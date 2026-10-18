@@ -2489,12 +2489,17 @@ async def test_property_13_refreshed_content_equals_latest_note(
     # Mock DB 和 service
     mock_db = AsyncMock()
 
-    # Mock note 查询返回 latest_text
+    # Mock note 查询返回 latest_text（§16b：_latest_note 用 select(DisclosureNote).scalars().first()
+    # 取整条 ORM 行；table_data=None 让重建走纯文字回退）
     mock_note_result = MagicMock()
     mock_note_row = MagicMock()
     mock_note_row.text_content = latest_text
     mock_note_row.table_data = None
+    mock_note_row.section_title = None
+    mock_note_row.note_section = section_code
+    mock_note_row.source_template = None
     mock_note_result.first.return_value = mock_note_row
+    mock_note_result.scalars.return_value.first.return_value = mock_note_row
 
     # Mock terminal check（非终态）
     mock_terminal_result = MagicMock()
@@ -2506,28 +2511,24 @@ async def test_property_13_refreshed_content_equals_latest_note(
     mock_state_result = MagicMock()
     mock_state_result.scalar_one_or_none.return_value = None
 
-    call_idx = [0]
-
     async def mock_execute(stmt, params=None):
-        call_idx[0] += 1
-        idx = call_idx[0]
-        if idx == 1:
-            # terminal check
+        # 按语句内容路由（而非调用序号）：confirm_overwrite=True 时跳过 detect_user_edits，
+        # 序号路由会让 note 查询错位。§16b 后 note 查询走 scalars().first()，必须稳定命中。
+        s = str(stmt).lower()
+        if "word_export_task" in s and "status" in s:
             return mock_terminal_result
-        elif idx == 2:
-            # detect_user_edits → baseline hash
-            return mock_state_result
-        elif idx == 3:
-            # note query
+        if "disclosure_note" in s or "note_section" in s:
             return mock_note_result
-        else:
-            # Other (hash computation, clear_stale, etc.)
-            mock_r = MagicMock()
-            mock_r.first.return_value = None
-            mock_r.all.return_value = []
-            mock_r.scalar_one_or_none.return_value = None
-            mock_r.rowcount = 1
-            return mock_r
+        if "deliverable_section_state" in s:
+            return mock_state_result
+        mock_r = MagicMock()
+        mock_r.first.return_value = None
+        mock_r.all.return_value = []
+        mock_r.scalar_one_or_none.return_value = None
+        mock_r.scalars.return_value.first.return_value = None
+        mock_r.scalars.return_value.all.return_value = []
+        mock_r.rowcount = 1
+        return mock_r
 
     mock_db.execute = AsyncMock(side_effect=mock_execute)
     mock_db.flush = AsyncMock()

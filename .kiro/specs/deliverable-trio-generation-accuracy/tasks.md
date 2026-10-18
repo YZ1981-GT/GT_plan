@@ -36,8 +36,19 @@
     只影响「有无 `{{`」判断，等价变异。附注 / 报表 / 交付件锚点回填刷新相关测试 31 个文件 493 passed
     （`test_deliverable_lineage_properties.py::test_property_16` 的 hypothesis 反例「0．㐀」打在未改动的 `_is_title_paragraph` 上，与本次无关）。
 - [x] 13. 表格渲染（回退路径，见 design §2.9 更正）：样例表外观 + 金额列放宽 + 字号随样例表 / 宽表 9→8 磅 + 最小行高 + 表头重复 + 合计加粗。
-- [ ]* 13a. 模板克隆路径（列数一致时直接克隆样例表行、保留表头合并）——未做：回退路径渲染后与模板版式已基本一致（四项目 PDF 核对），
-  克隆路径的行原型选择在真实表名 / 行名不规整时风险高，ROI 不足，如需再立任务。
+- [x]* 13a. 模板克隆路径（列数一致时直接克隆样例表行、保留表头合并）。2026-10-17 用户强制执行此前延后项，已落实。
+  - 实现：`note_template_table_look.render_cloned_table`（样例表叶子列数 = 库内表列数时深拷贝样例表、保留表头行含 `gridSpan`/`vMerge`
+    合并、按行标签三级选原型行「同名→合计/小计/总计→首个数据行」逐行克隆写值、金额右对齐千分位 0/空留白、列宽/边框/字体全继承模板）
+    + `sample_leaf_columns` / `lib_leaf_columns`（与 `_render_table` 同口径的有效列）；`rebuild_block._render` 克隆优先、列数不一致回退，
+    `BlockRebuildStats.tables_cloned` 记数。lxml 代理 `id()` 复用坑规避：全程 `copy.deepcopy(w:tbl)` + 持有元素引用，不按裸 `id()` 判定。
+  - 证据：`tests/services/test_note_template_clone_path.py` 10 例（列数分流 / 无样例表或无数据回退 / 表头两行合并保留 /
+    原型三级选择 / 0 与空留白 + 文本透传 / 模板列宽保留 / 端到端 `rebuild_block` 克隆与回退分流）；磁盘变异 3 条逐条打红
+    （关克隆优先 → 端到端克隆用例红；关表头合并保留 → 合并保留用例红；原型恒取首行 → 两个原型用例红），变异均注在被测生产函数内、
+    未替换函数本身。回归：block_fill / 克隆 / filter / outline / 导出清理 / 锚点 / cp02 叶子列 / 多级表头 / 子表 / 模板填充共 162 passed。
+  - 真实模板验证（解除延后理由）：soe/listed standalone+consolidated 四套模板现扫，样例表 245~428 张、含表头合并 61~124 张、
+    多行原型 241~418 张、列数 2~13。对 listed 块「五、4 应收票据」（7 叶子列、两行合并表头「期末余额→账面余额/坏账准备/账面价值」）
+    跑 `rebuild_block`：克隆路径触发、输出 2 表头行 + 3 数据行、合并保留、6 个数值列逐格落值、0 留白、另存重开文档结构合法。
+    原延后担心的「行名不规整」风险实测为低：原型行只决定继承的格式/边框，所有值都被库内值覆盖，行身份不影响数据正确性。
 - [x] 14. 交叉引用显示映射（含旧编号别名、指向未导出章节的提醒）；章级附注放入空章（章名相近才放）。
   - 偏离 AC-3.5：模板无位置的其余附注不追加、只提醒（实测全为章级大模型综述 / 旧编号重复 / 指引误导入，见 design §2.9）。
 - [x] 15. 导出提醒：剔除行数、残留占位章节、报表有余额附注无表、报表零余额未导出、勾选未导出、模板无位置、空章、悬空交叉引用、样板文字待填；
@@ -46,7 +57,27 @@
   本 spec 确认库内已有 AI 草稿经 Task 9 交付过滤剔除：四项目交付件分别剔除 630 / 625 / 374 / 8 行（安徽 / 和平 / 华氏 / 宜宾），残留单占位句子逐章提醒。
 - [x] 16a. 报表附注列与附注交付件编号同源：`build_fs_note_ref_plan` 与导出共用 `region_is_kept` + `container_orders` + `number_regions`。
   - 证据：真实模板端到端测试（零余额只有文字的节不编号、后续顺延；分项节不占号）；四项目报表附注列 78 个编号与交付件 LibreOffice 渲染编号逐个一致（0 不符）。
-- [ ]* 16b. 交付件增量刷新（`deliverable_refresh_service._replace_block_content`）按模板重建块 + 交付过滤 —— 未做，现仍只换正文文字（旧行为），需另立任务。
+- [x]* 16b. 交付件增量刷新（`deliverable_refresh_service._replace_block_content`）按模板重建块 + 交付过滤。2026-10-17 用户强制执行此前延后项，已落实。
+  - 实现：新模块 `deliverable_refresh_rebuild.py`（272 行）—— `_adapt`（marker 直传；anchor 在内容宿主 body/`w:sdtContent`
+    内首尾插哨兵空段作 open/close，适配 `rebuild_block` 的「elements[0]/[-1] 作标记、兄弟插删」约定，重建后删哨兵、持引用不按裸 `id()`）、
+    `_has_rebuildable_structure`（认 `w:tbl` 或标题样式段 → 走 `rebuild_block`；纯文字 / 空区间回退）、`rebuild_refresh_block`
+    （与全量生成同套：`rebuild_block` + `make_block_filter`，正文过滤与结构判定共用块标题 `extra_titles` + 子标题 / 表题
+    `structure_titles`）、`_fallback_text`（纯文字块接 `make_block_filter` 过滤后 `note_text_elements` 渲染）。
+    `deliverable_refresh_service`：`_latest_note_text`→`_latest_note`（取整条 ORM 行含 `table_data`，无记录返 `_EmptyNote` 占位）、
+    `_replace_block_content` 改签名 `(doc, block, note, locate_mode, section_code)` 调重建后用 `_current_block_elements`
+    重扫块算 `block_text_hash`（口径不变、与导出 / 人工编辑检测同一函数）、`_exporter()` 惰性建 `NoteWordExporter`；单 / 批两调用点均改。
+  - 关键发现：交付件块里已无模板样例表（全量导出已消费），但块内已渲染表 + 标题足以让 `rebuild_block` 用库内 note 重渲染表 + 过滤正文；
+    anchor / marker 两套 block 结构不同（anchor `.elements` 是纯内容、`start_el` 在 body 级而内容可能在 `w:sdtContent` 内），
+    必须哨兵适配不能硬塞。`_has_rebuildable_structure` 首版认「非空 `w:p`」太松 —— 纯文字块被 `rebuild_block` 当标题保留致旧文字残留，
+    收窄为只认表 / 标题样式。
+  - 证据：`tests/services/test_deliverable_refresh_rebuild.py` 5 例（模板重建重渲染表 + 过滤草稿 × anchor/marker 两模式 + 纯文字回退过滤
+    × 两模式 + Rendered_Block_Hash 口径）；磁盘变异 2 条逐条打红（关 `_has_rebuildable_structure` 分流 → 模板用例红；
+    关 `make_block_filter` 内层退化恒等 → 过滤用例红），变异注在被测 `rebuild_refresh_block` / `_replace_block_content` 的下一层、
+    未替换生产函数，复原后全绿无残留。回归：refresh / lineage / filter / note_template / clone / 锚点 + 导出相关 152 passed；
+    `_replace_block_content` 改签名牵连 4 处旧 fixture（e2e `MockDBResult` 补 `scalars()`、property_13 mock 改按语句内容路由 + 补
+    `scalars().first()`、`test_note_text_word_render` 刷新用例改传 note 对象 + 新签名）已按新契约更新；其余 8 个失败经 `git stash`
+    归因为并发 spec 的模板 JSON 改动 / OnlyOffice 密钥内置默认（HEAD 同样失败，非本任务引入）。`check_file_size` 两文件（service 539 /
+    新模块 272）均 ≤800、无需白名单。
 
 ## Phase C 审计报告正文
 

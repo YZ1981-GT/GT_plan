@@ -1,0 +1,41 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "6. 修复器：表格（表名、列、多级表头、行标签、表数），保留机器字段；与逐循环表格脚本冲突处逐条登记。": [
+      {
+        "executionId": "5938c0c4-f67b-40c3-9bb7-626d6d1628f8",
+        "chatSessionId": "sess_02a31e15-a6c6-4e4c-a399-b1abc19e6e2a",
+        "timestamp": 1792246684509
+      },
+      {
+        "executionId": "5938c0c4-f67b-40c3-9bb7-626d6d1628f8",
+        "chatSessionId": "sess_02a31e15-a6c6-4e4c-a399-b1abc19e6e2a",
+        "timestamp": 1792246691845
+      }
+    ],
+    "12. 表格结构写库：按新结构搬值，孤儿值保留在 `_realign_orphans` 并报告；断言非空值多重集合不变、正文哈希不变。": [
+      {
+        "executionId": "5938c0c4-f67b-40c3-9bb7-626d6d1628f8",
+        "chatSessionId": "sess_02a31e15-a6c6-4e4c-a399-b1abc19e6e2a",
+        "timestamp": 1792246685807
+      },
+      {
+        "executionId": "5938c0c4-f67b-40c3-9bb7-626d6d1628f8",
+        "chatSessionId": "sess_02a31e15-a6c6-4e4c-a399-b1abc19e6e2a",
+        "timestamp": 1792247913971
+      }
+    ],
+    "27. 验证：行数、章节树、无「五、N」旧行、抽查科目合计 = 试算表审定数、浏览器。": [
+      {
+        "executionId": "5938c0c4-f67b-40c3-9bb7-626d6d1628f8",
+        "chatSessionId": "sess_02a31e15-a6c6-4e4c-a399-b1abc19e6e2a",
+        "timestamp": 1792246686241
+      },
+      {
+        "executionId": "5938c0c4-f67b-40c3-9bb7-626d6d1628f8",
+        "chatSessionId": "sess_02a31e15-a6c6-4e4c-a399-b1abc19e6e2a",
+        "timestamp": 1792249232478
+      }
+    ]
+  }
+}

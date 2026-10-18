@@ -39,6 +39,21 @@ class RefreshResult(TypedDict):
     pending_confirm_sections: list[str]  # 等待确认的章节列表
 
 
+class _EmptyNote:
+    """无库内记录时的占位附注（§16b 重建按「无可出具内容」处理）。
+
+    鸭子类型满足 ``rebuild_block`` / 交付过滤读取：``text_content`` / ``table_data`` /
+    ``note_section`` / ``section_title`` / ``source_template``。
+    """
+
+    def __init__(self, section_code: str):
+        self.note_section = section_code
+        self.section_title = None
+        self.text_content = ""
+        self.table_data = None
+        self.source_template = None
+
+
 # ─── DeliverableRefreshService ───────────────────────────────────────────────
 
 
@@ -52,6 +67,7 @@ class DeliverableRefreshService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self._section_state_service = DeliverableSectionStateService(db)
+        self._note_exporter = None  # 惰性建（§16b 重建需要 _render_table）
 
     async def refresh_section(
         self,
@@ -85,10 +101,6 @@ class DeliverableRefreshService:
         Returns:
             RefreshResult
         """
-        import sqlalchemy as sa
-
-        from app.models.report_models import DisclosureNote
-
         # ─── 0. 终态检查 ─────────────────────────────────────────────────────
         terminal = await self._check_terminal(word_export_task_id)
         if terminal:
@@ -151,13 +163,14 @@ class DeliverableRefreshService:
                     pending_confirm_sections=[section_code],
                 )
 
-        # ─── 3. 获取最新 disclosure_notes 内容并重填 ─────────────────────────
-        latest_text = await self._latest_note_text(project_id, year, section_code)
+        # ─── 3. 获取最新 disclosure_notes 内容并按模板重建该块（§16b） ────────
+        # 取整条附注（含 table_data）：重建要重渲染库内表 + 过滤正文，不只换文字。
+        latest_note = await self._latest_note(project_id, year, section_code)
 
-        # 就地替换块内容（需求 4.5）：先在原位置插入新段落、再删旧元素，
+        # 就地按模板重建块内容（需求 4.5 / §16b）：先在原位置重建、再删旧元素，
         # 保证该章节在文档中的位置不变（旧实现用 doc.add_paragraph 追加到文末）。
         rendered_hash = self._replace_block_content(
-            target_block, latest_text or "", locate_mode
+            doc, target_block, latest_note, locate_mode, section_code
         )
 
         # ─── 4. 更新该章节 source_snapshot_hash + Rendered_Block_Hash + 清 stale ──
@@ -287,9 +300,9 @@ class DeliverableRefreshService:
                     pending_confirm.append(code)
                     continue
 
-            latest_text = await self._latest_note_text(project_id, year, code)
+            latest_note = await self._latest_note(project_id, year, code)
             new_hashes[code] = self._replace_block_content(
-                block, latest_text, locate_mode
+                doc, block, latest_note, locate_mode, code
             )
             refreshed.append(code)
 
@@ -343,22 +356,28 @@ class DeliverableRefreshService:
             pending_confirm_sections=[],
         )
 
-    async def _latest_note_text(
-        self, project_id: UUID, year: int, section_code: str
-    ) -> str:
-        """读取该章节当前 DB 文字（刷新写入源）。"""
+    async def _latest_note(self, project_id: UUID, year: int, section_code: str):
+        """读取该章节整条 ``DisclosureNote``（刷新重建源：正文 + table_data + 表头投影）。
+
+        §16b 重建要重渲染库内表格、按章节标题 / 编码做交付过滤，不能只拿 ``text_content``；
+        无该章节记录时返回一个轻量占位对象（``text_content=""`` / ``table_data=None``），
+        重建等价于清空该块的可出具内容。
+        """
         import sqlalchemy as sa
 
         from app.models.report_models import DisclosureNote
 
-        stmt = sa.select(DisclosureNote.text_content).where(
+        stmt = sa.select(DisclosureNote).where(
             DisclosureNote.project_id == project_id,
             DisclosureNote.year == year,
             DisclosureNote.note_section == section_code,
             DisclosureNote.is_deleted == sa.false(),
         )
         result = await self.db.execute(stmt)
-        return result.scalar_one_or_none() or ""
+        note = result.scalars().first()
+        if note is not None:
+            return note
+        return _EmptyNote(section_code)
 
     # ─── Private helpers ─────────────────────────────────────────────────────
 
@@ -451,70 +470,65 @@ class DeliverableRefreshService:
         current_block_hash = block_text_hash(list(target_block.elements))
         return current_block_hash != baseline_block_hash
 
+    def _exporter(self):
+        """惰性建 ``NoteWordExporter``（只需 db；提供 ``_render_table`` / ``_effective_table_data``）。"""
+        if self._note_exporter is None:
+            from app.services.note_word_exporter import NoteWordExporter
+
+            self._note_exporter = NoteWordExporter(self.db)
+        return self._note_exporter
+
     def _replace_block_content(
         self,
+        doc,
         target_block,
-        text_content: str,
+        note,
         locate_mode: str,
+        section_code: str,
     ) -> str:
-        """就地替换章节块内容，返回新内容的 Rendered_Block_Hash（需求 4.5/4.6）。
+        """就地按模板重建章节块，返回新内容的 Rendered_Block_Hash（需求 4.5/4.6 / §16b）。
 
-        算法（顺序关键）：
-        1. 先在**原位置**插入新段落 —— anchor 模式插到锚点区间内（有内容控件时插进
-           ``w:sdtContent`` 内部，新内容才被 Tag 覆盖）；marker 模式插到开标记之后；
-        2. 再删除旧内容元素。
+        与全量生成（``note_template_export_fill.fill_template_blocks``）同一套重建逻辑：
+        标题 + 库内有数表（含表题 / 子标题、克隆 / 回退渲染）+ **交付过滤后**的正文；指引 / 示例 /
+        占位 / 大模型草稿均剔除。无可识别结构的纯文字块回退到「过滤后正文」渲染（仍接交付过滤）。
 
-        先插后删是为了保住位置：旧实现 ``doc.add_paragraph`` 把刷新后的章节追加到
-        **文档末尾**（注释自承认「实际生产中应在删除前记录位置并 insertbefore」），
-        刷新一次章节顺序就乱。
+        位置保持（需求 4.5）：anchor 模式在内容宿主（body 或 ``w:sdtContent``）内重建，哨兵作插入锚点
+        重建后删除；marker 模式开闭标记保留只换中间。重建逻辑见 ``deliverable_refresh_rebuild``。
 
         Returns:
-            新写入内容的规范化 sha256（与导出侧同函数），供更新基线。
+            重建后块内文字的规范化 sha256（与导出 / 人工编辑检测侧同一 ``block_text_hash``），供更新基线。
         """
-        from app.services.section_anchor_utils import (
-            anchor_block_content_host,
-            block_text_hash,
+        from app.services.deliverable_refresh_rebuild import rebuild_refresh_block
+        from app.services.section_anchor_utils import block_text_hash
+
+        rebuild_refresh_block(
+            doc, target_block, note, locate_mode, exporter=self._exporter()
         )
 
-        from app.services.note_text_word_render import note_text_elements
+        # 重建后重新读取该块当前内容元素算哈希（内容已重组，不能复用插入前的段落列表）：
+        # anchor 模式按锚点区间重扫（含内容控件内部）；marker 模式取开闭标记之间。
+        current = self._current_block_elements(doc, target_block, locate_mode, section_code)
+        return block_text_hash(current)
 
-        old_elements = list(getattr(target_block, "elements", None) or [])
-        # 与导出同一渲染（段落 / 列表 / 表格，design §5.5）；纯文字先按编辑器口径转 HTML（第 22 组：
-        # 首版纯文字按行拆段 —— 单换行被拆成两段、markdown 表格成竖线段落，与导出也不一致）
-        new_paragraphs = note_text_elements(text_content or "")
-
+    def _current_block_elements(
+        self, doc, target_block, locate_mode: str, section_code: str
+    ) -> list:
+        """重建后该块当前内容元素（``w:p`` / ``w:tbl``）—— 算 Rendered_Block_Hash 用。"""
         if locate_mode == "anchor":
-            host, children = anchor_block_content_host(target_block)
-            if children:
-                anchor_el = children[0]
-                for p in new_paragraphs:
-                    anchor_el.addprevious(p)
-            else:
-                # 空区间：紧跟 bookmarkStart 之后逆序插入以保持先后顺序
-                start_el = target_block.start_el
-                for p in reversed(new_paragraphs):
-                    start_el.addnext(p)
-            # 删除旧内容（仅区间内内容元素；书签与内容控件外壳保留）
-            for el in children:
-                parent = el.getparent()
-                if parent is not None:
-                    parent.remove(el)
-        else:
-            # marker 模式：开闭标记保留，只换标记之间的内容
-            open_el = getattr(target_block, "open_el", None)
-            inner = [
-                el
-                for el in old_elements
-                if el is not open_el
-                and el is not getattr(target_block, "close_el", None)
-            ]
-            if open_el is not None:
-                for p in reversed(new_paragraphs):
-                    open_el.addnext(p)
-            for el in inner:
-                parent = el.getparent()
-                if parent is not None:
-                    parent.remove(el)
+            from app.services.section_anchor_utils import scan_anchor_blocks
 
-        # 用与导出侧完全一致的口径算新哈希（只取 w:p、排除 ## 标记行）
-        return block_text_hash(new_paragraphs)
+            for b in scan_anchor_blocks(doc):
+                if b.section_code == section_code:
+                    return list(b.elements)
+            return []
+        # marker 模式：开闭标记之间的内容（标记本身不计入哈希，block_text_hash 已跳过 ## 行）
+        open_el = getattr(target_block, "open_el", None)
+        close_el = getattr(target_block, "close_el", None)
+        if open_el is None:
+            return []
+        out = []
+        el = open_el.getnext()
+        while el is not None and el is not close_el:
+            out.append(el)
+            el = el.getnext()
+        return out

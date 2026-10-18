@@ -1,0 +1,187 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.2 右栏串页修复：`matchSheetCode` 改结构化精确等值 + fail-closed（改动点①）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282672824
+      }
+    ],
+    "1.3 历史缺值行 `stable_sheet_key` 回填（改动点①附属，复用单一真源）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282672877
+      }
+    ],
+    "1.4 surfaced/extraction 前端强制只读 + 保存按 kind 分派（改动点②）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282672912
+      }
+    ],
+    "1.5 字段名修正 `formula_category/formula_description` → `category/description`（改动点③，独立）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282672960
+      }
+    ],
+    "2.1 生产真正调用 `createOpenFormulaManagerCommand` + 统一 testid + 删 node-only 旁路": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282672992
+      }
+    ],
+    "2.2 B15 `redirect-materiality` 正式豁免登记": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673032
+      }
+    ],
+    "2.3 componentType 覆盖闭合 + 10 个 classification 404 一次性归类（实施期现算）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673103
+      }
+    ],
+    "3.1 右栏服务端精确过滤 `GET formulas?project_id&wp_id&sheet_uid`": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673141
+      }
+    ],
+    "3.2 左栏改为当前页 anchors + 显式全局浏览按钮 + 缺 identity fail-closed（ADR-FMC-05）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673194
+      }
+    ],
+    "4.1 附注权威源收敛：`execute_note_formulas` 合并消费 `_formulas` ∪ `_user_formulas`（ADR-FMC-04）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673239
+      }
+    ],
+    "4.2 函数支持矩阵禁静默 0（需求 8）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673283
+      }
+    ],
+    "4.3 报表链口径澄清（按 distinct 模板计，不按项目克隆夸大）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673324
+      }
+    ],
+    "5.1（前置·先坐实）FM-P0-05 跨项目越权 TestClient 坐实（§6.1，ADR-FMC-06）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673393
+      }
+    ],
+    "5.2 对象型端点加固（对象 id 反查 project + require_project_access + body/query project_id 校验）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673432
+      }
+    ],
+    "5.3 全局模板 / 全局自定义函数写限 admin（report_config CRUD + formula.py 注册/注销）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673474
+      }
+    ],
+    "5.4 批量单事务 + CAS + wp CRUD 写审计哈希链": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673507
+      }
+    ],
+    "6.1 report-config/types 路由修复（§1 #8）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673541
+      }
+    ],
+    "6.2 report-cross-check year 必填 + 按执行结果解析 + 规则落库 + 树 key↔规则 map key 一致": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673582
+      }
+    ],
+    "6.3 缓存按 project key 隔离 + 单行保存触发统一 stale + 保存用项目年（需求 10）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673615
+      }
+    ],
+    "6.4 每次执行写 run/issue/hint/outbox/audit 同 run_id + 去掉「执行 0 条仍成功」": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673648
+      }
+    ],
+    "7.2（两段式·先诊断）consolidated 合并三类最小数据运行诊断（§6.2，ADR-FMC-09）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673683
+      }
+    ],
+    "7.1 standalone 一套最小数据运行坐实（需求 11）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673716
+      }
+    ],
+    "8.2* ≥7 套 local formula dialog/drawer 收敛或明确分工登记（需求 20.1）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673750
+      }
+    ],
+    "8.1 全量门禁 `formula-manager-all-accessible-pages.spec.ts`（需求 12，§7）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673794
+      }
+    ],
+    "8.3 两条历史假红/脆化前端测试修为反映真实行为 + 变异反证（需求 20.2）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673840
+      }
+    ],
+    "8.5 RTK 吞失败退出码修正（复用 §7.4③ 口径）（需求 20.4）": [
+      {
+        "executionId": "4e128eb4-4a8c-4d1e-be6e-85cc12e45b07",
+        "chatSessionId": "sess_ef82f1b7-d913-498d-b4c0-0bbe406a1975",
+        "timestamp": 1792282673884
+      }
+    ]
+  }
+}

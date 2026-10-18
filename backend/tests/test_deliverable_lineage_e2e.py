@@ -183,9 +183,26 @@ class MockDBResult:
             return self._scalar
         return 0
 
+    def scalars(self):
+        # §16b：refresh 的 _latest_note 用 select(DisclosureNote).scalars().first()
+        # 取整条 ORM 行（含 table_data）。标量查询返回 _scalar，实体查询返回 rows。
+        rows = self._rows if self._rows else ([self._scalar] if self._scalar is not None else [])
+        return _MockScalars(rows)
+
     @property
     def rowcount(self):
         return len(self._rows) if self._rows else 1
+
+
+class _MockScalars:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def first(self):
+        return self._rows[0] if self._rows else None
+
+    def all(self):
+        return list(self._rows)
 
 
 def _make_mock_db(

@@ -60,6 +60,7 @@ from app.services.note_template_docx_base import (
 )
 from app.services.note_template_table_look import (
     apply_template_table_look,
+    render_cloned_table,
     _header_rows,
 )
 from app.services.note_template_doc_ops import (
@@ -90,6 +91,7 @@ __all__ = [
     "SyntheticBlock",
     "absorb_trailing_content",
     "apply_template_table_look",
+    "render_cloned_table",
     "block_layout",
     "caption_like",
     "capture_title_order",
@@ -135,6 +137,7 @@ class BlockRebuildStats:
     """单块重建统计（汇总进导出提醒）。"""
 
     tables_rendered: int = 0
+    tables_cloned: int = 0  # 走克隆路径（列数一致、直接克隆样例表行）的表数
     extra_tables: int = 0
     unmatched_slots: int = 0
     template_elements_removed: int = 0
@@ -529,15 +532,24 @@ def rebuild_block(
     first_sample = next((s.table for s in lay.slots if s.table is not None), None)
 
     def _render(tables: list[dict], sample, *, first_caption: bool, caption_proto) -> list[Any]:
-        """渲染若干表；第二张起（续表 / 期初表）、或 ``first_caption`` 时首张，按表名补表题。"""
+        """渲染若干表；第二张起（续表 / 期初表）、或 ``first_caption`` 时首张，按表名补表题。
+
+        克隆路径（design §2.4）：样例表叶子列数 = 库内表列数时，直接克隆样例表行写值（保留表头合并 / 列宽 /
+        字体 / 边框）；列数不一致或无样例表时回退到 ``_render_table`` 结构 + ``apply_template_table_look``。
+        """
         out: list[Any] = []
         for t in tables:
-            els = _render_table_elements(doc, exporter, t)
-            if not any(e.tag == _W_TBL for e in els):
-                continue
-            for e in els:
-                if e.tag == _W_TBL:
-                    apply_template_table_look(e, sample, header_rows=_header_rows(t))
+            cloned = render_cloned_table(sample, t, header_rows=_header_rows(t)) if sample is not None else None
+            if cloned is not None:
+                els: list[Any] = [cloned]
+                st.tables_cloned += 1
+            else:
+                els = _render_table_elements(doc, exporter, t)
+                if not any(e.tag == _W_TBL for e in els):
+                    continue
+                for e in els:
+                    if e.tag == _W_TBL:
+                        apply_template_table_look(e, sample, header_rows=_header_rows(t))
             name = str(t.get("name") or "").strip()
             if name and (out or first_caption):
                 out.append(_caption_para(name, caption_proto))

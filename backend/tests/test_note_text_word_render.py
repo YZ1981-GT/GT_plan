@@ -322,9 +322,20 @@ class TestExporters:
         assert seq.count("P:") == n_anchor, seq
 
     def test_refresh_replaces_block_with_rendered_html(self):
+        # §16b：_replace_block_content 改签名 (doc, block, note, locate_mode, section_code)，纯文字 /
+        # 无结构块走交付过滤回退渲染。这里的块只有普通段落（无标题样式 / 无表）→ 回退路径；传入的文字
+        # 都无需过滤（无大模型草稿 / 指引），故渲染结果与导出同口径（markdown 表格成表、单换行保留一段）。
         from app.services.deliverable_refresh_service import DeliverableRefreshService
         from app.services.section_anchor_utils import block_text_hash
         from app.services.word_doc_utils import scan_section_blocks
+
+        class _Note:
+            def __init__(self, text):
+                self.note_section = "八、1"
+                self.section_title = None
+                self.text_content = text
+                self.table_data = None
+                self.source_template = None
 
         # 纯文字与导出同一渲染（第 22 组）：首版按行拆段，单换行被拆成两段、markdown 表格成了竖线段落
         for text, expected in ((TABLE_HTML, ["货币资金明细如下：", "无受限资金。"]), ("第一行\n第二行", ["第一行\n第二行"]),
@@ -333,7 +344,9 @@ class TestExporters:
             for line in ("##SECTION:八、1##", "旧正文", "##/SECTION:八、1##"):
                 document.add_paragraph(line)
             [block] = scan_section_blocks(document)
-            new_hash = DeliverableRefreshService(SimpleNamespace())._replace_block_content(block, text, "marker")
+            new_hash = DeliverableRefreshService(SimpleNamespace())._replace_block_content(
+                document, block, _Note(text), "marker", "八、1"
+            )
             inner = _texts(document.paragraphs)[1:-1]
             assert inner == expected, inner
             [refreshed] = scan_section_blocks(document)

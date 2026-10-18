@@ -1,0 +1,33 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "id": "OBS-1",
+      "severity": "observation",
+      "blocking": false,
+      "confidence": "possible",
+      "location": "tasks.md 覆盖自检「20 条需求 → 任务承接」需求 13 行",
+      "issue": "需求 13.3（校对 cross_check_results / 传播 formula_runtime_outbox 由需求 10、11 运行坐实）的运行证据实际落在 Phase 7（7.1）与 Phase 6（6.4），而覆盖表把需求 13 承接写为 1.2/1.4/4.2/5.2/5.4。需求 13 本身是汇总型收敛需求、已由其引用的需求 1/2/5/8/10/11 整体覆盖，不构成缺口；仅提示实施期 13.3 运行证据来自 7.1/6.4。",
+      "action": "可选：在覆盖自检需求 13 行补注运行坐实由 7.1/6.4 承接。非阻断。"
+    },
+    {
+      "id": "OBS-2",
+      "severity": "observation",
+      "blocking": false,
+      "confidence": "possible",
+      "location": "tasks.md Task 6.1 的【需求】字段",
+      "issue": "Task 6.1 需求引用写「需求 9（report-config/types 侧）」未精确到子条；report-config/types 更贴切的锚点是审计报告 §1 #8（Task 6.1 的 design 锚点已正确写 §1 #8）。需求 9 的主体（A1/Univer 入口 + 404 归类）由 2.1/2.3 承接，无覆盖缺口。",
+      "action": "可选：需求编号可更精确。非阻断。"
+    },
+    {
+      "id": "OBS-3",
+      "severity": "observation",
+      "blocking": false,
+      "confidence": "confirmed",
+      "location": "tasks.md Task 8.1 门禁断言⑦ pending 前置",
+      "issue": "⑦ pending 前置（Phase 5 全部对象型端点加固 + Task 5.1 §6.1 坐实前标 skip/pending、不计入分母红、任一未合入则不做部分硬化）已与 design §7.2 NIT-2 响应逐字一致，处理正确。记录供实施期追踪依赖链。",
+      "action": "无需改动。"
+    }
+  ],
+  "reviewDoc": "d:\\GT_plan\\.agents\\tasks\\GT_plan-spec-formula-manager-closure-2026-10-17/tasks-review.md"
+}

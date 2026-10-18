@@ -1,0 +1,19 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "13a. 模板克隆路径（列数一致时直接克隆样例表行、保留表头合并）——未做：回退路径渲染后与模板版式已基本一致（四项目 PDF 核对），": [
+      {
+        "executionId": "d07cc387-85d5-4d13-8cdc-67f362f0d7ed",
+        "chatSessionId": "sess_5fefa6a0-fab2-4592-979e-76625c45b880",
+        "timestamp": 1792252139729
+      }
+    ],
+    "16b. 交付件增量刷新（`deliverable_refresh_service._replace_block_content`）按模板重建块 + 交付过滤 —— 未做，现仍只换正文文字（旧行为），需另立任务。": [
+      {
+        "executionId": "d07cc387-85d5-4d13-8cdc-67f362f0d7ed",
+        "chatSessionId": "sess_5fefa6a0-fab2-4592-979e-76625c45b880",
+        "timestamp": 1792279250936
+      }
+    ]
+  }
+}

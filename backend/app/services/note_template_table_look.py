@@ -22,6 +22,9 @@ from app.services.note_template_docx_base import (
 
 __all__ = [
     "apply_template_table_look",
+    "render_cloned_table",
+    "sample_leaf_columns",
+    "lib_leaf_columns",
 ]
 
 _TOTAL_RE = re.compile(r"^(?:合\s*计|小\s*计|总\s*计)")
@@ -145,6 +148,194 @@ def _row_cells(tr) -> list[tuple[int, int, Any]]:
         out.append((col, span, tc))
         col += span
     return out
+
+
+# ── 克隆路径（design §2.4） ───────────────────────────────────────────────────
+#
+# 参考表（模板样例表）叶子列数 = 库内表列数时，不走回退路径（``_render_table`` 结构 + 样例表外观），
+# 而是深拷贝样例表、保留表头（含合并单元格），按行标签选原型行逐行克隆写值 —— 列宽 / 边框 / 字体 /
+# 表头合并完全保留模板版式。列数不一致时返回 ``None``，调用方回退。
+
+
+def sample_leaf_columns(sample) -> int:
+    """模板样例表的叶子列数（``w:tblGrid/w:gridCol`` 个数）；无网格时按首行单元格跨列累加。"""
+    if sample is None:
+        return 0
+    grid = sample.find(qn("w:tblGrid"))
+    if grid is not None:
+        cols = grid.findall(qn("w:gridCol"))
+        if cols:
+            return len(cols)
+    rows = sample.findall(qn("w:tr"))
+    if not rows:
+        return 0
+    return sum(span for _c, span, _tc in _row_cells(rows[0]))
+
+
+def _valid_indices(table_data: dict) -> list[int]:
+    """与 ``NoteWordExporter._render_table`` 同口径的有效列下标：多级表头保留全部列，扁平表裁空标题列。"""
+    headers_raw = table_data.get("headers", []) or []
+    column_groups = table_data.get("_column_groups")
+    multi = (isinstance(column_groups, list) and len(column_groups) > 0) or (
+        isinstance(table_data.get("multi_header"), list) and len(table_data.get("multi_header", [])) > 0
+    )
+    if multi:
+        return list(range(len(headers_raw)))
+    return [i for i, h in enumerate(headers_raw) if h and str(h).strip()]
+
+
+def lib_leaf_columns(table_data: dict) -> int:
+    """库内表的叶子列数（与 ``_render_table`` 一致：首列 label + 各数值列）。"""
+    return len(_valid_indices(table_data))
+
+
+def _cell_display_value(val) -> Any:
+    """与 ``_render_table`` 同口径取单元格值（dict 取 value / manual_value）。"""
+    if isinstance(val, dict):
+        return val.get("value", val.get("manual_value", 0))
+    return val
+
+
+def _row_values(row: dict, valid_indices: list[int]) -> list[Any]:
+    """库内行 → 数值列的显示值列表（对齐 ``valid_indices[1:]``，缺值补空）。"""
+    values = row.get("values", [])
+    cells_data = row.get("cells", values)
+    out: list[Any] = []
+    for original_col_idx in valid_indices[1:]:
+        data_idx = original_col_idx - 1
+        out.append(_cell_display_value(cells_data[data_idx]) if 0 <= data_idx < len(cells_data) else "")
+    return out
+
+
+def _header_row_count(sample, table_data: dict) -> int:
+    """样例表里标了 ``w:tblHeader`` 的前导行数；没标时按库内表（多级表头两行 / 否则一行），至少 1、不超过总行数。"""
+    rows = sample.findall(qn("w:tr"))
+    if not rows:
+        return 0
+    marked = 0
+    for tr in rows:
+        trpr = tr.find(qn("w:trPr"))
+        if trpr is not None and trpr.find(qn("w:tblHeader")) is not None:
+            marked += 1
+        else:
+            break
+    if marked:
+        return min(marked, len(rows))
+    return min(max(1, _header_rows(table_data)), len(rows))
+
+
+def _norm_label(text: str) -> str:
+    return re.sub(r"\s+", "", unicodedata.normalize("NFKC", text or ""))
+
+
+def _set_cell_text(tc, text: str, *, right: bool) -> None:
+    """把单元格正文换成 ``text``（保留首个 run 的字体 / 字号），对齐按 ``right``；多余段落 / run 清掉。"""
+    from docx.oxml.ns import qn as _qn
+
+    paras = tc.findall(_qn("w:p"))
+    if not paras:
+        p = OxmlElement("w:p")
+        tc.append(p)
+        paras = [p]
+    first, rest = paras[0], paras[1:]
+    for extra in rest:
+        tc.remove(extra)
+    # 保留首个 run 的 rPr 作模板（字体 / 字号 / 加粗），其余 run 删掉
+    runs = first.findall(_qn("w:r"))
+    proto_rpr = None
+    for r in runs:
+        rpr = r.find(_qn("w:rPr"))
+        if rpr is not None and proto_rpr is None:
+            proto_rpr = copy.deepcopy(rpr)
+        first.remove(r)
+    ppr = first.find(_qn("w:pPr"))
+    if ppr is None:
+        ppr = OxmlElement("w:pPr")
+        first.insert(0, ppr)
+    for old in ppr.findall(_qn("w:jc")):
+        ppr.remove(old)
+    jc = OxmlElement("w:jc")
+    jc.set(qn("w:val"), "right" if right else "left")
+    ppr.append(jc)
+    run = OxmlElement("w:r")
+    if proto_rpr is not None:
+        run.append(proto_rpr)
+    t = OxmlElement("w:t")
+    t.text = text
+    t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+    run.append(t)
+    first.append(run)
+
+
+def _pick_prototype(data_rows: list[Any], label: str) -> Any:
+    """原型行三级选择：同名行 → 合计 / 小计 / 总计行 → 首个数据行。"""
+    key = _norm_label(label)
+    if key:
+        for tr in data_rows:
+            cells = _row_cells(tr)
+            if cells and _norm_label(_text(cells[0][2])) == key:
+                return tr
+    for tr in data_rows:
+        cells = _row_cells(tr)
+        if cells and _TOTAL_RE.match(_norm_label(_text(cells[0][2]))):
+            return tr
+    return data_rows[0]
+
+
+def render_cloned_table(sample, table_data: dict, *, header_rows: int = 1):
+    """克隆路径（design §2.4）：列数一致时深拷贝样例表、保留表头合并、按行标签选原型行逐行克隆写值。
+
+    返回填好值的新 ``w:tbl`` 元素；样例表缺失 / 无表头 / 无数据行、或叶子列数与库内表不一致时返回 ``None``
+    （调用方回退到 ``_render_table`` + ``apply_template_table_look``）。
+
+    - 保留表头行（``w:tblHeader`` 标记的前导行，含表头合并单元格 ``gridSpan`` / ``vMerge``），只读不改；
+    - 数据行按库内行数克隆原型行，首列写 label、其余列按 ``fmt_amount_gt`` 右对齐千分位（0 与空留白）；
+    - 列宽、边框、字体字号、单元格边距全部继承样例表模板。
+    """
+    from app.services.note_word_exporter import _is_amount, fmt_amount_gt
+
+    if sample is None:
+        return None
+    rows = table_data.get("rows") if isinstance(table_data, dict) else None
+    if not rows:
+        return None
+    rows = [r for r in rows if isinstance(r, dict)]
+    if not rows:
+        return None
+    valid = _valid_indices(table_data)
+    if not valid or sample_leaf_columns(sample) != len(valid):
+        return None
+
+    tbl = copy.deepcopy(sample)
+    all_tr = tbl.findall(qn("w:tr"))
+    hdr = _header_row_count(sample, table_data)
+    hdr = min(max(hdr, header_rows if header_rows > 0 else hdr), len(all_tr))
+    header_tr = all_tr[:hdr]
+    data_proto = all_tr[hdr:]
+    if not header_tr or not data_proto:
+        return None
+
+    # 组装：表头原样，数据行逐行克隆原型行；写完删掉所有原型数据行
+    anchor = header_tr[-1]
+    produced: list[Any] = []
+    for row in rows:
+        label = str(row.get("label", "") or "")
+        proto = _pick_prototype(data_proto, label)
+        clone = copy.deepcopy(proto)
+        cells = _row_cells(clone)
+        if cells:
+            _set_cell_text(cells[0][2], label, right=False)
+        values = _row_values(row, valid)
+        for display_col, (_col, _span, tc) in enumerate(cells[1:]):
+            val = values[display_col] if display_col < len(values) else ""
+            text = fmt_amount_gt(val) if _is_amount(val) or val in (None, "", 0) else str(val)
+            _set_cell_text(tc, text, right=True)
+        anchor.addnext(clone)
+        anchor = clone
+        produced.append(clone)
+    for tr in data_proto:
+        tbl.remove(tr)
+    return tbl
 
 
 def apply_template_table_look(tbl, sample=None, *, header_rows: int = 1) -> None:
