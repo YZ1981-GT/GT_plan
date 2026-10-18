@@ -203,3 +203,63 @@ async def test_real_template_fills_truncated_section_and_leaves_no_markers(monke
     texts = _texts(data)
     assert "本公司以权责发生制为记账基础（第26组）。" in texts
     assert [t for t in texts if _LEFTOVER.search(t)][:5] == []
+
+
+#: 测试集团甲实测章节码：锚点 sec_四_优先股_永续债等 逆映射成「四、优先股_永续债等」
+#: （夹具 _patch_scope 把「九、」开头的章节当合并口径排除，故不用安徽的「九、1、或有负债」）
+MULTI = "四、优先股、永续债等"
+
+
+@pytest.mark.parametrize("controls", [True, False], ids=["内容控件开", "内容控件关"])
+@pytest.mark.asyncio
+async def test_rendered_block_hash_recomputed_for_multi_dun_section_code(tmp_path, monkeypatch, controls):
+    """7.6 重算按真实章节码取块（spec deliverable-trio-generation-accuracy 16b 追加）。
+
+    原实现按逆映射出的章节码查 ``rendered_block_hashes`` ⇒ 多「、」章节（安徽 2 节、测试集团甲 3 节）的哈希停在 6.4，
+    收尾清理改了块内文字时，没动过的块也被增量刷新当成「有人工修改」。现行模板重建在 6.4 前已清掉块内占位符（真实
+    交付件两份实测 6.4 与终稿一致），故用 7.5 包一层改块内文字来模拟「收尾清理改了这一块」。
+    """
+    from docx.oxml import OxmlElement
+
+    from app.services.section_anchor_utils import block_text_hash, resolve_section_blocks
+
+    body_text = "本公司未发行优先股、永续债等金融工具。"
+    original_strip = nwe_mod._strip_residual_note_placeholders
+
+    def _strip_and_touch(document):
+        leaked = original_strip(document)
+        for p in document.element.body.iter(W + "p"):
+            if "".join(t.text or "" for t in p.iter(W + "t")) == body_text:
+                run, text = OxmlElement("w:r"), OxmlElement("w:t")
+                text.text = "（收尾清理后）"
+                run.append(text)
+                p.append(run)
+        return leaked
+
+    monkeypatch.setattr(nwe_mod, "_strip_residual_note_placeholders", _strip_and_touch)
+
+    doc = Document()
+    for code, body in ((MULTI, ["优先股、永续债等", "{{section:%s}}" % MULTI, "{{section:八、99}}"]),
+                       ("八、1", ["货币资金", "{{section:八、1}}"])):
+        doc.add_paragraph(f"##SECTION:{code}##")
+        for line in body:
+            doc.add_paragraph(line)
+        doc.add_paragraph(f"##/SECTION:{code}##")
+    path = tmp_path / "soe_standalone.docx"
+    doc.save(str(path))
+    _patch_loader(monkeypatch, path)
+    _patch_index(monkeypatch, {MULTI: "sid-perpetual"})
+    _patch_scope(monkeypatch)
+    monkeypatch.setattr(nwe_mod.settings, "DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED", controls)
+
+    exporter = NoteWordExporter(_make_db([_note(MULTI, body_text, "sid-perpetual"),
+                                          _note("八、1", "货币资金期末余额披露", "sid-cash")]))
+    buf, meta = await exporter.export_with_meta(
+        nwe_mod.UUID(int=1), 2025, template_type="soe", report_scope="standalone", mode="template")
+    data = buf.getvalue()
+    assert body_text + "（收尾清理后）" in _texts(data), "夹具：收尾清理没改到这一块，判据空转"
+    assert not any("{{section:八、99}}" in t for t in _texts(data))
+    mode, blocks = resolve_section_blocks(Document(BytesIO(data)), known_codes=meta.kept_codes)
+    delivered = {b.section_code: block_text_hash(list(b.elements)) for b in blocks}
+    assert mode == "anchor" and MULTI in delivered and MULTI in meta.rendered_block_hashes
+    assert meta.rendered_block_hashes[MULTI] == delivered[MULTI]

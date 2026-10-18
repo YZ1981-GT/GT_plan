@@ -34,6 +34,9 @@ from app.services.wp_note_linkage_service import WpNoteLinkageService
 
 logger = logging.getLogger(__name__)
 
+#: 冲突记录的 target_module → 联动契约的 target_type（附注冲突入队写 "disclosure"，契约里附注是 "note"；其余同名）
+_CONFLICT_MODULE_TARGET_TYPE: dict[str, str] = {"disclosure": TargetType.note.value}
+
 
 class LinkageFacadeService:
     """统一联动门面服务。
@@ -490,27 +493,34 @@ class LinkageFacadeService:
         if not contracts:
             return contracts
 
-        # 查询该项目的 pending 冲突
+        # 查询该项目的 pending 冲突。
+        # 🔴 表的目标列是 target_module / target_id（ORM CrossModuleConflict）：原写 target_type ⇒ 列不存在，异常被吞，
+        # 但 PG 事务已中止 ⇒ 同一请求里之后的查询全部失败（交付件溯源端点对每个章节恒 500，2026-10-17 实测）。
+        # SAVEPOINT 包住：这条附加查询失败只回滚它自己。
         conflict_targets: dict[str, str] = {}
         try:
             from sqlalchemy import text
-            result = await self.db.execute(
-                text("""
-                    SELECT id, target_type, target_id
-                    FROM cross_module_conflicts
-                    WHERE project_id = :pid AND status = 'pending'
-                """),
-                {"pid": str(project_id)},
-            )
-            for row in result.fetchall():
-                key = f"{row[1]}:{row[2]}"
-                conflict_targets[key] = str(row[0])
+            async with self.db.begin_nested():
+                result = await self.db.execute(
+                    text("""
+                        SELECT id, target_module, target_id
+                        FROM cross_module_conflicts
+                        WHERE project_id = :pid AND status = 'pending'
+                    """),
+                    {"pid": str(project_id)},
+                )
+                rows = result.fetchall()
+            for row in rows:
+                target_type = _CONFLICT_MODULE_TARGET_TYPE.get(row[1], row[1])
+                conflict_targets[f"{target_type}:{row[2]}"] = str(row[0])
         except Exception as exc:
             logger.debug("_enrich_conflict_stale 冲突查询跳过: %s", exc)
 
         # 附加冲突/stale 状态
         for c in contracts:
-            target_key = f"{c.get('target_type', '')}:{c.get('target_id', '')}"
+            # 契约 model_dump() 留的是枚举成员：Python 3.12 下 f"{TargetType.note}" 得「TargetType.note」，取 .value 比对
+            target_type = c.get("target_type", "")
+            target_key = f"{getattr(target_type, 'value', target_type)}:{c.get('target_id', '')}"
             if target_key in conflict_targets:
                 c["status"] = LinkageStatus.conflict.value
                 c["conflict_id"] = conflict_targets[target_key]

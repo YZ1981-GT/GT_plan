@@ -11,7 +11,7 @@ import hashlib
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Iterable, Literal
 
 from docx.document import Document as DocumentObject
 from docx.oxml import OxmlElement
@@ -172,6 +172,9 @@ class AnchorBlock:
     插入 / 删除；``elements`` 是展平后的内容元素（``w:p`` / ``w:tbl``，含内容控件
     ``w:sdt`` 内部的），用于文字提取与哈希 —— 二者刻意分开：内容控件开启时章节
     内部内容被包进 ``w:sdt``，只看 body 级会把整节看成一个不可读的容器。
+
+    ``nested``：书签不在 body 级、而在段落里（OnlyOffice 在线编辑保存后的形态：导出时 body 级的书签被挪进
+    块首 / 块尾段落）。此时含书签的容器本身属于本块；替换这些容器会连书签一起删掉，移植方须补回锚点。
     """
 
     section_code: str
@@ -180,6 +183,7 @@ class AnchorBlock:
     end_el: Any
     containers: list[Any] = field(default_factory=list)
     elements: list[Any] = field(default_factory=list)
+    nested: bool = False
 
 
 def _flatten_content_elements(containers: list[Any]) -> list[Any]:
@@ -201,11 +205,19 @@ def _flatten_content_elements(containers: list[Any]) -> list[Any]:
     return out
 
 
-def scan_anchor_blocks(doc: DocumentObject) -> list[AnchorBlock]:
+def scan_anchor_blocks(
+    doc: DocumentObject,
+    known_codes: Iterable[str] | None = None,
+) -> list[AnchorBlock]:
     """按 Section_Anchor 扫描章节区间（body 级，含内容控件内部）。
 
     只认名以 ``sec_`` 开头的书签（``SECTION_ANCHOR_PREFIX``）；其余书签（Word 内部、
     附注 note bookmark）一律忽略。
+
+    ``known_codes``：调用方已知的真实章节码（章节状态行 / 导出保留章节）。给了就先按正向映射
+    ``anchor_name(code)`` 精确对回真实章节码，对不上的锚点才走逆映射 —— 逆映射有损：章节码里第二个
+    「、」及「·」都写成了「_」，「九、1、或有负债」→ ``sec_九_1_或有负债`` → 反解成「九、1_或有负债」，
+    按真实章节码查块恒失败（增量刷新报「找不到定位标记」、导出重算块哈希漏掉这些块）。
 
     健壮性约定：
 
@@ -225,62 +237,77 @@ def scan_anchor_blocks(doc: DocumentObject) -> list[AnchorBlock]:
     open_map: dict[str, dict[str, Any]] = {}
     results: list[AnchorBlock] = []
     seen_codes: set[str] = set()
+    exact = {anchor_name(c): c for c in (known_codes or ()) if c and c.strip()}
+
+    def _is_section_start(el: Any) -> bool:
+        name = el.get(name_attr) or ""
+        # 排除其他交付件类型的锚点命名空间（报告正文 sec_rb_* 等）。
+        # 不排除会让附注回填反解出伪章节码并去 disclosure_notes 找，
+        # 见 FOREIGN_ANCHOR_PREFIXES 的说明。
+        return name.startswith(SECTION_ANCHOR_PREFIX) and not name.startswith(FOREIGN_ANCHOR_PREFIXES)
+
+    def _open(el: Any, nested: bool) -> None:
+        open_map[el.get(id_attr) or ""] = {
+            "name": el.get(name_attr) or "",
+            "start_el": el,
+            "containers": [],
+            "nested": nested,
+        }
+
+    def _close(el: Any, nested: bool) -> None:
+        info = open_map.pop(el.get(id_attr) or "", None)
+        if info is None:
+            return
+        code = exact.get(info["name"]) or section_code_from_anchor(info["name"])
+        if not code:
+            logger.warning(
+                "scan_anchor_blocks: 锚点名无法反解 section_code，跳过: %s",
+                info["name"],
+            )
+            return
+        if code in seen_codes:
+            logger.warning(
+                "scan_anchor_blocks: section_code 重复出现多个锚点，取首个: %s",
+                code,
+            )
+            return
+        seen_codes.add(code)
+        containers = info["containers"]
+        results.append(
+            AnchorBlock(
+                section_code=code,
+                anchor_name=info["name"],
+                start_el=info["start_el"],
+                end_el=el,
+                containers=containers,
+                elements=_flatten_content_elements(containers),
+                nested=info["nested"] or nested,
+            )
+        )
 
     for child in body.iterchildren():
         tag = child.tag
 
         if tag == bm_start_tag:
-            name = child.get(name_attr) or ""
-            if not name.startswith(SECTION_ANCHOR_PREFIX):
-                continue
-            # 排除其他交付件类型的锚点命名空间（报告正文 sec_rb_* 等）。
-            # 不排除会让附注回填反解出伪章节码并去 disclosure_notes 找，
-            # 见 FOREIGN_ANCHOR_PREFIXES 的说明。
-            if name.startswith(FOREIGN_ANCHOR_PREFIXES):
-                continue
-            bm_id = child.get(id_attr) or ""
-            open_map[bm_id] = {
-                "name": name,
-                "start_el": child,
-                "containers": [],
-            }
+            if _is_section_start(child):
+                _open(child, False)
             continue
 
         if tag == bm_end_tag:
-            bm_id = child.get(id_attr) or ""
-            info = open_map.pop(bm_id, None)
-            if info is None:
-                continue
-            code = section_code_from_anchor(info["name"])
-            if not code:
-                logger.warning(
-                    "scan_anchor_blocks: 锚点名无法反解 section_code，跳过: %s",
-                    info["name"],
-                )
-                continue
-            if code in seen_codes:
-                logger.warning(
-                    "scan_anchor_blocks: section_code 重复出现多个锚点，取首个: %s",
-                    code,
-                )
-                continue
-            seen_codes.add(code)
-            containers = info["containers"]
-            results.append(
-                AnchorBlock(
-                    section_code=code,
-                    anchor_name=info["name"],
-                    start_el=info["start_el"],
-                    end_el=child,
-                    containers=containers,
-                    elements=_flatten_content_elements(containers),
-                )
-            )
+            _close(child, False)
             continue
 
-        if tag in container_tags:
-            for info in open_map.values():
-                info["containers"].append(child)
+        if tag not in container_tags:
+            continue
+        # OnlyOffice 在线编辑保存后，导出时 body 级的书签被挪进块首 / 块尾段落（安徽附注交付件 v15 实测
+        # 106/106 节）：含块首书签的容器属于该块（先开区间再收容器），含块尾书签的容器同样属于该块（收完再关）
+        for el in child.iter(bm_start_tag):
+            if _is_section_start(el):
+                _open(el, True)
+        for info in open_map.values():
+            info["containers"].append(child)
+        for el in child.iter(bm_end_tag):
+            _close(el, True)
 
     for bm_id, info in open_map.items():
         logger.warning(
@@ -328,6 +355,7 @@ BlockLocateMode = Literal["anchor", "marker", "none"]
 
 def resolve_section_blocks(
     doc: DocumentObject,
+    known_codes: Iterable[str] | None = None,
 ) -> tuple[BlockLocateMode, list[Any]]:
     """统一章节块定位：锚点优先、``##SECTION:`` 标记回退。
 
@@ -335,8 +363,9 @@ def resolve_section_blocks(
     接线前生成）两者皆无 → ``none``；模板 / 中间态文档标记仍在 → ``marker``。
 
     返回的块对象统一鸭子类型：``.section_code`` + ``.elements``（内容元素列表）。
+    ``known_codes`` 见 :func:`scan_anchor_blocks`：要按真实章节码取块的调用方必须传（标记块本来就是真实章节码）。
     """
-    anchors = scan_anchor_blocks(doc)
+    anchors = scan_anchor_blocks(doc, known_codes)
     if anchors:
         return "anchor", list(anchors)
 

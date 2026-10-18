@@ -72,6 +72,42 @@ def _write_anchors(doc: Document, kept_codes: list[str]) -> dict[str, str]:
     return write_section_anchors(doc, kept_blocks)
 
 
+# WordprocessingML 主命名空间前缀（python-docx 元素标签）。
+W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def _oo_saved(doc):
+    """模拟 OnlyOffice 在线编辑保存：body 级 ``sec_`` 书签被挪进块首段落开头 / 块尾段落末尾
+    （安徽附注交付件 v15 实测 106/106 节；内容控件开时落在控件里的首 / 末段落）。
+
+    夹具辅助：原在 tests.services.test_deliverable_block_transplant，该文件随 block_transplant
+    架构弃用而移除，这里内联保留（只构造 docx 形态，不依赖任何业务逻辑）。
+    """
+    body = doc.element.body
+    containers = (f"{W}p", f"{W}tbl", f"{W}sdt")
+    starts = [e for e in body.iterchildren(f"{W}bookmarkStart") if (e.get(qn("w:name")) or "").startswith("sec_")]
+    ids = {e.get(qn("w:id")) for e in starts}
+    for start in starts:
+        nxt = start.getnext()
+        while nxt.tag not in containers:
+            nxt = nxt.getnext()
+        first_p = nxt if nxt.tag == f"{W}p" else next(nxt.iter(f"{W}p"))
+        body.remove(start)
+        ppr = first_p.find(f"{W}pPr")
+        if ppr is not None:
+            ppr.addnext(start)
+        else:
+            first_p.insert(0, start)
+    for end in [e for e in body.iterchildren(f"{W}bookmarkEnd") if e.get(qn("w:id")) in ids]:
+        prev = end.getprevious()
+        while prev.tag not in containers:
+            prev = prev.getprevious()
+        last_p = prev if prev.tag == f"{W}p" else list(prev.iter(f"{W}p"))[-1]
+        body.remove(end)
+        last_p.append(end)
+    return doc
+
+
 def _all_text(doc: Document) -> list[str]:
     return [p.text for p in doc.paragraphs]
 
@@ -326,3 +362,60 @@ def test_block_text_hash_differs_from_snapshot_hash_domain():
         audited_amounts=[],
     )
     assert block_hash != snapshot_hash
+
+
+# ─── 已知章节码精确反解（spec deliverable-trio-generation-accuracy Task 16b 追加） ───────────
+
+
+MULTI = "九、1、或有负债"  # 第二个「、」也写成「_」⇒ 逆映射有损（真实交付件：安徽 2 节、测试集团甲 3 节）
+
+
+def _anchored(codes: list[str]) -> Document:
+    doc = _build_doc({c: [f"{c} 正文"] for c in codes})
+    _write_anchors(doc, codes)
+    remove_section_markers(doc)
+    return _roundtrip(doc)
+
+
+def test_lossy_reverse_mapping_is_real():
+    """前提：不给已知章节码时，多「、」章节反解出的不是真实章节码（否则下面的判据空转）。"""
+    codes = [b.section_code for b in scan_anchor_blocks(_anchored([MULTI, "八、1"]))]
+    assert MULTI not in codes and "九、1_或有负债" in codes and "八、1" in codes
+
+
+def test_known_codes_restore_exact_section_code():
+    doc = _anchored([MULTI, "八、1", "五、12·1"])
+    blocks = {b.section_code: b for b in scan_anchor_blocks(doc, known_codes=[MULTI, "八、1", "五、12·1"])}
+    assert set(blocks) == {MULTI, "八、1", "五、12·1"}
+    assert block_text_of(blocks[MULTI].elements) == f"{MULTI} 正文"
+    # 统一入口同口径；已知码里没有的锚点照旧走逆映射，已知码不在文档里的不凭空造块
+    mode, resolved = resolve_section_blocks(doc, known_codes=[MULTI, "八、99"])
+    assert mode == "anchor"
+    assert sorted(b.section_code for b in resolved) == sorted([MULTI, "八、1", "五、12_1"])
+
+
+@pytest.mark.parametrize("controls", [True, False], ids=["内容控件开", "内容控件关"])
+def test_bookmarks_moved_into_paragraphs_by_online_edit_are_scanned(controls):
+    """OnlyOffice 在线编辑保存后 body 级书签被挪进块首 / 块尾段落（安徽附注 v15 实测 106/106 节）：
+    原实现只认 body 级书签 ⇒ 0 个锚点，刷新 / 回填对在线编辑过的交付件全部失效。"""
+    from app.services.content_control_injector import inject_content_controls_for_blocks
+
+    sections = {"八、1": ["甲一", "甲二"], MULTI: ["或有负债正文"], "八、2": ["乙"]}
+    doc = _build_doc(sections)
+    _write_anchors(doc, list(sections))
+    if controls:
+        inject_content_controls_for_blocks(doc, scan_section_blocks(doc))
+    remove_section_markers(doc)
+    flat_blocks = scan_anchor_blocks(doc, known_codes=list(sections))
+    expected = {b.section_code: block_text_of(b.elements) for b in flat_blocks}
+    flat = {b.section_code: block_text_hash(b.elements) for b in flat_blocks}
+    assert not any(b.nested for b in flat_blocks)
+
+    saved = _roundtrip(_oo_saved(doc))
+    assert not [e for e in saved.element.body.iterchildren(qn("w:bookmarkStart"))], "夹具：书签应已不在 body 级"
+    mode, blocks = resolve_section_blocks(saved, known_codes=list(sections))
+    assert mode == "anchor"
+    assert {b.section_code: block_text_of(b.elements) for b in blocks} == expected
+    assert all(b.nested for b in blocks)
+    # 块哈希与 body 级形态一致：在线编辑保存本身不被当成人工修改
+    assert {b.section_code: block_text_hash(b.elements) for b in blocks} == flat

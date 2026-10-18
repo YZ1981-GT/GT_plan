@@ -1114,7 +1114,9 @@ class NoteWordExporter:
             try:
                 from app.services.section_anchor_utils import block_text_hash, resolve_section_blocks
 
-                locate_mode, final_blocks = resolve_section_blocks(doc)
+                # 键是真实章节码 ⇒ 必须传 known_codes：逆映射把「九、1、或有负债」反解成「九、1_或有负债」，
+                # 这类块的哈希会一直停在 6.4（含要清掉的占位符），没动过也被当成人工改过
+                locate_mode, final_blocks = resolve_section_blocks(doc, known_codes=rendered_block_hashes)
                 if locate_mode == "anchor":
                     for b in final_blocks:
                         if b.section_code in rendered_block_hashes:

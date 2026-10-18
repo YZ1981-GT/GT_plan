@@ -1,9 +1,9 @@
 <template>
-  <el-dialog v-model="visible" :title="title" width="95%" top="2vh" :show-close="false" :close-on-press-escape="false" @close="cleanup" destroy-on-close>
+  <el-dialog v-model="visible" :title="displayTitle" width="95%" top="2vh" :show-close="false" :close-on-press-escape="false" @close="cleanup" destroy-on-close>
     <!-- 全屏按钮：调用 OnlyOffice 编辑器容器的浏览器原生全屏 -->
     <template #header="{ close, titleId, titleClass }">
       <div class="onlyoffice-editor__header">
-        <span :id="titleId" :class="titleClass">{{ title }}</span>
+        <span :id="titleId" :class="titleClass" class="onlyoffice-editor__title">{{ displayTitle }}</span>
         <div class="onlyoffice-editor__header-actions">
           <el-button
             v-if="!degraded && editorReady"
@@ -51,6 +51,8 @@
           :deliverable-status="deliverableStatus"
           :has-no-anchors="hasNoAnchors"
           :supports-section-refresh="supportsSectionRefresh"
+          :editor-has-unsaved-edits="sessionModified"
+          @refreshed="onDeliverableRefreshed"
         />
         <!--
           回填面板按后端能力标志门控（需求 6.1）：
@@ -126,7 +128,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { Close } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import {
+  deliverableDownloadUrl,
   fetchOnlyOfficeConfig,
   fetchOnlyOfficeHealth,
   fetchSectionStates,
@@ -165,7 +169,25 @@ const props = defineProps<{
   supportsSectionRefresh?: boolean
 }>()
 
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{
+  close: []
+  /** 章节刷新落了新版本（交付中心据此重取列表：否则再次打开编辑的是旧版本，保存会盖掉刷新结果） */
+  'version-changed': [versionNo: number]
+}>()
+
+/** 编辑器当前打开的版本（章节刷新后切到新版本，不再等于 props.versionNo） */
+const currentVersionNo = ref(props.versionNo)
+/** 标题是打开时那一版的文件名；刷新切到新版本后注明，免得标题与内容版本对不上 */
+const displayTitle = computed(() =>
+  currentVersionNo.value === props.versionNo
+    ? props.title
+    : `${props.title}（已切换到第 ${currentVersionNo.value} 版）`,
+)
+/**
+ * 本次编辑会话是否已有修改（OnlyOffice onDocumentStateChange data=true）。修改要等关闭编辑器后才回存为新版本 ⇒
+ * 有修改时溯源面板拒绝章节刷新（否则刷新以修改前的版本为底，之后回存的版本又会盖掉刷新结果）。
+ */
+const sessionModified = ref(false)
 
 const visible = ref(true)
 const isFullscreen = ref(false)
@@ -203,7 +225,8 @@ let editorInstance: any = null
 // 真·光标跟随溯源句柄（默认关闭 AUTO_FOLLOW_ENABLED，P0 live 验证通过后开启）
 let lineageFollow: LineageAutoFollow | null = null
 
-function cleanup() {
+/** 销毁当前 DocEditor（destroyEditor 会把占位 div 原样放回，同一容器 id 可再建编辑器） */
+function disposeEditor() {
   if (lineageFollow) {
     try { lineageFollow.dispose() } catch { /* ignore */ }
     lineageFollow = null
@@ -212,13 +235,75 @@ function cleanup() {
     try { editorInstance.destroyEditor() } catch { /* ignore */ }
     editorInstance = null
   }
+}
+
+function cleanup() {
+  disposeEditor()
   visible.value = false
   emit('close')
 }
 
 function doDownload() {
-  if (props.previewUrl) {
-    downloadFile(props.previewUrl, { fileName: props.title || 'deliverable' })
+  // 刷新切到新版本后下载新版本（previewUrl 是打开时那一版）；文件名同后端刷新落盘口径 {doc_type}_v{版本号}
+  const switched = currentVersionNo.value !== props.versionNo
+  const url = switched
+    ? deliverableDownloadUrl(props.projectId, props.taskId, currentVersionNo.value)
+    : props.previewUrl
+  const ext = (props.title || '').match(/\.[a-z0-9]+$/i)?.[0] || '.docx'
+  const fileName = switched && props.docType
+    ? `${props.docType}_v${currentVersionNo.value}${ext}`
+    : props.title || 'deliverable'
+  if (url) {
+    downloadFile(url, { fileName })
+  }
+}
+
+/** 取某一版本的编辑器配置（JWT token 并入 config） */
+async function fetchEditorConfig(versionNo: number): Promise<Record<string, any>> {
+  const cfg = await fetchOnlyOfficeConfig(props.projectId, props.taskId, versionNo, props.year)
+  const config = { ...(cfg.config as Record<string, any>) }
+  if (cfg.token) {
+    config.token = cfg.token
+  }
+  return config
+}
+
+/** 在容器里建 DocEditor（先销毁旧的）；记录会话内是否有修改 */
+function mountDocEditor(config: Record<string, any>, versionNo: number): void {
+  const DocsAPI = (window as any).DocsAPI
+  if (!DocsAPI) throw new Error('DocsAPI 未加载')
+  disposeEditor()
+  currentVersionNo.value = versionNo
+  sessionModified.value = false
+  let documentReady = false
+  const events = { ...(config.events || {}) }
+  // 文档载入完成前的状态变化不算用户修改
+  events.onDocumentReady = () => { documentReady = true }
+  events.onDocumentStateChange = (evt: { data?: boolean }) => {
+    if (documentReady && evt?.data === true) sessionModified.value = true
+  }
+  editorInstance = new DocsAPI.DocEditor(editorContainerId, { ...config, events })
+
+  // 真·光标跟随溯源（默认关闭；仅 P0 live 验证通过并开启 AUTO_FOLLOW_ENABLED 时建立连接器）
+  // fail-open：连接器不可用不阻断编辑器，手动章节溯源仍可用。
+  if (AUTO_FOLLOW_ENABLED) {
+    lineageFollow = createLineageAutoFollow(editorInstance, (tag) => {
+      lineagePanelRef.value?.onBookmarkDetected(tag)
+    })
+  }
+}
+
+/**
+ * 溯源面板刷新章节落了新版本 ⇒ 编辑器切到新版本（否则用户看不到刷新结果，接着编辑保存会盖掉它）。
+ * 先取新版本配置再销毁旧编辑器：取不到时旧编辑器保留并提示重新打开。
+ */
+async function onDeliverableRefreshed(versionNo: number): Promise<void> {
+  emit('version-changed', versionNo)
+  try {
+    mountDocEditor(await fetchEditorConfig(versionNo), versionNo)
+  } catch (e) {
+    console.error('OnlyOffice reload failed:', e)
+    ElMessage.warning(`已另存为第 ${versionNo} 版，但编辑器未能切换到新版本，请关闭后从交付中心重新打开`)
   }
 }
 
@@ -284,7 +369,8 @@ function onWritebackComplete(_result: WritebackResult) {
  */
 async function probeAnchors(): Promise<void> {
   try {
-    const states = await fetchSectionStates(props.projectId, props.taskId)
+    // 端点返回 { sections: [...] }：原实现直接取 .length（对象上恒 undefined）⇒ 无锚点提示从未出现（类型检查才暴露）
+    const states = (await fetchSectionStates(props.projectId, props.taskId))?.sections ?? []
     hasNoAnchors.value = states.length === 0
   } catch {
     hasNoAnchors.value = false
@@ -302,12 +388,7 @@ onMounted(async () => {
       return
     }
 
-    const cfg = await fetchOnlyOfficeConfig(
-      props.projectId,
-      props.taskId,
-      props.versionNo,
-      props.year,
-    )
+    const config = await fetchEditorConfig(props.versionNo)
 
     // 加载 OnlyOffice JS API
     const base = import.meta.env.VITE_ONLYOFFICE_URL || 'http://localhost:8080'
@@ -316,28 +397,13 @@ onMounted(async () => {
     editorReady.value = true
     await nextTick()
 
-    // 使用 JS API 初始化编辑器
-    const config = cfg.config as any
-    if (cfg.token) {
-      config.token = cfg.token
-    }
-
-    const DocsAPI = (window as any).DocsAPI
-    if (!DocsAPI) {
+    if (!(window as any).DocsAPI) {
       console.error('DocsAPI not loaded')
       degraded.value = true
       return
     }
-
-    editorInstance = new DocsAPI.DocEditor(editorContainerId, config)
-
-    // 真·光标跟随溯源（默认关闭；仅 P0 live 验证通过并开启 AUTO_FOLLOW_ENABLED 时建立连接器）
-    // fail-open：连接器不可用不阻断编辑器，手动章节溯源仍可用。
-    if (AUTO_FOLLOW_ENABLED) {
-      lineageFollow = createLineageAutoFollow(editorInstance, (tag) => {
-        lineagePanelRef.value?.onBookmarkDetected(tag)
-      })
-    }
+    // 使用 JS API 初始化编辑器
+    mountDocEditor(config, props.versionNo)
   } catch (e) {
     console.error('OnlyOffice init failed:', e)
     degraded.value = true
@@ -347,14 +413,7 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   document.removeEventListener('webkitfullscreenchange', onFullscreenChange)
-  if (lineageFollow) {
-    try { lineageFollow.dispose() } catch { /* ignore */ }
-    lineageFollow = null
-  }
-  if (editorInstance) {
-    try { editorInstance.destroyEditor() } catch { /* ignore */ }
-    editorInstance = null
-  }
+  disposeEditor()
 })
 
 /** 动态加载 OnlyOffice api.js（仅首次） */

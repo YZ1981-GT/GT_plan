@@ -208,3 +208,30 @@
   列入 `pending_items`；「报告模板类型」下拉的「自动」值是空串，`empty-values` 只认 null / undefined，否则显示「请选择」。
 - 未改：附注出具提醒弹窗实测出现过一次自行关闭，带埋点复跑同一流程停留超过 1.5 分钟未复现，Element Plus 消息框只有
   hashchange / 点遮罩 / Esc / 按钮四条关闭路径，均未触发 —— 不做无根据的改动，记录待再现。
+
+## 7. 16b 增量刷新架构裁定与正交修复移植（2026-10-18 并发会话合并）
+
+16b 增量刷新一度有两套并发实现：本会话的 block_transplant 方案（`deliverable_block_transplant` 整块移植
++ `deliverable_note_render` 同口径重导）与并发会话的 refresh_rebuild 方案（`deliverable_refresh_rebuild`
+原地按模板结构重建 + `note_template_table_look`，即远程 commit `67c3bcc5a`）。
+
+**裁定采纳远程 refresh_rebuild 架构**：已是推送主线、更贴合「只动目标块」的增量本意、并带 V189/V190 迁移。
+放弃本地 block_transplant 两模块及其专属测试。`deliverable_refresh_service` 用远程版（`__init__(self, db)`、
+`_replace_block_content` → `rebuild_refresh_block`），刷新路由仍用 `DeliverableService.render_and_store` 落版本。
+
+从本地 commit 移植到本架构的正交 bug 修复（与采纳哪套刷新机制无关，均为 16d 浏览器实测所得）：
+- **溯源端点恒 500**：`linkage_facade_service` 冲突查询原写 `target_type`（真实列 `target_module`），异常被吞但
+  PG 事务已中止 ⇒ 同请求后续查询全 500。改列名 + `begin_nested()` SAVEPOINT 隔离 + `disclosure→note` 映射
+  + 契约枚举取 `.value`（Py3.12 下 `f"{TargetType.note}"` 得「TargetType.note」，冲突状态从未附上）。
+- **OnlyOffice 在线编辑后锚点失效**：导出时 body 级 `sec_` 书签被挪进块首/块尾段落（安徽 v15 实测 106/106 节）⇒
+  `scan_anchor_blocks` 认段落内书签（`AnchorBlock.nested`），`resolve_section_blocks` 同口径。
+- **多「、」章节码逆映射有损**：「九、1、或有负债」→`sec_九_1_或有负债`→反解成「九、1_或有负债」，按真实码取块恒失败 ⇒
+  `scan_anchor_blocks`/`resolve_section_blocks` 加 `known_codes` 正向精确映射；`note_word_exporter` 7.6 重算块哈希按真实码取块。
+- **章节状态行从不清理**：`deliverable_section_state_service` store 时删不在本次保留章节里的旧版行（避免过期标记/溯源下拉带旧版章节）。
+- **刷新路由事务**：`refresh_section`/`refresh_stale` 补 `await db.commit()`（service 只 flush，`get_db` 不自动提交）；
+  删 refresh-stale 无 worker 处理的「>100 节转异步」死分支。
+- **前端**：`LineagePanel`/`OnlyOfficeEditor`/`DeliverableCenter` 刷新 UI + `deliverableRefreshNotice.ts` 结果提示纯函数。
+
+验证：移植后后端 158 passed（section_anchor_scan / linkage_facade / refresh_routes / export_cleanup / state_persist
++ 远程 refresh_rebuild / refresh_inplace / clone_path / lineage_e2e / note_text_word_render），前端 40 passed；
+3+1 项预存失败已用纯基线复现确认与本次移植无关。

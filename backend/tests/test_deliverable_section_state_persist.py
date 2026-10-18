@@ -307,3 +307,24 @@ def test_reverse_selfcheck_no_wiring_means_empty_table():
         return await _rows(session, task_id)
 
     assert _run(_scenario) == []
+
+
+# ─── 重新生成：上一版出具、这一版不再出具的章节状态行删除（spec deliverable-trio-generation-accuracy 16b 追加）───
+
+
+def test_regeneration_drops_states_of_sections_no_longer_delivered():
+    """安徽附注交付件实测 242 行里 136 行是第 9 版留下的：过期标记、溯源下拉、「刷新所有过期」一直带着不在交付件里的章节。"""
+    task_id, other_task = uuid.uuid4(), uuid.uuid4()
+
+    async def _scenario(session):
+        svc = DeliverableSectionStateService(session)
+        await svc.snapshot_on_confirm(task_id, uuid.uuid4(), 2025, ["八、1", "八、2", "五、1"], version_no=1)
+        await svc.snapshot_on_confirm(other_task, uuid.uuid4(), 2025, ["八、2"], version_no=1)
+        await svc.mark_section_stale(task_id, "八、2", source_uri="tb://x")
+        await svc.snapshot_on_confirm(task_id, uuid.uuid4(), 2025, ["八、1", "八、22"], version_no=2)
+        return await _rows(session, task_id), await _rows(session, other_task)
+
+    rows, other = _run(_scenario)
+    assert sorted(r.section_code for r in rows) == ["八、1", "八、22"]
+    assert all(r.version_no == 2 and r.is_stale is False for r in rows)
+    assert [r.section_code for r in other] == ["八、2"], "只删本交付件的行"

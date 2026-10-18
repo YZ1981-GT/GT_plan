@@ -415,6 +415,9 @@ async def refresh_section(
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
 
+    # service 只 flush：新版本记录与章节状态由路由统一提交（get_db 不自动提交 —— 原实现漏了这一步，
+    # 新版本文件落了盘、版本记录与「清过期」却随会话关闭回滚）
+    await db.commit()
     return result
 
 
@@ -435,7 +438,8 @@ async def refresh_stale(
 
     权限: project:edit（无权限 403，需求 10.3）
     终态: signed/confirmed/archived 拒绝（需求 11.1/11.3）
-    大文档: >100 stale 章节走异步（需求 10.2）
+    同步执行：刷新是「一次同口径重新导出 + 逐节移植」，耗时与过期章节数无关（spec deliverable-trio-generation-accuracy
+    §7.2）。🔴 原「>100 节转异步」分支建的 export_jobs_v2 任务全仓没有 worker 处理 ⇒ 静默不执行、前端却提示已刷新，已删除。
     审计日志: 写 app_audit_log（需求 10.4）
     """
     # 终态检查（needs 11.1/11.3）
@@ -449,28 +453,10 @@ async def refresh_stale(
     # doc_type 能力门控（需求 6.4）
     await _require_capability(db, word_export_task_id, kind="section_refresh")
 
-    # 获取 stale 章节
+    # 获取 stale 章节（审计日志计数用）
     dss = DeliverableSectionStateService(db)
     sections = await dss.get_section_states(word_export_task_id)
     stale_sections = [s for s in sections if s.get("is_stale")]
-
-    if len(stale_sections) > ASYNC_SECTION_THRESHOLD:
-        # 大文档 → 异步 job（needs 10.2）
-        result = await _delegate_to_async_job(
-            db, project_id, word_export_task_id, current_user.id,
-            action="deliverable_refresh_stale",
-            payload={"year": body.year, "confirm_overwrite": body.confirm_overwrite},
-        )
-        # 写审计日志（needs 10.4）
-        await audit_logger.log_action(
-            user_id=current_user.id,
-            action="deliverable_refresh_stale_async",
-            object_type="deliverable",
-            object_id=word_export_task_id,
-            project_id=project_id,
-            details={"year": body.year, "async_job_id": result["job_id"], "stale_count": len(stale_sections)},
-        )
-        return result
 
     # 写审计日志（needs 10.4）
     await audit_logger.log_action(
@@ -501,4 +487,5 @@ async def refresh_stale(
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
 
+    await db.commit()  # 同 refresh-section：service 只 flush，路由统一提交
     return result

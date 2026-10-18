@@ -148,6 +148,7 @@
       :supports-section-refresh="editorItem.supports_section_refresh === true"
       :show-watermark="['draft', 'editing'].includes(editorItem.status)"
       @close="editorVisible = false"
+      @version-changed="loadList()"
     />
 
     <!-- 生成财务报表选择弹窗 -->

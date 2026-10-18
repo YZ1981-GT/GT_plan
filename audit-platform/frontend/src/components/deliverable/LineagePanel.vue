@@ -12,6 +12,8 @@
     - 无锚点降级提示（旧版本出品物）
     - 复用 useLinkageTraceDrawer 抽屉状态，不新建并行面板
     - stale 章节提示"源数据已变更"+ "刷新本章节"/"刷新所有过期"按钮
+      （按后端能力标志显示；按返回结果提示已刷新 / 跳过原因，落了新版本 emit refreshed 让编辑器切换 ——
+       spec deliverable-trio-generation-accuracy Task 16b）
     - 终态出品物只读：signed/confirmed/archived 禁用刷新按钮
     - SSE LINKAGE_STALE_CHANGED 实时更新 stale 徽标
 
@@ -113,8 +115,8 @@
         </el-tag>
       </div>
 
-      <!-- 刷新操作栏（需求 4.5/5.5/11.4） -->
-      <div v-if="currentSectionCode" class="lineage-panel__refresh-toolbar">
+      <!-- 刷新操作栏（需求 4.5/5.5/11.4；按后端能力标志门控） -->
+      <div v-if="currentSectionCode && supportsSectionRefresh" class="lineage-panel__refresh-toolbar">
         <el-tooltip
           :content="terminalStateTooltip"
           :disabled="!isTerminalState"
@@ -153,6 +155,9 @@
             </el-button>
           </span>
         </el-tooltip>
+      </div>
+      <div v-else-if="currentSectionCode" class="lineage-panel__refresh-unsupported">
+        该类型交付件不支持按章节刷新；源数据变更后请整份重新生成。
       </div>
 
       <!-- 来源列表 -->
@@ -204,10 +209,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, h, ref, watch, onMounted, onUnmounted } from 'vue'
 import { InfoFilled, Document, Right } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import type { LinkageContract, TargetType } from '@/types/linkageContract'
+import {
+  UNSAVED_EDITS_MESSAGE,
+  overwritePrompt,
+  sectionRefreshPrompt,
+  staleRefreshPrompt,
+  summarizeRefresh,
+  type DeliverableRefreshResult,
+  type RefreshNotice,
+} from './deliverableRefreshNotice'
 import {
   useDeliverableLineage,
   anchorNameFromSectionCode,
@@ -218,6 +232,9 @@ import { api } from '@/services/apiProxy'
 /** 终态状态列表（signed/confirmed/archived）— 需求 11.4 */
 const TERMINAL_STATUSES = ['signed', 'confirmed', 'archived'] as const
 
+/** 刷新端点调用方自管提示：静默全局拦截（否则先弹一次通用错误；5xx 还会自动重发两次，刷新要重新导出整份附注） */
+const SILENT = { _silent: true } as any
+
 const props = defineProps<{
   projectId: string
   wordExportTaskId: string
@@ -227,6 +244,18 @@ const props = defineProps<{
   deliverableStatus?: string
   /** 项目年度（刷新接口所需） */
   year?: number
+  /**
+   * 能力标志（后端 deliverable_capabilities 下发，前端只消费）：不支持章节刷新的交付件（报告正文 / 报表）
+   * 不显示刷新按钮。缺省 false —— 原先该 prop 未声明，报告正文也显示刷新按钮、点了才报 400。
+   */
+  supportsSectionRefresh?: boolean
+  /** 在线编辑本次会话已有修改、尚未保存回交付件 ⇒ 拒绝刷新（保存时会覆盖刷新结果） */
+  editorHasUnsavedEdits?: boolean
+}>()
+
+const emit = defineEmits<{
+  /** 刷新落了新版本（编辑器据此切到新版本） */
+  refreshed: [versionNo: number]
 }>()
 
 const wordExportTaskIdRef = computed(() => props.wordExportTaskId)
@@ -260,17 +289,20 @@ const sectionOptions = ref<SectionOption[]>([])
 /**
  * 加载本交付物的章节列表（section-states 端点），供手动溯源下拉选择。
  * 后端权威、与 OnlyOffice 无关；fail-open：拿不到时下拉为空，仍可手动输入章节号（allow-create）。
+ * 返回是否取到（「刷新所有过期」据此判断过期节数是否可信：取不到不能当成「没有过期章节」）。
  */
-async function loadSections(): Promise<void> {
-  if (!props.projectId || !props.wordExportTaskId) return
+async function loadSections(): Promise<boolean> {
+  if (!props.projectId || !props.wordExportTaskId) return false
   try {
     const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/section-states`
     const data = await api.get<{ sections: Array<{ section_code: string; is_stale: boolean }> }>(url)
     sectionOptions.value = (data?.sections || [])
       .filter((s) => s.section_code)
       .map((s) => ({ code: s.section_code, isStale: !!s.is_stale }))
+    return Array.isArray(data?.sections)
   } catch {
     sectionOptions.value = []
+    return false
   }
 }
 
@@ -360,77 +392,127 @@ function refresh(): void {
   }
 }
 
-/**
- * "刷新本章节"按钮回调（需求 5.5：覆盖人工编辑前弹确认）
- * 调用 Task 9 端点 POST .../refresh-section
- */
-async function onRefreshSection(): Promise<void> {
-  if (!currentSectionCode.value || isTerminalState.value) return
-
-  // 需求 5.5：人工编辑覆盖确认
+/** 弹确认框；用户取消返回 false */
+async function confirmed(message: string, title: string, confirmButtonText: string): Promise<boolean> {
   try {
-    await ElMessageBox.confirm(
-      '刷新本章节将用最新源数据覆盖当前内容，如您有手动编辑的内容可能被覆盖。是否继续？',
-      '确认刷新本章节',
-      {
-        confirmButtonText: '确认刷新',
-        cancelButtonText: '取消',
-        type: 'warning',
-      },
-    )
+    await ElMessageBox.confirm(message, title, { confirmButtonText, cancelButtonText: '取消', type: 'warning' })
+    return true
   } catch {
-    // 用户取消
+    return false
+  }
+}
+
+/**
+ * 在线编辑本次会话已有修改 ⇒ 不刷新：OnlyOffice 关闭编辑器后才回存为新版本，刷新以修改前的版本为底，
+ * 之后回存的版本又会覆盖刷新结果（回调不比对版本，见 design §7.3）。
+ */
+function blockedByUnsavedEdits(): boolean {
+  if (!props.editorHasUnsavedEdits) return false
+  ElMessageBox.alert(UNSAVED_EDITS_MESSAGE, '请先保存在线编辑', {
+    confirmButtonText: '我知道了',
+    type: 'warning',
+  }).catch(() => {})
+  return true
+}
+
+/**
+ * 调刷新端点：先不带确认（后端按生成时记录的块哈希检测人工修改），检测到人工修改再二次确认后带确认重发
+ * （需求 5.5 / 5.7：只在会覆盖人工编辑时提示）。用户取消返回 null。
+ */
+async function postRefresh(
+  endpoint: 'refresh-section' | 'refresh-stale',
+  body: Record<string, unknown>,
+): Promise<DeliverableRefreshResult | null> {
+  const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/${endpoint}`
+  const year = props.year || new Date().getFullYear()
+  let res = await api.post<DeliverableRefreshResult>(url, { ...body, year, confirm_overwrite: false }, SILENT)
+  if (res?.requires_confirm) {
+    const pending = res.pending_confirm_sections || []
+    if (!(await confirmed(overwritePrompt(pending), '覆盖手动修改', '覆盖并刷新'))) return null
+    res = await api.post<DeliverableRefreshResult>(url, { ...body, year, confirm_overwrite: true }, SILENT)
+  }
+  return res
+}
+
+/** 刷新结果提示：成功 / 无需刷新用轻提示；有跳过原因或提醒逐条列出（内联样式：弹窗挂在 body 下，scoped 样式匹配不到） */
+function showRefreshNotice(notice: RefreshNotice): void {
+  if (notice.kind === 'success') {
+    ElMessage.success(notice.lines.join('；'))
     return
   }
+  if (notice.kind === 'info') {
+    ElMessage.info(notice.lines.join('；'))
+    return
+  }
+  const body = h(
+    'div',
+    { style: 'max-height: 50vh; overflow-y: auto; line-height: 1.6' },
+    notice.lines.map((line) => h('p', { style: 'margin: 0 0 6px' }, `• ${line}`)),
+  )
+  ElMessageBox.alert(body, notice.title, { confirmButtonText: '我知道了', type: 'warning' }).catch(() => {})
+}
+
+/** 刷新完成：提示结果；落了新版本 ⇒ 通知编辑器切换，并重取章节状态（过期标记已清） */
+function afterRefresh(res: DeliverableRefreshResult | null): void {
+  if (res === null) return
+  showRefreshNotice(summarizeRefresh(res))
+  if (typeof res.version_no === 'number' && res.refreshed?.length) {
+    emit('refreshed', res.version_no)
+  }
+  refresh()
+  void loadSections()
+}
+
+function showRefreshError(e: any, fallback: string): void {
+  const status = e?.response?.status
+  const detail = e?.response?.data?.message || e?.response?.data?.detail
+  if (status === 403) {
+    ElMessage.error('权限不足：需要编辑权限')
+  } else if (status === 409) {
+    ElMessage.warning(detail || '该出品物已终态，不可刷新')
+  } else {
+    ElMessage.error(detail || e?.message || fallback)
+  }
+}
+
+/**
+ * "刷新本章节"按钮回调 —— POST .../refresh-section
+ * 刷新 = 按最新源数据同口径重新导出，把该节整块换进已保存的最新版本，另存为新版本（spec deliverable-trio-generation-accuracy §7）。
+ */
+async function onRefreshSection(): Promise<void> {
+  const code = currentSectionCode.value
+  if (!code || isTerminalState.value || blockedByUnsavedEdits()) return
+  if (!(await confirmed(sectionRefreshPrompt(code), '确认刷新本章节', '确认刷新'))) return
 
   refreshingSingle.value = true
   try {
-    const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/refresh-section`
-    await api.post(url, {
-      year: props.year || new Date().getFullYear(),
-      section_code: currentSectionCode.value,
-      confirm_overwrite: true,
-    })
-    ElMessage.success('章节已刷新')
-    // 刷新溯源数据
-    refresh()
+    afterRefresh(await postRefresh('refresh-section', { section_code: code }))
   } catch (e: any) {
-    if (e?.response?.status === 403) {
-      ElMessage.error('权限不足：需要编辑权限')
-    } else if (e?.response?.status === 409) {
-      ElMessage.warning(e?.response?.data?.message || e?.response?.data?.detail || '该出品物已终态，不可刷新')
-    } else {
-      ElMessage.error(e?.response?.data?.message || e?.message || '刷新失败')
-    }
+    showRefreshError(e, '刷新失败')
   } finally {
     refreshingSingle.value = false
   }
 }
 
 /**
- * "刷新所有过期"按钮回调
- * 调用 Task 9 端点 POST .../refresh-stale
+ * "刷新所有过期"按钮回调 —— POST .../refresh-stale（全部过期章节一次重新导出、只落一个新版本）
  */
 async function onRefreshAllStale(): Promise<void> {
-  if (isTerminalState.value) return
+  if (isTerminalState.value || blockedByUnsavedEdits()) return
+  // 先取最新章节状态：确认框写明节数；确实没有过期章节就不打扰（取不到时交给后端判断）
+  const loaded = await loadSections()
+  const staleCount = loaded ? sectionOptions.value.filter((o) => o.isStale).length : null
+  if (staleCount === 0) {
+    ElMessage.info('当前没有过期章节，无需刷新')
+    return
+  }
+  if (!(await confirmed(staleRefreshPrompt(staleCount), '确认刷新所有过期章节', '确认刷新'))) return
 
   refreshingAll.value = true
   try {
-    const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/refresh-stale`
-    await api.post(url, {
-      year: props.year || new Date().getFullYear(),
-      confirm_overwrite: true,
-    })
-    ElMessage.success('所有过期章节已刷新')
-    refresh()
+    afterRefresh(await postRefresh('refresh-stale', {}))
   } catch (e: any) {
-    if (e?.response?.status === 403) {
-      ElMessage.error('权限不足：需要编辑权限')
-    } else if (e?.response?.status === 409) {
-      ElMessage.warning(e?.response?.data?.message || e?.response?.data?.detail || '该出品物已终态，不可刷新')
-    } else {
-      ElMessage.error(e?.response?.data?.message || e?.message || '批量刷新失败')
-    }
+    showRefreshError(e, '批量刷新失败')
   } finally {
     refreshingAll.value = false
   }
@@ -640,6 +722,14 @@ defineExpose({
 
 .lineage-panel__refresh-btn-wrapper {
   display: inline-flex;
+}
+
+.lineage-panel__refresh-unsupported {
+  padding: 8px 0 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .lineage-panel__action-btn {

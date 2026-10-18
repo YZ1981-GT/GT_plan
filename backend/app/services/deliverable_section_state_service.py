@@ -197,6 +197,16 @@ class DeliverableSectionStateService:
         anchor_map = anchor_map or {}
         rendered_block_hashes = rendered_block_hashes or {}
 
+        # 章节状态 = 本次生成出具的章节：更早一次生成出具、这次不再出具的章节行删掉。不删则过期标记、溯源下拉、
+        # 「刷新所有过期」一直带着不在交付件里的章节（安徽附注交付件 242 行里 136 行是第 9 版留下的）
+        if kept_codes:
+            await self.db.execute(
+                sa.delete(DeliverableSectionState).where(
+                    DeliverableSectionState.word_export_task_id == word_export_task_id,
+                    DeliverableSectionState.section_code.not_in(list(kept_codes)),
+                )
+            )
+
         for section_code in kept_codes:
             snapshot_hash = await self.compute_source_snapshot_hash(
                 project_id, year, section_code

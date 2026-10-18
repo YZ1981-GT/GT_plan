@@ -12,11 +12,22 @@ import pytest
 from app.services.linkage_facade_service import LinkageFacadeService
 
 
+class _Savepoint:
+    """``db.begin_nested()`` 替身（冲突查询包在 SAVEPOINT 里，见 test_linkage_facade_conflict_pg.py）。"""
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+
 @pytest.fixture
 def mock_db():
     """Mock AsyncSession"""
     db = AsyncMock()
     db.execute = AsyncMock(return_value=MagicMock(fetchall=lambda: []))
+    db.begin_nested = MagicMock(side_effect=lambda: _Savepoint())
     return db
 
 
@@ -124,6 +135,23 @@ async def test_enrich_conflict_stale(facade, mock_db):
 
     enriched = await facade._enrich_conflict_stale(project_id, contracts)
     assert enriched[0]["status"] == "conflict"
+    assert enriched[0]["conflict_id"] == conflict_id
+
+
+@pytest.mark.asyncio
+async def test_enrich_conflict_matches_disclosure_module_to_note_contract(facade, mock_db):
+    """附注冲突入队写 target_module='disclosure'；契约 model_dump() 留枚举成员（3.12 下 f-string 是「TargetType.note」）。"""
+    from app.schemas.linkage_contract import TargetType
+
+    conflict_id, note_id = str(uuid.uuid4()), str(uuid.uuid4())
+    mock_result = MagicMock()
+    mock_result.fetchall.return_value = [(conflict_id, "disclosure", note_id)]
+    mock_db.execute = AsyncMock(return_value=mock_result)
+    contracts = [{"target_type": TargetType.note, "target_id": note_id, "status": "current"},
+                 {"target_type": TargetType.note, "target_id": str(uuid.uuid4()), "status": "current"}]
+
+    enriched = await facade._enrich_conflict_stale(uuid.uuid4(), contracts)
+    assert [c["status"] for c in enriched] == ["conflict", "current"]
     assert enriched[0]["conflict_id"] == conflict_id
 
 
