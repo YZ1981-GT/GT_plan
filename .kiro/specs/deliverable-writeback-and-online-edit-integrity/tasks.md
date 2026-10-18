@@ -135,3 +135,4 @@
   - INDEX.md：本 spec 条目从「0/33 从 stash 恢复」更新为完成状态（29 必做全绿 + 3 处诚实部分：Task 32 flow⑤ 陈旧底版标签无真实数据、全量 vue-tsc OOM 未跑、Playwright 签发清单经 service+vitest 覆盖未在路由页截图）；CRLF 安全编辑（`read_bytes().decode` + `write_bytes`）。
   - memory.md：在「交付中心」族新增一条 ≤300 行约束内的精简条目（范围 / V191 / 教训 / 未修）。
   - 提交就绪报告已交 orchestrator 转述用户（本 spec 改动文件清单、并发会话禁提清单、建议 commit msg、CI `pytest -x` 预存红 caveat）；**本任务不提交**。
+  - 复盘追加（2026-10-19，design §10.3）：548318fb1 漏提交 5 个模型文件 ⇒ 补提交 6c262c06f；主工作区暂存区按路径对齐；安徽验收残留已修（审计日志 `deliverable_data_repair`）；前端被拒原因与一致性确认框转义已修；待拍板 2 项（needs_confirmation 无消费方、生成附注两次确认）。

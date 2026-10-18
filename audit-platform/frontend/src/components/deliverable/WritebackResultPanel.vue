@@ -6,9 +6,9 @@
   Reqs:    7.1, 11.4
 
   功能：
-    - "回填到附注模块"按钮（显式触发回填）
+    - "回填到报告正文"按钮（显式触发回填；附注回填已下线，本面板只对报告正文渲染）
     - WritebackResult 分组展示（written/rejected/conflicts/skipped）
-    - rejected 项显示中文 AJE 指引
+    - rejected 项显示后端给出的拒绝原因（rejection_reason）
     - 终态出品物只读：signed/confirmed/archived 禁用按钮 + tooltip
     - 全中文化 + GT 紫令牌
 -->
@@ -29,7 +29,7 @@
             class="writeback-panel__btn"
             @click="onWriteback"
           >
-            回填到附注模块
+            回填到报告正文
           </el-button>
         </span>
       </el-tooltip>
@@ -52,7 +52,7 @@
         </div>
       </div>
 
-      <!-- 被拒绝（含 AJE 指引） -->
+      <!-- 被拒绝（显示后端给出的拒绝原因：金额 → 走调整分录 / 标题 → 系统生成） -->
       <div v-if="result.rejected.length > 0" class="writeback-panel__group writeback-panel__group--rejected">
         <div class="writeback-panel__group-header">
           <el-icon class="writeback-panel__group-icon"><CircleClose /></el-icon>
@@ -64,10 +64,7 @@
           class="writeback-panel__item writeback-panel__item--rejected"
         >
           <span class="writeback-panel__item-code">{{ item.section_code }}</span>
-          <span class="writeback-panel__item-reason">{{ item.reason }}</span>
-          <span class="writeback-panel__item-guide">
-            金额变更须通过调整分录（AJE/RJE）修正，不可从出品物回填
-          </span>
+          <span class="writeback-panel__item-reason">{{ item.rejection_reason || item.reason }}</span>
         </div>
       </div>
 
@@ -135,6 +132,8 @@ import { api } from '@/services/apiProxy'
 export interface WritebackResultItem {
   section_code: string
   reason?: string
+  /** 被拒原因：后端 rejected 桶的字段名就是 rejection_reason（failed 桶才用 reason） */
+  rejection_reason?: string | null
   kind?: string
 }
 
@@ -211,7 +210,7 @@ async function onWriteback(): Promise<void> {
     // 需求 5.2：写入失败必须独立提示，不能被「成功 N 个」掩盖
     if (failedCount > 0) {
       ElMessage.error(
-        `${failedCount} 个章节写入失败（上游无对应附注记录），未计入已回填，详见下方明细`,
+        `${failedCount} 个章节写入失败，未计入已回填，详见下方明细`,
       )
     }
     if (result.value.conflicts.length > 0) {
@@ -375,12 +374,6 @@ defineExpose({
 .writeback-panel__item-reason {
   color: var(--el-color-danger);
   font-size: 11px;
-}
-
-.writeback-panel__item-guide {
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-  font-style: italic;
 }
 
 .writeback-panel__resolve-btn {

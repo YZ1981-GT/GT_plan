@@ -61,7 +61,7 @@ describe('WritebackResultPanel', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('回填到附注模块')
+    expect(wrapper.text()).toContain('回填到报告正文')
   })
 
   it('disables button when deliverable is in terminal state (signed)', () => {
@@ -175,6 +175,44 @@ describe('WritebackResultPanel', () => {
     })
 
     expect((wrapper.vm as any).isTerminalState).toBe(true)
+  })
+})
+
+describe('WritebackResultPanel — 被拒原因（deliverable-writeback-and-online-edit-integrity 复盘修复）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('被拒项显示后端的 rejection_reason，不再对所有被拒项硬编码 AJE 指引', async () => {
+    mockApiPost.mockResolvedValueOnce({
+      written: [],
+      rejected: [
+        { kind: 'title', section_code: 'opinion', content: '审计意见', rejection_reason: '章节标题由系统生成，不可从出品物回填' },
+      ],
+      conflicts: [],
+      skipped: [],
+      failed: [],
+      trace_id: null,
+    })
+    const wrapper = mount(WritebackResultPanel, {
+      props: { projectId: '123', wordExportTaskId: '456', year: 2025 },
+      global: {
+        stubs: {
+          ElTooltip: { template: '<div><slot /></div>' },
+          ElButton: { template: '<button @click="$emit(\'click\')"><slot /></button>' },
+          ElIcon: { template: '<span><slot /></span>' },
+        },
+      },
+    })
+    await (wrapper.vm as any).onWriteback()
+    await nextTick()
+
+    const rejected = wrapper.find('.writeback-panel__item--rejected')
+    expect(rejected.exists()).toBe(true)
+    // 原来读 item.reason（后端被拒项没有这个字段）⇒ 原因恒空
+    expect(rejected.text()).toContain('章节标题由系统生成，不可从出品物回填')
+    // 标题类拒绝不该再挂「金额变更须通过调整分录」那句（原来对所有被拒项硬编码）
+    expect(rejected.text()).not.toContain('金额变更须通过调整分录')
   })
 })
 

@@ -281,7 +281,6 @@ import {
   type DeliverableVersion,
   type OptionalSection,
   type TrioJob,
-  type NoteConsistencyItem,
 } from '@/services/deliverableApi'
 import {
   checkGenerateReady,
@@ -290,6 +289,7 @@ import {
 } from '@/components/deliverable/generateGuard'
 import { useProjectStore } from '@/stores/project'
 import { getDisclosureReadiness } from '@/services/commonApi'
+import { buildNoteConsistencyMessage } from '@/components/deliverable/noteConsistencyMessage'
 
 const route = useRoute()
 const projectStore = useProjectStore()
@@ -710,28 +710,9 @@ async function doRenderNotes(selectedSections: string[], confirmInconsistent: bo
 
   // 导出前一致性闸门命中：不建版本，弹确认框
   if (res.requires_confirmation) {
-    const c = res.consistency
-    const neverSynced = c?.never_synced ?? []
-    const stale = c?.stale ?? []
-    const fmtItem = (it: NoteConsistencyItem) => {
-      const codes = (it.wp_codes && it.wp_codes.length) ? `（底稿 ${it.wp_codes.join('、')}）` : ''
-      return `<p style="margin:2px 0;">• ${it.section_title || it.note_section}${codes}</p>`
-    }
-    const parts: string[] = [
-      `<p style="margin-bottom:8px;font-weight:600;">⚠️ 以下附注章节与底稿披露表不一致，建议先回底稿同步后再导出：</p>`,
-    ]
-    if (neverSynced.length) {
-      parts.push(`<p style="color:#e74c3c;margin:6px 0 2px;font-weight:600;">从未从底稿同步（${neverSynced.length} 章）：</p>`)
-      parts.push(neverSynced.map(fmtItem).join(''))
-    }
-    if (stale.length) {
-      parts.push(`<p style="color:#e6a23c;margin:6px 0 2px;font-weight:600;">底稿已更新、附注陈旧（${stale.length} 章）：</p>`)
-      parts.push(stale.map(fmtItem).join(''))
-    }
-    parts.push(`<p style="margin-top:10px;color:#666;font-size:12px;">附注数据由底稿披露表单项推送。请到底稿披露表重新同步这些章节；如确需带不一致导出，可选「仍要导出」。</p>`)
-
     try {
-      await ElMessageBox.confirm(parts.join(''), '附注与底稿不一致', {
+      // 章节标题 / 底稿编码来自库里的数据：正文统一由 buildNoteConsistencyMessage 转义后再拼 HTML
+      await ElMessageBox.confirm(buildNoteConsistencyMessage(res.consistency), '附注与底稿不一致', {
         confirmButtonText: '仍要导出',
         cancelButtonText: '返回同步',
         type: 'warning',
