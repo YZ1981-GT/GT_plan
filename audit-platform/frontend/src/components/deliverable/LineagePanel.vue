@@ -25,7 +25,7 @@
     <div class="lineage-panel__header">
       <span class="lineage-panel__title">数据溯源</span>
       <el-button
-        v-if="currentSectionCode"
+        v-if="currentSectionCode && !lineageUnsupported"
         text
         size="small"
         class="lineage-panel__refresh-btn"
@@ -36,8 +36,14 @@
       </el-button>
     </div>
 
+    <!-- US-8：不支持溯源的交付件（财务报表）—— 不显示章节 UI，改给穿透指引 -->
+    <div v-if="lineageUnsupported" class="lineage-panel__no-anchor">
+      <el-icon class="lineage-panel__no-anchor-icon"><InfoFilled /></el-icon>
+      <span>{{ lineageUnsupportedMessage }}</span>
+    </div>
+
     <!-- 手动章节溯源（章节列表来自后端 section-states，不依赖 OnlyOffice；允许手动输入兜底旧交付物） -->
-    <div v-if="!noAnchorAvailable" class="lineage-panel__manual">
+    <div v-if="!lineageUnsupported && !noAnchorAvailable" class="lineage-panel__manual">
       <el-select
         v-model="manualInput"
         filterable
@@ -78,13 +84,13 @@
     </div>
 
     <!-- 无锚点降级提示（需求 3.5） -->
-    <div v-if="noAnchorAvailable" class="lineage-panel__no-anchor">
+    <div v-if="!lineageUnsupported && noAnchorAvailable" class="lineage-panel__no-anchor">
       <el-icon class="lineage-panel__no-anchor-icon"><InfoFilled /></el-icon>
       <span>该出品物版本不支持溯源，请重新生成</span>
     </div>
 
     <!-- 未选中章节（提示用户输入章节号） -->
-    <div v-else-if="!currentSectionCode && !noAnchorAvailable" class="lineage-panel__hint">
+    <div v-else-if="!lineageUnsupported && !currentSectionCode && !noAnchorAvailable" class="lineage-panel__hint">
       <el-icon><Document /></el-icon>
       <span>请在上方输入章节号后点「溯源」，查看该章节的数据来源</span>
     </div>
@@ -235,7 +241,8 @@ const TERMINAL_STATUSES = ['signed', 'confirmed', 'archived'] as const
 /** 刷新端点调用方自管提示：静默全局拦截（否则先弹一次通用错误；5xx 还会自动重发两次，刷新要重新导出整份附注） */
 const SILENT = { _silent: true } as any
 
-const props = defineProps<{
+const props = withDefaults(
+  defineProps<{
   projectId: string
   wordExportTaskId: string
   /** 是否明确无锚点（旧版本出品物，由父组件判定） */
@@ -249,9 +256,23 @@ const props = defineProps<{
    * 不显示刷新按钮。缺省 false —— 原先该 prop 未声明，报告正文也显示刷新按钮、点了才报 400。
    */
   supportsSectionRefresh?: boolean
+  /**
+   * 溯源能力（US-8，后端下发）：财务报表恒 false。false 时**不请求** /section-states，
+   * 面板只显示「报表按行取数、去报表页穿透」说明——避免空下拉 + 「请重新生成」误导。
+   * 缺省 true：兼容旧后端（字段缺失时按支持处理，与原行为一致，不吞掉附注/报告正文的溯源）。
+   */
+  supportsLineage?: boolean
   /** 在线编辑本次会话已有修改、尚未保存回交付件 ⇒ 拒绝刷新（保存时会覆盖刷新结果） */
   editorHasUnsavedEdits?: boolean
-}>()
+  }>(),
+  {
+    // 🔴 Boolean prop 默认必须显式给 true：Vue 的 Boolean prop 转换规则会把「未传」
+    // 的 boolean prop 转成 false（而非 undefined），若不给默认，父组件没传 supportsLineage
+    // 时 `props.supportsLineage === false` 恒真 ⇒ 附注/报告正文的溯源会被整个吞掉、
+    // 面板恒显「报表按行取数」。缺省按 true = 兼容旧后端（字段缺失时按支持处理）。
+    supportsLineage: true,
+  },
+)
 
 const emit = defineEmits<{
   /** 刷新落了新版本（编辑器据此切到新版本） */
@@ -276,6 +297,17 @@ const {
 /** 是否为无锚点状态（旧版本出品物，需求 3.5） */
 const noAnchorAvailable = ref(false)
 
+/**
+ * US-8：该交付件不支持章节溯源（财务报表恒 false）。缺省按 true（兼容旧后端）。
+ * 为 true 时整个溯源 UI 用说明文案替代，且不请求 /section-states。
+ */
+const lineageUnsupported = computed(() => props.supportsLineage === false)
+
+/** US-8：不支持溯源时的说明文案（指明正确穿透路径，不留「请重新生成」误导）。 */
+const lineageUnsupportedMessage = computed(
+  () => '财务报表按报表行取数，没有章节溯源；数字来源请在「财务报表」页穿透查看',
+)
+
 /** 手动溯源输入（章节号，如「五、1」） */
 const manualInput = ref('')
 
@@ -292,6 +324,9 @@ const sectionOptions = ref<SectionOption[]>([])
  * 返回是否取到（「刷新所有过期」据此判断过期节数是否可信：取不到不能当成「没有过期章节」）。
  */
 async function loadSections(): Promise<boolean> {
+  // US-8：不支持溯源的交付件（财务报表）不请求 /section-states ——
+  // 该端点对报表任务恒返回 0 行章节状态，拉了只会得到空下拉 + 误导性「请重新生成」。
+  if (lineageUnsupported.value) return false
   if (!props.projectId || !props.wordExportTaskId) return false
   try {
     const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/section-states`

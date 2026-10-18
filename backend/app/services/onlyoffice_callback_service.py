@@ -2,26 +2,31 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
 import httpx
+import sqlalchemy as sa
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.core import User
 from app.models.phase13_models import WordExportStatus, WordExportTaskVersion
-from app.services.deliverable_doc_key import deliverable_doc_key
+from app.services.deliverable_doc_key import deliverable_doc_key, parse_deliverable_doc_key
 from app.services.deliverable_service import DeliverableService
+from app.services.onlyoffice_docx_normalize import normalize_onlyoffice_docx
 from app.services.onlyoffice_editor_identity import resolve_editor_id
 
 logger = logging.getLogger(__name__)
 
 # OnlyOffice callback status codes
 STATUS_READY_FOR_SAVE = 2
+STATUS_FORCE_SAVE = 6
+_SAVE_STATUSES = frozenset({STATUS_READY_FOR_SAVE, STATUS_FORCE_SAVE})
 
 
 class OnlyOfficeCallbackService:
@@ -114,6 +119,27 @@ class OnlyOfficeCallbackService:
             logger.debug("OnlyOffice healthcheck 不可用: %s", exc)
             return False
 
+    def _parse_base_version(self, body: dict, task_id: UUID) -> int | None:
+        """从回调体 ``key`` 反解底版版本号，并校验该 key 属于本交付物。
+
+        返回 ``None`` 表示 key 缺失 / 格式不符 / 指向别的 task —— 调用方据此拒绝（写安全日志）。
+        """
+        raw_key = body.get("key")
+        if not isinstance(raw_key, str) or not raw_key.strip():
+            return None
+        parsed = parse_deliverable_doc_key(raw_key.strip())
+        if parsed is None:
+            return None
+        key_task_id, base_no = parsed
+        if key_task_id != task_id:
+            logger.warning(
+                "OnlyOffice callback key 指向交付物 %s，与路径 %s 不符，拒绝",
+                key_task_id,
+                task_id,
+            )
+            return None
+        return base_no
+
     async def handle_callback(
         self,
         task_id: UUID,
@@ -122,27 +148,44 @@ class OnlyOfficeCallbackService:
         user_id: UUID,
         year: int,
     ) -> dict:
-        """status==2 时下载编辑后文件并创建新版本。
+        """status 2（关闭保存）/ 6（强制保存）下载编辑后文件并创建新版本。
 
         Args:
             user_id: 版本记录的 ``created_by`` 占位（NOT NULL 列，回调无鉴权用户上下文，
                 由路由传交付物创建人）。**实际编辑人**另由 ``resolve_editor_id`` 从回调体
                 解析并落 ``edited_by``；解析不出记 None（需求 7.2/7.3）。
 
-        快照绑定（需求 7.1）：OO 编辑**不重新捕获** ``tb_hash``，改为继承上一版
-        —— 人工润色不等于按新试算表重算，重捕会把「本该 stale」洗白成绿。
+        四项加固（spec deliverable-writeback-and-online-edit-integrity §3）：
+        1. **status 6 也落版本** —— 编辑器开了 ``forcesave``，用户点「保存」发的是 6；旧实现只认 2，
+           丢「保存但不关闭」的中间版本（见 OnlyOffice callback-handler 文档）。
+        2. **key 校验** —— 回调体 ``key`` 必须是本交付物的 doc_key，否则写安全日志并拒绝（外部可达端点）。
+        3. **幂等** —— 规范化后的字节 SHA-256 与最新版本相同则不建新版本（Document Server 重试 / 强制保存后关闭同内容）。
+        4. **陈旧底版** —— 底版之后已有非本会话版本则仍保存（不丢编辑），标 ``base_version_no`` 并写审计日志。
+
+        快照绑定（需求 7.1）：OO 编辑**不重新捕获** ``tb_hash``，继承底版。
         """
         status = body.get("status")
-        if status != STATUS_READY_FOR_SAVE:
+        if status not in _SAVE_STATUSES:
             return {"error": 0}
 
         url = body.get("url")
         if not url:
-            logger.warning("OnlyOffice callback status=2 但缺少 url task=%s", task_id)
+            logger.warning("OnlyOffice callback status=%s 但缺少 url task=%s", status, task_id)
             return {"error": 1}
 
         task = await self._deliverable_svc.get_task(task_id)
         if task is None:
+            return {"error": 1}
+
+        base_version_no = self._parse_base_version(body, task_id)
+        doc_key = body.get("key")
+        if base_version_no is None:
+            # key 缺失 / 非法 / 跨 task：外部组装的回调体不可采信，写安全日志后拒绝。
+            await self.write_security_log(
+                task_id,
+                project_id=task.project_id,
+                reason=f"callback key 无效或与交付物不符: {doc_key!r}",
+            )
             return {"error": 1}
 
         async with httpx.AsyncClient(timeout=60) as client:
@@ -150,7 +193,22 @@ class OnlyOfficeCallbackService:
             resp.raise_for_status()
             docx_bytes = resp.content
 
+        # 规范化在幂等判定之前：规范化改变字节，必须对最终入库字节判幂等，否则「同内容」每次仍落新版本。
+        if (Path(url).suffix or ".docx").lower() == ".docx":
+            docx_bytes = normalize_onlyoffice_docx(docx_bytes)
+        incoming_sha = hashlib.sha256(docx_bytes).hexdigest()
+
         latest = await self._deliverable_svc._latest_version(task_id)
+        if latest is not None and latest.file_hash == incoming_sha:
+            # 幂等：与最新版本逐字节相同（强制保存后关闭、Document Server 重试）⇒ 不建新版本。
+            logger.info(
+                "OnlyOffice callback 内容与最新版本 v%s 一致，幂等跳过 task=%s status=%s",
+                latest.version_no, task_id, status,
+            )
+            return {"error": 0}
+
+        overwrote = await self._stale_base_overwrites(task_id, base_version_no, doc_key)
+
         next_no = (latest.version_no + 1) if latest else 1
         ext = Path(url).suffix or ".docx"
         file_name = f"{task.doc_type}_v{next_no}{ext}"
@@ -166,13 +224,72 @@ class OnlyOfficeCallbackService:
             inherit_snapshot_refs=True,
             edited_by=editor_id,
             edited_at=datetime.now(timezone.utc),
+            base_version_no=base_version_no,
+            oo_doc_key=doc_key if isinstance(doc_key, str) else None,
         )
+
+        if overwrote:
+            # 不丢用户编辑，但留痕「本版基于旧底版、覆盖了期间产生的新版本」，并提示版本链。
+            await self._log_stale_base_save(
+                task=task,
+                saved_version_no=stored.version.version_no,
+                base_version_no=base_version_no,
+                overwrote=overwrote,
+                editor_id=editor_id,
+            )
+
         await self.detect_and_store_report_drift(
             task,
             version=stored.version,
-            baseline_version_no=latest.version_no if latest else None,
+            baseline_version_no=base_version_no,
         )
         return {"error": 0}
+
+    async def _stale_base_overwrites(
+        self, task_id: UUID, base_version_no: int, doc_key: object
+    ) -> list[int]:
+        """返回「底版之后、非本会话」的版本号列表 —— 非空即本次保存基于陈旧底版。
+
+        同一会话（同 doc_key）产生的更高版本（强制保存串）不算陈旧：它们本就是本次编辑的中间态。
+        """
+        rows = (await self.db.execute(
+            sa.select(WordExportTaskVersion.version_no, WordExportTaskVersion.oo_doc_key).where(
+                WordExportTaskVersion.word_export_task_id == task_id,
+                WordExportTaskVersion.version_no > base_version_no,
+            ).order_by(WordExportTaskVersion.version_no)
+        )).all()
+        same_key = doc_key.strip() if isinstance(doc_key, str) and doc_key.strip() else None
+        return [no for no, key in rows if not (same_key is not None and key == same_key)]
+
+    async def _log_stale_base_save(
+        self, *, task, saved_version_no: int, base_version_no: int,
+        overwrote: list[int], editor_id: UUID | None,
+    ) -> None:
+        from app.services.audit_log_helper import append_audit_log
+
+        try:
+            await append_audit_log(
+                self.db,
+                {
+                    "user_id": editor_id,
+                    "project_id": task.project_id,
+                    "action": "deliverable_oo_stale_base_save",
+                    "resource_type": "word_export_task_version",
+                    "resource_id": str(task.id),
+                    "details": {
+                        "event_type": "deliverable_oo_stale_base_save",
+                        "saved_version_no": saved_version_no,
+                        "base_version_no": base_version_no,
+                        "overwrote_versions": overwrote,
+                    },
+                },
+            )
+        except Exception:  # noqa: BLE001 — 留痕失败不得回滚已保存的版本
+            logger.warning("陈旧底版保存留痕写入失败 task=%s", task.id, exc_info=True)
+        logger.warning(
+            "OnlyOffice 保存基于陈旧底版 v%s：期间已有版本 %s；本版 v%s 以旧内容为底 task=%s",
+            base_version_no, overwrote, saved_version_no, task.id,
+        )
 
     async def detect_and_store_report_drift(
         self,
@@ -248,26 +365,42 @@ class OnlyOfficeCallbackService:
             return None
 
         try:
-            import sqlalchemy as sa
-
             # 🔴 类名是 ProjectUser（表 project_users），不是 ProjectMember；
             # 且它带 SoftDeleteMixin → 必须排除已移出项目的成员。
-            from app.models.core import ProjectUser
+            from app.models.core import ProjectUser, User
 
-            stmt = sa.select(ProjectUser.id).where(
-                ProjectUser.project_id == task.project_id,
-                ProjectUser.user_id == editor_id,
-                ProjectUser.is_deleted == sa.false(),
-            )
-            result = await self.db.execute(stmt)
-            if result.first() is None:
+            # 第一道闸：平台在册用户（未删除、未停用）。回调体由 Document Server 组装，不校验等于让外部值落留痕。
+            user_row = (await self.db.execute(
+                sa.select(User.role).where(
+                    User.id == editor_id,
+                    User.is_deleted == sa.false(),
+                    User.is_active == sa.true(),
+                )
+            )).first()
+            if user_row is None:
                 logger.warning(
-                    "OnlyOffice callback 编辑人 %s 不属于项目 %s，如实记为未知 task=%s",
-                    editor_id,
-                    task.project_id,
-                    task_id,
+                    "OnlyOffice callback 编辑人 %s 非在册有效用户，如实记为未知 task=%s",
+                    editor_id, task_id,
                 )
                 return None
+
+            # 第二道闸：与项目权限同口径（assert_project_permission）—— admin 免项目成员校验，
+            # 其余必须在 project_users 内。历史实现只查 project_users，使 admin 编辑恒记空（admin 不在成员表）。
+            role_val = getattr(user_row[0], "value", user_row[0])
+            if role_val != "admin":
+                member = (await self.db.execute(
+                    sa.select(ProjectUser.id).where(
+                        ProjectUser.project_id == task.project_id,
+                        ProjectUser.user_id == editor_id,
+                        ProjectUser.is_deleted == sa.false(),
+                    )
+                )).first()
+                if member is None:
+                    logger.warning(
+                        "OnlyOffice callback 编辑人 %s 不属于项目 %s，如实记为未知 task=%s",
+                        editor_id, task.project_id, task_id,
+                    )
+                    return None
         except Exception:  # noqa: BLE001 — 校验失败不阻断保存，但也不采信该 id
             logger.warning(
                 "OnlyOffice callback 编辑人归属校验失败，如实记为未知 task=%s",

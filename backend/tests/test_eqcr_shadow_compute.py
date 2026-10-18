@@ -157,9 +157,17 @@ async def test_shadow_compute_basic(db_session, sample_project, sample_user):
     rows = (await db_session.execute(q)).scalars().all()
     assert len(rows) == 1
     assert rows[0].computation_type == "debit_credit_balance"
-    # team_result_snapshot 为 None（测试环境无项目组数据），has_diff=True
-    # 这是正确行为：无法对比时标记为有差异
-    assert rows[0].has_diff is True
+    # 🔴 修正（deliverable-writeback-and-online-edit-integrity Task 29，活路径修复）：
+    # 原断言 has_diff is True 建立在「team 侧查询恒失败 ⇒ team_result_snapshot=None ⇒ 无法对比标差异」
+    # 这一 **bug** 之上——`_get_team_result` 的 debit_credit_balance 分支原查 `FROM trial_balance` 的
+    # debit_amount / credit_amount（真库这两列在 trial_balance 不存在、在 tb_balance 上），查错表被
+    # 外层 try/except 吞成 None。修复改查 tb_balance 后，即便项目组无数据，聚合查询也会返回一行
+    # 空汇总（total_debit=total_credit=0）⇒ team_result_snapshot 是有效 dict（非 None）。
+    # eqcr 侧为 consistent/success，与空汇总对比无差异 ⇒ has_diff=False。
+    # 本断言现同时守护「team 侧查询对真实 schema 有效（不再静默 None）」这一修复。
+    assert rows[0].team_result_snapshot is not None, "team 侧查询应返回有效空汇总，不应静默为 None"
+    assert rows[0].team_result_snapshot.get("source") == "tb_balance"
+    assert rows[0].has_diff is False
 
 
 @pytest.mark.asyncio

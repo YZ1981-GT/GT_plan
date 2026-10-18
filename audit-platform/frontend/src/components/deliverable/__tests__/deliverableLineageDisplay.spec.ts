@@ -158,6 +158,15 @@ describe('Property 22 — 快照与 stale 展示', () => {
     expect(src, 'edited_at 零消费 ⇒ 属 dead output').toContain('v.edited_at')
     expect(src).toContain('editorTooltip')
   })
+
+  it('陈旧底版 overwrote_versions 必须有警示出口（spec deliverable-writeback-and-online-edit-integrity §3.5）', () => {
+    const src = stripComments(VERSION_LIST)
+    // 下发了却零消费 = dead output；必须经标签 / tooltip 渲染
+    expect(src, 'overwrote_versions 零消费').toContain('v.overwrote_versions')
+    expect(src).toContain('staleBaseLabel')
+    expect(src).toContain('base_version_no')
+    expect(src).toContain('覆盖了第')
+  })
 })
 
 // ─── 需求 10.3：差异告警 ────────────────────────────────────────────────────

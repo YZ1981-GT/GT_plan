@@ -283,7 +283,8 @@ class ReportBodyAdapter:
 #: doc_type → 适配器类。与 ``deliverable_capabilities.WRITEBACK_SUPPORTED_DOC_TYPES``
 #: 必须一致（守卫交叉锁死）：能力矩阵说支持回填的类型，这里必须有适配器，反之亦然。
 ADAPTER_BY_DOC_TYPE: dict[str, type] = {
-    "disclosure_notes": DisclosureNoteAdapter,
+    # 🔴 disclosure_notes 已移除（附注回填下线，2026-10-17 方向裁定）：附注是底稿单项推送的只读下游，
+    # 交付中心禁止逆写。DisclosureNoteAdapter 类保留但不再被选中（避免误接 / 供历史测试引用）。
     "audit_report": ReportBodyAdapter,
 }
 

@@ -1006,19 +1006,17 @@ class DeliverableWritebackService:
         return [code for code, recorded in rows if recorded and current.get(code) == recorded]
 
     async def _resolve_adapter(self, word_export_task_id: UUID):
-        """按交付件 doc_type 取上游适配器（Wave 3 Task 18）。
+        """按交付件 doc_type 取上游适配器。
 
-        取不到 doc_type 时**回退附注适配器** —— 与引入前行为等价（历史实现即硬编码
-        附注），保证「读不到元数据」不会让既有附注回填突然失效；
-        真正的门控在端点层（`deliverable_capabilities` 的 400 校验）。
+        🔴 附注回填已下线（2026-10-17 方向裁定）：附注是底稿单项推送的只读下游，交付中心禁止逆写。
+        `get_writeback_adapter` 的 `ADAPTER_BY_DOC_TYPE` 已移除 disclosure_notes ⇒ 附注返回 None、
+        主流程直接返回全空结果；读不到 doc_type 时也返回 None（不再默认回退附注）。
+        真正的门控在端点层（`deliverable_capabilities` 的 400 校验），这里是第二道闸。
         """
         import sqlalchemy as sa
 
         from app.models.phase13_models import WordExportTask
-        from app.services.writeback_target_adapters import (
-            DisclosureNoteAdapter,
-            get_writeback_adapter,
-        )
+        from app.services.writeback_target_adapters import get_writeback_adapter
 
         try:
             stmt = sa.select(WordExportTask.doc_type).where(
@@ -1026,16 +1024,16 @@ class DeliverableWritebackService:
             )
             result = await self.db.execute(stmt)
             doc_type = result.scalar_one_or_none()
-        except Exception:  # noqa: BLE001 — 读不到不阻断，退回既有行为
+        except Exception:  # noqa: BLE001 — 读不到不阻断
             logger.warning(
-                "writeback: 读取 doc_type 失败，回退附注适配器 task=%s",
+                "writeback: 读取 doc_type 失败，不回填 task=%s",
                 word_export_task_id,
                 exc_info=True,
             )
-            return DisclosureNoteAdapter(self.db)
+            return None
 
         if doc_type is None:
-            return DisclosureNoteAdapter(self.db)
+            return None
         return get_writeback_adapter(self.db, doc_type)
 
     async def _extract_sections_for(self, adapter, docx_bytes: bytes) -> dict[str, str]:

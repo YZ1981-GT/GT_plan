@@ -20,10 +20,13 @@ from pathlib import Path
 import pytest
 
 from app.services.deliverable_capabilities import (
+    LINEAGE_SUPPORTED_DOC_TYPES,
     SECTION_REFRESH_SUPPORTED_DOC_TYPES,
     WRITEBACK_FORBIDDEN_DOC_TYPES,
     WRITEBACK_SUPPORTED_DOC_TYPES,
+    lineage_unsupported_message,
     section_refresh_unsupported_message,
+    supports_lineage,
     supports_section_refresh,
     supports_writeback,
     writeback_unsupported_message,
@@ -49,24 +52,32 @@ def _strip_comments_and_docstrings(src: str) -> str:
 
 
 @pytest.mark.parametrize(
-    ("doc_type", "wb", "refresh"),
+    ("doc_type", "wb", "refresh", "lineage"),
     [
-        ("disclosure_notes", True, True),
-        ("financial_report", False, False),
-        ("financial_report_unadjusted", False, False),
+        # 🔴 附注回填已下线（spec deliverable-writeback-and-online-edit-integrity 方向裁定）：
+        # 附注唯一权威源是底稿披露表的单项推送，交付中心回填附注=逆流，故 writeback=False。
+        # 章节级刷新保留 True —— 刷新是「从上游重新拉取生成」的导出方向，不改变上游。
+        # 溯源 True —— 附注有章节号 + 章节状态，可按章节回溯上游。
+        ("disclosure_notes", False, True, True),
+        # 财务报表：回填 / 刷新 / 溯源**全 False** —— 报表按报表行取数、无章节锚点，
+        # 章节状态任务恒 0 行，溯源面板会显示空下拉 + 「请重新生成」误导（US-8 改说明文案）。
+        ("financial_report", False, False, False),
+        ("financial_report_unadjusted", False, False, False),
         # Wave 3 Task 18 起报告正文支持**回填**（写 report_body_json.sections）；
         # 但**不支持章节级增量刷新** —— 刷新需要按上游重算章节内容再就地替换，
         # 而报告正文的内容来自 Word 模板占位符填充，重算等于重新生成整份。
-        ("audit_report", True, False),
-        ("unknown_type", False, False),
-        ("", False, False),
-        (None, False, False),
+        # 溯源 True —— 报告正文有段落章节 + 章节状态。
+        ("audit_report", True, False, True),
+        ("unknown_type", False, False, False),
+        ("", False, False, False),
+        (None, False, False, False),
     ],
 )
-def test_property_11_capability_matrix_values(doc_type, wb, refresh):
+def test_property_11_capability_matrix_values(doc_type, wb, refresh, lineage):
     # Feature: deliverable-lineage-wiring-and-writeback-closure, Property 11
     assert supports_writeback(doc_type) is wb, f"{doc_type} 的回填能力判定不符"
     assert supports_section_refresh(doc_type) is refresh, f"{doc_type} 的刷新能力判定不符"
+    assert supports_lineage(doc_type) is lineage, f"{doc_type} 的溯源能力判定不符"
 
 
 def test_none_and_empty_are_not_supported():
@@ -78,6 +89,7 @@ def test_none_and_empty_are_not_supported():
     for bad in (None, ""):
         assert supports_writeback(bad) is False
         assert supports_section_refresh(bad) is False
+        assert supports_lineage(bad) is False
 
 
 # ─── 审计底线：报表永不可回填 ────────────────────────────────────────────────
@@ -114,6 +126,14 @@ def test_unsupported_messages_point_to_alternative_path():
     # 但仍不支持章节级刷新，故刷新侧必须有可读拒绝文案。
     assert supports_writeback("audit_report") is True
     assert section_refresh_unsupported_message("audit_report")
+
+    # 🔴 附注回填已下线：拒绝文案必须指向「回底稿改并同步」这一正确路径，
+    # 否则用户看到「不支持」却不知道该去哪儿改。
+    assert supports_writeback("disclosure_notes") is False
+    notes_msg = writeback_unsupported_message("disclosure_notes")
+    assert "底稿" in notes_msg, f"附注回填拒绝文案未指向底稿: {notes_msg}"
+    # 附注仍支持章节刷新（导出方向），故不应落到刷新拒绝分支
+    assert supports_section_refresh("disclosure_notes") is True
 
     # 未知类型也要有可读文案（不得抛异常 / 不得返回空串）
     for dt in (None, "", "weird"):
@@ -159,6 +179,9 @@ def test_router_and_dto_both_consume_capability_functions():
     assert "supports_section_refresh=supports_section_refresh(" in service, (
         "DeliverableDTO 未由能力函数派生 supports_section_refresh"
     )
+    assert "supports_lineage=supports_lineage(" in service, (
+        "DeliverableDTO 未由能力函数派生 supports_lineage（US-8）"
+    )
 
 
 def test_dto_schema_exposes_capability_flags():
@@ -166,11 +189,34 @@ def test_dto_schema_exposes_capability_flags():
     from app.models.phase13_schemas import DeliverableDTOSchema
 
     fields = DeliverableDTOSchema.model_fields
-    for name in ("supports_writeback", "supports_section_refresh"):
+    for name in ("supports_writeback", "supports_section_refresh", "supports_lineage"):
         assert name in fields, f"DeliverableDTOSchema 缺少 {name}"
         assert fields[name].default is False, (
             f"{name} 默认值必须为 False —— 旧后端/异常路径下应隐藏入口而非误显示"
         )
+
+
+# ─── US-8 溯源能力标志 ───────────────────────────────────────────────────────
+
+
+def test_financial_report_never_lineage_capable():
+    """财务报表永不可溯源：报表按报表行取数、无章节锚点，章节状态恒 0 行。"""
+    assert supports_lineage("financial_report") is False
+    assert supports_lineage("financial_report_unadjusted") is False
+    # 附注 / 报告正文都有章节结构 ⇒ 可溯源
+    assert supports_lineage("disclosure_notes") is True
+    assert supports_lineage("audit_report") is True
+    # LINEAGE 集合不得含任何 financial_report*
+    assert not any(dt.startswith("financial_report") for dt in LINEAGE_SUPPORTED_DOC_TYPES)
+
+
+def test_lineage_unsupported_message_points_to_report_drilldown():
+    """不支持溯源时文案必须指向「财务报表页穿透」，不得只说不支持（避免「请重新生成」误导）。"""
+    msg = lineage_unsupported_message("financial_report")
+    assert "财务报表" in msg and "穿透" in msg, f"溯源不支持文案未指向报表穿透: {msg}"
+    # 未知类型也要有可读文案
+    for dt in (None, "", "weird"):
+        assert lineage_unsupported_message(dt)
 
 
 # ─── 反向自检 ────────────────────────────────────────────────────────────────

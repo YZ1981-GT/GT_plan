@@ -31,6 +31,16 @@
             {{ v.drift_report?.unavailable ? '差异检测不可用' : '数字与重算不一致' }}
           </el-tag>
 
+          <!-- 陈旧底版：OO 保存时底版之后已有新版本，本版以旧内容为底、覆盖了它们（编辑未丢，但需核对） -->
+          <el-tooltip
+            v-if="staleBaseLabel(v)"
+            :content="staleBaseTooltip(v)"
+            placement="top"
+            :show-after="200"
+          >
+            <el-tag size="small" type="danger" effect="plain">{{ staleBaseLabel(v) }}</el-tag>
+          </el-tooltip>
+
           <!--
             编辑时间与版本落库时间（时间轴上的 created_at）通常相近但并非同一事实：
             前者是 OnlyOffice 侧的编辑时刻，后者是回调落库时刻。放 tooltip 里既
@@ -102,6 +112,25 @@ function editorTooltip(v: DeliverableVersion): string {
     : '回调未携带可识别的编辑人，如实记为未知（不回退交付物创建人）'
   const when = v.edited_at ? `编辑时间 ${formatTime(v.edited_at)}` : '编辑时间未记录'
   return `${who}；${when}`
+}
+
+/**
+ * 陈旧底版标签（spec deliverable-writeback-and-online-edit-integrity §3.5）。
+ * `overwrote_versions` 非空 = 在线编辑期间有人刷新 / 重新生成，本版保存时以旧底版为底。
+ * 编辑内容未丢（已存为新版本），但覆盖了期间产生的版本，需人工核对。
+ */
+function staleBaseLabel(v: DeliverableVersion): string {
+  const over = v.overwrote_versions ?? []
+  if (!over.length || v.base_version_no == null) return ''
+  return `基于第 ${v.base_version_no} 版编辑，覆盖了第 ${over.join('、')} 版`
+}
+
+function staleBaseTooltip(v: DeliverableVersion): string {
+  const over = v.overwrote_versions ?? []
+  return (
+    `在线编辑期间有人刷新或重新生成（产生第 ${over.join('、')} 版），`
+    + `本版保存时以第 ${v.base_version_no} 版为底，可能未包含那些版本的改动；请核对后再确认。`
+  )
 }
 
 function download(versionNo: number) {

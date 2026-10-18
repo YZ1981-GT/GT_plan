@@ -114,6 +114,9 @@ class StepOutcome:
     error_message: str | None = None
     task_id: UUID | None = None
     validation_warning: str | None = None
+    # 附注一致性闸门（US-4 / design §4.3）：全套生成是批处理，不在批处理里弹窗/阻断；
+    # 附注与底稿不一致时只在该步打标 needs_confirmation，其余步骤照常执行，提示在交付中心列表侧呈现。
+    needs_confirmation: bool = False
 
 
 @dataclass
@@ -335,11 +338,20 @@ class FullDeliverablesExecutor:
                     await self.db.flush()
 
                 item_results[step_key] = ExportJobItemStatus.succeeded.value
+                # 附注步骤成功后打一致性标记（US-4）：不阻断，仅供交付中心列表侧提示。
+                step_needs_confirmation = False
+                if step_key == "disclosure_notes":
+                    step_needs_confirmation = (
+                        await self._disclosure_notes_needs_confirmation(
+                            job.project_id, job.year or 0
+                        )
+                    )
                 outcomes.append(StepOutcome(
                     step=step_key,
                     item_id=item.id,
                     succeeded=True,
                     task_id=result if isinstance(result, UUID) else None,
+                    needs_confirmation=step_needs_confirmation,
                 ))
             except Exception as exc:  # noqa: BLE001
                 # 保存点已自动回滚业务写入（包括 item/attempt 状态变更）
@@ -455,7 +467,14 @@ class FullDeliverablesExecutor:
                     task_id = await self._run_disclosure_notes(
                         project_id, year, user_id
                     )
-                    outcome = StepOutcome(step, item.id, True, task_id=task_id)
+                    outcome = StepOutcome(
+                        step, item.id, True, task_id=task_id,
+                        needs_confirmation=(
+                            await self._disclosure_notes_needs_confirmation(
+                                project_id, year
+                            )
+                        ),
+                    )
                 elif step == "report_body":
                     task_id, warning, resolved_opt = await self._run_report_body(
                         project_id, year, user_id, payload
@@ -576,6 +595,20 @@ class FullDeliverablesExecutor:
         )
         await self._advance_to_editing(dsvc, task.id)
         return task.id
+
+    async def _disclosure_notes_needs_confirmation(
+        self, project_id: UUID, year: int
+    ) -> bool:
+        """附注与底稿是否不一致（US-4 / design §4.3）。
+
+        仅用于给全套生成的 disclosure_notes 步骤打 ``needs_confirmation`` 标记——
+        **不阻断**导出（批处理逐项提示在交付中心列表侧呈现）。查询异常 fail-open
+        （``check_note_consistency`` 自身 fail-open 返回 consistent=True）⇒ 返回 False。
+        """
+        from app.services.deliverable_note_consistency import check_note_consistency
+
+        result = await check_note_consistency(self.db, project_id, year)
+        return not result.get("consistent", True)
 
     async def _run_disclosure_notes(
         self, project_id: UUID, year: int, user_id: UUID

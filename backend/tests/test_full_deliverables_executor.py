@@ -299,3 +299,65 @@ class TestFullDeliverablesExecutor:
         assert job.progress_total == 4
         assert job.progress_done == 4
         assert len(items) == 4
+
+class TestDisclosureNotesConsistencyFlag:
+    """全套生成的附注步骤一致性标记（US-4 / design §4.3）。
+
+    批处理不弹窗、不阻断：附注与底稿不一致时只在 disclosure_notes 步骤打
+    ``needs_confirmation=True``，其余步骤照常成功执行。
+    """
+
+    @pytest.mark.asyncio
+    async def test_inconsistent_marks_step_without_blocking(
+        self, test_db, test_project, test_user
+    ):
+        """不一致 ⇒ 附注步骤 needs_confirmation=True，但四步仍全部成功、不阻断。"""
+        executor = FullDeliverablesExecutor(test_db)
+        _patch_steps(executor)
+        # 桩：附注与底稿不一致
+        executor._disclosure_notes_needs_confirmation = (  # type: ignore[assignment]
+            lambda project_id, year: _const_bool(True)
+        )
+
+        result = await executor.run(
+            project_id=test_project.id,
+            user_id=test_user.id,
+            payload={"year": 2024, "template_variant": "simple"},
+        )
+
+        by_step = {o.step: o for o in result.outcomes}
+        # 核心：附注步骤被标记，但不阻断其余步骤
+        assert by_step["disclosure_notes"].needs_confirmation is True
+        assert by_step["disclosure_notes"].succeeded is True
+        # 批处理不阻断：所有已执行步骤仍全部成功、0 失败
+        assert result.failed == 0
+        assert all(o.succeeded for o in result.outcomes)
+        assert result.status == "succeeded"
+        # 其余步骤不受影响、不打标
+        assert by_step["financial_reports"].needs_confirmation is False
+        assert by_step["report_body"].needs_confirmation is False
+
+    @pytest.mark.asyncio
+    async def test_consistent_leaves_flag_false(
+        self, test_db, test_project, test_user
+    ):
+        """一致（或 fail-open）⇒ 附注步骤 needs_confirmation=False。"""
+        executor = FullDeliverablesExecutor(test_db)
+        _patch_steps(executor)
+        executor._disclosure_notes_needs_confirmation = (  # type: ignore[assignment]
+            lambda project_id, year: _const_bool(False)
+        )
+
+        result = await executor.run(
+            project_id=test_project.id,
+            user_id=test_user.id,
+            payload={"year": 2024, "template_variant": "simple"},
+        )
+
+        by_step = {o.step: o for o in result.outcomes}
+        assert by_step["disclosure_notes"].needs_confirmation is False
+        assert by_step["disclosure_notes"].succeeded is True
+
+
+async def _const_bool(value: bool) -> bool:
+    return value

@@ -51,6 +51,7 @@
           :deliverable-status="deliverableStatus"
           :has-no-anchors="hasNoAnchors"
           :supports-section-refresh="supportsSectionRefresh"
+          :supports-lineage="supportsLineage"
           :editor-has-unsaved-edits="sessionModified"
           @refreshed="onDeliverableRefreshed"
         />
@@ -167,6 +168,11 @@ const props = defineProps<{
    */
   supportsWriteback?: boolean
   supportsSectionRefresh?: boolean
+  /**
+   * 溯源能力（US-8）：财务报表恒 false。false 时溯源面板不请求 /section-states，
+   * 改显「报表按行取数、去报表页穿透」说明，避免空下拉 + 「请重新生成」误导。
+   */
+  supportsLineage?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -215,8 +221,9 @@ const writebackUnsupportedTitle = computed(() => {
   if (dt.startsWith('financial_report')) {
     return '财务报表数字来源于试算表与调整分录，不支持从出品物回填；如需修改金额请回底稿录入 AJE/RJE 后重新生成报表。'
   }
-  if (dt === 'audit_report') {
-    return '报告正文回填能力尚未开放（规划中），本版本可在线编辑并保存为新版本，但改动不会写回报告数据。'
+  if (dt === 'disclosure_notes') {
+    // 附注回填已下线（方向裁定）：附注是底稿单项推送的只读下游，交付中心不回写附注。
+    return '附注内容来源于底稿披露表的推送（底稿 → 附注），交付中心不支持回填。请回对应底稿修改并点「同步到附注」，再从交付中心重新导出附注。'
   }
   return '该类型交付件不支持回填到上游模块，编辑结果仅保存为交付件新版本。'
 })

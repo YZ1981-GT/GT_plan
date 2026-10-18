@@ -7,6 +7,13 @@
 
 判据：当前块哈希 == 生成 / 刷新时记录的 Rendered_Block_Hash（与增量刷新的人工编辑检测同一判据）⇒ 没改过 ⇒
 不比对、不写回；改过的块照旧走护栏、冲突检测与写回；记录为 NULL（存量交付件）的块照旧比对。
+
+🔴 **附注回填已下线**（spec deliverable-writeback-and-online-edit-integrity，2026-10-17）：
+生产 `_resolve_adapter` 对 disclosure_notes 返回 None、`writeback()` 短路返回全空。但「交付后
+没改过的块不写回」是**与上游种类无关的通用机制**，仍是 audit_report 回填的活代码，须继续守护。
+故本文件用例统一经 `_note_writeback_service` **强制注入附注适配器**（绕过 doc_type 门控），
+验证块哈希判据本身；附注的「不可回填」由 test_deliverable_writeback_rowcount 的 decommission
+用例守护。两者正交。
 """
 from __future__ import annotations
 
@@ -17,12 +24,19 @@ from docx import Document
 
 from app.models.audit_platform_models import DeliverableSectionState
 from app.models.report_models import DisclosureNote
-from app.services.deliverable_writeback_service import DeliverableWritebackService
 from app.services.section_anchor_utils import (
     SectionBlock, block_text_hash, resolve_section_blocks, write_section_anchors,
 )
 from app.services.word_doc_utils import remove_section_markers, scan_section_blocks
-from tests.test_deliverable_writeback_rowcount import ACTOR_ID, PROJECT_ID, TASK_ID, YEAR, _run, _setup
+from tests.test_deliverable_writeback_rowcount import (
+    ACTOR_ID,
+    PROJECT_ID,
+    TASK_ID,
+    YEAR,
+    _note_writeback_service,
+    _run,
+    _setup,
+)
 
 #: 模板模式交付件的块形态：编号行 + 标题 + 正文 + 模板指引（正文之外的都不在库里）
 BLOCKS = {
@@ -76,7 +90,7 @@ def test_untouched_template_blocks_are_not_written_back():
         await _setup(session, notes=NOTES, states=list(NOTES))
         delivered = _delivered(BLOCKS)
         await _record_rendered_hashes(session, delivered)
-        result = await DeliverableWritebackService(session).writeback(
+        result = await _note_writeback_service(session).writeback(
             TASK_ID, PROJECT_ID, YEAR, ACTOR_ID, docx_bytes=delivered)
         return result, await _texts(session)
 
@@ -90,7 +104,7 @@ def test_edited_block_is_still_compared_and_written():
         await _setup(session, notes=NOTES, states=list(NOTES))
         delivered = _delivered(BLOCKS)
         await _record_rendered_hashes(session, delivered)
-        result = await DeliverableWritebackService(session).writeback(
+        result = await _note_writeback_service(session).writeback(
             TASK_ID, PROJECT_ID, YEAR, ACTOR_ID, docx_bytes=_edited(delivered, "货币资金正文", "货币资金正文（已改）"))
         return result, await _texts(session)
 
@@ -104,7 +118,7 @@ def test_blocks_without_recorded_hash_keep_legacy_comparison():
     """对照：存量交付件（Rendered_Block_Hash 为 NULL）照旧逐块比对 —— 证明上面的不写回来自哈希判据。"""
     async def scenario(session):
         await _setup(session, notes=NOTES, states=list(NOTES))
-        return await DeliverableWritebackService(session).writeback(
+        return await _note_writeback_service(session).writeback(
             TASK_ID, PROJECT_ID, YEAR, ACTOR_ID, docx_bytes=_delivered(BLOCKS))
 
     result = _run(scenario)

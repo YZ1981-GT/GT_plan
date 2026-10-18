@@ -114,8 +114,11 @@ class WpQualityScoreService:
 
     async def get_dashboard(self, project_id: UUID) -> dict:
         """获取项目质量仪表盘数据"""
+        # 🔴 修复（deliverable-writeback-and-online-edit-integrity Phase E）：
+        # 删除 SELECT 中的 wp_status —— working_paper 无此列（真名是 status），且本方法从未读取它
+        # （下方只用 quality_score / consistency）。该列一存在就会在接线后首次调用即 UndefinedColumn 500。
         rows = (await self.db.execute(sa.text("""
-            SELECT quality_score, wp_status,
+            SELECT quality_score,
                    COALESCE(consistency_status, 'unknown') AS consistency
             FROM working_paper
             WHERE project_id = :pid AND is_deleted = false

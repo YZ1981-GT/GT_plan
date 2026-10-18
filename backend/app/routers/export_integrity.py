@@ -148,10 +148,14 @@ async def download_export(
             pass  # Redis 不可用时降级跳过
 
     # 查找导出文件路径
+    # 🔴 修复（deliverable-writeback-and-online-edit-integrity Phase E）：
+    # 原 `SELECT output_path ... WHERE id::text=:eid OR export_id=:eid` 引用两个真库不存在的列
+    # （真实列是 file_path，无 output_path / export_id）⇒ 每次 GET /exports/{id}/download 必 UndefinedColumn 500。
+    # export_tasks 主键是 id，无单独 export_id，故只按 id::text 匹配。
     from sqlalchemy import text
     stmt = text("""
-        SELECT output_path FROM export_tasks
-        WHERE id::text = :eid OR export_id = :eid
+        SELECT file_path FROM export_tasks
+        WHERE id::text = :eid
         LIMIT 1
     """)
     result = await db.execute(stmt, {"eid": export_id})

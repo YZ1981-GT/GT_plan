@@ -552,8 +552,11 @@ def test_scanner_matches_delegator_family_by_prefix():
 # ``GET /api/projects/{pid}/notes/cross-references`` 不带令牌 200。现算该维 **632** 个端点：项目级 237 /
 # 仅登录 339 / **无鉴权 56**（其中 2 个是签名 / 回调自鉴权，见 ``_PREFIXED_SELF_AUTH``）。
 #
-# 处置与上两维同一纪律：本 spec 只修附注域（note_advanced 五个），其余 54 个冻结为 ``_PREFIXED_KNOWN_GAPS``
-# （只许变短，另立 spec 逐个评估调用方后修）；仅登录档冻结上限。
+# 处置：note_advanced 五个由 disclosure-payload spec 修；其余 54 个由 disclosure-note-template-word-realignment
+# Phase 8 Task 8（2026-10-18）逐个评估调用方后补齐 —— 读端点挂 require_project_access("readonly")、写端点挂
+# "edit"（整路由同级的用路由级 dependencies）。``_PREFIXED_KNOWN_GAPS`` 现清空；仅登录档冻结上限。
+# 🔴 wp_template_files / wp_template_docx / wp_template_xlsx 的 /template-file 端点确认为**前端 Univer 渲染用**
+# （OnlyOffice 走 wp_onlyoffice_router + {ONLYOFFICE_URL} ConvertService，不抓这些），前端带会话令牌 ⇒ 加鉴权安全。
 
 _ANY_DECOR = re.compile(r'@(\w+)\.(get|post|put|patch|delete)\(\s*[\'"]([^\'"]*)[\'"]')
 
@@ -563,39 +566,10 @@ _PREFIXED_SELF_AUTH: dict[str, str] = {
     "deliverable.py::signed_download_version": "_verify_download_sig",  # 10 分钟 HMAC 签名下载
 }
 
-#: 🔴 前缀维真实欠账（2026-10-16 快照：16 个路由文件 54 个端点，写 24 / 读 30）：无任何鉴权依赖、函数体也
-#: 不校验。只许变短；写端点（POST/PATCH/DELETE，未登录可改数据）优先修。
-_PREFIXED_KNOWN_GAPS: frozenset[str] = frozenset({
-    "analytical_review_save.py::save_industry_comparison_endpoint",
-    "analytical_review_save.py::save_eps_roe_endpoint",
-    "auto_data.py::get_auto_data",
-    "b5_version.py::get_b5_recommended_version",
-    *(f"cf_verification.py::{n}" for n in (
-        "get_cash_equivalents", "reconcile_bs_cf", "verify_main_table", "verify_supplementary",
-        "get_saved_results", "save_explanation", "create_cf_adjustment", "export_a5_excel")),
-    "ledger_penetration.py::penetrate",
-    *(f"review_workflow.py::{n}" for n in (
-        "get_review_panel", "get_completion_checklist", "export_archive", "link_conversation",
-        "unlink_conversation", "get_review_progress", "import_review_excel", "export_blank_template",
-        "initiate_signing", "sign", "get_signing_progress")),
-    *(f"sign_convention.py::{n}" for n in (
-        "list_sign_anomalies", "create_direction_override", "batch_confirm_anomalies")),
-    *(f"wp_cross_check.py::{n}" for n in ("execute_cross_check", "get_results", "get_rules", "add_custom_rule")),
-    *(f"wp_evidence.py::{n}" for n in (
-        "get_evidence_links", "create_evidence_link", "delete_evidence_link", "batch_link_evidence",
-        "check_evidence_sufficiency")),
-    "wp_prerequisite_status.py::get_prerequisite_status",
-    *(f"wp_procedure_tables.py::{n}" for n in (
-        "get_procedure_tables_batch", "get_procedure_table", "create_custom_item", "delete_custom_item")),
-    *(f"wp_procedures.py::{n}" for n in (
-        "get_procedures", "complete_procedure", "trim_procedure", "create_custom_procedure", "copy_from_prior")),
-    "wp_review_status.py::get_review_status",
-    "wp_template_docx.py::convert_docx_to_univer_doc",
-    *(f"wp_template_files.py::{n}" for n in (
-        "get_workpaper_xlsx", "init_from_template", "get_available_templates", "get_single_sheet_data")),
-    "wp_template_xlsx.py::convert_xlsx_to_json",
-    "wp_template_xlsx.py::convert_xlsx_storage_to_json",
-})
+#: 🔴 前缀维真实欠账：2026-10-16 快照 16 个路由文件 54 个端点，**2026-10-18 Phase 8 Task 8 已全部补齐并清零**。
+#: 守卫 `test_prefixed_known_gaps_only_shrink` 只许变短；清零后它退化为「禁止任何条目回潮」，而真正拦住新增无鉴权
+#: 端点的是 `test_no_new_prefixed_unauthorized_endpoint`（扫 none 档必为空）。
+_PREFIXED_KNOWN_GAPS: frozenset[str] = frozenset()
 
 #: 前缀维「仅登录不校项目」上限（2026-10-16 现算 339），棘轮只许向下
 _PREFIXED_IDENTITY_ONLY_BASELINE = 339

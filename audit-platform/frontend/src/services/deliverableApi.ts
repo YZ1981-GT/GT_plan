@@ -21,6 +21,8 @@ export interface DeliverableItem {
    */
   supports_writeback?: boolean
   supports_section_refresh?: boolean
+  /** 溯源能力（US-8）：财务报表恒 false，面板不请求 /section-states、改显说明文案。 */
+  supports_lineage?: boolean
   /**
    * 报表差异告警（需求 10.3）：列表行即可见「数字与按试算表重算不一致」。
    * 判定由后端 `should_block_confirm` 唯一入口给出 —— 前端**不得**自己写
@@ -82,6 +84,10 @@ export interface DeliverableVersion {
   edited_by?: string | null
   edited_at?: string | null
   edited_by_name?: string | null
+  /** OO 编辑会话打开时的底版版本号（spec deliverable-writeback-and-online-edit-integrity §3.5） */
+  base_version_no?: number | null
+  /** 本版因陈旧底版覆盖掉的版本号；非空 ⇒ 编辑期间有人刷新 / 再生成，本版以旧内容为底 */
+  overwrote_versions?: number[] | null
   bound_tb_hash?: string | null
   is_stale?: boolean | null
   drift_report?: DeliverableDriftReport | null
@@ -216,7 +222,13 @@ export function deliverableGuidanceDownloadUrl(
 
 export async function renderDisclosureNotes(
   projectId: string,
-  body: { year: number; template_type?: string; selected_sections?: string[] },
+  body: {
+    year: number
+    template_type?: string
+    selected_sections?: string[]
+    /** 导出前一致性闸门：不一致时需用户显式确认后置 true 再导出 */
+    confirm_inconsistent?: boolean
+  },
 ) {
   return api.post<DeliverableExportResponse>(deliverables.renderDisclosureNotes(projectId), body)
 }
@@ -234,14 +246,38 @@ export async function renderFinancialReports(
   return api.post<DeliverableExportResponse>(deliverables.renderFinancialReports(projectId), body)
 }
 
+/** 附注章节一致性清单项（导出前闸门用，章节级定位 + 回底稿改的入口信息） */
+export interface NoteConsistencyItem {
+  note_section: string
+  section_title: string
+  wp_codes?: string[]
+  wp_ids?: string[]
+  wp_sheet?: string | null
+}
+
+/** 附注与底稿披露表的一致性结果（导出前闸门） */
+export interface NoteConsistency {
+  /** 用户是否已显式确认带不一致导出 */
+  confirmed: boolean
+  /** 从未从底稿同步过的章节 */
+  never_synced: NoteConsistencyItem[]
+  /** 底稿已更新、附注陈旧未重新同步的章节 */
+  stale: NoteConsistencyItem[]
+}
+
 export interface DeliverableExportResponse {
-  task_id: string
-  version_no: number
-  download_url: string
+  /** 需确认（requires_confirmation=true）时为空 */
+  task_id: string | null
+  version_no: number | null
+  download_url: string | null
   platform_persist_failed: boolean
   file_name: string | null
   /** 导出提醒（不阻断导出）：报表不平衡 / 合计不一致 / 附注残留占位等，中文 */
   warnings?: string[]
+  /** 导出前一致性闸门命中：附注与底稿不一致且未确认，前端应弹确认框、不建版本 */
+  requires_confirmation?: boolean
+  /** 一致性清单（requires_confirmation 时含待确认章节；成功时 confirmed 标记是否带不一致导出） */
+  consistency?: NoteConsistency | null
 }
 
 export interface CompletenessResult {

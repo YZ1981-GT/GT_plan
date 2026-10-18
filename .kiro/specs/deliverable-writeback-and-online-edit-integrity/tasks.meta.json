@@ -1,0 +1,206 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "17. 附注回填下线：`supports_writeback(\"disclosure_notes\")=False`（从 `WRITEBACK_SUPPORTED_DOC_TYPES` 移除）；": [
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296868985
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296882938
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792297425669
+      }
+    ],
+    "18. 报告正文回填保留 + 路由补 commit：`audit_report` 路径不变，`/writeback` 成功后 `await db.commit()`，回执分组。": [
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296869631
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792297430318
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792298463908
+      }
+    ],
+    "19. `deliverable_note_consistency.check_note_consistency`：复用 `note_readiness_service.build_readiness` 的 `needs_sync` / `is_stale`，": [
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296870345
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792298467439
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792298577602
+      }
+    ],
+    "20. `render_disclosure_notes` 接一致性闸门：请求体 additive `confirm_inconsistent`；不一致且未确认 ⇒ 不落版本、返回": [
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296870814
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792298581229
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792299042281
+      }
+    ],
+    "21. 前端：附注交付件（`supportsWriteback=false`）不渲染回填面板、改渲染只读说明；生成附注响应 `requires_confirmation` 时": [
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296871290
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792299046343
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792299343279
+      }
+    ],
+    "22. 测试：`test_deliverable_note_consistency.py`（从未同步 / stale / 全同步 / selected 过滤 / fail-open）；端点级（不一致未确认不建版本、": [
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296871762
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792299347103
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792299935811
+      }
+    ],
+    "23. 真库（事务回滚）：安徽附注 `check_note_consistency` 列出 never_synced / stale 章节。": [
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296872259
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792299939442
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792300071084
+      }
+    ],
+    "28. `test_raw_sql_unqualified_column_contract.py`（pg_only）+ 基线；现算违规清单逐条核调用链（活 / 死）。": [
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296872809
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792300075091
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792300273747
+      }
+    ],
+    "29. 修活路径高影响点（含 quality_score 两列已由 V191 补齐后的三个读方 / 两个写方实测），修一条删一条基线。": [
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296873260
+      },
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792300277387
+      }
+    ],
+    "30. `supports_lineage` 能力标志与面板文案；能力矩阵与门控守卫扩第三个标志。": [
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296873681
+      },
+      {
+        "executionId": "2ebab826-1ecf-443e-a34a-0bf23a3bc584",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792314659381
+      }
+    ],
+    "31. 全量相关回归 + HEAD 干净检出（临时 worktree）复跑守卫；文件行数门 / 迁移同号 / lazy import 守卫。": [
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296874123
+      },
+      {
+        "executionId": "2ebab826-1ecf-443e-a34a-0bf23a3bc584",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792315448523
+      }
+    ],
+    "32. Playwright 实测（design §8）；LibreOffice 复验。": [
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296874461
+      },
+      {
+        "executionId": "2ebab826-1ecf-443e-a34a-0bf23a3bc584",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792318121966
+      },
+      {
+        "executionId": "2ebab826-1ecf-443e-a34a-0bf23a3bc584",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792319783082
+      }
+    ],
+    "33. 更新本 tasks / design（实测证据、未修登记）、`.kiro/specs/INDEX.md`、memory；问用户是否提交。": [
+      {
+        "executionId": "2ad55dc3-0589-4ac1-8396-d2722124b49e",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792296874768
+      },
+      {
+        "executionId": "2ebab826-1ecf-443e-a34a-0bf23a3bc584",
+        "chatSessionId": "sess_506a05a3-72c1-4137-9131-ef32740e3f13",
+        "timestamp": 1792319787833
+      }
+    ]
+  }
+}

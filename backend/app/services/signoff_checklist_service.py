@@ -1,44 +1,51 @@
-"""签发一致性清单服务（P2-1）。
+"""签发一致性清单服务（合伙人签字页）。
 
-合伙人签发前，聚合检查以下数据源是否一致/最新：
-1. 四表（试算表）—— 是否存在 stale 状态
-2. 调整分录 —— 是否全部审批通过
-3. 底稿 —— 是否存在 stale 或 conflict
-4. 附注 —— 是否存在 stale
-5. 报告正文 —— 是否匹配审计意见类型
-6. AI 内容 —— 是否全部确认
+合伙人签发前逐项核对：试算表审定数不变式、调整分录审批、跨模块冲突、审计报告、数据过期、AI 内容确认。
+每项结果按 blocking / warning / info 分级，带可跳转的前端路由（无页面可跳则为 None）。
 
-每项检查结果按 blocking / warning / info 三级分类，
-每个结果带 LinkageContract 或 route 供前端跳转定位。
-
-设计要点：
-- service 只 flush 不 commit（router 统一 commit）
-- 签发清单每次打开重新计算，不走缓存
+设计要点（spec deliverable-writeback-and-online-edit-integrity §1）：
+- **每项检查在独立 SAVEPOINT 内执行，失败即 blocking（fail-closed）**。历史实现 9 条裸 SQL 有 8 条对真实 schema 无效、
+  又共用一个会话无 SAVEPOINT：首条失败使事务中止，其余全部失败，再各自降级成 info「暂不可用」⇒ 真实 PG 上恒
+  ``can_signoff = true``（四个真实项目实测）。「检查不了」不等于「没问题」。
+- 只用真实 schema / 既有权威实现：试算表 ``TrialBalanceService.check_consistency``、跨模块冲突
+  ``conflict_resolution_service``（与签字门禁规则同口径）、过期汇总 ``stale_summary_aggregate.get_full_summary``
+  （与签字页「项目状态摘要」同源）。
+- service 只 flush 不 commit；每次打开实时计算，不走缓存。
 """
 from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Any, Optional
+from typing import Awaitable, Callable, Optional
 from uuid import UUID
 
+import sqlalchemy as sa
 from pydantic import BaseModel, Field
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas.linkage_contract import (
-    LinkageContract,
-    LinkageConfidence,
-    LinkageStatus,
-    SourceType,
-    TargetType,
-)
-from app.services.ai_content_gate import (
-    AiContentStatus,
-    AI_CONTENT_CONFIRMATION_STRICT,
-)
+from app.schemas.linkage_contract import LinkageContract
+from app.services import ai_content_gate
 
 logger = logging.getLogger(__name__)
+
+#: 每类列出的明细上限（其余以一条 info 汇总计数）
+_LIST_LIMIT = 5
+
+_OPINION_LABELS = {
+    "unqualified": "无保留意见",
+    "qualified": "保留意见",
+    "adverse": "否定意见",
+    "disclaimer": "无法表示意见",
+}
+_REPORT_STATUS_LABELS = {"draft": "草稿", "review": "复核中", "eqcr_approved": "EQCR 已通过", "final": "定稿"}
+_AI_CONTENT_TYPE_LABELS = {
+    "data_fill": "数据填充",
+    "analytical_review": "分析性复核",
+    "risk_alert": "风险提示",
+    "test_summary": "测试汇总",
+    "note_draft": "附注草稿",
+    "review_finding": "复核发现",
+}
 
 
 # ─── 结果模型 ─────────────────────────────────────────────────────────
@@ -57,7 +64,7 @@ class CheckItem(BaseModel):
     category: str = Field(description="检查类别")
     message: str = Field(description="问题描述")
     contract: Optional[LinkageContract] = Field(default=None, description="关联联动契约")
-    route: Optional[str] = Field(default=None, description="跳转路由")
+    route: Optional[str] = Field(default=None, description="跳转路由（前端真实存在的页面；无则为空）")
 
 
 class SignoffChecklist(BaseModel):
@@ -69,6 +76,9 @@ class SignoffChecklist(BaseModel):
     has_warnings: bool = Field(default=False, description="是否有 warning 项需确认")
 
 
+CheckFn = Callable[[UUID, int, str], Awaitable[list[CheckItem]]]
+
+
 # ─── 服务实现 ─────────────────────────────────────────────────────────
 
 
@@ -78,30 +88,26 @@ class SignoffChecklistService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def generate_checklist(
-        self,
-        *,
-        project_id: UUID,
-        year: int,
-    ) -> SignoffChecklist:
-        """生成签发一致性清单。
+    def _checks(self) -> list[tuple[str, str, CheckFn]]:
+        """(category, 中文名, 检查函数)，按清单展示顺序。"""
+        return [
+            ("trial_balance", "试算表", self._check_trial_balance),
+            ("adjustment", "调整分录", self._check_adjustments),
+            ("conflict", "跨模块冲突", self._check_conflicts),
+            ("report", "审计报告", self._check_report),
+            ("stale", "数据过期", self._check_stale),
+            ("ai_content", "AI 内容", self._check_ai_content),
+        ]
 
-        聚合所有检查项，返回统一清单。
-        """
+    async def generate_checklist(self, *, project_id: UUID, year: int) -> SignoffChecklist:
+        """生成签发一致性清单（逐项独立执行，任一项失败按阻断处理）。"""
         pid = str(project_id)
         items: list[CheckItem] = []
-
-        # 并行检查各数据源
-        items.extend(await self._check_trial_balance(project_id, year, pid))
-        items.extend(await self._check_adjustments(project_id, year, pid))
-        items.extend(await self._check_workpapers(project_id, year, pid))
-        items.extend(await self._check_notes(project_id, year, pid))
-        items.extend(await self._check_report(project_id, year, pid))
-        items.extend(await self._check_ai_content(project_id, year, pid))
+        for category, label, fn in self._checks():
+            items.extend(await self._run_check(category, label, fn, project_id, year, pid))
 
         has_blocking = any(i.severity == CheckSeverity.blocking for i in items)
         has_warnings = any(i.severity == CheckSeverity.warning for i in items)
-
         return SignoffChecklist(
             project_id=pid,
             year=year,
@@ -110,382 +116,234 @@ class SignoffChecklistService:
             has_warnings=has_warnings,
         )
 
-    # ─── 检查：试算表 ──────────────────────────────────────────────
-
-    async def _check_trial_balance(
-        self, project_id: UUID, year: int, pid: str
+    async def _run_check(
+        self, category: str, label: str, fn: CheckFn, project_id: UUID, year: int, pid: str
     ) -> list[CheckItem]:
-        """检查试算表是否存在 stale 状态。"""
-        items: list[CheckItem] = []
+        """在独立 SAVEPOINT 内跑一项检查；失败只回滚本项并产出阻断项（fail-closed）。"""
         try:
-            result = await self.db.execute(
-                text("""
-                    SELECT id, standard_account_code, audited_amount
-                    FROM trial_balance
-                    WHERE project_id = :pid AND year = :year
-                      AND is_stale = true
-                    LIMIT 10
-                """),
-                {"pid": str(project_id), "year": year},
+            async with self.db.begin_nested():
+                return await fn(project_id, year, pid)
+        except Exception as exc:  # noqa: BLE001 — 失败即阻断，原因写进清单与日志
+            logger.warning("签发清单-%s检查执行失败 project=%s year=%s: %s", label, pid, year, exc, exc_info=True)
+            return [CheckItem(
+                severity=CheckSeverity.blocking,
+                category=category,
+                message=f"{label}检查执行失败，无法确认一致性（{type(exc).__name__}），请联系管理员处理后再签发",
+                route=None,
+            )]
+
+    # ─── 检查：试算表（审定数 = 未审数 + RJE + AJE + 底稿调整） ─────────────
+
+    async def _check_trial_balance(self, project_id: UUID, year: int, pid: str) -> list[CheckItem]:
+        """试算表没有「过期」状态（审批调整分录即同步重算），签发前核对的是审定数不变式。"""
+        from app.models.audit_platform_models import TrialBalance
+        from app.services.trial_balance_service import TrialBalanceService
+
+        route = f"/projects/{pid}/trial-balance"
+        total = (await self.db.execute(
+            sa.select(sa.func.count()).select_from(TrialBalance).where(
+                TrialBalance.project_id == project_id,
+                TrialBalance.year == year,
+                TrialBalance.is_deleted == sa.false(),
             )
-            stale_rows = result.fetchall()
+        )).scalar_one()
+        if not total:
+            return [_item(CheckSeverity.blocking, "trial_balance", f"{year} 年度试算表无数据，报表数字无来源", route)]
 
-            if stale_rows:
-                for row in stale_rows[:5]:
-                    contract = LinkageContract(
-                        source_type=SourceType.trial_balance,
-                        source_id=str(row[0]),
-                        source_cell="audited_amount",
-                        target_type=TargetType.trial_balance,
-                        target_id=str(row[0]),
-                        amount=str(row[2]) if row[2] else None,
-                        basis=f"试算表科目 {row[1]} 数据过期",
-                        status=LinkageStatus.stale,
-                        confidence=LinkageConfidence.system,
-                        route=f"/projects/{pid}/trial-balance?highlight={row[0]}",
-                    )
-                    items.append(CheckItem(
-                        severity=CheckSeverity.blocking,
-                        category="trial_balance",
-                        message=f"试算表科目 {row[1]} 存在过期数据",
-                        contract=contract,
-                        route=contract.route,
-                    ))
+        issues = await TrialBalanceService(self.db).check_consistency(project_id, year)
+        if not issues:
+            return [_item(CheckSeverity.info, "trial_balance",
+                          f"试算表 {total} 个科目审定数与「未审数 + 调整数」一致", route)]
+        items = [
+            _item(CheckSeverity.blocking, "trial_balance",
+                  f"试算表科目 {i.get('account_code')} 审定数 {i.get('actual')} 与「未审数 + 调整数」{i.get('expected')} 不一致",
+                  route)
+            for i in issues[:_LIST_LIMIT]
+        ]
+        return items + _more(issues, "trial_balance", "个试算表科目审定数不一致", route)
 
-                if len(stale_rows) > 5:
-                    items.append(CheckItem(
-                        severity=CheckSeverity.info,
-                        category="trial_balance",
-                        message=f"试算表还有 {len(stale_rows) - 5} 项过期数据未列出",
-                        route=f"/projects/{pid}/trial-balance",
-                    ))
-        except Exception as exc:
-            logger.warning("签发清单-试算表检查降级: %s", exc)
-            items.append(CheckItem(
-                severity=CheckSeverity.info,
-                category="trial_balance",
-                message="试算表 stale 检查暂不可用（表结构不支持）",
-                route=f"/projects/{pid}/trial-balance",
+    # ─── 检查：调整分录审批 ─────────────────────────────────────────────
+
+    async def _check_adjustments(self, project_id: UUID, year: int, pid: str) -> list[CheckItem]:
+        """草稿 / 待复核的调整分录未进入试算表（只有已审批才计入），签发前必须处理完。"""
+        from app.models.audit_platform_models import Adjustment
+
+        route = f"/projects/{pid}/adjustments"
+        cond = (
+            Adjustment.project_id == project_id,
+            Adjustment.year == year,
+            Adjustment.is_deleted == sa.false(),
+            Adjustment.review_status.in_(("draft", "pending_review")),
+        )
+        rows = (await self.db.execute(
+            sa.select(Adjustment.adjustment_no, Adjustment.adjustment_type, Adjustment.review_status)
+            .where(*cond).distinct().order_by(Adjustment.adjustment_no)
+        )).all()
+        if not rows:
+            return [_item(CheckSeverity.info, "adjustment", "调整分录均已审批（或无调整分录）", route)]
+        items = [
+            _item(CheckSeverity.blocking, "adjustment",
+                  f"调整分录 {no}（{_ADJ_TYPE_LABELS.get(_val(t), _val(t))}）{_ADJ_STATUS_LABELS.get(_val(s), _val(s))}，"
+                  "未完成审批、未计入试算表", route)
+            for no, t, s in rows[:_LIST_LIMIT]
+        ]
+        return items + _more(rows, "adjustment", "笔调整分录未完成审批", route)
+
+    # ─── 检查：跨模块冲突（与签字门禁 V3-CROSS-MODULE-CONFLICT-UNRESOLVED 同口径） ─
+
+    async def _check_conflicts(self, project_id: UUID, year: int, pid: str) -> list[CheckItem]:
+        from app.services import conflict_resolution_service as crs
+
+        total = await crs.count_pending(db=self.db, project_id=project_id)
+        if not total:
+            return [_item(CheckSeverity.info, "conflict", "无未调解的跨模块冲突", None)]
+        rows = await crs.list_pending(db=self.db, project_id=project_id, limit=_LIST_LIMIT)
+        items = []
+        for c in rows:
+            route = (f"/projects/{pid}/workpapers/{c.target_id}/edit" if c.target_module == "workpaper"
+                     else f"/projects/{pid}/disclosure-notes" if c.target_module == "disclosure" else None)
+            items.append(_item(
+                CheckSeverity.blocking, "conflict",
+                f"{_MODULE_LABELS.get(c.source_module, c.source_module)} → {_MODULE_LABELS.get(c.target_module, c.target_module)}"
+                f"「{c.target_field}」存在未调解冲突（上游值与手工值不一致）", route,
             ))
+        return items + _more(int(total), "conflict", "条跨模块冲突未调解", None)
 
+    # ─── 检查：审计报告（报告正文） ───────────────────────────────────────
+
+    async def _check_report(self, project_id: UUID, year: int, pid: str) -> list[CheckItem]:
+        from app.models.report_models import AuditReport
+
+        route = f"/projects/{pid}/audit-report"
+        report = (await self.db.execute(
+            sa.select(AuditReport).where(
+                AuditReport.project_id == project_id,
+                AuditReport.year == year,
+                AuditReport.is_deleted == sa.false(),
+            ).limit(1)
+        )).scalar_one_or_none()
+        if report is None:
+            return [_item(CheckSeverity.blocking, "report", f"未生成 {year} 年度审计报告（报告正文），无法签发", route)]
+        opinion = _OPINION_LABELS.get(_val(report.opinion_type), _val(report.opinion_type) or "未设置")
+        status = _REPORT_STATUS_LABELS.get(_val(report.status), _val(report.status) or "未知")
+        items = [_item(CheckSeverity.info, "report", f"审计报告已生成（{status}），意见类型：{opinion}", route)]
+        if report.is_stale:
+            items.append(_item(CheckSeverity.warning, "report",
+                               "报告正文所依据的数据已变更（已标记过期），建议重新生成后再签发", route))
         return items
 
-    # ─── 检查：调整分录 ──────────────────────────────────────────────
+    # ─── 检查：数据过期（与签字页「项目状态摘要」同源） ─────────────────────
 
-    async def _check_adjustments(
-        self, project_id: UUID, year: int, pid: str
-    ) -> list[CheckItem]:
-        """检查调整分录是否全部审批通过。"""
+    async def _check_stale(self, project_id: UUID, year: int, pid: str) -> list[CheckItem]:
+        from app.services.stale_summary_aggregate import get_full_summary
+
+        summary = await get_full_summary(self.db, project_id, year)
         items: list[CheckItem] = []
-        try:
-            result = await self.db.execute(
-                text("""
-                    SELECT id, adjustment_no, adjustment_type, review_status
-                    FROM adjustments
-                    WHERE project_id = :pid AND year = :year
-                      AND review_status NOT IN ('approved', 'cancelled')
-                    LIMIT 10
-                """),
-                {"pid": str(project_id), "year": year},
-            )
-            unapproved = result.fetchall()
-
-            if unapproved:
-                for row in unapproved[:5]:
-                    contract = LinkageContract(
-                        source_type=SourceType.adjustment,
-                        source_id=str(row[0]),
-                        source_cell=None,
-                        target_type=TargetType.adjustment,
-                        target_id=str(row[0]),
-                        basis=f"调整分录 {row[1]} 未审批（当前: {row[3]}）",
-                        status=LinkageStatus.current,
-                        confidence=LinkageConfidence.system,
-                        route=f"/projects/{pid}/adjustments?highlight={row[0]}",
-                    )
-                    items.append(CheckItem(
-                        severity=CheckSeverity.blocking,
-                        category="adjustment",
-                        message=f"调整分录 {row[1]}（{row[2]}）未完成审批",
-                        contract=contract,
-                        route=contract.route,
-                    ))
-
-                if len(unapproved) > 5:
-                    items.append(CheckItem(
-                        severity=CheckSeverity.info,
-                        category="adjustment",
-                        message=f"还有 {len(unapproved) - 5} 条调整分录未审批",
-                        route=f"/projects/{pid}/adjustments",
-                    ))
-        except Exception as exc:
-            logger.warning("签发清单-调整分录检查降级: %s", exc)
-            items.append(CheckItem(
-                severity=CheckSeverity.info,
-                category="adjustment",
-                message="调整分录检查暂不可用",
-                route=f"/projects/{pid}/adjustments",
-            ))
-
+        wp = summary.get("workpapers") or {}
+        n_wp = int(wp.get("stale") or 0) + int(wp.get("inconsistent") or 0)
+        if n_wp:
+            names = _names(wp.get("items"), lambda r: r.get("wp_code") or r.get("wp_name"))
+            items.append(_item(CheckSeverity.warning, "stale",
+                               f"{n_wp} 张底稿预填数据过期或与上游不一致{names}，签发前建议刷新",
+                               f"/projects/{pid}/workpapers"))
+        rpt = summary.get("reports") or {}
+        if int(rpt.get("stale") or 0):
+            names = _names(rpt.get("items"), lambda r: r.get("row_name") or r.get("row_code"))
+            items.append(_item(CheckSeverity.warning, "stale",
+                               f"{rpt['stale']} 个报表行标记为过期{names}，建议重新生成报表",
+                               f"/projects/{pid}/reports"))
+        notes = summary.get("notes") or {}
+        if int(notes.get("stale") or 0):
+            names = _names(notes.get("items"), lambda r: r.get("note_section"))
+            items.append(_item(CheckSeverity.warning, "stale",
+                               f"{notes['stale']} 个附注章节标记为过期{names}，建议刷新附注",
+                               f"/projects/{pid}/disclosure-notes"))
+        miss = summary.get("misstatements") or {}
+        if miss.get("unavailable"):
+            # 汇总服务内部降级成 0 的部分：对签发而言「查不了」必须按阻断处理（fail-closed）
+            items.append(_item(CheckSeverity.blocking, "stale",
+                               "未更正错报重新评估检查执行失败，无法确认，请联系管理员处理后再签发",
+                               f"/projects/{pid}/misstatements"))
+        elif int(miss.get("recheck_needed") or 0):
+            items.append(_item(CheckSeverity.warning, "stale",
+                               f"{miss['recheck_needed']} 条未更正错报在重要性水平变更后未重新评估",
+                               f"/projects/{pid}/misstatements"))
+        if not items:
+            items.append(_item(CheckSeverity.info, "stale", "底稿、报表、附注、未更正错报均无过期标记", None))
         return items
 
-    # ─── 检查：底稿 ──────────────────────────────────────────────
+    # ─── 检查：AI 内容确认 ─────────────────────────────────────────────
 
-    async def _check_workpapers(
-        self, project_id: UUID, year: int, pid: str
-    ) -> list[CheckItem]:
-        """检查底稿是否存在 stale 或 conflict。"""
-        items: list[CheckItem] = []
-        try:
-            # 查 cross_module_conflicts 中 pending 的底稿冲突
-            result = await self.db.execute(
-                text("""
-                    SELECT id, target_type, target_id, conflict_type
-                    FROM cross_module_conflicts
-                    WHERE project_id = :pid AND status = 'pending'
-                      AND target_type = 'workpaper'
-                    LIMIT 10
-                """),
-                {"pid": str(project_id)},
-            )
-            conflicts = result.fetchall()
+    async def _check_ai_content(self, project_id: UUID, year: int, pid: str) -> list[CheckItem]:
+        """两张真表：底稿 AI 内容 ``ai_content``（pending 待确认）+ 证据治理 AI 输出 ``ai_content_governance``
+        （draft / revised / stale 待确认，按审计年度）。strict 开关开启时阻断，否则提示。"""
+        from app.models.ai_models import AIConfirmationStatus, AIContent
+        from app.models.evidence_governance_models import AiContentGovernance
 
-            for row in conflicts[:5]:
-                contract = LinkageContract(
-                    source_type=SourceType.workpaper,
-                    source_id=str(row[2]),
-                    target_type=TargetType.workpaper,
-                    target_id=str(row[2]),
-                    basis=f"底稿存在未解决冲突（{row[3]}）",
-                    status=LinkageStatus.conflict,
-                    confidence=LinkageConfidence.system,
-                    route=f"/projects/{pid}/workpapers/{row[2]}",
-                    conflict_id=str(row[0]),
-                )
-                items.append(CheckItem(
-                    severity=CheckSeverity.blocking,
-                    category="workpaper",
-                    message=f"底稿 {row[2]} 存在未解决的{row[3]}冲突",
-                    contract=contract,
-                    route=contract.route,
-                ))
+        # 运行时读开关（模块级常量在导入时求值，测试 / 运维改开关后需读到最新值）
+        strict = ai_content_gate.AI_CONTENT_CONFIRMATION_STRICT
+        severity = CheckSeverity.blocking if strict else CheckSeverity.warning
+        legacy_cond = (
+            AIContent.project_id == project_id,
+            AIContent.is_deleted == sa.false(),
+            AIContent.confirmation_status == AIConfirmationStatus.pending,
+        )
+        gov_cond = (
+            AiContentGovernance.project_id == project_id,
+            AiContentGovernance.audit_year == year,
+            AiContentGovernance.lifecycle_status.in_(("draft", "revised", "stale")),
+        )
+        n_legacy = (await self.db.execute(
+            sa.select(sa.func.count()).select_from(AIContent).where(*legacy_cond))).scalar_one()
+        n_gov = (await self.db.execute(
+            sa.select(sa.func.count()).select_from(AiContentGovernance).where(*gov_cond))).scalar_one()
+        total = int(n_legacy) + int(n_gov)
+        if not total:
+            return [_item(CheckSeverity.info, "ai_content", "AI 生成内容均已人工确认（或未使用 AI 生成）", None)]
 
-        except Exception as exc:
-            logger.warning("签发清单-底稿检查降级: %s", exc)
-            items.append(CheckItem(
-                severity=CheckSeverity.info,
-                category="workpaper",
-                message="底稿冲突检查暂不可用",
-                route=f"/projects/{pid}/workpapers",
-            ))
-
-        # stale 底稿检查（event_cascade_health degraded）
-        try:
-            result = await self.db.execute(
-                text("""
-                    SELECT target_id, error_message
-                    FROM event_cascade_health
-                    WHERE project_id = :pid AND status = 'degraded'
-                      AND target_type = 'workpaper'
-                    LIMIT 5
-                """),
-                {"pid": str(project_id)},
-            )
-            degraded = result.fetchall()
-
-            for row in degraded:
-                items.append(CheckItem(
-                    severity=CheckSeverity.warning,
-                    category="workpaper",
-                    message=f"底稿 {row[0]} 存在降级记录: {row[1] or '数据可能过期'}",
-                    route=f"/projects/{pid}/workpapers/{row[0]}",
-                ))
-        except Exception as exc:
-            logger.debug("签发清单-底稿 degraded 检查跳过: %s", exc)
-
+        items = [_item(severity, "ai_content",
+                       f"{total} 条 AI 生成内容尚未人工确认（底稿 AI 内容 {n_legacy} 条、证据治理 AI 输出 {n_gov} 条）", None)]
+        # content_type 以 text 读取：真实 PG 枚举已有 review_finding，但旧 ORM AIContentType 少该成员；
+        # 直接反序列化 Enum 会 LookupError，把一条合法存量数据变成「整项检查执行失败」。清单只展示标签，不应依赖旧枚举完整性。
+        rows = (await self.db.execute(
+            sa.select(AIContent.workpaper_id, sa.cast(AIContent.content_type, sa.String).label("content_type"))
+            .where(*legacy_cond).order_by(AIContent.created_at).limit(_LIST_LIMIT)
+        )).all()
+        for wp_id, ctype in rows:
+            label = _AI_CONTENT_TYPE_LABELS.get(_val(ctype), _val(ctype))
+            items.append(_item(CheckSeverity.info, "ai_content", f"待确认：底稿 AI 内容（{label}）",
+                               f"/projects/{pid}/workpapers/{wp_id}/edit" if wp_id else None))
         return items
 
-    # ─── 检查：附注 ──────────────────────────────────────────────
 
-    async def _check_notes(
-        self, project_id: UUID, year: int, pid: str
-    ) -> list[CheckItem]:
-        """检查附注是否存在 stale 数据。"""
-        items: list[CheckItem] = []
-        try:
-            # 查 cross_module_conflicts 中附注相关的 pending 冲突
-            result = await self.db.execute(
-                text("""
-                    SELECT id, target_id, conflict_type
-                    FROM cross_module_conflicts
-                    WHERE project_id = :pid AND status = 'pending'
-                      AND target_type = 'note'
-                    LIMIT 5
-                """),
-                {"pid": str(project_id)},
-            )
-            note_conflicts = result.fetchall()
+# ─── 辅助 ─────────────────────────────────────────────────────────────
 
-            for row in note_conflicts:
-                contract = LinkageContract(
-                    source_type=SourceType.note,
-                    source_id=str(row[1]),
-                    target_type=TargetType.note,
-                    target_id=str(row[1]),
-                    basis=f"附注存在未解决冲突（{row[2]}）",
-                    status=LinkageStatus.conflict,
-                    confidence=LinkageConfidence.system,
-                    route=f"/projects/{pid}/disclosure-notes?section={row[1]}",
-                    conflict_id=str(row[0]),
-                )
-                items.append(CheckItem(
-                    severity=CheckSeverity.warning,
-                    category="note",
-                    message=f"附注 {row[1]} 存在未解决的{row[2]}冲突",
-                    contract=contract,
-                    route=contract.route,
-                ))
-        except Exception as exc:
-            logger.debug("签发清单-附注冲突检查跳过: %s", exc)
+_ADJ_TYPE_LABELS = {"aje": "审计调整", "rje": "重分类调整"}
+_ADJ_STATUS_LABELS = {"draft": "为草稿", "pending_review": "待复核"}
+_MODULE_LABELS = {"workpaper": "底稿", "disclosure": "附注", "report": "报表", "trial_balance": "试算表"}
 
-        # stale 附注检查
-        try:
-            result = await self.db.execute(
-                text("""
-                    SELECT target_id, error_message
-                    FROM event_cascade_health
-                    WHERE project_id = :pid AND status = 'degraded'
-                      AND target_type = 'note'
-                    LIMIT 5
-                """),
-                {"pid": str(project_id)},
-            )
-            degraded = result.fetchall()
 
-            for row in degraded:
-                items.append(CheckItem(
-                    severity=CheckSeverity.warning,
-                    category="note",
-                    message=f"附注 {row[0]} 存在降级记录: {row[1] or '数据可能过期'}",
-                    route=f"/projects/{pid}/disclosure-notes?section={row[0]}",
-                ))
-        except Exception as exc:
-            logger.debug("签发清单-附注 degraded 检查跳过: %s", exc)
+def _item(severity: CheckSeverity, category: str, message: str, route: str | None) -> CheckItem:
+    return CheckItem(severity=severity, category=category, message=message, route=route)
 
-        return items
 
-    # ─── 检查：报告正文 ──────────────────────────────────────────────
+def _val(v: object) -> str:
+    """枚举成员取 value；字符串原样；None → 空串。"""
+    if v is None:
+        return ""
+    return str(getattr(v, "value", v))
 
-    async def _check_report(
-        self, project_id: UUID, year: int, pid: str
-    ) -> list[CheckItem]:
-        """检查报告正文是否匹配审计意见类型。"""
-        items: list[CheckItem] = []
-        try:
-            # 查项目的审计意见类型
-            proj_result = await self.db.execute(
-                text("""
-                    SELECT opinion_type
-                    FROM projects
-                    WHERE id = :pid
-                """),
-                {"pid": str(project_id)},
-            )
-            proj_row = proj_result.fetchone()
-            opinion_type = proj_row[0] if proj_row else None
 
-            if not opinion_type:
-                items.append(CheckItem(
-                    severity=CheckSeverity.warning,
-                    category="report",
-                    message="项目未设置审计意见类型，报告正文一致性无法校验",
-                    route=f"/projects/{pid}/settings",
-                ))
-            else:
-                # 检查报告正文是否存在
-                report_result = await self.db.execute(
-                    text("""
-                        SELECT id, row_code
-                        FROM financial_report
-                        WHERE project_id = :pid
-                        LIMIT 1
-                    """),
-                    {"pid": str(project_id)},
-                )
-                report_row = report_result.fetchone()
-                if not report_row:
-                    items.append(CheckItem(
-                        severity=CheckSeverity.blocking,
-                        category="report",
-                        message="未生成审计报告正文",
-                        route=f"/projects/{pid}/report",
-                    ))
-                else:
-                    items.append(CheckItem(
-                        severity=CheckSeverity.info,
-                        category="report",
-                        message=f"审计报告已生成，意见类型: {opinion_type}",
-                        route=f"/projects/{pid}/report",
-                    ))
-        except Exception as exc:
-            logger.warning("签发清单-报告检查降级: %s", exc)
-            items.append(CheckItem(
-                severity=CheckSeverity.info,
-                category="report",
-                message="报告正文检查暂不可用",
-                route=f"/projects/{pid}/report",
-            ))
+def _more(seq_or_count: object, category: str, unit_text: str, route: str | None) -> list[CheckItem]:
+    """超过列出上限的部分汇总为一条 info。"""
+    total = seq_or_count if isinstance(seq_or_count, int) else len(seq_or_count)  # type: ignore[arg-type]
+    rest = total - _LIST_LIMIT
+    if rest <= 0:
+        return []
+    return [_item(CheckSeverity.info, category, f"另有 {rest} {unit_text}（未逐条列出）", route)]
 
-        return items
 
-    # ─── 检查：AI 内容 ──────────────────────────────────────────────
-
-    async def _check_ai_content(
-        self, project_id: UUID, year: int, pid: str
-    ) -> list[CheckItem]:
-        """检查 AI 生成内容是否全部确认。"""
-        items: list[CheckItem] = []
-        try:
-            result = await self.db.execute(
-                text("""
-                    SELECT id, content_type, status
-                    FROM ai_generated_content
-                    WHERE project_id = :pid
-                      AND status NOT IN ('confirmed', 'rejected')
-                    LIMIT 10
-                """),
-                {"pid": str(project_id)},
-            )
-            unconfirmed = result.fetchall()
-
-            if unconfirmed:
-                strict = AI_CONTENT_CONFIRMATION_STRICT
-                severity = CheckSeverity.blocking if strict else CheckSeverity.warning
-
-                for row in unconfirmed[:5]:
-                    content_status = row[2]
-                    items.append(CheckItem(
-                        severity=severity,
-                        category="ai_content",
-                        message=f"AI 生成内容（{row[1]}）状态为 {content_status}，需人工确认",
-                        route=f"/projects/{pid}/ai-content?highlight={row[0]}",
-                    ))
-
-                if len(unconfirmed) > 5:
-                    items.append(CheckItem(
-                        severity=CheckSeverity.info,
-                        category="ai_content",
-                        message=f"还有 {len(unconfirmed) - 5} 条 AI 内容未确认",
-                        route=f"/projects/{pid}/ai-content",
-                    ))
-        except Exception as exc:
-            logger.debug("签发清单-AI 内容检查跳过（表可能不存在）: %s", exc)
-            # AI 内容表可能不存在，静默跳过不阻断
-            items.append(CheckItem(
-                severity=CheckSeverity.info,
-                category="ai_content",
-                message="AI 内容确认检查暂不可用",
-                route=f"/projects/{pid}/ai-content",
-            ))
-
-        return items
+def _names(rows: object, pick: Callable[[dict], object]) -> str:
+    """「（如 A、B、C）」——最多 3 个名称，取不到返回空串。"""
+    names = [str(pick(r)) for r in (rows or [])[:3] if isinstance(r, dict) and pick(r)]  # type: ignore[index]
+    return f"（如 {'、'.join(names)}）" if names else ""

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,6 +25,7 @@ from app.models.base import ProjectStatus
 from app.models.core import Project
 from app.services.completeness_service import CompletenessService
 from app.services.deliverable_capabilities import (
+    supports_lineage,
     supports_section_refresh,
     supports_writeback,
 )
@@ -38,6 +40,28 @@ STORAGE_ROOT = Path(os.environ.get("STORAGE_ROOT", "storage"))
 DELIVERABLE_SUBDIR = "deliverables"
 
 TERMINAL_REEXPORT_STATUSES = {"confirmed", "signed", "archived"}
+
+
+_VERSION_SUFFIX_RE = re.compile(r"_v\d+$", re.IGNORECASE)
+
+
+def versioned_file_name(file_name: str | None, doc_type: str, version_no: int) -> str:
+    """把调用方的展示文件名收敛为版本唯一物理文件名。
+
+    历史上附注 / 报表生成传固定名 ``disclosure_notes_2025.docx`` / ``financial_reports_2025.xlsx``，
+    后一版原子移动时直接覆盖前一版。若调用方已传 ``audit_report_v5.docx``，先剥旧 ``_v5`` 再追加
+    当前版本，避免 ``_v5_v6``。路径成分一律丢弃，物理文件只能落在本交付物目录内。
+    """
+    raw = Path(file_name).name if file_name else f"{doc_type}.docx"
+    suffix = Path(raw).suffix or ".docx"
+    stem = Path(raw).stem if Path(raw).suffix else raw
+    stem = _VERSION_SUFFIX_RE.sub("", stem) or doc_type
+    return f"{stem}_v{int(version_no)}{suffix}"
+
+
+def _path_identity(path: str | Path) -> str:
+    """Windows 路径大小写 / 分隔符无关的比较键；文件无需存在。"""
+    return os.path.normcase(os.path.abspath(os.fspath(path)))
 
 
 @dataclass
@@ -56,6 +80,8 @@ class DeliverableDTO:
     #: 能力标志（需求 6.5）：由 deliverable_capabilities 单一真源派生，供前端门控
     supports_writeback: bool = False
     supports_section_refresh: bool = False
+    #: 溯源能力（US-8）：financial_report 恒 False，面板不请求 /section-states、改显说明文案。
+    supports_lineage: bool = False
     #: 报表差异告警（需求 10.3）：由 should_block_confirm **唯一入口**判定。
     #: 放在列表 DTO 而非只放版本链 —— 「数字与试算表不符」是阻断 confirmed 的信号，
     #: 藏在「更多 ▾ → 版本链」里等于要用户先怀疑再去查。列表循环本就取了最新版本
@@ -146,6 +172,22 @@ class DeliverableService(ExportTaskService):
             )
         ).all()
 
+        # 陈旧底版覆盖关系：某 OO 版本的 base_version_no 之后、本版之前、不属于同一会话（oo_doc_key）
+        # 的版本，就是它「以旧底版为底覆盖掉」的版本。整条链一次算好，避免逐版查库。
+        all_versions = [v for v, _ in rows]
+
+        def _overwrote(version: WordExportTaskVersion) -> list[int]:
+            base = version.base_version_no
+            if base is None:
+                return []
+            key = version.oo_doc_key
+            return sorted(
+                other.version_no
+                for other in all_versions
+                if base < other.version_no < version.version_no
+                and not (key is not None and other.oo_doc_key == key)
+            )
+
         out: list[dict] = []
         for version, edited_by_name in rows:
             refs = (
@@ -178,6 +220,8 @@ class DeliverableService(ExportTaskService):
                     "drift_report": version.drift_report,
                     "drift_blocked": blocked,
                     "drift_reason": reason,
+                    "base_version_no": version.base_version_no,
+                    "overwrote_versions": _overwrote(version),
                 }
             )
         return out
@@ -226,6 +270,72 @@ class DeliverableService(ExportTaskService):
         )
         await self.db.flush()
 
+    async def _lock_task(self, task_id: UUID) -> WordExportTask | None:
+        """锁交付物主行直到当前事务结束，串行化同一交付物的版本号分配与落盘。
+
+        PostgreSQL ``FOR UPDATE`` 是主防线；SQLite 会忽略该子句（单元测试仍可运行）；V189 的唯一索引是
+        最后兜底。所有生产版本创建都必须经本类，禁止绕过本锁直接 INSERT versions。
+        """
+        result = await self.db.execute(
+            sa.select(WordExportTask)
+            .where(WordExportTask.id == task_id)
+            .with_for_update()
+        )
+        return result.scalar_one_or_none()
+
+    async def _next_version_no(self, task_id: UUID) -> int:
+        result = await self.db.execute(
+            sa.select(sa.func.coalesce(sa.func.max(WordExportTaskVersion.version_no), 0))
+            .where(WordExportTaskVersion.word_export_task_id == task_id)
+        )
+        return int(result.scalar_one() or 0) + 1
+
+    async def _create_version_locked(
+        self,
+        task: WordExportTask,
+        *,
+        version_no: int,
+        file_path: str | None,
+        html_path: str | None,
+        user_id: UUID,
+        source_snapshot_refs: dict | None = None,
+        selected_sections: list | None = None,
+        file_size: int | None = None,
+        created_via: str = "generate",
+        edited_by: UUID | None = None,
+        edited_at: datetime | None = None,
+        base_version_no: int | None = None,
+        oo_doc_key: str | None = None,
+        render_context: dict | None = None,
+    ) -> WordExportTaskVersion:
+        """在已持有 task 行锁时创建指定的下一版（内部入口）。"""
+        if task.status == WordExportStatus.archived.value:
+            raise ValueError(f"交付物已归档，禁止创建新版本: task_id={task.id}")
+        expected = await self._next_version_no(task.id)
+        if version_no != expected:
+            # 正常生产路径持有 task 行锁，不应发生；硬失败比用错号覆盖磁盘文件安全。
+            raise RuntimeError(f"交付物版本号已变化：预期 {version_no}，当前下一版为 {expected}")
+
+        version = WordExportTaskVersion(
+            word_export_task_id=task.id,
+            version_no=version_no,
+            file_path=file_path,
+            html_path=html_path,
+            file_size=file_size,
+            created_by=user_id,
+            source_snapshot_refs=source_snapshot_refs,
+            selected_sections=selected_sections,
+            created_via=created_via,
+            edited_by=edited_by,
+            edited_at=edited_at,
+            base_version_no=base_version_no,
+            oo_doc_key=oo_doc_key,
+            render_context=render_context,
+        )
+        self.db.add(version)
+        await self.db.flush()
+        return version
+
     async def create_version(
         self,
         task_id: UUID,
@@ -239,37 +349,54 @@ class DeliverableService(ExportTaskService):
         created_via: str = "generate",
         edited_by: UUID | None = None,
         edited_at: datetime | None = None,
+        base_version_no: int | None = None,
+        oo_doc_key: str | None = None,
+        render_context: dict | None = None,
     ) -> WordExportTaskVersion:
-        # 归档锁定不变式（需求 11.2 / Property 24）：archived 态禁止创建新版本
-        task = await self.get_task(task_id)
-        if task is not None and task.status == WordExportStatus.archived.value:
-            raise ValueError(
-                f"交付物已归档，禁止创建新版本: task_id={task_id}"
-            )
-
-        result = await self.db.execute(
-            sa.select(sa.func.coalesce(sa.func.max(WordExportTaskVersion.version_no), 0))
-            .where(WordExportTaskVersion.word_export_task_id == task_id)
-        )
-        max_no = int(result.scalar_one() or 0)
-        version_no = max_no + 1
-
-        version = WordExportTaskVersion(
-            word_export_task_id=task_id,
+        """串行分配下一版本号并创建记录（低层入口；不负责文件落盘 / 指纹）。"""
+        task = await self._lock_task(task_id)
+        if task is None:
+            raise ValueError(f"交付物不存在: {task_id}")
+        version_no = await self._next_version_no(task_id)
+        return await self._create_version_locked(
+            task,
             version_no=version_no,
             file_path=file_path,
             html_path=html_path,
-            file_size=file_size,
-            created_by=user_id,
+            user_id=user_id,
             source_snapshot_refs=source_snapshot_refs,
             selected_sections=selected_sections,
+            file_size=file_size,
             created_via=created_via,
             edited_by=edited_by,
             edited_at=edited_at,
+            base_version_no=base_version_no,
+            oo_doc_key=oo_doc_key,
+            render_context=render_context,
         )
-        self.db.add(version)
-        await self.db.flush()
-        return version
+
+    async def _assert_version_path_unclaimed(self, task_id: UUID, file_path: Path) -> None:
+        """目标路径若已被任一历史版本引用则拒绝覆盖。
+
+        只检查版本记录而非 ``Path.exists``：报告正文渲染器会先在该目标路径生成本次临时结果，再交给
+        ``render_and_store`` 原子落盘；那是未被版本引用的本次产物，可以覆盖。历史版本引用的路径不可碰。
+        """
+        rows = (await self.db.execute(
+            sa.select(WordExportTaskVersion.version_no, WordExportTaskVersion.file_path).where(
+                WordExportTaskVersion.word_export_task_id == task_id,
+                WordExportTaskVersion.file_path.is_not(None),
+            )
+        )).all()
+        wanted = _path_identity(file_path)
+        for old_no, old_path in rows:
+            if old_path and _path_identity(old_path) == wanted:
+                from app.services.file_fingerprint_service import FilePersistError
+
+                raise FilePersistError(
+                    f"目标文件已属于历史版本 v{old_no}，拒绝覆盖: {file_path.name}",
+                    stage="version_path",
+                    path=str(file_path),
+                )
 
     async def export_or_new_deliverable(
         self,
@@ -429,6 +556,9 @@ class DeliverableService(ExportTaskService):
         edited_by: UUID | None = None,
         edited_at: datetime | None = None,
         snapshot_id: UUID | None = None,
+        base_version_no: int | None = None,
+        oo_doc_key: str | None = None,
+        render_context: dict | None = None,
     ) -> StoreResult:
         """落盘一个新版本 — **四阶段 fail-closed**。
 
@@ -462,17 +592,29 @@ class DeliverableService(ExportTaskService):
             FileFingerprintError: 文件落盘或校验失败（子类标明具体阶段）
             ValueError: 交付物不存在
         """
-        task = await self.get_task(task_id)
+        # 锁必须覆盖「读下一版本号 → 落唯一物理文件 → 建版本记录」整段；只锁 create_version 太晚，
+        # 两个并发请求会先算出同一个文件名并互相覆盖。
+        task = await self._lock_task(task_id)
         if task is None:
             raise ValueError(f"交付物不存在: {task_id}")
 
         if inherit_snapshot_refs:
-            prev = await self._latest_version(task_id)
+            # OO 回调必须继承「编辑器打开时的底版」，不能继承回调时的 latest：编辑期间若有人刷新 / 再生成，
+            # latest 已是另一条分支；继承它会把旧内容伪装成基于新快照。非 OO 调用未传 base 时沿用上一版。
+            prev = (
+                await self.get_version(task_id, base_version_no)
+                if base_version_no is not None
+                else await self._latest_version(task_id)
+            )
+            if base_version_no is not None and prev is None:
+                raise ValueError(f"OnlyOffice 底版不存在: task_id={task_id} v{base_version_no}")
             inherited = prev.source_snapshot_refs if prev is not None else None
             if inherited is None:
-                # 上一版也没有绑定（历史数据），退回 task 级；仍不主动捕获当前快照
+                # 底版也没有绑定（历史数据），退回 task 级；仍不主动捕获当前快照
                 inherited = task.source_snapshot_refs
             source_snapshot_refs = inherited
+            if render_context is None and prev is not None:
+                render_context = prev.render_context
 
         out_dir = self._deliverable_dir(task.project_id, task_id)
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -480,10 +622,10 @@ class DeliverableService(ExportTaskService):
         latest = await self._latest_version(task_id)
         next_no = (latest.version_no + 1) if latest else 1
 
-        ext = ".docx"
-        fname = file_name or f"{task.doc_type}_v{next_no}{ext}"
+        fname = versioned_file_name(file_name, task.doc_type, next_no)
         file_path = out_dir / fname
         html_path = out_dir / f"{task.doc_type}_v{next_no}.html"
+        await self._assert_version_path_unclaimed(task_id, file_path)
 
         # ── 阶段 1: 准备文件字节内容 ──
         content: bytes | None = None
@@ -511,8 +653,9 @@ class DeliverableService(ExportTaskService):
                 logger.warning("HTML 辅助文件写入失败: %s", exc)
 
         # ── 阶段 4: 全部校验通过后才创建版本 ──
-        version = await self.create_version(
-            task_id,
+        version = await self._create_version_locked(
+            task,
+            version_no=next_no,
             file_path=str(file_path),
             html_path=str(html_path) if html_written else None,
             user_id=user_id,
@@ -522,6 +665,9 @@ class DeliverableService(ExportTaskService):
             created_via=created_via,
             edited_by=edited_by,
             edited_at=edited_at,
+            base_version_no=base_version_no,
+            oo_doc_key=oo_doc_key,
+            render_context=render_context,
         )
 
         # 绑定 SHA-256 到版本记录
@@ -628,6 +774,7 @@ class DeliverableService(ExportTaskService):
                     template_type=task.template_type,
                     selected_sections=task.selected_sections,
                     supports_writeback=supports_writeback(task.doc_type),
+                    supports_lineage=supports_lineage(task.doc_type),
                     supports_section_refresh=supports_section_refresh(task.doc_type),
                     drift_blocked=drift_blocked,
                     drift_reason=drift_reason,

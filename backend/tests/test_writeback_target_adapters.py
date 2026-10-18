@@ -66,9 +66,10 @@ def test_adapter_table_matches_capability_matrix():
 def test_get_adapter_returns_none_for_unsupported():
     assert get_writeback_adapter(None, "financial_report") is None
     assert get_writeback_adapter(None, None) is None
-    assert isinstance(
-        get_writeback_adapter(None, "disclosure_notes"), DisclosureNoteAdapter
-    )
+    # 🔴 附注回填已下线（spec deliverable-writeback-and-online-edit-integrity，
+    # 2026-10-17 方向裁定）：附注是底稿单项推送的只读下游，不再有适配器 ⇒ 返回 None，
+    # 主流程 `_resolve_adapter` 据此短路返回全空结果。DisclosureNoteAdapter 类保留但不再被选中。
+    assert get_writeback_adapter(None, "disclosure_notes") is None
     assert isinstance(get_writeback_adapter(None, "audit_report"), ReportBodyAdapter)
 
 

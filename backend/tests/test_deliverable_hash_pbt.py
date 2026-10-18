@@ -308,6 +308,9 @@ def test_online_edit_source_isolation(original_doc, edited_doc, year):
 
         ReportSnapshotService._compute_trial_balance_hash = _fake_hash  # type: ignore[assignment]
 
+        # 本属性测的是「源 audit_report 隔离」，不是幂等；保证编辑内容与原件不同，
+        # 否则命中新契约的「同字节幂等跳过」（那是另一条属性，见 test_deliverable_onlyoffice）。
+        edited_doc_distinct = edited_doc if edited_doc != original_doc else edited_doc + b"\x01"
         # mock OnlyOffice 下载（httpx）返回编辑后的 docx 字节
         class _FakeResp:
             def __init__(self, content: bytes):
@@ -327,15 +330,22 @@ def test_online_edit_source_isolation(original_doc, edited_doc, year):
                 return False
 
             async def get(self, _url):
-                return _FakeResp(edited_doc)
+                return _FakeResp(edited_doc_distinct)
 
         orig_httpx = oo_module.httpx
         oo_module.httpx = SimpleNamespace(AsyncClient=_FakeClient)
         try:
+            from app.services.deliverable_doc_key import deliverable_doc_key
+
             oo_svc = OnlyOfficeCallbackService(session)
             await oo_svc.handle_callback(
                 task.id,
-                {"status": 2, "url": "http://onlyoffice/edited.docx"},
+                {
+                    "status": 2,
+                    "url": "http://onlyoffice/edited.docx",
+                    # 回调体 key 指向底版 v1（新契约校验 key 属于本交付物）
+                    "key": deliverable_doc_key(task.id, 1),
+                },
                 user_id=user_id,
                 year=year,
             )

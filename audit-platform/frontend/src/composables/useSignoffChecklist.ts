@@ -5,8 +5,16 @@
  * Requirements: 5.1, 5.2, 5.3
  */
 import { ref, computed, readonly } from 'vue'
+import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { isRequestCancelled } from '@/utils/http'
+
+/** 后端错误文案（HTTPException.detail / 信封 message），取不到用兜底文案 */
+function errorText(e: any, fallback: string): string {
+  const data = e?.response?.data
+  const detail = data?.detail ?? data?.message
+  return typeof detail === 'string' && detail ? detail : fallback
+}
 import type { LinkageContract } from '@/types/linkageContract'
 
 /** 检查结果严重级别 */
@@ -85,52 +93,59 @@ export function useSignoffChecklist(projectId: string) {
       const params: Record<string, string> = {}
       if (year) params.year = String(year)
 
+      // 错误由本组件的错误态展示（_silent：不再叠一个全局 toast）
       const data: any = await api.get(
         `/api/projects/${projectId}/signoff/checklist`,
-        { params },
+        { params, _silent: true } as any,
       )
       checklist.value = data as SignoffChecklist
     } catch (e: any) {
       if (isRequestCancelled(e)) return
-      error.value = e?.message || '获取清单失败'
+      error.value = errorText(e, '获取清单失败')
       checklist.value = null
     } finally {
       loading.value = false
     }
   }
 
-  /** 合伙人确认单个 warning 项 */
-  async function confirmWarning(itemIndex: number, userId: string) {
-    const confirmation: WarningConfirmation = {
+  /**
+   * 合伙人确认单个 warning 项。
+   * 只有后端留痕写入成功才记为已确认 —— 确认是审计证据，留痕失败时「已确认」等于没确认
+   * （历史实现先本地记已确认、留痕失败只打 console）。
+   */
+  async function confirmWarning(itemIndex: number, userId: string): Promise<boolean> {
+    try {
+      await api.post(
+        `/api/projects/${projectId}/signoff/confirm-warning`,
+        {
+          item_index: itemIndex,
+          item_message: checklist.value?.items[itemIndex]?.message ?? '',
+          item_category: checklist.value?.items[itemIndex]?.category ?? '',
+        },
+        { _silent: true } as any,
+      )
+    } catch (e: any) {
+      ElMessage.error(errorText(e, '确认记录写入失败，请稍后重试'))
+      return false
+    }
+    warningConfirmations.value.set(itemIndex, {
       itemIndex,
       confirmedAt: new Date().toISOString(),
       confirmedBy: userId,
-    }
-    warningConfirmations.value.set(itemIndex, confirmation)
-
-    // 记录审计日志
-    try {
-      await api.post(`/api/projects/${projectId}/signoff/confirm-warning`, {
-        item_index: itemIndex,
-        item_message: checklist.value?.items[itemIndex]?.message ?? '',
-        item_category: checklist.value?.items[itemIndex]?.category ?? '',
-      })
-    } catch (e) {
-      // 审计日志写入失败不阻断操作
-      console.warn('审计日志写入失败:', e)
-    }
+    })
+    return true
   }
 
   /** 批量确认所有 warning 项 */
   async function confirmAllWarnings(userId: string) {
     if (!checklist.value) return
-    const promises: Promise<void>[] = []
-    checklist.value.items.forEach((item, idx) => {
-      if (item.severity === 'warning' && !warningConfirmations.value.has(idx)) {
-        promises.push(confirmWarning(idx, userId))
-      }
-    })
-    await Promise.all(promises)
+    const pending = checklist.value.items
+      .map((item, idx) => ({ item, idx }))
+      .filter(({ item, idx }) => item.severity === 'warning' && !warningConfirmations.value.has(idx))
+    // 逐项确认，遇到失败即停（只提示一次，未确认的项保持未确认）
+    for (const { idx } of pending) {
+      if (!(await confirmWarning(idx, userId))) return
+    }
   }
 
   /** 重置清单 */

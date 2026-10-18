@@ -176,6 +176,18 @@ class DeliverableCenterIntegration:
         version = await self._deliverable_svc.get_version(task_id, version_no)
         if version is None:
             return False
-        # 版本一旦创建就不可覆盖 — 只能新建版本
-        # 这由 create_version 的 version_no 自增保证
+        # 「记录存在」不等于不可变：历史固定文件名让 16 个版本记录仍在，但磁盘内容已被后续生成覆盖。
+        # 只有当前字节的 size + SHA-256 与版本记录一致，才能证明该版本仍是原始内容。
+        from app.services import deliverable_service as deliverable_module
+        from app.services.file_fingerprint_service import FileFingerprintError, verify_file_fingerprint
+
+        try:
+            verify_file_fingerprint(
+                file_path=version.file_path,
+                expected_size=version.file_size,
+                expected_sha256=version.file_hash,
+                delivery_root=(deliverable_module.STORAGE_ROOT / deliverable_module.DELIVERABLE_SUBDIR),
+            )
+        except FileFingerprintError:
+            return False
         return True

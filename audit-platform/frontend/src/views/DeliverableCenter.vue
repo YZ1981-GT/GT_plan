@@ -146,6 +146,7 @@
       :doc-type="editorItem.doc_type"
       :supports-writeback="editorItem.supports_writeback === true"
       :supports-section-refresh="editorItem.supports_section_refresh === true"
+      :supports-lineage="editorItem.supports_lineage === true"
       :show-watermark="['draft', 'editing'].includes(editorItem.status)"
       @close="editorVisible = false"
       @version-changed="loadList()"
@@ -280,6 +281,7 @@ import {
   type DeliverableVersion,
   type OptionalSection,
   type TrioJob,
+  type NoteConsistencyItem,
 } from '@/services/deliverableApi'
 import {
   checkGenerateReady,
@@ -622,7 +624,11 @@ async function confirmGenerateReports() {
     const dlName = isUnadjusted
       ? `financial_reports_unadjusted_${year.value}.xlsx`
       : `financial_reports_${year.value}.xlsx`
-    downloadFile(deliverableDownloadUrl(projectId.value, res.task_id, res.version_no), { fileName: dlName })
+    // 财务报表不走一致性闸门（design §4.3），正常必有 task_id/version_no；
+    // task_id/version_no 现为可空类型（附注闸门未确认时为空），此处判空兜底满足类型且更稳健。
+    if (res.task_id && res.version_no != null) {
+      downloadFile(deliverableDownloadUrl(projectId.value, res.task_id, res.version_no), { fileName: dlName })
+    }
     await loadList()
   } catch {
     ElMessage.error('生成财务报表失败')
@@ -684,25 +690,74 @@ async function onNotesSelectionConfirm({ selectedSections }: { selectedSections:
 
   generating.value = true
   try {
-    const res = await renderDisclosureNotes(projectId.value, {
-      year: year.value,
-      selected_sections: selectedSections,
-    })
-    if (res.platform_persist_failed) {
-      ElMessage.warning('平台留存失败，请从版本链重新下载')
-    } else {
-      ElMessage.success('附注已生成并保存到交付中心')
-    }
-    // 附注联动复盘 P1-3：出具前软闸门提示（后端返回，不阻断导出）
-    showDeliveryWarnings(res.warnings, '附注出具提醒（不影响本次导出）')
-    downloadFile(deliverableDownloadUrl(projectId.value, res.task_id, res.version_no), { fileName: `disclosure_notes_${year.value}.docx` })
-    await loadList()
-    notesDialogVisible.value = false
-  } catch {
-    ElMessage.error('生成附注失败')
+    await doRenderNotes(selectedSections, false)
   } finally {
     generating.value = false
   }
+}
+
+/**
+ * 实际发起附注渲染。导出前一致性闸门：
+ * 后端返回 requires_confirmation=true 时，列出 never_synced / stale 章节，
+ * 让用户选「返回同步」（放弃本次导出，回底稿改）或「仍要导出」（带 confirm_inconsistent=true 重发）。
+ */
+async function doRenderNotes(selectedSections: string[], confirmInconsistent: boolean) {
+  const res = await renderDisclosureNotes(projectId.value, {
+    year: year.value,
+    selected_sections: selectedSections,
+    confirm_inconsistent: confirmInconsistent,
+  })
+
+  // 导出前一致性闸门命中：不建版本，弹确认框
+  if (res.requires_confirmation) {
+    const c = res.consistency
+    const neverSynced = c?.never_synced ?? []
+    const stale = c?.stale ?? []
+    const fmtItem = (it: NoteConsistencyItem) => {
+      const codes = (it.wp_codes && it.wp_codes.length) ? `（底稿 ${it.wp_codes.join('、')}）` : ''
+      return `<p style="margin:2px 0;">• ${it.section_title || it.note_section}${codes}</p>`
+    }
+    const parts: string[] = [
+      `<p style="margin-bottom:8px;font-weight:600;">⚠️ 以下附注章节与底稿披露表不一致，建议先回底稿同步后再导出：</p>`,
+    ]
+    if (neverSynced.length) {
+      parts.push(`<p style="color:#e74c3c;margin:6px 0 2px;font-weight:600;">从未从底稿同步（${neverSynced.length} 章）：</p>`)
+      parts.push(neverSynced.map(fmtItem).join(''))
+    }
+    if (stale.length) {
+      parts.push(`<p style="color:#e6a23c;margin:6px 0 2px;font-weight:600;">底稿已更新、附注陈旧（${stale.length} 章）：</p>`)
+      parts.push(stale.map(fmtItem).join(''))
+    }
+    parts.push(`<p style="margin-top:10px;color:#666;font-size:12px;">附注数据由底稿披露表单项推送。请到底稿披露表重新同步这些章节；如确需带不一致导出，可选「仍要导出」。</p>`)
+
+    try {
+      await ElMessageBox.confirm(parts.join(''), '附注与底稿不一致', {
+        confirmButtonText: '仍要导出',
+        cancelButtonText: '返回同步',
+        type: 'warning',
+        dangerouslyUseHTMLString: true,
+      })
+    } catch {
+      // 用户选「返回同步」：放弃本次导出
+      return
+    }
+    // 用户确认带不一致导出：重发 confirm_inconsistent=true
+    await doRenderNotes(selectedSections, true)
+    return
+  }
+
+  if (res.platform_persist_failed) {
+    ElMessage.warning('平台留存失败，请从版本链重新下载')
+  } else {
+    ElMessage.success('附注已生成并保存到交付中心')
+  }
+  // 附注联动复盘 P1-3：出具前软闸门提示（后端返回，不阻断导出）
+  showDeliveryWarnings(res.warnings, '附注出具提醒（不影响本次导出）')
+  if (res.task_id && res.version_no != null) {
+    downloadFile(deliverableDownloadUrl(projectId.value, res.task_id, res.version_no), { fileName: `disclosure_notes_${year.value}.docx` })
+  }
+  await loadList()
+  notesDialogVisible.value = false
 }
 
 async function runGenerateReport() {

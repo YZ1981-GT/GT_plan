@@ -20,6 +20,12 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
+def _sql(statement: str) -> sa.TextClause:
+    """裸 SQL 的 ``:pid`` 按 UUID 类型绑定：PG 上与按字符串绑定等价；SQLite 上 UUID 列存 32 位 hex，
+    按带连字符的字符串比较恒不命中 —— 历史实现在 SQLite 上永远汇总出 0，复用它的测试因此恒绿 / 恒空。"""
+    return sa.text(statement).bindparams(sa.bindparam("pid", type_=sa.Uuid()))
+
+
 async def get_full_summary(
     db: AsyncSession,
     project_id: UUID,
@@ -36,8 +42,9 @@ async def get_full_summary(
           "last_event_at": ISO8601 | null
         }
     """
+    pid = project_id if isinstance(project_id, UUID) else UUID(str(project_id))
     # 1. workpapers (prefill_stale + consistency_status)
-    wp_sql = sa.text(
+    wp_sql = _sql(
         """
         SELECT
           COUNT(*) AS total,
@@ -47,8 +54,8 @@ async def get_full_summary(
         WHERE project_id = :pid AND is_deleted = false
         """
     )
-    wp_row = (await db.execute(wp_sql, {"pid": str(project_id)})).first()
-    wp_items_sql = sa.text(
+    wp_row = (await db.execute(wp_sql, {"pid": pid})).first()
+    wp_items_sql = _sql(
         """
         SELECT wp.id, wi.wp_code, wi.wp_name
         FROM working_paper wp
@@ -62,11 +69,11 @@ async def get_full_summary(
     )
     wp_items = [
         {"id": str(r.id), "wp_code": r.wp_code, "wp_name": r.wp_name}
-        for r in (await db.execute(wp_items_sql, {"pid": str(project_id)})).all()
+        for r in (await db.execute(wp_items_sql, {"pid": pid})).all()
     ]
 
     # 2. financial_report (is_stale)
-    rpt_sql = sa.text(
+    rpt_sql = _sql(
         """
         SELECT
           COUNT(*) AS total,
@@ -75,8 +82,8 @@ async def get_full_summary(
         WHERE project_id = :pid AND year = :yr AND is_deleted = false
         """
     )
-    rpt_row = (await db.execute(rpt_sql, {"pid": str(project_id), "yr": year})).first()
-    rpt_items_sql = sa.text(
+    rpt_row = (await db.execute(rpt_sql, {"pid": pid, "yr": year})).first()
+    rpt_items_sql = _sql(
         """
         SELECT id, report_type, row_code, row_name
         FROM financial_report
@@ -93,11 +100,11 @@ async def get_full_summary(
             "row_code": r.row_code,
             "row_name": r.row_name,
         }
-        for r in (await db.execute(rpt_items_sql, {"pid": str(project_id), "yr": year})).all()
+        for r in (await db.execute(rpt_items_sql, {"pid": pid, "yr": year})).all()
     ]
 
     # 3. disclosure_notes (is_stale)
-    notes_sql = sa.text(
+    notes_sql = _sql(
         """
         SELECT
           COUNT(*) AS total,
@@ -106,8 +113,8 @@ async def get_full_summary(
         WHERE project_id = :pid AND year = :yr AND is_deleted = false
         """
     )
-    notes_row = (await db.execute(notes_sql, {"pid": str(project_id), "yr": year})).first()
-    notes_items_sql = sa.text(
+    notes_row = (await db.execute(notes_sql, {"pid": pid, "yr": year})).first()
+    notes_items_sql = _sql(
         """
         SELECT id, note_section, section_title
         FROM disclosure_notes
@@ -119,12 +126,12 @@ async def get_full_summary(
     )
     notes_items = [
         {"id": str(r.id), "note_section": r.note_section, "section_title": r.section_title}
-        for r in (await db.execute(notes_items_sql, {"pid": str(project_id), "yr": year})).all()
+        for r in (await db.execute(notes_items_sql, {"pid": pid, "yr": year})).all()
     ]
 
     # 4. misstatements (派生：updated_at < materiality.updated_at)
     # 字段缺失降级为派生计算
-    miss_sql = sa.text(
+    miss_sql = _sql(
         """
         WITH mat AS (
           SELECT MAX(updated_at) AS mat_updated
@@ -140,49 +147,54 @@ async def get_full_summary(
         WHERE m.project_id = :pid AND m.year = :yr AND m.is_deleted = false
         """
     )
+    miss_unavailable = False
     try:
-        miss_row = (await db.execute(miss_sql, {"pid": str(project_id), "yr": year})).first()
-        miss_items_sql = sa.text(
-            """
-            WITH mat AS (
-              SELECT MAX(updated_at) AS mat_updated
-              FROM materiality
-              WHERE project_id = :pid AND year = :yr AND is_deleted = false
+        # SAVEPOINT：本段失败只回滚本段 —— PG 上未包 SAVEPOINT 的失败会中止整个事务，后续查询全部连带失败
+        async with db.begin_nested():
+            miss_row = (await db.execute(miss_sql, {"pid": pid, "yr": year})).first()
+            miss_items_sql = _sql(
+                """
+                WITH mat AS (
+                  SELECT MAX(updated_at) AS mat_updated
+                  FROM materiality
+                  WHERE project_id = :pid AND year = :yr AND is_deleted = false
+                )
+                SELECT m.id, m.affected_account_code, m.misstatement_amount
+                FROM unadjusted_misstatements m
+                WHERE m.project_id = :pid AND m.year = :yr AND m.is_deleted = false
+                  AND m.updated_at < (SELECT mat_updated FROM mat)
+                ORDER BY m.misstatement_amount DESC NULLS LAST
+                LIMIT 30
+                """
             )
-            SELECT m.id, m.affected_account_code, m.misstatement_amount
-            FROM unadjusted_misstatements m
-            WHERE m.project_id = :pid AND m.year = :yr AND m.is_deleted = false
-              AND m.updated_at < (SELECT mat_updated FROM mat)
-            ORDER BY m.misstatement_amount DESC NULLS LAST
-            LIMIT 30
-            """
-        )
-        miss_items = [
-            {
-                "id": str(r.id),
-                "affected_account_code": r.affected_account_code,
-                "misstatement_amount": str(r.misstatement_amount) if r.misstatement_amount is not None else None,
-            }
-            for r in (
-                await db.execute(miss_items_sql, {"pid": str(project_id), "yr": year})
-            ).all()
-        ]
+            miss_items = [
+                {
+                    "id": str(r.id),
+                    "affected_account_code": r.affected_account_code,
+                    "misstatement_amount": str(r.misstatement_amount) if r.misstatement_amount is not None else None,
+                }
+                for r in (
+                    await db.execute(miss_items_sql, {"pid": pid, "yr": year})
+                ).all()
+            ]
     except Exception:
-        # materiality 表可能不存在或字段缺失 → 降级为 0
+        # 查询失败如实标「不可用」（不是「没有待评估错报」）：签发清单据此判检查失败；仪表盘仍显示 0
         miss_row = None
         miss_items = []
+        miss_unavailable = True
 
-    # 5. last_event_at: 取 4 模块中最近的 updated_at
-    last_evt_sql = sa.text(
-        """
-        SELECT GREATEST(
-          (SELECT MAX(updated_at) FROM working_paper WHERE project_id = :pid AND is_deleted = false),
-          (SELECT MAX(updated_at) FROM financial_report WHERE project_id = :pid AND year = :yr AND is_deleted = false),
-          (SELECT MAX(updated_at) FROM disclosure_notes WHERE project_id = :pid AND year = :yr AND is_deleted = false)
-        ) AS last_evt
-        """
-    )
-    last_evt = (await db.execute(last_evt_sql, {"pid": str(project_id), "yr": year})).scalar()
+    # 5. last_event_at: 取 3 模块中最近的 updated_at（三条 MAX 在 Python 侧取最大：GREATEST 是 PG 专有，
+    #    SQLite 上整条报错 —— 签发清单复用本函数，单测在 SQLite 上会因此恒判「执行失败」）
+    last_candidates = []
+    for sql in (
+        "SELECT MAX(updated_at) FROM working_paper WHERE project_id = :pid AND is_deleted = false",
+        "SELECT MAX(updated_at) FROM financial_report WHERE project_id = :pid AND year = :yr AND is_deleted = false",
+        "SELECT MAX(updated_at) FROM disclosure_notes WHERE project_id = :pid AND year = :yr AND is_deleted = false",
+    ):
+        value = (await db.execute(_sql(sql), {"pid": pid, "yr": year})).scalar()
+        if isinstance(value, datetime):
+            last_candidates.append(value if value.tzinfo else value.replace(tzinfo=timezone.utc))
+    last_evt = max(last_candidates) if last_candidates else None
 
     return {
         "workpapers": {
@@ -205,6 +217,7 @@ async def get_full_summary(
             "total": miss_row.total if miss_row else 0,
             "recheck_needed": miss_row.recheck_needed if miss_row else 0,
             "items": miss_items,
+            "unavailable": miss_unavailable,
         },
         "last_event_at": last_evt.isoformat() if isinstance(last_evt, datetime) else None,
     }

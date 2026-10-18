@@ -211,7 +211,31 @@ describe('SignoffChecklist', () => {
           item_message: '附注过期',
           item_category: 'note',
         }),
+        expect.objectContaining({ _silent: true }),
       )
+      expect(wrapper.text()).toContain('已确认')
+    })
+
+    it('审计留痕失败时不得把 warning 假标为已确认', async () => {
+      mockGet.mockResolvedValueOnce({
+        project_id: 'test-project-id',
+        year: 2025,
+        items: [
+          { severity: 'warning', category: 'stale', message: '附注过期', route: null },
+        ],
+        can_signoff: true,
+        has_warnings: true,
+      })
+      mockPost.mockRejectedValueOnce({ response: { data: { detail: '确认记录写入失败，请稍后重试' } } })
+
+      const wrapper = createWrapper({ autoLoad: true })
+      await flushPromises()
+      const confirmBtn = wrapper.findAll('button').find((b) => b.text().includes('确认放行'))
+      await confirmBtn!.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('确认放行')
+      expect(wrapper.text()).not.toContain('已确认')
     })
   })
 

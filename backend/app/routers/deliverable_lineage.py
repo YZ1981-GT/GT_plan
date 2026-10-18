@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -49,11 +48,8 @@ router = APIRouter(
 
 TERMINAL_STATUSES = frozenset({"signed", "confirmed", "archived"})
 
-# ---------------------------------------------------------------------------
-# Async job threshold — >100 sections delegates to export_jobs_v2 (need 10.2)
-# ---------------------------------------------------------------------------
-
-ASYNC_SECTION_THRESHOLD = 100
+# 🔴 「> 100 节转异步」已删除（2026-10-17）：export_jobs_v2 全仓无 worker 处理 deliverable_writeback，走到即 500；
+# 报告正文章节数远小于 100，回填一律同步执行。原 ASYNC_SECTION_THRESHOLD / _delegate_to_async_job 一并移除。
 
 
 # ---------------------------------------------------------------------------
@@ -64,6 +60,58 @@ ASYNC_SECTION_THRESHOLD = 100
 class WritebackRequest(BaseModel):
     year: int
     resolutions: dict[str, str] | None = None
+
+
+def _group_writeback_receipt(result: dict) -> dict:
+    """把 WritebackResult 五桶归并为「已回填 / 已拒绝 / 未回填」三组回执（AC-3.2）。
+
+    - 已回填 = ``written``；
+    - 已拒绝 = ``rejected``（护栏 TABLE/TITLE 变更），拒绝原因取 ``rejection_reason``；
+    - 未回填 = ``skipped``（锚点丢失）+ ``failed``（写入 0 行 / 派生段落），各带可读原因。
+
+    原始五桶键原样保留（前端 WritebackResultPanel 仍按 written/rejected/... 读），
+    新增 ``receipt`` 为 additive 分组视图：拒绝原因**只认后端字段 ``rejection_reason``**，
+    不再出现「前端读 item.reason 恒空」的历史缺陷（需求 §1.2）。
+    """
+    written = list(result.get("written") or [])
+    rejected_items = result.get("rejected") or []
+    skipped = list(result.get("skipped") or [])
+    failed_items = result.get("failed") or []
+
+    rejected_group = [
+        {
+            "section_code": item.get("section_code"),
+            "rejection_reason": item.get("rejection_reason"),
+        }
+        for item in rejected_items
+    ]
+    not_filled_group = (
+        [
+            {"section_code": code, "reason": "无法定位锚点，未回填"}
+            for code in skipped
+        ]
+        + [
+            {
+                "section_code": item.get("section_code"),
+                "reason": item.get("reason"),
+            }
+            for item in failed_items
+        ]
+    )
+
+    return {
+        **result,
+        "receipt": {
+            "filled": written,  # 已回填
+            "rejected": rejected_group,  # 已拒绝（含 rejection_reason）
+            "not_filled": not_filled_group,  # 未回填（锚点丢失 / 写入失败）
+            "counts": {
+                "filled": len(written),
+                "rejected": len(rejected_group),
+                "not_filled": len(not_filled_group),
+            },
+        },
+    }
 
 
 class RefreshSectionRequest(BaseModel):
@@ -245,37 +293,7 @@ async def _require_capability(
 
 
 # ---------------------------------------------------------------------------
-# Helper: async job delegation for large documents (needs 10.2)
-# ---------------------------------------------------------------------------
-
-
-async def _delegate_to_async_job(
-    db: AsyncSession,
-    project_id: UUID,
-    word_export_task_id: UUID,
-    user_id: UUID,
-    action: str,
-    payload: dict[str, Any],
-) -> dict:
-    """Delegate operation to export_jobs_v2 for large documents (>100 sections)."""
-    from app.services.export_job_service import ExportJobService
-
-    job_svc = ExportJobService(db)
-    job_id = await job_svc.create_job(
-        project_id=project_id,
-        user_id=user_id,
-        job_type=action,
-        params={
-            "word_export_task_id": str(word_export_task_id),
-            **payload,
-        },
-    )
-    await db.flush()
-    return {"job_id": str(job_id)}
-
-
-# ---------------------------------------------------------------------------
-# POST /writeback — 回填触发（needs 7.1, 10.2, 10.3, 10.4, 11.1/11.3）
+# POST /writeback — 回填触发（仅 audit_report；附注已下线）
 # ---------------------------------------------------------------------------
 
 
@@ -287,11 +305,13 @@ async def writeback_deliverable(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """出品物文字回填到附注模块（显式按钮触发）。
+    """出品物报告正文回填（显式按钮触发）。
 
     权限: project:edit（无权限 403，需求 10.3）
     终态: signed/confirmed/archived 拒绝（需求 11.1/11.3）
-    大文档: >100 章节走异步（需求 10.2）
+    能力门控: 仅 audit_report 可回填；附注已下线（disclosure_notes → 400，US-2）
+    提交: service 只 flush，路由成功后 `await db.commit()`（修 get_db 不自动提交，US-3 AC-3.2）
+    回执: 「已回填 / 已拒绝 / 未回填」三组，拒绝原因显示 rejection_reason（AC-3.2）
     审计日志: 写 app_audit_log（需求 10.4）
     """
     # 终态检查（needs 11.1/11.3）
@@ -302,30 +322,15 @@ async def writeback_deliverable(
             detail=f"该出品物已{terminal_status}，不可回填或刷新；如需修改请走撤回/解锁流程",
         )
 
-    # doc_type 能力门控（需求 6.4）：服务端硬校验，不依赖前端隐藏按钮
+    # doc_type 能力门控（需求 6.4）：服务端硬校验，不依赖前端隐藏按钮。
+    # 🔴 附注已下线（2026-10-17 方向裁定）：disclosure_notes 命中即 400（见 writeback_unsupported_message）。
+    # 当前仅 audit_report 可回填。
     await _require_capability(db, word_export_task_id, kind="writeback")
 
-    # 获取章节状态以判断是否需要异步（needs 10.2）
+    # 章节数仅用于审计计数；「> 100 节转异步」分支已删除——全仓无 worker 处理该 job，走到即 500，
+    # 且报告正文章节数远小于 100。回填一律同步执行。
     dss = DeliverableSectionStateService(db)
     sections = await dss.get_section_states(word_export_task_id)
-
-    if len(sections) > ASYNC_SECTION_THRESHOLD:
-        # 大文档 → 异步 job
-        result = await _delegate_to_async_job(
-            db, project_id, word_export_task_id, current_user.id,
-            action="deliverable_writeback",
-            payload={"year": body.year, "resolutions": body.resolutions},
-        )
-        # 写审计日志（needs 10.4）
-        await audit_logger.log_action(
-            user_id=current_user.id,
-            action="deliverable_writeback_async",
-            object_type="deliverable",
-            object_id=word_export_task_id,
-            project_id=project_id,
-            details={"year": body.year, "async_job_id": result["job_id"], "section_count": len(sections)},
-        )
-        return result
 
     # 同步执行回填
     from app.services.deliverable_writeback_service import DeliverableWritebackService
@@ -352,7 +357,13 @@ async def writeback_deliverable(
         details={"year": body.year, "section_count": len(sections), "has_resolutions": body.resolutions is not None},
     )
 
-    return result
+    # 🔴 service 只 flush，get_db 不自动提交 —— 历史缺陷是回填写入随会话关闭回滚、界面却提示成功。
+    # 报告正文回填成功后必须由路由统一提交。
+    await db.commit()
+
+    # 回执按「已回填 / 已拒绝 / 未回填」分组，拒绝原因显示 rejection_reason（AC-3.2）。
+    # 原始五桶键保留以兼容既有前端；additive 的 receipt 为三组视图。
+    return _group_writeback_receipt(result)
 
 
 # ---------------------------------------------------------------------------

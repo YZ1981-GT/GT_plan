@@ -8,6 +8,16 @@
 - 反向自检：旧行为（不查 rowcount 直接 append）会把 0 行写入报成成功
 
 用真实 SQLite 表跑 UPDATE，rowcount 语义是真的（mock 出来的 rowcount 证明不了任何事）。
+
+🔴 **附注回填已下线**（spec deliverable-writeback-and-online-edit-integrity 方向裁定，
+2026-10-17 用户确认）：附注是底稿披露表单项推送的只读下游，交付中心回填附注=逆流。
+`ADAPTER_BY_DOC_TYPE` 已移除 disclosure_notes ⇒ `writeback()` 对附注任务短路返回全空
+（见 ``test_disclosure_notes_writeback_is_decommissioned``）。
+
+但 Property 9/10 守护的 **rowcount→failed / 五桶不交** 是**与上游种类无关的通用写入
+机制**，仍是 audit_report 回填的活代码，必须继续守护。故这三条用例改为**直接注入
+``DisclosureNoteAdapter``**（绕过 `_resolve_adapter` 的 doc_type 门控），验证写入机制本身；
+附注的「不可回填」由独立的 decommission 用例守护。两者正交，不互相掩盖。
 """
 
 from __future__ import annotations
@@ -144,6 +154,25 @@ def _run(scenario):
     return asyncio.run(_main())
 
 
+def _note_writeback_service(session) -> DeliverableWritebackService:
+    """构造一个**强制走附注适配器**的回填服务。
+
+    生产 `_resolve_adapter` 对 disclosure_notes 已返回 None（附注回填下线）。
+    这些用例守护的是**通用写入机制**（rowcount→failed / 五桶不交），与上游种类
+    无关，故在此直接把 `_resolve_adapter` 覆盖为返回 `DisclosureNoteAdapter`，
+    让 `writeback()` 的完整分块/diff/护栏/写入链路仍可被这组机制断言覆盖。
+    """
+    from app.services.writeback_target_adapters import DisclosureNoteAdapter
+
+    svc = DeliverableWritebackService(session)
+
+    async def _force_note_adapter(_task_id):
+        return DisclosureNoteAdapter(session)
+
+    svc._resolve_adapter = _force_note_adapter  # type: ignore[method-assign]
+    return svc
+
+
 # ─── Property 9 ──────────────────────────────────────────────────────────────
 
 
@@ -154,7 +183,7 @@ def test_property_9_zero_rowcount_not_counted_as_written():
     async def _scenario(session):
         # 只给 八、1 建 note；八、2 无 note → 写入必 0 行
         await _setup(session, notes={"八、1": "旧文字"}, states=["八、1", "八、2"])
-        svc = DeliverableWritebackService(session)
+        svc = _note_writeback_service(session)
         result = await svc.writeback(
             TASK_ID,
             PROJECT_ID,
@@ -212,7 +241,7 @@ def test_writeback_locates_sections_on_marker_free_delivered_docx():
 
     async def _scenario(session):
         await _setup(session, notes={"八、1": "旧"}, states=["八、1"])
-        svc = DeliverableWritebackService(session)
+        svc = _note_writeback_service(session)
         result = await svc.writeback(
             TASK_ID, PROJECT_ID, YEAR, ACTOR_ID,
             docx_bytes=_delivered_docx({"八、1": "改后的文字"}),
@@ -240,7 +269,9 @@ def test_no_anchor_no_marker_docx_returns_empty_without_error():
         doc.add_paragraph("没有任何章节标识的正文")
         buf = BytesIO()
         doc.save(buf)
-        svc = DeliverableWritebackService(session)
+        # 强制走附注适配器，否则 _resolve_adapter 会先因附注下线短路返回全空，
+        # 本用例就测不到「有适配器但无锚点」这条降级路径。
+        svc = _note_writeback_service(session)
         return await svc.writeback(
             TASK_ID, PROJECT_ID, YEAR, ACTOR_ID, docx_bytes=buf.getvalue()
         )
@@ -249,6 +280,72 @@ def test_no_anchor_no_marker_docx_returns_empty_without_error():
     assert result["written"] == []
     assert result["failed"] == []
     assert result["conflicts"] == []
+
+
+# ─── 附注回填下线（方向裁定）─────────────────────────────────────────────────
+
+
+def test_disclosure_notes_writeback_is_decommissioned():
+    """🔴 附注任务走 `writeback()` 必短路返回全空 —— 附注回填已下线。
+
+    这是方向裁定的核心守卫：即使交付 docx 里有可定位、与上游不同的章节文字
+    （上文 ``test_writeback_locates_sections_on_marker_free_delivered_docx`` 证明
+    这种输入在**强制附注适配器**下会真的写入 八、1），只要走**生产**
+    `_resolve_adapter`（即不强制适配器），附注就不会被写入任何一个字。
+
+    与上面三条「强制附注适配器」的机制用例形成对照：
+    - 机制仍在（rowcount→failed / 五桶），是 audit_report 的活代码；
+    - 但附注这条**产品路径**已关闭，`DisclosureNote` 不会被交付中心逆写。
+    """
+
+    async def _scenario(session):
+        await _setup(session, notes={"八、1": "旧文字"}, states=["八、1"])
+        # 用生产服务（不强制适配器）：_resolve_adapter 读到 doc_type=disclosure_notes
+        # → get_writeback_adapter 返回 None → writeback 短路。
+        svc = DeliverableWritebackService(session)
+        result = await svc.writeback(
+            TASK_ID,
+            PROJECT_ID,
+            YEAR,
+            ACTOR_ID,
+            docx_bytes=_delivered_docx({"八、1": "交付件里改过的新文字"}),
+        )
+        note_text = (
+            await session.execute(
+                sa.select(DisclosureNote.text_content).where(
+                    DisclosureNote.note_section == "八、1"
+                )
+            )
+        ).scalar_one()
+        return result, note_text
+
+    result, note_text = _run(_scenario)
+
+    # 全五桶皆空：没写、没拒、没冲突、没跳过、没失败（压根没进处理循环）
+    assert result["written"] == []
+    assert result["rejected"] == []
+    assert result["conflicts"] == []
+    assert result["skipped"] == []
+    assert result["failed"] == []
+    assert result["trace_id"] is None
+    # 上游附注文字一字未动 —— 交付中心没有逆流改附注
+    assert note_text == "旧文字", "附注回填已下线，交付中心不得改写 disclosure_notes"
+
+
+def test_disclosure_notes_adapter_not_in_registry():
+    """反向自检：ADAPTER_BY_DOC_TYPE 不得含 disclosure_notes（否则上条用例空转）。
+
+    若有人把 disclosure_notes 加回注册表，上面的 decommission 用例会从「全空」
+    变成「真写入」而打红——但那条用例的断言是「全空」，可能被误读为「本来就该空」。
+    这条直接钉死注册表本身，让回归信号无歧义。
+    """
+    from app.services.writeback_target_adapters import ADAPTER_BY_DOC_TYPE
+
+    assert "disclosure_notes" not in ADAPTER_BY_DOC_TYPE, (
+        "附注回填已下线：ADAPTER_BY_DOC_TYPE 不得含 disclosure_notes"
+    )
+    # 正向：audit_report 仍在（报告正文回填保留）
+    assert "audit_report" in ADAPTER_BY_DOC_TYPE
 
 
 # ─── Property 10 ─────────────────────────────────────────────────────────────
@@ -266,7 +363,7 @@ def test_property_10_five_buckets_disjoint_and_complete():
             notes={"八、1": "旧", "八、3": "一致的文字"},
             states=["八、1", "八、2", "八、3"],
         )
-        svc = DeliverableWritebackService(session)
+        svc = _note_writeback_service(session)
         docx = _delivered_docx(
             {"八、1": "新", "八、2": "孤儿", "八、3": "一致的文字"}
         )

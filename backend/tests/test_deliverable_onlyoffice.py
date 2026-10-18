@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from pathlib import Path
 
@@ -115,7 +116,8 @@ async def _seed(db: AsyncSession, *, with_file: bool, tmp_dir: Path | None = Non
 
     file_path = None
     if with_file and tmp_dir is not None:
-        file_path = tmp_dir / "audit_report_v1.docx"
+        file_path = tmp_dir / "deliverables" / str(project_id) / str(task.id) / "audit_report_v1.docx"
+        file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_bytes(b"PK\x03\x04 fake docx content")
 
     version = WordExportTaskVersion(
@@ -124,6 +126,7 @@ async def _seed(db: AsyncSession, *, with_file: bool, tmp_dir: Path | None = Non
         version_no=1,
         file_path=str(file_path) if file_path else None,
         file_size=file_path.stat().st_size if file_path else None,
+        file_hash=hashlib.sha256(file_path.read_bytes()).hexdigest() if file_path else None,
         created_by=user_id,
         created_via="generate",
     )
@@ -172,6 +175,8 @@ async def test_property_54_onlyoffice_unavailable_degradation(
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
+        # 下载指纹门要求文件落在交付根目录；夹具模拟真实 storage/deliverables 布局。
+        monkeypatch.setattr("app.services.deliverable_service.STORAGE_ROOT", Path(tmp))
         seed = await _seed(db_session, with_file=True, tmp_dir=Path(tmp))
 
         monkeypatch.setattr(
@@ -295,7 +300,14 @@ async def test_property_55_callback_jwt_auth(db_session, monkeypatch, valid):
         _FakeAsyncClient,
     )
 
-    body = {"status": 2, "url": "http://onlyoffice/cache/edited.docx"}
+    # 回调体 key 必须是本交付物 v1 的 doc_key，否则新契约按「key 无效」拒绝（写安全日志）。
+    from app.services.deliverable_doc_key import deliverable_doc_key
+
+    body = {
+        "status": 2,
+        "url": "http://onlyoffice/cache/edited.docx",
+        "key": deliverable_doc_key(tid, 1),
+    }
     if valid:
         token = jwt.encode(body, ONLYOFFICE_SECRET, algorithm="HS256")
         headers = {"Authorization": token}
@@ -351,6 +363,8 @@ async def test_unit_core_endpoints_available_when_onlyoffice_down(
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
+        # 下载指纹门要求文件落在交付根目录；夹具模拟真实 storage/deliverables 布局。
+        monkeypatch.setattr("app.services.deliverable_service.STORAGE_ROOT", Path(tmp))
         seed = await _seed(db_session, with_file=True, tmp_dir=Path(tmp))
         monkeypatch.setattr(app_settings, "ONLYOFFICE_JWT_SECRET", ONLYOFFICE_SECRET)
 

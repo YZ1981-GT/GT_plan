@@ -11,7 +11,9 @@ Property 3：交付件历史不可覆盖
 """
 from __future__ import annotations
 
+import hashlib
 import uuid
+from pathlib import Path
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
@@ -220,23 +222,48 @@ class TestVersionImmutability:
         assert added.version_no == 4
 
     @pytest.mark.asyncio
-    async def test_verify_version_immutability_true(self):
-        """已存在的版本返回 immutable=True"""
+    async def test_verify_version_immutability_true(self, tmp_path: Path):
+        """记录存在且磁盘字节与 size/SHA-256 一致才是真不可变。"""
         db = AsyncMock()
         integration = DeliverableCenterIntegration(db)
-
         version = _make_version(uuid.uuid4(), 2)
-        with patch.object(
-            integration._deliverable_svc,
-            "get_version",
-            return_value=version,
-        ):
+        content = b"immutable-v2"
+        path = tmp_path / "deliverables" / str(version.word_export_task_id) / "report_v2.docx"
+        path.parent.mkdir(parents=True)
+        path.write_bytes(content)
+        version.file_path = str(path)
+        version.file_size = len(content)
+        version.file_hash = hashlib.sha256(content).hexdigest()
+
+        with patch.object(integration._deliverable_svc, "get_version", return_value=version), \
+                patch("app.services.deliverable_service.STORAGE_ROOT", tmp_path):
             result = await integration.verify_version_immutability(
-                task_id=version.word_export_task_id,
-                version_no=2,
+                task_id=version.word_export_task_id, version_no=2,
             )
 
         assert result is True
+
+    @pytest.mark.asyncio
+    async def test_verify_version_immutability_false_when_file_was_overwritten(self, tmp_path: Path):
+        """版本记录仍在但路径内容被后续生成覆盖 ⇒ False（历史真实缺陷）。"""
+        db = AsyncMock()
+        integration = DeliverableCenterIntegration(db)
+        version = _make_version(uuid.uuid4(), 2)
+        original = b"version-2-original"
+        path = tmp_path / "deliverables" / str(version.word_export_task_id) / "report_v2.docx"
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"version-9-overwrite")
+        version.file_path = str(path)
+        version.file_size = len(original)
+        version.file_hash = hashlib.sha256(original).hexdigest()
+
+        with patch.object(integration._deliverable_svc, "get_version", return_value=version), \
+                patch("app.services.deliverable_service.STORAGE_ROOT", tmp_path):
+            result = await integration.verify_version_immutability(
+                task_id=version.word_export_task_id, version_no=2,
+            )
+
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_verify_version_immutability_false_nonexistent(self):

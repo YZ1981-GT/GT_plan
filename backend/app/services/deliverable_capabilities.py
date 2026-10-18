@@ -23,13 +23,16 @@ from __future__ import annotations
 from typing import Final
 
 #: 支持「回填到上游」的 doc_type。
-#: Wave 3 增加 ``audit_report``（写 AuditReport.report_body_json）。
+#:
+#: 🔴 **附注（disclosure_notes）已下线**（spec deliverable-writeback-and-online-edit-integrity 方向裁定，2026-10-17 用户确认）：
+#: 附注唯一权威源是底稿披露表的单项推送（底稿 → 附注），交付中心是附注的只读下游出口。让审计师在交付 Word 改字再回填附注
+#: 是逆流（下游改上游、可能与底稿事实不符）。附注要改内容回底稿改；交付导出前有一致性确认闸门
+#: （见 deliverable_note_consistency）。
+#:
+#: 只保留 ``audit_report``：报告正文段落文字就在交付件里、不来自底稿→附注推送链，回填不构成逆流
+#: （写 AuditReport.report_body_json.sections，派生 / 模板固定段落仍拒绝，见 writeback_target_adapters）。
 WRITEBACK_SUPPORTED_DOC_TYPES: Final[frozenset[str]] = frozenset(
     {
-        "disclosure_notes",
-        # Wave 3 Task 18：报告正文段落级回填（写 AuditReport.report_body_json.sections）。
-        # 前提是 Task 17 已给交付 docx 写入 sec_rb_* 段落锚点、且 confirm 时把
-        # sections 落进 report_body_json —— 二者缺一则回填恒返回全空/failed。
         "audit_report",
     }
 )
@@ -38,6 +41,18 @@ WRITEBACK_SUPPORTED_DOC_TYPES: Final[frozenset[str]] = frozenset(
 SECTION_REFRESH_SUPPORTED_DOC_TYPES: Final[frozenset[str]] = frozenset(
     {
         "disclosure_notes",
+    }
+)
+
+#: 支持「章节溯源」的 doc_type（US-8）：有 Section_Anchor + 章节状态，可按章节回溯上游。
+#:
+#: 附注 / 报告正文都有章节结构（附注章节号 / 报告正文段落），交付时落 deliverable_section_state，
+#: 故可溯源。财务报表（xlsx）**不支持**：报表按报表行取数、无章节锚点，其章节状态任务恒 0 行，
+#: 面板只会显示空下拉 + 「请重新生成」误导（历史缺陷）。改为显式说明「报表按行取数、去报表页穿透」。
+LINEAGE_SUPPORTED_DOC_TYPES: Final[frozenset[str]] = frozenset(
+    {
+        "disclosure_notes",
+        "audit_report",
     }
 )
 
@@ -60,6 +75,19 @@ def supports_section_refresh(doc_type: str | None) -> bool:
     return (doc_type or "") in SECTION_REFRESH_SUPPORTED_DOC_TYPES
 
 
+def supports_lineage(doc_type: str | None) -> bool:
+    """该交付件类型是否支持章节溯源（US-8）。"""
+    return (doc_type or "") in LINEAGE_SUPPORTED_DOC_TYPES
+
+
+def lineage_unsupported_message(doc_type: str | None) -> str:
+    """不支持溯源时的可读说明（中文，指明正确查数路径）。"""
+    dt = doc_type or ""
+    if dt.startswith("financial_report"):
+        return "财务报表按报表行取数，没有章节溯源；数字来源请在「财务报表」页穿透查看。"
+    return "该交付件类型不支持章节溯源。"
+
+
 def writeback_unsupported_message(doc_type: str | None) -> str:
     """不支持回填时的可读错误文案（中文，指明替代路径）。"""
     dt = doc_type or "未知"
@@ -67,6 +95,11 @@ def writeback_unsupported_message(doc_type: str | None) -> str:
         return (
             f"该交付件类型（{dt}）不支持回填：财务报表数字只能由试算表与调整分录派生，"
             "请通过调整分录（AJE/RJE）修正后重新生成报表"
+        )
+    if dt == "disclosure_notes":
+        return (
+            "附注不支持从交付件回填：附注内容来源于底稿披露表的推送（底稿 → 附注）。"
+            "请回对应底稿修改并点「同步到附注」，再从交付中心重新导出附注。"
         )
     return f"该交付件类型（{dt}）不支持回填到上游"
 

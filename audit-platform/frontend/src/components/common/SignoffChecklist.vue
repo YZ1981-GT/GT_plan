@@ -224,10 +224,12 @@ const {
 const CATEGORY_LABELS: Record<string, string> = {
   trial_balance: '试算表',
   adjustment: '调整分录',
+  conflict: '跨模块冲突',
+  report: '审计报告',
+  stale: '数据过期',
+  ai_content: 'AI 内容',
   workpaper: '底稿',
   note: '附注',
-  report: '报告',
-  ai_content: 'AI 内容',
 }
 
 function getCategoryLabel(category: string): string {

@@ -120,3 +120,80 @@ describe('LineagePanel.vue', () => {
     expect(wrapper.find('.lineage-panel__no-anchor').exists()).toBe(true)
   })
 })
+
+/**
+ * US-8 溯源能力标志（deliverable-writeback-and-online-edit-integrity Task 30）
+ *
+ * 行为级断言（不止源码级）：supportsLineage=false（财务报表）时面板**不请求** /section-states，
+ * 只渲染穿透指引文案；缺省（不传）时按支持处理（会请求 section-states）。
+ *
+ * 🔴 守住 Vue Boolean prop 转换坑：未传的 boolean prop 会被转成 false 而非 undefined，
+ * 若 LineagePanel 不给 supportsLineage 默认 true，则「不传」会被当成不支持、吞掉附注/报告正文溯源。
+ */
+describe('LineagePanel.vue — US-8 supportsLineage 行为', () => {
+  const baseProps = {
+    projectId: 'proj-001',
+    wordExportTaskId: 'task-001',
+  }
+
+  const sectionStatesUrl =
+    '/api/projects/proj-001/deliverables/task-001/section-states'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  function sectionStatesCalls(): string[] {
+    return mockApiGet.mock.calls
+      .map((c) => c[0] as string)
+      .filter((u) => u.includes('/section-states'))
+  }
+
+  it('supportsLineage=false：onMounted 不请求 /section-states，改显报表穿透文案', async () => {
+    mockApiGet.mockResolvedValue({ sections: [] })
+    const wrapper = mount(LineagePanel, {
+      props: { ...baseProps, supportsLineage: false },
+    })
+    await nextTick()
+    await new Promise((r) => setTimeout(r, 10))
+    await nextTick()
+
+    // 行为断言：根本没打 section-states（不是「打了但拿空」）
+    expect(sectionStatesCalls()).toEqual([])
+    // 文案指向报表穿透，不是误导性的「请重新生成」
+    expect(wrapper.text()).toContain('财务报表按报表行取数')
+    expect(wrapper.text()).toContain('穿透查看')
+    expect(wrapper.text()).not.toContain('请重新生成')
+    // 不渲染手动溯源下拉（不支持溯源时整块 UI 用说明替代）
+    expect(wrapper.find('.lineage-panel__manual').exists()).toBe(false)
+  })
+
+  it('supportsLineage=false：手动触发 onBookmarkDetected 仍不请求 /section-states', async () => {
+    mockApiGet.mockResolvedValue({ sections: [] })
+    const wrapper = mount(LineagePanel, {
+      props: { ...baseProps, supportsLineage: false },
+    })
+    await nextTick()
+    ;(wrapper.vm as any).onBookmarkDetected('sec_八_1')
+    await nextTick()
+    await new Promise((r) => setTimeout(r, 10))
+    await nextTick()
+
+    expect(sectionStatesCalls()).toEqual([])
+  })
+
+  it('缺省（不传 supportsLineage）：按支持处理，onMounted 会请求 /section-states', async () => {
+    // 🔴 Vue Boolean prop 转换坑守卫：若组件不给 supportsLineage 默认 true，
+    // 「不传」会被转成 false ⇒ 这里的 section-states 请求不会发出，本例打红。
+    mockApiGet.mockResolvedValue({ sections: [{ section_code: '八、1', is_stale: false }] })
+    const wrapper = mount(LineagePanel, { props: baseProps })
+    await nextTick()
+    await new Promise((r) => setTimeout(r, 10))
+    await nextTick()
+
+    expect(sectionStatesCalls()).toEqual([sectionStatesUrl])
+    // 渲染正常溯源 UI（手动下拉），不显示报表穿透文案
+    expect(wrapper.find('.lineage-panel__manual').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('财务报表按报表行取数')
+  })
+})

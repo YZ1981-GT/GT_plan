@@ -75,6 +75,40 @@ def _ensure_task_belongs(task, project_id: UUID) -> None:
         raise HTTPException(status_code=403, detail="交付物不属于该项目")
 
 
+def _verified_version_path(version) -> Path:
+    """下载前校验版本记录绑定的物理文件（普通下载与 OO 签名下载单一入口）。
+
+    历史固定文件名使后续生成覆盖旧版本：数据库仍保留旧 hash/size，但路径内容已变。此时返回 409，
+    不能把最新内容冒充为历史版本下载。真正缺文件仍是 404。
+    """
+    from app.services import deliverable_service as deliverable_module
+    from app.services.file_fingerprint_service import (
+        FileFingerprintError,
+        FileHashMismatch,
+        FileNotFoundOnDisk,
+        FileSizeMismatch,
+        verify_file_fingerprint,
+    )
+
+    try:
+        verify_file_fingerprint(
+            file_path=version.file_path,
+            expected_size=version.file_size,
+            expected_sha256=version.file_hash,
+            delivery_root=(deliverable_module.STORAGE_ROOT / deliverable_module.DELIVERABLE_SUBDIR),
+        )
+    except FileNotFoundOnDisk as exc:
+        raise HTTPException(status_code=404, detail="文件不存在于存储") from exc
+    except (FileSizeMismatch, FileHashMismatch) as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="该版本文件已被后续生成覆盖（历史缺陷），无法提供原始内容；请下载最新版本",
+        ) from exc
+    except FileFingerprintError as exc:
+        raise HTTPException(status_code=409, detail=f"版本文件校验失败：{exc}") from exc
+    return Path(version.file_path)
+
+
 async def _is_project_eqcr(db: AsyncSession, user_id: UUID, project_id: UUID) -> bool:
     from app.services.eqcr_workbench_service import EqcrWorkbenchService
 
@@ -301,9 +335,7 @@ async def download_version(
     if version is None or not version.file_path:
         raise HTTPException(status_code=404, detail="版本文件不存在")
 
-    file_path = Path(version.file_path)
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="文件不存在于存储")
+    file_path = _verified_version_path(version)
 
     suffix = file_path.suffix.lower()
     media = (
@@ -667,6 +699,24 @@ async def render_disclosure_notes(
     await _guard_action(db, current_user, project_id, DeliverableAction.export)
     dsvc = DeliverableService(db)
 
+    # 🔴 导出前一致性闸门（US-4）：附注是底稿单项推送的只读下游，导出前比对附注与底稿、列出不一致章节。
+    # 不一致且用户未确认 ⇒ 不落交付件、返回待确认清单（HTTP 200，前端据此弹确认框）。在任何 task 变更之前做。
+    from app.models.phase13_schemas import NoteConsistency, NoteConsistencyItem
+    from app.services.deliverable_note_consistency import check_note_consistency
+
+    consistency = await check_note_consistency(
+        db, project_id, body.year, selected_sections=body.selected_sections,
+    )
+    if not consistency["consistent"] and not body.confirm_inconsistent:
+        return DeliverableExportResponse(
+            requires_confirmation=True,
+            consistency=NoteConsistency(
+                confirmed=False,
+                never_synced=[NoteConsistencyItem(**i) for i in consistency["never_synced"]],
+                stale=[NoteConsistencyItem(**i) for i in consistency["stale"]],
+            ),
+        )
+
     from app.models.core import Project
     from app.services.note_section_catalog import (
         normalize_report_scope,
@@ -678,6 +728,7 @@ async def render_disclosure_notes(
     # 不匹配，则 {{section:code}}/{{table:code:N}} 占位符全部匹配失败 → 原始标记泄漏
     # 进交付文档（用户所见"乱"）。故以 Project.template_type 为权威源（与附注编辑器
     # / 附注生成 / 章节编号端点一致），而非 body.template_type（交付件中心默认 "soe"）。
+    # 注：增量刷新已采纳 refresh_rebuild 架构（trio spec），本导出端点保留 NoteWordExporter 路径。
     proj_row = (
         await db.execute(
             sa.select(Project.template_type, Project.report_scope).where(
@@ -761,10 +812,16 @@ async def render_disclosure_notes(
         version_no=store.version.version_no,
         download_url=store.download_url,
         platform_persist_failed=store.platform_persist_failed,
-        file_name=file_name,
+        file_name=Path(store.file_path).name if store.file_path else file_name,
         # 导出时的交付统计（剔除的提示段 / 残留占位 / 报表有余额附注无表 / 未导出章节…）在前，出具前软闸门在后
         warnings=list(getattr(note_meta, "delivery_warnings", None) or []) + await _note_delivery_warnings(
             db, project_id, body.year, body.selected_sections,
+        ),
+        # 一致性闸门结论：本就一致 ⇒ 空清单；用户确认后仍带不一致清单 + confirmed=True（留痕用户知情导出）
+        consistency=NoteConsistency(
+            confirmed=body.confirm_inconsistent and not consistency["consistent"],
+            never_synced=[NoteConsistencyItem(**i) for i in consistency["never_synced"]],
+            stale=[NoteConsistencyItem(**i) for i in consistency["stale"]],
         ),
     )
 
@@ -877,7 +934,7 @@ async def render_financial_reports(
         version_no=store.version.version_no,
         download_url=store.download_url,
         platform_persist_failed=store.platform_persist_failed,
-        file_name=file_name,
+        file_name=Path(store.file_path).name if store.file_path else file_name,
         # 导出提醒（不阻断）：不平衡 / 合计不一致 / 有金额未导出 / 过期 / 无上期来源等
         warnings=list(getattr(exporter, "export_warnings", []) or []),
     )
@@ -1756,19 +1813,16 @@ async def onlyoffice_callback(
     )
     await db.commit()
 
-    # 文档关闭时释放编辑席位（status 2=保存关闭, 4=关闭无修改, 6=强制保存）
+    # 释放编辑席位只在**会话结束**：status 2=保存关闭 / 3=保存错误关闭 / 4=无修改关闭。
     #
-    # 🔴 需求 7.5：占用与释放必须成对。历史实现两处都对不上 ——
-    #   ① key 用 `body["version"]`（OnlyOffice 自己的内部版本号）拼，而占用时用的是
-    #      URL 路径里的平台 version_no；
-    #   ② user 用 `task.created_by` 近似，而占用时用的是 `current_user.id`。
-    # 两处任一不匹配 ⇒ DEL 打空 ⇒ 席位从未释放、全靠 1h TTL 自愈（期间虚占名额）。
+    # 🔴 status 6（强制保存）是「保存但仍在编辑」—— 用户点保存后继续编辑，会话未结束。
+    #    旧实现把 6 也当释放，于是「编辑中点一次保存」立即释放席位，别人就能顶进来共编，
+    #    超出并发上限的意义。6 保持占用，由会话真正结束时的 2/3/4 或 1h TTL 释放。
     #
-    # 正解：回调体的 `key` **就是**我们在 config 里下发的 doc_key（OO 原样回传），
-    # 以它按 doc_key 释放该文档全部席位；缺 key 时才退回确定性派生（此时版本号无从得知，
-    # 只能靠 TTL，但至少不再拼出一个必然错的 key）。
+    # key 校验与定向释放：回调体的 `key` 就是 config 下发的 doc_key（OO 原样回传），
+    # 以它释放该文档全部席位；缺 key 时只能等 TTL（不拼一个必然错的 key）。
     status = body.get("status")
-    if status in (2, 4, 6):
+    if status in (2, 3, 4):
         from app.services.onlyoffice_session_limiter import release_sessions_by_doc_key
 
         doc_key = body.get("key")
@@ -1872,9 +1926,7 @@ async def signed_download_version(
     if version is None or not version.file_path:
         raise HTTPException(status_code=404, detail="版本文件不存在")
 
-    file_path = Path(version.file_path)
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="文件不存在于存储")
+    file_path = _verified_version_path(version)
 
     suffix = file_path.suffix.lower()
     media = (

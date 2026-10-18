@@ -32,9 +32,11 @@
 
         <!-- P2-2: 签发一致性清单 -->
         <div class="gt-psd-section-title" style="margin-top: 16px">签发一致性清单</div>
+        <!-- 年度与本页其余面板一致（清单不再由后端猜年度） -->
         <SignoffChecklist
           v-if="projectId"
           :project-id="projectId"
+          :year="year"
           :user-id="currentUserId"
           :auto-load="true"
           @signoff="onSign"

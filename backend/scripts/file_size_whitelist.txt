@@ -1452,3 +1452,11 @@ backend/app/services/financial_report_drift_service.py  915
 #     2026-10-16 disclosure-note-template-word-realignment Task 17：编制指引回写盖「最近一次编辑」+ 操作人解析（+15 行）。
 #     拆分方向：文件校验 / 差异比对 / 合并决策（纯函数）与落库服务分文件。
 backend/app/services/note_offline_import_service.py  987
+
+#   deliverable_service.py —— 交付中心核心服务（HEAD 前即 735 行，本次未在册 ⇒ 任何改动都被门禁按 800 上限拒）。
+#     2026-10-18 deliverable-writeback-and-online-edit-integrity Task 7/8/9（design §2.1~2.3）：
+#     render_and_store 版本文件完整性收口（任务行 FOR UPDATE 覆盖「取号→落盘→建记录」整段 + versioned_file_name 剥 _v\d+ 再追加 + 历史版本已认领路径拒绝覆盖）、
+#     下载/签名下载共用 _verified_version_path（指纹不符 409 / 缺失 404 / verify_version_immutability 真校验），净增约 170 行至 924（splitlines 口径）。
+#     baseline 取当前真实行数不加余量，门禁从此刻对本文件重新生效（再加一行即打红）。
+#     拆分方向（属独立任务，不在本 spec 验证范围）：把版本/指纹相关（render_and_store / _verified_version_path / versioned_file_name 一组）抽为 deliverable_version_store.py。
+backend/app/services/deliverable_service.py  924

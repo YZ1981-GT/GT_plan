@@ -312,7 +312,12 @@ class EqcrShadowComputeService:
         """
         try:
             if computation_type == "debit_credit_balance":
-                # 从 trial_balance 获取项目组借贷平衡汇总
+                # 从 tb_balance 获取项目组借贷平衡汇总（v1 口径：借方/贷方发生额）。
+                # 🔴 修复（deliverable-writeback-and-online-edit-integrity Phase E）：
+                # 原查 `FROM trial_balance` 的 debit_amount / credit_amount —— 这两列在
+                # trial_balance 不存在（它只有 audited_amount / unadjusted_amount），借贷方发生额在
+                # tb_balance 上。查错表 ⇒ UndefinedColumn，被外层 try/except 吞成 {error} 快照，
+                # 影子计算的 team 侧借贷平衡恒取不到真实值（与 Layer 1 的 tb_balance 口径也一致）。
                 from sqlalchemy import text
                 stmt = text("""
                     SELECT
@@ -321,14 +326,15 @@ class EqcrShadowComputeService:
                         COALESCE(SUM(CASE WHEN credit_amount IS NOT NULL
                             THEN credit_amount ELSE 0 END), 0) as total_credit,
                         COUNT(*) as account_count
-                    FROM trial_balance
+                    FROM tb_balance
                     WHERE project_id = :pid
+                      AND (is_deleted = false OR is_deleted IS NULL)
                 """)
                 result = await self.db.execute(stmt, {"pid": str(project_id)})
                 row = result.fetchone()
                 if row:
                     return {
-                        "source": "trial_balance",
+                        "source": "tb_balance",
                         "total_debit": float(row[0] or 0),
                         "total_credit": float(row[1] or 0),
                         "account_count": int(row[2] or 0),
