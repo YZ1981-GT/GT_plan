@@ -88,6 +88,15 @@ export {
 } from './openFormulaManagerCommand'
 
 export {
+  openFormulaManagerFromLocation,
+  buildLocationFromContext,
+  payloadFromLocation,
+  type FormulaManagerOutletContext,
+  type FormulaManagerOutletScope,
+  type OpenFormulaManagerOutcome,
+} from './openFormulaManagerFromLocation'
+
+export {
   FORMULA_TRUTH_SOURCE_MATRIX,
   FormulaProviderRegistry,
   createDefaultFormulaProviderRegistry,

@@ -256,6 +256,64 @@ def _find_row_by_keyword(rows: list[dict], keyword: str) -> int | None:
     return None
 
 
+def _user_formula_to_def(rec: dict) -> tuple[str, dict] | None:
+    """把一条用户集公式记录（``_user_formulas`` 的 list 元素）归一化为
+    ``_formulas`` dict 条目形态 ``(key, fdef)``。
+
+    用户集 shape（见 note_formula_service._normalize_record）：
+    ``{target, formula, description, category, source, type}``，其中
+    ``target`` 为 ``"row:col"`` 单元格键、``formula`` 为 DSL 表达式。
+    归一化到执行态 ``{type, expression, description, category, source}``。
+
+    无合法 ``target``（非 ``"row:col"``）或无表达式者返回 None（跳过）。
+    """
+    if not isinstance(rec, dict):
+        return None
+    target = str(rec.get("target") or rec.get("target_cell") or "").strip()
+    parts = target.split(":")
+    if len(parts) != 2 or not (parts[0].isdigit() and parts[1].isdigit()):
+        return None
+    expr = rec.get("formula")
+    if expr is None:
+        expr = rec.get("expression")
+    expr = expr.strip() if isinstance(expr, str) else expr
+    if not expr:
+        return None
+    return target, {
+        "type": rec.get("type") or "",
+        "expression": expr,
+        "description": rec.get("description") or "",
+        "category": rec.get("category") or "auto_calc",
+        "source": rec.get("source") or "user_formula",
+        "binding_id": rec.get("binding_id"),
+    }
+
+
+def _merge_formula_sets(
+    template_formulas: dict[str, dict], user_formulas: list | None
+) -> dict[str, dict]:
+    """合并模板预设 ``_formulas`` 与用户集 ``_user_formulas``（ADR-FMC-04）。
+
+    合并口径：
+    - 以 ``"row:col"`` 为目标单元格键做去重合并。
+    - 同键冲突时**用户集优先**（用户公式覆盖同键模板预设）。
+    - 返回单一 dict，供 ``execute_note_formulas`` 对其**统一重算拓扑排序**
+      （调用方对合并集一次性拓扑，而非两套各自排序后拼接）。
+
+    ``user_formulas`` 为 None / 空 / 非 list 时等价于只有模板集（返回其浅拷贝）。
+    """
+    merged: dict[str, dict] = dict(template_formulas or {})
+    if isinstance(user_formulas, list):
+        for rec in user_formulas:
+            conv = _user_formula_to_def(rec)
+            if conv is None:
+                continue
+            key, fdef = conv
+            # 用户集优先：同键直接覆盖模板预设（不是追加第二条）。
+            merged[key] = fdef
+    return merged
+
+
 def _topological_sort_formulas(formulas: dict[str, dict], rows: list[dict]) -> list[str]:
     """拓扑排序公式：被引用的行先执行，引用方后执行。
 
@@ -430,6 +488,13 @@ async def execute_note_formulas(
         formulas = generate_formulas_for_table(table_template, check_presets)
         if formulas:
             td["_formulas"] = formulas
+
+    # 附注权威源收敛（ADR-FMC-04 / Task 4.1）：合并消费 _formulas（模板预设）
+    # 与 _user_formulas（用户集）两键。合并默认口径：同一目标单元格键（"row:col"）
+    # 冲突时**用户集优先**覆盖模板预设；对合并去重后的集合**统一重算拓扑排序**
+    # （不是两套各自排序后拼接），避免对同一单元格产生两次回填或排序抖动。
+    # 合并结果仅用于本次执行，不回写 _formulas / _user_formulas（二者各自语义不变）。
+    formulas = _merge_formula_sets(formulas, td.get("_user_formulas"))
 
     # 预加载跨表数据
     cross_table_data = await _load_cross_table_data(db, project_id, year)

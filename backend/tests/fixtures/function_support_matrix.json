@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "functions": [
+    "TB",
+    "SUM_TB",
+    "ROW",
+    "SUM_ROW",
+    "REPORT",
+    "NOTE",
+    "WP",
+    "PREV",
+    "AUX",
+    "ADJ"
+  ],
+  "executors": [
+    "wp_evaluator",
+    "report_path",
+    "note_executor",
+    "central_batch"
+  ],
+  "matrix": {
+    "TB": {
+      "wp_evaluator": {
+        "supported": true,
+        "reason": null
+      },
+      "report_path": {
+        "supported": true,
+        "reason": null
+      },
+      "note_executor": {
+        "supported": true,
+        "reason": null
+      },
+      "central_batch": {
+        "supported": true,
+        "reason": null
+      }
+    },
+    "SUM_TB": {
+      "wp_evaluator": {
+        "supported": true,
+        "reason": null
+      },
+      "report_path": {
+        "supported": true,
+        "reason": null
+      },
+      "note_executor": {
+        "supported": false,
+        "reason": "附注执行器不解析 SUM_TB（附注表内用 SUM 行区间）"
+      },
+      "central_batch": {
+        "supported": true,
+        "reason": null
+      }
+    },
+    "ROW": {
+      "wp_evaluator": {
+        "supported": true,
+        "reason": null
+      },
+      "report_path": {
+        "supported": true,
+        "reason": null
+      },
+      "note_executor": {
+        "supported": false,
+        "reason": "附注执行器不解析 ROW（跨报表行引用用 REPORT）"
+      },
+      "central_batch": {
+        "supported": true,
+        "reason": null
+      }
+    },
+    "SUM_ROW": {
+      "wp_evaluator": {
+        "supported": true,
+        "reason": null
+      },
+      "report_path": {
+        "supported": true,
+        "reason": null
+      },
+      "note_executor": {
+        "supported": false,
+        "reason": "附注执行器不解析 SUM_ROW"
+      },
+      "central_batch": {
+        "supported": true,
+        "reason": null
+      }
+    },
+    "REPORT": {
+      "wp_evaluator": {
+        "supported": true,
+        "reason": null
+      },
+      "report_path": {
+        "supported": true,
+        "reason": null
+      },
+      "note_executor": {
+        "supported": true,
+        "reason": null
+      },
+      "central_batch": {
+        "supported": true,
+        "reason": null
+      }
+    },
+    "NOTE": {
+      "wp_evaluator": {
+        "supported": true,
+        "reason": null
+      },
+      "report_path": {
+        "supported": true,
+        "reason": null
+      },
+      "note_executor": {
+        "supported": true,
+        "reason": null
+      },
+      "central_batch": {
+        "supported": true,
+        "reason": null
+      }
+    },
+    "WP": {
+      "wp_evaluator": {
+        "supported": true,
+        "reason": null
+      },
+      "report_path": {
+        "supported": true,
+        "reason": null
+      },
+      "note_executor": {
+        "supported": true,
+        "reason": null
+      },
+      "central_batch": {
+        "supported": true,
+        "reason": null
+      }
+    },
+    "PREV": {
+      "wp_evaluator": {
+        "supported": true,
+        "reason": null
+      },
+      "report_path": {
+        "supported": false,
+        "reason": "报表路径对 PREV 恒置 0（上期值走报表 prior 列，非 PREV）"
+      },
+      "note_executor": {
+        "supported": false,
+        "reason": "附注执行器用 PRIOR 取上年附注，不解析 PREV"
+      },
+      "central_batch": {
+        "supported": true,
+        "reason": null
+      }
+    },
+    "AUX": {
+      "wp_evaluator": {
+        "supported": true,
+        "reason": null
+      },
+      "report_path": {
+        "supported": false,
+        "reason": "报表路径对 AUX 恒置 0（辅助核算不进报表求值）"
+      },
+      "note_executor": {
+        "supported": false,
+        "reason": "附注执行器用 AGING 取账龄分桶，不解析 AUX"
+      },
+      "central_batch": {
+        "supported": true,
+        "reason": null
+      }
+    },
+    "ADJ": {
+      "wp_evaluator": {
+        "supported": true,
+        "reason": null
+      },
+      "report_path": {
+        "supported": false,
+        "reason": "报表路径默认不注入实时调整额（走 central_batch 注入）"
+      },
+      "note_executor": {
+        "supported": false,
+        "reason": "附注执行器不解析 ADJ"
+      },
+      "central_batch": {
+        "supported": true,
+        "reason": null
+      }
+    }
+  }
+}

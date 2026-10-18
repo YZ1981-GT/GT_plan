@@ -22,7 +22,7 @@ Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable, Optional
@@ -42,6 +42,7 @@ from app.models.wp_optimization_models import (
 from app.services.formula_engine import FormulaContext
 from app.services.formula_management.engine import (
     FormulaRecord,
+    HintItem,
     IssueItem,
     execute_formula,
 )
@@ -304,11 +305,26 @@ class CrossCheckOutcome:
 
 @dataclass
 class CrossCheckResult:
-    """报表勾稽执行聚合结果。"""
+    """报表勾稽执行聚合结果。
+
+    - ``issues``：logic_check 产出的勾稽不通过项（Issue_List）。
+    - ``hints``：reasonability 产出的提醒项（logic_check 分派一般为空，但执行器
+      若对某条勾稽产出 hint 则在此汇集 —— run/issue/hint 三类产出同一来源）。
+    - ``outcomes``：逐条勾稽执行结果（供前端展示 passed）。
+    - ``executed_count``：本次实际执行的勾稽条数（= len(outcomes)）。``0`` 表示
+      本次没有任何可执行的勾稽（无报表数据 / 无公式定义），Phase 6 Task 6.4 的
+      「0 条」语义据此判定「无结果」而非「成功」。
+    """
 
     issues: list[IssueItem]
     outcomes: list[CrossCheckOutcome]
     last_computed_at: Optional[datetime] = None
+    hints: list[HintItem] = field(default_factory=list)
+
+    @property
+    def executed_count(self) -> int:
+        """本次实际执行的勾稽条数。"""
+        return len(self.outcomes)
 
 
 async def run_cross_checks(
@@ -318,14 +334,19 @@ async def run_cross_checks(
     project_id: str | None = None,
     resolve_refs: bool = True,
 ) -> CrossCheckResult:
-    """在给定 row_cache 上执行 7 条 logic_check 勾稽，聚合 Issue_List。
+    """在给定 row_cache 上执行 7 条 logic_check 勾稽，聚合 Issue_List + Hint_List。
 
     统一走 ``execute_formula``（logic_check 分派）：勾稽不通过 → 追加 Issue，
     **绝不修改任何数据值**。``resolve_refs=True`` 时逐条引用经 ACNR
     ``full_resolve`` 解析（fail-open，不影响取值）。
+
+    除 Issue_List 外同时汇集执行器产出的 Hint_List（reasonability 提醒）——
+    Phase 6 Task 6.4：run/issue/hint 是**同一次执行**的三类产出，须在同一
+    run_id 下一并落库，不能漏采 hint。
     """
     ctx = FormulaContext(row_cache=dict(row_cache))
     issues: list[IssueItem] = []
+    hints: list[HintItem] = []
     outcomes: list[CrossCheckOutcome] = []
     last_computed_at: Optional[datetime] = None
 
@@ -339,6 +360,7 @@ async def run_cross_checks(
         )
         passed = len(result.issues) == 0
         issues.extend(result.issues)
+        hints.extend(result.hints)
         outcomes.append(
             CrossCheckOutcome(
                 formula_id=formula.id,
@@ -351,7 +373,10 @@ async def run_cross_checks(
             last_computed_at = result.last_computed_at
 
     return CrossCheckResult(
-        issues=issues, outcomes=outcomes, last_computed_at=last_computed_at
+        issues=issues,
+        outcomes=outcomes,
+        last_computed_at=last_computed_at,
+        hints=hints,
     )
 
 

@@ -10,7 +10,45 @@
     <div class="gt-fm-container">
       <!-- 左侧：树形导航 -->
       <div class="gt-fm-sidebar">
-        <div class="gt-fm-sidebar-title">数据源</div>
+        <!-- Task 3.2 / ADR-FMC-05：左栏默认只显精确当前 sheet 的 addr_id（当前页 anchors），
+             「全局浏览」是独立显式按钮（不作缺上下文默认回退），缺 location identity 时
+             fail-closed（空集 + 告警，不退全局树）。 -->
+        <div class="gt-fm-sidebar-title">
+          <span v-if="!isCurrentPageContext">数据源</span>
+          <span v-else>{{ leftPanelGlobalBrowse ? '数据源（全局浏览）' : '当前页地址' }}</span>
+          <!-- 「全局浏览」仅在当前页上下文作为独立显式按钮（ADR-FMC-05 AC4）；
+               域级 scope（报表/附注/合并等）本就在浏览整域，不出此切换。 -->
+          <el-button
+            v-if="isCurrentPageContext && leftPanelGlobalBrowse"
+            size="small"
+            link
+            type="primary"
+            class="gt-fm-left-mode-btn"
+            data-testid="formula-left-current-page"
+            title="返回当前页地址（仅显示本 sheet 的坐标）"
+            @click="exitGlobalBrowse"
+          >↩ 当前页</el-button>
+          <el-button
+            v-else-if="isCurrentPageContext"
+            size="small"
+            link
+            type="primary"
+            class="gt-fm-left-mode-btn"
+            data-testid="formula-left-global-browse"
+            title="浏览全平台地址树（跨全部域，非当前页）"
+            @click="enterGlobalBrowse"
+          >🌐 全局浏览</el-button>
+        </div>
+        <!-- 缺当前页身份：fail-closed 显式告警（不列地址、不退全局） -->
+        <el-alert
+          v-if="isCurrentPageContext && !leftPanelGlobalBrowse && leftPanelWarning"
+          :title="leftPanelWarning"
+          type="warning"
+          :closable="false"
+          show-icon
+          data-testid="formula-left-fail-closed"
+          class="gt-fm-left-warning"
+        />
         <el-tree
           ref="fmTreeRef"
           :data="treeData"
@@ -252,7 +290,10 @@
                   <el-button size="small" link style="font-size: 10px; padding: 0 2px;" @click.stop="editFormula += `ROW('')`" title="行次引用">ROW</el-button>
                 </div>
               </div>
+              <!-- Task 1.4：只读投影行禁双击/点击进入编辑（dblclick/click 不绑 startEdit）。 -->
+              <code v-else-if="row.formula && isReadonlyProjectionRow(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); word-break: break-all;" :title="'只读取数/溯源说明'">{{ row.formula }}</code>
               <code v-else-if="row.formula" @dblclick="startEdit(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular); word-break: break-all; cursor: pointer;" :title="'双击编辑公式'">{{ row.formula }}</code>
+              <span v-else-if="isReadonlyProjectionRow(row)" style="color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs);">—</span>
               <span v-else @click="startEdit(row)" style="color: var(--gt-color-text-placeholder); cursor: pointer; font-size: var(--gt-font-size-xs); border: 1px dashed var(--gt-color-border-light); padding: 2px 8px; border-radius: 4px;" title="点击添加公式">
                 + 点击添加公式
               </span>
@@ -309,7 +350,9 @@
           </el-table-column>
           <el-table-column label="来源" width="70" align="center">
             <template #default="{ row }">
-              <span v-if="isPresetFormula(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-teal); background: var(--gt-bg-info); padding: 1px 6px; border-radius: 3px;">预设</span>
+              <!-- Task 1.4：只读投影不得包装成「自定义」正式公式；标「只读」去伪装。 -->
+              <span v-if="isReadonlyProjectionRow(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder);">只读</span>
+              <span v-else-if="isPresetFormula(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-teal); background: var(--gt-bg-info); padding: 1px 6px; border-radius: 3px;">预设</span>
               <span v-else-if="row.formula" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">自定义</span>
             </template>
           </el-table-column>
@@ -321,7 +364,12 @@
           </el-table-column>
           <el-table-column label="操作" width="80" align="center">
             <template #default="{ row }">
-              <el-tooltip v-if="_isRowOwnedByPush(row)" content="此单元格由系统公式推送维护，不可编辑" placement="top">
+              <!-- Task 1.4 / ADR-FMC-02：surfaced/extraction 只读投影 —— 不渲染「编辑」按钮，
+                   仅标「只读」，避免把后端 readonly:true 的说明投影当成可编辑权威公式。 -->
+              <el-tooltip v-if="isReadonlyProjectionRow(row)" content="取数/溯源说明投影，只读不可编辑" placement="top">
+                <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder);">只读</span>
+              </el-tooltip>
+              <el-tooltip v-else-if="_isRowOwnedByPush(row)" content="此单元格由系统公式推送维护，不可编辑" placement="top">
                 <el-button size="small" link disabled>编辑</el-button>
               </el-tooltip>
               <el-button v-else-if="editingId !== row.id" size="small" link type="primary" @click.stop="startEdit(row)">编辑</el-button>
@@ -343,6 +391,16 @@
               <el-button size="small" type="primary" @click="onAddCrossRule">+ 新增规则</el-button>
             </div>
           </div>
+          <!-- Task 6.2（需求 7.5）：执行结果为空且当前节点无规则 → 显式「无结果」，不冒充静态示例 -->
+          <el-alert
+            v-if="crossCheckExecEmpty && !crossCheckRulesForCurrent.length"
+            type="info"
+            :closable="false"
+            show-icon
+            title="无结果"
+            description="本项目当前年度表间审核执行结果为空，且该节点尚无自定义规则。可点「+ 新增规则」添加后执行校验。"
+            style="margin-bottom: 10px;"
+          />
           <el-table :data="crossCheckRulesForCurrent" size="small" border style="width: 100%;"
             max-height="calc(100vh - 300px)"
             :header-cell-style="{ background: '#edf3f9', fontSize: '12px', whiteSpace: 'nowrap' }">
@@ -808,7 +866,36 @@ import {
   SCOPE_LABEL_MAP as SCOPE_CATALOG_LABEL_MAP,
   type FormulaScope,
 } from '@/composables/useFormulaScopeCatalog'
-import { noteSectionToNodeKey, buildNoteFormulaRows, isNoteDomainNodeKey } from './noteScopeTargeting'
+import { noteSectionToNodeKey, buildNoteFormulaRows, isNoteDomainNodeKey, mergeNoteUserFormulaRows, type NoteUserFormula } from './noteScopeTargeting'
+// Task 4.1 / ADR-FMC-04：弹窗附注节点改调 list_note_formulas（含用户编辑集 _user_formulas）。
+import { noteFormula as P_nf } from '@/services/apiPaths/formula'
+import { matchRowToSelectedSheet, sheetCodeEquals } from './sheetIdentityMatch'
+// Task 6.2 / MEDIUM-2：表间审核树 key ↔ 规则 map key 单一生成函数（需求 7.4）。
+import {
+  CROSS_CHECK_DOMAINS,
+  CROSS_CHECK_NODE_KEYS,
+  crossCheckNodeKey,
+} from './crossCheckKey'
+// Task 6.3（需求 10.1/10.2/10.4）：缓存按 project key 隔离 + 陈旧响应守卫 + 保存年份口径单一真源。
+import {
+  projectCacheKey,
+  cacheKeyMatches,
+  shouldApplyResponse,
+  resolveSaveYear,
+} from './projectCacheKey'
+// Task 1.4 / ADR-FMC-02：公式行 kind 分类 + 只读判定 + 保存端点分派单一真源。
+import {
+  isReadonlyProjectionRow,
+  resolveSaveDispatch,
+} from './formulaRowKind'
+// Task 1.5 / ADR-FMC-02 改动点③：wp 公式行契约字段（category/description）映射单一真源。
+import { mapWpItemToRowFields } from './wpFormulaFields'
+// Task 3.2 / ADR-FMC-05：左栏当前页 anchors + fail-closed 告警 + location identity 单一真源。
+import {
+  loadCurrentSheetLeftPanel,
+  type LeftPanelAnchorNode,
+  type LocationIdentity,
+} from './leftPanelAnchors'
 
 /**
  * scope：当前公式管理器的目标范围
@@ -1216,6 +1303,16 @@ function normalizeTemplateType(t?: string): 'soe' | 'listed' {
 }
 const fmTemplateType = ref<string>(normalizeTemplateType(props.templateType))
 
+// Task 6.3（需求 10.1）：当前上下文的项目隔离缓存键（project + 模板版本 + 年度）。
+// report/note/cross-check 三个加载态都以它为准判缓存命中；切项目后此键变化 → 旧缓存失效。
+const currentProjectCacheKey = computed(() =>
+  projectCacheKey({
+    projectId: props.projectId,
+    templateType: fmTemplateType.value,
+    year: props.year,
+  }),
+)
+
 // 当前 scope 对应的中文 tag（仅展示用，不影响树形导航行为）
 const SCOPE_LABEL_MAP: Record<FormulaManagerScope, string> = {
   note: '单体附注',
@@ -1247,17 +1344,24 @@ function allowTreeDrop(draggingNode: any, dropNode: any, type: string) {
 // ── 动态附注树（从项目实际附注章节加载，项目不同内容不同） ──
 const noteTreeChildren = ref<any[]>([])
 const noteTreeLoaded = ref(false)
+// Task 6.3（需求 10.1）：缓存命中记录的项目键。切项目后与 currentProjectCacheKey 不等 → 失效。
+const noteTreeCacheKey = ref<string | null>(null)
 
 async function loadNoteTree() {
-  if (noteTreeLoaded.value) return
+  // 缓存按 project key 隔离：仅当已加载且缓存键 == 当前键才复用（切项目后判未命中、重新加载）。
+  if (noteTreeLoaded.value && cacheKeyMatches(noteTreeCacheKey.value, currentProjectCacheKey.value)) return
+  // 本次请求绑定发起时的项目键；响应回来若已切项目则丢弃（旧响应不覆盖新项目，需求 10.1）。
+  const reqKey = currentProjectCacheKey.value
   try {
     // 优先从项目级附注 API 加载（项目不同结构不同）
     if (props.projectId && props.year) {
       const { getDisclosureNoteTree } = await import('@/services/auditPlatformApi')
       const notes = await getDisclosureNoteTree(props.projectId, Number(props.year))
+      if (!shouldApplyResponse(reqKey, currentProjectCacheKey.value)) return
       if (Array.isArray(notes) && notes.length) {
         noteTreeChildren.value = buildNoteTreeFromProjectData(notes)
         noteTreeLoaded.value = true
+        noteTreeCacheKey.value = reqKey
         return
       }
     }
@@ -1265,6 +1369,7 @@ async function loadNoteTree() {
     const data = await api.get(P_nt.list(fmTemplateType.value), {
       validateStatus: (s: number) => s < 600,
     })
+    if (!shouldApplyResponse(reqKey, currentProjectCacheKey.value)) return
     const sections = data ?? []
     if (!Array.isArray(sections) || !sections.length) return
 
@@ -1324,6 +1429,7 @@ async function loadNoteTree() {
     }
     noteTreeChildren.value = result
     noteTreeLoaded.value = true
+    noteTreeCacheKey.value = reqKey
   } catch { /* ignore, fallback to static tree */ }
 }
 
@@ -1536,14 +1642,20 @@ const reportTypes = ref<Array<{ type: string; label: string; count: number }>>(
   Object.entries(REPORT_SUBTYPE_LABELS_FALLBACK).map(([type, label]) => ({ type, label, count: 0 }))
 )
 const reportTypesLoaded = ref(false)
+// Task 6.3（需求 10.1）：报表类型缓存命中记录的项目键。
+const reportTypesCacheKey = ref<string | null>(null)
 
 async function loadReportTypes() {
-  if (reportTypesLoaded.value) return
+  // 缓存按 project key 隔离：切项目后缓存键不等 → 判未命中、重新加载（需求 10.1）。
+  if (reportTypesLoaded.value && cacheKeyMatches(reportTypesCacheKey.value, currentProjectCacheKey.value)) return
+  const reqKey = currentProjectCacheKey.value
   try {
     const data = await api.get('/api/report-config/types', {
       params: { project_id: props.projectId },
       _silent: true,  // 404 不弹全局错误 toast
     } as any)
+    // 旧项目的 late response 不覆盖新项目结果（需求 10.1）。
+    if (!shouldApplyResponse(reqKey, currentProjectCacheKey.value)) return
     const items = Array.isArray(data) ? data : (data?.data ?? [])
     if (Array.isArray(items) && items.length) {
       reportTypes.value = items.map((r: any) => ({
@@ -1552,19 +1664,89 @@ async function loadReportTypes() {
         count: r.formula_count ?? 0,
       }))
       reportTypesLoaded.value = true
+      reportTypesCacheKey.value = reqKey
       return
     }
   } catch { /* 降级到静态 */ }
+  if (!shouldApplyResponse(reqKey, currentProjectCacheKey.value)) return
   // 降级：API 不可用时用静态
   reportTypes.value = Object.entries(REPORT_SUBTYPE_LABELS_FALLBACK).map(([type, label]) => ({
     type, label, count: countFormulas(type),
   }))
   reportTypesLoaded.value = true
+  reportTypesCacheKey.value = reqKey
 }
 
 // ACNR sheet 列表缓存（从 useAcnr 加载）
 const acnrSheets = shallowRef<AcnrSheetEntry[]>([])
 const acnrTreeLoaded = ref(false)
+
+// ── Task 3.2 / ADR-FMC-05：左栏当前页 anchors 状态 ──
+// 「当前页上下文」= 从某张底稿实例页打开（props.wpId 存在或 scope='workpaper'）。
+// 此上下文左栏默认只显精确当前 sheet 的 anchors（缺身份 fail-closed）。报表/附注/试算表/
+// 合并等域级 scope 没有单一当前 sheet，属域级浏览，仍走全局域树（非「缺上下文回退」，
+// 而是这些 scope 本就在浏览整域）。
+const isCurrentPageContext = computed(() => !!props.wpId || props.scope === 'workpaper')
+// 默认模式 = 当前页 anchors（只显精确当前 sheet 的 addr_id）；leftPanelGlobalBrowse=true
+// 时才切换到全局五域树（显式「全局浏览」按钮触发，非缺上下文默认回退）。
+const leftPanelGlobalBrowse = ref(false)
+// 当前页 anchors 节点（current-sheet 模式的左栏数据）；每行带同一 location identity。
+const currentSheetAnchors = shallowRef<LeftPanelAnchorNode[]>([])
+// fail-closed 告警文案（缺当前页身份时非空；current-sheet / global-browse 为空串）。
+const leftPanelWarning = ref('')
+// 命中的当前页 location identity（左右栏对齐用；current-sheet 有值）。
+const currentPageIdentity = shallowRef<LocationIdentity | null>(null)
+
+/** 当前页 location identity（project_id + wp_id + sheet_uid=解析后结构化 sheet_code）。 */
+function currentLocationIdentity(): Partial<LocationIdentity> {
+  return {
+    projectId: props.projectId || '',
+    wpId: props.wpId || '',
+    sheetUid: selectedWpSheetCode.value || '',
+  }
+}
+
+/**
+ * 加载左栏当前页 anchors（Task 3.2 默认行为）。
+ * identity 完整 → 调当前 sheet anchors（useAcnr().listCells = GET /api/acnr/anchors），
+ * 只显精确当前 sheet 的 addr_id；identity 不完整 → fail-closed（空集 + 告警，不退全局树）。
+ */
+async function loadCurrentSheetAnchors() {
+  const identity = currentLocationIdentity()
+  // sheet_uid 口径 = 解析后的结构化 sheet_code（selectedWpSheetCode）；wp_code 用于拼 anchors 命名空间。
+  const wpCode = props.wpCode || selectedWpCode.value || ''
+  const sheet = selectedWpSheetCode.value || ''
+  // Task 6.3（需求 10.4）：ACNR listCells 是 **项目级** GET（useAcnr(props.projectId)）。
+  // 记录发起时的项目键；若 await 期间切了项目（含 http 去重取消→重发的 abort 后重发场景），
+  // 丢弃旧响应、不写入新项目的左栏状态，避免跨项目陈旧上下文污染。
+  const reqKey = currentProjectCacheKey.value
+  const result = await loadCurrentSheetLeftPanel(identity, async () => {
+    if (!wpCode || !sheet) return []
+    try {
+      return await useAcnr(props.projectId).listCells(wpCode, sheet)
+    } catch (e) {
+      console.warn('[FormulaManager] 当前页 anchors 加载失败', e)
+      return []
+    }
+  })
+  if (!shouldApplyResponse(reqKey, currentProjectCacheKey.value)) return
+  currentSheetAnchors.value = result.nodes
+  leftPanelWarning.value = result.warning
+  currentPageIdentity.value = result.identity
+}
+
+/** 显式进入全局浏览（独立按钮触发，非缺上下文默认回退）。 */
+async function enterGlobalBrowse() {
+  leftPanelGlobalBrowse.value = true
+  leftPanelWarning.value = ''
+  await loadAcnrTree()
+}
+
+/** 退回当前页地址模式（重新加载当前页 anchors）。 */
+async function exitGlobalBrowse() {
+  leftPanelGlobalBrowse.value = false
+  await loadCurrentSheetAnchors()
+}
 
 async function loadAcnrTree() {
   if (acnrTreeLoaded.value) return
@@ -1632,6 +1814,15 @@ function buildWpDomainTree(sheets: AcnrSheetEntry[]) {
 }
 
 const treeData = computed(() => {
+  // Task 3.2 / ADR-FMC-05：当前页上下文（底稿实例页）左栏默认只显精确当前 sheet 的 anchors。
+  //   - current-sheet 模式：返回当前页 anchors 节点（每行带 location identity）。
+  //   - fail-closed（缺当前页身份）：空集（告警已由 leftPanelWarning 独立显示，不退全局树）。
+  // 域级浏览上下文（报表/附注/试算表/合并等 scope，无单一当前 sheet）与用户显式点
+  // 「全局浏览」(leftPanelGlobalBrowse=true) 时，才构建下方全局五域树。
+  if (isCurrentPageContext.value && !leftPanelGlobalBrowse.value) {
+    return currentSheetAnchors.value
+  }
+
   // ACNR 五域树（动态，来自 catalog；与地址坐标名称库一致）
   const acnrDrivenTree: any[] = []
 
@@ -1725,13 +1916,14 @@ const treeData = computed(() => {
     ],
   })
 
-  // 表间审核
+  // 表间审核（Task 6.2 / MEDIUM-2：父节点 key 一律经 crossCheckNodeKey 生成，
+  // 与 crossCheckRulesMap 的 key 同源——避免树 key 与规则 map key 偏移致右栏恒空）
   acnrDrivenTree.push({
     key: 'cross_check', label: '表间审核', icon: '🔗', children: [
-      { key: 'cross_report_note', label: '报表 ↔ 附注', icon: '🔄', children: crossCheckItems.value.report_note },
-      { key: 'cross_report_wp', label: '报表 ↔ 底稿', icon: '🔄', children: crossCheckItems.value.report_wp },
-      { key: 'cross_note_wp', label: '附注 ↔ 底稿', icon: '🔄', children: crossCheckItems.value.note_wp },
-      { key: 'cross_consol', label: '合并 ↔ 报表', icon: '🔄', children: [
+      { key: crossCheckNodeKey('report_note'), label: '报表 ↔ 附注', icon: '🔄', children: crossCheckItems.value.report_note },
+      { key: crossCheckNodeKey('report_wp'), label: '报表 ↔ 底稿', icon: '🔄', children: crossCheckItems.value.report_wp },
+      { key: crossCheckNodeKey('note_wp'), label: '附注 ↔ 底稿', icon: '🔄', children: crossCheckItems.value.note_wp },
+      { key: crossCheckNodeKey('consol'), label: '合并 ↔ 报表', icon: '🔄', children: [
         { key: 'cross_cr_1', label: '合并抵消分录 ↔ 合并试算表', icon: '📌' },
         { key: 'cross_cr_2', label: '模拟权益法 ↔ 净资产表', icon: '📌' },
         { key: 'cross_cr_3', label: '资本公积变动 ↔ 合并报表', icon: '📌' },
@@ -1766,61 +1958,122 @@ const crossCheckItems = ref<Record<string, any[]>>({
   note_wp: [],
 })
 const crossCheckLoaded = ref(false)
+// Task 6.3（需求 10.1）：表间审核缓存命中记录的项目键。
+const crossCheckCacheKey = ref<string | null>(null)
+// Task 6.2（需求 7.5）：执行结果为空时显式「无结果」（不以静态示例冒充）。
+const crossCheckExecEmpty = ref(false)
 
+/**
+ * Task 6.2（需求 7.1/7.2/7.5）：加载表间审核执行结果 + 用户落库规则。
+ *
+ * 🔴 三处修复：
+ *  ① **GET 带 `year`**（项目年）——后端 `run_report_cross_check` 的 `year` 必填，
+ *     历史实现不传 → 恒 422 → 降级静态示例（需求 7.1）。
+ *  ② **按「执行结果」解析**——响应是 `{issue_list, results, last_computed_at}`
+ *     的执行结果（7 条 logic_check 勾稽的 passed/描述），**不是规则列表**。
+ *     历史实现按 `data.rules/items` 误解析、恒拿不到 → 降级静态（需求 7.2）。
+ *  ③ **空结果显式「无结果」**——执行结果为空（0 条）不以静态示例冒充（需求 7.5）。
+ */
 async function loadCrossCheckItems() {
-  if (crossCheckLoaded.value || !props.projectId) return
-  try {
-    const data = await api.get(projectFormula.reportCrossCheck(props.projectId), {
-      _silent: true,  // 404 不弹全局错误 toast
-    } as any)
-    const rules: any[] = Array.isArray(data) ? data : (data?.data?.rules ?? data?.data?.items ?? data?.rules ?? data?.items ?? [])
-    if (rules.length) {
-      // 按勾稽类型分组（source_domain ↔ target_domain）
-      const grouped: Record<string, any[]> = { report_note: [], report_wp: [], note_wp: [] }
-      for (const rule of rules) {
-        const src = rule.source_domain || rule.source_type || ''
-        const tgt = rule.target_domain || rule.target_type || ''
-        const label = rule.description || rule.label || `${rule.source_label || src} = ${rule.target_label || tgt}`
-        const item = {
-          key: `cross_${rule.id || rule.rule_id || Math.random().toString(36).slice(2, 8)}`,
-          label,
-          icon: rule.status === 'pass' ? '✅' : rule.status === 'fail' ? '❌' : '📌',
-          _ruleId: rule.id || rule.rule_id,
-          _status: rule.status,
+  // 缓存按 project key 隔离：切项目后缓存键不等 → 判未命中、重新加载（需求 10.1）。
+  if ((crossCheckLoaded.value && cacheKeyMatches(crossCheckCacheKey.value, currentProjectCacheKey.value)) || !props.projectId) return
+  const reqKey = currentProjectCacheKey.value
+  // ① GET 带 year（缺 year 后端必 422；无 year 则不请求，显式无结果而非静态示例）
+  if (props.year != null) {
+    try {
+      const data = await api.get(projectFormula.reportCrossCheck(props.projectId), {
+        params: { year: Number(props.year) },  // Task 6.2 ①：必传 year
+        _silent: true,  // 404/422 不弹全局错误 toast
+        validateStatus: (s: number) => s < 600,
+      } as any)
+      // 旧项目的 late response 不覆盖新项目结果（需求 10.1 / 10.4 abort 后重发污染）。
+      if (!shouldApplyResponse(reqKey, currentProjectCacheKey.value)) return
+      // ② 按执行结果解析：results = [{formula_id, description, expression, passed}]
+      const results: any[] = Array.isArray(data?.results)
+        ? data.results
+        : (Array.isArray(data?.data?.results) ? data.data.results : [])
+      if (results.length) {
+        // 执行结果是报表勾稽（report ↔ note/wp），统一归入 report_note 分组展示；
+        // passed → ✅、未通过 → ❌。每条 key 由 formula_id 稳定生成（不随机）。
+        const items = results.map((o: any) => ({
+          key: `cross_exec_${o.formula_id}`,
+          label: o.description || o.formula_id,
+          icon: o.passed === true ? '✅' : o.passed === false ? '❌' : '📌',
+          _formulaId: o.formula_id,
+          _passed: o.passed,
+        }))
+        crossCheckExecEmpty.value = false
+        crossCheckItems.value = {
+          report_note: items,
+          report_wp: [],
+          note_wp: [],
         }
-        // 分类到对应分组
-        if ((src === 'report' && tgt === 'note') || (src === 'note' && tgt === 'report')) {
-          grouped.report_note.push(item)
-        } else if ((src === 'report' && tgt === 'wp') || (src === 'wp' && tgt === 'report')) {
-          grouped.report_wp.push(item)
-        } else if ((src === 'note' && tgt === 'wp') || (src === 'wp' && tgt === 'note')) {
-          grouped.note_wp.push(item)
-        } else {
-          // 无法分类的放到 report_note（兜底）
-          grouped.report_note.push(item)
+        crossCheckLoaded.value = true
+        crossCheckCacheKey.value = reqKey
+        await loadCrossCheckUserRules()
+        return
+      }
+    } catch { /* 落到下方「无结果」分支 */ }
+  }
+  if (!shouldApplyResponse(reqKey, currentProjectCacheKey.value)) return
+  // ③ 空结果 / 无 year / 请求失败：显式「无结果」，不以静态示例冒充（需求 7.5）
+  crossCheckExecEmpty.value = true
+  crossCheckItems.value = { report_note: [], report_wp: [], note_wp: [] }
+  crossCheckLoaded.value = true
+  crossCheckCacheKey.value = reqKey
+  await loadCrossCheckUserRules()
+}
+
+/**
+ * Task 6.2（需求 7.3）：从后端读取用户落库的表间审核规则，覆盖到
+ * `crossCheckRulesMap`（按树节点 key 分组）。关闭再打开弹窗后仍可见。
+ */
+async function loadCrossCheckUserRules() {
+  if (!props.projectId) return
+  try {
+    const data: any = await api.get(projectFormula.crossCheckRules(props.projectId), {
+      _silent: true,
+      validateStatus: (s: number) => s < 600,
+    } as any)
+    const rules = data?.rules ?? data?.data?.rules ?? null
+    if (rules && typeof rules === 'object') {
+      for (const [nodeKey, nodeRules] of Object.entries(rules)) {
+        if (Array.isArray(nodeRules)) {
+          crossCheckRulesMap.value[nodeKey] = (nodeRules as any[]).map((r) => ({
+            label: r.label || '',
+            left_ref: r.left_ref || '',
+            operator: r.operator || '=',
+            right_ref: r.right_ref || '',
+            description: r.description || '',
+            _editing: false,
+          }))
         }
       }
-      crossCheckItems.value = grouped
-      crossCheckLoaded.value = true
-      return
     }
-  } catch { /* 降级到静态 */ }
-  // 降级：API 不可用时使用静态示例
-  crossCheckItems.value = {
-    report_note: [
-      { key: 'cross_rn_1', label: 'BS货币资金 = 附注货币资金合计', icon: '📌' },
-      { key: 'cross_rn_2', label: 'BS应收账款 = 附注应收账款合计', icon: '📌' },
-      { key: 'cross_rn_3', label: 'IS营业收入 = 附注营业收入合计', icon: '📌' },
-    ],
-    report_wp: [
-      { key: 'cross_rw_1', label: 'BS货币资金 = E1-1审定数', icon: '📌' },
-      { key: 'cross_rw_2', label: 'BS应收账款 = D2-1审定数', icon: '📌' },
-    ],
-    note_wp: [
-      { key: 'cross_nw_1', label: '附注货币资金 = E1-1审定数', icon: '📌' },
-    ],
+  } catch { /* 读失败保留内存默认（含静态种子），不阻断 */ }
+}
+
+/** Task 6.2（需求 7.3）：把当前节点的规则集整体 PUT 落库（新增/编辑/删除后调用）。 */
+async function persistCrossCheckRules() {
+  if (!props.projectId) return
+  // 只落库用户可编辑契约字段（剔除 _editing 等 UI 瞬态字段）。
+  const payload: Record<string, any[]> = {}
+  for (const [nodeKey, nodeRules] of Object.entries(crossCheckRulesMap.value)) {
+    payload[nodeKey] = (nodeRules || []).map((r) => ({
+      label: r.label || '',
+      left_ref: r.left_ref || '',
+      operator: r.operator || '=',
+      right_ref: r.right_ref || '',
+      description: r.description || '',
+    }))
   }
-  crossCheckLoaded.value = true
+  try {
+    await api.put(projectFormula.crossCheckRules(props.projectId), { rules: payload }, {
+      validateStatus: (s: number) => s < 600,
+    } as any)
+  } catch (e: any) {
+    handleApiError(e, '表间审核规则保存失败')
+  }
 }
 
 // ── 数据加载 ──
@@ -1832,6 +2085,40 @@ const showFormulaImport = ref(false)
 const formulaResults = ref<Record<string, { value: number | null; trace: any[] }>>({})
 
 const notePresetFormulas = ref<any[]>([])
+
+// Task 4.1 / ADR-FMC-04：当前选中附注章节的用户编辑集公式（来自 list_note_formulas，
+// 含 table_data._user_formulas）。按 section 缓存最近一次加载结果，避免切节点时串章。
+const noteUserFormulas = ref<NoteUserFormula[]>([])
+const noteUserFormulasSection = ref<string>('')
+
+/**
+ * Task 4.1 / ADR-FMC-04：加载指定附注章节的用户编辑集公式（list_note_formulas）。
+ *
+ * 弹窗附注节点此前只读模板预设（notePresetFormulas）、看不到用户在附注页保存的公式。
+ * 此处补齐：有 projectId/year/sectionId 时调 `GET list_note_formulas`，把用户集并入显示。
+ * 缺上下文（章级节点 / 无 sectionId）时清空用户集，不串到别的章节。
+ */
+async function loadNoteUserFormulas(sectionId: string): Promise<void> {
+  const sid = (sectionId || '').trim()
+  if (!props.projectId || !props.year || !sid) {
+    noteUserFormulas.value = []
+    noteUserFormulasSection.value = ''
+    return
+  }
+  if (noteUserFormulasSection.value === sid && noteUserFormulas.value.length) return
+  try {
+    const data = await api.get<{ formulas?: NoteUserFormula[] }>(
+      P_nf.list(props.projectId, Number(props.year), sid),
+      { validateStatus: (s: number) => s < 600 },
+    )
+    noteUserFormulas.value = Array.isArray(data?.formulas) ? data.formulas : []
+    noteUserFormulasSection.value = sid
+  } catch {
+    // 用户集加载失败不阻断：保持预设行可见
+    noteUserFormulas.value = []
+    noteUserFormulasSection.value = ''
+  }
+}
 
 // ── 底稿(wp)节点公式：从 GET /api/workpapers/{wp_id}/formulas 加载（含 wp_formula 网格公式、
 //    专属组件取数公式 surfaced、D-cycle 四表提取 extraction）。此前底稿节点无加载分支恒空。 ──
@@ -1927,23 +2214,23 @@ function normalizeWpSheetCode(sheetName: string, _wpCode: string): string {
   return normalizeWpCode(sheetName)
 }
 
-function normalizeSheetToken(value: string): string {
-  return normalizeWpCode(value).replace(/^wp-|^sheet-/, '')
-}
+// 右栏「当前页公式」sheet 归属匹配：结构化精确等值 + fail-closed（Task 1.2 / ADR-FMC-01）。
+// 旧 matchSheetCode 的 `a.includes(b) || b.includes(a)` 子串匹配致 E1-1 串入 E1-10/14/15、
+// D2-1 串入 D2-10/12 —— 已删除，替换为 sheetIdentityMatch.ts 的结构化精确等值。
 
-function matchSheetCode(actual: string, expected: string): boolean {
-  const a = normalizeSheetToken(actual)
-  const b = normalizeSheetToken(expected)
-  if (!a || !b) return false
-  return a === b || a.includes(b) || b.includes(a)
-}
-
-function matchesWpExtractionSheet(row: any, sheetCode: string, wpCode: string): boolean {
+function matchesWpExtractionSheet(row: any, sheetCode: string, _wpCode: string): boolean {
   if (!sheetCode) return true
-  if (row?.sheet_name) return matchSheetCode(String(row.sheet_name), sheetCode)
-  // 兼容部分 D 循环 extractor 只给 anchor（如 D6-1-tb-amount）而无 sheet_name。
+  // 优先用结构身份（stable_sheet_key / sheet_codes / sheet_name）做精确等值匹配。
+  if (row?.stable_sheet_key || (Array.isArray(row?.sheet_codes) && row.sheet_codes.length) || row?.sheet_name) {
+    return matchRowToSelectedSheet(row, sheetCode)
+  }
+  // 兼容部分 D 循环 extractor 只给 anchor（如 D6-1-tb-amount）而无 sheet_name：
+  // 结构化前缀归属（anchor === code 或 anchor 以 `code-` 开头），用边界锚定避免
+  // `D6-10-...` 被 `D6-1` 子串串页（禁 includes）。
   const anchor = normalizeWpCode(String(row?.anchor || row?.target_cell || ''))
-  return !!anchor && (anchor.startsWith(normalizeWpCode(sheetCode)) || anchor.includes(normalizeWpCode(sheetCode)))
+  const code = normalizeWpCode(sheetCode)
+  if (!anchor || !code) return false
+  return anchor === code || anchor.startsWith(`${code}-`)
 }
 
 /** 宿主 render-config 下发的 sheet 集（归一化）；未下发时为空集 = 退回前缀口径。 */
@@ -2018,8 +2305,9 @@ function resolveWpSheetNode(wpCode: string, sheetName: string): any | null {
   const normalizeCode = (value: string) => (value || '').trim().toLowerCase().replace(/—/g, '-').replace(/_/g, '-')
   const requestedCode = normalizeCode(wpCode)
 
-  const workpaper = treeData.value.find((n) => keyOf(n) === 'workpaper')
-  const roots: any[] = workpaper?.children?.length ? workpaper.children : []
+  // Task 3.2：sheet 解析源独立于左栏显示模式 —— 直接从 ACNR catalog 构建 wp 域树，
+  // 不读 treeData（默认模式下 treeData 已是当前页 anchors，不含全局 wp 树）。
+  const roots: any[] = acnrSheets.value.length ? buildWpDomainTree(acnrSheets.value) : []
   if (!roots.length) return null
   if (!wpCode) return null
 
@@ -2084,16 +2372,24 @@ async function loadWpFormulas(wpCode: string, sheetCode: string) {
       // sheet_name 是自由字符串（可能是中文页名或编码），故用「编码相等 OR 编码包含」
       // 双口径，避免严格相等把中文页名的公式误滤掉。
       if (sheetCode) {
-        const sc = normalizeWpSheetCode(sheetCode, wpCode)
-        const sn = normalizeWpSheetCode(String(it.sheet_name || ''), wpCode)
-        // 双口径：编码相等 OR 双向包含。items 的 sheet_name 是自由字符串（可能存中文页名），
-        // 严格相等会把中文页名的公式误滤掉；无 sheet 标识的行无法归属到具体页，本页视图下丢弃。
-        if (!sn || !matchSheetCode(sn, sc)) continue
+        // 结构化精确等值 + fail-closed（Task 1.2 / ADR-FMC-01）：按 stable_sheet_key /
+        // sheet_name 结构身份精确归属当前 sheet，禁 includes 子串串页；缺可解析结构身份的行
+        // 本页视图下排除（fail-closed，不退回 includes）。
+        if (!matchRowToSelectedSheet(it, sheetCode)) continue
       }
       rows.push({
         id: it.id, row_code: it.target_cell || it.sheet_name || '', row_name: it.sheet_name || '',
-        formula: it.formula || it.expression || '', formula_category: it.formula_category || '取数',
-        formula_description: it.formula_description || '', formula_source: '底稿公式(wp_formula)',
+        formula: it.formula || it.expression || '',
+        // Task 1.5 / ADR-FMC-02 改动点③（§1 #2b）：wp_formula item 的契约字段是
+        // `category`/`description`（后端 _formula_to_dict 实测），旧代码误读
+        // `it.formula_category`/`it.formula_description`（恒 undefined → 落兜底，分类/说明错位）。
+        // 经 mapWpItemToRowFields 从契约字段正确映射进内部行键。
+        ...mapWpItemToRowFields(it),
+        formula_source: '底稿公式(wp_formula)',
+        // Task 1.4：保留回源字段，供保存链按 kind 分派到 wpFormula.upsert 组装请求体
+        // （PUT /api/workpapers/{wp_id}/formulas 需 sheet_name/target_cell/expression）。
+        sheet_name: it.sheet_name || '', target_cell: it.target_cell || '',
+        stable_sheet_key: it.stable_sheet_key || null,
       })
     }
     // surfaced 按选中 sheet 过滤：条目带 sheet_codes（归属 sheet 列表）时，仅在选中该 sheet
@@ -2101,10 +2397,9 @@ async function loadWpFormulas(wpCode: string, sheetCode: string) {
     for (const s of (data?.surfaced || [])) {
       const scs = s.sheet_codes
       if (sheetCode) {
-        const sc = normalizeWpSheetCode(sheetCode, wpCode)
-        // 条目带 sheet_codes（归属 sheet 列表）时，仅在选中该 sheet 时显示；
-        // 无 sheet_codes（工作簿级）恒显示，避免误把全局公式算成本页。
-        if (Array.isArray(scs) && scs.length && !scs.some((c: string) => matchSheetCode(c, sc))) continue
+        // 条目带 sheet_codes（结构化归属 sheet 列表）时，仅在某编码与选中 sheet 精确等值
+        // 时显示（禁 includes，避免 E1-1 串入 E1-10）；无 sheet_codes（工作簿级）恒显示。
+        if (Array.isArray(scs) && scs.length && !scs.some((c: string) => sheetCodeEquals(c, sheetCode))) continue
       }
       rows.push({ ...s })
     }
@@ -2228,6 +2523,8 @@ async function applyTargetNode(explicitTarget?: string): Promise<boolean> {
 async function applyNoteScopeTarget() {
   await loadNoteTree()
   const sectionId = (props.noteSection || '').trim()
+  // Task 4.1 / ADR-FMC-04：定位到本页章节前先加载其用户编辑集公式（list_note_formulas）。
+  if (sectionId) void loadNoteUserFormulas(sectionId)
   if (sectionId) {
     const hit = await applyTargetNode(noteSectionToNodeKey(sectionId))
     if (hit) return
@@ -2331,6 +2628,15 @@ watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () 
     wpFormulaRows.value = []
     wpFormulaError.value = ''
     wpSheetLocateMiss.value = ''
+    // Task 3.2 / ADR-FMC-05：每次打开回到默认「当前页地址」模式（非全局浏览）。
+    leftPanelGlobalBrowse.value = false
+    currentSheetAnchors.value = []
+    leftPanelWarning.value = ''
+    currentPageIdentity.value = null
+    // Task 6.2（需求 7.3）：每次打开重置表间审核加载态，以便重新拉取执行结果与
+    // 用户落库规则（关闭再打开仍可见已保存的规则）。
+    crossCheckLoaded.value = false
+    crossCheckExecEmpty.value = false
     if (props.wpId || props.scope === 'workpaper') {
       selectedWpCode.value = props.wpCode || ''
       selectedWpSheetCode.value = ''
@@ -2382,9 +2688,14 @@ watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () 
         await nextTick()
         try { fmTreeRef.value?.setCurrentKey(selectedNodeKey.value) } catch { /* ignore */ }
       }
+      // Task 3.2 / ADR-FMC-05：左栏默认加载当前页 anchors（selectedWpSheetCode 已解析为
+      // 当前页结构化 sheet_code；缺 identity 时 loadCurrentSheetAnchors 内部 fail-closed）。
+      await loadCurrentSheetAnchors()
       await loadWpFormulas(selectedWpCode.value, selectedWpSheetCode.value)
       return
     }
+    // 非 wp 入口（报表/附注/tb/合并）为域级浏览上下文：左栏走全局域树（见 treeData），
+    // 不属于「缺当前页身份」范畴，故不在此加载当前页 anchors。
     selectedNodeKey.value = 'report_balance_sheet'
     selectedPath.value = '报表 > 资产负债表'
     // 同步 scope 到 sessionStorage（与 ThreeColumnLayout 全局入口保持一致）
@@ -2511,6 +2822,8 @@ function onTreeNodeClick(data: any) {
       if (!notePresetFormulas.value.length) {
         onImportPresetFormulas()
       }
+      // Task 4.1 / ADR-FMC-04：选中具体附注章节 → 加载其用户编辑集公式（list_note_formulas）。
+      loadNoteUserFormulas(data._sectionId || '')
     } else if (data.key.startsWith('wp_')) {
       selectedPath.value = `底稿 > ${data.label}`
       selectedWpCode.value = data._wpCode || ''
@@ -2582,8 +2895,8 @@ const currentRows = computed(() => {
     const rt = activeReportType.value
     return allRowsMap.value[rt] || []
   }
-  // 附注节点：显示该章节的预设公式
-  if (isNoteDomainNodeKey(selectedNodeKey.value) && notePresetFormulas.value.length) {
+  // 附注节点：显示该章节的预设公式（含用户编辑集，Task 4.1 / ADR-FMC-04）
+  if (isNoteDomainNodeKey(selectedNodeKey.value) && (notePresetFormulas.value.length || noteUserFormulas.value.length)) {
     // 从树节点获取 _sectionTitle / _sectionId
     const nodeKey = selectedNodeKey.value
     let targetTitle = ''
@@ -2626,7 +2939,17 @@ const currentRows = computed(() => {
     }
 
     // 章节命中 → 只列本章节公式；章级节点/无上下文 → 列全部（规则见 noteScopeTargeting）
-    return buildNoteFormulaRows(notePresetFormulas.value, {
+    const presetRows = buildNoteFormulaRows(notePresetFormulas.value, {
+      sectionId: targetSectionId,
+      sectionTitle: targetTitle,
+    })
+    // Task 4.1 / ADR-FMC-04：并入用户编辑集公式（list_note_formulas），用户集优先/去重。
+    // 仅当当前已加载的用户集属于本章节时并入，避免切章时把上一章的用户公式串过来。
+    const userForSection =
+      noteUserFormulasSection.value && noteUserFormulasSection.value === targetSectionId
+        ? noteUserFormulas.value
+        : []
+    return mergeNoteUserFormulaRows(presetRows, userForSection, {
       sectionId: targetSectionId,
       sectionTitle: targetTitle,
     })
@@ -2644,21 +2967,22 @@ const currentRows = computed(() => {
 
 const isCrossCheckMode = computed(() => selectedNodeKey.value.startsWith('cross_'))
 
-// 表间审核规则
+// 表间审核规则（Task 6.2 / MEDIUM-2：map key 一律经 CROSS_CHECK_NODE_KEYS 生成，
+// 与树父节点 key 同源；用户落库规则由 loadCrossCheckUserRules 覆盖，此处为内存默认种子）
 const crossCheckRulesMap = ref<Record<string, any[]>>({
-  cross_report_note: [
+  [CROSS_CHECK_NODE_KEYS.report_note]: [
     { label: 'BS货币资金 = 附注货币资金合计', left_ref: "REPORT('BS-002','期末')", right_ref: "NOTE('货币资金','合计','期末')", _editing: false },
     { label: 'BS应收账款 = 附注应收账款合计', left_ref: "REPORT('BS-008','期末')", right_ref: "NOTE('应收账款','合计','期末')", _editing: false },
     { label: 'IS营业收入 = 附注营业收入合计', left_ref: "REPORT('IS-002','本期')", right_ref: "NOTE('营业收入','合计','本期')", _editing: false },
   ],
-  cross_report_wp: [
+  [CROSS_CHECK_NODE_KEYS.report_wp]: [
     { label: 'BS货币资金 = E1-1审定数', left_ref: "REPORT('BS-002','期末')", right_ref: "WP('E1-1','审定数')", _editing: false },
     { label: 'BS应收账款 = D2-1审定数', left_ref: "REPORT('BS-008','期末')", right_ref: "WP('D2-1','审定数')", _editing: false },
   ],
-  cross_note_wp: [
+  [CROSS_CHECK_NODE_KEYS.note_wp]: [
     { label: '附注货币资金 = E1-1审定数', left_ref: "NOTE('货币资金','合计','期末')", right_ref: "WP('E1-1','审定数')", _editing: false },
   ],
-  cross_consol: [
+  [CROSS_CHECK_NODE_KEYS.consol]: [
     { label: '合并抵消分录借贷平衡', left_ref: "CONSOL('抵消分录','借方合计')", right_ref: "CONSOL('抵消分录','贷方合计')", _editing: false },
     { label: '模拟权益法长投 = 净资产×持股比例', left_ref: "CONSOL('模拟权益法','期末长投小计')", right_ref: "CONSOL('净资产表','期末净资产') × 持股比例", _editing: false },
     { label: '资本公积变动期末 = 合并报表期末', left_ref: "CONSOL('资本公积变动','期末金额')", right_ref: "REPORT('BS-资本公积','期末')", _editing: false },
@@ -2876,11 +3200,15 @@ function onSaveCrossRule() {
 
   showCrossRuleDialog.value = false
   ElMessage.success(crossRuleEditIndex.value >= 0 ? '规则已更新' : '规则已新增')
+  // Task 6.2（需求 7.3）：落库持久化，关闭再打开仍可见。
+  void persistCrossCheckRules()
 }
 
 function onRemoveCrossRule(index: number) {
   const key = selectedNodeKey.value
   crossCheckRulesMap.value[key]?.splice(index, 1)
+  // Task 6.2（需求 7.3）：删除也落库。
+  void persistCrossCheckRules()
 }
 
 // ── 表间审核执行校验（spec: formula-push-user-custom-cross-module T9）──
@@ -2980,7 +3308,9 @@ function _rowNeedsFormula(r: any): boolean {
 
 const healthPercent = computed(() => {
   const rows = currentRows.value
-  const meaningful = rows.filter(_rowNeedsFormula)
+  // Task 1.4：只读投影（surfaced/Tier B 溯源）不是可配置公式，从健康度分母剔除，
+  // 否则「说明元数据恒带 formula」会把健康度虚抬成 100%（伪装）。
+  const meaningful = rows.filter(r => _rowNeedsFormula(r) && !isReadonlyProjectionRow(r))
   if (!meaningful.length) return 100
   const withFormula = meaningful.filter(r => r.formula).length
   return Math.round((withFormula / meaningful.length) * 100)
@@ -2988,7 +3318,7 @@ const healthPercent = computed(() => {
 
 const healthDesc = computed(() => {
   const rows = currentRows.value
-  const meaningful = rows.filter(_rowNeedsFormula)
+  const meaningful = rows.filter(r => _rowNeedsFormula(r) && !isReadonlyProjectionRow(r))
   const withFormula = meaningful.filter(r => r.formula).length
   return `${withFormula}/${meaningful.length} 已配置`
 })
@@ -3084,6 +3414,12 @@ const showFormulaEdit = ref(false)
 const editingRow = ref<any>(null)
 
 function startEdit(row: any) {
+  // Task 1.4 / ADR-FMC-02：只读投影（surfaced/Tier B）不可进入编辑态（纵深防御：
+  // 即便模板上有入口被误绑，这里也拦截）。
+  if (isReadonlyProjectionRow(row)) {
+    ElMessage.info('取数/溯源说明为只读投影，不可编辑')
+    return
+  }
   editingRow.value = row
   showFormulaEdit.value = true
 }
@@ -3119,6 +3455,7 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
     await persistTbDetailFormulas()
     ElMessage.success('公式已保存')
     emit('saved')
+    await propagateFormulaStale()  // Task 6.3（需求 10.3）：单行保存触发统一 stale 传播
     return
   }
 
@@ -3148,6 +3485,7 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
           row._isNew = false
           ElMessage.success('新公式已保存')
           emit('saved')
+          await propagateFormulaStale()  // Task 6.3（需求 10.3）：单行保存触发统一 stale 传播
         } catch {
           ElMessage.warning('公式已添加到列表，保存到后端失败')
         }
@@ -3156,21 +3494,60 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
     return
   }
 
-  // 已有行——更新到后端
-  if (row.id) {
+  // 已有行——先按 kind 分派目标端点（Task 1.4 / ADR-FMC-02 / 改动点②）：
+  //   wp         → PUT /api/workpapers/{wp_id}/formulas（wpFormula.upsert）
+  //   surfaced   → 拒绝（只读投影，禁保存）
+  //   extraction → 拒绝（只读溯源，禁保存）
+  //   report     → PUT report-config detail（仅报表模板行）
+  // 旧逻辑「任何有 id 的行都发 report-config detail」无 kind 校验，会把底稿公式误写进
+  // 全局报表模板（§1 #2）。
+  if (!row.id) return
+
+  const dispatch = resolveSaveDispatch(row)
+
+  if (dispatch === 'reject') {
+    ElMessage.info('取数/溯源说明为只读投影，不可保存')
+    return
+  }
+
+  if (dispatch === 'wp') {
+    if (!props.wpId) {
+      ElMessage.warning('缺少底稿实例，无法保存底稿公式')
+      return
+    }
     try {
-      await api.put(P_rc.detail(row.id), {
-        formula: data.formula || null,
-        formula_category: data.category,
-        formula_description: data.description,
-        aje_formula: row.aje_formula || null,
-        rje_formula: row.rje_formula || null,
+      await api.put(wpFormula.upsert(props.wpId), {
+        sheet_name: row.sheet_name || row.row_name || selectedWpSheetCode.value || '',
+        target_cell: row.target_cell || row.row_code || '',
+        expression: data.formula || '',
+        year: props.year,
+        template_type: fmTemplateType.value,
+        category: data.category,
+        description: data.description,
       })
       ElMessage.success('公式已保存')
       emit('saved')
+      await propagateFormulaStale()  // Task 6.3（需求 10.3）：单行保存触发统一 stale 传播
     } catch (e) {
       handleApiError(e, '保存失败')
     }
+    return
+  }
+
+  // dispatch === 'report'：报表模板行走 report-config detail。
+  try {
+    await api.put(P_rc.detail(row.id), {
+      formula: data.formula || null,
+      formula_category: data.category,
+      formula_description: data.description,
+      aje_formula: row.aje_formula || null,
+      rje_formula: row.rje_formula || null,
+    })
+    ElMessage.success('公式已保存')
+    emit('saved')
+    await propagateFormulaStale()  // Task 6.3（需求 10.3）：单行保存触发统一 stale 传播
+  } catch (e) {
+    handleApiError(e, '保存失败')
   }
 }
 
@@ -3191,6 +3568,7 @@ async function saveEdit(row: any) {
     editingId.value = null
     ElMessage.success('公式已保存')
     emit('saved')
+    await propagateFormulaStale()  // Task 6.3（需求 10.3）：单行（行内）保存触发统一 stale 传播
   } catch (e) {
     handleApiError(e, '保存失败')
   }
@@ -3619,11 +3997,19 @@ async function onSaveAllFormulas() {
   }
   applying.value = true
   let saved = 0
+  let skippedReadonly = 0
   try {
     for (const row of rows) {
+      // Task 1.4 / ADR-FMC-02 触类旁通：批量「保存全部」同样先按 kind 分派，
+      // 否则在 wp 节点点保存会把底稿行 + surfaced 只读投影全批量发到 report-config
+      // detail（与 onFormulaEditSave 旧 bug 同源）。
+      const dispatch = resolveSaveDispatch(row)
+      if (dispatch === 'reject') { skippedReadonly++; continue }
+
       if (row._isNew && row.formula) {
-        // 新增
+        // 新增（仅报表节点有「新增行」入口，走 report-config list POST）
         const reportType = activeReportType.value
+        if (dispatch !== 'report') continue
         await api.post(P_rc.list, {
           report_type: reportType,
           // 与当前读取口径一致（项目级优先），避免新增行落到模板级影响其他项目
@@ -3638,8 +4024,21 @@ async function onSaveAllFormulas() {
         }, { validateStatus: (s: number) => s < 600 })
         row._isNew = false
         saved++
-      } else if (row.id) {
-        // 更新
+      } else if (row.id && dispatch === 'wp') {
+        // 底稿行 → wpFormula.upsert（非 report-config）
+        if (!props.wpId) continue
+        await api.put(wpFormula.upsert(props.wpId), {
+          sheet_name: row.sheet_name || row.row_name || selectedWpSheetCode.value || '',
+          target_cell: row.target_cell || row.row_code || '',
+          expression: row.formula || '',
+          year: props.year,
+          template_type: fmTemplateType.value,
+          category: row.formula_category,
+          description: row.formula_description,
+        }, { validateStatus: (s: number) => s < 600 })
+        saved++
+      } else if (row.id && dispatch === 'report') {
+        // 报表模板行 → report-config detail
         await api.put(P_rc.detail(row.id), {
           formula: row.formula,
           formula_category: row.formula_category,
@@ -3650,23 +4049,41 @@ async function onSaveAllFormulas() {
         saved++
       }
     }
-    ElMessage.success(`已保存 ${saved} 个公式`)
+    ElMessage.success(
+      skippedReadonly
+        ? `已保存 ${saved} 个公式（跳过 ${skippedReadonly} 条只读投影）`
+        : `已保存 ${saved} 个公式`,
+    )
     emit('saved')
 
-    // Sprint 5.10: 保存后调 stale_engine 传播变更
-    try {
-      await api.post(linkageBus.impact, {
-        source_uri: `FORMULA:${selectedNodeKey.value}::config_changed`,
-        project_id: props.projectId,
-        year: new Date().getFullYear(),
-      }, { validateStatus: (s: number) => s < 600 })
-    } catch {
-      // stale propagation failure is non-blocking
-    }
+    // Sprint 5.10 / Task 6.3（需求 10.2/10.3）: 保存后调 stale_engine 传播变更。
+    // 「保存全部」与单行保存共用这一条统一传播（propagateFormulaStale），年份取 props.year。
+    await propagateFormulaStale()
   } catch (e) {
     handleApiError(e, '保存失败')
   } finally {
     applying.value = false
+  }
+}
+
+/**
+ * Task 6.3（需求 10.2 / 10.3）：统一 stale 传播。
+ *
+ * 「保存全部」(`onSaveAllFormulas`) 与单行保存 (`onFormulaEditSave`) 都调本函数，使单行保存
+ * 触发**与保存全部相同**的传播（需求 10.3）。年份一律取 `props.year`（项目年），经
+ * `resolveSaveYear` 口径——缺可解析年份时跳过传播，**不** fallback 到系统当前年（需求 10.2）。
+ */
+async function propagateFormulaStale() {
+  const year = resolveSaveYear(props.year)
+  if (!props.projectId || year == null) return  // 缺项目/年份则跳过（不以系统年顶替）
+  try {
+    await api.post(linkageBus.impact, {
+      source_uri: `FORMULA:${selectedNodeKey.value}::config_changed`,
+      project_id: props.projectId,
+      year,
+    }, { validateStatus: (s: number) => s < 600 })
+  } catch {
+    // stale propagation failure is non-blocking
   }
 }
 
@@ -4162,6 +4579,20 @@ function onHistoryRollbackApplied(rowCode: string, formula: string) {
   color: var(--gt-color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+/* Task 3.2：左栏模式切换按钮（全局浏览 / 当前页）不随标题大写变形。 */
+.gt-fm-left-mode-btn {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+}
+/* Task 3.2：缺当前页身份 fail-closed 告警（不退全局树）。 */
+.gt-fm-left-warning {
+  margin: 0 8px 6px;
 }
 /* 主公式表格统一 12 号字（用户要求：公式管理中心字号 12） */
 .gt-fm-main-table :deep(.el-table__cell) {

@@ -1,0 +1,52 @@
+{
+  "_doc": "公式管理全量门禁（Task 8.1 / formula-manager-all-accessible-pages.spec.ts）的分母豁免登记。这是『可伪证声明』——不是只存理由文本的后门。每条豁免必须附带可被实际情况验证的字段（verify_against），门禁读取时须逐条校验，任一字段抽不到值或与运行时事实不符即视为豁免失效（该项重新计入分母并触发相应断言红）。kind=redirect（如 B15 重定向底稿，verify_against 含 wp_code/override_component_type/delegated_module/target_path，对活 wp_code_overrides 逐值比对）；kind=classification-404-out-of-scope（Task 2.3 现算的口径外 404 wp_code，verify_against 含 wp_code/classification_status=out_of_scope，可验证事实=该 wp_code 本就不在 wp_code_overrides 表，若后续补了映射则失效、要求重新归类为数据漂移）。schema 见 backend/app/services/formula_management/gate_exemptions.py。design 锚点：ADR-FMC-03、§5 步骤 2、§7.1、§7.3。",
+  "schema_version": 1,
+  "exemptions": [
+    {
+      "key": "redirect-materiality",
+      "kind": "redirect",
+      "owner": "workpaper-rendering",
+      "reason": "B15 重要性水平底稿在 render-config 标 redirect=true，只重定向到重要性模块、不渲染工作底稿 toolbar，故无当前页公式管理入口；按 ADR-FMC-03 登记为带期限正式豁免，从非 redirect 分母剔除。",
+      "expires_at": "2027-10-17",
+      "verify_against": {
+        "wp_code": "B15",
+        "override_component_type": "redirect-materiality",
+        "delegated_module": "materiality",
+        "target_path": "/materiality"
+      }
+    },
+    {
+      "key": "classification-404-out-of-scope:A18",
+      "kind": "classification-404-out-of-scope",
+      "owner": "workpaper-rendering",
+      "reason": "Task 2.3 实施期现算：A18 伞码在真实项目（医疗器械 5e193c68、辽宁卫生 d9295a0c）classification API 返 404，且在 wp_code_overrides.json 无映射（只有子码 A18-1/A18-2 有映射，伞码 A18 本身无建模 classification 行）→ 判口径外，从 §7.1 门禁按钮分母显式剔除。可验证事实：A18 在运行时 override 表抽不到映射；若后续补了 A18 的 override 则本豁免失效（fact_mismatch）、要求重新归类为数据漂移。",
+      "expires_at": "2027-10-17",
+      "verify_against": {
+        "wp_code": "A18",
+        "classification_status": "out_of_scope"
+      }
+    },
+    {
+      "key": "classification-404-out-of-scope:A26",
+      "kind": "classification-404-out-of-scope",
+      "owner": "workpaper-rendering",
+      "reason": "Task 2.3 实施期现算：A26 伞码在真实项目（医疗器械 5e193c68）classification API 返 404，且在 wp_code_overrides.json 无映射（只有子码 A26-1~A26-4 有 word-template 映射，伞码 A26 本身无建模 classification 行）→ 判口径外，从 §7.1 门禁按钮分母显式剔除。可验证事实：A26 在运行时 override 表抽不到映射；补了 A26 的 override 则本豁免失效、要求重新归类。",
+      "expires_at": "2027-10-17",
+      "verify_against": {
+        "wp_code": "A26",
+        "classification_status": "out_of_scope"
+      }
+    },
+    {
+      "key": "classification-404-out-of-scope:A27",
+      "kind": "classification-404-out-of-scope",
+      "owner": "workpaper-rendering",
+      "reason": "Task 2.3 实施期现算：A27 伞码在真实项目（医疗器械 5e193c68）classification API 返 404，且在 wp_code_overrides.json 无映射（只有子码 A27-1 有 a27-1-it-audit-memo 映射，伞码 A27 本身无建模 classification 行）→ 判口径外，从 §7.1 门禁按钮分母显式剔除。可验证事实：A27 在运行时 override 表抽不到映射；补了 A27 的 override 则本豁免失效、要求重新归类。",
+      "expires_at": "2027-10-17",
+      "verify_against": {
+        "wp_code": "A27",
+        "classification_status": "out_of_scope"
+      }
+    }
+  ]
+}

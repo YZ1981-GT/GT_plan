@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.services.formula_management.formula_scope_query import (
     FORMULA_SCOPES,
@@ -42,7 +42,9 @@ async def list_formulas_by_scope(
         ),
     ),
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    # Task 5.2 / ADR-FMC-06：path 有 {project_id}，直接用 require_project_access 依赖工厂
+    # （其内层从路径参数取 project_id 做 readonly 项目级校验）。只读端点 → readonly。
+    _user: User = Depends(require_project_access("readonly")),
 ):
     """按 Formula_Scope 过滤公式列表；省略 scope 时返回全局并集（按作用域分组）。"""
     # ── 指定作用域：弹窗按域加载（Req 24.1/24.2）──────────────────────

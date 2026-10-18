@@ -113,6 +113,71 @@ export interface NoteFormulaRow {
   formula_category?: string
   formula_description?: string
   formula_source?: string
+  /** 用户编辑集公式的目标单元格键（"row:col"）；预设行无此字段。 */
+  _userTarget?: string
+}
+
+/**
+ * 用户编辑集公式条目（来自 GET list_note_formulas，含 _user_formulas）。
+ * shape 与后端 note_formula_service._normalize_record 对齐。
+ */
+export interface NoteUserFormula {
+  target?: string
+  formula?: string
+  description?: string
+  category?: string
+  source?: string
+  type?: string
+  [k: string]: unknown
+}
+
+/**
+ * 把用户编辑集公式合并进附注预设行（ADR-FMC-04 弹窗侧消费 list_note_formulas）。
+ *
+ * 口径（与后端 execute_note_formulas 合并一致）：
+ * - 用户编辑集按目标单元格键 `target`（"row:col"）去重，**用户集优先**：
+ *   同 `target` 多条时保留列表后者（list 已是「这套就是最新集」语义，服务端覆盖式写入）。
+ * - 用户公式作为**附加行**追加到预设行之后（预设是章节级、用户公式是单元格级，二者互补）。
+ * - 无合法 `formula` 的用户记录跳过。
+ *
+ * 返回合并后的行集合；`userFormulas` 为空时等价于只返回预设行。
+ */
+export function mergeNoteUserFormulaRows(
+  presetRows: readonly NoteFormulaRow[],
+  userFormulas: readonly NoteUserFormula[] | null | undefined,
+  sectionRef?: NoteSectionRef,
+): NoteFormulaRow[] {
+  const base = Array.isArray(presetRows) ? [...presetRows] : []
+  if (!Array.isArray(userFormulas) || !userFormulas.length) return base
+
+  const sectionId = (sectionRef?.sectionId || '').trim()
+  const sectionTitle = (sectionRef?.sectionTitle || '').trim()
+
+  // 按 target 去重，用户集优先（后者覆盖前者）。
+  const byTarget = new Map<string, NoteUserFormula>()
+  for (const u of userFormulas) {
+    const expr = typeof u?.formula === 'string' ? u.formula.trim() : ''
+    if (!expr) continue
+    const target = String(u?.target ?? '')
+    byTarget.set(target, u)
+  }
+
+  const userRows: NoteFormulaRow[] = []
+  let i = 0
+  for (const u of byTarget.values()) {
+    userRows.push({
+      id: `note_user_${sectionId || sectionTitle || 'x'}_${i}`,
+      row_code: sectionId || undefined,
+      row_name: sectionTitle || undefined,
+      formula: typeof u.formula === 'string' ? u.formula.trim() : String(u.formula ?? ''),
+      formula_category: (u.category as string) || 'auto_calc',
+      formula_description: (u.description as string) || '',
+      formula_source: (u.source as string) || 'user_formula',
+      _userTarget: String(u.target ?? ''),
+    })
+    i += 1
+  }
+  return [...base, ...userRows]
 }
 
 /**

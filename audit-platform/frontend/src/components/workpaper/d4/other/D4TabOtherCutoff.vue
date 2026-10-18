@@ -18,7 +18,6 @@ import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import { d4_36Candidates, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME } from '../../composables/d4OtherGroupPushPredicates'
-import { eventBus } from '@/utils/eventBus'
 // D4-36 双向回写：统一走 useD4SyncMode（dedicated sync sheet，sheetKey=d436-managed，
 // 同 entry gt-d4-operating-revenue；后端 phase5_d4_other_cutoff_sheet 作为 sibling sheet
 // 并入 phase5_d4_revenue_detail，adapter d4.revenue_detail）——与 D4-34 同架构（双区 dict store）。
@@ -164,19 +163,15 @@ function pushCrossPeriodToA13() {
   pushToA13(items, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME)
 }
 
-// ─── 公式管理（打开平台全局公式管理中心，定位到本底稿 D4-36；同 E1 范式）───────────
-// 平台唯一一套公式：wp_formula 表权威存储，后端权威执行 + CAS + 审计；
-// 支持跨底稿 TB()/WP()/ROW() 取数联动与表内 SUM_ROW()/IF() 运算校对。
-function openFormulaManager() {
-  eventBus.emit('open-formula-manager', { nodeKey: 'wp_d4_36' })
-}
+// 公式管理入口统一由宿主 GtWpRenderer 的 primary outlet（data-testid=formula-manager-open）
+// 承载（ADR-FMC-03）；原 D4-36 页内 node-only 旁路（只发 nodeKey、丢实例/项目/sheet）已删除。
 
 defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
 <div class="d4-other-cutoff">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushCrossPeriodToA13" title="把跨期疑点推送到 A13 未更正错报汇总（方向+跨期天数，人工认定金额）">推送跨期至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><GtIndexChip value="wp:D4-36" :context-project-id="projectId" /><el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag><GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-36-cutoff')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushCrossPeriodToA13" title="把跨期疑点推送到 A13 未更正错报汇总（方向+跨期天数，人工认定金额）">推送跨期至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><GtIndexChip value="wp:D4-36" :context-project-id="projectId" /><el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag><GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-36-cutoff')">💬 复核</el-button></div></div>
 
   <template v-if="editorMode !== '在线编辑'">
     <!-- 截止日期配置 + 抽样参数 -->

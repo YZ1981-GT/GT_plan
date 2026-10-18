@@ -204,6 +204,35 @@
 
 > **P2 边界声明**：本步骤是治理收尾、非功能闭环主线；若某条 AC 在实施期评估 ROI 不足或须另立 spec（如 20.1 的大规模弹窗重构），按 tasks 的 `*` 可选项处置并在该任务显式记录「本轮仅登记 / 条件实施」的决策边界（与 ADR-FMC-09 的「先诊断后决策」同构，不默默丢弃正式需求）。
 
+#### 20.1 登记表 · local formula dialog/drawer 去留决策（Task 8.2* 实施期产出）
+
+> 现算基线：实施期 HEAD（`67c3bcc5` 工作树）现扫 `audit-platform/frontend/src/components/formula/*.vue` 中名含 `Dialog|Drawer|Panel` 者得 **11 个**，另 `FormulaBar.vue`（公式栏，非弹窗）与散落在 `views/` 的三方触发入口。本登记表收录 **12 套**局部公式弹窗/抽屉/入口（≥7 判据满足，禁写死数量，复现命令见本节末）。
+> 决策边界：本任务**本轮仅登记 + 标注分工边界**（P2 `*` 条件项）。无一套需要「新收敛改线」——因为步骤 2（Task 2.1）已把所有 node-only 旁路（E1/D4/A1/Univer）收敛到 `createOpenFormulaManagerCommand`；其余各套均为**权威源不同 / UX 专用 / 已废弃无挂载**三类，按分工保留或标废弃，无一属「按钮同名、能力/权威源不同」的隐性碎片化。任何需要把独立编辑弹窗（如 `FormulaEditDialog`/`NoteFormulaDialog`）并入中央弹窗的大重构 **ROI 不足、另立 spec**，本轮不动。
+
+| # | 组件路径（`src/` 下） | 类型 | 当前权威源 | 挂载/触发处（现算） | 去留决策 | 理由 |
+|---|---|---|---|---|---|---|
+| 1 | `components/formula/FormulaManagerDialog.vue` | 中央弹窗 | 多域（wp_formula / report_config / note `_formulas`+`_user_formulas` / consol / tb_detail） | `ThreeColumnLayout` / `ReportView` / `DisclosureEditor` 三处经 `open-formula-manager` 事件 | **保留（中央真源）** | 本 spec 收敛的目标弹窗；步骤 1~6 整改对象，非碎片化项，是分母本体。 |
+| 2 | `shell/formula/openFormulaManagerCommand.ts`（`createOpenFormulaManagerCommand`）+ `openFormulaManagerFromLocation.ts` | 统一命令（非组件） | 同中央弹窗（提交完整 `CanonicalWorkpaperLocation`） | `WorkpaperEditor`（底稿页主入口）、`useEditorToolbar`（A1/Univer）、primary outlet host | **保留（唯一收敛通道）** | Task 2.1 已令生产真正调用；所有可收敛入口的目标口径，20.1 的「凡能收敛走此命令」即指它。 |
+| 3 | `components/formula/FormulaEditDialog.vue` | 局部编辑弹窗 | wp 行（HTML 渲染器 `open-formula` 事件；读 report_config/TB/note 树做选址，写经父组件 `save` emit 回 HTML 渲染器 wp 持久化） | `WorkpaperEditor.vue`（`onHtmlOpenFormula`，HTML 渲染器子组件触发） | **保留（UX 专用：单元格级就地编辑）** | 与中央弹窗分工明确：此为 HTML 渲染器「右键单元格→编辑公式」的就地轻量弹窗，权威源单一=当前 wp 行，不跨域；并入中央弹窗 ROI 不足（另立 spec）。非同名碎片化（标题「编辑公式」vs 中央「公式管理」）。 |
+| 4 | `components/formula/NoteFormulaDialog.vue` | 局部弹窗 | note（`noteFormula.list/apply`，附注章节公式） | **生产零挂载**（仅 `__tests__/NoteFormulaDialog.spec.ts` + 作为被测组件；无 `.vue` 生产 `<NoteFormulaDialog>`） | **标记废弃候选（本轮仅登记，不删）** | 现算全仓无生产挂载，附注公式已由中央弹窗附注节点（Task 4.1 收敛 `list_note_formulas`）承接。删除须走「删旧代码铁律」（grep 0 调用 + 独立 commit + 测试全绿），本轮仅登记为废弃候选，不默默删（避免动其测试与其他未提交改动）。 |
+| 5 | `components/formula/GtFormulaEditDialog.vue` | 局部编辑弹窗 | 预设库（report_config 预设 / 自定义 / 参照三来源，Req 25） | `GtFormulaPresetDialog.vue`（公式预设库） | **保留（分工边界：模板/预设库编辑，非项目实例）** | 权威源=模板预设库（非项目实例公式），服务「模板库」场景，与中央弹窗的「项目当前页公式」是不同关注点，不收敛。 |
+| 6 | `components/formula/GtFormulaPresetDialog.vue` | 局部弹窗 | 预设库 + 说明文档（`GET /api/formula-management/reporting-instructions`） | 模板库三 Tab：`WpTemplateDetail` / `ReportConfigTab` / `NoteTemplateTab` | **保留（分工边界：模板库附加入口）** | 服务模板库的「公式预设库」附加入口（Req 25），权威源=预设库非项目实例，UX 与入口位置均专用于模板库，不收敛。 |
+| 7 | `components/formula/ConsolFormulaManagementPanel.vue` | 中央弹窗内嵌面板 | consol（`{soe\|listed}_consolidated` report_config / `consol_note_formula`） | `FormulaManagerDialog.vue`（合并节点 `isConsolFormulaNode`） | **保留（已在中央弹窗内）** | 已是中央弹窗的合并专用子面板，非独立碎片入口；权威源=合并域，与单体严格隔离（注释明确不与 standalone 缓存串用），属正当分工。 |
+| 8 | `components/formula/FormulaPushPanel.vue` | 中央弹窗内嵌面板 | formula_push（自动物化层运行面板，非权威定义源） | `FormulaManagerDialog.vue`（`formula_push` Tab） | **保留（已在中央弹窗内）** | 已是中央弹窗 Tab；职责=推送运行/物化观测（Req 4.3 口径：物化层非权威源），与「公式定义」分工清晰。 |
+| 9 | `components/formula/GtRefreshScopeDialog.vue` | 局部弹窗 | 刷新作用域（非公式定义；选「刷哪些 scope」触发重算） | `ThreeColumnLayout.vue`（全局一键刷新，formula-runtime-convergence Task 16） | **保留（分工边界：作用域刷新，非公式管理）** | 权威源≠公式定义，是「执行作用域选择器」；与中央弹窗关注点正交（一个管「定义」一个管「刷哪些」），不收敛、不同名。 |
+| 10 | `components/formula/GtRowNameAlignmentDialog.vue` | 局部弹窗 | 行名映射（底稿行名 ↔ 账套明细，落库映射） | `GtWpRenderer.vue`（刷新取数检测到 unmatched/ambiguous 行时经 eventBus 打开） | **保留（分工边界：行名对齐，非公式管理）** | 组件注释已显式声明「不合并、不复制 GtRefreshScopeDialog 的 scope 树」；解决「名字怎么对上」与「刷哪些作用域」「公式定义」均正交，属正当分工。 |
+| 11 | `components/formula/GtFormulaHintPanel.vue` | 内嵌面板 | 合理性提醒清单（issue/hint 只读展示，非编辑入口） | 中央弹窗 / 底稿页提醒区 | **保留（只读面板，非弹窗入口）** | 只读提醒清单，不是「打开公式管理」的入口弹窗，无碎片化风险；登记以说明已排查、非遗漏。 |
+| 12 | `components/formula/GtFormulaIssuePanel.vue` | 内嵌面板 | 逻辑审核问题清单（issue 只读展示） | 中央弹窗 / 底稿页提醒区 | **保留（只读面板，非弹窗入口）** | 同上，只读问题清单非入口，登记以示排查完整。 |
+
+**收敛 / 保留 / 废弃分布（现算 12 套）**：
+- **收敛走统一命令**：第 2 行即统一命令本体；node-only 旁路（E1/D4/A1/Univer）已在 Task 2.1 收敛进它——本轮**无新增收敛改线**（无遗漏的「按钮同名、权威源不同」项）。
+- **保留（权威源不同 / UX 专用 / 正交关注点）**：#1、#3、#5、#6、#7、#8、#9、#10、#11、#12（共 10 套），每套理由见表，无一属隐性碎片化。
+- **废弃候选（本轮仅登记不删）**：#4 `NoteFormulaDialog.vue`（生产零挂载，职责已被中央弹窗附注节点承接；删除另走「删旧代码铁律」）。
+
+**决策边界（显式记录，P2 `*` 条件处置）**：本任务**本轮仅登记 + 标注分工边界**，不实施任何收敛改线、不删任何组件。理由：(a) 所有「能收敛」的 node-only 入口已在 Task 2.1 收敛完毕；(b) 其余 10 套均为正当分工（权威源不同 / UX 专用 / 正交关注点），强行并入中央弹窗属**大规模重构、ROI 不足**，按 P2 边界声明**另立 spec**；(c) 唯一废弃候选（#4）删除须走「删旧代码铁律」（grep 0 调用 + 独立 commit + 全测试绿），且本轮工作树有多任务未提交改动，不在本登记任务内触碰其源码/测试。本任务**文档化为主**，无生产代码改动。
+
+**复现命令（禁写死数量）**：`Get-ChildItem audit-platform/frontend/src/components/formula -Filter *.vue | Where-Object { $_.Name -match 'Dialog|Drawer|Panel' }`（现算 11 个组件文件）+ 全仓 grep `@formula` / `open-formula-manager` / `createOpenFormulaManagerCommand` 触发入口；数量随 HEAD 漂移，交付时现算，≥7 判据满足。
+
 ## 6. 诊断：坐实用例与最小数据运行（先诊断后决策）
 
 本 spec 有两类必须先运行、再据结果决策的诊断，均**不预设结论**。
@@ -230,6 +259,52 @@
 
 **纪律**：三子节需求措辞禁写「重写/重建合并链」；诊断结果是是否改代码的前置分支；造数用幂等脚本、名称带可识别前缀、用完经项目回收站删除；诊断数据不污染真实项目。
 
+### 6.3 Task 7.1 standalone 最小数据运行记录（2026-10-17 实测，HEAD `67c3bcc5`）
+
+> 真连库（`audit-postgres` localhost:5432 `audit_platform`，asyncpg 实连）。标的 standalone 项目 = **重庆医药集团医疗器械有限公司_2025**（`5e193c68-f53c-4e95-8d03-5d9c996c402d`，非删除、非 consolidated；`tb=61 wp=208 wp_formula=0` 零存量公式天然隔离）。`audit_period_end` 为 NULL（首汽式降级坑），故 year 取 `projects.audit_year=2025` 显式传入、不从 period_end 派生。宿主底稿 A1（`249ecd05`）。隔离键 `sheet_name='_FMCLOSURE71_probe-sheet'` / `target_cell='B2'` / `expression='100 + 23'`（常量、无外部 ref 避免 ACNR 悬空拒绝）。造数幂等、用完直删复原（project wp_formula 回到 0，零残留实测确认）；`draft_refresh_audit` 为 append-only 审计轨迹，真实运行留痕不删。脚本在仓库外（`~/_fm_probe/`，用完即删）。
+
+**逐值对拍结论（以权威表为准，不看组件/mock）**：
+
+| 需求 | 判据 | 权威表 | 实测 | 结论 |
+|---|---|---|---|---|
+| 11.2 保存↔重开一致 | `wp_formula` save vs `list_by_wp` 重读 | `wp_formula` | id/expression/category/description/formula_type **逐值全一致** | **✓ 成立** |
+| 11.3a 执行后 `last_computed_at` 更新 | 执行前后比对 | `wp_formula.last_computed_at` | 执行前 `None` → 执行后 `None`（**未更新**） | **✗ 未成立** |
+| 11.3b 执行后目标值改变 | 执行前后比对 | `checklist_responses`（workpaper adapter 落库载体） | 行数 0 → 0（**未写入任何值**） | **✗ 未成立** |
+| 11.4 五处同一 `run_id` 贯穿 | run/stale/outbox/audit + last_computed_at | 见下 | **部分断裂** | **✗ 未成立** |
+| 11.5 以权威表为准 | 全程直查权威表 | — | 本运行全部逐值直查 SQL，未用 mock | **✓ 遵守** |
+
+**run_id 五处贯穿实测（run_id = `draft_refresh_audit.id` = `0ee1f74e…`）**：
+- (1) `draft_refresh_audit`（run 记录）：✓ 落库，`result_status=success affected_count=1`，`detail.refreshed_units` 含目标 `workpaper:249ecd05…/_FMCLOSURE71_probe-sheet/B2`。
+- (2) `formula_runtime_outbox`：按 run_id 查 **0 行**；**全库总行数 = 0**（该表从上线起从未被任何执行写过）。
+- (3) stale：`draft_marker(refresh_id)=1` ✓（本 run 打了 draft 标记）；但 `working_paper.prefill_stale=true=0`（`trigger_recalc` 的 `mark_stale` 本 run 标记 0 行）。
+- (4) `draft_refresh_snapshot(refresh_id)=0`。
+- (5) `audit_log_entries` 含该 run_id 文本 = 0（wp CRUD 审计走 `action='formula.changed'`、按 `target_cell` 标识，**不携带执行 run_id**）。
+
+**根因诊断（源码 + 运行时双坐实，诚实不假绿）**：standalone 公式执行走的入口是 `POST /api/workpapers/draft-refresh` → `DraftRefreshOrchestrator.generate` → `FormulaRuntimeCoordinator.generate_mutation_plan` → `DraftRefreshService.refresh_with_presets` → `refresh`。这条「治理层」路径只写 `draft_refresh_audit` + `draft_marker`（+ 条件性 `prefill_stale`），**不铸造统一 run_id、不写 `formula_runtime_outbox`、不把 mutation 的 `after_value` 应用到单元载体、不回写 `WpFormula.last_computed_at`**。
+- 旁证：直接跑 `coordinator.generate_mutation_plan` 对本公式**确实产出 1 条 mutation**（`target=…/B2 after_value=Decimal('123')`，123 = 100+23 求值正确）——**公式本身可执行**，断裂点在「orchestrator 把 mutation 降级成 `RefreshUnit(unit_scope, after_value)` 只打 draft 标记，从不调用 `WorkpaperMutationAdapter.apply_many`」这一接线。
+- Task 6.4 做成 run_id 贯穿五表（audit + snapshot + outbox 同 `run_id`、`execute_refresh` 铸造）的方法 `DraftRefreshService.execute_refresh` **零生产调用（仅测试）**；它与标准 standalone 入口 `refresh_with_presets` 是**两条并行路径**，前者从未被任何 router 接线。
+- `WpFormula.last_computed_at` 全仓**无任何写回点**（`engine.py` 只给内存态 `FormulaResult.last_computed_at` 赋值，`wp_formula_service.save` 显式写 `None` 并注释「时间戳留给 runtime coordinator」，而 coordinator/orchestrator 从不回写该列）。
+
+**判定**：需求 11.2/11.5 已坐实成立；11.3a/11.3b/11.4 在当前 standalone 执行入口**未贯穿 run_id、不改目标值、不更新 `last_computed_at`**——如实记录为「已接线产出 mutation 但执行语义未闭合」，**不假绿**。这属已坐实的接线缺口（而非 count=0 的「未证明」），但其最小改动（把 orchestrator 接到 `execute_refresh` 的 run_id 贯穿路径 / 在 coordinator 回写 `WpFormula.last_computed_at` / 应用 mutation 到单元载体）**超出 Task 7.1「运行坐实」的范围**（7.1 验收是「产出运行记录 + 逐值对拍」，不含改执行语义）；登记为后续轮次整改项（与需求 11.3/11.4 的执行语义闭合对应，建议另立「standalone 执行语义闭合」任务或并入 6.4 的后续硬化）。运行记录原件：`~/_fm_probe/run_record_7_1.txt`（探针用完即删，结论已固化于本节）。
+
+### 6.4 Task 7.3 合并三类据诊断结果决策（ADR-FMC-09「结果分支」）
+
+> 两段式·后决策。输入 = Task 7.2 consolidated 一次最小数据运行诊断（§6.2 consolidated、ADR-FMC-09）。诊断三子节均「落库且对拍一致」，故据 ADR-FMC-09 结果分支逐子节落判。本节是**决策记录，不改合并生产代码**（三子节判「已打通」）；措辞严格不含「重写 / 重建合并链」。
+
+**三子节决策结论（据 Task 7.2 诊断逐值对拍 + `consol_push_run` 落库）**：
+
+| 子节 | 需求 | 诊断结果（Task 7.2） | 结果分支（ADR-FMC-09） | 决策结论 | 代码改动 |
+|---|---|---|---|---|---|
+| 12.5 合并报表 consol-report | 17.2 / 17.3 / 17.4 | `consol_report_values` 352 行逐值对拍不一致=0；`consol_push_run` 落库 `succeeded` | 落库且对拍一致 → 判「已打通」 | **已打通（仅数据阻塞）** | **无** |
+| 12.6 合并附注 consol-note | 18.2 / 18.3 | `consol_note_data` 逐值一致；`consol_push_run` 落库 | 落库且对拍一致 → 判「已打通」 | **已打通（仅数据阻塞）** | **无** |
+| 12.7 合并底稿 consol-wp | 19.2 / 19.3 | 差额表引擎中间节点恒等式 `individual + adjustment + elim == consolidated` 全部成立；draft 抵销未被消费（APPROVED-only 正确） | 落库且对拍一致 → 判「已打通」 | **已打通（仅数据阻塞）** | **无** |
+
+**决策依据**：三子节均满足 ADR-FMC-09「落库且对拍一致」分支的两项条件——(a) 逐值对拍一致（12.5 不一致=0 / 12.6 逐值一致 / 12.7 恒等式成立），(b) `consol_push_run` 落库（`succeeded`）。按 ADR-FMC-09 该分支「判『已打通（仅数据阻塞）』**不改代码**」，故三子节均**无代码改动**，阻塞点是真库 consolidated 项目/数据稀少（数据阻塞），非值链断裂。无任一子节进入「不落库 / 不一致 → 判『已断裂』」分支，故本任务**不涉及任何最小改动与复测**。
+
+**12.6 `last_formula_run_id` 可观测性缺口处置（非断裂、可选后续）**：Task 7.2 附带观察到 notes 侧 `last_formula_run_id` 未与推送 run 关联。按 ADR-FMC-09 口径，该项**不构成「已断裂」**——合并附注的值链本身落库且逐值一致（12.6 判「已打通」不变），缺的只是「附注数据行 ↔ 推送 run」的关联可观测性。据此将其记录为**可选后续观察项**（可观测性增强，非值链整改），**不在本 spec 合并三类（Phase 7 / ADR-FMC-09）整改范围内**、本任务不改。若后续需补该关联，另立观察/增强项处置，不预设、不在此动合并生产代码。
+
+**纪律声明**：本节为决策记录；三子节判「已打通（仅数据阻塞）」，**未改任何合并生产代码**；全节措辞不含「重写 / 重建合并链」（符合 requirements 需求 17.4 / 18.3 / 19.3 的措辞约束与 ADR-FMC-09 硬约束）。
+
 ## 7. 全量门禁 `formula-manager-all-accessible-pages.spec.ts`（ADR-FMC-08）
 
 ### 7.1 运行时权威分母
@@ -253,6 +328,11 @@
 ### 7.3 豁免登记
 
 redirect / 不可渲染项（含 B15 `redirect-materiality`、判「口径外」的 404 wp_code）用带 `owner/reason/expires_at` 的可伪证豁免登记（不是只存理由文本的后门，须含可被实际情况验证的字段 + 「判据抽不到值」防空转断言）。
+
+**登记存放与读取（Task 2.2 落点）**：结构化登记文件 `backend/app/data/formula_manager_gate_exemptions.json`（schema `{schema_version, exemptions:[{key,kind,owner,reason,expires_at,verify_against}]}`）；读取 + 可伪证校验在 `backend/app/services/formula_management/gate_exemptions.py`（`load_exemptions` / `validate_exemption` / `exempted_keys`），供 Task 8.1 门禁复用——门禁只把 `exempted_keys()` 返回的**校验通过**的 key 从非 redirect 分母剔除。
+- **可伪证字段 `verify_against`**：每条豁免附 `{wp_code, override_component_type, delegated_module, target_path}`，`validate_exemption` 对**运行时活数据**（`load_wp_code_overrides()` 的 wp_code→componentType 映射 + redirect-materiality 的 `materiality`/`/materiality` 口径）逐值比对；口径漂移（如 B15 override 不再是 `redirect-materiality`、或 redirect 目标变更）即判 `fact_mismatch` 失效。
+- **防空转断言（铁律㉗⑤）**：`verify_against` 缺必填键、或声明的 `wp_code` 在运行时 override 表抽不到值 → 判 `probe_empty` 失效（拒绝「抽不到就跳过」的静默放行）；`owner/reason/expires_at/verify_against` 任一缺失 → `fields_missing`；`expires_at` 缺失/不可解析/已过期 → `expired`（fail-closed）。只有全部通过才 `valid=True`。
+- **变异反证**：删掉登记条目 → `exempted_keys` 不含该 key → 该项重新计入分母、触发门禁相应断言红（`backend/tests/formula_management/test_gate_exemptions.py` 覆盖删条目变红 + 有效条目剔除的反向断言 + 过期/漂移/空转各失效归因，14 例全绿）。
 
 ### 7.4 幂等输出（防永红，memory 铁律㉗）
 

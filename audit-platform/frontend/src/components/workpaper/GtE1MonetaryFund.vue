@@ -45,7 +45,9 @@
           @change="dualMode.onModeChange"
         />
         <span class="e1-mode-divider" aria-hidden="true"></span>
-        <el-button size="small" @click="openFormulaManager()">公式管理</el-button>
+        <!-- 公式管理入口统一由宿主 GtWpRenderer 的 primary outlet（data-testid=formula-manager-open）
+             承载（ADR-FMC-03）。此处原 node-only 旁路（仅发 nodeKey、丢实例/项目/sheet）已删除，
+             避免「恰一个 testid」被破坏与底稿入口落 report scope / 缺 year 的 422。 -->
         <el-button size="small" @click="openHandbook('preparation')">📖 编制手册</el-button>
         <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
@@ -178,7 +180,6 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
 import type { Ref } from 'vue'
 import http from '@/utils/http'
-import { eventBus } from '@/utils/eventBus'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { useG1DualMode } from './composables/useG1DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -273,17 +274,8 @@ function openHandbook(tab: 'preparation' | 'usage' = 'preparation') {
   handbookVisible.value = true
 }
 
-// ─── 公式管理（打开平台全局公式管理中心，定位到本底稿 E1）───────────────────
-// 由 ThreeColumnLayout 顶层挂载的全局 FormulaManagerDialog 响应 `open-formula-manager`。
-function openFormulaManager() {
-  const base = (props.wpCode || 'E1').split('-')[0].toLowerCase()
-  const sheet = currentSheet.value || ''
-  // 具体 sheet（如 E1-1）→ 定位到该 sheet 叶子节点 wp_e1_1；非编码 sheet（附注/程序表）→ 回退父节点 wp_e1
-  const nodeKey = /^[A-Za-z]+\d+-\d+$/.test(sheet)
-    ? `wp_${sheet.replace(/-/g, '_').toLowerCase()}`
-    : `wp_${base}`
-  eventBus.emit('open-formula-manager', { nodeKey })
-}
+// 公式管理入口已上移至宿主 GtWpRenderer 的统一 primary outlet（ADR-FMC-03）；
+// 原 E1 页内 node-only 旁路（openFormulaManager + eventBus.emit({nodeKey})）已删除。
 const allResponses: Ref<Map<string, any>> = ref(new Map())
 
 // ─── 四表取数（公式管理）───────────────────────────────────────────────────

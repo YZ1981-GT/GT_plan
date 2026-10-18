@@ -31,12 +31,16 @@
           <div class="qp-section">
             <div class="qp-label">取数（点击弹窗选择数据源）</div>
             <div class="qp-btns">
-              <el-button size="small" @click="pickSource('TB')" title="从试算表选择科目">TB</el-button>
-              <el-button size="small" @click="pickSource('ROW')" title="从报表选择行次">ROW</el-button>
-              <el-button size="small" @click="pickSource('SUM_ROW')" title="连续行范围求和">SUM_ROW</el-button>
-              <el-button size="small" @click="pickSource('NOTE')" title="从附注选择章节">NOTE</el-button>
-              <el-button size="small" @click="pickSource('WP')" title="从底稿选择">WP</el-button>
-              <el-button size="small" @click="pickSource('REPORT')" title="跨表引用报表行">REPORT</el-button>
+              <el-button
+                v-for="btn in sourceButtons"
+                :key="btn.fn"
+                size="small"
+                :disabled="!btn.supported"
+                :data-testid="`fn-btn-${btn.fn}`"
+                :data-supported="btn.supported ? '1' : '0'"
+                :title="btn.supported ? btn.hint : `此处不支持：${btn.reason}`"
+                @click="pickSource(btn.fn)"
+              >{{ btn.fn }}<span v-if="!btn.supported" class="qp-unsupported-mark" title="此处不支持">⊘</span></el-button>
             </div>
           </div>
           <div class="qp-section">
@@ -98,6 +102,12 @@ import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
 import { useAddressRegistry } from '@/stores/addressRegistry'
 import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
+import {
+  isFunctionSupported,
+  unsupportedReason,
+  type Executor,
+} from './functionSupportMatrix'
+import { ElMessage } from 'element-plus'
 
 // R14.6: 候选地址源统一走 Req16 store facade（ACNR-backed 域 computeds）+ useAcnr（WP 域），
 // 收敛到与 FormulaRefPicker/CellSelector/FormulaEditDialog/NoteFormulaDialog 同一 ACNR 模式；
@@ -121,7 +131,35 @@ const props = defineProps<{
   visible?: boolean
   cellInfo: CellInfo | null
   projectId?: string
+  // 当前执行器维度（函数支持矩阵查表用，需求 8）。缺省 wp evaluator（底稿页主路径）。
+  executor?: Executor
 }>()
+
+// ── 函数支持矩阵（需求 8，禁静默 0）：据当前执行器判每个取数按钮是否支持 ──
+// 不支持者在模板里 disabled + tooltip 标注「此处不支持」，并在 pickSource 内 fail-closed，
+// 禁止点击后静默返回 0。矩阵单一真源在后端，前端据 golden 镜像（见 functionSupportMatrix.ts）。
+const SOURCE_FUNCTIONS: Array<{ fn: string; hint: string }> = [
+  { fn: 'TB', hint: '从试算表选择科目' },
+  { fn: 'ROW', hint: '从报表选择行次' },
+  { fn: 'SUM_ROW', hint: '连续行范围求和' },
+  { fn: 'NOTE', hint: '从附注选择章节' },
+  { fn: 'WP', hint: '从底稿选择' },
+  { fn: 'REPORT', hint: '跨表引用报表行' },
+]
+
+const currentExecutor = computed<Executor>(() => props.executor || 'wp_evaluator')
+
+const sourceButtons = computed(() =>
+  SOURCE_FUNCTIONS.map((b) => {
+    const supported = isFunctionSupported(b.fn, currentExecutor.value)
+    return {
+      fn: b.fn,
+      hint: b.hint,
+      supported,
+      reason: supported ? '' : unsupportedReason(b.fn, currentExecutor.value) || '此执行器不支持该函数',
+    }
+  }),
+)
 
 const emit = defineEmits<{
   'update-formula': [cell: string, formula: string]
@@ -236,6 +274,11 @@ const filteredSourceRows = computed(() => {
 })
 
 async function pickSource(fn: string) {
+  // 需求 8：不支持的函数 fail-closed —— 显式提示「此处不支持」，禁打开选择弹窗、禁静默返回 0。
+  if (!isFunctionSupported(fn, currentExecutor.value)) {
+    ElMessage.info(`此处不支持 ${fn}：${unsupportedReason(fn, currentExecutor.value) || '该执行器不支持该函数'}`)
+    return
+  }
   currentPickFn.value = fn
   sourceSearch.value = ''
   sourceLoading.value = true
@@ -458,5 +501,6 @@ function onSourceRowClick(row: any) {
 .qp-label { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-bottom: 4px; }
 .qp-btns { display: flex; gap: 4px; flex-wrap: wrap; }
 .qp-btns .el-button { font-size: var(--gt-font-size-xs); padding: 2px 8px; font-family: monospace; }
+.qp-unsupported-mark { margin-left: 2px; color: var(--gt-color-danger); font-weight: 700; }
 .qp-hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); margin-top: 4px; }
 </style>

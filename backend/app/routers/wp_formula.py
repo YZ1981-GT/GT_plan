@@ -11,14 +11,14 @@ import logging
 import re
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import assert_project_permission, get_current_user
 from app.models.core import Project, User
 from app.models.workpaper_models import WorkingPaper, WpFormula, WpIndex
 from app.services.d_cycle_extraction.anchor_registry import is_known_anchor
@@ -28,12 +28,18 @@ from app.services.d_cycle_extraction.presets import (
     tier_a_semantic,
     tier_b_provenance,
 )
+from app.services.formula_management.sheet_identity_filter import (
+    filter_items_by_sheet_uid,
+)
 from app.services.wp_formula_eval_service import (
     evaluate_wp_formula_expression,
     find_unsupported_formula_functions,
 )
 from app.routers.wp_surfaced_formulas import CYCLE_SHEET_FORMULAS as _CYCLE_SHEET_FORMULAS
-from app.services.wp_formula_service import wp_formula_service
+from app.services.wp_formula_service import (
+    FormulaVersionConflict,
+    wp_formula_service,
+)
 from app.services.wp_parsed_data_service import (
     format_cell_display_value,
     write_cell_to_parsed_data,
@@ -197,6 +203,63 @@ router = APIRouter(
     tags=["wp-formula"],
 )
 
+# ── 批量保存行数限额（Task 5.4 / design §8 错误处理）────────────────────────
+# 单次批量请求体最多承接的公式行数。超限 → 422 拒绝（避免无界请求撑爆单事务 /
+# 产生超大审计批次）。取一个对真实底稿公式编辑足够宽松、又能挡住异常巨量请求的上限。
+_BATCH_MAX_ROWS = 200
+
+
+async def _write_wp_formula_audit(
+    db: AsyncSession,
+    *,
+    user: User,
+    project_id: UUID,
+    wp_code: str | None,
+    target_cell: str,
+    action: str,
+    old_formula: str,
+    new_formula: str,
+    result_value: str = "",
+) -> None:
+    """直接 wp_formula CRUD（save/delete）写 V007 审计哈希链（Task 5.4 / 需求 13.4）。
+
+    统一走 ``audit_log_helper.append_audit_log``（event_type='formula_changed'，与
+    report/consol 同源留痕），``user_id`` 必须是**真实操作人**（``user.id``，禁写死全零）。
+    ``resource_id`` 用 ``target_cell`` 作行标识。审计写失败**不阻断**主 CRUD（降级
+    WARNING），且由 router 统一 commit（service 只 flush，审计 append 也只 flush）。
+
+    🔴 必须包 ``begin_nested()``（memory 铁律：commit 前吞异常的非阻塞钩子）：
+    ``append_audit_log`` 内部 ``flush`` 若失败（如 ``audit_log_entries`` 表缺失 /
+    唯一冲突），会把整个 session 事务置为 ``PendingRollbackError`` 态——此后 router
+    的 ``db.commit()`` 必崩，且主 CRUD 写入也随之丢失（接口 500 但公式"看似已存"）。
+    用 SAVEPOINT 隔离：审计失败只回滚审计 INSERT，主 CRUD 写入保留、commit 正常。
+    """
+    try:
+        from app.services.audit_log_helper import append_audit_log
+
+        async with db.begin_nested():
+            await append_audit_log(db, {
+                "user_id": user.id,
+                "project_id": project_id,
+                "action": "formula.changed",
+                "resource_type": "wp_formula",
+                "resource_id": target_cell,
+                "details": {
+                    "event_type": "formula_changed",
+                    "module": "workpaper",
+                    "row_code": wp_code or "",
+                    "action": action,
+                    "old_formula": old_formula,
+                    "new_formula": new_formula,
+                    "result_value": result_value,
+                },
+            })
+    except Exception as audit_err:  # noqa: BLE001 — 审计写失败不阻断主 CRUD（SAVEPOINT 已回滚审计）
+        logger.warning(
+            "wp_formula 审计哈希链写入失败 wp_code=%s cell=%s action=%s: %s",
+            wp_code, target_cell, action, audit_err,
+        )
+
 
 class FormulaSaveRequest(BaseModel):
     sheet_name: str = Field(..., description="Sheet 名称")
@@ -236,6 +299,19 @@ class FormulaSaveRequest(BaseModel):
         None,
         description="可审阅的公式来源绑定模板与参数",
     )
+    # Task 1.4 / ADR-FMC-02 纵深防御：行 kind。前端按 kind 分派后，wp 行保存会带 kind='wp'
+    # （或省略 = 按 wp 处理）。surfaced/extraction 只读投影**不应**走本端点，若误带非 wp
+    # kind 由 save_formula 拒收（见该端点）。
+    kind: str | None = Field(
+        None,
+        description="行 kind（wp/surfaced/extraction/report）；本端点仅接受 wp 或省略",
+    )
+    # Task 5.4 / design §5 步骤 5：CAS 乐观锁版本号。给定时与库中既有行的
+    # definition_version 比对，不一致 → 409（并发冲突）；省略 = 不做 CAS（向后兼容）。
+    expected_version: int | None = Field(
+        None,
+        description="CAS 乐观锁版本（既有行的 definition_version）；不一致返 409",
+    )
 
 
 class FormulaItemResponse(BaseModel):
@@ -244,6 +320,10 @@ class FormulaItemResponse(BaseModel):
     wp_id: str
     sheet_name: str
     target_cell: str
+    # 结构化稳定键（V163 列，可空）：右栏结构化精确等值归属（Task 1.2 / ADR-FMC-01）。
+    stable_sheet_key: str | None = None
+    row_key: str | None = None
+    field_key: str | None = None
     expression: str
     category: str | None = None
     description: str | None = None
@@ -269,6 +349,11 @@ def _formula_to_dict(f: WpFormula) -> dict:
         "wp_id": str(f.wp_id),
         "sheet_name": f.sheet_name,
         "target_cell": f.target_cell,
+        # 结构化稳定键（V163 列）：供前端右栏按结构化精确等值归属当前 sheet
+        # （Task 1.2 / ADR-FMC-01，禁 includes 子串串页）。可空（历史未回填行由 Task 1.3 回填）。
+        "stable_sheet_key": f.stable_sheet_key,
+        "row_key": f.row_key,
+        "field_key": f.field_key,
         "expression": f.expression,
         "category": f.category,
         "description": f.description,
@@ -342,6 +427,32 @@ async def _load_wp(db: AsyncSession, wp_id: UUID) -> WorkingPaper:
     if wp is None:
         raise HTTPException(status_code=404, detail="底稿不存在")
     return wp
+
+
+async def _authorize_wp_project(
+    db: AsyncSession,
+    wp: WorkingPaper,
+    current_user: User,
+    *,
+    min_permission: str,
+    body_project_id: UUID | None = None,
+) -> None:
+    """对象型端点项目鉴权（Task 5.2 / ADR-FMC-06）。
+
+    路径只有 ``{wp_id}``、无项目维度。先经 ``wp.project_id`` **最小反查**出对象所属项目，
+    再对**反查出的 project_id** 做 ``assert_project_permission``（直调版，教训㉕①：禁
+    直接 override ``require_project_access`` 工厂——它从路径/查询取 project_id，对本类
+    对象型端点取不到，且每次返回新函数对象使 override 静默失效）。
+
+    body/query 的 ``project_id`` 若给定且与反查出的 project 不一致 → 403（防「拿 B 的
+    wp_id 配 A 的 project_id 蒙混」或反之）。一致性校验先于权限判定，避免泄露「该 wp
+    属于哪个项目」给无权者；但两者都 403，攻击者不能据状态码区分。
+    """
+    if body_project_id is not None and body_project_id != wp.project_id:
+        raise HTTPException(status_code=403, detail="权限不足")
+    await assert_project_permission(
+        db, current_user, wp.project_id, min_permission
+    )
 
 
 # D-cycle 底稿编码识别（D1–D7）；捕获基础码用于预设/锚点/溯源查询。
@@ -633,8 +744,23 @@ async def _build_surfaced_formulas(db: AsyncSession, wp: WorkingPaper) -> list[d
 @router.get("/formulas")
 async def list_formulas(
     wp_id: UUID,
+    project_id: UUID | None = Query(
+        None,
+        description=(
+            "当前页 location identity · 项目维度（可选）。Task 3.1 / §5 步骤 3：右栏"
+            "每行带同一 location identity（projectId/wpId/sheetUid）。"
+        ),
+    ),
+    sheet_uid: str | None = Query(
+        None,
+        description=(
+            "当前页 location identity · sheet 维度（可选）。给定时服务端按 stable_sheet_key"
+            "维度**精确等值 + fail-closed** 过滤 items，只返精确当前 sheet 的行"
+            "（Task 3.1 / ADR-FMC-01，门禁断言⑤a）；省略 = 整册视图（向后兼容）。"
+        ),
+    ),
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
     """列出该底稿的全部自定义公式（含 D-cycle 四表库提取分层，灰度开关 + 仅 D1–D7）。
 
@@ -642,14 +768,40 @@ async def list_formulas(
     - 原始 `items`（用户已落库 wp_formula 行）保持向后兼容，不改形状。
     - 额外 `extraction`（仅 D 循环 + 灰度开关开启时出现）= `{tierA, tierB}`，供公式管理
       面板（Task 4.x）分层展示；OFF / 非 D 循环时无此字段，GET 表现同当前（零回归）。
+
+    Task 3.1（§5 步骤 3 · ADR-FMC-01）服务端精确过滤
+    ================================================
+    右栏当前页视图按 `project_id & wp_id & sheet_uid` 三键**服务端精确过滤**，与 Task 1.2
+    的前端结构化等值配套（服务端口径）：
+      - `wp_id`（路径）：权威 wp 归属维度，由 `list_by_wp(project_id=wp.project_id)` 过滤。
+      - `sheet_uid`（可选 query）：给定时按 `stable_sheet_key` 维度精确等值 + fail-closed
+        过滤 `items`（复用 `stable_key` 单一真源归一，禁 includes 子串串页），只返精确当前
+        sheet 的行；省略时不过滤（整册视图，向后兼容）。
+      - `project_id`（可选 query）：location identity 项目维度，随响应回显使左右栏每行带同一
+        identity。**本任务不做鉴权加固**（跨项目 403 是 Phase 5 Task 5.2 的事）；此处仅在
+        与 wp 实际项目**不一致**时记一条审计日志（不改变过滤结果，不 403）。
     """
     wp = await _load_wp(db, wp_id)
+    # ── Task 5.2 / ADR-FMC-06：对象型端点项目鉴权 ──
+    # 经 wp.project_id 反查项目后做 readonly 项目级校验；query project_id 若与反查出的
+    # 项目不一致则 403（location identity 一致性，兼作「拿 B 的 wp_id 配 A 的 project_id」
+    # 的防绕过）。此前此处仅记日志不拦截（Task 3.1 遗留），现由 Phase 5 正式加固。
+    await _authorize_wp_project(
+        db, wp, user, min_permission="readonly", body_project_id=project_id
+    )
     # 传 project_id 使 ownership 校验通过并真正列出该底稿公式（此前缺 project_id 恒空）。
     formulas = await wp_formula_service.list_by_wp(db, wp_id, project_id=wp.project_id)
+    items = [_formula_to_dict(f) for f in formulas]
+    # ── Task 3.1：服务端按 sheet_uid 精确过滤（stable_sheet_key 维度，fail-closed）──
+    #    省略 sheet_uid = 整册视图（返回全部，向后兼容）；给定则只返精确当前 sheet 的行。
+    items = filter_items_by_sheet_uid(items, sheet_uid)
     resp: dict = {
         "wp_id": str(wp_id),
-        "count": len(formulas),
-        "items": [_formula_to_dict(f) for f in formulas],
+        # location identity（右栏每行同一 identity 的来源，§5 步骤 3）：回显请求三键。
+        "project_id": str(wp.project_id),
+        "sheet_uid": sheet_uid,
+        "count": len(items),
+        "items": items,
     }
     extraction = await _build_extraction_block(db, wp)
     if extraction is not None:
@@ -659,6 +811,45 @@ async def list_formulas(
     if surfaced:
         resp["surfaced"] = surfaced
     return resp
+
+
+# surfaced 伪 id（E1-surfaced-* / {base}-surfaced-*）与 Tier B 溯源 id（tierB-*）的标记正则，
+# 用于 save_formula 纵深防御：这些只读投影永不应写入 wp_formula（Task 1.4 / ADR-FMC-02）。
+_READONLY_PROJECTION_MARKER_RE = re.compile(r"-surfaced-|^tierB-|^tierB$")
+
+
+def _reject_non_wp_kind(body: FormulaSaveRequest) -> None:
+    """纵深防御：本端点仅承接 wp kind，拒收 surfaced/extraction/report 与只读投影伪标记。
+
+    - `kind` 省略或 == 'wp' → 放行（前端按 kind 分派后，wp 行会带 'wp' 或省略）。
+    - `kind` ∈ {surfaced, extraction, report} 或其它非 wp 值 → 403。
+    - target_cell / sheet_name 带只读投影伪标记（`-surfaced-` / `tierB-`）→ 403
+      （即便没带 kind，也兜住「把 surfaced 伪 id 当 target_cell 发过来」的绕过）。
+    """
+    kind = (body.kind or "").strip().lower()
+    if kind and kind != "wp":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error_code": "FORMULA_NON_WP_KIND_REJECTED",
+                "kind": body.kind,
+                "message": (
+                    "底稿公式端点仅接受工作底稿正式公式（wp）；"
+                    "surfaced/extraction 为只读投影，report 请走报表配置端点。"
+                ),
+            },
+        )
+    for field in (body.target_cell, body.sheet_name):
+        if field and _READONLY_PROJECTION_MARKER_RE.search(str(field)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error_code": "FORMULA_READONLY_PROJECTION_REJECTED",
+                    "message": (
+                        "surfaced/Tier B 为只读投影，不可写入底稿公式。"
+                    ),
+                },
+            )
 
 
 @router.put("/formulas")
@@ -674,8 +865,19 @@ async def save_formula(
     只支持 TB/SUM_TB/WP（+ 字面量/四则运算/跨 sheet 引用）。含 AUX/PREV/序时账
     （LEDGER/COUNT_LEDGER）等未实现函数时返 422（FORMULA_UNSUPPORTED_FUNCTION），
     不静默落库、不静默求值为 0——这些复杂归集由 Tier B prefill 承担。
+
+    Task 1.4 / ADR-FMC-02 纵深防御：本端点仅承接**工作底稿正式公式（wp kind）**。
+    若请求误带非 wp 的 kind（surfaced/extraction/report），或 target_cell/sheet_name 带
+    只读投影伪标记（`-surfaced-` / `tierB-`），直接 403 拒收——前端已按 kind 分派，这是
+    「即便前端分派被绕过也不把只读投影 / 报表行误写进 wp_formula」的后端兜底。
     """
     wp = await _load_wp(db, wp_id)
+
+    # ── Task 5.2 / ADR-FMC-06：对象型写端点项目鉴权（edit 级，经 wp.project_id 反查）──
+    await _authorize_wp_project(db, wp, user, min_permission="edit")
+
+    # ── 纵深防御：拒收非 wp kind 与只读投影伪标记（Task 1.4 / ADR-FMC-02） ──
+    _reject_non_wp_kind(body)
 
     # 不受支持函数硬阻断（写库前，仅作用于本编辑公式保存路径 = Tier A 入口）。
     unsupported = find_unsupported_formula_functions(body.expression)
@@ -694,27 +896,54 @@ async def save_formula(
             },
         )
 
-    saved, issues = await wp_formula_service.save(
-        db,
-        project_id=wp.project_id,
-        wp_id=wp_id,
-        sheet_name=body.sheet_name,
-        target_cell=body.target_cell,
-        expression=body.expression,
-        year=body.year,
-        template_type=body.template_type,
-        category=body.category,
-        description=body.description,
-        created_by=user.id,
-        formula_type=body.formula_type,
-        refs=body.refs,
-        issue_description=body.issue_description,
-        hint_text=body.hint_text,
-        formula_source=body.formula_source,
-        reference_formula_id=body.reference_formula_id,
-        source_scope=body.source_scope,
-        binding=body.binding,
-    )
+    # ── 保存前取既有行版本/表达式（供 CAS 冲突回报 + 审计 old_formula）──
+    _existing_before = (
+        await db.execute(
+            sa.select(WpFormula).where(
+                WpFormula.wp_id == wp_id,
+                WpFormula.sheet_name == body.sheet_name,
+                WpFormula.target_cell == body.target_cell,
+            )
+        )
+    ).scalar_one_or_none()
+    _old_formula = _existing_before.expression if _existing_before else ""
+    _audit_action = "update" if _existing_before else "create"
+
+    try:
+        saved, issues = await wp_formula_service.save(
+            db,
+            project_id=wp.project_id,
+            wp_id=wp_id,
+            sheet_name=body.sheet_name,
+            target_cell=body.target_cell,
+            expression=body.expression,
+            year=body.year,
+            template_type=body.template_type,
+            category=body.category,
+            description=body.description,
+            created_by=user.id,
+            formula_type=body.formula_type,
+            refs=body.refs,
+            issue_description=body.issue_description,
+            hint_text=body.hint_text,
+            formula_source=body.formula_source,
+            reference_formula_id=body.reference_formula_id,
+            source_scope=body.source_scope,
+            binding=body.binding,
+            expected_version=body.expected_version,
+        )
+    except FormulaVersionConflict as conflict:
+        # ── CAS 冲突（Task 5.4 / design §5 步骤 5）：409，不覆盖 ──
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error_code": "FORMULA_VERSION_CONFLICT",
+                "expected_version": conflict.expected,
+                "actual_version": conflict.actual,
+                "target_cell": conflict.target_cell,
+                "message": "公式已被他人修改（版本不一致），请刷新后重试。",
+            },
+        ) from conflict
     if issues:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -876,6 +1105,21 @@ async def save_formula(
                 linkage_err,
             )
 
+    # ── Task 5.4 / 需求 13.4：wp CRUD 写审计哈希链（真实 user_id，commit 前只 flush）──
+    await _write_wp_formula_audit(
+        db,
+        user=user,
+        project_id=wp.project_id,
+        wp_code=wp_code,
+        target_cell=body.target_cell,
+        action=_audit_action,
+        old_formula=_old_formula,
+        new_formula=body.expression,
+        result_value=(
+            str(evaluated_value) if evaluated_value is not None else ""
+        ),
+    )
+
     await db.commit()
     # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 
@@ -896,15 +1140,189 @@ async def save_formula(
     return payload
 
 
+# ── Task 5.4：批量保存（单事务 + CAS + 行数限额 + 审计哈希链）────────────────
+
+
+class FormulaBatchItem(BaseModel):
+    """批量保存的单行公式定义（与 FormulaSaveRequest 同契约字段，含可选 CAS 版本）。"""
+
+    sheet_name: str = Field(..., description="Sheet 名称")
+    target_cell: str = Field(..., description="写入目标单元格，如 B5")
+    expression: str = Field(..., description="公式表达式")
+    template_type: str = Field("soe", description="模板类型")
+    category: str | None = None
+    description: str | None = None
+    formula_type: str = Field("auto_calc", description="auto_calc / logic_check / reasonability")
+    refs: list | None = None
+    issue_description: str | None = None
+    hint_text: str | None = None
+    formula_source: str = Field("custom", description="preset / custom / reference")
+    reference_formula_id: UUID | None = None
+    source_scope: dict | None = None
+    binding: dict | None = None
+    kind: str | None = Field(None, description="行 kind；本端点仅接受 wp 或省略")
+    # CAS 乐观锁版本（既有行的 definition_version）；不一致 → 整批 409。
+    expected_version: int | None = None
+
+
+class FormulaBatchRequest(BaseModel):
+    year: int = Field(..., description="校验悬空引用所需年度（批内共用）")
+    items: list[FormulaBatchItem] = Field(..., description="批量公式行")
+
+
+@router.put("/formulas/batch")
+async def save_formulas_batch(
+    wp_id: UUID,
+    body: FormulaBatchRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """批量 upsert 底稿公式——**单事务 + CAS + 行数限额**（Task 5.4 / design §5 步骤 5 · §8）。
+
+    语义（memory 操作铁律：service 只 flush、router 统一 commit 保原子）：
+
+    1. **行数限额**（§8 错误处理）：`len(items) > _BATCH_MAX_ROWS` → 422 拒绝（不写库），
+       空批 → 422。挡住无界请求撑爆单事务 / 产生超大审计批次。
+    2. **单事务**：逐行调 `wp_formula_service.save`（内部只 `flush`）。任一行校验失败
+       （悬空引用 / 非法类型 / ownership 等）→ **整批 rollback**、422 回报失败行索引，
+       绝不「部分落库」。router 仅在全部成功后统一 `commit`。
+    3. **CAS 乐观锁**：行带 `expected_version` 且与库中既有行 `definition_version` 不一致
+       → `FormulaVersionConflict` → **整批 rollback**、409 回报冲突行（compare-and-swap
+       并发冲突检测，不覆盖他人改动）。
+    4. **审计哈希链**（需求 13.4）：每行成功 upsert 后写 `append_audit_log`
+       （真实 `user.id`，event_type='formula_changed'），与单条 CRUD 同源留痕。
+
+    纵深防御：每行同样经 `_reject_non_wp_kind`（surfaced/extraction/report 伪标记拒收）。
+    """
+    wp = await _load_wp(db, wp_id)
+    # ── Task 5.2 / ADR-FMC-06：对象型写端点项目鉴权（edit 级，经 wp.project_id 反查）──
+    await _authorize_wp_project(db, wp, user, min_permission="edit")
+
+    # 1) 行数限额（§8）：空批 / 超限 → 422（不写库）
+    n = len(body.items)
+    if n == 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"error_code": "FORMULA_BATCH_EMPTY", "message": "批量保存请求体为空"},
+        )
+    if n > _BATCH_MAX_ROWS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error_code": "FORMULA_BATCH_TOO_MANY_ROWS",
+                "max_rows": _BATCH_MAX_ROWS,
+                "received": n,
+                "message": f"批量保存行数 {n} 超过上限 {_BATCH_MAX_ROWS}",
+            },
+        )
+
+    wp_code = await _resolve_wp_code(db, wp)
+
+    saved_rows: list[dict] = []
+    try:
+        for idx, item in enumerate(body.items):
+            # 纵深防御：拒收非 wp kind / 只读投影伪标记（与单条端点同口径）。
+            _reject_non_wp_kind(
+                FormulaSaveRequest(
+                    sheet_name=item.sheet_name,
+                    target_cell=item.target_cell,
+                    expression=item.expression,
+                    year=body.year,
+                    kind=item.kind,
+                )
+            )
+
+            # 批前取既有行表达式/动作（供审计 old_formula）。
+            _existing = (
+                await db.execute(
+                    sa.select(WpFormula).where(
+                        WpFormula.wp_id == wp_id,
+                        WpFormula.sheet_name == item.sheet_name,
+                        WpFormula.target_cell == item.target_cell,
+                    )
+                )
+            ).scalar_one_or_none()
+            _old = _existing.expression if _existing else ""
+            _act = "update" if _existing else "create"
+
+            saved, issues = await wp_formula_service.save(
+                db,
+                project_id=wp.project_id,
+                wp_id=wp_id,
+                sheet_name=item.sheet_name,
+                target_cell=item.target_cell,
+                expression=item.expression,
+                year=body.year,
+                template_type=item.template_type,
+                category=item.category,
+                description=item.description,
+                created_by=user.id,
+                formula_type=item.formula_type,
+                refs=item.refs,
+                issue_description=item.issue_description,
+                hint_text=item.hint_text,
+                formula_source=item.formula_source,
+                reference_formula_id=item.reference_formula_id,
+                source_scope=item.source_scope,
+                binding=item.binding,
+                expected_version=item.expected_version,
+            )
+            if issues:
+                # 2) 单事务：任一行失败 → 整批 rollback、422（不部分落库）
+                await db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "error_code": _formula_issue_error_code(issues),
+                        "failed_index": idx,
+                        "target_cell": item.target_cell,
+                        "issues": issues,
+                        "message": "批量保存校验失败，整批已回滚（未部分落库）",
+                    },
+                )
+
+            # 4) 审计哈希链（真实 user.id，commit 前只 flush）
+            await _write_wp_formula_audit(
+                db,
+                user=user,
+                project_id=wp.project_id,
+                wp_code=wp_code,
+                target_cell=item.target_cell,
+                action=_act,
+                old_formula=_old,
+                new_formula=item.expression,
+            )
+            saved_rows.append(_formula_to_dict(saved))
+    except FormulaVersionConflict as conflict:
+        # 3) CAS 冲突 → 整批 rollback、409（不覆盖）
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error_code": "FORMULA_VERSION_CONFLICT",
+                "expected_version": conflict.expected,
+                "actual_version": conflict.actual,
+                "target_cell": conflict.target_cell,
+                "message": "批内存在版本冲突的公式，整批已回滚（未覆盖他人改动）。",
+            },
+        ) from conflict
+
+    # 全部成功 → router 统一 commit（原子）
+    await db.commit()
+    return {"saved_count": len(saved_rows), "saved": saved_rows}
+
+
 @router.delete("/formulas/{formula_id}")
 async def delete_formula(
     wp_id: UUID,
     formula_id: UUID,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
     """删除单条底稿公式。"""
     wp = await _load_wp(db, wp_id)
+    # ── Task 5.2 / ADR-FMC-06：对象型写端点项目鉴权（edit 级，经 wp.project_id 反查）──
+    await _authorize_wp_project(db, wp, user, min_permission="edit")
     existing = (
         await db.execute(
             sa.select(WpFormula).where(
@@ -916,9 +1334,10 @@ async def delete_formula(
     if existing is None:
         raise HTTPException(status_code=404, detail="公式不存在")
 
-    # 删除前留存目标格坐标（delete 之后 ORM 对象字段不可靠）
+    # 删除前留存目标格坐标 + 表达式（delete 之后 ORM 对象字段不可靠）
     _target_cell = existing.target_cell
     _sheet_name = existing.sheet_name
+    _old_expression = existing.expression
 
     # 🔴 2026-09-22 修复：必须传 project_id。`wp_formula_service.delete` 的第一道 ownership
     #    门是「project_id 为 None 即拒绝并 return False」（Req 10.6），此前这里不传 ⇒ 服务层
@@ -934,6 +1353,20 @@ async def delete_formula(
         # 上面已按 (id, wp_id) 校验过存在性，走到这里只可能是 project 归属不匹配。
         # 不得再返回 200「已删除」—— 那正是本次修复要消灭的假成功。
         raise HTTPException(status_code=404, detail="公式不存在")
+
+    # ── Task 5.4 / 需求 13.4：wp CRUD（删除）写审计哈希链（真实 user_id，commit 前只 flush）──
+    _del_wp_code = await _resolve_wp_code(db, wp)
+    await _write_wp_formula_audit(
+        db,
+        user=user,
+        project_id=wp.project_id,
+        wp_code=_del_wp_code,
+        target_cell=_target_cell or "",
+        action="delete",
+        old_formula=_old_expression,
+        new_formula="",
+    )
+
     await db.commit()
     # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 

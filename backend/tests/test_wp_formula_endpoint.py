@@ -34,6 +34,22 @@ def _stub_wp_ownership():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _stub_project_authz():
+    """隔离**项目级鉴权**（formula-manager-closure Task 5.2 / ADR-FMC-06）：本组是
+    **公式 CRUD 机制**测试（往返/悬空引用/假删除），只建 `wp_formula` 表、mock 掉
+    `_load_wp`、用 `_FakeUser` 桩（无 `.role`、无 project_users 行）。Task 5.2 给端点加了
+    `_authorize_wp_project`（经 wp.project_id 反查 → `assert_project_permission`），它会查
+    `projects`/`project_users` 表并读 `user.role` —— 对本组桩环境必崩（no such table /
+    AttributeError）。**项目级跨项目越权的正面 + 变异反证由专测 `test_fm_p0_05_cross_project_idor`
+    独立覆盖**，此处只需把该鉴权 seam 桩成放行，保持本组对 CRUD 机制的聚焦（与既有
+    `_stub_wp_ownership` 同一隔离思路）。"""
+    with patch(
+        "app.routers.wp_formula._authorize_wp_project", new=AsyncMock(return_value=None)
+    ):
+        yield
+
+
 class _FakeUser:
     id = uuid.uuid4()
     is_active = True

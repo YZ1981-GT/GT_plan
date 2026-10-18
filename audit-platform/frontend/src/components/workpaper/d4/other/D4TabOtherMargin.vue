@@ -15,7 +15,6 @@ import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import { d4_33Candidates, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME } from '../../composables/d4OtherGroupPushPredicates'
-import { eventBus } from '@/utils/eventBus'
 import WpAmountInput from '@/components/workpaper/shared/WpAmountInput.vue'
 // D4-33 双向回写：统一走 useD4SyncMode（dedicated sync sheet，sheetKey=d433-managed，
 // 同 entry gt-d4-operating-revenue；后端 phase5_d4_other_margin_sheet 作为**静态受管区** sibling
@@ -28,13 +27,8 @@ import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
-// ─── 公式管理（打开平台全局公式管理中心，定位到本底稿 D4-33）───────────────────
-// 由顶层挂载的全局 FormulaManagerDialog 响应 `open-formula-manager`（同 E1 范式）。
-// 平台唯一一套公式：wp_formula 表权威存储，后端权威执行 + CAS + 审计；
-// 支持跨底稿 TB()/WP()/ROW() 取数联动与表内 SUM_ROW()/IF() 运算校对。
-function openFormulaManager() {
-  eventBus.emit('open-formula-manager', { nodeKey: 'wp_d4_33' })
-}
+// 公式管理入口统一由宿主 GtWpRenderer 的 primary outlet（data-testid=formula-manager-open）
+// 承载（ADR-FMC-03）；原 D4-33 页内 node-only 旁路（只发 nodeKey、丢实例/项目/sheet）已删除。
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
 interface BizType { id: string; name: string }
@@ -208,7 +202,7 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 
 <template>
 <div class="d4-other-margin">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushMarginAnomaliesToA13" title="把毛利率异常推送到 A13（定性项，金额由人工逐条认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><GtIndexChip value="wp:D4-3" :context-project-id="projectId" /><el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-33-margin')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushMarginAnomaliesToA13" title="把毛利率异常推送到 A13（定性项，金额由人工逐条认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><GtIndexChip value="wp:D4-3" :context-project-id="projectId" /><el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-33-margin')">💬 复核</el-button></div></div>
 
   <template v-if="editorMode !== '在线编辑'">
     <!-- 业务类型管理 -->

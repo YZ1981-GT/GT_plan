@@ -25,6 +25,12 @@
     />
     <!-- 工具栏 -->
     <div class="gt-a1-dashboard__toolbar">
+      <el-button
+        size="small"
+        data-testid="formula-manager-open"
+        :disabled="!projectId || !wpId"
+        @click="openFormulaManager"
+      >⚙️ 公式管理</el-button>
       <el-button size="small" @click="$emit('export-template')"><img src="" style="display:none"/>导出模板</el-button>
       <el-button size="small" @click="$emit('export-data')"><img src="" style="display:none"/>导出数据</el-button>
       <el-button size="small" @click="$emit('import-data')"><img src="" style="display:none"/>导入</el-button>
@@ -367,6 +373,7 @@ import { getWpIndex, type WpIndexItem } from '@/services/workpaperApi'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useA1SubWorkpapers, type A1SubTab } from './composables/useA1SubWorkpapers'
 import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.vue'
+import { openFormulaManagerFromLocation } from '@/shell/formula/openFormulaManagerFromLocation'
 
 // ─── Lazy sub-workpaper components ───
 const GtA111SigningForm = defineAsyncComponent(() => import('./GtA111SigningForm.vue'))
@@ -437,6 +444,26 @@ const flowGraphVisible = ref(false)
 const cardRefs = reactive<Record<number, HTMLElement>>({})
 
 const projectId = computed(() => props.projectId || (route.params.projectId as string) || '')
+
+// ─── 公式管理（ADR-FMC-03 统一 primary outlet）──────────────────────────────
+// A1 自管工具栏（非走 GtWpRenderer 的标准工具栏），故在本页补同一 primary outlet：
+// 经统一命令 createOpenFormulaManagerCommand 校验后提交完整 CanonicalWorkpaperLocation，
+// 不发 node-only nodeKey、不落 report scope。
+async function openFormulaManager(): Promise<void> {
+  const year = props.year || parseInt(route.query.year as string) || undefined
+  const outcome = openFormulaManagerFromLocation({
+    wpId: props.wpId,
+    projectId: projectId.value,
+    wpCode: props.wpCode || 'A1',
+    year,
+    sheetName: props.sheetName || '',
+    scope: 'workpaper',
+  })
+  if (!outcome.ok) {
+    const { ElMessage } = await import('element-plus')
+    ElMessage.warning(outcome.detail)
+  }
+}
 
 // ─── Sub-workpapers (A1-11~A1-16) ───
 const subWps = useA1SubWorkpapers({

@@ -52,6 +52,7 @@ function makeActions(): { actions: EditorToolbarActions; spies: Record<string, R
     onExportPdf: vi.fn(),
     onUpload: vi.fn(),
     onManualRefresh: vi.fn(),
+    onFormulaManager: vi.fn(),
   }
   return { actions: spies as unknown as EditorToolbarActions, spies }
 }
@@ -102,7 +103,8 @@ describe('useEditorToolbar — availableButtons 过滤', () => {
     const { availableButtons } = useEditorToolbar(ctx, actions)
 
     const keys = availableButtons.value.map((b) => b.key)
-    expect(keys).toEqual(['save', 'prefill', 'submitReview', 'manualRefresh'])
+    // ADR-FMC-03：新增统一公式管理 primary outlet（standalone group，无 requireEdit）。
+    expect(keys).toEqual(['save', 'prefill', 'submitReview', 'manualRefresh', 'formulaManager'])
   })
 
   it('wpStatus !== "draft" 时 submitReview 隐藏（visibleWhenStatus 过滤）', () => {
@@ -112,7 +114,7 @@ describe('useEditorToolbar — availableButtons 过滤', () => {
 
     const keys = availableButtons.value.map((b) => b.key)
     expect(keys).not.toContain('submitReview')
-    expect(keys).toEqual(['save', 'prefill', 'manualRefresh'])
+    expect(keys).toEqual(['save', 'prefill', 'manualRefresh', 'formulaManager'])
   })
 })
 
@@ -198,7 +200,7 @@ describe('useEditorToolbar — handleAction 分发', () => {
     expect(spies.onRefreshPrefill).not.toHaveBeenCalled()
   })
 
-  it('handleAction 分发 9 个已知 action', () => {
+  it('handleAction 分发 10 个已知 action（含 ADR-FMC-03 formulaManager）', () => {
     const ctx = makeCtx({ wpStatus: 'draft' })
     const { actions, spies } = makeActions()
     const { handleAction } = useEditorToolbar(ctx, actions)
@@ -212,6 +214,7 @@ describe('useEditorToolbar — handleAction 分发', () => {
     handleAction('exportPdf')
     handleAction('upload')
     handleAction('manualRefresh')
+    handleAction('formulaManager')
 
     expect(spies.onSave).toHaveBeenCalledTimes(1)
     expect(spies.onRefreshPrefill).toHaveBeenCalledTimes(1)
@@ -222,6 +225,7 @@ describe('useEditorToolbar — handleAction 分发', () => {
     expect(spies.onExportPdf).toHaveBeenCalledTimes(1)
     expect(spies.onUpload).toHaveBeenCalledTimes(1)
     expect(spies.onManualRefresh).toHaveBeenCalledTimes(1)
+    expect(spies.onFormulaManager).toHaveBeenCalledTimes(1)
   })
 
   it('handleAction("unknown") 静默 no-op，不抛异常', () => {

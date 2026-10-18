@@ -132,7 +132,12 @@
         @open-attachments="attachmentsDrawerVisible = true"
       >
         <template #page-capabilities-compatibility>
-          <el-button size="small" :disabled="!runtimeProjectId || !runtimeWpCode || loading" @click="openPageFormulaManager">
+          <el-button
+            size="small"
+            data-testid="formula-manager-open"
+            :disabled="!runtimeProjectId || !runtimeWpCode || loading"
+            @click="openPageFormulaManager"
+          >
             <el-icon><Setting /></el-icon> 公式管理
           </el-button>
           <!-- 行名对齐刷新（formula-row-name-alignment-confirmation Task 11）：
@@ -352,6 +357,7 @@ import {
 import { createHtmlStableContextEmitter } from '@/composables/htmlStableContextEmitter'
 import { useCellLocate, type LocateTarget } from '@/composables/useCellLocate'
 import { eventBus, type WorkpaperLocateCellPayload } from '@/utils/eventBus'
+import { openFormulaManagerFromLocation } from '@/shell/formula/openFormulaManagerFromLocation'
 import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
 import {
   getRendererEntry,
@@ -1200,11 +1206,9 @@ function onOpenAttachment(payload: { wpId: string; sheetName: string; rowRef: st
  * 「完整Excel」合成页签不是真实 sheet，传空表示工作簿级视图。
  */
 function openPageFormulaManager() {
-  if (!props.wpId || !runtimeProjectId.value || !runtimeWpCode.value) {
-    ElMessage.warning('当前底稿缺少完整上下文，暂时无法打开公式管理')
-    return
-  }
-  eventBus.emit('open-formula-manager', {
+  // ADR-FMC-03：生产经统一命令 createOpenFormulaManagerCommand 校验后再提交完整
+  // CanonicalWorkpaperLocation；缺上下文由 helper fail-closed 拒绝（不退 nodeKey）。
+  const outcome = openFormulaManagerFromLocation({
     wpId: props.wpId,
     projectId: runtimeProjectId.value,
     year: preparationYear.value,
@@ -1213,7 +1217,11 @@ function openPageFormulaManager() {
     // 本工作簿真实拥有的 sheet 集（render-config 是运行时权威）。跨循环共享页
     // （D2 里的 D0-*、E1 里的 E26A）靠它才能被认成「本册内页」而非外册。
     sheetCodes: hostSheetCodes.value,
+    scope: 'workpaper',
   })
+  if (!outcome.ok) {
+    ElMessage.warning(outcome.detail)
+  }
 }
 
 // ─── 行名对齐刷新（formula-row-name-alignment-confirmation Task 11）───────────

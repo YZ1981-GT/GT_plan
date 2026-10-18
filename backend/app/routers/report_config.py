@@ -16,7 +16,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_role
+from app.deps import (
+    assert_project_permission,
+    get_current_user,
+    require_project_access,
+    require_role,
+)
 from app.models.core import User
 from app.models.report_models import FinancialReportType, ReportConfig
 from app.models.report_schemas import ReportConfigCloneRequest, ReportConfigRow
@@ -26,6 +31,51 @@ router = APIRouter(
     prefix="/api/report-config",
     tags=["report-config"],
 )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Task 5.3 / ADR-FMC-06 · report_config 写鉴权分流
+#
+# report_config 是**全局模板表**（无 project_id 列，按 applicable_standard 四标准区分）：
+#   · 全局模板行（applicable_standard ∈ {enterprise, small_business, listed, ...}，
+#     即非 "project:{uuid}"）：对所有项目共享，**写操作须限 admin**。任意登录用户
+#     篡改全局模板会污染所有项目取数。
+#   · 项目克隆行（applicable_standard == "project:{uuid}"）：属该项目，写按
+#     require_project_access("edit") —— 非该项目成员（含有角色但无项目归属者）被 403。
+#
+# 两条依赖工厂（require_role / require_project_access）不能在同一函数签名里按行内容
+# 条件挂载，故在函数体内显式分流（直调 assert_project_permission，避免「依赖工厂每次
+# 返回新对象」的 override 失效坑，memory 教训㉕①）。
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _project_id_from_standard(applicable_standard: str | None) -> UUID | None:
+    """项目克隆行的 applicable_standard 形如 "project:{uuid}"，解析出 project_id；
+    全局模板行返回 None。"""
+    std = (applicable_standard or "").strip()
+    if not std.startswith("project:"):
+        return None
+    try:
+        return UUID(std.removeprefix("project:"))
+    except ValueError:
+        return None
+
+
+async def _authorize_report_config_write(
+    db: AsyncSession,
+    current_user: User,
+    applicable_standard: str | None,
+) -> None:
+    """report_config 写鉴权分流：项目克隆行 → require_project_access("edit")；
+    全局模板行 → admin only。非 admin 写全局模板 / 非成员写项目克隆行 → 403。"""
+    project_id = _project_id_from_standard(applicable_standard)
+    if project_id is not None:
+        # 项目克隆行：项目级 edit 归属校验（admin 在 assert_project_permission 内放行）。
+        await assert_project_permission(db, current_user, project_id, "edit")
+        return
+    # 全局模板行：仅 admin 可写。
+    if current_user.role.value != "admin":
+        raise HTTPException(status_code=403, detail="权限不足：全局报表模板写操作仅限 admin")
 
 
 @router.get("")
@@ -39,7 +89,13 @@ async def list_report_configs(
     """查询报表配置列表。
     
     优先级：applicable_standard 显式传入 > 从 project_id 自动解析 > 降级 enterprise
+
+    Task 5.3 / ADR-FMC-06：给定 project_id 时按 readonly 做项目级鉴权（禁任意登录
+    用户用他人 project_id 解析其 applicable_standard）；无 project_id 的全局模板读
+    保持登录门控（全局模板非敏感，design §5 步骤 5 未要求收紧全局读）。
     """
+    if project_id is not None:
+        await assert_project_permission(db, current_user, project_id, "readonly")
     if not applicable_standard and project_id:
         applicable_standard = await ReportConfigService.resolve_applicable_standard(db, project_id)
     if not applicable_standard:
@@ -52,17 +108,82 @@ async def list_report_configs(
     return [ReportConfigRow.model_validate(r) for r in rows]
 
 
+# 报表子类标签（与前端 FormulaManagerDialog.vue REPORT_SUBTYPE_LABELS_FALLBACK 对齐）。
+_REPORT_TYPE_LABELS: dict[str, str] = {
+    "balance_sheet": "资产负债表",
+    "income_statement": "利润表",
+    "cash_flow_statement": "现金流量表",
+    "equity_statement": "权益变动表",
+    "cash_flow_supplement": "现金流附表",
+    "impairment_provision": "资产减值准备表",
+}
+
+
+# ⚠️ 路由顺序铁律（§1 #8 / design §5 步骤 6）：静态路径 `GET /types` 必须声明在
+# 动态路径 `GET /{config_id}`（config_id: UUID）**之前**，否则 `/types` 会被 UUID 路由
+# 先匹配、解析失败返 422。FastAPI 按声明顺序匹配，先声明者优先。
+@router.get("/types")
+async def list_report_types(
+    project_id: UUID | None = Query(None),
+    applicable_standard: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """返回当前项目（标准）下的报表子类列表及每类公式行数。
+
+    契约（前端 FormulaManagerDialog.vue loadReportTypes / docStructureTree
+    buildDocStructureDynamic 消费）：返回 `[{report_type, label, formula_count}]`。
+
+    优先级与 list_report_configs 一致：applicable_standard 显式传入 > 从 project_id
+    自动解析 > 降级 enterprise。给定 project_id 时按 readonly 做项目级鉴权（Task 5.3 /
+    ADR-FMC-06 同口径，禁任意登录用户用他人 project_id 解析其 applicable_standard）。
+    """
+    if project_id is not None:
+        await assert_project_permission(db, current_user, project_id, "readonly")
+    if not applicable_standard and project_id:
+        applicable_standard = await ReportConfigService.resolve_applicable_standard(db, project_id)
+    if not applicable_standard:
+        applicable_standard = "enterprise"
+
+    svc = ReportConfigService(db)
+    rows = await svc.list_configs(applicable_standard=applicable_standard)
+
+    # 统计每个报表子类的公式行数（有 formula 的行计入）。
+    counts: dict[str, int] = {}
+    for r in rows:
+        rt = r.report_type.value if hasattr(r.report_type, "value") else str(r.report_type)
+        if (r.formula or "").strip():
+            counts[rt] = counts.get(rt, 0) + 1
+
+    # 枚举全部报表子类（固定 6 类），formula_count 从统计填充（无公式则 0）。
+    return [
+        {
+            "report_type": rt.value,
+            "label": _REPORT_TYPE_LABELS.get(rt.value, rt.value),
+            "formula_count": counts.get(rt.value, 0),
+        }
+        for rt in FinancialReportType
+    ]
+
+
 @router.get("/{config_id}")
 async def get_report_config(
     config_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """查询单行配置详情"""
+    """查询单行配置详情。
+
+    Task 5.3 / ADR-FMC-06：项目克隆行（applicable_standard=project:{uuid}）按 readonly
+    做项目级鉴权；全局模板行读保持登录门控（非敏感）。
+    """
     svc = ReportConfigService(db)
     row = await svc.get_config(config_id)
     if row is None:
         raise HTTPException(status_code=404, detail="配置行不存在")
+    project_id = _project_id_from_standard(getattr(row, "applicable_standard", None))
+    if project_id is not None:
+        await assert_project_permission(db, current_user, project_id, "readonly")
     return ReportConfigRow.model_validate(row)
 
 
@@ -78,7 +199,12 @@ async def clone_report_config(
     供取数层按项目优先读取；可反复执行，返回 created/updated/skipped。
 
     ``mode=strict``（legacy，需显式传）：全量克隆（含无公式结构行），项目级已存在则 400。
+
+    Task 5.3 / ADR-FMC-06：克隆是把全局模板物化成**目标项目**的项目级公式（写入
+    ``project:{data.project_id}`` 行），属项目级写 → 对 ``data.project_id`` 做
+    ``require_project_access("edit")``（非目标项目成员被 403）。
     """
+    await assert_project_permission(db, current_user, data.project_id, "edit")
     svc = ReportConfigService(db)
     try:
         if data.mode == "sync":
@@ -113,12 +239,36 @@ async def update_report_config(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """修改配置行"""
+    """修改配置行。
+
+    Task 5.3 / ADR-FMC-06：写鉴权按行分流 —— 项目克隆行
+    （applicable_standard=project:{uuid}）→ require_project_access("edit")；
+    全局模板行 → admin only。body 的 project_id 与行归属不一致时 403
+    （防以 A 的归属改 B 的行 / 伪造 project_id 绕过）。
+    """
     svc = ReportConfigService(db)
     try:
         # Capture old formula for event payload
         old_row = await svc.get_config(config_id)
+        if old_row is None:
+            raise HTTPException(status_code=404, detail="配置行不存在")
         old_formula = old_row.formula if old_row else None
+
+        # ── 写鉴权分流（必须在任何写操作前）──
+        row_std = getattr(old_row, "applicable_standard", None)
+        row_pid = _project_id_from_standard(row_std)
+        # body/query 携带的 project_id 若与行归属不一致 → 403（不以入参冒充归属）。
+        body_pid_raw = str(updates.get("project_id") or "").strip()
+        if body_pid_raw:
+            try:
+                body_pid = UUID(body_pid_raw)
+            except ValueError:
+                body_pid = None
+            if body_pid is not None and row_pid is not None and body_pid != row_pid:
+                raise HTTPException(
+                    status_code=403, detail="权限不足：project_id 与配置行归属不一致"
+                )
+        await _authorize_report_config_write(db, current_user, row_std)
 
         # P2-2: 公式保存前校验地址有效性（悬空引用拒绝保存）
         new_formula = updates.get("formula")
@@ -197,7 +347,14 @@ async def create_report_config(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """新增配置行"""
+    """新增配置行。
+
+    Task 5.3 / ADR-FMC-06：项目克隆行（applicable_standard=project:{uuid}）→
+    require_project_access("edit")；全局模板行 → admin only。
+    """
+    await _authorize_report_config_write(
+        db, current_user, body.get("applicable_standard")
+    )
     rc = ReportConfig(
         report_type=FinancialReportType(body["report_type"]),
         row_number=body.get("row_number", 0),
@@ -221,7 +378,11 @@ async def delete_report_config(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """删除配置行"""
+    """删除配置行。
+
+    Task 5.3 / ADR-FMC-06：写鉴权按行分流 —— 项目克隆行 →
+    require_project_access("edit")；全局模板行 → admin only。
+    """
     import sqlalchemy as sa
     result = await db.execute(
         sa.select(ReportConfig).where(ReportConfig.id == config_id)
@@ -229,6 +390,9 @@ async def delete_report_config(
     row = result.scalar_one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="行不存在")
+    await _authorize_report_config_write(
+        db, current_user, getattr(row, "applicable_standard", None)
+    )
     row.is_deleted = True
     await db.commit()
     return {"deleted": True}
@@ -443,6 +607,11 @@ async def execute_formulas_batch(
     except ValueError:
         pid = None
 
+    # Task 5.3 / ADR-FMC-06：按 body.project_id 做项目级鉴权（readonly，批量执行为取数）。
+    # 此前仅 get_current_user = 任意登录用户可对任意项目执行批量公式，坐实 IDOR。
+    if pid is not None:
+        await assert_project_permission(db, current_user, pid, "readonly")
+
     row_values: dict[str, Decimal] = {}
     results = []
 
@@ -613,7 +782,9 @@ async def _tb_get_project_or_404(db: AsyncSession, project_id: UUID) -> _TbProje
 async def get_tb_detail_formulas(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    # Task 5.2 / ADR-FMC-06：path 有 {project_id}，补 readonly 项目级鉴权
+    # （此前仅 get_current_user = 任意登录用户可读任意项目 tb_detail，坐实 IDOR）。
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """读取试算表科目明细公式的项目级覆盖 + 自定义新增。
 
@@ -640,8 +811,15 @@ async def save_tb_detail_formulas(
     """保存试算表科目明细公式覆盖 + 自定义新增到 wizard_state.tb_detail_formulas。
 
     铁律：合并写入 wizard_state（不覆盖其他字段）。
+
+    Task 5.2 / ADR-FMC-06：``require_role`` 仅是**角色**门控（manager 等允许集），不含
+    项目维度 —— manager 可写**任意项目**，坐实 IDOR。在角色门控外叠加**项目归属校验**
+    （直调 ``assert_project_permission``，edit 级）：非该项目成员的 manager 被 403 挡下。
     """
     from sqlalchemy.orm.attributes import flag_modified
+
+    # 项目归属校验（在 require_role 角色门控之外叠加项目维度，edit 级）。
+    await assert_project_permission(db, current_user, project_id, "edit")
 
     project = await _tb_get_project_or_404(db, project_id)
 

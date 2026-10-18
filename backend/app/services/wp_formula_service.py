@@ -160,6 +160,24 @@ class OwnershipError(Exception):
         self.message = message
 
 
+class FormulaVersionConflict(Exception):
+    """乐观锁（CAS）冲突：客户端提交的 ``expected_version`` 与库中当前
+    ``definition_version`` 不一致（formula-manager-closure Task 5.4 / design §5 步骤 5）。
+
+    携带 ``expected`` / ``actual`` 供 router 转 409 时如实回报，让前端能提示「公式已被
+    他人修改，请刷新后重试」而非静默覆盖（compare-and-swap 并发冲突检测）。
+    """
+
+    def __init__(self, *, expected: int | None, actual: int | None,
+                 target_cell: str | None = None):
+        super().__init__(
+            f"公式定义版本冲突：expected={expected} actual={actual}"
+        )
+        self.expected = expected
+        self.actual = actual
+        self.target_cell = target_cell
+
+
 def _ownership_issue(reason: str = "ownership_denied") -> list[dict]:
     """生成 ownership 校验失败的 issue（不含目标敏感元数据，Req 10.4）。"""
     return [
@@ -285,6 +303,7 @@ class WpFormulaService:
         reference_formula_id: uuid.UUID | str | None = None,
         source_scope: dict | None = None,
         binding: dict | None = None,
+        expected_version: int | None = None,
     ) -> tuple[WpFormula | None, list[dict]]:
         """保存（upsert）一条底稿公式。
 
@@ -297,8 +316,18 @@ class WpFormulaService:
         - 必须传入 project_id（Req 10.6：未提供拒绝写入）。
         - 校验 wp_id 属于 project_id（Req 10.1 / 10.4）。
 
+        CAS 乐观锁（formula-manager-closure Task 5.4 / design §5 步骤 5）：
+        - ``expected_version`` 给定且命中既有行（upsert 的 update 分支）时，比对库中
+          当前 ``definition_version``；不一致 → 抛 ``FormulaVersionConflict``（router 转
+          409），**不覆盖**（compare-and-swap 并发冲突检测）。
+        - ``expected_version`` 为 None → 不做 CAS（向后兼容单条保存既有行为）。
+        - 新建分支不做 CAS（无既有版本可比）。
+
         Returns:
             (WpFormula, []) 保存成功；(None, issues) 校验失败未写库。
+
+        Raises:
+            FormulaVersionConflict: ``expected_version`` 与库中版本不一致（CAS 冲突）。
         """
         # ── Req 10.6：project_id 必填 ──
         if project_id is None:
@@ -486,6 +515,19 @@ class WpFormulaService:
             # ── Req 10.1：二次校验 existing formula 归属 ──
             if existing.project_id != project_uuid:
                 return None, _ownership_issue()
+
+            # ── CAS 乐观锁（Task 5.4 / design §5 步骤 5）──
+            # 客户端带 expected_version 时，与库中当前 definition_version 比对；不一致
+            # 说明期间已被他人改过 → 抛 FormulaVersionConflict（router 转 409），不覆盖。
+            # 版本比对**先于**任何字段赋值，确保冲突时 ORM 对象零改动（不留脏 flush）。
+            if expected_version is not None:
+                actual_version = getattr(existing, "definition_version", None)
+                if actual_version != expected_version:
+                    raise FormulaVersionConflict(
+                        expected=expected_version,
+                        actual=actual_version,
+                        target_cell=target_cell,
+                    )
 
             existing.expression = expression
             existing.formula_type = ftype

@@ -147,47 +147,33 @@ describe('D4-33~36 组件连接性（字面量正确）', () => {
   })
 })
 
-// ─── 公式管理入口守卫：接入平台唯一公式体系（FormulaManagerDialog / wp_formula） ─────
-// 四组件通过 open-formula-manager 事件打开平台全局公式管理中心（同 E1 范式），
-// 定位到本底稿 nodeKey（wp_d4_33/34/35/36）。平台侧后端权威执行 + CAS + 审计 +
-// 跨底稿 TB()/WP()/ROW() 取数联动，为"唯一一套公式"的落地入口。
-describe('D4-33~36 公式管理入口（接入平台唯一公式体系）', () => {
-  const cases = [
-    { file: 'D4TabOtherMargin.vue', node: 'wp_d4_33' },
-    { file: 'D4TabOtherContract.vue', node: 'wp_d4_34' },
-    { file: 'D4TabOtherCheck.vue', node: 'wp_d4_35' },
-    { file: 'D4TabOtherCutoff.vue', node: 'wp_d4_36' },
+// ─── 公式管理入口守卫（ADR-FMC-03 后，node-only 旁路已删除） ───────────────────
+// 原四组件各有一个页内「ƒx 公式管理」按钮 + node-only 旁路（openFormulaManager 只发
+// {nodeKey:'wp_d4_3X'}，丢实例/项目/sheet）。spec formula-manager-closure Task 2.1
+// 删除该旁路：D4 页的公式管理入口统一由宿主 GtWpRenderer 的 primary outlet
+// （data-testid=formula-manager-open，提交完整 CanonicalWorkpaperLocation）承载，
+// 以满足「恰一个 testid / 完整 location / 不落 report scope」。
+// 此守卫反映新真相：四组件不再有页内旁路；被删形态回归即打红。
+describe('D4-33~36 node-only 公式管理旁路已删除（ADR-FMC-03）', () => {
+  const files = [
+    'D4TabOtherMargin.vue',
+    'D4TabOtherContract.vue',
+    'D4TabOtherCheck.vue',
+    'D4TabOtherCutoff.vue',
   ]
-  for (const c of cases) {
-    it(`${c.file}: import eventBus 且 openFormulaManager emit open-formula-manager`, () => {
-      const src = readOther(c.file)
-      expect(src).toContain("from '@/utils/eventBus'")
-      // 判行为：openFormulaManager 函数体 emit 平台事件（非仅字符串出现）
-      const fnIdx = src.indexOf('function openFormulaManager')
-      expect(fnIdx, `${c.file} 缺 openFormulaManager 函数`).toBeGreaterThan(0)
-      const fnBody = src.slice(fnIdx, fnIdx + 260)
-      expect(fnBody).toContain("eventBus.emit('open-formula-manager'")
+  for (const file of files) {
+    it(`${file}: 不再有 node-only openFormulaManager 函数`, () => {
+      const src = readOther(file)
+      expect(src).not.toContain('function openFormulaManager')
     })
-    it(`${c.file}: nodeKey 字面量 = ${c.node}（定位本底稿，防串表）`, () => {
-      const src = readOther(c.file)
-      const fnIdx = src.indexOf('function openFormulaManager')
-      const fnBody = src.slice(fnIdx, fnIdx + 260)
-      expect(fnBody).toContain(`nodeKey: '${c.node}'`)
+    it(`${file}: 不再发 node-only wp_d4_3X 旁路`, () => {
+      const src = readOther(file)
+      // 变异反证：若旁路回归（函数体 emit {nodeKey:'wp_d4_3X'}）此断言打红。
+      expect(src).not.toMatch(/nodeKey:\s*'wp_d4_3\d'/)
     })
-    it(`${c.file}: 工具条有「ƒx 公式管理」按钮且 @click=openFormulaManager`, () => {
-      const src = readOther(c.file)
-      expect(src).toContain('ƒx 公式管理')
-      expect(src).toContain('@click="openFormulaManager"')
+    it(`${file}: 工具条不再有页内「ƒx 公式管理」旁路按钮`, () => {
+      const src = readOther(file)
+      expect(src).not.toContain('@click="openFormulaManager"')
     })
   }
-
-  it('四组件 nodeKey 互不串表（每表唯一 wp_d4_3X）', () => {
-    const nodes = cases.map(c => {
-      const src = readOther(c.file)
-      const m = src.match(/nodeKey:\s*'(wp_d4_3\d)'/)
-      return m?.[1]
-    })
-    expect(new Set(nodes).size).toBe(4) // 四个各自唯一
-    expect(nodes).toEqual(['wp_d4_33', 'wp_d4_34', 'wp_d4_35', 'wp_d4_36'])
-  })
 })

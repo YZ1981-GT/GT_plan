@@ -208,6 +208,7 @@
         >
           <el-button
             size="small"
+            :data-testid="btn.key === 'formulaManager' ? 'formula-manager-open' : undefined"
             :type="btn.dynamicType || btn.type"
             :plain="btn.plain"
             :loading="btn.loading"
@@ -463,6 +464,7 @@ import { GC0_CONTRACT_VERSION, type CanonicalWorkpaperLocation } from '@/shared/
 import type { WorkpaperCapabilitySnapshot, CapabilityDecision } from '@/shell/formula/workpaperCapabilitySnapshot'
 import { fetchWorkpaperCapabilitySnapshot } from '@/shell/formula/fetchCapabilitySnapshot'
 import { DSH_ASSIST_BRIDGE_KEY } from '@/shell/formula/dshAssistBridge'
+import { openFormulaManagerFromLocation } from '@/shell/formula/openFormulaManagerFromLocation'
 import {
   createShellStructuredError,
   type ShellStructuredError,
@@ -819,6 +821,7 @@ const { availableButtons: toolbarButtons, dropdownItems: toolbarDropdownItems, h
     onExportPdf: () => { univerEditorCoreRef.value?.onExportPdf() },
     onUpload: () => { onUpload() },
     onManualRefresh: () => { onManualRefresh() },
+    onFormulaManager: () => { onFormulaManager() },
   },
 )
 
@@ -1167,6 +1170,26 @@ async function onManualRefresh() {
     univerEditorCoreRef.value?.onRefreshPrefill()
   } finally {
     manualRefreshing.value = false
+  }
+}
+
+// ─── 公式管理（ADR-FMC-03 统一 primary outlet，Univer 主路径）──────────────────
+// 原 Univer 工具栏只有「同步公式」、无公式管理入口。此处经统一命令校验后提交完整
+// CanonicalWorkpaperLocation（取自 shellLocation 的 canonical 身份，不发 nodeKey）。
+function onFormulaManager() {
+  const loc = shellLocation.value
+  const ctx = activeSheetContext.value
+  const outcome = openFormulaManagerFromLocation({
+    projectId: projectId.value,
+    wpId: wpId.value,
+    wpCode: loc?.wpCode || wpDetail.value?.wp_code || '',
+    year: loc?.fiscalYear ?? projectYear.value,
+    sheetName: ctx.wholeWorkbook ? '' : (ctx.sheetName || ''),
+    host: 'univer',
+    scope: 'workpaper',
+  })
+  if (!outcome.ok) {
+    ElMessage.warning(outcome.detail)
   }
 }
 

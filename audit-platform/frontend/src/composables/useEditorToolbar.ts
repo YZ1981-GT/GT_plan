@@ -87,6 +87,7 @@ export interface EditorToolbarActions {
   onExportPdf?: () => void | Promise<unknown>
   onUpload?: () => void | Promise<unknown>
   onManualRefresh?: () => void | Promise<unknown>
+  onFormulaManager?: () => void | Promise<unknown>
 }
 
 /**
@@ -128,6 +129,16 @@ export const PRIMARY_TOOLBAR_BUTTONS: ToolbarButton[] = [
     group: 'standalone',
     staticTooltip: '重新执行预填充并触发受影响 sheet 刷新',
   },
+  {
+    // ADR-FMC-03：Univer 主路径的统一公式管理 primary outlet（原仅有「同步公式」、无入口）。
+    // 不要求编辑权限（只读用户也可查看公式）；提交完整 CanonicalWorkpaperLocation。
+    key: 'formulaManager',
+    label: '⚙️ 公式管理',
+    action: 'formulaManager',
+    plain: true,
+    group: 'standalone',
+    staticTooltip: '打开平台公式管理中心（当前底稿）',
+  },
 ]
 
 /** 更多 ▾ 下拉菜单 */
@@ -156,6 +167,7 @@ export function useEditorToolbar(
     exportPdf: actions.onExportPdf,
     upload: actions.onUpload,
     manualRefresh: actions.onManualRefresh,
+    formulaManager: actions.onFormulaManager,
   }
 
   /** 注入运行时态：loading / disabled / 动态 label / 动态 type / tooltip / title */

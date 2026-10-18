@@ -331,7 +331,7 @@ describe('R2.2 补强: lifecycle_state 中文标签的取值域必须与后端�
   })
 })
 
-describe('R10.4 可达性: FormulaStatusPanel 的宿主链必须完整（已登记的已知缺口）', () => {
+describe('R10.4 可达性: FormulaStatusPanel 的宿主链必须完整（缺口已闭合，见下方「HTML 路径已有入口按钮」）', () => {
   // 🔴🔴 **2026-08-07 浏览器实测发现的第 15 处缺陷（本轮最重要的一条）**
   //
   // R2 把面板的 issue / hint / 计算时间 / 中文类型标签都补齐了，且后端实测确实下发
@@ -378,35 +378,45 @@ describe('R10.4 可达性: FormulaStatusPanel 的宿主链必须完整（已登�
     expect(/label="公式"\s+name="formulas"/.test(sideSrc)).toBe(true)
   })
 
-  it('已登记缺口：HTML 路径下 showSidePanel 的唯一 setter 仍是 onOpenAttachment', () => {
-    // 抽所有 setter 的上下文。
-    // 🔴 正则必须容忍 `.value` —— 模板里是 `showSidePanel = !showSidePanel`（ref 自动解包），
-    //    而 `<script setup>` 里是 `showSidePanel.value = true`。首版漏了 `.value`
-    //    ⇒ 只抽到工具栏按钮那一处，把「附件事件也是 setter」这条判据打成假红。
-    const setters = [
-      ...editorSrc.matchAll(/showSidePanel(?:\.value)?\s*=\s*(?:!showSidePanel(?:\.value)?|true)/g),
-    ].map((m) => editorSrc.slice(Math.max(0, m.index! - 320), m.index!))
-    expect(setters.length).toBeGreaterThanOrEqual(2)
-    const hasToolbarButton = setters.some((ctx) => /面板/.test(ctx))
-    const hasAttachmentSetter = setters.some((ctx) =>
-      /onOpenAttachment|open-attachment|附件/.test(ctx),
-    )
-    expect(hasAttachmentSetter, '`onOpenAttachment` 不再置 showSidePanel → 面板彻底无入口').toBe(true)
-
-    // 🔴 stale 检测：「📋 面板」按钮仍在 **非 HTML** 分支里 ⇒ 缺口仍在。
-    //    哪天有人把它移到 HTML 分支（或另加入口），下面这条会打红，
-    //    提醒把本 describe 的「已知缺口」登记一并摘掉。
+  // 🟢 **缺口已闭合（Task 8.3 / 需求 20.2 更新为反映真实行为）**：
+  // 旧版本把「HTML 路径无面板入口」登记为已知缺口，并用 stale 检测断言
+  // `📋 面板` 按钮**只在非 HTML 分支**、`onOpenAttachment` 是 HTML 路径唯一 setter。
+  // 现状（HEAD 实测）：`WorkpaperEditor.vue` 的 HTML 渲染器工具栏
+  // （`v-if="useHtmlRenderer && wpDetail"` 的 `gt-wp-io-toolbar`）里**已显式新增**
+  //   `<el-button … @click="showSidePanel = !showSidePanel">📋 面板</el-button>`
+  // （源码注释亦记「HTML 路径此前无面板入口」= 事后补入的入口）。
+  // ⇒ FormulaStatusPanel 在 HTML 路径下已**可直接从工具栏打开**，不再依赖
+  //    `onOpenAttachment` 这条只覆盖程序表 / E 类控制测试的旁路。
+  // 故把判据从「缺口仍在」翻转为「HTML 面板已有入口按钮」，并保持非空转：
+  // 删掉 HTML 分支那枚按钮会使本断言打红（见本文件配套变异反证）。
+  it('HTML 路径已有「📋 面板」入口按钮 → FormulaStatusPanel 可达（缺口已闭合）', () => {
     const htmlBranchStart = editorSrc.indexOf('v-if="useHtmlRenderer && wpDetail"')
     const nonHtmlBranchStart = editorSrc.indexOf('toolbarButtons.filter')
-    expect(hasToolbarButton).toBe(true)
     expect(htmlBranchStart).toBeGreaterThan(-1)
     expect(nonHtmlBranchStart).toBeGreaterThan(htmlBranchStart)
-    const panelBtnIdx = editorSrc.indexOf('showSidePanel = !showSidePanel')
+
+    // HTML 渲染器工具栏块 = [htmlBranchStart, nonHtmlBranchStart)。
+    const htmlBranchBlock = editorSrc.slice(htmlBranchStart, nonHtmlBranchStart)
+    // 判据 = 形态（按钮 @click 切换 showSidePanel 且文案是「📋 面板」），
+    // 不是「某标识符出现过」—— 否则把一个被注释掉的按钮也放行。
     expect(
-      panelBtnIdx > nonHtmlBranchStart,
-      '「📋 面板」按钮已不在非 HTML 分支 —— 若已给 HTML 路径加入口，'
-        + '请摘掉本 describe 的「已知缺口」登记（它已成为盲区）',
+      /@click="showSidePanel = !showSidePanel"[^>]*>\s*📋 面板/.test(htmlBranchBlock)
+        || /📋 面板[\s\S]{0,80}?@click="showSidePanel = !showSidePanel"/.test(htmlBranchBlock),
+      'HTML 渲染器工具栏缺「📋 面板」入口 → FormulaStatusPanel 在 HTML 路径下又不可达',
     ).toBe(true)
+
+    // HTML 路径下第一枚 `showSidePanel` setter 必落在 HTML 分支内（而非仅非 HTML 分支）。
+    const firstPanelSetter = editorSrc.indexOf('showSidePanel = !showSidePanel')
+    expect(firstPanelSetter).toBeGreaterThan(htmlBranchStart)
+    expect(firstPanelSetter).toBeLessThan(nonHtmlBranchStart)
+
+    // 非 HTML（Univer）分支仍保留自己的面板按钮（两条渲染路径各有入口，互不依赖）。
+    const nonHtmlBlock = editorSrc.slice(nonHtmlBranchStart)
+    expect(/@click="showSidePanel = !showSidePanel"/.test(nonHtmlBlock)).toBe(true)
+
+    // `onOpenAttachment` 仍是 HTML 路径的**次要** setter（附件事件打开侧面板），
+    // 但已不再是唯一入口（工具栏按钮才是主入口）。
+    expect(/function onOpenAttachment[\s\S]{0,200}?showSidePanel\.value = true/.test(editorSrc)).toBe(true)
   })
 
   it('已登记缺口：open-attachment 只源自程序表与 E 类控制测试两条链', () => {

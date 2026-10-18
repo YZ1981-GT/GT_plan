@@ -77,6 +77,15 @@ export const projectFormula = {
    */
   reportCrossCheck: (projectId: string) =>
     `/api/projects/${projectId}/formula/report-cross-check`,
+  /**
+   * GET / PUT `/api/projects/{project_id}/formula/cross-check-rules` —
+   * 用户表间审核规则的落库读/写（存于 `project.wizard_state.cross_check_user_rules`）。
+   *
+   * spec: formula-manager-closure Phase 6 Task 6.2（需求 7.3）。GET 返
+   * `{rules: {<nodeKey>: [...]}}`；PUT 整体替换、返回已保存集合。
+   */
+  crossCheckRules: (projectId: string) =>
+    `/api/projects/${projectId}/formula/cross-check-rules`,
   // 注：曾登记过 `auto-generate` 前瞻占位（后端零实现 + 前端 404 降级）。
   // 现已由既有的 `POST /api/report-config/clone`（`reportConfig.clone`，mode=sync）
   // 落地「把报表预设落入项目级 project:{id}」，故该占位与其豁免登记一并删除。
