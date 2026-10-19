@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { buildNoteConsistencyMessage, escapeHtml } from '../noteConsistencyMessage'
+import { buildNoteConsistencyMessage, escapeHtml, notesInconsistencyFromError } from '../noteConsistencyMessage'
 
 function repoRoot(): string {
   let dir = resolve(__dirname)
@@ -70,5 +70,71 @@ describe('DeliverableCenter 接线', () => {
     const src = readFileSync(join(repoRoot(), 'audit-platform/frontend/src/views/DeliverableCenter.vue'), 'utf-8')
     expect(src).toContain('buildNoteConsistencyMessage(res.consistency)')
     expect(src).not.toMatch(/\$\{it\.section_title/)
+  })
+})
+
+/** 剥行注释与块注释（源码级断言只看代码，注释里的字样不算） */
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+}
+
+function readSrc(rel: string): string {
+  return readFileSync(join(repoRoot(), rel), 'utf-8')
+}
+
+/** 取函数体：从 `async function <name>(` 到下一个顶层 `function` / `async function` */
+function functionBody(src: string, name: string): string {
+  const start = src.indexOf(`async function ${name}(`)
+  expect(start, `未找到 ${name}`).toBeGreaterThan(-1)
+  const rest = src.slice(start + 1)
+  const next = rest.search(/\n(?:async )?function /)
+  return next === -1 ? rest : rest.slice(0, next)
+}
+
+describe('notesInconsistencyFromError（一键全套闸门的 409）', () => {
+  const item = { note_section: '八、1', section_title: '货币资金', wp_codes: ['E1'] }
+
+  it('409 notes_inconsistent（拦截器已回填 detail）⇒ 待确认清单', () => {
+    const err = { response: { status: 409, data: { detail: { code: 'notes_inconsistent', never_synced: [item], stale: [] } } } }
+    expect(notesInconsistencyFromError(err)).toEqual({ confirmed: false, never_synced: [item], stale: [] })
+  })
+
+  it('detail 缺失时读 message（全局处理器原始形状）', () => {
+    const err = { response: { status: 409, data: { message: { code: 'notes_inconsistent', never_synced: [], stale: [item] } } } }
+    expect(notesInconsistencyFromError(err)?.stale).toEqual([item])
+  })
+
+  it('其他 409、其他状态、非对象 detail、空错误 ⇒ null（交给原有错误提示）', () => {
+    expect(notesInconsistencyFromError({ response: { status: 409, data: { detail: { code: 'snapshot_changed' } } } })).toBeNull()
+    expect(notesInconsistencyFromError({ response: { status: 409, data: { detail: '数据冲突' } } })).toBeNull()
+    expect(notesInconsistencyFromError({ response: { status: 500, data: { detail: { code: 'notes_inconsistent' } } } })).toBeNull()
+    expect(notesInconsistencyFromError(null)).toBeNull()
+  })
+})
+
+describe('DeliverableCenter：一键全套接闸门 + 附注预检去重', () => {
+  const CENTER = stripComments(readSrc('audit-platform/frontend/src/views/DeliverableCenter.vue'))
+  const API = stripComments(readSrc('audit-platform/frontend/src/services/deliverableApi.ts'))
+
+  it('一键全套命中闸门弹确认框，确认后带 confirm_inconsistent=true 重发', () => {
+    const run = functionBody(CENTER, 'runGenerateFull')
+    expect(run).toContain('buildNoteConsistencyMessage(pending)')
+    expect(run).toContain('await startFullDeliverables(true)')
+    const start = functionBody(CENTER, 'startFullDeliverables')
+    expect(start).toMatch(/confirm_inconsistent:\s*confirmInconsistent/)
+    expect(start).toContain('notesInconsistencyFromError(e)')
+  })
+
+  it('一键全套请求静默全局拦截器（否则 409 先弹通用提示，5xx 重跑整套）', () => {
+    const fn = API.slice(API.indexOf('export async function createFullDeliverables('))
+    expect(fn.slice(0, fn.indexOf('\n}'))).toContain('_silent: true')
+  })
+
+  it('附注预检只保留校验错误 / 无数据，未同步与过期交给导出闸门', () => {
+    const fn = functionBody(CENTER, 'onNotesSelectionConfirm')
+    expect(fn).toContain('s.error_sections')
+    expect(fn).toContain('s.empty')
+    expect(fn).not.toContain('s.never_synced')
+    expect(fn).not.toContain('s.stale')
   })
 })

@@ -281,6 +281,7 @@ import {
   type DeliverableVersion,
   type OptionalSection,
   type TrioJob,
+  type NoteConsistency,
 } from '@/services/deliverableApi'
 import {
   checkGenerateReady,
@@ -289,7 +290,10 @@ import {
 } from '@/components/deliverable/generateGuard'
 import { useProjectStore } from '@/stores/project'
 import { getDisclosureReadiness } from '@/services/commonApi'
-import { buildNoteConsistencyMessage } from '@/components/deliverable/noteConsistencyMessage'
+import {
+  buildNoteConsistencyMessage,
+  notesInconsistencyFromError,
+} from '@/components/deliverable/noteConsistencyMessage'
 
 const route = useRoute()
 const projectStore = useProjectStore()
@@ -658,23 +662,23 @@ function goGenerateNotes() {
 /**
  * 附注选择对话框「确认生成」回调：以用户勾选的 selected_sections 生成交付 docx。
  * 不传 template_type（后端从 Project.template_type 权威解析变体）。
- * P2-10: 生成前附注质量预检（校验未通过/stale/未同步），不硬阻断但明确提示。
+ * P2-10: 生成前附注质量预检（校验错误 / 无数据），不硬阻断但明确提示。
+ * 「未从底稿同步 / 上游已变更」不在这里提示：导出闸门按所选章节逐条列出并让用户确认（doRenderNotes），
+ * 两处都提示就是同一问题确认两次。
  */
 async function onNotesSelectionConfirm({ selectedSections }: { selectedSections: string[] }) {
-  // P2-10: 质量预检——调 readiness 获取统计，有问题时提示确认
+  // P2-10: 质量预检——调 readiness 获取统计，有问题时提示确认（未同步 / 过期交给导出闸门）
   try {
     const readiness = await getDisclosureReadiness(projectId.value, year.value)
     const s = readiness?.summary
     if (s) {
       const issues: string[] = []
       if (s.error_sections > 0) issues.push(`校验错误 ${s.error_sections} 章`)
-      if (s.never_synced > 0) issues.push(`未从底稿同步 ${s.never_synced} 章`)
-      if (s.stale > 0) issues.push(`上游已变更(stale) ${s.stale} 章`)
       if (s.empty > 0) issues.push(`无数据 ${s.empty} 章`)
       if (issues.length > 0) {
         const msg = `<p style="margin-bottom:8px;font-weight:600;">📋 附注质量检查发现以下问题：</p>` +
           issues.map(i => `<p style="color:#e74c3c;margin:2px 0;">• ${i}</p>`).join('') +
-          `<p style="margin-top:10px;color:#666;font-size:12px;">仍可继续生成，但导出文档可能存在缺失或过时数据。</p>`
+          `<p style="margin-top:10px;color:#666;font-size:12px;">仍可继续生成，但导出文档可能存在缺失或未通过校验的内容。</p>`
         await ElMessageBox.confirm(msg, '附注质量检查', {
           confirmButtonText: '仍然生成',
           cancelButtonText: '返回检查',
@@ -796,23 +800,52 @@ function onExportConfirm(_sections: string[]) {
  * 一键生成全套（需求 14 / 设计 §14）。
  * 创建 ExportJob（job_type=full_deliverables）后轮询进度；完成时若有 KAM 警告则 Toast。
  * 报表 → 附注 → 报告正文顺序由后端执行器保证；前置守卫（试算表/报表就绪）由服务端校验。
+ * 附注导出前一致性闸门：后端 409 notes_inconsistent（未建任务）⇒ 弹与「生成附注」同一个确认框，
+ * 「仍要导出」带 confirm_inconsistent=true 重发，「返回同步」不生成。
  */
 async function runGenerateFull() {
   // 前端先做依赖链根节点提示（报表就绪即视为试算表就绪），服务端再做权威校验
   if (!guardGenerate('reports')) return
+  const pending = await startFullDeliverables(false)
+  if (!pending) return
+  try {
+    await ElMessageBox.confirm(buildNoteConsistencyMessage(pending), '附注与底稿不一致', {
+      confirmButtonText: '仍要导出',
+      cancelButtonText: '返回同步',
+      type: 'warning',
+      dangerouslyUseHTMLString: true,
+    })
+  } catch {
+    return // 「返回同步」：不生成
+  }
+  await startFullDeliverables(true)
+}
+
+/** 发起一键全套；命中附注一致性闸门时返回待确认清单（未建任务），其余情况返回 null。 */
+async function startFullDeliverables(confirmInconsistent: boolean): Promise<NoteConsistency | null> {
   fullGenerating.value = true
   try {
     const job = await createFullDeliverables(projectId.value, {
       year: year.value,
       template_variant: 'simple',
+      confirm_inconsistent: confirmInconsistent,
     })
     ElMessage.success('已创建一键生成全套任务，正在生成…')
     const finalJob = await pollExportJob(job.id)
     await loadList()
     summarizeFullJob(finalJob)
+    return null
   } catch (e: any) {
-    const detail = e?.response?.data?.detail || e?.message || '一键生成全套失败'
-    ElMessage.error(typeof detail === 'string' ? detail : '一键生成全套失败')
+    const pending = notesInconsistencyFromError(e)
+    if (pending) return pending
+    // 请求已静默全局拦截器（调用方自管提示）：超时与失败原因在这里给中文提示
+    if (e?.code === 'ECONNABORTED') {
+      ElMessage.warning('生成耗时较长，请稍后刷新交付中心查看结果')
+    } else {
+      const detail = e?.response?.data?.detail || e?.message || '一键生成全套失败'
+      ElMessage.error(typeof detail === 'string' ? detail : '一键生成全套失败')
+    }
+    return null
   } finally {
     fullGenerating.value = false
   }

@@ -832,11 +832,11 @@ async def _note_delivery_warnings(
     year: int,
     selected_sections: list | None = None,
 ) -> list[str]:
-    """附注出具前软闸门（P1-3）：只提示不阻断（出具决定权在合伙人）。
+    """附注出具提醒（P1-3）：只提示不阻断（出具决定权在合伙人）。
 
-    提示两类实测高发风险：
-    1. 有对应底稿披露表但**从未同步到附注**的章节 → 出具的附注未反映底稿编制成果；
-    2. 最近一次校验存在 **error 级 findings** 的章节。
+    提示最近一次校验存在 **error 级 findings** 的章节，以及项目从未执行过附注校验。
+    「有底稿披露表但从未同步 / 上游已变更」已由导出前一致性闸门逐条列出并让用户确认
+    （``check_note_consistency``），这里不再重复（原先同一清单会在确认框之后再弹一次）。
 
     任何异常一律返回空列表（fail-open，绝不阻断已完成的导出）。
     """
@@ -849,20 +849,12 @@ async def _note_delivery_warnings(
             picked = {str(s) for s in selected_sections}
             sections = [s for s in sections if s.get("note_section") in picked]
 
-        never_synced = [s["note_section"] for s in sections if s.get("needs_sync")]
         errored = [
             s["note_section"]
             for s in sections
             if (s.get("findings") or {}).get("error")
         ]
         out: list[str] = []
-        if never_synced:
-            head = "、".join(never_synced[:5])
-            more = f" 等 {len(never_synced)} 个章节" if len(never_synced) > 5 else ""
-            out.append(
-                f"以下章节有对应底稿披露表但从未同步到附注：{head}{more}——"
-                f"导出内容可能未反映底稿披露表的编制成果，建议回底稿点「同步到附注」后重新导出。"
-            )
         if errored:
             head = "、".join(errored[:5])
             more = f" 等 {len(errored)} 个章节" if len(errored) > 5 else ""

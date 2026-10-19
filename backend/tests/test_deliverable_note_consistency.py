@@ -52,6 +52,8 @@ def _section(
 
 def _patch_readiness(monkeypatch, sections: list[dict[str, Any]]) -> None:
     async def _fake_build_readiness(db, project_id, year):  # noqa: ANN001
+        if hasattr(db, "log"):
+            db.log.append("readiness")
         return {"summary": {}, "sections": sections}
 
     # check_note_consistency 内部 `from app.services.note_readiness_service import build_readiness`
@@ -61,10 +63,29 @@ def _patch_readiness(monkeypatch, sections: list[dict[str, Any]]) -> None:
     )
 
 
+class _FakeSavepoint:
+    def __init__(self, log: list[str]) -> None:
+        self._log = log
+
+    async def rollback(self) -> None:
+        self._log.append("rollback")
+
+
+class _FakeSession:
+    """只实现 check_note_consistency 用到的 begin_nested，按顺序记录调用。"""
+
+    def __init__(self) -> None:
+        self.log: list[str] = []
+
+    async def begin_nested(self) -> _FakeSavepoint:
+        self.log.append("begin_nested")
+        return _FakeSavepoint(self.log)
+
+
 def _run(monkeypatch, sections, **kwargs):
     _patch_readiness(monkeypatch, sections)
     return asyncio.run(
-        check_note_consistency(object(), PROJECT_ID, YEAR, **kwargs)
+        check_note_consistency(_FakeSession(), PROJECT_ID, YEAR, **kwargs)
     )
 
 
@@ -178,10 +199,13 @@ def test_fail_open_on_readiness_error(monkeypatch):
     monkeypatch.setattr(
         "app.services.note_readiness_service.build_readiness", _boom
     )
-    result = asyncio.run(check_note_consistency(object(), PROJECT_ID, YEAR))
+    db = _FakeSession()
+    result = asyncio.run(check_note_consistency(db, PROJECT_ID, YEAR))
     assert result["consistent"] is True
     assert result["never_synced"] == []
     assert result["stale"] == []
+    # 抛错时同样回滚到保存点（PG 上不回滚，调用方的事务就停在 aborted）
+    assert db.log == ["begin_nested", "rollback"]
 
 
 # ─── 反向自检：判定确实消费 needs_sync / is_stale ─────────────────────────────
@@ -204,3 +228,16 @@ def test_service_import_surface():
     """check_note_consistency 必须是 deliverable_note_consistency 的公开 API。"""
     assert hasattr(mod, "check_note_consistency")
     assert "check_note_consistency" in getattr(mod, "__all__", [])
+
+
+def test_readiness_runs_in_savepoint_that_is_always_rolled_back(monkeypatch):
+    """只读看板在保存点内执行，成功时也回滚到保存点。
+
+    build_readiness 内部会吞掉查询失败；PG 上那会让整个事务 aborted，只有回滚到保存点才能恢复。
+    去掉回滚的变异让本例打红（PG 层的真实恢复见 test_deliverable_note_consistency_pg.py）。
+    """
+    _patch_readiness(monkeypatch, [_section("八、1", needs_sync=True)])
+    db = _FakeSession()
+    result = asyncio.run(check_note_consistency(db, PROJECT_ID, YEAR))
+    assert result["consistent"] is False
+    assert db.log == ["begin_nested", "readiness", "rollback"]

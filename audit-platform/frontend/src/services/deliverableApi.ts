@@ -251,7 +251,8 @@ export interface NoteConsistencyItem {
   note_section: string
   section_title: string
   wp_codes?: string[]
-  wp_ids?: string[]
+  /** wp_code → working_paper.id（后端是对象，不是数组） */
+  wp_ids?: Record<string, string>
   wp_sheet?: string | null
 }
 
@@ -390,17 +391,22 @@ export interface FullDeliverablesRequest {
   template_variant?: string
   steps?: string[]
   optional_sections?: Record<string, boolean> | null
+  /** 附注与底稿不一致时，用户确认后带 true 重发（导出前一致性闸门，与「生成附注」同义） */
+  confirm_inconsistent?: boolean
 }
 
 /**
  * 创建「一键生成全套」后台任务（同步执行：审定报表 → 未审报表 → 附注 → 报告正文）。
  * 返回 ExportJob（含进度与明细），前端据 job_id 轮询 fetchExportJob。
+ * 附注与底稿不一致且未带 confirm_inconsistent ⇒ 409 notes_inconsistent（不建任务）。
+ * 调用方自管提示（确认框 / 失败原因），故静默全局拦截器：否则 409 先弹一次通用提示，
+ * 5xx 还会把整套生成自动重跑两次。
  */
 export async function createFullDeliverables(
   projectId: string,
   body: FullDeliverablesRequest,
 ): Promise<ExportJobResult> {
-  return api.post<ExportJobResult>(wordExports.fullDeliverables(projectId), body)
+  return api.post<ExportJobResult>(wordExports.fullDeliverables(projectId), body, { _silent: true } as any)
 }
 
 /** 轮询全套生成任务进度。 */

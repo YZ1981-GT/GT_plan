@@ -42,3 +42,23 @@ export function buildNoteConsistencyMessage(consistency: NoteConsistency | null 
   parts.push('<p style="margin-top:10px;color:#666;font-size:12px;">附注数据由底稿披露表单项推送。请到底稿披露表重新同步这些章节；如确需带不一致导出，可选「仍要导出」。</p>')
   return parts.join('')
 }
+
+/**
+ * 一键全套命中附注一致性闸门：后端 409 + `{code: 'notes_inconsistent', never_synced, stale}`
+ * （HTTPException 的 detail 由全局处理器放在 `message`，http 拦截器回填到 `detail`；两处都读）。
+ * 是这种响应就返回待确认清单，否则返回 null（其余错误照常提示）。
+ */
+export function notesInconsistencyFromError(err: unknown): NoteConsistency | null {
+  const res = (err as { response?: { status?: number; data?: { detail?: unknown; message?: unknown } } } | null)
+    ?.response
+  if (res?.status !== 409) return null
+  const raw = res.data?.detail ?? res.data?.message
+  if (!raw || typeof raw !== 'object') return null
+  const d = raw as { code?: unknown; never_synced?: unknown; stale?: unknown }
+  if (d.code !== 'notes_inconsistent') return null
+  return {
+    confirmed: false,
+    never_synced: Array.isArray(d.never_synced) ? (d.never_synced as NoteConsistencyItem[]) : [],
+    stale: Array.isArray(d.stale) ? (d.stale as NoteConsistencyItem[]) : [],
+  }
+}

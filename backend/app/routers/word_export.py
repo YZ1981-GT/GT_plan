@@ -366,6 +366,35 @@ async def create_full_package(
 # 一键生成全套 (audit-report-template-integration task 15 / design §14)
 # ------------------------------------------------------------------
 
+async def _require_notes_consistent(db: AsyncSession, project_id: UUID, year: int) -> None:
+    """附注与底稿不一致 ⇒ 409 ``notes_inconsistent``（不建任务）。清单只带确认框要显示的三项。"""
+    from app.services.deliverable_note_consistency import check_note_consistency
+
+    consistency = await check_note_consistency(db, project_id, year)
+    if consistency["consistent"]:
+        return
+
+    def _brief(items: list[dict]) -> list[dict]:
+        return [
+            {
+                "note_section": i.get("note_section"),
+                "section_title": i.get("section_title") or "",
+                "wp_codes": list(i.get("wp_codes") or []),
+            }
+            for i in items
+        ]
+
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "notes_inconsistent",
+            "message": "附注与底稿披露表不一致，请确认后再生成全套交付件",
+            "never_synced": _brief(consistency["never_synced"]),
+            "stale": _brief(consistency["stale"]),
+        },
+    )
+
+
 @router.post("/full-deliverables", response_model=ExportJobResponse)
 async def create_full_deliverables(
     project_id: UUID,
@@ -381,9 +410,16 @@ async def create_full_deliverables(
     - 完成后 KAM 警告写入 job.payload metadata，前端轮询完成时 Toast。
 
     进度轮询：``GET /api/projects/{project_id}/word-exports/jobs/{job_id}``。
+
+    附注导出前一致性闸门（与「生成附注」同一判定 ``check_note_consistency``）：会导出附注且未带
+    ``confirm_inconsistent`` 时，附注与底稿不一致 ⇒ 不建任务，409 ``notes_inconsistent`` + 待确认清单；
+    前端弹同一个确认框，用户确认后带 ``confirm_inconsistent=true`` 重发。
     """
-    from app.services.full_deliverables_executor import FullDeliverablesExecutor
+    from app.services.full_deliverables_executor import FullDeliverablesExecutor, resolve_full_steps
     from app.services.export_job_service import ExportJobService
+
+    if "disclosure_notes" in resolve_full_steps(body.steps) and not body.confirm_inconsistent:
+        await _require_notes_consistent(db, project_id, body.year)
 
     executor = FullDeliverablesExecutor(db)
     payload = {
@@ -391,6 +427,8 @@ async def create_full_deliverables(
         "template_variant": body.template_variant,
         "steps": body.steps,
         "optional_sections": body.optional_sections,
+        # 留痕：用户知情带不一致导出（闸门放行依据）
+        "confirm_inconsistent": body.confirm_inconsistent,
     }
     try:
         result = await executor.run(

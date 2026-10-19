@@ -164,6 +164,9 @@ class FullDeliverablesRequest(BaseModel):
     template_variant: str = "simple"
     steps: list[str] | None = None
     optional_sections: dict[str, bool] | None = None
+    # 附注导出前一致性闸门（与 DeliverableExportRequest.confirm_inconsistent 同义）：False 时附注与底稿
+    # 不一致 ⇒ 不建任务、409 notes_inconsistent 返回待确认清单；用户确认后带 True 重发。
+    confirm_inconsistent: bool = False
 
 
 # ===================================================================

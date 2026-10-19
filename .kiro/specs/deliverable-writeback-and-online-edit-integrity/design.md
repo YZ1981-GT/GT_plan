@@ -314,3 +314,11 @@ HEAD（`3e82df9bf`，分支 `spec/disclosure-note-doc-upload-and-batch-fill`）�
 - **前端两处修复**：①报告正文回填被拒原因改读 `rejection_reason`（原读 `item.reason`，后端被拒项没有这个字段 ⇒ 恒空；且对所有被拒项硬编码「金额变更须通过调整分录」，标题类拒绝也显示这句），按钮文案「回填到附注模块」改为「回填到报告正文」②附注一致性确认框正文抽到 `noteConsistencyMessage.ts` 统一转义（原把库里的章节标题 / 底稿编码原样拼进开了 `dangerouslyUseHTMLString` 的 HTML）。vitest 5 文件 74 passed；两处变异（回退读 `item.reason` / 转义失效）均打红并逐字节恢复；单区域 vue-tsc 改动文件 0 错（另 7 个错误在未改动的 DeliverableGroupList / DeliverablePreview / stores/project，属既有）。
 - **待拍板**：①全套生成的 `needs_confirmation` 没有消费方（三件套接口不返回、不落 export_job_item、前端不展示），一键全套生成时不一致的附注照常导出且无提示 —— 接到接口 + 交付中心列表，或删除；②生成附注要确认两次：P2-10 质量预检与一致性闸门读的是同一份 `build_readiness` —— 建议预检只保留闸门不覆盖的校验错误 / 无数据项。Task 32 浏览器里看到的是预检框，新闸门的弹窗在界面上未被实际看到。
 - 前端另有 9 处 `dangerouslyUseHTMLString`（OCR 预览 / 函证撤回 / 独立性声明等），是否转义未逐个审计。
+
+### 10.4 两项待拍板的处理（2026-10-19，追加）
+
+- **一键全套接导出前一致性闸门，删除 `needs_confirmation`**：一键全套（`POST /word-exports/full-deliverables`）是用户唯一的批量入口（三件套创建端点 `POST /deliverables/trio` 没有前端调用方），执行器直接导出附注、全程无提示；`needs_confirmation` 只在导出之后打标且无人读取 —— 方向裁定要求「导出附注前」让用户确认或去同步，导出后的标记做不到。改为路由在建任务之前用同一判定 `check_note_consistency` 拦截：会导出附注 + 未确认 + 不一致 ⇒ 409 `notes_inconsistent`（清单只带确认框要显示的 note_section / section_title / wp_codes），前端弹与「生成附注」同一个确认框，「仍要导出」带 `confirm_inconsistent=true` 重发（job payload 留痕）。删除执行器的 `needs_confirmation` 字段、两处计算与 `_disclosure_notes_needs_confirmation`；步骤口径抽 `resolve_full_steps` 给执行器与闸门共用。一键全套请求加 `_silent`：409 / 超时 / 失败由调用方提示，同时避免 5xx 自动重发把整套生成重跑两次。
+- **生成附注只确认一次**：P2-10 预检只保留校验错误 / 无数据；未同步与过期由导出闸门按所选章节逐条列出。导出后的「附注出具提醒」去掉「从未同步」一条（确认框里刚列过同一清单）。
+- **顺带修复：`check_note_consistency` 的 fail-open 在 PG 上不成立**。`build_readiness` 内部有 3 处查询失败即吞掉（最近校验结果 / 底稿 id 反查 / 公式灰度），PG 一条语句失败会让整个事务 aborted，吞掉异常救不回来 ⇒ 调用方随后的导出写入全部失败。改为看板在保存点内执行、无论成败都回滚到保存点（只读；回滚到保存点在 aborted 状态下照样可执行）。pg_only 守卫 `test_deliverable_note_consistency_pg.py` 在 `latest_findings_by_section` 注入非法 SQL 并吞掉，断言同一会话后续查询可用。
+- **验证**：新增 / 改动后端 16 passed（一键闸门 6 + 一致性 10）；回归 50 passed / 5 failed（`test_full_deliverables_executor` 5 例，即 §10.2 已登记的 HEAD 预存红）；PG 1 passed；前端 vitest 5 文件 80 passed；变异 4 处全部打红并逐字节恢复（预检加回未同步 / 409 辨识不看 code / 闸门关闭 / 去掉保存点，后者单测与 PG 守卫同时打红）；单区域 vue-tsc 改动文件 0 错（另 7 个错误在未改动文件，属既有）。
+- **未修登记**：`/word-exports/*` 整个路由只校验登录、不校验项目（含本次改的一键全套端点），任何登录用户都能为任意项目发起生成 —— 属项目级鉴权欠账（在 `_PREFIXED_IDENTITY_ONLY_BASELINE` 棘轮内），改访问控制需另行确认；本次只把 409 清单收窄到确认框所需三项。三件套 readiness 只拦过期附注、不拦从未同步，但三件套创建端点没有前端调用方，暂不处理。
