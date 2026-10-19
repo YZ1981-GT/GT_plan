@@ -4,7 +4,14 @@
       <template #default="{ row }">
         <span class="model-name">{{ row.model_name }}</span>
         <el-tag v-if="row.preset_key" type="info" size="small" class="active-tag">企业预设</el-tag>
-        <el-tag v-if="row.is_active" type="success" size="small" class="active-tag">当前激活</el-tag>
+        <el-tag v-if="row.is_active" type="success" size="small" class="active-tag">{{ activeTagText(row, models) }}</el-tag>
+      </template>
+    </el-table-column>
+    <el-table-column label="部署" prop="deployment" width="80" align="center">
+      <template #default="{ row }">
+        <el-tag :type="row.deployment === 'local' ? 'primary' : 'info'" size="small" effect="plain">
+          {{ deploymentLabel(row.deployment) }}
+        </el-tag>
       </template>
     </el-table-column>
     <el-table-column label="供应商" prop="provider" width="165">
@@ -34,12 +41,17 @@
           @click="emit('test', row)"
         >测试连接</el-button>
         <el-button
-          v-if="!row.is_active" type="primary" size="small" link
+          v-if="!row.is_active" type="primary" size="small" link :loading="switchingId === row.id"
           @click="emit('activate', row)"
-        >激活</el-button>
+        >启用</el-button>
+        <el-button
+          v-else size="small" link :loading="switchingId === row.id"
+          @click="emit('deactivate', row)"
+        >停用</el-button>
         <el-button size="small" link @click="emit('edit', row)">{{ row.preset_key && !row.has_api_key ? '录入 Key' : '编辑' }}</el-button>
         <el-button
           type="danger" size="small" link :disabled="row.is_active || !!row.preset_key"
+          :title="row.is_active ? '已启用的模型不能删除，请先停用' : row.preset_key ? '企业预设模型不能删除' : ''"
           @click="emit('delete', row)"
         >删除</el-button>
       </template>
@@ -48,21 +60,28 @@
 </template>
 
 <script setup lang="ts">
-import type { AIModel, AIProvider } from '@/services/aiModelApi'
+import type { AIDeployment, AIModel, AIProvider } from '@/services/aiModelApi'
+import { DEPLOYMENT_LABELS, activeTagText } from './modelRouteView'
 
 const props = withDefaults(defineProps<{
   models: AIModel[]
   loading: boolean
   testingId?: string
+  switchingId?: string
   providerLabels?: Partial<Record<AIProvider, string>>
-}>(), { testingId: '', providerLabels: () => ({}) })
+}>(), { testingId: '', switchingId: '', providerLabels: () => ({}) })
 
 function providerLabel(p: AIProvider): string {
   return props.providerLabels[p] || p
 }
 
+function deploymentLabel(d: AIDeployment | null | undefined): string {
+  return d ? DEPLOYMENT_LABELS[d] ?? '-' : '-'
+}
+
 const emit = defineEmits<{
   (e: 'activate', model: AIModel): void
+  (e: 'deactivate', model: AIModel): void
   (e: 'edit', model: AIModel): void
   (e: 'delete', model: AIModel): void
   (e: 'test', model: AIModel): void

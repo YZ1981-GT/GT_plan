@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from pydantic import BaseModel
 
@@ -35,21 +36,45 @@ def _make_mock_client(side_effect=None, return_value=None):
     return client
 
 
+def local_route(model_name="test-model", endpoint="http://localhost:8100/v1"):
+    """单条本机候选路由（结构化输出走本机优先路由，V197）。"""
+    from app.models.ai_models import AIModelType, AIProvider
+    from app.services.llm_provider_registry import provider_profile
+    from app.services.llm_runtime import ResolvedLLMConfig, RouteCandidate
+
+    config = ResolvedLLMConfig(
+        model_name=model_name, model_type=AIModelType.chat,
+        provider=AIProvider.openai_compatible, endpoint_url=endpoint, api_key=None,
+        profile=provider_profile(AIProvider.openai_compatible), source="database",
+        deployment="local" if "localhost" in endpoint else "server",
+    )
+    return [RouteCandidate(model_name, config.deployment, None, config)]
+
+
 def _patch_service(
     mock_client,
     guided_enabled=True,
     max_retries=2,
     model_name="test-model",
     breaker=None,
+    route=None,
 ):
     """返回组合 patch context manager。"""
     import contextlib
 
+    from app.services.llm_route import reset_route_health
+
     @contextlib.asynccontextmanager
     async def ctx():
+        reset_route_health()
         with patch(
             "app.services.structured_llm_service._get_instructor_client",
             return_value=mock_client,
+        ), patch(
+            "app.services.structured_llm_service._resolve_route",
+            new=AsyncMock(return_value=route or local_route(model_name)),
+        ), patch(
+            "app.services.llm_endpoint_policy.resolve_endpoint", new=_fake_resolve_endpoint
         ), patch("app.services.structured_llm_service.settings") as s, patch(
             "app.services.structured_llm_service._breaker", breaker
         ), patch(
@@ -58,7 +83,9 @@ def _patch_service(
             s.LLM_GUIDED_DECODING_ENABLED = guided_enabled
             s.LLM_STRUCTURED_MAX_RETRIES = max_retries
             s.DEFAULT_CHAT_MODEL = model_name
+            s.LLM_LOCAL_CONNECT_TIMEOUT_SECONDS = 3.0
             yield s
+        reset_route_health()
 
     return ctx()
 
@@ -317,3 +344,170 @@ async def test_recognizer_uses_legacy_when_structured_disabled():
     # legacy json.loads 应返回解析结果
     assert result is not None
     assert result.get("voucher_no") == "V001"
+
+
+# =============================================================================
+# Path H: 本机优先路由（V197）—— guided 只发本机、连接失败换服务器、模型名取候选
+# =============================================================================
+
+
+def _two_candidate_route():
+    local = local_route("local-model")[0]
+    server = local_route("qwen3.8", endpoint="https://ai.example.test/v1")[0]
+    return [local, server]
+
+
+@pytest.mark.asyncio
+async def test_guided_json_is_not_sent_to_server_candidate():
+    """guided_json 是 vLLM 专有参数：服务器候选即使开关打开也不发。"""
+    from app.services.structured_llm_service import extract_structured
+
+    expected = DummyResult(name="server", value=1)
+    mock_client = _make_mock_client(return_value=expected)
+    breaker = MagicMock()
+    breaker.is_open = False
+    server_only = [local_route("qwen3.8", endpoint="https://ai.example.test/v1")[0]]
+
+    async with _patch_service(mock_client, guided_enabled=True, breaker=breaker, route=server_only):
+        result = await extract_structured([{"role": "user", "content": "t"}], DummyResult)
+
+    assert result == expected
+    kw = mock_client.chat.completions.create.call_args.kwargs
+    assert "extra_body" not in kw
+    assert kw["model"] == "qwen3.8"
+
+
+@pytest.mark.asyncio
+async def test_connection_failure_on_local_falls_back_to_server():
+    """本机连不上 ⇒ 同一次调用改用服务器候选；整条路由成功记熔断成功、不记失败。"""
+    import httpx
+
+    from app.services.llm_route import last_route_outcome
+    from app.services.structured_llm_service import extract_structured
+
+    expected = DummyResult(name="fallback", value=2)
+    calls: list[str] = []
+
+    async def create(**kwargs):
+        calls.append(kwargs["model"])
+        if kwargs["model"] == "local-model":
+            raise httpx.ConnectError("connection refused")
+        return expected
+
+    mock_client = _make_mock_client()
+    mock_client.chat.completions.create = AsyncMock(side_effect=create)
+    breaker = MagicMock()
+    breaker.is_open = False
+
+    async with _patch_service(
+        mock_client, guided_enabled=False, breaker=breaker, route=_two_candidate_route()
+    ):
+        result = await extract_structured([{"role": "user", "content": "t"}], DummyResult)
+        outcome = last_route_outcome()
+
+    assert result == expected
+    assert calls == ["local-model", "qwen3.8"]
+    breaker.record_success.assert_called()
+    breaker.record_failure.assert_not_called()
+    assert outcome is not None and outcome.model_name == "qwen3.8" and outcome.fallback_used
+
+
+@pytest.mark.asyncio
+async def test_non_connection_error_does_not_fall_back():
+    """请求被模型拒绝（非连接类）不换候选：避免同一请求在两端重复执行。"""
+    from app.services.structured_llm_service import StructuredOutputError, extract_structured
+
+    calls: list[str] = []
+
+    async def create(**kwargs):
+        calls.append(kwargs["model"])
+        raise RuntimeError("schema validation failed")
+
+    mock_client = _make_mock_client()
+    mock_client.chat.completions.create = AsyncMock(side_effect=create)
+    breaker = MagicMock()
+    breaker.is_open = False
+
+    async with _patch_service(
+        mock_client, guided_enabled=False, breaker=breaker, route=_two_candidate_route()
+    ):
+        with pytest.raises(StructuredOutputError, match="schema validation failed"):
+            await extract_structured([{"role": "user", "content": "t"}], DummyResult)
+
+    assert calls == ["local-model"]
+
+
+async def _fake_resolve_endpoint(endpoint, profile):
+    """不做真实 DNS：结构化输出测试只关心候选顺序与参数。"""
+    from app.services.llm_endpoint_policy import SafeEndpoint
+
+    return SafeEndpoint(endpoint.rstrip("/"), "test.invalid")
+
+
+# =============================================================================
+# Path I: 结构化输出的转移口径与对话路由一致（ADR-ROUTE-003）
+# =============================================================================
+
+
+def _sdk_error(name: str, cause: BaseException | None = None) -> Exception:
+    """构造与 openai SDK 同名的异常（判定只看类名与 __cause__，不依赖 SDK 版本）。"""
+    exc = type(name, (Exception,), {})(name)
+    exc.__cause__ = cause
+    return exc
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("failure", "fails_over"), [
+    (_sdk_error("APITimeoutError", httpx.ConnectTimeout("slow connect")), True),
+    (_sdk_error("APIConnectionError", httpx.ConnectError("refused")), True),
+    (_sdk_error("InternalServerError"), True),
+    (_sdk_error("NotFoundError"), True),
+    (_sdk_error("APITimeoutError", httpx.ReadTimeout("slow answer")), False),
+    (_sdk_error("RateLimitError"), False),
+    (_sdk_error("BadRequestError"), False),
+])
+async def test_structured_failover_matches_chat_route_semantics(failure, fails_over):
+    """读超时 / 限流 / 参数错误不换服务器重复执行；连不上 / 5xx / 模型不存在才换。"""
+    from app.services.structured_llm_service import StructuredOutputError, extract_structured
+
+    expected = DummyResult(name="server", value=3)
+    calls: list[str] = []
+
+    async def create(**kwargs):
+        calls.append(kwargs["model"])
+        if kwargs["model"] == "local-model":
+            raise failure
+        return expected
+
+    mock_client = _make_mock_client()
+    mock_client.chat.completions.create = AsyncMock(side_effect=create)
+    breaker = MagicMock()
+    breaker.is_open = False
+
+    async with _patch_service(
+        mock_client, guided_enabled=False, breaker=breaker, route=_two_candidate_route()
+    ):
+        if fails_over:
+            assert await extract_structured([{"role": "user", "content": "t"}], DummyResult) == expected
+        else:
+            with pytest.raises(StructuredOutputError):
+                await extract_structured([{"role": "user", "content": "t"}], DummyResult)
+
+    assert calls == (["local-model", "qwen3.8"] if fails_over else ["local-model"])
+
+
+@pytest.mark.asyncio
+async def test_structured_read_timeout_still_counts_for_the_breaker():
+    """不转移的读超时仍计入熔断（整条路由到此为止，旧口径保留）。"""
+    from app.services.structured_llm_service import StructuredOutputError, extract_structured
+
+    mock_client = _make_mock_client(side_effect=httpx.ReadTimeout("slow answer"))
+    breaker = MagicMock()
+    breaker.is_open = False
+    async with _patch_service(
+        mock_client, guided_enabled=False, breaker=breaker, route=_two_candidate_route()
+    ):
+        with pytest.raises(StructuredOutputError):
+            await extract_structured([{"role": "user", "content": "t"}], DummyResult)
+    assert mock_client.chat.completions.create.await_count == 1
+    breaker.record_failure.assert_called_once()

@@ -192,6 +192,11 @@ inclusion: always
 - 🔴 提交复盘（2026-10-19，design §10.3）：548318fb1 按子代理给的文件清单提交，漏了本 spec 的 5 个模型文件（子代理把本 spec 自己的改动当成并发会话的），又带入了别的 spec 的 2 个鉴权测试 ⇒ 干净检出生成交付件全部失败、HEAD 多 8 例红；6c262c06f 补了模型文件。教训：①**提交前在干净 worktree 跑「要提交的那棵树」**（不是 HEAD）②文件归属在每个任务落盘时登记，不凭「这个文件还有别的改动」推断；INDEX / memory / 白名单这类共享文件按改动块归属③用 commit-tree / update-ref 前移已检出的分支后，必须 `git reset -- <这些路径>` 对齐主工作区暂存区，否则别人一提交就把它回退④写入型验收只用【测试】项目，清理按「写过哪些表」逐项对账（安徽 v18 残留已修，审计日志 `deliverable_data_repair`）
 - 🔴 2026-10-19 补（design §10.4）：①**禁在共享终端里设 git 环境变量**（`$env:GIT_INDEX_FILE=…`）——终端与并发会话共用（输出里出现过别的会话 worktree 的提示符），548318fb1 的树与我临时索引的树逐字节相同、提交后主暂存区仍缺那 18 个新文件，多半是另一会话在带着我临时索引的终端里提交的；底层 git 一律放子进程并显式传 env ②fail-open 要连事务一起：吞异常不回滚到保存点，PG 上调用方事务仍停在 aborted（只读检查放保存点、成败都回滚）③一键全套已接附注导出闸门（409 notes_inconsistent），预检与出具提醒不再重复列未同步
 
+### LLM / OCR 本机优先路由 `llm-ocr-local-first-routing`（2026-10-19~20，14/14，本地提交未推送）
+- V197：`ai_model_config.deployment`（local/server，按端点字面推导，`ai_model_options.classify_deployment`）；`is_active` = 参与路由，对话 / OCR 各能力槽本机、服务器各一条，向量单条不跨模型兜底；候选解析 `llm_runtime.resolve_route`、执行 `llm_route.route_chat_*`（连不上 / 5xx / 鉴权 / 404 改用下一个，读超时 / 400 / 429 / 空输出不改用，流式首片段前才改用，30 秒冷却，熔断按整条路由，ContextVar 记实际回答模型）；OCR `resolve_ocr_route` 本机引擎链优先、远程兜底；状态 `GET /api/ai-models/routes` + 模型配置页「调用路由」面板
+- 本地库现状（验收后）：对话本机 Qwen3.5 + 服务器 qwen3.8 均启用（本机先用）；OCR 本机 paddleocr（引擎未装 ⇒ 恒兜底）+ paddleocrv6、版面 paddleocrvl-1.6 启用；向量行指向 8100 而 8100 无 `/embeddings`（如实显示不可用，未改数据）
+- 🔴 教训：①全仓调用契约扫描只认字面量会漏「先赋值再整串传入」—— 现场三处都是这种写法，变异把列表改回变量没打红才暴露；改按函数作用域解析局部变量后又抓出 report_trace ②「缓存是否晚于本次请求」不要比 `monotonic`（Windows 精度约 15.6 ms，同刻旧结果被当新的 ⇒ 强刷失效），用计数 + 请求入口快照 ③候选身份必须含模型类型：同一端点同名模型可同时登记为对话与向量，否则向量 404 让对话跳过本机 ④HEAD 已超行数门且未登记白名单的文件（如 `test_task6_native_engine.py` 1691 行）一改就被 pre-commit 拦 ⇒ 扩展守卫放新文件 ⑤共享开发环境不重启 start-dev，迁移用 `MigrationRunner(...).run_pending()` 落库（与启动同一路径）
+
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
 

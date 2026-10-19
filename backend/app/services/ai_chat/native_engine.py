@@ -56,11 +56,12 @@ import logging
 import time
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ai_models import ChatEngineName, ChatMessageStatus, ChatRole
+from app.services.ai_chat.native_model_client import AIServiceModelClient, ModelClient
 from app.services.ai_chat.engine import (
     AuthorizedChatRunRequest,
     CancelSignal,
@@ -171,59 +172,8 @@ def is_llm_fail_soft_placeholder(text: Any) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# 模型调用接缝（唯一实现走既有 AIService，不新写 HTTP client）
+# 模型调用接缝（唯一实现走既有 AIService，不新写 HTTP client）—— 见 native_model_client
 # ---------------------------------------------------------------------------
-
-
-class ModelClient(Protocol):
-    """模型调用接缝。生产实现只有 :class:`AIServiceModelClient` 一个。
-
-    存在的理由是**可测**：守卫要注入"只产出占位串""中途抛异常""永远不结束"三种
-    模型行为，而这些行为无法从真实 vLLM 稳定复现。接缝**不是**第二套 HTTP client ——
-    它没有任何网络代码，网络只发生在 ``AIService`` 里。
-    """
-
-    async def resolve_model(self) -> str: ...
-
-    def stream_chat(
-        self, messages: list[dict[str, str]], *, model: str
-    ) -> AsyncIterator[str]: ...
-
-
-class AIServiceModelClient:
-    """把既有 ``AIService.chat_completion(stream=True)`` 包成 :class:`ModelClient`。
-
-    ``AIService._chat_stream`` 内部已经做 ``_merge_system_messages``（vLLM + Qwen3.5
-    只允许开头一条 system），并使用 ``settings.LLM_BASE_URL`` 指向本地 vLLM。
-    本类只做参数传递，**没有** httpx 调用。
-    """
-
-    def __init__(self, db: AsyncSession, *, temperature: float = 0.3) -> None:
-        self._db = db
-        self._temperature = temperature
-
-    async def resolve_model(self) -> str:
-        """当前激活的 chat 模型名（无激活记录则回落服务端默认值）。"""
-        from app.core.config import settings
-        from app.models import AIModelType
-        from app.services.ai_service import AIService
-
-        active = await AIService(self._db).get_active_model(AIModelType.chat)
-        return active.model_name if active else settings.DEFAULT_CHAT_MODEL
-
-    async def stream_chat(
-        self, messages: list[dict[str, str]], *, model: str
-    ) -> AsyncIterator[str]:
-        from app.services.ai_service import AIService
-
-        generator = await AIService(self._db).chat_completion(
-            messages=messages,
-            model=model,
-            stream=True,
-            temperature=self._temperature,
-        )
-        async for chunk in generator:  # type: ignore[union-attr]
-            yield chunk
 
 
 # ---------------------------------------------------------------------------
@@ -590,7 +540,7 @@ class NativeEngine:
         outcome: EngineOutcome,
         messages: list[dict[str, str]],
     ) -> AsyncIterator[ChatEvent]:
-        """调用本地 vLLM 并把 chunk 转成 ``delta`` 事件。
+        """按平台模型路由（本机优先）调用模型，把 chunk 转成 ``delta`` 事件。
 
         复用既有基础设施（Req 10.7）：
         ``llm_client._breaker`` 同一实例（读 + 记录成功/失败）、
@@ -664,6 +614,10 @@ class NativeEngine:
                 if closer is not None:
                     await closer()
 
+        # 本机不可用时路由会改用服务器：消息留痕记实际回答的模型（ADR-ROUTE-008）。
+        served = getattr(self._model, "served_model", None)
+        if isinstance(served, str) and served:
+            outcome.model = served
         _breaker.record_success()
 
     async def _resolve_model(self, request: AuthorizedChatRunRequest) -> str:

@@ -27,6 +27,17 @@ from app.services.unified_ocr_service import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def _implicit_local_ocr_route(monkeypatch):
+    """本文件只测本机引擎链：路由固定为隐式本机，不读库内启用行（V197 起 recognize 先解析路由）。"""
+    from app.services import remote_ocr_runtime as remote
+
+    async def _route(capability, *, db=None):
+        return [remote.OCRRouteCandidate(capability, "local", "本机 OCR 引擎", implicit=True)]
+
+    monkeypatch.setattr(remote, "resolve_ocr_route", _route)
+
+
 @pytest.fixture
 def ocr_service():
     """创建 OCR 服务实例"""

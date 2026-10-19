@@ -21,16 +21,16 @@ class TestAIService:
 
     @pytest.mark.asyncio
     async def test_chat_completion_success(self):
-        """AIService 委派给统一 runtime 并返回结果。"""
+        """AIService 委派给统一路由（本机优先）并返回结果。"""
         from app.services.ai_service import AIService
 
         db = self._make_mock_db()
         service = AIService(db)
         with patch(
-            "app.services.ai_service.resolve_runtime_config",
-            new=AsyncMock(return_value=MagicMock()),
+            "app.services.ai_service.resolve_route",
+            new=AsyncMock(return_value=[MagicMock()]),
         ) as resolve, patch(
-            "app.services.ai_service.runtime_chat_sync",
+            "app.services.ai_service.route_chat_sync",
             new=AsyncMock(return_value="测试回复"),
         ) as runtime:
             result = await service.chat_completion(
@@ -52,10 +52,10 @@ class TestAIService:
             {"role": "user", "content": "什么是实质性程序"},
         ]
         with patch(
-            "app.services.ai_service.resolve_runtime_config",
-            new=AsyncMock(return_value=MagicMock()),
+            "app.services.ai_service.resolve_route",
+            new=AsyncMock(return_value=[MagicMock()]),
         ), patch(
-            "app.services.ai_service.runtime_chat_sync",
+            "app.services.ai_service.route_chat_sync",
             new=AsyncMock(return_value="专业回答"),
         ) as runtime:
             result = await service.chat_completion(messages=messages)

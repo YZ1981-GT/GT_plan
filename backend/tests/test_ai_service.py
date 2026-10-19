@@ -61,8 +61,45 @@ def _runtime_config(
 # Test AIService.health_check()  — Requirement 1.1
 # ---------------------------------------------------------------------------
 
+
+def _candidate(
+    *,
+    model_name="llama3.1",
+    provider="ollama",
+    deployment="local",
+    status="available",
+    source="database",
+    endpoint="http://localhost:11434/v1",
+):
+    return {
+        "model_id": None,
+        "model_name": model_name,
+        "deployment": deployment,
+        "provider": provider,
+        "endpoint": endpoint,
+        "source": source,
+        "reasoning_effort": None,
+        "implicit": source != "database",
+        "status": status,
+        "reason": "可用" if status == "available" else "不可达",
+        "latency_ms": 1,
+        "checked_at": None,
+    }
+
+
+def _route_status(chat=(), embedding=(), ocr=()):
+    def route(kind, candidates):
+        candidates = list(candidates)
+        effective = next((c for c in candidates if c["status"] == "available"), None)
+        return {"kind": kind, "label": kind, "policy": "local_first", "effective": effective,
+                "candidates": candidates, "error": None, "has_local": True, "has_server": False}
+
+    return {"routes": [route("chat", chat), route("embedding", embedding),
+                       route("ocr", ocr), route("layout_parsing", ())], "checked_at": None}
+
+
 class TestAIServiceHealthCheck:
-    """health_check 只探测当前生效的 chat/embedding runtime。"""
+    """health_check 由路由状态派生（V197）：兼容既有字段，另附 routes。"""
 
     @staticmethod
     def _chroma(status=503):
@@ -73,124 +110,125 @@ class TestAIServiceHealthCheck:
         client.get = AsyncMock(return_value=response)
         return client
 
-    @pytest.mark.asyncio
-    async def test_health_check_healthy(self):
-        async def resolve(_db, model_type):
-            if model_type == AIModelType.chat:
-                return _runtime_config()
-            return _runtime_config(
-                provider=AIProvider.openai_compatible,
-                model_name="BAAI/bge-m3",
-                model_type=AIModelType.embedding,
-            )
-
+    async def _run(self, status, *, public=False):
         service = AIService(MagicMock())
+        collect = AsyncMock(return_value=status)
         with patch(
-            "app.services.ai_service.resolve_runtime_config",
-            side_effect=resolve,
-        ), patch(
-            "app.services.ai_service.probe_runtime_config",
-            new=AsyncMock(return_value=True),
+            "app.services.model_route_status.collect_route_status", new=collect
         ), patch(
             "app.services.ai_service._get_chromadb_client",
             new=AsyncMock(return_value=self._chroma()),
-        ), patch("app.services.ai_service.paddleocr", None):
-            result = await service.health_check()
+        ):
+            result = await service.health_check(public=public)
+        return result, collect
 
+    @pytest.mark.asyncio
+    async def test_health_check_healthy(self):
+        result, _ = await self._run(_route_status(
+            chat=[_candidate()],
+            embedding=[_candidate(model_name="BAAI/bge-m3", provider="openai_compatible")],
+        ))
         assert result["llm_status"] == "healthy"
         assert result["ollama_status"] == "healthy"
         assert result["active_chat_model"] == "llama3.1"
+        assert result["chat_config"]["endpoint_url"] == "http://localhost:11434/v1"
+        assert result["chat_config"]["deployment"] == "local"
+        assert [r["kind"] for r in result["routes"]] == ["chat", "embedding", "ocr", "layout_parsing"]
         assert "api_key" not in str(result)
 
     @pytest.mark.asyncio
-    async def test_health_check_degraded_ollama_down(self):
-        service = AIService(MagicMock())
-        with patch(
-            "app.services.ai_service.resolve_runtime_config",
-            new=AsyncMock(return_value=_runtime_config()),
-        ), patch(
-            "app.services.ai_service.probe_runtime_config",
-            new=AsyncMock(return_value=False),
-        ), patch(
-            "app.services.ai_service._get_chromadb_client",
-            new=AsyncMock(return_value=self._chroma()),
-        ), patch("app.services.ai_service.paddleocr", None):
-            result = await service.health_check()
+    async def test_health_check_degraded_when_every_chat_candidate_is_down(self):
+        result, _ = await self._run(_route_status(chat=[
+            _candidate(status="unavailable"),
+            _candidate(model_name="qwen3.8", provider="custom", deployment="server", status="unavailable",
+                       endpoint="https://ai.example/v1"),
+        ]))
         assert result["llm_status"] == "unavailable"
         assert result["ollama_status"] == "unavailable"
+        # 都不可用时展示首选候选（本机）
+        assert result["active_chat_model"] == "llama3.1"
 
     @pytest.mark.asyncio
-    async def test_health_check_degraded_connection_error(self):
-        service = AIService(MagicMock())
-        with patch(
-            "app.services.ai_service.resolve_runtime_config",
-            new=AsyncMock(return_value=_runtime_config()),
-        ), patch(
-            "app.services.ai_service.probe_runtime_config",
-            new=AsyncMock(side_effect=RuntimeError("connection refused")),
-        ), patch(
-            "app.services.ai_service._get_chromadb_client",
-            new=AsyncMock(return_value=self._chroma()),
-        ), patch("app.services.ai_service.paddleocr", None):
-            result = await service.health_check()
-        assert result["llm_status"] == "unavailable"
+    async def test_health_check_reports_server_when_local_down(self):
+        """本机不可用、服务器可用 ⇒ 对话仍 healthy，生效模型是服务器那条。"""
+        result, _ = await self._run(_route_status(chat=[
+            _candidate(model_name="Qwen-local", provider="openai_compatible", status="unavailable"),
+            _candidate(model_name="qwen3.8", provider="custom", deployment="server",
+                       endpoint="https://ai.example/v1"),
+        ]))
+        assert result["llm_status"] == "healthy"
+        assert result["active_chat_model"] == "qwen3.8"
+        assert result["chat_config"]["deployment"] == "server"
+        assert result["vllm_status"] == "healthy"
 
     @pytest.mark.asyncio
     async def test_health_check_healthy_fallback_model(self):
-        fallback = _runtime_config(
-            provider=AIProvider.openai_compatible,
-            model_name="Qwen3.5-27B",
-            source="environment",
-        )
-        service = AIService(MagicMock())
-        with patch(
-            "app.services.ai_service.resolve_runtime_config",
-            new=AsyncMock(return_value=fallback),
-        ), patch(
-            "app.services.ai_service.probe_runtime_config",
-            new=AsyncMock(return_value=True),
-        ), patch(
-            "app.services.ai_service._get_chromadb_client",
-            new=AsyncMock(return_value=self._chroma()),
-        ), patch("app.services.ai_service.paddleocr", None):
-            result = await service.health_check()
+        result, _ = await self._run(_route_status(chat=[
+            _candidate(model_name="Qwen3.5-27B", provider="openai_compatible", source="environment"),
+        ]))
         assert result["vllm_status"] == "healthy"
         assert result["ollama_status"] == "unavailable"
         assert result["chat_config"]["source"] == "environment"
+
+    @pytest.mark.asyncio
+    async def test_public_health_probes_chat_only_and_hides_endpoints(self):
+        """未鉴权的 /api/ai/health：只探测对话、不回端点地址、不探 ChromaDB。"""
+        result, collect = await self._run(
+            _route_status(chat=[_candidate()]), public=True
+        )
+        kwargs = collect.await_args.kwargs
+        assert tuple(kwargs["probe_kinds"]) == ("chat",)
+        assert kwargs["include_endpoints"] is False
+        assert "endpoint_url" not in result["chat_config"]
+        assert result["chromadb_status"] == "unknown"
 
 
 # ---------------------------------------------------------------------------
 # Test AIService.get_active_model()  — Requirement 1.2
 # ---------------------------------------------------------------------------
 
+
+def _rows_result(rows):
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = list(rows)
+    return result
+
+
 class TestAIServiceGetActiveModel:
-    """get_active_model queries the DB for the active model of a given type."""
+    """get_active_model 返回路由中排在最前的已启用模型（本机优先）。"""
 
     @pytest.mark.asyncio
     async def test_get_active_model_found(self):
-        """Returns AIModelConfig when an active model exists."""
         mock_model = _mock_model(model_name="llama3.1")
-        mock_result = _mock_execute_result(scalar_value=mock_model)
-
+        mock_model.deployment = "local"
         mock_db = MagicMock()
-        mock_db.execute = AsyncMock(return_value=mock_result)
+        mock_db.execute = AsyncMock(return_value=_rows_result([mock_model]))
 
-        service = AIService(mock_db)
-        result = await service.get_active_model(AIModelType.chat)
+        result = await AIService(mock_db).get_active_model(AIModelType.chat)
 
         assert result is not None
         assert result.model_name == "llama3.1"
 
     @pytest.mark.asyncio
-    async def test_get_active_model_not_found(self):
-        """Returns None when no active model is configured."""
-        mock_result = _mock_execute_result(scalar_value=None)
-
+    async def test_get_active_model_prefers_local_over_server(self):
+        """V197 起同类型可本机、服务器各启用一条：不得因多行而报错，且本机在前。"""
+        server = _mock_model(model_name="qwen3.8", provider=AIProvider.custom)
+        server.deployment = "server"
+        local = _mock_model(model_name="Qwen-local", provider=AIProvider.openai_compatible)
+        local.deployment = "local"
         mock_db = MagicMock()
-        mock_db.execute = AsyncMock(return_value=mock_result)
+        mock_db.execute = AsyncMock(return_value=_rows_result([server, local]))
 
-        service = AIService(mock_db)
-        result = await service.get_active_model(AIModelType.chat)
+        result = await AIService(mock_db).get_active_model(AIModelType.chat)
+
+        assert result is local
+
+    @pytest.mark.asyncio
+    async def test_get_active_model_not_found(self):
+        mock_db = MagicMock()
+        mock_db.execute = AsyncMock(return_value=_rows_result([]))
+
+        result = await AIService(mock_db).get_active_model(AIModelType.chat)
 
         assert result is None
 

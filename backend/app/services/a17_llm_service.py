@@ -310,9 +310,11 @@ class A17LlmService:
             if isinstance(draft, str) and draft.startswith("["):
                 return {"error": draft}
 
+            from app.services.llm_route import served_model_label
+
             return {
                 "draft": draft,
-                "model": settings.DEFAULT_CHAT_MODEL,
+                "model": served_model_label(settings.DEFAULT_CHAT_MODEL),  # 实际回答的模型（ADR-ROUTE-008）
                 "confidence": 0.7,
             }
         except Exception as e:
@@ -376,9 +378,11 @@ class A17LlmService:
             if isinstance(draft, str) and draft.startswith("["):
                 return {"error": draft}
 
+            from app.services.llm_route import served_model_label
+
             return {
                 "draft": draft,
-                "model": settings.DEFAULT_CHAT_MODEL,
+                "model": served_model_label(settings.DEFAULT_CHAT_MODEL),  # 实际回答的模型（ADR-ROUTE-008）
                 "confidence": 0.7,
             }
         except Exception as e:

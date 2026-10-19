@@ -215,7 +215,11 @@ class BatchReviewService:
                 start_time=start_time.isoformat(),
                 end_time=end_time.isoformat(),
                 duration_seconds=duration,
-                model_used=model_used,
+                # 各底稿可能由不同模型回答（路由兜底）；汇总取首个成功复核的实际模型
+                model_used=next(
+                    (r.model_used for r in results if r.error_message is None),
+                    model_used,
+                ),
             ),
         )
 
@@ -478,6 +482,8 @@ class BatchReviewService:
                 if not f.pass_status and f.risk_level in risk_summary:
                     risk_summary[f.risk_level] += 1
 
+            from app.services.llm_route import served_model_label
+
             return ReviewResult(
                 wp_id=wp_id,
                 sheet_name=sheet_name,
@@ -486,7 +492,8 @@ class BatchReviewService:
                 findings=parse_result.findings,
                 risk_summary=risk_summary,
                 reviewed_at=datetime.now(timezone.utc).isoformat(),
-                model_used=model_used,
+                # 实际回答的模型（本机不可用时路由改用服务器，ADR-ROUTE-008）
+                model_used=served_model_label(model_used),
                 prompt_source=prompt_result.source_level,
                 error_message=None,
             )

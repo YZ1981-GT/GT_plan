@@ -7,8 +7,8 @@
 - 支持延迟初始化，按需加载引擎（PaddleOCR ~500MB）
 - 引擎不可用时自动回退到另一引擎
 
-v2: OCR 服务化 — 优先 HTTP 调用独立 OCR 容器（OCR_SERVICE_URL），
-    降低 web worker 内存占用。HTTP 超时/错误 → 503 + warning。
+v2: OCR 服务化 — 配置了 OCR_SERVICE_URL 时本机引擎改走独立 OCR 容器，降低 web worker 内存占用。
+v3（V197）: 本机优先、服务器兜底 —— 按能力槽在已启用模型中先试本机，再试远程 PaddleX。
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import asyncio
 import logging
 import os
 import re
+import shutil
 from enum import Enum
 from pathlib import Path
 
@@ -71,43 +72,85 @@ class UnifiedOCRService:
         image_path: str,
         mode: OCREngine = OCREngine.AUTO,
     ) -> dict:
-        """统一OCR接口
+        """统一OCR接口：本机优先、服务器兜底（ADR-ROUTE-009）。
 
-        v2: 优先 HTTP 调用独立 OCR 服务容器（OCR_SERVICE_URL）。
-        HTTP 超时/连接失败 → 返回 503 错误（不 fallback 到 in-process，
-        避免 web worker 内存膨胀）。
+        候选按能力槽（文字识别 / 版面解析）取已启用模型，本机在前：本机行 = 进程内引擎链
+        （PaddleOCR / Tesseract / MinerU）或旧 ``OCR_SERVICE_URL`` 容器，环回 PaddleX 也算本机；
+        服务器行 = 远程 PaddleX。没有启用行时文字识别走本机进程内引擎（旧行为），
+        版面解析报「未配置」。OCR 幂等，前序候选任何失败都换下一个；最后一个失败才报错。
+        显式点名 ``TESSERACT`` / ``MINERU`` 时只走本机引擎。
 
         Returns:
-            {"text": "...", "engine": "paddle|tesseract|mineru", "regions": [...]}
+            {"text": "...", "engine": "...", "regions": [...], "route": {...}}
 
         Raises:
-            OCRServiceUnavailableError: OCR 服务不可达（HTTP 超时/连接错误）
+            OCRServiceUnavailableError: 全部候选不可用（逐个列出原因）
         """
-        # DB 中显式激活的远程 PaddleX 配置优先于 legacy OCR_SERVICE_URL。
-        # 远程配置一旦存在，连接/协议错误必须上抛，不静默改走本地引擎。
-        if mode in {OCREngine.AUTO, OCREngine.PADDLE, OCREngine.LAYOUT_PARSING}:
-            from app.services.remote_ocr_runtime import (
-                RemoteOCRRuntimeError,
-                recognize_with_active_remote_ocr,
-            )
+        if mode in {OCREngine.TESSERACT, OCREngine.MINERU}:
+            return await self._local_recognize(image_path, mode)
 
-            capability = (
-                "layout_parsing"
-                if mode == OCREngine.LAYOUT_PARSING
-                else "ocr"
-            )
+        from app.services.llm_route import (
+            cooling_notes,
+            mark_available,
+            mark_unavailable,
+            plan_attempts,
+        )
+        from app.services.remote_ocr_runtime import (
+            RemoteOCRRuntimeError,
+            recognize_remote_file,
+            resolve_ocr_route,
+        )
+
+        capability = "layout_parsing" if mode == OCREngine.LAYOUT_PARSING else "ocr"
+        try:
+            route = await resolve_ocr_route(capability)
+        except RemoteOCRRuntimeError as exc:
+            raise OCRServiceUnavailableError(str(exc)) from exc
+        if not route:
+            raise OCRServiceUnavailableError("未配置已启用的版面解析模型")
+
+        planned = plan_attempts(route)
+        failures: list[tuple[str, str]] = []
+        for candidate in planned:
             try:
-                remote_result = await recognize_with_active_remote_ocr(
-                    image_path, capability=capability
-                )
-            except RemoteOCRRuntimeError as exc:
-                raise OCRServiceUnavailableError(str(exc)) from exc
-            if remote_result is not None:
-                return remote_result
-            if mode == OCREngine.LAYOUT_PARSING:
-                raise OCRServiceUnavailableError("未配置已激活的远程版面解析模型")
+                if candidate.local_engine:
+                    result = await self._local_recognize(image_path, mode)
+                elif candidate.config is None:
+                    raise candidate.error or RemoteOCRRuntimeError("invalid_ocr_config", "OCR 配置无效")
+                else:
+                    result = await recognize_remote_file(candidate.config, image_path)
+            except FileNotFoundError:
+                raise  # 文件本身不存在：换候选也没用
+            except Exception as exc:  # noqa: BLE001 — OCR 幂等，任何失败都换下一个候选
+                reason = str(exc) or type(exc).__name__
+                if candidate.config is not None and candidate.config.is_remote:
+                    mark_unavailable(candidate.identity, reason)
+                failures.append((candidate.label, reason))
+                logger.warning("OCR 候选失败 %s：%s", candidate.label, reason)
+                continue
+            if candidate.config is not None and candidate.config.is_remote:
+                mark_available(candidate.identity)
+            notes = [f"{label}：{reason}" for label, reason in failures]
+            notes.extend(cooling_notes(route, planned))
+            result["route"] = {
+                "deployment": candidate.deployment,
+                "model_name": candidate.model_name,
+                "fallback_used": candidate is not route[0],
+                "attempts": notes,
+            }
+            return result
+        skipped = cooling_notes(route, planned)
+        if len(failures) == 1 and not skipped:
+            raise OCRServiceUnavailableError(failures[0][1])
+        raise OCRServiceUnavailableError(
+            "；".join([f"{label}：{reason}" for label, reason in failures] + skipped)
+            or "没有可用的 OCR 引擎"
+        )
 
-        # 兼容旧的固定 HTTP OCR 容器。
+    async def _local_recognize(
+        self, image_path: str, mode: OCREngine = OCREngine.AUTO
+    ) -> dict:
+        """本机引擎：旧固定 OCR 容器优先，否则进程内引擎链。"""
         if OCR_SERVICE_URL:
             try:
                 return await self._http_recognize(image_path, mode)
@@ -210,6 +253,41 @@ class UnifiedOCRService:
                     logger.warning("Tesseract also failed, trying MinerU: %s", exc2)
                     return await self._mineru_fallback(image_path)
 
+    async def local_engine_status(self) -> dict:
+        """本机 OCR 引擎能否用（只查安装与配置，不加载模型、不识别）。
+
+        路由状态与启用本机 OCR 行的校验共用这一份判定。
+        """
+        if OCR_SERVICE_URL:
+            try:
+                async with httpx.AsyncClient(
+                    timeout=httpx.Timeout(3.0, connect=2.0), mounts={}, trust_env=False
+                ) as client:
+                    response = await client.get(f"{OCR_SERVICE_URL}/health")
+                ok = response.status_code == 200
+                reason = "本机 OCR 容器可用" if ok else f"本机 OCR 容器返回 HTTP {response.status_code}"
+            except httpx.HTTPError as exc:
+                ok, reason = False, f"本机 OCR 容器不可达（{type(exc).__name__}）"
+            return {"available": ok, "engines": {"container": ok}, "reason": reason}
+        engines = {
+            "paddle": self._check_paddle_available(),
+            "tesseract": self._check_tesseract_available(),
+            "mineru": (
+                await self._check_mineru_available()
+                if getattr(settings, "MINERU_ENABLED", False)
+                else False
+            ),
+        }
+        names = {"paddle": "PaddleOCR", "tesseract": "Tesseract", "mineru": "MinerU"}
+        ready = [names[key] for key, ok in engines.items() if ok]
+        if ready:
+            return {"available": True, "engines": engines, "reason": "可用：" + " / ".join(ready)}
+        return {
+            "available": False,
+            "engines": engines,
+            "reason": "本机未安装 PaddleOCR / Tesseract，MinerU 未启用",
+        }
+
     async def health_check(self) -> dict:
         """OCR引擎健康检查（禁用 MinerU 时不探测，避免拖慢 /api/ai/health）"""
         paddle_ok = self._check_paddle_available()
@@ -277,8 +355,11 @@ class UnifiedOCRService:
         # Last resort
         if self._check_paddle_available():
             return OCREngine.PADDLE
+        # Paddle / Tesseract 都不可用时 MinerU 仍是本机引擎（旧实现在这里直接抛错，MinerU 永远轮不到）
+        if await self._check_mineru_available():
+            return OCREngine.MINERU
 
-        raise RuntimeError("没有可用的OCR引擎")
+        raise RuntimeError("没有可用的本机 OCR 引擎（PaddleOCR / Tesseract 未安装，MinerU 未启用）")
 
     # ------------------------------------------------------------------
     # Engine availability checks (lazy)
@@ -307,9 +388,13 @@ class UnifiedOCRService:
             self._tesseract_available = False
             return False
         try:
-            import pytesseract  # noqa: F401
+            import pytesseract
 
-            self._tesseract_available = True
+            # 只装 Python 包不装 tesseract 程序时，识别到 image_to_string 才报错 ⇒ 这里一并检查。
+            cmd = str(getattr(pytesseract.pytesseract, "tesseract_cmd", "tesseract") or "tesseract")
+            self._tesseract_available = bool(
+                os.path.isfile(cmd) if os.path.isabs(cmd) else shutil.which(cmd)
+            )
         except Exception:
             self._tesseract_available = False
         return self._tesseract_available

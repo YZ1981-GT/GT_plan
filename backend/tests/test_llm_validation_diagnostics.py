@@ -196,7 +196,8 @@ async def test_activation_reports_fake_ip_tls_failure_instead_of_generic_hint(
     detail = activated.json()["detail"]
     assert isinstance(detail, dict), f"激活失败必须返回 code + 具体原因，实际：{detail}"
     assert detail["error_code"] == "provider_unreachable"
-    assert detail["message"].startswith("模型验证失败，未激活：模型端点不可达：TLS 握手被中断")
+    # 服务器模型（企业端点）连不上：仍拒绝启用（只有本机模型允许「当前不可用但已启用」）
+    assert detail["message"].startswith("模型验证失败，未启用：模型端点不可达：TLS 握手被中断")
     assert "请检查端点、模型名和凭证" not in detail["message"]
     assert "sk-placeholder-not-real" not in activated.text
     async with session_factory() as db:

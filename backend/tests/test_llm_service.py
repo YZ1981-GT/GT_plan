@@ -1,4 +1,7 @@
-"""Tests for LLMService — mock vLLM responses + timeout degradation + error handling
+"""Tests for LLMService — 经平台本机优先路由调用 + 超时降级 + 错误处理
+
+V197 起 LLMService 不再自建 httpx 直连 `.env` 端点，而是走 ``llm_runtime.resolve_route``
+的候选与同一 transport；这里用 MockTransport 替换出站，验证结构化响应契约不变。
 
 Requirements: F2.1, F2.4
 """
@@ -6,90 +9,92 @@ Requirements: F2.1, F2.4
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
 
+from app.models.ai_models import AIModelType, AIProvider
+from app.services.llm_provider_registry import provider_profile
+from app.services.llm_route import reset_route_health
+from app.services.llm_runtime import ResolvedLLMConfig, RouteCandidate
 from app.services.llm_service import LLMResponse, LLMService
 
-
-# --- Fixtures ---
-
-
-@pytest.fixture
-def llm_service():
-    """Create LLMService instance with test URL"""
-    return LLMService(base_url="http://test-vllm:8100/v1", model="test-model")
+LOCAL = "http://localhost:8100/v1"
+SERVER = "https://ai.example.test/v1"
 
 
-# --- Mock response helpers ---
-
-
-def _mock_success_response() -> dict:
-    """Standard successful vLLM response"""
-    return {
-        "choices": [
-            {
-                "message": {
-                    "content": "## 异常分析\n\n销售费用同比增长 45%，主要原因：\n1. 新增渠道推广费用\n2. 人员扩张"
-                }
-            }
-        ],
-        "usage": {"prompt_tokens": 150, "completion_tokens": 80, "total_tokens": 230},
-    }
-
-
-def _mock_success_response_no_usage() -> dict:
-    """vLLM response without usage field"""
-    return {
-        "choices": [
-            {
-                "message": {
-                    "content": "分析结果：费用正常。"
-                }
-            }
-        ],
-    }
-
-
-def _make_httpx_response(status_code: int = 200, json_data: dict | None = None, text: str = "") -> httpx.Response:
-    """Create a mock httpx.Response"""
-    if json_data is not None:
-        return httpx.Response(
-            status_code=status_code,
-            json=json_data,
-            request=httpx.Request("POST", "http://test-vllm:8100/v1/chat/completions"),
-        )
-    return httpx.Response(
-        status_code=status_code,
-        text=text,
-        request=httpx.Request("POST", "http://test-vllm:8100/v1/chat/completions"),
+def _candidate(model: str, endpoint: str) -> RouteCandidate:
+    provider = AIProvider.openai_compatible if "localhost" in endpoint else AIProvider.custom
+    config = ResolvedLLMConfig(
+        model_name=model, model_type=AIModelType.chat, provider=provider,
+        endpoint_url=endpoint, api_key=None if "localhost" in endpoint else "k",
+        profile=provider_profile(provider), source="database",
+        deployment="local" if "localhost" in endpoint else "server",
     )
+    return RouteCandidate(model, config.deployment, None, config)
+
+
+def _success(content: str, usage: dict | None = None) -> dict:
+    body: dict = {"choices": [{"message": {"content": content}}]}
+    if usage is not None:
+        body["usage"] = usage
+    return body
+
+
+@pytest.fixture(autouse=True)
+def _clean_route_health():
+    reset_route_health()
+    yield
+    reset_route_health()
+
+
+def _transport(handlers: dict[str, object], seen: list[httpx.Request] | None = None):
+    """按端点前缀分派：值为 httpx.Response 或要抛出的异常实例。"""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if seen is not None:
+            seen.append(request)
+        for prefix, outcome in handlers.items():
+            if str(request.url).startswith(prefix):
+                if isinstance(outcome, Exception):
+                    raise outcome
+                return outcome
+        raise AssertionError(f"unexpected request {request.url}")
+
+    async def factory(config, *, timeout, connect_timeout=10.0):
+        return httpx.AsyncClient(
+            base_url=config.endpoint_url.rstrip("/") + "/",
+            transport=httpx.MockTransport(handle),
+        )
+
+    return factory
+
+
+async def _generate(route, handlers, *, seen=None, **kwargs) -> LLMResponse:
+    svc = LLMService()
+    with patch.object(LLMService, "_route", new=AsyncMock(return_value=route)), patch(
+        "app.services.llm_runtime.build_runtime_client", _transport(handlers, seen)
+    ):
+        return await svc.generate(
+            system_prompt=kwargs.pop("system_prompt", "你是审计师"),
+            user_prompt=kwargs.pop("user_prompt", "分析费用异常"),
+            **kwargs,
+        )
 
 
 # --- Tests: Successful calls ---
 
 
 @pytest.mark.asyncio
-async def test_generate_success(llm_service):
-    """LLM 调用成功时返回 content + tokens_used + is_stub=False"""
-    mock_response = _make_httpx_response(200, _mock_success_response())
-
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(return_value=mock_response)
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-
-    with patch("app.services.llm_service.httpx.AsyncClient", return_value=mock_client):
-        result = await llm_service.generate(
-            system_prompt="你是审计师",
-            user_prompt="分析费用异常",
-        )
-
+async def test_generate_success():
+    """调用成功时返回 content + tokens_used + is_stub=False"""
+    result = await _generate(
+        [_candidate("local-model", LOCAL)],
+        {LOCAL: httpx.Response(200, json=_success("## 异常分析\n销售费用同比增长 45%", {"total_tokens": 230}))},
+    )
     assert isinstance(result, LLMResponse)
     assert result.is_stub is False
-    assert result.content is not None
     assert "异常分析" in result.content
     assert result.tokens_used == 230
     assert result.error is None
@@ -97,98 +102,101 @@ async def test_generate_success(llm_service):
 
 
 @pytest.mark.asyncio
-async def test_generate_success_no_usage(llm_service):
-    """vLLM 响应缺少 usage 字段时 tokens_used 默认为 0"""
-    mock_response = _make_httpx_response(200, _mock_success_response_no_usage())
-
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(return_value=mock_response)
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-
-    with patch("app.services.llm_service.httpx.AsyncClient", return_value=mock_client):
-        result = await llm_service.generate(
-            system_prompt="你是审计师",
-            user_prompt="分析",
-        )
-
+async def test_generate_success_no_usage():
+    """响应缺少 usage 字段时 tokens_used 默认为 0"""
+    result = await _generate(
+        [_candidate("local-model", LOCAL)],
+        {LOCAL: httpx.Response(200, json=_success("分析结果：费用正常。"))},
+    )
     assert result.is_stub is False
     assert result.content == "分析结果：费用正常。"
     assert result.tokens_used == 0
 
 
 @pytest.mark.asyncio
-async def test_generate_custom_params(llm_service):
-    """自定义 temperature/max_tokens 参数正确传递"""
-    mock_response = _make_httpx_response(200, _mock_success_response())
-
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(return_value=mock_response)
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-
-    with patch("app.services.llm_service.httpx.AsyncClient", return_value=mock_client):
-        result = await llm_service.generate(
-            system_prompt="系统提示",
-            user_prompt="用户提示",
-            temperature=0.7,
-            max_tokens=500,
-        )
-
+async def test_generate_custom_params():
+    """temperature / max_tokens / 消息结构 / 候选自身的模型名正确传递"""
+    seen: list[httpx.Request] = []
+    result = await _generate(
+        [_candidate("local-model", LOCAL)],
+        {LOCAL: httpx.Response(200, json=_success("ok"))},
+        seen=seen,
+        system_prompt="系统提示", user_prompt="用户提示", temperature=0.7, max_tokens=500,
+    )
     assert result.is_stub is False
-
-    # Verify request payload
-    call_args = mock_client.post.call_args
-    body = call_args[1]["json"] if "json" in call_args[1] else call_args[0][1]
+    body = json.loads(seen[0].content)
     assert body["temperature"] == 0.7
     assert body["max_tokens"] == 500
-    assert body["model"] == "test-model"
-    assert body["messages"][0]["role"] == "system"
-    assert body["messages"][0]["content"] == "系统提示"
-    assert body["messages"][1]["role"] == "user"
-    assert body["messages"][1]["content"] == "用户提示"
+    assert body["model"] == "local-model"
+    assert body["messages"] == [
+        {"role": "system", "content": "系统提示"},
+        {"role": "user", "content": "用户提示"},
+    ]
+
+
+# --- Tests: 本机优先路由 ---
+
+
+@pytest.mark.asyncio
+async def test_local_unreachable_falls_back_to_server():
+    """本机连不上 ⇒ 同一次调用改用服务器候选，服务器的模型名与用量生效。"""
+    seen: list[httpx.Request] = []
+    result = await _generate(
+        [_candidate("local-model", LOCAL), _candidate("qwen3.8", SERVER)],
+        {
+            LOCAL: httpx.ConnectError("Connection refused"),
+            SERVER: httpx.Response(200, json=_success("服务器回答", {"total_tokens": 42})),
+        },
+        seen=seen,
+    )
+    assert result.is_stub is False
+    assert result.content == "服务器回答"
+    assert result.tokens_used == 42
+    assert [json.loads(r.content)["model"] for r in seen] == ["local-model", "qwen3.8"]
+
+
+@pytest.mark.asyncio
+async def test_local_read_timeout_does_not_fall_back():
+    """读取超时说明请求已被接收：不换服务器重复执行，直接降级。"""
+    seen: list[httpx.Request] = []
+    result = await _generate(
+        [_candidate("local-model", LOCAL), _candidate("qwen3.8", SERVER)],
+        {
+            LOCAL: httpx.ReadTimeout("read timed out"),
+            SERVER: httpx.Response(200, json=_success("不该被调用")),
+        },
+        seen=seen,
+    )
+    assert result.is_stub is True
+    assert "timeout" in result.error.lower()
+    assert len(seen) == 1
 
 
 # --- Tests: Timeout degradation (F2.4) ---
 
 
 @pytest.mark.asyncio
-async def test_generate_timeout_degradation(llm_service):
-    """超时 30s 后降级返回 is_stub=True + error 描述"""
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(side_effect=httpx.ReadTimeout("Connection timed out"))
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-
-    with patch("app.services.llm_service.httpx.AsyncClient", return_value=mock_client):
-        result = await llm_service.generate(
-            system_prompt="你是审计师",
-            user_prompt="分析费用异常",
-            timeout=30.0,
-        )
-
+async def test_generate_timeout_degradation():
+    """超时后降级返回 is_stub=True + error 描述"""
+    result = await _generate(
+        [_candidate("local-model", LOCAL)],
+        {LOCAL: httpx.ReadTimeout("Connection timed out")},
+        timeout=30.0,
+    )
     assert result.is_stub is True
     assert result.content is None
     assert result.tokens_used == 0
-    assert result.error is not None
     assert "timeout" in result.error.lower()
     assert result.duration_ms >= 0
 
 
 @pytest.mark.asyncio
-async def test_generate_connect_timeout(llm_service):
+async def test_generate_connect_timeout():
     """连接超时也降级"""
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(side_effect=httpx.ConnectTimeout("Failed to connect"))
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-
-    with patch("app.services.llm_service.httpx.AsyncClient", return_value=mock_client):
-        result = await llm_service.generate(
-            system_prompt="系统",
-            user_prompt="用户",
-        )
-
+    result = await _generate(
+        [_candidate("local-model", LOCAL)],
+        {LOCAL: httpx.ConnectTimeout("Failed to connect")},
+    )
     assert result.is_stub is True
     assert result.content is None
     assert "timeout" in result.error.lower()
@@ -198,68 +206,42 @@ async def test_generate_connect_timeout(llm_service):
 
 
 @pytest.mark.asyncio
-async def test_generate_http_500_error(llm_service):
-    """vLLM 返回 500 时降级"""
-    mock_response = _make_httpx_response(500, text="Internal Server Error")
-
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(return_value=mock_response)
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-
-    with patch("app.services.llm_service.httpx.AsyncClient", return_value=mock_client):
-        result = await llm_service.generate(
-            system_prompt="系统",
-            user_prompt="用户",
-        )
-
+async def test_generate_http_500_error():
+    """返回 500 时降级，错误里不回传上游正文"""
+    result = await _generate(
+        [_candidate("local-model", LOCAL)],
+        {LOCAL: httpx.Response(500, text="upstream-secret-body")},
+    )
     assert result.is_stub is True
     assert result.content is None
-    assert result.error is not None
     assert "500" in result.error
+    assert "upstream-secret-body" not in result.error
 
 
 @pytest.mark.asyncio
-async def test_generate_http_429_rate_limit(llm_service):
-    """vLLM 返回 429 限流时降级"""
-    mock_response = _make_httpx_response(429, text="Rate limit exceeded")
-
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(return_value=mock_response)
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-
-    with patch("app.services.llm_service.httpx.AsyncClient", return_value=mock_client):
-        result = await llm_service.generate(
-            system_prompt="系统",
-            user_prompt="用户",
-        )
-
+async def test_generate_http_429_rate_limit():
+    """返回 429 限流时降级"""
+    result = await _generate(
+        [_candidate("local-model", LOCAL)],
+        {LOCAL: httpx.Response(429, text="Rate limit exceeded")},
+    )
     assert result.is_stub is True
-    assert "429" in result.error
+    assert "provider_rate_limited" in result.error
 
 
 # --- Tests: Connection errors ---
 
 
 @pytest.mark.asyncio
-async def test_generate_connection_refused(llm_service):
-    """vLLM 未启动（连接拒绝）时降级"""
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-
-    with patch("app.services.llm_service.httpx.AsyncClient", return_value=mock_client):
-        result = await llm_service.generate(
-            system_prompt="系统",
-            user_prompt="用户",
-        )
-
+async def test_generate_connection_refused():
+    """本机未启动且没有服务器候选时降级"""
+    result = await _generate(
+        [_candidate("local-model", LOCAL)],
+        {LOCAL: httpx.ConnectError("Connection refused")},
+    )
     assert result.is_stub is True
     assert result.content is None
-    assert result.error is not None
-    assert "ConnectError" in result.error
+    assert "provider_unreachable" in result.error
 
 
 # --- Tests: LLMResponse dataclass ---
@@ -286,54 +268,36 @@ def test_llm_response_stub():
 
 
 def test_llm_service_default_config():
-    """LLMService 使用 settings 默认配置"""
-    svc = LLMService()
-    assert svc.BASE_URL == "http://localhost:8100/v1"
-    assert svc.MODEL == "Kbenkhaled/Qwen3.5-27B-NVFP4"
+    """默认不点名模型：完全按路由选择"""
+    assert LLMService().model is None
 
 
-def test_llm_service_custom_config():
-    """LLMService 支持自定义 base_url 和 model"""
-    svc = LLMService(base_url="http://custom:9000/v1", model="custom-model")
-    assert svc.BASE_URL == "http://custom:9000/v1"
-    assert svc.MODEL == "custom-model"
+def test_llm_service_model_is_only_a_preference():
+    """点名模型只作优先提示，不再接受任意 base_url（不得绕开路由与出站策略）"""
+    assert LLMService(model="custom-model").model == "custom-model"
+    with pytest.raises(TypeError):
+        LLMService(base_url="http://custom:9000/v1")  # type: ignore[call-arg]
 
 
 # --- Tests: Duration logging ---
 
 
 @pytest.mark.asyncio
-async def test_generate_records_duration(llm_service):
+async def test_generate_records_duration():
     """调用记录耗时（duration_ms > 0）"""
-    mock_response = _make_httpx_response(200, _mock_success_response())
-
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(return_value=mock_response)
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-
-    with patch("app.services.llm_service.httpx.AsyncClient", return_value=mock_client):
-        result = await llm_service.generate(
-            system_prompt="系统",
-            user_prompt="用户",
-        )
-
+    result = await _generate(
+        [_candidate("local-model", LOCAL)],
+        {LOCAL: httpx.Response(200, json=_success("ok", {"total_tokens": 1}))},
+    )
     assert result.duration_ms > 0
 
 
 @pytest.mark.asyncio
-async def test_generate_records_duration_on_failure(llm_service):
+async def test_generate_records_duration_on_failure():
     """失败时也记录耗时"""
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(side_effect=httpx.ConnectError("refused"))
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-
-    with patch("app.services.llm_service.httpx.AsyncClient", return_value=mock_client):
-        result = await llm_service.generate(
-            system_prompt="系统",
-            user_prompt="用户",
-        )
-
+    result = await _generate(
+        [_candidate("local-model", LOCAL)],
+        {LOCAL: httpx.ConnectError("refused")},
+    )
     assert result.duration_ms >= 0
     assert result.is_stub is True

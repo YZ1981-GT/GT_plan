@@ -1,67 +1,41 @@
 """AI服务统一抽象层 — 屏蔽底层模型差异
 
 提供统一的 AI 能力接口：
-- chat_completion: LLM对话，支持同步和SSE流式输出
-- embedding: 文本向量化
+- chat_completion: LLM对话（本机优先路由，支持同步和SSE流式输出）
+- embedding: 文本向量化（单一启用模型，不跨模型兜底）
 - ocr_recognize: OCR文字识别
-- get_active_model: 获取当前激活的模型
-- switch_model: 切换模型（含可用性验证）
+- get_active_model: 路由中排在最前的已启用模型
+- switch_model: 启用模型参与路由（含可用性验证）
 - health_check: 检查所有AI引擎状态
 """
 
 import asyncio
-import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, AsyncGenerator
-from uuid import UUID
 
 import httpx
-
-try:
-    import paddleocr  # type: ignore
-except Exception:
-    paddleocr = None  # type: ignore
-
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models import AIModelConfig, AIModelType, AIProvider
+from app.models.ai_model_options import AIDeployment
+from app.services.llm_route import route_chat_stream, route_chat_sync
 from app.services.llm_runtime import (
     LLMRuntimeError,
-    chat_stream as runtime_chat_stream,
-    chat_sync as runtime_chat_sync,
+    deployment_of,
     embedding as runtime_embedding,
+    enabled_model_rows,
     merge_system_messages,
-    probe_runtime_config,
     resolve_config_from_model,
+    resolve_route,
     resolve_runtime_config,
     test_runtime_config,
 )
 
 logger = logging.getLogger(__name__)
-
-# 全局 PaddleOCR 实例（延迟初始化）
-_paddle_ocr: "paddleocr.PaddleOCR | None" = None
-
-
-def _get_paddle_ocr() -> "paddleocr.PaddleOCR":
-    """延迟初始化 PaddleOCR 实例"""
-    global _paddle_ocr
-    if paddleocr is None:
-        raise AIServiceUnavailableError(
-            "PaddleOCR 未安装（当前 Python 环境无 paddleocr 包）"
-        )
-    if _paddle_ocr is None:
-        _paddle_ocr = paddleocr.PaddleOCR(
-            use_angle_cls=True,
-            lang="ch",
-            use_gpu=False,
-            show_log=False,
-        )
-    return _paddle_ocr
 
 
 # ============================================================================
@@ -86,10 +60,15 @@ class ModelValidationError(Exception):
 
 @dataclass(frozen=True)
 class ModelValidationFailure:
-    """最近一次模型验证失败的稳定 code 与可展示原因（不含上游正文或密钥）。"""
+    """最近一次模型验证失败的稳定 code 与可展示原因（不含上游正文或密钥）。
+
+    ``kind`` 与 ``LLMRuntimeError.kind`` 同口径：``unavailable`` 表示服务当前不可用，
+    启用本机模型时允许带提示启用（调用时自动走服务器兜底）。
+    """
 
     code: str
     message: str
+    kind: str = "config"
 
 
 # ============================================================================
@@ -160,6 +139,8 @@ class AIService:
         self.db = db
         # switch_model 保持 bool 契约；失败原因留在这里供 router 返回给用户。
         self.last_validation_error: ModelValidationFailure | None = None
+        # 本机模型「当前不可用但已启用」时的提示（R4.2）。
+        self.last_validation_warning: ModelValidationFailure | None = None
 
     # -------------------------------------------------------------------------
     # 模型管理
@@ -171,16 +152,15 @@ class AIService:
         *,
         ocr_capability: str | None = None,
     ) -> AIModelConfig | None:
-        """获取 active model；OCR 可按 capability 独立查询。"""
-        conditions = [
-            AIModelConfig.model_type == model_type,
-            AIModelConfig.is_active.is_(True),
-            AIModelConfig.is_deleted.is_(False),
-        ]
-        if model_type == AIModelType.ocr and ocr_capability:
-            conditions.append(AIModelConfig.ocr_capability == ocr_capability)
-        result = await self.db.execute(select(AIModelConfig).where(*conditions))
-        return result.scalar_one_or_none()
+        """路由中排在最前的已启用模型（本机优先）；OCR 可按能力槽查询。
+
+        V197 起同类型可同时启用本机与服务器各一条，不能再假设「只有一行」。
+        """
+        rows = await enabled_model_rows(self.db, model_type, ocr_capability=ocr_capability)
+        if not rows:
+            return None
+        rows.sort(key=lambda row: 0 if deployment_of(row) == AIDeployment.local.value else 1)
+        return rows[0]
 
     async def get_all_models(self) -> list[AIModelConfig]:
         """获取所有模型配置"""
@@ -196,7 +176,13 @@ class AIService:
         model_name: str,
         model_type: AIModelType,
     ) -> bool:
-        """验证并切换 active model；只 flush，由 router 统一 commit。"""
+        """启用模型参与路由；只 flush，由 router 统一 commit（ADR-ROUTE-002）。
+
+        只替换同类型（OCR 同能力槽）同部署位置的那一条；向量只保留一条。服务器模型必须通过
+        真实连接测试；本机模型仅因「当前不可用」失败时仍启用，并在 ``last_validation_warning``
+        留提示（调用时自动走服务器兜底）。
+        """
+        self.last_validation_warning = None
         result = await self.db.execute(
             select(AIModelConfig).where(
                 AIModelConfig.model_name == model_name,
@@ -207,12 +193,19 @@ class AIService:
         model = result.scalar_one_or_none()
         if not model:
             raise ModelNotFoundError(f"Model not found: {model_name} ({model_type})")
+        deployment = deployment_of(model)
         if not await self._validate_model(model):
-            return False
+            failure = self.last_validation_error
+            local = deployment == AIDeployment.local.value
+            if not (local and failure is not None and failure.kind == "unavailable"):
+                return False
+            self.last_validation_warning = failure
+            self.last_validation_error = None
 
         deactivate_conditions = [
             AIModelConfig.model_type == model_type,
             AIModelConfig.is_deleted.is_(False),
+            AIModelConfig.id != model.id,
         ]
         if model_type == AIModelType.ocr:
             if not model.ocr_capability:
@@ -220,14 +213,46 @@ class AIService:
             deactivate_conditions.append(
                 AIModelConfig.ocr_capability == model.ocr_capability
             )
+        if model_type != AIModelType.embedding:
+            deactivate_conditions.append(AIModelConfig.deployment == deployment)
         await self.db.execute(
             update(AIModelConfig)
             .where(*deactivate_conditions)
             .values(is_active=False)
         )
+        model.deployment = deployment
         model.is_active = True
         await self.db.flush()
         return True
+
+    async def disable_model(self, model: AIModelConfig) -> None:
+        """停用：退出路由（不做验证）；只 flush，由 router 统一 commit。"""
+        model.is_active = False
+        await self.db.flush()
+
+    @staticmethod
+    async def route_slot_taken(
+        db: AsyncSession,
+        *,
+        model_type: AIModelType,
+        deployment: str,
+        ocr_capability: str | None = None,
+        exclude_id: Any = None,
+    ) -> bool:
+        """同一路由位置（V197 唯一约束口径）是否已有其他已启用模型。"""
+        conditions = [
+            AIModelConfig.model_type == model_type,
+            AIModelConfig.is_active.is_(True),
+            AIModelConfig.is_deleted.is_(False),
+        ]
+        if exclude_id is not None:
+            conditions.append(AIModelConfig.id != exclude_id)
+        if model_type == AIModelType.ocr:
+            conditions.append(AIModelConfig.ocr_capability == ocr_capability)
+        if model_type != AIModelType.embedding:
+            conditions.append(AIModelConfig.deployment == deployment)
+        result = await db.execute(select(AIModelConfig.id).where(*conditions).limit(1))
+        return result.first() is not None
 
     async def _validate_model(self, model: AIModelConfig) -> bool:
         """通过生产同一 runtime 验证模型；不复制 provider 分支。
@@ -251,15 +276,17 @@ class AIService:
                         self.last_validation_error.code,
                     )
                     return False
-            try:
-                _get_paddle_ocr()
+            # 本机行代表进程内引擎链（PaddleOCR / Tesseract / MinerU 或 OCR 容器），与路由同一判定。
+            from app.services.unified_ocr_service import UnifiedOCRService
+
+            status = await UnifiedOCRService().local_engine_status()
+            if status["available"]:
                 return True
-            except Exception as exc:
-                self.last_validation_error = ModelValidationFailure(
-                    "engine_unavailable", "本地 PaddleOCR 引擎不可用（未安装或初始化失败）"
-                )
-                logger.warning("PaddleOCR validation failed: %s", type(exc).__name__)
-                return False
+            self.last_validation_error = ModelValidationFailure(
+                "engine_unavailable", f"本机 OCR 引擎不可用：{status['reason']}", "unavailable"
+            )
+            logger.warning("Local OCR validation failed: %s", status["reason"])
+            return False
         try:
             config = resolve_config_from_model(model)
             await test_runtime_config(config)
@@ -277,8 +304,10 @@ class AIService:
     def _record_validation_failure(self, exc: Exception, fallback_code: str) -> None:
         # runtime 异常的 message 已保证不含上游正文与密钥；其他异常只暴露类型。
         code = getattr(exc, "code", None)
+        kind = getattr(exc, "kind", None)
+        kind = kind if isinstance(kind, str) and kind else "config"
         if isinstance(code, str) and code:
-            self.last_validation_error = ModelValidationFailure(code, str(exc))
+            self.last_validation_error = ModelValidationFailure(code, str(exc), kind)
         elif isinstance(exc, ValueError):
             self.last_validation_error = ModelValidationFailure(fallback_code, str(exc))
         else:
@@ -298,7 +327,7 @@ class AIService:
         temperature: float = 0.3,
         max_tokens: int | None = None,
     ) -> str | AsyncGenerator[str, None]:
-        """使用 DB active model（无记录时 env fallback）完成对话。"""
+        """按本机优先路由完成对话（无启用模型时回落 `.env`）；``model`` 只作优先提示。"""
         if stream:
             return self._chat_stream(model, messages, temperature, max_tokens)
         return await self._chat_sync(model, messages, temperature, max_tokens)
@@ -311,11 +340,9 @@ class AIService:
         max_tokens: int | None,
     ) -> str:
         try:
-            config = await resolve_runtime_config(
-                self.db, AIModelType.chat, requested_model=model
-            )
-            return await runtime_chat_sync(
-                config,
+            route = await resolve_route(self.db, AIModelType.chat, requested_model=model)
+            return await route_chat_sync(
+                route,
                 messages,
                 temperature=temperature,
                 max_tokens=max_tokens or settings.LLM_MAX_TOKENS,
@@ -331,11 +358,9 @@ class AIService:
         max_tokens: int | None,
     ) -> AsyncGenerator[str, None]:
         try:
-            config = await resolve_runtime_config(
-                self.db, AIModelType.chat, requested_model=model
-            )
-            async for chunk in runtime_chat_stream(
-                config,
+            route = await resolve_route(self.db, AIModelType.chat, requested_model=model)
+            async for chunk in route_chat_stream(
+                route,
                 messages,
                 temperature=temperature,
                 max_tokens=max_tokens or settings.LLM_MAX_TOKENS,
@@ -412,41 +437,46 @@ class AIService:
     # 健康检查
     # -------------------------------------------------------------------------
 
-    async def health_check(self) -> dict[str, Any]:
-        """按当前 active chat/embedding 配置检查健康状态，不泄漏凭证。"""
+    async def health_check(self, *, public: bool = False) -> dict[str, Any]:
+        """由路由状态派生健康结果（兼容既有字段，另附 ``routes``），不泄漏凭证。
 
-        async def _resolve_model(model_type: AIModelType):
-            try:
-                return await resolve_runtime_config(self.db, model_type)
-            except Exception as exc:
-                logger.debug(
-                    "%s runtime config failed: %s",
-                    model_type.value,
-                    type(exc).__name__,
-                )
+        ``public=True``（未鉴权的 ``/api/ai/health``，大量页面挂载即调用）只探测对话、
+        不返回端点地址；其余类只读缓存与实际调用记录。
+        """
+        from app.services.model_route_status import KINDS, collect_route_status
+
+        status = await collect_route_status(
+            self.db,
+            probe_kinds=("chat",) if public else KINDS,
+            include_endpoints=not public,
+        )
+        routes = {item["kind"]: item for item in status["routes"]}
+
+        def _summary(kind: str) -> tuple[str, dict[str, Any] | None]:
+            route = routes.get(kind) or {}
+            effective = route.get("effective")
+            candidates = route.get("candidates") or []
+            if effective is not None:
+                return "healthy", effective
+            if any(item["status"] == "unknown" for item in candidates):
+                return "unknown", candidates[0] if candidates else None
+            return "unavailable", candidates[0] if candidates else None
+
+        def _runtime_view(entry: dict[str, Any] | None, model_type: AIModelType):
+            if entry is None:
                 return None
-
-        async def _probe_model(config):
-            if config is None:
-                return "unavailable", None
-            try:
-                status = "healthy" if await probe_runtime_config(config) else "unavailable"
-            except Exception as exc:
-                logger.debug("runtime health probe failed: %s", type(exc).__name__)
-                status = "unavailable"
-            safe = config.safe_dict()
-            safe.pop("has_api_key", None)
-            return status, safe
-
-        async def _probe_paddle() -> str:
-            if paddleocr is None:
-                return "unavailable"
-            try:
-                _get_paddle_ocr()
-                return "healthy"
-            except Exception as exc:
-                logger.debug("PaddleOCR health failed: %s", type(exc).__name__)
-                return "unavailable"
+            view = {
+                "model_id": entry.get("model_id"),
+                "model_name": entry.get("model_name"),
+                "model_type": model_type.value,
+                "provider": entry.get("provider"),
+                "source": entry.get("source"),
+                "reasoning_effort": entry.get("reasoning_effort"),
+                "deployment": entry.get("deployment"),
+            }
+            if not public:
+                view["endpoint_url"] = entry.get("endpoint")
+            return view
 
         async def _probe_chroma() -> str:
             try:
@@ -459,15 +489,12 @@ class AIService:
                 logger.debug("ChromaDB health failed: %s", type(exc).__name__)
                 return "unavailable"
 
-        # AsyncSession 不支持并发 execute：先顺序解析 DB 配置，再并行做纯网络探针。
-        chat_runtime = await _resolve_model(AIModelType.chat)
-        embedding_runtime = await _resolve_model(AIModelType.embedding)
-        (chat_status, chat_config), (embedding_status, embedding_config), paddle_status, chroma_status = await asyncio.gather(
-            _probe_model(chat_runtime),
-            _probe_model(embedding_runtime),
-            _probe_paddle(),
-            _probe_chroma(),
-        )
+        chat_status, chat_entry = _summary("chat")
+        embedding_status, embedding_entry = _summary("embedding")
+        ocr_status, _ = _summary("ocr")
+        chroma_status = "unknown" if public else await _probe_chroma()
+        chat_config = _runtime_view(chat_entry, AIModelType.chat)
+        embedding_config = _runtime_view(embedding_entry, AIModelType.embedding)
         chat_provider = chat_config.get("provider") if chat_config else None
         return {
             "llm_status": chat_status,
@@ -475,12 +502,14 @@ class AIService:
             # 兼容 UnifiedAIService 和既有前端字段。
             "vllm_status": chat_status if chat_provider != AIProvider.ollama.value else "unavailable",
             "ollama_status": chat_status if chat_provider == AIProvider.ollama.value else "unavailable",
-            "paddleocr_status": paddle_status,
+            # V197 起表示「OCR 文字识别路由可用」（本机或服务器任一），不再只看本机 PaddleOCR。
+            "paddleocr_status": ocr_status,
             "chromadb_status": chroma_status,
             "active_chat_model": chat_config.get("model_name") if chat_config else None,
             "active_embedding_model": embedding_config.get("model_name") if embedding_config else None,
             "chat_config": chat_config,
             "embedding_config": embedding_config,
+            "routes": status["routes"],
             "timestamp": datetime.now().isoformat(),
         }
 
@@ -574,6 +603,8 @@ class AIService:
             [preset.orm_values() for preset in ENTERPRISE_MODEL_PRESETS]
         )
 
+        from app.services.llm_runtime import classify_model_deployment
+
         for model_data in default_models:
             # 检查是否已存在
             result = await db.execute(
@@ -585,6 +616,13 @@ class AIService:
             existing = result.scalar_one_or_none()
             if not existing:
                 model = AIModelConfig(**model_data)
+                model.deployment = classify_model_deployment(model)
+                if model.is_active and await AIService.route_slot_taken(
+                    db, model_type=model.model_type, deployment=model.deployment,
+                    ocr_capability=model.ocr_capability,
+                ):
+                    # 种子不得挤掉用户已启用的同位置模型（唯一约束同 V197）。
+                    model.is_active = False
                 db.add(model)
 
         await db.flush()

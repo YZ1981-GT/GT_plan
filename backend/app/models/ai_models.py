@@ -30,6 +30,7 @@ try:
 except ImportError:  # pragma: no cover
     Vector = None  # type: ignore[assignment,misc]
 
+from app.models.ai_model_options import active_route_indexes
 from app.models.base import Base, SoftDeleteMixin
 
 
@@ -267,6 +268,9 @@ class AIModelConfig(Base, SoftDeleteMixin):
     auth_scheme: Mapped[str | None] = mapped_column(String(32), nullable=True)
     auth_header_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     request_timeout_seconds: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    # local / server（V197）；由 classify_deployment() 按端点推导写入，见 ai_model_options。
+    deployment: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'server'"))
+    # 参与路由（V197 起不再是「唯一生效」）：唯一索引按部署位置约束。
     is_active: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -292,28 +296,7 @@ class AIModelConfig(Base, SoftDeleteMixin):
             postgresql_where=text("is_deleted = false"),
             sqlite_where=text("is_deleted = 0"),
         ),
-        Index(
-            "uq_ai_model_config_active_non_ocr",
-            "model_type",
-            unique=True,
-            postgresql_where=text(
-                "is_active = true AND is_deleted = false AND model_type <> 'ocr'"
-            ),
-            sqlite_where=text(
-                "is_active = 1 AND is_deleted = 0 AND model_type <> 'ocr'"
-            ),
-        ),
-        Index(
-            "uq_ai_model_config_active_ocr_capability",
-            "ocr_capability",
-            unique=True,
-            postgresql_where=text(
-                "is_active = true AND is_deleted = false AND model_type = 'ocr'"
-            ),
-            sqlite_where=text(
-                "is_active = 1 AND is_deleted = 0 AND model_type = 'ocr'"
-            ),
-        ),
+        *active_route_indexes(),
     )
 
 

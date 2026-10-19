@@ -24,13 +24,18 @@ async def parse_work_hour_natural_language(text: str, project_list: list[dict]) 
 """ + "\n".join(f"- {n}" for n in project_names if n)
 
     try:
+        # 旧实现传 system= / user=（chat_completion 没有这两个参数），恒 TypeError 返回空。
         response = await chat_completion(
-            system=system_prompt,
-            user=text,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text},
+            ],
             temperature=0.1,
             max_tokens=1000,
         )
     except Exception:
+        return []
+    if not isinstance(response, str):
         return []
 
     # 解析 JSON

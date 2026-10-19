@@ -236,8 +236,40 @@ class TestUnifiedOCRService:
         svc = UnifiedOCRService()
         svc._paddle_available = False
         svc._tesseract_available = False
-        with pytest.raises(RuntimeError, match="没有可用的OCR引擎"):
+        svc._mineru_available = False  # MinerU 也是本机引擎（V197 起 Paddle / Tesseract 都不可用时仍试它）
+        with pytest.raises(RuntimeError, match="没有可用的本机 OCR 引擎"):
             await svc._select_engine("/tmp/test.png", OCREngine.AUTO)
+
+    @pytest.mark.asyncio
+    async def test_select_engine_uses_mineru_when_paddle_and_tesseract_missing(self):
+        """Paddle / Tesseract 都不可用但 MinerU 可达 ⇒ 选 MinerU（旧实现直接抛错，MinerU 永远轮不到）。"""
+        from app.services.unified_ocr_service import OCREngine, UnifiedOCRService
+        svc = UnifiedOCRService()
+        svc._paddle_available = False
+        svc._tesseract_available = False
+        svc._mineru_available = True
+        engine = await svc._select_engine("/tmp/test.png", OCREngine.AUTO)
+        assert engine == OCREngine.MINERU
+
+    def test_tesseract_requires_program_not_just_package(self, monkeypatch):
+        """只装 pytesseract 包、没有 tesseract 程序 ⇒ 判不可用（否则识别到 image_to_string 才报错）。"""
+        import sys
+        import types
+
+        from app.services import unified_ocr_service as mod
+
+        fake = types.ModuleType("pytesseract")
+        fake.pytesseract = types.SimpleNamespace(tesseract_cmd="tesseract")
+        monkeypatch.setitem(sys.modules, "pytesseract", fake)
+        monkeypatch.setattr(mod, "OCR_SERVICE_URL", "")
+        monkeypatch.setattr(mod.shutil, "which", lambda cmd: None)
+        svc = mod.UnifiedOCRService()
+        svc._tesseract_available = None
+        assert svc._check_tesseract_available() is False
+
+        monkeypatch.setattr(mod.shutil, "which", lambda cmd: "/usr/bin/tesseract")
+        svc._tesseract_available = None
+        assert svc._check_tesseract_available() is True
 
     @pytest.mark.asyncio
     async def test_select_engine_forced_mode(self):
@@ -249,9 +281,16 @@ class TestUnifiedOCRService:
         assert engine == OCREngine.PADDLE
 
     @pytest.mark.asyncio
-    async def test_recognize_fallback(self):
+    async def test_recognize_fallback(self, monkeypatch):
         """If primary engine fails, fallback to the other"""
+        from app.services import remote_ocr_runtime as remote
         from app.services.unified_ocr_service import OCREngine, UnifiedOCRService
+
+        async def _implicit_local(capability, *, db=None):
+            # 只测本机引擎链：路由不读库内启用行（V197 起 recognize 先解析路由）
+            return [remote.OCRRouteCandidate(capability, "local", "本机 OCR 引擎", implicit=True)]
+
+        monkeypatch.setattr(remote, "resolve_ocr_route", _implicit_local)
         svc = UnifiedOCRService()
         svc._paddle_available = False
         svc._tesseract_available = True

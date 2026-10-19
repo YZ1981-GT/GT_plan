@@ -561,27 +561,6 @@ async def test_two_ocr_capabilities_can_be_active_together(session_factory):
 
 
 @pytest.mark.asyncio
-async def test_unified_ocr_prefers_active_remote_adapter(monkeypatch):
-    from app.services.unified_ocr_service import OCREngine, UnifiedOCRService
-
-    expected = {
-        "text": "远程识别", "engine": "paddleocr_remote",
-        "regions": [], "layout_blocks": [], "capability": "ocr",
-    }
-    remote = AsyncMock(return_value=expected)
-    monkeypatch.setattr(
-        "app.services.remote_ocr_runtime.recognize_with_active_remote_ocr", remote
-    )
-    result = await UnifiedOCRService().recognize(
-        "never-read-customer-file.png", OCREngine.AUTO
-    )
-    assert result == expected
-    remote.assert_awaited_once_with(
-        "never-read-customer-file.png", capability="ocr"
-    )
-
-
-@pytest.mark.asyncio
 async def test_ocr_fields_does_not_turn_remote_failure_into_empty_success(monkeypatch):
     from app.services.ocr_fields_service import OcrFieldsService
     from app.services.unified_ocr_service import OCRServiceUnavailableError

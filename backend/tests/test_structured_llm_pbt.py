@@ -56,9 +56,16 @@ async def test_extract_structured_round_trip(name, value):
     mock_breaker = MagicMock()
     mock_breaker.is_open = False
 
+    from tests.test_structured_llm_service import _fake_resolve_endpoint, local_route
+
     with patch(
         "app.services.structured_llm_service._get_instructor_client",
         return_value=mock_client,
+    ), patch(
+        "app.services.structured_llm_service._resolve_route",
+        new=AsyncMock(return_value=local_route("test-model")),
+    ), patch(
+        "app.services.llm_endpoint_policy.resolve_endpoint", new=_fake_resolve_endpoint
     ), patch("app.services.structured_llm_service.settings") as mock_settings, patch(
         "app.services.structured_llm_service._breaker", mock_breaker
     ), patch(
@@ -67,6 +74,7 @@ async def test_extract_structured_round_trip(name, value):
         mock_settings.LLM_GUIDED_DECODING_ENABLED = True
         mock_settings.LLM_STRUCTURED_MAX_RETRIES = 2
         mock_settings.DEFAULT_CHAT_MODEL = "test-model"
+        mock_settings.LLM_LOCAL_CONNECT_TIMEOUT_SECONDS = 3.0
 
         result = await extract_structured(
             [{"role": "user", "content": "extract structured data"}],

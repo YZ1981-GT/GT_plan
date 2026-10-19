@@ -33,6 +33,7 @@ from app.services.ai_model_presets import (
     AIModelPreset,
 )
 from app.services.ai_service import AIService, ModelNotFoundError, ModelValidationFailure
+from app.services.model_route_status import collect_route_status
 from app.services.llm_endpoint_policy import (
     LLMEndpointPolicyError,
     validate_endpoint_structure,
@@ -40,6 +41,7 @@ from app.services.llm_endpoint_policy import (
 from app.services.llm_provider_registry import provider_profile, public_provider_list
 from app.services.llm_runtime import (
     LLMRuntimeError,
+    classify_model_deployment,
     resolve_config_from_model,
     test_runtime_config,
 )
@@ -269,6 +271,7 @@ async def create_model(
         performance_notes=body.performance_notes,
         **ocr_values,
     )
+    model.deployment = classify_model_deployment(model)
     _apply_secret_or_raise(model, api_key=body.api_key, clear_api_key=False)
     db.add(model)
     try:
@@ -371,15 +374,33 @@ async def update_model(
         }
         & set(changed)
     )
+    new_deployment = classify_model_deployment(model)
+    if model.is_active and new_deployment != model.deployment:
+        with db.no_autoflush:  # 冲突检查不得提前把未校验完的改动刷进库
+            taken = await AIService.route_slot_taken(
+                db, model_type=model.model_type, deployment=new_deployment,
+                ocr_capability=model.ocr_capability, exclude_id=model.id,
+            )
+        if taken:
+            await db.rollback()
+            raise HTTPException(
+                409,
+                f"该类型已启用另一条{_DEPLOYMENT_LABEL[new_deployment]}模型，请先停用后再修改端点",
+            )
+    model.deployment = new_deployment
+
+    warning: str | None = None
     if model.is_active and connection_changed:
         service = AIService(db)
         if not await service._validate_model(model):
             failure = service.last_validation_error
-            await db.rollback()
-            raise HTTPException(
-                400,
-                _validation_failure_detail(failure, "当前激活模型的新配置验证失败，未保存"),
-            )
+            if not _local_unavailable(model, failure):
+                await db.rollback()
+                raise HTTPException(
+                    400,
+                    _validation_failure_detail(failure, "当前已启用模型的新配置验证失败，未保存"),
+                )
+            warning = await _local_unavailable_warning(db, model, failure)
 
     try:
         await db.commit()
@@ -393,7 +414,7 @@ async def update_model(
         secret_changed,
         current_user.username,
     )
-    return _to_dict(model)
+    return {**_to_dict(model), "warning": warning}
 
 
 @router.delete("/{model_id}")
@@ -406,7 +427,7 @@ async def delete_model(
     if model.preset_key:
         raise HTTPException(409, "企业预设模型不能删除，可编辑后录入 API Key")
     if model.is_active:
-        raise HTTPException(409, "当前激活模型不能删除，请先激活同类型的其他模型")
+        raise HTTPException(409, "已启用的模型不能删除，请先停用")
     model.is_deleted = True
     model.api_key_ciphertext = None
     await db.commit()
@@ -425,7 +446,7 @@ async def test_model_connection(
         service = AIService(db)
         ok = await service._validate_model(model)
         remote = model.ocr_protocol == OCRProtocol.paddlex_json.value
-        label = "远程 OCR" if remote else "本地 OCR"
+        label = "远程 OCR" if remote else "本机 OCR"
         if ok:
             return {"status": "ok", "error_code": None, "message": f"{label} 引擎可用"}
         failure = service.last_validation_error
@@ -461,6 +482,7 @@ async def activate_model(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_admin),
 ):
+    """启用模型参与路由：只替换同类型（OCR 同能力槽）同部署位置的那一条（ADR-ROUTE-002）。"""
     model = await _get_model(db, model_id)
     service = AIService(db)
     try:
@@ -470,18 +492,77 @@ async def activate_model(
     if not ok:
         failure = service.last_validation_error
         await db.rollback()
-        raise HTTPException(400, _validation_failure_detail(failure, "模型验证失败，未激活"))
+        raise HTTPException(400, _validation_failure_detail(failure, "模型验证失败，未启用"))
+    warning = await _local_unavailable_warning(db, model, service.last_validation_warning)
     try:
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
         raise HTTPException(409, "并发切换冲突，请刷新后重试") from exc
-    logger.info("AI 模型已激活 id=%s by=%s", model.id, current_user.username)
+    logger.info("AI 模型已启用 id=%s deployment=%s by=%s", model.id, model.deployment, current_user.username)
     return {
-        "message": "已激活",
+        "message": "已启用",
         "model_name": model.model_name,
         "provider": model.provider.value,
+        "deployment": model.deployment,
+        "warning": warning,
     }
+
+
+@router.post("/{model_id}/deactivate")
+async def deactivate_model(
+    model_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(_admin),
+):
+    """停用：退出路由；该类型没有任何启用模型时回落 `.env` / 本机进程内 OCR。"""
+    model = await _get_model(db, model_id)
+    if model.is_active:
+        await AIService(db).disable_model(model)
+        await db.commit()
+        logger.info("AI 模型已停用 id=%s by=%s", model.id, current_user.username)
+    return {"message": "已停用", "model_name": model.model_name}
+
+
+@router.get("/routes")
+async def model_routes(
+    refresh: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(_admin),
+):
+    """各类「本机 → 服务器」路由的候选、状态与当前生效（ADR-ROUTE-010）。"""
+    return await collect_route_status(db, refresh=refresh)
+
+
+_DEPLOYMENT_LABEL = {"local": "本机", "server": "服务器"}
+
+
+def _local_unavailable(model: AIModelConfig, failure: ModelValidationFailure | None) -> bool:
+    """本机模型仅因「当前不可用」验证失败：允许保存 / 启用并给出提示（R4.2）。"""
+    return (
+        failure is not None
+        and failure.kind == "unavailable"
+        and model.deployment == "local"
+    )
+
+
+async def _local_unavailable_warning(
+    db: AsyncSession, model: AIModelConfig, failure: ModelValidationFailure | None
+) -> str | None:
+    """本机不可用仍启用时的提示：按有没有可兜底的服务器模型如实说明后果。"""
+    if failure is None:
+        return None
+    head = f"本机模型当前不可用（{failure.message}），已启用"
+    if model.model_type == AIModelType.embedding:
+        return f"{head}；向量模型不跨模型兜底，本机恢复前向量检索不可用"
+    with db.no_autoflush:
+        has_server = await AIService.route_slot_taken(
+            db, model_type=model.model_type, deployment="server",
+            ocr_capability=model.ocr_capability, exclude_id=model.id,
+        )
+    if has_server:
+        return f"{head}；调用时会自动使用已启用的服务器模型兜底"
+    return f"{head}；该类型尚未启用服务器模型，本机恢复前调用会失败"
 
 
 def _chat_preset(model: AIModelConfig) -> AIModelPreset | None:
@@ -546,6 +627,7 @@ def _to_dict(model: AIModelConfig) -> dict[str, object]:
         "api_key_updated_at": (
             model.api_key_updated_at.isoformat() if model.api_key_updated_at else None
         ),
+        "deployment": model.deployment,
         "is_active": model.is_active,
         "context_window": model.context_window,
         "performance_notes": model.performance_notes,

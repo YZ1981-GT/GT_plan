@@ -1,4 +1,4 @@
-"""LLM 客户端公共入口：DB active 配置 + 统一 transport + 熔断/限流。"""
+"""LLM 客户端公共入口：本机优先路由 + 统一 transport + 熔断/限流。"""
 
 from __future__ import annotations
 
@@ -9,12 +9,12 @@ from typing import AsyncGenerator
 
 from app.core.database import async_session
 from app.models.ai_models import AIModelType
+from app.services.llm_route import route_chat_stream, route_chat_sync, route_identity
 from app.services.llm_runtime import (
     LLMRuntimeError,
     ResolvedLLMConfig,
-    chat_stream as runtime_chat_stream,
-    chat_sync as runtime_chat_sync,
-    resolve_runtime_config,
+    RouteCandidate,
+    resolve_route,
 )
 
 logger = logging.getLogger(__name__)
@@ -69,25 +69,31 @@ _breaker = _CircuitBreaker()
 _breaker_identity: str | None = None
 
 
-def _bind_breaker(config: ResolvedLLMConfig) -> None:
-    """配置切换时只重置熔断器，不缓存 URL/Key。"""
+def _bind_breaker(route: list[RouteCandidate]) -> None:
+    """熔断器按整条路由计数（ADR-ROUTE-007）：路由组成变化时重置，不缓存 URL/Key。"""
     global _breaker_identity
-    identity = f"{config.provider.value}|{config.endpoint_url}|{config.model_name}"
+    identity = route_identity(route)
     if identity != _breaker_identity:
         _breaker.reset()
         _breaker_identity = identity
 
 
-async def _resolve_config(model: str | None = None) -> ResolvedLLMConfig:
+def _single_route(config: ResolvedLLMConfig) -> list[RouteCandidate]:
+    """兼容旧调用：显式给定单个配置时按单候选路由执行。"""
+    return [RouteCandidate(config.model_name, config.deployment, config.model_id, config)]
+
+
+async def _resolve_route(model: str | None = None) -> list[RouteCandidate]:
     async with async_session() as db:
-        return await resolve_runtime_config(
-            db, AIModelType.chat, requested_model=model
-        )
+        return await resolve_route(db, AIModelType.chat, requested_model=model)
 
 
 async def get_active_config() -> dict[str, object]:
-    """返回当前真实生效配置；不包含 Key 或 Key 前缀。"""
-    config = await _resolve_config()
+    """返回路由首个可用候选的配置；不包含 Key 或 Key 前缀。"""
+    route = await _resolve_route()
+    config = next((c.config for c in route if c.config is not None), None)
+    if config is None:
+        raise route[0].error or LLMRuntimeError("no_model", "没有可用的模型配置", kind="config")
     safe = config.safe_dict()
     safe.pop("has_api_key", None)
     return safe
@@ -102,7 +108,7 @@ async def chat_completion(
     context_documents: list[str] | None = None,
     enable_thinking: bool | None = None,
 ) -> str | AsyncGenerator[str, None]:
-    """调用当前 active LLM；无 active row 时回落 `.env`。"""
+    """按本机优先路由调用；无启用模型时回落 `.env`。``model`` 只作优先提示。"""
     if context_documents:
         context_text = "\n\n---\n\n".join(context_documents)
         if len(context_text) > 8000:
@@ -116,7 +122,7 @@ async def chat_completion(
         else:
             messages = [{"role": "system", "content": suffix.strip()}, *messages]
 
-    config = await _resolve_config(model)
+    route = await _resolve_route(model)
     payload = {
         "messages": messages,
         "temperature": temperature,
@@ -124,26 +130,27 @@ async def chat_completion(
         "enable_thinking": enable_thinking,
     }
     if stream:
-        return _stream_completion(payload, config=config)
-    return await _sync_completion(payload, config=config)
+        return _stream_completion(payload, route=route)
+    return await _sync_completion(payload, route=route)
 
 
 async def _sync_completion(
     payload: dict,
     *,
     config: ResolvedLLMConfig | None = None,
+    route: list[RouteCandidate] | None = None,
 ) -> str:
-    """非流式调用；保留旧 helper 名供测试与兼容调用。"""
-    if config is None:
-        config = await _resolve_config(payload.get("model"))
-    _bind_breaker(config)
+    """非流式调用；保留旧 helper 名与 ``config=`` 单候选入口供测试与兼容调用。"""
+    if route is None:
+        route = _single_route(config) if config is not None else await _resolve_route(payload.get("model"))
+    _bind_breaker(route)
     if _breaker.is_open:
         return "[LLM 服务熔断中，请稍后重试]"
 
     async with _llm_semaphore:
         try:
-            result = await runtime_chat_sync(
-                config,
+            result = await route_chat_sync(
+                route,
                 payload.get("messages", []),
                 temperature=float(payload.get("temperature", 0.3)),
                 max_tokens=int(payload.get("max_tokens", 2000)),
@@ -155,6 +162,7 @@ async def _sync_completion(
         except LLMRuntimeError as exc:
             _breaker.record_failure()
             logger.warning("LLM 调用失败 code=%s", exc.code)
+            # 占位串须原样写在本函数内：test_task6 守卫只扫 _sync/_stream_completion 的字面量。
             if exc.code == "provider_timeout":
                 return "[LLM 调用超时，请稍后重试]"
             if exc.code == "output_limit":
@@ -165,7 +173,8 @@ async def _sync_completion(
                 return "[LLM 服务暂不可用，请检查模型配置和网络]"
             return f"[LLM 调用失败: {exc}]"
         except Exception as exc:
-            _breaker.record_failure()
+            # 调用方参数错误等不是模型服务故障：不计入熔断，否则一个写错的调用点就能
+            # 在 60 秒内拖垮全部 AI 功能（ADR-ROUTE-007）。
             logger.error("LLM 调用异常: %s", type(exc).__name__, exc_info=True)
             return "[LLM 调用失败，请稍后重试]"
 
@@ -174,19 +183,20 @@ async def _stream_completion(
     payload: dict,
     *,
     config: ResolvedLLMConfig | None = None,
+    route: list[RouteCandidate] | None = None,
 ) -> AsyncGenerator[str, None]:
-    """流式调用；配置与 semaphore 在完整流生命周期内保持一致。"""
-    if config is None:
-        config = await _resolve_config(payload.get("model"))
-    _bind_breaker(config)
+    """流式调用；路由与 semaphore 在完整流生命周期内保持一致。"""
+    if route is None:
+        route = _single_route(config) if config is not None else await _resolve_route(payload.get("model"))
+    _bind_breaker(route)
     if _breaker.is_open:
         yield "[LLM 服务熔断中，请稍后重试]"
         return
 
     async with _llm_semaphore:
         try:
-            async for chunk in runtime_chat_stream(
-                config,
+            async for chunk in route_chat_stream(
+                route,
                 payload.get("messages", []),
                 temperature=float(payload.get("temperature", 0.3)),
                 max_tokens=int(payload.get("max_tokens", 2000)),
@@ -205,6 +215,5 @@ async def _stream_completion(
             else:
                 yield f"[LLM 错误: {exc}]"
         except Exception as exc:
-            _breaker.record_failure()
             logger.error("LLM 流式调用异常: %s", type(exc).__name__, exc_info=True)
             yield "[LLM 错误，请稍后重试]"

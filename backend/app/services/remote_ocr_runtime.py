@@ -12,17 +12,21 @@ from uuid import UUID
 
 import httpx
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import async_session
+from app.models.ai_model_options import AIDeployment
 from app.models.ai_models import AIModelConfig, AIModelType, AIProvider
 from app.services.ai_model_secret_service import decrypt_api_key
 from app.services.llm_endpoint_policy import (
+    LLMEndpointPolicyError,
     describe_network_failure,
     resolve_endpoint,
     validate_endpoint_structure,
 )
 from app.services.llm_provider_registry import provider_profile
+from app.services.llm_runtime import deployment_of
 
 _ALLOWED_CAPABILITIES = {"ocr", "layout_parsing"}
 _ALLOWED_PROTOCOLS = {"local", "paddlex_json"}
@@ -32,8 +36,11 @@ _FORBIDDEN_HEADERS = {"host", "content-length", "transfer-encoding", "connection
 
 
 class RemoteOCRRuntimeError(RuntimeError):
-    def __init__(self, code: str, message: str):
+    """``kind`` 与 ``LLMRuntimeError`` 同一口径：unavailable 表示服务当前不可用（启用本机行时可带提示）。"""
+
+    def __init__(self, code: str, message: str, *, kind: str = "config"):
         self.code = code
+        self.kind = kind
         super().__init__(message)
 
 
@@ -49,10 +56,16 @@ class RemoteOCRConfig:
     auth_header_name: str | None
     api_key: str | None
     timeout_seconds: int
+    deployment: str = AIDeployment.server.value
 
     @property
     def is_remote(self) -> bool:
         return self.protocol == "paddlex_json"
+
+    @property
+    def identity(self) -> str:
+        """冷却与状态缓存的候选身份（不含密钥）。"""
+        return f"paddleocr|{self.endpoint_url}{self.api_path or ''}|{self.model_name}"
 
 
 def _normalize_api_path(path: str | None, capability: str) -> str:
@@ -119,31 +132,96 @@ def resolve_ocr_config_from_model(model: AIModelConfig) -> RemoteOCRConfig:
         auth_header_name=model.auth_header_name,
         api_key=key,
         timeout_seconds=int(timeout),
+        deployment=deployment_of(model),
     )
     _auth_headers(config)
     return config
 
 
-async def get_active_ocr_config(capability: str) -> RemoteOCRConfig | None:
-    """按 capability 读取 active OCR；local 或无记录返回 None。"""
+@dataclass(frozen=True)
+class OCRRouteCandidate:
+    """OCR 路由候选（ADR-ROUTE-009）。
+
+    ``config`` 为远程 PaddleX（环回端点也算本机）；为空且无 ``error`` 表示本机进程内引擎链
+    （PaddleOCR / Tesseract / MinerU，或旧 ``OCR_SERVICE_URL`` 容器）。
+    """
+
+    capability: str
+    deployment: str
+    model_name: str
+    model_id: UUID | None = None
+    config: RemoteOCRConfig | None = None
+    error: RemoteOCRRuntimeError | None = None
+    implicit: bool = False  # 无启用行时的本机进程内引擎兜底
+
+    @property
+    def local_engine(self) -> bool:
+        return self.error is None and (self.config is None or not self.config.is_remote)
+
+    @property
+    def identity(self) -> str:
+        if self.config is not None and self.config.is_remote:
+            return self.config.identity
+        if self.local_engine:
+            return f"ocr-local|{self.capability}"
+        return f"ocr-invalid|{self.model_id}|{self.model_name}"
+
+    @property
+    def label(self) -> str:
+        if self.local_engine:
+            return "本机 OCR 引擎"
+        where = "本机" if self.deployment == AIDeployment.local.value else "服务器"
+        return f"{where} OCR「{self.model_name}」"
+
+
+async def _enabled_ocr_rows(db: AsyncSession, capability: str) -> list[AIModelConfig]:
+    result = await db.execute(
+        select(AIModelConfig).where(
+            AIModelConfig.model_type == AIModelType.ocr,
+            AIModelConfig.ocr_capability == capability,
+            AIModelConfig.is_active.is_(True),
+            AIModelConfig.is_deleted.is_(False),
+        )
+    )
+    return list(result.scalars().all())
+
+
+async def resolve_ocr_route(
+    capability: str, *, db: AsyncSession | None = None
+) -> list[OCRRouteCandidate]:
+    """按「本机 → 服务器」排序的已启用 OCR 候选。
+
+    无启用行：文字识别回落本机进程内引擎（与旧行为一致），版面解析返回空（没有本机实现）。
+    """
     if capability not in _ALLOWED_CAPABILITIES:
         raise RemoteOCRRuntimeError("invalid_ocr_capability", "OCR 能力配置非法")
-    async with async_session() as db:
-        result = await db.execute(
-            select(AIModelConfig).where(
-                AIModelConfig.model_type == AIModelType.ocr,
-                AIModelConfig.ocr_capability == capability,
-                AIModelConfig.is_active.is_(True),
-                AIModelConfig.is_deleted.is_(False),
-            )
+    if db is not None:
+        rows = await _enabled_ocr_rows(db, capability)
+    else:
+        async with async_session() as session:
+            rows = await _enabled_ocr_rows(session, capability)
+    deployments = [deployment_of(row) for row in rows]
+    if len(deployments) != len(set(deployments)):
+        raise RemoteOCRRuntimeError(
+            "multiple_active_ocr", "同一 OCR 能力的同一部署位置存在多个启用模型"
         )
-        rows = list(result.scalars().all())
-    if len(rows) > 1:
-        raise RemoteOCRRuntimeError("multiple_active_ocr", "同一 OCR 能力存在多个激活模型")
     if not rows:
-        return None
-    config = resolve_ocr_config_from_model(rows[0])
-    return config if config.is_remote else None
+        if capability == "ocr":
+            return [OCRRouteCandidate(capability, AIDeployment.local.value, "本机 OCR 引擎", implicit=True)]
+        return []
+    candidates: list[OCRRouteCandidate] = []
+    for row in rows:
+        try:
+            config = resolve_ocr_config_from_model(row)
+        except RemoteOCRRuntimeError as exc:
+            candidates.append(
+                OCRRouteCandidate(capability, deployment_of(row), row.model_name, row.id, None, exc)
+            )
+        else:
+            candidates.append(
+                OCRRouteCandidate(capability, config.deployment, row.model_name, row.id, config)
+            )
+    return sorted(candidates, key=lambda c: 0 if c.deployment == AIDeployment.local.value else 1)
 
 
 def _file_type(filename: str) -> int:
@@ -246,11 +324,21 @@ async def recognize_remote_bytes(
         raise RemoteOCRRuntimeError("ocr_not_remote", "OCR 配置不是远程 PaddleX 服务")
     max_bytes = int(settings.MAX_UPLOAD_SIZE_MB) * 1024 * 1024
     if len(content) > max_bytes:
-        raise RemoteOCRRuntimeError("ocr_file_too_large", "OCR 文件超过平台上传大小限制")
-    safe = await resolve_endpoint(
-        config.endpoint_url, provider_profile(AIProvider.paddleocr)
-    )
+        raise RemoteOCRRuntimeError(
+            "ocr_file_too_large", "OCR 文件超过平台上传大小限制", kind="request"
+        )
+    try:
+        safe = await resolve_endpoint(
+            config.endpoint_url, provider_profile(AIProvider.paddleocr)
+        )
+    except LLMEndpointPolicyError as exc:
+        raise RemoteOCRRuntimeError(
+            "ocr_endpoint_blocked", f"远程 OCR 端点不可用：{exc}", kind="unavailable"
+        ) from exc
     endpoint = safe.url
+    connect_timeout = 10.0
+    if config.deployment == AIDeployment.local.value:
+        connect_timeout = min(connect_timeout, float(settings.LLM_LOCAL_CONNECT_TIMEOUT_SECONDS))
     payload = {
         "file": base64.b64encode(content).decode("ascii"),
         "fileType": _file_type(filename),
@@ -260,7 +348,7 @@ async def recognize_remote_bytes(
         async with httpx.AsyncClient(
             base_url=endpoint.rstrip("/") + "/",
             headers=_auth_headers(config),
-            timeout=httpx.Timeout(config.timeout_seconds, connect=10.0),
+            timeout=httpx.Timeout(config.timeout_seconds, connect=connect_timeout),
             follow_redirects=False,
             mounts={},
             trust_env=False,
@@ -269,15 +357,23 @@ async def recognize_remote_bytes(
             response = await client.post(config.api_path.lstrip("/"), json=payload)
     except httpx.TimeoutException as exc:
         detail = await describe_network_failure(endpoint, exc)
-        raise RemoteOCRRuntimeError("ocr_timeout", f"远程 OCR 调用超时：{detail}") from exc
+        raise RemoteOCRRuntimeError(
+            "ocr_timeout", f"远程 OCR 调用超时：{detail}", kind="unavailable"
+        ) from exc
     except httpx.HTTPError as exc:
         detail = await describe_network_failure(endpoint, exc)
-        raise RemoteOCRRuntimeError("ocr_unreachable", f"远程 OCR 服务不可达：{detail}") from exc
+        raise RemoteOCRRuntimeError(
+            "ocr_unreachable", f"远程 OCR 服务不可达：{detail}", kind="unavailable"
+        ) from exc
     if response.status_code in {401, 403}:
         raise RemoteOCRRuntimeError("ocr_auth_failed", "远程 OCR 认证失败，请检查 API Key")
     if response.status_code == 422:
         # PaddleX 对无法解码或过小的文件回 422 `Invalid input file`（2026-10-19 实测 1x1 PNG）。
         raise RemoteOCRRuntimeError("ocr_http_error", "远程 OCR 返回 HTTP 422（文件格式或尺寸不被接受）")
+    if response.status_code >= 500:
+        raise RemoteOCRRuntimeError(
+            "ocr_http_error", f"远程 OCR 返回 HTTP {response.status_code}", kind="unavailable"
+        )
     if response.status_code >= 400:
         raise RemoteOCRRuntimeError("ocr_http_error", f"远程 OCR 返回 HTTP {response.status_code}")
     try:
@@ -293,15 +389,6 @@ async def recognize_remote_file(config: RemoteOCRConfig, file_path: str) -> dict
     return await recognize_remote_bytes(config, content, filename=path.name)
 
 
-async def recognize_with_active_remote_ocr(
-    file_path: str, *, capability: str = "ocr"
-) -> dict | None:
-    config = await get_active_ocr_config(capability)
-    if config is None:
-        return None
-    return await recognize_remote_file(config, file_path)
-
-
 # 连接测试图：240x64 黑白 PNG，内容 "GT OCR 2026"（459 字节，不含任何项目数据）。
 # 原 1x1 PNG 会被 PaddleX 拒为 HTTP 422 `Invalid input file`（ADR-LLM-016）；
 # 两条企业 OCR（/ocr、/layout-parsing）对本图均返回 200 并原样识别出文字。
@@ -310,9 +397,13 @@ _TEST_PNG = base64.b64decode(
 )
 
 
-async def test_remote_ocr_model(model: AIModelConfig) -> None:
-    """使用无项目数据的内置 PNG 走生产同一 adapter。"""
-    config = resolve_ocr_config_from_model(model)
+async def probe_remote_ocr(config: RemoteOCRConfig) -> None:
+    """用内置测试图走生产同一 adapter（连接测试与路由状态共用）。"""
     if not config.is_remote:
         raise RemoteOCRRuntimeError("ocr_not_remote", "本地 OCR 不使用远程连接测试")
     await recognize_remote_bytes(config, _TEST_PNG, filename="connection-test.png")
+
+
+async def test_remote_ocr_model(model: AIModelConfig) -> None:
+    """使用无项目数据的内置 PNG 走生产同一 adapter。"""
+    await probe_remote_ocr(resolve_ocr_config_from_model(model))

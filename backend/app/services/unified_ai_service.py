@@ -91,10 +91,10 @@ class UnifiedAIService:
     async def health_check(self) -> dict:
         """统一AI+OCR健康检查
 
-        overall 以 LLM（vLLM/Ollama）为主：文本生成可用即 healthy/degraded，
-        OCR/向量库缺失不拖垮整体状态（本地开发常见）。
+        overall 以对话路由为主（本机或服务器任一可用即 healthy），OCR/向量库缺失不拖垮整体状态。
+        供未鉴权的 ``/api/ai/health`` 使用：只探测对话、不返回端点地址（ADR-ROUTE-010）。
         """
-        ai_health = await self._ai_service.health_check()
+        ai_health = await self._ai_service.health_check(public=True)
         ocr_health = await self._ocr_service.health_check()
 
         llm_ok = ai_health.get("llm_status") == "healthy"

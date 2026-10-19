@@ -150,9 +150,12 @@ export const aiModels = {
   list: '/api/ai-models',
   detail: (id: string) => `/api/ai-models/${id}`,
   activate: (id: string) => `/api/ai-models/${id}/activate`,
+  deactivate: (id: string) => `/api/ai-models/${id}/deactivate`,
   test: (id: string) => `/api/ai-models/${id}/test`,
   providers: '/api/ai-models/providers',
   health: '/api/ai-models/health',
+  /** 各类「本机 → 服务器」调用路由的候选、状态与当前生效（V197） */
+  routes: '/api/ai-models/routes',
   seed: '/api/ai-models/seed',
 } as const
 

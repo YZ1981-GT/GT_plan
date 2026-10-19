@@ -191,6 +191,10 @@ class Settings(BaseSettings):
     # 直连 DNS 被代理拦截时，经本机 HTTP 代理 CONNECT 查询（只接受环回地址，如 http://127.0.0.1:7897）；
     # 留空则依次尝试 HTTP(S)_PROXY 环境变量与 Windows 系统代理设置。
     LLM_UPSTREAM_DNS_PROXY: str = ""
+    # 本机优先路由（V197）：本机候选连接超时（秒），本机服务没起时尽快转去服务器；
+    # 候选因不可用失败后的冷却期（秒），冷却期内有后续候选时直接跳过它。
+    LLM_LOCAL_CONNECT_TIMEOUT_SECONDS: float = 3.0
+    LLM_ROUTE_COOLDOWN_SECONDS: float = 30.0
     # ChromaDB 向量数据库
     CHROMADB_URL: str = "http://localhost:8000"
     # Phase 8: 事件总线去重窗口（毫秒）

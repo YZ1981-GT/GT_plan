@@ -12,7 +12,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_db
+from app.deps import get_current_user, get_db
+from app.services.llm_client import chat_completion
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +63,9 @@ async def ai_generate(
     wp_id: str,
     request: J2AiRequest,
     db: AsyncSession = Depends(get_db),
+    _user=Depends(get_current_user),
 ) -> J2AiResponse:
-    """AI辅助生成精算分析内容."""
+    """AI辅助生成精算分析内容（与同族 J1 一致：须登录；模型走平台本机优先路由）。"""
     prompt = AI_PROMPTS.get(request.section, "请提供审计分析意见。")
 
     # 构建完整 prompt
@@ -74,14 +76,24 @@ async def ai_generate(
     if request.existing_content:
         full_prompt += f"\n\n已有内容（可参考优化）：{request.existing_content}"
 
-    # 调用通用AI接口
+    # 调用通用AI接口（旧实现 import 了不存在的 ai_service.chat_completion，恒走占位分支）
+    from app.services.ai_chat.native_engine import is_llm_fail_soft_placeholder
+
     try:
-        from app.services.ai_service import chat_completion
         content = await chat_completion(
-            system_prompt="你是资深审计师，精通CAS9设定受益计划准则和ISA620利用专家工作准则。请用专业但简洁的语言回答。",
-            user_prompt=full_prompt,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "你是资深审计师，精通CAS9设定受益计划准则和ISA620利用专家工作准则。请用专业但简洁的语言回答。",
+                },
+                {"role": "user", "content": full_prompt},
+            ],
             max_tokens=800,
         )
+        if not isinstance(content, str):
+            raise TypeError("unexpected streaming response")
+        if is_llm_fail_soft_placeholder(content):
+            raise RuntimeError(content)  # 模型不可用的占位串不得当正文返回
     except Exception as e:
         logger.warning("J2 AI generate failed, returning placeholder: %s", e)
         content = f"[AI生成暂时不可用] 请手动填写{request.section}相关内容。"

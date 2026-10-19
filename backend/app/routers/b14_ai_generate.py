@@ -146,9 +146,11 @@ async def b14_ai_generate(
         if isinstance(draft, str) and draft.startswith("["):
             raise HTTPException(status_code=503, detail=draft)
 
+        from app.services.llm_route import served_model_label
+
         return B14AiGenerateResponse(
             draft=draft,
-            model=settings.DEFAULT_CHAT_MODEL,
+            model=served_model_label(settings.DEFAULT_CHAT_MODEL),  # 实际回答的模型（ADR-ROUTE-008）
             confidence=0.85,
         )
     except HTTPException:

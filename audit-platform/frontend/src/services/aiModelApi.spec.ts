@@ -10,8 +10,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/utils/http', () => ({ default: mocks }))
 
 import {
+  activateAIModel,
   createAIModel,
+  deactivateAIModel,
   getAIProviders,
+  getAIRoutes,
   testAIModel,
   updateAIModel,
 } from './aiModelApi'
@@ -64,5 +67,30 @@ describe('aiModelApi 企业模型配置契约', () => {
     expect(mocks.post).toHaveBeenCalledWith(
       '/api/ai-models/model-id/test', undefined, { _silent: true },
     )
+  })
+
+  it('启用返回部署位置与本机不可用提示', async () => {
+    const result = {
+      message: '已启用', model_name: 'paddleocr', provider: 'paddleocr',
+      deployment: 'local', warning: '本机模型当前不可用（未安装），已启用；调用时会自动使用已启用的服务器模型兜底',
+    }
+    mocks.post.mockResolvedValue({ data: result })
+    await expect(activateAIModel('ocr-local')).resolves.toEqual(result)
+    expect(mocks.post).toHaveBeenCalledWith('/api/ai-models/ocr-local/activate', undefined, { _silent: true })
+  })
+
+  it('停用走独立端点', async () => {
+    mocks.post.mockResolvedValue({ data: { message: '已停用', model_name: 'qwen3.8' } })
+    await deactivateAIModel('chat-server')
+    expect(mocks.post).toHaveBeenCalledWith('/api/ai-models/chat-server/deactivate', undefined, { _silent: true })
+  })
+
+  it('调用路由默认复用检测结果，检测状态时强制重探', async () => {
+    const status = { routes: [], checked_at: '2026-10-19T08:00:00+00:00' }
+    mocks.get.mockResolvedValue({ data: status })
+    await expect(getAIRoutes()).resolves.toEqual(status)
+    expect(mocks.get).toHaveBeenLastCalledWith('/api/ai-models/routes', { params: {}, _silent: true })
+    await getAIRoutes(true)
+    expect(mocks.get).toHaveBeenLastCalledWith('/api/ai-models/routes', { params: { refresh: true }, _silent: true })
   })
 })

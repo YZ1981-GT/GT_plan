@@ -309,7 +309,8 @@ class WorkHourService:
 请以 JSON 数组格式返回，每项包含 project_name、hours（小数）、description（简短工作描述）。
 优先分配给执行阶段的项目，计划阶段的项目分配较少工时。"""
 
-            response = await chat_completion(prompt)
+            # 旧实现把字符串当 messages 传入，每次都失败并累计全局熔断。
+            response = await chat_completion([{"role": "user", "content": prompt}])
             if response and not response.startswith("[LLM"):
                 # 解析 LLM 返回
                 text = response.strip()

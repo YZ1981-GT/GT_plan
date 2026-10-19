@@ -1,7 +1,7 @@
-"""统一 LLM 调用服务 — 所有 stub 引擎通过此服务调用 vLLM
+"""统一 LLM 调用服务 — stub 引擎的结构化响应封装
 
 设计目标：
-- OpenAI 兼容 API 调用（httpx async）
+- 走平台本机优先路由（V197，本机不可用时服务器兜底），不再自建 httpx 直连 `.env` 端点
 - 超时 30s + 失败降级（返回 is_stub=True）
 - 调用日志记录（耗时/token 数/成功率）
 - 结构化响应（LLMResponse dataclass）
@@ -15,9 +15,6 @@ import logging
 import time
 from dataclasses import dataclass, field
 
-import httpx
-
-from app.core.config import settings
 from app.services.llm_metrics import llm_metrics
 
 logger = logging.getLogger(__name__)
@@ -70,20 +67,23 @@ def build_reasoning_chain(
 
 
 class LLMService:
-    """统一 LLM 调用封装，所有 stub 引擎通过此服务调用 vLLM"""
+    """统一 LLM 调用封装：stub 引擎经此调用平台对话路由（本机优先、服务器兜底）。
 
-    BASE_URL: str = settings.LLM_BASE_URL
-    MODEL: str = settings.DEFAULT_CHAT_MODEL
+    ``model`` 只作优先提示（等于某条已启用模型的模型名时排到最前），不会把模型名
+    套到另一条模型的端点上（ADR-ROUTE-005）。
+    """
 
-    def __init__(
-        self,
-        base_url: str | None = None,
-        model: str | None = None,
-    ):
-        if base_url is not None:
-            self.BASE_URL = base_url
-        if model is not None:
-            self.MODEL = model
+    def __init__(self, model: str | None = None):
+        self.model = model
+
+    async def _route(self):
+        """对话路由候选（测试替换点）。"""
+        from app.core.database import async_session
+        from app.models.ai_models import AIModelType
+        from app.services.llm_runtime import resolve_route
+
+        async with async_session() as db:
+            return await resolve_route(db, AIModelType.chat, requested_model=self.model)
 
     async def generate(
         self,
@@ -93,7 +93,7 @@ class LLMService:
         max_tokens: int = 2000,
         timeout: float = 30.0,
     ) -> LLMResponse:
-        """调用 vLLM OpenAI 兼容 API
+        """经平台路由调用对话模型
 
         Args:
             system_prompt: 系统提示词
@@ -103,121 +103,48 @@ class LLMService:
             timeout: 超时秒数（默认 30s）
 
         Returns:
-            LLMResponse: 结构化响应，失败时 is_stub=True + error 描述
+            LLMResponse: 结构化响应，失败时 is_stub=True + error 描述（不含上游正文）
         """
+        from app.services.llm_route import route_chat_sync, served_model_label
+        from app.services.llm_runtime import LLMRuntimeError, last_total_tokens
+
         start_time = time.perf_counter()
-
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
         try:
-            async with httpx.AsyncClient(timeout=timeout, mounts={}, trust_env=False) as client:
-                resp = await client.post(
-                    f"{self.BASE_URL}/chat/completions",
-                    json={
-                        "model": self.MODEL,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                        "temperature": temperature,
-                        "max_tokens": max_tokens,
-                    },
-                    headers={"Authorization": f"Bearer {settings.LLM_API_KEY}"},
-                )
-                resp.raise_for_status()
-                data = resp.json()
-
-                content = data["choices"][0]["message"]["content"]
-                tokens_used = data.get("usage", {}).get("total_tokens", 0)
-                duration_ms = (time.perf_counter() - start_time) * 1000
-
-                logger.info(
-                    "LLM call success: model=%s duration_ms=%.1f tokens_used=%d",
-                    self.MODEL,
-                    duration_ms,
-                    tokens_used,
-                )
-
-                llm_metrics.record_call(
-                    duration_ms=duration_ms,
-                    tokens_used=tokens_used,
-                    success=True,
-                    model=self.MODEL,
-                )
-
-                return LLMResponse(
-                    content=content,
-                    tokens_used=tokens_used,
-                    is_stub=False,
-                    duration_ms=duration_ms,
-                )
-
-        except httpx.TimeoutException as e:
+            route = await self._route()
+            content = await route_chat_sync(
+                route, messages, temperature=temperature, max_tokens=max_tokens, timeout=timeout,
+            )
+        except LLMRuntimeError as exc:
+            error_msg = f"{exc.code}: {exc}"
+        except Exception as exc:  # noqa: BLE001 — stub 引擎约定失败降级而不是抛出
+            error_msg = f"LLM call failed: {type(exc).__name__}"
+        else:
             duration_ms = (time.perf_counter() - start_time) * 1000
-            error_msg = f"LLM call timeout after {timeout}s"
-            logger.warning(
-                "LLM call timeout: model=%s duration_ms=%.1f error=%s",
-                self.MODEL,
-                duration_ms,
-                str(e),
+            tokens_used = last_total_tokens()
+            model = served_model_label(self.model)
+            logger.info(
+                "LLM call success: model=%s duration_ms=%.1f tokens_used=%d",
+                model, duration_ms, tokens_used,
             )
             llm_metrics.record_call(
-                duration_ms=duration_ms,
-                tokens_used=0,
-                success=False,
-                model=self.MODEL,
-                error=error_msg,
+                duration_ms=duration_ms, tokens_used=tokens_used, success=True, model=model,
             )
             return LLMResponse(
-                content=None,
-                tokens_used=0,
-                is_stub=True,
-                error=error_msg,
-                duration_ms=duration_ms,
+                content=content, tokens_used=tokens_used, is_stub=False, duration_ms=duration_ms,
             )
 
-        except httpx.HTTPStatusError as e:
-            duration_ms = (time.perf_counter() - start_time) * 1000
-            error_msg = f"LLM HTTP error {e.response.status_code}: {e.response.text[:200]}"
-            logger.warning(
-                "LLM call HTTP error: model=%s duration_ms=%.1f status=%d",
-                self.MODEL,
-                duration_ms,
-                e.response.status_code,
-            )
-            llm_metrics.record_call(
-                duration_ms=duration_ms,
-                tokens_used=0,
-                success=False,
-                model=self.MODEL,
-                error=error_msg,
-            )
-            return LLMResponse(
-                content=None,
-                tokens_used=0,
-                is_stub=True,
-                error=error_msg,
-                duration_ms=duration_ms,
-            )
-
-        except Exception as e:
-            duration_ms = (time.perf_counter() - start_time) * 1000
-            error_msg = f"LLM call failed: {type(e).__name__}: {e}"
-            logger.warning(
-                "LLM call failed: model=%s duration_ms=%.1f error=%s",
-                self.MODEL,
-                duration_ms,
-                error_msg,
-            )
-            llm_metrics.record_call(
-                duration_ms=duration_ms,
-                tokens_used=0,
-                success=False,
-                model=self.MODEL,
-                error=error_msg,
-            )
-            return LLMResponse(
-                content=None,
-                tokens_used=0,
-                is_stub=True,
-                error=error_msg,
-                duration_ms=duration_ms,
-            )
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        model = self.model or "route"
+        logger.warning(
+            "LLM call failed: model=%s duration_ms=%.1f error=%s", model, duration_ms, error_msg,
+        )
+        llm_metrics.record_call(
+            duration_ms=duration_ms, tokens_used=0, success=False, model=model, error=error_msg,
+        )
+        return LLMResponse(
+            content=None, tokens_used=0, is_stub=True, error=error_msg, duration_ms=duration_ms,
+        )

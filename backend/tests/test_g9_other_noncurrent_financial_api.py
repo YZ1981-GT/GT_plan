@@ -58,7 +58,13 @@ async def test_g9_export_template_all_sheets(sheet: str):
 
 
 @pytest.mark.asyncio
-async def test_g9_ai_sections():
+async def test_g9_ai_sections(monkeypatch):
+    # 旧断言接受 500（chat_completion 收到不存在的 system= / user= 恒 TypeError）——假绿；
+    # 现在替换出站，断言每个 section 都按消息列表调用并原样返回正文。
+    llm = AsyncMock(return_value="G9 审计结论正文")
+    monkeypatch.setattr(
+        "app.routers.wp_render_strategies._g9_other_noncurrent_financial_ai.chat_completion", llm
+    )
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         for section in (
@@ -83,7 +89,30 @@ async def test_g9_ai_sections():
                 headers={"Authorization": "Bearer test"},
                 json={"existingContent": "", "rows": []},
             )
-            assert resp.status_code in (200, 500, 504), section
+            assert resp.status_code == 200, (section, resp.text)
+            assert resp.json()["data"]["content"] == "G9 审计结论正文"  # 统一响应信封
+            messages = llm.await_args.kwargs["messages"]
+            assert [m["role"] for m in messages] == ["system", "user"], section
+            assert "G9" in messages[0]["content"] and messages[1]["content"]
+    assert llm.await_count == 15
+
+
+@pytest.mark.asyncio
+async def test_g9_ai_unavailable_model_is_not_returned_as_content(monkeypatch):
+    """模型不可用时 chat_completion 返回占位串而不抛错：不得当正文填进底稿。"""
+    monkeypatch.setattr(
+        "app.routers.wp_render_strategies._g9_other_noncurrent_financial_ai.chat_completion",
+        AsyncMock(return_value="[LLM 服务暂不可用，请检查模型配置和网络]"),
+    )
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/workpapers/test-wp/g9/ai/detail-note",
+            headers={"Authorization": "Bearer test"},
+            json={"existingContent": "", "rows": []},
+        )
+    assert resp.status_code == 503
+    assert "LLM 服务暂不可用" not in resp.text
 
 
 @pytest.mark.asyncio

@@ -22,6 +22,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 
+def _default_source_model() -> str:
+    """未显式给出模型标识时：取本请求实际回答的模型（路由可能已改用服务器，ADR-ROUTE-008），
+    同一上下文没有调用记录时回落 `.env` 默认模型名。"""
+    try:
+        from app.services.llm_route import served_model_label
+
+        return served_model_label()
+    except Exception:
+        return "Qwen3.5-27B"
+
+
 def wrap_ai_content(
     value: str | dict,
     source_model: str,
@@ -81,11 +92,7 @@ def wrap_ai_output(
         统一结构化 dict，含确认状态字段
     """
     if source_model is None:
-        try:
-            from app.core.config import settings
-            source_model = getattr(settings, "DEFAULT_CHAT_MODEL", "Qwen3.5-27B")
-        except Exception:
-            source_model = "Qwen3.5-27B"
+        source_model = _default_source_model()
 
     return {
         "id": str(_uuid.uuid4()),
@@ -169,13 +176,9 @@ async def wrap_ai_output_with_log(
     Validates: Requirements 6.2 (强制写 ai_content_log + 返回 id /
         generated_at / confirm_action)
     """
-    # ── 1. 默认 source_model 从 settings 读取（与同步版本一致） ──
+    # ── 1. 默认 source_model：本请求实际回答的模型（与同步版本一致） ──
     if source_model is None:
-        try:
-            from app.core.config import settings
-            source_model = getattr(settings, "DEFAULT_CHAT_MODEL", "Qwen3.5-27B")
-        except Exception:
-            source_model = "Qwen3.5-27B"
+        source_model = _default_source_model()
 
     # ── 2. 计算 content_hash（始终）+ prompt_hash（如有 prompt_text）──
     content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()

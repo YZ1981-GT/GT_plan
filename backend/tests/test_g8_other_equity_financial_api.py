@@ -58,7 +58,13 @@ async def test_g8_export_template_all_sheets(sheet: str):
 
 
 @pytest.mark.asyncio
-async def test_g8_ai_sections():
+async def test_g8_ai_sections(monkeypatch):
+    # 旧断言接受 500，且端点吞掉 TypeError 返回占位（chat_completion 收到不存在的 system= / user=）——
+    # 假绿；现在替换出站，断言按消息列表调用并原样返回正文。
+    llm = AsyncMock(return_value="G8 审计结论正文")
+    monkeypatch.setattr(
+        "app.routers.wp_render_strategies._g8_other_equity_instruments_ai.chat_completion", llm
+    )
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         for section in (
@@ -72,7 +78,30 @@ async def test_g8_ai_sections():
                 headers={"Authorization": "Bearer test"},
                 json={"existingContent": "", "rows": []},
             )
-            assert resp.status_code in (200, 500, 504), section
+            assert resp.status_code == 200, (section, resp.text)
+            assert resp.json()["data"]["content"] == "G8 审计结论正文", section  # 统一响应信封
+            messages = llm.await_args.kwargs["messages"]
+            assert [m["role"] for m in messages] == ["system", "user"], section
+    assert llm.await_count == 4
+
+
+@pytest.mark.asyncio
+async def test_g8_ai_unavailable_model_falls_back_to_placeholder(monkeypatch):
+    monkeypatch.setattr(
+        "app.routers.wp_render_strategies._g8_other_equity_instruments_ai.chat_completion",
+        AsyncMock(return_value="[LLM 服务暂不可用，请检查模型配置和网络]"),
+    )
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/workpapers/test-wp/g8/ai/voucher-conclusion",
+            headers={"Authorization": "Bearer test"},
+            json={"existingContent": "", "rows": []},
+        )
+    assert resp.status_code == 200
+    content = resp.json()["data"]["content"]
+    assert "AI 暂不可用" in content
+    assert "[LLM" not in content
 
 
 @pytest.mark.asyncio

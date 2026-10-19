@@ -386,7 +386,7 @@ async def workpaper_ai_generate_text(
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": user_msg},
             ],
-            model=settings.DEFAULT_CHAT_MODEL,
+            # 不强制 `.env` 模型名：路由按本机优先选择，服务器端点收到本机模型名会 404。
             max_tokens=512,
         )
         content = generated if isinstance(generated, str) else ""

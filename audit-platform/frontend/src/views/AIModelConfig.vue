@@ -2,7 +2,7 @@
   <div class="ai-model-config">
     <GtPageHeader title="AI 模型配置" :show-back="false">
       <template #actions>
-        <el-button size="small" :loading="healthLoading" @click="refreshHealth">
+        <el-button size="small" :loading="routesLoading" @click="refreshRoutes">
           <el-icon><Refresh /></el-icon>检测状态
         </el-button>
         <el-button size="small" type="primary" @click="openCreate">
@@ -14,33 +14,17 @@
     <el-alert
       class="security-tip" type="info" :closable="false" show-icon
       title="已内置 qwen3.8、PaddleOCR-VL 1.6、PaddleOCR v6 三条企业预设；点击“录入 Key”即可，qwen3.8 的思考强度可在同一窗口选择（默认未指定）。Key 密文存储，服务端需先配置 ENCRYPTION_KEY。"
+      description="调用按「本机 → 服务器」顺序：对话与 OCR 的本机、服务器模型各可启用一条，本机不可用时自动改用服务器模型；向量模型只启用一条，不跨模型兜底。"
     />
 
-    <div v-if="health" class="ai-health-cards">
-      <div class="health-card" :class="health.llm_status === 'healthy' ? 'ok' : 'err'">
-        <span class="health-dot" /><span class="health-label">对话模型</span>
-        <span class="health-val">{{ health.chat_config?.model_name || '未配置' }}</span>
-      </div>
-      <div class="health-card" :class="health.embedding_status === 'healthy' ? 'ok' : 'err'">
-        <span class="health-dot" /><span class="health-label">嵌入模型</span>
-        <span class="health-val">{{ health.embedding_config?.model_name || '未配置' }}</span>
-      </div>
-      <div class="health-card" :class="health.paddleocr_status === 'healthy' ? 'ok' : 'err'">
-        <span class="health-dot" /><span class="health-label">OCR</span>
-        <span class="health-val">{{ health.paddleocr_status }}</span>
-      </div>
-      <div class="health-card" :class="health.chromadb_status === 'healthy' ? 'ok' : 'err'">
-        <span class="health-dot" /><span class="health-label">向量库</span>
-        <span class="health-val">{{ health.chromadb_status }}</span>
-      </div>
-    </div>
+    <ModelRoutePanel :routes="routes" :loading="routesLoading" :checked-at="routesCheckedAt" />
 
     <el-tabs v-model="activeTab" class="ai-tabs">
       <el-tab-pane v-for="tab in tabs" :key="tab.name" :label="tab.label" :name="tab.name">
         <ModelTable
           :models="modelsByType[tab.name]" :loading="loading"
-          :testing-id="testingId" :provider-labels="providerLabels"
-          @activate="onActivate" @edit="onEdit" @delete="onDelete" @test="onTest"
+          :testing-id="testingId" :switching-id="switchingId" :provider-labels="providerLabels"
+          @activate="onActivate" @deactivate="onDeactivate" @edit="onEdit" @delete="onDelete" @test="onTest"
         />
       </el-tab-pane>
     </el-tabs>
@@ -124,18 +108,21 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElNotification } from 'element-plus'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
+import ModelRoutePanel from '@/components/ai/ModelRoutePanel.vue'
 import ModelTable from '@/components/ai/ModelTable.vue'
+import { deactivateConsequence } from '@/components/ai/modelRouteView'
 import { confirmDelete } from '@/utils/confirm'
 import { handleApiError } from '@/utils/errorHandler'
+import { isRequestCancelled } from '@/utils/http'
 import type {
-  AIAuthScheme, AIHealthStatus, AIModel, AIModelCreate, AIModelType, AIProvider,
-  AIProviderOption, OCRCapability, OCRProtocol, ReasoningEffort,
+  AIAuthScheme, AIModel, AIModelCreate, AIModelType, AIProvider,
+  AIProviderOption, AIRoute, OCRCapability, OCRProtocol, ReasoningEffort,
 } from '@/services/aiModelApi'
 import {
-  activateAIModel, createAIModel, deleteAIModel, getAIHealth, getAIModels,
-  getAIProviders, testAIModel, updateAIModel,
+  activateAIModel, createAIModel, deactivateAIModel, deleteAIModel, getAIModels,
+  getAIProviders, getAIRoutes, testAIModel, updateAIModel,
 } from '@/services/aiModelApi'
 
 interface ModelForm {
@@ -160,12 +147,14 @@ const tabs: Array<{ name: AIModelType; label: string }> = [
   { name: 'chat', label: '对话模型' }, { name: 'embedding', label: '嵌入模型' }, { name: 'ocr', label: 'OCR 引擎' },
 ]
 const loading = ref(false)
-const healthLoading = ref(false)
+const routesLoading = ref(false)
 const submitting = ref(false)
 const testingId = ref('')
+const switchingId = ref('')
 const models = ref<AIModel[]>([])
 const providers = ref<AIProviderOption[]>([])
-const health = ref<AIHealthStatus | null>(null)
+const routes = ref<AIRoute[]>([])
+const routesCheckedAt = ref<string | null>(null)
 const activeTab = ref<AIModelType>('chat')
 const showDialog = ref(false)
 const editingModel = ref<AIModel | null>(null)
@@ -230,14 +219,19 @@ async function fetchProviders() {
     providers.value = []
   }
 }
-async function refreshHealth() {
-  healthLoading.value = true
+// refresh=false 复用 30~60 秒内的检测结果（未检测过的候选仍会探测）；「检测状态」强制重探。
+async function fetchRoutes(refresh = false) {
+  routesLoading.value = true
   try {
-    health.value = await getAIHealth()
+    const status = await getAIRoutes(refresh)
+    routes.value = status?.routes ?? []
+    routesCheckedAt.value = status?.checked_at ?? null
   } catch (error) {
-    handleApiError(error, '检测 AI 服务状态')
-  } finally { healthLoading.value = false }
+    if (isRequestCancelled(error)) return
+    handleApiError(error, '检测调用路由')
+  } finally { routesLoading.value = false }
 }
+function refreshRoutes() { return fetchRoutes(true) }
 function openCreate() {
   editingModel.value = null
   form.value = emptyForm()
@@ -311,16 +305,38 @@ async function onTest(model: AIModel) {
     handleApiError(error, '测试模型连接')
   } finally { testingId.value = '' }
 }
+// 本机模型当前不可用但已启用 / 已保存：提示是否有服务器兜底（后端按实际启用情况给出）。
+function notifyLocalUnavailable(title: string, warning: string) {
+  ElNotification({ title, message: warning, type: 'warning', duration: 15000 })
+}
 async function onActivate(model: AIModel) {
+  switchingId.value = model.id
   try {
-    await activateAIModel(model.id)
-    ElMessage.success(`已激活：${model.model_name}`)
-    await Promise.all([fetchModels(), refreshHealth()])
+    const result = await activateAIModel(model.id)
+    if (result?.warning) notifyLocalUnavailable(`已启用：${model.model_name}`, result.warning)
+    else ElMessage.success(`已启用：${model.model_name}`)
+    await Promise.all([fetchModels(), fetchRoutes()])
   } catch (error) {
     const message = validationFailureMessage(error)
-    if (message) notifyModelFailure('激活失败', message)
-    else handleApiError(error, '激活模型')
-  }
+    if (message) notifyModelFailure('启用失败', message)
+    else handleApiError(error, '启用模型')
+  } finally { switchingId.value = '' }
+}
+async function onDeactivate(model: AIModel) {
+  try {
+    await ElMessageBox.confirm(
+      deactivateConsequence(model, models.value), `停用「${model.model_name}」`,
+      { type: 'warning', confirmButtonText: '停用', cancelButtonText: '取消' },
+    )
+  } catch { return }
+  switchingId.value = model.id
+  try {
+    await deactivateAIModel(model.id)
+    ElMessage.success(`已停用：${model.model_name}`)
+    await Promise.all([fetchModels(), fetchRoutes()])
+  } catch (error) {
+    handleApiError(error, '停用模型')
+  } finally { switchingId.value = '' }
 }
 async function onDelete(model: AIModel) {
   try {
@@ -396,11 +412,11 @@ async function onSubmit() {
         payload.request_timeout_seconds = form.value.request_timeout_seconds
       }
       if (form.value.api_key.trim()) payload.api_key = form.value.api_key.trim()
-      await updateAIModel(editingModel.value.id, payload)
-      ElMessage.success(
-        !editingModel.value.preset_key ? '模型配置已更新'
-          : form.value.api_key.trim() ? 'API Key 已安全保存' : '企业预设已更新',
-      )
+      const saved = await updateAIModel(editingModel.value.id, payload)
+      const savedText = !editingModel.value.preset_key ? '模型配置已更新'
+        : form.value.api_key.trim() ? 'API Key 已安全保存' : '企业预设已更新'
+      if (saved?.warning) notifyLocalUnavailable(savedText, saved.warning)
+      else ElMessage.success(savedText)
     } else {
       const payload: AIModelCreate = {
         model_name: form.value.model_name, model_type: form.value.model_type, provider: form.value.provider,
@@ -419,10 +435,11 @@ async function onSubmit() {
       }
       if (form.value.api_key.trim()) payload.api_key = form.value.api_key.trim()
       await createAIModel(payload)
-      ElMessage.success('模型配置已创建，请先测试连接再激活')
+      ElMessage.success('模型配置已创建，请先测试连接再启用')
     }
+    const wasActive = !!editingModel.value?.is_active
     showDialog.value = false
-    await fetchModels()
+    await Promise.all([fetchModels(), wasActive ? fetchRoutes() : Promise.resolve()])
   } catch (error) {
     const message = validationFailureMessage(error)
     if (message) notifyModelFailure('保存失败', message)
@@ -432,25 +449,13 @@ async function onSubmit() {
 
 onMounted(async () => {
   await fetchProviders()
-  await Promise.all([fetchModels(), refreshHealth()])
+  await Promise.all([fetchModels(), fetchRoutes()])
 })
 </script>
 
 <style scoped>
 .ai-model-config { padding: var(--gt-space-4); height: 100%; overflow-y: auto; }
 .security-tip { margin-bottom: var(--gt-space-4); }
-.ai-health-cards { display: flex; flex-wrap: wrap; gap: var(--gt-space-3); margin-bottom: var(--gt-space-4); }
-.health-card {
-  display: flex; align-items: center; gap: 8px; min-width: 190px; padding: 10px 16px;
-  border-radius: var(--gt-radius-md); background: var(--gt-color-bg); border: 1px solid var(--gt-color-border-light);
-  font-size: var(--gt-font-size-sm);
-}
-.health-card.ok { border-color: var(--gt-color-success); }
-.health-card.err { border-color: var(--gt-color-coral); }
-.health-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gt-color-coral); }
-.health-card.ok .health-dot { background: var(--gt-color-success); }
-.health-label { font-weight: 500; color: var(--gt-color-text); }
-.health-val { color: var(--gt-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-tabs { margin-top: var(--gt-space-2); }
 .form-help { margin-top: 4px; color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-xs); line-height: 1.4; }
 </style>

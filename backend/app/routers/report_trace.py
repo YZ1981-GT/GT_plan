@@ -361,7 +361,8 @@ async def recommend_workpapers(project_id: UUID, db: AsyncSession = Depends(get_
 {wp_summary}
 返回 JSON 数组，每项含 wp_code 和 priority(high/medium/low) 和 reason。"""
 
-        response = await chat_completion(prompt)
+        # 旧实现把提示词字符串当 messages 传入，每次构造请求即抛错 ⇒ 恒走金额排序降级。
+        response = await chat_completion([{"role": "user", "content": prompt}])
         if response and not response.startswith("[LLM"):
             text_r = response.strip()
             if text_r.startswith("```"):

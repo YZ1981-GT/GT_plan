@@ -83,15 +83,23 @@ async def generate_g9_ai(
             prompt += f"\n上期金额：{body.relatedContext.get('priorAmount')}"
     if body.existingContent:
         prompt += f"\n\n已有内容：{body.existingContent[:2000]}"
+    from app.services.ai_chat.native_engine import is_llm_fail_soft_placeholder
+
     try:
+        # 旧实现传 system= / user= / db= 等 chat_completion 没有的参数，恒 TypeError ⇒ 500。
         content = await chat_completion(
-            system=_SYSTEM,
-            user=prompt,
-            db=db,
-            wp_id=wp_id,
-            feature=f"g9-ai-{section}",
+            messages=[
+                {"role": "system", "content": _SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("G9 AI %s failed: %s", section, e)
         raise HTTPException(status_code=500, detail=str(e)) from e
-    return G9AiGenerateResponse(content=content or "")
+    if not isinstance(content, str):
+        raise HTTPException(status_code=500, detail="AI 返回格式异常")
+    if is_llm_fail_soft_placeholder(content):
+        # 模型不可用时 chat_completion 返回占位串而不抛错：不得当正文填进底稿
+        logger.warning("G9 AI %s unavailable: %s", section, content[:80])
+        raise HTTPException(status_code=503, detail="AI 服务暂不可用，请稍后重试")
+    return G9AiGenerateResponse(content=content)

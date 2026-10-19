@@ -310,8 +310,15 @@ async def _llm_polish_report(raw_data: dict) -> str:
 
 要求：专业简洁，突出进展和风险，给出下周建议。"""
 
-        result = await chat_completion(prompt, temperature=0.3, max_tokens=300)
-        return result or "（LLM 生成失败，请查看原始数据）"
+        from app.services.ai_chat.native_engine import is_llm_fail_soft_placeholder
+
+        # 旧实现把字符串当 messages 传入，每次都失败并累计全局熔断。
+        result = await chat_completion(
+            [{"role": "user", "content": prompt}], temperature=0.3, max_tokens=300
+        )
+        if is_llm_fail_soft_placeholder(result):
+            raise RuntimeError(str(result)[:80])
+        return result
     except Exception as e:
         _logger.warning("LLM polish failed: %s", e)
         return f"本周完成{raw_data['completed_this_week']}个底稿，总进度{raw_data['completion_rate']}%，{raw_data['stale_workpapers']}个底稿超期待跟进。"
@@ -348,8 +355,14 @@ async def _llm_generate_summary(summary_data: dict) -> str:
 
 要求：开头一句话总结项目状态（正常/需关注/有风险），然后分点说明关键信息和建议。"""
 
-        result = await chat_completion(prompt, temperature=0.3, max_tokens=400)
-        return result or "（LLM 生成失败）"
+        from app.services.ai_chat.native_engine import is_llm_fail_soft_placeholder
+
+        result = await chat_completion(
+            [{"role": "user", "content": prompt}], temperature=0.3, max_tokens=400
+        )
+        if is_llm_fail_soft_placeholder(result):
+            raise RuntimeError(str(result)[:80])
+        return result
     except Exception as e:
         _logger.warning("LLM summary failed: %s", e)
         return f"项目进度{metrics['workpaper_progress']}，{'有风险需关注' if risks else '进展正常'}。"

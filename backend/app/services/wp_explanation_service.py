@@ -80,11 +80,10 @@ class WpExplanationService:
         except Exception as _manual_err:
             logger.debug("load manual context failed (non-blocking): %s", _manual_err)
 
-        # 3. 调用 LLM
+        # 3. 调用 LLM（本机优先路由；不再强制 `.env` 模型名——服务器端点收到本机模型名会 404）
         from app.services.llm_client import chat_completion
-        from app.core.config import settings
+        from app.services.llm_route import served_model_label
 
-        model_name = settings.DEFAULT_CHAT_MODEL
         messages = [
             {"role": "system", "content": self._system_prompt()},
             {"role": "user", "content": input_text},
@@ -92,12 +91,14 @@ class WpExplanationService:
 
         try:
             draft_text = await chat_completion(
-                messages, model=model_name, temperature=0.3, max_tokens=2000,
+                messages, temperature=0.3, max_tokens=2000,
                 context_documents=context_docs if context_docs else None,
             )
         except Exception as e:
             logger.error("LLM调用失败: %s", e)
             return {"error": f"AI服务暂不可用: {e}"}
+        # 留痕记实际回答的模型（ADR-ROUTE-008）
+        model_name = served_model_label()
 
         # 4. 写入 wp_ai_generations 留痕
         generation_id = uuid.uuid4()

@@ -5,12 +5,24 @@
 
 ## 1. 配置权威源与前置条件
 
-运行时优先级固定为：
+运行时按「本机 → 服务器」路由选择（V197，spec `llm-ocr-local-first-routing`）：
 
-1. `ai_model_config` 中该类型/能力的 active row；
-2. 仅在没有 active row 时，回落 `.env` 的 `LLM_*` bootstrap 配置。
+1. `ai_model_config` 中该类型（OCR 按能力槽）**已启用**的行参与路由，本机行在前、服务器行在后；
+2. 仅在该类型没有任何已启用行时，对话 / 向量回落 `.env` 的 `LLM_*` bootstrap 配置，文字识别回落本机进程内引擎，版面解析报「未配置」。
 
-模型调用每次重新读取 active row，因此切换后不依赖当前 worker 内存，后端重启和多 worker 仍一致。系统设置通用接口不再允许改 LLM URL/Key，统一在 `/settings/ai-models` 管理。
+模型调用每次重新读取已启用行，因此切换后不依赖当前 worker 内存，后端重启和多 worker 仍一致。系统设置通用接口不再允许改 LLM URL/Key，统一在 `/settings/ai-models` 管理。
+
+### 本机优先路由
+
+- **部署位置**：端点主机字面量为 `localhost` / `127.0.0.0/8` / `::1`，或 OCR 协议为本机引擎 ⇒「本机」，其余（含企业网关的内网地址）⇒「服务器」。由端点推导写入 `deployment` 列，不能手工改。
+- **启用规则**：对话、OCR 每个能力槽的本机、服务器各最多启用一条；启用只替换同位置的那一条。**向量只启用一条、不跨模型兜底**（已存向量与查询向量必须同一模型）。已启用的模型不能删除，先「停用」。
+- **何时改用下一个**：连不上、连接超时、端点被出站策略拦截、HTTP 5xx、401/403、404（模型或路径不存在）、返回的不是 OpenAI 兼容 JSON。**不改用**：读取超时、400/422/429、空回复、输出超出 token 限制 —— 请求已被接收或会在另一端同样失败，换候选会让同一请求在两端重复执行。流式调用只在首个片段输出前改用。OCR 是幂等的，前序候选任何失败都改用下一个。
+- **冷却**：候选改用失败后 `LLM_ROUTE_COOLDOWN_SECONDS`（默认 30 秒）内直接跳过（仍有其他候选时）；全部在冷却期则按顺序全部尝试。本机候选连接超时收紧为 `LLM_LOCAL_CONNECT_TIMEOUT_SECONDS`（默认 3 秒）。冷却只在进程内，多 worker 各自探测。
+- **熔断**：按整条路由计数，本机失败、服务器成功记为成功；调用方参数错误不计入。
+- **调用方点名的模型**只作优先提示：等于某条已启用模型的模型名时排到最前，否则忽略（不再把 `.env` 的模型名发给服务器端点）。
+- **留痕**：AI 对话消息、底稿 AI 内容来源、批量复核、A17、B14、底稿说明草稿记录**实际回答的模型**。
+- **状态**：模型配置页「调用路由」面板（`GET /api/ai-models/routes`）逐类显示本机 → 服务器候选、状态、原因与当前生效；探测与生产同一 transport，探测结果同时更新冷却记录。未鉴权的 `/api/ai/health` 只探测对话、不返回端点地址。
+- **启用本机模型**：若只是当前不可达 / 引擎未安装 / 5xx，仍允许启用并提示后果（有已启用的服务器模型时调用自动兜底；没有时本机恢复前调用会失败；向量没有兜底）；鉴权失败、模型不存在等配置错误拒绝启用。启用服务器模型必须通过真实连接测试。
 
 ### 必须先配置 ENCRYPTION_KEY
 
@@ -114,7 +126,7 @@ Authorization: Bearer <用户输入的 Key>
 
 版面解析使用 `layoutParsingResults`。平台只保留规范化文字、区域和版面块，不保留响应中的可视化 Base64 大图。测试连接使用内置合成 PNG，不发送任何项目文件。若内部网关的字段名与 PaddleX 官方协议不同，需提供脱敏请求/响应样例后新增 adapter，不应在生产代码中猜字段。
 
-正常附件 OCR 会优先使用 active `ocr` 能力；显式版面解析调用使用 active `layout_parsing` 能力。已选择远程模型时，网络/认证/响应错误会标记失败，不静默改成本地空文本“成功”。
+附件 OCR 按 `ocr` 能力槽路由：已启用的本机行（本机 PaddleOCR / Tesseract / MinerU 引擎链或 `OCR_SERVICE_URL` 容器）在前，远程 `paddleocrv6` 兜底；显式版面解析按 `layout_parsing` 槽（当前只有远程 `paddleocrvl-1.6`）。识别结果附 `route`（部署位置、模型、是否兜底、前序候选的失败原因）。全部候选失败时逐个列出原因并标记失败，不静默改成空文本“成功”。显式点名 Tesseract / MinerU 引擎时只走本机。
 
 ## 4. 支持矩阵
 
@@ -161,9 +173,11 @@ LLM_ENDPOINT_ALLOWLIST=http://vllm:8000/v1,http://ocr:8080
 | POST | `/api/ai-models` | 新增，Key 为 write-only |
 | PUT | `/api/ai-models/{id}` | 更新、替换或显式清除 Key；企业预设只接受 Key 与（对话模型的）思考强度 |
 | POST | `/api/ai-models/{id}/test` | 使用生产同一 transport 测试；返回 `{status, error_code, message}` |
-| POST | `/api/ai-models/{id}/activate` | 验证后原子切换 active；验证失败返回 400 `{error_code, message}` |
-| DELETE | `/api/ai-models/{id}` | 软删除；active/企业预设模型禁止删除 |
-| GET | `/api/ai-models/health` | 当前 chat/embedding 健康状态 |
+| POST | `/api/ai-models/{id}/activate` | 启用（只替换同类型、同能力槽、同部署位置的那一条）；返回 `deployment` 与 `warning`（本机当前不可用但已启用时的后果说明）；验证失败返回 400 `{error_code, message}` |
+| POST | `/api/ai-models/{id}/deactivate` | 停用，退出路由 |
+| DELETE | `/api/ai-models/{id}` | 软删除；已启用 / 企业预设模型禁止删除 |
+| GET | `/api/ai-models/routes?refresh=` | 四类路由（对话 / 向量 / OCR 文字识别 / OCR 版面解析）的候选、状态、原因与当前生效；结果缓存 30 秒（远程 OCR 60 秒），`refresh=true` 重新探测 |
+| GET | `/api/ai-models/health` | 由路由状态派生的健康状态（兼容旧字段，另含 `routes`） |
 | POST | `/api/ai-models/seed` | 幂等初始化本地默认模型 |
 
 ### 对话模型创建示例
@@ -214,6 +228,10 @@ LLM_ENDPOINT_ALLOWLIST=http://vllm:8000/v1,http://ocr:8080
 | 测试提示“请求参数被拒绝；若该模型不支持思考强度…” | 服务端不接受 `reasoning_effort`，把思考强度改回「未指定」 |
 | 测试提示“模型或 API 路径不存在” | 端点应以 `/v1` 结尾，且模型名与服务端 `/v1/models` 返回的 id 一致 |
 | 远程 OCR 返回 HTTP 422（文件格式或尺寸不被接受） | PaddleX 拒绝了该文件（如 1x1 图片会被判 `Invalid input file`）；连接测试已改用 240x64 文字图 |
+| 想用本机模型但调用总是服务器回答 | 看「调用路由」面板：本机行未启用，或本机处于冷却期（最近一次调用失败，30 秒内跳过）；点「检测状态」会重新探测并在成功时清除冷却 |
+| 启用本机模型提示「当前不可用，已启用」 | 本机服务没起或引擎未安装；有已启用的服务器模型时调用自动兜底，否则本机恢复前调用会失败 |
+| 修改端点返回 409「该类型已启用另一条…模型」 | 改动让部署位置变了（本机 ↔ 服务器），而目标位置已有启用模型；先停用其中一条 |
+| 向量模型「模型或 API 路径不存在」 | 端点不提供 `/embeddings`（本机 8100 的 vLLM 只跑对话模型即如此）；向量不跨模型兜底，需启用一个真正的向量模型 |
 
 测试连接与激活返回的是稳定错误码 + 具体原因（不含上游正文与 Key）：`provider_unreachable`（附 TLS / 拒连 / DNS / fake-IP 判断）、`provider_timeout`、`provider_auth_failed`、`model_not_found`、`provider_error`、`invalid_response`；远程 OCR 对应 `ocr_unreachable`、`ocr_timeout`、`ocr_auth_failed` 等。
 

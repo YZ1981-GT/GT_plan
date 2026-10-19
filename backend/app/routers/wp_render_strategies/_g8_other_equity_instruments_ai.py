@@ -139,14 +139,20 @@ async def generate_g8_ai(
         prompt += f"\n\n相关行数：{len(body.rows)}；预览：{preview!s}"[:1500]
     if body.existingContent:
         prompt += f"\n\n已有内容：{body.existingContent[:2000]}"
+    from app.services.ai_chat.native_engine import is_llm_fail_soft_placeholder
+
     try:
+        # 旧实现传 system= / user= / db= 等 chat_completion 没有的参数，恒 TypeError 走占位分支。
         content = await chat_completion(
-            system=_SYSTEM,
-            user=prompt,
-            db=db,
-            wp_id=wp_id,
-            feature=f"g8-ai-{section}",
+            messages=[
+                {"role": "system", "content": _SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
         )
+        if not isinstance(content, str):
+            raise TypeError("unexpected streaming response")
+        if is_llm_fail_soft_placeholder(content):
+            raise RuntimeError(content)  # 模型不可用的占位串不得当结论写进底稿
     except Exception as e:  # noqa: BLE001
         logger.warning("G8 AI %s failed: %s", section, e)
         content = f"【G8 {section} 审计结论占位】请结合 G8 底稿数据补充专业结论。（AI 暂不可用）"
