@@ -19,6 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import Project, User
+from app.routers.deliverable import _guard_action
+from app.services.deliverable_permissions import DeliverableAction
 from app.services.formula_management.delivery_export import (
     content_disposition_attachment,
 )
@@ -48,8 +50,12 @@ async def export_word(
 ):
     """导出附注为 Word 文档（致同标准格式）
 
+    与交付中心「生成附注」同一判定 ``_guard_action``（export）：只有本项目成员（review 及以上）能导出，
+    项目组外的人 403；EQCR 只读。
+
     Requirements: 4.1, 4.11
     """
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
     # Validate template_type
     if body.template_type not in ("soe", "listed"):
         raise HTTPException(status_code=400, detail={"message": "template_type 必须是 soe 或 listed", "message_en": "template_type must be 'soe' or 'listed'"})

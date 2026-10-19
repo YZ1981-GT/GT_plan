@@ -7,7 +7,7 @@
   - 不存在 preview_session → confirm 返回 404
   - 他人 preview_session → confirm 返回 403
 
-直接调用路由函数（in-process，无需 uvicorn）。guard 在模板解析前执行，
+直接调用路由函数（in-process，无需 uvicorn）。guard（先校验本项目成员，再按全局角色矩阵）在模板解析前执行，
 confirm 在交付件入库前校验会话，故无需真实模板即可覆盖以上分支。
 
 Feature: audit-report-template-integration
@@ -24,8 +24,8 @@ from fastapi import HTTPException
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.models.base import Base, ProjectStatus, ProjectType, UserRole
-from app.models.core import Project, User
+from app.models.base import Base, PermissionLevel, ProjectStatus, ProjectType, ProjectUserRole, UserRole
+from app.models.core import Project, ProjectUser, User
 from app.models.report_models import FillPreviewSession
 from app.models.phase13_schemas import (
     ReportBodyConfirmRequest,
@@ -81,6 +81,14 @@ async def _make_project(db: AsyncSession, owner_id: uuid.UUID) -> Project:
     return project
 
 
+async def _add_member(
+    db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID, level: PermissionLevel
+) -> None:
+    """交付中心先要求是本项目成员；本文件测的是成员之后的角色矩阵与会话校验。"""
+    db.add(ProjectUser(project_id=project_id, user_id=user_id, role=ProjectUserRole.manager, permission_level=level))
+    await db.flush()
+
+
 async def _make_session_row(
     db: AsyncSession,
     *,
@@ -109,9 +117,10 @@ async def _make_session_row(
 
 @pytest.mark.asyncio
 async def test_preview_readonly_forbidden(db_session):
-    """readonly 无 export 权限 → preview 403。"""
+    """readonly 无 export 权限 → preview 403（即便是本项目 edit 级成员，全局角色矩阵仍拦）。"""
     user = await _make_user(db_session, UserRole.readonly)
     project = await _make_project(db_session, user.id)
+    await _add_member(db_session, project.id, user.id, PermissionLevel.edit)
     body = ReportBodyPreviewRequest(
         year=2025, opinion_type="unqualified", company_subtype="type_d"
     )
@@ -127,6 +136,7 @@ async def test_confirm_readonly_forbidden(db_session):
     """readonly 无 export 权限 → confirm 403（在校验会话前即被 guard 拦截）。"""
     user = await _make_user(db_session, UserRole.readonly)
     project = await _make_project(db_session, user.id)
+    await _add_member(db_session, project.id, user.id, PermissionLevel.edit)
     body = ReportBodyConfirmRequest(
         year=2025, preview_session_id=uuid.uuid4(), optional_sections={}
     )
@@ -145,6 +155,7 @@ async def test_confirm_expired_session_404(db_session):
     """过期 preview_session → confirm 404。"""
     user = await _make_user(db_session, UserRole.manager)
     project = await _make_project(db_session, user.id)
+    await _add_member(db_session, project.id, user.id, PermissionLevel.review)
     sess = await _make_session_row(
         db_session,
         project_id=project.id,
@@ -166,6 +177,7 @@ async def test_confirm_missing_session_404(db_session):
     """不存在的 preview_session → confirm 404。"""
     user = await _make_user(db_session, UserRole.manager)
     project = await _make_project(db_session, user.id)
+    await _add_member(db_session, project.id, user.id, PermissionLevel.review)
     body = ReportBodyConfirmRequest(
         year=2025, preview_session_id=uuid.uuid4(), optional_sections={}
     )
@@ -182,6 +194,8 @@ async def test_confirm_wrong_user_403(db_session):
     owner = await _make_user(db_session, UserRole.manager)
     other = await _make_user(db_session, UserRole.manager)
     project = await _make_project(db_session, owner.id)
+    for member in (owner, other):  # 两人都是本项目成员 ⇒ 403 来自「会话不是你的」而非成员校验
+        await _add_member(db_session, project.id, member.id, PermissionLevel.review)
     sess = await _make_session_row(
         db_session,
         project_id=project.id,
@@ -196,3 +210,19 @@ async def test_confirm_wrong_user_403(db_session):
             project.id, body, db=db_session, current_user=other
         )
     assert exc.value.status_code == 403
+    assert exc.value.detail == "preview 会话不属于当前用户", exc.value.detail  # 会话归属拦下，而非成员校验
+
+
+@pytest.mark.asyncio
+async def test_non_member_forbidden_before_session_check(db_session):
+    """不是本项目成员（即便全局角色是 manager）→ preview / confirm 均 403「权限不足」。"""
+    user = await _make_user(db_session, UserRole.manager)
+    project = await _make_project(db_session, user.id)
+    preview = ReportBodyPreviewRequest(year=2025, opinion_type="unqualified", company_subtype="type_d")
+    confirm = ReportBodyConfirmRequest(year=2025, preview_session_id=uuid.uuid4(), optional_sections={})
+    with pytest.raises(HTTPException) as exc:
+        await preview_report_body(project.id, preview, db=db_session, current_user=user)
+    assert (exc.value.status_code, exc.value.detail) == (403, "权限不足")
+    with pytest.raises(HTTPException) as exc:
+        await confirm_report_body(project.id, confirm, db=db_session, current_user=user)
+    assert (exc.value.status_code, exc.value.detail) == (403, "权限不足")

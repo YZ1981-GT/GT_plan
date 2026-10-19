@@ -73,6 +73,9 @@ _PROJECT_LEVEL_TOKENS = (
     # 2026-10-16 补（spec disclosure-note-template-word-realignment Task 19，前缀维现算出现）：
     "require_project_permission",     # deps.py：先 assert_project_permission 再校细粒度项目权限
     "authorize_object",               # 取证治理 scope_guard：按对象反查项目归属
+    # 2026-10-19 补：交付中心鉴权 —— 先 assert_project_permission 校验本项目成员，再按交付件角色矩阵；
+    # word-exports / 导出附注 Word / 组合导出包复用同一函数。可伪证：test_guard_action_token_is_really_project_level
+    "_guard_action",
 )
 
 #: 仅身份认证 / 角色判定，不含项目维度
@@ -402,7 +405,7 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #:
 #: 本断言只**冻结上限**：不得比现状更差。
 #: 🔴 阈值是现算值而非拍脑袋 —— 降到更低后应同步下调（棘轮只许向下）。
-_IDENTITY_ONLY_BASELINE = 224
+_IDENTITY_ONLY_BASELINE = 214  # 2026-10-19：附注 AI 四个端点补项目成员校验后现算 214
 
 
 def test_identity_only_endpoints_do_not_grow():
@@ -571,8 +574,9 @@ _PREFIXED_SELF_AUTH: dict[str, str] = {
 #: 端点的是 `test_no_new_prefixed_unauthorized_endpoint`（扫 none 档必为空）。
 _PREFIXED_KNOWN_GAPS: frozenset[str] = frozenset()
 
-#: 前缀维「仅登录不校项目」上限（2026-10-16 现算 339），棘轮只许向下
-_PREFIXED_IDENTITY_ONLY_BASELINE = 339
+#: 前缀维「仅登录不校项目」上限，棘轮只许向下。2026-10-16 现算 339；2026-10-19 补附注 / 交付件生成链路
+#: （交付中心 35 + word-exports 13 + 导出附注 Word 1 + 全链路工作流 10）后现算 277
+_PREFIXED_IDENTITY_ONLY_BASELINE = 277
 
 
 def _matches(names: set[str], tokens: tuple[str, ...]) -> bool:
@@ -678,6 +682,31 @@ def test_self_auth_endpoints_really_verify():
     for key, verifier in _PREFIXED_SELF_AUTH.items():
         assert key in found, f"{key} 已不在前缀维，请删除豁免"
         assert verifier in _auth_names_in_node(funcs[key.split("::", 1)[1]]), f"{key} 没调 {verifier}"
+
+
+def test_guard_action_token_is_really_project_level():
+    """``_guard_action`` 记作项目级的前提（可伪证）：
+
+    ① 全部路由里只有 deliverable.py 定义它，且函数体真的调 ``assert_project_permission``；
+    ② 其余路由用到它必须是从 ``app.routers.deliverable`` 导入的那一个 —— 自写一份同名函数不得被当成项目级。
+    """
+    defs: dict[str, ast.AST] = {}
+    users: dict[str, bool] = {}
+    for f in sorted(_ROUTERS.rglob("*.py")):
+        rel = f.relative_to(_ROUTERS).as_posix()
+        tree = ast.parse(f.read_text(encoding="utf-8-sig", errors="replace"))
+        for n in ast.walk(tree):
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith("_guard_action"):
+                defs[rel] = n
+        if rel != "deliverable.py" and any(isinstance(n, ast.Name) and n.id == "_guard_action" for n in ast.walk(tree)):
+            users[rel] = any(
+                isinstance(n, ast.ImportFrom) and n.module == "app.routers.deliverable"
+                and any(a.name == "_guard_action" for a in n.names)
+                for n in ast.walk(tree)
+            )
+    assert set(defs) == {"deliverable.py"}, f"_guard_action 只许交付中心定义一份：{sorted(defs)}"
+    assert "assert_project_permission" in _auth_names_in_node(defs["deliverable.py"]), "_guard_action 不再校验项目成员"
+    assert users and all(users.values()), f"复用方必须从 app.routers.deliverable 导入：{users}"
 
 
 def test_prefixed_identity_only_do_not_grow():

@@ -7,6 +7,10 @@ Requirements: 1.1, 2.1-2.7, 9.1-9.4, 15.1-15.3
   GET  /api/projects/{pid}/workflow/progress/{eid}      — SSE 进度流
   GET  /api/projects/{pid}/workflow/executions          — 执行历史
   POST /api/projects/{pid}/workflow/retry/{eid}         — 重试失败步骤
+
+鉴权（全链路会重算试算表 / 报表并生成附注 —— 项目组外的人不得触发）：查看类要求本项目成员（readonly）；
+执行 / 重试 / 附注同步与裁剪属编制，要求 edit（与附注模块写端点同级）；组合导出包与交付中心生成同一判定
+``deliverable._guard_action``；批量执行逐项目校验 edit，无权项目跳过并写明原因。
 """
 from __future__ import annotations
 
@@ -24,13 +28,15 @@ from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import assert_project_permission, get_current_user, require_project_access
 from app.models.core import User
+from app.routers.deliverable import _guard_action
 from app.services.chain_orchestrator import (
     ChainConflictError,
     ChainStep,
     chain_orchestrator,
 )
+from app.services.deliverable_permissions import DeliverableAction
 from app.services.project_audit_year import fetch_project_audit_year
 
 logger = logging.getLogger(__name__)
@@ -108,7 +114,7 @@ async def execute_full_chain(
     project_id: UUID,
     body: ExecuteChainRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """执行全链路生成
 
@@ -178,7 +184,7 @@ async def execute_full_chain(
 async def get_progress_stream(
     project_id: UUID,
     execution_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """SSE 进度流 — 实时推送步骤状态
 
@@ -232,7 +238,7 @@ async def get_executions(
     end_time: str | None = Query(None, description="结束时间 ISO 格式"),
     limit: int = Query(100, ge=1, le=100, description="最多返回条数"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """执行历史列表
 
@@ -282,6 +288,7 @@ async def export_package(
 
     Requirements: 5.1-5.8
     """
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
     # Resolve year: 前端可不传，自动从 project_id 推断
     year = body.year
     if year is None:
@@ -340,7 +347,7 @@ async def consistency_check(
     project_id: UUID,
     year: int | None = Query(None, description="年度（可选，缺省时从项目自动推断）"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """一致性检查 — 5 项检查
 
@@ -387,7 +394,7 @@ async def compare_execution(
     project_id: UUID,
     execution_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """版本对比 — 返回执行前后每行变化
 
@@ -396,7 +403,10 @@ async def compare_execution(
     """
     from app.models.chain_execution import ChainExecution
 
-    stmt = sa_select(ChainExecution).where(ChainExecution.id == execution_id)
+    stmt = sa_select(ChainExecution).where(
+        ChainExecution.id == execution_id,
+        ChainExecution.project_id == project_id,  # 只认本项目的执行记录
+    )
     result = await db.execute(stmt)
     execution = result.scalar_one_or_none()
 
@@ -459,7 +469,7 @@ async def get_data_health(
     project_id: UUID,
     year: int = Query(..., description="年度"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """全局数据一致性实时监控 — 数据健康度
 
@@ -491,7 +501,7 @@ async def sync_notes_from_report(
     project_id: UUID,
     year: int = Query(..., description="年度"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """同步报表数据到附注
 
@@ -511,7 +521,7 @@ async def trim_and_sort_notes(
     project_id: UUID,
     year: int = Query(..., description="年度"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """附注智能裁剪与排序
 
@@ -531,7 +541,7 @@ async def retry_execution(
     project_id: UUID,
     execution_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """重试失败步骤
 
@@ -613,6 +623,8 @@ async def batch_execute(
         for pid_str in batch:
             try:
                 pid = UUID(pid_str)
+                # 只能批量执行自己有编制权（edit）的项目；无权项目跳过并写明原因，不影响其余项目
+                await assert_project_permission(db, current_user, pid, "edit")
 
                 # Resolve year: 全局指定则用全局，否则逐项目推断
                 year = global_year
@@ -647,6 +659,16 @@ async def batch_execute(
                     "execution_id": execution.id,
                 })
                 success_count += 1
+
+            except HTTPException as e:
+                reason = e.detail.get("message") if isinstance(e.detail, dict) else e.detail
+                results.append({
+                    "project_id": pid_str,
+                    "status": "skipped",
+                    "reason": f"无权执行：{reason}",
+                })
+                skipped_count += 1
+                await db.rollback()
 
             except ChainConflictError:
                 results.append({

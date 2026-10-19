@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import async_session, get_db
 import sqlalchemy as sa
-from app.deps import get_current_user
+from app.deps import assert_project_permission, get_current_user
 from app.models.core import User
 from app.models.phase13_models import WordExportDocType, WordExportStatus, ExportJobItem
 from app.models.phase13_schemas import (
@@ -51,7 +51,7 @@ from app.models.phase13_schemas import (
 )
 from app.models.report_models import AuditReport, CompanyType, ReportStatus
 from app.services.completeness_service import CompletenessService
-from app.services.deliverable_permissions import DeliverableAction, can_deliverable
+from app.services.deliverable_permissions import READ_ACTIONS, DeliverableAction, can_deliverable
 from app.services.deliverable_doc_key import deliverable_doc_key
 from app.services.deliverable_hash_service import DeliverableHashService
 from app.services.deliverable_package_service import DeliverablePackageService
@@ -231,6 +231,15 @@ async def _guard_action(
     *,
     task_status: str | None = None,
 ) -> None:
+    """交付件操作鉴权：先要求是本项目成员，再按角色 × 操作 × 状态矩阵判定（EQCR 只读）。
+
+    查看 / 下载要求 readonly 及以上；生成、编辑、确认、签署、审批、归档要求 review 及以上 ——
+    合伙人 / 经理 / 质控 / EQCR 在项目里是 review 级（assignment_service.ROLE_MAP），挂 edit 会把
+    复核人锁在外面。非项目成员 403「权限不足」；admin 跳过成员校验。一键生成全套也走本函数。
+    """
+    await assert_project_permission(
+        db, user, project_id, "readonly" if action in READ_ACTIONS else "review"
+    )
     is_eqcr = await _is_project_eqcr(db, user.id, project_id)
     if not can_deliverable(
         user.role.value,
@@ -296,6 +305,7 @@ async def compare_versions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    await _guard_action(db, current_user, project_id, DeliverableAction.preview)
     svc = DeliverableService(db)
     task = await svc.get_task(task_id)
     if task is None:
@@ -402,6 +412,7 @@ async def preview_version(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    await _guard_action(db, current_user, project_id, DeliverableAction.preview)
     svc = DeliverableService(db)
     task = await svc.get_task(task_id)
     if task is None:
@@ -438,6 +449,7 @@ async def load_report_body_template(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    await _guard_action(db, current_user, project_id, DeliverableAction.list)
     rbs = ReportBodyService(db)
     template = await rbs.load_body_template(
         body.opinion_type,
@@ -1589,6 +1601,8 @@ async def unarchive_deliverable(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # 仅 admin（admin 本就跳过项目成员校验）。不走 _guard_action：其 review 级校验先判项目归档（423），
+    # 而解除归档往往发生在项目已归档之后。
     if current_user.role.value != "admin":
         raise HTTPException(status_code=403, detail="仅 admin 可解除归档")
     svc = DeliverableService(db)
@@ -1836,6 +1850,7 @@ async def preview_report_body_html(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    await _guard_action(db, current_user, project_id, DeliverableAction.preview)
     rbs = ReportBodyService(db)
     report = await rbs._audit_svc.get_report(project_id, year)
     if report is None or not report.report_body_json:

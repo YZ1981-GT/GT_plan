@@ -1,6 +1,9 @@
 """附注 LLM 辅助 API
 
 Phase 9 Task 9.29
+
+鉴权：全部端点要求本项目成员（readonly 及以上）—— 生成结果只是预览、不落库（采纳走附注编辑器的 edit 写端点），
+但会把本项目上年附注 / 数据喂给大模型，项目组外的人不得调用。
 """
 
 from __future__ import annotations
@@ -12,7 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import require_project_access
 from app.models.core import User
 
 router = APIRouter(prefix="/api/disclosure-notes", tags=["note-ai"])
@@ -60,7 +63,7 @@ async def generate_policy(
     project_id: UUID,
     data: PolicyGenerateRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     """会计政策自动生成（接入 vLLM + RAG 参照上年附注）"""
     from app.services.llm_client import chat_completion
@@ -93,7 +96,7 @@ async def generate_analysis(
     project_id: UUID,
     data: AnalysisGenerateRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     """变动分析自动生成（接入 vLLM + RAG 参照上年附注）"""
     from app.services.llm_client import chat_completion
@@ -125,7 +128,7 @@ async def generate_analysis(
 async def check_completeness(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     """披露完整性检查（接入 vLLM + RAG 参照知识库准则）"""
     from app.services.llm_client import chat_completion
@@ -153,7 +156,7 @@ async def check_expression(
     project_id: UUID,
     section_number: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User = Depends(require_project_access("readonly")),
 ):
     """表述规范性检查（接入 vLLM）"""
     return {"section_number": section_number, "issues": [], "message": "表述规范检查需要提供具体文本内容"}

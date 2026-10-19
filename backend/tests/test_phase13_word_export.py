@@ -22,7 +22,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.models.base import Base
+from app.models.base import Base, UserRole
 from app.models.core import Project, User
 from app.models.phase13_models import (
     VALID_STATUS_TRANSITIONS,
@@ -77,7 +77,7 @@ async def test_user(test_db: AsyncSession) -> User:
         username="test_phase13",
         email="phase13@test.com",
         hashed_password="hashed",
-        role="admin",
+        role=UserRole.admin,  # 枚举：word-exports 经项目级鉴权读 role.value（真实用户从库里取出即枚举）
     )
     test_db.add(user)
     await test_db.flush()

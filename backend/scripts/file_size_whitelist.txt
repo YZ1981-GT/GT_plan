@@ -1466,3 +1466,8 @@ backend/app/services/deliverable_service.py  924
 #     真库 ai_content_type_enum 已有该标签、复核 AI 写入方在用，漏声明致读取存量行 LookupError）。
 #     拆分方向：按 AI 域（内容 / 治理 / 会话）分模块，属独立任务。
 backend/app/models/ai_models.py  1537
+
+#   test_phase13_word_export.py —— Phase 13 Word 导出综合测试（非本次引入；触碰前已 1255 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-19 deliverable-writeback-and-online-edit-integrity design §10.5：word-exports 补项目成员鉴权后读 role.value，
+#     测试用户角色由裸字符串改为 UserRole 枚举（行数不变）。拆分方向：按服务（任务 / 快照 / 占位符 / 引擎 / API）分文件，属独立任务。
+backend/tests/test_phase13_word_export.py  1255

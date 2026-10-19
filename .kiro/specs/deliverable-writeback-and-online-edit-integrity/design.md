@@ -322,3 +322,17 @@ HEAD（`3e82df9bf`，分支 `spec/disclosure-note-doc-upload-and-batch-fill`）�
 - **顺带修复：`check_note_consistency` 的 fail-open 在 PG 上不成立**。`build_readiness` 内部有 3 处查询失败即吞掉（最近校验结果 / 底稿 id 反查 / 公式灰度），PG 一条语句失败会让整个事务 aborted，吞掉异常救不回来 ⇒ 调用方随后的导出写入全部失败。改为看板在保存点内执行、无论成败都回滚到保存点（只读；回滚到保存点在 aborted 状态下照样可执行）。pg_only 守卫 `test_deliverable_note_consistency_pg.py` 在 `latest_findings_by_section` 注入非法 SQL 并吞掉，断言同一会话后续查询可用。
 - **验证**：新增 / 改动后端 16 passed（一键闸门 6 + 一致性 10）；回归 50 passed / 5 failed（`test_full_deliverables_executor` 5 例，即 §10.2 已登记的 HEAD 预存红）；PG 1 passed；前端 vitest 5 文件 80 passed；变异 4 处全部打红并逐字节恢复（预检加回未同步 / 409 辨识不看 code / 闸门关闭 / 去掉保存点，后者单测与 PG 守卫同时打红）；单区域 vue-tsc 改动文件 0 错（另 7 个错误在未改动文件，属既有）。
 - **未修登记**：`/word-exports/*` 整个路由只校验登录、不校验项目（含本次改的一键全套端点），任何登录用户都能为任意项目发起生成 —— 属项目级鉴权欠账（在 `_PREFIXED_IDENTITY_ONLY_BASELINE` 棘轮内），改访问控制需另行确认；本次只把 409 清单收窄到确认框所需三项。三件套 readiness 只拦过期附注、不拦从未同步，但三件套创建端点没有前端调用方，暂不处理。
+
+### 10.5 生成附注 / 交付件的全部入口补项目成员鉴权（2026-10-19，追加；用户确认「项目组成员只能生成自己项目的附注」）
+
+- **缺口**：§10.4 登记的 `/word-exports/*` 只校验登录之外，交付中心 `_guard_action` 也只按全局角色 × 操作 × 状态 + EQCR 判定、不看是不是本项目成员（库里全局角色只有 auditor / admin ⇒ 任一审计员可为任一项目生成附注）。另有三处同样能生成附注：工作流看板导出对话框的「导出附注 Word」、全链路工作流（生成附注 / 附注同步与裁剪 / 组合导出包 / 批量执行）、附注 AI 四个端点。
+- **定级（一个判定函数）**：`_guard_action` 首句 `assert_project_permission` —— 查看 / 下载 readonly，其余 review（合伙人 / 经理 / 质控 / EQCR 在项目里是 review，挂 edit 会锁住复核人）；角色矩阵与 EQCR 只读照旧。交付中心原先完全不校验的 4 个端点（版本对比 / 预览链接 / 加载正文模板 / 正文 HTML 预览）补上；`unarchive` 仍只认 admin、不走 `_guard_action`（其 review 级校验先判项目归档 423，而解除归档往往在项目已归档之后）；OO 回调与签名下载保持自鉴权。
+  - word-exports：读 5 个挂 `require_project_access("readonly")`；生成 / 确认 / 重试 8 个走 `_guard_action`。一键全套与逐项生成同一判定 ⇒ EQCR、无导出权的全局角色在两条路上结论一致（此前一键全套绕过）。
+  - 导出附注 Word、组合导出包：`_guard_action(export)`。
+  - 全链路：查看 5 个 readonly；执行 / 重试 / 附注同步 / 附注裁剪 edit（会改写试算表 / 报表 / 附注，与附注模块写端点同级）；批量执行逐项目校验 edit，无权项目跳过并写明「无权执行：权限不足」。顺带修：版本对比只按 execution_id 取记录（本项目成员可读别的项目的执行快照）→ 同时按本项目过滤。
+  - 附注 AI 四个（生成会计政策 / 变动分析、完整性与表述检查）：readonly（与同文件续写 / 改写一致；只预览不落库，但会把本项目上年附注喂给大模型）。
+- **守卫**：新增 `test_deliverable_generation_membership_auth.py`（89 例，真实 `assert_project_permission` 判定，只替换权限缓存 / 归档 / RLS 取数点，业务层打桩记账）：非成员 403 且零业务调用、只读成员能看不能生成、review / edit 能生成交付件、编制类只有 edit、admin 绕过、EQCR 能看不能生成、角色矩阵对一键全套同样生效、未登录拒绝、版本对比 WHERE 带本项目、批量执行跳过无权项目、各入口同一 `_guard_action`、两条下层变异。鉴权基线把 `_guard_action` 记为项目级 token，配可伪证断言（只许交付中心定义一份且真调 `assert_project_permission`，复用方必须从 `app.routers.deliverable` 导入）；前缀维仅登录 336 → 277、旧维 218 → 214，常量同步下调。
+- **磁盘变异 11 处**逐个打红、逐字节恢复（去成员校验 / 读端点退回仅登录 / 三处去 `_guard_action` / 全链路退回仅登录 / 版本对比去本项目过滤 / 批量执行去逐项目校验 / AI 去成员依赖 / 别处自写同名 `_guard_action`）。首版「版本对比」断言恒真（SELECT 列表本就含 `project_id`，整句匹配恒命中），是变异抓到的，已改为只看 WHERE 之后。
+- **既有测试按新口径补成员**：phase4（只读 / 编辑级成员 + 关权限缓存）、报告正文两阶段、交付件预览、导出验收（EQCR 判定置空）、phase13（测试用户角色改枚举）、一键闸门（直调换桩 + 真链路置空取数点）。`test_unsupported_format_downgrade` 是 HEAD 预存红（`.xlsx` 已支持预览而策略仍列为降级），改策略并补 xlsx 正例。
+- **验证**：相关 20 个测试文件 407 passed / 2 failed（`test_property_54` 与 lazy import 僵尸基线，§10.2 已登记的预存红）。未做浏览器实测：真实用户目前全是 admin，绕过成员校验，界面行为不变。
+- **未纳入（登记）**：excel-html 通用模块 18 个端点（跨底稿 / 试算表 / 报表 / 附注的查看与导出，含写端点）、报表 Excel 导出、报表数据（`reports.py`）、审计报告模块（`audit_report.py`）仍只校验登录，在两维棘轮内；附注编辑器导出（`disclosure_notes` export-word）与交付件增量刷新（`deliverable_lineage`）已是项目级但定在 edit，复核人用不了，是否下调待拍板。
