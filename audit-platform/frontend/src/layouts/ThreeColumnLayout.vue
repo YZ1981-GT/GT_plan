@@ -434,7 +434,7 @@ const FALLBACK_NAV = [
   { key: 'users', label: '账号权限', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
   { key: 'knowledge', label: '知识库', icon: Reading, path: '/knowledge', maturity: 'production', roles: null },
   { key: 'private-storage', label: '私人库', icon: Suitcase, path: '/private-storage', maturity: 'production', roles: null },
-  { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
+  { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models', maturity: 'production', roles: ['admin'] },
 ]
 
 /**

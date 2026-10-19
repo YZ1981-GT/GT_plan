@@ -178,6 +178,19 @@ class Settings(BaseSettings):
     AI_DSH_QUEUE_LIMIT: int = Field(default=16, ge=1)
     # Ollama 配置（备用，当 vLLM 不可用时降级）
     OLLAMA_BASE_URL: str = "http://localhost:11434"
+    # 自定义 / OpenAI-compatible 私网模型端点精确 allowlist（逗号分隔 base URL）。
+    # 公网端点仍必须 HTTPS；私网/容器服务名只有显式登记后才能携带 API Key 出站。
+    LLM_ENDPOINT_ALLOWLIST: str = ""
+    # 本机代理 TUN（Clash/mihomo/Mesl 等）把 allowlist 端点解析成 fake-IP 198.18/15 时，
+    # 绕过代理 DNS 取真实地址直连（SNI/证书仍按域名）。详见 docs/reference/llm-provider-configuration.md。
+    LLM_FAKE_IP_COMPAT: bool = True
+    # 显式钉选：逗号分隔 host=ip（只在 fake-IP/解析失败时使用，仍按 allowlist 策略复核）。
+    LLM_ENDPOINT_HOST_OVERRIDES: str = ""
+    # 上游 DNS（逗号分隔 IP）；留空则读取本机网卡配置的 DNS。
+    LLM_UPSTREAM_DNS_SERVERS: str = ""
+    # 直连 DNS 被代理拦截时，经本机 HTTP 代理 CONNECT 查询（只接受环回地址，如 http://127.0.0.1:7897）；
+    # 留空则依次尝试 HTTP(S)_PROXY 环境变量与 Windows 系统代理设置。
+    LLM_UPSTREAM_DNS_PROXY: str = ""
     # ChromaDB 向量数据库
     CHROMADB_URL: str = "http://localhost:8000"
     # Phase 8: 事件总线去重窗口（毫秒）

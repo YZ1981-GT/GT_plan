@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/settings", tags=["system-settings"])
 
 # 可由前端修改的配置项白名单
 _EDITABLE_KEYS = {
-    "LLM_BASE_URL", "LLM_API_KEY", "DEFAULT_CHAT_MODEL", "DEFAULT_EMBEDDING_MODEL",
+    # 模型端点/Key/名称由 admin-only /api/ai-models 管理；这里不再形成第二写入口。
     "LLM_TEMPERATURE", "LLM_MAX_TOKENS", "LLM_ENABLE_THINKING",
     "OLLAMA_BASE_URL", "ONLYOFFICE_URL",
     "OCR_DEFAULT_ENGINE", "OCR_PADDLE_ENABLED", "OCR_TESSERACT_ENABLED",
@@ -62,7 +62,7 @@ class SettingsUpdateRequest(BaseModel):
 
 @router.get("")
 async def get_system_settings(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
 ):
     """获取当前系统配置（敏感字段脱敏）"""
     config = _get_settings_dict()
@@ -160,7 +160,7 @@ async def update_system_settings(
 
 @router.get("/health")
 async def check_services_health(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
 ):
     """各外部服务连通性检查"""
     import asyncio

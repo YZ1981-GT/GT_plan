@@ -9,6 +9,7 @@ export const systemRoutes: RouteRecordRaw[] = [
           path: 'settings/ai-models',
           name: 'AIModelConfig',
           component: () => import('@/views/AIModelConfig.vue'),
+          meta: { permission: 'admin' },
         },
 {
           path: 'recycle-bin',

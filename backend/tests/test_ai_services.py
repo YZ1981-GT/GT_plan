@@ -21,56 +21,46 @@ class TestAIService:
 
     @pytest.mark.asyncio
     async def test_chat_completion_success(self):
-        """测试对话补全成功"""
+        """AIService 委派给统一 runtime 并返回结果。"""
         from app.services.ai_service import AIService
 
         db = self._make_mock_db()
         service = AIService(db)
-
-        with patch('app.services.ai_service._get_llm_client') as mock_client_factory:
-            mock_client = AsyncMock()
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json = MagicMock(return_value={
-                "choices": [{"message": {"role": "assistant", "content": "测试回复"}}],
-            })
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client_factory.return_value = mock_client
-
+        with patch(
+            "app.services.ai_service.resolve_runtime_config",
+            new=AsyncMock(return_value=MagicMock()),
+        ) as resolve, patch(
+            "app.services.ai_service.runtime_chat_sync",
+            new=AsyncMock(return_value="测试回复"),
+        ) as runtime:
             result = await service.chat_completion(
                 messages=[{"role": "user", "content": "你好"}],
             )
-            assert result == "测试回复"
+        assert result == "测试回复"
+        resolve.assert_awaited_once()
+        runtime.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_chat_completion_with_system_prompt(self):
-        """测试带系统提示的对话"""
+        """带系统提示的消息原样交给统一 runtime，由 runtime 合并。"""
         from app.services.ai_service import AIService
 
         db = self._make_mock_db()
         service = AIService(db)
-
-        with patch('app.services.ai_service._get_llm_client') as mock_client_factory:
-            mock_client = AsyncMock()
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json = MagicMock(return_value={
-                "choices": [{"message": {"role": "assistant", "content": "专业回答"}}],
-            })
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client_factory.return_value = mock_client
-
-            result = await service.chat_completion(
-                messages=[
-                    {"role": "system", "content": "你是一名审计师"},
-                    {"role": "user", "content": "什么是实质性程序"},
-                ],
-            )
-            assert result is not None
+        messages = [
+            {"role": "system", "content": "你是一名审计师"},
+            {"role": "user", "content": "什么是实质性程序"},
+        ]
+        with patch(
+            "app.services.ai_service.resolve_runtime_config",
+            new=AsyncMock(return_value=MagicMock()),
+        ), patch(
+            "app.services.ai_service.runtime_chat_sync",
+            new=AsyncMock(return_value="专业回答"),
+        ) as runtime:
+            result = await service.chat_completion(messages=messages)
+        assert result == "专业回答"
+        assert runtime.await_args.args[1] == messages
 
     @pytest.mark.asyncio
     async def test_boundary_check(self):

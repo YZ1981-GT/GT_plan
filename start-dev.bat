@@ -54,6 +54,9 @@ echo.
 
 REM --- [1/5] kill old processes -------------------------------
 echo [1/5] Stopping old processes...
+call :kill_named_tree %BACKEND_TITLE%
+call :kill_named_tree %FRONTEND_TITLE%
+call :kill_named_tree %DSH_TITLE%
 taskkill /F /FI "WINDOWTITLE eq %BACKEND_TITLE%*" /T >nul 2>nul
 taskkill /F /FI "WINDOWTITLE eq %FRONTEND_TITLE%*" /T >nul 2>nul
 taskkill /F /FI "WINDOWTITLE eq %DSH_TITLE%*" /T >nul 2>nul
@@ -64,6 +67,9 @@ timeout /t 1 /nobreak >nul
 REM strictPort: vite exits if port is taken (no drift to 3031).
 REM Port may linger after taskkill; wait explicitly.
 call :wait_port_free %FRONTEND_PORT%
+REM uvicorn has no strictPort: SO_REUSEADDR lets it bind next to a stale
+REM listener, so a survivor must be reported here instead of shared silently.
+call :wait_port_free %BACKEND_PORT%
 echo       Done.
 
 REM --- [2/5] start backend ------------------------------------
@@ -95,7 +101,7 @@ for /L %%i in (1,1,60) do (
     REM localhost resolves ::1 first, so with -TimeoutSec 1 the probe
     REM always times out in the IPv6 phase regardless of backend health.
     REM Measured: localhost 2053ms / 127.0.0.1 16ms / [::1] refused.
-    powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:%BACKEND_PORT%/api/health' -TimeoutSec 1 -UseBasicParsing; if ($r.StatusCode -eq 200) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>nul
+    powershell -NoProfile -NonInteractive -Command "$ProgressPreference='SilentlyContinue'; try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:%BACKEND_PORT%/api/health' -TimeoutSec 1 -UseBasicParsing; if ($r.StatusCode -eq 200) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>nul
     if !errorlevel!==0 (
       set "READY=1"
       echo  OK
@@ -128,7 +134,7 @@ if exist "%DSH_DIR%\python\sdk-runtime" (
 REM --- [4/5] start frontend -----------------------------------
 echo [4/5] Starting frontend on :%FRONTEND_PORT% ...
 REM Use 127.0.0.1 for the API base: backend listens IPv4 only.
-start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && set VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT% && set VITE_DSH_URL=http://127.0.0.1:%DSH_PORT% && set VITE_DEV_PORT=%FRONTEND_PORT% && npm run dev"
+start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && set VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT% && set VITE_DSH_URL=http://127.0.0.1:%DSH_PORT% && set VITE_DEV_PORT=%FRONTEND_PORT% && npm run dev -- --host 0.0.0.0 --port %FRONTEND_PORT%"
 
 REM --- [5/5] wait for frontend --------------------------------
 echo [5/5] Waiting for frontend (max 15s)...
@@ -136,13 +142,11 @@ echo [5/5] Waiting for frontend (max 15s)...
 set "FE_READY=0"
 for /L %%i in (1,1,15) do (
   if !FE_READY!==0 (
-    REM This one MUST stay localhost. Do NOT "fix" it to 127.0.0.1 for
-    REM symmetry with [3/5] - the two sides use opposite address families
-    REM on purpose: backend uvicorn 0.0.0.0 is IPv4-only, while vite's
-    REM default host resolves localhost to ::1 and listens IPv6-only.
-    REM Measured: localhost 49ms / 127.0.0.1:3030 cannot connect.
-    REM Known limit: open the UI via localhost:3030, not 127.0.0.1:3030.
-    powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri 'http://localhost:%FRONTEND_PORT%' -TimeoutSec 1 -UseBasicParsing; if ($r.StatusCode -eq 200) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>nul
+    REM Vite is explicitly bound to 0.0.0.0 above. Probe IPv4 loopback so the
+    REM launcher also works when Windows IPv6 loopback is disabled or broken.
+    REM Keep ProgressPreference silent: Invoke-WebRequest progress is a host stream
+    REM and can leak through redirection as garbled terminal control output.
+    powershell -NoProfile -NonInteractive -Command "$ProgressPreference='SilentlyContinue'; try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:%FRONTEND_PORT%' -TimeoutSec 1 -UseBasicParsing; if ($r.StatusCode -eq 200) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>nul
     if !errorlevel!==0 (
       set "FE_READY=1"
       echo  OK
@@ -164,7 +168,7 @@ if !READY!==1 if !FE_READY!==1 (
   echo  ^|  [OK] ALL SERVICES STARTED          ^|
   echo  ^|                                     ^|
   echo  ^|  Backend:  http://localhost:%BACKEND_PORT%   ^|
-  echo  ^|  Frontend: http://localhost:%FRONTEND_PORT%   ^|
+  echo  ^|  Frontend: http://127.0.0.1:%FRONTEND_PORT%   ^|
   echo  ^|  DSH AI:   http://localhost:%DSH_PORT%   ^|
   echo  +-------------------------------------+
 ) else (
@@ -173,17 +177,37 @@ if !READY!==1 if !FE_READY!==1 (
   echo  ^|  Check minimized windows for errors.^|
   echo  ^|                                     ^|
   echo  ^|  Backend:  http://localhost:%BACKEND_PORT%   ^|
-  echo  ^|  Frontend: http://localhost:%FRONTEND_PORT%   ^|
+  echo  ^|  Frontend: http://127.0.0.1:%FRONTEND_PORT%   ^|
   echo  ^|  DSH AI:   http://localhost:%DSH_PORT%   ^|
   echo  +-------------------------------------+
 )
 echo.
 exit /b 0
 
+:kill_named_tree
+REM Elevated cmd windows prefix the visible title with "Administrator:". WINDOWTITLE
+REM filtering then misses the reload supervisor, and killing only the listening worker
+REM lets that supervisor immediately respawn stale settings. Kill the tagged cmd tree by
+REM command line first; exclude this helper PowerShell process itself.
+powershell -NoProfile -NonInteractive -Command "$tag='%~1'; Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like ('*' + $tag + '*') } | ForEach-Object { & taskkill.exe /PID $_.ProcessId /F /T | Out-Null }" >nul 2>nul
+exit /b 0
+
 :kill_port
-for /f %%P in ('powershell -NoProfile -Command "$ErrorActionPreference='SilentlyContinue'; Get-NetTCPConnection -LocalPort %~1 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { $_ }"') do (
-  taskkill /PID %%P /F >nul 2>nul
-)
+REM Kill every listener on the port AND the uvicorn --reload worker it spawned.
+REM The reload supervisor owns the listening socket and hands a duplicate handle
+REM to its multiprocessing spawn worker. If the supervisor dies first (the old
+REM taskkill here had no /T and created exactly that), the worker keeps serving
+REM OLD code and OLD .env on the same port while netstat still reports the dead
+REM supervisor PID as owner. uvicorn binds with SO_REUSEADDR, so the next backend
+REM silently shares the port with the orphan. Rules:
+REM   1. owners come from netstat: Get-NetTCPConnection collapses duplicate
+REM      binds of the same address and hides one of the two owners
+REM   2. a live owner started 2s+ after its socket was created is a reused PID,
+REM      never kill it
+REM   3. orphans are matched by their own command line:
+REM      spawn_main(parent_pid=<owner pid>, pipe_handle=...)
+REM Details: docs/runbooks/start-dev-launcher-notes.md section 6.
+powershell -NoProfile -NonInteractive -Command "$port = %~1; $ids = @(netstat -ano | Select-String -Pattern ('^\s*TCP\s+\S+:' + $port + '\s+\S+\s+LISTENING\s+(\d+)\s*$') | ForEach-Object { [int]$_.Matches[0].Groups[1].Value } | Where-Object { $_ -gt 4 } | Select-Object -Unique); if ($ids.Count -eq 0) { exit 0 }; $kill = @(); foreach ($o in $ids) { $proc = Get-Process -Id $o -ErrorAction SilentlyContinue; if (-not $proc) { continue }; $born = Get-NetTCPConnection -OwningProcess $o -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Sort-Object CreationTime | Select-Object -First 1 -ExpandProperty CreationTime; if (-not $born -or $proc.StartTime -le $born.AddSeconds(2)) { $kill += $o } }; $orphans = @(Get-CimInstance Win32_Process | Where-Object { $cl = [string]$_.CommandLine; $hit = $false; foreach ($o in $ids) { if ($cl -like ('*spawn_main(parent_pid=' + $o + ',*')) { $hit = $true } }; $hit } | Select-Object -ExpandProperty ProcessId); foreach ($p in @($kill + $orphans | Select-Object -Unique)) { & taskkill.exe /PID $p /F /T 2>$null | Out-Null }" >nul 2>nul
 exit /b 0
 
 :wait_port_free

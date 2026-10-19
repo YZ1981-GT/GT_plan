@@ -150,6 +150,8 @@ export const aiModels = {
   list: '/api/ai-models',
   detail: (id: string) => `/api/ai-models/${id}`,
   activate: (id: string) => `/api/ai-models/${id}/activate`,
+  test: (id: string) => `/api/ai-models/${id}/test`,
+  providers: '/api/ai-models/providers',
   health: '/api/ai-models/health',
   seed: '/api/ai-models/seed',
 } as const

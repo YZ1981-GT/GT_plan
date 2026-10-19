@@ -168,17 +168,11 @@ class OcrFieldsService:
                 logger.exception("Failed to update attachment status to failed")
 
     async def _perform_ocr(self, file_path: str) -> str:
-        """执行 OCR 识别，返回全文文本"""
-        try:
-            from app.services.unified_ocr_service import UnifiedOCRService
+        """执行 OCR 识别；故障上抛，由任务状态机写 failed，禁止空文本假成功。"""
+        from app.services.unified_ocr_service import UnifiedOCRService
 
-            ocr_service = UnifiedOCRService()
-            result = await ocr_service.recognize(file_path)
-            return result.get("text", "")
-        except Exception as exc:
-            logger.warning("UnifiedOCRService failed, trying stub: %s", exc)
-            # 如果 OCR 引擎不可用，返回空文本（stub 模式）
-            return ""
+        result = await UnifiedOCRService().recognize(file_path)
+        return result.get("text", "")
 
     async def _extract_fields_from_text(
         self, ocr_text: str, file_name: str

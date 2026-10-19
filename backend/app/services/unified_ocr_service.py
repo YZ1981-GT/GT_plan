@@ -36,6 +36,7 @@ class OCREngine(str, Enum):
     PADDLE = "paddle"
     TESSERACT = "tesseract"
     MINERU = "mineru"
+    LAYOUT_PARSING = "layout_parsing"
     AUTO = "auto"
 
 
@@ -82,7 +83,31 @@ class UnifiedOCRService:
         Raises:
             OCRServiceUnavailableError: OCR 服务不可达（HTTP 超时/连接错误）
         """
-        # 优先走 HTTP 远程 OCR 服务
+        # DB 中显式激活的远程 PaddleX 配置优先于 legacy OCR_SERVICE_URL。
+        # 远程配置一旦存在，连接/协议错误必须上抛，不静默改走本地引擎。
+        if mode in {OCREngine.AUTO, OCREngine.PADDLE, OCREngine.LAYOUT_PARSING}:
+            from app.services.remote_ocr_runtime import (
+                RemoteOCRRuntimeError,
+                recognize_with_active_remote_ocr,
+            )
+
+            capability = (
+                "layout_parsing"
+                if mode == OCREngine.LAYOUT_PARSING
+                else "ocr"
+            )
+            try:
+                remote_result = await recognize_with_active_remote_ocr(
+                    image_path, capability=capability
+                )
+            except RemoteOCRRuntimeError as exc:
+                raise OCRServiceUnavailableError(str(exc)) from exc
+            if remote_result is not None:
+                return remote_result
+            if mode == OCREngine.LAYOUT_PARSING:
+                raise OCRServiceUnavailableError("未配置已激活的远程版面解析模型")
+
+        # 兼容旧的固定 HTTP OCR 容器。
         if OCR_SERVICE_URL:
             try:
                 return await self._http_recognize(image_path, mode)
@@ -230,6 +255,11 @@ class UnifiedOCRService:
                 return OCREngine.PADDLE
             if mode == OCREngine.TESSERACT and self._check_tesseract_available():
                 return OCREngine.TESSERACT
+            if mode == OCREngine.MINERU and await self._check_mineru_available():
+                return OCREngine.MINERU
+            # layout_parsing 只能由上层远程 adapter 处理，不可伪降级成普通 OCR。
+            if mode == OCREngine.LAYOUT_PARSING:
+                raise RuntimeError("未配置可用的版面解析引擎")
             # Requested engine unavailable — fall through to auto logic
 
         file_name = Path(image_path).name.lower()

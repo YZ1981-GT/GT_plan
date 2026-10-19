@@ -42,6 +42,8 @@ cmd.exe 先按**父 console 当前代码页**打开并逐行解析 bat；第 3 �
    成立，应重新评估而不是删限制/删测试。
 5. `test_real_launcher_parses_clean_under_cp936` —— **端到端**：真实
    start-dev.bat（副作用打桩）在 CP936 下必须 0 残片且 6 个步骤 banner 全到。
+6. `test_dry_run_stub_neutralizes_every_side_effect_command` —— 打桩后不得残留
+   任何可执行的 powershell / taskkill / start（否则 dry-run 会真杀开发服务器）。
 
 判据 4/5 是防「grep 式假绿」的关键：不检查字符串是否存在，而是让 cmd 真的
 执行一次，用行为证明。
@@ -149,6 +151,47 @@ def _garbage_lines(text: str) -> list[str]:
     ]
 
 
+# powershell 的开关会变（2026-10-19 加了 -NonInteractive 后，旧正则
+# `powershell -NoProfile -Command ".*?"` 漏掉 3 处：两处健康探测 + :kill_named_tree，
+# dry-run 因此会真按命令行标签杀掉正在运行的开发服务器）。正则必须容忍任意开关，
+# 且打桩后要断言脚本里不剩任何可执行的 powershell / taskkill / start。
+_PS_CALL = re.compile(r'powershell\b[^"\r\n]*?\s-Command\s+".*?"', re.S)
+
+
+def _stub_side_effects(src: str) -> str:
+    stub = _PS_CALL.sub("cmd /c exit 0", src)
+    stub = re.sub(r"^\s*taskkill .*$", "rem stubbed-taskkill", stub, flags=re.M)
+    stub = re.sub(r'^start ".*$', "echo    [stub] would start service", stub, flags=re.M)
+    stub = re.sub(r"^timeout .*$", "rem stubbed-timeout", stub, flags=re.M)
+    return stub
+
+
+def _live_side_effect_lines(stub: str) -> list[str]:
+    live = []
+    for line in stub.split("\n"):
+        s = line.strip()
+        if not s or s.upper().startswith("REM"):
+            continue
+        low = s.lower()
+        if "powershell" in low or "taskkill" in low or low.startswith('start "'):
+            live.append(s[:160])
+    return live
+
+
+def test_dry_run_stub_neutralizes_every_side_effect_command() -> None:
+    """跨平台静态判据：真实脚本打桩后 0 条可执行副作用；探测器自身配变异证明。"""
+    src = BAT.read_bytes().decode("ascii")
+    assert not _live_side_effect_lines(_stub_side_effects(src))
+
+    # 变异：任意开关组合的 powershell 调用都必须被识别为「活的」，且能被打桩消掉。
+    sample = (
+        'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "kill"\r\n'
+        "  taskkill /PID 1 /F\r\n"
+    )
+    assert len(_live_side_effect_lines(sample)) == 2
+    assert not _live_side_effect_lines(_stub_side_effects(sample))
+
+
 def test_referenced_notes_doc_exists() -> None:
     """bat 头部引用的中文说明文档必须真实存在（防死链）。
 
@@ -239,13 +282,15 @@ def test_real_launcher_parses_clean_under_cp936(tmp_path: Path) -> None:
     """
     src = BAT.read_bytes().decode("ascii")
 
-    stub = re.sub(r'powershell -NoProfile -Command ".*?"', "cmd /c exit 0", src, flags=re.S)
-    stub = re.sub(r"^\s*taskkill .*$", "rem stubbed-taskkill", stub, flags=re.M)
-    stub = re.sub(r'^start ".*$', "echo    [stub] would start service", stub, flags=re.M)
-    stub = re.sub(r"^timeout .*$", "rem stubbed-timeout", stub, flags=re.M)
+    stub = _stub_side_effects(src)
 
     assert "cmd /c exit 0" in stub, "打桩失败：未替换任何 powershell 探测调用"
     assert "[stub] would start service" in stub, "打桩失败：未替换 start 调用"
+    live = _live_side_effect_lines(stub)
+    assert not live, (
+        "dry-run 打桩后仍有会真执行的副作用命令（会真杀开发服务器 / 真发探测）：\n"
+        + textwrap.indent("\n".join(live), "    ")
+    )
 
     # 桩必须落在仓库根目录：bat 里 %~dp0 派生 BACKEND_DIR/FRONTEND_DIR，
     # 放到 tmp_path 会让前置检查 `if not exist %BACKEND_DIR%\app\main.py`

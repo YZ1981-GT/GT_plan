@@ -27,8 +27,8 @@
  * 🔴 CI 必须用 `--from-baseline`：PR checkout 后工作树干净，「git 改动」模式会
  * 报「无待扫文件」直接退出 0 —— 那是空转假绿。
  *
- * 需要 dev server 已在跑。**Vite 只监听 IPv6**，故用 localhost 而非 127.0.0.1
- * （实测 `127.0.0.1:3030` 会「连接被拒绝」，极易误判成服务没起）。
+ * 需要 dev server 已在跑。Vite 显式监听 `0.0.0.0`，本脚本统一使用
+ * `127.0.0.1`，避免 Windows IPv6 loopback 异常导致“端口 LISTENING 但连接被拒绝”。
  *
  * 退出码：0 全通过 / 1 有编译失败 / 2 dev server 不可达（无法判定）
  */
@@ -130,7 +130,7 @@ async function main() {
   const args = process.argv.slice(2)
   const portIdx = args.indexOf('--port')
   const port = portIdx >= 0 ? args[portIdx + 1] : '3030'
-  const base = `http://localhost:${port}/src/`
+  const base = `http://127.0.0.1:${port}/src/`
   const root = findRoot()
 
   const targets = collectTargets(args, root)
@@ -156,17 +156,17 @@ async function main() {
 
   // dev server 存活检查 —— 否则「全部失败」会被误读成「代码全崩」
   try {
-    const probe = await fetch(`http://localhost:${port}/`, { signal: AbortSignal.timeout(8000) })
+    const probe = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(8000) })
     if (!probe.ok) throw new Error(`HTTP ${probe.status}`)
   } catch (e) {
     console.error(
-      `🔴 dev server 不可达（localhost:${port}）：${e.message}\n` +
-        '   本脚本需要 dev server 在跑。注意 Vite **只监听 IPv6**，须用 localhost 而非 127.0.0.1。',
+      `🔴 dev server 不可达（127.0.0.1:${port}）：${e.message}\n` +
+        '   请确认 Vite 已按 vite.config.ts 监听 0.0.0.0。',
     )
     return 2
   }
 
-  console.log(`扫描 ${targets.length} 个文件的 Vite transform（localhost:${port}）...\n`)
+  console.log(`扫描 ${targets.length} 个文件的 Vite transform（127.0.0.1:${port}）...\n`)
 
   const bad = []
   for (const rel of targets) {

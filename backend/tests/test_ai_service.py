@@ -35,119 +35,128 @@ def _mock_execute_result(scalar_value=None):
     return result
 
 
+def _runtime_config(
+    *,
+    provider=AIProvider.ollama,
+    model_name="llama3.1",
+    model_type=AIModelType.chat,
+    source="database",
+):
+    from app.services.llm_provider_registry import provider_profile
+    from app.services.llm_runtime import ResolvedLLMConfig
+
+    endpoint = provider_profile(provider).default_endpoint or "https://example.openai.azure.com/openai/v1"
+    return ResolvedLLMConfig(
+        model_name=model_name,
+        model_type=model_type,
+        provider=provider,
+        endpoint_url=endpoint,
+        api_key=None,
+        profile=provider_profile(provider),
+        source=source,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Test AIService.health_check()  — Requirement 1.1
 # ---------------------------------------------------------------------------
 
 class TestAIServiceHealthCheck:
-    """health_check returns 'healthy' / 'degraded' based on engine status."""
+    """health_check 只探测当前生效的 chat/embedding runtime。"""
+
+    @staticmethod
+    def _chroma(status=503):
+        response = MagicMock(status_code=status)
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=False)
+        client.get = AsyncMock(return_value=response)
+        return client
 
     @pytest.mark.asyncio
     async def test_health_check_healthy(self):
-        """health_check returns healthy + up when Ollama /api/tags returns 200."""
-        mock_model = _mock_model(model_name="llama3.1")
-        mock_db = MagicMock()
-        mock_db.execute = AsyncMock(
-            return_value=_mock_execute_result(scalar_value=mock_model)
-        )
+        async def resolve(_db, model_type):
+            if model_type == AIModelType.chat:
+                return _runtime_config()
+            return _runtime_config(
+                provider=AIProvider.openai_compatible,
+                model_name="BAAI/bge-m3",
+                model_type=AIModelType.embedding,
+            )
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"models": [{"name": "llama3.1"}]}
-
-        mock_client_instance = MagicMock()
-        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock()
-        mock_client_instance.get = AsyncMock(return_value=mock_response)
-
-        service = AIService(mock_db)
+        service = AIService(MagicMock())
         with patch(
-            "app.services.ai_service._get_ollama_client",
-            return_value=mock_client_instance,
+            "app.services.ai_service.resolve_runtime_config",
+            side_effect=resolve,
         ), patch(
-            "app.services.ai_service._get_llm_client",
-            side_effect=Exception("vllm down"),
-        ):
+            "app.services.ai_service.probe_runtime_config",
+            new=AsyncMock(return_value=True),
+        ), patch(
+            "app.services.ai_service._get_chromadb_client",
+            new=AsyncMock(return_value=self._chroma()),
+        ), patch("app.services.ai_service.paddleocr", None):
             result = await service.health_check()
 
-        # Return dict keys confirmed from ai_service.py: health_check()
+        assert result["llm_status"] == "healthy"
         assert result["ollama_status"] == "healthy"
         assert result["active_chat_model"] == "llama3.1"
+        assert "api_key" not in str(result)
 
     @pytest.mark.asyncio
     async def test_health_check_degraded_ollama_down(self):
-        """health_check returns unavailable when Ollama returns non-200."""
-        mock_db = MagicMock()
-        mock_db.execute = AsyncMock(
-            return_value=_mock_execute_result(scalar_value=None)
-        )
-
-        mock_response = MagicMock()
-        mock_response.status_code = 503
-
-        mock_client_instance = MagicMock()
-        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock()
-        mock_client_instance.get = AsyncMock(return_value=mock_response)
-
-        service = AIService(mock_db)
+        service = AIService(MagicMock())
         with patch(
-            "app.services.ai_service._get_ollama_client",
-            return_value=mock_client_instance,
-        ):
+            "app.services.ai_service.resolve_runtime_config",
+            new=AsyncMock(return_value=_runtime_config()),
+        ), patch(
+            "app.services.ai_service.probe_runtime_config",
+            new=AsyncMock(return_value=False),
+        ), patch(
+            "app.services.ai_service._get_chromadb_client",
+            new=AsyncMock(return_value=self._chroma()),
+        ), patch("app.services.ai_service.paddleocr", None):
             result = await service.health_check()
-
-        # Code sets "unavailable" when Ollama is unreachable or returns non-200
+        assert result["llm_status"] == "unavailable"
         assert result["ollama_status"] == "unavailable"
 
     @pytest.mark.asyncio
     async def test_health_check_degraded_connection_error(self):
-        """health_check degrades when Ollama is unreachable."""
-        mock_db = MagicMock()
-        mock_db.execute = AsyncMock(
-            return_value=_mock_execute_result(scalar_value=None)
-        )
-
-        service = AIService(mock_db)
+        service = AIService(MagicMock())
         with patch(
-            "app.services.ai_service._get_ollama_client",
-            side_effect=Exception("connection refused"),
-        ):
+            "app.services.ai_service.resolve_runtime_config",
+            new=AsyncMock(return_value=_runtime_config()),
+        ), patch(
+            "app.services.ai_service.probe_runtime_config",
+            new=AsyncMock(side_effect=RuntimeError("connection refused")),
+        ), patch(
+            "app.services.ai_service._get_chromadb_client",
+            new=AsyncMock(return_value=self._chroma()),
+        ), patch("app.services.ai_service.paddleocr", None):
             result = await service.health_check()
-
-        assert result["ollama_status"] == "unavailable"
+        assert result["llm_status"] == "unavailable"
 
     @pytest.mark.asyncio
     async def test_health_check_healthy_fallback_model(self):
-        """health_check falls back to first installed model when no active model set."""
-        mock_db = MagicMock()
-        mock_db.execute = AsyncMock(
-            return_value=_mock_execute_result(scalar_value=None)
+        fallback = _runtime_config(
+            provider=AIProvider.openai_compatible,
+            model_name="Qwen3.5-27B",
+            source="environment",
         )
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"models": [{"name": "qwen2.5:7b"}]}
-
-        mock_client_instance = MagicMock()
-        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock()
-        mock_client_instance.get = AsyncMock(return_value=mock_response)
-
-        service = AIService(mock_db)
+        service = AIService(MagicMock())
         with patch(
-            "app.services.ai_service._get_ollama_client",
-            return_value=mock_client_instance,
+            "app.services.ai_service.resolve_runtime_config",
+            new=AsyncMock(return_value=fallback),
         ), patch(
-            "app.services.ai_service.settings"
-        ) as mock_settings:
-            mock_settings.DEFAULT_CHAT_MODEL = "qwen2.5:7b"
-            mock_settings.OLLAMA_BASE_URL = "http://localhost:11434"
-            mock_settings.LLM_BASE_URL = "http://localhost:11434/v1"
+            "app.services.ai_service.probe_runtime_config",
+            new=AsyncMock(return_value=True),
+        ), patch(
+            "app.services.ai_service._get_chromadb_client",
+            new=AsyncMock(return_value=self._chroma()),
+        ), patch("app.services.ai_service.paddleocr", None):
             result = await service.health_check()
-
-        assert result["ollama_status"] == "healthy"
-        assert result["active_chat_model"] == "qwen2.5:7b"
+        assert result["vllm_status"] == "healthy"
+        assert result["ollama_status"] == "unavailable"
+        assert result["chat_config"]["source"] == "environment"
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +204,7 @@ class TestAIServiceSwitchModel:
 
     @pytest.mark.asyncio
     async def test_switch_model_success(self):
-        """switch_model returns True and commits when validation passes."""
+        """switch_model returns True and flushes; router owns commit."""
         mock_model = _mock_model(model_name="llama3")
 
         # 1st call: SELECT target model; 2nd call: UPDATE other models
@@ -212,11 +221,12 @@ class TestAIServiceSwitchModel:
             AIService, "_validate_model", new_callable=AsyncMock
         ) as mock_validate:
             mock_validate.return_value = True
-            result = await service.switch_model(AIModelType.chat, "llama3")
+            result = await service.switch_model("llama3", AIModelType.chat)
 
         # switch_model returns True on success (confirmed from code)
         assert result is True
-        mock_db.commit.assert_awaited()
+        mock_db.flush.assert_awaited()
+        mock_db.commit.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_switch_model_not_found(self):
@@ -228,7 +238,7 @@ class TestAIServiceSwitchModel:
 
         service = AIService(mock_db)
         with pytest.raises(ModelNotFoundError):
-            await service.switch_model(AIModelType.chat, "nonexistent")
+            await service.switch_model("nonexistent", AIModelType.chat)
 
     @pytest.mark.asyncio
     async def test_switch_model_validation_fails(self):
@@ -245,7 +255,7 @@ class TestAIServiceSwitchModel:
             AIService, "_validate_model", new_callable=AsyncMock
         ) as mock_validate:
             mock_validate.return_value = False
-            result = await service.switch_model(AIModelType.chat, "broken-model")
+            result = await service.switch_model("broken-model", AIModelType.chat)
 
         assert result is False
 

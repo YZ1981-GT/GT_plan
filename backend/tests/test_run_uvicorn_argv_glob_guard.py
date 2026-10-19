@@ -53,7 +53,8 @@ import pytest
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 RUN_UVICORN = BACKEND_DIR / "run_uvicorn.py"
 
-EXTRA_ARGS_MARKER = "Got unexpected extra arguments"
+# click 只多 1 个参数时报单数 "argument"、多个时报 "arguments"；取公共前缀两种都认。
+EXTRA_ARGS_MARKER = "Got unexpected extra argument"
 
 # 与 start-dev.bat 同形的参数（app 换成不存在的模块；不带 --reload / --help，理由见模块 docstring）
 LAUNCH_ARGS = (
@@ -111,10 +112,12 @@ def test_main_called_with_expand_disabled() -> None:
 @pytest.mark.skipif(sys.platform != "win32", reason="click 的 argv glob 展开仅在 Windows 生效")
 def test_argv_glob_not_expanded(tmp_path: Path) -> None:
     """行为判据：真跑一次，`--reload-exclude tmp_*` 不得被展开成文件列表。"""
-    # 必须存在至少一个能被 tmp_* 命中的文件，否则展开无匹配 ⇒ 本测试恒绿（空转）
-    probe = BACKEND_DIR / "tmp_argv_glob_guard_probe.txt"
-    created = not probe.exists()
-    if created:
+    # 必须至少有 2 个能被 tmp_* 命中的文件：0 个时展开无匹配、1 个时展开后仍是单个值，
+    # 两种情况都不会报 extra arguments ⇒ 去掉修法本测试也恒绿（空转）。
+    probes = [BACKEND_DIR / "tmp_argv_glob_guard_probe.txt",
+              BACKEND_DIR / "tmp_argv_glob_guard_probe2.txt"]
+    created = [p for p in probes if not p.exists()]
+    for probe in created:
         probe.write_text("guard probe\n", encoding="utf-8")
 
     env = dict(os.environ)
@@ -123,7 +126,7 @@ def test_argv_glob_not_expanded(tmp_path: Path) -> None:
 
     try:
         matches = sorted(p.name for p in BACKEND_DIR.glob("tmp_*"))
-        assert matches, "backend/ 下没有 tmp_* 文件，本测试会空转"
+        assert len(matches) >= 2, "backend/ 下 tmp_* 不足 2 个，本测试会空转"
 
         proc = subprocess.run(
             [sys.executable, "run_uvicorn.py", *LAUNCH_ARGS],
@@ -131,7 +134,7 @@ def test_argv_glob_not_expanded(tmp_path: Path) -> None:
             encoding="utf-8", errors="replace", timeout=180,
         )
     finally:
-        if created:
+        for probe in created:
             probe.unlink(missing_ok=True)
 
     out = (proc.stdout or "") + (proc.stderr or "")
@@ -183,9 +186,12 @@ def test_click_would_expand_without_the_flag(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    probe = BACKEND_DIR / "tmp_argv_glob_guard_probe.txt"
-    created = not probe.exists()
-    if created:
+    # 必须让 `tmp_*` 至少命中 2 个文件：只命中 1 个时 click 展开后仍是单个值，
+    # 不会报 extra arguments（2026-10-19 backend/ 下 tmp_* 已清空，本自检因此误红）。
+    probes = [BACKEND_DIR / "tmp_argv_glob_guard_probe.txt",
+              BACKEND_DIR / "tmp_argv_glob_guard_probe2.txt"]
+    created = [p for p in probes if not p.exists()]
+    for probe in created:
         probe.write_text("guard probe\n", encoding="utf-8")
 
     env = dict(os.environ)
@@ -203,7 +209,7 @@ def test_click_would_expand_without_the_flag(tmp_path: Path) -> None:
         on = _run("on")     # 展开开启（click 默认）
         off = _run("off")   # 展开关闭（本仓库修法）
     finally:
-        if created:
+        for probe in created:
             probe.unlink(missing_ok=True)
 
     assert EXTRA_ARGS_MARKER in on, (

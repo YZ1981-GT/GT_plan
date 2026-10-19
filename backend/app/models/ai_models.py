@@ -46,10 +46,24 @@ class AIModelType(str, enum.Enum):
 
 
 class AIProvider(str, enum.Enum):
-    """AI模型供应商"""
+    """AI模型供应商
+
+    V192 扩展：新增外部 LLM 提供商。所有新增供应商均走 OpenAI 兼容协议，
+    区分枚举值是为了前端展示和默认 endpoint 推导。
+    """
     ollama = "ollama"
     openai_compatible = "openai_compatible"
     paddleocr = "paddleocr"
+    # V192 新增
+    deepseek = "deepseek"
+    zhipu = "zhipu"
+    qwen = "qwen"
+    azure_openai = "azure_openai"
+    custom = "custom"
+
+
+# 推理强度 / OCR 能力槽 / OCR 协议 / 认证方式的取值域见 app.models.ai_model_options
+# （这些列是 VARCHAR + CHECK 约束，不建 PG 枚举）。
 
 
 class DocumentType(str, enum.Enum):
@@ -227,6 +241,7 @@ class AIModelConfig(Base, SoftDeleteMixin):
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    preset_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     model_name: Mapped[str] = mapped_column(String(100), nullable=False)
     model_type: Mapped[AIModelType] = mapped_column(
         sa.Enum(AIModelType, name="ai_model_type_enum", create_type=False),
@@ -237,6 +252,21 @@ class AIModelConfig(Base, SoftDeleteMixin):
         nullable=False,
     )
     endpoint_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    api_key_ciphertext: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="v1: 前缀的 Fernet 密文；禁止存储明文 API Key",
+    )
+    api_key_updated_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    reasoning_effort: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    api_path: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    ocr_capability: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    ocr_protocol: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    auth_scheme: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    auth_header_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    request_timeout_seconds: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -249,9 +279,40 @@ class AIModelConfig(Base, SoftDeleteMixin):
 
     __table_args__ = (
         Index(
+            "uq_ai_model_config_preset_key",
+            "preset_key",
+            unique=True,
+            postgresql_where=text("preset_key IS NOT NULL AND is_deleted = false"),
+            sqlite_where=text("preset_key IS NOT NULL AND is_deleted = 0"),
+        ),
+        Index(
             "ix_ai_model_config_name_type",
             "model_name", "model_type",
             unique=True,
+            postgresql_where=text("is_deleted = false"),
+            sqlite_where=text("is_deleted = 0"),
+        ),
+        Index(
+            "uq_ai_model_config_active_non_ocr",
+            "model_type",
+            unique=True,
+            postgresql_where=text(
+                "is_active = true AND is_deleted = false AND model_type <> 'ocr'"
+            ),
+            sqlite_where=text(
+                "is_active = 1 AND is_deleted = 0 AND model_type <> 'ocr'"
+            ),
+        ),
+        Index(
+            "uq_ai_model_config_active_ocr_capability",
+            "ocr_capability",
+            unique=True,
+            postgresql_where=text(
+                "is_active = true AND is_deleted = false AND model_type = 'ocr'"
+            ),
+            sqlite_where=text(
+                "is_active = 1 AND is_deleted = 0 AND model_type = 'ocr'"
+            ),
         ),
     )
 

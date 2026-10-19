@@ -12,8 +12,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
-import logging
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, AsyncGenerator
 from uuid import UUID
@@ -30,6 +29,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models import AIModelConfig, AIModelType, AIProvider
+from app.services.llm_runtime import (
+    LLMRuntimeError,
+    chat_stream as runtime_chat_stream,
+    chat_sync as runtime_chat_sync,
+    embedding as runtime_embedding,
+    merge_system_messages,
+    probe_runtime_config,
+    resolve_config_from_model,
+    resolve_runtime_config,
+    test_runtime_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +84,14 @@ class ModelValidationError(Exception):
     pass
 
 
+@dataclass(frozen=True)
+class ModelValidationFailure:
+    """最近一次模型验证失败的稳定 code 与可展示原因（不含上游正文或密钥）。"""
+
+    code: str
+    message: str
+
+
 # ============================================================================
 # 辅助函数
 # ============================================================================
@@ -90,7 +108,11 @@ async def _get_ollama_client() -> httpx.AsyncClient:
 
 
 async def _get_llm_client() -> httpx.AsyncClient:
-    """获取 LLM HTTP 客户端（默认 vLLM OpenAI 兼容 API）"""
+    """获取 LLM HTTP 客户端（默认 vLLM OpenAI 兼容 API）。
+
+    此函数是无 DB 上下文的兜底路径，从全局 settings 读配置。
+    有 DB session 的场景应优先用 build_client_for_model(active_model)。
+    """
     return httpx.AsyncClient(
         base_url=settings.LLM_BASE_URL,
         headers={"Authorization": f"Bearer {settings.LLM_API_KEY}"},
@@ -112,25 +134,8 @@ async def _get_embedding_client() -> httpx.AsyncClient:
 
 
 def _merge_system_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
-    """合并多条 system 消息为一条（vLLM + Qwen3.5 仅允许开头一条 system）。
-
-    规则：将所有 role=system 的消息内容用换行合并，放在最前面；
-    其余消息保持原序。
-    """
-    system_parts: list[str] = []
-    other_msgs: list[dict[str, str]] = []
-    for msg in messages:
-        if msg.get("role") == "system":
-            content = msg.get("content", "")
-            if content:
-                system_parts.append(content)
-        else:
-            other_msgs.append(msg)
-    result: list[dict[str, str]] = []
-    if system_parts:
-        result.append({"role": "system", "content": "\n\n".join(system_parts)})
-    result.extend(other_msgs)
-    return result
+    """向后兼容旧测试/调用方；实现委派给统一 runtime。"""
+    return merge_system_messages(messages)
 
 
 async def _get_chromadb_client() -> httpx.AsyncClient:
@@ -153,20 +158,28 @@ class AIService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+        # switch_model 保持 bool 契约；失败原因留在这里供 router 返回给用户。
+        self.last_validation_error: ModelValidationFailure | None = None
 
     # -------------------------------------------------------------------------
     # 模型管理
     # -------------------------------------------------------------------------
 
-    async def get_active_model(self, model_type: AIModelType) -> AIModelConfig | None:
-        """获取当前激活的模型配置"""
-        result = await self.db.execute(
-            select(AIModelConfig).where(
-                AIModelConfig.model_type == model_type,
-                AIModelConfig.is_active == True,  # noqa: E712
-                AIModelConfig.is_deleted == False,  # noqa: E712
-            )
-        )
+    async def get_active_model(
+        self,
+        model_type: AIModelType,
+        *,
+        ocr_capability: str | None = None,
+    ) -> AIModelConfig | None:
+        """获取 active model；OCR 可按 capability 独立查询。"""
+        conditions = [
+            AIModelConfig.model_type == model_type,
+            AIModelConfig.is_active.is_(True),
+            AIModelConfig.is_deleted.is_(False),
+        ]
+        if model_type == AIModelType.ocr and ocr_capability:
+            conditions.append(AIModelConfig.ocr_capability == ocr_capability)
+        result = await self.db.execute(select(AIModelConfig).where(*conditions))
         return result.scalar_one_or_none()
 
     async def get_all_models(self) -> list[AIModelConfig]:
@@ -183,95 +196,95 @@ class AIService:
         model_name: str,
         model_type: AIModelType,
     ) -> bool:
-        """
-        切换模型，含可用性验证（10秒超时）
-        返回 True 表示切换成功，False 表示验证失败
-        """
-        # 查找目标模型
+        """验证并切换 active model；只 flush，由 router 统一 commit。"""
         result = await self.db.execute(
             select(AIModelConfig).where(
                 AIModelConfig.model_name == model_name,
                 AIModelConfig.model_type == model_type,
-                AIModelConfig.is_deleted == False,  # noqa: E712
+                AIModelConfig.is_deleted.is_(False),
             )
         )
         model = result.scalar_one_or_none()
         if not model:
             raise ModelNotFoundError(f"Model not found: {model_name} ({model_type})")
-
-        # 可用性验证
-        validation_passed = await self._validate_model(model)
-        if not validation_passed:
+        if not await self._validate_model(model):
             return False
 
-        # 禁用同类型的其他模型
+        deactivate_conditions = [
+            AIModelConfig.model_type == model_type,
+            AIModelConfig.is_deleted.is_(False),
+        ]
+        if model_type == AIModelType.ocr:
+            if not model.ocr_capability:
+                raise ModelValidationError("OCR 模型缺少 capability")
+            deactivate_conditions.append(
+                AIModelConfig.ocr_capability == model.ocr_capability
+            )
         await self.db.execute(
             update(AIModelConfig)
-            .where(
-                AIModelConfig.model_type == model_type,
-                AIModelConfig.is_deleted == False,  # noqa: E712
-            )
+            .where(*deactivate_conditions)
             .values(is_active=False)
         )
-
-        # 激活目标模型
         model.is_active = True
-        await self.db.commit()
+        await self.db.flush()
         return True
 
     async def _validate_model(self, model: AIModelConfig) -> bool:
-        """验证模型可用性（10秒超时）"""
+        """通过生产同一 runtime 验证模型；不复制 provider 分支。
+
+        失败原因写入 ``self.last_validation_error``：只返回 False 会让激活接口只能报
+        笼统的「检查端点、模型名和凭证」，网络/代理问题被误读成 Key 错误（2026-10-19）。
+        """
+        self.last_validation_error = None
         if model.provider == AIProvider.paddleocr:
-            # PaddleOCR 验证：尝试初始化
+            if model.ocr_protocol == "paddlex_json":
+                try:
+                    from app.services.remote_ocr_runtime import test_remote_ocr_model
+
+                    await test_remote_ocr_model(model)
+                    return True
+                except Exception as exc:
+                    self._record_validation_failure(exc, "ocr_validation_failed")
+                    logger.warning(
+                        "Remote PaddleOCR validation failed model=%s code=%s",
+                        model.model_name,
+                        self.last_validation_error.code,
+                    )
+                    return False
             try:
                 _get_paddle_ocr()
                 return True
-            except Exception as e:
-                logger.warning(f"PaddleOCR validation failed: {e}")
+            except Exception as exc:
+                self.last_validation_error = ModelValidationFailure(
+                    "engine_unavailable", "本地 PaddleOCR 引擎不可用（未安装或初始化失败）"
+                )
+                logger.warning("PaddleOCR validation failed: %s", type(exc).__name__)
                 return False
+        try:
+            config = resolve_config_from_model(model)
+            await test_runtime_config(config)
+            return True
+        except (LLMRuntimeError, ValueError) as exc:
+            self._record_validation_failure(exc, "invalid_model_config")
+            logger.warning(
+                "AI model validation failed provider=%s model=%s code=%s",
+                model.provider.value,
+                model.model_name,
+                self.last_validation_error.code,
+            )
+            return False
 
-        elif model.provider == AIProvider.ollama:
-            # Ollama 验证：发送测试请求
-            try:
-                async with await _get_ollama_client() as client:
-                    response = await asyncio.wait_for(
-                        client.post(
-                            "/api/generate",
-                            json={
-                                "model": model.model_name,
-                                "prompt": "hello",
-                                "stream": False,
-                            },
-                        ),
-                        timeout=10.0,
-                    )
-                    return response.status_code == 200
-            except (asyncio.TimeoutError, httpx.HTTPError) as e:
-                logger.warning(f"Ollama model validation failed for {model.model_name}: {e}")
-                return False
-
-        elif model.provider == AIProvider.openai_compatible:
-            # OpenAI 兼容验证（vLLM 等）
-            try:
-                async with await _get_llm_client() as client:
-                    response = await asyncio.wait_for(
-                        client.post(
-                            "/chat/completions",
-                            json={
-                                "model": model.model_name,
-                                "messages": [{"role": "user", "content": "hi"}],
-                                "max_tokens": 5,
-                                "chat_template_kwargs": {"enable_thinking": False},
-                            },
-                        ),
-                        timeout=30.0,
-                    )
-                    return response.status_code == 200
-            except (asyncio.TimeoutError, httpx.HTTPError) as e:
-                logger.warning(f"OpenAI-compatible model validation failed: {e}")
-                return False
-
-        return False
+    def _record_validation_failure(self, exc: Exception, fallback_code: str) -> None:
+        # runtime 异常的 message 已保证不含上游正文与密钥；其他异常只暴露类型。
+        code = getattr(exc, "code", None)
+        if isinstance(code, str) and code:
+            self.last_validation_error = ModelValidationFailure(code, str(exc))
+        elif isinstance(exc, ValueError):
+            self.last_validation_error = ModelValidationFailure(fallback_code, str(exc))
+        else:
+            self.last_validation_error = ModelValidationFailure(
+                fallback_code, f"验证过程出错（{type(exc).__name__}）"
+            )
 
     # -------------------------------------------------------------------------
     # LLM 对话
@@ -285,105 +298,51 @@ class AIService:
         temperature: float = 0.3,
         max_tokens: int | None = None,
     ) -> str | AsyncGenerator[str, None]:
-        """
-        LLM对话，支持同步和SSE流式输出
-
-        Args:
-            messages: 对话消息列表 [{"role": "user", "content": "..."}]
-            model: 模型名称，默认使用激活的 chat 模型
-            stream: 是否流式输出
-            temperature: 温度参数
-            max_tokens: 最大token数
-
-        Returns:
-            同步模式：完整响应字符串
-            流式模式：AsyncGenerator，逐字产出
-        """
-        # 获取模型
-        if model is None:
-            active_model = await self.get_active_model(AIModelType.chat)
-            if active_model:
-                model = active_model.model_name
-            else:
-                model = settings.DEFAULT_CHAT_MODEL
-
+        """使用 DB active model（无记录时 env fallback）完成对话。"""
         if stream:
             return self._chat_stream(model, messages, temperature, max_tokens)
-        else:
-            return await self._chat_sync(model, messages, temperature, max_tokens)
+        return await self._chat_sync(model, messages, temperature, max_tokens)
 
     async def _chat_sync(
         self,
-        model: str,
+        model: str | None,
         messages: list[dict[str, str]],
         temperature: float,
         max_tokens: int | None,
     ) -> str:
-        """同步对话（OpenAI 兼容 API，默认 vLLM）"""
-        async with await _get_llm_client() as client:
-            payload: dict[str, Any] = {
-                "model": model,
-                "messages": _merge_system_messages(messages),
-                "temperature": temperature,
-                "max_tokens": max_tokens or settings.LLM_MAX_TOKENS,
-                "stream": False,
-            }
-            # Qwen3.5 thinking 模式控制
-            if not settings.LLM_ENABLE_THINKING:
-                payload["chat_template_kwargs"] = {"enable_thinking": False}
-
-            response = await client.post("/chat/completions", json=payload)
-            if response.status_code != 200:
-                raise AIServiceUnavailableError(
-                    f"LLM returned {response.status_code}: {response.text[:200]}"
-                )
-
-            data = response.json()
-            msg = data.get("choices", [{}])[0].get("message", {})
-            # Qwen3.5 thinking 模式下 content 可能为 None，实际内容在 reasoning_content
-            content = msg.get("content") or msg.get("reasoning_content", "")
-            return content
+        try:
+            config = await resolve_runtime_config(
+                self.db, AIModelType.chat, requested_model=model
+            )
+            return await runtime_chat_sync(
+                config,
+                messages,
+                temperature=temperature,
+                max_tokens=max_tokens or settings.LLM_MAX_TOKENS,
+            )
+        except LLMRuntimeError as exc:
+            raise AIServiceUnavailableError(str(exc)) from exc
 
     async def _chat_stream(
         self,
-        model: str,
+        model: str | None,
         messages: list[dict[str, str]],
         temperature: float,
         max_tokens: int | None,
     ) -> AsyncGenerator[str, None]:
-        """流式对话（OpenAI 兼容 SSE，默认 vLLM）"""
-        async with await _get_llm_client() as client:
-            payload: dict[str, Any] = {
-                "model": model,
-                "messages": _merge_system_messages(messages),
-                "temperature": temperature,
-                "max_tokens": max_tokens or settings.LLM_MAX_TOKENS,
-                "stream": True,
-            }
-            if not settings.LLM_ENABLE_THINKING:
-                payload["chat_template_kwargs"] = {"enable_thinking": False}
-
-            async with client.stream("POST", "/chat/completions", json=payload) as response:
-                if response.status_code != 200:
-                    raise AIServiceUnavailableError(
-                        f"LLM returned {response.status_code}"
-                    )
-
-                async for line in response.aiter_lines():
-                    line = line.strip()
-                    if not line or not line.startswith("data: "):
-                        continue
-                    data_str = line[6:]  # 去掉 "data: " 前缀
-                    if data_str == "[DONE]":
-                        break
-                    try:
-                        data = json.loads(data_str)
-                        delta = data.get("choices", [{}])[0].get("delta", {})
-                        content = delta.get("content", "")
-                        if content:
-                            yield content
-                    except json.JSONDecodeError:
-                        continue
+        try:
+            config = await resolve_runtime_config(
+                self.db, AIModelType.chat, requested_model=model
+            )
+            async for chunk in runtime_chat_stream(
+                config,
+                messages,
+                temperature=temperature,
+                max_tokens=max_tokens or settings.LLM_MAX_TOKENS,
+            ):
+                yield chunk
+        except LLMRuntimeError as exc:
+            raise AIServiceUnavailableError(str(exc)) from exc
 
     # -------------------------------------------------------------------------
     # Embedding 向量化
@@ -394,42 +353,14 @@ class AIService:
         text: str,
         model: str | None = None,
     ) -> list[float]:
-        """
-        文本向量化（OpenAI 兼容 API）
-
-        Args:
-            text: 待向量化的文本
-            model: embedding模型名称，默认使用激活的 embedding 模型
-
-        Returns:
-            嵌入向量列表
-        """
-        if model is None:
-            active_model = await self.get_active_model(AIModelType.embedding)
-            if active_model:
-                model = active_model.model_name
-            else:
-                model = settings.DEFAULT_EMBEDDING_MODEL
-
-        async with await _get_embedding_client() as client:
-            response = await client.post(
-                "/embeddings",
-                json={
-                    "model": model,
-                    "input": text,
-                },
+        """使用 active embedding model 生成向量。"""
+        try:
+            config = await resolve_runtime_config(
+                self.db, AIModelType.embedding, requested_model=model
             )
-            if response.status_code != 200:
-                raise AIServiceUnavailableError(
-                    f"Embedding returned {response.status_code}: {response.text[:200]}"
-                )
-
-            data = response.json()
-            # OpenAI 格式：data[0].embedding
-            embeddings = data.get("data", [])
-            if embeddings:
-                return embeddings[0].get("embedding", [])
-            return []
+            return await runtime_embedding(config, text)
+        except LLMRuntimeError as exc:
+            raise AIServiceUnavailableError(str(exc)) from exc
 
     # -------------------------------------------------------------------------
     # OCR 识别
@@ -482,35 +413,30 @@ class AIService:
     # -------------------------------------------------------------------------
 
     async def health_check(self) -> dict[str, Any]:
-        """检查所有AI引擎健康状态（探针并行，避免串行拖到 3s+）"""
-        vllm_status = "unavailable"
-        ollama_status = "unavailable"
-        paddleocr_status = "unavailable"
-        chromadb_status = "unavailable"
-        active_chat_model = None
-        active_embedding_model = None
+        """按当前 active chat/embedding 配置检查健康状态，不泄漏凭证。"""
 
-        async def _probe_vllm() -> tuple[str, str | None]:
+        async def _resolve_model(model_type: AIModelType):
             try:
-                async with await _get_llm_client() as client:
-                    response = await asyncio.wait_for(client.get("/models"), timeout=2.0)
-                    if response.status_code == 200:
-                        models = response.json().get("data", [])
-                        mid = models[0].get("id", settings.DEFAULT_CHAT_MODEL) if models else None
-                        return "healthy", mid
-            except Exception as e:
-                logger.debug(f"vLLM health check failed: {e}")
-            return "unavailable", None
+                return await resolve_runtime_config(self.db, model_type)
+            except Exception as exc:
+                logger.debug(
+                    "%s runtime config failed: %s",
+                    model_type.value,
+                    type(exc).__name__,
+                )
+                return None
 
-        async def _probe_ollama() -> str:
+        async def _probe_model(config):
+            if config is None:
+                return "unavailable", None
             try:
-                async with await _get_ollama_client() as client:
-                    response = await asyncio.wait_for(client.get("/api/tags"), timeout=1.0)
-                    if response.status_code == 200:
-                        return "healthy"
-            except Exception as e:
-                logger.debug(f"Ollama health check failed (backup): {e}")
-            return "unavailable"
+                status = "healthy" if await probe_runtime_config(config) else "unavailable"
+            except Exception as exc:
+                logger.debug("runtime health probe failed: %s", type(exc).__name__)
+                status = "unavailable"
+            safe = config.safe_dict()
+            safe.pop("has_api_key", None)
+            return status, safe
 
         async def _probe_paddle() -> str:
             if paddleocr is None:
@@ -518,54 +444,43 @@ class AIService:
             try:
                 _get_paddle_ocr()
                 return "healthy"
-            except Exception as e:
-                logger.debug(f"PaddleOCR health check failed: {e}")
+            except Exception as exc:
+                logger.debug("PaddleOCR health failed: %s", type(exc).__name__)
                 return "unavailable"
 
         async def _probe_chroma() -> str:
             try:
                 async with await _get_chromadb_client() as client:
                     response = await asyncio.wait_for(
-                        client.get("/api/v1/heartbeat"),
-                        timeout=0.8,
+                        client.get("/api/v1/heartbeat"), timeout=0.8
                     )
-                    if response.status_code == 200:
-                        return "healthy"
-            except Exception as e:
-                logger.debug(f"ChromaDB health check failed: {e}")
-            return "unavailable"
+                    return "healthy" if response.status_code == 200 else "unavailable"
+            except Exception as exc:
+                logger.debug("ChromaDB health failed: %s", type(exc).__name__)
+                return "unavailable"
 
-        (vllm_status, vllm_model), ollama_status, paddleocr_status, chromadb_status = await asyncio.gather(
-            _probe_vllm(),
-            _probe_ollama(),
+        # AsyncSession 不支持并发 execute：先顺序解析 DB 配置，再并行做纯网络探针。
+        chat_runtime = await _resolve_model(AIModelType.chat)
+        embedding_runtime = await _resolve_model(AIModelType.embedding)
+        (chat_status, chat_config), (embedding_status, embedding_config), paddle_status, chroma_status = await asyncio.gather(
+            _probe_model(chat_runtime),
+            _probe_model(embedding_runtime),
             _probe_paddle(),
             _probe_chroma(),
         )
-        if vllm_model:
-            active_chat_model = vllm_model
-
-        # 从数据库获取激活模型
-        if not active_chat_model:
-            chat_model = await self.get_active_model(AIModelType.chat)
-            if chat_model:
-                active_chat_model = chat_model.model_name
-            else:
-                active_chat_model = settings.DEFAULT_CHAT_MODEL
-
-        embed_model = await self.get_active_model(AIModelType.embedding)
-        if embed_model:
-            active_embedding_model = embed_model.model_name
-        else:
-            active_embedding_model = settings.DEFAULT_EMBEDDING_MODEL
-
+        chat_provider = chat_config.get("provider") if chat_config else None
         return {
-            "vllm_status": vllm_status,
-            "ollama_status": ollama_status,
-            "paddleocr_status": paddleocr_status,
-            "chromadb_status": chromadb_status,
-            "active_chat_model": active_chat_model,
-            "active_embedding_model": active_embedding_model,
-            "llm_base_url": settings.LLM_BASE_URL,
+            "llm_status": chat_status,
+            "embedding_status": embedding_status,
+            # 兼容 UnifiedAIService 和既有前端字段。
+            "vllm_status": chat_status if chat_provider != AIProvider.ollama.value else "unavailable",
+            "ollama_status": chat_status if chat_provider == AIProvider.ollama.value else "unavailable",
+            "paddleocr_status": paddle_status,
+            "chromadb_status": chroma_status,
+            "active_chat_model": chat_config.get("model_name") if chat_config else None,
+            "active_embedding_model": embedding_config.get("model_name") if embedding_config else None,
+            "chat_config": chat_config,
+            "embedding_config": embedding_config,
             "timestamp": datetime.now().isoformat(),
         }
 
@@ -631,24 +546,33 @@ class AIService:
                 "performance_notes": "Qwen3.5-27B NVFP4量化，本地vLLM推理，128K上下文",
             },
             {
-                "model_name": "Kbenkhaled/Qwen3.5-27B-NVFP4",
+                "model_name": "BAAI/bge-m3",
                 "model_type": AIModelType.embedding,
                 "provider": AIProvider.openai_compatible,
-                "endpoint_url": "http://localhost:8100/v1",
+                "endpoint_url": "http://localhost:8101/v1",
                 "is_active": True,
-                "context_window": 32768,
-                "performance_notes": "Qwen3.5-27B 文本嵌入（复用对话模型）",
+                "context_window": 8192,
+                "performance_notes": "bge-m3 本地 vLLM Embedding 服务",
             },
             {
                 "model_name": "paddleocr",
                 "model_type": AIModelType.ocr,
                 "provider": AIProvider.paddleocr,
                 "endpoint_url": None,
+                "ocr_capability": "ocr",
+                "ocr_protocol": "local",
+                "auth_scheme": "none",
                 "is_active": False,
                 "context_window": None,
                 "performance_notes": "百度PaddleOCR，中英文识别",
             },
         ]
+
+        from app.services.ai_model_presets import ENTERPRISE_MODEL_PRESETS
+
+        default_models.extend(
+            [preset.orm_values() for preset in ENTERPRISE_MODEL_PRESETS]
+        )
 
         for model_data in default_models:
             # 检查是否已存在
@@ -663,4 +587,4 @@ class AIService:
                 model = AIModelConfig(**model_data)
                 db.add(model)
 
-        await db.commit()
+        await db.flush()

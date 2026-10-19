@@ -2,125 +2,211 @@
   <div class="ai-model-config">
     <GtPageHeader title="AI 模型配置" :show-back="false">
       <template #actions>
-        <el-button size="small" @click="refreshHealth" :loading="healthLoading">
+        <el-button size="small" :loading="healthLoading" @click="refreshHealth">
           <el-icon><Refresh /></el-icon>检测状态
         </el-button>
-        <el-button size="small" type="primary" @click="showCreateDialog = true">
+        <el-button size="small" type="primary" @click="openCreate">
           <el-icon><Plus /></el-icon>新增模型
         </el-button>
       </template>
     </GtPageHeader>
 
-    <!-- 健康状态卡片 -->
-    <div class="ai-health-cards" v-if="health">
-      <div class="health-card" :class="health.ollama_status === 'healthy' ? 'ok' : 'err'">
-        <span class="health-dot" />
-        <span class="health-label">Ollama</span>
-        <span class="health-val">{{ health.ollama_status }}</span>
+    <el-alert
+      class="security-tip" type="info" :closable="false" show-icon
+      title="已内置 qwen3.8、PaddleOCR-VL 1.6、PaddleOCR v6 三条企业预设；点击“录入 Key”即可，qwen3.8 的思考强度可在同一窗口选择（默认未指定）。Key 密文存储，服务端需先配置 ENCRYPTION_KEY。"
+    />
+
+    <div v-if="health" class="ai-health-cards">
+      <div class="health-card" :class="health.llm_status === 'healthy' ? 'ok' : 'err'">
+        <span class="health-dot" /><span class="health-label">对话模型</span>
+        <span class="health-val">{{ health.chat_config?.model_name || '未配置' }}</span>
+      </div>
+      <div class="health-card" :class="health.embedding_status === 'healthy' ? 'ok' : 'err'">
+        <span class="health-dot" /><span class="health-label">嵌入模型</span>
+        <span class="health-val">{{ health.embedding_config?.model_name || '未配置' }}</span>
       </div>
       <div class="health-card" :class="health.paddleocr_status === 'healthy' ? 'ok' : 'err'">
-        <span class="health-dot" />
-        <span class="health-label">PaddleOCR</span>
+        <span class="health-dot" /><span class="health-label">OCR</span>
         <span class="health-val">{{ health.paddleocr_status }}</span>
       </div>
       <div class="health-card" :class="health.chromadb_status === 'healthy' ? 'ok' : 'err'">
-        <span class="health-dot" />
-        <span class="health-label">ChromaDB</span>
+        <span class="health-dot" /><span class="health-label">向量库</span>
         <span class="health-val">{{ health.chromadb_status }}</span>
       </div>
     </div>
 
-    <!-- 模型分类 Tabs -->
     <el-tabs v-model="activeTab" class="ai-tabs">
-      <el-tab-pane label="对话模型" name="chat">
-        <ModelTable :models="chatModels" :loading="loading" @activate="onActivate" @edit="onEdit" @delete="onDelete" />
-      </el-tab-pane>
-      <el-tab-pane label="嵌入模型" name="embedding">
-        <ModelTable :models="embeddingModels" :loading="loading" @activate="onActivate" @edit="onEdit" @delete="onDelete" />
-      </el-tab-pane>
-      <el-tab-pane label="OCR 引擎" name="ocr">
-        <ModelTable :models="ocrModels" :loading="loading" @activate="onActivate" @edit="onEdit" @delete="onDelete" />
+      <el-tab-pane v-for="tab in tabs" :key="tab.name" :label="tab.label" :name="tab.name">
+        <ModelTable
+          :models="modelsByType[tab.name]" :loading="loading"
+          :testing-id="testingId" :provider-labels="providerLabels"
+          @activate="onActivate" @edit="onEdit" @delete="onDelete" @test="onTest"
+        />
       </el-tab-pane>
     </el-tabs>
 
-    <!-- 新增/编辑弹窗 -->
-    <el-dialog append-to-body
-      v-model="showCreateDialog"
-      :title="editingModel ? '编辑模型' : '新增模型'"
-      width="520px"
-      destroy-on-close
+    <el-dialog
+      v-model="showDialog" append-to-body destroy-on-close width="560px"
+      :title="editingModel?.preset_key ? '配置企业预设' : editingModel ? '编辑模型' : '新增模型'" @closed="resetDialog"
     >
-      <el-form :model="form" label-width="100px" ref="formRef" :rules="formRules">
+      <el-form ref="formRef" :model="form" :rules="formRules" label-width="110px">
         <el-form-item label="模型名称" prop="model_name">
-          <el-input v-model="form.model_name" placeholder="如 qwen2.5:7b" />
+          <el-input v-model="form.model_name" :disabled="!!editingModel?.preset_key" placeholder="如 deepseek-chat / qwen-plus" />
         </el-form-item>
         <el-form-item label="模型类型" prop="model_type">
-          <el-select v-model="form.model_type" :disabled="!!editingModel" style="width: 100%">
-            <el-option label="对话模型" value="chat" />
-            <el-option label="嵌入模型" value="embedding" />
+          <el-select v-model="form.model_type" :disabled="!!editingModel" style="width:100%" @change="onModelTypeChange">
+            <el-option label="对话模型" value="chat" /><el-option label="嵌入模型" value="embedding" />
             <el-option label="OCR 引擎" value="ocr" />
           </el-select>
         </el-form-item>
         <el-form-item label="供应商" prop="provider">
-          <el-select v-model="form.provider" style="width: 100%">
-            <el-option label="Ollama" value="ollama" />
-            <el-option label="OpenAI 兼容" value="openai_compatible" />
-            <el-option label="PaddleOCR" value="paddleocr" />
+          <el-select v-model="form.provider" :disabled="!!editingModel?.preset_key" style="width:100%" @change="onProviderChange">
+            <el-option v-for="item in availableProviders" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
+          <div v-if="selectedProvider" class="form-help">{{ selectedProvider.description }}</div>
         </el-form-item>
-        <el-form-item label="端点 URL">
-          <el-input v-model="form.endpoint_url" placeholder="留空使用默认地址" />
+        <template v-if="form.model_type === 'ocr'">
+          <el-form-item label="部署方式">
+            <el-select v-model="form.ocr_protocol" :disabled="!!editingModel?.preset_key" style="width:100%" @change="onOcrProtocolChange">
+              <el-option label="本机 PaddleOCR" value="local" />
+              <el-option label="远程 PaddleX JSON API" value="paddlex_json" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="OCR 能力">
+            <el-select v-model="form.ocr_capability" :disabled="!!editingModel?.preset_key" style="width:100%" @change="onOcrCapabilityChange">
+              <el-option label="文字识别（/ocr）" value="ocr" />
+              <el-option label="版面解析（/layout-parsing）" value="layout_parsing" />
+            </el-select>
+          </el-form-item>
+          <el-form-item v-if="form.ocr_protocol === 'paddlex_json'" label="接口路径">
+            <el-input v-model="form.api_path" readonly />
+          </el-form-item>
+          <el-form-item v-if="form.ocr_protocol === 'paddlex_json'" label="认证方式">
+            <el-select v-model="form.auth_scheme" :disabled="!!editingModel?.preset_key" style="width:100%">
+              <el-option label="Authorization: Bearer" value="bearer" />
+              <el-option label="X-API-Key" value="x_api_key" />
+              <el-option label="api-key" value="api_key" />
+              <el-option label="自定义 Header" value="custom_header" />
+              <el-option label="无需认证" value="none" />
+            </el-select>
+          </el-form-item>
+          <el-form-item v-if="form.ocr_protocol === 'paddlex_json' && form.auth_scheme === 'custom_header'" label="Header 名称">
+            <el-input v-model="form.auth_header_name" placeholder="如 X-Model-Token" />
+          </el-form-item>
+        </template>
+        <el-form-item v-if="form.model_type !== 'ocr' || form.ocr_protocol === 'paddlex_json'" label="端点 URL" prop="endpoint_url">
+          <el-input v-model="form.endpoint_url" :readonly="!!editingModel?.preset_key" placeholder="留空时使用供应商默认端点" />
         </el-form-item>
-        <el-form-item label="上下文窗口">
-          <el-input-number v-model="form.context_window" :min="1024" :step="1024" style="width: 100%" />
+        <el-form-item v-if="form.model_type !== 'ocr' || form.ocr_protocol === 'paddlex_json'" label="API Key">
+          <el-input v-model="form.api_key" type="password" show-password autocomplete="new-password"
+            :placeholder="editingModel?.preset_key ? '请输入企业模型 API Key' : editingModel?.has_api_key ? '留空则保留现有 Key' : '本地无鉴权模型可留空'" />
+          <div v-if="editingModel?.has_api_key" class="form-help">已配置加密凭证，服务端不会回显。</div>
         </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="form.performance_notes" type="textarea" :rows="2" />
+        <el-form-item v-if="editingModel?.has_api_key && (form.model_type !== 'ocr' || form.ocr_protocol === 'paddlex_json')" label="清除凭证">
+          <el-checkbox v-model="form.clear_api_key">显式清除现有 API Key</el-checkbox>
         </el-form-item>
+        <el-form-item v-if="form.model_type === 'chat'" label="思考强度">
+          <!-- '' 是可选值「未指定」，不能被当成空值显示占位符 -->
+          <el-select v-model="form.reasoning_effort" :empty-values="[null, undefined]" style="width:100%">
+            <el-option :label="unsetReasoningLabel" value="" />
+            <el-option v-for="item in reasoningOptions" :key="item" :label="REASONING_LABELS[item]" :value="item" />
+          </el-select>
+          <div class="form-help">{{ reasoningHelp }}</div>
+        </el-form-item>
+        <el-form-item v-if="form.model_type !== 'ocr'" label="上下文窗口"><el-input-number v-model="form.context_window" :disabled="!!editingModel?.preset_key" :min="1" :step="1024" style="width:100%" /></el-form-item>
+        <el-form-item v-else-if="form.ocr_protocol === 'paddlex_json'" label="请求超时（秒）"><el-input-number v-model="form.request_timeout_seconds" :disabled="!!editingModel?.preset_key" :min="1" :max="600" style="width:100%" /></el-form-item>
+        <el-form-item label="备注"><el-input v-model="form.performance_notes" :disabled="!!editingModel?.preset_key" type="textarea" :rows="2" /></el-form-item>
       </el-form>
-      <template #footer>
-        <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" @click="onSubmit" :loading="submitting">确定</el-button>
-      </template>
+      <template #footer><el-button @click="showDialog=false">取消</el-button><el-button type="primary" :loading="submitting" @click="onSubmit">保存</el-button></template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { confirmDelete } from '@/utils/confirm'
-import { Refresh, Plus } from '@element-plus/icons-vue'
+import { computed, onMounted, ref } from 'vue'
+import { ElMessage, ElNotification } from 'element-plus'
+import { Plus, Refresh } from '@element-plus/icons-vue'
 import ModelTable from '@/components/ai/ModelTable.vue'
-import type { AIModel, AIModelCreate, AIHealthStatus } from '@/services/aiModelApi'
+import { confirmDelete } from '@/utils/confirm'
+import { handleApiError } from '@/utils/errorHandler'
+import type {
+  AIAuthScheme, AIHealthStatus, AIModel, AIModelCreate, AIModelType, AIProvider,
+  AIProviderOption, OCRCapability, OCRProtocol, ReasoningEffort,
+} from '@/services/aiModelApi'
 import {
-  getAIModels, createAIModel, updateAIModel, deleteAIModel,
-  activateAIModel, getAIHealth,
+  activateAIModel, createAIModel, deleteAIModel, getAIHealth, getAIModels,
+  getAIProviders, testAIModel, updateAIModel,
 } from '@/services/aiModelApi'
 
+interface ModelForm {
+  model_name: string
+  model_type: AIModelType
+  provider: AIProvider
+  endpoint_url: string
+  api_key: string
+  clear_api_key: boolean
+  reasoning_effort: ReasoningEffort | ''
+  ocr_capability: OCRCapability
+  ocr_protocol: OCRProtocol
+  api_path: string
+  auth_scheme: AIAuthScheme
+  auth_header_name: string
+  request_timeout_seconds: number
+  context_window: number
+  performance_notes: string
+}
+
+const tabs: Array<{ name: AIModelType; label: string }> = [
+  { name: 'chat', label: '对话模型' }, { name: 'embedding', label: '嵌入模型' }, { name: 'ocr', label: 'OCR 引擎' },
+]
 const loading = ref(false)
 const healthLoading = ref(false)
 const submitting = ref(false)
+const testingId = ref('')
 const models = ref<AIModel[]>([])
+const providers = ref<AIProviderOption[]>([])
 const health = ref<AIHealthStatus | null>(null)
-const activeTab = ref('chat')
-const showCreateDialog = ref(false)
+const activeTab = ref<AIModelType>('chat')
+const showDialog = ref(false)
 const editingModel = ref<AIModel | null>(null)
 const formRef = ref()
 
-const chatModels = computed(() => models.value.filter(m => m.model_type === 'chat'))
-const embeddingModels = computed(() => models.value.filter(m => m.model_type === 'embedding'))
-const ocrModels = computed(() => models.value.filter(m => m.model_type === 'ocr'))
-
-const form = ref<AIModelCreate>({
-  model_name: '',
-  model_type: 'chat',
-  provider: 'ollama',
-  endpoint_url: '',
-  context_window: 8192,
-  performance_notes: '',
+function emptyForm(): ModelForm {
+  return {
+    model_name: '', model_type: 'chat', provider: 'openai_compatible', endpoint_url: '', api_key: '',
+    clear_api_key: false, reasoning_effort: '', ocr_capability: 'ocr', ocr_protocol: 'local',
+    api_path: '/ocr', auth_scheme: 'bearer', auth_header_name: '', request_timeout_seconds: 60,
+    context_window: 8192, performance_notes: '',
+  }
+}
+const form = ref<ModelForm>(emptyForm())
+const modelsByType = computed<Record<AIModelType, AIModel[]>>(() => ({
+  chat: models.value.filter(item => item.model_type === 'chat'),
+  embedding: models.value.filter(item => item.model_type === 'embedding'),
+  ocr: models.value.filter(item => item.model_type === 'ocr'),
+}))
+const availableProviders = computed(() => providers.value.filter(item => item.supported_types.includes(form.value.model_type)))
+const selectedProvider = computed(() => providers.value.find(item => item.value === form.value.provider) || null)
+const providerLabels = computed<Partial<Record<AIProvider, string>>>(() =>
+  Object.fromEntries(providers.value.map(item => [item.value, item.label])) as Partial<Record<AIProvider, string>>,
+)
+const REASONING_LABELS: Record<ReasoningEffort, string> = {
+  low: '低（low）', medium: '中（medium）', high: '高（high）', xhigh: '极高（xhigh）',
+}
+const ALL_REASONING: ReasoningEffort[] = ['low', 'medium', 'high', 'xhigh']
+// 企业预设登记了服务端实际支持的取值（如 qwen3.8 网关只接受 low/medium/xhigh），只展示这些。
+const reasoningOptions = computed<ReasoningEffort[]>(() =>
+  editingModel.value?.reasoning_effort_options?.length ? editingModel.value.reasoning_effort_options : ALL_REASONING,
+)
+const unsetReasoningLabel = computed(() => {
+  const fallback = editingModel.value?.reasoning_effort_server_default
+  return fallback ? `未指定（服务端默认 ${fallback}）` : '未指定（不发送 reasoning_effort）'
 })
-
+const reasoningHelp = computed(() =>
+  editingModel.value?.reasoning_effort_options?.length
+    ? `该模型支持：${editingModel.value.reasoning_effort_options.map(item => REASONING_LABELS[item]).join(' / ')}；强度越高越慢、消耗越多。`
+    : '未指定时由模型服务端决定；若测试连接提示参数被拒绝，请改回「未指定」。',
+)
 const formRules = {
   model_name: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
   model_type: [{ required: true, message: '请选择模型类型', trigger: 'change' }],
@@ -131,136 +217,240 @@ async function fetchModels() {
   loading.value = true
   try {
     models.value = await getAIModels()
-  } finally {
-    loading.value = false
+  } catch (error) {
+    handleApiError(error, '加载模型列表')
+    models.value = []
+  } finally { loading.value = false }
+}
+async function fetchProviders() {
+  try {
+    providers.value = await getAIProviders()
+  } catch (error) {
+    handleApiError(error, '加载模型供应商')
+    providers.value = []
   }
 }
-
 async function refreshHealth() {
   healthLoading.value = true
   try {
     health.value = await getAIHealth()
-  } finally {
-    healthLoading.value = false
+  } catch (error) {
+    handleApiError(error, '检测 AI 服务状态')
+  } finally { healthLoading.value = false }
+}
+function openCreate() {
+  editingModel.value = null
+  form.value = emptyForm()
+  const profile = providers.value.find(item => item.value === form.value.provider)
+  form.value.endpoint_url = profile?.default_endpoint || ''
+  showDialog.value = true
+}
+function resetDialog() { editingModel.value = null; form.value = emptyForm(); formRef.value?.clearValidate?.() }
+function onProviderChange(value: AIProvider) {
+  const profile = providers.value.find(item => item.value === value)
+  form.value.endpoint_url = profile?.default_endpoint || ''
+  form.value.api_key = ''
+  form.value.clear_api_key = false
+}
+function onModelTypeChange(value: AIModelType) {
+  const first = providers.value.find(item => item.supported_types.includes(value))
+  if (first) {
+    form.value.provider = first.value
+    form.value.endpoint_url = first.default_endpoint || ''
+  }
+  if (value === 'ocr') {
+    form.value.ocr_protocol = 'local'
+    form.value.ocr_capability = 'ocr'
+    form.value.api_path = '/ocr'
+    form.value.auth_scheme = 'bearer'
   }
 }
-
-async function onActivate(model: AIModel) {
-  try {
-    await activateAIModel(model.id)
-    ElMessage.success(`已激活: ${model.model_name}`)
-    await fetchModels()
-  } catch { /* error handled by interceptor */ }
+function onOcrProtocolChange(value: OCRProtocol) {
+  if (value === 'local') {
+    form.value.endpoint_url = ''
+    form.value.api_key = ''
+  }
 }
-
+function onOcrCapabilityChange(value: OCRCapability) {
+  form.value.api_path = value === 'layout_parsing' ? '/layout-parsing' : '/ocr'
+  form.value.request_timeout_seconds = value === 'layout_parsing' ? 120 : 60
+}
 function onEdit(model: AIModel) {
   editingModel.value = model
   form.value = {
-    model_name: model.model_name,
-    model_type: model.model_type,
-    provider: model.provider,
-    endpoint_url: model.endpoint_url ?? '',
-    context_window: model.context_window ?? 8192,
-    performance_notes: model.performance_notes ?? '',
+    model_name: model.model_name, model_type: model.model_type, provider: model.provider,
+    endpoint_url: model.endpoint_url || '', api_key: '', clear_api_key: false,
+    reasoning_effort: model.reasoning_effort || '',
+    ocr_capability: model.ocr_capability || 'ocr',
+    ocr_protocol: model.ocr_protocol || 'local',
+    api_path: model.api_path || (model.ocr_capability === 'layout_parsing' ? '/layout-parsing' : '/ocr'),
+    auth_scheme: model.auth_scheme || 'bearer', auth_header_name: model.auth_header_name || '',
+    request_timeout_seconds: model.request_timeout_seconds || (model.ocr_capability === 'layout_parsing' ? 120 : 60),
+    context_window: model.context_window || 8192, performance_notes: model.performance_notes || '',
   }
-  showCreateDialog.value = true
+  showDialog.value = true
 }
-
-async function onDelete(model: AIModel) {
-  await confirmDelete(`模型「${model.model_name}」`)
+// 验证失败原因可能较长（含代理/内网 DNS 排查提示），3 秒的 ElMessage 来不及读完。
+function notifyModelFailure(title: string, message: string) {
+  ElNotification({ title, message, type: 'error', duration: 15000 })
+}
+// 后端验证失败返回 400 + {error_code, message}；其余状态仍走统一错误处理。
+function validationFailureMessage(error: any): string {
+  if (error?.response?.status !== 400) return ''
+  const detail = error?.response?.data?.detail
+  if (typeof detail === 'string') return detail.trim()
+  return typeof detail?.message === 'string' ? detail.message.trim() : ''
+}
+async function onTest(model: AIModel) {
+  testingId.value = model.id
   try {
-    await deleteAIModel(model.id)
-    ElMessage.success('已删除')
-    await fetchModels()
-  } catch { /* error handled by interceptor */ }
+    const result = await testAIModel(model.id)
+    if (result.status === 'ok') ElMessage.success(result.message)
+    else notifyModelFailure('连接测试失败', result.message)
+  } catch (error) {
+    handleApiError(error, '测试模型连接')
+  } finally { testingId.value = '' }
 }
-
+async function onActivate(model: AIModel) {
+  try {
+    await activateAIModel(model.id)
+    ElMessage.success(`已激活：${model.model_name}`)
+    await Promise.all([fetchModels(), refreshHealth()])
+  } catch (error) {
+    const message = validationFailureMessage(error)
+    if (message) notifyModelFailure('激活失败', message)
+    else handleApiError(error, '激活模型')
+  }
+}
+async function onDelete(model: AIModel) {
+  try {
+    await confirmDelete(`模型「${model.model_name}」`)
+    await deleteAIModel(model.id)
+    ElMessage.success('已移入回收状态')
+    await fetchModels()
+  } catch (error: any) {
+    if (error === 'cancel' || error?.message === 'cancel') return
+    handleApiError(error, '删除模型')
+  }
+}
 async function onSubmit() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
-
+  if (form.value.clear_api_key && form.value.api_key.trim()) {
+    ElMessage.warning('不能同时替换并清除 API Key'); return
+  }
+  const reasoningChanged = !!editingModel.value && form.value.model_type === 'chat'
+    && (editingModel.value.reasoning_effort || '') !== form.value.reasoning_effort
+  if (editingModel.value?.preset_key && !editingModel.value.has_api_key && !form.value.api_key.trim() && !reasoningChanged) {
+    ElMessage.warning('企业预设只需录入 API Key，请先填写 Key'); return
+  }
+  const destinationChanged = !!editingModel.value && (
+    editingModel.value.provider !== form.value.provider
+    || (editingModel.value.endpoint_url || '') !== form.value.endpoint_url.trim()
+    || (editingModel.value.ocr_protocol || 'local') !== form.value.ocr_protocol
+    || (editingModel.value.ocr_capability || 'ocr') !== form.value.ocr_capability
+    || (editingModel.value.api_path || '') !== (form.value.ocr_protocol === 'paddlex_json' ? form.value.api_path : '')
+    || (editingModel.value.auth_scheme || 'none') !== (form.value.ocr_protocol === 'paddlex_json' ? form.value.auth_scheme : 'none')
+  )
+  if (editingModel.value?.has_api_key && destinationChanged && !form.value.api_key.trim() && !form.value.clear_api_key) {
+    ElMessage.warning('修改供应商或端点时，请重新输入 API Key 或显式清除旧凭证'); return
+  }
+  const remoteOcrNeedsKey = form.value.model_type === 'ocr'
+    && form.value.ocr_protocol === 'paddlex_json'
+    && form.value.auth_scheme !== 'none'
+  if (remoteOcrNeedsKey && !editingModel.value?.has_api_key && !form.value.api_key.trim()) {
+    ElMessage.warning('所选远程 OCR 认证方式必须配置 API Key'); return
+  }
+  if (form.value.auth_scheme === 'custom_header' && !form.value.auth_header_name.trim()) {
+    ElMessage.warning('请填写自定义认证 Header 名称'); return
+  }
+  if (selectedProvider.value?.requires_api_key && !editingModel.value?.has_api_key && !form.value.api_key.trim()) {
+    ElMessage.warning('该供应商必须配置 API Key'); return
+  }
+  const endpointRequired = form.value.model_type !== 'ocr' || form.value.ocr_protocol === 'paddlex_json'
+  if (endpointRequired && !form.value.endpoint_url.trim() && !selectedProvider.value?.default_endpoint) {
+    ElMessage.warning('请填写模型端点 URL'); return
+  }
   submitting.value = true
   try {
     if (editingModel.value) {
-      await updateAIModel(editingModel.value.id, {
-        model_name: form.value.model_name,
-        endpoint_url: form.value.endpoint_url || null,
-        context_window: form.value.context_window,
-        performance_notes: form.value.performance_notes || null,
-      })
-      ElMessage.success('已更新')
+      const payload: Parameters<typeof updateAIModel>[1] = editingModel.value.preset_key
+        ? { clear_api_key: form.value.clear_api_key }
+        : {
+            model_name: form.value.model_name, provider: form.value.provider,
+            endpoint_url: endpointRequired ? (form.value.endpoint_url || null) : null,
+            context_window: form.value.model_type === 'ocr' ? null : form.value.context_window,
+            performance_notes: form.value.performance_notes || null,
+            clear_api_key: form.value.clear_api_key,
+          }
+      // 企业预设只在用户改了思考强度时才提交该字段（后端对预设只放行 Key 与思考强度）。
+      if (form.value.model_type === 'chat' && (!editingModel.value.preset_key || reasoningChanged)) {
+        payload.reasoning_effort = form.value.reasoning_effort || null
+      }
+      if (!editingModel.value.preset_key && form.value.model_type === 'ocr') {
+        payload.ocr_capability = form.value.ocr_capability
+        payload.ocr_protocol = form.value.ocr_protocol
+        payload.api_path = form.value.ocr_protocol === 'paddlex_json' ? form.value.api_path : null
+        payload.auth_scheme = form.value.ocr_protocol === 'paddlex_json' ? form.value.auth_scheme : 'none'
+        payload.auth_header_name = form.value.auth_scheme === 'custom_header' ? form.value.auth_header_name : null
+        payload.request_timeout_seconds = form.value.request_timeout_seconds
+      }
+      if (form.value.api_key.trim()) payload.api_key = form.value.api_key.trim()
+      await updateAIModel(editingModel.value.id, payload)
+      ElMessage.success(
+        !editingModel.value.preset_key ? '模型配置已更新'
+          : form.value.api_key.trim() ? 'API Key 已安全保存' : '企业预设已更新',
+      )
     } else {
-      await createAIModel(form.value)
-      ElMessage.success('已创建')
+      const payload: AIModelCreate = {
+        model_name: form.value.model_name, model_type: form.value.model_type, provider: form.value.provider,
+        endpoint_url: endpointRequired ? (form.value.endpoint_url || null) : null,
+        context_window: form.value.model_type === 'ocr' ? null : form.value.context_window,
+        performance_notes: form.value.performance_notes || null,
+      }
+      if (form.value.model_type === 'chat') payload.reasoning_effort = form.value.reasoning_effort || null
+      if (form.value.model_type === 'ocr') {
+        payload.ocr_capability = form.value.ocr_capability
+        payload.ocr_protocol = form.value.ocr_protocol
+        payload.api_path = form.value.ocr_protocol === 'paddlex_json' ? form.value.api_path : null
+        payload.auth_scheme = form.value.ocr_protocol === 'paddlex_json' ? form.value.auth_scheme : 'none'
+        payload.auth_header_name = form.value.auth_scheme === 'custom_header' ? form.value.auth_header_name : null
+        payload.request_timeout_seconds = form.value.request_timeout_seconds
+      }
+      if (form.value.api_key.trim()) payload.api_key = form.value.api_key.trim()
+      await createAIModel(payload)
+      ElMessage.success('模型配置已创建，请先测试连接再激活')
     }
-    showCreateDialog.value = false
-    editingModel.value = null
+    showDialog.value = false
     await fetchModels()
-  } finally {
-    submitting.value = false
-  }
+  } catch (error) {
+    const message = validationFailureMessage(error)
+    if (message) notifyModelFailure('保存失败', message)
+    else handleApiError(error, '保存模型配置')
+  } finally { submitting.value = false }
 }
 
-onMounted(() => {
-  fetchModels()
-  refreshHealth()
+onMounted(async () => {
+  await fetchProviders()
+  await Promise.all([fetchModels(), refreshHealth()])
 })
 </script>
 
 <style scoped>
-.ai-model-config {
-  padding: var(--gt-space-4);
-  height: 100%;
-  overflow-y: auto;
-}
-.ai-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--gt-space-4);
-}
-.ai-title {
-  font-size: var(--gt-font-size-xl);
-  font-weight: 600;
-  color: var(--gt-color-text);
-  margin: 0;
-}
-.ai-header-actions {
-  display: flex;
-  gap: var(--gt-space-2);
-}
-.ai-health-cards {
-  display: flex;
-  gap: var(--gt-space-3);
-  margin-bottom: var(--gt-space-4);
-}
+.ai-model-config { padding: var(--gt-space-4); height: 100%; overflow-y: auto; }
+.security-tip { margin-bottom: var(--gt-space-4); }
+.ai-health-cards { display: flex; flex-wrap: wrap; gap: var(--gt-space-3); margin-bottom: var(--gt-space-4); }
 .health-card {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-radius: var(--gt-radius-md);
-  background: var(--gt-color-bg);
-  border: 1px solid var(--gt-color-border-light);
+  display: flex; align-items: center; gap: 8px; min-width: 190px; padding: 10px 16px;
+  border-radius: var(--gt-radius-md); background: var(--gt-color-bg); border: 1px solid var(--gt-color-border-light);
   font-size: var(--gt-font-size-sm);
 }
 .health-card.ok { border-color: var(--gt-color-success); }
 .health-card.err { border-color: var(--gt-color-coral); }
-.health-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
+.health-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gt-color-coral); }
 .health-card.ok .health-dot { background: var(--gt-color-success); }
-.health-card.err .health-dot { background: var(--gt-color-coral); }
-.health-label {
-  font-weight: 500;
-  color: var(--gt-color-text);
-}
-.health-val {
-  color: var(--gt-color-text-secondary);
-}
-.ai-tabs {
-  margin-top: var(--gt-space-2);
-}
+.health-label { font-weight: 500; color: var(--gt-color-text); }
+.health-val { color: var(--gt-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-tabs { margin-top: var(--gt-space-2); }
+.form-help { margin-top: 4px; color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-xs); line-height: 1.4; }
 </style>

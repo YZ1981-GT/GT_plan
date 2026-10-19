@@ -56,22 +56,25 @@ cmd.exe 先按**父 console 当前代码页**打开并逐行解析 bat。第 3 �
 `backend/tests/test_start_dev_bat_ascii_guard.py`（6 条，含 CP936 下的反向自检
 与真实脚本端到端 dry-run）。
 
-## 二、健康探测的地址族不对称（有意设计，勿"对称化"）
+## 二、前后端统一使用 IPv4 loopback（2026-10-19 勘误）
 
-前后端探测地址**故意相反**，改成一致会立刻坏掉：
+旧记录认为 Vite 默认只监听 `::1`，因此前端探测必须用 `localhost`。2026-10-19
+真实复现证明该结论已经不适用于当前机器：`netstat` 虽显示 `[::1]:3030 LISTENING`，
+但 `curl`、浏览器和 `Test-NetConnection` 对 `::1` 全部拒绝，启动器因此稳定报
+`[WARN] Frontend not responding`，页面打不开。
 
-| 服务 | 监听 | 探测必须用 | 实测 |
-|---|---|---|---|
-| 后端 uvicorn `--host 0.0.0.0` | 仅 IPv4，`::1` 无监听 | `127.0.0.1` | localhost 2053ms / 127.0.0.1 16ms / `[::1]` 拒绝 |
-| 前端 vite（默认 host） | node 解析 localhost 得 `::1`，仅 IPv6 | `localhost` | localhost 49ms / `127.0.0.1:3030` 连不上 |
+现行统一契约：
 
-后端若用 `localhost` + `-TimeoutSec 1`：Windows 先解析 `::1`，连接失败后才回退
-IPv4，固定耗时约 2050ms > 1s 超时 ⇒ **探测永远在 IPv6 阶段超时**，无论后端是否
-健康都判失败，打出误导性的 `[WARN] Backend not responding`。
+| 服务 | 监听 | 探测/工具地址 |
+|---|---|---|
+| 后端 uvicorn | `0.0.0.0:9980` | `127.0.0.1:9980` |
+| 前端 Vite | `0.0.0.0:3030` | `127.0.0.1:3030` |
 
-**已知限制**：前端请用 `localhost:3030` 访问，`127.0.0.1:3030` 不通。
-若要改 vite 为 `host: '127.0.0.1'`，必须同时把 `http://127.0.0.1:3030` 加进后端
-`CORS_ORIGINS`（当前只有 `localhost:5173,localhost:3030`），否则一点开就撞 CORS。
+`vite.config.ts` 固定 `host: '0.0.0.0'`；`start-dev.bat`、Playwright 和 Vite transform
+检查都走 `127.0.0.1`。浏览器使用 `localhost:3030` 通常仍可回落 IPv4，但自动化与
+健康探针禁止依赖该回落。启动器的 PowerShell 探针还必须设置
+`$ProgressPreference='SilentlyContinue'`，否则 `Invoke-WebRequest` 的 Host progress
+流会绕过普通重定向，在终端里表现成大段错位/疑似乱码。
 
 ## 三、后端健康等待为何是 60s
 
@@ -107,3 +110,34 @@ echo [3.5] DSH SDK runtime detected ^(vendor read-only^).
 
 vite 配了 `strictPort`，端口被占就直接退出（不会漂到 3031）；`taskkill` 后
 socket 未必立即释放，所以必须显式等端口空闲。
+
+## 六、`:kill_port` 必须清掉 uvicorn 孤儿 worker（2026-10-19 实测）
+
+现象：重启后 `netstat -ano` 出现两条 `0.0.0.0:9980 LISTENING`，其中一条的 PID
+早已不存在；请求随机落到旧进程，旧进程读的是改 `.env` 之前的配置（当时
+`ENCRYPTION_KEY` 为空，保存模型 API Key 直接 503）。
+
+根因链：
+
+1. uvicorn `--reload` 的 supervisor 创建监听 socket，经 multiprocessing spawn 把
+   句柄复制给 worker（worker 命令行形如
+   `spawn_main(parent_pid=<supervisor>, pipe_handle=...)`）。
+2. 旧 `:kill_port` 对 owner 执行 `taskkill /F` **不带 `/T`**：杀掉 supervisor 后
+   worker 成孤儿，继续持有监听句柄、继续跑旧代码与旧 `.env`。
+3. netstat 仍把该 socket 记在**已死的 supervisor PID** 名下，下次 `:kill_port`
+   杀已死 PID 是空操作，孤儿永远杀不掉。
+4. uvicorn 以 `SO_REUSEADDR` 绑定，新后端能绑到同一端口，与孤儿共享连接。
+5. `Get-NetTCPConnection` 会把同地址的重复绑定折叠成一条，只显示其中一个 owner；
+   取 owner 必须用 `netstat -ano`。
+
+现行规则：owner 取自 netstat；存活 owner 若启动时间晚于其 socket 创建时间 2s 以上，
+视为 PID 已被复用，不杀；孤儿按命令行 `spawn_main(parent_pid=<owner>,` 匹配；
+一律 `taskkill /F /T`。启动后端前对 9980 也执行 `:wait_port_free`，端口仍被占
+会打出 `[WARN] Port 9980 still occupied`，不再静默共享。
+
+守卫：`backend/tests/test_start_dev_kill_port_orphan_guard.py` 真实复现
+「supervisor 先死、worker 持句柄存活」，执行从 bat 原样提取的 `:kill_port`
+命令；把命令换回旧逻辑时该测试打红（变异已验证）。
+`test_start_dev_bat_ascii_guard.py` 的 dry-run 打桩正则容忍任意 powershell
+开关，并断言打桩后不残留可执行的 powershell / taskkill / start —— 旧正则漏掉
+带 `-NonInteractive` 的 3 处调用，dry-run 会真按标签杀掉正在运行的开发服务器。

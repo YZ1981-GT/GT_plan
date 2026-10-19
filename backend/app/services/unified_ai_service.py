@@ -97,10 +97,7 @@ class UnifiedAIService:
         ai_health = await self._ai_service.health_check()
         ocr_health = await self._ocr_service.health_check()
 
-        llm_ok = (
-            ai_health.get("vllm_status") == "healthy"
-            or ai_health.get("ollama_status") == "healthy"
-        )
+        llm_ok = ai_health.get("llm_status") == "healthy"
         ocr_ok = ocr_health.get("status") == "healthy"
 
         if llm_ok:
