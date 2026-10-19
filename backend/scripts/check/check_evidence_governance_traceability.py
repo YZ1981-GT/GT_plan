@@ -31,7 +31,13 @@ sys.stderr.reconfigure(encoding="utf-8")
 # ─── 路径常量 ─────────────────────────────────────────────────────────────────
 
 ROOT = Path(__file__).resolve().parents[3]  # GT_plan 根目录
-SPEC_DIR = ROOT / ".kiro" / "specs" / "attachment-ocr-ai-evidence-governance-hardening"
+# spec 归档后仍能定位（active 优先、回退 _archive/**）。见 _spec_dir.py。
+from _spec_dir import resolve_spec_dir  # noqa: E402
+
+SPEC_DIR = resolve_spec_dir(
+    "attachment-ocr-ai-evidence-governance-hardening",
+    require_files=["requirements.md", "design.md", "tasks.md"],
+)
 REQUIREMENTS_MD = SPEC_DIR / "requirements.md"
 DESIGN_MD = SPEC_DIR / "design.md"
 TASKS_MD = SPEC_DIR / "tasks.md"

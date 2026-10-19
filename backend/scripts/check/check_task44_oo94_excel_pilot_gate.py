@@ -81,9 +81,8 @@ from typing import Any, Callable, Final, Mapping, Sequence
 
 _REPO: Final[Path] = Path(__file__).resolve().parents[3]
 _BACKEND: Final[Path] = _REPO / "backend"
-_SPEC_DIR: Final[Path] = (
-    _REPO / ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure"
-)
+from _spec_dir import resolve_spec_dir  # noqa: E402  归档后 active 优先回退 _archive，见 _spec_dir.py
+_SPEC_DIR: Final[Path] = resolve_spec_dir("workpaper-html-onlyoffice-bidirectional-writeback-closure", require_files=["tasks.md", "design.md"])
 _TASKS_MD: Final[Path] = _SPEC_DIR / "tasks.md"
 _DESIGN_MD: Final[Path] = _SPEC_DIR / "design.md"
 _EVIDENCE_DIR: Final[Path] = _SPEC_DIR / "evidence/task44-oo94-excel-pilot-gate"

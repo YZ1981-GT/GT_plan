@@ -26,7 +26,13 @@ sys.stderr.reconfigure(encoding="utf-8")
 # ─── 路径常量 ─────────────────────────────────────────────────────────────────
 
 ROOT = Path(__file__).resolve().parents[3]  # GT_plan 根目录
-SPEC_DIR = ROOT / ".kiro" / "specs" / "formula-runtime-convergence"
+
+# spec 归档后仍能定位（active 优先、回退 _archive/**）。
+# 用共享 helper _spec_dir.resolve_spec_dir 作单一来源，不在本脚本内复制归档回退逻辑
+# （否则又成"多份拷贝漂移"的反模式）。
+from _spec_dir import resolve_spec_dir  # noqa: E402
+
+SPEC_DIR = resolve_spec_dir("formula-runtime-convergence", require_files=["tasks.md"])
 TASKS_MD = SPEC_DIR / "tasks.md"
 
 # 证据文件
@@ -187,18 +193,15 @@ def check_forbidden_patterns() -> None:
 # 保护的是低级求值原语 formula_parse_utils.evaluate_formula 和 FormulaEvaluator，
 # 不是 report_engine.evaluate_formula（那是合法的高层函数）。
 
-# 允许直接导入低级求值的文件（唯一合法消费者）
-_KERNEL_ALLOWED_FILES = {
-    "formula_management/engine.py",
-    "services/formula_engine.py",
-    "services/formula_parse_utils.py",
-}
+# single-kernel 白名单 + 保护模式来自**单一来源** _single_kernel_policy，
+# pytest 守卫 test_single_kernel_guard.py 也 import 同一来源，不再各留拷贝（防漂移）。
+from _single_kernel_policy import (  # noqa: E402
+    ALLOWED_FILES as _KERNEL_ALLOWED_FILES,
+    PROTECTED_IMPORT_PATTERNS as _PROTECTED_IMPORT_SOURCES,
+)
 
-# 保护的 import 模式（从 formula_parse_utils 导入 evaluate_formula / FormulaEvaluator）
 _PROTECTED_IMPORT_PATTERNS = [
-    re.compile(r"from\s+[\w.]*formula_parse_utils\s+import\s+.*\bevaluate_formula\b", re.IGNORECASE),
-    re.compile(r"from\s+[\w.]*\s+import\s+.*\bFormulaEvaluator\b", re.IGNORECASE),
-    re.compile(r"import\s+[\w.]*formula_parse_utils\b", re.IGNORECASE),
+    re.compile(p, re.IGNORECASE) for p in _PROTECTED_IMPORT_SOURCES
 ]
 
 

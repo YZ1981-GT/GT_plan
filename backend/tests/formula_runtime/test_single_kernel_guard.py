@@ -10,8 +10,9 @@
 
 from __future__ import annotations
 
-import os
+import importlib.util
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -21,39 +22,37 @@ import pytest
 # 项目 backend/app 根目录
 _BACKEND_APP_DIR = Path(__file__).resolve().parents[2] / "app"
 
-# 被保护的低级求值符号（只能被 engine.py 自身消费）
-_PROTECTED_IMPORTS = [
-    # from formula_parse_utils import evaluate_formula
-    r"from\s+[\w.]*formula_parse_utils\s+import\s+.*\bevaluate_formula\b",
-    # from ... import FormulaEvaluator
-    r"from\s+[\w.]*\s+import\s+.*\bFormulaEvaluator\b",
-    # import formula_parse_utils 然后 .evaluate_formula
-    r"import\s+[\w.]*formula_parse_utils\b",
-]
+# check 脚本目录要进 sys.path：CI 脚本内部有 `from _spec_dir import` /
+# `from _single_kernel_policy import`，被本测试用 importlib 加载时需要能解析它们
+# （脚本自己作为 __main__ 跑时 sys.path[0] 即脚本目录，故平时无碍）。
+_CHECK_DIR = Path(__file__).resolve().parents[2] / "scripts" / "check"
+if str(_CHECK_DIR) not in sys.path:
+    sys.path.insert(0, str(_CHECK_DIR))
 
-# 允许直接导入的文件（唯一合法消费者）
-_ALLOWED_FILES = {
-    # engine.py 本身是 single kernel 入口
-    "formula_management/engine.py",
-    # formula_engine.py 是 L1 内核本身（它定义了 execute）
-    "services/formula_engine.py",
-    # 以下是 legacy adapter / deprecation shim 仍需暂时保留
-    "services/formula_parse_utils.py",
-    # ── note_source_resolvers.py：附注 SUM 绑定的**行内**求和 ─────────────────
-    # 🔴 这条豁免与本守卫的意图**同向**，不是给它开后门：
-    #    `_resolve_formula_sum` 把 binding.cells 拼成 `ROW('c1') + ROW('c2') …`，
-    #    连同一份**内存** row_values 字典交给 evaluate_formula 求值，其 docstring
-    #    写明「复用既有 evaluate_formula 内核…不新造求值器，满足 Req1.2 / Property4」。
-    #    走不了 engine.execute_formula 的原因是两者形态不兼容（已核实 2026-09-06）：
-    #      · execute_formula 要 FormulaRecord + FormulaContext 两个结构化对象，
-    #        而这里只有一个临时字符串表达式，没有落库的公式定义；
-    #      · execute_formula **不支持** row_values（engine.py 内该标识符 0 次出现），
-    #        而本场景的值全部来自当前附注表的同表坐标，不经任何 domain reader。
-    #    强行改造 = 为「附注行内求和」凭空造一条 FormulaRecord，属功能改造而非修红，
-    #    且会把一个纯函数式求和变成需要 db/ownership 上下文的重路径。
-    #    → 因此登记豁免。**新增**消费者仍应被本守卫拦下（这正是它的价值）。
-    "services/note_source_resolvers.py",
-}
+
+def _load_single_kernel_policy():
+    """从单一来源 backend/scripts/check/_single_kernel_policy.py 加载策略。
+
+    白名单与保护 import 正则不在本文件维护拷贝——两个守卫（本 pytest + CI strict
+    脚本）共用同一来源，根除历史上出现过的漂移（CI 缺 note_source_resolvers 豁免
+    → pytest 绿而 CI 恒红）。
+    """
+    policy_path = (
+        Path(__file__).resolve().parents[2] / "scripts" / "check" / "_single_kernel_policy.py"
+    )
+    spec = importlib.util.spec_from_file_location("_single_kernel_policy", policy_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_POLICY = _load_single_kernel_policy()
+
+# 被保护的低级求值符号（只能被 ALLOWED_FILES 中的文件直接导入）—— 来自单一来源
+_PROTECTED_IMPORTS = list(_POLICY.PROTECTED_IMPORT_PATTERNS)
+
+# 允许直接导入的文件（唯一合法消费者）—— 来自单一来源（含 note_source_resolvers 豁免论证）
+_ALLOWED_FILES = set(_POLICY.ALLOWED_FILES)
 
 
 # ─── Guard 实现 ────────────────────────────────────────────────────────────────
@@ -142,3 +141,48 @@ class TestSingleKernelGuard:
         # formula_engine.py 是 L1 内核
         kernel_path = _BACKEND_APP_DIR / "services" / "formula_engine.py"
         assert kernel_path.exists(), f"formula_engine.py not found: {kernel_path}"
+
+    def test_ci_strict_guard_uses_single_source(self):
+        """CI strict 脚本与本守卫都必须真的用同一个单一来源的白名单。
+
+        白名单与保护模式已收敛到 backend/scripts/check/_single_kernel_policy.py。
+        本断言验证三者相等：单一来源 == 本 pytest 守卫实际用的 == CI 脚本实际用的。
+        这既保证一致性，又防止将来有人把任一侧改回本地拷贝（改回后值可能仍恰好相等，
+        但下面的 `is 同一对象` 断言会抓住"没真的用单一来源"这件事）。
+        历史：曾因 CI 缺 note_source_resolvers 豁免而 pytest 绿、CI strict 恒红。
+        """
+        policy_allow = set(_POLICY.ALLOWED_FILES)
+        pytest_allow = set(_ALLOWED_FILES)
+
+        script_path = (
+            Path(__file__).resolve().parents[3]
+            / "backend"
+            / "scripts"
+            / "check"
+            / "check_formula_runtime_completion.py"
+        )
+        assert script_path.exists(), f"CI 守卫脚本不存在: {script_path}"
+
+        spec = importlib.util.spec_from_file_location(
+            "_check_formula_runtime_completion", script_path
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        ci_allow = set(module._KERNEL_ALLOWED_FILES)
+
+        assert pytest_allow == policy_allow == ci_allow, (
+            "single-kernel 白名单与单一来源不一致:\n"
+            f"  仅单一来源有: {sorted(policy_allow - (pytest_allow & ci_allow))}\n"
+            f"  仅 pytest 有:  {sorted(pytest_allow - policy_allow)}\n"
+            f"  仅 CI 脚本有:  {sorted(ci_allow - policy_allow)}\n"
+            "两处都应 `from _single_kernel_policy import ALLOWED_FILES`，不要留本地拷贝。"
+        )
+
+        # 保护 import 模式同样来自单一来源
+        policy_patterns = tuple(_POLICY.PROTECTED_IMPORT_PATTERNS)
+        pytest_patterns = tuple(_PROTECTED_IMPORTS)
+        assert pytest_patterns == policy_patterns, (
+            "保护 import 正则与单一来源漂移:\n"
+            f"  单一来源: {policy_patterns}\n"
+            f"  pytest:   {pytest_patterns}"
+        )

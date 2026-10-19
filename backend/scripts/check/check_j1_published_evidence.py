@@ -18,9 +18,15 @@ BACKEND = REPO / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-DEFAULT_EVIDENCE = (
-    REPO / ".kiro/specs/j1-post-publish-semantic-and-evidence-closure/evidence/oo94.json"
+# spec 归档后仍能定位（active 优先、回退 _archive/**）。见 _spec_dir.py。
+# 本门要的是 evidence 产物（evidence/oo94.json），故 require 该子路径而非三件套。
+from _spec_dir import resolve_spec_dir  # noqa: E402
+
+_J1_SPEC_DIR = resolve_spec_dir(
+    "j1-post-publish-semantic-and-evidence-closure",
+    require_files=["evidence/oo94.json"],
 )
+DEFAULT_EVIDENCE = _J1_SPEC_DIR / "evidence/oo94.json"
 ENTRY_ID = "xlsx/j1/gt-j1-employee-compensation"
 
 

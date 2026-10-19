@@ -207,8 +207,8 @@ def main():
     )
     parser.add_argument(
         "--analysis-json",
-        default=".kiro/specs/workpaper-editor-slimdown/workpaper_template_analysis.json",
-        help="分析 JSON 文件路径",
+        default=None,
+        help="分析 JSON 文件路径（缺省时按 spec 归档回退自动定位）",
     )
     parser.add_argument(
         "--schema-dir",
@@ -217,6 +217,16 @@ def main():
     )
     parser.add_argument("--verbose", "-v", action="store_true", help="显示每个匹配详情")
     args = parser.parse_args()
+
+    # 缺省分析 JSON：spec 归档后仍能定位（active 优先、回退 _archive/**）。见 _spec_dir.py。
+    if args.analysis_json is None:
+        from _spec_dir import resolve_spec_dir
+
+        _spec_dir = resolve_spec_dir(
+            "workpaper-editor-slimdown",
+            require_files=["workpaper_template_analysis.json"],
+        )
+        args.analysis_json = str(_spec_dir / "workpaper_template_analysis.json")
 
     # 确定项目根目录
     script_path = Path(__file__).resolve()

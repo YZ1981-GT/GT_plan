@@ -63,7 +63,16 @@ except Exception:  # pragma: no cover - non-reconfigurable stream
 # 本文件: backend/scripts/check/check_evidence_governance_release_gate.py
 BACKEND_DIR = Path(__file__).resolve().parents[2]          # backend/
 ROOT = BACKEND_DIR.parent                                   # GT_plan 根
-SPEC_DIR = ROOT / ".kiro" / "specs" / "attachment-ocr-ai-evidence-governance-hardening"
+# spec 归档后仍能定位（active 优先、回退 _archive/**）。见 _spec_dir.py。
+from _spec_dir import resolve_spec_dir  # noqa: E402
+
+# 注意：本门要的是 evidence 产物目录（含 release_evidence.json），而不是 spec 三件套。
+# 历史上 release_evidence.json 落在 active 目录；归档后若 active 空壳无此文件，才回退
+# archive。因此 require_files 用 release_evidence.json（而非 requirements/design/tasks）。
+SPEC_DIR = resolve_spec_dir(
+    "attachment-ocr-ai-evidence-governance-hardening",
+    require_files=["release_evidence.json"],
+)
 DEFAULT_EVIDENCE_PATH = SPEC_DIR / "release_evidence.json"
 
 FEATURE = "attachment-ocr-ai-evidence-governance-hardening"
