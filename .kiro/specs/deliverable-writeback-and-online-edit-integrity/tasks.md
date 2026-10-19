@@ -138,3 +138,4 @@
   - 复盘追加（2026-10-19，design §10.3）：548318fb1 漏提交 5 个模型文件 ⇒ 补提交 6c262c06f；主工作区暂存区按路径对齐；安徽验收残留已修（审计日志 `deliverable_data_repair`）；前端被拒原因与一致性确认框转义已修；待拍板 2 项（needs_confirmation 无消费方、生成附注两次确认）。
   - 待拍板处理（2026-10-19，design §10.4）：一键全套接导出前一致性闸门（409 `notes_inconsistent` → 同一确认框 → `confirm_inconsistent` 重发），删除无消费方的 `needs_confirmation`；生成附注只确认一次（预检保留校验错误 / 无数据，出具提醒去掉「从未同步」）；`check_note_consistency` 改保存点隔离（PG 上 fail-open 才真正成立）。
   - 项目成员鉴权（2026-10-19，design §10.5，用户确认「项目组外的人无权生成附注」）：交付中心 `_guard_action` 先校验本项目成员（看 readonly / 生成 review），word-exports / 导出附注 Word / 组合导出包复用同一函数；全链路编制类 edit、查看 readonly，批量执行逐项目校验；附注 AI 四个 readonly；版本对比按本项目过滤。新增守卫 89 passed，相关 20 文件 407 passed / 2 failed（预存），磁盘变异 11 处全红并逐字节恢复；鉴权基线前缀维 336 → 277、旧维 218 → 214。
+  - 编辑级下调（2026-10-19，design §10.5 追加，用户拍板「合伙人和经理都要用」）：附注编辑器导出 Word、交付件报告正文回填 / 章节刷新改走 `_guard_action`（review 及以上 + 角色矩阵 + EQCR 只读）；交付件溯源 / 章节状态 / 回填 / 刷新补交付件归属校验。守卫 120 passed，磁盘变异 8 处全红并逐字节恢复，69 个测试文件与干净 HEAD 对拍无新增失败。

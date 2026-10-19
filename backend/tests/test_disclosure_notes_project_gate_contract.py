@@ -56,6 +56,9 @@ BODY_GATES = {
     "_assert_note_project_access",
     "_assert_validation_project_access",
     "_assert_object_project_access",
+    # 交付中心同一判定（首句 assert_project_permission，再按交付件角色矩阵 + EQCR 只读）：导出 Word 用。
+    # 「它真的校验项目成员」由 test_project_endpoint_authorization_baseline 的可伪证断言钉住
+    "_guard_action",
 }
 
 #: 业务动作调用名 —— 门禁必须早于它们全部。

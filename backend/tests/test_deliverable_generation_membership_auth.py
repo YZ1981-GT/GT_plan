@@ -9,6 +9,9 @@ word-exports 整组（一键生成全套等）、交付中心（``deliverable._g
   review 及以上 + 角色矩阵 + EQCR 只读。review 而非 edit：合伙人 / 经理 / 质控在项目里是 review 级（ROLE_MAP）；
 - 编制（全链路执行 / 重试 / 附注同步与裁剪，会改写试算表 / 报表 / 附注）：edit，与附注模块写端点同级。
 
+同日用户拍板「合伙人和经理都要用」：附注编辑器导出 Word、交付件章节刷新 / 报告正文回填原为 edit（复核人用不了），
+改走同一个 ``_guard_action``；溯源 / 章节状态 / 刷新 / 回填另须交付件属于路径上的项目（防凭别的项目的交付件 id 越权）。
+
 做法同 test_phase8_endpoint_role_levels（memory ㉕）：不 override 鉴权依赖，只替换其下的取数点（权限缓存返回指定
 级别，None = 查库查无此人；归档守卫与 RLS 置空），让真实 ``assert_project_permission`` 判定；业务层打桩并记账 ——
 被拦下的请求一次业务调用都不能有。
@@ -25,7 +28,9 @@ from fastapi.testclient import TestClient
 
 import app.deps as deps
 from app.core.database import get_db
-from app.routers import chain_workflow, deliverable, note_ai, note_export, word_export
+from app.routers import (
+    chain_workflow, deliverable, deliverable_lineage, disclosure_notes, note_ai, note_export, word_export,
+)
 from app.services.assignment_service import ROLE_MAP
 
 PID = uuid.UUID("7a1c0d6e-0000-4000-8000-000000000001")
@@ -44,25 +49,34 @@ _INCONSISTENT = {
 
 
 class _Result:
-    def __init__(self, value=None):
-        self._value = value
+    def __init__(self, value=None, first=None):
+        self._value, self._first = value, first
 
     def scalar_one_or_none(self):
         return self._value
 
+    def first(self):
+        return self._first
+
 
 class _FakeDB:
-    """project_users / chain_executions 查询恒查无此人 / 无记录；其余查询给一个最小项目（取文件名用）。"""
+    """project_users / chain_executions 查无记录；交付件归属查 task_project；交付件状态为编辑中；其余给一个最小项目。"""
 
     project = SimpleNamespace(report_scope="standalone", wizard_state={}, client_name="测试客户", name="测试项目")
 
-    def __init__(self, sql_log: list[str]):
-        self.sql_log = sql_log
+    def __init__(self, sql_log: list[str], task_project: uuid.UUID | None):
+        self.sql_log, self.task_project = sql_log, task_project
 
     async def execute(self, stmt, *_a, **_k):
         sql = str(stmt)
         self.sql_log.append(sql)
-        return _Result(None if ("project_users" in sql or "chain_executions" in sql) else self.project)
+        if "project_users" in sql or "chain_executions" in sql:
+            return _Result(None)
+        if "word_export_task.project_id" in sql:  # 交付件归属（_ensure_task_in_project）
+            return _Result(self.task_project)
+        if "FROM word_export_task" in sql:  # 终态检查：编辑中、非终态
+            return _Result(None, first=("editing", "audit_report"))
+        return _Result(self.project)
 
     async def commit(self):
         return None
@@ -139,6 +153,19 @@ def _stub_business(monkeypatch: pytest.MonkeyPatch, calls: list[str]) -> None:
     monkeypatch.setattr(word_export, "ExportTaskService",
                         _service(calls, "ExportTaskService", create_task=task, update_status=task, get_history=[]))
     monkeypatch.setattr(deliverable.DeliverableService, "list_deliverables", _recorder(calls, "list_deliverables", []))
+    lineage_result = {"written": [], "rejected": [], "skipped": [], "failed": [], "refreshed": [], "messages": []}
+    monkeypatch.setattr(
+        "app.services.deliverable_writeback_service.DeliverableWritebackService",
+        _service(calls, "DeliverableWritebackService", writeback=lineage_result))
+    monkeypatch.setattr(
+        "app.services.deliverable_refresh_service.DeliverableRefreshService",
+        _service(calls, "DeliverableRefreshService", refresh_section=lineage_result,
+                 refresh_all_stale_sections=lineage_result))
+    monkeypatch.setattr(deliverable_lineage, "LinkageFacadeService", _service(calls, "LinkageFacadeService", trace=[]))
+    monkeypatch.setattr(deliverable_lineage.DeliverableSectionStateService, "get_section_states",
+                        _recorder(calls, "get_section_states", []))
+    monkeypatch.setattr(deliverable_lineage, "_require_capability", _recorder(calls, "capability", "ok"))
+    monkeypatch.setattr(deliverable_lineage.audit_logger, "log_action", _recorder(calls, "audit_log", None))
     orch = chain_workflow.chain_orchestrator
     monkeypatch.setattr(orch, "execute_full_chain", _recorder(calls, "execute_full_chain", execution))
     monkeypatch.setattr(orch, "retry_execution", _recorder(calls, "retry_execution", execution))
@@ -154,6 +181,7 @@ def _client(
     authenticated: bool = True,
     calls: list[str] | None = None,
     sql_log: list[str] | None = None,
+    task_project: uuid.UUID | None = PID,
 ) -> TestClient:
     """level=None：不是项目成员（缓存未命中 → 查库查无此人）。role 是全局角色；eqcr=本项目委派了 EQCR。"""
     monkeypatch.setattr(deps, "_get_cached_permission", _async_return(level))
@@ -165,12 +193,12 @@ def _client(
 
     app = FastAPI()
     for r in (word_export.router, deliverable.router, note_export.router, chain_workflow.router,
-              chain_workflow.batch_router, note_ai.router):
+              chain_workflow.batch_router, note_ai.router, deliverable_lineage.router, disclosure_notes.router):
         app.include_router(r)
     log = sql_log if sql_log is not None else []
 
     async def _db():
-        yield _FakeDB(log)
+        yield _FakeDB(log, task_project)
 
     app.dependency_overrides[get_db] = _db
     if authenticated:
@@ -193,6 +221,10 @@ _GENERATE = [  # 生成交付件：_guard_action（review 及以上 + 角色矩�
     ("交付中心生成附注", "post", f"{_P}/deliverables/disclosure-notes/render", {"year": 2025}),
     ("导出附注 Word", "post", f"{_P}/notes/export-word", {"year": 2025}),
     ("组合导出包", "post", f"{_P}/workflow/export-package", {"year": 2025}),
+    ("附注编辑器导出 Word", "post", f"{_N}/2025/export-word", None),
+    ("交付件单节刷新", "post", f"{_P}/deliverables/{TASK}/refresh-section", {"year": 2025, "section_code": "八、1"}),
+    ("交付件批量刷新", "post", f"{_P}/deliverables/{TASK}/refresh-stale", {"year": 2025}),
+    ("报告正文回填", "post", f"{_P}/deliverables/{TASK}/writeback", {"year": 2025}),
 ]
 _PREPARE = [  # 编制：edit
     ("全链路生成", "post", f"{_P}/workflow/execute-full-chain", {"year": 2025}),
@@ -211,7 +243,10 @@ _VIEW = [  # 查看 / AI 预览：readonly 及以上
     ("AI 生成变动分析", "post", f"{_N}/ai/generate-analysis", {"section_number": "五、1"}),
     ("AI 披露完整性检查", "post", f"{_N}/ai/check-completeness", None),
     ("AI 表述规范检查", "post", f"{_N}/ai/check-expression?section_number=x", None),
+    ("交付件溯源", "get", f"{_P}/deliverables/{TASK}/trace?section_code=x", None),
+    ("交付件章节状态", "get", f"{_P}/deliverables/{TASK}/section-states", None),
 ]
+_LINEAGE = [c for c in _GENERATE + _VIEW if f"/deliverables/{TASK}/" in c[2]]
 _ALL = _GENERATE + _PREPARE + _VIEW + [("全链路进度流", "get", f"{_P}/workflow/progress/{EXEC}", None)]
 
 
@@ -334,9 +369,20 @@ def test_batch_execute_skips_projects_without_edit(monkeypatch) -> None:
     assert calls.count("execute_full_chain") == 1
 
 
+@pytest.mark.parametrize("name,method,path,body", _LINEAGE, ids=_ids(_LINEAGE))
+def test_lineage_only_touches_deliverables_of_this_project(monkeypatch, name, method, path, body) -> None:
+    """交付件属于别的项目 ⇒ 403「交付物不属于该项目」（此前只按交付件 id 取，本项目成员可读写别的项目的交付件）；不存在 ⇒ 404。"""
+    calls: list[str] = []
+    resp = _call(_client(monkeypatch, "edit", calls=calls, task_project=OTHER), method, path, body)
+    assert resp.status_code == 403 and "交付物不属于该项目" in resp.text, f"{name}：{resp.status_code} {resp.text}"
+    assert calls == [], f"{name}：归属不符仍调到了业务层 {calls}"
+    resp = _call(_client(monkeypatch, "edit", task_project=None), method, path, body)
+    assert resp.status_code == 404 and "交付物不存在" in resp.text, f"{name}：{resp.status_code} {resp.text}"
+
+
 def test_every_generate_entry_shares_the_deliverable_guard() -> None:
     """生成附注的各入口（交付中心 / word-exports / 导出附注 Word / 组合导出包）是同一个判定函数，不是几份拷贝。"""
-    for mod in (word_export, note_export, chain_workflow):
+    for mod in (word_export, note_export, chain_workflow, deliverable_lineage, disclosure_notes):
         assert mod._guard_action is deliverable._guard_action, mod.__name__
 
 
@@ -358,7 +404,7 @@ def test_mutation_dependency_without_membership_lets_outsider_in(monkeypatch) ->
         return current_user
 
     monkeypatch.setattr(deps, "assert_project_permission", _no_membership_check)
-    cases = [c for c in _PREPARE + _VIEW if "/deliverables/" not in c[2]]  # 交付中心走 _guard_action，另测
+    cases = [c for c in _PREPARE + _VIEW if not c[2].endswith("/deliverables/")]  # 交付件列表走 _guard_action，另测
     for name, method, path, body in cases:
         resp = _call(_client(monkeypatch, None), method, path, body)
         assert resp.status_code == 200, f"{name}：去掉成员校验后仍 {resp.status_code}"

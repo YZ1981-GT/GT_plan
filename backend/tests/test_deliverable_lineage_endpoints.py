@@ -70,7 +70,9 @@ def override_deps(mock_user, mock_db):
 
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_current_user] = _override_get_current_user
-    yield
+    # 交付件归属校验（_ensure_task_in_project）mock_db 答不了；归属见 test_deliverable_generation_membership_auth.py
+    with patch("app.routers.deliverable_lineage._ensure_task_in_project", new=AsyncMock(return_value=None)):
+        yield
     app.dependency_overrides.clear()
 
 

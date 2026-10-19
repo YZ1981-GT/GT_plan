@@ -27,6 +27,8 @@ from app.core.database import get_db
 from app.deps import assert_project_permission, get_current_user, require_project_access, require_operation, get_user_scope_cycles, check_consol_lock, require_role
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
+from app.routers.deliverable import _guard_action
+from app.services.deliverable_permissions import DeliverableAction
 from app.models.report_models import DisclosureNote, NoteStatus
 from app.models.report_schemas import (
     DisclosureNoteDetail,
@@ -1236,9 +1238,14 @@ async def export_word(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(get_current_user),
 ):
-    """导出附注为 Word 文档"""
+    """导出附注为 Word 文档。
+
+    与交付中心「生成附注」同一判定 ``_guard_action``（项目成员 review 及以上 + 角色矩阵 + EQCR 只读）——
+    原为 edit 级，合伙人 / 经理（项目里是 review 级）用不了（2026-10-19 用户拍板放开）。
+    """
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
     from fastapi.responses import StreamingResponse
     from app.models.core import Project
     from app.services.note_section_catalog import normalize_report_scope
