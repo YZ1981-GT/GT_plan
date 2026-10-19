@@ -14,11 +14,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_db
+from app.deps import get_db, require_project_access
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/workpapers",
     tags=["workpaper-review-status"],
+    dependencies=[Depends(require_project_access("readonly"))],  # 项目级读鉴权（Phase 8 Task 8 补）
 )
 
 

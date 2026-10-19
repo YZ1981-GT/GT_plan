@@ -14,13 +14,16 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
 from app.services.wp_template_init_service import find_template_file
 
 logger = logging.getLogger(__name__)
 
+# 项目级读鉴权：供前端 Univer 渲染底稿（非 OnlyOffice 外部抓取，前端带会话令牌）（Phase 8 Task 8 补）
 router = APIRouter(
     prefix="/api/projects/{project_id}/workpapers/{wp_id}/template-file",
     tags=["workpaper-template-files"],
+    dependencies=[Depends(require_project_access("readonly"))],
 )
 
 

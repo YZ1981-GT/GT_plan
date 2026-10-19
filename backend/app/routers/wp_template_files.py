@@ -15,6 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
 from app.services.four_table.occurrence_by_standard_code import (
     fetch_occurrence_by_standard_code,
     merge_occurrence_into_tb_data,
@@ -28,9 +29,11 @@ from app.services.wp_template_init_service import (
 
 logger = logging.getLogger(__name__)
 
+# 项目级读鉴权：供前端 Univer 加载底稿 xlsx（非 OnlyOffice 外部抓取）；init 写端点再挂 edit（Phase 8 Task 8 补）
 router = APIRouter(
     prefix="/api/projects/{project_id}/workpapers/{wp_id}/template-file",
     tags=["workpaper-template-files"],
+    dependencies=[Depends(require_project_access("readonly"))],
 )
 
 
@@ -102,6 +105,7 @@ async def init_from_template(
     project_id: str,
     wp_id: str,
     db: AsyncSession = Depends(get_db),
+    _=Depends(require_project_access("edit")),
 ):
     """手动触发从模板初始化底稿文件（覆盖已有文件）"""
     pid = UUID(project_id)

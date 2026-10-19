@@ -18,13 +18,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
 from app.services.wp_evidence_service import WpEvidenceService
 
 logger = logging.getLogger(__name__)
 
+# 路由级 readonly 保证项目隔离；link / {link_id} 删除 / batch-link 三个写端点各自再挂 edit（Phase 8 Task 8 补）
 router = APIRouter(
     prefix="/api/projects/{project_id}/workpapers/{wp_id}/evidence",
     tags=["workpaper-evidence"],
+    dependencies=[Depends(require_project_access("readonly"))],
 )
 
 
@@ -76,6 +79,7 @@ async def create_evidence_link(
     wp_id: str,
     body: CreateLinkRequest,
     db: AsyncSession = Depends(get_db),
+    _=Depends(require_project_access("edit")),
 ):
     """创建证据链接（单元格→附件）"""
     svc = WpEvidenceService(db)
@@ -99,6 +103,7 @@ async def delete_evidence_link(
     wp_id: str,
     link_id: str,
     db: AsyncSession = Depends(get_db),
+    _=Depends(require_project_access("edit")),
 ):
     """删除证据链接"""
     svc = WpEvidenceService(db)
@@ -115,6 +120,7 @@ async def batch_link_evidence(
     wp_id: str,
     body: BatchLinkRequest,
     db: AsyncSession = Depends(get_db),
+    _=Depends(require_project_access("edit")),
 ):
     """批量关联（区域→多附件）"""
     svc = WpEvidenceService(db)

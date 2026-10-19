@@ -20,6 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
 from app.services.wp_template_init_service import (
     get_workpaper_file,
     get_workpaper_storage_path,
@@ -28,9 +29,11 @@ from app.services.wp_template_init_service import (
 
 logger = logging.getLogger(__name__)
 
+# 项目级读鉴权：xlsx → Univer JSON 转换供前端渲染（前端带会话令牌）（Phase 8 Task 8 补）
 router = APIRouter(
     prefix="/api/projects/{project_id}/workpapers/{wp_id}/template-file",
     tags=["workpaper-template-files"],
+    dependencies=[Depends(require_project_access("readonly"))],
 )
 
 

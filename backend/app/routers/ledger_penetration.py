@@ -51,6 +51,7 @@ async def penetrate(
     page_size: int = 100,
     db: AsyncSession = Depends(get_db),
     redis=Depends(get_redis),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """统一穿透查询（带缓存）"""
     svc = _svc(db, redis)

@@ -96,6 +96,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { apiProxy } from '@/utils/apiProxy'
+import { downloadFile } from '@/utils/http'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps<{
@@ -168,11 +169,12 @@ async function unlinkConversation(conversationId: string) {
   await fetchPanel()
 }
 
+// 归档导出走带令牌的下载：window.open 不带 Authorization 头，接口加了项目鉴权后会被拒
 async function exportArchive() {
-  window.open(
-    `/api/projects/${props.projectId}/review-workflow/${props.year}/archive?template_code=${panelData.value?.template_code}`,
-    '_blank'
-  )
+  await downloadFile(`/api/projects/${props.projectId}/review-workflow/${props.year}/archive`, {
+    params: { template_code: panelData.value?.template_code },
+    fileName: `Review_Archive_${props.year}.xlsx`,
+  })
 }
 
 onMounted(fetchPanel)

@@ -6,19 +6,30 @@ import io
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.services.independence_signing_service import IndependenceSigningService
 from app.services.review_workflow_service import ReviewWorkflowService
 
-router = APIRouter(prefix="/api/projects/{project_id}/review-workflow", tags=["review-workflow"])
-signing_router = APIRouter(prefix="/api/projects/{project_id}/signing", tags=["signing"])
+# 路由级 readonly 保证项目隔离（只有项目成员能访问）。写端点按「谁会用」定级（Phase 8 Task 8 补，2026-10-19 复核调整）：
+#   - 复核写（save / link / unlink / import）与发起签署（initiate）挂 review：合伙人 / 经理 / 质控 / EQCR 在项目里是
+#     review 级（assignment_service.ROLE_MAP），挂 edit 会把复核人挡在外面；edit 级的审计员 / 助理照样放行。
+#   - 成员签署（sign）只要求是项目成员，且只能签本人（URL 里的 user_id 必须是当前登录人）。
+# my_signing_router 无 project_id：要求登录，且只能查本人的待签任务。
+router = APIRouter(
+    prefix="/api/projects/{project_id}/review-workflow", tags=["review-workflow"],
+    dependencies=[Depends(require_project_access("readonly"))],
+)
+signing_router = APIRouter(
+    prefix="/api/projects/{project_id}/signing", tags=["signing"],
+    dependencies=[Depends(require_project_access("readonly"))],
+)
 my_signing_router = APIRouter(prefix="/api/my/signing-tasks", tags=["signing"])
 
 
@@ -57,7 +68,7 @@ async def save_review(
     year: int,
     body: SaveReviewRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("review")),
 ) -> dict[str, Any]:
     """保存复核记录"""
     svc = ReviewWorkflowService(db)
@@ -104,6 +115,7 @@ async def link_conversation(
     year: int,
     body: LinkConversationRequest,
     db: AsyncSession = Depends(get_db),
+    _: Any = Depends(require_project_access("review")),
 ) -> dict[str, Any]:
     """将复核对话关联到检查要点"""
     svc = ReviewWorkflowService(db)
@@ -119,6 +131,7 @@ async def unlink_conversation(
     year: int,
     conversation_id: str = Query(...),
     db: AsyncSession = Depends(get_db),
+    _: Any = Depends(require_project_access("review")),
 ) -> dict[str, Any]:
     """取消关联"""
     svc = ReviewWorkflowService(db)
@@ -146,6 +159,7 @@ async def import_review_excel(
     template_code: str = Query(...),
     reviewer_id: str = Query(...),
     db: AsyncSession = Depends(get_db),
+    _: Any = Depends(require_project_access("review")),
 ) -> dict[str, Any]:
     """导入已填写的复核 Excel 回写系统"""
     from fastapi import UploadFile, File
@@ -210,12 +224,27 @@ async def export_blank_template(
 # ─── Independence Signing ───
 
 
+def _self_user_id(user_id: str, current_user: User) -> UUID:
+    """独立性声明只认本人：URL 里的 user_id 必须是当前登录人。
+
+    声明是个人承诺，admin 也不代签 / 代查；不合法的 ID 回 422（原先直接 UUID() 抛 500）。
+    """
+    try:
+        uid = UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="user_id 不是合法的用户 ID") from None
+    if uid != current_user.id:
+        raise HTTPException(status_code=403, detail="只能签署或查看本人的独立性声明")
+    return uid
+
+
 @signing_router.post("/{year}/initiate")
 async def initiate_signing(
     project_id: UUID,
     year: int,
     template_code: str = Query("A17-7"),
     db: AsyncSession = Depends(get_db),
+    _: Any = Depends(require_project_access("review")),
 ) -> dict[str, Any]:
     """为项目成员创建签署任务"""
     svc = IndependenceSigningService(db)
@@ -234,10 +263,12 @@ async def sign(
     user_id: str = Query(...),
     template_code: str = Query("A17-7"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """成员电子签署"""
+    """成员电子签署（只要求是项目成员，由路由级 readonly 保证；且只能签本人）"""
+    signer_id = _self_user_id(user_id, current_user)
     svc = IndependenceSigningService(db)
-    result = await svc.sign(project_id, UUID(user_id), template_code)
+    result = await svc.sign(project_id, signer_id, template_code)
     if result.get("success"):
         await db.commit()
     return result
@@ -259,7 +290,8 @@ async def get_signing_progress(
 async def get_my_signing_tasks(
     user_id: str = Query(..., description="当前用户ID"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
-    """获取当前用户待签署任务"""
+    """获取当前用户待签署任务（要求登录，且只能查本人）"""
     svc = IndependenceSigningService(db)
-    return await svc.get_my_pending_tasks(UUID(user_id))
+    return await svc.get_my_pending_tasks(_self_user_id(user_id, current_user))

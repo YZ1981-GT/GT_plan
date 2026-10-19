@@ -12,9 +12,14 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
 from app.services.auto_data_resolvers import resolve_auto_data_source
 
-router = APIRouter(prefix="/api/projects/{project_id}/auto-data", tags=["auto-data"])
+# 项目级读鉴权：路径含 {project_id}，所有端点都是按项目读 resolver（Phase 8 Task 8 补）
+router = APIRouter(
+    prefix="/api/projects/{project_id}/auto-data", tags=["auto-data"],
+    dependencies=[Depends(require_project_access("readonly"))],
+)
 
 #: 路径/固定参数名——**不得**被当成 resolver 的行级参数透传（否则重复传参 TypeError）。
 _RESERVED_QUERY_KEYS = frozenset({"project_id", "source", "year"})

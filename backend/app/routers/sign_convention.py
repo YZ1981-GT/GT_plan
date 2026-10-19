@@ -13,11 +13,13 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
+from app.deps import require_project_access
 from app.services.ledger_import.sign_convention_types import (
     CURRENT_SIGN_CONVENTION,
     SignAnomaly,
 )
 
+# 读 readonly / 写 edit，均逐端点挂（project_id 在路径，与同域既有端点一致写法）
 router = APIRouter(
     prefix="/api/projects/{project_id}/datasets/{dataset_id}/sign-convention",
     tags=["符号约定"],
@@ -98,6 +100,7 @@ async def list_sign_anomalies(
     review_status: Optional[str] = Query(None, description="筛选复核状态"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    _: Any = Depends(require_project_access("readonly")),
 ) -> SignAnomalyListResponse:
     """获取方向异常列表。
 
@@ -121,6 +124,7 @@ async def create_direction_override(
     project_id: UUID,
     dataset_id: UUID,
     body: DirectionOverrideRequest,
+    _: Any = Depends(require_project_access("edit")),
 ) -> DirectionOverrideResponse:
     """用户覆盖方向，记录原因和留痕。
 
@@ -150,6 +154,7 @@ async def batch_confirm_anomalies(
     project_id: UUID,
     dataset_id: UUID,
     body: BatchConfirmRequest,
+    _: Any = Depends(require_project_access("edit")),
 ) -> BatchConfirmResponse:
     """批量确认异常为正确（真实业务余额）。
 

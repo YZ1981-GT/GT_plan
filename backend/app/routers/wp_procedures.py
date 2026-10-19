@@ -18,14 +18,18 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
 from app.services.wp_procedure_service import WpProcedureService
 from app.services.wp_quality_score_linkage import recalc_quality_score
 
 logger = logging.getLogger(__name__)
 
+# 路由级 readonly 保证项目隔离；complete/custom/copy-from-prior 是编制操作，各自再挂 edit（Phase 8 Task 8 补）。
+# trim 挂 review：裁剪由经理 / 合伙人做，他们在项目里是 review 级（assignment_service.ROLE_MAP），挂 edit 会被挡住。
 router = APIRouter(
     prefix="/api/projects/{project_id}/workpapers/{wp_id}/procedures",
     tags=["workpaper-procedures"],
+    dependencies=[Depends(require_project_access("readonly"))],
 )
 
 
@@ -76,6 +80,7 @@ async def complete_procedure(
     proc_id: str,
     body: CompleteRequest,
     db: AsyncSession = Depends(get_db),
+    _=Depends(require_project_access("edit")),
 ):
     """标记程序完成"""
     svc = WpProcedureService(db)
@@ -95,6 +100,7 @@ async def trim_procedure(
     proc_id: str,
     body: TrimRequest,
     db: AsyncSession = Depends(get_db),
+    _=Depends(require_project_access("review")),
 ):
     """裁剪程序（经理/合伙人权限）"""
     svc = WpProcedureService(db)
@@ -121,6 +127,7 @@ async def create_custom_procedure(
     wp_id: str,
     body: CustomProcedureRequest,
     db: AsyncSession = Depends(get_db),
+    _=Depends(require_project_access("edit")),
 ):
     """新增自定义程序"""
     svc = WpProcedureService(db)
@@ -141,6 +148,7 @@ async def copy_from_prior(
     wp_id: str,
     body: CopyFromPriorRequest,
     db: AsyncSession = Depends(get_db),
+    _=Depends(require_project_access("edit")),
 ):
     """从上年复制程序清单"""
     svc = WpProcedureService(db)

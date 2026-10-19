@@ -13,7 +13,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
-from app.deps import get_current_user, get_db
+from app.deps import get_current_user, get_db, require_project_access
 
 router = APIRouter(prefix="/api/disclosure-notes", tags=["note-offline"])
 
@@ -25,6 +25,7 @@ async def export_offline_package(
     body: dict[str, Any] | None = None,
     db=Depends(get_db),
     user=Depends(get_current_user),
+    _=Depends(require_project_access("readonly")),
 ):
     """导出附注离线编辑包 (C.0.17)."""
     from app.services.note_offline_export_service import NoteOfflineExportService
@@ -60,6 +61,7 @@ async def preview_import(
     file: UploadFile = File(...),
     db=Depends(get_db),
     user=Depends(get_current_user),
+    _=Depends(require_project_access("readonly")),
 ):
     """校验并预览导入 (C.0.18)."""
     from app.services.note_offline_import_service import NoteOfflineImportService
@@ -84,6 +86,7 @@ async def execute_import(
     decisions: str = Form("{}"),
     db=Depends(get_db),
     user=Depends(get_current_user),
+    _=Depends(require_project_access("edit")),
 ):
     """执行导入 (C.0.18)."""
     import json

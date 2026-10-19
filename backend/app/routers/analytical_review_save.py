@@ -14,12 +14,15 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
 
 logger = logging.getLogger(__name__)
 
+# 项目级写鉴权：两端点都是写分析性复核底稿，project_id 在路径（Phase 8 Task 8 补）
 router = APIRouter(
     prefix="/api/projects/{project_id}/analytical-review",
     tags=["analytical-review"],
+    dependencies=[Depends(require_project_access("edit"))],
 )
 
 

@@ -14,12 +14,15 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
 
 logger = logging.getLogger(__name__)
 
+# 项目级读鉴权：按项目推荐 B5 版本（Phase 8 Task 8 补）
 router = APIRouter(
     prefix="/api/projects/{project_id}/b5",
     tags=["b5-version"],
+    dependencies=[Depends(require_project_access("readonly"))],
 )
 
 

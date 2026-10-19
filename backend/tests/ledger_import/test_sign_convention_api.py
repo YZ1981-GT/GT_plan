@@ -9,10 +9,13 @@ Requirements: 4.4, 4.5, 6.3, 6.6
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 
 import pytest
 import httpx
 
+import app.deps as deps
+from app.core.database import get_db
 from app.routers.sign_convention import (
     BatchConfirmRequest,
     BatchConfirmResponse,
@@ -26,6 +29,45 @@ from app.routers.sign_convention import (
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _as_edit_level_member(monkeypatch: pytest.MonkeyPatch):
+    """以 edit 级项目成员身份请求。
+
+    Phase 8 Task 8 起这三个端点挂了项目级鉴权（列表 readonly / 两个写端点 edit）。本文件测的是
+    stub 接口的响应结构与入参校验，不是鉴权；鉴权由 test_phase8_endpoint_auth_fires /
+    test_phase8_endpoint_role_levels 覆盖。这里不 override ``require_project_access``（依赖工厂
+    每次返回新函数对象，override 对不上会静默失效），只替换它下面的取数点，让真实的
+    ``assert_project_permission`` 照常判定。``app.main.app`` 是全局对象，结束后原样恢复 overrides。
+    """
+    from app.main import app
+
+    async def _none(*_a, **_k):
+        return None
+
+    async def _edit_level(*_a, **_k):
+        return "edit"
+
+    monkeypatch.setattr(deps, "_get_cached_permission", _edit_level)
+    monkeypatch.setattr(deps, "_set_cached_permission", _none)
+    monkeypatch.setattr(deps, "_check_project_not_archived", _none)
+    monkeypatch.setattr(deps, "set_rls_context", _none)
+
+    member = SimpleNamespace(id=uuid.uuid4(), role=SimpleNamespace(value="auditor"))
+
+    async def _user():
+        return member
+
+    async def _db():
+        yield None  # 端点本身是 stub 不查库；鉴权链的查库点已在上面替换
+
+    previous = dict(app.dependency_overrides)
+    app.dependency_overrides[deps.get_current_user] = _user
+    app.dependency_overrides[get_db] = _db
+    yield
+    app.dependency_overrides.clear()
+    app.dependency_overrides.update(previous)
+
 
 @pytest.fixture
 def project_id() -> str:

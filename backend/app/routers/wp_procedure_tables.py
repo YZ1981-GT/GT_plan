@@ -19,14 +19,17 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
 from app.services.procedure_table_auto_service import ProcedureTableService, list_table_codes
 from app.services.field_override_service import FieldOverrideService
 
 _logger = logging.getLogger(__name__)
 
+# 路由级 readonly 保证项目隔离；custom-items 增删两个写端点各自再挂 edit（Phase 8 Task 8 补）
 router = APIRouter(
     prefix="/api/projects/{project_id}/procedure-tables",
     tags=["procedure-tables"],
+    dependencies=[Depends(require_project_access("readonly"))],
 )
 
 
@@ -80,6 +83,7 @@ async def create_custom_item(
     project_id: UUID,
     body: CustomItemCreate,
     db: AsyncSession = Depends(get_db),
+    _: Any = Depends(require_project_access("edit")),
 ) -> dict[str, Any]:
     """持久化用户自定义程序行（存入 field_overrides 表）"""
     override_svc = FieldOverrideService(db)
@@ -112,6 +116,7 @@ async def delete_custom_item(
     table_code: str = Query(...),
     year: int = Query(default=2025),
     db: AsyncSession = Depends(get_db),
+    _: Any = Depends(require_project_access("edit")),
 ) -> dict[str, str]:
     """删除用户自定义程序行"""
     import sqlalchemy as sa

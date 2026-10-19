@@ -10,9 +10,14 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access
 from app.services.cash_flow_verification_service import CashFlowVerificationService
 
-router = APIRouter(prefix="/api/projects/{project_id}/cf-verification", tags=["cf-verification"])
+# 路由级 readonly 保证项目隔离；两个写端点（explanation / create-adjustment）各自再挂 edit（Phase 8 Task 8 补）
+router = APIRouter(
+    prefix="/api/projects/{project_id}/cf-verification", tags=["cf-verification"],
+    dependencies=[Depends(require_project_access("readonly"))],
+)
 
 
 class ExplanationRequest(BaseModel):
@@ -82,6 +87,7 @@ async def save_explanation(
     year: int,
     body: ExplanationRequest,
     db: AsyncSession = Depends(get_db),
+    _: Any = Depends(require_project_access("edit")),
 ) -> dict[str, Any]:
     """保存用户差异说明"""
     svc = CashFlowVerificationService(db)
@@ -103,6 +109,7 @@ async def create_cf_adjustment(
     year: int,
     body: CreateAdjustmentRequest,
     db: AsyncSession = Depends(get_db),
+    _: Any = Depends(require_project_access("edit")),
 ) -> dict[str, Any]:
     """从 CF 差异一键创建调整分录"""
     from decimal import Decimal
