@@ -101,7 +101,10 @@ def _override_auth():
     app.dependency_overrides[get_current_user] = lambda: _FakeUser()
     app.dependency_overrides[get_db] = _override_db
 
-    with patch("app.core.database.set_rls_context", new_callable=AsyncMock):
+    # 附注 Word / 全套打包走交付中心 _guard_action：admin 跳过成员校验，但仍查 EQCR 委派（mock_db 不支持）
+    with patch("app.core.database.set_rls_context", new_callable=AsyncMock), patch(
+        "app.routers.deliverable._is_project_eqcr", new=AsyncMock(return_value=False)
+    ):
         yield mock_db
 
     app.dependency_overrides.clear()

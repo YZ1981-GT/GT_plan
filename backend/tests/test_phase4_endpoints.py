@@ -24,10 +24,11 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+import app.deps as deps
 from app.core.database import get_db
 from app.deps import get_current_user
-from app.models.base import Base
-from app.models.core import Project, User
+from app.models.base import Base, PermissionLevel, ProjectUserRole
+from app.models.core import Project, ProjectUser, User
 from app.models.phase13_models import (
     DeliverableSnapshot,
     ExportJob,
@@ -121,6 +122,26 @@ async def seed_project(db: AsyncSession):
     db.add(other_project)
     await db.commit()
     return project
+
+
+@pytest.fixture(autouse=True)
+def _no_permission_cache(monkeypatch):
+    """权限缓存是真 Redis、按 (用户, 项目) 记 5 分钟，而本文件 ID 是模块级常量 ⇒ 关掉缓存，每例只认本例种的成员。"""
+
+    async def _miss(*_a, **_k):
+        return None
+
+    monkeypatch.setattr(deps, "_get_cached_permission", _miss)
+    monkeypatch.setattr(deps, "_set_cached_permission", _miss)
+
+
+async def _add_member(
+    db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID, level: PermissionLevel
+) -> None:
+    """把用户种成本项目某级别成员（交付中心先校验项目成员，再按全局角色矩阵判定）。"""
+    role = ProjectUserRole.readonly if level == PermissionLevel.readonly else ProjectUserRole.auditor
+    db.add(ProjectUser(project_id=project_id, user_id=user_id, role=role, permission_level=level))
+    await db.commit()
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -704,8 +725,9 @@ class TestDownloadEndpoint:
 class TestAuthorizationGuards:
     """需求 5.1 / 7.4：权限校验。
 
-    readonly 角色 → write 端点（create/retry）应 403；
-    readonly 角色 → read 端点（readiness/job/download）应 200。
+    先校验本项目成员（2026-10-19 补；此前只看全局角色，任意登录用户可读写任意项目）：
+    - 全局角色 readonly 即便是 edit 级成员 → write 端点（create/retry）应 403（角色矩阵）；
+    - 项目只读成员 → read 端点（readiness/job）应 200；不是本项目成员 → read 也 403。
     """
 
     @pytest.mark.asyncio
@@ -713,6 +735,7 @@ class TestAuthorizationGuards:
         self, db: AsyncSession, db_factory, seed_project,
     ):
         """readonly 角色用户 → POST /trio → 403。"""
+        await _add_member(db, PROJECT_ID, READONLY_USER_ID, PermissionLevel.edit)
         app, _ = _build_app(db_factory, READONLY_USER)
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test",
@@ -731,6 +754,7 @@ class TestAuthorizationGuards:
     ):
         """readonly 角色用户 → POST retry → 403。"""
         job, _, _ = await _seed_trio_job(db, PROJECT_ID)
+        await _add_member(db, PROJECT_ID, READONLY_USER_ID, PermissionLevel.edit)
 
         app, _ = _build_app(db_factory, READONLY_USER)
         async with AsyncClient(
@@ -746,6 +770,7 @@ class TestAuthorizationGuards:
         self, db: AsyncSession, db_factory, seed_project,
     ):
         """readonly 角色可以查 readiness（只读操作）。"""
+        await _add_member(db, PROJECT_ID, READONLY_USER_ID, PermissionLevel.readonly)
         app, _ = _build_app(db_factory, READONLY_USER)
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test",
@@ -762,6 +787,7 @@ class TestAuthorizationGuards:
     ):
         """readonly 角色可以查 job（只读操作）。"""
         job, _, _ = await _seed_trio_job(db, PROJECT_ID)
+        await _add_member(db, PROJECT_ID, READONLY_USER_ID, PermissionLevel.readonly)
 
         app, _ = _build_app(db_factory, READONLY_USER)
         async with AsyncClient(
@@ -773,6 +799,24 @@ class TestAuthorizationGuards:
         assert r.status_code == 200
 
     @pytest.mark.asyncio
+    async def test_non_member_cannot_read(
+        self, db: AsyncSession, db_factory, seed_project,
+    ):
+        """不是本项目成员 → 只读端点也 403（不能看别的项目的三件套）。"""
+        job, _, _ = await _seed_trio_job(db, PROJECT_ID)
+
+        app, _ = _build_app(db_factory, READONLY_USER)
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test",
+        ) as client:
+            readiness = await client.get(
+                f"{_base_url(PROJECT_ID)}/trio/readiness", params={"year": YEAR},
+            )
+            job_resp = await client.get(f"{_base_url(PROJECT_ID)}/trio/jobs/{job.id}")
+        assert readiness.status_code == 403 and "权限不足" in readiness.text
+        assert job_resp.status_code == 403 and "权限不足" in job_resp.text
+
+    @pytest.mark.asyncio
     async def test_readonly_create_zero_writes(
         self, db: AsyncSession, db_factory, seed_project,
     ):
@@ -782,6 +826,7 @@ class TestAuthorizationGuards:
         """
         import sqlalchemy as sa
 
+        await _add_member(db, PROJECT_ID, READONLY_USER_ID, PermissionLevel.edit)
         app, _ = _build_app(db_factory, READONLY_USER)
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test",

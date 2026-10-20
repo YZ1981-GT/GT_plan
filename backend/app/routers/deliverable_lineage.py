@@ -1,19 +1,23 @@
 """出品物溯源与章节状态查询端点 — deliverable-lineage-and-writeback Task 5.1/17.1/17.2/17.3
 
 GET /api/projects/{project_id}/deliverables/{word_export_task_id}/trace
-    溯源查询（project:read），2s 超时返回明确错误（需求 10.1）
+    溯源查询（项目成员 readonly），2s 超时返回明确错误（需求 10.1）
 
 GET /api/projects/{project_id}/deliverables/{word_export_task_id}/section-states
-    章节状态查询（project:read）
+    章节状态查询（项目成员 readonly）
 
 POST /api/projects/{project_id}/deliverables/{word_export_task_id}/writeback
-    回填触发（project:edit），终态拒绝，>100 章节走异步（需求 7.1, 10.2, 10.3, 10.4, 11.1）
+    回填触发，终态拒绝（需求 7.1, 10.2, 10.3, 10.4, 11.1）
 
 POST /api/projects/{project_id}/deliverables/{word_export_task_id}/refresh-section
-    单章节增量刷新（project:edit）（需求 5.1, 10.3, 10.4, 11.1）
+    单章节增量刷新（需求 5.1, 10.3, 10.4, 11.1）
 
 POST /api/projects/{project_id}/deliverables/{word_export_task_id}/refresh-stale
-    批量刷新所有过期章节（project:edit）（需求 5.7, 10.2, 10.3, 10.4, 11.1）
+    批量刷新所有过期章节（需求 5.7, 10.2, 10.3, 10.4, 11.1）
+
+鉴权：回填 / 刷新与交付中心同一判定 ``deliverable._guard_action``（项目成员 review 及以上 + 角色矩阵 +
+EQCR 只读）—— 原为 edit 级，合伙人 / 经理（项目里是 review 级）用不了（2026-10-19 用户拍板放开）。
+五个端点都先校验交付件属于路径上的项目（``_ensure_task_in_project``）。
 
 Requirements: 1.1, 3.1, 5.1, 5.7, 7.1, 10.1, 10.2, 10.3, 10.4, 11.1, 11.3
 """
@@ -28,9 +32,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_db, require_project_access
+from app.deps import get_current_user, get_db, require_project_access
 from app.models.core import User
+from app.routers.deliverable import _guard_action
 from app.services.audit_logger_enhanced import audit_logger
+from app.services.deliverable_permissions import DeliverableAction
 from app.services.deliverable_section_state_service import DeliverableSectionStateService
 from app.services.linkage_facade_service import LinkageFacadeService
 
@@ -125,6 +131,21 @@ class RefreshStaleRequest(BaseModel):
     confirm_overwrite: bool = False
 
 
+async def _ensure_task_in_project(db: AsyncSession, word_export_task_id: UUID, project_id: UUID) -> None:
+    """交付件必须属于路径上的项目 —— 否则本项目成员凭别的项目的交付件 id 就能读溯源、刷新或回填。"""
+    from sqlalchemy import select
+
+    from app.models.phase13_models import WordExportTask
+
+    owner = (
+        await db.execute(select(WordExportTask.project_id).where(WordExportTask.id == word_export_task_id))
+    ).scalar_one_or_none()
+    if owner is None:
+        raise HTTPException(status_code=404, detail="交付物不存在")
+    if owner != project_id:
+        raise HTTPException(status_code=403, detail="交付物不属于该项目")
+
+
 @router.get("/trace")
 async def trace_deliverable(
     project_id: UUID,
@@ -140,6 +161,7 @@ async def trace_deliverable(
     source_id = '{word_export_task_id}:{section_code}'。
     2 秒超时返回明确错误（需求 10.1）。
     """
+    await _ensure_task_in_project(db, word_export_task_id, project_id)
     source_id = f"{word_export_task_id}:{section_code}"
     facade = LinkageFacadeService(db)
 
@@ -184,6 +206,7 @@ async def get_section_states(
 
     返回所有章节的 stale 状态 + 锚点 + 快照哈希。
     """
+    await _ensure_task_in_project(db, word_export_task_id, project_id)
     dss = DeliverableSectionStateService(db)
     sections = await dss.get_section_states(word_export_task_id)
     return {"sections": sections}
@@ -303,17 +326,19 @@ async def writeback_deliverable(
     word_export_task_id: UUID,
     body: WritebackRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(get_current_user),
 ):
     """出品物报告正文回填（显式按钮触发）。
 
-    权限: project:edit（无权限 403，需求 10.3）
+    权限: 交付中心同一判定（项目成员 review 及以上 + 角色矩阵 + EQCR 只读，无权限 403，需求 10.3）
     终态: signed/confirmed/archived 拒绝（需求 11.1/11.3）
     能力门控: 仅 audit_report 可回填；附注已下线（disclosure_notes → 400，US-2）
     提交: service 只 flush，路由成功后 `await db.commit()`（修 get_db 不自动提交，US-3 AC-3.2）
     回执: 「已回填 / 已拒绝 / 未回填」三组，拒绝原因显示 rejection_reason（AC-3.2）
     审计日志: 写 app_audit_log（需求 10.4）
     """
+    await _guard_action(db, current_user, project_id, DeliverableAction.edit)
+    await _ensure_task_in_project(db, word_export_task_id, project_id)
     # 终态检查（needs 11.1/11.3）
     terminal_status = await _check_terminal_state(db, word_export_task_id)
     if terminal_status:
@@ -377,14 +402,16 @@ async def refresh_section(
     word_export_task_id: UUID,
     body: RefreshSectionRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(get_current_user),
 ):
     """单章节增量刷新。
 
-    权限: project:edit（无权限 403，需求 10.3）
+    权限: 交付中心同一判定（项目成员 review 及以上 + 角色矩阵 + EQCR 只读，无权限 403，需求 10.3）
     终态: signed/confirmed/archived 拒绝（需求 11.1/11.3）
     审计日志: 写 app_audit_log（需求 10.4）
     """
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
+    await _ensure_task_in_project(db, word_export_task_id, project_id)
     # 终态检查（needs 11.1/11.3）
     terminal_status = await _check_terminal_state(db, word_export_task_id)
     if terminal_status:
@@ -443,16 +470,18 @@ async def refresh_stale(
     word_export_task_id: UUID,
     body: RefreshStaleRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(get_current_user),
 ):
     """批量刷新所有过期章节。
 
-    权限: project:edit（无权限 403，需求 10.3）
+    权限: 交付中心同一判定（项目成员 review 及以上 + 角色矩阵 + EQCR 只读，无权限 403，需求 10.3）
     终态: signed/confirmed/archived 拒绝（需求 11.1/11.3）
     同步执行：刷新是「一次同口径重新导出 + 逐节移植」，耗时与过期章节数无关（spec deliverable-trio-generation-accuracy
     §7.2）。🔴 原「>100 节转异步」分支建的 export_jobs_v2 任务全仓没有 worker 处理 ⇒ 静默不执行、前端却提示已刷新，已删除。
     审计日志: 写 app_audit_log（需求 10.4）
     """
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
+    await _ensure_task_in_project(db, word_export_task_id, project_id)
     # 终态检查（needs 11.1/11.3）
     terminal_status = await _check_terminal_state(db, word_export_task_id)
     if terminal_status:

@@ -20,14 +20,15 @@ from hypothesis import strategies as st
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.models.base import Base, ProjectStatus, ProjectType, UserRole
-from app.models.core import Project, User
+from app.models.base import Base, PermissionLevel, ProjectStatus, ProjectType, ProjectUserRole, UserRole
+from app.models.core import Project, ProjectUser, User
 from app.models.phase13_models import (
     WordExportStatus,
     WordExportTask,
     WordExportTaskVersion,
 )
 from app.models.report_models import AuditReport
+from app.models.staff_models import ProjectAssignment, StaffMember
 from app.routers.deliverable import preview_version
 from app.services.deliverable_service import DeliverableService
 
@@ -40,6 +41,9 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 _DELIVERABLE_TABLES = [
     User.__table__,
     Project.__table__,
+    ProjectUser.__table__,  # 交付中心先校验本项目成员
+    StaffMember.__table__,  # _is_project_eqcr 查 EQCR 委派
+    ProjectAssignment.__table__,
     WordExportTask.__table__,
     WordExportTaskVersion.__table__,
     AuditReport.__table__,
@@ -79,6 +83,8 @@ async def seeded(db_session: AsyncSession):
         created_by=user_id,
     )
     db_session.add(project)
+    db_session.add(ProjectUser(project_id=project_id, user_id=user_id, role=ProjectUserRole.manager,
+                               permission_level=PermissionLevel.review))
     await db_session.flush()
     return {"project_id": project_id, "user_id": user_id, "user": user}
 
@@ -136,6 +142,20 @@ async def test_preview_pdf_returns_download_url(db_session, seeded):
 
 
 @pytest.mark.asyncio
+async def test_preview_xlsx_returns_download_url(db_session, seeded):
+    """财务报表交付件是 .xlsx：预览返回 xlsx 类型 + 下载链接（不走降级提示）。"""
+    task, version = await _make_version(
+        db_session, seeded, file_path="/tmp/report.xlsx"
+    )
+    result = await preview_version(
+        seeded["project_id"], task.id, version.version_no, db=db_session,
+        current_user=seeded["user"],
+    )
+    assert result["preview_type"] == "xlsx"
+    assert "/download" in result["url"]
+
+
+@pytest.mark.asyncio
 async def test_preview_html_path_preferred(db_session, seeded, tmp_path):
     """5.1: 存在 html_path 时优先返回 html 预览。"""
     html_file = tmp_path / "report.html"
@@ -151,17 +171,33 @@ async def test_preview_html_path_preferred(db_session, seeded, tmp_path):
     assert result["html_path"] == str(html_file)
 
 
+@pytest.mark.asyncio
+async def test_preview_requires_project_membership(db_session, seeded):
+    """预览链接（含服务器 html_path）此前不做任何校验；不是本项目成员 → 403。"""
+    from fastapi import HTTPException
+
+    task, version = await _make_version(db_session, seeded, file_path="/tmp/report.docx")
+    outsider = User(id=uuid.uuid4(), username="dr_outsider", email="dr_outsider@test.com",
+                    hashed_password="x", role=UserRole.manager)
+    db_session.add(outsider)
+    await db_session.flush()
+    with pytest.raises(HTTPException) as exc:
+        await preview_version(seeded["project_id"], task.id, version.version_no, db=db_session, current_user=outsider)
+    assert (exc.value.status_code, exc.value.detail) == (403, "权限不足")
+
+
 # ───────────────────────── 6.3 PBT Property 15：不支持格式降级提示 ─────────────────────────
 
 
 @settings(max_examples=3, deadline=None)
 @given(
-    suffix=st.sampled_from([".xlsx", ".txt", ".csv", ".zip", ".pptx", ".odt", ""])
+    # .xlsx 已支持在线预览（财务报表交付件是 xlsx，见 preview_version），不再属于降级集合
+    suffix=st.sampled_from([".txt", ".csv", ".zip", ".pptx", ".odt", ""])
 )
 @pytest.mark.asyncio
 async def test_unsupported_format_downgrade(suffix):
     # Feature: audit-report-deliverable-center, Property 15: 不支持格式降级提示
-    """Property 15: 对任一后缀不属于 {.docx,.pdf} 的版本，预览返回降级提示并附下载链接，不渲染。
+    """Property 15: 对任一后缀不属于 {.docx,.pdf,.xlsx} 的版本，预览返回降级提示并附下载链接，不渲染。
 
     Validates: Requirements 5.4
     """
@@ -191,6 +227,8 @@ async def test_unsupported_format_downgrade(suffix):
                     created_by=user_id,
                 )
             )
+            db.add(ProjectUser(project_id=project_id, user_id=user_id, role=ProjectUserRole.manager,
+                               permission_level=PermissionLevel.review))
             await db.flush()
 
             seeded = {"project_id": project_id, "user_id": user_id, "user": user}

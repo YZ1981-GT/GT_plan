@@ -1466,6 +1466,16 @@ backend/app/services/deliverable_service.py  924
 #     拆分方向：按 AI 域（内容 / 治理 / 会话）分模块，属独立任务。
 backend/app/models/ai_models.py  1537
 
+#   test_phase13_word_export.py —— Phase 13 Word 导出综合测试（非本次引入；触碰前已 1255 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-19 deliverable-writeback-and-online-edit-integrity design §10.5：word-exports 补项目成员鉴权后读 role.value，
+#     测试用户角色由裸字符串改为 UserRole 枚举（行数不变）。拆分方向：按服务（任务 / 快照 / 占位符 / 引擎 / API）分文件，属独立任务。
+backend/tests/test_phase13_word_export.py  1255
+
+#   test_deliverable_lineage_properties.py —— 交付件溯源 / 回填属性测试（非本次引入；触碰前已 3169 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-19 design §10.5 追加：回填 / 刷新改走交付中心 _guard_action + 交付件归属校验，Property 24 / 25 的 mock 答不了
+#     EQCR 委派与归属两类查询 ⇒ 置空这两个取数点（+14 行）。拆分方向：按 Property 分组拆文件，属独立任务。
+backend/tests/test_deliverable_lineage_properties.py  3183
+
 # dsh-kb-ocr-local-first-routing / preexisting-test-failures-closure（2026-10-20）—— 三个触碰前已超 800 行且未登记的文件（非本轮引入，
 #   任何改动都会被门禁拒）。baseline 取当前真实行数不加余量。
 #   test_task4_run_contract.py（触碰前 1467）：G4 把已归档 spec 的 design 路径改走 _spec_dir.resolve_spec_dir（+16 行）。

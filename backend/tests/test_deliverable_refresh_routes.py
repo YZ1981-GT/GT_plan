@@ -62,7 +62,10 @@ async def test_refresh_routes_commit_and_never_delegate_to_async_job(path, body,
     app.dependency_overrides[get_current_user] = lambda: user
     project_id, task_id = uuid.uuid4(), uuid.uuid4()
     try:
-        with patch("app.routers.deliverable_lineage._require_capability", new=AsyncMock()), \
+        # 刷新走交付中心 _guard_action（admin 仍查 EQCR 委派）+ 交付件归属校验：mock db 答不了，鉴权另测
+        with patch("app.routers.deliverable._is_project_eqcr", new=AsyncMock(return_value=False)), \
+                patch("app.routers.deliverable_lineage._ensure_task_in_project", new=AsyncMock(return_value=None)), \
+                patch("app.routers.deliverable_lineage._require_capability", new=AsyncMock()), \
                 patch("app.services.deliverable_section_state_service.DeliverableSectionStateService.get_section_states",
                       new=AsyncMock(return_value=stale_states)), \
                 patch(f"app.services.deliverable_refresh_service.DeliverableRefreshService.{method}",

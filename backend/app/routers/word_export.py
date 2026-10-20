@@ -12,6 +12,9 @@
 - GET  /jobs/{job_id} — 获取后台任务状态（Stage 2.5）
 - POST /jobs/{job_id}/retry — 重试失败项（Stage 2.5）
 - GET  /{task_id}/download — 下载生成的文件
+
+鉴权（只有本项目成员能生成 / 查看本项目的交付件）：读端点要求项目成员（readonly 及以上）；生成 / 确认 /
+重试与交付中心同一判定 ``deliverable._guard_action``（项目成员 review 及以上 + 角色矩阵 + EQCR 只读）。
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.models.phase13_models import WordExportDocType, WordExportStatus
 from app.models.phase13_schemas import (
@@ -39,6 +42,8 @@ from app.models.phase13_schemas import (
     WordExportTaskCreate,
     WordExportTaskResponse,
 )
+from app.routers.deliverable import _guard_action
+from app.services.deliverable_permissions import DeliverableAction
 from app.services.export_task_service import ExportTaskService
 from app.services.report_snapshot_service import ReportSnapshotService
 
@@ -60,6 +65,7 @@ async def generate_audit_report(
     current_user: User = Depends(get_current_user),
 ):
     """生成审计报告 Word 草稿并创建 ExportTask"""
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
     svc = ExportTaskService(db)
     try:
         task = await svc.create_task(
@@ -90,6 +96,7 @@ async def generate_financial_reports(
     current_user: User = Depends(get_current_user),
 ):
     """生成财务报表 Word 并绑定最新快照"""
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
     svc = ExportTaskService(db)
     try:
         task = await svc.create_task(
@@ -119,6 +126,7 @@ async def generate_disclosure_notes(
     current_user: User = Depends(get_current_user),
 ):
     """生成附注 Word 草稿"""
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
     svc = ExportTaskService(db)
     try:
         task = await svc.create_task(
@@ -148,6 +156,7 @@ async def confirm_export(
     current_user: User = Depends(get_current_user),
 ):
     """人工确认导出任务"""
+    await _guard_action(db, current_user, project_id, DeliverableAction.confirm)
     svc = ExportTaskService(db)
     try:
         # 先推进到 editing（如果还在 generated）
@@ -180,7 +189,7 @@ async def confirm_export(
 async def get_export_history(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取项目 Word 导出历史"""
     svc = ExportTaskService(db)
@@ -202,6 +211,7 @@ async def create_report_snapshot(
     current_user: User = Depends(get_current_user),
 ):
     """创建报表数据快照"""
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
     svc = ReportSnapshotService(db)
     try:
         snapshots = await svc.create_snapshot(project_id, year, current_user.id)
@@ -231,7 +241,7 @@ async def get_latest_snapshot(
     year: int = Query(...),
     report_type: str = Query("BS"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取最新快照（含过期检测）"""
     svc = ReportSnapshotService(db)
@@ -260,7 +270,7 @@ async def check_snapshot_stale(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """检测报表快照是否过期（trial_balance 数据已变更）"""
     svc = ReportSnapshotService(db)
@@ -293,6 +303,7 @@ async def create_full_package(
     Phase 14: 导出前统一门禁评估（export_package）
     Creates an ExportJob and triggers fill_full_package.
     """
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
     # ── Phase 14: 统一门禁引擎评估（export_package） ──
     try:
         from app.services.gate_engine import gate_engine as _gate_engine
@@ -415,6 +426,7 @@ async def create_full_deliverables(
     ``confirm_inconsistent`` 时，附注与底稿不一致 ⇒ 不建任务，409 ``notes_inconsistent`` + 待确认清单；
     前端弹同一个确认框，用户确认后带 ``confirm_inconsistent=true`` 重发。
     """
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
     from app.services.full_deliverables_executor import FullDeliverablesExecutor, resolve_full_steps
     from app.services.export_job_service import ExportJobService
 
@@ -463,7 +475,7 @@ async def get_job_status(
     project_id: UUID,
     job_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取后台任务状态"""
     from app.services.export_job_service import ExportJobService
@@ -493,6 +505,7 @@ async def retry_failed_items(
     current_user: User = Depends(get_current_user),
 ):
     """重试失败项"""
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
     from app.services.export_job_service import ExportJobService
 
     job_svc = ExportJobService(db)
@@ -520,7 +533,7 @@ async def download_export_file(
     project_id: UUID,
     task_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """下载已生成的导出文件"""
     svc = ExportTaskService(db)

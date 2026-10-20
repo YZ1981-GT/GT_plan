@@ -8,6 +8,9 @@
 - 已确认 ⇒ 不再检查、照常执行，payload 留痕 confirm_inconsistent；一致 ⇒ 照常执行；
 - 步骤不含附注 ⇒ 不检查；
 - 409 经全局异常处理器后 detail 在 ``message``（前端拦截器回填到 detail）—— 线形守卫走真实 app。
+
+鉴权（项目成员 + 交付件角色矩阵）不在本文件测：直调时把 ``_guard_action`` 换成桩，只断言闸门之前先鉴权；
+端点级鉴权见 test_deliverable_generation_membership_auth.py。
 """
 from __future__ import annotations
 
@@ -20,6 +23,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.models.phase13_schemas import FullDeliverablesRequest
+from app.services.deliverable_permissions import DeliverableAction
 from app.services.full_deliverables_executor import FULL_DELIVERABLES_STEPS, resolve_full_steps
 
 PROJECT_ID = uuid.uuid4()
@@ -57,6 +61,7 @@ def test_resolve_full_steps_matches_executor_contract():
 class _Harness:
     def __init__(self, consistency: dict) -> None:
         self.check = AsyncMock(return_value=consistency)
+        self.guard = AsyncMock(return_value=None)
         self.executor = MagicMock()
         self.executor.run = AsyncMock(return_value=SimpleNamespace(job_id=JOB_ID))
         self.executor_cls = MagicMock(return_value=self.executor)
@@ -73,6 +78,7 @@ class _Harness:
         from app.routers import word_export as mod
 
         with (
+            patch.object(mod, "_guard_action", new=self.guard),
             patch(_CHECK, new=self.check),
             patch(_EXECUTOR, new=self.executor_cls),
             patch("app.services.export_job_service.ExportJobService", return_value=self.job_svc),
@@ -97,6 +103,9 @@ def test_inconsistent_unconfirmed_returns_409_and_never_builds_job():
     assert h.check.await_args.args[1:] == (PROJECT_ID, YEAR)
     # 🔴 核心：闸门在建任务之前 —— 执行器一次都不构造
     h.executor_cls.assert_not_called()
+    # 先鉴权（与交付中心生成同一判定）再进闸门
+    h.guard.assert_awaited_once()
+    assert h.guard.await_args.args[2:] == (PROJECT_ID, DeliverableAction.export)
 
 
 def test_inconsistent_confirmed_skips_check_and_runs():
@@ -129,6 +138,7 @@ async def test_409_wire_shape_through_app_error_handler():
     """真实 app：全局处理器把 HTTPException.detail 放在 message（前端 notesInconsistencyFromError 两处都读）。"""
     from httpx import ASGITransport, AsyncClient
 
+    import app.deps as deps
     from app.deps import get_current_user, get_db
     from app.main import app
     from app.models.core import User
@@ -149,7 +159,14 @@ async def test_409_wire_shape_through_app_error_handler():
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[get_current_user] = _user
     try:
-        with patch(_CHECK, new=AsyncMock(return_value=_INCONSISTENT)), patch(_EXECUTOR, new=executor_cls):
+        # 真实鉴权链照跑（admin 跳过成员校验）；只把归档守卫 / RLS / EQCR 判定这几个取数点置空（db 是 AsyncMock）
+        with (
+            patch.object(deps, "_check_project_not_archived", new=AsyncMock(return_value=None)),
+            patch.object(deps, "set_rls_context", new=AsyncMock(return_value=None)),
+            patch("app.routers.deliverable._is_project_eqcr", new=AsyncMock(return_value=False)),
+            patch(_CHECK, new=AsyncMock(return_value=_INCONSISTENT)),
+            patch(_EXECUTOR, new=executor_cls),
+        ):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
                     f"/api/projects/{PROJECT_ID}/word-exports/full-deliverables", json={"year": YEAR}
