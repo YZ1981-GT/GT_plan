@@ -1,11 +1,12 @@
-"""M7 专项储备 — 导入导出三级端点 + 计提测试API
+"""M7 专项储备 — 明细表导入导出三态端点 + 计提测试API
 
-4个端点：
-- GET  /api/m7-special-reserve/{wp_id}/export-template    明细表空白模板xlsx
-- GET  /api/m7-special-reserve/{wp_id}/export-data         当前数据xlsx
-- POST /api/m7-special-reserve/{wp_id}/import-data         解析xlsx写入（multipart）
+4个端点（业务实现在 `app.services.m7_special_reserve_service`）：
+- GET  /api/m7-special-reserve/{wp_id}/export-template    明细表 M7-2 空白模板xlsx
+- GET  /api/m7-special-reserve/{wp_id}/export-data         明细表 M7-2 当前数据xlsx
+- POST /api/m7-special-reserve/{wp_id}/import-data         解析xlsx整表替换 M7-2（multipart）
 - POST /api/m7-special-reserve/{wp_id}/accrual-test        安全生产费计提测试
 
+三态目前只支持 M7-2（界面唯一有导入导出入口的动态行表）；其他 sheet 返回 400。
 科目编码: 4201专项储备（**贷方/权益类！**）
 公式方向: 期末=期初+贷方-借方（计提在贷方增加，使用在借方减少）
 安全生产费: 高危行业按产量分档计提 / 其他按营业收入比例计提
@@ -64,9 +65,9 @@ _X3_CODES: frozenset[str] = frozenset(
 #:    5.1 半径。该存量缺陷已登记 `Deviation_Registry` G6（10 条 = m1 + m2~m10），收口另立
 #:    任务。⇒ `IE_SHEETS` 此刻只覆盖 X-3（= 形态 A 端点的白名单）。
 #:
-#: 🔴 另一条存量缺陷（G6 已登记为 `SERVICE_MODULE_MISSING`）：本模块既有三态端点惰性 import
-#:    的 service 模块在仓库中**不存在** ⇒ 那三个端点一调即 ImportError。形态 A 三态走共享实现
-#:    `_x3_adjustment_import_export`，与该 service 无关，故本模块 import 与形态 A 调用均不受影响。
+#: 长前缀三态的 sheet 白名单在 `m7_special_reserve_service.SUPPORTED_SHEETS`（M7-2），未知 sheet
+#: 返回 400。该 service 曾在仓库中不存在（G6 登记为 `SERVICE_MODULE_MISSING`），由 spec
+#: m7-m9-service-modules-and-lazy-import-guard 补齐。
 IE_SHEETS: frozenset[str] = _X3_CODES
 
 attach_shape_a_routes(router, api_prefix=_IE_API_PREFIX, sheets=_X3_CODES)
@@ -88,7 +89,7 @@ class AccrualTestRequest(BaseModel):
     method: str = Field("output", description="计提方式: output(按产量) / revenue(按营业收入)")
     tiers: list[AccrualTier] = Field(default_factory=list, description="按产量分档计提明细")
     revenue: float = Field(0.0, description="营业收入（按收入计提时使用）")
-    revenue_rate: float = Field(0.0, description="营业收入计提比例")
+    revenue_rate: float = Field(0.0, description="营业收入计提比例（小数，0.015 = 1.5%）")
     booked_accrual: float = Field(0.0, description="账面已计提金额")
 
 
@@ -98,7 +99,7 @@ class AccrualTestResponse(BaseModel):
     estimated: float = Field(description="应计提金额")
     booked: float = Field(description="账面计提")
     diff: float = Field(description="计提差异=应计提-账面")
-    is_material: bool = Field(description="差异是否重大（|diff|>阈值）")
+    is_material: bool = Field(description="差异是否重大（同界面高亮口径：|差异|>1000 元，且应计提非 0 时相对差异 >5%）")
     detail: dict[str, Any] = Field(default_factory=dict, description="计算明细")
 
 
@@ -114,10 +115,10 @@ async def m7_export_template(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
-    """导出空白xlsx模板（M7-2明细表 / M7-4计提测试表）
+    """导出空白xlsx模板（M7-2明细表，含「编制说明」页）
 
     Query params:
-        sheet: 可选，指定导出sheet（M7-2/M7-4/M7-5）
+        sheet: 可选，目前只支持 M7-2；缺省导出全部支持的 sheet，其他值返回 400
 
     Requirements: 7.6
     """
@@ -144,10 +145,10 @@ async def m7_export_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
-    """导出含当前数据的xlsx（M7-2明细/M7-4计提测试）
+    """导出含当前数据的xlsx（M7-2明细：输入列 + 公式列 + 合计行）
 
     Query params:
-        sheet: 可选，指定导出sheet
+        sheet: 可选，目前只支持 M7-2；缺省导出全部支持的 sheet，其他值返回 400
 
     Requirements: 7.6
     """
@@ -175,13 +176,13 @@ async def m7_import_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """导入xlsx解析写入checklist_responses（M7-2明细表动态行）
+    """导入xlsx整表替换 M7-2 明细行（写 checklist_responses，与界面同一组键）
 
     Query params:
-        sheet: 可选，指定导入目标sheet（M7-2/M7-4）
+        sheet: 可选，缺省 M7-2（前端把 sheet 放在表单字段里，这里收不到）；其他值返回 400
 
     Returns:
-        { imported_count: int, warnings: list[str] }
+        { ok, sheet, imported_count, warnings, warning? }；文件内容有问题返回 400 且不写库
 
     Requirements: 7.6
     """
@@ -189,7 +190,7 @@ async def m7_import_data(
 
     content = await file.read()
     try:
-        result = await import_data(wp_id, content, db, sheet=sheet)
+        result = await import_data(wp_id, content, db, sheet=sheet, updated_by=current_user.id)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -223,11 +224,14 @@ async def m7_accrual_test(
     """
     from app.services.m7_special_reserve_service import run_accrual_test
 
-    result = run_accrual_test(
-        method=request.method,
-        tiers=[{"output": t.output, "rate": t.rate} for t in request.tiers],
-        revenue=request.revenue,
-        revenue_rate=request.revenue_rate,
-        booked_accrual=request.booked_accrual,
-    )
+    try:
+        result = run_accrual_test(
+            method=request.method,
+            tiers=[{"output": t.output, "rate": t.rate} for t in request.tiers],
+            revenue=request.revenue,
+            revenue_rate=request.revenue_rate,
+            booked_accrual=request.booked_accrual,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     return AccrualTestResponse(**result)

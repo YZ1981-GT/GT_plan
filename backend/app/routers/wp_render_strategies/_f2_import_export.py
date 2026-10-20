@@ -143,14 +143,16 @@ async def _export_f2_1_data(db: AsyncSession, wp_id: str) -> StreamingResponse:
     from openpyxl.styles import Font
     import sqlalchemy as sa
 
-    # 查 checklist_responses 中以 F2-1- 开头的 item_id
-    from app.models.checklist_response_models import ChecklistResponse as CR
-
-    stmt = sa.select(CR.item_id, CR.conclusion).where(
-        CR.wp_id == wp_id,
-        CR.item_id.like("F2-1-%"),
+    # 查 checklist_responses 中以 F2-1- 开头的 item_id。
+    # 该表没有 ORM 模型（原先 import 的 `app.models.checklist_response_models` 全仓不存在，
+    # 本函数一调即 ModuleNotFoundError），与本文件导入侧一样走裸 SQL。
+    result = await db.execute(
+        sa.text(
+            "SELECT item_id, conclusion FROM checklist_responses "
+            "WHERE wp_id = :wp_id AND item_id LIKE :pattern"
+        ),
+        {"wp_id": str(wp_id), "pattern": "F2-1-%"},
     )
-    result = await db.execute(stmt)
     rows_raw = result.all()
 
     # 按 block/rowKey/field 解析
@@ -225,7 +227,6 @@ async def _import_f2_1_data(db: AsyncSession, wp_id: str, content: bytes) -> dic
     import openpyxl
     import sqlalchemy as sa
 
-    from app.models.checklist_response_models import ChecklistResponse as CR
     from app.models.workpaper_models import WorkingPaper
 
     # 反查 project_id

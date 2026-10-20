@@ -1131,9 +1131,10 @@ def probe_g6() -> Probe:
             "control_factory_handling": control,
             "criterion": "三态路径上不存在任何针对未知 sheet 值的可读错误（400）",
             "mechanism_note": (
-                "四种子形态：no_sheet_param（m1）/ WHITELIST_ELSE_ALL（m2~m6·m8）/ "
-                "SHEET_OR_DEFAULT（m10，m6·m8 兼有）/ SERVICE_MODULE_MISSING（m7·m9，端点一调即 ImportError）。"
-                "design §C7 的「静默回退全部」是这四种的概称；条数不变，形态按实测登记。"
+                "三种子形态：no_sheet_param（m1）/ WHITELIST_ELSE_ALL（m2~m6·m8）/ "
+                "SHEET_OR_DEFAULT（m10，m6·m8 兼有）。m7·m9 原为第四种 SERVICE_MODULE_MISSING（端点一调即 "
+                "ImportError），spec m7-m9-service-modules-and-lazy-import-guard 补齐 service、未知 sheet 返回 400"
+                "（RAISE_ON_SHEET）后移出本组，条数 10 → 8。design §C7 的「静默回退全部」是这些形态的概称。"
             ),
         },
     )
@@ -1872,7 +1873,10 @@ _GROUPS: dict[str, dict[str, Any]] = {
     "G6": {
         "title": "M 族专属通路对未知 sheet 值无可读错误（静默回退全部 / 静默按默认 sheet / service 模块缺失）",
         "status": _MEASURED_STATUS,
-        "owner_spec": "各 M 循环 spec（存量缺陷；本 spec 的 X-3 通路另走共享实现，不改这些分支）",
+        "owner_spec": (
+            "各 M 循环 spec（存量缺陷；本 spec 的 X-3 通路另走共享实现，不改这些分支）；"
+            "m7 / m9 已由 m7-m9-service-modules-and-lazy-import-guard 任务 9 收口（基线 10 → 8）"
+        ),
         "verdict_default": "real_drift",
         "probe_id": "g6_m_cycle_unknown_sheet_silent",
         "method": [

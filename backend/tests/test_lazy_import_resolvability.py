@@ -18,7 +18,10 @@ from __future__ import annotations
 import ast
 import importlib
 import subprocess
+import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable, Iterator, Mapping
 
 import pytest
 
@@ -66,7 +69,7 @@ _KNOWN_UNRESOLVED_BASELINE: frozenset[tuple[str, str, str]] = frozenset({
     ("app/services/m8_general_risk_reserve_service.py", "app.models.audit_platform_models", "ChecklistResponse"),
     ("app/services/s_estimate_import_export_service.py", "app.models.audit_platform_models", "ChecklistResponse"),
     # ── F 循环：flag=True 但模块不存在（从 _FLAG_GATED_PLACEHOLDERS 移入，2026-10-07）
-    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_01_adjudication"),
+    # 🔴 phase5_f4_01_adjudication 已由 5cb7ebe70 入库 ⇒ 僵尸条目，2026-10-20 删除。
     ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_09_supplier_financing"),
 })
 
@@ -217,6 +220,92 @@ def _head_bytes(repo_rel: str) -> bytes | None:
     return None if proc.returncode != 0 else proc.stdout
 
 
+def _worktree_bytes(repo_rel: str) -> bytes | None:
+    """当前检出里的文件字节（仓库根相对路径，posix 分隔）；不存在返回 None。"""
+    path = _BACKEND.parent / repo_rel
+    return path.read_bytes() if path.is_file() else None
+
+
+def _module_level_statements(body: list[ast.stmt]) -> Iterator[ast.stmt]:
+    """模块顶层语句，含顶层 if / try / with / for / while 块内的（不进函数体、类体）。
+
+    🔴 只看 `tree.body` 的直接子节点会漏掉 `try: from x import N` / `except ImportError: N = None`
+       这类顶层兜底定义 ⇒ 把取得到的名字判成取不到（假红）。
+    """
+    for node in body:
+        yield node
+        if isinstance(node, ast.If):
+            yield from _module_level_statements(node.body)
+            yield from _module_level_statements(node.orelse)
+        elif isinstance(node, (ast.Try, ast.TryStar)):
+            for block in (node.body, node.orelse, node.finalbody):
+                yield from _module_level_statements(block)
+            for handler in node.handlers:
+                yield from _module_level_statements(handler.body)
+        elif isinstance(node, (ast.With, ast.AsyncWith)):
+            yield from _module_level_statements(node.body)
+        elif isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
+            yield from _module_level_statements(node.body)
+            yield from _module_level_statements(node.orelse)
+
+
+def _binds_name(node: ast.stmt, name: str) -> bool:
+    """该顶层语句是否绑定了 `name`（定义 / 赋值含元组解包 / import）。"""
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return node.name == name
+    if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        return any(
+            isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store) and n.id == name
+            for target in targets
+            for n in ast.walk(target)
+        )
+    if isinstance(node, (ast.Import, ast.ImportFrom)):
+        return any((alias.asname or alias.name.split(".")[0]) == name for alias in node.names)
+    return False
+
+
+def _opens_dynamic_namespace(node: ast.stmt) -> bool:
+    """星号导入 / 模块级 `__getattr__`：静态枚举不出全部可取的名字。"""
+    if isinstance(node, ast.ImportFrom) and any(alias.name == "*" for alias in node.names):
+        return True
+    return isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "__getattr__"
+
+
+def _static_resolvable(mod: str, name: str, read: Callable[[str], bytes | None]) -> bool | None:
+    """按源码静态判定 `from {mod} import {name}` 能不能取到 —— 不 import、不执行任何代码。
+
+    `read` 按仓库根相对路径给文件字节：`_head_bytes`（HEAD 版，分类三用）或 `_worktree_bytes`
+    （当前检出，目标模块在本环境 import 失败时用）。两处同一套判据，只换字节来源。
+
+    Returns:
+        True 取得到；False 取不到；None 无法判定（找不到模块源码 / 解析失败 /
+        星号导入或模块级 `__getattr__` 而名字没有显式绑定）。
+    """
+    mod_path = mod.replace(".", "/")
+    # ① name 是子模块 / 子包：`backend/<mod>/<name>.py` 或 `backend/<mod>/<name>/__init__.py`
+    if read(f"backend/{mod_path}/{name}.py") is not None:
+        return True
+    if read(f"backend/{mod_path}/{name}/__init__.py") is not None:
+        return True
+    # ② name 是符号：`<mod>.py` 或 `<mod>/__init__.py` 顶层（含顶层 if / try 块）能找到绑定
+    for candidate in (f"backend/{mod_path}.py", f"backend/{mod_path}/__init__.py"):
+        raw = read(candidate)
+        if raw is None:
+            continue
+        try:
+            tree = ast.parse(raw.decode("utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            return None
+        statements = list(_module_level_statements(tree.body))
+        if any(_binds_name(node, name) for node in statements):
+            return True
+        if any(_opens_dynamic_namespace(node) for node in statements):
+            return None
+        return False
+    return None
+
+
 def _resolvable_on_head(mod: str, name: str) -> bool | None:
     """在 **HEAD 版**代码里 `from {mod} import {name}` 能不能取到。
 
@@ -226,63 +315,90 @@ def _resolvable_on_head(mod: str, name: str) -> bool | None:
     Returns:
         True  取得到；False 取不到；None 无法判定（HEAD 里连 mod 都没有）。
     """
-    mod_path = mod.replace(".", "/")
-    # ① name 是子模块：`backend/<mod>/<name>.py`
-    if _head_bytes(f"backend/{mod_path}/{name}.py") is not None:
-        return True
-    # ② name 是包：`backend/<mod>/<name>/__init__.py`
-    if _head_bytes(f"backend/{mod_path}/{name}/__init__.py") is not None:
-        return True
-    # ③ name 是符号：在 HEAD 版 `<mod>.py` 或 `<mod>/__init__.py` 的顶层能找到定义/导入
-    for candidate in (f"backend/{mod_path}.py", f"backend/{mod_path}/__init__.py"):
-        raw = _head_bytes(candidate)
-        if raw is None:
-            continue
-        try:
-            tree = ast.parse(raw.decode("utf-8"))
-        except (SyntaxError, UnicodeDecodeError):
-            return None
-        for node in tree.body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                if node.name == name:
-                    return True
-            elif isinstance(node, ast.Assign):
-                for tgt in node.targets:
-                    if isinstance(tgt, ast.Name) and tgt.id == name:
-                        return True
-            elif isinstance(node, ast.AnnAssign):
-                if isinstance(node.target, ast.Name) and node.target.id == name:
-                    return True
-            elif isinstance(node, (ast.Import, ast.ImportFrom)):
-                for alias in node.names:
-                    if (alias.asname or alias.name.split(".")[0]) == name:
-                        return True
-        return False
-    return None
+    return _static_resolvable(mod, name, _head_bytes)
+
+
+#: `_scan` 里「目标模块不存在」的哨兵（区别于「模块存在但本环境 import 失败」的 None）
+_MISSING_MODULE = object()
+
+
+@dataclass(frozen=True)
+class _ScanResult:
+    """一次扫描的结论。`unresolved` 是唯一的判定口径，其余三项说明它从哪来。"""
+
+    unresolved: frozenset[tuple[str, str, str]]
+    #: 目标模块在当前检出里根本不存在 —— 其全部导入名都已计入 unresolved
+    missing_modules: frozenset[str]
+    #: 目标模块存在、但在本环境 import 失败 → 异常摘要（其导入名已改按源码静态判定）
+    unimportable_modules: Mapping[str, str]
+    #: 静态也判不了的导入名（星号导入 / 模块级 __getattr__ / 源码解析失败）—— 按不可解析计
+    undeterminable: frozenset[tuple[str, str, str]]
+
+
+def _missing_is_target(exc: ModuleNotFoundError, mod: str) -> bool:
+    """缺的是目标模块本身（或它的父包），而不是目标模块里面 import 的别的模块。"""
+    missing = getattr(exc, "name", None) or ""
+    return bool(missing) and (mod == missing or mod.startswith(missing + "."))
+
+
+def _scan(entries: list[tuple[str, int, str, str]] | None = None) -> _ScanResult:
+    """判定每条 `from {mod} import {name}` 能否取到。
+
+    🔴 旧实现对 `import_module(mod)` 抛的**任何**异常都把整个模块记入 skipped、跳过不判 ——
+       模块整个不存在时一条都不报（m7 / m9 的 service 与 `checklist_response_models` 因此一直没打红）。
+       现在没有「跳过」分支，目标模块三分：
+         * 能 import ⇒ 原判据（模块属性 → 子模块）；
+         * 缺的就是目标模块（或其父包）⇒ 它的每个导入名都不可解析；
+         * 模块存在但本环境执行出错 ⇒ 改按源码静态判定，判不了的按不可解析计。
+    """
+    if entries is None:
+        entries = _collect_function_scoped_app_imports()
+    modules: dict[str, object] = {}
+    missing: set[str] = set()
+    unimportable: dict[str, str] = {}
+    unresolved: set[tuple[str, str, str]] = set()
+    undeterminable: set[tuple[str, str, str]] = set()
+
+    for rel_path, _lineno, mod, name in entries:
+        if mod not in modules:
+            try:
+                modules[mod] = importlib.import_module(mod)
+            except ModuleNotFoundError as exc:
+                if _missing_is_target(exc, mod):
+                    modules[mod] = _MISSING_MODULE
+                    missing.add(mod)
+                else:
+                    modules[mod] = None
+                    unimportable[mod] = f"{type(exc).__name__}: {exc}"
+            except Exception as exc:  # noqa: BLE001 — 任何 import 期异常都改走静态判定，不跳过
+                modules[mod] = None
+                unimportable[mod] = f"{type(exc).__name__}: {exc}"
+        key = (rel_path, mod, name)
+        target = modules[mod]
+        if target is _MISSING_MODULE:
+            unresolved.add(key)
+        elif target is None:
+            verdict = _static_resolvable(mod, name, _worktree_bytes)
+            if verdict is None:
+                undeterminable.add(key)
+            if verdict is not True:
+                unresolved.add(key)
+        elif not hasattr(target, name):
+            try:
+                importlib.import_module(f"{mod}.{name}")
+            except Exception:
+                unresolved.add(key)
+    return _ScanResult(
+        unresolved=frozenset(unresolved),
+        missing_modules=frozenset(missing),
+        unimportable_modules=dict(unimportable),
+        undeterminable=frozenset(undeterminable),
+    )
 
 
 def _scan_unresolved() -> set[tuple[str, str, str]]:
     """扫出全部不可解析项，返回 {(文件, 模块, 导入名)} 去重集合（不含行号）。"""
-    entries = _collect_function_scoped_app_imports()
-    module_cache: dict[str, object] = {}
-    skipped: set[str] = set()
-    unresolved: set[tuple[str, str, str]] = set()
-
-    for rel_path, _lineno, mod, name in entries:
-        if mod in skipped:
-            continue
-        if mod not in module_cache:
-            try:
-                module_cache[mod] = importlib.import_module(mod)
-            except Exception:
-                skipped.add(mod)
-                continue
-        if not hasattr(module_cache[mod], name):
-            try:
-                importlib.import_module(f"{mod}.{name}")
-            except Exception:
-                unresolved.add((rel_path, mod, name))
-    return unresolved
+    return set(_scan().unresolved)
 
 
 class TestLazyImportResolvability:
@@ -296,15 +412,33 @@ class TestLazyImportResolvability:
         entries = _collect_function_scoped_app_imports()
         assert entries, "扫描器未收集到任何函数体内 app.* import ⇒ 解析口径有问题"
 
-        unresolved = _scan_unresolved()
+        result = _scan(entries)
+        unresolved = set(result.unresolved)
         newly_added = sorted(unresolved - _ALLOWED_UNRESOLVED)
+
+        def _why(mod: str, item: tuple[str, str, str]) -> str:
+            if mod in result.missing_modules:
+                return "  ← 目标模块不存在"
+            if item in result.undeterminable:
+                return "  ← 模块 import 失败且源码静态无法判定"
+            if mod in result.unimportable_modules:
+                return "  ← 模块 import 失败，按源码判定取不到"
+            return ""
 
         assert not newly_added, (
             f"新增 {len(newly_added)} 处函数体内 lazy import 不可解析"
             f"（现算已扫 {len(entries)} 条 import、不可解析共 {len(unresolved)} 条、"
             f"占位 {len(_FLAG_GATED_PLACEHOLDERS)} 条、待修 {len(_KNOWN_UNRESOLVED_BASELINE)} 条）。\n"
             "运行时必抛 ImportError —— 请修正 import 路径，而非加进基线：\n"
-            + "\n".join(f"  {f}: from {m} import {n}" for f, m, n in newly_added)
+            + "\n".join(
+                f"  {f}: from {m} import {n}{_why(m, (f, m, n))}" for f, m, n in newly_added
+            )
+            + (
+                f"\n本环境 import 失败、已改按源码静态判定的模块 {len(result.unimportable_modules)} 个："
+                + "；".join(f"{m}（{e[:80]}）" for m, e in sorted(result.unimportable_modules.items()))
+                if result.unimportable_modules
+                else ""
+            )
         )
 
     def test_baseline_has_no_zombie_entries(self):
@@ -535,3 +669,113 @@ class TestLazyImportResolvability:
 
         attach = importlib.import_module("app.models.attachment_models")
         assert hasattr(attach, "Attachment"), "attachment_models 缺 Attachment"
+
+
+# ---------------------------------------------------------------------------
+# 整模块缺失 / 模块 import 失败的判定（spec m7-m9-service-modules-and-lazy-import-guard）
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def synthetic_package(tmp_path, monkeypatch):
+    """在 tmp 目录造一个可 import 的包，返回 ``write(stem, source) -> 模块名``。
+
+    故障注在被测函数的下一层：只替换字节读取 `_worktree_bytes`（把合成包映射到 tmp 目录），
+    `_scan` / `_static_resolvable` 跑的都是生产实现。
+    """
+    pkg = "lazyguard_selftest_pkg"
+    pkg_dir = tmp_path / pkg
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text("", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    original_reader = _worktree_bytes
+    prefix = f"backend/{pkg}/"
+
+    def _read(repo_rel: str) -> bytes | None:
+        if repo_rel.startswith(prefix):
+            path = pkg_dir / repo_rel[len(prefix):]
+            return path.read_bytes() if path.is_file() else None
+        return original_reader(repo_rel)
+
+    monkeypatch.setattr(sys.modules[__name__], "_worktree_bytes", _read)
+
+    def write(stem: str, source: str) -> str:
+        (pkg_dir / f"{stem}.py").write_text(source, encoding="utf-8")
+        return f"{pkg}.{stem}"
+
+    yield write
+    for loaded in [m for m in sys.modules if m == pkg or m.startswith(pkg + ".")]:
+        sys.modules.pop(loaded, None)
+
+
+class TestWholeModuleAndImportFailureVerdicts:
+    """旧扫描器对这两类目标一律静默跳过；合成条目钉死新判定（变异：恢复跳过 / 静态判定恒真 /
+    不进顶层 try 块 / 动态命名空间判成可取，各自要打红）。"""
+
+    _GHOST = "app.services._lazy_guard_selftest_ghost_module"
+
+    def test_missing_target_module_marks_every_name_unresolved(self):
+        ghost_file = _BACKEND / "app" / "services" / "_lazy_guard_selftest_ghost_module.py"
+        assert not ghost_file.exists(), "合成的「不存在模块」竟然存在 ⇒ 本条判据空转"
+        entries = [("app/x.py", 1, self._GHOST, "alpha"), ("app/x.py", 2, self._GHOST, "beta")]
+        result = _scan(entries)
+        assert result.unresolved == {("app/x.py", self._GHOST, "alpha"), ("app/x.py", self._GHOST, "beta")}
+        assert result.missing_modules == {self._GHOST}
+        assert not result.unimportable_modules
+
+    def test_missing_dependency_of_existing_module_is_not_a_missing_target(self):
+        target = "app.services.some_real_module"
+        assert _missing_is_target(ModuleNotFoundError(name=target), target)
+        assert _missing_is_target(ModuleNotFoundError(name="app.services"), target)
+        assert not _missing_is_target(ModuleNotFoundError(name="openpyxl_extra"), target)
+        assert not _missing_is_target(ModuleNotFoundError(name="app.serv"), target)
+        assert not _missing_is_target(ModuleNotFoundError(), target)
+
+    def test_unimportable_module_falls_back_to_static_resolution(self, synthetic_package):
+        mod = synthetic_package(
+            "broken_at_import",
+            "raise RuntimeError('模拟：本环境 import 期出错')\n"
+            "def defined_func():\n    return 1\n"
+            "CONST = 1\n"
+            "LEFT, RIGHT = 1, 2\n"
+            "try:\n    from os import path as fallback_alias\n"
+            "except ImportError:\n    fallback_alias = None\n",
+        )
+        with pytest.raises(RuntimeError):
+            importlib.import_module(mod)  # 反空转：它确实 import 不了
+        names = ("defined_func", "CONST", "LEFT", "RIGHT", "fallback_alias", "ghost_name")
+        result = _scan([("app/x.py", i, mod, n) for i, n in enumerate(names)])
+        assert "RuntimeError" in result.unimportable_modules.get(mod, "")
+        assert result.unresolved == {("app/x.py", mod, "ghost_name")}
+        assert not result.missing_modules and not result.undeterminable
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            "raise RuntimeError('x')\nfrom os.path import *\n",
+            "raise RuntimeError('x')\ndef __getattr__(name):\n    return name\n",
+        ],
+        ids=["star_import", "module_getattr"],
+    )
+    def test_dynamic_namespace_counts_as_unresolved(self, synthetic_package, source):
+        mod = synthetic_package("dynamic_namespace", source)
+        item = ("app/x.py", mod, "join")
+        result = _scan([("app/x.py", 1, mod, "join")])
+        assert result.undeterminable == {item}
+        assert item in result.unresolved
+
+    def test_m7_m9_service_imports_resolve_and_no_target_module_is_missing(self):
+        """M7 / M9 路由惰性 import 的 8 个名字可取到；全仓没有指向不存在模块的 lazy import。"""
+        entries = _collect_function_scoped_app_imports()
+        seen = {(f, m, n) for f, _line, m, n in entries}
+        targets = {
+            ("app/routers/m7_special_reserve.py", "app.services.m7_special_reserve_service", n)
+            for n in ("generate_export_template", "generate_export_data", "import_data", "run_accrual_test")
+        } | {
+            ("app/routers/m9_other_comprehensive_income.py", "app.services.m9_other_comprehensive_income_service", n)
+            for n in ("generate_export_template", "generate_export_data", "import_data", "get_adjudication_rows")
+        }
+        assert targets <= seen, f"路由已不再惰性 import 这些名字（判据空转）：{sorted(targets - seen)}"
+        result = _scan(entries)
+        assert not (targets & result.unresolved), sorted(targets & result.unresolved)
+        assert not result.missing_modules, f"仍有 lazy import 指向不存在的模块：{sorted(result.missing_modules)}"

@@ -15,7 +15,7 @@
     "design_ref": "design §C7（十一组 G1~G11）+ §用户裁决 2",
     "generated_by": "python backend/scripts/check/check_x3_deviation_registry.py --emit",
     "checked_by": "python backend/scripts/check/check_x3_deviation_registry.py --check",
-    "written_at": "2026-08-16T00:14:42+08:00",
+    "written_at": "2026-10-20T22:31:50+08:00",
     "column_contract": "每条恒带三列 catalog_value / contract_value / frontend_observed（R8.4）；某列不适用时值为 null 且必须在 na_reasons 里给出理由 —— `--check` 强制。",
     "verdict_values": [
       "real_drift",
@@ -37,9 +37,9 @@
     },
     "totals": {
       "groups": 11,
-      "baseline_sum": 91,
-      "measured_sum": 91,
-      "entries_landed": 91,
+      "baseline_sum": 89,
+      "measured_sum": 89,
+      "entries_landed": 89,
       "pending_groups": []
     }
   },
@@ -2556,10 +2556,10 @@
     {
       "group": "G6",
       "title": "M 族专属通路对未知 sheet 值无可读错误（静默回退全部 / 静默按默认 sheet / service 模块缺失）",
-      "baseline_count": 10,
-      "measured_count": 10,
+      "baseline_count": 8,
+      "measured_count": 8,
       "status": "measured",
-      "owner_spec": "各 M 循环 spec（存量缺陷；本 spec 的 X-3 通路另走共享实现，不改这些分支）",
+      "owner_spec": "各 M 循环 spec（存量缺陷；本 spec 的 X-3 通路另走共享实现，不改这些分支）；m7 / m9 已由 m7-m9-service-modules-and-lazy-import-guard 任务 9 收口（基线 10 → 8）",
       "verdict_default": "real_drift",
       "method": [
         "① 取运行期形态 B 三态端点 `/api/{长前缀}/{wp_id}/{三态}`，筛出 m1~m10（实测 10 个前缀齐全）",
@@ -2580,7 +2580,7 @@
             "RAISE_ON_SHEET"
           ],
           "criterion": "三态路径上不存在任何针对未知 sheet 值的可读错误（400）",
-          "mechanism_note": "四种子形态：no_sheet_param（m1）/ WHITELIST_ELSE_ALL（m2~m6·m8）/ SHEET_OR_DEFAULT（m10，m6·m8 兼有）/ SERVICE_MODULE_MISSING（m7·m9，端点一调即 ImportError）。design §C7 的「静默回退全部」是这四种的概称；条数不变，形态按实测登记。"
+          "mechanism_note": "三种子形态：no_sheet_param（m1）/ WHITELIST_ELSE_ALL（m2~m6·m8）/ SHEET_OR_DEFAULT（m10，m6·m8 兼有）。m7·m9 原为第四种 SERVICE_MODULE_MISSING（端点一调即 ImportError），spec m7-m9-service-modules-and-lazy-import-guard 补齐 service、未知 sheet 返回 400（RAISE_ON_SHEET）后移出本组，条数 10 → 8。design §C7 的「静默回退全部」是这些形态的概称。"
         }
       },
       "entries": [
@@ -2773,37 +2773,6 @@
         },
         {
           "group": "G6",
-          "key": "m7",
-          "sheet_code": "M7-3",
-          "catalog_value": "启用该短前缀的 sheet: ['M7-3']",
-          "contract_value": "M7-3-entry-*",
-          "frontend_observed": "派生 registry 短前缀在位=True / 长前缀在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G6.method",
-          "evidence": {
-            "long_prefix": "m7-special-reserve",
-            "host_modules": [
-              "app.routers.m7_special_reserve"
-            ],
-            "sheet_param_declared": {
-              "export-data": true,
-              "export-template": true,
-              "import-data": true
-            },
-            "delegate_services": [
-              "m7_special_reserve_service"
-            ],
-            "unknown_sheet_handling": {
-              "m7_special_reserve_service": [
-                "SERVICE_MODULE_MISSING"
-              ]
-            },
-            "mechanism": "m7_special_reserve_service: SERVICE_MODULE_MISSING",
-            "readable_error_on_unknown_sheet": false
-          }
-        },
-        {
-          "group": "G6",
           "key": "m8",
           "sheet_code": "M8-3",
           "catalog_value": "启用该短前缀的 sheet: ['M8-3']",
@@ -2831,37 +2800,6 @@
               ]
             },
             "mechanism": "m8_general_risk_reserve_service: WHITELIST_ELSE_ALL+SHEET_OR_DEFAULT",
-            "readable_error_on_unknown_sheet": false
-          }
-        },
-        {
-          "group": "G6",
-          "key": "m9",
-          "sheet_code": "M9-3",
-          "catalog_value": "启用该短前缀的 sheet: ['M9-3']",
-          "contract_value": "M9-3-entry-*",
-          "frontend_observed": "派生 registry 短前缀在位=True / 长前缀在位=False",
-          "verdict": "real_drift",
-          "method_ref": "G6.method",
-          "evidence": {
-            "long_prefix": "m9-other-comprehensive-income",
-            "host_modules": [
-              "app.routers.m9_other_comprehensive_income"
-            ],
-            "sheet_param_declared": {
-              "export-data": true,
-              "export-template": true,
-              "import-data": true
-            },
-            "delegate_services": [
-              "m9_other_comprehensive_income_service"
-            ],
-            "unknown_sheet_handling": {
-              "m9_other_comprehensive_income_service": [
-                "SERVICE_MODULE_MISSING"
-              ]
-            },
-            "mechanism": "m9_other_comprehensive_income_service: SERVICE_MODULE_MISSING",
             "readable_error_on_unknown_sheet": false
           }
         },
@@ -2896,7 +2834,9 @@
             "readable_error_on_unknown_sheet": false
           }
         }
-      ]
+      ],
+      "baseline_lowered_from": 10,
+      "lowered_by_task": "9"
     },
     {
       "group": "G7",
@@ -3042,15 +2982,10 @@
             "row2_title_expected_to_contain": "递延所得税负债",
             "row2_title_mismatch": true,
             "row3_labels_observed": [
-              "被审计单位：",
-              "编制人：",
-              "编制人：",
               "索引号：",
               "N3-3"
             ],
-            "row3_duplicated_labels": [
-              "编制人："
-            ],
+            "row3_duplicated_labels": [],
             "handling": "源模板只读（R11.1）⇒ 登记不修；导出用 catalog sheet_name，不搬第 2 行标题"
           },
           "na_reasons": {

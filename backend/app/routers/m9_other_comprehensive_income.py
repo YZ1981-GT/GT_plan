@@ -1,12 +1,13 @@
-"""M9 其他综合收益 — 导入导出三级端点 + OCI核对API + TB回写
+"""M9 其他综合收益 — 明细表导入导出三态端点 + 公式校验API + TB回写
 
-5个端点：
-- GET  /api/m9-other-comprehensive-income/{wp_id}/export-template    多sheet空白模板xlsx
-- GET  /api/m9-other-comprehensive-income/{wp_id}/export-data         当前数据xlsx
-- POST /api/m9-other-comprehensive-income/{wp_id}/import-data         解析xlsx写入（multipart）
-- GET  /api/m9-other-comprehensive-income/{wp_id}/validate-formulas   权益类公式方向验证
+5个端点（前四个的业务实现在 `app.services.m9_other_comprehensive_income_service`）：
+- GET  /api/m9-other-comprehensive-income/{wp_id}/export-template    明细表 M9-2 空白模板xlsx
+- GET  /api/m9-other-comprehensive-income/{wp_id}/export-data         明细表 M9-2 当前数据xlsx
+- POST /api/m9-other-comprehensive-income/{wp_id}/import-data         解析xlsx整表替换 M9-2（multipart）
+- GET  /api/m9-other-comprehensive-income/{wp_id}/validate-formulas   审定表 M9-1 权益类公式方向验证
 - POST /api/m9-other-comprehensive-income/{wp_id}/tb-writeback        回写TB（科目4103）
 
+三态目前只支持 M9-2（界面唯一有导入导出入口的动态行表）；其他 sheet 返回 400。
 科目编码: 4103其他综合收益（**贷方/权益类！**）
 公式方向: 期末=期初+贷方-借方（OCI增加在贷方，重分类/减少在借方）
 OCI特征: 税后净额列示=税前发生-所得税影响；分两大类（不可/可重分类进损益）
@@ -68,9 +69,9 @@ _X3_CODES: frozenset[str] = frozenset(
 #:    5.1 半径。该存量缺陷已登记 `Deviation_Registry` G6（10 条 = m1 + m2~m10），收口另立
 #:    任务。⇒ `IE_SHEETS` 此刻只覆盖 X-3（= 形态 A 端点的白名单）。
 #:
-#: 🔴 另一条存量缺陷（G6 已登记为 `SERVICE_MODULE_MISSING`）：本模块既有三态端点惰性 import
-#:    的 service 模块在仓库中**不存在** ⇒ 那三个端点一调即 ImportError。形态 A 三态走共享实现
-#:    `_x3_adjustment_import_export`，与该 service 无关，故本模块 import 与形态 A 调用均不受影响。
+#: 长前缀三态的 sheet 白名单在 `m9_other_comprehensive_income_service.SUPPORTED_SHEETS`（M9-2），
+#: 未知 sheet 返回 400。该 service 曾在仓库中不存在（G6 登记为 `SERVICE_MODULE_MISSING`），由 spec
+#: m7-m9-service-modules-and-lazy-import-guard 补齐。
 IE_SHEETS: frozenset[str] = _X3_CODES
 
 attach_shape_a_routes(router, api_prefix=_IE_API_PREFIX, sheets=_X3_CODES)
@@ -91,11 +92,13 @@ class ValidateFormulasRequest(BaseModel):
 
 class ValidateFormulasRow(BaseModel):
     """单行校验结果"""
+    row_key: str = Field("", description="审定表行键（定位是哪一行）")
+    item_name: str = Field("", description="项目名称")
     begin: float = Field(0.0, description="期初余额")
     credit: float = Field(0.0, description="贷方发生额（OCI增加）")
     debit: float = Field(0.0, description="借方发生额（重分类/减少）")
     calculated_end: float = Field(0.0, description="计算期末=期初+贷方-借方")
-    reported_end: float | None = Field(None, description="报告期末余额")
+    reported_end: float | None = Field(None, description="报告期末余额（该行未审数，即期末账面数）")
     diff: float = Field(0.0, description="差异=计算-报告")
     is_valid: bool = Field(True, description="是否通过校验")
 
@@ -106,8 +109,9 @@ class ValidateFormulasResponse(BaseModel):
     valid_rows: int = Field(0, description="通过行数")
     invalid_rows: int = Field(0, description="不通过行数")
     results: list[ValidateFormulasRow] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list, description="未参与校验的行（如库中 JSON 损坏）")
     formula_description: str = Field(
-        "权益类贷方：期末=期初+贷方-借方（OCI增加贷方，减少/重分类借方）",
+        "权益类贷方：期末=期初+贷方-借方（OCI增加贷方，减少/重分类借方），与该行未审数核对，容差1元",
         description="公式说明",
     )
 
@@ -137,10 +141,10 @@ async def m9_export_template(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
-    """导出空白xlsx模板（M9-2明细表 / M9-4核对表）
+    """导出空白xlsx模板（M9-2明细表，含「编制说明」页）
 
     Query params:
-        sheet: 可选，指定导出sheet（M9-2/M9-4）
+        sheet: 可选，目前只支持 M9-2；缺省导出全部支持的 sheet，其他值返回 400
 
     Requirements: 6.6
     """
@@ -167,10 +171,10 @@ async def m9_export_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
-    """导出含当前数据的xlsx（M9-2明细/M9-4核对）
+    """导出含当前数据的xlsx（M9-2明细：输入列 + 公式列 + 合计行）
 
     Query params:
-        sheet: 可选，指定导出sheet
+        sheet: 可选，目前只支持 M9-2；缺省导出全部支持的 sheet，其他值返回 400
 
     Requirements: 6.6
     """
@@ -198,13 +202,13 @@ async def m9_import_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """导入xlsx解析写入checklist_responses（M9-2明细表动态行 / M9-4核对表）
+    """导入xlsx整表替换 M9-2 明细行（写 checklist_responses，与界面同一组键）
 
     Query params:
-        sheet: 可选，指定导入目标sheet（M9-2/M9-4）
+        sheet: 可选，缺省 M9-2（前端把 sheet 放在表单字段里，这里收不到）；其他值返回 400
 
     Returns:
-        { imported_count: int, warnings: list[str] }
+        { ok, sheet, imported_count, warnings, warning? }；文件内容有问题返回 400 且不写库
 
     Requirements: 6.6
     """
@@ -212,7 +216,7 @@ async def m9_import_data(
 
     content = await file.read()
     try:
-        result = await import_data(wp_id, content, db, sheet=sheet)
+        result = await import_data(wp_id, content, db, sheet=sheet, updated_by=current_user.id)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -239,13 +243,15 @@ async def m9_validate_formulas(
     - 期末余额 = 期初 + 贷方发生额 - 借方发生额
     - 本期税后净额 = 本期税前发生 - 所得税影响
 
-    从 checklist_responses 读取已保存的审定表数据进行验证。
+    从 checklist_responses 读取已保存的审定表行（与界面恢复同口径：全部 M9-1-*-data），
+    按「期初 + 贷方 − 借方」推算期末，与该行未审数（期末账面数）核对。
+    库中 JSON 损坏的行不参与校验，列在 warnings 里。
 
     Requirements: 6.6
     """
     from app.services.m9_other_comprehensive_income_service import get_adjudication_rows
 
-    rows = await get_adjudication_rows(wp_id, db)
+    rows, warnings = await get_adjudication_rows(wp_id, db)
 
     results: list[ValidateFormulasRow] = []
     valid_count = 0
@@ -270,6 +276,8 @@ async def m9_validate_formulas(
             valid_count += 1
 
         results.append(ValidateFormulasRow(
+            row_key=str(row_data.get("rowKey") or ""),
+            item_name=str(row_data.get("itemName") or ""),
             begin=begin,
             credit=credit,
             debit=debit,
@@ -284,6 +292,7 @@ async def m9_validate_formulas(
         valid_rows=valid_count,
         invalid_rows=len(results) - valid_count,
         results=results,
+        warnings=warnings,
     )
 
 

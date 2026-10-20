@@ -698,7 +698,9 @@ async function onImportFile(f: { raw?: File } | File): Promise<void> {
   if (!file) return
   const result = await ie.importData('M9-2', file)
   if (result?.success) {
-    // 触发父组件刷新
+    // 后端已整表替换 M9-2-detail-rows：按挂载时同一口径重新加载，否则界面停在导入前（与 M7-2 一致）
+    await formData.loadData()
+    _initDefaultRows()
     emit('imported')
   }
 }

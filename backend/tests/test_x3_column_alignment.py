@@ -56,6 +56,8 @@ _EVIDENCE_DUMP = (
     _REPO
     / ".kiro"
     / "specs"
+    / "_archive"  # spec 已于 2026-08-16（d96245a9a）归档
+    / "05-business-features"
     / "x3-adjustment-entry-import-export"
     / "evidence"
     / "source_template_x3_headers.txt"

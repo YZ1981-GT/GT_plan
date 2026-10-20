@@ -31,7 +31,11 @@ FE_SRC = ROOT / "audit-platform" / "frontend" / "src"
 WP_DIR = FE_SRC / "components" / "workpaper"
 CATALOG_PATH = BACKEND / "data" / "acnr" / "global_catalog.json"
 CONTRACT_PATH = BACKEND / "data" / "adjustment_ie_contract.json"
-REGISTRY_PATH = ROOT / ".kiro" / "specs" / "x3-adjustment-entry-import-export" / "evidence" / "deviation_registry.json"
+# spec 已于 2026-08-16（d96245a9a）归档；与 `check_x3_deviation_registry.REGISTRY_PATH` 同一落点
+REGISTRY_PATH = (
+    ROOT / ".kiro" / "specs" / "_archive" / "05-business-features"
+    / "x3-adjustment-entry-import-export" / "evidence" / "deviation_registry.json"
+)
 
 _ADJ_CLASS = "F-调整分录"
 
@@ -161,4 +165,5 @@ class TestProperty9SameOriginConsumerOrRegistered:
 
     def test_g1_registration_non_empty(self):
         """G1 登记不为空（防空过使 (b) 恒假）。"""
+        assert REGISTRY_PATH.is_file(), f"登记表不存在：{REGISTRY_PATH}（spec 目录被移动过？）"
         assert len(_G1_REGISTERED) > 0, "G1 entries 为空 —— deviation_registry.json 可能未生成"
