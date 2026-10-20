@@ -17,9 +17,9 @@
 | G7 a16_sign_status_check_auto | 2 | 生产缺陷 | resolver 的 step_status / link / detail 被丢弃，按白名单透传 |
 | G8 archive_deprecated | 2 | 测试不封闭 | 覆盖二次确认依赖 + 补「无确认令牌 403」 |
 | G9 g1_classification | 2 | 测试过时 | 假底稿补 project_id + 打桩并断言缓存失效 |
-| G10 ocr_service | 2 | 生产缺陷 | 大模型结果只补规则未取到且被请求的字段，规则结果优先 |
+| G10 ocr_service | 2 | 生产缺陷 | 大模型结果只补规则未取到且被请求的字段，规则结果优先；第二轮按实际用途定字段清单（§1.10） |
 | G11 startup_registry | 2 | 生产缺陷 | 启动编排两份副本各自漂移；lifespan 改为执行 registry，health 输出启动报告 |
-| G12 review_prompt_integration | 1 | 生产缺陷（口径） | 覆盖率按 wp_code 前缀统一计数，扫描范围与加载规则一致 |
+| G12 review_prompt_integration | 1 | 生产缺陷（口径） | 覆盖率按底稿（wp_code 前缀）统一计数，扫描范围与加载规则一致；第二轮分母与科目级降级改取权威编码表（§1.12） |
 
 ## 1. 各组根因与修法
 
@@ -71,6 +71,17 @@
 
 现象：`assert 8 == 3` ×2。30a6a489e 起 `extract_fields` 先走规则层、LLM 只补缺失字段，但合并写成 `rule_fields + llm_fields`：规则已取到的字段被 LLM 再给一遍时出现两次（值 / 置信度各异，下游取哪个看顺序），没请求的字段也混进来。修法：规则结果优先，LLM 只补「被请求且规则没取到」的字段、同名只取第一个。用例精确钉死字段与来源顺序、提示词里只列缺失字段；LLM 多给的未请求字段（`seller_name`）不得并入。字段清单按规则层现行输出钉住（含规则层算出的 `total`、银行回单把交易日期也报成 `invoice_date`），列入 §3 待确认。
 
+**第二轮（2026-10-20，用户要求「根据实际分析判断」后定稿）**。用途排查：这条链唯一在用的入口是 `POST /api/attachments/{id}/ocr-fields`（结果缓存进 `attachments.ocr_fields_cache`），唯一按字段名取值的下游是 `_match_ocr_to_ledger`（只取 `total` / `amount` 对序时账）；本地库 365 个附件全部 `pending`、无存量结果，改清单不涉及数据迁移。清单按审计用途定（单据拿来与序时账 / 凭证核对、填底稿：多少钱、哪天、和谁、什么单号，再加该类单据特有的关键数），单一来源 `app/services/ocr_document_fields.py`，OCRService 与规则层共用：
+
+- 输出只含本类清单内字段、按清单顺序；规则先取，大模型只补清单内缺的。银行回单由通用「日期」误抓的 `invoice_date` 不再输出。
+- `total`（价税合计）正式列入两类发票清单：它是应收 / 应付的挂账金额，规则层也用它校验「金额 + 税额」。两类发票都要 `buyer_name` + `seller_name`（票面都有：一方核对客户 / 供应商，另一方核对是否本单位）。
+- 银行回单：`payer_name` / `payee_name` 照票面取，`counterparty_name` 只在票面写了「对方户名」时才有。原规则先取「收款人」当对方 —— 收款回单上收款人就是本单位。
+- 银行对账单 / 余额调节表：原清单按单笔交易写（交易日期 / 对方 / 金额），与单据内容和规则层（账号 / 期初期末余额 / 银行余额 / 账面余额）都对不上，改为账户与余额字段。
+- 合同加 `contract_no`；出入库单加规则层本就取到的 `warehouse`；物流单去掉没有审计用途的 `weight`（规则一并删）。
+- 规则分类器给得出、原先不在字段表里的 7 类报销票据（火车票 / 行程单 / 出租车 / 住宿 / 通行费 / 餐饮 / 定额发票）补清单与中文名 —— 原先这 7 类提取结果恒为空。
+- 规则层：类型专用正则优先于通用发票正则（纳税申报表的 amount 原先取到第一处「金额」而非应纳税额）；日期统一 YYYY-MM-DD、金额 / 余额 / 数量去千分位（与给大模型的格式要求一致）；住宿票的酒店名原先会把下一行「入住日期：…」当名称；删掉被后一个同名定义覆盖、从未生效的前一版 `_TYPE_SPECIFIC_PATTERNS`。
+- 未改：`_match_ocr_to_ledger` 直接调规则层、不经清单过滤（它对所有类型取 amount / total，含 other）；前端抽屉与另两套字段表见 §2 #9。
+
 
 ### 1.11 G11 `test_startup_registry.py`（2 例，生产缺陷）
 
@@ -111,6 +122,12 @@ registry 的顺序锁 / 关键性锁守的是一份不执行的副本；若有�
 
 守卫：集成测试改为精确恒等式 + A/B/C 前缀进入 `sheet_breakdown`；新增夹具目录单测钉死精确值（含不在别名表的前缀、无前缀文件、非单字母目录）。
 
+**第二轮（2026-10-20，用户确认「至少涵盖 D-N 的底稿」）**。第一轮的分母是 `_AUDIT_CYCLE_ALIASES` 的键 ∪ 有文件的前缀 —— 表外底稿有没有提示词都看不见，缺口只剩 `S1`。改为致同 2025 编码表 `wp_account_mapping.json`（D~N 89 本，与模板库 `gt_template_library.json` 的 D~N 前缀逐个一致）：分母 = 编码表全部 179 本（A 28 / B 19 / C 21 / D~N 89 / S 22）∪ 有文件的前缀。现值 179 / 141 / 38 条缺口：7 本函证（D0 / E0 / F0 / G0 / H0 / K0 / L0）、A 6（A21~A25 复核表、A31）、B 2、C 1、S 22（S 目录尚无提示词）；缺口按循环、编号排序并附底稿名。
+
+同时修 §2 #5 的科目级降级：同一张别名表按旧编码写成，与 2025 编码 40 个前缀错位，而整本底稿复核（`wp_ai` 不带 sheet 名）必走科目级 ⇒ G1 交易性金融资产拿到长期股权投资的提示词、N5 所得税费用拿到投资收益的。改为按编码表的科目名 / 底稿名精确匹配根目录科目级文件，另加 5 条逐条核对的同义名（营业收入→收入、营业成本→成本、实收资本→实收资本或股本、资产处置损益→资产处置收益、持有待售资产和负债→持有待售资产 / 负债）；不做包含匹配（「收入」会命中「营业外收入」，「其他权益工具」会命中 G8「其他权益工具投资」）。D~N 89 本：64 本加载本科目提示词，25 本没有本科目文件改走 base（原先 75 本走科目级，其中 38 本加载的是别的科目，用 HEAD 版服务逐本对拍）。别名表删除。
+
+守卫：`test_review_prompt_authoritative_workpapers.py`（全部 179 本「不加载别的科目」+ 16 条钉死 + 6 条走 base + 精确匹配夹具 + 同义名无失效条目 + D~N 与模板库逐个一致）；集成测试加「分母 ⊇ D~N 89 本」。
+
 ## 2. 排查中发现、不在本轮范围的问题（如实登记，未修）
 
 | # | 位置 | 现象 / 证据 | 不修的原因 |
@@ -119,12 +136,13 @@ registry 的顺序锁 / 关键性锁守的是一份不执行的副本；若有�
 | 2 | 约 74 个测试文件 | 写死已归档 spec 的路径（如 `test_task32_bridge_state_domain`、`test_render_schema_coverage`、`acnr/test_resolve_contract` 报错；`test_n_foundation_p4_closeout` 静默跳过） | 批量改路径会触及他人 spec 守卫，应按 G4 同一修法（`_spec_dir.resolve_spec_dir`）另立一轮 |
 | 3 | 约 100 处 `sa.Enum(..., create_type=False)` | `create_type` 对通用 `sa.Enum` 静默无效（已记于 dsh-kb-ocr-local-first-routing design §1.3） | 与迁移体系相关，需单独评估 |
 | 4 | `test_pm_workflow_e2e`（1）/ `test_property_archived_invariant`（1）/ `test_onlyoffice_word_template_callback`（5） | G1 修复的相邻回归里失败；干净 HEAD 逐例同样失败（与本轮改动无关） | 不在 46 例内 |
-| 5 | `review_prompt_service._AUDIT_CYCLE_ALIASES` | 科目级降级用的关键词与 sheet 级提示词标题对不上：40 个前缀错位（如 G1 映射「长期股权投资」而 G1 是交易性金融资产，M1 映射「实收资本」而 M1 是应付股利），另 4 个标题不含科目名无法判定 ⇒ sheet 级缺失时会加载别的科目的提示词 | 需按致同 2025 编码逐条复核业务含义 |
+| 5 | `review_prompt_service._AUDIT_CYCLE_ALIASES` | 科目级降级用的关键词与 sheet 级提示词标题对不上：40 个前缀错位（如 G1 映射「长期股权投资」而 G1 是交易性金融资产，M1 映射「实收资本」而 M1 是应付股利），另 4 个标题不含科目名无法判定 ⇒ sheet 级缺失时会加载别的科目的提示词 | **已修（2026-10-20 G12 第二轮，§1.12）**：改取 `wp_account_mapping.json` 的科目名精确匹配，别名表删除 |
 | 6 | WOPI 锁用例 `test_unlock_wrong_id` / `test_refresh_lock` | 非严格 xfail，单跑 xfail、与其他文件同跑 XPASS（依赖 Redis 可用性）；xfail 理由本身描述了真实缺陷（锁写 Redis、unlock / refresh 只查内存） | 不在 46 例内 |
 | 7 | `test_put_file_version_contract_moved_to_real_postgres` 的 docstring | 声称版本单调契约已搬到 `tests/workpaper_sync/test_task19_writer_migration_pg.py`，该文件不在 HEAD（只在另一引用上的 42d2f6e6f）⇒ put_file 成功路径在 HEAD 上没有真库测试（本轮用探针实测过一次） | 恢复该真库用例属 workpaper-sync spec |
 | 8 | `app/main.py` 的 `/api/_debug/a51-*` 三个临时端点（4198a4d8f 入库） | 无鉴权：可按任意 wp_id 读 content_revision、可触发注册表 `register_from_manifest` | 属 canary 排障遗留，需端点所有者决定删除或加管理员鉴权；本轮只把它们周围的启动代码移走，未动端点本身 |
+| 9 | `components/workpaper/OcrFieldsDrawer.vue` / `OCRService.batch_recognize` 链 / `wp_document_recognizer` | 抽屉是 `/ocr-fields` 唯一的前端调用方但没有挂载，且读 `data.fields`（整个缓存字典）而非字段列表、标签写 `total_amount` 而后端出 `total`；批量识别链没有可达路由、自带第三份字段表；`wp_document_recognizer` 是另一套在用接口，字段名自成一套（`payer_name` / `total_amount` / `voucher_date`…） | 不在 G10 字段清单范围：抽屉挂载前需改为读 `ocr_fields_cache.fields` 列表；两套字段名是否合并需单独定 |
 
-## 3. 待确认事项
+## 3. 待确认事项（2026-10-20 已定）
 
-1. G12 覆盖率口径：`total_subjects` 由「根目录科目级文件数（67）」改为「已知 wp_code 前缀数（142）」，四个字段同一单位；扫描范围扩到 A/B/C。
-2. G10 字段清单：按规则层现行输出钉住，包括规则层算出的 `total`（价税合计）与银行回单同时报出的 `invoice_date`。若这两项不应出现，属规则层（`ocr_rule_engine`）的口径问题，另行修。
+1. G12 覆盖率口径：原拟「已知 wp_code 前缀数（142）」。用户确认「至少涵盖 D-N 的底稿」⇒ 分母改取权威编码表全部底稿（179，D~N 89 本全在内），见 §1.12 第二轮。
+2. G10 字段清单：原按规则层现行输出钉住（含 `total` 与银行回单的 `invoice_date`）。用户要求「根据实际分析判断」⇒ 按 §1.10 第二轮定稿：`total` 保留并列入发票清单，银行回单的 `invoice_date` 不再输出，其余逐类调整。

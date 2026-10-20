@@ -335,6 +335,14 @@ async def test_coverage_endpoint_response_structure(client):
     )
     # 扫描范围与 load_prompt 同一规则：A/B/C 目录的 sheet 级提示词同样计入
     assert {"A", "B", "C"} <= {prefix[0] for prefix in data["sheet_breakdown"]}
+    # 分母至少涵盖 D~N 全部底稿（权威编码表），没有提示词的必须出现在缺口里
+    from app.services.review_prompt_service import _authoritative_workpapers
+
+    counted = set(data["sheet_breakdown"]) | {gap.split(" ", 1)[0] for gap in data["missing_gaps"]}
+    d_to_n = {p for p in _authoritative_workpapers() if p[0] in "DEFGHIJKLMN"}
+    assert len(d_to_n) == 89
+    assert d_to_n <= counted
+    assert len(counted) == data["total_subjects"]
 
     # sheet_breakdown values are lists of strings
     for prefix, suffixes in data["sheet_breakdown"].items():
@@ -348,8 +356,11 @@ async def test_coverage_endpoint_response_structure(client):
 
 
 def test_coverage_counts_prefixes_across_every_cycle_dir(tmp_path, monkeypatch):
-    """夹具目录钉死口径：以前缀为单位；全部单字母目录都扫；别名表外的前缀也算已知。"""
+    """夹具目录钉死口径：以底稿（前缀）为单位；全部单字母目录都扫；分母 = 权威编码表 ∪ 有文件的前缀。"""
     from app.services import review_prompt_service as rps
+
+    def workpaper(name: str) -> "rps._Workpaper":
+        return rps._Workpaper(name=name, subject_names=(name,))
 
     # 根级科目文件不参与前缀计数（原口径正是拿它当 total）
     (tmp_path / "应收账款审计复核提示词.md").write_text("x", encoding="utf-8")
@@ -363,15 +374,19 @@ def test_coverage_counts_prefixes_across_every_cycle_dir(tmp_path, monkeypatch):
         path = tmp_path / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("x", encoding="utf-8")
-    monkeypatch.setattr(
-        rps, "_AUDIT_CYCLE_ALIASES", {"D2": ["应收账款"], "S1": ["审计方案", "总体"]}
-    )
+    # 编码表里没有 A1（有文件照样计入）；E10 与 E2 用来钉住按编号而非字典序排序
+    monkeypatch.setattr(rps, "_authoritative_workpapers", lambda: {
+        "D2": workpaper("应收账款审定表"),
+        "E10": workpaper("银行询证函十"),
+        "E2": workpaper("银行询证函二"),
+        "S1": workpaper("违反法规行为的考虑"),
+    })
 
     report = rps.ReviewPromptService(base_dir=tmp_path).get_coverage()
 
     assert report.sheet_breakdown == {"A1": ["1"], "D2": ["1", "note-listed"]}
-    assert report.missing_gaps == ["S1 (审计方案)"]
-    assert (report.total_subjects, report.subjects_with_sheet_prompts) == (3, 2)
+    assert report.missing_gaps == ["E2 (银行询证函二)", "E10 (银行询证函十)", "S1 (违反法规行为的考虑)"]
+    assert (report.total_subjects, report.subjects_with_sheet_prompts) == (5, 2)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

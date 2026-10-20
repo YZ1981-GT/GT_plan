@@ -316,13 +316,20 @@ _TRAIN_TICKET_PATTERNS: dict[str, list[re.Pattern]] = {
 }
 
 # 银行回单专用字段
+# 付款人 / 收款人照票面取；原先 counterparty_name 先取「收款人」—— 收款回单上收款人就是本单位，
+# 取到的是自己。只有票面写了「对方户名」才算 counterparty_name。
 _BANK_RECEIPT_PATTERNS: dict[str, list[re.Pattern]] = {
     "transaction_date": [
         re.compile(r'(?:交易日期|日期)[:：\s]*(\d{4}[年/.—-]\d{1,2}[月/.—-]\d{1,2})'),
     ],
+    "payer_name": [
+        re.compile(r'(?:付款人户名|付款人名称|付款户名|付款人|付款方)[:：\s]*([^\n]{2,40})'),
+    ],
+    "payee_name": [
+        re.compile(r'(?:收款人户名|收款人名称|收款户名|收款人|收款方)[:：\s]*([^\n]{2,40})'),
+    ],
     "counterparty_name": [
-        re.compile(r'(?:收款人|对方户名|收款方)[:：\s]*([^\n]{2,40})'),
-        re.compile(r'(?:付款人|付款方)[:：\s]*([^\n]{2,40})'),
+        re.compile(r'(?:对方户名|对方账户名|对方单位)[:：\s]*([^\n]{2,40})'),
     ],
     "amount": [
         re.compile(r'(?:交易金额|金额)[:：\s]*[¥￥]?\s*([\d,]+\.?\d*)'),
@@ -334,6 +341,7 @@ _BANK_RECEIPT_PATTERNS: dict[str, list[re.Pattern]] = {
 
 # 合同专用字段
 _CONTRACT_PATTERNS: dict[str, list[re.Pattern]] = {
+    "contract_no": [re.compile(r'(?:合同编号|合同号|协议编号)[:：\s]*([A-Za-z0-9][A-Za-z0-9\-_/]{2,39})')],
     "party_a": [re.compile(r'(?:甲方|买方|委托方)[:：（(]\s*([^\n)）]{2,40})')],
     "party_b": [re.compile(r'(?:乙方|卖方|受托方)[:：（(]\s*([^\n)）]{2,40})')],
     "contract_amount": [
@@ -343,14 +351,6 @@ _CONTRACT_PATTERNS: dict[str, list[re.Pattern]] = {
         re.compile(r'(?:签订日期|签署日期|签约日)[:：\s]*(\d{4}[年/.—-]\d{1,2}[月/.—-]\d{1,2})'),
     ],
 }
-
-# 类型 → 专用正则映射
-_TYPE_SPECIFIC_PATTERNS: dict[str, dict[str, list[re.Pattern]]] = {
-    "train_ticket": _TRAIN_TICKET_PATTERNS,
-    "bank_receipt": _BANK_RECEIPT_PATTERNS,
-    "contract": _CONTRACT_PATTERNS,
-}
-
 
 # ─── 扩展：出入库单 ───
 _OUTBOUND_ORDER_PATTERNS: dict[str, list[re.Pattern]] = {
@@ -418,9 +418,6 @@ _LOGISTICS_ORDER_PATTERNS: dict[str, list[re.Pattern]] = {
     "receiver": [
         re.compile(r'(?:收件人|收货人|签收人)[:：\s]*([^\n]{2,30})'),
     ],
-    "weight": [
-        re.compile(r'(?:重量|实际重量)[:：\s]*([\d.]+)\s*(?:kg|KG|公斤)?'),
-    ],
 }
 
 # ─── 扩展：银行对账单/流水 ───
@@ -463,9 +460,10 @@ _TAX_RETURN_PATTERNS: dict[str, list[re.Pattern]] = {
 # ─── 扩展：住宿发票 ───
 _ACCOMMODATION_PATTERNS: dict[str, list[re.Pattern]] = {
     "hotel_name": [
-        re.compile(r'(?:酒店|宾馆|旅馆|饭店)[:：\s]*([^\n]{2,30})'),
-        # 也匹配发票头中出现的酒店名
-        re.compile(r'([^\n]{2,20}(?:酒店|宾馆|旅馆|大酒店|商务酒店))'),
+        # 票头酒店名（以酒店 / 宾馆等结尾）优先。原先第一条是「酒店」后面跟什么取什么：
+        # 「如家商务酒店」换行后的「入住日期：…」会被当成酒店名
+        re.compile(r'([^\n:：]{2,20}(?:酒店|宾馆|旅馆|饭店))'),
+        re.compile(r'(?:酒店名称|宾馆名称|住宿单位)[:：\s]*([^\n]{2,30})'),
     ],
     "check_in": [
         re.compile(r'(?:入住日期|入住|check.?in)[:：\s]*(\d{4})[年/.—-](\d{1,2})[月/.—-](\d{1,2})'),
@@ -513,7 +511,7 @@ _BANK_RECONCILIATION_PATTERNS: dict[str, list[re.Pattern]] = {
     ],
 }
 
-# 完整类型→专用正则映射（14 类全覆盖）
+# 类型 → 专用正则（字段名必须在 ocr_document_fields.DOCUMENT_FIELD_RULES 该类清单内，测试钉住）
 _TYPE_SPECIFIC_PATTERNS: dict[str, dict[str, list[re.Pattern]]] = {
     "sales_invoice": {},  # 通用字段已覆盖
     "purchase_invoice": {},
@@ -525,7 +523,7 @@ _TYPE_SPECIFIC_PATTERNS: dict[str, dict[str, list[re.Pattern]]] = {
     "outbound_order": _OUTBOUND_ORDER_PATTERNS,
     "inbound_order": _INBOUND_ORDER_PATTERNS,
     "logistics_order": _LOGISTICS_ORDER_PATTERNS,
-    "voucher": {},  # 凭证字段在通用正则中
+    "voucher": {},  # 凭证的分录行是表格，规则层只取得到通用「金额」，其余交大模型
     "tax_return": _TAX_RETURN_PATTERNS,
     "contract": _CONTRACT_PATTERNS,
     "bank_reconciliation": _BANK_RECONCILIATION_PATTERNS,
@@ -548,21 +546,21 @@ def extract_fields_by_rules(text: str, doc_type: str) -> list[dict[str, Any]]:
 
     results: list[dict[str, Any]] = []
 
-    # 通用字段提取
-    for field_name, patterns in _COMMON_FIELD_PATTERNS.items():
+    # 类型专用字段优先：同名字段按本类单据的版式取（纳税申报表的 amount 是「应纳税额」，
+    # 原先先跑通用正则，取到的是第一处「金额」，专用正则被跳过）
+    specific = _TYPE_SPECIFIC_PATTERNS.get(doc_type, {})
+    for field_name, patterns in specific.items():
         value = _try_patterns(text, patterns, field_name)
         if value:
             results.append({
                 "field_name": field_name,
                 "field_value": value,
-                "confidence_score": 0.95,
+                "confidence_score": 0.90,
                 "method": "rule",
             })
 
-    # 类型专用字段
-    specific = _TYPE_SPECIFIC_PATTERNS.get(doc_type, {})
-    for field_name, patterns in specific.items():
-        # 避免重复提取通用字段
+    # 通用字段补充（发票版式；清单外的由 OCRService.extract_fields 按单据类型过滤）
+    for field_name, patterns in _COMMON_FIELD_PATTERNS.items():
         if any(r["field_name"] == field_name for r in results):
             continue
         value = _try_patterns(text, patterns, field_name)
@@ -570,7 +568,7 @@ def extract_fields_by_rules(text: str, doc_type: str) -> list[dict[str, Any]]:
             results.append({
                 "field_name": field_name,
                 "field_value": value,
-                "confidence_score": 0.90,
+                "confidence_score": 0.95,
                 "method": "rule",
             })
 
@@ -635,21 +633,34 @@ def _get_field_as_float(fields: list[dict[str, Any]], name: str) -> float | None
     return None
 
 
+#: 名字里不带 date 的日期字段 / 不带 amount 的金额与数量字段（值格式与大模型提示词同一口径）
+_EXTRA_DATE_FIELDS = frozenset({"check_in", "check_out"})
+_EXTRA_NUMBER_FIELDS = frozenset({"total", "unit_price", "quantity"})
+_DATE_VALUE_RE = re.compile(r'^(\d{4})\s*[年/.—-]\s*(\d{1,2})\s*[月/.—-]\s*(\d{1,2})')
+
+
 def _try_patterns(text: str, patterns: list[re.Pattern], field_name: str) -> str | None:
-    """尝试多个正则模式，返回第一个匹配结果"""
+    """尝试多个正则模式，返回第一个匹配结果（日期统一 YYYY-MM-DD，金额 / 余额 / 数量去千分位）"""
+    is_date = "date" in field_name or field_name in _EXTRA_DATE_FIELDS
+    is_number = (
+        "amount" in field_name or field_name.endswith("balance") or field_name in _EXTRA_NUMBER_FIELDS
+    )
     for pat in patterns:
         m = pat.search(text)
         if m:
             groups = m.groups()
             if not groups:
                 continue
-            # 日期字段特殊处理：多组拼接为 YYYY-MM-DD
-            if "date" in field_name and len(groups) == 3:
+            # 日期：三组拼接；整串捕获的（如「2025年1月8」）同样规整
+            if is_date and len(groups) == 3:
                 y, mo, d = groups
                 return f"{y}-{int(mo):02d}-{int(d):02d}"
-            # 金额字段：去掉千分位逗号
             value = groups[0].strip()
-            if "amount" in field_name:
+            date_match = _DATE_VALUE_RE.match(value) if is_date else None
+            if date_match:
+                y, mo, d = date_match.groups()
+                return f"{y}-{int(mo):02d}-{int(d):02d}"
+            if is_number:
                 value = value.replace(",", "")
             return value if value else None
     return None

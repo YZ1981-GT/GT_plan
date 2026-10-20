@@ -54,3 +54,13 @@
 - [x] 10. 待确认事项与范围外发现如实登记
   - _需求：3.1、2.1_
   - 证据：design §2（8 项，含 main.py 三个无鉴权 `/api/_debug/a51-*` 端点）、§3（覆盖率口径、OCR 字段清单）
+
+- [x] 11. G12 第二轮：覆盖率分母取权威编码表，科目级降级按编码表精确匹配（2026-10-20 用户确认「至少涵盖 D-N 的底稿」）
+  - 分母 = `wp_account_mapping.json` 全部底稿 ∪ 有文件的前缀（D~N 89 本全在内），缺口附底稿名、按编号排序；删除错位的 `_AUDIT_CYCLE_ALIASES`，科目级降级按科目名 / 底稿名精确匹配 + 5 条核对过的同义名
+  - _需求：1.2、3.1_
+  - 证据：`test_review_prompt_authoritative_workpapers.py` 26 passed；`test_review_prompt_integration.py` 分母 ⊇ D~N 89 本；现值 179 / 141 / 38；D~N 科目级降级 64 本本科目 + 25 本 base（HEAD 版 75 本里 38 本是别的科目）；变异 4 条全杀（精确→包含、删同义名、分母只取有文件的、缺口按字典序）
+
+- [x] 12. G10 第二轮：OCR 字段清单按实际用途定稿（2026-10-20 用户要求「根据实际分析判断」）
+  - 单一来源 `app/services/ocr_document_fields.py`；`extract_fields` 只输出清单内字段、按清单顺序；规则层专用正则优先、日期 / 金额格式统一；银行回单付款人 / 收款人照票面取；对账单 / 调节表改账户与余额字段；7 类报销票据补清单；清单与规则层一致性由测试钉住
+  - _需求：1.2、3.1_
+  - 证据：`test_ocr_document_fields.py` 14 passed；`test_ocr_service.py` 改 2 例、新增 2 例；复核提示词 / OCR / 附件 / DSH 相关 907 passed / 1 skipped；变异 5 条全杀（去清单过滤、通用正则优先、价税合计留千分位、单组日期不规整、收款人当对方）；ruff `F,E9,E3` 对改动文件与 HEAD 相比新增 0 条

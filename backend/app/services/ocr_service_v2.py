@@ -2,8 +2,8 @@
 
 基于 PaddleOCR 的通用文档 OCR 识别，支持：
 - 单张OCR识别（≤5秒）
-- AI自动分类单据类型（12类）
-- AI语义理解提取结构化字段
+- 单据分类（规则层 19 类，大模型兜底在其中 12 类里选）
+- 按类型提取结构化字段（字段清单见 ocr_document_fields）
 - 批量异步处理（Celery任务）
 - 单据与账面数据自动匹配
 """
@@ -29,6 +29,7 @@ from sqlalchemy import select, update, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.ai_service import AIService, AIServiceUnavailableError
+from app.services.ocr_document_fields import DOCUMENT_FIELD_RULES, DOCUMENT_TYPE_LABELS
 
 try:
     from paddleocr import PaddleOCR
@@ -134,36 +135,9 @@ def _extract_text_from_result(result: Any) -> list[dict[str, Any]]:
 class OCRService:
     """OCR识别服务 — 单据处理完整流水线"""
 
-    # 12类单据的字段提取规则
-    DOCUMENT_FIELD_RULES: dict[str, list[str]] = {
-        "sales_invoice": ["buyer_name", "amount", "tax_amount", "invoice_date", "invoice_no", "goods_name"],
-        "purchase_invoice": ["seller_name", "amount", "tax_amount", "invoice_date", "invoice_no", "goods_name"],
-        "bank_receipt": ["transaction_date", "counterparty_name", "amount", "summary", "transaction_type"],
-        "bank_statement": ["transaction_date", "counterparty_name", "amount", "summary", "transaction_type"],
-        "outbound_order": ["outbound_date", "product_name", "quantity", "unit_price", "amount", "customer"],
-        "inbound_order": ["inbound_date", "product_name", "quantity", "unit_price", "amount", "supplier"],
-        "logistics_order": ["ship_date", "receiver", "sender", "tracking_no", "sign_date"],
-        "voucher": ["voucher_no", "date", "summary", "account_code", "account_name", "amount", "debit", "credit"],
-        "tax_return": ["tax_type", "period", "amount", "filing_date"],
-        "contract": ["party_a", "party_b", "contract_amount", "sign_date", "expire_date", "payment_terms"],
-        "bank_reconciliation": ["bank_name", "account_no", "statement_date", "opening_balance", "closing_balance"],
-        "other": [],
-    }
-
-    DOCUMENT_TYPE_LABELS: dict[str, str] = {
-        "sales_invoice": "销售发票",
-        "purchase_invoice": "采购发票",
-        "bank_receipt": "银行收付款回单",
-        "bank_statement": "银行对账单",
-        "outbound_order": "出库单",
-        "inbound_order": "入库单",
-        "logistics_order": "物流单据",
-        "voucher": "记账凭证",
-        "tax_return": "纳税申报表",
-        "contract": "合同协议",
-        "bank_reconciliation": "银行余额调节表",
-        "other": "其他单据",
-    }
+    # 单据类型 → 要识别的字段（单一来源与取舍口径见 ocr_document_fields）
+    DOCUMENT_FIELD_RULES: dict[str, list[str]] = DOCUMENT_FIELD_RULES
+    DOCUMENT_TYPE_LABELS: dict[str, str] = DOCUMENT_TYPE_LABELS
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -306,14 +280,23 @@ class OCRService:
     async def extract_fields(
         self, ocr_text: str, document_type: str
     ) -> list[dict[str, Any]]:
-        """按DOCUMENT_FIELD_RULES提取结构化字段 — 规则优先，LLM 补全缺失字段"""
+        """按 DOCUMENT_FIELD_RULES 提取本类单据的字段 — 规则优先，LLM 只补清单内缺失的字段。
+
+        结果只含清单内字段，按清单顺序；规则层多抓的（如银行回单上由「日期」误抓的 invoice_date）不输出。
+        """
         fields = self.DOCUMENT_FIELD_RULES.get(document_type, [])
         if not fields or not ocr_text:
             return []
+        order = {name: index for index, name in enumerate(fields)}
+
+        def in_order(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            return sorted(items, key=lambda f: order[f["field_name"]])
 
         # ─── Layer 1: 规则提取（毫秒级） ───
         from app.services.ocr_rule_engine import extract_fields_by_rules
-        rule_fields = extract_fields_by_rules(ocr_text, document_type)
+        rule_fields = in_order([
+            f for f in extract_fields_by_rules(ocr_text, document_type) if f["field_name"] in order
+        ])
 
         # 检查哪些目标字段已被规则提取
         extracted_names = {f["field_name"] for f in rule_fields}
@@ -396,7 +379,7 @@ class OCRService:
                     if name in wanted and name not in seen:
                         merged.append(item)
                         seen.add(name)
-                return merged
+                return in_order(merged)
             return rule_fields
         except (json.JSONDecodeError, Exception) as e:
             logger.warning(f"LLM extract_fields failed: {e}")
@@ -407,16 +390,17 @@ class OCRService:
         examples: dict[str, str] = {
             "sales_invoice": """
 【示例】
-原文片段："购买方：北京科技有限公司 货物名称：办公设备 金额：¥28,500.00 税率：13% 税额：¥3,705.00 价税合计：叁万贰仟贰佰零伍元整 ¥32,205.00 开票日期：2025年01月15日 发票号码：04785123"
-提取结果：[{"field_name":"buyer_name","field_value":"北京科技有限公司","confidence":0.98},{"field_name":"amount","field_value":"28500.00","confidence":0.95},{"field_name":"tax_amount","field_value":"3705.00","confidence":0.95},{"field_name":"invoice_date","field_value":"2025-01-15","confidence":0.98},{"field_name":"invoice_no","field_value":"04785123","confidence":0.99},{"field_name":"goods_name","field_value":"办公设备","confidence":0.95}]""",
+原文片段："购买方：北京科技有限公司 销售方：上海设备有限公司 货物名称：办公设备 金额：¥28,500.00 税率：13% 税额：¥3,705.00 价税合计：叁万贰仟贰佰零伍元整 ¥32,205.00 开票日期：2025年01月15日 发票号码：04785123"
+提取结果：[{"field_name":"invoice_no","field_value":"04785123","confidence":0.99},{"field_name":"invoice_date","field_value":"2025-01-15","confidence":0.98},{"field_name":"buyer_name","field_value":"北京科技有限公司","confidence":0.98},{"field_name":"seller_name","field_value":"上海设备有限公司","confidence":0.98},{"field_name":"goods_name","field_value":"办公设备","confidence":0.95},{"field_name":"amount","field_value":"28500.00","confidence":0.95},{"field_name":"tax_amount","field_value":"3705.00","confidence":0.95},{"field_name":"total","field_value":"32205.00","confidence":0.95}]""",
             "bank_receipt": """
 【示例】
 原文片段："中国工商银行电子回单 交易日期：2025-02-20 收款人：上海贸易有限公司 付款人：深圳制造有限公司 交易金额：100,000.00元 摘要：货款"
-提取结果：[{"field_name":"transaction_date","field_value":"2025-02-20","confidence":0.99},{"field_name":"counterparty_name","field_value":"上海贸易有限公司","confidence":0.95},{"field_name":"amount","field_value":"100000.00","confidence":0.98},{"field_name":"summary","field_value":"货款","confidence":0.95},{"field_name":"transaction_type","field_value":"转账","confidence":0.7}]""",
+提取结果：[{"field_name":"transaction_date","field_value":"2025-02-20","confidence":0.99},{"field_name":"payer_name","field_value":"深圳制造有限公司","confidence":0.97},{"field_name":"payee_name","field_value":"上海贸易有限公司","confidence":0.97},{"field_name":"counterparty_name","field_value":null,"confidence":0.9},{"field_name":"amount","field_value":"100000.00","confidence":0.98},{"field_name":"summary","field_value":"货款","confidence":0.95},{"field_name":"transaction_type","field_value":"转账","confidence":0.7}]
+（票面只印付款人、收款人时不推断哪一方是对方，counterparty_name 为 null）""",
             "contract": """
 【示例】
 原文片段："采购合同 合同编号：HT-2025-0089 甲方（买方）：杭州智能科技有限公司 乙方（卖方）：苏州精密制造有限公司 合同金额：人民币壹佰伍拾万元整（¥1,500,000.00） 签订日期：2025年1月8日 有效期至：2026年1月7日 付款方式：分三期支付"
-提取结果：[{"field_name":"party_a","field_value":"杭州智能科技有限公司","confidence":0.98},{"field_name":"party_b","field_value":"苏州精密制造有限公司","confidence":0.98},{"field_name":"contract_amount","field_value":"1500000.00","confidence":0.95},{"field_name":"sign_date","field_value":"2025-01-08","confidence":0.99},{"field_name":"expire_date","field_value":"2026-01-07","confidence":0.99},{"field_name":"payment_terms","field_value":"分三期支付","confidence":0.9}]""",
+提取结果：[{"field_name":"contract_no","field_value":"HT-2025-0089","confidence":0.99},{"field_name":"party_a","field_value":"杭州智能科技有限公司","confidence":0.98},{"field_name":"party_b","field_value":"苏州精密制造有限公司","confidence":0.98},{"field_name":"contract_amount","field_value":"1500000.00","confidence":0.95},{"field_name":"sign_date","field_value":"2025-01-08","confidence":0.99},{"field_name":"expire_date","field_value":"2026-01-07","confidence":0.99},{"field_name":"payment_terms","field_value":"分三期支付","confidence":0.9}]""",
             "voucher": """
 【示例】
 原文片段："记账凭证 凭证号：记-2025-001 日期：2025/03/01 摘要：支付办公室租金 借方科目：6602管理费用-租赁费 金额：25,000.00 贷方科目：1002银行存款 金额：25,000.00"

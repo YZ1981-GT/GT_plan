@@ -243,27 +243,30 @@ class TestOCRServiceFieldExtraction:
                 '[{"field_name":"invoice_no","field_value":"FP12345678","confidence":0.98},'
                 '{"field_name":"buyer_name","field_value":"ABC科技有限公司","confidence":0.95},'
                 '{"field_name":"amount","field_value":"100000.00","confidence":0.92},'
-                '{"field_name":"seller_name","field_value":"某销售方","confidence":0.90}]'
+                '{"field_name":"seller_name","field_value":"某销售方","confidence":0.90},'
+                '{"field_name":"tax_id","field_value":"91310000MA1FL0000X","confidence":0.90}]'
             )
 
             result = await service.extract_fields(ocr_text, "sales_invoice")
 
-        # 30a6a489e 起先走规则层（ocr_rule_engine），LLM 只补规则没取到的字段。
-        # 规则层取到 开票日期 / 金额 / 税额 / 购买方，并算出价税合计 total（规则层现行输出，照实钉住）；
-        # 发票号码 FP12345678 带字母前缀规则层不认 ⇒ 由 LLM 补；LLM 重复给出的 buyer_name / amount 不得再并入，
-        # 销售发票没请求的 seller_name（LLM 多给的）也不得并入
+        # 先走规则层（ocr_rule_engine），LLM 只补清单内规则没取到的字段，结果按清单顺序（G10 口径，
+        # 清单见 ocr_document_fields）。规则层取到 开票日期 / 购买方 / 金额 / 税额，并算出价税合计 total；
+        # 发票号码 FP12345678 带字母前缀规则层不认 ⇒ 由 LLM 补；销售方在清单内 ⇒ LLM 补的并入；
+        # LLM 重复给出的 buyer_name / amount 不得再并入，清单外的 tax_id 也不得并入
         assert [(f["field_name"], f["method"]) for f in result] == [
-            ("invoice_date", "rule"), ("amount", "rule"), ("tax_amount", "rule"),
-            ("buyer_name", "rule"), ("total", "rule_computed"), ("invoice_no", "llm"),
+            ("invoice_no", "llm"), ("invoice_date", "rule"), ("buyer_name", "rule"),
+            ("seller_name", "llm"), ("amount", "rule"), ("tax_amount", "rule"),
+            ("total", "rule_computed"),
         ]
         by_name = {f["field_name"]: f for f in result}
         assert by_name["invoice_no"]["field_value"] == "FP12345678"
         assert by_name["invoice_no"]["confidence_score"] == 0.98
         assert by_name["buyer_name"]["field_value"] == "ABC科技有限公司"
         assert by_name["amount"]["field_value"] == "100000.00"
-        # 只向 LLM 要缺失的两个字段
+        assert by_name["total"]["field_value"] == "113000.00"
+        # 只向 LLM 要清单内缺失的三个字段
         system_prompt = mock_chat.await_args.kwargs["messages"][0]["content"]
-        assert "【待提取字段】invoice_no, goods_name" in system_prompt
+        assert "【待提取字段】invoice_no, seller_name, goods_name" in system_prompt
 
     @pytest.mark.asyncio
     async def test_extract_fields_bank_receipt(self, mock_db_session):
@@ -292,15 +295,52 @@ class TestOCRServiceFieldExtraction:
 
             result = await service.extract_fields(ocr_text, "bank_receipt")
 
-        # 规则层取到交易日期 / 对方户名 / 金额 / 摘要（另把同一日期也报成 invoice_date，规则层现行输出，照实钉住）；
-        # LLM 回来的三个字段规则层都已有 ⇒ 一个都不并入（原实现并入后同名字段各出现两次）
+        # 规则层取到交易日期 / 对方户名 / 金额 / 摘要；通用发票正则由「日期」误抓的 invoice_date
+        # 不在银行回单清单内 ⇒ 不输出（G10 口径）。LLM 回来的三个字段规则层都已有 ⇒ 一个都不并入
         assert [(f["field_name"], f["method"]) for f in result] == [
-            ("invoice_date", "rule"), ("amount", "rule"), ("transaction_date", "rule"),
-            ("counterparty_name", "rule"), ("summary", "rule"),
+            ("transaction_date", "rule"), ("counterparty_name", "rule"),
+            ("amount", "rule"), ("summary", "rule"),
         ]
-        assert {f["field_name"]: f["field_value"] for f in result}["counterparty_name"] == "XYZ公司"
+        values = {f["field_name"]: f["field_value"] for f in result}
+        assert values == {
+            "transaction_date": "2024-01-20", "counterparty_name": "XYZ公司",
+            "amount": "50000.00", "summary": "货款",
+        }
         system_prompt = mock_chat.await_args.kwargs["messages"][0]["content"]
-        assert "【待提取字段】transaction_type" in system_prompt
+        assert "【待提取字段】payer_name, payee_name, transaction_type" in system_prompt
+
+    @pytest.mark.asyncio
+    async def test_extract_fields_two_party_bank_receipt_does_not_guess_counterparty(self, mock_db_session):
+        """票面只有付款人 / 收款人：两方照取，counterparty_name 不从中猜（收款回单的收款人是本单位）。"""
+        service = OCRService(mock_db_session)
+        ocr_text = (
+            "中国工商银行电子回单\n交易日期：2025年2月20日\n付款人：深圳制造有限公司\n"
+            "收款人：上海贸易有限公司\n交易金额：100,000.00\n用途：货款"
+        )
+        with patch.object(service.ai, "get_active_model", new_callable=AsyncMock), patch.object(
+            service.ai, "chat_completion", new_callable=AsyncMock, return_value="[]"
+        ):
+            result = await service.extract_fields(ocr_text, "bank_receipt")
+
+        assert {f["field_name"]: f["field_value"] for f in result} == {
+            "transaction_date": "2025-02-20", "payer_name": "深圳制造有限公司",
+            "payee_name": "上海贸易有限公司", "amount": "100000.00", "summary": "货款",
+        }
+
+    @pytest.mark.asyncio
+    async def test_extract_fields_rule_only_type_is_not_empty(self, mock_db_session):
+        """住宿发票只由规则分类器给出；原先不在字段表里 ⇒ 结果恒为空。"""
+        service = OCRService(mock_db_session)
+        ocr_text = "如家商务酒店\n入住日期：2025年3月1日\n离店日期：2025-03-03\n住宿天数：2\n房费：¥1,200.00"
+        with patch.object(service.ai, "get_active_model", new_callable=AsyncMock), patch.object(
+            service.ai, "chat_completion", new_callable=AsyncMock, return_value="[]"
+        ):
+            result = await service.extract_fields(ocr_text, "accommodation_receipt")
+
+        assert [(f["field_name"], f["field_value"]) for f in result] == [
+            ("hotel_name", "如家商务酒店"), ("check_in", "2025-03-01"), ("check_out", "2025-03-03"),
+            ("nights", "2"), ("amount", "1200.00"),
+        ]
 
     @pytest.mark.asyncio
     async def test_extract_fields_invalid_json_fallback(self, mock_db_session):

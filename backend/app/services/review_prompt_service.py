@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import functools
 import logging
 import os
 import re
@@ -20,92 +21,70 @@ _DEFAULT_TSJ_DIR = Path(__file__).resolve().parents[2] / "data" / "tsj_review_pr
 # 🔴 原先是写死的 D~N+S 集合，A/B/C 目录的提示词能被加载却不进覆盖率统计。
 _CYCLE_DIR_RE = re.compile(r"[A-Z]")
 
-# wp_code 前缀 → 科目关键词映射（用于 subject-level 降级匹配）
-_AUDIT_CYCLE_ALIASES: dict[str, list[str]] = {
-    "D1": ["应收票据"],
-    "D2": ["应收账款"],
-    "D3": ["预收账款", "预收款项", "合同负债"],
-    "D4": ["收入", "营业收入"],
-    "D5": ["应收款项融资"],
-    "D6": ["合同资产"],
-    "D7": ["其他应收款", "其他应收"],
-    "E1": ["货币资金", "现金"],
-    "F1": ["预付账款", "预付款项"],
-    "F2": ["存货"],
-    "F3": ["应付票据"],
-    "F4": ["应付账款"],
-    "F5": ["成本", "营业成本"],
-    "G1": ["长期股权投资"],
-    "G2": ["债权投资"],
-    "G3": ["其他债权投资"],
-    "G4": ["其他权益工具"],
-    "G5": ["长期应收款"],
-    "G6": ["持有待售资产"],
-    "G7": ["长期股权投资"],
-    "G8": ["投资性房地产"],
-    "G9": ["固定资产"],
-    "G10": ["在建工程"],
-    "G11": ["无形资产"],
-    "G12": ["开发支出"],
-    "G13": ["商誉"],
-    "G14": ["长期待摊费用"],
-    "H1": ["固定资产"],
-    "H2": ["在建工程"],
-    "H3": ["投资性房地产"],
-    "H4": ["无形资产"],
-    "H5": ["固定资产"],
-    "H6": ["使用权资产"],
-    "H7": ["固定资产"],
-    "H8": ["在建工程"],
-    "H9": ["无形资产"],
-    "H10": ["长期待摊费用"],
-    "I1": ["无形资产"],
-    "I2": ["研发费用", "开发支出"],
-    "I3": ["无形资产"],
-    "I4": ["商誉"],
-    "I5": ["长期待摊费用"],
-    "I6": ["递延所得税"],
-    "J1": ["应付职工薪酬"],
-    "J2": ["长期应付职工薪酬"],
-    "J3": ["股份支付"],
-    "K1": ["其他应收款"],
-    "K2": ["其他流动资产"],
-    "K3": ["其他应付款"],
-    "K4": ["其他流动负债"],
-    "K5": ["预计负债"],
-    "K6": ["持有待售"],
-    "K7": ["递延收益"],
-    "K8": ["销售费用"],
-    "K9": ["管理费用"],
-    "K10": ["其他收益"],
-    "K11": ["资产减值损失"],
-    "K12": ["营业外收入"],
-    "K13": ["营业外支出"],
-    "L1": ["短期借款"],
-    "L2": ["应付利息"],
-    "L3": ["长期借款"],
-    "L4": ["应付债券"],
-    "L5": ["一年内到期的非流动负债"],
-    "L6": ["长期应付款"],
-    "L7": ["租赁负债"],
-    "L8": ["其他非流动负债"],
-    "M1": ["实收资本", "股本"],
-    "M2": ["资本公积"],
-    "M3": ["库存股"],
-    "M4": ["盈余公积"],
-    "M5": ["未分配利润"],
-    "M6": ["未分配利润"],
-    "M7": ["其他综合收益"],
-    "M8": ["专项储备"],
-    "M9": ["少数股东权益"],
-    "M10": ["应付股利"],
-    "N1": ["财务费用"],
-    "N2": ["应交税费", "税金及附加"],
-    "N3": ["所得税费用"],
-    "N4": ["研发费用"],
-    "N5": ["投资收益"],
-    "S1": ["审计方案", "总体"],
+# 底稿清单与科目名的权威源：致同 2025 编码表 ``wp_account_mapping.json``（D~N 前缀 89 个，与模板库
+# ``gt_template_library.json`` 逐个一致）。覆盖率分母与科目级降级都按它取。
+# 🔴 原先是手写的 ``_AUDIT_CYCLE_ALIASES``：按旧编码写成（G1=长期股权投资、M1=实收资本、N5=投资收益…），
+#    与 2025 编码 40 个前缀错位 ⇒ 整本底稿复核（不带 sheet 名，wp_ai 即如此）加载的是别的科目的提示词；
+#    覆盖率分母也只认它的键 ⇒ 7 本函证底稿（D0/E0/F0/G0/H0/K0/L0）没有提示词却从不进缺口。
+_PREFIX_RE = re.compile(r"([A-Z]\d+)", re.IGNORECASE)
+
+# 科目名与根目录科目级文件名用词不同、但确是同一科目的对照（逐条核对）。其余一律按名称精确匹配，
+# 不做包含匹配：「收入」会命中「营业外收入」，「其他权益工具」（M10 权益）会命中 G8「其他权益工具投资」。
+_SUBJECT_FILE_SYNONYMS: dict[str, tuple[str, ...]] = {
+    "营业收入": ("收入",),
+    "营业成本": ("成本",),
+    "实收资本": ("实收资本或股本",),
+    "资产处置损益": ("资产处置收益",),
+    "持有待售资产和负债": ("持有待售资产", "持有待售负债"),
 }
+# 根目录科目级文件名 = 科目名 + 后缀（「货币资金提示词」没有「审计复核」）
+_SUBJECT_FILE_SUFFIXES = ("审计复核提示词", "提示词")
+
+
+@dataclass(frozen=True)
+class _Workpaper:
+    """权威编码表里的一本底稿（以 wp_code 前缀为单位）。"""
+
+    name: str                       # 底稿名，覆盖率缺口显示用
+    subject_names: tuple[str, ...]  # 科目级降级候选：科目名 → 底稿名去「审定表」→ 同义名
+
+
+@functools.lru_cache(maxsize=1)
+def _authoritative_workpapers() -> dict[str, _Workpaper]:
+    """wp_code 前缀 → 底稿。取前缀本身那一条（D2）；编码表没有时取该前缀的第一条（B22 → B22A-1）。"""
+    from app.services.wp_mapping_service import WpMappingService  # 延迟导入：该模块带 ORM 依赖
+
+    chosen: dict[str, dict] = {}
+    for entry in WpMappingService().get_all_mappings():
+        code = str(entry.get("wp_code") or "").upper()
+        match = _PREFIX_RE.match(code)
+        if match and (code == match.group(1) or match.group(1) not in chosen):
+            chosen[match.group(1)] = entry
+    out: dict[str, _Workpaper] = {}
+    for prefix, entry in chosen.items():
+        account = str(entry.get("account_name") or "").strip()
+        wp_name = str(entry.get("wp_name") or "").strip()
+        names: list[str] = []
+        for name in (account, wp_name.removesuffix("审定表")):
+            for candidate in (name, *_SUBJECT_FILE_SYNONYMS.get(name, ())):
+                if candidate and candidate not in names:
+                    names.append(candidate)
+        out[prefix] = _Workpaper(name=wp_name or account or prefix, subject_names=tuple(names))
+    return out
+
+
+def _subject_of(stem: str) -> str:
+    """根目录科目级文件 stem → 科目名。"""
+    for suffix in _SUBJECT_FILE_SUFFIXES:
+        if stem.endswith(suffix):
+            return stem[: -len(suffix)]
+    return stem
+
+
+def _prefix_order(prefix: str) -> tuple[str, int]:
+    """按循环字母、编号排序（D2 在 D10 前）。"""
+    return prefix[0], int(prefix[1:])
+
 
 # sheet_suffix 正则：支持"审定表D2-1"、"D2-note-listed"等多种格式
 # 匹配规则：字母+数字+可选后续部分（数字后缀或英文标识符）
@@ -143,9 +122,9 @@ class PromptResult:
 
 @dataclass
 class CoverageReport:
-    """提示词覆盖率统计（单位：wp_code 前缀，见 ``get_coverage``）"""
-    total_subjects: int               # 已知前缀数
-    subjects_with_sheet_prompts: int  # 其中有 sheet 级提示词的前缀数
+    """提示词覆盖率统计（单位：底稿 = wp_code 前缀，见 ``get_coverage``）"""
+    total_subjects: int               # 底稿总数（权威编码表 ∪ 有提示词的前缀）
+    subjects_with_sheet_prompts: int  # 其中有 sheet 级提示词的底稿数
     sheet_breakdown: dict[str, list[str]]  # {wp_code_prefix: [suffixes]}
     missing_gaps: list[str]
 
@@ -277,48 +256,23 @@ class ReviewPromptService:
         )
 
     def _load_subject_prompt(self, wp_code: str) -> PromptResult | None:
-        """按 wp_code 前缀匹配科目级提示词文件"""
-        if not wp_code:
+        """按权威编码表里该底稿的科目名，精确匹配根目录科目级文件（D2-1 → D2 → 应收账款）。
+
+        编码表里没有的前缀、或该科目没有科目级文件 ⇒ None（交给 base），不拿相近科目顶替。
+        """
+        prefix_match = _PREFIX_RE.match(wp_code or "")
+        if not prefix_match or not self._base_dir.is_dir():
+            return None
+        workpaper = _authoritative_workpapers().get(prefix_match.group(1).upper())
+        if workpaper is None:
             return None
 
-        # 提取 wp_code 前缀（如 D2-1 → D2, D2 → D2）
-        prefix_match = re.match(r"([A-Z]\d+)", wp_code, re.IGNORECASE)
-        if not prefix_match:
-            return None
-        prefix = prefix_match.group(1).upper()
-
-        # 获取该前缀对应的科目关键词
-        keywords = _AUDIT_CYCLE_ALIASES.get(prefix, [])
-        if not keywords:
-            # 尝试仅用 cycle_letter 匹配（如 D → 应收相关所有）
-            return None
-
-        # 扫描根目录下所有 .md 文件匹配关键词
-        if not self._base_dir.is_dir():
-            return None
-
-        best_file: Path | None = None
-        best_score = 0
-
-        for md_file in self._base_dir.glob("*.md"):
-            fname = md_file.stem  # 去掉 .md 后缀
-            score = 0
-            for kw in keywords:
-                # 匹配文件名中的关键词
-                name_core = re.sub(r"审计复核提示词$", "", fname)
-                if kw in name_core:
-                    score += 2
-                elif kw in fname:
-                    score += 1
-            if score > best_score:
-                best_score = score
-                best_file = md_file
-
-        if best_file and best_score > 0:
-            content = self._read_file(best_file)
+        by_subject = {_subject_of(f.stem): f for f in sorted(self._base_dir.glob("*.md"))}
+        for name in workpaper.subject_names:
+            path = by_subject.get(name)
+            content = self._read_file(path) if path else None
             if content:
-                return self._build_result(content, "subject", str(best_file))
-
+                return self._build_result(content, "subject", str(path))
         return None
 
     # ------------------------------------------------------------------
@@ -326,16 +280,17 @@ class ReviewPromptService:
     # ------------------------------------------------------------------
 
     def get_coverage(self) -> CoverageReport:
-        """统计提示词覆盖率，四个字段统一以 wp_code 前缀（如 D2 / G10）为单位。
+        """统计提示词覆盖率，四个字段统一以底稿（wp_code 前缀，如 D2 / G10）为单位。
 
-        - sheet_breakdown: {前缀: [sheet 后缀]}，扫描全部单字母循环目录
-        - total_subjects: 已知前缀数 = ``_AUDIT_CYCLE_ALIASES`` 的键 ∪ 有 sheet 级文件的前缀
-        - subjects_with_sheet_prompts: 有 sheet 级文件的前缀数
-        - missing_gaps: 已知但没有 sheet 级文件的前缀（附科目关键词）
+        - sheet_breakdown: {前缀: [sheet 后缀]}，扫描全部单字母循环目录（与 load_prompt 同一规则）
+        - total_subjects: 底稿总数 = 权威编码表全部底稿（A~N 与 S，D~N 89 本全在内）∪ 有 sheet 级文件的前缀
+        - subjects_with_sheet_prompts: 有 sheet 级文件的底稿数
+        - missing_gaps: 还没有 sheet 级文件的底稿（附底稿名），按循环、编号排序
 
         恒有 ``total_subjects == subjects_with_sheet_prompts + len(missing_gaps)``。
-        🔴 原先 total 数根目录科目级文件（67）、with_sheet 数前缀（82），两个单位混比，
-        得出「有 sheet 级提示词的科目」多于「科目总数」（preexisting-test-failures-closure G12）。
+        🔴 preexisting-test-failures-closure G12 两轮：① total 原数根目录科目级文件（67）、with_sheet
+        数前缀（82），单位混比；② 改成前缀后分母取手写别名表的键 —— 表外底稿（7 本函证、A/B/C/S）
+        有没有提示词都不进统计，缺口只剩 S1 一条。
         """
         sheet_breakdown: dict[str, list[str]] = {}
         if self._base_dir.is_dir():
@@ -354,11 +309,13 @@ class ReviewPromptService:
                     sheet_breakdown.setdefault(prefix, []).append(suffix or fname)
 
         covered = set(sheet_breakdown)
-        known = covered | set(_AUDIT_CYCLE_ALIASES)
-        missing_gaps: list[str] = []
-        for prefix in sorted(known - covered):
-            keywords = _AUDIT_CYCLE_ALIASES.get(prefix, [])
-            missing_gaps.append(f"{prefix} ({keywords[0]})" if keywords else prefix)
+        authoritative = _authoritative_workpapers()
+        known = covered | set(authoritative)
+        # known - covered ⊆ authoritative：缺口只可能是编码表里的底稿
+        missing_gaps = [
+            f"{prefix} ({authoritative[prefix].name})"
+            for prefix in sorted(known - covered, key=_prefix_order)
+        ]
 
         return CoverageReport(
             total_subjects=len(known),
