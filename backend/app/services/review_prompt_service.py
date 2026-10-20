@@ -16,8 +16,9 @@ logger = logging.getLogger(__name__)
 # 默认位置：backend/data/tsj_review_prompts/
 _DEFAULT_TSJ_DIR = Path(__file__).resolve().parents[2] / "data" / "tsj_review_prompts"
 
-# 支持的 cycle letter 目录
-_CYCLE_LETTERS = {"D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "S"}
+# sheet 级提示词目录 = 单个大写循环字母（与 load_prompt 按 wp_code[0] 取目录同一规则）。
+# 🔴 原先是写死的 D~N+S 集合，A/B/C 目录的提示词能被加载却不进覆盖率统计。
+_CYCLE_DIR_RE = re.compile(r"[A-Z]")
 
 # wp_code 前缀 → 科目关键词映射（用于 subject-level 降级匹配）
 _AUDIT_CYCLE_ALIASES: dict[str, list[str]] = {
@@ -142,9 +143,9 @@ class PromptResult:
 
 @dataclass
 class CoverageReport:
-    """提示词覆盖率统计"""
-    total_subjects: int
-    subjects_with_sheet_prompts: int
+    """提示词覆盖率统计（单位：wp_code 前缀，见 ``get_coverage``）"""
+    total_subjects: int               # 已知前缀数
+    subjects_with_sheet_prompts: int  # 其中有 sheet 级提示词的前缀数
     sheet_breakdown: dict[str, list[str]]  # {wp_code_prefix: [suffixes]}
     missing_gaps: list[str]
 
@@ -325,61 +326,43 @@ class ReviewPromptService:
     # ------------------------------------------------------------------
 
     def get_coverage(self) -> CoverageReport:
-        """统计提示词覆盖率
+        """统计提示词覆盖率，四个字段统一以 wp_code 前缀（如 D2 / G10）为单位。
 
-        扫描文件系统按 cycle_letter 目录聚合，统计：
-        - total_subjects: 根级 .md 文件数（69 个科目级）
-        - subjects_with_sheet_prompts: 有 sheet-level 提示词的科目数
-        - sheet_breakdown: {wp_code_prefix: [suffixes]}
-        - missing_gaps: 有科目级但无 sheet-level 的科目列表
+        - sheet_breakdown: {前缀: [sheet 后缀]}，扫描全部单字母循环目录
+        - total_subjects: 已知前缀数 = ``_AUDIT_CYCLE_ALIASES`` 的键 ∪ 有 sheet 级文件的前缀
+        - subjects_with_sheet_prompts: 有 sheet 级文件的前缀数
+        - missing_gaps: 已知但没有 sheet 级文件的前缀（附科目关键词）
+
+        恒有 ``total_subjects == subjects_with_sheet_prompts + len(missing_gaps)``。
+        🔴 原先 total 数根目录科目级文件（67）、with_sheet 数前缀（82），两个单位混比，
+        得出「有 sheet 级提示词的科目」多于「科目总数」（preexisting-test-failures-closure G12）。
         """
-        # 统计根级科目文件
-        root_md_files: list[str] = []
-        if self._base_dir.is_dir():
-            for f in self._base_dir.iterdir():
-                if f.is_file() and f.suffix == ".md" and "审计复核提示词" in f.stem:
-                    root_md_files.append(f.stem)
-
-        total_subjects = len(root_md_files)
-
-        # 扫描各 cycle_letter 子目录
         sheet_breakdown: dict[str, list[str]] = {}
-        covered_prefixes: set[str] = set()
-
-        for letter in _CYCLE_LETTERS:
-            cycle_dir = self._base_dir / letter
-            if not cycle_dir.is_dir():
-                continue
-
-            for md_file in cycle_dir.glob("*.md"):
-                fname = md_file.stem  # e.g. "D2-1", "D2-note-listed"
-                # 提取 wp_code 前缀（字母+数字部分）
-                prefix_match = re.match(r"([A-Z]\d+)", fname, re.IGNORECASE)
-                if prefix_match:
+        if self._base_dir.is_dir():
+            for cycle_dir in sorted(self._base_dir.iterdir()):
+                if not (cycle_dir.is_dir() and _CYCLE_DIR_RE.fullmatch(cycle_dir.name)):
+                    continue
+                for md_file in sorted(cycle_dir.glob("*.md")):
+                    fname = md_file.stem  # e.g. "D2-1", "D2-note-listed"
+                    prefix_match = re.match(r"([A-Z]\d+)", fname, re.IGNORECASE)
+                    if not prefix_match:
+                        continue  # 无 wp_code 前缀的说明文件（如 F/_RESERVED_SHEETS.md）
                     prefix = prefix_match.group(1).upper()
-                    if prefix not in sheet_breakdown:
-                        sheet_breakdown[prefix] = []
-                    # suffix = 前缀之后的部分
                     suffix = fname[len(prefix):]
                     if suffix.startswith("-"):
                         suffix = suffix[1:]  # 去掉前导 -
-                    sheet_breakdown[prefix].append(suffix or fname)
-                    covered_prefixes.add(prefix)
+                    sheet_breakdown.setdefault(prefix, []).append(suffix or fname)
 
-        subjects_with_sheet_prompts = len(covered_prefixes)
-
-        # 找出缺口（有科目级文件但无 sheet-level）
-        # 根据 _AUDIT_CYCLE_ALIASES 列出所有已知 prefix，检查哪些没有 sheet-level
+        covered = set(sheet_breakdown)
+        known = covered | set(_AUDIT_CYCLE_ALIASES)
         missing_gaps: list[str] = []
-        for prefix in sorted(_AUDIT_CYCLE_ALIASES.keys()):
-            if prefix not in covered_prefixes:
-                keywords = _AUDIT_CYCLE_ALIASES.get(prefix, [])
-                label = f"{prefix} ({keywords[0]})" if keywords else prefix
-                missing_gaps.append(label)
+        for prefix in sorted(known - covered):
+            keywords = _AUDIT_CYCLE_ALIASES.get(prefix, [])
+            missing_gaps.append(f"{prefix} ({keywords[0]})" if keywords else prefix)
 
         return CoverageReport(
-            total_subjects=total_subjects,
-            subjects_with_sheet_prompts=subjects_with_sheet_prompts,
+            total_subjects=len(known),
+            subjects_with_sheet_prompts=len(covered),
             sheet_breakdown=sheet_breakdown,
             missing_gaps=missing_gaps,
         )

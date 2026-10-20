@@ -474,28 +474,46 @@ async def test_baseline_projection_prewarm_really_runs_and_splits_warmed_from_sk
 # ═══ 3. 启动接线 ═══
 
 
-def test_startup_schedules_the_prewarm_in_the_background() -> None:
-    """预热必须是后台任务：25~30s 若 await 在 Ready 之前会把 health 等待拖超时。"""
-    from app import main as main_mod
+@pytest.mark.asyncio
+async def test_startup_schedules_the_prewarm_in_the_background(monkeypatch) -> None:
+    """预热必须是后台任务：25~30s 若 await 在 Ready 之前会把 health 等待拖超时。
 
-    lifespan_source = inspect.getsource(main_mod.lifespan)
-    assert "_warm_workpaper_sync_registry" in lifespan_source, (
-        "lifespan 没有接预热 —— 首个 sync 请求仍要自己付 30s"
-    )
-    assert "create_task(_warm_workpaper_sync_registry())" in lifespan_source, (
-        "预热被 await 在启动路径上 —— 会把 Ready 推迟 25~30s"
-    )
-    assert "tasks.append" in lifespan_source, (
-        "后台任务未存引用 —— 可能被 GC 静默回收，预热白做"
-    )
+    启动接线在 ``startup_registry`` 的 ``warm_workpaper_sync_registry`` 任务（lifespan 执行
+    registry，preexisting-test-failures-closure G11）；这里按行为断言而不是读源码字符串。
+    """
+    from app.core import startup_registry
+    from app.services.workpaper_sync import startup_prewarm
 
-    warm_source = inspect.getsource(main_mod._warm_workpaper_sync_registry)
+    warm = startup_prewarm.warm_workpaper_sync_registry  # 真实函数，下文检查其实现
+    spec = next(
+        (t for t in startup_registry.STARTUP_TASKS if t.name == "warm_workpaper_sync_registry"),
+        None,
+    )
+    assert spec is not None, "启动序列没有接预热 —— 首个 sync 请求仍要自己付 30s"
+
+    release = asyncio.Event()
+    monkeypatch.setattr(startup_prewarm, "warm_workpaper_sync_registry", release.wait)
+    ctx = startup_registry.StartupContext()
+    await asyncio.wait_for(
+        startup_registry.run_startup_tasks((spec,), context=ctx), timeout=1
+    )  # 预热若被 await 在启动路径上，这里会超时
+    assert len(ctx.worker_tasks) == 1, (
+        "后台任务未存进 ctx.worker_tasks —— 关闭阶段 cancel 不到，也可能被 GC 静默回收"
+    )
+    task = ctx.worker_tasks[0]
+    assert not task.done()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    startup_registry.reset_startup_report()
+
+    warm_source = inspect.getsource(warm)
     assert "except Exception" in warm_source, "预热失败必须被吞（不阻塞启动）"
     assert "CancelledError" in warm_source, (
         "关闭阶段的 cancel 不得被当成预热失败记 WARNING"
     )
 
-    warm_calls = _called_names(main_mod._warm_workpaper_sync_registry)
+    warm_calls = _called_names(warm)
     for required in (
         "prewarm_sync_registration_cache",
         "prewarm_sync_baseline_projections",
@@ -513,9 +531,9 @@ def test_startup_log_reports_projection_failures_as_their_own_number() -> None:
     「本就不该预热」与「该预热但炸了」印成同一个数，「有故障」与「一切正常」在
     日志里就是同一个样子，于是「失败不阻塞启动」退化成「失败不被知道」。
     """
-    from app import main as main_mod
+    from app.services.workpaper_sync.startup_prewarm import warm_workpaper_sync_registry
 
-    warm_source = inspect.getsource(main_mod._warm_workpaper_sync_registry)
+    warm_source = inspect.getsource(warm_workpaper_sync_registry)
     assert "outcome.failed" in warm_source, (
         "汇总日志没有单独打印失败数 —— 故障与健康在日志里长得一样"
     )

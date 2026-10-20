@@ -219,8 +219,15 @@ _DEFAULT_TOKEN_TTL = 300  # 5 分钟（短命）
 
 
 def _signing_key() -> bytes:
-    """HMAC 签名密钥。从 SECRET_KEY 派生，不使用 JWT 第三方库。"""
-    base = getattr(settings, "SECRET_KEY", "") or "dev-fallback-mcp-token-key"
+    """HMAC 签名密钥：派生自平台 JWT 密钥（加域分离前缀），不使用 JWT 第三方库。
+
+    🔴 原实现读 ``settings.SECRET_KEY`` —— Settings 没有这个字段，恒落回源码里的固定常量，
+    任何人都能签出任意 user / project 的 MCP token 调 ``/api/ai-chat/mcp/*``
+    （spec dsh-kb-ocr-local-first-routing 实施中发现，与 DSH 转发令牌同一修法）。
+    """
+    base = str(getattr(settings, "JWT_SECRET_KEY", "") or "")
+    if not base:
+        raise McpTokenInvalid("平台未配置 JWT_SECRET_KEY，不能签发或校验 MCP token")
     return hashlib.sha256(f"mcp-scoped:{base}".encode()).digest()
 
 

@@ -1313,7 +1313,6 @@ audit-platform/frontend/src/views/ConsolidationIndex.vue 2180
 backend/tests/test_module_cell_resolver.py 835
 audit-platform/frontend/src/views/DisclosureEditor.vue 3281
 audit-platform/frontend/src/components/consolidation/worksheets/ConsolWorksheetTabs.vue 1543
-backend/app/main.py 816
 
 # test_formula_push_batch_e_note.py — 2026-10-06 入册。
 #   Batch E 附注推送六字段测试（D1~D7 分类+坏账聚合 + Tier A 多科目行），
@@ -1466,3 +1465,15 @@ backend/app/services/deliverable_service.py  924
 #     真库 ai_content_type_enum 已有该标签、复核 AI 写入方在用，漏声明致读取存量行 LookupError）。
 #     拆分方向：按 AI 域（内容 / 治理 / 会话）分模块，属独立任务。
 backend/app/models/ai_models.py  1537
+
+# dsh-kb-ocr-local-first-routing / preexisting-test-failures-closure（2026-10-20）—— 三个触碰前已超 800 行且未登记的文件（非本轮引入，
+#   任何改动都会被门禁拒）。baseline 取当前真实行数不加余量。
+#   test_task4_run_contract.py（触碰前 1467）：G4 把已归档 spec 的 design 路径改走 _spec_dir.resolve_spec_dir（+16 行）。
+#     拆分方向：按测试类分组拆文件（契约对齐 design / 事件形状与状态机 / 权限字段拒绝 / OpenAPI / 幂等创建 / 鉴权先于写入 / 终态与并发）。
+backend/tests/dsh_agent_panel/test_task4_run_contract.py  1483
+#   test_task31_phase_c_gate.py（触碰前 1061）：mcp-client stdio 配置与 MCP_TOKEN 变量名按 vendor / audit-data-mcp server.py 的真实契约更新（+21 行）。
+#     拆分方向：按测试类分组拆文件（双用户隔离 / 取消传播 / 背压 / 进程与工具目录 / 无外联证据 / 销毁后清理 / 综合门禁）。
+backend/tests/dsh_agent_panel/test_task31_phase_c_gate.py  1082
+#   mutate_dsh_agent_panel_guards.py（触碰前 1056）：spec 归档后默认输出目录改走 _spec_dir（+9 行）。
+#     拆分方向：变异清单（数据）与注入 / 恢复执行器分文件。
+backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py  1065

@@ -327,8 +327,14 @@ async def test_coverage_endpoint_response_structure(client):
     assert isinstance(data["sheet_breakdown"], dict)
     assert isinstance(data["missing_gaps"], list)
 
-    # total_subjects >= subjects_with_sheet_prompts
-    assert data["total_subjects"] >= data["subjects_with_sheet_prompts"]
+    # 四个字段同一单位（wp_code 前缀），恒等式精确成立（preexisting-test-failures-closure G12：
+    # 原先 total 数根目录科目文件、with_sheet 数前缀，67 < 82）
+    assert data["subjects_with_sheet_prompts"] == len(data["sheet_breakdown"])
+    assert data["total_subjects"] == (
+        data["subjects_with_sheet_prompts"] + len(data["missing_gaps"])
+    )
+    # 扫描范围与 load_prompt 同一规则：A/B/C 目录的 sheet 级提示词同样计入
+    assert {"A", "B", "C"} <= {prefix[0] for prefix in data["sheet_breakdown"]}
 
     # sheet_breakdown values are lists of strings
     for prefix, suffixes in data["sheet_breakdown"].items():
@@ -339,6 +345,33 @@ async def test_coverage_endpoint_response_structure(client):
 
     # D2 should be present (we created sheet-level prompts for it)
     assert "D2" in data["sheet_breakdown"]
+
+
+def test_coverage_counts_prefixes_across_every_cycle_dir(tmp_path, monkeypatch):
+    """夹具目录钉死口径：以前缀为单位；全部单字母目录都扫；别名表外的前缀也算已知。"""
+    from app.services import review_prompt_service as rps
+
+    # 根级科目文件不参与前缀计数（原口径正是拿它当 total）
+    (tmp_path / "应收账款审计复核提示词.md").write_text("x", encoding="utf-8")
+    for rel in (
+        "A/A1-1.md",              # 别名表外的循环目录（原先只扫 D~N+S，A1 会丢）
+        "D/D2-1.md",
+        "D/D2-note-listed.md",
+        "F/_RESERVED_SHEETS.md",  # 无 wp_code 前缀的说明文件
+        "notes/D9-1.md",          # 非单字母目录，不是循环目录
+    ):
+        path = tmp_path / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("x", encoding="utf-8")
+    monkeypatch.setattr(
+        rps, "_AUDIT_CYCLE_ALIASES", {"D2": ["应收账款"], "S1": ["审计方案", "总体"]}
+    )
+
+    report = rps.ReviewPromptService(base_dir=tmp_path).get_coverage()
+
+    assert report.sheet_breakdown == {"A1": ["1"], "D2": ["1", "note-listed"]}
+    assert report.missing_gaps == ["S1 (审计方案)"]
+    assert (report.total_subjects, report.subjects_with_sheet_prompts) == (3, 2)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

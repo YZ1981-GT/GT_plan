@@ -95,7 +95,23 @@ from app.services.wp_visibility.denial import ExternalNotFound
 from ._fixtures import FIXTURE_AUDIT_YEAR, IS_PG, AccessFixture, run_with_fixture
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DESIGN = REPO_ROOT / ".kiro" / "specs" / "dsh-agent-panel-integration" / "design.md"
+
+
+def _spec_design(spec_name: str) -> Path:
+    """spec 的 design.md：active 优先，已归档则取 `_archive/*/` 下的（单一来源 `_spec_dir.resolve_spec_dir`）。
+
+    写死 active 路径会在 spec 归档后恒红（FileNotFoundError），2026-10 本 spec 归档后即如此。
+    """
+    import importlib.util
+
+    helper = REPO_ROOT / "backend" / "scripts" / "check" / "_spec_dir.py"
+    spec = importlib.util.spec_from_file_location("_spec_dir_for_task4", helper)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.resolve_spec_dir(spec_name, require_files=["design.md"]) / "design.md"
+
+
+DESIGN = _spec_design("dsh-agent-panel-integration")
 
 #: 并发规模（Property 6/7 明确要求 100）。
 CONCURRENCY = 100

@@ -125,6 +125,35 @@ async def seeded_db(db_session: AsyncSession):
     }
 
 
+async def _make_qc_ready(db: AsyncSession, wp: WorkingPaper, *, without: str | None = None):
+    """补齐 QC 四项（结论 QC-01 / 复核人 QC-04 / ≥50 字且已同步的审计说明 QC-15 /
+    附件证据 QC-17），``without`` 指定故意缺哪一项。R7 起空注册表即 20 条全部启用。"""
+    from app.models.attachment_models import Attachment, AttachmentWorkingPaper
+
+    parsed = {
+        "conclusion": "经审计，穿行测试未发现控制执行偏差。",
+        "audit_explanation": "本底稿对销售与收款循环的关键控制执行穿行测试，抽取样本核对审批、"
+                             "发货、开票与收款记录，控制设计与执行均有效，未发现偏差。" * 2,
+    }
+    parsed.pop(without, None)
+    wp.parsed_data = parsed
+    wp.explanation_status = "synced"
+    wp.reviewer = None if without == "reviewer" else FAKE_USER_ID_2
+    if without != "attachment":
+        att = Attachment(project_id=wp.project_id, file_name="穿行测试样本.pdf",
+                         file_path="evidence/穿行测试样本.pdf", file_type="pdf", file_size=1024)
+        db.add(att)
+        await db.flush()
+        db.add(AttachmentWorkingPaper(attachment_id=att.id, wp_id=wp.id, association_type="evidence"))
+    await db.commit()
+    return wp
+
+
+@pytest_asyncio.fixture
+async def qc_ready_wp(db_session: AsyncSession, seeded_db):
+    return await _make_qc_ready(db_session, seeded_db["wp1"])
+
+
 # ===================================================================
 # Task 9: WOPI Host Service Tests
 # ===================================================================
@@ -242,20 +271,9 @@ class TestWOPIHostService:
             "只由 ContentMutationService 的 CAS 推进（Requirement 2.1 / Property 61）"
         )
 
-    @pytest.mark.asyncio
-    async def test_put_file_rejects_a_non_ooxml_payload(self, db_session, seeded_db):
-        """**Validates: Requirements 10.8**
-
-        迁移前 `put_file(b"content")` 会把 7 个字节写成「底稿」。统一入口按版本化安全
-        策略在 stage 阶段拒绝非 OOXML 载荷 —— 这条把「拒绝」钉成可观测行为，防止
-        日后有人为了让上面两条更好写而把校验关掉。
-        """
-        from app.services.wopi_service import WOPIHostService
-
-        svc = WOPIHostService()
-        with pytest.raises(Exception) as exc:
-            await svc.put_file(db_session, seeded_db["wp1"].id, b"content")
-        assert "ZIP magic" in str(exc.value) or "zip_magic" in str(exc.value), exc.value
+    # 「非 OOXML 载荷被拒绝」与「被拒后磁盘还原」移到 test_wopi_put_file_rollback.py：
+    # 那里为 wopi_put_file lane 发布了 bundle、底稿文件落在 tmp_path（本文件的夹具没有
+    # bundle，拒绝会提前停在 bundle 解析；且相对路径会把被拒载荷写进 backend/）。
 
     # Lock tests
     def test_lock_success(self):
@@ -452,16 +470,46 @@ class TestQCEngine:
     """Tests for QCEngine"""
 
     @pytest.mark.asyncio
-    async def test_qc_check_passes(self, db_session, seeded_db):
-        """All stub rules return empty findings → passed=True"""
+    async def test_qc_check_passes(self, db_session, qc_ready_wp):
+        """补齐四项后 20 条内置规则全部通过（R7 起空注册表 = 全部启用，不再是桩）。"""
         from app.services.qc_engine import QCEngine
         engine = QCEngine()
-        result = await engine.check(db_session, seeded_db["wp1"].id)
+        result = await engine.check(db_session, qc_ready_wp.id)
         assert result["passed"] is True
         assert result["blocking_count"] == 0
         assert result["warning_count"] == 0
         assert result["info_count"] == 0
         assert result["findings"] == []
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("missing, rule_id", [
+        ("conclusion", "QC-01"),
+        ("reviewer", "QC-04"),
+        ("audit_explanation", "QC-15"),
+        ("attachment", "QC-17"),
+    ])
+    async def test_qc_check_blocks_on_each_missing_item(
+        self, db_session, seeded_db, missing, rule_id
+    ):
+        """只缺一项 ⇒ 恰好它对应的那条阻断规则命中（四条规则各自独立把关）。"""
+        from app.services.qc_engine import QCEngine
+        wp = await _make_qc_ready(db_session, seeded_db["wp1"], without=missing)
+        result = await QCEngine().check(db_session, wp.id)
+        assert result["passed"] is False
+        assert [(f["rule_id"], f["severity"]) for f in result["findings"]] == [
+            (rule_id, "blocking")
+        ]
+
+    @pytest.mark.asyncio
+    async def test_qc_check_bare_workpaper_fails_four_blocking_rules(self, db_session, seeded_db):
+        """裸底稿（无结论 / 复核人 / 审计说明 / 附件）⇒ 恰好 QC-01/04/15/17 四条阻断。"""
+        from app.services.qc_engine import QCEngine
+        result = await QCEngine().check(db_session, seeded_db["wp1"].id)
+        assert result["passed"] is False
+        assert (result["blocking_count"], result["warning_count"], result["info_count"]) == (4, 0, 0)
+        assert sorted(f["rule_id"] for f in result["findings"]) == [
+            "QC-01", "QC-04", "QC-15", "QC-17"
+        ]
 
     @pytest.mark.asyncio
     async def test_qc_check_not_found(self, db_session, seeded_db):
@@ -471,19 +519,19 @@ class TestQCEngine:
             await engine.check(db_session, uuid.uuid4())
 
     @pytest.mark.asyncio
-    async def test_qc_check_stores_result(self, db_session, seeded_db):
+    async def test_qc_check_stores_result(self, db_session, qc_ready_wp):
         """QC result is persisted to wp_qc_results table"""
         from app.services.qc_engine import QCEngine
         from app.models.workpaper_models import WpQcResult
         import sqlalchemy as sa
 
         engine = QCEngine()
-        await engine.check(db_session, seeded_db["wp1"].id)
+        await engine.check(db_session, qc_ready_wp.id)
         await db_session.commit()
 
         result = await db_session.execute(
             sa.select(WpQcResult).where(
-                WpQcResult.working_paper_id == seeded_db["wp1"].id
+                WpQcResult.working_paper_id == qc_ready_wp.id
             )
         )
         qc = result.scalar_one_or_none()
@@ -517,11 +565,11 @@ class TestQCEngine:
         assert summary["not_checked"] == 2  # No QC run yet
 
     @pytest.mark.asyncio
-    async def test_get_project_summary_after_check(self, db_session, seeded_db):
+    async def test_get_project_summary_after_check(self, db_session, qc_ready_wp):
         from app.services.qc_engine import QCEngine
         engine = QCEngine()
-        # Run QC on wp1
-        await engine.check(db_session, seeded_db["wp1"].id)
+        # Run QC on wp1（已补齐 → 通过）
+        await engine.check(db_session, qc_ready_wp.id)
         await db_session.commit()
 
         summary = await engine.get_project_summary(db_session, FAKE_PROJECT_ID)
@@ -712,13 +760,8 @@ async def client(db_session: AsyncSession, seeded_db):
 class TestWorkingPaperAPI:
     """API route tests for working paper endpoints"""
 
-    @pytest.mark.asyncio
-    async def test_list_workpapers_api(self, client, seeded_db):
-        resp = await client.get(f"/api/projects/{FAKE_PROJECT_ID}/working-papers")
-        assert resp.status_code == 200
-        data = resp.json()
-        items = data.get("data", data)
-        assert len(items) == 2
+    # 列表端点的 SQL 是 PostgreSQL 专有（DISTINCT ON / uuid[]），用例在
+    # test_working_paper_list_api_pg.py（真库，响应 {items,total,stats,page,page_size}）。
 
     @pytest.mark.asyncio
     async def test_get_workpaper_api(self, client, seeded_db):
@@ -784,8 +827,8 @@ class TestQCAPI:
     """API route tests for QC endpoints"""
 
     @pytest.mark.asyncio
-    async def test_qc_check_api(self, client, seeded_db):
-        wp_id = str(seeded_db["wp1"].id)
+    async def test_qc_check_api(self, client, qc_ready_wp):
+        wp_id = str(qc_ready_wp.id)
         resp = await client.post(
             f"/api/projects/{FAKE_PROJECT_ID}/working-papers/{wp_id}/qc-check"
         )
@@ -793,6 +836,7 @@ class TestQCAPI:
         data = resp.json()
         result = data.get("data", data)
         assert result["passed"] is True
+        assert result["findings"] == []
 
     @pytest.mark.asyncio
     async def test_qc_results_api(self, client, seeded_db):

@@ -355,10 +355,16 @@ async def recognize_remote_bytes(
             transport=safe.transport(),
         ) as client:
             response = await client.post(config.api_path.lstrip("/"), json=payload)
-    except httpx.TimeoutException as exc:
+    except (httpx.ConnectTimeout, httpx.PoolTimeout) as exc:
         detail = await describe_network_failure(endpoint, exc)
         raise RemoteOCRRuntimeError(
-            "ocr_timeout", f"远程 OCR 调用超时：{detail}", kind="unavailable"
+            "ocr_timeout", f"远程 OCR 连接超时：{detail}", kind="unavailable"
+        ) from exc
+    except httpx.TimeoutException as exc:
+        # 连上之后读 / 写超时：服务在，是这一份文件处理太久（多页扫描件常见），不让候选冷却
+        detail = await describe_network_failure(endpoint, exc)
+        raise RemoteOCRRuntimeError(
+            "ocr_timeout", f"远程 OCR 调用超时：{detail}", kind="timeout"
         ) from exc
     except httpx.HTTPError as exc:
         detail = await describe_network_failure(endpoint, exc)
@@ -367,15 +373,22 @@ async def recognize_remote_bytes(
         ) from exc
     if response.status_code in {401, 403}:
         raise RemoteOCRRuntimeError("ocr_auth_failed", "远程 OCR 认证失败，请检查 API Key")
+    if response.status_code == 404:
+        raise RemoteOCRRuntimeError("ocr_http_error", "远程 OCR 返回 HTTP 404（请检查端点与 API 路径）")
     if response.status_code == 422:
         # PaddleX 对无法解码或过小的文件回 422 `Invalid input file`（2026-10-19 实测 1x1 PNG）。
-        raise RemoteOCRRuntimeError("ocr_http_error", "远程 OCR 返回 HTTP 422（文件格式或尺寸不被接受）")
+        raise RemoteOCRRuntimeError(
+            "ocr_http_error", "远程 OCR 返回 HTTP 422（文件格式或尺寸不被接受）", kind="request"
+        )
     if response.status_code >= 500:
         raise RemoteOCRRuntimeError(
             "ocr_http_error", f"远程 OCR 返回 HTTP {response.status_code}", kind="unavailable"
         )
     if response.status_code >= 400:
-        raise RemoteOCRRuntimeError("ocr_http_error", f"远程 OCR 返回 HTTP {response.status_code}")
+        # 其余 4xx（400 / 413 …）是这份文件被拒，不是服务或配置坏了
+        raise RemoteOCRRuntimeError(
+            "ocr_http_error", f"远程 OCR 返回 HTTP {response.status_code}", kind="request"
+        )
     try:
         data = response.json()
     except ValueError as exc:

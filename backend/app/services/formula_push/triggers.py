@@ -214,7 +214,7 @@ _REGISTERED: set[int] = set()
 
 
 def register_formula_push_handlers(event_bus: Any) -> None:
-    """注册到 EventBus（main._register_phase_handlers 调用）。subscribe 不去重 ⇒ 同一总线只注册一次。"""
+    """注册到 EventBus（startup_registry 的 register_phase_handlers 启动任务调用）。subscribe 不去重 ⇒ 同一总线只注册一次。"""
     from app.models.audit_platform_schemas import EventType
 
     if id(event_bus) in _REGISTERED:

@@ -345,7 +345,13 @@ class VisibilityQueryService:
         return list((await self.db.execute(sa.text(sql), params)).all())
 
     def _sqlite_portable_uuid_casts(self, sql: str) -> str:
-        """SQLite 无 uuid 类型；测试夹具下去掉 CAST(... AS uuid)，参数直接按文本比。"""
+        """SQLite 无 uuid 类型：把 ``CAST(:x AS uuid)`` 换成与库内存储同形的文本。
+
+        🔴 SQLAlchemy 的 ``Uuid`` 在 SQLite 上存 32 位十六进制（无连字符），而参数传的是
+        ``str(uuid)``（带连字符）——原先直接比文本恒不相等，admin 也看不到任何底稿，
+        依赖可见性闸门的端点在 SQLite 夹具下全部 404（preexisting-test-failures-closure G1）。
+        只在 SQLite 生效；PostgreSQL 原样保留 CAST。
+        """
         dialect = ""
         try:
             bind = self.db.get_bind()
@@ -361,9 +367,9 @@ class VisibilityQueryService:
         if dialect != "sqlite":
             return sql
         return (
-            sql.replace("CAST(:pid AS uuid)", ":pid")
-            .replace("CAST(:uid AS uuid)", ":uid")
-            .replace("CAST(:wpx AS uuid)", ":wpx")
+            sql.replace("CAST(:pid AS uuid)", "REPLACE(:pid, '-', '')")
+            .replace("CAST(:uid AS uuid)", "REPLACE(:uid, '-', '')")
+            .replace("CAST(:wpx AS uuid)", "REPLACE(:wpx, '-', '')")
         )
 
     @staticmethod
@@ -381,7 +387,9 @@ class VisibilityQueryService:
             lambda: {"audit_cycle": None, "all_pages": False, "sheets": set()}
         )
         for r in rows:
-            wp_index_id = r[0]
+            # asyncpg 返回 UUID；SQLite 原生 SQL 返回库内文本（32 位十六进制）→ 统一成 UUID，
+            # 否则调用方拿 ORM 的 UUID 去比对可见集恒不命中。
+            wp_index_id = r[0] if isinstance(r[0], UUID) else UUID(str(r[0]))
             audit_cycle = r[1]
             access_kind = r[2]
             sheet_key = r[4]

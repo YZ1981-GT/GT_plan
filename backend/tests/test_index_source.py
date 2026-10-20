@@ -228,8 +228,39 @@ class TestKnowledgeIndexServiceRegistry:
 # KnowledgeDocSource 测试
 # ---------------------------------------------------------------------------
 
+from types import SimpleNamespace
+
 from app.services.index_source import KnowledgeDocSource
 from app.models.knowledge_models import KnowledgeAccessLevel
+
+
+def _doc_row(
+    doc_id,
+    content_text,
+    *,
+    access_level=None,
+    project_ids=None,
+    folder_access_level,
+    folder_project_ids=None,
+    created_by=None,
+    folder_created_by=None,
+):
+    """与 ``KnowledgeDocSource.fetch_texts`` 的 SELECT 同形的一行（按列名取值）。
+
+    2026-10-02（601707554）起该查询改为取判权三元组（access_level / project_ids / created_by，
+    文档与文件夹各一组）交给 ``KnowledgeAccessPolicy.can_retrieve`` 单一判定面；旧夹具是按位置的
+    7 元组（含 name、不含 created_by），对新代码恒 AttributeError。
+    """
+    return SimpleNamespace(
+        id=doc_id,
+        content_text=content_text,
+        access_level=access_level,
+        project_ids=project_ids,
+        created_by=created_by,
+        folder_access_level=folder_access_level,
+        folder_project_ids=folder_project_ids,
+        folder_created_by=folder_created_by,
+    )
 
 
 class TestKnowledgeDocSource:
@@ -250,16 +281,8 @@ class TestKnowledgeDocSource:
         doc_id = uuid4()
         project_id = uuid4()
 
-        # Mock query result: one document in a public folder
-        mock_row = (
-            doc_id,                          # doc.id
-            "审计准则.pdf",                   # doc.name
-            "这是审计准则的内容文本",          # doc.content_text
-            None,                            # doc.access_level (inherit folder)
-            None,                            # doc.project_ids
-            KnowledgeAccessLevel.public,     # folder.access_level
-            None,                            # folder.project_ids
-        )
+        # Mock query result: one document in a public folder（文档 access_level=None ⇒ 继承文件夹）
+        mock_row = _doc_row(doc_id, "这是审计准则的内容文本", folder_access_level=KnowledgeAccessLevel.public)
 
         mock_result = MagicMock()
         mock_result.all.return_value = [mock_row]
@@ -280,14 +303,10 @@ class TestKnowledgeDocSource:
         doc_id = uuid4()
         project_id = uuid4()
 
-        mock_row = (
-            doc_id,
-            "内部文档.docx",
-            "项目组专属内容",
-            None,                                    # inherit folder
-            None,
-            KnowledgeAccessLevel.project_group,      # folder access
-            [str(project_id), str(uuid4())],         # folder project_ids contains our project
+        mock_row = _doc_row(
+            doc_id, "项目组专属内容",
+            folder_access_level=KnowledgeAccessLevel.project_group,
+            folder_project_ids=[str(project_id), str(uuid4())],  # folder project_ids contains our project
         )
 
         mock_result = MagicMock()
@@ -307,14 +326,10 @@ class TestKnowledgeDocSource:
         project_id = uuid4()
         other_project = uuid4()
 
-        mock_row = (
-            doc_id,
-            "其他项目文档.pdf",
-            "不应该看到的内容",
-            None,
-            None,
-            KnowledgeAccessLevel.project_group,
-            [str(other_project)],  # does NOT contain our project_id
+        mock_row = _doc_row(
+            doc_id, "不应该看到的内容",
+            folder_access_level=KnowledgeAccessLevel.project_group,
+            folder_project_ids=[str(other_project)],  # does NOT contain our project_id
         )
 
         mock_result = MagicMock()
@@ -332,14 +347,10 @@ class TestKnowledgeDocSource:
         doc_id = uuid4()
         project_id = uuid4()
 
-        mock_row = (
-            doc_id,
-            "私人笔记.md",
-            "私人内容",
-            KnowledgeAccessLevel.private,  # doc-level override
-            None,
-            KnowledgeAccessLevel.public,   # folder is public but doc overrides
-            None,
+        mock_row = _doc_row(
+            doc_id, "私人内容",
+            access_level=KnowledgeAccessLevel.private,        # doc-level override
+            folder_access_level=KnowledgeAccessLevel.public,  # folder is public but doc overrides
         )
 
         mock_result = MagicMock()
@@ -358,14 +369,10 @@ class TestKnowledgeDocSource:
         project_id = uuid4()
 
         # Folder is private, but doc is public → doc wins
-        mock_row = (
-            doc_id,
-            "公开文档.pdf",
-            "公开内容",
-            KnowledgeAccessLevel.public,    # doc-level: public
-            None,
-            KnowledgeAccessLevel.private,   # folder: private
-            None,
+        mock_row = _doc_row(
+            doc_id, "公开内容",
+            access_level=KnowledgeAccessLevel.public,          # doc-level: public
+            folder_access_level=KnowledgeAccessLevel.private,  # folder: private
         )
 
         mock_result = MagicMock()
@@ -404,15 +411,15 @@ class TestKnowledgeIndexServiceRegistryWithDocSource:
         source_types = [s.source_type for s in sources]
         assert "knowledge_doc" in source_types
 
-    def test_index_sources_has_both_sources(self, mock_db_session):
-        """_index_sources() 同时包含 BusinessDataSource 和 KnowledgeDocSource。"""
+    def test_index_sources_has_all_registered_sources(self, mock_db_session):
+        """_index_sources() 恰好是业务数据、知识文档、地址坐标三个源（按注册顺序）。
+
+        第三个源 AddressCoordinateIndexSource 由 dsh-agent-panel-integration Task 22（55c5e0fe5，V148）注册。
+        """
         service = KnowledgeIndexService(mock_db_session)
         sources = service._index_sources()
 
-        source_types = [s.source_type for s in sources]
-        assert "business_data" in source_types
-        assert "knowledge_doc" in source_types
-        assert len(sources) == 2
+        assert [s.source_type for s in sources] == ["business_data", "knowledge_doc", "address_coordinate"]
 
 
 class TestKnowledgeSourceTypeEnum:
@@ -426,9 +433,13 @@ class TestKnowledgeSourceTypeEnum:
         assert hasattr(KnowledgeSourceType, "knowledge_doc")
         assert KnowledgeSourceType.knowledge_doc.value == "knowledge_doc"
 
-    def test_enum_has_12_members(self):
-        """KnowledgeSourceType 现有 12 个成员（原 11 + knowledge_doc）。"""
-        assert len(KnowledgeSourceType) == 12
+    def test_enum_members(self):
+        """KnowledgeSourceType 成员精确集合：原 11 + knowledge_doc + address_coordinate（55c5e0fe5 / V148）。"""
+        assert {m.value for m in KnowledgeSourceType} == {
+            "trial_balance", "journal", "auxiliary", "contract", "document_scan", "workpaper",
+            "adjustment", "elimination", "confirmation", "review_comment", "prior_year_summary",
+            "knowledge_doc", "address_coordinate",
+        }
 
     def test_incremental_update_can_parse_knowledge_doc(self):
         """incremental_update 内部 KnowledgeSourceType(source_type) 可解析 'knowledge_doc'。"""

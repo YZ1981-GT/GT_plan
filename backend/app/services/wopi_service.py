@@ -75,6 +75,23 @@ def _resolve_put_target(file_id: UUID, raw_file_path: str) -> Path:
         raise PermissionError(f"底稿文件路径越界，拒绝写入: {raw_file_path}")
     return resolved
 
+
+def _restore_pre_save_bytes(fp: Path, snapshot: Path | None, file_id: UUID) -> None:
+    """PutFile 未提交：把写入目标还原成保存前的状态（有快照则拷回，首次保存则删除）。
+
+    还原失败只记 ERROR、不吞原异常（调用方随后原样抛出）。
+    """
+    import shutil
+
+    try:
+        if snapshot is not None:
+            shutil.copy2(snapshot, fp)
+        elif fp.exists():
+            fp.unlink()
+        logger.warning("put_file 未提交，已还原保存前文件: wp=%s path=%s", file_id, fp)
+    except OSError:
+        logger.exception("put_file 未提交且还原失败（磁盘与库不一致）: wp=%s path=%s", file_id, fp)
+
 # ---------------------------------------------------------------------------
 # Lock store — Redis 分布式锁（生产环境）+ 内存锁（降级/开发环境）
 # Phase 9 Task 9.3: 从纯内存锁升级为 Redis 分布式锁
@@ -342,10 +359,11 @@ class WOPIHostService:
         # 单一声明处：保存前备份与 hash-mismatch 回滚必须指向**同一个**文件名。
         # 两处各拼一遍 f-string 时，回滚分支（只在写盘校验失败时才走）会静默找不到快照。
         snapshot_name = f"{fp.stem}_r{pre_save_revision}{fp.suffix}"
-        if fp.exists():
-            snapshot_dir = fp.parent / ".versions"
-            snapshot_dir.mkdir(exist_ok=True)
-            shutil.copy2(fp, snapshot_dir / snapshot_name)
+        snapshot_path = fp.parent / ".versions" / snapshot_name
+        existed_before = fp.exists()
+        if existed_before:
+            snapshot_path.parent.mkdir(exist_ok=True)
+            shutil.copy2(fp, snapshot_path)
             logger.info("version snapshot: %s → %s", fp.name, snapshot_name)
 
         # 3. 幂等检查（如果内容与当前文件完全相同，跳过写入）
@@ -364,23 +382,7 @@ class WOPIHostService:
                     "idempotent": True,
                 }
 
-        # 4. 写入文件
-        fp.write_bytes(content)
-
-        # 5. 哈希校验（写入后验证完整性）
-        written_hash = hashlib.sha256(fp.read_bytes()).hexdigest()
-        if written_hash != content_hash:
-            logger.error("CRITICAL: hash mismatch after write! file=%s expected=%s actual=%s",
-                         fp, content_hash, written_hash)
-            # 尝试从快照恢复
-            snapshot_dir = fp.parent / ".versions"
-            snapshot_path = snapshot_dir / snapshot_name
-            if snapshot_path.exists():
-                shutil.copy2(snapshot_path, fp)
-                logger.info("restored from snapshot after hash mismatch")
-            raise RuntimeError("文件写入完整性校验失败，已从快照恢复")
-
-        # 5. 更新数据库 —— Task 19：迁入统一 business revision 域
+        # 4. 更新数据库 —— Task 19：迁入统一 business revision 域（写盘之前做完，见第 6 步）
         #
         # 改造前这里是 `wp.file_version += 1`：WOPI PutFile 自己推进一个跨通道版本
         # 计数器，绕过统一提交入口（Requirement 2.2 明列 WOPI）。改造后：
@@ -414,7 +416,7 @@ class WOPIHostService:
         old_version = await _writer.current_revision(file_id)
         new_content_revision = old_version + 1
 
-        # 6. 审计留痕 —— **在**内容 commit 之前入库
+        # 5. 审计留痕 —— **在**内容 commit 之前入库
         #
         # 🔴 顺序不是风格问题：`commit_bytes` 是这笔事务的唯一提交出口，写在它之后的
         #    `db.add(log)` 会落到**下一个**事务里，而 WOPI router 并不一定再提交一次
@@ -441,24 +443,40 @@ class WOPIHostService:
         except Exception as e:
             logger.warning("audit log for online save failed: %s", e)
 
+        # 6. 写盘 → 哈希校验 → 提交（同进退）
+        #
+        # 🔴 OOXML 结构校验 / bundle 解析 / revision CAS 都在 commit_bytes 里，任一失败都会回滚
+        #    DB 并抛出；此时 `fp` 若已是新字节，GetFile 就把被拒的载荷当底稿发出去（原先只有
+        #    hash 不符才还原，首次保存也不删）。故 DB 侧准备都放在写盘之前，写盘之后到提交成功
+        #    之间的任何异常都先把 `fp` 还原成保存前的状态再抛出。
+        fp.write_bytes(content)
         try:
-            _receipt = await _writer.commit_bytes(
-                project_id=wp.project_id,
-                wp_id=file_id,
-                entry_id=_entry_id,
-                source=_WOPI_SOURCE,
-                payload=content,
-                document_type=fp.suffix.lstrip(".").lower() or "xlsx",
-                expected_revision=old_version,
-                # Task 65：authority model 由 lane 登记决定（`wopi_put_file` →
-                # `opaque_single_onlyoffice`），不再由调用点传身份参数。
-                substrate_path=fp,
-                lane_id="wopi_put_file",
-            )
-        except _RevisionConflictError as exc:
-            raise PermissionError(
-                "内容版本冲突：其他会话在本次 PutFile 期间修改了该底稿，请重新打开后再保存"
-            ) from exc
+            written_hash = hashlib.sha256(fp.read_bytes()).hexdigest()
+            if written_hash != content_hash:
+                logger.error("CRITICAL: hash mismatch after write! file=%s expected=%s actual=%s",
+                             fp, content_hash, written_hash)
+                raise RuntimeError("文件写入完整性校验失败，已还原保存前的文件")
+            try:
+                _receipt = await _writer.commit_bytes(
+                    project_id=wp.project_id,
+                    wp_id=file_id,
+                    entry_id=_entry_id,
+                    source=_WOPI_SOURCE,
+                    payload=content,
+                    document_type=fp.suffix.lstrip(".").lower() or "xlsx",
+                    expected_revision=old_version,
+                    # Task 65：authority model 由 lane 登记决定（`wopi_put_file` →
+                    # `opaque_single_onlyoffice`），不再由调用点传身份参数。
+                    substrate_path=fp,
+                    lane_id="wopi_put_file",
+                )
+            except _RevisionConflictError as exc:
+                raise PermissionError(
+                    "内容版本冲突：其他会话在本次 PutFile 期间修改了该底稿，请重新打开后再保存"
+                ) from exc
+        except BaseException:
+            _restore_pre_save_bytes(fp, snapshot_path if existed_before else None, file_id)
+            raise
         await _writer.publish_committed_events(_receipt)
         new_content_revision = _receipt.revision
 

@@ -28,7 +28,7 @@ vi.mock('element-plus', async () => {
   const actual = await vi.importActual('element-plus')
   return {
     ...actual as any,
-    ElMessage: { warning: vi.fn(), error: vi.fn() },
+    ElMessage: { warning: vi.fn(), error: vi.fn(), success: vi.fn() },
   }
 })
 
@@ -220,6 +220,18 @@ describe('GtA173ConsultationRecord.vue', () => {
       expect(ElMessage.warning).toHaveBeenLastCalledWith('a.pdf 上传失败：你没有向该文件夹添加资料的权限')
       props.onError(new Error('<html>502 Bad Gateway</html>'), { name: 'b.pdf' })
       expect(ElMessage.warning).toHaveBeenLastCalledWith('b.pdf 上传失败，请重试')
+    })
+
+    it('成功：有正文 / 扫描件已排队后台识别 / 没有正文且不能识别，三种提示各说各的（dsh-kb-ocr Req 5.7）', async () => {
+      const { ElMessage } = await import('element-plus')
+      const { props } = await uploadProps()
+      const saved = (extra: Record<string, unknown>) => ({ code: 200, data: { uploaded: 1, files: [{ id: 'd1', name: 'x', ...extra }], failed: [] } })
+      props.onSuccess(saved({ name: '纪要.docx', text_extracted: true, ocr_queued: false }), { name: '纪要.docx' })
+      expect(ElMessage.success).toHaveBeenLastCalledWith('纪要.docx 上传成功，已存入知识库')
+      props.onSuccess(saved({ name: '回函.pdf', text_extracted: false, ocr_queued: true }), { name: '回函.pdf' })
+      expect(ElMessage.success).toHaveBeenLastCalledWith('回函.pdf 已存入知识库，扫描件正在后台识别文字，完成后 AI 生成即可引用')
+      props.onSuccess(saved({ name: '空白.txt', text_extracted: false, ocr_queued: false }), { name: '空白.txt' })
+      expect(ElMessage.success).toHaveBeenLastCalledWith('空白.txt 已存入知识库，但未识别出文字内容，AI 生成时无法引用')
     })
   })
 

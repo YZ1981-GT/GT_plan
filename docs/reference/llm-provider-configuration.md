@@ -128,6 +128,16 @@ Authorization: Bearer <用户输入的 Key>
 
 附件 OCR 按 `ocr` 能力槽路由：已启用的本机行（本机 PaddleOCR / Tesseract / MinerU 引擎链或 `OCR_SERVICE_URL` 容器）在前，远程 `paddleocrv6` 兜底；显式版面解析按 `layout_parsing` 槽（当前只有远程 `paddleocrvl-1.6`）。识别结果附 `route`（部署位置、模型、是否兜底、前序候选的失败原因）。全部候选失败时逐个列出原因并标记失败，不静默改成空文本“成功”。显式点名 Tesseract / MinerU 引擎时只走本机。
 
+### 知识库扫描件的后台识别
+
+上传进知识库的文件先在请求内抽文字层；没有文字层、且类型可 OCR（PDF 与 png / jpg / jpeg / bmp / tif / tiff / webp）的文档标「待识别」，上传回执带 `ocr_queued`，请求立即返回，不再在请求里做 OCR（V198，spec `dsh-kb-ocr-local-first-routing`）。
+
+- 后台 worker `knowledge_ocr_worker` 随后端启动（`KNOWLEDGE_OCR_WORKER_ENABLED`，默认开启），上传提交后会被唤醒。认领用 PG `FOR UPDATE SKIP LOCKED`，多个进程不会重复识别同一份文档；识别中持 15 分钟租约，进程退出后租约过期可被重新认领，写回以认领次数为围栏，迟到的结果丢弃。
+- 识别走与附件 OCR 相同的 `ocr` 能力槽：本机引擎在前，远程 `paddleocrv6` 兜底。写回正文后刷新知识库索引，AI 检索即可命中识别出的文字。
+- `ocr_status`：待识别 `pending` / 识别中 `running` / 已识别 `done` / 识别成功但没有文字 `empty` / 失败 `failed`（`ocr_error` 为中文原因）。失败按 60 秒、5 分钟、15 分钟退避重试，认领满 3 次仍失败即标失败。
+- 列表接口返回 `ocr_status` / `ocr_error`；`POST /api/knowledge-library/documents/{doc_id}/ocr-retry` 重新识别（与删除同一管理权限）。存量扫描件不自动回填，按需点「重新识别」。前端在有待识别文档时每 5 秒刷新一次列表。
+- 冷却口径：只有候选不可用 / 配置错误类失败让该 OCR 候选进入冷却；读超时归为超时、不冷却，避免一份大文件把整个服务标成不可用。
+
 ## 4. 支持矩阵
 
 | Provider | Base URL | 鉴权 | 状态 |
@@ -278,3 +288,24 @@ dial DIRECT (match DomainSuffix/cn) ... --> ai.gt-china.com.cn:10010 error: dns 
 ## 8. 数据与合规提醒
 
 远程 OCR 会将原始凭证/附件内容发送到配置的服务端。生产启用前应完成事务所内部的数据边界、留存、传输加密和供应商审批。平台不会记录 API Key、请求正文或完整上游错误响应；测试连接只发送合成数据。本文示例中的 `sk-placeholder` / `gt-placeholder` 均不是可用密钥，也不应提交真实 Key 到 Git。
+
+## 9. DSH 智能体子进程的模型路由
+
+AI 对话的 DSH 引擎以子进程运行 vendor 的 node 运行时（spec `dsh-kb-ocr-local-first-routing`）。子进程不拿任何模型 Key，也不直连模型服务：
+
+- **选候选**：每次 run 开始前 `dsh_model_bridge.select_run_candidate` 按与平台对话模型相同的「本机 → 服务器」顺序、探测缓存与冷却选一个候选；没有可用候选即 `engine_unavailable` 并列出每个候选的原因。usage / done 记录实际模型名、部署位置与 `fallback_used`。
+- **环回转发**：Cordis 配置里模型服务的 `baseURL` 指向平台环回端点 `POST /api/ai-chat/dsh-llm/v1/chat/completions`，`apiKeyEnv` 是 run 令牌变量 `GT_DSH_LLM_TOKEN`。端点只收本机进程，带代理头（如 `X-Forwarded-For`）一律拒绝；令牌是 HMAC 签名，绑定 run 与身份，有效期 = run 墙钟上限 + 60 秒，签名密钥派生自 `JWT_SECRET_KEY`（未配置则拒绝签发，run 以 typed 错误结束）。平台按令牌绑定的候选转发上游，思考参数与普通对话同一份规则（`llm_runtime.reasoning_fields`）。
+- **冷却**：上游 5xx / 401 / 403 / 404 / 连接失败让该候选进入冷却；400 / 422 / 429 / 读超时不冷却。
+- **上游受信**：上游须在平台受信端点清单（内置企业预设 + `LLM_ENDPOINT_ALLOWLIST`）内，或是环回 / 内网 IP 字面量，否则 run 以 `local_only_violation` 拒绝。Cordis 校验器另要求 `baseURL` 是环回转发地址、`apiKeyEnv` 不是 `DEEPSEEK_API_KEY`。注意 vendor 只认大写的 `baseURL`，写成 `baseUrl` 会被忽略并回落到公网默认地址。
+
+### vendor 检出与 node 运行时闭包
+
+平台只跑验证过的 vendor 版本 `dsh_discovery.DSH_PINNED_COMMIT`（当前 `9a226f1077`）。`DSH_VENDOR_ROOT`（`.env`，默认 `D:\DeepHorness`）须指向**检出到该提交**且已构建 node 闭包的目录；开发检出往前走了就另建一个 pin 检出，不要改 pin 常量。Windows + Node 24 上的做法：
+
+1. `git clone D:\DeepHorness D:\dsh_vendor_pinned`，再 `git -C D:\dsh_vendor_pinned checkout 9a226f1077`。
+2. 在该目录 `pnpm install`、`pnpm run build`。
+3. 构建闭包。vendor 脚本 `scripts/build-exe-for-python-sdk.ts` 在 Windows + Node 24 上 spawn `pnpm.cmd` 报 `EINVAL`，按其 `deployStaging` 段手工做三步：
+   - `pnpm --filter dsh-jsonrpc-agent-pkg deploy --legacy --prod --config.node-linker=hoisted --config.auto-install-peers=false --config.link-workspace-packages=true python/sdk-runtime/src/deepseek_harness_runtime/runtime/node`
+   - 补回 legacy hoist：`runtime/node/package.json` 的每个直接依赖若不在 `runtime/node/node_modules/` 下，从 `python/sdk-runtime/node_modules/<依赖>` 拷过去（解引用，不带它自己的内层 `node_modules`）。
+   - 实化软链：`runtime/node/node_modules` 下的软链逐个换成解引用后的实体目录（落在 `.bin` 里的链接把该 `.bin` 目录删掉），直到不剩任何软链；删掉 `runtime/node/` 下的 `README.md` / `README.zh.md` / `README.i18n.yaml`。
+4. `.env` 写 `DSH_VENDOR_ROOT=D:\dsh_vendor_pinned`，重启后端。`discover_dsh_sdk` 返回 available、`validate_version_pin` 无错误即可用。

@@ -5,8 +5,8 @@ Design: 组件 H2 DispatcherLifecycle。
 Requirements: 2.1–2.10。
 
 把父 spec 已构建的失效派发器（``app.services.wp_visibility.invalidation_dispatcher``）从
-"已构建" 挂载为 "LIVE"：从 ``app.main`` lifespan 的 ``_start_workers`` 启动、``stop_event``
-优雅关闭，与既有 worker（如 ``procedure_dispatcher_worker``）**同范式**。本 worker 只做
+"已构建" 挂载为 "LIVE"：由 lifespan 执行的启动任务（``app.core.startup_registry`` 的 worker
+段）启动、``stop_event`` 优雅关闭，与既有 worker（如 ``procedure_dispatcher_worker``）**同范式**。本 worker 只做
 **挂载 + 优雅降级 + 重连编排**，不改 ``epoch_cache`` / ``invalidation_dispatcher`` 语义
 （两者恒 fail-closed，父 spec 已建已测）。
 
@@ -152,7 +152,7 @@ async def _run_publisher_loop(
 
 
 async def run(stop_event: asyncio.Event) -> None:
-    """dispatcher 主入口（由 ``_start_workers`` 挂载）。开关关闭时直接退出（回退路径）。"""
+    """dispatcher 主入口（由 startup_registry 的 worker 段挂载）。开关关闭时直接退出（回退路径）。"""
     if not settings.VISIBILITY_INVALIDATION_DISPATCHER_ENABLED:
         logger.info(
             "[invalidation_dispatcher] VISIBILITY_INVALIDATION_DISPATCHER_ENABLED=false，"

@@ -340,14 +340,27 @@ def build_chat_payload(
         "max_tokens": max_tokens,
         "stream": stream,
     }
+    payload.update(reasoning_fields(config, enable_thinking))
+    return payload
+
+
+def reasoning_fields(
+    config: ResolvedLLMConfig, enable_thinking: bool | None = None
+) -> dict[str, object]:
+    """按候选生成思考参数（平台直调与 DSH 转发共用这一份规则）。
+
+    - 配置了思考强度 ⇒ ``reasoning_effort``（企业网关只认 low / medium / xhigh）。
+    - 本机 OpenAI-compatible 的 Qwen ⇒ ``chat_template_kwargs.enable_thinking``。
+    """
+    fields: dict[str, object] = {}
     if config.reasoning_effort:
-        payload["reasoning_effort"] = config.reasoning_effort
+        fields["reasoning_effort"] = config.reasoning_effort
     host = (urlsplit(config.endpoint_url).hostname or "").lower()
     local = host in {"localhost", "127.0.0.1", "::1"}
     if local and "qwen" in config.model_name.lower() and config.provider == AIProvider.openai_compatible:
         thinking = settings.LLM_ENABLE_THINKING if enable_thinking is None else enable_thinking
-        payload["chat_template_kwargs"] = {"enable_thinking": bool(thinking)}
-    return payload
+        fields["chat_template_kwargs"] = {"enable_thinking": bool(thinking)}
+    return fields
 
 
 def _raise_for_status(

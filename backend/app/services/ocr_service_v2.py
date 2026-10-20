@@ -385,8 +385,18 @@ class OCRService:
                     for item in extracted
                     if item.get("field_name")
                 ]
-                # 合并：规则层结果 + LLM 补全结果（规则层优先）
-                return rule_fields + llm_fields
+                # 合并：规则层结果优先，LLM 只补规则层缺失的字段（同名只取第一个）。
+                # 原实现 `rule_fields + llm_fields` 把 LLM 输出整段并入：规则已提取的字段出现两次
+                # （值 / 置信度各不相同，下游取哪个看顺序），没请求的字段也混进来
+                wanted = set(missing_fields)
+                merged = list(rule_fields)
+                seen = {f["field_name"] for f in rule_fields}
+                for item in llm_fields:
+                    name = item["field_name"]
+                    if name in wanted and name not in seen:
+                        merged.append(item)
+                        seen.add(name)
+                return merged
             return rule_fields
         except (json.JSONDecodeError, Exception) as e:
             logger.warning(f"LLM extract_fields failed: {e}")

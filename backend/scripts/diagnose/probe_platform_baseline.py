@@ -221,18 +221,27 @@ def probe() -> dict:
         }
 
     # ── lifespan ──────────────────────────────────────────────────────
+    # lifespan 执行 startup_registry.STARTUP_TASKS（preexisting-test-failures-closure G11），
+    # worker 清单只在 registry 的 WORKER_TASK_NAMES / _WORKER_BINDINGS 一处。
     mainp = ROOT / "backend/app/main.py"
+    regp = ROOT / "backend/app/core/startup_registry.py"
     if mainp.exists():
-        tree = ast.parse(mainp.read_text(encoding="utf-8"))
+        main_text = mainp.read_text(encoding="utf-8")
+        tree = ast.parse(main_text)
         ls = next((n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == "lifespan"), None)
-        workers = next((n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_start_workers"), None)
-        wtext = ast.get_source_segment(mainp.read_text(encoding="utf-8"), workers) or "" if workers else ""
-        create_task_count = count_literal(wtext, "create_task(")
+        ls_text = (ast.get_source_segment(main_text, ls) or "") if ls else ""
+        worker_names = 0
+        if regp.exists():
+            reg_tree = ast.parse(regp.read_text(encoding="utf-8"))
+            for node in reg_tree.body:
+                target = node.target if isinstance(node, ast.AnnAssign) else None
+                if isinstance(target, ast.Name) and target.id == "WORKER_TASK_NAMES" and isinstance(node.value, ast.Tuple):
+                    worker_names = len(node.value.elts)
         out["lifespan"] = {
             "start": ls.lineno if ls else None,
             "lines": (ls.end_lineno - ls.lineno + 1) if ls else None,
-            "has_registry": "StartupTaskSpec" in mainp.read_text(encoding="utf-8"),
-            "worker_create_task_calls": create_task_count,
+            "has_registry": "run_startup_tasks(" in ls_text,
+            "worker_create_task_calls": worker_names,
         }
 
     # ── 事件总线确定缺陷 ────────────────────────────────────────────

@@ -59,6 +59,14 @@ def _normalized_allowlist() -> tuple[str, ...]:
     return tuple(values)
 
 
+def is_allowlisted_endpoint(endpoint: str) -> bool:
+    """端点是否在平台受信清单内（企业预设 + ``LLM_ENDPOINT_ALLOWLIST``，精确到 scheme/host/port/路径前缀）。"""
+    try:
+        return _matches_allowlist(str(endpoint or "").strip().rstrip("/"))
+    except LLMEndpointPolicyError:
+        return False
+
+
 def _matches_allowlist(endpoint: str) -> bool:
     target = urlsplit(endpoint)
     target_port = _port(target)

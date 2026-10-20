@@ -99,11 +99,12 @@
                 <el-table-column prop="name" label="文档名称" min-width="200">
                   <template #default="{ row }">
                     <div class="gt-kb-doc-name" :title="row.name">{{ row.name }}</div>
-                    <!-- 无正文：AI 检索与对话读不到它的内容；扫描件（PDF 需 OCR）与其余原因分开提示；
-                         has_text 缺失（搜索视图）不显示 -->
+                    <!-- 无正文：AI 检索与对话读不到它的内容；按后台识别状态（排队 / 识别中 / 失败 / 无文字）
+                         与文件类型分开提示；has_text 缺失（搜索视图）不显示 -->
                     <div v-if="row.has_text === false" class="gt-kb-doc-notext"
-                      :title="noTextHint(row.name, row.file_type).title">
-                      {{ noTextHint(row.name, row.file_type).label }}
+                      :class="{ 'gt-kb-doc-notext--progress': docHint(row).tone === 'progress' }"
+                      :title="docHint(row).title">
+                      {{ docHint(row).label }}
                     </div>
                     <!-- 搜索结果：所在文件夹路径 + 命中片段（后端词法检索返回，≤200 字） -->
                     <div v-if="isSearchView && row.folder_path" class="gt-kb-doc-path">📁 {{ row.folder_path }}</div>
@@ -121,11 +122,13 @@
                 <el-table-column prop="created_at" label="时间" width="90">
                   <template #default="{ row }">{{ row.created_at?.slice(0, 10) || '—' }}</template>
                 </el-table-column>
-                <el-table-column label="操作" width="150" align="center">
+                <el-table-column label="操作" width="210" align="center">
                   <template #default="{ row }">
                     <el-button size="small" link type="primary" @click.stop="onPreviewDoc(row)">预览</el-button>
-                    <!-- 管理权由后端逐行下发：非创建者（且非系统管理员）看不到改名 / 删除 -->
+                    <!-- 管理权由后端逐行下发：非创建者（且非系统管理员）看不到改名 / 删除 / 重新识别 -->
                     <template v-if="canWriteKb && row.can_manage">
+                      <el-button v-if="row.has_text === false && docHint(row).retryable" size="small" link type="primary"
+                        :loading="ocrRetrying.has(row.id)" @click.stop="onRetryOcr(row)">重新识别</el-button>
                       <el-button size="small" link @click.stop="onRenameDoc(row)">重命名</el-button>
                       <el-button size="small" link type="danger" @click.stop="onDeleteDoc(row)">删除</el-button>
                     </template>
@@ -245,7 +248,7 @@
         <el-icon style="font-size: 40px /* allow-px: special */; color: var(--gt-color-text-placeholder)"><Upload /></el-icon>
         <div>拖拽文件到此处，或点击选择</div>
         <template #tip>
-          <div style="color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs)">支持 PDF / Word / Excel（含 .xlsm）/ PPT / TXT / Markdown / CSV；扫描件需开启 OCR 才能提取文字</div>
+          <div style="color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs)">支持 PDF / Word / Excel（含 .xlsm）/ PPT / TXT / Markdown / CSV；扫描件上传后在后台自动识别文字</div>
         </template>
       </el-upload>
       <!-- 文件夹上传 -->
@@ -305,9 +308,11 @@ import {
   buildUploadSummary,
   collectFromEntries,
   entriesFromDataTransfer,
+  isOcrInProgress,
   isSystemJunkPath,
   noTextHint,
   parseUploadResponse,
+  type NoTextHint,
   type UploadFailure,
   type UploadOutcome,
   type UploadSummary,
@@ -483,6 +488,73 @@ async function onFolderClick(node: any) {
     docLoading.value = false
   }
 }
+
+// ─── 扫描件后台识别（spec dsh-kb-ocr-local-first-routing Req 5.6 / 5.7） ─────────────
+function docHint(row: any): NoTextHint {
+  return noTextHint(row.name, row.file_type, row.ocr_status, row.ocr_error)
+}
+
+const ocrRetrying = ref(new Set<string>())
+
+async function onRetryOcr(row: any) {
+  if (ocrRetrying.value.has(row.id)) return
+  ocrRetrying.value = new Set(ocrRetrying.value).add(row.id)
+  try {
+    // _silent：409（正在识别 / 已有正文）等原因由 handleApiError 展示一次，不叠加全局提示
+    const res: any = await api.post(P_kl.documentOcrRetry(row.id), null, { _silent: true } as any)
+    row.ocr_status = res?.ocr_status || 'pending'
+    row.ocr_error = null
+    ElMessage.success('已加入识别队列，完成后列表自动刷新')
+  } catch (e: any) {
+    handleApiError(e, '重新识别')
+  } finally {
+    const next = new Set(ocrRetrying.value)
+    next.delete(row.id)
+    ocrRetrying.value = next
+  }
+}
+
+/** 当前文件夹里有排队 / 识别中的文档 ⇒ 每 5 秒静默刷新这些行的状态，全部结束即停 */
+const OCR_POLL_MS = 5000
+const ocrPolling = computed(() =>
+  !!selectedFolder.value?.id && !selectedFolder.value?.isSearch
+  && documents.value.some((d: any) => isOcrInProgress(d.ocr_status)),
+)
+let ocrPollTimer: ReturnType<typeof setTimeout> | null = null
+
+function stopOcrPoll() {
+  if (ocrPollTimer) clearTimeout(ocrPollTimer)
+  ocrPollTimer = null
+}
+
+async function pollOcrStatus() {
+  ocrPollTimer = null
+  const folderId = selectedFolder.value?.id
+  if (!ocrPolling.value || !folderId) return
+  try {
+    // _dedupe:false：与用户点文件夹的同一 GET 并发时，去重会取消先发的那个（点击那个被取消会清空列表）
+    const data: any = await api.get(P_kl.folderDocuments(folderId), { _silent: true, _dedupe: false } as any)
+    if (selectedFolder.value?.id !== folderId) return
+    const fresh = new Map<string, any>((Array.isArray(data) ? data : []).map((d: any) => [d.id, d]))
+    // 原地更新状态字段：整表替换会清掉用户的勾选
+    for (const row of documents.value as any[]) {
+      const next = fresh.get(row.id)
+      if (!next) continue
+      row.ocr_status = next.ocr_status
+      row.ocr_error = next.ocr_error
+      row.has_text = next.has_text
+    }
+  } catch {
+    // 静默：下一轮再试
+  } finally {
+    if (ocrPolling.value && !ocrPollTimer) ocrPollTimer = setTimeout(pollOcrStatus, OCR_POLL_MS)
+  }
+}
+
+watch(ocrPolling, (on) => {
+  stopOcrPoll()
+  if (on) ocrPollTimer = setTimeout(pollOcrStatus, OCR_POLL_MS)
+})
 
 // ─── 深链 `/knowledge?folder_id=…&doc_id=…`（spec knowledge-base-retrieval-and-authz-closure Req 5.10） ───
 // AI 笔记转存、@引用跳转都生成这种链接（后端单一真源 note_service.knowledge_jump_route）。
@@ -736,6 +808,7 @@ async function startBackgroundUpload(files: File[], targetFolder: any, skipped =
   /** 逐文件结果（结束时一次性汇总展示：失败原因 + 未提取到正文） */
   const failures: UploadFailure[] = []
   const noText: string[] = []
+  const ocrQueued: string[] = []
   const folderFailures: string[] = []
 
   // 构建目录树结构：{ files: File[], children: { name: { files, children } } }
@@ -821,6 +894,8 @@ async function startBackgroundUpload(files: File[], targetFolder: any, skipped =
       if (!outcome.ok) {
         bgUploadError.value += 1
         failures.push({ name: shownName, reason: outcome.reason })
+      } else if (outcome.ocrQueued) {
+        ocrQueued.push(shownName)
       } else if (!outcome.textExtracted) {
         noText.push(shownName)
       }
@@ -842,7 +917,7 @@ async function startBackgroundUpload(files: File[], targetFolder: any, skipped =
   bgUploading.value = false
   bgUploadJustDone.value = true
   setTimeout(() => { bgUploadJustDone.value = false }, 3000)
-  showUploadSummary(buildUploadSummary({ fileCount: files.length, failures, noText, folderFailures, skipped }))
+  showUploadSummary(buildUploadSummary({ fileCount: files.length, failures, noText, ocrQueued, folderFailures, skipped }))
   await loadTree()
   await refreshDocView()
 }
@@ -1199,6 +1274,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  stopOcrPoll()
   // 清理 blob URL，防止内存泄漏
   if (previewUrl.value?.startsWith('blob:')) {
     URL.revokeObjectURL(previewUrl.value)
@@ -1232,6 +1308,7 @@ onBeforeUnmount(() => {
 /* 文档名 + 搜索结果的所在路径与命中片段 */
 .gt-kb-doc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-kb-doc-notext { font-size: var(--gt-font-size-xs); color: var(--gt-color-wheat); white-space: nowrap; }
+.gt-kb-doc-notext--progress { color: var(--gt-color-text-tertiary); }
 .gt-kb-doc-path { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-kb-doc-snippet {
   font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5;

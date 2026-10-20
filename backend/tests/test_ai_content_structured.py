@@ -101,7 +101,7 @@ class TestMigrateAiContentStructure:
 
     def test_normalize_missing_fields(self):
         """缺失字段补齐"""
-        from scripts.migrate_ai_content_structure import normalize_ai_content_item
+        from scripts.migrate.migrate_ai_content_structure import normalize_ai_content_item
 
         old_item = {
             "cell_ref": "B5",
@@ -122,7 +122,7 @@ class TestMigrateAiContentStructure:
 
     def test_normalize_accepted_status_mapping(self):
         """status=accepted 映射到 confirm_action=accept"""
-        from scripts.migrate_ai_content_structure import normalize_ai_content_item
+        from scripts.migrate.migrate_ai_content_structure import normalize_ai_content_item
 
         old_item = {
             "status": "accepted",
@@ -134,7 +134,7 @@ class TestMigrateAiContentStructure:
 
     def test_normalize_already_complete(self):
         """已有所有字段的条目不变"""
-        from scripts.migrate_ai_content_structure import normalize_ai_content_item
+        from scripts.migrate.migrate_ai_content_structure import normalize_ai_content_item
 
         complete_item = {
             "id": str(uuid.uuid4()),
@@ -157,7 +157,7 @@ class TestMigrateAiContentStructure:
 
     def test_normalize_list(self):
         """列表级别规范化"""
-        from scripts.migrate_ai_content_structure import normalize_ai_content_list
+        from scripts.migrate.migrate_ai_content_structure import normalize_ai_content_list
 
         items = [
             {"content": "item1", "status": "pending"},

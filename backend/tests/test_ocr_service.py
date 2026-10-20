@@ -242,14 +242,28 @@ class TestOCRServiceFieldExtraction:
             mock_chat.return_value = (
                 '[{"field_name":"invoice_no","field_value":"FP12345678","confidence":0.98},'
                 '{"field_name":"buyer_name","field_value":"ABC科技有限公司","confidence":0.95},'
-                '{"field_name":"amount","field_value":"100000.00","confidence":0.92}]'
+                '{"field_name":"amount","field_value":"100000.00","confidence":0.92},'
+                '{"field_name":"seller_name","field_value":"某销售方","confidence":0.90}]'
             )
 
             result = await service.extract_fields(ocr_text, "sales_invoice")
 
-        assert len(result) == 3
-        assert result[0]["field_name"] == "invoice_no"
-        assert result[0]["confidence_score"] == 0.98
+        # 30a6a489e 起先走规则层（ocr_rule_engine），LLM 只补规则没取到的字段。
+        # 规则层取到 开票日期 / 金额 / 税额 / 购买方，并算出价税合计 total（规则层现行输出，照实钉住）；
+        # 发票号码 FP12345678 带字母前缀规则层不认 ⇒ 由 LLM 补；LLM 重复给出的 buyer_name / amount 不得再并入，
+        # 销售发票没请求的 seller_name（LLM 多给的）也不得并入
+        assert [(f["field_name"], f["method"]) for f in result] == [
+            ("invoice_date", "rule"), ("amount", "rule"), ("tax_amount", "rule"),
+            ("buyer_name", "rule"), ("total", "rule_computed"), ("invoice_no", "llm"),
+        ]
+        by_name = {f["field_name"]: f for f in result}
+        assert by_name["invoice_no"]["field_value"] == "FP12345678"
+        assert by_name["invoice_no"]["confidence_score"] == 0.98
+        assert by_name["buyer_name"]["field_value"] == "ABC科技有限公司"
+        assert by_name["amount"]["field_value"] == "100000.00"
+        # 只向 LLM 要缺失的两个字段
+        system_prompt = mock_chat.await_args.kwargs["messages"][0]["content"]
+        assert "【待提取字段】invoice_no, goods_name" in system_prompt
 
     @pytest.mark.asyncio
     async def test_extract_fields_bank_receipt(self, mock_db_session):
@@ -278,10 +292,15 @@ class TestOCRServiceFieldExtraction:
 
             result = await service.extract_fields(ocr_text, "bank_receipt")
 
-        assert len(result) == 3
-        field_names = [f["field_name"] for f in result]
-        assert "transaction_date" in field_names
-        assert "counterparty_name" in field_names
+        # 规则层取到交易日期 / 对方户名 / 金额 / 摘要（另把同一日期也报成 invoice_date，规则层现行输出，照实钉住）；
+        # LLM 回来的三个字段规则层都已有 ⇒ 一个都不并入（原实现并入后同名字段各出现两次）
+        assert [(f["field_name"], f["method"]) for f in result] == [
+            ("invoice_date", "rule"), ("amount", "rule"), ("transaction_date", "rule"),
+            ("counterparty_name", "rule"), ("summary", "rule"),
+        ]
+        assert {f["field_name"]: f["field_value"] for f in result}["counterparty_name"] == "XYZ公司"
+        system_prompt = mock_chat.await_args.kwargs["messages"][0]["content"]
+        assert "【待提取字段】transaction_type" in system_prompt
 
     @pytest.mark.asyncio
     async def test_extract_fields_invalid_json_fallback(self, mock_db_session):

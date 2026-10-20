@@ -292,15 +292,22 @@ class TestDshFailureNoDegradation:
         from app.services.ai_chat.dsh_engine import DshEngine
 
         created_contexts: list[Any] = []
-        spawned_mcp: list[Any] = []
+        spawned_roots: list[Any] = []
+        model_probes: list[Any] = []
 
         async def _spy_create_run_context(_self, request):  # noqa: ANN001
             created_contexts.append(request.run_id)
             raise AssertionError("SDK 门失效：不该走到上下文创建")
 
-        async def _spy_spawn_mcp(ctx):  # noqa: ANN001
-            spawned_mcp.append(ctx)
+        async def _spy_select_model(_self):  # noqa: ANN001
+            model_probes.append(True)
+            raise AssertionError("SDK 门失效：不该走到模型探测")
 
+        async def _spy_spawn_root(ctx, **_kw):  # noqa: ANN001
+            spawned_roots.append(ctx)
+
+        # audit-data MCP 由 DSH 根进程的 mcp-client 拉起（spec dsh-kb-ocr-local-first-routing D5），
+        # 「不创建进程」的判据落在根进程上
         with patch(
             "app.services.ai_chat.dsh_discovery.discover_dsh_sdk",
             return_value=self._discovery(False),
@@ -308,8 +315,11 @@ class TestDshFailureNoDegradation:
             "app.services.ai_chat.dsh_engine.DshEngine._create_run_context",
             _spy_create_run_context,
         ), patch(
-            "app.services.ai_chat.dsh_engine.DshProcessManager.spawn_mcp_process",
-            _spy_spawn_mcp,
+            "app.services.ai_chat.dsh_engine.DshEngine._select_model",
+            _spy_select_model,
+        ), patch(
+            "app.services.ai_chat.dsh_engine.DshProcessManager.spawn_dsh_root",
+            _spy_spawn_root,
         ):
             engine = DshEngine(db=None)
             request = _make_request()
@@ -320,7 +330,8 @@ class TestDshFailureNoDegradation:
 
         assert exc_info.value.code == ChatErrorCode.engine_unavailable
         assert created_contexts == [], "SDK 门之后仍创建了 per-run 上下文"
-        assert spawned_mcp == [], "SDK 门之后仍拉起了 MCP 进程"
+        assert model_probes == [], "SDK 门之后仍探测了模型"
+        assert spawned_roots == [], "SDK 门之后仍拉起了 DSH 进程"
 
 
 # ---------------------------------------------------------------------------

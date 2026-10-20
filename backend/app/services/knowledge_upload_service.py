@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.core import User
 from app.services.knowledge_folder_service import KnowledgeDocumentService
+from app.services.knowledge_ocr_service import is_ocr_eligible, mark_pending
 
 _logger = logging.getLogger("app.routers.knowledge_folders")
 
@@ -37,19 +38,21 @@ TriggerIndexUpdate = Callable[..., Awaitable[None]]
 async def extract_text_with_ocr(
     file_path: str, content: bytes, filename_lower: str
 ) -> str | None:
-    """提取文档全文 → Markdown 文本
+    """提取文档全文 → Markdown 文本（只抽文字层，不做 OCR）
 
     多级降级链：
       1. **anydoc**（Rust，毫秒级，含旧格式 .doc/.xls/.ppt）—— 主路径
       2. **MarkItDown**（纯 Python，补 anydoc 不覆盖的 HTML/JSON/XML）
-      3. **MinerU OCR**（扫描件 PDF；由 anydoc 的 needs_ocr 信号**精准触发**）
-      4. **pypdf / python-docx** —— 最后兜底（pypdf 是 PyPDF2 的延续，后者已停更且未声明依赖）
+      3. **pypdf / python-docx** —— 最后兜底（pypdf 是 PyPDF2 的延续，后者已停更且未声明依赖）
 
     设计要点：
       - anydoc 对图片型 PDF 明确回 "no extractable text ... OCR is required"，
-        据此**跳过无意义的 markitdown 尝试直接进 OCR**，而不是盲目走完整条链。
+        据此跳过无意义的 markitdown 尝试。
       - anydoc 报 permanent（Encrypted / 真正不支持的格式）时同样不再往下试。
       - 其它扩展名（.txt/.md）由调用方直读，不进本函数。
+      - 🔴 扫描件 OCR 不在上传请求内做（旧实现在这里同步调 MinerU：仅 PDF、默认关闭、多页会超过
+        2 分钟上传超时）：正文为空的 PDF / 图片由 ``store_uploaded_files`` 标「待识别」，后台 worker
+        经统一 OCR 路由（本机优先、服务器兜底）识别后写回（spec dsh-kb-ocr-local-first-routing）。
     """
     _log = _logger
     needs_ocr = False
@@ -101,38 +104,7 @@ async def extract_text_with_ocr(
         except Exception as exc:
             _log.warning("[KB Extract] MarkItDown failed (%s), trying fallback for %s", exc, file_path)
 
-    # ── 降级 2：MinerU OCR（扫描件 PDF） ──
-    if filename_lower.endswith(".pdf"):
-        try:
-            from app.services.mineru_service import MinerUService
-
-            mineru = MinerUService()
-            if await mineru.is_available():
-                result = await mineru.recognize_for_ocr(file_path)
-                text = (result.get("text") or "").strip()
-                if text:
-                    _log.info(
-                        "[KB Extract] MinerU OCR extracted %d chars from %s",
-                        len(text),
-                        file_path,
-                    )
-                    return text[:50000]
-                _log.warning("[KB Extract] MinerU returned empty text, falling back for %s", file_path)
-            elif needs_ocr:
-                # 已确知是扫描件却没有可用 OCR 引擎：显式记录 ERROR，
-                # 别让调用方把「抽取为空」误当成「文档本身没内容」
-                from app.core.config import settings as _settings
-
-                _log.error(
-                    "[KB Extract] %s 是扫描件但 MinerU 不可用（MINERU_ENABLED=%s），"
-                    "文本抽取为空并非文档本身无内容",
-                    file_path,
-                    getattr(_settings, "MINERU_ENABLED", "?"),
-                )
-        except Exception as exc:
-            _log.warning("[KB Extract] MinerU failed (%s), falling back for %s", exc, file_path)
-
-    # ── 降级 3：pypdf / python-docx ──
+    # ── 降级 2：pypdf / python-docx（扫描件在这里同样抽不到，交给后台 OCR） ──
     try:
         if filename_lower.endswith(".pdf"):
             import io
@@ -162,6 +134,65 @@ async def extract_text_with_ocr(
         _log.warning("[KB Extract] Fallback extraction also failed: %s", exc)
 
     return None
+
+
+async def trigger_index_update(
+    project_ids: list | None,
+    doc_id: UUID,
+    content_text: str | None,
+    doc_version: int | None = None,
+    mark_previous_stale: bool = False,
+    previous_doc_id: UUID | None = None,
+) -> None:
+    """CRUD 提交后触发 incremental_update 建向量索引（可选加速层）。
+
+    非阻塞：失败仅 log 不影响 CRUD 主流程。幂等（R3）：incremental_update 内部 upsert。
+    P2-2.2: mark_previous_stale=True 时，先将旧版本索引标记 stale。
+
+    🔴 使用**独立会话**（spec knowledge-base-retrieval-and-authz-closure Req 1.5）：索引写路径在
+    当前环境必然失败（无唯一索引承接 ON CONFLICT、embedding 502，见 design §十一），而
+    incremental_update 内部会 commit —— 用请求会话执行时，任一语句失败都会让请求会话进入
+    aborted，同一请求里后续文件的正文读取随之全部失败。文档本身已在调用前提交，
+    独立会话能看到它；索引缺席时检索由文档词法层兜住。
+    """
+    if not content_text:
+        return
+    if not project_ids:
+        return
+
+    from app.core.database import async_session
+    from app.services.knowledge_index_service import KnowledgeIndexService
+
+    async with async_session() as index_db:
+        index_svc = KnowledgeIndexService(index_db)
+
+        # P2-2.2: 文档更新后标记旧索引 stale
+        if mark_previous_stale and previous_doc_id:
+            try:
+                await index_svc.mark_index_stale(previous_doc_id)
+                await index_db.commit()
+            except Exception as exc:
+                await index_db.rollback()
+                _logger.warning(
+                    "[KB Hook] mark_index_stale failed for prev_doc=%s: %s",
+                    previous_doc_id, exc,
+                )
+
+        for pid in project_ids:
+            try:
+                await index_svc.incremental_update(
+                    project_id=UUID(str(pid)),
+                    source_type="knowledge_doc",
+                    source_id=doc_id,
+                    content=content_text,
+                    doc_version=doc_version,
+                )
+            except Exception as exc:
+                await index_db.rollback()
+                _logger.warning(
+                    "[KB Hook] incremental_update failed for doc=%s project=%s: %s",
+                    doc_id, pid, exc,
+                )
 
 
 def _knowledge_storage_base(folder_id: UUID):
@@ -324,13 +355,19 @@ async def store_uploaded_files(
             written.remove(file_path)
             failed.append({"filename": safe_name, "reason": upload_failure_reason(exc)})
             continue
+        text_extracted = bool(content_text and content_text.strip())
+        # 扫描件：照常入库，标「待识别」交给后台 OCR（不在本请求内识别）
+        ocr_queued = not text_extracted and is_ocr_eligible(safe_name)
+        if ocr_queued:
+            mark_pending(doc)
         uploaded.append({
             "id": str(doc.id),
             "name": doc.name,
             "filename": doc.name,
             "size": len(content),
             # 只有抽到非空正文才算：扫描件 / 空文件入库后 AI 检索不到它的内容，界面要如实告知
-            "text_extracted": bool(content_text and content_text.strip()),
+            "text_extracted": text_extracted,
+            "ocr_queued": ocr_queued,
             "version": doc.version,
             "previous_version_id": str(doc.previous_version_id) if doc.previous_version_id else None,
         })
@@ -341,6 +378,10 @@ async def store_uploaded_files(
         for path in written:
             _remove_quietly(path)
         raise
+    if any(item["ocr_queued"] for item in uploaded):
+        from app.workers.knowledge_ocr_worker import wake
+
+        wake()
 
     # §21.3.1 联动钩子：上传文档后触发向量索引（独立会话，失败不影响本请求）
     import sqlalchemy as _sa

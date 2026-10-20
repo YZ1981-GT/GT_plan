@@ -68,6 +68,10 @@ _LONG_TTL_SOURCES = frozenset([
 ])
 
 
+#: 注册式 resolver 除 summary 外可带回、要原样交给程序表行的键（26fe57a69 拆分前各分支写的同一组）
+_RESOLVER_PASSTHROUGH_KEYS = ("step_status", "link", "detail")
+
+
 def _cache_key(project_id: UUID, year: int, source: str) -> str:
     return f"{project_id}:{year}:{source}"
 
@@ -249,6 +253,12 @@ class ProcedureTableService:
                 )
                 if resolved and resolved.get("summary"):
                     result["summary"] = resolved["summary"]
+                    # 26fe57a69 把 elif 拆成注册式 resolver 时只搬了 summary：A16 签署状态的步骤建议
+                    # （step_status）、现金流量表勾稽的跳转（link）、A16 主版本推荐明细（detail）都被丢掉，
+                    # 而各 resolver 的「返回结构」仍声明这些键
+                    for key in _RESOLVER_PASSTHROUGH_KEYS:
+                        if resolved.get(key) is not None:
+                            result[key] = resolved[key]
                 else:
                     _logger.debug("auto_data_source '%s' 未注册，跳过", source)
         except Exception as e:

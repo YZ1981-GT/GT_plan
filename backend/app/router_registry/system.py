@@ -271,6 +271,11 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.ai_chat_mcp import router as ai_chat_mcp_router
     app.include_router(ai_chat_mcp_router, tags=["AI Chat MCP"])
 
+    # ═══ §130.2 DSH 子进程模型请求环回转发（dsh-kb-ocr-local-first-routing ADR-DKR-001） ═══
+    # 只收本机直连 + run 令牌（HMAC、绑定 run、短时效），不接受登录态、不对浏览器开放。
+    from app.routers.dsh_model_forward import router as dsh_model_forward_router
+    app.include_router(dsh_model_forward_router)
+
     # ═══ §123. V3 Req 7.4: 跨模块冲突调解（list_pending / list / resolve） ═══
     from app.routers.cross_module_conflicts import router as cross_module_conflicts_router
     app.include_router(cross_module_conflicts_router, tags=["跨模块冲突调解"])

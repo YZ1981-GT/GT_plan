@@ -1,10 +1,17 @@
 """Ordered startup task registry, serial executor, and runtime report.
 
 platform-architecture-convergence Tasks 10–12:
-- ``STARTUP_TASKS`` order matches ``lifespan`` in ``app.main`` (pre-refactor).
+- ``app.main.lifespan`` executes ``STARTUP_TASKS`` via ``run_startup_tasks`` — this module
+  is the **only** place that defines startup steps (order, criticality, bodies).
 - Serial executor: critical failures re-raise; best_effort records and continues.
 - Process-local readonly report snapshot for ``/api/health``.
 - Each worker has a stable name in the report (not a bare count).
+
+🔴 preexisting-test-failures-closure G11: the lifespan wiring of the original spec never
+landed (main.py / health.py were left out of its commit), so main kept its own copy of
+every step while this registry was only read by tests. The two drifted both ways (the
+registry lost 3 event-handler registrations + the workpaper-sync prewarm; main's drift
+self-check under-counted ``checksum_drift``). Add new startup steps here, never in main.py.
 """
 from __future__ import annotations
 
@@ -323,12 +330,41 @@ def _task_register_phase_handlers(_ctx: StartupContext) -> None:
             register_consol_elimination_recalc_handler,
         )
 
-        register_stale_handler(event_bus)
-        register_consol_trial_stale_handler(event_bus)
-        register_consol_elimination_recalc_handler(event_bus)
+        register_stale_handler(event_bus)              # NOTE_UPDATED → 合并附注 stale
+        register_consol_trial_stale_handler(event_bus)  # TRIAL_BALANCE_UPDATED → 合并 trial stale
+        register_consol_elimination_recalc_handler(event_bus)  # ELIMINATION_APPROVED → 重算
+        from app.services.consol_note_formula_refresh_handler import (
+            register_consol_note_formula_refresh_handler,
+        )
+
+        register_consol_note_formula_refresh_handler(event_bus)  # TB → 节点附注公式持久化
     except Exception as e:
         logging.getLogger("audit_platform").warning(
             "[启动] 合并 stale handler 注册失败: %s", e
+        )
+
+    # 调整分录复核通过 / 撤回 → 试算表调整列 + 审定数重算
+    try:
+        from app.services.event_bus import event_bus
+        from app.services.adjustment_approved_recalc_handler import (
+            register_adjustment_approved_recalc_handler,
+        )
+
+        register_adjustment_approved_recalc_handler(event_bus)
+    except Exception as e:
+        logging.getLogger("audit_platform").warning(
+            "[启动] 调整分录复核 recalc handler 注册失败: %s", e
+        )
+
+    # chain-closure-phase2-formula-push-engine 任务 11：试算表更新 / E1 底稿保存 → 公式推送
+    try:
+        from app.services.event_bus import event_bus
+        from app.services.formula_push.triggers import register_formula_push_handlers
+
+        register_formula_push_handlers(event_bus)
+    except Exception as e:
+        logging.getLogger("audit_platform").warning(
+            "[启动] 公式推送 handler 注册失败: %s", e
         )
 
 
@@ -573,6 +609,18 @@ async def _task_acnr_catalog_snapshot_gc(_ctx: StartupContext) -> None:
     )
 
 
+def _task_schedule_workpaper_sync_prewarm(ctx: StartupContext) -> None:
+    """Schedule the workpaper-sync cold-registration prewarm as a background task.
+
+    Never awaited here: it takes 25~30s and would push Ready past the health wait. The
+    task goes into ``ctx.worker_tasks`` so shutdown cancels it with the workers (a bare
+    ``create_task`` reference could be garbage-collected mid-run).
+    """
+    from app.services.workpaper_sync.startup_prewarm import warm_workpaper_sync_registry
+
+    ctx.worker_tasks.append(asyncio.create_task(warm_workpaper_sync_registry()))
+
+
 def _task_install_sigterm(_ctx: StartupContext) -> None:
     from app.core.graceful_shutdown import install_sigterm_handler
 
@@ -612,7 +660,35 @@ def _start_import_job_runner(ctx: StartupContext) -> None:
     ctx.worker_tasks.append(task)
 
 
-# Stable worker names (11 always-on + 1 conditional ImportJobRunner).
+#: The one worker list: (stable report name, module whose ``run(stop_event)`` is started).
+#: Both the lifespan (via ``STARTUP_TASKS``) and ``start_all_workers`` build their worker
+#: specs from here — add a worker here only (main.py once kept its own copy).
+#:
+#: TODO: Worker 多副本去重（zero-downtime-deployment Task 9.2）—— 对仍需 in-process 的
+#: worker（sla/outbox/cleanup），每轮 run loop 先 ``try_acquire_leadership("worker_name")``
+#: 或用 ``@with_leader_lock``（``app.workers._leader_lock``）。
+_WORKER_BINDINGS: tuple[tuple[str, str], ...] = (
+    ("sla_worker", "app.workers.sla_worker"),
+    ("import_recover_worker", "app.workers.import_recover_worker"),
+    ("outbox_replay_worker", "app.workers.outbox_replay_worker"),
+    ("audit_log_writer_worker", "app.workers.audit_log_writer_worker"),
+    ("budget_alert_worker", "app.workers.budget_alert_worker"),
+    ("dataset_purge_worker", "app.workers.dataset_purge_worker"),
+    ("staged_orphan_cleaner", "app.workers.staged_orphan_cleaner"),
+    ("export_cleanup_worker", "app.workers.export_cleanup_worker"),
+    ("time_machine_cleanup_worker", "app.workers.time_machine_cleanup_worker"),
+    # procedure-delegation-notification / Task 10：有序 outbox dispatcher，
+    # 受 PROCEDURE_TASK_DISPATCHER_ENABLED 控制（关闭时 worker 直接退出）。
+    ("procedure_dispatcher_worker", "app.workers.procedure_dispatcher_worker"),
+    # visibility-isolation-go-live-hardening Task 3 / R2：epoch 失效 Redis dispatcher，
+    # 受 VISIBILITY_INVALIDATION_DISPATCHER_ENABLED 控制；Redis 不可用不阻塞启动（退避重连）。
+    ("invalidation_dispatcher_worker", "app.workers.invalidation_dispatcher_worker"),
+    # 知识库扫描件后台 OCR（dsh-kb-ocr-local-first-routing；受 KNOWLEDGE_OCR_WORKER_ENABLED 控制）。
+    ("knowledge_ocr_worker", "app.workers.knowledge_ocr_worker"),
+)
+
+# Stable worker names (12 always-on + 1 conditional ImportJobRunner) — pinned contract,
+# tests assert it equals the worker phase of ``STARTUP_TASKS`` in order.
 WORKER_TASK_NAMES: tuple[str, ...] = (
     "sla_worker",
     "import_recover_worker",
@@ -625,64 +701,26 @@ WORKER_TASK_NAMES: tuple[str, ...] = (
     "time_machine_cleanup_worker",
     "procedure_dispatcher_worker",
     "invalidation_dispatcher_worker",
+    "knowledge_ocr_worker",
     "ImportJobRunner.run_forever",
 )
 
 
 def start_all_workers(stop_event: asyncio.Event) -> list[asyncio.Task]:
-    """Batch-start all workers (compat for ``app.main._start_workers`` tests).
+    """Batch-start all workers outside the report (``app.main._start_workers`` re-exports it).
 
-    Same set/order as registry worker tasks; ImportJobRunner is conditional.
+    Runs exactly the worker specs of ``STARTUP_TASKS`` (same bindings, order and
+    ImportJobRunner skip condition) — there is no second worker list to drift.
     """
-    from app.core.config import settings
-    from app.workers import (
-        sla_worker,
-        import_recover_worker,
-        outbox_replay_worker,
-        audit_log_writer_worker,
-        budget_alert_worker,
-        dataset_purge_worker,
-        staged_orphan_cleaner,
-        export_cleanup_worker,
-        time_machine_cleanup_worker,
-        procedure_dispatcher_worker,
-        invalidation_dispatcher_worker,
-    )
-
-    tasks = [
-        asyncio.create_task(sla_worker.run(stop_event)),
-        asyncio.create_task(import_recover_worker.run(stop_event)),
-        asyncio.create_task(outbox_replay_worker.run(stop_event)),
-        asyncio.create_task(audit_log_writer_worker.run(stop_event)),
-        asyncio.create_task(budget_alert_worker.run(stop_event)),
-        asyncio.create_task(dataset_purge_worker.run(stop_event)),
-        asyncio.create_task(staged_orphan_cleaner.run(stop_event)),
-        asyncio.create_task(export_cleanup_worker.run(stop_event)),
-        asyncio.create_task(time_machine_cleanup_worker.run(stop_event)),
-        asyncio.create_task(procedure_dispatcher_worker.run(stop_event)),
-        asyncio.create_task(invalidation_dispatcher_worker.run(stop_event)),
-    ]
-    if settings.LEDGER_IMPORT_IN_PROCESS_RUNNER_ENABLED:
-        from app.services.import_job_runner import ImportJobRunner
-
-        tasks.append(asyncio.create_task(ImportJobRunner.run_forever(stop_event=stop_event)))
-    return tasks
+    ctx = StartupContext(stop_event=stop_event)
+    for spec in _worker_specs():
+        if spec.skip_condition is not None and spec.skip_condition(ctx):
+            continue
+        spec.run(ctx)
+    return ctx.worker_tasks
 
 
 def _worker_specs() -> tuple[StartupTaskSpec, ...]:
-    bindings: list[tuple[str, str]] = [
-        ("sla_worker", "app.workers.sla_worker"),
-        ("import_recover_worker", "app.workers.import_recover_worker"),
-        ("outbox_replay_worker", "app.workers.outbox_replay_worker"),
-        ("audit_log_writer_worker", "app.workers.audit_log_writer_worker"),
-        ("budget_alert_worker", "app.workers.budget_alert_worker"),
-        ("dataset_purge_worker", "app.workers.dataset_purge_worker"),
-        ("staged_orphan_cleaner", "app.workers.staged_orphan_cleaner"),
-        ("export_cleanup_worker", "app.workers.export_cleanup_worker"),
-        ("time_machine_cleanup_worker", "app.workers.time_machine_cleanup_worker"),
-        ("procedure_dispatcher_worker", "app.workers.procedure_dispatcher_worker"),
-        ("invalidation_dispatcher_worker", "app.workers.invalidation_dispatcher_worker"),
-    ]
     specs: list[StartupTaskSpec] = [
         StartupTaskSpec(
             name=name,
@@ -690,7 +728,7 @@ def _worker_specs() -> tuple[StartupTaskSpec, ...]:
             criticality="critical",
             run=_make_worker_starter(mod),
         )
-        for name, mod in bindings
+        for name, mod in _WORKER_BINDINGS
     ]
     specs.append(
         StartupTaskSpec(
@@ -705,7 +743,7 @@ def _worker_specs() -> tuple[StartupTaskSpec, ...]:
 
 
 # ---------------------------------------------------------------------------
-# Ordered registry — MUST match former main.lifespan line order
+# Ordered registry — this IS the lifespan startup sequence (app.main runs it)
 # ---------------------------------------------------------------------------
 
 STARTUP_TASKS: tuple[StartupTaskSpec, ...] = (
@@ -837,6 +875,12 @@ STARTUP_TASKS: tuple[StartupTaskSpec, ...] = (
         run=_task_acnr_catalog_snapshot_gc,
     ),
     *_worker_specs(),
+    StartupTaskSpec(
+        name="warm_workpaper_sync_registry",
+        phase="caches",
+        criticality="best_effort",
+        run=_task_schedule_workpaper_sync_prewarm,
+    ),
     StartupTaskSpec(
         name="install_sigterm_handler",
         phase="finalize",

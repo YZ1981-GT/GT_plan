@@ -8,6 +8,10 @@ migration-runner-resilience spec / Sprint 2 / Task 2.4：
 - ``schema_drift``: { count, items }
 任一字段非空 → status="degraded" → 前端 DegradedBanner 提示运维。
 
+platform-architecture-convergence Task 12：
+- ``startup``: 启动任务逐项报告（``startup_registry.startup_report_as_dict``，已脱敏），
+  只作可观测暴露，**不参与** status 判定。
+
 Validates: Requirements 4.8, 4.9
 """
 
@@ -16,6 +20,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.core.container import ServiceContainer, get_container
+from app.core.startup_registry import startup_report_as_dict
 
 router = APIRouter(tags=["健康检查"])
 
@@ -33,7 +38,8 @@ async def health_check(
           "services": { "postgres": "ok|unavailable", "redis": "ok|unavailable" },
           "redis": {...},
           "migration": { "applied_count": 26, "failures": [...] },
-          "schema_drift": { "count": 0, "items": [...] }
+          "schema_drift": { "count": 0, "items": [...] },
+          "startup": { "status": "complete|not_run", "tasks": [...], "failed": [...], ... }
         }
 
     状态码：
@@ -77,7 +83,7 @@ async def health_check(
     # 业务接口运行时 500 / 插入失败，或已应用迁移的编辑静默丢失）+ 迁移失败。INFO 级 db_extra（DB 历史残留表/列，
     # 如 deleted_at 软删列、raw SQL 建的表）和 WARN 级 type_mismatch 仅作可观测
     # 暴露，不翻 degraded banner——否则共库残留噪音会让 health 永远 degraded。
-    # 与 main.py 启动 self-check 的 critical_count 口径一致。
+    # 与启动 self-check（startup_registry.run_schema_drift_check，count_critical）口径一致。
     if not all_healthy:
         status = "unhealthy"
         status_code = 503
@@ -96,6 +102,8 @@ async def health_check(
             "redis": redis_details,
             "migration": migration_info,
             "schema_drift": drift_info,
+            # 启动报告只读进程内快照，不做 I/O；best_effort 失败不翻 status（Req 6.x）
+            "startup": startup_report_as_dict(),
         },
     )
 

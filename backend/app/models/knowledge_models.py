@@ -55,6 +55,10 @@ def normalize_file_type(value: str | None) -> str | None:
     return t
 
 
+#: 扫描件后台 OCR 状态（V198 CHECK 约束同一组取值）
+KNOWLEDGE_OCR_STATUSES = ("pending", "running", "done", "empty", "failed")
+
+
 class KnowledgeAccessLevel(str, enum.Enum):
     """知识库访问级别"""
     public = "public"              # 全所公开
@@ -163,15 +167,36 @@ class KnowledgeDocument(Base):
     )
     index_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # V198: 扫描件后台 OCR（spec dsh-kb-ocr-local-first-routing ADR-DKR-005）。
+    # ocr_status：None = 不需要 / 不适用；pending / running / done / empty / failed（取值见 KNOWLEDGE_OCR_STATUSES）。
+    # ocr_due_at：pending 时 = 下次可尝试时间（退避）；running 时 = 租约到期（过期可被重新认领）。
+    # ocr_attempts：已认领次数，写回以它为围栏 —— 只有当前租约持有者能落库。
+    ocr_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    ocr_attempts: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), default=0, nullable=False
+    )
+    ocr_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ocr_due_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
+
     __table_args__ = (
         Index("idx_knowledge_documents_folder", "folder_id"),
         Index("idx_knowledge_documents_name", "name"),
+        Index(
+            "ix_knowledge_documents_ocr_queue",
+            "ocr_due_at",
+            postgresql_where=text("ocr_status IN ('pending', 'running')"),
+            sqlite_where=text("ocr_status IN ('pending', 'running')"),
+        ),
+        sa.CheckConstraint(
+            "ocr_status IS NULL OR ocr_status IN ('pending', 'running', 'done', 'empty', 'failed')",
+            name="ck_knowledge_documents_ocr_status",
+        ),
     )
 
     # 写入清洗放在 ORM 层而非上传入口：写本表的路径有 7 条（文件夹上传、项目上传、
     # POST /documents、AI 笔记转存、版本回滚、批量建文档、索引流水线回填正文），
     # 全部经实例构造或属性赋值，validates 一处兜住（spec knowledge-upload-robustness-and-consumer-wiring R2）。
-    @validates("name", "content_text", "content_summary", "tags", "index_error")
+    @validates("name", "content_text", "content_summary", "tags", "index_error", "ocr_error")
     def _strip_nul(self, _key: str, value: Any) -> Any:
         return strip_nul(value)
 

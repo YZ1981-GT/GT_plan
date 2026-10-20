@@ -410,7 +410,9 @@ function handleUploadSuccess(response: any, file: any) {
   ElMessage.success(
     saved.text_extracted
       ? `${filename} 上传成功，已存入知识库`
-      : `${filename} 已存入知识库，但未识别出文字内容，AI 生成时无法引用`,
+      : saved.ocr_queued
+        ? `${filename} 已存入知识库，扫描件正在后台识别文字，完成后 AI 生成即可引用`
+        : `${filename} 已存入知识库，但未识别出文字内容，AI 生成时无法引用`,
   )
 }
 

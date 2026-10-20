@@ -14,7 +14,8 @@ import {
   collectFromEntries,
   entriesFromDataTransfer,
   extractErrorReason,
-  isLikelyScannedPdf,
+  isOcrEligible,
+  isOcrInProgress,
   isSystemJunkName,
   isSystemJunkPath,
   noTextHint,
@@ -167,17 +168,25 @@ const ok = (files: unknown[], failed: unknown[] = []) =>
 
 describe('parseUploadResponse', () => {
   it('成功且抽到正文', () => {
-    expect(parseUploadResponse(200, ok([{ id: 'd1', text_extracted: true }]))).toEqual({
-      ok: true, reason: '', textExtracted: true,
+    expect(parseUploadResponse(200, ok([{ id: 'd1', text_extracted: true, ocr_queued: false }]))).toEqual({
+      ok: true, reason: '', textExtracted: true, ocrQueued: false,
     })
   })
 
-  it('成功但未抽到正文（扫描件）', () => {
-    expect(parseUploadResponse(200, ok([{ id: 'd1', text_extracted: false }])).textExtracted).toBe(false)
+  it('成功但未抽到正文、已交给后台识别（扫描件）', () => {
+    expect(parseUploadResponse(200, ok([{ id: 'd1', text_extracted: false, ocr_queued: true }]))).toEqual({
+      ok: true, reason: '', textExtracted: false, ocrQueued: true,
+    })
   })
 
-  it('旧后端无 text_extracted 字段时不误报', () => {
-    expect(parseUploadResponse(200, ok([{ id: 'd1' }])).textExtracted).toBe(true)
+  it('成功但未抽到正文、不能识别（空白 txt 等）', () => {
+    const out = parseUploadResponse(200, ok([{ id: 'd1', text_extracted: false, ocr_queued: false }]))
+    expect([out.textExtracted, out.ocrQueued]).toEqual([false, false])
+  })
+
+  it('旧后端无 text_extracted / ocr_queued 字段时不误报', () => {
+    const out = parseUploadResponse(200, ok([{ id: 'd1' }]))
+    expect([out.textExtracted, out.ocrQueued]).toEqual([true, false])
   })
 
   it('200 + failed[]：逐文件失败带后端原因（旧实现只当成「成功 0 个」）', () => {
@@ -217,30 +226,68 @@ describe('extractErrorReason', () => {
   })
 })
 
-// ─── 未提取到正文：区分扫描件（R4.2） ─────────────────────────────────────────
+// ─── 没有正文：区分扫描件（R4.2）与后台识别状态（dsh-kb-ocr Req 5.7） ─────────────
 
-describe('isLikelyScannedPdf / noTextHint', () => {
+describe('isOcrEligible / noTextHint / isOcrInProgress', () => {
   it.each([
     ['扫描件.pdf', undefined, true],
     ['扫描件.PDF', undefined, true],
     ['目录/扫描件.pdf', undefined, true],
     ['无后缀名', 'pdf', true], // file_type 优先于文件名
+    ['截图.png', undefined, true], // 图片与后端 OCR_SUFFIXES 同一份
+    ['照片.JPEG', undefined, true],
+    ['传真.tif', 'tif', true],
     ['名字像pdf.txt', 'txt', false],
     ['空白.txt', undefined, false],
     ['审计报告.final-reviewed-by-partner-v2', null, false], // 后端 file_type 置空的超长扩展名
     ['.pdf', undefined, false], // 点开头的隐藏文件没有扩展名
     ['图片.docx', 'docx', false],
   ])('%s (file_type=%s) → %s', (name, fileType, expected) => {
-    expect(isLikelyScannedPdf(name, fileType as string | null | undefined)).toBe(expected)
+    expect(isOcrEligible(name, fileType as string | null | undefined)).toBe(expected)
   })
 
-  it('扫描件 PDF 提示需 OCR；其余类型不提 OCR，两者都保留「未提取到正文，AI 无法引用」', () => {
-    const scan = noTextHint('合同扫描.pdf', 'pdf')
-    const blank = noTextHint('空白.txt', 'txt')
-    expect(scan.label).toBe('⚠ 未提取到正文（扫描件需 OCR），AI 无法引用')
-    expect(scan.title).toContain('开启 OCR')
-    expect(blank.label).toBe('⚠ 未提取到正文，AI 无法引用')
-    expect(`${blank.label}${blank.title}`).not.toContain('OCR')
+  it('排队 / 识别中：进度提示、不能重复发起识别', () => {
+    for (const [status, label] of [['pending', '⏳ 排队识别中…'], ['running', '⏳ 正在识别文字…']]) {
+      const hint = noTextHint('回函.pdf', 'pdf', status)
+      expect(hint).toMatchObject({ label, tone: 'progress', retryable: false })
+      expect(hint.title).toContain('自动刷新')
+    }
+  })
+
+  it('识别失败：带后端中文原因、可重新识别；没有原因时如实说未知', () => {
+    const hint = noTextHint('回函.pdf', 'pdf', 'failed', '远程 OCR 认证失败，请检查 API Key')
+    expect(hint).toMatchObject({ label: '⚠ 识别失败，AI 无法引用', tone: 'warning', retryable: true })
+    expect(hint.title).toBe('识别失败：远程 OCR 认证失败，请检查 API Key。可点「重新识别」再试')
+    expect(noTextHint('回函.pdf', 'pdf', 'failed', '  ').title).toContain('原因未知')
+  })
+
+  it('识别完成但没有文字：可重新识别', () => {
+    expect(noTextHint('空白页.pdf', 'pdf', 'empty')).toMatchObject({
+      label: '⚠ 未识别出文字，AI 无法引用', tone: 'warning', retryable: true,
+    })
+  })
+
+  it('存量扫描件（没有识别记录）可交给后台识别；其余类型不提扫描件、不给重新识别', () => {
+    const scan = noTextHint('合同扫描.pdf', 'pdf', null)
+    const blank = noTextHint('空白.txt', 'txt', null)
+    expect(scan).toMatchObject({ label: '⚠ 未提取到正文（扫描件），AI 无法引用', retryable: true })
+    expect(scan.title).toContain('重新识别')
+    expect(blank).toMatchObject({ label: '⚠ 未提取到正文，AI 无法引用', retryable: false })
+    expect(`${blank.label}${blank.title}`).not.toMatch(/OCR|扫描件|识别/)
+  })
+
+  it('任何状态都不再出现旧文案「需开启 OCR」（用户无处可开）', () => {
+    for (const status of [null, 'pending', 'running', 'failed', 'empty', 'done']) {
+      for (const [name, type] of [['a.pdf', 'pdf'], ['b.txt', 'txt']]) {
+        const hint = noTextHint(name, type, status, 'x')
+        expect(`${hint.label}${hint.title}`).not.toContain('开启 OCR')
+      }
+    }
+  })
+
+  it('isOcrInProgress 只认排队与识别中', () => {
+    expect(['pending', 'running', 'done', 'empty', 'failed', null, undefined].map((s) => isOcrInProgress(s)))
+      .toEqual([true, true, false, false, false, false, false])
   })
 })
 
@@ -262,31 +309,44 @@ describe('buildUploadSummary', () => {
     expect(s.lines[5]).toBe('……另有 2 个文件上传失败')
   })
 
-  it('全部成功但有无正文文件：warning，说明 AI 无法引用', () => {
+  it('扫描件已交给后台识别：仍是 success，告知进度去向', () => {
+    const s = buildUploadSummary({ fileCount: 2, failures: [], noText: [], ocrQueued: ['函证/回函.pdf'] })
+    expect(s).toEqual({
+      level: 'success',
+      title: '上传完成：2 个文件',
+      lines: ['⏳ 扫描件已交给后台识别文字，完成后 AI 即可引用（进度见文档列表）：函证/回函.pdf'],
+    })
+  })
+
+  it('旧后端（回执无 ocr_queued）的无正文扫描件：warning，指向「重新识别」', () => {
     const s = buildUploadSummary({ fileCount: 2, failures: [], noText: ['扫描件.pdf'] })
     expect(s.level).toBe('warning')
     expect(s.title).toBe('上传完成：2 个文件')
-    expect(s.lines).toEqual(['⚠ 未提取到正文 · 扫描件需开启 OCR 才能识别（AI 暂无法引用）：扫描件.pdf'])
+    expect(s.lines).toEqual(['⚠ 未提取到正文 · 可在文档列表点「重新识别」交给后台识别（AI 暂无法引用）：扫描件.pdf'])
   })
 
-  // R4.2「区分扫描件」：只有 PDF 会走 OCR；空白 txt / 无扩展名文件提示「开启 OCR」是误导
+  // R4.2「区分扫描件」：空白 txt / 无扩展名文件不能说成扫描件
   // （2026-10-01 Playwright 实测：旧文案对空白 txt 与「扩展名」超长的文件也说「扫描件需开启 OCR」）
-  it('无正文文件按原因分两行：扫描件 PDF 才提示 OCR，其余不提', () => {
+  it('排队识别 / 可识别未排队 / 不能识别三类分行，不出现「开启 OCR」', () => {
     const s = buildUploadSummary({
-      fileCount: 4, failures: [], noText: ['资料/扫描件.PDF', '空白.txt', '审计报告.final-reviewed-by-partner-v2', '图片.docx'],
+      fileCount: 5, failures: [],
+      ocrQueued: ['回函.pdf'],
+      noText: ['资料/扫描件.PDF', '空白.txt', '审计报告.final-reviewed-by-partner-v2', '图片.docx'],
     })
     expect(s.level).toBe('warning')
     expect(s.lines).toEqual([
-      '⚠ 未提取到正文 · 扫描件需开启 OCR 才能识别（AI 暂无法引用）：资料/扫描件.PDF',
+      '⏳ 扫描件已交给后台识别文字，完成后 AI 即可引用（进度见文档列表）：回函.pdf',
+      '⚠ 未提取到正文 · 可在文档列表点「重新识别」交给后台识别（AI 暂无法引用）：资料/扫描件.PDF',
       '⚠ 未提取到正文 · 文件为空、只含图片或该类型不支持提取文字（AI 无法引用）：空白.txt、审计报告.final-reviewed-by-partner-v2、图片.docx',
     ])
-    expect(s.lines[1]).not.toContain('OCR')
+    expect(s.lines.join('')).not.toContain('开启 OCR')
+    expect(s.lines[2]).not.toMatch(/OCR|识别/)
   })
 
-  it('无正文文件超出上限时每类各自折叠', () => {
+  it('每类超出上限时各自折叠', () => {
     const scans = Array.from({ length: 7 }, (_, i) => `s${i}.pdf`)
-    const s = buildUploadSummary({ fileCount: 8, failures: [], noText: [...scans, '空白.txt'], maxItems: 5 })
-    expect(s.lines[0]).toBe('⚠ 未提取到正文 · 扫描件需开启 OCR 才能识别（AI 暂无法引用）：s0.pdf、s1.pdf、s2.pdf、s3.pdf、s4.pdf 等 7 个')
+    const s = buildUploadSummary({ fileCount: 9, failures: [], noText: ['空白.txt'], ocrQueued: scans, maxItems: 5 })
+    expect(s.lines[0]).toBe('⏳ 扫描件已交给后台识别文字，完成后 AI 即可引用（进度见文档列表）：s0.pdf、s1.pdf、s2.pdf、s3.pdf、s4.pdf 等 7 个')
     expect(s.lines[1]).toContain('：空白.txt')
   })
 

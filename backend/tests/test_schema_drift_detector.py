@@ -404,10 +404,9 @@ class TestCriticalTypesSingleSource:
             f"{rel} 仍手写漂移类型字面量；critical 集合只允许引用 CRITICAL_DRIFT_TYPES / count_critical"
         )
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "已知残留：main._run_schema_drift_check 与 startup_registry 同体，main.py 有并发会话未提交改动，"
-        "本 spec 不触碰（design §七）。修掉后本用例 XPASS ⇒ strict 失败，届时删除 xfail 标记"))
     def test_main_startup_check_uses_the_single_source(self):
+        """main.py 不再自带启动漂移自检（preexisting-test-failures-closure G11 已改为执行
+        startup_registry）⇒ 不得重新出现手写的 critical 类型字面量。"""
         path = _APP / "main.py"
         assert not (_string_constants(path) & {"orm_extra", "enum_mismatch"})
 

@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     OCR_TESSERACT_ENABLED: bool = True
     OCR_TESSERACT_LANG: str = "chi_sim+eng"
     OCR_CONFIDENCE_THRESHOLD: float = 0.8
+    # 知识库扫描件后台 OCR worker（spec dsh-kb-ocr-local-first-routing ADR-DKR-005）：
+    # 上传时正文为空的 PDF / 图片排队，经统一 OCR 路由（本机优先、服务器兜底）识别后写回正文。
+    KNOWLEDGE_OCR_WORKER_ENABLED: bool = True
     # MinerU 配置
     MINERU_ENABLED: bool = False
     MINERU_API_URL: str = "http://localhost:8000"
@@ -142,6 +145,9 @@ class Settings(BaseSettings):
     AI_DSH_ENABLED: bool = False
     # 逗号分隔的 project UUID；空 = 任何项目都不启用（fail-safe）。
     AI_DSH_PROJECT_ALLOWLIST: str = ""
+    # DSH vendor 根目录（只读）。须检出到 dsh_discovery.DSH_PINNED_COMMIT 并构建 node 运行时闭包；
+    # 与日常开发用的 DSH 检出分开放，开发检出往前提交不影响平台（spec dsh-kb-ocr-local-first-routing ADR-DKR-004）。
+    DSH_VENDOR_ROOT: str = r"D:\DeepHorness"
     # --- Chat Run coordinator（dsh-agent-panel-integration Task 5 / Req 4.7/4.9/4.12）---
     # 🔴 容量边界的单一真源（NFR-4）。6000 用户目标 ≠ 允许 6000 个并发 run：
     # active 与 queue 都有硬上界，超限返回 typed quota error 而不是无界堆积。

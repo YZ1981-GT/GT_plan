@@ -198,3 +198,29 @@ class TestA16SignStatusCheckAuto:
 
         assert "step_status" not in result
         assert "待签署" in result["summary"]
+
+
+class TestRegisteredResolverPassthrough:
+    """注册式 resolver 的附加键原样交给程序表行（26fe57a69 拆分时只搬了 summary，三类建议全丢）。"""
+
+    @pytest.mark.asyncio
+    async def test_documented_extra_keys_pass_through(self, monkeypatch):
+        from app.services import auto_data_resolvers
+
+        async def _resolved(_db, _pid, _year, _source, **_kw):
+            return {
+                "summary": "通过12/12项",
+                "step_status": "completed",
+                "link": {"type": "cf_verification", "target": "cash_flow_verification"},
+                "detail": {"code": "A16-1", "confidence": "high"},
+                "levels": [{"level": "A21"}],  # 不在约定里的键不外溢
+            }
+
+        monkeypatch.setattr(auto_data_resolvers, "resolve_auto_data_source", _resolved)
+        svc = ProcedureTableService(db=None)  # 走注册分支不碰库
+        result = await svc._resolve_auto_values(FAKE_PROJECT_ID, YEAR, {"auto_data_source": "any_registered"}, "C")
+        assert result["summary"] == "通过12/12项"
+        assert result["step_status"] == "completed"
+        assert result["link"] == {"type": "cf_verification", "target": "cash_flow_verification"}
+        assert result["detail"] == {"code": "A16-1", "confidence": "high"}
+        assert "levels" not in result

@@ -166,7 +166,12 @@ def _call_platform_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, 
     if response.status_code >= 400:
         raise RuntimeError(f"请求错误 ({response.status_code}): {response.text}")
 
-    data = response.json()
+    body = response.json()
+    # 平台 ResponseWrapperMiddleware 把 2xx JSON 包成 {code, message, data}：工具结果在 data 里。
+    # 不解包时 status / result 都取不到 ⇒ 每次工具调用都返回 {}（2026-10-20 真实运行抓到）。
+    data = body.get("data") if isinstance(body, dict) and "code" in body and "data" in body else body
+    if not isinstance(data, dict):
+        data = {}
 
     # 更新本地预算镜像
     budget_info = data.get("budget", {})

@@ -24,7 +24,7 @@ WRONG   打红了但新增失败不含预期测试名 ⇒ 污染残留或锚点�
     python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --only fe    # 只跑前端
     python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --restore    # 清 .bak
 
-spec: .kiro/specs/dsh-agent-panel-integration/ (Task 33)
+spec: dsh-agent-panel-integration (Task 33；已归档到 .kiro/specs/_archive/04-infra-architecture/)
 Validates: Requirements 14.4
 Properties: 1–40
 """
@@ -45,6 +45,19 @@ _HERE = Path(__file__).resolve()
 _BACKEND = _HERE.parents[2]
 ROOT = _BACKEND.parent
 FRONTEND = ROOT / "audit-platform" / "frontend"
+
+
+def _spec_dir() -> Path:
+    """本 spec 目录：active 优先，已归档则取 `_archive/*/` 下的（`check/_spec_dir.resolve_spec_dir`）。
+
+    写死 active 路径在 spec 归档后会凭空新建一个只有结果文件的空壳 active 目录。
+    """
+    sys.path.insert(0, str(_BACKEND / "scripts" / "check"))
+    try:
+        from _spec_dir import resolve_spec_dir
+    finally:
+        sys.path.pop(0)
+    return resolve_spec_dir("dsh-agent-panel-integration", require_files=["design.md"])
 
 _BAK_SUFFIX = ".mutate-dsh.bak"
 
@@ -1029,11 +1042,7 @@ def main(argv: list[str] | None = None) -> int:
         }
         for o in results
     ]
-    result_path = (
-        Path(args.out)
-        if args.out
-        else ROOT / ".kiro" / "specs" / "dsh-agent-panel-integration" / "mutation_results.json"
-    )
+    result_path = Path(args.out) if args.out else _spec_dir() / "mutation_results.json"
     if not result_path.is_absolute():
         result_path = ROOT / result_path
     result_path.parent.mkdir(parents=True, exist_ok=True)

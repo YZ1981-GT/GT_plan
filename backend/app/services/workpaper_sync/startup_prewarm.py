@@ -44,6 +44,7 @@ __all__ = [
     "PrewarmProjectionOutcome",
     "prewarm_sync_baseline_projections",
     "prewarm_sync_registration_cache",
+    "warm_workpaper_sync_registry",
 ]
 
 
@@ -78,7 +79,7 @@ PREWARM_PROJECTION_MAX_ENTRIES: int = 32
 async def prewarm_sync_registration_cache() -> tuple[str, ...]:
     """第一段：把 ROI-0 注册缓存在**没有用户请求**的时候建好。
 
-    失败不吞在这里（交给调用方 `app.main._warm_workpaper_sync_registry` 统一记
+    失败不吞在这里（交给调用方 :func:`warm_workpaper_sync_registry` 统一记
     WARNING）：预热只是把成本提前，失败就退回原来的惰性路径（首请求自己建）。
     """
     from app.core.database import async_session
@@ -201,3 +202,48 @@ async def prewarm_sync_baseline_projections() -> PrewarmProjectionOutcome:
     return PrewarmProjectionOutcome(
         warmed=warmed, not_eligible=not_eligible, failed=failed
     )
+
+
+async def warm_workpaper_sync_registry() -> None:
+    """启动后台预热：先暖注册缓存，再暖可切 OO entry 的基线 projection。
+
+    由 ``app.core.startup_registry`` 的 ``warm_workpaper_sync_registry`` 任务建成后台任务
+    （不 await：25~30s 会把 Ready 推迟到 health 等待超时），引用进 ``ctx.worker_tasks``，
+    关闭阶段随 worker 一起 cancel。
+
+    失败只记 WARNING：预热只把成本提前，失败就退回原来的惰性路径（首请求自己建），
+    绝不让预热把后端启动打挂。关闭阶段的 cancel 原样抛出，不当成预热失败。
+    """
+    import asyncio
+    import time
+
+    log = logging.getLogger("audit_platform")
+    started = time.perf_counter()
+    try:
+        adapter_ids = await prewarm_sync_registration_cache()
+        registered_at = time.perf_counter()
+        log.warning(
+            "[启动] workpaper-sync 冷注册预热完成：%d 个 adapter，耗时 %.1fs",
+            len(adapter_ids),
+            registered_at - started,
+        )
+        # 第二段：可切 OO 的 entry 的基线 extract（首请求实测仍要 8.2s，暖后 0.13s）。
+        # 🔴 「不适用」与「失败」分开报：前者是设计内分流（capability 非 bidirectional），
+        # 数字大是正常的；后者是真故障。合成一个「跳过 N 个」会让故障长得和健康一模一样。
+        outcome = await prewarm_sync_baseline_projections()
+        log.warning(
+            "[启动] workpaper-sync 基线 projection 预热完成："
+            "暖 %d 个 / 不适用 %d 个 / 失败 %d 个，耗时 %.1fs",
+            outcome.warmed,
+            outcome.not_eligible,
+            outcome.failed,
+            time.perf_counter() - registered_at,
+        )
+    except asyncio.CancelledError:  # 关闭阶段取消，不当成失败
+        raise
+    except Exception as exc:  # noqa: BLE001 — 预热失败不阻塞，首请求会自行惰性注册
+        log.warning(
+            "[启动] workpaper-sync 冷注册预热失败（忽略，改由首请求惰性注册，%.1fs）: %s",
+            time.perf_counter() - started,
+            exc,
+        )

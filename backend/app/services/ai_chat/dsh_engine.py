@@ -22,19 +22,23 @@ Properties:
 DshEngine 是平台的第二种 ChatEngine 实现，在 Phase C feature flag + 项目 allowlist
 都满足时可选。它通过 per-run DSH SDK subprocess 执行多步 Agent 推理：
 
-1. SDK discovery（验证 vendor 安装与 Cordis）
-2. 创建 per-run scoped token（MCP 认证）
-3. 启动 per-run MCP stdio process（audit-data server）
-4. 启动 DSH root subprocess（custom Cordis + JSON-RPC）
-5. 监听 DSH events → 映射为平台 ChatEvent
-6. cancel/timeout → 销毁全部 descendants + 清理 session files
+1. SDK discovery（验证 vendor 安装、pin 与 Cordis）
+2. 选定本 run 的模型：平台对话路由本机优先、执行前探测、全程不换（``dsh_model_bridge``）
+3. 创建 per-run scoped token（MCP 认证）与模型转发令牌
+4. 启动 DSH root subprocess（custom Cordis；audit-data MCP 由它的 mcp-client 以 stdio 拉起，
+   模型请求经平台环回转发 ``/api/ai-chat/dsh-llm/v1``）
+5. JSON-RPC：initialize → session/prompt → 消费 session.event 到 idle（``dsh_protocol``）
+6. cancel/timeout/结束 → shutdown → 终止进程树 + 清理 session files
 
 ## 进程隔离与安全
 
-- 每个 run 独立启动 MCP stdio process 和 DSH root process
+- 每个 run 独立启动 DSH root process（MCP 在它的进程树里）
 - DSH root 不跨 principal 复用（无法证明完整 reset）
-- MCP process 只持有 per-run scoped token，不持有长期登录凭据
+- MCP process 只持有 per-run scoped token；DSH 进程只持有模型转发令牌，拿不到上游 Key
 - 运行结束后销毁全部进程与临时文件
+
+spec dsh-kb-ocr-local-first-routing 把进程管理拆到 ``dsh_process``、协议拆到 ``dsh_protocol``，
+并按 vendor 真实协议重写（旧实现对真实运行时每次握手必败，见该 spec design §1.1）。
 
 ## Backpressure
 
@@ -49,18 +53,28 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
-import shutil
-import signal
 import tempfile
 import time
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 from app.models.ai_models import ChatEngineName
+from app.services.ai_chat import dsh_model_bridge, dsh_protocol
+
+# 拆出的进程模块（dsh-kb-ocr-local-first-routing Task 1）：再导出原名，
+# 旧导入与 patch 路径（``dsh_engine.DshProcessManager`` / ``D.DshRunContext``）保持可解析。
+from app.services.ai_chat.dsh_process import (  # noqa: F401
+    DshProcessManager,
+    DshRunContext,
+    _build_dsh_env,
+    _build_mcp_env,
+    _dsh_process_ttl,
+    _dsh_run_timeout,
+    _resolve_mcp_server_path,
+    _write_platform_cordis_config,
+)
 from app.services.ai_chat.engine import (
     AuthorizedChatRunRequest,
     CancelSignal,
@@ -106,253 +120,6 @@ def _dsh_max_active() -> int:
 def _dsh_queue_limit() -> int:
     from app.core.config import settings
     return int(getattr(settings, "AI_DSH_QUEUE_LIMIT", 16))
-
-
-def _dsh_run_timeout() -> int:
-    """单 run 墙钟上限（秒）。复用 AI_CHAT_RUN_TIMEOUT_SECONDS。"""
-    from app.core.config import settings
-    return int(getattr(settings, "AI_CHAT_RUN_TIMEOUT_SECONDS", 180))
-
-
-def _dsh_process_ttl() -> int:
-    """进程最大存活时间（秒）。使用 run timeout * 2 作为进程 TTL 上界。"""
-    from app.core.config import settings
-    base = int(getattr(settings, "AI_CHAT_RUN_TIMEOUT_SECONDS", 180))
-    return base * 2
-
-
-# ---------------------------------------------------------------------------
-# DSH Run Context（per-run 隔离状态）
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class DshRunContext:
-    """一次 DSH run 的完整隔离上下文。
-
-    🔴 per-run 独立，不跨 principal 复用（Property 28）。
-    包含：scoped token、MCP process、DSH root process、session 目录。
-    """
-
-    run_id: UUID
-    principal_id: UUID
-    project_id: UUID
-    session_dir: Path | None = None
-    mcp_process: asyncio.subprocess.Process | None = None
-    dsh_process: asyncio.subprocess.Process | None = None
-    scoped_token: str | None = None
-    token_id: str | None = None
-    #: 工具调用计数（cancel 后不再增加 = Property 8 判据）
-    tool_call_count: int = 0
-    #: cancel 标志
-    cancelled: bool = False
-    #: 启动时间（用于 timeout 判定）
-    started_at: float = field(default_factory=time.monotonic)
-    #: 子进程 PID 列表（用于清理确认）
-    child_pids: list[int] = field(default_factory=list)
-    #: 清理错误（记录审计）
-    cleanup_errors: list[str] = field(default_factory=list)
-
-    @property
-    def elapsed_seconds(self) -> float:
-        return time.monotonic() - self.started_at
-
-    @property
-    def is_timed_out(self) -> bool:
-        return self.elapsed_seconds > _dsh_run_timeout()
-
-
-# ---------------------------------------------------------------------------
-# DSH Process Manager（进程生命周期）
-# ---------------------------------------------------------------------------
-
-
-class DshProcessManager:
-    """管理 per-run 的 MCP stdio process 和 DSH root process。
-
-    🔴 设计约束：
-    - 每个 run 独立进程，不复用（Property 28：跨用户隔离）
-    - 进程不监听 TCP 端口（Property 27：MCP 零监听）
-    - 进程环境只注入 scoped token，不继承长期凭据
-    - cleanup 失败记录审计和指标，不静默
-    """
-
-    @staticmethod
-    async def spawn_mcp_process(
-        ctx: DshRunContext,
-        *,
-        mcp_server_path: str | None = None,
-        api_base_url: str | None = None,
-    ) -> asyncio.subprocess.Process:
-        """启动 per-run MCP stdio process。
-
-        MCP server 只通过 AUDIT_API_BASE 调用平台 REST endpoints，
-        不 import DB driver/ORM，不读取 DB/Redis/平台密钥。
-        """
-        from app.core.config import settings
-
-        server_path = mcp_server_path or _resolve_mcp_server_path()
-        # 127.0.0.1 而非 localhost：后端只监听 IPv4，而 MCP server 每次工具调用都新建 httpx.Client；
-        # Windows 上 localhost 先试 ::1，每次建连多等约 2s（spec startup-prewarm-event-loop-unblocking 4.1）。
-        base_url = api_base_url or f"http://127.0.0.1:{getattr(settings, 'PORT', 9980)}"
-
-        # 构造受限环境——只注入必要变量，不从父进程全量继承
-        env = _build_mcp_env(
-            token=ctx.scoped_token or "",
-            api_base=base_url,
-            run_id=str(ctx.run_id),
-        )
-
-        try:
-            process = await asyncio.create_subprocess_exec(
-                "python", server_path, "--stdio",
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env,
-                cwd=str(ctx.session_dir) if ctx.session_dir else None,
-            )
-            ctx.mcp_process = process
-            if process.pid:
-                ctx.child_pids.append(process.pid)
-            logger.info(
-                "run %s MCP stdio process 已启动 (pid=%s)",
-                ctx.run_id, process.pid,
-            )
-            return process
-        except (OSError, FileNotFoundError) as exc:
-            raise EngineFailure(
-                ChatErrorCode.engine_unavailable,
-                f"MCP stdio process 启动失败: {exc}",
-            ) from exc
-
-    @staticmethod
-    async def spawn_dsh_root(
-        ctx: DshRunContext,
-        *,
-        cordis_config_path: str | None = None,
-    ) -> asyncio.subprocess.Process:
-        """启动 per-run DSH root subprocess。
-
-        使用 custom Cordis 配置（无 bash/fs-write 工具），
-        指向本地 vLLM（非 cloud）。
-        """
-        from app.services.ai_chat.dsh_discovery import (
-            DSH_VENDOR_ROOT,
-            discover_dsh_sdk,
-        )
-
-        discovery = discover_dsh_sdk()
-        if not discovery.is_available:
-            raise EngineFailure(
-                ChatErrorCode.engine_unavailable,
-                f"DSH SDK 不可用: {discovery.status.value} — {'; '.join(discovery.errors[:3])}",
-            )
-
-        # 确定 node runtime 路径
-        runtime_dir = (
-            DSH_VENDOR_ROOT / "python" / "sdk-runtime"
-            / "src" / "deepseek_harness_runtime" / "runtime"
-        )
-        node_bin_js = (
-            runtime_dir / "node" / "node_modules"
-            / "@deepseek-ai" / "dsh-sdk-jsonrpc-demo"
-            / "lib" / "packaged-bin.js"
-        )
-
-        node_path = shutil.which("node")
-        if not node_path:
-            raise EngineFailure(
-                ChatErrorCode.engine_unavailable,
-                "Node.js 未安装（DSH JSON-RPC server 需要 Node.js）",
-            )
-
-        if not node_bin_js.is_file():
-            raise EngineFailure(
-                ChatErrorCode.engine_unavailable,
-                f"DSH node runtime closure 不存在: {node_bin_js}",
-            )
-
-        # 使用平台 Cordis 配置或指定的外部配置
-        config_path = cordis_config_path
-        if not config_path:
-            config_path = _write_platform_cordis_config(ctx)
-
-        env = _build_dsh_env(
-            cordis_config=config_path,
-            vendor_root=str(DSH_VENDOR_ROOT),
-            session_dir=str(ctx.session_dir) if ctx.session_dir else "",
-        )
-
-        try:
-            process = await asyncio.create_subprocess_exec(
-                node_path, str(node_bin_js),
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env,
-                cwd=str(ctx.session_dir) if ctx.session_dir else None,
-            )
-            ctx.dsh_process = process
-            if process.pid:
-                ctx.child_pids.append(process.pid)
-            logger.info(
-                "run %s DSH root process 已启动 (pid=%s)",
-                ctx.run_id, process.pid,
-            )
-            return process
-        except (OSError, FileNotFoundError) as exc:
-            raise EngineFailure(
-                ChatErrorCode.engine_unavailable,
-                f"DSH root process 启动失败: {exc}",
-            ) from exc
-
-    @staticmethod
-    async def terminate_all(ctx: DshRunContext) -> None:
-        """终止 run 关联的全部子进程 + 清理 session 文件。
-
-        🔴 顺序：先 DSH root → 再 MCP → 最后 session 文件。
-        失败不阻断（记录到 ctx.cleanup_errors），后续审计可重试。
-        """
-        # 1. 终止 DSH root（及其 children）
-        if ctx.dsh_process and ctx.dsh_process.returncode is None:
-            try:
-                ctx.dsh_process.terminate()
-                await asyncio.wait_for(ctx.dsh_process.wait(), timeout=5.0)
-            except (asyncio.TimeoutError, ProcessLookupError, OSError) as exc:
-                ctx.cleanup_errors.append(f"DSH root 终止失败: {exc}")
-                # 强杀
-                try:
-                    ctx.dsh_process.kill()
-                except (ProcessLookupError, OSError):
-                    pass
-
-        # 2. 终止 MCP process
-        if ctx.mcp_process and ctx.mcp_process.returncode is None:
-            try:
-                ctx.mcp_process.terminate()
-                await asyncio.wait_for(ctx.mcp_process.wait(), timeout=5.0)
-            except (asyncio.TimeoutError, ProcessLookupError, OSError) as exc:
-                ctx.cleanup_errors.append(f"MCP process 终止失败: {exc}")
-                try:
-                    ctx.mcp_process.kill()
-                except (ProcessLookupError, OSError):
-                    pass
-
-        # 3. 清理 session 文件（JSONL/log/temp）
-        if ctx.session_dir and ctx.session_dir.exists():
-            try:
-                shutil.rmtree(ctx.session_dir, ignore_errors=False)
-                logger.info("run %s session 目录已清理: %s", ctx.run_id, ctx.session_dir)
-            except (OSError, PermissionError) as exc:
-                ctx.cleanup_errors.append(f"session 目录清理失败: {exc}")
-
-        # 记录清理结果
-        if ctx.cleanup_errors:
-            logger.warning(
-                "run %s 清理有 %d 项失败: %s",
-                ctx.run_id, len(ctx.cleanup_errors), ctx.cleanup_errors,
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -539,13 +306,28 @@ class DshEngine:
             await self._pool.acquire(request.run_id)
 
             try:
-                # ④ 创建 per-run 隔离上下文
+                # ④ 创建 per-run 隔离上下文（先校验项目绑定：注定失败的 run 不去探测模型）
                 ctx = await self._create_run_context(request)
+
+                # ⑤ 选定本 run 的模型：按平台对话路由（本机优先）执行前探测，全程不换
+                #    （spec dsh-kb-ocr-local-first-routing ADR-DKR-002）；无可用 / 不允许 ⇒ typed error。
+                #    模型请求凭 run 令牌经平台环回转发（ADR-DKR-001）
+                route = await self._select_model()
+                ctx.model_route = route
+                try:
+                    ctx.llm_token = dsh_model_bridge.issue_token(
+                        request.run_id, route.identity,
+                        ttl_seconds=dsh_model_bridge.token_ttl_seconds(),
+                    )
+                except dsh_model_bridge.DshTokenError as exc:  # 只在平台密钥缺失时发生
+                    raise EngineFailure(
+                        ChatErrorCode.engine_unavailable, f"DSH 模型转发不可用：{exc}"
+                    ) from exc
                 self._pool.register(ctx)
 
                 await self._abort_if_cancelled(cancel, "上下文创建后")
 
-                # ⑤ 发出 context_ready
+                # ⑥ 发出 context_ready
                 yield build_event(
                     request,
                     self._events,
@@ -564,11 +346,7 @@ class DshEngine:
                     },
                 )
 
-                # ⑥ 启动 MCP stdio process
-                await DshProcessManager.spawn_mcp_process(ctx)
-                await self._abort_if_cancelled(cancel, "MCP 启动后")
-
-                # ⑦ 启动 DSH root 并执行 handshake
+                # ⑦ 启动 DSH root（audit-data MCP 由它的 mcp-client 按 Cordis 配置以 stdio 拉起）
                 await DshProcessManager.spawn_dsh_root(ctx)
                 await self._abort_if_cancelled(cancel, "DSH root 启动后")
 
@@ -580,16 +358,18 @@ class DshEngine:
                 async for event in self._execute_agent_run(ctx, request, cancel, outcome):
                     yield event
 
-                # ⑩ 定稿
+                # ⑩ 定稿：记录实际服务的模型与部署位置（Req 1.6）
                 outcome.latency_ms = _elapsed_ms(started)
-                outcome.model = self._resolve_effective_model()
+                outcome.model = route.model_name
 
-                # 生成 usage
                 outcome.usage = {
                     "source": "dsh_agent",
                     "model": outcome.model,
+                    "deployment": route.deployment,
+                    "fallback_used": bool(route.notes),
                     "tool_calls": ctx.tool_call_count,
                     "elapsed_seconds": ctx.elapsed_seconds,
+                    **ctx.token_usage,
                 }
 
                 yield build_terminal_intent(
@@ -599,6 +379,7 @@ class DshEngine:
                     payload={
                         "usage": dict(outcome.usage),
                         "model": outcome.model,
+                        "deployment": route.deployment,
                         "latency_ms": outcome.latency_ms,
                         "delta_count": outcome.delta_count,
                         "tool_calls": ctx.tool_call_count,
@@ -630,8 +411,9 @@ class DshEngine:
             )
             raise
         finally:
-            # 清理全部子进程与 session 文件（Property 8/28）
+            # 清理全部子进程与 session 文件（Property 8/28）：先请 DSH 优雅退出，再终止进程树
             if ctx is not None:
+                await dsh_protocol.shutdown(ctx)
                 await DshProcessManager.terminate_all(ctx)
                 self._pool.unregister(request.run_id)
                 # 清理失败记录审计
@@ -645,6 +427,10 @@ class DshEngine:
     # ------------------------------------------------------------------
     # 分步实现
     # ------------------------------------------------------------------
+
+    async def _select_model(self) -> dsh_model_bridge.DshModelRoute:
+        """本 run 的模型（实现在 ``dsh_model_bridge.select_run_candidate``）。"""
+        return await dsh_model_bridge.select_run_candidate()
 
     def _verify_sdk_available(self) -> None:
         """验证 DSH SDK 可用（Property 25：不可用 → engine_unavailable）。"""
@@ -661,12 +447,17 @@ class DshEngine:
     async def _create_run_context(
         self, request: AuthorizedChatRunRequest
     ) -> DshRunContext:
-        """创建 per-run 隔离上下文（Property 28）。"""
-        # 创建 session 目录
-        session_dir = Path(tempfile.mkdtemp(prefix=f"dsh_run_{request.run_id.hex[:8]}_"))
+        """创建 per-run 隔离上下文（Property 28）。
 
-        # 创建 scoped token（Property 29：只在当前 run scope 内）
-        from app.services.ai_chat.mcp_token import McpTokenService
+        先校验并签 scoped token，最后才建会话目录：任一步失败都以 typed error 结束且不留临时目录
+        （此时 ctx 尚未返回，``finally`` 里的清理够不着它）。
+        """
+        from app.services.ai_chat.mcp_token import (
+            McpMaskLevel,
+            McpTokenError,
+            McpTokenService,
+            resolve_mask_policy,
+        )
 
         token_service = McpTokenService()
         role = _resolve_role(request)
@@ -679,14 +470,24 @@ class DshEngine:
                 "DSH engine 需要项目上下文，当前宿主无项目绑定",
             )
 
-        token = token_service.create_token(
-            user_id=request.host.principal_id,
-            project_id=project_id,
-            run_id=request.run_id,
-            role=role,
-            cycle_scope=cycle_scope,
-        )
+        # 创建 scoped token（Property 29：只在当前 run scope 内）
+        try:
+            token = token_service.create_token(
+                user_id=request.host.principal_id,
+                project_id=project_id,
+                run_id=request.run_id,
+                role=role,
+                cycle_scope=cycle_scope,
+            )
+        except McpTokenError as exc:
+            # 未知角色 fail-closed（Req 11.9）⇒ 无权；其余（平台密钥缺失）⇒ 引擎不可用
+            rejected = resolve_mask_policy(role) == McpMaskLevel.REJECTED
+            raise EngineFailure(
+                ChatErrorCode.access_denied if rejected else ChatErrorCode.engine_unavailable,
+                f"DSH 数据访问令牌签发失败：{exc.message}",
+            ) from exc
 
+        session_dir = Path(tempfile.mkdtemp(prefix=f"dsh_run_{request.run_id.hex[:8]}_"))
         ctx = DshRunContext(
             run_id=request.run_id,
             principal_id=request.host.principal_id,
@@ -700,250 +501,28 @@ class DshEngine:
     async def _handshake(
         self, ctx: DshRunContext, request: AuthorizedChatRunRequest
     ) -> None:
-        """执行 JSON-RPC initialize handshake。
+        """JSON-RPC 握手（实现在 ``dsh_protocol.handshake``）。"""
+        await dsh_protocol.handshake(self, ctx, request)
 
-        失败 → engine_unavailable（Property 25）。
-        不使用真实 SDK client（依赖 DSH vendor root）；
-        而是通过 stdin/stdout 发送 JSON-RPC initialize。
-        """
-        if ctx.dsh_process is None or ctx.dsh_process.stdin is None:
-            raise EngineFailure(
-                ChatErrorCode.engine_unavailable,
-                "DSH root process 未启动或 stdin 不可用",
-            )
-
-        import json
-
-        # 构造 JSON-RPC initialize 请求
-        init_request = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "cwd": str(ctx.session_dir),
-                "provider": "local-vllm",
-                "model": self._resolve_effective_model(),
-            },
-        }
-
-        try:
-            payload = json.dumps(init_request) + "\n"
-            ctx.dsh_process.stdin.write(payload.encode())
-            await ctx.dsh_process.stdin.drain()
-
-            # 等待 initialize 响应（超时 30s）
-            response_data = await asyncio.wait_for(
-                ctx.dsh_process.stdout.readline(),  # type: ignore[union-attr]
-                timeout=30.0,
-            )
-
-            if not response_data:
-                raise EngineFailure(
-                    ChatErrorCode.engine_unavailable,
-                    "DSH JSON-RPC handshake 无响应",
-                )
-
-            response = json.loads(response_data.decode())
-            if "error" in response:
-                error_msg = response["error"].get("message", "unknown")
-                raise EngineFailure(
-                    ChatErrorCode.engine_unavailable,
-                    f"DSH JSON-RPC handshake 失败: {error_msg}",
-                )
-
-            logger.info("run %s DSH handshake 成功", ctx.run_id)
-
-        except asyncio.TimeoutError as exc:
-            raise EngineFailure(
-                ChatErrorCode.engine_unavailable,
-                "DSH JSON-RPC handshake 超时（30s）",
-            ) from exc
-        except (json.JSONDecodeError, OSError) as exc:
-            raise EngineFailure(
-                ChatErrorCode.engine_unavailable,
-                f"DSH JSON-RPC handshake 通信错误: {exc}",
-            ) from exc
-
-    async def _execute_agent_run(
+    def _execute_agent_run(
         self,
         ctx: DshRunContext,
         request: AuthorizedChatRunRequest,
         cancel: CancelSignal,
         outcome: EngineOutcome,
     ) -> AsyncIterator[ChatEvent]:
-        """执行 Agent run，将 DSH events 映射为平台 ChatEvent。
+        """执行 Agent run（实现在 ``dsh_protocol.execute_agent_run``）。"""
+        return dsh_protocol.execute_agent_run(self, ctx, request, cancel, outcome)
 
-        包含：
-        - tool_started / tool_finished 事件
-        - delta 文本事件
-        - timeout 检测
-        - cancel 检查点
-        """
-        import json
-
-        if ctx.dsh_process is None or ctx.dsh_process.stdin is None:
-            raise EngineFailure(
-                ChatErrorCode.engine_unavailable,
-                "DSH root process 未就绪",
-            )
-
-        # 发送 run 请求
-        run_request = {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "run",
-            "params": {
-                "prompt": request.query,
-                "session_id": str(request.session_id),
-            },
-        }
-
-        try:
-            payload = json.dumps(run_request) + "\n"
-            ctx.dsh_process.stdin.write(payload.encode())
-            await ctx.dsh_process.stdin.drain()
-        except (OSError, BrokenPipeError) as exc:
-            raise EngineFailure(
-                ChatErrorCode.engine_unavailable,
-                f"DSH run 请求发送失败: {exc}",
-            ) from exc
-
-        # 消费 DSH stdout events
-        run_timeout = _dsh_run_timeout()
-        try:
-            async with asyncio.timeout(run_timeout):
-                while True:
-                    # Cancel 检查
-                    if await is_cancel_requested(cancel) or ctx.cancelled:
-                        ctx.cancelled = True
-                        raise EngineCancelled("用户取消 DSH run")
-
-                    # Timeout 检查
-                    if ctx.is_timed_out:
-                        raise EngineFailure(
-                            ChatErrorCode.engine_unavailable,
-                            f"DSH run 超时（{run_timeout}s）",
-                        )
-
-                    # 读取下一个 event（非阻塞等待 + cancel 检查）
-                    try:
-                        line = await asyncio.wait_for(
-                            ctx.dsh_process.stdout.readline(),  # type: ignore[union-attr]
-                            timeout=5.0,  # 每 5s 检查一次 cancel
-                        )
-                    except asyncio.TimeoutError:
-                        continue  # 回到 cancel/timeout 检查
-
-                    if not line:
-                        # EOF = DSH process 退出
-                        break
-
-                    # 解析 DSH event
-                    try:
-                        event_data = json.loads(line.decode())
-                    except json.JSONDecodeError:
-                        continue  # 跳过非 JSON 行
-
-                    # 映射 DSH event → ChatEvent
-                    async for chat_event in self._map_dsh_event(
-                        event_data, ctx, request, outcome
-                    ):
-                        yield chat_event
-
-        except asyncio.TimeoutError as exc:
-            raise EngineFailure(
-                ChatErrorCode.engine_unavailable,
-                f"DSH run 超时（{run_timeout}s）",
-            ) from exc
-
-    async def _map_dsh_event(
+    def _map_dsh_event(
         self,
         event_data: dict[str, Any],
         ctx: DshRunContext,
         request: AuthorizedChatRunRequest,
         outcome: EngineOutcome,
     ) -> AsyncIterator[ChatEvent]:
-        """将单个 DSH JSON-RPC event 映射为平台 ChatEvent。
-
-        DSH event 类型映射：
-        - tool.call / tool.start → tool_started
-        - tool.result / tool.end → tool_finished
-        - text / delta / chunk → delta
-        - done / result → 不直接映射（由 _run 产出终态）
-        - error → EngineFailure
-        """
-        method = event_data.get("method", "")
-        params = event_data.get("params", {})
-
-        # 如果是 response（非 notification），检查 error
-        if "error" in event_data:
-            error_msg = event_data["error"].get("message", "DSH 运行时错误")
-            raise EngineFailure(
-                ChatErrorCode.engine_unavailable,
-                f"DSH 运行时错误: {error_msg}",
-            )
-
-        # 如果是 response with result（final）
-        if "result" in event_data and event_data.get("id") == 2:
-            # run 完成——提取最终文本
-            result = event_data["result"]
-            if isinstance(result, dict):
-                final_text = result.get("text", "") or result.get("content", "")
-                if final_text and not outcome.text:
-                    outcome.text = final_text
-            return
-
-        # Notifications（method-based）
-        if method in ("tool.call", "tool.start", "toolCall"):
-            # cancel 后不再增加工具调用（Property 8）
-            if ctx.cancelled:
-                return
-            ctx.tool_call_count += 1
-            tool_name = params.get("name", params.get("tool", "unknown"))
-            yield build_event(
-                request,
-                self._events,
-                ChatEventType.tool_started,
-                payload={
-                    "tool_name": tool_name,
-                    "call_index": ctx.tool_call_count,
-                },
-                message_id=request.assistant_message_id,
-            )
-
-        elif method in ("tool.result", "tool.end", "toolResult"):
-            tool_name = params.get("name", params.get("tool", "unknown"))
-            yield build_event(
-                request,
-                self._events,
-                ChatEventType.tool_finished,
-                payload={
-                    "tool_name": tool_name,
-                    "call_index": ctx.tool_call_count,
-                    "success": not params.get("error"),
-                },
-                message_id=request.assistant_message_id,
-            )
-
-        elif method in ("text", "delta", "chunk", "content"):
-            text = params.get("text", "") or params.get("content", "") or params.get("delta", "")
-            if text:
-                outcome.text += text
-                outcome.delta_count += 1
-                yield build_event(
-                    request,
-                    self._events,
-                    ChatEventType.delta,
-                    payload={"text": text},
-                    message_id=request.assistant_message_id,
-                )
-
-        elif method in ("error", "failure"):
-            error_msg = params.get("message", "DSH Agent 执行错误")
-            raise EngineFailure(
-                ChatErrorCode.engine_unavailable,
-                f"DSH Agent 错误: {error_msg}",
-            )
+        """单个 DSH 事件 → ChatEvent（实现在 ``dsh_protocol.map_dsh_event``）。"""
+        return dsh_protocol.map_dsh_event(self, event_data, ctx, request, outcome)
 
     # ------------------------------------------------------------------
     # 辅助
@@ -978,77 +557,6 @@ def _resolve_role(request: AuthorizedChatRunRequest) -> str:
         return binding
     # 回退默认角色
     return "auditor"
-
-
-def _resolve_mcp_server_path() -> str:
-    """MCP server 路径（Task 26 实现的 audit-data stdio server）。"""
-    candidates = [
-        Path("tools/audit-data-mcp/server.py"),
-        Path(__file__).parent.parent.parent.parent / "tools" / "audit-data-mcp" / "server.py",
-    ]
-    for p in candidates:
-        if p.is_file():
-            return str(p.resolve())
-    raise EngineFailure(
-        ChatErrorCode.engine_unavailable,
-        "audit-data MCP server 不存在（tools/audit-data-mcp/server.py）",
-    )
-
-
-def _build_mcp_env(*, token: str, api_base: str, run_id: str) -> dict[str, str]:
-    """构造 MCP process 的受限环境变量。
-
-    🔴 不从父进程全量继承（安全要求）。只注入必要变量。
-    """
-    env: dict[str, str] = {
-        "AUDIT_API_BASE": api_base,
-        "MCP_SCOPED_TOKEN": token,
-        "MCP_RUN_ID": run_id,
-        "PYTHONIOENCODING": "utf-8",
-        "PATH": os.environ.get("PATH", ""),
-        "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),  # Windows 必需
-    }
-    # Python 需要的最小环境
-    python_home = os.environ.get("PYTHONHOME", "")
-    if python_home:
-        env["PYTHONHOME"] = python_home
-    virtual_env = os.environ.get("VIRTUAL_ENV", "")
-    if virtual_env:
-        env["VIRTUAL_ENV"] = virtual_env
-    return env
-
-
-def _build_dsh_env(
-    *, cordis_config: str, vendor_root: str, session_dir: str
-) -> dict[str, str]:
-    """构造 DSH root process 的受限环境变量。"""
-    env: dict[str, str] = {
-        "DSH_CORDIS_CONFIG": cordis_config,
-        "DSH_CWD": vendor_root,
-        "DSH_SESSION_DIR": session_dir,
-        "NODE_ENV": "production",
-        "PATH": os.environ.get("PATH", ""),
-        "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
-        "APPDATA": os.environ.get("APPDATA", ""),  # Node.js on Windows
-    }
-    return env
-
-
-def _write_platform_cordis_config(ctx: DshRunContext) -> str:
-    """将平台 Cordis 配置写入 session 目录。"""
-    from app.services.ai_chat.dsh_discovery import build_platform_cordis_config
-
-    config = build_platform_cordis_config(
-        session_root=str(ctx.session_dir) if ctx.session_dir else "./.sessions",
-    )
-
-    import json as json_mod
-    config_path = ctx.session_dir / "cordis.json" if ctx.session_dir else Path(tempfile.mktemp(suffix=".json"))
-    config_path.write_text(
-        json_mod.dumps(config, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    return str(config_path)
 
 
 # ---------------------------------------------------------------------------

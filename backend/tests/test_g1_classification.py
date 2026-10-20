@@ -265,7 +265,7 @@ class TestWriteBack:
 
         assert asyncio.run(_run()) is None
 
-    def test_writeback_populates_parsed_data_structure(self):
+    def test_writeback_populates_parsed_data_structure(self, wp_cache_touches):
         wp = _FakeWorkpaper(parsed_data=None)
         mock_db = _FakeAsyncSession(workpaper=wp)
         sheet_name = "业务模式分析G1-8"
@@ -300,8 +300,10 @@ class TestWriteBack:
         assert "applied_at" in record
         assert mock_db.flush_called
         assert mock_db.commit_called
+        # 提交后按底稿所属项目让 WP 域地址缓存失效（公式 / 地址引用读到新写回的结果）
+        assert wp_cache_touches == [_FAKE_PROJECT_ID]
 
-    def test_writeback_endpoint_e2e(self):
+    def test_writeback_endpoint_e2e(self, wp_cache_touches):
         wp = _FakeWorkpaper(parsed_data={"existing": "data"})
         mock_db = _FakeAsyncSession(workpaper=wp)
         sheet_name = "合同现金流量特征分析G1-10"
@@ -327,6 +329,7 @@ class TestWriteBack:
         # 既有数据保留
         assert wp.parsed_data["existing"] == "data"
         assert wp.parsed_data["classification_checks"][sheet_name]["classification_suggestion"] == "fvtpl"
+        assert wp_cache_touches == [_FAKE_PROJECT_ID]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -463,9 +466,29 @@ class TestReasoningText:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+_FAKE_PROJECT_ID = "00000000-0000-0000-0000-000000000001"
+
+
 class _FakeWorkpaper:
-    def __init__(self, parsed_data: dict | None = None):
+    """写回后路由会按 ``wp.project_id`` 让 WP 域地址缓存失效（e81fea54e 起），替身须带 project_id。"""
+
+    def __init__(self, parsed_data: dict | None = None, project_id: str = _FAKE_PROJECT_ID):
         self.parsed_data = parsed_data
+        self.project_id = project_id
+
+
+@pytest.fixture
+def wp_cache_touches(monkeypatch):
+    """记录写回后的缓存失效调用（不跑真实 ACNR invalidate，测试保持封闭）。"""
+    from app.services import wp_parsed_data_service
+
+    touched: list[str] = []
+
+    async def _record(project_id):
+        touched.append(str(project_id))
+
+    monkeypatch.setattr(wp_parsed_data_service, "touch_wp_registry", _record)
+    return touched
 
 
 class _FakeScalarResult:

@@ -51,6 +51,27 @@ import app.models.qc_rule_models  # noqa: E402, F401
 
 from app.models.qc_rule_models import QcRuleDefinition  # noqa: E402
 
+#: QCEngine 内置的 20 条规则（qc_engine.QCEngine.rules）
+BUILTIN_QC_RULES = frozenset({f"QC-{n:02d}" for n in range(1, 19)} | {"QC-27", "QC-28"})
+
+
+@pytest.mark.asyncio
+async def test_empty_registry_runs_all_builtin_rules(db_session: AsyncSession, caplog):
+    """登记表为空（真实库就是空表）⇒ 内置规则全部执行并给 WARNING，不是「全部禁用」（R7 修过的 P0）。"""
+    from app.services.qc_engine import QCEngine
+
+    with caplog.at_level(logging.WARNING, logger="app.services.qc_engine"):
+        enabled_codes = await QCEngine()._get_enabled_rule_codes(db_session)
+    assert enabled_codes == BUILTIN_QC_RULES
+    assert any("为空表" in r.getMessage() for r in caplog.records if r.levelno == logging.WARNING)
+
+
+def test_builtin_rule_set_is_pinned():
+    """内置规则集合变了要同步本文件的期望（防止新增 / 删规则后这里的精确断言悄悄失真）。"""
+    from app.services.qc_engine import QCEngine
+
+    assert {rule.rule_id for rule in QCEngine().rules} == BUILTIN_QC_RULES
+
 
 @pytest_asyncio.fixture
 async def db_session():
@@ -110,12 +131,14 @@ async def test_seed_22_rules_loaded(db_session: AsyncSession):
     enabled_count = enabled_result.scalar()
     assert enabled_count == 22, f"Expected all 22 enabled, got {enabled_count}"
 
-    # QCEngine 加载 enabled 规则集应包含所有 seed rule_codes
+    # QCEngine 解析出的执行集合：内置 20 条全部执行。
+    # 83614b612（sampling-evaluation-and-governance-closure R7）起登记表是**禁用清单**而非准入白名单：
+    # 只排除显式 enabled=false 的内置规则；seed 里的 QC-19~26 是提交复核 / 签字门的规则，不在
+    # QCEngine 内置集合里；内置的 QC-15~18、QC-27/28 未登记 ⇒ 按启用处理。
     from app.services.qc_engine import QCEngine
     engine = QCEngine()
     enabled_codes = await engine._get_enabled_rule_codes(db_session)
-    # seed 中 22 条都是 python 类型且 enabled
-    assert len(enabled_codes) == 22
+    assert enabled_codes == BUILTIN_QC_RULES
 
 
 # ── 场景 2：enabled=false 的规则被跳过 ─────────────────────────────
@@ -138,9 +161,7 @@ async def test_disabled_rule_skipped(db_session: AsyncSession):
     engine = QCEngine()
     enabled_codes = await engine._get_enabled_rule_codes(db_session)
 
-    assert "QC-14" not in enabled_codes, "Disabled rule QC-14 should not be in enabled set"
-    assert "QC-01" in enabled_codes, "Enabled rule QC-01 should be in enabled set"
-    assert len(enabled_codes) == 21, f"Expected 21 enabled codes, got {len(enabled_codes)}"
+    assert enabled_codes == BUILTIN_QC_RULES - {"QC-14"}, "只应排除显式禁用的 QC-14"
 
 
 # ── 场景 3：非 python 类型规则产生 warning 日志 ─────────────────────
@@ -173,10 +194,9 @@ async def test_non_python_rule_warning(db_session: AsyncSession, caplog):
     with caplog.at_level(logging.WARNING, logger="app.services.qc_engine"):
         enabled_codes = await engine._get_enabled_rule_codes(db_session)
 
-    # QC-99 不应在 enabled 集合中
+    # QC-99 不应在 enabled 集合中；内置 20 条照常执行
     assert "QC-99" not in enabled_codes, "Non-python rule should not be in enabled set"
-    # 22 条 python 规则仍在
-    assert len(enabled_codes) == 22
+    assert enabled_codes == BUILTIN_QC_RULES
 
     # 验证 warning 日志
     warning_messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]

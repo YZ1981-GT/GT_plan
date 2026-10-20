@@ -145,6 +145,18 @@ async def _probe_chat(config: ResolvedLLMConfig) -> tuple[bool, str]:
     return True, "可用"
 
 
+async def probe_chat_candidate(config: ResolvedLLMConfig) -> tuple[bool, str]:
+    """执行前探测一个对话候选（DSH 这类中途不能换模型的调用方用）。
+
+    与状态页共用探测缓存与冷却记录：30 秒内探过就直接用结果；失败写冷却，成功清冷却。
+    """
+    identity = config.identity
+    probe = await _cached_probe(
+        identity, _TTL_SHORT, False, lambda: _probe_chat(config), _GENERATION.get(identity, 0)
+    )
+    return probe.ok, probe.reason
+
+
 async def _probe_embedding(config: ResolvedLLMConfig) -> tuple[bool, str]:
     """向量必须发真实 /embeddings：本机 8100 的 /models 返回 200 但不提供 /embeddings。"""
     try:

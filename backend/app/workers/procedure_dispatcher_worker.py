@@ -5,7 +5,7 @@ Feature: procedure-delegation-notification
 Design：C10（ProcedureDeliveryDispatcher）、Deployment matrix（PROCEDURE_TASK_DISPATCHER_ENABLED
         gate dispatcher claim）
 
-从 main.py lifespan 的 `_start_workers` 启动、`stop_event` 优雅关闭。
+由 lifespan 执行的启动任务（`app.core.startup_registry` 的 worker 段）启动、`stop_event` 优雅关闭。
 开关 `PROCEDURE_TASK_DISPATCHER_ENABLED=False`（expand 阶段默认）时 worker 直接退出，
 已有 outbox 事件保留（Req 13.2/13.8）。
 

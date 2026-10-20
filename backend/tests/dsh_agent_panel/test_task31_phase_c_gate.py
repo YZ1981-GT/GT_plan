@@ -577,7 +577,11 @@ class TestProcessPortAndToolCatalog:
         )
 
         config = build_platform_cordis_config(
-            mcp_command="python -m audit_data_mcp",
+            mcp_server={
+                "transport": "stdio", "serverName": "audit", "command": "python",
+                "args": ["server.py", "--stdio"], "env": {}, "cwd": ".",
+                "toolCallTimeoutMs": 60000, "failOnStartupError": True,
+            },
         )
         errors = validate_cordis_services(config)
         assert not errors, f"Cordis 安全校验失败: {errors}"
@@ -588,6 +592,7 @@ class TestProcessPortAndToolCatalog:
             "@deepseek-ai/dsh-tool-bash-persistent",
             "@deepseek-ai/dsh-terminal-bash",
             "@deepseek-ai/dsh-tool-fs",
+            "@deepseek-ai/dsh-subprocess-local",
         }
         assert not service_names & bash_services
 
@@ -668,9 +673,14 @@ class TestNoEgressEvidence:
             run_id="run-123",
         )
 
-        # 只包含允许的 key
+        # 只包含允许的 key。🔴 token 变量名必须是 server.py 读取的 MCP_TOKEN
+        # （旧值 MCP_SCOPED_TOKEN 没人读 ⇒ 工具调用全部无凭据，spec dsh-kb-ocr-local-first-routing D6）
+        server_src = (Path(__file__).resolve().parents[3] / "tools" / "audit-data-mcp" / "server.py").read_text(
+            encoding="utf-8"
+        )
+        assert 'os.environ.get("MCP_TOKEN"' in server_src
+        assert env["MCP_TOKEN"] == "test-scoped-token"
         assert "AUDIT_API_BASE" in env
-        assert "MCP_SCOPED_TOKEN" in env
         assert "MCP_RUN_ID" in env
 
         # 不包含 DB/Redis 密钥
@@ -678,22 +688,33 @@ class TestNoEgressEvidence:
         for key in forbidden_keys:
             assert key not in env, f"DSH env 不应含: {key}"
 
+    def test_dsh_root_env_isolated_from_parent_and_user_home(self, tmp_path):
+        """DSH 根进程 env 从零构造：不带平台密钥 / DEEPSEEK_*，DSH_HOME 落在本 run 会话目录。"""
+        import os as _os
+
+        from app.services.ai_chat.dsh_engine import _build_dsh_env
+
+        with patch.dict(_os.environ, {"DEEPSEEK_API_KEY": "sk-leak", "DEEPSEEK_BASE_URL": "https://x", "DATABASE_URL": "pg://x"}):
+            env = _build_dsh_env(cordis_config="c.json", session_dir=str(tmp_path), llm_token="tok")
+        assert not {"DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL", "DATABASE_URL", "SECRET_KEY"} & set(env)
+        assert env["GT_DSH_LLM_TOKEN"] == "tok"
+        assert Path(env["DSH_HOME"]).parent == tmp_path
+        assert Path(env["TEMP"]).parent == tmp_path
+
     def test_cordis_llm_points_to_loopback(self):
         """Cordis 配置的 LLM provider 指向本地 loopback。"""
         from app.services.ai_chat.dsh_discovery import build_platform_cordis_config
 
-        config = build_platform_cordis_config(
-            vllm_base_url="http://localhost:8100/v1",
-            vllm_model="Qwen3.5-27B-NVFP4",
-        )
+        config = build_platform_cordis_config(model="Qwen3.5-27B-NVFP4")
 
         llm_item = next(
             (item for item in config if "llm" in item.get("id", "")), None
         )
         assert llm_item is not None
-        base_url = llm_item.get("config", {}).get("baseUrl", "")
-        assert "localhost" in base_url or "127.0.0.1" in base_url, (
-            f"LLM baseUrl 不是本地地址: {base_url}（Req 12.2: local-only）"
+        # vendor 读 baseURL（大写）；DSH 只连平台环回转发端点，上游由平台按路由决定（ADR-DKR-001/003）
+        base_url = llm_item.get("config", {}).get("baseURL", "")
+        assert base_url.startswith("http://127.0.0.1:"), (
+            f"LLM baseURL 不是本机环回地址: {base_url}（Req 12.2: DSH 只连环回）"
         )
 
 

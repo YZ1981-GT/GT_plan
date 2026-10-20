@@ -73,6 +73,8 @@ export const knowledgeLibrary = {
   documentDownload: (docId: string) => `/api/knowledge-library/documents/${docId}/download`,
   documentPreview: (docId: string) => `/api/knowledge-library/documents/${docId}/preview`,
   documentMove: (docId: string) => `/api/knowledge-library/documents/${docId}/move`,
+  /** 扫描件重新识别（后台 OCR 重新排队；与删除同一管理权限） */
+  documentOcrRetry: (docId: string) => `/api/knowledge-library/documents/${docId}/ocr-retry`,
   /** 上传到项目知识文件夹（「{项目名}（项目资料）/ A17-3 咨询附件」，项目组可见） */
   projectUpload: (projectId: string) => `/api/knowledge-library/projects/${projectId}/upload`,
 } as const

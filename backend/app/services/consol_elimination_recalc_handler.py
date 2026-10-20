@@ -61,7 +61,7 @@ async def handle_elimination_revoked(event: Any) -> None:
 
 
 def register_consol_elimination_recalc_handler(event_bus: Any) -> None:
-    """注册分录审批 / 撤销审批 → 合并推送 handler（在应用启动时调用，main._register_phase_handlers）。"""
+    """注册分录审批 / 撤销审批 → 合并推送 handler（应用启动时由 startup_registry 的 register_phase_handlers 任务调用）。"""
     try:
         from app.models.audit_platform_schemas import EventType
 

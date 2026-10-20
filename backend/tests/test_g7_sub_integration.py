@@ -23,6 +23,10 @@ from app.deps import get_current_user
 from app.main import app
 from app.models.base import UserRole
 
+#: 路由模块 `from app.services.llm_client import chat_completion` 在导入时绑定了名字 ⇒ 必须替换它用的那个，
+#: 替换 `app.services.llm_client.chat_completion` 拦不住（原写法真调本机 / 服务器模型，结果随环境漂）
+_G7_AI_LLM = "app.routers.wp_render_strategies._g7_long_term_equity_subsidiary_ai.chat_completion"
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Fixtures
@@ -347,83 +351,51 @@ class TestImportExportEndpoints:
 class TestAiEndpoints:
     """测试G7子公司组AI辅助生成端点."""
 
-    @patch("app.services.llm_client.chat_completion", new_callable=AsyncMock)
-    async def test_ai_control_judgment_conclusion_accepts_request(self, mock_llm):
-        """POST /g7-sub/ai/control-judgment-conclusion → 200."""
-        mock_llm.return_value = "经审计，我们认为被投资方满足CAS33控制三要素..."
+    @pytest.fixture(autouse=True)
+    def _ai_enabled_and_hermetic(self, monkeypatch):
+        """AI 开关打开（默认 False，原先靠开发机 .env 才是 200）；成功写操作的审计日志中间件不落真库。"""
+        from app.core.config import settings
+        from app.middleware import audit_log
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url="http://test",
-        ) as client:
-            resp = await client.post(
-                "/api/workpapers/test-wp/g7-sub/ai/control-judgment-conclusion",
+        monkeypatch.setattr(settings, "WP_AI_SERVICE_ENABLED", True)
+        monkeypatch.setattr(audit_log, "_write_log", AsyncMock())
+
+    async def _generate(self, section: str):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            return await client.post(
+                f"/api/workpapers/test-wp/g7-sub/ai/{section}",
                 json={"existingContent": "", "relatedContext": {}},
             )
-            assert resp.status_code == 200
-            body = resp.json()
-            data = body.get("data", body)
-            assert "content" in data
 
-    @patch("app.services.llm_client.chat_completion", new_callable=AsyncMock)
-    async def test_ai_initial_measurement_conclusion(self, mock_llm):
-        """POST /g7-sub/ai/initial-measurement-conclusion → 200."""
-        mock_llm.return_value = "初始计量审计结论..."
+    @staticmethod
+    def _content(resp) -> str:
+        body = resp.json()
+        return body.get("data", body)["content"]
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url="http://test",
-        ) as client:
-            resp = await client.post(
-                "/api/workpapers/test-wp/g7-sub/ai/initial-measurement-conclusion",
-                json={"existingContent": "", "relatedContext": {}},
-            )
-            assert resp.status_code == 200
+    @pytest.mark.parametrize("section,reply", [
+        ("control-judgment-conclusion", "经审计，我们认为被投资方满足CAS33控制三要素..."),
+        ("initial-measurement-conclusion", "初始计量审计结论..."),
+        ("subsequent-conclusion", "后续计量结论..."),
+        ("disposal-conclusion", "处置结论..."),
+        ("voucher-conclusion", "凭证检查结论..."),
+    ])
+    @patch(_G7_AI_LLM, new_callable=AsyncMock)
+    async def test_ai_section_returns_model_reply(self, mock_llm, section, reply):
+        """POST /g7-sub/ai/{section} → 200，正文就是模型返回（替身真的被调到，不连真实模型）。"""
+        mock_llm.return_value = reply
+        resp = await self._generate(section)
+        assert resp.status_code == 200
+        assert self._content(resp) == reply
+        mock_llm.assert_awaited_once()
 
-    @patch("app.services.llm_client.chat_completion", new_callable=AsyncMock)
-    async def test_ai_subsequent_conclusion(self, mock_llm):
-        """POST /g7-sub/ai/subsequent-conclusion → 200."""
-        mock_llm.return_value = "后续计量结论..."
+    @patch(_G7_AI_LLM, new_callable=AsyncMock)
+    async def test_ai_disabled_returns_503_without_calling_model(self, mock_llm, monkeypatch):
+        from app.core.config import settings
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url="http://test",
-        ) as client:
-            resp = await client.post(
-                "/api/workpapers/test-wp/g7-sub/ai/subsequent-conclusion",
-                json={"existingContent": "", "relatedContext": {}},
-            )
-            assert resp.status_code == 200
-
-    @patch("app.services.llm_client.chat_completion", new_callable=AsyncMock)
-    async def test_ai_disposal_conclusion(self, mock_llm):
-        """POST /g7-sub/ai/disposal-conclusion → 200."""
-        mock_llm.return_value = "处置结论..."
-
-        async with AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url="http://test",
-        ) as client:
-            resp = await client.post(
-                "/api/workpapers/test-wp/g7-sub/ai/disposal-conclusion",
-                json={"existingContent": "", "relatedContext": {}},
-            )
-            assert resp.status_code == 200
-
-    @patch("app.services.llm_client.chat_completion", new_callable=AsyncMock)
-    async def test_ai_voucher_conclusion(self, mock_llm):
-        """POST /g7-sub/ai/voucher-conclusion → 200."""
-        mock_llm.return_value = "凭证检查结论..."
-
-        async with AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url="http://test",
-        ) as client:
-            resp = await client.post(
-                "/api/workpapers/test-wp/g7-sub/ai/voucher-conclusion",
-                json={"existingContent": "", "relatedContext": {}},
-            )
-            assert resp.status_code == 200
+        monkeypatch.setattr(settings, "WP_AI_SERVICE_ENABLED", False)
+        resp = await self._generate("voucher-conclusion")
+        assert resp.status_code == 503
+        mock_llm.assert_not_awaited()
 
     async def test_ai_invalid_section_returns_400(self):
         """POST /g7-sub/ai/invalid-section → 400."""

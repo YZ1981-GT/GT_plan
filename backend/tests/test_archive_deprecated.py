@@ -80,10 +80,20 @@ async def db_session():
         await conn.run_sync(Base.metadata.drop_all)
 
 
+async def _password_confirmed() -> None:
+    """视为已通过二次密码确认（本文件测编排可达与幂等，确认门本身见 test_orchestrate_requires_confirmation_token）。"""
+    return None
+
+
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession) -> AsyncClient:
-    """创建包含归档相关路由的测试客户端。"""
+    """创建包含归档相关路由的测试客户端。
+
+    orchestrate 自 b98cdc51f（2026-05-22）起要求二次密码确认（``require_confirmation_token``，
+    令牌存 Redis 一次性消费）；本文件写于其前，未带令牌即 403 / Redis 不可用即 503。
+    """
     from app.routers.archive import router as archive_router
+    from app.routers.password_confirm import require_confirmation_token
     from app.routers.wp_storage import router as wp_storage_router
 
     app = FastAPI()
@@ -98,9 +108,11 @@ async def client(db_session: AsyncSession) -> AsyncClient:
 
     app.dependency_overrides[get_db] = _override_db
     app.dependency_overrides[get_current_user] = _override_user
+    app.dependency_overrides[require_confirmation_token] = _password_confirmed
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
+        c.app_under_test = app  # type: ignore[attr-defined]
         yield c
 
     app.dependency_overrides.clear()
@@ -226,3 +238,32 @@ async def test_idempotent_returns_same_job_id(client: AsyncClient, db_session: A
         f"got new job {body['id']}"
     )
     assert body["status"] == "succeeded"
+
+
+# ── 场景 4：编排要求二次密码确认（夹具里视为已确认，这里撤掉该替身验证门本身仍在） ──
+
+
+@pytest.mark.asyncio
+async def test_orchestrate_requires_confirmation_token(client: AsyncClient, db_session: AsyncSession):
+    """不带 X-Confirmation-Token ⇒ 403，且不创建归档作业。"""
+    from sqlalchemy import func, select
+
+    from app.core.redis import get_redis
+    from app.routers.password_confirm import require_confirmation_token
+
+    app = client.app_under_test  # type: ignore[attr-defined]
+    app.dependency_overrides.pop(require_confirmation_token)
+
+    async def _redis_available():
+        return object()  # 缺令牌时只判「Redis 可用」，不读写
+
+    app.dependency_overrides[get_redis] = _redis_available
+    project_id = uuid.uuid4()
+    resp = await client.post(f"/api/projects/{project_id}/archive/orchestrate", json={"scope": "final"})
+
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "X-Confirmation-Token header required"
+    jobs = (await db_session.execute(
+        select(func.count()).select_from(ArchiveJob).where(ArchiveJob.project_id == project_id)
+    )).scalar_one()
+    assert jobs == 0

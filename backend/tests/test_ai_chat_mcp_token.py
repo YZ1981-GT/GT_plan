@@ -573,3 +573,35 @@ class TestTokenCleanup:
         assert cleaned == 2
         assert "recent_token" in token_service._revoked
         assert "old_token_1" not in token_service._revoked
+
+
+# ---------------------------------------------------------------------------
+# 签名密钥（spec dsh-kb-ocr-local-first-routing：原实现读不存在的 settings.SECRET_KEY，恒用固定常量）
+# ---------------------------------------------------------------------------
+
+
+class TestSigningKey:
+    """签名密钥必须来自平台密钥：换平台密钥签的 token 校验不过；密钥缺失时拒绝签发。"""
+
+    def test_token_from_another_platform_secret_is_rejected(self, monkeypatch, token_service, user_a_id, project_id, run_id):
+        from app.services.ai_chat import mcp_token as M
+
+        monkeypatch.setattr(M.settings, "JWT_SECRET_KEY", "platform-secret-a")
+        scoped = token_service.create_token(
+            user_id=user_a_id, project_id=project_id, run_id=run_id,
+            role="auditor", cycle_scope=frozenset({"D"}),
+        )
+        assert token_service.validate_token(scoped.token).user_id == user_a_id
+        monkeypatch.setattr(M.settings, "JWT_SECRET_KEY", "platform-secret-b")
+        with pytest.raises(McpTokenInvalid):
+            token_service.validate_token(scoped.token)
+
+    def test_missing_platform_secret_refuses_to_sign(self, monkeypatch, token_service, user_a_id, project_id, run_id):
+        from app.services.ai_chat import mcp_token as M
+
+        monkeypatch.setattr(M.settings, "JWT_SECRET_KEY", "")
+        with pytest.raises(McpTokenInvalid, match="JWT_SECRET_KEY"):
+            token_service.create_token(
+                user_id=user_a_id, project_id=project_id, run_id=run_id,
+                role="auditor", cycle_scope=frozenset({"D"}),
+            )

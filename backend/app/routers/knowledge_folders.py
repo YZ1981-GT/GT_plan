@@ -30,6 +30,9 @@ from app.services.knowledge_upload_service import (
     extract_text_with_ocr as _extract_text_with_ocr,
     store_uploaded_files,
 )
+# 索引钩子实现在服务层（后台 OCR 写回后也要调用）；此处保留路由模块属性名，
+# 上传管线按本模块属性注入、真库守卫替换的也是它。
+from app.services.knowledge_upload_service import trigger_index_update as _trigger_index_update
 from app.services.wp_visibility.denial import ExternalNotFound
 
 _logger = logging.getLogger(__name__)
@@ -124,65 +127,6 @@ router = APIRouter(prefix="/api/knowledge-library", tags=["知识库管理"])
 # ---------------------------------------------------------------------------
 # 向量索引联动钩子（修 §21.3.1 联动断裂）
 # ---------------------------------------------------------------------------
-
-async def _trigger_index_update(
-    project_ids: list | None,
-    doc_id: UUID,
-    content_text: str | None,
-    doc_version: int | None = None,
-    mark_previous_stale: bool = False,
-    previous_doc_id: UUID | None = None,
-) -> None:
-    """CRUD 提交后触发 incremental_update 建向量索引（可选加速层）。
-
-    非阻塞：失败仅 log 不影响 CRUD 主流程。幂等（R3）：incremental_update 内部 upsert。
-    P2-2.2: mark_previous_stale=True 时，先将旧版本索引标记 stale。
-
-    🔴 使用**独立会话**（spec knowledge-base-retrieval-and-authz-closure Req 1.5）：索引写路径在
-    当前环境必然失败（无唯一索引承接 ON CONFLICT、embedding 502，见 design §十一），而
-    incremental_update 内部会 commit —— 用请求会话执行时，任一语句失败都会让请求会话进入
-    aborted，同一请求里后续文件的正文读取随之全部失败。文档本身已在调用前提交，
-    独立会话能看到它；索引缺席时检索由文档词法层兜住。
-    """
-    if not content_text:
-        return
-    if not project_ids:
-        return
-
-    from app.core.database import async_session
-    from app.services.knowledge_index_service import KnowledgeIndexService
-
-    async with async_session() as index_db:
-        index_svc = KnowledgeIndexService(index_db)
-
-        # P2-2.2: 文档更新后标记旧索引 stale
-        if mark_previous_stale and previous_doc_id:
-            try:
-                await index_svc.mark_index_stale(previous_doc_id)
-                await index_db.commit()
-            except Exception as exc:
-                await index_db.rollback()
-                _logger.warning(
-                    "[KB Hook] mark_index_stale failed for prev_doc=%s: %s",
-                    previous_doc_id, exc,
-                )
-
-        for pid in project_ids:
-            try:
-                await index_svc.incremental_update(
-                    project_id=UUID(str(pid)),
-                    source_type="knowledge_doc",
-                    source_id=doc_id,
-                    content=content_text,
-                    doc_version=doc_version,
-                )
-            except Exception as exc:
-                await index_db.rollback()
-                _logger.warning(
-                    "[KB Hook] incremental_update failed for doc=%s project=%s: %s",
-                    doc_id, pid, exc,
-                )
-
 
 async def _trigger_index_delete(
     db: AsyncSession,
@@ -314,6 +258,9 @@ async def list_documents(
             # 正文为空（扫描件 / 空文件 / 抽取失败）⇒ AI 检索与对话读不到内容，界面据此提示
             # （spec knowledge-upload-robustness-and-consumer-wiring R4.2）
             "has_text": bool(d.content_text and d.content_text.strip()),
+            # 扫描件后台 OCR 状态（V198）：pending / running / done / empty / failed，None = 不适用
+            "ocr_status": d.ocr_status,
+            "ocr_error": d.ocr_error,
             "can_manage": KnowledgeWritePolicy.can_manage(
                 subject, visible=True, owner_id=d.created_by, role=role
             ),
@@ -465,6 +412,32 @@ async def delete_document(
 
     await db.commit()
     return {"message": "文档已删除"}
+
+
+@router.post("/documents/{doc_id}/ocr-retry")
+async def retry_document_ocr(
+    doc_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """扫描件重新识别：失败 / 没识别出文字 / 存量无正文的 PDF 与图片重新排队（与删除同一管理权限）。"""
+    from app.models.knowledge_models import KnowledgeDocument
+    from app.services.knowledge_ocr_service import OcrRetryRejected, request_retry
+    from app.workers.knowledge_ocr_worker import wake
+
+    subject, document = await _authorize_document_read(db, current_user, doc_id)
+    if not KnowledgeWritePolicy.can_manage(
+        subject, visible=True, owner_id=document.created_by, role=getattr(current_user, "role", None)
+    ):
+        raise HTTPException(status_code=403, detail=_MANAGE_DENIED)
+    doc = await db.get(KnowledgeDocument, doc_id)
+    try:
+        request_retry(doc)
+    except OcrRetryRejected as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await db.commit()
+    wake()
+    return {"id": str(doc.id), "ocr_status": doc.ocr_status, "message": "已加入识别队列"}
 
 
 @router.post("/init-presets")

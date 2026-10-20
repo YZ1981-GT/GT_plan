@@ -14,7 +14,7 @@ e2e 判据（只断言 URL）失效的同一机制，所以必须逐条证明守
 用法：
   python backend/scripts/diagnose/mutate_frontend_reference_integrity.py --check-anchors
   python backend/scripts/diagnose/mutate_frontend_reference_integrity.py --run \
-      --out .kiro/specs/dsh-agent-panel-integration/mutation_results_reference_integrity.json
+      --out .kiro/specs/_archive/04-infra-architecture/dsh-agent-panel-integration/mutation_results_reference_integrity.json
 """
 
 from __future__ import annotations

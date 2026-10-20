@@ -42,8 +42,21 @@ class OCREngine(str, Enum):
 
 
 class OCRServiceUnavailableError(RuntimeError):
-    """OCR 远程服务不可达（HTTP 超时/连接错误）→ 调用方应返回 503"""
-    pass
+    """OCR 远程服务不可达（HTTP 超时/连接错误）→ 调用方应返回 503
+
+    ``kinds``：各候选失败的类别（与 ``LLMRuntimeError.kind`` 同一口径）。全是 ``request``
+    说明是文件本身的问题（过大 / 格式不被接受），换时间重试也没用；后台任务据此决定是否重试。
+    """
+
+    def __init__(self, message: str = "", *, kinds: tuple[str, ...] = ()) -> None:
+        super().__init__(message)
+        self.kinds = kinds
+
+
+#: 只有这两类失败说明候选本身不可用，才让它进入全局冷却（spec dsh-kb-ocr-local-first-routing
+#: ADR-DKR-006）：文件过大 / 格式被拒（request）、读超时（timeout）是这一份文件的问题，冷却会让
+#: 一份坏 PDF 把服务器 OCR 对所有人停 30 秒。
+_COOLING_KINDS = frozenset({"unavailable", "config"})
 
 
 class UnifiedOCRService:
@@ -110,7 +123,7 @@ class UnifiedOCRService:
             raise OCRServiceUnavailableError("未配置已启用的版面解析模型")
 
         planned = plan_attempts(route)
-        failures: list[tuple[str, str]] = []
+        failures: list[tuple[str, str, str]] = []
         for candidate in planned:
             try:
                 if candidate.local_engine:
@@ -123,14 +136,19 @@ class UnifiedOCRService:
                 raise  # 文件本身不存在：换候选也没用
             except Exception as exc:  # noqa: BLE001 — OCR 幂等，任何失败都换下一个候选
                 reason = str(exc) or type(exc).__name__
-                if candidate.config is not None and candidate.config.is_remote:
+                kind = str(getattr(exc, "kind", "unavailable"))
+                if (
+                    candidate.config is not None
+                    and candidate.config.is_remote
+                    and kind in _COOLING_KINDS
+                ):
                     mark_unavailable(candidate.identity, reason)
-                failures.append((candidate.label, reason))
+                failures.append((candidate.label, reason, kind))
                 logger.warning("OCR 候选失败 %s：%s", candidate.label, reason)
                 continue
             if candidate.config is not None and candidate.config.is_remote:
                 mark_available(candidate.identity)
-            notes = [f"{label}：{reason}" for label, reason in failures]
+            notes = [f"{label}：{reason}" for label, reason, _ in failures]
             notes.extend(cooling_notes(route, planned))
             result["route"] = {
                 "deployment": candidate.deployment,
@@ -140,11 +158,13 @@ class UnifiedOCRService:
             }
             return result
         skipped = cooling_notes(route, planned)
+        kinds = tuple(kind for _, _, kind in failures)
         if len(failures) == 1 and not skipped:
-            raise OCRServiceUnavailableError(failures[0][1])
+            raise OCRServiceUnavailableError(failures[0][1], kinds=kinds)
         raise OCRServiceUnavailableError(
-            "；".join([f"{label}：{reason}" for label, reason in failures] + skipped)
-            or "没有可用的 OCR 引擎"
+            "；".join([f"{label}：{reason}" for label, reason, _ in failures] + skipped)
+            or "没有可用的 OCR 引擎",
+            kinds=kinds,
         )
 
     async def _local_recognize(

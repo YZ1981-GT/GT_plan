@@ -53,6 +53,18 @@ from app.services.ai_chat.dsh_discovery import (
     validate_version_pin,
 )
 
+#: mcp-client 的 stdio 启动配置样例（键名按 vendor config-catalog ``dsh-mcp-client`` 的 StdioConfig）
+_MCP_LAUNCH = {
+    "transport": "stdio",
+    "serverName": "audit",
+    "command": "python",
+    "args": ["tools/audit-data-mcp/server.py", "--stdio"],
+    "env": {"AUDIT_API_BASE": "http://127.0.0.1:9980", "MCP_TOKEN": "t", "MCP_RUN_ID": "r"},
+    "cwd": ".",
+    "toolCallTimeoutMs": 60000,
+    "failOnStartupError": True,
+}
+
 
 # ---------------------------------------------------------------------------
 # Fixture: vendor 根目录
@@ -198,28 +210,41 @@ class TestPlatformCordisConfig:
         service_names = {item["name"] for item in config}
 
         for spec in REQUIRED_CORDIS_SERVICES:
-            if spec.is_transport:
-                # transport 只在指定 mcp_command 时加入
+            if spec.conditional:
+                # mcp-client 只在提供 MCP 启动配置时加入（vendor 要求它带完整 stdio 配置）
                 continue
             assert spec.name in service_names, (
                 f"缺少必需 Cordis 服务: {spec.name}"
             )
 
     def test_has_required_services_with_mcp(self) -> None:
-        """带 MCP 命令时配置包含 internal-stdio-transport。"""
-        config = build_platform_cordis_config(mcp_command="python -m audit_data_mcp")
+        """带 MCP 启动配置时 mcp-client 以 stdio 自己拉起 MCP，且全部必需服务齐全。"""
+        config = build_platform_cordis_config(mcp_server=_MCP_LAUNCH)
         service_names = {item["name"] for item in config}
 
         for spec in REQUIRED_CORDIS_SERVICES:
             assert spec.name in service_names, (
                 f"缺少必需 Cordis 服务: {spec.name}"
             )
+        mcp = next(item for item in config if item["name"] == "@deepseek-ai/dsh-mcp-client")
+        assert mcp["config"] == _MCP_LAUNCH
+        # vendor mcp-client 用 MCP SDK 的 StdioClientTransport 自己 spawn，不需要也不得挂 subprocess-local
+        assert "@deepseek-ai/dsh-subprocess-local" not in service_names
 
     def test_no_prohibited_tools_in_config(self) -> None:
         """配置不能包含禁止的工具服务。"""
-        config = build_platform_cordis_config(mcp_command="python -m audit_data_mcp")
+        config = build_platform_cordis_config(mcp_server=_MCP_LAUNCH)
         errors = validate_cordis_services(config)
         assert not errors, f"Cordis 配置安全校验失败: {errors}"
+
+    def test_subprocess_local_service_is_rejected(self) -> None:
+        """subprocess-local 不再有「MCP 运输」例外：任何 id 下挂它都判违规。"""
+        config = build_platform_cordis_config(mcp_server=_MCP_LAUNCH)
+        config.append(
+            {"id": "internal-stdio-transport", "name": "@deepseek-ai/dsh-subprocess-local"}
+        )
+        errors = validate_cordis_services(config)
+        assert any("dsh-subprocess-local" in e for e in errors), errors
 
     def test_no_bash_tool(self) -> None:
         """配置不能包含 bash 工具。"""
@@ -264,17 +289,54 @@ class TestPlatformCordisConfig:
         assert spine.get("config", {}).get("toolBash") is False
         assert spine.get("config", {}).get("toolJobs") is False
 
-    def test_llm_points_to_local_vllm(self) -> None:
-        """LLM provider 必须指向本地 vLLM（不是 cloud）。"""
+    def test_llm_points_to_platform_loopback_forwarder(self) -> None:
+        """模型服务只连平台环回转发端点（不是 cloud，也不直连上游）。
+
+        🔴 键名必须是 vendor 读取的 ``baseURL``：旧配置写 ``baseUrl``，vendor 读不到就回落
+        ``$DEEPSEEK_BASE_URL`` 再到公网 api.deepseek.com（spec dsh-kb-ocr-local-first-routing D1）。
+        """
         config = build_platform_cordis_config()
         llm = next(
-            (item for item in config if "llm" in item.get("id", "")), None
+            (item for item in config if item.get("name") == "@deepseek-ai/dsh-llm-deepseek"), None
         )
         assert llm is not None, "LLM provider 不存在"
-        base_url = llm.get("config", {}).get("baseUrl", "")
-        assert "localhost" in base_url or "127.0.0.1" in base_url, (
-            f"LLM baseUrl 不是本地地址: {base_url}"
+        cfg = llm.get("config", {})
+        assert "baseUrl" not in cfg, "写成 baseUrl 会被 vendor 忽略"
+        assert cfg.get("baseURL") == "http://127.0.0.1:9980/api/ai-chat/dsh-llm/v1"
+        assert cfg.get("apiKeyEnv") == "GT_DSH_LLM_TOKEN"
+        # vendor 默认输出上限 256000 会被本机 vLLM（max_model_len=32768）拒收
+        assert cfg["models"][0]["maxTokens"] <= cfg["models"][0]["contextWindow"]
+        # 思考参数由转发端按候选重写（适配器只会发 low/high/max，企业网关拒收 high）⇒ DSH 侧关闭
+        assert cfg["thinking"] == "disabled"
+        # 上游失败快速结束本次 run，由下一次 run 选下一个候选（ADR-DKR-002；vendor 默认重试 3 次）
+        assert cfg["retryPolicy"] == {"mode": "normal", "maxRetries": 1}
+
+    def test_validator_rejects_misnamed_or_external_base_url(self) -> None:
+        """校验器挡住两种回落公网的写法，并说清是哪一种：键名写错（vendor 读不到 ⇒ 等于没写）、指向外部端点。"""
+        cases = (
+            ({"baseUrl": "http://127.0.0.1:9980/x"}, "缺少 baseURL"),
+            ({"baseURL": "https://api.deepseek.com"}, "必须是平台环回转发地址"),
         )
+        for patch_cfg, expected in cases:
+            config = build_platform_cordis_config(mcp_server=_MCP_LAUNCH)
+            llm = next(item for item in config if item["name"] == "@deepseek-ai/dsh-llm-deepseek")
+            llm["config"].pop("baseURL")
+            llm["config"].update(patch_cfg)
+            errors = validate_cordis_services(config)
+            assert any(expected in e for e in errors), (patch_cfg, errors)
+
+    def test_validator_rejects_public_api_key_env(self) -> None:
+        """模型服务必须读平台 run 令牌变量：读 DEEPSEEK_API_KEY、留空、不写 apiKeyEnv 都要挡（vendor 会读公网 Key）。"""
+        assert not validate_cordis_services(build_platform_cordis_config(mcp_server=_MCP_LAUNCH))
+        for value in ("DEEPSEEK_API_KEY", "", None):
+            config = build_platform_cordis_config(mcp_server=_MCP_LAUNCH)
+            llm = next(item for item in config if item["name"] == "@deepseek-ai/dsh-llm-deepseek")
+            if value is None:
+                llm["config"].pop("apiKeyEnv")
+            else:
+                llm["config"]["apiKeyEnv"] = value
+            errors = validate_cordis_services(config)
+            assert any("apiKeyEnv" in e for e in errors), (value, errors)
 
 
 class TestToolCatalogValidation:
@@ -560,19 +622,19 @@ class TestFullDiscoveryPipeline:
         pin_errors = validate_version_pin(discovery)
         assert not pin_errors, f"Pin 校验失败: {pin_errors}"
 
-        # 3. Generate platform Cordis config
+        # 3. Generate platform Cordis config（模型经平台环回转发，MCP 由 mcp-client 以 stdio 拉起）
         config = build_platform_cordis_config(
-            vllm_base_url="http://localhost:8100/v1",
-            vllm_model="Qwen3.5-27B-NVFP4",
-            mcp_command="python -m audit_data_mcp",
+            model="Qwen3.5-27B-NVFP4",
+            mcp_server=_MCP_LAUNCH,
         )
 
         # 4. Validate Cordis services
         service_errors = validate_cordis_services(config)
         assert not service_errors, f"Cordis 服务校验失败: {service_errors}"
 
-        # 5. Validate model route
-        route_errors = validate_model_route("http://localhost:8100/v1")
+        # 5. Validate model route：DSH 子进程看到的模型端点就是平台环回转发地址
+        llm = next(item for item in config if item["name"] == "@deepseek-ai/dsh-llm-deepseek")
+        route_errors = validate_model_route(llm["config"]["baseURL"])
         assert not route_errors, f"模型路由校验失败: {route_errors}"
 
         # 6. Validate tool catalog (expected = MCP_READONLY_TOOLS)

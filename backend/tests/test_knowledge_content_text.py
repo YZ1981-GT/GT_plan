@@ -175,30 +175,33 @@ async def test_markitdown_takes_over_when_anydoc_misses(anydoc):
     e["mineru_ctor"].assert_not_called()
 
 
-# ═══ 3. 扫描件 → MinerU ═══════════════════════════════════════════════════════
+# ═══ 3. 扫描件：上传请求内不做 OCR（交给后台识别） ══════════════════════════════
+# spec dsh-kb-ocr-local-first-routing Req 5.1：旧实现在这里同步调 MinerU（仅 PDF、默认关闭、
+# 多页扫描件超过 2 分钟上传超时）；现在正文为空的 PDF 由上传管线标「待识别」，后台 worker 经
+# 统一 OCR 路由识别（见 test_knowledge_background_ocr.py）。
 
 
 @pytest.mark.asyncio
-async def test_scanned_pdf_skips_markitdown_and_uses_mineru_truncated():
+async def test_scanned_pdf_skips_markitdown_and_returns_none_without_ocr():
+    """扫描件：MarkItDown 同样提不出（跳过），本函数也不调 OCR —— 即使 MinerU 可用。"""
     mineru = _mineru(available=True, text="扫" * 60000)
     with engines(anydoc=ANYDOC_OCR, markitdown="不该被用到", mineru=mineru) as e:
         result = await _extract_text_with_ocr(PDF_PATH, make_blank_pdf(), "scan.pdf")
 
-    assert result == "扫" * LIMIT
-    e["markitdown"].assert_not_called()  # 扫描件无文本层，MarkItDown 同样提不出，直接进 OCR
-    mineru.recognize_for_ocr.assert_awaited_once_with(PDF_PATH)
+    assert result is None
+    e["markitdown"].assert_not_called()
+    e["mineru_ctor"].assert_not_called()
+    mineru.recognize_for_ocr.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_scanned_pdf_without_ocr_engine_logs_error_and_returns_none(caplog):
-    """已确知是扫描件却无 OCR 引擎：结果为空，且必须留 ERROR —— 不能让「没抽到」看起来像「文档没内容」。"""
-    with caplog.at_level(logging.ERROR, logger="app.routers.knowledge_folders"), \
-            engines(anydoc=ANYDOC_OCR, markitdown="不该被用到", mineru=_mineru(available=False)) as e:
+async def test_scanned_pdf_without_ocr_engine_returns_none_and_never_constructs_mineru():
+    with engines(anydoc=ANYDOC_OCR, markitdown="不该被用到", mineru=_mineru(available=False)) as e:
         result = await _extract_text_with_ocr(PDF_PATH, make_blank_pdf(), "scan.pdf")
 
     assert result is None
     e["markitdown"].assert_not_called()
-    assert any("是扫描件但 MinerU 不可用" in r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR)
+    e["mineru_ctor"].assert_not_called()
 
 
 # ═══ 4. 最后兜底：pypdf / python-docx ═══════════════════════════════════════════
@@ -231,11 +234,13 @@ async def test_pypdf_fallback_truncates_to_limit():
     ],
     ids=["mineru-raises", "mineru-empty"],
 )
-async def test_mineru_failure_falls_back_to_pypdf(mineru):
-    with engines(anydoc=ANYDOC_MISS, markitdown=None, mineru=mineru):
+async def test_mineru_state_irrelevant_pdf_text_layer_comes_from_pypdf(mineru):
+    """anydoc / MarkItDown 都没抽到时由 pypdf 兜底；无论 MinerU 什么状态都不在请求内调用它。"""
+    with engines(anydoc=ANYDOC_MISS, markitdown=None, mineru=mineru) as e:
         result = await _extract_text_with_ocr(PDF_PATH, make_text_pdf("KBAFTERMINERU"), "a.pdf")
 
-    mineru.recognize_for_ocr.assert_awaited_once_with(PDF_PATH)
+    e["mineru_ctor"].assert_not_called()
+    mineru.recognize_for_ocr.assert_not_awaited()
     assert result is not None and "KBAFTERMINERU" in result
 
 

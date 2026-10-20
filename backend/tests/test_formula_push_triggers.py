@@ -259,14 +259,15 @@ def test_register_subscribes_both_events_once():
     ]
 
 
-def test_main_registers_formula_push_handlers():
-    """注册点在 main._register_phase_handlers（与审批重算 handler 同处）—— 漏注册则事件驱动整条断。"""
+def test_startup_registers_formula_push_handlers():
+    """注册点在启动任务 register_phase_handlers（startup_registry，与审批重算 handler 同处；
+    lifespan 执行它）—— 漏注册则事件驱动整条断。逐项调用断言见 test_startup_registry。"""
     import ast
     import inspect
 
-    import app.main as main
+    from app.core import startup_registry
 
-    tree = ast.parse(inspect.getsource(main._register_phase_handlers))
+    tree = ast.parse(inspect.getsource(startup_registry._task_register_phase_handlers))
     names = {n.func.id for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
     assert "register_formula_push_handlers" in names
 

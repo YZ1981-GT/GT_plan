@@ -4,12 +4,16 @@ Validates Requirements 5.1–5.7, 6.1–6.6 and Properties 9–12.
 """
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+import ast
+import asyncio
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from app.core import startup_registry as sr
 from app.core.startup_registry import (
     FROZEN_CRITICAL_SEQUENCE_NAMES,
     FROZEN_STARTUP_SEQUENCE_NAMES,
@@ -63,6 +67,9 @@ def test_frozen_sequence_includes_legacy_lifespan_milestones():
         "recover_ai_chat_runs",
         "run_ai_chat_health_check",
         "acnr_catalog_snapshot_gc",
+        "sla_worker",
+        "ImportJobRunner.run_forever",
+        "warm_workpaper_sync_registry",
         "install_sigterm_handler",
         "print_ready",
     ]
@@ -71,12 +78,11 @@ def test_frozen_sequence_includes_legacy_lifespan_milestones():
 
 
 def test_all_worker_names_present_in_registry():
-    """Each of the 11+1 workers has a stable name in STARTUP_TASKS."""
-    names = {t.name for t in STARTUP_TASKS}
-    for worker_name in WORKER_TASK_NAMES:
-        assert worker_name in names, f"missing worker {worker_name}"
-    worker_phase = [t for t in STARTUP_TASKS if t.phase == "workers"]
-    assert len(worker_phase) == len(WORKER_TASK_NAMES)
+    """The 12+1 workers appear in STARTUP_TASKS' worker phase, by name, in pinned order."""
+    worker_phase = [t.name for t in STARTUP_TASKS if t.phase == "workers"]
+    assert worker_phase == list(WORKER_TASK_NAMES)
+    assert [name for name, _mod in sr._WORKER_BINDINGS] == list(WORKER_TASK_NAMES[:-1])
+    assert WORKER_TASK_NAMES[-1] == "ImportJobRunner.run_forever"
 
 
 def test_mutation_swap_adjacent_critical_fails_sequence_lock():
@@ -438,3 +444,176 @@ def test_main_reexports_start_workers():
     from app.core.startup_registry import start_all_workers
 
     assert _start_workers is start_all_workers
+
+
+# ---------------------------------------------------------------------------
+# preexisting-test-failures-closure G11 — lifespan executes the registry (one source)
+#
+# The lifespan wiring of platform-architecture-convergence never landed: main.lifespan
+# kept its own copy of every step while STARTUP_TASKS was only read by the tests above,
+# and the two drifted (registry lost 6 EventBus subscriptions + the sync prewarm).
+# ---------------------------------------------------------------------------
+
+_MAIN_PY = Path(__file__).resolve().parents[1] / "app" / "main.py"
+
+#: Startup helpers main.py used to inline — each duplicated a registry task body.
+_FORMER_MAIN_STARTUP_HELPERS = frozenset({
+    "_run_ai_chat_health_check", "_recover_ai_chat_runs", "_check_attachment_security_gates",
+    "_warm_render_caches", "_warm_workpaper_sync_registry", "_run_schema_drift_check",
+    "_run_migrations", "_register_phase_handlers", "_check_gin_index_status",
+    "_validate_template_manifest", "_check_libreoffice_health",
+    "_validate_procedure_rollout_config", "_replay_startup_events", "_start_workers",
+})
+
+
+def _lifespan_calls_before_yield() -> list[str]:
+    """Names called by ``main.lifespan`` before its ``yield`` (AST: comments never count)."""
+    tree = ast.parse(_MAIN_PY.read_text(encoding="utf-8"))
+    fn = next(
+        n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == "lifespan"
+    )
+    calls: list[str] = []
+    for stmt in fn.body:
+        if any(isinstance(n, ast.Yield) for n in ast.walk(stmt)):
+            break
+        for node in ast.walk(stmt):
+            if isinstance(node, ast.Call):
+                func = node.func
+                calls.append(func.id if isinstance(func, ast.Name) else getattr(func, "attr", "?"))
+    return calls
+
+
+def test_lifespan_startup_is_only_the_registry():
+    """Before ``yield`` lifespan only builds the context and runs STARTUP_TASKS."""
+    assert _lifespan_calls_before_yield() == ["StartupContext", "run_startup_tasks"]
+
+
+def test_main_defines_no_startup_step_bodies():
+    """main.py must not carry its own copy of a startup step (that copy drifted once)."""
+    tree = ast.parse(_MAIN_PY.read_text(encoding="utf-8"))
+    defined = {
+        n.name for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert defined & _FORMER_MAIN_STARTUP_HELPERS == set()
+
+
+@pytest.mark.asyncio
+async def test_lifespan_runs_registry_and_stops_its_tasks(monkeypatch):
+    """lifespan awaits run_startup_tasks(context=ctx); shutdown sets ctx.stop_event and
+    cancels every task the registry put into ctx.worker_tasks."""
+    import app.main as main_mod
+    from app.core import database, graceful_shutdown
+    from app.core import sse_registry as sse_mod
+    from app.services.acnr import cache_epoch, invalidation_outbox
+
+    seen: dict[str, object] = {}
+
+    async def fake_run(tasks=None, *, context=None):
+        seen["tasks"] = tasks
+        seen["ctx"] = context
+        context.worker_tasks.append(asyncio.create_task(asyncio.Event().wait()))
+        return []
+
+    dispatcher = MagicMock()
+    dispatcher.stop = AsyncMock()
+    monkeypatch.setattr(sr, "run_startup_tasks", fake_run)
+    monkeypatch.setattr(graceful_shutdown, "PRE_DRAIN_DELAY", 0)
+    monkeypatch.setattr(graceful_shutdown, "drain_http_requests", AsyncMock())
+    monkeypatch.setattr(sse_mod.sse_registry, "close_all", AsyncMock())
+    monkeypatch.setattr(cache_epoch, "stop_epoch_subscriber", AsyncMock())
+    monkeypatch.setattr(invalidation_outbox, "get_dispatcher", lambda: dispatcher)
+    monkeypatch.setattr(database, "dispose_engine", AsyncMock())
+
+    async with main_mod.lifespan(FastAPI()):
+        ctx = seen["ctx"]
+        assert isinstance(ctx, StartupContext)
+        assert seen["tasks"] is None  # None = the full STARTUP_TASKS
+        worker = ctx.worker_tasks[0]
+        assert not worker.done() and not ctx.stop_event.is_set()
+    assert ctx.stop_event.is_set()
+    assert worker.cancelled()
+    dispatcher.stop.assert_awaited_once()
+
+
+#: (module, registration function, takes the EventBus) — everything main used to register.
+_PHASE_HANDLER_REGISTRATIONS = (
+    ("app.services.gate_rules_phase14", "register_phase14_rules", False),
+    ("app.services.gate_rules_eqcr", "register_eqcr_gate_rules", False),
+    ("app.services.gate_rules_cross_check", "register_cross_check_rules", False),
+    ("app.services.task_event_handlers", "register_event_handlers", False),
+    ("app.services.consol_note_stale_handler", "register_stale_handler", True),
+    ("app.services.consol_trial_stale_handler", "register_consol_trial_stale_handler", True),
+    ("app.services.consol_elimination_recalc_handler",
+     "register_consol_elimination_recalc_handler", True),
+    ("app.services.consol_note_formula_refresh_handler",
+     "register_consol_note_formula_refresh_handler", True),
+    ("app.services.adjustment_approved_recalc_handler",
+     "register_adjustment_approved_recalc_handler", True),
+    ("app.services.formula_push.triggers", "register_formula_push_handlers", True),
+)
+
+
+def test_phase_handlers_task_registers_every_handler(monkeypatch):
+    """The last three were missing from the registry copy (6 EventBus subscriptions:
+    adjustment approved / revoked recalc, formula push ×2, consol note formula refresh ×2)."""
+    import importlib
+
+    from app.services.event_bus import event_bus
+
+    mocks = {}
+    for module, func, _takes_bus in _PHASE_HANDLER_REGISTRATIONS:
+        mocks[func] = MagicMock(name=func)
+        monkeypatch.setattr(importlib.import_module(module), func, mocks[func])
+
+    sr._task_register_phase_handlers(StartupContext())
+
+    for _module, func, takes_bus in _PHASE_HANDLER_REGISTRATIONS:
+        if takes_bus:
+            mocks[func].assert_called_once_with(event_bus)
+        else:
+            mocks[func].assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_workpaper_sync_prewarm_is_scheduled_not_awaited(monkeypatch):
+    """25~30s prewarm must not delay Ready, and its task must be kept for shutdown."""
+    from app.services.workpaper_sync import startup_prewarm
+
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def slow_prewarm() -> None:
+        started.set()
+        await release.wait()
+
+    monkeypatch.setattr(startup_prewarm, "warm_workpaper_sync_registry", slow_prewarm)
+    spec = next(t for t in STARTUP_TASKS if t.name == "warm_workpaper_sync_registry")
+    assert (spec.phase, spec.criticality) == ("caches", "best_effort")
+
+    ctx = StartupContext()
+    results = await run_startup_tasks((spec,), context=ctx)
+    assert [r.status for r in results] == ["ok"]
+    assert len(ctx.worker_tasks) == 1
+    task = ctx.worker_tasks[0]
+    await asyncio.wait_for(started.wait(), timeout=1)
+    assert not task.done()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    reset_startup_report()
+
+
+def test_start_all_workers_runs_the_registry_worker_specs(monkeypatch):
+    """The compat entry starts exactly the registry worker bindings (no second list)."""
+    from app.core.config import settings
+
+    started: list[str] = []
+    monkeypatch.setattr(
+        sr, "_make_worker_starter", lambda mod, attr="run": (lambda _ctx: started.append(mod))
+    )
+    monkeypatch.setattr(sr, "_start_import_job_runner", lambda _ctx: started.append("runner"))
+    for enabled in (False, True):
+        started.clear()
+        monkeypatch.setattr(settings, "LEDGER_IMPORT_IN_PROCESS_RUNNER_ENABLED", enabled)
+        assert sr.start_all_workers(asyncio.Event()) == []
+        expected = [mod for _name, mod in sr._WORKER_BINDINGS] + (["runner"] if enabled else [])
+        assert started == expected

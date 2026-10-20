@@ -197,6 +197,15 @@ inclusion: always
 - 本地库现状（验收后）：对话本机 Qwen3.5 + 服务器 qwen3.8 均启用（本机先用）；OCR 本机 paddleocr（引擎未装 ⇒ 恒兜底）+ paddleocrv6、版面 paddleocrvl-1.6 启用；向量行指向 8100 而 8100 无 `/embeddings`（如实显示不可用，未改数据）
 - 🔴 教训：①全仓调用契约扫描只认字面量会漏「先赋值再整串传入」—— 现场三处都是这种写法，变异把列表改回变量没打红才暴露；改按函数作用域解析局部变量后又抓出 report_trace ②「缓存是否晚于本次请求」不要比 `monotonic`（Windows 精度约 15.6 ms，同刻旧结果被当新的 ⇒ 强刷失效），用计数 + 请求入口快照 ③候选身份必须含模型类型：同一端点同名模型可同时登记为对话与向量，否则向量 404 让对话跳过本机 ④HEAD 已超行数门且未登记白名单的文件（如 `test_task6_native_engine.py` 1691 行）一改就被 pre-commit 拦 ⇒ 扩展守卫放新文件 ⑤共享开发环境不重启 start-dev，迁移用 `MigrationRunner(...).run_pending()` 落库（与启动同一路径）
 
+### DSH 子进程 + 知识库扫描件 OCR 接入本机优先 `dsh-kb-ocr-local-first-routing`（2026-10-20，12/12，本地提交未推送）
+- DSH：子进程不拿 Key；Cordis 模型服务 `baseURL` = 平台环回端点 `/api/ai-chat/dsh-llm/v1`（只收本机、带代理头即拒），`apiKeyEnv=GT_DSH_LLM_TOKEN`（HMAC run 令牌）；`select_run_candidate` 与对话同一套候选 / 冷却；vendor 根 `DSH_VENDOR_ROOT=D:\dsh_vendor_pinned`（pin `9a226f1077` + node 闭包，步骤见 `docs/reference/llm-provider-configuration.md` §9）
+- 知识库：扫描件后台识别（V198 `ocr_status/attempts/error/due_at` + `knowledge_ocr_worker`：SKIP LOCKED、15 分钟租约、围栏、3 次退避），上传请求内不再 OCR；`POST /api/knowledge-library/documents/{id}/ocr-retry`
+- 🔴 D11：DSH 转发令牌与 MCP scoped token 的签名密钥原读不存在的 `settings.SECRET_KEY`（`getattr` 默认值 = 源码常量 ⇒ 可伪造），已改派生自 `JWT_SECRET_KEY`；凡 `getattr(settings, "X", 默认)` 取密钥，先核对 X 真的存在
+
+### 46 个预存失败用例收口 `preexisting-test-failures-closure`（2026-10-20，10/10，本地提交未推送）
+- 生产缺陷 5 组：G7 resolver 附加键透传 · G10 OCR 字段合并 · **G11 启动编排单一来源**（`main.lifespan` 只跑 `startup_registry.run_startup_tasks`，`/api/health` 带 `startup` 报告；🔴 **新启动步骤只加在 `app/core/startup_registry.py`**，main.py 已删 14 个重复辅助函数）· G12 提示词覆盖率按前缀统一 · G1 可见性 SQLite UUID（SQLite 存 32 位十六进制无连字符，原生 SQL 绑 `str(uuid)` 恒不命中）+ WOPI put_file 被拒后还原磁盘
+- 🔴 教训：①spec 标完成但接线没入库（PAC 的 Method A 漏收 main.py / health.py）⇒ registry 成了只被测试看的副本，两边各自漂移（registry 缺 6 个事件订阅、main 的漂移自检漏 checksum_drift）—— 守卫守副本前先证明副本就是在跑的那份 ②旧用例每跑一次在 `backend/` 留一个 `<uuid>/2025/B1-1.xlsx`，正是 put_file 被拒载荷不还原的现场证据 ③待确认：覆盖率口径（67→142）、OCR 字段清单；范围外 8 项见其 design §2（含 main.py 三个无鉴权 `/api/_debug/a51-*`）
+
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
 
@@ -204,8 +213,8 @@ inclusion: always
 - **交付边界**：`knowledge-base-retrieval-and-authz-closure`（55/58）+ `knowledge-upload-robustness-and-consumer-wiring`（10/10）同一提交；`GtA173ConsultationRecord.vue` 仅纳入上传端点/鉴权头/回执处理，排除并发 sync-bridge；`components.d.ts` 仅删 `DocAiChatPanel`，排除 `_head_*.vue` 临时登记
 - **知识库原生上传统一走 `utils/authToken`**（getAuthHeaders/getAuthToken；`authToken.spec.ts` 守护读取顺序）· 🔴 **commit 前吞异常的非阻塞钩子必须包 `begin_nested()`**（PG 语句失败使事务 aborted、COMMIT 等价 ROLLBACK ⇒ 接口 200 但未落库；真库守卫 `test_knowledge_delete_hook_isolation_pg.py`）
 - **V168 补 knowledge_doc 枚举**（V042 以空文件登记、从未生效）；checksum 漂移 7 条已由 `migration-integrity-and-enum-drift-closure`（21/21 ✅）逐条登记；🔴 旧记「`confirmation_risk_level_enum` 缺 pass、`workpaper_task_status_enum` 缺 4 值」经核验为**误报**（旧实现比较 `.value`，public 标签正是成员名）
-- **上传写路径**（`knowledge_folders._store_uploaded_files`）：每文件一个 SAVEPOINT（`_insert_document_isolated`），单文件失败只回滚自己 + 删已落盘文件 + 回 `failed[{filename, reason}]` 中文原因；NUL 由 ORM `@validates` 统一剔（PG text/varchar/jsonb 都拒 NUL，覆盖 7 条写入方）；txt/md/csv 走 `decode_text_bytes`（BOM → UTF-16 启发式（比例且 ≥4 个 0 字节）→ 严格 UTF-8 → GB18030）；列表 `has_text` 与回执 `text_extracted` 同口径（去空白后非空）；后端只有 PDF 会走 OCR ⇒ 前端「需开启 OCR」只对 PDF 说
-- **消费方**：下游 RAG 走 `knowledge_documents.content_text` 带权限词法检索（方案 A；`knowledge_index` 0 行、仅可选加速层；方案 B 修索引写路径 5 断点仍暂缓）· 附注续写 / 改写只传 `knowledge_doc_ids`（≤5），后端 `load_documents` 逐篇判权注入并回 `knowledge_count`（不收前端拼的正文）· 审计报告「📚 知识库」标开发中 · DSH `kb_search` 只走向量（dsh Property 16），embedding 8101 不可达（`audit-vllm-embed` 已停 3 个月）⇒ 恒 `semantic_unavailable` · 镜像 `pgvector/pgvector:pg16` 带 vector 扩展但库内未 CREATE（`pg_extension` 仅 citext/plpgsql）· `MINERU_ENABLED=False` ⇒ 扫描件无正文
+- **上传写路径**（`knowledge_folders._store_uploaded_files`）：每文件一个 SAVEPOINT（`_insert_document_isolated`），单文件失败只回滚自己 + 删已落盘文件 + 回 `failed[{filename, reason}]` 中文原因；NUL 由 ORM `@validates` 统一剔（PG text/varchar/jsonb 都拒 NUL，覆盖 7 条写入方）；txt/md/csv 走 `decode_text_bytes`（BOM → UTF-16 启发式（比例且 ≥4 个 0 字节）→ 严格 UTF-8 → GB18030）；列表 `has_text` 与回执 `text_extracted` 同口径（去空白后非空）；没有文字层的扫描件交后台识别（2026-10-20 起，见上方 dsh-kb-ocr 条目），前端按 `ocr_status` 提示
+- **消费方**：下游 RAG 走 `knowledge_documents.content_text` 带权限词法检索（方案 A；`knowledge_index` 0 行、仅可选加速层；方案 B 修索引写路径 5 断点仍暂缓）· 附注续写 / 改写只传 `knowledge_doc_ids`（≤5），后端 `load_documents` 逐篇判权注入并回 `knowledge_count`（不收前端拼的正文）· 审计报告「📚 知识库」标开发中 · DSH `kb_search` 只走向量（dsh Property 16），embedding 8101 不可达（`audit-vllm-embed` 已停 3 个月）⇒ 恒 `semantic_unavailable` · 镜像 `pgvector/pgvector:pg16` 带 vector 扩展但库内未 CREATE（`pg_extension` 仅 citext/plpgsql）· 扫描件正文由后台 OCR 经 `ocr` 能力槽补（本机无 OCR 引擎时走服务器 paddleocrv6；`MINERU_ENABLED=False` 不再意味着扫描件无正文）
 - 待办：修复向量/扩展（`audit-vllm-embed` + pgvector）· 收口其余 10 组重复路由 · MinerU · 旧 `knowledge_base.py` 路由与 `KnowledgeBasePanel` 零挂载死链（登记于 `test_frontend_knowledge_paths_exist._KNOWN_DEAD_PATHS`）
 
 ### 待修 bug（2026-06-01 grep 实证，与已修 render-config 同源：查 users 不存在的 display_name 列）

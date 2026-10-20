@@ -9,10 +9,8 @@
 from __future__ import annotations
 
 import ast
-import asyncio
 import uuid
 from pathlib import Path
-from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -43,22 +41,30 @@ def test_audit_data_mcp_server_default_base_is_ipv4_loopback() -> None:
     assert defaults == ["http://127.0.0.1:9980"], defaults
 
 
-def test_dsh_engine_spawns_mcp_against_ipv4_loopback_by_default() -> None:
-    """行为判据：真调 `spawn_mcp_process`（子进程创建打桩），看传给 MCP 的 AUDIT_API_BASE。"""
+def test_dsh_engine_spawns_mcp_against_ipv4_loopback_by_default(tmp_path: Path) -> None:
+    """行为判据：真调写 Cordis 配置的函数，看 mcp-client 传给 MCP 的 AUDIT_API_BASE，以及模型转发地址。
+
+    audit-data MCP 由 DSH 根进程的 mcp-client 按 Cordis 配置以 stdio 拉起
+    （spec dsh-kb-ocr-local-first-routing D5），MCP 的 env 就在这份配置里。
+    """
+    import json
+
     from app.services.ai_chat import dsh_engine as D
+    from app.services.ai_chat.dsh_model_bridge import DshModelRoute
 
-    captured: dict[str, str] = {}
+    class _Cfg:
+        model_name = "m"
+        deployment = "local"
+        identity = "chat|x|http://127.0.0.1:8100/v1|m"
 
-    class _Proc:
-        pid = None
+    ctx = D.DshRunContext(
+        run_id=uuid.uuid4(), principal_id=uuid.uuid4(), project_id=uuid.uuid4(), session_dir=tmp_path
+    )
+    ctx.model_route = DshModelRoute(_Cfg(), 32768)  # type: ignore[arg-type]
+    config = json.loads(Path(D._write_platform_cordis_config(ctx)).read_text(encoding="utf-8"))
+    by_name = {item["name"]: item for item in config}
 
-    async def fake_exec(*_args, env=None, **_kwargs):
-        captured.update(env or {})
-        return _Proc()
-
-    ctx = D.DshRunContext(run_id=uuid.uuid4(), principal_id=uuid.uuid4(), project_id=uuid.uuid4())
-    with patch.object(D.asyncio, "create_subprocess_exec", fake_exec):
-        asyncio.run(D.DshProcessManager.spawn_mcp_process(ctx, mcp_server_path="server.py"))
-
-    base = captured.get("AUDIT_API_BASE", "")
+    base = by_name["@deepseek-ai/dsh-mcp-client"]["config"]["env"]["AUDIT_API_BASE"]
     assert base.startswith("http://127.0.0.1:"), base
+    llm_base = by_name["@deepseek-ai/dsh-llm-deepseek"]["config"]["baseURL"]
+    assert llm_base.startswith("http://127.0.0.1:"), llm_base

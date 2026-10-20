@@ -486,8 +486,11 @@ class FakeXhr {
   }
 }
 
-const uploadOk = (name: string, textExtracted = true) =>
-  JSON.stringify({ code: 200, data: { uploaded: 1, files: [{ id: `id-${name}`, name, text_extracted: textExtracted }], failed: [] } })
+const uploadOk = (name: string, textExtracted = true, ocrQueued = false) =>
+  JSON.stringify({
+    code: 200,
+    data: { uploaded: 1, files: [{ id: `id-${name}`, name, text_extracted: textExtracted, ocr_queued: ocrQueued }], failed: [] },
+  })
 const uploadFailed = (name: string, reason: string) =>
   JSON.stringify({ code: 200, data: { uploaded: 0, files: [], failed: [{ filename: name, reason }] } })
 
@@ -526,11 +529,15 @@ describe('KnowledgeBase 上传结果与拖拽文件夹', () => {
     await flushPromises()
     const scan = docRow(w, 'd-theirs').find('.gt-kb-doc-notext')
     const blank = docRow(w, 'd-blank').find('.gt-kb-doc-notext')
-    expect(scan.text()).toBe('⚠ 未提取到正文（扫描件需 OCR），AI 无法引用')
-    expect(scan.attributes('title')).toContain('开启 OCR')
+    // 存量扫描件（无识别记录）：指向「重新识别」，不再叫用户去「开启 OCR」（无处可开）
+    expect(scan.text()).toBe('⚠ 未提取到正文（扫描件），AI 无法引用')
+    expect(scan.attributes('title')).toContain('重新识别')
+    expect(scan.attributes('title')).not.toContain('开启 OCR')
     expect(blank.text()).toBe('⚠ 未提取到正文，AI 无法引用')
-    expect(`${blank.text()}${blank.attributes('title')}`).not.toContain('OCR')
+    expect(`${blank.text()}${blank.attributes('title')}`).not.toMatch(/OCR|扫描件|识别/)
     expect(docRow(w, 'd-mine').find('.gt-kb-doc-notext').exists()).toBe(false)
+    // 不可管理的行没有「重新识别」
+    expect(docRow(w, 'd-theirs').findAll('button').map((b) => b.text())).not.toContain('重新识别')
   })
 
   it('拖入 250 个文件的嵌套文件夹：全部上传，子目录逐级建出，失败原因与无正文逐条汇总', async () => {
@@ -542,7 +549,7 @@ describe('KnowledgeBase 上传结果与拖拽文件夹', () => {
     }))
     FakeXhr.respond = (name) =>
       name === 'bad.txt' ? { status: 200, body: uploadFailed(name, '文件内容含无法存储的字符') }
-        : name === 'scan.pdf' ? { status: 200, body: uploadOk(name, false) }
+        : name === 'scan.pdf' ? { status: 200, body: uploadOk(name, false, true) }
           : name === 'huge.pdf' ? { status: 413, body: JSON.stringify({ code: 413, message: '请求体过大，上限 850MB' }) }
             : { status: 200, body: uploadOk(name) }
 
@@ -581,7 +588,8 @@ describe('KnowledgeBase 上传结果与拖拽文件夹', () => {
     const text = JSON.stringify(arg.message)
     expect(text).toContain('资料/bad.txt：文件内容含无法存储的字符')
     expect(text).toContain('资料/huge.pdf：请求体过大，上限 850MB')
-    expect(text).toContain('扫描件需开启 OCR 才能识别（AI 暂无法引用）：资料/scan.pdf')
+    expect(text).toContain('扫描件已交给后台识别文字，完成后 AI 即可引用（进度见文档列表）：资料/scan.pdf')
+    expect(text).not.toContain('开启 OCR')
     // 通知挂在 body 下且 VNode 不带本组件 scopeId ⇒ 限高 / 滚动必须内联（scoped 样式匹配不到）
     expect(arg.message.props.style).toMatchObject({ maxHeight: '240px', overflowY: 'auto' })
     vi.unstubAllGlobals()
@@ -620,5 +628,136 @@ describe('KnowledgeBase 上传结果与拖拽文件夹', () => {
     expect(arg.title).toBe('上传完成：1 成功，1 失败')
     expect(JSON.stringify(arg.message)).toContain('上传超时')
     vi.unstubAllGlobals()
+  })
+})
+
+// ─── 扫描件后台识别：状态标记 / 重新识别 / 自动刷新（spec dsh-kb-ocr-local-first-routing Req 5.6 / 5.7） ───
+
+describe('KnowledgeBase 扫描件后台识别', () => {
+  /** f-own 换成带识别状态的一组文档（每次 GET 返回新对象，模拟真实接口） */
+  function withOcrDocs(rows: () => any[]) {
+    const base = state.api.get.getMockImplementation()!
+    state.api.get.mockImplementation(async (url: string, cfg?: any) =>
+      url === '/api/knowledge-library/folders/f-own/documents' ? rows() : base(url, cfg))
+  }
+  const scan = (id: string, extra: Record<string, unknown>) => ({
+    id, name: `${id}.pdf`, file_type: 'pdf', file_size: 9, can_manage: true, has_text: false, ...extra,
+  })
+  const docCalls = () => getCalls(/\/folders\/f-own\/documents$/)
+  const rowButtons = (w: VueWrapper, id: string) => docRow(w, id).findAll('button').map((b) => b.text())
+
+  async function openOwn() {
+    const w = await mountPage()
+    await treeNode(w, 'f-own').trigger('click')
+    await flushPromises()
+    return w
+  }
+
+  it('按状态标记：识别中是进度提示且不能重复发起；失败带原因、可管理才给「重新识别」', async () => {
+    withOcrDocs(() => [
+      scan('d-queued', { ocr_status: 'pending' }),
+      scan('d-running', { ocr_status: 'running' }),
+      scan('d-failed', { ocr_status: 'failed', ocr_error: '远程 OCR 认证失败，请检查 API Key' }),
+      scan('d-failed-other', { ocr_status: 'failed', ocr_error: 'x', can_manage: false }),
+      scan('d-empty', { ocr_status: 'empty' }),
+    ])
+    const w = await openOwn()
+    const mark = (id: string) => docRow(w, id).find('.gt-kb-doc-notext')
+    expect(mark('d-queued').text()).toBe('⏳ 排队识别中…')
+    expect(mark('d-queued').classes()).toContain('gt-kb-doc-notext--progress')
+    expect(mark('d-running').text()).toBe('⏳ 正在识别文字…')
+    expect(mark('d-failed').text()).toBe('⚠ 识别失败，AI 无法引用')
+    expect(mark('d-failed').attributes('title')).toContain('远程 OCR 认证失败，请检查 API Key')
+    expect(mark('d-failed').classes()).not.toContain('gt-kb-doc-notext--progress')
+    expect(mark('d-empty').text()).toBe('⚠ 未识别出文字，AI 无法引用')
+    expect(rowButtons(w, 'd-queued')).not.toContain('重新识别')
+    expect(rowButtons(w, 'd-running')).not.toContain('重新识别')
+    expect(rowButtons(w, 'd-failed')).toContain('重新识别')
+    expect(rowButtons(w, 'd-empty')).toContain('重新识别')
+    expect(rowButtons(w, 'd-failed-other')).not.toContain('重新识别')
+    w.unmount()
+  })
+
+  it('点「重新识别」：调重试端点（静默，错误由页面提示一次），该行转为排队中', async () => {
+    withOcrDocs(() => [scan('d-failed', { ocr_status: 'failed', ocr_error: '多次识别失败' })])
+    state.api.post.mockResolvedValueOnce({ id: 'd-failed', ocr_status: 'pending', message: '已加入识别队列' })
+    const w = await openOwn()
+    await docRow(w, 'd-failed').findAll('button').find((b) => b.text() === '重新识别')!.trigger('click')
+    await flushPromises()
+    expect(state.api.post).toHaveBeenCalledWith(
+      '/api/knowledge-library/documents/d-failed/ocr-retry', null, expect.objectContaining({ _silent: true }),
+    )
+    expect(state.message.success).toHaveBeenCalledWith('已加入识别队列，完成后列表自动刷新')
+    expect(docRow(w, 'd-failed').find('.gt-kb-doc-notext').text()).toBe('⏳ 排队识别中…')
+    expect(rowButtons(w, 'd-failed')).not.toContain('重新识别')
+    w.unmount()
+  })
+
+  it('重新识别被拒（409 已在识别）：交给 handleApiError 提示，状态不变', async () => {
+    const { handleApiError } = await import('@/utils/errorHandler')
+    withOcrDocs(() => [scan('d-failed', { ocr_status: 'failed', ocr_error: 'x' })])
+    const conflict = httpError(409)
+    state.api.post.mockRejectedValueOnce(conflict)
+    const w = await openOwn()
+    await docRow(w, 'd-failed').findAll('button').find((b) => b.text() === '重新识别')!.trigger('click')
+    await flushPromises()
+    expect(handleApiError).toHaveBeenCalledWith(conflict, '重新识别')
+    expect(docRow(w, 'd-failed').find('.gt-kb-doc-notext').text()).toBe('⚠ 识别失败，AI 无法引用')
+    w.unmount()
+  })
+
+  it('有排队 / 识别中的文档：每 5 秒静默刷新（不去重、不清勾选），识别完标记消失并停止刷新', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      let round = 0
+      withOcrDocs(() => {
+        round += 1
+        return [
+          scan('d-scan', round < 3 ? { ocr_status: round === 1 ? 'pending' : 'running' } : { ocr_status: 'done', has_text: true }),
+          { id: 'd-note2', name: '说明.txt', file_type: 'txt', file_size: 1, can_manage: true, has_text: true },
+        ]
+      })
+      const w = await openOwn()
+      expect(docCalls()).toHaveLength(1)
+      await w.find('.kb-row[data-id="d-note2"] .kb-select').trigger('click')  // 用户勾选了一行
+      const rowBefore = (w.vm as any).documents[0]
+
+      await vi.advanceTimersByTimeAsync(4999)
+      expect(docCalls()).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(1)
+      await flushPromises()
+      expect(docCalls()).toHaveLength(2)
+      expect(docCalls()[1][1]).toMatchObject({ _silent: true, _dedupe: false })
+      expect(docRow(w, 'd-scan').find('.gt-kb-doc-notext').text()).toBe('⏳ 正在识别文字…')
+
+      await vi.advanceTimersByTimeAsync(5000)
+      await flushPromises()
+      expect(docCalls()).toHaveLength(3)
+      expect(docRow(w, 'd-scan').find('.gt-kb-doc-notext').exists()).toBe(false)  // 识别完：AI 可引用
+      // 原地更新同一行对象（整表替换会让 el-table 清掉勾选）；用户的勾选还在
+      expect((w.vm as any).documents[0]).toBe(rowBefore)
+      expect(buttons(w, '删除选中 (1)')).toHaveLength(1)
+
+      await vi.advanceTimersByTimeAsync(15000)
+      await flushPromises()
+      expect(docCalls()).toHaveLength(3)  // 没有识别中的文档：停止刷新
+      w.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('离开页面停止刷新', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      withOcrDocs(() => [scan('d-scan', { ocr_status: 'pending' })])
+      const w = await openOwn()
+      w.unmount()
+      await vi.advanceTimersByTimeAsync(20000)
+      await flushPromises()
+      expect(docCalls()).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
