@@ -23,7 +23,6 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from app.core.config import settings
 from app.services.ai_chat.dsh_model_bridge import (
-    FORWARD_PATH,
     DshTokenError,
     candidate_for,
     rewrite_request,
@@ -35,7 +34,10 @@ from app.services.llm_runtime import ResolvedLLMConfig, build_runtime_client
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix=FORWARD_PATH, tags=["DSH 模型转发"])
+# 前缀必须写成字面量：鉴权基线扫描器（test_project_endpoint_authorization_baseline）只解析字面量前缀，
+# 写成变量整个文件会静默脱管。它必须等于 dsh_model_bridge.FORWARD_PATH（DSH 子进程 baseURL 由后者拼出），
+# 两者一致由 tests/dsh_agent_panel/test_dsh_model_bridge.py 钉住。
+router = APIRouter(prefix="/api/ai-chat/dsh-llm/v1", tags=["DSH 模型转发"])
 
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1"})
 _PROXY_HEADERS = ("x-forwarded-for", "x-forwarded-host", "x-real-ip", "forwarded")

@@ -40,7 +40,8 @@ from app.services.llm_runtime import (
 
 logger = logging.getLogger("app.services.ai_chat.dsh_engine")
 
-#: 平台环回转发端点前缀（routers/dsh_model_forward.py 用同一常量注册）
+#: 平台环回转发端点前缀。routers/dsh_model_forward.py 以字面量注册同一前缀（鉴权基线扫描器只认字面量），
+#: 两者一致由 tests/dsh_agent_panel/test_dsh_model_bridge.py 钉住
 FORWARD_PATH = "/api/ai-chat/dsh-llm/v1"
 #: DSH 子进程里承载 run 令牌的环境变量名（Cordis 模型服务的 ``apiKeyEnv``）
 TOKEN_ENV = "GT_DSH_LLM_TOKEN"

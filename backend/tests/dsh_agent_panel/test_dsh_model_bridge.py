@@ -254,6 +254,15 @@ def _client(host: str = "127.0.0.1") -> httpx.AsyncClient:
 _URL = "/api/ai-chat/dsh-llm/v1/chat/completions"
 
 
+def test_forward_prefix_matches_bridge_constant() -> None:
+    """路由前缀写成字面量（鉴权基线扫描器只认字面量），而 DSH 子进程的 baseURL 由 ``FORWARD_PATH`` 拼出
+    ⇒ 两者必须逐字相等，否则子进程的模型请求全部 404。"""
+    assert F.router.prefix == B.FORWARD_PATH
+    assert B.forward_base_url().endswith(B.FORWARD_PATH)
+    assert _URL == F.router.prefix + "/chat/completions"
+    assert {route.path for route in F.router.routes} == {_URL}
+
+
 def _upstream(handler):
     """把 build_runtime_client 换成 MockTransport 客户端（其余转发逻辑全真）。"""
 
