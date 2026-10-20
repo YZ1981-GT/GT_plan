@@ -39,6 +39,8 @@
 
 2.3 `deepseek-official` 只是 vendor 适配器的路由名，不代表请求目的地；端点判定以写入配置的 `baseURL` 为准。
 
+2.4 修订已确认：用户 2026-10-20 确认可以放宽原 Req 12「全本地化」—— 本机模型不可用时 DSH 改用事务所服务器上的 qwen3.8，审计数据可能发往该服务器模型（与 native 对话同一口径）；所用 API Key 是事务所服务器的 Key，确认可以使用（Key 仍只在平台转发端使用，不进 DSH 子进程）。受信端点以外（含 DeepSeek 官方等公网 API）仍一律拒绝。原 spec 已归档，按 append-only 不回填，以本条为准。
+
 ## Requirement 3：DSH 协议与进程对齐 vendor 真实实现
 
 3.1 JSON-RPC 流程：`initialize` → `session/prompt`（`{sessionId, contentBlocks}`）→ 消费 `session.event` / `session.status` 通知，直到本 session 回到 idle → `shutdown`。

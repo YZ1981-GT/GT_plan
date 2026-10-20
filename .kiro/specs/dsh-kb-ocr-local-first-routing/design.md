@@ -63,6 +63,8 @@ DSH 子进程的 `baseURL` 指向平台自身 `http://127.0.0.1:{PORT}/api/ai-ch
 
 ### ADR-DKR-003 端点策略修订（dsh-agent-panel-integration Req 12.1~12.3）
 
+状态：已确认（用户 2026-10-20：本机不可用时改用服务器 qwen3.8、审计数据可能发往该服务器，可以接受；用的是事务所服务器的 API Key，可以使用；见 requirements 2.4）。
+
 判定对象从「DSH 配置里的 URL」改为「转发端实际出站的上游端点」：`validate_dsh_upstream` 只放行平台受信清单（企业预设 + `LLM_ENDPOINT_ALLOWLIST`）或环回 / 内网 IP 字面量，否则该候选不给 DSH 用；路由里一个可用端点都没有 ⇒ `local_only_violation`。比 native 更严：官方公网 API 即使配置为服务器候选也不给 DSH。
 
 DSH 子进程侧由 Cordis 校验器把关：模型服务 `baseURL` 必须是环回转发地址、`apiKeyEnv` 不得是 `DEEPSEEK_API_KEY`。`validate_model_route` 不改（仍服务 `.env` 健康检查）。
