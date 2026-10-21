@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
+from app.models.formula_setting_models import ProjectBaselineColumns
 
 
 # ---------------------------------------------------------------------------
@@ -107,8 +108,8 @@ class ExportTaskStatus(str, enum.Enum):
 # ---------------------------------------------------------------------------
 
 
-class ReportConfig(Base):
-    """报表格式配置（行次定义+取数公式）"""
+class ReportConfig(ProjectBaselineColumns, Base):
+    """报表格式配置（行次定义+取数公式）；V199 formula_version：全局行 = 定义版本、项目行 = 本地修订号（CAS）"""
 
     __tablename__ = "report_config"
 
@@ -150,6 +151,7 @@ class ReportConfig(Base):
     is_stale: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    formula_version: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=1, server_default=text("1"))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_by: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)

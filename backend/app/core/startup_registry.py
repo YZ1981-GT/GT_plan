@@ -339,22 +339,16 @@ def _task_register_phase_handlers(_ctx: StartupContext) -> None:
 
         register_consol_note_formula_refresh_handler(event_bus)  # TB → 节点附注公式持久化
     except Exception as e:
-        logging.getLogger("audit_platform").warning(
-            "[启动] 合并 stale handler 注册失败: %s", e
-        )
+        logging.getLogger("audit_platform").warning("[启动] 合并 stale handler 注册失败: %s", e)
 
     # 调整分录复核通过 / 撤回 → 试算表调整列 + 审定数重算
     try:
         from app.services.event_bus import event_bus
-        from app.services.adjustment_approved_recalc_handler import (
-            register_adjustment_approved_recalc_handler,
-        )
+        from app.services.adjustment_approved_recalc_handler import register_adjustment_approved_recalc_handler
 
         register_adjustment_approved_recalc_handler(event_bus)
     except Exception as e:
-        logging.getLogger("audit_platform").warning(
-            "[启动] 调整分录复核 recalc handler 注册失败: %s", e
-        )
+        logging.getLogger("audit_platform").warning("[启动] 调整分录复核 recalc handler 注册失败: %s", e)
 
     # chain-closure-phase2-formula-push-engine 任务 11：试算表更新 / E1 底稿保存 → 公式推送
     try:
@@ -363,9 +357,16 @@ def _task_register_phase_handlers(_ctx: StartupContext) -> None:
 
         register_formula_push_handlers(event_bus)
     except Exception as e:
-        logging.getLogger("audit_platform").warning(
-            "[启动] 公式推送 handler 注册失败: %s", e
-        )
+        logging.getLogger("audit_platform").warning("[启动] 公式推送 handler 注册失败: %s", e)
+
+    # formula-global-settings-sync R8：公式有效定义变化 → 报表标过期重算 / 底稿 / 附注 / 合并附注
+    try:
+        from app.services.event_bus import event_bus
+        from app.services.formula_settings.propagation import register_formula_settings_handlers
+
+        register_formula_settings_handlers(event_bus)
+    except Exception as e:
+        logging.getLogger("audit_platform").warning("[启动] 公式设置传播 handler 注册失败: %s", e)
 
 
 async def _task_replay_startup_events(_ctx: StartupContext) -> None:

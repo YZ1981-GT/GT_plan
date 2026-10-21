@@ -73,6 +73,15 @@
 
       <!-- 右侧：公式配置 -->
       <div class="gt-fm-main">
+        <el-alert
+          v-if="props.formulaSession?.banner"
+          :title="props.formulaSession.banner"
+          type="warning"
+          :closable="false"
+          show-icon
+          data-testid="formula-session-pinned-banner"
+          style="margin: 0 12px 8px;"
+        />
         <!-- 当前选中的路径 + 模板类型切换 -->
         <div class="gt-fm-breadcrumb">
           <div style="display: flex; align-items: center; gap: 8px;">
@@ -93,7 +102,7 @@
               :type="activeReportLevelLabel === '项目级' ? 'success' : 'info'"
               effect="plain"
               :title="activeReportLevelLabel === '项目级'
-                ? '本页公式取自项目级配置（project:{id}），修改只影响本项目'
+                ? '本页显示本项目的有效公式（每行标注 全局 / 本项目 / 模板），修改只写本项目'
                 : '本页公式取自模板级预设，修改会影响所有使用同一适用准则的项目'"
             >
               {{ activeReportLevelLabel }}
@@ -102,22 +111,10 @@
           <div v-if="!isConsolFormulaNode" style="display: flex; gap: 6px; align-items: center;">
             <el-button size="small" @click="showFormulaDashboard = true">📊 公式看板</el-button>
             <el-button size="small" @click="onOpenGlobalScopeOverview">🌐 全局公式</el-button>
-            <SharedTemplatePicker
-              config-type="formula_config"
-              :project-id="projectId"
-              :get-config-data="getFormulaConfigData"
-              @applied="onTemplateApplied"
-            />
-            <el-button
-              v-if="lastTemplateUndo"
-              size="small"
-              type="warning"
-              plain
-              :loading="applying"
-              @click="onUndoTemplateApply"
-            >
-              ↩ 撤销引用（{{ lastTemplateUndo.entries.length }}）
-            </el-button>
+            <!-- formula-global-settings-sync：全局设置 / 保存为模板 / 订阅模板（取代旧共享配置「公式审核配置」） -->
+            <FormulaSettingsToolbar ref="settingsToolbarRef" :project-id="projectId" :domain="settingsDomain"
+              :default-scope="settingsScope" :can-edit-global="canEditGlobal" @navigate="visible = false"
+              @changed="onFormulaSettingsChanged" />
             <el-button size="small" @click="onImportPresetFormulas" :loading="loadingData">📥 导入预设</el-button>
             <el-button size="small" @click="onExportFormulaTemplate">📤 导出模板</el-button>
             <el-button size="small" @click="showFormulaImport = true">📥 Excel导入</el-button>
@@ -227,6 +224,7 @@
               v-if="activeCategory === 'history' && projectId"
               :project-id="projectId"
               :year="year || new Date().getFullYear()"
+              :read-only="formulaReadOnly"
               @rollback-applied="onHistoryRollbackApplied"
             />
           </el-tab-pane>
@@ -239,6 +237,7 @@
               :year="year"
               :wp-code="pushWpCode"
               :supported-wp-codes="pushWpCodes"
+              :can-edit="!formulaReadOnly"
             />
             <div v-else-if="activeCategory === 'formula_push' && !pushWpCode" class="gt-fp-not-connected">
               <el-empty description="本底稿尚未接入自动推送" :image-size="64">
@@ -348,10 +347,12 @@
               <span v-else style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-placeholder)">—</span>
             </template>
           </el-table-column>
-          <el-table-column label="来源" width="70" align="center">
+          <el-table-column label="来源" width="88" align="center">
             <template #default="{ row }">
               <!-- Task 1.4：只读投影不得包装成「自定义」正式公式；标「只读」去伪装。 -->
               <span v-if="isReadonlyProjectionRow(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder);">只读</span>
+              <!-- formula-global-settings-sync R1.4：有效定义行标层级（全局 / 本项目 / 模板 / 暂缓采用）与待确认 -->
+              <span v-else-if="row._layer_label"><el-tag size="small" effect="plain" :type="layerTagType(row._layer)">{{ row._layer_label }}</el-tag><el-tag v-if="row._pending" size="small" type="danger" effect="plain">待确认</el-tag></span>
               <span v-else-if="isPresetFormula(row)" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-teal); background: var(--gt-bg-info); padding: 1px 6px; border-radius: 3px;">预设</span>
               <span v-else-if="row.formula" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">自定义</span>
             </template>
@@ -362,8 +363,9 @@
               <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder);">0</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="80" align="center">
+          <el-table-column label="操作" width="120" align="center">
             <template #default="{ row }">
+              <el-button v-if="canRestoreRow(row) && editingId !== row.id" size="small" link @click.stop="onRestoreGlobal(row)">恢复全局</el-button>
               <!-- Task 1.4 / ADR-FMC-02：surfaced/extraction 只读投影 —— 不渲染「编辑」按钮，
                    仅标「只读」，避免把后端 readonly:true 的说明投影当成可编辑权威公式。 -->
               <el-tooltip v-if="isReadonlyProjectionRow(row)" content="取数/溯源说明投影，只读不可编辑" placement="top">
@@ -405,6 +407,12 @@
             max-height="calc(100vh - 300px)"
             :header-cell-style="{ background: '#edf3f9', fontSize: '12px', whiteSpace: 'nowrap' }">
             <el-table-column type="index" label="#" width="50" />
+            <el-table-column label="来源" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag v-if="row.layer" size="small" effect="plain" :type="layerTagType(row.layer)">{{ layerLabel(row.layer) || row.layer }}</el-tag>
+                <el-tag v-if="row.pending" size="small" type="danger" effect="plain">待确认</el-tag>
+              </template>
+            </el-table-column>
             <el-table-column label="规则名称" min-width="200">
               <template #default="{ row }">
                 <span style="font-size: var(--gt-font-size-xs);">{{ row.label }}</span>
@@ -650,6 +658,7 @@
       :applicable-standard="`${fmTemplateType}_standalone`"
       :project-id="props.projectId"
       :year="props.year"
+      @dirty-change="onFormulaDraftDirtyChange"
       @save="onFormulaEditSave"
     />
 
@@ -835,7 +844,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { confirmDelete, confirmDangerous } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
-import { reportConfig as P_rc, noteTemplates as P_nt, linkageBus, formulaAuditLog } from '@/services/apiPaths'
+import { reportConfig as P_rc, noteTemplates as P_nt, consolNoteSections as P_cn, linkageBus, formulaAuditLog } from '@/services/apiPaths'
 // spec: formula-management-runtime-closure Task 14 — 公式端点收敛进 apiPaths（纯搬迁，URL 逐字不变）
 import {
   projectFormula,
@@ -855,7 +864,12 @@ import {
   consolReportNodeOfType,
   consolReportTypeOfNode,
 } from './consolFormulaManagement'
-import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
+// formula-global-settings-sync：报表行读本项目有效定义 + 保存写本项目适配 + 全局设置 / 模板入口
+import FormulaSettingsToolbar from './settings/FormulaSettingsToolbar.vue'
+import { canRestoreRow, fetchEffectiveReportRows, invalidateEffectiveReport, markLoaded, restoreReportRows, rowChanged, saveReportRows } from './settings/reportEffectiveRows'
+import { layerLabel, layerTagType, showFormulaError } from '@/composables/formula/useFormulaSettings'
+import { useTbDetailFormulas } from './composables/useTbDetailFormulas'
+import { useCrossCheckRules } from './composables/useCrossCheckRules'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAddressRegistry } from '@/stores/addressRegistry'
@@ -869,6 +883,15 @@ import {
 import { noteSectionToNodeKey, buildNoteFormulaRows, isNoteDomainNodeKey, mergeNoteUserFormulaRows, type NoteUserFormula } from './noteScopeTargeting'
 // Task 4.1 / ADR-FMC-04：弹窗附注节点改调 list_note_formulas（含用户编辑集 _user_formulas）。
 import { noteFormula as P_nf } from '@/services/apiPaths/formula'
+import type { CanonicalWorkpaperLocation } from '@/shared/contracts/gc0'
+import type { WorkpaperCapabilitySnapshot } from '@/shell/formula/workpaperCapabilitySnapshot'
+import {
+  decideSaveDraft,
+  discardDraftAndFollowLatest,
+  markSessionDirty,
+  type FormulaManagerSession,
+  type SaveDraftDecision,
+} from '@/shell/formula/openFormulaManagerCommand'
 import { matchRowToSelectedSheet, sheetCodeEquals } from './sheetIdentityMatch'
 // Task 6.2 / MEDIUM-2：表间审核树 key ↔ 规则 map key 单一生成函数（需求 7.4）。
 import {
@@ -882,6 +905,7 @@ import {
   cacheKeyMatches,
   shouldApplyResponse,
   resolveSaveYear,
+  createKeyedSingleFlight,
 } from './projectCacheKey'
 // Task 1.4 / ADR-FMC-02：公式行 kind 分类 + 只读判定 + 保存端点分派单一真源。
 import {
@@ -943,20 +967,65 @@ const props = withDefaults(defineProps<{
    * 而非默认的「科目明细」节点。值域与 treeData 报表域 key 后缀一致。
    */
   initialReportType?: string
+  canonicalLocation?: CanonicalWorkpaperLocation
+  capabilitySnapshot?: WorkpaperCapabilitySnapshot
+  formulaSession?: FormulaManagerSession
+  readOnly?: boolean
 }>(), {
   scope: 'report',
+  readOnly: false,
 })
 
 const emit = defineEmits<{
   (e: 'update:modelValue', val: boolean): void
   (e: 'saved'): void
   (e: 'applied'): void
+  (e: 'session-change', session: FormulaManagerSession): void
 }>()
 
 const visible = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v),
 })
+
+const formulaReadOnly = computed(() => props.readOnly === true)
+
+type FormulaMutationGate = SaveDraftDecision | { allow: true; location?: undefined }
+
+function evaluateFormulaMutation(baseVersionOk = true): FormulaMutationGate {
+  if (formulaReadOnly.value) {
+    return { allow: false, reasonCode: 'read_only', detail: '当前账号只有公式查看权限，不能修改或执行公式' }
+  }
+  if (props.scope !== 'workpaper') return { allow: true }
+  if (!props.formulaSession || !props.capabilitySnapshot || !props.canonicalLocation) {
+    return {
+      allow: false,
+      reasonCode: 'context_expired',
+      detail: '公式能力上下文已失效，请关闭后从当前底稿重新打开',
+    }
+  }
+  const pinned = props.formulaSession.pinnedLocation
+  return decideSaveDraft({
+    session: props.formulaSession,
+    capability: props.capabilitySnapshot,
+    routeOwnerValid: pinned.projectId === props.projectId && pinned.wpId === props.wpId,
+    baseVersionOk,
+  })
+}
+
+function guardFormulaMutation(baseVersionOk = true): boolean {
+  const decision = evaluateFormulaMutation(baseVersionOk)
+  if (!decision.allow) ElMessage.warning(decision.detail)
+  return decision.allow
+}
+
+function onFormulaDraftDirtyChange(dirty: boolean) {
+  if (props.scope !== 'workpaper' || !props.formulaSession) return
+  const next = dirty
+    ? markSessionDirty(props.formulaSession)
+    : discardDraftAndFollowLatest(props.formulaSession)
+  emit('session-change', next)
+}
 
 // 路由器(用于外链节点跳转)
 const router = useRouter()
@@ -1082,6 +1151,7 @@ async function loadMasterDiff() {
 
 /** 同步主模板更新到本项目（默认保留项目本地覆盖）。 */
 async function onApplyMasterUpdate() {
+  if (!guardFormulaMutation()) return
   if (!props.projectId) return
   try {
     await ElMessageBox.confirm(
@@ -1112,6 +1182,7 @@ async function onApplyMasterUpdate() {
 
 /** 把某条项目级公式提交为主模板候选（admin 审核通过后合并回 standard 级）。 */
 async function onSuggestToMaster(row: any) {
+  if (!guardFormulaMutation()) return
   if (!props.projectId || !row?.project_formula) return
   try {
     await ElMessageBox.confirm(
@@ -1164,6 +1235,7 @@ async function onOpenGlobalScopeOverview() {
  * 只落有公式的行）。此前这里打的是后端零实现的 `formula/auto-generate`，恒 404。
  */
 async function onMaterializeReportPresets() {
+  if (!guardFormulaMutation()) return
   if (!props.projectId) return
   const standard = `${fmTemplateType.value}_standalone`
   try {
@@ -1212,8 +1284,13 @@ const consolNoteTreeChildren = ref<any[]>([])
 const consolNoteTreeLoaded = ref(false)
 /** 用户在合并附注树上选中的 section_id（如 "五、1"），传递给 ConsolFormulaManagementPanel */
 const consolNoteSelectedSection = ref('')
+// 合并附注入口会从 watch 与 applyConsolNoteTarget 两处同时调用：同一模板只发一次（见 createKeyedSingleFlight）
+const consolNoteTreeFlight = createKeyedSingleFlight()
+function loadConsolNoteTree(): Promise<void> {
+  return consolNoteTreeFlight(fmTemplateType.value, fetchConsolNoteTree)
+}
 
-async function loadConsolNoteTree() {
+async function fetchConsolNoteTree() {
   if (consolNoteTreeLoaded.value) return
   try {
     const data = await api.get<any[]>(P_cn.list(fmTemplateType.value), {
@@ -1346,8 +1423,13 @@ const noteTreeChildren = ref<any[]>([])
 const noteTreeLoaded = ref(false)
 // Task 6.3（需求 10.1）：缓存命中记录的项目键。切项目后与 currentProjectCacheKey 不等 → 失效。
 const noteTreeCacheKey = ref<string | null>(null)
+// 打开链路会从 watch 与 applyNoteScopeTarget 两处同时调用：同一项目键只发一次（见 createKeyedSingleFlight）
+const noteTreeFlight = createKeyedSingleFlight()
+function loadNoteTree(): Promise<void> {
+  return noteTreeFlight(currentProjectCacheKey.value, fetchNoteTree)
+}
 
-async function loadNoteTree() {
+async function fetchNoteTree() {
   // 缓存按 project key 隔离：仅当已加载且缓存键 == 当前键才复用（切项目后判未命中、重新加载）。
   if (noteTreeLoaded.value && cacheKeyMatches(noteTreeCacheKey.value, currentProjectCacheKey.value)) return
   // 本次请求绑定发起时的项目键；响应回来若已切项目则丢弃（旧响应不覆盖新项目，需求 10.1）。
@@ -1950,131 +2032,24 @@ function countFormulas(reportType: string): number {
   return (allRowsMap.value[reportType] || []).filter(r => r.formula).length
 }
 
-// ── 表间审核自定义规则 ──
-// ── 表间审核规则（动态从 logic_check API 加载，项目不同规则不同） ──
-const crossCheckItems = ref<Record<string, any[]>>({
-  report_note: [],
-  report_wp: [],
-  note_wp: [],
+// ── cross_check composable（拆出 useCrossCheckRules.ts，原 ~130 行） ──
+const cc = useCrossCheckRules({
+  projectId: computed(() => props.projectId || ''),
+  year: computed(() => props.year),
+  selectedNodeKey, currentProjectCacheKey,
+  cacheKeyMatches, shouldApplyResponse, api, projectFormula, P_rc: P_rc,
+  guardFormulaMutation, showFormulaError,
+  askApplyScope: (d: string, s: string[]) => { settingsToolbarRef.value?.askApplyScope(d, s) },
+  CROSS_CHECK_NODE_KEYS,
 })
-const crossCheckLoaded = ref(false)
-// Task 6.3（需求 10.1）：表间审核缓存命中记录的项目键。
-const crossCheckCacheKey = ref<string | null>(null)
-// Task 6.2（需求 7.5）：执行结果为空时显式「无结果」（不以静态示例冒充）。
-const crossCheckExecEmpty = ref(false)
-
-/**
- * Task 6.2（需求 7.1/7.2/7.5）：加载表间审核执行结果 + 用户落库规则。
- *
- * 🔴 三处修复：
- *  ① **GET 带 `year`**（项目年）——后端 `run_report_cross_check` 的 `year` 必填，
- *     历史实现不传 → 恒 422 → 降级静态示例（需求 7.1）。
- *  ② **按「执行结果」解析**——响应是 `{issue_list, results, last_computed_at}`
- *     的执行结果（7 条 logic_check 勾稽的 passed/描述），**不是规则列表**。
- *     历史实现按 `data.rules/items` 误解析、恒拿不到 → 降级静态（需求 7.2）。
- *  ③ **空结果显式「无结果」**——执行结果为空（0 条）不以静态示例冒充（需求 7.5）。
- */
-async function loadCrossCheckItems() {
-  // 缓存按 project key 隔离：切项目后缓存键不等 → 判未命中、重新加载（需求 10.1）。
-  if ((crossCheckLoaded.value && cacheKeyMatches(crossCheckCacheKey.value, currentProjectCacheKey.value)) || !props.projectId) return
-  const reqKey = currentProjectCacheKey.value
-  // ① GET 带 year（缺 year 后端必 422；无 year 则不请求，显式无结果而非静态示例）
-  if (props.year != null) {
-    try {
-      const data = await api.get(projectFormula.reportCrossCheck(props.projectId), {
-        params: { year: Number(props.year) },  // Task 6.2 ①：必传 year
-        _silent: true,  // 404/422 不弹全局错误 toast
-        validateStatus: (s: number) => s < 600,
-      } as any)
-      // 旧项目的 late response 不覆盖新项目结果（需求 10.1 / 10.4 abort 后重发污染）。
-      if (!shouldApplyResponse(reqKey, currentProjectCacheKey.value)) return
-      // ② 按执行结果解析：results = [{formula_id, description, expression, passed}]
-      const results: any[] = Array.isArray(data?.results)
-        ? data.results
-        : (Array.isArray(data?.data?.results) ? data.data.results : [])
-      if (results.length) {
-        // 执行结果是报表勾稽（report ↔ note/wp），统一归入 report_note 分组展示；
-        // passed → ✅、未通过 → ❌。每条 key 由 formula_id 稳定生成（不随机）。
-        const items = results.map((o: any) => ({
-          key: `cross_exec_${o.formula_id}`,
-          label: o.description || o.formula_id,
-          icon: o.passed === true ? '✅' : o.passed === false ? '❌' : '📌',
-          _formulaId: o.formula_id,
-          _passed: o.passed,
-        }))
-        crossCheckExecEmpty.value = false
-        crossCheckItems.value = {
-          report_note: items,
-          report_wp: [],
-          note_wp: [],
-        }
-        crossCheckLoaded.value = true
-        crossCheckCacheKey.value = reqKey
-        await loadCrossCheckUserRules()
-        return
-      }
-    } catch { /* 落到下方「无结果」分支 */ }
-  }
-  if (!shouldApplyResponse(reqKey, currentProjectCacheKey.value)) return
-  // ③ 空结果 / 无 year / 请求失败：显式「无结果」，不以静态示例冒充（需求 7.5）
-  crossCheckExecEmpty.value = true
-  crossCheckItems.value = { report_note: [], report_wp: [], note_wp: [] }
-  crossCheckLoaded.value = true
-  crossCheckCacheKey.value = reqKey
-  await loadCrossCheckUserRules()
-}
-
-/**
- * Task 6.2（需求 7.3）：从后端读取用户落库的表间审核规则，覆盖到
- * `crossCheckRulesMap`（按树节点 key 分组）。关闭再打开弹窗后仍可见。
- */
-async function loadCrossCheckUserRules() {
-  if (!props.projectId) return
-  try {
-    const data: any = await api.get(projectFormula.crossCheckRules(props.projectId), {
-      _silent: true,
-      validateStatus: (s: number) => s < 600,
-    } as any)
-    const rules = data?.rules ?? data?.data?.rules ?? null
-    if (rules && typeof rules === 'object') {
-      for (const [nodeKey, nodeRules] of Object.entries(rules)) {
-        if (Array.isArray(nodeRules)) {
-          crossCheckRulesMap.value[nodeKey] = (nodeRules as any[]).map((r) => ({
-            label: r.label || '',
-            left_ref: r.left_ref || '',
-            operator: r.operator || '=',
-            right_ref: r.right_ref || '',
-            description: r.description || '',
-            _editing: false,
-          }))
-        }
-      }
-    }
-  } catch { /* 读失败保留内存默认（含静态种子），不阻断 */ }
-}
-
-/** Task 6.2（需求 7.3）：把当前节点的规则集整体 PUT 落库（新增/编辑/删除后调用）。 */
-async function persistCrossCheckRules() {
-  if (!props.projectId) return
-  // 只落库用户可编辑契约字段（剔除 _editing 等 UI 瞬态字段）。
-  const payload: Record<string, any[]> = {}
-  for (const [nodeKey, nodeRules] of Object.entries(crossCheckRulesMap.value)) {
-    payload[nodeKey] = (nodeRules || []).map((r) => ({
-      label: r.label || '',
-      left_ref: r.left_ref || '',
-      operator: r.operator || '=',
-      right_ref: r.right_ref || '',
-      description: r.description || '',
-    }))
-  }
-  try {
-    await api.put(projectFormula.crossCheckRules(props.projectId), { rules: payload }, {
-      validateStatus: (s: number) => s < 600,
-    } as any)
-  } catch (e: any) {
-    handleApiError(e, '表间审核规则保存失败')
-  }
-}
+const crossCheckItems = cc.execItems
+const crossCheckLoaded = cc.execLoaded
+const crossCheckExecEmpty = cc.execEmpty
+const loadCrossCheckItems = cc.loadExecItems
+const crossCheckTokens = cc.tokens
+function applyCrossCheckRules(data: any) { cc.applyRulesData(data) }
+async function persistCrossCheckRules() { await cc.persist() }
+async function loadCrossCheckUserRules() { await cc.loadUserRules() }
 
 // ── 数据加载 ──
 const allRowsMap = ref<Record<string, any[]>>({})
@@ -2097,9 +2072,17 @@ const noteUserFormulasSection = ref<string>('')
  * 弹窗附注节点此前只读模板预设（notePresetFormulas）、看不到用户在附注页保存的公式。
  * 此处补齐：有 projectId/year/sectionId 时调 `GET list_note_formulas`，把用户集并入显示。
  * 缺上下文（章级节点 / 无 sectionId）时清空用户集，不串到别的章节。
+ *
+ * 附注页带章节打开时会调两次：applyNoteScopeTarget 预取（不 await）+ 定位到章节叶子后
+ * onTreeNodeClick 再调一次，第一发还在飞 ⇒ 同一项目 + 章节只发一次（见 createKeyedSingleFlight）。
  */
-async function loadNoteUserFormulas(sectionId: string): Promise<void> {
+const noteUserFormulasFlight = createKeyedSingleFlight()
+function loadNoteUserFormulas(sectionId: string): Promise<void> {
   const sid = (sectionId || '').trim()
+  return noteUserFormulasFlight(`${currentProjectCacheKey.value}|${sid}`, () => fetchNoteUserFormulas(sid))
+}
+
+async function fetchNoteUserFormulas(sid: string): Promise<void> {
   if (!props.projectId || !props.year || !sid) {
     noteUserFormulas.value = []
     noteUserFormulasSection.value = ''
@@ -2124,48 +2107,20 @@ async function loadNoteUserFormulas(sectionId: string): Promise<void> {
 //    专属组件取数公式 surfaced、D-cycle 四表提取 extraction）。此前底稿节点无加载分支恒空。 ──
 const wpFormulaRows = ref<any[]>([])
 
-// ── tb_detail「科目明细」公式覆盖 + 自定义新增（持久化于 wizard_state.tb_detail_formulas）──
-const tbDetailOverrides = ref<Record<string, any>>({})
-const tbDetailAdded = ref<any[]>([])
-// 第三级兜底：当 addrStore.tbAddresses 和 props.rows 都为空时，从 API 拉取试算表科目列表
-const tbDetailFallbackAccounts = ref<Array<{ code: string; name: string }>>([])
-
-async function loadTbDetailFormulas() {
-  if (!props.projectId) return
-  try {
-    const data: any = await api.get(reportConfigFormula.tbDetail(props.projectId), {
-      _silent: true, validateStatus: (s: number) => s < 600,
-    } as any)
-    tbDetailOverrides.value = data?.overrides || {}
-    tbDetailAdded.value = Array.isArray(data?.added) ? data.added : []
-  } catch { /* silent */ }
-  // 当 addrStore.tbAddresses 和 props.rows 都为空时，从试算表 API 拉科目作兜底
-  if (!(addrStore.loaded && addrStore.tbAddresses.length > 0) && !(props.rows && props.rows.length > 0) && !tbDetailFallbackAccounts.value.length) {
-    try {
-      const tbData: any = await api.get(`/api/projects/${props.projectId}/trial-balance`, {
-        params: { year: props.year || new Date().getFullYear() },
-        _silent: true, validateStatus: (s: number) => s < 600,
-      } as any)
-      const items = Array.isArray(tbData) ? tbData : (tbData?.items || tbData?.data || [])
-      if (Array.isArray(items) && items.length) {
-        tbDetailFallbackAccounts.value = items.map((r: any) => ({
-          code: r.standard_account_code || r.account_code || '',
-          name: r.account_name || '',
-        })).filter((r: { code: string }) => r.code)
-      }
-    } catch { /* silent fallback */ }
-  }
-}
-
-async function persistTbDetailFormulas() {
-  if (!props.projectId) return
-  try {
-    await api.put(reportConfigFormula.tbDetail(props.projectId), {
-      overrides: tbDetailOverrides.value,
-      added: tbDetailAdded.value,
-    }, { validateStatus: (s: number) => s < 600 })
-  } catch (e) { handleApiError(e, '保存失败') }
-}
+// ── tb_detail composable（拆出 useTbDetailFormulas.ts，原 ~52 行） ──
+const tbDetail = useTbDetailFormulas({
+  projectId: computed(() => props.projectId || ''),
+  year: computed(() => props.year),
+  rows: computed(() => props.rows),
+  addrStore, api, reportConfigFormula, guardFormulaMutation, showFormulaError,
+  askApplyScope: (d: string, s: string[]) => { settingsToolbarRef.value?.askApplyScope(d, s) },
+})
+const tbDetailOverrides = tbDetail.overrides
+const tbDetailAdded = tbDetail.added
+const tbDetailLoaded = tbDetail.loaded
+const tbDetailFallbackAccounts = tbDetail.fallbackAccounts
+const loadTbDetailFormulas = tbDetail.load
+const persistTbDetailFormulas = tbDetail.persist
 const wpFormulaLoading = ref(false)
 const wpFormulaError = ref('')
 /** 「调用页给了具体 sheet 但坐标目录里定位不到」的显式告警（≠ 加载失败，≠ 全册视图）。 */
@@ -2193,7 +2148,7 @@ async function loadPushBindings(): Promise<void> {
       : Array.isArray(data?.bindings) ? data.bindings.map((item: any) => item?.wp_code) : []
     pushWpCodes.value = codes
       .filter((code: unknown): code is string => typeof code === 'string' && !!code.trim())
-      .map((code) => code.trim().toUpperCase())
+      .map((code: string) => code.trim().toUpperCase())
   } catch {
     if (request === pushBindingsRequest) pushWpCodes.value = []
   }
@@ -2266,7 +2221,7 @@ function resolveCurrentWpSheet(sheets: AcnrSheetEntry[], wpCode: string, sheetNa
   const wpSheets = sheets.filter((s) => s.domain === 'wp')
 
   const owned = wpSheets.filter((s) => {
-    const parent = normalizeWpCode(s.parent_wp_code || s._wpCode || '')
+    const parent = normalizeWpCode(s.parent_wp_code || '')
     if (!(parent === requested || requested.startsWith(`${parent}-`))) return false
     return matchesSheetIdentity(s, name)
   })
@@ -2298,7 +2253,7 @@ function resolveWpSheetNode(wpCode: string, sheetName: string): any | null {
   // 共享页的树节点挂在它的原生工作簿下（D0-2 在 D0 名下），按真实归属找，
   // 否则只在宿主(D2)子树里找必然落空。
   const ownerWpCode = resolvedSheet
-    ? normalizeWpCode(resolvedSheet.parent_wp_code || resolvedSheet._wpCode || wpCode)
+    ? normalizeWpCode(resolvedSheet.parent_wp_code || wpCode)
     : ''
   const keyOf = (n: any) => String(n?.key || '').toLowerCase()
   const same = (a: string, b: string) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase()
@@ -2390,6 +2345,7 @@ async function loadWpFormulas(wpCode: string, sheetCode: string) {
         // （PUT /api/workpapers/{wp_id}/formulas 需 sheet_name/target_cell/expression）。
         sheet_name: it.sheet_name || '', target_cell: it.target_cell || '',
         stable_sheet_key: it.stable_sheet_key || null,
+        definition_version: it.definition_version ?? null,
       })
     }
     // surfaced 按选中 sheet 过滤：条目带 sheet_codes（归属 sheet 列表）时，仅在选中该 sheet
@@ -2637,6 +2593,8 @@ watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () 
     // 用户落库规则（关闭再打开仍可见已保存的规则）。
     crossCheckLoaded.value = false
     crossCheckExecEmpty.value = false
+    // formula-global-settings-sync：报表行是本项目有效定义，每次打开 / 换项目都重取（全局发布、待确认处理后不读旧缓存）
+    invalidateEffectiveReport(props.projectId); allRowsMap.value = {}; reportStandardByType.value = {}
     if (props.wpId || props.scope === 'workpaper') {
       selectedWpCode.value = props.wpCode || ''
       selectedWpSheetCode.value = ''
@@ -2785,8 +2743,9 @@ watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () 
       await nextTick()
       try { fmTreeRef.value?.setCurrentKey(nodeKey) } catch { /* ignore */ }
     }
-    // 外部入口指定目标节点（如底稿页跳转 wp_e1_1）→ 自动展开+选中+加载公式
-    applyTargetNode()
+    // 外部入口指定目标节点（如底稿页跳转 wp_e1_1）→ 自动展开+选中+加载公式；
+    // 没有目标且停在报表节点时补加载当前报表（打开时已清报表行缓存）
+    if (!(await applyTargetNode()) && activeReportType.value && !allRowsMap.value[activeReportType.value]) await loadRowsForNode(selectedNodeKey.value)
   }
 })
 
@@ -2845,46 +2804,12 @@ function onTreeNodeClick(data: any) {
 const currentRows = computed(() => {
   // 试算平衡表节点
   if (selectedNodeKey.value === 'tb_detail') {
-    // 科目明细：按科目生成 TB() 取数预设（分类默认「自动运算」），叠加用户覆盖 + 自定义新增
-    // 覆盖/新增持久化于 wizard_state.tb_detail_formulas，避免预设不对且支持二次编辑。
-    // R14.6: 候选地址源优先走 Req16 store facade（ACNR-backed）tbAddresses，空/未加载时回退 props.rows。
-    // 第三级兜底：从 trial-balance API 拉取的科目列表（全局入口打开时 props.rows 为空）。
-    const ov = tbDetailOverrides.value
     const base = (addrStore.loaded && addrStore.tbAddresses.length > 0)
       ? addrStore.tbAddresses.map((e) => ({ code: e.account_code || '', name: e.label || '', computed: undefined as any }))
       : (props.rows && props.rows.length > 0)
         ? props.rows.map((r: any) => ({ code: r.standard_account_code || '', name: r.account_name || '', computed: r.unadjusted_amount }))
         : tbDetailFallbackAccounts.value.map((r) => ({ code: r.code, name: r.name, computed: undefined as any }))
-    const rows: any[] = base.map((b) => {
-      const o = ov[b.code]
-      return {
-        id: `tbd-${b.code}`,
-        row_code: b.code,
-        row_name: b.name,
-        formula: (o && o.formula != null) ? o.formula : `TB('${b.code}','期末余额')`,
-        formula_category: (o && o.formula_category) ? o.formula_category : 'auto_calc',
-        formula_description: (o && o.formula_description != null) ? o.formula_description : '从余额表取期末余额',
-        _computed_value: b.computed,
-        _tbDetail: true,
-        _overridden: !!o,
-      }
-    })
-    // 追加用户自定义新增行
-    for (let i = 0; i < tbDetailAdded.value.length; i++) {
-      const a = tbDetailAdded.value[i]
-      rows.push({
-        id: a.row_code ? `tbd-add-${a.row_code}` : `tbd-add-${i}`,
-        row_code: a.row_code || '',
-        row_name: a.row_name || '',
-        formula: a.formula || '',
-        formula_category: a.formula_category || 'auto_calc',
-        formula_description: a.formula_description || '',
-        _computed_value: undefined,
-        _tbDetail: true,
-        _tbAdded: true,
-      })
-    }
-    return rows
+    return tbDetail.buildRows(base)
   }
   if (selectedNodeKey.value === 'tb_summary') {
     // 试算平衡表：显示 report_config 的行次公式
@@ -2965,31 +2890,21 @@ const currentRows = computed(() => {
   return []
 })
 
-const isCrossCheckMode = computed(() => selectedNodeKey.value.startsWith('cross_'))
+// ── cross_check CRUD + 执行（委托 composable，原 ~311 行） ──
+const isCrossCheckMode = cc.isCrossCheckMode
+const crossCheckRulesMap = cc.rulesMap
+const crossCheckRulesForCurrent = cc.rulesForCurrent
+const showCrossRuleDialog = cc.showDialog
+const crossRuleDialogTitle = cc.dialogTitle
+const crossRuleEditIndex = cc.editIndex
+const crossRuleForm = cc.form
+const onAddCrossRule = cc.onAdd
+const onEditCrossRule = cc.onEdit
+const onSaveCrossRule = cc.onSave
+const onRemoveCrossRule = cc.onRemove
+const crossCheckRunning = cc.running
+const onRunCrossCheck = cc.run
 
-// 表间审核规则（Task 6.2 / MEDIUM-2：map key 一律经 CROSS_CHECK_NODE_KEYS 生成，
-// 与树父节点 key 同源；用户落库规则由 loadCrossCheckUserRules 覆盖，此处为内存默认种子）
-const crossCheckRulesMap = ref<Record<string, any[]>>({
-  [CROSS_CHECK_NODE_KEYS.report_note]: [
-    { label: 'BS货币资金 = 附注货币资金合计', left_ref: "REPORT('BS-002','期末')", right_ref: "NOTE('货币资金','合计','期末')", _editing: false },
-    { label: 'BS应收账款 = 附注应收账款合计', left_ref: "REPORT('BS-008','期末')", right_ref: "NOTE('应收账款','合计','期末')", _editing: false },
-    { label: 'IS营业收入 = 附注营业收入合计', left_ref: "REPORT('IS-002','本期')", right_ref: "NOTE('营业收入','合计','本期')", _editing: false },
-  ],
-  [CROSS_CHECK_NODE_KEYS.report_wp]: [
-    { label: 'BS货币资金 = E1-1审定数', left_ref: "REPORT('BS-002','期末')", right_ref: "WP('E1-1','审定数')", _editing: false },
-    { label: 'BS应收账款 = D2-1审定数', left_ref: "REPORT('BS-008','期末')", right_ref: "WP('D2-1','审定数')", _editing: false },
-  ],
-  [CROSS_CHECK_NODE_KEYS.note_wp]: [
-    { label: '附注货币资金 = E1-1审定数', left_ref: "NOTE('货币资金','合计','期末')", right_ref: "WP('E1-1','审定数')", _editing: false },
-  ],
-  [CROSS_CHECK_NODE_KEYS.consol]: [
-    { label: '合并抵消分录借贷平衡', left_ref: "CONSOL('抵消分录','借方合计')", right_ref: "CONSOL('抵消分录','贷方合计')", _editing: false },
-    { label: '模拟权益法长投 = 净资产×持股比例', left_ref: "CONSOL('模拟权益法','期末长投小计')", right_ref: "CONSOL('净资产表','期末净资产') × 持股比例", _editing: false },
-    { label: '资本公积变动期末 = 合并报表期末', left_ref: "CONSOL('资本公积变动','期末金额')", right_ref: "REPORT('BS-资本公积','期末')", _editing: false },
-  ],
-})
-
-// ── 合并报表表样行结构（供公式配置用） ──
 function consolSheetRows(nodeKey: string): any[] {
   const sheetMap: Record<string, { rows: { code: string; name: string; formula?: string; category?: string; desc?: string }[] }> = {
     consol_info: { rows: [
@@ -3140,147 +3055,6 @@ function consolSheetRows(nodeKey: string): any[] {
   }))
 }
 
-const crossCheckRulesForCurrent = computed(() => {
-  const key = selectedNodeKey.value
-  return crossCheckRulesMap.value[key] || []
-})
-
-// ── 表间审核规则弹窗编辑 ──
-const showCrossRuleDialog = ref(false)
-const crossRuleDialogTitle = ref('新增规则')
-const crossRuleEditIndex = ref(-1)  // -1 = 新增，>= 0 = 编辑已有行
-const crossRuleForm = ref({
-  label: '',
-  left_ref: '',
-  operator: '=',
-  right_ref: '',
-  description: '',
-})
-
-function onAddCrossRule() {
-  crossRuleDialogTitle.value = '新增表间审核规则'
-  crossRuleEditIndex.value = -1
-  crossRuleForm.value = { label: '', left_ref: '', operator: '=', right_ref: '', description: '' }
-  showCrossRuleDialog.value = true
-}
-
-function onEditCrossRule(row: any, index: number) {
-  crossRuleDialogTitle.value = '编辑表间审核规则'
-  crossRuleEditIndex.value = index
-  crossRuleForm.value = {
-    label: row.label || '',
-    left_ref: row.left_ref || '',
-    operator: row.operator || '=',
-    right_ref: row.right_ref || '',
-    description: row.description || '',
-  }
-  showCrossRuleDialog.value = true
-}
-
-function onSaveCrossRule() {
-  const key = selectedNodeKey.value
-  if (!crossCheckRulesMap.value[key]) crossCheckRulesMap.value[key] = []
-
-  const ruleData = {
-    label: crossRuleForm.value.label,
-    left_ref: crossRuleForm.value.left_ref,
-    operator: crossRuleForm.value.operator,
-    right_ref: crossRuleForm.value.right_ref,
-    description: crossRuleForm.value.description,
-    _editing: false,
-  }
-
-  if (crossRuleEditIndex.value >= 0) {
-    // 编辑已有行
-    Object.assign(crossCheckRulesMap.value[key][crossRuleEditIndex.value], ruleData)
-  } else {
-    // 新增
-    crossCheckRulesMap.value[key].push(ruleData)
-  }
-
-  showCrossRuleDialog.value = false
-  ElMessage.success(crossRuleEditIndex.value >= 0 ? '规则已更新' : '规则已新增')
-  // Task 6.2（需求 7.3）：落库持久化，关闭再打开仍可见。
-  void persistCrossCheckRules()
-}
-
-function onRemoveCrossRule(index: number) {
-  const key = selectedNodeKey.value
-  crossCheckRulesMap.value[key]?.splice(index, 1)
-  // Task 6.2（需求 7.3）：删除也落库。
-  void persistCrossCheckRules()
-}
-
-// ── 表间审核执行校验（spec: formula-push-user-custom-cross-module T9）──
-const crossCheckRunning = ref(false)
-
-async function onRunCrossCheck() {
-  const rules = crossCheckRulesForCurrent.value
-  if (!rules.length) {
-    ElMessage.info('当前节点没有校验规则')
-    return
-  }
-  if (!props.projectId || !props.year) {
-    ElMessage.warning('缺少项目信息')
-    return
-  }
-
-  crossCheckRunning.value = true
-  try {
-    // 收集左右两侧所有公式，批量执行
-    const allFormulas: { row_code: string; formula: string }[] = []
-    for (let i = 0; i < rules.length; i++) {
-      if (rules[i].left_ref) allFormulas.push({ row_code: `_ccL${i}`, formula: rules[i].left_ref })
-      if (rules[i].right_ref) allFormulas.push({ row_code: `_ccR${i}`, formula: rules[i].right_ref })
-    }
-
-    const data = await api.post(P_rc.executeFormulasBatch, {
-      project_id: props.projectId,
-      year: props.year,
-      formulas: allFormulas,
-    }, { validateStatus: (s: number) => s < 600 })
-
-    const resultMap = new Map<string, number>()
-    for (const r of (data?.results || [])) {
-      if (r.row_code && r.value != null && r.error == null) {
-        resultMap.set(r.row_code, Number(r.value))
-      }
-    }
-
-    // 写回校验结果
-    let passCount = 0
-    let failCount = 0
-    for (let i = 0; i < rules.length; i++) {
-      const leftVal = resultMap.get(`_ccL${i}`) ?? null
-      const rightVal = resultMap.get(`_ccR${i}`) ?? null
-      rules[i]._leftVal = leftVal
-      rules[i]._rightVal = rightVal
-      rules[i]._checked = leftVal != null && rightVal != null
-      if (rules[i]._checked) {
-        const diff = (leftVal ?? 0) - (rightVal ?? 0)
-        rules[i]._diff = diff
-        const op = rules[i].operator || '='
-        rules[i]._pass = op === '=' ? Math.abs(diff) < 0.01
-          : op === '<=' ? diff <= 0.01
-          : op === '>=' ? diff >= -0.01
-          : Math.abs(diff) < 0.01
-        if (rules[i]._pass) passCount++
-        else failCount++
-      }
-    }
-
-    if (failCount > 0) {
-      ElMessage.warning(`校验完成：${passCount} 条通过，${failCount} 条差异`)
-    } else {
-      ElMessage.success(`全部 ${passCount} 条校验通过`)
-    }
-  } catch (e: any) {
-    handleApiError(e, '表间审核执行失败')
-  } finally {
-    crossCheckRunning.value = false
-  }
-}
-
 // ── 分类筛选 ──
 const activeCategory = ref('all')
 
@@ -3420,17 +3194,18 @@ function startEdit(row: any) {
     ElMessage.info('取数/溯源说明为只读投影，不可编辑')
     return
   }
+  if (!guardFormulaMutation()) return
   editingRow.value = row
   showFormulaEdit.value = true
 }
 
-async function onFormulaEditSave(data: { formula: string; category: string; description: string }) {
+async function onFormulaEditSave(data: { formula: string; category: string; description: string; target_cell?: string }) {
   const row = editingRow.value
-  if (!row) return
-
-  row.formula = data.formula
-  row.formula_category = data.category
-  row.formula_description = data.description
+  const gate = evaluateFormulaMutation(row?.definition_version != null || row?._isNew === true)
+  if (!row || !gate.allow) {
+    if (!gate.allow) ElMessage.warning(gate.detail)
+    return
+  }
 
   // tb_detail 科目明细：覆盖默认预设 / 自定义新增 → 持久化 wizard_state.tb_detail_formulas
   if (selectedNodeKey.value === 'tb_detail') {
@@ -3452,7 +3227,13 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
         formula: data.formula, formula_category: cat, formula_description: data.description,
       }
     }
-    await persistTbDetailFormulas()
+    Object.assign(row, {
+      formula: data.formula,
+      formula_category: data.category,
+      formula_description: data.description,
+    })
+    if (!await persistTbDetailFormulas()) return
+    showFormulaEdit.value = false
     ElMessage.success('公式已保存')
     emit('saved')
     await propagateFormulaStale()  // Task 6.3（需求 10.3）：单行保存触发统一 stale 传播
@@ -3463,6 +3244,11 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
     // 新增公式行——添加到当前列表并尝试保存到后端
     if (data.formula) {
       const rows = currentRows.value
+      Object.assign(row, {
+        formula: data.formula,
+        formula_category: data.category,
+        formula_description: data.description,
+      })
       row.row_number = rows.length + 1
       rows.push(row)
 
@@ -3481,8 +3267,9 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
             formula_category: data.category,
             formula_description: data.description,
           }, { validateStatus: (s: number) => s < 600 })
-          if (saved?.id) row.id = saved.id
+          if (saved?.id) Object.assign(row, { id: saved.id, formula_version: saved.formula_version })
           row._isNew = false
+          showFormulaEdit.value = false
           ElMessage.success('新公式已保存')
           emit('saved')
           await propagateFormulaStale()  // Task 6.3（需求 10.3）：单行保存触发统一 stale 传播
@@ -3511,66 +3298,64 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
   }
 
   if (dispatch === 'wp') {
-    if (!props.wpId) {
-      ElMessage.warning('缺少底稿实例，无法保存底稿公式')
+    const targetLocation = gate.location
+    if (!targetLocation) {
+      ElMessage.warning('缺少固定的底稿位置，无法保存底稿公式')
       return
     }
     try {
-      await api.put(wpFormula.upsert(props.wpId), {
-        sheet_name: row.sheet_name || row.row_name || selectedWpSheetCode.value || '',
-        target_cell: row.target_cell || row.row_code || '',
+      const saved: any = await api.put(wpFormula.upsert(targetLocation.wpId), {
+        sheet_name: row.sheet_name || targetLocation.display.sheetName || selectedWpSheetCode.value || '',
+        target_cell: data.target_cell || row.target_cell || row.row_code || '',
         expression: data.formula || '',
-        year: props.year,
+        year: targetLocation.fiscalYear,
         template_type: fmTemplateType.value,
         category: data.category,
         description: data.description,
+        expected_version: row.definition_version ?? undefined,
       })
+      if (saved?.definition_version != null) row.definition_version = saved.definition_version
+      Object.assign(row, {
+        formula: data.formula,
+        formula_category: data.category,
+        formula_description: data.description,
+        target_cell: data.target_cell || row.target_cell,
+      })
+      showFormulaEdit.value = false
       ElMessage.success('公式已保存')
       emit('saved')
-      await propagateFormulaStale()  // Task 6.3（需求 10.3）：单行保存触发统一 stale 传播
+      await propagateFormulaStale(targetLocation)
     } catch (e) {
       handleApiError(e, '保存失败')
     }
     return
   }
 
-  // dispatch === 'report'：报表模板行走 report-config detail。
-  try {
-    await api.put(P_rc.detail(row.id), {
-      formula: data.formula || null,
-      formula_category: data.category,
-      formula_description: data.description,
-      aje_formula: row.aje_formula || null,
-      rje_formula: row.rje_formula || null,
-    })
-    ElMessage.success('公式已保存')
-    emit('saved')
-    await propagateFormulaStale()  // Task 6.3（需求 10.3）：单行保存触发统一 stale 传播
-  } catch (e) {
-    handleApiError(e, '保存失败')
-  }
+  // dispatch === 'report'：项目上下文写本项目适配（有效定义行），否则写报表配置行（全局行 = 直接发布，带版本）
+  await saveReportRowDraft(row, { formula: data.formula || null, formula_category: data.category, formula_description: data.description },
+    () => { showFormulaEdit.value = false })
 }
 
 async function saveEdit(row: any) {
   // 兼容行内编辑（保留）
-  if (!row.id) return
+  if (!row.id || !guardFormulaMutation(row.definition_version != null)) return
+  await saveReportRowDraft(row, { formula: editFormula.value || null, formula_category: editCategory.value, formula_description: editDescription.value },
+    () => { editingId.value = null })
+}
+
+/** 单行保存：先存草稿副本，成功才回写到行（失败不留「界面已改、库里没有」）；本项目保存后问应用范围（R7.1）。 */
+async function saveReportRowDraft(row: any, fields: Record<string, any>, onDone: () => void) {
   try {
-    await api.put(P_rc.detail(row.id), {
-      formula: editFormula.value || null,
-      formula_category: editCategory.value,
-      formula_description: editDescription.value,
-      aje_formula: row.aje_formula || null,
-      rje_formula: row.rje_formula || null,
-    })
-    row.formula = editFormula.value
-    row.formula_category = editCategory.value
-    row.formula_description = editDescription.value
-    editingId.value = null
+    const draft = { ...row, ...fields }
+    const { projectSlotKeys } = await saveReportRows(props.projectId, [draft])
+    Object.assign(row, draft)
+    onDone()
     ElMessage.success('公式已保存')
     emit('saved')
-    await propagateFormulaStale()  // Task 6.3（需求 10.3）：单行（行内）保存触发统一 stale 传播
+    await propagateFormulaStale()  // Task 6.3（需求 10.3）：单行保存触发统一 stale 传播
+    askApplyScope(projectSlotKeys)
   } catch (e) {
-    handleApiError(e, '保存失败')
+    showFormulaError(e, '保存失败')
   }
 }
 
@@ -3594,6 +3379,7 @@ function categoryLabel(cat: string | null) {
 }
 
 async function onApplyFormulas() {
+  if (!guardFormulaMutation()) return
   if (!props.projectId || !props.year) {
     ElMessage.warning('缺少项目信息')
     return
@@ -3711,14 +3497,12 @@ async function onImportPresetFormulas() {
   ElMessage.info('当前节点暂无预设公式')
 }
 
-// ── 共享模板 ──
+// ── 报表行全量加载（看板等全览场景用） ──
 
 /**
  * 确保 6 类报表的 report_config 行都已加载。
  *
- * 🔴 模板保存/引用都必须先补齐：`allRowsMap` 只装"用户点过的报表"，
- * 直接采集会存下**只含当前已看过部分**的残缺模板（用户无从察觉），
- * 引用时也会因目标报表未加载而**静默跳过**整类行。
+ * 🔴 全览前必须先补齐：`allRowsMap` 只装"用户点过的报表"，直接统计会只含已看过的部分（用户无从察觉）。
  */
 async function ensureAllReportRowsLoaded(): Promise<void> {
   for (const rt of REPORT_TYPE_KEYS) {
@@ -3727,254 +3511,59 @@ async function ensureAllReportRowsLoaded(): Promise<void> {
   }
 }
 
-/**
- * 保存为模板：采集全 6 类报表公式（异步补齐后再采集）+ 附注校验预设 + 项目级底稿公式。
- *
- * 三段各自可独立引用：报表段可写回 report_config；附注段与底稿段属**只读快照**
- * （附注预设是模板级、底稿公式绑定具体 wp 实例，跨项目行号/实例都不同，
- * 直接写回会串项目），故引用时只回填报表段，另两段仅作留档与比对。
- */
-async function getFormulaConfigData(): Promise<Record<string, any>> {
-  await ensureAllReportRowsLoaded()
-  const formulaRows: any[] = []
-  const perType: Record<string, number> = {}
-  // 与看板同源：只遍历 6 类报表键白名单（`key.includes('_')` 会把全部报表键跳掉）
-  for (const key of REPORT_TYPE_KEYS) {
-    const rows = (allRowsMap.value[key] as any[] | undefined) || []
-    let n = 0
-    for (const r of rows) {
-      if (r.formula) {
-        formulaRows.push({
-          row_code: r.row_code,
-          row_name: r.row_name,
-          formula: r.formula,
-          formula_category: r.formula_category,
-          formula_description: r.formula_description,
-          report_type: key,
-        })
-        n += 1
-      }
-    }
-    perType[key] = n
-  }
-  // ── 附注段：模板级校验预设（先补齐，避免"没点过附注就存不到"）──
-  if (!notePresetFormulas.value.length) {
-    try {
-      const data = await api.get(P_nt.presetFormulas(fmTemplateType.value), {
-        validateStatus: (s: number) => s < 600,
-      })
-      notePresetFormulas.value = data ?? []
-    } catch { /* 附注预设不可用不阻断报表段 */ }
-  }
-  const noteRows = buildNoteFormulaRows(notePresetFormulas.value, {}).map((r: any) => ({
-    note_section: r.row_code,
-    section_title: r.row_name,
-    formula: r.formula,
-    formula_category: r.formula_category,
-    formula_description: r.formula_description,
-  }))
+// ── 全局设置 / 本项目适配 / 公式模板（spec formula-global-settings-sync）──
+// 旧「保存为模板 / 引用模板 / 撤销引用」走共享配置 formula_config（只回填报表段、引用会写全局行）已下线（R13.10 / R14.2），
+// 改为顶栏 FormulaSettingsToolbar：模板 = 订阅一层，只写本项目层，模板更新经同一同步内核与待确认弹窗。
 
-  // ── 底稿段：项目级 wp_formula（按 7 类作用域）──
-  if (props.projectId && !scopeCatalog.totalCount.value) {
-    try { await scopeCatalog.loadGlobal(props.projectId) } catch { /* 不阻断 */ }
-  }
-  const wpRows = scopeCatalog.allRows.value.map((r) => ({
-    scope: r.scope,
-    sheet_name: r.sheetName,
-    target_cell: r.targetCell,
-    formula: r.expression,
-    formula_type: r.formulaType,
-  }))
+const settingsToolbarRef = ref<InstanceType<typeof FormulaSettingsToolbar> | null>(null)
+/** 当前用户是否 admin（本项目有效定义接口给出）：应用范围里显示「设为全局」还是「提交为全局候选」 */
+const canEditGlobal = ref(false)
+/** 本项目报表域的作用范围（有效定义接口给出）：跳转全局设置、保存模板时默认带上 */
+const projectReportScope = ref('')
+/** 当前节点对应的公式域 */
+const settingsDomain = computed(() => {
+  const k = selectedNodeKey.value
+  if (k === 'tb_detail') return 'tb_detail'
+  if (k.startsWith('cross_')) return 'cross_check'
+  return isNoteDomainNodeKey(k) ? 'note' : 'report'
+})
+const settingsScope = computed(() => projectReportScope.value || `${fmTemplateType.value}_standalone`)
 
-  const total = formulaRows.length + noteRows.length + wpRows.length
-  if (!total) ElMessage.warning('当前无公式可保存为模板')
-  return {
-    formulas: formulaRows,
-    // 新增两段（引用时只回填 formulas；这两段作留档/比对，避免跨项目串行号与实例）
-    note_formulas: noteRows,
-    workpaper_formulas: wpRows,
-    template_type: fmTemplateType.value,
-    // 存下采集口径，便于引用时判断是否同版（此前只有 template_type，无准则/覆盖信息）
-    applicable_standard: `${fmTemplateType.value}_standalone`,
-    coverage: {
-      ...perType,
-      note_presets: noteRows.length,
-      workpaper_project: wpRows.length,
-    },
-    captured_at: new Date().toISOString(),
-  }
+/** 订阅 / 退订 / 应用到其他 / 恢复全局之后：本项目有效定义变了，丢掉报表行缓存重取当前节点 */
+async function onFormulaSettingsChanged() {
+  invalidateEffectiveReport(props.projectId)
+  allRowsMap.value = {}
+  reportStandardByType.value = {}
+  await loadRowsForNode(selectedNodeKey.value)
+  emit('saved')
 }
 
-/**
- * 引用模板：填入 + **落库**，并给出准确的三类计数。
- *
- * 修掉三处旧问题：
- *  1. 只改内存不落库 —— 弹窗关掉就丢，提示却是「已引用 N 条」（假成功）；
- *  2. 目标报表未加载时整类静默跳过（`if (!rows) continue`）；
- *  3. 模板版本（国企/上市）与当前页不同也直接套用。
- */
-async function onTemplateApplied(data: Record<string, any>) {
-  const formulas = data?.formulas || []
-  if (!formulas.length) {
-    ElMessage.warning('模板中无公式数据')
-    return
-  }
-
-  const tplType = normalizeTemplateType(data?.template_type)
-  if (data?.template_type && tplType !== fmTemplateType.value) {
-    try {
-      await ElMessageBox.confirm(
-        `模板是「${tplType === 'listed' ? '上市版' : '国企版'}」，当前页是`
-        + `「${fmTemplateType.value === 'listed' ? '上市版' : '国企版'}」，行次编码体系可能不同。仍要引用？`,
-        '模板版本不一致',
-        { confirmButtonText: '仍要引用', cancelButtonText: '取消', type: 'warning' },
-      )
-    } catch { return }
-  }
-
-  applying.value = true
-  try {
-    await ensureAllReportRowsLoaded()
-
-    // ── 先算 plan（不改任何数据）：可写 / 跳过 / 不存在 ──
-    const writable: any[] = []
-    let skippedExisting = 0
-    let unmatched = 0
-    for (const f of formulas) {
-      const rows = (allRowsMap.value[f.report_type] as any[] | undefined) || []
-      const target = rows.find((r: any) => r.row_code === f.row_code)
-      if (!target) { unmatched += 1; continue }
-      if (target.formula) { skippedExisting += 1; continue }
-      writable.push({ target, source: f })
-    }
-
-    if (!writable.length) {
-      ElMessage.warning(
-        `无可写入行：跳过已有公式 ${skippedExisting} 条，模板行次在当前报表中不存在 ${unmatched} 条`,
-      )
-      return
-    }
-
-    // ── 预览 + 确认（此前是直接落库，用户看不到将写什么）──
-    const preview = writable.slice(0, 8)
-      .map(({ target, source }) => `${target.row_code} ${target.row_name || ''} ← ${source.formula}`)
-      .join('\n')
-    try {
-      await ElMessageBox.confirm(
-        `将写入 ${writable.length} 条公式；跳过已有 ${skippedExisting} 条；`
-        + `模板行次不存在 ${unmatched} 条。\n\n前 ${preview ? Math.min(8, writable.length) : 0} 条预览：\n${preview}`
-        + (writable.length > 8 ? `\n…（其余 ${writable.length - 8} 条）` : ''),
-        '引用模板 — 写入预览',
-        {
-          confirmButtonText: '确认写入',
-          cancelButtonText: '取消',
-          type: 'info',
-          customClass: 'gt-fm-tpl-preview',
-        },
-      )
-    } catch { return }
-
-    // ── 落库；逐条记录 undo 快照（失败/回滚都要能还原）──
-    const undo: { row: any; before: { formula: any; category: any; description: any } }[] = []
-    let saved = 0
-    let failed = 0
-    for (const { target, source } of writable) {
-      const before = {
-        formula: target.formula ?? null,
-        category: target.formula_category ?? null,
-        description: target.formula_description ?? null,
-      }
-      target.formula = source.formula
-      target.formula_category = source.formula_category
-      target.formula_description = source.formula_description
-      if (!target.id) { failed += 1; continue }
-      try {
-        await api.put(P_rc.detail(target.id), {
-          formula: target.formula || null,
-          formula_category: target.formula_category,
-          formula_description: target.formula_description,
-        })
-        undo.push({ row: target, before })
-        saved += 1
-      } catch {
-        // 该行写库失败 → 内存也还原，避免"界面显示已写、库里没有"
-        target.formula = before.formula
-        target.formula_category = before.category
-        target.formula_description = before.description
-        failed += 1
-      }
-    }
-
-    lastTemplateUndo.value = undo.length
-      ? { templateName: String(data?.template_name || '模板'), entries: undo }
-      : null
-
-    const parts = [`已引用并保存 ${saved} 条`]
-    if (failed) parts.push(`保存失败 ${failed} 条`)
-    if (skippedExisting) parts.push(`跳过已有公式 ${skippedExisting} 条`)
-    if (unmatched) parts.push(`模板行次在当前报表中不存在 ${unmatched} 条`)
-    // 附注/底稿段是只读留档：如实说明未写回，避免用户以为整包都进来了
-    const noteCount = Array.isArray(data?.note_formulas) ? data.note_formulas.length : 0
-    const wpCount = Array.isArray(data?.workpaper_formulas) ? data.workpaper_formulas.length : 0
-    if (noteCount || wpCount) {
-      parts.push(`模板另含附注预设 ${noteCount} 条 / 底稿公式 ${wpCount} 条（只读留档，未写回）`)
-    }
-    const text = parts.join('，')
-    if (failed) ElMessage.warning(text)
-    else ElMessage.success(`${text}（可点「↩ 撤销引用」还原）`)
-    if (saved) emit('saved')
-  } finally {
-    applying.value = false
-  }
+/** 本项目保存成功后问应用范围：仅本项目（默认）/ 设为全局 / 应用到指定项目（R7.1） */
+function askApplyScope(slotKeys: string[]) {
+  if (slotKeys.length) settingsToolbarRef.value?.askApplyScope('report', slotKeys)
 }
 
-/** 上一次引用模板的可撤销快照（仅本次会话内有效）。 */
-const lastTemplateUndo = ref<{
-  templateName: string
-  entries: { row: any; before: { formula: any; category: any; description: any } }[]
-} | null>(null)
-
-/** 撤销上一次引用模板：把写过的行逐条还原回引用前的值。 */
-async function onUndoTemplateApply() {
-  const snapshot = lastTemplateUndo.value
-  if (!snapshot?.entries.length) return
+/** 恢复为全局（R6.2）：删除本项目适配；来自订阅模板的回到模板定义 */
+async function onRestoreGlobal(row: any) {
+  if (!guardFormulaMutation() || !props.projectId) return
   try {
-    await ElMessageBox.confirm(
-      `将把「${snapshot.templateName}」写入的 ${snapshot.entries.length} 条公式还原为引用前的值。确认撤销？`,
-      '撤销引用模板',
-      { confirmButtonText: '确认撤销', cancelButtonText: '取消', type: 'warning' },
-    )
+    await confirmDangerous({
+      title: '恢复为全局', confirmText: '恢复',
+      message: `「${row.row_code} ${row.row_name || ''}」将去掉本项目的改动，回到全局（或订阅模板）的定义。`,
+    })
   } catch { return }
-
-  applying.value = true
-  let restored = 0
-  let failed = 0
   try {
-    for (const { row, before } of snapshot.entries) {
-      try {
-        await api.put(P_rc.detail(row.id), {
-          formula: before.formula,
-          formula_category: before.category,
-          formula_description: before.description,
-        })
-        row.formula = before.formula
-        row.formula_category = before.category
-        row.formula_description = before.description
-        restored += 1
-      } catch { failed += 1 }
-    }
-    if (failed) ElMessage.warning(`已还原 ${restored} 条，${failed} 条还原失败`)
-    else {
-      ElMessage.success(`已还原 ${restored} 条`)
-      lastTemplateUndo.value = null
-    }
-    if (restored) emit('saved')
-  } finally {
-    applying.value = false
+    await restoreReportRows(props.projectId, [row])
+    ElMessage.success('已恢复为全局定义')
+    await onFormulaSettingsChanged()
+    await propagateFormulaStale()
+  } catch (e) {
+    showFormulaError(e, '恢复为全局失败')
   }
 }
 
 function onAddFormulaRow() {
+  if (!guardFormulaMutation()) return
   // 打开公式编辑弹窗，不绑定具体行——用户自由编辑
   editingRow.value = {
     id: null,
@@ -3990,7 +3579,13 @@ function onAddFormulaRow() {
 }
 
 async function onSaveAllFormulas() {
-  const rows = currentRows.value.filter(r => r.formula)
+  const gate = evaluateFormulaMutation()
+  if (!gate.allow) {
+    ElMessage.warning(gate.detail)
+    return
+  }
+  // 改过的行也算（含「清除公式」后为空的行，此前被 `r.formula` 过滤掉、清除从未落库）
+  const rows = currentRows.value.filter(r => r.formula || rowChanged(r))
   if (!rows.length) {
     ElMessage.warning('无公式可保存')
     return
@@ -3998,6 +3593,7 @@ async function onSaveAllFormulas() {
   applying.value = true
   let saved = 0
   let skippedReadonly = 0
+  const reportBatch: any[] = []
   try {
     for (const row of rows) {
       // Task 1.4 / ADR-FMC-02 触类旁通：批量「保存全部」同样先按 kind 分派，
@@ -4025,30 +3621,29 @@ async function onSaveAllFormulas() {
         row._isNew = false
         saved++
       } else if (row.id && dispatch === 'wp') {
-        // 底稿行 → wpFormula.upsert（非 report-config）
-        if (!props.wpId) continue
-        await api.put(wpFormula.upsert(props.wpId), {
-          sheet_name: row.sheet_name || row.row_name || selectedWpSheetCode.value || '',
+        // 底稿行 → wpFormula.upsert；URL/年度/sheet 必须来自 session pinnedLocation。
+        const targetLocation = gate.location
+        if (!targetLocation) continue
+        const savedRow: any = await api.put(wpFormula.upsert(targetLocation.wpId), {
+          sheet_name: row.sheet_name || targetLocation.display.sheetName || selectedWpSheetCode.value || '',
           target_cell: row.target_cell || row.row_code || '',
           expression: row.formula || '',
-          year: props.year,
+          year: targetLocation.fiscalYear,
           template_type: fmTemplateType.value,
           category: row.formula_category,
           description: row.formula_description,
+          expected_version: row.definition_version ?? undefined,
         }, { validateStatus: (s: number) => s < 600 })
+        if (savedRow?.definition_version != null) row.definition_version = savedRow.definition_version
         saved++
-      } else if (row.id && dispatch === 'report') {
-        // 报表模板行 → report-config detail
-        await api.put(P_rc.detail(row.id), {
-          formula: row.formula,
-          formula_category: row.formula_category,
-          formula_description: row.formula_description,
-          aje_formula: row.aje_formula || null,
-          rje_formula: row.rje_formula || null,
-        })
-        saved++
+      } else if (row.id && dispatch === 'report' && rowChanged(row)) {
+        // 报表行只收改过的，循环后一次保存（项目上下文 = 一次写本项目适配，原子）
+        reportBatch.push(row)
       }
     }
+    const { projectSlotKeys } = reportBatch.length ? await saveReportRows(props.projectId, reportBatch) : { projectSlotKeys: [] }
+    saved += reportBatch.length
+    askApplyScope(projectSlotKeys)
     ElMessage.success(
       skippedReadonly
         ? `已保存 ${saved} 个公式（跳过 ${skippedReadonly} 条只读投影）`
@@ -4056,11 +3651,10 @@ async function onSaveAllFormulas() {
     )
     emit('saved')
 
-    // Sprint 5.10 / Task 6.3（需求 10.2/10.3）: 保存后调 stale_engine 传播变更。
-    // 「保存全部」与单行保存共用这一条统一传播（propagateFormulaStale），年份取 props.year。
-    await propagateFormulaStale()
+    // 保存全部与单行保存共用传播；工作底稿域继续使用固定位置的项目/年度。
+    await propagateFormulaStale(gate.location)
   } catch (e) {
-    handleApiError(e, '保存失败')
+    showFormulaError(e, '保存失败')
   } finally {
     applying.value = false
   }
@@ -4073,13 +3667,14 @@ async function onSaveAllFormulas() {
  * 触发**与保存全部相同**的传播（需求 10.3）。年份一律取 `props.year`（项目年），经
  * `resolveSaveYear` 口径——缺可解析年份时跳过传播，**不** fallback 到系统当前年（需求 10.2）。
  */
-async function propagateFormulaStale() {
-  const year = resolveSaveYear(props.year)
-  if (!props.projectId || year == null) return  // 缺项目/年份则跳过（不以系统年顶替）
+async function propagateFormulaStale(location?: CanonicalWorkpaperLocation) {
+  const projectId = location?.projectId || props.projectId
+  const year = resolveSaveYear(location?.fiscalYear ?? props.year)
+  if (!projectId || year == null) return  // 缺项目/年份则跳过（不以系统年顶替）
   try {
     await api.post(linkageBus.impact, {
       source_uri: `FORMULA:${selectedNodeKey.value}::config_changed`,
-      project_id: props.projectId,
+      project_id: projectId,
       year,
     }, { validateStatus: (s: number) => s < 600 })
   } catch {
@@ -4144,6 +3739,17 @@ const activeReportLevelLabel = computed(() => {
  * 毫无变化（用户以为按钮没生效），改公式还改在模板级（波及所有项目）。
  */
 async function fetchReportRows(reportType: string): Promise<any[]> {
+  // formula-global-settings-sync R1.2：项目上下文读本项目有效定义（全局 → 订阅模板 / 本项目适配，逐行标层级）；
+  // 「有项目行就只显示项目行」的旧口径会把只适配了几行的项目其余全局行全部藏掉。接口不可用才回退旧口径。
+  if (props.projectId) {
+    const eff = await fetchEffectiveReportRows(props.projectId, reportType)
+    if (eff) {
+      reportStandardByType.value[reportType] = `project:${props.projectId}`
+      canEditGlobal.value = eff.canEditGlobal
+      projectReportScope.value = eff.scope
+      return eff.rows
+    }
+  }
   const candidates: string[] = []
   if (props.projectId) candidates.push(`project:${props.projectId}`)
   candidates.push(`${fmTemplateType.value}_standalone`)
@@ -4166,7 +3772,7 @@ async function fetchReportRows(reportType: string): Promise<any[]> {
         }
       }
       reportStandardByType.value[reportType] = standard
-      return rows
+      return markLoaded(rows)
     } catch { /* 该口径取失败 → 试下一个 */ }
   }
   return []
@@ -4489,6 +4095,7 @@ async function loadUserFormulas(wpId: string) {
 }
 
 async function onRestorePresetFormula(row: UserFormulaItem) {
+  if (!guardFormulaMutation()) return
   const wpId = wpIdForUserFormulas.value
   const session = dialogSession
   if (!wpId) return
@@ -4515,6 +4122,7 @@ async function onRestorePresetFormula(row: UserFormulaItem) {
 }
 
 async function onDeleteUserFormula(row: UserFormulaItem) {
+  if (!guardFormulaMutation()) return
   const wpId = wpIdForUserFormulas.value
   const session = dialogSession
   if (!wpId) return

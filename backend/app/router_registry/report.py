@@ -36,8 +36,11 @@ def register_report_routers(app: FastAPI) -> None:
     from app.routers.word_export import router as word_export_router
     from app.routers.report_mapping import router as report_mapping_router
     from app.routers.deliverable import router as deliverable_router
+    # 从 report_config 迁出的两个子路由（同前缀 /api/report-config），紧随其后注册以保持匹配顺序
+    from app.routers.tb_detail_formulas import router as tb_detail_router
+    from app.routers.report_drill_down import router as drill_down_router
 
-    for r in [rc_router, reports_router, cfs_router, dn_router, ar_router,
+    for r in [rc_router, tb_detail_router, drill_down_router, reports_router, cfs_router, dn_router, ar_router,
               export_router, nt_router, nwm_router, ntr_router, nai_router,
               rt_router, word_export_router, report_mapping_router]:
         app.include_router(r, tags=["报表与附注"])
@@ -150,3 +153,15 @@ def register_report_routers(app: FastAPI) -> None:
 
     from app.routers.note_text_batch import router as note_tb_router
     app.include_router(note_tb_router, tags=["note-text-batch"])
+
+    # ═══ §107. formula-global-settings-sync：公式全局设置 / 本项目适配 / 待确认 / 应用到其他 ═══
+    from app.routers.formula_settings import project_router as fs_project_router
+    from app.routers.formula_settings import router as fs_router
+    app.include_router(fs_router, tags=["formula-settings"])
+    app.include_router(fs_project_router, tags=["formula-settings"])
+
+    # 公式模板：保存 / 共享 / 订阅 / 发布新版本 / 退订 / 设为全局（R13）
+    from app.routers.formula_templates import project_router as ft_project_router
+    from app.routers.formula_templates import router as ft_router
+    app.include_router(ft_router, tags=["formula-templates"])
+    app.include_router(ft_project_router, tags=["formula-templates"])

@@ -711,16 +711,14 @@ async def resolve_consol_standard(db: AsyncSession, project_id: UUID) -> str:
     return consol_standard(template_type)
 
 
-async def load_report_rows(db: AsyncSession, standard: str) -> list[ReportRow]:
-    from app.models.report_models import ReportConfig
+async def load_report_rows(
+    db: AsyncSession, standard: str, project_id: UUID | None = None
+) -> list[ReportRow]:
+    """合并准则行；给定 ``project_id`` 时叠加本项目适配（spec formula-global-settings-sync R1.2）。"""
+    from app.services.formula_settings.effective_report import load_effective_report_configs
 
-    result = await db.execute(
-        sa.select(ReportConfig).where(
-            ReportConfig.applicable_standard == standard,
-            ReportConfig.is_deleted == sa.false(),
-        )
-    )
-    return ordered_rows(ReportRow.from_config(c) for c in result.scalars().all())
+    configs = await load_effective_report_configs(db, standard=standard, project_id=project_id)
+    return ordered_rows(ReportRow.from_config(c) for c in configs)
 
 
 __all__ = [

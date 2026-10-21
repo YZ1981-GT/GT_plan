@@ -19,6 +19,12 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.report_models import FinancialReportType, ReportConfig, ReportConfigBaseline
+from app.services.formula_settings.legacy_report import (
+    approve_baseline_candidate,
+    master_base,
+    sync_project_to_global,
+    update_row,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -245,6 +251,7 @@ class ReportConfigService:
                 applicable_standard=project_standard,
                 is_total_row=src.is_total_row,
                 parent_row_code=src.parent_row_code,
+                **master_base(src),  # V199：以准则行为基线（跟随全局，全局再改时自动同步）
             )
             self.db.add(clone)
             count += 1
@@ -316,6 +323,7 @@ class ReportConfigService:
         project_id: UUID,
         applicable_standard: str | None = None,
         overwrite: bool = False,
+        user_id: UUID | None = None,
     ) -> dict:
         """把标准模板的**预设公式**落成项目级配置（``project:{id}``）。
 
@@ -335,7 +343,9 @@ class ReportConfigService:
             overwrite: 项目级已有该行时是否用模板公式覆盖。
 
         Returns:
-            ``{standard, project_standard, created, updated, skipped, master_with_formula}``
+            ``{standard, project_standard, created, updated, skipped, master_with_formula, events}``；
+            ``overwrite`` 覆盖 = 本项目「采用全局」（formula-global-settings-sync）：同时结案该公式位的待确认、
+            写带 project_id 的留痕，``events`` 由调用方 commit 后交 ``publish_events``。
         """
         project_standard = f"project:{project_id}"
         standard = applicable_standard or await self.resolve_applicable_standard(
@@ -363,6 +373,7 @@ class ReportConfigService:
         }
 
         created = updated = skipped = 0
+        adopted: list[tuple[str, str | None, str | None]] = []  # (公式位, 原公式, 新公式)
         for src in master_rows:
             key = (
                 src.report_type.value
@@ -373,12 +384,16 @@ class ReportConfigService:
             hit = existing.get(key)
             if hit is not None:
                 if overwrite and hit.formula != src.formula:
+                    adopted.append((f"{key[0]}:{src.row_code}", hit.formula, src.formula))
                     hit.formula = src.formula
                     hit.formula_category = src.formula_category
                     hit.formula_description = src.formula_description
                     hit.formula_source = src.formula_source
                     hit.aje_formula = src.aje_formula
                     hit.rje_formula = src.rje_formula
+                    for attr, value in master_base(src).items():  # 采用全局 ⇒ 基线 = 全局
+                        setattr(hit, attr, value)
+                    hit.formula_version = (hit.formula_version or 1) + 1
                     updated += 1
                 else:
                     skipped += 1
@@ -399,9 +414,27 @@ class ReportConfigService:
                     applicable_standard=project_standard,
                     is_total_row=src.is_total_row,
                     parent_row_code=src.parent_row_code,
+                    **master_base(src),
                 )
             )
             created += 1
+
+        events: list[dict] = []
+        if adopted:
+            # overwrite 覆盖 = 本项目采用全局：结案这些公式位的待确认（adopt），写一条项目留痕，
+            # 并上报有效定义变化（调用方 commit 后发事件 → 报表重算）。
+            from app.services.formula_settings.audit import audit_project, change_entry
+            from app.services.formula_settings.pending import close_pending
+
+            slot_keys = [slot for slot, _, _ in adopted]
+            await close_pending(self.db, project_id, "report", slot_keys, status="resolved",
+                                resolution="adopt", user_id=user_id)
+            await audit_project(
+                self.db, user_id=user_id, project_id=project_id, domain="report", action="adapt",
+                source="materialize_overwrite",
+                changes=[change_entry("report", slot, {"formula": old}, {"formula": new})
+                         for slot, old, new in adopted])
+            events = [{"project_id": str(project_id), "slot_keys": slot_keys}]
 
         await self.db.flush()
         return {
@@ -411,6 +444,7 @@ class ReportConfigService:
             "updated": updated,
             "skipped": skipped,
             "master_with_formula": len(master_rows),
+            "events": events,
         }
 
     # ------------------------------------------------------------------
@@ -422,72 +456,18 @@ class ReportConfigService:
         updates: dict,
         user_id: UUID | None = None,
     ) -> ReportConfig:
-        """修改报表配置行"""
+        """修改报表配置行 —— 经公式设置同步内核（spec formula-global-settings-sync R9）。
+
+        全局行改公式 = 直接发布（全部应用 + 冲突交项目确认）；项目行改公式 = 保存本项目适配；
+        改公式须带 ``expected_version``（缺失 428、不一致 409，抛 ``FormulaSettingError``）。
+        结构字段（行名 / 缩进 / 合计行 / 父行）直接写。留痕由内核写（带 project_id，
+        原写法取 ``row.project_id`` 恒为 None ⇒ 项目「公式历史」查不到）。
+        需要传播的调用方改用 ``legacy_report.update_row`` 拿 events，commit 后发布。
+        """
         row = await self.get_config(config_id)
         if row is None:
             raise ValueError("配置行不存在")
-
-        # 记录变更前的值（审计留痕）
-        old_values = {}
-        allowed_fields = {"row_name", "indent_level", "formula", "is_total_row", "parent_row_code", "formula_category", "formula_description", "formula_source", "aje_formula", "rje_formula"}
-        for key, value in updates.items():
-            if key in allowed_fields:
-                old_values[key] = getattr(row, key, None)
-                setattr(row, key, value)
-
-        # 公式变更审计留痕（统一走哈希链 append_audit_log）
-        if old_values and user_id:
-            try:
-                from app.services.audit_log_helper import append_audit_log
-
-                old_formula = str(old_values.get("formula", "")) if old_values.get("formula") is not None else ""
-                new_formula = str(updates.get("formula", "")) if updates.get("formula") is not None else ""
-                await append_audit_log(self.db, {
-                    "user_id": user_id,
-                    "project_id": row.project_id if hasattr(row, "project_id") else None,
-                    "action": "formula.changed",
-                    "resource_type": "report_config",
-                    "resource_id": str(config_id),
-                    "details": {
-                        "event_type": "formula_changed",
-                        "module": "report",
-                        "row_code": row.row_code,
-                        "action": "update",
-                        "old_formula": old_formula,
-                        "new_formula": new_formula,
-                        "result_value": "",
-                        "trace": [],
-                        "_diff": {k: {"old": str(old_values.get(k)), "new": str(updates.get(k))} for k in old_values if old_values[k] != updates.get(k)},
-                    },
-                })
-            except Exception:
-                pass  # 审计留痕失败不阻断业务
-
-        await self.db.flush()
-
-        # 主模板更新事件：非 project:* 才发 REPORT_CONFIG_MASTER_UPDATED（需求 2.1）
-        if not row.applicable_standard.startswith("project:"):
-            try:
-                from app.models.audit_platform_schemas import EventPayload, EventType
-                from app.services.event_bus import event_bus
-
-                # project_id 是占位（主模板无项目维度），真正的作用对象由 handler 按
-                # extra.standard/report_type/row_code 反查克隆项目。该事件类型不在
-                # EventBus 的年度补齐范围内（YEAR_SCOPED_EVENT_TYPES），占位 id 不会被当项目查年度。
-                await event_bus.publish(EventPayload(
-                    event_type=EventType.REPORT_CONFIG_MASTER_UPDATED,
-                    project_id=user_id or config_id,  # fallback: config_id as UUID placeholder
-                    extra={
-                        "standard": row.applicable_standard,
-                        "report_type": row.report_type.value if hasattr(row.report_type, "value") else str(row.report_type),
-                        "row_code": row.row_code,
-                        "config_id": str(config_id),
-                    },
-                ))
-            except Exception:
-                pass  # 事件发布失败不阻断业务
-
-        return row
+        return (await update_row(self.db, row, updates, user_id=user_id))["row"]
 
     # ------------------------------------------------------------------
     # 主模板回填：suggest_to_master
@@ -551,8 +531,8 @@ class ReportConfigService:
         candidate_id: UUID,
         approved: bool,
         reviewer: UUID,
-    ) -> None:
-        """admin 审核候选：通过则合并回 standard 级 + 版本号 + append_audit_log。
+    ) -> dict | None:
+        """admin 审核候选：通过则作为全局发布 + 版本号 + append_audit_log；返回发布结果（含 events）。
 
         Args:
             candidate_id: 候选记录 ID
@@ -575,61 +555,48 @@ class ReportConfigService:
         if not approved:
             candidate.status = "rejected"
             await self.db.flush()
-            return
+            return None
 
-        # 通过：合并回 standard 级
+        # 通过：经同步内核作为全局发布（V199，source=promote）—— 跟随全局的项目自动更新，
+        # 改过且不同的项目生成待确认事项；不再只改准则行、让各项目各自不知情。
         candidate.status = "approved"
-
-        # 查找 standard 级对应行
-        master_result = await self.db.execute(
-            sa.select(ReportConfig).where(
-                ReportConfig.applicable_standard == candidate.standard,
-                ReportConfig.row_code == candidate.row_code,
-                ReportConfig.report_type == FinancialReportType(candidate.report_type),
-                ReportConfig.is_deleted == sa.false(),
-            )
+        published = await approve_baseline_candidate(
+            self.db, standard=candidate.standard, report_type=candidate.report_type,
+            row_code=candidate.row_code, formula=candidate.candidate_formula, reviewer=reviewer,
+            source_project_id=candidate.source_project_id, candidate_id=candidate_id,
         )
-        master_row = master_result.scalar_one_or_none()
-
-        old_formula = ""
-        if master_row:
-            old_formula = master_row.formula or ""
-            master_row.formula = candidate.candidate_formula
-        else:
-            # standard 级不存在该行（理论上不应发生，但防御性处理）
-            logger.warning(
-                "standard 级未找到 %s/%s/%s，跳过合并",
-                candidate.standard, candidate.report_type, candidate.row_code,
-            )
+        old_formula = published["old_formula"]
 
         # 版本号递增
         candidate.version = candidate.version + 1
 
-        # 审计留痕（event_type='report_config_changed'）
+        # 审计留痕（event_type='report_config_changed'）；SAVEPOINT 隔离：失败不让 PG 事务中止
         try:
             from app.services.audit_log_helper import append_audit_log
 
-            await append_audit_log(self.db, {
-                "user_id": reviewer,
-                "project_id": candidate.source_project_id,
-                "action": "report_config.review_approved",
-                "resource_type": "report_config_baseline",
-                "resource_id": str(candidate_id),
-                "details": {
-                    "event_type": "report_config_changed",
-                    "sub_action": "review_approved",
-                    "standard": candidate.standard,
-                    "report_type": candidate.report_type,
-                    "row_code": candidate.row_code,
-                    "candidate_id": str(candidate_id),
-                    "old_formula": old_formula,
-                    "new_formula": candidate.candidate_formula or "",
-                },
-            })
+            async with self.db.begin_nested():
+                await append_audit_log(self.db, {
+                    "user_id": reviewer,
+                    "project_id": candidate.source_project_id,
+                    "action": "report_config.review_approved",
+                    "resource_type": "report_config_baseline",
+                    "resource_id": str(candidate_id),
+                    "details": {
+                        "event_type": "report_config_changed",
+                        "sub_action": "review_approved",
+                        "standard": candidate.standard,
+                        "report_type": candidate.report_type,
+                        "row_code": candidate.row_code,
+                        "candidate_id": str(candidate_id),
+                        "old_formula": old_formula,
+                        "new_formula": candidate.candidate_formula or "",
+                    },
+                })
         except Exception:
             logger.exception("review_candidate 审计留痕失败")
 
         await self.db.flush()
+        return published
 
     # ------------------------------------------------------------------
     # 主模板回填：diff_vs_master
@@ -719,85 +686,16 @@ class ReportConfigService:
         *,
         keep_local: bool = True,
     ) -> int:
-        """主模板更新同步到项目（保留项目本地覆盖）。
+        """主模板更新同步到项目 —— 经同步内核（spec formula-global-settings-sync R9.2）。
 
-        Args:
-            project_id: 项目 ID
-            standard: 源 standard（如 soe_consolidated）
-            keep_local: 若为 True，不覆盖项目已自定义的行（公式与主模板不同的行视为本地覆盖）
+        跟随全局的行（本项目 == 基线）改为当前全局；已一致只更新基线；改过且不同的行
+        ``keep_local=True`` 生成待确认事项（🔴 原实现只清过期标记了事，项目永远不知道主模板改了），
+        ``keep_local=False`` 直接采用全局。没有本项目行的公式位本就读全局，不再复制。
 
         Returns:
-            实际同步更新的行数
+            本项目公式被改为全局的行数（待确认 / 只更新基线的行不计；明细见 ``sync_project_to_global``）
         """
-        project_standard = f"project:{project_id}"
-
-        # 加载项目级配置
-        proj_result = await self.db.execute(
-            sa.select(ReportConfig).where(
-                ReportConfig.applicable_standard == project_standard,
-                ReportConfig.is_deleted == sa.false(),
-            )
+        result = await sync_project_to_global(
+            self.db, project_id=project_id, standard=standard, keep_local=keep_local,
         )
-        proj_rows = {
-            (r.report_type.value if hasattr(r.report_type, "value") else str(r.report_type), r.row_code): r
-            for r in proj_result.scalars().all()
-        }
-
-        # 加载 standard 级配置（主模板）
-        master_result = await self.db.execute(
-            sa.select(ReportConfig).where(
-                ReportConfig.applicable_standard == standard,
-                ReportConfig.is_deleted == sa.false(),
-            )
-        )
-        master_rows = list(master_result.scalars().all())
-
-        updated_count = 0
-
-        for master_row in master_rows:
-            key = (
-                master_row.report_type.value if hasattr(master_row.report_type, "value") else str(master_row.report_type),
-                master_row.row_code,
-            )
-            proj_row = proj_rows.get(key)
-
-            if proj_row is None:
-                # 项目没有该行 → 新增（从主模板同步）
-                new_row = ReportConfig(
-                    report_type=master_row.report_type,
-                    row_number=master_row.row_number,
-                    row_code=master_row.row_code,
-                    row_name=master_row.row_name,
-                    indent_level=master_row.indent_level,
-                    formula=master_row.formula,
-                    aje_formula=master_row.aje_formula,
-                    rje_formula=master_row.rje_formula,
-                    applicable_standard=project_standard,
-                    is_total_row=master_row.is_total_row,
-                    parent_row_code=master_row.parent_row_code,
-                    is_stale=False,
-                )
-                self.db.add(new_row)
-                updated_count += 1
-            else:
-                # 项目已有该行
-                if keep_local and proj_row.formula != master_row.formula:
-                    # 本地覆盖保留：公式不同说明项目已自定义，不覆盖
-                    # 但清除 is_stale 标记（用户已知晓差异）
-                    proj_row.is_stale = False
-                    continue
-
-                if not keep_local or proj_row.formula == master_row.formula:
-                    # 非本地覆盖 或 公式相同（可能其他字段变了）→ 同步
-                    proj_row.formula = master_row.formula
-                    proj_row.aje_formula = master_row.aje_formula
-                    proj_row.rje_formula = master_row.rje_formula
-                    proj_row.row_name = master_row.row_name
-                    proj_row.indent_level = master_row.indent_level
-                    proj_row.is_total_row = master_row.is_total_row
-                    proj_row.parent_row_code = master_row.parent_row_code
-                    proj_row.is_stale = False
-                    updated_count += 1
-
-        await self.db.flush()
-        return updated_count
+        return result["updated"]

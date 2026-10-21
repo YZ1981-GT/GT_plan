@@ -34,7 +34,8 @@ inclusion: always
 - **venv 路径**：backend cwd 用 `..\.venv\Scripts\python.exe`；仓库根 cwd 用 `.venv\Scripts\python.exe`（勿混）
 - Docker 容器：`audit-postgres`(5432) / `audit-redis`(6379→6379) / `audit-metabase`(3000)；health 端点 `/api/health`
 - 🔴 **Docker Desktop 重启后宿主端口转发可能陈旧**（vpnkit 仍转发到容器旧 IP）：容器 healthy、容器网内 `redis-cli ping` 通，宿主连 6379 却连上即断 ⇒ health 503 + **登录 500**（`auth_service` 的 login / refresh / logout 对 Redis=None 无降级，待修）。确认：`$env:LOCALAPPDATA/Docker/log/host/com.docker.backend.exe.log` 里有 `unable to connect … tcp forward … connection refused`；处置 `docker restart <容器>`（数据卷保留；2026-10-01 实测 DBSIZE 前后一致）
-- **前端唯一路径**：`audit-platform/frontend/`（仓库根无 `frontend/`）；views/components/composables 在其 `src/` 下
+- 🔴 **Kiro 窗口打开慢的主因不在仓库**（2026-10-20 实测）：每次启动 Session Migration 都要扫 `%APPDATA%\Kiro\User\globalStorage\kiro.kiroagent\workspace-sessions\ZDpcR1RfcGxhbg__` 下 1118 个 v1 旧会话（日志约 10.6 秒）；同目录 2026-08-10 前的旧执行记录约 48GB。**2026-10-20 用户确认后已处理**：9 项旧数据（48.7GB）同盘改名挪到 `C:\Users\Administrator\kiro_legacy_backup\`（内有 `README-恢复说明.txt`，确认无碍后可整体删除），`User\History` 删掉 30 天未动的文件夹（2GB→0.98GB），`~/.kiro/sessions`（当前会话 4.6GB）未动
+- **前端唯一路径**：`audit-platform/frontend/`（仓库根无 `frontend/`；`audit-platform/backend/` 是 7 月误提交的旧副本，2026-10-20 已删，曾让按目录名找仓库根的测试停错层）；views/components/composables 在其 `src/` 下
 - Playwright MCP 已装（workspace `.kiro/settings/mcp.json`）；新增依赖见 #dev-history（locust/marked+dompurify/decimal.js/python-docx/PyYAML/fast-check/Jinja2/jsonpatch + 外部 LibreOffice）
 - **scripts 规约**：`_` 前缀=一次性用完即删，无前缀=正式工具；`backend/scripts/` 分 8 子目录（check/seed/gen/analyze/ops/fix/migrate/e2e）；仓库根 `scripts/run.py` 统一入口
 - **底稿模板源目录**：`backend/wp_templates/`（按审计循环 A~S 分子目录），scan 脚本 `scripts/analyze/scan_wp_templates.py` 扫描后输出 `backend/data/gt_template_library.json`；ROOT 变量 = `backend/`（parent×3）
@@ -193,6 +194,12 @@ inclusion: always
 - 🔴 2026-10-19 补（design §10.4）：①**禁在共享终端里设 git 环境变量**（`$env:GIT_INDEX_FILE=…`）——终端与并发会话共用（输出里出现过别的会话 worktree 的提示符），548318fb1 的树与我临时索引的树逐字节相同、提交后主暂存区仍缺那 18 个新文件，多半是另一会话在带着我临时索引的终端里提交的；底层 git 一律放子进程并显式传 env ②fail-open 要连事务一起：吞异常不回滚到保存点，PG 上调用方事务仍停在 aborted（只读检查放保存点、成败都回滚）③一键全套已接附注导出闸门（409 notes_inconsistent），预检与出具提醒不再重复列未同步
 - 🔴 2026-10-19 补（design §10.5）：生成附注 / 交付件的全部入口补项目成员鉴权 —— 交付中心 `_guard_action` 先 `assert_project_permission`（看 readonly / 生成 review），word-exports / 导出附注 Word / 组合导出包复用同一函数，全链路编制类 edit、附注 AI readonly；鉴权基线把 `_guard_action` 记项目级（可伪证），前缀维 336→277；附注编辑器导出与交付件刷新 / 回填原为 edit 级、合伙人 / 经理用不了，用户拍板同样改走 `_guard_action`，deliverable_lineage 补交付件归属校验。教训：①磁盘变异脚本单独一条命令跑，别和其他命令串在一起 —— 工具返回不代表进程结束，串着再跑一次会与仍在跑的那次交错，一度把「去守卫」的变异留在磁盘上（跑完先核对文件状态）②SQL 断言只看 WHERE 之后：SELECT 列表本就含该列，整句匹配恒真
 
+### 前端单测网络隔离 + 弹窗并发加载合并 `frontend-test-network-isolation-and-load-dedup`（2026-10-19，10/10，未提交）
+- 单测基座拦 `net.Socket.prototype.connect`（改连不存在的命名管道 ⇒ ENOENT、axios 得 ERR_NETWORK，覆盖 XHR / WebSocket / Node http）；25 个历史泄漏文件冻结在 `src/test/networkLeakInventory.json`（只许删）；常规运行只告警，`GT_TEST_NETWORK_AUDIT=1` 才判失败（GtA121.pbt / GtA271 的泄漏是间歇性的）
+- `useAcnr.listSheets/listCells` 在途合并（键含缓存纪元，失效后不回写）；公式管理弹窗 `loadNoteTree` / `loadConsolNoteTree` / `loadNoteUserFormulas` 用 `createKeyedSingleFlight`
+- 🔴 教训：①mock 立即返回测不到并发：既有守卫「打开只调 1 次」靠时序成立，浏览器实测是 2 次 ⇒ 挂起响应到断言之后再数 ②网络面板请求数不是判据：同一 tick 的 GET 去重在 XHR 发出前就取消了先发那次 ⇒ 看被中止的 XHR 与「listSheets 失败 canceled」告警 ③在共享开发服务上做改动前后对照：另起端口 + Vite load 钩子在内存里换 HEAD 版（独立 cacheDir、关 HMR、关 d.ts 生成），不改源码 ④Playwright 浏览器与并发会话共用「当前标签页」，会被对方的导航带走 ⇒ 浏览器实测用 chrome-devtools ⑤HEAD 版公式管理弹窗 `P_cn` 未导入（ReferenceError 被 catch 吞，合并附注树从不加载；工作树已补导入）—— 全量 vue-tsc OOM，这类问题目前没有门禁兜
+- 提交前须知：`FormulaManagerDialog.vue` 4959 行 > whitelist 4268 +5%（HEAD 已 4820 超限），pre-commit 行数门会拦
+
 ### LLM / OCR 本机优先路由 `llm-ocr-local-first-routing`（2026-10-19~20，14/14，本地提交未推送）
 - V197：`ai_model_config.deployment`（local/server，按端点字面推导，`ai_model_options.classify_deployment`）；`is_active` = 参与路由，对话 / OCR 各能力槽本机、服务器各一条，向量单条不跨模型兜底；候选解析 `llm_runtime.resolve_route`、执行 `llm_route.route_chat_*`（连不上 / 5xx / 鉴权 / 404 改用下一个，读超时 / 400 / 429 / 空输出不改用，流式首片段前才改用，30 秒冷却，熔断按整条路由，ContextVar 记实际回答模型）；OCR `resolve_ocr_route` 本机引擎链优先、远程兜底；状态 `GET /api/ai-models/routes` + 模型配置页「调用路由」面板
 - 本地库现状（验收后）：对话本机 Qwen3.5 + 服务器 qwen3.8 均启用（本机先用）；OCR 本机 paddleocr（引擎未装 ⇒ 恒兜底）+ paddleocrv6、版面 paddleocrvl-1.6 启用；向量行指向 8100 而 8100 无 `/embeddings`（如实显示不可用，未改数据）
@@ -206,6 +213,12 @@ inclusion: always
 ### 46 个预存失败用例收口 `preexisting-test-failures-closure`（2026-10-20，10/10，本地提交未推送）
 - 生产缺陷 5 组：G7 resolver 附加键透传 · G10 OCR 字段合并 · **G11 启动编排单一来源**（`main.lifespan` 只跑 `startup_registry.run_startup_tasks`，`/api/health` 带 `startup` 报告；🔴 **新启动步骤只加在 `app/core/startup_registry.py`**，main.py 已删 14 个重复辅助函数）· G12 提示词覆盖率按前缀统一 · G1 可见性 SQLite UUID（SQLite 存 32 位十六进制无连字符，原生 SQL 绑 `str(uuid)` 恒不命中）+ WOPI put_file 被拒后还原磁盘
 - 🔴 教训：①spec 标完成但接线没入库（PAC 的 Method A 漏收 main.py / health.py）⇒ registry 成了只被测试看的副本，两边各自漂移（registry 缺 6 个事件订阅、main 的漂移自检漏 checksum_drift）—— 守卫守副本前先证明副本就是在跑的那份 ②旧用例每跑一次在 `backend/` 留一个 `<uuid>/2025/B1-1.xlsx`，正是 put_file 被拒载荷不还原的现场证据 ③待确认：覆盖率口径（67→142）、OCR 字段清单；范围外 8 项见其 design §2（含 main.py 三个无鉴权 `/api/_debug/a51-*`）
+
+### 公式全局设置 / 项目适配 / 一处改全处生效 `formula-global-settings-sync`（2026-10-21 续做收口 35/36 + 8.2 `[ ]*` UI 走查待环境，未提交）
+- 三层有效定义（本项目适配 → 订阅模板 → 全局 → 系统预设）+ 版本 / 基线 / 同步内核（inherit/follow/same/conflict/pinned/frozen），六域（report/tb_detail/cross_check/wp/note/consol_note）统一 `services/formula_settings/`；V199/R199；路由 `formula_settings.py`/`formula_templates.py`/`tb_detail_formulas.py`。全局发布→预览冲突→按项目应用/暂缓/冲突决策→待确认弹窗；公式模板=订阅一层（只写项目层）
+- 本轮补的真缺陷：①报表取数层四读者（report_account_mapping + four_table 三件）「本项目行公式空=停用不退回准则行」与报表生成同口径 ②`fill_all_formulas` 改经 `publish_global(source=seed)` 过内核（原直改准则行绕开同步）③propagation 过期标记先 commit 再 try 重算（整体失败保留过期+降级）④cross_check 落库 rule_id 用 `result_rule_id`=user:sha1(slot)[:16]（原不同节点同号撞 user:00000 丢行）⑤tb-detail PUT 去 require_role 只放 admin、改纯项目 edit ⑥shared_config delete_template 去二次所有者判断（admin 能删他人个人模板）+ 列表/详情同可见性口径
+- 🔴 EventPayload.year 默认 None 但 FORMULA_CONFIG_CHANGED 在 `event_bus.YEAR_SCOPED_EVENT_TYPES` ⇒ 派发口 `_backfill_year` 按项目审计年度补齐，consol_note/report 传播经事件能拿到 year（直接调 handler 传 year 的测试会掩盖此路径，须测「事件不带 year」）
+- 🔴 教训：①report_config 有多条写入路径（迁移 / fill_all_formulas / report_formula_service），只改一处等于白改——改公式行必过同步内核 ②design §3/§5/§9/§12/§16.2 五处偏离（代码为准，见其 design §17 / tasks 交付勘误）：停用=保留行 formula 置 None 非剔除、底稿项目层含 preset/reference（跟随副本写 preset，narrow 会读不回）③🔴 **数行数禁用 PowerShell `Measure-Object -Line`（跳过空行：report_models 算出 683 实为 798）**，一律 Python `splitlines()`（与门禁同口径）—— 曾据此把 HEAD 已超限的历史大文件误判为「并发会话膨胀」；**PowerShell here-string 里的反引号是转义符**（`` `f `` 变换页符，写进 INDEX 把链接弄坏），含反引号的文本一律写成 .py 文件再执行 ④提交须知：`FormulaManagerDialog.vue` HEAD 4819 > 阈值 4481，WT 4758 仍超，pre-commit 会拦
 
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
@@ -223,7 +236,19 @@ inclusion: always
 - ✅ `qc_report_export.py` — **已修**（2026-10-10 现读确认已用 `u.username`，无 display_name 引用；`test_export_endpoints_acceptance.py` 守卫 `test_sql_uses_username_not_display_name` 钉住）
 - ✅ `word_export.py` full-package 端点 — **已修**（2026-10-10）：`from fastapi import HTTPException` 写在 `if gate_result.decision == "block"` 分支内，模块顶层已有同名 import，函数体内延迟 import 遮蔽模块级名字 → 门禁通过时 `except HTTPException` 触发 `UnboundLocalError` → 异常穿透中间件。删掉冗余延迟 import 即修。
 - 系统性防御建议：加 CI「SQL 列引用 ⊆ 真实 schema」契约检查，一次兜住整类「查不存在列」bug（render-config/prefill/wizard/qc 已 4 处同源）
+### M7/M9 缺失 service + lazy import 守卫 `m7-m9-service-modules-and-lazy-import-guard`（2026-10-20，10/10，本地未提交）
+- **根因**：`routers/m7_special_reserve.py` / `m9_other_comprehensive_income.py` 函数体内 import 的 `app.services.m7_special_reserve_service` / `m9_other_comprehensive_income_service` 全仓不存在（8 端点一调即 ModuleNotFoundError）；7 月误提交 `audit-platform/backend/` 旧草稿（dd620e430）签名也不符。F2-1 导出/导入同类（import 不存在的 `app.models.checklist_response_models`）
+- **修**：新建共用内核 `m_detail_sheet_io.py`（DetailSheetSpec + 模板/数据工作簿 + 整表替换写库，裸 SQL `ON CONFLICT (wp_id,item_id)`）+ 两个 service（M7-2 / M9-2，各只支持界面唯一有入口的那张表，未知 sheet 抛 `HTTPException(400)`——这正是 X-3 G6 的判据）；计提测试阈值 1000/0.05 读 TS 源码钉住；M9 `get_adjudication_rows` 返回 `(rows, warnings)`；F2-1 两路径改裸 SQL；M9TabDetail 导入后 `loadData()+_initDefaultRows()`。X-3 G6 规范下调 10→8（`--emit --set-baselines --lowered-by-task 9`）
+- **守卫改造**：`test_lazy_import_resolvability._scan` 删「import 失败即 skipped 跳过」分支（整模块缺失时一条不报正是旧漏洞），改三分：能 import 走原判据 / 缺的是目标模块或父包 → 全部导入名记 `missing_modules` / 其他 import 失败 → 源码静态判定。新类 `TestWholeModuleAndImportFailureVerdicts` 6 例
+- 🔴 教训：①守卫遇 import 失败**不得静默跳过**，整模块缺失必须打红（否则「端点一调即崩」长期不可见）②新增 service 必与路由**同一次提交**③故障注入变异（换回 HEAD 缺陷版、挪走 service）每次逐字节恢复 + sha256 校验④写入型验收无【测试】项目的 M7/M9 底稿 ⇒ 由 PG 真实路由测试（事务回滚）覆盖，不在共享库造持久底稿⑤干净 worktree 复跑「要提交的那棵树」确认 310 passed；主树 lazy import 另 2 红由**并发会话未跟踪的 `app/services/formula_settings/` 包**触发（`project_ops.py` import 不存在的 `.templates`），HEAD 无此包故不红，归该包作者；`test_m_cycle_export_import_verification` 56 红 + x3 两测试红均在 HEAD 干净检出复现（x3 两处过期归档路径顺手修）
+- 待提交清单见 spec design §9 / tasks.md；范围外发现（未改）：兄弟 M service 查不存在列 `evidence`/`status`、`_m9_other_comprehensive_income.py` 渲染校验读错列/字段、`useM7CrossSheet` 读无写入方的 `M7-M7-2-*` 双前缀键、`_m7/_m9_import_export.py` 死代码、科目码两套（4201/4301、4103/4003）
 
+
+### AI 面板采纳 / 转存笔记选目标 `ai-chat-adopt-and-note-target-picker`（2026-10-21，8/8，未提交）
+- 修全局模式「采纳」404 与「转存笔记」被前端拦截：采纳加可选 `source_host`（跨宿主只许全局知识 / 报表 / 知识库会话 → 底稿 / 附注，须同项目、同主体；底稿 / 附注会话仍严格绑定）；笔记 `session_id` 改由服务端按消息反查，`target_project_id` / `target_folder_id` 二选一（会话有项目只能存本项目，堵跨项目转存），校验全在幂等收据之前；前端 `ChatAdoptTargetDialog` / `ChatNoteSaveDialog`
+- 隐藏缺陷：转存笔记请求体（嵌套 host、缺 session_id）在任何宿主下恒 422，唯一前端守卫只数调用次数 ⇒ 改跨语言契约（前端测试解析 `doc_ai_chat.py` 的 pydantic 必填集合）+ TestClient 钉住旧形状必 422
+- 🔴 教训：①fetch 直连的接口不经 http 拦截器，错误按真实信封取：业务码在 `message.code`，外层 `code` 是 HTTP 状态数字（`aiChatWireError.ts`）②`window.open(…, 'noopener')` 的新标签不复制 sessionStorage ⇒ 令牌丢失、跳登录页（站内路径不加 noopener）③共享开发环境上做磁盘变异会污染别人：Vite HMR 把变异版推给所有已开浏览器，后端 `--reload` 让 9980 跑变异代码 ⇒ 变异放独立 worktree，或先把浏览器停在 about:blank④admin 不绕过知识库可见性：admin 能把笔记写进自己不是成员的项目，却看不到也删不了（已知限制，待产品拍板）⑤附注未生成 = 404「附注数据不存在」，是空态不是失败⑥核对行数门的文件清单 = 将要提交的全部文件：改一行 HEAD 已超限且未登记的旧测试也会被 pre-commit 拒（`test_task7_adopt_fail_closed.py` 已登记白名单）⑦chrome-devtools 的「当前页」各会话共享：别的会话不带 pageId 的导航会落到你刚建的页上（实测问题被发到了全局会话）⇒ 关键点击前在同一脚本里校验 `location.pathname`
+- 浏览器实测四条路径全通过（第二轮用平台同一路径临时建【测试】项目补测，用完走删除接口软删）；提交清单见其 design §6.5
 
 ### 全局 7 横切模块（2026-05/06，7 spec 全部 ✅ 完成 —— 历史已压缩）
 - 7 模块=地址库/公式管理/高级查询/枚举字典/底稿模板库/报告模板库/知识库；A~G 七个 spec 全完成（121 任务）。完整盘点+多源治理裁定（含三大内核统一、单源/联动断裂三处、向量存储选型 pgvector）见 `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`（六轮复盘）；逐 spec 产出见 `.kiro/specs/INDEX.md`。**被压掉的 24 行原文**：`git show 51f6987be:.kiro/steering/memory.md`。

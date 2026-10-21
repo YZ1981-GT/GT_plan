@@ -98,6 +98,14 @@ class SharedConfigService:
 
     # ── 查询可用模板 ──
 
+    async def all_templates(self, config_type: str) -> list[SharedConfigTemplate]:
+        """某配置类型的全部未删除模板（不做可见性过滤 —— 由 shared_config_access.list_visible 统一判）。"""
+        rows = await self.db.execute(sa.select(SharedConfigTemplate).where(
+            SharedConfigTemplate.config_type == config_type,
+            SharedConfigTemplate.is_deleted == False,  # noqa: E712
+        ))
+        return list(rows.scalars().all())
+
     async def list_available_templates(
         self,
         config_type: str,
@@ -193,12 +201,12 @@ class SharedConfigService:
     # ── 删除模板 ──
 
     async def delete_template(self, template_id: UUID, user_id: UUID) -> bool:
+        # 🔴 鉴权在路由层由 shared_config_access.check_manage 统一判（admin / 所有者 / 集团项目 edit）。
+        # 这里**不再**重做 `owner_user_id != user_id` 的所有者判断 —— 否则 admin（check_manage 放行）
+        # 到这里又被拒成 ValueError→403，删不了别人的个人模板（formula-global-settings-sync R14.1）。
         tpl = await self.db.get(SharedConfigTemplate, template_id)
         if not tpl or tpl.is_deleted:
             return False
-        # 只有所有者或 system 类型可删
-        if tpl.owner_type == 'personal' and tpl.owner_user_id != user_id:
-            raise ValueError("无权删除他人的模板")
         tpl.is_deleted = True
         tpl.deleted_at = datetime.now(timezone.utc)
         await self.db.flush()

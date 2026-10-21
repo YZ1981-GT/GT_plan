@@ -160,6 +160,15 @@ from app.models.consol_push_models import (  # noqa: F401
     ConsolNoteFormula,
     ConsolPushRun,
 )
+# 公式全局设置 / 本项目适配 / 公式模板（迁移 V199）
+from app.models.formula_setting_models import (  # noqa: F401
+    FormulaPublish,
+    FormulaSetting,
+    FormulaSyncItem,
+    FormulaTemplate,
+    FormulaTemplateSubscription,
+    FormulaTemplateVersion,
+)
 # D5 合并范围用户确认快照（迁移 V183）
 from app.models.consol_scope_confirmation_models import (  # noqa: F401
     ConsolScopeConfirmation,

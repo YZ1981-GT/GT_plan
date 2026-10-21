@@ -582,7 +582,7 @@ async def _fetch_report_line(
     )
     last_name = ""
     try:
-        for sql, params in queries:
+        for i, (sql, params) in enumerate(queries):
             row = (await ctx.db.execute(sa.text(sql), params)).fetchone()
             if row is None:
                 continue
@@ -593,6 +593,8 @@ async def _fetch_report_line(
                     str(row.formula),
                     _norm(row.applicable_standard),
                 )
+            if i == 0:
+                break  # 本项目行公式为空 = 本项目停用（formula-global-settings-sync R1.1）：不退回准则行，走段兜底码
     except Exception as e:  # noqa: BLE001 — 查询失败一律回退段兜底码
         logger.debug("I 类科目解析: 报表行 %s 查询失败: %s", row_code, e)
     return last_name, None, ""

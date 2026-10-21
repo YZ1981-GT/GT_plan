@@ -17,7 +17,6 @@ import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.database import get_db
 from app.deps import require_project_access
@@ -27,12 +26,12 @@ from app.services.formula_management.cross_check_run import (
     execute_cross_check_run,
 )
 from app.services.formula_management.logic_check import CrossCheckResult
+from app.services.formula_settings import cross_check_rules
 
 router = APIRouter(tags=["formula-logic-check"])
 
-#: ``project.wizard_state`` 下存放用户表间审核规则的键。
-#: 复用既有 ``wizard_state`` JSONB（与 aging_config / column_mappings /
-#: custom_fetch_rules 同款项目级配置存储，不新建大表——design §5 步骤 6）。
+#: 旧存储键：``project.wizard_state["cross_check_user_rules"]``。2026-10-20 起规则存 ``formula_setting``
+#: （cross_check 域，全局 + 本项目两层），V199 迁移把旧数据迁入；代码不再读写 wizard_state。
 _CROSS_CHECK_RULES_KEY = "cross_check_user_rules"
 
 
@@ -111,16 +110,8 @@ async def run_report_cross_check(
 # 表间审核用户规则持久化（Phase 6 Task 6.2 / 需求 7.3）
 # ─────────────────────────────────────────────────────────────────────────────
 # 用户在公式管理中央弹窗「表间审核」里新增/编辑的规则，必须落库，关闭再打开仍
-# 可见。规则按树节点 key（如 ``cross_report_note``）分组存放于项目 ``wizard_state``
-# 下的 ``cross_check_user_rules``——复用既有项目级 JSONB 配置存储（不新建大表）。
-#
-# 存储结构::
-#
-#     project.wizard_state["cross_check_user_rules"] = {
-#         "<nodeKey>": [ {label, left_ref, operator, right_ref, description}, ... ],
-#         ...
-#     }
-#
+# 可见。规则按树节点 key（如 ``cross_report_note``）分组；存储见
+# ``services/formula_settings/cross_check_rules.py``（公式位 ``{nodeKey}#{rule_id}``）。
 # 前端树节点 key 与规则 map key 由同一键生成函数产出（MEDIUM-2），后端只按
 # 字符串 key 存取、不解析其语义——避免前后端双真源偏移。
 
@@ -129,19 +120,26 @@ class CrossCheckRule(BaseModel):
     """单条表间审核规则（用户可编辑字段）。
 
     与前端 ``crossRuleForm`` 契约字段一致；``_editing`` 等 UI 瞬态字段不落库。
+    ``rule_id``：读接口下发的规则编号（新增规则不带，后端生成）；``tolerance`` 缺省 0.01。
     """
 
+    rule_id: str | None = None
     label: str = ""
     left_ref: str = ""
     operator: str = "="
     right_ref: str = ""
     description: str = ""
+    tolerance: float | None = None
 
 
 class CrossCheckRulesPayload(BaseModel):
-    """PUT 请求体：按节点 key 分组的规则集合（整体替换该项目的用户规则）。"""
+    """PUT 请求体：按节点 key 分组的规则集合（整体替换该项目的用户规则）。
+
+    ``loaded``：读接口下发的版本令牌原样带回（差量写入与并发冲突判定，见 setting_sets）。
+    """
 
     rules: dict[str, list[CrossCheckRule]]
+    loaded: dict[str, str] | None = None
 
 
 async def _get_project_or_404(db: AsyncSession, project_id: UUID) -> Project:
@@ -164,14 +162,13 @@ async def get_cross_check_rules(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_project_access("readonly")),
 ) -> dict[str, Any]:
-    """读取项目的用户表间审核规则（按树节点 key 分组）。
+    """读取项目生效的表间审核规则（全局 + 本项目，按树节点 key 分组，带层级与版本令牌）。
 
     从未保存过 → 返回空集 ``{"rules": {}}``（前端据此呈现「无规则」，不冒充静态示例）。
+    spec formula-global-settings-sync：存储改为 ``formula_setting``（V199 已迁入旧 wizard_state 数据）。
     """
-    project = await _get_project_or_404(db, project_id)
-    ws = project.wizard_state if isinstance(project.wizard_state, dict) else {}
-    rules = ws.get(_CROSS_CHECK_RULES_KEY) or {}
-    return {"rules": rules}
+    await _get_project_or_404(db, project_id)
+    return await cross_check_rules.load(db, project_id)
 
 
 @router.put("/api/projects/{project_id}/formula/cross-check-rules")
@@ -181,23 +178,27 @@ async def save_cross_check_rules(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_project_access("edit")),
 ) -> dict[str, Any]:
-    """整体替换项目的用户表间审核规则（落库到 ``wizard_state``），返回已保存集合。
+    """整体替换项目的用户表间审核规则，返回保存后的生效集合。
 
-    整体替换语义：前端在新增/编辑/删除后把该节点（或全部节点）的完整规则集 PUT 上来，
-    后端按 key 覆盖。``flag_modified`` 就地改 JSONB 使 SQLAlchemy 感知变更。
+    整体替换语义保持：前端把完整规则集 PUT 上来；后端按载入时的版本令牌求差量写本项目适配
+    （来自全局的规则被删 = 本项目停用，全局不受影响）。缺令牌 428、令牌过期 409，整批不写。
+    service 只 flush，这里 commit 后发变更事件。
     """
-    project = await _get_project_or_404(db, project_id)
-    ws = dict(project.wizard_state) if isinstance(project.wizard_state, dict) else {}
-    # 序列化为纯 dict（剔除 pydantic 模型 / UI 瞬态字段），仅落库契约字段。
-    serialized: dict[str, list[dict[str, str]]] = {
-        node_key: [rule.model_dump() for rule in node_rules]
-        for node_key, node_rules in payload.rules.items()
-    }
-    ws[_CROSS_CHECK_RULES_KEY] = serialized
-    project.wizard_state = ws
-    flag_modified(project, "wizard_state")
-    # service 层只 flush、router 统一 commit（工程铁律）。此端点无跨 service 编排，
-    # 直接在 router 内 flush + commit。
-    await db.flush()
+    from app.services.formula_settings.errors import FormulaSettingError
+    from app.services.formula_settings.propagation import publish_events
+
+    await _get_project_or_404(db, project_id)
+    try:
+        result = await cross_check_rules.save(
+            db, project_id,
+            rules={k: [r.model_dump() for r in v] for k, v in payload.rules.items()},
+            loaded=payload.loaded, user_id=_user.id,
+        )
+    except FormulaSettingError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from None
     await db.commit()
-    return {"rules": serialized}
+    await publish_events(result["events"], domain="cross_check", source="cross_check_edit")
+    # 本次真正改动的公式位（供前端保存后问「应用范围」，R7.1）
+    changed = sorted({s for ev in result["events"] for s in ev.get("slot_keys", [])})
+    return {**await cross_check_rules.load(db, project_id), "changed_slot_keys": changed}

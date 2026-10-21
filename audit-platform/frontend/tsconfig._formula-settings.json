@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force",
+    "jsx": "preserve", "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": { "@/*": ["./src/*"] }, "baseUrl": "."
+  },
+  "include": [
+    "src/services/apiPaths/formulaSettings.ts",
+    "src/services/formulaSettingsApi.ts",
+    "src/composables/formula/useFormulaSettings.ts",
+    "src/components/formula/settings/*.vue",
+    "src/components/formula/settings/*.ts",
+    "src/components/formula/settings/__tests__/*.spec.ts",
+    "src/views/FormulaGlobalSettings.vue",
+    "src/components/formula/NoteFormulaDialog.vue",
+    "src/components/formula/ConsolFormulaManagementPanel.vue",
+    "src/components/formula/FormulaHistoryTab.vue",
+    "src/components/formula/noteScopeTargeting.ts",
+    "src/views/ReportConfigEditor.vue",
+    "src/composables/useFormulaImportExport.ts",
+    "src/router/domains/system.ts",
+    "src/env.d.ts"
+  ]
+}

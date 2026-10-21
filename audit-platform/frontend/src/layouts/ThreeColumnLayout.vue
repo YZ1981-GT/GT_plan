@@ -97,6 +97,8 @@
             <el-icon :size="18"><Setting /></el-icon>
           </div>
         </el-tooltip>
+        <!-- 公式待确认角标 + 弹窗（formula-global-settings-sync R5：进入项目自动弹一次，角标常驻） -->
+        <FormulaPendingSyncDialog :project-id="currentProjectId" @resolved="onFormulaSaved" />
         <!-- 后台导入任务指示 -->
         <el-tooltip
           v-if="bgImportStatus"
@@ -323,7 +325,7 @@
       :rows="[]"
       :project-id="formulaContext?.projectId ?? currentProjectId"
       :year="formulaContext?.year ?? currentYear"
-      :scope="formulaContext?.scope ?? (formulaContext?.wpId ? 'workpaper' : 'report')"
+      :scope="formulaContext?.scope ?? 'report'"
       :wp-id="formulaContext?.wpId"
       :wp-code="formulaContext?.wpCode"
       :sheet-name="formulaContext?.sheetName"
@@ -332,6 +334,11 @@
       :note-section="formulaContext?.noteSection"
       :note-section-title="formulaContext?.noteSectionTitle"
       :initial-report-type="formulaContext?.initialReportType"
+      :canonical-location="formulaContext?.canonicalLocation"
+      :capability-snapshot="formulaContext?.capabilitySnapshot"
+      :formula-session="formulaContext?.formulaSession"
+      :read-only="formulaContext?.readOnly ?? false"
+      @session-change="onFormulaSessionChange"
       @saved="onFormulaSaved"
       @applied="onFormulaApplied"
     />
@@ -375,11 +382,20 @@ import {
 } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import GtRefreshScopeDialog from '@/components/formula/GtRefreshScopeDialog.vue'
+import FormulaPendingSyncDialog from '@/components/formula/settings/FormulaPendingSyncDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
 import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
 import DshPanel from '@/components/ai/DshPanel.vue'
 import WorkpaperPrimaryCapabilitiesHost from '@/shell/formula/WorkpaperPrimaryCapabilitiesHost.vue'
-import { legacyPayloadToPartialCommand } from '@/shell/formula/openFormulaManagerCommand'
+import {
+  legacyPayloadToPartialCommand,
+  type FormulaManagerSession,
+} from '@/shell/formula/openFormulaManagerCommand'
+import {
+  receiveFormulaManagerOpen,
+  receiveFormulaManagerSession,
+  type FormulaManagerContextOwnerState,
+} from '@/shell/formula/formulaManagerContextOwner'
 import { DSH_ASSIST_BRIDGE_KEY, type DshAssistBridge } from '@/shell/formula/dshAssistBridge'
 import { eventBus, type SyncEventPayload, type OpenFormulaManagerPayload } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
@@ -431,6 +447,7 @@ const FALLBACK_NAV = [
   { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
   { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor'] },
   { key: 'template-library', label: '模板库', icon: Document, path: '/template-library', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
+  { key: 'formula-global', label: '全局公式', icon: Grid, path: '/settings/formula-global', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
   { key: 'users', label: '账号权限', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
   { key: 'knowledge', label: '知识库', icon: Reading, path: '/knowledge', maturity: 'production', roles: null },
   { key: 'private-storage', label: '私人库', icon: Suitcase, path: '/private-storage', maturity: 'production', roles: null },
@@ -562,7 +579,8 @@ const isConsolNotePage = computed(() =>
 )
 const fullscreen = ref(false)
 const showFormulaManager = ref(false)
-const formulaContext = ref<OpenFormulaManagerPayload>()
+const formulaOwnerState = ref<FormulaManagerContextOwnerState>({})
+const formulaContext = computed(() => formulaOwnerState.value.active)
 const showCustomQuery = ref(false)
 const customQueryInitialTab = ref<'basic' | 'advanced'>('basic')
 const customQueryInitialSource = ref<string | undefined>(undefined)
@@ -911,17 +929,23 @@ watch(() => route.params.projectId, (newId) => {
 
 // 监听子组件打开公式管理的自定义事件
 function onOpenFormulaEvent(payload?: OpenFormulaManagerPayload) {
-  // 合并模块是项目级能力、没有普通 wpId；任何显式 payload 都必须保留，否则 scope/project/year 会静默退成报表域/路由年度
-  formulaContext.value = payload ? { ...payload } : undefined
+  formulaOwnerState.value = receiveFormulaManagerOpen(formulaOwnerState.value, payload)
   sessionStorage.removeItem('gt-formula-target-node')
-  // Task 6: EventBus remains a thin adapter; nodeKey is migration metadata only.
-  // Page entry must open FormulaManagerDialog (never FormulaEditDialog).
+  // EventBus 只负责适配；dirty 会话由唯一 owner 固定完整上下文，nodeKey 仅为迁移元数据。
   const meta = legacyPayloadToPartialCommand(payload ?? {})
   if (meta.legacyNodeKey) {
     sessionStorage.setItem('gt-formula-target-node', meta.legacyNodeKey)
   }
   showFormulaManager.value = true
 }
+
+function onFormulaSessionChange(session: FormulaManagerSession) {
+  formulaOwnerState.value = receiveFormulaManagerSession(formulaOwnerState.value, session)
+}
+
+watch(showFormulaManager, (open) => {
+  if (!open) formulaOwnerState.value = {}
+})
 
 /** 监听全局打开自定义查询事件（如 Dashboard 快捷操作 / 模板页触发） */
 function onOpenCustomQueryEvent(payload?: { tab?: 'basic' | 'advanced'; source?: string; project_id?: string }) {

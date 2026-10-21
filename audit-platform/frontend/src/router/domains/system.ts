@@ -12,6 +12,13 @@ export const systemRoutes: RouteRecordRaw[] = [
           meta: { permission: 'admin' },
         },
 {
+          // 全局公式设置 / 发布记录 / 公式模板（spec formula-global-settings-sync）：
+          // 不设 admin 门控 —— 非管理员只读查看全局定义，并管理自己可见的公式模板；写操作由后端判权
+          path: 'settings/formula-global',
+          name: 'FormulaGlobalSettings',
+          component: () => import('@/views/FormulaGlobalSettings.vue'),
+        },
+{
           path: 'recycle-bin',
           name: 'RecycleBin',
           component: () => import('@/views/RecycleBin.vue'),

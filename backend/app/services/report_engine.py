@@ -825,6 +825,7 @@ async def evaluate_formula_result(
     resolver: AmountResolver,
     row_cache: dict[str, Decimal] | None = None,
     adj_data: dict[str, dict[str, Decimal]] | None = None,
+    strict_context: bool = False,
 ) -> FormulaResult:
     """L2 编排层：预载数据 → 构建 FormulaContext → 委托 L1 内核 execute → 返回 Decimal。
 
@@ -895,8 +896,14 @@ async def evaluate_formula_result(
                 wp_data[wc] = {}
             try:
                 val = await WPExecutor.execute(resolver.db, resolver.project_id, wc, col)
+                if val is None and strict_context:
+                    raise ValueError(f"WP({wc!r}, {col!r}) 无可用上下文数据")
                 wp_data[wc][col] = Decimal(str(val)) if val is not None else Decimal("0")
-            except Exception:
+            except Exception as exc:
+                if strict_context:
+                    raise ValueError(
+                        f"WP({wc!r}, {col!r}) 上下文加载失败: {exc}"
+                    ) from exc
                 wp_data[wc][col] = Decimal("0")
 
     note_refs = _extract_note_refs(formula)
@@ -910,8 +917,14 @@ async def evaluate_formula_result(
                 note_data[section] = {}
             try:
                 val = await NOTEExecutor.execute(resolver.db, resolver.project_id, resolver.year, section, field_name)
+                if val is None and strict_context:
+                    raise ValueError(f"NOTE({section!r}, {field_name!r}) 无可用上下文数据")
                 note_data[section][field_name] = Decimal(str(val)) if val is not None else Decimal("0")
-            except Exception:
+            except Exception as exc:
+                if strict_context:
+                    raise ValueError(
+                        f"NOTE({section!r}, {field_name!r}) 上下文加载失败: {exc}"
+                    ) from exc
                 note_data[section][field_name] = Decimal("0")
 
     # WP/NOTE token 不再预替换——留给 L1 handler 消费 wp_data/note_data
@@ -942,6 +955,7 @@ async def evaluate_formula(
     resolver: AmountResolver,
     row_cache: dict[str, Decimal] | None = None,
     adj_data: dict[str, dict[str, Decimal]] | None = None,
+    strict_context: bool = False,
 ) -> Decimal:
     """兼容入口：执行公式并只返回 Decimal 值。"""
     result = await evaluate_formula_result(
@@ -949,6 +963,7 @@ async def evaluate_formula(
         resolver=resolver,
         row_cache=row_cache,
         adj_data=adj_data or {},
+        strict_context=strict_context,
     )
     return result.value
 
@@ -1069,21 +1084,22 @@ class ReportEngine:
     async def _load_report_configs(
         self,
         applicable_standard: str = "enterprise",
+        project_id: UUID | None = None,
     ) -> dict[FinancialReportType, list[ReportConfig]]:
-        """加载报表配置，按 report_type 分组"""
-        result = await self.db.execute(
-            sa.select(ReportConfig)
-            .where(
-                ReportConfig.applicable_standard == applicable_standard,
-                ReportConfig.is_deleted == sa.false(),
-            )
-            .order_by(ReportConfig.report_type, ReportConfig.row_number)
+        """加载报表配置，按 report_type 分组。
+
+        给定 ``project_id`` 时返回**有效配置**：准则行逐行用本项目适配（``project:{id}``）
+        的公式覆盖（spec formula-global-settings-sync R1.2）；不给则只读该口径（旧行为）。
+        """
+        from app.services.formula_settings.effective_report import (
+            group_by_type,
+            load_effective_report_configs,
         )
-        rows = result.scalars().all()
-        configs: dict[FinancialReportType, list[ReportConfig]] = {}
-        for row in rows:
-            configs.setdefault(row.report_type, []).append(row)
-        return configs
+
+        rows = await load_effective_report_configs(
+            self.db, standard=applicable_standard, project_id=project_id
+        )
+        return group_by_type(rows)
 
     # ------------------------------------------------------------------
     # 生成全部报表
@@ -1122,7 +1138,7 @@ class ReportEngine:
                 project_id, year,
             )
 
-        configs = await self._load_report_configs(applicable_standard)
+        configs = await self._load_report_configs(applicable_standard, project_id=project_id)
         results: dict[str, Any] = {}
 
         # We need a global row_cache across report types for cross-report ROW() refs
@@ -1818,7 +1834,7 @@ class ReportEngine:
         applicable_standard = await ReportConfigService.resolve_applicable_standard(
             self.db, project_id,
         )
-        all_configs = await self._load_report_configs(applicable_standard)
+        all_configs = await self._load_report_configs(applicable_standard, project_id=project_id)
         global_row_cache: dict[str, Decimal] = {}
         wp_overlay = await self._load_workpaper_equity_overlay(project_id)
 
@@ -2023,7 +2039,7 @@ class ReportEngine:
         stale_rows = list(stale_result.scalars().all())
         stale_by_key = {(row.report_type, row.row_code): row for row in stale_rows}
 
-        configs = await self._load_report_configs(applicable_standard)
+        configs = await self._load_report_configs(applicable_standard, project_id=project_id)
         all_rows_result = await self.db.execute(
             sa.select(FinancialReport).where(
                 FinancialReport.project_id == project_id,
@@ -2165,7 +2181,7 @@ class ReportEngine:
             await self.generate_all_reports(project_id, year, applicable_standard)
             return -1  # indicates full regen
 
-        configs = await self._load_report_configs(applicable_standard)
+        configs = await self._load_report_configs(applicable_standard, project_id=project_id)
         global_row_cache: dict[str, Decimal] = {}
         # Req 15.5：跨报表共享的 ACNR ROW() 引用解析缓存（fail-open 由 resolve_ref 保证）。
         row_ref_cache: dict[str, Any] = {}

@@ -12,8 +12,14 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.services.formula_management.function_support_matrix import (
+    Executor,
+    FormulaSupportViolation,
+    require_expression_support,
+)
 
 from app.core.database import get_db
 from app.deps import (
@@ -25,6 +31,9 @@ from app.deps import (
 from app.models.core import User
 from app.models.report_models import FinancialReportType, ReportConfig
 from app.models.report_schemas import ReportConfigCloneRequest, ReportConfigRow
+from app.services.formula_settings import legacy_report
+from app.services.formula_settings.errors import FormulaSettingError
+from app.services.formula_settings.propagation import publish_events
 from app.services.report_config_service import ReportConfigService
 
 router = APIRouter(
@@ -78,6 +87,43 @@ async def _authorize_report_config_write(
         raise HTTPException(status_code=403, detail="权限不足：全局报表模板写操作仅限 admin")
 
 
+async def _authorize_report_config_read(
+    db: AsyncSession,
+    current_user: User,
+    *,
+    project_id: UUID | None,
+    applicable_standard: str | None,
+) -> UUID | None:
+    """校验 report_config 读/执行上下文，禁止用 project:{id} 绕过项目鉴权。"""
+    standard_project_id = _project_id_from_standard(applicable_standard)
+    if (
+        project_id is not None
+        and standard_project_id is not None
+        and project_id != standard_project_id
+    ):
+        raise HTTPException(status_code=403, detail="project_id 与 applicable_standard 项目不一致")
+    effective_project_id = project_id or standard_project_id
+    if effective_project_id is not None:
+        await assert_project_permission(
+            db, current_user, effective_project_id, "readonly"
+        )
+    return effective_project_id
+
+
+async def _legacy_write(db: AsyncSession, coro) -> dict:
+    """旧写路径经公式设置同步内核（formula-global-settings-sync R9）：
+    业务错误（428 / 409 / 400）回滚并转 HTTP；成功 commit 之后才发变更事件。"""
+    try:
+        result = await coro
+    except FormulaSettingError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from None
+    await db.commit()
+    await publish_events(result.get("events") or [], domain="report", source="direct_edit",
+                         token=result.get("publish_id"))
+    return result
+
+
 @router.get("")
 async def list_report_configs(
     report_type: FinancialReportType | None = Query(None),
@@ -94,10 +140,16 @@ async def list_report_configs(
     用户用他人 project_id 解析其 applicable_standard）；无 project_id 的全局模板读
     保持登录门控（全局模板非敏感，design §5 步骤 5 未要求收紧全局读）。
     """
-    if project_id is not None:
-        await assert_project_permission(db, current_user, project_id, "readonly")
-    if not applicable_standard and project_id:
-        applicable_standard = await ReportConfigService.resolve_applicable_standard(db, project_id)
+    effective_project_id = await _authorize_report_config_read(
+        db,
+        current_user,
+        project_id=project_id,
+        applicable_standard=applicable_standard,
+    )
+    if not applicable_standard and effective_project_id:
+        applicable_standard = await ReportConfigService.resolve_applicable_standard(
+            db, effective_project_id
+        )
     if not applicable_standard:
         applicable_standard = "enterprise"
     svc = ReportConfigService(db)
@@ -138,10 +190,16 @@ async def list_report_types(
     自动解析 > 降级 enterprise。给定 project_id 时按 readonly 做项目级鉴权（Task 5.3 /
     ADR-FMC-06 同口径，禁任意登录用户用他人 project_id 解析其 applicable_standard）。
     """
-    if project_id is not None:
-        await assert_project_permission(db, current_user, project_id, "readonly")
-    if not applicable_standard and project_id:
-        applicable_standard = await ReportConfigService.resolve_applicable_standard(db, project_id)
+    effective_project_id = await _authorize_report_config_read(
+        db,
+        current_user,
+        project_id=project_id,
+        applicable_standard=applicable_standard,
+    )
+    if not applicable_standard and effective_project_id:
+        applicable_standard = await ReportConfigService.resolve_applicable_standard(
+            db, effective_project_id
+        )
     if not applicable_standard:
         applicable_standard = "enterprise"
 
@@ -212,8 +270,10 @@ async def clone_report_config(
                 project_id=data.project_id,
                 applicable_standard=data.applicable_standard,
                 overwrite=data.overwrite,
+                user_id=current_user.id,
             )
             await db.commit()
+            await publish_events(result.pop("events", []), domain="report", source="materialize")
             return {
                 "message": (
                     f"已落入 {result['created']} 条项目级公式"
@@ -298,45 +358,11 @@ async def update_report_config(
                         },
                     )
 
-        row = await svc.update_config(config_id, updates, user_id=current_user.id)
-        await db.commit()
-
-        # Publish FORMULA_CONFIG_CHANGED event if formula changed
-        # 🔴 修复前 project_id 传的是 current_user.id（「row has no project_id」的兜底），
-        #    下游 stale_engine 于是按一个**用户 id** 去标 stale、年份再猜 2025 ——
-        #    全局模板行的编辑对任何真实项目都不起作用，对项目克隆行也标错对象。
-        #    正解：只有项目克隆行（applicable_standard='project:{uuid}'）才有项目可标；
-        #    全局模板行的传播由 REPORT_CONFIG_MASTER_UPDATED（report-config-baseline）负责，
-        #    不在这里冒充项目事件。
-        try:
-            new_formula = row.formula if row else None
-            std = (row.applicable_standard or "") if row else ""
-            if old_formula != new_formula:
-                # 反向索引（「谁引用了该单元格」面板）按 report_config 全表构建，与项目无关：
-                # 模板行 / 克隆行改公式都要失效。原先靠 handler 顺带失效（且因 project_id
-                # 是用户 id 才恰好每次都跑到）；事件只对克隆行发布后必须在此直接失效，
-                # 否则模板行编辑后面板显示过时引用关系。
-                from app.services.formula_reverse_index import invalidate_reverse_index
-                invalidate_reverse_index()
-            if old_formula != new_formula and std.startswith("project:"):
-                from uuid import UUID as _UUID
-
-                from app.models.audit_platform_schemas import EventPayload, EventType
-                from app.services.event_bus import event_bus
-
-                await event_bus.publish(EventPayload(
-                    event_type=EventType.FORMULA_CONFIG_CHANGED,
-                    project_id=_UUID(std.removeprefix("project:")),
-                    extra={
-                        "row_code": row.row_code if row else "",
-                        "old_formula": old_formula,
-                        "new_formula": new_formula,
-                    },
-                ))
-        except Exception:
-            pass  # Never block main operation
-
-        return ReportConfigRow.model_validate(row)
+        # spec formula-global-settings-sync R9：全局行 = 直接发布（全部应用 + 冲突交项目确认），
+        # 项目行 = 保存本项目适配；改公式须带 expected_version（缺失 428、不一致 409）。
+        # commit 之后才发变更事件（受影响项目标过期重算 + 反向索引失效）。
+        result = await _legacy_write(db, legacy_report.update_row(db, old_row, updates, user_id=current_user.id))
+        return ReportConfigRow.model_validate(result["row"])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -355,26 +381,15 @@ async def create_report_config(
     await _authorize_report_config_write(
         db, current_user, body.get("applicable_standard")
     )
-    rc = ReportConfig(
-        report_type=FinancialReportType(body["report_type"]),
-        row_number=body.get("row_number", 0),
-        row_code=body.get("row_code", ""),
-        row_name=body.get("row_name", ""),
-        indent_level=body.get("indent_level", 0),
-        formula=body.get("formula"),
-        applicable_standard=body.get("applicable_standard", "enterprise"),
-        is_total_row=body.get("is_total_row", False),
-        parent_row_code=body.get("parent_row_code"),
-    )
-    db.add(rc)
-    await db.flush()
-    await db.commit()
-    return ReportConfigRow.model_validate(rc)
+    # R9：全局 = 新增公式位的发布；项目 = 本项目适配（项目独有行带结构）
+    result = await _legacy_write(db, legacy_report.create_row(db, body, user_id=current_user.id))
+    return ReportConfigRow.model_validate(result["row"])
 
 
 @router.delete("/{config_id}")
 async def delete_report_config(
     config_id: UUID,
+    expected_version: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -382,6 +397,7 @@ async def delete_report_config(
 
     Task 5.3 / ADR-FMC-06：写鉴权按行分流 —— 项目克隆行 →
     require_project_access("edit")；全局模板行 → admin only。
+    R9：全局行 = 删除公式位的发布（须带 ``expected_version``）；项目行 = 恢复为全局。
     """
     import sqlalchemy as sa
     result = await db.execute(
@@ -393,26 +409,31 @@ async def delete_report_config(
     await _authorize_report_config_write(
         db, current_user, getattr(row, "applicable_standard", None)
     )
-    row.is_deleted = True
-    await db.commit()
+    await _legacy_write(db, legacy_report.delete_row(db, row, user_id=current_user.id,
+                                                     expected_version=expected_version))
     return {"deleted": True}
 
 
 @router.post("/seed")
 async def load_seed_data(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
 ):
-    """加载种子数据，完成后自动填充公式（确保新部署自动就绪）"""
+    """加载种子数据并填充公式（全局模板写操作，仅 admin）。"""
     from app.services.report_formula_service import report_formula_service
 
     svc = ReportConfigService(db)
     count = await svc.load_seed_data()
     await db.commit()
 
-    # 自动填充公式（幂等，已有公式的行跳过）
-    formula_stats = await report_formula_service.fill_all_formulas(db, standard="all")
+    # 自动填充公式（幂等，已有公式的行跳过）；填出的公式经全局发布，commit 后对有效定义变化的项目发事件
+    try:
+        formula_stats = await report_formula_service.fill_all_formulas(db, standard="all", user_id=current_user.id)
+    except FormulaSettingError as exc:  # 并发修改（409）等：回滚填充，种子行已提交
+        await db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from None
     await db.commit()
+    await publish_events(formula_stats.pop("events", []), domain="report", source="seed")
 
     return {
         "message": f"成功加载 {count} 行种子数据，填充 {formula_stats['updated']} 行公式",
@@ -441,8 +462,13 @@ async def fill_formulas(
     if body and isinstance(body, dict):
         standard = body.get("standard", "all")
 
-    stats = await report_formula_service.fill_all_formulas(db, standard=standard)
+    try:
+        stats = await report_formula_service.fill_all_formulas(db, standard=standard, user_id=current_user.id)
+    except FormulaSettingError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from None
     await db.commit()
+    await publish_events(stats.pop("events", []), domain="report", source="seed")
 
     return {
         "total": stats["total"],
@@ -450,45 +476,6 @@ async def fill_formulas(
         "skipped": stats["skipped"],
         "coverage": f"{stats['coverage_pct']}%",
     }
-
-
-@router.post("/drill-down")
-async def report_drill_down(
-    body: dict,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """汇总穿透：合并报表某行由企业树各节点怎样构成（spec consol-elimination-single-source-push 需求 9.3）。
-
-    与报表差额表同一求值（``consol_report_view_service.child_contributions``）：``rows`` = 所选汇总节点
-    （默认根合并节点）的直接子节点，``leaf_rows`` = 子树全部末级节点；线性行两层之和都 = 合并数。
-    不再读 ``consol_worksheet_data['info']``、不再按持股比例估算。项目在请求体里 ⇒ 函数体内做项目级鉴权。
-
-    请求体：``project_id``、``year``（可选，默认项目审计年度）、``report_type``、``row_code``、``node_key``（可选）。
-    """
-    from app.deps import assert_project_permission
-    from app.services.consol_report_view_service import ViewError, child_contributions, load_view_context
-
-    try:
-        project_id = UUID(str(body.get("project_id") or ""))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="缺少或无效的 project_id") from exc
-    row_code = str(body.get("row_code") or "").strip()
-    if not row_code:
-        raise HTTPException(status_code=400, detail="缺少 row_code")
-    await assert_project_permission(db, current_user, project_id, "readonly")
-    year_val = body.get("year")
-    ctx = await load_view_context(db, project_id, int(year_val) if year_val else None)
-    if ctx is None:
-        raise HTTPException(status_code=404, detail="不是合并报表项目或没有审计年度，无法穿透")
-    try:
-        result = await child_contributions(
-            ctx.basis, ctx.rows, report_type=str(body.get("report_type") or "balance_sheet"),
-            row_code=row_code, node_key=body.get("node_key") or None,
-        )
-    except ViewError as exc:
-        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
-    return {"year": ctx.year, "applicable_standard": ctx.standard, **result}
 
 
 @router.post("/execute-formula")
@@ -522,12 +509,33 @@ async def execute_formula(
     row_values_raw = body.get("row_values", {})
 
     if not formula:
-        return {"value": None, "trace": [], "error": "公式不能为空"}
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"error_code": "FORMULA_EMPTY", "message": "公式不能为空"},
+        )
+
+    pid: UUID | None = None
+    if project_id_str:
+        try:
+            pid = UUID(project_id_str)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error_code": "PROJECT_ID_INVALID", "message": "project_id 格式无效"},
+            ) from exc
+        await assert_project_permission(db, current_user, pid, "readonly")
 
     try:
-        pid = UUID(project_id_str) if project_id_str else None
-    except ValueError:
-        pid = None
+        require_expression_support(formula, Executor.REPORT_PATH)
+    except FormulaSupportViolation as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error_code": "FORMULA_FUNCTION_UNSUPPORTED",
+                "executor": exc.executor.value,
+                "issues": exc.issues,
+            },
+        ) from exc
 
     row_values = {k: Decimal(str(v)) for k, v in row_values_raw.items()} if row_values_raw else None
 
@@ -541,6 +549,7 @@ async def execute_formula(
                 formula,
                 resolver=resolver,
                 row_cache=row_values,
+                strict_context=True,
             )
             # 为了保持返回结构兼容，也跑一次 L1 内核获取 trace
             ctx = FormulaContext(
@@ -564,12 +573,14 @@ async def execute_formula(
             'trace': trace,
             'error': None,
         }
-    except Exception as e:
-        return {
-            'value': None,
-            'trace': [],
-            'error': f'执行错误: {e}',
-        }
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error_code": "FORMULA_CONTEXT_UNAVAILABLE",
+                "message": f"公式执行失败: {exc}",
+            },
+        ) from exc
 
 
 @router.post("/execute-formulas-batch")
@@ -602,15 +613,32 @@ async def execute_formulas_batch(
     year_val = body.get("year", 2024)
     formulas = body.get("formulas", [])
 
-    try:
-        pid = UUID(project_id_str) if project_id_str else None
-    except ValueError:
-        pid = None
-
-    # Task 5.3 / ADR-FMC-06：按 body.project_id 做项目级鉴权（readonly，批量执行为取数）。
-    # 此前仅 get_current_user = 任意登录用户可对任意项目执行批量公式，坐实 IDOR。
-    if pid is not None:
+    pid: UUID | None = None
+    if project_id_str:
+        try:
+            pid = UUID(project_id_str)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error_code": "PROJECT_ID_INVALID", "message": "project_id 格式无效"},
+            ) from exc
         await assert_project_permission(db, current_user, pid, "readonly")
+
+    support_errors: list[dict] = []
+    for index, item in enumerate(formulas):
+        try:
+            require_expression_support(item.get("formula", ""), Executor.REPORT_PATH)
+        except FormulaSupportViolation as exc:
+            support_errors.append({"index": index, "row_code": item.get("row_code"), "issues": exc.issues})
+    if support_errors:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error_code": "FORMULA_FUNCTION_UNSUPPORTED",
+                "executor": Executor.REPORT_PATH.value,
+                "items": support_errors,
+            },
+        )
 
     row_values: dict[str, Decimal] = {}
     results = []
@@ -679,6 +707,7 @@ async def execute_formulas_batch(
                         formula_str,
                         resolver=resolver,
                         row_cache=row_values,
+                        strict_context=True,
                     )
                     return code, {'value': float(value), 'trace': [], 'error': None}
                 else:
@@ -739,107 +768,10 @@ async def execute_formulas_batch(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 试算表「科目明细」公式（tb_detail）项目级覆盖 + 自定义新增
-#
-# 背景：公式管理中心「试算平衡表 > 科目明细」节点原为按科目动态生成
-# TB('科目','期末余额') 只读预设，无法二次编辑/新增，预设不对时无从修正。
-# 现改为：默认预设仍自动生成（分类=自动运算），但支持用户覆盖某科目公式、
-# 或新增自定义公式行，持久化到 project.wizard_state.tb_detail_formulas。
-#
-# 复用 aging_config 的 wizard_state JSONB 项目级存储范式（无新表/迁移）。
+# 2026-10-20 迁出、路径不变（自带 /api/report-config 前缀，在 router_registry/report.py §4 紧随本路由注册）：
+#   试算表「科目明细」公式 → ``routers/tb_detail_formulas.py``（spec formula-global-settings-sync，存 formula_setting）
+#   合并报表汇总穿透 → ``routers/report_drill_down.py``（本文件超行数门）
 # ─────────────────────────────────────────────────────────────────────────────
-
-from pydantic import BaseModel as _TbBaseModel  # noqa: E402
-from sqlalchemy import select  # noqa: E402 — 🔴 此前漏 import：两个端点每次调用都 NameError
-from app.models.core import Project as _TbProject  # noqa: E402
-
-
-class TbDetailFormulaItem(_TbBaseModel):
-    row_code: str
-    row_name: str | None = None
-    formula: str | None = None
-    # 用户要求：分类默认为自动运算类型
-    formula_category: str | None = "auto_calc"
-    formula_description: str | None = None
-
-
-class TbDetailFormulasPayload(_TbBaseModel):
-    # overrides：科目编码 → 覆盖项（覆盖默认 TB() 预设）
-    overrides: dict[str, TbDetailFormulaItem] = {}
-    # added：用户新增的自定义公式行
-    added: list[TbDetailFormulaItem] = []
-
-
-async def _tb_get_project_or_404(db: AsyncSession, project_id: UUID) -> _TbProject:
-    result = await db.execute(select(_TbProject).where(_TbProject.id == project_id))
-    project = result.scalar_one_or_none()
-    if project is None:
-        raise HTTPException(status_code=404, detail="项目不存在")
-    return project
-
-
-@router.get("/tb-detail-formulas/{project_id}")
-async def get_tb_detail_formulas(
-    project_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    # Task 5.2 / ADR-FMC-06：path 有 {project_id}，补 readonly 项目级鉴权
-    # （此前仅 get_current_user = 任意登录用户可读任意项目 tb_detail，坐实 IDOR）。
-    current_user: User = Depends(require_project_access("readonly")),
-):
-    """读取试算表科目明细公式的项目级覆盖 + 自定义新增。
-
-    返回 {overrides: {code: {...}}, added: [{...}]}；无配置时返回空结构。
-    """
-    project = await _tb_get_project_or_404(db, project_id)
-    ws = project.wizard_state or {}
-    cfg = ws.get("tb_detail_formulas") or {}
-    return {
-        "overrides": cfg.get("overrides") or {},
-        "added": cfg.get("added") or [],
-    }
-
-
-@router.put("/tb-detail-formulas/{project_id}")
-async def save_tb_detail_formulas(
-    project_id: UUID,
-    body: TbDetailFormulasPayload,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(
-        require_role(["admin", "partner", "signing_partner", "manager"])
-    ),
-):
-    """保存试算表科目明细公式覆盖 + 自定义新增到 wizard_state.tb_detail_formulas。
-
-    铁律：合并写入 wizard_state（不覆盖其他字段）。
-
-    Task 5.2 / ADR-FMC-06：``require_role`` 仅是**角色**门控（manager 等允许集），不含
-    项目维度 —— manager 可写**任意项目**，坐实 IDOR。在角色门控外叠加**项目归属校验**
-    （直调 ``assert_project_permission``，edit 级）：非该项目成员的 manager 被 403 挡下。
-    """
-    from sqlalchemy.orm.attributes import flag_modified
-
-    # 项目归属校验（在 require_role 角色门控之外叠加项目维度，edit 级）。
-    await assert_project_permission(db, current_user, project_id, "edit")
-
-    project = await _tb_get_project_or_404(db, project_id)
-
-    overrides = {
-        code: item.model_dump() for code, item in (body.overrides or {}).items()
-    }
-    added = [item.model_dump() for item in (body.added or [])]
-
-    ws = dict(project.wizard_state) if project.wizard_state else {}
-    ws["tb_detail_formulas"] = {"overrides": overrides, "added": added}
-    project.wizard_state = ws
-    flag_modified(project, "wizard_state")
-
-    await db.flush()
-    await db.commit()
-    return {
-        "overrides": overrides,
-        "added": added,
-        "message": "科目明细公式已保存",
-    }
 
 
 @router.get("/row-note-mapping")

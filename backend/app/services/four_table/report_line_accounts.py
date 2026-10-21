@@ -458,10 +458,12 @@ async def _fetch_formula(ctx, row_code: str, standards: list[str]) -> str | None
         )
     )
     try:
-        for sql, params in queries:
+        for i, (sql, params) in enumerate(queries):
             row = (await ctx.db.execute(sa.text(sql), params)).fetchone()
             if row is not None and row.formula:
                 return str(row.formula)
+            if i == 0 and row is not None:
+                return None  # 本项目行公式为空 = 本项目停用（formula-global-settings-sync R1.1），不退回准则行
     except Exception as e:  # noqa: BLE001
         logger.debug("科目解析: 报表公式原文查询失败: %s", e)
     return None

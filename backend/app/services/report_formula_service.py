@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import uuid
 from pathlib import Path
 
 import sqlalchemy as sa
@@ -618,16 +619,26 @@ class ReportFormulaService:
         self,
         db: AsyncSession,
         standard: str = "all",
+        *,
+        user_id: uuid.UUID | None = None,
     ) -> dict:
         """填充 report_config 表的 formula 字段。
+
+        只 flush 不 commit。填出的公式按准则各做一次全局发布（spec formula-global-settings-sync R9.1：
+        版本 +1、跟随全局的本项目行随之更新、本项目改过的行进待确认），不再绕过同步内核直接改准则行；
+        返回值的 ``events``（有效定义变化的项目）须由调用方在 commit 之后交 ``publish_events``。
 
         Args:
             db: 异步数据库会话
             standard: "all" | "soe" | "listed" | 具体标准名
+            user_id: 操作人（留痕）
 
         Returns:
-            {total, updated, skipped, coverage_pct}
+            {total, updated, skipped, no_formula, coverage_pct, events}
         """
+        from app.services.formula_settings.publish import publish_global
+        from app.services.formula_settings.stores import report_slot_key
+
         cas_formulas = self._get_cas_formulas()
 
         # 解析 standard 参数
@@ -637,8 +648,10 @@ class ReportFormulaService:
             standards = [standard]
 
         stats = {"total": 0, "updated": 0, "skipped": 0, "no_formula": 0}
+        events: list[dict] = []
 
         for std in standards:
+            std_changes: dict[str, dict] = {}
             result = await db.execute(
                 sa.select(ReportConfig).where(
                     ReportConfig.applicable_standard == std,
@@ -724,13 +737,25 @@ class ReportFormulaService:
                             source = "fallback_prefix"
 
                     if formula:
-                        cfg.formula = formula
-                        cfg.formula_source = source
-                        cfg.formula_category = "auto_calc"
+                        slot = report_slot_key(cfg.report_type, cfg.row_code)
+                        # 同一准则同一公式位有重复行时只取第一行（与读取口径一致）
+                        std_changes.setdefault(slot, {
+                            "slot_key": slot, "label": row_name, "expected_version": cfg.formula_version or 1,
+                            "definition": {"formula": formula, "formula_source": source,
+                                           "formula_category": "auto_calc"},
+                        })
                         stats["updated"] += 1
                     else:
                         stats["no_formula"] += 1
 
+            if std_changes:
+                published = await publish_global(
+                    db, domain="report", scope=std, changes=list(std_changes.values()), user_id=user_id,
+                    source="seed", note="报表公式自动填充（只填空公式的行）",
+                )
+                events.extend(published.get("events") or [])
+
+        stats["events"] = events
         # 计算覆盖率
         fillable = stats["total"] - stats["skipped"]
         coverage_pct = round(stats["updated"] / max(fillable, 1) * 100, 1)
