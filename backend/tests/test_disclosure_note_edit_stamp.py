@@ -74,9 +74,7 @@ async def notes_env() -> AsyncGenerator[dict, None]:
     app.dependency_overrides[get_db] = _override_db
     app.dependency_overrides[get_current_user] = lambda: _Actor(ids["me"])
     app.dependency_overrides[check_consol_lock] = lambda: None
-    with patch("app.deps._get_cached_permission", new=AsyncMock(return_value=None)), \
-            patch("app.deps._set_cached_permission", new=AsyncMock()), \
-            patch("app.routers.disclosure_notes._assert_project_edit", new=AsyncMock()), \
+    with patch("app.routers.disclosure_notes._assert_project_edit", new=AsyncMock()), \
             patch.object(DisclosureMutationCoordinator, "_redis", new=AsyncMock(return_value=None)), \
             patch("app.services.event_bus.event_bus.publish", new=AsyncMock()):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db, require_project_access
+from app.services.note_edit_gate import require_note_edit_access
 from app.models.core import User
 
 router = APIRouter(prefix="/api/projects/{project_id}/notes")
@@ -33,7 +34,7 @@ async def import_prior_year_notes(
     year: int = Query(..., description="本年附注年度（上年 Word 内容填进这一年的章节）"),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ) -> dict[str, Any]:
     """上传上年附注 .docx，按标题匹配本年章节，填入正文与表格期初列。"""
     if not file.filename or not file.filename.endswith('.docx'):
@@ -56,7 +57,7 @@ async def inherit_prior_year_notes(
     project_id: UUID,
     year: int = Query(..., description="本年附注年度（从 year-1 年继承正文）"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ) -> dict[str, Any]:
     """连续审计：从本库上一年度附注继承正文（标记待更新）。"""
     from app.services.note_prior_year_import_service import NotePriorYearImportService
@@ -91,7 +92,7 @@ async def update_cross_references(
     project_id: UUID,
     year: int = Query(..., description="附注年度"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ) -> dict[str, Any]:
     """章节重排后重算全部交叉引用（系统重算，不盖「最近一次编辑」）。"""
     from app.services.note_cross_reference_service import NoteCrossReferenceService

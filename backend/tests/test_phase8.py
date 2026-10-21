@@ -1020,40 +1020,11 @@ class TestSecurityMonitor:
 
 
 class TestPermissionCache:
-    """Task 10.5: 权限查询缓存"""
+    """Task 10.5: 权限层级。
 
-    @pytest.mark.asyncio
-    async def test_cache_miss_returns_none(self):
-        """缓存未命中返回 None"""
-        from app.deps import _get_cached_permission
-
-        result = await _get_cached_permission(uuid.uuid4(), uuid.uuid4())
-        # With no Redis or fakeredis, should return None (graceful degradation)
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_set_and_get_cache(self):
-        """缓存写入和读取"""
-        from app.deps import _get_cached_permission, _set_cached_permission
-
-        uid = uuid.uuid4()
-        pid = uuid.uuid4()
-
-        # Set cache (may fail silently if no Redis)
-        await _set_cached_permission(uid, pid, "edit")
-
-        # Get cache (may return None if no Redis)
-        result = await _get_cached_permission(uid, pid)
-        # Either None (no Redis) or "edit" (with Redis)
-        assert result is None or result == "edit"
-
-    @pytest.mark.asyncio
-    async def test_invalidate_cache(self):
-        """缓存失效"""
-        from app.deps import invalidate_permission_cache
-
-        # Should not raise even without Redis
-        await invalidate_permission_cache(uuid.uuid4(), uuid.uuid4())
+    同一任务的权限查询缓存已移除（partner-manager-edit-permission D3：级别判定每次直接查库），
+    原有三个缓存用例随之删除，接替测试见 ``test_permission_cache_removed.py``。
+    """
 
     def test_permission_hierarchy(self):
         """权限层级定义"""

@@ -409,8 +409,7 @@ async def test_trace_403_for_non_admin_without_project_access():
     fake_result.scalar_one_or_none.return_value = None
     mock_db.execute = AsyncMock(return_value=fake_result)
 
-    with patch("app.deps.set_rls_context", new=AsyncMock()), \
-         patch("app.deps._get_cached_permission", new=AsyncMock(return_value=None)):
+    with patch("app.deps.set_rls_context", new=AsyncMock()):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/workpapers/trace",

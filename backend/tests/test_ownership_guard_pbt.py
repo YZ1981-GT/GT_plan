@@ -40,7 +40,6 @@ from app.services.custom_query.query_orchestrator import (
 )
 
 # 模块级 patch 目标（在 ownership_guard 命名空间内）
-_CACHED_PERM = "app.services.custom_query.ownership_guard._get_cached_permission"
 _SET_RLS = "app.services.custom_query.ownership_guard.set_rls_context"
 _AUDIT_LOG = "app.services.custom_query.ownership_guard.audit_logger.log_action"
 
@@ -147,7 +146,7 @@ async def test_p15_over_privilege_target_rejected_403(accessible, denied):
     user = _user()
     db = AsyncMock()
 
-    with patch(_CACHED_PERM, new=AsyncMock(return_value=None)), patch(
+    with patch(
         _SET_RLS, new=AsyncMock()
     ), patch(_AUDIT_LOG, new=AsyncMock()):
         # (1) 越权 project → 403，且 detail 不含任何数据内容（无泄露）

@@ -233,6 +233,55 @@ class TestKnownAllowlist:
             "ON CONFLICT DO UPDATE 承载（而非 Python 侧读-改-写）"
         )
 
+    def test_level_backfill_record_table_allowlisted_and_unmapped(self):
+        """级别回填记录表（spec partner-manager-edit-permission 需求 4.5 / 4.9）：在 allowlist **且** 无 ORM 模型 —— 两条双向锁死。
+
+        与上面 V154 / V155 两条同构（为什么两条一起断言，见 V154 那条的 docstring）。这张表只由级别回填迁移
+        ``V<n>__partner_manager_edit_level_backfill.sql`` 建、配对回滚脚本 ``R<n>__…`` 读完即删，业务代码零读写；正向已执行、
+        回滚脚本未执行期间它一直留在库里，不登记就是每次启动一条 INFO 级 db_extra。
+
+        没有服务层常量可取：表名的单一真源是迁移脚本本身。按文件名后缀找到 V / R 两个脚本，用执行器的分句函数切句、去掉
+        行注释后取 V 建的表与 R 删的表 —— 两者须是同一张、且 V 只建这一张；迁移里改了表名而 allowlist 没跟着改，本条打红。
+        """
+        import re
+        from pathlib import Path
+
+        from app.core.migration_runner import MigrationRunner
+
+        migrations = Path(__file__).resolve().parents[1] / "migrations"
+        forward = sorted(migrations.glob("V*__partner_manager_edit_level_backfill.sql"))
+        rollback = sorted(migrations.glob("R*__rollback_partner_manager_edit_level_backfill.sql"))
+        assert len(forward) == len(rollback) == 1, f"级别回填迁移应各恰有一个 V / R 脚本，实际 V={forward} R={rollback}"
+
+        def tables(path: Path, verb: str) -> set[str]:
+            found = set()
+            for stmt in MigrationRunner._split_sql_statements(path.read_text(encoding="utf-8")):
+                code = "\n".join(line.split("--", 1)[0] for line in stmt.splitlines()).strip()
+                match = re.match(rf"{verb}\s+(\w+)", code, re.IGNORECASE)
+                if match:
+                    found.add(match.group(1).lower())
+            return found
+
+        created = tables(forward[0], r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS")
+        assert len(created) == 1, f"{forward[0].name} 应恰建一张表，实际 {created}"
+        (table,) = created
+        assert tables(rollback[0], r"DROP\s+TABLE\s+IF\s+EXISTS") == {table}, (
+            f"{rollback[0].name} 删的表应与 {forward[0].name} 建的 {table} 是同一张")
+
+        assert table in SchemaDriftDetector.KNOWN_ALLOWLIST, (
+            f"{table} 不在 allowlist —— 正向迁移执行后、回滚脚本执行前，每次启动都会报 db_extra 漂移噪音。"
+            "若已为它补 ORM 模型，请改本测试的另一半断言而不是删这一半"
+        )
+
+        SchemaDriftDetector._import_all_models()
+        from app.models.base import Base
+
+        mapped = {t.lower() for t in Base.metadata.tables.keys()}
+        assert table not in mapped, (
+            f"{table} 已被 ORM 映射，但仍留在 KNOWN_ALLOWLIST 里 —— 整表被跳过后，它的列级漂移永远检测不到。"
+            "请从 KNOWN_ALLOWLIST 删除该条目"
+        )
+
 
 class TestNonPgSkip:
     """非 PG 方言（SQLite 测试）退化为返回空。"""

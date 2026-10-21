@@ -1,0 +1,262 @@
+{
+  "schema": "note_write_target_declarations/v1",
+  "declarations": [
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/note-template/save",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.1（表 B B1）：写本项目自定义附注模板的新版本，属附注数据"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/note-template/restore",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.1（表 B B1）：回滚产生本项目自定义附注模板的新版本，属附注数据"
+    },
+    {
+      "method": "POST",
+      "path": "/api/disclosure-notes/{project_id}/{year}/refresh-from-workpapers",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.1（表 B B1）：从底稿刷新、写入附注表格数据"
+    },
+    {
+      "method": "POST",
+      "path": "/api/disclosure-notes/{project_id}/{year}/{note_section}/refresh-from-workpaper",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.1（表 B B1）：从底稿刷新、写入本章节表格数据"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/apply-group-baseline",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.1（表 B B1）：写入路径中子项目的附注章节；只判被写入的路径项目，不判基线所属的母公司项目（8.1 默认口径）"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/disclosure-notes/{project_id}/wp-mapping",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.2（表 B B2）：写附注与底稿的取数映射，属附注数据"
+    },
+    {
+      "method": "POST",
+      "path": "/api/disclosure-notes/{project_id}/{year}/refresh-all-bindings",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.2（表 B B2）：全量取数刷新，写附注表格（含公式二次求值），属附注数据"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/disclosure-notes/{project_id}/sections/trim",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.2（表 B B2）：写章节裁剪状态，属附注数据"
+    },
+    {
+      "method": "POST",
+      "path": "/api/disclosure-notes/{project_id}/{year}/auto-trim",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.2（表 B B2）：自动裁剪，写章节裁剪状态，属附注数据"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/notes/custom-sections/create",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.2（表 B B2）：新增自定义附注章节，属附注数据"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/notes/custom-sections/save-as-template",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.2（表 B B2）design 定级（design §4.7、§4.8）：写共享章节模板库（非附注数据），发布模板的主体与编辑主体一致；门禁按路径项目判定之后再校验请求体里的章节属于路径项目，不属于返回 404，堵住跨项目读章节"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/notes/custom-sections/apply-template",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.2（表 B B2）：把章节模板应用为本项目附注章节，属附注数据"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/notes/conversion/preview",
+      "target": "design_gate",
+      "gate": "require_project_access",
+      "params": {"level": "readonly"},
+      "project_from": ["path"],
+      "eqcr": "allow",
+      "reason": "需求 8.2（表 B B2）design 定级（design §4.8）：只读计算、不落库（任务 8.2 现读 NoteConversionService.preview_conversion：只查询 projects 与读取预置映射，路由不提交事务），readonly 级、放行本项目 EQCR"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/notes/conversion/execute",
+      "target": "design_gate",
+      "gate": "assert_note_role_access",
+      "params": {"project_roles": ["manager", "partner"], "denied_message": "仅本项目经理或合伙人可切换附注模板类型"},
+      "project_from": ["path"],
+      "eqcr": "deny",
+      "reason": "需求 8.2（表 B B2）允许更严（design §4.8）：同时改附注章节与 projects.template_type，模板类型影响报表口径，只放行本项目经理与合伙人"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/notes/conversion/rollback",
+      "target": "design_gate",
+      "gate": "assert_note_role_access",
+      "params": {"project_roles": ["manager", "partner"], "denied_message": "仅本项目经理或合伙人可切换附注模板类型"},
+      "project_from": ["path"],
+      "eqcr": "deny",
+      "reason": "需求 8.2（表 B B2）允许更严（design §4.8）：撤销转换同样改回附注章节与 projects.template_type，与执行转换同级"
+    },
+    {
+      "method": "POST",
+      "path": "/api/group-note-baselines",
+      "target": "design_gate",
+      "gate": "assert_note_edit_access_on_projects",
+      "params": {"consol_lock": false},
+      "project_from": ["query"],
+      "eqcr": "deny",
+      "reason": "需求 8.2、8.5（表 B B2，design §4.8）：路径中没有项目，判定查询参数 project_id 所指的来源项目；读来源项目附注并发布为共享集团基线"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/notes/locks/acquire",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.3（表 B B3，design §4.8）：持锁即编辑意图，不能编辑的人持锁会挡住真正的编辑者"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/notes/locks/heartbeat",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.3（表 B B3，design §4.8）：心跳续期即继续持锁编辑，与获取锁同级"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/notes/locks/release",
+      "target": "design_gate",
+      "gate": "require_project_access",
+      "params": {"level": "readonly"},
+      "project_from": ["path"],
+      "eqcr": "allow",
+      "reason": "需求 8.3（表 B B3，design §4.8）：只释放本人的锁（service 按 user_id 过滤），降级后仍须能释放自己遗留的锁，只影响本人"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/notes/locks/force-release",
+      "target": "design_gate",
+      "gate": "assert_note_role_access",
+      "params": {"project_roles": ["manager", "partner"], "denied_message": "仅本项目经理或合伙人可强制释放章节锁"},
+      "project_from": ["path"],
+      "eqcr": "deny",
+      "reason": "需求 8.3（表 B B3，design §4.8）：释放他人的锁；落实函数说明「项目经理强制解锁」的角色限制，合伙人在项目内职级高于经理一并放行"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/data-lock/lock",
+      "target": "design_gate",
+      "gate": "assert_note_role_access",
+      "params": {"project_roles": ["manager", "partner"], "denied_message": "仅本项目经理或合伙人可锁定报表附注数据"},
+      "project_from": ["path"],
+      "eqcr": "deny",
+      "reason": "需求 8.3（表 B B3，design §4.8）：签字后锁定报表附注数据是签字收尾动作，只放行本项目经理与合伙人"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/data-lock/unlock",
+      "target": "design_gate",
+      "gate": "assert_note_role_access",
+      "params": {"project_roles": [], "denied_message": "仅管理员可解除报表附注数据锁定"},
+      "project_from": ["path"],
+      "eqcr": "deny",
+      "reason": "需求 8.3（表 B B3，design §4.8）：落实函数说明「管理员解锁」的角色限制（项目角色集合为空，只有 admin 通过）；项目级判定照常（已归档返回 423）"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/data-lock/snapshot",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.3（表 B B3，design §4.8）：手动创建数据快照，属编辑过程的版本留存"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/notes/group-template/save",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.3（表 B B3，design §4.8）：读本项目附注结构并保存为共享集团模板，与另存章节模板同理"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/notes/group-template/distribute",
+      "target": "design_gate",
+      "gate": "assert_note_edit_access_on_projects",
+      "params": {"consol_lock": false},
+      "project_from": ["path", "body"],
+      "eqcr": "deny",
+      "reason": "需求 8.3、8.5（表 B B3，design §4.8）：写入每个目标项目的附注；路径项目与请求体 target_project_ids 逐一判定，任一不通过整单拒绝，错误信息列出未通过的项目"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/{project_id}/notes/group-template/detach",
+      "target": "note_edit_gate",
+      "project_from": ["path"],
+      "reason": "需求 8.3（表 B B3，design §4.8）：改本项目与集团模板的继承关系，即本项目附注结构的归属"
+    },
+    {
+      "method": "POST",
+      "path": "/api/note-templates/custom",
+      "target": "keep_current",
+      "reason": "范围外 R3（design §9）：note_templates.py 的全局附注模板写端点没有任何鉴权依赖，经核实也没有全局中间件或注册依赖兜底（design N8），本 spec 不改，另立 spec"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/note-templates/custom/{template_id}",
+      "target": "keep_current",
+      "reason": "范围外 R3（design §9）：note_templates.py 的全局附注模板写端点没有任何鉴权依赖，经核实也没有全局中间件或注册依赖兜底（design N8），本 spec 不改，另立 spec"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/note-templates/custom/{template_id}",
+      "target": "keep_current",
+      "reason": "范围外 R3（design §9）：note_templates.py 的全局附注模板写端点没有任何鉴权依赖，经核实也没有全局中间件或注册依赖兜底（design N8），本 spec 不改，另立 spec"
+    },
+    {
+      "method": "POST",
+      "path": "/api/note-templates/custom/{template_id}/rollback",
+      "target": "keep_current",
+      "reason": "范围外 R3（design §9）：note_templates.py 的全局附注模板写端点没有任何鉴权依赖，经核实也没有全局中间件或注册依赖兜底（design N8），本 spec 不改，另立 spec"
+    },
+    {
+      "method": "POST",
+      "path": "/api/note-templates/validate",
+      "target": "keep_current",
+      "reason": "范围外 R3（design §9）：note_templates.py 的全局附注模板写端点（含校验）没有任何鉴权依赖，经核实也没有全局中间件或注册依赖兜底（design N8），本 spec 不改，另立 spec"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/account-note-mapping/{project_id}",
+      "target": "keep_current",
+      "reason": "范围外 R10（design §9）：account_note_mapping.py 的 3 个 edit 级写端点（写作时前端零调用点），本 spec 不改其门禁"
+    },
+    {
+      "method": "POST",
+      "path": "/api/account-note-mapping/{project_id}/auto-generate",
+      "target": "keep_current",
+      "reason": "范围外 R10（design §9）：account_note_mapping.py 的 3 个 edit 级写端点（写作时前端零调用点），本 spec 不改其门禁"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/account-note-mapping/{project_id}/{mapping_id}",
+      "target": "keep_current",
+      "reason": "范围外 R10（design §9）：account_note_mapping.py 的 3 个 edit 级写端点（写作时前端零调用点），本 spec 不改其门禁"
+    }
+  ]
+}

@@ -13,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
+from app.models.core import User
+from app.services.note_edit_gate import require_note_edit_access
 from app.services.note_trim_service import NoteTrimService
 
 router = APIRouter(prefix="/api/disclosure-notes", tags=["note-trim"])
@@ -48,7 +50,7 @@ async def save_trim(
     data: NoteTrimRequest,
     template_type: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
     svc = NoteTrimService(db)
     resolved_template_type = await svc.resolve_template_type(project_id, template_type)
@@ -77,7 +79,7 @@ async def auto_trim(
     year: int,
     template_type: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
     """自动裁剪：扫描 binding 列出科目，TrialBalance 全 0 → 标 not_applicable.
 

@@ -13,9 +13,10 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import get_current_user
 from app.models.core import User
 from app.schemas._common import OptionalAmountDecimal
+from app.services.note_edit_gate import require_note_edit_access
 from app.services.note_readiness_service import run_validation_best_effort
 from app.services.note_wp_mapping_service import NoteWpMappingService
 
@@ -38,6 +39,7 @@ async def update_mapping(
     mapping: dict,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
+    _gate=Depends(require_note_edit_access(consol_lock=False)),
 ):
     svc = NoteWpMappingService(db)
     result = await svc.update_mapping(project_id, mapping)
@@ -51,6 +53,7 @@ async def refresh_from_workpapers(
     year: int,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
+    _gate=Depends(require_note_edit_access(consol_lock=False)),
 ):
     svc = NoteWpMappingService(db)
     result = await svc.refresh_from_workpapers(project_id, year)
@@ -71,6 +74,7 @@ async def refresh_all_bindings(
     note_section: str | None = Query(default=None, description="指定章节号则只刷新该章节"),
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
+    _gate=Depends(require_note_edit_access(consol_lock=False)),
 ):
     """全量 binding 取数刷新：对所有已有 binding 的章节走 _build_with_binding 重取数。
 
@@ -175,6 +179,7 @@ async def refresh_section_from_workpaper(
     note_section: str,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
+    _gate=Depends(require_note_edit_access(consol_lock=False)),
 ):
     """只重算单个章节的科目数据（当前页面刷新）。
 
@@ -205,9 +210,9 @@ async def toggle_mode(
     note_id: UUID,
     data: ToggleModeRequest,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_project_access("edit")),
+    user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
-    """改单元格模式 = 用户编辑附注：项目编辑权限 + 只认本项目本年度的章节 + 以当前用户盖「最近一次编辑」
+    """改单元格模式 = 用户编辑附注：附注编辑门禁 + 只认本项目本年度的章节 + 以当前用户盖「最近一次编辑」
     （原来只校验登录、按章节 id 不看项目；spec disclosure-note-template-word-realignment Task 17）。"""
     svc = NoteWpMappingService(db)
     result = await svc.toggle_cell_mode(project_id, year, note_id, data.row_label, data.col_index, data.mode,

@@ -5,6 +5,11 @@ Validates: Requirements 3.11.5 §4.2（附注双源问题）+ design §12.1 推�
 Strategy: bypass real DB by mocking `sync_from_workpaper` service + `get_db` dep,
 so we focus on router-level behavior (status codes, RBAC, schema validation).
 A separate service-level integration test covers the create/update branches.
+
+RBAC（项目成员判定）三条用例走权限世界（``tests/authz_world.py``，SQLite 内存库）：身份是真实用户与目标项目上
+的成员行（取 ``assignment_service.ROLE_MAP`` 对委派角色给出的值，未登记角色取 ``UNMAPPED_ROLE``），由生产的
+``require_project_access("edit")`` / ``assert_project_permission`` 判定，不替换门禁
+（partner-manager-edit-permission 需求 12.1）；同步本身与同步后的自动校验打桩计数。
 """
 
 from __future__ import annotations
@@ -19,10 +24,14 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import app.routers.wp_disclosure_sync as wp_disclosure_sync_module
+import app.services.note_readiness_service as note_readiness_service
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User, UserRole
 from app.routers.wp_disclosure_sync import router as wp_disclosure_sync_router
+from app.services.assignment_service import ROLE_MAP, map_assignment_role
+from tests.authz_world import TARGET_PROJECT_ID, sqlite_world
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -323,80 +332,71 @@ async def test_sync_422_when_wp_id_invalid():
     assert resp.status_code == 422
 
 
-@pytest.mark.asyncio
-async def test_sync_403_for_non_admin_without_project_access():
-    """auditor without project_users record → 403."""
-    app, mock_db = _make_app(role=UserRole.auditor)
+# ─── RBAC：权限世界里的真实成员行，生产门禁判定 ────────────────────────────────
 
-    # Mock DB execute to return no project_users row (→ 403)
-    fake_result = MagicMock()
-    fake_result.scalar_one_or_none.return_value = None
-    mock_db.execute = AsyncMock(return_value=fake_result)
+_GATE = "app.deps.assert_project_permission"
+_TARGET_SYNC_PATH = f"/api/projects/{TARGET_PROJECT_ID}/disclosure-notes/sync-from-workpaper"
+_RBAC_PAYLOAD = {
+    "wp_id": str(WP_ID),
+    "sheet_name": "C-sheet",
+    "section_id": "五-1-1 应收账款",
+    "sub_table_data": {},
+    "current_standard": "soe_standalone",
+}
 
-    payload = {
-        "wp_id": str(WP_ID),
-        "sheet_name": "C-sheet",
-        "section_id": "五-1-1 应收账款",
-        "sub_table_data": {},
-        "current_standard": "soe_standalone",
-    }
 
-    with patch("app.deps.set_rls_context", new=AsyncMock()), \
-         patch("app.deps._get_cached_permission", new=AsyncMock(return_value=None)):
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.post(
-                f"/api/projects/{PROJECT_ID}/disclosure-notes/sync-from-workpaper",
-                json=payload,
-            )
+@pytest_asyncio.fixture
+async def world(monkeypatch):
+    async with sqlite_world(monkeypatch) as w:
+        yield w
 
-    assert resp.status_code == 403
+
+async def _post_as_member(world, user, payload, *, result=None):
+    """以世界里的 ``user`` 向目标项目发同步请求；同步与同步后的自动校验打桩计数。"""
+    sync = world.stub(wp_disclosure_sync_module, "sync_from_workpaper", returns=result)
+    validation = world.stub(note_readiness_service, "run_validation_best_effort", returns=None)
+    async with world.client(wp_disclosure_sync_router, user=user) as client:
+        resp = await client.post(_TARGET_SYNC_PATH, json=payload)
+    return resp, sync, validation, client
 
 
 @pytest.mark.asyncio
-async def test_sync_403_for_readonly_user():
-    """Non-admin user with cached readonly permission → 403."""
-    app, _mock_db = _make_app(role=UserRole.auditor)
+async def test_sync_403_for_non_admin_without_project_access(world):
+    """auditor without project_users record on the target project → 403（在另一项目上是 edit 级也不行）。"""
+    identity = await world.non_member()
 
-    payload = {
-        "wp_id": str(WP_ID),
-        "sheet_name": "C-sheet",
-        "section_id": "五-1-1 应收账款",
-        "sub_table_data": {},
-        "current_standard": "soe_standalone",
-    }
+    resp, sync, validation, client = await _post_as_member(world, identity.user, _RBAC_PAYLOAD)
 
-    # 模拟 Redis 缓存返回 readonly（require_project_access('edit') 应拒绝）
-    with patch("app.deps.set_rls_context", new=AsyncMock()), \
-         patch(
-             "app.deps._get_cached_permission",
-             new=AsyncMock(return_value="readonly"),
-         ):
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.post(
-                f"/api/projects/{PROJECT_ID}/disclosure-notes/sync-from-workpaper",
-                json=payload,
-            )
-
-    assert resp.status_code == 403
+    assert (resp.status_code, resp.json()) == (403, {"detail": "权限不足"})
+    assert (sync.count, validation.count) == (0, 0)
+    client.assert_passed(_GATE, times=1)
 
 
 @pytest.mark.asyncio
-async def test_sync_with_edit_user_succeeds():
-    """Non-admin user with cached edit permission → 200."""
-    app, _mock_db = _make_app(role=UserRole.auditor)
+async def test_sync_403_for_readonly_user(world):
+    """Non-admin member whose project_users row is readonly → 403.
 
-    payload = {
-        "wp_id": str(WP_ID),
-        "sheet_name": "C-sheet",
-        "section_id": "五-1-1 应收账款",
-        "sub_table_data": {"st1": [{"v": 1}]},
-        "current_standard": "soe_standalone",
-    }
+    成员行取 ROLE_MAP 对未登记委派角色的兜底（UNMAPPED_ROLE = readonly, readonly），
+    require_project_access('edit') 应拒绝。
+    """
+    role, level = map_assignment_role("观察员")
+    identity = await world.member(level, role)
+    assert (identity.member.role.value, identity.member.permission_level.value) == ("readonly", "readonly")
 
+    resp, sync, validation, client = await _post_as_member(world, identity.user, _RBAC_PAYLOAD)
+
+    assert (resp.status_code, resp.json()) == (403, {"detail": "权限不足"})
+    assert (sync.count, validation.count) == (0, 0)
+    client.assert_passed(_GATE, times=1)
+
+
+@pytest.mark.asyncio
+async def test_sync_with_edit_user_succeeds(world):
+    """Non-admin member whose project_users row is edit（委派角色 auditor → ROLE_MAP 值 (auditor, edit)）→ 200."""
+    role, level = ROLE_MAP["auditor"]
+    identity = await world.member(level, role)
+
+    payload = {**_RBAC_PAYLOAD, "sub_table_data": {"st1": [{"v": 1}]}}
     fake_result = {
         "success": True,
         "section_id": "五-1-1 应收账款",
@@ -405,25 +405,17 @@ async def test_sync_with_edit_user_succeeds():
         "created": True,
     }
 
-    with patch(
-        "app.routers.wp_disclosure_sync.sync_from_workpaper",
-        new=AsyncMock(return_value=fake_result),
-    ), patch("app.deps.set_rls_context", new=AsyncMock()), \
-       patch(
-           "app.deps._get_cached_permission",
-           new=AsyncMock(return_value="edit"),
-       ):
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.post(
-                f"/api/projects/{PROJECT_ID}/disclosure-notes/sync-from-workpaper",
-                json=payload,
-            )
+    resp, sync, validation, client = await _post_as_member(world, identity.user, payload, result=fake_result)
 
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["created"] is True
+    assert body == {**fake_result, "texts_synced": 0}
+    ((args, kwargs),) = sync.calls
+    assert args[1] == TARGET_PROJECT_ID
+    assert (kwargs["wp_id"], kwargs["section_id"], kwargs["user"].id) == (WP_ID, "五-1-1 应收账款", identity.user.id)
+    assert validation.count == 1  # 同步成功后自动补跑一次附注校验
+    client.assert_passed(_GATE, times=1)
 
 
 @pytest.mark.asyncio

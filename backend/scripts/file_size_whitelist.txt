@@ -1518,3 +1518,18 @@ backend/tests/dsh_agent_panel/test_task7_adopt_fail_closed.py  1433
 #     拆分方向：semantic_account_resolver 按「语义槽定义 / 科目反解 / 报表公式取数」拆模块；consol_elimination_sheet_service 按「差额表组装 / 映射器 / 推送」拆。
 backend/app/services/four_table/semantic_account_resolver.py  844
 backend/app/services/consol_elimination_sheet_service.py  1143
+# ═══════════════════════════════════════════════════════════════════════════
+# spec: partner-manager-edit-permission（2026-10-22 入册）
+#
+# 三个文件因本 spec 的安全/正确性改动超过 800 行上限。
+#   gen_edit_level_impact_inventory.py —— edit 级影响清单生成脚本（单文件承载路由收集 +
+#     门禁识别 + 直接比较位置 + 所门禁端点 + 覆盖集合 + 自检 + 检查模式），设计上必须
+#     单文件（门禁登记表与自检样例互为分母）。
+#   test_disclosure_notes_hardening.py —— 附注端点改走附注编辑门禁后的集成测试，
+#     判定顺序用例与业务路径用例同文件共用 mock 基础设施。
+#   test_phase8.py —— 删除 TestPermissionCache 三例后仍超限（历史大文件，本次减 3 例）。
+# baseline 取当前真实行数（splitlines 口径），门禁继续拦膨胀 >5%。
+# ═══════════════════════════════════════════════════════════════════════════
+backend/scripts/gen/gen_edit_level_impact_inventory.py  1029
+backend/tests/test_disclosure_notes_hardening.py  1511
+backend/tests/test_phase8.py  1087

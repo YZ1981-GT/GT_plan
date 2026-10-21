@@ -17,6 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
+from app.services.note_edit_gate import (
+    assert_note_edit_access_on_projects,
+    require_note_edit_access,
+)
 from app.models.core import User
 from app.services.group_note_baseline_service import GroupNoteBaselineService
 
@@ -72,6 +76,7 @@ async def save_baseline(
     current_user: User = Depends(get_current_user),
 ):
     """Save current project notes as a group baseline."""
+    await assert_note_edit_access_on_projects(db, current_user, [project_id], consol_lock=False)
     svc = GroupNoteBaselineService(db)
     result = await svc.save_baseline(
         parent_project_id=project_id,
@@ -117,7 +122,7 @@ async def apply_group_baseline(
     project_id: UUID,
     body: ApplyBaselineRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
     """Apply a group baseline to a child project（以当前用户盖「最近一次编辑」）."""
     svc = GroupNoteBaselineService(db)

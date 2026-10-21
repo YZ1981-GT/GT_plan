@@ -76,6 +76,11 @@ _PROJECT_LEVEL_TOKENS = (
     # 2026-10-19 补：交付中心鉴权 —— 先 assert_project_permission 校验本项目成员，再按交付件角色矩阵；
     # word-exports / 导出附注 Word / 组合导出包复用同一函数。可伪证：test_guard_action_token_is_really_project_level
     "_guard_action",
+    # 2026-10-20 补（spec partner-manager-edit-permission 任务 6.5）：附注编辑门禁 app/services/note_edit_gate.py。前缀匹配
+    # 同时覆盖 assert_note_edit_access_for_object / _on_projects。可伪证：test_note_edit_gate_tokens_are_really_project_level
+    "require_note_edit_access",
+    "assert_note_edit_access",
+    "assert_note_role_access",
 )
 
 #: 仅身份认证 / 角色判定，不含项目维度
@@ -405,7 +410,7 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #:
 #: 本断言只**冻结上限**：不得比现状更差。
 #: 🔴 阈值是现算值而非拍脑袋 —— 降到更低后应同步下调（棘轮只许向下）。
-_IDENTITY_ONLY_BASELINE = 214  # 2026-10-19：附注 AI 四个端点补项目成员校验后现算 214
+_IDENTITY_ONLY_BASELINE = 207  # 2026-10-22：note_wp_mapping B1/B2 四个端点补附注编辑门禁后现算 210
 
 
 def test_identity_only_endpoints_do_not_grow():
@@ -735,3 +740,39 @@ def test_prefixed_scanner_self_check():
     )
     got = {k: tier for k, _, tier in _scan_prefixed_source("s.py", sample)}
     assert got == {"s.py::bare": "none", "s.py::via_router": "project"}, got
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 附注编辑门禁三个令牌记作项目级的前提（spec partner-manager-edit-permission 需求 6.10，任务 6.5）
+# ══════════════════════════════════════════════════════════════════════════
+# 按 AST 判定（注释 / docstring / 字符串里的名字不计）。判定函数 ``note_gate_ast_facts`` 与附注门禁契约守卫共用，
+# 合成样例自检在那边；``_NOTE_GATE`` 在调用时读取，变异实测可把它指向源码副本（不改磁盘上的生产文件）。
+
+_NOTE_GATE = _ROOT / "backend/app/services/note_edit_gate.py"
+
+#: 事实键（与 ``note_gate_ast_facts`` 一致）→ 不成立时的说明
+_NOTE_GATE_FACTS = {
+    "permission": "需求 6.10 ①：assert_note_edit_access 不再在条件分支、异常处理与提前 return 之外以 review 级"
+                  "（字面量或同文件常量）await app.deps.assert_project_permission",
+    "eqcr": "需求 6.10 ②：assert_note_edit_access 不再无条件 await EQCR 判定 app.services.eqcr_resolver.is_project_eqcr",
+    "role": "assert_note_role_access 不再在任何 return 之前无条件 await 判定实现 assert_note_edit_access",
+}
+
+
+def _note_gate_facts(src: str) -> dict[str, bool]:
+    # 延迟导入：本文件其余用例只读源码，不因 app 导入失败而无法收集
+    from tests.test_disclosure_notes_project_gate_contract import note_gate_ast_facts
+
+    return note_gate_ast_facts(src)
+
+
+@pytest.mark.parametrize("fact", sorted(_NOTE_GATE_FACTS))
+def test_note_edit_gate_tokens_are_really_project_level(fact: str):
+    """三个附注令牌记作项目级的前提（可伪证）：判定实现做 review 级成员校验与 EQCR 判定，角色限定形态先调判定实现。"""
+    assert _note_gate_facts(_NOTE_GATE.read_text(encoding="utf-8"))[fact], _NOTE_GATE_FACTS[fact]
+
+
+def test_note_gate_facts_can_fail():
+    """反向自检：不满足的源码三条全为 False —— 共享判定函数退化为恒真时，本文件也能独立打红。"""
+    sample = "async def assert_note_edit_access(db, user, project_id, *, consol_lock):\n    return user\n"
+    assert _note_gate_facts(sample) == {"permission": False, "eqcr": False, "role": False}

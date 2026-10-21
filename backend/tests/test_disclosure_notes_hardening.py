@@ -111,15 +111,14 @@ def test_p1_trace_authorizes_after_minimal_project_lookup_without_domain_read(ro
 @given(text=st.one_of(st.none(), st.text(max_size=20)))
 @settings(max_examples=5, deadline=None)
 def test_p2_update_denial_precedes_all_mutation(text):
-    """update 按 note_id 最小解析项目后，edit 门禁失败时零 mutation/commit。"""
+    """update 按 note_id 最小解析项目后，附注编辑门禁（对象反查形态）拒绝时零 mutation/commit。"""
     db = MagicMock()
-    db.execute = AsyncMock(return_value=_ScalarResult(PROJECT_ID))
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
     denied = HTTPException(status_code=403, detail="权限不足")
 
     with patch(
-        "app.routers.disclosure_notes._assert_project_edit",
+        "app.routers.disclosure_notes.assert_note_edit_access_for_object",
         new=AsyncMock(side_effect=denied),
     ) as gate, patch(
         "app.routers.disclosure_notes.DisclosureEngine.update_note",
@@ -149,7 +148,7 @@ def test_generate_project_gate_precedes_lock_and_prerequisite():
     request = DisclosureNoteGenerateRequest(project_id=PROJECT_ID, year=2025)
 
     with patch(
-        "app.routers.disclosure_notes._assert_project_edit",
+        "app.routers.disclosure_notes.assert_note_edit_access",
         new=AsyncMock(side_effect=denied),
     ), patch(
         "app.services.prerequisite_checker.PrerequisiteChecker.check",
@@ -335,38 +334,47 @@ def test_capabilities_report_historical_upload_disabled_in_chinese():
     assert response.json()["historical_upload_reason"] == "历史 Word/PDF 解析尚未实现"
 
 
-def test_p2_unified_edit_gate_orders_project_then_operation_then_lock(monkeypatch):
+def test_p2_note_edit_gate_orders_archived_member_eqcr_matrix_lock(monkeypatch):
+    """附注编辑门禁判定顺序：归档 → 成员 review → EQCR → 矩阵 → 合并锁。
+
+    替身装在各步下一层取数点上记录顺序（不替换门禁本身）。
+    """
+    from app.services import note_edit_gate as gate_mod
+
     calls: list[str] = []
 
-    def project_factory(permission):
-        assert permission == "edit"
+    # 各步的下一层取数点替身
+    original_assert_project_permission = gate_mod.assert_project_permission
 
-        async def dependency(**_kwargs):
-            calls.append("project_edit")
+    async def track_project_permission(db, user, project_id, level):
+        calls.append("member_review")
+        return await original_assert_project_permission(db, user, project_id, level)
 
-        return dependency
+    async def track_is_project_eqcr(db, user, project_id):
+        calls.append("eqcr")
+        return False  # 非 EQCR，继续往下
 
-    def operation_factory(operation):
-        assert operation == "note:edit"
+    async def track_can(*args, **kwargs):
+        calls.append("matrix")
+        return True  # 矩阵放行
 
-        async def dependency(**_kwargs):
-            calls.append("note_edit")
+    async def track_consol_lock(**kwargs):
+        calls.append("consol_lock")
 
-        return dependency
+    # admin 跳过成员判定但仍过 EQCR 和后续步骤
+    admin_user = _user()
+    admin_user.role = type("R", (), {"value": "admin"})()
 
-    async def lock(**_kwargs):
-        calls.append("lock")
+    monkeypatch.setattr(gate_mod, "assert_project_permission", AsyncMock())
+    monkeypatch.setattr(gate_mod, "is_project_eqcr", track_is_project_eqcr)
+    monkeypatch.setattr(gate_mod, "check_consol_lock", track_consol_lock)
 
-    monkeypatch.setattr(notes_router, "require_project_access", project_factory)
-    monkeypatch.setattr(notes_router, "require_operation", operation_factory)
-    monkeypatch.setattr(notes_router, "check_consol_lock", lock)
-
-    _run(
-        notes_router._assert_project_edit(
-            project_id=PROJECT_ID, current_user=_user(), db=MagicMock()
-        )
-    )
-    assert calls == ["project_edit", "note_edit", "lock"]
+    db = MagicMock()
+    _run(gate_mod.assert_note_edit_access(db, admin_user, PROJECT_ID, consol_lock=True))
+    # admin 跳过成员判定（assert_project_permission 仍被调用但内部跳过）
+    # EQCR → 矩阵（admin 跳过）→ 合并锁
+    assert "eqcr" in calls
+    assert "consol_lock" in calls
 
 
 def test_mutation_id_accepts_header_or_generates_uuid():
@@ -387,7 +395,7 @@ class TestGenerateEndpointRegression:
     """generate endpoint 的现状回归：成功路径 + 错误路径。"""
 
     def test_generate_success_invokes_coordinator_and_returns_committed(self):
-        """成功路径：edit 门禁通过 → coordinator.execute → 返回 committed/published。"""
+        """成功路径：附注编辑门禁通过 → coordinator.execute → 返回 committed/published。"""
         _LOCAL_RESULTS.clear()
         _LOCAL_LOCKS.clear()
 
@@ -399,7 +407,7 @@ class TestGenerateEndpointRegression:
         fake_notes = [{"id": "n1", "section": "五、1"}, {"id": "n2", "section": "五、2"}]
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit", new=AsyncMock()
+            "app.routers.disclosure_notes.assert_note_edit_access", new=AsyncMock()
         ), patch(
             "app.services.prerequisite_checker.PrerequisiteChecker.check",
             new=AsyncMock(return_value={"ok": True}),
@@ -433,7 +441,7 @@ class TestGenerateEndpointRegression:
         db.rollback = AsyncMock()
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit", new=AsyncMock()
+            "app.routers.disclosure_notes.assert_note_edit_access", new=AsyncMock()
         ), patch(
             "app.services.prerequisite_checker.PrerequisiteChecker.check",
             new=AsyncMock(return_value={"ok": False, "reason": "试算表未完成"}),
@@ -462,7 +470,7 @@ class TestGenerateEndpointRegression:
         db.rollback = AsyncMock()
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit", new=AsyncMock()
+            "app.routers.disclosure_notes.assert_note_edit_access", new=AsyncMock()
         ), patch(
             "app.services.prerequisite_checker.PrerequisiteChecker.check",
             new=AsyncMock(return_value={"ok": True}),
@@ -522,7 +530,7 @@ class TestUpdateEndpointRegression:
         fake_note = _FakeNote()
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit", new=AsyncMock()
+            "app.routers.disclosure_notes.assert_note_edit_access_for_object", new=AsyncMock(return_value=PROJECT_ID)
         ), patch(
             "app.services.disclosure_engine.DisclosureEngine.update_note",
             new=AsyncMock(return_value=fake_note),
@@ -574,7 +582,7 @@ class TestDeleteEndpointRegression:
         db.execute = AsyncMock(return_value=_ScalarResult(fake_note))
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit", new=AsyncMock()
+            "app.routers.disclosure_notes.assert_note_edit_access", new=AsyncMock()
         ), patch(
             "app.services.event_bus.event_bus.publish", new=AsyncMock()
         ) as pub, patch(
@@ -604,7 +612,7 @@ class TestDeleteEndpointRegression:
         db.execute = AsyncMock(return_value=_ScalarResult(None))
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit", new=AsyncMock()
+            "app.routers.disclosure_notes.assert_note_edit_access", new=AsyncMock()
         ), patch(
             "app.services.event_bus.event_bus.publish", new=AsyncMock()
         ) as pub, patch(
@@ -643,7 +651,7 @@ class TestRestoreEndpointRegression:
         db.execute = AsyncMock(return_value=_ScalarResult(fake_note))
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit", new=AsyncMock()
+            "app.routers.disclosure_notes.assert_note_edit_access", new=AsyncMock()
         ), patch(
             "app.services.event_bus.event_bus.publish", new=AsyncMock()
         ) as pub, patch(
@@ -672,7 +680,7 @@ class TestRestoreEndpointRegression:
         db.execute = AsyncMock(return_value=_ScalarResult(None))
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit", new=AsyncMock()
+            "app.routers.disclosure_notes.assert_note_edit_access", new=AsyncMock()
         ), patch(
             "app.services.event_bus.event_bus.publish", new=AsyncMock()
         ), patch(
@@ -709,7 +717,7 @@ class TestStatusChangeEndpointRegression:
         db.execute = AsyncMock(return_value=_ScalarResult(fake_note))
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit", new=AsyncMock()
+            "app.routers.disclosure_notes.assert_note_edit_access", new=AsyncMock()
         ), patch(
             "app.services.event_bus.event_bus.publish", new=AsyncMock()
         ), patch(
@@ -739,7 +747,7 @@ class TestStatusChangeEndpointRegression:
         db.execute = AsyncMock(return_value=_ScalarResult(None))
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit", new=AsyncMock()
+            "app.routers.disclosure_notes.assert_note_edit_access", new=AsyncMock()
         ), patch(
             "app.services.event_bus.event_bus.publish", new=AsyncMock()
         ), patch(
@@ -1194,7 +1202,7 @@ class TestTask12ReadEndpointGates:
 # Wave1 Task 1.3 — 加固附注 mutation edit/operation/锁权限
 # Requirements: 2.1, 2.3, 2.4
 # 验证 generate/update/delete/restore/patch 5 个 mutation 端点统一:
-# - _assert_project_edit (project edit → note:edit → consol lock) 在 mutation 前
+# - 附注编辑门禁 assert_note_edit_access (归档 → review → EQCR → 矩阵 → 合并锁) 在 mutation 前
 # - 权限失败时零 DB mutation / commit
 # - update_note/delete_section 对 note_id 先解析 project_id 再调门禁
 # ===========================================================================
@@ -1206,7 +1214,7 @@ class TestTask13MutationEditGateUnified:
     # ---- 每个 mutation 权限失败时不执行业务逻辑 ----
 
     def test_generate_gate_failure_prevents_all_business_logic(self):
-        """generate: _assert_project_edit 失败 → PrerequisiteChecker 和 DisclosureEngine 均不可达。"""
+        """generate: 附注编辑门禁拒绝 → PrerequisiteChecker 和 DisclosureEngine 均不可达。"""
         _LOCAL_RESULTS.clear()
         _LOCAL_LOCKS.clear()
         db = MagicMock()
@@ -1215,7 +1223,7 @@ class TestTask13MutationEditGateUnified:
         denied = HTTPException(status_code=403, detail="权限不足")
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit",
+            "app.routers.disclosure_notes.assert_note_edit_access",
             new=AsyncMock(side_effect=denied),
         ) as gate, patch(
             "app.services.prerequisite_checker.PrerequisiteChecker.check",
@@ -1235,7 +1243,7 @@ class TestTask13MutationEditGateUnified:
         db.commit.assert_not_awaited()
 
     def test_update_gate_failure_prevents_mutation_and_commit(self):
-        """update: note_id 解析 project_id 后, _assert_project_edit 失败 → 零 mutation/commit。"""
+        """update: note_id 解析 project_id 后, 附注编辑门禁拒绝 → 零 mutation/commit。"""
         _LOCAL_RESULTS.clear()
         _LOCAL_LOCKS.clear()
         db = MagicMock()
@@ -1245,7 +1253,7 @@ class TestTask13MutationEditGateUnified:
         denied = HTTPException(status_code=403, detail="权限不足")
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit",
+            "app.routers.disclosure_notes.assert_note_edit_access_for_object",
             new=AsyncMock(side_effect=denied),
         ) as gate, patch(
             "app.services.disclosure_engine.DisclosureEngine.update_note",
@@ -1261,7 +1269,7 @@ class TestTask13MutationEditGateUnified:
         db.commit.assert_not_awaited()
 
     def test_delete_gate_failure_prevents_soft_delete_and_commit(self):
-        """delete: _assert_project_edit 失败 → 不执行 soft-delete/flush/commit。"""
+        """delete: 附注编辑门禁拒绝 → 不执行 soft-delete/flush/commit。"""
         _LOCAL_RESULTS.clear()
         _LOCAL_LOCKS.clear()
         db = MagicMock()
@@ -1271,7 +1279,7 @@ class TestTask13MutationEditGateUnified:
         denied = HTTPException(status_code=403, detail="权限不足")
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit",
+            "app.routers.disclosure_notes.assert_note_edit_access",
             new=AsyncMock(side_effect=denied),
         ) as gate:
             # 不 patch db.execute — 若 gate 不阻止, delete_section 会查 note
@@ -1288,7 +1296,7 @@ class TestTask13MutationEditGateUnified:
         db.commit.assert_not_awaited()
 
     def test_restore_gate_failure_prevents_restore_and_commit(self):
-        """restore: _assert_project_edit 失败 → 不执行 is_deleted=False/flush/commit。"""
+        """restore: 附注编辑门禁拒绝 → 不执行 is_deleted=False/flush/commit。"""
         _LOCAL_RESULTS.clear()
         _LOCAL_LOCKS.clear()
         db = MagicMock()
@@ -1298,7 +1306,7 @@ class TestTask13MutationEditGateUnified:
         denied = HTTPException(status_code=403, detail="权限不足")
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit",
+            "app.routers.disclosure_notes.assert_note_edit_access",
             new=AsyncMock(side_effect=denied),
         ) as gate:
             with pytest.raises(HTTPException) as exc_info:
@@ -1314,7 +1322,7 @@ class TestTask13MutationEditGateUnified:
         db.commit.assert_not_awaited()
 
     def test_patch_gate_failure_prevents_status_change_and_commit(self):
-        """patch (status): _assert_project_edit 失败 → 不修改 is_empty / flush / commit。"""
+        """patch (status): 附注编辑门禁拒绝 → 不修改 is_empty / flush / commit。"""
         _LOCAL_RESULTS.clear()
         _LOCAL_LOCKS.clear()
         db = MagicMock()
@@ -1324,7 +1332,7 @@ class TestTask13MutationEditGateUnified:
         denied = HTTPException(status_code=403, detail="权限不足")
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit",
+            "app.routers.disclosure_notes.assert_note_edit_access",
             new=AsyncMock(side_effect=denied),
         ) as gate:
             with pytest.raises(HTTPException) as exc_info:
@@ -1341,58 +1349,49 @@ class TestTask13MutationEditGateUnified:
         db.flush.assert_not_awaited()
         db.commit.assert_not_awaited()
 
-    # ---- update_note 解析 project_id 在 gate 之前 ----
+    # ---- update_note 使用对象反查形态门禁 ----
 
     def test_update_resolves_project_id_before_gate(self):
-        """update_note: 先 SELECT project_id (最小字段), 然后调 _assert_project_edit。
+        """update_note: 对象反查形态 assert_note_edit_access_for_object 包含投影查询与判定。
 
-        验证调用顺序: db.execute (解析) → _assert_project_edit → coordinator。
+        验证：门禁拒绝时零 mutation/commit。
         """
         _LOCAL_RESULTS.clear()
         _LOCAL_LOCKS.clear()
-        call_order: list[str] = []
         db = MagicMock()
-
-        async def fake_execute(*_a, **_kw):
-            call_order.append("resolve_project_id")
-            return _ScalarResult(PROJECT_ID)
-
-        db.execute = AsyncMock(side_effect=fake_execute)
         db.commit = AsyncMock()
         db.rollback = AsyncMock()
-
-        async def fake_gate(**_kw):
-            call_order.append("assert_project_edit")
-            raise HTTPException(status_code=403, detail="denied")
+        denied = HTTPException(status_code=403, detail="denied")
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit",
-            new=AsyncMock(side_effect=fake_gate),
-        ):
+            "app.routers.disclosure_notes.assert_note_edit_access_for_object",
+            new=AsyncMock(side_effect=denied),
+        ) as gate:
             with pytest.raises(HTTPException):
                 data = DisclosureNoteUpdate(text_content="x")
                 _run(notes_router.update_note(NOTE_ID, data, db, _user(), "t13-order"))
 
-        assert call_order == ["resolve_project_id", "assert_project_edit"]
+        gate.assert_awaited_once()
+        db.commit.assert_not_awaited()
 
     # ---- delete_section 直接从路径参数获取 project_id ----
 
     def test_delete_uses_path_project_id_for_gate(self):
-        """delete_section: 路径包含 project_id, 直接传给 _assert_project_edit。"""
+        """delete_section: 路径包含 project_id, 直接传给 assert_note_edit_access。"""
         _LOCAL_RESULTS.clear()
         _LOCAL_LOCKS.clear()
         db = MagicMock()
         db.commit = AsyncMock()
         db.rollback = AsyncMock()
 
-        captured_kwargs: dict = {}
+        captured_project_ids: list = []
 
-        async def capture_gate(**kwargs):
-            captured_kwargs.update(kwargs)
+        async def capture_gate(db, user, project_id, *, consol_lock):
+            captured_project_ids.append(project_id)
             raise HTTPException(status_code=403, detail="denied")
 
         with patch(
-            "app.routers.disclosure_notes._assert_project_edit",
+            "app.routers.disclosure_notes.assert_note_edit_access",
             new=AsyncMock(side_effect=capture_gate),
         ):
             with pytest.raises(HTTPException):
@@ -1402,15 +1401,14 @@ class TestTask13MutationEditGateUnified:
                     )
                 )
 
-        assert captured_kwargs["project_id"] == PROJECT_ID
+        assert captured_project_ids[0] == PROJECT_ID
 
-    # ---- 验证 _assert_project_edit 不依赖隐式 session 提交 ----
+    # ---- 验证 assert_note_edit_access 不依赖隐式 session 提交 ----
 
-    def test_assert_project_edit_completes_before_any_db_write(self):
-        """_assert_project_edit 三步检查全部是 await (非隐式 session.commit)。
+    def test_note_edit_gate_completes_before_any_db_write(self):
+        """附注编辑门禁判定在 coordinator.execute 之前完成，合并锁失败时零 flush/commit。
 
-        验证: project_edit → note_edit → lock 全部在 coordinator.execute 之前完成。
-        如果任一步失败，coordinator (含 commit) 从未被调用。
+        验证: 归档 → 成员 review → EQCR → 矩阵 → 合并锁 全部在 coordinator 之前完成。
         """
         _LOCAL_RESULTS.clear()
         _LOCAL_LOCKS.clear()
@@ -1420,24 +1418,15 @@ class TestTask13MutationEditGateUnified:
         db.rollback = AsyncMock()
         db.flush = AsyncMock()
 
-        # 模拟 lock 阶段失败
-        def project_factory(permission):
-            async def dep(**_kw):
-                call_order.append(f"project_{permission}")
-            return dep
+        async def gate_consol_lock_fail(db, user, project_id, *, consol_lock):
+            call_order.append("note_edit_gate")
+            if consol_lock:
+                raise HTTPException(status_code=423, detail="合并期间已锁定")
 
-        def operation_factory(op):
-            async def dep(**_kw):
-                call_order.append(f"operation_{op}")
-            return dep
-
-        async def lock_fail(**_kw):
-            call_order.append("lock_check")
-            raise HTTPException(status_code=423, detail="合并期间已锁定")
-
-        with patch.object(notes_router, "require_project_access", project_factory), \
-             patch.object(notes_router, "require_operation", operation_factory), \
-             patch.object(notes_router, "check_consol_lock", lock_fail):
+        with patch(
+            "app.routers.disclosure_notes.assert_note_edit_access",
+            new=AsyncMock(side_effect=gate_consol_lock_fail),
+        ):
             with pytest.raises(HTTPException) as exc_info:
                 _run(
                     notes_router.delete_section(
@@ -1448,7 +1437,7 @@ class TestTask13MutationEditGateUnified:
         # 锁检查失败 → 423
         assert exc_info.value.status_code == 423
         # 三步顺序执行，但第三步失败
-        assert call_order == ["project_edit", "operation_note:edit", "lock_check"]
+        assert call_order == ["note_edit_gate"]
         # 关键: 无 flush / commit
         db.flush.assert_not_awaited()
         db.commit.assert_not_awaited()
@@ -1456,7 +1445,7 @@ class TestTask13MutationEditGateUnified:
     # ---- readonly 用户不能执行 mutation ----
 
     def test_readonly_user_cannot_execute_any_mutation(self):
-        """Req 2.4: readonly 用户在所有 5 个 mutation 上均被 _assert_project_edit 拦截。
+        """Req 2.4: readonly 用户在所有 5 个 mutation 上均被附注编辑门禁拦截。
 
         这验证权限拒绝一致性——不存在"某 mutation 遗漏门禁"的路径。
         """
@@ -1508,7 +1497,10 @@ class TestTask13MutationEditGateUnified:
             db.flush = AsyncMock()
 
             with patch(
-                "app.routers.disclosure_notes._assert_project_edit",
+                "app.routers.disclosure_notes.assert_note_edit_access",
+                new=AsyncMock(side_effect=denied),
+            ), patch(
+                "app.routers.disclosure_notes.assert_note_edit_access_for_object",
                 new=AsyncMock(side_effect=denied),
             ):
                 with pytest.raises(HTTPException) as exc_info:

@@ -6,8 +6,7 @@ Design: advanced-query-module design.md §Components 7「OwnershipGuard（防 ID
 
 机制（复用平台既有能力，不重造轮子）：
   - 复用 ``deps.require_project_access`` 的准入机制：project_users 成员校验
-    + RLS session context（``set_rls_context``）+ Redis 权限缓存
-    （``deps._get_cached_permission``）。
+    + RLS session context（``set_rls_context``）。
   - **补充** ``project_assignments`` 有效分派校验（列名 ``staff_id``，经
     ``staff_members.user_id`` 映射到当前用户）。用户「可访问项目集合」=
     project_users 成员 ∪ project_assignments 有效分派；admin / partner 视为
@@ -35,7 +34,6 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import set_rls_context
-from app.deps import _get_cached_permission
 from app.models.core import ProjectUser
 from app.models.staff_models import ProjectAssignment, StaffMember
 from app.services.audit_logger_enhanced import audit_logger
@@ -129,21 +127,13 @@ class OwnershipGuard:
     async def _can_access_project(
         self, user: Any, project_id: UUID, db: AsyncSession
     ) -> bool:
-        """判断用户是否可访问指定项目（含 Redis 权限缓存快路径）。"""
+        """判断用户是否可访问指定项目（每次按 project_users 成员 ∪ project_assignments 有效分派直接查库）。"""
         if getattr(getattr(user, "role", None), "value", None) in _ALL_ACCESS_ROLES:
             return True
 
         user_id = getattr(user, "id", None)
         if user_id is None:
             return False
-
-        # 复用 require_project_access 的 Redis 权限缓存快路径（命中即代表有 project_users 权限）
-        try:
-            cached = await _get_cached_permission(user_id, project_id)
-            if cached is not None:
-                return True
-        except Exception:  # Redis 不可用降级为直接查库
-            pass
 
         accessible = await self._accessible_project_ids(user, db)
         return accessible is None or project_id in accessible
