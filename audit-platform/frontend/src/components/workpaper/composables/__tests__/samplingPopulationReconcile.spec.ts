@@ -72,6 +72,28 @@ describe('parseReconcileInfo', () => {
     expect(info!.available).toBe(false)
     expect(info!.unavailableReason).toBe('余额表无行')
   })
+
+  it('新后端含映射状态', () => {
+    const info = parseReconcileInfo({
+      reconcile_available: true,
+      book_amount: '1900',
+      reconcile_basis: 'tb_balance_movement',
+      reconcile_ledger_debit: '1000',
+      reconcile_ledger_credit: '900',
+      reconcile_book_debit: '1000',
+      reconcile_book_credit: '900',
+      reconcile_mapping_used: true,
+    })
+    expect(info!.mappingUsed).toBe(true)
+  })
+
+  it('旧后端无映射状态 → 默认 false', () => {
+    const info = parseReconcileInfo({
+      reconcile_available: true,
+      book_amount: '500',
+    })
+    expect(info!.mappingUsed).toBe(false)
+  })
 })
 
 // ─── resolvePopulationReconcile ──────────────────────────────────────────────
@@ -86,6 +108,7 @@ function mkInfo(overrides: Partial<PopulationReconcileInfo> = {}): PopulationRec
     ledgerCredit: '900',
     bookDebit: '1000',
     bookCredit: '900',
+    mappingUsed: false,
     ...overrides,
   }
 }

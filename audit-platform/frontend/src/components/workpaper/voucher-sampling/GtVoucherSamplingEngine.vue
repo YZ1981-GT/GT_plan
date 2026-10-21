@@ -855,7 +855,17 @@ async function handleResample() {
         </div>
         <div class="reconcile-item" v-if="reconcileInfo?.available && reconcileInfo.bookDebit != null">
           <span class="reconcile-label">{{ reconcileBasisLabel(reconcileInfo.basis) }}</span>
-          <span class="reconcile-value">{{ formatMovementPair(reconcileInfo.bookDebit, reconcileInfo.bookCredit) }}</span>
+          <span class="reconcile-value">
+            {{ formatMovementPair(reconcileInfo.bookDebit, reconcileInfo.bookCredit) }}
+            <el-tag
+              :type="reconcileInfo.mappingUsed ? 'success' : 'info'"
+              size="small"
+              effect="plain"
+              style="margin-left: 8px"
+            >
+              {{ reconcileInfo.mappingUsed ? '已通过科目映射' : '直接匹配（未使用映射）' }}
+            </el-tag>
+          </span>
         </div>
         <div class="reconcile-item">
           <span class="reconcile-label">手工录入账面（借+贷发生额合计）</span>

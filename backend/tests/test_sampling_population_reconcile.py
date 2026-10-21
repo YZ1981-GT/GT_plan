@@ -137,12 +137,11 @@ class TestResolvePopulationReconcile:
 
     @pytest.mark.asyncio
     async def test_no_balance_rows(self, db: AsyncSession):
-        """余额表无行 → 不可用 + 原因（单科目不带省略号，原因里点名科目）。"""
+        """余额表无行 → 不可用 + 原因（含映射建议，因为 9999 无映射）。"""
         r = await resolve_population_reconcile(db, _PID, _YEAR, ["9999"], _DATASET)
         assert r.available is False
-        assert r.unavailable_reason == (
-            "科目余额表中无所选科目（9999）的行，可能尚未导入余额表或科目编码不一致"
-        )
+        assert "科目余额表中无所选科目（9999）的行" in (r.unavailable_reason or "")
+        assert "科目映射" in (r.unavailable_reason or "")  # 无映射时追加映射建议
 
     @pytest.mark.asyncio
     async def test_no_balance_rows_many_codes_summarized(self, db: AsyncSession):
@@ -339,3 +338,209 @@ class TestToStatsUnavailable:
         assert s["reconcile_available"] is False
         assert s["book_amount"] is None
         assert s["reconcile_unavailable_reason"] == "test reason"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# resolve_effective_codes 映射反查 + 映射后核对
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+from app.models.audit_platform_models import AccountMapping
+from app.services.sampling_population_reconcile import resolve_effective_codes
+
+
+def _mapping(standard: str, original: str) -> AccountMapping:
+    """构造一行科目映射（标准码 → 企业原始码）。"""
+    return AccountMapping(
+        project_id=_PID,
+        original_account_code=original,
+        original_account_name=f"企业科目{original}",
+        standard_account_code=standard,
+        mapping_type="auto_exact",
+    )
+
+
+class TestResolveEffectiveCodes:
+    """映射反查纯函数测试。"""
+
+    @pytest.mark.asyncio
+    async def test_no_mapping_fallback(self, db: AsyncSession):
+        """无映射记录 → 退回标准编码，mapping_used=False。"""
+        codes, used = await resolve_effective_codes(db, _PID, ["1122"])
+        assert codes == ["1122"]
+        assert used is False
+
+    @pytest.mark.asyncio
+    async def test_empty_codes(self, db: AsyncSession):
+        """空科目列表 → 原样返回，mapping_used=False。"""
+        codes, used = await resolve_effective_codes(db, _PID, [])
+        assert codes == []
+        assert used is False
+
+    @pytest.mark.asyncio
+    async def test_with_mapping(self, db: AsyncSession):
+        """有映射 → 返回原始编码，mapping_used=True。"""
+        db.add_all([
+            _mapping("1122", "SA1122"),
+            _mapping("1122", "SA1122.01"),
+        ])
+        await db.commit()
+
+        codes, used = await resolve_effective_codes(db, _PID, ["1122"])
+        assert used is True
+        assert sorted(codes) == ["SA1122", "SA1122.01"]
+
+    @pytest.mark.asyncio
+    async def test_partial_mapping(self, db: AsyncSession):
+        """部分标准科目有映射：映射到的原始码 + 未映射的标准码合并返回。
+
+        传入 ['1122', '1221']，只有 1122 有映射 → 返回 ['SA1122', '1221']，
+        mapping_used=True（因为有映射存在）。1221 保留标准编码做前缀匹配，
+        避免企业恰好用标准编码体系的科目被丢掉。
+        """
+        db.add(_mapping("1122", "SA1122"))
+        await db.commit()
+
+        codes, used = await resolve_effective_codes(db, _PID, ["1122", "1221"])
+        assert used is True
+        assert sorted(codes) == ["1221", "SA1122"]  # 映射码 + 未映射标准码
+
+    @pytest.mark.asyncio
+    async def test_deleted_mapping_ignored(self, db: AsyncSession):
+        """已删除的映射不被反查。"""
+        m = _mapping("1122", "SA1122")
+        m.is_deleted = True
+        db.add(m)
+        await db.commit()
+
+        codes, used = await resolve_effective_codes(db, _PID, ["1122"])
+        assert codes == ["1122"]  # 退回标准编码
+        assert used is False
+
+    @pytest.mark.asyncio
+    async def test_prefix_match_in_standard_code(self, db: AsyncSession):
+        """标准码做前缀匹配：传入 '1122'，映射表中 standard='1122.01' 也能命中。"""
+        db.add(_mapping("1122.01", "QY-AR-SUB01"))
+        await db.commit()
+
+        codes, used = await resolve_effective_codes(db, _PID, ["1122"])
+        assert used is True
+        assert codes == ["QY-AR-SUB01"]
+
+    @pytest.mark.asyncio
+    async def test_other_project_ignored(self, db: AsyncSession):
+        """其他项目的映射不被反查。"""
+        other_pid = uuid.uuid4()
+        m = AccountMapping(
+            project_id=other_pid,
+            original_account_code="SA1122",
+            original_account_name="其他项目科目",
+            standard_account_code="1122",
+            mapping_type="auto_exact",
+        )
+        db.add(m)
+        await db.commit()
+
+        codes, used = await resolve_effective_codes(db, _PID, ["1122"])
+        assert codes == ["1122"]  # 退回标准编码
+        assert used is False
+
+
+class TestReconcileWithMapping:
+    """映射反查接入核对的集成测试。"""
+
+    @pytest.mark.asyncio
+    async def test_mapping_used_in_reconcile(self, db: AsyncSession):
+        """有映射时核对用原始编码查余额表和序时账。"""
+        # 映射：标准 1122 → 企业 SA1122
+        db.add(_mapping("1122", "SA1122"))
+        # 余额表和序时账都用企业编码
+        db.add_all([
+            _bal("SA1122", debit=1000, credit=800),
+            _led("SA1122.01", date(2025, 3, 15), debit=600, credit=None),
+            _led("SA1122.02", date(2025, 6, 20), debit=400, credit=800),
+        ])
+        await db.commit()
+
+        # 传入标准编码 1122 → 内部映射反查得到 SA1122 → 匹配到数据
+        r = await resolve_population_reconcile(db, _PID, _YEAR, ["1122"], _DATASET)
+        assert r.available is True
+        assert r.mapping_used is True
+        assert r.book_debit == Decimal("1000")
+        assert r.book_credit == Decimal("800")
+        assert r.ledger_debit == Decimal("1000")  # 600 + 400
+        assert r.ledger_credit == Decimal("800")
+
+    @pytest.mark.asyncio
+    async def test_no_mapping_standard_code_direct(self, db: AsyncSession):
+        """无映射时退回标准编码直接匹配（向后兼容）。"""
+        db.add_all([
+            _bal("1122", debit=500, credit=300),
+            _led("1122.01", date(2025, 1, 10), debit=500, credit=300),
+        ])
+        await db.commit()
+
+        r = await resolve_population_reconcile(db, _PID, _YEAR, ["1122"], _DATASET)
+        assert r.available is True
+        assert r.mapping_used is False
+        assert r.book_debit == Decimal("500")
+
+    @pytest.mark.asyncio
+    async def test_mapping_no_balance_rows_suggests_mapping(self, db: AsyncSession):
+        """有映射但余额表无匹配行时，不建议"确认映射"（因为映射已存在）。"""
+        db.add(_mapping("1122", "SA1122"))
+        # 余额表里没有 SA1122 的行
+        await db.commit()
+
+        r = await resolve_population_reconcile(db, _PID, _YEAR, ["1122"], _DATASET)
+        assert r.available is False
+        assert r.mapping_used is True
+        # 有映射时不追加映射建议
+        assert "科目映射" not in (r.unavailable_reason or "")
+
+    @pytest.mark.asyncio
+    async def test_no_mapping_no_balance_rows_suggests_mapping(self, db: AsyncSession):
+        """无映射且余额表无行 → 不可用原因包含映射建议。"""
+        r = await resolve_population_reconcile(db, _PID, _YEAR, ["9999"], _DATASET)
+        assert r.available is False
+        assert r.mapping_used is False
+        assert "科目映射" in (r.unavailable_reason or "")
+
+    @pytest.mark.asyncio
+    async def test_mapping_used_in_to_stats(self, db: AsyncSession):
+        """to_stats() 输出包含 reconcile_mapping_used 字段。"""
+        db.add_all([
+            _mapping("1122", "SA1122"),
+            _bal("SA1122", debit=100, credit=50),
+            _led("SA1122", date(2025, 1, 1), debit=100, credit=50),
+        ])
+        await db.commit()
+
+        r = await resolve_population_reconcile(db, _PID, _YEAR, ["1122"], _DATASET)
+        s = r.to_stats()
+        assert "reconcile_mapping_used" in s
+        assert s["reconcile_mapping_used"] is True
+
+    @pytest.mark.asyncio
+    async def test_top_level_after_mapping(self, db: AsyncSession):
+        """映射后的原始编码也正确做最高层行选取。"""
+        # 映射：1122 → SA1122, 1122 → SA1122.01
+        db.add_all([
+            _mapping("1122", "SA1122"),
+            _mapping("1122", "SA1122.01"),
+        ])
+        # 余额表有父子两级
+        db.add_all([
+            _bal("SA1122", debit=1000, credit=800),
+            _bal("SA1122.01", debit=600, credit=500),
+        ])
+        # 序时账
+        db.add(_led("SA1122.01", date(2025, 1, 1), debit=1000, credit=800))
+        await db.commit()
+
+        r = await resolve_population_reconcile(db, _PID, _YEAR, ["1122"], _DATASET)
+        assert r.available is True
+        assert r.mapping_used is True
+        # 只取最高层 SA1122，不重复加 SA1122.01
+        assert r.book_debit == Decimal("1000")
+        assert r.book_credit == Decimal("800")

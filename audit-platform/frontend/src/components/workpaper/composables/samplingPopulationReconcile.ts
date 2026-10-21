@@ -29,6 +29,8 @@ export interface PopulationReconcileInfo {
   ledgerCredit: string | null
   bookDebit: string | null
   bookCredit: string | null
+  /** 是否使用了科目映射反查企业原始编码（新后端才有；旧后端默认 false） */
+  mappingUsed: boolean
 }
 
 /** 单方向核对结果。 */
@@ -128,6 +130,7 @@ export function parseReconcileInfo(stats: Record<string, any> | null): Populatio
     ledgerCredit: stats.reconcile_ledger_credit != null ? String(stats.reconcile_ledger_credit) : null,
     bookDebit: stats.reconcile_book_debit != null ? String(stats.reconcile_book_debit) : null,
     bookCredit: stats.reconcile_book_credit != null ? String(stats.reconcile_book_credit) : null,
+    mappingUsed: stats.reconcile_mapping_used === true,
   }
 }
 

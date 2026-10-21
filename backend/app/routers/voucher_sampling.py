@@ -34,7 +34,7 @@ from app.models.audit_platform_models import WorkpaperExtractionLog
 from app.models.core import Project, User as _CoreUser  # noqa: F401 (Project 用于年度校验)
 from app.models.core import User
 from app.services.dataset_query import get_active_dataset_id_or_none
-from app.services.sampling_population_reconcile import resolve_population_reconcile
+from app.services.sampling_population_reconcile import resolve_effective_codes, resolve_population_reconcile
 from app.services.ledger_sampling_service import (
     LedgerQueryFilters,
     LedgerSamplingService,
@@ -248,11 +248,16 @@ async def voucher_extract(
                 )
                 exclude_voucher_nos = list(set(exclude_voucher_nos) | set(proj_nos))
 
-        # 4. 构建 LedgerQueryFilters
+        # 4. 科目映射反查：标准编码 → 企业原始编码（无映射退回标准编码）
+        effective_codes, _mapping_used = await resolve_effective_codes(
+            db, pid, account_codes
+        )
+
+        # 5. 构建 LedgerQueryFilters（用解析后的编码查序时账）
         ledger_filters = LedgerQueryFilters(
             date_start=date_start,
             date_end=date_end,
-            account_codes=account_codes,
+            account_codes=effective_codes,
             amount_threshold=amount_threshold,
             amount_max=amount_max_val,
             months=months_filter,
@@ -263,12 +268,12 @@ async def voucher_extract(
             exclude_unit_ids=exclude_unit_ids,
         )
 
-        # 5. 构建查询
+        # 6. 构建查询
         query = await LedgerSamplingService.build_ledger_query(
             db, pid, req.year, ledger_filters
         )
 
-        # 6. 全量统计（不受截断影响）+ 内存样本框（≤ 上限）
+        # 7. 全量统计（不受截断影响）+ 内存样本框（≤ 上限）
         items, stats = await LedgerSamplingService.execute_with_stats(
             db, query, page=1, page_size=_SAMPLING_FRAME_LIMIT, max_total=_SAMPLING_FRAME_LIMIT
         )
