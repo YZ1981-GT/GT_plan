@@ -59,7 +59,7 @@ from app.services.wp_formula_service import (
     wp_formula_service,
 )
 from app.services.prefill_engine import (
-    _FORMULA_RE,
+    _get_formula_re,
     _FORMULA_RESOLVERS,
     _parse_args,
     resolve_extended_formula,
@@ -142,7 +142,7 @@ def _safe_function_name(expression: str | None) -> str | None:
     """
     if not expression:
         return None
-    m = _FORMULA_RE.search(expression.strip())
+    m = _get_formula_re().search(expression.strip())
     return m.group(1).upper() if m else None
 
 
@@ -169,7 +169,7 @@ def _parse_formula_or_raise(formula: str) -> tuple[str, list[str]]:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"error_code": "FORMULA_NOT_EQUALS", "message": "公式必须以 = 开头"},
         )
-    m = _FORMULA_RE.search(s)
+    m = _get_formula_re().search(s)
     if not m:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -718,7 +718,7 @@ async def validate_formula(
                 response.preview_value = float(result) if result is not None else None
         else:
             # 其他类型用 resolve_extended_formula
-            raw_args = _FORMULA_RE.search(payload.formula).group(2)
+            raw_args = _get_formula_re().search(payload.formula).group(2)
             val = await resolve_extended_formula(
                 db, payload.project_id, payload.year, ftype, raw_args
             )

@@ -560,31 +560,23 @@ async def resolve_extended_formula(
     db: AsyncSession, project_id: UUID, year: int,
     formula_type: str, raw_args: str,
 ) -> Decimal | None:
-    """统一入口：解析并执行扩展公式"""
+    """统一入口：解析并执行扩展公式（兼容保留；内部改走 preload → L1）。
+
+    spec: formula-execution-path-convergence Phase 2 · Task 10
+    """
     ft = formula_type.upper()
-
-    # TB_AUX 返回列表而非单值，调用方需特殊处理
-    if ft == "TB_AUX":
-        args = _parse_args(raw_args)
-        if len(args) >= 3:
-            results = await _resolve_tb_aux(db, project_id, year, args[0], args[1], args[2])
-            # 返回合计值作为 Decimal（调用方如需明细列表应直接调 _resolve_tb_aux）
-            total = sum(r["value"] for r in results)
-            return Decimal(str(total))
-        return None
-
-    # E1 spec Task 1.4: LEDGER_DETAIL 返回列表，统一入口返回笔数（合计意义不大）
-    # 调用方如需明细应直接调 _resolve_ledger_detail_formula
-    if ft == "LEDGER_DETAIL":
-        args = _parse_args(raw_args)
-        rows = await _resolve_ledger_detail_formula(db, project_id, year, args)
-        return Decimal(str(len(rows)))
-
-    resolver = _FORMULA_RESOLVERS.get(ft)
-    if resolver is None:
-        return None
     args = _parse_args(raw_args)
-    return await resolver(db, project_id, year, args)
+
+    # 重建公式文本让 preloader 扫描
+    quoted = ",".join(f"'{a}'" for a in args)
+    formula_text = f"{ft}({quoted})"
+
+    from app.services.formula_preloader import preload
+    from app.services.formula_engine import execute as fe_execute
+
+    ctx = await preload(db, project_id, year, [formula_text], adj_exclude_origins=frozenset())
+    result = fe_execute(formula_text, ctx)
+    return result.value if result.ok else None
 
 
 async def prefill_workpaper_real(
@@ -650,59 +642,42 @@ async def prefill_workpaper_real(
             "message": "未发现取数公式",
         }
 
-    # 批量执行公式（需求 46：只更新 parsed_data['univer_snapshot'] 的 v 字段，保留 xlsx 公式）
-    from app.services.formula_engine import FormulaEngine
-    import json as _json
-    engine = FormulaEngine()
-
-    # 读取 parsed_data['univer_snapshot']（Req 6 单源化：从 JSONB 读取，不再读 structure.json）
+    # ── 读取 univer_snapshot（结果写回目标） ──
     structure_data: dict | None = None
     if wp.parsed_data and isinstance(wp.parsed_data, dict):
         univer_snap = wp.parsed_data.get("univer_snapshot")
         if isinstance(univer_snap, dict) and univer_snap.get("sheets"):
-            # 从 slim snapshot 重建 structure 格式供 prefill 写值
             from app.routers.workpaper_html_preview import _structure_from_univer_snapshot
             structure_data = _structure_from_univer_snapshot(univer_snap)
     if structure_data is None:
         _logger.warning("prefill_real: univer_snapshot 不存在 wp=%s，预填充将跳过值写入", wp_id)
 
+    # ── 批量预载 + L1 内核求值（spec formula-execution-path-convergence Phase 2） ──
+    # 一次性扫描全部公式 → 批量查 DB → 构建 FormulaContext → 逐格纯内存 execute
+    from app.services.formula_preloader import preload
+    from app.services.formula_engine import execute as fe_execute
+
+    formula_texts = [f["original"].lstrip("=") for f in formulas_found]
+    ctx = await preload(db, project_id, year, formula_texts, adj_exclude_origins=frozenset(),
+                        template_type=getattr(wp, "template_type", None) or "soe")
+
     filled = 0
     errors = list(overlay_notes)
 
     for f in formulas_found:
-        args = _parse_args(f["raw_args"])
-        ft = f["formula_type"]
-
-        params: dict[str, Any] = {}
-        if ft == "TB" and len(args) >= 2:
-            params = {"account_code": args[0], "column_name": args[1]}
-        elif ft == "SUM_TB" and len(args) >= 2:
-            params = {"account_range": args[0], "column_name": args[1]}
-        elif ft == "AUX" and len(args) >= 4:
-            params = {"account_code": args[0], "aux_dimension": args[1], "dimension_value": args[2], "column_name": args[3]}
-        elif ft == "WP" and len(args) >= 2:
-            params = {"wp_code": args[0], "cell_ref": args[1]}
-        elif ft == "PREV" and len(args) >= 2:
-            params = {"formula_type": args[0], "account_code": args[1] if len(args) > 1 else "", "column_name": args[2] if len(args) > 2 else ""}
-        else:
-            errors.append({"cell": f["cell"], "error": f"参数不足: {f['original']}"})
+        formula_text = f["original"].lstrip("=").strip()
+        if not formula_text:
+            errors.append({"cell": f["cell"], "error": "空公式"})
             continue
 
         try:
-            result = await engine.execute(
-                db=db,
-                project_id=project_id,
-                year=year if ft != "PREV" else year - 1,
-                formula_type=ft if ft != "PREV" else params.get("formula_type", "TB"),
-                params=params,
-            )
+            result = fe_execute(formula_text, ctx)
 
-            if hasattr(result, 'message'):
-                # FormulaError
-                errors.append({"cell": f["cell"], "error": result.message})
+            if not result.ok:
+                errors.append({"cell": f["cell"], "error": "; ".join(result.errors)[:200] or "公式被拦截"})
                 continue
 
-            value = float(result) if isinstance(result, Decimal) else result
+            value = float(result.value)
 
             # 需求 46.1/46.2：只更新 parsed_data['univer_snapshot'] 的 v 字段，保留 xlsx 中的公式
             # 不再写 cell_obj.value（避免覆盖公式），不再将公式移入 comment

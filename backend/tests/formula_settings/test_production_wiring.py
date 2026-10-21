@@ -32,12 +32,13 @@ WIRED_FUNCTIONS: list[tuple[str, str]] = [
     ("formula_catalog", "build_catalog"),
     ("formula_catalog", "catalog_stats"),
     ("formula_catalog", "extract_function_names"),
+    ("formula_preloader", "preload"),
 ]
 
 # 域列表——确保 WIRED_FUNCTIONS 覆盖所有接线域
 WIRED_DOMAINS = {"cross_check_rules", "wp_effective", "consol_note_settings", "note_settings",
                  "rollback", "custom_presets", "propagation", "cross_check_history",
-                 "coverage", "dependencies", "formula_catalog"}
+                 "coverage", "dependencies", "formula_catalog", "formula_preloader"}
 
 
 def _scan_production_refs() -> dict[str, set[str]]:

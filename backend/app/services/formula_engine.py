@@ -114,6 +114,15 @@ class FormulaContext:
     adj_data: dict[str, dict[str, Decimal]] = field(default_factory=dict)
     # 默认列名
     default_column: str = "期末余额"
+    # ── 底稿预填充扩展（spec formula-execution-path-convergence Phase 1） ──
+    # 序时账发生额：key = "{account}:{direction}:{period}" → Decimal
+    ledger_data: dict[str, Decimal] = field(default_factory=dict)
+    # 序时账明细行：key = "{account}:{period}:{amount_filter}" → [{voucher_date, ...}]
+    ledger_detail_data: dict[str, list] = field(default_factory=dict)
+    # 序时账笔数：key = "{account}:{period}" → int
+    ledger_count_data: dict[str, int] = field(default_factory=dict)
+    # TB_AUX 汇总：key = "{account}:{aux_type}:{column}" → Decimal
+    tb_aux_data: dict[str, Decimal] = field(default_factory=dict)
 
     # ── 便捷构造方法 ──
     @classmethod
@@ -990,38 +999,59 @@ _REGISTRY.register("MAX", _handle_max, arity=2, description="最大值", syntax=
 _REGISTRY.register("MIN", _handle_min, arity=2, description="最小值", syntax="MIN(值1, 值2)", category="数学")
 _REGISTRY.register("IF", _handle_if, arity=3, description="条件判断", syntax="IF(条件, 真值, 假值)", category="逻辑")
 
-# ── 底稿预填充专用函数（占位 handler，真实取数走 prefill_engine 异步路径） ──
-# spec: unified-formula-registry Phase 1 · Task 1
-# 注册它们使 validate_formula / _is_blocked_formula / formulaSyntaxParser 不再把
-# 合法的底稿公式标为「未知函数」。L1 内核无底稿数据库上下文，handler 返回 0。
+# ── 底稿预填充函数（L1 handler 从 ctx 新字段取值） ──
+# spec: formula-execution-path-convergence Phase 1 · Task 7
+# preloader 已按 key 格式批量查好 DB 数据并填入 FormulaContext 的扩展字段。
 
 
 def _handle_ledger(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """LEDGER('科目','方向','范围') — 序时账取数（底稿预填充专用）。"""
+    """LEDGER('科目','方向','范围') — 序时账取数。"""
     str_args = _extract_string_args(args, ctx, trace)
-    trace.append(f"LEDGER({str_args}) = 0 (no-op in L1; 真实取数走 prefill_engine)")
-    return Decimal("0")
+    code = str_args[0] if str_args else ""
+    direction = str_args[1] if len(str_args) > 1 else "debit"
+    period = str_args[2] if len(str_args) > 2 else "全年"
+    key = f"{code}:{direction}:{period}"
+    val = ctx.ledger_data.get(key, Decimal("0"))
+    trace.append(f"LEDGER('{code}','{direction}','{period}') = {val}")
+    return val
 
 
 def _handle_ledger_detail(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """LEDGER_DETAIL('科目','月份','阈值') — 序时账明细筛选（底稿预填充专用）。"""
+    """LEDGER_DETAIL('科目','月份','阈值') — 序时账明细，返回行数。"""
     str_args = _extract_string_args(args, ctx, trace)
-    trace.append(f"LEDGER_DETAIL({str_args}) = 0 (no-op in L1)")
-    return Decimal("0")
+    code = str_args[0] if str_args else ""
+    period = str_args[1] if len(str_args) > 1 else "全年"
+    amount_filter = str_args[2] if len(str_args) > 2 else "*"
+    key = f"{code}:{period}:{amount_filter}"
+    rows = ctx.ledger_detail_data.get(key, [])
+    val = Decimal(str(len(rows)))
+    trace.append(f"LEDGER_DETAIL('{code}','{period}','{amount_filter}') = {val}")
+    return val
 
 
 def _handle_tb_aux(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """TB_AUX('科目','维度','列名') — 辅助维度汇总（底稿预填充专用）。"""
+    """TB_AUX('科目','维度','列名') — 辅助维度汇总。"""
     str_args = _extract_string_args(args, ctx, trace)
-    trace.append(f"TB_AUX({str_args}) = 0 (no-op in L1)")
-    return Decimal("0")
+    code = str_args[0] if str_args else ""
+    aux_type = str_args[1] if len(str_args) > 1 else ""
+    column = str_args[2] if len(str_args) > 2 else "期末余额"
+    key = f"{code}:{aux_type}:{column}"
+    val = ctx.tb_aux_data.get(key, Decimal("0"))
+    trace.append(f"TB_AUX('{code}','{aux_type}','{column}') = {val}")
+    return val
 
 
 def _handle_count_ledger(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """COUNT_LEDGER('科目','方向','范围') — 序时账笔数统计（底稿预填充专用）。"""
+    """COUNT_LEDGER('科目','范围') — 序时账笔数。"""
     str_args = _extract_string_args(args, ctx, trace)
-    trace.append(f"COUNT_LEDGER({str_args}) = 0 (no-op in L1)")
-    return Decimal("0")
+    code = str_args[0] if str_args else ""
+    period = str_args[1] if len(str_args) > 1 else "全年"
+    key = f"{code}:{period}"
+    val = Decimal(str(ctx.ledger_count_data.get(key, 0)))
+    trace.append(f"COUNT_LEDGER('{code}','{period}') = {val}")
+    return val
+
+
 
 
 _REGISTRY.register("LEDGER", _handle_ledger, arity=3, description="序时账取数", syntax="LEDGER('科目','方向','范围')", category="底稿取数")
