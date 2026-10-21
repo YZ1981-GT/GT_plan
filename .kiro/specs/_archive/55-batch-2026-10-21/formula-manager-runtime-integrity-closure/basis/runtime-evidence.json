@@ -1,0 +1,21 @@
+{
+  "after_value": 123,
+  "audit_count": 1,
+  "before_value": null,
+  "commit": "27b4402860a109e45ac4d08c4d91107137fcc2f8",
+  "formula_id": "dd45c08e-53c4-4479-ba94-e2f01470af73",
+  "last_computed_at_set": true,
+  "outbox_count": 1,
+  "project_id": "f396cd12-9ee8-41e0-8d1b-66f3ef5e08ea",
+  "query_basis": "ORM direct read after commit; test cleanup follows evidence capture",
+  "run_id": "80ad99a5-123e-4257-b567-7f0eb8b71a36",
+  "schema_version": 1,
+  "snapshot_count": 1,
+  "target": {
+    "cell": "Z998",
+    "sheet": "_FMRUNTIME_50f57743ca8e4f53ad84b6aac3288f00"
+  },
+  "test": "test_production_chain_applies_value_and_links_one_run_id",
+  "working_tree": true,
+  "wp_id": "a5f23a29-9288-47c1-85af-c6fefa82655d"
+}

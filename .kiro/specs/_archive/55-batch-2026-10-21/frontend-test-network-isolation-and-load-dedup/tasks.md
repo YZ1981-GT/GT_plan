@@ -1,0 +1,62 @@
+# 实施任务：前端单测网络隔离与并发加载合并
+
+> 关联：#[[file:.kiro/specs/frontend-test-network-isolation-and-load-dedup/requirements.md]] · #[[file:.kiro/specs/frontend-test-network-isolation-and-load-dedup/design.md]]
+> `[x]` = 代码已落地且验收通过；做不到的如实保持 `[ ]` 并写明原因。
+
+- [x] 1 现状实测（探针只记录、不改行为，全量跑一遍）
+  - 25 个测试文件、132 次真实连接，全部打到 `localhost:3000`；全部发生在用例运行期间。
+  - ACNR `listSheets` 7 个调用方；弹窗打开时 `loadAcnrTree`、`loadConsolNoteTree` 存在并发调用；其余 loader 打开时无并发。
+  - 【需求】R1、R2、R3 现状
+- [x] 2 测试基座网络拦截：`src/test/networkGuard.ts`（安装 / 记录 / 判定）+ `setup.ts` 接线
+  - 被拦连接改连不存在的本地管道（`…unit-test-real-network-blocked-see-src-test-networkGuard`），由 libuv 异步返回 ENOENT；axios 得到 `ERR_NETWORK`。
+  - 【需求】R1.1~R1.3、R2.4　【design】§1、§2
+- [x] 3 泄漏清单 `src/test/networkLeakInventory.json`（25 个文件，由探针记录脚本生成）+ afterAll 判定
+  - 实施期勘误（design §2.1）：2 个文件泄漏是间歇性的 ⇒ 常规运行只告警、审计模式才失败；这 2 个标 `intermittent`，不判 stale。
+  - 审计模式跑清单 25 个文件两轮：stale 0、new-leak 0（失败的只有 3 个基线预存红文件：DeliverableShortcut / useB22BControlMatrix / WorkpaperListShell）。
+  - 变异：从清单删掉 GtA173 → 审计模式该文件失败并列出 `GET /api/workpapers/onlyoffice/health（×13）`；把干净文件加进清单 → 审计模式报 stale。清单已逐字节还原。
+  - 【需求】R2.1~R2.3　【design】§2
+- [x] 4 守卫单测 `src/test/__tests__/networkGuard.spec.ts`：13 passed
+  - 回环服务器：拦截开着收到 0 次连接（Node http 与 axios/jsdom XHR 两条路）；临时换回原始 connect 后收到 1 次（变异反证）；开着假定时器 axios 仍得 `ERR_NETWORK`；安装幂等。
+  - 判定纯函数 new-leak / ok / stale / 间歇性 / 共享模式；清单只能是基线 25 个的子集、路径存在、证据非空、键排序、间歇性条目在 files 内。
+  - ESLint 0、IDE 诊断 0。
+  - 【需求】R1.4、R2　【design】§6
+- [x] 5 `useAcnr` 的 `listSheets` / `listCells` 在途合并 + 纪元守卫 + 单测（含变异反证）
+  - 模块级 `_sheetsInflight` / `_cellsInflight`，键 `${纪元}:${缓存键}`；在途期间被失效则不写回缓存；`then(clear, clear)` 清理。
+  - `src/services/acnr/tests/useAcnr_inflight_dedup.spec.ts` 5 passed；ACNR 目录 5 个测试文件 43 passed（既有缓存 / TTL / 失效用例不受影响）。
+  - 变异：去掉在途复用 → 3 例红（请求 2 次 ≠ 1）；去掉纪元守卫 → 「在途失效」例红（旧目录 `D2/D2-2` 覆盖了新目录）。均已还原。
+  - 【需求】R3.1~R3.3　【design】§3
+- [x] 6 弹窗 `loadConsolNoteTree` 单飞 + 挂载级请求次数测试
+  - `src/components/formula/__tests__/formulaManagerOpenRequestDedup.spec.ts` 3 passed：真实 useAcnr、只 mock 其 http，ACNR 响应挂起到断言后才放行（两路调用必然重叠）。附注 scope、合并工作底稿 scope 打开 ACNR 目录各 1 次；合并附注 scope 章节 1 次。
+  - 变异：关掉 useAcnr 在途复用 + 弹窗单飞 → 3 例全部红，均为「2 次 ≠ 1」。已还原。
+  - ESLint 0 error（3 条 warning 为既有代码：Dialog 第 471 / 1071 行、useAcnr `removeOverlay` 的 `http.delete`）；IDE 诊断 0。
+  - 【需求】R3.4　【design】§3、§4
+- [x] 7 验证：公式目录隔离 + 共享、全量对比基线、审计模式跑清单、ESLint / 诊断
+  - `src/components/formula/__tests__`：隔离模式与共享模式（默认顺序、seed 21、seed 22）均为 37 个文件 440 passed / 3 skipped。
+  - `src/components/formula` + `src/shell/formula`：隔离与共享各 52 个文件 529 passed；`src/test` + `src/services/acnr` 56 passed。
+  - 全量（隔离）：36592 用例 341 failed；改动前基线（探针跑）36571 用例 346 failed。
+    - 新增 1 例：`useA38Goodwill.property.spec.ts` P5，fast-check 反例 `carrying 5e-324`，单独重跑 8/8 通过 ⇒ 随机输入偶发，纯计算、不涉网络。
+    - 消失 6 例：`aiModelApi` ×3（并发会话已修）、g6 / b23 两处 PBT 偶发。
+  - 全量输出里 `[测试基座·网络]` 告警 0 条、`localhost:3000` / `ECONNREFUSED` 0 处；被拦连接的 ENOENT 共 95 行（即原本会打到 3000 端口的请求）。
+  - 审计模式跑清单 25 个文件两轮：stale 0、new-leak 0（见任务 3）。
+  - ESLint 0 error（warning 均为既有代码，见任务 6）；IDE 诊断 0。
+  - 【需求】R4.1　【design】§6
+- [x] 8 浏览器实测：公式管理弹窗打开时 `/api/acnr/entries` 只请求 1 次、无「listSheets 失败」告警
+  - 对照服务 3031（HEAD 版 / 工作树版，内存替换，不改源码），三个入口改动前后各跑一次，方法与结果见 design §7。
+  - 改动前：合并工作底稿、合并附注两个入口都打「[useAcnr] listSheets 失败 canceled」，合并附注入口另有 1 个被中止的 ACNR XHR；附注入口附注树、本章节用户编辑集各有 1 个被中止的 XHR。
+  - 改动后：三个入口 0 中止、0 告警；ACNR 目录各 1 个 XHR；附注入口定位到「货币资金」。
+  - 实测纠正两处说法（已写进 requirements 现状）：网络面板请求数不是可靠判据（同一 tick 的取消发生在 XHR 发出前）；附注入口的 ACNR 并发取决于时序，本机不撞。
+  - 顺带发现：HEAD 版弹窗 `P_cn` 未导入（合并附注树从不加载），工作树已补导入、须一起提交；见 design §7。
+  - 【需求】R3.4
+- [x] 9 浏览器实测发现的同类：`loadNoteUserFormulas` 单飞 + 挂载级测试
+  - 键 `${项目缓存键}|${章节}`，原函数改名 `fetchNoteUserFormulas`、逻辑不变（design §4）。
+  - `formulaManagerOpenRequestDedup.spec.ts` 新增一例（用户编辑集响应挂起到断言之后，并先断言已定位到章节叶子，证明第二次调用确实发生）：4 passed。
+  - 变异：去掉单飞 → 该例红「expected 2 to be 1」，其余 3 例仍绿；已按备份逐字节还原（SHA256 一致）。
+  - 浏览器重跑附注入口：本章节用户编辑集 XHR 1 个、0 中止。
+  - 回归：隔离模式公式 + 外壳 + ACNR + 测试基座 + 引用弹窗的其余 4 个文件共 62 个文件 628 passed / 3 skipped；共享模式 `src/components/formula/__tests__` 默认 / seed 21 / seed 22 均 37 个文件 441 passed / 3 skipped，`src/components/formula` + `src/shell/formula` 52 个文件 530 passed / 3 skipped、网络告警 0 条。ESLint 0 error（2 条 warning 为既有代码）；IDE 诊断 0。
+  - 未重跑全量：本次只改弹窗内一个加载函数。全仓提到 `FormulaManagerDialog` 的 22 个测试文件里，21 个在上面的回归里；剩下的 `InventoryStocktakeDialog.spec.ts` 只在注释里提到它，不导入。
+  - 【需求】R3.4
+- [x] 10 INDEX 登记、清理探针与临时文件
+  - INDEX 第 2 行状态更新为 10/10（纯 CRLF 校验通过；INDEX 相对 HEAD 另有 2 行新增属并发会话，未动）。
+  - 已删：`audit-platform/frontend/.vitest-probe/`（探针、对照服务配置、清单生成与 INDEX 脚本）、TEMP 下 34 个探针 / 全量结果 / 备份文件、对照服务的 Vite 缓存目录、`.playwright-mcp` 下本次的 10 个快照与日志（标签页 1 的控制台日志未删：该标签页已被并发会话接着使用）。
+  - `src/auto-imports.d.ts` / `src/components.d.ts` 哈希与修改时间与开始前一致。
+  - 【需求】R4.2
