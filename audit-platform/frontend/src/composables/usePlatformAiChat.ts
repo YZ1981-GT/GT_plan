@@ -248,6 +248,9 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
       }
       const err = new Error(code) as any
       err.status = res.status
+      // 复盘 P0 缺陷6：提取后端返回的中文原因，供 catch 块显示给用户
+      const bizMessage = body?.message?.message || body?.message || body?.detail
+      if (typeof bizMessage === 'string') err.reason = bizMessage
       throw err
     }
 
@@ -434,7 +437,7 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
         messages.value.push({
           id: `err_${Date.now()}`,
           role: 'assistant',
-          text: 'AI 服务暂不可用，请稍后重试。',
+          text: (e?.reason as string) || 'AI 服务暂不可用，请稍后重试。',
           status: 'failed',
         })
       }

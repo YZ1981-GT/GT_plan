@@ -223,12 +223,38 @@ function cancelRevise() {
   reviseText.value = ''
 }
 
+/** 按后端 writeback 结果给提示并决定是否移出待确认（锁定/无权 → 保持 pending）。 */
+function _handleConfirmResult(resp: any, fallbackMsg: string): boolean {
+  const wb = resp?.writeback
+  // 后端在「附注锁定 / 无编辑权限」时回传 writeback.skipped=true（见 ai_content._confirm_or_revise），
+  // 该标志即待确认信号的唯一权威来源，无需再比较 confirm_action 字面量。
+  if (wb && wb.skipped) {
+    // 内容保持待确认，告诉用户原因，不移出列表
+    ElMessage.warning(wb.reason || '内容保持待确认')
+    return false
+  }
+  if (wb && wb.written) {
+    ElMessage.success(`已确认并写入「${wb.note_section || '附注'}」`)
+  } else if (wb && wb.written === false) {
+    // 底稿类：确认成功但不自动写，提示复制
+    ElMessage.success(wb.reason || fallbackMsg)
+  } else {
+    ElMessage.success(fallbackMsg)
+  }
+  return true
+}
+
 async function act(item: PendingAiItem, action: 'confirm' | 'reject') {
   actingId.value = item.id
   try {
-    await api.post(`/api/ai-content/${item.id}/${action}`)
-    ElMessage.success(action === 'confirm' ? 'AI 内容已确认' : 'AI 内容已拒绝')
-    afterResolved(item.id)
+    const resp: any = await api.post(`/api/ai-content/${item.id}/${action}`)
+    if (action === 'reject') {
+      ElMessage.success('AI 内容已拒绝')
+      afterResolved(item.id)
+    } else if (_handleConfirmResult(resp, 'AI 内容已确认')) {
+      afterResolved(item.id)
+    }
+    // 确认未生效（保持 pending）时不移出列表、不发 resolved
   } catch (e) {
     handleApiError(e, action === 'confirm' ? '确认 AI 内容' : '拒绝 AI 内容')
   } finally {
@@ -244,14 +270,24 @@ async function submitRevise(item: PendingAiItem) {
   }
   actingId.value = item.id
   try {
-    await api.post(`/api/ai-content/${item.id}/revise`, { revised_content: text })
-    ElMessage.success('AI 内容已修订')
-    cancelRevise()
-    afterResolved(item.id)
+    const resp: any = await api.post(`/api/ai-content/${item.id}/revise`, { revised_content: text })
+    if (_handleConfirmResult(resp, 'AI 内容已修订')) {
+      cancelRevise()
+      afterResolved(item.id)
+    }
   } catch (e) {
     handleApiError(e, '修订 AI 内容')
   } finally {
     actingId.value = ''
+  }
+}
+
+async function copyContent(item: { content?: string }) {
+  try {
+    await navigator.clipboard.writeText(item.content || '')
+    ElMessage.success('已复制 AI 内容到剪贴板')
+  } catch {
+    ElMessage.warning('复制失败，请手动复制')
   }
 }
 

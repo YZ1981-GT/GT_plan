@@ -244,11 +244,13 @@ inclusion: always
 - 待提交清单见 spec design §9 / tasks.md；范围外发现（未改）：兄弟 M service 查不存在列 `evidence`/`status`、`_m9_other_comprehensive_income.py` 渲染校验读错列/字段、`useM7CrossSheet` 读无写入方的 `M7-M7-2-*` 双前缀键、`_m7/_m9_import_export.py` 死代码、科目码两套（4201/4301、4103/4003）
 
 
-### AI 面板采纳 / 转存笔记选目标 `ai-chat-adopt-and-note-target-picker`（2026-10-21，8/8，未提交）
+### AI 面板采纳 / 转存笔记选目标 `ai-chat-adopt-and-note-target-picker`（2026-10-21，8/8 + 第二轮复盘 R1~R6）
 - 修全局模式「采纳」404 与「转存笔记」被前端拦截：采纳加可选 `source_host`（跨宿主只许全局知识 / 报表 / 知识库会话 → 底稿 / 附注，须同项目、同主体；底稿 / 附注会话仍严格绑定）；笔记 `session_id` 改由服务端按消息反查，`target_project_id` / `target_folder_id` 二选一（会话有项目只能存本项目，堵跨项目转存），校验全在幂等收据之前；前端 `ChatAdoptTargetDialog` / `ChatNoteSaveDialog`
 - 隐藏缺陷：转存笔记请求体（嵌套 host、缺 session_id）在任何宿主下恒 422，唯一前端守卫只数调用次数 ⇒ 改跨语言契约（前端测试解析 `doc_ai_chat.py` 的 pydantic 必填集合）+ TestClient 钉住旧形状必 422
 - 🔴 教训：①fetch 直连的接口不经 http 拦截器，错误按真实信封取：业务码在 `message.code`，外层 `code` 是 HTTP 状态数字（`aiChatWireError.ts`）②`window.open(…, 'noopener')` 的新标签不复制 sessionStorage ⇒ 令牌丢失、跳登录页（站内路径不加 noopener）③共享开发环境上做磁盘变异会污染别人：Vite HMR 把变异版推给所有已开浏览器，后端 `--reload` 让 9980 跑变异代码 ⇒ 变异放独立 worktree，或先把浏览器停在 about:blank④admin 不绕过知识库可见性：admin 能把笔记写进自己不是成员的项目，却看不到也删不了（已知限制，待产品拍板）⑤附注未生成 = 404「附注数据不存在」，是空态不是失败⑥核对行数门的文件清单 = 将要提交的全部文件：改一行 HEAD 已超限且未登记的旧测试也会被 pre-commit 拒（`test_task7_adopt_fail_closed.py` 已登记白名单）⑦chrome-devtools 的「当前页」各会话共享：别的会话不带 pageId 的导航会落到你刚建的页上（实测问题被发到了全局会话）⇒ 关键点击前在同一脚本里校验 `location.pathname`
 - 浏览器实测四条路径全通过（第二轮用平台同一路径临时建【测试】项目补测，用完走删除接口软删）；提交清单见其 design §6.5
+- 🔴 **第二轮复盘修复 6 缺陷**：①P0 安全漏洞 confirm/revise/reject 无项目鉴权 ⇒ 接 review 级 `assert_project_permission` ②确认后裸赋值绕过协调器 ⇒ 改 `DisclosureEngine.update_note` 追加写 + `NOTE_SECTION_SAVED` ③编辑器不刷新 ⇒ 横幅 `@resolved` + `onAiContentResolved` + 未保存先 confirm 警告 ④合并锁/无权仍标已确认 ⇒ 回滚保持 pending + `writeback.skipped` ⑤revise 不写回 ⇒ 与 confirm 共用 `_confirm_or_revise` ⑥target_label 全 None ⇒ 统一 `str(log.id)` key + savepoint 降级。底稿裁定不自动写（提示复制）。详见 design §6.6
+- 🔴 **教训：未 commit 的改动被并发会话 checkout 覆盖全部丢失** ⇒ 铁律：每完成一个文件立即 `git add`，每完成一批立即 `git commit -m "WIP:..."`
 
 ### 全局 7 横切模块（2026-05/06，7 spec 全部 ✅ 完成 —— 历史已压缩）
 - 7 模块=地址库/公式管理/高级查询/枚举字典/底稿模板库/报告模板库/知识库；A~G 七个 spec 全完成（121 任务）。完整盘点+多源治理裁定（含三大内核统一、单源/联动断裂三处、向量存储选型 pgvector）见 `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`（六轮复盘）；逐 spec 产出见 `.kiro/specs/INDEX.md`。**被压掉的 24 行原文**：`git show 51f6987be:.kiro/steering/memory.md`。

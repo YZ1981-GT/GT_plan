@@ -14,15 +14,35 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 const mockGet = vi.fn()
+const mockPost = vi.fn()
 vi.mock('@/services/apiProxy', () => ({
-  api: { get: (...args: any[]) => mockGet(...args) },
+  api: {
+    get: (...args: any[]) => mockGet(...args),
+    post: (...args: any[]) => mockPost(...args),
+  },
 }))
 
+const msgSuccess = vi.fn()
+const msgWarning = vi.fn()
+vi.mock('element-plus', () => ({
+  ElMessage: {
+    success: (...a: any[]) => msgSuccess(...a),
+    warning: (...a: any[]) => msgWarning(...a),
+    error: vi.fn(),
+  },
+}))
+
+vi.mock('@/utils/errorHandler', () => ({ handleApiError: vi.fn() }))
+
+import { eventBus } from '@/utils/eventBus'
 import AiContentPendingBanner from '../AiContentPendingBanner.vue'
 
 describe('AiContentPendingBanner', () => {
   beforeEach(() => {
     mockGet.mockReset()
+    mockPost.mockReset()
+    msgSuccess.mockReset()
+    msgWarning.mockReset()
   })
 
   it('projectId 为空时不调用 API 也不显示横幅', async () => {
@@ -112,5 +132,83 @@ describe('AiContentPendingBanner', () => {
     await btn.trigger('click')
     expect(wrapper.emitted('view')).toBeTruthy()
     expect(wrapper.emitted('view')!.length).toBe(1)
+  })
+
+  // ── 复盘 P0/P2 回补：确认结果分流 + eventBus 刷新 ──────────────────────────
+
+  it('确认返回 skipped（锁定/无权）→ 警告原因、不移出、不发 resolved', async () => {
+    mockGet.mockResolvedValue({ count: 1, items: [{ id: 'log-1', instance_type: 'note', content: 'x' }] })
+    const wrapper = mount(AiContentPendingBanner, { props: { projectId: 'p1' } })
+    await flushPromises()
+    mockPost.mockResolvedValue({
+      confirm_action: 'pending',
+      writeback: { skipped: true, reason: '项目已被合并锁定，内容保持待确认' },
+    })
+    await (wrapper.vm as any).act({ id: 'log-1', instance_type: 'note', content: 'x' }, 'confirm')
+    await flushPromises()
+    expect(msgWarning).toHaveBeenCalledWith('项目已被合并锁定，内容保持待确认')
+    expect(msgSuccess).not.toHaveBeenCalled()
+    expect(wrapper.emitted('resolved')).toBeFalsy()
+  })
+
+  it('确认返回 written（附注已写）→ 成功提示含章节、发 resolved', async () => {
+    mockGet.mockResolvedValue({ count: 1, items: [{ id: 'log-1', instance_type: 'note', content: 'x' }] })
+    const wrapper = mount(AiContentPendingBanner, { props: { projectId: 'p1' } })
+    await flushPromises()
+    mockPost.mockResolvedValue({
+      confirm_action: 'confirmed',
+      writeback: { written: true, note_section: '八、1' },
+    })
+    await (wrapper.vm as any).act({ id: 'log-1', instance_type: 'note', content: 'x' }, 'confirm')
+    await flushPromises()
+    expect(msgSuccess).toHaveBeenCalledWith(expect.stringContaining('八、1'))
+    expect(wrapper.emitted('resolved')).toBeTruthy()
+  })
+
+  it('底稿类确认 written=false → 提示复制、仍发 resolved', async () => {
+    mockGet.mockResolvedValue({ count: 1, items: [{ id: 'log-1', instance_type: 'workpaper', content: 'x' }] })
+    const wrapper = mount(AiContentPendingBanner, { props: { projectId: 'p1' } })
+    await flushPromises()
+    mockPost.mockResolvedValue({
+      confirm_action: 'confirmed',
+      writeback: { written: false, reason: '底稿内容不自动写入，请在底稿页面复制到目标位置' },
+    })
+    await (wrapper.vm as any).act({ id: 'log-1', instance_type: 'workpaper', content: 'x' }, 'confirm')
+    await flushPromises()
+    expect(msgSuccess).toHaveBeenCalledWith(expect.stringContaining('复制'))
+    expect(wrapper.emitted('resolved')).toBeTruthy()
+  })
+
+  it('监听 ai-content:adopted 事件后重拉计数（同项目）', async () => {
+    mockGet.mockResolvedValueOnce({ count: 0 })
+    const wrapper = mount(AiContentPendingBanner, { props: { projectId: 'pX' } })
+    await flushPromises()
+    expect(wrapper.find('.gt-ai-pending-banner').exists()).toBe(false)
+    mockGet.mockResolvedValueOnce({ count: 3 })
+    eventBus.emit('ai-content:adopted', { projectId: 'pX' })
+    await flushPromises()
+    expect(wrapper.text()).toContain('3')
+  })
+
+  it('ai-content:adopted 事件项目不同则不重拉', async () => {
+    mockGet.mockResolvedValueOnce({ count: 0 })
+    mount(AiContentPendingBanner, { props: { projectId: 'pX' } })
+    await flushPromises()
+    mockGet.mockClear()
+    eventBus.emit('ai-content:adopted', { projectId: 'pOther' })
+    await flushPromises()
+    expect(mockGet).not.toHaveBeenCalled()
+  })
+
+  it('复制内容调用 clipboard 并提示', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+    mockGet.mockResolvedValue({ count: 1, items: [{ id: 'log-1', instance_type: 'workpaper', content: '待复制' }] })
+    const wrapper = mount(AiContentPendingBanner, { props: { projectId: 'p1' } })
+    await flushPromises()
+    await (wrapper.vm as any).copyContent({ content: '待复制的 AI 文本' })
+    await flushPromises()
+    expect(writeText).toHaveBeenCalledWith('待复制的 AI 文本')
+    expect(msgSuccess).toHaveBeenCalledWith(expect.stringContaining('复制'))
   })
 })

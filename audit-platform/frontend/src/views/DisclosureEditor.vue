@@ -157,7 +157,7 @@
     <ConsolLockedBanner />
 
     <!-- AI 内容 pending 顶部 banner（spec global-refinement-v3 Task 6.4） -->
-    <AiContentPendingBanner :project-id="projectId" />
+    <AiContentPendingBanner :project-id="projectId" @resolved="onAiContentResolved" />
 
     <!-- 跨模块冲突 banner（spec global-refinement-v3 Task 7.5） -->
     <ConflictBanner :project-id="projectId" @view="conflictPanelVisible = true" />
@@ -1447,6 +1447,28 @@ function onDocAiAdopt(_payload: { content: string; messageId: string }) {
   if (currentNote.value?.note_section) {
     fetchDetailFresh(currentNote.value.note_section)
   }
+}
+
+// AI 待确认内容被确认/修订/拒绝后（spec ai-chat-adopt-and-note-target-picker 复盘 P0 缺陷3）：
+// 确认写附注会在服务端追加 text_content，这里刷新当前章节让编辑器看到最新正文；
+// 若当前章节有未保存改动，先警告——否则用户随后保存会用旧正文覆盖掉刚写入的 AI 文本。
+async function onAiContentResolved() {
+  const section = currentNote.value?.note_section
+  if (!section) return
+  if (editDirty.value || autoSave.isDirty.value) {
+    try {
+      await ElMessageBox.confirm(
+        '当前附注章节有未保存的改动。AI 内容已写入该章节，若此时保存将用你的草稿覆盖刚写入的内容。建议先放弃本地改动并刷新为最新正文。',
+        '附注已被 AI 确认更新',
+        { confirmButtonText: '放弃本地改动并刷新', cancelButtonText: '保留本地改动', type: 'warning' },
+      )
+    } catch {
+      return  // 用户选择保留本地改动，不刷新
+    }
+    editDirty.value = false
+    autoSave.isDirty.value = false
+  }
+  await fetchDetailFresh(section)
 }
 
 const year = computed(() => {
