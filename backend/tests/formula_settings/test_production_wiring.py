@@ -29,12 +29,15 @@ WIRED_FUNCTIONS: list[tuple[str, str]] = [
     ("formula_push.coverage", "load_coverage"),
     ("formula_push.coverage", "compute"),
     ("formula_settings.dependencies", "formula_dependencies"),
+    ("formula_catalog", "build_catalog"),
+    ("formula_catalog", "catalog_stats"),
+    ("formula_catalog", "extract_function_names"),
 ]
 
 # 域列表——确保 WIRED_FUNCTIONS 覆盖所有接线域
 WIRED_DOMAINS = {"cross_check_rules", "wp_effective", "consol_note_settings", "note_settings",
                  "rollback", "custom_presets", "propagation", "cross_check_history",
-                 "coverage", "dependencies"}
+                 "coverage", "dependencies", "formula_catalog"}
 
 
 def _scan_production_refs() -> dict[str, set[str]]:
@@ -94,8 +97,8 @@ def test_function_has_production_caller(module_suffix: str, func_name: str):
     """每个接线函数至少在一处非定义模块的生产代码里被引用。"""
     refs = _get_refs()
     callers = refs.get(func_name, set())
-    # 排除自身定义所在文件
-    defn_path_part = module_suffix.replace(".", "/") + ".py"
+    # 排除自身定义所在文件（用 services/ 限定避免同名 router 被误排）
+    defn_path_part = "services/" + module_suffix.replace(".", "/") + ".py"
     non_self = {r for r in callers if defn_path_part not in r}
     assert non_self, (
         f"{module_suffix}.{func_name} 没有生产调用方——"

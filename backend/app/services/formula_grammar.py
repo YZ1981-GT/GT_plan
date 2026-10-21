@@ -99,22 +99,20 @@ FORMULA_FUNCTION_NAMES: frozenset[str] = frozenset({
     "ABS", "ROUND", "MAX", "MIN", "IF",
 })
 
-FORMULA_ARITY: dict[str, int | list[int] | None] = {
-    "TB": 2,
-    "SUM_TB": 2,
-    "ROW": 1,
-    "SUM_ROW": 2,
-    "REPORT": 2,
-    "NOTE": 3,
-    "WP": [2, 3],  # grammar_v1: arities=[2,3], 2参 custom_flat / 3参 standard
-    "PREV": [2, 3],  # grammar_v1: arities=[2,3], 同 WP 结构
-    "AUX": 3,
-    "ABS": 1,
-    "ROUND": 2,
-    "MAX": 2,
-    "MIN": 2,
-    "IF": 3,
-}
+# spec: unified-formula-registry Phase 1 · Task 3
+# 从 formula_engine._REGISTRY 派生（单一真源）；保留 WP/PREV 的 [2,3] 多元形式。
+def _build_formula_arity() -> dict[str, int | list[int] | None]:
+    from app.services.formula_engine import _REGISTRY
+
+    _MULTI_ARITY: dict[str, list[int]] = {"WP": [2, 3], "PREV": [2, 3]}
+    out: dict[str, int | list[int] | None] = {}
+    for meta in _REGISTRY.list_all():
+        name = meta["name"]
+        out[name] = _MULTI_ARITY.get(name, meta.get("arity"))
+    return out
+
+
+FORMULA_ARITY: dict[str, int | list[int] | None] = _build_formula_arity()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

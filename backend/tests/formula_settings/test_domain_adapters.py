@@ -25,7 +25,7 @@ from app.services.formula_settings.wp_effective import (
     overlay_prefill_formulas,
     override_value,
 )
-from app.services.prefill_engine import _FORMULA_RE
+from app.services.prefill_engine import _get_formula_re
 
 from ._env import add_project, add_user, make_db, pending_items
 
@@ -143,7 +143,7 @@ async def test_wp_effective_and_prefill_overlay():
         wb = _workbook()
         scanned = [{"sheet": "审定表D2-1", "cell": c, "original": wb.active[c].value} for c in ("E8", "F8")]
         found, notes = await overlay_prefill_formulas(db, pid, await db.get(WorkingPaper, wp_id), wb, scanned,
-                                                      _FORMULA_RE)
+                                                      _get_formula_re())
         by_cell = {f["cell"]: f for f in found}
         assert by_cell["E8"]["original"] == f"={G2}" and by_cell["E8"]["layer"] == "global", "全局覆盖模板内置公式"
         assert by_cell["F8"]["original"] == "=TB('1001','期末余额')", "无关单元格不动"
@@ -154,7 +154,7 @@ async def test_wp_effective_and_prefill_overlay():
         await publish_global(db, domain="wp", scope="*", user_id=admin.id, changes=[
             {"slot_key": SLOT, "definition": wdef(MINE), "expected_version": 1}])
         found, notes = await overlay_prefill_formulas(db, pid, await db.get(WorkingPaper, wp_id), _workbook(),
-                                                      scanned, _FORMULA_RE)
+                                                      scanned, _get_formula_re())
         assert "E8" not in {f["cell"] for f in found}, "复合公式：不再按模板内置公式算"
         assert [n["cell"] for n in notes] == ["审定表D2-1!E8"] and "公式运行时" in notes[0]["error"]
 

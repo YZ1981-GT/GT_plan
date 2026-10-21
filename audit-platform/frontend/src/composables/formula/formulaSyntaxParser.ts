@@ -49,17 +49,19 @@ export interface ValidationResult {
 /**
  * 平台已知公式函数。
  *
- * 与后端 `formula_grammar.FORMULA_ARITY` / `formula_engine._REGISTRY` 对齐：
+ * 与后端 `formula_engine._REGISTRY`（20 函数）对齐：
  * - 取数：TB / SUM_TB / ROW / SUM_ROW / REPORT / WP / NOTE / ADJ / AUX / PREV(=PRIOR)
+ * - 底稿取数：LEDGER / LEDGER_DETAIL / TB_AUX / COUNT_LEDGER / PLACEHOLDER
  * - 数学：ABS / ROUND / MAX / MIN / IF
  */
 const KNOWN_FUNCTIONS = new Set([
   'TB', 'SUM_TB', 'WP', 'NOTE', 'ROW', 'SUM_ROW', 'REPORT',
   'ADJ', 'AUX', 'PREV', 'PRIOR',
+  'LEDGER', 'LEDGER_DETAIL', 'TB_AUX', 'COUNT_LEDGER', 'PLACEHOLDER',
   'ABS', 'ROUND', 'MAX', 'MIN', 'IF',
 ])
 
-/** 各函数的参数数量范围 [min, max]（与 formula_grammar.FORMULA_ARITY 对齐） */
+/** 各函数的参数数量范围 [min, max]（与 formula_engine._REGISTRY 对齐） */
 const FUNCTION_ARITY: Record<string, [number, number]> = {
   TB: [2, 2],
   SUM_TB: [2, 2],
@@ -72,6 +74,11 @@ const FUNCTION_ARITY: Record<string, [number, number]> = {
   AUX: [2, 3],
   PREV: [2, 3],
   PRIOR: [2, 3],
+  LEDGER: [3, 3],
+  LEDGER_DETAIL: [3, 3],
+  TB_AUX: [3, 3],
+  COUNT_LEDGER: [3, 3],
+  PLACEHOLDER: [0, 0],
   ABS: [1, 1],
   ROUND: [2, 2],
   MAX: [2, 2],
@@ -324,6 +331,11 @@ export function knownFunctions(): Array<{ name: string; minArgs: number; maxArgs
     { name: 'AUX', minArgs: 2, maxArgs: 3, description: "辅助余额取数 AUX('科目','维度','字段')" },
     { name: 'PREV', minArgs: 2, maxArgs: 3, description: "上期数取数 PREV('科目','字段')" },
     { name: 'PRIOR', minArgs: 2, maxArgs: 3, description: "上期数（PREV 别名）PRIOR('科目','字段')" },
+    { name: 'LEDGER', minArgs: 3, maxArgs: 3, description: "序时账取数 LEDGER('科目','方向','范围')" },
+    { name: 'LEDGER_DETAIL', minArgs: 3, maxArgs: 3, description: "序时账明细 LEDGER_DETAIL('科目','月份','阈值')" },
+    { name: 'TB_AUX', minArgs: 3, maxArgs: 3, description: "辅助维度汇总 TB_AUX('科目','维度','列名')" },
+    { name: 'COUNT_LEDGER', minArgs: 3, maxArgs: 3, description: "序时账笔数 COUNT_LEDGER('科目','方向','范围')" },
+    { name: 'PLACEHOLDER', minArgs: 0, maxArgs: 0, description: "预留占位 PLACEHOLDER()" },
     { name: 'ABS', minArgs: 1, maxArgs: 1, description: "绝对值 ABS(值)" },
     { name: 'ROUND', minArgs: 2, maxArgs: 2, description: "四舍五入 ROUND(值, 位数)" },
     { name: 'MAX', minArgs: 2, maxArgs: 2, description: "最大值 MAX(值1, 值2)" },

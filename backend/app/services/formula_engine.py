@@ -990,6 +990,46 @@ _REGISTRY.register("MAX", _handle_max, arity=2, description="最大值", syntax=
 _REGISTRY.register("MIN", _handle_min, arity=2, description="最小值", syntax="MIN(值1, 值2)", category="数学")
 _REGISTRY.register("IF", _handle_if, arity=3, description="条件判断", syntax="IF(条件, 真值, 假值)", category="逻辑")
 
+# ── 底稿预填充专用函数（占位 handler，真实取数走 prefill_engine 异步路径） ──
+# spec: unified-formula-registry Phase 1 · Task 1
+# 注册它们使 validate_formula / _is_blocked_formula / formulaSyntaxParser 不再把
+# 合法的底稿公式标为「未知函数」。L1 内核无底稿数据库上下文，handler 返回 0。
+
+
+def _handle_ledger(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
+    """LEDGER('科目','方向','范围') — 序时账取数（底稿预填充专用）。"""
+    str_args = _extract_string_args(args, ctx, trace)
+    trace.append(f"LEDGER({str_args}) = 0 (no-op in L1; 真实取数走 prefill_engine)")
+    return Decimal("0")
+
+
+def _handle_ledger_detail(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
+    """LEDGER_DETAIL('科目','月份','阈值') — 序时账明细筛选（底稿预填充专用）。"""
+    str_args = _extract_string_args(args, ctx, trace)
+    trace.append(f"LEDGER_DETAIL({str_args}) = 0 (no-op in L1)")
+    return Decimal("0")
+
+
+def _handle_tb_aux(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
+    """TB_AUX('科目','维度','列名') — 辅助维度汇总（底稿预填充专用）。"""
+    str_args = _extract_string_args(args, ctx, trace)
+    trace.append(f"TB_AUX({str_args}) = 0 (no-op in L1)")
+    return Decimal("0")
+
+
+def _handle_count_ledger(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
+    """COUNT_LEDGER('科目','方向','范围') — 序时账笔数统计（底稿预填充专用）。"""
+    str_args = _extract_string_args(args, ctx, trace)
+    trace.append(f"COUNT_LEDGER({str_args}) = 0 (no-op in L1)")
+    return Decimal("0")
+
+
+_REGISTRY.register("LEDGER", _handle_ledger, arity=3, description="序时账取数", syntax="LEDGER('科目','方向','范围')", category="底稿取数")
+_REGISTRY.register("LEDGER_DETAIL", _handle_ledger_detail, arity=3, description="序时账明细筛选", syntax="LEDGER_DETAIL('科目','月份','阈值')", category="底稿取数")
+_REGISTRY.register("TB_AUX", _handle_tb_aux, arity=3, description="辅助维度汇总", syntax="TB_AUX('科目','维度','列名')", category="底稿取数")
+_REGISTRY.register("COUNT_LEDGER", _handle_count_ledger, arity=3, description="序时账笔数统计", syntax="COUNT_LEDGER('科目','方向','范围')", category="底稿取数")
+_REGISTRY.register("PLACEHOLDER", lambda a, c, t: Decimal("0"), arity=0, description="预留占位", syntax="PLACEHOLDER()", category="底稿取数")
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 公式 Token 解析（Regex）

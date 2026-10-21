@@ -168,3 +168,7 @@ def register_report_routers(app: FastAPI) -> None:
     from app.routers.formula_templates import router as ft_router
     app.include_router(ft_router, tags=["formula-templates"])
     app.include_router(ft_project_router, tags=["formula-templates"])
+
+    # ═══ §108. unified-formula-registry：公式目录 + 函数清单 ═══
+    from app.routers.formula_catalog import router as fc_router
+    app.include_router(fc_router, tags=["formula-catalog"])

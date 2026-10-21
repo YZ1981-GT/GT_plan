@@ -31,10 +31,19 @@ _logger = logging.getLogger(__name__)
 # 公式正则 & FormulaCell（兼容旧 prefill_service 接口）
 # ---------------------------------------------------------------------------
 
-_FORMULA_RE = re.compile(
-    r'=(TB|WP|AUX|PREV|SUM_TB|LEDGER_DETAIL|COUNT_LEDGER|LEDGER|ADJ|NOTE)\s*\(([^)]*)\)',
-    re.IGNORECASE,
-)
+# spec: unified-formula-registry Phase 1 · Task 2
+# 从 formula_engine._REGISTRY 派生函数名列表（单一真源），延迟编译避免 import 顺序问题。
+_FORMULA_RE: re.Pattern | None = None
+
+
+def _get_formula_re() -> re.Pattern:
+    global _FORMULA_RE
+    if _FORMULA_RE is None:
+        from app.services.formula_engine import _REGISTRY
+        names = sorted(_REGISTRY.known_function_names(), key=len, reverse=True)  # 长名优先避免部分匹配
+        pattern = "|".join(re.escape(n) for n in names)
+        _FORMULA_RE = re.compile(rf"=({pattern})\s*\(([^)]*)\)", re.IGNORECASE)
+    return _FORMULA_RE
 
 # ---------------------------------------------------------------------------
 # 扩展公式正则（D4：6 种新公式类型）
@@ -615,7 +624,7 @@ async def prefill_workpaper_real(
         for row in ws.iter_rows():
             for cell in row:
                 if cell.value and isinstance(cell.value, str) and cell.value.startswith('='):
-                    match = _FORMULA_RE.search(cell.value)
+                    match = _get_formula_re().search(cell.value)
                     if match:
                         formulas_found.append({
                             "sheet": ws.title,
@@ -631,7 +640,7 @@ async def prefill_workpaper_real(
 
     # formula-global-settings-sync：有效公式（本项目 > 全局 > 预设）覆盖 / 补充模板内置公式
     from app.services.formula_settings.wp_effective import overlay_prefill_formulas
-    formulas_found, overlay_notes = await overlay_prefill_formulas(db, project_id, wp, wb, formulas_found, _FORMULA_RE)
+    formulas_found, overlay_notes = await overlay_prefill_formulas(db, project_id, wp, wb, formulas_found, _get_formula_re())
 
     if not formulas_found:
         wb.close()
@@ -1133,7 +1142,7 @@ def scan_formulas(cell_texts: list[dict]) -> list[FormulaCell]:
         text = entry.get("text", "")
         sheet = entry.get("sheet", "Sheet1")
         cell_ref = entry.get("cell_ref", "")
-        for match in _FORMULA_RE.finditer(text):
+        for match in _get_formula_re().finditer(text):
             results.append(FormulaCell(
                 sheet=sheet, cell_ref=cell_ref,
                 formula_type=match.group(1).upper(),

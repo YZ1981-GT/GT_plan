@@ -252,10 +252,11 @@ describe('新增函数识别与校验（wiring-closure T11）', () => {
     expect(validate("IF(ROW('BS-001'), 0)").valid).toBe(false)
   })
 
-  it('knownFunctions 包含全部 16 个', () => {
+  it('knownFunctions 包含全部 21 个', () => {
     const names = knownFunctions().map(f => f.name)
     for (const fn of ['TB', 'SUM_TB', 'WP', 'NOTE', 'ROW', 'SUM_ROW', 'REPORT',
-      'ADJ', 'AUX', 'PREV', 'PRIOR', 'ABS', 'ROUND', 'MAX', 'MIN', 'IF']) {
+      'ADJ', 'AUX', 'PREV', 'PRIOR', 'ABS', 'ROUND', 'MAX', 'MIN', 'IF',
+      'LEDGER', 'LEDGER_DETAIL', 'TB_AUX', 'COUNT_LEDGER', 'PLACEHOLDER']) {
       expect(names).toContain(fn)
     }
   })
@@ -263,5 +264,35 @@ describe('新增函数识别与校验（wiring-closure T11）', () => {
   it('cursorContext 在 SUM_TB 参数位正确', () => {
     const ctx = cursorContext("SUM_TB('1001~1099',", 20)
     expect(ctx).toEqual({ funcName: 'SUM_TB', argIndex: 1 })
+  })
+})
+
+
+// ── unified-formula-registry Phase 1：底稿专用函数 ────────────────────────
+
+describe('底稿专用函数识别（unified-formula-registry P1-T4）', () => {
+  it('LEDGER 被识别且参数校验 = 3', () => {
+    expect(tokenize("LEDGER('1001','借','全年')")[0].type).toBe('function')
+    expect(validate("LEDGER('1001','借','全年')").valid).toBe(true)
+    expect(validate("LEDGER('1001','借')").valid).toBe(false)
+  })
+
+  it('LEDGER_DETAIL 被识别且参数校验 = 3', () => {
+    expect(validate("LEDGER_DETAIL('6001','12月','>=100000')").valid).toBe(true)
+    expect(validate("LEDGER_DETAIL('6001')").valid).toBe(false)
+  })
+
+  it('TB_AUX 被识别且参数校验 = 3', () => {
+    expect(validate("TB_AUX('1121','客户','期末余额')").valid).toBe(true)
+    expect(validate("TB_AUX('1121')").valid).toBe(false)
+  })
+
+  it('COUNT_LEDGER 被识别且参数校验 = 3', () => {
+    expect(validate("COUNT_LEDGER('1001','借','全年')").valid).toBe(true)
+  })
+
+  it('PLACEHOLDER 被识别且参数 = 0', () => {
+    expect(validate("PLACEHOLDER()").valid).toBe(true)
+    expect(validate("PLACEHOLDER('arg')").valid).toBe(false)
   })
 })
