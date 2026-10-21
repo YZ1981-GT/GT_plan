@@ -56,12 +56,20 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { tokenize, validate, cursorContext, knownFunctions, type ParseToken, type ValidationError } from '@/composables/formula/formulaSyntaxParser'
+import { getCandidateConfig, filterCandidates, type CandidateItem } from '@/composables/formula/formulaParamCandidates'
+import { loadAccountCodes } from '@/composables/formula/useFormulaParamCache'
 
 defineOptions({ name: 'FormulaInput' })
 
 const props = withDefaults(defineProps<{
   modelValue: string
   placeholder?: string
+  /** 项目 ID（提供后启用科目代码参数补全） */
+  projectId?: string
+  /** 当前报表行次列表（供 ROW/REPORT 参数补全） */
+  reportRows?: Array<{ row_code: string; row_name?: string }>
+  /** 底稿编码列表（供 WP 参数补全） */
+  wpCodes?: string[]
 }>(), {
   placeholder: "如 TB('1001','期末余额') 或 WP('D2','审定数')",
 })
@@ -137,20 +145,54 @@ const showSuggestions = ref(false)
 const suggestions = ref<Array<{ name: string; description: string }>>([])
 const activeSuggestionIndex = ref(0)
 const suggestionsStyle = ref<Record<string, string>>({})
+/** 当前补全模式：'func' = 函数名补全，'param' = 参数值补全 */
+let completionMode: 'func' | 'param' = 'func'
 
-function updateSuggestions() {
+async function updateSuggestions() {
   const input = inputRef.value
   if (!input) { showSuggestions.value = false; return }
 
   const expr = props.modelValue
   const cursor = input.selectionStart ?? expr.length
-
-  // 检查光标前是否刚输入了函数名的开头（大写字母）
   const beforeCursor = expr.slice(0, cursor)
 
-  // 场景 1：刚输入了 `(` 且光标在函数参数内 → 不显示函数补全
+  // 场景 1：光标在函数参数内 → 尝试参数值补全
   const ctx = cursorContext(expr, cursor)
   if (ctx) {
+    const config = getCandidateConfig(ctx.funcName, ctx.argIndex)
+    if (config) {
+      // 提取光标前引号后的输入前缀（如 TB(' 已输入 10 → prefix='10'）
+      const quoteMatch = beforeCursor.match(/'([^']*)$/)
+      const prefix = quoteMatch ? quoteMatch[1] : ''
+
+      let items: CandidateItem[] = []
+      if (config.source === 'static' && config.staticItems) {
+        items = config.staticItems
+      } else if (config.source === 'account_codes' && props.projectId) {
+        items = await loadAccountCodes(props.projectId)
+      } else if (config.source === 'report_rows' && props.reportRows) {
+        items = props.reportRows.map(r => ({ value: r.row_code, label: `${r.row_code} - ${r.row_name || ''}` }))
+      } else if (config.source === 'wp_codes' && props.wpCodes) {
+        items = props.wpCodes.map(c => ({ value: c, label: c }))
+      } else if (config.source === 'tb_fields') {
+        const { TB_FIELDS } = await import('@/composables/formula/formulaParamCandidates')
+        items = TB_FIELDS
+      } else if (config.source === 'report_fields') {
+        const { REPORT_FIELDS } = await import('@/composables/formula/formulaParamCandidates')
+        items = REPORT_FIELDS
+      }
+
+      if (items.length) {
+        const filtered = filterCandidates(items, prefix)
+        if (filtered.length > 0 && quoteMatch) {
+          suggestions.value = filtered.map(it => ({ name: it.value, description: it.label }))
+          activeSuggestionIndex.value = 0
+          completionMode = 'param'
+          showSuggestions.value = true
+          return
+        }
+      }
+    }
     showSuggestions.value = false
     return
   }
@@ -163,6 +205,7 @@ function updateSuggestions() {
     if (candidates.length > 0) {
       suggestions.value = candidates
       activeSuggestionIndex.value = 0
+      completionMode = 'func'
       showSuggestions.value = true
       return
     }
@@ -177,15 +220,33 @@ function acceptSuggestion(item: { name: string }) {
 
   const cursor = input.selectionStart ?? props.modelValue.length
   const beforeCursor = props.modelValue.slice(0, cursor)
+  const afterCursor = props.modelValue.slice(cursor)
+
+  if (completionMode === 'param') {
+    // 参数值补全：处理引号
+    const quoteMatch = beforeCursor.match(/'([^']*)$/)
+    if (quoteMatch) {
+      const prefixStart = beforeCursor.length - quoteMatch[1].length
+      const newVal = beforeCursor.slice(0, prefixStart) + item.name + "'" + afterCursor
+      emit('update:modelValue', newVal)
+      showSuggestions.value = false
+      nextTick(() => {
+        const pos = prefixStart + item.name.length + 1 // 光标在闭合引号后
+        input.setSelectionRange(pos, pos)
+        input.focus()
+      })
+    }
+    return
+  }
+
+  // 函数名补全（原有逻辑）
   const match = beforeCursor.match(/([A-Z_]+)$/)
   const prefixLen = match ? match[1].length : 0
-  const afterCursor = props.modelValue.slice(cursor)
 
   const newVal = beforeCursor.slice(0, -prefixLen) + item.name + '(' + afterCursor
   emit('update:modelValue', newVal)
   showSuggestions.value = false
 
-  // 光标定位到括号内
   nextTick(() => {
     const pos = cursor - prefixLen + item.name.length + 1
     input.setSelectionRange(pos, pos)
