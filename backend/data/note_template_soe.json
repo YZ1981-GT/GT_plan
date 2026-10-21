@@ -4691,6 +4691,24 @@
               "is_total": true,
               "row_type": "total"
             }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "账 龄",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "期初数",
+              "format": "amount"
+            }
           ]
         },
         {
@@ -4705,7 +4723,7 @@
           ],
           "_column_groups": [
             {
-              "group": "账面金额",
+              "group": "账面余额",
               "start": 1,
               "span": 2
             },
@@ -4740,6 +4758,42 @@
               "label": "合 计",
               "is_total": true,
               "row_type": "total"
+            }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "类 别",
+              "is_label": true
+            },
+            {
+              "key": "balance",
+              "label": "金额",
+              "group": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "比例(%)",
+              "group": "账面余额",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "金额",
+              "group": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "坏账准备",
+              "format": "percent"
+            },
+            {
+              "key": "book_value",
+              "label": "账面价值",
+              "format": "amount"
             }
           ]
         },
@@ -4755,7 +4809,7 @@
           ],
           "_column_groups": [
             {
-              "group": "账面金额",
+              "group": "账面余额",
               "start": 1,
               "span": 2
             },
@@ -4790,6 +4844,42 @@
               "label": "合 计",
               "is_total": true,
               "row_type": "total"
+            }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "类 别",
+              "is_label": true
+            },
+            {
+              "key": "balance",
+              "label": "金额",
+              "group": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "比例(%)",
+              "group": "账面余额",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "金额",
+              "group": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "坏账准备",
+              "format": "percent"
+            },
+            {
+              "key": "book_value",
+              "label": "账面价值",
+              "format": "amount"
             }
           ]
         },
@@ -4808,6 +4898,39 @@
               "label": "合 计",
               "is_total": true,
               "row_type": "total"
+            }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债务人名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "balance",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "provision",
+              "label": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "aging",
+              "label": "账龄",
+              "format": "text"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率（%）",
+              "format": "percent"
+            },
+            {
+              "key": "basis",
+              "label": "计提理由",
+              "format": "text"
             }
           ]
         },
@@ -4864,6 +4987,49 @@
               "is_total": true,
               "row_type": "total"
             }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "账 龄",
+              "is_label": true
+            },
+            {
+              "key": "end_balance",
+              "label": "应收账款",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "end_ratio",
+              "label": "比例（%）",
+              "group": "期末数",
+              "format": "percent"
+            },
+            {
+              "key": "end_provision",
+              "label": "坏账准备",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_balance",
+              "label": "应收账款",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_ratio",
+              "label": "比例（%）",
+              "group": "期初数",
+              "format": "percent"
+            },
+            {
+              "key": "prior_provision",
+              "label": "坏账准备",
+              "group": "期初数",
+              "format": "amount"
+            }
           ]
         },
         {
@@ -4919,6 +5085,49 @@
               "is_total": true,
               "row_type": "total"
             }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "账 龄",
+              "is_label": true
+            },
+            {
+              "key": "end_balance",
+              "label": "应收账款",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "end_ratio",
+              "label": "比例（%）",
+              "group": "期末数",
+              "format": "percent"
+            },
+            {
+              "key": "end_provision",
+              "label": "坏账准备",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_balance",
+              "label": "应收账款",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_ratio",
+              "label": "比例（%）",
+              "group": "期初数",
+              "format": "percent"
+            },
+            {
+              "key": "prior_provision",
+              "label": "坏账准备",
+              "group": "期初数",
+              "format": "amount"
+            }
           ]
         },
         {
@@ -4950,6 +5159,49 @@
               "is_total": true,
               "row_type": "total"
             }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "组合名称",
+              "is_label": true
+            },
+            {
+              "key": "end_balance",
+              "label": "账面余额",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "end_ratio",
+              "label": "计提比例（%）",
+              "group": "期末数",
+              "format": "percent"
+            },
+            {
+              "key": "end_provision",
+              "label": "坏账准备",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_balance",
+              "label": "账面余额",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_ratio",
+              "label": "计提比例（%）",
+              "group": "期初数",
+              "format": "percent"
+            },
+            {
+              "key": "prior_provision",
+              "label": "坏账准备",
+              "group": "期初数",
+              "format": "amount"
+            }
           ]
         },
         {
@@ -4964,7 +5216,7 @@
           ],
           "_column_groups": [
             {
-              "group": "本期变动金额",
+              "group": "本期变动情况",
               "start": 2,
               "span": 3
             }
@@ -4987,6 +5239,41 @@
               "is_total": true,
               "row_type": "total"
             }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "类 别",
+              "is_label": true
+            },
+            {
+              "key": "opening",
+              "label": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "provision_amount",
+              "label": "计提",
+              "group": "本期变动情况",
+              "format": "amount"
+            },
+            {
+              "key": "reversal_amount",
+              "label": "收回或转回",
+              "group": "本期变动情况",
+              "format": "amount"
+            },
+            {
+              "key": "writeoff_amount",
+              "label": "转销或核销",
+              "group": "本期变动情况",
+              "format": "amount"
+            },
+            {
+              "key": "ending",
+              "label": "期末数",
+              "format": "amount"
+            }
           ]
         },
         {
@@ -5002,6 +5289,29 @@
               "label": "合 计",
               "is_total": true,
               "row_type": "total"
+            }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债务人名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "转回或收回金额",
+              "format": "amount"
+            },
+            {
+              "key": "cumulative_provision",
+              "label": "转回或收回前累计已计提坏账准备金额",
+              "format": "amount"
+            },
+            {
+              "key": "reason_method",
+              "label": "转回或收回原因、方式",
+              "format": "text"
             }
           ]
         },
@@ -5021,6 +5331,39 @@
               "is_total": true,
               "row_type": "total"
             }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债务人名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "note_type",
+              "label": "应收账款性质",
+              "format": "text"
+            },
+            {
+              "key": "amount",
+              "label": "核销金额",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "核销原因",
+              "format": "text"
+            },
+            {
+              "key": "procedure",
+              "label": "履行的核销程序",
+              "format": "text"
+            },
+            {
+              "key": "related",
+              "label": "是否因关联交易产生",
+              "format": "text"
+            }
           ]
         },
         {
@@ -5037,6 +5380,29 @@
               "is_total": true,
               "row_type": "total"
             }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债务人名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "balance",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "占应收账款合计的比例（%）",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "坏账准备",
+              "format": "amount"
+            }
           ]
         },
         {
@@ -5051,6 +5417,24 @@
               "label": "合 计",
               "is_total": true,
               "row_type": "total"
+            }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债务人名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "终止确认金额",
+              "format": "amount"
+            },
+            {
+              "key": "gain_loss",
+              "label": "与终止确认相关的利得或损失（损失以“-”填列）",
+              "format": "amount"
             }
           ]
         },
@@ -5078,6 +5462,19 @@
               "label": "负债小计",
               "is_total": true,
               "row_type": "subtotal"
+            }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末金额",
+              "format": "amount"
             }
           ]
         }

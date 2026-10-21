@@ -609,27 +609,38 @@ async def _push_note(
     if note is None:
         reason = f"附注尚未生成「{section} {table_name}」章节（在附注模块生成后下次推送纳入）"
     elif (note.section_title or "").strip() != _title_check_name:
-        # ── 章节号不匹配：尝试按 section_title 反查（spec: formula-push-note-skip-reduction · 需求 3.1） ──
-        _section_prefix = section.split("、")[0] + "、" if "、" in section else section[:1]
-        fallback_rows = (await ctx.db.execute(
-            sa.select(DisclosureNote).where(
-                DisclosureNote.project_id == ctx.project_id,
-                DisclosureNote.year == ctx.year,
-                DisclosureNote.section_title == _title_check_name,
-                DisclosureNote.is_deleted == sa.false(),
-                DisclosureNote.note_section.like(f"{_section_prefix}%"),
-            ).with_for_update()
-        )).scalars().all()
-        if len(fallback_rows) == 1:
-            logger.info(
-                "formula_push: 章节号动态定位 %s → %s（规则声明 %s）",
-                _title_check_name, fallback_rows[0].note_section, section,
-            )
-            note = fallback_rows[0]
-            section = fallback_rows[0].note_section
-            section_addr = f"note://{section}/{table_name}"
+        # ── 章节号不匹配：子表规则可通过 sub_table_data 验证 ──
+        # 子表规则的 table_name 不等于章节标题是正常的（如 D1 章节「应收票据」下有
+        # 「应收票据分类」「坏账分类」等子表）。仅对 subtable 规则：如果 sub_table_data
+        # 中能找到目标表，就不因标题不匹配而 skip。主表规则仍需标题匹配。
+        # spec: formula-push-subtable-expansion
+        _is_subtable = "subtable" in rule.rule_id
+        _td = note.table_data if isinstance(note.table_data, dict) else {}
+        _sub = _td.get("sub_table_data", {})
+        if _is_subtable and isinstance(_sub, dict) and table_name in _sub:
+            pass  # 子表存在于该章节中，跳过标题校验
         else:
-            reason = f"附注 {section} 是「{note.section_title}」章节，不是「{table_name}」，未推送"
+            # 尝试按 section_title 反查（spec: formula-push-note-skip-reduction · 需求 3.1）
+            _section_prefix = section.split("、")[0] + "、" if "、" in section else section[:1]
+            fallback_rows = (await ctx.db.execute(
+                sa.select(DisclosureNote).where(
+                    DisclosureNote.project_id == ctx.project_id,
+                    DisclosureNote.year == ctx.year,
+                    DisclosureNote.section_title == _title_check_name,
+                    DisclosureNote.is_deleted == sa.false(),
+                    DisclosureNote.note_section.like(f"{_section_prefix}%"),
+                ).with_for_update()
+            )).scalars().all()
+            if len(fallback_rows) == 1:
+                logger.info(
+                    "formula_push: 章节号动态定位 %s → %s（规则声明 %s）",
+                    _title_check_name, fallback_rows[0].note_section, section,
+                )
+                note = fallback_rows[0]
+                section = fallback_rows[0].note_section
+                section_addr = f"note://{section}/{table_name}"
+            else:
+                reason = f"附注 {section} 是「{note.section_title}」章节，不是「{table_name}」，未推送"
     elif str(_enum_value(note.status)) in FROZEN_NOTE_STATUSES:
         reason = "附注章节已确认，公式推送不改写"
     table_data = copy.deepcopy(note.table_data) if note is not None else None

@@ -3790,7 +3790,25 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "账 龄",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上年年末余额",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "按坏账计提方法分类披露",
@@ -3853,7 +3871,43 @@
               "span": 2
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "类 别",
+              "is_label": true
+            },
+            {
+              "key": "balance",
+              "label": "金额",
+              "group": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "比例(%)",
+              "group": "账面余额",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "金额",
+              "group": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "坏账准备",
+              "format": "percent"
+            },
+            {
+              "key": "book_value",
+              "label": "账面价值",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "按坏账计提方法分类披露（续：上年年末余额）",
@@ -3916,7 +3970,43 @@
               "span": 2
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "类 别",
+              "is_label": true
+            },
+            {
+              "key": "balance",
+              "label": "金额",
+              "group": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "比例(%)",
+              "group": "账面余额",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "金额",
+              "group": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "坏账准备",
+              "format": "percent"
+            },
+            {
+              "key": "book_value",
+              "label": "账面价值",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "按单项计提坏账准备的应收账款",
@@ -3952,7 +4042,35 @@
               ]
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "名 称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "balance",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "provision",
+              "label": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率（%）",
+              "format": "percent"
+            },
+            {
+              "key": "basis",
+              "label": "计提依据",
+              "format": "text"
+            }
+          ]
         },
         {
           "name": "按单项计提坏账准备的应收账款（续：上年年末余额）",
@@ -3988,7 +4106,35 @@
               ]
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "名 称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "balance",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "provision",
+              "label": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率（%）",
+              "format": "percent"
+            },
+            {
+              "key": "basis",
+              "label": "计提依据",
+              "format": "text"
+            }
+          ]
         },
         {
           "name": "组合计提项目：应收中央企业客户",
@@ -4044,7 +4190,50 @@
               "span": 3
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "账龄",
+              "is_label": true
+            },
+            {
+              "key": "end_balance",
+              "label": "应收账款",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_ratio",
+              "label": "坏账准备",
+              "group": "期末余额",
+              "format": "percent"
+            },
+            {
+              "key": "end_provision",
+              "label": "预期信用损失率(%)",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_balance",
+              "label": "应收账款",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_ratio",
+              "label": "坏账准备",
+              "group": "上年年末余额",
+              "format": "percent"
+            },
+            {
+              "key": "prior_provision",
+              "label": "预期信用损失率(%)",
+              "group": "上年年末余额",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "组合计提项目：应收地方国有企业客户",
@@ -4100,7 +4289,50 @@
               "span": 3
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "账龄",
+              "is_label": true
+            },
+            {
+              "key": "end_balance",
+              "label": "应收账款",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_ratio",
+              "label": "坏账准备",
+              "group": "期末余额",
+              "format": "percent"
+            },
+            {
+              "key": "end_provision",
+              "label": "预期信用损失率(%)",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_balance",
+              "label": "应收账款",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_ratio",
+              "label": "坏账准备",
+              "group": "上年年末余额",
+              "format": "percent"
+            },
+            {
+              "key": "prior_provision",
+              "label": "预期信用损失率(%)",
+              "group": "上年年末余额",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "组合计提项目：应收海外企业客户",
@@ -4156,7 +4388,50 @@
               "span": 3
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "账龄",
+              "is_label": true
+            },
+            {
+              "key": "end_balance",
+              "label": "应收账款",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_ratio",
+              "label": "坏账准备",
+              "group": "期末余额",
+              "format": "percent"
+            },
+            {
+              "key": "end_provision",
+              "label": "预期信用损失率(%)",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_balance",
+              "label": "应收账款",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_ratio",
+              "label": "坏账准备",
+              "group": "上年年末余额",
+              "format": "percent"
+            },
+            {
+              "key": "prior_provision",
+              "label": "预期信用损失率(%)",
+              "group": "上年年末余额",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "组合计提项目：组合4",
@@ -4212,7 +4487,50 @@
               "span": 3
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "账龄",
+              "is_label": true
+            },
+            {
+              "key": "end_balance",
+              "label": "应收账款",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_ratio",
+              "label": "坏账准备",
+              "group": "期末余额",
+              "format": "percent"
+            },
+            {
+              "key": "end_provision",
+              "label": "预期信用损失率(%)",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_balance",
+              "label": "应收账款",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_ratio",
+              "label": "坏账准备",
+              "group": "上年年末余额",
+              "format": "percent"
+            },
+            {
+              "key": "prior_provision",
+              "label": "预期信用损失率(%)",
+              "group": "上年年末余额",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "组合计提项目：组合5",
@@ -4268,7 +4586,50 @@
               "span": 3
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "账龄",
+              "is_label": true
+            },
+            {
+              "key": "end_balance",
+              "label": "应收账款",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_ratio",
+              "label": "坏账准备",
+              "group": "期末余额",
+              "format": "percent"
+            },
+            {
+              "key": "end_provision",
+              "label": "预期信用损失率(%)",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_balance",
+              "label": "应收账款",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_ratio",
+              "label": "坏账准备",
+              "group": "上年年末余额",
+              "format": "percent"
+            },
+            {
+              "key": "prior_provision",
+              "label": "预期信用损失率(%)",
+              "group": "上年年末余额",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "本期计提、收回或转回的坏账准备情况",
@@ -4307,7 +4668,20 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项 目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "坏账准备金额",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "转回或收回金额重要的坏账准备",
@@ -4337,7 +4711,35 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "单位名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "reason",
+              "label": "转回原因",
+              "format": "text"
+            },
+            {
+              "key": "recovery_method",
+              "label": "收回方式",
+              "format": "text"
+            },
+            {
+              "key": "basis",
+              "label": "原确定坏账准备的依据",
+              "format": "text"
+            },
+            {
+              "key": "amount",
+              "label": "转回或收回金额",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "本期实际核销的应收账款情况",
@@ -4351,7 +4753,20 @@
               "row_type": "data"
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "核销金额",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "重要的应收账款核销情况（逐项披露）",
@@ -4382,7 +4797,40 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "单位名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "note_type",
+              "label": "应收账款性质",
+              "format": "text"
+            },
+            {
+              "key": "amount",
+              "label": "核销金额",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "核销原因",
+              "format": "text"
+            },
+            {
+              "key": "procedure",
+              "label": "履行的核销程序",
+              "format": "text"
+            },
+            {
+              "key": "related",
+              "label": "款项是否由关联交易产生",
+              "format": "text"
+            }
+          ]
         },
         {
           "name": "按欠款方归集的应收账款和合同资产期末余额前五名单位情况",
@@ -4421,7 +4869,40 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "单位名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "ar_amount",
+              "label": "应收账款期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "contract_asset_amount",
+              "label": "合同资产期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "total_amount",
+              "label": "应收账款和合同资产期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "占应收账款和合同资产期末余额合计数的比例%",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "应收账款坏账准备和合同资产减值准备期末余额",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "因金融资产转移而终止确认的应收账款情况",
@@ -4450,7 +4931,30 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "transfer_method",
+              "label": "转移方式",
+              "format": "text"
+            },
+            {
+              "key": "amount",
+              "label": "终止确认金额",
+              "format": "amount"
+            },
+            {
+              "key": "gain_loss",
+              "label": "与终止确认相关的利得或损失",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "转移应收账款且继续涉入形成的资产、负债",
@@ -4479,7 +4983,30 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "transfer_method",
+              "label": "资产转移方式",
+              "format": "text"
+            },
+            {
+              "key": "asset_amount",
+              "label": "继续涉入形成的资产金额",
+              "format": "amount"
+            },
+            {
+              "key": "liability_amount",
+              "label": "继续涉入形成的负债金额",
+              "format": "amount"
+            }
+          ]
         }
       ],
       "text_sections": [

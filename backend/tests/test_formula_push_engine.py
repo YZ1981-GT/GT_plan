@@ -417,7 +417,11 @@ async def test_note_section_is_skipped_with_reason(env, case, fragment):
     elif case == "confirmed":
         await env.add_note("五、1", _f2_note(), status=NoteStatus.confirmed)
     result = await env.push()
-    [skip] = [i for i in result.items if i.stage == "note"]
+    # 子表规则也会产出 note stage 的 items，只检查主表规则的 skip
+    skips = [i for i in result.items if i.stage == "note" and i.action == "skipped"
+             and "subtable" not in i.rule_id]
+    assert skips, f"应有主表 note skip，实际 items: {result.items}"
+    skip = next(s for s in skips if fragment in (s.reason or ""))
     assert skip.action == "skipped" and fragment in skip.reason
     assert result.note_sections == []
     if case != "missing":
@@ -524,9 +528,9 @@ async def test_single_field_note_rule_only_writes_declared_column(env, monkeypat
     # 合计行也只更新 end_amount
     assert rows["合计"]["end_amount"] == 390 + 120 + 0 + 0 + 5
     assert rows["合计"]["prior_amount"] == 1, "合计行的 prior_amount 也必须保持原值"
-    # 确认 items 中无 prior 期间的记录
-    note_items = [i for i in result.items if i.domain == "note"]
-    assert all(".prior" not in (i.addr_id or "") for i in note_items), (
+    # 确认主表 items 中无 prior 期间的记录（子表规则有自己的字段不受此约束）
+    main_note_items = [i for i in result.items if i.domain == "note" and "subtable" not in i.rule_id]
+    assert all(".prior" not in (i.addr_id or "") for i in main_note_items), (
         "单字段规则不应产生 prior 期间的推送记录"
     )
 
