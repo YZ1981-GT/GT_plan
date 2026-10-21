@@ -252,12 +252,75 @@ async def _load_wp(db: AsyncSession, project_id: uuid.UUID, year: int,
 
 async def _load_note(db: AsyncSession, project_id: uuid.UUID, year: int,
                      refs: set[tuple], template_type: str) -> dict[str, dict[str, Decimal]]:
-    """从披露表 sub_table_data 取附注值（与 note-data-from-disclosure-table 对齐）。"""
+    """从披露表 sub_table_data 取附注值（复用 disclosure_source，与 note-data-from-disclosure-table 对齐）。
+
+    spec: formula-execution-path-convergence 复盘修复 P0-2
+    """
     if not refs:
         return {}
     out: dict[str, dict[str, Decimal]] = {}
 
-    # 按 section 分组
+    # 按 section 分组需要的 field
+    section_fields: dict[str, set[str]] = {}
+    for ref_tuple in refs:
+        section = ref_tuple[0]
+        field = ref_tuple[1] if len(ref_tuple) > 1 else ""
+        section_fields.setdefault(section, set()).add(field)
+
+    # 复用 disclosure_source 的 wp_code → section 映射查询 sub_table_data
+    try:
+        from app.services.formula_push.bindings.disclosure_source import (
+            _load_section_map,
+            load_disclosure_sub_table_data,
+            note_rows_from_disclosure,
+        )
+    except ImportError:
+        logger.warning("preloader._load_note: disclosure_source not available, falling back to direct query")
+        return await _load_note_fallback(db, project_id, year, refs)
+
+    # 反查 section → wp_code（section_map 是 wp_code → {listed/soe: section}）
+    section_map = _load_section_map()
+    section_to_wp: dict[str, str] = {}
+    for wp_code, entry in section_map.items():
+        for variant_key in ("listed", "soe"):
+            sec = entry.get(variant_key, "")
+            if sec:
+                section_to_wp.setdefault(sec, wp_code)
+
+    for section, fields in section_fields.items():
+        wp_code = section_to_wp.get(section)
+        if not wp_code:
+            continue
+        sub = await load_disclosure_sub_table_data(db, project_id, year, wp_code, template_type)
+        if sub is None:
+            continue
+        entry = out.setdefault(section, {})
+        for table_name, rows_list in sub.items():
+            if not isinstance(rows_list, list):
+                continue
+            for row in rows_list:
+                if not isinstance(row, dict):
+                    continue
+                label = str(row.get("label") or "").strip()
+                for field in fields:
+                    if not field:
+                        continue
+                    # 复用 disclosure_source._read_row_value 的多键名兼容
+                    from app.services.formula_push.bindings.disclosure_source import _read_row_value
+                    from app.services.formula_push.note_writer import NOTE_FIELDS
+                    value_key = NOTE_FIELDS.get(field, (field, "end"))[0]
+                    raw = _read_row_value(row, value_key, field)
+                    if raw is not None:
+                        entry[field] = _safe_decimal(raw)
+                        if label:
+                            entry[f"{label}:{field}"] = _safe_decimal(raw)
+    return out
+
+
+async def _load_note_fallback(db: AsyncSession, project_id: uuid.UUID, year: int,
+                              refs: set[tuple]) -> dict[str, dict[str, Decimal]]:
+    """降级：直接查 disclosure_notes（disclosure_source 不可用时）。"""
+    out: dict[str, dict[str, Decimal]] = {}
     sections = {r[0] for r in refs}
     from app.models.report_models import DisclosureNote
 
@@ -272,40 +335,17 @@ async def _load_note(db: AsyncSession, project_id: uuid.UUID, year: int,
         )).scalar_one_or_none()
         if note is None or not isinstance(note.table_data, dict):
             continue
-        # 优先从 sub_table_data 取（披露表数据源）
-        sub = note.table_data.get("sub_table_data")
-        if isinstance(sub, dict):
-            for table_name, rows in sub.items():
-                if not isinstance(rows, list):
+        td_rows = note.table_data.get("rows", [])
+        for r in td_rows:
+            if not isinstance(r, dict):
+                continue
+            for field_ref in refs:
+                if field_ref[0] != section:
                     continue
-                for row in rows:
-                    if not isinstance(row, dict):
-                        continue
-                    label = str(row.get("label") or "").strip()
-                    for field_ref in refs:
-                        if field_ref[0] != section:
-                            continue
-                        field = field_ref[1] if len(field_ref) > 1 else ""
-                        # 尝试多种键名
-                        val = row.get(field) or row.get("ending") or row.get("end_amount")
-                        if val is not None:
-                            entry = out.setdefault(section, {})
-                            entry[field] = _safe_decimal(val)
-                            if label:
-                                entry[f"{label}:{field}"] = _safe_decimal(val)
-        else:
-            # 降级：从旧 rows 格式取
-            td_rows = note.table_data.get("rows", [])
-            for r in td_rows:
-                if not isinstance(r, dict):
-                    continue
-                for field_ref in refs:
-                    if field_ref[0] != section:
-                        continue
-                    field = field_ref[1] if len(field_ref) > 1 else ""
-                    val = r.get("values", {}).get(field)
-                    if val is not None:
-                        out.setdefault(section, {})[field] = _safe_decimal(val)
+                field = field_ref[1] if len(field_ref) > 1 else ""
+                val = r.get("values", {}).get(field)
+                if val is not None:
+                    out.setdefault(section, {})[field] = _safe_decimal(val)
     return out
 
 

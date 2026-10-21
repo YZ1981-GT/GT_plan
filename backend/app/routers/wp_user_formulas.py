@@ -60,7 +60,6 @@ from app.services.wp_formula_service import (
 )
 from app.services.prefill_engine import (
     _get_formula_re,
-    _FORMULA_RESOLVERS,
     _parse_args,
     resolve_extended_formula,
 )
@@ -114,7 +113,18 @@ class ValidateFormulaResponse(BaseModel):
 
 
 _CELL_KEY_RE = re.compile(r"^[^!]+![A-Z]+\d+$")
-_SUPPORTED_TYPES = set(_FORMULA_RESOLVERS.keys()) | {"TB", "SUM_TB"}
+# spec: unified-formula-registry — 从 _REGISTRY 派生，不再依赖已删除的 _FORMULA_RESOLVERS
+def _get_supported_types() -> frozenset[str]:
+    from app.services.formula_engine import _REGISTRY
+    return frozenset(_REGISTRY.known_function_names())
+
+_SUPPORTED_TYPES: frozenset[str] | None = None
+
+def _supported() -> frozenset[str]:
+    global _SUPPORTED_TYPES
+    if _SUPPORTED_TYPES is None:
+        _SUPPORTED_TYPES = _get_supported_types()
+    return _SUPPORTED_TYPES
 
 #: 用户公式在 `wp_formula` 表里的来源标识。
 #:
@@ -175,12 +185,12 @@ def _parse_formula_or_raise(formula: str) -> tuple[str, list[str]]:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
                 "error_code": "FORMULA_TYPE_UNKNOWN",
-                "message": f"未识别的公式类型,支持: {sorted(_SUPPORTED_TYPES)}",
+                "message": f"未识别的公式类型,支持: {sorted(_supported())}",
             },
         )
     ftype = m.group(1).upper()
     args = _parse_args(m.group(2).strip())
-    if ftype not in _SUPPORTED_TYPES:
+    if ftype not in _supported():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
