@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
+from app.models.formula_setting_models import ProjectBaselineColumns
 
 
 # ---------------------------------------------------------------------------
@@ -834,7 +835,7 @@ class SampledVoucher(Base):
 # ---------------------------------------------------------------------------
 
 
-class WpFormula(Base):
+class WpFormula(ProjectBaselineColumns, Base):  # V199：自定义行即底稿域本项目适配，带上游基线列
     """自定义底稿公式绑定（独立表，custom-workpaper-formula-binding）
 
     与 V052__wp_formula.sql 三层一致：表名/列名/索引名完全对应。

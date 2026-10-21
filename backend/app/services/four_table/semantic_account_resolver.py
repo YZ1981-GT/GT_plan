@@ -633,10 +633,12 @@ async def _fetch_report_formula(ctx, row_code: str) -> str | None:
         )
     )
     try:
-        for sql, params in queries:
+        for i, (sql, params) in enumerate(queries):
             row = (await ctx.db.execute(sa.text(sql), params)).fetchone()
             if row is not None and row.formula:
                 return str(row.formula)
+            if i == 0 and row is not None:
+                return None  # 本项目行公式为空 = 本项目停用（FGS R1.1），不退回准则行
     except Exception as e:  # noqa: BLE001
         logger.debug("语义科目定位: 报表公式查询失败: %s", e)
     return None

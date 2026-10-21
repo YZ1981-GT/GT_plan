@@ -65,10 +65,12 @@ async def env():
 
     from app.routers.account_chart import router as account_chart_router
     from app.routers.report_config import router as report_config_router
+    from app.routers.tb_detail_formulas import router as tb_detail_router
 
     app = FastAPI()
     app.include_router(account_chart_router)
     app.include_router(report_config_router)
+    app.include_router(tb_detail_router)  # 2026-10-20 迁出 report_config，路径不变
 
     async def _db():
         async with factory() as s:
@@ -106,7 +108,8 @@ async def test_tb_detail_formulas_roundtrip(env):
     client, factory, pid = env
     empty = await client.get(f"/api/report-config/tb-detail-formulas/{pid}")
     assert empty.status_code == 200, empty.text
-    assert empty.json() == {"overrides": {}, "added": []}
+    # 2026-10-20 起另带层级 / 版本令牌 / 待确认（formula-global-settings-sync），空项目全空
+    assert empty.json() == {"overrides": {}, "added": [], "layers": {}, "loaded": {}, "pending": []}
 
     body = {
         "overrides": {"1001": {"row_code": "1001", "formula": "TB('1001','期末余额')"}},

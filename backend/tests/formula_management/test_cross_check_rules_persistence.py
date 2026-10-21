@@ -188,19 +188,27 @@ def test_cross_check_rules_roundtrip(db: AsyncSession, seed: User):
 
 
 def test_cross_check_rules_overwrite(db: AsyncSession, seed: User):
-    """PUT 整体替换：第二次 PUT 覆盖第一次（编辑/删除后的新全集生效）。"""
+    """PUT 整体替换：第二次 PUT 覆盖第一次（编辑/删除后的新全集生效）。
+
+    formula-global-settings-sync（2026-10-20）：已有规则时 PUT 须带读接口下发的 ``loaded``
+    版本令牌（缺失 428 且零写入；防止拿着过期列表整表覆盖别人的修改）。
+    """
     app = _make_app(db, seed)
     client = TestClient(app)
 
-    client.put(
+    first = client.put(
         _rules_url(),
         json={"rules": {"cross_report_note": [{"label": "旧规则", "left_ref": "A", "right_ref": "B"}]}},
     )
-    # 第二次 PUT：删掉 report_note、改为 note_wp 一条。
-    client.put(
-        _rules_url(),
-        json={"rules": {"cross_note_wp": [{"label": "新规则", "left_ref": "X", "right_ref": "Y"}]}},
-    )
+    assert first.status_code == 200, first.text
+    loaded = first.json()["loaded"]
+    assert len(loaded) == 1
+    # 第二次 PUT：删掉 report_note、改为 note_wp 一条（缺令牌 428 由
+    # tests/formula_settings/test_tb_detail_and_cross_check.py 覆盖：本文件各请求共用一个会话，
+    # 428 回滚会让注入的身份实例过期，无法在同步测试里重新载入）。
+    second = client.put(_rules_url(), json={
+        "rules": {"cross_note_wp": [{"label": "新规则", "left_ref": "X", "right_ref": "Y"}]}, "loaded": loaded})
+    assert second.status_code == 200, second.text
 
     data = client.get(_rules_url()).json()
     rules = data.get("rules", data.get("data", {}).get("rules"))
@@ -241,6 +249,9 @@ def test_put_strips_transient_fields(db: AsyncSession, seed: User):
     data = client.get(_rules_url()).json()
     rules = data.get("rules", data.get("data", {}).get("rules"))
     stored = rules["cross_report_note"][0]
-    assert set(stored) == {"label", "left_ref", "operator", "right_ref", "description"}, (
-        f"落库应只含契约字段，实得 {set(stored)}（瞬态字段未被剔除 = 缺陷）"
+    # 读接口 = 契约字段 + 服务端元数据（规则编号 / 公式位 / 层级 / 待确认 / 版本令牌，2026-10-20 起）
+    assert set(stored) == {"label", "left_ref", "operator", "right_ref", "description", "tolerance",
+                           "rule_id", "slot_key", "layer", "pending", "version_token"}, (
+        f"读出应只含契约字段与服务端元数据，实得 {set(stored)}（瞬态字段未被剔除 = 缺陷）"
     )
+    # 落库定义只含契约字段：tests/formula_settings/test_tb_detail_and_cross_check.py 逐字段断言

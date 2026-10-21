@@ -1,0 +1,22 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "8.2 真库迁移；浏览器实测：管理员改全局报表公式 → 预览冲突 → 发布 → 有适配项目弹窗确认 → 报表重算；集团模板订阅 → 发布新版本（均用【测试】项目），清理并对账": [
+      {
+        "executionId": "0c1d4083-a2b6-46df-b500-d945033e0737",
+        "chatSessionId": "sess_4e53a089-7ed4-4f62-98e7-fa8276bacd2e",
+        "timestamp": 1792574961264
+      },
+      {
+        "executionId": "0c1d4083-a2b6-46df-b500-d945033e0737",
+        "chatSessionId": "sess_4e53a089-7ed4-4f62-98e7-fa8276bacd2e",
+        "timestamp": 1792575014039
+      },
+      {
+        "executionId": "0c1d4083-a2b6-46df-b500-d945033e0737",
+        "chatSessionId": "sess_4e53a089-7ed4-4f62-98e7-fa8276bacd2e",
+        "timestamp": 1792575816800
+      }
+    ]
+  }
+}

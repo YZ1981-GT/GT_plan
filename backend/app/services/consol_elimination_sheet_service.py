@@ -405,7 +405,7 @@ async def load_mapper(db: AsyncSession, project_id: UUID, tree: TreeNode, year: 
     mapper = build_mapper(
         ((o["account_code"], o["account_name"]) for o in options),
         standard_chart_entries(),
-        await load_report_rows(db, standard),
+        await load_report_rows(db, standard, project_id=project_id),
         standard,
     )
     return mapper, standard

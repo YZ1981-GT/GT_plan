@@ -39,6 +39,11 @@ export {
   formulaPresets, reportConfigFormula, draftRefresh, noteFormula, formulaPush, formulaApi,
 } from './formula'
 
+// 公式全局设置 / 本项目适配 / 公式模板（spec formula-global-settings-sync）
+export {
+  formulaSettings, projectFormulaSettings, formulaTemplates, projectFormulaTemplates,
+} from './formulaSettings'
+
 export {
   auth, users, system, recycleBin, knowledge, knowledgeLibrary,
   dashboard, auditLogs, ai, aiModels, aiProject, admin,
@@ -81,6 +86,9 @@ import {
   sync, independenceDeclarations, my,
 } from './collaboration'
 import {
+  formulaSettings, projectFormulaSettings, formulaTemplates, projectFormulaTemplates,
+} from './formulaSettings'
+import {
   auth, users, system, recycleBin, knowledge, knowledgeLibrary,
   dashboard, auditLogs, ai, aiModels, aiProject, admin,
   aiPlugins, gtCoding, regulatory, processRecord, attachments,
@@ -118,6 +126,7 @@ export const API = {
   templateLibraryMgmt,
   customQuery, systemDicts, adminLogs,
   officePreview, acnr, workpaperLeads,
+  formulaSettings, projectFormulaSettings, formulaTemplates, projectFormulaTemplates,
 } as const
 
 export default API

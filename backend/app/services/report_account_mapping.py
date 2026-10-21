@@ -81,8 +81,10 @@ async def resolve_report_line_account_codes(
                 {"rc": row_code, "std": f"project:{project_id}"},
             )
         ).fetchone()
-        # 项目级无覆盖 → 按项目适用准则精确匹配（若调用方提供）
-        if (row is None or not row.formula) and applicable_standards:
+        # 本项目有该行即以它为准：公式为空 = 本项目停用该公式位（spec formula-global-settings-sync
+        # R1.1 / R7.4，与报表生成读的有效定义同口径），不再退回准则行 ⇒ 走调用方兜底科目。
+        # 无本项目行 → 按项目适用准则精确匹配（若调用方提供）→ 任取一条非项目级配置
+        if row is None and applicable_standards:
             for std in applicable_standards:
                 if not std:
                     continue
@@ -99,7 +101,7 @@ async def resolve_report_line_account_codes(
                 if candidate is not None and candidate.formula:
                     row = candidate
                     break
-        if row is None or not row.formula:
+        if row is None:
             row = (
                 await db.execute(
                     sa.text(

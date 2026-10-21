@@ -273,7 +273,9 @@ class TestE1ControlledPropagation:
                 candidate_id, approved=True, reviewer=uuid.uuid4()
             )
 
-            # Assert: standard 级公式更新为候选公式
+            # Assert: standard 级公式更新为候选公式。
+            # spec formula-global-settings-sync（2026-10-20）起审核通过 = 一次全局发布：公式按定义规范化
+            # 落库（去首尾空白，design §3），规范化后与现值相同的变更不产生新版本 ⇒ 按规范化后比较。
             result = await session.execute(
                 select(ReportConfig.formula).where(
                     ReportConfig.applicable_standard == STANDARD,
@@ -282,7 +284,7 @@ class TestE1ControlledPropagation:
                 )
             )
             current_formula = result.scalar_one()
-            assert current_formula == candidate_formula, (
+            assert (current_formula or "").strip() == candidate_formula.strip(), (
                 f"E1 正向: approved 后主模板应更新为候选公式。"
                 f"期望 '{candidate_formula}'，实际 '{current_formula}'"
             )

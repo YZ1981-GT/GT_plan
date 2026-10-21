@@ -803,7 +803,7 @@ async def _exec_seed(seed_name: str, db: AsyncSession, current_user: User) -> di
         from app.services.report_formula_service import report_formula_service
         svc = ReportConfigService(db)
         count = await svc.load_seed_data()
-        formula_stats = await report_formula_service.fill_all_formulas(db, standard="all")
+        formula_stats = await report_formula_service.fill_all_formulas(db, standard="all", user_id=current_user.id)
         return {
             "seed_name": seed_name,
             "status": "loaded",
@@ -811,6 +811,8 @@ async def _exec_seed(seed_name: str, db: AsyncSession, current_user: User) -> di
             "updated": 0,
             "record_count": int(count or 0),
             "errors": [],
+            # 填出的公式经全局发布（formula-global-settings-sync）：commit 后由调用方发变更事件，不进响应
+            "_formula_events": formula_stats.get("events") or [],
         }
     if seed_name == "gt_wp_coding":
         from app.services.gt_coding_service import GTCodingService
@@ -991,6 +993,11 @@ async def seed_all(
 
     # 全部完成后统一 commit（history 记录 + 各 seed 已 SAVEPOINT 提交）
     await db.commit()
+    formula_events = [ev for r in results for ev in (r.pop("_formula_events", None) or [])]
+    if formula_events:
+        from app.services.formula_settings.propagation import publish_events
+
+        await publish_events(formula_events, domain="report", source="seed")
 
     success_count = sum(1 for r in results if r.get("status") == "loaded")
     failed_count = sum(1 for r in results if r.get("status") == "failed")
