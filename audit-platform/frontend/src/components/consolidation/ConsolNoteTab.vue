@@ -40,15 +40,33 @@
               <el-button size="small" @click="openNoteFormula">ƒx</el-button>
             </el-tooltip>
             <el-tooltip content="明细映射：匹配子企业附注科目到合并模板行" placement="bottom">
-              <el-button size="small" @click="showMappingDialog = true" data-testid="consol-note-open-mapping">📋 明细映射</el-button>
+              <el-button size="small" @click="showMappingDialog = true" data-testid="consol-note-open-mapping"
+                :disabled="!selectedNoteSection?.section_id">📋 明细映射</el-button>
             </el-tooltip>
             <el-tooltip content="管理合并附注明细模板：查看、编辑、绑定模板版本" placement="bottom">
-              <el-button size="small" @click="showTemplateManager = true" data-testid="consol-note-open-template-manager">📝 模板管理</el-button>
+              <el-button size="small" @click="showTemplateManager = true" data-testid="consol-note-open-template-manager"
+                :disabled="!selectedNoteSection?.section_id">📝 模板管理</el-button>
             </el-tooltip>
           </div>
         </div>
 
         <!-- 跨表勾稽校验结果 -->
+        <!-- P2：映射变更通知横幅（集团侧确认映射 / 提升模板后 SSE 推送） -->
+        <el-alert
+          v-if="mappingChangedBanner"
+          type="info"
+          show-icon
+          style="margin-bottom:8px"
+          data-testid="consol-note-mapping-changed-banner"
+        >
+          <template #title>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <span>集团已更新附注明细映射规则，建议刷新预览确认</span>
+              <el-button size="small" type="primary" @click="openMappingFromBanner">📋 查看映射</el-button>
+              <el-button size="small" @click="mappingChangedBanner = false">稍后</el-button>
+            </div>
+          </template>
+        </el-alert>
         <div v-if="checkRulesResults.length" style="margin-bottom:8px">
           <el-alert
             v-for="cr in checkRulesResults"
@@ -1052,6 +1070,18 @@ const formulaFilling = ref(false)
 const reaggregating = ref(false)
 const showMappingDialog = ref(false)
 const showTemplateManager = ref(false)
+const mappingChangedBanner = ref(false)
+
+/** SSE → eventBus 回调：集团侧映射确认或模板提升 → 显示横幅 */
+function onMappingChangedEvent() {
+  mappingChangedBanner.value = true
+}
+
+/** 横幅中「刷新预览」→ 打开映射弹窗并关闭横幅 */
+function openMappingFromBanner() {
+  mappingChangedBanner.value = false
+  showMappingDialog.value = true
+}
 
 /** 明细刷新 apply 完成后重读当前章节 */
 async function onDetailRefreshApplied() {
@@ -3092,6 +3122,7 @@ onMounted(() => {
   eventBus.on('consol-tree-aggregate', onTreeAggregate)
   eventBus.on('consol-note-audit-all', onNoteAuditAllEvent)
   eventBus.on('shortcut:save', onShortcutSave)
+  eventBus.on('consol-note-mapping-changed', onMappingChangedEvent)
 })
 
 onUnmounted(() => {
@@ -3100,6 +3131,7 @@ onUnmounted(() => {
   eventBus.off('consol-tree-aggregate', onTreeAggregate)
   eventBus.off('consol-note-audit-all', onNoteAuditAllEvent)
   eventBus.off('shortcut:save', onShortcutSave)
+  eventBus.off('consol-note-mapping-changed', onMappingChangedEvent)
   // 取消飞行中的附注请求与子操作
   noteRequestGuard.abort()
   noteSubOpGuard.abort()

@@ -31,11 +31,17 @@
       <el-table-column label="涉及企业" width="90" align="center">
         <template #default="{ row }">{{ row._entity_count }}</template>
       </el-table-column>
-      <el-table-column label="建议目标" min-width="180">
+      <el-table-column label="建议目标" min-width="200">
         <template #default="{ row }">
-          <el-select v-model="row.target_row_id" size="small" style="width:100%" filterable clearable placeholder="请选择目标行">
-            <el-option v-for="tr in templateRows" :key="tr.target_row_id" :label="tr.canonical_name" :value="tr.target_row_id" />
-          </el-select>
+          <div style="display:flex;align-items:center;gap:4px">
+            <el-select v-model="row.target_row_id" size="small" style="flex:1" filterable clearable placeholder="请选择目标行">
+              <el-option v-for="tr in templateRows" :key="tr.target_row_id" :label="tr.canonical_name" :value="tr.target_row_id" />
+            </el-select>
+            <el-tooltip v-if="targetMergeCount(row.target_row_id) > 1"
+              :content="`${targetMergeCount(row.target_row_id)} 条来源行合并到此目标`" placement="top">
+              <el-badge :value="targetMergeCount(row.target_row_id)" type="warning" style="margin-left:2px" />
+            </el-tooltip>
+          </div>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="130">
@@ -52,6 +58,22 @@
           <el-tag :type="row._status === 'ready' ? 'success' : row._status === 'stale' ? 'warning' : 'info'" size="small">
             {{ row._status === 'ready' ? '就绪' : row._status === 'stale' ? '已变化' : '待确认' }}
           </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="置信度" width="100" align="center">
+        <template #default="{ row }">
+          <el-progress
+            :percentage="Math.round(row._confidence * 100)"
+            :stroke-width="14"
+            :text-inside="true"
+            :color="row._confidence >= 0.9 ? '#67c23a' : row._confidence >= 0.75 ? '#e6a23c' : '#f56c6c'"
+            style="width:80px;display:inline-block"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column label="匹配方式" width="100" align="center">
+        <template #default="{ row }">
+          <el-tag size="small" :type="matchTypeTagType(row._match_type)">{{ matchTypeLabel(row._match_type) }}</el-tag>
         </template>
       </el-table-column>
     </el-table>
@@ -101,6 +123,7 @@ import {
   getDetailTemplate,
   getDetailTemplateBinding,
   bindDetailTemplate,
+  listDetailTemplates,
 } from '@/services/consolidationApi'
 
 interface MappingRow {
@@ -148,6 +171,12 @@ const allMapped = computed(() => mappingRows.value.every(r =>
   r.mapping_action === 'ignore' || (r.target_row_id && r.mapping_action),
 ))
 
+/** 统计某个目标行被多少条非忽略的来源行映射（>1 表示多条来源合并到同一目标） */
+function targetMergeCount(targetRowId: string): number {
+  if (!targetRowId) return 0
+  return mappingRows.value.filter(r => r.target_row_id === targetRowId && r.mapping_action !== 'ignore').length
+}
+
 watch(() => props.visible, (v) => { if (v) loadPreview() })
 
 async function loadPreview() {
@@ -160,13 +189,31 @@ async function loadPreview() {
 
     // 构建映射行（从建议中构建）
     const staleKeys = new Set((result.stale_entities || []).map(e => e.node_key))
-    const allEntities = (result.groups || []).flatMap(g => g.entities)
+    const groups = result.groups || []
+
+    // 按来源标签→所属 group 的企业列表建索引（一个 label 可能出现在多个 group 中）
+    const labelToEntities = new Map<string, Array<{ node_key: string; company_name: string }>>()
+    for (const group of groups) {
+      for (const sr of group.source_rows || []) {
+        const label = (sr.label || '').trim()
+        if (!label) continue
+        const existing = labelToEntities.get(label) || []
+        for (const ent of group.entities || []) {
+          if (!existing.some(e => e.node_key === ent.node_key)) {
+            existing.push({ node_key: ent.node_key, company_name: ent.company_name })
+          }
+        }
+        labelToEntities.set(label, existing)
+      }
+    }
+
+    const allEntities = groups.flatMap(g => g.entities)
     const rows: MappingRow[] = []
 
     for (const suggestion of result.suggestions || []) {
-      // TODO: 当前把全部非 stale 企业赋给每条建议行，因为 preview API 没有返回
-      // "哪条来源标签属于哪些企业"的精确映射。Phase 6 Playwright 实测后考虑按 group 细分。
-      const entities = allEntities.filter(e => !staleKeys.has(e.node_key))
+      // 精确匹配 group 的企业列表；找不到时降级为全部非 stale 企业
+      const matched = labelToEntities.get(suggestion.source_label)
+      const entities = (matched || allEntities).filter(e => !staleKeys.has(e.node_key))
       rows.push({
         source_label: suggestion.source_label,
         target_row_id: suggestion.suggested_target?.target_row_id || '',
@@ -189,7 +236,25 @@ async function loadPreview() {
 function rowClassName({ row }: { row: MappingRow }) {
   if (row._status === 'stale') return 'gt-mapping-row-stale'
   if (row._status === 'pending' && !row.target_row_id) return 'gt-mapping-row-pending'
+  if (row._confidence > 0 && row._confidence < 0.75) return 'gt-mapping-row-low-confidence'
   return ''
+}
+
+/** 匹配方式标签文字 */
+function matchTypeLabel(matchType: string): string {
+  const labels: Record<string, string> = {
+    exact: '精确', alias: '别名', fuzzy: '模糊',
+    history: '历史', rule_template: '模板', manual: '手动',
+  }
+  return labels[matchType] || matchType || '手动'
+}
+
+/** 匹配方式标签颜色 */
+function matchTypeTagType(matchType: string): '' | 'success' | 'warning' | 'info' | 'danger' {
+  if (matchType === 'exact' || matchType === 'rule_template') return 'success'
+  if (matchType === 'alias' || matchType === 'history') return ''
+  if (matchType === 'fuzzy') return 'warning'
+  return 'info'
 }
 
 function buildMappings(): MappingRuleItem[] {
@@ -271,12 +336,20 @@ async function handleConfirmAndApply() {
 }
 
 async function handleEditTemplate() {
-  // 加载当前绑定的模板
+  // 加载当前绑定的模板——先查绑定，再从模板列表中匹配
   try {
     const binding = await getDetailTemplateBinding(props.projectId, props.sectionId)
     if (binding?.template_version_id) {
-      // 从版本反查模板
-      currentTemplate.value = null // 简化：编辑器内部处理
+      // 列出该章节的模板，找到包含已绑定版本的那个
+      const templates = await listDetailTemplates({
+        template_type: props.templateType,
+        section_id: props.sectionId,
+      })
+      const matched = templates.find(t =>
+        t.latest_version?.id === binding.template_version_id
+        || t.id === (t.latest_version as any)?.template_id,
+      )
+      currentTemplate.value = matched ?? null
     } else {
       currentTemplate.value = null
     }
@@ -304,4 +377,5 @@ async function onTemplateSaved(tmpl: DetailTemplate) {
 <style scoped>
 :deep(.gt-mapping-row-stale) { background-color: #fef0e0 !important; }
 :deep(.gt-mapping-row-pending) { background-color: #fafafa !important; }
+:deep(.gt-mapping-row-low-confidence) { background-color: #fef0f0 !important; }
 </style>

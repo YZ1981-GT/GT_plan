@@ -106,21 +106,6 @@ export function useConsolNoteReuse(projectId: Ref<string>) {
     staleSummary.value = null
   }
 
-  // ─── 映射变更通知（P2：集团确认映射 / 提升模板 → SSE → 横幅） ──────────
-  const mappingChanged = ref(false)
-
-  /** SSE 事件回调：consol.note_mapping_confirmed / template_promoted → 前端刷新提示 */
-  function onMappingChanged() {
-    mappingChanged.value = true
-    // 同时刷新 stale 和结构锁（映射确认可能伴随锁定）
-    loadStaleSummary()
-    loadLocks()
-  }
-
-  function clearMappingChanged() {
-    mappingChanged.value = false
-  }
-
   // ─── 值确认 ──────────────────────────────────────────────────────────────
   const confirmations = ref<ConfirmationItem[]>([])
   const confirmLoading = ref(false)
@@ -229,10 +214,6 @@ export function useConsolNoteReuse(projectId: Ref<string>) {
     loadStaleSummary,
     onValueChanged,
     clearStale,
-    // 映射变更
-    mappingChanged,
-    onMappingChanged,
-    clearMappingChanged,
     // 确认
     confirmations,
     confirmLoading,
