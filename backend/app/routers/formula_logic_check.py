@@ -205,12 +205,7 @@ async def save_cross_check_rules(
 
 
 # ── E 批：表间审核执行历史 ────────────────────────────────────────────────
-# spec: formula-management-ux-improvements · E 批 · Task E1
-
-from app.models.wp_optimization_models import (
-    CrossCheckResult as CrossCheckResultRow,
-)
-from app.models.workpaper_models import DraftRefreshAudit
+# spec: formula-management-ux-improvements · E 批；按真实列读取见 formula-settings-wiring-closure R3.1
 
 
 @router.get("/api/projects/{project_id}/formula/cross-check-history")
@@ -221,53 +216,9 @@ async def cross_check_history(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ) -> dict[str, Any]:
-    """返回表间审核执行历史：近 N 次 run 记录 + 每次的勾稽结果。
+    """本项目本年度最近 N 次表间审核：每次的计数 + 仍保留的逐条结论（只读）。"""
+    from app.services.formula_management.cross_check_history import list_history
 
-    数据来自 ``draft_refresh_audit`` (runs) + ``cross_check_results`` (issues)。
-    """
-    # 查近 N 次 run
-    runs = (await db.execute(
-        sa.select(DraftRefreshAudit).where(
-            DraftRefreshAudit.project_id == project_id,
-        ).order_by(DraftRefreshAudit.created_at.desc()).limit(max(1, min(limit, 50)))
-    )).scalars().all()
-
-    result_runs = []
-    for run in runs:
-        # 每个 run 的勾稽结论
-        from app.services.formula_management.cross_check_run import get_issues_by_run
-        issues = await get_issues_by_run(db, run.id)
-
-        result_runs.append({
-            "run_id": str(run.id),
-            "status": run.result_status,
-            "created_at": run.created_at.isoformat() if run.created_at else None,
-            "detail": run.detail or {},
-            "issues": [
-                {
-                    "rule_id": getattr(row, "rule_id", ""),
-                    "status": getattr(row, "status", ""),
-                    "left_value": _safe_float(getattr(row, "left_value", None)),
-                    "right_value": _safe_float(getattr(row, "right_value", None)),
-                    "diff": _safe_float(getattr(row, "diff_value", None)),
-                    "details": getattr(row, "details", None) or {},
-                }
-                for row in issues
-            ],
-        })
-
-    return {
-        "project_id": str(project_id),
-        "year": year,
-        "total": len(result_runs),
-        "runs": result_runs,
-    }
-
-
-def _safe_float(v: Any) -> float | None:
-    if v is None:
-        return None
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return None
+    await _get_project_or_404(db, project_id)
+    runs = await list_history(db, project_id, year, limit)
+    return {"project_id": str(project_id), "year": year, "total": len(runs), "runs": runs}

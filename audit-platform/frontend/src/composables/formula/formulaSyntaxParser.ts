@@ -2,8 +2,11 @@
  * 公式语法解析器（纯函数）。
  *
  * spec: formula-management-ux-improvements · A 批 · Task A1
+ * spec: formula-settings-wiring-closure · Task 11（函数列表与元数对齐 formula_grammar）
  *
- * 支持 6 种平台公式函数：TB / WP / NOTE / ROW / REPORT / SUM_ROW
+ * 支持 16 种平台公式函数（与 formula_grammar.FORMULA_ARITY / formula_engine._REGISTRY 对齐）：
+ * - 取数：TB / SUM_TB / ROW / SUM_ROW / REPORT / WP / NOTE / ADJ / AUX / PREV / PRIOR
+ * - 数学：ABS / ROUND / MAX / MIN / IF
  * + 数学运算符（+ - * / %）+ 数字常量 + 括号。
  *
  * 两个入口：
@@ -43,20 +46,37 @@ export interface ValidationResult {
 
 // ── 常量 ────────────────────────────────────────────────────────────────────
 
-/** 平台已知公式函数 */
-const KNOWN_FUNCTIONS = new Set(['TB', 'WP', 'NOTE', 'ROW', 'REPORT', 'SUM_ROW', 'ADJ', 'AUX', 'PRIOR'])
+/**
+ * 平台已知公式函数。
+ *
+ * 与后端 `formula_grammar.FORMULA_ARITY` / `formula_engine._REGISTRY` 对齐：
+ * - 取数：TB / SUM_TB / ROW / SUM_ROW / REPORT / WP / NOTE / ADJ / AUX / PREV(=PRIOR)
+ * - 数学：ABS / ROUND / MAX / MIN / IF
+ */
+const KNOWN_FUNCTIONS = new Set([
+  'TB', 'SUM_TB', 'WP', 'NOTE', 'ROW', 'SUM_ROW', 'REPORT',
+  'ADJ', 'AUX', 'PREV', 'PRIOR',
+  'ABS', 'ROUND', 'MAX', 'MIN', 'IF',
+])
 
-/** 各函数的参数数量范围 [min, max] */
+/** 各函数的参数数量范围 [min, max]（与 formula_grammar.FORMULA_ARITY 对齐） */
 const FUNCTION_ARITY: Record<string, [number, number]> = {
   TB: [2, 2],
+  SUM_TB: [2, 2],
   WP: [2, 3],
   NOTE: [2, 3],
   ROW: [1, 1],
-  REPORT: [2, 2],
   SUM_ROW: [2, 2],
+  REPORT: [2, 2],
   ADJ: [1, 2],
-  AUX: [1, 3],
-  PRIOR: [1, 2],
+  AUX: [2, 3],
+  PREV: [2, 3],
+  PRIOR: [2, 3],
+  ABS: [1, 1],
+  ROUND: [2, 2],
+  MAX: [2, 2],
+  MIN: [2, 2],
+  IF: [3, 3],
 }
 
 const OPERATORS = new Set(['+', '-', '*', '/', '%', '=', '<', '>', '!'])
@@ -294,13 +314,20 @@ export function cursorContext(expr: string, cursor: number): { funcName: string;
 export function knownFunctions(): Array<{ name: string; minArgs: number; maxArgs: number; description: string }> {
   return [
     { name: 'TB', minArgs: 2, maxArgs: 2, description: "试算表取数 TB('科目代码','字段')" },
+    { name: 'SUM_TB', minArgs: 2, maxArgs: 2, description: "范围科目求和 SUM_TB('起始~结束','字段')" },
     { name: 'WP', minArgs: 2, maxArgs: 3, description: "底稿取数 WP('底稿','字段') 或 WP('底稿','sheet','坐标')" },
-    { name: 'NOTE', minArgs: 2, maxArgs: 3, description: "附注取数 NOTE('章节','字段')" },
+    { name: 'NOTE', minArgs: 2, maxArgs: 3, description: "附注取数 NOTE('章节','字段','子字段')" },
     { name: 'ROW', minArgs: 1, maxArgs: 1, description: "行次引用 ROW('行次')" },
     { name: 'REPORT', minArgs: 2, maxArgs: 2, description: "报表取数 REPORT('行次','字段')" },
-    { name: 'SUM_ROW', minArgs: 2, maxArgs: 2, description: "区间求和 SUM_ROW('起始行','结束行')" },
-    { name: 'ADJ', minArgs: 1, maxArgs: 2, description: "调整分录取数 ADJ('科目')" },
-    { name: 'AUX', minArgs: 1, maxArgs: 3, description: "辅助余额取数 AUX('科目')" },
-    { name: 'PRIOR', minArgs: 1, maxArgs: 2, description: "上期数取数 PRIOR('行次')" },
+    { name: 'SUM_ROW', minArgs: 2, maxArgs: 2, description: "区间行次求和 SUM_ROW('起始行','结束行')" },
+    { name: 'ADJ', minArgs: 1, maxArgs: 2, description: "调整分录取数 ADJ('科目','类型')" },
+    { name: 'AUX', minArgs: 2, maxArgs: 3, description: "辅助余额取数 AUX('科目','维度','字段')" },
+    { name: 'PREV', minArgs: 2, maxArgs: 3, description: "上期数取数 PREV('科目','字段')" },
+    { name: 'PRIOR', minArgs: 2, maxArgs: 3, description: "上期数（PREV 别名）PRIOR('科目','字段')" },
+    { name: 'ABS', minArgs: 1, maxArgs: 1, description: "绝对值 ABS(值)" },
+    { name: 'ROUND', minArgs: 2, maxArgs: 2, description: "四舍五入 ROUND(值, 位数)" },
+    { name: 'MAX', minArgs: 2, maxArgs: 2, description: "最大值 MAX(值1, 值2)" },
+    { name: 'MIN', minArgs: 2, maxArgs: 2, description: "最小值 MIN(值1, 值2)" },
+    { name: 'IF', minArgs: 3, maxArgs: 3, description: "条件 IF(条件, 真值, 假值)" },
   ]
 }

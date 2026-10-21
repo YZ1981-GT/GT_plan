@@ -753,7 +753,11 @@ backend/app/services/workpaper_sync/phase5_d4_customer_structure.py  953
 #     🔴 依赖 monkeypatch 符号或共享 dialogSession 闭包的 handler 不能搬走（同
 #     custom_query.py 登记时记录的约束），故不为凑行数扭曲接线。
 #     spec: workpaper-page-formula-toolbar-closure（F-SHELL 交付）
-audit-platform/frontend/src/components/formula/FormulaManagerDialog.vue  4268
+#   🔴 2026-10-21 formula-settings-wiring-closure T11：并发 ux 会话增至 4680（+412），
+#     本会话提取 3 个面板组件（CrossCheckHistoryPanel / FormulaDependencyPanel /
+#     PushCoverageCard）减回 4501（-179）；剩余 +233 是 ux 会话的看板/规则编辑/徽章。
+#     consolSheetRows 静态数据约 900 行是长期最大可拆块。
+audit-platform/frontend/src/components/formula/FormulaManagerDialog.vue  4502
 
 # ═══════════════════════════════════════════════════════════════════════════
 # spec: four-table-extraction-entry-completion（2026-09-12 入库）

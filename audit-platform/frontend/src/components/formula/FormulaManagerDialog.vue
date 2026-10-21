@@ -240,11 +240,12 @@
               :can-edit="!formulaReadOnly"
             />
             <div v-else-if="activeCategory === 'formula_push' && !pushWpCode" class="gt-fp-not-connected">
-              <el-empty description="本底稿尚未接入自动推送" :image-size="64">
+              <!-- formula-management-ux-improvements B3：改进空状态文案 -->
+              <el-empty :image-size="64">
                 <template #description>
                   <p>本底稿尚未接入自动推送</p>
                   <p style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">
-                    已接入：{{ pushWpCodes.length ? pushWpCodes.join('、') : '暂无' }}
+                    {{ pushNotNeededReason || ('已接入：' + (pushWpCodes.length ? pushWpCodes.join('、') : '暂无')) }}
                   </p>
                 </template>
               </el-empty>
@@ -281,12 +282,14 @@
           <el-table-column label="公式" min-width="260">
             <template #default="{ row }">
               <div v-if="editingId === row.id" style="display: flex; flex-direction: column; gap: 2px;">
-                <el-input v-model="editFormula" size="small" placeholder="如 TB('1001','期末余额') 或 WP('D2','审定数')" />
+                <!-- formula-management-ux-improvements A3：语法高亮输入 + 实时校验 -->
+                <FormulaInput v-model="editFormula" />
+                <!-- formula-management-ux-improvements A4：快捷按钮改为参数选择器 -->
                 <div style="display: flex; gap: 2px; flex-wrap: wrap;">
-                  <el-button size="small" link style="font-size: 10px; padding: 0 2px;" @click.stop="editFormula += `TB('','')`" title="试算表取数">TB</el-button>
-                  <el-button size="small" link style="font-size: 10px; padding: 0 2px;" @click.stop="editFormula += `WP('','')`" title="底稿取数">WP</el-button>
-                  <el-button size="small" link style="font-size: 10px; padding: 0 2px;" @click.stop="editFormula += `NOTE('','','')`" title="附注取数">NOTE</el-button>
-                  <el-button size="small" link style="font-size: 10px; padding: 0 2px;" @click.stop="editFormula += `ROW('')`" title="行次引用">ROW</el-button>
+                  <FormulaParamPicker mode="tb" :tb-items="paramPickerTbItems" @select="onParamPickerSelect" />
+                  <FormulaParamPicker mode="wp" :wp-items="paramPickerWpItems" @select="onParamPickerSelect" />
+                  <FormulaParamPicker mode="note" :note-items="paramPickerNoteItems" @select="onParamPickerSelect" />
+                  <FormulaParamPicker mode="row" :row-items="paramPickerRowItems" @select="onParamPickerSelect" />
                 </div>
               </div>
               <!-- Task 1.4：只读投影行禁双击/点击进入编辑（dblclick/click 不绑 startEdit）。 -->
@@ -359,7 +362,8 @@
           </el-table-column>
           <el-table-column label="引用方" width="70" align="center">
             <template #default="{ row }">
-              <el-badge v-if="row._ref_count > 0" :value="row._ref_count" :max="99" type="info" />
+              <el-badge v-if="row._ref_count > 0" :value="row._ref_count" :max="99" type="info"
+                style="cursor: pointer;" @click.native="depPanelRef.value?.load(`report:${selectedReportType.value}:${row.row_code || row.id}`)" title="点击查看依赖关系" />
               <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder);">0</span>
             </template>
           </el-table-column>
@@ -383,6 +387,8 @@
         <div v-if="!isConsolFormulaNode" class="gt-fm-footer">
           <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">共 {{ currentRows.length }} 行，{{ currentRows.filter(r => r.formula).length }} 个公式{{ Object.values(formulaResults).filter(r => r.value != null).length ? `，${Object.values(formulaResults).filter(r => r.value != null).length} 个已计算` : '' }}</span>
         </div>
+
+        <FormulaDependencyPanel v-if="!isConsolFormulaNode" ref="depPanelRef" :project-id="props.projectId" />
 
         <!-- 表间审核模式 -->
         <div v-if="isCrossCheckMode" style="flex: 1;">
@@ -457,6 +463,8 @@
             {{ crossCheckRulesForCurrent.length }} 条规则
           </div>
 
+          <CrossCheckHistoryPanel ref="ccHistoryRef" :project-id="props.projectId" :year="props.year" />
+
           <!-- 表间审核规则编辑弹窗 -->
           <el-dialog
             v-model="showCrossRuleDialog"
@@ -519,6 +527,7 @@
       destroy-on-close
       class="gt-fm-dashboard-dialog"
     >
+      <PushCoverageCard :show="showFormulaDashboard" />
       <div style="margin-bottom: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
         <el-input v-model="dashboardSearch" size="small" placeholder="搜索公式/行次/说明/域..." clearable style="width: 220px;" />
         <el-select v-model="dashboardGroupBy" size="small" style="width: 130px;">
@@ -856,6 +865,8 @@ import {
 import { fmtAmount } from '@/utils/formatters'
 import { isOwnedKey } from '@/generated/formulaPushOwnedKeys'
 import FormulaEditDialog from './FormulaEditDialog.vue'
+import FormulaInput from './FormulaInput.vue'
+import FormulaParamPicker from './FormulaParamPicker.vue'
 import FormulaHistoryTab from './FormulaHistoryTab.vue'
 import FormulaPushPanel from './FormulaPushPanel.vue'
 import ConsolFormulaManagementPanel from './ConsolFormulaManagementPanel.vue'
@@ -920,6 +931,10 @@ import {
   type LeftPanelAnchorNode,
   type LocationIdentity,
 } from './leftPanelAnchors'
+// formula-settings-wiring-closure T11：提取面板组件
+import CrossCheckHistoryPanel from './panels/CrossCheckHistoryPanel.vue'
+import FormulaDependencyPanel from './panels/FormulaDependencyPanel.vue'
+import PushCoverageCard from './panels/PushCoverageCard.vue'
 
 /**
  * scope：当前公式管理器的目标范围
@@ -982,6 +997,10 @@ const emit = defineEmits<{
   (e: 'applied'): void
   (e: 'session-change', session: FormulaManagerSession): void
 }>()
+
+// formula-settings-wiring-closure T11：提取面板组件的 ref
+const depPanelRef = ref<InstanceType<typeof FormulaDependencyPanel> | null>(null)
+const ccHistoryRef = ref<InstanceType<typeof CrossCheckHistoryPanel> | null>(null)
 
 const visible = computed({
   get: () => props.modelValue,
@@ -2159,6 +2178,20 @@ const pushWpCode = computed(() => {
   const code = normalizeWpCode(selectedWpCode.value || props.wpCode || '').split('-')[0].toUpperCase()
   return pushWpCodes.value.includes(code) ? code : ''
 })
+
+// formula-management-ux-improvements B3：不需推送循环的具体原因
+const _PUSH_NOT_NEEDED_REASONS: Record<string, string> = {
+  A: '报表/调整类底稿不涉及数值回写试算表',
+  B: '控制了解/计划类底稿，审计程序不产出数值',
+  C: '控制测试底稿只记录测试结论，不涉及科目金额',
+  S: '专项底稿按项目自定义，不走统一推送通道',
+}
+const pushNotNeededReason = computed(() => {
+  const code = normalizeWpCode(selectedWpCode.value || props.wpCode || '').split('-')[0].toUpperCase()
+  const letter = code.charAt(0)
+  return _PUSH_NOT_NEEDED_REASONS[letter] || ''
+})
+
 const selectedWpSheetCode = ref('')
 
 function normalizeWpCode(value: string): string {
@@ -3182,6 +3215,48 @@ const editFormula = ref('')
 const editCategory = ref('auto_calc')
 const editDescription = ref('')
 const applying = ref(false)
+
+// formula-management-ux-improvements A4/A5：参数选择器的数据源
+const paramPickerTbItems = computed(() => {
+  const store = addrStore
+  const addrs = store.tbAddresses || []
+  return addrs.map((a: any) => ({ code: a.code || a.account_code || '', name: a.name || a.account_name || a.label || '' }))
+})
+const paramPickerWpItems = computed(() => {
+  // 从当前行列表提取已知底稿
+  const seen = new Set<string>()
+  const items: Array<{ wpCode: string; label: string }> = []
+  for (const r of currentRows.value) {
+    const wc = r.wp_code || props.wpCode || ''
+    if (wc && !seen.has(wc)) {
+      seen.add(wc)
+      items.push({ wpCode: wc, label: wc })
+    }
+  }
+  return items
+})
+const paramPickerNoteItems = computed(() => {
+  // 从附注树提取章节
+  const items: Array<{ section: string; title: string }> = []
+  function walk(nodes: any[]) {
+    for (const n of nodes) {
+      if (n.section || n.note_section) {
+        items.push({ section: n.section || n.note_section, title: n.label || n.title || '' })
+      }
+      if (n.children?.length) walk(n.children)
+    }
+  }
+  walk(noteTreeChildren.value)
+  return items
+})
+const paramPickerRowItems = computed(() =>
+  currentRows.value
+    .filter((r: any) => r.row_code)
+    .map((r: any) => ({ rowCode: r.row_code, rowName: r.row_name || '' })),
+)
+function onParamPickerSelect(formulaText: string) {
+  editFormula.value += formulaText
+}
 
 // 公式编辑弹窗
 const showFormulaEdit = ref(false)

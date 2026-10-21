@@ -221,3 +221,47 @@ describe('knownFunctions', () => {
     }
   })
 })
+
+
+// ── formula-settings-wiring-closure：新增函数对齐 ────────────────────────
+
+describe('新增函数识别与校验（wiring-closure T11）', () => {
+  it('SUM_TB 被识别为 function（非 unknown）', () => {
+    const tokens = tokenize("SUM_TB('1001~1099','期末余额')")
+    expect(tokens[0].type).toBe('function')
+    expect(tokens[0].value).toBe('SUM_TB')
+  })
+
+  it('SUM_TB 参数校验 = 2', () => {
+    expect(validate("SUM_TB('1001~1099','期末余额')").valid).toBe(true)
+    expect(validate("SUM_TB('1001~1099')").valid).toBe(false)
+  })
+
+  it('PREV 被识别（PRIOR 的官方名称）', () => {
+    expect(validate("PREV('1001','期末余额','上期')").valid).toBe(true)
+    expect(validate("PREV('1001')").valid).toBe(false)  // 至少 2 参
+  })
+
+  it('ABS / ROUND / MAX / MIN / IF', () => {
+    expect(validate("ABS(ROW('BS-001'))").valid).toBe(true)
+    expect(validate("ROUND(TB('1001','期末余额'), 2)").valid).toBe(true)
+    expect(validate("MAX(ROW('BS-001'), 0)").valid).toBe(true)
+    expect(validate("MIN(ROW('BS-001'), 0)").valid).toBe(true)
+    expect(validate("IF(ROW('BS-001'), 0, 1)").valid).toBe(true)
+    // IF 需要 3 个参数
+    expect(validate("IF(ROW('BS-001'), 0)").valid).toBe(false)
+  })
+
+  it('knownFunctions 包含全部 16 个', () => {
+    const names = knownFunctions().map(f => f.name)
+    for (const fn of ['TB', 'SUM_TB', 'WP', 'NOTE', 'ROW', 'SUM_ROW', 'REPORT',
+      'ADJ', 'AUX', 'PREV', 'PRIOR', 'ABS', 'ROUND', 'MAX', 'MIN', 'IF']) {
+      expect(names).toContain(fn)
+    }
+  })
+
+  it('cursorContext 在 SUM_TB 参数位正确', () => {
+    const ctx = cursorContext("SUM_TB('1001~1099',", 20)
+    expect(ctx).toEqual({ funcName: 'SUM_TB', argIndex: 1 })
+  })
+})

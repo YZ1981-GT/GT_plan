@@ -399,148 +399,23 @@ async def apply(project_id: uuid.UUID, domain: str, body: ApplyBody, db: AsyncSe
 
 
 # ── G 批：公式依赖关系查询 ────────────────────────────────────────────────
-# spec: formula-management-ux-improvements · G 批 · Task G1
-
-from app.services.note_formula_dependency_service import parse_formula_dependencies
+# spec: formula-management-ux-improvements · G 批；口径修正见 formula-settings-wiring-closure R3.2
 
 
 @project_router.get("/dependencies")
 async def formula_dependencies(
     project_id: uuid.UUID,
-    addr_id: str = Query(..., description="公式地址标识符（如 report:balance_sheet:BS-001 或 wp:D2/审定数）"),
-    depth: int = Query(1, ge=1, le=3, description="追溯深度（1~3）"),
+    addr_id: str = Query(..., max_length=300,
+                         description="report:{报表类型}:{行次} / {报表类型}:{行次} / 行次 / tb:{科目编码}"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ) -> dict[str, Any]:
-    """查询公式的上下游依赖链。
+    """一条公式的上游引用与下游被引用（按本项目有效定义精确匹配，只读）。"""
+    from app.services.formula_settings.dependencies import DependencyTargetError
+    from app.services.formula_settings.dependencies import formula_dependencies as resolve
 
-    - upstream（引用了谁）：解析公式文本中的 TB/WP/NOTE/ROW/REPORT 引用
-    - downstream（被谁引用）：通过 formula_reverse_index 查找
-
-    返回两个列表，每项有 type/label/addr_id，支持前端点击跳转。
-    """
-    from app.services.formula_reverse_index import FormulaReverseIndex
-
-    # 1. 解析 addr_id 获取公式文本
-    formula_text = await _resolve_formula_text(db, project_id, addr_id)
-
-    # 2. upstream：从公式文本解析引用
-    upstream = []
-    if formula_text:
-        deps = parse_formula_dependencies(formula_text)
-        for dep in deps:
-            dep_type = dep.get("type", "")
-            label = _dep_label(dep)
-            upstream.append({
-                "type": dep_type,
-                "label": label,
-                "addr_id": _dep_addr_id(dep),
-                "detail": dep,
-            })
-
-    # 3. downstream：反向索引查"谁引用了我"
-    downstream = []
     try:
-        reverse_idx = FormulaReverseIndex(db)
-        index = await reverse_idx.build()
-        # 尝试多种 URI 形式匹配
-        for uri_variant in _addr_id_to_uris(addr_id):
-            for referencing_uri in index.get(uri_variant, []):
-                downstream.append({
-                    "type": _uri_type(referencing_uri),
-                    "label": referencing_uri,
-                    "addr_id": referencing_uri,
-                })
-    except Exception:  # noqa: BLE001 — 反向索引失败不阻断上游结果
-        pass
-
-    return {
-        "addr_id": addr_id,
-        "formula": formula_text or "",
-        "upstream": upstream[:50],
-        "downstream": downstream[:50],
-    }
-
-
-async def _resolve_formula_text(db: AsyncSession, project_id: uuid.UUID, addr_id: str) -> str | None:
-    """按 addr_id 尝试从各域解析公式文本。"""
-    # 报表域：report:type:row_code
-    if addr_id.startswith("report:"):
-        parts = addr_id.split(":", 2)
-        if len(parts) == 3:
-            from app.models.report_models import ReportConfig
-            row = (await db.execute(sa.select(ReportConfig.formula).where(
-                ReportConfig.project_id == project_id,
-                ReportConfig.report_type == parts[1],
-                ReportConfig.row_code == parts[2],
-            ))).scalar_one_or_none()
-            return row
-    # 通用：尝试从 effective slots 拿
-    for domain in ("report", "wp", "note", "tb_detail", "cross_check"):
-        try:
-            slots = await effective_slots(db, domain, project_id)
-            for key, slot in slots.items():
-                if key == addr_id or addr_id in key:
-                    d = slot.definition
-                    if d:
-                        return d.get("formula") or d.get("expression") or d.get("left_ref") or ""
-        except Exception:  # noqa: BLE001
-            continue
-    return None
-
-
-def _dep_label(dep: dict) -> str:
-    t = dep.get("type", "")
-    if t == "trial_balance":
-        return f"TB({dep.get('account_code', '')}, {dep.get('column', '')})"
-    if t == "workpaper":
-        return f"WP({dep.get('wp_code', '')}, {dep.get('sheet', '')}, {dep.get('field', '')})"
-    if t == "report":
-        return f"REPORT({dep.get('row_code', '')}, {dep.get('period', '')})"
-    if t == "note":
-        return f"NOTE({dep.get('section', '')}, {dep.get('field', '')})"
-    if t == "prior":
-        return f"PRIOR({dep.get('row_code', '')})"
-    return str(dep)
-
-
-def _dep_addr_id(dep: dict) -> str:
-    t = dep.get("type", "")
-    if t == "trial_balance":
-        return f"tb:{dep.get('account_code', '')}"
-    if t == "workpaper":
-        return f"wp:{dep.get('wp_code', '')}/{dep.get('sheet', '')}"
-    if t == "report":
-        return f"report:{dep.get('row_code', '')}"
-    if t == "note":
-        return f"note:{dep.get('section', '')}"
-    return str(dep)
-
-
-def _addr_id_to_uris(addr_id: str) -> list[str]:
-    """将前端 addr_id 转为反向索引可能使用的 URI 形式。"""
-    variants = [addr_id]
-    # 报表：report:balance_sheet:BS-001 → REPORT:BS-001
-    if addr_id.startswith("report:"):
-        parts = addr_id.split(":")
-        if len(parts) >= 3:
-            variants.append(f"REPORT:{parts[2]}")
-            variants.append(f"report_config:{parts[1]}:{parts[2]}")
-    # TB：tb:1001 → TB:1001
-    if addr_id.startswith("tb:"):
-        code = addr_id[3:]
-        variants.append(f"TB:{code}")
-        variants.append(f"trial_balance:{code}")
-    return variants
-
-
-def _uri_type(uri: str) -> str:
-    if uri.startswith("TB:") or uri.startswith("trial_balance:"):
-        return "trial_balance"
-    if uri.startswith("REPORT:") or uri.startswith("report_config:"):
-        return "report"
-    if uri.startswith("WP:") or uri.startswith("workpaper:"):
-        return "workpaper"
-    if uri.startswith("NOTE:") or uri.startswith("note:"):
-        return "note"
-    return "unknown"
+        return await resolve(db, project_id, addr_id)
+    except DependencyTargetError as exc:
+        raise HTTPException(status_code=404, detail={"error_code": "FORMULA_DEPENDENCY_TARGET_NOT_FOUND",
+                                                     "message": str(exc)}) from None

@@ -1,0 +1,73 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "6. 表间审核历史接口按真实列读取 + 年度过滤 + 端点测试": [
+      {
+        "executionId": "c8cc7c0b-db1e-4146-8c41-6f8e6991f311",
+        "chatSessionId": "sess_9fe9e71d-0cb7-4046-b19e-f8f3770b25fe",
+        "timestamp": 1792590187732
+      },
+      {
+        "executionId": "c8cc7c0b-db1e-4146-8c41-6f8e6991f311",
+        "chatSessionId": "sess_9fe9e71d-0cb7-4046-b19e-f8f3770b25fe",
+        "timestamp": 1792590207714
+      }
+    ],
+    "7. 依赖查询接口按有效定义取公式、精确匹配、科目下游 + 端点测试": [
+      {
+        "executionId": "c8cc7c0b-db1e-4146-8c41-6f8e6991f311",
+        "chatSessionId": "sess_9fe9e71d-0cb7-4046-b19e-f8f3770b25fe",
+        "timestamp": 1792590187782
+      }
+    ],
+    "8. 推送覆盖率按真实编码分母 + 测试": [
+      {
+        "executionId": "c8cc7c0b-db1e-4146-8c41-6f8e6991f311",
+        "chatSessionId": "sess_9fe9e71d-0cb7-4046-b19e-f8f3770b25fe",
+        "timestamp": 1792590187858
+      }
+    ],
+    "9. 编辑器函数清单与后端对齐 + 测试（含 18 条 SUM_TB 真实公式不再报错）": [
+      {
+        "executionId": "c8cc7c0b-db1e-4146-8c41-6f8e6991f311",
+        "chatSessionId": "sess_9fe9e71d-0cb7-4046-b19e-f8f3770b25fe",
+        "timestamp": 1792590187886
+      }
+    ],
+    "10. `FormulaManagerDialog.vue` 抽出三块新增 UI，回到行数门以内；提交": [
+      {
+        "executionId": "c8cc7c0b-db1e-4146-8c41-6f8e6991f311",
+        "chatSessionId": "sess_9fe9e71d-0cb7-4046-b19e-f8f3770b25fe",
+        "timestamp": 1792590187923
+      }
+    ],
+    "11. 生产调用方守卫 + 内存变异证明": [
+      {
+        "executionId": "c8cc7c0b-db1e-4146-8c41-6f8e6991f311",
+        "chatSessionId": "sess_9fe9e71d-0cb7-4046-b19e-f8f3770b25fe",
+        "timestamp": 1792590187958
+      }
+    ],
+    "12. 回归：后端公式域套件、前端公式域 vitest、ESLint、单区域 vue-tsc": [
+      {
+        "executionId": "c8cc7c0b-db1e-4146-8c41-6f8e6991f311",
+        "chatSessionId": "sess_9fe9e71d-0cb7-4046-b19e-f8f3770b25fe",
+        "timestamp": 1792590187991
+      }
+    ],
+    "13. 开发服务实测：只读接口；【测试】项目写入一条表间审核规则 → 执行勾稽见到用户规则结果 → 清理并对账": [
+      {
+        "executionId": "c8cc7c0b-db1e-4146-8c41-6f8e6991f311",
+        "chatSessionId": "sess_9fe9e71d-0cb7-4046-b19e-f8f3770b25fe",
+        "timestamp": 1792590188033
+      }
+    ],
+    "14. INDEX / memory 登记；交用户决定的清单（17:56 stash 余下的非公式文件、`DisclosureEditor.vue`）": [
+      {
+        "executionId": "c8cc7c0b-db1e-4146-8c41-6f8e6991f311",
+        "chatSessionId": "sess_9fe9e71d-0cb7-4046-b19e-f8f3770b25fe",
+        "timestamp": 1792590188063
+      }
+    ]
+  }
+}

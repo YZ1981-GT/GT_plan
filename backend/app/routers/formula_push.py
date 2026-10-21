@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import require_project_access
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.models.formula_push_models import PUSH_STATES
 from app.services.formula_push import engine, panel
@@ -235,93 +235,14 @@ async def run_items(
         "total": len(items),
     }
 
-# ── 全局覆盖率端点（无需项目权限） ────────────────────────────────────────
-# spec: formula-management-ux-improvements · B 批 · Task B1
-
-import json
-from pathlib import Path
-
-_COVERAGE_PATH = Path(__file__).resolve().parents[2] / "data" / "formula_push_coverage.json"
-
-#: 各循环不需要推送的原因说明（A/B/C/S 循环不产出数值回写试算表）
-_NOT_NEEDED_REASONS: dict[str, str] = {
-    "A": "报表/调整类底稿不涉及数值回写试算表",
-    "B": "控制了解/计划类底稿，审计程序不产出数值",
-    "C": "控制测试底稿只记录测试结论，不涉及科目金额",
-    "S": "专项底稿按项目自定义，不走统一推送通道",
-}
-
-#: 各循环的总底稿编码数（D~N 实质性循环有明确底稿，A/B/C/S 按类型标注）
-_CYCLE_TOTAL_CODES: dict[str, int] = {
-    "D": 7,   # D1~D7
-    "E": 1,   # E1
-    "F": 5,   # F1~F5
-    "G": 14,  # G1~G14
-    "H": 10,  # H1~H10
-    "I": 6,   # I1~I6
-    "J": 2,   # J1~J2
-    "K": 13,  # K1~K13
-    "L": 8,   # L1~L8
-    "M": 10,  # M1~M10
-    "N": 5,   # N1~N5
-}
-
-_CYCLE_LABELS: dict[str, str] = {
-    "A": "A 报表/调整", "B": "B 控制了解", "C": "C 控制测试",
-    "D": "D 销售收入", "E": "E 货币资金", "F": "F 采购存货",
-    "G": "G 投资", "H": "H 固定资产", "I": "I 无形资产",
-    "J": "J 职工薪酬", "K": "K 管理", "L": "L 筹资",
-    "M": "M 股东权益", "N": "N 税费", "S": "S 专项",
-}
-
+# ── 全局覆盖率端点（静态数据，登录即可） ─────────────────────────────────────
+# spec: formula-management-ux-improvements · B 批；口径修正见 formula-settings-wiring-closure R3.3
 global_router = APIRouter(prefix="/api/formula-push", tags=["formula-push"])
 
 
 @global_router.get("/coverage")
-async def push_coverage():
-    """返回推送覆盖率概览（按循环分组，静态数据无需鉴权）。"""
-    try:
-        data = json.loads(_COVERAGE_PATH.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
-        data = {"registered_codes": []}
+async def push_coverage(_user: User = Depends(get_current_user)):
+    """推送覆盖率：分母 = 编码表 D~N 带科目码的主编码（剔除判为不适用的），分子 = 已登记推送的主编码。"""
+    from app.services.formula_push.coverage import load_coverage
 
-    registered = set(data.get("registered_codes", []))
-    total_registered = len(registered)
-
-    # 按循环分组
-    cycles = []
-    total_all = 0
-    for letter in "ABCDEFGHIJKLMNS":
-        reason = _NOT_NEEDED_REASONS.get(letter)
-        total = _CYCLE_TOTAL_CODES.get(letter, 0)
-        connected = sum(1 for c in registered if c.startswith(letter))
-
-        if reason:
-            # 不需推送的循环
-            cycles.append({
-                "cycle": letter,
-                "label": _CYCLE_LABELS.get(letter, letter),
-                "connected": 0,
-                "total": 0,
-                "percentage": 100,
-                "not_needed": True,
-                "reason": reason,
-            })
-        elif total > 0:
-            total_all += total
-            cycles.append({
-                "cycle": letter,
-                "label": _CYCLE_LABELS.get(letter, letter),
-                "connected": connected,
-                "total": total,
-                "percentage": round(connected / total * 100) if total else 0,
-                "not_needed": False,
-                "reason": None,
-            })
-
-    return {
-        "total_registered": total_registered,
-        "total_codes": total_all,
-        "percentage": round(total_registered / total_all * 100) if total_all else 0,
-        "cycles": cycles,
-    }
+    return load_coverage()
