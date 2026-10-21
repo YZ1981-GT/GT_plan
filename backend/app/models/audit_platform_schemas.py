@@ -966,6 +966,11 @@ class EventType(str, enum.Enum):
     DISPATCH_CREATED = "dispatch.created"
     DISPATCH_REVOKED = "dispatch.revoked"
 
+    # consol-note-mapping-reuse-and-reference-push Phase 4:
+    # 子企业附注值变化 → 合并侧 stale 通知
+    # payload: {consol_project_id, section_id, entity_node_key, entity_project_id, new_fingerprint}
+    CONSOL_NOTE_VALUE_CHANGED = "consol_note.value_changed"
+
 
 class EventPayload(BaseModel):
     """事件载荷"""

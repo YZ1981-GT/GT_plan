@@ -202,3 +202,72 @@ async def save_cross_check_rules(
     # 本次真正改动的公式位（供前端保存后问「应用范围」，R7.1）
     changed = sorted({s for ev in result["events"] for s in ev.get("slot_keys", [])})
     return {**await cross_check_rules.load(db, project_id), "changed_slot_keys": changed}
+
+
+# ── E 批：表间审核执行历史 ────────────────────────────────────────────────
+# spec: formula-management-ux-improvements · E 批 · Task E1
+
+from app.models.wp_optimization_models import (
+    CrossCheckResult as CrossCheckResultRow,
+)
+from app.models.workpaper_models import DraftRefreshAudit
+
+
+@router.get("/api/projects/{project_id}/formula/cross-check-history")
+async def cross_check_history(
+    project_id: UUID,
+    year: int,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
+) -> dict[str, Any]:
+    """返回表间审核执行历史：近 N 次 run 记录 + 每次的勾稽结果。
+
+    数据来自 ``draft_refresh_audit`` (runs) + ``cross_check_results`` (issues)。
+    """
+    # 查近 N 次 run
+    runs = (await db.execute(
+        sa.select(DraftRefreshAudit).where(
+            DraftRefreshAudit.project_id == project_id,
+        ).order_by(DraftRefreshAudit.created_at.desc()).limit(max(1, min(limit, 50)))
+    )).scalars().all()
+
+    result_runs = []
+    for run in runs:
+        # 每个 run 的勾稽结论
+        from app.services.formula_management.cross_check_run import get_issues_by_run
+        issues = await get_issues_by_run(db, run.id)
+
+        result_runs.append({
+            "run_id": str(run.id),
+            "status": run.result_status,
+            "created_at": run.created_at.isoformat() if run.created_at else None,
+            "detail": run.detail or {},
+            "issues": [
+                {
+                    "rule_id": getattr(row, "rule_id", ""),
+                    "status": getattr(row, "status", ""),
+                    "left_value": _safe_float(getattr(row, "left_value", None)),
+                    "right_value": _safe_float(getattr(row, "right_value", None)),
+                    "diff": _safe_float(getattr(row, "diff_value", None)),
+                    "details": getattr(row, "details", None) or {},
+                }
+                for row in issues
+            ],
+        })
+
+    return {
+        "project_id": str(project_id),
+        "year": year,
+        "total": len(result_runs),
+        "runs": result_runs,
+    }
+
+
+def _safe_float(v: Any) -> float | None:
+    if v is None:
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None

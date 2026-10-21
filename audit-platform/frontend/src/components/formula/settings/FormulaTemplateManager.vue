@@ -21,7 +21,13 @@
     </div>
     <el-table v-loading="loading" :data="filtered" size="small" border max-height="calc(100vh - 320px)" row-key="id"
       empty-text="暂无可见的公式模板" @row-dblclick="openDetail">
-      <el-table-column prop="name" label="模板" min-width="220" show-overflow-tooltip />
+      <el-table-column prop="name" label="模板" min-width="220" show-overflow-tooltip>
+        <!-- formula-management-ux-improvements C2：推荐标签 -->
+        <template #default="{ row }">
+          <span>{{ row.name }}</span>
+          <el-tag v-if="row._recommended" size="small" type="success" effect="plain" style="margin-left: 4px;">推荐</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="share_scope_label" label="共享范围" width="90" />
       <el-table-column label="适用范围" width="140">
         <template #default="{ row }">{{ scopeLabel(row.applicable_scope) }}</template>
@@ -75,8 +81,16 @@ const detailId = ref('')
 
 const filtered = computed(() => {
   const kw = keyword.value.trim()
-  return items.value.filter((t) => (!shareFilter.value || t.share_scope === shareFilter.value)
-    && (!kw || t.name.includes(kw)))
+  return items.value
+    .map((t) => ({
+      ...t,
+      // formula-management-ux-improvements C2：推荐标签（事务所级 + 适用范围匹配常用准则）
+      _recommended: t.share_scope === 'firm' && !!t.applicable_scope
+        && ['soe_standalone', 'listed_standalone', 'soe_consolidated', 'listed_consolidated'].includes(t.applicable_scope),
+    }))
+    .filter((t) => (!shareFilter.value || t.share_scope === shareFilter.value)
+      && (!kw || t.name.includes(kw)))
+    .sort((a, b) => (b._recommended ? 1 : 0) - (a._recommended ? 1 : 0))  // 推荐排在前面
 })
 
 function domainLabel(key: string): string {

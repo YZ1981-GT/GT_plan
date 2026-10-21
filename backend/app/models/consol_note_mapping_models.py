@@ -208,6 +208,12 @@ class ConsolNoteMappingRule(Base):
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+    # V200: 记录该项目规则是否已提升为模板，防止重复提升
+    promoted_to_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("consol_note_mapping_rule_template.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     __table_args__ = (
         CheckConstraint("version_number > 0", name="ck_cnmr_version_positive"),

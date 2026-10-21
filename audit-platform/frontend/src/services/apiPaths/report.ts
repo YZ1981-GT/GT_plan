@@ -96,6 +96,25 @@ export const consolNoteFormulas = {
   seed: '/api/consol-note-formulas/seed',
 } as const
 
+// 合并附注映射规则模板 + 值变化 + 确认 + 结构锁（spec: consol-note-mapping-reuse-and-reference-push）
+export const consolNoteReuse = {
+  // 映射规则模板
+  promote: (pid: string, ruleId: string) => `/api/projects/${pid}/consol-note-mapping/rules/${ruleId}/promote`,
+  templates: '/api/consol-note-mapping-templates',
+  templateDetail: (tid: string) => `/api/consol-note-mapping-templates/${tid}`,
+  // 标准科目参考
+  accountReference: (pid: string, sectionId: string) => `/api/projects/${pid}/consol-note-account-reference/${sectionId}`,
+  // 值变化通知
+  staleSummary: (pid: string) => `/api/projects/${pid}/consol-note-value/stale-summary`,
+  // 值确认
+  confirm: (pid: string) => `/api/projects/${pid}/consol-note-value/confirm`,
+  confirmationStatus: (pid: string) => `/api/projects/${pid}/consol-note-value/confirmation-status`,
+  readinessCheck: (pid: string) => `/api/projects/${pid}/consol-note-value/readiness-check`,
+  // 结构锁
+  structureLock: (pid: string) => `/api/projects/${pid}/consol-note-structure-lock`,
+  structureLockRelease: (pid: string, sectionId: string) => `/api/projects/${pid}/consol-note-structure-lock/${sectionId}`,
+} as const
+
 // ─── 现金流量表工作底稿 ─────────────────────────────────────────────────────
 
 export const cfsWorksheet = {

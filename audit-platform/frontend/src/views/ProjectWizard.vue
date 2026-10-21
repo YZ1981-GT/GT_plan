@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElNotification } from 'element-plus'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { useWizardStore } from '@/stores/wizard'
 import BasicInfoStep from '@/components/wizard/BasicInfoStep.vue'
@@ -143,8 +143,28 @@ async function handleConfirm() {
       )
       if (!proceed) return
       ElMessage.success('项目创建成功')
-      // Phase 3 需求 5.1：合并项目创建后弹"配置合并范围"步骤（R3：仅 consolidated 触发，非合并项目流程不变）
+      // formula-management-ux-improvements C1：创建成功后提示订阅公式模板
       const createdId = wizardStore.projectId
+      if (createdId) {
+        try {
+          await ElMessageBox.confirm(
+            '建议为新项目订阅事务所标准公式模板，订阅后项目公式会自动对齐全局设置，后续全局更新也会提醒确认。',
+            '💡 公式模板订阅建议',
+            {
+              confirmButtonText: '去订阅',
+              cancelButtonText: '稍后设置',
+              type: 'info',
+            },
+          )
+          // 跳转到项目公式管理（全局设置页的模板 Tab）
+          router.push(`/settings/formula-global?tab=templates`)
+          wizardStore.reset()
+          return
+        } catch {
+          // 用户选了「稍后设置」，正常继续
+        }
+      }
+      // Phase 3 需求 5.1：合并项目创建后弹"配置合并范围"步骤（R3：仅 consolidated 触发，非合并项目流程不变）
       const isConsolidated = (data as any)?.report_scope === 'consolidated'
       if (isConsolidated && createdId) {
         scopeConfigProjectId.value = createdId

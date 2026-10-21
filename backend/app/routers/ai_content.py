@@ -28,10 +28,9 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import get_current_user, require_project_access, assert_project_permission
 from app.models.core import User
 from app.services import ai_content_log_service
-from app.services.project_permission import assert_project_permission
 
 logger = logging.getLogger(__name__)
 

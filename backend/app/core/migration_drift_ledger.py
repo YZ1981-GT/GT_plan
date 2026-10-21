@@ -85,6 +85,15 @@ KNOWN_CHECKSUM_DRIFTS: tuple[KnownChecksumDrift, ...] = (
         "d002d0f2f9abc71b2a91b8c15b0c140fd1237f59b6730b0a992c944743a7d329",
         "应用后被编辑；逐对象核验当前文件声明的 7 个对象在 public 全部存在。",
     ),
+    KnownChecksumDrift(
+        "189",
+        "3376d39236144cf901dd360ff58fb74a10ffc5ce0cdcd121840135e108aa069c",
+        "a9c6b4cb58b79259d004ca6c74c4f9a76b7e6f11808b8340610b0398d5a1687b",
+        "应用时为 V189__deliverable_edit_and_writeback_integrity.sql（trio spec），后被并发会话替换为"
+        " V189__create_share_change_event_table.sql：原 deliverable 相关对象（deliverable_section_state/"
+        "word_export_task_versions/working_paper 两新列）由 V191 补建；share_change_event 表/约束/索引"
+        " 3 个对象经逐列核验（22 列）在 public 全部存在。两份内容的效果均已在库中生效，无需补迁移。",
+    ),
 )
 
 

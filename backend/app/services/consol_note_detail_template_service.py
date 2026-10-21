@@ -423,12 +423,21 @@ def _validate_template_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             sort_order = int(row.get("sort_order", i * 10))
         except (TypeError, ValueError):
             sort_order = i * 10
+        # V200: 推荐科目码——可选 string[]，不校验科目码格式
+        rec_codes_raw = row.get("recommended_account_codes")
+        rec_codes: list[str] | None = None
+        if isinstance(rec_codes_raw, list):
+            rec_codes = [str(c).strip() for c in rec_codes_raw if str(c).strip()]
+            if not rec_codes:
+                rec_codes = None
         validated.append({
             "target_row_id": target_row_id,
             "canonical_name": canonical_name,
             "aliases": aliases,
             "sort_order": sort_order,
             "row_type": row_type,
+            # V200: 推荐科目码（可选，不校验格式）
+            **({"recommended_account_codes": rec_codes} if rec_codes else {}),
         })
     return validated
 

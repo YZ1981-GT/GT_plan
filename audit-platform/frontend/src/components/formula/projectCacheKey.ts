@@ -76,3 +76,41 @@ export function resolveSaveYear(propsYear: string | number | null | undefined): 
   const n = Number(propsYear)
   return Number.isFinite(n) ? n : null
 }
+
+/**
+ * 创建一个按 key 去重的异步请求合并器。
+ *
+ * 同一个 key 在飞的请求不重发——后续调用复用第一次的 Promise。
+ * key 变化（如切项目/切模板版本）时重新发起。
+ *
+ * 典型用法：
+ * ```ts
+ * const flight = createKeyedSingleFlight()
+ * function load() { return flight(currentKey.value, fetchData) }
+ * ```
+ *
+ * 补写原因：FormulaManagerDialog 的 noteTreeFlight / consolNoteTreeFlight /
+ * noteUserFormulasFlight 三处依赖此函数（Task 6.3 需求 10.1），但此前仅在
+ * import 中引用、从未实现——导致前端编译失败。
+ */
+export function createKeyedSingleFlight() {
+  let inFlightKey: string | null = null
+  let inFlightPromise: Promise<void> | null = null
+
+  return function singleFlight(key: string, fn: () => Promise<void>): Promise<void> {
+    // 同一 key 正在飞：复用
+    if (inFlightKey === key && inFlightPromise) {
+      return inFlightPromise
+    }
+    // key 变了或没有在飞的：发新请求
+    inFlightKey = key
+    inFlightPromise = fn().finally(() => {
+      // 只有当前 key 仍一致时才清除（防止 key 已变但旧 finally 清掉新请求）
+      if (inFlightKey === key) {
+        inFlightKey = null
+        inFlightPromise = null
+      }
+    })
+    return inFlightPromise
+  }
+}

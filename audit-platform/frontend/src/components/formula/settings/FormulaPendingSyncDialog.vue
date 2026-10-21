@@ -19,54 +19,72 @@
     <el-alert type="warning" :closable="false" show-icon class="gt-fps-gap"
       title="全局设置或公式模板有更新，与本项目改过的公式不一致（或管理员暂缓应用）。请逐条确认；选「稍后处理」可先关闭，角标会一直提醒。" />
     <div class="gt-fps-bar">
-      <span class="gt-fps-muted">共 {{ count }} 处，已选择处理 {{ chosenCount }} 处</span>
+      <span class="gt-fps-muted">共 {{ count }} 处（{{ groupedItems.length }} 个域），已选择处理 {{ chosenCount }} 处</span>
       <span class="gt-fps-spacer" />
       <el-button size="small" data-testid="fps-all-adopt" @click="setAll('adopt')">全部采用新定义</el-button>
       <el-button size="small" data-testid="fps-all-keep" @click="setAll('keep')">全部保留本项目</el-button>
     </div>
-    <el-table v-loading="loading" :data="items" size="small" border max-height="460" row-key="id">
-      <el-table-column label="公式位" min-width="180" show-overflow-tooltip>
-        <template #default="{ row }">
-          <div>{{ row.slot_label }}</div>
-          <el-tag size="small" effect="plain" type="info">{{ domainLabel(row.domain) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="原因" width="130">
-        <template #default="{ row }">
-          <el-tag size="small" :type="row.reason === 'conflict' ? 'danger' : 'warning'">{{ row.reason_label }}</el-tag>
-          <div class="gt-fps-muted">来自{{ row.upstream_origin_label }}</div>
-        </template>
-      </el-table-column>
-      <el-table-column label="原定义（基线）" min-width="150">
-        <template #default="{ row }"><code class="gt-fps-code">{{ row.base_formula || '（空）' }}</code></template>
-      </el-table-column>
-      <el-table-column label="新定义" min-width="150">
-        <template #default="{ row }">
-          <el-tag v-if="row.upstream_deleted" size="small" type="danger">已删除</el-tag>
-          <code v-else class="gt-fps-code gt-fps-new">{{ row.upstream_formula }}</code>
-        </template>
-      </el-table-column>
-      <el-table-column label="本项目当前" min-width="150">
-        <template #default="{ row }"><code class="gt-fps-code gt-fps-local">{{ row.local_formula || '（空）' }}</code></template>
-      </el-table-column>
-      <!-- 三个选项按钮约 320px：列宽不够时最后一个会被裁掉（实测 1080px 弹窗里「手工修改」看不全） -->
-      <el-table-column label="处理" min-width="330">
-        <template #default="{ row }">
-          <el-radio-group :model-value="choices[row.id] || ''" size="small"
-            @update:model-value="(v: string | number | boolean | undefined) => setChoice(row, v as ResolutionChoice)">
-            <el-radio-button value="adopt">采用新定义</el-radio-button>
-            <el-radio-button value="keep">保留本项目</el-radio-button>
-            <el-radio-button value="custom">手工修改</el-radio-button>
-          </el-radio-group>
-          <div v-if="choices[row.id] === 'custom'" class="gt-fps-custom">
-            <el-input v-for="f in editableFields(row)" :key="f" v-model="custom[row.id][f]" size="small"
-              :placeholder="fieldLabel(f)">
-              <template #prepend>{{ fieldLabel(f) }}</template>
-            </el-input>
-          </div>
-        </template>
-      </el-table-column>
-    </el-table>
+    <!-- formula-management-ux-improvements D1：按域分组折叠展示 -->
+    <div v-loading="loading" class="gt-fps-groups" style="max-height: 460px; overflow-y: auto;">
+      <div v-for="group in groupedItems" :key="group.domain" class="gt-fps-group">
+        <!-- D2：组头：域名 + 来源 + 数量 + 组级批量按钮 -->
+        <div class="gt-fps-group-header" @click="toggleGroup(group.domain)">
+          <span class="gt-fps-group-toggle">{{ expandedGroups[group.domain] ? '▼' : '▶' }}</span>
+          <span class="gt-fps-group-title">{{ group.label }}</span>
+          <el-tag size="small" type="info" effect="plain">{{ group.count }} 处</el-tag>
+          <!-- D3：来源标签 -->
+          <el-tag v-for="src in group.sources" :key="src" size="small" effect="plain" type="warning" style="margin-left: 4px;">
+            {{ src }}
+          </el-tag>
+          <span class="gt-fps-spacer" />
+          <el-button size="small" @click.stop="setGroupAll(group.domain, 'adopt')">全部采用</el-button>
+          <el-button size="small" @click.stop="setGroupAll(group.domain, 'keep')">全部保留</el-button>
+        </div>
+        <!-- 组内表格（可折叠） -->
+        <el-table v-show="expandedGroups[group.domain]" :data="group.items" size="small" border row-key="id">
+          <el-table-column label="公式位" min-width="180" show-overflow-tooltip>
+            <template #default="{ row }">
+              <div>{{ row.slot_label }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="原因" width="130">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.reason === 'conflict' ? 'danger' : 'warning'">{{ row.reason_label }}</el-tag>
+              <div class="gt-fps-muted">来自{{ row.upstream_origin_label }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="原定义（基线）" min-width="150">
+            <template #default="{ row }"><code class="gt-fps-code">{{ row.base_formula || '（空）' }}</code></template>
+          </el-table-column>
+          <el-table-column label="新定义" min-width="150">
+            <template #default="{ row }">
+              <el-tag v-if="row.upstream_deleted" size="small" type="danger">已删除</el-tag>
+              <code v-else class="gt-fps-code gt-fps-new">{{ row.upstream_formula }}</code>
+            </template>
+          </el-table-column>
+          <el-table-column label="本项目当前" min-width="150">
+            <template #default="{ row }"><code class="gt-fps-code gt-fps-local">{{ row.local_formula || '（空）' }}</code></template>
+          </el-table-column>
+          <el-table-column label="处理" min-width="330">
+            <template #default="{ row }">
+              <el-radio-group :model-value="choices[row.id] || ''" size="small"
+                @update:model-value="(v: string | number | boolean | undefined) => setChoice(row, v as ResolutionChoice)">
+                <el-radio-button value="adopt">采用新定义</el-radio-button>
+                <el-radio-button value="keep">保留本项目</el-radio-button>
+                <el-radio-button value="custom">手工修改</el-radio-button>
+              </el-radio-group>
+              <div v-if="choices[row.id] === 'custom'" class="gt-fps-custom">
+                <el-input v-for="f in editableFields(row)" :key="f" v-model="custom[row.id][f]" size="small"
+                  :placeholder="fieldLabel(f)">
+                  <template #prepend>{{ fieldLabel(f) }}</template>
+                </el-input>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <el-empty v-if="!loading && !items.length" description="没有待确认事项" :image-size="64" />
+    </div>
     <template #footer>
       <el-button data-testid="fps-later" @click="visible = false">稍后处理</el-button>
       <el-button type="primary" :loading="submitting" :disabled="!chosenCount" data-testid="fps-submit"
@@ -103,6 +121,47 @@ let loadSeq = 0
 
 const count = computed(() => items.value.length)
 const chosenCount = computed(() => items.value.filter((i) => choices[i.id]).length)
+
+// formula-management-ux-improvements D1：按域分组
+interface PendingGroup {
+  domain: string
+  label: string
+  count: number
+  items: PendingItem[]
+  sources: string[]  // D3：来源标签
+}
+
+const expandedGroups = reactive<Record<string, boolean>>({})
+
+const groupedItems = computed<PendingGroup[]>(() => {
+  const groups = new Map<string, PendingItem[]>()
+  for (const item of items.value) {
+    const key = item.domain
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(item)
+  }
+  return [...groups.entries()].map(([domain, groupItems]) => {
+    // 首次出现的域默认展开
+    if (!(domain in expandedGroups)) expandedGroups[domain] = true
+    return {
+      domain,
+      label: domainLabel(domain),
+      count: groupItems.length,
+      items: groupItems,
+      sources: [...new Set(groupItems.map(i => i.upstream_origin_label).filter(Boolean))],
+    }
+  })
+})
+
+function toggleGroup(domain: string) {
+  expandedGroups[domain] = !expandedGroups[domain]
+}
+
+function setGroupAll(domain: string, v: ResolutionChoice) {
+  for (const it of items.value) {
+    if (it.domain === domain) choices[it.id] = v
+  }
+}
 
 function alreadyShown(pid: string): boolean {
   try { return sessionStorage.getItem(SHOWN_KEY + pid) === '1' } catch { return shownFallback.has(pid) }
@@ -240,4 +299,14 @@ defineExpose({ reload, openDialog, count })
 .gt-fps-new { color: var(--gt-color-primary); }
 .gt-fps-local { color: var(--gt-color-warning); }
 .gt-fps-custom { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+/* formula-management-ux-improvements D1/D2 分组样式 */
+.gt-fps-groups { display: flex; flex-direction: column; gap: 8px; }
+.gt-fps-group { border: 1px solid var(--gt-color-border, #ebeef5); border-radius: 6px; overflow: hidden; }
+.gt-fps-group-header {
+  display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+  background: var(--gt-bg-page, #fafafa); cursor: pointer; user-select: none;
+}
+.gt-fps-group-header:hover { background: var(--gt-bg-info, #ecf5ff); }
+.gt-fps-group-toggle { font-size: 11px; color: var(--gt-color-text-tertiary); width: 14px; }
+.gt-fps-group-title { font-size: 13px; font-weight: 600; color: var(--gt-color-text-primary); }
 </style>

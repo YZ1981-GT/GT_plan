@@ -143,3 +143,56 @@ def build_matrix_payload() -> dict:
         "executors": [e.value for e in Executor],
         "matrix": matrix,
     }
+
+
+import re
+
+# ---------------------------------------------------------------------------
+# 公式函数支持校验（report_config / cross_check_rules 调用）
+# ---------------------------------------------------------------------------
+
+# 匹配公式中的取数函数调用：如 TB(...), SUM_TB(...), ADJ(...) 等
+_FUNC_CALL_RE = re.compile(
+    r"\b(" + "|".join(re.escape(f) for f in FUNCTIONS) + r")\s*\(",
+    re.IGNORECASE,
+)
+
+
+class FormulaSupportViolation(Exception):
+    """公式中包含指定执行器不支持的函数时抛出。
+
+    属性:
+        executor: 目标执行器
+        issues: 每个不支持函数的 ``{function, reason}`` 列表
+    """
+
+    def __init__(self, executor: Executor, issues: list[dict]) -> None:
+        self.executor = executor
+        self.issues = issues
+        funcs = ", ".join(i["function"] for i in issues)
+        super().__init__(f"{executor.value} 不支持函数: {funcs}")
+
+
+def require_expression_support(formula: str, executor: Executor | str) -> None:
+    """校验公式文本中使用的所有取数函数在目标执行器下均受支持。
+
+    不支持时抛 :class:`FormulaSupportViolation`，调用方可捕获并转化为
+    HTTP 422 响应。空公式或不含取数函数的纯算术表达式直接放行。
+    """
+    if not formula:
+        return
+    exe = Executor(executor) if not isinstance(executor, Executor) else executor
+    seen: set[str] = set()
+    issues: list[dict] = []
+    for m in _FUNC_CALL_RE.finditer(formula):
+        fn = m.group(1).upper()
+        if fn in seen:
+            continue
+        seen.add(fn)
+        if not is_supported(fn, exe):
+            issues.append({
+                "function": fn,
+                "reason": unsupported_reason(fn, exe) or "此执行器不支持该函数",
+            })
+    if issues:
+        raise FormulaSupportViolation(exe, issues)

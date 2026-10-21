@@ -205,21 +205,39 @@ def suggest_template_rows(
     *,
     existing_template_rows: list[dict[str, Any]] | None = None,
     history_mappings: list[dict[str, Any]] | None = None,
+    rule_template_suggestions: list[dict[str, Any]] | None = None,
+    previous_year_suggestions: list[dict[str, Any]] | None = None,
     fuzzy_threshold: float = 0.75,
 ) -> list[dict[str, Any]]:
     """生成模板建议行列表。
 
-    每条来源标签经五级匹配：
+    每条来源标签经七级匹配：
     1. 精确匹配目标 canonical_name
     2. 别名匹配 aliases
-    3. 模糊匹配（SequenceMatcher ≥ threshold）
-    4. 历史规则复用
-    5. 未匹配 → 建议新增
+    3. 规则模板库匹配（rule_template_suggestions，confidence=0.92）
+    4. 上年同集团项目匹配（previous_year_suggestions，confidence=0.88）
+    5. 模糊匹配（SequenceMatcher ≥ threshold）
+    6. 历史规则复用
+    7. 未匹配 → 建议新增
 
     返回 ``[{source_label, suggested_target, confidence, match_type, candidates}]``
     """
     template_rows = existing_template_rows or []
     history = history_mappings or []
+
+    # 构建规则模板建议索引（source_label → suggestion）
+    rule_tmpl_index: dict[str, dict[str, Any]] = {}
+    for s in (rule_template_suggestions or []):
+        sl = str(s.get("source_label", "")).strip()
+        if sl and s.get("suggested_target"):
+            rule_tmpl_index[sl] = s
+
+    # 构建上年项目建议索引
+    prev_year_index: dict[str, dict[str, Any]] = {}
+    for s in (previous_year_suggestions or []):
+        sl = str(s.get("source_label", "")).strip()
+        if sl and s.get("suggested_target"):
+            prev_year_index[sl] = s
 
     # 收集所有来源标签（去重保序）
     all_labels: list[str] = []
@@ -267,7 +285,32 @@ def suggest_template_rows(
             ))
             continue
 
-        # 3. 模糊匹配
+        # 3. 规则模板库匹配（confidence=0.92）
+        if label in rule_tmpl_index:
+            s = rule_tmpl_index[label]
+            suggestions.append({
+                "source_label": label,
+                "suggested_target": s["suggested_target"],
+                "confidence": s.get("confidence", 0.92),
+                "match_type": "rule_template",
+                "candidates": s.get("candidates", []),
+                **({"template_id": s["template_id"]} if "template_id" in s else {}),
+            })
+            continue
+
+        # 4. 上年同集团项目匹配（confidence=0.88）
+        if label in prev_year_index:
+            s = prev_year_index[label]
+            suggestions.append({
+                "source_label": label,
+                "suggested_target": s["suggested_target"],
+                "confidence": s.get("confidence", 0.88),
+                "match_type": "previous_year",
+                "candidates": s.get("candidates", []),
+            })
+            continue
+
+        # 5. 模糊匹配
         best_ratio = 0.0
         best_target: dict[str, Any] | None = None
         candidates: list[dict[str, Any]] = []
@@ -292,7 +335,7 @@ def suggest_template_rows(
             ))
             continue
 
-        # 4. 历史规则复用
+        # 6. 历史规则复用
         if label in history_index:
             target_row_id = history_index[label]
             # 在模板中找到对应行
@@ -312,7 +355,7 @@ def suggest_template_rows(
                 })
             continue
 
-        # 5. 未匹配
+        # 7. 未匹配
         suggestions.append({
             "source_label": label,
             "suggested_target": None,
@@ -542,3 +585,109 @@ async def suggest_template_for_section(
         "group_count": len(groups),
         "suggested_rows": suggested_rows,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 上年同集团项目映射匹配（V200 spec: consol-note-mapping-reuse-and-reference-push）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+async def find_previous_year_rules(
+    db: AsyncSession,
+    *,
+    consol_project_id: UUID,
+    section_id: str,
+    source_structure_hash: str,
+) -> list[dict[str, Any]]:
+    """查找同集团上年项目的确认过的映射规则。
+
+    ⚠ projects 表无 client_id 字段，按双条件定位同集团：
+    1. 主条件：projects.client_name 精确匹配（同一审计客户名称相同）
+    2. 辅条件：projects.ultimate_company_code 非空且一致（最终控制方代码）
+    两个条件取 OR。
+
+    步骤：
+    1. 读当前项目的 client_name + ultimate_company_code
+    2. 查满足双条件的其他合并项目，按 audit_period_end DESC 排序
+    3. 在上年项目中查 section_id + source_structure_hash 匹配的 active rule
+
+    返回 ``[{source_label, suggested_target, confidence, match_type}]``
+    格式与 suggest_template_rows 的 suggestions 兼容，可直接传入 previous_year_suggestions。
+    """
+    from app.models.core import Project
+    from app.models.consol_note_mapping_models import ConsolNoteMappingRule
+
+    # 1. 读当前项目信息
+    current = (await db.execute(
+        sa.select(Project.client_name, Project.ultimate_company_code).where(
+            Project.id == consol_project_id
+        )
+    )).one_or_none()
+    if current is None:
+        return []
+
+    client_name, ultimate_code = current.client_name, current.ultimate_company_code
+
+    # 2. 查同集团其他合并项目
+    conditions = [
+        Project.id != consol_project_id,
+        Project.is_deleted == sa.false(),
+    ]
+    # 双条件 OR：client_name 或 ultimate_company_code
+    or_clauses = [Project.client_name == client_name]
+    if ultimate_code:
+        or_clauses.append(
+            sa.and_(
+                Project.ultimate_company_code.isnot(None),
+                Project.ultimate_company_code == ultimate_code,
+            )
+        )
+    conditions.append(sa.or_(*or_clauses))
+
+    peer_projects = (await db.execute(
+        sa.select(Project.id).where(*conditions)
+        .order_by(Project.audit_period_end.desc().nullslast())
+        .limit(10)  # 性能限制：只查最近 10 个项目
+    )).scalars().all()
+
+    if not peer_projects:
+        return []
+
+    # 3. 查上年项目中匹配的 active rule
+    rules = (await db.execute(
+        sa.select(ConsolNoteMappingRule).where(
+            ConsolNoteMappingRule.project_id.in_(peer_projects),
+            ConsolNoteMappingRule.section_id == section_id,
+            ConsolNoteMappingRule.source_structure_hash == source_structure_hash,
+            ConsolNoteMappingRule.is_active == sa.true(),
+        ).order_by(ConsolNoteMappingRule.confirmed_at.desc().nullslast())
+        .limit(1)
+    )).scalars().all()
+
+    if not rules:
+        return []
+
+    rule = rules[0]
+    mappings = rule.mappings if isinstance(rule.mappings, list) else []
+
+    # 转换为 suggestions 格式
+    suggestions: list[dict[str, Any]] = []
+    for m in mappings:
+        sl = str(m.get("source_label", "")).strip()
+        target_row_id = m.get("target_row_id")
+        if not sl or not target_row_id:
+            continue
+        if m.get("mapping_action") == "ignore":
+            continue
+        suggestions.append({
+            "source_label": sl,
+            "suggested_target": {
+                "target_row_id": target_row_id,
+                "canonical_name": m.get("canonical_name"),
+            },
+            "confidence": 0.88,
+            "match_type": "previous_year",
+            "candidates": [],
+        })
+
+    return suggestions
