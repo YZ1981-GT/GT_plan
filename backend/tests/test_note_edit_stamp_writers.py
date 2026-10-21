@@ -1,6 +1,6 @@
 """其他模块以用户身份改附注时盖「最近一次编辑」（spec disclosure-note-template-word-realignment Task 16~18，design §5）。
 
-每个写入方一条行为测试：真 SQLite + 真 ORM，能走路由的走真路由（鉴权依赖真跑，只替换 Redis 权限缓存）。
+每个写入方一条行为测试：真 SQLite + 真 ORM，能走路由的走真路由（鉴权依赖真跑）。
 集团模板下发是裸 SQL（SQLite 下 uuid 形态与 ORM 不一致、也不拒绝把字母写进整数列）⇒ 见
 ``test_note_group_template_stamp_pg.py``。上年导入 / 继承见 ``test_note_prior_year_import_stamp.py``。
 """
@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
@@ -96,10 +96,8 @@ async def env() -> AsyncGenerator[dict, None]:
     app.dependency_overrides[get_db] = _override_db
     actor = {"user": _Actor(ids["me"])}
     app.dependency_overrides[get_current_user] = lambda: actor["user"]
-    with patch("app.deps._get_cached_permission", new=AsyncMock(return_value=None)), \
-            patch("app.deps._set_cached_permission", new=AsyncMock()):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            yield {"client": client, "ids": ids, "factory": factory, "actor": actor}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield {"client": client, "ids": ids, "factory": factory, "actor": actor}
     await engine.dispose()
 
 

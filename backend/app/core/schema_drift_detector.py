@@ -252,6 +252,14 @@ class SchemaDriftDetector:
         #    本条与「无 ORM 模型」双向锁死，见 tests/test_schema_drift_detector.py
         #    的 test_v155_oo_content_revision_table_allowlisted_and_unmapped。
         "working_paper_oo_content_revision",
+        # ── 级别回填记录表（spec partner-manager-edit-permission 需求 4.5 / 4.9，有意不做 ORM 映射）────────
+        # 🔴 迁移建、ORM 不声明：级别回填迁移 V<n>__partner_manager_edit_level_backfill.sql（写作时 n = 200）
+        #    在改写成员行的同一条语句里写入本表，记下每个被改动成员行的迁移前项目角色与级别；只有配对回滚
+        #    脚本 R<n> 读它（只恢复仍等于目标值的行），读完即删表。业务代码零读写，补 ORM 模型没有用途。
+        #    正向已执行、回滚脚本未执行期间本表一直留在库里，不登记则每次启动都报一条 INFO 级 db_extra。
+        #    → 表名单一真源 = 迁移脚本本身（V 建、R 删的那张表）。本条与「无 ORM 模型」双向锁死，见
+        #    tests/test_schema_drift_detector.py 的 test_level_backfill_record_table_allowlisted_and_unmapped。
+        "project_user_level_backfill",
     })
 
     # 列级 allowlist：DB 有但 ORM 不需映射的列（历史残留 / 已弃用 / 有意只走裸 SQL）

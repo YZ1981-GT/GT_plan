@@ -89,15 +89,15 @@ class TestNoUnregisteredLevelInCallSites:
 
 
 class TestMutationEndpointsRequireEdit:
-    """曾被降级的写端点必须要求 edit（不是 readonly / review）。
+    """曾被降级的写端点必须要求 edit 或走附注编辑门禁。
 
-    判据接受两种等价形态 —— 直接挂 ``require_project_access("edit")``，或走附注模块的
-    统一编辑门禁 ``_assert_project_edit``（其内部第一步就是 ``require_project_access
-    ("edit")``，见下方 ``test_unified_note_gate_requires_edit``）。锁的是「要求 edit」这个
-    不变量，不是某一种拼写。
+    判据接受三种形态：直接挂 ``require_project_access("edit")``（底稿签字等一般写端点），
+    走附注编辑门禁的路径依赖 ``require_note_edit_access``，或函数体调用
+    ``assert_note_edit_access``（其内部以 review 级调用 ``assert_project_permission``，
+    见 ``test_unified_note_gate_requires_review_eqcr_matrix_lock``）。
     """
 
-    UNIFIED_GATES = {"_assert_project_edit"}
+    NOTE_EDIT_GATES = {"assert_note_edit_access", "assert_note_edit_access_for_object", "require_note_edit_access"}
 
     CASES = (
         ("backend/app/routers/disclosure_notes.py", "delete_section"),
@@ -132,30 +132,52 @@ class TestMutationEndpointsRequireEdit:
                 for c in ast.walk(ast.parse(seg.lstrip()))
                 if isinstance(c, ast.Call)
             }
-            if "edit" not in levels and not (called & self.UNIFIED_GATES):
+            if "edit" not in levels and not (called & self.NOTE_EDIT_GATES):
                 problems.append(
                     f"{rel}::{func} 既没有 require_project_access(\"edit\")，"
-                    f"也没走统一编辑门禁（实测级别 {levels}）"
+                    f"也没走附注编辑门禁（实测级别 {levels}）"
                 )
         assert not problems, "\n".join(problems)
 
-    def test_unified_note_gate_requires_edit(self):
-        """统一门禁自身必须要求 edit —— 否则上一条会把「走了统一门禁」当成足够。"""
+    def test_unified_note_gate_requires_review_eqcr_matrix_lock(self):
+        """附注编辑门禁自身必须包含 review + EQCR + note:edit + consol_lock（需求 6.10）。
+
+        ``assert_note_edit_access`` 在顶层语句中以 review 级调 ``assert_project_permission``，
+        调 ``is_project_eqcr``，判定操作矩阵 ``note:edit``，并以 ``consol_lock`` 字面量判合并锁。
+        """
         import ast
         import inspect
 
-        from app.routers import disclosure_notes as notes
+        from app.services.note_edit_gate import assert_note_edit_access, NOTE_EDIT_MIN_LEVEL
 
-        src = inspect.getsource(notes._assert_project_edit)
-        levels = CALL_RE.findall(src)
-        assert levels == ["edit"], (
-            f"_assert_project_edit 的项目权限级别为 {levels}，应为 ['edit']"
+        # 验证门禁级别常量是 review
+        assert NOTE_EDIT_MIN_LEVEL == "review", (
+            f"NOTE_EDIT_MIN_LEVEL 应为 'review'，实际为 {NOTE_EDIT_MIN_LEVEL!r}"
         )
-        # 三段检查都必须在（漏一段就不是「统一」门禁）
+
+        src = inspect.getsource(assert_note_edit_access)
+        tree = ast.parse(src.lstrip())
         called = {
             getattr(c.func, "id", None) or getattr(c.func, "attr", None)
-            for c in ast.walk(ast.parse(src.lstrip()))
+            for c in ast.walk(tree)
             if isinstance(c, ast.Call)
         }
-        for required in ("require_project_access", "require_operation", "check_consol_lock"):
-            assert required in called, f"_assert_project_edit 缺少 {required}"
+        assert "assert_project_permission" in called, (
+            "assert_note_edit_access 未调用 assert_project_permission"
+        )
+        assert "is_project_eqcr" in called, (
+            "assert_note_edit_access 未调用 EQCR 判定 is_project_eqcr"
+        )
+        # NOTE_EDIT_MIN_LEVEL 常量被传递给 assert_project_permission（在源码中引用）
+        assert "NOTE_EDIT_MIN_LEVEL" in src, (
+            "assert_note_edit_access 源码中未引用 NOTE_EDIT_MIN_LEVEL 常量"
+        )
+        # consol_lock 关键字参数在源码中
+        assert "consol_lock" in src, (
+            "assert_note_edit_access 源码中未见 consol_lock 关键字"
+        )
+        # note:edit 操作矩阵权限点
+        from app.services.note_edit_gate import NOTE_EDIT_OPERATION
+        assert NOTE_EDIT_OPERATION == "note:edit", (
+            f"NOTE_EDIT_OPERATION 应为 'note:edit'，实际为 {NOTE_EDIT_OPERATION!r}"
+        )

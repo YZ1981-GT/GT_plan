@@ -10,7 +10,6 @@ import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -302,7 +301,7 @@ class _Actor:
 
 
 def _api(scenario):
-    """真路由 + 真鉴权依赖（只替换 Redis 权限缓存）；``scenario(client, ids)``。"""
+    """真路由 + 真鉴权依赖；``scenario(client, ids)``。"""
     from app.routers import signoff_checklist
 
     async def _main():
@@ -334,10 +333,8 @@ def _api(scenario):
         app.dependency_overrides[get_db] = _db
         app.dependency_overrides[get_current_user] = lambda: actor["user"]
         try:
-            with patch("app.deps._get_cached_permission", new=AsyncMock(return_value=None)), \
-                    patch("app.deps._set_cached_permission", new=AsyncMock()):
-                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                    return await scenario(client, ids, actor)
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                return await scenario(client, ids, actor)
         finally:
             await engine.dispose()
 

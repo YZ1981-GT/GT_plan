@@ -24,7 +24,12 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import assert_project_permission, get_current_user, require_project_access, require_operation, get_user_scope_cycles, check_consol_lock, require_role
+from app.deps import assert_project_permission, get_current_user, require_project_access, get_user_scope_cycles, require_role
+from app.services.note_edit_gate import (
+    assert_note_edit_access,
+    assert_note_edit_access_for_object,
+    require_note_edit_access,
+)
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
 from app.routers.deliverable import _guard_action
@@ -73,37 +78,6 @@ def _mutation_id(supplied: str | None) -> str:
     （见 ``DisclosureMutationCoordinator``）。不传则每次都是新请求。
     """
     return supplied or str(uuid4())
-
-
-async def _assert_project_edit(
-    *,
-    project_id: UUID,
-    current_user: User,
-    db: AsyncSession,
-) -> None:
-    """附注 mutation 的**统一**编辑门禁，顺序固定为项目 → 操作 → 合并锁。
-
-    为什么要有这个函数而不是各端点各挂 ``Depends``：
-
-    - ``require_project_access`` / ``require_operation`` 的内部依赖从**路径/查询参数**取
-      ``project_id``。附注的写端点里有的把 project_id 放在**请求体**（generate）、有的
-      路径上只有 ``note_id``（update）—— 那两种情况下依赖要么拿不到 project_id
-      （退化为仅按 system_role 判定），要么更糟：FastAPI 把 ``project_id`` 变成一个
-      **查询参数**，于是调用方可以传一个自己有权的项目，却对另一个项目的对象动手。
-    - 五个写端点各写一遍三段检查必然漂移（顺序、级别、漏一段）。收敛到单点后，
-      「readonly 用户在任何 mutation 上都被拦住」是结构性成立的，不靠逐端点自觉。
-
-    顺序有意义：先判项目级权限（最便宜、最常见的拒绝原因），再判操作级权限，最后才判
-    合并锁（锁是状态而非权限，403 优先于 423）。
-    """
-    await require_project_access("edit")(
-        project_id=project_id, current_user=current_user, db=db
-    )
-    await require_operation("note:edit")(
-        current_user=current_user, project_id=project_id, db=db
-    )
-    await check_consol_lock(project_id=project_id, db=db)
-
 
 def _coordinator(
     db: AsyncSession,
@@ -181,27 +155,6 @@ async def _assert_note_project_access(
         min_permission=min_permission,
         missing_ok=missing_ok,
     )
-
-
-async def _assert_validation_project_access(
-    db: AsyncSession,
-    current_user: User,
-    validation_id: UUID,
-    min_permission: str = "edit",
-) -> UUID:
-    """按 validation_id 反查所属项目并鉴权。"""
-    from app.models.report_models import NoteValidationResult
-
-    return await _assert_object_project_access(
-        db,
-        current_user,
-        id_column=NoteValidationResult.id,
-        project_column=NoteValidationResult.project_id,
-        object_id=validation_id,
-        not_found_detail="校验结果不存在",
-        min_permission=min_permission,
-    )
-
 
 # ---------------------------------------------------------------------------
 # Sprint 4 Task 4.4 — NoteFormatConfig 排版规范端点
@@ -282,14 +235,12 @@ async def generate_notes(
 ):
     """生成附注初稿。
 
-    project_id 在请求体里 ⇒ 门禁走 ``_assert_project_edit``（依赖注入取不到 body）。
+    project_id 在请求体里 ⇒ 门禁走函数体形态 ``assert_note_edit_access``（依赖注入取不到 body）。
     事务边界、幂等与「commit 成功后才发事件」由 ``DisclosureMutationCoordinator`` 统一保证。
     """
     from app.services.prerequisite_checker import PrerequisiteChecker
 
-    await _assert_project_edit(
-        project_id=data.project_id, current_user=current_user, db=db
-    )
+    await assert_note_edit_access(db, current_user, data.project_id, consol_lock=True)
 
     async def _mutate() -> dict[str, Any]:
         check = await PrerequisiteChecker().check(
@@ -506,7 +457,7 @@ async def pull_from_workpapers(
     year: int,
     note_section: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
     """附注主动从底稿拉取最新数据（刷新/生成时调用）。
 
@@ -900,20 +851,17 @@ async def update_note(
 ):
     """更新附注章节内容。
 
-    路径上只有 note_id ⇒ 先**最小反查**所属项目（只 SELECT 一列），再过统一编辑门禁，
-    最后才进 mutation。此前只挂 ``require_operation``，而它在没有 project_id 时**只按
-    system_role 判定** ⇒ 任何能 note:edit 的角色都可改任意项目的附注章节。
+    路径上只有 note_id ⇒ 对象反查形态 ``assert_note_edit_access_for_object``：最小反查所属项目、
+    对象不存在返回 404、再对该项目调附注编辑门禁判定。
     """
-    project_id = (
-        await db.execute(
-            sa.select(DisclosureNote.project_id).where(DisclosureNote.id == note_id)
-        )
-    ).scalar_one_or_none()
-    if project_id is None:
-        raise HTTPException(status_code=404, detail="附注章节不存在")
-
-    await _assert_project_edit(
-        project_id=project_id, current_user=current_user, db=db
+    project_id = await assert_note_edit_access_for_object(
+        db,
+        current_user,
+        id_column=DisclosureNote.id,
+        project_column=DisclosureNote.project_id,
+        object_id=note_id,
+        not_found_detail="附注章节不存在",
+        consol_lock=True,
     )
 
     holder: dict[str, Any] = {}
@@ -964,9 +912,7 @@ async def delete_section(
     mutation_id: str | None = Header(default=None, alias=MUTATION_ID_HEADER),
 ):
     """软删除指定附注章节。"""
-    await _assert_project_edit(
-        project_id=project_id, current_user=current_user, db=db
-    )
+    await assert_note_edit_access(db, current_user, project_id, consol_lock=True)
 
     async def _mutate() -> dict[str, Any]:
         result = await db.execute(
@@ -1012,9 +958,7 @@ async def patch_section(
     mutation_id: str | None = Header(default=None, alias=MUTATION_ID_HEADER),
 ):
     """部分更新附注章节字段（如 status → 用 is_empty 标记排除导出）。"""
-    await _assert_project_edit(
-        project_id=project_id, current_user=current_user, db=db
-    )
+    await assert_note_edit_access(db, current_user, project_id, consol_lock=True)
 
     async def _mutate() -> dict[str, Any]:
         result = await db.execute(
@@ -1092,9 +1036,7 @@ async def restore_section(
     mutation_id: str | None = Header(default=None, alias=MUTATION_ID_HEADER),
 ):
     """恢复已删除的附注章节。"""
-    await _assert_project_edit(
-        project_id=project_id, current_user=current_user, db=db
-    )
+    await assert_note_edit_access(db, current_user, project_id, consol_lock=True)
 
     holder: dict[str, Any] = {}
 
@@ -1141,7 +1083,7 @@ async def validate_notes(
     year: int,
     template_type: str = "soe",
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
     """执行附注校验
 
@@ -1215,12 +1157,18 @@ async def confirm_finding(
     current_user: User = Depends(get_current_user),
 ):
     """确认校验发现为"已确认-无需修改" """
-    # ── 项目编辑权门禁（防 IDOR）─────────────────────────────────────────────
-    # 原来挂的是 Depends(require_project_access("edit"))，但本端点路径里**没有**
-    # project_id ⇒ FastAPI 把它变成一个**必填查询参数**，调用方可以传一个自己有权的
-    # 项目，却去确认**另一个项目**的校验发现 —— 门禁校验了无关对象。
-    # 改为按 validation_id 反查真实所属项目再鉴权。
-    await _assert_validation_project_access(db, current_user, validation_id, "edit")
+    from app.models.report_models import NoteValidationResult
+
+    # 对象反查形态：按 validation_id 反查所属项目 → 附注编辑门禁判定（防 IDOR）
+    await assert_note_edit_access_for_object(
+        db,
+        current_user,
+        id_column=NoteValidationResult.id,
+        project_column=NoteValidationResult.project_id,
+        object_id=validation_id,
+        not_found_detail="校验结果不存在",
+        consol_lock=False,
+    )
 
     engine = NoteValidationEngine(db)
     success = await engine.confirm_finding(
@@ -1242,8 +1190,8 @@ async def export_word(
 ):
     """导出附注为 Word 文档。
 
-    与交付中心「生成附注」同一判定 ``_guard_action``（项目成员 review 及以上 + 角色矩阵 + EQCR 只读）——
-    原为 edit 级，合伙人 / 经理（项目里是 review 级）用不了（2026-10-19 用户拍板放开）。
+    与交付中心「生成附注」同一判定 ``_guard_action``（项目成员 review 及以上 + 角色矩阵 + EQCR 只读）。
+    review 门禁放行 review 级的质控与 EQCR 的读与非写动作；合伙人 / 经理为 edit 级同样满足。
     """
     await _guard_action(db, current_user, project_id, DeliverableAction.export)
     from fastapi.responses import StreamingResponse
@@ -1349,8 +1297,7 @@ async def clear_formulas(
     year: int,
     note_section: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-    _lock_check=Depends(check_consol_lock),
+    current_user: User = Depends(require_note_edit_access(consol_lock=True)),
 ):
     """一键清除指定附注章节的所有自动公式，切换为手动编辑模式。
 
@@ -1377,8 +1324,7 @@ async def restore_auto_mode(
     year: int,
     note_section: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-    _lock_check=Depends(check_consol_lock),
+    current_user: User = Depends(require_note_edit_access(consol_lock=True)),
 ):
     """恢复指定附注章节的自动提数模式。
 
@@ -1461,8 +1407,7 @@ async def apply_formulas(
     year: int,
     note_section: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-    _lock_check=Depends(check_consol_lock),
+    current_user: User = Depends(require_note_edit_access(consol_lock=True)),
 ):
     """执行附注表格中的自动运算公式，回填计算结果。
 
@@ -1521,8 +1466,7 @@ async def upsert_note_formulas(
     note_section: str,
     body: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-    _lock_check=Depends(check_consol_lock),
+    current_user: User = Depends(require_note_edit_access(consol_lock=True)),
 ):
     """保存附注章节的公式集（Req 15.2/15.3）。
 

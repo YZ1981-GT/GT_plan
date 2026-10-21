@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.core import User, Project, ProjectUser, ProjectUserRole, PermissionLevel
 from app.models.staff_models import ProjectAssignment, StaffMember
 from app.models.workpaper_models import WorkingPaper, WpFileStatus, WpReviewStatus
+from app.services.assignment_service import resolve_member_mapping
 
 _logger = logging.getLogger(__name__)
 
@@ -26,25 +27,8 @@ _logger = logging.getLogger(__name__)
 # R5 任务 2：eqcr 与 partner 同级（5），与 design.md "架构决策一览" 对齐。
 _ROLE_PRIORITY = {"partner": 5, "eqcr": 5, "qc": 4, "manager": 3, "auditor": 2, "readonly": 1}
 
-# 委派角色 → 项目角色映射
-_ASSIGNMENT_ROLE_MAP = {
-    "partner": ("partner", "review"),
-    "合伙人": ("partner", "review"),
-    "manager": ("manager", "review"),
-    "项目经理": ("manager", "review"),
-    "qc": ("qc", "review"),
-    "质控": ("qc", "review"),
-    "auditor": ("auditor", "edit"),
-    "审计员": ("auditor", "edit"),
-    "assistant": ("auditor", "edit"),
-    "助理": ("auditor", "edit"),
-    "readonly": ("readonly", "readonly"),
-    "观察员": ("readonly", "readonly"),
-    # R5 任务 2：EQCR 在 project_users 层面映射为 partner+review
-    # （ProjectUserRole 枚举不新增 eqcr，独立性靠 project_assignments.role='eqcr' 区分）
-    "eqcr": ("partner", "review"),
-    "独立复核合伙人": ("partner", "review"),
-}
+# 委派角色 → 项目角色与级别：两处委派兜底都经 assignment_service.resolve_member_mapping
+# （ROLE_MAP 单一真源），本模块不另存映射；未登记的委派角色得 (readonly, readonly)。
 
 
 class RoleContextService:
@@ -57,6 +41,10 @@ class RoleContextService:
         """
         获取用户在特定项目中的有效角色。
         优先级：project_users > project_assignments > users.role 降级
+
+        委派兜底（该项目没有未删除成员行时）：取该用户全部未删除人员库记录在本项目的现行委派，
+        委派角色经 resolve_member_mapping 合并（EQCR 优先，否则取最高级别），以字符串返回；
+        scope_cycles 取 assigned_at 最早的一条委派。
         """
         # 1. 查 project_users（最权威）
         pu = (await self.db.execute(
@@ -75,28 +63,29 @@ class RoleContextService:
                 "scope_cycles": pu.scope_cycles,
             }
 
-        # 2. 查 project_assignments（委派表）
-        staff = (await self.db.execute(
-            select(StaffMember.id).where(StaffMember.user_id == user_id, StaffMember.is_deleted == False)
-        )).scalar()
+        # 2. 查 project_assignments（委派表）：该用户全部未删除人员库记录的现行委派，不只看第一条人员库记录
+        assignments = (await self.db.execute(
+            select(ProjectAssignment.role, ProjectAssignment.assigned_cycles)
+            .select_from(ProjectAssignment)
+            .join(StaffMember, ProjectAssignment.staff_id == StaffMember.id)
+            .where(
+                StaffMember.user_id == user_id,
+                StaffMember.is_deleted == False,  # noqa: E712
+                ProjectAssignment.project_id == project_id,
+                ProjectAssignment.is_deleted == False,  # noqa: E712
+            )
+            # 首行即 assigned_at 最早的一条（空值排最后；同刻按委派 id 定序，结论确定）
+            .order_by(ProjectAssignment.assigned_at.asc().nulls_last(), ProjectAssignment.id.asc())
+        )).all()
 
-        if staff:
-            pa = (await self.db.execute(
-                select(ProjectAssignment).where(
-                    ProjectAssignment.project_id == project_id,
-                    ProjectAssignment.staff_id == staff,
-                    ProjectAssignment.is_deleted == False,
-                )
-            )).scalar_one_or_none()
-
-            if pa:
-                mapped = _ASSIGNMENT_ROLE_MAP.get(pa.role, ("auditor", "edit"))
-                return {
-                    "source": "project_assignments",
-                    "role": mapped[0],
-                    "permission_level": mapped[1],
-                    "scope_cycles": pa.assigned_cycles,
-                }
+        if assignments:
+            mapped_role, mapped_level = resolve_member_mapping([a.role for a in assignments])
+            return {
+                "source": "project_assignments",
+                "role": mapped_role.value,
+                "permission_level": mapped_level.value,
+                "scope_cycles": assignments[0].assigned_cycles,
+            }
 
         # 3. 降级到系统角色
         user = (await self.db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
@@ -143,29 +132,36 @@ class RoleContextService:
                 "permission_level": perm.value if perm else "readonly",
             })
 
-        # 也查委派表补充
-        staff = (await self.db.execute(
-            select(StaffMember.id).where(StaffMember.user_id == user_id, StaffMember.is_deleted == False)
-        )).scalar()
-
-        if staff:
-            pa_q = (
-                select(ProjectAssignment.project_id, ProjectAssignment.role, Project.name, Project.client_name)
-                .join(Project, ProjectAssignment.project_id == Project.id)
-                .where(ProjectAssignment.staff_id == staff, ProjectAssignment.is_deleted == False, Project.is_deleted == False)
+        # 也查委派表补充：该用户全部未删除人员库记录的现行委派（不只看第一条人员库记录）；
+        # 已有成员行的项目不补，其余按项目收集委派角色，经 resolve_member_mapping 合并为一组取值
+        pa_q = (
+            select(ProjectAssignment.project_id, ProjectAssignment.role, Project.name, Project.client_name)
+            .select_from(ProjectAssignment)
+            .join(StaffMember, ProjectAssignment.staff_id == StaffMember.id)
+            .join(Project, ProjectAssignment.project_id == Project.id)
+            .where(
+                StaffMember.user_id == user_id,
+                StaffMember.is_deleted == False,  # noqa: E712
+                ProjectAssignment.is_deleted == False,  # noqa: E712
+                Project.is_deleted == False,  # noqa: E712
             )
-            for pid, role, pname, cname in (await self.db.execute(pa_q)).all():
-                pid_str = str(pid)
-                if not any(p["project_id"] == pid_str for p in projects):
-                    mapped = _ASSIGNMENT_ROLE_MAP.get(role, ("auditor", "edit"))
-                    roles_seen.add(mapped[0])
-                    projects.append({
-                        "project_id": pid_str,
-                        "project_name": pname,
-                        "client_name": cname,
-                        "role": mapped[0],
-                        "permission_level": mapped[1],
-                    })
+        )
+        member_project_ids = {p["project_id"] for p in projects}
+        delegated: dict[str, tuple[str, str | None, list[str]]] = {}
+        for pid, role, pname, cname in (await self.db.execute(pa_q)).all():
+            pid_str = str(pid)
+            if pid_str not in member_project_ids:
+                delegated.setdefault(pid_str, (pname, cname, []))[2].append(role)
+        for pid_str, (pname, cname, assignment_roles) in delegated.items():
+            mapped_role, mapped_level = resolve_member_mapping(assignment_roles)
+            roles_seen.add(mapped_role.value)
+            projects.append({
+                "project_id": pid_str,
+                "project_name": pname,
+                "client_name": cname,
+                "role": mapped_role.value,
+                "permission_level": mapped_level.value,
+            })
 
         # 确定最高角色
         if sys_role == "admin":

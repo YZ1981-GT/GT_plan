@@ -21,7 +21,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import check_consol_lock, get_db, require_operation, require_project_access
+from app.deps import get_db, require_project_access
+from app.services.note_edit_gate import require_note_edit_access
 from app.models.core import User
 from app.models.note_content_template_schemas import BatchApplyRequest, BatchPreviewRequest, ParseKnowledgeRequest
 from app.services.disclosure_mutation_coordinator import DisclosureMutationCoordinator, mutation_fingerprint
@@ -94,9 +95,7 @@ async def parse_upload(
     project_id: UUID,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-    _operation: User = Depends(require_operation("note:edit")),
-    _lock: None = Depends(check_consol_lock),
+    current_user: User = Depends(require_note_edit_access(consol_lock=True)),
 ):
     data = await file.read(MAX_UPLOAD_BYTES + 1)  # 有界读取：多读 1 字节即可判超限
     try:
@@ -114,9 +113,7 @@ async def parse_knowledge(
     project_id: UUID,
     body: ParseKnowledgeRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-    _operation: User = Depends(require_operation("note:edit")),
-    _lock: None = Depends(check_consol_lock),
+    current_user: User = Depends(require_note_edit_access(consol_lock=True)),
 ):
     try:
         return await knowledge_source_payload(db, project_id=project_id, user=current_user, doc_ids=body.doc_ids)
@@ -132,9 +129,7 @@ async def preview_text_batch(
     project_id: UUID,
     body: BatchPreviewRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-    _operation: User = Depends(require_operation("note:edit")),
-    _lock: None = Depends(check_consol_lock),
+    current_user: User = Depends(require_note_edit_access(consol_lock=True)),
 ):
     try:
         resolved = await resolve_source(db, project_id=project_id, user=current_user, source=body.source)
@@ -153,9 +148,7 @@ async def apply_text_batch(
     project_id: UUID,
     body: BatchApplyRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-    _operation: User = Depends(require_operation("note:edit")),
-    _lock: None = Depends(check_consol_lock),
+    current_user: User = Depends(require_note_edit_access(consol_lock=True)),
     mutation_id: str | None = Header(default=None, alias=MUTATION_ID_HEADER),
 ):
     if not mutation_id or not 8 <= len(mutation_id) <= 128:

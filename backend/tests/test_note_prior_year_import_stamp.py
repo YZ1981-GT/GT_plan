@@ -2,7 +2,7 @@
 
 路由前缀带 ``{project_id}``，原来五个端点一个鉴权依赖都没挂（未登录可读写任意项目附注，鉴权基线扫描器只看
 装饰器路径所以没看见）；导入服务读不存在的 ``note.title``、调不存在的 ``_extract_to_opening_balance``、年度恒为
-2025。真 SQLite + 真 ORM + 真路由与真项目鉴权（只替换 Redis 权限缓存）。
+2025。真 SQLite + 真 ORM + 真路由与真项目鉴权。
 """
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ import io
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -24,6 +23,7 @@ from app.deps import get_current_user
 from app.models.base import Base, PermissionLevel, ProjectStatus, ProjectUserRole
 from app.models.core import Project, ProjectUser, User
 from app.models.report_models import DisclosureNote
+from app.models.staff_models import ProjectAssignment, StaffMember
 from app.routers import note_advanced
 from tests.test_note_text_batch_endpoints import _Actor
 
@@ -66,7 +66,8 @@ async def env() -> AsyncGenerator[dict, None]:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: Base.metadata.create_all(
-            c, tables=[User.__table__, Project.__table__, ProjectUser.__table__, DisclosureNote.__table__]))
+            c, tables=[User.__table__, Project.__table__, ProjectUser.__table__, DisclosureNote.__table__,
+                         StaffMember.__table__, ProjectAssignment.__table__]))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     ids = {k: uuid.uuid4() for k in ("me", "viewer", "p", "cash", "period", "prior_cash", "prior_gone")}
     first = _table([[None, None], [5, 7]])
@@ -101,10 +102,8 @@ async def env() -> AsyncGenerator[dict, None]:
     app.dependency_overrides[get_db] = _override_db
     actor = {"user": _Actor(ids["me"])}
     app.dependency_overrides[get_current_user] = lambda: actor["user"]
-    with patch("app.deps._get_cached_permission", new=AsyncMock(return_value=None)), \
-            patch("app.deps._set_cached_permission", new=AsyncMock()):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            yield {"client": client, "ids": ids, "factory": factory, "actor": actor, "app": app}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield {"client": client, "ids": ids, "factory": factory, "actor": actor, "app": app}
     await engine.dispose()
 
 

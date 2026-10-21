@@ -1,4 +1,4 @@
-"""Sprint C.0 — 附注离线导出/导入路由 (D15).
+﻿"""Sprint C.0 — 附注离线导出/导入路由 (D15).
 
 端点：
 - POST /api/disclosure-notes/{project_id}/{year}/offline-export
@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from app.deps import get_current_user, get_db, require_project_access
+from app.services.note_edit_gate import require_note_edit_access
 
 router = APIRouter(prefix="/api/disclosure-notes", tags=["note-offline"])
 
@@ -86,7 +87,7 @@ async def execute_import(
     decisions: str = Form("{}"),
     db=Depends(get_db),
     user=Depends(get_current_user),
-    _=Depends(require_project_access("edit")),
+    _=Depends(require_note_edit_access(consol_lock=False)),
 ):
     """执行导入 (C.0.18)."""
     import json

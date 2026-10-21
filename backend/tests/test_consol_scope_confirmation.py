@@ -8,7 +8,6 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -103,12 +102,9 @@ async def env():
 
     app.dependency_overrides[get_db] = override_db
     app.dependency_overrides[get_current_user] = lambda: current["actor"]
-    with patch("app.deps._get_cached_permission", new=AsyncMock(return_value=None)), patch(
-        "app.deps._set_cached_permission", new=AsyncMock()
-    ):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            yield {"client": client, "factory": factory, "ids": ids,
-                   "set_actor": lambda key: current.update(actor=actors[key])}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield {"client": client, "factory": factory, "ids": ids,
+               "set_actor": lambda key: current.update(actor=actors[key])}
     await engine.dispose()
 
 

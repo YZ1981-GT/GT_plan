@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db, require_project_access
+from app.services.note_edit_gate import require_note_edit_access
 from app.models.core import User
 from app.models.note_content_template_schemas import SaveContentTemplateRequest, SnapshotPreviewRequest
 from app.services.note_content_template_snapshot import (
@@ -54,7 +55,7 @@ async def snapshot_preview_endpoint(
     project_id: UUID,
     body: SnapshotPreviewRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
     try:
         return await snapshot_preview(db, project_id, body.year, user=current_user, owner_scope=body.owner_scope)
@@ -67,7 +68,7 @@ async def save_template_endpoint(
     project_id: UUID,
     body: SaveContentTemplateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
     try:
         result = await save_snapshot(
@@ -112,7 +113,7 @@ async def delete_template_endpoint(
     project_id: UUID,
     template_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
     try:
         deleted = await soft_delete_template(db, template_id, project_id=project_id, user=current_user)

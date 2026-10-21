@@ -28,7 +28,7 @@ from fastapi import HTTPException, UploadFile
 from openpyxl import Workbook
 
 from app.deps import authorize_wp_edit, authorize_wp_read
-from app.models.base import UserRole
+from app.models.base import PermissionLevel, UserRole
 from app.routers.wp_render_strategies._d4_import_export import d4_import_data
 
 
@@ -133,9 +133,8 @@ async def test_authorize_wp_read_allows_readonly_member():
         sql = str(getattr(stmt, "text", stmt)).lower()
         if "working_paper" in sql:
             return _scalar_result(_PROJECT_ID)
-        pu = MagicMock()
-        pu.permission_level = MagicMock(value="readonly")
-        return _scalar_result(pu)
+        # 成员级别查询只取 project_users.permission_level 一列 ⇒ 标量就是级别枚举本身
+        return _scalar_result(PermissionLevel.readonly)
 
     db.execute = AsyncMock(side_effect=_side)
     pid = await authorize_wp_read(db, _make_user(UserRole.readonly), _WP_ID)

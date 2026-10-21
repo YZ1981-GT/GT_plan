@@ -11,7 +11,6 @@ spec: knowledge-upload-robustness-and-consumer-wiring（Requirement 6.2–6.5）
 
 本文件只 mock ``chat_completion``（LLM）与上年附注加载器；路由、``require_project_access``、
 ``KnowledgeIndexService.load_documents`` 的单一判定面全部真实执行（SQLite 内存库）。
-权限缓存打桩为「未命中 / 不写」：既不写共享 Redis，也避免用例间缓存串味。
 """
 from __future__ import annotations
 
@@ -114,8 +113,6 @@ async def env() -> AsyncGenerator[dict, None]:
     with patch("app.services.llm_client.chat_completion", new=llm), patch(
         "app.services.reference_doc_service.ReferenceDocService.load_context",
         new=AsyncMock(return_value=[PRIOR_NOTE]),
-    ), patch("app.deps._get_cached_permission", new=AsyncMock(return_value=None)), patch(
-        "app.deps._set_cached_permission", new=AsyncMock()
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             yield {

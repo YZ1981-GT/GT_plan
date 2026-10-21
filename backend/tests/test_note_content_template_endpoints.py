@@ -1,13 +1,12 @@
 """附注内容模板端点安全矩阵（Task 45 / R-03 / R-04）：TestClient 真发请求，鉴权依赖链真实执行。
 
-只覆盖 ``get_db`` / ``get_current_user``；权限缓存打桩为未命中。SQLite 内存库 + 真 ORM。
+只覆盖 ``get_db`` / ``get_current_user``。SQLite 内存库 + 真 ORM。
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -80,11 +79,9 @@ async def env() -> AsyncGenerator[dict, None]:
 
     app.dependency_overrides[get_db] = _override_db
     app.dependency_overrides[get_current_user] = lambda: current["actor"]
-    with patch("app.deps._get_cached_permission", new=AsyncMock(return_value=None)), \
-            patch("app.deps._set_cached_permission", new=AsyncMock()):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            yield {"client": client, "ids": ids, "factory": factory,
-                   "act_as": lambda key: current.update(actor=_Actor(ids[key]))}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield {"client": client, "ids": ids, "factory": factory,
+               "act_as": lambda key: current.update(actor=_Actor(ids[key]))}
     await engine.dispose()
 
 

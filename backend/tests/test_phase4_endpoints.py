@@ -24,7 +24,6 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-import app.deps as deps
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import Base, PermissionLevel, ProjectUserRole
@@ -122,17 +121,6 @@ async def seed_project(db: AsyncSession):
     db.add(other_project)
     await db.commit()
     return project
-
-
-@pytest.fixture(autouse=True)
-def _no_permission_cache(monkeypatch):
-    """权限缓存是真 Redis、按 (用户, 项目) 记 5 分钟，而本文件 ID 是模块级常量 ⇒ 关掉缓存，每例只认本例种的成员。"""
-
-    async def _miss(*_a, **_k):
-        return None
-
-    monkeypatch.setattr(deps, "_get_cached_permission", _miss)
-    monkeypatch.setattr(deps, "_set_cached_permission", _miss)
 
 
 async def _add_member(

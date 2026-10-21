@@ -207,8 +207,7 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
     """项目级权限校验依赖工厂。
 
     - admin 角色跳过检查
-    - Redis 缓存权限查询结果（TTL=5min）
-    - Redis 不可用时降级为直接查库
+    - 其余用户按本项目未删除成员行的级别判定（每次直接查库）
     - 权限不足返回 403
 
     ``min_permission`` 必须是 :data:`PERMISSION_HIERARCHY` 的键，**在工厂调用期即校验**
@@ -222,7 +221,6 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
     这类拼写错误不会有任何报错或日志，只有逐字符核对才发现，故改为导入期硬失败。
     """
     _validate_permission_level(min_permission, caller="require_project_access")
-    # PERM_CACHE_TTL 使用模块级常量（见下方），此处不重复定义
 
     async def dependency(
         project_id: UUID,
@@ -275,31 +273,11 @@ async def assert_project_permission(
 
     required_level = PERMISSION_HIERARCHY[min_permission]
 
-    # Try Redis cache first
-    cached_level = await _get_cached_permission(current_user.id, project_id)
-    if cached_level is not None:
-        if PERMISSION_HIERARCHY.get(cached_level, 0) < required_level:
-            raise HTTPException(status_code=403, detail="权限不足")
-        # 设置 RLS context（SET LOCAL 仅当前事务有效）
-        await set_rls_context(db, project_id)
-        return current_user
+    # 查询 project_users 表（只取级别一列，每次直接查库）
+    level_value = await _load_member_level(db, current_user.id, project_id)
 
-    # 查询 project_users 表
-    result = await db.execute(
-        select(ProjectUser).where(
-            ProjectUser.project_id == project_id,
-            ProjectUser.user_id == current_user.id,
-            ProjectUser.is_deleted == False,  # noqa: E712
-        )
-    )
-    project_user = result.scalar_one_or_none()
-
-    if project_user is None:
+    if level_value is None:
         raise HTTPException(status_code=403, detail="权限不足")
-
-    # Cache the permission level
-    level_value = project_user.permission_level.value
-    await _set_cached_permission(current_user.id, project_id, level_value)
 
     if PERMISSION_HIERARCHY.get(level_value, 0) < required_level:
         raise HTTPException(status_code=403, detail="权限不足")
@@ -424,24 +402,12 @@ async def authorize_wp_edit(db: AsyncSession, current_user: User, wp_id: UUID) -
     if role in ("admin", "partner"):
         return project_id
 
-    # ④ 项目成员编辑权（project_users edit 级；复用权限缓存）
-    cached_level = await _get_cached_permission(current_user.id, project_id)
-    if cached_level is None:
-        project_user = (
-            await db.execute(
-                select(ProjectUser).where(
-                    ProjectUser.project_id == project_id,
-                    ProjectUser.user_id == current_user.id,
-                    ProjectUser.is_deleted == False,  # noqa: E712
-                )
-            )
-        ).scalar_one_or_none()
-        if project_user is None:
-            raise HTTPException(status_code=403, detail="无底稿编辑权限")
-        cached_level = project_user.permission_level.value
-        await _set_cached_permission(current_user.id, project_id, cached_level)
+    # ④ 项目成员编辑权（project_users edit 级；每次直接查库）
+    level = await _load_member_level(db, current_user.id, project_id)
+    if level is None:
+        raise HTTPException(status_code=403, detail="无底稿编辑权限")
 
-    if PERMISSION_HIERARCHY.get(cached_level, 0) < PERMISSION_HIERARCHY["edit"]:
+    if PERMISSION_HIERARCHY.get(level, 0) < PERMISSION_HIERARCHY["edit"]:
         raise HTTPException(status_code=403, detail="无底稿编辑权限")
 
     return project_id
@@ -482,70 +448,38 @@ async def authorize_wp_read(db: AsyncSession, current_user: User, wp_id: UUID) -
     if role in ("admin", "partner"):
         return project_id
 
-    cached_level = await _get_cached_permission(current_user.id, project_id)
-    if cached_level is None:
-        project_user = (
-            await db.execute(
-                select(ProjectUser).where(
-                    ProjectUser.project_id == project_id,
-                    ProjectUser.user_id == current_user.id,
-                    ProjectUser.is_deleted == False,  # noqa: E712
-                )
-            )
-        ).scalar_one_or_none()
-        if project_user is None:
-            raise HTTPException(status_code=403, detail="无底稿访问权限")
-        cached_level = project_user.permission_level.value
-        await _set_cached_permission(current_user.id, project_id, cached_level)
+    level = await _load_member_level(db, current_user.id, project_id)
+    if level is None:
+        raise HTTPException(status_code=403, detail="无底稿访问权限")
 
-    if PERMISSION_HIERARCHY.get(cached_level, 0) < PERMISSION_HIERARCHY["readonly"]:
+    if PERMISSION_HIERARCHY.get(level, 0) < PERMISSION_HIERARCHY["readonly"]:
         raise HTTPException(status_code=403, detail="无底稿访问权限")
 
     return project_id
 
 
 # ---------------------------------------------------------------------------
-# Permission cache helpers (Redis, graceful degradation)
+# _load_member_level — 级别判定点共用的成员级别读取（不经缓存）
 # ---------------------------------------------------------------------------
 
-PERM_CACHE_TTL = 300  # 5 minutes
 
+async def _load_member_level(db: AsyncSession, user_id: UUID, project_id: UUID) -> str | None:
+    """返回用户在项目的未删除成员行级别（``permission_level`` 的字符串取值），没有成员行返回 None。
 
-async def _get_cached_permission(user_id: UUID, project_id: UUID) -> str | None:
-    """从 Redis 获取缓存的权限级别，不可用时返回 None（降级查库）。"""
-    try:
-        from app.core.redis import redis_client
-        if redis_client is None:
-            return None
-        cache_key = f"perm:{user_id}:{project_id}"
-        cached = await redis_client.get(cache_key)
-        return cached.decode() if cached else None
-    except Exception:
-        return None
-
-
-async def _set_cached_permission(user_id: UUID, project_id: UUID, level: str) -> None:
-    """写入权限缓存。"""
-    try:
-        from app.core.redis import redis_client
-        if redis_client is None:
-            return
-        cache_key = f"perm:{user_id}:{project_id}"
-        await redis_client.setex(cache_key, PERM_CACHE_TTL, level)
-    except Exception:
-        pass
-
-
-async def invalidate_permission_cache(user_id: UUID, project_id: UUID) -> None:
-    """权限变更时主动失效缓存。"""
-    try:
-        from app.core.redis import redis_client
-        if redis_client is None:
-            return
-        cache_key = f"perm:{user_id}:{project_id}"
-        await redis_client.delete(cache_key)
-    except Exception:
-        pass
+    ``assert_project_permission``、``authorize_wp_edit``、``authorize_wp_read`` 三个级别判定点共用本函数，
+    每次判定都直接查库（partner-manager-edit-permission D3：权限缓存已移除）。只取级别一列、不经 ORM
+    身份映射：结果取自本次查询返回的行，不会是同一会话里早先加载、之后已过时的成员行对象。
+    """
+    level = (
+        await db.execute(
+            select(ProjectUser.permission_level).where(
+                ProjectUser.project_id == project_id,
+                ProjectUser.user_id == user_id,
+                ProjectUser.is_deleted == False,  # noqa: E712
+            )
+        )
+    ).scalar_one_or_none()
+    return level.value if level is not None else None
 
 
 # ---------------------------------------------------------------------------

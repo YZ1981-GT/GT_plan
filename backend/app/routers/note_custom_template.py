@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
+from app.services.note_edit_gate import require_note_edit_access
 from app.services.note_custom_template_service import NoteCustomTemplateService
 
 logger = logging.getLogger(__name__)
@@ -51,7 +52,7 @@ async def save_custom_template(
     project_id: UUID,
     body: SaveCustomTemplateRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_note_edit_access(consol_lock=False)),
 ):
     """保存自定义模板（产生新版本 v{N+1}.json）."""
     svc = NoteCustomTemplateService(db)
@@ -83,7 +84,7 @@ async def restore_custom_template(
     project_id: UUID,
     version: int = Query(..., ge=1, description="目标历史版本号"),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_note_edit_access(consol_lock=False)),
 ):
     """回滚到指定历史版本（产生新版本，不覆盖历史快照）."""
     svc = NoteCustomTemplateService(db)

@@ -1,7 +1,7 @@
 """附注正文批量导入端点（R-01 / R-18）：TestClient 真发请求，鉴权与依赖链真实执行。
 
 只覆盖 ``get_db`` / ``get_current_user``（``require_project_access`` 每次返回新函数，不能直接覆盖）；
-权限缓存打桩为未命中、协调器 Redis 打桩为不可用、EventBus 只记录不分发。SQLite 内存库 + 真 ORM。
+协调器 Redis 打桩为不可用、EventBus 只记录不分发。SQLite 内存库 + 真 ORM。
 """
 
 from __future__ import annotations
@@ -32,13 +32,14 @@ from app.models.note_content_template_models import (
     NoteTextBatchApplication,
 )
 from app.models.report_models import DisclosureNote
-from app.models.staff_models import StaffMember
+from app.models.staff_models import ProjectAssignment, StaffMember
 from app.routers import note_text_batch
 from app.services.disclosure_mutation_coordinator import DisclosureMutationCoordinator
 
 YEAR = 2025
 # 来源端点要解析写入人姓名（人员档案 → 登录名），与生产一样需要 staff_members
 _TABLES = [User.__table__, Project.__table__, ProjectUser.__table__, DisclosureNote.__table__, StaffMember.__table__,
+           ProjectAssignment.__table__,
            NoteContentTemplate.__table__, NoteContentTemplateVersion.__table__, NoteTextBatchApplication.__table__,
            KnowledgeFolder.__table__, KnowledgeDocument.__table__]
 BASE = "/api/projects/{pid}"
@@ -134,9 +135,7 @@ async def env() -> AsyncGenerator[dict, None]:
     app.dependency_overrides[get_db] = _override_db
     app.dependency_overrides[get_current_user] = lambda: current["actor"]
     published: list = []
-    with patch("app.deps._get_cached_permission", new=AsyncMock(return_value=None)), \
-            patch("app.deps._set_cached_permission", new=AsyncMock()), \
-            patch.object(DisclosureMutationCoordinator, "_redis", new=AsyncMock(return_value=None)), \
+    with patch.object(DisclosureMutationCoordinator, "_redis", new=AsyncMock(return_value=None)), \
             patch("app.services.event_bus.event_bus.publish", new=AsyncMock(side_effect=published.append)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             yield {"client": client, "ids": ids, "factory": factory, "published": published,
