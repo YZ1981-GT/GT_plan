@@ -39,6 +39,9 @@
             <el-tooltip content="公式管理（编辑取数规则）" placement="bottom">
               <el-button size="small" @click="openNoteFormula">ƒx</el-button>
             </el-tooltip>
+            <el-tooltip content="明细映射：匹配子企业附注科目到合并模板行" placement="bottom">
+              <el-button size="small" @click="showMappingDialog = true" data-testid="consol-note-open-mapping">📋 明细映射</el-button>
+            </el-tooltip>
           </div>
         </div>
 
@@ -676,6 +679,18 @@
     </el-table>
     <template #footer><el-button @click="showNoteBreakdownDialog = false">关闭</el-button></template>
   </el-dialog>
+
+  <!-- 明细映射弹窗（科目匹配确认） -->
+  <ConsolNoteMappingDialog
+    v-model:visible="showMappingDialog"
+    :project-id="props.projectId"
+    :section-id="String(selectedNoteSection?.section_id || '')"
+    :section-title="String(selectedNoteSection?.title || '')"
+    :year="props.year"
+    :template-type="(props.standard?.includes('listed') ? 'listed' : 'soe') as 'soe' | 'listed'"
+    :node-key="currentNodeKey() || undefined"
+    @applied="onDetailRefreshApplied"
+  />
 </template>
 
 <script setup lang="ts">
