@@ -82,7 +82,6 @@
         @cross-ref-update="onHtmlCrossRefUpdate"
         @sync-to-disclosure-notes="onHtmlSyncToDisclosureNotes"
         @jump-to-reference="onHtmlJumpToReference"
-        @open-formula="onHtmlOpenFormula"
         @open-attachment="onOpenAttachment"
         @sheet-change="onHtmlSheetChange"
       />
@@ -212,7 +211,7 @@
             :type="btn.dynamicType || btn.type"
             :plain="btn.plain"
             :loading="btn.loading"
-            :disabled="btn.disabled"
+            :disabled="btn.disabled || (btn.key === 'formulaManager' && shellCapabilitySnapshot.formulaView.allowed !== true)"
             :title="btn.title"
             @click="handleToolbarAction(btn.action)"
           >{{ btn.dynamicLabel || btn.label }}</el-button>
@@ -267,16 +266,6 @@
       :label="cellDetailLabel"
       @update:visible="showCellFormulaDetail = $event"
       @navigate="onCellDetailNavigate"
-    />
-
-    <!-- 公式编辑弹窗（HTML 渲染器子组件 open-formula 事件触发） -->
-    <FormulaEditDialog
-      v-model="showHtmlFormulaDialog"
-      :row="htmlFormulaDialogRow"
-      :project-id="projectId"
-      :year="currentYear"
-      :wp-context="htmlFormulaWpContext"
-      @save="onHtmlFormulaSave"
     />
 
   </div>
@@ -446,7 +435,6 @@ import GtWpRenderer from '@/components/workpaper/GtWpRenderer.vue'
 import WorkpaperSidePanel from '@/components/workpaper/WorkpaperSidePanel.vue'
 import ReviewLayerBadges from '@/components/workpaper/ReviewLayerBadges.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
-import FormulaEditDialog from '@/components/formula/FormulaEditDialog.vue'
 import TimeMachineDrawer from '@/components/time_machine/TimeMachineDrawer.vue'
 import UniverEditorCore from './workpaper-editor/UniverEditorCore.vue'
 import EditorBanners from './workpaper-editor/EditorBanners.vue'
@@ -465,6 +453,7 @@ import type { WorkpaperCapabilitySnapshot, CapabilityDecision } from '@/shell/fo
 import { fetchWorkpaperCapabilitySnapshot } from '@/shell/formula/fetchCapabilitySnapshot'
 import { DSH_ASSIST_BRIDGE_KEY } from '@/shell/formula/dshAssistBridge'
 import { openFormulaManagerFromLocation } from '@/shell/formula/openFormulaManagerFromLocation'
+import { FORMULA_MANAGER_CAPABILITY_CONTEXT } from '@/shell/formula/formulaManagerCapabilityContext'
 import {
   createShellStructuredError,
   type ShellStructuredError,
@@ -539,21 +528,6 @@ const showCellFormulaDetail = ref(false)
 const cellDetailSheet = ref('')
 const cellDetailLabel = ref('')
 
-// ─── HTML 渲染器公式编辑弹窗状态（open-formula 事件触发）───
-const showHtmlFormulaDialog = ref(false)
-const htmlFormulaDialogRow = ref<Record<string, string>>({})
-const currentYear = computed(() => new Date().getFullYear())
-const htmlFormulaWpContext = computed(() => {
-  if (!projectId.value) return undefined
-  return {
-    wpId: wpId.value,
-    wpCode: wpDetail.value?.wp_code || '',
-    sheetName: htmlFormulaDialogRow.value.sheet_name || '',
-    projectId: projectId.value,
-    year: currentYear.value,
-    cells: [],
-  }
-})
 const showStaleImpactPanel = ref(false)
 const showWpImportEnhanced = ref(false)
 
@@ -1007,43 +981,61 @@ const activeSheetContext = ref<WorkpaperSheetContext>({
 const shellOwnerEpoch = ref(1)
 const shellCapabilityEpoch = ref(1)
 const shellError = ref<ShellStructuredError | null>(null)
-const _deny: CapabilityDecision = {
-  allowed: false,
-  reasonCode: 'snapshot_uninitialized',
-  owner: 'workpaper-capability-matrix',
-  nextAction: '刷新后重试',
-  zhMessage: '能力快照尚未就绪，请稍候。',
+let shellCapabilityRequest = 0
+
+function denyCapabilitySnapshot(ownerEpoch: number, reasonCode = 'snapshot_uninitialized'): WorkpaperCapabilitySnapshot {
+  const deny: CapabilityDecision = {
+    allowed: false,
+    reasonCode,
+    owner: 'workpaper-capability-matrix',
+    nextAction: '刷新后重试',
+    zhMessage: '能力快照尚未就绪，请稍候。',
+  }
+  return {
+    snapshotVersion: '1.0',
+    subjectDigest: '',
+    ownerEpoch,
+    expiresAt: '1970-01-01T00:00:00Z',
+    formulaView: deny,
+    formulaEditUser: deny,
+    formulaHistory: deny,
+    aiReviewPage: deny,
+    aiReviewBatch: deny,
+    aiAssistChat: deny,
+    humanReviewRead: deny,
+    humanReviewWrite: deny,
+    guidanceRead: deny,
+  }
 }
-const shellCapabilitySnapshot = ref<WorkpaperCapabilitySnapshot>({
-  snapshotVersion: '1.0',
-  subjectDigest: '',
-  ownerEpoch: 1,
-  expiresAt: '1970-01-01T00:00:00Z',
-  formulaView: _deny,
-  formulaEditUser: _deny,
-  formulaHistory: _deny,
-  aiReviewPage: _deny,
-  aiReviewBatch: _deny,
-  aiAssistChat: _deny,
-  humanReviewRead: _deny,
-  humanReviewWrite: _deny,
-  guidanceRead: _deny,
-})
+
+const shellCapabilitySnapshot = ref<WorkpaperCapabilitySnapshot>(denyCapabilitySnapshot(1))
 
 async function refreshShellCapability(): Promise<void> {
+  const request = ++shellCapabilityRequest
+  const subject = {
+    wpId: wpId.value,
+    projectId: projectId.value,
+    sheetUid: activeSheetContext.value.sheetUid,
+    ownerEpoch: activeSheetContext.value.ownerEpoch ?? shellOwnerEpoch.value,
+  }
+  shellOwnerEpoch.value = subject.ownerEpoch
+  shellCapabilityEpoch.value = subject.ownerEpoch
+  shellCapabilitySnapshot.value = denyCapabilitySnapshot(subject.ownerEpoch, 'snapshot_loading')
+  const stillCurrent = () => request === shellCapabilityRequest
+    && wpId.value === subject.wpId
+    && projectId.value === subject.projectId
+    && activeSheetContext.value.sheetUid === subject.sheetUid
+    && (activeSheetContext.value.ownerEpoch ?? shellOwnerEpoch.value) === subject.ownerEpoch
   try {
-    const snap = await fetchWorkpaperCapabilitySnapshot({
-      wpId: wpId.value,
-      projectId: projectId.value,
-      ownerEpoch: shellOwnerEpoch.value,
-      sheetUid: activeSheetContext.value.sheetUid,
-    })
-    if (!snap) {
+    const snap = await fetchWorkpaperCapabilitySnapshot(subject)
+    if (!stillCurrent()) return
+    if (!snap || snap.ownerEpoch !== subject.ownerEpoch) {
+      shellCapabilitySnapshot.value = denyCapabilitySnapshot(subject.ownerEpoch, 'snapshot_subject_mismatch')
       shellError.value = createShellStructuredError({
         domain: 'capability',
         reasonCode: 'snapshot_parse_failed',
         zhMessage: '能力快照不可用，公共操作已暂时阻断。',
-        ownerEpoch: shellOwnerEpoch.value,
+        ownerEpoch: subject.ownerEpoch,
         capabilityEpoch: shellCapabilityEpoch.value,
       })
       return
@@ -1052,11 +1044,13 @@ async function refreshShellCapability(): Promise<void> {
     shellCapabilityEpoch.value = snap.ownerEpoch
     shellError.value = null
   } catch (err) {
+    if (!stillCurrent()) return
+    shellCapabilitySnapshot.value = denyCapabilitySnapshot(subject.ownerEpoch, 'snapshot_fetch_failed')
     shellError.value = createShellStructuredError({
       domain: 'capability',
       reasonCode: 'snapshot_fetch_failed',
       zhMessage: '能力快照加载失败，请稍后重试。',
-      ownerEpoch: shellOwnerEpoch.value,
+      ownerEpoch: subject.ownerEpoch,
       capabilityEpoch: shellCapabilityEpoch.value,
       operation: 'capability-snapshot',
     })
@@ -1098,6 +1092,11 @@ const shellLocation = computed<CanonicalWorkpaperLocation | null>(() => {
     ownerEpoch: ctx.ownerEpoch ?? shellOwnerEpoch.value,
     contextRevision: ctx.contextRevision ?? 1,
   }
+})
+
+provide(FORMULA_MANAGER_CAPABILITY_CONTEXT, {
+  capability: shellCapabilitySnapshot,
+  location: shellLocation,
 })
 
 const guidancePanelStore = useGuidancePanelStore()
@@ -1187,7 +1186,9 @@ function onFormulaManager() {
     sheetName: ctx.wholeWorkbook ? '' : (ctx.sheetName || ''),
     host: 'univer',
     scope: 'workpaper',
-  })
+    ownerEpoch: loc?.ownerEpoch,
+    contextRevision: loc?.contextRevision,
+  }, shellCapabilitySnapshot.value, loc)
   if (!outcome.ok) {
     ElMessage.warning(outcome.detail)
   }
@@ -1206,51 +1207,6 @@ function onUpload() {
 function onOpenAttachment(_payload: { wpId: string; sheetName: string; rowRef: string }) {
   // 打开侧面板（附件 Tab 由 WorkpaperSidePanel 内部管理）
   showSidePanel.value = true
-}
-
-// ─── HTML 渲染器公式编辑（open-formula 事件）─────────────────────────────
-
-function onHtmlOpenFormula(payload: { wpId: string; sheetName: string }) {
-  htmlFormulaDialogRow.value = {
-    row_code: `WP:${payload.wpId}:${payload.sheetName}`,
-    row_name: payload.sheetName,
-    sheet_name: payload.sheetName,
-  }
-  showHtmlFormulaDialog.value = true
-}
-
-async function onHtmlFormulaSave(payload: {
-  formula: string
-  category: string
-  description: string
-  target_cell?: string
-}) {
-  if (!payload.formula?.trim()) {
-    ElMessage.warning('公式表达式不能为空')
-    return
-  }
-  const target = (payload.target_cell || '').trim()
-  const cellMatch = target.match(/([A-Z]+\d+)/i)
-  const targetCell = cellMatch ? cellMatch[1].toUpperCase() : ''
-  if (!targetCell) {
-    ElMessage.warning('请先选择目标单元格（如 B5）')
-    return
-  }
-  try {
-    await httpApi.put(`/api/workpapers/${wpId.value}/formulas`, {
-      sheet_name: htmlFormulaDialogRow.value.sheet_name || '',
-      target_cell: targetCell,
-      expression: payload.formula,
-      year: currentYear.value,
-      template_type: 'soe',
-      category: payload.category || '',
-      description: payload.description || '',
-    })
-    ElMessage.success('公式已保存')
-    showHtmlFormulaDialog.value = false
-  } catch (e) {
-    handleApiError(e, '保存公式失败')
-  }
 }
 
 // ─── Cell formula detail ────────────────────────────────────────────────────

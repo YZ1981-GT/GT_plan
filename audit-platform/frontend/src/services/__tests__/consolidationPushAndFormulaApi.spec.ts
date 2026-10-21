@@ -60,10 +60,13 @@ describe('合并附注公式 API 契约', () => {
     api.put.mockResolvedValue({ id: 'n1' })
     api.delete.mockResolvedValue({ id: 'n1', deleted: true })
     api.post.mockResolvedValue({ inserted: 1 })
-    await updateConsolNoteFormula('n1', { formula: 'REPORT(\'BS-002\')', description: null })
-    expect(api.put).toHaveBeenCalledWith('/api/consol-note-formulas/n1', { formula: "REPORT('BS-002')", description: null })
-    await deleteConsolNoteFormula('n1')
-    expect(api.delete).toHaveBeenCalledWith('/api/consol-note-formulas/n1')
+    // 修改 / 删除须带当前版本号（formula-global-settings-sync：缺失 428、已被他人修改 409）
+    await updateConsolNoteFormula('n1', { formula: 'REPORT(\'BS-002\')', description: null, expected_version: 2 })
+    expect(api.put).toHaveBeenCalledWith('/api/consol-note-formulas/n1', {
+      formula: "REPORT('BS-002')", description: null, expected_version: 2,
+    })
+    await deleteConsolNoteFormula('n1', 2)
+    expect(api.delete).toHaveBeenCalledWith('/api/consol-note-formulas/n1', { params: { expected_version: 2 } })
     await reseedConsolNoteFormulas('listed')
     expect(api.post).toHaveBeenCalledWith('/api/consol-note-formulas/seed?template_type=listed')
   })

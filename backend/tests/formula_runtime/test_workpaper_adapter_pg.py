@@ -42,10 +42,21 @@ CREATE TABLE checklist_responses (
 
 
 async def _scenario() -> dict:
-    from app.core.database import engine
+    from app.core.config import settings
     from app.services.formula_runtime.adapters.workpaper import WorkpaperMutationAdapter
     from app.services.formula_runtime.contracts import CanonicalFormulaTarget
-    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    # 🔴 用独立 NullPool engine，不碰仓库全局 app.core.database.engine：
+    # 全组跑时多个 PG 守卫共用全局 engine 且各自 dispose，先 dispose 的会使本测试拿到
+    # 已释放/重建的连接池 → SET search_path 落在不同连接上 → schema 不一致而失败
+    # （单跑绿、全组红的典型测试间污染，与 test_formula_push_engine_pg 同根同治）。
+    url = str(settings.DATABASE_URL)
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    connect_args = {"ssl": False} if getattr(settings, "DB_DISABLE_SSL", False) else {}
+    engine = create_async_engine(url, poolclass=NullPool, connect_args=connect_args)
 
     assert engine.dialect.name == "postgresql", f"需要 PostgreSQL，实际 {engine.dialect.name}"
     schema = f"tmp_wp_adapter_{uuid.uuid4().hex[:10]}"

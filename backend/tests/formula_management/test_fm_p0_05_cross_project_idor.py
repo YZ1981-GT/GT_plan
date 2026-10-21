@@ -235,12 +235,14 @@ def _make_app(db: AsyncSession, user_a: User) -> FastAPI:
         formula as formula_router,
         formula_scope_query as formula_scope_router,
         report_config as report_config_router,
+        tb_detail_formulas as tb_detail_router,
         wp_formula as wp_formula_router,
     )
 
     app = FastAPI()
     app.include_router(wp_formula_router.router)
     app.include_router(report_config_router.router)
+    app.include_router(tb_detail_router.router)  # 2026-10-20 迁出 report_config，路径不变
     app.include_router(formula_router.router)
     app.include_router(formula_scope_router.router)
 

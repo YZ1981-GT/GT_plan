@@ -571,6 +571,7 @@ def prefill_workpaper_xlsx(
     tb_data: dict[str, dict[str, float]],
     adj_data: dict[str, dict[str, float]] | None = None,
     user_formulas: dict[str, dict] | None = None,
+    mapping_overrides: dict[str, str] | None = None,
 ) -> int:
     """在已复制的底稿 xlsx 中写入预填充数据
 
@@ -588,6 +589,7 @@ def prefill_workpaper_xlsx(
         tb_data: 试算表数据 {科目编码: {列名: 值}}
         adj_data: 调整分录数据 {科目编码: {aje_net: 值, rje_net: 值}}
         user_formulas: 用户自定义公式 {sheet!cell_ref: {formula, formula_type, ...}}
+        mapping_overrides: 映射单元格的有效公式（本项目 / 全局改过）{sheet!cell_ref: formula}，按它取值
 
     Returns:
         写入的单元格数量
@@ -677,8 +679,13 @@ def prefill_workpaper_xlsx(
         if cell_ref.startswith("_"):
             continue
         value = None
+        override = (mapping_overrides or {}).get(f"{sheet_name}!{cell_ref}")
 
-        if formula_type == "TB" and primary_code:
+        if override is not None:  # formula-global-settings-sync：全局 > 预设映射
+            from app.services.formula_settings.wp_effective import override_value
+
+            value = override_value(override, cell_def.get("formula", ""), tb_data, adj_data, account_codes)
+        elif formula_type == "TB" and primary_code:
             # =TB('code','列名') → 从 tb_data 取值
             col_name = _extract_tb_column(cell_def.get("formula", ""))
             value = tb_data.get(primary_code, {}).get(col_name)

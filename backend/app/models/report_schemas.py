@@ -125,6 +125,11 @@ class ReportConfigRow(BaseModel):
     applicable_standard: str
     is_total_row: bool = False
     parent_row_code: str | None = None
+    # V199 formula-global-settings-sync：修改公式须带 expected_version = 本字段（CAS）；
+    # 项目行另有基线来源与是否暂缓固定（层级标签）。
+    formula_version: int = 1
+    pinned: bool = False
+    base_origin: str | None = None
 
 
 class ReportConfigCloneRequest(BaseModel):

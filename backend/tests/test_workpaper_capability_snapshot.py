@@ -121,3 +121,79 @@ def test_server_revalidate_matches_matrix(key: str) -> None:
     gate = assert_snapshot_action_allowed(snap, key, owner_epoch=9)  # type: ignore[arg-type]
     direct = decide_capability(_principal(role="reviewer"), key)  # type: ignore[arg-type]
     assert gate.allowed == direct.allowed
+
+
+# ── runtime-integrity：端点必须从 DB/认证用户重建快照，不信任 query/snapshot ──
+
+import inspect
+import uuid
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+
+from fastapi import HTTPException
+
+from app.models.core import UserRole
+from app.routers import wp_capability_snapshot as capability_router
+
+
+def test_endpoint_signature_has_no_client_membership_or_role_knobs() -> None:
+    params = inspect.signature(capability_router.get_capability_snapshot).parameters
+    assert "project_member" not in params
+    assert "wp_visible" not in params
+    assert "role" not in params
+    assert "db" in params
+
+
+def test_real_user_roles_map_to_capability_roles() -> None:
+    expected = {
+        UserRole.admin: "admin",
+        UserRole.partner: "supervisor",
+        UserRole.manager: "lead",
+        UserRole.auditor: "assignee",
+        UserRole.qc: "reviewer",
+        UserRole.eqcr: "reviewer",
+        UserRole.readonly: "readonly",
+    }
+    for role, mapped in expected.items():
+        assert capability_router._role_of(SimpleNamespace(role=role)) == mapped
+
+
+@pytest.mark.asyncio
+async def test_snapshot_project_mismatch_is_forbidden() -> None:
+    wp_id, actual_project, claimed_project = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    user = SimpleNamespace(id=uuid.uuid4(), role=UserRole.admin)
+    with patch.object(
+        capability_router,
+        "authorize_wp_read",
+        new=AsyncMock(return_value=actual_project),
+    ):
+        with pytest.raises(HTTPException) as exc:
+            await capability_router.get_capability_snapshot(
+                wp_id=wp_id,
+                project_id=claimed_project,
+                owner_epoch=1,
+                sheet_uid="A1",
+                db=AsyncMock(),
+                user=user,
+            )
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_capability_assert_ignores_client_allow_for_readonly_user() -> None:
+    wp_id, project_id = uuid.uuid4(), uuid.uuid4()
+    user = SimpleNamespace(id=uuid.uuid4(), role=UserRole.readonly)
+    forged = build_capability_snapshot(_principal(role="admin", project_id=str(project_id), wp_id=str(wp_id)), owner_epoch=7)
+    body = capability_router.CapabilityActionBody(
+        capability="formulaEditUser", ownerEpoch=7, snapshot=forged,
+    )
+    with patch.object(
+        capability_router,
+        "authorize_wp_read",
+        new=AsyncMock(return_value=project_id),
+    ):
+        with pytest.raises(HTTPException) as exc:
+            await capability_router.assert_capability_action(
+                wp_id=wp_id, body=body, db=AsyncMock(), user=user,
+            )
+    assert exc.value.status_code == 403

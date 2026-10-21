@@ -342,6 +342,7 @@ def test_save_update_of_source_triggers_invalidation():
                     new_callable=AsyncMock,
                 ) as mock_inval:
                     # upsert 命中既有源（同 wp_id/sheet/cell）→ 更新 = 源变更。
+                    # CAS 前置条件：更新已有公式必须携带 expected_version（取源当前版本）。
                     saved, issues = await svc.save(
                         db,
                         project_id=project_id,
@@ -350,6 +351,7 @@ def test_save_update_of_source_triggers_invalidation():
                         target_cell="B5",
                         expression="TB('1001')+100",
                         year=2025,
+                        expected_version=src.definition_version,
                     )
 
                 assert issues == []

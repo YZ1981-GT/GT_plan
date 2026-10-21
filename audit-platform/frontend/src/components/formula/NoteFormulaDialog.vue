@@ -41,8 +41,10 @@
             <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary)">{{ row.description }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="来源" width="100">
+        <el-table-column label="来源" width="120">
           <template #default="{ row }">
+            <el-tag v-if="row.layer_label" size="small" effect="plain" :type="row.layer === 'project' ? 'warning' : 'info'">{{ row.layer_label }}</el-tag>
+            <el-tag v-if="row.pending" size="small" type="danger" effect="plain">待确认</el-tag>
             <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary)">{{ row.source }}</span>
           </template>
         </el-table-column>
@@ -145,6 +147,18 @@ function onInsertRef(formula: string, _label: string) {
 
 // 附注公式列表（Req 15.1：onOpen 从后端加载已保存/预览集，替代此前空 ref）
 const formulas = ref<any[]>([])
+/**
+ * 载入时的版本令牌（spec formula-global-settings-sync）：保存时原样带回，后端据此只写
+ * 改过的公式位并判定并发冲突（缺失 428、已被他人修改 409）。
+ */
+const loadedTokens = ref<Record<string, string | null> | null>(null)
+
+/** 列表 / 保存接口同形：`{formulas, loaded}`；每条带层级标签（全局 / 本项目 / 系统预设 …）。 */
+function applyListing(resp: any) {
+  const list = resp?.formulas
+  formulas.value = (Array.isArray(list) ? list : []).map((f: any) => ({ ...f, _editing: false }))
+  loadedTokens.value = resp?.loaded ?? {}
+}
 
 const filteredFormulas = computed(() => {
   return formulas.value.filter(f => f.category === activeCategory.value)
@@ -163,10 +177,10 @@ async function loadFormulas() {
     const resp = await api.get(
       noteFormula.list(props.projectId, props.year, noteSection)
     )
-    const list = resp?.formulas
-    formulas.value = (Array.isArray(list) ? list : []).map((f: any) => ({ ...f, _editing: false }))
+    applyListing(resp)
   } catch (e: any) {
     formulas.value = []
+    loadedTokens.value = null
     handleApiError(e, '加载公式失败')
   } finally {
     loading.value = false
@@ -218,16 +232,26 @@ async function persistFormulas(): Promise<boolean> {
     return false
   }
   const noteSection = props.currentNote.note_section
-  // 剔除前端本地态字段（_editing），只送持久化 shape
+  // 剔除前端本地态字段（_editing）与只读展示字段（层级），只送持久化 shape
   const payload = formulas.value
     .filter(f => (f?.formula || '').trim())
-    .map(({ _editing, ...rest }) => rest)
+    .map(({ _editing, layer, layer_label, pending, slot_key, ...rest }) => rest)
   persisting.value = true
   try {
-    await api.put(
+    const resp = await api.put(
       noteFormula.list(props.projectId, props.year, noteSection),
-      { formulas: payload }
+      { formulas: payload, loaded: loadedTokens.value }
     )
+    // 保存后换用新令牌（连续保存不会带旧令牌撞 409），并就地刷新层级标签；
+    // 不替换行对象 —— 调用方（completeRow）还要把正在完成的那一行退出编辑态
+    if (resp?.loaded) {
+      loadedTokens.value = resp.loaded
+      const fresh = new Map<string, any>((resp.formulas || []).map((f: any) => [f.target, f]))
+      for (const f of formulas.value) {
+        const r = fresh.get(f.target)
+        if (r) Object.assign(f, { layer: r.layer, layer_label: r.layer_label, pending: r.pending, slot_key: r.slot_key })
+      }
+    }
     return true
   } catch (e: any) {
     handleApiError(e, '保存失败')

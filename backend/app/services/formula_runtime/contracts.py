@@ -75,13 +75,35 @@ class ExecutionResult:
     """公式执行结果。"""
 
     run_id: UUID
-    status: Literal["success", "partial_success", "failed", "no_effect", "idempotent_hit"]
+    status: Literal[
+        "success", "partial_success", "failed", "no_effect", "idempotent_hit",
+        "rolled_back", "conflict",
+    ]
     applied_count: int = 0
+    restored_count: int = 0
     failed_count: int = 0
     skipped_count: int = 0
     applied: list[AppliedMutation] = field(default_factory=list)
     failures: list[dict] = field(default_factory=list)
+    conflicts: list[dict] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     rollback_available: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "run_id": str(self.run_id),
+            "affected_count": self.applied_count,
+            "applied_count": self.applied_count,
+            "restored_count": self.restored_count,
+            "failed_count": self.failed_count,
+            "skipped_count": self.skipped_count,
+            "idempotent": self.status == "idempotent_hit",
+            "rollback_available": self.rollback_available,
+            "failures": list(self.failures),
+            "conflicts": list(self.conflicts),
+            "warnings": list(self.warnings),
+        }
 
 
 @runtime_checkable

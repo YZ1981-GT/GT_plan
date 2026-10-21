@@ -22,7 +22,9 @@ describe('公式管理合并域跨层接线', () => {
   })
 
   it('无 wpId 的项目级合并 payload 仍完整保留并透传模板/章节/报表类型', () => {
-    expect(layout).toContain('formulaContext.value = payload ? { ...payload } : undefined')
+    expect(layout).toContain('formulaOwnerState.value = receiveFormulaManagerOpen(formulaOwnerState.value, payload)')
+    expect(layout).toContain('const formulaContext = computed(() => formulaOwnerState.value.active)')
+    expect(layout).not.toContain('formulaContext.value = payload ? { ...payload } : undefined')
     expect(layout).not.toContain('payload?.wpId ? { ...payload } : undefined')
     for (const binding of [
       ':template-type="formulaContext?.templateType"', ':note-section="formulaContext?.noteSection"',

@@ -29,6 +29,7 @@ spec: .kiro/specs/formula-management-runtime-closure/
 """
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -254,14 +255,29 @@ class TestCoordinatorSeesUserFormulas:
         加了过滤 ⇒ `formula_source='custom'` 的用户公式被排除在 mutation plan 外，
         收敛就白做了。
         """
-        src = _strip_comments(_COORD.read_text(encoding="utf-8"))
-        m = re.search(r"async def _load_formulas[\s\S]*?return list\(", src)
-        assert m, "未找到 _load_formulas 查询体（结构已变）"
-        body = m.group(0)
-        assert "formula_source" not in body, (
+        tree = ast.parse(_COORD.read_text(encoding="utf-8"))
+        fn = next(
+            (
+                node for node in ast.walk(tree)
+                if isinstance(node, ast.AsyncFunctionDef) and node.name == "_load_formulas"
+            ),
+            None,
+        )
+        assert fn is not None, "未找到 _load_formulas AST（结构已变）"
+        attrs = {
+            node.attr for node in ast.walk(fn) if isinstance(node, ast.Attribute)
+        }
+        names = {node.id for node in ast.walk(fn) if isinstance(node, ast.Name)}
+        assert "formula_source" not in attrs | names, (
             "_load_formulas 出现 formula_source 过滤 —— 用户公式会被排除在求值外"
         )
-        assert "select(WpFormula)" in body, "_load_formulas 不再查 WpFormula"
+        assert any(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "select"
+            and any(isinstance(arg, ast.Name) and arg.id == "WpFormula" for arg in node.args)
+            for node in ast.walk(fn)
+        ), "_load_formulas 不再查 WpFormula"
 
 
 # ─────────────────── Property 11：cell_key 往返无损 ───────────────────
@@ -348,7 +364,8 @@ class TestUniqueIndexEvidence:
             if idx.unique
         }
         assert uniques, "WpFormula 无唯一索引（结构已变）"
-        cols = next(iter(uniques.values()))
+        cols = uniques.get("uq_wp_formula_wp_sheet_cell")
+        assert cols is not None, f"缺少实例 sheet/cell 唯一索引：{uniques}"
         assert cols == ["wp_id", "sheet_name", "target_cell"], (
             f"唯一索引列变了：{uniques}"
         )

@@ -97,6 +97,18 @@ describe('saveCustomPreset', () => {
     )
   })
 
+  it('非管理员 → 提交为全局候选：提示「待审核」，不报「已新增 / 已更新」', async () => {
+    mockPost.mockResolvedValueOnce({
+      data: { ok: true, pending_review: true, candidate: { id: 'c-1', status: 'pending' } },
+    })
+    const { saveCustomPreset } = useFormulaImportExport()
+    const res = await saveCustomPreset({ page_key: 'p', target_cell: 'c', expression: 'e', formula_type: 'auto_calc' })
+    expect(res?.pending_review).toBe(true)
+    expect(ElMessage.success).toHaveBeenCalledWith('已提交为全局候选，管理员审核通过后生效')
+    expect(ElMessage.success).not.toHaveBeenCalledWith('自定义预设已新增')
+    expect(ElMessage.success).not.toHaveBeenCalledWith('自定义预设已更新')
+  })
+
   it('422 悬空引用 → 友好提示 + 返回 null（Property 6 前端侧）', async () => {
     mockPost.mockRejectedValueOnce({
       response: {

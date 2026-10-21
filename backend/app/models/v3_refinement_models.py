@@ -56,7 +56,17 @@ class AiContentLog(Base, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("evidence_refs.id", ondelete="RESTRICT"), nullable=True
     )
     citation_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("citation_snapshots.id", ondelete="RESTRICT"), nullable=True
+        UUID(as_uuid=True),
+        # ai_content_log.citation_snapshot_id ↔ citation_snapshots.ai_content_log_id 构成循环外键，
+        # metadata.drop_all 无法为环排序（SAWarning + fixture teardown 失败）。给环中这一条边标
+        # use_alter + 命名约束，SQLAlchemy 即以独立 ALTER 建/解该约束，打破排序死锁；ondelete 语义不变。
+        ForeignKey(
+            "citation_snapshots.id",
+            ondelete="RESTRICT",
+            use_alter=True,
+            name="fk_ai_content_log_citation_snapshot_id",
+        ),
+        nullable=True,
     )
     is_stale: Mapped[bool] = mapped_column(
         Boolean, server_default=text("false"), nullable=False

@@ -160,6 +160,15 @@ class OwnershipError(Exception):
         self.message = message
 
 
+class FormulaVersionRequired(Exception):
+    """更新已有公式缺少 expected_version；router 转 428，禁止绕过 CAS。"""
+
+    def __init__(self, *, actual: int | None, target_cell: str | None = None):
+        super().__init__("更新已有公式必须携带 expected_version")
+        self.actual = actual
+        self.target_cell = target_cell
+
+
 class FormulaVersionConflict(Exception):
     """乐观锁（CAS）冲突：客户端提交的 ``expected_version`` 与库中当前
     ``definition_version`` 不一致（formula-manager-closure Task 5.4 / design §5 步骤 5）。
@@ -316,12 +325,11 @@ class WpFormulaService:
         - 必须传入 project_id（Req 10.6：未提供拒绝写入）。
         - 校验 wp_id 属于 project_id（Req 10.1 / 10.4）。
 
-        CAS 乐观锁（formula-manager-closure Task 5.4 / design §5 步骤 5）：
-        - ``expected_version`` 给定且命中既有行（upsert 的 update 分支）时，比对库中
-          当前 ``definition_version``；不一致 → 抛 ``FormulaVersionConflict``（router 转
-          409），**不覆盖**（compare-and-swap 并发冲突检测）。
-        - ``expected_version`` 为 None → 不做 CAS（向后兼容单条保存既有行为）。
-        - 新建分支不做 CAS（无既有版本可比）。
+        CAS 乐观锁（formula-manager-runtime-integrity-closure R3）：
+        - 命中既有行时 ``expected_version`` 必填；缺失抛 ``FormulaVersionRequired``。
+        - 更新使用 ``UPDATE ... WHERE definition_version=:expected RETURNING`` 单条条件写；
+          未命中说明并发版本已变化，抛 ``FormulaVersionConflict``，不覆盖。
+        - 新建分支无既有版本，definition_version 初始化为 1。
 
         Returns:
             (WpFormula, []) 保存成功；(None, issues) 校验失败未写库。
@@ -512,58 +520,63 @@ class WpFormulaService:
         ).scalar_one_or_none()
 
         if existing is not None:
-            # ── Req 10.1：二次校验 existing formula 归属 ──
             if existing.project_id != project_uuid:
                 return None, _ownership_issue()
+            actual_version = getattr(existing, "definition_version", None)
+            if expected_version is None:
+                raise FormulaVersionRequired(
+                    actual=actual_version,
+                    target_cell=target_cell,
+                )
 
-            # ── CAS 乐观锁（Task 5.4 / design §5 步骤 5）──
-            # 客户端带 expected_version 时，与库中当前 definition_version 比对；不一致
-            # 说明期间已被他人改过 → 抛 FormulaVersionConflict（router 转 409），不覆盖。
-            # 版本比对**先于**任何字段赋值，确保冲突时 ORM 对象零改动（不留脏 flush）。
-            if expected_version is not None:
-                actual_version = getattr(existing, "definition_version", None)
-                if actual_version != expected_version:
-                    raise FormulaVersionConflict(
-                        expected=expected_version,
-                        actual=actual_version,
-                        target_cell=target_cell,
+            now = datetime.now(timezone.utc)
+            update_stmt = (
+                sa.update(WpFormula)
+                .where(
+                    WpFormula.id == existing.id,
+                    WpFormula.project_id == project_uuid,
+                    WpFormula.definition_version == expected_version,
+                )
+                .values(
+                    expression=expression,
+                    formula_type=ftype,
+                    refs=normalized_refs,
+                    category=category,
+                    description=description,
+                    issue_description=issue_description,
+                    hint_text=hint_text,
+                    formula_source=fsource,
+                    reference_formula_id=reference_uuid,
+                    source_scope=normalized_source_scope,
+                    binding=normalized_binding,
+                    stable_sheet_key=stable.stable_sheet_key,
+                    row_key=stable.row_key,
+                    field_key=stable.field_key,
+                    stable_key_needs_review=stable.needs_review,
+                    updated_at=now,
+                    definition_version=WpFormula.definition_version + 1,
+                    definition_hash=def_hash,
+                    lifecycle_state="saved",
+                )
+                .returning(WpFormula.id)
+                .execution_options(synchronize_session=False)
+            )
+            updated_id = (await db.execute(update_stmt)).scalar_one_or_none()
+            if updated_id is None:
+                current_version = (
+                    await db.execute(
+                        sa.select(WpFormula.definition_version).where(
+                            WpFormula.id == existing.id
+                        )
                     )
+                ).scalar_one_or_none()
+                raise FormulaVersionConflict(
+                    expected=expected_version,
+                    actual=current_version,
+                    target_cell=target_cell,
+                )
 
-            existing.expression = expression
-            existing.formula_type = ftype
-            existing.refs = normalized_refs
-            existing.category = category
-            existing.description = description
-            existing.issue_description = issue_description
-            existing.hint_text = hint_text
-            existing.formula_source = fsource
-            existing.reference_formula_id = reference_uuid
-            if hasattr(existing, "source_scope"):
-                existing.source_scope = normalized_source_scope
-            if hasattr(existing, "binding"):
-                existing.binding = normalized_binding
-            # ── P0-项1：稳定键双写（identity 不随 sheet 展示重命名而变）──
-            if hasattr(existing, "stable_sheet_key"):
-                existing.stable_sheet_key = stable.stable_sheet_key
-                existing.row_key = stable.row_key
-                existing.field_key = stable.field_key
-                existing.stable_key_needs_review = stable.needs_review
-            # ── P5：save 绝不写 last_computed_at ──
-            # existing.last_computed_at 保持原值不动
-            existing.updated_at = datetime.now(timezone.utc)
-            # ── definition_version 递增（若 ORM 列可用）──
-            if hasattr(existing, "definition_version") and existing.definition_version is not None:
-                existing.definition_version = existing.definition_version + 1
-            elif hasattr(existing, "definition_version"):
-                existing.definition_version = 1
-            # ── definition_hash 更新 ──
-            if hasattr(existing, "definition_hash"):
-                existing.definition_hash = def_hash
-            # ── lifecycle_state 置为 saved（若 ORM 列可用）──
-            if hasattr(existing, "lifecycle_state"):
-                existing.lifecycle_state = "saved"
-            await db.flush()
-            # 源变更失效传播（Req 25.7）
+            await db.refresh(existing)
             await self._invalidate_reference_dependents(
                 db, source_formula_id=existing.id, project_id=project_uuid
             )

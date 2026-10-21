@@ -53,7 +53,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.deps import get_current_user, get_db
 from app.models.core import User
 from app.models.workpaper_models import WorkingPaper, WpFormula
-from app.services.wp_formula_service import wp_formula_service
+from app.services.wp_formula_service import (
+    FormulaVersionConflict,
+    FormulaVersionRequired,
+    wp_formula_service,
+)
 from app.services.prefill_engine import (
     _FORMULA_RE,
     _FORMULA_RESOLVERS,
@@ -435,21 +439,50 @@ async def update_user_formulas(
                 await db.delete(existing_row)
             continue
 
-        saved, issues = await wp_formula_service.save(
-            db,
-            project_id=wp.project_id,
-            wp_id=wp_id,
-            sheet_name=sheet_name,
-            target_cell=target_cell,
-            expression=formula,
-            year=_resolved_year,
-            template_type=_resolved_template_type,
-            description="用户自定义公式",
-            created_by=getattr(user, "id", None),
-            # 🔴 函数名（TB/WP/…）不是三类型，落表一律 auto_calc；见 USER_FORMULA_TYPE
-            formula_type=USER_FORMULA_TYPE,
-            formula_source=USER_FORMULA_SOURCE,
-        )
+        existing_row = (
+            await db.execute(
+                sa.select(WpFormula).where(
+                    WpFormula.wp_id == wp_id,
+                    WpFormula.sheet_name == sheet_name,
+                    WpFormula.target_cell == target_cell,
+                )
+            )
+        ).scalar_one_or_none()
+        try:
+            saved, issues = await wp_formula_service.save(
+                db,
+                project_id=wp.project_id,
+                wp_id=wp_id,
+                sheet_name=sheet_name,
+                target_cell=target_cell,
+                expression=formula,
+                year=_resolved_year,
+                template_type=_resolved_template_type,
+                description="用户自定义公式",
+                created_by=getattr(user, "id", None),
+                # 🔴 函数名（TB/WP/…）不是三类型，落表一律 auto_calc；见 USER_FORMULA_TYPE
+                formula_type=USER_FORMULA_TYPE,
+                formula_source=USER_FORMULA_SOURCE,
+                expected_version=(
+                    existing_row.definition_version if existing_row is not None else None
+                ),
+            )
+        except FormulaVersionRequired as exc:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+                detail={"error_code": "FORMULA_VERSION_REQUIRED", "actual_version": exc.actual},
+            ) from exc
+        except FormulaVersionConflict as exc:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error_code": "FORMULA_VERSION_CONFLICT",
+                    "expected_version": exc.expected,
+                    "actual_version": exc.actual,
+                },
+            ) from exc
         if saved is None:
             save_issues.extend(issues or [])
 

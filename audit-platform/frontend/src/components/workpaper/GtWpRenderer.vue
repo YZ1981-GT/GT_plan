@@ -135,7 +135,7 @@
           <el-button
             size="small"
             data-testid="formula-manager-open"
-            :disabled="!runtimeProjectId || !runtimeWpCode || loading"
+            :disabled="!runtimeProjectId || !runtimeWpCode || loading || !formulaViewAllowed"
             @click="openPageFormulaManager"
           >
             <el-icon><Setting /></el-icon> 公式管理
@@ -342,7 +342,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, toRef, onMounted, onUnmounted, nextTick, watch, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Switch, Setting, Refresh } from '@element-plus/icons-vue'
@@ -358,6 +358,7 @@ import { createHtmlStableContextEmitter } from '@/composables/htmlStableContextE
 import { useCellLocate, type LocateTarget } from '@/composables/useCellLocate'
 import { eventBus, type WorkpaperLocateCellPayload } from '@/utils/eventBus'
 import { openFormulaManagerFromLocation } from '@/shell/formula/openFormulaManagerFromLocation'
+import { FORMULA_MANAGER_CAPABILITY_CONTEXT } from '@/shell/formula/formulaManagerCapabilityContext'
 import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
 import {
   getRendererEntry,
@@ -413,6 +414,11 @@ const props = defineProps<{
   initialCell?: string
   readonly?: boolean
 }>()
+
+const formulaCapabilityContext = inject(FORMULA_MANAGER_CAPABILITY_CONTEXT, null)
+const formulaViewAllowed = computed(
+  () => formulaCapabilityContext?.capability.value.formulaView.allowed === true,
+)
 
 const emit = defineEmits<{
   'sheet-change': [context: WorkpaperSheetContext]
@@ -1218,7 +1224,9 @@ function openPageFormulaManager() {
     // （D2 里的 D0-*、E1 里的 E26A）靠它才能被认成「本册内页」而非外册。
     sheetCodes: hostSheetCodes.value,
     scope: 'workpaper',
-  })
+    ownerEpoch: formulaCapabilityContext?.location.value?.ownerEpoch,
+    contextRevision: formulaCapabilityContext?.location.value?.contextRevision,
+  }, formulaCapabilityContext?.capability.value, formulaCapabilityContext?.location.value)
   if (!outcome.ok) {
     ElMessage.warning(outcome.detail)
   }

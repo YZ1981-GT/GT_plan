@@ -87,7 +87,12 @@ async def get_workpaper_xlsx(
         tb_data = await _get_tb_data_for_prefill(db, pid)
         if tb_data:
             try:
-                filled = prefill_workpaper_xlsx(result, wp_code, tb_data)
+                # formula-global-settings-sync：本项目 > 全局 > 预设映射（读失败按预设）
+                from app.services.formula_settings.wp_effective import init_prefill_overrides
+
+                user_formulas, overrides = await init_prefill_overrides(db, pid, wid)
+                filled = prefill_workpaper_xlsx(result, wp_code, tb_data, user_formulas=user_formulas,
+                                                mapping_overrides=overrides)
                 if filled > 0:
                     logger.info("Auto-prefill on init: wp_code=%s, filled=%d cells", wp_code, filled)
             except Exception as e:

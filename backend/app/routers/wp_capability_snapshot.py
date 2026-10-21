@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from typing import Any, Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_current_user
+from app.core.database import get_db
+from app.deps import authorize_wp_read, get_current_user
 from app.models.core import User
 from app.services.workpaper_capability import (
     CapabilityPrincipal,
@@ -46,58 +49,78 @@ class CapabilityActionBody(BaseModel):
 
 
 def _role_of(user: User) -> RoleName:
-    # Minimal projection until Task 3 wires full visibility grants.
-    raw = (getattr(user, "role", None) or getattr(user, "user_role", None) or "assignee")
-    value = str(raw).strip().lower()
-    if value in {"admin", "supervisor", "lead", "assignee", "reviewer", "readonly"}:
-        return value  # type: ignore[return-value]
-    if value in {"superadmin", "system_admin"}:
-        return "admin"
-    return "assignee"
+    raw = getattr(user, "role", None) or getattr(user, "user_role", None)
+    value = raw.value if hasattr(raw, "value") else str(raw or "")
+    mapping: dict[str, RoleName] = {
+        "admin": "admin",
+        "partner": "supervisor",
+        "manager": "lead",
+        "auditor": "assignee",
+        "qc": "reviewer",
+        "eqcr": "reviewer",
+        "readonly": "readonly",
+    }
+    return mapping.get(value.strip().lower(), "anonymous")
 
 
 @router.get("/{wp_id}/capability-snapshot")
-def get_capability_snapshot(
-    wp_id: str,
-    project_id: str = Query(..., min_length=1),
+async def get_capability_snapshot(
+    wp_id: UUID,
+    project_id: UUID = Query(...),
     owner_epoch: int = Query(0, ge=0, alias="ownerEpoch"),
     sheet_uid: str | None = Query(None, alias="sheetUid"),
-    project_member: bool = Query(True, alias="projectMember"),
-    wp_visible: bool = Query(True, alias="wpVisible"),
-    role: RoleQuery | None = Query(None),
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """Issue a versioned capability snapshot for the workpaper shell.
-
-    Query flags ``projectMember`` / ``wpVisible`` are temporary wiring knobs for
-    fail-closed tests until this endpoint is fully bound to ``wp_visibility``.
-    Production callers should omit them (defaults true) and rely on gate wiring.
-    """
+    """按认证用户与数据库归属签发能力快照；不信任客户端角色/成员/可见性标志。"""
+    actual_project_id = await authorize_wp_read(db, user, wp_id)
+    if actual_project_id != project_id:
+        raise HTTPException(status_code=403, detail="project_id 与底稿归属不一致")
     principal = CapabilityPrincipal(
-        role=role or _role_of(user),
-        user_id=str(getattr(user, "id", "") or getattr(user, "user_id", "") or "unknown"),
-        project_id=project_id,
-        wp_id=wp_id,
+        role=_role_of(user),
+        user_id=str(user.id),
+        project_id=str(actual_project_id),
+        wp_id=str(wp_id),
         sheet_uid=sheet_uid,
-        project_member=project_member,
-        wp_visible=wp_visible,
+        project_member=True,
+        wp_visible=True,
     )
     return build_capability_snapshot(principal, owner_epoch=owner_epoch)
 
 
 @router.post("/{wp_id}/capability-assert")
-def assert_capability_action(
-    wp_id: str,
+async def assert_capability_action(
+    wp_id: UUID,
     body: CapabilityActionBody,
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """Server-side revalidation for a shell action (provider/save/AI/review/rail)."""
-    _ = user  # auth required; decision is snapshot-authoritative here
-    if body.snapshot.get("wpId") not in (None, wp_id) and body.snapshot.get("wpId") != wp_id:
+    """按当前认证用户和数据库归属重新计算能力，不信任客户端 snapshot 决策。"""
+    actual_project_id = await authorize_wp_read(db, user, wp_id)
+    snapshot_project = str(body.snapshot.get("projectId") or "")
+    if snapshot_project and snapshot_project != str(actual_project_id):
+        raise HTTPException(status_code=403, detail="snapshot projectId mismatch")
+    snapshot_wp = str(body.snapshot.get("wpId") or "")
+    if snapshot_wp and snapshot_wp != str(wp_id):
         raise HTTPException(status_code=400, detail="snapshot wpId mismatch")
+    principal = CapabilityPrincipal(
+        role=_role_of(user),
+        user_id=str(user.id),
+        project_id=str(actual_project_id),
+        wp_id=str(wp_id),
+        sheet_uid=body.snapshot.get("sheetUid"),
+        project_member=True,
+        wp_visible=True,
+    )
+    authoritative = build_capability_snapshot(
+        principal,
+        owner_epoch=body.ownerEpoch,
+    )
     decision = assert_snapshot_action_allowed(
-        body.snapshot,
+        authoritative,
         body.capability,
         owner_epoch=body.ownerEpoch,
     )
-    return {"wpId": wp_id, "capability": body.capability, **decision.to_wire()}
+    if not decision.allowed:
+        raise HTTPException(status_code=403, detail=decision.zh_message or "权限不足")
+    return {"wpId": str(wp_id), "capability": body.capability, **decision.to_wire()}

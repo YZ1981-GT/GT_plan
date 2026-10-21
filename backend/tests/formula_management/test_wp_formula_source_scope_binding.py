@@ -84,6 +84,7 @@ async def _save(
     wp_id: uuid.UUID,
     source_scope: dict | None,
     binding: dict | None,
+    expected_version: int | None = None,
 ):
     return await WpFormulaService().save(
         db,
@@ -95,6 +96,7 @@ async def _save(
         year=2025,
         source_scope=source_scope,
         binding=binding,
+        expected_version=expected_version,
     )
 
 
@@ -168,6 +170,7 @@ async def test_scope_or_binding_change_updates_definition_hash_and_version(
             wp_id=wp_id,
             source_scope=changed_scope,
             binding=changed_binding,
+            expected_version=first_version,  # CAS 前置条件：更新携带当前版本
         )
         assert second_issues == []
         assert second is not None

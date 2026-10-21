@@ -90,7 +90,14 @@ export interface FullInventoryGateResult {
 
 const FE_SRC = join(__dirname, '../..')
 /** repo root .kiro — FE_SRC is audit-platform/frontend/src */
-const SPEC_ROOT = join(FE_SRC, '../../../.kiro/specs/workpaper-page-formula-toolbar-closure')
+const ACTIVE_SPEC_ROOT = join(FE_SRC, '../../../.kiro/specs/workpaper-page-formula-toolbar-closure')
+const ARCHIVED_SPEC_ROOT = join(
+  FE_SRC,
+  '../../../.kiro/specs/_archive/05-business-features/workpaper-page-formula-toolbar-closure',
+)
+const SPEC_ROOT = existsSync(join(ACTIVE_SPEC_ROOT, 'basis', 'T15-grid-host-exemption.json'))
+  ? ACTIVE_SPEC_ROOT
+  : ARCHIVED_SPEC_ROOT
 
 /** Shell-owned single carriers — exactly one intended owner per kind where applicable. */
 const SHELL_OWNED: Array<{ kind: DuplicateCapabilityFinding['kind']; path: string; reason: string }> =

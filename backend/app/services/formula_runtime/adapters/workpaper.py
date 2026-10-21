@@ -22,8 +22,15 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 from uuid import UUID, uuid4
 
+import sqlalchemy as sa
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.workpaper_models import WorkingPaper
+from app.services.wp_parsed_data_service import (
+    format_cell_display_value,
+    write_cell_to_parsed_data,
+)
 
 from app.services.formula_runtime.contracts import (
     AppliedMutation,
@@ -88,6 +95,21 @@ def _storage_field(locator: Mapping[str, str]) -> str:
     if sf not in _ALLOWED_STORAGE_FIELDS:
         raise ValueError(f"非法 storage_field: {sf!r}，允许值: {sorted(_ALLOWED_STORAGE_FIELDS)}")
     return sf
+
+
+def _is_parsed_data_target(locator: Mapping[str, str]) -> bool:
+    return locator.get("storage_kind") == "parsed_data"
+
+
+def _read_parsed_data_cell(wp: WorkingPaper, sheet_name: str, cell_ref: str) -> Any:
+    parsed = wp.parsed_data if isinstance(wp.parsed_data, dict) else {}
+    html_data = parsed.get("html_data") if isinstance(parsed, dict) else {}
+    sheet = html_data.get(sheet_name) if isinstance(html_data, dict) else {}
+    cells = sheet.get("cells") if isinstance(sheet, dict) else {}
+    value = cells.get(cell_ref.strip().upper()) if isinstance(cells, dict) else None
+    if isinstance(value, dict):
+        return value.get("value", value.get("v"))
+    return value
 
 
 def _cell_read(remark_json: str | None, cell: str) -> Any:
@@ -216,15 +238,39 @@ class WorkpaperMutationAdapter:
         for target in targets:
             locator = dict(target.locator)
             wp_id_str = locator.get("wp_id")
+            if not wp_id_str:
+                continue
+            wp_id = UUID(wp_id_str)
+            await self._verify_ownership(wp_id, target.project_id)
+
+            if _is_parsed_data_target(locator):
+                sheet_name = locator.get("sheet_name", "")
+                cell_ref = locator.get("cell_ref", "")
+                if not sheet_name or not cell_ref:
+                    raise ValueError("parsed_data target 缺少 sheet_name/cell_ref")
+                wp = (
+                    await self._session.execute(
+                        sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+                    )
+                ).scalar_one()
+                before_value = _read_parsed_data_cell(wp, sheet_name, cell_ref)
+                version = _version_from_timestamp(wp.updated_at)
+                mutations.append(
+                    FormulaMutation(
+                        target=target,
+                        before_value=before_value,
+                        after_value=values.get(target.addr_id, before_value),
+                        expected_version=version,
+                        source_formula_id=None,
+                    )
+                )
+                continue
+
             item_id = locator.get("item")
             cell = locator.get("cell", ".")
             storage_col = _storage_field(locator)
-            if not wp_id_str or not item_id:
+            if not item_id:
                 continue
-
-            wp_id = UUID(wp_id_str)
-            # ownership check during prepare
-            await self._verify_ownership(wp_id, target.project_id)
 
             col_value, updated_at = await self._read_row(wp_id, item_id, storage_col)
             before_value = _cell_read(col_value, cell)
@@ -255,20 +301,52 @@ class WorkpaperMutationAdapter:
         for mutation in mutations:
             locator = dict(mutation.target.locator)
             wp_id = UUID(locator["wp_id"])
+
+            if _is_parsed_data_target(locator):
+                sheet_name = locator.get("sheet_name", "")
+                cell_ref = locator.get("cell_ref", "")
+                wp = (
+                    await self._session.execute(
+                        sa.select(WorkingPaper)
+                        .where(
+                            WorkingPaper.id == wp_id,
+                            WorkingPaper.project_id == mutation.target.project_id,
+                        )
+                        .with_for_update()
+                    )
+                ).scalar_one_or_none()
+                if wp is None:
+                    raise OwnershipViolation(wp_id, mutation.target.project_id, None)
+                current_version = _version_from_timestamp(wp.updated_at)
+                if mutation.expected_version is not None and current_version != mutation.expected_version:
+                    raise VersionConflict(mutation.target, mutation.expected_version, current_version)
+                write_cell_to_parsed_data(
+                    wp,
+                    sheet_name=sheet_name,
+                    cell_ref=cell_ref,
+                    value=format_cell_display_value(mutation.after_value),
+                )
+                wp.updated_at = now
+                await self._session.flush()
+                applied.append(
+                    AppliedMutation(
+                        target=mutation.target,
+                        applied_version=now.isoformat(),
+                        applied_at=now.isoformat(),
+                    )
+                )
+                continue
+
             item_id = locator["item"]
             cell = locator.get("cell", ".")
             storage_col = _storage_field(locator)
 
-            # 再次校验归属
             await self._verify_ownership(wp_id, mutation.target.project_id)
-
-            # 版本校验 (CAS)
             col_value, updated_at = await self._read_row(wp_id, item_id, storage_col)
             current_version = _version_from_timestamp(updated_at)
             if mutation.expected_version is not None and current_version != mutation.expected_version:
                 raise VersionConflict(mutation.target, mutation.expected_version, current_version)
 
-            # 写入新值
             new_value = _cell_write(col_value, cell, mutation.after_value)
 
             # UPSERT — 按 storage_col 选列写入
@@ -329,14 +407,54 @@ class WorkpaperMutationAdapter:
         for snapshot in snapshots:
             locator = dict(snapshot.target.locator)
             wp_id = UUID(locator["wp_id"])
+
+            if _is_parsed_data_target(locator):
+                wp = (
+                    await self._session.execute(
+                        sa.select(WorkingPaper)
+                        .where(
+                            WorkingPaper.id == wp_id,
+                            WorkingPaper.project_id == snapshot.target.project_id,
+                        )
+                        .with_for_update()
+                    )
+                ).scalar_one_or_none()
+                if wp is None:
+                    raise OwnershipViolation(wp_id, snapshot.target.project_id, None)
+                current_version = _version_from_timestamp(wp.updated_at)
+                if snapshot.expected_version is not None and current_version != snapshot.expected_version:
+                    restored.append(
+                        RestoredMutation(
+                            target=snapshot.target,
+                            restored_version=current_version,
+                            conflict=True,
+                            conflict_detail=(
+                                f"expected={snapshot.expected_version}, current={current_version}"
+                            ),
+                        )
+                    )
+                    continue
+                write_cell_to_parsed_data(
+                    wp,
+                    sheet_name=locator["sheet_name"],
+                    cell_ref=locator["cell_ref"],
+                    value=snapshot.before_value,
+                )
+                wp.updated_at = now
+                await self._session.flush()
+                restored.append(
+                    RestoredMutation(
+                        target=snapshot.target,
+                        restored_version=now.isoformat(),
+                    )
+                )
+                continue
+
             item_id = locator["item"]
             cell = locator.get("cell", ".")
             storage_col = _storage_field(locator)
 
-            # 归属校验
             await self._verify_ownership(wp_id, snapshot.target.project_id)
-
-            # Optimistic version check
             col_value, updated_at = await self._read_row(wp_id, item_id, storage_col)
             current_version = _version_from_timestamp(updated_at)
 
@@ -403,10 +521,21 @@ class WorkpaperMutationAdapter:
         for target in targets:
             locator = dict(target.locator)
             wp_id_str = locator.get("wp_id")
-            item_id = locator.get("item")
-            if not wp_id_str or not item_id:
+            if not wp_id_str:
                 continue
             wp_id = UUID(wp_id_str)
+            if _is_parsed_data_target(locator):
+                wp = (
+                    await self._session.execute(
+                        sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+                    )
+                ).scalar_one_or_none()
+                if wp is not None:
+                    versions[target.addr_id] = _version_from_timestamp(wp.updated_at)
+                continue
+            item_id = locator.get("item")
+            if not item_id:
+                continue
             _, updated_at = await self._read_row(wp_id, item_id)
             versions[target.addr_id] = _version_from_timestamp(updated_at)
         return versions

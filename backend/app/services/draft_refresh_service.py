@@ -51,6 +51,7 @@ from app.models.workpaper_models import (
     DraftMarker,
     DraftRefreshAudit,
     DraftRefreshSnapshot,
+    WpFormula,
 )
 from app.services.dataset_query import get_active_filter
 from app.services.formula_runtime.contracts import (
@@ -62,6 +63,13 @@ from app.services.formula_runtime.contracts import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class _RuntimeRollbackConflict(RuntimeError):
+    def __init__(self, conflicts: list[dict[str, Any]]):
+        super().__init__("runtime rollback conflict")
+        self.conflicts = conflicts
+
 
 # 四表库表名 → 中文标签（缺失清单展示用）
 TABLE_LABELS: dict[str, str] = {
@@ -907,7 +915,11 @@ class DraftRefreshService:
         # 用 SAVEPOINT 隔离：mark_stale 失败仅回滚该嵌套事务，外层刷新事务保持可用
         # （fail-open，与 event_handlers 对 mark_stale 失败记 degraded 不阻断的语义一致）。
         try:
-            async with db.begin_nested():
+            nested = db.begin_nested()
+            import inspect
+            if inspect.isawaitable(nested):
+                nested = await nested
+            async with nested:
                 count = await mark_stale(db, project_id, codes)
             return count
         except Exception as exc:  # noqa: BLE001 — 过时刷新失败不阻断一键刷新
@@ -1304,6 +1316,7 @@ class DraftRefreshService:
         formula_definition_revision: str = "",
         preset_revision: str = "",
         acnr_registry_version: str = "",
+        confirm_overwrite: bool = False,
     ) -> str:
         """计算 revision fingerprint（确定性 SHA256）。
 
@@ -1338,6 +1351,7 @@ class DraftRefreshService:
             formula_definition_revision,
             preset_revision,
             acnr_registry_version,
+            "overwrite" if confirm_overwrite else "preserve_human_edits",
         ])
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -1348,12 +1362,13 @@ class DraftRefreshService:
         year: int,
         fingerprint: str,
     ) -> None:
-        """获取 pg_advisory_xact_lock，防止并发执行同一 fingerprint。
+        """获取项目年度级事务锁，串行化所有会触达同一项目的刷新。
 
-        锁在事务结束时自动释放。使用 project_id/year/fingerprint 三元组的 hash
-        作为 64-bit lock key。
+        fingerprint 仍作为幂等身份，但不能进入锁键：确认/不确认覆盖会产生不同
+        fingerprint，却可能触达同一目标；若分别加锁会并发互相覆盖。
         """
-        lock_payload = f"{project_id}|{year}|{fingerprint}"
+        del fingerprint
+        lock_payload = f"{project_id}|{year}"
         lock_key = int(hashlib.sha256(lock_payload.encode()).hexdigest()[:16], 16) & 0x7FFFFFFFFFFFFFFF
         await db.execute(sa.text(f"SELECT pg_advisory_xact_lock({lock_key})"))
 
@@ -1403,6 +1418,8 @@ class DraftRefreshService:
         scopes: Sequence[str],
         mutations: Sequence[FormulaMutation],
         adapters: dict[str, DomainMutationAdapter],
+        draft_units: Sequence[RefreshUnit] = (),
+        confirm_overwrite: bool = False,
         transaction_mode: Literal["all_or_nothing", "partial_success"] = "all_or_nothing",
         idempotency_key: str | None = None,
         operator: Any | None = None,
@@ -1452,6 +1469,7 @@ class DraftRefreshService:
             formula_definition_revision=formula_definition_revision,
             preset_revision=preset_revision,
             acnr_registry_version=acnr_registry_version,
+            confirm_overwrite=confirm_overwrite,
         )
 
         # ── 2. Advisory lock ──
@@ -1473,11 +1491,44 @@ class DraftRefreshService:
             )
 
         if prior is not None:
+            prior_detail = prior.detail if isinstance(prior.detail, dict) else {}
             return ExecutionResult(
                 run_id=prior.id,
                 status="idempotent_hit",
                 applied_count=prior.affected_count,
+                skipped_count=len(prior_detail.get("skipped_human_edited", [])),
             )
+
+        mutation_list = list(mutations)
+        preset_marker_scopes = list(dict.fromkeys(
+            unit.unit_scope for unit in draft_units if unit.unit_scope
+        ))
+        runtime_scopes = [self._runtime_unit_scope(mutation) for mutation in mutation_list]
+        existing_markers = await self._load_markers(
+            db,
+            project_id=project_id,
+            year=year,
+            unit_scopes=[*runtime_scopes, *preset_marker_scopes],
+        )
+        human_edited = {
+            unit_scope for unit_scope, marker in existing_markers.items()
+            if marker.state == "human_edited"
+        }
+        skipped_human_edited: list[str] = []
+        if not confirm_overwrite:
+            skipped_human_edited = [
+                unit_scope for unit_scope in [*runtime_scopes, *preset_marker_scopes]
+                if unit_scope in human_edited
+            ]
+            mutation_list = [
+                mutation for mutation in mutation_list
+                if self._runtime_unit_scope(mutation) not in human_edited
+            ]
+            preset_marker_scopes = [
+                unit_scope for unit_scope in preset_marker_scopes
+                if unit_scope not in human_edited
+            ]
+        skipped_human_edited = list(dict.fromkeys(skipped_human_edited))
 
         # ── 4. Create audit record (status=executing) ──
         operator_id, operator_role = self._operator_fields(operator) if operator else (project_id, "system")
@@ -1494,7 +1545,11 @@ class DraftRefreshService:
             tb_snapshot_hash=fingerprint,
             affected_count=0,
             result_status="executing",
-            detail={},
+            detail={
+                "confirm_overwrite": confirm_overwrite,
+                "skipped_human_edited": skipped_human_edited,
+                "preset_marker_scopes": preset_marker_scopes,
+            },
             revision_fingerprint=fingerprint,
             transaction_mode=transaction_mode,
             idempotency_key=idempotency_key or fingerprint,
@@ -1502,139 +1557,365 @@ class DraftRefreshService:
         db.add(audit)
         await db.flush()
 
-        if not mutations:
-            # No mutations → no_effect
+        if not mutation_list and not preset_marker_scopes:
             audit.result_status = "success"
-            audit.affected_count = 0
             await db.flush()
             return ExecutionResult(
                 run_id=run_id,
                 status="no_effect",
                 applied_count=0,
+                skipped_count=len(skipped_human_edited),
+                rollback_available=False,
             )
 
         # ── 5. Group mutations by domain ──
         mutations_by_domain: dict[str, list[FormulaMutation]] = {}
-        for m in mutations:
-            domain = m.target.domain
-            mutations_by_domain.setdefault(domain, []).append(m)
+        for mutation in mutation_list:
+            mutations_by_domain.setdefault(mutation.target.domain, []).append(mutation)
 
         # ── 6. Execute by transaction mode ──
         if transaction_mode == "all_or_nothing":
             result = await self._execute_all_or_nothing(
-                db, run_id=run_id, mutations_by_domain=mutations_by_domain,
-                adapters=adapters, audit=audit,
+                db,
+                run_id=run_id,
+                project_id=project_id,
+                year=year,
+                mutations_by_domain=mutations_by_domain,
+                preset_marker_scopes=preset_marker_scopes,
+                adapters=adapters,
+                audit=audit,
+                skipped_count=len(skipped_human_edited),
             )
         else:
             result = await self._execute_partial_success(
-                db, run_id=run_id, mutations_by_domain=mutations_by_domain,
-                adapters=adapters, audit=audit, scopes=scopes,
+                db,
+                run_id=run_id,
+                project_id=project_id,
+                year=year,
+                mutations_by_domain=mutations_by_domain,
+                preset_marker_scopes=preset_marker_scopes,
+                adapters=adapters,
+                audit=audit,
+                scopes=scopes,
+                skipped_count=len(skipped_human_edited),
             )
 
         return result
+
+    @staticmethod
+    def _runtime_json_value(value: Any) -> Any:
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, dict):
+            return {str(k): DraftRefreshService._runtime_json_value(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [DraftRefreshService._runtime_json_value(v) for v in value]
+        return value
+
+    @staticmethod
+    def _runtime_unit_scope(mutation: FormulaMutation) -> str:
+        return f"{mutation.target.domain}:{mutation.target.addr_id}"
+
+    @staticmethod
+    def _marker_before(marker: DraftMarker | None) -> dict[str, Any] | None:
+        if marker is None:
+            return None
+        return {
+            "state": marker.state,
+            "refresh_id": str(marker.refresh_id) if marker.refresh_id else None,
+        }
+
+    async def _snapshot_runtime_mutations(
+        self,
+        db: AsyncSession,
+        *,
+        run_id: UUID,
+        project_id: UUID,
+        year: int,
+        mutations: Sequence[FormulaMutation],
+    ) -> None:
+        source_ids = {m.source_formula_id for m in mutations if m.source_formula_id}
+        formula_meta: dict[UUID, dict[str, Any]] = {}
+        if source_ids:
+            rows = await db.execute(
+                sa.select(
+                    WpFormula.id,
+                    WpFormula.source_scope,
+                    WpFormula.lifecycle_state,
+                    WpFormula.last_computed_at,
+                ).where(WpFormula.id.in_(source_ids))
+            )
+            formula_meta = {
+                row.id: {
+                    "source_scope": row.source_scope,
+                    "lifecycle_state": row.lifecycle_state,
+                    "last_computed_at": (
+                        row.last_computed_at.isoformat() if row.last_computed_at else None
+                    ),
+                }
+                for row in rows
+            }
+        unit_scopes = [self._runtime_unit_scope(mutation) for mutation in mutations]
+        markers = await self._load_markers(
+            db,
+            project_id=project_id,
+            year=year,
+            unit_scopes=unit_scopes,
+        )
+        for mutation in mutations:
+            unit_scope = self._runtime_unit_scope(mutation)
+            meta = formula_meta.get(mutation.source_formula_id, {}) if mutation.source_formula_id else {}
+            source_scope = dict(meta.get("source_scope") or {})
+            source_scope["_runtime_before"] = {
+                "lifecycle_state": meta.get("lifecycle_state"),
+                "last_computed_at": meta.get("last_computed_at"),
+                "marker": self._marker_before(markers.get(unit_scope)),
+            }
+            db.add(DraftRefreshSnapshot(
+                refresh_id=run_id,
+                unit_scope=unit_scope,
+                before_value=self._runtime_json_value(mutation.before_value),
+                domain=mutation.target.domain,
+                target_locator=dict(mutation.target.locator) if mutation.target.locator else {},
+                after_value=self._runtime_json_value(mutation.after_value),
+                before_version=mutation.expected_version,
+                source_formula_id=mutation.source_formula_id,
+                source_scope=source_scope,
+            ))
+        await db.flush()
+
+    async def _upsert_runtime_markers(
+        self,
+        db: AsyncSession,
+        *,
+        run_id: UUID,
+        project_id: UUID,
+        year: int,
+        unit_scopes: Sequence[str],
+        runtime_snapshot_scopes: set[str],
+    ) -> list[str]:
+        scopes = list(dict.fromkeys(scope for scope in unit_scopes if scope))
+        markers = await self._load_markers(
+            db,
+            project_id=project_id,
+            year=year,
+            unit_scopes=scopes,
+        )
+        now = datetime.now(timezone.utc)
+        for unit_scope in scopes:
+            marker = markers.get(unit_scope)
+            # Runtime business snapshots carry marker metadata in source_scope. Marker-only
+            # preset units need their own snapshot so rollback can restore the prior marker.
+            if marker is not None and unit_scope not in runtime_snapshot_scopes:
+                db.add(DraftRefreshSnapshot(
+                    refresh_id=run_id,
+                    unit_scope=unit_scope,
+                    before_value={
+                        "marker_state": marker.state,
+                        "marker_refresh_id": str(marker.refresh_id) if marker.refresh_id else None,
+                    },
+                    domain="marker",
+                    target_locator={"marker_only": "true"},
+                    after_value={"marker_state": "draft"},
+                ))
+            if marker is None:
+                db.add(DraftMarker(
+                    project_id=project_id,
+                    year=year,
+                    unit_scope=unit_scope,
+                    state="draft",
+                    refresh_id=run_id,
+                ))
+            else:
+                marker.state = "draft"
+                marker.refresh_id = run_id
+                marker.updated_at = now
+        await db.flush()
+        return scopes
+
+    async def _mark_applied_formulas(
+        self,
+        db: AsyncSession,
+        *,
+        mutations: Sequence[FormulaMutation],
+        applied_at: datetime,
+    ) -> list[str]:
+        formula_ids = sorted({m.source_formula_id for m in mutations if m.source_formula_id}, key=str)
+        if formula_ids:
+            await db.execute(
+                sa.update(WpFormula)
+                .where(WpFormula.id.in_(formula_ids))
+                .values(last_computed_at=applied_at, lifecycle_state="succeeded")
+            )
+            await db.flush()
+        return [str(value) for value in formula_ids]
+
+    async def _write_runtime_hash_audit(
+        self,
+        db: AsyncSession,
+        *,
+        audit: DraftRefreshAudit,
+        run_id: UUID,
+        status: str,
+        applied_count: int,
+        formula_ids: list[str],
+    ) -> None:
+        from app.services.audit_log_helper import append_audit_log
+
+        await append_audit_log(db, {
+            "user_id": audit.operator_id,
+            "project_id": audit.project_id,
+            "action": "formula_runtime_executed",
+            "resource_type": "formula_runtime",
+            "resource_id": str(run_id),
+            "details": {
+                "event_type": "formula_changed",
+                "module": "formula_runtime",
+                "row_code": "*",
+                "action": "execute",
+                "old_formula": None,
+                "new_formula": None,
+                "result_value": str(applied_count),
+                "run_id": str(run_id),
+                "status": status,
+                "applied_count": applied_count,
+                "formula_ids": formula_ids,
+            },
+        })
 
     async def _execute_all_or_nothing(
         self,
         db: AsyncSession,
         *,
         run_id: UUID,
+        project_id: UUID,
+        year: int,
         mutations_by_domain: dict[str, list[FormulaMutation]],
+        preset_marker_scopes: Sequence[str],
         adapters: dict[str, DomainMutationAdapter],
         audit: DraftRefreshAudit,
+        skipped_count: int,
     ) -> ExecutionResult:
-        """All-or-nothing：任一失败 → 整批标记 failed（让 router 回滚事务）。"""
+        """All-or-nothing：业务值、治理标记、快照、公式状态和 outbox 同一 savepoint。"""
         all_applied: list[AppliedMutation] = []
-        all_failures: list[dict] = []
-
-        for domain, domain_mutations in mutations_by_domain.items():
-            adapter = adapters.get(domain)
-            if adapter is None:
-                # 失败：无对应 adapter
-                all_failures.append({
-                    "domain": domain,
-                    "error": f"no_adapter_for_domain:{domain}",
-                    "mutations_count": len(domain_mutations),
-                })
-                # All-or-nothing: one failure → abort all
-                audit.result_status = "failed"
-                audit.failure_detail = {"failures": all_failures}
-                audit.affected_count = 0
-                await db.flush()
-                return ExecutionResult(
-                    run_id=run_id,
-                    status="failed",
-                    failures=all_failures,
-                    rollback_available=False,
-                )
-
-            # ── Snapshot: save before_values ──
-            for m in domain_mutations:
-                db.add(DraftRefreshSnapshot(
-                    refresh_id=run_id,
-                    unit_scope=f"{m.target.domain}:{m.target.addr_id}",
-                    before_value=m.before_value if m.before_value is not None else {},
-                    domain=m.target.domain,
-                    target_locator=dict(m.target.locator) if m.target.locator else {},
-                    after_value=m.after_value,
-                    before_version=m.expected_version,
-                ))
-
-            # ── Apply ──
-            try:
-                applied = await adapter.apply_many(domain_mutations)
-                all_applied.extend(applied)
-
-                # Update snapshot after_version
-                for am in applied:
-                    scope_key = f"{am.target.domain}:{am.target.addr_id}"
-                    snap_stmt = (
-                        sa.select(DraftRefreshSnapshot)
-                        .where(
-                            DraftRefreshSnapshot.refresh_id == run_id,
-                            DraftRefreshSnapshot.unit_scope == scope_key,
-                        )
+        marker_scopes: list[str] = []
+        formula_ids: list[str] = []
+        try:
+            nested = db.begin_nested()
+            import inspect
+            if inspect.isawaitable(nested):
+                nested = await nested
+            async with nested:
+                for domain, domain_mutations in mutations_by_domain.items():
+                    adapter = adapters.get(domain)
+                    if adapter is None:
+                        raise RuntimeError(f"no_adapter_for_domain:{domain}")
+                    await self._snapshot_runtime_mutations(
+                        db,
+                        run_id=run_id,
+                        project_id=project_id,
+                        year=year,
+                        mutations=domain_mutations,
                     )
-                    snap = (await db.execute(snap_stmt)).scalars().first()
-                    if snap is not None:
-                        snap.after_version = am.applied_version
-            except Exception as exc:
-                all_failures.append({
-                    "domain": domain,
-                    "error": f"apply_failed:{type(exc).__name__}:{exc}",
-                    "mutations_count": len(domain_mutations),
-                })
-                # All-or-nothing: abort
-                audit.result_status = "failed"
-                audit.failure_detail = {"failures": all_failures}
-                audit.affected_count = 0
-                await db.flush()
-                return ExecutionResult(
-                    run_id=run_id,
-                    status="failed",
-                    failures=all_failures,
-                    rollback_available=False,
-                )
+                    applied = await adapter.apply_many(domain_mutations)
+                    all_applied.extend(applied)
+                    for applied_mutation in applied:
+                        scope_key = f"{applied_mutation.target.domain}:{applied_mutation.target.addr_id}"
+                        snapshot = (
+                            await db.execute(
+                                sa.select(DraftRefreshSnapshot).where(
+                                    DraftRefreshSnapshot.refresh_id == run_id,
+                                    DraftRefreshSnapshot.unit_scope == scope_key,
+                                )
+                            )
+                        ).scalars().first()
+                        if snapshot is not None:
+                            snapshot.after_version = applied_mutation.applied_version
 
-        # ── All succeeded → audit + outbox ──
+                applied_targets = {
+                    (item.target.domain, item.target.addr_id) for item in all_applied
+                }
+                applied_mutations = [
+                    mutation
+                    for values in mutations_by_domain.values()
+                    for mutation in values
+                    if (mutation.target.domain, mutation.target.addr_id) in applied_targets
+                ]
+                formula_ids = await self._mark_applied_formulas(
+                    db,
+                    mutations=applied_mutations,
+                    applied_at=datetime.now(timezone.utc),
+                )
+                runtime_marker_scopes = {
+                    self._runtime_unit_scope(mutation) for mutation in applied_mutations
+                }
+                marker_scopes = await self._upsert_runtime_markers(
+                    db,
+                    run_id=run_id,
+                    project_id=project_id,
+                    year=year,
+                    unit_scopes=[*runtime_marker_scopes, *preset_marker_scopes],
+                    runtime_snapshot_scopes=runtime_marker_scopes,
+                )
+                await self._write_runtime_hash_audit(
+                    db,
+                    audit=audit,
+                    run_id=run_id,
+                    status="success",
+                    applied_count=len(all_applied),
+                    formula_ids=formula_ids,
+                )
+                await self._write_outbox_event(
+                    db,
+                    run_id=run_id,
+                    event_type="refresh_completed",
+                    payload={
+                        "project_id": str(project_id),
+                        "year": year,
+                        "applied_count": len(all_applied),
+                        "draft_marker_count": len(marker_scopes),
+                        "domains": list(mutations_by_domain.keys()),
+                        "formula_ids": formula_ids,
+                    },
+                )
+        except Exception as exc:
+            failure = {
+                "error": f"apply_failed:{type(exc).__name__}:{exc}",
+                "mutations_count": sum(len(v) for v in mutations_by_domain.values()),
+            }
+            audit.result_status = "failed"
+            audit.failure_detail = {"failures": [failure]}
+            audit.affected_count = 0
+            audit.detail = {**(audit.detail or {}), "formula_ids": [], "draft_marker_scopes": []}
+            await db.flush()
+            return ExecutionResult(
+                run_id=run_id,
+                status="failed",
+                skipped_count=skipped_count,
+                failures=[failure],
+                rollback_available=False,
+            )
+
+        stale_marked = await self.trigger_recalc(db, project_id=project_id) if marker_scopes else 0
         audit.result_status = "success"
         audit.affected_count = len(all_applied)
+        audit.detail = {
+            **(audit.detail or {}),
+            "formula_ids": formula_ids,
+            "applied_targets": [
+                f"{item.target.domain}:{item.target.addr_id}" for item in all_applied
+            ],
+            "draft_marker_scopes": marker_scopes,
+            "stale_marked_count": stale_marked,
+        }
         await db.flush()
-
-        # ── Outbox event ──
-        await self._write_outbox_event(
-            db, run_id=run_id, event_type="refresh_completed",
-            payload={
-                "applied_count": len(all_applied),
-                "domains": list(mutations_by_domain.keys()),
-            },
-        )
-
         return ExecutionResult(
             run_id=run_id,
             status="success",
             applied_count=len(all_applied),
+            skipped_count=skipped_count,
             applied=all_applied,
-            rollback_available=True,
+            rollback_available=bool(all_applied or marker_scopes),
         )
 
     async def _execute_partial_success(
@@ -1642,14 +1923,20 @@ class DraftRefreshService:
         db: AsyncSession,
         *,
         run_id: UUID,
+        project_id: UUID,
+        year: int,
         mutations_by_domain: dict[str, list[FormulaMutation]],
+        preset_marker_scopes: Sequence[str],
         adapters: dict[str, DomainMutationAdapter],
         audit: DraftRefreshAudit,
         scopes: Sequence[str],
+        skipped_count: int,
     ) -> ExecutionResult:
-        """Partial-success：按 domain 建 savepoint，失败 scope 回滚，成功提交。"""
+        """Partial-success：每个 domain 独立 savepoint，preset marker 也独立结算。"""
         all_applied: list[AppliedMutation] = []
+        successful_mutations: list[FormulaMutation] = []
         all_failures: list[dict] = []
+        marker_scopes: list[str] = []
 
         for domain, domain_mutations in mutations_by_domain.items():
             adapter = adapters.get(domain)
@@ -1661,80 +1948,219 @@ class DraftRefreshService:
                 })
                 continue
 
-            # ── Per-scope savepoint ──
+            domain_applied: list[AppliedMutation] = []
+            domain_success: list[FormulaMutation] = []
             try:
-                async with db.begin_nested():
-                    # Snapshot
-                    for m in domain_mutations:
-                        db.add(DraftRefreshSnapshot(
-                            refresh_id=run_id,
-                            unit_scope=f"{m.target.domain}:{m.target.addr_id}",
-                            before_value=m.before_value if m.before_value is not None else {},
-                            domain=m.target.domain,
-                            target_locator=dict(m.target.locator) if m.target.locator else {},
-                            after_value=m.after_value,
-                            before_version=m.expected_version,
-                        ))
-
-                    # Apply
-                    applied = await adapter.apply_many(domain_mutations)
-                    all_applied.extend(applied)
-
-                    # Update snapshot after_version
-                    for am in applied:
-                        scope_key = f"{am.target.domain}:{am.target.addr_id}"
-                        snap_stmt = (
-                            sa.select(DraftRefreshSnapshot)
-                            .where(
-                                DraftRefreshSnapshot.refresh_id == run_id,
-                                DraftRefreshSnapshot.unit_scope == scope_key,
+                nested = db.begin_nested()
+                import inspect
+                if inspect.isawaitable(nested):
+                    nested = await nested
+                async with nested:
+                    await self._snapshot_runtime_mutations(
+                        db,
+                        run_id=run_id,
+                        project_id=project_id,
+                        year=year,
+                        mutations=domain_mutations,
+                    )
+                    domain_applied = await adapter.apply_many(domain_mutations)
+                    for applied_mutation in domain_applied:
+                        scope_key = f"{applied_mutation.target.domain}:{applied_mutation.target.addr_id}"
+                        snapshot = (
+                            await db.execute(
+                                sa.select(DraftRefreshSnapshot).where(
+                                    DraftRefreshSnapshot.refresh_id == run_id,
+                                    DraftRefreshSnapshot.unit_scope == scope_key,
+                                )
                             )
-                        )
-                        snap = (await db.execute(snap_stmt)).scalars().first()
-                        if snap is not None:
-                            snap.after_version = am.applied_version
+                        ).scalars().first()
+                        if snapshot is not None:
+                            snapshot.after_version = applied_mutation.applied_version
+                    applied_targets = {
+                        (item.target.domain, item.target.addr_id)
+                        for item in domain_applied
+                    }
+                    domain_success = [
+                        mutation for mutation in domain_mutations
+                        if (mutation.target.domain, mutation.target.addr_id) in applied_targets
+                    ]
+                    await self._mark_applied_formulas(
+                        db,
+                        mutations=domain_success,
+                        applied_at=datetime.now(timezone.utc),
+                    )
+                    domain_marker_scopes = {
+                        self._runtime_unit_scope(mutation) for mutation in domain_success
+                    }
+                    marker_scopes.extend(await self._upsert_runtime_markers(
+                        db,
+                        run_id=run_id,
+                        project_id=project_id,
+                        year=year,
+                        unit_scopes=list(domain_marker_scopes),
+                        runtime_snapshot_scopes=domain_marker_scopes,
+                    ))
+                all_applied.extend(domain_applied)
+                successful_mutations.extend(domain_success)
             except Exception as exc:
-                # Savepoint rolled back, continue with other domains
                 all_failures.append({
                     "domain": domain,
                     "error": f"apply_failed:{type(exc).__name__}:{exc}",
                     "status": "failed",
                 })
-                continue
 
-        # ── Final audit ──
-        if all_applied and all_failures:
-            status = "partial_success"
-        elif all_applied:
-            status = "success"
+        if preset_marker_scopes:
+            try:
+                nested = db.begin_nested()
+                import inspect
+                if inspect.isawaitable(nested):
+                    nested = await nested
+                async with nested:
+                    marker_scopes.extend(await self._upsert_runtime_markers(
+                        db,
+                        run_id=run_id,
+                        project_id=project_id,
+                        year=year,
+                        unit_scopes=preset_marker_scopes,
+                        runtime_snapshot_scopes=set(),
+                    ))
+            except Exception as exc:
+                all_failures.append({
+                    "domain": "preset",
+                    "error": f"marker_apply_failed:{type(exc).__name__}:{exc}",
+                    "status": "failed",
+                })
+
+        marker_scopes = list(dict.fromkeys(marker_scopes))
+        has_success = bool(all_applied or marker_scopes)
+        if has_success and all_failures:
+            result_status = "partial_success"
+        elif has_success:
+            result_status = "success"
         else:
-            status = "failed"
+            result_status = "failed"
 
-        audit.result_status = status
+        formula_ids = sorted({
+            str(m.source_formula_id) for m in successful_mutations if m.source_formula_id
+        })
+        stale_marked = await self.trigger_recalc(db, project_id=project_id) if marker_scopes else 0
+        audit.result_status = result_status
         audit.affected_count = len(all_applied)
         audit.failure_detail = {"failures": all_failures} if all_failures else None
+        audit.detail = {
+            **(audit.detail or {}),
+            "formula_ids": formula_ids,
+            "draft_marker_scopes": marker_scopes,
+            "stale_marked_count": stale_marked,
+        }
         await db.flush()
-
-        # Outbox
-        await self._write_outbox_event(
-            db, run_id=run_id, event_type="refresh_completed",
-            payload={
-                "status": status,
-                "applied_count": len(all_applied),
-                "failed_count": len(all_failures),
-                "domains": list(mutations_by_domain.keys()),
-            },
+        await self._write_runtime_hash_audit(
+            db,
+            audit=audit,
+            run_id=run_id,
+            status=result_status,
+            applied_count=len(all_applied),
+            formula_ids=formula_ids,
         )
+        if has_success:
+            await self._write_outbox_event(
+                db,
+                run_id=run_id,
+                event_type="refresh_completed",
+                payload={
+                    "project_id": str(project_id),
+                    "year": year,
+                    "status": result_status,
+                    "applied_count": len(all_applied),
+                    "draft_marker_count": len(marker_scopes),
+                    "failed_count": len(all_failures),
+                    "domains": list(mutations_by_domain.keys()),
+                    "formula_ids": formula_ids,
+                },
+            )
 
         return ExecutionResult(
             run_id=run_id,
-            status=status,
+            status=result_status,
             applied_count=len(all_applied),
             failed_count=len(all_failures),
+            skipped_count=skipped_count,
             applied=all_applied,
             failures=all_failures,
-            rollback_available=bool(all_applied),
+            rollback_available=has_success,
         )
+
+    async def _restore_runtime_governance(
+        self,
+        db: AsyncSession,
+        *,
+        audit: DraftRefreshAudit,
+        snapshots: Sequence[DraftRefreshSnapshot],
+    ) -> tuple[int, int]:
+        """业务值成功恢复后，对称恢复 DraftMarker 与公式生命周期。"""
+        detail = audit.detail if isinstance(audit.detail, dict) else {}
+        marker_scopes = list(dict.fromkeys(detail.get("draft_marker_scopes", [])))
+        prior_markers: dict[str, dict[str, Any] | None] = {}
+        formula_before: dict[UUID, dict[str, Any]] = {}
+
+        for snapshot in snapshots:
+            if getattr(snapshot, "domain", None) == "marker":
+                before = getattr(snapshot, "before_value", None)
+                if isinstance(before, dict) and "marker_state" in before:
+                    prior_markers[snapshot.unit_scope] = {
+                        "state": before["marker_state"],
+                        "refresh_id": before.get("marker_refresh_id"),
+                    }
+            source_scope = getattr(snapshot, "source_scope", None)
+            runtime_before = source_scope.get("_runtime_before") if isinstance(source_scope, dict) else None
+            if isinstance(runtime_before, dict):
+                prior_markers[snapshot.unit_scope] = runtime_before.get("marker")
+                source_formula_id = getattr(snapshot, "source_formula_id", None)
+                if source_formula_id is not None:
+                    formula_before[source_formula_id] = runtime_before
+
+        markers = await self._load_markers(
+            db,
+            project_id=audit.project_id,
+            year=audit.year,
+            unit_scopes=marker_scopes,
+        ) if marker_scopes else {}
+        marker_restored = 0
+        for unit_scope in marker_scopes:
+            marker = markers.get(unit_scope)
+            before = prior_markers.get(unit_scope)
+            if before is None:
+                if marker is not None:
+                    await db.delete(marker)
+                    marker_restored += 1
+                continue
+            if marker is None:
+                marker = DraftMarker(
+                    project_id=audit.project_id,
+                    year=audit.year,
+                    unit_scope=unit_scope,
+                    state=str(before.get("state") or "draft"),
+                )
+                db.add(marker)
+            marker.state = str(before.get("state") or "draft")
+            prior_refresh_id = before.get("refresh_id")
+            marker.refresh_id = UUID(prior_refresh_id) if prior_refresh_id else None
+            marker.updated_at = datetime.now(timezone.utc)
+            marker_restored += 1
+
+        formula_restored = 0
+        for formula_id, before in formula_before.items():
+            formula = await db.get(WpFormula, formula_id)
+            if formula is None:
+                continue
+            formula.lifecycle_state = before.get("lifecycle_state") or "saved"
+            last_computed_at = before.get("last_computed_at")
+            formula.last_computed_at = (
+                datetime.fromisoformat(last_computed_at) if last_computed_at else None
+            )
+            formula_restored += 1
+        await db.flush()
+        return marker_restored, formula_restored
 
     async def rollback_refresh(
         self,
@@ -1743,150 +2169,197 @@ class DraftRefreshService:
         run_id: UUID,
         adapters: dict[str, DomainMutationAdapter],
         operator: Any | None = None,
-    ) -> ExecutionResult | dict:
-        """真实业务值回滚：逆序恢复并做 after_version CAS。
-
-        加载 run_id 对应的 snapshots（逆序），调用 adapter.restore_many 恢复业务值。
-        如果任一目标的当前版本不等于 snapshot 的 after_version（CAS 失败），
-        返回结构化 409 冲突响应。
-
-        Args:
-            db: 数据库会话。
-            run_id: 待回滚的执行批次。
-            adapters: domain→adapter 映射。
-            operator: 操作者。
-
-        Returns:
-            成功返回 ExecutionResult(status='rolled_back')。
-            CAS 冲突返回 dict 含 409 冲突明细。
-        """
-        # ① 定位执行批次
+    ) -> ExecutionResult:
+        """原子回滚业务值与治理元数据；任何 CAS 冲突都回滚整个 savepoint。"""
         audit = (
             await db.execute(
                 sa.select(DraftRefreshAudit).where(DraftRefreshAudit.id == run_id)
             )
         ).scalar_one_or_none()
-
         if audit is None:
-            return ExecutionResult(run_id=run_id, status="failed", failures=[{"error": "not_found"}])
-
+            return ExecutionResult(
+                run_id=run_id,
+                status="failed",
+                failures=[{"error": "not_found"}],
+                rollback_available=False,
+            )
         if audit.result_status == "rolled_back":
-            return ExecutionResult(run_id=run_id, status="idempotent_hit", applied_count=0)
+            return ExecutionResult(
+                run_id=run_id,
+                status="idempotent_hit",
+                rollback_available=False,
+            )
 
-        # ② 加载 snapshots（逆序）
-        snapshots = (
+        snapshots = list((
             await db.execute(
                 sa.select(DraftRefreshSnapshot)
                 .where(DraftRefreshSnapshot.refresh_id == run_id)
                 .order_by(DraftRefreshSnapshot.id.desc())
             )
-        ).scalars().all()
+        ).scalars().all())
 
-        if not snapshots:
-            audit.result_status = "rolled_back"
-            await db.flush()
-            return ExecutionResult(run_id=run_id, status="rolled_back", applied_count=0)
+        # V100 marker-only 历史批次保留原 rollback 语义；runtime snapshot 才走 adapter。
+        if snapshots and all(getattr(snapshot, "domain", None) is None for snapshot in snapshots):
+            legacy = await self.rollback(db, refresh_id=run_id, operator=operator)
+            return ExecutionResult(
+                run_id=run_id,
+                status="rolled_back" if legacy.status == "rolled_back" else "idempotent_hit",
+                applied_count=legacy.restored_count,
+                restored_count=legacy.restored_count,
+                rollback_available=False,
+            )
 
-        # ③ Group by domain and restore
+        detail = audit.detail if isinstance(audit.detail, dict) else {}
+        marker_scopes = list(dict.fromkeys(detail.get("draft_marker_scopes", [])))
+        if marker_scopes:
+            markers = await self._load_markers(
+                db,
+                project_id=audit.project_id,
+                year=audit.year,
+                unit_scopes=marker_scopes,
+            )
+            marker_conflicts = [
+                {
+                    "domain": "marker",
+                    "target": unit_scope,
+                    "conflict_detail": "draft marker 已被后续编辑或不再属于该刷新批次",
+                }
+                for unit_scope in marker_scopes
+                if (
+                    markers.get(unit_scope) is None
+                    or markers[unit_scope].refresh_id != run_id
+                    or markers[unit_scope].state != "draft"
+                )
+            ]
+            if marker_conflicts:
+                return ExecutionResult(
+                    run_id=run_id,
+                    status="conflict",
+                    conflicts=marker_conflicts,
+                    rollback_available=True,
+                )
+
+        business_snapshots = [
+            snapshot for snapshot in snapshots
+            if getattr(snapshot, "domain", None) not in (None, "marker")
+        ]
         snapshots_by_domain: dict[str, list[DraftRefreshSnapshot]] = {}
-        for snap in snapshots:
-            d = snap.domain or "unknown"
-            snapshots_by_domain.setdefault(d, []).append(snap)
+        for snapshot in business_snapshots:
+            snapshots_by_domain.setdefault(str(snapshot.domain), []).append(snapshot)
 
         all_restored: list[RestoredMutation] = []
-        conflicts: list[dict] = []
+        try:
+            nested = db.begin_nested()
+            import inspect
+            if inspect.isawaitable(nested):
+                nested = await nested
+            async with nested:
+                for domain, domain_snapshots in snapshots_by_domain.items():
+                    adapter = adapters.get(domain)
+                    if adapter is None:
+                        raise _RuntimeRollbackConflict([{
+                            "domain": domain,
+                            "error": "no_adapter",
+                            "targets": [snapshot.unit_scope for snapshot in domain_snapshots],
+                        }])
 
-        for domain, domain_snapshots in snapshots_by_domain.items():
-            adapter = adapters.get(domain)
-            if adapter is None:
-                conflicts.append({
-                    "domain": domain,
-                    "error": "no_adapter",
-                    "targets": [s.unit_scope for s in domain_snapshots],
-                })
-                continue
+                    from app.services.formula_runtime.contracts import CanonicalFormulaTarget
+                    restore_mutations: list[FormulaMutation] = []
+                    expected_by_addr: dict[str, str | None] = {}
+                    for snapshot in domain_snapshots:
+                        addr_id = snapshot.unit_scope.split(":", 1)[-1]
+                        target = CanonicalFormulaTarget(
+                            domain=snapshot.domain,
+                            project_id=audit.project_id,
+                            year=audit.year,
+                            addr_id=addr_id,
+                            locator=snapshot.target_locator or {},
+                        )
+                        restore_mutations.append(FormulaMutation(
+                            target=target,
+                            # restore_many 的契约是“把 before_value 写回”；方向不可反转。
+                            before_value=snapshot.before_value,
+                            after_value=snapshot.after_value,
+                            expected_version=snapshot.after_version,
+                            source_formula_id=getattr(snapshot, "source_formula_id", None),
+                        ))
+                        expected_by_addr[addr_id] = snapshot.after_version
 
-            # Build restore mutations (reverse: after→before)
-            restore_mutations: list[FormulaMutation] = []
-            for snap in domain_snapshots:
-                # Build a CanonicalFormulaTarget-like object for restore
-                from app.services.formula_runtime.contracts import CanonicalFormulaTarget
-                target = CanonicalFormulaTarget(
-                    domain=snap.domain or "unknown",
-                    project_id=audit.project_id,
-                    year=audit.year,
-                    addr_id=snap.unit_scope.split(":", 1)[-1] if ":" in snap.unit_scope else snap.unit_scope,
-                    locator=snap.target_locator or {},
+                    try:
+                        restored = await adapter.restore_many(restore_mutations)
+                    except Exception as exc:
+                        raise _RuntimeRollbackConflict([{
+                            "domain": domain,
+                            "error": f"restore_failed:{type(exc).__name__}:{exc}",
+                            "targets": [snapshot.unit_scope for snapshot in domain_snapshots],
+                        }]) from exc
+
+                    conflicts = [
+                        {
+                            "domain": domain,
+                            "target": f"{item.target.domain}:{item.target.addr_id}",
+                            "expected_version": expected_by_addr.get(item.target.addr_id),
+                            "conflict_detail": item.conflict_detail,
+                        }
+                        for item in restored if item.conflict
+                    ]
+                    if conflicts:
+                        raise _RuntimeRollbackConflict(conflicts)
+
+                    all_restored.extend(restored)
+                    restored_at = datetime.now(timezone.utc)
+                    restored_addr_ids = {item.target.addr_id for item in restored}
+                    for snapshot in domain_snapshots:
+                        if snapshot.unit_scope.split(":", 1)[-1] in restored_addr_ids:
+                            snapshot.restored_at = restored_at
+
+                marker_restored, formula_restored = await self._restore_runtime_governance(
+                    db,
+                    audit=audit,
+                    snapshots=snapshots,
                 )
-                restore_mutations.append(FormulaMutation(
-                    target=target,
-                    before_value=snap.after_value,  # current state is what was applied
-                    after_value=snap.before_value,  # restore to before
-                    expected_version=snap.after_version,  # CAS: current must == after_version
-                ))
-
-            # Call adapter restore_many
-            try:
-                restored = await adapter.restore_many(restore_mutations)
-            except Exception as exc:
-                conflicts.append({
-                    "domain": domain,
-                    "error": f"restore_failed:{type(exc).__name__}:{exc}",
-                    "targets": [s.unit_scope for s in domain_snapshots],
-                })
-                continue
-
-            for rm in restored:
-                if rm.conflict:
-                    conflicts.append({
-                        "domain": domain,
-                        "target": f"{rm.target.domain}:{rm.target.addr_id}",
-                        "expected_version": restore_mutations[0].expected_version if restore_mutations else None,
-                        "conflict_detail": rm.conflict_detail,
-                    })
-                else:
-                    all_restored.append(rm)
-                    # Mark snapshot as restored
-                    for snap in domain_snapshots:
-                        addr = snap.unit_scope.split(":", 1)[-1] if ":" in snap.unit_scope else snap.unit_scope
-                        if addr == rm.target.addr_id:
-                            snap.restored_at = datetime.now(timezone.utc)
-                            break
-
-        # ④ If conflicts → return 409 structured response
-        if conflicts:
-            return {
-                "status": 409,
-                "error": "version_conflict",
-                "run_id": str(run_id),
-                "conflicts": conflicts,
-                "restored_count": len(all_restored),
-            }
-
-        # ⑤ Success → update audit + outbox
-        audit.result_status = "rolled_back"
-        operator_id, operator_role = self._operator_fields(operator) if operator else (audit.operator_id, "system")
-        audit.detail = {
-            **(audit.detail or {}),
-            "rollback": {
-                "operator_id": str(operator_id),
-                "operator_role": operator_role,
-                "rolled_back_at": datetime.now(timezone.utc).isoformat(),
-                "restored_count": len(all_restored),
-            },
-        }
-        await db.flush()
-
-        # Outbox
-        await self._write_outbox_event(
-            db, run_id=run_id, event_type="refresh_rolled_back",
-            payload={"restored_count": len(all_restored)},
-        )
+                restored_count = len(all_restored) + marker_restored
+                audit.result_status = "rolled_back"
+                operator_id, operator_role = (
+                    self._operator_fields(operator) if operator else (audit.operator_id, "system")
+                )
+                audit.detail = {
+                    **detail,
+                    "rollback": {
+                        "operator_id": str(operator_id),
+                        "operator_role": operator_role,
+                        "rolled_back_at": datetime.now(timezone.utc).isoformat(),
+                        "restored_count": restored_count,
+                        "restored_business_count": len(all_restored),
+                        "restored_marker_count": marker_restored,
+                        "restored_formula_count": formula_restored,
+                    },
+                }
+                await db.flush()
+                await self._write_outbox_event(
+                    db,
+                    run_id=run_id,
+                    event_type="refresh_rolled_back",
+                    payload={
+                        "project_id": str(audit.project_id),
+                        "year": audit.year,
+                        "restored_count": restored_count,
+                    },
+                )
+        except _RuntimeRollbackConflict as exc:
+            return ExecutionResult(
+                run_id=run_id,
+                status="conflict",
+                restored_count=0,
+                conflicts=exc.conflicts,
+                rollback_available=True,
+            )
 
         return ExecutionResult(
             run_id=run_id,
             status="rolled_back",
-            applied_count=len(all_restored),
+            applied_count=restored_count,
+            restored_count=restored_count,
             rollback_available=False,
         )
 
@@ -1898,29 +2371,13 @@ class DraftRefreshService:
         event_type: str,
         payload: dict,
     ) -> None:
-        """写入 formula_runtime_outbox 事件（同事务）。
+        """写入 formula_runtime_outbox（同事务，失败即让调用方回滚）。"""
+        from app.services.formula_runtime.outbox import write_outbox_event
 
-        使用 raw SQL 因 ORM model 尚未定义。event_key 保证幂等。
-        """
-        import uuid as uuid_mod
-
-        event_key = f"{run_id}:{event_type}"
-        stmt = sa.text("""
-            INSERT INTO formula_runtime_outbox (id, event_key, run_id, event_type, payload, attempts)
-            VALUES (:id, :event_key, :run_id, :event_type, CAST(:payload AS jsonb), 0)
-            ON CONFLICT (event_key) DO NOTHING
-        """)
-        try:
-            await db.execute(stmt, {
-                "id": str(uuid_mod.uuid4()),
-                "event_key": event_key,
-                "run_id": str(run_id),
-                "event_type": event_type,
-                "payload": json.dumps(payload),
-            })
-        except Exception as exc:  # noqa: BLE001
-            # Outbox 写入失败不阻断主事务（降级日志记录）
-            logger.warning(
-                "formula_runtime_outbox write failed (degraded): %s: %s",
-                type(exc).__name__, exc,
-            )
+        await write_outbox_event(
+            db,
+            run_id=run_id,
+            event_type=event_type,
+            event_key=f"{run_id}:{event_type}",
+            payload=payload,
+        )

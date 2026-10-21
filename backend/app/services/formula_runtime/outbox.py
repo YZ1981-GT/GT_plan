@@ -53,25 +53,48 @@ async def write_outbox_event(
     if payload is None:
         payload = {}
 
-    # 幂等 INSERT: ON CONFLICT DO NOTHING
-    stmt = (
-        pg_insert(FormulaRuntimeOutbox)
-        .values(
-            id=uuid.uuid4(),
-            event_key=event_key,
-            run_id=run_id,
-            event_type=event_type,
-            payload=payload,
-            attempts=0,
-            delivered_at=None,
-            last_error=None,
+    bind = session.get_bind()
+    import inspect
+    if inspect.isawaitable(bind):
+        bind = await bind
+    dialect = bind.dialect.name if bind is not None else ""
+    if dialect == "postgresql":
+        stmt = (
+            pg_insert(FormulaRuntimeOutbox)
+            .values(
+                id=uuid.uuid4(),
+                event_key=event_key,
+                run_id=run_id,
+                event_type=event_type,
+                payload=payload,
+                attempts=0,
+                delivered_at=None,
+                last_error=None,
+            )
+            .on_conflict_do_nothing(index_elements=["event_key"])
         )
-        .on_conflict_do_nothing(index_elements=["event_key"])
-    )
-    await session.execute(stmt)
+        await session.execute(stmt)
+    else:
+        existing = (
+            await session.execute(
+                select(FormulaRuntimeOutbox).where(
+                    FormulaRuntimeOutbox.event_key == event_key
+                )
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            session.add(FormulaRuntimeOutbox(
+                id=uuid.uuid4(),
+                event_key=event_key,
+                run_id=run_id,
+                event_type=event_type,
+                payload=payload,
+                attempts=0,
+                delivered_at=None,
+                last_error=None,
+            ))
     await session.flush()
 
-    # 返回该 event_key 对应的记录（无论新插入还是已存在）
     result = await session.execute(
         select(FormulaRuntimeOutbox).where(
             FormulaRuntimeOutbox.event_key == event_key
@@ -111,6 +134,7 @@ async def publish_pending_events(
         )
         .order_by(FormulaRuntimeOutbox.created_at)
         .limit(batch_size)
+        .with_for_update(skip_locked=True)
     )
     if run_id is not None:
         stmt = stmt.where(FormulaRuntimeOutbox.run_id == run_id)

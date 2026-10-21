@@ -8,8 +8,14 @@ Validates: Requirements 2.9
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.services.formula_management.function_support_matrix import (
+    Executor,
+    FormulaSupportViolation,
+    require_function_support,
+)
 
 from app.core.database import get_db
 from app.core.redis import get_redis
@@ -101,6 +107,17 @@ async def execute_formula(
     # Task 5.2 / ADR-FMC-06：按 body.project_id 做项目级鉴权（此前仅 get_current_user =
     # 任意登录用户可对任意项目执行取数，坐实 IDOR）。execute 为只读取数 → readonly。
     await assert_project_permission(db, current_user, data.project_id, "readonly")
+    try:
+        require_function_support(data.formula_type, Executor.CENTRAL_BATCH)
+    except FormulaSupportViolation as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error_code": "FORMULA_FUNCTION_UNSUPPORTED",
+                "executor": exc.executor.value,
+                "issues": exc.issues,
+            },
+        ) from exc
     engine = FormulaEngine(redis_client=redis)
     result = await engine.execute(
         db=db,
@@ -123,10 +140,40 @@ async def batch_execute_formulas(
     if not data:
         return []
 
-    # All formulas in a batch should share project_id and year
-    # Use the first item's project_id and year
     project_id = data[0].project_id
     year = data[0].year
+    await assert_project_permission(db, current_user, project_id, "readonly")
+
+    mixed = [
+        index
+        for index, item in enumerate(data)
+        if item.project_id != project_id or item.year != year
+    ]
+    if mixed:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error_code": "FORMULA_BATCH_CONTEXT_MISMATCH",
+                "message": "同一批公式必须属于同一项目和年度",
+                "mismatched_indexes": mixed,
+            },
+        )
+
+    support_errors: list[dict] = []
+    for index, item in enumerate(data):
+        try:
+            require_function_support(item.formula_type, Executor.CENTRAL_BATCH)
+        except FormulaSupportViolation as exc:
+            support_errors.append({"index": index, "issues": exc.issues})
+    if support_errors:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error_code": "FORMULA_FUNCTION_UNSUPPORTED",
+                "executor": Executor.CENTRAL_BATCH.value,
+                "items": support_errors,
+            },
+        )
 
     engine = FormulaEngine(redis_client=redis)
     formulas = [

@@ -94,6 +94,9 @@ class DraftRefreshOrchestrator:
         #: `no_formulas` 这一态必须透到响应体 `warnings`（前端 GtRefreshScopeDialog
         #: 已有 warnings 渲染区，故零前端改动即可见）。
         self._coordinator_warnings: list[str] = []
+        # 完整 FormulaMutation 仅在本次 generate 生命周期内保存；禁止降格成 RefreshUnit
+        # 后丢失 locator/before/version/source_formula_id。
+        self._runtime_mutations: list[Any] = []
 
     async def generate(
         self,
@@ -103,7 +106,9 @@ class DraftRefreshOrchestrator:
         operator: Any,
         scopes: Sequence[str],
         confirm_overwrite: bool = False,
-    ) -> tuple[RefreshResult, PresetApplication]:
+        transaction_mode: str = "all_or_nothing",
+        idempotency_key: str | None = None,
+    ) -> tuple[Any, PresetApplication]:
         """按勾选 ``scopes`` 分派生成器产初稿，交治理层统一编排（Req 21）。
 
         步骤：
@@ -156,30 +161,109 @@ class DraftRefreshOrchestrator:
         # ── ② 按被勾选 scope 分派生成器 → 归集 units + page_keys ──────────────
         units: list[RefreshUnit] = []
         page_keys: list[str] = []
-        self._coordinator_warnings = []  # 每次 generate 重置（实例可被复用）
+        self._coordinator_warnings = []
+        self._runtime_mutations = []
         for scope in selected:
             gen_units, gen_pages = await self._dispatch(
                 scope, project_id=project_id, year=year
             )
             units.extend(gen_units)
             page_keys.extend(gen_pages)
-        page_keys = list(dict.fromkeys(page_keys))  # 去重（多 scope 可能派生同页）
+        page_keys = list(dict.fromkeys(page_keys))
 
-        # ── ③ 交治理层：套预设 + 合并生成 units → 统一编排（幂等/Draft/覆盖/快照/审计）──
-        result, application = await self.svc.refresh_with_presets(
-            self.db,
-            project_id=project_id,
-            year=year,
-            operator=operator,
-            scope=selected,
-            page_keys=page_keys,
-            extra_units=units,
-            confirm_overwrite=confirm_overwrite,
-        )
+        # 同一公式可能被多个 workpaper scope 发现；按目标+来源去重，禁止重复 apply 自冲突。
+        deduped: dict[tuple[str, str, str], Any] = {}
+        for mutation in self._runtime_mutations:
+            key = (
+                mutation.target.domain,
+                mutation.target.addr_id,
+                str(mutation.source_formula_id or ""),
+            )
+            deduped[key] = mutation
+        runtime_mutations = list(deduped.values())
+        application = self.svc.build_preset_draft_units(page_keys)
+
+        if runtime_mutations:
+            import hashlib
+            import json
+            from app.services.formula_runtime.coordinator import FormulaRuntimeCoordinator
+
+            coordinator = FormulaRuntimeCoordinator(self.db)
+            adapters = coordinator.build_adapter_map(
+                {mutation.target.domain for mutation in runtime_mutations}
+            )
+            revision_payload = [
+                {
+                    "source_formula_id": str(m.source_formula_id or ""),
+                    "target": m.target.addr_id,
+                    "after": str(m.after_value),
+                    "version": m.expected_version,
+                }
+                for m in runtime_mutations
+            ]
+            formula_revision = hashlib.sha256(
+                json.dumps(revision_payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+            ).hexdigest()
+            preset_revision = hashlib.sha256(
+                json.dumps(
+                    [
+                        {"unit_scope": unit.unit_scope, "after": unit.after_value}
+                        for unit in application.units
+                    ],
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    default=str,
+                ).encode("utf-8")
+            ).hexdigest()
+            if application.units:
+                self._coordinator_warnings.append(
+                    f"{len(application.units)} 条预设已登记为待编制草稿；无规范业务 binding 的预设不计入已应用数"
+                )
+            result = await self.svc.execute_refresh(
+                self.db,
+                project_id=project_id,
+                year=year,
+                scopes=selected,
+                mutations=runtime_mutations,
+                adapters=adapters,
+                draft_units=application.units,
+                confirm_overwrite=confirm_overwrite,
+                transaction_mode=transaction_mode,
+                idempotency_key=idempotency_key,
+                operator=operator,
+                formula_definition_revision=formula_revision,
+                preset_revision=preset_revision,
+            )
+            audit = (
+                await self.db.execute(
+                    sa.select(DraftRefreshAudit).where(DraftRefreshAudit.id == result.run_id)
+                )
+            ).scalar_one_or_none()
+            if audit is not None:
+                audit.detail = {
+                    **(audit.detail or {}),
+                    "scopes": selected,
+                    "preset_application": application.to_dict(),
+                    "warnings": list(self._coordinator_warnings),
+                }
+                await self.db.flush()
+        else:
+            # 无可安全应用的 runtime mutation 时保留旧 marker-only 治理路径，且告警明确透出。
+            result, application = await self.svc.refresh_with_presets(
+                self.db,
+                project_id=project_id,
+                year=year,
+                operator=operator,
+                scope=selected,
+                page_keys=page_keys,
+                extra_units=units,
+                confirm_overwrite=confirm_overwrite,
+            )
 
         # ── ④ 审计留痕记录本次实际执行的勾选范围（Req 21.6，复用 Req 4 留痕）──────
-        if result.status == "success" and result.refresh_id is not None:
-            await self._record_scopes_to_audit(result.refresh_id, selected)
+        run_id = getattr(result, "refresh_id", None) or getattr(result, "run_id", None)
+        if result.status == "success" and run_id is not None:
+            await self._record_scopes_to_audit(run_id, selected)
 
         # ── ⑤ 把 coordinator 的「无公式定义」等告警透到响应体（Task 11 / R6.4）──
         # fail-open：`result` 可能没有 `warnings` 属性（不同实现），此时只落日志。
@@ -242,16 +326,23 @@ class DraftRefreshOrchestrator:
             scopes=[scope],
         )
 
-        # Convert mutations to RefreshUnit for the treatment layer
-        units: list[RefreshUnit] = []
-        for mutation in plan.mutations:
-            unit_scope = f"{mutation.target.domain}:{mutation.target.addr_id}"
-            units.append(
-                RefreshUnit(
-                    unit_scope=unit_scope,
-                    after_value=mutation.after_value,
-                )
+        # 保留完整 mutation，交 generate 统一去重并由 execute_refresh 真正 apply。
+        # 禁止转成 RefreshUnit 丢失 locator/before/version/source_formula_id。
+        # getattr 自愈：__init__ 已建 _runtime_mutations；但诊断/测试可能用 __new__ 绕过
+        # __init__ 直接调 _dispatch —— 此处兜底建空列表，避免 AttributeError 而非静默。
+        if not hasattr(self, "_runtime_mutations"):
+            self._runtime_mutations = []
+        self._runtime_mutations.extend(plan.mutations)
+        # 兼容直接调用 _dispatch 的既有诊断/测试：仍返回只读 RefreshUnit 投影；
+        # generate 的 runtime 分支不消费这些投影写值，而是使用上面的完整 mutation。
+        units: list[RefreshUnit] = [
+            RefreshUnit(
+                unit_scope=f"{mutation.target.domain}:{mutation.target.addr_id}",
+                before_value=mutation.before_value,
+                after_value=mutation.after_value,
             )
+            for mutation in plan.mutations
+        ]
 
         # Build page_keys based on scope type
         page_keys: list[str] = []

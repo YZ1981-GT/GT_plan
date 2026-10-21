@@ -1,26 +1,25 @@
 /**
- * formulaTemplateAndMaterialize.spec.ts — 「保存为模板 / 引用模板 / 落入项目」守卫
+ * formulaTemplateAndMaterialize.spec.ts — 报表行「有效定义 / 本项目适配」+「落入项目」守卫
  *
- * 复核发现的三个真实缺陷（本文件锁死修复）：
- *
- * 1. **保存为模板只存"看过的部分"**：`allRowsMap` 只装用户点过的报表，
- *    采集时不补齐 ⇒ 只逛过资产负债表就保存，模板里静默只有 BS 行。
- * 2. **引用模板不落库**：旧实现只改内存（`allRowsMap`），后端 `apply_template`
- *    仅记引用不写公式，弹窗却提示「已引用 N 条」⇒ 关掉即丢的假成功；
- *    且目标报表未加载时 `if (!rows) continue` 整类静默跳过。
- * 3. **预设带不进项目**：旧「自动生成」打后端零实现的 `formula/auto-generate` 恒 404。
- *    现走既有 `POST /api/report-config/clone` 的 `mode: 'sync'`，
- *    把带公式的模板行落成 `project:{id}`（取数层优先消费该口径）。
+ * spec formula-global-settings-sync（R1.2 / R1.4 / R6 / R13.10 / R14.2）：
+ * 1. **旧「保存为模板 / 引用模板 / 撤销引用」已下线**：它走共享配置 formula_config（只回填报表段、
+ *    引用会写全局行），后端已 410。改为顶栏 FormulaSettingsToolbar（订阅一层，只写本项目层）。
+ * 2. **项目上下文读本项目有效定义**：旧口径「有项目行就只显示项目行」会把只适配了几行的项目
+ *    其余全局行全部藏掉；现读 `/formula-settings/report/effective`，每行带层级标签。
+ * 3. **保存写本项目适配**（带本项目版本 CAS），不再 PUT 全局行（非管理员 403）；批量只发改过的行。
+ * 4. **预设带进项目**：走既有 `POST /api/report-config/clone` 的 `mode: 'sync'`（替代 404 的 auto-generate）。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { shallowMount, flushPromises } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+import { invalidateEffectiveReport } from '@/components/formula/settings/reportEffectiveRows'
 
-const { get, post, put, confirm, httpGet, acnrListSheets, noteState, scopeState } = vi.hoisted(() => ({
+const { get, post, put, del, confirm, httpGet, acnrListSheets, noteState, scopeState } = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
   put: vi.fn(),
+  del: vi.fn(),
   confirm: vi.fn(),
   httpGet: vi.fn(),
   acnrListSheets: vi.fn(),
@@ -28,7 +27,7 @@ const { get, post, put, confirm, httpGet, acnrListSheets, noteState, scopeState 
   scopeState: { rows: [] as any[] },
 }))
 
-vi.mock('@/services/apiProxy', () => ({ api: { get, post, put } }))
+vi.mock('@/services/apiProxy', () => ({ api: { get, post, put, delete: del } }))
 vi.mock('@/utils/http', () => ({ default: { get: httpGet } }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/components/formula/FormulaEditDialog.vue', () => ({ default: { template: '<div />' } }))
@@ -121,215 +120,192 @@ async function mounted(props: Record<string, unknown> = {}) {
   return w
 }
 
-describe('保存为模板：必须覆盖全部 6 类报表', () => {
-  beforeEach(() => {
-    get.mockReset()
-    get.mockImplementation(async (url: string, cfg?: any) => {
-      if (String(url).includes('report-config/types')) return []
-      if (String(url).includes('preset-formulas')) return clone(noteState.presets)
-      if (String(url).includes('report-config')) return clone(ROWS_BY_TYPE[cfg?.params?.report_type] ?? [])
-      return {}
-    })
-    post.mockReset(); post.mockResolvedValue({})
-    put.mockReset(); put.mockResolvedValue({})
-    confirm.mockReset(); confirm.mockResolvedValue('confirm')
-    noteState.presets = []
-    scopeState.rows = []
-    httpGet.mockReset(); httpGet.mockResolvedValue({ data: { scopes: {} } })
-    acnrListSheets.mockReset(); acnrListSheets.mockResolvedValue([])
+/** 本项目有效定义（formula-settings/report/effective）：BS-002 本项目改过，BS-006 跟随全局。 */
+const EFFECTIVE = {
+  domain: 'report', project_id: 'project-1', scope: 'soe_standalone', frozen: false, can_edit_global: false,
+  slots: [
+    {
+      slot_key: 'balance_sheet:BS-006', label: '资产负债表 BS-006 应收账款', layer: 'global', layer_label: '全局',
+      definition: { formula: "TB('1122','期末余额')", formula_category: 'auto_calc' }, disabled: false, pending: false,
+      structure: { row_number: 6, row_name: '应收账款', indent_level: 1 },
+      global_definition: { formula: "TB('1122','期末余额')", formula_category: 'auto_calc' }, global_version: 4,
+      local_definition: null, local_version: null, pinned: false,
+    },
+    {
+      slot_key: 'balance_sheet:BS-002', label: '资产负债表 BS-002 货币资金', layer: 'project', layer_label: '本项目',
+      definition: { formula: "TB('1001','期末余额')+1", formula_category: 'auto_calc' }, disabled: false, pending: true,
+      structure: { row_number: 2, row_name: '货币资金', indent_level: 1 },
+      global_definition: { formula: "TB('1001','期末余额')", formula_category: 'auto_calc' }, global_version: 4,
+      local_definition: { formula: "TB('1001','期末余额')+1" }, local_version: 2, pinned: false,
+    },
+    {
+      slot_key: 'income_statement:IS-002', label: '利润表 IS-002 营业收入', layer: 'global', layer_label: '全局',
+      definition: { formula: "TB('6001','本期')" }, disabled: false, pending: false,
+      structure: { row_number: 2, row_name: '营业收入' }, global_definition: { formula: "TB('6001','本期')" },
+      global_version: 1, local_definition: null, local_version: null, pinned: false,
+    },
+  ],
+}
+const OVERRIDES_URL = '/api/projects/project-1/formula-settings/report/overrides'
+
+function resetMocks() {
+  invalidateEffectiveReport()
+  get.mockReset()
+  get.mockImplementation(async (url: string, cfg?: any) => {
+    if (String(url).includes('/formula-settings/report/effective')) return clone(EFFECTIVE)
+    if (String(url).includes('report-config/types')) return []
+    if (String(url).includes('preset-formulas')) return clone(noteState.presets)
+    if (String(url).includes('report-config')) {
+      return clone((ROWS_BY_TYPE[cfg?.params?.report_type] ?? []).map((r) => ({ ...r, formula_version: 3 })))
+    }
+    return {}
   })
+  post.mockReset(); post.mockResolvedValue({})
+  put.mockReset(); put.mockImplementation(async (url: string, body: any) => (
+    String(url) === OVERRIDES_URL ? { saved: body.items.map((i: any) => ({ slot_key: i.slot_key, version: 3 })) } : { formula_version: 4 }))
+  del.mockReset(); del.mockResolvedValue({ restored: ['balance_sheet:BS-002'] })
+  confirm.mockReset(); confirm.mockResolvedValue('confirm')
+  noteState.presets = []
+  scopeState.rows = []
+  httpGet.mockReset(); httpGet.mockResolvedValue({ data: { scopes: {} } })
+  acnrListSheets.mockReset(); acnrListSheets.mockResolvedValue([])
+}
 
-  it('只逛过一类报表也会补齐其余五类后再采集', async () => {
+describe('旧共享配置公式模板已下线，入口改走订阅机制（R13.10 / R14.2）', () => {
+  beforeEach(resetMocks)
+
+  it('组件里不再有 formula_config 的保存 / 引用 / 撤销引用', async () => {
     const w = await mounted()
-    // 模拟"只加载过资产负债表"
-    state(w).allRowsMap = { balance_sheet: ROWS_BY_TYPE.balance_sheet }
-    await flushPromises()
-
-    const data = await state(w).getFormulaConfigData()
-
-    expect(Object.keys(data.coverage).sort()).toEqual([
-      'balance_sheet', 'cash_flow_statement', 'cash_flow_supplement',
-      'equity_statement', 'impairment_provision', 'income_statement',
-      // 覆盖面已扩到附注预设与项目级底稿公式（只读留档段）
-      'note_presets', 'workpaper_project',
-    ].sort())
-    expect(data.note_formulas).toEqual([])
-    expect(data.workpaper_formulas).toEqual([])
-    expect(data.formulas).toHaveLength(6)
-    expect(data.applicable_standard).toBe('soe_standalone')
-    expect(data.template_type).toBe('soe')
-    w.unmount()
-  })
-
-  it('覆盖面含附注预设与项目级底稿公式（只读留档段）', async () => {
-    noteState.presets = [
-      { id: 'n-1', note_section: '五、1', section_title: '货币资金', formula: "NOTE('货币资金','合计','期末')" },
-    ]
-    scopeState.rows = [
-      {
-        id: 'wpf-1', scope: 'workpaper', scopeLabel: '底稿', wpId: 'wp-1',
-        sheetName: 'D2-1', targetCell: 'E10', expression: "TB('1122','期末余额')",
-        formulaType: 'auto_calc', issueDescription: '', hintText: '', sourceLabel: null,
-        lastComputedAt: null, refs: [], addrKey: 'k1', sourceAddrId: null, formulaSource: null,
-      },
-    ]
-    const w = await mounted()
-
-    const data = await state(w).getFormulaConfigData()
-
-    expect(data.note_formulas).toHaveLength(1)
-    expect(data.note_formulas[0]).toMatchObject({ note_section: '五、1', section_title: '货币资金' })
-    expect(data.workpaper_formulas).toHaveLength(1)
-    expect(data.workpaper_formulas[0]).toMatchObject({ scope: 'workpaper', sheet_name: 'D2-1', target_cell: 'E10' })
-    expect(data.coverage.note_presets).toBe(1)
-    expect(data.coverage.workpaper_project).toBe(1)
-    w.unmount()
-  })
-
-  it('无公式行不进模板（模板只存真配置）', async () => {
-    const w = await mounted()
-    const data = await state(w).getFormulaConfigData()
-
-    expect(data.formulas.map((f: any) => f.row_code)).not.toContain('BS-006')
+    for (const gone of ['getFormulaConfigData', 'onTemplateApplied', 'onUndoTemplateApply', 'lastTemplateUndo']) {
+      expect(state(w)[gone]).toBeUndefined()
+    }
+    // 顶栏入口带上当前公式域与项目口径
+    expect(state(w).settingsDomain).toBe('report')
+    expect(typeof state(w).askApplyScope).toBe('function')
     w.unmount()
   })
 })
 
-describe('引用模板：填入必须落库且计数准确', () => {
-  beforeEach(() => {
-    get.mockReset()
-    get.mockImplementation(async (url: string, cfg?: any) => {
-      if (String(url).includes('report-config/types')) return []
-      if (String(url).includes('preset-formulas')) return clone(noteState.presets)
-      if (String(url).includes('report-config')) return clone(ROWS_BY_TYPE[cfg?.params?.report_type] ?? [])
-      return {}
-    })
-    post.mockReset(); post.mockResolvedValue({})
-    put.mockReset(); put.mockResolvedValue({})
-    confirm.mockReset(); confirm.mockResolvedValue('confirm')
-    noteState.presets = []
-    scopeState.rows = []
-    httpGet.mockReset(); httpGet.mockResolvedValue({ data: { scopes: {} } })
-    acnrListSheets.mockReset(); acnrListSheets.mockResolvedValue([])
-  })
+describe('项目上下文：报表行 = 本项目有效定义，保存写本项目适配（R1.2 / R1.4 / R6）', () => {
+  beforeEach(resetMocks)
 
-  it('填入的行逐条 PUT 落库（此前只改内存，关窗即丢）', async () => {
+  it('读有效定义：全局行与本项目行一起显示、按行号排序、逐行带层级与待确认', async () => {
     const w = await mounted()
-    await state(w).onTemplateApplied({
-      template_type: 'soe',
-      formulas: [{ report_type: 'balance_sheet', row_code: 'BS-006', formula: "TB('1122','期末余额')", formula_category: 'auto_calc' }],
-    })
+    const rows = await state(w).fetchReportRows('balance_sheet')
 
-    const puts = put.mock.calls.filter(([url]) => String(url).includes('/api/report-config/'))
-    expect(puts).toHaveLength(1)
-    expect(puts[0][0]).toBe('/api/report-config/bs-2')
-    expect(puts[0][1]).toMatchObject({ formula: "TB('1122','期末余额')" })
+    expect(rows.map((r: any) => r.row_code)).toEqual(['BS-002', 'BS-006'])
+    expect(rows[0]).toMatchObject({ _layer: 'project', _layer_label: '本项目', _pending: true, _local_version: 2 })
+    expect(rows[1]).toMatchObject({ _layer: 'global', _layer_label: '全局', formula: "TB('1122','期末余额')" })
+    // 不再按旧口径单读 project:{id} 行（只适配几行的项目会把其余全局行藏掉）
+    const legacy = get.mock.calls.filter(([url, cfg]) => String(url).includes('/api/report-config')
+      && String(cfg?.params?.applicable_standard || '').startsWith('project:'))
+    expect(legacy).toEqual([])
     w.unmount()
   })
 
-  it('目标报表未加载时不再整类静默跳过（先补齐再匹配）', async () => {
+  it('行内保存：写本项目适配（带本项目版本），不 PUT 全局报表配置行', async () => {
     const w = await mounted()
-    state(w).allRowsMap = {}   // 一类都没加载
+    const [row] = await state(w).fetchReportRows('balance_sheet')
+    state(w).editFormula = "TB('1001','期末余额')+2"
+    state(w).editCategory = 'auto_calc'
+    state(w).editDescription = '本项目口径'
+    await state(w).saveEdit(row)
+
+    const calls = put.mock.calls.filter(([url]) => String(url) === OVERRIDES_URL)
+    expect(calls).toHaveLength(1)
+    expect(calls[0][1].items).toEqual([expect.objectContaining({
+      slot_key: 'balance_sheet:BS-002', expected_version: 2,
+      definition: expect.objectContaining({ formula: "TB('1001','期末余额')+2", formula_description: '本项目口径' }),
+    })])
+    expect(put.mock.calls.some(([url]) => String(url).startsWith('/api/report-config/'))).toBe(false)
+    expect(row).toMatchObject({ formula: "TB('1001','期末余额')+2", _local_version: 3, _layer: 'project' })
+    w.unmount()
+  })
+
+  it('跟随全局的行第一次改：不带版本（新建本项目适配）；改回与全局相同时标回「全局」', async () => {
+    const w = await mounted()
+    const rows = await state(w).fetchReportRows('balance_sheet')
+    const bs006 = rows[1]
+    state(w).editFormula = "TB('1122','期末余额')"
+    state(w).editCategory = 'auto_calc'
+    state(w).editDescription = ''
+    await state(w).saveEdit(bs006)
+
+    const body = put.mock.calls.find(([url]) => String(url) === OVERRIDES_URL)![1]
+    expect(body.items[0]).toMatchObject({ slot_key: 'balance_sheet:BS-006', expected_version: null })
+    expect(bs006).toMatchObject({ _layer: 'global', _layer_label: '全局' })
+    w.unmount()
+  })
+
+  it('保存失败：行保持原值（不留「界面已改、库里没有」）', async () => {
+    const w = await mounted()
+    const [row] = await state(w).fetchReportRows('balance_sheet')
+    put.mockRejectedValueOnce({ response: { status: 409, data: { detail: { message: '本项目公式已被他人修改，请刷新后重试' } } } })
+    state(w).editFormula = 'X'
+    await state(w).saveEdit(row)
+
+    expect(row.formula).toBe("TB('1001','期末余额')+1")
+    w.unmount()
+  })
+
+  it('「💾 保存」只发改过的行，一次写入本项目适配', async () => {
+    const w = await mounted()
+    const rows = await state(w).fetchReportRows('balance_sheet')
+    state(w).allRowsMap = { balance_sheet: rows }
     await flushPromises()
+    state(w).allRowsMap.balance_sheet[1].formula = "TB('1122','期末余额')*2"
+    await state(w).onSaveAllFormulas()
 
-    await state(w).onTemplateApplied({
-      template_type: 'soe',
-      formulas: [{ report_type: 'impairment_provision', row_code: 'IMP-001', formula: 'X' }],
-    })
-
-    // IMP-001 已有公式 ⇒ 计入"跳过已有"，但必须真的被匹配到（不是 unmatched）
-    const requested = get.mock.calls
-      .map(([, cfg]) => cfg?.params?.report_type)
-      .filter(Boolean)
-    expect(requested).toContain('impairment_provision')
+    const calls = put.mock.calls.filter(([url]) => String(url) === OVERRIDES_URL)
+    expect(calls).toHaveLength(1)
+    expect(calls[0][1].items.map((i: any) => i.slot_key)).toEqual(['balance_sheet:BS-006'])
     w.unmount()
   })
 
-  it('已有公式的行不覆盖，且不会误报成已保存', async () => {
+  it('恢复为全局：确认后删除本项目适配并重取有效定义', async () => {
     const w = await mounted()
-    await state(w).onTemplateApplied({
-      template_type: 'soe',
-      formulas: [{ report_type: 'balance_sheet', row_code: 'BS-002', formula: '不该覆盖' }],
-    })
+    const [row] = await state(w).fetchReportRows('balance_sheet')
+    get.mockClear()
+    await state(w).onRestoreGlobal(row)
 
-    expect(put).not.toHaveBeenCalled()
-    expect(state(w).allRowsMap.balance_sheet[0].formula).toBe("TB('1001','期末余额')")
+    expect(del).toHaveBeenCalledWith(OVERRIDES_URL, expect.objectContaining({ params: { slot_key: ['balance_sheet:BS-002'] } }))
+    expect(get.mock.calls.some(([url]) => String(url).includes('/formula-settings/report/effective'))).toBe(true)
     w.unmount()
   })
 
-  it('写入前给出预览确认（含将写入/跳过/不存在条数），取消则零写入', async () => {
+  it('恢复为全局：取消确认则零写入', async () => {
     const w = await mounted()
-    confirm.mockReset()
+    const [row] = await state(w).fetchReportRows('balance_sheet')
     confirm.mockRejectedValueOnce('cancel')
+    await state(w).onRestoreGlobal(row)
 
-    await state(w).onTemplateApplied({
-      template_type: 'soe',
-      formulas: [
-        { report_type: 'balance_sheet', row_code: 'BS-006', formula: "TB('1122','期末余额')" },
-        { report_type: 'balance_sheet', row_code: 'BS-002', formula: '已有公式不写' },
-        { report_type: 'balance_sheet', row_code: 'BS-999', formula: '行次不存在' },
-      ],
-    })
-
-    const msg = String(confirm.mock.calls[0]?.[0] ?? '')
-    expect(msg).toContain('将写入 1 条')
-    expect(msg).toContain('跳过已有 1 条')
-    expect(msg).toContain('模板行次不存在 1 条')
-    expect(put).not.toHaveBeenCalled()
-    expect(state(w).allRowsMap.balance_sheet[1].formula).toBeNull()
+    expect(del).not.toHaveBeenCalled()
     w.unmount()
   })
+})
 
-  it('写入后可整体撤销（逐条 PUT 还原为引用前的值）', async () => {
-    const w = await mounted()
-    await state(w).onTemplateApplied({
-      template_type: 'soe',
-      formulas: [{ report_type: 'balance_sheet', row_code: 'BS-006', formula: "TB('1122','期末余额')" }],
-    })
-    expect(state(w).lastTemplateUndo.entries).toHaveLength(1)
+describe('无项目上下文（管理员全局入口）：保存报表配置行带 formula_version', () => {
+  beforeEach(resetMocks)
 
-    put.mockClear()
-    await state(w).onUndoTemplateApply()
+  it('行内保存 PUT 报表配置行，带载入时的版本并采用响应里的新版本', async () => {
+    const w = await mounted({ projectId: '' })
+    const rows = await state(w).fetchReportRows('balance_sheet')
+    const row = rows.find((r: any) => r.row_code === 'BS-002')
+    state(w).editFormula = "TB('1001','期末余额')"
+    state(w).editCategory = 'auto_calc'
+    state(w).editDescription = ''
+    await state(w).saveEdit(row)
 
-    expect(put).toHaveBeenCalledWith('/api/report-config/bs-2', {
-      formula: null, formula_category: null, formula_description: null,
-    })
-    expect(state(w).allRowsMap.balance_sheet[1].formula).toBeNull()
-    expect(state(w).lastTemplateUndo).toBeNull()
-    w.unmount()
-  })
-
-  it('单行写库失败时内存同步还原（不留"界面已写、库里没有"）', async () => {
-    const w = await mounted()
-    put.mockRejectedValueOnce(new Error('500'))
-
-    await state(w).onTemplateApplied({
-      template_type: 'soe',
-      formulas: [{ report_type: 'balance_sheet', row_code: 'BS-006', formula: 'X' }],
-    })
-
-    expect(state(w).allRowsMap.balance_sheet[1].formula).toBeNull()
-    expect(state(w).lastTemplateUndo).toBeNull()
-    w.unmount()
-  })
-
-  it('模板版本与当前页不一致时先确认（取消则不动数据）', async () => {
-    confirm.mockRejectedValueOnce('cancel')
-    const w = await mounted()
-
-    await state(w).onTemplateApplied({
-      template_type: 'listed',
-      formulas: [{ report_type: 'balance_sheet', row_code: 'BS-006', formula: 'X' }],
-    })
-
-    expect(confirm).toHaveBeenCalled()
-    expect(put).not.toHaveBeenCalled()
+    expect(put).toHaveBeenCalledWith('/api/report-config/bs-1', expect.objectContaining({ expected_version: 3 }))
+    expect(row.formula_version).toBe(4)
+    expect(get.mock.calls.some(([url]) => String(url).includes('/formula-settings/'))).toBe(false)
     w.unmount()
   })
 })
 
 describe('把报表预设落入项目（替代 404 的自动生成）', () => {
   beforeEach(() => {
+    invalidateEffectiveReport()
     get.mockReset()
     get.mockImplementation(async (url: string, cfg?: any) => {
       if (String(url).includes('report-config/types')) return []

@@ -86,12 +86,16 @@ describe('面板（真挂载）', () => {
     const w = mountPanel()
     await flushPromises()
     const gets = calls.filter((c) => c.method === 'get').map((c) => c.url)
+    // runs = 推送历史 UI（commit 4c818d977 入库），与 rules/latest/states 一并在挂载期加载。
     expect(gets).toEqual([
-      '/api/projects/p1/formula-push/rules', '/api/projects/p1/formula-push/latest', '/api/projects/p1/formula-push/states',
+      '/api/projects/p1/formula-push/rules', '/api/projects/p1/formula-push/latest',
+      '/api/projects/p1/formula-push/states', '/api/projects/p1/formula-push/runs',
     ])
-    expect(calls[0].params).toEqual({ wp_code: 'E1' })
-    expect(calls[1].params).toEqual({ year: 2025, wp_code: 'E1' })
-    expect(calls[2].params).toEqual({ year: 2025, wp_code: 'E1' })
+    const getByUrl = (url: string) => calls.find((c) => c.method === 'get' && c.url === url)
+    expect(getByUrl('/api/projects/p1/formula-push/rules')?.params).toEqual({ wp_code: 'E1' })
+    expect(getByUrl('/api/projects/p1/formula-push/latest')?.params).toEqual({ year: 2025, wp_code: 'E1' })
+    expect(getByUrl('/api/projects/p1/formula-push/states')?.params).toEqual({ year: 2025, wp_code: 'E1' })
+    expect(getByUrl('/api/projects/p1/formula-push/runs')?.params).toEqual({ year: 2025, limit: 20, offset: 0 })
     const text = w.text()
     for (const s of ['公式推送 · E1', '最近一次推送', '成功', '触发：试算表更新', '写入 20', '待处理差异（2）',
       '待确认', '人工修改', '在附注模块中处理', '推送规则（1）', '系统值（总是跟随公式）', '试算表含多个公司编码']) {

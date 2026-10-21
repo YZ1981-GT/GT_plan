@@ -951,7 +951,17 @@ backend/tests/workpaper_sync/test_task25_materialize_coordinator_pg.py  2682
 #     GET 仍返回该条）。补传 project_id + 返回 False 时抛 404。拆分方向：该 router 是
 #     公式 CRUD + 预设 + 依赖图 + 批量重算的聚合体，宜按「CRUD / preset / graph」拆三个
 #     router 模块，属独立打磨任务。
-backend/app/routers/wp_formula.py  980
+#   2026-10-21 抢救登记（spec formula-settings-wiring-closure）：980→1461。HEAD 早已 1412（超基线
+#     未登记，提交时绕过了门禁），+49 来自 17:56 被 `git stash`（temp-for-push-reconcile，
+#     救援标签 rescue/2026-10-21-1756-temp-for-push-reconcile）收走、从未还原的
+#     formula-manager-runtime-integrity-closure 改动（对象型端点项目鉴权、CAS 428/409、函数支持
+#     preflight）。原样恢复已测过的实现，不在事故恢复里重写；拆分方向同上（CRUD / preset / graph）。
+backend/app/routers/wp_formula.py  1461
+#   draft_refresh_service.py —— 历史大文件（HEAD 1926 > 800 从未登记）。2026-10-21 抢救登记 2383：
+#     +457 同属上述被 stash 收走的 runtime-integrity 改动（刷新事务 owner：业务写 / snapshot /
+#     公式状态 / DraftMarker / 审计 / outbox 同 run_id，冲突整体回滚 409）。拆分方向：把
+#     「回滚」「冲突判定」「marker 写入」三段抽成同包伴生模块，属独立打磨任务。
+backend/app/services/draft_refresh_service.py  2383
 
 #   workpaper_sync 判据文件（2026-09-24 suite triage）—— 13 份，基线一律取当前真实行数。
 #     增量的来源是**加判据**，不是加实现：这一轮把套件从 283 failed / 16 errors 打到

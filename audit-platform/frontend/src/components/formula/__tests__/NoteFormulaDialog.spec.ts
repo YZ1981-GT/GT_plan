@@ -165,6 +165,33 @@ describe('NoteFormulaDialog — 加载/编辑/持久化（Req 15.1/15.2/15.4）'
     wrapper.unmount()
   })
 
+  // ── 2b. 载入版本令牌（formula-global-settings-sync）：原样带回、保存后换新 ─────────
+  it('PUT 带回 GET 给的 loaded；第二次保存改用上次 PUT 返回的新令牌；层级字段不入库', async () => {
+    const slot = '五、1|R1C1'
+    mockGet.mockResolvedValue({
+      formulas: [{ ...makeSavedFormula(), slot_key: slot, layer: 'global', layer_label: '全局', pending: false }],
+      loaded: { [slot]: 'G3' },
+    })
+    mockPut.mockResolvedValueOnce({
+      formulas: [{ ...makeSavedFormula(), slot_key: slot, layer: 'project', layer_label: '本项目', pending: false }],
+      loaded: { [slot]: 'L1' }, saved_count: 1,
+    })
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    const row = (wrapper.vm as any).formulas[0]
+    row._editing = true
+    await (wrapper.vm as any).completeRow(row)
+    expect(mockPut.mock.calls[0][1].loaded).toEqual({ [slot]: 'G3' })
+    expect(mockPut.mock.calls[0][1].formulas[0]).not.toHaveProperty('layer_label')
+    expect(row._editing).toBe(false)
+    expect(row.layer_label).toBe('本项目')
+
+    row._editing = true
+    await (wrapper.vm as any).completeRow(row)
+    expect(mockPut.mock.calls[1][1].loaded).toEqual({ [slot]: 'L1' })
+    wrapper.unmount()
+  })
+
   // ── 3. apply 执行持久集（先 PUT 再 apply-formulas） ─────────────────────────
   it('onApply 先 PUT 持久化编辑集，再 POST apply-formulas（不重生成丢编辑）', async () => {
     const wrapper = mountDialog()

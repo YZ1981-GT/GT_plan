@@ -313,11 +313,41 @@ def load_custom_presets() -> list[PresetEntry]:
     return entries
 
 
+# ── 数据库自定义预设（formula-global-settings-sync R14.3） ────────────────────
+#: 进程内缓存：数据库里的自定义预设（事务所级模板「自定义公式预设」，见
+#: ``formula_settings.custom_presets``）。写入方写完即刷新；各进程启动时加载并定期对齐。
+_DB_CUSTOM: list[PresetEntry] = []
+#: 读时补刷钩子（缓存过时效时后台刷新，不阻塞；由 custom_presets.start_refresher 登记）
+_DB_CUSTOM_REFRESHER: Any = None
+
+
+def set_db_custom_entries(entries: Iterable[PresetEntry]) -> None:
+    global _DB_CUSTOM
+    _DB_CUSTOM = list(entries)
+
+
+def set_db_custom_refresher(fn: Any) -> None:
+    global _DB_CUSTOM_REFRESHER
+    _DB_CUSTOM_REFRESHER = fn
+
+
+def db_custom_entries() -> list[PresetEntry]:
+    if _DB_CUSTOM_REFRESHER is not None:
+        try:
+            _DB_CUSTOM_REFRESHER()
+        except Exception as exc:  # noqa: BLE001 —— 补刷失败沿用当前缓存
+            logger.debug("自定义预设缓存补刷未触发：%s", exc)
+    return list(_DB_CUSTOM)
+
+
 # ── 合并 + 去重（Req 22.3） ──────────────────────────────────────────────────
 def build_preset_library(
-    *, include_sources: bool = True
+    *, include_sources: bool = True, custom_entries: Iterable[PresetEntry] | None = None,
 ) -> tuple[list[PresetEntry], dict[str, int]]:
     """构建统一预设库：custom ∪ seed ∪ 收敛源，按 ``(page_key, target_cell)`` 去重。
+
+    custom = 数据库自定义预设（``custom_entries``，缺省取进程内缓存）在前，旧文件
+    ``formula_custom_presets.json``（只读兼容）在后。
 
     **自定义（custom）置于最前** → 同 ``(page_key, target_cell)`` 键覆盖通用（seed/
     收敛源），"去重首个赢"（Property 4）。显式 seed 次之，收敛源最后；相同去重键的
@@ -331,7 +361,8 @@ def build_preset_library(
     Returns:
         (entries, stats)；stats 含 ``inserted`` / ``skipped`` / 各 source 计数。
     """
-    ordered: list[Iterable[PresetEntry]] = [load_custom_presets(), load_seed_presets()]
+    db_custom = list(custom_entries) if custom_entries is not None else db_custom_entries()
+    ordered: list[Iterable[PresetEntry]] = [db_custom, load_custom_presets(), load_seed_presets()]
     if include_sources:
         ordered.extend(
             [
@@ -576,53 +607,7 @@ def upsert_seed_presets(entries: list[PresetEntry]) -> dict[str, int]:
     return {"inserted": inserted, "updated": updated, "total": len(presets)}
 
 
-# ── 自定义预设幂等 upsert（平台级自定义写入，隔离于 seed） ────────────────────
-def upsert_custom_presets(entries: list[PresetEntry]) -> dict[str, int]:
-    """把自定义预设条目幂等写入 ``formula_custom_presets.json``（隔离于 seed）。
-
-    镜像 ``upsert_seed_presets`` 的幂等语义（按 ``(page_key, target_cell)`` 覆盖/追加），
-    但**只写 ``formula_custom_presets.json``，绝不触碰 ``formula_presets_seed.json``**
-    （Property 2）。写入条目 ``source`` 一律标 ``custom``。
-
-    Returns:
-        stats：``{"inserted": n, "updated": m, "total": k}``。
-    """
-    data = _safe_load_json(CUSTOM_PATH)
-    if not isinstance(data, dict):
-        data = {
-            "description": "公式预设库自定义条目（用户在致同通用基线之上新增，与 formula_presets_seed.json 隔离，平台级共享）。",
-            "version": "2025-R1",
-            "presets": [],
-        }
-    presets: list[dict[str, Any]] = list(data.get("presets") or [])
-
-    index: dict[tuple[str, str], int] = {}
-    for i, p in enumerate(presets):
-        key = ((p.get("page_key") or "").strip(), (p.get("target_cell") or "").strip())
-        index[key] = i
-
-    inserted = 0
-    updated = 0
-    for entry in entries:
-        key = entry.dedup_key()
-        payload = entry.to_dict()
-        payload["source"] = "custom"  # 隔离来源标注（Property 3）
-        if key in index:
-            presets[index[key]] = payload
-            updated += 1
-        else:
-            index[key] = len(presets)
-            presets.append(payload)
-            inserted += 1
-
-    data["presets"] = presets
-    try:
-        PRESET_DIR.mkdir(parents=True, exist_ok=True)
-        CUSTOM_PATH.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-    except OSError as exc:
-        logger.error("写入自定义预设失败 %s: %s", CUSTOM_PATH, exc)
-        raise
-
-    return {"inserted": inserted, "updated": updated, "total": len(presets)}
+# ── 自定义预设写入 ────────────────────────────────────────────────────────────
+# formula-global-settings-sync R14.3：自定义预设改存数据库（``formula_settings.custom_presets``：
+# admin 直接写事务所级模板、其他可写角色提交全局候选），不再写代码仓库里的
+# ``formula_custom_presets.json``；该文件仅 ``load_custom_presets`` 只读兼容。

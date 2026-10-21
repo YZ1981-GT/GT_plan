@@ -10,10 +10,9 @@
  *  - The helper fails closed when the page cannot supply a complete location
  *    identity (projectId / wpId / wpCode): no nodeKey-only bypass, no silent
  *    `report` scope fallback, no `/report-config/types` or missing-year 422.
- *  - Project-level RBAC is enforced server-side (Phase 5). The client command
- *    gate here validates the G-C0 location contract + capability epoch; the
- *    local capability snapshot is permissive-but-valid so a well-formed page
- *    location passes and a malformed one is rejected.
+ *  - Project-level RBAC is enforced server-side. The client command gate consumes the
+ *    real capability snapshot fetched by WorkpaperEditor; missing/expired/mismatched
+ *    snapshots fail closed and are never replaced with a synthetic allow decision.
  *
  * The EventBus payload is DERIVED from the same validated location, so the
  * dialog's scope label / breadcrumb stay consistent with the opening page
@@ -23,11 +22,7 @@
 import { GC0_CONTRACT_VERSION, type CanonicalWorkpaperLocation } from '@/shared/contracts/gc0'
 import { eventBus, type OpenFormulaManagerPayload } from '@/utils/eventBus'
 
-import {
-  CAPABILITY_SNAPSHOT_VERSION,
-  type CapabilityDecision,
-  type WorkpaperCapabilitySnapshot,
-} from './workpaperCapabilitySnapshot'
+import type { WorkpaperCapabilitySnapshot } from './workpaperCapabilitySnapshot'
 import {
   createOpenFormulaManagerCommand,
   type OpenFormulaManagerResult,
@@ -63,16 +58,6 @@ export type OpenFormulaManagerOutcome =
   | { ok: true; command: OpenFormulaManagerResult & { ok: true }; payload: OpenFormulaManagerPayload }
   | { ok: false; reasonCode: string; detail: string }
 
-function allowDecision(): CapabilityDecision {
-  return {
-    allowed: true,
-    reasonCode: null,
-    owner: 'workpaper-capability-matrix',
-    nextAction: null,
-    zhMessage: null,
-  }
-}
-
 /**
  * Build a complete CanonicalWorkpaperLocation from page context.
  * Returns null when a required identity field (projectId/wpId/wpCode) is absent
@@ -107,25 +92,6 @@ export function buildLocationFromContext(
   }
 }
 
-function buildCapability(ownerEpoch: number): WorkpaperCapabilitySnapshot {
-  const allow = allowDecision()
-  return {
-    snapshotVersion: CAPABILITY_SNAPSHOT_VERSION,
-    subjectDigest: '0'.repeat(64),
-    ownerEpoch,
-    expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
-    formulaView: allow,
-    formulaEditUser: allow,
-    formulaHistory: allow,
-    aiReviewPage: allow,
-    aiReviewBatch: allow,
-    aiAssistChat: allow,
-    humanReviewRead: allow,
-    humanReviewWrite: allow,
-    guidanceRead: allow,
-  }
-}
-
 /**
  * Derive the EventBus payload from the validated location — single source.
  * `scope` defaults to `workpaper` so a workpaper entry never silently becomes
@@ -144,7 +110,7 @@ export function payloadFromLocation(
     year: location.fiscalYear || undefined,
     sheetName,
     sheetCodes: ctx.sheetCodes ?? undefined,
-    scope: ctx.scope ?? 'workpaper',
+    scope: 'workpaper',
     ...(ctx.legacyNodeKey ? { nodeKey: ctx.legacyNodeKey } : {}),
   }
 }
@@ -158,8 +124,17 @@ export function payloadFromLocation(
  */
 export function openFormulaManagerFromLocation(
   ctx: FormulaManagerOutletContext,
+  capability: WorkpaperCapabilitySnapshot | null | undefined,
+  canonicalLocation?: CanonicalWorkpaperLocation | null,
 ): OpenFormulaManagerOutcome {
-  const location = buildLocationFromContext(ctx)
+  if (!capability) {
+    return {
+      ok: false,
+      reasonCode: 'capability_missing',
+      detail: '公式管理能力尚未就绪，请稍候刷新后重试',
+    }
+  }
+  const location = canonicalLocation ?? buildLocationFromContext(ctx)
   if (!location) {
     return {
       ok: false,
@@ -170,7 +145,7 @@ export function openFormulaManagerFromLocation(
 
   const result = createOpenFormulaManagerCommand({
     location,
-    capability: buildCapability(location.ownerEpoch),
+    capability,
     legacyNodeKey: ctx.legacyNodeKey,
   })
 
@@ -178,7 +153,43 @@ export function openFormulaManagerFromLocation(
     return { ok: false, reasonCode: result.reasonCode, detail: result.detail }
   }
 
-  const payload = payloadFromLocation(location, ctx)
+  const payload: OpenFormulaManagerPayload = {
+    ...payloadFromLocation(location, ctx),
+    contextKind: 'workpaper',
+    canonicalLocation: location,
+    capabilitySnapshot: capability,
+    formulaSession: result.session,
+    readOnly: capability.formulaEditUser.allowed !== true,
+  }
   eventBus.emit('open-formula-manager', payload)
   return { ok: true, command: result, payload }
+}
+
+
+export type FormulaManagerProjectScope = Exclude<FormulaManagerOutletScope, 'workpaper'>
+
+export interface FormulaManagerScopeContext extends Omit<OpenFormulaManagerPayload, 'scope'> {
+  scope: FormulaManagerProjectScope
+  projectId: string
+  year: number
+}
+
+/** 无普通 wpId 的 report/note/tb/consolidation 入口；显式分支，禁止伪造工作底稿身份。 */
+export function openFormulaManagerScope(
+  ctx: FormulaManagerScopeContext,
+): { ok: true; payload: OpenFormulaManagerPayload } | { ok: false; reasonCode: string; detail: string } {
+  if (!ctx.projectId?.trim() || !Number.isFinite(ctx.year) || !ctx.scope) {
+    return {
+      ok: false,
+      reasonCode: 'incomplete_scope_context',
+      detail: '公式管理缺少完整的项目、年度或作用域上下文',
+    }
+  }
+  const payload: OpenFormulaManagerPayload = {
+    ...ctx,
+    contextKind: 'scope',
+    readOnly: false,
+  }
+  eventBus.emit('open-formula-manager', payload)
+  return { ok: true, payload }
 }

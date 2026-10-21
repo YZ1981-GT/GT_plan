@@ -1469,9 +1469,11 @@ async def apply_formulas(
     只更新 mode=auto 的单元格，manual 单元格不受影响。
     公式从 check_presets 自动生成（纵向合计/横向平衡/账面价值）。
     """
+    from app.services.formula_settings.note_settings import materialize_quietly
     from app.services.note_formula_generator import execute_note_formulas
 
     try:
+        await materialize_quietly(db, project_id, [note_section])  # 全局 / 本项目公式设置（新建附注还没物化）
         result = await execute_note_formulas(db, project_id, year, note_section)
         if result.get("updated"):
             await stamp_section_edit(db, project_id=project_id, year=year, note_section=note_section,
@@ -1508,10 +1510,8 @@ async def list_note_formulas(
     """
     from app.services.note_formula_service import note_formula_service
 
-    formulas = await note_formula_service.list_by_section(
-        db, project_id, year, note_section
-    )
-    return {"formulas": formulas}
+    # formula-global-settings-sync：有效集 + 层级标签 + 载入版本令牌 loaded（保存时原样带回）
+    return await note_formula_service.list_with_versions(db, project_id, year, note_section)
 
 
 @router.put("/{project_id}/{year}/{note_section}/formulas")
@@ -1524,30 +1524,37 @@ async def upsert_note_formulas(
     current_user: User = Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
 ):
-    """upsert 附注章节的用户编辑公式集（Req 15.2/15.3）。
+    """保存附注章节的公式集（Req 15.2/15.3）。
 
-    body: ``{"formulas": [{target, formula, description, category, source?}, ...]}``
-    整体替换该章节的 ``_user_formulas`` 集（"这套就是最新集"语义），空行被过滤。
+    body: ``{"formulas": [{target, formula, description, category, source?}, ...], "loaded": {...}}``
+    "这套就是最新集"语义，空行被过滤；``loaded`` = 列表接口给的载入版本令牌（缺 428、过期 409）。
+    formula-global-settings-sync：差量写本项目适配，有效集合物化到 ``_user_formulas``。
 
     service 只 flush，router 统一 commit（工程铁律）。
     """
-    from app.services.note_formula_service import note_formula_service
+    from app.services.formula_settings import note_settings
+    from app.services.formula_settings.errors import FormulaSettingError
+    from app.services.formula_settings.propagation import publish_events
 
     formulas = body.get("formulas")
     if not isinstance(formulas, list):
         raise HTTPException(status_code=400, detail="formulas 必须是列表")
 
     try:
-        saved = await note_formula_service.save_many(
-            db, project_id, year, note_section, formulas
-        )
+        result = await note_settings.save_section(db, project_id, year, note_section, formulas,
+                                                  loaded=body.get("loaded"), user_id=current_user.id)
         await stamp_section_edit(db, project_id=project_id, year=year, note_section=note_section,
                                  user_id=current_user.id)
         await db.commit()
-        return {"formulas": saved, "saved_count": len(saved)}
+        await publish_events(result.get("events") or [], domain="note", source="project_edit")
+        saved = result["formulas"]
+        return {"formulas": saved, "saved_count": len(saved), "loaded": result.get("loaded") or {}}
     except ValueError as e:
         await db.rollback()
         raise HTTPException(status_code=404, detail=str(e))
+    except FormulaSettingError as e:  # 缺版本令牌 428 / 已被他人修改 409
+        await db.rollback()
+        raise HTTPException(status_code=e.status_code, detail=e.to_detail())
     except HTTPException:
         await db.rollback()
         raise

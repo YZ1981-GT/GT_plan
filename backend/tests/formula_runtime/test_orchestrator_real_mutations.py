@@ -94,6 +94,21 @@ def _mock_session():
     return session
 
 
+class _PreparedAdapter:
+    """只模拟 adapter prepare 层；保留完整 target/value/source attach 由 coordinator 验证。"""
+
+    async def prepare_many(self, targets, values):
+        return [
+            FormulaMutation(
+                target=target,
+                before_value=None,
+                after_value=values[target.addr_id],
+                expected_version="v1",
+            )
+            for target in targets
+        ]
+
+
 # ─── Unit Tests ──────────────────────────────────────────────────────────────
 
 
@@ -161,10 +176,17 @@ class TestFormulaRuntimeCoordinator:
         mock_result.scalars.return_value.all.return_value = [formula]
         session.execute = AsyncMock(return_value=mock_result)
 
-        with patch.object(
-            FormulaValueLoader, "load_many",
-            new_callable=AsyncMock,
-            return_value=LoadResult(values={"tb:1221": Decimal("50000")}, issues=[]),
+        with (
+            patch.object(
+                FormulaValueLoader, "load_many",
+                new_callable=AsyncMock,
+                return_value=LoadResult(values={"tb:1221": Decimal("50000")}, issues=[]),
+            ),
+            patch.object(
+                FormulaRuntimeCoordinator,
+                "_get_adapter",
+                return_value=_PreparedAdapter(),
+            ),
         ):
             coordinator = FormulaRuntimeCoordinator(session)
             plan = await coordinator.generate_mutation_plan(
@@ -275,6 +297,7 @@ class TestFormulaRuntimeCoordinator:
             project_id=project_id,
             formula_type="auto_calc",
             target_cell="B5",
+            category="报表",
             refs=["tb:9999_nonexistent", "tb:8888_ambiguous"],
         )
 
@@ -462,10 +485,17 @@ def test_pbt_plan_structure_invariants(n_formulas: int, scope: str):
     load_result = LoadResult(values=values, issues=[])
 
     async def _run():
-        with patch.object(
-            FormulaValueLoader, "load_many",
-            new_callable=AsyncMock,
-            return_value=load_result,
+        with (
+            patch.object(
+                FormulaValueLoader, "load_many",
+                new_callable=AsyncMock,
+                return_value=load_result,
+            ),
+            patch.object(
+                FormulaRuntimeCoordinator,
+                "_get_adapter",
+                return_value=_PreparedAdapter(),
+            ),
         ):
             coordinator = FormulaRuntimeCoordinator(session)
             return await coordinator.generate_mutation_plan(

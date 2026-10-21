@@ -13,6 +13,7 @@ from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.models.base import Base
+from app.models.formula_setting_models import FormulaSyncItem
 from app.models.report_models import (
     FinancialReportType,
     ReportConfig,
@@ -325,95 +326,84 @@ class TestDiffVsMaster:
 # ------------------------------------------------------------------
 
 
+async def _project_rows(db: AsyncSession) -> dict[str, ReportConfig]:
+    result = await db.execute(select(ReportConfig).where(
+        ReportConfig.applicable_standard == f"project:{FAKE_PROJECT_ID}",
+        ReportConfig.is_deleted == False,  # noqa: E712
+    ))
+    return {r.row_code: r for r in result.scalars().all()}
+
+
+async def _pending(db: AsyncSession) -> dict[str, FormulaSyncItem]:
+    rows = (await db.execute(select(FormulaSyncItem).where(
+        FormulaSyncItem.project_id == FAKE_PROJECT_ID, FormulaSyncItem.status == "pending"))).scalars().all()
+    return {r.slot_key: r for r in rows}
+
+
 class TestApplyMasterUpdate:
-    """apply_master_update 方法测试"""
+    """apply_master_update 方法测试。
+
+    spec formula-global-settings-sync R9.2 改口径（2026-10-20）：经同步内核按基线判断 ——
+    改过且不同的行生成待确认事项（原实现「保留本地 + 清过期标记」⇒ 项目永远不知道主模板改了），
+    没有本项目行的公式位直接读全局（继承），不再复制一份。
+    """
 
     @pytest.mark.asyncio
     async def test_keep_local_preserves_custom(self, seeded_db: AsyncSession):
-        """keep_local=True 时不覆盖项目已自定义的行"""
+        """keep_local=True：自定义行保留且列入待确认；相同行只更新基线；主模板独有行不复制"""
         svc = ReportConfigService(seeded_db)
         updated = await svc.apply_master_update(FAKE_PROJECT_ID, STANDARD, keep_local=True)
 
-        # BS001 公式不同 → 保留本地覆盖（不计入 updated）
-        # BS002 公式相同 → 同步（计入 updated）
-        # BS003 项目没有 → 新增（计入 updated）
-        assert updated == 2
-
-        # 验证 BS001 公式未被覆盖
-        project_standard = f"project:{FAKE_PROJECT_ID}"
-        result = await seeded_db.execute(
-            select(ReportConfig).where(
-                ReportConfig.applicable_standard == project_standard,
-                ReportConfig.row_code == "BS001",
-                ReportConfig.is_deleted == False,  # noqa: E712
-            )
-        )
-        row = result.scalar_one()
-        assert row.formula == "TB(1001)+TB(1002)"  # 保留本地
+        assert updated == 0  # 没有任何一行的公式被改成全局
+        rows = await _project_rows(seeded_db)
+        assert rows["BS001"].formula == "TB(1001)+TB(1002)"  # 保留本地
+        pending = await _pending(seeded_db)
+        assert set(pending) == {"balance_sheet:BS001"}
+        item = pending["balance_sheet:BS001"]
+        assert (item.reason, item.upstream_definition["formula"], item.local_definition["formula"]) == (
+            "conflict", "TB(1001)", "TB(1001)+TB(1002)")
+        # BS002 与主模板相同 → 记下基线（之后主模板再改即自动跟随）
+        assert (rows["BS002"].base_definition["formula"], rows["BS002"].base_version) == ("TB(1122)", 1)
+        assert "BS003" not in rows
 
     @pytest.mark.asyncio
     async def test_keep_local_false_overwrites(self, seeded_db: AsyncSession):
-        """keep_local=False 时覆盖所有行"""
+        """keep_local=False：自定义行直接采用主模板，并以主模板为新基线"""
         svc = ReportConfigService(seeded_db)
         updated = await svc.apply_master_update(FAKE_PROJECT_ID, STANDARD, keep_local=False)
 
-        # 全部同步：BS001(覆盖) + BS002(同步) + BS003(新增)
-        assert updated == 3
-
-        # 验证 BS001 公式被覆盖
-        project_standard = f"project:{FAKE_PROJECT_ID}"
-        result = await seeded_db.execute(
-            select(ReportConfig).where(
-                ReportConfig.applicable_standard == project_standard,
-                ReportConfig.row_code == "BS001",
-                ReportConfig.is_deleted == False,  # noqa: E712
-            )
-        )
-        row = result.scalar_one()
-        assert row.formula == "TB(1001)"  # 被主模板覆盖
+        assert updated == 1  # 只有 BS001 的公式被改
+        rows = await _project_rows(seeded_db)
+        assert rows["BS001"].formula == "TB(1001)"  # 被主模板覆盖
+        assert rows["BS001"].base_definition["formula"] == "TB(1001)"
+        assert rows["BS002"].formula == "TB(1122)"
+        assert await _pending(seeded_db) == {}
 
     @pytest.mark.asyncio
-    async def test_adds_missing_rows(self, seeded_db: AsyncSession):
-        """主模板有但项目没有的行应被新增"""
+    async def test_master_only_rows_are_inherited_without_copy(self, seeded_db: AsyncSession):
+        """主模板有但项目没有的行：项目有效配置直接读主模板（行名、公式逐值一致），不复制项目行"""
+        from app.services.formula_settings.effective_report import load_effective_report_configs
+
         svc = ReportConfigService(seeded_db)
         await svc.apply_master_update(FAKE_PROJECT_ID, STANDARD, keep_local=True)
 
-        project_standard = f"project:{FAKE_PROJECT_ID}"
-        result = await seeded_db.execute(
-            select(ReportConfig).where(
-                ReportConfig.applicable_standard == project_standard,
-                ReportConfig.row_code == "BS003",
-                ReportConfig.is_deleted == False,  # noqa: E712
-            )
-        )
-        row = result.scalar_one()
-        assert row.formula == "TB(1405)"
-        assert row.row_name == "存货"
+        assert "BS003" not in await _project_rows(seeded_db)
+        eff = {r.row_code: r for r in await load_effective_report_configs(
+            seeded_db, standard=STANDARD, project_id=FAKE_PROJECT_ID)}
+        assert (eff["BS003"].formula, eff["BS003"].row_name) == ("TB(1405)", "存货")
+        assert eff["BS001"].formula == "TB(1001)+TB(1002)"
 
     @pytest.mark.asyncio
-    async def test_clears_is_stale(self, seeded_db: AsyncSession):
-        """同步后 is_stale 应被清除"""
-        # 先标记 is_stale
-        project_standard = f"project:{FAKE_PROJECT_ID}"
-        result = await seeded_db.execute(
-            select(ReportConfig).where(
-                ReportConfig.applicable_standard == project_standard,
-                ReportConfig.is_deleted == False,  # noqa: E712
-            )
-        )
-        for row in result.scalars().all():
+    async def test_is_stale_cleared_only_for_resolved_rows(self, seeded_db: AsyncSession):
+        """已同步的行清过期标记；仍待确认的行保留标记（直到项目处理待确认事项）"""
+        for row in (await _project_rows(seeded_db)).values():
             row.is_stale = True
         await seeded_db.flush()
 
         svc = ReportConfigService(seeded_db)
         await svc.apply_master_update(FAKE_PROJECT_ID, STANDARD, keep_local=True)
 
-        # 所有行 is_stale 应为 False
-        result = await seeded_db.execute(
-            select(ReportConfig).where(
-                ReportConfig.applicable_standard == project_standard,
-                ReportConfig.is_deleted == False,  # noqa: E712
-            )
-        )
-        for row in result.scalars().all():
-            assert row.is_stale is False
+        rows = await _project_rows(seeded_db)
+        assert rows["BS002"].is_stale is False
+        assert rows["BS001"].is_stale is True
+        assert set(await _pending(seeded_db)) == {"balance_sheet:BS001"}

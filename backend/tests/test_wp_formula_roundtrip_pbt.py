@@ -190,6 +190,7 @@ class TestP12FormulaRoundtrip:
                     await session.commit()
 
                     # Second save (same key, different expression)
+                    # 命中既有行须带 expected_version（CAS，formula-manager-runtime-integrity-closure R3）
                     saved2, _ = await svc.save(
                         session,
                         project_id=project_id,
@@ -199,6 +200,7 @@ class TestP12FormulaRoundtrip:
                         expression=expr2,
                         year=2025,
                         category="cross_check",
+                        expected_version=saved1.definition_version,
                     )
                     await session.commit()
 

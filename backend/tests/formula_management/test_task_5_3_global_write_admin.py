@@ -209,11 +209,22 @@ class TestGlobalTemplateWriteAdminOnly:
 
     @pytest.mark.asyncio
     async def test_global_delete_admin_ok(self, db, seed):
+        """admin 删全局行 = 删除公式位的发布（formula-global-settings-sync R2.2 / R9）：
+        不带版本 428 且零写入；带当前版本 200 且行被软删、版本 +1。"""
         admin = await _load(db, seed.admin_id)
-        app = _make_app(db, admin)
-        with TestClient(app, raise_server_exceptions=False) as c:
-            resp = c.delete(f"/api/report-config/{seed.global_config_id}")
+        with TestClient(_make_app(db, admin), raise_server_exceptions=False) as c:
+            missing = c.delete(f"/api/report-config/{seed.global_config_id}")
+        assert missing.status_code == 428, missing.text
+        assert missing.json()["detail"]["error_code"] == "FORMULA_VERSION_REQUIRED"
+        # 本文件各请求共用一个会话：428 路径回滚后实例已过期，重新载入身份再发下一请求
+        admin = await _load(db, seed.admin_id)
+        with TestClient(_make_app(db, admin), raise_server_exceptions=False) as c:
+            resp = c.delete(f"/api/report-config/{seed.global_config_id}", params={"expected_version": 1})
         assert resp.status_code == 200, resp.text
+        async with async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)() as s:
+            row = (await s.execute(select(ReportConfig).where(
+                ReportConfig.id == seed.global_config_id))).scalar_one()
+        assert (row.is_deleted, row.formula_version) == (True, 2)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -368,3 +379,123 @@ class TestMutationReverseAssertion:
         assert resp.json().get("role") == "manager", (
             "manager 角色本身不触发其它拦截 —— 证明生产端点 403 确来自 require_role 门控"
         )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 5. runtime-integrity：历史未覆盖旁路 + 后端函数 preflight
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class TestFormulaRuntimeIntegritySecurity:
+
+    @pytest.mark.asyncio
+    async def test_project_standard_list_and_types_require_membership(self, db, seed):
+        outsider = await _load(db, seed.manager_non_member_id)
+        app = _make_app(db, outsider)
+        standard = f"project:{seed.project_id}"
+        with TestClient(app, raise_server_exceptions=False) as c:
+            list_resp = c.get("/api/report-config", params={"applicable_standard": standard})
+            types_resp = c.get("/api/report-config/types", params={"applicable_standard": standard})
+        assert list_resp.status_code == 403
+        assert types_resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_project_and_standard_mismatch_is_forbidden(self, db, seed):
+        mgr = await _load(db, seed.manager_id)
+        app = _make_app(db, mgr)
+        with TestClient(app, raise_server_exceptions=False) as c:
+            resp = c.get(
+                "/api/report-config/types",
+                params={
+                    "project_id": str(seed.project_id),
+                    "applicable_standard": f"project:{uuid.uuid4()}",
+                },
+            )
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_seed_is_admin_only(self, db, seed):
+        mgr = await _load(db, seed.manager_id)
+        app = _make_app(db, mgr)
+        with TestClient(app, raise_server_exceptions=False) as c:
+            resp = c.post("/api/report-config/seed")
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_report_execute_requires_project_membership(self, db, seed):
+        outsider = await _load(db, seed.manager_non_member_id)
+        app = _make_app(db, outsider)
+        with TestClient(app, raise_server_exceptions=False) as c:
+            resp = c.post(
+                "/api/report-config/execute-formula",
+                json={
+                    "project_id": str(seed.project_id),
+                    "year": 2025,
+                    "formula": "TB('1001','期末余额')",
+                },
+            )
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_formula_batch_requires_membership(self, db, seed):
+        outsider = await _load(db, seed.manager_non_member_id)
+        app = _make_app(db, outsider)
+        with TestClient(app, raise_server_exceptions=False) as c:
+            resp = c.post(
+                "/api/formula/batch-execute",
+                json=[{
+                    "project_id": str(seed.project_id),
+                    "year": 2025,
+                    "formula_type": "TB",
+                    "params": {},
+                }],
+            )
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_formula_batch_rejects_mixed_project_or_year(self, db, seed):
+        mgr = await _load(db, seed.manager_id)
+        app = _make_app(db, mgr)
+        base = {
+            "project_id": str(seed.project_id),
+            "year": 2025,
+            "formula_type": "TB",
+            "params": {},
+        }
+        with TestClient(app, raise_server_exceptions=False) as c:
+            mixed_project = c.post(
+                "/api/formula/batch-execute",
+                json=[base, {**base, "project_id": str(uuid.uuid4())}],
+            )
+            mixed_year = c.post(
+                "/api/formula/batch-execute",
+                json=[base, {**base, "year": 2024}],
+            )
+        assert mixed_project.status_code == 422
+        assert mixed_year.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_report_execution_rejects_unsupported_function_before_zero_fallback(self, db, seed):
+        mgr = await _load(db, seed.manager_id)
+        app = _make_app(db, mgr)
+        with TestClient(app, raise_server_exceptions=False) as c:
+            single = c.post(
+                "/api/report-config/execute-formula",
+                json={
+                    "project_id": str(seed.project_id),
+                    "year": 2025,
+                    "formula": "PREV('1001')",
+                },
+            )
+            batch = c.post(
+                "/api/report-config/execute-formulas-batch",
+                json={
+                    "project_id": str(seed.project_id),
+                    "year": 2025,
+                    "formulas": [{"row_code": "BS-X", "formula": "AUX('客户')"}],
+                },
+            )
+        assert single.status_code == 422
+        assert batch.status_code == 422
+        assert "FORMULA_FUNCTION_UNSUPPORTED" in single.text
+        assert "FORMULA_FUNCTION_UNSUPPORTED" in batch.text

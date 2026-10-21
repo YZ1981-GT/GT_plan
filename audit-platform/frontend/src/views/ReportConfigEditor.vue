@@ -42,7 +42,7 @@
 
     <!-- 编辑模式提示条 -->
     <div v-if="isEditing" class="rce-edit-ribbon">
-      <span>✏️ 编辑模式 · 双击项目名称可直接修改，完成后点击"保存"</span>
+      <span>✏️ 编辑模式 · 双击项目名称可直接修改，完成后点击"保存"。这里改的是全局报表公式：保存即发布到使用该准则的全部项目，本项目改过且不同的项目会收到待确认提醒；想先看影响请到「全局公式设置」预览后再发布。</span>
     </div>
 
     <!-- 数据表格 -->
@@ -238,18 +238,26 @@ function onInsertAbove() {
 async function onDeleteSelected() {
   if (selectedRows.value.length === 0) return
   await confirmBatch('删除', selectedRows.value.length)
-  for (const row of selectedRows.value) {
+  let failed = 0
+  for (const row of [...selectedRows.value]) {
     if (row.id && !row._isNew) {
       try {
-        await api.delete(P.reportConfig.detail(row.id))
-      } catch { /* ignore */ }
+        // 删全局公式位 = 一次发布，须带当前版本（spec formula-global-settings-sync：缺失 428、已被他人修改 409）
+        await api.delete(P.reportConfig.detail(row.id), { params: { expected_version: row.formula_version ?? 1 } })
+      } catch (e: any) {
+        // 删除失败的行留在界面上（此前吞掉错误照样移除，界面与库不一致）
+        failed++
+        handleApiError(e, `删除 ${row.row_code}`)
+        continue
+      }
     }
     const idx = rows.value.indexOf(row)
     if (idx >= 0) rows.value.splice(idx, 1)
   }
   selectedRows.value = []
   rows.value.forEach((r, i) => { r.row_number = i + 1 })
-  ElMessage.success('已删除')
+  if (failed) ElMessage.warning(`有 ${failed} 行删除失败，已保留在列表中`)
+  else ElMessage.success('已删除')
 }
 
 async function onSaveAll() {
@@ -275,12 +283,16 @@ async function onSaveAll() {
         }
         savedCount++
       } else if (row.id) {
-        await api.put(P.reportConfig.detail(row.id), {
+        const saved = await api.put(P.reportConfig.detail(row.id), {
           row_name: row.row_name,
           formula: row.formula,
           indent_level: row.indent_level,
           is_total_row: row.is_total_row,
+          // 公式有变化时后端按全局发布处理，须带当前版本（缺失 428、已被他人修改 409）
+          expected_version: row.formula_version ?? 1,
         })
+        const fresh = saved?.data ?? saved
+        if (fresh?.formula_version != null) row.formula_version = fresh.formula_version
         savedCount++
       }
     }

@@ -28,7 +28,7 @@
       <el-button
         size="small"
         data-testid="formula-manager-open"
-        :disabled="!projectId || !wpId"
+        :disabled="!projectId || !wpId || !formulaViewAllowed"
         @click="openFormulaManager"
       >⚙️ 公式管理</el-button>
       <el-button size="small" @click="$emit('export-template')"><img src="" style="display:none"/>导出模板</el-button>
@@ -362,7 +362,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, reactive, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, reactive, onMounted, onBeforeUnmount, defineAsyncComponent, inject } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowDown, InfoFilled, Back, Switch, Document } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
@@ -374,6 +374,7 @@ import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useA1SubWorkpapers, type A1SubTab } from './composables/useA1SubWorkpapers'
 import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.vue'
 import { openFormulaManagerFromLocation } from '@/shell/formula/openFormulaManagerFromLocation'
+import { FORMULA_MANAGER_CAPABILITY_CONTEXT } from '@/shell/formula/formulaManagerCapabilityContext'
 
 // ─── Lazy sub-workpaper components ───
 const GtA111SigningForm = defineAsyncComponent(() => import('./GtA111SigningForm.vue'))
@@ -417,6 +418,11 @@ const props = withDefaults(defineProps<{
   wpCode?: string
 }>(), { readonly: false, wpCode: 'A1' })
 
+const formulaCapabilityContext = inject(FORMULA_MANAGER_CAPABILITY_CONTEXT, null)
+const formulaViewAllowed = computed(
+  () => formulaCapabilityContext?.capability.value.formulaView.allowed === true,
+)
+
 const emit = defineEmits<{
   'save': [data: AProgramHtmlData]
   'jump-to-workpaper': [wpCode: string]
@@ -458,7 +464,9 @@ async function openFormulaManager(): Promise<void> {
     year,
     sheetName: props.sheetName || '',
     scope: 'workpaper',
-  })
+    ownerEpoch: formulaCapabilityContext?.location.value?.ownerEpoch,
+    contextRevision: formulaCapabilityContext?.location.value?.contextRevision,
+  }, formulaCapabilityContext?.capability.value, formulaCapabilityContext?.location.value)
   if (!outcome.ok) {
     const { ElMessage } = await import('element-plus')
     ElMessage.warning(outcome.detail)

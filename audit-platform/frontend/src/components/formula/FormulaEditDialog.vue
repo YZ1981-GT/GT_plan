@@ -428,7 +428,7 @@ import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
 import type { WpFormulaContext } from '@/components/workpaper/GtCustomWpEditor.vue'
 import { filterWpBrowserRows, mapRegistryToPickerRows, mapAcnrCellsToPickerRows } from '@/utils/wpFormulaPicker'
-import { useAcnr } from '@/services/acnr/useAcnr'
+import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
 
 const route = useRoute()
 // ACNR 前端 SDK（acnr-consumer-wiring Req 14.3/14.5, task 18.3）
@@ -455,6 +455,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [val: boolean]
   'save': [data: { formula: string; category: string; description: string; target_cell?: string }]
+  'dirty-change': [dirty: boolean]
 }>()
 
 const visible = computed({
@@ -463,6 +464,13 @@ const visible = computed({
 })
 
 const formulas = ref<FormulaItem[]>([])
+const initialDraftFingerprint = ref('')
+
+function formulaDraftFingerprint(items: FormulaItem[]): string {
+  return JSON.stringify(items.map(({ expression, category, description, target_cell }) => ({
+    expression, category, description, target_cell: target_cell || '',
+  })))
+}
 
 watch(visible, (v) => {
   if (v && props.row) {
@@ -477,6 +485,7 @@ watch(visible, (v) => {
           expression: expr.trim(),
           category: props.row.formula_category || 'auto_calc',
           description: descs[i]?.trim() || '',
+          target_cell: props.row.target_cell || '',
           _checked: false,
         }))
       } else {
@@ -484,6 +493,7 @@ watch(visible, (v) => {
           expression: props.row.formula,
           category: props.row.formula_category || 'auto_calc',
           description: props.row.formula_description || '',
+          target_cell: props.row.target_cell || '',
           _checked: false,
         }]
       }
@@ -492,11 +502,22 @@ watch(visible, (v) => {
         expression: '',
         category: 'auto_calc',
         description: '',
+        target_cell: props.row.target_cell || '',
         _checked: false,
       }]
     }
+    initialDraftFingerprint.value = formulaDraftFingerprint(formulas.value)
+    emit('dirty-change', false)
+  } else if (!v) {
+    initialDraftFingerprint.value = ''
+    emit('dirty-change', false)
   }
 })
+
+watch(formulas, (items) => {
+  if (!visible.value || !initialDraftFingerprint.value) return
+  emit('dirty-change', formulaDraftFingerprint(items) !== initialDraftFingerprint.value)
+}, { deep: true })
 
 function addFormula() {
   formulas.value.push({ expression: '', category: 'auto_calc', description: '', _checked: false })
@@ -891,7 +912,7 @@ function onSave() {
       target_cell: validFormulas[0].target_cell,
     })
   }
-  visible.value = false
+  // 保存结果由父组件确认；父组件只在服务端成功后关闭，403/409 时保留草稿。
 }
 
 // ── 数据源一览折叠状态 ──
@@ -901,7 +922,7 @@ function toggleRefGroup(key: string) {
 }
 
 // ── 数据源一览树形数据（与公式管理中心左侧树同结构） ──
-import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
+// useAcnr / AcnrSheetEntry 已在文件顶部统一 import（此处勿重复，否则 TS2300 重复标识符）。
 import { wpCodeNaturalCompare, composeSheetLabelsForGroup } from '@/services/acnr/sheetDisplayName'
 
 const acnrSourceSheets = shallowRef<AcnrSheetEntry[]>([])

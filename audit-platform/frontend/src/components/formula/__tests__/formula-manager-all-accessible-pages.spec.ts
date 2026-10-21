@@ -71,6 +71,8 @@ import {
   type FormulaManagerOutletContext,
 } from '@/shell/formula/openFormulaManagerFromLocation'
 
+import type { WorkpaperCapabilitySnapshot } from '@/shell/formula/workpaperCapabilitySnapshot'
+
 const here = dirname(fileURLToPath(import.meta.url))
 // .../src/components/formula/__tests__ → repo root 上溯 6 层
 const REPO_ROOT = resolve(here, '../../../../../..')
@@ -128,10 +130,18 @@ let probe: { status: number | null; stdout: string; stderr: string }
 let dbAvailable = false
 let doc: DenominatorDoc | null = null
 
+const runLiveDenominator = process.env.FORMULA_MANAGER_LIVE_DENOMINATOR === '1'
+
 beforeAll(() => {
-  probe = runProbeCheck()
+  probe = runLiveDenominator
+    ? runProbeCheck()
+    : {
+        status: EXIT_DB_UNAVAILABLE,
+        stdout: '[DB_UNAVAILABLE] 快速契约模式未启用 live denominator；夜间门禁设置 FORMULA_MANAGER_LIVE_DENOMINATOR=1',
+        stderr: '',
+      }
   // §7.4③：断言 stdout 含预期内容（不只看 returncode）——否则 Windows gbk 解码失败会假绿。
-  dbAvailable = probe.status === EXIT_OK || probe.status === EXIT_DRIFT
+  dbAvailable = runLiveDenominator && (probe.status === EXIT_OK || probe.status === EXIT_DRIFT)
   if (existsSync(DENOMINATOR_JSON)) {
     doc = JSON.parse(readFileSync(DENOMINATOR_JSON, 'utf-8')) as DenominatorDoc
   }
@@ -157,7 +167,7 @@ describe('§7.1 运行时权威分母（枚举器真连 PG）', () => {
     expect([EXIT_OK, EXIT_DRIFT, EXIT_DB_UNAVAILABLE]).toContain(probe.status)
   })
 
-  it.runIf(() => dbAvailable)('真库可达时：分母与磁盘基线一致（--check exit 0，无漂移）', () => {
+  it.skipIf(!runLiveDenominator)('真库可达时：分母与磁盘基线一致（--check exit 0，无漂移）', () => {
     // dbAvailable=DRIFT 也算真库可达，但此时应点名漂移 → 要求 OK。
     expect(
       probe.status,
@@ -213,7 +223,7 @@ describe('§7.3 豁免登记（gate_exemptions 可伪证 + 防空转）', () => 
     }
   })
 
-  it.runIf(() => dbAvailable && !!doc)('分母里 exempted 项的 exempt_key 必须出自豁免登记（剔除可追溯）', () => {
+  it.skipIf(!runLiveDenominator || !existsSync(DENOMINATOR_JSON))('分母里 exempted 项的 exempt_key 必须出自豁免登记（剔除可追溯）', () => {
     if (!doc) return
     const ex = JSON.parse(readFileSync(EXEMPTIONS_JSON, 'utf-8')) as {
       exemptions: Array<{ key: string }>
@@ -239,6 +249,16 @@ describe('§7.3 豁免登记（gate_exemptions 可伪证 + 防空转）', () => 
 //
 // 分母级断言：对真实分母里的非 redirect / 非 exempted 项逐项跑契约断言（复用生产单一真源）。
 // 真库不可达时退化为「生产单一真源 + 代表性 fixture」断言（不依赖活后端 HTTP），不假绿。
+
+function allowCapability(): WorkpaperCapabilitySnapshot {
+  const allow = { allowed: true, reasonCode: null, owner: 'test', nextAction: null, zhMessage: null }
+  return {
+    snapshotVersion: '1.0', subjectDigest: 'a'.repeat(64), ownerEpoch: 0,
+    expiresAt: '2099-01-01T00:00:00Z', formulaView: allow, formulaEditUser: allow,
+    formulaHistory: allow, aiReviewPage: allow, aiReviewBatch: allow, aiAssistChat: allow,
+    humanReviewRead: allow, humanReviewWrite: allow, guidanceRead: allow,
+  }
+}
 
 /** 取参与 8 断言的分母项（非 redirect、非 exempted）；真库不可达时给代表性 fixture。 */
 function scopeItems(): DenominatorItem[] {
@@ -279,7 +299,7 @@ describe('§7.2 断言①③ 唯一入口 + 完整 location（openFormulaManager
       wpId: it.wp_id,
       wpCode: it.wp_code,
       sheetName: it.sheet_uid === 'whole_workbook' ? '' : it.sheet_uid,
-    })
+    }, allowCapability())
     expect(outcome.ok, '完整 location 应成功打开').toBe(true)
     if (outcome.ok) {
       expect(outcome.payload.projectId).toBe(it.project_id)
@@ -311,7 +331,10 @@ describe('§7.2 断言①③ 唯一入口 + 完整 location（openFormulaManager
     const it = scopeItems()[0]
     const loc = buildLocationFromContext({ projectId: it.project_id, wpId: '', wpCode: it.wp_code })
     expect(loc, '缺 wp_id 应 fail-closed 返 null（禁 nodeKey-only 打开）').toBeNull()
-    const outcome = openFormulaManagerFromLocation({ projectId: it.project_id, wpId: '', wpCode: it.wp_code })
+    const outcome = openFormulaManagerFromLocation(
+      { projectId: it.project_id, wpId: '', wpCode: it.wp_code },
+      allowCapability(),
+    )
     expect(outcome.ok).toBe(false)
     if (!outcome.ok) expect(outcome.reasonCode).toBe('incomplete_location')
   })
@@ -542,7 +565,10 @@ describe('§7.2 断言⑦ 权限分层（Phase 5 鉴权整改已落地，转硬�
 
 describe('§7.2 断言⑧ 零错误（缺 location 不发请求 / 缺身份不退全局树）', () => {
   it('⑧ 缺 location 时不发打开请求（返错误 outcome，不产生 4xx / abort）', () => {
-    const outcome = openFormulaManagerFromLocation({ projectId: '', wpId: '', wpCode: '' })
+    const outcome = openFormulaManagerFromLocation(
+      { projectId: '', wpId: '', wpCode: '' },
+      allowCapability(),
+    )
     expect(outcome.ok).toBe(false)
     // fail-closed：不构造 location、不 emit 事件 ⇒ 不会打出 /report-config/types 或缺 year 的 422。
     if (!outcome.ok) expect(outcome.reasonCode).toBe('incomplete_location')
@@ -559,7 +585,7 @@ describe('§7.4 门禁幂等自证（同输入两次运行 JSON 字节一致）'
   // beforeAll 已真跑一次 --check（真连 PG、exit 0、分母与基线一致）——那一次就是「同输入第
   // 二次运行」的证明（第一次是 --write 取基线）。本条读 beforeAll 捕获的结果，不再重复 230s
   // 的全量枚举（会超时且无新信息）。两次独立 --write 字节一致已由 shell 自证（见 design/报告）。
-  it.runIf(() => dbAvailable)('枚举器 --check 真连后退出码确定（beforeAll 已跑 → exit 0，无漂移）', () => {
+  it.skipIf(!runLiveDenominator)('枚举器 --check 真连后退出码确定（beforeAll 已跑 → exit 0，无漂移）', () => {
     expect(probe.status, '真连 --check 应 exit 0（基线确定、无漂移 ⇒ 门禁不恒红）').toBe(EXIT_OK)
   })
 

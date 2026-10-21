@@ -18,8 +18,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_role
+from app.deps import assert_project_permission, get_current_user, require_project_access, require_role
 from app.models.core import User
+from app.services.formula_settings.errors import FormulaSettingError
+from app.services.formula_settings.propagation import publish_events
 from app.services.report_config_service import ReportConfigService
 
 router = APIRouter(
@@ -63,7 +65,11 @@ async def suggest_to_master(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """项目级优化提交为主模板候选（写 ReportConfigBaseline pending）"""
+    """项目级优化提交为主模板候选（写 ReportConfigBaseline pending）。
+
+    🔴 V199 补：原只校验登录 ⇒ 任何人可读任意项目的公式并以它的名义提交候选；现需来源项目 edit。
+    """
+    await assert_project_permission(db, current_user, body.project_id, "edit")
     svc = ReportConfigService(db)
     try:
         candidate_id = await svc.suggest_to_master(
@@ -86,19 +92,27 @@ async def review_candidate(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(["admin"])),
 ):
-    """admin 审核候选：通过则合并回 standard 级"""
+    """admin 审核候选：通过则作为全局发布（经同步内核，冲突交项目确认），commit 后发变更事件。"""
     svc = ReportConfigService(db)
     try:
-        await svc.review_candidate(
+        published = await svc.review_candidate(
             candidate_id=body.candidate_id,
             approved=body.approved,
             reviewer=current_user.id,
         )
-        await db.commit()
-        status = "已通过" if body.approved else "已驳回"
-        return {"message": f"候选审核{status}", "approved": body.approved}
+    except FormulaSettingError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    await db.commit()
+    if published:
+        await publish_events(published.get("events") or [], domain="report", source="promote",
+                             token=published.get("publish_id"))
+    status = "已通过" if body.approved else "已驳回"
+    summary = (published or {}).get("summary") or {}
+    return {"message": f"候选审核{status}", "approved": body.approved,
+            "pending_total": summary.get("pending_total", 0)}
 
 
 @router.get("/diff-vs-master/{project_id}")
@@ -106,9 +120,9 @@ async def diff_vs_master(
     project_id: UUID,
     standard: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """项目级 vs 主模板差异"""
+    """项目级 vs 主模板差异（V199 补项目 readonly 鉴权，原只校验登录）"""
     if not standard:
         standard = await ReportConfigService.resolve_applicable_standard(db, project_id)
     svc = ReportConfigService(db)
@@ -136,18 +150,24 @@ async def apply_master_update(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """主模板更新同步到项目（保留项目本地覆盖）"""
-    svc = ReportConfigService(db)
-    try:
-        updated_count = await svc.apply_master_update(
-            project_id=body.project_id,
-            standard=body.standard,
-            keep_local=body.keep_local,
-        )
-        await db.commit()
-        return {"updated_count": updated_count, "message": f"已同步 {updated_count} 行"}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    """主模板更新同步到项目（V199：经同步内核；改过且不同的行生成待确认事项，不再静默保留）。
+
+    🔴 原只校验登录 ⇒ 任何人可改写任意项目的项目级公式；现需目标项目 edit。
+    """
+    from app.services.formula_settings.legacy_report import sync_project_to_global
+    from app.services.formula_settings.projects import get_project
+
+    await assert_project_permission(db, current_user, body.project_id, "edit")
+    if await get_project(db, "report", body.project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在或已删除")
+    result = await sync_project_to_global(db, project_id=body.project_id, standard=body.standard,
+                                          keep_local=body.keep_local, user_id=current_user.id)
+    await db.commit()
+    await publish_events(result["events"], domain="report", source="master_sync")
+    pending = result["pending"]
+    message = f"已同步 {result['updated']} 行" + (f"，{pending} 处与本项目修改冲突，已列入待确认" if pending else "")
+    return {"updated_count": result["updated"], "pending_count": pending, "rebased_count": result["rebased"],
+            "message": message}
 
 
 @router.get("/candidates")
@@ -192,10 +212,11 @@ async def list_candidates(
 async def stale_status(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """查询项目是否有 stale 配置行"""
+    """查询项目是否有 stale 配置行 + 报表公式待确认事项（V199 补项目 readonly 鉴权）"""
     import sqlalchemy as sa
+    from app.models.formula_setting_models import FormulaSyncItem
     from app.models.report_models import ReportConfig
 
     project_standard = f"project:{project_id}"
@@ -207,8 +228,12 @@ async def stale_status(
         )
     )
     stale_count = result.scalar() or 0
+    pending_count = (await db.execute(sa.select(sa.func.count()).select_from(FormulaSyncItem).where(
+        FormulaSyncItem.project_id == project_id, FormulaSyncItem.domain == "report",
+        FormulaSyncItem.status == "pending"))).scalar() or 0
     return {
         "project_id": str(project_id),
-        "is_stale": stale_count > 0,
+        "is_stale": stale_count > 0 or pending_count > 0,
         "stale_count": stale_count,
+        "pending_count": pending_count,
     }

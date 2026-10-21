@@ -29,10 +29,13 @@ vi.mock('@/utils/eventBus', () => ({
 import * as commandModule from '../openFormulaManagerCommand'
 import {
   openFormulaManagerFromLocation,
+  openFormulaManagerScope,
   buildLocationFromContext,
   payloadFromLocation,
   type FormulaManagerOutletContext,
 } from '../openFormulaManagerFromLocation'
+
+import type { WorkpaperCapabilitySnapshot } from '../workpaperCapabilitySnapshot'
 
 function fullCtx(overrides: Partial<FormulaManagerOutletContext> = {}): FormulaManagerOutletContext {
   return {
@@ -47,6 +50,23 @@ function fullCtx(overrides: Partial<FormulaManagerOutletContext> = {}): FormulaM
   }
 }
 
+function capability(allowed = true): WorkpaperCapabilitySnapshot {
+  const decision = {
+    allowed,
+    reasonCode: allowed ? null : 'denied',
+    owner: 'test',
+    nextAction: null,
+    zhMessage: allowed ? null : '无权限',
+  }
+  return {
+    snapshotVersion: '1.0', subjectDigest: 'a'.repeat(64), ownerEpoch: 0,
+    expiresAt: '2099-01-01T00:00:00Z',
+    formulaView: decision, formulaEditUser: decision, formulaHistory: decision,
+    aiReviewPage: decision, aiReviewBatch: decision, aiAssistChat: decision,
+    humanReviewRead: decision, humanReviewWrite: decision, guidanceRead: decision,
+  }
+}
+
 describe('openFormulaManagerFromLocation — Task 2.1 (ADR-FMC-03)', () => {
   beforeEach(() => {
     emitted.length = 0
@@ -55,10 +75,12 @@ describe('openFormulaManagerFromLocation — Task 2.1 (ADR-FMC-03)', () => {
 
   it('完整上下文：经统一命令校验后提交完整 location 并 emit 一次（断言③反向）', () => {
     const spy = vi.spyOn(commandModule, 'createOpenFormulaManagerCommand')
-    const outcome = openFormulaManagerFromLocation(fullCtx())
+    const realCapability = capability()
+    const outcome = openFormulaManagerFromLocation(fullCtx(), realCapability)
 
-    // #5：生产真正调用 createOpenFormulaManagerCommand。
+    // #5：生产真正调用 createOpenFormulaManagerCommand，且使用调用方真实快照。
     expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy.mock.calls[0][0].capability).toBe(realCapability)
     const passedLocation = spy.mock.calls[0][0].location
     expect(passedLocation.projectId).toBe('proj-1')
     expect(passedLocation.wpId).toBe('wp-123')
@@ -82,7 +104,7 @@ describe('openFormulaManagerFromLocation — Task 2.1 (ADR-FMC-03)', () => {
 
   it('变异「去 wp_id」命中③：fail-closed、不 emit、不调命令', () => {
     const spy = vi.spyOn(commandModule, 'createOpenFormulaManagerCommand')
-    const outcome = openFormulaManagerFromLocation(fullCtx({ wpId: '' }))
+    const outcome = openFormulaManagerFromLocation(fullCtx({ wpId: '' }), capability())
 
     expect(outcome.ok).toBe(false)
     if (!outcome.ok) expect(outcome.reasonCode).toBe('incomplete_location')
@@ -93,8 +115,8 @@ describe('openFormulaManagerFromLocation — Task 2.1 (ADR-FMC-03)', () => {
   })
 
   it('缺 projectId / wpCode 同样 fail-closed', () => {
-    expect(openFormulaManagerFromLocation(fullCtx({ projectId: '' })).ok).toBe(false)
-    expect(openFormulaManagerFromLocation(fullCtx({ wpCode: '' })).ok).toBe(false)
+    expect(openFormulaManagerFromLocation(fullCtx({ projectId: '' }), capability()).ok).toBe(false)
+    expect(openFormulaManagerFromLocation(fullCtx({ wpCode: '' }), capability()).ok).toBe(false)
     expect(emitted).toHaveLength(0)
   })
 
@@ -120,17 +142,58 @@ describe('openFormulaManagerFromLocation — Task 2.1 (ADR-FMC-03)', () => {
     expect(payload.scope).toBe('workpaper')
     expect(payload.templateType).toBe('listed')
 
-    // 显式 scope 不被覆盖（合并/附注入口可传）。
+    // workpaper helper 强制收敛为 workpaper；附注/合并必须走 openFormulaManagerScope。
     const noteLoc = buildLocationFromContext(fullCtx())!
     const notePayload = payloadFromLocation(noteLoc, fullCtx({ scope: 'note' }))
-    expect(notePayload.scope).toBe('note')
+    expect(notePayload.scope).toBe('workpaper')
   })
 
   it('legacyNodeKey 作为迁移元数据可随 payload 透传（非位置身份）', () => {
-    openFormulaManagerFromLocation(fullCtx({ legacyNodeKey: 'wp_e1_1' }))
+    openFormulaManagerFromLocation(fullCtx({ legacyNodeKey: 'wp_e1_1' }), capability())
     expect(emitted).toHaveLength(1)
     expect(emitted[0].payload.nodeKey).toBe('wp_e1_1')
     // 但位置身份仍来自完整 location，而非 nodeKey。
     expect(emitted[0].payload.wpId).toBe('wp-123')
+  })
+})
+
+
+describe('真实 capability fail-closed', () => {
+  beforeEach(() => { emitted.length = 0 })
+
+  it('缺 capability 不 emit，不能再由 helper 制造全允许快照', () => {
+    const outcome = openFormulaManagerFromLocation(fullCtx(), null)
+    expect(outcome.ok).toBe(false)
+    if (!outcome.ok) expect(outcome.reasonCode).toBe('capability_missing')
+    expect(emitted).toHaveLength(0)
+  })
+
+  it('formulaView 被拒绝时不打开', () => {
+    const outcome = openFormulaManagerFromLocation(fullCtx(), capability(false))
+    expect(outcome.ok).toBe(false)
+    expect(emitted).toHaveLength(0)
+  })
+})
+
+
+describe('显式 project scope context', () => {
+  beforeEach(() => { emitted.length = 0 })
+
+  it('合并 scope 不伪造 wpId，完整保留项目/年度/章节', () => {
+    const outcome = openFormulaManagerScope({
+      scope: 'consol_note', projectId: 'p-consol', year: 2025,
+      noteSection: '五、1', templateType: 'soe',
+    })
+    expect(outcome.ok).toBe(true)
+    expect(emitted).toHaveLength(1)
+    expect(emitted[0].payload.contextKind).toBe('scope')
+    expect(emitted[0].payload.wpId).toBeUndefined()
+    expect(emitted[0].payload.noteSection).toBe('五、1')
+  })
+
+  it('缺项目或年度 fail-closed', () => {
+    expect(openFormulaManagerScope({ scope: 'consol_report', projectId: '', year: 2025 }).ok).toBe(false)
+    expect(openFormulaManagerScope({ scope: 'consol_report', projectId: 'p', year: Number.NaN }).ok).toBe(false)
+    expect(emitted).toHaveLength(0)
   })
 })

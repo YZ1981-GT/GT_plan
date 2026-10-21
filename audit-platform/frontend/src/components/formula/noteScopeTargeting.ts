@@ -115,6 +115,10 @@ export interface NoteFormulaRow {
   formula_source?: string
   /** 用户编辑集公式的目标单元格键（"row:col"）；预设行无此字段。 */
   _userTarget?: string
+  /** 层级（全局 / 本项目 / 系统预设 …，formula-global-settings-sync）；预设行无此字段。 */
+  _layer?: string
+  _layer_label?: string
+  _pending?: boolean
 }
 
 /**
@@ -174,6 +178,9 @@ export function mergeNoteUserFormulaRows(
       formula_description: (u.description as string) || '',
       formula_source: (u.source as string) || 'user_formula',
       _userTarget: String(u.target ?? ''),
+      _layer: typeof u.layer === 'string' ? u.layer : undefined,
+      _layer_label: typeof u.layer_label === 'string' ? u.layer_label : undefined,
+      _pending: u.pending === true,
     })
     i += 1
   }

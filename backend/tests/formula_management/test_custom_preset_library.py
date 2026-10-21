@@ -1,14 +1,12 @@
-"""自定义预设收敛源与隔离存储测试（template-library-formula-preset-custom Wave 1）。
+"""自定义预设收敛口径测试（template-library-formula-preset-custom Wave 1；formula-global-settings-sync R14.3 改存数据库）。
 
-覆盖 Property 2/4/7：
-- P2 自定义不写入通用基线（``upsert_custom_presets`` 后 seed 逐字节不变）
-- P4 自定义同键覆盖通用（custom 置于 seed 之前，去重首个赢）
-- P7 零回归（custom 为空时 ``build_preset_library`` 口径不变）
-- ``upsert_custom_presets`` 幂等（重复写同键仅 update 不追加）
+覆盖 Property 4/7 + 迁库口径：
+- P4 自定义同键覆盖通用（数据库自定义 > 旧文件 > seed > 收敛源，去重首个赢）
+- P7 零回归（自定义为空时 ``build_preset_library`` 口径不变）
+- 旧文件 ``formula_custom_presets.json`` 只读兼容；预设库读不写文件
+- 读时补刷钩子：读预设库会触发缓存补刷（失败不影响读取）
 
-隔离：所有写测试用 ``monkeypatch`` 把 ``CUSTOM_PATH`` 指向 tmp_path，绝不碰真实数据文件。
-
-Requirements: 3.2, 5.1, 6.1
+隔离：``CUSTOM_PATH`` 指向 tmp_path；数据库自定义预设走进程内缓存，用例结束清空。
 """
 
 from __future__ import annotations
@@ -22,120 +20,104 @@ from app.services.formula_management import preset_library as pl
 from app.services.formula_management.preset_library import PresetEntry
 
 
+@pytest.fixture(autouse=True)
+def clean_db_cache():
+    pl.set_db_custom_entries([])
+    pl.set_db_custom_refresher(None)
+    yield
+    pl.set_db_custom_entries([])
+    pl.set_db_custom_refresher(None)
+
+
 @pytest.fixture
 def tmp_custom(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """把 CUSTOM_PATH 重定向到临时文件（隔离，不碰真实自定义文件）。"""
     p = tmp_path / "formula_custom_presets.json"
-    p.write_text(
-        json.dumps(
-            {"description": "test", "version": "t", "presets": []},
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
+    p.write_text(json.dumps({"description": "test", "version": "t", "presets": []}, ensure_ascii=False),
+                 encoding="utf-8")
     monkeypatch.setattr(pl, "CUSTOM_PATH", p)
     return p
 
 
 def _entry(page_key: str, target_cell: str, expr: str = "=TB('1001')") -> PresetEntry:
-    return PresetEntry(
-        page_key=page_key,
-        target_cell=target_cell,
-        expression=expr,
-        formula_type="auto_calc",
-        refs=[],
-        source="custom",
-        description="test custom",
-    )
+    return PresetEntry(page_key=page_key, target_cell=target_cell, expression=expr, formula_type="auto_calc",
+                       refs=[], source="custom", description="test custom")
 
 
-# ── P2: 自定义不写入通用基线 ──────────────────────────────────────────────────
-def test_upsert_custom_does_not_touch_seed(tmp_custom: Path):
-    seed_before = pl.SEED_PATH.read_bytes()
-    pl.upsert_custom_presets([_entry("note:测试章节", "R1C1")])
-    seed_after = pl.SEED_PATH.read_bytes()
-    assert seed_before == seed_after, "upsert_custom_presets 不得改动 formula_presets_seed.json"
+def test_upsert_writer_removed_and_library_never_writes(tmp_custom: Path):
+    """R14.3：不再有写仓库 JSON 的函数；建库只读。"""
+    assert not hasattr(pl, "upsert_custom_presets")
+    before = tmp_custom.read_bytes()
+    pl.set_db_custom_entries([_entry("note:测试章节", "R1C1")])
+    pl.build_preset_library()
+    assert tmp_custom.read_bytes() == before
 
 
-def test_upsert_custom_writes_only_custom_file(tmp_custom: Path):
-    pl.upsert_custom_presets([_entry("workpaper:ZZ99", "A1")])
-    saved = json.loads(tmp_custom.read_text(encoding="utf-8"))
-    assert len(saved["presets"]) == 1
-    assert saved["presets"][0]["source"] == "custom"
-    assert saved["presets"][0]["page_key"] == "workpaper:ZZ99"
-
-
-# ── upsert 幂等 ───────────────────────────────────────────────────────────────
-def test_upsert_custom_idempotent(tmp_custom: Path):
-    s1 = pl.upsert_custom_presets([_entry("note:X", "R2C2", "=TB('1002')")])
-    assert s1 == {"inserted": 1, "updated": 0, "total": 1}
-    s2 = pl.upsert_custom_presets([_entry("note:X", "R2C2", "=TB('9999')")])
-    assert s2["updated"] == 1 and s2["inserted"] == 0 and s2["total"] == 1
-    saved = json.loads(tmp_custom.read_text(encoding="utf-8"))
-    assert saved["presets"][0]["expression"] == "=TB('9999')", "同键应覆盖表达式"
-
-
-def test_upsert_custom_forces_source_custom(tmp_custom: Path):
-    """即便传入 source 非 custom，落库也强制标 custom（隔离来源）。"""
-    e = _entry("note:Y", "R1C1")
-    e.source = "seed"  # 恶意/误传
-    pl.upsert_custom_presets([e])
-    saved = json.loads(tmp_custom.read_text(encoding="utf-8"))
-    assert saved["presets"][0]["source"] == "custom"
-
-
-# ── P7: 零回归（custom 为空口径不变） ─────────────────────────────────────────
+# ── P7: 零回归（自定义为空口径不变） ─────────────────────────────────────────
 def test_empty_custom_preserves_baseline(tmp_custom: Path):
-    """空 custom 时 build_preset_library 结果与无 custom 源逐字节一致。"""
     entries, stats = pl.build_preset_library()
     keys = [e.dedup_key() for e in entries]
     assert len(keys) == len(set(keys))
     assert stats["inserted"] == len(entries) > 0
-    # 空 custom → 无 custom 条目
     assert all(e.source != "custom" for e in entries)
-    # include_sources=False 仍仅显式源
     seed_only, _ = pl.build_preset_library(include_sources=False)
     assert all(e.source != "custom" for e in seed_only)
     assert 0 < len(seed_only) < len(entries)
 
 
-# ── P4: 自定义同键覆盖通用 ────────────────────────────────────────────────────
-def test_custom_overrides_seed_on_same_key(tmp_custom: Path):
-    """custom 与 seed 同 (page_key, target_cell) 时结果取 custom（置最前，首个赢）。"""
-    # 取一条真实 seed 条目的键
+# ── P4: 自定义同键覆盖通用；数据库 > 旧文件 ──────────────────────────────────
+def test_db_custom_overrides_file_and_seed_on_same_key(tmp_custom: Path):
     seed = pl.load_seed_presets()
     assert seed, "需要非空 seed 作对照"
     target = seed[0]
-    # 写一条同键 custom（表达式区分）
-    override_expr = "=CUSTOM_OVERRIDE_MARKER()"
-    pl.upsert_custom_presets(
-        [
-            PresetEntry(
-                page_key=target.page_key,
-                target_cell=target.target_cell,
-                expression=override_expr,
-                formula_type="auto_calc",
-                refs=[],
-                source="custom",
-                description="override",
-            )
-        ]
-    )
+    tmp_custom.write_text(json.dumps({"presets": [
+        {"page_key": target.page_key, "target_cell": target.target_cell, "expression": "=FILE_MARKER()",
+         "formula_type": "auto_calc"},
+        {"page_key": "note:旧文件独有", "target_cell": "R1C1", "expression": "=TB('1')", "formula_type": "auto_calc"},
+    ]}, ensure_ascii=False), encoding="utf-8")
     entries, _ = pl.build_preset_library()
-    matched = [
-        e
-        for e in entries
-        if e.page_key == target.page_key and e.target_cell == target.target_cell
-    ]
-    assert len(matched) == 1, "去重后同键仅一条"
-    assert matched[0].source == "custom", "同键应为 custom（覆盖通用）"
-    assert matched[0].expression == override_expr
-
-
-def test_custom_only_key_appears_in_library(tmp_custom: Path):
-    """custom 独有键出现在预设库且 source=custom。"""
-    pl.upsert_custom_presets([_entry("note:自定义独有节", "R7C7")])
+    hit = [e for e in entries if e.dedup_key() == target.dedup_key()]
+    assert [(e.source, e.expression) for e in hit] == [("custom", "=FILE_MARKER()")], "旧文件只读兼容仍生效"
+    pl.set_db_custom_entries([_entry(target.page_key, target.target_cell, "=DB_MARKER()")])
     entries, stats = pl.build_preset_library()
-    matched = [e for e in entries if e.page_key == "note:自定义独有节"]
-    assert len(matched) == 1 and matched[0].source == "custom"
-    assert stats.get("source:custom", 0) >= 1
+    hit = [e for e in entries if e.dedup_key() == target.dedup_key()]
+    assert [(e.source, e.expression) for e in hit] == [("custom", "=DB_MARKER()")], "数据库自定义优先"
+    assert any(e.page_key == "note:旧文件独有" for e in entries)
+    assert stats.get("source:custom", 0) >= 2
+
+
+def test_explicit_custom_entries_argument_wins_over_cache(tmp_custom: Path):
+    pl.set_db_custom_entries([_entry("note:缓存", "R1C1")])
+    entries, _ = pl.build_preset_library(custom_entries=[_entry("note:显式", "R1C1")])
+    pages = {e.page_key for e in entries if e.source == "custom"}
+    assert "note:显式" in pages and "note:缓存" not in pages
+
+
+def test_reading_library_triggers_refresher_and_survives_its_failure(tmp_custom: Path):
+    calls: list[int] = []
+
+    def refresher():
+        calls.append(1)
+        raise RuntimeError("连不上库")
+
+    pl.set_db_custom_refresher(refresher)
+    pl.set_db_custom_entries([_entry("note:仍可读", "R2C2")])
+    entries, _ = pl.build_preset_library()
+    assert calls and any(e.page_key == "note:仍可读" for e in entries), "补刷失败沿用当前缓存"
+
+
+# ── 草稿刷新读取口径回归（R14.3：自定义优先于基线，改存数据库后不变） ──────────
+def test_draft_refresh_applies_db_custom_over_seed(tmp_custom: Path):
+    from app.services.draft_refresh_service import DraftRefreshService
+
+    seed = pl.load_seed_presets()
+    target = seed[0]
+    baseline = DraftRefreshService().build_preset_draft_units([target.page_key])
+    unit = next(u for u in baseline.units if u.after_value["target_cell"] == target.target_cell)
+    assert unit.after_value["expression"] == target.expression
+    pl.set_db_custom_entries([_entry(target.page_key, target.target_cell, "=DB_CUSTOM_MARKER()"),
+                              _entry("note:仅自定义页", "R1C1")])
+    app = DraftRefreshService().build_preset_draft_units([target.page_key, "note:仅自定义页"])
+    unit = next(u for u in app.units if u.after_value["target_cell"] == target.target_cell)
+    assert unit.after_value["expression"] == "=DB_CUSTOM_MARKER()", "数据库自定义优先于基线"
+    assert "note:仅自定义页" in app.presetted_pages

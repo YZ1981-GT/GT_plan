@@ -123,12 +123,19 @@ export interface CustomPresetPayload {
   variant?: string
 }
 
-/** 自定义预设写入结果。 */
+/**
+ * 自定义预设写入结果。
+ *
+ * 管理员直接生效（`pending_review=false`，带新增 / 更新计数）；其他人提交为全局候选
+ * （`pending_review=true`，带候选记录），由管理员在「全局公式设置 → 发布记录」审核后才生效。
+ */
 export interface CustomPresetSaveResult {
   ok: boolean
-  inserted: number
-  updated: number
-  total: number
+  pending_review?: boolean
+  inserted?: number
+  updated?: number
+  total?: number
+  candidate?: { id: string; status: string }
 }
 
 const XLSX_MIME =
@@ -295,7 +302,7 @@ export function useFormulaImportExport() {
   }
 
   /**
-   * 新增/更新一条平台级自定义预设（写 formula_custom_presets.json，隔离于 seed）
+   * 新增/更新一条平台级自定义预设（存数据库：管理员直接生效，其他人提交全局候选待审核）
    * POST /presets/custom（require edit role；悬空引用 → 422 携清单不落库）
    * @param payload 自定义预设条目
    * @param projectId 可选：项目上下文，供引用解析
@@ -312,9 +319,11 @@ export function useFormulaImportExport() {
         { params: projectId ? { project_id: projectId } : {} },
       )
       const data = (response.data?.data ?? response.data) as CustomPresetSaveResult
-      ElMessage.success(
-        data.inserted > 0 ? '自定义预设已新增' : '自定义预设已更新',
-      )
+      if (data.pending_review) {
+        ElMessage.success('已提交为全局候选，管理员审核通过后生效')
+      } else {
+        ElMessage.success((data.inserted ?? 0) > 0 ? '自定义预设已新增' : '自定义预设已更新')
+      }
       return data
     } catch (err: unknown) {
       // 悬空引用 422 携 dangling_refs 清单，友好展示

@@ -3,7 +3,7 @@
  * Validates: Requirements 13.6, 1.5, 12.5 / Property 22
  */
 
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -14,10 +14,17 @@ import {
 } from '@/shell/formula/fullInventoryGate'
 import { DOMAIN_OWNED_FORMULA_EXCLUSIONS } from '@/shell/formula'
 
-const SPEC = join(
+const ACTIVE_SPEC = join(
   __dirname,
   '../../../../../../.kiro/specs/workpaper-page-formula-toolbar-closure',
 )
+const ARCHIVED_SPEC = join(
+  __dirname,
+  '../../../../../../.kiro/specs/_archive/05-business-features/workpaper-page-formula-toolbar-closure',
+)
+const SPEC = existsSync(join(ACTIVE_SPEC, 'basis/T15-grid-host-exemption.json'))
+  ? ACTIVE_SPEC
+  : ARCHIVED_SPEC
 const BASIS = join(SPEC, 'basis')
 const EVIDENCE = join(SPEC, 'evidence/F-SHELL')
 
@@ -43,15 +50,8 @@ describe('Task 15: full inventory gate', () => {
     expect(DOMAIN_OWNED_FORMULA_EXCLUSIONS.length).toBeGreaterThanOrEqual(6)
     expect(gate.overall, gate.blockers.join('; ')).toBe('PASS')
 
-    mkdirSync(BASIS, { recursive: true })
-    mkdirSync(EVIDENCE, { recursive: true })
     const payload = buildT15EvidencePayload(gate)
-    writeFileSync(join(BASIS, 'T15-full-inventory-run.json'), JSON.stringify(payload, null, 2), 'utf8')
-    writeFileSync(join(EVIDENCE, 'envelope.json'), JSON.stringify(gate.fshellEnvelope, null, 2), 'utf8')
-
-    const index = buildIndexMarkdown(gate, payload)
-    writeFileSync(join(EVIDENCE, 'INDEX.md'), index, 'utf8')
-
+    expect(payload.evidenceSha256).toMatch(/^[a-f0-9]{64}$/)
     const tracked = [
       'basis/T15-full-inventory-run.json',
       'basis/T15-grid-host-exemption.json',
@@ -61,22 +61,9 @@ describe('Task 15: full inventory gate', () => {
       'evidence/F-SHELL/envelope.json',
       'evidence/F-SHELL/INDEX.md',
     ]
-    writeFileSync(
-      join(BASIS, 'T15-tracked-artifacts.json'),
-      JSON.stringify(
-        {
-          recordedAt: gate.generatedAt,
-          artifacts: tracked.map((p) => ({
-            path: p,
-            exists: existsSync(join(SPEC, p)),
-          })),
-          inventoryDigest: gate.inventoryDigest,
-        },
-        null,
-        2,
-      ),
-      'utf8',
-    )
+    for (const path of tracked) {
+      expect(existsSync(join(SPEC, path)), `归档证据缺失：${path}`).toBe(true)
+    }
   })
 
   it('grid exemption is formal and word exemption is superseded', () => {

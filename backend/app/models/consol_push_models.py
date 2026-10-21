@@ -85,6 +85,10 @@ class ConsolNoteFormula(Base):
         String(20), nullable=False, default="manual", server_default=text("'manual'")
     )
     description: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    # V199 formula-global-settings-sync：模板级表即合并附注域的全局层，版本号供 CAS 与三方比对。
+    version: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, default=1, server_default=text("1")
+    )
     is_deleted: Mapped[bool] = mapped_column(
         sa.Boolean, nullable=False, default=False, server_default=text("false")
     )

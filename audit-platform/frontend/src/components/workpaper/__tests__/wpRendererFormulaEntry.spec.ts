@@ -9,6 +9,7 @@
  * 的 wp_code），且工具栏按钮与子组件 `open-formula` 事件必须共用同一入口。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { shallowMount } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -72,11 +73,32 @@ vi.mock('@/composables/useWpRenderer', async (importOriginal) => {
 })
 
 import GtWpRenderer from '../GtWpRenderer.vue'
+import { FORMULA_MANAGER_CAPABILITY_CONTEXT } from '@/shell/formula/formulaManagerCapabilityContext'
+
+const allowed = {
+  allowed: true,
+  reasonCode: 'allowed',
+  owner: 'workpaper-capability-matrix',
+  nextAction: '',
+  zhMessage: '允许',
+}
 
 function mountRenderer() {
   return shallowMount(GtWpRenderer, {
     props: { wpId: 'wp-d2' },
-    global: { renderStubDefaultSlot: false },
+    global: {
+      renderStubDefaultSlot: false,
+      provide: {
+        [FORMULA_MANAGER_CAPABILITY_CONTEXT as symbol]: {
+          capability: ref({
+            snapshotVersion: '1.0', subjectDigest: 'd'.repeat(64), ownerEpoch: 0,
+            expiresAt: '2099-01-01T00:00:00Z', formulaView: allowed,
+            formulaEditUser: allowed,
+          } as any),
+          location: ref(null),
+        },
+      },
+    },
   })
 }
 

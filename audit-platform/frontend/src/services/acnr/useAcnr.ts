@@ -173,6 +173,27 @@ const _sheetsCache = new Map<string, CacheEntry<AcnrSheetEntry[]>>()
 const _cellsCache = new Map<string, CacheEntry<AcnrCellEntry[]>>()
 
 /**
+ * 模块级在途请求：缓存只在响应回来后才写入，同参数的并发调用（同一或不同实例）此前会全部穿透，
+ * 发出多发相同 GET；`utils/http` 的 GET 去重随即取消先发的那一发，被取消方被当成失败（打告警、
+ * 先写空目录）。这里让并发调用共用同一个在途 Promise。
+ * 键带缓存纪元：在途期间若 invalidateModuleCache，之后的调用另发请求，不复用失效前的那一发。
+ * spec: frontend-test-network-isolation-and-load-dedup（design §3）
+ */
+const _sheetsInflight = new Map<string, Promise<AcnrSheetEntry[]>>()
+const _cellsInflight = new Map<string, Promise<AcnrCellEntry[]>>()
+
+function _shareInflight<T>(table: Map<string, Promise<T>>, key: string, run: () => Promise<T>): Promise<T> {
+  const pending = table.get(key)
+  if (pending) return pending
+  const promise = run()
+  table.set(key, promise)
+  // then(clear, clear)：成功失败都移除；不用 finally，避免派生 Promise 在失败时成为未处理拒绝
+  const clear = () => { if (table.get(key) === promise) table.delete(key) }
+  promise.then(clear, clear)
+  return promise
+}
+
+/**
  * 判断缓存条目是否已过期 (TTL 兜底，Req-15.1)
  */
 function _isExpired<T>(entry: CacheEntry<T>): boolean {
@@ -417,14 +438,19 @@ export function useAcnr(projectId?: string) {
 
     loading.value = true
     try {
-      const { data } = await http.get(ACNR_PATHS.entries, {
-        params: {
-          ...(cycle ? { cycle } : {}),
-          ...(importExportOnly ? { import_export_only: true } : {}),
-        },
+      const epoch = _cacheEpoch
+      const result = await _shareInflight(_sheetsInflight, `${epoch}:${cacheKey}`, async () => {
+        const { data } = await http.get(ACNR_PATHS.entries, {
+          params: {
+            ...(cycle ? { cycle } : {}),
+            ...(importExportOnly ? { import_export_only: true } : {}),
+          },
+        })
+        const rows: AcnrSheetEntry[] = Array.isArray(data) ? data : (data?.items ?? [])
+        // 在途期间缓存已被失效：结果只交给已经在等的调用方，不把失效前的旧目录写回缓存
+        if (epoch === _cacheEpoch) sheetsCache.set(cacheKey, { data: rows, timestamp: Date.now() })
+        return rows
       })
-      const result: AcnrSheetEntry[] = Array.isArray(data) ? data : (data?.items ?? [])
-      sheetsCache.set(cacheKey, { data: result, timestamp: Date.now() })
       sheets.value = result
       return result
     } catch (e) {
@@ -461,11 +487,15 @@ export function useAcnr(projectId?: string) {
 
     loading.value = true
     try {
-      const { data } = await http.get(ACNR_PATHS.anchors, {
-        params: { wp_code: wpCode, sheet },
+      const epoch = _cacheEpoch
+      const result = await _shareInflight(_cellsInflight, `${epoch}:${cacheKey}`, async () => {
+        const { data } = await http.get(ACNR_PATHS.anchors, {
+          params: { wp_code: wpCode, sheet },
+        })
+        const rows: AcnrCellEntry[] = Array.isArray(data) ? data : (data?.items ?? [])
+        if (epoch === _cacheEpoch) cellsCache.set(cacheKey, { data: rows, timestamp: Date.now() })
+        return rows
       })
-      const result: AcnrCellEntry[] = Array.isArray(data) ? data : (data?.items ?? [])
-      cellsCache.set(cacheKey, { data: result, timestamp: Date.now() })
       cells.value = result
       return result
     } catch (e) {

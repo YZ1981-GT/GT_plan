@@ -12,9 +12,10 @@ from types import SimpleNamespace
 
 import pytest
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.pool import NullPool
 
-from app.core.database import engine
+from app.core.config import settings
 from app.models.formula_push_models import FormulaPushState
 from app.services.formula_push import engine as push
 from app.services.formula_push.bindings.e1 import WorkpaperTarget
@@ -32,6 +33,11 @@ async def _run_sql_file(conn, path: Path) -> None:
 
 
 async def _scenario(monkeypatch) -> dict:
+    url = str(settings.DATABASE_URL)
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    connect_args = {"ssl": False} if getattr(settings, "DB_DISABLE_SSL", False) else {}
+    engine = create_async_engine(url, poolclass=NullPool, connect_args=connect_args)
     assert engine.dialect.name == "postgresql", f"需要 PostgreSQL，实际 {engine.dialect.name}"
     schema = f"tmp_formula_push_isolation_{uuid.uuid4().hex[:10]}"
     f1, f2 = uuid.uuid4(), uuid.uuid4()
@@ -143,8 +149,11 @@ async def _scenario(monkeypatch) -> dict:
                 await session.close()
                 await conn.rollback()
     finally:
-        async with engine.begin() as admin:
-            await admin.execute(sa.text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
+        try:
+            async with engine.begin() as admin:
+                await admin.execute(sa.text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
+        finally:
+            await engine.dispose()
 
 
 async def _audit_year() -> tuple[bool, int]:

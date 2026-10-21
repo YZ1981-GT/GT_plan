@@ -704,6 +704,7 @@ async def seed_note_formulas(
             result.kept_manual += 1
         elif (row.formula, row.description) != (cell.formula, cell.description):
             row.formula, row.description, row.source, row.updated_at = cell.formula, cell.description, source_tag, now
+            row.version = (row.version or 1) + 1  # 派生配置更新：只升版本（编辑中的人再保存会 409），不经同步内核
             result.updated += 1
         else:
             result.unchanged += 1
@@ -766,6 +767,7 @@ def formula_to_dict(f: ConsolNoteFormula, table: dict | None = None) -> dict:
         "source": f.source,
         "source_label": SOURCE_LABELS.get(f.source, f.source),
         "description": f.description,
+        "version": f.version or 1,  # formula-global-settings-sync：修改 / 删除须带回（CAS）
         "updated_at": f.updated_at.isoformat() if f.updated_at else None,
         "updated_by": str(f.updated_by) if f.updated_by else None,
     }
@@ -825,66 +827,14 @@ async def list_note_formulas(db: AsyncSession, template_type: str, section_id: s
     return {"template_type": tt, "count": len(formulas), "sections": sections}
 
 
-async def create_note_formula(
-    db: AsyncSession, *, template_type: str, section_id: str, row_index: int, col_index: int,
-    formula: str, description: str | None, user_id: UUID | None,
-) -> ConsolNoteFormula:
-    tt = _check_template(template_type)
-    _check_cell(tt, section_id, row_index, col_index)
-    text = validate_note_formula(formula)
-    dup = (await db.execute(sa.select(ConsolNoteFormula.id).where(
-        ConsolNoteFormula.template_type == tt, ConsolNoteFormula.section_id == section_id,
-        ConsolNoteFormula.row_index == row_index, ConsolNoteFormula.col_index == col_index,
-        ConsolNoteFormula.is_deleted == sa.false(),
-    ))).first()
-    if dup is not None:
-        raise NoteFormulaError("该单元格已有公式，请直接修改", status=409)
-    now = datetime.now(timezone.utc)  # 显式给时间：服务端默认值 flush 后是过期属性，异步会话里读它会触发懒加载
-    row = ConsolNoteFormula(
-        template_type=tt, section_id=section_id, row_index=row_index, col_index=col_index, formula=text,
-        source="manual", description=(description or "").strip() or None, updated_by=user_id,
-        created_at=now, updated_at=now,
-    )
-    db.add(row)
-    try:
-        await db.flush()
-    except IntegrityError as exc:
-        raise NoteFormulaError("该单元格已有公式，请刷新后修改", status=409) from exc
-    return row
+# 增 / 改 / 删：formula-global-settings-sync 起经全局发布（版本 + 同步内核），见
+# ``app.services.formula_settings.consol_note_settings``（create_formula / update_formula / delete_formula）。
 
 
 async def _get_formula(db: AsyncSession, formula_id: UUID) -> ConsolNoteFormula:
     row = await db.get(ConsolNoteFormula, formula_id)
     if row is None or row.is_deleted:
         raise NoteFormulaError("公式不存在", status=404)
-    return row
-
-
-async def update_note_formula(
-    db: AsyncSession, formula_id: UUID, *, formula: str | None, description: str | None, user_id: UUID | None,
-) -> ConsolNoteFormula:
-    """改公式 ⇒ 来源变为人工（之后种子不再覆盖）。只改说明不改来源。"""
-    row = await _get_formula(db, formula_id)
-    if formula is not None:
-        text = validate_note_formula(formula)
-        if canonical_formula(text) != canonical_formula(row.formula):   # 只差空白 ⇒ 不算改
-            row.formula = text
-            row.source = "manual"
-    if description is not None:
-        row.description = description.strip() or None
-    row.updated_by = user_id
-    row.updated_at = datetime.now(timezone.utc)
-    await db.flush()
-    return row
-
-
-async def delete_note_formula(db: AsyncSession, formula_id: UUID, *, user_id: UUID | None) -> ConsolNoteFormula:
-    """软删（保留记录 ⇒ 种子不再补回该单元格，design「不覆盖人工」）。"""
-    row = await _get_formula(db, formula_id)
-    row.is_deleted = True
-    row.updated_by = user_id
-    row.updated_at = datetime.now(timezone.utc)
-    await db.flush()
     return row
 
 
@@ -1119,7 +1069,9 @@ async def note_breakdown(
     children = [
         (c.node_key, measures[c.node_key][MEASURE_CONSOLIDATED]) for c in node.children
     ] if node.kind == KIND_AGGREGATE else []
-    formulas = await _active_formulas(db, tt, section_id)
+    from app.services.formula_settings.consol_note_settings import effective_formulas
+
+    formulas = await effective_formulas(db, project_id, section_id, await _active_formulas(db, tt, section_id))
     cells = await note_cell_values(
         ctx.rows, formulas, measures[node.node_key], categories=ctx.basis.categories, children=children,
     )

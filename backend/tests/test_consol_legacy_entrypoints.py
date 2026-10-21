@@ -37,12 +37,14 @@ FRONTEND_SRC = Path(__file__).resolve().parents[2] / "audit-platform" / "fronten
 async def legacy_client(client_for):
     from app.routers.consol_note_sections import router as ns_router
     from app.routers.report_config import router as rc_router
+    from app.routers.report_drill_down import router as drill_down_router
 
     def make(user):
         client = client_for(user)
         app = client._transport.app  # noqa: SLF001
         if not any(getattr(r, "path", "").startswith("/api/report-config") for r in app.routes):
             app.include_router(rc_router)
+            app.include_router(drill_down_router)  # 2026-10-20 迁出 report_config，路径不变
             app.include_router(ns_router)
         return client
 

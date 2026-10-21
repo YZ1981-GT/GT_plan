@@ -299,6 +299,8 @@ class ConsolNoteFormulaCreate(BaseModel):
 class ConsolNoteFormulaUpdate(BaseModel):
     formula: str | None = Field(default=None, min_length=1, max_length=2000)
     description: str | None = Field(default=None, max_length=500)
+    # formula-global-settings-sync：当前版本号（必填，缺 428、不符 409）
+    expected_version: int | None = Field(default=None, ge=0)
 
 
 # ========== 5. 内部交易 ==========

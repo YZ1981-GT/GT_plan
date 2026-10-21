@@ -104,11 +104,39 @@ def _ddl_added_columns(table: str) -> dict[str, bool]:
     return out
 
 
+def _later_migrations() -> list[str]:
+    """V172 之后的迁移正文（按版本号数字排序，去行注释）：后续迁移可加列 / 重定义 CHECK。"""
+    later = []
+    for p in MIGRATIONS.glob("V*.sql"):
+        m = re.match(r"^V0*(\d+)__", p.name)
+        if m and int(m.group(1)) > 172:
+            later.append((int(m.group(1)), _strip_line_comments(p.read_text(encoding="utf-8"))))
+    return [sql for _, sql in sorted(later)]
+
+
+def _later_added_columns(table: str) -> dict[str, bool]:
+    """V172 之后的迁移给 ``table`` 加的列（如 V199 的 consol_note_formula.version）。"""
+    out: dict[str, bool] = {}
+    pattern = rf"ALTER\s+TABLE\s+{table}\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+(\w+)([^;]*);"
+    for sql in _later_migrations():
+        for m in re.finditer(pattern, sql, re.IGNORECASE):
+            out[m.group(1)] = "NOT NULL" in m.group(2).upper()
+    return out
+
+
 def _ddl_check_values(table: str, column: str) -> set[str]:
+    """CHECK 取值：最后一次定义为准（V184 重建了 consol_note_formula 的 source CHECK）。"""
     body = _create_body(table)
-    m = re.search(rf"CHECK\s*\(\s*{column}\s+IN\s*\(([^)]*)\)\s*\)", body, re.IGNORECASE)
+    pattern = rf"CHECK\s*\(\s*{column}\s+IN\s*\(([^)]*)\)\s*\)"
+    m = re.search(pattern, body, re.IGNORECASE)
     assert m, f"{table}.{column} 的 CHECK IN 未找到"
-    return set(re.findall(r"'([^']*)'", m.group(1)))
+    values = m.group(1)
+    for sql in _later_migrations():
+        for stmt in re.finditer(rf"ALTER\s+TABLE\s+{table}\b[^;]*;", sql, re.IGNORECASE):
+            redefined = re.search(pattern, stmt.group(0), re.IGNORECASE)
+            if redefined:
+                values = redefined.group(1)
+    return set(re.findall(r"'([^']*)'", values))
 
 
 def _orm_check_values(model, name: str) -> set[str]:
@@ -142,7 +170,7 @@ def test_v172_r172_pair_and_version_unique():
 
 @pytest.mark.parametrize("model", [ConsolPushRun, ConsolNoteFormula], ids=lambda m: m.__tablename__)
 def test_new_tables_orm_columns_match_ddl(model):
-    ddl = _ddl_columns(model.__tablename__)
+    ddl = {**_ddl_columns(model.__tablename__), **_later_added_columns(model.__tablename__)}
     orm = {c.name: (not c.nullable) for c in model.__table__.columns}
     assert not (set(orm) - set(ddl)), f"ORM 有列但 V172 无: {sorted(set(orm) - set(ddl))}"
     assert not (set(ddl) - set(orm)), f"V172 有列但 ORM 无: {sorted(set(ddl) - set(orm))}"

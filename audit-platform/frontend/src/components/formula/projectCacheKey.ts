@@ -78,39 +78,25 @@ export function resolveSaveYear(propsYear: string | number | null | undefined): 
 }
 
 /**
- * 创建一个按 key 去重的异步请求合并器。
+ * 同一缓存键的并发加载合并为一次（single-flight）。
  *
- * 同一个 key 在飞的请求不重发——后续调用复用第一次的 Promise。
- * key 变化（如切项目/切模板版本）时重新发起。
+ * 打开弹窗时同一个加载函数会被两处同时调用（watch 里直接预加载 + 定位函数 await 等它加载完）。
+ * 组件里的 `xxxLoaded` 标志只在**加载完成后**才拦得住重复，飞行期间两路都会真的发请求：
+ * 生产上第二发相同 GET 会被 http 去重取消先发的那一发（白发一次、先发方 catch 到取消）；
+ * 测试里两路并发动态 import 同一个被 vi.mock 的模块，第二路会绕过 mock 走真实模块
+ * （vitest 已知限制），打开链路因此要等一次真实网络往返，用例时序随机。
  *
- * 典型用法：
- * ```ts
- * const flight = createKeyedSingleFlight()
- * function load() { return flight(currentKey.value, fetchData) }
- * ```
- *
- * 补写原因：FormulaManagerDialog 的 noteTreeFlight / consolNoteTreeFlight /
- * noteUserFormulasFlight 三处依赖此函数（Task 6.3 需求 10.1），但此前仅在
- * import 中引用、从未实现——导致前端编译失败。
+ * 返回的函数：飞行期间同键的后到调用直接复用在途 Promise；键不同（期间切了项目/模板/年度）
+ * 照常另发；在途 Promise 落定（含失败）后清空，下次调用重新执行。
  */
-export function createKeyedSingleFlight() {
-  let inFlightKey: string | null = null
-  let inFlightPromise: Promise<void> | null = null
-
-  return function singleFlight(key: string, fn: () => Promise<void>): Promise<void> {
-    // 同一 key 正在飞：复用
-    if (inFlightKey === key && inFlightPromise) {
-      return inFlightPromise
-    }
-    // key 变了或没有在飞的：发新请求
-    inFlightKey = key
-    inFlightPromise = fn().finally(() => {
-      // 只有当前 key 仍一致时才清除（防止 key 已变但旧 finally 清掉新请求）
-      if (inFlightKey === key) {
-        inFlightKey = null
-        inFlightPromise = null
-      }
+export function createKeyedSingleFlight(): <T>(key: string, run: () => Promise<T>) => Promise<T> {
+  let inflight: { key: string; promise: Promise<unknown> } | null = null
+  return <T>(key: string, run: () => Promise<T>): Promise<T> => {
+    if (inflight && inflight.key === key) return inflight.promise as Promise<T>
+    const promise: Promise<T> = run().finally(() => {
+      if (inflight?.promise === promise) inflight = null
     })
-    return inFlightPromise
+    inflight = { key, promise }
+    return promise
   }
 }

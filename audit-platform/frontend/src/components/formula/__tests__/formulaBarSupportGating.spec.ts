@@ -84,12 +84,17 @@ describe('FormulaBar 函数支持矩阵 UI 门控', () => {
     document.body.innerHTML = ''
   })
 
-  it('wp_evaluator 执行器下全部取数按钮可用（supported，无禁用原因）', () => {
+  it('wp_evaluator 只开放真实具备上下文的可见按钮 TB/WP', () => {
     const w = mountBar('wp_evaluator')
-    for (const fn of ['TB', 'ROW', 'SUM_ROW', 'NOTE', 'WP', 'REPORT']) {
+    for (const fn of ['TB', 'WP']) {
       const b = btn(w, fn)
       expect(b.supported).toBe(true)
       expect(b.reason).toBe('')
+    }
+    for (const fn of ['ROW', 'SUM_ROW', 'NOTE', 'REPORT']) {
+      const b = btn(w, fn)
+      expect(b.supported).toBe(false)
+      expect(b.reason).toBeTruthy()
     }
   })
 
@@ -140,14 +145,14 @@ describe('FormulaBar 函数支持矩阵 UI 门控', () => {
   })
 
   // ── 变异反证 ──
-  it('变异：note 执行器把 ROW 当支持可点必与门控冲突；反向断言 wp_evaluator 下不误判', () => {
+  it('变异：把不支持的 ROW 标成可点必须被门控识别', () => {
     const wNote = mountBar('note_executor')
-    const mutatedClickable = true // 变异态（错误）= ROW 在 note 可点 → 静默 0
-    const realSupported = btn(wNote, 'ROW').supported
-    expect(realSupported).toBe(false) // 真源：note 执行器禁 ROW
-    expect(realSupported).not.toBe(mutatedClickable) // 生产若按变异态渲染，此红
-    // 反向断言：wp_evaluator 下同一按钮不被误判为禁用
     const wWp = mountBar('wp_evaluator')
-    expect(btn(wWp, 'ROW').supported).toBe(true)
+    const mutatedClickable = true
+    expect(btn(wNote, 'ROW').supported).toBe(false)
+    expect(btn(wNote, 'ROW').supported).not.toBe(mutatedClickable)
+    // 工作底稿保存路径同样没有 ROW 上下文，不能因 L1 注册过就误放行。
+    expect(btn(wWp, 'ROW').supported).toBe(false)
+    expect(btn(wWp, 'TB').supported).toBe(true)
   })
 })

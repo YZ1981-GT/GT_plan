@@ -5,10 +5,10 @@
 四个执行器维度（design §5 步骤 4、§1 报告第三/五/九节；现状均由源码 grep 实证，
 **非凭命名推测**，memory 铁律⑭）：
 
-- ``wp_evaluator``  = ``app.services.formula_engine`` L1 内核（``_REGISTRY``）。
-  现状实证：``_REGISTRY.register(...)`` 注册 TB/SUM_TB/ROW/SUM_ROW/REPORT/PREV/AUX/
-  NOTE/WP/ADJ 全部取数函数（formula_engine.py ~L974-979）——即 wp evaluator 真支持
-  全部取数函数（design 点名「真支持 TB/SUM_TB/WP」是其子集，此处据注册表如实标全集）。
+- ``wp_evaluator`` = 当前可保存并由 ``evaluate_wp_formula_expression`` 求值的工作底稿公式路径。
+  该路径只真实实现 TB/SUM_TB/WP（另含字面量、四则运算与已解析 sheet 引用）；L1
+  ``_REGISTRY`` 注册不等于请求上下文已注入，故 ROW/SUM_ROW/REPORT/NOTE/PREV/AUX/ADJ
+  在本执行器均 fail-closed 判不支持。通用 ``/api/formula`` 按 ``central_batch`` 能力校验。
 
 - ``report_path`` = ``app.services.report_engine.evaluate_formula_result``。
   现状实证：TB/SUM_TB/ROW/SUM_ROW/REPORT 经 resolver 预载求值（report_engine.py
@@ -66,24 +66,29 @@ FUNCTIONS: tuple[str, ...] = (
 #: 「函数 × 执行器 → 是否支持」。True=支持（运行产生真实结果）；False=不支持
 #: （UI 必须显式禁用/标注，禁静默 0）。每一格的依据见模块 docstring 的逐执行器实证。
 _SUPPORT: dict[str, dict[Executor, bool]] = {
-    # wp evaluator 真支持全部取数函数（_REGISTRY 全注册）
+    # wp_evaluator = 当前可保存工作底稿公式路径；只承诺真实具备上下文的 TB/SUM_TB/WP。
     "TB":     {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: True,  Executor.CENTRAL_BATCH: True},
     "SUM_TB": {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
-    "ROW":    {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
-    "SUM_ROW":{Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
-    "REPORT": {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: True,  Executor.CENTRAL_BATCH: True},
-    "NOTE":   {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: True,  Executor.CENTRAL_BATCH: True},
+    "ROW":    {Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
+    "SUM_ROW":{Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
+    "REPORT": {Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: True,  Executor.CENTRAL_BATCH: True},
+    "NOTE":   {Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: True,  Executor.CENTRAL_BATCH: True},
     "WP":     {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: True,  Executor.CENTRAL_BATCH: True},
-    # PREV/AUX：report 路径硬置 0（静默）—— 不支持；note 用 PRIOR/AGING，不解析 PREV/AUX
-    "PREV":   {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: False, Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
-    "AUX":    {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: False, Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
-    # ADJ：report 路径「中央执行器自身」不注入 → 返 0（不支持）；central_batch 注入 adj_data（支持）
-    "ADJ":    {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: False, Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
+    "PREV":   {Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: False, Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
+    "AUX":    {Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: False, Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
+    "ADJ":    {Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: False, Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
 }
 
 
 #: 每一格「不支持」的人类可读原因（UI 标注用；支持的格无原因）。缺原因即判矩阵不完整。
 _UNSUPPORTED_REASON: dict[tuple[str, Executor], str] = {
+    ("ROW", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未注入 ROW 行次上下文",
+    ("SUM_ROW", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未注入 SUM_ROW 行次上下文",
+    ("REPORT", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未注入报表上下文",
+    ("NOTE", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未注入附注上下文",
+    ("PREV", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未实现 PREV",
+    ("AUX", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未实现 AUX",
+    ("ADJ", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未注入实时调整上下文",
     ("SUM_TB", Executor.NOTE_EXECUTOR): "附注执行器不解析 SUM_TB（附注表内用 SUM 行区间）",
     ("ROW", Executor.NOTE_EXECUTOR): "附注执行器不解析 ROW（跨报表行引用用 REPORT）",
     ("SUM_ROW", Executor.NOTE_EXECUTOR): "附注执行器不解析 SUM_ROW",
@@ -145,54 +150,64 @@ def build_matrix_payload() -> dict:
     }
 
 
-import re
+class FormulaSupportViolation(ValueError):
+    """公式包含当前执行器不支持的函数。"""
 
-# ---------------------------------------------------------------------------
-# 公式函数支持校验（report_config / cross_check_rules 调用）
-# ---------------------------------------------------------------------------
-
-# 匹配公式中的取数函数调用：如 TB(...), SUM_TB(...), ADJ(...) 等
-_FUNC_CALL_RE = re.compile(
-    r"\b(" + "|".join(re.escape(f) for f in FUNCTIONS) + r")\s*\(",
-    re.IGNORECASE,
-)
-
-
-class FormulaSupportViolation(Exception):
-    """公式中包含指定执行器不支持的函数时抛出。
-
-    属性:
-        executor: 目标执行器
-        issues: 每个不支持函数的 ``{function, reason}`` 列表
-    """
-
-    def __init__(self, executor: Executor, issues: list[dict]) -> None:
+    def __init__(self, executor: Executor, issues: list[dict[str, str]]) -> None:
         self.executor = executor
         self.issues = issues
-        funcs = ", ".join(i["function"] for i in issues)
-        super().__init__(f"{executor.value} 不支持函数: {funcs}")
+        names = "/".join(issue["function"] for issue in issues)
+        super().__init__(f"执行器 {executor.value} 不支持函数：{names}")
 
 
-def require_expression_support(formula: str, executor: Executor | str) -> None:
-    """校验公式文本中使用的所有取数函数在目标执行器下均受支持。
+def expression_functions(expression: str | None) -> list[str]:
+    """按出现顺序提取平台已登记函数名；未知函数由 L1 语法白名单负责拒绝。"""
+    import re
 
-    不支持时抛 :class:`FormulaSupportViolation`，调用方可捕获并转化为
-    HTTP 422 响应。空公式或不含取数函数的纯算术表达式直接放行。
-    """
-    if not formula:
-        return
-    exe = Executor(executor) if not isinstance(executor, Executor) else executor
+    if not expression:
+        return []
     seen: set[str] = set()
-    issues: list[dict] = []
-    for m in _FUNC_CALL_RE.finditer(formula):
-        fn = m.group(1).upper()
-        if fn in seen:
-            continue
-        seen.add(fn)
-        if not is_supported(fn, exe):
-            issues.append({
-                "function": fn,
-                "reason": unsupported_reason(fn, exe) or "此执行器不支持该函数",
-            })
+    result: list[str] = []
+    for match in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(", expression):
+        name = match.group(1).upper()
+        if name in _SUPPORT and name not in seen:
+            seen.add(name)
+            result.append(name)
+    return result
+
+
+def support_issues(expression: str | None, executor: Executor | str) -> list[dict[str, str]]:
+    """返回表达式在指定执行器中的不支持函数，供所有生产入口统一 preflight。"""
+    exe = Executor(executor) if not isinstance(executor, Executor) else executor
+    return [
+        {
+            "function": name,
+            "executor": exe.value,
+            "reason": unsupported_reason(name, exe) or "此执行器不支持该函数",
+        }
+        for name in expression_functions(expression)
+        if not is_supported(name, exe)
+    ]
+
+
+def require_expression_support(expression: str | None, executor: Executor | str) -> None:
+    """不支持即抛结构化异常；生产路由将其转换为 422，禁止静默 0。"""
+    exe = Executor(executor) if not isinstance(executor, Executor) else executor
+    issues = support_issues(expression, exe)
     if issues:
         raise FormulaSupportViolation(exe, issues)
+
+
+def require_function_support(function: str, executor: Executor | str) -> None:
+    """校验按类型调用的单一函数 API。"""
+    exe = Executor(executor) if not isinstance(executor, Executor) else executor
+    name = (function or "").strip().upper()
+    if not is_supported(name, exe):
+        raise FormulaSupportViolation(
+            exe,
+            [{
+                "function": name or "<empty>",
+                "executor": exe.value,
+                "reason": unsupported_reason(name, exe) or "此执行器不支持该函数",
+            }],
+        )

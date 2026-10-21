@@ -47,6 +47,17 @@
         "wp_code": "A27",
         "classification_status": "out_of_scope"
       }
+    },
+    {
+      "key": "classification-404-out-of-scope:B5附件",
+      "kind": "classification-404-out-of-scope",
+      "owner": "workpaper-rendering",
+      "reason": "formula-manager-runtime-integrity-closure 复核期现算：B5附件 在真实项目 wp_index 存在但 classification API 返 404，且在 wp_code_overrides.json 无映射（B5 本体与 B5-1~B5-9-2 子码均有 a-program-console/word-template 映射并判 data_drift，唯 B5附件 这一附件登记类 sheet 本身无建模 classification 行、非公式底稿）→ 判口径外，从 §7.1 门禁按钮分母显式剔除。可验证事实：B5附件 在运行时 override 表抽不到映射；若后续补了 B5附件 的 override 则本豁免失效（fact_mismatch）、要求重新归类为数据漂移。探针：backend/scripts/analyze/_fm_b5_probe.py（已用完删除）。",
+      "expires_at": "2027-10-17",
+      "verify_against": {
+        "wp_code": "B5附件",
+        "classification_status": "out_of_scope"
+      }
     }
   ]
 }

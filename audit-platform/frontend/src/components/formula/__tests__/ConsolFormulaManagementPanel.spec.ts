@@ -35,12 +35,13 @@ import {
 const REPORT_ROW = {
   id: 'bs-1', row_code: 'BS-002', row_name: '货币资金',
   formula: "TB('1001','期末余额')", formula_category: 'auto_calc', formula_description: '原说明',
+  formula_version: 3,
 }
 const NOTE_ROW = {
   id: 'n1', template_type: 'soe', section_id: '五-1-1', row_index: 0, col_index: 1,
   row_label: '库存现金', col_name: '期末余额', position: '第 1 行 · 期末余额（库存现金）',
   formula: "TB('1001','期末余额')", source: 'seed', source_label: '自动种子',
-  description: null, updated_at: null, updated_by: null,
+  description: null, updated_at: null, updated_by: null, version: 2,
 }
 function noteList() {
   return {
@@ -112,12 +113,27 @@ describe('合并报表公式', () => {
     state(wrapper).editDescription = '新说明'
     await state(wrapper).saveReportRow(state(wrapper).reportRows[0])
     expect(confirmDangerous).toHaveBeenCalledWith(expect.objectContaining({ title: '修改合并报表公式确认' }))
+    // 公式版本原样带回（后端 CAS：缺失 428、已被他人修改 409）
     expect(api.put).toHaveBeenCalledWith('/api/report-config/bs-1', {
       formula: "TB('1002','期末余额')", formula_category: 'logic_check', formula_description: '新说明',
-      project_id: 'p1', year: 2025, template_type: 'soe',
+      expected_version: 3, project_id: 'p1', year: 2025, template_type: 'soe',
     })
     expect(service.pushConsolidation).toHaveBeenCalledWith('p1', 2025, 'formula_changed')
     expect(state(wrapper).reportRows[0].formula).toBe("TB('1002','期末余额')")
+    wrapper.unmount()
+  })
+
+  it('保存后采用响应里的新版本号，连续第二次保存不会带旧版本撞 409', async () => {
+    const wrapper = create({ mode: 'report' })
+    await flushPromises()
+    api.put.mockResolvedValueOnce({ formula_version: 4 })
+    state(wrapper).startReportEdit(state(wrapper).reportRows[0])
+    state(wrapper).editFormula = "TB('1002','期末余额')"
+    await state(wrapper).saveReportRow(state(wrapper).reportRows[0])
+    state(wrapper).startReportEdit(state(wrapper).reportRows[0])
+    state(wrapper).editFormula = "TB('1003','期末余额')"
+    await state(wrapper).saveReportRow(state(wrapper).reportRows[0])
+    expect(api.put.mock.calls.map(([, body]) => body.expected_version)).toEqual([3, 4])
     wrapper.unmount()
   })
 
@@ -153,7 +169,7 @@ describe('合并附注公式', () => {
     state(wrapper).editDescription = '人工修订'
     await state(wrapper).saveNoteRow(state(wrapper).noteRows[0])
     expect(service.updateConsolNoteFormula).toHaveBeenCalledWith('n1', {
-      formula: "TB('1002','期末余额')", description: '人工修订',
+      formula: "TB('1002','期末余额')", description: '人工修订', expected_version: 2,
     })
     expect(state(wrapper).noteRows[0]).toMatchObject({ source: 'manual', source_label: '人工' })
     expect(service.pushConsolidation).toHaveBeenCalledWith('p1', 2025, 'formula_changed')
@@ -176,7 +192,7 @@ describe('合并附注公式', () => {
 
     service.pushConsolidation.mockClear()
     await state(wrapper).removeNoteRow(state(wrapper).noteRows[0])
-    expect(service.deleteConsolNoteFormula).toHaveBeenCalledWith('n1')
+    expect(service.deleteConsolNoteFormula).toHaveBeenCalledWith('n1', 2)
     expect(service.pushConsolidation).toHaveBeenCalledTimes(1)
     expect(confirmDangerous).toHaveBeenCalledWith(expect.objectContaining({ confirmText: '确认删除' }))
     wrapper.unmount()

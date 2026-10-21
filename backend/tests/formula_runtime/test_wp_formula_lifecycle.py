@@ -112,12 +112,29 @@ def _mock_session_for_ownership(
         elif call_count[0] == 2:
             # existing formula lookup (upsert)
             result.scalar_one_or_none = MagicMock(return_value=existing_formula)
+        elif existing_formula is not None and call_count[0] == 3:
+            # CAS `UPDATE ... RETURNING id`：模拟条件命中（版本匹配）→ 返回被更新行 id。
+            # 不返回 None，否则 service 会判 CAS 冲突（版本不符）而抛 FormulaVersionConflict。
+            result.scalar_one_or_none = MagicMock(return_value=existing_formula.id)
         else:
             result.scalar_one_or_none = MagicMock(return_value=None)
             result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
         return result
 
     session.execute = AsyncMock(side_effect=_execute_side_effect)
+
+    # 新 CAS 架构：version/lifecycle 由 DB 端 `definition_version+1` / `='saved'` 写入，
+    # service 用 db.refresh(existing) 读回。mock 下按真实语义同步 existing 属性，
+    # 使"更新后 version 递增 / lifecycle=saved / computed_at 不动"断言反映真实行为而非对象别名。
+    async def _refresh_side_effect(obj, *args, **kwargs):
+        if obj is existing_formula and existing_formula is not None:
+            cur = getattr(existing_formula, "definition_version", None)
+            if isinstance(cur, int):
+                existing_formula.definition_version = cur + 1
+            existing_formula.lifecycle_state = "saved"
+            # last_computed_at 不受 save 影响（P5）：保持原值，不改。
+
+    session.refresh = AsyncMock(side_effect=_refresh_side_effect)
     return session
 
 
@@ -143,7 +160,7 @@ class TestP5SaveDoesNotWriteComputedTime:
             wp_id=WP_ID_A,
             sheet_name="Sheet1",
             target_cell="B5",
-            expression="SUM(A1:A5)",
+            expression="TB('1001','期末余额')",
             year=2025,
         )
 
@@ -177,8 +194,9 @@ class TestP5SaveDoesNotWriteComputedTime:
             wp_id=WP_ID_A,
             sheet_name="Sheet1",
             target_cell="B5",
-            expression="SUM(A1:A10)",  # updated
+            expression="TB('1001','期末余额')+TB('1002','期末余额')",  # updated
             year=2025,
+            expected_version=2,  # 匹配 existing.definition_version（CAS 前置条件）
         )
 
         assert issues == []
@@ -209,8 +227,9 @@ class TestP5SaveDoesNotWriteComputedTime:
             wp_id=WP_ID_A,
             sheet_name="Sheet1",
             target_cell="B5",
-            expression="AVG(C1:C10)",
+            expression="SUM_TB('10','审定数')",
             year=2025,
+            expected_version=1,  # 匹配 existing.definition_version（CAS 前置条件）
         )
 
         assert issues == []
@@ -261,6 +280,7 @@ class TestP5SaveDoesNotWriteComputedTime:
             target_cell="B5",
             expression=expression,
             year=2025,
+            expected_version=3,  # 匹配 existing.definition_version（CAS 前置条件）
         )
         if not issues2:
             assert existing.last_computed_at == original_time
@@ -326,7 +346,7 @@ class TestDefinitionVersionAndHash:
             wp_id=WP_ID_A,
             sheet_name="Sheet1",
             target_cell="D1",
-            expression="SUM(X1:X10)",
+            expression="SUM_TB('1','审定数')",
             year=2025,
         )
 
@@ -358,8 +378,9 @@ class TestDefinitionVersionAndHash:
             wp_id=WP_ID_A,
             sheet_name="Sheet1",
             target_cell="B5",
-            expression="NEW_EXPR()",
+            expression="TB('1601','期末余额')",
             year=2025,
+            expected_version=5,  # 匹配 existing.definition_version（CAS 前置条件）
         )
 
         assert issues == []
@@ -387,8 +408,9 @@ class TestDefinitionVersionAndHash:
             wp_id=WP_ID_A,
             sheet_name="Sheet1",
             target_cell="B5",
-            expression="CHANGED()",
+            expression="WP('E1-1','审定数')",
             year=2025,
+            expected_version=1,  # existing 默认 definition_version=1（CAS 前置条件）
         )
 
         assert issues == []

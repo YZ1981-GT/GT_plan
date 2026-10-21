@@ -1,12 +1,10 @@
-"""导入事件 Outbox 重放 Worker
+"""耐久 Outbox 重放 Worker。
 
-需求 10.1/10.3/10.5：从 main.py lifespan 中拆出 `_outbox_replay_loop`。
-受 `settings.LEDGER_IMPORT_OUTBOX_REPLAY_ENABLED` 控制；未启用时直接返回。
+同一 lifespan worker 处理两类耐久事件：
+- import_event_outbox（受 LEDGER_IMPORT_OUTBOX_REPLAY_ENABLED 控制）；
+- formula_runtime_outbox（始终轮询，发布 formula_runtime.* SSE，业务 stale 已在主事务触发）。
 
-功能：
-  - 重放 import_event_outbox 中 pending/failed 的事件
-  - 定期清理 import_event_consumptions 中过期的记录
-  - 支持指数退避与抖动
+两类发布都使用独立 session；失败保留 pending/attempts，后续轮询重试。
 """
 
 from __future__ import annotations
@@ -24,9 +22,9 @@ logger = logging.getLogger("import_outbox")
 
 async def run(stop_event: asyncio.Event) -> None:
     """Outbox 重放主循环。"""
-    if not settings.LEDGER_IMPORT_OUTBOX_REPLAY_ENABLED:
-        logger.info("[OutboxReplay] disabled by settings, worker exits")
-        return
+    import_enabled = bool(settings.LEDGER_IMPORT_OUTBOX_REPLAY_ENABLED)
+    if not import_enabled:
+        logger.info("[OutboxReplay] import replay disabled; formula runtime replay remains active")
 
     base_interval = max(5, int(settings.LEDGER_IMPORT_OUTBOX_REPLAY_INTERVAL_SECONDS))
     max_backoff = max(base_interval, int(settings.LEDGER_IMPORT_OUTBOX_REPLAY_MAX_BACKOFF_SECONDS))
@@ -46,31 +44,48 @@ async def run(stop_event: asyncio.Event) -> None:
 
         try:
             from app.core.database import async_session
-            from app.services.import_event_consumption_service import ImportEventConsumptionService
-            from app.services.import_event_outbox_service import ImportEventOutboxService
+            from app.services.event_bus import event_bus
+            from app.services.formula_runtime.outbox import publish_pending_events
 
+            async def _publish_formula_runtime(event_type: str, payload: dict) -> None:
+                event_bus.broadcast_raw(f"formula_runtime.{event_type}", payload)
+
+            report = {"failed_count": 0, "moved_to_dlq_count": 0, "exhausted_total_count": 0}
+            cleanup_report = {"deleted_count": 0}
+            formula_delivered = 0
             async with async_session() as db:
-                replay_kwargs = {"limit": limit}
-                if max_attempts > 0:
-                    replay_kwargs["max_attempts"] = max_attempts
-                report = await ImportEventOutboxService.replay_pending(db, **replay_kwargs)
+                formula_delivered = await publish_pending_events(
+                    db,
+                    publisher=_publish_formula_runtime,
+                    batch_size=limit,
+                )
 
-                cleanup_report = {"deleted_count": 0}
-                if cleanup_enabled and (_time.monotonic() - last_cleanup_monotonic) >= cleanup_interval_seconds:
-                    cleanup_report = await ImportEventConsumptionService.cleanup_older_than_days(
-                        db,
-                        retention_days=cleanup_retention_days,
-                        batch_size=cleanup_batch_size,
-                    )
-                    last_cleanup_monotonic = _time.monotonic()
-                # F45 / Sprint 7.18: 刷新 DLQ 深度到 Prometheus gauge
-                try:
-                    from app.services.ledger_import.metrics import set_dlq_depth
-                    dlq_depth = await ImportEventOutboxService.dlq_depth(db)
-                    set_dlq_depth(dlq_depth)
-                except Exception:  # pragma: no cover - metrics 失败不阻断主循环
-                    logger.debug("[OutboxReplay] failed to update DLQ gauge", exc_info=True)
+                if import_enabled:
+                    from app.services.import_event_consumption_service import ImportEventConsumptionService
+                    from app.services.import_event_outbox_service import ImportEventOutboxService
+
+                    replay_kwargs = {"limit": limit}
+                    if max_attempts > 0:
+                        replay_kwargs["max_attempts"] = max_attempts
+                    report = await ImportEventOutboxService.replay_pending(db, **replay_kwargs)
+
+                    if cleanup_enabled and (_time.monotonic() - last_cleanup_monotonic) >= cleanup_interval_seconds:
+                        cleanup_report = await ImportEventConsumptionService.cleanup_older_than_days(
+                            db,
+                            retention_days=cleanup_retention_days,
+                            batch_size=cleanup_batch_size,
+                        )
+                        last_cleanup_monotonic = _time.monotonic()
+                    try:
+                        from app.services.ledger_import.metrics import set_dlq_depth
+                        dlq_depth = await ImportEventOutboxService.dlq_depth(db)
+                        set_dlq_depth(dlq_depth)
+                    except Exception:  # pragma: no cover - metrics 失败不阻断主循环
+                        logger.debug("[OutboxReplay] failed to update DLQ gauge", exc_info=True)
                 await db.commit()
+
+            if formula_delivered:
+                logger.info("[OutboxReplay] delivered %s formula runtime event(s)", formula_delivered)
 
             if report.get("failed_count"):
                 logger.warning(

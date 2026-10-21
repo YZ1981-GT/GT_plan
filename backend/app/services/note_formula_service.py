@@ -12,17 +12,14 @@
   且 ``table_data`` 已按约定存 ``_formulas`` / ``_check_presets`` / ``_cell_meta``
   等下划线前缀内部键，追加 ``_user_formulas`` 与现有惯例一致，**无需迁移**。
 
-职责：
-- ``list_by_section``：已保存用户公式集（``_user_formulas``）优先；否则回退
-  generator 预览（``_formulas`` 若已存则直接归一化，否则用
-  ``generate_formulas_for_table`` 从 ``_check_presets`` + 表结构现算）。
-- ``save_many``：把用户编辑集整体 upsert 到 ``_user_formulas``（覆盖式写入，
-  即"这套就是最新集"），只 ``flush`` 不 ``commit``（router 统一 commit）。
+职责（formula-global-settings-sync 起，见 ``formula_settings.note_settings``）：
+- ``list_with_versions`` / ``list_by_section``：有效公式集 = 本项目适配 > 全局 > 该表模板公式
+  （generator 预览：``_formulas`` 若已存则直接归一化，否则从 ``_check_presets`` + 表结构现算）。
+- ``save_many``：按载入版本令牌求差量写本项目适配（``formula_setting``），再把有效集合物化到
+  ``_user_formulas``（执行器按目标单元格「用户集优先」合并，不改）；只 ``flush`` 不 ``commit``。
 
 工程铁律（遵循 memory）：
 - service 只 ``flush`` 不 ``commit``（跨 service 编排由 router 统一 commit）。
-- JSONB 原地修改后必须 ``flag_modified`` 让 SQLAlchemy 感知（与
-  note_formula_generator / note_wp_mapping_service 一致）。
 - 全 async（AsyncSession + select/execute async 风格）。
 """
 
@@ -33,7 +30,6 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.report_models import DisclosureNote
 
@@ -111,6 +107,25 @@ def _preview_from_formulas_dict(formulas: dict) -> list[dict]:
     return out
 
 
+def preview_records(td: dict | None, note_section: str) -> list[dict]:
+    """该附注表自带的模板公式（generator 预览）：已有 ``_formulas`` 直接归一化，否则按
+    ``_check_presets`` + 表结构现算；现算失败返回空（不阻断弹窗）。"""
+    if not isinstance(td, dict) or not td:
+        return []
+    existing = td.get("_formulas")
+    if isinstance(existing, dict) and existing:
+        return _preview_from_formulas_dict(existing)
+    from app.services.note_formula_generator import generate_formulas_for_table
+
+    table_template = {"headers": td.get("headers", []), "rows": td.get("rows", [])}
+    try:
+        generated = generate_formulas_for_table(table_template, td.get("_check_presets") or [])
+    except Exception as e:  # generator 现算失败不阻断弹窗
+        logger.warning("[NOTE_FORMULA] preview generate 失败 section=%s: %s", note_section, e)
+        return []
+    return _preview_from_formulas_dict(generated)
+
+
 class NoteFormulaService:
     """附注公式列表/持久化（list_by_section / save_many）。"""
 
@@ -127,48 +142,23 @@ class NoteFormulaService:
         )
         return result.scalar_one_or_none()
 
+    async def list_with_versions(
+        self, db: AsyncSession, project_id: UUID | str, year: int, note_section: str
+    ) -> dict:
+        """某附注章节的有效公式集 + 载入版本令牌（formula-global-settings-sync）。
+
+        有效集 = 本项目适配 > 全局 > 该表模板公式（generator 预览）；每条带层级标签。
+        ``loaded`` 原样回传给保存接口（缺 428、过期 409）。
+        """
+        from app.services.formula_settings.note_settings import list_section
+
+        return await list_section(db, _uuid(project_id), year, note_section)
+
     async def list_by_section(
         self, db: AsyncSession, project_id: UUID | str, year: int, note_section: str
     ) -> list[dict]:
-        """列出某附注章节的当前公式集。
-
-        优先级：
-        1. 已保存用户编辑集 ``table_data._user_formulas``（非空则直接返回）。
-        2. generator 预览：``table_data._formulas`` 若已存则归一化返回；
-           否则用 ``generate_formulas_for_table`` 从 ``_check_presets`` + 表结构现算。
-
-        note 不存在 / 无 table_data → 返回空列表（前端弹窗不阻断）。
-        """
-        note = await self._load_note(db, project_id, year, note_section)
-        if note is None or not note.table_data:
-            return []
-
-        td = note.table_data
-
-        # 1. 已保存用户编辑集优先
-        saved = td.get(_USER_FORMULAS_KEY)
-        if isinstance(saved, list) and saved:
-            normalized = [_normalize_record(r) for r in saved]
-            return [r for r in normalized if r is not None]
-
-        # 2. generator 预览：已有 _formulas 直接用
-        existing = td.get("_formulas")
-        if isinstance(existing, dict) and existing:
-            return _preview_from_formulas_dict(existing)
-
-        # 3. 从 check_presets + 表结构现算预览
-        from app.services.note_formula_generator import generate_formulas_for_table
-
-        check_presets = td.get("_check_presets") or []
-        table_template = {"headers": td.get("headers", []), "rows": td.get("rows", [])}
-        try:
-            generated = generate_formulas_for_table(table_template, check_presets)
-        except Exception as e:  # generator 现算失败不阻断弹窗
-            logger.warning(
-                "[NOTE_FORMULA] preview generate 失败 section=%s: %s", note_section, e
-            )
-            return []
-        return _preview_from_formulas_dict(generated)
+        """列出某附注章节的当前公式集（同 ``list_with_versions`` 的 ``formulas``）。"""
+        return (await self.list_with_versions(db, project_id, year, note_section))["formulas"]
 
     async def save_many(
         self,
@@ -177,38 +167,36 @@ class NoteFormulaService:
         year: int,
         note_section: str,
         formulas: list[dict],
+        *,
+        loaded: dict | None = None,
+        user_id: UUID | None = None,
     ) -> list[dict]:
-        """upsert 用户编辑公式集到 ``table_data._user_formulas``（覆盖式）。
+        """保存附注章节的公式集（前端提交完整编辑集，"这套就是最新集"语义）。
 
-        入参 ``formulas`` 为前端提交的完整编辑集（"这套就是最新集"语义），
-        整体替换 ``_user_formulas``。空行（无 formula 表达式）被过滤。
-
+        formula-global-settings-sync：按载入时的版本令牌求差量写本项目适配（``formula_setting``），
+        再把有效集合物化到 ``table_data._user_formulas``（执行器不改）；与该表模板公式相同的不算适配。
         只 ``flush`` 不 ``commit``（router 统一 commit）。
 
         Returns:
-            持久化后的归一化公式列表。
+            保存后的有效公式列表。
 
         Raises:
-            ValueError: 附注章节不存在（router 转 404/400）。
+            ValueError: 附注章节不存在（router 转 404）。
+            FormulaSettingError: 缺版本令牌 428 / 已被他人修改 409。
         """
-        note = await self._load_note(db, project_id, year, note_section)
-        if note is None:
-            raise ValueError(f"附注章节不存在: {note_section}")
+        from app.services.formula_settings.note_settings import save_section
 
-        normalized = [_normalize_record(r) for r in (formulas or [])]
-        clean = [r for r in normalized if r is not None]
-
-        td = dict(note.table_data) if isinstance(note.table_data, dict) else {}
-        td[_USER_FORMULAS_KEY] = clean
-        note.table_data = td
-        flag_modified(note, "table_data")
-        await db.flush()
-
+        result = await save_section(db, _uuid(project_id), year, note_section, formulas or [],
+                                    loaded=loaded, user_id=user_id)
         logger.info(
             "[NOTE_FORMULA] save_many project=%s section=%s count=%d",
-            project_id, note_section, len(clean),
+            project_id, note_section, len(result["formulas"]),
         )
-        return clean
+        return result["formulas"]
+
+
+def _uuid(value: UUID | str) -> UUID:
+    return value if isinstance(value, UUID) else UUID(str(value))
 
 
 # 模块级单例（与 wp_formula_service / address_registry 等一致的使用风格）

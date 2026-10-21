@@ -113,6 +113,8 @@ async def one_click_draft_refresh(
             operator=_user,
             scopes=body.scopes,
             confirm_overwrite=body.confirm_overwrite,
+            transaction_mode=body.transaction_mode,
+            idempotency_key=body.idempotency_key,
         )
     except Exception as exc:
         # all-or-nothing 失败由 router rollback（Req 9）
@@ -135,9 +137,16 @@ async def one_click_draft_refresh(
         else {}
     )
 
+    raw_status = result_dict.get("status", "success")
+    response_status = "success" if raw_status == "no_effect" else raw_status
+    raw_failures = result_dict.get("failures", [])
+    failures = [
+        item if isinstance(item, str) else str(item.get("error") or item)
+        for item in raw_failures
+    ]
     return DraftRefreshResponse(
-        status=result_dict.get("status", "success"),
-        run_id=result_dict.get("run_id", body.project_id),
+        status=response_status,
+        run_id=result_dict.get("run_id") or result_dict.get("refresh_id"),
         transaction_mode=body.transaction_mode,
         affected_count=result_dict.get("affected_count", 0),
         applied_count=result_dict.get("applied_count", 0),
@@ -147,7 +156,7 @@ async def one_click_draft_refresh(
         idempotent=result_dict.get("idempotent", False),
         rollback_available=result_dict.get("rollback_available", True),
         warnings=result_dict.get("warnings", []),
-        failures=result_dict.get("failures", []),
+        failures=failures,
         preset_application=PresetApplication(
             preset_count=preset_dict.get("preset_count", 0),
             presetted_pages=preset_dict.get("presetted_pages", []),
@@ -174,7 +183,17 @@ async def rollback_draft_refresh(
     service = DraftRefreshService()
 
     try:
-        rollback_result = await service.rollback(db, run_id=run_id)
+        from app.services.formula_runtime.coordinator import FormulaRuntimeCoordinator
+
+        adapters = FormulaRuntimeCoordinator(db).build_adapter_map({
+            "workpaper", "adjudication", "report", "note", "consol_worksheet",
+        })
+        rollback_result = await service.rollback_refresh(
+            db,
+            run_id=run_id,
+            adapters=adapters,
+            operator=_user,
+        )
     except Exception as exc:
         await db.rollback()
         logger.exception("Rollback failed for run_id %s", run_id)
@@ -186,23 +205,35 @@ async def rollback_draft_refresh(
             error=str(exc),
         )
 
-    await db.commit()
-
-    # 构造 rollback 响应
-    if hasattr(rollback_result, "to_dict"):
-        rd = rollback_result.to_dict()
-        return RollbackResponse(
-            status="rolled_back",
-            run_id=run_id,
-            restored_count=rd.get("restored_count", 0),
-            conflicts=rd.get("conflicts", []),
-            error=None,
+    if rollback_result.status == "conflict":
+        # restore_many 可能在发现后续冲突前已触达前序目标；service savepoint 已回滚，
+        # router 还必须回滚外层事务，绝不能把冲突当成功 commit。
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "回滚目标已被后续编辑，未恢复任何数据",
+                "run_id": str(run_id),
+                "conflicts": rollback_result.conflicts,
+            },
         )
 
+    if rollback_result.status == "failed":
+        await db.rollback()
+        error = (rollback_result.failures[0].get("error") if rollback_result.failures else "rollback_failed")
+        return RollbackResponse(
+            status="failed",
+            run_id=run_id,
+            restored_count=0,
+            conflicts=[],
+            error=str(error),
+        )
+
+    await db.commit()
     return RollbackResponse(
         status="rolled_back",
         run_id=run_id,
-        restored_count=getattr(rollback_result, "restored_count", 0),
-        conflicts=getattr(rollback_result, "conflicts", []),
+        restored_count=rollback_result.restored_count,
+        conflicts=[],
         error=None,
     )

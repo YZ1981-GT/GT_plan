@@ -523,6 +523,21 @@ async def execute_report_cross_checks(
     result = await run_cross_checks(
         row_cache, db=db, project_id=str(project_id), resolve_refs=True
     )
+    # spec formula-global-settings-sync R10.2：用户表间审核规则（全局 + 本项目）与内置勾稽
+    # 同一次执行、同一 run 落库（此前用户规则只存不执行）。SAVEPOINT 隔离：失败不污染外层事务。
+    try:
+        import uuid as _uuid
+
+        from app.services.formula_settings.cross_check_rules import run_user_rules
+
+        async with db.begin_nested():
+            user_outcomes, user_issues = await run_user_rules(
+                db, project_id=_uuid.UUID(str(project_id)), year=year
+            )
+        result.outcomes.extend(user_outcomes)
+        result.issues.extend(user_issues)
+    except Exception as exc:  # noqa: BLE001 - 用户规则失败不阻断内置勾稽
+        logger.warning("用户表间审核规则执行失败（project=%s year=%s）：%s", project_id, year, exc)
     if persist:
         await persist_cross_check_results(
             db, project_id=project_id, year=year, result=result

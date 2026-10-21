@@ -187,6 +187,8 @@ class TestComputeFingerprint:
         assert svc.compute_fingerprint(**{**base_kwargs, "four_table_dataset_revision": "rev2"}) != base
         # Change formula_definition_revision
         assert svc.compute_fingerprint(**{**base_kwargs, "formula_definition_revision": "def2"}) != base
+        # 覆盖策略必须进入幂等身份，未确认跳过不能吞掉随后确认覆盖。
+        assert svc.compute_fingerprint(**{**base_kwargs, "confirm_overwrite": True}) != base
 
     def test_scopes_order_insensitive(self):
         """Scope order should not affect fingerprint (normalized sort)."""

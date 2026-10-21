@@ -421,13 +421,19 @@ class TestEndpoints:
             assert note.data["rows"][5][1] == "343.00" and note.data["manual_cells"] == [{"row": 0, "col": 1}]
 
             # 改 / 删
-            fid = formulas[0]["id"]
+            fid, ver = formulas[0]["id"], formulas[0]["version"]
             edited = (await c.put(f"{_NF}/{fid}", json={"formula": " TB('1001', '期末余额') "})).json()
             assert (edited["formula"], edited["source"]) == ("TB('1001','期末余额')", "seed"), "只差空白 ⇒ 不算改，仍是种子"
-            edited = (await c.put(f"{_NF}/{fid}", json={"formula": "TB('1001','期末余额') + TB('1002','期末余额')"})).json()
-            assert edited["source"] == "manual", "改公式 ⇒ 人工"
-            assert (await c.delete(f"{_NF}/{fid}")).status_code == 200
-            assert (await c.delete(f"{_NF}/{fid}")).status_code == 404
+            assert edited["version"] == ver, "没有改动 ⇒ 版本不变"
+            # formula-global-settings-sync：修改 / 删除经全局发布，须带版本号（缺 428、过期 409）
+            changed = {"formula": "TB('1001','期末余额') + TB('1002','期末余额')"}
+            assert (await c.put(f"{_NF}/{fid}", json=changed)).status_code == 428
+            assert (await c.put(f"{_NF}/{fid}", json={**changed, "expected_version": ver + 5})).status_code == 409
+            edited = (await c.put(f"{_NF}/{fid}", json={**changed, "expected_version": ver})).json()
+            assert edited["source"] == "manual" and edited["version"] == ver + 1, "改公式 ⇒ 人工，版本 +1"
+            assert (await c.delete(f"{_NF}/{fid}")).status_code == 428
+            assert (await c.delete(f"{_NF}/{fid}", params={"expected_version": ver + 1})).status_code == 200
+            assert (await c.delete(f"{_NF}/{fid}", params={"expected_version": ver + 2})).status_code == 404
             reseed = (await c.post(f"{_NF}/seed", params={"template_type": "soe"})).json()
             assert reseed["suppressed"] == 1 and reseed["kept_manual"] == 0, "人工删的不补回（改过的已删）"
 

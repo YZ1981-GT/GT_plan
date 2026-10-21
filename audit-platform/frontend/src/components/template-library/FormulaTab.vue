@@ -489,7 +489,7 @@ const presetDialogVisible = ref(false)
 const presetDialogRef = ref<InstanceType<typeof GtFormulaPresetDialog> | null>(null)
 const { saveCustomPreset } = useFormulaImportExport()
 
-/** 弹窗内保存自定义公式 → 持久化到平台级 formula_custom_presets.json（隔离于 seed）。 */
+/** 弹窗内保存自定义公式 → 存数据库（管理员直接生效；其他人提交全局候选，审核后生效）。 */
 async function onSaveCustomPreset(payload: {
   page_key: string
   formula_type: 'auto_calc' | 'logic_check' | 'reasonability'

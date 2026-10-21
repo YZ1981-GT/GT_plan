@@ -289,3 +289,9 @@ class ConsolNoteMappingBinding(Base):
         ),
         Index("idx_cnmb_rule", "rule_id"),
     )
+
+
+# ``ConsolNoteMappingRule.promoted_to_template_id`` 外键指向 V200 的规则模板表；只加载本模块时
+# （测试按需导入、``Base.metadata.create_all``）目标表必须同时登记在同一 MetaData，否则
+# NoReferencedTableError。模板模块只依赖 Base、按表名引用本模块的表，无导入环。
+from app.models import consol_note_mapping_template_models as _rule_template_models  # noqa: E402,F401

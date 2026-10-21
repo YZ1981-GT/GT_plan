@@ -133,8 +133,25 @@ describe('弹窗附注节点调 list_note_formulas（Task 4.1 / ADR-FMC-04）', 
     addressState.tbAddresses = []
   })
 
-  it('点选附注章节节点 → 调 list_note_formulas（精确 pid/year/section）', async () => {
+  it('带页面章节打开：打开链路即按精确章节取用户集，附注树只取一次且在打开内落定', async () => {
+    // 打开链路会从 watch 与 applyNoteScopeTarget 两处同时加载附注树。没有单飞合并时第二路
+    // 并发动态 import 会绕过 vi.mock 去打真实接口，打开链路要等一次真实网络往返才走完——
+    // 这里固定 3 次 flush 后章节、选中节点都还停在初始值（本例即打红）。
     const w = await open()
+    const noteFormulaCalls = get.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/disclosure-notes/project-1/2025/') && u.endsWith('/formulas'))
+    expect(noteFormulaCalls).toHaveLength(1)
+    expect(noteFormulaCalls[0]).toContain(SECTION)
+    expect(getNoteTree).toHaveBeenCalledTimes(1)
+    expect(state(w).noteUserFormulasSection).toBe(SECTION)
+    expect(state(w).selectedNodeKey).toBe('note_五_1')
+    w.unmount()
+  })
+
+  it('点选附注章节节点 → 调 list_note_formulas（精确 pid/year/section）', async () => {
+    // 不带页面章节打开：打开链路不预取任何章节的用户集，下面的请求只可能来自点选。
+    const w = await open({ noteSection: '', noteSectionTitle: '' })
     get.mockClear()
     // 用户点选具体附注章节节点（onTreeNodeClick 是主交互路径）。
     state(w).onTreeNodeClick({ key: 'note_五_1', _sectionId: SECTION, _sectionTitle: SECTION_TITLE, label: SECTION_TITLE })

@@ -44,6 +44,9 @@ class SuccessAdapter:
 
     domain = "workpaper"
 
+    def __init__(self):
+        self.restored_inputs: list[FormulaMutation] = []
+
     async def prepare_many(self, targets, values):
         return []
 
@@ -51,6 +54,7 @@ class SuccessAdapter:
         return []
 
     async def restore_many(self, snapshots: list[FormulaMutation]) -> list[RestoredMutation]:
+        self.restored_inputs.extend(snapshots)
         return [
             RestoredMutation(target=s.target, restored_version="v1", conflict=False)
             for s in snapshots
@@ -167,6 +171,9 @@ class TestRollbackRestoresValues:
 
         assert result.status == "rolled_back"
         assert result.applied_count == 2
+        assert [(item.before_value, item.after_value) for item in adapter.restored_inputs] == [
+            (100, 200), (50, 75),
+        ]
 
     @pytest.mark.asyncio
     async def test_rollback_reverse_order(self):
@@ -279,12 +286,10 @@ class TestRollbackVersionConflict:
             adapters={"workpaper": adapter},
         )
 
-        # Should return dict with 409
-        assert isinstance(result, dict)
-        assert result["status"] == 409
-        assert result["error"] == "version_conflict"
-        assert len(result["conflicts"]) == 1
-        assert "expected v2, found v3" in result["conflicts"][0]["conflict_detail"]
+        assert result.status == "conflict"
+        assert result.restored_count == 0
+        assert len(result.conflicts) == 1
+        assert "expected v2, found v3" in result.conflicts[0]["conflict_detail"]
 
 
 class TestRollbackAuditStatus:

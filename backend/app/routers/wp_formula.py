@@ -31,6 +31,10 @@ from app.services.d_cycle_extraction.presets import (
 from app.services.formula_management.sheet_identity_filter import (
     filter_items_by_sheet_uid,
 )
+from app.services.formula_management.function_support_matrix import (
+    Executor,
+    support_issues,
+)
 from app.services.wp_formula_eval_service import (
     evaluate_wp_formula_expression,
     find_unsupported_formula_functions,
@@ -38,6 +42,7 @@ from app.services.wp_formula_eval_service import (
 from app.routers.wp_surfaced_formulas import CYCLE_SHEET_FORMULAS as _CYCLE_SHEET_FORMULAS
 from app.services.wp_formula_service import (
     FormulaVersionConflict,
+    FormulaVersionRequired,
     wp_formula_service,
 )
 from app.services.wp_parsed_data_service import (
@@ -306,11 +311,10 @@ class FormulaSaveRequest(BaseModel):
         None,
         description="行 kind（wp/surfaced/extraction/report）；本端点仅接受 wp 或省略",
     )
-    # Task 5.4 / design §5 步骤 5：CAS 乐观锁版本号。给定时与库中既有行的
-    # definition_version 比对，不一致 → 409（并发冲突）；省略 = 不做 CAS（向后兼容）。
+    # 数据库原子 CAS：更新既有行时必填；新建行可省略。缺失 → 428，不一致 → 409。
     expected_version: int | None = Field(
         None,
-        description="CAS 乐观锁版本（既有行的 definition_version）；不一致返 409",
+        description="更新既有公式时必填的 definition_version；缺失返 428，不一致返 409",
     )
 
 
@@ -880,18 +884,23 @@ async def save_formula(
     _reject_non_wp_kind(body)
 
     # 不受支持函数硬阻断（写库前，仅作用于本编辑公式保存路径 = Tier A 入口）。
-    unsupported = find_unsupported_formula_functions(body.expression)
+    matrix_issues = support_issues(body.expression, Executor.WP_EVALUATOR)
+    unsupported = list(dict.fromkeys(
+        [issue["function"] for issue in matrix_issues]
+        + find_unsupported_formula_functions(body.expression)
+    ))
     if unsupported:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
                 "error_code": "FORMULA_UNSUPPORTED_FUNCTION",
+                "executor": Executor.WP_EVALUATOR.value,
                 "unsupported_functions": unsupported,
+                "issues": matrix_issues,
                 "message": (
-                    "公式含不受支持的函数 "
+                    "公式含当前工作底稿执行器不支持的函数 "
                     + "/".join(unsupported)
-                    + "；可编辑公式仅支持 TB/SUM_TB/WP。AUX/PREV/序时账 等复杂"
-                    "归集由四表库自动预填（Tier B）承担。"
+                    + "；当前只支持 TB/SUM_TB/WP，其他函数须由具备相应上下文的执行器处理。"
                 ),
             },
         )
@@ -932,8 +941,17 @@ async def save_formula(
             binding=body.binding,
             expected_version=body.expected_version,
         )
+    except FormulaVersionRequired as required:
+        raise HTTPException(
+            status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+            detail={
+                "error_code": "FORMULA_VERSION_REQUIRED",
+                "actual_version": required.actual,
+                "target_cell": required.target_cell,
+                "message": "公式已存在，更新前必须刷新并携带 definition_version。",
+            },
+        ) from required
     except FormulaVersionConflict as conflict:
-        # ── CAS 冲突（Task 5.4 / design §5 步骤 5）：409，不覆盖 ──
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -1231,6 +1249,25 @@ async def save_formulas_batch(
                     kind=item.kind,
                 )
             )
+            matrix_issues = support_issues(item.expression, Executor.WP_EVALUATOR)
+            unsupported = list(dict.fromkeys(
+                [issue["function"] for issue in matrix_issues]
+                + find_unsupported_formula_functions(item.expression)
+            ))
+            if unsupported:
+                await db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "error_code": "FORMULA_UNSUPPORTED_FUNCTION",
+                        "executor": Executor.WP_EVALUATOR.value,
+                        "failed_index": idx,
+                        "target_cell": item.target_cell,
+                        "unsupported_functions": unsupported,
+                        "issues": matrix_issues,
+                        "message": "批量公式含当前工作底稿执行器不支持的函数，整批已回滚",
+                    },
+                )
 
             # 批前取既有行表达式/动作（供审计 old_formula）。
             _existing = (
@@ -1293,6 +1330,18 @@ async def save_formulas_batch(
                 new_formula=item.expression,
             )
             saved_rows.append(_formula_to_dict(saved))
+    except FormulaVersionRequired as required:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+            detail={
+                "error_code": "FORMULA_VERSION_REQUIRED",
+                "failed_index": idx,
+                "actual_version": required.actual,
+                "target_cell": required.target_cell,
+                "message": "批内已有公式缺少 expected_version，整批已回滚。",
+            },
+        ) from required
     except FormulaVersionConflict as conflict:
         # 3) CAS 冲突 → 整批 rollback、409（不覆盖）
         await db.rollback()

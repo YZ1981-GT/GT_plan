@@ -178,6 +178,8 @@ interface ReportFormulaRow {
   formula: string | null
   formula_category: string | null
   formula_description: string | null
+  /** 公式版本：修改须原样带回（spec formula-global-settings-sync，缺失 428、已被他人修改 409） */
+  formula_version?: number
 }
 
 const props = withDefaults(defineProps<{
@@ -313,10 +315,11 @@ async function saveReportRow(row: ReportFormulaRow) {
   } catch { return }
   saving.value = true
   try {
-    await api.put(P_rc.detail(row.id), {
+    const saved = await api.put<Partial<ReportFormulaRow>>(P_rc.detail(row.id), {
       formula: editFormula.value || null,
       formula_category: editCategory.value,
       formula_description: editDescription.value || null,
+      expected_version: row.formula_version ?? 1,
       project_id: props.projectId,
       year: props.year,
       template_type: templateType.value,
@@ -324,6 +327,7 @@ async function saveReportRow(row: ReportFormulaRow) {
     row.formula = editFormula.value || null
     row.formula_category = editCategory.value
     row.formula_description = editDescription.value || null
+    if (saved?.formula_version != null) row.formula_version = saved.formula_version
     cancelEdit()
     await pushAfterChange()
   } catch (err) {
@@ -341,6 +345,7 @@ async function saveNoteRow(row: ConsolNoteFormula) {
     const updated = await updateConsolNoteFormula(row.id, {
       formula: editFormula.value,
       description: editDescription.value || null,
+      expected_version: row.version ?? 1,
     })
     const section = formulaSections.value.find((item) => item.section_id === row.section_id)
     if (section) {
@@ -403,7 +408,7 @@ async function removeNoteRow(row: ConsolNoteFormula) {
   } catch { return }
   saving.value = true
   try {
-    await deleteConsolNoteFormula(row.id)
+    await deleteConsolNoteFormula(row.id, row.version ?? 1)
     await load()
     await pushAfterChange()
   } catch (err) {

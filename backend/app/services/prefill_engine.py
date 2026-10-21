@@ -629,6 +629,10 @@ async def prefill_workpaper_real(
                             "cell_obj": cell,
                         })
 
+    # formula-global-settings-sync：有效公式（本项目 > 全局 > 预设）覆盖 / 补充模板内置公式
+    from app.services.formula_settings.wp_effective import overlay_prefill_formulas
+    formulas_found, overlay_notes = await overlay_prefill_formulas(db, project_id, wp, wb, formulas_found, _FORMULA_RE)
+
     if not formulas_found:
         wb.close()
         return {
@@ -654,7 +658,7 @@ async def prefill_workpaper_real(
         _logger.warning("prefill_real: univer_snapshot 不存在 wp=%s，预填充将跳过值写入", wp_id)
 
     filled = 0
-    errors = []
+    errors = list(overlay_notes)
 
     for f in formulas_found:
         args = _parse_args(f["raw_args"])

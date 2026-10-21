@@ -37,6 +37,15 @@ describe('mergeNoteUserFormulaRows — 附注用户公式合并', () => {
     expect(userRow!.formula_source).toBe('user')
   })
 
+  it('层级标签随用户公式带到弹窗行（formula-global-settings-sync R1.4）', () => {
+    const merged = mergeNoteUserFormulaRows([], [
+      { target: '2:0', formula: 'X()', layer: 'project', layer_label: '本项目', pending: true },
+      { target: '2:1', formula: 'Y()' },
+    ])
+    expect(merged[0]).toMatchObject({ _layer: 'project', _layer_label: '本项目', _pending: true })
+    expect(merged[1]).toMatchObject({ _layer: undefined, _pending: false })
+  })
+
   it('同 target 多条 → 用户集优先（保留后者，覆盖前者）', () => {
     const user: NoteUserFormula[] = [
       { target: '2:0', formula: 'OLD()', description: '旧', source: 'user' },

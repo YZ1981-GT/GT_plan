@@ -13,7 +13,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,11 +38,8 @@ router = APIRouter(prefix="/api/formula-audit-log", tags=["formula-audit-log"])
 # 权限分档依据（对齐既有基准，不自造）：
 #   · 读 → `require_project_access("readonly")`（与 `disclosure_notes` 全部只读端点同级）
 #   · 写审计链 → `require_project_access("edit")`（写的是该项目的留痕）
-#   · 回滚全局公式 → `require_role([...])`：改的是**跨项目的全局配置**，
-#     项目级权限保护不了全局资源。对齐 `report_config.populate-formulas`
-#     （改全局公式，用 `require_role(["admin"])`）与平台「全局一键刷新 = 合伙人专属」
-#     的既有裁定，这里放到 admin / partner / manager 三档以保证日常可用。
-#     🔴 这是**权限收紧**：此前任何人（含未登录）可调，现需上述角色之一。
+#   · 回滚 → `require_role([...])` + 本项目 review 级成员：2026-10-20 起回滚只写**本项目适配**
+#     （formula-global-settings-sync R9.3），不再改全局行；角色门控保留（与前端按钮逐值对齐）。
 
 
 class LogEntry(BaseModel):
@@ -60,7 +57,8 @@ class RollbackRequest(BaseModel):
     row_code: str
     module: str = 'report'
     target_formula: str  # 要回滚到的公式（old_formula）
-    source_log_id: str = ''  # 来源日志 ID（留痕用）
+    source_log_id: str = ''  # 来源历史条目 ID（据此定位公式位）
+    expected_version: int | None = None  # 本项目适配的修订号（可选 CAS）
 
 
 @router.get("/{project_id}/{year}")
@@ -132,6 +130,9 @@ async def get_audit_log(
             "new_formula": _parse_payload(r[1]).get("new_formula", ""),
             "result_value": _safe_float(_parse_payload(r[1]).get("result_value")),
             "trace": _parse_payload(r[1]).get("trace"),
+            # formula-global-settings-sync：本项目适配 / 同步全局 / 恢复 / 处理待确认 / 订阅模板 …（旧记录无）
+            "operation": _parse_payload(r[1]).get("operation"),
+            "source": _parse_payload(r[1]).get("source"),
             "created_at": str(r[2]) if r[2] else None,
         }
         for r in rows
@@ -226,74 +227,38 @@ async def rollback_formula(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(["admin", "partner", "manager"])),
 ):
-    """一键回滚公式：将指定行次的公式写回 old_formula。
+    """一键回滚：把这条历史对应的公式位在**本项目**写回 ``target_formula``（spec formula-global-settings-sync R9.3）。
 
-    复用时光机思路：
-    1. 查 report_config 找到对应行
-    2. 将 formula 写回 target_formula（old_formula）
-    3. 记录一条 rollback 审计日志（统一走哈希链 formula.changed，不再写旧 formula_audit_log 表）
+    按历史条目（``source_log_id``）定位公式位，经本项目适配写入（带版本、留痕、触发重算）；
+    定位不到返回 404，不再按行次 ``LIMIT 1`` 改任意一个准则的全局行，也不再吞异常返回成功。
 
-    🔴 权限 = `require_role(["admin", "partner", "manager"])` 而非项目级权限：
-    本端点 `UPDATE` 的 `report_config` 是**全局**表（无 `project_id` 列，见下方 SQL 注释），
-    一次回滚影响**全平台所有项目**的该行公式 —— 项目级权限保护不了全局资源。
-    对齐 `report_config.populate-formulas`（同样改全局公式，用 `require_role(["admin"])`）。
-    路径里的 `project_id` 仅用于审计留痕归属，不构成隔离。
+    权限：签名保留 ``require_role``（与前端按钮门控逐值对齐，守卫 ``formulaHistoryRollbackGate.spec.ts``），
+    函数体再校验本项目成员（review 级：回滚是复核纠错动作，与签名角色同属复核人员）。
     """
-    from app.services.audit_log_helper import append_audit_log
+    from app.deps import assert_project_permission
+    from app.services.formula_settings.errors import FormulaSettingError
+    from app.services.formula_settings.propagation import publish_events
+    from app.services.formula_settings.rollback import rollback_from_log
 
-    # 1. 查找 report_config 中对应行并更新公式
-    current_formula = None
-    row_id = None
-    try:
-        result = await db.execute(text("""
-            -- report_config 是**全局**报表行模板表（报表科目映射真源），
-            -- 无 project_id 列 —— 按 row_code 定位即可，不做项目维度过滤。
-            SELECT id, formula FROM report_config
-            WHERE row_code = :rc AND is_deleted = false
-            LIMIT 1
-        """), {"rc": body.row_code})
-        row = result.fetchone()
-        if row:
-            row_id = row[0]
-            current_formula = row[1]
-            await db.execute(text("""
-                UPDATE report_config SET formula = :f WHERE id = :id
-            """), {"f": body.target_formula, "id": str(row_id)})
-    except Exception:
-        # report_config 表可能不存在或结构不同，静默处理
-        pass
-
-    # 2. 记录回滚审计日志 — 统一走哈希链 audit_log_entries（action='formula.changed'）
     try:
         pid = uuid.UUID(project_id)
     except (ValueError, AttributeError):
-        pid = None
-
-    await append_audit_log(db, {
-        # 🔴 与 add_audit_log 同修：回滚全局公式必须记下真实操作人
-        "user_id": current_user.id,
-        "project_id": pid,
-        "action": "formula.changed",
-        "resource_type": "report_config",
-        "resource_id": body.row_code,
-        "details": {
-            "event_type": "formula_changed",
-            "module": body.module,
-            "row_code": body.row_code,
-            "action": "rollback",
-            "old_formula": current_formula or '',
-            "new_formula": body.target_formula,
-            "result_value": None,
-            "source_log_id": body.source_log_id,
-        },
-    })
-
+        raise HTTPException(status_code=400, detail="project_id 格式无效") from None
+    await assert_project_permission(db, current_user, pid, "review")
+    try:
+        result = await rollback_from_log(db, project_id=pid, source_log_id=body.source_log_id,
+                                         target_formula=body.target_formula,
+                                         expected_version=body.expected_version, user_id=current_user.id)
+    except FormulaSettingError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.to_detail()) from None
     await db.commit()
-    now = datetime.now(timezone.utc)
+    await publish_events(result["events"], domain=result["domain"], source="history_rollback")
     return {
         "ok": True,
         "row_code": body.row_code,
-        "restored_formula": body.target_formula,
-        "previous_formula": current_formula,
-        "created_at": str(now),
+        "slot_key": result["slot_key"],
+        "restored_formula": result["restored_formula"],
+        "previous_formula": result["previous_formula"],
+        "created_at": str(datetime.now(timezone.utc)),
     }

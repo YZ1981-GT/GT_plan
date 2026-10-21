@@ -168,10 +168,12 @@ class TestFormulaEdits:
 
     @pytest.mark.asyncio
     async def test_saving_user_formulas_stamps(self, notes_env):
-        from app.services.note_formula_service import note_formula_service
+        # formula-global-settings-sync：保存端点经 note_settings.save_section（差量写本项目适配 + 物化）
+        from app.services.formula_settings import note_settings
 
         since = datetime.now(timezone.utc) - timedelta(seconds=1)
-        with patch.object(note_formula_service, "save_many", new=AsyncMock(return_value=[{"target": "B2"}])):
+        saved = {"formulas": [{"target": "B2"}], "loaded": {}, "events": []}
+        with patch.object(note_settings, "save_section", new=AsyncMock(return_value=saved)):
             resp = await notes_env["client"].put(_section_url(notes_env, f"{SECTION}/formulas"),
                                                  json={"formulas": [{"target": "B2", "formula": "=1"}]})
         assert resp.status_code == 200, resp.text
@@ -280,6 +282,7 @@ _SYSTEM_WRITERS: dict[str, tuple[str, ...]] = {
     "services/report_note_sync_service.py": ("ReportNoteSyncService._sync_real",),
     "services/note_formula_generator.py": ("execute_note_formulas",),
     "services/note_formula_service.py": ("NoteFormulaService.save_many",),
+    "services/formula_settings/note_settings.py": ("materialize", "save_section", "_import_legacy"),
     "services/note_wp_mapping_service.py": ("NoteWpMappingService.clear_formulas", "NoteWpMappingService.restore_auto_mode"),
     "services/note_trim_service.py": ("NoteTrimService.auto_trim_v2",),
     "services/consol_disclosure_service.py": ("ConsolDisclosureService.save_consol_notes",),

@@ -24,7 +24,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.workpaper_models import WpFormula
+from app.models.workpaper_models import WorkingPaper, WpFormula, WpIndex
 from app.services.formula_management.engine import (
     BatchExecutionResult,
     BatchFormulaContext,
@@ -187,17 +187,51 @@ class FormulaRuntimeCoordinator:
         year: int,
         scopes: list[str],
     ) -> list[WpFormula]:
-        """Load WpFormula definitions filtered by project and scope-relevant domains."""
-        # Map scopes → formula_type filter is not needed; we load all formulas
-        # for the project. Scope filtering is done by target domain in step 5.
-        stmt = (
-            select(WpFormula)
-            .where(
-                WpFormula.project_id == project_id,
-            )
+        """按项目、source_scope 年度、目标 domain 与 workpaper 循环过滤公式。"""
+        result = await self._session.execute(
+            select(WpFormula).where(WpFormula.project_id == project_id)
         )
-        result = await self._session.execute(stmt)
-        return list(result.scalars().all())
+        formulas = list(result.scalars().all())
+        if not formulas:
+            return []
+
+        wanted_domains: set[str] = set()
+        wanted_cycles: set[str] = set()
+        for scope in scopes:
+            if scope.startswith("workpaper"):
+                wanted_domains.add("workpaper")
+                if ":" in scope:
+                    cycle = scope.split(":", 1)[1].strip().upper()
+                    if cycle:
+                        wanted_cycles.add(cycle)
+            elif scope in _SCOPE_DOMAIN_MAP:
+                wanted_domains.add(_SCOPE_DOMAIN_MAP[scope])
+
+        wp_ids = {formula.wp_id for formula in formulas if formula.wp_id}
+        wp_codes: dict[UUID, str] = {}
+        if wp_ids:
+            rows = await self._session.execute(
+                select(WorkingPaper.id, WpIndex.wp_code)
+                .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+                .where(WorkingPaper.id.in_(wp_ids))
+            )
+            wp_codes = {row.id: str(row.wp_code or "") for row in rows}
+
+        selected: list[WpFormula] = []
+        for formula in formulas:
+            source_scope = formula.source_scope if isinstance(formula.source_scope, dict) else {}
+            source_year = source_scope.get("year")
+            if source_year is not None and int(source_year) != year:
+                continue
+            domain = self._infer_domain(formula)
+            if wanted_domains and domain not in wanted_domains:
+                continue
+            if domain == "workpaper" and wanted_cycles:
+                code = wp_codes.get(formula.wp_id, "").upper()
+                if not code or code[0] not in wanted_cycles:
+                    continue
+            selected.append(formula)
+        return selected
 
     def _build_batch_definitions(
         self,
@@ -228,22 +262,23 @@ class FormulaRuntimeCoordinator:
 
             all_ref_addr_ids.update(ref_ids)
 
-            # Build target for auto_calc formulas
+            # Build a target for auto_calc formulas. 当前只对工作底稿 A1 目标具备
+            # 可验证的写入载体；report/note/adjudication 必须由各自显式 binding 构造，
+            # 禁止拿 sheet_name/target_cell 猜 locator 后写错库。
             target: EngineTarget | None = None
             ftype = (formula.formula_type or "auto_calc").strip()
-            if ftype == "auto_calc" and formula.target_cell:
-                # Build a target from the formula's context
-                # Domain is inferred from formula context (category/sheet/wp)
-                domain = self._infer_domain(formula)
+            domain = self._infer_domain(formula)
+            if ftype == "auto_calc" and formula.target_cell and domain == "workpaper":
                 target = EngineTarget(
-                    domain=domain,
+                    domain="workpaper",
                     project_id=project_id,
                     year=year,
                     addr_id=f"{formula.wp_id}/{formula.sheet_name}/{formula.target_cell}",
                     locator={
                         "wp_id": str(formula.wp_id),
-                        "item": formula.sheet_name,
-                        "cell": formula.target_cell,
+                        "storage_kind": "parsed_data",
+                        "sheet_name": formula.sheet_name,
+                        "cell_ref": formula.target_cell,
                     },
                     wp_id=formula.wp_id,
                 )
@@ -325,10 +360,7 @@ class FormulaRuntimeCoordinator:
         for domain, domain_intents in by_domain.items():
             adapter = self._get_adapter(domain)
             if adapter is None:
-                # No adapter available — build mutations directly
-                for intent in domain_intents:
-                    mutations.append(self._intent_to_mutation(intent, project_id, year))
-                continue
+                raise RuntimeError(f"no_adapter_for_domain:{domain}")
 
             # Use adapter.prepare_many to build mutations
             targets_for_adapter = []
@@ -367,15 +399,25 @@ class FormulaRuntimeCoordinator:
                         source_formula_id=source_id,
                     ))
             except Exception as exc:
-                logger.warning(
+                logger.error(
                     "Adapter prepare_many failed for domain=%s: %s: %s",
                     domain, type(exc).__name__, exc,
                 )
-                # Fallback: build mutations without before_value
-                for intent in domain_intents:
-                    mutations.append(self._intent_to_mutation(intent, project_id, year))
+                raise RuntimeError(
+                    f"adapter_prepare_failed:{domain}:{type(exc).__name__}:{exc}"
+                ) from exc
 
         return mutations
+
+    def build_adapter_map(self, domains: set[str] | list[str]) -> dict[str, Any]:
+        """为本次计划构造唯一 adapter 映射；缺 adapter fail-closed。"""
+        result: dict[str, Any] = {}
+        for domain in sorted(set(domains)):
+            adapter = self._get_adapter(domain)
+            if adapter is None:
+                raise RuntimeError(f"no_adapter_for_domain:{domain}")
+            result[domain] = adapter
+        return result
 
     def _get_adapter(self, domain: str) -> Any | None:
         """Get the domain mutation adapter instance for the given domain."""

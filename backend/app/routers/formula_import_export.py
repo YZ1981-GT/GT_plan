@@ -48,7 +48,6 @@ from app.services.formula_management.preset_library import (
     build_preset_library,
     compute_preset_coverage,
     find_presets_for_page,
-    upsert_custom_presets,
     upsert_seed_presets,
 )
 
@@ -238,13 +237,14 @@ async def create_custom_preset(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_role(_CUSTOM_PRESET_WRITE_ROLES)),
 ) -> dict[str, Any]:
-    """新增/更新一条平台级自定义预设（写 ``formula_custom_presets.json``，隔离于 seed）。
+    """新增/更新一条平台级自定义预设（存数据库，隔离于 seed）。
 
     body：``{page_key, target_cell, expression, formula_type, refs?, description?, variant?}``。
-    ``require_role``（admin/partner/signing_partner）为唯一权限防线（Property 5）。
+    ``require_role``（admin/partner/signing_partner）为权限防线（Property 5）。
     落库前**复用 ``import-data`` 的逐条 ACNR full_resolve 校验路径**（``validate_single_formula_refs``），
-    悬空引用 → 422 携清单**不落库**（Property 6）；通过 → ``upsert_custom_presets``
-    写 ``formula_custom_presets.json``（**绝不触碰 seed**，Property 2）。
+    悬空引用 → 422 携清单**不落库**（Property 6）。
+    formula-global-settings-sync R14.3：admin 直接写事务所级模板「自定义公式预设」；合伙人 / 签字合伙人
+    提交全局候选（admin 在全局设置页审核）。不再写代码仓库里的 ``formula_custom_presets.json``。
     """
     page_key = str(payload.get("page_key") or "").strip()
     target_cell = str(payload.get("target_cell") or "").strip()
@@ -279,21 +279,27 @@ async def create_custom_preset(
             },
         )
 
-    stats = upsert_custom_presets(
-        [
-            PresetEntry(
-                page_key=page_key,
-                target_cell=target_cell,
-                expression=expression,
-                formula_type=formula_type,
-                refs=normalized_refs,
-                source="custom",
-                description=str(payload.get("description") or ""),
-                variant=payload.get("variant"),
-            )
-        ]
+    from app.services.formula_settings import custom_presets
+    from app.services.formula_settings.publish import publish_to_dict
+
+    entry = PresetEntry(
+        page_key=page_key,
+        target_cell=target_cell,
+        expression=expression,
+        formula_type=formula_type,
+        refs=normalized_refs,
+        source="custom",
+        description=str(payload.get("description") or ""),
+        variant=payload.get("variant"),
     )
-    return {"ok": True, **stats}
+    if getattr(_user.role, "value", _user.role) != "admin":
+        candidate = await custom_presets.submit_candidate(db, [entry], user_id=_user.id)
+        await db.commit()
+        return {"ok": True, "pending_review": True, "candidate": publish_to_dict(candidate)}
+    stats = await custom_presets.upsert(db, [entry], user_id=_user.id)
+    await db.commit()
+    await custom_presets.refresh_cache(db)  # 本进程立即可见；其他进程最迟一分钟内对齐
+    return {"ok": True, "pending_review": False, **stats}
 
 
 # ── 说明文档单一源（Req 23.6 / 25.2 / 25.3） ─────────────────────────────────

@@ -333,10 +333,11 @@ class TestChain2MasterUpdateToStaleSyncFlow:
             keep_local=True,
         )
 
-        # Step 7: 验证同步完成
+        # Step 7: 验证同步完成（spec formula-global-settings-sync R9.2 口径）
         # BS001: 项目公式 "TB(1001)+TB(1002)" ≠ 主模板 "TB(1001)+TB(1012)"
-        #   → keep_local=True 保留本地覆盖，但 is_stale 清除
-        # BS002: 项目公式 "TB(1122)" == 主模板 "TB(1122)" → 同步（无变化但计入 updated）
+        #   → keep_local=True 保留本地公式，生成待确认事项，is_stale 保留到项目处理为止
+        #     （原口径「保留并清除 is_stale」⇒ 项目永远不知道主模板改了，R9.2 修正）
+        # BS002: 项目公式 "TB(1122)" == 主模板 "TB(1122)" → 只更新基线
         result_after = await db_session.execute(
             select(ReportConfig).where(
                 ReportConfig.applicable_standard == project_a_standard,
@@ -345,13 +346,20 @@ class TestChain2MasterUpdateToStaleSyncFlow:
         )
         rows_after = {r.row_code: r for r in result_after.scalars().all()}
 
+        assert updated_count == 0
         # BS001 保留本地覆盖（keep_local=True）
         assert rows_after["BS001"].formula == "TB(1001)+TB(1002)", (
             "keep_local=True 应保留项目自定义公式"
         )
-        # is_stale 已清除
-        assert rows_after["BS001"].is_stale is False, "同步后 is_stale 应清除"
+        assert rows_after["BS001"].is_stale is True, "冲突行待项目确认，过期标记不得清除"
         assert rows_after["BS002"].is_stale is False, "同步后 is_stale 应清除"
+        assert rows_after["BS002"].base_definition["formula"] == "TB(1122)"
+        from app.models.formula_setting_models import FormulaSyncItem
+
+        items = (await db_session.execute(select(FormulaSyncItem).where(
+            FormulaSyncItem.project_id == PROJECT_A_ID))).scalars().all()
+        assert [(i.slot_key, i.status, i.upstream_definition["formula"]) for i in items] == [
+            ("balance_sheet:BS001", "pending", "TB(1001)+TB(1012)")]
 
     @pytest.mark.asyncio
     async def test_stale_only_marks_matching_row(self, db_session: AsyncSession):

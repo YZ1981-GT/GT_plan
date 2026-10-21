@@ -48,6 +48,7 @@
               <el-tag :type="actionTagType(entry.action)" size="small">{{ actionLabel(entry.action) }}</el-tag>
               <span class="gt-fh-row-code">{{ entry.row_code }}</span>
               <span class="gt-fh-module">{{ moduleLabel(entry.module) }}</span>
+              <span v-if="operationLabel(entry.operation)" class="gt-fh-module">· {{ operationLabel(entry.operation) }}</span>
             </div>
             <div v-if="entry.action === 'update' || entry.action === 'create' || entry.action === 'delete'" class="gt-fh-entry-body">
               <div v-if="entry.old_formula" class="gt-fh-formula-diff">
@@ -112,11 +113,14 @@ interface HistoryEntry {
   result_value: number | null
   trace: any[] | null
   created_at: string | null
+  /** 写入方式（本项目适配 / 同步全局 / 恢复为全局 / 处理待确认 / 订阅模板 …），旧记录无 */
+  operation?: string | null
 }
 
 const props = defineProps<{
   projectId: string
   year: number
+  readOnly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -174,7 +178,7 @@ async function loadHistory() {
 const ROLLBACK_ROLES = ['admin', 'partner', 'signing_partner', 'manager'] as const
 
 const canRollbackByRole = computed(() =>
-  (ROLLBACK_ROLES as readonly string[]).includes(authStore.user?.role || ''),
+  !props.readOnly && (ROLLBACK_ROLES as readonly string[]).includes(authStore.user?.role || ''),
 )
 
 function canRollback(entry: HistoryEntry): boolean {
@@ -248,8 +252,19 @@ function actionColor(action: string): 'primary' | 'success' | 'warning' | 'dange
 function moduleLabel(module: string): string {
   const map: Record<string, string> = {
     report: '报表', consol: '合并', note: '附注', wp: '底稿',
+    tb_detail: '试算表科目明细', cross_check: '表间审核', consol_note: '合并附注',
   }
   return map[module] || module
+}
+
+/** 写入方式（spec formula-global-settings-sync 写的审计才有；旧记录返回空串不显示）。 */
+function operationLabel(op?: string | null): string {
+  const map: Record<string, string> = {
+    adapt: '本项目适配', sync_global: '同步全局', restore: '恢复为全局', resolve_pending: '处理待确认',
+    push: '他项目应用', rollback: '历史回滚', template_subscribe: '订阅模板', template_unsubscribe: '退订模板',
+    template_sync: '模板更新',
+  }
+  return op ? (map[op] || op) : ''
 }
 
 // 组件挂载时自动加载

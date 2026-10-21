@@ -10,7 +10,8 @@
 两侧同对一张 golden（``tests/fixtures/function_support_matrix.json``），前端渲染==后端真相。
 
 现状实证锚点（memory 铁律⑭：枚举/字段路径现读实证，非凭命名推测）：
-  - wp evaluator：``formula_engine._REGISTRY`` 注册全部取数函数 ⇒ 全 True。
+  - wp evaluator：当前可保存底稿公式路径只保证 TB/SUM_TB/WP；L1 `_REGISTRY` 注册
+    不等于请求上下文已注入，ROW/REPORT/NOTE/PREV/AUX/ADJ 等必须显式拒绝。
   - report path：``report_engine.evaluate_formula_result`` 用 ``_PREV_PATTERN``/``_AUX_PATTERN``
     硬替换成 "0" ⇒ PREV/AUX report_path=False（本文件直接断言源码仍有该替换，锚点漂移即红）。
   - note executor：``note_formula_generator`` 支持 TB/REPORT/NOTE/WP + PRIOR/AGING，不解析 PREV/AUX/ADJ/SUM_TB/ROW。
@@ -29,6 +30,7 @@ from app.services.formula_management.function_support_matrix import (
     FUNCTIONS,
     build_matrix_payload,
     is_supported,
+    support_issues,
     unsupported_reason,
 )
 
@@ -91,10 +93,12 @@ def test_report_path_zeros_prev_and_aux():
     assert is_supported("AUX", Executor.REPORT_PATH) is False
 
 
-def test_wp_evaluator_supports_core_fetch_functions():
-    """wp evaluator 真支持 TB/SUM_TB/WP（design 点名）+ 其余取数函数。"""
-    for fn in ("TB", "SUM_TB", "WP", "PREV", "AUX", "ADJ"):
+def test_wp_evaluator_supports_only_real_context_functions():
+    """工作底稿可编辑路径只承诺真实具备上下文的 TB/SUM_TB/WP。"""
+    for fn in ("TB", "SUM_TB", "WP"):
         assert is_supported(fn, Executor.WP_EVALUATOR) is True
+    for fn in ("ROW", "SUM_ROW", "REPORT", "NOTE", "PREV", "AUX", "ADJ"):
+        assert is_supported(fn, Executor.WP_EVALUATOR) is False
 
 
 def test_central_batch_supports_adj_injection():
@@ -130,13 +134,14 @@ def test_report_path_source_still_zeros_prev_aux():
     assert "报表域默认置 0" in src, "report_engine PREV/AUX 置 0 逻辑可能已变 —— 矩阵须复核"
 
 
-def test_wp_evaluator_source_registers_all_fetch_functions():
-    """锚点守卫：formula_engine._REGISTRY 真注册全部取数函数（矩阵 wp_evaluator 全 True 的依据）。"""
+def test_l1_registration_does_not_overclaim_wp_context_support():
+    """注册函数不等于工作底稿请求已注入上下文，防止再次把注册表当执行证据。"""
     from app.services.formula_engine import _REGISTRY
 
     known = set(_REGISTRY.known_function_names())
-    for fn in ("TB", "SUM_TB", "ROW", "SUM_ROW", "REPORT", "NOTE", "WP", "PREV", "AUX", "ADJ"):
-        assert fn in known, f"{fn} 未注册进 wp evaluator _REGISTRY —— 矩阵 wp_evaluator=True 失据"
+    assert "AUX" in known and "ADJ" in known
+    assert is_supported("AUX", Executor.WP_EVALUATOR) is False
+    assert is_supported("ADJ", Executor.WP_EVALUATOR) is False
 
 
 # ─────────────────────────── 变异反证 ───────────────────────────
@@ -176,3 +181,17 @@ def test_mutation_supported_misjudged_as_disabled_is_caught():
     mutated_disabled = True  # 变异：误把 TB 禁用
     # 「真源支持」与「变异禁用」互斥：real_supported(True) 与 (not mutated_disabled)(False) 不等
     assert real_supported != (not mutated_disabled)
+
+
+def test_expression_preflight_reports_all_unsupported_functions_in_order():
+    issues = support_issues(
+        "PREV('1001') + AUX('客户') + TB('1001','期末余额')",
+        Executor.REPORT_PATH,
+    )
+    assert [item["function"] for item in issues] == ["PREV", "AUX"]
+    assert all(item["reason"] for item in issues)
+
+
+def test_wp_expression_preflight_rejects_registered_but_contextless_function():
+    issues = support_issues("REPORT('BS-001') + TB('1001','期末余额')", Executor.WP_EVALUATOR)
+    assert [item["function"] for item in issues] == ["REPORT"]

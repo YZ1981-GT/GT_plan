@@ -12,12 +12,13 @@
  * 组件里所有缓存命中判定与保存年份口径都只经它们产出。只要都经同一函数，「切项目缓存不失效 /
  * 旧响应覆盖新项目 / 保存用系统年」在结构上即不可能。
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   projectCacheKey,
   cacheKeyMatches,
   shouldApplyResponse,
   resolveSaveYear,
+  createKeyedSingleFlight,
 } from '../projectCacheKey'
 
 describe('projectCacheKey — 按项目隔离的缓存键（需求 10.1）', () => {
@@ -141,5 +142,60 @@ describe('变异反证：缓存键去掉 project 维度 → 跨项目串样本�
     const reqKey = projectCacheKey({ projectId: 'PROJ-A', templateType: 'soe', year: 2025 })
     const curKey = projectCacheKey({ projectId: 'PROJ-B', templateType: 'soe', year: 2025 })
     expect(shouldApplyResponse(reqKey, curKey)).toBe(false)
+  })
+})
+
+describe('createKeyedSingleFlight — 同键并发加载只执行一次', () => {
+  function deferred<T>() {
+    let resolve!: (v: T) => void
+    let reject!: (e: unknown) => void
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
+    return { promise, resolve, reject }
+  }
+
+  it('飞行期间同键调用复用在途 Promise，run 只执行一次', async () => {
+    const flight = createKeyedSingleFlight()
+    const d = deferred<string>()
+    const run = vi.fn(() => d.promise)
+    const p1 = flight('PROJ-A', run)
+    const p2 = flight('PROJ-A', run)
+    expect(p2).toBe(p1)
+    expect(run).toHaveBeenCalledTimes(1)
+    d.resolve('tree')
+    await expect(p2).resolves.toBe('tree')
+  })
+
+  it('键不同（期间切了项目）照常另发，不复用旧项目的在途请求', () => {
+    const flight = createKeyedSingleFlight()
+    const run = vi.fn(() => new Promise<void>(() => { /* 永不落定 */ }))
+    const pa = flight('PROJ-A', run)
+    const pb = flight('PROJ-B', run)
+    expect(pb).not.toBe(pa)
+    expect(run).toHaveBeenCalledTimes(2)
+  })
+
+  it('在途 Promise 成功或失败落定后清空，下一次调用重新执行', async () => {
+    const flight = createKeyedSingleFlight()
+    const run = vi.fn()
+      .mockImplementationOnce(() => Promise.resolve('first'))
+      .mockImplementationOnce(() => Promise.reject(new Error('boom')))
+      .mockImplementationOnce(() => Promise.resolve('third'))
+    await expect(flight('K', run)).resolves.toBe('first')
+    await expect(flight('K', run)).rejects.toThrow('boom')
+    await expect(flight('K', run)).resolves.toBe('third')
+    expect(run).toHaveBeenCalledTimes(3)
+  })
+
+  it('变异反证：不做合并（每次都执行 run）时同键两次调用会执行两次', () => {
+    const noFlight = <T>(_key: string, run: () => Promise<T>) => run()
+    const run = vi.fn(() => new Promise<void>(() => { /* 永不落定 */ }))
+    noFlight('K', run)
+    noFlight('K', run)
+    expect(run).toHaveBeenCalledTimes(2)
+    const flight = createKeyedSingleFlight()
+    const run2 = vi.fn(() => new Promise<void>(() => { /* 永不落定 */ }))
+    flight('K', run2)
+    flight('K', run2)
+    expect(run2).toHaveBeenCalledTimes(1)
   })
 })

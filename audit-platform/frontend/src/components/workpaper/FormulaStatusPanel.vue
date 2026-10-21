@@ -297,6 +297,9 @@ async function putFormula(binding: {
   category?: string
 }): Promise<boolean> {
   try {
+    const existing = rawItems.value.find(
+      (it) => it.target_cell === binding.anchor && it.sheet_name === binding.sheet_name,
+    )
     await api.put(
       wpFormula.upsert(props.wpId),
       {
@@ -307,6 +310,7 @@ async function putFormula(binding: {
         formula_type: 'auto_calc',
         category: binding.category ?? null,
         description: binding.description ?? null,
+        expected_version: existing?.definition_version ?? undefined,
       },
       { _silent: true } as any,
     )

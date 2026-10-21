@@ -70,16 +70,22 @@ function collectBackendRoutes(): BackendRoute[] {
   const routes: BackendRoute[] = []
   for (const py of walk(BE_ROUTERS, ['.py'])) {
     const src = fs.readFileSync(py, 'utf-8')
-    // `APIRouter(... prefix="/api/xxx" ...)`；同一文件可能有多个 router，
-    // 取第一个 prefix 作为默认（本仓库实测每个 router 文件只有一个 APIRouter）
-    const pm = /APIRouter\([^)]*?prefix\s*=\s*["']([^"']*)["']/s.exec(src)
-    const prefix = pm ? pm[1] : ''
-    const re = /@\w+\.(get|put|post|delete|patch)\(\s*["']([^"']*)["']/g
+    // `name = APIRouter(... prefix="/api/xxx" ...)`：同一文件可能有多个 router
+    // （如 formula_settings.py 的 `router` 与 `project_router`），按装饰器变量名取各自 prefix；
+    // 认不出变量名时退回文件内第一个 prefix（旧口径）。
+    const prefixByVar = new Map<string, string>()
+    for (const rm of src.matchAll(/(\w+)\s*=\s*APIRouter\(([^)]*)/g)) {
+      const pm = /prefix\s*=\s*["']([^"']*)["']/.exec(rm[2])
+      prefixByVar.set(rm[1], pm ? pm[1] : '')
+    }
+    const fallback = [...prefixByVar.values()].find((p) => p) ?? ''
+    const re = /@(\w+)\.(get|put|post|delete|patch)\(\s*["']([^"']*)["']/g
     let m: RegExpExecArray | null
     while ((m = re.exec(src)) !== null) {
+      const prefix = prefixByVar.get(m[1]) ?? fallback
       routes.push({
-        verb: m[1].toUpperCase(),
-        fullPath: prefix + m[2] || '/',
+        verb: m[2].toUpperCase(),
+        fullPath: prefix + m[3] || '/',
         file: path.relative(REPO_ROOT, py),
       })
     }
@@ -247,6 +253,13 @@ describe('提取器自检（判据失效必打红）', () => {
     expect(backendNorm.has('/api/workpapers/{}/formulas')).toBe(true)
     expect(backendNorm.has('/api/workpapers/{}/formulas/{}')).toBe(true)
     expect(backendNorm.has('/api/workpapers/{}/user-formulas')).toBe(true)
+  })
+
+  it('同一文件多个 router 按装饰器变量取各自 prefix（formula_settings 的 router / project_router）', () => {
+    expect(backendNorm.has('/api/formula-settings/{}/global')).toBe(true)
+    expect(backendNorm.has('/api/projects/{}/formula-settings/pending')).toBe(true)
+    // 旧口径（一律取第一个 prefix）会造出这条不存在的路径
+    expect(backendNorm.has('/api/formula-settings/pending')).toBe(false)
   })
 
   it('前端公式 URL 抽取非空', () => {

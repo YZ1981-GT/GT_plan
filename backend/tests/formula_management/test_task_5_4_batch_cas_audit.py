@@ -397,36 +397,51 @@ class TestAuditChain:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# 4. 变异反证：去掉 CAS → 并发冲突样本不再 409（坐实 409 确来自 CAS）
+# 4. 强制版本前置条件（原子并发由真实 PG 专测）
 # ══════════════════════════════════════════════════════════════════════════
 
 
-class TestMutationCASRemoved:
+class TestCASPreconditionRequired:
 
     @pytest.mark.asyncio
-    async def test_mutation_cas_noop_conflict_no_longer_409(self, db, seed):
-        """临时把 service.save 的 CAS 检查关掉（忽略 expected_version），陈旧版本保存
-        **不再 409**（证明 409 确来自 CAS 乐观锁，而非别处恒红）。"""
-        from app.services import wp_formula_service as svc_mod
-
-        orig_save = svc_mod.WpFormulaService.save
-
-        async def _save_no_cas(self, db_, **kwargs):  # noqa: ANN001
-            kwargs.pop("expected_version", None)  # 丢弃 CAS 版本 → 永不冲突
-            return await orig_save(self, db_, **kwargs)
-
-        svc_mod.WpFormulaService.save = _save_no_cas  # type: ignore[assignment]
-        try:
-            user = await _load_user(db, seed.user_id)
-            app = _make_app(db, user)
-            with _NO_REF_ISSUES, TestClient(app, raise_server_exceptions=False) as c:
-                resp = c.put(f"/api/workpapers/{seed.wp_id}/formulas",
-                             json={"sheet_name": "Z1-1", "target_cell": "B2",
-                                   "expression": "8 + 8", "year": _YEAR,
-                                   "expected_version": 99})
-            assert resp.status_code != 409, (
-                f"去掉 CAS 后陈旧版本保存不应再 409（实得 {resp.status_code}）；"
-                "若仍 409 说明冲突来自别处、CAS 变异反证无效"
+    async def test_existing_formula_without_expected_version_returns_428(self, db, seed):
+        user = await _load_user(db, seed.user_id)
+        app = _make_app(db, user)
+        with _NO_REF_ISSUES, TestClient(app, raise_server_exceptions=False) as c:
+            resp = c.put(
+                f"/api/workpapers/{seed.wp_id}/formulas",
+                json={
+                    "sheet_name": "Z1-1",
+                    "target_cell": "B2",
+                    "expression": "8 + 8",
+                    "year": _YEAR,
+                },
             )
-        finally:
-            svc_mod.WpFormulaService.save = orig_save  # type: ignore[assignment]
+        assert resp.status_code == 428, resp.text
+        assert resp.json()["detail"]["error_code"] == "FORMULA_VERSION_REQUIRED"
+
+    @pytest.mark.asyncio
+    async def test_batch_missing_expected_version_rolls_back_all(self, db, seed):
+        user = await _load_user(db, seed.user_id)
+        app = _make_app(db, user)
+        items = [
+            {"sheet_name": "Z1-1", "target_cell": "NEW1", "expression": "1 + 1"},
+            {"sheet_name": "Z1-1", "target_cell": "B2", "expression": "2 + 2"},
+        ]
+        with _NO_REF_ISSUES, TestClient(app, raise_server_exceptions=False) as c:
+            resp = c.put(
+                f"/api/workpapers/{seed.wp_id}/formulas/batch",
+                json={"year": _YEAR, "items": items},
+            )
+        assert resp.status_code == 428, resp.text
+        async with async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)() as s:
+            created = (await s.execute(select(WpFormula).where(
+                WpFormula.wp_id == seed.wp_id,
+                WpFormula.target_cell == "NEW1",
+            ))).scalar_one_or_none()
+            existing = (await s.execute(select(WpFormula).where(
+                WpFormula.id == seed.existing_formula_id,
+            ))).scalar_one()
+        assert created is None
+        assert existing.expression == "1 + 1"
+        assert existing.definition_version == 1

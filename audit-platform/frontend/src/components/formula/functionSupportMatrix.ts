@@ -40,7 +40,7 @@ interface Cell {
 
 /**
  * 矩阵真值（镜像后端）。每一格依据见后端模块 docstring 的逐执行器实证：
- *  - wp_evaluator：_REGISTRY 全注册 ⇒ 全 True
+ *  - wp_evaluator：当前可保存工作底稿公式只支持 TB/SUM_TB/WP；注册函数不等于上下文已注入
  *  - report_path：PREV/AUX 硬置 0、ADJ 默认不注入 ⇒ False
  *  - note_executor：仅 TB/REPORT/NOTE/WP（用 PRIOR/AGING，非 PREV/AUX）
  *  - central_batch：ADJ 实时注入 ⇒ 全 True
@@ -59,25 +59,25 @@ const MATRIX: Record<FormulaFunction, Record<Executor, Cell>> = {
     central_batch: { supported: true, reason: null },
   },
   ROW: {
-    wp_evaluator: { supported: true, reason: null },
+    wp_evaluator: { supported: false, reason: '工作底稿可编辑公式尚未注入 ROW 行次上下文' },
     report_path: { supported: true, reason: null },
     note_executor: { supported: false, reason: '附注执行器不解析 ROW（跨报表行引用用 REPORT）' },
     central_batch: { supported: true, reason: null },
   },
   SUM_ROW: {
-    wp_evaluator: { supported: true, reason: null },
+    wp_evaluator: { supported: false, reason: '工作底稿可编辑公式尚未注入 SUM_ROW 行次上下文' },
     report_path: { supported: true, reason: null },
     note_executor: { supported: false, reason: '附注执行器不解析 SUM_ROW' },
     central_batch: { supported: true, reason: null },
   },
   REPORT: {
-    wp_evaluator: { supported: true, reason: null },
+    wp_evaluator: { supported: false, reason: '工作底稿可编辑公式尚未注入报表上下文' },
     report_path: { supported: true, reason: null },
     note_executor: { supported: true, reason: null },
     central_batch: { supported: true, reason: null },
   },
   NOTE: {
-    wp_evaluator: { supported: true, reason: null },
+    wp_evaluator: { supported: false, reason: '工作底稿可编辑公式尚未注入附注上下文' },
     report_path: { supported: true, reason: null },
     note_executor: { supported: true, reason: null },
     central_batch: { supported: true, reason: null },
@@ -89,19 +89,19 @@ const MATRIX: Record<FormulaFunction, Record<Executor, Cell>> = {
     central_batch: { supported: true, reason: null },
   },
   PREV: {
-    wp_evaluator: { supported: true, reason: null },
+    wp_evaluator: { supported: false, reason: '工作底稿可编辑公式尚未实现 PREV' },
     report_path: { supported: false, reason: '报表路径对 PREV 恒置 0（上期值走报表 prior 列，非 PREV）' },
     note_executor: { supported: false, reason: '附注执行器用 PRIOR 取上年附注，不解析 PREV' },
     central_batch: { supported: true, reason: null },
   },
   AUX: {
-    wp_evaluator: { supported: true, reason: null },
+    wp_evaluator: { supported: false, reason: '工作底稿可编辑公式尚未实现 AUX' },
     report_path: { supported: false, reason: '报表路径对 AUX 恒置 0（辅助核算不进报表求值）' },
     note_executor: { supported: false, reason: '附注执行器用 AGING 取账龄分桶，不解析 AUX' },
     central_batch: { supported: true, reason: null },
   },
   ADJ: {
-    wp_evaluator: { supported: true, reason: null },
+    wp_evaluator: { supported: false, reason: '工作底稿可编辑公式尚未注入实时调整上下文' },
     report_path: { supported: false, reason: '报表路径默认不注入实时调整额（走 central_batch 注入）' },
     note_executor: { supported: false, reason: '附注执行器不解析 ADJ' },
     central_batch: { supported: true, reason: null },

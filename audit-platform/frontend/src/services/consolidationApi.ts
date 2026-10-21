@@ -432,6 +432,8 @@ export interface ConsolNoteFormula {
   description: string | null
   updated_at: string | null
   updated_by?: string | null
+  /** 版本号：修改 / 删除须原样带回（缺失 428、已被他人修改 409） */
+  version?: number
 }
 
 export interface ConsolNoteFormulaSection {
@@ -1208,14 +1210,17 @@ export async function createConsolNoteFormula(payload: ConsolNoteFormulaPayload)
 
 /** 改公式 ⇒ 来源变为「人工」（自动种子不再覆盖）；只改空白不算改 */
 export async function updateConsolNoteFormula(
-  formulaId: string, payload: { formula?: string; description?: string | null },
+  formulaId: string,
+  payload: { formula?: string; description?: string | null; expected_version?: number },
 ): Promise<ConsolNoteFormula> {
   return api.put(P_cnf.detail(formulaId), payload)
 }
 
-/** 删除（软删；自动种子不再补回该单元格） */
-export async function deleteConsolNoteFormula(formulaId: string): Promise<{ id: string; deleted: boolean }> {
-  return api.delete(P_cnf.detail(formulaId))
+/** 删除（软删；自动种子不再补回该单元格）；须带当前版本号（spec formula-global-settings-sync） */
+export async function deleteConsolNoteFormula(
+  formulaId: string, expectedVersion?: number,
+): Promise<{ id: string; deleted: boolean }> {
+  return api.delete(P_cnf.detail(formulaId), { params: { expected_version: expectedVersion } })
 }
 
 /** 按当前模板与合并口径报表配置重新种子化（幂等；不覆盖人工、不补回人工删除的） */

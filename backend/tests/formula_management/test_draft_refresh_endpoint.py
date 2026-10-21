@@ -31,9 +31,11 @@ import app.routers.draft_refresh as endpoint
 from app.routers.draft_refresh import (
     PARTNER_ROLES,
     one_click_draft_refresh,
+    rollback_draft_refresh,
 )
 from app.schemas.formula_runtime import DraftRefreshRequest as OneClickRefreshRequest
 from app.services.draft_refresh_service import PresetApplication, RefreshResult, RefreshUnit
+from app.services.formula_runtime.contracts import ExecutionResult
 
 
 def _run(coro):
@@ -63,9 +65,13 @@ class _FakeDb:
 
     def __init__(self):
         self.committed = False
+        self.rolled_back = False
 
     async def commit(self):
         self.committed = True
+
+    async def rollback(self):
+        self.rolled_back = True
 
 
 class _Warning:
@@ -114,7 +120,17 @@ class _StubOrchestrator:
     def __init__(self, db):
         self.db = db
 
-    async def generate(self, *, project_id, year, operator, scopes, confirm_overwrite=False):
+    async def generate(
+        self,
+        *,
+        project_id,
+        year,
+        operator,
+        scopes,
+        confirm_overwrite=False,
+        transaction_mode="all_or_nothing",
+        idempotency_key=None,
+    ):
         type(self).called = True
         type(self).last_kwargs = {
             "project_id": project_id,
@@ -122,6 +138,8 @@ class _StubOrchestrator:
             "operator": operator,
             "scopes": list(scopes),
             "confirm_overwrite": confirm_overwrite,
+            "transaction_mode": transaction_mode,
+            "idempotency_key": idempotency_key,
         }
         return type(self)._result
 
@@ -181,6 +199,9 @@ def test_endpoint_routes_through_orchestrator_and_returns_nonempty_draft(monkeyp
     # 非空初稿：affected_count > 0
     assert resp.affected_count == 3
     assert resp.status == "success"
+    assert resp.run_id == result.refresh_id
+    assert _StubOrchestrator.last_kwargs["transaction_mode"] == "all_or_nothing"
+    assert _StubOrchestrator.last_kwargs["idempotency_key"] is None
 
     # preset_application（PresetApplication 属性）
     pa = resp.preset_application
@@ -252,4 +273,31 @@ def test_endpoint_precheck_block_returns_422_and_skips_orchestrator(monkeypatch)
     assert exc.value.detail["can_refresh"] is False
     # 阻断不进 orchestrator，且不 commit
     assert _StubOrchestrator.called is False
+    assert db.committed is False
+
+
+
+def test_rollback_conflict_returns_http_409_without_commit(monkeypatch):
+    """CAS 冲突必须回滚外层事务，不能 commit 后再伪报 rolled_back。"""
+    run_id = uuid.uuid4()
+
+    class _ConflictService:
+        async def rollback_refresh(self, db, *, run_id, adapters, operator):
+            return ExecutionResult(
+                run_id=run_id,
+                status="conflict",
+                conflicts=[{"target": "workpaper:A1", "conflict_detail": "version changed"}],
+            )
+
+    monkeypatch.setattr(endpoint, "DraftRefreshService", _ConflictService)
+    monkeypatch.setattr(
+        "app.services.formula_runtime.coordinator.FormulaRuntimeCoordinator.build_adapter_map",
+        lambda self, domains: {},
+    )
+    db = _FakeDb()
+    with pytest.raises(HTTPException) as raised:
+        _run(rollback_draft_refresh(run_id=run_id, db=db, _user=object()))
+
+    assert raised.value.status_code == 409
+    assert db.rolled_back is True
     assert db.committed is False
