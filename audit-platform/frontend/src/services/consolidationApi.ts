@@ -1194,11 +1194,11 @@ export async function getConsolPushStatus(projectId: string, year: number): Prom
 // ─── 合并附注公式与差额（需求 6 / 7.2）────────────────────────────────────────
 
 export async function listConsolNoteFormulas(
-  templateType: ConsolNoteTemplateType, sectionId?: string,
+  templateType: ConsolNoteTemplateType, sectionId?: string, signal?: AbortSignal,
 ): Promise<ConsolNoteFormulaList> {
   const params: Record<string, string> = { template_type: templateType }
   if (sectionId) params.section_id = sectionId
-  return api.get(P_cnf.list, { params })
+  return api.get(P_cnf.list, { params, signal })
 }
 
 /** 写入仅限 admin / partner / manager（后端 require_role） */
@@ -1226,12 +1226,12 @@ export async function reseedConsolNoteFormulas(templateType: ConsolNoteTemplateT
 /** 附注章节差额：有公式单元格的个别数汇总 / 调整 / 抵销 / 合并数 + 子节点贡献 */
 export async function getConsolNoteBreakdown(
   projectId: string, year: number, sectionId: string,
-  opts: { nodeKey?: string | null; standard?: string | null } = {},
+  opts: { nodeKey?: string | null; standard?: string | null; signal?: AbortSignal } = {},
 ): Promise<ConsolNoteBreakdown> {
   const params: Record<string, string> = {}
   if (opts.nodeKey) params.node_key = opts.nodeKey
   if (opts.standard) params.standard = opts.standard
-  return api.get(P_cn.breakdown(projectId, year, sectionId), { params })
+  return api.get(P_cn.breakdown(projectId, year, sectionId), { params, signal: opts.signal })
 }
 
 /**

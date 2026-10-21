@@ -62,7 +62,11 @@ export function createConsolRequestGuard<TContext extends ConsolRequestContext>(
   }
 
   function isStale(ticket: ConsolRequestTicket<TContext>): boolean {
-    return ticket.sequence !== sequence || !sameContext(ticket.context, getContext())
+    // 票据过期的三个条件：序号被更新的请求顶替、上下文已变、或信号已被 abort()。
+    // signal.aborted 覆盖「scope 变化时直接 abort() 而未发起新请求」的场景（晚到响应须判过期）。
+    return ticket.signal.aborted
+      || ticket.sequence !== sequence
+      || !sameContext(ticket.context, getContext())
   }
 
   /** 取消当前飞行中的请求（组件卸载时调用） */

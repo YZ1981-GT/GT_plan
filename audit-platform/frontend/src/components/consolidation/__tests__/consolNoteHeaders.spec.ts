@@ -27,7 +27,12 @@ describe('CP04 real header contracts', () => {
     const body = noteBodyRows(sec.rows, sec._header_row_indexes)
     expect(leaves(cols).map((c) => c.colIndex)).toEqual([0, 1, 2, 3, 4, 5])
     expect(cols[1].children?.[2]).toEqual({ label: '账面价值', colIndex: 5 })
-    expect(body).toEqual(sec.rows.slice(2))
+    // noteBodyRows 只排除「显式配置的」表头行（_header_row_indexes）。本测试引入时 listed 五-5-2/五-5-3
+    // 的 rows 含 2 个 `类  别` 表头行且 _header_row_indexes=[0,1]，故期望 slice(2)；后续 fixture 清理
+    // （commit 5914e315b 等）删掉那 2 个表头行且 _header_row_indexes 变 undefined ⇒ 无显式表头行可排除，
+    // body 应为全部业务行（含空白业务行 rows[2]/[3]），正是本用例标题「keeps blank business rows」之意。
+    expect(sec._header_row_indexes).toBeUndefined()
+    expect(body).toEqual(sec.rows)
     expect(body.length).toBe(9)
     expect(JSON.stringify(sec)).toBe(before)
   })

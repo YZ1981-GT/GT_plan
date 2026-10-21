@@ -81,8 +81,8 @@
             <!-- 多行合并表头：有 parsedMultiHeader 时用嵌套 el-table-column -->
             <template v-if="parsedMultiHeader">
               <template v-for="(col, ci) in parsedMultiHeader" :key="'mh-' + ci">
-                <!-- 叶子列（独立列，无 children） -->
-                <el-table-column v-if="!col.children" :label="col.label" :min-width="col.colIndex === 0 ? 200 : 130">
+                <!-- 叶子列（独立列，无 children）；:prop=原始叶子列下标，供 @cell-click 列身份与拖选映射 -->
+                <el-table-column v-if="!col.children" :label="col.label" :prop="String(col.colIndex)" :min-width="col.colIndex === 0 ? 200 : 130">
                   <template #default="{ row, $index }">
                     <el-input v-if="noteEditMode && lazyEdit.isEditing($index, col.colIndex)" v-model="row[col.colIndex]" size="small" :placeholder="col.label"
                       :class="{ 'gt-note-cell-manual': isManual(row, col.colIndex) }"
@@ -105,7 +105,7 @@
                 <el-table-column v-else :label="col.label" align="center">
                   <template v-for="(child, chi) in col.children" :key="'mhc-' + ci + '-' + chi">
                     <!-- 二级叶子 -->
-                    <el-table-column v-if="!child.children" :label="child.label" :min-width="130">
+                    <el-table-column v-if="!child.children" :label="child.label" :prop="String(child.colIndex)" :min-width="130">
                       <template #default="{ row, $index }">
                         <el-input v-if="noteEditMode && lazyEdit.isEditing($index, child.colIndex)" v-model="row[child.colIndex]" size="small" :placeholder="child.label"
                           :class="{ 'gt-note-cell-manual': isManual(row, child.colIndex) }"
@@ -123,7 +123,7 @@
                     <!-- 三级嵌套（3 行表头场景） -->
                     <el-table-column v-else :label="child.label" align="center">
                       <el-table-column v-for="(leaf, li) in child.children" :key="'mhl-' + ci + '-' + chi + '-' + li"
-                        :label="leaf.label" :min-width="130">
+                        :label="leaf.label" :prop="String(leaf.colIndex)" :min-width="130">
                         <template #default="{ row, $index }">
                           <el-input v-if="noteEditMode && lazyEdit.isEditing($index, leaf.colIndex)" v-model="row[leaf.colIndex]" size="small" :placeholder="leaf.label"
                             :class="{ 'gt-note-cell-manual': isManual(row, leaf.colIndex) }"
@@ -145,7 +145,7 @@
             </template>
             <!-- 扁平表头（无 multi_header 的章节，走原逻辑） -->
             <template v-else>
-            <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :min-width="hi === 0 ? 200 : 130">
+            <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :prop="String(hi)" :min-width="hi === 0 ? 200 : 130">
               <template #default="{ row, $index }">
                 <el-input v-if="noteEditMode && lazyEdit.isEditing($index, hi)" v-model="row[hi]" size="small" :placeholder="h"
                   :class="{ 'gt-note-cell-manual': isManual(row, hi) }"
@@ -277,7 +277,7 @@
             <!-- 全屏模式：多行合并表头 -->
             <template v-if="parsedMultiHeader">
               <template v-for="(col, ci) in parsedMultiHeader" :key="'fs-mh-' + ci">
-                <el-table-column v-if="!col.children" :label="col.label" :min-width="col.colIndex === 0 ? 200 : 130">
+                <el-table-column v-if="!col.children" :label="col.label" :prop="String(col.colIndex)" :min-width="col.colIndex === 0 ? 200 : 130">
                   <template #default="{ row, $index }">
                     <el-input v-if="noteEditMode && lazyEdit.isEditing($index + 10000, col.colIndex)" v-model="row[col.colIndex]" size="small" :placeholder="col.label"
                       :class="{ 'gt-note-cell-manual': isManual(row, col.colIndex) }"
@@ -292,7 +292,7 @@
                 </el-table-column>
                 <el-table-column v-else :label="col.label" align="center">
                   <template v-for="(child, chi) in col.children" :key="'fs-mhc-' + ci + '-' + chi">
-                    <el-table-column v-if="!child.children" :label="child.label" :min-width="130">
+                    <el-table-column v-if="!child.children" :label="child.label" :prop="String(child.colIndex)" :min-width="130">
                       <template #default="{ row, $index }">
                         <el-input v-if="noteEditMode && lazyEdit.isEditing($index + 10000, child.colIndex)" v-model="row[child.colIndex]" size="small" :placeholder="child.label"
                           :class="{ 'gt-note-cell-manual': isManual(row, child.colIndex) }"
@@ -307,7 +307,7 @@
                     </el-table-column>
                     <el-table-column v-else :label="child.label" align="center">
                       <el-table-column v-for="(leaf, li) in child.children" :key="'fs-mhl-' + ci + '-' + chi + '-' + li"
-                        :label="leaf.label" :min-width="130">
+                        :label="leaf.label" :prop="String(leaf.colIndex)" :min-width="130">
                         <template #default="{ row, $index }">
                           <el-input v-if="noteEditMode && lazyEdit.isEditing($index + 10000, leaf.colIndex)" v-model="row[leaf.colIndex]" size="small" :placeholder="leaf.label"
                             :class="{ 'gt-note-cell-manual': isManual(row, leaf.colIndex) }"
@@ -327,7 +327,7 @@
             </template>
             <!-- 全屏模式：扁平表头 -->
             <template v-else>
-            <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :min-width="hi === 0 ? 200 : 130">
+            <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :prop="String(hi)" :min-width="hi === 0 ? 200 : 130">
               <template #default="{ row, $index }">
                 <el-input v-if="noteEditMode && lazyEdit.isEditing($index + 10000, hi)" v-model="row[hi]" size="small" :placeholder="h"
                   :class="{ 'gt-note-cell-manual': isManual(row, hi) }"
@@ -747,6 +747,8 @@ const emit = defineEmits<{
   (e: 'audit-all'): void
   (e: 'load-note-tree', forceRefresh?: boolean): void
   (e: 'revert-standard', standard: string): void
+  // CP-05：脏状态下用户取消切模板 → 请求父组件把 standard 等 scope 恢复到加载时的上下文
+  (e: 'restore-note-context', context: { projectId: string; year: number; nodeKey: string; variant: string; sectionId: string }): void
 }>()
 
 // ─── ACNR NOTE 域索引解析（Req 20.3/20.4/20.7/20.9） ──────────────────────────
@@ -772,13 +774,21 @@ function sourceNoteAddr(sectionId?: string): string {
  */
 async function jumpToNoteSection(sectionId?: string, title?: string) {
   if (!sectionId) return
+  // CP-05：ACNR 跳转也走子操作守卫——scope/变体切换或更新的跳转进来后，本次晚到解析一律作废
+  // （既不 routerPush 也不回退加载旧章节）；连续两次跳转只有最新的生效。
+  const ticket = noteSubOpGuard.startRequest()
   try {
     const res = await acnr.resolveIndex(sourceNoteAddr(sectionId))
+    if (noteSubOpGuard.isStale(ticket)) return
     if (res.found && res.jump_route) {
       router.push(res.jump_route)
       return
     }
-  } catch { /* ACNR 不可用 → 回退现有导航 */ }
+  } catch {
+    if (noteSubOpGuard.isStale(ticket)) return
+    /* ACNR 不可用 → 回退现有导航 */
+  }
+  if (noteSubOpGuard.isStale(ticket)) return
   // miss / 无 jump_route / 异常 → 回退现有 note 导航（行为不变）
   onNoteNodeClick({ section_id: sectionId, title })
 }
@@ -1034,6 +1044,8 @@ interface NotePageSnapshot {
   projectId: string
   year: number
   nodeKey: string
+  // CP-05：模板变体（soe/listed）也是上下文身份维度；切模板后旧响应须判过期
+  variant: string
 }
 
 interface NoteContextSnapshot extends NotePageSnapshot {
@@ -1071,7 +1083,41 @@ function capturePageSnapshot(): NotePageSnapshot | null {
   const projectId = String(props.projectId || '').trim()
   const year = Number(props.year) || 0
   if (!projectId || !year) return null
-  return { projectId, year, nodeKey: currentNodeKey() || '' }
+  return { projectId, year, nodeKey: currentNodeKey() || '', variant: String(props.standard || 'soe') }
+}
+
+// CP-05：已成功加载并渲染的章节上下文（含模板变体 variant）。
+// 与 selectedNoteSection 解耦：scope 清空时 selectedNoteSection 先置空，loadedNoteContext
+// 保留旧值直到新章节重载成功，供保存前身份校验与晚到响应判定使用。
+const loadedNoteContext = ref<NoteContextSnapshot | null>(null)
+
+// CP-05：导航 epoch（并发切章节时 latest wins）+ 脏状态确认期间暂存的原章节（并发共享）。
+const noteNavEpoch = ref(0)
+const navDirtyOriginal = ref<any>(null)
+const navDirtyContext = ref<NoteContextSnapshot | null>(null)
+
+// CP-05：脏状态切换的共享确认。并发的"丢弃未保存编辑"确认必须复用同一个弹窗，
+// 避免同一次 setProps 批量更新（如 standard+currentEntity 一起变）或连续切章节弹多次。
+let pendingDirtyDecision: Promise<boolean> | null = null
+async function confirmDiscardDirty(): Promise<boolean> {
+  if (pendingDirtyDecision) return pendingDirtyDecision
+  pendingDirtyDecision = (async () => {
+    try {
+      await ElMessageBox.confirm(
+        '当前附注章节有未保存的编辑内容，切换后将丢失。是否放弃修改并切换？',
+        '切换附注',
+        { confirmButtonText: '放弃修改并切换', cancelButtonText: '取消', type: 'warning' },
+      )
+      return true
+    } catch {
+      return false
+    }
+  })()
+  try {
+    return await pendingDirtyDecision
+  } finally {
+    pendingDirtyDecision = null
+  }
 }
 
 function captureNoteSnapshot(section: any = selectedNoteSection.value): NoteContextSnapshot | null {
@@ -1087,6 +1133,7 @@ function isPageSnapshotCurrent(snapshot: NotePageSnapshot): boolean {
     && current.projectId === snapshot.projectId
     && current.year === snapshot.year
     && current.nodeKey === snapshot.nodeKey
+    && current.variant === snapshot.variant
 }
 
 function isNoteSnapshotCurrent(snapshot: NoteContextSnapshot, section?: any): boolean {
@@ -1100,7 +1147,18 @@ const noteRequestGuard = createConsolRequestGuard(() => ({
   projectId: props.projectId,
   year: props.year,
   nodeKey: currentNodeKey() || '',
+  variant: String(props.standard || 'soe'),
   sectionId: requestedSectionId.value,
+}))
+
+// CP-05：子操作（差额/审核/公式/导入导出/汇总/删行/跳转）专用守卫，与章节加载守卫独立，
+// 避免打开差额弹窗等子操作把正在飞行的章节加载请求顶掉。scope/变体变化时两个守卫都 abort。
+const noteSubOpGuard = createConsolRequestGuard(() => ({
+  projectId: props.projectId,
+  year: props.year,
+  nodeKey: currentNodeKey() || '',
+  variant: String(props.standard || 'soe'),
+  sectionId: String(selectedNoteSection.value?.section_id || requestedSectionId.value || ''),
 }))
 
 function noteDataUrl(context: NoteContextSnapshot): string {
@@ -1121,6 +1179,7 @@ function sameNoteContext(left: NoteContextSnapshot, right: NoteContextSnapshot):
   return left.projectId === right.projectId
     && left.year === right.year
     && left.nodeKey === right.nodeKey
+    && left.variant === right.variant
     && left.sectionId === right.sectionId
 }
 
@@ -1136,6 +1195,15 @@ function noteRefreshResult(
     updatedAt: options.updatedAt ?? null,
     reason: options.reason,
   }
+}
+
+// CP-05：身份校验失败的统一处置——清空当前渲染与已加载上下文、显式报错、返回 failed。
+// 不保留任何半成品状态，避免后续保存误把错数据落库。
+function rejectNoteIdentity(context: NoteContextSnapshot, reason: string): NoteRefreshResult {
+  selectedNoteSection.value = null
+  loadedNoteContext.value = null
+  ElMessage.error(`加载附注章节失败：${reason}`)
+  return noteRefreshResult('failed', context, { reason })
 }
 
 function noteErrorMessage(err: any, fallback: string): string {
@@ -1256,7 +1324,6 @@ const noteEditRows = computed({
 const {
   selectedRows: noteSelectedRows,
   onSelectionChange: onNoteSelectionChange,
-  deleteSelectedRows,
 } = useTableToolbar(noteEditRows)
 const noteBatchFileRef = ref<HTMLInputElement | null>(null)
 const noteFormulaFileRef = ref<HTMLInputElement | null>(null)
@@ -1339,6 +1406,31 @@ const selectedCellIsManual = computed(() => {
 })
 const drillDownCell = reactive({ itemName: '', colName: '', totalValue: 0 as number | null, sectionId: '', rowIdx: -1, colIdx: -1 })
 
+// CP-04：当前渲染的可见数据行（视图模式裁掉尾部占位空行）。拖选 / 复制 / 导出以此为准。
+const noteVisibleRows = computed<any[]>(() => {
+  const sec = selectedNoteSection.value
+  if (!sec?.editRows) return []
+  return noteEditMode.value ? sec.editRows : trimTrailingEmptyRows(sec.editRows)
+})
+
+// CP-04：数据区起始行号 = 前导"类别行"（仅第 0 列有文本、其余列为空）的数量。
+// 批量导入按模板槽位回填、拖选 DOM 行→存储行映射都以此为偏移，保留模板的分类/小标题行。
+function noteDataRowStart(sec: any): number {
+  const rows: any[] = sec?.editRows || []
+  let start = 0
+  for (const r of rows) {
+    const col0 = String(r?.[0] ?? '').trim()
+    const width = sec?.headers?.length || 0
+    let restEmpty = true
+    for (let c = 1; c < width; c++) {
+      if (String(r?.[c] ?? '').trim() !== '') { restEmpty = false; break }
+    }
+    if (col0 !== '' && restEmpty) start++
+    else break
+  }
+  return start
+}
+
 // ─── 批注 ────────────────────────────────────────────────────────────────────
 const showCommentDialog = ref(false)
 const commentTarget = reactive({ itemName: '', colName: '', value: '', text: '' })
@@ -1393,9 +1485,17 @@ function fmtAmt(v: any): string {
 // onNoteSelectionChange 已由 useTableToolbar 提供
 
 /** 编辑值即成为手工单元格；第 0 列是项目名，不参与取数公式 */
+// CP-05：脏世代计数。每次产生新编辑 +1；保存发起时快照，PUT 返回时若世代已变，
+// 说明 PUT 期间用户又改了，不能用旧保存结果清除新的 dirty。
+const noteDirtyEpoch = ref(0)
+function markNoteDirtyTracked() {
+  noteDirtyEpoch.value++
+  markNoteDirty()
+}
+
 function onNoteCellInput(row: NoteEditRow, col: number) {
   markManual(row, col)
-  markNoteDirty()
+  markNoteDirtyTracked()
   // 自动刷新合计行
   recalcTotalRows()
 }
@@ -1454,9 +1554,27 @@ function _parseNum(val: any): number | null {
   return isNaN(n) ? null : n
 }
 
-/** 删除行后手工标记随行对象一起移动；保存时重新按当前行号序列化 */
+/** 删除行后手工标记随行对象一起移动；保存时重新按当前行号序列化。
+ *  CP-05：删除确认晚到（切 scope/变体后）不得删掉新章节的行，也不得标脏。 */
 async function deleteNoteRows() {
-  if (await deleteSelectedRows()) markNoteDirty()
+  const sec = selectedNoteSection.value
+  const rows = noteSelectedRows.value
+  if (!sec || !rows.length) {
+    if (!rows.length) ElMessage.warning('请先选择要删除的行')
+    return
+  }
+  const ticket = noteSubOpGuard.startRequest()
+  try {
+    await confirmBatch('删除', rows.length)
+  } catch {
+    return // 用户取消
+  }
+  // 确认晚到后若已切走 → 作废，不碰新章节
+  if (noteSubOpGuard.isStale(ticket) || selectedNoteSection.value !== sec) return
+  const toDelete = new Set(rows)
+  sec.editRows = sec.editRows.filter((r: any) => !toDelete.has(r))
+  noteSelectedRows.value = []
+  markNoteDirtyTracked()
 }
 
 /** 取消手工保护；下一次「按公式填入」会重新写入该格 */
@@ -1466,7 +1584,7 @@ function restoreSelectedFormula() {
   const cell = selectedCells.value[0]
   if (!sec || !cell) return
   clearManual(sec.editRows[cell.row], cell.col)
-  markNoteDirty()
+  markNoteDirtyTracked()
   ElMessage.success('已恢复为公式单元格；点击“按公式填入”即可取最新合并数')
 }
 
@@ -1508,7 +1626,8 @@ function onNoteCellClick(row: any, column: any, _cell: HTMLElement, event: Mouse
   noteCtx.closeContextMenu()
   const sec = selectedNoteSection.value
   if (!sec || noteEditMode.value) return
-  const colIdx = sec.headers.indexOf(column.label)
+  // 列身份以原始叶子列下标（:prop=col.colIndex）为准，而非 label（label 可能重复且不唯一）
+  const colIdx = noteCellColIndex(column, sec)
   if (colIdx < 0) return
   const rowIdx = sec.editRows.indexOf(row)
   if (rowIdx < 0) return
@@ -1525,10 +1644,65 @@ function onNoteCellClick(row: any, column: any, _cell: HTMLElement, event: Mouse
   }
 }
 
+// 从 el-table 列对象解析原始叶子列下标：优先 property（= :prop 绑定的 colIndex），回退按 label 查找
+function noteCellColIndex(column: any, sec: any): number {
+  const prop = column?.property
+  if (prop != null && prop !== '') {
+    const n = Number(prop)
+    if (Number.isInteger(n) && n >= 0) return n
+  }
+  return sec.headers.indexOf(column?.label)
+}
+
+// CP-04：DOM 拖选。从原生鼠标事件解析 td 的行列：列 = td.cellIndex（原始叶子列下标），
+// 行 = tr 在 tbody 的位置 + 数据区偏移（noteDataRowStart，跳过前导类别行）→ 存储 editRows 下标。
+const noteDragAnchor = reactive({ row: -1, col: -1 })
+function parseNoteDragCell(ev: MouseEvent): { row: number; col: number } | null {
+  const sec = selectedNoteSection.value
+  if (!sec) return null
+  const td = (ev.target as HTMLElement)?.closest?.('td.el-table__cell') as HTMLTableCellElement | null
+  if (!td) return null
+  const tr = td.closest('tr') as HTMLTableRowElement | null
+  const tbody = tr?.closest('tbody') as HTMLTableSectionElement | null
+  if (!tr || !tbody) return null
+  const domRow = Array.from(tbody.children).indexOf(tr)
+  const col = td.cellIndex
+  if (domRow < 0 || col < 0) return null
+  const row = domRow + noteDataRowStart(sec)
+  return { row, col }
+}
+function onNoteDragStart(ev: MouseEvent) {
+  if (ev.button !== 0) return
+  const pos = parseNoteDragCell(ev)
+  if (!pos) return
+  const sec = selectedNoteSection.value
+  ev.preventDefault()
+  noteDragAnchor.row = pos.row
+  noteDragAnchor.col = pos.col
+  selectedCells.value = [{ row: pos.row, col: pos.col, value: sec?.editRows?.[pos.row]?.[pos.col] ?? '' }]
+}
+function onNoteDragMove(ev: MouseEvent) {
+  if (noteDragAnchor.row < 0) return
+  const pos = parseNoteDragCell(ev)
+  if (!pos) return
+  const sec = selectedNoteSection.value
+  const r0 = Math.min(noteDragAnchor.row, pos.row)
+  const r1 = Math.max(noteDragAnchor.row, pos.row)
+  const c0 = Math.min(noteDragAnchor.col, pos.col)
+  const c1 = Math.max(noteDragAnchor.col, pos.col)
+  const cells: Array<{ row: number; col: number; value: any }> = []
+  for (let r = r0; r <= r1; r++) {
+    for (let c = c0; c <= c1; c++) {
+      cells.push({ row: r, col: c, value: sec?.editRows?.[r]?.[c] ?? '' })
+    }
+  }
+  selectedCells.value = cells
+}
+
 function onNoteCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   const sec = selectedNoteSection.value
   if (!sec || noteEditMode.value) return
-  const colIdx = sec.headers.indexOf(column.label)
+  const colIdx = noteCellColIndex(column, sec)
   if (colIdx < 0) return
   const rowIdx = sec.editRows.indexOf(row)
   if (rowIdx < 0) return
@@ -1606,11 +1780,19 @@ async function loadNoteBreakdown() {
   if (!sec?.section_id || noteBreakdownLoading.value) return
   noteBreakdownLoading.value = true
   noteBreakdownError.value = ''
+  // CP-05：子操作守卫——切 scope/变体后本次差额响应须判过期，不得重开弹窗或写入旧数据
+  const ticket = noteSubOpGuard.startRequest()
   try {
     const result = await getConsolNoteBreakdown(props.projectId, props.year, sec.section_id, {
       nodeKey: noteBreakdownNodeKey.value,
       standard: props.standard,
+      signal: ticket.signal,
     })
+    if (noteSubOpGuard.isStale(ticket)) {
+      noteBreakdown.value = null
+      showNoteBreakdownDialog.value = false
+      return
+    }
     noteBreakdown.value = result
     if (!noteBreakdownNodeKey.value && result.node_key) noteBreakdownNodeKey.value = result.node_key
     // 已保存数据插删过行时，用行标签把编辑格映射回模板公式行（与后端填入同口径）
@@ -1623,6 +1805,11 @@ async function loadNoteBreakdown() {
       }
     }
   } catch (err: any) {
+    if (noteSubOpGuard.isStale(ticket)) {
+      noteBreakdown.value = null
+      showNoteBreakdownDialog.value = false
+      return
+    }
     noteBreakdown.value = null
     const detail = err?.response?.data?.detail
     noteBreakdownError.value = typeof detail === 'string' && detail ? detail : '加载附注差额失败'
@@ -1745,9 +1932,12 @@ async function confirmAndExecuteAggregate() {
     confirmMsg = `将汇总以下 ${checkedNodes.length} 家企业的${sourceLabel}数据：\n${names || '未选择'}\n\n结果填充到 "${aggTarget.itemName} / ${aggTarget.colName}"。`
   }
 
+  // CP-05：确认期间若 scope/变体切换，确认晚到也不得在新上下文里执行汇总写入
+  const ticket = noteSubOpGuard.startRequest()
   try {
     const { confirmDangerous } = await import('@/utils/confirm')
     await confirmDangerous(confirmMsg, '确认执行汇总')
+    if (noteSubOpGuard.isStale(ticket)) return
     await executeAggregate()
   } catch { /* cancelled */ }
 }
@@ -1849,8 +2039,15 @@ async function fillCurrentByFormula(): Promise<NoteRefreshResult> {
     return noteRefreshResult('skipped', context, { reason: '请先选择附注章节' })
   }
   // 未保存的编辑必须先落库并带 manual_cells；否则后端读到旧数据会覆盖用户刚输入的值
-  if (noteDirty.value && !(await saveNoteData())) {
-    return noteRefreshResult('failed', context, { reason: '当前附注数据保存失败' })
+  if (noteDirty.value) {
+    const epochBefore = noteDirtyEpoch.value
+    if (!(await saveNoteData())) {
+      return noteRefreshResult('failed', context, { reason: '当前附注数据保存失败' })
+    }
+    // 保存期间用户又产生新编辑 → 公式填入会覆盖这些新编辑，放弃本次填入
+    if (noteDirtyEpoch.value !== epochBefore || noteDirty.value) {
+      return noteRefreshResult('skipped', context, { reason: '保存期间有新编辑，已取消按公式填入' })
+    }
   }
   const latestBeforeFill = currentRequestedNoteContext()
   if (!latestBeforeFill || !sameNoteContext(context, latestBeforeFill)) {
@@ -1880,11 +2077,10 @@ async function fillCurrentByFormula(): Promise<NoteRefreshResult> {
       ElMessage.success(fillResultSummary.value)
     } else if (reloadResult.status === 'failed') {
       ElMessage.error(`按公式填入完成，但持久化重读失败：${reloadResult.reason || '未知原因'}`)
-    } else if (reloadResult.status === 'stale') {
-      ElMessage.warning(`按公式填入结果已过期：${reloadResult.reason || '附注节点或章节已切换'}`)
-    } else {
+    } else if (reloadResult.status === 'skipped') {
       ElMessage.warning(`按公式填入未完成：${reloadResult.reason || '暂无持久化数据'}`)
     }
+    // stale（切 scope/变体）→ 静默，不得在新上下文弹提示
     return reloadResult
   } catch (err: any) {
     noteFormulaError(err, '按公式填入')
@@ -1927,13 +2123,17 @@ async function handleReaggregate(): Promise<NoteRefreshResult> {
       if (!errors.length && !failures.length) ElMessage.success(`重新汇总完成：更新 ${updated} 个章节`)
     } else if (reloadResult.status === 'failed') {
       ElMessage.error(`重新汇总完成，但章节重读失败：${reloadResult.reason || '未知原因'}`)
-    } else if (reloadResult.status === 'stale') {
-      ElMessage.warning(`重新汇总结果已过期：${reloadResult.reason || '附注节点或章节已切换'}`)
-    } else {
+    } else if (reloadResult.status === 'skipped') {
       ElMessage.warning(`重新汇总未完成：${reloadResult.reason || '暂无持久化数据'}`)
     }
+    // stale（切 scope/变体）→ 静默，不得在新上下文弹提示
     return reloadResult
   } catch (err: any) {
+    // 切 scope/变体后本次 reaggregate 响应已过期 → 静默返回 stale，不在新上下文弹错
+    const latest = currentRequestedNoteContext()
+    if (!latest || !sameNoteContext(context, latest)) {
+      return noteRefreshResult('stale', context, { reason: '重新汇总响应已过期' })
+    }
     const reason = noteErrorMessage(err, '重新汇总失败')
     handleApiError(err, '重新汇总')
     return noteRefreshResult('failed', context, { reason })
@@ -1946,7 +2146,7 @@ function addNoteRow() {
   const sec = selectedNoteSection.value
   if (!sec?.headers) return
   sec.editRows.push(emptyEditRow(sec.headers.length))
-  markNoteDirty()
+  markNoteDirtyTracked()
 }
 
 // deleteNoteRows 封装 useTableToolbar.deleteSelectedRows：删除后同步 dirty，手工标记随行移动
@@ -1954,7 +2154,21 @@ function addNoteRow() {
 async function saveNoteData(): Promise<boolean> {
   const sec = selectedNoteSection.value
   if (!sec || !props.projectId) return false
+  // CP-05：保存前身份校验——已加载上下文的变体/章节必须与当前 props/章节一致，
+  // 否则说明页面已切走，严禁把旧数据 PUT 到新上下文。
+  const loaded = loadedNoteContext.value
+  if (!loaded
+    || loaded.variant !== String(props.standard || 'soe')
+    || loaded.sectionId !== String(sec.section_id || '')) {
+    return false
+  }
+  // 保存发起时冻结载荷快照 + 上下文 + 脏世代；PUT 期间的新编辑不进本次快照。
+  const context = captureNoteSnapshot(sec)
+  if (!context) return false
   const data = notePayload(sec.savedData, sec.headers, sec.editRows)
+  // template_variant 以加载时的变体为准（而非仅透传旧 savedData），确保落库标识正确
+  data.template_variant = loaded.variant
+  const epochAtStart = noteDirtyEpoch.value
   try {
     const nk = currentNodeKey()
     const url = nk
@@ -1966,12 +2180,30 @@ async function saveNoteData(): Promise<boolean> {
       { validateStatus: (s: number) => s < 600 },
     )
     if (result?.ok === false) throw Object.assign(new Error(result.error || '保存失败'), { status: 500 })
+    // CP-05：A-B-A 保护——PUT 返回时若上下文已切换，旧保存结果既不能报成功也不能清 dirty。
+    const latest = currentRequestedNoteContext()
+    if (!latest || !sameNoteContext(context, latest) || selectedNoteSection.value !== sec) {
+      return false
+    }
+    // 响应节点身份校验：后端回传的 node_key 必须匹配，否则不认这次保存。
+    if (context.nodeKey && result?.node_key && String(result.node_key) !== context.nodeKey) {
+      return false
+    }
+    // 落库快照 = 发起时冻结的 data；PUT 期间的实时编辑保留在 editRows 中不被覆盖。
     sec.savedData = data
     ElMessage.success('附注数据已保存')
-    clearNoteDirty()
-    clearAutoSaveDraft()
+    // 仅当 PUT 期间没有产生新编辑时才清 dirty；否则保留新 dirty（用户在保存中又改了）。
+    if (noteDirtyEpoch.value === epochAtStart) {
+      clearNoteDirty()
+      clearAutoSaveDraft()
+    }
     return true
   } catch (err) {
+    // A-B-A：旧保存失败同样不能影响新上下文；仅当仍是同一上下文时才提示。
+    const latest = currentRequestedNoteContext()
+    if (!latest || !sameNoteContext(context, latest) || selectedNoteSection.value !== sec) {
+      return false
+    }
     handleApiError(err, '保存')
     return false
   }
@@ -2016,10 +2248,13 @@ async function onNoteFileSelected(e: Event) {
   if (!file) return
   const sec = selectedNoteSection.value
   if (!sec?.headers) return
+  // CP-05：文件解析晚到（切 scope/变体后）不得写回已切走的章节，也不得标脏
+  const ticket = noteSubOpGuard.startRequest()
   try {
     // 走 useExcelIO 单一入口（B4 批）。原先取第一个 sheet + sheet_to_json(header:1)，
     // readSheetAoa 不传 sheetName 时同样取第一个，选项逐项透传保持等价。
     const { rows: json } = await readSheetAoa(file)
+    if (noteSubOpGuard.isStale(ticket) || selectedNoteSection.value !== sec) return
     let startRow = 0
     if (json.length > 0) {
       const firstRow = json[0].map((c: any) => String(c || '').trim())
@@ -2040,12 +2275,15 @@ async function onNoteFileSelected(e: Event) {
     }
     if (imported.length) {
       sec.editRows.push(...imported)
-      markNoteDirty()
+      markNoteDirtyTracked()
       ElMessage.success(`已导入 ${imported.length} 行`)
     } else {
       ElMessage.warning('未解析到有效数据')
     }
-  } catch (err: any) { handleApiError(err, '导入') }
+  } catch (err: any) {
+    if (noteSubOpGuard.isStale(ticket)) return
+    handleApiError(err, '导入')
+  }
   finally { if (noteFileRef.value) noteFileRef.value.value = '' }
 }
 
@@ -2167,10 +2405,13 @@ async function onNoteBatchImport(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file || !props.projectId) return
   noteBatchLoading.value = true
+  // CP-05：批量解析晚到（切 scope/变体后）一律作废——不读章节目录、不写回、不清新 scope 的 loading/弹窗/输入框
+  const ticket = noteSubOpGuard.startRequest()
   try {
     // 走 useExcelIO 单一入口（B4 批）。本函数需遍历**全部** sheet 按标题匹配章节，
     // 故用整簿读取：一次解析拿到所有 sheet 的 AOA，与原实现等价。
     const { sheetNames, sheets } = await readWorkbookAoa(file)
+    if (noteSubOpGuard.isStale(ticket)) return
     let matched = 0
     const data = await api.get(P_cn.list(props.standard), {
       validateStatus: (s: number) => s < 600,
@@ -2182,42 +2423,74 @@ async function onNoteBatchImport(e: Event) {
         sectionMap[c.title] = c.section_id
       }
     }
+    const variant = String(props.standard || 'soe')
     for (const sheetName of sheetNames) {
       const sectionId = sectionMap[sheetName]
       if (!sectionId) continue
       const json: any[][] = sheets[sheetName]
       if (json.length < 2) continue
-      const headers = json[0].map((c: any) => String(c || ''))
-      const rows = json.slice(1).filter((r: any[]) => r.some(c => c != null && c !== '')).map((r: any[]) => r.map(c => String(c ?? '')))
-      // Excel 导入属于人工录入：所有非空数值格都标为手工，后续「按公式填入」不得静默覆盖
-      const editRows: NoteEditRow[] = rows.map((r: string[]) => {
-        const item: NoteEditRow = {}
-        const manual: number[] = []
-        for (let col = 0; col < headers.length; col++) {
-          item[col] = r[col] || ''
-          if (col > 0 && item[col] !== '') manual.push(col)
-        }
-        if (manual.length) item.__manual = manual
-        return item
+      // 取该章节模板，把上传的数据行按模板槽位回填：保留模板前导类别行，数据行从 dataStart 起覆盖
+      const detail: any = await api.get(P_cn.detail(variant, sectionId), {
+        validateStatus: (s: number) => s < 600,
+        signal: ticket.signal,
       })
-      const serialised = fromEditRows(headers, editRows)
+      if (noteSubOpGuard.isStale(ticket)) return
+      const tpl = detail?.data ?? detail
+      const headers: string[] = Array.isArray(tpl?.headers) ? tpl.headers.map((h: any) => String(h ?? '')) : json[0].map((c: any) => String(c || ''))
+      const width = headers.length
+      // 模板行作为基底（深拷贝），不足补空行
+      const baseRows: string[][] = (Array.isArray(tpl?.rows) ? tpl.rows : []).map((r: any[]) => {
+        const row: string[] = []
+        for (let c = 0; c < width; c++) row[c] = String(r?.[c] ?? '')
+        return row
+      })
+      // 数据区起点 = 模板前导类别行数（仅第 0 列有文本）
+      let dataStart = 0
+      for (const r of baseRows) {
+        const col0 = String(r[0] ?? '').trim()
+        let restEmpty = true
+        for (let c = 1; c < width; c++) if (String(r[c] ?? '').trim() !== '') { restEmpty = false; break }
+        if (col0 !== '' && restEmpty) dataStart++
+        else break
+      }
+      // 上传数据行（跳过上传文件自身的表头行）
+      const uploaded = json.slice(1).map((r: any[]) => {
+        const row: string[] = []
+        for (let c = 0; c < width; c++) row[c] = String(r?.[c] ?? '')
+        return row
+      })
+      const finalRows: string[][] = [...baseRows]
+      const manualCells: { row: number; col: number }[] = []
+      for (let i = 0; i < uploaded.length; i++) {
+        const target = dataStart + i
+        while (finalRows.length <= target) finalRows.push(Array.from({ length: width }, () => ''))
+        finalRows[target] = uploaded[i]
+        // Excel 导入属于人工录入：非空数值格（第 1 列起）标手工，按公式填入时保留
+        for (let c = 1; c < width; c++) if (uploaded[i][c] !== '') manualCells.push({ row: target, col: c })
+      }
       const nk = currentNodeKey()
       const importUrl = nk
         ? `${P_cn.data(props.projectId, props.year, sectionId)}?node_key=${encodeURIComponent(nk)}`
         : P_cn.data(props.projectId, props.year, sectionId)
       await api.put(
         importUrl,
-        { data: { headers, ...serialised } },
+        { data: { headers, rows: finalRows, manual_cells: manualCells, template_variant: variant } },
         { validateStatus: (s: number) => s < 600 },
       )
       matched++
     }
+    if (noteSubOpGuard.isStale(ticket)) return
     ElMessage.success(`已导入 ${matched} 个附注表格（共 ${sheetNames.length} 个 Sheet）`)
-  } catch (e: any) { handleApiError(e, '导入') }
+  } catch (e: any) {
+    if (noteSubOpGuard.isStale(ticket)) return
+    handleApiError(e, '导入')
+  }
   finally {
-    noteBatchLoading.value = false
-    showNoteBatchDialog.value = false
-    if (noteBatchFileRef.value) noteBatchFileRef.value.value = ''
+    if (!noteSubOpGuard.isStale(ticket)) {
+      noteBatchLoading.value = false
+      showNoteBatchDialog.value = false
+      if (noteBatchFileRef.value) noteBatchFileRef.value.value = ''
+    }
   }
 }
 
@@ -2241,11 +2514,15 @@ function openNoteFormula() {
 
 async function exportNoteFormulas() {
   noteBatchLoading.value = true
+  // CP-05：导出目录读取接子操作守卫信号——scope/变体切换后晚到响应作废，不生成文件也不清新 loading
+  const ticket = noteSubOpGuard.startRequest()
   try {
     const headers = ['章节ID', '章节标题', '行号', '列号', '公式类型', '公式表达式', '数据来源', '说明']
     const data = await api.get(P_cn.list(props.standard), {
       validateStatus: (s: number) => s < 600,
+      signal: ticket.signal,
     })
+    if (noteSubOpGuard.isStale(ticket)) return
     const groups = Array.isArray(data) ? data : (data ?? [])
     const rows: string[][] = []
     for (const g of groups) {
@@ -2266,38 +2543,58 @@ async function exportNoteFormulas() {
       successMessage: false,
     })
     ElMessage.success(`已导出公式模板`)
-  } catch (e: any) { handleApiError(e, '导出') }
-  finally { noteBatchLoading.value = false }
+  } catch (e: any) {
+    if (noteSubOpGuard.isStale(ticket)) return
+    handleApiError(e, '导出')
+  }
+  finally { if (!noteSubOpGuard.isStale(ticket)) noteBatchLoading.value = false }
 }
 
 async function onNoteFormulaImport(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
   noteBatchLoading.value = true
+  // CP-05：公式文件解析晚到（切 scope/变体后）一律静默作废——不提示成功、不清新 loading、不写回
+  const ticket = noteSubOpGuard.startRequest()
   try {
     if (file.name.endsWith('.json')) {
       const text = await file.text()
+      if (noteSubOpGuard.isStale(ticket)) return
       const formulas = JSON.parse(text)
       ElMessage.success(`已导入 ${Array.isArray(formulas) ? formulas.length : 0} 条公式规则（需后端配合存储）`)
     } else {
       const { rows: json } = await readSheetAoa(file)
+      if (noteSubOpGuard.isStale(ticket)) return
       const ruleCount = Math.max(0, json.length - 1)
       ElMessage.success(`已解析 ${ruleCount} 条公式规则（需后端配合存储）`)
     }
-  } catch (e: any) { handleApiError(e, '导入') }
+  } catch (e: any) {
+    if (noteSubOpGuard.isStale(ticket)) return
+    handleApiError(e, '导入')
+  }
   finally {
-    noteBatchLoading.value = false
-    if (noteFormulaFileRef.value) noteFormulaFileRef.value.value = ''
+    if (!noteSubOpGuard.isStale(ticket)) {
+      noteBatchLoading.value = false
+      if (noteFormulaFileRef.value) noteFormulaFileRef.value.value = ''
+    }
   }
 }
 
 async function fillAllByFormula() {
   if (noteBatchLoading.value) return
-  if (noteDirty.value && !(await saveNoteData())) return
+  if (noteDirty.value) {
+    const epochBefore = noteDirtyEpoch.value
+    if (!(await saveNoteData())) return
+    // 保存成功但 PUT 期间用户又产生了新编辑（脏世代变化）→ 不覆盖，放弃本次批量填入
+    if (noteDirtyEpoch.value !== epochBefore || noteDirty.value) return
+  }
   noteBatchLoading.value = true
+  // CP-05：子操作守卫——切 scope/变体后目录响应须判过期，不得继续填入或清 loading
+  const ticket = noteSubOpGuard.startRequest()
   try {
     const templateType = props.standard.includes('listed') ? 'listed' : 'soe'
-    const formulaList = await listConsolNoteFormulas(templateType)
+    const formulaList = await listConsolNoteFormulas(templateType, undefined, ticket.signal)
+    if (noteSubOpGuard.isStale(ticket)) return
     const sectionIds = sectionIdsWithFormulas(formulaList)
     if (!sectionIds.length) {
       ElMessage.info('当前模板还没有合并附注公式')
@@ -2336,10 +2633,14 @@ async function fillAllByFormula() {
     if (failed.length || blank) ElMessage.warning(`${summary}${failed.length ? `；失败 ${failed.length} 个章节` : ''}`)
     else ElMessage.success(summary)
   } catch (err: any) {
+    if (noteSubOpGuard.isStale(ticket)) return
     noteFormulaError(err, '全部按公式填入')
   } finally {
-    noteBatchLoading.value = false
-    showNoteBatchDialog.value = false
+    // 已过期（scope/变体切换）→ 不触碰新上下文的 loading 与弹窗状态
+    if (!noteSubOpGuard.isStale(ticket)) {
+      noteBatchLoading.value = false
+      showNoteBatchDialog.value = false
+    }
   }
 }
 
@@ -2398,6 +2699,8 @@ async function auditCurrentNote() {
   const sec = selectedNoteSection.value
   if (!sec || !props.projectId) { ElMessage.warning('请先选择章节'); return }
   noteSingleAuditLoading.value = true
+  // CP-05：子操作守卫——切 scope/变体后审核响应须判过期，不得重开结果弹窗或清当前 loading
+  const ticket = noteSubOpGuard.startRequest()
   try {
     const entityCode = props.currentEntity.code || ''
     const currentRows = sec.editRows.map((r: any) => sec.headers.map((_: string, j: number) => r[j] || ''))
@@ -2407,7 +2710,8 @@ async function auditCurrentNote() {
       node_key: currentNodeKey(),
       headers: sec.headers,
       rows: currentRows,
-    }, { validateStatus: (s: number) => s < 600 })
+    }, { validateStatus: (s: number) => s < 600, signal: ticket.signal })
+    if (noteSubOpGuard.isStale(ticket)) return
     const result = data
     noteAuditResults.value = Array.isArray(result?.results) ? result.results : []
     noteAuditSummary.totalSections = 1
@@ -2417,8 +2721,11 @@ async function auditCurrentNote() {
     noteAuditSummary.warnCount = noteAuditResults.value.filter((r: any) => r.level === 'warn').length
     showNoteAuditDialog.value = true
   } catch (err: any) {
+    if (noteSubOpGuard.isStale(ticket)) return
     handleApiError(err, '单表审核')
-  } finally { noteSingleAuditLoading.value = false }
+  } finally {
+    if (!noteSubOpGuard.isStale(ticket)) noteSingleAuditLoading.value = false
+  }
 }
 
 function hasApiFailure(payload: any): boolean {
@@ -2439,6 +2746,40 @@ async function onNoteNodeClick(
 ): Promise<NoteRefreshResult> {
   const sectionId = String(data.section_id || '').trim()
   if (!sectionId) return noteRefreshResult('skipped', null, { reason: '未指定附注章节' })
+  // CP-05：每次导航递增 epoch；确认期间若有更新的导航进来，本次作废（latest wins）。
+  const myNav = ++noteNavEpoch.value
+  // 切走一个有未保存编辑的章节前先确认；并发切换共享同一个确认弹窗。
+  // 确认期间先置空当前章节（禁止保存），取消 → 恢复原章节与 dirty 返回 skipped，接受 → 清 dirty 继续。
+  if (noteDirty.value && (selectedNoteSection.value || navDirtyOriginal.value)) {
+    // 第一个进入的调用把 original 暂存到 nav 作用域，后续并发调用共享同一个 original
+    if (!navDirtyOriginal.value) {
+      navDirtyOriginal.value = selectedNoteSection.value
+      navDirtyContext.value = loadedNoteContext.value
+    }
+    const original = navDirtyOriginal.value
+    const originalContext = navDirtyContext.value
+    selectedNoteSection.value = null
+    const accepted = await confirmDiscardDirty()
+    // 更新的导航已进来 → 本次作废
+    if (myNav !== noteNavEpoch.value) {
+      return noteRefreshResult('stale', captureNoteSnapshot({ section_id: sectionId }), { reason: '已有更新的章节切换' })
+    }
+    if (!accepted) {
+      selectedNoteSection.value = original
+      loadedNoteContext.value = originalContext
+      navDirtyOriginal.value = null
+      navDirtyContext.value = null
+      return noteRefreshResult('skipped', captureNoteSnapshot({ section_id: sectionId }), { reason: '用户取消切换' })
+    }
+    clearNoteDirty()
+    clearAutoSaveDraft()
+    navDirtyOriginal.value = null
+    navDirtyContext.value = null
+  }
+  // 确认后再次检查是否仍是最新导航（防止确认期间又有新点击）
+  if (myNav !== noteNavEpoch.value) {
+    return noteRefreshResult('stale', captureNoteSnapshot({ section_id: sectionId }), { reason: '已有更新的章节切换' })
+  }
   requestedSectionId.value = sectionId
   textAfterExpanded.value = false
   noteSelectedRows.value = []
@@ -2464,6 +2805,14 @@ async function onNoteNodeClick(
     }
     const sec = detail?.data ?? detail
     if (!sec || sec.error) throw new Error(sec?.error || '附注模板读取失败')
+    // CP-05：身份校验①——模板返回的 template_type / section_id 必须与请求上下文一致，
+    // 否则后端把错模板/错章节的数据回给了当前节点，严禁静默采用（见 §域5）。
+    if (sec.template_type && String(sec.template_type) !== context.variant) {
+      return rejectNoteIdentity(context, `附注模板类型不符（期望 ${context.variant}，收到 ${sec.template_type}）`)
+    }
+    if (sec.section_id && String(sec.section_id) !== context.sectionId) {
+      return rejectNoteIdentity(context, `附注章节不符（期望 ${context.sectionId}，收到 ${sec.section_id}）`)
+    }
     const headers = Array.isArray(sec.headers) ? sec.headers : []
     let rows = Array.isArray(sec.rows) ? sec.rows : []
     let savedContent: Record<string, unknown> = {}
@@ -2486,6 +2835,18 @@ async function onNoteNodeClick(
     if (!latest || !sameNoteContext(context, latest)) {
       return noteRefreshResult('stale', context, { reason: '附注节点或章节已切换' })
     }
+    // CP-05：身份校验②——持久化数据的 node_key / template_variant / 列宽必须与当前上下文一致。
+    // 任何一项不符都说明读到的是别的节点/模板/宽度的数据，拒绝采用并显式报错（见 §域5）。
+    if (context.nodeKey && saved?.node_key && String(saved.node_key) !== context.nodeKey) {
+      return rejectNoteIdentity(context, `附注数据节点不符（期望 ${context.nodeKey}，收到 ${saved.node_key}）`)
+    }
+    if (savedContent.template_variant && String(savedContent.template_variant) !== context.variant) {
+      return rejectNoteIdentity(context, `附注数据模板变体不符（期望 ${context.variant}，收到 ${savedContent.template_variant}）`)
+    }
+    if (Array.isArray(savedContent.headers) && headers.length
+      && savedContent.headers.length !== headers.length) {
+      return rejectNoteIdentity(context, `附注数据列数不符（模板 ${headers.length} 列，数据 ${savedContent.headers.length} 列）`)
+    }
     const editRows = toEditRows(headers, rows, savedContent.manual_cells)
     selectedNoteSection.value = {
       section_id: sec.section_id,
@@ -2503,8 +2864,13 @@ async function onNoteNodeClick(
       rowTypes: Array.isArray(sec._row_types) ? sec._row_types : null,
       // Phase 6：Word 模板中表格下方的参考文字
       textAfterTable: sec.text_after_table || null,
+      // CP-05：记录加载时的模板变体，保存时作为 template_variant 透传且用于身份校验
+      templateVariant: context.variant,
     }
-    cellComments.loadComments(sec.section_id)
+    // CP-05：章节成功渲染后记录上下文（含 variant），供保存前身份校验与晚到响应判定
+    loadedNoteContext.value = { ...context }
+    // 批注加载带本次请求的 signal：切模板/章节后旧批注响应（signal 已 abort）不得覆盖新章节
+    cellComments.loadComments(sec.section_id, ticket.signal)
     // 异步加载跨表勾稽结果（不阻塞章节展示）
     loadCheckRules(sec.section_id)
     return noteRefreshResult(
@@ -2530,33 +2896,113 @@ function switchToFourCol() {
   eventBus.emit('four-col-switch', { tab: 'notes' })
 }
 
-// CP-05：模板切换（国企↔上市）时重新加载当前已选章节，不保留旧配置
-// R4.3：如有未保存内容须先确认
-watch(() => props.standard, async (newStd, oldStd) => {
-  if (newStd && oldStd && newStd !== oldStd && selectedNoteSection.value) {
-    // 有未保存编辑时先确认
-    if (noteDirty.value) {
-      try {
-        await ElMessageBox.confirm(
-          '当前附注章节有未保存的编辑内容，切换模板后将丢失。是否继续？',
-          '未保存提醒',
-          { confirmButtonText: '继续切换', cancelButtonText: '取消', type: 'warning' },
-        )
-      } catch {
-        // 用户取消 → emit 让父组件回退 standard
-        emit('revert-standard', oldStd)
-        return
-      }
+// CP-05：退出编辑模式。脏时先确认丢弃；确认期间若 scope/变体切换或产生了新上下文，
+// 本次（针对旧上下文的）确认结果一律作废，不得清除新章节的 dirty/编辑态。
+async function leaveNoteEdit() {
+  if (!noteEditMode.value) return
+  const ctxAtStart = loadedNoteContext.value ? { ...loadedNoteContext.value } : null
+  if (noteDirty.value) {
+    let accepted = false
+    try {
+      await ElMessageBox.confirm(
+        '当前附注章节有未保存的编辑内容，退出编辑后将丢失。是否放弃修改并退出？',
+        '退出编辑',
+        { confirmButtonText: '放弃修改并退出', cancelButtonText: '取消', type: 'warning' },
+      )
+      accepted = true
+    } catch {
+      accepted = false
     }
-    const currentSection = selectedNoteSection.value
-    // 清除旧配置
-    selectedNoteSection.value = null
+    // 确认晚到：上下文已切换（variant/section/node/scope 变化）→ 作废，不碰新上下文
+    const now = loadedNoteContext.value
+    if (!ctxAtStart || !now || !sameNoteContext(ctxAtStart, now)) return
+    if (!accepted) return
     clearNoteDirty()
     clearAutoSaveDraft()
-    // 用新模板重新加载同一章节
-    onNoteNodeClick({ section_id: currentSection.section_id, title: currentSection.title })
   }
-})
+  // 已在上面自行确认过丢弃，强制退出避免 useEditMode 再弹一次
+  exitNoteEdit(true)
+}
+
+// CP-05：脏状态下取消切模板时暂存原章节对象，待父组件把 standard 恢复到加载变体后原样恢复。
+const stashedNoteSection = ref<any>(null)
+const stashedContext = ref<NoteContextSnapshot | null>(null)
+
+// CP-05：scope（project/year/node/variant）任一变化都要让飞行中的请求失效并关闭弹窗；
+// 变体变化（国企↔上市）在脏时需确认，scope（年度/项目/节点）变化直接清空当前章节。
+// R4.3：如有未保存内容须先确认。
+watch(
+  () => ({
+    projectId: props.projectId,
+    year: props.year,
+    nodeKey: props.currentEntity?.nodeKey || '',
+    variant: props.standard,
+  }),
+  async (next, prev) => {
+    if (!prev) return
+    const variantChanged = next.variant !== prev.variant
+    const scopeChanged = next.projectId !== prev.projectId
+      || next.year !== prev.year
+      || next.nodeKey !== prev.nodeKey
+    if (!variantChanged && !scopeChanged) return
+
+    // 任一维度变化 → 立即取消飞行中的附注请求与子操作（使其 signal.aborted，晚到响应判过期）
+    noteRequestGuard.abort()
+    noteSubOpGuard.abort()
+
+    // ── 变体变化（模板切换）：脏时确认，否则重载同章节 ──
+    if (variantChanged && !scopeChanged) {
+      // 父组件把 standard 恢复到暂存上下文的变体 → 原样恢复暂存的章节对象（保留 dirty）
+      if (stashedNoteSection.value && stashedContext.value?.variant === next.variant) {
+        selectedNoteSection.value = stashedNoteSection.value
+        loadedNoteContext.value = { ...stashedContext.value }
+        stashedNoteSection.value = null
+        stashedContext.value = null
+        return
+      }
+      // 以"最后请求的章节"为重载目标：即便首个加载还在飞行中（selectedNoteSection 尚空），
+      // 也要用新变体重载，否则 A-B-A 后页面会停在空态。
+      const reloadSectionId = String(requestedSectionId.value || selectedNoteSection.value?.section_id || '').trim()
+      if (!reloadSectionId) return
+      const reloadTitle = selectedNoteSection.value?.title
+      if (noteDirty.value && selectedNoteSection.value) {
+        const accepted = await confirmDiscardDirty()
+        if (!accepted) {
+          // 取消 → 暂存原章节 + 请求父组件恢复 scope，当前置空且不可保存
+          stashedNoteSection.value = selectedNoteSection.value
+          stashedContext.value = loadedNoteContext.value ? { ...loadedNoteContext.value } : null
+          if (loadedNoteContext.value) emit('restore-note-context', { ...loadedNoteContext.value })
+          emit('revert-standard', prev.variant)
+          selectedNoteSection.value = null
+          return
+        }
+        clearNoteDirty()
+        clearAutoSaveDraft()
+      }
+      selectedNoteSection.value = null
+      onNoteNodeClick({ section_id: reloadSectionId, title: reloadTitle })
+      return
+    }
+
+    // ── scope 变化（年度/项目/节点）：清空当前章节 + 关闭过程弹窗，禁写直到重载 ──
+    if (scopeChanged) {
+      const hadSection = !!selectedNoteSection.value
+      selectedNoteSection.value = null
+      loadedNoteContext.value = null
+      stashedNoteSection.value = null
+      stashedContext.value = null
+      showFillResultDialog.value = false
+      showNoteBreakdownDialog.value = false
+      showNoteAuditDialog.value = false
+      showAggregateDialog.value = false
+      noteBreakdown.value = null
+      clearNoteDirty()
+      clearAutoSaveDraft()
+      // 若原来有选中章节，用新 scope 重载同章节（父组件可据 selectedNoteSection 空态决定是否触发）
+      if (hadSection) requestedSectionId.value = ''
+    }
+  },
+)
 
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
 function onDocClick(e: MouseEvent) {
@@ -2623,9 +3069,12 @@ onUnmounted(() => {
   eventBus.off('consol-tree-aggregate', onTreeAggregate)
   eventBus.off('consol-note-audit-all', onNoteAuditAllEvent)
   eventBus.off('shortcut:save', onShortcutSave)
-  // 取消飞行中的附注请求
+  // 取消飞行中的附注请求与子操作
   noteRequestGuard.abort()
-  autoSync.cancelPending()
+  noteSubOpGuard.abort()
+  // 🔴 删除原 `autoSync.cancelPending()`：`autoSync` 从未定义（HEAD 既有 ReferenceError，
+  //    每次卸载即抛，污染测试套件并在生产卸载时报错），且 useAutoSave 已在其内部
+  //    onBeforeUnmount 里 stopTimer() 自行取消待存草稿定时器，无需也无此 API。
 })
 
 // Expose for parent to call

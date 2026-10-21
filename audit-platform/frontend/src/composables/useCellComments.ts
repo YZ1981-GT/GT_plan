@@ -27,7 +27,7 @@ export function useCellComments(projectId: () => string, year: () => number, mod
   const loading = ref(false)
 
   /** 加载模块下所有批注/复核 */
-  async function loadComments(sheetKey?: string) {
+  async function loadComments(sheetKey?: string, signal?: AbortSignal) {
     const pid = projectId()
     const y = year()
     if (!pid || !y) return
@@ -36,9 +36,12 @@ export function useCellComments(projectId: () => string, year: () => number, mod
       const url = sheetKey
         ? `/api/cell-comments/${pid}/${y}/${module}/${sheetKey}`
         : `/api/cell-comments/${pid}/${y}/${module}`
-      const data = await api.get(url)
+      const data = await api.get(url, signal ? { signal } : undefined)
+      // 晚到响应（请求已被 abort）不得覆盖当前批注，避免切模板/章节后旧批注复活
+      if (signal?.aborted) return
       comments.value = Array.isArray(data) ? data : []
     } catch {
+      if (signal?.aborted) return
       comments.value = []
     } finally {
       loading.value = false

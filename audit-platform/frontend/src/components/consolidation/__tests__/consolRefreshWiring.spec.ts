@@ -155,7 +155,11 @@ describe('ConsolNoteTab 持久化重读错误判定（需求 6.4）', () => {
   })
 
   it('onNoteNodeClick 对持久化 GET 也检查 hasApiFailure', () => {
-    const fn = noteTab.slice(noteTab.indexOf('async function onNoteNodeClick'), noteTab.indexOf('async function onNoteNodeClick') + 3000)
+    // 取整个 onNoteNodeClick 函数体（到下一个 `function switchToFourCol` 边界），而非固定 3000 字窗口：
+    // CP-05 在函数顶部新增了脏状态确认门控与身份校验，函数体变长，固定窗口会漏掉第二个检查。
+    const start = noteTab.indexOf('async function onNoteNodeClick')
+    const end = noteTab.indexOf('function switchToFourCol', start)
+    const fn = noteTab.slice(start, end > start ? end : start + 8000)
     const checks = fn.match(/hasApiFailure\(/g) || []
     expect(checks.length).toBeGreaterThanOrEqual(2)
   })

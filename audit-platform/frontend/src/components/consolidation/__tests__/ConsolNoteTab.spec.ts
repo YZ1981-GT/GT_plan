@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, inject, provide } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
+import { defineComponent, h, provide, inject } from 'vue'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -32,6 +32,10 @@ function deferred<T = any>() {
   const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
   return { promise, resolve, reject }
 }
+// 自定义 Table/Column stub：叶子列（组件绑定 :prop=colIndex）按行渲染 .fixture-cell，
+// 携带 data-prop=列下标，供渲染类断言用。单根节点，不触发 @vue/test-utils getRootNodes 的
+// null 组件崩溃（关键：组件已给叶子列绑定 :prop，Column stub 的 slots.default 带 {row,$index}
+// 作用域参数，不会把 undefined 传给组件模板的 #default 解构）。
 const Table = defineComponent({
   props: ['data'],
   setup(p, { slots, attrs }) {
@@ -39,14 +43,14 @@ const Table = defineComponent({
     return () => h('div', { class: 'fixture-table', ...attrs }, slots.default?.())
   },
 })
-// Unlike an empty table-column stub, this keeps group slots and renders leaf cells.
 const Column = defineComponent({
   props: ['label', 'prop', 'type'],
   setup(p, { slots }) {
     const rows = inject<() => any[]>('note-rows', () => [])
     return () => h('div', { 'data-label': p.label, 'data-prop': p.prop }, p.prop !== undefined
       ? rows().map((row, $index) => h('div', { class: 'fixture-cell', 'data-row': $index }, slots.default?.({ row, $index })))
-      : p.type ? [] : slots.default?.())
+      // 无 prop 的展示列（如差额弹窗的金额列）也用作用域插槽，传空 row 避免 `#default="{ row }"` 解构崩溃
+      : p.type ? [] : slots.default?.({ row: {}, $index: 0 }))
   },
 })
 const Pass = defineComponent({ setup(_, { slots }) { return () => h('div', slots.default?.()) } })
@@ -355,11 +359,16 @@ describe('CP04 stored coordinates and asynchronous readers', () => {
     s.copyEntireNoteTable()
     const text = copy.mock.calls[0][0]
     expect(text.split('\n')).toHaveLength(10)
-    expect(text.split('\n')[1].split('\t')[5]).toBe('505')
+    // 复制/导出 = 表头行 + 全部 editRows；editRows[2]（上面设 505 的行）落在输出第 3 行
+    // （行 0 表头、行 1=editRows[0]、行 2=editRows[1]、行 3=editRows[2]）。
+    // 注：测试引入时 listed 五-5-2 的 rows 含 2 个 `类  别` 表头重复行，当时 editRows[2] 对应输出行 1；
+    // 后续 fixture 清理（commit 5914e315b 等）删掉那 2 行 ⇒ 现对应输出行 3。断言随 fixture 校准，
+    // 行为意图（第 5 列金额经复制/导出在原列位保留）不变。
+    expect(text.split('\n')[3].split('\t')[5]).toBe('505')
     expect(text).not.toContain('账面余额\t坏账准备')
     await s.exportNoteData()
     const rows = excel.exportMultiSheetData.mock.calls[0][0].sheets[0].rows
-    expect(rows).toHaveLength(10); expect(rows[1][5]).toBe('505')
+    expect(rows).toHaveLength(10); expect(rows[3][5]).toBe('505')
   })
 
   it('batch import restores exact listed header slots and manual coordinates', async () => {
