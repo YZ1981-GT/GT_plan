@@ -1,0 +1,89 @@
+{
+  "_说明": "单测真实网络连接清单（2026-10-19 探针现算，spec: frontend-test-network-isolation-and-load-dedup）。这些文件里的请求已被测试基座拦截（与 CI 上连接被拒同语义），列在这里只是还没补 mock。只许删除：补好 mock 后删掉对应条目，不要往这里加新文件。常规运行里不在清单内的文件发生真实连接会在输出里告警；GT_TEST_NETWORK_AUDIT=1 运行时会失败，列在这里却不再发生连接的条目（intermittent 里的除外）也会失败。",
+  "intermittent": {
+    "src/components/workpaper/__tests__/GtA121LegalConfirmation.pbt.spec.ts": "推断：组件 onMounted 里 `await import('@/services/apiProxy')`，多个实例（或相邻用例的实例）并发 import 同一个被 vi.mock 的模块时，vitest 的 mocker 让第二路绕过 mock 走真实模块；实测 2026-10-19 全量探针跑里连了 1 次，紧接着的审计跑里 0 次",
+    "src/components/workpaper/__tests__/GtA271ItAuditMemo.spec.ts": "推断：组件 onMounted 里 `await import('@/services/apiProxy')`，多个实例（或相邻用例的实例）并发 import 同一个被 vi.mock 的模块时，vitest 的 mocker 让第二路绕过 mock 走真实模块；实测 2026-10-19 全量探针跑里连了 1 次，紧接着的审计跑里 0 次"
+  },
+  "files": {
+    "src/__tests__/AttachmentPreviewOfficeIframe.spec.ts": [
+      "GET /api/office-preview/health"
+    ],
+    "src/__tests__/cfVerification.spec.ts": [
+      "GET /api/projects/{uuid}/wp-index"
+    ],
+    "src/__tests__/useWorkpaperNavigation.spec.ts": [
+      "GET /api/acnr/resolve"
+    ],
+    "src/components/deliverable/__tests__/DeliverableShortcut.spec.ts": [
+      "GET /api/projects/proj-abc/deliverables/",
+      "GET /api/projects/proj-abc/deliverables/completeness",
+      "GET /api/projects/proj-xyz/deliverables/",
+      "GET /api/projects/proj-xyz/deliverables/completeness",
+      "GET /api/projects/test-project-123/deliverables/",
+      "GET /api/projects/test-project-123/deliverables/completeness"
+    ],
+    "src/components/workpaper/GtDForm/__tests__/GtDFormQA.spec.ts": [
+      "GET /api/feature-flags"
+    ],
+    "src/components/workpaper/GtWpRenderer.runtime-boundary.test.ts": [
+      "GET /api/disclosure-notes/project-1/2025/wp-sync-status"
+    ],
+    "src/components/workpaper/__tests__/F1DisclosureMount.spec.ts": [
+      "GET /api/ai/health"
+    ],
+    "src/components/workpaper/__tests__/GtA121LegalConfirmation.pbt.spec.ts": [
+      "GET /api/workpapers/onlyoffice/health"
+    ],
+    "src/components/workpaper/__tests__/GtA1731ConsultationExecution.spec.ts": [
+      "GET /api/workpapers/onlyoffice/health"
+    ],
+    "src/components/workpaper/__tests__/GtA173ConsultationRecord.spec.ts": [
+      "GET /api/workpapers/onlyoffice/health"
+    ],
+    "src/components/workpaper/__tests__/GtA174DisagreementRecord.spec.ts": [
+      "GET /api/workpapers/onlyoffice/health"
+    ],
+    "src/components/workpaper/__tests__/GtA176ClosingMeeting.spec.ts": [
+      "GET /api/workpapers/onlyoffice/health"
+    ],
+    "src/components/workpaper/__tests__/GtA1Dashboard.spec.ts": [
+      "GET /api/projects/proj-001/wp-index"
+    ],
+    "src/components/workpaper/__tests__/GtA271ItAuditMemo.spec.ts": [
+      "GET /api/workpapers/onlyoffice/health"
+    ],
+    "src/components/workpaper/__tests__/GtAProgramConsole.spec.ts": [
+      "GET /api/projects/proj-001/assignments"
+    ],
+    "src/components/workpaper/__tests__/GtAProgramConsoleA16Seq2.spec.ts": [
+      "GET /api/projects/proj-001/assignments"
+    ],
+    "src/components/workpaper/__tests__/GtAProgramConsoleChipDisabled.spec.ts": [
+      "GET /api/projects/proj-001/assignments"
+    ],
+    "src/components/workpaper/__tests__/GtEControlTest.spec.ts": [
+      "GET /api/feature-flags"
+    ],
+    "src/components/workpaper/__tests__/b22bControlMatrix.spec.ts": [
+      "GET /api/workpapers/onlyoffice/health"
+    ],
+    "src/components/workpaper/__tests__/c23c24PersistReadonly.spec.ts": [
+      "GET /api/projects/proj-1"
+    ],
+    "src/components/workpaper/__tests__/useB22BControlMatrix.spec.ts": [
+      "GET /api/workpapers/onlyoffice/health"
+    ],
+    "src/components/workpaper/composables/__tests__/tabIndexAcnrCatalog.pbt.spec.ts": [
+      "GET /api/projects/proj-1/wp-templates/list"
+    ],
+    "src/components/workpaper/d3/__tests__/D3TabIndex.spec.ts": [
+      "GET /api/projects/proj-1/wp-templates/list"
+    ],
+    "src/views/eqcr/EqcrProjectView.spec.ts": [
+      "GET /api/eqcr/projects/test-project-id/time-summary"
+    ],
+    "src/views/workpaper-list/__tests__/WorkpaperListShell.spec.ts": [
+      "GET /api/projects/test-proj"
+    ]
+  }
+}
