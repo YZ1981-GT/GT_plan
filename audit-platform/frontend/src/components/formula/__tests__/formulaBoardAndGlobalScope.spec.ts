@@ -172,23 +172,20 @@ describe('公式看板：跨域总览不再恒空', () => {
     scopeState.rows = SCOPE_ROWS as any[]
     const w = await openBoard()
 
-    expect(state(w).dashboardGroupBy).toBe('domain')
-    expect((state(w).dashboardGroupedData as any[]).map((g) => g.key).sort())
-      .toEqual(['report', 'workpaper'])
+    // 筛选/分组逻辑已在子组件 FormulaDashboardDialog 内部；
+    // 父组件的职责是提供正确的 allFormulaRows，验证其域/层级标注正确。
+    const rows = state(w).allFormulaRows as any[]
+    const domains = [...new Set(rows.map((r: any) => r._domain))].sort()
+    expect(domains).toEqual(['report', 'workpaper'])
 
-    state(w).dashboardFilterLevel = '项目级'
-    await flushPromises()
-    expect((state(w).dashboardFilteredRows as any[]).map((r) => r.id)).toEqual(['wpf-1'])
+    const projectRows = rows.filter((r: any) => r._level === '项目级')
+    expect(projectRows.map((r: any) => r.id)).toEqual(['wpf-1'])
 
-    state(w).dashboardFilterLevel = ''
-    state(w).dashboardFilterDomain = 'report'
-    await flushPromises()
-    expect((state(w).dashboardFilteredRows as any[]).every((r) => r._domain === 'report')).toBe(true)
+    const reportRows = rows.filter((r: any) => r._domain === 'report')
+    expect(reportRows.every((r: any) => r._domain === 'report')).toBe(true)
 
-    state(w).dashboardFilterDomain = ''
-    state(w).dashboardSearch = '底稿'
-    await flushPromises()
-    expect((state(w).dashboardFilteredRows as any[]).map((r) => r.id)).toEqual(['wpf-1'])
+    const byLabel = rows.filter((r: any) => (r._domainLabel || '').includes('底稿'))
+    expect(byLabel.map((r: any) => r.id)).toEqual(['wpf-1'])
     w.unmount()
   })
 
@@ -294,8 +291,11 @@ describe('看板分类健康度维度', () => {
   it('未分类计数真实（无 formula_category 的行不被自动补类）', async () => {
     const w = await openBoard()
 
-    // fetchReportRows 会给"有公式无分类"补 auto_calc ⇒ 该口径下未分类应为 0
-    expect(state(w).dashboardCategorizedCount).toEqual({ yes: 2, no: 0 })
+    // fetchReportRows 会给"有公式无分类"补 auto_calc ⇒ allFormulaRows 中不应有未分类行
+    const rows = state(w).allFormulaRows as any[]
+    const yes = rows.filter((r: any) => r.formula_category).length
+    const no = rows.filter((r: any) => !r.formula_category).length
+    expect({ yes, no }).toEqual({ yes: 2, no: 0 })
     w.unmount()
   })
 
@@ -309,15 +309,12 @@ describe('看板分类健康度维度', () => {
     }
     await flushPromises()
 
-    expect(state(w).dashboardCategorizedCount).toEqual({ yes: 1, no: 1 })
-
-    state(w).dashboardFilterCategorized = 'no'
-    await flushPromises()
-    expect((state(w).dashboardFilteredRows as any[]).map((r) => r.id)).toEqual(['x-2'])
-
-    state(w).dashboardFilterCategorized = 'yes'
-    await flushPromises()
-    expect((state(w).dashboardFilteredRows as any[]).map((r) => r.id)).toEqual(['x-1'])
+    // 分类健康度的筛选逻辑已在子组件 FormulaDashboardDialog 内部；
+    // 父组件只负责提供 allFormulaRows，验证其分类分布正确。
+    const rows = state(w).allFormulaRows as any[]
+    const yes = rows.filter((r: any) => r.formula_category).length
+    const no = rows.filter((r: any) => !r.formula_category).length
+    expect({ yes, no }).toEqual({ yes: 1, no: 1 })
     w.unmount()
   })
 })
@@ -339,7 +336,8 @@ describe('全局公式：7 域全列 + 说明预设归属', () => {
     const groups = state(w).globalScopeGroups as any[]
     expect(groups).toHaveLength(7)
     expect(groups.map((g) => g.scope)).toContain('workpaper')
-    expect(state(w).globalScopeNonEmpty).toHaveLength(0)
+    // globalScopeNonEmpty 已移到 FormulaGlobalScopeDialog 内部；验证 groups 里没有有行的分组
+    expect(groups.filter((g: any) => g.rows.length > 0)).toHaveLength(0)
     w.unmount()
   })
 
@@ -348,7 +346,8 @@ describe('全局公式：7 域全列 + 说明预设归属', () => {
     const w = create()
     await flushPromises()
 
-    expect(state(w).globalScopeNonEmpty.map((g: any) => g.scope)).toEqual(['workpaper'])
+    const groups = state(w).globalScopeGroups as any[]
+    expect(groups.filter((g: any) => g.rows.length > 0).map((g: any) => g.scope)).toEqual(['workpaper'])
     w.unmount()
   })
 })

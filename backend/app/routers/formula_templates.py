@@ -119,7 +119,26 @@ async def list_templates(domain: str | None = Query(None, max_length=32), scope:
                          db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     viewer = await _viewer(db, current_user)
     rows = await list_visible(db, viewer, domain=domain, scope=scope)
-    return {"items": [svc.template_to_dict(t, viewer=viewer) for t in rows], "is_admin": viewer.admin}
+    # 批量统计每个模板的活跃订阅数（优化建议 #4：模板发现与推荐增强）
+    sub_counts: dict[str, int] = {}
+    if rows:
+        tpl_ids = [t.id for t in rows]
+        count_rows = (await db.execute(
+            sa.select(
+                FormulaTemplateSubscription.template_id,
+                sa.func.count().label("cnt"),
+            ).where(
+                FormulaTemplateSubscription.template_id.in_(tpl_ids),
+                FormulaTemplateSubscription.is_active == sa.true(),
+            ).group_by(FormulaTemplateSubscription.template_id)
+        )).all()
+        sub_counts = {str(r[0]): r[1] for r in count_rows}
+    items = []
+    for t in rows:
+        d = svc.template_to_dict(t, viewer=viewer)
+        d["subscriber_count"] = sub_counts.get(str(t.id), 0)
+        items.append(d)
+    return {"items": items, "is_admin": viewer.admin}
 
 
 @router.post("", status_code=201)

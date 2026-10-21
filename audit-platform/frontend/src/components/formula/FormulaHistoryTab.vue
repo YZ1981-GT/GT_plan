@@ -53,11 +53,17 @@
             <div v-if="entry.action === 'update' || entry.action === 'create' || entry.action === 'delete'" class="gt-fh-entry-body">
               <div v-if="entry.old_formula" class="gt-fh-formula-diff">
                 <span class="gt-fh-label">旧公式：</span>
-                <code class="gt-fh-old">{{ entry.old_formula }}</code>
+                <code class="gt-fh-old" v-html="diffOld(entry.old_formula, entry.new_formula)"></code>
               </div>
               <div v-if="entry.new_formula" class="gt-fh-formula-diff">
                 <span class="gt-fh-label">新公式：</span>
-                <code class="gt-fh-new">{{ entry.new_formula }}</code>
+                <code class="gt-fh-new" v-html="diffNew(entry.old_formula, entry.new_formula)"></code>
+              </div>
+              <!-- 紧凑 diff 视图：单行显示变化（两边都有公式时才展示） -->
+              <div v-if="entry.old_formula && entry.new_formula && entry.old_formula !== entry.new_formula"
+                class="gt-fh-inline-diff">
+                <span class="gt-fh-label">变化：</span>
+                <code class="gt-fh-diff-inline" v-html="diffInline(entry.old_formula, entry.new_formula)"></code>
               </div>
             </div>
             <div v-if="entry.action === 'execute' && entry.result_value != null" class="gt-fh-entry-body">
@@ -218,6 +224,9 @@ async function onRollback(entry: HistoryEntry) {
   }
 }
 
+// ── 字符级 diff（提取到 formulaDiff.ts，供单测覆盖）──────────────────────────
+import { diffOld, diffNew, diffInline } from './formulaDiff'
+
 function formatTime(ts: string | null): string {
   if (!ts) return '—'
   try {
@@ -358,5 +367,34 @@ watch(() => [props.projectId, props.year], () => {
 }
 .gt-fh-entry-actions {
   margin-top: 4px;
+}
+/* 字符级 diff 高亮 */
+:deep(.gt-fh-del) {
+  background: #fdd;
+  color: #c0392b;
+  text-decoration: line-through;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+:deep(.gt-fh-add) {
+  background: #dfd;
+  color: #27ae60;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.gt-fh-inline-diff {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: var(--el-fill-color-lighter, #f5f7fa);
+  border-radius: 4px;
+  border: 1px solid var(--gt-color-border, #ebeef5);
+}
+.gt-fh-diff-inline {
+  font-size: 12px;
+  word-break: break-all;
+  color: var(--gt-color-text-regular);
 }
 </style>

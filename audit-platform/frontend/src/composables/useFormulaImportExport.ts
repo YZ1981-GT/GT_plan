@@ -19,6 +19,7 @@
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import api from '@/services/apiProxy'
 // spec: formula-management-runtime-closure Task 14 — 端点收敛进 apiPaths（纯搬迁）
 import { formulaPresets } from '@/services/apiPaths/formula'
 
@@ -302,6 +303,120 @@ export function useFormulaImportExport() {
   }
 
   /**
+   * 导出 JSON 标准公式包（跨环境迁移用，优化建议 #8）。
+   * 从后端获取全部有效公式定义（全局 + 系统预设），按域和作用范围结构化输出为 JSON。
+   * 公式包格式：{ version, exported_at, domains: { [domain]: { scope, slots: [...] } } }
+   *
+   * @param opts.domain 限定导出某域（不传 = 全部域）
+   * @param opts.scope 限定导出某作用范围
+   * @param opts.projectId 从某项目导出有效定义（含项目适配）
+   */
+  async function exportFormulaPackage(
+    opts: { domain?: string; scope?: string; projectId?: string } = {},
+  ): Promise<void> {
+    loading.value = true
+    try {
+      const domains = opts.domain ? [opts.domain] : ['report', 'tb_detail', 'cross_check', 'wp', 'note', 'consol_note']
+      const pack: Record<string, unknown> = {
+        version: '1.0',
+        format: 'gt_formula_package',
+        exported_at: new Date().toISOString(),
+        source: opts.projectId ? `project:${opts.projectId}` : 'global',
+        domains: {} as Record<string, unknown>,
+      }
+
+      for (const domain of domains) {
+        try {
+          let data: any
+          if (opts.projectId) {
+            data = await api.get(`/api/projects/${opts.projectId}/formula-settings/${domain}/effective`) as any
+          } else {
+            const scope = opts.scope || '*'
+            data = await api.get(`/api/formula-settings/${domain}/global`, { params: { scope } }) as any
+          }
+          const slots = (data?.slots || []).filter((s: any) => s.definition && Object.values(s.definition).some((v: unknown) => v))
+          if (slots.length) {
+            (pack.domains as Record<string, unknown>)[domain] = {
+              scope: data?.scope || opts.scope || '*',
+              slot_count: slots.length,
+              slots: slots.map((s: any) => ({
+                slot_key: s.slot_key,
+                label: s.label,
+                layer: s.layer,
+                definition: s.definition,
+              })),
+            }
+          }
+        } catch { /* 单域取失败不阻断 */ }
+      }
+
+      const json = JSON.stringify(pack, null, 2)
+      const blob = new Blob([json], { type: 'application/json' })
+      const suffix = opts.projectId ? `_项目` : '_全局'
+      downloadBlob(blob, `公式包${suffix}_${new Date().toISOString().slice(0, 10)}.json`)
+      const count = Object.values(pack.domains as Record<string, any>).reduce((a, d) => a + (d.slot_count || 0), 0)
+      ElMessage.success(`已导出 ${count} 条公式定义`)
+    } catch (err: unknown) {
+      ElMessage.error(extractError(err, '导出公式包失败'))
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 导入 JSON 标准公式包（跨环境迁移用，优化建议 #8）。
+   * 解析包文件，逐域逐条调用公式设置的保存接口写入。只做预览不直接写入，返回解析结果供用户确认。
+   *
+   * @param file JSON 公式包文件
+   * @returns 解析结果 { domains, total_slots, errors }
+   */
+  async function importFormulaPackage(
+    file: File,
+  ): Promise<{ domains: Record<string, { slot_count: number; slots: any[] }>; total: number; errors: string[] } | null> {
+    importing.value = true
+    try {
+      const text = await file.text()
+      let pack: any
+      try { pack = JSON.parse(text) } catch {
+        ElMessage.error('文件不是合法的 JSON 格式')
+        return null
+      }
+      if (pack?.format !== 'gt_formula_package') {
+        ElMessage.error('该文件不是标准公式包格式（缺少 format: "gt_formula_package" 标识）')
+        return null
+      }
+      const domains = pack.domains || {}
+      const errors: string[] = []
+      let total = 0
+      const validDomains = ['report', 'tb_detail', 'cross_check', 'wp', 'note', 'consol_note']
+      const result: Record<string, { slot_count: number; slots: any[] }> = {}
+
+      for (const [domain, data] of Object.entries(domains)) {
+        if (!validDomains.includes(domain)) {
+          errors.push(`跳过未知域「${domain}」`)
+          continue
+        }
+        const d = data as any
+        const slots = Array.isArray(d?.slots) ? d.slots : []
+        const validSlots = slots.filter((s: any) => s?.slot_key && s?.definition)
+        if (validSlots.length !== slots.length) {
+          errors.push(`域「${domain}」有 ${slots.length - validSlots.length} 条缺少 slot_key 或 definition`)
+        }
+        result[domain] = { slot_count: validSlots.length, slots: validSlots }
+        total += validSlots.length
+      }
+
+      ElMessage.success(`已解析公式包：${total} 条定义（${Object.keys(result).length} 个域）${errors.length ? `，${errors.length} 条警告` : ''}`)
+      return { domains: result, total, errors }
+    } catch (err: unknown) {
+      ElMessage.error(extractError(err, '导入公式包失败'))
+      return null
+    } finally {
+      importing.value = false
+    }
+  }
+
+  /**
    * 新增/更新一条平台级自定义预设（存数据库：管理员直接生效，其他人提交全局候选待审核）
    * POST /presets/custom（require edit role；悬空引用 → 422 携清单不落库）
    * @param payload 自定义预设条目
@@ -344,10 +459,57 @@ export function useFormulaImportExport() {
     }
   }
 
+  /**
+   * 应用已解析的 JSON 公式包到指定项目（复盘修复 #8：importFormulaPackage 的写入步骤）。
+   * 逐域调用 save_overrides 端点写入本项目层。
+   *
+   * @param projectId 目标项目 ID
+   * @param parsed importFormulaPackage 返回的解析结果
+   * @returns 写入统计 { written, skipped, errors }
+   */
+  async function applyFormulaPackage(
+    projectId: string,
+    parsed: { domains: Record<string, { slot_count: number; slots: any[] }> },
+  ): Promise<{ written: number; skipped: number; errors: string[] }> {
+    loading.value = true
+    let written = 0; let skipped = 0; const errors: string[] = []
+    try {
+      for (const [domain, data] of Object.entries(parsed.domains)) {
+        const items = data.slots.map((s: any) => ({
+          slot_key: s.slot_key,
+          definition: s.definition,
+        }))
+        if (!items.length) continue
+        try {
+          await api.post(`/api/projects/${projectId}/formula-settings/${domain}/overrides`, {
+            items,
+            source: 'formula_package_import',
+          })
+          written += items.length
+        } catch (e: any) {
+          const msg = e?.response?.data?.detail || e?.message || '写入失败'
+          errors.push(`域「${domain}」写入失败：${msg}`)
+          skipped += items.length
+        }
+      }
+      if (written > 0) ElMessage.success(`已写入 ${written} 条公式定义${skipped ? `，${skipped} 条跳过` : ''}`)
+      if (errors.length) ElMessage.warning(errors.join('；').slice(0, 300))
+      return { written, skipped, errors }
+    } catch (err: unknown) {
+      ElMessage.error(extractError(err, '应用公式包失败'))
+      return { written, skipped, errors }
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     exportTemplate,
     exportData,
     importData,
+    exportFormulaPackage,
+    importFormulaPackage,
+    applyFormulaPackage,
     getReportingInstructions,
     getPresetInventory,
     getPresetPage,

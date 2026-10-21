@@ -21,10 +21,13 @@
         <el-dropdown-item command="template">导出模板</el-dropdown-item>
         <el-dropdown-item command="export">导出数据</el-dropdown-item>
         <el-dropdown-item command="import">导入数据</el-dropdown-item>
+        <el-dropdown-item divided command="export-package">📦 导出公式包</el-dropdown-item>
+        <el-dropdown-item command="import-package">📦 导入公式包</el-dropdown-item>
       </el-dropdown-menu>
     </template>
   </el-dropdown>
   <input ref="fileRef" type="file" accept=".xlsx" hidden @change="onFile" />
+  <input ref="packageFileRef" type="file" accept=".json" hidden @change="onPackageFile" />
 </template>
 
 <script setup lang="ts">
@@ -47,12 +50,15 @@ const emit = defineEmits<{
 }>()
 
 const fileRef = ref<HTMLInputElement | null>(null)
+const packageFileRef = ref<HTMLInputElement | null>(null)
 const ie = useFormulaImportExport()
 
 async function onCommand(cmd: string) {
   if (cmd === 'template') await ie.exportTemplate()
   else if (cmd === 'export') await ie.exportData(props.pageKey)
   else if (cmd === 'import') fileRef.value?.click()
+  else if (cmd === 'export-package') await ie.exportFormulaPackage({ projectId: props.projectId })
+  else if (cmd === 'import-package') packageFileRef.value?.click()
 }
 
 async function onFile(ev: Event) {
@@ -73,6 +79,32 @@ async function onFile(ev: Event) {
         .join('；')
       ElMessage.warning(`已跳过 ${result.skipped_count} 条悬空/无效公式：${detail}`)
     }
+  }
+}
+
+async function onPackageFile(ev: Event) {
+  const input = ev.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  const parsed = await ie.importFormulaPackage(file)
+  if (!parsed || !parsed.total) return
+  if (!props.projectId) {
+    ElMessage.warning('当前不在项目上下文内，无法应用公式包（请在项目内打开公式管理中心）')
+    return
+  }
+  // 确认后应用
+  try {
+    const { ElMessageBox } = await import('element-plus')
+    await ElMessageBox.confirm(
+      `已解析 ${parsed.total} 条公式定义（${Object.keys(parsed.domains).length} 个域）${parsed.errors.length ? `，${parsed.errors.length} 条警告` : ''}。确认写入本项目？`,
+      '导入公式包确认',
+      { confirmButtonText: '确认导入', cancelButtonText: '取消', type: 'info' },
+    )
+  } catch { return }
+  const result = await ie.applyFormulaPackage(props.projectId, parsed)
+  if (result.written > 0) {
+    emit('imported', { imported_count: result.written, skipped_count: result.skipped, skipped: [] } as any)
   }
 }
 </script>

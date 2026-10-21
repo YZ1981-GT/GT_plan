@@ -202,6 +202,64 @@ async def propagate_consol_note(project_id: uuid.UUID, year: int | None, slot_ke
     return {"sections": sections, "result": result}
 
 
+async def propagate_cross_check(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
+    """表间审核规则变更 → 重新执行全部勾稽（内置 7 条 + 用户规则）并落库结果。
+
+    ``execute_report_cross_checks`` 内部已集成 ``run_user_rules``（R10.2），
+    结果 upsert 进 ``cross_check_results`` 表（fail-open）。此处只需按传播约定
+    提供独立会话与冻结检查。无审计年度则跳过（勾稽需要报表行做 row_cache）。
+    """
+    if year is None:
+        return {"skipped": "no_year", "slot_keys": slot_keys}
+    async with _factory()() as db:
+        frozen = await _is_frozen(db, project_id)
+        if frozen is None or frozen:
+            return {"skipped": "frozen" if frozen else "missing"}
+        try:
+            from app.services.formula_management.logic_check import execute_report_cross_checks
+
+            async with db.begin_nested():
+                result = await execute_report_cross_checks(
+                    db, project_id=project_id, year=year, persist=True,
+                )
+            await db.commit()
+            return {
+                "slot_keys": slot_keys,
+                "executed": len(result.outcomes),
+                "passed": sum(1 for o in result.outcomes if o.passed),
+                "failed": sum(1 for o in result.outcomes if not o.passed),
+                "issues": len(result.issues),
+            }
+        except Exception as exc:  # noqa: BLE001 —— R8.4：不回滚已提交定义
+            await db.rollback()
+            logger.warning("[formula_settings] 表间审核重算失败 project=%s year=%s: %s",
+                           project_id, year, exc)
+            _degraded("cross_check_rerun", project_id, str(exc),
+                      {"year": year, "slot_keys": slot_keys[:50]})
+            return {"slot_keys": slot_keys, "error": str(exc)[:500]}
+
+
+async def propagate_tb_detail(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
+    """试算表科目明细公式变更 → 标全项目底稿 prefill_stale。
+
+    科目明细公式影响所有依赖 TB 取数的底稿（任何使用 ``TB('科目','字段')`` 的底稿），
+    无法按 wp_code 精准缩小范围，故标全部底稿。底稿下次打开时检测 ``prefill_stale``
+    并重新预填。
+    """
+    from app.models.workpaper_models import WorkingPaper
+
+    async with _factory()() as db:
+        frozen = await _is_frozen(db, project_id)
+        if frozen is None or frozen:
+            return {"skipped": "frozen" if frozen else "missing"}
+        n = (await db.execute(sa.update(WorkingPaper).where(
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == sa.false(),
+        ).values(prefill_stale=True).execution_options(synchronize_session=False))).rowcount or 0
+        await db.commit()
+    return {"slot_keys": slot_keys, "marked": int(n)}
+
+
 async def _notify_only(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
     return {"notified": len(slot_keys)}
 
@@ -211,8 +269,8 @@ HANDLERS: dict[str, Callable[[uuid.UUID, int | None, list[str]], Awaitable[dict[
     "wp": propagate_wp,
     "note": propagate_note,
     "consol_note": propagate_consol_note,
-    "tb_detail": _notify_only,
-    "cross_check": _notify_only,
+    "tb_detail": propagate_tb_detail,
+    "cross_check": propagate_cross_check,
 }
 
 

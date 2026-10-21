@@ -154,6 +154,29 @@
           />
         </div>
 
+        <!-- 智能公式建议（复盘修复 #9：当前节点有系统预设但该行尚未配置公式时展示） -->
+        <div v-if="!isConsolFormulaNode && formulaSuggestions.length" class="gt-fm-suggest-bar">
+          <div class="gt-fm-suggest-header" @click="showSuggestions = !showSuggestions">
+            <span>💡 {{ formulaSuggestions.length }} 条公式建议</span>
+            <span style="font-size: 11px; color: var(--gt-color-text-tertiary); margin-left: 8px;">
+              系统预设中有公式但当前行未配置
+            </span>
+            <span style="flex: 1;" />
+            <el-button size="small" link>{{ showSuggestions ? '收起' : '展开' }}</el-button>
+          </div>
+          <div v-if="showSuggestions" class="gt-fm-suggest-list">
+            <div v-for="s in formulaSuggestions.slice(0, 10)" :key="s.row_code" class="gt-fm-suggest-item">
+              <span class="gt-fm-suggest-code">{{ s.row_code }}</span>
+              <span class="gt-fm-suggest-name">{{ s.row_name }}</span>
+              <code class="gt-fm-suggest-formula">{{ s.formula }}</code>
+              <el-button size="small" type="primary" link @click="onApplySuggestion(s)">应用</el-button>
+            </div>
+            <div v-if="formulaSuggestions.length > 10" style="font-size: 11px; color: var(--gt-color-text-tertiary); padding: 4px 0;">
+              还有 {{ formulaSuggestions.length - 10 }} 条，请在公式看板中查看
+            </div>
+          </div>
+        </div>
+
         <el-tabs v-if="!isConsolFormulaNode" v-model="activeCategory" size="small" style="margin-bottom: 8px;">
           <el-tab-pane name="all">
             <template #label>全部 ({{ currentRows.length }})</template>
@@ -390,126 +413,27 @@
 
         <FormulaDependencyPanel v-if="!isConsolFormulaNode" ref="depPanelRef" :project-id="props.projectId" />
 
-        <!-- 表间审核模式 -->
-        <div v-if="isCrossCheckMode" style="flex: 1;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <span style="font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary);">{{ selectedPath }}</span>
-            <div style="display: flex; gap: 6px;">
-              <el-button size="small" @click="onRunCrossCheck" :loading="crossCheckRunning">▶ 执行校验</el-button>
-              <el-button size="small" type="primary" @click="onAddCrossRule">+ 新增规则</el-button>
-            </div>
-          </div>
-          <!-- Task 6.2（需求 7.5）：执行结果为空且当前节点无规则 → 显式「无结果」，不冒充静态示例 -->
-          <el-alert
-            v-if="crossCheckExecEmpty && !crossCheckRulesForCurrent.length"
-            type="info"
-            :closable="false"
-            show-icon
-            title="无结果"
-            description="本项目当前年度表间审核执行结果为空，且该节点尚无自定义规则。可点「+ 新增规则」添加后执行校验。"
-            style="margin-bottom: 10px;"
-          />
-          <el-table :data="crossCheckRulesForCurrent" size="small" border style="width: 100%;"
-            max-height="calc(100vh - 300px)"
-            :header-cell-style="{ background: '#edf3f9', fontSize: '12px', whiteSpace: 'nowrap' }">
-            <el-table-column type="index" label="#" width="50" />
-            <el-table-column label="来源" width="80" align="center">
-              <template #default="{ row }">
-                <el-tag v-if="row.layer" size="small" effect="plain" :type="layerTagType(row.layer)">{{ layerLabel(row.layer) || row.layer }}</el-tag>
-                <el-tag v-if="row.pending" size="small" type="danger" effect="plain">待确认</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="规则名称" min-width="200">
-              <template #default="{ row }">
-                <span style="font-size: var(--gt-font-size-xs);">{{ row.label }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="左侧（源）" min-width="180">
-              <template #default="{ row }">
-                <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ row.left_ref || '—' }}</code>
-                <div v-if="row._leftVal != null" style="font-size: 10px; color: var(--gt-color-text-tertiary);">= {{ row._leftVal }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="关系" width="60" align="center">
-              <template #default="{ row }">
-                <span v-if="row._checked && row._pass" style="font-size: var(--gt-font-size-sm); color: var(--gt-color-success);">✅</span>
-                <span v-else-if="row._checked && !row._pass" style="font-size: var(--gt-font-size-sm); color: var(--gt-color-danger);">❌</span>
-                <span v-else style="font-size: var(--gt-font-size-sm);">=</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="右侧（目标）" min-width="180">
-              <template #default="{ row }">
-                <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ row.right_ref || '—' }}</code>
-                <div v-if="row._rightVal != null" style="font-size: 10px; color: var(--gt-color-text-tertiary);">= {{ row._rightVal }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="差额" width="100" align="right">
-              <template #default="{ row }">
-                <span v-if="row._checked" :style="{ fontSize: '11px', fontWeight: 600, color: row._pass ? 'var(--gt-color-success)' : 'var(--gt-color-danger)' }">
-                  {{ row._diff != null ? row._diff.toFixed(2) : '—' }}
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="120" align="center">
-              <template #default="{ row, $index }">
-                <div style="display: flex; gap: 4px; justify-content: center;">
-                  <el-button size="small" link type="primary" @click="onEditCrossRule(row, $index)">编辑</el-button>
-                  <el-button size="small" link style="color: var(--gt-color-text-tertiary);" @click="onRemoveCrossRule($index)">删除</el-button>
-                </div>
-              </template>
-            </el-table-column>
-          </el-table>
-          <div style="margin-top: 8px; text-align: right; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">
-            {{ crossCheckRulesForCurrent.length }} 条规则
-          </div>
-
-          <CrossCheckHistoryPanel ref="ccHistoryRef" :project-id="props.projectId" :year="props.year" />
-
-          <!-- 表间审核规则编辑弹窗 -->
-          <el-dialog
-            v-model="showCrossRuleDialog"
-            :title="crossRuleDialogTitle"
-            width="640px"
-            append-to-body
-            destroy-on-close
-          >
-            <el-form :model="crossRuleForm" label-width="100px" label-position="top" style="padding: 0 10px;">
-              <el-form-item label="规则名称" required>
-                <el-input v-model="crossRuleForm.label" placeholder="如：BS货币资金 = 附注货币资金合计" />
-              </el-form-item>
-              <el-form-item label="左侧（源）" required>
-                <el-input v-model="crossRuleForm.left_ref" placeholder="报表行次引用，如 REPORT('BS-002','期末')">
-                  <template #prepend>源</template>
-                </el-input>
-                <div style="font-size: 11px; color: var(--gt-color-text-tertiary); margin-top: 4px;">
-                  语法：REPORT('行次','字段') 或 ROW('行次')。示例：REPORT('BS-002','期末')
-                </div>
-              </el-form-item>
-              <el-form-item label="关系运算符">
-                <el-select v-model="crossRuleForm.operator" style="width: 120px;">
-                  <el-option label="=" value="=" />
-                  <el-option label="≤" value="<=" />
-                  <el-option label="≥" value=">=" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="右侧（目标）" required>
-                <el-input v-model="crossRuleForm.right_ref" placeholder="附注/底稿引用，如 NOTE('货币资金','合计') 或 WP('E1','E1-1','审定数')">
-                  <template #prepend>目标</template>
-                </el-input>
-                <div style="font-size: 11px; color: var(--gt-color-text-tertiary); margin-top: 4px;">
-                  语法：NOTE('章节','字段') / WP('底稿','sheet','坐标') / TB('科目','字段')
-                </div>
-              </el-form-item>
-              <el-form-item label="说明（选填）">
-                <el-input v-model="crossRuleForm.description" type="textarea" :autosize="{ minRows: 2 }" placeholder="描述该规则的业务含义" />
-              </el-form-item>
-            </el-form>
-            <template #footer>
-              <el-button @click="showCrossRuleDialog = false">取消</el-button>
-              <el-button type="primary" @click="onSaveCrossRule" :disabled="!crossRuleForm.label || !crossRuleForm.left_ref || !crossRuleForm.right_ref">确认保存</el-button>
-            </template>
-          </el-dialog>
-        </div>
+        <!-- 表间审核模式（已拆出为独立组件 FormulaCrossCheckPanel） -->
+        <FormulaCrossCheckPanel
+          v-if="isCrossCheckMode"
+          :selected-path="selectedPath"
+          :rules="crossCheckRulesForCurrent"
+          :exec-empty="crossCheckExecEmpty"
+          :running="crossCheckRunning"
+          :show-dialog="showCrossRuleDialog"
+          :dialog-title="crossRuleDialogTitle"
+          :form="crossRuleForm"
+          :project-id="props.projectId"
+          :year="props.year"
+          :layer-tag-type="layerTagType"
+          :layer-label="layerLabel"
+          @run="onRunCrossCheck"
+          @add="onAddCrossRule"
+          @edit="onEditCrossRule"
+          @remove="onRemoveCrossRule"
+          @save="onSaveCrossRule"
+          @update:show-dialog="showCrossRuleDialog = $event"
+        />
       </div>
     </div>
 
@@ -517,147 +441,20 @@
       <el-button @click="visible = false">关闭</el-button>
     </template>
 
-    <!-- 公式看板弹窗 -->
-    <el-dialog
+    <!-- 公式看板弹窗（已拆出为独立组件 FormulaDashboardDialog） -->
+    <FormulaDashboardDialog
       v-model="showFormulaDashboard"
-      title="📊 公式看板 — 全局审核公式总览"
-      width="95%"
-      top="2vh"
-      append-to-body
-      destroy-on-close
-      class="gt-fm-dashboard-dialog"
-    >
-      <PushCoverageCard :show="showFormulaDashboard" />
-      <div style="margin-bottom: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-        <el-input v-model="dashboardSearch" size="small" placeholder="搜索公式/行次/说明/域..." clearable style="width: 220px;" />
-        <el-select v-model="dashboardGroupBy" size="small" style="width: 130px;">
-          <el-option label="按域" value="domain" />
-          <el-option label="按层级" value="level" />
-          <el-option label="按报表类型" value="report_type" />
-          <el-option label="按公式分类" value="category" />
-          <el-option label="按数据源" value="source" />
-          <el-option label="全部平铺" value="flat" />
-        </el-select>
-        <el-select v-model="dashboardFilterDomain" size="small" style="width: 140px;" clearable placeholder="筛选域">
-          <el-option v-for="d in dashboardDomainOptions" :key="d.value" :label="`${d.label}（${d.count}）`" :value="d.value" />
-        </el-select>
-        <el-select v-model="dashboardFilterLevel" size="small" style="width: 120px;" clearable placeholder="筛选层级">
-          <el-option label="模板预设" value="模板预设" />
-          <el-option label="项目级" value="项目级" />
-        </el-select>
-        <el-select v-model="dashboardFilterCategory" size="small" style="width: 130px;" clearable placeholder="筛选分类">
-          <el-option v-for="c in dashboardCategoryOptions" :key="c.value" :label="c.label" :value="c.value" />
-        </el-select>
-        <el-select v-model="dashboardFilterCategorized" size="small" style="width: 140px;" clearable placeholder="分类健康度">
-          <el-option :label="`已分类（${dashboardCategorizedCount.yes}）`" value="yes" />
-          <el-option :label="`未分类（${dashboardCategorizedCount.no}）`" value="no" />
-        </el-select>
-        <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-left: auto;">
-          共 {{ dashboardFilteredRows.length }} / {{ allFormulaRows.length }} 条公式
-          <template v-if="dashboardCategorizedCount.no">
-            · 未分类 {{ dashboardCategorizedCount.no }} 条
-          </template>
-        </span>
-      </div>
-
-      <el-alert
-        v-if="!dashboardLoading && !allFormulaRows.length"
-        type="warning"
-        :closable="false"
-        show-icon
-        title="未取到任何公式"
-        :description="dashboardCoverageText"
-        style="margin-bottom: 10px;"
-      />
-      <div v-else-if="!dashboardLoading" style="margin-bottom: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">
-        覆盖：{{ dashboardCoverageText }}
-      </div>
-
-      <!-- 分组展示 -->
-      <div v-if="dashboardGroupBy !== 'flat'" style="max-height: 80vh; overflow-y: auto;">
-        <div v-for="group in dashboardGroupedData" :key="group.key" style="margin-bottom: 12px;">
-          <div class="gt-fm-dash-group-title" @click="group._open = !group._open">
-            {{ group._open ? '▼' : '▶' }} {{ group.label }}
-            <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-left: 6px;">{{ group.rows.length }} 条</span>
-          </div>
-          <el-table v-show="group._open" :data="group.rows" size="small" border style="width: 100%;"
-            :header-cell-style="{ background: '#edf3f9', fontSize: '11px', whiteSpace: 'nowrap' }">
-            <el-table-column prop="row_code" label="行次" width="90" />
-            <el-table-column prop="row_name" label="项目" min-width="150" show-overflow-tooltip />
-            <el-table-column prop="formula" label="公式" min-width="240" show-overflow-tooltip>
-              <template #default="{ row }">
-                <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular);">{{ row.formula }}</code>
-              </template>
-            </el-table-column>
-            <el-table-column label="分类" width="90" align="center">
-              <template #default="{ row }">
-                <el-tag :type="(categoryTagType(row.formula_category)) || undefined" size="small">{{ categoryLabel(row.formula_category) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="formula_description" label="说明" min-width="140" show-overflow-tooltip />
-            <el-table-column label="当前值" width="100" align="right">
-              <template #default="{ row }">
-                <span v-if="row.current_period_amount != null" style="font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-primary-dark); font-variant-numeric: tabular-nums;">
-                  {{ prefs.fmt(row.current_period_amount) }}
-                </span>
-                <span v-else style="color: var(--gt-color-text-placeholder);">-</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="域" width="110" align="center">
-              <template #default="{ row }">
-                <el-tag size="small" effect="plain">{{ row._domainLabel }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="来源" width="90" align="center">
-              <template #default="{ row }">
-                <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">{{ row._source_type || '报表' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="86" align="center">
-              <template #default="{ row }">
-                <el-button v-if="row._editable" size="small" link type="primary" @click="onDashboardEdit(row)">编辑</el-button>
-                <el-button v-else size="small" link type="primary" @click="onDashboardLocate(row)">定位</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-      </div>
-
-      <!-- 平铺展示 -->
-      <el-table v-else :data="dashboardFilteredRows" size="small" border max-height="80vh" style="width: 100%;"
-        :header-cell-style="{ background: '#edf3f9', fontSize: '11px', whiteSpace: 'nowrap' }">
-        <el-table-column prop="row_code" label="行次" width="90" />
-        <el-table-column prop="row_name" label="项目" min-width="150" show-overflow-tooltip />
-        <el-table-column prop="formula" label="公式" min-width="240" show-overflow-tooltip>
-          <template #default="{ row }">
-            <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-regular);">{{ row.formula }}</code>
-          </template>
-        </el-table-column>
-        <el-table-column label="分类" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag :type="(categoryTagType(row.formula_category)) || undefined" size="small">{{ categoryLabel(row.formula_category) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="formula_description" label="说明" min-width="140" show-overflow-tooltip />
-        <el-table-column label="域" width="120" align="center">
-          <template #default="{ row }">
-            <el-tag size="small" effect="plain">{{ row._domainLabel }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="_level" label="层级" width="86" align="center" />
-        <el-table-column prop="_report_type_label" label="报表" width="100" />
-        <el-table-column label="操作" width="86" align="center">
-          <template #default="{ row }">
-            <el-button v-if="row._editable" size="small" link type="primary" @click="onDashboardEdit(row)">编辑</el-button>
-            <el-button v-else size="small" link type="primary" @click="onDashboardLocate(row)">定位</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <template #footer>
-        <el-button @click="showFormulaDashboard = false">关闭</el-button>
-      </template>
-    </el-dialog>
+      :rows="allFormulaRows"
+      :loading="dashboardLoading"
+      :coverage-text="dashboardCoverageText"
+      :category-label="categoryLabel"
+      :category-tag-type="categoryTagType"
+      :fmt="prefs.fmt"
+      :project-id="props.projectId"
+      :year="props.year"
+      @edit="onDashboardEdit"
+      @locate="onDashboardLocate"
+    />
 
     <!-- 公式编辑弹窗 -->
     <FormulaEditDialog
@@ -680,169 +477,27 @@
       @imported="onFormulaFileImported"
     />
 
-    <!-- 全局公式总览弹窗（Req 24.3：跨全部 7 类作用域取并集） -->
-    <el-dialog
+    <!-- 全局公式总览弹窗（已拆出为独立组件 FormulaGlobalScopeDialog） -->
+    <FormulaGlobalScopeDialog
       v-model="showGlobalScopeOverview"
-      title="🌐 全局公式管理 — 跨作用域总览"
-      width="88%"
-      top="3vh"
-      append-to-body
-      destroy-on-close
-      class="gt-fm-global-scope"
-    >
-      <div style="margin-bottom: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">
-        本页统计的是<strong>项目级公式</strong>（存储于 wp_formula，按底稿编码派生 7 类作用域），共 {{ scopeCatalog.totalCount.value }} 条。各作用域公式集互不串扰。
-      </div>
-      <el-alert
-        type="info"
-        :closable="false"
-        show-icon
-        title="报表 / 附注预设是模板级，不计入本页统计"
-        description="报表预设存于 report_config（按适用准则共用，报表引擎直接消费），附注校验预设存于附注预设集；两者不会被复制进项目。要查看或修改它们，用下面的按钮跳到对应节点，或打开「📊 公式看板」按域总览。"
-        style="margin-bottom: 10px;"
-      />
-      <div style="margin-bottom: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
-        <el-button size="small" plain @click="onGoToReportPresets">📄 查看报表预设（模板级）</el-button>
-        <el-button size="small" plain @click="onGoToNotePresets">📝 查看附注预设（模板级）</el-button>
-        <el-button size="small" plain @click="onOpenDashboardFromGlobal">📊 打开公式看板</el-button>
-      </div>
-
-      <!-- 项目级 vs 主模板差异（复用 report_config_baseline 三端点） -->
-      <div class="gt-fm-master-diff">
-        <div class="gt-fm-master-diff__head">
-          <span class="gt-fm-master-diff__title">项目级 ↔ 主模板差异</span>
-          <el-tag v-if="masterDiffLoaded" size="small" :type="masterDiff.length ? 'warning' : 'success'" effect="plain">
-            {{ masterDiff.length }} 条
-          </el-tag>
-          <span v-if="masterDiffStandard" class="gt-fm-master-diff__std">对比准则：{{ masterDiffStandard }}</span>
-          <el-checkbox v-if="masterDiffLoaded" v-model="masterDiffOnlyFormula" size="small">
-            只看公式差异（全部 {{ masterDiffAll.length }} 条）
-          </el-checkbox>
-          <el-button size="small" link type="primary" :loading="masterDiffLoading" @click="loadMasterDiff">
-            {{ masterDiffLoaded ? '重新比对' : '开始比对' }}
-          </el-button>
-          <el-button
-            v-if="masterDiffLoaded"
-            size="small"
-            link
-            type="primary"
-            :loading="masterDiffApplying"
-            @click="onApplyMasterUpdate"
-          >
-            ⬇ 同步主模板更新到本项目
-          </el-button>
-        </div>
-        <div v-if="!masterDiffLoaded" class="gt-fm-master-diff__hint">
-          比对本项目 <code>project:{id}</code> 配置与主模板的公式差异：项目改对了可回流主模板，主模板更新了可同步下来。
-        </div>
-        <el-alert
-          v-else-if="!masterDiff.length"
-          type="success"
-          :closable="false"
-          show-icon
-          :title="masterDiffAll.length
-            ? `无公式层面差异（另有 ${masterDiffAll.length} 条仅结构行差异，多为主模板中无公式的行）`
-            : '项目级与主模板一致（或本项目尚未落入项目级配置）'"
-          style="margin-bottom: 8px;"
-        />
-        <el-table v-else :data="masterDiff.slice(0, 50)" size="small" border style="width: 100%; margin-bottom: 8px;"
-          :header-cell-style="{ background: '#edf3f9', fontSize: '11px', whiteSpace: 'nowrap' }">
-          <el-table-column prop="row_code" label="行次" width="100" />
-          <el-table-column label="差异" width="110" align="center">
-            <template #default="{ row }">
-              <el-tag size="small" :type="masterDiffTagType(row.diff_type)" effect="plain">
-                {{ masterDiffLabel(row.diff_type) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="项目级公式" min-width="200" show-overflow-tooltip>
-            <template #default="{ row }"><code class="gt-fm-mono">{{ row.project_formula || '—' }}</code></template>
-          </el-table-column>
-          <el-table-column label="主模板公式" min-width="200" show-overflow-tooltip>
-            <template #default="{ row }"><code class="gt-fm-mono">{{ row.master_formula || '—' }}</code></template>
-          </el-table-column>
-          <el-table-column label="操作" width="110" align="center">
-            <template #default="{ row }">
-              <el-button
-                v-if="row.project_formula"
-                size="small"
-                link
-                type="primary"
-                @click="onSuggestToMaster(row)"
-              >
-                回流主模板
-              </el-button>
-              <span v-else style="color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs);">—</span>
-            </template>
-          </el-table-column>
-        </el-table>
-        <div v-if="masterDiff.length > 50" class="gt-fm-master-diff__hint">
-          仅展示前 50 条（共 {{ masterDiff.length }} 条）。
-        </div>
-      </div>
-      <div v-if="!globalScopeNonEmpty.length" style="text-align: center; padding: 24px 20px;">
-        <el-empty description="暂无公式" :image-size="80" style="margin-bottom: 16px;" />
-        <div style="color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm); margin-bottom: 20px; line-height: 1.8;">
-          本项目尚无项目级公式（底稿域 wp_formula 为空）。项目级公式在各底稿页新增，模板级预设请走上方按钮。
-        </div>
-        <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;">
-          <el-button type="primary" plain @click="onGoToReportPresets">
-            📄 去报表预设（{{ reportPresetHint }}）
-          </el-button>
-          <el-button type="primary" plain @click="onMaterializeReportPresets">
-            📥 把报表预设落入项目
-          </el-button>
-          <el-button plain @click="showGlobalScopeOverview = false">
-            ✏️ 手动新增公式
-          </el-button>
-        </div>
-        <div style="margin-top: 16px; padding: 12px 16px; background: var(--gt-color-fill-tertiary, #f5f7fa); border-radius: 6px; text-align: left; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); line-height: 1.8;">
-          <div><strong>💡 各类公式存放位置：</strong></div>
-          <div>• <strong>报表预设</strong>：report_config（模板级，按适用准则共用）—— 在报表节点直接编辑，保存即生效</div>
-          <div>• <strong>附注校验预设</strong>：附注预设集（模板级，按国企版/上市版区分）</div>
-          <div>• <strong>项目级公式</strong>：wp_formula（本页统计口径）—— 在各底稿页「新增公式」逐条创建</div>
-          <div>• <strong>落入项目</strong>：把模板带公式的报表行复制成 <code>project:{id}</code> 配置，取数层优先用它；幂等可重复执行</div>
-        </div>
-      </div>
-      <div v-else style="max-height: 72vh; overflow-y: auto;">
-        <div v-for="group in globalScopeGroups" :key="group.scope" style="margin-bottom: 14px;">
-          <div style="font-weight: 600; font-size: var(--gt-font-size-sm); margin-bottom: 6px; color: var(--gt-color-text-primary);">
-            {{ group.label }}
-            <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-left: 6px;">{{ group.rows.length }} 条</span>
-          </div>
-          <div v-if="!group.rows.length" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder); padding: 2px 0 6px;">
-            本作用域暂无项目级公式
-          </div>
-          <el-table v-else :data="group.rows" size="small" border style="width: 100%;"
-            :header-cell-style="{ background: '#edf3f9', fontSize: '11px', whiteSpace: 'nowrap' }">
-            <el-table-column label="目标单元" prop="targetCell" min-width="150" show-overflow-tooltip>
-              <template #default="{ row }"><span class="gt-fm-mono">{{ row.targetCell }}</span></template>
-            </el-table-column>
-            <el-table-column label="公式" prop="expression" min-width="240" show-overflow-tooltip>
-              <template #default="{ row }"><code class="gt-fm-mono">{{ row.expression || '—' }}</code></template>
-            </el-table-column>
-            <el-table-column label="类型" width="110" align="center">
-              <template #default="{ row }">
-                <el-tag :type="(categoryTagType(row.formulaType)) || undefined" size="small">{{ categoryLabel(row.formulaType) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="来源地址" min-width="180" show-overflow-tooltip>
-              <template #default="{ row }">
-                <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ row.sourceLabel || '—' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="最近计算" width="160" align="center">
-              <template #default="{ row }">
-                <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">{{ row.lastComputedAt || '尚未计算' }}</span>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="showGlobalScopeOverview = false">关闭</el-button>
-      </template>
-    </el-dialog>
+      :total-count="scopeCatalog.totalCount.value"
+      :groups="globalScopeGroups"
+      :report-preset-hint="reportPresetHint"
+      :category-label="categoryLabel"
+      :category-tag-type="categoryTagType"
+      :master-diff-all="masterDiffAll"
+      :master-diff-standard="masterDiffStandard"
+      :master-diff-loaded="masterDiffLoaded"
+      :master-diff-loading="masterDiffLoading"
+      :master-diff-applying="masterDiffApplying"
+      @go-report-presets="onGoToReportPresets"
+      @go-note-presets="onGoToNotePresets"
+      @open-dashboard="onOpenDashboardFromGlobal"
+      @load-diff="loadMasterDiff"
+      @apply-master="onApplyMasterUpdate"
+      @suggest-to-master="onSuggestToMaster"
+      @materialize-presets="onMaterializeReportPresets"
+    />
   </el-dialog>
 </template>
 
@@ -935,6 +590,9 @@ import {
 import CrossCheckHistoryPanel from './panels/CrossCheckHistoryPanel.vue'
 import FormulaDependencyPanel from './panels/FormulaDependencyPanel.vue'
 import PushCoverageCard from './panels/PushCoverageCard.vue'
+import FormulaDashboardDialog from './FormulaDashboardDialog.vue'
+import FormulaGlobalScopeDialog from './FormulaGlobalScopeDialog.vue'
+import FormulaCrossCheckPanel from './FormulaCrossCheckPanel.vue'
 
 /**
  * scope：当前公式管理器的目标范围
@@ -1076,8 +734,7 @@ const globalScopeGroups = computed(() =>
     .map((s) => ({ scope: s, label: SCOPE_CATALOG_LABEL_MAP[s], rows: scopeCatalog.globalGrouped.value[s] })),
 )
 
-/** 有公式的分组（决定是否展示空态引导）。 */
-const globalScopeNonEmpty = computed(() => globalScopeGroups.value.filter((g) => g.rows.length > 0))
+// globalScopeNonEmpty 已移到 FormulaGlobalScopeDialog 内部
 
 /** 打开时按当前 scope 加载本域公式，并规范化来源地址（Req 24.1/24.6）。 */
 async function loadScopeFormulas() {
@@ -1125,29 +782,7 @@ const masterDiffApplying = ref(false)
  *
  * 🔴 后端 diff 比的是**全部行**：本项目只落了「带公式」的行（183 条），
  * 主模板另有大量无公式的结构行 ⇒ 实测 169 条差异里绝大多数是
- * 「仅主模板有 + 两侧公式都为空」，对公式治理是纯噪声。
- */
-const masterDiffOnlyFormula = ref(true)
-
-/** 面板实际展示的差异行。 */
-const masterDiff = computed(() =>
-  masterDiffOnlyFormula.value
-    ? masterDiffAll.value.filter((d) => d.project_formula || d.master_formula)
-    : masterDiffAll.value,
-)
-
-const MASTER_DIFF_LABELS: Record<string, string> = {
-  modified: '公式不同',
-  project_only: '仅项目有',
-  master_only: '仅主模板有',
-}
-function masterDiffLabel(t: string): string {
-  return MASTER_DIFF_LABELS[t] || t
-}
-function masterDiffTagType(t: string): 'warning' | 'success' | 'info' {
-  if (t === 'modified') return 'warning'
-  if (t === 'project_only') return 'success'
-  return 'info'
+// masterDiff 筛选/标签/颜色已移到 FormulaGlobalScopeDialog 内部
 }
 
 async function loadMasterDiff() {
@@ -3130,6 +2765,39 @@ const healthDesc = computed(() => {
   return `${withFormula}/${meaningful.length} 已配置`
 })
 
+// ── 智能公式建议（复盘修复 #9）──────────────────────────────────────────────
+/** 系统预设中有公式、但当前行无公式的那些行 = 建议列表。
+ * _upstream 来自 reportEffectiveRows 的全局/预设定义快照。 */
+const showSuggestions = ref(false)
+const formulaSuggestions = computed(() => {
+  const rows = currentRows.value
+  if (!rows.length) return []
+  return rows.filter((r: any) =>
+    _rowNeedsFormula(r)
+    && !isReadonlyProjectionRow(r)
+    && !r.formula
+    && r._upstream?.formula,  // 上游（全局或预设）中该行有公式
+  ).map((r: any) => ({
+    row_code: r.row_code,
+    row_name: r.row_name || '',
+    formula: r._upstream.formula,
+    formula_type: r._upstream.formula_category || 'auto_calc',
+    id: r.id,
+  }))
+})
+
+function onApplySuggestion(s: { row_code: string; formula: string; id?: string }) {
+  const row = currentRows.value.find((r: any) => r.row_code === s.row_code)
+  if (!row) return
+  // 打开编辑弹窗，预填建议公式（走统一编辑+保存链路，不直接写入避免绕过校验）
+  editingRow.value = row
+  editFormula.value = s.formula
+  editCategory.value = s.formula_type || 'auto_calc'
+  editDescription.value = ''
+  showFormulaEdit.value = true
+  ElMessage.info(`已预填建议公式到编辑弹窗，确认后保存`)
+}
+
 const filteredRows = computed(() => {
   let rows = currentRows.value
 
@@ -3759,14 +3427,6 @@ async function propagateFormulaStale(location?: CanonicalWorkpaperLocation) {
 
 // ── 公式看板 ──
 const showFormulaDashboard = ref(false)
-const dashboardSearch = ref('')
-const dashboardGroupBy = ref('domain')
-const dashboardFilterCategory = ref('')
-/** 维度筛选：域（报表/附注/底稿各作用域/试算表）与层级（模板预设/项目级）。 */
-const dashboardFilterDomain = ref('')
-const dashboardFilterLevel = ref('')
-/** 分类健康度维度：'' 全部 / 'yes' 已分类 / 'no' 未分类。 */
-const dashboardFilterCategorized = ref('')
 const dashboardLoading = ref(false)
 /** 看板加载后的覆盖情况（空态要说清「哪一类没取到」，不能只显示 No Data）。 */
 const dashboardCoverage = ref<{ label: string; count: number }[]>([])
@@ -3945,113 +3605,12 @@ const allFormulaRows = computed(() => [
   ...tbBoardRows(),
 ])
 
-/** 域下拉选项（带条数），按实际数据派生。 */
-const dashboardDomainOptions = computed(() => {
-  const counter = new Map<string, { value: string; label: string; count: number }>()
-  for (const r of allFormulaRows.value) {
-    const value = String(r._domain || '')
-    if (!value) continue
-    const hit = counter.get(value)
-    if (hit) hit.count += 1
-    else counter.set(value, { value, label: String(r._domainLabel || value), count: 1 })
-  }
-  return [...counter.values()]
-})
-
 /** 覆盖情况文案：空态时必须说清哪一类没取到，而不是只给 No Data。 */
 const dashboardCoverageText = computed(() =>
   dashboardCoverage.value.map((c) => `${c.label} ${c.count} 条`).join(' · ')
   || '尚未加载',
 )
 
-/** 分类健康度计数（未分类条数直接暴露，供批量补齐）。 */
-const dashboardCategorizedCount = computed(() => {
-  let yes = 0
-  let no = 0
-  for (const r of allFormulaRows.value) {
-    if (r.formula_category) yes += 1
-    else no += 1
-  }
-  return { yes, no }
-})
-
-/** 分类下拉选项按实际数据派生，避免写死三类而漏掉底稿公式的类型。 */
-const dashboardCategoryOptions = computed(() => {
-  const seen = new Map<string, string>()
-  for (const r of allFormulaRows.value) {
-    const key = r.formula_category || ''
-    if (!key || seen.has(key)) continue
-    seen.set(key, categoryLabel(key))
-  }
-  return [...seen.entries()].map(([value, label]) => ({ value, label }))
-})
-
-const dashboardFilteredRows = computed(() => {
-  let rows = allFormulaRows.value
-  if (dashboardFilterCategory.value) {
-    rows = rows.filter(r => r.formula_category === dashboardFilterCategory.value)
-  }
-  if (dashboardFilterDomain.value) {
-    rows = rows.filter(r => r._domain === dashboardFilterDomain.value)
-  }
-  if (dashboardFilterLevel.value) {
-    rows = rows.filter(r => r._level === dashboardFilterLevel.value)
-  }
-  // 「未分类」是数据现状（实测 183 条报表预设里 38 条无 formula_category），
-  // 给一个显式维度便于批量补齐，而不是让用户在满屏「未分类」里肉眼找。
-  if (dashboardFilterCategorized.value === 'yes') {
-    rows = rows.filter(r => !!r.formula_category)
-  } else if (dashboardFilterCategorized.value === 'no') {
-    rows = rows.filter(r => !r.formula_category)
-  }
-  const kw = dashboardSearch.value.toLowerCase()
-  if (kw) {
-    rows = rows.filter(r =>
-      (r.row_code || '').toLowerCase().includes(kw) ||
-      (r.row_name || '').toLowerCase().includes(kw) ||
-      (r.formula || '').toLowerCase().includes(kw) ||
-      (r.formula_description || '').toLowerCase().includes(kw) ||
-      (r._domainLabel || '').toLowerCase().includes(kw) ||
-      (r._source_type || '').toLowerCase().includes(kw)
-    )
-  }
-  return rows
-})
-
-const dashboardGroupedData = computed(() => {
-  const rows = dashboardFilteredRows.value
-  const groups: Record<string, { key: string; label: string; rows: any[]; _open: boolean }> = {}
-
-  for (const r of rows) {
-    let gKey = '', gLabel = ''
-    if (dashboardGroupBy.value === 'domain') {
-      gKey = r._domain || 'unknown'
-      gLabel = `${r._domainLabel || gKey}（${r._level || ''}）`
-    } else if (dashboardGroupBy.value === 'level') {
-      gKey = r._level || 'unknown'
-      gLabel = r._level || gKey
-    } else if (dashboardGroupBy.value === 'report_type') {
-      gKey = r._report_type || 'unknown'
-      gLabel = r._report_type_label || gKey
-    } else if (dashboardGroupBy.value === 'category') {
-      gKey = r.formula_category || 'none'
-      gLabel = categoryLabel(r.formula_category)
-    } else if (dashboardGroupBy.value === 'source') {
-      // 按公式中引用的数据源分组
-      const formula = r.formula || ''
-      if (formula.includes('TB(') || formula.includes('SUM_TB(')) gKey = 'tb'
-      else if (formula.includes('NOTE(')) gKey = 'note'
-      else if (formula.includes('WP(')) gKey = 'wp'
-      else if (formula.includes('ROW(') || formula.includes('SUM_ROW(')) gKey = 'row'
-      else gKey = 'other'
-      const sourceLabels: Record<string, string> = { tb: '📈 试算表', note: '📝 附注', wp: '📋 底稿', row: '📊 报表行次', other: '其他' }
-      gLabel = sourceLabels[gKey] || gKey
-    }
-    if (!groups[gKey]) groups[gKey] = { key: gKey, label: gLabel, rows: [], _open: true }
-    groups[gKey].rows.push(r)
-  }
-  return Object.values(groups)
-})
 
 /**
  * 看板行可编辑性分两类：
@@ -4359,6 +3918,58 @@ function onHistoryRollbackApplied(rowCode: string, formula: string) {
 }
 .gt-fm-dash-group-title:hover {
   background: var(--gt-bg-info);
+}
+/* 智能公式建议条 */
+.gt-fm-suggest-bar {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: #ecf5ff;
+  border: 1px solid #d9ecff;
+  border-radius: 6px;
+}
+.gt-fm-suggest-header {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gt-color-primary, #409eff);
+}
+.gt-fm-suggest-list {
+  margin-top: 6px;
+}
+.gt-fm-suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  margin-bottom: 3px;
+  background: #fff;
+  border-radius: 4px;
+  border: 1px solid #e4e7ed;
+  font-size: 11px;
+}
+.gt-fm-suggest-code {
+  font-weight: 600;
+  min-width: 70px;
+  color: var(--gt-color-text-primary);
+}
+.gt-fm-suggest-name {
+  min-width: 80px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--gt-color-text-secondary);
+}
+.gt-fm-suggest-formula {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--gt-color-text-regular);
+  font-family: 'Consolas', monospace;
+  font-size: 11px;
 }
 .gt-fm-health-bar {
   display: flex;

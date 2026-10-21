@@ -38,6 +38,12 @@
       <el-table-column label="版本" width="70" align="center">
         <template #default="{ row }">v{{ row.version }}</template>
       </el-table-column>
+      <el-table-column label="订阅" width="70" align="center">
+        <template #default="{ row }">
+          <span v-if="row.subscriber_count" style="font-weight: 600; color: var(--gt-color-primary);">{{ row.subscriber_count }}</span>
+          <span v-else class="gt-ftm-muted">0</span>
+        </template>
+      </el-table-column>
       <el-table-column label="可管理" width="80" align="center">
         <template #default="{ row }">
           <el-tag v-if="row.can_manage" size="small" type="success">是</el-tag>
@@ -90,7 +96,11 @@ const filtered = computed(() => {
     }))
     .filter((t) => (!shareFilter.value || t.share_scope === shareFilter.value)
       && (!kw || t.name.includes(kw)))
-    .sort((a, b) => (b._recommended ? 1 : 0) - (a._recommended ? 1 : 0))  // 推荐排在前面
+    .sort((a, b) => {
+      // 推荐排前面，订阅数多的排前面（优化建议 #4）
+      if (b._recommended !== a._recommended) return (b._recommended ? 1 : 0) - (a._recommended ? 1 : 0)
+      return (b.subscriber_count || 0) - (a.subscriber_count || 0)
+    })
 })
 
 function domainLabel(key: string): string {
