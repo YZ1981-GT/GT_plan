@@ -182,6 +182,7 @@ declare module 'vue' {
     ConsolNoteDetailTemplateEditor: typeof import('./components/consolidation/ConsolNoteDetailTemplateEditor.vue')['default']
     ConsolNoteMappingDialog: typeof import('./components/consolidation/ConsolNoteMappingDialog.vue')['default']
     ConsolNoteTab: typeof import('./components/consolidation/ConsolNoteTab.vue')['default']
+    ConsolNoteTemplateManagerDialog: typeof import('./components/consolidation/ConsolNoteTemplateManagerDialog.vue')['default']
     ConsolNoteTreeEnhanced: typeof import('./components/notes/ConsolNoteTreeEnhanced.vue')['default']
     ConsolPushPanel: typeof import('./components/consolidation/ConsolPushPanel.vue')['default']
     ConsolReportBreakdownView: typeof import('./components/consolidation/ConsolReportBreakdownView.vue')['default']

@@ -57,6 +57,22 @@ async def promote_rule(
             db, rule_id=rule_id, promoted_by=current_user.id,
         )
         await db.commit()
+
+        # SSE 通知：规则已提升为模板，其他项目可引用
+        try:
+            from app.services.event_bus import event_bus
+            event_bus.broadcast_raw(
+                "consol.note_mapping_template_promoted",
+                {
+                    "project_id": str(project_id),
+                    "template_id": str(result.get("template_id", "")),
+                    "section_id": result.get("section_id", ""),
+                    "version_number": result.get("version_number", 1),
+                },
+            )
+        except Exception:
+            pass  # SSE 失败不阻断业务
+
         return result
     except MappingTemplateError as exc:
         _raise(exc)

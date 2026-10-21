@@ -1265,6 +1265,9 @@ function onConsolScopeChanged(evt: { event_type: string }) {
   } else if (evt.event_type === 'consol.note_stale') {
     // F5：子公司数据变更导致母项目 stale → 提示重新汇总
     consolStale.value = true
+  } else if (evt.event_type === 'consol.note_mapping_confirmed' || evt.event_type === 'consol.note_mapping_template_promoted') {
+    // P2：映射确认/模板提升 → 通知合并附注 Tab 刷新（供其他在线用户实时看到变更）
+    eventBus.emit('consol-note-mapping-changed' as any)
   }
 }
 

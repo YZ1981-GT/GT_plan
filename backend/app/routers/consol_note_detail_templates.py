@@ -458,6 +458,22 @@ async def api_confirm_mapping(
             current_entity_hashes=body.current_entity_hashes,
         )
         await db.commit()
+
+        # SSE 通知：映射已确认，前端刷新 stale/映射状态
+        try:
+            from app.services.event_bus import event_bus
+            event_bus.broadcast_raw(
+                "consol.note_mapping_confirmed",
+                {
+                    "project_id": str(project_id),
+                    "section_id": body.section_id,
+                    "year": body.year,
+                    "bound_count": result.get("bound_count", 0),
+                },
+            )
+        except Exception:
+            pass  # SSE 失败不阻断业务
+
         return result
     except MappingRuleError as exc:
         await db.rollback()

@@ -42,6 +42,9 @@
             <el-tooltip content="明细映射：匹配子企业附注科目到合并模板行" placement="bottom">
               <el-button size="small" @click="showMappingDialog = true" data-testid="consol-note-open-mapping">📋 明细映射</el-button>
             </el-tooltip>
+            <el-tooltip content="管理合并附注明细模板：查看、编辑、绑定模板版本" placement="bottom">
+              <el-button size="small" @click="showTemplateManager = true" data-testid="consol-note-open-template-manager">📝 模板管理</el-button>
+            </el-tooltip>
           </div>
         </div>
 
@@ -691,6 +694,17 @@
     :node-key="currentNodeKey() || undefined"
     @applied="onDetailRefreshApplied"
   />
+
+  <!-- 模板管理弹窗 -->
+  <ConsolNoteTemplateManagerDialog
+    v-model:visible="showTemplateManager"
+    :project-id="props.projectId"
+    :section-id="String(selectedNoteSection?.section_id || '')"
+    :section-title="String(selectedNoteSection?.title || '')"
+    :year="props.year"
+    :template-type="(props.standard?.includes('listed') ? 'listed' : 'soe') as 'soe' | 'listed'"
+    @bound="onDetailRefreshApplied"
+  />
 </template>
 
 <script setup lang="ts">
@@ -731,6 +745,7 @@ import {
 } from '@/components/consolidation/composables/consolNoteView'
 import { useAcnr } from '@/services/acnr/useAcnr'
 import ConsolNoteMappingDialog from '@/components/consolidation/ConsolNoteMappingDialog.vue'
+import ConsolNoteTemplateManagerDialog from '@/components/consolidation/ConsolNoteTemplateManagerDialog.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
@@ -1036,6 +1051,7 @@ const { isFullscreen: noteFullscreen, toggleFullscreen: toggleNoteFullscreen } =
 const formulaFilling = ref(false)
 const reaggregating = ref(false)
 const showMappingDialog = ref(false)
+const showTemplateManager = ref(false)
 
 /** 明细刷新 apply 完成后重读当前章节 */
 async function onDetailRefreshApplied() {
