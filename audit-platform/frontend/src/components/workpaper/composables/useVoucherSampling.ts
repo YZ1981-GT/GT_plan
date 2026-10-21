@@ -64,6 +64,10 @@ import {
   summarizeDeviationNature,
   type DeviationAnnotationMap,
 } from './samplingDeviationNature'
+import {
+  parseReconcileInfo,
+  type PopulationReconcileInfo,
+} from './samplingPopulationReconcile'
 import { useVersionTrail } from './useVersionTrail'
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
@@ -388,6 +392,23 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
   function setReconcileBlockedReason(reason: string | null): void {
     reconcileBlockedReason.value = reason
   }
+
+  /**
+   * 门控来源标识——消费方据此决定提示文案（如 reconcile 来源时指向本窗口而非弹窗背后）。
+   * 与 `conclusionBlockedReason` 同链；null = 未阻断。
+   */
+  type BlockedSource = 'unchecked' | 'deviation' | 'reconcile' | 'other' | null
+  const conclusionBlockedSource = computed<BlockedSource>(() => {
+    if (!conclusionBlockedReason.value) return null
+    const unchecked = uncheckedResolution.value
+    if (unchecked.pending.length > 0 || unchecked.missingNote.length > 0) return 'unchecked'
+    const dev = deviationResolution.value
+    if (dev.unannotated.length > 0 || dev.missingExplanation.length > 0) return 'deviation'
+    const reconcileIssue = reconcileBlockedReason.value
+    if (reconcileIssue && reconcileOverrideReason.value.trim().length < 10) return 'reconcile'
+    return 'other'
+  })
+
   const loading = ref(false)
   const configDialogVisible = ref(false)
   const previewVisible = ref(false)
@@ -413,11 +434,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
    * - available=false → 无独立数据源，UI 显示"未执行核对"，不得以序时账总体自身比对。
    * - bookAmount → trial_balance 审定等独立账面；basis → 来源标识。
    */
-  const reconcileInfo = ref<{
-    available: boolean
-    bookAmount: string | null
-    basis: string | null
-  } | null>(null)
+  const reconcileInfo = ref<PopulationReconcileInfo | null>(null)
   /** 后端方法学权威快照（含 algo_version）；抽样后由 triggerSampling 填充，回填时留痕 */
   const methodologySnapshot = ref<Record<string, any> | null>(null)
   /**
@@ -855,13 +872,8 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
         amountCoverageRate: String(statsData.amount_coverage_rate ?? statsData.amountCoverageRate ?? '0.00'),
       }
 
-      // 总体完整性核对信息（独立账面来源）
-      reconcileInfo.value = {
-        available: statsData.reconcile_available === true,
-        bookAmount:
-          statsData.book_amount != null ? String(statsData.book_amount) : null,
-        basis: statsData.reconcile_basis ?? null,
-      }
+      // 总体完整性核对信息（科目余额表发生额 vs 序时账）
+      reconcileInfo.value = parseReconcileInfo(statsData)
 
       // ─── 方法学单一真源：优先消费后端权威快照（interval/suggested/algo_version）───
       // 后端以 CAS1314 权威口径计算；前端 computeSuggestedSampleSize 仅作即时预览兜底。
@@ -1688,6 +1700,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     reconcileOverrideReason,
     setReconcileBlockedReason,
     conclusionBlockedReason,
+    conclusionBlockedSource,
     stratifiedDetail,
     stratifiedFallback,
     strataEvaluationEnabled,

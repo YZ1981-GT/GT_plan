@@ -13,7 +13,15 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { useVoucherSampling } from '../composables/useVoucherSampling'
 import { WorkpaperRuntimeContextKey } from '../composables/useWorkpaperScaffold'
 import { useSamplingPhase, type ViewMode } from '../composables/useSamplingPhase'
-import { reconcilePopulation, buildSamplingMemo } from '../composables/useSamplingAlgorithms'
+import { buildSamplingMemo } from '../composables/useSamplingAlgorithms'
+import {
+  resolvePopulationReconcile as resolveReconcile,
+  describeReconcileIssue,
+  reconcilePresetsFor,
+  reconcileBasisLabel,
+  formatMovementPair,
+  parseAmountInput,
+} from '../composables/samplingPopulationReconcile'
 import {
   UNCHECKED_DISPOSITION_HINTS,
   UNCHECKED_DISPOSITION_LABELS,
@@ -221,6 +229,7 @@ const {
   reconcileOverrideReason,
   setReconcileBlockedReason,
   conclusionBlockedReason,
+  conclusionBlockedSource,
   stratifiedDetail,
   stratifiedFallback,
 } = useVoucherSampling({
@@ -312,12 +321,7 @@ const batchReasonMode = ref<'preset' | 'custom'>('preset')
 const batchReasonPreset = ref('')
 const batchReasonCustom = ref('')
 const batchOverwrite = ref(false) // 是否覆盖已有值
-// 总体完整性校验——预置放行理由（点击即填入，减少输入摩擦）
-const RECONCILE_PRESETS = [
-  '该科目无独立明细表，已与总账另行核对一致，确认抽样总体完整',
-  '已与科目余额表核对一致，序时账总体金额与账面无差异',
-  '本科目审定表已独立编制，抽样总体取自同一数据源，不再重复核对',
-]
+// 总体完整性校验——预置放行理由由 activeReconcilePresets 动态计算（Task 6）
 
 const REASON_PRESETS = [
   { value: '大额交易', label: '大额交易' },
@@ -373,6 +377,12 @@ const confirmBlockedReason = computed<string | null>(() => {
   // `conclusionBlockedReason` 里，此处只做合并与文案补全，不另开判定分支。
   const criteriaBlocked = conclusionBlockedReason.value
   if (criteriaBlocked) {
+    const source = conclusionBlockedSource.value
+    if (source === 'reconcile') {
+      // 完整性核对来源：指向本窗口下方（预览弹窗内有就地放行入口，不需关闭预览）
+      return `${criteriaBlocked}（可直接在本窗口下方「总体完整性校验」处填写说明后继续）`
+    }
+    // 其余门控（未检查处置 / 偏差性质等）需在主界面操作，仍要求关闭预览
     return `${criteriaBlocked}（请先关闭本预览，在下方对应区域补齐后再点操作栏的「继续填充」）`
   }
   if (samplingConclusion.value && !conclusionConfirmed.value) {
@@ -513,7 +523,7 @@ const samplingIntervalDisplay = computed(() => samplingInterval.value ?? null)
 
 // ─── 方法学增强：总体完整性校验区（R19）─────────────────────────────────────
 
-/** 账面金额（序时账/明细/审定），默认取抽样总体金额，允许审计师手工录入核对 */
+/** 账面金额手工录入（借+贷发生额合计口径） */
 const bookAmountInput = ref<string>('')
 /** 总体完整性可容忍差异比例（默认 5%） */
 const reconcileThresholdPct = ref<number>(0.05)
@@ -526,57 +536,47 @@ const samplingPopulationCount = computed(
 )
 
 /**
- * 有效账面金额：手工录入优先（Req2.4）；否则用后端独立账面（trial_balance 审定）；
- * 二者皆无 → null（不以序时账总体自身比对，避免自身比对假绿，Req2.2）。
+ * 核对结果（新模块 resolvePopulationReconcile）：
+ * 手工优先 → 自动逐方向 → 旧响应单值回落 → null（未执行核对）。
  */
-const effectiveBookAmount = computed<string | null>(() => {
-  if (bookAmountInput.value && bookAmountInput.value !== '') {
-    return bookAmountInput.value
-  }
-  if (reconcileInfo.value?.available && reconcileInfo.value.bookAmount != null) {
-    return reconcileInfo.value.bookAmount
-  }
-  return null
-})
-
-/** 是否可执行总体完整性核对（有独立账面或手工录入） */
-const reconcileAvailable = computed(
-  () => coverageStats.value != null && effectiveBookAmount.value != null,
-)
-
-/** 总体完整性校验结果（纯函数 reconcilePopulation）；无独立账面时返回 null → UI 显示"未执行核对" */
 const populationReconcile = computed(() => {
-  if (!coverageStats.value || effectiveBookAmount.value == null) return null
-  return reconcilePopulation(
-    samplingPopulationAmount.value,
-    effectiveBookAmount.value,
-    reconcileThresholdPct.value,
-  )
+  if (!coverageStats.value) return null
+  return resolveReconcile({
+    info: reconcileInfo.value,
+    manualBook: bookAmountInput.value || null,
+    populationAmount: samplingPopulationAmount.value,
+    thresholdPct: reconcileThresholdPct.value,
+  })
 })
+
+/** 是否可执行总体完整性核对（有核对结果） */
+const reconcileAvailable = computed(
+  () => populationReconcile.value != null,
+)
 
 /**
  * R5.1/5.2：总体完整性核对未通过 → 阻断结论确认。
- *
- * 「从不完整的总体中抽样」会让整个抽样结论失效，比「结论未人工确认」更该阻断。
- * 改造前这里只显示一条 alert，`confirmBlockedReason` 完全不看它。
  *
  * 尚未执行抽样（`coverageStats` 为空）时不判定 —— 那不是"核对失败"而是"还没开始"。
  */
 const reconcileIssue = computed<string | null>(() => {
   if (!coverageStats.value) return null
-  if (!reconcileAvailable.value) {
-    return '未执行总体完整性核对：无独立账面来源且未手工录入账面金额，无法确认样本取自完整总体'
-  }
-  const r = populationReconcile.value
-  if (r && !r.withinThreshold) {
-    return (
-      `总体完整性核对不符：抽样总体 ${samplingPopulationAmount.value} 元与账面 ` +
-      `${effectiveBookAmount.value} 元差异 ${r.diff} 元，超出可容忍差异 ` +
-      `${(reconcileThresholdPct.value * 100).toFixed(0)}%`
-    )
-  }
-  return null
+  return describeReconcileIssue(
+    populationReconcile.value,
+    reconcileInfo.value,
+    reconcileThresholdPct.value,
+  )
 })
+
+/** 预置放行理由（核对不符时不给一致类理由——与系统证据矛盾，R3.4）。 */
+const activeReconcilePresets = computed(() =>
+  reconcilePresetsFor(populationReconcile.value),
+)
+
+/** 手工账面填了但识别不了（不参与比对，界面提示而不是按 0 比） */
+const bookAmountInvalid = computed(
+  () => bookAmountInput.value.trim() !== '' && parseAmountInput(bookAmountInput.value) == null,
+)
 
 // 把判定结果注入 composable 的统一门控链（composable 不去猜组件里的手工录入状态）
 watch(reconcileIssue, val => setReconcileBlockedReason(val), { immediate: true })
@@ -835,7 +835,7 @@ async function handleResample() {
       <template #header>
         <div class="reconcile-header">
           <span class="reconcile-title">总体完整性校验</span>
-          <span class="reconcile-sub">将抽样总体与账面（序时账/明细表/审定数）核对，确认从完整总体中抽样</span>
+          <span class="reconcile-sub">将序时账（所选科目·全年）与科目余额表按借、贷方发生额核对，确认从完整总体中抽样</span>
           <!-- R10：抽样配置与总体界定的复核入口（总体是否完整、抽样框版本是否适用） -->
           <GtReviewTrigger :section-id="samplingConfigSectionId" label="💬 复核" />
         </div>
@@ -849,20 +849,26 @@ async function handleResample() {
           <span class="reconcile-label">抽样总体笔数</span>
           <span class="reconcile-value">{{ samplingPopulationCount }} 笔</span>
         </div>
+        <div class="reconcile-item" v-if="reconcileInfo?.ledgerDebit != null">
+          <span class="reconcile-label">序时账发生额（所选科目·全年）</span>
+          <span class="reconcile-value">{{ formatMovementPair(reconcileInfo.ledgerDebit, reconcileInfo.ledgerCredit) }}</span>
+        </div>
+        <div class="reconcile-item" v-if="reconcileInfo?.available && reconcileInfo.bookDebit != null">
+          <span class="reconcile-label">{{ reconcileBasisLabel(reconcileInfo.basis) }}</span>
+          <span class="reconcile-value">{{ formatMovementPair(reconcileInfo.bookDebit, reconcileInfo.bookCredit) }}</span>
+        </div>
         <div class="reconcile-item">
-          <span class="reconcile-label">账面金额（独立来源）</span>
+          <span class="reconcile-label">手工录入账面（借+贷发生额合计）</span>
           <el-input
             v-model="bookAmountInput"
             :disabled="props.readonly"
             size="small"
-            :placeholder="reconcileInfo?.available ? '已取独立账面，可手工覆盖' : '无独立账面，请手工录入核对'"
-            style="width: 200px"
+            :placeholder="reconcileInfo?.available ? '留空即用上方科目余额表核对' : '未取到余额表，可手工录入核对'"
+            style="width: 220px"
           >
             <template #suffix>元</template>
           </el-input>
-          <el-tag v-if="reconcileInfo?.available" size="small" type="success" effect="plain">
-            {{ reconcileInfo?.basis && reconcileInfo.basis.startsWith('trial_balance_audited') ? '试算表审定发生额' : '独立来源' }}
-          </el-tag>
+          <span v-if="bookAmountInvalid" class="reconcile-input-error">金额格式无法识别，未参与核对</span>
         </div>
         <div class="reconcile-item">
           <span class="reconcile-label">可容忍差异</span>
@@ -879,8 +885,13 @@ async function handleResample() {
           </el-select>
         </div>
         <div class="reconcile-item" v-if="populationReconcile">
-          <span class="reconcile-label">差异</span>
-          <span class="reconcile-value">{{ populationReconcile.diff }} 元</span>
+          <span class="reconcile-label">核对结果</span>
+          <span v-for="d in populationReconcile.directions" :key="d.label" class="reconcile-value" style="margin-right: 16px">
+            {{ d.label }}：差异 {{ d.diff }} 元
+            <el-tag :type="d.withinThreshold ? 'success' : 'warning'" size="small" effect="plain" style="margin-left: 4px">
+              {{ d.withinThreshold ? '一致' : '不符' }}
+            </el-tag>
+          </span>
         </div>
       </div>
       <el-alert
@@ -888,7 +899,7 @@ async function handleResample() {
         type="info"
         :closable="false"
         show-icon
-        title="未执行总体完整性核对：无独立账面数据源，请手工录入账面金额（不以序时账总体自身比对）"
+        :title="`未执行总体完整性核对：${reconcileInfo?.unavailableReason || '未取到科目余额表'}。可在上方手工录入账面借+贷发生额合计后核对`"
         style="margin-top: 8px"
       />
       <el-alert
@@ -896,7 +907,7 @@ async function handleResample() {
         type="warning"
         :closable="false"
         show-icon
-        title="总体可能不完整，抽样结论受限：抽样总体与独立账面差异超过可容忍阈值，请核实总体来源"
+        title="总体可能不完整，抽样结论受限：序时账与账面发生额差异超过可容忍阈值，请核实序时账是否完整导入"
         style="margin-top: 8px"
       />
 
@@ -918,8 +929,8 @@ async function handleResample() {
           placeholder="如确有正当理由（例如该科目无独立明细表、已与总账另行核对一致），请说明不少于 10 字后继续；该说明将随抽样评价留痕"
         />
         <!-- 预置理由快捷填入 -->
-        <div v-if="!reconcileOverrideReason.trim()" class="reconcile-presets">
-          <el-button v-for="preset in RECONCILE_PRESETS" :key="preset" size="small" text type="primary" @click="reconcileOverrideReason = preset">
+        <div v-if="!reconcileOverrideReason.trim() && activeReconcilePresets.length > 0" class="reconcile-presets">
+          <el-button v-for="preset in activeReconcilePresets" :key="preset" size="small" text type="primary" @click="reconcileOverrideReason = preset">
             {{ preset }}
           </el-button>
         </div>
@@ -1480,6 +1491,10 @@ async function handleResample() {
       :selected-credit-total="selectedCreditTotal"
       :phase="props.phase"
       :confirm-blocked-reason="confirmBlockedReason"
+      :reconcile-issue="reconcileIssue"
+      :reconcile-override-reason="reconcileOverrideReason"
+      :reconcile-presets="activeReconcilePresets"
+      @update:reconcile-override-reason="(v: string) => reconcileOverrideReason = v"
       @update:fill-mode="(v: FillMode) => fillMode = v"
       @confirm="handleConfirmFill"
       @toggle-select-all="toggleSelectAll"
@@ -1564,6 +1579,11 @@ async function handleResample() {
 
 .reconcile-override-foot {
   margin-top: 6px;
+}
+
+.reconcile-input-error {
+  font-size: 12px;
+  color: var(--el-color-danger);
 }
 
 .reconcile-presets {

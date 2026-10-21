@@ -30,10 +30,11 @@ from app.deps import get_current_user
 import sqlalchemy as sa
 
 from app.deps import authorize_wp_edit
-from app.models.audit_platform_models import TrialBalance, WorkpaperExtractionLog
+from app.models.audit_platform_models import WorkpaperExtractionLog
 from app.models.core import Project, User as _CoreUser  # noqa: F401 (Project 用于年度校验)
 from app.models.core import User
 from app.services.dataset_query import get_active_dataset_id_or_none
+from app.services.sampling_population_reconcile import resolve_population_reconcile
 from app.services.ledger_sampling_service import (
     LedgerQueryFilters,
     LedgerSamplingService,
@@ -403,12 +404,11 @@ async def voucher_extract(
                 req.sampling_method, sp, population_amount
             )
 
-        # 总体完整性核对：独立账面来源（trial_balance，独立于序时账）。取不到 → 未执行核对，
-        # 绝不用序时账总体自身作账面（消除自身比对假绿，Req2）。
-        independent_book, reconcile_basis = await _resolve_independent_book_amount(
-            db, pid, req.year, account_codes
+        # 总体完整性核对：序时账 vs 科目余额表发生额（voucher-sampling-reconcile-balance-source）。
+        # 取不到 → 未执行核对（不阻断抽样）；不再使用 trial_balance 审定数。
+        reconcile_facts = await resolve_population_reconcile(
+            db, pid, req.year, account_codes, sampling_dataset_id
         )
-        reconcile_available = independent_book is not None
 
         # 样本借贷合计 + 代表金额（GREATEST 求和；样本集合小，Python 端计算）
         sample_debit_total = sum(
@@ -480,12 +480,8 @@ async def voucher_extract(
                 "population_debit_total": str(stats.debit_total),
                 "population_credit_total": str(stats.credit_total),
                 "population_amount": str(population_amount),
-                # 独立账面（trial_balance 审定，独立于序时账）；取不到为 null + 未执行核对
-                "book_amount": (
-                    str(independent_book) if independent_book is not None else None
-                ),
-                "reconcile_available": reconcile_available,
-                "reconcile_basis": reconcile_basis,
+                # 总体完整性核对（科目余额表发生额 vs 序时账）；向后兼容旧字段 + 新逐方向字段
+                **reconcile_facts.to_stats(),
                 "sample_count": sample_count_val,
                 "sample_debit_total": str(sample_debit_total),
                 "sample_credit_total": str(sample_credit_total),
@@ -1197,62 +1193,6 @@ async def _authorize_and_validate_extract(
                     status_code=400, detail=f"年度 {year} 不属于项目审计期"
                 )
 
-
-async def _resolve_independent_book_amount(
-    db: AsyncSession,
-    project_id: UUID,
-    year: int,
-    account_codes: list[str],
-) -> tuple[Optional[Decimal], Optional[str]]:
-    """解析**独立于序时账**的账面金额用于总体完整性核对（Req2）。
-
-    从 trial_balance（审定试算表，独立于 tb_ledger 序时账）按科目前缀汇总审定数
-    （审定为空回退未审）。取不到返回 (None, None) → 前端显示"未执行核对"，
-    绝不以序时账总体自身作为账面（避免自身比对假绿）。
-
-    🔴 口径守卫（P1）：抽凭总体为**本期发生额（movement）**口径。trial_balance 是四列
-    结构（无独立本期发生额列），其审定数对**损益/成本类（编码 5/6）= 发生额**，可与凭证
-    发生额总体同口径比对；对**资产/负债/权益类（编码 1/2/3/4）= 期末余额**，与发生额总体
-    口径不符（余额 vs 发生额是范畴错误）→ 返回 (None, None) 不提供独立核对，避免误导性差异。
-    审计师若持有余额型可比总体，可在前端手工录入核对值。
-
-    Returns:
-        (book_amount, basis)；basis 标识来源（'trial_balance_audited_occurrence'）。
-    """
-    if not account_codes:
-        return None, None
-    # 仅损益/成本类（审定=发生额）与凭证发生额总体同口径；含资产/负债/权益类即口径不符
-    if not all(str(code)[:1] in ("5", "6") for code in account_codes):
-        return None, None
-    prefix_conditions = [
-        TrialBalance.standard_account_code.like(f"{code}%") for code in account_codes
-    ]
-    stmt = sa.select(
-        sa.func.coalesce(
-            sa.func.sum(
-                sa.func.abs(
-                    sa.func.coalesce(
-                        TrialBalance.audited_amount, TrialBalance.unadjusted_amount, 0
-                    )
-                )
-            ),
-            0,
-        ),
-        sa.func.count(),
-    ).where(
-        TrialBalance.project_id == project_id,
-        TrialBalance.year == year,
-        TrialBalance.is_deleted == sa.false(),
-        sa.or_(*prefix_conditions),
-    )
-    try:
-        row = (await db.execute(stmt)).one()
-        total, cnt = row[0], row[1]
-        if not cnt:
-            return None, None
-        return Decimal(str(total)), "trial_balance_audited_occurrence"
-    except Exception:  # noqa: BLE001 — 独立源取数失败不阻断抽样（Req2.5）
-        return None, None
 
 
 def _parse_iso_date(value: Any) -> Optional[date]:

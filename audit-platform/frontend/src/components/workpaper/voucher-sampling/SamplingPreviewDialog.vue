@@ -45,11 +45,23 @@ interface Props {
    * 用户无从下手）。缺省 null = 无门控，行为与引入前逐字等价。
    */
   confirmBlockedReason?: string | null
+  /**
+   * 总体完整性核对未通过的原因（非空 ⇒ 显示就地放行入口）。
+   * 缺省 null = 无核对问题 / 旧调用点未传，不显示放行块。
+   */
+  reconcileIssue?: string | null
+  /** 放行说明（双向绑定，与引擎主界面卡片同一份状态） */
+  reconcileOverrideReason?: string
+  /** 预置放行理由列表 */
+  reconcilePresets?: string[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
   phase: 'preliminary',
   confirmBlockedReason: null,
+  reconcileIssue: null,
+  reconcileOverrideReason: '',
+  reconcilePresets: () => [],
 })
 
 // ─── Emits ────────────────────────────────────────────────────────────────────
@@ -57,6 +69,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'update:visible', v: boolean): void
   (e: 'update:fill-mode', v: FillMode): void
+  (e: 'update:reconcile-override-reason', v: string): void
   (e: 'confirm'): void
   (e: 'toggle-select-all', v: boolean): void
 }>()
@@ -518,6 +531,49 @@ function handleConfirm() {
       </el-table-column>
     </el-table>
 
+    <!-- ═══ 总体完整性校验——就地放行（R3.1）═══ -->
+    <div v-if="reconcileIssue" class="reconcile-override-inline" data-testid="preview-reconcile-override">
+      <div class="reconcile-override-head">
+        <el-tag type="danger" size="small" effect="dark">总体完整性核对</el-tag>
+        <span class="reconcile-override-text">{{ reconcileIssue }}</span>
+      </div>
+      <el-input
+        :model-value="reconcileOverrideReason"
+        type="textarea"
+        :autosize="{ minRows: 2 }"
+        maxlength="500"
+        show-word-limit
+        placeholder="如确有正当理由，请说明不少于 10 字后继续；该说明将随抽样评价留痕"
+        data-testid="preview-reconcile-reason"
+        @update:model-value="(v: string) => emit('update:reconcile-override-reason', v)"
+      />
+      <div v-if="reconcilePresets.length > 0 && !(reconcileOverrideReason || '').trim()" class="reconcile-presets">
+        <el-button
+          v-for="preset in reconcilePresets"
+          :key="preset"
+          size="small"
+          text
+          type="primary"
+          @click="emit('update:reconcile-override-reason', preset)"
+        >
+          {{ preset }}
+        </el-button>
+      </div>
+      <div class="reconcile-override-foot">
+        <el-tag
+          :type="(reconcileOverrideReason || '').trim().length >= 10 ? 'success' : 'info'"
+          size="small"
+          effect="plain"
+        >
+          {{
+            (reconcileOverrideReason || '').trim().length >= 10
+              ? '已填写放行理由，可继续确认填充'
+              : `还需 ${10 - (reconcileOverrideReason || '').trim().length} 字`
+          }}
+        </el-tag>
+      </div>
+    </div>
+
     <!-- ═══ 底部操作区 ═══ -->
     <div class="dialog-footer">
       <div class="fill-mode-section">
@@ -738,6 +794,39 @@ function handleConfirm() {
 
 .voucher-table :deep(.el-table__header th) {
   font-size: var(--wp-font-size, 13px);
+}
+
+/* ── 总体完整性校验：就地放行（与引擎主界面同款视觉，scoped 样式不跨组件，须各写一份）── */
+.reconcile-override-inline {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--el-color-danger);
+  background: var(--el-color-danger-light-9);
+  border-radius: 4px;
+}
+
+.reconcile-override-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.reconcile-override-text {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+
+.reconcile-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.reconcile-override-foot {
+  margin-top: 6px;
 }
 
 /* ── 底部操作区 ── */

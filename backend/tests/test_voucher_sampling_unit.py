@@ -124,8 +124,15 @@ async def _call(unit: str, population: list[dict]) -> dict:
         "app.routers.voucher_sampling._get_preliminary_voucher_nos",
         new=AsyncMock(return_value=[]),
     ), patch(
-        "app.routers.voucher_sampling._resolve_independent_book_amount",
-        new=AsyncMock(return_value=(None, None)),
+        "app.routers.voucher_sampling.resolve_population_reconcile",
+        new=AsyncMock(return_value=MagicMock(
+            available=False, to_stats=lambda: {
+                "book_amount": None, "reconcile_available": False,
+                "reconcile_basis": None, "reconcile_ledger_debit": None,
+                "reconcile_ledger_credit": None, "reconcile_book_debit": None,
+                "reconcile_book_credit": None, "reconcile_unavailable_reason": None,
+            },
+        )),
     ):
         MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
         MockService.execute_with_stats = AsyncMock(

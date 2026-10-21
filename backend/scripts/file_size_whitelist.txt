@@ -1407,8 +1407,13 @@ audit-platform/frontend/src/components/layout/DetailProjectPanel.vue  1726
 #     独立 service，前端批量填充 UI 可抽独立组件，属后续打磨。
 audit-platform/frontend/src/components/workpaper/composables/useVoucherSampling.ts  1770
 audit-platform/frontend/src/components/workpaper/voucher-sampling/GtVoucherSamplingEngine.vue  1751
-backend/app/routers/voucher_sampling.py  1497
+backend/app/routers/voucher_sampling.py  1438
 backend/app/services/ledger_sampling_service.py  1044
+
+#   test_voucher_sampling_integration.py —— 抽凭引擎完整流程集成测试。
+#     voucher-sampling-reconcile-balance-source 新增 _stub_population_reconcile fixture（+16 行）
+#     使核对取数不再靠 AsyncMock 会话意外降级。拆分方向：按测试类拆文件，后续打磨。
+backend/tests/test_voucher_sampling_integration.py  1143
 
 #   D1TabVoucherCheck.vue —— D1 凭证检查表（原 D1TabSamplingVouching，已重命名统一）。
 #     拆分方向：OCR/导出/抽凭回填逻辑抽伴生 composable。
@@ -1487,3 +1492,15 @@ backend/tests/dsh_agent_panel/test_task31_phase_c_gate.py  1082
 #   mutate_dsh_agent_panel_guards.py（触碰前 1056）：spec 归档后默认输出目录改走 _spec_dir（+9 行）。
 #     拆分方向：变异清单（数据）与注入 / 恢复执行器分文件。
 backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py  1065
+
+#   test_task7_adopt_fail_closed.py —— DSH 面板采纳 fail-closed 守卫（非本次引入；触碰前已 1431 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-21 ai-chat-adopt-and-note-target-picker R2.1：AdoptRequest 新增可选 source_host，字段集合断言同步（+2 行）。
+#     拆分方向：按测试类分组拆文件（服务端权威正文 / 哈希链审计 / 篡改输入拒绝 / 服务端草稿可采纳 / 写能力门 / 下游失败不报成功）。
+backend/tests/dsh_agent_panel/test_task7_adopt_fail_closed.py  1433
+
+#   semantic_account_resolver.py / consol_elimination_sheet_service.py —— 历史大文件（HEAD 已 842 / 1143 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-21 formula-global-settings-sync：前者 _fetch_report_formula 补「本项目行公式为空 = 停用，不退回准则行」（+2 行，R1.1 取数层与报表生成同口径）；
+#     后者 load_mapper 传 project_id 读本项目有效定义（0 净行，R1.2）。
+#     拆分方向：semantic_account_resolver 按「语义槽定义 / 科目反解 / 报表公式取数」拆模块；consol_elimination_sheet_service 按「差额表组装 / 映射器 / 推送」拆。
+backend/app/services/four_table/semantic_account_resolver.py  844
+backend/app/services/consol_elimination_sheet_service.py  1143

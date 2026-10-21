@@ -1,15 +1,15 @@
-"""总体完整性独立数据源测试（voucher-sampling-hardening Task 4.3）
+"""总体完整性核对 — 端点契约测试（voucher-sampling-reconcile-balance-source Task 3）
 
-Property 5：不以序时账总体自身比对——无独立账面时 reconcile_available=false 且
-book_amount=null，绝不等于抽样总体金额（population_amount）。
+Property 5 改写：接入科目余额表后，资产类科目（如 1122）也应返回 reconcile_available=true
+（不再因科目类别恒返 false）。新增逐方向字段必须存在且类型正确。
 
-Validates: Requirements 2.1, 2.2, 2.5
-Properties: Property 5
+Validates: Requirements R1.1, R1.5, R2.1, R5.1
 """
 
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,10 +19,8 @@ from httpx import ASGITransport, AsyncClient
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import UserRole
-from app.routers.voucher_sampling import (
-    _resolve_independent_book_amount,
-    router,
-)
+from app.routers.voucher_sampling import router
+from app.services.sampling_population_reconcile import PopulationReconcileFacts
 
 from tests.test_voucher_sampling_integration import (
     _make_extract_request,
@@ -51,9 +49,6 @@ def _bypass_extract_auth():
 
 @pytest.fixture(autouse=True)
 def _bridge_exclusions_to_legacy(monkeypatch):
-    """P3：新 `_get_voucher_sampling_exclusions`（ledger_line 行级排除入口）委托到各测试
-    已 mock 的 legacy 收集器，使端点级 reconcile 测试的 voucher-extract 调用不触达未 mock
-    的 db。行级拆分本身由 test_voucher_sampling_row_exclusion.py 独立覆盖。"""
     import app.routers.voucher_sampling as _vs
 
     async def _delegate(db, wp, preliminary_only=False):
@@ -66,163 +61,160 @@ def _bridge_exclusions_to_legacy(monkeypatch):
     monkeypatch.setattr(_vs, "_get_voucher_sampling_exclusions", _delegate)
 
 
-class TestResolveIndependentBookAmount:
-    @pytest.mark.asyncio
-    async def test_empty_account_codes_returns_none(self):
-        # 无科目 → 无法解析独立账面 → (None, None)，不自身比对
-        got = await _resolve_independent_book_amount(AsyncMock(), _PID, 2025, [])
-        assert got == (None, None)
+def _make_app():
+    app = FastAPI()
+    app.include_router(router)
+    mock_db = AsyncMock()
 
-    @pytest.mark.asyncio
-    async def test_db_failure_degrades_gracefully(self):
-        # 独立源取数异常 → (None, None) 不抛（Req2.5）
-        # 用损益类 6601（通过口径守卫到达 DB 路径）验证 DB 失败降级
-        db = AsyncMock()
-        db.execute = AsyncMock(side_effect=RuntimeError("boom"))
-        got = await _resolve_independent_book_amount(db, _PID, 2025, ["6601"])
-        assert got == (None, None)
+    async def _override_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[get_current_user] = lambda: _FakeUser()
+    return app, mock_db
 
 
-class TestReconcileScopeGuard:
-    """P1 口径守卫：发生额总体只对损益/成本类(5/6)核对，资产/负债/权益类不核对。"""
+def _mock_reconcile_facts(available=True, **kwargs):
+    """构造 mock 的 PopulationReconcileFacts 用于端点 patch。"""
+    defaults = dict(
+        available=available,
+        basis="tb_balance_movement" if available else None,
+        ledger_debit=Decimal("1000000") if available else None,
+        ledger_credit=Decimal("900000") if available else None,
+        book_debit=Decimal("1000000") if available else None,
+        book_credit=Decimal("900000") if available else None,
+        unavailable_reason=None if available else "测试不可用原因",
+    )
+    defaults.update(kwargs)
+    return PopulationReconcileFacts(**defaults)
 
-    @pytest.mark.asyncio
-    async def test_asset_account_no_reconcile(self):
-        # 资产类 1122：审定=期末余额，与发生额总体口径不符 → (None,None)，且不查 DB
-        db = AsyncMock()
-        db.execute = AsyncMock(side_effect=AssertionError("不应查询 DB"))
-        got = await _resolve_independent_book_amount(db, _PID, 2025, ["1122"])
-        assert got == (None, None)
 
-    @pytest.mark.asyncio
-    async def test_liability_account_no_reconcile(self):
-        db = AsyncMock()
-        db.execute = AsyncMock(side_effect=AssertionError("不应查询 DB"))
-        got = await _resolve_independent_book_amount(db, _PID, 2025, ["2202"])
-        assert got == (None, None)
-
-    @pytest.mark.asyncio
-    async def test_mixed_scope_no_reconcile(self):
-        # 含资产类 → 整体口径不符 → (None,None)
-        db = AsyncMock()
-        db.execute = AsyncMock(side_effect=AssertionError("不应查询 DB"))
-        got = await _resolve_independent_book_amount(db, _PID, 2025, ["6601", "1122"])
-        assert got == (None, None)
-
-    @pytest.mark.asyncio
-    async def test_pl_account_reconciles_occurrence(self):
-        # 损益类 6601：审定=发生额，可核对 → 返回汇总值 + occurrence basis
-        from decimal import Decimal
-
-        db = AsyncMock()
-        row = MagicMock()
-        row.__getitem__ = lambda self, i: (Decimal("123456.00"), 3)[i]
-        result = MagicMock()
-        result.one = MagicMock(return_value=row)
-        db.execute = AsyncMock(return_value=result)
-        amount, basis = await _resolve_independent_book_amount(db, _PID, 2025, ["6601"])
-        assert amount == Decimal("123456.00")
-        assert basis == "trial_balance_audited_occurrence"
-
-    @pytest.mark.asyncio
-    async def test_cost_account_5_reconciles(self):
-        # 成本类 5001（发生额口径）同样可核对
-        from decimal import Decimal
-
-        db = AsyncMock()
-        row = MagicMock()
-        row.__getitem__ = lambda self, i: (Decimal("999.00"), 1)[i]
-        result = MagicMock()
-        result.one = MagicMock(return_value=row)
-        db.execute = AsyncMock(return_value=result)
-        _, basis = await _resolve_independent_book_amount(db, _PID, 2025, ["5001"])
-        assert basis == "trial_balance_audited_occurrence"
+async def _extract(app, account_codes=None):
+    """发一次 voucher-extract 请求。"""
+    population = _make_ledger_rows(30)
+    with patch(
+        "app.routers.voucher_sampling.LedgerSamplingService"
+    ) as MockService, patch(
+        "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
+        new=AsyncMock(return_value=[]),
+    ), patch(
+        "app.routers.voucher_sampling._get_preliminary_voucher_nos",
+        new=AsyncMock(return_value=[]),
+    ):
+        MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
+        MockService.execute_with_stats = AsyncMock(
+            return_value=(population, _make_stats(population))
+        )
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                f"/api/projects/{_PID}/sampling/voucher-extract",
+                json=_make_extract_request(
+                    method="random",
+                    account_codes=account_codes or ["1122"],
+                ),
+            )
+    return resp
 
 
 class TestReconcileResponseContract:
-    @pytest.mark.asyncio
-    async def test_no_independent_source_not_self_compare(self):
-        """无独立账面时 reconcile_available=false 且 book_amount!=population_amount。"""
-        app = FastAPI()
-        app.include_router(router)
-        mock_db = AsyncMock()
-
-        async def _override_db():
-            yield mock_db
-
-        app.dependency_overrides[get_db] = _override_db
-        app.dependency_overrides[get_current_user] = lambda: _FakeUser()
-
-        population = _make_ledger_rows(30)
-        with patch(
-            "app.routers.voucher_sampling.LedgerSamplingService"
-        ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._resolve_independent_book_amount",
-            new=AsyncMock(return_value=(None, None)),
-        ):
-            MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
-            MockService.execute_with_stats = AsyncMock(
-                return_value=(population, _make_stats(population))
-            )
-            transport = ASGITransport(app=app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
-                resp = await client.post(
-                    f"/api/projects/{_PID}/sampling/voucher-extract",
-                    json=_make_extract_request(method="random"),
-                )
-        assert resp.status_code == 200
-        stats = resp.json()["stats"]
-        assert stats["reconcile_available"] is False
-        assert stats["book_amount"] is None
-        # 关键：book_amount 不等于 population_amount（消除自身比对）
-        assert stats["book_amount"] != stats["population_amount"]
+    """端点契约：新核对字段存在且类型正确。"""
 
     @pytest.mark.asyncio
-    async def test_independent_source_present(self):
-        """有独立账面时 reconcile_available=true + book_amount 为独立来源值。"""
-        app = FastAPI()
-        app.include_router(router)
-        mock_db = AsyncMock()
-
-        async def _override_db():
-            yield mock_db
-
-        app.dependency_overrides[get_db] = _override_db
-        app.dependency_overrides[get_current_user] = lambda: _FakeUser()
-
-        population = _make_ledger_rows(30)
-        from decimal import Decimal
+    async def test_asset_account_now_available(self):
+        """资产类科目（1122）不再恒返 false —— 有余额表行即 available=true。"""
+        app, _ = _make_app()
+        facts = _mock_reconcile_facts(available=True)
 
         with patch(
-            "app.routers.voucher_sampling.LedgerSamplingService"
-        ) as MockService, patch(
-            "app.routers.voucher_sampling._get_voucher_sampling_extracted_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._get_preliminary_voucher_nos",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "app.routers.voucher_sampling._resolve_independent_book_amount",
-            new=AsyncMock(return_value=(Decimal("888888.00"), "trial_balance_audited")),
+            "app.routers.voucher_sampling.resolve_population_reconcile",
+            new=AsyncMock(return_value=facts),
         ):
-            MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
-            MockService.execute_with_stats = AsyncMock(
-                return_value=(population, _make_stats(population))
-            )
-            transport = ASGITransport(app=app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
-                resp = await client.post(
-                    f"/api/projects/{_PID}/sampling/voucher-extract",
-                    json=_make_extract_request(method="random"),
-                )
+            resp = await _extract(app, account_codes=["1122"])
+
         assert resp.status_code == 200
         stats = resp.json()["stats"]
         assert stats["reconcile_available"] is True
-        assert stats["book_amount"] == "888888.00"
-        assert stats["reconcile_basis"] == "trial_balance_audited"
+        assert stats["reconcile_basis"] == "tb_balance_movement"
+        assert stats["book_amount"] is not None
+
+    @pytest.mark.asyncio
+    async def test_new_direction_fields_present(self):
+        """新逐方向字段在 stats 中存在且为字符串或 null。"""
+        app, _ = _make_app()
+        facts = _mock_reconcile_facts(available=True)
+
+        with patch(
+            "app.routers.voucher_sampling.resolve_population_reconcile",
+            new=AsyncMock(return_value=facts),
+        ):
+            resp = await _extract(app)
+
+        stats = resp.json()["stats"]
+        for key in (
+            "reconcile_ledger_debit",
+            "reconcile_ledger_credit",
+            "reconcile_book_debit",
+            "reconcile_book_credit",
+            "reconcile_unavailable_reason",
+        ):
+            assert key in stats, f"缺失字段 {key}"
+
+        # 数值字段为字符串（JSON 序列化口径）
+        assert isinstance(stats["reconcile_ledger_debit"], str)
+        assert isinstance(stats["reconcile_book_credit"], str)
+
+    @pytest.mark.asyncio
+    async def test_unavailable_returns_reason(self):
+        """不可用时 unavailable_reason 非空、book_amount 为 null。"""
+        app, _ = _make_app()
+        facts = _mock_reconcile_facts(available=False, unavailable_reason="余额表无行")
+
+        with patch(
+            "app.routers.voucher_sampling.resolve_population_reconcile",
+            new=AsyncMock(return_value=facts),
+        ):
+            resp = await _extract(app)
+
+        stats = resp.json()["stats"]
+        assert stats["reconcile_available"] is False
+        assert stats["book_amount"] is None
+        assert stats["reconcile_unavailable_reason"] == "余额表无行"
+
+    @pytest.mark.asyncio
+    async def test_book_amount_backward_compatible(self):
+        """book_amount = |借| + |贷|（向后兼容旧前端单值核对）。"""
+        app, _ = _make_app()
+        facts = _mock_reconcile_facts(
+            available=True,
+            book_debit=Decimal("600"),
+            book_credit=Decimal("400"),
+        )
+
+        with patch(
+            "app.routers.voucher_sampling.resolve_population_reconcile",
+            new=AsyncMock(return_value=facts),
+        ):
+            resp = await _extract(app)
+
+        stats = resp.json()["stats"]
+        assert stats["book_amount"] == "1000"  # |600| + |400|
+
+    @pytest.mark.asyncio
+    async def test_not_self_compare(self):
+        """book_amount 不等于 population_amount（不以序时账总体自身比对）。"""
+        app, _ = _make_app()
+        facts = _mock_reconcile_facts(
+            available=True,
+            book_debit=Decimal("888888"),
+            book_credit=Decimal("0"),
+        )
+
+        with patch(
+            "app.routers.voucher_sampling.resolve_population_reconcile",
+            new=AsyncMock(return_value=facts),
+        ):
+            resp = await _extract(app)
+
+        stats = resp.json()["stats"]
+        assert stats["book_amount"] != stats["population_amount"]

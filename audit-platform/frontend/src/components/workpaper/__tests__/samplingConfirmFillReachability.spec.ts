@@ -144,7 +144,7 @@ describe('Property 23：门控命中先关预览再提示', () => {
   })
 
   it('门控提示指向具体动作（区名 + 确认按钮 + 回来的入口）', () => {
-    const reason = engineSrc.match(/confirmBlockedReason\s*=\s*computed[\s\S]{0,700}?\n\}\)/)
+    const reason = engineSrc.match(/confirmBlockedReason\s*=\s*computed[\s\S]{0,1200}?\n\}\)/)
     expect(reason).not.toBeNull()
     const text = reason![0]
     expect(text).toContain('错报推断与总体结论')

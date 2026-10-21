@@ -67,6 +67,22 @@ def _bypass_extract_auth():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _stub_population_reconcile():
+    """总体完整性核对取数在这些流程测试中显式打桩为「不可用」。
+
+    不打桩时它会拿 AsyncMock 会话真去查库、靠异常走降级分支（并留下协程未等待告警）——
+    结果碰巧一样，但测的是意外路径。核对本身由 test_sampling_population_reconcile*.py 覆盖。
+    """
+    from app.services.sampling_population_reconcile import PopulationReconcileFacts
+
+    with patch(
+        "app.routers.voucher_sampling.resolve_population_reconcile",
+        new=AsyncMock(return_value=PopulationReconcileFacts(available=False)),
+    ):
+        yield
+
+
 # ─── Fake User ────────────────────────────────────────────────────────────────
 
 

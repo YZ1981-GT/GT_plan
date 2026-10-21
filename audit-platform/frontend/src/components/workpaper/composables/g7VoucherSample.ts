@@ -85,8 +85,10 @@ export function parseG7VoucherSampleRows(payload: unknown): G7VoucherSampleRow[]
 /**
  * 纯函数：把抽凭样本映射为凭证抽查行并按 `voucherNo` 去重后追加到既有行（Property 14）。
  *
- * - 已存在的 `voucherNo`（既有行或本批已加）跳过（skipped）；
+ * - 已存在的 `voucherNo`（既有行或本批已加）跳过（skipped，按样本计）；
  * - 空 `voucherNo` 的样本无法去重，一律追加（added，不进去重集）；
+ * - 多科目凭证按对方分录展开为多行（added 按行计）。🔴 去重必须在**展开前**按样本做：
+ *   展开后同一张凭证的多行凭证号相同，若逐行去重会把第 2 行起全部当重复丢掉；
  * - 借方优先取 `debitAmount ?? amount`；有 `creditAmount` 则贷方独立取。
  *
  * @returns 追加后的新行数组 + 统计（不改传入的 existing）。
@@ -103,32 +105,32 @@ export function mergeVoucherSamples(
   const out = [...existing]
   let added = 0
   let skipped = 0
-  const expanded = expandMultiAccountVouchers(samples as any[])
-  for (const s of expanded) {
-    const no = String(s.voucherNo || '').trim()
+  for (const sample of samples) {
+    const no = String(sample.voucherNo || '').trim()
     if (no && seen.has(no)) {
       skipped += 1
       continue
     }
-    const row = createG7VoucherSampleRow(out.length + 1)
-    row.voucherDate = (s as any).voucherDate || ''
-    row.voucherNo = no
-    row.businessContent = (s as any).summary || ''
-    row.counterAccount = (s as any).counterpartAccount ?? (s as any).counterAccount ?? ''
-    const debit = num((s as any).debitAmount ?? (s as any).amount)
-    const credit = num((s as any).creditAmount)
-    if (credit) {
-      row.creditAmount = credit
-      row.debitAmount = num((s as any).debitAmount)
-    } else {
-      row.debitAmount = debit
-      row.creditAmount = 0
+    for (const s of expandMultiAccountVouchers([sample] as any[])) {
+      const row = createG7VoucherSampleRow(out.length + 1)
+      row.voucherDate = (s as any).voucherDate || ''
+      row.voucherNo = no
+      row.businessContent = (s as any).summary || ''
+      row.counterAccount = (s as any).counterpartAccount ?? (s as any).counterAccount ?? ''
+      const debit = num((s as any).debitAmount ?? (s as any).amount)
+      const credit = num((s as any).creditAmount)
+      if (credit) {
+        row.creditAmount = credit
+        row.debitAmount = num((s as any).debitAmount)
+      } else {
+        row.debitAmount = debit
+        row.creditAmount = 0
+      }
+      row.source = '抽凭'
+      out.push(row)
+      added += 1
     }
-    row.source = '抽凭'
-    out.push(row)
     if (no) seen.add(no)
-    added += 1
-    }
   }
   out.forEach((r, i) => { r.seq = i + 1 })
   return { rows: out, added, skipped }
