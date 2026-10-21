@@ -22,7 +22,7 @@
 
 - [x] 11. 生产调用方守卫 `test_production_wiring.py`：14 个接线函数 AST 扫描 + `WIRED_DOMAINS` 全覆盖 · 证据：15 passed
 - [x] 12. 回归：`formula_settings` 189 passed；`formula_settings + formula_management + formula_runtime` 961 passed / 0 failed / 4 skipped；前端 536 passed / 3 skipped · 无新增失败
-- [ ]* 13. 开发服务实测（待 start-dev.bat 环境）
+- [x] 13. 开发服务实测 · 证据：coverage 200（81/81 + excluded 8）；history 200（2 runs / 258 executed / 2 issues）；dependencies BS-002 200（3 upstream TB / 2 downstream report）；NOT-EXIST 404 FORMULA_DEPENDENCY_TARGET_NOT_FOUND
 - [x] 14. 提交（本 spec 文件清单见下）
 
 ## 提交文件清单

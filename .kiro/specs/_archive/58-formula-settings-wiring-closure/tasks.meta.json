@@ -68,6 +68,18 @@
         "chatSessionId": "sess_9fe9e71d-0cb7-4046-b19e-f8f3770b25fe",
         "timestamp": 1792590188063
       }
+    ],
+    "13. 开发服务实测（待 start-dev.bat 环境）": [
+      {
+        "executionId": "c8cc7c0b-db1e-4146-8c41-6f8e6991f311",
+        "chatSessionId": "sess_9fe9e71d-0cb7-4046-b19e-f8f3770b25fe",
+        "timestamp": 1792590470854
+      },
+      {
+        "executionId": "c8cc7c0b-db1e-4146-8c41-6f8e6991f311",
+        "chatSessionId": "sess_9fe9e71d-0cb7-4046-b19e-f8f3770b25fe",
+        "timestamp": 1792590475190
+      }
     ]
   }
 }

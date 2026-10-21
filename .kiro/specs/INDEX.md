@@ -1064,6 +1064,7 @@ _archive/
 | `formula-push-note-skip-reduction` | ✅ **32/32** 已归档 `_archive/41-formula-push-note-skip-and-row-matching/` | **公式推送附注跳过减少**：修复四类设计缺陷（B _source 判断 / F has_obscured_data 误报 / A 单科目合计行兜底 / D 章节号动态定位）；真库守卫 + 44 unit + 5 engine 集成测试全绿。 |
 | `formula-push-note-row-matching` | ✅ **39/39** 已归档 `_archive/41-formula-push-note-skip-and-row-matching/` | **公式推送附注行匹配增强**：消除合计行兜底后虚假 skip（FALLBACK_TO_TOTAL）+ find_row 第三级包含匹配 + PG 守卫分类别棘轮；真库 skipped 208→66（-68%）/ coverage 303→327。 |
 
+| `formula-settings-wiring-closure` | ✅ **14/14** 已归档 `_archive/58-formula-settings-wiring-closure/` | **公式设置接线闭环**：stash 事故抢救（112bfabec/4cbd8029d）+ 并发 ux 4 处缺陷修正（coverage/history/dependencies/syntaxParser）+ 面板提取 + 生产接线守卫；后端 189+961 passed，前端 536 passed。 |
 ---
 
 ## 四、索引规约
