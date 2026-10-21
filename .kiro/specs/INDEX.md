@@ -1066,6 +1066,7 @@ _archive/
 
 | `formula-settings-wiring-closure` | ✅ **14/14** 已归档 `_archive/58-formula-settings-wiring-closure/` | **公式设置接线闭环**：stash 事故抢救（112bfabec/4cbd8029d）+ 并发 ux 4 处缺陷修正（coverage/history/dependencies/syntaxParser）+ 面板提取 + 生产接线守卫；后端 189+961 passed，前端 536 passed。 |
 | `unified-formula-registry` | â **17/18** å·²å½æ¡£ `_archive/59-unified-formula-registry/` | **ç»ä¸å¬å¼æ³¨åè¡¨**ï¼_REGISTRY 14â20ï¼+5 åºç¨¿å ä½ï¼ãprefill_engine æ­£åä» registry æ´¾çãFORMULA_ARITY åä¸çæºãå¬å¼ç®å½ build_catalogï¼6 åæå¹³ç®å½ï¼ã/api/formula-functions ç«¯ç¹ãslot-key å½åè§èææ¡£ï¼åç«¯ 236 passedï¼åç«¯ 43 passedã |
+| `formula-execution-path-convergence` | â **17/18** å·²å½æ¡£ `_archive/60-formula-execution-path-convergence/` | **å¬å¼æ§è¡è·¯å¾æ¶æ**ï¼preloader æ¹éé¢è½½âL1 åæ ¸ãprefill ä¸»è·¯å¾æ¶æãADJ å£å¾å®å«ãè·¯å¾ä¸è´æ§å®å«ãå¤çæ¸çå æ§ resolver 408 è¡ï¼åç«¯ 272 passedã |
 ---
 
 ## 四、索引规约
