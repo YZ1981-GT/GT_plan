@@ -21,11 +21,17 @@
           <span class="gt-rv-audit-stat-num">{{ (consistencyResult.total || 0) - (consistencyResult.logic_check_passed || 0) - (consistencyResult.reasonability_passed || 0) }}</span>
           <span class="gt-rv-audit-stat-label">未通过</span>
         </div>
-        <div class="gt-rv-audit-stat" :class="consistencyResult.consistent ? 'gt-rv-audit-stat-pass' : 'gt-rv-audit-stat-fail'">
+        <div v-if="consistencyResult.noResult" class="gt-rv-audit-stat">
+          <span class="gt-rv-audit-stat-num">—</span>
+          <span class="gt-rv-audit-stat-label">暂无可执行的审核项</span>
+        </div>
+        <div v-else class="gt-rv-audit-stat" :class="consistencyResult.consistent ? 'gt-rv-audit-stat-pass' : 'gt-rv-audit-stat-fail'">
           <span class="gt-rv-audit-stat-num">{{ consistencyResult.consistent ? '✓' : '✗' }}</span>
           <span class="gt-rv-audit-stat-label">{{ consistencyResult.consistent ? '全部通过' : '存在异常' }}</span>
         </div>
       </div>
+      <el-alert v-if="consistencyResult.noResult" type="info" :closable="false" show-icon style="margin-top: 10px;"
+        title="本项目本年度没有可执行的审核项：报表尚未生成，且未在公式管理中配置勾稽 / 合理性公式。" />
 
       <!-- 按类型分 Tab -->
       <el-tabs :model-value="auditTab" type="card" size="small" style="margin-top: 10px;" @update:model-value="$emit('update:auditTab', $event as string)">

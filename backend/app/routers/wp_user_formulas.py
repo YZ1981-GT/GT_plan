@@ -50,7 +50,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_current_user, get_db
+from app.deps import authorize_wp_edit, authorize_wp_read, get_current_user, get_db
 from app.models.core import User
 from app.models.workpaper_models import WorkingPaper, WpFormula
 from app.services.wp_formula_service import (
@@ -245,6 +245,8 @@ async def list_user_formulas(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
+    # 路径只有 wp_id：按底稿反查所属项目判权（非成员 403，不取任何底稿数据）
+    await authorize_wp_read(db, _user, wp_id)
     wp = await _load_wp(db, wp_id)
 
     # ── 读时合并：`wp_formula` 表（权威）∪ `parsed_data` 遗留键（兼容，优先级低）──
@@ -294,6 +296,7 @@ async def update_user_formulas(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await authorize_wp_edit(db, user, wp_id)
     wp = await _load_wp(db, wp_id)
 
     # 校验每条公式
@@ -603,6 +606,7 @@ async def restore_preset_formula(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await authorize_wp_edit(db, _user, wp_id)
     wp = await _load_wp(db, wp_id)
     parsed_data = dict(wp.parsed_data or {})
     user_formulas: dict[str, dict] = dict(parsed_data.get("user_formulas") or {})
@@ -684,7 +688,13 @@ async def validate_formula(
     """校验公式语法并可选预览结果
 
     锚定 tasks 1.21 / requirements F2.3 手动公式编辑器后端支持。
+
+    鉴权：按底稿反查所属项目判 readonly；请求体 ``project_id`` 若给定须与之一致（不一致 403，
+    防「拿 A 的底稿配 B 的项目」读 B 的试算表），预览一律按底稿所属项目取数。
     """
+    wp_project_id = await authorize_wp_read(db, _user, wp_id)
+    if payload.project_id is not None and payload.project_id != wp_project_id:
+        raise HTTPException(status_code=403, detail="权限不足")
     try:
         ftype, args = _parse_formula_or_raise(payload.formula)
     except HTTPException as e:
@@ -700,10 +710,11 @@ async def validate_formula(
     if not payload.preview:
         return response
 
-    # 预览执行
-    if payload.project_id is None or payload.year is None:
-        response.error = "预览需要 project_id + year"
+    # 预览执行（项目一律取底稿所属项目，见上方鉴权）
+    if payload.year is None:
+        response.error = "预览需要 year"
         return response
+    payload.project_id = wp_project_id
 
     try:
         # TB / SUM_TB 走 formula_engine,其他走 prefill_engine extended resolver

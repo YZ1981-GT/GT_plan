@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import require_wp_edit_permission, get_current_user
+from app.deps import assert_project_permission, get_current_user, require_wp_edit_permission
 from app.models.core import User
 from app.models.workpaper_models import WpIndex, WorkingPaper
 from app.services.project_audit_year import PROJECT_AUDIT_YEAR_SQL
@@ -278,9 +278,13 @@ async def batch_refresh(
     """批量刷新底稿取数：对 wp_ids 逐个执行行名对齐 + 自动确认。
 
     串行处理，每底稿独立 try/catch。返回每底稿刷新结果汇总。
+    鉴权：请求体项目 edit（同文件另两个端点按底稿判编辑权；本端点路径没有 wp_id，router 级可见性门是 no-op，
+    原先任何登录用户都能批量改写任意项目的底稿取数 —— spec formula-governance-coverage-closure R1.7）。
+    逐个底稿是否属于该项目由 service 校验（不属于的记失败、不写）。
     """
     from app.services.workpaper_refresh_service import batch_refresh_workpapers
 
+    await assert_project_permission(db, _user, body.project_id, "edit")
     results = await batch_refresh_workpapers(db, body.project_id, body.wp_ids)
     await db.commit()
 

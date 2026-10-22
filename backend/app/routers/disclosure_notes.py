@@ -379,13 +379,15 @@ async def set_formula_gray(
 
     Body: {"enabled": true/false}
     写入 project.wizard_state["disclosure_note_formula_enabled"]。
-    权限：manager+。
+    权限：manager+，且须是本项目 edit 级成员（角色门不含项目维度 —— 原先任一经理 / 合伙人都能改任意项目的
+    附注公式开关，spec formula-governance-coverage-closure R1.7）。
 
     Validates: Requirements 5.1, 6.1
     """
     from sqlalchemy.orm.attributes import flag_modified
     from app.models.core import Project
 
+    await assert_project_permission(db, current_user, project_id, "edit")
     enabled = body.get("enabled")
     if not isinstance(enabled, bool):
         raise HTTPException(status_code=400, detail="body.enabled must be boolean")

@@ -43,14 +43,54 @@
 | `POST /formula-management/import-export/import-data` | 带 `project_id` 先校验 readonly；`persist=true` 需 `_CUSTOM_PRESET_WRITE_ROLES`；管理员 → `custom_presets.upsert`（数据库）+ 刷新缓存，其余 → `custom_presets.submit_candidate`（全局候选）；**删除对仓库 seed 文件的写入** | 角色 + 候选 |
 | `GET /api/reports/{pid}/{year}/consistency-check` | `require_project_access("readonly")`；0 条可执行公式时返回 `no_result: true`，前端显示「暂无可执行的审核公式」而非「全部通过」 | readonly |
 
-- `upsert_seed_presets` 去掉唯一生产调用方后成为死代码：全仓 grep 只剩它自己的测试 ⇒ 连同测试删除（删旧代码铁律：先 grep 0 调用方、删前后测试全绿）。
+- `upsert_seed_presets` **保留**：去掉在线导入调用后，仍被两个离线生成脚本使用（`scripts/gen/generate_note_cross_check_presets.py` / `generate_note_formula_data.py`，维护人员重生成基线 seed 后经 git 提交 —— 这是改仓库文件的正当通道）。只切断「在线端点改写仓库文件」这一条路径。
 - 前端：导入入口（R4 挂载的下拉）按角色门控「导入数据」；非管理员导入后提示「已提交为全局候选，待管理员审核」。审核报表按钮对 `no_result` 走空态。
 - 守卫（R1.7）：在 `test_project_endpoint_authorization_baseline.py` 加第三维「对象 / 请求体型」：
   路径含 `{wp_id}` 或函数参数里有 `project_id`（请求体模型字段或查询参数）、只挂身份认证、函数闭包（本模块二层）内无项目级 token 的端点 ⇒ 冻结基线（现算登记，只许变小）；
   本 spec 修过的 7 个端点逐个列入「已修钉子」，任一回退即红；扫描器配双向变异（注入缺口必命中、补上鉴权必放行）。
 - 端点级测试（TestClient 真实鉴权链，只替换身份与取数下一层，禁 override 工厂）：非成员 403 且**不触达数据**（断言 `_build_context` / 写库函数未被调用）、成员 readonly 可读、edit 可写、管理员放行。
 
+### 2.1 实施勘误与扩围（2026-10-22，以代码为准）
+
+- 🔴 **更正评估**：`wp_user_formulas` 四个端点在生产经 `router_registry/workpaper.py` 的注册循环挂了 router 级 `dedicated_wp_gate`（可见性隔离，非委派 / 跨项目一律 404），不是「只校验登录」。处理函数里补的 `authorize_wp_read` / `authorize_wp_edit` 是第二道（项目成员 + 编辑级）。真缺口只有 validate-formula：可见性门只看路径上的底稿，预览却按**请求体**的 `project_id` 取数。测试分两层：生产注册确实挂了门 + 处理函数自身的项目级判定。
+- 守卫没有改共享基线文件（多会话并发改同一文件，磁盘上后写者覆盖），第三维放新文件 `tests/test_project_endpoint_authz_body_carried.py`：
+  - 「带项目」= 参数名 `project_id`，或从参数上读 `project_id`：属性（请求体模型）/ `["project_id"]` / `.get("project_id")`（首版只认属性，漏了地址库三个 `body: dict` 端点）；路径带 `{project_id}` / `{wp_id}` / `{wp_index_id}` 的归前两维与可见性门。
+  - 「函数闭包二层」改为**额外项目级标识 + 证明链**：本地 / 服务层 helper（`check_project_access` / `_ensure_project_access` / `_authorize_doc_host` / `_authorize_report_config_read|write` / `_assert_writeback_authorized` / 本 spec 的 `_assert_context_project`）各登记一条 AST 证明链，末环须落到项目级判定（基线标识 / `ProjectUser` / SQL 里的 `FROM project_users` / 项目可见集 / 底稿可见性门），且路由里用到的必须是证明过的那一份（本地定义或从链上模块导入；属性引用、自写同名、同族名一律报出）。docstring 里的表名不算证据。
+  - 冻结：仅登录 / 仅角色 **93**（首次现算 111；误判 21 个由证明链消除）；无鉴权 **5**（`_BODY_KNOWN_GAPS`，只许变短）；自鉴权 1（MCP scoped token）。
+  - 变异：合成样本（四种带项目写法 × 三档）+ **真实源码 AST 变异**（逐个摘掉已修端点函数体里的项目级判定语句，扫描器必须判回仅登录）。
+  - 路径维（第一维）的两个已修端点（报表审核、附注公式开关）在新文件里逐个钉住；第一维现算 200（共享基线常量 207，差 7 未超 20，未改共享文件）。
+- 第三维抓到、属公式链路、本 spec 一并修的端点（都只有角色门或只有登录）：
+
+| 端点 | 改法 | 级别 |
+|---|---|---|
+| `POST /api/workpapers/draft-refresh` | 按请求体项目 `assert_project_permission`（全局一键刷新批量改写底稿 / 报表 / 附注初稿） | edit |
+| `POST /api/workpapers/draft-refresh/{run_id}/rollback` | 按运行记录反查项目；记录不存在 404 | edit |
+| `GET /api/workpapers/refresh-scopes` | 按查询参数项目（枚举底稿循环） | readonly |
+| `POST /api/formula-management/presets/custom` | 带 `project_id`（引用解析上下文）时校验，无效 UUID 400；与导入共用 `_assert_context_project` | readonly |
+| `POST /api/workpapers/batch-refresh` | 按请求体项目（同文件另两个端点按底稿判编辑权，只有它路径没有 wp_id、可见性门 no-op） | edit |
+| `PUT /api/disclosure-notes/{pid}/formula-gray` | 角色门之外再校项目（附注公式灰度开关） | edit |
+
+- 前端（R1.8）：全局一键刷新入口按钮由「合伙人」改为「合伙人 + 本项目编辑级成员」（`roleContext.canEditInProject`，DefaultLayout 按路由项目加载）。其余收紧端点的入口本就只对编辑者 / 管理员可见。
+
+### 2.2 范围外发现（冻结在守卫里，待用户裁决，不在本 spec 改）
+
+| 优先级 | 端点 | 问题 |
+|---|---|---|
+| P0 | `GET /api/metabase/embed-url` | **未登录**即可按任意 `project_id` 签发 Metabase 嵌入 JWT（10 分钟有效） |
+| P1 | `POST /api/linkage-bus/impact`、`GET /api/linkage-bus/impact-by-addr`、`POST /api/address-registry/v2/notify-cell-change` | 任一登录用户可给任意项目的底稿 / 报表 / 附注 / 交付件打 stale 标记（`stale_engine.on_change` 写库；GET 也写） |
+| P1 | `GET /api/linkage-bus/audit-log` | 不带 `project_id` 时返回全部项目的联动日志 |
+| P2 | 地址库 6 个端点、`/api/workpapers/field-overrides` 读写 | 仅登录，按请求里的项目读写 |
+| P2 | `reports.py` 的 `get_report` / `drilldown_report_row` / `export_report_excel` | 路径带项目但只校验登录（第一维冻结项） |
+| — | `metabase.build_drilldown_url`、`feature_flags` 旧端点、`b60_chapters.get_chapter_definitions` | 无鉴权，但不读库或只读静态定义 |
+| — | 全局一键刷新角色集合 | 后端 draft-refresh 放行 admin，refresh-scopes 与前端入口不含 admin（真库 0 个合伙人 ⇒ 入口无人可见） |
+
 ## 3. R7a 表间审核严格取数
+
+> 🔴 实施调整（2026-10-22）：`report_engine.py` 正被另一会话改 PREV / AUX 预载（工作树未提交，且其 AUX 预载仍从不存在的
+> `app.models.four_table_models` 导入 ⇒ 恒失败、恒 0）。本 spec **不动 report_engine**：严格取数在表间审核自己的求值入口
+> `cross_check_rules._evaluate` 做 —— 先用新模块把 PREV / AUX **按值代入**（缺数即报「无法取数」），再以
+> `enable_prev=False, enable_aux=False` 交 `evaluate_formula_result`，不经过 report_engine 的预载分支。报表生成路径行为不变；
+> report_engine 改调新模块、删重复分支留待对方提交后另行收口（登记在交付说明）。下面的模块口径不变。
 
 把 `report_engine.evaluate_formula_result` 里 PREV / AUX 的预载搬到新模块 `services/formula_ref_preload.py`（report_engine 净减行数）：
 

@@ -462,8 +462,14 @@ export interface ReportDrilldownData {
 }
 
 export interface ReportConsistencyCheck {
-  consistent: boolean
-  checks: Array<{ name: string; passed: boolean; expected: string; actual: string; diff: string }>
+  /** null = 没有任何可执行的审核项（见 noResult），不是「全部通过」 */
+  consistent: boolean | null
+  /** 0 条可执行：报表未生成且未配置审核公式 */
+  noResult: boolean
+  checks: Array<{
+    name: string; passed: boolean; expected: string; actual: string; diff: string
+    category: string; category_label: string; formula: string | null; source: string
+  }>
   total?: number
   logic_check_passed?: number
   logic_check_count?: number
@@ -501,18 +507,39 @@ export async function getReportDrilldown(projectId: string, year: number, report
   }
 }
 
+/**
+ * 报表「审核」结果映射。🔴 汇总计数与 category 必须透传：审核弹窗按 category 分页签、
+ * 按 total / *_passed 出统计 —— 早先只映射 consistent / checks 五个字段，弹窗统计恒 0、
+ * 两个分类页签恒空（spec formula-governance-coverage-closure R1.6）。
+ */
+export function mapReportConsistencyCheck(raw: any): ReportConsistencyCheck {
+  const checks = (raw?.checks || []).map((item: any) => ({
+    name: item.name ?? item.check_name ?? '',
+    passed: !!item.passed,
+    expected: item.expected ?? item.expected_value ?? '',
+    actual: item.actual ?? item.actual_value ?? '',
+    diff: item.diff ?? item.difference ?? '',
+    category: item.category ?? 'logic_check',
+    category_label: item.category_label ?? '',
+    formula: item.formula ?? null,
+    source: item.source ?? '',
+  }))
+  const noResult = raw?.no_result ?? checks.length === 0
+  return {
+    consistent: noResult ? null : (raw?.consistent ?? raw?.all_passed ?? false),
+    noResult,
+    checks,
+    total: raw?.total ?? checks.length,
+    logic_check_count: raw?.logic_check_count,
+    logic_check_passed: raw?.logic_check_passed,
+    reasonability_count: raw?.reasonability_count,
+    reasonability_passed: raw?.reasonability_passed,
+  }
+}
+
 export async function getReportConsistencyCheck(projectId: string, year: number): Promise<ReportConsistencyCheck> {
   const { data: raw } = await http.get(P_rpt.consistencyCheck(projectId, year))
-  return {
-    consistent: raw.consistent ?? raw.all_passed ?? false,
-    checks: (raw.checks || []).map((item: any) => ({
-      name: item.name ?? item.check_name ?? '',
-      passed: !!item.passed,
-      expected: item.expected ?? item.expected_value ?? '',
-      actual: item.actual ?? item.actual_value ?? '',
-      diff: item.diff ?? item.difference ?? '',
-    })),
-  }
+  return mapReportConsistencyCheck(raw)
 }
 
 export function getReportExcelUrl(projectId: string, year: number, reportType: string): string {

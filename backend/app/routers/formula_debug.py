@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import assert_project_permission, get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,9 @@ async def debug_formula(
 ):
     """调试运行公式：构造上下文 → 执行 → 返回 trace。
 
-    不要求 project_access（调试可能用于探索公式语法），但需要登录。
+    鉴权：项目在请求体里（工厂依赖取不到），函数首句直调 ``assert_project_permission``
+    判 readonly —— 调试会按该项目实时取数并原样回显（试算表、报表、附注、底稿），
+    非成员必须 403 且不触达任何数据（spec formula-governance-coverage-closure R1.1）。
     """
     from app.services.formula_engine import FormulaContext, execute
 
@@ -60,6 +62,7 @@ async def debug_formula(
         project_id = uuid.UUID(body.project_id)
     except ValueError:
         return FormulaDebugResponse(errors=["无效的项目 ID"], state="error")
+    await assert_project_permission(db, _user, project_id, "readonly")
 
     # ── 构造 FormulaContext ──
     try:

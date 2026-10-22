@@ -32,6 +32,7 @@ const {
   mockMsgSuccess,
   mockMsgWarning,
   roleHolder,
+  projectRoleHolder,
   checkedKeysHolder,
 } = vi.hoisted(() => ({
   mockGet: vi.fn(),
@@ -40,7 +41,12 @@ const {
   mockMsgSuccess: vi.fn(),
   mockMsgWarning: vi.fn(),
   roleHolder: { role: 'partner' as string },
+  projectRoleHolder: { canEditInProject: true },
   checkedKeysHolder: { keys: [] as string[] },
+}))
+
+vi.mock('@/stores/roleContext', () => ({
+  useRoleContextStore: () => projectRoleHolder,
 }))
 
 vi.mock('@/utils/http', () => ({
@@ -132,8 +138,25 @@ describe('GtRefreshScopeDialog — Task 16 production host + contract', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     roleHolder.role = 'partner'
+    projectRoleHolder.canEditInProject = true
     checkedKeysHolder.keys = []
     mockGet.mockResolvedValue({ data: { data: { items: SCOPE_ITEMS } } })
+  })
+
+  // ─── 0. 入口门禁：合伙人 + 本项目编辑级成员（R1.8：后端两端点都按项目成员判） ──────
+  it.each([
+    ['partner', true, true],
+    ['signing_partner', true, true],
+    ['partner', false, false],
+    ['manager', true, false],
+    ['auditor', true, false],
+  ])('角色 %s · 本项目可编辑 %s → 入口按钮可见 %s', (role, canEdit, visible) => {
+    roleHolder.role = role
+    projectRoleHolder.canEditInProject = canEdit
+    const wrapper = mountDialog()
+    expect(wrapper.find('.gt-rsd-entry').exists()).toBe(visible)
+    expect((wrapper.vm as any).canRefreshProject).toBe(visible)
+    wrapper.unmount()
   })
 
   // ─── 1. production host 传 project_id/year ──────────────────────────────────

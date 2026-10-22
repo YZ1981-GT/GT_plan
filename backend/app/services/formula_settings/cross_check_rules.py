@@ -148,6 +148,10 @@ async def _evaluate(expression: str, resolver: Any, row_cache: dict[str, Decimal
     return result.value, ""
 
 
+#: 严格求值的公开入口（报表「审核」的配置公式与表间审核同一口径，spec formula-governance-coverage-closure R1.6）
+evaluate_strict = _evaluate
+
+
 async def _report_rows(db: AsyncSession, project_id: uuid.UUID, year: int) -> list[Any]:
     import sqlalchemy as sa
 

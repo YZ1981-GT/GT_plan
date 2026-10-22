@@ -13,6 +13,8 @@
    阶段抛 403，先于任何读写。
 3. **precheck 阻断 422**：四表库不完整时 precheck 阻断返回 422 缺失清单，**不进 orchestrator**
    （orchestrator.generate 不被调用，零写入）。
+4. **项目级门禁先于编排**（spec formula-governance-coverage-closure R1.7）：刷新按请求体项目、回滚按运行记录
+   反查的项目判 edit。这里只记录门禁调用，判定本身在 ``test_formula_endpoint_authz`` 经真实判定链测。
 
 以直接调用路由处理函数 ``one_click_draft_refresh`` 的方式测试（monkeypatch 模块级
 ``DraftRefreshService`` / ``DraftRefreshOrchestrator`` 为桩），避免 TestClient/DB 依赖，聚焦
@@ -23,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -61,17 +64,36 @@ def _run(coro):
 
 
 class _FakeDb:
-    """最小 AsyncSession 替身：仅需可 await 的 commit（记录是否被调用）。"""
+    """最小 AsyncSession 替身：可 await 的 commit / rollback（记录是否被调用）；``execute`` 只服务
+    回滚端点按 run_id 反查所属项目那一句（返回 ``run_project``）。"""
 
-    def __init__(self):
+    def __init__(self, run_project=None):
         self.committed = False
         self.rolled_back = False
+        self.run_project = run_project
+
+    async def execute(self, _stmt):
+        return SimpleNamespace(scalar_one_or_none=lambda: self.run_project)
 
     async def commit(self):
         self.committed = True
 
     async def rollback(self):
         self.rolled_back = True
+
+
+@pytest.fixture(autouse=True)
+def gate_calls(monkeypatch):
+    """项目级门禁只记录调用：本文件测编排契约，门禁本身的判定（非成员 / 只读成员 / 管理员）由
+    ``tests/formula_settings/test_formula_endpoint_authz.py`` 经权限世界走真实判定链测。"""
+    calls: list[tuple] = []
+
+    async def _record(_db, user, project_id, level):
+        calls.append((project_id, level))
+        return user
+
+    monkeypatch.setattr(endpoint, "assert_project_permission", _record)
+    return calls
 
 
 class _Warning:
@@ -157,7 +179,7 @@ def _install_stubs(monkeypatch, *, precheck: _Precheck, result):
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. 经 orchestrator 生成非空初稿 + 响应契约
 # ─────────────────────────────────────────────────────────────────────────────
-def test_endpoint_routes_through_orchestrator_and_returns_nonempty_draft(monkeypatch):
+def test_endpoint_routes_through_orchestrator_and_returns_nonempty_draft(monkeypatch, gate_calls):
     """端点经 orchestrator.generate 生成非空初稿；响应含 affected_count/preset_application。"""
     refreshed = ["report:BS-1", "report:BS-2", "note:cash!1:2"]
     result = RefreshResult(
@@ -187,6 +209,9 @@ def test_endpoint_routes_through_orchestrator_and_returns_nonempty_draft(monkeyp
         confirm_overwrite=True,
     )
     resp = _run(one_click_draft_refresh(body=body, db=db, _user=object()))
+
+    # 项目级门禁按请求体项目判 edit（R1.7：角色门不含项目维度）
+    assert gate_calls == [(body.project_id, "edit")]
 
     # 经 orchestrator，而非裸 service.refresh
     assert _StubOrchestrator.called is True
@@ -223,8 +248,6 @@ def test_endpoint_defaults_scopes_when_empty(monkeypatch):
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. 合伙人门禁 403（复用 require_role）
 # ─────────────────────────────────────────────────────────────────────────────
-from types import SimpleNamespace  # noqa: E402
-
 from app.deps import require_role  # noqa: E402
 
 
@@ -277,9 +300,10 @@ def test_endpoint_precheck_block_returns_422_and_skips_orchestrator(monkeypatch)
 
 
 
-def test_rollback_conflict_returns_http_409_without_commit(monkeypatch):
+def test_rollback_conflict_returns_http_409_without_commit(monkeypatch, gate_calls):
     """CAS 冲突必须回滚外层事务，不能 commit 后再伪报 rolled_back。"""
     run_id = uuid.uuid4()
+    run_project = uuid.uuid4()
 
     class _ConflictService:
         async def rollback_refresh(self, db, *, run_id, adapters, operator):
@@ -294,10 +318,21 @@ def test_rollback_conflict_returns_http_409_without_commit(monkeypatch):
         "app.services.formula_runtime.coordinator.FormulaRuntimeCoordinator.build_adapter_map",
         lambda self, domains: {},
     )
-    db = _FakeDb()
+    db = _FakeDb(run_project=run_project)
     with pytest.raises(HTTPException) as raised:
         _run(rollback_draft_refresh(run_id=run_id, db=db, _user=object()))
 
     assert raised.value.status_code == 409
     assert db.rolled_back is True
     assert db.committed is False
+    assert gate_calls == [(run_project, "edit")], "回滚按运行记录反查所属项目判 edit"
+
+
+def test_rollback_unknown_run_is_404_before_any_restore(monkeypatch, gate_calls):
+    """运行记录不存在 → 404，不判门禁、不构造回滚服务（路径只有 run_id，查不到就没有项目可判）。"""
+    built: list[int] = []
+    monkeypatch.setattr(endpoint, "DraftRefreshService", lambda: built.append(1))
+    with pytest.raises(HTTPException) as raised:
+        _run(rollback_draft_refresh(run_id=uuid.uuid4(), db=_FakeDb(run_project=None), _user=object()))
+    assert raised.value.status_code == 404
+    assert (gate_calls, built) == ([], [])

@@ -112,19 +112,26 @@ async def consistency_check(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """公式审核——执行 logic_check + reasonability 类型公式校验"""
+    """公式审核——内置平衡校验 + 本项目有效配置里的 logic_check / reasonability 公式（真实求值）。
+
+    鉴权：项目 readonly（原先只校验登录，任意登录用户可读任意项目的审核结果与金额）。
+    0 条可执行时返回 ``no_result=true``、``consistent=null`` —— 不再把「什么都没查」报成「全部通过」。
+    （spec formula-governance-coverage-closure R1.6）
+    """
+    from app.services.report_audit_checks import run_report_audit
+
     applicable_standard = await _resolve_applicable_standard(db, project_id)
-    engine = ReportEngine(db)
-    checks = await engine.run_audit_checks(project_id, year, applicable_standard)
+    checks = await run_report_audit(db, project_id, year, applicable_standard)
 
     logic_checks = [c for c in checks if c["category"] == "logic_check"]
     reason_checks = [c for c in checks if c["category"] == "reasonability"]
-    all_passed = all(c["passed"] for c in checks) if checks else True
+    all_passed = all(c["passed"] for c in checks) if checks else None
 
     return {
         "consistent": all_passed,
+        "no_result": not checks,
         "total": len(checks),
         "logic_check_count": len(logic_checks),
         "logic_check_passed": len([c for c in logic_checks if c["passed"]]),

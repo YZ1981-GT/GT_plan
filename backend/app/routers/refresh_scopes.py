@@ -10,6 +10,7 @@
 
 门禁复用 ``deps.py`` 的 ``require_role(["partner", "signing_partner"])``——与
 ``/draft-refresh`` 同一合伙人门禁（不新增并行角色判断，Req 1.3）；非合伙人 403。
+另须是查询参数里那个项目的成员（readonly），非成员 403。
 本端点只读，不写任何数据。
 """
 
@@ -22,7 +23,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import require_role
+from app.deps import assert_project_permission, require_role
 from app.models.core import User
 from app.services.formula_management.refresh_scope_discovery import (
     RefreshScopeDiscovery,
@@ -50,6 +51,9 @@ async def list_refresh_scopes(
 
     从三来源动态发现（模块注册固定顶层域 + 后端注册循环常量 + ``wp_index`` 循环前缀），
     按 key 去重。非合伙人在依赖解析阶段即被 ``require_role`` 拦截返回 403。
+    角色门不含项目维度（spec formula-governance-coverage-closure R1.7）：须是该项目成员（readonly），
+    否则任一合伙人都能枚举任意项目的底稿循环。
     """
+    await assert_project_permission(db, _user, project_id, "readonly")
     items = await RefreshScopeDiscovery(db).discover(project_id=project_id, year=year)
     return {"items": [item.to_dict() for item in items]}

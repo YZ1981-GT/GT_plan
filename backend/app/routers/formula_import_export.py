@@ -14,14 +14,17 @@
 - ``GET /api/formula-management/reporting-instructions``：结构化说明文档 / Markdown
   （与导出模板编报说明同源，Req 23.6 / 25.3）。
 
-鉴权：三端点经 ``get_current_user``（http/axios 自动携带 Authorization）。中文文件名
+鉴权：导出与校验经 ``get_current_user``；导入入库需可写预设的角色（非管理员走候选审核），
+带 ``project_id`` 须是该项目成员。中文文件名
 按 RFC 5987 编码（复用 ``delivery_export.content_disposition_attachment``，Req 23.5）。
-service 只 flush，router 层 commit（导入写入 seed 文件为文件系统操作，无 DB 事务）。
+service 只 flush，router 层 commit。导入入库写数据库自定义预设（与「新增自定义预设」同一存储），
+不写任何仓库文件。
 """
 
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
@@ -29,7 +32,7 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_role
+from app.deps import assert_project_permission, get_current_user, require_role
 from app.models.core import User
 from app.services.formula_management.delivery_export import (
     content_disposition_attachment,
@@ -48,7 +51,6 @@ from app.services.formula_management.preset_library import (
     build_preset_library,
     compute_preset_coverage,
     find_presets_for_page,
-    upsert_seed_presets,
 )
 
 # 自定义预设写入角色门控（与平台编辑门控一致：系统管理员 / 业务合伙人 / 签字合伙人）
@@ -120,21 +122,39 @@ async def export_data(
     )
 
 
+async def _assert_context_project(db: AsyncSession, user: User, project_id: str | None) -> None:
+    """引用解析用的项目上下文须是本人可见的项目（readonly）—— 解析结果会暴露该项目的取数地址与数据存在性。"""
+    if not project_id:
+        return
+    try:
+        pid = uuid.UUID(project_id)
+    except ValueError:
+        raise HTTPException(400, "project_id 格式无效") from None
+    await assert_project_permission(db, user, pid, "readonly")
+
+
 # ── 导入数据（Req 23.4/23.5） ─────────────────────────────────────────────────
 @router.post("/import-export/import-data")
 async def import_data(
     file: UploadFile = File(...),
     page_key: str | None = Query(default=None, description="可选：限定导入到某页面键（校验一致性）"),
     project_id: str | None = Query(default=None, description="可选：项目上下文，供引用解析"),
-    persist: bool = Query(default=True, description="是否把有效条目幂等入库（预设 seed）"),
+    persist: bool = Query(default=True, description="是否把有效条目幂等入库（自定义预设）"),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     """导入公式：逐条经 ACNR full_resolve 校验，悬空报告并跳过（Req 23.4）。
 
-    有效条目（引用可解析）幂等写入预设 seed；悬空引用条目在响应 ``skipped`` 中报告，
-    不静默入库错误公式。
+    入库与「新增自定义预设」同一口径（spec formula-governance-coverage-closure R1.4）：
+    只有可写预设的角色能入库；管理员直接写数据库自定义预设，其余角色提交为全局候选待审核。
+    **不再改写仓库里的 seed 文件**（原实现任何登录用户都能改写跟踪文件 formula_presets_seed.json）。
+    带 ``project_id`` 时按该项目做引用解析，须是项目成员（readonly）。
+    ``persist=false`` 只做校验报告，登录即可。
     """
+    role = getattr(_user.role, "value", _user.role)
+    if persist and role not in _CUSTOM_PRESET_WRITE_ROLES:
+        raise HTTPException(403, "导入入库仅限管理员 / 合伙人（可先不入库，只做校验）")
+    await _assert_context_project(db, _user, project_id)
     if not file.filename or not file.filename.lower().endswith(".xlsx"):
         raise HTTPException(400, "请上传 .xlsx 格式文件")
     content = await file.read()
@@ -164,13 +184,23 @@ async def import_data(
             )
         result.imported = imported
 
-    persist_stats: dict[str, int] | None = None
-    if persist and result.imported:
-        persist_stats = upsert_seed_presets(result.imported)
-
     payload = result.to_dict()
-    if persist_stats is not None:
-        payload["persisted"] = persist_stats
+    if persist and result.imported:
+        from app.services.formula_settings import custom_presets
+        from app.services.formula_settings.publish import publish_to_dict
+
+        if role != "admin":
+            candidate = await custom_presets.submit_candidate(
+                db, list(result.imported), user_id=_user.id, note="公式导入候选")
+            await db.commit()
+            payload["pending_review"] = True
+            payload["candidate"] = publish_to_dict(candidate)
+            return payload
+        stats = await custom_presets.upsert(db, list(result.imported), user_id=_user.id, note="公式导入")
+        await db.commit()
+        await custom_presets.refresh_cache(db)  # 本进程立即可见；其他进程最迟一分钟内对齐
+        payload["pending_review"] = False
+        payload["persisted"] = stats
     return payload
 
 
@@ -245,7 +275,9 @@ async def create_custom_preset(
     悬空引用 → 422 携清单**不落库**（Property 6）。
     formula-global-settings-sync R14.3：admin 直接写事务所级模板「自定义公式预设」；合伙人 / 签字合伙人
     提交全局候选（admin 在全局设置页审核）。不再写代码仓库里的 ``formula_custom_presets.json``。
+    带 ``project_id`` 时按该项目做引用解析，须是项目成员（readonly；角色门不含项目维度）。
     """
+    await _assert_context_project(db, _user, project_id)
     page_key = str(payload.get("page_key") or "").strip()
     target_cell = str(payload.get("target_cell") or "").strip()
     expression = str(payload.get("expression") or "").strip()

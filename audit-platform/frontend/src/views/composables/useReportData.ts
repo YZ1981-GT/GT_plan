@@ -272,7 +272,8 @@ export function useReportData(options: UseReportDataOptions): UseReportDataRetur
     if (rows.value.length > 0) {
       try {
         const result = await getReportConsistencyCheck(projectId.value, year.value)
-        if (result && !result.consistent) {
+        // noResult（0 条可执行）不出「未通过」横幅：没查不等于查出了问题
+        if (result && !result.noResult && !result.consistent) {
           const total = result.total || result.checks?.length || 0
           const passed = (result.logic_check_passed || 0) + (result.reasonability_passed || 0)
           const failCount = total - passed

@@ -11,9 +11,9 @@
   - rollback_available 时显示回滚按钮
 -->
 <template>
-  <!-- ① 入口按钮：仅合伙人可见（Req 19.1/19.2） -->
+  <!-- ① 入口按钮：仅本项目编辑级成员中的合伙人可见（Req 19.1/19.2 + R1.8） -->
   <el-button
-    v-if="isPartner"
+    v-if="canRefreshProject"
     class="gt-rsd-entry"
     type="primary"
     :icon="Refresh"
@@ -216,6 +216,7 @@ import http from '@/utils/http'
 // spec: formula-management-runtime-closure Task 14/16 - 端点收敛进 apiPaths（纯搬迁）
 import { draftRefresh } from '@/services/apiPaths/formula'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
+import { useRoleContextStore } from '@/stores/roleContext'
 import {
   parseDraftRefreshResponse,
   isSuccess,
@@ -250,8 +251,14 @@ const emit = defineEmits<{
 
 // ─── 前端门禁 ──────────────────────────────────────────────────────────────────
 const { currentRole } = usePermissionMatrix()
+const roleContext = useRoleContextStore()
 const PARTNER_ROLES = ['partner', 'signing_partner']
 const isPartner = computed(() => PARTNER_ROLES.includes(currentRole.value))
+/**
+ * 入口门禁 = 合伙人 + 本项目编辑级成员：后端刷新按请求体项目判 edit、刷新范围按项目判成员
+ * （spec formula-governance-coverage-closure R1.7 / R1.8）—— 不显示一个点了必 403 的按钮。
+ */
+const canRefreshProject = computed(() => isPartner.value && roleContext.canEditInProject)
 
 // ─── 弹窗状态 ──────────────────────────────────────────────────────────────────
 const visible = ref(false)
@@ -423,7 +430,7 @@ function extractError(err: unknown, fallback: string): string {
   return fallback
 }
 
-defineExpose({ openDialog, isPartner, checkedScopes, parsedResult })
+defineExpose({ openDialog, isPartner, canRefreshProject, checkedScopes, parsedResult })
 </script>
 
 <style scoped>

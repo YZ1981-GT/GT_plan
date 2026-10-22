@@ -29,11 +29,12 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import require_role
+from app.deps import assert_project_permission, require_role
 from app.models.core import User
 from app.schemas.formula_runtime import (
     DraftRefreshRequest,
@@ -91,6 +92,10 @@ async def one_click_draft_refresh(
     不再恒为 0）。
     """
     # 注意：空 scopes 已由 Pydantic min_length=1 校验，FastAPI 自动返回 422。
+
+    # 项目级门禁（spec formula-governance-coverage-closure R1.7）：角色门只保证「是合伙人」，
+    # 不含项目维度 —— 任一合伙人都能刷新（批量改写）任意项目。项目在请求体里，直调判定。
+    await assert_project_permission(db, _user, body.project_id, "edit")
 
     service = DraftRefreshService()
 
@@ -179,7 +184,18 @@ async def rollback_draft_refresh(
     加载快照按写入逆序恢复业务值、Draft marker、生命周期状态等治理元数据（Req 2）。
     CAS 保护：若目标当前版本不等于快照 applied_version，返回 conflict（Req 2.4）。
     成功后写入 rolled_back 审计记录与 Outbox 失效事件。
+
+    鉴权：按运行记录反查所属项目判 edit（路径只有 run_id；角色门不含项目维度）。
     """
+    from app.models.workpaper_models import DraftRefreshAudit
+
+    run_project = (await db.execute(
+        sa.select(DraftRefreshAudit.project_id).where(DraftRefreshAudit.id == run_id)
+    )).scalar_one_or_none()
+    if run_project is None:
+        raise HTTPException(status_code=404, detail="刷新记录不存在")
+    await assert_project_permission(db, _user, run_project, "edit")
+
     service = DraftRefreshService()
 
     try:

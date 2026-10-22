@@ -5,17 +5,18 @@
 
 ## 1. 越权修复（R1）
 
-- [ ] 1.1 `formula_debug.debug_formula` 首句校验请求体项目 readonly；非成员 403 且不取数（R1.1）
-- [ ] 1.2 `wp_user_formulas` 列表 / 保存 / 恢复预设改用 `authorize_wp_read` / `authorize_wp_edit`（R1.2）
-- [ ] 1.3 `validate_formula` 反查底稿项目 + 请求体项目一致性 + 预览用反查项目（R1.3）
-- [ ] 1.4 `import_data`：带项目校验 readonly；`persist` 需写预设角色；管理员写数据库预设、其余提交候选；删除 seed 文件写入与死代码 `upsert_seed_presets`（R1.4 / R1.5）
-- [ ] 1.5 `reports.consistency_check` 改 `require_project_access("readonly")`；0 条可执行时 `no_result`；前端审核对话框空态（R1.6）
-- [ ] 1.6 端点级测试：7 个端点 × 非成员 403（断言未触达数据）/ 成员 / 管理员（R1.1~R1.6）
-- [ ] 1.7 鉴权守卫第三维（对象 / 请求体型）+ 已修钉子 + 双向变异；重算并下调既有基线（R1.7）
+- [x] 1.1 `formula_debug.debug_formula` 首句校验请求体项目 readonly；非成员 403 且不取数（R1.1）
+- [x] 1.2 `wp_user_formulas` 列表 / 保存 / 恢复预设改用 `authorize_wp_read` / `authorize_wp_edit`（R1.2）—— 勘误：生产本已挂 router 级可见性门，这是第二道（design §2.1）
+- [x] 1.3 `validate_formula` 反查底稿项目 + 请求体项目一致性 + 预览用反查项目（R1.3）
+- [x] 1.4 `import_data`：带项目校验 readonly；`persist` 需写预设角色；管理员写数据库预设、其余提交候选；切断在线端点对 seed 文件的写入（`upsert_seed_presets` 保留给离线生成脚本）（R1.4 / R1.5）
+- [x] 1.5 `reports.consistency_check` 改 `require_project_access("readonly")`；0 条可执行时 `no_result`；前端审核对话框空态；配置公式改真实严格求值（`report_audit_checks.py`）；前端映射透传汇总计数与分类（R1.6）
+- [x] 1.6 端点级测试：`tests/formula_settings/test_formula_endpoint_authz.py`（权限世界真实判定链，业务层计数桩：被拦请求 0 次业务调用）+ `test_draft_refresh_endpoint.py` 门禁调用断言；一次性变异（各端点模块里把判定换成放行）4/4 被测出（R1.1~R1.6）
+- [x] 1.7 鉴权守卫第三维 `tests/test_project_endpoint_authz_body_carried.py`：额外项目级标识证明链 + 绑定检查、已修钉子（本维 6 个 + 路径维 2 个）、合成样本与真实源码 AST 变异双向；冻结仅登录 93 / 无鉴权 5 / 自鉴权 1。共享基线第一维现算 200（常量 207，未改共享文件，见 design §2.1）（R1.7）
+- [x] 1.8 第三维抓到的公式链路端点：一键刷新 / 回滚 / 刷新范围 / 新增自定义预设 / 批量刷新取数 / 附注公式开关补项目级判定；前端一键刷新入口改「合伙人 + 本项目编辑级成员」；范围外发现登记 design §2.2（R1.7 / R1.8）
 
 ## 2. 表间审核严格取数（R7a）
 
-- [ ] 2.1 新模块 `formula_ref_preload.py`：PREV / AUX 预载与严格缺数报错；AUX 走 `get_active_filter`；`report_engine` 改调并删除重复分支（R7.1）
+- [ ] 2.1 新模块 `formula_ref_preload.py`：PREV / AUX 预载与严格缺数报错；AUX 走 `get_active_filter`；表间审核 `_evaluate` 先按值代入再求值（不经 report_engine 预载分支）。`report_engine` 改调并删除重复分支 —— 该文件正被另一会话修改，留待其提交后收口（design §3 调整）（R7.1）
 - [ ] 2.2 更新 `test_user_rules_run…` 断言；新增「AUX 缺数 + 另一侧 0」「PREV 无上年数据」两例；变异去掉严格报错必红（R7.1）
 
 ## 3. 推送规则纳入治理内核（R2）

@@ -103,6 +103,27 @@ describe('useReportData — fetchReport', () => {
     expect(rows.value).toEqual(fakeRows)
   })
 
+  it('审核 0 条可执行（noResult）不出「未通过」横幅：没查不等于查出了问题', async () => {
+    mockGetReport.mockResolvedValue(makeFakeRows())
+    mockGetReportConsistencyCheck.mockResolvedValue({
+      consistent: null, noResult: true, checks: [], total: 0,
+    } as any)
+    const { fetchReport, balanceCheckResult } = useReportData(createOptions())
+    await fetchReport()
+    expect(balanceCheckResult.value).toBeNull()
+  })
+
+  it('审核有未通过项时出横幅并给出未通过数', async () => {
+    mockGetReport.mockResolvedValue(makeFakeRows())
+    mockGetReportConsistencyCheck.mockResolvedValue({
+      consistent: false, noResult: false, checks: [], total: 3, logic_check_passed: 1, reasonability_passed: 0,
+    } as any)
+    const { fetchReport, balanceCheckResult } = useReportData(createOptions())
+    await fetchReport()
+    expect(balanceCheckResult.value?.status).toBe('warning')
+    expect(balanceCheckResult.value?.message).toBe('自动校对：3 项审核，2 项未通过')
+  })
+
   it('in compare mode, calls getReport twice (audited + unadjusted) and sets compareRows', async () => {
     const auditedRows = makeFakeRows(2)
     const unadjustedRows = [

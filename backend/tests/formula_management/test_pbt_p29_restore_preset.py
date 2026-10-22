@@ -159,10 +159,13 @@ async def _read_user_formulas(db: AsyncSession, wp_id: uuid.UUID) -> dict:
     它按「表优先、遗留键补 `original_preset`」合并，同时给出 `formula` 与
     `original_preset` 两个字段。**P29 自身的断言一条未动**（禁放宽/跳过）。
     """
-    resp = await list_user_formulas(
-        wp_id, db=db, _user=types.SimpleNamespace(id=uuid.uuid4())
-    )
+    resp = await list_user_formulas(wp_id, db=db, _user=_admin_user())
     return dict(resp.get("user_formulas") or {})
+
+
+def _admin_user() -> types.SimpleNamespace:
+    """管理员身份（全局角色 admin）：端点鉴权走真实的 authorize_wp_read / authorize_wp_edit 判定并放行。"""
+    return types.SimpleNamespace(id=uuid.uuid4(), role=types.SimpleNamespace(value="admin"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -224,7 +227,9 @@ def test_restore_preset_roundtrip(case):
             async with factory() as db:
                 project_id = uuid.uuid4()
                 wp_id = await _insert_wp(db, project_id=project_id)
-                user = types.SimpleNamespace(id=uuid.uuid4())
+                # 端点自 2026-10-22 起按底稿反查项目判权（authorize_wp_read / authorize_wp_edit，
+                # spec formula-governance-coverage-closure R1.2）；本属性只验往返保真，用管理员身份走真实判定
+                user = _admin_user()
 
                 cell_key = case["cell_key"]
                 preset_formula = case["preset_formula"]
