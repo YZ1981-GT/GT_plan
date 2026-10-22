@@ -99,7 +99,17 @@ def _synonym_rule(vocab: Vocabulary):
     return rule
 
 
-#: 强 → 弱；弱规则只在强规则零命中时才试；命中不唯一放弃；同一单体列被多列认领全部放弃
+def _balance_pick(keys: Sequence[ColumnKey], vocab: Vocabulary) -> ColumnKey | None:
+    """「只写了期间」对上同期间多列时的唯一候选：纯期间列 = 该项目的余额（``column_role`` 同口径），
+    对唯一的余额计量列（账面余额 / 公允价值）；同期间还有净额列（账面价值）时余额 / 净额分不出，不选。"""
+    if any(k.measure in vocab.net_measures for k in keys):
+        return None
+    hits = [k for k in keys if k.measure in vocab.balance_measures]
+    return hits[0] if len(hits) == 1 else None
+
+
+#: 强 → 弱；弱规则只在强规则零命中时才试；命中不唯一放弃（「只写了期间」多列时按 ``_balance_pick`` 取唯一余额列，
+#: 记作 period_balance）；同一单体列被多列认领全部放弃（都是「只写了期间」时同样按 ``_balance_pick``）
 RULES = (
     ("exact", _rule_exact), ("synonym", None), ("suffix", _rule_suffix), ("prefix", _rule_prefix),
     ("reverse_suffix", _rule_reverse_suffix), ("reverse_prefix", _rule_reverse_prefix),
@@ -154,19 +164,32 @@ def match_columns(
         if t.kind != "amount" or not (t.period or t.measure):
             continue  # 空表头不取数
         for name, rule in rules:
-            hits = [(pos, s.index) for pos, s in sources if rule(t, s)]
+            hits = [(pos, s) for pos, s in sources if rule(t, s)]
             if hits:
                 if len(hits) == 1:
-                    claims[t.index] = (*hits[0], name)
+                    claims[t.index] = (hits[0][0], hits[0][1].index, name)
+                elif name == "period_only" and not t.measure:
+                    pick = _balance_pick([s for _pos, s in hits], vocab)
+                    if pick is not None:
+                        claims[t.index] = (next(p for p, s in hits if s is pick), pick.index, "period_balance")
                 break
-    owners: dict[tuple[int, int], int] = {}
-    for pos, col, _rule in claims.values():
-        owners[(pos, col)] = owners.get((pos, col), 0) + 1
+    owners: dict[tuple[int, int], list[int]] = {}
+    for c, (pos, col, _rule) in claims.items():
+        owners.setdefault((pos, col), []).append(c)
+    by_index = {t.index: t for t in target}
+    kept: dict[int, str] = {}
+    for cols in owners.values():
+        if len(cols) == 1:
+            kept[cols[0]] = claims[cols[0]][2]
+        elif all(claims[c][2] == "period_only" for c in cols):
+            # 同一纯期间列被同期间多列认领（合并「期末数/账面余额」「期末数/坏账准备」↔ 单体「期末数」）
+            pick = _balance_pick([by_index[c] for c in cols], vocab)
+            if pick is not None:
+                kept[pick.index] = "period_balance"
     out = ColumnMatch(ratio=ratio, aux_matched=aux_matched)
-    for c, (pos, col, rule) in sorted(claims.items()):
-        if owners[(pos, col)] == 1:
-            out.col_map[c] = (pos, col)
-            out.rules[c] = rule
+    for c, rule in sorted(kept.items()):
+        out.col_map[c] = claims[c][:2]
+        out.rules[c] = rule
     out.unmatched = [
         t.index for t in target[1:]
         if t.kind == "amount" and (t.period or t.measure) and t.index not in out.col_map

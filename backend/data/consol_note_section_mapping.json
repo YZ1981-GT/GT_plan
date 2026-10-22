@@ -4682,8 +4682,8 @@
         "consol_seq": 80,
         "standalone_note_section": "五、11",
         "standalone_section_title": "持有待售资产和持有待售负债",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "持有待售资产减值准备"
       },
       {
         "consol_section_id": "五-11-4",

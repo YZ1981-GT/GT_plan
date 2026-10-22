@@ -98,12 +98,6 @@
  {
   "variant": "listed_consolidated",
   "kind": "table_columns",
-  "key": "三、重要会计政策、会计估计的变更#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
   "key": "九、2#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
  },
@@ -484,36 +478,6 @@
   "kind": "table_columns",
   "key": "五、82#t8",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、9#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、9#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、9#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、9#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "八、采用净额法冲减相关成本费用的政府补助情况#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = 底稿 xlsx 派生表（政府补助章节，表结构仍为底稿口径）"
  },
  {
   "variant": "listed_consolidated",
@@ -710,18 +674,6 @@
  {
   "variant": "listed_consolidated",
   "kind": "table_headers",
-  "key": "九、4#t14",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_headers",
-  "key": "九、4#t15",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_headers",
   "key": "五、10#t4",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
  },
@@ -734,25 +686,7 @@
  {
   "variant": "listed_consolidated",
   "kind": "table_headers",
-  "key": "五、11#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_headers",
   "key": "五、14#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_headers",
-  "key": "五、15#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_headers",
-  "key": "五、15#t4",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout（种子节 _aligned_by 标记）"
  },
  {
@@ -992,20 +926,32 @@
  {
   "variant": "listed_consolidated",
   "kind": "table_headers",
-  "key": "五、9#t8",
+  "key": "五、9#t3",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
-  "kind": "table_rows",
-  "key": "九、4#t14",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "kind": "table_headers",
+  "key": "五、9#t4",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
-  "kind": "table_rows",
-  "key": "九、4#t15",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "kind": "table_headers",
+  "key": "五、9#t5",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "table_headers",
+  "key": "五、9#t6",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "table_headers",
+  "key": "五、9#t8",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
@@ -1256,12 +1202,6 @@
  {
   "variant": "listed_consolidated",
   "kind": "table_rows",
-  "key": "五、62#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d4-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_rows",
   "key": "五、62#t5",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d4-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
@@ -1346,18 +1286,6 @@
  {
   "variant": "listed_consolidated",
   "kind": "table_rows",
-  "key": "五、9#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_rows",
-  "key": "五、9#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_rows",
   "key": "五、9#t7",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
  },
@@ -1372,12 +1300,6 @@
   "kind": "table_rows",
   "key": "五、9#t9",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_rows",
-  "key": "八、采用净额法冲减相关成本费用的政府补助情况#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = 底稿 xlsx 派生表（政府补助章节，表结构仍为底稿口径）"
  },
  {
   "variant": "listed_standalone",
@@ -1461,12 +1383,6 @@
   "variant": "listed_standalone",
   "kind": "table_columns",
   "key": "七、9#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "三、重要会计政策、会计估计的变更#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
  },
  {
@@ -1856,36 +1772,6 @@
  {
   "variant": "listed_standalone",
   "kind": "table_columns",
-  "key": "五、9#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、9#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、9#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、9#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "八、采用净额法冲减相关成本费用的政府补助情况#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = 底稿 xlsx 派生表（政府补助章节，表结构仍为底稿口径）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
   "key": "六、1#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
  },
@@ -2054,18 +1940,6 @@
  {
   "variant": "listed_standalone",
   "kind": "table_headers",
-  "key": "九、4#t14",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_headers",
-  "key": "九、4#t15",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_headers",
   "key": "五、10#t4",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
  },
@@ -2078,25 +1952,7 @@
  {
   "variant": "listed_standalone",
   "kind": "table_headers",
-  "key": "五、11#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_headers",
   "key": "五、14#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_headers",
-  "key": "五、15#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_headers",
-  "key": "五、15#t4",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout（种子节 _aligned_by 标记）"
  },
  {
@@ -2336,20 +2192,32 @@
  {
   "variant": "listed_standalone",
   "kind": "table_headers",
-  "key": "五、9#t8",
+  "key": "五、9#t3",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
-  "kind": "table_rows",
-  "key": "九、4#t14",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "kind": "table_headers",
+  "key": "五、9#t4",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
-  "kind": "table_rows",
-  "key": "九、4#t15",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "kind": "table_headers",
+  "key": "五、9#t5",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_standalone",
+  "kind": "table_headers",
+  "key": "五、9#t6",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_standalone",
+  "kind": "table_headers",
+  "key": "五、9#t8",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
@@ -2600,12 +2468,6 @@
  {
   "variant": "listed_standalone",
   "kind": "table_rows",
-  "key": "五、62#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d4-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_rows",
   "key": "五、62#t5",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d4-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
@@ -2690,18 +2552,6 @@
  {
   "variant": "listed_standalone",
   "kind": "table_rows",
-  "key": "五、9#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_rows",
-  "key": "五、9#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_rows",
   "key": "五、9#t7",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
  },
@@ -2716,12 +2566,6 @@
   "kind": "table_rows",
   "key": "五、9#t9",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f2-inventory-disclosure-template-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_rows",
-  "key": "八、采用净额法冲减相关成本费用的政府补助情况#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = 底稿 xlsx 派生表（政府补助章节，表结构仍为底稿口径）"
  },
  {
   "variant": "soe_consolidated",
@@ -3322,12 +3166,6 @@
   "kind": "table_headers",
   "key": "八、9#t9",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_headers",
-  "key": "十一、关联交易情况#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
@@ -4186,12 +4024,6 @@
   "kind": "table_headers",
   "key": "八、9#t9",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_headers",
-  "key": "十一、关联交易情况#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",

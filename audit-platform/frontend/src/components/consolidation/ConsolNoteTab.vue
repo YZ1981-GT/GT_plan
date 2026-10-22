@@ -750,6 +750,7 @@ import {
 import { nodeLabel as treeNodeLabel, walkTree } from '@/components/consolidation/composables/consolTreeView'
 import { createConsolRequestGuard, isAborted } from '@/components/consolidation/composables/consolRequestGuard'
 import {
+  cellAggregateSummary,
   clearManual,
   emptyEditRow,
   fillDetailRows,
@@ -766,6 +767,7 @@ import {
   sectionIdsWithFormulas,
   toEditRows,
   trimTrailingEmptyRows,
+  type CellAggregateResult,
   type FillDetailRow,
   type NoteEditRow,
 } from '@/components/consolidation/composables/consolNoteView'
@@ -2032,6 +2034,13 @@ async function confirmAndExecuteAggregate() {
   } catch { /* cancelled */ }
 }
 
+/** 只取下级已保存的合并附注：有数写入单元格；没有附注数据的下级不计入并点名（R6.5） */
+function applyCellAggregate(sec: any, c: { row: number; col: number }, result: CellAggregateResult | null) {
+  if (result?.value != null) sec.editRows[c.row][c.col] = String(result.value)
+  const summary = cellAggregateSummary(result, fmtAmt)
+  ElMessage({ type: summary.level, message: summary.text, duration: summary.level === 'warning' ? 8000 : 3000 })
+}
+
 async function executeAggregate() {
   aggLoading.value = true
   try {
@@ -2051,13 +2060,7 @@ async function executeAggregate() {
         standard: props.standard,
         node_key: currentNodeKey(),
       }, { validateStatus: (s: number) => s < 600 })
-      const result = data
-      if (result?.value != null) {
-        sec.editRows[c.row][c.col] = String(result.value)
-        ElMessage.success(`已汇总 ${result.count || 0} 家直接下级，合计：${fmtAmt(result.value)}`)
-      } else {
-        ElMessage.info('暂无下级数据可汇总')
-      }
+      applyCellAggregate(sec, c, data)
     } else {
       const checkedNodes = aggTreeRef.value?.getCheckedNodes() || []
       if (!checkedNodes.length) { ElMessage.warning('请选择要汇总的单位'); aggLoading.value = false; return }
@@ -2076,13 +2079,7 @@ async function executeAggregate() {
         standard: props.standard,
         node_key: currentNodeKey(),
       }, { validateStatus: (s: number) => s < 600 })
-      const result = data
-      if (result?.value != null) {
-        sec.editRows[c.row][c.col] = String(result.value)
-        ElMessage.success(`已汇总 ${companyCodes.length} 家企业，合计：${fmtAmt(result.value)}`)
-      } else {
-        ElMessage.info('暂无数据可汇总')
-      }
+      applyCellAggregate(sec, c, data)
     }
     showAggregateDialog.value = false
   } catch (err: any) {

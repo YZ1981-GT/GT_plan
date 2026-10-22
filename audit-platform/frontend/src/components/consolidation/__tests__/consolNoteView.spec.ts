@@ -17,6 +17,7 @@ import {
   noteBreakdownRows,
   notePayload,
   parseManualCells,
+  cellAggregateSummary,
   reaggregateSummary,
   sectionIdsWithFormulas,
   toEditRows,
@@ -183,6 +184,34 @@ describe('重新汇总完成提示（节点子树）', () => {
   })
 })
 
+describe('单元格「Σ 汇总」提示（只取下级合并附注，R6.5）', () => {
+  /** 打标记的格式化：断言合计确实经调用方传入的金额格式化（组件里是 fmtAmt） */
+  const fmt = (v: number) => `<${v}>`
+
+  it('全部下级都有数 ⇒ 成功', () => {
+    expect(cellAggregateSummary({ value: 150, count: 2, empty_count: 0, missing_children: [] }, fmt))
+      .toEqual({ level: 'success', text: '已汇总 2 家下级，合计：<150>' })
+  })
+
+  it('有下级没有附注数据 ⇒ 告警并点名，提示先做明细映射 / 重新汇总', () => {
+    const s = cellAggregateSummary({
+      value: 100, count: 1, empty_count: 1,
+      missing_children: [{ node_key: 'C:subsidiary', name: '子公司C', reason: '没有附注数据' }],
+    }, fmt)
+    expect(s.level).toBe('warning')
+    expect(s.text).toBe('已汇总 1 家下级，合计：<100>；1 家下级这一格没有数；'
+      + '1 家下级没有附注数据，未计入（子公司C；请先对其执行「📋 明细映射」或「🔄 重新汇总」）')
+  })
+
+  it('一个数都没有：没有附注 ⇒ 告警；只是这一格为空 ⇒ 普通提示；错误信封 ⇒ 汇总失败', () => {
+    const missing = cellAggregateSummary({ value: null, count: 0, missing_children: [{ node_key: 'A:parent' }] }, fmt)
+    expect(missing).toEqual({ level: 'warning', text: '没有可汇总的数：1 家下级没有附注数据，未计入（A:parent；请先对其执行「📋 明细映射」或「🔄 重新汇总」）' })
+    expect(cellAggregateSummary({ value: null, count: 0, empty_count: 2, missing_children: [] }, fmt).level).toBe('info')
+    expect(cellAggregateSummary({ detail: '合并附注模板（soe）中没有表格 x' }, fmt))
+      .toEqual({ level: 'warning', text: '汇总失败：合并附注模板（soe）中没有表格 x' })
+  })
+})
+
 describe('ConsolNoteTab 生产接线守卫', () => {
   const component = fs.readFileSync(path.resolve(__dirname, '../ConsolNoteTab.vue'), 'utf-8')
   const index = fs.readFileSync(path.resolve(__dirname, '../../../views/ConsolidationIndex.vue'), 'utf-8')
@@ -206,6 +235,13 @@ describe('ConsolNoteTab 生产接线守卫', () => {
     expect(component).toContain('本节点下各企业按已确认映射从单体附注重新拉数，差额节点按抵销分录重算，再自下而上汇总到本节点')
     expect(component).not.toContain('按公式重算本节点合并附注')
     expect(component).toContain("lastWrite === 'subtree_aggregate'")
+  })
+
+  it('单元格汇总两种模式都走同一提示（没有附注的下级点名）', () => {
+    const body = component.slice(component.indexOf('async function executeAggregate'), component.indexOf('// ─── 附注数据操作'))
+    expect(body.match(/applyCellAggregate\(sec, c, data\)/g) || []).toHaveLength(2)
+    expect(component).toContain('cellAggregateSummary(result, fmtAmt)')
+    expect(body).not.toContain('暂无下级数据可汇总')
   })
 
   it('页面按钮接入新 fill/breakdown API；编辑即标手工；保存保留原 data', () => {

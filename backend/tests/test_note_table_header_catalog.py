@@ -62,9 +62,9 @@ def test_known_anomalies_are_listed(catalog):
     found = {(a["variant"], a["id"], a["kind"]) for a in catalog["anomalies"]}
     assert ("soe_standalone", "八、9#16", "continuation_self_reference") in found
     assert ("soe_standalone", "八、18#4", "continuation_self_reference") in found
-    for sid in ("五-9-4", "五-9-5", "五-9-6", "五-9-7"):
-        assert ("listed_consolidated", sid, "label_header_spans_data_columns") in found
-    assert ("listed_consolidated", "五-9-6", "header_row_has_data") in found
+    # 合并种子多级表头按 Word 修复后（R6.3）：表头里没有数据行，标签列表头不盖数据列（原上市 五-9-4~7 等 11 处）
+    header_defects = {a for a in found if a[2] in ("header_row_has_data", "label_header_spans_data_columns")}
+    assert header_defects == set()
     xu = {a["id"] for a in catalog["anomalies"] if a["kind"] == "xu_word_not_continuation"}
     assert "八、9#16" in xu  # 继续涉入
     assert any(i.startswith("八、51#") for i in xu)  # 永续债
@@ -93,12 +93,22 @@ def test_mapping_agrees_with_runtime_choice(catalog, std):
 
 
 #: 覆盖率只许变好、认不到的表只许变少（改词表 / 种子后更好就收紧）。
-#: none 含主动拒绝的错配：上市 五-9-4~7 合并表头错列且单体两张组合表同构；国企 五-64-4/5、五-79-2
+#: none 含主动拒绝的错配：上市 五-9-4~7 单体两张组合表同构；国企 五-64-4/5、五-79-2
 #: 章节映射错位（单体对应章节唯一一张表一列都对不上）—— 宁缺不错，见 design §13。
+#: 2026-10-22 R6.3 种子多级表头修复 + 纯期间列对唯一余额列：国企 656→660 列、上市 803→815 列，上市 五-11-3 由 none 转为对上。
 _RATCHET = {
-    "soe": {"coverage": 0.7727, "none": 27},
-    "listed": {"coverage": 0.8932, "none": 27},
+    "soe": {"coverage": 0.7774, "none": 27},
+    "listed": {"coverage": 0.9015, "none": 26},
 }
+
+
+def test_receivable_aging_pure_period_correspondence(catalog):
+    """国企 五-5-1 账龄表（期末数/账面余额 | 期末数/坏账准备 …）↔ 单体「账龄 | 期末数 | 期初数」：纯期间列对账面余额列。
+
+    种子多级表头修复前，五-5-1 只有期末账面余额一列在「期末」下，碰巧对上；修复后坏账准备也在期末下，按唯一余额列认（R6.3）。
+    """
+    item = next(i for i in catalog["correspondence"]["soe"] if i["consol"] == "五-5-1")
+    assert item["columns"] == [[1, "八、5#0", 1, "period_balance"], [3, "八、5#0", 2, "period_balance"]]
 
 
 @pytest.mark.parametrize("std", ["soe", "listed"])

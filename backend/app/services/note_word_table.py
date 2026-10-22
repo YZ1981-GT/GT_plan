@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Sequence
 
 __all__ = [
     "WordTable",
@@ -19,6 +19,7 @@ __all__ = [
     "norm_cell",
     "parse_word_table",
     "seed_header_paths",
+    "seed_multi_header",
     "word_header_paths",
 ]
 
@@ -105,20 +106,28 @@ def _header_row_count(nrows: int, ncols: int, grid: dict, texts: dict, spans: di
     基于 ``sync_note_templates_from_word.detect_header_row_count``，多一条：横向合并的单元格（分组表头）
     之下必有一行子表头。原规则只看纵向延伸，首列未纵向合并的两级表头（「账龄」列下格留白）会被判成一行。
     之后照原规则从第 2 行起找「首列有字、无合并、不被上方覆盖」的行截断（数据行）。
+
+    合并格只认有字的（R6.3）：空白的合并格既不撑开表头，也不让所在行免于截断 —— 数据行里两格一并的空白取数格
+    （上市 五、9 存货组合 / 五、10 合同资产 / 五、11 持有待售 / 五、62 收入分解、国企 八、64 等表）原先让数据行算进
+    表头。本行起始的格全空白（空白占位行）、首格从首列通栏（「商品价格风险」分类行）的行也是数据行。
     """
     max_covered = 0
-    for (r0, _c0), (rs, cs) in spans.items():
-        if r0 < min(nrows, 5) and (rs > 1 or cs > 1):
+    for (r0, c0), (rs, cs) in spans.items():
+        if r0 < min(nrows, 5) and (rs > 1 or cs > 1) and texts.get((r0, c0)):
             max_covered = max(max_covered, r0 + rs - 1 + (1 if cs > 1 else 0))
     if max_covered == 0:
         return 1
     header_rows = max_covered + 1
     for r in range(1, header_rows):
+        starts = {grid[(r, c)] for c in range(ncols) if (r, c) in grid and grid[(r, c)][0] == r}
+        if starts and (not any(texts.get(o) for o in starts)
+                       or any(o[1] == 0 and spans[o][1] >= ncols for o in starts)):
+            header_rows = r
+            break
         owner0 = grid.get((r, 0))
         if owner0 != (r, 0) or not texts.get(owner0):
             continue
-        starts = {grid[(r, c)] for c in range(ncols) if (r, c) in grid and grid[(r, c)][0] == r}
-        if any(spans[o][0] > 1 or spans[o][1] > 1 for o in starts):
+        if any(texts.get(o) and (spans[o][0] > 1 or spans[o][1] > 1) for o in starts):
             continue
         if not any((r, c) in grid and grid[(r, c)][0] < r for c in range(ncols)):
             header_rows = r
@@ -141,9 +150,83 @@ def _logical_columns(ncols: int, n_hdr: int, grid: dict) -> list[int]:
     return starts
 
 
+def _absorb(grid: dict, texts: dict, spans: dict, gap: tuple[int, int], into: tuple[int, int]) -> None:
+    """空白格 ``gap`` 并进同一行相邻的单元格 ``into``（新单元格起点取左边，横向多占一列）。"""
+    r = gap[0]
+    owner, (rs, cs), text = (r, min(gap[1], into[1])), spans.pop(into), texts.pop(into)
+    texts.pop(gap, None)
+    spans.pop(gap, None)
+    for key, value in list(grid.items()):
+        if value in (gap, into):
+            grid[key] = owner
+    texts[owner], spans[owner] = text, (rs, cs + 1)
+
+
+def _normalize_header_gaps(ncols: int, n_hdr: int, grid: dict, texts: dict, spans: dict) -> tuple[dict, dict, dict]:
+    """Word 模板表头里没合并的空白单元格归一（种子格式 / 列路径都表达不了「留白的上级」，R6.3）：
+
+    1. 下一行的子表头从它跨进相邻的分组表头（子表头只能挂在一个上级下）⇒ 并入那个分组；
+    2. 正下方是一个列名：左邻是分组表头、右邻不是 ⇒ 列名属于左邻分组（并入左邻，如「本期变动情况」下的「其他变动」）；
+       否则 ⇒ 列名是独立的一列（如「减值准备期初余额」），提到这一格（纵向合并）。左右都是分组时分不出，按独立列。
+
+    四版 Word 里第 1 类只有上市存货按组合计提跌价准备四张表；全部出现处见
+    ``tests/test_consol_note_seed_header_repair.py::TestWordHeaderRules``。返回新的三张表。
+    """
+    grid, texts, spans = dict(grid), dict(texts), dict(spans)
+
+    def is_group(cell: tuple[int, int] | None, r: int) -> bool:
+        if cell is None or cell[0] != r or spans[cell][1] < 2 or r + 1 >= n_hdr or not texts.get(cell):
+            return False
+        kids = {grid.get((r + 1, cc)) for cc in range(cell[1], cell[1] + spans[cell][1])}
+        return len({k for k in kids if k is not None and k[0] == r + 1}) >= 2
+
+    for r in range(max(n_hdr - 1, 0)):
+        for c in range(ncols):
+            gap, below = grid.get((r, c)), grid.get((r + 1, c))
+            if gap != (r, c) or texts.get(gap) or spans.get(gap) != (1, 1) or below is None or below[0] != r + 1:
+                continue
+            straddled = next((
+                other for nb, other in ((nb, grid.get((r, nb))) for nb in (c + 1, c - 1) if 0 <= nb < ncols)
+                if other and other != gap and other[0] == r and spans[other][0] == 1 and texts.get(other)
+                and grid.get((r + 1, nb)) == below
+            ), None)
+            if straddled is not None:
+                _absorb(grid, texts, spans, gap, straddled)
+                continue
+            if not texts.get(below) or spans[below][1] != 1 or below[0] + spans[below][0] != n_hdr:
+                continue  # 正下方不是一直到表头末行的单个列名
+            left = grid.get((r, c - 1)) if c else None
+            right = grid.get((r, c + 1)) if c + 1 < ncols else None
+            # 左邻须与空白格同一个上级（上市 九、1:2 第 1 行：左邻「以摊余成本计量」属「期末余额」，空白格属「上年年末余额」）
+            same_parent = r == 0 or (left is not None and grid.get((r - 1, left[1])) == grid.get((r - 1, c)))
+            if same_parent and is_group(left, r) and not is_group(right, r):
+                _absorb(grid, texts, spans, gap, left)
+                continue
+            texts[gap], spans[gap] = texts.pop(below), (n_hdr - r, 1)
+            spans.pop(below, None)
+            for rr in range(r, n_hdr):
+                grid[(rr, c)] = gap
+    return grid, texts, spans
+
+
+def seed_multi_header(tbl_el: Any, cols: Sequence[int] | None = None) -> tuple[int, list[list[str]]]:
+    """Word 表头 → 合并附注种子格式的多级表头：(表头行数, 每行每列文字)。按网格列（``cols`` 可指定种子各列对应的网格列）；
+    单元格起点写字（去换行、去首尾空白）、合并延续格为空串。
+
+    种子格式里空串 = 合并延续、表达不了留白：表头里没合并的空白格先按 ``_normalize_header_gaps`` 归一。
+    """
+    nrows, ncols, grid, texts, spans = _table_grid(tbl_el)
+    n_hdr = min(_header_row_count(nrows, ncols, grid, texts, spans), nrows) if nrows else 0
+    grid, texts, spans = _normalize_header_gaps(ncols, n_hdr, grid, texts, spans)
+    cols = list(range(ncols)) if cols is None else list(cols)
+    clean = lambda o: (texts.get(o) or "").replace("\n", "").strip()  # noqa: E731
+    return n_hdr, [[clean((r, c)) if grid.get((r, c)) == (r, c) else "" for c in cols] for r in range(n_hdr)]
+
+
 def parse_word_table(tbl_el: Any, caption: str) -> WordTable:
     nrows, ncols, grid, texts, spans = _table_grid(tbl_el)
     n_hdr = min(_header_row_count(nrows, ncols, grid, texts, spans), nrows) if nrows else 0
+    grid, texts, spans = _normalize_header_gaps(ncols, n_hdr, grid, texts, spans)
     columns = _logical_columns(ncols, n_hdr, grid) if n_hdr else list(range(ncols))
     leaf: list[str] = []
     groups: list[str | None] = []

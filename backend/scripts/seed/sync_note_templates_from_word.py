@@ -28,8 +28,9 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
 DOCX_DIR = DATA_DIR / "audit_report_templates" / "disclosure_notes"
 
-# 导入 multi_header_to_column_groups
+# 导入 multi_header_to_column_groups；表头行数判定用平台的 app.services.note_word_table
 sys.path.insert(0, str(ROOT / "scripts" / "seed"))
+sys.path.insert(0, str(ROOT))
 from seed_consol_note_sections import multi_header_to_column_groups
 
 
@@ -88,49 +89,18 @@ def get_merge_grid(table) -> tuple[dict, int, int]:
     return grid, num_cols, num_rows
 
 
-def detect_header_row_count(grid: dict, num_rows: int, num_cols: int) -> int:
-    """检测多级表头行数。"""
-    max_covered = 0
-    for r in range(min(num_rows, 5)):
-        for c in range(num_cols):
-            cell = grid.get((r, c))
-            if cell and not cell.get("is_merged") and (cell.get("colspan", 1) > 1 or cell.get("rowspan", 1) > 1):
-                max_covered = max(max_covered, r + cell.get("rowspan", 1) - 1)
-    if max_covered == 0:
-        return 1
-    header_rows = max_covered + 1
-    # 排除数据行被误归为表头
-    for r in range(1, header_rows):
-        col0 = grid.get((r, 0))
-        if col0 and not col0.get("is_merged") and col0.get("text"):
-            row_has_merge = any(
-                grid.get((r, c), {}).get("colspan", 1) > 1 or grid.get((r, c), {}).get("rowspan", 1) > 1
-                for c in range(num_cols)
-                if grid.get((r, c)) and not grid.get((r, c), {}).get("is_merged")
-            )
-            if not row_has_merge:
-                is_covered = any(grid.get((r, c), {}).get("is_merged") for c in range(num_cols))
-                if not is_covered:
-                    header_rows = r
-                    break
-    return min(max(header_rows, 1), 4)
+def word_header(table) -> tuple[int, list[list[str]] | None]:
+    """表头行数与多级表头（None = 单行表头）：与平台同一套（``note_word_table.seed_multi_header``，标题行库 /
+    上年附注导入 / Word 目录核对共用）。
 
+    原先这里另有一套只看纵向合并的判定：两级表头「账龄」列下格留白判成一行，数据行里两格一并的空白取数格、
+    通栏分类行又被算进表头（合并种子 12 张表数据行升进表头）；Word 表头里没合并的空白格也照搬，
+    种子格式把它读成「并进左边」（R6.3）。
+    """
+    from app.services.note_word_table import seed_multi_header
 
-def build_multi_header(grid: dict, n_hdr: int, num_cols: int) -> list[list[str]] | None:
-    """构造标准化 multi_header（去换行/strip）。None 如果只有 1 行。"""
-    if n_hdr < 2:
-        return None
-    mh: list[list[str]] = []
-    for r in range(n_hdr):
-        row = []
-        for c in range(num_cols):
-            cell = grid.get((r, c))
-            if cell is None or cell.get("is_merged"):
-                row.append("")
-            else:
-                row.append(cell["text"].replace("\n", "").strip())
-        mh.append(row)
-    return mh
+    n_hdr, mh = seed_multi_header(table._tbl)
+    return (n_hdr, mh) if n_hdr >= 2 else (max(n_hdr, 1), None)
 
 
 def extract_word_data_rows(grid: dict, n_hdr: int, num_rows: int, num_cols: int) -> list[list[str]]:
@@ -194,8 +164,8 @@ def extract_all_word_tables(docx_path: Path) -> list[dict]:
                 for r in range(min(4, nr)) for c in range(nc)
                 if grid.get((r, c)) and not grid.get((r, c), {}).get("is_merged")
             )
-            n_hdr = detect_header_row_count(grid, nr, nc) if has_merge else 1
-            mh = build_multi_header(grid, n_hdr, nc)
+            n_hdr, mh = word_header(table) if has_merge else (1, None)
+            assert mh is None or len(mh[0]) == nc, f"Word 表 #{table_idx} 网格列数 {nc} 与表头列数 {len(mh[0])} 不同"
             # 最后一行表头作为 leaf headers
             leaf_headers = []
             last_hdr_row = n_hdr - 1
@@ -214,6 +184,9 @@ def extract_all_word_tables(docx_path: Path) -> list[dict]:
                         leaf_headers.append(cell["text"].replace("\n", "").strip())
                     else:
                         leaf_headers.append("")
+            elif mh and leaf_headers:
+                # 标签列表头多为纵向合并（末行是延续格）：取它的文字，phase5 的「首列表头一致」校验才不会因空串被跳过
+                leaf_headers[0] = next((row[0] for row in mh if row[0]), leaf_headers[0])
 
             data_rows = extract_word_data_rows(grid, n_hdr, nr, nc)
 

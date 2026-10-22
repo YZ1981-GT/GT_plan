@@ -28,7 +28,7 @@ from app.services.consol_node_scope import (
     resolve_requested_node_key,
     save_scoped_note_record,
 )
-from app.services.note_table_header_library import column_keys, column_role, column_roles, rollforward_columns
+from app.services.note_table_header_library import column_keys, column_role, rollforward_columns
 
 router = APIRouter(prefix="/api/consol-note-sections", tags=["consol-note-sections"])
 
@@ -899,7 +899,8 @@ async def aggregate_data(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
-    """汇总指定单位的数据到目标单元格
+    """汇总指定单位的数据到目标单元格：只取各下级已保存的合并附注（个别数由「📋 明细映射」/「🔄 重新汇总」
+    从单体附注拉来），不用试算表兜底；没有附注数据的下级不计入，列在 ``missing_children`` 里提示用户。
 
     mode=direct: 汇总当前节点的直接下级企业（从企业树获取）
     mode=custom: 汇总用户选择的企业列表
@@ -912,7 +913,7 @@ async def aggregate_data(
     mode = body.get("mode", "direct")
     company_codes = body.get("company_codes", [])
     resolved_node_key = _requested_node_key(node_key, body)
-    template_type = await _resolve_requested_template(db, project_id, body)
+    await _resolve_requested_template(db, project_id, body)   # 只校验请求里的准则 / 模板参数
     scope = await _resolve_note_scope(db, project_id, year, resolved_node_key, section_id)
 
     # 获取目标子节点列表
@@ -936,58 +937,48 @@ async def aggregate_data(
                         break
 
     if not child_scopes:
-        return {"value": None, "count": 0, "message": "无下级企业"}
+        return {"value": None, "count": 0, "message": "无下级企业", "missing_children": [], "empty_count": 0}
 
-    # 从各子节点的已保存数据中提取同位置的值并汇总
+    # 从各子节点已保存的合并附注中取同位置的值求和
     total = 0.0
     count = 0
+    empty_count = 0
     child_errors: list[dict] = []
+    missing_children: list[dict] = []
     for child_scope in child_scopes:
+        node = child_scope.node
+        name = (getattr(node, "display_name", None) or getattr(node, "company_name", None)
+                or child_scope.node_key or "")
         try:
             record = await _load_note_record(db, child_scope)
-            if record is not None:
-                data = record.data if isinstance(record.data, dict) else {}
-                rows = data.get("rows", [])
-                if row_idx < len(rows) and col_idx < len(rows[row_idx]):
-                    val = rows[row_idx][col_idx]
-                    try:
-                        num = float(str(val).replace(",", "").replace("，", ""))
-                        total += num
-                        count += 1
-                    except (ValueError, TypeError):
-                        pass
         except Exception as e:
-            child_errors.append({"node_key": child_scope.node_key, "error": str(e)})
+            child_errors.append({"node_key": child_scope.node_key, "name": name, "error": str(e)})
+            continue
+        if record is None:
+            missing_children.append({"node_key": child_scope.node_key, "name": name, "reason": "没有附注数据"})
+            continue
+        data = record.data if isinstance(record.data, dict) else {}
+        rows = data.get("rows", [])
+        val = rows[row_idx][col_idx] if row_idx < len(rows) and col_idx < len(rows[row_idx]) else None
+        try:
+            num = float(str(val).replace(",", "").replace("，", ""))
+        except (ValueError, TypeError):
+            empty_count += 1   # 有附注、这一格没有数
+            continue
+        total += num
+        count += 1
 
-    # 如果没有从附注数据中找到，尝试从试算表提取
-    if count == 0:
-        sections = _load_sections(template_type)
-        template = next((sec for sec in sections if sec["section_id"] == section_id), None)
-
-        if template:
-            item_name = ""
-            if template.get("rows") and row_idx < len(template["rows"]):
-                item_name = template["rows"][row_idx][0] if template["rows"][row_idx] else ""
-
-            roles = column_roles(template)
-            role = roles[col_idx] if col_idx < len(roles) else None
-            if item_name and role in ("closing", "opening"):
-                for child_scope in child_scopes:
-                    try:
-                        child_tb = await _load_tb_map(db, child_scope)
-                        entry = child_tb.get(item_name.strip())
-                        if entry:
-                            val = _tb_expected(role, entry) or 0.0
-                            if val:
-                                total += val
-                                count += 1
-                    except Exception as e:
-                        child_errors.append({"node_key": child_scope.node_key, "error": f"试算表加载失败: {e}"})
-
+    parts = [f"已汇总 {count} 家企业"]
+    if empty_count:
+        parts.append(f"{empty_count} 家下级这一格没有数")
+    if missing_children:
+        parts.append(f"{len(missing_children)} 家下级没有附注数据，未计入")
     response: dict = {
         "value": round(total, 2) if count > 0 else None,
         "count": count,
-        "message": f"已汇总 {count} 家企业",
+        "message": "；".join(parts),
+        "missing_children": missing_children,
+        "empty_count": empty_count,
     }
     if child_errors:
         response["child_errors"] = child_errors

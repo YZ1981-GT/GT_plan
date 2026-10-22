@@ -103,9 +103,14 @@
 - [x] 26. 残留扫描（全仓 grep 已删符号 / 端点 / 配置）+ 相关后端套件 + lazy import / 鉴权守卫；单独提交
   - 残留只剩：报表穿透（保留）、迁移 V039 注释（不可改）、冻结的影响清单基线、断言「已下线」的测试与说明
   - 干净 worktree（HEAD `1d8600593` + 本批 64 个文件）：后端 52 个测试文件 1049 passed，89 failed + 8 error 全部在 HEAD 同样失败（附注编辑门端点 / 鉴权清册 `--check` / `_assert_project_edit` 不存在 / lazy import 2 / 种子计数 2 / 推送往返），HEAD 多红的 1 例被本批修好
-- [ ] 27. 「核销」= 减少：词表 + 库测试 + 库目录重生成（R6.4）
-- [ ] 28. `/aggregate` 只从下级附注取数：删试算表兜底，响应 `missing_children`，前端提示；测试改为断言不取试算表（R6.5）
-- [ ] 29. 种子多级表头修复：一次性脚本按 Word 替换 / 退回数据行；删 `_fix_missing_multi_header.py`；守卫测试（期望来自 Word）；Word 同步 `--check` 前后对比、库目录与映射重生成并逐条审（R6.3）
+- [x] 27. 「核销」= 减少：词表 + 库测试 + 库目录重生成（R6.4）
+  - 词表 `movement_words.decrease` 加「核销」；`test_write_off_is_a_decrease`（期末 = 期初 + 计提 − 转回 − 核销）与最长词用例；库目录随 29 重生成（`--check` 一致）
+- [x] 28. `/aggregate` 只从下级附注取数：删试算表兜底，响应 `missing_children`，前端提示；测试改为断言不取试算表（R6.5）
+  - 后端用例断言 `tb_loader.assert_not_called()`、`missing_children` 点名；前端 `cellAggregateSummary` 四态（成功 / 只是这一格为空 / 有下级没附注 / 汇总失败）+ 接线守卫；合并组件目录 vitest 25 个文件 300 passed，6 例失败与 HEAD 相同（`ConsolTrialBalanceTab` / `ConsolReportBreakdownView` 请求参数多了 `signal`）；ESLint 0 error（本批新增 0 warning）；单区域 vue-tsc 0 error，ts / vue 探针各报 TS2322
+- [x] 29. 种子多级表头修复：一次性脚本按 Word 替换 / 退回数据行；删 `_fix_missing_multi_header.py`；守卫测试（期望来自 Word）；Word 同步 `--check` 前后对比、库目录与映射重生成并逐条审（R6.3）
+  - 表头行数判定 / 表头空白格归一改在平台 `note_word_table` 一处，Word 同步工具改调它；17 张换表头、12 张退回数据行、1 张人工定（上市 六-1-2）、全部多级表头表平表头改全路径（国企 92 / 上市 118）；国企 五-11-2 不修（同步工具按标记推章节号错一节，另立 spec）、13 张列宽不符待人工核对（design §15.3）
+  - 守卫 `test_consol_note_seed_header_repair.py` 80 例（测试时解析 Word；1 例单体版无同标记表跳过）；标题行库 / 目录测试 + 守卫共 209 passed；变异 15 条全红（基线全绿）
+  - 66 个相关测试文件：基线树 151 失败、本批 152 失败，多出的 1 例（推送整体状态）单跑 / 同序前缀 / 整文件重跑均过；Word 同步 dry-run 合并模板 Phase 1 只剩国企 五-11-2；修复脚本在基线种子上重放，产物与落盘种子换行归一后逐字节相同，之后删除（design §15.8）
 - [ ] 30. `value_column` 改调标题行库（净额 → 账面价值、毛额 → 账面余额 / 公允价值、纯期间优先、分不出写原因）；两版种子新旧逐格对比归类；真库种子与已填数据影响核对；测试 + 变异（R6.7）
 - [ ] 31. 上年导入解析：`note_word_table` 数据行取值；按块（含内容控件）切节、表名；单元测试（分组 / 续表 / 内容控件 / 上年年末）（R6.6）
 - [ ] 32. 上年导入规划 / 写入服务（标题行库对列、按表名 + 结构选表、行名 + 同名序号对行、状态与原因）；预览 / 写入端点（sha256 校验）；原端点只写自动认出的；测试（R6.6）

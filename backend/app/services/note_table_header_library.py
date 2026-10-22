@@ -101,6 +101,7 @@ class Vocabulary:
     digest: str
     movements: tuple[tuple[str, str], ...] = ()  # (词, increase / decrease / movement)，按词表顺序
     balance_measures: frozenset[tuple[str, ...]] = frozenset()  # 余额列允许的计量（空计量 = 纯期间，恒算）
+    net_measures: frozenset[tuple[str, ...]] = frozenset()  # 净额列计量（账面价值）
 
 
 def _require_reason(entry: dict, kind: str) -> None:
@@ -154,10 +155,14 @@ def _build_vocabulary(raw: dict) -> Vocabulary:
             (norm(word), kind)
             for kind in _MOVEMENT_KINDS for word in (raw.get("movement_words") or {}).get(kind) or []
         ),
-        balance_measures=frozenset(
-            tuple(x for x in (norm(p) for p in str(m).split("/")) if x) for m in raw.get("balance_measures") or []
-        ),
+        balance_measures=_measure_set(raw.get("balance_measures")),
+        net_measures=_measure_set(raw.get("net_measures")),
     )
+
+
+def _measure_set(items: Any) -> frozenset[tuple[str, ...]]:
+    """词表计量清单（「a/b」= 两级计量）→ 规范化后的计量元组集合（与 ``ColumnKey.measure`` 同形）。"""
+    return frozenset(tuple(x for x in (norm(p) for p in str(m).split("/")) if x) for m in items or [])
 
 
 @lru_cache(maxsize=1)
@@ -528,7 +533,7 @@ def rollforward_columns(
     """变动表勾稽列；没有期初 / 期末一对、或两者之间没有增加 / 减少列时返回 None（不是变动表）。
 
     变动列只认期初、期末两列之间的列（变动表版式「期初 | 本期变动… | 期末」）：两侧之外的「投资成本」「本期计提减值准备」
-    「减值准备期末余额」是说明列。之间的金额列方向不定（核销 / 其他 / 现金流量净额，或种子多级表头错位挂到期末下的列）→ ``unknown``。
+    「减值准备期末余额」是说明列。之间的金额列方向不定（其他 / 现金流量净额 / 现金流入流出 / 计提减值准备）→ ``unknown``。
     """
     vocab = vocab or load_vocabulary()
     keys = column_keys(table, identity=identity, vocab=vocab)

@@ -1,8 +1,8 @@
 """合并附注审核 / 下级汇总的认列（spec consol-note-header-library-and-node-reaggregate R5）。
 
 表头识别统一走标题行库（``note_table_header_library``）：逐列角色按模板展示用的多级表头认，变动表勾稽列由
-``rollforward_columns`` 给出。这里测路由侧选表（模板 vs 本次平表头）与三处真实调用：全部审核、单表审核、
-下级汇总的试算表兜底。附注数据落真实行，试算表金额（合并计算上下文）打桩。
+``rollforward_columns`` 给出。这里测路由侧选表（模板 vs 本次平表头）与真实调用：全部审核、单表审核；
+另测单元格「Σ 汇总」只取下级合并附注、不用试算表兜底（R6.5）。附注数据落真实行，试算表金额（合并计算上下文）打桩。
 """
 from __future__ import annotations
 
@@ -191,29 +191,44 @@ class TestAuditSingle:
         assert _brief(results, "试算表校验") == [("试算表校验 - 工程物资/期初余额/账面余额", "80.00", "70.00")]
 
 
-class TestAggregateTbFallback:
-    @pytest.mark.asyncio
-    async def test_only_balance_columns_fall_back_to_child_tb(self, env):
-        """下级没有附注数据时按试算表兜底：只有期末 / 期初余额列取，减值准备列不取（平表头会把它认成期初）。"""
-        _, project, app = env
+class TestAggregateNotesOnly:
+    """单元格「Σ 汇总」只取各下级已保存的合并附注（个别数来自单体附注），不用试算表兜底（R6.5）。"""
+
+    async def _run(self, env, saved: dict[str, list], col_idx: int = 1) -> tuple[dict, AsyncMock]:
+        factory, project, app = env
         children = [
-            TreeNode(None, code, f"子{code}", "P", "P", 1, node_key=f"{code}:parent", role="parent") for code in ("A", "B")
+            TreeNode(None, code, f"子{code}", "P", "P", 1, node_key=f"{code}:parent", role="parent")
+            for code in ("A", "B", "C")
         ]
         root = TreeNode(None, "P", "母公司", None, None, 0, children=children, node_key="P:consol", role="consol")
         scope = NodeScope(project.id, Y, "五-24-1", "P:consol", root, root)
-        child_tb = {
-            "A:parent": {"在建工程": {"audited": 100.0, "opening": 80.0}},
-            "B:parent": {"在建工程": {"audited": 50.0, "opening": 20.0}},
-        }
-        tb_loader = AsyncMock(side_effect=lambda db, s: child_tb[s.node_key])
-        url = f"{BASE}/aggregate/{project.id}/{Y}?node_key=P:consol"
-        body = {"standard": "soe", "section_id": "五-24-1", "row_idx": 0, "mode": "direct"}
+        headers = _section("五-24-1")["headers"]
+        async with factory() as db:
+            for node_key, rows in saved.items():
+                db.add(ConsolNoteData(project_id=project.id, year=Y, section_id="五-24-1", node_key=node_key,
+                                      data={"headers": headers, "rows": rows}))
+            await db.commit()
+        # 试算表一定有数：结果里出现试算表的数就是兜底没删干净
+        tb_loader = AsyncMock(return_value={"在建工程": {"audited": 999.0, "opening": 888.0}})
+        body = {"standard": "soe", "section_id": "五-24-1", "row_idx": 0, "col_idx": col_idx, "mode": "direct"}
         with patch.object(R, "_resolve_note_scope", AsyncMock(return_value=scope)), patch.object(R, "_load_tb_map", tb_loader):
-            closing = await _post(app, url, {**body, "col_idx": 1})
-            opening = await _post(app, url, {**body, "col_idx": 4})
-            tb_loader.reset_mock()
-            impairment = await _post(app, url, {**body, "col_idx": 2})
-        assert (closing["value"], closing["count"]) == (150.0, 2)
-        assert (opening["value"], opening["count"]) == (100.0, 2)
-        assert (impairment["value"], impairment["count"]) == (None, 0)
+            result = await _post(app, f"{BASE}/aggregate/{project.id}/{Y}?node_key=P:consol", body)
+        return result, tb_loader
+
+    @pytest.mark.asyncio
+    async def test_sums_child_notes_and_lists_children_without_notes(self, env):
+        result, tb_loader = await self._run(env, {
+            "A:parent": [["在建工程", "100", "5", "95", "80", "4", "76"]],
+            "B:parent": [["在建工程", "", "", "", "", "", ""]],
+        })
+        assert (result["value"], result["count"], result["empty_count"]) == (100.0, 1, 1)
+        assert [(m["node_key"], m["reason"]) for m in result["missing_children"]] == [("C:parent", "没有附注数据")]
+        assert "1 家下级没有附注数据，未计入" in result["message"]
+        tb_loader.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_child_notes_means_no_value_not_trial_balance(self, env):
+        result, tb_loader = await self._run(env, {}, col_idx=4)
+        assert (result["value"], result["count"]) == (None, 0)
+        assert [m["node_key"] for m in result["missing_children"]] == ["A:parent", "B:parent", "C:parent"]
         tb_loader.assert_not_called()

@@ -213,6 +213,49 @@ export function reaggregateSummary(
   return { ok: !notWritten && !pending.length && !failures.length, text: `重新汇总完成：${parts.join('；')}` }
 }
 
+// ─── 单元格「Σ 汇总」结果 ──────────────────────────────────────────────────────
+
+/** `/consol-note-sections/aggregate` 响应：只取下级已保存的合并附注，没有附注的下级列在 missing_children */
+export interface CellAggregateResult {
+  value?: number | null
+  count?: number
+  empty_count?: number
+  missing_children?: Array<{ node_key: string; name?: string; reason?: string }>
+  child_errors?: Array<{ node_key: string; name?: string; error: string }>
+  /** 请求按 validateStatus < 600 放行：出错时是错误信封 */
+  detail?: unknown
+}
+
+export interface CellAggregateSummary {
+  level: 'success' | 'warning' | 'info'
+  text: string
+}
+
+/** 完成提示：下级没有附注数据的不计入并点名（spec consol-note-header-library-and-node-reaggregate R6.5） */
+export function cellAggregateSummary(
+  res: CellAggregateResult | null | undefined, fmt: (v: number) => string,
+): CellAggregateSummary {
+  if (res?.detail != null && res.count === undefined) {
+    const detail = typeof res.detail === 'string' ? res.detail : JSON.stringify(res.detail)
+    return { level: 'warning', text: `汇总失败：${detail}` }
+  }
+  const missing = res?.missing_children || []
+  const names = missing.slice(0, 5).map((m) => m.name || m.node_key).join('、') + (missing.length > 5 ? ' 等' : '')
+  const missingText = missing.length
+    ? `${missing.length} 家下级没有附注数据，未计入（${names}；请先对其执行「📋 明细映射」或「🔄 重新汇总」）`
+    : ''
+  const errors = res?.child_errors || []
+  const errorText = errors.length ? `${errors.length} 家下级读取出错：${errors[0].error}` : ''
+  const tail = [missingText, errorText].filter(Boolean)
+  if (res?.value != null) {
+    const head = `已汇总 ${res.count || 0} 家下级，合计：${fmt(res.value)}`
+    const empty = res.empty_count ? `${res.empty_count} 家下级这一格没有数` : ''
+    return { level: tail.length ? 'warning' : 'success', text: [head, empty, ...tail].filter(Boolean).join('；') }
+  }
+  if (tail.length) return { level: 'warning', text: `没有可汇总的数：${tail.join('；')}` }
+  return { level: 'info', text: '下级这一格都没有数，没有可汇总的数据' }
+}
+
 // ─── 查看差额 ─────────────────────────────────────────────────────────────────
 
 export interface NoteBreakdownRow extends ConsolNoteBreakdownCell {
