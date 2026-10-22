@@ -858,11 +858,16 @@ const textAfterExpanded = ref(false)
 const noteAggregateSource = computed(() => {
   const data = selectedNoteSection.value?.savedData
   if (!data || typeof data !== 'object') return ''
-  const source = data._aggregate_source
-  if (source === 'standalone') {
+  // 优先用 _last_write_source（最后一次写入来源），回退到 _aggregate_source
+  const lastWrite = data._last_write_source
+  const aggSource = data._aggregate_source
+  if (lastWrite === 'standalone_aggregate' || aggSource === 'standalone') {
     const leafCount = data._aggregate_leaf_count || 0
     const cellCount = data._aggregate_cell_count || 0
     return `📊 单体汇总（${leafCount} 个子企业 · ${cellCount} 格）`
+  }
+  if (lastWrite === 'formula') {
+    return '🧮 公式计算（含调整/抵销）'
   }
   return ''
 })

@@ -59,6 +59,13 @@
         </template>
 
         <template v-else>
+          <el-alert type="info" :closable="false" show-icon class="gt-cfmp-source-note">
+            <template #title>
+              合并附注有两条取数路径：<b>🧮 公式计算</b>（本页维护，含调整/抵销的完整合并数，「按公式填入」触发）
+              · <b>📊 单体汇总</b>（从各子企业单体附注拉取个别数，「重新汇总」触发）。
+              两者写入同一章节，以最后执行的为准。
+            </template>
+          </el-alert>
           <div class="gt-cfmp-toolbar">
             <div class="gt-cfmp-note-select">
               <span>章节</span>
@@ -451,6 +458,7 @@ defineExpose({ load, panelTab })
 <style scoped>
 .gt-cfmp { min-height: 360px; }
 .gt-cfmp-alert { margin-bottom: 8px; }
+.gt-cfmp-source-note { margin-bottom: 8px; }
 .gt-cfmp-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .gt-cfmp-toolbar > span { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); }
 .gt-cfmp-note-select, .gt-cfmp-actions { display: flex; align-items: center; gap: 8px; }
