@@ -30,7 +30,7 @@
           <template #left>
             <div class="gt-de-actions-row">
               <!-- 数据操作 -->
-              <el-button-group v-if="!isEqcrRole" size="small">
+              <el-button-group v-if="noteEdit.showNonEqcrEntries" size="small">
                 <el-tooltip content="从底稿同步最新数据到当前附注章节" placement="bottom" :show-after="400">
                   <el-button @click="onRefreshFromWP" :loading="refreshLoading">🔄 刷新</el-button>
                 </el-tooltip>
@@ -47,7 +47,7 @@
               <!-- 编辑 -->
               <el-button-group size="small">
                 <el-tooltip content="新增自定义附注章节" placement="bottom" :show-after="400">
-                  <el-button v-if="!isEqcrRole" data-test="de-add-section" @click="openAddSectionDialog">➕ 新增</el-button>
+                  <el-button v-if="noteEdit.showNonEqcrEntries" data-test="de-add-section" @click="openAddSectionDialog">➕ 新增</el-button>
                 </el-tooltip>
                 <el-tooltip content="编辑表格结构" placement="bottom" :show-after="400">
                   <el-button @click="openStructureEditor">📐 表样</el-button>
@@ -73,7 +73,7 @@
                 <el-button size="small" :loading="batchAiFillLoading">🤖 AI 助手 ▾</el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item v-if="!isEqcrRole" :disabled="batchAiFillLoading" @click="openBatchAiFill" title="对空/草稿章节一键 AI 预填充（逐章确认采纳，不自动写库）">📚 批量预填充（空/草稿章节）</el-dropdown-item>
+                    <el-dropdown-item v-if="noteEdit.showNonEqcrEntries" :disabled="batchAiFillLoading" @click="openBatchAiFill" title="对空/草稿章节一键 AI 预填充（逐章确认采纳，不自动写库）">📚 批量预填充（空/草稿章节）</el-dropdown-item>
                     <el-dropdown-item @click="showDocAiChat = true" title="与 AI 对话">💬 AI 对话</el-dropdown-item>
                     <el-dropdown-item @click="showAiPanel = true" title="AI 智能建议">🧠 AI 智能建议</el-dropdown-item>
                   </el-dropdown-menu>
@@ -141,7 +141,7 @@
                   📋 就绪度<span v-if="readinessAlertCount" class="gt-de-readiness-badge">{{ readinessAlertCount }}</span>
                 </el-button>
               </el-tooltip>
-              <el-button v-if="isEqcrRole" size="small" type="info">📋 只读副本</el-button>
+              <el-button v-if="noteEdit.showReadonlyBadge" size="small" type="info">📋 只读副本</el-button>
               <!-- 使用手册：各功能键用途 / 数据提取来源 / 操作流程 -->
               <el-tooltip content="附注模块使用手册：各功能键用途、数据提取来源、标准操作流程" placement="bottom" :show-after="400">
                 <el-button size="small" @click="showNoteHandbook = true">📖 使用手册</el-button>
@@ -263,7 +263,7 @@
             :indent="10"
             highlight-current
             node-key="id"
-            :draggable="!isEqcrRole"
+            :draggable="noteEdit.canWrite"
             :allow-drop="allowTreeDrop"
             @node-click="onNodeClick"
             @node-contextmenu="onTreeNodeContextMenu"
@@ -464,10 +464,10 @@
                 {{ currentNote.status === 'confirmed' ? '已确认' : '草稿' }}
               </el-tag>
               <!-- 编辑操作按钮（置于标题行，随时可见，无需滚动到底部） -->
-              <el-button v-if="!editMode" size="small" @click="enterNoteEdit()" :disabled="!effectiveCanEdit" :title="!effectiveCanEdit ? '无法编辑（项目已归档或他人正在编辑）' : ''">编辑</el-button>
+              <el-button v-if="!editMode" size="small" @click="enterNoteEdit()" :disabled="!noteEdit.canWriteLocked" :title="!noteEdit.canWriteLocked ? '无法编辑（项目已归档或他人正在编辑）' : ''">编辑</el-button>
               <el-button v-if="editMode" size="small" @click="exitNoteEdit(true)">取消</el-button>
               <!-- 保存按钮始终可见：富文本编辑后无需先进编辑模式即可保存 -->
-              <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!effectiveCanEdit" :title="!effectiveCanEdit ? '无法编辑（项目已归档或他人正在编辑）' : ''">💾 保存</el-button>
+              <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!noteEdit.canWriteLocked" :title="!noteEdit.canWriteLocked ? '无法编辑（项目已归档或他人正在编辑）' : ''">💾 保存</el-button>
             </div>
           </div>
 
@@ -708,12 +708,12 @@
 
             <div class="gt-de-editor-footer" v-if="editMode">
               <div class="gt-de-footer-secondary">
-                <el-button size="small" plain @click="onClearAllFormulas" :disabled="!effectiveCanEdit" :title="!effectiveCanEdit ? '无法编辑' : '清除所有单元格公式'">一键清除公式</el-button>
-                <el-button size="small" plain @click="onRestoreAutoMode" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : '恢复为自动提数模式'">恢复自动提数</el-button>
+                <el-button size="small" plain @click="onClearAllFormulas" :disabled="!noteEdit.canWriteLocked" :title="!noteEdit.canWriteLocked ? '无法编辑' : '清除所有单元格公式'">一键清除公式</el-button>
+                <el-button size="small" plain @click="onRestoreAutoMode" :disabled="!noteEdit.canWrite" :title="!noteEdit.canWrite ? '项目已归档，无法编辑' : '恢复为自动提数模式'">恢复自动提数</el-button>
               </div>
               <div class="gt-de-footer-primary">
                 <el-button size="small" @click="exitNoteEdit(true)">取消</el-button>
-                <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!effectiveCanEdit" :title="!effectiveCanEdit ? '无法编辑' : ''">保存</el-button>
+                <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!noteEdit.canWriteLocked" :title="!noteEdit.canWriteLocked ? '无法编辑' : ''">保存</el-button>
               </div>
             </div>
 
@@ -948,7 +948,7 @@
       v-model="showNoteMappingDialog"
       :project-id="projectId"
       :loading="noteMappingLoading"
-      :can-edit="canEdit"
+      :can-edit="noteEdit.canWrite"
       :rules="noteMappingRules"
       :target-sections="targetSections"
       :template-type="templateType"
@@ -968,7 +968,7 @@
     />
 
     <!-- 附注正文批量写入：上传/知识库/内容模板（同一时刻只挂一个弹窗） -->
-    <DisclosureNoteContentTools ref="noteContentTools" :project-id="projectId" :year="year" :can-write="!isEqcrRole && effectiveCanEdit" :has-unsaved-changes="editDirty || autoSave.isDirty.value" @applied="onNoteTextBatchApplied" />
+    <DisclosureNoteContentTools ref="noteContentTools" :project-id="projectId" :year="year" :can-write="noteEdit.canWriteLocked" :has-unsaved-changes="editDirty || autoSave.isDirty.value" @applied="onNoteTextBatchApplied" />
     <!-- D15 离线导出弹窗 -->
     <NoteOfflineExportDialog
       v-model="showOfflineExport"
@@ -1315,14 +1315,7 @@ import { refreshDisclosureFromWorkpapers, getProjectWizardState } from '@/servic
 import { useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import { useAuthStore } from '@/stores/auth'
-import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
-
-// EQCR 只读访问 (Requirements: 17.1-17.4)
 const authStore = useAuthStore()
-const isEqcrRole = computed(() => authStore.user?.role === 'eqcr')
-// ─── P0-6.5: PermissionMatrix facade ────────────────────────────────────────
-const { can: canOp, whyCannot } = usePermissionMatrix()
-// DEPRECATED: 旧 isEqcrRole 判断仍保留，后续替换为 !canOp('note:edit')
 import Placeholder from '@tiptap/extension-placeholder'
 import {
   generateDisclosureNotes, getDisclosureNoteDetail,
@@ -1361,6 +1354,8 @@ import { useNoteTree, type TreeNode } from '@/views/composables/useNoteTree'
 import { useNoteDetail } from '@/views/composables/useNoteDetail'
 import { createNoteDetailPrefetch } from '@/views/composables/noteDetailPrefetch'
 import { useNotePersist } from '@/views/composables/useNotePersist'
+import { useNoteEditPermission, createNoteEditRequestGuard, isNoteEditGuardError, noteEditShouldRetry } from '@/views/composables/noteEdit'
+import { WRITE_ENTRIES } from '@/views/composables/noteEdit/noteEditWriteEntries'
 import { useNoteRefresh } from '@/views/composables/useNoteRefresh'
 import { resolveNoteDisclosureJumpTarget } from '@/views/composables/noteDisclosureJump'
 import { projectSubTablesClient, deriveLegacyTableHeaders } from '@/components/workpaper/composables/disclosureColumnDefs'
@@ -1394,7 +1389,7 @@ import ConflictResolutionPanel from '@/components/conflict/ConflictResolutionPan
 const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
-const { canEdit, onContextChange } = useAuditContext()
+const { onContextChange } = useAuditContext()
 
 // 四栏模式感知：隐藏内置树面板避免与四栏目录重复
 const isFourColumnMode = inject<import('vue').Ref<boolean>>('isFourColumnMode', ref(false))
@@ -1410,7 +1405,6 @@ const conflictPanelVisible = ref(false)
 function onConflictResolved(_id: string, _resolution: string) {
   // 调解后 banner 自动从列表移除；此处保留 hook 供后续扩展（如局部 reload）
 }
-
 // ─── AI 宿主上下文（dsh-agent-panel-integration Req 3.2/3.5） ─────────────────
 // 附注宿主的稳定标识：优先 instance ID，其次稳定 section key（section_id / note_section）。
 // 旧实现 `currentNote?.id || currentNote?.note_section || ''` 让服务端无法判断收到的是哪种
@@ -1461,7 +1455,6 @@ const year = computed(() => {
   const qy = Number(route.query.year)
   return (Number.isFinite(qy) && qy > 2000) ? qy : projectStore.year
 })
-
 // ─── 云协同：账套激活/回滚后自动刷新 ─────────────────────────────────────────
 const { onDatasetActivated, onDatasetRolledBack } = useProjectEvents(projectId)
 onDatasetActivated(() => fetchTree())
@@ -1492,8 +1485,13 @@ const editLock = useEditingLock({
   autoAcquire: false,
 })
 
-// 多窗口门禁：编辑锁冲突时覆盖 canEdit，禁用保存/编辑按钮（复盘 P0-3）
-const effectiveCanEdit = computed(() => canEdit.value && !editLock.forcedReadonly.value)
+// 附注编辑权限单一来源 + 请求级守卫 (partner-manager-edit-permission)
+const noteEdit = useNoteEditPermission({
+  projectId,
+  isArchived: computed(() => projectStore.currentProject?.status === 'archived'),
+  forcedReadonly: editLock.forcedReadonly,
+})
+const requestGuard = createNoteEditRequestGuard(noteEdit)
 
 // A.6.2: 章节级协作锁状态
 const sectionLocks = ref<Record<string, { locked_by: string; locked_by_name: string; locked_at: string; section_id: string } | null>>({})
@@ -1507,8 +1505,11 @@ function getSectionLock(sectionId: string | undefined) {
 
 // R7-S2-05：后端定时自动保存（2 分钟间隔）
 const autoSave = useWorkpaperAutoSave(async () => {
+  if (!noteEdit.canWriteLocked.value) return  // 不可写时跳过
   await onSave()
-}, 120_000)
+}, 120_000, undefined, {
+  shouldRetry: noteEditShouldRetry,
+})
 
 // 单位切换 — 使用 projectStore
 const selectedProjectId = ref('')
@@ -1522,8 +1523,9 @@ const selectedYear = ref(new Date().getFullYear() - 1)
 const yearOptions = computed(() => projectStore.yearOptions)
 function onYearChange() {
   projectStore.changeYear(selectedYear.value)
-  fetchTree().then(() => {
-    if (noteList.value.length === 0) onGenerate()
+  fetchTree().then(async () => {
+    await noteEdit.ready()  // 切年度后等判定结论
+    if (noteList.value.length === 0 && noteEdit.canWrite.value) onGenerate()
   })
   currentNote.value = null
 }
@@ -1553,10 +1555,10 @@ const {
   projectId,
   year,
   templateType,
-  isEqcrRole,
+  isEqcrRole: computed(() => !noteEdit.showNonEqcrEntries.value),
+  canWrite: noteEdit.canWrite,
   onTreeLoaded: () => numbering.refreshNumbers(),
 })
-
 // ─── P2-9：附注树快捷筛选 ──────────────────────────────────────────────────────
 const treeFilter = ref<'all' | 'incomplete' | 'has_findings' | 'has_placeholder'>('all')
 const treeFilterOptions = [
@@ -1655,7 +1657,6 @@ const filteredTreeData = computed(() => {
     return filtered.length ? { ...group, children: filtered } : null
   }).filter(Boolean) as any[]
 })
-
 // ─── 侧栏拖拽调整宽度 ─────────────────────────────────────────────────────────
 const sidebarWidth = ref(220)
 const isResizing = ref(false)
@@ -1683,7 +1684,6 @@ function onResizeEnd() {
   document.body.style.cursor = ''
   document.body.style.userSelect = ''
 }
-
 // ─── 右侧校验栏拖拽调整宽度 ───────────────────────────────────────────────────
 const validationWidth = ref(240)
 let _rightResizeStartX = 0
@@ -1796,7 +1796,6 @@ async function exitNoteEdit(force = false): Promise<boolean> {
   }
   return result
 }
-
 // ─── 单元格激活编辑（仅活跃单元格渲染 input，其余保持轻量 span）──────────────────
 const activeCellEdit = ref<{ rowIndex: number; colIndex: number } | null>(null)
 
@@ -2014,7 +2013,6 @@ async function goAdoptSection(section: string) {
   openNoteAiFill('ai')
 }
 // 单位切换（侧边栏）
-
 
 // ─── 多表投影 + 两级分组表头（useNoteTableProjection composable）───────────
 import { useNoteTableProjection } from '@/views/composables/useNoteTableProjection'
@@ -2288,7 +2286,6 @@ function recalcHorizontalFormula(rowIndex: number) {
   values[values.length - 1] = ending
 }
 
-
 function isFormulaMismatch(row: any, colIdx: number): boolean {
   if (!row?.is_total) return false
   const rows = activeTableData.value?.rows
@@ -2316,8 +2313,8 @@ const {
   fetchTree,
   staleRecalc: () => stale.recalc(),
   invalidateAllCache: () => invalidateDetailCache(),  // 全部刷新：清空全部章节缓存
+  canWrite: noteEdit.canWrite,
 })
-
 // ─── 编制进度 + 首次同步引导（useNoteProgressHints composable）─────────────
 import { useNoteProgressHints } from '@/views/composables/useNoteProgressHints'
 const { showSyncHint, dismissSyncHint, noteProgress } =
@@ -2371,7 +2368,6 @@ async function onStructureEditorSaved() {
   if (currentNote.value) await fetchDetailFresh(currentNote.value.note_section)
   ElMessage.success('表样编辑已同步')
 }
-
 // ─── Sprint 3 Task 3.1/3.4: 自定义模板编辑事件处理 ─────────────────────────
 
 function onStructureEditorAddTable(payload: { name: string; headers: string[] }) {
@@ -2390,7 +2386,6 @@ async function onCustomTemplateRestored(payload: { version: number }) {
   ElMessage.success(`自定义模板已回滚至 v${payload.version}，正在刷新章节树…`)
   await fetchTree()
 }
-
 // ─── 章节管理（useNoteSectionManage composable）──────────────────────────────
 import { useNoteSectionManage } from '@/views/composables/useNoteSectionManage'
 const {
@@ -2424,7 +2419,9 @@ async function onClearAllFormulas() {
     )
     ElMessage.success('公式已清除，所有单元格切换为手动编辑模式')
     await fetchDetailFresh(currentNote.value.note_section)
-  } catch {
+  } catch (err: any) {
+    // partner-manager-edit-permission: 门禁拒绝 / 守卫取消不做本地手动模式降级
+    if (isNoteEditGuardError(err)) return
     // 降级：仅修改当前活动表可见行的模式，不假定 legacy 首表结构。
     const rows = activeTableData.value?.rows
     if (!Array.isArray(rows)) return
@@ -2715,7 +2712,6 @@ async function locateTreeNode(section: string) {
     el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
   } catch { /* 定位失败不影响右侧已加载内容 */ }
 }
-
 // ─── 章节详情缓存 + hover 预取 ─────────────────────────────────────────────────
 const _detailCache = new Map<string, any>()
 
@@ -2924,6 +2920,7 @@ watch(justSaved, (saved) => {
 
 /** 快捷键保存：保存当前附注 */
 function onShortcutSave() {
+  if (!noteEdit.canWriteLocked.value) return  // 不可写时跳过
   if (currentNote.value) {
     onSave()
   }
@@ -3028,6 +3025,7 @@ watch(() => currentNote.value?.note_section, (newSection) => {
 })
 
 onMounted(async () => {
+  requestGuard.install()
   selectedProjectId.value = projectId.value
   selectedYear.value = year.value
   projectStore.loadProjectOptions()
@@ -3043,8 +3041,8 @@ onMounted(async () => {
     templateType.value = qTemplate
   }
   await fetchTree()
-  // 如果没有附注数据，自动从模板生成
-  if (noteList.value.length === 0) {
+  await noteEdit.ready()  // 无章节自动生成：等判定结论，仅可写时执行
+  if (noteList.value.length === 0 && noteEdit.canWrite.value) {
     await onGenerate()
   }
   // Task 5.1: 从 URL query.section 自动定位章节（四栏跨页面导航 / 披露表反向跳转）
@@ -3088,6 +3086,7 @@ onContextChange(async () => {
 })
 
 onUnmounted(() => {
+  requestGuard.uninstall()
   eventBus.off('shortcut:save', onShortcutSave)
   eventBus.off('workpaper:saved', onWorkpaperSaved)
   eventBus.off('disclosure:note-text-updated', onDisclosureNoteTextUpdated)

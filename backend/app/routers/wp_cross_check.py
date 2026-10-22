@@ -23,7 +23,7 @@ from app.services.wp_cross_check_service import CrossCheckService
 logger = logging.getLogger(__name__)
 
 # 路由级 readonly 保证项目隔离（Phase 8 Task 8 补）。execute 挂 review：触发方有编制保存（save）也有签字前检查
-# （sign_off，合伙人 / 质控在项目里是 review 级），挂 edit 会挡住复核人；rules/custom 是规则配置，挂 edit。
+# （sign_off，合伙人是 edit 级、质控是 review 级，两者都满足 review 门禁），挂 edit 会挡住质控；rules/custom 是规则配置，挂 edit。
 router = APIRouter(
     prefix="/api/projects/{project_id}/cross-check",
     tags=["cross-check"],

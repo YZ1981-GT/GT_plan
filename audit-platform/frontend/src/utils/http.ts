@@ -534,6 +534,12 @@ http.interceptors.response.use(
         duration: 8000,
       })
     } else if (status === 403) {
+      // partner-manager-edit-permission: 附注编辑门禁专用钩子，调用后跳过通用 toast
+      const handler = (error.config as any)?._forbiddenHandler
+      if (typeof handler === 'function') {
+        handler(error)
+        return Promise.reject(error)
+      }
       ElMessage.error(displayMsg)
     } else {
       ElMessage.warning(displayMsg)

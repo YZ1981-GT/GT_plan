@@ -28,6 +28,7 @@ from app.services.note_edit_gate import (
     REASON_EQCR_READONLY,
     REASON_FORBIDDEN,
     REASON_MULTI_PROJECT_DENIED_PREFIX,
+    REASON_OPERATION_DENIED,
 )
 
 # ---------------------------------------------------------------------------
@@ -270,146 +271,105 @@ class TestSaveBaselineDesignGate:
         assert detail.get("error_code") == "NOTE_EDIT_MULTI_PROJECT_DENIED"
 
 
-# ---------------------------------------------------------------------------
-# 闄勬敞妯℃澘鎻愬瀷杞崲绔偣锛坉esign 瀹氱骇锛?
-# note_conversion.py: preview (readonly) / execute & rollback (assert_note_role_access)
-# ---------------------------------------------------------------------------
 
-# 瀵煎叆杞崲璺敱
+
+# ---------------------------------------------------------------------------
+# note_conversion (B2): execute / rollback / preview (两种)
+# design 定级：execute / rollback → assert_note_role_access({partner, manager})
+#              preview (POST + GET) → require_project_access("readonly")
+# ---------------------------------------------------------------------------
 from app.routers import note_conversion  # noqa: E402
 
 _CONVERSION_ROUTERS = (note_conversion.router,)
 
-# --- 杈呭姪 ---
+_EXECUTE_URL = f"/api/projects/{TARGET_PROJECT_ID}/notes/conversion/execute"
+_EXECUTE_BODY = {"year": 2025, "target_type": "soe"}
+
+_ROLLBACK_URL = f"/api/projects/{TARGET_PROJECT_ID}/notes/conversion/rollback"
+_ROLLBACK_BODY = {"year": 2025}
+
+_PREVIEW_POST_URL = f"/api/projects/{TARGET_PROJECT_ID}/notes/conversion/preview"
+_PREVIEW_POST_BODY = {"year": 2025, "target_type": "soe"}
+
+_PREVIEW_GET_URL = f"/api/projects/{TARGET_PROJECT_ID}/notes/conversion/2025/preview"
+_PREVIEW_GET_PARAMS = {"target_type": "soe"}
+
+_ROLE_DENIED_MSG = "\u4ec5\u672c\u9879\u76ee\u7ecf\u7406\u6216\u5408\u4f19\u4eba\u53ef\u5207\u6362\u9644\u6ce8\u6a21\u677f\u7c7b\u578b"
+
 
 class _ConversionServiceMock:
-    """NoteConversionService 鐨?SmartMock锛氫换浣曟柟娉曞畨鍏ㄨ繑鍥炲悎鐞嗗€笺€?""
+    """NoteConversionService SmartMock: any method returns a sensible async default."""
     def __getattr__(self, name: str):
         async def _method(*args, **kwargs):
-            if "preview" in name:
-                # preview_conversion 杩斿洖 .to_dict() 鐨勫璞?
-                class _R:
-                    def to_dict(self):
-                        return {"added": 0, "removed": 0, "preserved": 0,
-                                "added_items": [], "removed_items": []}
-                return _R()
+            return {"status": "success", "added": 0, "removed": 0, "preserved": 0,
+                    "added_items": [], "removed_items": []}
+        return _method
+
+
+class _ConversionPreviewResult:
+    """preview_conversion return value mock (needs to_dict)."""
+    def to_dict(self):
+        return {"added": 0, "removed": 0, "preserved": 0, "added_items": [], "removed_items": []}
+
+
+class _ConversionServiceMockWithPreview:
+    """Mock with preview-specific return values."""
+    def __getattr__(self, name: str):
+        if name == "preview_conversion":
+            async def _preview(*a, **kw):
+                return _ConversionPreviewResult()
+            return _preview
+        if name == "preview_note_conversion":
+            async def _note_preview(*a, **kw):
+                return {"status": "preview", "from_type": "soe", "to_type": "listed",
+                        "mapped": 0, "archived": 0, "created": 0,
+                        "user_edits_preserved": 0, "forbidden_hits": [], "details": {}}
+            return _note_preview
+        async def _method(*a, **kw):
             return {"status": "success"}
         return _method
 
 
-_EXECUTE_URL = f"/api/projects/{TARGET_PROJECT_ID}/notes/conversion/execute"
-_EXECUTE_BODY = {"year": 2025, "target_type": "soe"}
-_ROLLBACK_URL = f"/api/projects/{TARGET_PROJECT_ID}/notes/conversion/rollback"
-_ROLLBACK_BODY = {"year": 2025}
-_PREVIEW_POST_URL = f"/api/projects/{TARGET_PROJECT_ID}/notes/conversion/preview"
-_PREVIEW_POST_BODY = {"year": 2025, "target_type": "soe"}
-_PREVIEW_GET_URL = f"/api/projects/{TARGET_PROJECT_ID}/notes/conversion/2025/preview?target_type=soe"
+def _stub_conversion_service(world: AuthzWorld):
+    """Stub NoteConversionService (lazy-imported inside endpoint function body)."""
+    return world.stub(
+        importlib.import_module("app.services.note_conversion_service"),
+        "NoteConversionService",
+        returns=_ConversionServiceMock(),
+        awaitable=False,
+    )
 
 
-# --- preview (POST /preview 鍙婁 GET /{year}/preview) 锛歳equire_project_access("readonly") ---
-
-class TestConversionPreviewReadonly:
-    """杞崲棰勮瑙?棰勮绔偣鏀逛负 readonly 绾э紝readonly 鎴愬憳鍜?EQCR 搴旀斁琛屻€?""
-
-    @pytest.mark.asyncio
-    async def test_preview_post_non_member_403(self, world: AuthzWorld) -> None:
-        """闈炴垚鍛?POST /preview 鈫?403"""
-        identity = await world.identity("non_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=_ConversionServiceMock(),
-            awaitable=False,
-        )
-        async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
-            resp = await client.post(_PREVIEW_POST_URL, json=_PREVIEW_POST_BODY)
-        assert resp.status_code == 403, f"闈炴垚鍛樺簲 403锛屽疄闄?{resp.status_code}锛歿resp.text[:300]}"
-        assert len(stub.calls) == 0
-
-    @pytest.mark.asyncio
-    async def test_preview_get_non_member_403(self, world: AuthzWorld) -> None:
-        """闈炴垚鍛?GET /{year}/preview 鈫?403"""
-        identity = await world.identity("non_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=_ConversionServiceMock(),
-            awaitable=False,
-        )
-        async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
-            resp = await client.get(_PREVIEW_GET_URL)
-        assert resp.status_code == 403, f"闈炴垚鍛樺簲 403锛屽疄闄?{resp.status_code}锛歿resp.text[:300]}"
-        assert len(stub.calls) == 0
-
-    @pytest.mark.asyncio
-    async def test_preview_post_readonly_allowed(self, world: AuthzWorld) -> None:
-        """readonly 鎴愬憳 POST /preview 鈫?鏀捐"""
-        identity = await world.identity("readonly_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=_ConversionServiceMock(),
-            awaitable=False,
-        )
-        async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
-            resp = await client.post(_PREVIEW_POST_URL, json=_PREVIEW_POST_BODY)
-        assert resp.status_code not in (401, 403, 423), (
-            f"readonly 鎴愬憳搴旀斁琛岋紝瀹為檯 {resp.status_code}锛歿resp.text[:300]}"
-        )
-
-    @pytest.mark.asyncio
-    async def test_preview_get_eqcr_allowed(self, world: AuthzWorld) -> None:
-        """EQCR GET /{year}/preview 鈫?鏀捐锛堝彧璇荤鐐癸級"""
-        identity = await world.identity("project_eqcr")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=_ConversionServiceMock(),
-            awaitable=False,
-        )
-        async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
-            resp = await client.get(_PREVIEW_GET_URL)
-        assert resp.status_code not in (401, 403, 423), (
-            f"EQCR 搴旀斁琛岋紝瀹為檯 {resp.status_code}锛歿resp.text[:300]}"
-        )
-
-
-# --- execute / rollback: assert_note_role_access({partner, manager}) ---
-
-from app.services.note_edit_gate import REASON_OPERATION_DENIED  # noqa: E402
-
-_DENIED_MESSAGE_CONVERSION = "浠呮湰椤圭洰缁忕悊鎴栧悎浼欎汉鍙垏鎹㈤檮娉ㄦā鏉跨被鍨?
+def _stub_conversion_service_preview(world: AuthzWorld):
+    """Stub NoteConversionService (preview variant, needs to_dict)."""
+    return world.stub(
+        importlib.import_module("app.services.note_conversion_service"),
+        "NoteConversionService",
+        returns=_ConversionServiceMockWithPreview(),
+        awaitable=False,
+    )
 
 
 class TestConversionExecuteDesignGate:
-    """execute_conversion 绔偣閴存潈锛歛ssert_note_role_access({partner, manager})銆?
-    闈炴垚鍛?/ readonly / EQCR / 璐ㄦ帶 / 瀹¤鍛?鈫?403锛涚粡鐞?/ 鍚堜紮浜?/ admin 鈫?鏀捐銆?
+    """execute_conversion: assert_note_role_access({partner, manager}).
+    Non-member / readonly / EQCR / qc / auditor -> 403; manager / partner / admin -> allowed.
+    _Requirements: 8.2, 8.4, 8.6_
     """
 
     @pytest.mark.asyncio
     async def test_non_member_gets_403(self, world: AuthzWorld) -> None:
         identity = await world.identity("non_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=None,
-            awaitable=False,
-        )
+        stub = _stub_conversion_service(world)
         async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
             resp = await client.post(_EXECUTE_URL, json=_EXECUTE_BODY)
-        assert resp.status_code == 403, f"闈炴垚鍛樺簲 403锛屽疄闄?{resp.status_code}锛歿resp.text[:300]}"
+        assert resp.status_code == 403
         assert len(stub.calls) == 0
         _assert_denied(resp, 403, REASON_FORBIDDEN)
 
     @pytest.mark.asyncio
     async def test_readonly_member_gets_403(self, world: AuthzWorld) -> None:
         identity = await world.identity("readonly_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=None,
-            awaitable=False,
-        )
+        stub = _stub_conversion_service(world)
         async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
             resp = await client.post(_EXECUTE_URL, json=_EXECUTE_BODY)
         assert resp.status_code == 403
@@ -419,12 +379,7 @@ class TestConversionExecuteDesignGate:
     @pytest.mark.asyncio
     async def test_eqcr_gets_403(self, world: AuthzWorld) -> None:
         identity = await world.identity("project_eqcr")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=None,
-            awaitable=False,
-        )
+        stub = _stub_conversion_service(world)
         async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
             resp = await client.post(_EXECUTE_URL, json=_EXECUTE_BODY)
         assert resp.status_code == 403
@@ -432,98 +387,58 @@ class TestConversionExecuteDesignGate:
         _assert_denied(resp, 403, REASON_EQCR_READONLY)
 
     @pytest.mark.asyncio
-    async def test_qc_member_gets_403(self, world: AuthzWorld) -> None:
-        """璐ㄦ帶锛坬c, review锛?鈫?403锛氶€氳繃闄勬敞缂栬緫闂ㄧ浣嗚鑹查檺瀹氭嫆缁?""
-        identity = await world.identity("qc_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=None,
-            awaitable=False,
-        )
+    async def test_qc_review_member_gets_403(self, world: AuthzWorld) -> None:
+        identity = await world.identity("qc_review_member")
+        stub = _stub_conversion_service(world)
         async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
             resp = await client.post(_EXECUTE_URL, json=_EXECUTE_BODY)
-        assert resp.status_code == 403, f"璐ㄦ帶搴?403锛屽疄闄?{resp.status_code}锛歿resp.text[:300]}"
+        assert resp.status_code == 403
         assert len(stub.calls) == 0
-        _assert_denied_exact(resp, 403, _DENIED_MESSAGE_CONVERSION)
+        _assert_denied(resp, 403, REASON_OPERATION_DENIED)
 
     @pytest.mark.asyncio
-    async def test_auditor_member_gets_403(self, world: AuthzWorld) -> None:
-        """瀹¤鍛橈紙auditor, edit锛?鈫?403锛氶€氳繃缂栬緫闂ㄧ浣嗚鑹查檺瀹氭嫆缁?""
-        identity = await world.identity("auditor_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=None,
-            awaitable=False,
-        )
+    async def test_review_member_qc_gets_403(self, world: AuthzWorld) -> None:
+        identity = await world.identity("review_member")
+        stub = _stub_conversion_service(world)
         async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
             resp = await client.post(_EXECUTE_URL, json=_EXECUTE_BODY)
-        assert resp.status_code == 403, f"瀹¤鍛樺簲 403锛屽疄闄?{resp.status_code}锛歿resp.text[:300]}"
+        assert resp.status_code == 403
         assert len(stub.calls) == 0
-        _assert_denied_exact(resp, 403, _DENIED_MESSAGE_CONVERSION)
+        _assert_denied(resp, 403, _ROLE_DENIED_MSG)
 
     @pytest.mark.asyncio
-    async def test_manager_allowed(self, world: AuthzWorld) -> None:
-        """缁忕悊锛坢anager, edit锛?鈫?鏀捐"""
+    async def test_edit_member_manager_allowed(self, world: AuthzWorld) -> None:
         identity = await world.identity("edit_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=_ConversionServiceMock(),
-            awaitable=False,
-        )
+        stub = _stub_conversion_service(world)
         async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
             resp = await client.post(_EXECUTE_URL, json=_EXECUTE_BODY)
         assert resp.status_code not in (401, 403, 423), (
-            f"缁忕悊搴旀斁琛岋紝瀹為檯 {resp.status_code}锛歿resp.text[:300]}"
+            f"edit_member should be allowed, got {resp.status_code}: {resp.text[:300]}"
         )
-
-    @pytest.mark.asyncio
-    async def test_partner_allowed(self, world: AuthzWorld) -> None:
-        """鍚堜紮浜猴紙partner, edit锛?鈫?鏀捐"""
-        identity = await world.identity("partner_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=_ConversionServiceMock(),
-            awaitable=False,
-        )
-        async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
-            resp = await client.post(_EXECUTE_URL, json=_EXECUTE_BODY)
-        assert resp.status_code not in (401, 403, 423), (
-            f"鍚堜紮浜哄簲鏀捐锛屽疄闄?{resp.status_code}锛歿resp.text[:300]}"
-        )
+        client.assert_passed("app.services.note_edit_gate.assert_note_role_access")
 
     @pytest.mark.asyncio
     async def test_admin_allowed(self, world: AuthzWorld) -> None:
-        """admin 闈炴垚鍛?鈫?鏀捐"""
         identity = await world.identity("admin_non_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=_ConversionServiceMock(),
-            awaitable=False,
-        )
+        stub = _stub_conversion_service(world)
         async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
             resp = await client.post(_EXECUTE_URL, json=_EXECUTE_BODY)
         assert resp.status_code not in (401, 403, 423), (
-            f"admin 搴旀斁琛岋紝瀹為檯 {resp.status_code}锛歿resp.text[:300]}"
+            f"admin should be allowed, got {resp.status_code}: {resp.text[:300]}"
         )
+        client.assert_passed("app.services.note_edit_gate.assert_note_role_access")
 
 
 class TestConversionRollbackDesignGate:
-    """rollback_conversion 绔偣閴存潈锛氫笌 execute 鍚岃鍒欍€?""
+    """rollback_conversion: assert_note_role_access({partner, manager}).
+    Same gate as execute; same identity set.
+    _Requirements: 8.2, 8.4, 8.6_
+    """
 
     @pytest.mark.asyncio
     async def test_non_member_gets_403(self, world: AuthzWorld) -> None:
         identity = await world.identity("non_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=None,
-            awaitable=False,
-        )
+        stub = _stub_conversion_service(world)
         async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
             resp = await client.post(_ROLLBACK_URL, json=_ROLLBACK_BODY)
         assert resp.status_code == 403
@@ -531,14 +446,18 @@ class TestConversionRollbackDesignGate:
         _assert_denied(resp, 403, REASON_FORBIDDEN)
 
     @pytest.mark.asyncio
+    async def test_readonly_member_gets_403(self, world: AuthzWorld) -> None:
+        identity = await world.identity("readonly_member")
+        stub = _stub_conversion_service(world)
+        async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_ROLLBACK_URL, json=_ROLLBACK_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+
+    @pytest.mark.asyncio
     async def test_eqcr_gets_403(self, world: AuthzWorld) -> None:
         identity = await world.identity("project_eqcr")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=None,
-            awaitable=False,
-        )
+        stub = _stub_conversion_service(world)
         async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
             resp = await client.post(_ROLLBACK_URL, json=_ROLLBACK_BODY)
         assert resp.status_code == 403
@@ -546,61 +465,665 @@ class TestConversionRollbackDesignGate:
         _assert_denied(resp, 403, REASON_EQCR_READONLY)
 
     @pytest.mark.asyncio
-    async def test_qc_member_gets_403(self, world: AuthzWorld) -> None:
-        identity = await world.identity("qc_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=None,
-            awaitable=False,
-        )
+    async def test_qc_review_member_gets_403(self, world: AuthzWorld) -> None:
+        identity = await world.identity("qc_review_member")
+        stub = _stub_conversion_service(world)
         async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
             resp = await client.post(_ROLLBACK_URL, json=_ROLLBACK_BODY)
         assert resp.status_code == 403
         assert len(stub.calls) == 0
-        _assert_denied_exact(resp, 403, _DENIED_MESSAGE_CONVERSION)
+        _assert_denied(resp, 403, REASON_OPERATION_DENIED)
 
     @pytest.mark.asyncio
-    async def test_auditor_member_gets_403(self, world: AuthzWorld) -> None:
-        identity = await world.identity("auditor_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=None,
-            awaitable=False,
-        )
-        async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
-            resp = await client.post(_ROLLBACK_URL, json=_ROLLBACK_BODY)
-        assert resp.status_code == 403
-        assert len(stub.calls) == 0
-        _assert_denied_exact(resp, 403, _DENIED_MESSAGE_CONVERSION)
-
-    @pytest.mark.asyncio
-    async def test_manager_allowed(self, world: AuthzWorld) -> None:
+    async def test_edit_member_manager_allowed(self, world: AuthzWorld) -> None:
         identity = await world.identity("edit_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=_ConversionServiceMock(),
-            awaitable=False,
-        )
+        stub = _stub_conversion_service(world)
         async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
             resp = await client.post(_ROLLBACK_URL, json=_ROLLBACK_BODY)
         assert resp.status_code not in (401, 403, 423), (
-            f"缁忕悊搴旀斁琛岋紝瀹為檯 {resp.status_code}锛歿resp.text[:300]}"
+            f"edit_member should be allowed, got {resp.status_code}: {resp.text[:300]}"
         )
+        client.assert_passed("app.services.note_edit_gate.assert_note_role_access")
 
     @pytest.mark.asyncio
     async def test_admin_allowed(self, world: AuthzWorld) -> None:
         identity = await world.identity("admin_non_member")
-        stub = world.stub(
-            importlib.import_module("app.services.note_conversion_service"),
-            "NoteConversionService",
-            returns=_ConversionServiceMock(),
-            awaitable=False,
-        )
+        stub = _stub_conversion_service(world)
         async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
             resp = await client.post(_ROLLBACK_URL, json=_ROLLBACK_BODY)
         assert resp.status_code not in (401, 403, 423), (
-            f"admin 搴旀斁琛岋紝瀹為檯 {resp.status_code}锛歿resp.text[:300]}"
+            f"admin should be allowed, got {resp.status_code}: {resp.text[:300]}"
         )
+        client.assert_passed("app.services.note_edit_gate.assert_note_role_access")
+
+
+class TestConversionPreviewDesignGate:
+    """Both preview endpoints: require_project_access("readonly").
+    Non-member -> 403; readonly and EQCR allowed.
+    POST /preview + GET /{year}/preview tested separately.
+    _Requirements: 8.4, 8.6_
+    """
+
+    @pytest.mark.asyncio
+    async def test_post_preview_non_member_gets_403(self, world: AuthzWorld) -> None:
+        identity = await world.identity("non_member")
+        stub = _stub_conversion_service_preview(world)
+        async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_PREVIEW_POST_URL, json=_PREVIEW_POST_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+
+    @pytest.mark.asyncio
+    async def test_post_preview_readonly_allowed(self, world: AuthzWorld) -> None:
+        identity = await world.identity("readonly_member")
+        stub = _stub_conversion_service_preview(world)
+        async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_PREVIEW_POST_URL, json=_PREVIEW_POST_BODY)
+        assert resp.status_code not in (401, 403, 423), (
+            f"readonly should be allowed, got {resp.status_code}: {resp.text[:300]}"
+        )
+        client.assert_passed("app.deps.require_project_access.<locals>.dependency")
+
+    @pytest.mark.asyncio
+    async def test_post_preview_eqcr_allowed(self, world: AuthzWorld) -> None:
+        identity = await world.identity("project_eqcr")
+        stub = _stub_conversion_service_preview(world)
+        async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_PREVIEW_POST_URL, json=_PREVIEW_POST_BODY)
+        assert resp.status_code not in (401, 403, 423), (
+            f"EQCR should be allowed for preview, got {resp.status_code}: {resp.text[:300]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_preview_non_member_gets_403(self, world: AuthzWorld) -> None:
+        identity = await world.identity("non_member")
+        stub = _stub_conversion_service_preview(world)
+        async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
+            resp = await client.get(_PREVIEW_GET_URL, params=_PREVIEW_GET_PARAMS)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+
+    @pytest.mark.asyncio
+    async def test_get_preview_readonly_allowed(self, world: AuthzWorld) -> None:
+        identity = await world.identity("readonly_member")
+        stub = _stub_conversion_service_preview(world)
+        async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
+            resp = await client.get(_PREVIEW_GET_URL, params=_PREVIEW_GET_PARAMS)
+        assert resp.status_code not in (401, 403, 423), (
+            f"readonly should be allowed for GET preview, got {resp.status_code}: {resp.text[:300]}"
+        )
+        client.assert_passed("app.deps.require_project_access.<locals>.dependency")
+
+    @pytest.mark.asyncio
+    async def test_get_preview_eqcr_allowed(self, world: AuthzWorld) -> None:
+        identity = await world.identity("project_eqcr")
+        stub = _stub_conversion_service_preview(world)
+        async with world.client(*_CONVERSION_ROUTERS, user=identity.user) as client:
+            resp = await client.get(_PREVIEW_GET_URL, params=_PREVIEW_GET_PARAMS)
+        assert resp.status_code not in (401, 403, 423), (
+            f"EQCR should be allowed for GET preview, got {resp.status_code}: {resp.text[:300]}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# note_section_lock (B3): release / force-release
+# Task 11.4
+# ---------------------------------------------------------------------------
+from app.routers import note_section_lock  # noqa: E402
+
+_SECTION_LOCK_ROUTERS = (note_section_lock.router,)
+
+_RELEASE_URL = f"/api/projects/{TARGET_PROJECT_ID}/notes/locks/release"
+_RELEASE_BODY = {"year": 2025, "section_code": "五、1"}
+
+_FORCE_RELEASE_URL = f"/api/projects/{TARGET_PROJECT_ID}/notes/locks/force-release"
+_FORCE_RELEASE_BODY = {"year": 2025, "section_code": "五、1"}
+
+_FORCE_RELEASE_DENIED_MSG = "仅本项目经理或合伙人可强制释放章节锁"
+
+
+class _SectionLockServiceMock:
+    """NoteSectionLockService SmartMock."""
+    def __getattr__(self, name: str):
+        async def _method(*args, **kwargs):
+            return True
+        return _method
+
+
+def _stub_section_lock_service(world: AuthzWorld):
+    return world.stub(
+        importlib.import_module("app.routers.note_section_lock"),
+        "NoteSectionLockService",
+        returns=_SectionLockServiceMock(),
+        awaitable=False,
+    )
+
+
+class TestReleaseLockDesignGate:
+    """release_lock: require_project_access("readonly").
+    Non-member → 403; readonly and EQCR both allowed.
+    _Requirements: 8.4, 8.6_
+    """
+
+    @pytest.mark.asyncio
+    async def test_non_member_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_section_lock_service(world)
+        identity = await world.identity("non_member")
+        async with world.client(*_SECTION_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_RELEASE_URL, json=_RELEASE_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+
+    @pytest.mark.asyncio
+    async def test_readonly_member_allowed(self, world: AuthzWorld) -> None:
+        stub = _stub_section_lock_service(world)
+        identity = await world.identity("readonly_member")
+        async with world.client(*_SECTION_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_RELEASE_URL, json=_RELEASE_BODY)
+        assert resp.status_code not in (401, 403, 423), (
+            f"readonly should be allowed, got {resp.status_code}: {resp.text[:300]}"
+        )
+        client.assert_passed("app.deps.require_project_access.<locals>.dependency")
+
+    @pytest.mark.asyncio
+    async def test_eqcr_allowed(self, world: AuthzWorld) -> None:
+        stub = _stub_section_lock_service(world)
+        identity = await world.identity("project_eqcr")
+        async with world.client(*_SECTION_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_RELEASE_URL, json=_RELEASE_BODY)
+        assert resp.status_code not in (401, 403, 423), (
+            f"EQCR should be allowed for release, got {resp.status_code}: {resp.text[:300]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_edit_member_allowed(self, world: AuthzWorld) -> None:
+        stub = _stub_section_lock_service(world)
+        identity = await world.identity("edit_member")
+        async with world.client(*_SECTION_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_RELEASE_URL, json=_RELEASE_BODY)
+        assert resp.status_code not in (401, 403, 423), (
+            f"edit_member should be allowed, got {resp.status_code}: {resp.text[:300]}"
+        )
+        client.assert_passed("app.deps.require_project_access.<locals>.dependency")
+
+
+class TestForceReleaseLockDesignGate:
+    """force_release_lock: assert_note_role_access({manager, partner}).
+    Non-member / readonly / EQCR / qc / review_member → 403; edit_member(manager) / admin → allowed.
+    _Requirements: 8.3, 8.4, 8.6_
+    """
+
+    @pytest.mark.asyncio
+    async def test_non_member_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_section_lock_service(world)
+        identity = await world.identity("non_member")
+        async with world.client(*_SECTION_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_FORCE_RELEASE_URL, json=_FORCE_RELEASE_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, REASON_FORBIDDEN)
+
+    @pytest.mark.asyncio
+    async def test_readonly_member_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_section_lock_service(world)
+        identity = await world.identity("readonly_member")
+        async with world.client(*_SECTION_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_FORCE_RELEASE_URL, json=_FORCE_RELEASE_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, REASON_FORBIDDEN)
+
+    @pytest.mark.asyncio
+    async def test_eqcr_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_section_lock_service(world)
+        identity = await world.identity("project_eqcr")
+        async with world.client(*_SECTION_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_FORCE_RELEASE_URL, json=_FORCE_RELEASE_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, REASON_EQCR_READONLY)
+
+    @pytest.mark.asyncio
+    async def test_qc_review_member_gets_403(self, world: AuthzWorld) -> None:
+        """qc_review_member (qc, review, global qc) → 403 NOTE_EDIT_OPERATION_DENIED."""
+        stub = _stub_section_lock_service(world)
+        identity = await world.identity("qc_review_member")
+        async with world.client(*_SECTION_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_FORCE_RELEASE_URL, json=_FORCE_RELEASE_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, REASON_OPERATION_DENIED)
+
+    @pytest.mark.asyncio
+    async def test_review_member_gets_403(self, world: AuthzWorld) -> None:
+        """review_member (qc, review, global auditor) → 403 with role denied message."""
+        stub = _stub_section_lock_service(world)
+        identity = await world.identity("review_member")
+        async with world.client(*_SECTION_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_FORCE_RELEASE_URL, json=_FORCE_RELEASE_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, _FORCE_RELEASE_DENIED_MSG)
+
+    @pytest.mark.asyncio
+    async def test_edit_member_manager_allowed(self, world: AuthzWorld) -> None:
+        stub = _stub_section_lock_service(world)
+        identity = await world.identity("edit_member")
+        async with world.client(*_SECTION_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_FORCE_RELEASE_URL, json=_FORCE_RELEASE_BODY)
+        assert resp.status_code not in (401, 403, 423), (
+            f"edit_member should be allowed, got {resp.status_code}: {resp.text[:300]}"
+        )
+        client.assert_passed("app.services.note_edit_gate.assert_note_role_access")
+
+    @pytest.mark.asyncio
+    async def test_admin_allowed(self, world: AuthzWorld) -> None:
+        stub = _stub_section_lock_service(world)
+        identity = await world.identity("admin_non_member")
+        async with world.client(*_SECTION_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_FORCE_RELEASE_URL, json=_FORCE_RELEASE_BODY)
+        assert resp.status_code not in (401, 403, 423), (
+            f"admin should be allowed, got {resp.status_code}: {resp.text[:300]}"
+        )
+        client.assert_passed("app.services.note_edit_gate.assert_note_role_access")
+
+
+# ---------------------------------------------------------------------------
+# note_data_lock (B3): lock / unlock
+# Task 11.4
+# ---------------------------------------------------------------------------
+from app.routers import note_data_lock  # noqa: E402
+
+_DATA_LOCK_ROUTERS = (note_data_lock.router,)
+
+_LOCK_URL = f"/api/projects/{TARGET_PROJECT_ID}/data-lock/lock"
+_LOCK_BODY = {"year": 2025}
+
+_UNLOCK_URL = f"/api/projects/{TARGET_PROJECT_ID}/data-lock/unlock"
+_UNLOCK_BODY = {"year": 2025, "reason": "解锁原因"}
+
+_LOCK_DENIED_MSG = "仅本项目经理或合伙人可锁定报表附注数据"
+_UNLOCK_DENIED_MSG = "仅管理员可解除报表附注数据锁定"
+
+
+class _DataLockServiceMock:
+    """NoteDataLockService SmartMock."""
+    def __getattr__(self, name: str):
+        async def _method(*args, **kwargs):
+            return {"locked": True, "version": 1}
+        return _method
+
+
+def _stub_data_lock_service(world: AuthzWorld):
+    return world.stub(
+        importlib.import_module("app.routers.note_data_lock"),
+        "NoteDataLockService",
+        returns=_DataLockServiceMock(),
+        awaitable=False,
+    )
+
+
+class TestLockOnSignOffDesignGate:
+    """lock_on_sign_off: assert_note_role_access({partner, manager}).
+    Non-member / readonly / EQCR / qc / review_member → 403; edit_member(manager) / admin → allowed.
+    _Requirements: 8.3, 8.4, 8.6_
+    """
+
+    @pytest.mark.asyncio
+    async def test_non_member_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_data_lock_service(world)
+        identity = await world.identity("non_member")
+        async with world.client(*_DATA_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_LOCK_URL, json=_LOCK_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, REASON_FORBIDDEN)
+
+    @pytest.mark.asyncio
+    async def test_readonly_member_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_data_lock_service(world)
+        identity = await world.identity("readonly_member")
+        async with world.client(*_DATA_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_LOCK_URL, json=_LOCK_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, REASON_FORBIDDEN)
+
+    @pytest.mark.asyncio
+    async def test_eqcr_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_data_lock_service(world)
+        identity = await world.identity("project_eqcr")
+        async with world.client(*_DATA_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_LOCK_URL, json=_LOCK_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, REASON_EQCR_READONLY)
+
+    @pytest.mark.asyncio
+    async def test_qc_review_member_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_data_lock_service(world)
+        identity = await world.identity("qc_review_member")
+        async with world.client(*_DATA_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_LOCK_URL, json=_LOCK_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, REASON_OPERATION_DENIED)
+
+    @pytest.mark.asyncio
+    async def test_review_member_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_data_lock_service(world)
+        identity = await world.identity("review_member")
+        async with world.client(*_DATA_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_LOCK_URL, json=_LOCK_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, _LOCK_DENIED_MSG)
+
+    @pytest.mark.asyncio
+    async def test_edit_member_manager_allowed(self, world: AuthzWorld) -> None:
+        stub = _stub_data_lock_service(world)
+        identity = await world.identity("edit_member")
+        async with world.client(*_DATA_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_LOCK_URL, json=_LOCK_BODY)
+        assert resp.status_code not in (401, 403, 423), (
+            f"edit_member should be allowed, got {resp.status_code}: {resp.text[:300]}"
+        )
+        client.assert_passed("app.services.note_edit_gate.assert_note_role_access")
+
+    @pytest.mark.asyncio
+    async def test_admin_allowed(self, world: AuthzWorld) -> None:
+        stub = _stub_data_lock_service(world)
+        identity = await world.identity("admin_non_member")
+        async with world.client(*_DATA_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_LOCK_URL, json=_LOCK_BODY)
+        assert resp.status_code not in (401, 403, 423), (
+            f"admin should be allowed, got {resp.status_code}: {resp.text[:300]}"
+        )
+        client.assert_passed("app.services.note_edit_gate.assert_note_role_access")
+
+
+class TestUnlockDataDesignGate:
+    """unlock_data: assert_note_role_access(frozenset(), admin-only).
+    Non-member / readonly / EQCR / edit_member / review_member → 403; only admin → allowed.
+    _Requirements: 8.3, 8.4, 8.6_
+    """
+
+    @pytest.mark.asyncio
+    async def test_non_member_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_data_lock_service(world)
+        identity = await world.identity("non_member")
+        async with world.client(*_DATA_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_UNLOCK_URL, json=_UNLOCK_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, REASON_FORBIDDEN)
+
+    @pytest.mark.asyncio
+    async def test_readonly_member_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_data_lock_service(world)
+        identity = await world.identity("readonly_member")
+        async with world.client(*_DATA_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_UNLOCK_URL, json=_UNLOCK_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, REASON_FORBIDDEN)
+
+    @pytest.mark.asyncio
+    async def test_eqcr_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_data_lock_service(world)
+        identity = await world.identity("project_eqcr")
+        async with world.client(*_DATA_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_UNLOCK_URL, json=_UNLOCK_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, REASON_EQCR_READONLY)
+
+    @pytest.mark.asyncio
+    async def test_edit_member_gets_403(self, world: AuthzWorld) -> None:
+        """edit_member (manager, edit) → 403 with role denied (empty frozenset = admin only)."""
+        stub = _stub_data_lock_service(world)
+        identity = await world.identity("edit_member")
+        async with world.client(*_DATA_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_UNLOCK_URL, json=_UNLOCK_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, _UNLOCK_DENIED_MSG)
+
+    @pytest.mark.asyncio
+    async def test_admin_allowed(self, world: AuthzWorld) -> None:
+        stub = _stub_data_lock_service(world)
+        identity = await world.identity("admin_non_member")
+        async with world.client(*_DATA_LOCK_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_UNLOCK_URL, json=_UNLOCK_BODY)
+        assert resp.status_code not in (401, 403, 423), (
+            f"admin should be allowed, got {resp.status_code}: {resp.text[:300]}"
+        )
+        client.assert_passed("app.services.note_edit_gate.assert_note_role_access")
+
+
+# ---------------------------------------------------------------------------
+# note_group_template (B3): distribute
+# Task 11.4: assert_note_edit_access_on_projects([project_id, *target_project_ids])
+# ---------------------------------------------------------------------------
+from app.routers import note_group_template  # noqa: E402
+from authz_world import OTHER_PROJECT_ID  # noqa: E402
+
+_GROUP_TEMPLATE_ROUTERS = (note_group_template.router,)
+
+_DISTRIBUTE_URL = f"/api/projects/{TARGET_PROJECT_ID}/notes/group-template/distribute"
+_DISTRIBUTE_BODY = {
+    "template_id": "5a1d0c3e-7b2f-4e61-9c84-2f0d6b9a1e50",
+    "target_project_ids": [str(OTHER_PROJECT_ID)],
+    "strategy": "bc_keep_data",
+}
+
+
+class _GroupTemplateServiceMock:
+    """NoteGroupTemplateService SmartMock."""
+    def __getattr__(self, name: str):
+        async def _method(*args, **kwargs):
+            return {"distributed": True, "count": 1}
+        return _method
+
+
+def _stub_group_template_service(world: AuthzWorld):
+    return world.stub(
+        importlib.import_module("app.routers.note_group_template"),
+        "NoteGroupTemplateService",
+        returns=_GroupTemplateServiceMock(),
+        awaitable=False,
+    )
+
+
+class TestDistributeTemplateDesignGate:
+    """distribute_template: assert_note_edit_access_on_projects([project_id, *target_project_ids]).
+    Non-member / readonly / EQCR → 403; edit_member / admin → allowed.
+    Must list failed project IDs on denial.
+    Must reject entire request if any project fails (no writes).
+    _Requirements: 8.5, 8.6_
+    """
+
+    @pytest.mark.asyncio
+    async def test_non_member_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_group_template_service(world)
+        identity = await world.identity("non_member")
+        async with world.client(*_GROUP_TEMPLATE_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_DISTRIBUTE_URL, json=_DISTRIBUTE_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0, "业务不应执行"
+        _assert_denied(resp, 403, REASON_FORBIDDEN)
+        # Non-member fails on both TARGET and OTHER project → both listed
+        _assert_denied_lists_project(resp, TARGET_PROJECT_ID)
+
+    @pytest.mark.asyncio
+    async def test_readonly_member_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_group_template_service(world)
+        identity = await world.identity("readonly_member")
+        async with world.client(*_GROUP_TEMPLATE_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_DISTRIBUTE_URL, json=_DISTRIBUTE_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, REASON_FORBIDDEN)
+
+    @pytest.mark.asyncio
+    async def test_eqcr_gets_403(self, world: AuthzWorld) -> None:
+        stub = _stub_group_template_service(world)
+        identity = await world.identity("project_eqcr")
+        async with world.client(*_GROUP_TEMPLATE_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_DISTRIBUTE_URL, json=_DISTRIBUTE_BODY)
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0
+        _assert_denied(resp, 403, REASON_EQCR_READONLY)
+
+    @pytest.mark.asyncio
+    async def test_edit_member_target_only_allowed(self, world: AuthzWorld) -> None:
+        """edit_member is member of TARGET; distribute to TARGET only (no OTHER) → allowed."""
+        stub = _stub_group_template_service(world)
+        identity = await world.identity("edit_member")
+        body_target_only = {
+            "template_id": "5a1d0c3e-7b2f-4e61-9c84-2f0d6b9a1e50",
+            "target_project_ids": [],
+            "strategy": "bc_keep_data",
+        }
+        async with world.client(*_GROUP_TEMPLATE_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_DISTRIBUTE_URL, json=body_target_only)
+        assert resp.status_code not in (401, 403, 423), (
+            f"edit_member should be allowed when targeting own project only, got {resp.status_code}: {resp.text[:300]}"
+        )
+        client.assert_passed("app.services.note_edit_gate.assert_note_edit_access_on_projects")
+
+    @pytest.mark.asyncio
+    async def test_admin_allowed(self, world: AuthzWorld) -> None:
+        """admin non-member → allowed for all projects."""
+        stub = _stub_group_template_service(world)
+        identity = await world.identity("admin_non_member")
+        async with world.client(*_GROUP_TEMPLATE_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_DISTRIBUTE_URL, json=_DISTRIBUTE_BODY)
+        assert resp.status_code not in (401, 403, 423), (
+            f"admin should be allowed, got {resp.status_code}: {resp.text[:300]}"
+        )
+        client.assert_passed("app.services.note_edit_gate.assert_note_edit_access_on_projects")
+
+    @pytest.mark.asyncio
+    async def test_error_lists_failed_project_ids(self, world: AuthzWorld) -> None:
+        """When target projects include one where the user is not a member, rejection lists those project IDs."""
+        stub = _stub_group_template_service(world)
+        identity = await world.identity("edit_member")
+        # edit_member is member of TARGET but NOT of OTHER
+        async with world.client(*_GROUP_TEMPLATE_ROUTERS, user=identity.user) as client:
+            resp = await client.post(_DISTRIBUTE_URL, json=_DISTRIBUTE_BODY)
+        # Should fail because OTHER_PROJECT_ID is not accessible
+        assert resp.status_code == 403
+        assert len(stub.calls) == 0, "Business must not execute when any project fails"
+        body = resp.json()
+        detail = body.get("detail", {})
+        assert isinstance(detail, dict), f"detail should be dict, got {type(detail).__name__}"
+        assert "project_ids" in detail, "detail should contain project_ids key"
+        assert str(OTHER_PROJECT_ID) in detail["project_ids"], (
+            f"project_ids should list {OTHER_PROJECT_ID}"
+        )
+        assert detail.get("error_code") == "NOTE_EDIT_MULTI_PROJECT_DENIED"
+
+
+# ---------------------------------------------------------------------------
+# Task 11.5: design 定级端点集合收口
+# ---------------------------------------------------------------------------
+import json as _json
+from pathlib import Path as _Path
+
+_INVENTORY_PATH_11_5 = _Path(__file__).resolve().parents[1] / "data" / "authz" / "note_write_inventory.json"
+
+
+def _load_design_gate_set() -> set[tuple[str, str]]:
+    """清册中 target_gate.kind == 'design_gate' 的端点集合。"""
+    data = _json.loads(_INVENTORY_PATH_11_5.read_text("utf-8"))
+    result: set[tuple[str, str]] = set()
+    for ep in data["endpoints"]:
+        tg = ep.get("target_gate") or {}
+        if tg.get("kind") == "design_gate":
+            result.add((ep["method"], ep["path"]))
+    return result
+
+
+# 文件内被测的 design 定级端点集合——把每个 Test*DesignGate 类对应的
+# （method, inventory path）收集起来。
+# 当新增或删除端点时，两边都必须同步更新，否则本测试会报差异。
+_TESTED_DESIGN_GATE_ENDPOINTS: set[tuple[str, str]] = {
+    # TestSaveBaselineDesignGate
+    ("POST", "/api/group-note-baselines"),
+    # TestConversionExecuteDesignGate
+    ("POST", "/api/projects/{project_id}/notes/conversion/execute"),
+    # TestConversionRollbackDesignGate
+    ("POST", "/api/projects/{project_id}/notes/conversion/rollback"),
+    # TestConversionPreviewDesignGate (POST preview — design_gate readonly)
+    ("POST", "/api/projects/{project_id}/notes/conversion/preview"),
+    # TestReleaseLockDesignGate
+    ("POST", "/api/projects/{project_id}/notes/locks/release"),
+    # TestForceReleaseLockDesignGate
+    ("POST", "/api/projects/{project_id}/notes/locks/force-release"),
+    # TestLockOnSignOffDesignGate
+    ("POST", "/api/projects/{project_id}/data-lock/lock"),
+    # TestUnlockDataDesignGate
+    ("POST", "/api/projects/{project_id}/data-lock/unlock"),
+    # TestDistributeTemplateDesignGate
+    ("POST", "/api/projects/{project_id}/notes/group-template/distribute"),
+}
+
+
+class TestDesignGateEndpointSetClosure:
+    """Task 11.5: 参数化端点集合等于清册中 design 定级门禁的端点集合。
+
+    双向比较并逐个列出差异。
+    _Requirements: 8.6_
+    """
+
+    def test_design_gate_set_equals_inventory(self) -> None:
+        """双向比较：本文件实际被测的端点集合 == 清册 design_gate 集合。"""
+        inventory_set = _load_design_gate_set()
+        tested_set = _TESTED_DESIGN_GATE_ENDPOINTS
+
+        only_in_inventory = inventory_set - tested_set
+        only_in_tests = tested_set - inventory_set
+
+        diff_lines: list[str] = []
+        if only_in_inventory:
+            diff_lines.append("清册中有、本测试文件未覆盖的 design 定级端点：")
+            for m, p in sorted(only_in_inventory):
+                diff_lines.append(f"  + {m} {p}")
+        if only_in_tests:
+            diff_lines.append("本测试文件有、清册中不存在的 design 定级端点：")
+            for m, p in sorted(only_in_tests):
+                diff_lines.append(f"  - {m} {p}")
+
+        assert inventory_set == tested_set, (
+            f"design 定级端点集合不一致（清册 {len(inventory_set)} 个 vs "
+            f"测试 {len(tested_set)} 个）：\n"
+            + "\n".join(diff_lines)
+        )
+
+    def test_design_gate_set_nonempty(self) -> None:
+        """清册与测试的 design 定级端点集合非空。"""
+        inventory_set = _load_design_gate_set()
+        assert len(inventory_set) > 0, "清册中 design_gate 端点为空"
+        assert len(_TESTED_DESIGN_GATE_ENDPOINTS) > 0, "测试文件 design_gate 端点为空"
+
+    def test_each_design_gate_endpoint_has_test_class(self) -> None:
+        """每个 design 定级端点在本文件至少有一个测试类的放行用例（需求 8.6）。"""
+        inventory_set = _load_design_gate_set()
+        for method, path in sorted(inventory_set):
+            assert (method, path) in _TESTED_DESIGN_GATE_ENDPOINTS, (
+                f"design_gate 端点 {method} {path} 在本测试文件中没有对应的测试"
+            )
+
+    def test_each_design_gate_endpoint_eqcr_matches_inventory(self) -> None:
+        """每个 design 定级端点的 EQCR 声明都可在本文件中验证。"""
+        data = _json.loads(_INVENTORY_PATH_11_5.read_text("utf-8"))
+        for ep in data["endpoints"]:
+            tg = ep.get("target_gate") or {}
+            if tg.get("kind") != "design_gate":
+                continue
+            key = (ep["method"], ep["path"])
+            eqcr_policy = tg.get("eqcr", "deny")
+            assert key in _TESTED_DESIGN_GATE_ENDPOINTS, (
+                f"design_gate 端点 {key} 的 EQCR 策略 '{eqcr_policy}' 无法验证（缺测试）"
+            )

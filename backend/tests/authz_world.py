@@ -329,8 +329,10 @@ class GateClient:
         assert_gates_are_production()
         assert_world_overrides(self.app)
         with GateTrace() as trace:
-            response = await self.http.request(method, url, **kwargs)
-        self.gate_runs = dict(trace.counts)
+            try:
+                response = await self.http.request(method, url, **kwargs)
+            finally:
+                self.gate_runs = dict(trace.counts)
         return response
 
     async def get(self, url: str, **kwargs: Any) -> Response:

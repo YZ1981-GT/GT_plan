@@ -167,8 +167,11 @@ class ContinuousAuditService:
                 count += 1
             items_copied["account_mapping"] = count
 
-        # 4. 复制团队委派
+        # 4. 复制团队成员（跳过上年 EQCR，partner-manager-edit-permission §4.11）
+        notices: list[str] = []
         if copy_team:
+            from app.services.eqcr_resolver import project_eqcr_user_ids
+            eqcr_skip = await project_eqcr_user_ids(db, prior_project_id)  # 出错不吞 → 整单失败（需求 11.5）
             result = await db.execute(
                 sa.select(ProjectUser).where(
                     ProjectUser.project_id == prior_project_id,
@@ -176,8 +179,9 @@ class ContinuousAuditService:
                 )
             )
             users = result.scalars().all()
-            count = 0
-            for u in users:
+            copied = [u for u in users if u.user_id not in eqcr_skip]
+            skipped = len(users) - len(copied)
+            for u in copied:
                 new_u = ProjectUser(
                     project_id=new_project.id,
                     user_id=u.user_id,
@@ -187,8 +191,10 @@ class ContinuousAuditService:
                     scope_accounts=u.scope_accounts,
                 )
                 db.add(new_u)
-                count += 1
-            items_copied["team_assignments"] = count
+            items_copied["team_assignments"] = len(copied)
+            items_copied["team_skipped_eqcr"] = skipped
+            if skipped:
+                notices.append(f"已跳过 {skipped} 名成员：独立复核合伙人需在新项目重新委派")
 
         # 5. 试算表审定数 → 当年期初（只取上年度的行：其他年度的行改写成 new_year 会撞
         #    唯一索引 (project_id, year, company_code, standard_account_code)）
@@ -325,6 +331,7 @@ class ContinuousAuditService:
             "prior_year_project_id": str(prior_project_id),
             "new_year": new_year,
             "items_copied": items_copied,
+            "notices": notices,
         }
 
 

@@ -410,7 +410,7 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #:
 #: 本断言只**冻结上限**：不得比现状更差。
 #: 🔴 阈值是现算值而非拍脑袋 —— 降到更低后应同步下调（棘轮只许向下）。
-_IDENTITY_ONLY_BASELINE = 207  # 2026-10-22：note_wp_mapping B1/B2 四个端点补附注编辑门禁后现算 210
+_IDENTITY_ONLY_BASELINE = 202  # 2026-10-22：Task 11.1 note_wp_mapping 5 端点补附注编辑门禁后现算
 
 
 def test_identity_only_endpoints_do_not_grow():
@@ -581,7 +581,7 @@ _PREFIXED_KNOWN_GAPS: frozenset[str] = frozenset()
 
 #: 前缀维「仅登录不校项目」上限，棘轮只许向下。2026-10-16 现算 339；2026-10-19 补附注 / 交付件生成链路
 #: （交付中心 35 + word-exports 13 + 导出附注 Word 1 + 全链路工作流 10）后现算 277
-_PREFIXED_IDENTITY_ONLY_BASELINE = 277
+_PREFIXED_IDENTITY_ONLY_BASELINE = 270
 
 
 def _matches(names: set[str], tokens: tuple[str, ...]) -> bool:
@@ -711,7 +711,49 @@ def test_guard_action_token_is_really_project_level():
             )
     assert set(defs) == {"deliverable.py"}, f"_guard_action 只许交付中心定义一份：{sorted(defs)}"
     assert "assert_project_permission" in _auth_names_in_node(defs["deliverable.py"]), "_guard_action 不再校验项目成员"
+    # Task 13.1：_guard_action 调用 is_project_eqcr（需求 7.3），不含 _is_project_eqcr，不含与 "eqcr" 字面量比较
+    guard_names = _auth_names_in_node(defs["deliverable.py"])
+    assert "is_project_eqcr" in guard_names, "_guard_action 不再调用 is_project_eqcr（需求 7.3）"
+    assert "_is_project_eqcr" not in guard_names, "_guard_action 仍残留旧的 _is_project_eqcr 调用"
+    # 不含与字面量 "eqcr" 比较：函数体内不应有 Constant(value="eqcr") 出现
+    guard_node = defs["deliverable.py"]
+    eqcr_literals = [
+        n for n in ast.walk(guard_node)
+        if isinstance(n, ast.Constant) and n.value == "eqcr"
+    ]
+    assert not eqcr_literals, f"_guard_action 含与字面量 'eqcr' 的比较（{len(eqcr_literals)} 处），应通过 is_project_eqcr 判定"
     assert users and all(users.values()), f"复用方必须从 app.routers.deliverable 导入：{users}"
+
+
+def test_g_class_word_exports_use_only_guard_action():
+    """G 类导出 Word 端点只走 _guard_action，不调附注编辑门禁（需求 6.9）。
+
+    deliverable.py 整文件不应 import 或引用 note_edit_gate 任何函数名。"""
+    src = (_ROUTERS / "deliverable.py").read_text(encoding="utf-8-sig", errors="replace")
+    tree = ast.parse(src)
+    _NOTE_GATE_NAMES = {
+        "require_note_edit_access", "assert_note_edit_access",
+        "assert_note_edit_access_for_object", "assert_note_edit_access_on_projects",
+        "assert_note_role_access",
+    }
+    # 检查 import 层：不应从 note_edit_gate 导入
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module and "note_edit_gate" in node.module:
+            imported = {a.name for a in node.names}
+            assert not imported & _NOTE_GATE_NAMES, (
+                f"deliverable.py 导入了附注编辑门禁函数 {sorted(imported & _NOTE_GATE_NAMES)}（需求 6.9）"
+            )
+    # 检查引用层：函数体内不应出现这些名字
+    all_names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            all_names.add(node.id)
+        elif isinstance(node, ast.Attribute):
+            all_names.add(node.attr)
+    gate_refs = all_names & _NOTE_GATE_NAMES
+    assert not gate_refs, (
+        f"deliverable.py 引用了附注编辑门禁 {sorted(gate_refs)}，G 类端点应只走 _guard_action（需求 6.9）"
+    )
 
 
 def test_prefixed_identity_only_do_not_grow():

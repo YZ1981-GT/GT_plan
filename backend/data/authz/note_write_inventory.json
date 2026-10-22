@@ -1,10 +1,10 @@
 {
   "counts": {
-    "C": 25,
-    "E": 34,
+    "C": 33,
+    "E": 51,
     "G": 2,
-    "I": 24,
-    "R": 11,
+    "I": 5,
+    "R": 13,
     "S": 1,
     "X": 1
   },
@@ -807,6 +807,196 @@
       "function": "edit_note_formula",
       "method": "PUT",
       "path": "/api/consol-note-formulas/{formula_id}",
+      "registered": true,
+      "registry_group": "system",
+      "target_gate": {
+        "declared": false,
+        "eqcr": null,
+        "gate": null,
+        "kind": "keep_current",
+        "params": null,
+        "project_from": null,
+        "reason": null
+      }
+    },
+    {
+      "category": "C",
+      "current_equals_target": true,
+      "current_gate": {
+        "consol_lock": false,
+        "eqcr_exclusion": false,
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": null,
+            "name": "get_current_user",
+            "params": {},
+            "via": "signature"
+          }
+        ],
+        "global_roles": [],
+        "identity_only": true,
+        "max_level": null,
+        "operations": [],
+        "stub": null
+      },
+      "file": "consol_note_mapping_templates.py",
+      "function": "deactivate_mapping_template",
+      "method": "DELETE",
+      "path": "/api/consol-note-mapping-templates/{template_id}",
+      "registered": true,
+      "registry_group": "system",
+      "target_gate": {
+        "declared": false,
+        "eqcr": null,
+        "gate": null,
+        "kind": "keep_current",
+        "params": null,
+        "project_from": null,
+        "reason": null
+      }
+    },
+    {
+      "category": "C",
+      "current_equals_target": true,
+      "current_gate": {
+        "consol_lock": false,
+        "eqcr_exclusion": false,
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "review",
+            "name": "require_project_access",
+            "params": {},
+            "via": "signature"
+          }
+        ],
+        "global_roles": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [],
+        "stub": null
+      },
+      "file": "consol_note_mapping_templates.py",
+      "function": "promote_rule",
+      "method": "POST",
+      "path": "/api/projects/{project_id}/consol-note-mapping/rules/{rule_id}/promote",
+      "registered": true,
+      "registry_group": "system",
+      "target_gate": {
+        "declared": false,
+        "eqcr": null,
+        "gate": null,
+        "kind": "keep_current",
+        "params": null,
+        "project_from": null,
+        "reason": null
+      }
+    },
+    {
+      "category": "C",
+      "current_equals_target": true,
+      "current_gate": {
+        "consol_lock": false,
+        "eqcr_exclusion": false,
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "review",
+            "name": "require_project_access",
+            "params": {},
+            "via": "signature"
+          }
+        ],
+        "global_roles": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [],
+        "stub": null
+      },
+      "file": "consol_note_mapping_templates.py",
+      "function": "activate_structure_lock",
+      "method": "POST",
+      "path": "/api/projects/{project_id}/consol-note-structure-lock",
+      "registered": true,
+      "registry_group": "system",
+      "target_gate": {
+        "declared": false,
+        "eqcr": null,
+        "gate": null,
+        "kind": "keep_current",
+        "params": null,
+        "project_from": null,
+        "reason": null
+      }
+    },
+    {
+      "category": "C",
+      "current_equals_target": true,
+      "current_gate": {
+        "consol_lock": false,
+        "eqcr_exclusion": false,
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "review",
+            "name": "require_project_access",
+            "params": {},
+            "via": "signature"
+          }
+        ],
+        "global_roles": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [],
+        "stub": null
+      },
+      "file": "consol_note_mapping_templates.py",
+      "function": "release_structure_lock",
+      "method": "DELETE",
+      "path": "/api/projects/{project_id}/consol-note-structure-lock/{section_id}",
+      "registered": true,
+      "registry_group": "system",
+      "target_gate": {
+        "declared": false,
+        "eqcr": null,
+        "gate": null,
+        "kind": "keep_current",
+        "params": null,
+        "project_from": null,
+        "reason": null
+      }
+    },
+    {
+      "category": "C",
+      "current_equals_target": true,
+      "current_gate": {
+        "consol_lock": false,
+        "eqcr_exclusion": false,
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "review",
+            "name": "require_project_access",
+            "params": {},
+            "via": "signature"
+          }
+        ],
+        "global_roles": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [],
+        "stub": null
+      },
+      "file": "consol_note_mapping_templates.py",
+      "function": "confirm_value",
+      "method": "POST",
+      "path": "/api/projects/{project_id}/consol-note-value/confirm",
       "registered": true,
       "registry_group": "system",
       "target_gate": {
@@ -2615,11 +2805,11 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
@@ -2628,12 +2818,28 @@
             "name": "get_current_user",
             "params": {},
             "via": "signature"
+          },
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "review",
+            "name": "assert_note_role_access",
+            "params": {
+              "denied_message": "仅本项目经理或合伙人可切换附注模板类型",
+              "project_roles": [
+                "manager",
+                "partner"
+              ]
+            },
+            "via": "body"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -2663,8 +2869,8 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "R",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
         "eqcr_exclusion": false,
@@ -2672,23 +2878,21 @@
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
+            "level": "readonly",
+            "name": "require_project_access",
             "params": {},
             "via": "signature"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
+        "identity_only": false,
+        "max_level": "readonly",
         "operations": [],
         "stub": null
       },
-      "editor_call_points": null,
       "file": "note_conversion.py",
       "function": "preview_conversion",
       "method": "POST",
-      "outside_editor_files": null,
       "path": "/api/projects/{project_id}/notes/conversion/preview",
       "registered": true,
       "registry_group": "report",
@@ -2707,11 +2911,11 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
@@ -2720,12 +2924,28 @@
             "name": "get_current_user",
             "params": {},
             "via": "signature"
+          },
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "review",
+            "name": "assert_note_role_access",
+            "params": {
+              "denied_message": "仅本项目经理或合伙人可切换附注模板类型",
+              "project_roles": [
+                "manager",
+                "partner"
+              ]
+            },
+            "via": "body"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -2755,25 +2975,29 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
-            "params": {},
+            "level": "review",
+            "name": "require_note_edit_access",
+            "params": {
+              "consol_lock": false
+            },
             "via": "signature"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -2797,25 +3021,29 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
-            "params": {},
+            "level": "review",
+            "name": "require_note_edit_access",
+            "params": {
+              "consol_lock": false
+            },
             "via": "signature"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -2839,25 +3067,29 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
-            "params": {},
+            "level": "review",
+            "name": "require_note_edit_access",
+            "params": {
+              "consol_lock": false
+            },
             "via": "signature"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -2881,25 +3113,29 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
-            "params": {},
+            "level": "review",
+            "name": "require_note_edit_access",
+            "params": {
+              "consol_lock": false
+            },
             "via": "signature"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -2969,11 +3205,11 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
@@ -2982,12 +3218,28 @@
             "name": "get_current_user",
             "params": {},
             "via": "signature"
+          },
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "review",
+            "name": "assert_note_role_access",
+            "params": {
+              "denied_message": "仅本项目经理或合伙人可锁定报表附注数据",
+              "project_roles": [
+                "manager",
+                "partner"
+              ]
+            },
+            "via": "body"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -3017,25 +3269,29 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
-            "params": {},
+            "level": "review",
+            "name": "require_note_edit_access",
+            "params": {
+              "consol_lock": false
+            },
             "via": "signature"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -3059,11 +3315,11 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
@@ -3072,12 +3328,25 @@
             "name": "get_current_user",
             "params": {},
             "via": "signature"
+          },
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "review",
+            "name": "assert_note_role_access",
+            "params": {
+              "denied_message": "仅管理员可解除报表附注数据锁定",
+              "project_roles": []
+            },
+            "via": "body"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -3152,25 +3421,29 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
-            "params": {},
+            "level": "review",
+            "name": "require_note_edit_access",
+            "params": {
+              "consol_lock": false
+            },
             "via": "signature"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -3194,11 +3467,11 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
@@ -3207,12 +3480,24 @@
             "name": "get_current_user",
             "params": {},
             "via": "signature"
+          },
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "review",
+            "name": "assert_note_edit_access_on_projects",
+            "params": {
+              "consol_lock": false
+            },
+            "via": "body"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -3239,25 +3524,29 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
-            "params": {},
+            "level": "review",
+            "name": "require_note_edit_access",
+            "params": {
+              "consol_lock": false
+            },
             "via": "signature"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -3425,25 +3714,29 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
-            "params": {},
+            "level": "review",
+            "name": "require_note_edit_access",
+            "params": {
+              "consol_lock": false
+            },
             "via": "signature"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -3467,11 +3760,11 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
@@ -3480,12 +3773,28 @@
             "name": "get_current_user",
             "params": {},
             "via": "signature"
+          },
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "review",
+            "name": "assert_note_role_access",
+            "params": {
+              "denied_message": "仅本项目经理或合伙人可强制释放章节锁",
+              "project_roles": [
+                "manager",
+                "partner"
+              ]
+            },
+            "via": "body"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -3515,25 +3824,29 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
-            "params": {},
+            "level": "review",
+            "name": "require_note_edit_access",
+            "params": {
+              "consol_lock": false
+            },
             "via": "signature"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -3557,8 +3870,8 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "R",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
         "eqcr_exclusion": false,
@@ -3566,23 +3879,21 @@
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
+            "level": "readonly",
+            "name": "require_project_access",
             "params": {},
             "via": "signature"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
+        "identity_only": false,
+        "max_level": "readonly",
         "operations": [],
         "stub": null
       },
-      "editor_call_points": null,
       "file": "note_section_lock.py",
       "function": "release_lock",
       "method": "POST",
-      "outside_editor_files": null,
       "path": "/api/projects/{project_id}/notes/locks/release",
       "registered": true,
       "registry_group": "report",
@@ -3932,25 +4243,29 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
-            "params": {},
+            "level": "review",
+            "name": "require_note_edit_access",
+            "params": {
+              "consol_lock": false
+            },
             "via": "signature"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -3974,25 +4289,29 @@
       }
     },
     {
-      "category": "I",
-      "current_equals_target": false,
+      "category": "E",
+      "current_equals_target": true,
       "current_gate": {
         "consol_lock": false,
-        "eqcr_exclusion": false,
+        "eqcr_exclusion": true,
         "forms": [
           {
             "conditional": false,
             "helper": null,
-            "level": null,
-            "name": "get_current_user",
-            "params": {},
+            "level": "review",
+            "name": "require_note_edit_access",
+            "params": {
+              "consol_lock": false
+            },
             "via": "signature"
           }
         ],
         "global_roles": [],
-        "identity_only": true,
-        "max_level": null,
-        "operations": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
         "stub": null
       },
       "editor_call_points": null,
@@ -4281,6 +4600,7 @@
       "account_note_mapping.py",
       "consol_note_detail_templates.py",
       "consol_note_formulas.py",
+      "consol_note_mapping_templates.py",
       "consol_note_sections.py",
       "consol_notes.py",
       "disclosure_notes.py",
@@ -4293,6 +4613,7 @@
       "note_custom_section.py",
       "note_custom_template.py",
       "note_data_lock.py",
+      "note_edit_permission.py",
       "note_export.py",
       "note_group_template.py",
       "note_offline.py",
@@ -4306,7 +4627,7 @@
       "report_note_references.py"
     ],
     "frontend": "待接入（任务 8.3）",
-    "write_endpoint_total": 98
+    "write_endpoint_total": 106
   },
   "schema": "note_write_inventory/v1"
 }

@@ -18,8 +18,8 @@ from app.services.independence_signing_service import IndependenceSigningService
 from app.services.review_workflow_service import ReviewWorkflowService
 
 # 路由级 readonly 保证项目隔离（只有项目成员能访问）。写端点按「谁会用」定级（Phase 8 Task 8 补，2026-10-19 复核调整）：
-#   - 复核写（save / link / unlink / import）与发起签署（initiate）挂 review：合伙人 / 经理 / 质控 / EQCR 在项目里是
-#     review 级（assignment_service.ROLE_MAP），挂 edit 会把复核人挡在外面；edit 级的审计员 / 助理照样放行。
+#   - 复核写（save / link / unlink / import）与发起签署（initiate）挂 review：质控与 EQCR 是 review 级，
+#     合伙人 / 经理是 edit 级，两者都满足 review 门禁；挂 edit 会把质控 / EQCR 挡在外面。
 #   - 成员签署（sign）只要求是项目成员，且只能签本人（URL 里的 user_id 必须是当前登录人）。
 # my_signing_router 无 project_id：要求登录，且只能查本人的待签任务。
 router = APIRouter(
