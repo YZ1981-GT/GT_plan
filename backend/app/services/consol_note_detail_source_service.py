@@ -240,6 +240,9 @@ async def load_source_tables(
                 table_name=entry.get("standalone_table_name"),
                 title=entry.get("consol_title"),
                 section_title=note.section_title,
+                std=template_type,
+                consol_section_id=section_id,
+                standalone_section=note.note_section,
             )
     return out
 

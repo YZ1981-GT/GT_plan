@@ -12,12 +12,11 @@ import pytest
 from app.services.consol_note_formula_service import find_table
 from app.services.consol_note_section_mapping import resolve_mapping_entry
 from app.services.consol_note_standalone_reader import (
-    END_TOKEN,
-    PRIOR_TOKEN,
-    column_paths,
     pick_standalone_table,
     read_source_table,
 )
+
+# 表头路径 / 列语义键 / 续表认定的用例在 tests/test_note_table_header_library.py（读取层已收口到标题行库）
 
 
 def _meta(section: str, label: str) -> dict:
@@ -58,35 +57,6 @@ def _read(td: dict, section_id: str, template_type: str = "soe"):
         table_name=entry.get("standalone_table_name"),
         title=entry.get("consol_title"),
     )
-
-
-class TestColumnPaths:
-    def test_multi_header_beats_misaligned_headers(self):
-        """五-4-1 的 headers 与 multi_header 错位，列路径以 multi_header 为准。"""
-        paths = column_paths(find_table("soe", "五-4-1"))
-        assert paths[1] == (END_TOKEN, "账面余额")
-        assert paths[3] == (END_TOKEN, "账面价值")
-        assert paths[4] == (PRIOR_TOKEN, "账面余额")
-
-    def test_three_level_header_and_vertical_merge(self):
-        """五-4-2：三层表头，「账面价值」在最底层纵向合并，不继承左侧的「预期信用损失率」。"""
-        paths = column_paths(find_table("soe", "五-4-2"))
-        assert paths[1] == (END_TOKEN, "账面余额", "金额")
-        assert paths[2] == (END_TOKEN, "账面余额", "比例(%)")
-        assert paths[4] == (END_TOKEN, "坏账准备", "预期信用损失率(%)")
-        assert paths[5] == (END_TOKEN, "账面价值")
-
-    def test_standalone_headers_with_column_groups(self):
-        table = {
-            "headers": ["票据种类", "账面余额", "坏账准备", "账面价值", "账面余额", "坏账准备", "账面价值"],
-            "_column_groups": [{"group": "期末数", "start": 1, "span": 3}, {"group": "期初数", "start": 4, "span": 3}],
-        }
-        paths = column_paths(table)
-        assert paths[2] == (END_TOKEN, "坏账准备")
-        assert paths[6] == (PRIOR_TOKEN, "账面价值")
-
-    def test_period_synonyms_share_token(self):
-        assert column_paths({"headers": ["项目", "期末数", "上年年末余额"]})[1:] == [(END_TOKEN,), (PRIOR_TOKEN,)]
 
 
 class TestPickTable:
@@ -187,6 +157,59 @@ class TestReadSourceTable:
         ]}]}
         st = _read(td, "五-1-1")
         assert st.rows == [{"label": "库存现金", "row_type": "data", "values": [1234.5, None]}]
+
+    def test_prior_continuation_chosen_by_headers(self):
+        """国企 五-4-3（期初数续表）：映射子表名精确命中的「（续）」是单项计提表，按表头读「（续：期初数）」。"""
+        groups = [{"group": "账面余额", "start": 1, "span": 2}, {"group": "坏账准备", "start": 3, "span": 2}]
+        headers = ["类别", "金额", "比例(%)", "金额", "预期信用损失率(%)", "账面价值"]
+        tables = [
+            {"name": "按坏账准备计提方法分类披露应收票据（期末数）", "headers": headers, "_column_groups": groups,
+             "rows": [{"label": "按组合计提坏账准备", "values": [900, 90, 45, 5, 855]}]},
+            {"name": "按坏账准备计提方法分类披露应收票据（续：期初数）", "headers": headers, "_column_groups": groups,
+             "rows": [{"label": "按组合计提坏账准备", "values": [700, 70, 35, 5, 665]}]},
+            {"name": "按坏账准备计提方法分类披露应收票据（续）", "headers": ["名称", "账面余额", "坏账准备", "预期信用损失率(%)", "计提理由"],
+             "rows": [{"label": "甲公司", "values": [10, 1, 10, "无法收回"]}]},
+        ]
+        st = read_source_table(
+            {"_tables": tables}, consol_table=find_table("soe", "五-4-3"),
+            table_name="按坏账准备计提方法分类披露应收票据（续）",
+        )
+        assert st.table_name == "按坏账准备计提方法分类披露应收票据（续：期初数）"
+        assert st.table_choice == "structure"
+        assert st.rows == [{"label": "按组合计提坏账准备", "row_type": "data", "values": [700, None, 35, None, 665]}]
+        assert st.to_status()["table_choice"] == "structure"
+
+    def test_row_continuation_rows_are_appended(self):
+        """行续表（同样的列补行）：行追加在主表后，列按续表自己的表头对应。"""
+        tables = [
+            {"name": "货币资金", "headers": ["项目", "期末余额", "期初余额"],
+             "rows": [{"label": "库存现金", "values": [1, 2]}, {"label": "银行存款", "values": [3, 4]}]},
+            {"name": "货币资金（续）", "headers": ["项目", "期末余额", "期初余额"],
+             "rows": [{"label": "其他货币资金", "values": [5, 6]}]},
+        ]
+        st = _read({"_tables": tables}, "五-1-1")
+        assert [r["label"] for r in st.rows] == ["库存现金", "银行存款", "其他货币资金"]
+        assert st.rows[2]["values"] == [5, 6]
+
+    def test_legacy_headerless_table_uses_cell_semantics(self):
+        """真库旧单表格式（宜宾临港店）：headers 为空，按行 _cell_meta 语义补表头后认列（与附注编辑器同口径）。"""
+        def row(label, end, prior):
+            return {"label": label, "values": [end, prior], "_cell_meta": {
+                "0": {"semantic": "closing_balance"}, "1": {"semantic": "opening_balance"}}}
+        td = {"headers": [], "rows": [row("库存现金", 10, 8), row("银行存款", 100, 90)]}
+        st = read_source_table(td, consol_table=find_table("soe", "五-1-1"), table_name="货币资金",
+                               section_title="货币资金")
+        assert st.rows[0]["values"] == [10, 8] and st.rows[1]["values"] == [100, 90]
+
+    def test_continuing_involvement_table_is_not_joined(self):
+        """「继续涉入」表名含「续」但不是续表，不能被当成主表的续表并进来。"""
+        tables = [
+            {"name": "货币资金", "headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "库存现金", "values": [1, 2]}]},
+            {"name": "货币资金转移继续涉入形成的资产", "headers": ["项目", "期末余额", "期初余额"],
+             "rows": [{"label": "其他", "values": [9, 9]}]},
+        ]
+        st = _read({"_tables": tables}, "五-1-1")
+        assert [r["label"] for r in st.rows] == ["库存现金"]
 
     @pytest.mark.parametrize("td", [None, {}, {"_tables": []}])
     def test_empty_inputs_have_reason(self, td):

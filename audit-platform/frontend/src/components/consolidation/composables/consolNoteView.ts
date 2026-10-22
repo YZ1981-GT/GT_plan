@@ -3,7 +3,7 @@
  *
  * - 编辑行 ⇄ 已保存数据（`consol_note_data.data`）：手工标记 `manual_cells` 随行对象移动，删行 / 插行后位置仍对；
  *   保存时按当前行号写回，并保留已保存数据里的其他键（整包替换不再丢 `manual_cells`）。
- * - 「按公式填入」结果的汇总与明细；「查看差额」的行与核对（线性公式各下级贡献之和 = 合并数）。
+ * - 「按公式填入」结果的汇总与明细；「查看差额」的行与核对（线性公式各下级贡献之和 = 合并数）；「重新汇总」完成提示。
  * 金额只做 Decimal 比较，不在前端重算。
  */
 import Decimal from 'decimal.js'
@@ -12,6 +12,8 @@ import type {
   ConsolNoteBreakdownCell,
   ConsolNoteFillResult,
   ConsolNoteFormulaList,
+  ConsolNoteReaggregateAction,
+  ConsolNoteReaggregateResult,
 } from '@/services/consolidationApi'
 
 /** 编辑行：列号 → 文本；`__manual` = 本行手工填写的列号（按公式填入时保留） */
@@ -175,6 +177,40 @@ export function fillDetailRows(res: ConsolNoteFillResult): FillDetailRow[] {
 /** 有公式的章节（「全部按公式填入」只跑这些） */
 export function sectionIdsWithFormulas(list: Pick<ConsolNoteFormulaList, 'sections'> | null | undefined): string[] {
   return (list?.sections || []).filter((s) => s.formulas?.length).map((s) => s.section_id)
+}
+
+// ─── 重新汇总（节点子树）结果 ──────────────────────────────────────────────────
+
+export interface ReaggregateSummary {
+  /** 所选节点都写上了、没有待确认映射的企业、没有出错 */
+  ok: boolean
+  text: string
+}
+
+/**
+ * 完成提示：写入节点数与拉数 / 差额 / 汇总分布、所选节点没写上的原因、待确认映射的企业、出错处
+ * （spec consol-note-header-library-and-node-reaggregate R3.6）。旧响应没有 `nodes` 时退回按章节计数。
+ */
+export function reaggregateSummary(
+  res: Partial<Pick<ConsolNoteReaggregateResult, 'nodes' | 'results' | 'pending_entities' | 'failures' | 'sections_updated'>>
+    | null | undefined,
+): ReaggregateSummary {
+  const nodes = res?.nodes || []
+  const written = nodes.filter((n) => n.written > 0)
+  const count = (action: ConsolNoteReaggregateAction) => written.filter((n) => n.action === action).length
+  const parts = [nodes.length
+    ? `写入 ${written.length} 个节点（拉数 ${count('pull')} / 差额 ${count('elim')} / 汇总 ${count('aggregate')}）`
+    : `更新 ${res?.sections_updated ?? 0} 个章节`]
+  const notWritten = (res?.results || []).find((r) => r.status !== 'persisted')
+  if (notWritten) parts.push(`本节点未更新：${notWritten.reason || '没有可汇总的数据'}`)
+  const pending = res?.pending_entities || []
+  if (pending.length) {
+    const names = pending.slice(0, 3).map((p) => p.label).join('、') + (pending.length > 3 ? ' 等' : '')
+    parts.push(`${pending.length} 家企业待在「📋 明细映射」确认映射（${names}）`)
+  }
+  const failures = res?.failures || []
+  if (failures.length) parts.push(`${failures.length} 处出错：${failures[0].error}`)
+  return { ok: !notWritten && !pending.length && !failures.length, text: `重新汇总完成：${parts.join('；')}` }
 }
 
 // ─── 查看差额 ─────────────────────────────────────────────────────────────────

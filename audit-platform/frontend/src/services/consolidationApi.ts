@@ -505,6 +505,52 @@ export interface ConsolNoteFillResult {
   data: { headers: any[]; rows: string[][]; manual_cells?: Array<{ row: number; col: number }>; [k: string]: any }
 }
 
+// ─── 重新汇总：节点子树逐节点更新 + 自下而上汇总（spec consol-note-header-library-and-node-reaggregate）───
+
+/** 本轮对节点做的事：数据叶子从单体附注拉数 / 差额节点按抵销分录算差额 / 汇总节点 Σ 直接下级 + 差额 */
+export type ConsolNoteReaggregateAction = 'pull' | 'elim' | 'aggregate'
+
+export interface ConsolNoteReaggregateNode {
+  node_key: string
+  kind: ConsolNodeKind
+  action: ConsolNoteReaggregateAction
+  label: string
+  written: number
+  skipped: number
+  failed: number
+  /** 跳过 / 失败原因及章节数 */
+  reasons: Array<{ reason: string; count: number }>
+}
+
+export interface ConsolNoteReaggregateResult {
+  success: boolean
+  status: 'persisted' | 'partial' | 'failed' | 'skipped'
+  project_id: string
+  year: number
+  /** 所选节点（请求不带节点 = 根合并节点） */
+  node_key: string | null
+  legacy_null: boolean
+  template_type: ConsolNoteTemplateType
+  mode: 'subtree'
+  sections_processed: number
+  /** 所选节点写入的章节数 */
+  sections_updated: number
+  /** 所选节点的逐章节结果 */
+  results: Array<{
+    section_id: string
+    node_key: string
+    action: ConsolNoteReaggregateAction
+    status: 'persisted' | 'skipped' | 'failed'
+    reason: string | null
+    [k: string]: unknown
+  }>
+  failures: Array<{ section_id: string; node_key: string | null; status: 'failed'; error: string }>
+  errors: string[]
+  nodes: ConsolNoteReaggregateNode[]
+  /** 需要到「📋 明细映射」确认映射的企业 */
+  pending_entities: Array<{ node_key: string; label: string; section_count: number; sections: string[]; reasons: string[] }>
+}
+
 // ─── 合并企业树（三码推导，spec consol-tree-three-code-autobuild）─────────────────
 
 /** 节点角色：合并 / 合并差额 / 母公司 / 本部 / 母分差额 / 子公司 / 分公司 */

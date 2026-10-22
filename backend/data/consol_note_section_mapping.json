@@ -60,8 +60,8 @@
         "consol_seq": 6,
         "standalone_note_section": "八、4",
         "standalone_section_title": "应收票据",
-        "match_type": "table_title",
-        "standalone_table_name": "按坏账准备计提方法分类披露应收票据"
+        "match_type": "structure",
+        "standalone_table_name": "按坏账准备计提方法分类披露应收票据（期末数）"
       },
       {
         "consol_section_id": "五-4-3",
@@ -70,8 +70,8 @@
         "consol_seq": 7,
         "standalone_note_section": "八、4",
         "standalone_section_title": "应收票据",
-        "match_type": "table_title",
-        "standalone_table_name": "按坏账准备计提方法分类披露应收票据（续）"
+        "match_type": "structure",
+        "standalone_table_name": "按坏账准备计提方法分类披露应收票据（续：期初数）"
       },
       {
         "consol_section_id": "五-4-4",
@@ -890,8 +890,8 @@
         "consol_seq": 240,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "不重要合营企业和联营企业的汇总信息"
       },
       {
         "consol_section_id": "五-18-10",
@@ -900,8 +900,8 @@
         "consol_seq": 241,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "②对合营企业或联营企业发生超额亏损的分担额"
       },
       {
         "consol_section_id": "五-19-1",
@@ -1890,8 +1890,8 @@
         "consol_seq": 261,
         "standalone_note_section": "八、54",
         "standalone_section_title": "长期应付职工薪酬",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "计划资产"
       },
       {
         "consol_section_id": "五-55-1",
@@ -1970,8 +1970,8 @@
         "consol_seq": 157,
         "standalone_note_section": "八、54",
         "standalone_section_title": "长期应付职工薪酬",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "计划资产"
       },
       {
         "consol_section_id": "五-56-1",
@@ -2010,8 +2010,8 @@
         "consol_seq": 160,
         "standalone_note_section": "八、56",
         "standalone_section_title": "递延收益",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "其中：递延收益-政府补助情况"
       },
       {
         "consol_section_id": "五-58-1",
@@ -2251,7 +2251,7 @@
         "standalone_note_section": "八、72",
         "standalone_section_title": "公允价值变动收益",
         "match_type": "exact",
-        "standalone_table_name": null
+        "standalone_table_name": "产生公允价值变动收益的来源"
       },
       {
         "consol_section_id": "五-74-1",
@@ -3962,8 +3962,8 @@
         "consol_seq": 8,
         "standalone_note_section": "五、4",
         "standalone_section_title": "应收票据",
-        "match_type": "table_title",
-        "standalone_table_name": "按坏账计提方法分类"
+        "match_type": "structure",
+        "standalone_table_name": "按坏账计提方法分类（期末余额）"
       },
       {
         "consol_section_id": "五-4-6",
@@ -3982,8 +3982,8 @@
         "consol_seq": 10,
         "standalone_note_section": "五、4",
         "standalone_section_title": "应收票据",
-        "match_type": "table_title",
-        "standalone_table_name": "按单项计提坏账准备的应收票据"
+        "match_type": "structure",
+        "standalone_table_name": "按单项计提坏账准备的应收票据（期末余额）"
       },
       {
         "consol_section_id": "五-4-8",
@@ -3992,8 +3992,8 @@
         "consol_seq": 11,
         "standalone_note_section": "五、4",
         "standalone_section_title": "应收票据",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "continuation",
+        "standalone_table_name": "按单项计提坏账准备的应收票据（续：上年年末余额）"
       },
       {
         "consol_section_id": "五-4-9",
@@ -4202,8 +4202,8 @@
         "consol_seq": 32,
         "standalone_note_section": "五、5",
         "standalone_section_title": "应收账款",
-        "match_type": "exact",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "按欠款方归集的应收账款和合同资产期末余额前五名单位情况"
       },
       {
         "consol_section_id": "五-6-1",
@@ -4272,8 +4272,8 @@
         "consol_seq": 39,
         "standalone_note_section": "五、7",
         "standalone_section_title": "预付款项",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "按预付对象归集的预付款项期末余额前五名单位情况"
       },
       {
         "consol_section_id": "五-8-1",
@@ -4593,7 +4593,7 @@
         "standalone_note_section": "五、10",
         "standalone_section_title": "合同资产",
         "match_type": "chapter",
-        "standalone_table_name": null
+        "standalone_table_name": "合同资产减值准备计提情况（期末余额）"
       },
       {
         "consol_section_id": "五-10-4",
@@ -4603,7 +4603,7 @@
         "standalone_note_section": "五、10",
         "standalone_section_title": "合同资产",
         "match_type": "chapter",
-        "standalone_table_name": null
+        "standalone_table_name": "按单项计提减值准备（期末余额）"
       },
       {
         "consol_section_id": "五-10-5",
@@ -4612,8 +4612,8 @@
         "consol_seq": 73,
         "standalone_note_section": "五、10",
         "standalone_section_title": "合同资产",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "continuation",
+        "standalone_table_name": "按单项计提减值准备（续：上年年末余额）"
       },
       {
         "consol_section_id": "五-10-6",
@@ -6262,8 +6262,8 @@
         "consol_seq": 238,
         "standalone_note_section": "五、62",
         "standalone_section_title": "营业收入和营业成本",
-        "match_type": "exact",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "营业收入、营业成本按分解信息"
       },
       {
         "consol_section_id": "五-62-5",
@@ -6453,7 +6453,7 @@
         "standalone_note_section": "五、76",
         "standalone_section_title": "信用减值损失",
         "match_type": "fuzzy",
-        "standalone_table_name": null
+        "standalone_table_name": "项  目"
       },
       {
         "consol_section_id": "五-73-1",
@@ -6523,7 +6523,7 @@
         "standalone_note_section": "五、74",
         "standalone_section_title": "租赁",
         "match_type": "table_title",
-        "standalone_table_name": "②资产负债表日后连续五个会计年度每年将收到的未折现租赁收款额，以及剩余年度将收到的未折现租赁收款额总额。"
+        "standalone_table_name": "②资产负债表日后连续五个会计年度每年将收到的未折现租赁收款额，以及剩余年度将收到的未折现租赁收款额总额"
       },
       {
         "consol_section_id": "五-75-1",
@@ -6532,8 +6532,8 @@
         "consol_seq": 256,
         "standalone_note_section": "五、79",
         "standalone_section_title": "营业外收入",
-        "match_type": "exact",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "营业外收入"
       },
       {
         "consol_section_id": "五-76-1",
@@ -6542,8 +6542,8 @@
         "consol_seq": 257,
         "standalone_note_section": "五、80",
         "standalone_section_title": "营业外支出",
-        "match_type": "exact",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "营业外支出"
       },
       {
         "consol_section_id": "五-77-1",
@@ -6862,8 +6862,8 @@
         "consol_seq": 303,
         "standalone_note_section": "五、27",
         "standalone_section_title": "开发支出",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "开发支出"
       },
       {
         "consol_section_id": "六-1-2",
@@ -6882,8 +6882,8 @@
         "consol_seq": 305,
         "standalone_note_section": "五、27",
         "standalone_section_title": "开发支出",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "重要的资本化研发项目"
       },
       {
         "consol_section_id": "六-1-4",

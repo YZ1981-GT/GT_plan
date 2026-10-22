@@ -17,10 +17,16 @@ import {
   noteBreakdownRows,
   notePayload,
   parseManualCells,
+  reaggregateSummary,
   sectionIdsWithFormulas,
   toEditRows,
 } from '../composables/consolNoteView'
-import type { ConsolNoteBreakdown, ConsolNoteFillResult } from '@/services/consolidationApi'
+import type {
+  ConsolNoteBreakdown,
+  ConsolNoteFillResult,
+  ConsolNoteReaggregateAction,
+  ConsolNoteReaggregateNode,
+} from '@/services/consolidationApi'
 
 const HEADERS = ['项目', '期末余额', '期初余额']
 
@@ -143,6 +149,40 @@ describe('附注差额', () => {
   })
 })
 
+describe('重新汇总完成提示（节点子树）', () => {
+  const node = (node_key: string, action: ConsolNoteReaggregateAction, written: number): ConsolNoteReaggregateNode => ({
+    node_key, kind: action === 'pull' ? 'data' : action, action, label: node_key, written, skipped: 0, failed: 0, reasons: [],
+  })
+  const persisted = { section_id: '五-1-1', node_key: 'G:consol', action: 'aggregate' as const, status: 'persisted' as const, reason: null }
+
+  it('按节点汇报拉数 / 差额 / 汇总分布；全部写上且无待确认、无出错 ⇒ ok', () => {
+    const summary = reaggregateSummary({
+      nodes: [node('G:consol', 'aggregate', 1), node('G:consol_elim', 'elim', 1), node('A:subsidiary', 'pull', 1),
+        node('B:subsidiary', 'pull', 1), node('G:parent', 'pull', 0)],
+      results: [persisted], pending_entities: [], failures: [],
+    })
+    expect(summary).toEqual({ ok: true, text: '重新汇总完成：写入 4 个节点（拉数 2 / 差额 1 / 汇总 1）' })
+  })
+
+  it('所选节点没写上、待确认映射、出错都写进提示且不算 ok', () => {
+    const summary = reaggregateSummary({
+      nodes: [node('A:subsidiary', 'pull', 1)],
+      results: [{ ...persisted, status: 'skipped', reason: '下级企业都没有可汇总的单体附注数据' }],
+      pending_entities: ['乙', '丙', '丁', '戊'].map((label) => ({
+        node_key: `${label}:subsidiary`, label, section_count: 1, sections: ['五-1-1'], reasons: ['未确认映射'] })),
+      failures: [{ section_id: '五-1-1', node_key: 'G:consol_elim', status: 'failed', error: '无法计算差额：当前合并范围尚未由用户确认' }],
+    })
+    expect(summary.ok).toBe(false)
+    expect(summary.text).toBe('重新汇总完成：写入 1 个节点（拉数 1 / 差额 0 / 汇总 0）；本节点未更新：下级企业都没有可汇总的单体附注数据；'
+      + '4 家企业待在「📋 明细映射」确认映射（乙、丙、丁 等）；1 处出错：无法计算差额：当前合并范围尚未由用户确认')
+  })
+
+  it('旧响应没有逐节点摘要时按章节计数', () => {
+    expect(reaggregateSummary({ sections_updated: 3 })).toEqual({ ok: true, text: '重新汇总完成：更新 3 个章节' })
+    expect(reaggregateSummary(null)).toEqual({ ok: true, text: '重新汇总完成：更新 0 个章节' })
+  })
+})
+
 describe('ConsolNoteTab 生产接线守卫', () => {
   const component = fs.readFileSync(path.resolve(__dirname, '../ConsolNoteTab.vue'), 'utf-8')
   const index = fs.readFileSync(path.resolve(__dirname, '../../../views/ConsolidationIndex.vue'), 'utf-8')
@@ -161,6 +201,11 @@ describe('ConsolNoteTab 生产接线守卫', () => {
     const body = component.slice(component.indexOf('async function handleReaggregate'), component.indexOf('function addNoteRow'))
     expect(body).toContain('standard: props.standard')
     expect(body).not.toContain('standard: props.currentEntity')
+    // 完成提示按节点汇报（不再只报「更新 N 个章节」），按钮说明是子树拉数 + 汇总而不是「按公式重算」
+    expect(body).toContain('reaggregateSummary(result)')
+    expect(component).toContain('本节点下各企业按已确认映射从单体附注重新拉数，差额节点按抵销分录重算，再自下而上汇总到本节点')
+    expect(component).not.toContain('按公式重算本节点合并附注')
+    expect(component).toContain("lastWrite === 'subtree_aggregate'")
   })
 
   it('页面按钮接入新 fill/breakdown API；编辑即标手工；保存保留原 data', () => {

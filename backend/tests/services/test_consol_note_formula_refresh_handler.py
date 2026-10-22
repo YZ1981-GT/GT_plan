@@ -640,3 +640,25 @@ async def test_load_view_context_called_exactly_once(runtime):
 
     assert runtime.load_view.await_count == 1
     assert runtime.fill_sections.await_count == 4  # G + A + B + C
+
+
+@pytest.mark.asyncio
+async def test_background_refresh_preserves_pulled_data_and_reports_it_separately(runtime):
+    """后台刷新传 preserve_pulled=True：从单体附注拉来的章节单列 kept_pulled，不算「按公式写入」
+    （spec consol-note-header-library-and-node-reaggregate design §9）。"""
+    runtime.build_tree.return_value = _node("G:consol")
+    runtime.fill_sections.return_value = {
+        "results": [
+            {"section_id": _SECTIONS[0], "record_id": "r-1", "status": "persisted", "kept_manual_count": 0},
+            {"section_id": _SECTIONS[1], "record_id": "r-2", "status": "kept_pulled", "stale_marked": True},
+        ],
+        "failures": [],
+    }
+
+    result = await refresh_handler.handle_consol_note_formula_refresh(_event())
+
+    assert runtime.fill_sections.await_args.kwargs["preserve_pulled"] is True
+    assert [item["section_id"] for item in result["persisted"]] == [_SECTIONS[0]]
+    assert [(item["section_id"], item["stale_marked"]) for item in result["kept_pulled"]] == [(_SECTIONS[1], True)]
+    assert result["nodes"][0]["persisted"] == 1 and result["nodes"][0]["kept_pulled"] == 1
+    assert result["status"] == "persisted"

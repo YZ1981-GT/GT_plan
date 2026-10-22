@@ -1,0 +1,76 @@
+# 合并附注标题行库 + 节点子树重新汇总 — 任务
+
+## Phase 1 标题行库
+
+- [x] 1. 词表 `backend/data/note_table_header_vocabulary.json`：期间四类词（从读取层 `_END_WORDS/_PRIOR_WORDS` 迁入并拆分 本期 / 期末）、期间前缀与纯期间余词、分组同义词、比例列规则、续表标记规则与非续表词、逐表覆盖（初始为空，结构带理由字段）（R1.2）
+  - 词表按四版种子全部表头段现扫（197 个带期间词的段）定：整词期间 / 期间开头 / 期间结尾三种写法都认（「减值准备期末余额」「期末余额（账面价值）」）
+- [x] 2. 模块 `backend/app/services/note_table_header_library.py`：`column_paths`（合并表走 `normalize_consol_note_section`，单体表认平铺 / 树形分组与 `columns[].group`）、`column_keys`、`is_continuation_name`、`name_period`、`continuation_links`、`match_columns`、`choose_unit`（R1.1 / R1.4 / R1.5）
+  - 行数门 800：识别（501 行）与对应 / 选表（`note_table_header_match.py`，345 行）分两个模块
+  - 选表补一条「表头分不出时取有数的那张」：真库同一章节新旧模板表并存（和平 八、4 有 17 张表，「（期末数）」与无期间同名表同构）
+- [x] 3. 模块单元测试：续表正反例、主表与类型、树形分组、表名期间、期间前缀拆分不撞键、「/」平表头、强弱规则与歧义放弃、三种选表方式、覆盖生效
+  - `tests/test_note_table_header_library.py` 65 passed；进程内 5 个变异（续表按子串 / 去期间前缀 / 去结构排序 / 去有数优先 / 合并表只取末级）各自打红对应用例
+  - 真库三种 八、4 表组合：五-4-2 都选到期末表、五-4-3 都选到「（续：期初数）」（名字精确命中的是单项计提表）
+- [x] 4. 目录生成：`note_table_header_catalog.py` + `backend/scripts/seed/build_note_table_header_library.py`（`--check` 漂移 exit 2），生成 `note_table_header_library.json`（R1.3 / R1.6）
+  - 四版：国企单体 252 / 国企合并 321 / 上市单体 460 / 上市合并 432 张表；对应覆盖（已选中单体表的金额列对上比例）国企 76.2%、上市 89.1%
+  - 按目录审出来的规则修正（都进了模块与测试）：说明类列（原因 / 依据 / 日期 / 期限 …）不算金额列；「金额 / 余额」是计量填充词；种子「中级-叶」连字符拆层；表头尾部勾稽式注记不进计量；新增同义（坏账准备 ↔ 减值准备）、反向前后缀、单期间唯一列三条弱规则；选表打分加比例 / 说明类列一致与列数接近；一列金额都对不上时只认表名精确命中；「续」接紧挨着的上一张表（上市「应付债券（续）」原被认到同基名汇总表）
+  - 异常清单 90 条（续表自指 2 / 并列表误标续表 12 / 种子续表序号与标记不符 4 / 同表两列同键 23 / 表头混入数据行 7 / 标签列表头盖到数据列 4 / 疑似新旧模板重复表 5 / 含「续」非续表 33）
+- [x] 5. 目录测试：入库文件与生成结果一致、四版表数 = 种子表数、已知异常在清单、国企 五-4-3 对到「（续：期初数）」、覆盖率棘轮
+  - `tests/test_note_table_header_catalog.py` 11 passed；进程内变异：词表改动未重生成 / 去掉章节异常检测 / 续表主表改按同基名优先，各自打红
+
+## Phase 2 读取层与映射收口
+
+- [x] 6. `consol_note_standalone_reader` 删除自带表头解析 / 同义词 / 续表判定改调模块；行续表并行、名字认不到按结构兜底并回报 `table_choice`（R2.1~R2.3）
+  - 读取层只剩取表（`_tables_of`）、行类型与按「行名 + 同名序号」对行；选表 / 认列全部调 `choose_unit` / `match_columns`
+  - 带合并表头时子表名与合并表标题两路命中合起来按表头比（映射子表名来自种子，种子有错名：国企 八、54 敏感性分析表叫「计划资产」）；裸「续：」标题有更具体名字时不参与
+  - 无名字证据只在强命中明显领先「取自别的表」的次优者时按结构选（同构表不猜）；章节只有一张表但一列金额都对不上时不拿它凑数（多是章节映射错位）
+  - 旧单表格式表头为空：复用 `note_header_projector.derive_headers_for_legacy_table` 补表头（真库宜宾临港店 17 个章节）
+- [x] 7. `gen_consol_standalone_note_mapping.py` 续表判定与单体选表改调模块，重生成 `consol_note_section_mapping.json` 并逐条审变化（R1.5）
+  - 只用单体口径章节的表选子表；「续：」接上一张改为按标题行库续表关系认；23 条变化逐条审过（国企 五-4-2 / 五-4-3、上市 五-4-5~8 / 五-10-3~5 等），库目录 `mapping_disagreements` 两版均为 0
+- [x] 8. 回归：读取层 / 映射 / V186 / 端到端测试不回退（R2.4）
+  - 合并附注相关 12 个测试文件 250 passed；`test_consol_note_formulas::test_seed_counts_on_real_templates` 2 例与 `test_consol_note_headers` 147 例失败在 HEAD 干净检出同样失败（预存，非本 spec）
+  - 真库只读对比（9 个项目 × 映射章节 3228 组，新旧代码各跑一次）：2554 组完全相同；9 组换表全是 五-4-2 / 五-4-3 纠正；31 组不再取表（30 组是章节映射错位时唯一一张不相干的表、本来一列都对不上，1 组旧模板表无数）；76 个合并章节新认到表；没有任何原有非零数丢失
+  - 进程内变异：两路名字证据改回子表名优先 / 去掉裸「续：」过滤 / 去掉旧单表补表头，各自打红
+
+## Phase 3 重新汇总 = 子树逐节点更新 + 自下而上汇总
+
+- [x] 9. 合计 / 小计重算抽成 `consol_note_table_totals.recompute_total_rows`，apply 改用（不改行为）
+  - 勘误：实际抽成 `build_table_rows`（骨架行 + 逐列金额 → 写入行，含合计 / 小计重算与手工 / 锁定格保留），apply 与子树汇总共用；另有 `to_decimal` / `fmt_amount` / `existing_cell`
+  - 偏离「不改行为」一处（缺陷修复）：手工 / 锁定格在来源这一格没数时原来会被清空，现在一律保留（来源有数时才回报「保留了手工值」）；`tests/test_consol_note_table_totals.py` 4 例，变异「恢复旧清空」「小计不截断」各自打红
+- [x] 10. `apply_detail_refresh` 增加可选 `scope_leaves` / `template_type`（编排传入，免逐次建树）
+- [x] 11. 编排服务 `consol_note_subtree_reaggregate.py`：后序遍历、章节级 SAVEPOINT、叶子拉数 / 差额公式 / 汇总求和、跳过原因、公式值快照、共用推送锁（R3.1~R3.3）
+  - 树 / 模板口径 / 绑定 / 映射状态 / 各章节有效公式只装载一次；计算口径（差额与快照用）只在有公式时装载，装载失败（如合并范围未确认 409）只让差额与快照不可用，拉数与汇总照常
+  - 叶子：章节未绑定明细模板 / 没有单体项目 / 未确认映射 / 映射已变 / 已排除 → 按原因跳过（后三类里需要用户处理的列入 `pending_entities`），不调 apply（只有 stale 绑定时 apply 会写一张空表）
+  - 汇总：来源判定 `record_write_source`（有标记用标记；没有标记但有公式值快照 = 来源标记出现之前的「按公式填入」）；非差额下级来源是 `formula` 不计入；映射里排除的企业旧数不计入；没有绑定的章节骨架用合并附注模板行（行类型与「从来源建议模板」同一判定 `_row_type`，表内嵌子表头行原样保留，国企 五-10-5 / 五-16-6）；根节点只有项目级兼容行时先复制再写
+- [x] 12. 端点 `reaggregate` 改走编排，响应兼容 + 逐节点摘要（R3.4）
+  - 新增 `mode` / `nodes` / `pending_entities`；`node_key` 回填所选节点（不传 = 根合并节点，不再写项目级兼容行，`legacy_null` 恒 False）；复用路由校验节点时建的树
+- [x] 13. `fill_by_formula` / `fill_note_sections` 增加 `preserve_pulled`，推送后刷新与试算表事件处理器传入（R3.5）
+  - 快照构造 / 比较 / 来源判定 / 章节有效公式收成公式服务公共函数（`formula_snapshot` / `snapshot_changed` / `record_write_source` / `section_formulas`），按钮与后台同一份；保留的章节 `kept_pulled` 不计入 `sections_updated`，推送统计与事件结果单列
+  - 推送先把全部附注行标待更新再刷新：保留的拉数行推送后保持「待更新」（差额变了汇总就过期，由用户重新汇总）；试算表事件只在公式值变化时标
+- [x] 14. 测试：SQLite 三层树端到端 + 后台不覆盖 + 端点；关键分支变异打红
+  - `tests/services/test_consol_note_subtree_reaggregate.py` 14 例（全表 SQLite、生产函数全链：单体附注 → 建议模板 → 绑定 → 预览 → 确认 → 子树汇总；试算表 1002 故意与附注不同，证明个别数取自单体附注）+ 处理器 1 例 + 合计 4 例
+  - 真库探针补出一条规则：差额没算出（合并范围未确认 = 计算门 409）时上级还在汇总、并标「不过期」⇒ 改为下级出错则上级本章不汇总、逐级向上；按原因跳过的下级仍用已保存数（`test_failed_elim_stops_aggregation_upward_but_not_the_pulls`）
+  - 干净 worktree 磁盘变异 20 个全部打红（后序 / 公式下级排除 / 差额计入 / 只有差额不写 / 手工格 / 整节锁定 / 快照 / 待确认 / 章节 SAVEPOINT / 子表头行 / 排除企业 / preserve 失效 / 快照比较 / 无标记来源判定 / 推送与事件两处传参 / 手工格旧清空 / 小计截断 / 下级出错仍汇总 / 出错不向上传），逐字节恢复校验
+  - 回归：见任务 18（干净 worktree 终验 540 passed）
+- [x] 15. 真库事务回滚探针：【测试】集团子树汇总金额核对后回滚
+  - 现有【测试】集团都不合用（公式同步集团子企业没有附注；附注批量集团在回收站且附注全空），改为在一个事务里新建【测试】集团 + 两家子企业，复制两家真实单体项目（重药控股安徽 / 重庆和平药房）的附注与试算表（真实项目的行只读），按生产链路确认合并范围、建明细模板、确认映射、录一笔抵销（贷 银行存款 1000）
+  - 三个章节（五-1-1 有差额公式、五-91-4、五-95-4）：叶子 = 单体附注、合并 = Σ 直接下级 + 差额、合计 = 本表数据行之和，独立核对 0 处不符；差额节点 银行存款 -1000.00；后台按公式刷新三章都 `kept_pulled`、未标过期、来源标记不变
+  - 全量 321 章节 × 5 节点 4.2 秒；回滚后探针项目 0 个、库内子树汇总行 0 行
+  - 另跑原「附注批量」集团（事务内临时恢复）：合并范围未确认 ⇒ 57 个有公式章节差额失败、原因写明，未绑定章节全部按原因跳过，回滚后数据与删除状态不变
+
+## Phase 4 前端
+
+- [x] 16. `ConsolNoteTab.vue` 按钮说明与完成提示按节点汇报；`consolidationApi` 响应类型；`ConsolFormulaManagementPanel.vue` 取数路径说明（R3.6）
+  - 提示文案收成纯函数 `consolNoteView.reaggregateSummary`（写入节点数 + 拉数 / 差额 / 汇总分布、所选节点没写上的原因、待确认映射企业、出错处；旧响应没有 `nodes` 时按章节计数）；当前章节重读完成后才提示（有待确认 / 未写上 / 出错用告警）
+  - 来源标签新增「🔄 子树汇总（N 个下级 + 差额）」（`_subtree_child_count` 只数计入了数的非差额下级）；类型 `ConsolNoteReaggregateResult` / `ConsolNoteReaggregateNode` / `ConsolNoteReaggregateAction`
+  - `ConsolidationIndex.vue`（并发会话改动中）未改：它只读 `sections_updated` / `errors`，响应字段兼容
+- [x] 17. vitest / ESLint / 单区域 vue-tsc + TS2322 变异
+  - vitest：`consolNoteView.spec.ts` 新增 3 例 + 接线守卫，`ConsolNoteTab.spec.ts` 新增 1 例（真组件：POST 体、重读完成后的成功 / 告警文案）；合并 + 公式组件目录 72 个文件里 2 个失败（`ConsolTrialBalanceTab` / `ConsolReportBreakdownView` 6 例，请求参数多了 `signal`），在干净 worktree 把 `consolidationApi.ts` 换回 HEAD 版同样失败（预存，非本 spec）
+  - ESLint 0 error（3 条 warning 是原有代码行）；单区域 vue-tsc（ConsolNoteTab / consolNoteView / consolidationApi / ConsolFormulaManagementPanel 及其依赖）0 错误，往 ts 与 vue 各注入一处 number = string 均报 TS2322
+
+## Phase 5 收尾
+
+- [x] 18. 行数门、design 勘误、INDEX / memory；干净 worktree 跑要提交的树；只提交本会话文件（不推送）
+  - 行数门：本 spec 改动的 27 个代码 / 测试文件全过（`consol_note_formula_service.py` 1500 行在白名单基线 1470 的 +5% 内；`ConsolNoteTab.vue` 在基线内）
+  - design §13 记实施偏离、实测数字、范围外 / 待拍板与 ADR-RA-004；INDEX 本 spec 一行、memory 合并附注拉数小节更新（memory 295 行）
+  - 干净 worktree（HEAD `1e1d73f64` + 本会话 35 个文件 = 要提交的树；提交前 HEAD 被并发会话前移两次，两者文件零交集，按新 HEAD 重跑）：后端合并附注 / 推送相关 32 个测试文件 540 passed，3 例失败在 HEAD 同样失败；前端合并 + 公式组件目录 815 passed，6 例失败在 HEAD 同样失败；库目录 `--check` 一致，映射生成器重跑字节不变
+  - 另跑鉴权 / lazy import 守卫：鉴权 3 个文件全过；`test_lazy_import_resolvability` 2 例红在 `ai_content.py` / `formula_preloader.py` / `note_section_pairing.py` 的 import（不在本 spec 文件里，HEAD 预存）

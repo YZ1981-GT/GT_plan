@@ -665,3 +665,43 @@ describe('CP05 equivalent props and shared dirty decision', () => {
     expect(api.put).not.toHaveBeenCalled()
   })
 })
+
+
+describe('重新汇总 = 节点子树逐节点更新 + 自下而上汇总（spec consol-note-header-library-and-node-reaggregate）', () => {
+  const node = (node_key: string, action: string, written: number) => ({
+    node_key, kind: action === 'pull' ? 'data' : action, action, label: node_key, written, skipped: 0, failed: 0, reasons: [],
+  })
+
+  it('当前章节重读完成后按节点汇报；有待确认映射的企业改用告警提示', async () => {
+    const w = await loaded()
+    const headers = section('soe').headers
+    api.get.mockImplementation(async (url: string) => {
+      if (url.includes('/cell-comments/')) return []
+      if (url.includes('/data/')) return { content: { headers, rows: [['汇总后', '1']] }, node_key: 'G:consol' }
+      return section('soe')
+    })
+    api.post.mockResolvedValue({
+      sections_updated: 1, sections_processed: 1,
+      nodes: [node('G:consol', 'aggregate', 1), node('G:consol_elim', 'elim', 0), node('A:subsidiary', 'pull', 1)],
+      results: [{ section_id: '五-5-2', node_key: 'G:consol', action: 'aggregate', status: 'persisted', reason: null }],
+      pending_entities: [], failures: [],
+    })
+    expect((await exposed(w).handleReaggregate()).status).toBe('done')
+    expect(api.post).toHaveBeenCalledWith(expect.stringContaining('/reaggregate'),
+      expect.objectContaining({ section_ids: ['五-5-2'], node_key: 'G:consol', template_type: 'soe' }))
+    expect(message.success).toHaveBeenCalledWith('重新汇总完成：写入 2 个节点（拉数 1 / 差额 0 / 汇总 1）')
+
+    message.success.mockClear()
+    api.post.mockResolvedValue({
+      sections_updated: 0, sections_processed: 1, nodes: [node('G:consol', 'aggregate', 0)],
+      results: [{ section_id: '五-5-2', node_key: 'G:consol', action: 'aggregate', status: 'skipped',
+        reason: '下级企业都没有可汇总的单体附注数据' }],
+      pending_entities: [{ node_key: 'B:subsidiary', label: '乙公司', section_count: 1, sections: ['五-5-2'], reasons: ['未确认映射'] }],
+      failures: [],
+    })
+    await exposed(w).handleReaggregate()
+    expect(message.success).not.toHaveBeenCalled()
+    expect(message.warning).toHaveBeenCalledWith('重新汇总完成：写入 0 个节点（拉数 0 / 差额 0 / 汇总 0）；'
+      + '本节点未更新：下级企业都没有可汇总的单体附注数据；1 家企业待在「📋 明细映射」确认映射（乙公司）')
+  })
+})

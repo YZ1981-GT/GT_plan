@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -18,6 +18,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consol_note_data_models import ConsolNoteData
+from app.services.consol_note_table_totals import to_decimal as _to_decimal
 from app.models.consol_note_mapping_models import (
     ConsolNoteDetailTemplateVersion,
     ConsolNoteMappingBinding,
@@ -56,8 +57,13 @@ async def apply_detail_refresh(
     year: int,
     node_key: str | None = None,
     preview_entity_hashes: dict[str, str] | None = None,
+    scope_leaves: list[Any] | None = None,
+    template_type: str | None = None,
 ) -> dict[str, Any]:
     """按已确认映射规则，将来源行转换后写入 consol_note_data。
+
+    ``scope_leaves`` / ``template_type``：节点子树重新汇总逐节点调用时传入（已建好的树里该节点的数据叶子、
+    已解析的附注模板），免得每个章节每个节点重建一次企业树、重查一次模板口径。
 
     流程：
     1. 加载模板绑定 → 模板行
@@ -96,7 +102,8 @@ async def apply_detail_refresh(
 
     template_rows: list[dict[str, Any]] = version.rows if isinstance(version.rows, list) else []
     target_row_index = {str(tr["target_row_id"]): i for i, tr in enumerate(template_rows)}
-    template_type = await resolve_section_template_type(db, project_id)
+    if template_type is None:
+        template_type = await resolve_section_template_type(db, project_id)
 
     # ── 2. 加载确认绑定（按节点子树限定） ──
     entity_bindings = list((await db.execute(
@@ -106,7 +113,8 @@ async def apply_detail_refresh(
         )
     )).scalars().all())
 
-    scope_leaves = await _scope_data_leaves(db, project_id, node_key)
+    if scope_leaves is None:
+        scope_leaves = await _scope_data_leaves(db, project_id, node_key)
     out_of_scope: list[str] = []
     if scope_leaves is not None:
         scope_keys = {leaf.node_key for leaf in scope_leaves}
@@ -259,51 +267,16 @@ async def apply_detail_refresh(
     if existing_rows and isinstance(existing_rows[0], (list, tuple)):
         width = max(width, len(existing_rows[0]))
 
-    # ── 7. 构建新行（以模板行为骨架） ──
-    new_rows: list[list[str]] = []
-    filled: list[dict[str, Any]] = []
-    kept_manual: list[dict[str, Any]] = []
+    # ── 7. 构建新行（以模板行为骨架；合计 / 小计按本表数据重算，与节点子树汇总共用） ──
+    from app.services.consol_note_table_totals import build_table_rows
 
-    for i, tr in enumerate(template_rows):
-        row = [""] * width
-        row[0] = tr.get("canonical_name", "")
-        row_type = tr.get("row_type")
-
-        if i in target_amounts and row_type not in ("total", "subtotal"):
-            for col, val in target_amounts[i].items():
-                if col < 1 or col >= width:
-                    continue
-                if (i, col) in protected:
-                    old_val = _get_existing_cell(existing_rows, i, col)
-                    row[col] = old_val
-                    kept_manual.append({"row": i, "col": col, "kept_value": old_val})
-                else:
-                    formatted = _fmt(val)
-                    row[col] = formatted
-                    filled.append({"row": i, "col": col, "value": formatted, "target_name": tr.get("canonical_name", "")})
-
-        # 合计 / 小计 = 本表数据行之和（表内计算，不取来源合计）：
-        # subtotal 只加到上一个合计 / 小计行为止；total 加全部数据行；整列无数据保持空白
-        if row_type in ("total", "subtotal"):
-            for col in range(1, width):
-                if (i, col) in protected:
-                    row[col] = _get_existing_cell(existing_rows, i, col)
-                    continue
-                total, has_value = Decimal("0"), False
-                for j in range(len(new_rows) - 1, -1, -1):
-                    jt = template_rows[j].get("row_type", "data")
-                    if jt in ("total", "subtotal"):
-                        if row_type == "subtotal":
-                            break
-                        continue
-                    cell = _to_decimal(new_rows[j][col])
-                    if cell is not None:
-                        total += cell
-                        has_value = True
-                if has_value:
-                    row[col] = _fmt(total)
-
-        new_rows.append(row)
+    new_rows, filled, kept_manual = build_table_rows(
+        [(tr.get("canonical_name", ""), tr.get("row_type")) for tr in template_rows],
+        target_amounts,
+        width=width,
+        protected=protected,
+        existing_rows=existing_rows,
+    )
 
     headers = data.get("headers") or template_headers or ["项目"] + [f"列{c}" for c in range(1, width)]
 
@@ -375,27 +348,6 @@ def _row_width(row: Any) -> int:
     return 0
 
 
-def _to_decimal(value: Any) -> Decimal | None:
-    """单元格 → Decimal；空、占位符、非数值 → None（不参与加总）。"""
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, Decimal):
-        return value
-    if isinstance(value, float) and value != value:  # NaN
-        return None
-    s = str(value).strip().replace(",", "").replace("，", "")
-    if not s or s in ("-", "—", "－"):
-        return None
-    try:
-        return Decimal(s)
-    except InvalidOperation:
-        return None
-
-
-def _fmt(value: Decimal) -> str:
-    return str(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
-
-
 def _extract_amounts(row: Any, width: int) -> dict[int, Decimal]:
     """来源行 → ``{合并模板列号: 金额}``。
 
@@ -456,20 +408,6 @@ def _parse_locked_cells(record: Any) -> set[tuple[int, int]]:
             except (TypeError, ValueError):
                 pass
     return out
-
-
-def _get_existing_cell(rows: list, row_idx: int, col_idx: int) -> str:
-    """从现有行中安全取值。"""
-    if row_idx >= len(rows):
-        return ""
-    row = rows[row_idx]
-    if isinstance(row, (list, tuple)):
-        return str(row[col_idx]) if col_idx < len(row) else ""
-    if isinstance(row, dict):
-        vals = row.get("values") or row.get("cells") or {}
-        if isinstance(vals, dict):
-            return str(vals.get(str(col_idx), vals.get(col_idx, "")))
-    return ""
 
 
 async def _load_or_create_note_data(

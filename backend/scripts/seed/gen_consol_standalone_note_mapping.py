@@ -14,6 +14,9 @@
 4. 整个合并章节都没有表标题命中：按 parent_section（中文科目名）匹配单体 section_title
    （精确 → 规范化 → 前缀）。match_type=exact / normed / fuzzy
 5. 仍未匹配的标为 consol_only（合并特有章节，无单体对应）
+6. 定了单体章节后，子表名再按标题行库选一次（``note_table_header_match.choose_unit``：名字缩小候选、
+   列语义键重合度定，与运行时读取层同一函数）—— 只按表名会把国企 五-4-3（期初数续表）对到同名的
+   「（续）」单项计提表。按表头改了子表名的标 match_type=structure
 
 ⚠ 合并模板 ``parent_section`` 自 五-10 起整体错后一章（如 五-11「合同资产」表的 parent 是
 「存货」），只按 parent_section 映射会把合同资产拉成存货 —— 所以表标题优先，parent 兜底。
@@ -30,7 +33,12 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data"
 sys.path.insert(0, str(ROOT))
 
-from app.services.consol_note_standalone_reader import _table_key  # noqa: E402  与运行时同口径
+from app.services.note_table_header_library import (  # noqa: E402  与运行时读取层同口径（续表只认标记）
+    column_keys,
+    table_identity,
+    table_key as _table_key,
+)
+from app.services.note_table_header_match import choose_unit  # noqa: E402
 
 # ─── 规范化函数（与 consol_note_formula_service.label_key 同源） ──────────
 
@@ -63,8 +71,60 @@ def _is_generic_continuation(title: str) -> bool:
     return _norm(title).rstrip(":：") in ("续", "")
 
 
-def _is_continuation_name(name: str) -> bool:
-    return "续" in _table_key(name)
+_STANDALONE_TABLES: dict[str, dict[str, list[dict]]] = {}
+
+
+def _standalone_tables(template_type: str, section_number: str) -> list[dict]:
+    """子企业单体附注实际有的表（单体口径章节；与库目录、运行时读取同一来源）。"""
+    if template_type not in _STANDALONE_TABLES:
+        from app.services.note_table_header_catalog import standalone_sections
+
+        _STANDALONE_TABLES[template_type] = dict(standalone_sections(template_type))
+    return _STANDALONE_TABLES[template_type].get(section_number) or []
+
+
+def _choose_table(template_type: str, consol_table: dict, single: dict, table_name: str | None) -> tuple[str | None, str]:
+    """在已定的单体章节里按标题行库选子表（与运行时读取层同一个 choose_unit）。返回 (子表名, 选表方式)。
+
+    只用单体口径章节的表（子企业单体附注里没有的表选了也拉不到）；章节只有一张表、一列金额都对不上时
+    不硬填表名。
+    """
+    tables = _standalone_tables(template_type, str(single.get("section_number") or ""))
+    if not tables:
+        return table_name, ""
+    target = column_keys(
+        consol_table,
+        identity=table_identity(f"{template_type}_consolidated", str(consol_table.get("section_id") or "")),
+    ) if consol_table.get("headers") else None
+    choice = choose_unit(
+        tables, target_keys=target, table_name=table_name, title=consol_table.get("title"),
+        section_title=single.get("section_title"),
+    )
+    if choice.primary is None:
+        return table_name, ""
+    amounts = [k for k in (target or [])[1:] if k.kind == "amount" and (k.period or k.measure)]
+    if choice.method == "single_table" and amounts and not (choice.match and choice.match.col_map):
+        return table_name, ""
+    return tables[choice.primary].get("name"), choice.method
+
+
+def _continuation_of(template_type: str, section_number: str, prev_table: str | None) -> str | None:
+    """「续：」接上一张：取单体同章节里续上一张子表（或与它同基名的表）的续表；不唯一返回 None。"""
+    from app.services.note_table_header_library import base_key, continuation_links
+
+    tables = _standalone_tables(template_type, section_number)
+    if not tables or not prev_table:
+        return None
+    base = base_key(prev_table)
+    owners = {i for i, t in enumerate(tables) if _table_key(t.get("name")) == _table_key(prev_table) or (
+        base and base_key(t.get("name")) == base)}
+    conts = sorted(i for i, lk in continuation_links(tables).items() if lk.of in owners)
+    if len(conts) == 1:
+        return tables[conts[0]].get("name")
+    exact = [i for i in sorted(owners) if _table_key(tables[i].get("name")) == _table_key(prev_table)]
+    after = [i for i in conts if exact and i > exact[0]]
+    # 多张续表：取紧跟上一张子表（表名精确相同的第一张）之后的那张
+    return tables[after[0]].get("name") if after else None
 
 
 def generate(template_type: str) -> tuple[list[dict], Counter]:
@@ -174,15 +234,19 @@ def generate(template_type: str) -> tuple[list[dict], Counter]:
             single, table_name, how = resolved[i]
             if single is None and fallback_single is not None:
                 single, how = fallback_single, fallback_how
-                # 「续：」接上一张表：取单体同章节里紧随上一张子表的续表
+                # 「续：」接上一张表：取单体同章节里续上一张子表的续表（标题行库认续表，不按「紧随其后」猜）
                 prev_single, prev_table, _ = resolved[i - 1] if i else (None, None, "")
                 if _is_generic_continuation(t.get("title", "")) and prev_single is single and prev_table:
-                    names = [x.get("name") for x in single.get("tables") or []]
-                    if prev_table in names:
-                        j = names.index(prev_table)
-                        if j + 1 < len(names) and _is_continuation_name(names[j + 1] or ""):
-                            table_name, how = names[j + 1], "continuation"
-                resolved[i] = (single, table_name, how)
+                    cont = _continuation_of(template_type, str(single.get("section_number") or ""), prev_table)
+                    if cont:
+                        table_name, how = cont, "continuation"
+            if single is not None:
+                chosen, method = _choose_table(template_type, t, single, table_name)
+                if chosen and _table_key(chosen) != _table_key(table_name or "") and method in ("structure", "name"):
+                    table_name, how = chosen, "structure" if method == "structure" else how
+                elif chosen and not table_name:
+                    table_name = chosen
+            resolved[i] = (single, table_name, how)  # 下一张「续：」按改过的子表名接
             stats[how or "consol_only"] += 1
             mappings.append({
                 "consol_section_id": t.get("section_id", ""),

@@ -936,6 +936,57 @@ async def _active_formulas(db: AsyncSession, template_type: str, section_id: str
     ).order_by(ConsolNoteFormula.row_index, ConsolNoteFormula.col_index))).scalars().all())
 
 
+async def section_formulas(db: AsyncSession, project_id: UUID, template_type: str, section_id: str) -> list[Any]:
+    """某章节的有效单元格公式：全局（模板级）被本项目适配覆盖、本项目停用的剔除。"""
+    from app.services.formula_settings.consol_note_settings import effective_formulas
+
+    return await effective_formulas(db, project_id, section_id, await _active_formulas(db, template_type, section_id))
+
+
+# ─────────────────────────────── 写入来源与公式值快照 ───────────────────────────────
+
+#: 从单体附注拉来的数（明细映射 / 节点子树汇总）：后台按公式刷新只比对公式值、不改行（design §9）
+PULLED_SOURCES = frozenset({"detail_mapping", "subtree_aggregate"})
+
+
+def record_write_source(record: Any) -> str:
+    """附注行最后一次写入来源：``data._last_write_source``；没有标记但有公式值快照 ⇒ ``formula``
+    （来源标记出现之前「按公式填入」写的行；手工保存不写快照）；都没有 ⇒ ``manual``。"""
+    data = getattr(record, "data", None)
+    source = data.get("_last_write_source") if isinstance(data, dict) else None
+    if source:
+        return str(source)
+    return "formula" if getattr(record, "last_formula_value", None) is not None else "manual"
+
+
+def formula_snapshot(cells: Sequence[dict], now: datetime) -> dict:
+    """公式值快照（V182 ``last_formula_value``）：有合并数的公式单元格。"""
+    return {
+        "cells": [
+            {"row_index": c["row_index"], "col_index": c["col_index"], "value": c.get(MEASURE_CONSOLIDATED)}
+            for c in cells
+            if c.get(MEASURE_CONSOLIDATED) is not None
+        ],
+        "computed_at": now.isoformat(),
+    }
+
+
+def _snapshot_cells(snapshot: Any) -> dict[tuple[int, int], Any]:
+    cells = snapshot.get("cells") if isinstance(snapshot, dict) else None
+    out: dict[tuple[int, int], Any] = {}
+    for c in cells if isinstance(cells, list) else []:
+        try:
+            out[(int(c["row_index"]), int(c["col_index"]))] = c.get("value")
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
+
+
+def snapshot_changed(old: Any, new: Any) -> bool:
+    """两份快照的公式值是否不同（不比计算时间；没有旧快照 = 没有公式值）。"""
+    return _snapshot_cells(old) != _snapshot_cells(new)
+
+
 async def _context(
     db: AsyncSession,
     project_id: UUID,
@@ -1069,9 +1120,7 @@ async def note_breakdown(
     children = [
         (c.node_key, measures[c.node_key][MEASURE_CONSOLIDATED]) for c in node.children
     ] if node.kind == KIND_AGGREGATE else []
-    from app.services.formula_settings.consol_note_settings import effective_formulas
-
-    formulas = await effective_formulas(db, project_id, section_id, await _active_formulas(db, tt, section_id))
+    formulas = await section_formulas(db, project_id, tt, section_id)
     cells = await note_cell_values(
         ctx.rows, formulas, measures[node.node_key], categories=ctx.basis.categories, children=children,
     )
@@ -1239,10 +1288,13 @@ async def fill_by_formula(
     _view_context: "ViewContext | None" = None,
     context: "ConsolContext | None" = None,
     tree: "TreeNode | None" = None,
+    preserve_pulled: bool = False,
 ) -> dict:
     """「按公式填入」：按节点把合并数写入 ``consol_note_data``；旧调用不带节点键时使用项目级兼容行。
 
     ``_view_context``: 预构建的合并计算上下文（批量场景传入避免逐章节重建树）。
+    ``preserve_pulled``: 后台刷新（推送后 / 试算表事件）传 True —— 该行是从单体附注拉来的数
+    （``PULLED_SOURCES``）时不改行，公式值与上次快照不同只标 ``is_stale`` 并更新快照（design §9）。
     """
     if standard and template_type and note_template_type(standard) != note_template_type(template_type):
         raise NoteFormulaError(
@@ -1296,6 +1348,32 @@ async def fill_by_formula(
             "is_stale": record.is_stale,
             "data": data,
         }
+    now = datetime.now(timezone.utc)
+    formula_values = formula_snapshot(breakdown.get("cells", []), now)
+    if preserve_pulled and record is not None and record_write_source(record) in PULLED_SOURCES:
+        stale_marked = snapshot_changed(record.last_formula_value, formula_values)
+        if stale_marked:
+            record.is_stale = True
+            record.last_formula_value = formula_values
+            await db.flush()
+        return {
+            "project_id": str(project_id),
+            "year": breakdown["year"],
+            "section_id": section_id,
+            "node_key": record.node_key,
+            "legacy_null": record.node_key is None,
+            "template_type": tt,
+            "status": "kept_pulled",
+            "record_id": str(record.id) if record.id else None,
+            "reason": "本节点数据从单体附注拉取，后台按公式刷新不覆盖" + ("；公式值有变化，已标待更新" if stale_marked else ""),
+            "stale_marked": stale_marked,
+            "filled": [],
+            "kept_manual": [],
+            "kept_manual_count": 0,
+            "blank": [],
+            "is_stale": record.is_stale,
+            "data": data,
+        }
     manual_set = _manual_cells(data)
     # 把 locked_cells 列表中的坐标也加入保护集合
     if record is not None:
@@ -1306,28 +1384,19 @@ async def fill_by_formula(
     data.update({"headers": headers, "rows": new_rows})
     # 写入来源标记：ConsolNoteTab 据此区分「🧮 公式计算」与「📋 明细映射」（后写覆盖先写）
     data["_last_write_source"] = "formula"
-    now = datetime.now(timezone.utc)
     # V182：保存公式值快照（用于"当前值 vs 公式值"对比）
-    formula_snapshot = {
-        "cells": [
-            {"row_index": c["row_index"], "col_index": c["col_index"], "value": c.get(MEASURE_CONSOLIDATED)}
-            for c in breakdown.get("cells", [])
-            if c.get(MEASURE_CONSOLIDATED) is not None
-        ],
-        "computed_at": now.isoformat(),
-    }
     if record is None:
         record = ConsolNoteData(
             project_id=project_id, year=breakdown["year"], section_id=section_id,
             node_key=node_key, data=data, is_stale=False, updated_at=now,
-            last_formula_value=formula_snapshot,
+            last_formula_value=formula_values,
         )
         db.add(record)
     else:
         record.data = data
         record.is_stale = False
         record.updated_at = now
-        record.last_formula_value = formula_snapshot
+        record.last_formula_value = formula_values
     await db.flush()
     return {
         "project_id": str(project_id),
@@ -1356,11 +1425,14 @@ async def fill_note_sections(
     context: "ConsolContext | None" = None,
     tree: "TreeNode | None" = None,
     view_context: "ViewContext | None" = None,
+    preserve_pulled: bool = False,
 ) -> dict:
     """逐章节调用 ``fill_by_formula``，以 SAVEPOINT 隔离单章失败。
 
     该编排器只负责节点/章节结果和事务边界，金额计算与行形状处理仍全部由
     ``fill_by_formula`` 完成；调用方在拿到结果后统一 commit。
+    ``preserve_pulled`` 原样传给 ``fill_by_formula``（后台刷新不覆盖拉数结果）；保留的章节
+    状态为 ``kept_pulled``，不计入 ``sections_updated``。
     """
     if standard and template_type and note_template_type(standard) != note_template_type(template_type):
         raise NoteFormulaError(
@@ -1401,6 +1473,7 @@ async def fill_note_sections(
                     _view_context=view_ctx,
                     context=context,
                     tree=tree,
+                    preserve_pulled=preserve_pulled,
                 )
             results.append(result)
         except Exception as exc:  # noqa: BLE001 - 单章节失败不能污染其余章节
@@ -1410,6 +1483,8 @@ async def fill_note_sections(
                 "error": str(exc),
             })
 
+    kept_pulled = sum(1 for r in results if r.get("status") == "kept_pulled")
+    updated = len(results) - kept_pulled
     return {
         "project_id": str(project_id),
         "year": year,
@@ -1420,5 +1495,6 @@ async def fill_note_sections(
         "results": results,
         "failures": failures,
         "sections_processed": len(results) + len(failures),
-        "sections_updated": len(results),
+        "sections_updated": updated,
+        "sections_kept_pulled": kept_pulled,
     }

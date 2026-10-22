@@ -32,8 +32,8 @@
             <el-tooltip content="查看本章节有公式单元格的个别数汇总、调整、抵销、合并数及各下级贡献" placement="bottom">
               <el-button size="small" data-testid="consol-note-breakdown" @click="openNoteBreakdown()">📊 查看差额</el-button>
             </el-tooltip>
-            <!-- B.1.13: 重新汇总按钮 -->
-            <el-tooltip content="按公式重算本节点合并附注（含调整/抵销）；从子企业单体附注拉数请用「📋 明细映射」" placement="bottom">
+            <!-- 重新汇总 = 本节点子树逐节点更新 + 自下而上汇总（spec consol-note-header-library-and-node-reaggregate） -->
+            <el-tooltip content="重新汇总：本节点下各企业按已确认映射从单体附注重新拉数，差额节点按抵销分录重算，再自下而上汇总到本节点（映射在「📋 明细映射」确认）" placement="bottom">
               <el-button size="small" @click="handleReaggregate" :loading="reaggregating">🔄 重新汇总</el-button>
             </el-tooltip>
             <el-tooltip content="审核当前表格公式一致性" placement="bottom">
@@ -743,6 +743,7 @@ import {
   listConsolNoteFormulas,
   type ConsolNoteBreakdown,
   type ConsolNoteFillResult,
+  type ConsolNoteReaggregateResult,
   type ConsolTreeNode,
   type CurrentConsolEntity,
 } from '@/services/consolidationApi'
@@ -761,6 +762,7 @@ import {
   noteBreakdownCheckText,
   noteBreakdownRows,
   notePayload,
+  reaggregateSummary,
   sectionIdsWithFormulas,
   toEditRows,
   trimTrailingEmptyRows,
@@ -864,6 +866,10 @@ const noteAggregateSource = computed(() => {
   if (lastWrite === 'detail_mapping') {
     const entityCount = Number(data._detail_entity_count) || 0
     return `📋 明细映射（${entityCount} 家子企业单体附注）`
+  }
+  if (lastWrite === 'subtree_aggregate') {
+    const childCount = Number(data._subtree_child_count) || 0
+    return `🔄 子树汇总（${childCount} 个下级 + 差额）`
   }
   if (lastWrite === 'formula') {
     return '🧮 公式计算（含调整/抵销）'
@@ -2174,10 +2180,9 @@ async function fillCurrentByFormula(): Promise<NoteRefreshResult> {
   }
 }
 
-// B.1.13: 重新汇总 = 节点级公式刷新（后端 fill_note_sections，ADR-CNFO-006）；
-// 从子企业单体附注拉数走「📋 明细映射」（ConsolNoteMappingDialog → detail-refresh/apply）。
-// Req 20.4/20.9：溯源以 NOTE addr（note:{section}）标识源单体附注 section，
-// 与统一寻址体系一致；reaggregate 计算逻辑本身完全不变（仅后端聚合，前端只负责触发+重载）。
+// 重新汇总 = 本节点子树逐节点更新（叶子按已确认映射从单体附注拉数、差额节点按抵销分录算差额）
+// + 自下而上汇总（后端 reaggregate_subtree，spec consol-note-header-library-and-node-reaggregate）。
+// 映射在「📋 明细映射」确认；前端只负责触发、按节点汇报、重读当前章节。
 async function handleReaggregate(): Promise<NoteRefreshResult> {
   if (!props.projectId) return noteRefreshResult('skipped', null, { reason: '当前项目无效' })
   const sec = selectedNoteSection.value
@@ -2191,21 +2196,16 @@ async function handleReaggregate(): Promise<NoteRefreshResult> {
       standard: props.standard,
       template_type: props.standard,
     }
-    const result: any = await api.post(
+    const result = (await api.post(
       P_consol.notes.reaggregate(context.projectId, context.year),
       body,
-    )
-    const updated = result?.sections_updated ?? 0
-    const processed = result?.sections_processed ?? 0
-    const errors = Array.isArray(result?.errors) ? result.errors : []
-    const failures = Array.isArray(result?.failures) ? result.failures : []
-    if (errors.length || failures.length) {
-      ElMessage.warning(`重新汇总完成：处理 ${processed} 个章节，更新 ${updated} 个，${errors.length || failures.length} 个有告警`)
-    }
+    )) as Partial<ConsolNoteReaggregateResult> | null
+    const summary = reaggregateSummary(result)
     // reaggregate 成功只说明服务端编排完成；当前章节仍必须通过独立 GET 证明已持久化。
     const reloadResult = await reloadCurrentSectionAfterRefresh(context)
     if (reloadResult.status === 'done') {
-      if (!errors.length && !failures.length) ElMessage.success(`重新汇总完成：更新 ${updated} 个章节`)
+      if (summary.ok) ElMessage.success(summary.text)
+      else ElMessage.warning(summary.text)
     } else if (reloadResult.status === 'failed') {
       ElMessage.error(`重新汇总完成，但章节重读失败：${reloadResult.reason || '未知原因'}`)
     } else if (reloadResult.status === 'skipped') {

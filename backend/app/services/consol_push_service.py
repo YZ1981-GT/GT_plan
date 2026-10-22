@@ -264,12 +264,14 @@ async def _refresh_notes(
     stats["node_count"] = len(nodes)
 
     total_persisted = 0
+    total_kept = 0
     total_failed = 0
     total_skipped = 0
 
     for node in nodes:
         node_key = str(node.node_key)
         try:
+            # 从单体附注拉来的节点数据（明细映射 / 子树汇总）不按公式覆盖，只在公式值变化时标待更新
             result = await fill_note_sections(
                 db, project_id, year, section_ids,
                 node_key=node_key,
@@ -277,28 +279,32 @@ async def _refresh_notes(
                 context=resolved_context,
                 tree=resolved_tree,
                 view_context=view_ctx,
+                preserve_pulled=True,
             )
             if result.get("results"):
                 await db.commit()
-            persisted = len(result.get("results") or [])
+            kept = int(result.get("sections_kept_pulled") or 0)
+            persisted = len(result.get("results") or []) - kept
             failed = len(result.get("failures") or [])
             total_persisted += persisted
+            total_kept += kept
             total_failed += failed
-            total_skipped += max(0, len(section_ids) - persisted - failed)
+            total_skipped += max(0, len(section_ids) - persisted - kept - failed)
         except Exception as exc:
             await db.rollback()
             logger.warning("合并推送附注刷新节点 %s 失败：%s", node_key, exc)
             total_failed += len(section_ids)
 
     stats["refreshed_count"] = total_persisted
+    stats["kept_pulled_count"] = total_kept
     stats["failed_count"] = total_failed
     stats["skipped_count"] = total_skipped
 
-    if total_failed and total_persisted:
+    if total_failed and (total_persisted or total_kept):
         stats["note_status"] = "partial"
     elif total_failed:
         stats["note_status"] = "failed"
-    elif total_persisted:
+    elif total_persisted or total_kept:
         stats["note_status"] = "persisted"
     else:
         stats["note_status"] = "skipped"
@@ -346,6 +352,7 @@ async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[d
         sections = stats.get("distinct_section_count", 0)
         nodes = stats.get("node_count", 0)
         refreshed = stats.get("refreshed_count", 0)
+        kept = stats.get("kept_pulled_count", 0)
         failed = stats.get("failed_count", 0)
         note_status = stats.get("note_status", "skipped")
 
@@ -353,6 +360,8 @@ async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[d
             parts.append(f"标记 {stale} 行待更新")
         parts.append(f"{sections} 个章节 × {nodes} 个节点")
         parts.append(f"刷新 {refreshed}")
+        if kept:
+            parts.append(f"保留单体附注拉数 {kept}（待重新汇总）")
         if failed:
             parts.append(f"失败 {failed}")
             warnings.append(f"「{name}」附注刷新有 {failed} 个章节×节点失败")

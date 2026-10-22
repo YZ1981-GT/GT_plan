@@ -283,6 +283,7 @@ async def handle_consol_note_formula_refresh(event: EventPayload) -> dict[str, o
                 node_key = str(node.node_key)
                 node_out = _node_result(node)
                 try:
+                    # 从单体附注拉来的节点数据不按公式覆盖（公式值变化只标待更新，由用户重新汇总）
                     result = await fill_note_sections(
                         db,
                         project_id,
@@ -293,6 +294,7 @@ async def handle_consol_note_formula_refresh(event: EventPayload) -> dict[str, o
                         context=context,
                         tree=tree,
                         view_context=view_context,
+                        preserve_pulled=True,
                     )
                     # 一个节点的成功章节先提交；后续节点失败不能撤销已完成节点。
                     if result.get("results"):
@@ -310,6 +312,11 @@ async def handle_consol_note_formula_refresh(event: EventPayload) -> dict[str, o
                             "manual_preserved_count": persisted.get("kept_manual_count", 0),
                         }
                         node_out["sections"].append(item)
+                        if item["status"] == "kept_pulled":
+                            item["stale_marked"] = bool(persisted.get("stale_marked"))
+                            node_out["kept_pulled"] = node_out.get("kept_pulled", 0) + 1
+                            base.setdefault("kept_pulled", []).append(item)
+                            continue
                         node_out["persisted"] += 1
                         base["persisted"].append(item)
                     for failure in result.get("failures", []):
@@ -325,9 +332,10 @@ async def handle_consol_note_formula_refresh(event: EventPayload) -> dict[str, o
                         node_out["failed"] += 1
                         base["failed"].append(item)
                     node_out["skipped"] = len(section_ids) - len(node_out["sections"])
+                    succeeded = node_out["persisted"] + node_out.get("kept_pulled", 0)
                     if node_out["failed"]:
-                        node_out["status"] = "failed" if not node_out["persisted"] else "partial"
-                    elif node_out["persisted"]:
+                        node_out["status"] = "failed" if not succeeded else "partial"
+                    elif succeeded:
                         node_out["status"] = "persisted"
                     else:
                         node_out["status"] = "skipped"
@@ -352,11 +360,12 @@ async def handle_consol_note_formula_refresh(event: EventPayload) -> dict[str, o
                         base["failed"].append(item)
                 base.setdefault("nodes", []).append(node_out)
 
-            if base["failed"] and base["persisted"]:
+            succeeded = base["persisted"] or base.get("kept_pulled")
+            if base["failed"] and succeeded:
                 base["status"] = "partial"
             elif base["failed"]:
                 base["status"] = "failed"
-            elif base["persisted"]:
+            elif succeeded:
                 base["status"] = "persisted"
             else:
                 base["status"] = "skipped"

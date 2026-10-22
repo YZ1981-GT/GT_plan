@@ -115,7 +115,12 @@ class ReaggregateRequest(BaseModel):
 
 
 class ReaggregateResponse(BaseModel):
-    """重新汇总响应，保留旧计数字段并暴露逐章节持久化证据。"""
+    """重新汇总响应，保留旧计数字段并暴露逐章节持久化证据。
+
+    ``mode="subtree"``：所选节点子树逐节点更新 + 自下而上汇总；``results`` 只放所选节点的逐章节结果，
+    ``nodes`` 是子树每个节点的写入 / 跳过 / 失败计数与原因，``pending_entities`` 是需到「📋 明细映射」
+    确认映射的企业。
+    """
     success: bool
     status: str
     project_id: UUID
@@ -128,6 +133,9 @@ class ReaggregateResponse(BaseModel):
     results: list[dict] = []
     failures: list[dict] = []
     errors: list[str] = []
+    mode: str = "subtree"
+    nodes: list[dict] = []
+    pending_entities: list[dict] = []
 
 
 @router.post(
@@ -143,15 +151,11 @@ async def reaggregate_consol_notes(
     user=Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
 ):
-    """兼容旧按钮的节点级公式刷新入口；不把单体聚合结果冒充 V2 表格载荷。"""
+    """重新汇总：所选节点（缺省为根合并节点）子树逐节点更新 —— 数据叶子按已确认映射从单体附注拉数、
+    差额节点按抵销 / 调整分录算差额、汇总节点 = Σ 直接下级 + 差额 —— 自下而上汇总到所选节点。"""
     from app.services.consol_note_aggregation_service import validate_lineage_dag
-    from app.services.consol_note_formula_service import (
-        NoteFormulaError,
-        consol_note_tables,
-        fill_note_sections,
-        note_template_type,
-        resolve_note_template_type,
-    )
+    from app.services.consol_note_formula_service import NoteFormulaError, note_template_type
+    from app.services.consol_note_subtree_reaggregate import reaggregate_subtree
     from app.services.consol_node_scope import (
         NodeScopeError,
         resolve_node_scope,
@@ -171,20 +175,14 @@ async def reaggregate_consol_notes(
             raise NoteFormulaError(
                 f"standard={request.standard} 与 template_type={request.template_type} 指向不同附注模板"
             )
-        requested_template = request.template_type or request.standard
-        template_type = await resolve_note_template_type(db, project_id, requested_template)
-        section_ids = request.section_ids or [
-            str(sec.get("section_id"))
-            for sec in consol_note_tables(template_type)
-            if sec.get("section_id")
-        ]
-        result = await fill_note_sections(
+        result = await reaggregate_subtree(
             db,
             project_id,
-            year,
-            section_ids,
+            scope.year,
             node_key=scope.node_key,
-            template_type=template_type,
+            section_ids=request.section_ids,
+            template_type=request.template_type or request.standard,
+            tree=scope.tree,
         )
         await db.commit()
     except HTTPException:
@@ -203,14 +201,17 @@ async def reaggregate_consol_notes(
         status=result["status"],
         project_id=project_id,
         year=year,
-        node_key=scope.node_key,
-        legacy_null=scope.node_key is None,
+        node_key=result["node_key"],
+        legacy_null=False,
         template_type=result["template_type"],
         sections_processed=result["sections_processed"],
         sections_updated=result["sections_updated"],
         results=result["results"],
         failures=result["failures"],
         errors=errors[:10],
+        mode=result["mode"],
+        nodes=result["nodes"],
+        pending_entities=result["pending_entities"],
     )
 
 

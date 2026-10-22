@@ -74,8 +74,19 @@ class TestResolveStandaloneSection:
         assert resolve_standalone_section("soe", "五-9-13") == "八、9"
 
     def test_generic_continuation_follows_previous_table(self):
-        """五-9-8「续：」接上一张 → 单体紧随其后的续表。"""
+        """五-9-8「续：」接上一张 → 单体续上一张子表的续表。"""
         assert resolve_standalone_table_name("soe", "五-9-8") == "按坏账准备计提方法分类披露其他应收款项（续：期初余额）"
+        # 上市 五-4-8「续：」原映射不到子表：上一张选的是「（期末余额）」，其续表由标题行库认出
+        assert resolve_standalone_table_name("listed", "五-4-8") == "按单项计提坏账准备的应收票据（续：上年年末余额）"
+
+    def test_table_choice_uses_header_library(self):
+        """国企 五-4-3（期初数续表）：只按表名会对到同名的「（续）」单项计提表，按表头改选「（续：期初数）」。"""
+        assert resolve_standalone_table_name("soe", "五-4-3") == "按坏账准备计提方法分类披露应收票据（续：期初数）"
+        assert resolve_standalone_table_name("soe", "五-4-2") == "按坏账准备计提方法分类披露应收票据（期末数）"
+
+    def test_identical_candidates_are_not_guessed(self):
+        """上市 五-9-4（合并表头错列）：单体按组合 / 按库龄组合两张表同构，不按次要特征硬选。"""
+        assert resolve_standalone_table_name("listed", "五-9-4") is None
 
     def test_listed_currency(self):
         """Listed 货币资金。"""
