@@ -27,6 +27,7 @@ from app.services.formula_push import panel
 from app.services.formula_push.bindings import e1_calc, register_binding
 from app.services.formula_push.bindings.e1 import E1Binding, TargetSkip, WorkpaperTarget
 from app.services.formula_push.rules import PushRule, PushSource, PushTarget
+from app.services.formula_settings import push_settings
 from tests._formula_push_env import (
     CASH_OPENING, TB_ENDING, YEAR, Env, base_entries, by_addr, cash_rows, make_env, make_sources,
 )
@@ -761,8 +762,12 @@ async def test_execute_filters_plan_to_explicit_codes(monkeypatch, codes, expect
     async def save_states(ctx, run_id):
         return None
 
+    async def no_overrides(db, project_id):  # 本例只测选码；本项目有效规则 = 清单本身（FakeDb 不能查公式设置）
+        return push.load_push_rules(), []
+
     monkeypatch.setattr(push, "_project_audit_year", resolved_audit_year)
     monkeypatch.setattr(push, "load_push_rules", lambda: ())
+    monkeypatch.setattr(push_settings, "effective_push_rules", no_overrides)
     monkeypatch.setattr(push, "supported_wp_codes", lambda: ("E1", "K1"))
     monkeypatch.setattr(push, "rules_for", lambda rules, *, wp_code, trigger: (wp_code,))
     monkeypatch.setattr(push, "_find_workpapers", fake_find_workpapers)

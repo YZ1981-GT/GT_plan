@@ -68,6 +68,13 @@ DOMAINS: dict[str, DomainSpec] = {
         ("description",),
         "template_type",
     ),
+    # 公式位 = 推送规则 rule_id；系统预设 = formula_push_rules.json（spec formula-governance-coverage-closure R2）
+    "push": DomainSpec(
+        "push", "公式推送规则",
+        ("expression",),
+        ("description",),
+        "any",
+    ),
 }
 
 #: 通用作用范围（全局层对所有准则 / 模板类型生效）。
@@ -109,6 +116,7 @@ def is_disabled(definition: Mapping[str, Any] | None) -> bool:
 #: 各域写入方缺省的类别 / 运算符按其缺省值比较（缺省与显式缺省值不算差异）。
 _FIELD_CANON = {
     ("wp", "expression"): lambda v: v.lstrip("=").strip(),
+    ("push", "expression"): lambda v: v.lstrip("=").strip(),
     ("wp", "formula_type"): lambda v: v or "auto_calc",
     ("note", "category"): lambda v: v or "auto_calc",
     ("tb_detail", "formula_category"): lambda v: v or "auto_calc",
@@ -181,7 +189,7 @@ def display_formula(domain: str, definition: Mapping[str, Any] | None) -> str:
         text = f"{d.get('left_ref', '')} {d.get('operator', '') or '='} {d.get('right_ref', '')}".strip()
         tol = d.get("tolerance", "")
         return f"{text}（容差 {tol}）" if tol else text
-    field = "expression" if domain == "wp" else "formula"
+    field = "expression" if domain in ("wp", "push") else "formula"
     return _norm_value(definition.get(field))
 
 

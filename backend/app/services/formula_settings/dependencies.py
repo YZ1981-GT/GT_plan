@@ -36,8 +36,10 @@ FORMULA_FIELDS: dict[str, tuple[str, ...]] = {
     "wp": ("expression",),
     "note": ("formula",),
     "tb_detail": ("formula",),
+    "push": ("expression",),
 }
-DOMAIN_LABELS = {"report": "报表", "cross_check": "表间审核", "wp": "底稿", "note": "附注", "tb_detail": "试算表明细"}
+DOMAIN_LABELS = {"report": "报表", "cross_check": "表间审核", "wp": "底稿", "note": "附注", "tb_detail": "试算表明细",
+                 "push": "公式推送"}
 
 
 class DependencyTargetError(ValueError):

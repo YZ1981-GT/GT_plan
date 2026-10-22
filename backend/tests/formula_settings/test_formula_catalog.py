@@ -133,11 +133,16 @@ class TestBuildCatalog:
     async def test_stats_aggregation(self, env):
         from app.services.formula_catalog import catalog_stats
 
+        from app.services.formula_push.engine import load_push_rules
+
         async with env["factory"]() as db:
             stats = await catalog_stats(db, env["pid"])
-        assert stats["total"] == 2
+        # 公式推送规则也在内核里（spec formula-governance-coverage-closure R2）：公式来源的规则以系统预设进目录
+        push_formulas = [r.source.expression for r in load_push_rules() if r.source.kind == "formula"]
         assert stats["by_domain"]["report"] == 2
-        assert stats["by_function"]["TB"] == 2
+        assert stats["by_domain"]["push"] == len(push_formulas)
+        assert stats["total"] == 2 + len(push_formulas)
+        assert stats["by_function"]["TB"] == 2 + sum("TB(" in e for e in push_formulas)
 
     @pytest.mark.asyncio
     async def test_domain_filter(self, env):

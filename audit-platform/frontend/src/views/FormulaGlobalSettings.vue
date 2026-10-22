@@ -38,7 +38,7 @@
           <el-table-column label="定义" min-width="320">
             <template #default="{ row }">
               <el-tag v-if="staged.has(row.slot_key)" size="small" type="warning">已暂存</el-tag>
-              <code class="gt-fgs-code">{{ definitionText(displayDefinition(row)) }}</code>
+              <code class="gt-fgs-code">{{ definitionText(displayDefinition(row), row.structure) }}</code>
             </template>
           </el-table-column>
           <el-table-column label="层级" width="90" align="center">
@@ -119,7 +119,7 @@ const filteredSlots = computed(() => {
   const kw = keyword.value.trim()
   if (!kw) return slots.value
   return slots.value.filter((s) => s.label.includes(kw) || s.slot_key.includes(kw)
-    || definitionText(s.definition).includes(kw))
+    || definitionText(s.definition, s.structure).includes(kw))
 })
 
 /** 暂存过的显示暂存值（删除显示原值，标签区分） */

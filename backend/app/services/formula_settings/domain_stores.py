@@ -225,12 +225,19 @@ class WpStore(SettingStore):
             await db.flush()
 
 
-def validate_definition(domain: str, definition: dict, label: str) -> None:
-    """模板 / 手工录入的定义按域校验（与各域写入时同一口径）；停用不能写进模板。"""
+def validate_definition(domain: str, definition: dict, label: str, slot_key: str = "") -> None:
+    """模板 / 手工录入的定义按域校验（与各域写入时同一口径）；停用不能写进模板。
+
+    ``slot_key``：推送规则域按公式位（规则编号）找规则做校验，其余域不用。
+    """
     if is_disabled(definition):
         raise FormulaSettingError(f"{label}：模板里只放公式，不能放「停用」")
     if domain == "wp":
         checked_wp_definition(definition, label)
+    elif domain == "push":
+        from app.services.formula_settings.push_settings import validate_push_definition
+
+        validate_push_definition(slot_key, definition, label)
     elif domain == "note":
         check_note_definition(definition, label)
     elif domain == "consol_note":

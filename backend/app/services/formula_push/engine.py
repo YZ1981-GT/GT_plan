@@ -60,6 +60,9 @@ logger = logging.getLogger(__name__)
 #: SSE 事件名
 SSE_EVENT = "formula.pushed"
 MANUAL = "manual"
+#: 推送规则有效定义变化后的重推（公式治理内核传播；选规则按「手动」口径，记录保留本值）
+FORMULA_CONFIG_CHANGED = "FORMULA_CONFIG_CHANGED"
+RUN_TRIGGERS = (*TRIGGERS, FORMULA_CONFIG_CHANGED)
 #: 冻结底稿状态（复核通过 / 已归档 / 逐级中间态）
 FROZEN_WP_STATUSES: Mapping[str, str] = {
     "review_passed": "复核通过", "archived": "已归档",
@@ -270,8 +273,8 @@ async def run(
     force_addr_ids: Iterable[str] = (),
 ) -> RunResult:
     """执行一次推送（调用方事务内，只 flush 不 commit）。"""
-    if trigger not in TRIGGERS:
-        raise ValueError(f"未知触发来源 {trigger!r}（可选 {TRIGGERS}）")
+    if trigger not in RUN_TRIGGERS:
+        raise ValueError(f"未知触发来源 {trigger!r}（可选 {RUN_TRIGGERS}）")
     force = frozenset(str(a) for a in force_addr_ids)
     selected_codes = frozenset(str(code).strip() for code in codes or () if str(code).strip()) if codes is not None else None
     async with _process_lock(project_id, year):
@@ -310,12 +313,20 @@ async def _execute(
         result.add_warning(msg)
         return result
 
-    rules = load_push_rules()
+    # 本项目有效规则（规则清单 ⊕ 公式治理内核的全局 / 模板 / 本项目定义）；失效定义跳过并写明原因
+    from app.services.formula_settings.push_settings import effective_push_rules
+
+    rules, rule_issues = await effective_push_rules(db, project_id)
+    code_of = {r.rule_id: r.wp_code for r in rules}
+    for rid, msg in rule_issues:
+        if codes is None or code_of.get(rid) in codes:
+            result.add_warning(msg)
+    pick = MANUAL if trigger == FORMULA_CONFIG_CHANGED else trigger
     plan: list[tuple[str, Any, tuple[PushRule, ...], list[_Paper], list[str]]] = []
     for code in supported_wp_codes():
         if codes is not None and code not in codes:
             continue
-        code_rules = rules_for(rules, wp_code=code, trigger=trigger)
+        code_rules = rules_for(rules, wp_code=code, trigger=pick)
         if not code_rules:
             continue
         binding = get_binding(code)

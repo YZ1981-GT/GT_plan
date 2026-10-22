@@ -22,7 +22,7 @@ from app.services.formula_settings.project_ops import save_overrides
 from app.services.formula_settings.stores import get_store, report_slot_key
 
 _MODULE_TO_DOMAIN = {"report": "report", "consol": "report", "tb_detail": "tb_detail", "wp": "wp",
-                     "workpaper": "wp", "note": "note", "consol_note": "consol_note"}
+                     "workpaper": "wp", "note": "note", "consol_note": "consol_note", "push": "push"}
 
 
 def _payload(entry: AuditLogEntry) -> dict[str, Any]:
@@ -73,7 +73,7 @@ async def rollback_from_log(db: AsyncSession, *, project_id: uuid.UUID, source_l
     domain, slot = await _locate(db, project_id, entry, payload)
     if domain == "cross_check":
         raise FormulaSettingError("表间审核规则请在规则列表中修改")
-    field = "expression" if domain == "wp" else "formula"
+    field = "expression" if domain in ("wp", "push") else "formula"
     eff = (await effective_slots(db, domain, project_id)).get(slot)
     local = (await get_store(domain).list_project(db, project_id)).get(slot)
     version = expected_version if expected_version is not None else (local.version if local else None)

@@ -5,6 +5,7 @@
 * 底稿：用到该底稿编码的底稿标 ``prefill_stale``。
 * 附注：对应章节 ``is_stale``。
 * 合并附注：对应章节重新填数（``fill_note_sections``）。
+* 推送规则：受影响底稿重新推送（``propagate_push``，触发来源「公式规则变更」）。
 * 试算表明细 / 表间审核：事件本身即通知前端刷新（SSE），下次执行即用新定义。
 
 事件 ``extra.row_code`` 置空，旧 handler 只做反向索引失效（不再按单行 BFS）。handler 失败只记降级日志，
@@ -260,6 +261,37 @@ async def propagate_tb_detail(project_id: uuid.UUID, year: int | None, slot_keys
     return {"slot_keys": slot_keys, "marked": int(n)}
 
 
+async def propagate_push(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
+    """推送规则有效定义变化 → 对受影响底稿重新推送（spec formula-governance-coverage-closure R2.7）。
+
+    规则编号以底稿主编码开头（``E1.tb_amount.ending``）。合并项目由 consol_push 负责、无审计年度无处可推，均跳过。
+    运行记录的触发来源 = ``FORMULA_CONFIG_CHANGED``（选规则按「手动」口径：每条规则都含手动触发）。
+    """
+    from app.models.core import Project
+    from app.services.formula_push.engine import FORMULA_CONFIG_CHANGED, PushActionError, run_and_commit
+    from app.services.formula_settings.push_settings import rule_by_id
+
+    codes = sorted({r.wp_code for r in map(rule_by_id, slot_keys) if r is not None})
+    if not codes:
+        return {"skipped": "no_rule", "wp_codes": []}
+    if year is None:
+        return {"skipped": "no_year", "wp_codes": codes}
+    async with _factory()() as db:
+        frozen = await _is_frozen(db, project_id)
+        if frozen is None or frozen:
+            return {"skipped": "frozen" if frozen else "missing", "wp_codes": codes}
+        scope = (await db.execute(sa.select(Project.report_scope).where(Project.id == project_id))).scalar_one_or_none()
+        if (scope or "").strip().lower() == "consolidated":
+            return {"skipped": "consolidated", "wp_codes": codes}  # 合并项目由 consol_push 负责（与推送事件同口径）
+        try:
+            result = await run_and_commit(db, project_id=project_id, year=year, trigger=FORMULA_CONFIG_CHANGED,
+                                          codes=codes)
+        except PushActionError as exc:  # 业务上不可推（如年度不符），与推送事件同口径：不算故障
+            return {"skipped": "not_pushable", "reason": str(exc), "wp_codes": codes}
+    return {"wp_codes": codes, "run_id": str(result.run_id) if result.run_id else None,
+            "written": result.written_count, "skipped": result.skipped_count}
+
+
 async def _notify_only(project_id: uuid.UUID, year: int | None, slot_keys: list[str]) -> dict[str, Any]:
     return {"notified": len(slot_keys)}
 
@@ -271,6 +303,7 @@ HANDLERS: dict[str, Callable[[uuid.UUID, int | None, list[str]], Awaitable[dict[
     "consol_note": propagate_consol_note,
     "tb_detail": propagate_tb_detail,
     "cross_check": propagate_cross_check,
+    "push": propagate_push,
 }
 
 

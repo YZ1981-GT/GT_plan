@@ -77,10 +77,42 @@ async def test_rules_listing_is_readonly_and_chinese(api):
     assert "E1" in payload["supported_wp_codes"] and "K1" in payload["supported_wp_codes"]
     assert len(payload["supported_wp_codes"]) >= 80  # 80+ 主编码（随注册表增长）
     rules = payload["rules"]
-    assert len(rules) == 30 and {x["wp_code"] for x in rules} == {"E1"}  # wp_code 过滤只返回 E1 的 30 条
+    from app.services.formula_push.engine import load_push_rules
+
+    expected = [r.rule_id for r in load_push_rules() if r.wp_code == "E1"]  # 规则数随清单增长，现算不写死
+    assert [x["rule_id"] for x in rules] == expected and {x["wp_code"] for x in rules} == {"E1"}
     tb = next(x for x in rules if x["rule_id"] == "E1.tb_amount.ending")
     assert tb["formula"].startswith("TB('1001','期末余额')") and "试算" in tb["description"]
     assert all(x["description"] and x["formula"] for x in rules), "面板每条规则都要有中文说明与算式"
+
+
+@pytest.mark.asyncio
+async def test_rules_listing_carries_layer_actions_and_lists_disabled_rules(api):
+    """规则列表 = 本项目有效规则（含已停用）+ 每条的层级与可用操作（spec formula-governance-coverage-closure R2.8）。"""
+    from app.services.formula_settings.stores import get_store
+
+    c, base, env = api["client"], api["base"], api["env"]
+    blank = dict(base_definition=None, base_version=None, pinned=False, base_origin=None, base_template_id=None,
+                 user_id=None)
+    async with env.factory() as db:
+        store = get_store("push")
+        await store.write_project(db, env.pid, "E1.cash_rows.four_table", definition={"disabled": True}, **blank)
+        await store.write_project(db, env.pid, "E1.tb_amount.ending",
+                                  definition={"expression": "TB('1001','期末余额')"}, **blank)
+        await db.commit()
+    api["as"]("reader")
+    r = await c.get(f"{base}/rules", params={"wp_code": "E1"})
+    assert r.status_code == 200, r.text
+    rules = {x["rule_id"]: x for x in r.json()["rules"]}
+    cash, tb, derived = rules["E1.cash_rows.four_table"], rules["E1.tb_amount.ending"], rules["E1.cash_detail.ending"]
+    assert (cash["status"], cash["disabled"], cash["layer"], cash["can_disable"]) == ("disabled", True, "project", True)
+    assert cash["has_local"] and cash["local_version"] == 1 and not cash["editable_formula"]
+    assert tb["formula"] == "TB('1001','期末余额')" and tb["preset_formula"].startswith("TB('1001','期末余额')+")
+    assert (tb["status"], tb["layer"], tb["layer_label"], tb["editable_formula"], tb["can_disable"]) == (
+        "active", "project", "本项目", True, False)
+    assert (derived["layer"], derived["editable_formula"], derived["can_disable"], derived["has_local"]) == (
+        "preset", False, False, False)
+    assert derived["issue"] is None and tb["issue"] is None
 
 
 @pytest.mark.asyncio
@@ -237,10 +269,16 @@ def test_every_route_declares_project_access_dependency():
 
     tree = ast.parse(inspect.getsource(mod))
     routes: dict[str, str] = {}
+    global_routes: dict[str, ast.AsyncFunctionDef] = {}
     for fn in (n for n in tree.body if isinstance(n, ast.AsyncFunctionDef)):
         verbs = [d.func.attr for d in fn.decorator_list
                  if isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute) and d.func.attr in ("get", "post")]
         if not verbs:
+            continue
+        owner = {d.func.value.id for d in fn.decorator_list if isinstance(d, ast.Call)
+                 and isinstance(d.func, ast.Attribute) and isinstance(d.func.value, ast.Name)}
+        if owner == {"global_router"}:
+            global_routes[fn.name] = fn  # 不在项目路径下的全局端点：下面单独验它确实不碰项目数据
             continue
         levels = [
             d.args[0].args[0].value
@@ -252,6 +290,13 @@ def test_every_route_declares_project_access_dependency():
         routes[fn.name] = levels[0]
         assert levels[0] == ("edit" if verbs[0] == "post" else "readonly"), (fn.name, levels)
     assert set(routes) == {"list_bindings", "list_rules", "run_push", "latest", "states", "adopt", "lock", "list_runs", "run_items"}
+    # 豁免的全局端点只有静态覆盖率：路径无项目、只要求登录、不取数据库（覆盖率来自注册表与编码表文件）
+    assert set(global_routes) == {"push_coverage"}
+    for fn in global_routes.values():
+        params = [a.arg for a in fn.args.args + fn.args.kwonlyargs]
+        deps = {getattr(d.args[0], "id", None) for d in fn.args.defaults + fn.args.kw_defaults
+                if isinstance(d, ast.Call) and getattr(d.func, "id", None) == "Depends" and d.args}
+        assert "project_id" not in params and deps == {"get_current_user"}, (fn.name, params, deps)
 
 
 def test_router_is_registered():

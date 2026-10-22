@@ -32,7 +32,7 @@ router = APIRouter(prefix="/api/formula-settings", tags=["formula-settings"])
 project_router = APIRouter(prefix="/api/projects/{project_id}/formula-settings", tags=["formula-settings"])
 
 #: 消费方已改读有效定义的域（未接入的域只存不生效，界面据此提示）
-WIRED_DOMAINS = {"report", "tb_detail", "cross_check", "wp", "note", "consol_note"}
+WIRED_DOMAINS = {"report", "tb_detail", "cross_check", "wp", "note", "consol_note", "push"}
 #: 界面默认选第一个作用范围：常用准则在前，enterprise 只是「项目配置不在合法集合」时的兜底口径，放最后
 _STANDARD_ORDER = ["soe_standalone", "soe_consolidated", "listed_standalone", "listed_consolidated", "enterprise"]
 _SCOPE_OPTIONS = {

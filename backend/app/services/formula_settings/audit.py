@@ -18,7 +18,7 @@ _CHANGES_CAP = 200
 #: 与项目「公式历史」页的模块标签同口径（report / wp / note …）
 MODULE_OF_DOMAIN = {
     "report": "report", "tb_detail": "tb_detail", "cross_check": "cross_check",
-    "wp": "wp", "note": "note", "consol_note": "consol_note",
+    "wp": "wp", "note": "note", "consol_note": "consol_note", "push": "push",
 }
 #: 历史页按 action 显示「修改 / 回滚」并决定能否一键回滚；具体操作记在 operation
 _HISTORY_ACTION = {"rollback": "rollback"}

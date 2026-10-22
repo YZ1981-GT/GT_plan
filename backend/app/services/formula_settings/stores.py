@@ -432,6 +432,10 @@ def get_store(domain: str) -> DomainStore:
     if store is None:
         if domain == "report":
             store = ReportStore()
+        elif domain == "push":
+            from app.services.formula_settings.push_settings import PushStore
+
+            store = PushStore()
         elif domain in ("wp", "note", "consol_note"):
             from app.services.formula_settings import domain_stores
 

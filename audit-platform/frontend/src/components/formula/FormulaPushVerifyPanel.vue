@@ -62,7 +62,6 @@
 import { computed, ref } from 'vue'
 import { api } from '@/services/apiProxy'
 import { formulaPushVerify } from '@/services/apiPaths/formula'
-import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{
   projectId: string
@@ -78,9 +77,14 @@ async function onVerify() {
   loading.value = true
   error.value = ''
   try {
-    data.value = await api.get(formulaPushVerify.verify(props.projectId, props.year))
+    // 错误在面板内显示（_silent：全局拦截器不再先弹一次笼统提示）
+    data.value = await api.get(formulaPushVerify.verify(props.projectId, props.year), { _silent: true } as any)
   } catch (e: any) {
-    error.value = handleApiError(e, { silent: true }) || '校验失败'
+    // 原写法 handleApiError(e, { silent: true }) 把对象当操作名传入：弹出「[object Object]：…」且返回 void
+    const d = e?.response?.data?.detail
+    const why = (typeof d === 'string' && d) || (typeof d?.message === 'string' && d.message)
+      || (e?.response ? '请稍后重试' : '网络不通，请检查连接')
+    error.value = `校验失败：${why}`
   } finally {
     loading.value = false
   }

@@ -137,9 +137,12 @@
       </el-table>
     </div>
 
-    <!-- 规则清单 -->
+    <!-- 规则清单（本项目有效规则：规则清单 ⊕ 全局 / 模板 / 本项目定义） -->
     <div class="gt-fp-block">
-      <div class="gt-fp-subtitle">推送规则（{{ rules.length }}）</div>
+      <div class="gt-fp-subtitle">
+        推送规则（{{ rules.length }}）
+        <span class="gt-fp-muted">改写公式只能取试算表审定数 TB 与大厅调整 ADJ（可配 ABS / ROUND / MAX / MIN / IF），科目限本底稿推送取数的科目；系统值、派生值规则不能停用</span>
+      </div>
       <el-table :data="rules" size="small" border max-height="360" empty-text="暂无推送规则">
         <el-table-column label="阶段" width="70">
           <template #default="{ row }">{{ labelOf(STAGE_LABELS, row.stage) }}</template>
@@ -148,7 +151,19 @@
           <template #default="{ row }">{{ targetText(row) }}</template>
         </el-table-column>
         <el-table-column label="来源公式" min-width="260" show-overflow-tooltip>
-          <template #default="{ row }"><code class="gt-fp-mono">{{ row.formula }}</code></template>
+          <template #default="{ row }">
+            <code class="gt-fp-mono" :class="{ 'gt-fp-off': isRuleDisabled(row) }">{{ row.formula }}</code>
+          </template>
+        </el-table-column>
+        <el-table-column label="层级" width="150">
+          <template #default="{ row }">
+            <el-tag size="small" effect="plain" :type="layerTagType(row.layer)">{{ row.layer_label || '系统预设' }}</el-tag>
+            <el-tooltip v-if="ruleStatusText(row)" :content="row.issue || ruleStatusText(row)" placement="top">
+              <el-tag size="small" class="gt-fp-tag-gap" :type="row.status === 'invalid' ? 'danger' : 'warning'">
+                {{ ruleStatusText(row) }}
+              </el-tag>
+            </el-tooltip>
+          </template>
         </el-table-column>
         <el-table-column label="写入策略" width="170">
           <template #default="{ row }">{{ labelOf(POLICY_LABELS, row.policy) }}</template>
@@ -157,8 +172,26 @@
           <template #default="{ row }">{{ triggersText(row.triggers) }}</template>
         </el-table-column>
         <el-table-column label="说明" min-width="220" prop="description" show-overflow-tooltip />
+        <el-table-column label="本项目适配" width="190">
+          <template #default="{ row }">
+            <template v-if="ruleActions(row, props.canEdit).length">
+              <el-tooltip v-for="a in ruleActions(row, props.canEdit)" :key="a.key" :content="a.reason"
+                :disabled="!a.reason" placement="top">
+                <span>
+                  <el-button size="small" text :type="a.key === 'disable' ? 'danger' : 'primary'"
+                    :disabled="!a.enabled || ruleBusy === row.rule_id" :data-testid="`fp-rule-${a.key}`"
+                    @click="onRuleAction(row, a)">{{ a.label }}</el-button>
+                </span>
+              </el-tooltip>
+            </template>
+            <span v-else class="gt-fp-muted">{{ ruleReadonlyText(row) }}</span>
+          </template>
+        </el-table-column>
       </el-table>
     </div>
+    <FormulaDefinitionEditDialog v-model="rewriteVisible" :title="`改写推送公式：${rewriting?.rule_id || ''}`"
+      :exec-fields="['expression']" :desc-fields="['description']" :definition="rewriteDefinition"
+      @save="onRewriteSave" />
 
     <!-- spec: formula-management-deep-optimization · R5 — 推送反向校验 -->
     <FormulaPushVerifyPanel v-if="props.projectId && props.year" :project-id="props.projectId" :year="props.year" />
@@ -176,11 +209,15 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { formulaPush } from '@/services/apiPaths'
+import { formulaSettingsApi } from '@/services/formulaSettingsApi'
+import { showFormulaError, type Definition } from '@/composables/formula/useFormulaSettings'
+import FormulaDefinitionEditDialog from './settings/FormulaDefinitionEditDialog.vue'
 import FormulaPushVerifyPanel from './FormulaPushVerifyPanel.vue'
 import {
   POLICY_LABELS, RUN_STATUS_LABELS, STAGE_LABELS, STATE_LABELS, TRIGGER_LABELS,
-  actionable, labelOf, pendingStates, runStatusTag, targetText, triggersText, valueText,
-  type PushRuleView, type PushStateView,
+  actionable, isRuleDisabled, labelOf, layerTagType, pendingStates, ruleActions, ruleReadonlyText, ruleStatusText,
+  runStatusTag, targetText, triggersText, valueText,
+  type PushRuleView, type PushStateView, type RuleAction,
 } from './formulaPushView'
 
 const props = withDefaults(defineProps<{
@@ -318,6 +355,83 @@ function onSelect(rows: PushStateView[]): void {
   selectedAddrs.value = rows.filter(actionable).map((r) => r.addr_id)
 }
 
+// ── 规则本项目适配（公式治理内核 push 域：改写公式 / 停用 / 启用 / 恢复上游） ──────────
+const DOMAIN = 'push'
+const ruleBusy = ref('')
+const rewriting = ref<PushRuleView | null>(null)
+const rewriteVisible = ref(false)
+const rewriteDefinition = computed<Definition | null>(() => rewriting.value
+  ? { expression: rewriting.value.formula, description: rewriting.value.description || '' }
+  : null)
+
+async function saveRule(rule: PushRuleView, definition: Definition): Promise<void> {
+  await formulaSettingsApi.saveOverrides(props.projectId, DOMAIN, [{
+    slot_key: rule.rule_id, definition, label: `${rule.rule_id} ${rule.description || ''}`.trim(),
+    expected_version: rule.has_local ? (rule.local_version ?? null) : null,
+  }])
+}
+
+async function afterRuleChange(text: string): Promise<void> {
+  ElMessage.success(`${text}；本项目将按新规则重新推送，稍后点「刷新」查看结果`)
+  await Promise.all([loadAll(), loadRunHistory()])
+}
+
+async function confirmed(message: string, title: string): Promise<boolean> {
+  try {
+    await ElMessageBox.confirm(message, title, { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function onRuleAction(rule: PushRuleView, action: RuleAction): Promise<void> {
+  if (action.key === 'rewrite') {
+    rewriting.value = rule
+    rewriteVisible.value = true
+    return
+  }
+  if (action.key === 'disable' && !(await confirmed(
+    `本项目停用「${rule.description || rule.rule_id}」后不再推送该规则（已写入的值保留，可随时启用）。确认停用？`, '本项目停用'))) return
+  if (action.key === 'restore' && !(await confirmed(
+    `删除本项目对「${rule.description || rule.rule_id}」的适配，回到上游（全局 / 模板 / 系统预设）定义。确认？`, '恢复上游'))) return
+  ruleBusy.value = rule.rule_id
+  try {
+    if (action.key === 'disable') {
+      await saveRule(rule, { disabled: true })
+      await afterRuleChange('已在本项目停用')
+    } else if (action.key === 'restore' || action.via === 'restore') {
+      await formulaSettingsApi.restoreGlobal(props.projectId, DOMAIN, [rule.rule_id])
+      await afterRuleChange(action.key === 'enable' ? '已启用（回到上游定义）' : '已恢复上游定义')
+    } else {
+      // 上游停用、本项目启用：公式来源的规则同时带回清单原式（只写「启用」会成空公式）
+      const enable: Definition = rule.editable_formula
+        ? { disabled: false, expression: rule.preset_formula || '' }
+        : { disabled: false }
+      await saveRule(rule, enable)
+      await afterRuleChange('已在本项目启用')
+    }
+  } catch (e) {
+    showFormulaError(e, '保存推送规则失败')
+  } finally {
+    ruleBusy.value = ''
+  }
+}
+
+async function onRewriteSave(definition: Definition): Promise<void> {
+  const rule = rewriting.value
+  if (!rule) return
+  ruleBusy.value = rule.rule_id
+  try {
+    await saveRule(rule, { expression: definition.expression ?? '', description: definition.description ?? null })
+    await afterRuleChange('已改写本项目推送公式')
+  } catch (e) {
+    showFormulaError(e, '保存推送公式失败')
+  } finally {
+    ruleBusy.value = ''
+  }
+}
+
 // ── 运行历史 ──────────────────────────────────────────────────
 const runHistory = ref<any[]>([])
 const historyLoading = ref(false)
@@ -390,4 +504,6 @@ watch(() => [props.projectId, props.year, props.wpCode], loadRunHistory)
 .gt-fp-warnings { margin: 0; padding-left: 18px; font-size: var(--gt-font-size-xs); color: var(--gt-color-warning); }
 .gt-fp-muted { color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-xs); }
 .gt-fp-mono { font-family: var(--gt-font-family-mono, monospace); font-size: var(--gt-font-size-xs); }
+.gt-fp-off { text-decoration: line-through; color: var(--gt-color-text-tertiary); }
+.gt-fp-tag-gap { margin-left: 4px; }
 </style>

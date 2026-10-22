@@ -23,6 +23,7 @@ import app.models.workpaper_models  # noqa: E402, F401
 from app.models.base import Base  # noqa: E402
 from app.models.core import Project, ProjectStatus, ProjectType  # noqa: E402
 from app.models.formula_push_models import FormulaPushRun, FormulaPushState  # noqa: E402
+from app.models.formula_setting_models import FormulaSetting, FormulaSyncItem  # noqa: E402
 from app.models.report_models import ContentType, DisclosureNote, NoteStatus  # noqa: E402
 from app.services.formula_push import engine as push  # noqa: E402
 from app.services.formula_push.bindings import e1_calc  # noqa: E402
@@ -155,8 +156,10 @@ class Env:
 @asynccontextmanager
 async def make_env(monkeypatch, extra_tables=()):
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    # 推送规则的本项目有效定义在公式治理内核（formula_setting / 待确认事项），引擎每次运行都读
+    # （spec formula-governance-coverage-closure R2.4）
     tables = [Project.__table__, DisclosureNote.__table__, FormulaPushRun.__table__, FormulaPushState.__table__,
-              *extra_tables]
+              FormulaSetting.__table__, FormulaSyncItem.__table__, *extra_tables]
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=tables))
         await conn.execute(sa.text(

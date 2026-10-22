@@ -261,7 +261,7 @@ function actionColor(action: string): 'primary' | 'success' | 'warning' | 'dange
 function moduleLabel(module: string): string {
   const map: Record<string, string> = {
     report: '报表', consol: '合并', note: '附注', wp: '底稿',
-    tb_detail: '试算表科目明细', cross_check: '表间审核', consol_note: '合并附注',
+    tb_detail: '试算表科目明细', cross_check: '表间审核', consol_note: '合并附注', push: '公式推送',
   }
   return map[module] || module
 }

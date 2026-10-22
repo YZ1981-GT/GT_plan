@@ -21,13 +21,13 @@
 
 ## 3. 推送规则纳入治理内核（R2）
 
-- [ ] 3.1 `definitions` 加 push 域；`push_settings.py`：`PushStore`、`validate_push_definition`、`effective_push_rules`（R2.1~R2.3 / R2.6）
-- [ ] 3.2 接线：`get_store` / `validate_definition` / `display_formula` / `rollback` / `dependencies` / `WIRED_DOMAINS`（R2.1 / R2.8）
-- [ ] 3.3 引擎读有效规则 + 失效进提示 + 触发来源 `FORMULA_CONFIG_CHANGED`（R2.4 / R2.5）
-- [ ] 3.4 传播 handler `propagate_push`（R2.7）
-- [ ] 3.5 规则列表接口返回层级与可用操作（R2.8）
-- [ ] 3.6 后端测试：预设、四类拒绝、有效叠加、失效跳过、引擎改写生效 / 停用不推、传播（R2.2~R2.7）
-- [ ] 3.7 前端：`formulaPushView.ruleActions` + 触发来源标签 + `definitionText` 停用；推送面板层级列与操作；全局设置页空表达式显示中文算式；单测（R2.8）
+- [x] 3.1 `definitions` 加 push 域；`push_settings.py`：`PushStore`、`validate_push_definition`、`effective_push_rules`（R2.1~R2.3 / R2.6）—— 补第五类拒绝「推送取数给不出数」`push_context_errors`（design §4.5）；`_structure` 收而不存、读出按清单补
+- [x] 3.2 接线：`get_store` / `validate_definition` / `display_formula` / `rollback` / `dependencies` / `WIRED_DOMAINS` / 审计模块标签（R2.1 / R2.8）；公式目录随 `DOMAINS` 纳入 push 域
+- [x] 3.3 引擎读有效规则 + 失效进提示（按规则底稿编码过滤）+ 触发来源 `FORMULA_CONFIG_CHANGED`（选规则按手动口径，记录保留原值）（R2.4 / R2.5）
+- [x] 3.4 传播 handler `propagate_push`：按清单反查底稿编码；无规则 / 无年度 / 合并 / 归档跳过；业务不可推记 `not_pushable`（R2.7）
+- [x] 3.5 规则列表接口：本项目有效规则（含停用 / 失效）+ 层级、可用操作、本项目版本号、清单原式、失效原因（R2.8）
+- [x] 3.6 后端测试 `tests/formula_settings/test_push_settings.py` 13 例（四类拒绝 + 取数上下文、清单内 5 条恒推 0 冻结、叠加 / 失效跳过、写入各层都校验、引擎改写生效 / 停用不推 / 失效不推不回退、新触发来源、传播重推与五类跳过）+ 端点 2 例（层级与操作；旧「30 条」写死改现算）+ 端点鉴权 AST 守卫豁免全局静态端点并反向断言；一次性变异 8/8 打红（去取数校验 / 失效回退预设 / 引擎读静态清单 / 不跳过合并 / 结构落库 / 系统值可停用 / 新触发按原值选规则 / 列表只列 active）。干净 worktree 对比：push + formula_settings + formula_management 全套相对 HEAD 新增失败 0（`test_stats_aggregation` 因目录纳入 push 已改现算）、修好 2 例，其余 37 例 HEAD 同红（R2.2~R2.7）
+- [x] 3.7 前端：`formulaPushView.ruleActions` / `ruleStatusText` / `layerTagType` + 触发来源「公式规则变更」；`definitionText` 停用显示与中文算式兜底；推送面板层级列与「本项目适配」列（改写公式 / 本项目停用 / 启用 / 恢复上游）；公式历史模块标签；反向校验面板错误显示；单测 `formulaPushRuleActions.spec.ts` 12 例 + 既有面板 14 例 + 全局设置相关 58 例全绿；单区域 vue-tsc 本次改动 0 错（探针变异 TS2322 证明在检查）（R2.8）
 
 ## 4. 校对规则统一目录（R3）
 

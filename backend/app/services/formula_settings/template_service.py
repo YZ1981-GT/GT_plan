@@ -181,7 +181,7 @@ async def create_template(db: AsyncSession, *, viewer: Viewer, name: str, descri
     await db.flush()
     for domain, slots in entries.items():
         for slot, e in slots.items():
-            validate_definition(domain, e["definition"], f"{get_spec(domain).label} {e.get('label') or slot}")
+            validate_definition(domain, e["definition"], f"{get_spec(domain).label} {e.get('label') or slot}", slot)
             db.add(_template_row(tpl.id, domain, slot, e, user_id))
     changes = [{"domain": d, "slot_key": s, "label": e.get("label") or s, "new": e["definition"]}
                for d, slots in entries.items() for s, e in slots.items()]

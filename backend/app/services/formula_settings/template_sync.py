@@ -290,7 +290,7 @@ async def _publish_plan(db: AsyncSession, tpl: FormulaTemplate, raw: list[Mappin
             row = current[domain].get(slot)
             if d is not None:
                 merged = {**(dict(row.definition or {}) if row else {}), **d}
-                validate_definition(domain, merged, f"{get_spec(domain).label} {slot}")
+                validate_definition(domain, merged, f"{get_spec(domain).label} {slot}", slot)
                 if row is not None and normalize(domain, merged) == normalize(domain, row.definition) \
                         and merged.get("_structure") == (row.definition or {}).get("_structure"):
                     continue

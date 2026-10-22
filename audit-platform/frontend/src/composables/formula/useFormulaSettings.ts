@@ -202,6 +202,8 @@ export interface FormulaTemplateInfo {
   status: string
   can_manage: boolean
   updated_at: string | null
+  /** 列表接口附带：在用订阅数（模板列表按它排序） */
+  subscriber_count?: number
 }
 export interface TemplateSlot {
   slot_key: string
@@ -318,12 +320,17 @@ export function emptyDecisions(defaultConflict: ConflictChoice = 'ask'): Decisio
   return { project_choices: {}, conflict_choices: {}, default_conflict: defaultConflict }
 }
 
-/** 定义的单行展示（与后端 display_formula 同思路：优先公式类字段）。 */
-export function definitionText(d: Definition | null | undefined): string {
+/**
+ * 定义的单行展示（与后端 display_formula 同思路：优先公式类字段）。
+ * 停用显示「（已停用）」；没有公式字段时用结构里的中文算式（推送规则的四表明细 / 派生计算来源）。
+ */
+export function definitionText(d: Definition | null | undefined, structure?: Record<string, any> | null): string {
   if (d == null) return '（已删除）'
+  if (d.disabled) return '（已停用）'
   for (const k of ['formula', 'expression']) if (d[k]) return String(d[k])
   if (d.left_ref || d.right_ref) return `${d.left_ref || ''} ${d.operator || '='} ${d.right_ref || ''}`.trim()
-  return '（空）'
+  const text = structure?.formula_text
+  return typeof text === 'string' && text.trim() ? text.trim() : '（空）'
 }
 
 /** 后端错误 → 中文提示；取不到具体原因时用兜底文案。 */

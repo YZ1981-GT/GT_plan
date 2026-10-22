@@ -28,7 +28,6 @@ from app.models.core import User
 from app.models.formula_push_models import PUSH_STATES
 from app.services.formula_push import engine, panel
 from app.services.formula_push.bindings import supported_wp_codes, watched_prefixes
-from app.services.formula_push.rules import rules_for
 
 router = APIRouter(prefix="/api/projects/{project_id}/formula-push", tags=["formula-push"])
 
@@ -95,12 +94,24 @@ async def list_bindings(
 async def list_rules(
     project_id: UUID,
     wp_code: str | None = Query(None, max_length=16),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    rules = rules_for(engine.load_push_rules(), wp_code=wp_code)
+    """本项目有效规则（含已停用 / 失效的）：每条带层级与可用操作（spec formula-governance-coverage-closure R2.8）。
+
+    ``formula`` 是本项目实际推送的来源公式（改写过即改写后的），``preset_formula`` 是规则清单原文。
+    """
+    from app.services.formula_settings.effective import effective_slots
+    from app.services.formula_settings.push_settings import effective_push_rules, rule_actions
+
+    slots = await effective_slots(db, "push", project_id)
+    rules, issues = await effective_push_rules(db, project_id, slots=slots)
+    reasons = dict(issues)
+    picked = [r for r in rules if wp_code is None or r.wp_code == wp_code]
     return {
         "supported_wp_codes": list(supported_wp_codes()),
-        "rules": [_rule_view(r) for r in rules],
+        "rules": [{**_rule_view(r), **rule_actions(r, slots.get(r.rule_id)), "status": r.status,
+                   "issue": reasons.get(r.rule_id)} for r in picked],
     }
 
 
