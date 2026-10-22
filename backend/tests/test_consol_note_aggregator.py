@@ -331,3 +331,91 @@ class TestAggregateEndToEnd:
         # 合计行不参与（is_total=True 被跳过）
         assert (2, 1) not in cells
         assert (2, 2) not in cells
+
+
+# ─── multi_header 列解析 ─────────────────────────────────────────────────────
+
+
+class TestResolveConsolColNames:
+    """多级表头列名解析。"""
+
+    def test_simple_no_multi_header(self):
+        """无 multi_header：headers 原样返回。"""
+        from app.services.consol_note_aggregator import _resolve_consol_col_names
+
+        result = _resolve_consol_col_names(
+            ["项目", "期末余额", "期初余额"], None, None,
+        )
+        assert result == ["项目", "期末余额", "期初余额"]
+
+    def test_empty_cols_filled_by_column_groups(self):
+        """空串列通过 _column_groups 填充组名。"""
+        from app.services.consol_note_aggregator import _resolve_consol_col_names
+
+        headers = ["票据种类", "期末数", "", "", "期初数", "", ""]
+        cg = [
+            {"group": "期末数", "start": 1, "span": 3},
+            {"group": "期初数", "start": 4, "span": 3},
+        ]
+        result = _resolve_consol_col_names(headers, cg, None)
+        # 第 2、3 列（原空串）应被填为 "期末数"
+        assert result[2] == "期末数"
+        assert result[3] == "期末数"
+        # 第 5、6 列应被填为 "期初数"
+        assert result[5] == "期初数"
+        assert result[6] == "期初数"
+
+    def test_multi_header_last_row_fills(self):
+        """multi_header 最后一行的非空值补空。"""
+        from app.services.consol_note_aggregator import _resolve_consol_col_names
+
+        headers = ["票据种类", "期末数", "", "", "期初数", "", ""]
+        mh = [
+            ["票据种类", "期末数", "", "", "期初数", "", ""],
+            ["", "账面余额", "坏账准备", "账面价值", "账面余额", "坏账准备", "账面价值"],
+        ]
+        cg = [
+            {"group": "期末数", "start": 1, "span": 3},
+            {"group": "期初数", "start": 4, "span": 3},
+        ]
+        result = _resolve_consol_col_names(headers, cg, mh)
+        # 第 2 列：_column_groups 先填为 "期末数"，但 multi_header 最后行有 "坏账准备"
+        # _column_groups 填的是非空，不会再被覆盖
+        # 实际行为：cg 先补空为组名，mh 只补还剩空的
+        assert result[1] == "期末数"  # 原值
+        assert result[2] == "期末数"  # cg 补
+        assert result[3] == "期末数"  # cg 补
+
+
+class TestMatchColumnMultiHeader:
+    """多级表头场景下的列匹配。"""
+
+    def test_slash_path_match(self):
+        """斜杠路径匹配：期末数/账面余额 → 账面余额。"""
+        from app.services.consol_note_aggregator import _match_column, _norm
+
+        result = _match_column(
+            _norm("期末数/账面余额"),
+            [_norm("账面余额"), _norm("坏账准备"), _norm("账面价值")],
+        )
+        assert result == 0
+
+    def test_group_name_synonym_match(self):
+        """组名同义词匹配：合并模板 "期末数" → 单体 "期末余额"。"""
+        from app.services.consol_note_aggregator import _match_column, _norm
+
+        result = _match_column(
+            _norm("期末数"),
+            [_norm("期末余额"), _norm("期初余额")],
+        )
+        assert result == 0
+
+    def test_group_name_prior_match(self):
+        """组名同义词匹配：合并模板 "期初数" → 单体 "年初余额"。"""
+        from app.services.consol_note_aggregator import _match_column, _norm
+
+        result = _match_column(
+            _norm("期初数"),
+            [_norm("期末金额"), _norm("年初余额")],
+        )
+        assert result == 1

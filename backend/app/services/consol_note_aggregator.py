@@ -146,6 +146,7 @@ def _match_column(consol_col_norm: str, standalone_headers_norm: list[str]) -> i
 
     1. 精确匹配
     2. 同义词组匹配（同属 _END_SYNONYMS 或 _PRIOR_SYNONYMS）
+    3. 斜杠路径末段匹配（合并模板 "期末数/账面余额" → 匹配 "账面余额"）
     """
     # 精确匹配
     for i, h in enumerate(standalone_headers_norm):
@@ -158,7 +159,67 @@ def _match_column(consol_col_norm: str, standalone_headers_norm: list[str]) -> i
                 if h in synonyms:
                     return i
             break
+    # 斜杠路径末段匹配：合并模板可能用 "期末数/账面余额" 编码多级表头
+    if "/" in consol_col_norm:
+        last_part = consol_col_norm.rsplit("/", 1)[-1]
+        if last_part:
+            for i, h in enumerate(standalone_headers_norm):
+                if h == last_part:
+                    return i
+            # 末段也走同义词
+            for synonyms in (_END_SYNONYMS, _PRIOR_SYNONYMS):
+                if last_part in synonyms:
+                    for i, h in enumerate(standalone_headers_norm):
+                        if h in synonyms:
+                            return i
+                    break
     return None
+
+
+def _resolve_consol_col_names(
+    headers: list[str],
+    column_groups: list[dict] | None,
+    multi_header: list[list[str]] | None,
+) -> list[str]:
+    """把合并模板的 headers（可能有空串）解析为每列的语义名称。
+
+    空串列通过 _column_groups 映射到组名，
+    或通过 multi_header 最深非空行取名。
+    """
+    result = list(headers)
+
+    # 用 _column_groups 补空
+    if column_groups:
+        for g in column_groups:
+            group_name = g.get("group", "")
+            start = g.get("start", 0)
+            span = g.get("span", 1)
+            for ci in range(start, min(start + span, len(result))):
+                if not _norm(result[ci]):
+                    result[ci] = group_name
+
+    # 用 multi_header 最后一行非空值补空
+    if multi_header and len(multi_header) >= 2:
+        last_row = multi_header[-1]
+        for ci in range(len(result)):
+            if not _norm(result[ci]) and ci < len(last_row):
+                v = str(last_row[ci] or "").strip()
+                if v:
+                    result[ci] = v
+
+    # 对仍为空的列，用 multi_header 第一行组名 + 第二行子列名拼成路径
+    if multi_header and len(multi_header) >= 2:
+        row0 = multi_header[0]
+        row1 = multi_header[1] if len(multi_header) > 1 else []
+        current_group = ""
+        for ci in range(len(result)):
+            if ci < len(row0) and str(row0[ci] or "").strip():
+                current_group = str(row0[ci]).strip()
+            if not _norm(result[ci]) and current_group:
+                sub = str(row1[ci]).strip() if ci < len(row1) else ""
+                result[ci] = f"{current_group}/{sub}" if sub else current_group
+
+    return result
 
 
 def read_tables_format(
@@ -524,6 +585,13 @@ async def aggregate_section(
         result.warnings.append(f"合并模板 {consol_section_id} 无表头或行")
         return result
 
+    # 4b. 解析多级表头列名（处理空串和斜杠路径）
+    resolved_headers = _resolve_consol_col_names(
+        consol_headers,
+        consol_table.get("_column_groups"),
+        consol_table.get("multi_header"),
+    )
+
     # 5. 批量查询所有叶子的单体附注
     leaf_project_ids = [leaf.project_id for leaf in data_leaves]
     notes = await _batch_load_notes(db, leaf_project_ids, year, standalone_section)
@@ -545,7 +613,7 @@ async def aggregate_section(
             continue
 
         table_data = notes[leaf.project_id]
-        std_table = read_standalone_note_table(table_data, standalone_table_name, consol_headers)
+        std_table = read_standalone_note_table(table_data, standalone_table_name, resolved_headers)
         if std_table is None:
             result.leaf_summary.append(LeafStatus(
                 company_code=leaf.company_code,
@@ -579,8 +647,8 @@ async def aggregate_section(
             rows_read += 1
 
             # 逐列读数值并累加
-            for ci in range(1, len(consol_headers)):
-                col_norm = _norm(consol_headers[ci])
+            for ci in range(1, len(resolved_headers)):
+                col_norm = _norm(resolved_headers[ci])
                 val = src_row.values.get(col_norm)
                 if val is None or val == 0.0:
                     continue
@@ -589,7 +657,7 @@ async def aggregate_section(
                     row_index=ri,
                     col_index=ci,
                     row_label=label,
-                    col_name=consol_headers[ci] if ci < len(consol_headers) else "",
+                    col_name=resolved_headers[ci] if ci < len(resolved_headers) else "",
                 ))
                 cell.individual += val
                 cell.by_company.append({
