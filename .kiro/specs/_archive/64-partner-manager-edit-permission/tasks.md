@@ -440,7 +440,7 @@
     - 前置条件不满足时按需求 12.11 标 `[ ]*` 并写明所缺环境。
     - _Requirements: 12.10_
 
-- [ ] 20. 收尾
+- [x] 20. 收尾
   - [x] 20.1 steering 记忆定级条改写与口径检索
     - 在 worktree 的 `.kiro/steering/memory.md`（基于上游版本，不碰主工作树那份）只改「项目级鉴权按『谁会用』定级」这一条，行级改动：合伙人（含签字合伙人）/ 经理为 edit 级，质控 / EQCR 为 review 级；附注写操作走附注编辑门禁（本项目 review 及以上 + EQCR 只读 + `note:edit`）；同条末尾一句指向 R1 / R2 / R3 待另立 spec；文件保持 ≤ 300 行。
     - 需求 2.9：在需求 2.6 范围内检索同一注释块、docstring、断言失败信息或记忆条目里同时出现「合伙人」或「经理」与「review」的文字，逐条判读，仍称合伙人 / 经理为 review 级的命中为 0；检索口径与命中清单（含判读结论）记入 `acceptance.md`。
@@ -455,14 +455,14 @@
     - 用仓库外一次性闭合检查脚本核对（用完即删，输出写入 `acceptance.md`）：需求 1~12 每条验收标准至少对应一个测试标识或验收记录条目，对应关系逐条列出；design §8.5 全部变异以及需求 8.6、12.12 的补充变异逐项有记录；design §8.3 每个性质测试的测试标识、声明的样例数与固定样例名；现算计数对账、改写对照、预存失败登记、真库迁移验收、浏览器实测与清理对账齐全；每个端点级测试文件至少一条放行用例。未闭合不得勾选最后一项。
     - 按需求 12.11 勾选：只勾「代码与测试已在将要提交的树中、19.9 干净检出运行通过（`pg_only` 实际执行）、涉及的变异记录已写入」的任务，并在任务下写完成证据（测试标识、验收记录条目）；外部环境未实测的标 `[ ]*` 并写明「代码已改但未实测」与所缺环境；不用 `[~]`。勾选在主工作树本 spec 的 `tasks.md` 上进行，随后逐字节同步进 worktree。
     - _Requirements: 12.11, 12.14_
-  - [ ] 20.5 单 commit 提交与推送
+  - [x] 20.5 单 commit 提交与推送
     - 提交前：用 `git diff --stat` 核对最终树与 C 的差异只有 `.kiro/` 下的文档（`tasks.md`、`acceptance.md`、`INDEX.md`、`memory.md`）；按需求 4.1 再核一次迁移号。
     - 在实施 worktree 逐个 `git add` 本 spec 的全部文件，单个 commit 提交；不用 `--no-verify`；hook 失败时修复后重新提交，不用 `--amend`。
     - 推送前 `git fetch --prune origin`，确认 `origin/spec/disclosure-note-doc-upload-and-batch-fill` 尖端仍是本提交的父提交（可快进）；若已前移则停止推送：在新尖端上 rebase（逐文件裁决冲突）、重核迁移号、重跑 19.9 受影响的部分后再推，不强推。
     - 只推到该分支：`git push origin HEAD:spec/disclosure-note-doc-upload-and-batch-fill`；推送后 `git ls-remote origin spec/disclosure-note-doc-upload-and-batch-fill` 核对远端 SHA 等于本地提交（推送命令返回异常码时先核对，不盲目重推）。
     - 本任务在提交之后才算完成：勾选只更新主工作树副本，不为勾选另做提交。
     - _Requirements: 4.1, 12.11_
-  - [ ] 20.6 清理 worktree 与临时分支
+  - [x] 20.6 清理 worktree 与临时分支
     - 实施、验证、变异 worktree，以及只读参考 worktree `D:\wt_pm_ref`（与可能另建的 `D:\wt_pm_base`）逐个 `git worktree unlock` → 删除目录（`git worktree remove` 会卡在确认提示，改用 `Remove-Item -Recurse`）→ `git worktree prune`；`git worktree list` 核对无残留。
     - 确认临时分支的提交已包含在 `origin/spec/disclosure-note-doc-upload-and-batch-fill` 之后删除该分支（`git branch -d`；因无上游被拒时，核实包含关系后用 `-D`，删除临时分支已获用户授权）。
     - 勾选本项前复跑 20.4 的闭合检查（需求 12.14：最后一项任务）。

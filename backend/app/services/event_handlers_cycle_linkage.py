@@ -683,6 +683,14 @@ def register_cycle_linkage_handlers() -> None:
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_workpaper_saved_wp_formula_stale)
     logger.debug("WP() cross-workpaper stale propagation handler registered")
 
+    # 底稿保存 → 从披露表刷新附注数据（spec: note-data-from-disclosure-table Task 3）
+    from app.services.note_disclosure_refresh_service import (
+        handle_workpaper_saved as _refresh_note_from_disclosure,
+    )
+
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _refresh_note_from_disclosure)
+    logger.debug("Disclosure → note refresh handler registered")
+
 
 async def _on_workpaper_saved_wp_formula_stale(payload: EventPayload) -> None:
     """WORKPAPER_SAVED → 扫描 wp_formula 中 WP() 引用该底稿的公式 → 标引用方 stale。

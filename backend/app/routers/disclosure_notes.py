@@ -555,6 +555,64 @@ async def pull_from_workpapers(
     }
 
 
+@router.post("/{project_id}/{year}/refresh-from-disclosure")
+async def refresh_from_disclosure(
+    project_id: UUID,
+    year: int,
+    wp_code: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
+):
+    """从披露表（disclosure builder）刷新附注数据。
+
+    - 传 wp_code：只刷新该科目对应的附注章节（单科目）
+    - 不传：刷新全部有映射的章节（全量）
+
+    按项目 template_type 自动过滤准则变体（listed/soe），只刷新匹配的章节。
+
+    spec: note-data-from-disclosure-table Phase 1 Task 4
+    """
+    from app.models.core import Project
+    from app.services.note_disclosure_refresh_service import (
+        refresh_all_notes,
+        refresh_note_from_disclosure,
+    )
+
+    # 取项目准则变体，只刷新匹配的章节（国企项目不去查上市章节，反之亦然）
+    project = await db.get(Project, project_id)
+    variant = (project.template_type if project else None) or None
+
+    # 先用 builder 从 checklist_responses 构建 sub_table_data（如果该科目有 builder）
+    from app.services.disclosure_payload_builder_service import build_and_sync, get_builder
+
+    if wp_code:
+        if get_builder(wp_code) is not None:
+            try:
+                await build_and_sync(db, project_id, year, wp_code, triggered_by=current_user.id)
+                await db.flush()
+            except Exception as e:
+                logger.warning("build_and_sync failed for %s: %s", wp_code, e)
+                await db.rollback()
+        result = await refresh_note_from_disclosure(db, project_id, year, wp_code, variant=variant)
+    else:
+        # 全量：逐科目 build 再统一 refresh
+        from app.services.note_disclosure_refresh_service import all_wp_codes
+        for code in all_wp_codes():
+            if get_builder(code) is not None:
+                try:
+                    await build_and_sync(db, project_id, year, code, triggered_by=current_user.id)
+                    await db.flush()
+                except Exception as e:
+                    logger.warning("build_and_sync failed for %s: %s", code, e)
+                    try:
+                        await db.rollback()
+                    except Exception:
+                        pass
+        result = await refresh_all_notes(db, project_id, year, variant=variant)
+
+    return result
+
+
 @router.get("/{project_id}/{year}/wp-sync-status")
 async def get_wp_sync_status(
     project_id: UUID,
