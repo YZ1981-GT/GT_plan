@@ -359,3 +359,114 @@ class TestOverrides:
         ])
         links = L.continuation_links(tables, variant="soe_standalone", section="八、1", vocab=vocab)
         assert set(links) == {2} and (links[2].of, links[2].via) == (0, "override")
+
+
+# ─── 逐列角色 / 变动表勾稽列（spec consol-note-header-library-and-node-reaggregate R5） ───
+
+
+def _col(*path: str) -> dict:
+    """单列表：最后一段是叶表头，前面几段是分组（``columns[].group`` 用「/」分层）。"""
+    group = "/".join(path[:-1])
+    cols = [{"label": "项目", "is_label": True}, {"label": path[-1], **({"group": group} if group else {})}]
+    return {"headers": ["项目", path[-1]], "columns": cols}
+
+
+def _vocab_with(**fields):
+    raw = json.loads(L.VOCABULARY_PATH.read_text(encoding="utf-8"))
+    raw.update(fields)
+    return L._build_vocabulary(raw)
+
+
+class TestColumnRoles:
+    @pytest.mark.parametrize("period,side", [
+        ("end", "current"), ("cur", "current"), ("prior", "previous"), ("prev", "previous"), (None, None),
+    ])
+    def test_period_side(self, period, side):
+        assert L.period_side(period) == side
+
+    def test_flat_change_table(self):
+        roles = L.column_roles({"headers": [
+            "项目", "期初余额", "本期增加", "本期减少", "本期核销", "期末余额", "比例(%)", "备注", "本期<br/>增加",
+        ]})
+        assert roles == ["label", "opening", "increase", "decrease", "movement", "closing", None, None, "increase"]
+
+    @pytest.mark.parametrize("path,role", [
+        (("期末余额",), "closing"), (("本期发生额",), "closing"), (("期末公允价值",), "closing"),
+        (("期末数", "账面余额", "金额"), "closing"), (("上年年末余额",), "opening"), (("上期金额",), "opening"),
+        (("期初数", "账面余额"), "opening"),
+        (("期末数", "坏账准备", "金额"), None), (("期末数", "账面价值"), None), (("期末余额", "已质押金额"), None),
+        (("期末数", "账面余额", "比例(%)"), None), (("期末余额", "核销原因"), None),
+    ])
+    def test_balance_columns_are_pure_period_or_balance_measures(self, path, role):
+        """余额列 = 纯期间 / 账面余额 / 公允价值；坏账准备 / 账面价值 / 比例 / 说明 不和试算表审定数比。"""
+        assert L.column_roles(_col(*path))[1] == role
+
+    @pytest.mark.parametrize("path,kind", [
+        (("本期计提",), "increase"), (("本期应交",), "increase"), (("按面值计提利息",), "increase"),
+        (("本期变动金额", "转销或核销"), "decrease"), (("本期增减变动", "减少投资"), "decrease"),
+        (("本期核销",), "movement"), (("本期增减变动", "计提减值准备"), "movement"),
+        (("本期增加", "自用房地产或存货转入"), "increase"),
+    ])
+    def test_movement_kind_longest_word_wins(self, path, kind):
+        """命中多个变动词取最长的（「计提减值准备」方向不定，不按「计提」认作增加）；同长按 增加 → 减少 → 不定。"""
+        key = L.column_keys(_col(*path))[1]
+        assert L.movement_kind(key) == kind and L.column_role(key) == kind
+
+    def test_balance_side_columns_are_never_movements(self):
+        """种子多级表头错位把「计提的利息」挂到期末余额下：期末一侧的列不当变动列。"""
+        key = L.column_keys(_col("期末余额", "计提的利息"))[1]
+        assert key.period == "end" and L.movement_kind(key) is None and L.column_role(key) is None
+
+    def test_template_header_rows_beat_misaligned_flat_headers(self):
+        """五-24-1 种子平表头只在分组起始列写期间（「期初余额」落在期末余额/减值准备上）；角色按展示表头。"""
+        table = find_table("soe", "五-24-1")
+        assert L.column_roles(table) == ["label", "closing", None, None, "opening", None, None]
+        assert L.column_roles({"headers": table["headers"]})[2] == "opening"  # 平表头会把减值准备列当期初
+
+    def test_words_come_from_vocabulary(self):
+        vocab = _vocab_with(movement_words={"decrease": ["核销"]}, balance_measures=["账面价值"])
+        assert L.column_roles(_col("本期核销"), vocab=vocab)[1] == "decrease"
+        assert L.column_roles(_col("本期增加"), vocab=vocab)[1] is None
+        assert L.column_roles(_col("期末数", "账面价值"), vocab=vocab)[1] == "closing"
+        assert L.column_roles(_col("期末数", "账面余额"), vocab=vocab)[1] is None
+
+
+class TestRollForward:
+    def test_simple_change_table(self):
+        flow = L.rollforward_columns({"headers": ["项目", "期初余额", "本期增加", "本期减少", "期末余额"]})
+        assert flow == L.RollForward(1, 4, (2,), (3,), ())
+
+    def test_every_leaf_of_movement_groups(self):
+        """五-10-2 存货跌价准备：「本期增加 / 本期减少」分组下每个叶子列都参与（旧逻辑只认分组起始列）。"""
+        assert L.rollforward_columns(find_table("soe", "五-10-2")) == L.RollForward(1, 7, (2, 3), (4, 5, 6), ())
+
+    def test_unknown_flows_between_opening_and_closing(self):
+        """五-81-9 筹资活动负债变动：现金流量净额 / 公允价值变动 / 其他 方向不定。"""
+        assert L.rollforward_columns(find_table("soe", "五-81-9")) == L.RollForward(1, 6, (3,), (), (2, 4, 5))
+
+    def test_columns_outside_opening_and_closing_are_notes(self):
+        """十二-长期股权投资-2：期末之后的「本期计提减值准备 / 减值准备期末余额」是说明列，不参与勾稽。"""
+        flow = L.rollforward_columns(find_table("soe", "十二-长期股权投资-2"))
+        assert flow == L.RollForward(1, 4, (2,), (3,), ())
+
+    def test_equity_investment_detail(self):
+        """五-18-2 长期股权投资明细：投资成本在期初之前不参与；增减变动里「计提减值准备」方向不定。"""
+        flow = L.rollforward_columns(find_table("soe", "五-18-2"))
+        assert (flow.opening, flow.closing, flow.increase, flow.decrease) == (2, 11, (), (4,))
+        assert flow.unknown == (3, 5, 6, 7, 8, 9, 10)
+
+    def test_same_measure_pair_without_balance_columns(self):
+        """五-25-1 期初 / 期末账面价值；五-58-1 期初 / 期末投资金额（所占比例是比例列）。"""
+        assert L.rollforward_columns(find_table("soe", "五-25-1")) == L.RollForward(1, 4, (2,), (3,), ())
+        assert L.rollforward_columns(find_table("soe", "五-58-1")) == L.RollForward(1, 5, (3,), (4,), ())
+
+    def test_misaligned_seed_columns_under_closing_are_unknown(self):
+        """五-22-1 种子多级表头错位：「处置 / 转为自用房地产」挂到期末余额下 → 方向不定（有数的行不校验）。"""
+        assert L.rollforward_columns(find_table("soe", "五-22-1")) == L.RollForward(1, 6, (2,), (3,), (4, 5))
+
+    def test_not_a_single_rollforward(self):
+        """五-51-2 数量 / 账面价值各有一对期初、期末：不唯一不校验；期末列重复、余额表、空表都不校验。"""
+        assert L.rollforward_columns(find_table("soe", "五-51-2")) is None
+        assert L.rollforward_columns({"headers": ["项目", "期初余额", "本期增加", "本期减少", "期末余额", "期末数"]}) is None
+        assert L.rollforward_columns(find_table("soe", "五-1-1")) is None
+        assert L.rollforward_columns({"headers": []}) is None

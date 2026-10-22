@@ -74,3 +74,19 @@
   - design §13 记实施偏离、实测数字、范围外 / 待拍板与 ADR-RA-004；INDEX 本 spec 一行、memory 合并附注拉数小节更新（memory 295 行）
   - 干净 worktree（HEAD `1e1d73f64` + 本会话 35 个文件 = 要提交的树；提交前 HEAD 被并发会话前移两次，两者文件零交集，按新 HEAD 重跑）：后端合并附注 / 推送相关 32 个测试文件 540 passed，3 例失败在 HEAD 同样失败；前端合并 + 公式组件目录 815 passed，6 例失败在 HEAD 同样失败；库目录 `--check` 一致，映射生成器重跑字节不变
   - 另跑鉴权 / lazy import 守卫：鉴权 3 个文件全过；`test_lazy_import_resolvability` 2 例红在 `ai_content.py` / `formula_preloader.py` / `note_section_pairing.py` 的 import（不在本 spec 文件里，HEAD 预存）
+
+## Phase 6 其余表头识别点改调标题行库（R5，2026-10-22 用户追加）
+
+- [x] 19. 标题行库新增逐列角色（`period_side` / `movement_kind` / `column_role` / `column_roles`）与变动表勾稽列（`rollforward_columns` / `RollForward`），变动词与余额计量词进词表，库目录重生成（R5.2）
+  - 变动词命中多个取最长、同长按 增加 → 减少 → 不定；「计提减值准备」进方向不定（四版种子逐列核对：只影响 10 列，全是这一种）；期末 / 期初一侧的列不算变动
+  - 勾稽列：期初 / 期末取余额列各唯一的一对，否则同一计量各唯一的一对；变动列只认两者之间的列，之间其余金额列为方向不定
+  - 库目录重生成只有 `vocabulary_sha1` 一行变化
+- [x] 20. `consol_note_sections`：删 `_resolve_value_columns` 与全部期间 / 变动关键词，4 个调用点改用标题行库（`_header_table` 选模板 / 平表头，`_column_view` 给列名与角色）；勾稽改用 `rollforward_columns`，方向不定列有数的行跳过；试算表校验列名取展示路径（R5.1）
+  - 真库已保存合并附注 4496 行表头与国企模板逐字相同 ⇒ 审核全走模板多级表头
+- [x] 21. 测试：角色 / 勾稽列单元测试 + 路由三处真实调用（全审 / 单表审核 / 下级汇总兜底）+ 变异；新旧逐列对比并归类（R5.5，design §14.4）
+  - `test_note_table_header_library.py` +37 例；`test_consol_note_section_column_roles.py` 20 例（替换只测已删函数的 `test_consol_note_refresh_column_resolve.py`）
+  - 干净 worktree（HEAD `cb320d128` + 本轮文件）19 个磁盘变异全打红；合并附注 / 推送 / 标题行库 33 个测试文件 568 passed，152 例失败在 HEAD 同样失败（`test_consol_note_headers.py` 147、`test_seed_counts_on_real_templates` ×2、`test_approve_push_revoke_roundtrip`、`test_note_standalone_consolidated_only_scope.py` ×2）
+- [ ] 22. `note_writer.legacy_value_keys` 改调标题行库（R5.3，与用户确认接手方式后做）
+- [x] 23. 收尾：行数门、干净 worktree 跑要提交的树、只提交本会话文件
+  - 行数门过（路由 1157 → 1032 行，白名单基线 1116）；库目录 `--check` 一致，映射生成器重跑字节不变；鉴权基线全过，lazy import 2 例红与 HEAD 相同（`consol_lock_service` / `disclosure_source` 不存在，非本轮文件）
+  - 私有索引只提交本轮 12 个文件（含删除旧测试）；note_writer 未动（task 22）

@@ -52,3 +52,11 @@
 - R4.2 `formula_push/note_writer` 的期间词表改用标题行库（该文件有并发会话未提交改动，本 spec 不碰）。
 - R4.3 旧 V2 汇总器（`CONSOL_NOTES_V2_ENABLED=False`、mock CSV）、`useNoteAggregation`、无界面的 V202 端点是否下线。
 - R4.4 披露附注（`disclosure_notes`）合并口径表不在本库（不属拉数链路，已有 Word 对齐检查 `check_note_template_word_tree.py` 守护）。
+
+## R5 其余表头识别点改调标题行库（2026-10-22 用户追加：「公式推送的附注写入（note_writer）和试算表刷新端点（consol_note_sections._resolve_value_columns）里还各有一套表头识别，也改用标题行库」）
+
+- R5.1 `consol_note_sections`：`_resolve_value_columns` 无生产调用方（试算表刷新端点早已改走 `fill_by_formula`），删除；`_classify_header` 的 4 个调用点（全审 / 单表审核的试算表交叉校验、单表审核「期末 = 期初 + 增加 − 减少」、下级汇总取数的试算表兜底）改用标题行库的逐列角色，按合并模板的多级表头认列（与展示同口径）；路由里的期间 / 变动关键词全部删除。
+- R5.2 逐列角色由标题行库给出：本期一侧余额列 `closing`、上期一侧余额列 `opening`（纯期间列与「账面余额 / 公允价值」）、`increase` / `decrease`（参与勾稽）、方向不定的变动列 `movement`；比例 / 说明类列、坏账准备 / 账面价值 / 已质押金额等计量列不参与与试算表的比对。变动表勾稽列（期初 / 期末 / 增加 / 减少 / 方向不定）也由库给出：变动列只认期初、期末之间的列，方向不定的列有数的行不勾稽。变动词与余额计量词进词表。
+- R5.3 `formula_push/note_writer.legacy_value_keys` 改调标题行库（期末 / 期初金额列）。该函数有并发会话已暂存未提交的改动（六列对称兜底），先与用户确认接手方式再改。
+- R5.4 同类识别点盘点（不在本轮改动，登记待拍板）：合并附注公式种子取数列 `consol_note_formula_service.value_column`、上年附注导入 `note_prior_year_import_service._header_index`。
+- R5.5 改动前后逐列对比，每处差异归类说明：审核 / 汇总只用两版合并模板 ⇒ 两版合并模板全部表新旧对比；词表变动词改动另在四版种子上逐列核对。

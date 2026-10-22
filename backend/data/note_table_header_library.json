@@ -6,7 +6,7 @@
     "语义键「期间|计量」：end 期末余额类 / prior 期初·上年年末余额类 / cur 本期发生额类 / prev 上期发生额类；§label 标签列；|ratio 比例列（不加总）。",
     "correspondence：每张合并表对到单体哪张表（via：name 按表名 / structure 按表头结构 / single_table / no_source 合并特有），columns 为 [合并列, 单体表, 单体列, 规则]，unmatched 为没对上的合并列。"
   ],
-  "vocabulary_sha1": "2bc21c7cb0f625639bcd5776710cf1bbdd975748",
+  "vocabulary_sha1": "2bf9e9bc40fe868785bb91898c99f3d7a96d3221",
   "stats": {
     "soe_standalone": {
       "tables": 252,

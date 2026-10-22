@@ -28,6 +28,7 @@ from app.services.consol_node_scope import (
     resolve_requested_node_key,
     save_scoped_note_record,
 )
+from app.services.note_table_header_library import column_keys, column_role, column_roles, rollforward_columns
 
 router = APIRouter(prefix="/api/consol-note-sections", tags=["consol-note-sections"])
 
@@ -404,121 +405,39 @@ async def save_note_data(
         return {"ok": False, "error": str(e), "node_key": scope.node_key}
 
 
-# ─── 列定位辅助（spec consol-note-refresh-multi-header-fix） ─────────────────
-
-# 期末/本期 关键词
-_ENDING_KEYWORDS = ("期末", "本期")
-# 期初/年初/上年 关键词
-_OPENING_KEYWORDS = ("期初", "年初", "上期", "上年")
-# 变动类排除词（含这些词的列是变动列，不应被当作期末/期初写入目标）
-_CHANGE_EXCLUDE = ("增加", "减少", "计提", "转回", "转销", "核销", "摊销", "偿还", "发行", "转入", "变动")
+# ─── 逐列角色（表头识别统一走标题行库，spec consol-note-header-library-and-node-reaggregate R5） ───
 
 
-def _header_root(h: str) -> str:
-    """取斜杠路径表头的首段；无斜杠时原样返回。"""
-    return h.split("/", 1)[0] if "/" in h else h
-
-
-def _is_ending_label(label: str) -> bool:
-    """判断 label 是否表示"期末/本期"类（排除变动列如"本期增加""本期减少"）。"""
-    if not any(k in label for k in _ENDING_KEYWORDS):
-        return False
-    # 含变动类关键词的列排除（"本期增加"不是期末值列）
-    if any(k in label for k in _CHANGE_EXCLUDE):
-        return False
-    return True
-
-
-def _is_opening_label(label: str) -> bool:
-    """判断 label 是否表示"期初/年初/上年"类。"""
-    return any(k in label for k in _OPENING_KEYWORDS)
-
-
-def _classify_header(h: str) -> str | None:
-    """单列表头分类：返回 ``'audited'`` / ``'opening'`` / ``None``。
-
-    用于审计校验等需要**逐列判断**的场景（不同于 _resolve_value_columns 只取第一列）。
-    对斜杠路径只看首段，排除变动列。
+def _header_table(template: dict | None, headers: list) -> dict:
+    """认列用的表：模板列数与本次表头一致 → 模板（合并附注多级表头与展示同口径 —— 种子的平铺 ``headers`` 只在分组
+    起始列写组名，和实际叶子列对不齐）；否则本次平表头。逐列角色 / 变动表勾稽列由标题行库按它给出。
     """
-    h_clean = h.replace(" ", "").replace("\u3000", "")
-    if not h_clean:
-        return None
-    root = _header_root(h_clean)
-    if _is_ending_label(root):
-        return "audited"
-    if _is_opening_label(root):
-        return "opening"
+    if isinstance(template, dict) and len(template.get("headers") or []) == len(headers):
+        return template
+    return {"headers": list(headers)}
+
+
+def _column_view(table: dict) -> tuple[list[str], list[str | None]]:
+    """逐列（列名, 角色）：列名取展示表头路径（「期初数/账面余额」），角色见 ``column_role``。"""
+    keys = column_keys(table)
+    return [k.label for k in keys], [column_role(k) for k in keys]
+
+
+def _cell_amount(row: list, ci: int) -> float:
+    """单元格数值；空 / 越界 / 不是数字记 0。"""
+    try:
+        return float(str(row[ci]).replace(",", "")) if ci < len(row) and row[ci] else 0.0
+    except ValueError:
+        return 0.0
+
+
+def _tb_expected(role: str | None, tb_entry: dict) -> float | None:
+    """与试算表比对的值：本期一侧余额列比审定数，上期一侧余额列比期初数；其他列不比。"""
+    if role == "closing":
+        return tb_entry["audited"]
+    if role == "opening":
+        return tb_entry["opening"]
     return None
-
-
-def _resolve_value_columns(
-    template: dict,
-) -> dict[str, list[int]]:
-    """从模板解析数值列映射：``{'audited': [col_indices], 'opening': [col_indices]}``。
-
-    策略分三层（逐层降级）：
-
-    1. ``_column_groups``（P2 产出）存在时，按组名定位到组内第一列。
-    2. ``multi_header`` 非 null 时，按 multi_header 第一行的顶级分组名匹配，
-       对每个分组只取**起始列**（即叶子列第一个）。
-    3. 扁平表头：用首段关键词匹配，多列命中**只取第一个**（保守策略）。
-
-    对"本期增加""本期减少"等变动列不写入（刷新只推合计值到期末/期初列）。
-    """
-    headers = template.get("headers", [])
-    column_groups = template.get("_column_groups")
-
-    # ── 策略 1：_column_groups（P2 就绪后走此路径） ──
-    if column_groups:
-        audited_cols: list[int] = []
-        opening_cols: list[int] = []
-        for g in column_groups:
-            group_name = str(g.get("group", ""))
-            start = int(g.get("start", 0))
-            if _is_ending_label(group_name):
-                audited_cols.append(start)
-            elif _is_opening_label(group_name):
-                opening_cols.append(start)
-        return {"audited": audited_cols[:1], "opening": opening_cols[:1]}
-
-    # ── 策略 2：multi_header 非 null ──
-    multi_header = template.get("multi_header")
-    if multi_header and len(multi_header) >= 2:
-        # multi_header[0] 是顶级分组行，如 ["账龄", "期末数", "期初数", "", ""]
-        top_row = multi_header[0]
-        audited_cols = []
-        opening_cols = []
-        # 从顶级行识别"期末"/"期初"分组的起始列
-        for ci, cell in enumerate(top_row):
-            if ci == 0:
-                continue
-            cell_clean = str(cell).replace(" ", "").replace("\u3000", "")
-            if not cell_clean:
-                continue  # 空白 = 前一个分组的延续列
-            if _is_ending_label(cell_clean):
-                audited_cols.append(ci)
-            elif _is_opening_label(cell_clean):
-                opening_cols.append(ci)
-        return {"audited": audited_cols[:1], "opening": opening_cols[:1]}
-
-    # ── 策略 3：扁平表头降级 ──
-    audited_cols = []
-    opening_cols = []
-    for ci, h in enumerate(headers):
-        if ci == 0:
-            continue
-        h_clean = str(h).replace(" ", "").replace("\u3000", "")
-        if not h_clean:
-            continue
-        # 取首段做匹配，避免斜杠路径里"账面余额"误命中
-        root = _header_root(h_clean)
-        if _is_ending_label(root):
-            audited_cols.append(ci)
-        elif _is_opening_label(root):
-            opening_cols.append(ci)
-    # 多列命中只取第一个（保守：变动表"本期增加/本期减少/期末余额"只取期末余额不现实，
-    # 故只取第一个命中列——通常就是期末余额列）
-    return {"audited": audited_cols[:1], "opening": opening_cols[:1]}
 
 
 # ─── 公式刷新：根据项目数据重新计算附注表格 ──────────────────────────────────
@@ -678,8 +597,9 @@ async def audit_all_notes(
                         "message": "通过",
                     })
 
-        # 规则2：与试算表交叉校验（按第一列科目名匹配）
+        # 规则2：与试算表交叉校验（按第一列科目名匹配；逐列角色按模板多级表头认）
         if tb_map:
+            labels, roles = _column_view(_header_table(sec, headers))
             for ri, row in enumerate(data_rows):
                 if not row or not row[0]:
                     continue
@@ -689,7 +609,6 @@ async def audit_all_notes(
                     continue
 
                 for ci in range(1, min(len(headers), len(row))):
-                    h = headers[ci].replace(" ", "")
                     try:
                         cell_val = float(str(row[ci]).replace(",", "").replace("，", "")) if row[ci] else 0
                     except ValueError:
@@ -698,19 +617,14 @@ async def audit_all_notes(
                     if cell_val == 0:
                         continue
 
-                    expected = None
-                    col_type = _classify_header(h)
-                    if col_type == "audited":
-                        expected = tb_entry["audited"]
-                    elif col_type == "opening":
-                        expected = tb_entry["opening"]
+                    expected = _tb_expected(roles[ci] if ci < len(roles) else None, tb_entry)
 
                     if expected is not None:
                         diff = round(cell_val - expected, 2)
                         if abs(diff) > 0.01:
                             results.append({
                                 "section_title": title,
-                                "rule_name": f"试算表交叉校验 - {item_name}/{headers[ci]}",
+                                "rule_name": f"试算表交叉校验 - {item_name}/{labels[ci]}",
                                 "level": "warn",
                                 "expected": f"{expected:,.2f}",
                                 "actual": f"{cell_val:,.2f}",
@@ -756,15 +670,16 @@ async def audit_single_note(
 
     # 加载模板获取标题
     sections = _load_sections(template_type)
+    template = next((sec for sec in sections if sec["section_id"] == section_id), None)
     title = section_id
-    for sec in sections:
-        if sec["section_id"] == section_id:
-            title = sec.get("title", section_id)
-            if not headers:
-                headers = sec.get("headers", [])
-            if not data_rows:
-                data_rows = sec.get("rows", [])
-            break
+    if template is not None:
+        title = template.get("title", section_id)
+        if not headers:
+            headers = template.get("headers", [])
+        if not data_rows:
+            data_rows = template.get("rows", [])
+    table = _header_table(template, headers)
+    labels, roles = _column_view(table)
 
     results: list[dict] = []
 
@@ -827,29 +742,9 @@ async def audit_single_note(
                     "message": "通过",
                 })
 
-    # 规则2：期末 = 期初 + 增加 - 减少（如表头包含这些列）
-    col_map: dict = {}
-    for ci, h in enumerate(headers):
-        h_clean = h.replace(" ", "").replace("\u3000", "")
-        root = _header_root(h_clean)
-        col_type = _classify_header(h)
-        if col_type == "audited":
-            col_map["closing"] = ci
-        elif col_type == "opening":
-            col_map["opening"] = ci
-        elif "增加" in root or "计提" in root:
-            col_map.setdefault("increase", []).append(ci) if isinstance(col_map.get("increase"), list) else col_map.update({"increase": [ci]})
-        elif "减少" in root or "转回" in root or "转销" in root:
-            col_map.setdefault("decrease", []).append(ci) if isinstance(col_map.get("decrease"), list) else col_map.update({"decrease": [ci]})
-
-    if "closing" in col_map and "opening" in col_map:
-        inc_cols = col_map.get("increase", [])
-        dec_cols = col_map.get("decrease", [])
-        if isinstance(inc_cols, int):
-            inc_cols = [inc_cols]
-        if isinstance(dec_cols, int):
-            dec_cols = [dec_cols]
-
+    # 规则2：期末 = 期初 + 增加 - 减少（变动表才校验；期初 / 期末 / 增加 / 减少列由标题行库认）
+    flow = rollforward_columns(table)
+    if flow is not None:
         for ri, row in enumerate(data_rows):
             if not row or not row[0]:
                 continue
@@ -857,27 +752,19 @@ async def audit_single_note(
             if "合计" in cell0 or "小计" in cell0 or "其中" in cell0:
                 continue
             try:
-                opening = float(str(row[col_map["opening"]]).replace(",", "")) if row[col_map["opening"]] else 0
-                closing = float(str(row[col_map["closing"]]).replace(",", "")) if row[col_map["closing"]] else 0
+                opening = float(str(row[flow.opening]).replace(",", "")) if row[flow.opening] else 0
+                closing = float(str(row[flow.closing]).replace(",", "")) if row[flow.closing] else 0
             except (ValueError, IndexError):
                 continue
 
             if opening == 0 and closing == 0:
                 continue
+            # 方向不定的变动列（核销 / 其他 / 现金流量净额…）有数：这一行无法按「增加 − 减少」勾稽
+            if any(_cell_amount(row, ci) for ci in flow.unknown):
+                continue
 
-            inc_sum = 0
-            for ic in inc_cols:
-                try:
-                    inc_sum += float(str(row[ic]).replace(",", "")) if ic < len(row) and row[ic] else 0
-                except (ValueError, IndexError):
-                    pass
-            dec_sum = 0
-            for dc in dec_cols:
-                try:
-                    dec_sum += float(str(row[dc]).replace(",", "")) if dc < len(row) and row[dc] else 0
-                except (ValueError, IndexError):
-                    pass
-
+            inc_sum = sum(_cell_amount(row, ci) for ci in flow.increase)
+            dec_sum = sum(_cell_amount(row, ci) for ci in flow.decrease)
             if inc_sum == 0 and dec_sum == 0:
                 continue
 
@@ -911,25 +798,19 @@ async def audit_single_note(
             if not tb_entry:
                 continue
             for ci in range(1, min(len(headers), len(row))):
-                h = headers[ci].replace(" ", "")
                 try:
                     cell_val = float(str(row[ci]).replace(",", "")) if row[ci] else 0
                 except ValueError:
                     continue
                 if cell_val == 0:
                     continue
-                expected = None
-                col_type = _classify_header(h)
-                if col_type == "audited":
-                    expected = tb_entry["audited"]
-                elif col_type == "opening":
-                    expected = tb_entry["opening"]
+                expected = _tb_expected(roles[ci] if ci < len(roles) else None, tb_entry)
                 if expected is not None:
                     diff = round(cell_val - expected, 2)
                     if abs(diff) > 0.01:
                         results.append({
                             "section_title": title,
-                            "rule_name": f"试算表校验 - {item_name}/{headers[ci]}",
+                            "rule_name": f"试算表校验 - {item_name}/{labels[ci]}",
                             "level": "warn",
                             "expected": f"{expected:,.2f}",
                             "actual": f"{cell_val:,.2f}",
@@ -1088,21 +969,15 @@ async def aggregate_data(
             if template.get("rows") and row_idx < len(template["rows"]):
                 item_name = template["rows"][row_idx][0] if template["rows"][row_idx] else ""
 
-            if item_name:
+            roles = column_roles(template)
+            role = roles[col_idx] if col_idx < len(roles) else None
+            if item_name and role in ("closing", "opening"):
                 for child_scope in child_scopes:
                     try:
                         child_tb = await _load_tb_map(db, child_scope)
                         entry = child_tb.get(item_name.strip())
                         if entry:
-                            headers = template.get("headers", [])
-                            col_header = headers[col_idx] if col_idx < len(headers) else ""
-                            h_clean = col_header.replace(" ", "")
-                            val = 0.0
-                            col_type = _classify_header(col_header)
-                            if col_type == "audited":
-                                val = entry["audited"]
-                            elif col_type == "opening":
-                                val = entry["opening"]
+                            val = _tb_expected(role, entry) or 0.0
                             if val:
                                 total += val
                                 count += 1

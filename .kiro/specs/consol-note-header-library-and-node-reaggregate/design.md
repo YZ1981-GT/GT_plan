@@ -157,3 +157,65 @@ reaggregate_subtree(db, project_id, year, node_key, section_ids, template_type)
 - 有拉数行时试算表事件处理器的短路失效（13.1 §9），可按来源标记排除拉数行后再判短路。
 - 本 spec 外的预存失败（HEAD 干净检出同样失败）：`test_consol_note_formulas::test_seed_counts_on_real_templates`（soe / listed）、`test_consol_note_headers.py`、`test_consol_push::TestEndpoints::test_approve_push_revoke_roundtrip`、前端 `ConsolTrialBalanceTab.spec.ts` / `ConsolReportBreakdownView.spec.ts`（请求参数多了 `signal`）。
 - ADR-RA-004 下级出错不汇总、按原因跳过不阻断：出错意味着这一级本轮的数不可信，在其上汇总会写出标「不过期」的错数；跳过是已知原因（用户可见、可处理），用已保存数并回报更有用。
+
+## 14 其余表头识别点收口（R5，2026-10-22 追加）
+
+### 14.1 标题行库新增：逐列角色 + 变动表勾稽列
+
+```
+period_side(period)          end / cur → current；prior / prev → previous
+movement_kind(key)           计量段含词表 movement_words 的词 → increase / decrease / movement（方向不定）；
+                             期间是期末 / 期初（余额类）的列不算变动（「期末余额 / 计提的利息」是期末一侧列）；
+                             命中多个词取最长的，同长按 increase → decrease → movement
+column_role(key)             label / closing / opening / increase / decrease / movement / None
+                             closing / opening = 金额列、不是变动、计量为空或在 balance_measures（账面余额、公允价值）
+column_roles(table)          column_keys(table) 逐列角色
+rollforward_columns(table)   RollForward(opening, closing, increase, decrease, unknown) | None
+                             期初 / 期末：余额列各唯一；否则同一计量（账面价值 / 投资金额…）期初、期末各唯一的一对；
+                             变动列只认两者之间的列，之间其余金额列（方向不定 / 没有变动词）→ unknown
+```
+
+- 比例 / 说明类列、坏账准备 / 账面价值 / 已质押金额 / 终止确认金额等计量列角色为 None：不是该项目的余额，拿去和试算表审定数比只会报假告警（旧口径「首段含期末」全部当审定数列）。
+- 「计提减值准备」进 movement：长期股权投资明细里它减少账面价值，减值准备变动表里是增加，词本身定不了方向；最长词优先让它不被「计提」认成增加（四版种子共 10 列受影响，全是这一种）。
+- 变动表版式「期初 | 本期变动… | 期末」：期初之前的「投资成本」「预算数」、期末之后的「本期计提减值准备」「减值准备期末余额」「利息资本化累计金额」是说明列，不参与勾稽。
+
+### 14.2 `consol_note_sections`
+
+- 删 `_ENDING_KEYWORDS / _OPENING_KEYWORDS / _CHANGE_EXCLUDE / _header_root / _is_ending_label / _is_opening_label / _classify_header / _resolve_value_columns`，路由里不再有期间 / 变动关键词。
+- `_header_table(template, headers)`：模板存在且列数与本次表头一致 → 模板（多级表头 / 分组，与展示同口径）；否则本次平表头。`_column_view(table)` 给逐列（列名, 角色），列名取展示路径（「期初余额/账面余额」；原来取平表头，分组表里常是空串）。
+- 试算表交叉校验（全部审核 / 单表审核）只比 closing / opening 列；下级汇总的试算表兜底只对 closing / opening 列取下级试算表。
+- 单表审核勾稽改用 `rollforward_columns(table)`；一行里 unknown 列有数就跳过该行（方向不定，没法按「增加 − 减少」算；旧逻辑当 0 算，必误报）。
+- 真库核对：已保存的合并附注 4496 行表头与国企模板逐字相同 ⇒ 审核全走模板多级表头，平表头兜底现实中不走（平表头里的「/」不拆段，期间与计量混写的列不认作余额列）。
+
+### 14.3 `note_writer`（R5.3，待确认接手方式）
+
+期末金额列 = 本期一侧唯一纯期间列；没有时取唯一的账面价值 / 公允价值列；期初同理。旧格式整列无表头时仍按位置（与现状一致）。并发会话暂存的「六列对称兜底」按位置取前后半段，且优先顺序实际取到「账面余额」（与注释「优先账面价值」相反）—— 改调标题行库后分组表由 `_column_groups` 给出期间，不再需要按位置兜底。
+
+### 14.4 新旧逐列对比（R5.5，两版合并模板全部表）
+
+试算表比对用的角色（HEAD `_classify_header` vs `column_role`，2893 个数据列）：相同 2444；旧的余额列不再比 330（closing→None 176 / opening→None 154：比例 / 说明列，坏账准备 / 账面价值 / 减值准备 / 已质押 / 终止确认等计量列，以及种子平表头错位，如五-5-6 平表头把「期初数」写在「期末数/计提比例」列上）；新增比对 38（None→opening 23 / None→closing 15：分组表平表头为空串的余额列）；变动列不再当余额 13（closing→decrease 7 / closing→increase 4 / opening→increase 2）；closing→opening 1（上市五-10-5「续：」平表头写期末余额、多级表头写上年年末余额，跟展示）；其余 67 列只是变动方向变化 / 新认出的变动列，只影响勾稽。
+
+单表审核勾稽（两版合并模板里新旧任一会校验的 78 张表）：
+
+| 类别 | 张数 | 说明 |
+|---|---|---|
+| 列完全相同 | 38 | |
+| 列相同、多了方向不定列 | 7 | 应付债券 / 筹资活动负债变动：发行 / 摊销 / 偿还 / 现金流量净额 / 其他有数的行跳过（旧逻辑当 0 算，必误报） |
+| 纠正 | 20 | 分组下第二、三个叶子列（其他增加 / 转销 / 其他减少 / 本期出售）补进来；期末列取对（旧「后出现的覆盖」常落在利息资本化率 / 减值准备期末余额 / 本期出售列上）；对子公司投资期末之后的「本期计提减值准备」不再当增加；种子错位挂到期末下的列改为方向不定 |
+| 新增校验 | 6 | 国企五-4-6 / 五-5-7 坏账准备变动；长期股权投资明细 4 张（只有「减少投资」能判方向，其余变动列有数的行跳过） |
+| 不再校验 | 7 | 优先股 / 永续债 / 其他权益工具 / 资本公积 6 张「数量 + 账面价值」两套期初期末（不唯一；旧逻辑 2 张恰好对上数量列、4 张列错位）；上市五-23-3 字母标注列（A / E=A+B−C−D；旧逻辑漏「转入固定资产 C」） |
+
+### 14.5 测试与变异
+
+- `tests/test_note_table_header_library.py` +37 例（期间侧、余额计量、变动方向与最长词、期末一侧不算变动、模板表头优先、词表驱动、勾稽列 8 种版式）。
+- `tests/test_consol_note_section_column_roles.py` 20 例，替换只测已删函数的 `test_consol_note_refresh_column_resolve.py`：选表、平表头矩阵、真模板余额列、全部审核 / 单表审核 / 下级汇总兜底三处真实调用（附注落真实行，试算表金额打桩）。
+- 干净 worktree 19 个磁盘变异全打红（库 7、词表 2、路由 10），每个由对应用例抓到。
+
+### 14.6 范围外 / 待拍板
+
+- `note_writer.legacy_value_keys`（R5.3）：并发会话暂存未提交，等确认接手方式。
+- `consol_note_formula_service.value_column`（公式种子取数列）、上年附注导入 `_header_index`：仍各有一套识别（R5.4）；改了会变生产种子公式 / 导入行为，未动。
+- 「数量 + 账面价值」两套计量的变动表按计量分别勾稽、字母标注列认作纯期间：没做（见 14.4「不再校验」）。
+- 「核销」方向：坏账准备表里是减少，现按方向不定（有数的行跳过、不误报也不校验）；归减少要拍板。
+- 种子多级表头错位（五-22-1 / 五-22-2「本期减少/自用房地产或存货转入」、五-13-2「期末数/本期出售」、五-29-1 商誉原值套了开发支出的子表头等）是种子问题（R4.1）。挂到期末下的错位列已按方向不定处理；五-22-1 / 五-22-2 只有「自用房地产或存货转入」有数的行仍按减少算。
+- 单元格「汇总」（`/aggregate`）下级没有附注数据时用下级试算表兜底，与「只从单体附注拉数」不一致：保留原行为，只把兜底限在余额列，是否下线待拍板。

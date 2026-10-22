@@ -1278,7 +1278,8 @@ backend/tests/test_report_engine.py  986
 
 #   consol_note_sections.py —— **改动前即 982 行已超 800 上限**。本次净增 +56 行：
 #     合并附注节点隔离 key + 共享上下文接线。拆分方向：把 AI 填充端点组抽为伴生模块。
-backend/app/routers/consol_note_sections.py  1116
+#     2026-10-22 表头识别改调标题行库（删关键词表 / _resolve_value_columns）后 1032 行，基线随之下调。
+backend/app/routers/consol_note_sections.py  1032
 #   consol_note_formula_service.py —— **改动前即 864 行已超 800 上限**。本次净增 +42 行：
 #     合并附注公式推送引擎接线。拆分方向：把公式求值与公式注册两个关注点分离。
 #   2026-10-06 净增 +161 行：附注模块全面修复（multi_header 转换/columns+_row_types 补齐/

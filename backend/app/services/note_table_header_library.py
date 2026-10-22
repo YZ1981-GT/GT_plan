@@ -28,17 +28,23 @@ __all__ = [
     "PERIODS",
     "ColumnKey",
     "ContinuationLink",
+    "RollForward",
     "VOCABULARY_PATH",
     "base_key",
     "column_keys",
     "column_paths",
+    "column_role",
+    "column_roles",
     "continuation_links",
     "is_continuation_name",
     "load_vocabulary",
+    "movement_kind",
     "name_period",
     "norm",
     "parse_segment",
+    "period_side",
     "reset_vocabulary_cache",
+    "rollforward_columns",
     "table_identity",
     "table_key",
 ]
@@ -48,6 +54,8 @@ VOCABULARY_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "note
 PERIODS = ("end", "prior", "cur", "prev")
 #: 同侧期间：期末余额 与 本期发生额 都在「本期」一侧（最弱规则才跨类对应）
 _FAMILY = {"end": "current", "cur": "current", "prior": "previous", "prev": "previous"}
+#: 变动列类别（词表 movement_words 的键，判定时按此顺序：「转销 / 核销」先认作减少）
+_MOVEMENT_KINDS = ("increase", "decrease", "movement")
 #: 主表没有期间、列续表是这个期间时，主表取对侧（「有『续：期初』续表的主表承载期末」）
 _OPPOSITE = {"prior": "end", "prev": "cur", "end": "prior", "cur": "prev"}
 
@@ -91,6 +99,8 @@ class Vocabulary:
     column_overrides: dict[tuple[str, str, int], dict]
     continuation_overrides: dict[tuple[str, str], dict]
     digest: str
+    movements: tuple[tuple[str, str], ...] = ()  # (词, increase / decrease / movement)，按词表顺序
+    balance_measures: frozenset[tuple[str, ...]] = frozenset()  # 余额列允许的计量（空计量 = 纯期间，恒算）
 
 
 def _require_reason(entry: dict, kind: str) -> None:
@@ -140,6 +150,13 @@ def _build_vocabulary(raw: dict) -> Vocabulary:
         column_overrides=columns,
         continuation_overrides=continuations,
         digest=digest,
+        movements=tuple(
+            (norm(word), kind)
+            for kind in _MOVEMENT_KINDS for word in (raw.get("movement_words") or {}).get(kind) or []
+        ),
+        balance_measures=frozenset(
+            tuple(x for x in (norm(p) for p in str(m).split("/")) if x) for m in raw.get("balance_measures") or []
+        ),
     )
 
 
@@ -423,6 +440,112 @@ def _level_parts(segment: str) -> list[str]:
 
 def _has_period(keys: Sequence[ColumnKey]) -> bool:
     return any(k.period for k in keys[1:])
+
+
+# ─── 逐列角色（审核校验 / 取数用） ────────────────────────────────────────────
+
+
+def period_side(period: str | None) -> str | None:
+    """期间侧：期末余额 / 本期发生额 → ``current``；期初余额 / 上期发生额 → ``previous``。"""
+    return _FAMILY.get(period) if period else None
+
+
+def movement_kind(key: ColumnKey, vocab: Vocabulary | None = None) -> str | None:
+    """变动列：计量段含词表 ``movement_words`` 的词 → ``increase`` / ``decrease`` / ``movement``（方向不定）。
+
+    期间是期末 / 期初（余额类）的列不算变动：「期末余额 / 计提的利息」是余额列，「本期增加」「本期变动金额 / 计提」才是。
+    命中多个词取最长的（「计提减值准备」比「计提」具体），同长按 increase → decrease → movement（「转销或核销」认作减少）。
+    """
+    if key.kind != "amount" or key.period in ("end", "prior"):
+        return None
+    text = "".join(key.measure)
+    hits = [(len(word), -i, kind) for i, (word, kind) in enumerate((vocab or load_vocabulary()).movements) if word in text]
+    return max(hits)[2] if hits else None
+
+
+def column_role(key: ColumnKey, vocab: Vocabulary | None = None) -> str | None:
+    """逐列角色：``label`` / ``closing``（本期一侧余额列）/ ``opening``（上期一侧余额列）/ 变动三类 / None。
+
+    余额列 = 金额列、不是变动列、计量为空（期末余额 / 本期发生额）或在词表 ``balance_measures``（账面余额、公允价值）。
+    比例 / 说明类列，坏账准备 / 账面价值 / 已质押金额等计量列为 None：不是该项目的余额，不拿去和试算表审定数比。
+    """
+    if key.kind == "label":
+        return "label"
+    if key.kind != "amount":
+        return None
+    vocab = vocab or load_vocabulary()
+    moved = movement_kind(key, vocab)
+    if moved:
+        return moved
+    side = period_side(key.period)
+    if side is None or (key.measure and key.measure not in vocab.balance_measures):
+        return None
+    return "closing" if side == "current" else "opening"
+
+
+def column_roles(
+    table: dict | None,
+    *,
+    identity: tuple[str, str] | None = None,
+    vocab: Vocabulary | None = None,
+) -> list[str | None]:
+    """逐列角色（``column_keys`` 同口径：合并表按展示用多级表头，单体表按分组 / 表名期间）。"""
+    vocab = vocab or load_vocabulary()
+    return [column_role(k, vocab) for k in column_keys(table, identity=identity, vocab=vocab)]
+
+
+@dataclass(frozen=True)
+class RollForward:
+    """变动表勾稽列：期末 = 期初 + Σ增加 − Σ减少。``unknown`` = 期初、期末之间方向不定的金额列（本行有数时无法勾稽）。"""
+
+    opening: int
+    closing: int
+    increase: tuple[int, ...]
+    decrease: tuple[int, ...]
+    unknown: tuple[int, ...]
+
+
+def _balance_pair(keys: Sequence[ColumnKey], roles: Sequence[str | None], vocab: Vocabulary) -> tuple[int, int] | None:
+    """(期初列, 期末列)：余额列（纯期间 / 账面余额 / 公允价值）各唯一；否则同一计量（账面价值 / 投资金额…）期初、期末各唯一的一对。"""
+    closing = [k.index for k, r in zip(keys, roles) if r == "closing"]
+    opening = [k.index for k, r in zip(keys, roles) if r == "opening"]
+    if len(closing) == 1 and len(opening) == 1:
+        return opening[0], closing[0]
+    by_measure: dict[tuple[str, ...], dict[str, list[int]]] = {}
+    for k in keys:
+        if k.kind == "amount" and k.period in ("end", "prior") and movement_kind(k, vocab) is None:
+            by_measure.setdefault(k.measure, {}).setdefault(k.period, []).append(k.index)
+    pairs = [cols for cols in by_measure.values() if len(cols.get("end", ())) == 1 and len(cols.get("prior", ())) == 1]
+    return (pairs[0]["prior"][0], pairs[0]["end"][0]) if len(pairs) == 1 else None
+
+
+def rollforward_columns(
+    table: dict | None,
+    *,
+    identity: tuple[str, str] | None = None,
+    vocab: Vocabulary | None = None,
+) -> RollForward | None:
+    """变动表勾稽列；没有期初 / 期末一对、或两者之间没有增加 / 减少列时返回 None（不是变动表）。
+
+    变动列只认期初、期末两列之间的列（变动表版式「期初 | 本期变动… | 期末」）：两侧之外的「投资成本」「本期计提减值准备」
+    「减值准备期末余额」是说明列。之间的金额列方向不定（核销 / 其他 / 现金流量净额，或种子多级表头错位挂到期末下的列）→ ``unknown``。
+    """
+    vocab = vocab or load_vocabulary()
+    keys = column_keys(table, identity=identity, vocab=vocab)
+    roles = [column_role(k, vocab) for k in keys]
+    pair = _balance_pair(keys, roles, vocab)
+    if pair is None:
+        return None
+    lo, hi = sorted(pair)
+    found: dict[str, list[int]] = {"increase": [], "decrease": [], "unknown": []}
+    for k, role in zip(keys[lo + 1:hi], roles[lo + 1:hi]):
+        if role in ("increase", "decrease"):
+            found[role].append(k.index)
+        elif k.kind == "amount":
+            found["unknown"].append(k.index)
+    if not found["increase"] and not found["decrease"]:
+        return None
+    return RollForward(pair[0], pair[1], tuple(found["increase"]), tuple(found["decrease"]), tuple(found["unknown"]))
 
 
 # ─── 续表 ────────────────────────────────────────────────────────────────────

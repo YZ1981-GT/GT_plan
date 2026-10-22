@@ -67,11 +67,12 @@ inclusion: always
 - ADR-CSP-001~006；唯一来源 `elimination_entries`；计算内核 `consol_report_values`（前缀口径 + 线性分解 + 五度量恒等式 P2）；合并报表按项目口径全六类生成（V172/V173）；试算平衡表只读五列 + 穿透；报表差额表读时计算；合并附注公式种子化 + 填入；推送服务四步上层联动 + SSE；公式管理合并节点 + 推送页。后端 141 passed 变异 166/166；前端 22 files 207 passed；浏览器实测通过
 - 顺带修复合并入口页 "canceled" bug（`useGroupTree.ts` + `ConsolidationIndex.vue` catch 块忽略 axios cancel 错误）
 
-### 合并附注拉数 `consol-note-pull-from-standalone`（v3）+ 标题行库与子树重新汇总 `consol-note-header-library-and-node-reaggregate`（18/18，2026-10-22 本地提交未推送）
+### 合并附注拉数 `consol-note-pull-from-standalone`（v3）+ 标题行库与子树重新汇总 `consol-note-header-library-and-node-reaggregate`（22/23，2026-10-22 本地提交未推送）
 - 唯一拉数链路 = V186 明细映射（明细模板 → 映射规则 → 逐企业绑定 → 用户确认 → apply）；读取层 `consol_note_standalone_reader` 只取表 / 对行，表头识别 / 续表 / 单体↔合并选表全在 `note_table_header_library` + `note_table_header_match`（词表 `note_table_header_vocabulary.json` 手工维护，库目录 `note_table_header_library.json` 生成 + `--check`，请求期不读目录）；映射 JSON 由同一选表结果生成
 - 「🔄 重新汇总」= `consol_note_subtree_reaggregate.reaggregate_subtree`：所选节点子树后序、每章一个 SAVEPOINT；叶子 apply 拉数、差额节点 `fill_by_formula`、汇总 = Σ 直接下级已保存数 + 差额（`build_table_rows` 合计按本表重算、手工 / 锁定格不动）；试算表公式来源的非差额下级不计入（`record_write_source`：无标记但有公式值快照也算公式）；下级出错则上级本章不汇总
 - 推送后 / 试算表事件刷新传 `preserve_pulled=True`：来源 `detail_mapping` / `subtree_aggregate` 的行不改，公式值变化才标 `is_stale`（推送先全标待更新 ⇒ 拉数行推送后保持待更新）；「按公式填入」按钮照旧覆盖
-- 🔴 真库 0 个明细模板绑定、0 条确认映射 ⇒ 现在点重新汇总叶子全按「未绑定」跳过；待拍板：合并种子按 Word 重同步、上市 五-9-4~7 表头、`note_writer` / `consol_note_sections._resolve_value_columns` 改调标题行库、旧 V2 汇总器下线
+- 审核 / 单元格汇总认列也走标题行库（R5）：`column_role` 逐列角色（试算表只比期末 / 期初余额列 = 纯期间 / 账面余额 / 公允价值）、`rollforward_columns` 变动表勾稽列（变动列只认期初、期末之间，方向不定的列有数的行不勾稽；变动词取最长命中，「计提减值准备」方向不定）；路由 `_header_table` 列数与模板一致用模板多级表头，否则本次平表头
+- 🔴 真库 0 个明细模板绑定、0 条确认映射 ⇒ 现在点重新汇总叶子全按「未绑定」跳过；待拍板：`note_writer.legacy_value_keys` 改调标题行库（并发会话暂存未提交）、公式种子 `value_column` 与上年附注导入的识别、「核销」方向、单元格汇总 `/aggregate` 的试算表兜底、合并种子按 Word 重同步、上市 五-9-4~7 表头、旧 V2 汇总器下线
 - 🔴 v2 假绿勘误（保留）：「路径 A」写入器从未接线、端到端测试在测试里重写循环 ⇒ 标完成前 grep 调用方；端到端测试调生产函数并配下层变异。附注更新事件 `section_code` 曾恒为记录 id（已修）；子企业附注模板可与合并口径不同，按章节号取不到按标题认
 - 🔴 教训：`git stash` 在 worktree 里也写进全仓共享的 `refs/stash`，禁用（干净 worktree 换回 HEAD 版用 `git show HEAD:<path>` 写文件）；真库没有合适的【测试】数据时，在一个回滚事务里新建【测试】项目、复制真实项目的行（真实行只读）再跑探针
 
