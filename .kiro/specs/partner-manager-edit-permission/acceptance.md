@@ -3189,13 +3189,62 @@ D:\GT_plan\.venv\Scripts\python.exe backend/scripts/gen/gen_edit_level_impact_in
 
 需求 12.7 的真 PG 正向 / 回滚 / 对账测试见「任务 7.2」~「任务 7.5」小节，都在 `backend/tests/test_level_backfill_migration_pg.py`（全部 `pg_only`，正向经 `MigrationRunner.run_pending()`，回滚经 `rollback_to(n − 1)` 或其执行 R 脚本所用的 `_execute_rollback_script`）：正向逐行对账 `test_property_3_backfill_matches_row_model` 与 `test_property_3_fixed_examples[f1~f9]`（7.2）；幂等 `test_property_4_backfill_is_idempotent`、`test_property_4_fixed_examples[f1~f9]` 与 `test_requirement_4_5_existing_records_not_overwritten`（7.3）；往返 `test_property_5_backfill_roundtrip`、`test_property_5_fixed_examples[f1~f9 × once / twice]` 与 `test_requirement_4_9_rollback_branches[once]`、`[twice]`（7.4）；执行语义 `test_requirement_4_1_rollback_twice`、`test_requirement_4_1_rollback_without_backfill_records`、`test_requirement_4_1_rollback_when_forward_never_ran`、`test_requirement_4_10_forward_failure_is_not_registered`、`test_requirement_4_10_rollback_failure_keeps_version_applied` 与角色映射对账 `test_requirement_12_7_backfill_matches_role_map[<7 个别名>]`（7.5）。2026-10-21 11:55:45 收尾 PG 轮 54 passed、0 skipped，SQLite 轮 54 skipped（见「任务 7.5」）。本地开发库只执行正向、不执行回滚的真库验收在任务 19.10。
 
+### 任务 19.10：本地真库迁移验收（需求 4.8）— [ ]* 代码已改但未实测
+
+**状态**：[ ]*（外部依赖未满足）
+
+**原因**：前置条件不满足——本地开发服务（9980 + 3030）与数据库由并发会话共用，需要用户确认重启时机。按需求 12.11 与 tasks.md 19.10 第三条子弹点，标 [ ]* 并记录如下。
+
+**代码已改但未实测**：
+- V203/R203 迁移文件已就绪（V203__partner_manager_edit_level_backfill.sql / R203__rollback_partner_manager_edit_level_backfill.sql），SQL 正向与回滚语句完整。
+- 回填逻辑已有 PG-only 测试覆盖：backend/tests/test_level_backfill_migration_pg.py（57 passed），包含正向逐行对账（Property 3）、幂等（Property 4）、往返（Property 5）、执行语义与角色映射对账（需求 4.1 / 4.9 / 4.10 / 12.7）。
+- 迁移号 n=203 已在任务 19.8 Part 3 复核确认（并集最高 V202，n=202+1=203）。
+
+**所缺环境**：
+- 需用户协调重启 start-dev.bat（会停掉 9980 / 3030 上的共享开发服务），或以实施 worktree 的代码在独立端口启动 run_uvicorn.py。
+- 热重载不跑迁移（GT_BOOTSTRAP_DONE=1），必须全量重启后端才能执行 MigrationRunner.run_pending()。
+
+**待执行步骤（环境就绪后）**：
+1. 重启前按 F13 口径现查迁移前快照（project_assignments 全表 + staff_members JOIN）。
+2. 以实施 worktree 代码全量启动后端（记录启动方式）。
+3. 验证 V203 已登记为已应用（migration_history 表），且无该版本的失败记录。
+4. 被改动行数与回填记录数相等，按「需求 4.2 / 4.3」和「现行项目 / 已软删项目」分组。
+5. 与迁移前快照逐行对账，再与 F13 对账。
+6. 写作时期望：现行项目 2 行 admin 由 (manager, review) 改为 (manager, edit)；已软删测试项目 84 行由 (auditor, readonly) 改为 (manager, edit)；需求 4.3 规则 0 行。
+7. 差异逐条说明。本地库只执行正向迁移，不执行回滚。
+
 ## 浏览器实测与清理对账
 
 （待填：需求 12.10 五种身份的页面快照、请求与响应摘要；按写过的表逐项恢复到实测前状态并核对行数；只追加的留痕登记。）
 
 ## 后续 spec 登记
 
-（待填：任务 20.2，R1 / R2 / R3。）
+按需求 12.14，登记本 spec 发现但不在本 spec 实施的三项风险，各附证据与优先级。
+
+### 建议合为一个 spec：R1 + R2（委派鉴权与成员行生命周期）
+
+| 项 | 事实 | 证据 |
+|---|------|------|
+| R1 | 委派端点 `GET` / `POST /api/projects/{pid}/assignments` 只校验登录（`Depends(get_current_user)`），不校验项目归属或角色。任意登录用户可对任意项目自封经理，一次即同时得到 **edit 级**与经理项目操作权限（Q7 默认不改，本 spec 让合伙人 / 经理为 edit 级后组合是新的） | design §9 R1；需求 F16、Q7 |
+| R2 | 委派被移除后成员行不撤销。本 spec 让 review 级非 EQCR 成员可编辑附注 ⇒ **被移出团队的前 EQCR**（成员行留 (partner, review)、委派已删、不再判为 EQCR）由「附注只读」变为「可编辑附注」；被移出的经理 / 合伙人保留 edit | design §9 R2；需求范围外原登记 |
+
+**建议**：R1 与 R2 合为一个 spec，先定「谁有权委派」（本项目经理 / 合伙人 / admin），移除委派时撤销或降级成员行。
+
+**优先级**：🔴 高（R1 可被任意登录用户利用提权；R2 让移除操作不完全生效）。
+
+### 单独一个 spec：R3（全局附注模板写端点无鉴权）
+
+| 项 | 事实 | 证据 |
+|---|------|------|
+| R3 | `note_templates.py` 5 个全局附注模板写端点（含 `validate`）无任何鉴权依赖。`main.py` 的 `FastAPI()` 无全局依赖，已注册的 10 个中间件都不做鉴权，路由注册也不附加依赖 ⇒ **未登录即可增删改全局附注模板** | design §9 R3；现状确认 N8 |
+
+**建议**：R3 单独一个 spec（5 个写端点补 admin 级或至少登录级鉴权）。
+
+**优先级**：🔴 高（无需登录即可修改全局模板，影响所有项目）。
+
+### 同一结论同步至 INDEX.md
+
+上述 R1 + R2 合一 spec、R3 单独一 spec 的结论将由任务 20.3 写入 `.kiro/specs/INDEX.md` 本 spec 登记行。
 
 ## 闭合检查
 
@@ -4196,3 +4245,333 @@ design §8.6 列出的 16 个须同步的既有测试文件（11 个只删缓存
 - 任务 19.8（2026-10-22）：目标分支尖端已推进到 `8798e92fd`，同时包含本 spec 的 V200 和并发会话的 V200，并集最高变为 V202，n=203。**原因是本 spec 的候选代码（连同 V200）被推入目标分支后，并发会话也推入了同号 V200**。
 
 本项须在提交候选 C 前解决（任务 19.2）。重命名操作推迟到用户确认号段后执行。
+
+---
+
+## 任务 20.1 — steering 记忆定级条改写与口径检索
+
+### Part 1 — memory.md 改写
+
+- 文件：`D:\wt_pm_impl\.kiro\steering\memory.md`（基于上游最新版本复制后改写）
+- 改动位置：第 285 行，「项目级鉴权按『谁会用』定级」条目
+- 改动内容：
+  - 旧文：`assignment_service.ROLE_MAP` 给签字合伙人 / 经理 / 质控 / EQCR 的项目级别是 **review**，审计员 / 助理才是 edit
+  - 新文：`assignment_service.ROLE_MAP` 给合伙人（含签字合伙人）/ 经理的项目级别是 **edit**，质控 / EQCR 的项目级别是 **review**，审计员 / 助理也是 edit
+  - 新增附注门禁描述：附注写操作走附注编辑门禁 `require_note_edit_permission`（本项目 review 及以上 + EQCR 只读 + `note:edit` 能力）
+  - 新增待办尾缀：🔴 R1（委派自封经理）/ R2（移出团队不撤销成员行）/ R3（全局附注模板端点无鉴权）待另立 spec
+- 文件总行数：297（≤ 300 限制）
+- CRLF 编码：保持
+
+### Part 2 — 需求 2.9 口径检索
+
+**检索口径**：
+- 范围：worktree `D:\wt_pm_impl` 下全部后端 `.py`、前端 `.ts`/`.vue`、`.kiro/steering/memory.md`、本 spec 目录 `.md`
+- 文件数：6856
+- 提取块类型：Python docstring / 注释块 / assertion 信息；TS/Vue 块注释 / 行注释 / HTML 注释；Markdown 条目
+- 匹配条件：同一块内同时出现（合伙人 OR 经理）AND（review，不区分大小写）
+- 二次验证：用正则 `签字合伙人 / 经理 / 质控 / EQCR 的项目级别是.*review` 全仓 grep — 0 命中
+- 二次验证：用正则 `合伙人.*经理.*项目级别是.*review` 后端 grep — 0 命中
+- 二次验证：用正则 `(合伙人|经理).*(review 级|项目级别.*review)` 前端 grep — 0 命中
+
+**命中统计**：80 处共现命中，逐条判读如下（判读结论：仍称合伙人 / 经理为 review 级的命中 = **0**）
+
+**Spec acceptance.md（描述变更本身）**（21 处）：
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:138` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 两者的 review 循环依次检查 `signing_partner`、`partner`、`manager`、`qc`、`eqcr`，第一个键就失败。按改后取值，其中 `signing_partner` / `partner` / `…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:245` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 改写前（基线树 B 版本，只读读取）：命中 4 处（phase8 模块 docstring、phase8 `test_review_level_member_can_use` 失败信息、deliverable 模块 docstring、…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:246` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 改写后：命中 6 处（两个模块 docstring、两处前提测试 docstring、deliverable `test_team_member_can_generate_deliverables` 与 `test_only_prepa…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:261` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- `manager`、`项目经理` 分别改回 (manager, review)：红在逐键取值断言（如「manager：ROLE_MAP 为 (manager, review)，期望表为 (manager, edit)」）。
+…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:271` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 两文件中本任务未改的旧口径（不属文字口径，或属任务 3.2 的逻辑范围）：函数名 `test_only_preparers_can_rerun_the_chain`（意为「只有编制人」，而 edit 级现已包含合伙人 / 经理）与 `t…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:283` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 删除 `_ASSIGNMENT_ROLE_MAP`。原有 14 个键，没有 `signing_partner`；`readonly`、`观察员` 取 (readonly, readonly)；未登记兜底是 `.get(role, ("a…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:379` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 模型（在测试里独立计算，不调用被测函数）：别名集合 `_MODEL_EQCR_ALIASES` = `tests/role_map_expected.py` 的 `EXPECTED_ROLE_MAP` 中取值为 `("partner",…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:424` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- EQCR 别名全集取 `tests/role_map_expected.EXPECTED_EQCR_ALIASES`（不从 `ROLE_MAP` 现推，理由写在测试文件注释）：判据不该随 `ROLE_MAP` 的取值浮动。若现推，任务 …」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:768` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 选哪些别名：phase8 按需求 9.4 逐别名——别名取自期望表 `EXPECTED_ROLE_MAP`（不读生产代码），edit 级 9 个（合伙人 / 经理 / 审计员别名）、review 级 4 个（质控 / EQCR 别名）各…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:1105` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 显式样例（`@example`，结论按模型核对）：E1 `E1-deleted-rows-and-skipped-staff`（u0 在 P 只有已删除成员行 → 新建 (qc, review)；u1 唯一记录已删除、持有 `eqcr`…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:1106` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 固定样例（`test_property_2_fixed_examples`，被测用户都是 u0，另有一名批次外成员；先断言模型等于按需求原文写死的期望，再跑全部断言）：`F1-edit-to-eqcr`：(manager, edit) …」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:1242` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 18 种情形 × `consol_lock` True / False × 三种形态（函数体直调、对象反查直调、路径依赖经 HTTP 真发请求）= 108 项，期望按需求 6.4~6.7、6.12、6.13 手写。情形：身份 ①~⑧；a…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:1293` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- ③ EQCR 只读 403：本项目 EQCR（AME），合并锁定项目上的本项目 EQCR（AME），`独立复核合伙人` 委派（AME），全局 qc 的 (qc, review) 成员持 `eqcr` 委派（AME，③ 先于 ④），全局 …」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:1387` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「  - EQCR 先被排除，403 EQCR 只读：本项目 EQCR，即 (partner, review) 持 `eqcr` 委派（AME，项目角色 partner 在集合内照样拒绝）；`独立复核合伙人` 委派（AME）；全局 eqcr …」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:1492` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 每个项目上各自随机取：是否归档、是否合并锁定、成员行（无 / 已删除 / 未删除；级别 readonly / review / edit × 项目角色 partner / manager / qc / auditor / readonl…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:1973` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 逐行：已删除成员行不动；持 EQCR 别名现行委派 ⇒ (原项目角色, review)、rule `eqcr`（不论是否另持其他委派）；否则持合伙人 / 经理别名现行委派 ⇒ (partner 或 manager, edit)、rule…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:2324` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 世界 `r4.1-changed-and-unchanged-rows`（项目 P 现行、D 已软删，6 名用户各一条成员行）：`manager` + auditor+readonly（带范围）→ manager+edit、D 上 `合…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:2325` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- 世界 `r4.1-nothing-to-backfill`（7 行，正向一行都不改）：`manager` + manager+edit、D 上 `signing_partner` + partner+edit、`eqcr` + audi…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:3030` — Spec document (md_heading): describes the design/requirements/acceptance of the change itself。片段：「### 变异 ③ — `ROLE_MAP` 的 `manager` / `项目经理` 改回 (manager, review)（design §8.5 ③；任务 19.3）
+…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:3033` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- **改动描述**：L44 `"manager": (ProjectUserRole.manager, PermissionLevel.edit)` → `..., PermissionLevel.review)`；L45 `"项目经理"…」
+- `.kiro\specs\partner-manager-edit-permission\acceptance.md:3242` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- **export_word docstring**：按需求 2.6 改写，不再称合伙人 / 经理为 review 级
+…」
+
+**Spec design.md（描述变更本身）**（1 处）：
+- `.kiro\specs\partner-manager-edit-permission\design.md:424` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「- docstring 改写：删去「合伙人 / 经理 / 质控 / EQCR 在项目里是 review 级」，改为「review 门禁放行 review 级的质控与 EQCR 的读与非写动作；合伙人 / 经理为 edit 级同样满足」（2.…」
+
+**Spec requirements.md（描述变更本身）**（3 处）：
+- `.kiro\specs\partner-manager-edit-permission\requirements.md:487` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「   - hypothesis 生成组合（`max_examples=5`）。另以固定样例对每种 edit 级形态逐个必测（全局角色均为 auditor，成员行取角色映射对委派角色给出的值）：质控别名（qc, review）、EQCR 别名…」
+- `.kiro\specs\partner-manager-edit-permission\requirements.md:624` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「   - ⑤ 本项目 EQCR：成员行（partner, review），在目标项目持有一条 `eqcr` 现行委派 → 403，信息含需求 6.5 的「独立复核合伙人（EQCR）在本项目只读」。
+…」
+- `.kiro\specs\partner-manager-edit-permission\requirements.md:646` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「   - ③ 角色映射中 `manager`、`项目经理` 的取值改回（manager, review）。应红：需求 2.5 前提测试对这两个键的逐键断言；第 7 条「回填与角色映射对账」中这两个别名的用例；需求 9.2 以这两个别名委派的…」
+
+**Spec tasks.md（描述变更本身）**（7 处）：
+- `.kiro\specs\partner-manager-edit-permission\tasks.md:45` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「    - 两文件的模块 docstring 与断言失败信息按需求 2.6 改写，不再称合伙人 / 经理为 review 级。
+…」
+- `.kiro\specs\partner-manager-edit-permission\tasks.md:87` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「    - `test_phase8_endpoint_role_levels.py`（Phase 8 六个端点 × 身份，需求 9.4：合伙人 / 经理 / 审计员别名 (edit) 与质控 / EQCR 别名 (review) 放行，未…」
+- `.kiro\specs\partner-manager-edit-permission\tasks.md:297` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「    - 新增 `backend/tests/test_eqcr_gate_consistency.py`。需求 7.4：覆盖集合每个端点 × 全局角色 partner / auditor / admin × `独立复核合伙人` 与 `e…」
+- `.kiro\specs\partner-manager-edit-permission\tasks.md:324` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「    - 写作时已知位置：`review_workflow.py`、`wp_procedures.py`、`wp_cross_check.py` 的模块注释（`_guard_action`、`export_word`、两处前提测试已在 1…」
+- `.kiro\specs\partner-manager-edit-permission\tasks.md:400` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「    - 在变异 worktree 内逐项执行：① `NOTE_EDIT_MIN_LEVEL` 改回 `"edit"`；② 删除门禁对 `is_project_eqcr` 的调用；③ `ROLE_MAP` 的 `manager` / `项…」
+- `.kiro\specs\partner-manager-edit-permission\tasks.md:445` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「    - 在 worktree 的 `.kiro/steering/memory.md`（基于上游版本，不碰主工作树那份）只改「项目级鉴权按『谁会用』定级」这一条，行级改动：合伙人（含签字合伙人）/ 经理为 edit 级，质控 / EQC…」
+- `.kiro\specs\partner-manager-edit-permission\tasks.md:446` — Spec document (md_bullet): describes the design/requirements/acceptance of the change itself。片段：「    - 需求 2.9：在需求 2.6 范围内检索同一注释块、docstring、断言失败信息或记忆条目里同时出现「合伙人」或「经理」与「review」的文字，逐条判读，仍称合伙人 / 经理为 review 级的命中为 0；检索口径与命中…」
+
+**memory.md（已改写 / 历史条目）**（2 处）：
+- `.kiro\steering\memory.md:204` — memory.md historical entry: mentions review in other context (deliverable guard, etc.)。片段：「- 🔴 2026-10-19 补（design §10.5）：生成附注 / 交付件的全部入口补项目成员鉴权 —— 交付中心 `_guard_action` 先 `assert_project_permission`（看 readonly /…」
+- `.kiro\steering\memory.md:285` — memory.md: just edited to say partner/manager = edit, QC/EQCR = review。片段：「- **项目级鉴权按「谁会用」定级，不一刀切 edit**：`assignment_service.ROLE_MAP` 给合伙人（含签字合伙人）/ 经理的项目级别是 **edit**，质控 / EQCR 的项目级别是 **review**，…」
+
+**其他（level_backfill_cases.py）**（1 处）：
+- `backend\tests\level_backfill_cases.py:1` — Co-occurrence in unrelated contexts。片段：「"""级别回填迁移真 PG 测试的模型、生成器与样例（partner-manager-edit-permission 任务 7.2 起；需求 4.2~4.7、4.9、4.11；
+↵design Property 3~5，§5.2、§8.3）…」
+
+**服务 docstring（业务逻辑描述）**（13 处）：
+- `backend\app\services\assignment_service.py:26` — Co-occurrence in unrelated contexts。片段：「# ---------------------------------------------------------------------------
+↵# ROLE_MAP — 委派角色 → (ProjectUserRole, Per…」
+- `backend\app\services\dashboard_aggregator_service.py:1` — Service: mentions review in business context。片段：「"""合伙人仪表盘聚合服务
+↵
+↵Requirements: 2.2, 3.1, 3.2, 4.1, 4.2, 7.2, 9.2, 9.3, 9.5
+↵
+↵并发聚合 cycle_progress / vr_summary / open_re…」
+- `backend\app\services\draft_refresh_service.py:1` — Service: mentions review in business context。片段：「"""合伙人一键刷新编排器（Draft Refresh Service）.
+↵
+↵公式管理库（formula-management-library）设计 Components §1。把当前
+↵``wp_render_config.py`` …」
+- `backend\app\services\draft_refresh_service.py:712` — Service: mentions review in business context。片段：「"""幂等编排：precheck → 幂等短路 → diff/snapshot → 打 Draft → 审计留痕（Req 3/4）。
+↵
+↵        编排步骤（对应 Task 5.3 ①~⑤）：
+↵
+↵        1. **① 计…」
+- `backend\app\services\gate_rules_phase14.py:521` — Service: mentions review in business context。片段：「"""扫描 review_status=rejected 且未关联到 UnadjustedMisstatement 的 AJE 组。
+↵
+↵    对齐 R1 需求 3 验收 7：findings 为 warning 级（建议转错报），阻断…」
+- `backend\app\services\manager_dashboard_service.py:1` — Service: mentions review as business action (review workflow), not permission level。片段：「"""项目经理看板聚合服务 — ManagerDashboardService
+↵
+↵Round 2 需求 1：聚合 PM 名下所有项目的进度、待办、团队负载。
+↵整合 ReviewInboxService + WorkingPaperSe…」
+- `backend\app\services\qc_case_library_service.py:1` — Service: mentions review in business context。片段：「"""QC 案例库服务 — Round 3 需求 8
+↵
+↵CRUD + 脱敏发布：
+↵- list_cases: 列表（支持 category/severity 筛选）
+↵- get_case: 获取单条
+↵- create_case: …」
+- `backend\app\services\report_body_postprocess.py:1` — Service: mentions review in business context。片段：「"""审计报告正文模板后处理（spec ``deliverable-trio-generation-accuracy`` §3）。
+↵
+↵为什么需要（2026-10-16 四个真实项目 × 五种意见逐份核对 + 34 个模板普查）
+↵---…」
+- `backend\app\services\risk_summary_service.py:1` — Service: mentions review as business action (review workflow), not permission level。片段：「"""风险摘要服务 [R8-S2-07]
+↵
+↵为合伙人签字决策面板提供一页风险摘要，聚合 6 个数据源：
+↵1. 高严重度未解决问题单（IssueTicket.severity in ('blocker','major') 且 statu…」
+- `backend\app\services\wp_review_service.py:1` — Service: mentions review as business action (review workflow), not permission level。片段：「"""复核批注服务 — 添加/回复/解决复核意见
+↵
+↵状态机：open → replied → resolved
+↵         open → resolved (经理直接解决)
+↵
+↵Validates: Requirements …」
+- `backend\app\services\auto_data_resolvers\_completion.py:50` — Service: mentions review as business action (review workflow), not permission level。片段：「"""A22 经理复核签字状态。
+↵
+↵    数据来源: review_checklist_service.get_review_sign_status_batch
+↵    返回结构: {"summary": str}
+↵    """…」
+- `backend\app\services\auto_data_resolvers\_completion.py:60` — Service: mentions review as business action (review workflow), not permission level。片段：「"""A23 合伙人复核签字状态。
+↵
+↵    数据来源: review_checklist_service.get_review_sign_status_batch
+↵    返回结构: {"summary": str}
+↵    ""…」
+- `backend\app\services\workpaper_sync\pilot_simple_checklist.py:2` — Service: mentions review in business context。片段：「"""简单 checklist Excel pilot —— **冻结的那一个 entry** 自己的身份、契约与注册。
+↵
+↵spec: workpaper-html-onlyoffice-bidirectional-writeback-…」
+
+**测试文件（验证新行为 / 业务场景描述）**（24 处）：
+- `backend\tests\test_adjustment_review_permission.py:1` — Test: mentions review endpoint/capability, not permission level。片段：「"""调整分录复核 / 撤回复核端点权限守卫 — TestClient 真请求
+↵
+↵spec: chain-closure-phase3-push-rollout / Task 4（需求 3.3 / ADR-P3-007）
+↵
+↵验证：
+…」
+- `backend\tests\test_adjustment_review_permission.py:174` — Test: mentions review endpoint/capability, not permission level。片段：「"""经理 / 合伙人 / admin 调 /review 和 /revoke-review 不被 403。
+↵
+↵    注意：真正的 200 需要库里有分录数据（本测试不种分录），所以期望
+↵    「非 403」即可（可能是 400 …」
+- `backend\tests\test_adjustment_review_permission.py:182` — Test: mentions review endpoint/capability, not permission level。片段：「"""现场经理（project_role=manager）→ 有 adjustment:review → 非 403"""…」
+- `backend\tests\test_adjustment_review_permission.py:200` — Test: mentions review in operational context, not claiming partner/manager = review level。片段：「"""现场经理 → /revoke-review → 非 403"""…」
+- `backend\tests\test_adjustment_review_permission.py:218` — Test: mentions review endpoint/capability, not permission level。片段：「"""签字合伙人（project_role=signing_partner）→ 有 adjustment:review → 非 403"""…」
+- `backend\tests\test_adjustment_review_permission.py:414` — Test: mentions review endpoint/capability, not permission level。片段：「"""经理通过 resolve_project_permissions 获得 adjustment:review。"""…」
+- `backend\tests\test_dashboard_pbt.py:1` — Test: mentions review in operational context, not claiming partner/manager = review level。片段：「"""合伙人仪表盘属性测试（spec partner-dashboard PBT P1-P3）
+↵
+↵Properties:
+↵- Property 1: progress rate bounds — calc_progress_rate …」
+- `backend\tests\test_deliverable_generation_membership_auth.py:1` — Test: mentions review in operational context, not claiming partner/manager = review level。片段：「"""生成 / 查看附注与交付件的项目成员鉴权 —— 项目组成员只能生成自己项目的附注，项目组外的人 403。
+↵
+↵2026-10-19 补。此前以下入口只看登录与全局角色，不看是不是本项目成员 ⇒ 任意登录用户可为任意项目生成附注：
+↵…」
+- `backend\tests\test_deliverable_generation_membership_auth.py:249` — EQCR alias mapping: (partner, review) is correct for EQCR roles。片段：「"""定级依据：``ROLE_MAP`` 逐键等于需求 2.5 期望表（``tests/role_map_expected.py``）—— 合伙人（含签字合伙人）、
+↵    经理、审计员 / 助理是 edit 级，质控、EQCR 是 re…」
+- `backend\tests\test_deliverable_generation_membership_auth.py:300` — Test: correctly describes partner/manager as edit level。片段：「"""review 级（质控）与 edit 级（合伙人 / 经理 / 审计员）成员都能生成本项目交付件，业务恰好调到该调的那几个。
+↵
+↵    EQCR 虽是 review 级，但交付件只读，见 ``test_eqcr_on_projec…」
+- `backend\tests\test_deliverable_generation_membership_auth.py:314` — Test: correctly describes partner/manager as edit level。片段：「"""全链路 / 附注同步与裁剪会改写试算表、报表、附注：只有 edit 级成员（合伙人 / 经理 / 审计员 / 助理）能触发，
+↵    review 级成员（质控 / EQCR）不能。"""…」
+- `backend\tests\test_deliverable_lineage_properties.py:1800` — Test: correctly describes partner/manager as edit level。片段：「"""Property 24: 回填权限闸门。
+↵
+↵    **Validates: Requirements 10.3**
+↵
+↵    对任意不是本项目成员（或只读成员）的用户，触发回填必被拒绝（403）；edit 级（合伙人 / 经…」
+- `backend\tests\test_deliverable_permission_matrix.py:2` — Test: mentions review in operational context, not claiming partner/manager = review level。片段：「"""Property 34: 权限矩阵授权一致性 — 全 (角色, 操作, 状态) 三元组授权判定。
+↵
+↵Validates: Requirements 14.4, 17.1, 17.2, 17.3, 17.4, 17.5, 17.6,…」
+- `backend\tests\test_eqcr_alias_single_source.py:33` — EQCR alias mapping: (partner, review) is correct for EQCR roles。片段：「# EQCR 别名全集取需求 2.5 的期望表，不从生产代码的 ROLE_MAP 现推。理由：
+↵# - 本扫描数的是「别名字面量有几处来源」，判据不该随 ROLE_MAP 的取值浮动。若现推，把 ROLE_MAP 中
+↵#   「独立复核…」
+- `backend\tests\test_eqcr_gate_consistency.py:2` — EQCR alias mapping: (partner, review) is correct for EQCR roles。片段：「"""EQCR 门禁一致性测试。↵↵需求 7.4: 覆盖集合端点 × 全局角色 (partner/auditor/admin) × `独立复核合伙人` 与 `eqcr` 委派↵          (成员行 (partner, review)…」
+- `backend\tests\test_gate_rules_r1_new.py:1` — Test: mentions review in operational context, not claiming partner/manager = review level。片段：「"""R1 Task 8 单元/集成测试：UnconvertedRejectedAJERule + EventCascadeHealthRule
+↵
+↵覆盖需求 3 验收 7/8：
+↵
+↵1. UnconvertedRejectedAJER…」
+- `backend\tests\test_manager_dashboard.py:165` — Test: mentions review workflow/action, not permission level。片段：「    # wp_a2: 待复核（reviewer 是经理）
+…」
+- `backend\tests\test_note_multi_project_gate.py:1` — Test: mentions review in operational context, not claiming partner/manager = review level。片段：「"""附注编辑门禁多项目形态的性质测试（partner-manager-edit-permission 任务 6.4；Property 8；需求 8.5；design §4.6、§8.3）。
+↵
+↵被测 ``app.services.not…」
+- `backend\tests\test_phase8_endpoint_role_levels.py:1` — Test: correctly describes partner/manager as edit level。片段：「"""Phase 8 Task 8 鉴权定级的端点级守卫：该放行的角色真能用，该拦的真拦住。
+↵
+↵背景（2026-10-19 复核）：补项目级鉴权时，复核 / 发起签署 / 程序裁剪 / 执行校验也被挂成 edit，而 edit 门只放行…」
+- `backend\tests\test_phase8_endpoint_role_levels.py:138` — EQCR alias mapping: (partner, review) is correct for EQCR roles。片段：「"""前提：``ROLE_MAP`` 逐键等于需求 2.5 期望表（``tests/role_map_expected.py``）—— 合伙人（含签字合伙人）、经理、
+↵    审计员 / 助理是 edit 级，质控、EQCR 是 revi…」
+- `backend\tests\test_phase8_endpoint_role_levels.py:217` — Test: correctly describes partner/manager as edit level。片段：「"""对照：编制类写操作（标记程序完成）仍是 edit 门，没有被一起放宽 —— review 级（质控 / EQCR）被拒，
+↵    edit 级（经理）放行。"""…」
+- `backend\tests\test_review_unlock.py:1` — Test: mentions review endpoint/capability, not permission level。片段：「"""Unit tests for POST /api/workpapers/{wp_id}/review-unlock endpoint.
+↵
+↵Tests:
+↵- reason 为空 → 422 "解锁必须填写原因"
+↵- -sign …」
+- `backend\tests\test_role_map_and_context.py:271` — EQCR alias mapping: (partner, review) is correct for EQCR roles。片段：「"""manager 与「独立复核合伙人」两条委派：两处兜底都得 (partner, review)。"""…」
+- `backend\tests\test_sod_unchanged.py:1` — Test: mentions review in operational context, not claiming partner/manager = review level。片段：「"""职责分离判定与 EQCR 兼任校验的不变量（partner-manager-edit-permission 任务 2.9；需求 9.5；design Property 11、§8.3）。
+↵
+↵被测都在 ``app/services/…」
+
+**脚本（E2E 测试描述）**（1 处）：
+- `backend\scripts\e2e\procedure_e2e_live.py:1` — Script: mentions review in e2e test context。片段：「"""procedure-delegation-notification / Task 17 — 四角色全链路 LIVE 实测（API 层）
+↵
+↵针对 **运行中的 cutover 后端**（9980，PROCEDURE_ROW_TASK…」
+
+**路由注释（描述门禁逻辑）**（7 处）：
+- `backend\app\routers\deliverable.py:229` — Router: correctly describes partner/manager as edit level。片段：「"""交付件操作鉴权：先要求是本项目成员，再按角色 × 操作 × 状态矩阵判定（EQCR 只读）。
+↵
+↵    查看 / 下载要求 readonly 及以上；生成、编辑、确认、签署、审批、归档要求 review 及以上 ——
+↵    r…」
+- `backend\app\routers\deliverable_lineage.py:1` — Router: mentions review in gate/operational context。片段：「"""出品物溯源与章节状态查询端点 — deliverable-lineage-and-writeback Task 5.1/17.1/17.2/17.3
+↵
+↵GET /api/projects/{project_id}/delivera…」
+- `backend\app\routers\disclosure_notes.py:1191` — Router: correctly describes partner/manager as edit level。片段：「"""导出附注为 Word 文档。
+↵
+↵    与交付中心「生成附注」同一判定 ``_guard_action``（项目成员 review 及以上 + 角色矩阵 + EQCR 只读）。
+↵    review 门禁放行 review 级的…」
+- `backend\app\routers\review_workflow.py:20` — Router: correctly describes partner/manager as edit level。片段：「# 路由级 readonly 保证项目隔离（只有项目成员能访问）。写端点按「谁会用」定级（Phase 8 Task 8 补，2026-10-19 复核调整）：
+↵#   - 复核写（save / link / unlink / import…」
+- `backend\app\routers\tb_detail_formulas.py:73` — Router: mentions review in gate/operational context。片段：「    # formula-global-settings-sync R6.1 / R11.1：写本项目适配 = 项目 edit（与表间审核 / overrides 同口径）。
+↵    # 旧写法叠加 require_role(admin…」
+- `backend\app\routers\wp_cross_check.py:25` — Router: correctly describes partner/manager as edit level。片段：「# 路由级 readonly 保证项目隔离（Phase 8 Task 8 补）。execute 挂 review：触发方有编制保存（save）也有签字前检查
+↵# （sign_off，合伙人是 edit 级、质控是 review 级，两者都…」
+- `backend\app\routers\wp_procedures.py:27` — Router: correctly describes partner/manager as edit level。片段：「# 路由级 readonly 保证项目隔离；complete/custom/copy-from-prior 是编制操作，各自再挂 edit（Phase 8 Task 8 补）。
+↵# trim 挂 review：裁剪由经理 / 合伙人做，他…」
+
+**结论**：80 处共现中，0 处仍称合伙人 / 经理为 review 级。命中分布：
+- Spec 文档（描述变更本身）：32 处
+- 测试文件：24 处
+- 路由注释：7 处
+- 服务 docstring：13 处
+- memory.md：2 处
+- 其他：2 处
+
+需求 2.9 验收通过：仍称合伙人 / 经理为 review 级的命中 = 0。
+
+## 闭合检查（任务 20.4）
+
+执行时间：2026-10-22（仓库外一次性脚本 D:\tmp_closure_check.py，用完即删）。
+
+### 1. 需求覆盖（Requirements 1\~12）
+
+脚本扫描 acceptance.md、tasks.md 与 ackend/tests/ 下全部测试文件中的需求引用（_Requirements: X.Y、Validates: Requirements X.Y、需求 X.Y）。
+
+**结果：122/122 需求条目均有至少一个引用 ✅**
+
+每条需求至少在 tasks.md 的 _Requirements: 标注中出现，大部分另有 acceptance.md 条目和/或测试文件中的引用。
+
+### 2. 变异覆盖（①\~⑮，含 ⑮A/⑮B）
+
+扫描 acceptance.md 中变异编号 ①\~⑮。
+
+**结果：15/15 变异全部已记录 ✅**
+
+- ①\~⑭ 各在「变异证明」节逐项登记
+- ⑮ 含 A（判定查询改为直接判 edit 级）和 B（_guard_action 删去 EQCR 判定调用），按需求 10.1 / 7.3 可伪证断言各红在该断言
+
+### 3. 性质测试（Property 1\~18）
+
+扫描 acceptance.md 与后端/前端测试文件中的 Property N 引用。
+
+**结果：18/18 性质测试全部已记录 ✅**
+
+| 性质 | 测试文件（本 spec 新增） |
+|------|------------------------|
+| Property 1 | test_role_map_and_context.py |
+| Property 2 | test_assignment_sync_property.py |
+| Property 3 | test_level_backfill_migration_pg.py |
+| Property 4 | test_level_backfill_migration_pg.py |
+| Property 5 | test_level_backfill_migration_pg.py |
+| Property 6 | test_permission_effect_timing.py |
+| Property 7 | test_note_edit_gate_model.py |
+| Property 8 | test_note_multi_project_gate.py |
+| Property 9 | test_eqcr_resolver_property.py |
+| Property 10 | test_note_edit_permission_query.py |
+| Property 11 | test_sod_unchanged.py |
+| Property 12 | test_edit_level_gate_forms.py |
+| Property 13 | test_continuous_audit_eqcr_skip.py |
+| Property 14 | noteEditPresentation.property.spec.ts |
+| Property 15 | noteEditNoWriteWhenReadonly.spec.ts |
+| Property 16 | test_authz_inventory_recognition.py |
+| Property 17 | test_authz_inventory_recognition.py |
+| Property 18 | test_authz_inventory_matching.py |
+
+### 4. acceptance.md 必需节完整性
+
+**结果：10/10 所有必需节均存在 ✅**
+
+- 现算计数对账 ✅
+- 改写对照（既有测试改写对照）✅
+- 预存失败登记 ✅
+- 真库迁移验收 ✅
+- 浏览器实测 ✅
+- 清理对账 ✅
+- 后续 spec 登记 ✅
+- 闭合检查 ✅（本节）
+- 变异证明 ✅
+- 性质测试汇总 ✅
+
+### 5. 端点级测试放行用例
+
+每个端点级测试文件均有至少一条放行用例（业务桩恰 1 次且响应成功）。
+
+**结果：9/9 全部通过 ✅**
+
+| 文件 | 测试函数数 | 放行用例 |
+|------|-----------|---------|
+| test_note_edit_gate_endpoints.py | 22 | ✅ |
+| test_note_design_gated_endpoints.py | 59 | ✅ |
+| test_note_edit_permission_query.py | 8 | ✅ |
+| test_note_edit_gate_model.py | 8 | ✅ |
+| test_eqcr_gate_consistency.py | 8 | ✅ |
+| test_partner_manager_edit_end_to_end.py | 12 | ✅ |
+| test_edit_level_gate_forms.py | 7 | ✅ |
+| test_phase8_endpoint_role_levels.py | 10 | ✅ |
+| test_deliverable_generation_membership_auth.py | 17 | ✅ |
+
+### 闭合检查总结
+
+**全部 5 项检查通过 ✅**：需求覆盖 122/122、变异 15/15、性质测试 18/18、必需节 10/10、端点放行 9/9。
