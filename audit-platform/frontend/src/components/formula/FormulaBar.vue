@@ -131,7 +131,7 @@ const props = defineProps<{
   visible?: boolean
   cellInfo: CellInfo | null
   projectId?: string
-  // 当前执行器维度（函数支持矩阵查表用，需求 8）。缺省 wp evaluator（底稿页主路径）。
+  // 当前执行器维度（函数支持矩阵查表用，需求 8）。缺省 wp evaluator；附注结构编辑器传 note_executor。
   executor?: Executor
 }>()
 
@@ -331,14 +331,27 @@ async function loadTbRows(): Promise<any[]> {
 }
 
 // ── REPORT/ROW 域：优先 store reportAddresses，空则回退 legacy report_config ──
+// 地址库按「行次 × 期间」逐条登记（资产负债表 期末/期初、利润表 本期/上期），REPORT 直接用登记的引用写法；
+// ROW / SUM_ROW 只取本期，按行次去重。
 async function loadReportRows(fn: string): Promise<any[]> {
   const toRef = (code: string) => (fn === 'REPORT' ? `REPORT('${code}','期末')` : `ROW('${code}')`)
   if (addrStore.loaded && addrStore.reportAddresses.length > 0) {
-    return addrStore.reportAddresses.map((e) => ({
-      code: e.row_code || '',
-      name: e.label || '',
-      _ref: toRef(e.row_code || ''),
-    }))
+    if (fn === 'REPORT') {
+      return addrStore.reportAddresses.map((e) => ({
+        code: e.row_code || '',
+        name: e.label || '',
+        _ref: e.formula_ref || toRef(e.row_code || ''),
+      }))
+    }
+    const seen = new Set<string>()
+    return addrStore.reportAddresses
+      .filter((e) => {
+        const code = e.row_code || ''
+        if (!code || seen.has(code)) return false
+        seen.add(code)
+        return true
+      })
+      .map((e) => ({ code: e.row_code || '', name: e.label || '', _ref: toRef(e.row_code || '') }))
   }
   const data = await api.get(P.reportConfig.list, {
     params: { report_type: 'balance_sheet', project_id: props.projectId },
@@ -353,21 +366,26 @@ async function loadReportRows(fn: string): Promise<any[]> {
 }
 
 // ── NOTE 域：优先 store noteAddresses，空则回退 legacy disclosure-notes/tree ──
+// NOTE 第一参是章节编号（如「八、1」= 附注 note_section），不是标题或地址标签；
+// 地址库按「章节 × 合计行 × 表头列」登记，直接用登记的引用写法（列名与附注表头一致）。
 async function loadNoteRows(): Promise<any[]> {
   if (addrStore.loaded && addrStore.noteAddresses.length > 0) {
     return addrStore.noteAddresses.map((e) => ({
       code: e.note_section || '',
       name: e.label || '',
-      _ref: `NOTE('${e.label || ''}','合计','期末')`,
+      _ref: e.formula_ref || `NOTE('${e.note_section || ''}','合计','期末余额')`,
     }))
   }
   const data = await api.get('/api/disclosure-notes/tree', { validateStatus: (s: number) => s < 600 })
   const items = data ?? []
-  return items.map((r: any) => ({
-    code: r.note_number || r.section_number || r.note_section || '',
-    name: r.title || r.section_title || '',
-    _ref: `NOTE('${r.title || r.section_title || ''}','合计','期末')`,
-  }))
+  return items.map((r: any) => {
+    const section = r.note_section || r.section_number || r.note_number || ''
+    return {
+      code: section,
+      name: r.title || r.section_title || '',
+      _ref: `NOTE('${section}','合计','期末余额')`,
+    }
+  })
 }
 
 // ── WP 域：优先 ACNR listSheets（grammar_v1 2 参语义列 WP(code,'审定数')），空则回退 legacy /api/working-papers ──

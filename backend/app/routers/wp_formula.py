@@ -32,12 +32,15 @@ from app.services.formula_management.sheet_identity_filter import (
     filter_items_by_sheet_uid,
 )
 from app.services.formula_management.function_support_matrix import (
+    FUNCTIONS as _MATRIX_FUNCTIONS,
     Executor,
+    is_supported as _is_function_supported,
     support_issues,
 )
 from app.services.wp_formula_eval_service import (
     evaluate_wp_formula_expression,
     find_unsupported_formula_functions,
+    unsupported_formula_function_issues,
 )
 from app.routers.wp_surfaced_formulas import CYCLE_SHEET_FORMULAS as _CYCLE_SHEET_FORMULAS
 from app.services.wp_formula_service import (
@@ -264,6 +267,27 @@ async def _write_wp_formula_audit(
             "wp_formula 审计哈希链写入失败 wp_code=%s cell=%s action=%s: %s",
             wp_code, target_cell, action, audit_err,
         )
+
+
+def _unsupported_function_detail(expression: str | None) -> tuple[list[str], list[dict]]:
+    """保存前的函数门：``(不支持的函数名, 逐项原因)``；矩阵外的函数（序时账 / TB_AUX / PREV 三参）一并给原因。"""
+    matrix_issues = support_issues(expression, Executor.WP_EVALUATOR)
+    names = list(dict.fromkeys(
+        [issue["function"] for issue in matrix_issues]
+        + find_unsupported_formula_functions(expression)
+    ))
+    reasons = {issue["function"]: issue["reason"] for issue in unsupported_formula_function_issues(expression)}
+    seen = {issue["function"] for issue in matrix_issues}
+    issues = matrix_issues + [
+        {"function": name, "executor": Executor.WP_EVALUATOR.value,
+         "reason": reasons.get(name, "此执行器不支持该函数")}
+        for name in names if name not in seen
+    ]
+    return names, issues
+
+
+def _wp_supported_functions_text() -> str:
+    return "/".join(fn for fn in _MATRIX_FUNCTIONS if _is_function_supported(fn, Executor.WP_EVALUATOR))
 
 
 class FormulaSaveRequest(BaseModel):
@@ -865,10 +889,10 @@ async def save_formula(
 ):
     """保存（upsert）一条底稿公式；悬空引用返回 422。
 
-    d-cycle-four-table-extraction-formulas 决策3（方案 a）：Tier A 可编辑公式
-    只支持 TB/SUM_TB/WP（+ 字面量/四则运算/跨 sheet 引用）。含 AUX/PREV/序时账
-    （LEDGER/COUNT_LEDGER）等未实现函数时返 422（FORMULA_UNSUPPORTED_FUNCTION），
-    不静默落库、不静默求值为 0——这些复杂归集由 Tier B prefill 承担。
+    可编辑公式支持函数支持矩阵 ``wp_evaluator`` 列的全部函数（TB/SUM_TB/ROW/SUM_ROW/REPORT/NOTE/WP/
+    PREV/AUX/ADJ，spec formula-governance-coverage-closure R6；此前 d-cycle 决策3 只开放 TB/SUM_TB/WP）。
+    含序时账（LEDGER/COUNT_LEDGER/LEDGER_DETAIL）、TB_AUX、PREV 三参（上年底稿）时返 422
+    （FORMULA_UNSUPPORTED_FUNCTION），不静默落库、不静默求值为 0——序时账归集由 Tier B prefill 承担。
 
     Task 1.4 / ADR-FMC-02 纵深防御：本端点仅承接**工作底稿正式公式（wp kind）**。
     若请求误带非 wp 的 kind（surfaced/extraction/report），或 target_cell/sheet_name 带
@@ -884,11 +908,7 @@ async def save_formula(
     _reject_non_wp_kind(body)
 
     # 不受支持函数硬阻断（写库前，仅作用于本编辑公式保存路径 = Tier A 入口）。
-    matrix_issues = support_issues(body.expression, Executor.WP_EVALUATOR)
-    unsupported = list(dict.fromkeys(
-        [issue["function"] for issue in matrix_issues]
-        + find_unsupported_formula_functions(body.expression)
-    ))
+    unsupported, unsupported_issues = _unsupported_function_detail(body.expression)
     if unsupported:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -896,11 +916,12 @@ async def save_formula(
                 "error_code": "FORMULA_UNSUPPORTED_FUNCTION",
                 "executor": Executor.WP_EVALUATOR.value,
                 "unsupported_functions": unsupported,
-                "issues": matrix_issues,
+                "issues": unsupported_issues,
                 "message": (
                     "公式含当前工作底稿执行器不支持的函数 "
                     + "/".join(unsupported)
-                    + "；当前只支持 TB/SUM_TB/WP，其他函数须由具备相应上下文的执行器处理。"
+                    + "（" + "；".join(f"{i['function']}：{i['reason']}" for i in unsupported_issues) + "）"
+                    + f"；可编辑公式支持 {_wp_supported_functions_text()}。"
                 ),
             },
         )
@@ -1249,11 +1270,7 @@ async def save_formulas_batch(
                     kind=item.kind,
                 )
             )
-            matrix_issues = support_issues(item.expression, Executor.WP_EVALUATOR)
-            unsupported = list(dict.fromkeys(
-                [issue["function"] for issue in matrix_issues]
-                + find_unsupported_formula_functions(item.expression)
-            ))
+            unsupported, unsupported_issues = _unsupported_function_detail(item.expression)
             if unsupported:
                 await db.rollback()
                 raise HTTPException(
@@ -1264,7 +1281,7 @@ async def save_formulas_batch(
                         "failed_index": idx,
                         "target_cell": item.target_cell,
                         "unsupported_functions": unsupported,
-                        "issues": matrix_issues,
+                        "issues": unsupported_issues,
                         "message": "批量公式含当前工作底稿执行器不支持的函数，整批已回滚",
                     },
                 )

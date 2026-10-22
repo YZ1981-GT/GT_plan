@@ -527,16 +527,16 @@ def test_pbt_p12_logic_check_never_writes_value(monkeypatch, pair, ftype):
 
 
 @given(
-    fn=st.sampled_from(["AUX", "PREV", "LEDGER", "COUNT_LEDGER"]),
+    fn=st.sampled_from(["PREV", "LEDGER", "COUNT_LEDGER", "LEDGER_DETAIL", "TB_AUX"]),
     code=st.from_regex(r"[1-6][0-9]{3}", fullmatch=True),
 )
 def test_pbt_p12_unsupported_four_table_functions_detected(fn, code):
-    """任意不受支持四表库函数（AUX/PREV/序时账）→ find_unsupported 检出（保存端点据此 422，
-    不得当 auto_calc 可编辑目标 / R6.3）。"""
+    """任意不受支持四表库函数（序时账 / TB_AUX / PREV 三参）→ find_unsupported 检出（保存端点据此 422，
+    不得当 auto_calc 可编辑目标 / R6.3）。AUX 与 PREV 两参自 formula-governance-coverage-closure R6 起支持。"""
     from app.services.wp_formula_eval_service import find_unsupported_formula_functions
 
     expr = f"{fn}('{code}','x','期末余额')"
-    assert find_unsupported_formula_functions(expr), f"{fn} 应被检出为不受支持"
+    assert find_unsupported_formula_functions(expr) == [fn], f"{fn} 应被检出为不受支持"
 
 
 # ===========================================================================

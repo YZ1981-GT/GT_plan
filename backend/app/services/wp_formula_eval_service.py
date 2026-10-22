@@ -1,6 +1,12 @@
 """自定义底稿公式表达式求值（custom-workpaper-formula-binding 补强）。
 
 将 wp_formula.expression 求值为 Decimal，供写回 parsed_data 目标单元格展示。
+
+支持的取数函数（spec formula-governance-coverage-closure R6；与函数支持矩阵 ``wp_evaluator`` 列一致）：
+TB / SUM_TB / WP（含三参与 ``Sheet!Cell`` 跨 sheet 引用）/ ROW / SUM_ROW / REPORT / NOTE / PREV / AUX / ADJ。
+PREV / AUX / ROW / SUM_ROW / REPORT / NOTE 经 ``formula_ref_preload`` 严格按值代入（取不到数写进错误清单，
+不代入 0）；ADJ 经统一预载层（底稿口径：不排除底稿来源的调整分录）交 L1 内核。序时账（LEDGER /
+COUNT_LEDGER / LEDGER_DETAIL）、TB_AUX、PREV 三参（上年底稿）不支持：保存时 422，求值时报错不求值。
 """
 
 from __future__ import annotations
@@ -25,45 +31,70 @@ from app.services.four_table.occurrence_by_standard_code import (
 
 logger = logging.getLogger(__name__)
 
-_TB_PATTERN = re.compile(r"TB\('([^']+)','([^']+)'\)")
-_SUM_TB_PATTERN = re.compile(r"SUM_TB\('([^']+)','([^']+)'\)")
+#: 参数间允许空白（库内有 ``TB('1231', '期末余额')`` 写法）；前面不能紧挨标识符字符（``SUM_TB(`` 里的 ``TB(`` 不算）
+_START = r"(?<![A-Za-z0-9_])"
+_ARG = r"\s*'([^']+)'\s*"
+_TB_PATTERN = re.compile(_START + r"TB\(" + _ARG + "," + _ARG + r"\)")
+_SUM_TB_PATTERN = re.compile(_START + r"SUM_TB\(" + _ARG + "," + _ARG + r"\)")
 # 三参 WP（D2-3 嵌套寻址）须先于两参匹配：WP('D2','坏账准备明细表D2-3','本期计提合计')
-_WP3_PATTERN = re.compile(r"WP\('([^']+)','([^']+)','([^']+)'\)")
-_WP_PATTERN = re.compile(r"WP\('([^']+)','([^']+)'\)")
+_WP3_PATTERN = re.compile(_START + r"WP\(" + _ARG + "," + _ARG + "," + _ARG + r"\)")
+_WP_PATTERN = re.compile(_START + r"WP\(" + _ARG + "," + _ARG + r"\)")
+#: 函数调用（先把引号内的文字抹掉，避免 sheet 名里的括号被当成函数）
+_CALL_RE = re.compile(_START + r"([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+_QUOTED_RE = re.compile(r"'[^']*'")
+#: 全部代入之后还允许留给 L1 的函数：ADJ（预载）与纯运算函数
+_KERNEL_FUNCTIONS = frozenset({"ADJ", "ABS", "ROUND", "MAX", "MIN", "IF", "PLACEHOLDER"})
 
-# ── d-cycle-four-table-extraction-formulas 决策3（方案 a）：Tier A 可编辑公式
-# 不支持 AUX/PREV/序时账（LEDGER/COUNT_LEDGER）函数——这些正是 Tier B 复杂归集，
-# 由 `_build_adjudication_prefill` prefill 承担。保存端点检出即返 422（不静默返 0）。
-# 用 \b 词边界避免误伤：`COUNT_LEDGER(` 中 `LEDGER` 前是 `_`（词字符），故
-# `\bLEDGER\(` 不会命中 COUNT_LEDGER，二者各自单列。
-_UNSUPPORTED_FUNCTION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("AUX", re.compile(r"\bAUX\s*\(")),
-    ("PREV", re.compile(r"\bPREV\s*\(")),
-    ("LEDGER", re.compile(r"\bLEDGER\s*\(")),
-    ("COUNT_LEDGER", re.compile(r"\bCOUNT_LEDGER\s*\(")),
-)
+#: 工作底稿可编辑公式不支持的函数（函数支持矩阵之外的 L1 函数）及原因。
+#:
+#: 历史（d-cycle-four-table-extraction-formulas 决策3）：Tier A 可编辑公式曾只支持 TB / SUM_TB / WP，
+#: AUX / PREV 一并拒绝；spec formula-governance-coverage-closure R6 补齐了 AUX / PREV（两参）等 7 个函数，
+#: 序时账归集仍由底稿预填充（Tier B）承担。
+UNSUPPORTED_FUNCTION_REASONS: dict[str, str] = {
+    "LEDGER": "序时账取数由底稿预填充承担，可编辑公式不支持",
+    "COUNT_LEDGER": "序时账笔数由底稿预填充承担，可编辑公式不支持",
+    "LEDGER_DETAIL": "序时账明细由底稿预填充承担，可编辑公式不支持",
+    "TB_AUX": "辅助维度汇总请写 AUX('科目','辅助类型','列')",
+}
+_PREV3_REASON = "PREV 三参写法是上年底稿取数，可编辑公式不支持（上年试算表取数写 PREV('科目','列')）"
+
+
+def _strip_formula(expression: str | None) -> str:
+    raw = (expression or "").strip()
+    return raw[1:] if raw.startswith("=") else raw
+
+
+def _called_functions(expression: str) -> list[str]:
+    """按出现顺序列出调用的函数名（大写、去重；引号内文字不算）。"""
+    names: list[str] = []
+    for m in _CALL_RE.finditer(_QUOTED_RE.sub("''", expression)):
+        name = m.group(1).upper()
+        if name not in names:
+            names.append(name)
+    return names
+
+
+def unsupported_formula_function_issues(expression: str | None) -> list[dict[str, str]]:
+    """工作底稿可编辑公式里不支持的函数 → ``[{function, reason}]``（按声明顺序，PREV 三参在最后）。
+
+    纯字符串检测（不依赖 DB），供保存端点写库前调用；求值时同样据此不求值（不静默 0）。
+    """
+    raw = _strip_formula(expression)
+    if not raw:
+        return []
+    called = set(_called_functions(raw))
+    issues = [{"function": name, "reason": reason}
+              for name, reason in UNSUPPORTED_FUNCTION_REASONS.items() if name in called]
+    from app.services.formula_ref_preload import PREV3_RE
+
+    if PREV3_RE.search(raw):
+        issues.append({"function": "PREV", "reason": _PREV3_REASON})
+    return issues
 
 
 def find_unsupported_formula_functions(expression: str | None) -> list[str]:
-    """检出 Tier A 可编辑公式表达式中不受支持的四表库函数（决策3 方案 a）。
-
-    返回命中的函数名列表（去重、保持声明顺序）。当前评估器
-    ``evaluate_wp_formula_expression`` 只真实实现 ``TB``/``SUM_TB``/``WP``（+ 字面量/
-    四则运算/``Sheet!Cell`` 跨 sheet 引用），``AUX``/``PREV``/``LEDGER``/``COUNT_LEDGER``
-    未实现（会静默求值为 0），故保存时应拒绝而非静默落空。
-
-    仅作纯字符串检测（不依赖 DB），供保存端点在写库前调用。
-    """
-    if not expression:
-        return []
-    raw = expression.strip()
-    if raw.startswith("="):
-        raw = raw[1:]
-    hits: list[str] = []
-    for name, pat in _UNSUPPORTED_FUNCTION_PATTERNS:
-        if pat.search(raw) and name not in hits:
-            hits.append(name)
-    return hits
+    """不支持的函数名列表（去重、保持声明顺序）；详见 :func:`unsupported_formula_function_issues`。"""
+    return list(dict.fromkeys(issue["function"] for issue in unsupported_formula_function_issues(expression)))
 
 #: 列名 → ``trial_balance`` 的**真实列**。
 #:
@@ -276,14 +307,19 @@ async def evaluate_wp_formula_expression(
     """求值自定义底稿公式表达式。
 
     支持：字面量、TB/SUM_TB、WP（含单元格地址 B5）、``Sheet!Cell`` 跨 sheet 引用
-    （经 CrossSheetResolver 追溯，Req 14.2）、四则运算与内置函数（委托 L1 execute）。
-    失败返回 (Decimal('0'), errors)。
+    （经 CrossSheetResolver 追溯，Req 14.2）、ROW/SUM_ROW/REPORT/NOTE/PREV/AUX（严格按值代入）、
+    ADJ（统一预载层，底稿口径）、四则运算与内置函数（委托 L1 execute）。
+    取不到数（无上年试算表 / 无辅助核算 / 报表未生成 / 附注无该项）写进 errors，不静默 0；
+    含不支持的函数时不求值，返回 (Decimal('0'), errors)。
 
     Args:
         parsed_data: 底稿 ``working_paper.parsed_data``（含 univer_snapshot），
             提供时启用 ``Sheet!Cell`` 跨 sheet 引用追溯求值。
         parent_wp_code: 父底稿码，供 CrossSheetResolver 构造 grammar_v1 3 参 WP。
     """
+    from app.services.formula_preloader import preload
+    from app.services.formula_ref_preload import substitute_value_refs
+
     errors: list[str] = []
     raw = (expression or "").strip()
     if not raw:
@@ -297,6 +333,11 @@ async def evaluate_wp_formula_expression(
     except (InvalidOperation, ValueError):
         pass
 
+    # 不支持的函数：不求值（保存端点已 422；读取 / 渲染时求值预设也不能静默 0）
+    unsupported = unsupported_formula_function_issues(raw)
+    if unsupported:
+        return Decimal("0"), [f"{issue['function']}：{issue['reason']}" for issue in unsupported]
+
     # 跨 sheet 引用（Sheet!Cell）先经 CrossSheetResolver 追溯解析为值代入（Req 14.2）
     raw, cross_errors = _resolve_cross_sheet_refs(
         raw,
@@ -305,6 +346,11 @@ async def evaluate_wp_formula_expression(
         parent_wp_code=parent_wp_code,
     )
     errors.extend(cross_errors)
+
+    # PREV / AUX / ROW / SUM_ROW / REPORT / NOTE 严格按值代入；须在 TB 代入之前（PREV(TB(...)) 里的 TB 是上年）
+    substituted = await substitute_value_refs(raw, db=db, project_id=project_id, year=year, strict=True)
+    errors.extend(substituted.missing)
+    raw = substituted.expression
 
     expr = raw
     # 三参 WP（D2-3 嵌套寻址）先处理，避免被两参正则截断
@@ -353,7 +399,18 @@ async def evaluate_wp_formula_expression(
             errors.append(f"{match.group(0)}: {e}")
         expr = expr.replace(match.group(0), str(val), 1)
 
+    # 代入后还剩取数函数 = 写法没认出来（参数没加单引号 / 少参数等）：报错，不让 L1 按空上下文求 0
+    leftover = [name for name in _called_functions(expr) if name not in _KERNEL_FUNCTIONS]
+    if leftover:
+        errors.append(f"{'、'.join(leftover)} 写法无法识别（参数需用单引号括起，个数与函数说明一致）")
+        return Decimal("0"), errors
+
+    # ADJ 走统一预载层 → L1；底稿口径不排除底稿来源的调整分录（与报表口径排除 workpaper 相反）
     ctx = FormulaContext(tb_data={}, row_cache={})
+    if "ADJ" in _called_functions(expr):
+        gaps: list[str] = []
+        ctx = await preload(db, project_id, year, [expr], adj_exclude_origins=frozenset(), gaps=gaps)
+        errors.extend(gaps)
     result = execute(expr, ctx)
     errors.extend(result.errors)
     return result.value, errors

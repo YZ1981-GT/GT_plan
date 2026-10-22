@@ -8,6 +8,10 @@ spec: formula-execution-path-convergence Phase 1 · Task 2~6
 调用方传入的参数决定口径差异：
 - ``adj_exclude_origins=frozenset()``   → 底稿路径（不排 origin）
 - ``adj_exclude_origins=frozenset({"workpaper"})`` → 报表路径（排 workpaper）
+
+AUX 与报表行（spec formula-governance-coverage-closure R6.5）：AUX 按引用写法逐个取数（与表间审核严格代入
+同一口径），存 ``aux_data[科目][aux_ref_key(参数)]``；调用方没给 ``row_cache`` 且公式引用了 ROW / SUM_ROW /
+REPORT 时读本年度报表本期金额。``gaps`` 收集取数缺口，供严格调用方报错。
 """
 from __future__ import annotations
 
@@ -20,15 +24,24 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.formula_engine import FormulaContext
+from app.services.formula_engine import FormulaContext, aux_ref_key
+from app.services.formula_ref_preload import AuxRef, load_report_rows, parse_aux_refs, resolve_aux_refs
 
 logger = logging.getLogger(__name__)
+
+
+def _gap(gaps: list[str] | None, reason: str) -> None:
+    """记一条取数缺口（调用方传了 ``gaps`` 才记；不传 = 沿用非严格的置 0 行为）。"""
+    if gaps is not None and reason not in gaps:
+        gaps.append(reason)
+
 
 # ── 公式文本扫描正则 ──────────────────────────────────────────────────────────
 
 _TB_RE = re.compile(r"(?:SUM_)?TB\(\s*'([^']+)'")
 _ADJ_RE = re.compile(r"ADJ\(\s*'([^']+)'")
-_AUX_RE = re.compile(r"AUX\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)")
+#: 报表行引用（ROW / SUM_ROW / REPORT）：调用方没给 row_cache 时据此决定是否读本年度报表
+_REPORT_REF_RE = re.compile(r"(?<![A-Za-z0-9_])(?:ROW|SUM_ROW|REPORT)\s*\(")
 _WP_RE = re.compile(r"WP\(\s*'([^']+)'\s*,\s*'([^']+)'(?:\s*,\s*'([^']+)')?\s*\)")
 _NOTE_RE = re.compile(r"NOTE\(\s*'([^']+)'\s*,\s*'([^']+)'(?:\s*,\s*'([^']+)')?\s*\)")
 _PREV_RE = re.compile(r"PREV\(\s*'([^']+)'")
@@ -42,7 +55,8 @@ def _scan_refs(formulas: list[str]) -> dict[str, set]:
     refs: dict[str, set] = {
         "tb_codes": set(),
         "adj_codes": set(),
-        "aux_specs": set(),  # (account, aux_type, aux_code, column)
+        "aux_specs": set(),  # formula_ref_preload.AuxRef（四参 / 三参 / 两参，按写法原样）
+        "report_refs": set(),  # 出现过的 ROW / SUM_ROW / REPORT 调用（只用于判断要不要读报表）
         "wp_refs": set(),    # (wp_code, column) or (wp_code, sheet, cell)
         "note_refs": set(),  # (section, field) or (section, field, row_label)
         "prev_codes": set(),
@@ -58,8 +72,8 @@ def _scan_refs(formulas: list[str]) -> dict[str, set]:
             refs["tb_codes"].add(m.group(1))
         for m in _ADJ_RE.finditer(t):
             refs["adj_codes"].add(m.group(1))
-        for m in _AUX_RE.finditer(t):
-            refs["aux_specs"].add((m.group(1), m.group(2), m.group(3), m.group(4) or "期末余额"))
+        refs["aux_specs"].update(parse_aux_refs(t))
+        refs["report_refs"].update(m.group(0) for m in _REPORT_REF_RE.finditer(t))
         for m in _WP_RE.finditer(t):
             refs["wp_refs"].add(tuple(g for g in m.groups() if g))
         for m in _NOTE_RE.finditer(t):
@@ -138,17 +152,61 @@ async def _load_tb(db: AsyncSession, project_id: uuid.UUID, year: int,
 
 
 async def _load_adj(db: AsyncSession, project_id: uuid.UUID, year: int,
-                    codes: set[str], exclude_origins: frozenset[str]) -> dict[str, dict[str, Decimal]]:
-    """从 adjustment_amount_source 批量取调整额。"""
+                    codes: set[str], exclude_origins: frozenset[str],
+                    gaps: list[str] | None = None) -> dict[str, dict[str, Decimal]]:
+    """从 adjustment_amount_source 批量取调整额（只含已审批分录；某科目没有分录 = 合法的 0）。"""
     if not codes:
         return {}
     try:
         from app.services.adjustment_amount_source import adj_net_batch
-        return await adj_net_batch(db, project_id=project_id, year=year,
-                                   account_codes=codes, exclude_origins=exclude_origins)
+        async with db.begin_nested():
+            return await adj_net_batch(db, project_id=project_id, year=year,
+                                       account_codes=codes, exclude_origins=exclude_origins)
     except Exception as exc:
         logger.warning("preloader: adj_net_batch failed: %s", exc)
+        _gap(gaps, f"调整分录取数失败：{exc}")
         return {}
+
+
+async def _load_aux(db: AsyncSession, project_id: uuid.UUID, year: int,
+                    refs: set[AuxRef], gaps: list[str] | None = None) -> dict[str, dict[str, Decimal]]:
+    """按 AUX 引用写法逐个取数（与表间审核严格代入同一口径，``formula_ref_preload.resolve_aux_refs``）。
+
+    结果存 ``aux_data[科目][aux_ref_key(参数)]``，L1 ``_handle_aux`` 用同一键取值；取不到的引用不存值并记缺口。
+    """
+    if not refs:
+        return {}
+    ordered = sorted(refs, key=lambda ref: ref.token)
+    try:
+        async with db.begin_nested():
+            resolved = await resolve_aux_refs(db, project_id, year, ordered)
+    except Exception as exc:
+        logger.warning("preloader: aux 取数失败: %s", exc)
+        _gap(gaps, f"辅助核算余额取数失败：{exc}")
+        return {}
+    out: dict[str, dict[str, Decimal]] = {}
+    for ref in ordered:
+        value, reason = resolved[ref.token]
+        if value is None:
+            _gap(gaps, f"{ref.token}：{reason}")
+            continue
+        out.setdefault(ref.account, {})[aux_ref_key((ref.account, *ref.args))] = value
+    return out
+
+
+async def _load_report_rows(db: AsyncSession, project_id: uuid.UUID, year: int,
+                            gaps: list[str] | None = None) -> dict[str, Decimal]:
+    """本年度报表本期金额 → row_cache（供 ROW / SUM_ROW / REPORT）；报表未生成记缺口。"""
+    try:
+        async with db.begin_nested():
+            rows = await load_report_rows(db, project_id, year)
+    except Exception as exc:
+        logger.warning("preloader: 报表行取数失败: %s", exc)
+        _gap(gaps, f"报表行取数失败：{exc}")
+        return {}
+    if not rows:
+        _gap(gaps, f"本年度（{year}）报表未生成")
+    return {code: Decimal(str(current)) for code, (current, _prior) in rows.items() if current is not None}
 
 
 async def _load_ledger(db: AsyncSession, project_id: uuid.UUID, year: int,
@@ -361,6 +419,7 @@ async def preload(
     adj_exclude_origins: frozenset[str] = frozenset(),
     template_type: str = "soe",
     row_cache: dict[str, Decimal] | None = None,
+    gaps: list[str] | None = None,
 ) -> FormulaContext:
     """批量扫描公式文本 → 一次性查 DB → 构建 FormulaContext。
 
@@ -368,13 +427,18 @@ async def preload(
         formulas: 公式文本列表（可含 ``=`` 前缀）
         adj_exclude_origins: ADJ 取数排除的 origin 集合（底稿传空集、报表传 {"workpaper"}）
         template_type: 项目模板类型（"soe"/"listed"），影响附注取数的章节映射
-        row_cache: 已计算的行次缓存（供 ROW/SUM_ROW/REPORT 引用）
+        row_cache: 已计算的行次缓存（供 ROW/SUM_ROW/REPORT 引用）；不传且公式引用了报表行 ⇒ 读本年度报表本期金额
+        gaps: 传入列表时记取数缺口（报表未生成、辅助核算取不到、调整分录取数失败），供严格调用方报错；
+            不传 = 非严格（缺数按 0，L1 内核行为）
     """
     refs = _scan_refs(formulas)
 
     # 批量查 DB（各数据源独立，失败不互相拖累）
     tb_data = await _load_tb(db, project_id, year, refs["tb_codes"])
-    adj_data = await _load_adj(db, project_id, year, refs["adj_codes"], adj_exclude_origins)
+    adj_data = await _load_adj(db, project_id, year, refs["adj_codes"], adj_exclude_origins, gaps)
+    aux_data = await _load_aux(db, project_id, year, refs["aux_specs"], gaps)
+    if row_cache is None and refs["report_refs"]:
+        row_cache = await _load_report_rows(db, project_id, year, gaps)
     wp_data = await _load_wp(db, project_id, year, refs["wp_refs"])
     note_data = await _load_note(db, project_id, year, refs["note_refs"], template_type)
     ledger_data = await _load_ledger(db, project_id, year, refs["ledger_specs"])
@@ -392,7 +456,7 @@ async def preload(
         prior_tb_data=prior_tb_data,
         note_data=note_data,
         wp_data=wp_data,
-        aux_data={},  # AUX 数据走 ctx.aux_data（已有字段，格式与 _load_aux 不同）
+        aux_data=aux_data,
         adj_data=adj_data,
         ledger_data=ledger_data,
         ledger_detail_data={},  # Phase 2 实装 LEDGER_DETAIL 明细查询

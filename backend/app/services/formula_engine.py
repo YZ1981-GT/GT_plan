@@ -900,15 +900,32 @@ def _handle_prev(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Deci
     return val
 
 
-def _handle_aux(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """AUX('account','dimension','column') — 辅助核算取值"""
-    str_args = _extract_string_args(args, ctx, trace)
+def aux_ref_key(args: list[str] | tuple[str, ...]) -> str:
+    """AUX 预载值在 ``ctx.aux_data[科目]`` 里的键：科目之后的参数原样拼接。
+
+    统一预载层（``formula_preloader._load_aux``）按引用写法逐个取数后用本键存值，
+    覆盖四参（类型, 辅助项, 列）/ 三参 / 两参全部写法与列名；单一来源，两侧同函数计算。
+    spec formula-governance-coverage-closure R6.5。
+    """
+    return "\x1f".join(str(a) for a in args[1:])
+
+
+def _aux_value(str_args: list[str], ctx: FormulaContext) -> Decimal:
+    """先取预载键（按写法取到的值）；没有时退回旧口径 ``aux_data[科目][维度]``（报表路径按维度预载）。"""
     account = str_args[0] if str_args else ''
-    dimension = str_args[1] if len(str_args) > 1 else ''
-    col_name = str_args[2] if len(str_args) > 2 else ctx.default_column
     account_data = ctx.aux_data.get(account, {})
-    val = account_data.get(dimension, Decimal("0"))
-    trace.append(f"AUX('{account}','{dimension}','{col_name}') = {val}")
+    key = aux_ref_key(str_args)
+    if key in account_data:
+        return account_data[key]
+    dimension = str_args[1] if len(str_args) > 1 else ''
+    return account_data.get(dimension, Decimal("0"))
+
+
+def _handle_aux(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
+    """AUX('account','dimension','column') / AUX('account','aux_type','item','column') — 辅助核算取值"""
+    str_args = _extract_string_args(args, ctx, trace)
+    val = _aux_value(str_args, ctx)
+    trace.append(f"AUX({','.join(repr(a) for a in str_args)}) = {val}")
     return val
 
 
@@ -1344,8 +1361,8 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
                 if token_name == "AUX":
                     account = match.group(1)
                     dimension = match.group(2)
-                    account_data = ctx.aux_data.get(account, {})
-                    val = account_data.get(dimension, Decimal("0"))
+                    # 与 AST 路径同一取值函数（预载键优先，旧口径兜底）
+                    val = _aux_value([account, dimension, match.group(3)], ctx)
                     trace_msg = f"AUX('{account}','{dimension}') = {val}"
                 elif token_name == "NOTE":
                     section = match.group(1)

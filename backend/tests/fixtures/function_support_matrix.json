@@ -57,8 +57,8 @@
     },
     "ROW": {
       "wp_evaluator": {
-        "supported": false,
-        "reason": "工作底稿可编辑公式尚未注入 ROW 行次上下文"
+        "supported": true,
+        "reason": null
       },
       "report_path": {
         "supported": true,
@@ -75,8 +75,8 @@
     },
     "SUM_ROW": {
       "wp_evaluator": {
-        "supported": false,
-        "reason": "工作底稿可编辑公式尚未注入 SUM_ROW 行次上下文"
+        "supported": true,
+        "reason": null
       },
       "report_path": {
         "supported": true,
@@ -93,8 +93,8 @@
     },
     "REPORT": {
       "wp_evaluator": {
-        "supported": false,
-        "reason": "工作底稿可编辑公式尚未注入报表上下文"
+        "supported": true,
+        "reason": null
       },
       "report_path": {
         "supported": true,
@@ -111,8 +111,8 @@
     },
     "NOTE": {
       "wp_evaluator": {
-        "supported": false,
-        "reason": "工作底稿可编辑公式尚未注入附注上下文"
+        "supported": true,
+        "reason": null
       },
       "report_path": {
         "supported": true,
@@ -147,8 +147,8 @@
     },
     "PREV": {
       "wp_evaluator": {
-        "supported": false,
-        "reason": "工作底稿可编辑公式尚未实现 PREV"
+        "supported": true,
+        "reason": null
       },
       "report_path": {
         "supported": false,
@@ -165,8 +165,8 @@
     },
     "AUX": {
       "wp_evaluator": {
-        "supported": false,
-        "reason": "工作底稿可编辑公式尚未实现 AUX"
+        "supported": true,
+        "reason": null
       },
       "report_path": {
         "supported": false,
@@ -183,8 +183,8 @@
     },
     "ADJ": {
       "wp_evaluator": {
-        "supported": false,
-        "reason": "工作底稿可编辑公式尚未注入实时调整上下文"
+        "supported": true,
+        "reason": null
       },
       "report_path": {
         "supported": false,

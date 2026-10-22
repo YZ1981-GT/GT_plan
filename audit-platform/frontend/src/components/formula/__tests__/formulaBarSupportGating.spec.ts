@@ -84,17 +84,12 @@ describe('FormulaBar 函数支持矩阵 UI 门控', () => {
     document.body.innerHTML = ''
   })
 
-  it('wp_evaluator 只开放真实具备上下文的可见按钮 TB/WP', () => {
+  it('wp_evaluator 的可见取数按钮全部可点（底稿求值器补齐 ROW/SUM_ROW/REPORT/NOTE，R6）', () => {
     const w = mountBar('wp_evaluator')
-    for (const fn of ['TB', 'WP']) {
+    for (const fn of ['TB', 'ROW', 'SUM_ROW', 'NOTE', 'WP', 'REPORT']) {
       const b = btn(w, fn)
       expect(b.supported).toBe(true)
       expect(b.reason).toBe('')
-    }
-    for (const fn of ['ROW', 'SUM_ROW', 'NOTE', 'REPORT']) {
-      const b = btn(w, fn)
-      expect(b.supported).toBe(false)
-      expect(b.reason).toBeTruthy()
     }
   })
 
@@ -151,8 +146,8 @@ describe('FormulaBar 函数支持矩阵 UI 门控', () => {
     const mutatedClickable = true
     expect(btn(wNote, 'ROW').supported).toBe(false)
     expect(btn(wNote, 'ROW').supported).not.toBe(mutatedClickable)
-    // 工作底稿保存路径同样没有 ROW 上下文，不能因 L1 注册过就误放行。
-    expect(btn(wWp, 'ROW').supported).toBe(false)
+    // 门控按执行器取值：底稿求值器有 ROW 上下文（R6），附注执行器没有 —— 同一按钮两种结论。
+    expect(btn(wWp, 'ROW').supported).toBe(true)
     expect(btn(wWp, 'TB').supported).toBe(true)
   })
 })

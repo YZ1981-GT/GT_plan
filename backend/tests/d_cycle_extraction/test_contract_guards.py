@@ -158,17 +158,24 @@ def test_g2_evaluator_tb_resolvers_use_active_filter():
 
 
 def test_g3_unsupported_function_detector_present_and_effective():
-    """find_unsupported_formula_functions 存在且检出 AUX/PREV/序时账（Property 12 / R4.2）。"""
+    """find_unsupported_formula_functions 存在且检出序时账 / PREV 三参（Property 12 / R4.2）。
+
+    R6（formula-governance-coverage-closure）起 AUX 与 PREV 两参由底稿求值器严格按值代入，属支持函数；
+    序时账归集仍归 Tier B，不得当可编辑公式。
+    """
     from app.services.wp_formula_eval_service import (
         find_unsupported_formula_functions,
     )
 
-    # 受支持（Tier A 简单总额）→ 空
+    # 受支持 → 空
     assert find_unsupported_formula_functions("TB('1402','期末余额')") == []
     assert find_unsupported_formula_functions("SUM_TB('1122','审定数')") == []
-    # 不受支持（复杂归集归 Tier B，不得当可编辑公式）→ 检出
-    assert find_unsupported_formula_functions("AUX('1122','客户A','期末余额')")
-    assert find_unsupported_formula_functions("PREV('1402','期末余额')")
+    assert find_unsupported_formula_functions("AUX('1122','客户A','期末余额')") == []
+    assert find_unsupported_formula_functions("PREV('1402','期末余额')") == []
+    # 不受支持（序时账归集归 Tier B / 上年底稿取数）→ 检出
+    assert find_unsupported_formula_functions("LEDGER('6001','借','全年')") == ["LEDGER"]
+    assert find_unsupported_formula_functions("COUNT_LEDGER('6001','借','全年')") == ["COUNT_LEDGER"]
+    assert find_unsupported_formula_functions("PREV('D2','审定表D2-1','审定数')") == ["PREV"]
 
 
 # ---------------------------------------------------------------------------

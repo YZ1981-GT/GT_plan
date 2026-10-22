@@ -1547,3 +1547,10 @@ audit-platform/frontend/src/views/composables/noteEdit/noteEditWriteEntries.ts  
 backend/tests/test_continuous_audit_eqcr_skip.py  843
 backend/tests/test_note_design_gated_endpoints.py  1130
 backend/tests/test_project_endpoint_authorization_baseline.py  821
+#   address_registry.py / test_tier_a_detail_seed_properties_pbt.py —— 历史大文件（HEAD 已 1431 / 835 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-22 formula-governance-coverage-closure R6：底稿可编辑公式补齐 ROW/NOTE/AUX 后，保存时的引用校验暴露三处地址库缺陷，
+#     前者 +42 行修复（ROW 按报表类型的本期名转 URI、附注域按模板 sections + 章节编号建、辅助余额补类型合计地址与按科目前缀校验）；
+#     后者只改 p12 用例口径（AUX / PREV 两参改为支持，行数不变）。
+#     拆分方向：address_registry 按「URI ↔ 公式引用互转 / 各域条目构建 / 缓存与校验服务」拆三个模块。
+backend/app/services/address_registry.py  1473
+backend/tests/d_cycle_extraction/test_tier_a_detail_seed_properties_pbt.py  835

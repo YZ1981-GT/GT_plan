@@ -143,7 +143,7 @@ const COMPONENT_REFS: Record<string, string[]> = {
     "TB('1001','期末余额')", // loadTbRows
     "REPORT('BS-002','期末')", // loadReportRows（REPORT）
     "ROW('BS-002')", // loadReportRows（ROW）
-    "NOTE('货币资金','合计','期末')", // loadNoteRows
+    "NOTE('八、1','合计','期末余额')", // loadNoteRows（章节编号 + 附注表头列名）
     "WP('E1-1','审定数')", // loadWpRows（2 参语义列）
   ],
   // NoteFormulaDialog.vue — 用户编辑的附注公式（NOTE/WP/TB 形态持久化）

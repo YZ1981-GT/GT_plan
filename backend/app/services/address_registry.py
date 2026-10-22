@@ -106,10 +106,13 @@ def formula_ref_to_uri(formula_ref: str) -> Optional[str]:
             else:
                 return build_uri('tb', groups[0], cell=groups[1])
         elif fn_name in ('ROW', 'SUM_ROW'):
-            # ROW('BS-002') → report://BS/BS-002
+            # ROW('BS-002') → report://BS/BS-002#期末：ROW 取本期金额，期间名按报表类型登记
+            # （资产负债表叫「期末」、利润表叫「本期」）；原先一律写「本期」⇒ 资产负债表行恒判悬空
+            # （spec formula-governance-coverage-closure R6）
             code = groups[0]
             report_type = _row_code_to_report_type(code)
-            return build_uri('report', report_type, code, '本期')
+            current = _PERIOD_COLUMNS.get(report_type, ['期末'])[0]
+            return build_uri('report', report_type, code, current)
         elif fn_name == 'REPORT':
             code = groups[0]
             report_type = _row_code_to_report_type(code)
@@ -381,10 +384,16 @@ async def build_note_entries(db, project_id: str, year: int,
             return entries
 
         with open(tpl_file, 'r', encoding='utf-8-sig') as f:
-            sections = json.load(f)
+            raw = json.load(f)
+        # 模板文件是 {"sections": [...]}（旧版是列表）；原先直接遍历 dict 的键 ⇒ 附注域恒为空、
+        # 任何 NOTE 引用保存时都判悬空（spec formula-governance-coverage-closure R6）
+        sections = raw.get('sections', []) if isinstance(raw, dict) else raw
 
         for sec in sections:
-            section_id = sec.get('section_id', sec.get('note_section', ''))
+            if not isinstance(sec, dict):
+                continue
+            # 章节编号（如「八、1」）= disclosure_notes.note_section = NOTE() 第一参；section_id 是内部稳定键
+            section_id = sec.get('section_number') or sec.get('note_section') or sec.get('section_id', '')
             title = sec.get('section_title', sec.get('title', ''))
             tables = sec.get('tables', [])
             if not tables and sec.get('table_template'):
@@ -908,11 +917,15 @@ async def build_aux_entries(db, project_id: str, year: int) -> list[AddressEntry
         return entries
 
     seen: set[tuple[str, str]] = set()
+    # 辅助类型合计（AUX('科目','辅助类型','列')，求值口径见 formula_ref_preload）排在辅助项之后登记
+    type_rows: dict[tuple[str, str], str] = {}
     for row in rows:
         code = row.account_code or ''
         if not code:
             continue
         acc_name = row.account_name or code
+        if row.aux_type:
+            type_rows.setdefault((code, row.aux_type), acc_name)
         dimension = (row.aux_name or row.aux_code or '').strip()
         if not dimension:
             continue
@@ -934,6 +947,23 @@ async def build_aux_entries(db, project_id: str, year: int) -> list[AddressEntry
                 formula_ref=f"AUX('{code}','{dimension}','{col}')",
                 jump_route=build_jump_route(uri, project_id, year),
                 tags=['辅助余额', acc_name, aux_type_label] if aux_type_label else ['辅助余额', acc_name],
+            ))
+    for (code, aux_type), acc_name in type_rows.items():
+        if (code, aux_type) in seen:  # 辅助项恰好与类型同名：同一地址只登记一次（求值时按类型合计）
+            continue
+        for col in columns:
+            uri = build_uri('aux', code, aux_type, col)
+            entries.append(AddressEntry(
+                uri=uri,
+                domain='aux',
+                source=code,
+                path=aux_type,
+                cell=col,
+                label=f"辅助余额 > {code} {acc_name} > {aux_type}（合计） > {col}",
+                account_code=code,
+                formula_ref=f"AUX('{code}','{aux_type}','{col}')",
+                jump_route=build_jump_route(uri, project_id, year),
+                tags=['辅助余额', acc_name, aux_type],
             ))
     return entries
 
@@ -1247,16 +1277,28 @@ class AddressRegistryService:
                     needed_domains.add('aux')
 
         uri_set: set[str] = set()
+        #: 辅助余额按（科目, 维度, 列）登记的科目是明细码（如 1122.01）；AUX 求值按科目前缀合计，
+        #: 故 AUX('1122',…) 只要有以 1122 开头的同维度同列地址就算存在（R6）
+        aux_keys: set[tuple[str, str, str]] = set()
         for d in needed_domains:
             entries = await self._get_domain(db, project_id, year, template_type, d)
             uri_set.update(e.uri for e in entries)
+            if d == 'aux':
+                aux_keys.update((e.source or '', e.path or '', e.cell or '') for e in entries)
+
+        def _aux_prefix_registered(uri: str) -> bool:
+            parts = parse_uri(uri)
+            if not parts or parts['domain'] != 'aux' or not parts['source']:
+                return False
+            return any(src.startswith(parts['source']) and dim == parts['path'] and col == parts['cell']
+                       for src, dim, col in aux_keys)
 
         issues = []
         for fn_name, pattern in _FORMULA_PATTERNS.items():
             for m in pattern.finditer(formula):
                 ref_text = m.group(0)
                 uri = formula_ref_to_uri(ref_text)
-                if uri and uri not in uri_set:
+                if uri and uri not in uri_set and not (fn_name == 'AUX' and _aux_prefix_registered(uri)):
                     issues.append({
                         'ref': ref_text,
                         'uri': uri,

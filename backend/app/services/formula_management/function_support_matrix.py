@@ -6,9 +6,12 @@
 **非凭命名推测**，memory 铁律⑭）：
 
 - ``wp_evaluator`` = 当前可保存并由 ``evaluate_wp_formula_expression`` 求值的工作底稿公式路径。
-  该路径只真实实现 TB/SUM_TB/WP（另含字面量、四则运算与已解析 sheet 引用）；L1
-  ``_REGISTRY`` 注册不等于请求上下文已注入，故 ROW/SUM_ROW/REPORT/NOTE/PREV/AUX/ADJ
-  在本执行器均 fail-closed 判不支持。通用 ``/api/formula`` 按 ``central_batch`` 能力校验。
+  全部 10 个函数支持（spec formula-governance-coverage-closure R6）：TB/SUM_TB/WP 直接取数；
+  PREV/AUX/ROW/SUM_ROW/REPORT/NOTE 经 ``formula_ref_preload.substitute_value_refs`` 严格按值代入
+  （上年试算表 / 辅助核算当前数据集 / 本年度报表本期·上期金额 / 本年度附注单元格；取不到数写进
+  错误清单而非代入 0）；ADJ 经统一预载层 ``preload(adj_exclude_origins=frozenset())`` 交 L1（底稿口径，
+  不排除底稿来源分录）。矩阵外的序时账 / TB_AUX / PREV 三参由 ``unsupported_formula_function_issues``
+  拒绝。通用 ``/api/formula`` 按 ``central_batch`` 能力校验。
 
 - ``report_path`` = ``app.services.report_engine.evaluate_formula_result``。
   现状实证：TB/SUM_TB/ROW/SUM_ROW/REPORT 经 resolver 预载求值（report_engine.py
@@ -66,29 +69,22 @@ FUNCTIONS: tuple[str, ...] = (
 #: 「函数 × 执行器 → 是否支持」。True=支持（运行产生真实结果）；False=不支持
 #: （UI 必须显式禁用/标注，禁静默 0）。每一格的依据见模块 docstring 的逐执行器实证。
 _SUPPORT: dict[str, dict[Executor, bool]] = {
-    # wp_evaluator = 当前可保存工作底稿公式路径；只承诺真实具备上下文的 TB/SUM_TB/WP。
+    # wp_evaluator = 当前可保存工作底稿公式路径；10 个函数都有真实取数上下文（R6）。
     "TB":     {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: True,  Executor.CENTRAL_BATCH: True},
     "SUM_TB": {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
-    "ROW":    {Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
-    "SUM_ROW":{Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
-    "REPORT": {Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: True,  Executor.CENTRAL_BATCH: True},
-    "NOTE":   {Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: True,  Executor.CENTRAL_BATCH: True},
+    "ROW":    {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
+    "SUM_ROW":{Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
+    "REPORT": {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: True,  Executor.CENTRAL_BATCH: True},
+    "NOTE":   {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: True,  Executor.CENTRAL_BATCH: True},
     "WP":     {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: True,  Executor.NOTE_EXECUTOR: True,  Executor.CENTRAL_BATCH: True},
-    "PREV":   {Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: False, Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
-    "AUX":    {Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: False, Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
-    "ADJ":    {Executor.WP_EVALUATOR: False, Executor.REPORT_PATH: False, Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
+    "PREV":   {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: False, Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
+    "AUX":    {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: False, Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
+    "ADJ":    {Executor.WP_EVALUATOR: True,  Executor.REPORT_PATH: False, Executor.NOTE_EXECUTOR: False, Executor.CENTRAL_BATCH: True},
 }
 
 
 #: 每一格「不支持」的人类可读原因（UI 标注用；支持的格无原因）。缺原因即判矩阵不完整。
 _UNSUPPORTED_REASON: dict[tuple[str, Executor], str] = {
-    ("ROW", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未注入 ROW 行次上下文",
-    ("SUM_ROW", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未注入 SUM_ROW 行次上下文",
-    ("REPORT", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未注入报表上下文",
-    ("NOTE", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未注入附注上下文",
-    ("PREV", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未实现 PREV",
-    ("AUX", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未实现 AUX",
-    ("ADJ", Executor.WP_EVALUATOR): "工作底稿可编辑公式尚未注入实时调整上下文",
     ("SUM_TB", Executor.NOTE_EXECUTOR): "附注执行器不解析 SUM_TB（附注表内用 SUM 行区间）",
     ("ROW", Executor.NOTE_EXECUTOR): "附注执行器不解析 ROW（跨报表行引用用 REPORT）",
     ("SUM_ROW", Executor.NOTE_EXECUTOR): "附注执行器不解析 SUM_ROW",

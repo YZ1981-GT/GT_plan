@@ -10,8 +10,9 @@
 两侧同对一张 golden（``tests/fixtures/function_support_matrix.json``），前端渲染==后端真相。
 
 现状实证锚点（memory 铁律⑭：枚举/字段路径现读实证，非凭命名推测）：
-  - wp evaluator：当前可保存底稿公式路径只保证 TB/SUM_TB/WP；L1 `_REGISTRY` 注册
-    不等于请求上下文已注入，ROW/REPORT/NOTE/PREV/AUX/ADJ 等必须显式拒绝。
+  - wp evaluator：10 个函数都支持（spec formula-governance-coverage-closure R6）——PREV/AUX/ROW/SUM_ROW/
+    REPORT/NOTE 由 ``formula_ref_preload.substitute_value_refs`` 严格按值代入，ADJ 走统一预载层；
+    本文件断言求值器源码确有这两处接线（注册表不是执行证据，接线才是）。
   - report path：``report_engine.evaluate_formula_result`` 用 ``_PREV_PATTERN``/``_AUX_PATTERN``
     硬替换成 "0" ⇒ PREV/AUX report_path=False（本文件直接断言源码仍有该替换，锚点漂移即红）。
   - note executor：``note_formula_generator`` 支持 TB/REPORT/NOTE/WP + PRIOR/AGING，不解析 PREV/AUX/ADJ/SUM_TB/ROW。
@@ -93,12 +94,11 @@ def test_report_path_zeros_prev_and_aux():
     assert is_supported("AUX", Executor.REPORT_PATH) is False
 
 
-def test_wp_evaluator_supports_only_real_context_functions():
-    """工作底稿可编辑路径只承诺真实具备上下文的 TB/SUM_TB/WP。"""
-    for fn in ("TB", "SUM_TB", "WP"):
-        assert is_supported(fn, Executor.WP_EVALUATOR) is True
-    for fn in ("ROW", "SUM_ROW", "REPORT", "NOTE", "PREV", "AUX", "ADJ"):
-        assert is_supported(fn, Executor.WP_EVALUATOR) is False
+def test_wp_evaluator_supports_all_functions():
+    """工作底稿可编辑路径 10 个函数都有真实取数上下文（R6）。"""
+    for fn in FUNCTIONS:
+        assert is_supported(fn, Executor.WP_EVALUATOR) is True, fn
+        assert unsupported_reason(fn, Executor.WP_EVALUATOR) is None
 
 
 def test_central_batch_supports_adj_injection():
@@ -134,14 +134,27 @@ def test_report_path_source_still_zeros_prev_aux():
     assert "报表域默认置 0" in src, "report_engine PREV/AUX 置 0 逻辑可能已变 —— 矩阵须复核"
 
 
-def test_l1_registration_does_not_overclaim_wp_context_support():
-    """注册函数不等于工作底稿请求已注入上下文，防止再次把注册表当执行证据。"""
-    from app.services.formula_engine import _REGISTRY
+def test_wp_evaluator_support_is_backed_by_wiring():
+    """wp_evaluator 判支持须有求值接线背书（注册表不是执行证据）：严格按值代入 + ADJ 底稿口径预载。
 
-    known = set(_REGISTRY.known_function_names())
-    assert "AUX" in known and "ADJ" in known
-    assert is_supported("AUX", Executor.WP_EVALUATOR) is False
-    assert is_supported("ADJ", Executor.WP_EVALUATOR) is False
+    任一接线被删（例如回到「空上下文跑 L1」），矩阵即与现状矛盾 ⇒ 本断言打红，提示矩阵须复核。
+    """
+    import ast
+
+    import app.services.wp_formula_eval_service as eval_mod
+
+    tree = ast.parse(Path(eval_mod.__file__).read_text(encoding="utf-8"))
+    calls = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+            calls.setdefault(name, []).append(node)
+    assert "substitute_value_refs" in calls, "底稿求值器不再严格代入 PREV/AUX/ROW/REPORT/NOTE"
+    assert any(kw.arg == "strict" and isinstance(kw.value, ast.Constant) and kw.value.value is True
+               for call in calls["substitute_value_refs"] for kw in call.keywords), "代入必须 strict=True"
+    assert "preload" in calls, "底稿求值器不再经统一预载层取 ADJ"
+    assert any(kw.arg == "adj_exclude_origins" and ast.unparse(kw.value) == "frozenset()"
+               for call in calls["preload"] for kw in call.keywords), "ADJ 须为底稿口径（不排除来源）"
 
 
 # ─────────────────────────── 变异反证 ───────────────────────────
@@ -192,6 +205,7 @@ def test_expression_preflight_reports_all_unsupported_functions_in_order():
     assert all(item["reason"] for item in issues)
 
 
-def test_wp_expression_preflight_rejects_registered_but_contextless_function():
-    issues = support_issues("REPORT('BS-001') + TB('1001','期末余额')", Executor.WP_EVALUATOR)
-    assert [item["function"] for item in issues] == ["REPORT"]
+def test_expression_preflight_rejects_function_without_executor_context():
+    expr = "ROW('BS-001') + TB('1001','期末余额')"
+    assert [item["function"] for item in support_issues(expr, Executor.NOTE_EXECUTOR)] == ["ROW"]
+    assert support_issues(expr, Executor.WP_EVALUATOR) == []

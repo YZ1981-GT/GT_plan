@@ -15,10 +15,12 @@
     </div>
 
     <!-- 公式编辑栏 -->
+    <!-- 附注表格结构编辑：单元格公式由附注执行器求值（按 note_executor 列门控取数按钮） -->
     <FormulaBar
       :visible="true"
       :cell-info="currentCellInfo"
       :project-id="props.projectId"
+      executor="note_executor"
       @update-formula="onUpdateFormula"
       @update-value="onUpdateValue"
       @open-selector="showSelector = true"
