@@ -16,8 +16,8 @@
 
 ## 2. 表间审核严格取数（R7a）
 
-- [ ] 2.1 新模块 `formula_ref_preload.py`：PREV / AUX 预载与严格缺数报错；AUX 走 `get_active_filter`；表间审核 `_evaluate` 先按值代入再求值（不经 report_engine 预载分支）。`report_engine` 改调并删除重复分支 —— 该文件正被另一会话修改，留待其提交后收口（design §3 调整）（R7.1）
-- [ ] 2.2 更新 `test_user_rules_run…` 断言；新增「AUX 缺数 + 另一侧 0」「PREV 无上年数据」两例；变异去掉严格报错必红（R7.1）
+- [x] 2.1 新模块 `formula_ref_preload.py`：PREV / AUX 预载与严格缺数报错；AUX 走 `get_active_filter(strict=True)`，读库包保存点；表间审核 `_evaluate` 先按值代入再求值（`enable_prev/aux=False`，不经 report_engine 预载分支）；报表「审核」的配置公式经同一入口自动受益。`report_engine` 改调并删除重复分支 —— 该文件正被另一会话修改，留待其提交后收口（design §3 调整）（R7.1）
+- [x] 2.2 更新 `test_user_rules_run…` 断言（AUX 已进支持矩阵，改断言具体原因）；`test_formula_ref_preload.py` 10 例（AUX 缺数 + 另一侧 0、PREV 无上年、前缀聚合与上年缺科目为 0、4 参按名称 / 编码且只取当前数据集、3 参类型合计、三类报因、写法识别不了、`TB_AUX` 不被误认、非严格置 0、上下文缺失）+ `test_report_audit_checks.py`（勾稽 / 合理性真实求值、本项目适配生效）；一次性变异（去掉严格报因 / 回到旧口径）3/3 打红且红在「判成通过」（R7.1）
 
 ## 3. 推送规则纳入治理内核（R2）
 

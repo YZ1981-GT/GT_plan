@@ -135,17 +135,35 @@ async def _evaluate(expression: str, resolver: Any, row_cache: dict[str, Decimal
         require_expression_support(text, Executor.CENTRAL_BATCH)
     except FormulaSupportViolation:
         return None, "含报表路径不支持的函数"
+    # 严格取数（spec formula-governance-coverage-closure R7a）：PREV / AUX 先按值代入、取不到即报原因。
+    # report_engine 的 PREV / AUX 预载只会置 0，不经它（enable_prev / enable_aux 关）。
     try:
-        # R4：表间审核启用 PREV/AUX 预载
+        text, missing = await _substitute_strict(text, resolver)
+    except Exception as exc:  # noqa: BLE001 —— 取数失败如实记为不通过
+        return None, f"上年 / 辅助核算取数失败：{exc}"[:200]
+    if missing:
+        return None, "；".join(missing)[:200]
+    try:
         result = await evaluate_formula_result(
             text, resolver=resolver, row_cache=row_cache,
-            strict_context=True, enable_prev=True, enable_aux=True,
+            strict_context=True, enable_prev=False, enable_aux=False,
         )
     except Exception as exc:  # noqa: BLE001 —— 取不到数如实记为不通过
         return None, str(exc)[:200]
     if not result.ok:
         return None, "；".join(result.errors)[:200] or "公式被拦截"
     return result.value, ""
+
+
+async def _substitute_strict(text: str, resolver: Any) -> tuple[str, list[str]]:
+    from app.services.formula_ref_preload import has_prev_or_aux, substitute_prev_aux
+
+    if not has_prev_or_aux(text):
+        return text, []
+    if not all(hasattr(resolver, a) for a in ("db", "project_id", "year")):
+        return text, ["PREV / AUX 在当前取数上下文里不可用"]
+    sub = await substitute_prev_aux(text, db=resolver.db, project_id=resolver.project_id, year=resolver.year)
+    return sub.expression, sub.missing
 
 
 #: 严格求值的公开入口（报表「审核」的配置公式与表间审核同一口径，spec formula-governance-coverage-closure R1.6）

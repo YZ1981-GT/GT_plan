@@ -136,9 +136,11 @@ def test_compare_semantics_match_frontend(left, right, op, passed):
 
 
 async def test_user_rules_run_with_builtin_checks_and_unresolvable_is_failure(monkeypatch):
+    from app.models.audit_platform_models import TbAuxBalance, TrialBalance
+    from app.models.dataset_models import LedgerDataset
     from app.services.formula_management.logic_check import execute_report_cross_checks
 
-    async with make_db() as factory, factory() as db:
+    async with make_db(extra_models=(TrialBalance, TbAuxBalance, LedgerDataset)) as factory, factory() as db:
         pid = await add_project(db, "执行")
         for code, amt in (("BS-001", "100"), ("BS-002", "100"), ("BS-003", "7")):
             db.add(FinancialReport(project_id=pid, year=2025, report_type=BS, row_code=code, row_name=code,
@@ -156,7 +158,9 @@ async def test_user_rules_run_with_builtin_checks_and_unresolvable_is_failure(mo
         builtin = [o for o in result.outcomes if o.formula_id.startswith("report-cross-check-")]
         assert len(builtin) == 7
         msgs = {i.description for i in result.issues if i.formula_id.startswith("user:")}
-        assert any("无法取数" in m and "不支持" in m for m in msgs)
+        # AUX 已进表间审核支持矩阵（原断言「不支持」随之过时）；核心语义不变：取不到数写明原因、判不通过，
+        # 不代入 0 —— 修复前这里得到的是「左侧 0 = 右侧 100.00 不成立」（spec formula-governance-coverage-closure R7a）
+        assert any("无法取数" in m and "1122" in m and "无辅助核算余额" in m for m in msgs), msgs
         assert any(m.startswith("不等：") for m in msgs)
 
 
