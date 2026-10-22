@@ -3,8 +3,9 @@
   - 全局公式：按公式域 + 作用范围查看全局定义（无全局时显示系统预设）；管理员编辑后统一「预览并发布」：
     先看影响（各分类计数、受影响项目、冲突三方对比），逐项目应用 / 暂缓、逐条冲突决策后发布；
   - 发布记录：变更、发布人、时间、各分类计数；全局候选由管理员预览后通过或驳回；
-  - 公式模板：可见模板列表与详情（发布新版本、并入全局、设为全局、删除）。
-  非管理员只读（项目侧调整走公式管理中心的本项目适配）。路由参数 `?tab=&domain=&scope=` 可直达。
+  - 公式模板：可见模板列表与详情（发布新版本、并入全局、设为全局、删除）；
+  - 校对规则目录：平台各处校对 / 勾稽 / 质控规则的只读目录（spec formula-governance-coverage-closure R3）。
+  非管理员只读（项目侧调整走公式管理中心的本项目适配）。路由参数 `?tab=&domain=&scope=&source=` 可直达。
 -->
 <template>
   <div class="gt-fgs gt-fade-in">
@@ -63,6 +64,9 @@
       <el-tab-pane label="公式模板" name="templates" lazy>
         <FormulaTemplateManager :domains="domains" :is-admin="isAdmin" />
       </el-tab-pane>
+      <el-tab-pane label="校对规则目录" name="checks" lazy>
+        <FormulaCheckCatalog :initial-source="String(route.query.source || '')" />
+      </el-tab-pane>
     </el-tabs>
 
     <FormulaDefinitionEditDialog v-model="editVisible" :title="`编辑全局公式：${editing?.label || ''}`"
@@ -83,6 +87,7 @@ import FormulaDefinitionEditDialog from '@/components/formula/settings/FormulaDe
 import FormulaPublishPreviewDialog from '@/components/formula/settings/FormulaPublishPreviewDialog.vue'
 import FormulaPublishRecords from '@/components/formula/settings/FormulaPublishRecords.vue'
 import FormulaTemplateManager from '@/components/formula/settings/FormulaTemplateManager.vue'
+import FormulaCheckCatalog from '@/components/formula/settings/FormulaCheckCatalog.vue'
 import {
   definitionText, formulaSettingsApi, isPresetSlot, newRequestId, scopeLabel, showFormulaError,
   type ConflictChoice, type Decisions, type Definition, type FormulaDomainInfo, type GlobalSlot, type SlotChange,

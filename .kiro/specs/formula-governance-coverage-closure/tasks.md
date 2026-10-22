@@ -31,9 +31,9 @@
 
 ## 4. 校对规则统一目录（R3）
 
-- [ ] 4.1 `formula_check_catalog.py` 登记表 + 加载器；`GET /api/formula-catalog/check-rules`（R3.1 / R3.2）
-- [ ] 4.2 登记守卫（规则文件全登记或带理由排除、无失效条目、各来源可加载）（R3.4）
-- [ ] 4.3 前端 `FormulaCheckCatalog.vue` + 全局设置页「校对规则目录」页签 + 表间审核面板入口 + 新增规则「从预置选用」；单测（R3.3）
+- [x] 4.1 `formula_check_catalog.py` 登记表 12 个来源 + 加载器；`GET /api/formula-catalog/check-rules`（登录即可；清单 / `source` / `q` 三形态，见 design §5.1）（R3.1 / R3.2）
+- [x] 4.2 登记守卫 + 测试 `tests/formula_settings/test_formula_check_catalog.py` 7 例：真实数据目录全登记或带理由排除；临时目录双向用例（未登记 / 登记文件不存在 / 排除项失效 / 缺理由）；10 个静态来源计数与规则文件现算一致；只读全局层（排除项目层、停用、已删、自动运算、空公式）；单来源失败隔离；端点未登录拒绝 + 三形态。一次性变异 6/6 打红（漏登记 / 混进项目行 / 停用照列 / 只算勾稽 / 失败拖垮 / 不查失效排除项）（R3.4）
+- [x] 4.3 前端 `FormulaCheckCatalog.vue`（来源清单可键盘选、执行位置 / 去哪编辑 / 规则文件、跨来源搜索）+ 全局设置页「校对规则目录」页签（`?tab=checks&source=`）+ 表间审核面板「全平台校对规则目录」入口 + 编辑弹窗「从预置选用」；单测 5 例；单区域 vue-tsc 0 错；ESLint 仅既有的 el-form 规则提示（HEAD 同样有）（R3.3）
 
 ## 5. 零挂载组件处置（R4）
 
@@ -59,5 +59,5 @@
 ## 8. 回归与交付（R7）
 
 - [ ] 8.1 全量回归：`formula_settings` / `formula_push` / 鉴权基线 / 矩阵对拍 / 前端 formula 目录；预存失败在干净检出上复现并登记（R7.2）
-- [ ] 8.2 干净 worktree 验证要提交的树；提交、推送特性分支、建 PR（合并交用户拍板）（R7.3）
+- [ ] 8.2 干净 worktree 验证要提交的树；提交并推送（R7.3）—— 2026-10-22 用户裁定：不新建分支、不建 PR，推送到 `spec/disclosure-note-doc-upload-and-batch-fill`；`spec/formula-management-deep-optimization` 已快进并入该分支后删除（本地 + 远端，无关联 PR）。pre-push 的分支命名守卫不认 `_archive/NN-<name>` 归档形态 ⇒ 已修（c555dd831）
 - [ ] 8.3 INDEX.md 登记 + memory 更新（R7.3）

@@ -205,6 +205,34 @@ export interface FormulaTemplateInfo {
   /** 列表接口附带：在用订阅数（模板列表按它排序） */
   subscriber_count?: number
 }
+/** 全平台校对规则目录的一条规则（后端 formula_check_catalog，spec formula-governance-coverage-closure R3） */
+export interface CheckRule {
+  id: string
+  label: string
+  expression: string
+  severity: string
+  severity_label: string
+  scope: string
+  /** 表间审核预置：原始字段（「从预置选用」填表用） */
+  fields?: Record<string, any>
+}
+export interface CheckRuleSource {
+  key: string
+  label: string
+  /** 报表 / 附注 / 底稿 / 质控 / 关系 */
+  category: string
+  /** 在哪里执行（现查代码得出；无调用方会如实写明） */
+  runs_in: string
+  editable: boolean
+  edit_where: string
+  files: string[]
+  from_db: boolean
+  rule_count: number
+  error: string | null
+  /** 带 source 或 q 查询时才有 */
+  matched?: number
+  rules?: CheckRule[]
+}
 export interface TemplateSlot {
   slot_key: string
   label: string

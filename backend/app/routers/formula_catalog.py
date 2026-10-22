@@ -3,6 +3,7 @@
 端点：
 - ``GET /api/formula-catalog``          — 本项目有效公式目录（跨 6 域）
 - ``GET /api/formula-catalog/stats``    — 按域 / 层级 / 函数的计数摘要
+- ``GET /api/formula-catalog/check-rules`` — 全平台校对规则目录（只读，spec formula-governance-coverage-closure R3）
 - ``GET /api/formula-functions``        — 已注册函数清单（供前端语法解析器消费）
 """
 from __future__ import annotations
@@ -62,6 +63,27 @@ async def formula_catalog_stats(
     from app.services.formula_catalog import catalog_stats
 
     return await catalog_stats(db, project_id)
+
+
+# ── 全平台校对规则目录（登录即可：规则文件与全局设置层，不含项目数据） ──────────────
+
+@router.get("/api/formula-catalog/check-rules")
+async def check_rules_catalog(
+    source: str | None = Query(None, max_length=40, description="只看一个来源（返回其规则）"),
+    q: str = Query("", max_length=100, description="跨来源检索：编号 / 名称 / 公式 / 适用范围"),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """各处校对 / 勾稽 / 质控规则的只读目录（spec formula-governance-coverage-closure R3）。
+
+    不带参数只返回来源清单与计数；``source`` 返回该来源的规则；``q`` 在全部来源里检索。
+    """
+    from app.services.formula_check_catalog import build_check_catalog
+
+    try:
+        return await build_check_catalog(db, source=source or None, keyword=q)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"校对规则来源不存在：{source}") from None
 
 
 # ── 函数清单（登录即可） ──────────────────────────────────────────────────────

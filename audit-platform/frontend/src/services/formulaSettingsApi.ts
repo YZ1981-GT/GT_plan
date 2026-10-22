@@ -11,9 +11,9 @@ import {
   formulaTemplates as PT, projectFormulaTemplates as PPT,
 } from '@/services/apiPaths'
 import type {
-  ApplyTarget, ApplyTargetKind, Decisions, Definition, EffectiveResult, FormulaDomainInfo, FormulaTemplateInfo,
-  GlobalSlot, PendingItem, PublishRecord, Resolution, SlotChange, SyncPreview, TemplateDetail, TemplateSubscriber,
-  TemplateSubscription, TemplateVersion,
+  ApplyTarget, ApplyTargetKind, CheckRuleSource, Decisions, Definition, EffectiveResult, FormulaDomainInfo,
+  FormulaTemplateInfo, GlobalSlot, PendingItem, PublishRecord, Resolution, SlotChange, SyncPreview, TemplateDetail,
+  TemplateSubscriber, TemplateSubscription, TemplateVersion,
 } from '@/composables/formula/useFormulaSettings'
 
 // ── 请求 ──────────────────────────────────────────────────────────────────────
@@ -37,6 +37,8 @@ export const formulaSettingsApi = {
   candidatePreview: (id: string) => api.post<SyncPreview>(P.candidatePreview(id), {}, silent()),
   reviewCandidate: (id: string, body: { approve: boolean; decisions?: Decisions; note?: string }) =>
     api.post<Record<string, any>>(P.candidateReview(id), body, silent()),
+  checkRules: (params: { source?: string; q?: string } = {}) =>
+    api.get<{ sources: CheckRuleSource[]; total: number }>(P.checkRules, silent({ params })),
 
   pending: (pid: string) =>
     api.get<{ project_id: string; count: number; items: PendingItem[] }>(PP.pending(pid), silent({ _dedupe: false })),

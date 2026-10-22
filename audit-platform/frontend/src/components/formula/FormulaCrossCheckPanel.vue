@@ -7,6 +7,8 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
       <span style="font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary);">{{ selectedPath }}</span>
       <div style="display: flex; gap: 6px;">
+        <!-- spec formula-governance-coverage-closure R3：平台各处校对规则的只读目录 -->
+        <el-button size="small" data-testid="cc-open-catalog" @click="catalogVisible = true">全平台校对规则目录</el-button>
         <el-button size="small" @click="onRun" :loading="running">▶ 执行校验</el-button>
         <el-button size="small" type="primary" @click="onAdd">+ 新增规则</el-button>
       </div>
@@ -106,19 +108,36 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="$emit('update:showDialog', false)">取消</el-button>
-        <el-button type="primary" @click="onSave" :disabled="!form.label || !form.left_ref || !form.right_ref">确认保存</el-button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <!-- spec formula-governance-coverage-closure R3：表间审核预置（cross_check_preset_rules.json）选用后可改 -->
+          <el-select v-model="presetPick" size="small" filterable clearable placeholder="从预置选用（填入后可改）"
+            style="width: 260px;" :loading="presetLoading" data-testid="cc-preset"
+            @visible-change="onPresetOpen" @change="applyPreset">
+            <el-option v-for="p in presets" :key="p.id" :label="p.label" :value="p.id" />
+          </el-select>
+          <span style="flex: 1;" />
+          <el-button @click="$emit('update:showDialog', false)">取消</el-button>
+          <el-button type="primary" @click="onSave" :disabled="!form.label || !form.left_ref || !form.right_ref">确认保存</el-button>
+        </div>
       </template>
+    </el-dialog>
+
+    <el-dialog v-model="catalogVisible" title="全平台校对规则目录" width="1100px" append-to-body destroy-on-close>
+      <FormulaCheckCatalog v-if="catalogVisible" />
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+import { formulaSettingsApi } from '@/services/formulaSettingsApi'
+import { showFormulaError, type CheckRule } from '@/composables/formula/useFormulaSettings'
 import CrossCheckHistoryPanel from './panels/CrossCheckHistoryPanel.vue'
+import FormulaCheckCatalog from './settings/FormulaCheckCatalog.vue'
 
 defineOptions({ name: 'FormulaCrossCheckPanel' })
 
-defineProps<{
+const props = defineProps<{
   selectedPath: string
   rules: any[]
   execEmpty: boolean
@@ -148,4 +167,35 @@ function onAdd() { emit('add') }
 function onEdit(row: any, index: number) { emit('edit', row, index) }
 function onRemove(index: number) { emit('remove', index) }
 function onSave() { emit('save') }
+
+// ── 全平台校对规则目录 / 从预置选用（spec formula-governance-coverage-closure R3） ──
+const catalogVisible = ref(false)
+const presets = ref<CheckRule[]>([])
+const presetLoading = ref(false)
+const presetPick = ref('')
+const OPERATORS = ['=', '<=', '>=']
+
+async function onPresetOpen(open: boolean): Promise<void> {
+  if (!open || presets.value.length || presetLoading.value) return
+  presetLoading.value = true
+  try {
+    presets.value = (await formulaSettingsApi.checkRules({ source: 'cross_check_preset' }))?.sources?.[0]?.rules || []
+  } catch (e) {
+    showFormulaError(e, '加载表间审核预置失败')
+  } finally {
+    presetLoading.value = false
+  }
+}
+
+/** 预置填进编辑表单（与快捷按钮同样直接改表单对象），保存前仍可改 */
+function applyPreset(id: string): void {
+  const f = presets.value.find((p) => p.id === id)?.fields
+  if (!f) return
+  Object.assign(props.form, {
+    label: String(f.label || ''), left_ref: String(f.left_ref || ''),
+    operator: OPERATORS.includes(f.operator) ? f.operator : '=',
+    right_ref: String(f.right_ref || ''), description: String(f.description || ''),
+  })
+  presetPick.value = ''
+}
 </script>

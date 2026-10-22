@@ -21,6 +21,8 @@ export const formulaSettings = {
   candidatePreview: (publishId: string) => `/api/formula-settings/candidates/${publishId}/preview`,
   /** POST 审核全局候选（admin，通过即发布） */
   candidateReview: (publishId: string) => `/api/formula-settings/candidates/${publishId}/review`,
+  /** GET `?source=&q=` 全平台校对规则目录（只读；不带参数只给来源清单） */
+  checkRules: '/api/formula-catalog/check-rules',
 } as const
 
 /** 本项目适配 / 待确认 / 应用到其他（`/api/projects/{pid}/formula-settings`） */
