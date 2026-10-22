@@ -6,6 +6,9 @@
         <!-- 工具栏 -->
         <div class="gt-note-toolbar">
           <h4 class="gt-note-section-title">{{ selectedNoteSection.title }}</h4>
+          <el-tag v-if="noteAggregateSource" size="small" type="info" style="margin-left:8px;flex-shrink:0">
+            {{ noteAggregateSource }}
+          </el-tag>
           <div class="gt-note-actions">
             <el-tooltip content="复制整表（可粘贴到 Word/Excel）" placement="bottom">
               <el-button size="small" @click="copyEntireNoteTable">📋 整表</el-button>
@@ -847,6 +850,19 @@ const selectedNoteSection = ref<any>(null)
 
 // text_after_table 折叠控制
 const textAfterExpanded = ref(false)
+
+// consol-note-pull-from-standalone: 来源标签（数据来自单体附注汇总时显示）
+const noteAggregateSource = computed(() => {
+  const data = selectedNoteSection.value?.savedData
+  if (!data || typeof data !== 'object') return ''
+  const source = data._aggregate_source
+  if (source === 'standalone') {
+    const leafCount = data._aggregate_leaf_count || 0
+    const cellCount = data._aggregate_cell_count || 0
+    return `📊 单体汇总（${leafCount} 个子企业 · ${cellCount} 格）`
+  }
+  return ''
+})
 const isTextAfterLong = computed(() => {
   const text = selectedNoteSection.value?.textAfterTable || ''
   return text.split('\n').length > 2 || text.length > 80

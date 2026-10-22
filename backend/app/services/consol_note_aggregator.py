@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Sequence
 from uuid import UUID
@@ -744,7 +745,12 @@ async def reaggregate_from_standalone(
                 new_rows, summary = fill_rows(saved_headers, saved_rows, fill_cells, manual_set, template_rows)
                 data.update({"headers": saved_headers, "rows": new_rows})
 
-                from datetime import datetime, timezone
+                data["_aggregate_source"] = "standalone"
+                data["_aggregate_at"] = datetime.now(timezone.utc).isoformat()
+                data["_aggregate_leaf_count"] = len([ls for ls in agg.leaf_summary if ls.status == "found"])
+                data["_aggregate_cell_count"] = agg.cell_count
+
+                now = datetime.now(timezone.utc)
                 now = datetime.now(timezone.utc)
 
                 if record is None:
