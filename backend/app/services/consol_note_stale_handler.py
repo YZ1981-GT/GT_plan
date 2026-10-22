@@ -171,9 +171,109 @@ def register_stale_handler(event_bus: Any) -> None:
         from app.models.audit_platform_schemas import EventType
 
         event_bus.subscribe(EventType.NOTE_UPDATED, handle_child_note_updated)
-        logger.info("Registered consol_note_stale_handler for NOTE_UPDATED events")
+        # consol-note-pull-from-standalone: NOTE_SECTION_SAVED 也标合并附注 stale
+        event_bus.subscribe(EventType.NOTE_SECTION_SAVED, _on_note_section_saved_mark_consol_stale)
+        logger.info("Registered consol_note_stale_handler for NOTE_UPDATED + NOTE_SECTION_SAVED events")
     except Exception as err:
         logger.warning("Failed to register stale handler: %s", err)
+
+
+async def _on_note_section_saved_mark_consol_stale(event: Any) -> None:
+    """NOTE_SECTION_SAVED → 标合并附注 consol_note_data.is_stale。
+
+    子企业单体附注被修改时，通过章节映射找到对应的合并附注章节，标 stale。
+    spec: consol-note-pull-from-standalone · Phase 2 stale 联动
+    """
+    project_id = getattr(event, "project_id", None)
+    year = getattr(event, "year", None)
+    extra = getattr(event, "extra", None) or {}
+    note_section = extra.get("note_section") or extra.get("section_id")
+
+    if not project_id or not year:
+        return
+
+    try:
+        from app.core.database import async_session as async_session_factory
+        from app.services.consol_note_section_mapping import resolve_consol_sections
+
+        async with async_session_factory() as db:
+            # 1. 找 parent 合并项目
+            parents = await _find_consol_parents(project_id, db)
+            if not parents:
+                return
+
+            # 2. 根据章节映射找合并附注 section_ids
+            # 尝试按项目模板类型确定 template_type
+            from sqlalchemy import text as sa_text
+            template_row = (await db.execute(
+                sa_text("SELECT template_type FROM projects WHERE id = :pid"),
+                {"pid": str(project_id)},
+            )).first()
+            template_type = "soe"  # 默认
+            if template_row and template_row[0]:
+                tt = str(template_row[0]).lower()
+                template_type = "listed" if "listed" in tt else "soe"
+
+            consol_section_ids = []
+            if note_section:
+                consol_section_ids = resolve_consol_sections(template_type, note_section)
+
+            # 3. 标 consol_note_data.is_stale
+            for parent_id in parents:
+                count = await _mark_consol_note_data_stale(
+                    db, parent_id, year, consol_section_ids,
+                )
+                if count > 0:
+                    _emit_consol_note_stale(parent_id, year, note_section, count)
+
+            await db.commit()
+
+    except Exception as err:
+        logger.warning(
+            "_on_note_section_saved_mark_consol_stale failed for project %s: %s",
+            project_id, err,
+        )
+
+
+async def _mark_consol_note_data_stale(
+    db: Any,
+    parent_project_id: UUID,
+    year: int,
+    section_ids: list[str],
+) -> int:
+    """标合并附注 consol_note_data 表的 is_stale=True。
+
+    section_ids 非空时只标对应章节；空时标该项目该年度全部。
+    """
+    try:
+        from sqlalchemy import text
+
+        if section_ids:
+            # 逐个章节标 stale
+            total = 0
+            for sid in section_ids:
+                result = await db.execute(
+                    text(
+                        "UPDATE consol_note_data SET is_stale = true "
+                        "WHERE project_id = :pid AND year = :year "
+                        "AND section_id = :sid AND is_stale = false"
+                    ),
+                    {"pid": str(parent_project_id), "year": year, "sid": sid},
+                )
+                total += result.rowcount or 0
+            return total
+        else:
+            result = await db.execute(
+                text(
+                    "UPDATE consol_note_data SET is_stale = true "
+                    "WHERE project_id = :pid AND year = :year AND is_stale = false"
+                ),
+                {"pid": str(parent_project_id), "year": year},
+            )
+            return result.rowcount or 0
+    except Exception as err:
+        logger.warning("_mark_consol_note_data_stale failed: %s", err)
+        return 0
 
 
 # ---------------------------------------------------------------------------

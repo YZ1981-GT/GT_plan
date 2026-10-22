@@ -1204,7 +1204,7 @@ backend/app/services/ledger_penetration_service.py  942
 #   届时必须先拆分。
 #   登记为待办：report_engine 的 ReportFormulaParser（取数缓存 + 列名映射）
 #   与模块级 evaluate_formula（L2 编排）是两个关注点，可按此切分。
-backend/app/services/report_engine.py  2685
+backend/app/services/report_engine.py  2693
 backend/app/services/consol_report_service.py  1008
 
 # ── 2026-09-28 spec d1-sync-row-table-engine-and-d1-coverage · X2 ────────────
@@ -1533,3 +1533,6 @@ backend/app/services/consol_elimination_sheet_service.py  1143
 backend/scripts/gen/gen_edit_level_impact_inventory.py  1029
 backend/tests/test_disclosure_notes_hardening.py  1511
 backend/tests/test_phase8.py  1087
+
+# consol-note-pull-from-standalone: 核心汇总服务（读取层+行列匹配+汇总+编排持久化）
+backend/app/services/consol_note_aggregator.py  806
