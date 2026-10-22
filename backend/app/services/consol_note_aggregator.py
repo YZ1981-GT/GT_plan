@@ -327,7 +327,12 @@ def read_sub_table_format(
         return None
 
     has_values = isinstance(first.get("values"), list)
-    has_biz_keys = any(k in first for k in ("end_amount", "prior_amount", "ending", "opening"))
+    has_biz_keys = any(k in first for k in (
+        "end_amount", "prior_amount", "ending", "opening",
+        "end_balance", "prior_balance", "end_gross", "prior_gross",
+        "end_net", "prior_net", "end_book_value", "prior_book_value",
+        "end_book", "prior_book",
+    ))
 
     if has_biz_keys and not has_values:
         # F2 格式：{label, end_amount, prior_amount, ...}
@@ -353,15 +358,32 @@ def _read_f2(
     consol_norms: list[str],
     consol_headers: list[str],
 ) -> StandardizedTable:
-    """F2 格式：行有业务键（end_amount/prior_amount/ending/opening 等）。"""
-    # 建业务键 → 合并列名的映射
-    key_to_col: dict[str, str] = {}
+    """F2 格式：行有业务键（end_amount/prior_amount/ending/opening/end_balance 等）。"""
+    # 1. 确定合并模板中哪些列属于"期末"组、哪些属于"期初"组
+    end_cols: list[int] = []
+    prior_cols: list[int] = []
     for ci in range(1, len(consol_norms)):
-        col_norm = consol_norms[ci]
-        for biz_key, synonyms in _FIELD_TO_GROUP.items():
-            if col_norm in synonyms:
-                key_to_col[biz_key] = col_norm
-                break
+        if consol_norms[ci] in _END_SYNONYMS:
+            end_cols.append(ci)
+        elif consol_norms[ci] in _PRIOR_SYNONYMS:
+            prior_cols.append(ci)
+
+    # 2. 确定行数据中的业务键
+    # 期末族键（按优先级）
+    _END_KEYS = ("end_amount", "ending", "end_balance", "end_gross", "end_net", "end_book_value", "end_book")
+    _PRIOR_KEYS = ("prior_amount", "opening", "prior_balance", "prior_gross", "prior_net", "prior_book_value", "prior_book")
+
+    # 取第一行样本确定实际使用的键
+    sample = rows_data[0] if rows_data else {}
+    end_key = next((k for k in _END_KEYS if k in sample), None)
+    prior_key = next((k for k in _PRIOR_KEYS if k in sample), None)
+
+    # 3. 构建 biz_key → col_norm 映射
+    key_to_col: dict[str, str] = {}
+    if end_key and end_cols:
+        key_to_col[end_key] = consol_norms[end_cols[0]]
+    if prior_key and prior_cols:
+        key_to_col[prior_key] = consol_norms[prior_cols[0]]
 
     std_rows = []
     for row in rows_data:

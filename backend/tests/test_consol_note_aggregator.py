@@ -494,3 +494,133 @@ class TestRecalcTotalRows:
         ]
         _recalc_total_rows(rows)
         assert rows[2][1] == "300.80"
+
+
+# ─── 存货多表端到端（multi_header + values 数组） ────────────────────────────
+
+
+class TestMultiHeaderEndToEnd:
+    """多级表头章节的端到端汇总验证。"""
+
+    def test_inventory_multi_table(self):
+        """存货章节：两个子企业各有不同行，汇总后按列匹配正确。"""
+        from app.services.consol_note_aggregator import (
+            CellValue,
+            StandardizedRow,
+            StandardizedTable,
+            _find_matching_row,
+            _norm,
+            _resolve_consol_col_names,
+        )
+
+        # 合并模板：存货分类表（简单两列）
+        consol_headers = ["项  目", "期末余额", "期初余额"]
+        consol_rows = [
+            ["原材料", "", ""],
+            ["库存商品", "", ""],
+            ["合  计", "", ""],
+        ]
+        resolved = _resolve_consol_col_names(consol_headers, None, None)
+
+        # 子 A 单体附注（_tables 格式）
+        sub_a_td = {
+            "_tables": [{
+                "name": "存货分类",
+                "headers": ["项目", "期末余额", "期初余额"],
+                "rows": [
+                    {"label": "原材料", "values": [1000.50, 800], "is_total": False},
+                    {"label": "库存商品", "values": [2000, 1500], "is_total": False},
+                    {"label": "合计", "values": [3000.50, 2300], "is_total": True},
+                ],
+            }],
+        }
+
+        # 子 B 单体附注（_tables 格式，列名不同：期末数/期初数）
+        sub_b_td = {
+            "_tables": [{
+                "name": "存货分类",
+                "headers": ["项目", "期末数", "期初数"],
+                "rows": [
+                    {"label": "原材料", "values": [500, 400], "is_total": False},
+                    {"label": "在产品", "values": [300, 200], "is_total": False},  # 合并模板没有此行
+                    {"label": "合计", "values": [800, 600], "is_total": True},
+                ],
+            }],
+        }
+
+        from app.services.consol_note_aggregator import read_standalone_note_table
+
+        std_a = read_standalone_note_table(sub_a_td, "存货分类", resolved)
+        std_b = read_standalone_note_table(sub_b_td, "存货分类", resolved)
+
+        assert std_a is not None
+        assert std_b is not None
+
+        # 汇总
+        cells: dict[tuple[int, int], CellValue] = {}
+        consol_norms = [_norm(h) for h in resolved]
+
+        for std_table in [std_a, std_b]:
+            for ri, consol_row in enumerate(consol_rows):
+                label = consol_row[0].strip()
+                src_idx = _find_matching_row(std_table.rows, label)
+                if src_idx is None:
+                    continue
+                src_row = std_table.rows[src_idx]
+                for ci in range(1, len(resolved)):
+                    col_norm = consol_norms[ci]
+                    val = src_row.values.get(col_norm)
+                    if val is not None and val != 0.0:
+                        cell = cells.setdefault((ri, ci), CellValue(ri, ci))
+                        cell.individual += val
+
+        # 验证
+        assert cells[(0, 1)].individual == 1500.50  # 原材料期末 = 1000.50 + 500
+        assert cells[(0, 2)].individual == 1200.0    # 原材料期初 = 800 + 400
+        assert cells[(1, 1)].individual == 2000.0    # 库存商品期末 = 只有子A有
+        # "在产品"不在合并模板中 → 不参与
+        assert (2, 1) not in cells  # 合计行不参与（is_total）
+
+    def test_multi_header_six_column_receivable(self):
+        """应收票据六列（期末数/期初数各含账面余额/坏账准备/账面价值）。"""
+        from app.services.consol_note_aggregator import (
+            CellValue,
+            _find_matching_row,
+            _norm,
+            _resolve_consol_col_names,
+            read_standalone_note_table,
+        )
+
+        # 合并模板：应收票据分类表（有 multi_header）
+        consol_headers = ["票据种类", "期末数", "", "", "期初数", "", ""]
+        mh = [
+            ["票据种类", "期末数", "", "", "期初数", "", ""],
+            ["", "账面余额", "坏账准备", "账面价值", "账面余额", "坏账准备", "账面价值"],
+        ]
+        cg = [
+            {"group": "期末数", "start": 1, "span": 3},
+            {"group": "期初数", "start": 4, "span": 3},
+        ]
+        resolved = _resolve_consol_col_names(consol_headers, cg, mh)
+        # resolved 应该把空串列用 cg 组名填充
+        assert _norm(resolved[1]) == "期末数"
+        assert _norm(resolved[4]) == "期初数"
+
+        # 子企业单体附注：用 sub_table_data F2 格式
+        sub_td = {
+            "sub_table_data": {
+                "应收票据分类": [
+                    {"label": "银行承兑汇票", "end_balance": 100, "prior_balance": 80, "is_total": False},
+                    {"label": "商业承兑汇票", "end_balance": 50, "prior_balance": 40, "is_total": False},
+                    {"label": "合计", "end_balance": 150, "prior_balance": 120, "is_total": True},
+                ],
+            },
+        }
+
+        std = read_standalone_note_table(sub_td, "应收票据分类", resolved)
+        assert std is not None
+        # F2 格式的业务键（end_balance）会被映射到期末组的列
+        # 但 resolved[1]="期末数"，F2 读取按 _FIELD_TO_GROUP 映射 end_balance → _END_SYNONYMS → "期末数"
+        # 验证至少能读到数据
+        assert len(std.rows) == 3
+        assert std.rows[0].label == "银行承兑汇票"

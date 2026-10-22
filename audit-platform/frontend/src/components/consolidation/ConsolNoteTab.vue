@@ -275,6 +275,9 @@
       <div v-if="selectedNoteSection" class="gt-note-detail">
         <div class="gt-note-toolbar">
           <h4 class="gt-note-section-title">{{ selectedNoteSection.title }}</h4>
+          <el-tag v-if="noteAggregateSource" size="small" type="info" style="margin-left:8px;flex-shrink:0">
+            {{ noteAggregateSource }}
+          </el-tag>
           <div class="gt-note-actions">
             <el-button-group size="small">
               <el-button :type="noteEditMode ? '' : 'primary'" @click="exitNoteEdit(true)">📋 查看</el-button>
@@ -2191,13 +2194,39 @@ async function handleReaggregate(): Promise<NoteRefreshResult> {
     const processed = result?.sections_processed ?? 0
     const errors = Array.isArray(result?.errors) ? result.errors : []
     const failures = Array.isArray(result?.failures) ? result.failures : []
+
+    // consol-note-pull-from-standalone: 解析子企业状态和未匹配行
+    const resultsList = Array.isArray(result?.results) ? result.results : []
+    const allLeaves: any[] = []
+    const allUnmatched: any[] = []
+    for (const r of resultsList) {
+      if (Array.isArray(r.leaf_summary)) allLeaves.push(...r.leaf_summary)
+      if (Array.isArray(r.unmatched_rows)) allUnmatched.push(...r.unmatched_rows)
+    }
+    const leafFound = allLeaves.filter((ls: any) => ls.status === 'found')
+    const leafMissing = allLeaves.filter((ls: any) => ls.status !== 'found')
+
+    let msgParts: string[] = []
+    if (allLeaves.length > 0) {
+      msgParts.push(`已读取 ${leafFound.length}/${allLeaves.length} 个子企业`)
+    }
+    msgParts.push(`处理 ${processed} 个章节，更新 ${updated} 个`)
+    if (leafMissing.length > 0) {
+      const names = leafMissing.slice(0, 3).map((ls: any) => ls.company_name || ls.company_code).join('、')
+      msgParts.push(`未读取：${names}${leafMissing.length > 3 ? '等' : ''}`)
+    }
+    if (allUnmatched.length > 0) {
+      msgParts.push(`${allUnmatched.length} 行未匹配`)
+    }
+    const summaryMsg = msgParts.join('；')
+
     if (errors.length || failures.length) {
-      ElMessage.warning(`重新汇总完成：处理 ${processed} 个章节，更新 ${updated} 个，${errors.length || failures.length} 个有告警`)
+      ElMessage.warning(`重新汇总完成：${summaryMsg}，${errors.length || failures.length} 个有告警`)
     }
     // reaggregate 成功只说明服务端编排完成；当前章节仍必须通过独立 GET 证明已持久化。
     const reloadResult = await reloadCurrentSectionAfterRefresh(context)
     if (reloadResult.status === 'done') {
-      if (!errors.length && !failures.length) ElMessage.success(`重新汇总完成：更新 ${updated} 个章节`)
+      if (!errors.length && !failures.length) ElMessage.success(`重新汇总完成：${summaryMsg}`)
     } else if (reloadResult.status === 'failed') {
       ElMessage.error(`重新汇总完成，但章节重读失败：${reloadResult.reason || '未知原因'}`)
     } else if (reloadResult.status === 'skipped') {
