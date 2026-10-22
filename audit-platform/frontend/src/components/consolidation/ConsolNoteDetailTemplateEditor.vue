@@ -235,10 +235,11 @@ async function handleSuggest() {
       ElMessage.info('当前来源没有可建议的行')
       return
     }
+    // 建议以合并附注模板该表的行（顺序 / 行类型）为骨架，别名是子企业来源里的不同写法
     editRows.value = result.suggested_rows.map((r: any) => ({
       target_row_id: '',
       canonical_name: r.canonical_name,
-      _aliases_text: '',
+      _aliases_text: (r.aliases || []).join(', '),
       row_type: r.row_type || 'data',
       sort_order: r.sort_order || 0,
     }))

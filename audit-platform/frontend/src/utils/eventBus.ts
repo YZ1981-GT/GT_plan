@@ -397,6 +397,8 @@ export type Events = {
   'consol-refresh-done': ConsolRefreshDonePayload
   'consol-tree-aggregate': ConsolTreeAggregatePayload
   'consol-note-audit-all': ConsolNoteAuditAllPayload
+  /** 他人确认了合并附注明细映射 / 提升了映射模板（ConsolidationIndex 收 SSE 后转发，ConsolNoteTab 显示横幅） */
+  'consol-note-mapping-changed': void
 
   // 模板 & 地址注册表
   'template-applied': TemplateAppliedPayload

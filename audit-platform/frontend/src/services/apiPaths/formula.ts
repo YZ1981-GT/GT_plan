@@ -207,7 +207,7 @@ export const formulaTimeline = {
   list: (projectId: string, year: number | string) => `/api/formula-timeline/${projectId}/${year}`,
 } as const
 
-/** 公式域聚合 */（便于 `import { formulaApi } from '@/services/apiPaths/formula'`） */
+/** 公式域聚合（便于 `import { formulaApi } from '@/services/apiPaths/formula'`） */
 export const formulaApi = {
   wpFormula,
   wpUserFormula,

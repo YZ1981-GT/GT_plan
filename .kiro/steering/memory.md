@@ -67,6 +67,12 @@ inclusion: always
 - ADR-CSP-001~006；唯一来源 `elimination_entries`；计算内核 `consol_report_values`（前缀口径 + 线性分解 + 五度量恒等式 P2）；合并报表按项目口径全六类生成（V172/V173）；试算平衡表只读五列 + 穿透；报表差额表读时计算；合并附注公式种子化 + 填入；推送服务四步上层联动 + SSE；公式管理合并节点 + 推送页。后端 141 passed 变异 166/166；前端 22 files 207 passed；浏览器实测通过
 - 顺带修复合并入口页 "canceled" bug（`useGroupTree.ts` + `ConsolidationIndex.vue` catch 块忽略 axios cancel 错误）
 
+### 合并附注从子企业单体附注拉数 `consol-note-pull-from-standalone`（v3 收口，2026-10-22）
+- 唯一链路 = V186 明细映射（明细模板 → 映射规则 → 逐企业绑定 → 用户确认 → apply），附注页「📋 明细映射」触发；「🔄 重新汇总」仍是公式重算（ADR-CNFO-006）。读取层 `consol_note_standalone_reader`（effective_table_data 与编辑器同口径、按子表名选表、多级表头列路径、续表期初、比率列不加总）；映射 JSON 按表标题生成（合并模板 `parent_section` 自 五-10 起错一章）
+- 🔴 v2 假绿勘误：「路径 A」写入器从未接线（端点一直调 `fill_note_sections`），「端到端」测试在测试里重写循环 ⇒ 记进 spec 的「实测」测的是公式内核。教训：标完成前 grep 调用方确认新函数真被端点调用；端到端测试必须调生产函数并配下层变异
+- 🔴 附注更新事件 `section_code` 曾恒为记录 id（模型无 `section_code` 属性），NOTE_SECTION_SAVED 全部订阅方对不上章节，已修；子企业附注模板可与合并口径不同（国企集团含上市子公司），按章节号取不到要按标题认
+- 待拍板：重新汇总是否改跑明细映射 / 个别数与差额如何合成 / 旧 V2 汇总服务退役（详见其 tasks.md Task 12）
+
 ### 全链打通阶段三（2026-10-01 体检，待用户拍板后立 spec）
 - 现状：四表→TB 未审数 / 审批→TB 调整列 / →报表审定数 / 大厅 = 绿；底稿明细·审定·披露 + 附注只有 E1 由 `formula_push` 后端推，其余 77 个 wp_code 靠「打开页面时种一次」+ 前端 `buildXSyncPayload` 防抖推附注（261 个附注章节标底稿来源却从未同步）
 - 🔴 待拍板 4 件：①TB 审定数两个写入方（发布门直写 `audited_amount` 会被 `recalc_audited` 覆盖；真库仅测试项目 9 行漂移）②附注权威源（ADR-DPA-001「留前端」与「经公式管理自动推」冲突，建议按章节交接 + 前后端对拍守卫）③「确认」= 大厅 approved（approved 无撤回出口）④TB 未审数保持映射聚合，只在公式管理只读可见

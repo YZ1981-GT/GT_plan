@@ -23,7 +23,7 @@
       </el-table-column>
       <el-table-column label="可见性" width="90" align="center">
         <template #default="{ row }">
-          <el-tag size="small" :type="row.visibility === 'firm' ? 'success' : row.visibility === 'project' ? '' : 'info'">
+          <el-tag size="small" :type="row.visibility === 'firm' ? 'success' : row.visibility === 'project' ? 'primary' : 'info'">
             {{ row.visibility === 'firm' ? '全局' : row.visibility === 'project' ? '项目' : '草稿' }}
           </el-tag>
         </template>

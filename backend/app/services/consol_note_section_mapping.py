@@ -47,6 +47,20 @@ def _entries(template_type: str) -> list[dict]:
 # ─── 正向查询：合并 section_id → 单体 note_section ─────────────────────────
 
 
+def resolve_mapping_entry(
+    template_type: str,
+    consol_section_id: str,
+) -> dict | None:
+    """合并附注 section_id 的完整映射条目（单体章节号 / 子表名 / 合并表标题）。
+
+    返回 None = 映射文件未覆盖；``standalone_note_section`` 为空 = 合并特有章节。
+    """
+    for entry in _entries(template_type):
+        if entry.get("consol_section_id") == consol_section_id:
+            return entry
+    return None
+
+
 def resolve_standalone_section(
     template_type: str,
     consol_section_id: str,

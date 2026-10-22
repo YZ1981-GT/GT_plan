@@ -56,12 +56,26 @@ class TestResolveStandaloneSection:
         assert ar[0]["standalone_note_section"] == "八、5"
 
     def test_soe_inventory(self):
-        """SOE 存货 五-10-1 或相近 → 八、10。"""
-        # 存货的 section_id 取决于生成脚本的排序
-        mapped = all_mapped_sections("soe")
-        inventory = [m for m in mapped if m.get("consol_parent") == "存货"]
-        assert len(inventory) > 0
-        assert inventory[0]["standalone_note_section"] == "八、10"
+        """SOE 存货 五-10-1「存货分类」→ 八、10 子表「存货分类」。"""
+        assert resolve_standalone_section("soe", "五-10-1") == "八、10"
+        assert resolve_standalone_table_name("soe", "五-10-1") == "存货分类"
+
+    def test_parent_section_shift_does_not_misroute(self):
+        """合并模板 parent_section 自 五-10 起错后一章（五-11 合同资产表的 parent 是「存货」）。
+
+        按表标题映射：合同资产 → 八、11，固定资产 → 八、22，不被 parent 带偏。
+        """
+        assert resolve_standalone_section("soe", "五-11-1") == "八、11"
+        assert resolve_standalone_table_name("soe", "五-11-1") == "合同资产情况"
+        assert resolve_standalone_section("soe", "五-22-2") == "八、22"
+
+    def test_duplicate_table_name_follows_chapter(self):
+        """「收回或转回的坏账准备」八、5 与 八、9 都有：其他应收款章节的那张映射到 八、9。"""
+        assert resolve_standalone_section("soe", "五-9-13") == "八、9"
+
+    def test_generic_continuation_follows_previous_table(self):
+        """五-9-8「续：」接上一张 → 单体紧随其后的续表。"""
+        assert resolve_standalone_table_name("soe", "五-9-8") == "按坏账准备计提方法分类披露其他应收款项（续：期初余额）"
 
     def test_listed_currency(self):
         """Listed 货币资金。"""

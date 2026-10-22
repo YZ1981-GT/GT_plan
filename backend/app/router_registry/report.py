@@ -80,12 +80,8 @@ def register_report_routers(app: FastAPI) -> None:
     app.include_router(note_data_lock_router, tags=["note-data-lock"])
 
     # ═══ §52. Sprint 10：附注章节模板可扩展性 ═══
-    try:
-        from app.routers.note_custom_section import router as note_custom_section_router
-        app.include_router(note_custom_section_router, tags=["note-custom-section"])
-    except (ImportError, ModuleNotFoundError) as _e:
-        import logging
-        logging.getLogger(__name__).warning("note_custom_section 路由注册跳过: %s", _e)
+    from app.routers.note_custom_section import router as note_custom_section_router
+    app.include_router(note_custom_section_router, tags=["note-custom-section"])
 
     # ═══ §52b. Sprint 3 Task 3.2：项目级自定义附注模板存储 + 版本回滚 ═══
     from app.routers.note_custom_template import router as note_custom_template_router

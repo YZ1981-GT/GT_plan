@@ -1533,6 +1533,3 @@ backend/app/services/consol_elimination_sheet_service.py  1143
 backend/scripts/gen/gen_edit_level_impact_inventory.py  1029
 backend/tests/test_disclosure_notes_hardening.py  1511
 backend/tests/test_phase8.py  1087
-
-# consol-note-pull-from-standalone: 核心汇总服务（读取层+行列匹配+汇总+编排持久化）
-backend/app/services/consol_note_aggregator.py  964

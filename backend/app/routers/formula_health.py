@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import require_project_access
+from app.deps import require_project_access
 
 router = APIRouter(prefix="/api/formula-health", tags=["formula-health"])
 

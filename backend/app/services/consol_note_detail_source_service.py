@@ -12,7 +12,6 @@ import json
 import logging
 import secrets
 from datetime import datetime, timezone
-from difflib import SequenceMatcher
 from typing import Any, Sequence
 from uuid import UUID
 
@@ -25,6 +24,11 @@ from app.models.consol_note_mapping_models import (
     ConsolNoteTemplateBinding,
 )
 from app.models.report_models import DisclosureNote
+from app.services.consol_note_detail_suggest import (  # 建议算法拆出；本模块重新导出以兼容原导入路径
+    _label_key,
+    suggest_template_rows,
+)
+from app.services.consol_note_standalone_reader import SourceTable
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +68,26 @@ def _row_type(row: Any) -> str:
         if label == "小计":
             return "subtotal"
     return "data"
+
+
+def _row_numbers(row: Any) -> list[float]:
+    """来源行里的数值（标准来源行 ``values`` 或 ``[label, v1, ...]``），跳过空 / 非数值。"""
+    if isinstance(row, dict):
+        raw = row.get("values")
+        cells = list(raw) if isinstance(raw, (list, tuple)) else []
+    elif isinstance(row, (list, tuple)):
+        cells = list(row[1:])
+    else:
+        cells = []
+    out: list[float] = []
+    for v in cells:
+        if v is None or isinstance(v, bool):
+            continue
+        try:
+            out.append(float(str(v).replace(",", "")))
+        except ValueError:
+            continue
+    return out
 
 
 def _stable_key(row: Any) -> str:
@@ -142,24 +166,98 @@ def group_entities_by_structure(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+async def resolve_section_template_type(db: AsyncSession, consol_project_id: UUID) -> str:
+    """合并项目附注模板口径（soe / listed）——章节映射与合并模板表都按它取。"""
+    from app.services.consol_note_formula_service import resolve_note_template_type
+
+    return await resolve_note_template_type(db, consol_project_id)
+
+
+async def load_source_tables(
+    db: AsyncSession,
+    project_ids: Sequence[UUID],
+    section_id: str,
+    year: int,
+    *,
+    template_type: str,
+) -> dict[UUID, SourceTable]:
+    """批量读取各企业单体附注里与合并章节 ``section_id`` 对应的表（一次查询）。
+
+    合并章节号先经章节映射换成单体章节号与子表名（如 五-1-1 → 八、1「货币资金」）——
+    单体附注里根本没有「五-1-1」这个章节号。读的是单体附注页面实际显示的表
+    （``consol_note_standalone_reader``），按合并模板列对齐。没读到的企业带中文原因。
+    """
+    from app.services.consol_note_formula_service import find_table
+    from app.services.consol_note_section_mapping import resolve_mapping_entry
+    from app.services.consol_note_standalone_reader import read_source_table
+
+    ids = list(dict.fromkeys(pid for pid in project_ids if pid is not None))
+    if not ids:
+        return {}
+    entry = resolve_mapping_entry(template_type, section_id)
+    standalone_section = (entry or {}).get("standalone_note_section")
+    if not standalone_section:
+        reason = "合并特有章节，没有对应的单体附注" if entry else f"章节映射未覆盖 {section_id}"
+        return {pid: SourceTable(reason=reason, status="no_source") for pid in ids}
+    standalone_title = str(entry.get("standalone_section_title") or "").strip()
+
+    # 子企业附注模板可能与合并口径不同（国企集团含上市子公司：上市版货币资金是「五、1」不是
+    # 「八、1」）——按章节号取不到时按章节标题取，同标题多节取文档里靠前的（报表项目注释）
+    conditions = [DisclosureNote.note_section == standalone_section]
+    if standalone_title:
+        conditions.append(DisclosureNote.section_title == standalone_title)
+    notes = (await db.execute(
+        sa.select(
+            DisclosureNote.project_id, DisclosureNote.note_section, DisclosureNote.table_data,
+            DisclosureNote.is_empty, DisclosureNote.section_title,
+        )
+        .where(
+            DisclosureNote.project_id.in_(ids),
+            DisclosureNote.year == year,
+            sa.or_(*conditions),
+            DisclosureNote.is_deleted == sa.false(),
+        )
+        .order_by(DisclosureNote.sort_order.desc().nullsfirst(), DisclosureNote.updated_at)
+    )).all()
+    by_project: dict[UUID, Any] = {}
+    for row in notes:  # 后写覆盖先写：同号以最近更新为准；按号命中优先于按标题命中
+        held = by_project.get(row.project_id)
+        if held is None or row.note_section == standalone_section or held.note_section != standalone_section:
+            by_project[row.project_id] = row
+
+    consol_table = find_table(template_type, section_id)
+    out: dict[UUID, SourceTable] = {}
+    for pid in ids:
+        note = by_project.get(pid)
+        if note is None:
+            out[pid] = SourceTable(reason=f"单体附注未生成章节 {standalone_section}", status="missing")
+        elif note.is_empty:
+            out[pid] = SourceTable(reason=f"单体附注 {standalone_section} 标为本期无此情形", status="not_applicable")
+        else:
+            out[pid] = read_source_table(
+                note.table_data,
+                consol_table=consol_table,
+                table_name=entry.get("standalone_table_name"),
+                title=entry.get("consol_title"),
+                section_title=note.section_title,
+            )
+    return out
+
+
 async def load_entity_source_rows(
     db: AsyncSession,
     entity_project_id: UUID,
     section_id: str,
     year: int,
+    *,
+    template_type: str,
 ) -> list[Any]:
-    """从单个子企业的 disclosure_notes 读取来源行。"""
-    note = (await db.execute(
-        sa.select(DisclosureNote).where(
-            DisclosureNote.project_id == entity_project_id,
-            DisclosureNote.year == year,
-            DisclosureNote.note_section == section_id,
-            DisclosureNote.is_deleted == sa.false(),
-        )
-    )).scalar_one_or_none()
-    if note is None or not isinstance(note.table_data, dict):
-        return []
-    return note.table_data.get("rows", [])
+    """单个企业的标准来源行（``load_source_tables`` 的单企业便捷形式）。"""
+    tables = await load_source_tables(
+        db, [entity_project_id], section_id, year, template_type=template_type,
+    )
+    source = tables.get(entity_project_id)
+    return source.rows if source is not None else []
 
 
 async def scan_all_entities(
@@ -168,222 +266,40 @@ async def scan_all_entities(
     consol_project_id: UUID,
     section_id: str,
     year: int,
+    template_type: str | None = None,
 ) -> list[dict[str, Any]]:
-    """扫描所有数据叶子企业，返回含 hash 的实体列表。"""
+    """扫描企业树全部数据叶子的来源，返回含 hash 与读取状态的实体列表。
+
+    没读到来源行的企业（未生成 / 本期无此情形 / 读不出表）``rows`` 为空，由调用方
+    决定是否参与分组；读取状态在 ``source_status``。
+    """
     from app.services.consol_calc_basis import data_leaves
     from app.services.consol_tree_service import build_tree
 
     tree = await build_tree(db, consol_project_id)
     if tree is None:
         return []
+    if template_type is None:
+        template_type = await resolve_section_template_type(db, consol_project_id)
 
+    leaves = [leaf for leaf in data_leaves(tree) if leaf.project_id is not None]
+    sources = await load_source_tables(
+        db, [leaf.project_id for leaf in leaves], section_id, year, template_type=template_type,
+    )
     entities: list[dict[str, Any]] = []
-    # TODO: N+1 查询——叶子企业多时应改为 IN 批查 disclosure_notes
-    for leaf in data_leaves(tree):
-        if leaf.project_id is None:
-            continue
-        rows = await load_entity_source_rows(db, leaf.project_id, section_id, year)
-        h = compute_source_structure_hash(section_id, rows)
+    for leaf in leaves:
+        source = sources.get(leaf.project_id)
+        rows = source.rows if source is not None else []
         entities.append({
             "node_key": leaf.node_key,
             "project_id": leaf.project_id,
             "company_name": getattr(leaf, "company_name", "") or "",
             "section_id": section_id,
             "rows": rows,
-            "hash": h,
+            "hash": compute_source_structure_hash(section_id, rows),
+            "source_status": source.to_status() if source is not None else {"status": "missing"},
         })
     return entities
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 4. 模板建议算法（R1.1 / D§六）
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-def suggest_template_rows(
-    source_groups: list[dict[str, Any]],
-    *,
-    existing_template_rows: list[dict[str, Any]] | None = None,
-    history_mappings: list[dict[str, Any]] | None = None,
-    rule_template_suggestions: list[dict[str, Any]] | None = None,
-    previous_year_suggestions: list[dict[str, Any]] | None = None,
-    fuzzy_threshold: float = 0.75,
-) -> list[dict[str, Any]]:
-    """生成模板建议行列表。
-
-    每条来源标签经七级匹配：
-    1. 精确匹配目标 canonical_name
-    2. 别名匹配 aliases
-    3. 规则模板库匹配（rule_template_suggestions，confidence=0.92）
-    4. 上年同集团项目匹配（previous_year_suggestions，confidence=0.88）
-    5. 模糊匹配（SequenceMatcher ≥ threshold）
-    6. 历史规则复用
-    7. 未匹配 → 建议新增
-
-    返回 ``[{source_label, suggested_target, confidence, match_type, candidates}]``
-    """
-    template_rows = existing_template_rows or []
-    history = history_mappings or []
-
-    # 构建规则模板建议索引（source_label → suggestion）
-    rule_tmpl_index: dict[str, dict[str, Any]] = {}
-    for s in (rule_template_suggestions or []):
-        sl = str(s.get("source_label", "")).strip()
-        if sl and s.get("suggested_target"):
-            rule_tmpl_index[sl] = s
-
-    # 构建上年项目建议索引
-    prev_year_index: dict[str, dict[str, Any]] = {}
-    for s in (previous_year_suggestions or []):
-        sl = str(s.get("source_label", "")).strip()
-        if sl and s.get("suggested_target"):
-            prev_year_index[sl] = s
-
-    # 收集所有来源标签（去重保序）
-    all_labels: list[str] = []
-    seen: set[str] = set()
-    for group in source_groups:
-        for sr in group.get("source_rows", []):
-            label = sr["label"]
-            if label and label not in seen:
-                all_labels.append(label)
-                seen.add(label)
-
-    # 构建目标索引
-    name_to_target: dict[str, dict[str, Any]] = {}
-    alias_to_target: dict[str, dict[str, Any]] = {}
-    for tr in template_rows:
-        cn = str(tr.get("canonical_name", "")).strip()
-        if cn:
-            name_to_target[cn] = tr
-        for alias in tr.get("aliases", []):
-            a = str(alias).strip()
-            if a:
-                alias_to_target[a] = tr
-
-    # 历史映射索引
-    history_index: dict[str, str] = {}
-    for hm in history:
-        sl = str(hm.get("source_label", "")).strip()
-        trid = str(hm.get("target_row_id", "")).strip()
-        if sl and trid:
-            history_index[sl] = trid
-
-    suggestions: list[dict[str, Any]] = []
-    for label in all_labels:
-        # 1. 精确匹配 canonical_name
-        if label in name_to_target:
-            suggestions.append(_suggestion(
-                label, name_to_target[label], "exact", 1.0,
-            ))
-            continue
-
-        # 2. 别名匹配
-        if label in alias_to_target:
-            suggestions.append(_suggestion(
-                label, alias_to_target[label], "alias", 0.95,
-            ))
-            continue
-
-        # 3. 规则模板库匹配（confidence=0.92）
-        if label in rule_tmpl_index:
-            s = rule_tmpl_index[label]
-            suggestions.append({
-                "source_label": label,
-                "suggested_target": s["suggested_target"],
-                "confidence": s.get("confidence", 0.92),
-                "match_type": "rule_template",
-                "candidates": s.get("candidates", []),
-                **({"template_id": s["template_id"]} if "template_id" in s else {}),
-            })
-            continue
-
-        # 4. 上年同集团项目匹配（confidence=0.88）
-        if label in prev_year_index:
-            s = prev_year_index[label]
-            suggestions.append({
-                "source_label": label,
-                "suggested_target": s["suggested_target"],
-                "confidence": s.get("confidence", 0.88),
-                "match_type": "previous_year",
-                "candidates": s.get("candidates", []),
-            })
-            continue
-
-        # 5. 模糊匹配
-        best_ratio = 0.0
-        best_target: dict[str, Any] | None = None
-        candidates: list[dict[str, Any]] = []
-        for tr in template_rows:
-            cn = str(tr.get("canonical_name", ""))
-            ratio = SequenceMatcher(None, label, cn).ratio()
-            if ratio >= fuzzy_threshold:
-                candidates.append({"target": tr, "ratio": round(ratio, 3)})
-                if ratio > best_ratio:
-                    best_ratio = ratio
-                    best_target = tr
-            for alias in tr.get("aliases", []):
-                r2 = SequenceMatcher(None, label, str(alias)).ratio()
-                if r2 >= fuzzy_threshold and r2 > best_ratio:
-                    best_ratio = r2
-                    best_target = tr
-                    candidates.append({"target": tr, "ratio": round(r2, 3)})
-
-        if best_target is not None:
-            suggestions.append(_suggestion(
-                label, best_target, "fuzzy", round(best_ratio, 3), candidates,
-            ))
-            continue
-
-        # 6. 历史规则复用
-        if label in history_index:
-            target_row_id = history_index[label]
-            # 在模板中找到对应行
-            for tr in template_rows:
-                if str(tr.get("target_row_id", "")) == target_row_id:
-                    suggestions.append(_suggestion(
-                        label, tr, "history", 0.85,
-                    ))
-                    break
-            else:
-                suggestions.append({
-                    "source_label": label,
-                    "suggested_target": None,
-                    "confidence": 0.0,
-                    "match_type": "manual",
-                    "candidates": [],
-                })
-            continue
-
-        # 7. 未匹配
-        suggestions.append({
-            "source_label": label,
-            "suggested_target": None,
-            "confidence": 0.0,
-            "match_type": "manual",
-            "candidates": [],
-        })
-
-    return suggestions
-
-
-def _suggestion(
-    label: str,
-    target: dict[str, Any],
-    match_type: str,
-    confidence: float,
-    candidates: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    return {
-        "source_label": label,
-        "suggested_target": {
-            "target_row_id": target.get("target_row_id"),
-            "canonical_name": target.get("canonical_name"),
-        },
-        "confidence": confidence,
-        "match_type": match_type,
-        "candidates": candidates or [],
-    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -402,10 +318,12 @@ async def preview_detail_refresh(
 
     返回 ``{preview_token, section_id, year, groups, stale_entities, suggestions, template_binding}``
     """
-    # 1. 扫描来源
-    entities = await scan_all_entities(
+    # 1. 扫描来源（只有读到来源行的企业参与分组与映射；其余在 entity_sources 里说明原因）
+    scanned = await scan_all_entities(
         db, consol_project_id=project_id, section_id=section_id, year=year,
     )
+    entities = [e for e in scanned if e["rows"]]
+    entity_sources = _entity_source_report(scanned)
     groups = group_entities_by_structure(entities)
 
     # 2. 读取当前模板绑定
@@ -430,15 +348,18 @@ async def preview_detail_refresh(
             template_rows = version.rows
 
     # 3. 检测 stale 绑定（只读——标记在返回值中，不写数据库；实际 stale 标记在 confirm/apply 阶段）
-    stale_entities: list[dict[str, Any]] = []
-    for entity in entities:
-        existing_binding = (await db.execute(
+    bindings_by_key = {
+        b.entity_node_key: b
+        for b in (await db.execute(
             sa.select(ConsolNoteMappingBinding).where(
                 ConsolNoteMappingBinding.project_id == project_id,
                 ConsolNoteMappingBinding.section_id == section_id,
-                ConsolNoteMappingBinding.entity_node_key == entity["node_key"],
             )
-        )).scalar_one_or_none()
+        )).scalars().all()
+    }
+    stale_entities: list[dict[str, Any]] = []
+    for entity in entities:
+        existing_binding = bindings_by_key.get(entity["node_key"])
         if existing_binding is not None:
             if existing_binding.bound_source_hash != entity["hash"]:
                 stale_entities.append({
@@ -515,9 +436,25 @@ async def preview_detail_refresh(
         "entity_count": len(entities),
         "group_count": len(groups),
         "stale_count": len(stale_entities),
+        # 每家企业的来源读取状态（含未参与映射的企业及原因、未对上的列）
+        "entity_sources": entity_sources,
+        "missing_count": sum(1 for s in entity_sources if s["status"] != "found"),
         # 存 token_data 供 apply 校验
         "_token_data": token_data,
     }
+
+
+def _entity_source_report(scanned: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """扫描结果 → 前端可读的逐企业来源状态。"""
+    return [
+        {
+            "node_key": e["node_key"],
+            "project_id": str(e["project_id"]),
+            "company_name": e.get("company_name", ""),
+            **(e.get("source_status") or {"status": "missing"}),
+        }
+        for e in scanned
+    ]
 
 
 async def suggest_template_for_section(
@@ -527,55 +464,85 @@ async def suggest_template_for_section(
     section_id: str,
     year: int,
 ) -> dict[str, Any]:
-    """扫描来源并生成模板行建议（不含规则匹配，只做频率+模糊分析）。"""
-    entities = await scan_all_entities(
+    """模板行建议：以合并附注模板该表的行（顺序 / 行类型）为骨架，标出每行在子企业来源里
+    出现的频率与金额；来源里有而模板没有的行插在首个合计行之前，由用户取舍。
+
+    明细模板与合并附注模板同行序，「按公式填入」与明细映射写的才是同一批行。
+    合并模板缺该表时退回按来源频率排序。
+    """
+    from app.services.consol_note_formula_service import find_table
+
+    template_type = await resolve_section_template_type(db, project_id)
+    scanned = await scan_all_entities(
         db, consol_project_id=project_id, section_id=section_id, year=year,
+        template_type=template_type,
     )
+    entities = [e for e in scanned if e["rows"]]
     groups = group_entities_by_structure(entities)
 
-    # 统计所有行标签出现频率和金额占比
+    # 统计来源行标签出现频率和金额（按规范化标签合并，展示取首次出现的写法）
     label_stats: dict[str, dict[str, Any]] = {}
     for entity in entities:
         for row in entity["rows"]:
             label = _first_cell(row).strip()
-            rt = _row_type(row)
-            if not label:
+            key = _label_key(label)
+            if not key:
                 continue
-            if label not in label_stats:
-                # row_type 取首次出现的值（同标签在不同企业可能标不同类型，以首次为准）
-                label_stats[label] = {"count": 0, "row_type": rt, "total_amount": 0.0}
-            label_stats[label]["count"] += 1
-            # 尝试提取金额
-            if isinstance(row, dict):
-                vals = row.get("values") or row.get("cells") or {}
-                if isinstance(vals, dict):
-                    for v in vals.values():
-                        try:
-                            label_stats[label]["total_amount"] += abs(float(v))
-                        except (TypeError, ValueError):
-                            pass
-            elif isinstance(row, (list, tuple)):
-                for v in row[1:]:
-                    try:
-                        label_stats[label]["total_amount"] += abs(float(str(v).replace(",", "")))
-                    except (TypeError, ValueError):
-                        pass
+            stats = label_stats.setdefault(
+                key, {"label": label, "count": 0, "row_type": _row_type(row), "total_amount": 0.0},
+            )
+            stats["count"] += 1
+            stats["total_amount"] += sum(abs(float(v)) for v in _row_numbers(row))
 
-    # 按频率降序排列，合计行放最后
-    sorted_labels = sorted(
-        label_stats.items(),
-        key=lambda x: (x[1]["row_type"] == "total", -x[1]["count"], -x[1]["total_amount"]),
-    )
+    skeleton: list[dict[str, Any]] = []
+    table = find_table(template_type, section_id) or {}
+    row_types = table.get("_row_types") or []
+    for i, trow in enumerate(table.get("rows") or []):
+        label = _first_cell(trow).strip()
+        key = _label_key(label)
+        if not key:
+            continue
+        declared = row_types[i] if i < len(row_types) else ""
+        rt = declared if declared in ("total", "subtotal") else _row_type([label])
+        stats = label_stats.get(key)
+        canonical = key if key in ("合计", "小计") else label
+        skeleton.append({
+            "canonical_name": canonical,
+            "aliases": [stats["label"]] if stats and stats["label"] != canonical else [],
+            "row_type": rt,
+            "origin": "template",
+            "_key": key,
+        })
+
+    template_keys = {r["_key"] for r in skeleton}
+    extras = [
+        {
+            "canonical_name": stats["label"],
+            "aliases": [],
+            "row_type": stats["row_type"],
+            "origin": "source",
+            "_key": key,
+        }
+        for key, stats in sorted(label_stats.items(), key=lambda kv: (-kv[1]["count"], -kv[1]["total_amount"]))
+        if key not in template_keys and stats["row_type"] == "data"
+    ]
+    if skeleton:
+        cut = next((i for i, r in enumerate(skeleton) if r["row_type"] == "total"), len(skeleton))
+        ordered = skeleton[:cut] + extras + skeleton[cut:]
+    else:  # 合并模板缺该表：按来源频率，合计行放最后
+        ordered = extras + [
+            {"canonical_name": s["label"], "aliases": [], "row_type": s["row_type"], "origin": "source", "_key": k}
+            for k, s in label_stats.items() if s["row_type"] != "data"
+        ]
 
     suggested_rows: list[dict[str, Any]] = []
-    for i, (label, stats) in enumerate(sorted_labels):
+    for i, r in enumerate(ordered):
+        stats = label_stats.get(r.pop("_key"))
         suggested_rows.append({
-            "canonical_name": label,
-            "aliases": [],
+            **r,
             "sort_order": i * 10,
-            "row_type": stats["row_type"],
-            "frequency": stats["count"],
-            "total_amount": round(stats["total_amount"], 2),
+            "frequency": stats["count"] if stats else 0,
+            "total_amount": round(stats["total_amount"], 2) if stats else 0.0,
             "entity_total": len(entities),
         })
 
@@ -584,6 +551,7 @@ async def suggest_template_for_section(
         "entity_count": len(entities),
         "group_count": len(groups),
         "suggested_rows": suggested_rows,
+        "entity_sources": _entity_source_report(scanned),
     }
 
 

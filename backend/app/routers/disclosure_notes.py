@@ -888,7 +888,9 @@ async def update_note(
             project_id=note.project_id,
             year=note.year,
             extra={
-                "section_code": getattr(note, "section_code", None) or str(note_id),
+                # DisclosureNote 没有 section_code 属性，章节号在 note_section；
+                # 原写法恒退回 str(note_id)，订阅方（stale 引擎 / 交付件 / 合并附注）都对不上章节
+                "section_code": getattr(note, "note_section", None) or str(note_id),
                 "action": "update",
             },
         )

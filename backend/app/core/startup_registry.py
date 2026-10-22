@@ -330,7 +330,7 @@ def _task_register_phase_handlers(_ctx: StartupContext) -> None:
             register_consol_elimination_recalc_handler,
         )
 
-        register_stale_handler(event_bus)              # NOTE_UPDATED → 合并附注 stale
+        register_stale_handler(event_bus)              # NOTE_UPDATED / NOTE_SECTION_SAVED → 合并附注 stale
         register_consol_trial_stale_handler(event_bus)  # TRIAL_BALANCE_UPDATED → 合并 trial stale
         register_consol_elimination_recalc_handler(event_bus)  # ELIMINATION_APPROVED → 重算
         from app.services.consol_note_formula_refresh_handler import (

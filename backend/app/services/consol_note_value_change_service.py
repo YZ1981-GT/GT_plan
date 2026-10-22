@@ -59,8 +59,8 @@ def compute_value_fingerprint(
                 # 按 key 排序确保确定性
                 row_nums = [_to_decimal_str(vals[k]) for k in sorted(vals.keys())]
             elif isinstance(vals, (list, tuple)):
-                # 跳过第一个元素（通常是标签）
-                row_nums = [_to_decimal_str(v) for v in vals[1:]]
+                # dict 行的 values 不含行名（附注 _tables / 标准来源行同口径）：全部是数值列
+                row_nums = [_to_decimal_str(v) for v in vals]
             else:
                 row_nums = []
         elif isinstance(row, (list, tuple)):
@@ -86,6 +86,7 @@ async def on_note_section_saved(
     section_id: str,
     year: int,
     rows: list[Any],
+    consol_project_ids: list[UUID] | None = None,
 ) -> dict[str, Any] | None:
     """NOTE_SECTION_SAVED 事件处理逻辑（由 handler 调用）。
 
@@ -105,14 +106,15 @@ async def on_note_section_saved(
 
     new_fingerprint = compute_value_fingerprint(rows)
 
-    # 查映射绑定：该子企业是否作为某个合并项目的数据源
-    bindings = (await db.execute(
-        sa.select(ConsolNoteMappingBinding).where(
-            ConsolNoteMappingBinding.entity_project_id == entity_project_id,
-            ConsolNoteMappingBinding.section_id == section_id,
-            ConsolNoteMappingBinding.status.in_(["confirmed", "stale"]),
-        )
-    )).scalars().all()
+    # 查映射绑定：该子企业是否作为某个合并项目的数据源（section_id 是合并章节号）
+    query = sa.select(ConsolNoteMappingBinding).where(
+        ConsolNoteMappingBinding.entity_project_id == entity_project_id,
+        ConsolNoteMappingBinding.section_id == section_id,
+        ConsolNoteMappingBinding.status.in_(["confirmed", "stale"]),
+    )
+    if consol_project_ids is not None:
+        query = query.where(ConsolNoteMappingBinding.project_id.in_(consol_project_ids))
+    bindings = (await db.execute(query)).scalars().all()
 
     if not bindings:
         return None
@@ -132,6 +134,7 @@ async def on_note_section_saved(
             note_data = (await db.execute(
                 sa.select(ConsolNoteData).where(
                     ConsolNoteData.project_id == consol_project_id,
+                    ConsolNoteData.year == year,
                     ConsolNoteData.section_id == section_id,
                 )
             )).scalars().all()

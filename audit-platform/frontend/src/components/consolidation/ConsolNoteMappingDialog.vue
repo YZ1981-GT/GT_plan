@@ -14,9 +14,20 @@
 
     <el-alert v-if="errorMsg" type="error" :title="errorMsg" :closable="false" show-icon style="margin-bottom:10px" />
 
+    <!-- 子企业单体附注读取情况：没读到的企业不参与映射，部分列没对上的企业该列为空 -->
+    <el-alert v-if="sourceIssues.length" type="warning" :closable="false" show-icon style="margin-bottom:10px"
+      :title="`${sourceIssues.length} 家企业的单体附注未完整读取`">
+      <div v-for="s in sourceIssues.slice(0, 6)" :key="s.node_key" style="font-size:12px;line-height:1.7">
+        {{ s.company_name || s.node_key }}：{{ s.status === 'found'
+          ? `未对上的列 ${(s.unmatched_columns || []).join('、')}`
+          : (s.reason || '未读到来源') }}
+      </div>
+      <div v-if="sourceIssues.length > 6" style="font-size:12px">……共 {{ sourceIssues.length }} 家</div>
+    </el-alert>
+
     <!-- 来源分组映射表 -->
     <el-table v-loading="loading" :data="mappingRows" border size="small" max-height="50vh"
-      :row-class-name="rowClassName" empty-text="请先点击"刷新预览"扫描来源数据">
+      :row-class-name="rowClassName" empty-text="请先点击「刷新预览」扫描来源数据">
       <el-table-column type="expand" width="44">
         <template #default="{ row }">
           <div style="padding:8px 16px">
@@ -163,6 +174,9 @@ const ignoreReason = ref('不适用')
 const showTemplateEditor = ref(false)
 const currentTemplate = ref<DetailTemplate | null>(null)
 
+const sourceIssues = computed(() => (preview.value?.entity_sources || []).filter(
+  s => s.status !== 'found' || (s.unmatched_columns || []).length > 0,
+))
 const hasIgnoredRows = computed(() => mappingRows.value.some(r => r.mapping_action === 'ignore'))
 const readyCount = computed(() => mappingRows.value.filter(r => r._status === 'ready' && r.mapping_action !== 'ignore').length)
 const pendingCount = computed(() => mappingRows.value.filter(r => r._status === 'pending').length)
@@ -250,9 +264,9 @@ function matchTypeLabel(matchType: string): string {
 }
 
 /** 匹配方式标签颜色 */
-function matchTypeTagType(matchType: string): '' | 'success' | 'warning' | 'info' | 'danger' {
+function matchTypeTagType(matchType: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
   if (matchType === 'exact' || matchType === 'rule_template') return 'success'
-  if (matchType === 'alias' || matchType === 'history') return ''
+  if (matchType === 'alias' || matchType === 'history') return 'primary'
   if (matchType === 'fuzzy') return 'warning'
   return 'info'
 }
@@ -321,7 +335,12 @@ async function handleConfirmAndApply() {
       node_key: props.nodeKey,
     })
     if (result.status === 'applied') {
-      ElMessage.success(`已写入：${result.filled_count || 0} 格填入，${result.kept_manual_count || 0} 格保留手工`)
+      const notes: string[] = []
+      if (result.unbound_entities?.length) notes.push(`${result.unbound_entities.length} 家企业尚未确认映射，未计入`)
+      if (result.skipped_entities?.length) notes.push(`${result.skipped_entities.length} 家企业未读到来源，未计入`)
+      const msg = `已写入：${result.filled_count || 0} 格填入，${result.kept_manual_count || 0} 格保留手工`
+      if (notes.length) ElMessage.warning(`${msg}；${notes.join('；')}`)
+      else ElMessage.success(msg)
       emit('applied')
       emit('update:visible', false)
     } else if (result.status === 'skipped_locked') {

@@ -30,6 +30,10 @@ from app.services.consol_note_detail_apply_service import ApplyError, apply_deta
 from app.services.consol_note_detail_source_service import compute_source_structure_hash
 from app.services.consol_note_detail_template_service import bind_template_version, create_template
 from app.services.consol_note_mapping_rule_service import confirm_mapping
+from app.services.consol_note_section_mapping import (
+    resolve_standalone_section,
+    resolve_standalone_table_name,
+)
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON  # type: ignore[attr-defined]
 
@@ -95,11 +99,33 @@ def _source_rows_list(labels_amounts: list[tuple[str, str, str]]) -> list[list[s
     return [[la[0], la[1], la[2]] for la in labels_amounts]
 
 
+def _tables_row(row: list) -> dict:
+    """[label, v1, v2] → 单体附注 _tables 行（values 不含行名，数值按真库存 number）。"""
+    label, *values = row
+    return {
+        "label": label,
+        "values": [float(v) if str(v).strip() else None for v in values],
+        "is_total": False,
+        "row_type": "data",
+    }
+
+
 async def _seed_disclosure(db: AsyncSession, project_id: UUID, rows: list) -> None:
-    """向 disclosure_notes 写入来源数据。"""
+    """向子企业 disclosure_notes 写入真实形态的来源数据。
+
+    单体附注里没有合并章节号：合并 ``五-67-1`` 经章节映射是单体「八、66 管理费用」，
+    表格放 ``_tables``（附注编辑器显示的那张表）。旧测试两侧共用 ``五-67-1`` 会掩盖
+    读取层从不换算章节号的缺陷。
+    """
     db.add(DisclosureNote(
-        project_id=project_id, year=_YEAR, note_section=_SECTION,
-        section_title="管理费用", table_data={"rows": rows},
+        project_id=project_id, year=_YEAR,
+        note_section=resolve_standalone_section("soe", _SECTION),
+        section_title="管理费用",
+        table_data={"_tables": [{
+            "name": resolve_standalone_table_name("soe", _SECTION),
+            "headers": ["项目", "本期发生额", "上期发生额"],
+            "rows": [_tables_row(r) for r in rows],
+        }]},
         status="draft",
     ))
     await db.flush()

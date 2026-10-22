@@ -1,15 +1,16 @@
 """合并附注明细刷新 apply service（Phase 4 Task 22~27）。
 
-spec: consol-note-detail-template-and-mapping
+spec: consol-note-detail-template-and-mapping（consol-note-pull-from-standalone 收口）
 
-按已确认的映射规则，将下属企业来源行转换后写入 consol_note_data.data.rows。
-Service 只 flush 不 commit。
+按已确认的映射规则，把各子企业单体附注的来源行（``consol_note_detail_source_service.
+load_source_tables``，已按合并模板列对齐）汇总后写入 ``consol_note_data.data.rows``。
+合计 / 小计行按本表数据重算。Service 只 flush 不 commit。
 """
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 from uuid import UUID
 
@@ -28,6 +29,9 @@ logger = logging.getLogger(__name__)
 
 # 与 consol_note_formula_service 同口径的 manual_cells 解析
 CONSOL_NOTE_CELL_STATES_LOCKED = ("locked",)
+
+#: 写入来源标记（ConsolNoteTab 据此显示「📋 明细映射」）
+WRITE_SOURCE = "detail_mapping"
 
 
 class ApplyError(Exception):
@@ -57,14 +61,21 @@ async def apply_detail_refresh(
 
     流程：
     1. 加载模板绑定 → 模板行
-    2. 加载所有已确认绑定 → 规则 → 来源行
-    3. 校验 preview_entity_hashes（409 防护）
-    4. 检查阻断条件（未映射行 / 未确认绑定）
-    5. 按规则转换来源行 → 按目标行汇总金额
+    2. 加载已确认绑定；``node_key`` 给定时只取该节点子树内的企业
+    3. 一次读取全部来源（单体附注，按合并模板列对齐）；校验 preview 指纹（409 防护）
+    4. 检查阻断条件（映射目标行不在模板中）
+    5. 按规则把来源行汇总到目标行
     6. 读取 consol_note_data → 手工保护 / locked 跳过
-    7. 写入新行 + 穿透 provenance
+    7. 写入新行（合计 / 小计按本表数据重算）+ 穿透 provenance
     8. 清 is_stale
     """
+    from app.services.consol_note_detail_source_service import (
+        compute_source_structure_hash,
+        load_source_tables,
+        resolve_section_template_type,
+    )
+    from app.services.consol_note_formula_service import find_table
+
     # ── 1. 模板绑定 ──
     binding = (await db.execute(
         sa.select(ConsolNoteTemplateBinding).where(
@@ -85,14 +96,25 @@ async def apply_detail_refresh(
 
     template_rows: list[dict[str, Any]] = version.rows if isinstance(version.rows, list) else []
     target_row_index = {str(tr["target_row_id"]): i for i, tr in enumerate(template_rows)}
+    template_type = await resolve_section_template_type(db, project_id)
 
-    # ── 2. 加载确认绑定 + 规则 + 来源行 ──
-    entity_bindings = (await db.execute(
+    # ── 2. 加载确认绑定（按节点子树限定） ──
+    entity_bindings = list((await db.execute(
         sa.select(ConsolNoteMappingBinding).where(
             ConsolNoteMappingBinding.project_id == project_id,
             ConsolNoteMappingBinding.section_id == section_id,
         )
-    )).scalars().all()
+    )).scalars().all())
+
+    scope_leaves = await _scope_data_leaves(db, project_id, node_key)
+    out_of_scope: list[str] = []
+    if scope_leaves is not None:
+        scope_keys = {leaf.node_key for leaf in scope_leaves}
+        out_of_scope = [
+            b.entity_node_key for b in entity_bindings
+            if b.entity_node_key not in scope_keys and b.status in ("confirmed", "stale")
+        ]
+        entity_bindings = [b for b in entity_bindings if b.entity_node_key in scope_keys]
 
     confirmed = [b for b in entity_bindings if b.status == "confirmed"]
     stale = [b for b in entity_bindings if b.status == "stale"]
@@ -100,43 +122,45 @@ async def apply_detail_refresh(
     if not confirmed and not stale:
         raise ApplyError(400, "NO_BINDINGS", "该章节没有已确认的企业绑定，请先预览并确认映射")
 
-    # ── 3. 校验 preview_entity_hashes（409 防护） ──
+    # ── 3. 一次读取全部来源（已确认企业 + 本节点范围内全部数据叶子） ──
+    source_pids = [b.entity_project_id for b in confirmed]
+    source_pids += [leaf.project_id for leaf in (scope_leaves or []) if leaf.project_id is not None]
+    sources = await load_source_tables(
+        db, source_pids, section_id, year, template_type=template_type,
+    )
+
+    def _rows_of(pid: UUID) -> list[Any]:
+        src = sources.get(pid)
+        return src.rows if src is not None else []
+
     if preview_entity_hashes:
-        from app.services.consol_note_detail_source_service import (
-            compute_source_structure_hash,
-            load_entity_source_rows,
-        )
         for b in confirmed:
             expected = preview_entity_hashes.get(b.entity_node_key)
             if expected is None:
                 continue
-            current_rows = await load_entity_source_rows(db, b.entity_project_id, section_id, year)
-            current_hash = compute_source_structure_hash(section_id, current_rows)
-            if current_hash != expected:
+            if compute_source_structure_hash(section_id, _rows_of(b.entity_project_id)) != expected:
                 raise ApplyError(
                     409, "SOURCE_CHANGED",
                     f"企业 {b.entity_node_key} 的来源数据已变化，请重新预览",
                 )
 
     # ── 4. 加载规则并检查阻断 ──
+    rule_ids = list({b.rule_id for b in confirmed if b.rule_id is not None})
     rule_cache: dict[UUID, ConsolNoteMappingRule] = {}
+    if rule_ids:
+        for rule in (await db.execute(
+            sa.select(ConsolNoteMappingRule).where(ConsolNoteMappingRule.id.in_(rule_ids))
+        )).scalars().all():
+            rule_cache[rule.id] = rule
+
     unmapped_labels: list[str] = []
-
     for b in confirmed:
-        if b.rule_id not in rule_cache:
-            rule = (await db.execute(
-                sa.select(ConsolNoteMappingRule).where(ConsolNoteMappingRule.id == b.rule_id)
-            )).scalar_one_or_none()
-            if rule is not None:
-                rule_cache[b.rule_id] = rule
-
         rule = rule_cache.get(b.rule_id)
         if rule is None:
             unmapped_labels.append(f"企业 {b.entity_node_key} 的规则已删除")
             continue
         for m in (rule.mappings if isinstance(rule.mappings, list) else []):
-            action = m.get("mapping_action", "")
-            if action in ("map", "map_merge"):
+            if m.get("mapping_action", "") in ("map", "map_merge"):
                 trid = str(m.get("target_row_id", ""))
                 if trid not in target_row_index:
                     unmapped_labels.append(f"映射目标行 {trid} 不在当前模板中")
@@ -149,75 +173,55 @@ async def apply_detail_refresh(
             {"unmapped": unmapped_labels[:20]},
         )
 
-    # stale 企业不参与但不阻断（R4.3.2）
-    stale_node_keys = {b.entity_node_key for b in stale}
-
-    # ── 5. 一次性加载全部 confirmed 企业来源行（消除重复查询） ──
-    from app.services.consol_note_detail_source_service import load_entity_source_rows
-
-    entity_source_cache: dict[str, list[Any]] = {}
-    width = 3  # 最少 3 列（项目名+本期+上期）
+    # ── 5. 按规则汇总 ──
+    consol_table = find_table(template_type, section_id) or {}
+    template_headers = list(consol_table.get("headers") or [])
+    width = max(len(template_headers), 3)  # 最少 3 列（项目名 + 本期 + 上期）
     for b in confirmed:
-        cache_key = f"{b.entity_project_id}:{section_id}:{year}"
-        if cache_key not in entity_source_cache:
-            entity_source_cache[cache_key] = await load_entity_source_rows(
-                db, b.entity_project_id, section_id, year,
-            )
-        # 从所有企业取 max width（不只第一个）
-        for sr in entity_source_cache[cache_key]:
-            if isinstance(sr, (list, tuple)):
-                width = max(width, len(sr))
-            elif isinstance(sr, dict):
-                vals = sr.get("values") or sr.get("cells") or {}
-                if isinstance(vals, dict):
-                    width = max(width, max((int(k) for k in vals if str(k).isdigit()), default=0) + 1)
+        for sr in _rows_of(b.entity_project_id):
+            width = max(width, _row_width(sr))
 
-    # 目标金额汇总
     target_amounts: dict[int, dict[int, Decimal]] = {}
-    # 穿透 provenance
     provenance: list[dict[str, Any]] = []
     applied_entities: list[str] = []
-    skipped_stale: list[str] = list(stale_node_keys)
+    skipped_entities: list[dict[str, Any]] = [
+        {"node_key": b.entity_node_key, "reason": "来源结构已变化，需重新确认映射"} for b in stale
+    ]
 
     for b in confirmed:
         rule = rule_cache.get(b.rule_id)
         if rule is None:
             continue
-
-        cache_key = f"{b.entity_project_id}:{section_id}:{year}"
-        source_rows = entity_source_cache.get(cache_key, [])
-        # 建立来源标签→行的索引
-        source_by_label: dict[str, list[dict[str, Any]]] = {}
+        source_rows = _rows_of(b.entity_project_id)
+        if not source_rows:
+            src = sources.get(b.entity_project_id)
+            skipped_entities.append({
+                "node_key": b.entity_node_key,
+                "reason": (src.reason if src is not None else None) or "未读到来源",
+            })
+            continue
+        source_by_label: dict[str, list[Any]] = {}
         for sr in source_rows:
-            label = _first_cell(sr).strip()
-            source_by_label.setdefault(label, []).append(sr)
+            source_by_label.setdefault(_first_cell(sr).strip(), []).append(sr)
 
         entity_contrib: list[dict[str, Any]] = []
-
         for m in (rule.mappings if isinstance(rule.mappings, list) else []):
-            action = m.get("mapping_action", "")
-            source_label = str(m.get("source_label", "")).strip()
-
-            if action == "ignore":
+            if m.get("mapping_action", "") == "ignore":
                 continue
-
             target_row_id = str(m.get("target_row_id", ""))
             target_idx = target_row_index.get(target_row_id)
             if target_idx is None:
                 continue
-
-            source_hits = source_by_label.get(source_label, [])
-            for sr in source_hits:
+            source_label = str(m.get("source_label", "")).strip()
+            for sr in source_by_label.get(source_label, []):
                 amounts = _extract_amounts(sr, width)
-                if target_idx not in target_amounts:
-                    target_amounts[target_idx] = {}
+                bucket = target_amounts.setdefault(target_idx, {})
                 for col, val in amounts.items():
-                    target_amounts[target_idx][col] = target_amounts[target_idx].get(col, Decimal("0")) + val
-
+                    bucket[col] = bucket.get(col, Decimal("0")) + val
                 entity_contrib.append({
                     "source_label": source_label,
                     "target_row_id": target_row_id,
-                    "target_name": template_rows[target_idx]["canonical_name"] if target_idx < len(template_rows) else "",
+                    "target_name": template_rows[target_idx].get("canonical_name", ""),
                     "amounts": {str(k): str(v) for k, v in amounts.items()},
                 })
 
@@ -227,6 +231,14 @@ async def apply_detail_refresh(
             "entity_project_id": str(b.entity_project_id),
             "contributions": entity_contrib,
         })
+
+    # 本节点范围内读到了来源、却还没确认映射的企业（合并数会缺它们）
+    bound_keys = {b.entity_node_key for b in entity_bindings if b.status in ("confirmed", "stale", "excluded")}
+    unbound_entities = [
+        {"node_key": leaf.node_key, "company_name": getattr(leaf, "company_name", "") or ""}
+        for leaf in (scope_leaves or [])
+        if leaf.node_key not in bound_keys and leaf.project_id is not None and _rows_of(leaf.project_id)
+    ]
 
     # ── 6. 读取 consol_note_data ──
     note_record = await _load_or_create_note_data(
@@ -242,20 +254,12 @@ async def apply_detail_refresh(
         }
 
     data = dict(note_record.data) if isinstance(note_record.data, dict) else {}
-    manual_set = _parse_manual_cells(data)
-    locked_set = _parse_locked_cells(note_record)
-
-    protected = manual_set | locked_set
-
-    # ── 7. 构建新行 ──
-    # 以模板行为骨架
+    protected = _parse_manual_cells(data) | _parse_locked_cells(note_record)
     existing_rows = data.get("rows", [])
-    # 取当前列数
     if existing_rows and isinstance(existing_rows[0], (list, tuple)):
         width = max(width, len(existing_rows[0]))
-    elif existing_rows and isinstance(existing_rows[0], dict):
-        width = max(width, len(existing_rows[0].get("values", {})) + 1)
 
+    # ── 7. 构建新行（以模板行为骨架） ──
     new_rows: list[list[str]] = []
     filled: list[dict[str, Any]] = []
     kept_manual: list[dict[str, Any]] = []
@@ -263,63 +267,52 @@ async def apply_detail_refresh(
     for i, tr in enumerate(template_rows):
         row = [""] * width
         row[0] = tr.get("canonical_name", "")
+        row_type = tr.get("row_type")
 
-        if i in target_amounts:
+        if i in target_amounts and row_type not in ("total", "subtotal"):
             for col, val in target_amounts[i].items():
                 if col < 1 or col >= width:
                     continue
                 if (i, col) in protected:
-                    # 保留手工值
                     old_val = _get_existing_cell(existing_rows, i, col)
                     row[col] = old_val
                     kept_manual.append({"row": i, "col": col, "kept_value": old_val})
                 else:
-                    formatted = str(val.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+                    formatted = _fmt(val)
                     row[col] = formatted
                     filled.append({"row": i, "col": col, "value": formatted, "target_name": tr.get("canonical_name", "")})
 
-        # 合计行 / 小计行自动求和
-        # subtotal：向上找到最近的 total/subtotal 行（不含），对中间的 data 行求和
-        # total：对所有非 total/subtotal 的 data 行求和（全表合计）
-        if tr.get("row_type") in ("total", "subtotal"):
+        # 合计 / 小计 = 本表数据行之和（表内计算，不取来源合计）：
+        # subtotal 只加到上一个合计 / 小计行为止；total 加全部数据行；整列无数据保持空白
+        if row_type in ("total", "subtotal"):
             for col in range(1, width):
                 if (i, col) in protected:
-                    old_val = _get_existing_cell(existing_rows, i, col)
-                    row[col] = old_val
+                    row[col] = _get_existing_cell(existing_rows, i, col)
                     continue
-                total = Decimal("0")
-                if tr.get("row_type") == "subtotal":
-                    # subtotal：从当前行往上找到最近的 total/subtotal 边界
-                    for j in range(len(new_rows) - 1, -1, -1):
-                        jt = template_rows[j].get("row_type", "data") if j < len(template_rows) else "data"
-                        if jt in ("total", "subtotal"):
-                            break  # 遇到上一个合计/小计行即停
-                        try:
-                            total += Decimal(str(new_rows[j][col]).replace(",", "")) if new_rows[j][col] else Decimal("0")
-                        except Exception:
-                            pass
-                else:
-                    # total：全表所有 data 行求和（跳过 total/subtotal）
-                    for j in range(len(new_rows)):
-                        jt = template_rows[j].get("row_type", "data") if j < len(template_rows) else "data"
-                        if jt in ("total", "subtotal"):
-                            continue
-                        try:
-                            total += Decimal(str(new_rows[j][col]).replace(",", "")) if new_rows[j][col] else Decimal("0")
-                        except Exception:
-                            pass
-                row[col] = str(total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+                total, has_value = Decimal("0"), False
+                for j in range(len(new_rows) - 1, -1, -1):
+                    jt = template_rows[j].get("row_type", "data")
+                    if jt in ("total", "subtotal"):
+                        if row_type == "subtotal":
+                            break
+                        continue
+                    cell = _to_decimal(new_rows[j][col])
+                    if cell is not None:
+                        total += cell
+                        has_value = True
+                if has_value:
+                    row[col] = _fmt(total)
 
         new_rows.append(row)
 
-    # 写入
-    headers = data.get("headers", [])
-    if not headers and template_rows:
-        headers = ["项目"] + [f"列{c}" for c in range(1, width)]
+    headers = data.get("headers") or template_headers or ["项目"] + [f"列{c}" for c in range(1, width)]
 
     data["rows"] = new_rows
     data["headers"] = headers
     data["_detail_provenance"] = provenance
+    data["_last_write_source"] = WRITE_SOURCE
+    data["_detail_entity_count"] = len(applied_entities)
+    data["_detail_applied_at"] = datetime.now(timezone.utc).isoformat()
 
     note_record.data = data
     note_record.is_stale = False
@@ -331,7 +324,10 @@ async def apply_detail_refresh(
         "section_id": section_id,
         "node_key": node_key,
         "applied_entity_count": len(applied_entities),
-        "skipped_stale": skipped_stale,
+        "skipped_stale": [b.entity_node_key for b in stale],
+        "skipped_entities": skipped_entities,
+        "unbound_entities": unbound_entities,
+        "out_of_scope_count": len(out_of_scope),
         "filled_count": len(filled),
         "kept_manual_count": len(kept_manual),
         "filled": filled[:50],
@@ -344,51 +340,86 @@ async def apply_detail_refresh(
 # ─── 内部辅助 ────────────────────────────────────────────────────────────────
 
 
+async def _scope_data_leaves(db: AsyncSession, project_id: UUID, node_key: str | None) -> list[Any] | None:
+    """``node_key`` 子树内的数据叶子；``node_key`` 为空（项目级兼容行）时返回 None = 不限定。
+
+    中间合并节点只汇总自己子树里的企业，不能把整棵树的企业都加进来。
+    """
+    if not node_key:
+        return None
+    from app.services.consol_calc_basis import data_leaves
+    from app.services.consol_tree_service import build_tree, find_node_by_key
+
+    tree = await build_tree(db, project_id)
+    if tree is None:
+        raise ApplyError(400, "NO_TREE", "无法构建企业树，不能按节点写入")
+    node = find_node_by_key(tree, node_key)
+    if node is None:
+        raise ApplyError(404, "NODE_NOT_FOUND", f"节点 {node_key} 不在当前企业树中")
+    return data_leaves(node)
+
+
 def _first_cell(row: Any) -> str:
-    """提取行标签——复用 source service 的同名函数（已在顶部 import）。"""
+    """提取行标签——与 source service 同口径。"""
     from app.services.consol_note_detail_source_service import _first_cell as _fc
     return _fc(row)
 
 
-def _extract_amounts(row: Any, width: int) -> dict[int, Decimal]:
-    """从来源行提取数值列金额。返回 {col_index: Decimal}。"""
-    amounts: dict[int, Decimal] = {}
+def _row_width(row: Any) -> int:
+    """来源行覆盖到的列数（含第 0 列行名）。"""
     if isinstance(row, dict):
-        vals = row.get("values") or row.get("cells") or {}
+        vals = row.get("values")
+        return len(vals) + 1 if isinstance(vals, (list, tuple)) else 0
+    if isinstance(row, (list, tuple)):
+        return len(row)
+    return 0
+
+
+def _to_decimal(value: Any) -> Decimal | None:
+    """单元格 → Decimal；空、占位符、非数值 → None（不参与加总）。"""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, Decimal):
+        return value
+    if isinstance(value, float) and value != value:  # NaN
+        return None
+    s = str(value).strip().replace(",", "").replace("，", "")
+    if not s or s in ("-", "—", "－"):
+        return None
+    try:
+        return Decimal(s)
+    except InvalidOperation:
+        return None
+
+
+def _fmt(value: Decimal) -> str:
+    return str(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _extract_amounts(row: Any, width: int) -> dict[int, Decimal]:
+    """来源行 → ``{合并模板列号: 金额}``。
+
+    - 标准来源行 ``{label, values:[...]}``：``values[k]`` 是第 ``k+1`` 列（行名不在 values 里）
+    - ``{label, values:{"1": v, ...}}``：键即列号
+    - ``[label, v1, v2, ...]``：第 ``j`` 项是第 ``j`` 列
+    """
+    pairs: list[tuple[int, Any]] = []
+    if isinstance(row, dict):
+        vals = row.get("values")
         if isinstance(vals, dict):
-            # 优先按数字键索引；如果无数字键则按值顺序（跳过第一个当标签用的键）
-            has_numeric = any(str(k).isdigit() for k in vals)
-            if has_numeric:
-                for k, v in vals.items():
-                    try:
-                        col = int(k) if str(k).isdigit() else None
-                        if col is not None and col >= 1:
-                            amounts[col] = Decimal(str(v))
-                    except (TypeError, ValueError):
-                        pass
-            else:
-                for j, (k, v) in enumerate(vals.items()):
-                    if j >= 1:  # 跳过第一个键（通常是标签）
-                        try:
-                            amounts[j] = Decimal(str(v))
-                        except (TypeError, ValueError):
-                            pass
+            pairs = [(int(k), v) for k, v in vals.items() if str(k).isdigit()]
         elif isinstance(vals, (list, tuple)):
-            for j, v in enumerate(vals):
-                if j >= 1:
-                    try:
-                        amounts[j] = Decimal(str(v))
-                    except (TypeError, ValueError):
-                        pass
+            pairs = [(k + 1, v) for k, v in enumerate(vals)]
     elif isinstance(row, (list, tuple)):
-        for j, v in enumerate(row):
-            if j >= 1:
-                s = str(v or "").strip().replace(",", "").replace("，", "")
-                if s:
-                    try:
-                        amounts[j] = Decimal(s)
-                    except Exception:
-                        pass
+        pairs = [(j, v) for j, v in enumerate(row) if j >= 1]
+
+    amounts: dict[int, Decimal] = {}
+    for col, raw in pairs:
+        if not 1 <= col < width:
+            continue
+        value = _to_decimal(raw)
+        if value is not None:
+            amounts[col] = value
     return amounts
 
 
@@ -449,7 +480,7 @@ async def _load_or_create_note_data(
     node_key: str | None,
 ) -> ConsolNoteData:
     """加载或创建 consol_note_data 行。
-    
+
     node_key=None 时操作项目级兼容行（与 consol_note_formula_service.fill_by_formula 同口径）。
     """
     q = sa.select(ConsolNoteData).where(

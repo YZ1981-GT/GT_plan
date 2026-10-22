@@ -433,6 +433,18 @@ describe('CP04 stored coordinates and asynchronous readers', () => {
     expect(sec.editRows.length).toBe(count)
     expect(exposed(w).noteDirty).toBe(false)
   })
+
+  it('confirmed delete removes the selected row and marks dirty', async () => {
+    // 正向用例：此前 confirmBatch 未导入，删除恒被 catch 当成「用户取消」，上一条迟到用例因此假绿
+    const w = await loaded(), s = state(w)
+    const sec = s.selectedNoteSection, count = sec.editRows.length, target = sec.editRows[2]
+    s.noteSelectedRows = [target]
+    await s.deleteNoteRows(); await flushPromises()
+    expect(confirmBatch).toHaveBeenCalledWith('删除', 1)
+    expect(sec.editRows.length).toBe(count - 1)
+    expect(sec.editRows.includes(target)).toBe(false)
+    expect(exposed(w).noteDirty).toBe(true)
+  })
 })
 
 describe('CP05 remaining async scope boundaries', () => {

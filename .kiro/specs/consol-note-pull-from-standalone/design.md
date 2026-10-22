@@ -267,3 +267,57 @@ async def aggregate_section(
 | 医疗器械 | 54 | 0 | 0 | 0 | ❌ 无底稿 |
 
 端到端验证使用安徽+和平+宜宾三个有真实推送数据的项目。
+
+## §10 v3 收口：并入 V186 明细映射链路（2026-10-22 复盘）
+
+> §1~§8 描述的「路径 A 新写入器」已废弃，代码已删除；本节为现行设计。勘误明细见 tasks.md「v3 勘误」。
+
+### 10.1 为什么收口而不是另起一条路径
+
+- 用户描述的工作方式（按企业代码建树 → 从各单位单体附注拉 → 科目明细对应规则 → 附注模板 / 参照模板 → 推送 + 用户弹窗确认）**就是**既有 V186 明细映射链路：明细模板（`consol_note_detail_template*`）→ 映射规则（按来源结构指纹分组）→ 逐企业绑定 → 映射弹窗确认 → apply 写 `consol_note_data`。
+- v2 另起的 `aggregate_section` / `reaggregate_from_standalone` 不经用户确认、行匹配靠模糊包含，且从未接到端点上。保留两套只会让「同一合并章节的个别数从哪来」有两个答案。
+- V186 的问题不在流程而在读取：拿合并章节号「五-1-1」查单体附注（单体里只有「八、1」）、只读顶层 `rows`、apply 首列错位 —— 在真实数据上一个数都读不到，所以一直没人发现。
+
+### 10.2 现行数据流
+
+```
+子企业单体附注 disclosure_notes（note_section=八、N / 五、N，_tables 或 workpaper 投影）
+  └─ consol_note_standalone_reader.read_source_table   ← 与编辑器 / Word 同口径（effective_table_data）
+       选表（子表名 / 合并表标题）+ 认列（列路径、期间归一、续表期初、比率列不加总）
+  └─ consol_note_detail_source_service.load_source_tables（批量；章节号取不到按标题）
+       → 标准来源行 {label, row_type, values}，values 已按合并模板列对齐
+  └─ preview（结构指纹分组 + 建议 + entity_sources）→ 用户确认（confirm_mapping，逐组）
+  └─ apply_detail_refresh（node_key 子树内的已确认企业；合计按本表重算）→ consol_note_data
+子企业保存附注（NOTE_SECTION_SAVED）
+  └─ consol_note_stale_handler → 按明细映射绑定找受影响合并章节 → value_change_service 标 is_stale
+```
+
+### 10.3 章节映射
+
+- 合并模板 `parent_section` 自 五-10 起整体错后一章，按 parent 映射不可用；改按**表标题 = 单体子表名**逐表映射（规范化口径与运行时 `_table_key` 同源），续表接上一张，定章兜底只认报表项目注释主章节（soe 八、/ listed 五、）。
+- 子企业模板与合并口径可以不同（国企集团含上市子公司），映射给出的章节号取不到时，读取层与 stale 判定都按单体章节标题认。
+
+### 10.4 与归档 ADR 的关系
+
+- 归档 spec `consol-note-node-refresh-and-formula-orchestration`（ADR-CNFO-006）规定「重新汇总」端点只调公式内核 `fill_note_sections`、禁止把单体记录当合并表格数据。v3 **不改**该端点：单体拉数的入口是附注页「📋 明细映射」，经用户确认后写入。
+- 本 spec requirements R1 写的「重新汇总从单体附注拉取」与该 ADR 冲突，未落地，待用户拍板（tasks.md Task 12 ①）。
+- 差额（调整 / 抵销）仍在公式内核（`note_breakdown` / `fill_by_formula`）；明细映射只产出个别数汇总。两条路径整表后写覆盖先写，写入来源记在 `_last_write_source`（`detail_mapping` / `formula`），附注页显示来源标签；如何合成待拍板（Task 12 ②）。
+
+### 10.5 已知限制
+
+- 真库读取覆盖（soe 已映射 316 章 × 安徽 / 和平 / 宜宾）：found 710、unreadable 214（多为 workpaper 来源章节只投影出主表 / 单体与合并表名不一致）、missing 24；found 中 234 有部分列未对上。读不到的企业在预览与 apply 结果里逐家列出原因，不静默算 0。
+- 行映射按来源行名：同一张表里行名重复（两处「其他」）会被加到同一目标行。
+- 合并模板自身的数据缺陷（tasks.md Task 11）会让个别列按歧义留空。
+
+### 10.6 文件（v3）
+
+| 文件 | 说明 |
+|------|------|
+| `backend/app/services/consol_note_standalone_reader.py` | 新：共用读取层 |
+| `backend/app/services/consol_note_detail_source_service.py` | 改：批量读取 / 章节换算 / 标题兜底 / 来源状态 / 模板建议骨架 |
+| `backend/app/services/consol_note_detail_apply_service.py` | 改：列对齐 / 子树 / 合计 / 来源标记 |
+| `backend/app/services/consol_note_section_mapping.py` | 改：`resolve_mapping_entry` |
+| `backend/scripts/seed/gen_consol_standalone_note_mapping.py` + `backend/data/consol_note_section_mapping.json` | 改：按表标题映射并重生成 |
+| `backend/app/services/consol_note_stale_handler.py` / `consol_note_value_change_service.py` | 改：按绑定定位 / 年度 / 合并项目过滤 / 值指纹 |
+| `backend/app/routers/disclosure_notes.py` | 改：更新事件 section_code 取 note_section |
+| `backend/app/services/consol_note_aggregator.py`、`backend/tests/test_consol_note_aggregator.py` | 删 |
