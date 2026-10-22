@@ -215,6 +215,12 @@ function openDialog() {
 function domainLabel(key: string): string {
   return domains.value[key]?.label || key
 }
+/** 处理结果提示：只有有效定义真的变了的域才会重算（全选「保留本项目」不重算，不能说「会按新定义重算」）。 */
+function resolvedText(n: number, recalcDomains?: string[]): string {
+  if (!recalcDomains) return `已处理 ${n} 处`
+  if (!recalcDomains.length) return `已处理 ${n} 处，本项目有效公式未变，无需重算`
+  return `已处理 ${n} 处，${recalcDomains.map(domainLabel).join('、')}会按新定义重算`
+}
 function fieldLabel(f: string): string {
   return FIELD_LABELS[f] || f
 }
@@ -250,10 +256,10 @@ async function onSubmit() {
   if (!pid || !resolutions.length || submitting.value) return
   submitting.value = true
   try {
-    await formulaSettingsApi.resolve(pid, resolutions)
+    const res = await formulaSettingsApi.resolve(pid, resolutions)
     const done = new Set(resolutions.map((r) => r.item_id))
     const touched = [...new Set(items.value.filter((i) => done.has(i.id)).map((i) => i.domain))]
-    ElMessage.success(`已处理 ${resolutions.length} 处，相关报表 / 附注会按新定义重算`)
+    ElMessage.success(resolvedText(resolutions.length, res?.recalc_domains))
     resetChoices()
     await reload()
     emit('resolved', touched)

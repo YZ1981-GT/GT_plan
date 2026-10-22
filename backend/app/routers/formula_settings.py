@@ -276,9 +276,12 @@ async def resolve(project_id: uuid.UUID, body: ResolveBody, db: AsyncSession = D
                   current_user: User = Depends(require_project_access("edit"))):
     result = await _run(db, project_ops.resolve_items(
         db, project_id=project_id, resolutions=[r.model_dump() for r in body.resolutions], user_id=current_user.id))
-    for ev in result.get("events") or []:
+    events = result.get("events") or []
+    for ev in events:
         await publish_events([ev], domain=ev["domain"], source="project_resolve")
-    return {k: v for k, v in result.items() if k != "events"}
+    # recalc_domains：有效定义真的变了、会重算的域（全选「保留本项目」时为空 ⇒ 前端不能说「会按新定义重算」）
+    return {**{k: v for k, v in result.items() if k != "events"},
+            "recalc_domains": sorted({ev["domain"] for ev in events})}
 
 
 @project_router.get("/apply-targets")

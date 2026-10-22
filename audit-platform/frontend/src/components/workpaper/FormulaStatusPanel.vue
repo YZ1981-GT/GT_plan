@@ -28,6 +28,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 // spec: formula-management-runtime-closure Task 14 — 公式端点收敛进 apiPaths（纯搬迁，URL 逐字不变）
 import { wpFormula } from '@/services/apiPaths/formula'
+import { wpFormulaSaveNotice, type WpFormulaSaveReceipt } from '@/composables/formula/wpFormulaSaveNotice'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import {
   FORMULA_TYPE_LABEL,
@@ -295,12 +296,12 @@ async function putFormula(binding: {
   expression: string
   description?: string
   category?: string
-}): Promise<boolean> {
+}): Promise<WpFormulaSaveReceipt | null> {
   try {
     const existing = rawItems.value.find(
       (it) => it.target_cell === binding.anchor && it.sheet_name === binding.sheet_name,
     )
-    await api.put(
+    const receipt = await api.put(
       wpFormula.upsert(props.wpId),
       {
         sheet_name: binding.sheet_name,
@@ -314,10 +315,10 @@ async function putFormula(binding: {
       },
       { _silent: true } as any,
     )
-    return true
+    return (receipt as WpFormulaSaveReceipt | null) || {}
   } catch (err) {
     handleSaveError(err)
-    return false
+    return null
   }
 }
 
@@ -359,7 +360,9 @@ async function confirmEdit() {
       category: null,
     })
     if (ok) {
-      ElMessage.success('已保存')
+      // 算不出值时写明原因（spec formula-governance-coverage-closure R6.3），不能只说「已保存」
+      const notice = wpFormulaSaveNotice(ok, editForm.value.anchor)
+      ElMessage[notice.level]({ message: notice.text, duration: notice.level === 'warning' ? 8000 : 3000 })
       editVisible.value = false
       await loadFormulas()
     }

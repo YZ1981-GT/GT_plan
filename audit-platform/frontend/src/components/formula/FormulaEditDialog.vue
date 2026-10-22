@@ -963,12 +963,15 @@ async function loadAcnrSources() {
     const yr = props.year || resolveYear()
     if (pid && yr) {
       const { getDisclosureNoteTree } = await import('@/services/auditPlatformApi')
-      const notes = await getDisclosureNoteTree(pid, Number(yr))
+      // 附注未生成（404）是正常空态：静默、用静态目录（原先每次打开都弹「附注数据不存在」）
+      const notes = await getDisclosureNoteTree(pid, Number(yr), { _silent: true } as any)
       if (Array.isArray(notes) && notes.length) {
         noteSourceChildren.value = buildNoteSourceTree(notes)
       }
     }
-  } catch { /* ignore */ }
+  } catch (e: any) {
+    if ((e?.response?.status ?? e?.status) !== 404) ElMessage.warning('本项目附注目录加载失败，暂按模板目录显示')
+  }
 }
 
 /** 从项目附注章节数据构建按大章分组的树（带编号如「五、1 货币资金」） */

@@ -133,10 +133,12 @@ watch(() => props.modelValue, async (open) => {
   if (!open) return
   domain.value = props.defaultDomain
   unsubscribeMode.value = 'keep'
-  try {
-    domainOptions.value = ((await formulaSettingsApi.domains())?.domains || []).filter((d) => d.wired)
-  } catch { /* 域清单拿不到时只显示当前域 */ }
-  await loadAll()
+  // 域清单与模板清单并行取（loadAll 同步进入加载态）：原先等域清单回来才开始加载，期间列表空着、
+  // 露出「没有可订阅的模板」（R5 走查：公式管理中心还在加载时打开订阅，几秒内都是这句）
+  const domainsReq = formulaSettingsApi.domains()
+    .then((data) => { domainOptions.value = (data?.domains || []).filter((d) => d.wired) })
+    .catch(() => { /* 域清单拿不到时只显示当前域 */ })
+  await Promise.all([domainsReq, loadAll()])
 }, { immediate: true })
 
 watch(domain, () => { if (props.modelValue) void loadAll() })

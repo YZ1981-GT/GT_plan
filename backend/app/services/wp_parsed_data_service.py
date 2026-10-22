@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import re
 import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -106,6 +107,26 @@ def write_cell_to_parsed_data(
     parsed["html_data"] = html_data
     wp.parsed_data = parsed
     flag_modified(wp, "parsed_data")
+
+
+def ensure_parsed_data_placeholder(wp: WorkingPaper, *, wp_code: str, created_by: str) -> bool:
+    """新建底稿的 ``parsed_data`` 兜底：为空时写入最小非空占位，已有内容不动；返回是否写入。
+
+    结构对齐渲染器消费的 ``html_data`` 形态（空表），避免 HTML 渲染器「有记录无内容」。
+    按模板读 sheet 结构填充 ``html_data``（wp-generation-pipeline 设想的 ``populate_parsed_data``）
+    全仓从未实现；两条生成路径（按编码生成 ``generate-from-codes`` / 准则转换）共用本兜底，
+    ``created_by`` 记来源，便于日后补齐真实填充时区分存量占位。
+    """
+    if wp.parsed_data:
+        return False
+    wp.parsed_data = {
+        "_created_by": created_by,
+        "wp_code": wp_code,
+        "html_data": {},
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    flag_modified(wp, "parsed_data")
+    return True
 
 
 def format_cell_display_value(value: Decimal | Any) -> Any:

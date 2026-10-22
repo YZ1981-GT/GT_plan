@@ -42,8 +42,9 @@ export const formulaSettingsApi = {
 
   pending: (pid: string) =>
     api.get<{ project_id: string; count: number; items: PendingItem[] }>(PP.pending(pid), silent({ _dedupe: false })),
+  /** `recalc_domains`：有效定义真的变了（会重算）的域；全选「保留本项目」时为空 */
   resolve: (pid: string, resolutions: Resolution[]) =>
-    api.post<{ resolved: Array<Record<string, any>> }>(PP.resolve(pid), { resolutions }, silent()),
+    api.post<{ resolved: Array<Record<string, any>>; recalc_domains?: string[] }>(PP.resolve(pid), { resolutions }, silent()),
   applyTargets: (pid: string, domain: string) =>
     api.get<{ items: ApplyTarget[] }>(PP.applyTargets(pid), silent({ params: { domain } })),
   effective: (pid: string, domain: string) => api.get<EffectiveResult>(PP.effective(pid, domain), silent()),

@@ -175,6 +175,8 @@ export interface FormulaListItem {
   sheet_name?: string | null
   computed_value?: string | null
   last_computed_at?: string | null
+  /** 定义版本：再次保存同一格要带它作 expected_version（不带 ⇒ 后端 428） */
+  definition_version?: number | null
 }
 
 function cellTextOf(cells: Record<string, unknown>, ref: string): string {

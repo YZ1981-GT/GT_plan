@@ -313,7 +313,7 @@ async def generate_from_codes(
     改造要点（wp-generation-pipeline spec）：
     - 前置门禁：trial_balance > 0 行
     - savepoint 隔离：单条失败不影响整批
-    - populate_parsed_data：填充 html_data 供渲染器消费
+    - parsed_data：写最小非空占位（与准则转换生成路径同一兜底）供渲染器消费
     - 结构化返回：created/skipped/failures + codes 列表
     """
     import json
@@ -323,7 +323,9 @@ async def generate_from_codes(
     from pathlib import Path
 
     from app.services.prerequisite_checker import PrerequisiteChecker
-    from app.services.wp_parsed_data_service import populate_parsed_data
+    # 原 import 的 `populate_parsed_data` 全仓从未实现 ⇒ 本端点对任何调用都在这里 ImportError 500
+    # （前端「生成底稿」在模板集生成 5xx 时回退到本端点，回退同样失败）
+    from app.services.wp_parsed_data_service import ensure_parsed_data_placeholder
 
     _logger = logging.getLogger(__name__)
 
@@ -461,8 +463,8 @@ async def generate_from_codes(
                 except Exception as _e:
                     _logger.warning("fill header failed for %s: %s", code, _e)
 
-                # [新增] 填充 parsed_data（核心产物）
-                await populate_parsed_data(db, wp, code, wp_name, cycle)
+                # 填充 parsed_data（核心产物；为空时写最小非空占位）
+                ensure_parsed_data_placeholder(wp, wp_code=code, created_by="generate_from_codes")
 
             created += 1
             created_codes.append(code)

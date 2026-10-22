@@ -1062,6 +1062,12 @@ async def save_formula(
                 parsed_data=wp.parsed_data,
                 parent_wp_code=wp_code,
             )
+        if eval_errors:
+            # spec formula-governance-coverage-closure R6.3：求值有错（取不到数 / 写法无法识别 …）时
+            # 求值器回的 0 只是占位 ⇒ 格子留空、不回 0，原因在 eval_warnings 里给用户看。
+            # 原先网格 cell 照写 0（R5 真库走查：REPORT 期初缺数、PREV 无上年试算表、附注无章节都写成 0），
+            # 与 D-cycle 锚点「不静默落空」口径不一致。
+            evaluated_value = None
         if not is_dcycle_anchor and not is_f2_anchor:
             # 普通网格 cell（∉ known_anchors）/ 非 D-cycle / 主开关关 → parsed_data 网格写回（零回归）
             _display = format_cell_display_value(evaluated_value)
@@ -1164,16 +1170,13 @@ async def save_formula(
 
     payload: dict = {"saved": _formula_to_dict(saved)}
     if saved.formula_type == "auto_calc":
-        if is_dcycle_anchor and eval_errors:
-            # R1.4 / Property 3：D-cycle 锚点求值失败或有 eval_errors → 只返回 eval_warnings，
-            # 不返回错误/0 的 evaluated_value（不静默落空）。
+        if eval_errors:
+            # R1.4 / Property 3 + R6.3：求值有错（锚点与网格 cell 同口径）→ 只返回 eval_warnings，
+            # 不返回错误 / 0 的 evaluated_value（不静默落空；网格 cell 上面已留空）。
             payload["eval_warnings"] = eval_errors
-        else:
-            # 非锚点（网格 cell）逐字节零回归：仍返回 evaluated_value（+ eval_warnings 若有）；
-            # D-cycle 锚点求值成功：返回 evaluated_value 供前端即时本地显示（不落库）。
+        elif evaluated_value is not None:
+            # 求值成功：返回 evaluated_value 供前端即时显示（D-cycle 锚点不落库；F2 锚点保存时不求值 ⇒ 不返回）
             payload["evaluated_value"] = str(evaluated_value)
-            if eval_errors:
-                payload["eval_warnings"] = eval_errors
     if linkage is not None:
         payload["linkage"] = linkage
     return payload

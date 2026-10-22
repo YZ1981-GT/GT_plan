@@ -28,7 +28,8 @@
                 <code v-else class="gt-fpp-code gt-fpp-new">{{ definitionText(row.new) }}</code>
               </template>
             </el-table-column>
-            <el-table-column label="版本" width="90" align="center">
+            <!-- 模板发布 / 设为全局的变更行没有逐公式位版本（模板版本在标题里）：整列都是「— → —」时不显示 -->
+            <el-table-column v-if="hasSlotVersions" label="版本" width="90" align="center">
               <template #default="{ row }">{{ row.old_version ?? '—' }} → {{ row.new_version ?? '—' }}</template>
             </el-table-column>
           </el-table>
@@ -165,6 +166,7 @@ watch(() => props.preview, () => {
 })
 
 const changes = computed(() => props.preview?.changes || [])
+const hasSlotVersions = computed(() => changes.value.some((r: any) => r.old_version != null || r.new_version != null))
 const versionProblems = computed(() => props.preview?.version_problems || [])
 const projects = computed(() => props.preview?.summary?.projects || [])
 const counts = computed<Record<string, number>>(() => props.preview?.summary?.counts || props.preview?.counts || {})

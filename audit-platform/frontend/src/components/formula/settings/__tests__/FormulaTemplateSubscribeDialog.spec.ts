@@ -61,6 +61,22 @@ beforeEach(() => {
 })
 
 describe('订阅', () => {
+  it('打开即进入加载态，模板清单不等域清单（R5 走查：域清单慢时露出「没有可订阅的模板」）', async () => {
+    let releaseDomains: (v: unknown) => void = () => {}
+    api.domains.mockReturnValueOnce(new Promise((resolve) => { releaseDomains = resolve }))
+    const w = mountDialog()
+    const vm = w.vm as any
+    expect(vm.loading).toBe(true)
+    await flushPromises()
+    expect(api.templates).toHaveBeenCalledWith({ domain: 'report' })
+    expect(vm.templates.map((t: any) => t.id)).toEqual(['t1'])
+    expect(vm.loading).toBe(false)
+    releaseDomains({ domains: [{ key: 'report', label: '报表公式', wired: true }] })
+    await flushPromises()
+    expect(vm.domainOptions.map((d: any) => d.key)).toEqual(['report'])
+    w.unmount()
+  })
+
   it('列出该域可见模板；订阅先预览，冲突只给「采用模板 / 保留本项目」，默认采用', async () => {
     const w = mountDialog()
     await flushPromises()

@@ -230,6 +230,11 @@ inclusion: always
 - 🔴 EventPayload.year 默认 None 但 FORMULA_CONFIG_CHANGED 在 `event_bus.YEAR_SCOPED_EVENT_TYPES` ⇒ 派发口 `_backfill_year` 按项目审计年度补齐，consol_note/report 传播经事件能拿到 year（直接调 handler 传 year 的测试会掩盖此路径，须测「事件不带 year」）
 - 🔴 教训：①report_config 有多条写入路径（迁移 / fill_all_formulas / report_formula_service），只改一处等于白改——改公式行必过同步内核 ②design §3/§5/§9/§12/§16.2 五处偏离（代码为准，见其 design §17 / tasks 交付勘误）：停用=保留行 formula 置 None 非剔除、底稿项目层含 preset/reference（跟随副本写 preset，narrow 会读不回）③🔴 **数行数禁用 PowerShell `Measure-Object -Line`（跳过空行：report_models 算出 683 实为 798）**，一律 Python `splitlines()`（与门禁同口径）—— 曾据此把 HEAD 已超限的历史大文件误判为「并发会话膨胀」；**PowerShell here-string 里的反引号是转义符**（`` `f `` 变换页符，写进 INDEX 把链接弄坏），含反引号的文本一律写成 .py 文件再执行 ④提交须知：`FormulaManagerDialog.vue` HEAD 4819 > 阈值 4481，WT 4758 仍超，pre-commit 会拦
 
+### 公式治理全覆盖收口 `formula-governance-coverage-closure`（2026-10-22，36/36，分批推送至 spec/disclosure-note-doc-upload-and-batch-fill）
+- 承接公式管理全面评估七条建议：R1 公式调试 / 底稿用户公式 / 公式导入 / 报表审核等端点越权修复 + 鉴权守卫第三维（请求体 / 对象型，`test_project_endpoint_authz_body_carried.py`）· R7a 表间审核 PREV / AUX 取不到数报原因、不代入 0（`formula_ref_preload.py`）· R2 推送 420 条规则成 push 域系统预设层（只开放改写公式与启停，系统值 / 派生值不许停用）· R3 校对规则只读目录 12 来源（`GET /api/formula-catalog/check-rules` + 登记守卫）· R4 零挂载组件逐个裁决（挂载守卫 `formulaComponentMounts.spec.ts`）· R6 底稿可编辑公式补齐 ROW / REPORT / NOTE / PREV / AUX / ADJ · R5【测试】甲 / 乙真库走查（接口 + 无头浏览器双证）修 9 处缺陷，清理全走平台路径并对账
+- 🔴 教训：①回执字段先看真实形状：底稿公式保存的版本号在 `saved.definition_version` 下，读顶层 ⇒ 同一行第二次保存恒 409；CAS 端点调用方漏传 `expected_version` ⇒ 恒 428 ②求值有错照写 0 是静默假数：缺数一律留空、清旧值、回原因 ③tb_detail / push 的全局层适用范围是 `*`，全局发布会触达真实项目 ⇒ 写入型走查改用只覆盖【测试】项目的域（上市单体报表公式）④`backend/pytest.ini` 的 `pythonpath = tests` 让 `tests/playwright/` 遮蔽真 playwright 包 ⇒ 后端 pytest 一律带 `-p no:playwright` ⑤前端地址库 store 一次取 5000 条、后端按 report → tb → note → wp → aux 顺序截断 ⇒ 真实项目附注 / 底稿 / 辅助域在前端恒空（只修了公式栏的回退）⑥验证 worktree 放 `C:\Users\Administrator\fgcc_verify` 并 lock（`D:\` 下的被并发会话清掉过），用完 unlock + 先删 junction + prune
+- 范围外登记未改（见其 design §2.2 / §9）：consistency_gate 82 处 `passed=True`（缺数 / 异常即放行签字门禁，需拍板）· metabase embed-url · 5 条推送规则恒推 0 · note_templates 预设端点无鉴权 · `/generate` 丢 `selected_templates` · 生成端点仅登录 · 平台无底稿删除端点 · 184 条 PREV 三参预设恒 0 · d-cycle Tier A 28 例与 `ChatAdoptNoteTarget.spec.ts` 8 例 HEAD 同红
+
 ### 真正待办（外部依赖）
 - LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
 
@@ -241,11 +246,8 @@ inclusion: always
 - **消费方**：下游 RAG 走 `knowledge_documents.content_text` 带权限词法检索（方案 A；`knowledge_index` 0 行、仅可选加速层；方案 B 修索引写路径 5 断点仍暂缓）· 附注续写 / 改写只传 `knowledge_doc_ids`（≤5），后端 `load_documents` 逐篇判权注入并回 `knowledge_count`（不收前端拼的正文）· 审计报告「📚 知识库」标开发中 · DSH `kb_search` 只走向量（dsh Property 16），embedding 8101 不可达（`audit-vllm-embed` 已停 3 个月）⇒ 恒 `semantic_unavailable` · 镜像 `pgvector/pgvector:pg16` 带 vector 扩展但库内未 CREATE（`pg_extension` 仅 citext/plpgsql）· 扫描件正文由后台 OCR 经 `ocr` 能力槽补（本机无 OCR 引擎时走服务器 paddleocrv6；`MINERU_ENABLED=False` 不再意味着扫描件无正文）
 - 待办：修复向量/扩展（`audit-vllm-embed` + pgvector）· 收口其余 10 组重复路由 · MinerU · 旧 `knowledge_base.py` 路由与 `KnowledgeBasePanel` 零挂载死链（登记于 `test_frontend_knowledge_paths_exist._KNOWN_DEAD_PATHS`）
 
-### 待修 bug（2026-06-01 grep 实证，与已修 render-config 同源：查 users 不存在的 display_name 列）
-- ✅ `project_wizard.py` — **已修**（2026-10-10 现读确认已用 `UserModel.username`，注释明确标注「users 表无 display_name 列，用 username」）
-- ✅ `qc_report_export.py` — **已修**（2026-10-10 现读确认已用 `u.username`，无 display_name 引用；`test_export_endpoints_acceptance.py` 守卫 `test_sql_uses_username_not_display_name` 钉住）
-- ✅ `word_export.py` full-package 端点 — **已修**（2026-10-10）：`from fastapi import HTTPException` 写在 `if gate_result.decision == "block"` 分支内，模块顶层已有同名 import，函数体内延迟 import 遮蔽模块级名字 → 门禁通过时 `except HTTPException` 触发 `UnboundLocalError` → 异常穿透中间件。删掉冗余延迟 import 即修。
-- 系统性防御建议：加 CI「SQL 列引用 ⊆ 真实 schema」契约检查，一次兜住整类「查不存在列」bug（render-config/prefill/wizard/qc 已 4 处同源）
+### 待修 bug（2026-06-01 grep 实证：查 users 不存在的 display_name 列）—— ✅ 2026-10-10 全部已修
+- `project_wizard.py` / `qc_report_export.py` 改用 username（守卫 `test_sql_uses_username_not_display_name`）· `word_export.py` full-package 函数体内延迟 `from fastapi import HTTPException` 遮蔽模块级名字致 `UnboundLocalError`，删冗余 import 即修 · 系统性防御建议：CI「SQL 列引用 ⊆ 真实 schema」契约检查（render-config / prefill / wizard / qc 已 4 处同源）
 ### M7/M9 缺失 service + lazy import 守卫 `m7-m9-service-modules-and-lazy-import-guard`（2026-10-20，10/10，本地未提交）
 - **根因**：`routers/m7_special_reserve.py` / `m9_other_comprehensive_income.py` 函数体内 import 的 `app.services.m7_special_reserve_service` / `m9_other_comprehensive_income_service` 全仓不存在（8 端点一调即 ModuleNotFoundError）；7 月误提交 `audit-platform/backend/` 旧草稿（dd620e430）签名也不符。F2-1 导出/导入同类（import 不存在的 `app.models.checklist_response_models`）
 - **修**：新建共用内核 `m_detail_sheet_io.py`（DetailSheetSpec + 模板/数据工作簿 + 整表替换写库，裸 SQL `ON CONFLICT (wp_id,item_id)`）+ 两个 service（M7-2 / M9-2，各只支持界面唯一有入口的那张表，未知 sheet 抛 `HTTPException(400)`——这正是 X-3 G6 的判据）；计提测试阈值 1000/0.05 读 TS 源码钉住；M9 `get_adjudication_rows` 返回 `(rows, warnings)`；F2-1 两路径改裸 SQL；M9TabDetail 导入后 `loadData()+_initDefaultRows()`。X-3 G6 规范下调 10→8（`--emit --set-baselines --lowered-by-task 9`）

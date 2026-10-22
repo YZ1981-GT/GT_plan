@@ -305,8 +305,13 @@ def test_property3_dcycle_anchor_eval_error_returns_warnings_no_value(monkeypatc
     assert spies["write"] == [], "锚点求值失败仍不写 parsed_data"
 
 
-def test_property3_grid_cell_eval_error_keeps_value_zero_regression(monkeypatch):
-    """非锚点网格 cell 求值有 eval_errors → 逐字节零回归：仍返回 evaluated_value + eval_warnings。"""
+def test_property3_grid_cell_eval_error_clears_cell_no_zero(monkeypatch):
+    """非锚点网格 cell 求值有 eval_errors → 格子留空、只回 eval_warnings，不回 0。
+
+    原口径（「逐字节零回归」：照写 0 并返回 evaluated_value）在 spec formula-governance-coverage-closure
+    R5 真库走查中暴露为「取不到数静默 0」（R6.3 禁止）：REPORT 期初缺数、PREV 无上年试算表、附注无章节
+    在网格里都成了 0，公式管理中心还提示「公式已保存」。现与 D-cycle 锚点同口径。
+    """
     _enable(monkeypatch)
     wp = _wp()
     saved = _saved_formula("B5", sheet_name="Sheet1", wp=wp)
@@ -317,9 +322,10 @@ def test_property3_grid_cell_eval_error_keeps_value_zero_regression(monkeypatch)
     resp = _run(router_mod.save_formula(
         wp.id, _body("B5", sheet_name="Sheet1"), db=db, user=_user()))
 
-    assert resp["evaluated_value"] == str(0.0), "非锚点保留旧行为（返回 evaluated_value）"
+    assert "evaluated_value" not in resp, "求值有错不回 0（R6.3）"
     assert resp.get("eval_warnings") == ["跨 sheet 引用缺失"]
-    assert len(spies["write"]) == 1
+    assert len(spies["write"]) == 1, "仍写该格（清掉旧值），不是跳过"
+    assert spies["write"][0]["value"] is None, "格子留空，不写 0"
 
 
 # ---------------------------------------------------------------------------

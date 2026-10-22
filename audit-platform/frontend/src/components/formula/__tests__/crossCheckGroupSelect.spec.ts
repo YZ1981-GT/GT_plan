@@ -124,14 +124,52 @@ describe('表间审核分组节点', () => {
     w.unmount()
   })
 
-  it('其他有子节点的分组（报表 / 附注 根节点）仍然只展开不选中', async () => {
+  it('其他有子节点的分组（报表 / 附注 根节点、底稿循环节点）仍然只展开不选中', async () => {
     const w = await open()
     const s = state(w)
     const before = s.selectedNodeKey
     s.onTreeNodeClick({ key: 'cross_check', label: '表间审核', children: [{ key: 'cross_report_wp' }] })
     s.onTreeNodeClick({ key: 'report', label: '报表', children: [{ key: 'report_balance_sheet' }] })
+    s.onTreeNodeClick({ key: 'wp_cycle_e', label: 'E 货币资金', children: [{ key: 'wp_e1', _wpCode: 'E1' }] })
     await flushPromises()
     expect(s.selectedNodeKey).toBe(before)
+    expect(s.selectedWpCode).toBe('')
+    w.unmount()
+  })
+})
+
+describe('底稿工作簿节点（R5 走查：点「E1 货币资金」只高亮不切换）', () => {
+  beforeEach(() => {
+    get.mockReset()
+    get.mockImplementation(async (url: string) => {
+      const u = String(url)
+      if (u.endsWith('/formula-push/bindings')) return { supported_wp_codes: ['E1'] }
+      if (u.includes('report-config/types')) return []
+      return {}
+    })
+    scopeLoad.mockReset(); scopeLoad.mockResolvedValue([])
+    acnrListSheets.mockReset(); acnrListSheets.mockResolvedValue([])
+    acnrListCells.mockReset(); acnrListCells.mockResolvedValue([])
+    getNoteTree.mockReset(); getNoteTree.mockResolvedValue([])
+  })
+
+  it('点工作簿节点即选中整本：底稿编码就位、不限定页，推送页按本底稿；没选底稿时推送空状态引导去选', async () => {
+    const w = create()
+    await w.setProps({ modelValue: true })
+    for (let i = 0; i < 4; i++) await flushPromises()
+    const s = state(w)
+    expect(s.pushWpSelected).toBe(false)
+    s.onTreeNodeClick({
+      key: 'wp_e1', label: 'E1 货币资金', _wpCode: 'E1', _sheetCode: '',
+      children: [{ key: 'wp_e1_1', label: 'E1-1', _wpCode: 'E1', _sheetCode: 'E1-1' }],
+    })
+    await flushPromises()
+    expect(s.selectedNodeKey).toBe('wp_e1')
+    expect(s.selectedWpCode).toBe('E1')
+    expect(s.selectedWpSheetCode).toBe('')
+    expect(s.selectedPath).toBe('底稿 > E1 货币资金')
+    expect(s.pushWpSelected).toBe(true)
+    expect(s.pushWpCode).toBe('E1')
     w.unmount()
   })
 })

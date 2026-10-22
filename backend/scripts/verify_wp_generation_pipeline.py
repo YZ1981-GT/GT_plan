@@ -295,7 +295,8 @@ async def _call_generate(db, project_id: UUID, wp_codes: list, year: int, user) 
     from sqlalchemy.orm.attributes import flag_modified
 
     from app.models.workpaper_models import WpIndex, WorkingPaper, WpStatus, WpSourceType
-    from app.services.wp_parsed_data_service import populate_parsed_data
+    # 与端点同口径：`populate_parsed_data` 全仓从未实现（原 import 让本脚本与端点一样 ImportError）
+    from app.services.wp_parsed_data_service import ensure_parsed_data_placeholder
 
     _logger = logging.getLogger(__name__)
 
@@ -414,7 +415,7 @@ async def _call_generate(db, project_id: UUID, wp_codes: list, year: int, user) 
                 except Exception:
                     pass
 
-                await populate_parsed_data(db, wp, code, wp_name, cycle)
+                ensure_parsed_data_placeholder(wp, wp_code=code, created_by="generate_from_codes")
 
             created += 1
             created_codes.append(code)

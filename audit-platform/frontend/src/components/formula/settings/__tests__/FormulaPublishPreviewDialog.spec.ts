@@ -107,6 +107,22 @@ describe('FormulaPublishPreviewDialog', () => {
     w.unmount()
   })
 
+  it('变更行没有逐公式位版本（模板发布 / 设为全局）：不显示整列「— → —」的版本列', async () => {
+    const headers = async (w: ReturnType<typeof open>) => {
+      await flushPromises()
+      return w.findAll('th').map((t) => t.text().trim())
+    }
+    const withVersion = open()
+    expect(await headers(withVersion)).toContain('版本')
+    withVersion.unmount()
+    const tplChanges = [{ slot_key: 'balance_sheet:BS-002', label: '货币资金', old: { formula: 'A' }, new: { formula: 'B' }, deleted: false }]
+    const template = open({ preview: { ...PREVIEW, changes: tplChanges } })
+    const hs = await headers(template)
+    expect(hs).toContain('新定义')
+    expect(hs).not.toContain('版本')
+    template.unmount()
+  })
+
   it('提交失败（返回 false）不关窗', async () => {
     submit.mockResolvedValueOnce(false)
     const w = open()

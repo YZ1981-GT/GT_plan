@@ -2,6 +2,7 @@
   * 审计作业平台 API 服务层
   * 封装所有后端 API 调用
   */
+ import type { AxiosRequestConfig } from 'axios'
  import http from '@/utils/http'
  import { resolveAuditYearFromProject } from '@/utils/resolveAuditYear'
  import {
@@ -671,8 +672,15 @@ export async function generateDisclosureNotes(projectId: string, year: number, t
   return data
 }
 
-export async function getDisclosureNoteTree(projectId: string, year: number): Promise<DisclosureNoteTreeItem[]> {
-  const { data } = await http.get(P_dn.tree(projectId, year))
+/**
+ * 本项目附注目录。附注未生成时后端 404「附注数据不存在，请先生成附注」是正常空态 ——
+ * 调用方可传 `{ _silent: true }` 自己处理（原先只收两个参数，第三参被丢弃 ⇒ 公式管理中心 / AI 采纳目标
+ * 每次都弹全局错误提示，spec formula-governance-coverage-closure R5 走查）。
+ */
+export async function getDisclosureNoteTree(
+  projectId: string, year: number, config?: AxiosRequestConfig,
+): Promise<DisclosureNoteTreeItem[]> {
+  const { data } = await http.get(P_dn.tree(projectId, year), config)
   return data
 }
 

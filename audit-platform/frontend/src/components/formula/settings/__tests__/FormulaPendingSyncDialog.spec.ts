@@ -124,6 +124,27 @@ describe('处理待确认', () => {
     w.unmount()
   })
 
+  it('提示按 recalc_domains：全选保留 ⇒「无需重算」；有变化的域 ⇒ 写域名会重算（R5 走查：保留也说「会按新定义重算」）', async () => {
+    api.domains.mockResolvedValue({ domains: [{ key: 'report', label: '报表公式' }] })
+    for (const [recalc, text] of [
+      [[], '已处理 2 处，本项目有效公式未变，无需重算'],
+      [['report'], '已处理 2 处，报表公式会按新定义重算'],
+      [undefined, '已处理 2 处'],
+    ] as const) {
+      api.resolve.mockResolvedValueOnce({ resolved: [], ...(recalc ? { recalc_domains: [...recalc] } : {}) })
+      msg.success.mockClear()
+      const w = mountDialog('p1')
+      await flushPromises()
+      w.vm.openDialog()
+      await flushPromises()
+      w.vm.setAll('keep')
+      await w.vm.onSubmit()
+      await flushPromises()
+      expect(msg.success).toHaveBeenCalledWith(text)
+      w.unmount()
+    }
+  })
+
   it('批量「全部采用新定义」后只提交一次，未选择的不提交', async () => {
     const w = mountDialog('p1')
     await flushPromises()

@@ -273,10 +273,10 @@
               :can-edit="!formulaReadOnly"
             />
             <div v-else-if="activeCategory === 'formula_push' && !pushWpCode" class="gt-fp-not-connected">
-              <!-- formula-management-ux-improvements B3：改进空状态文案 -->
+              <!-- formula-management-ux-improvements B3：改进空状态文案；没选底稿时先引导去选（R5 走查：原先一律说「本底稿尚未接入」） -->
               <el-empty :image-size="64">
                 <template #description>
-                  <p>本底稿尚未接入自动推送</p>
+                  <p>{{ pushWpSelected ? '本底稿尚未接入自动推送' : '请先在左侧「📋 底稿」里选一张底稿（点工作簿或其中任一页）' }}</p>
                   <p style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">
                     {{ pushNotNeededReason || ('已接入：' + (pushWpCodes.length ? pushWpCodes.join('、') : '暂无')) }}
                   </p>
@@ -552,6 +552,7 @@ import {
 import FormulaSettingsToolbar from './settings/FormulaSettingsToolbar.vue'
 import { canRestoreRow, fetchEffectiveReportRows, invalidateEffectiveReport, markLoaded, restoreReportRows, rowChanged, saveReportRows } from './settings/reportEffectiveRows'
 import { layerLabel, layerTagType, showFormulaError } from '@/composables/formula/useFormulaSettings'
+import { savedDefinitionVersion, wpFormulaBatchNotice, wpFormulaSaveNotice } from '@/composables/formula/wpFormulaSaveNotice'
 import { useTbDetailFormulas } from './composables/useTbDetailFormulas'
 import { useCrossCheckRules } from './composables/useCrossCheckRules'
 import { issueRunForNode } from './formulaIssueHint'
@@ -1112,7 +1113,13 @@ async function fetchNoteTree() {
     // 优先从项目级附注 API 加载（项目不同结构不同）
     if (props.projectId && props.year) {
       const { getDisclosureNoteTree } = await import('@/services/auditPlatformApi')
-      const notes = await getDisclosureNoteTree(props.projectId, Number(props.year))
+      let notes: unknown = []
+      try {
+        // 附注未生成（404）是正常空态：静默改用下面的模板目录（原先弹「附注数据不存在」且跳过模板目录）
+        notes = await getDisclosureNoteTree(props.projectId, Number(props.year), { _silent: true } as any)
+      } catch (e: any) {
+        if ((e?.response?.status ?? e?.status) !== 404) ElMessage.warning('本项目附注目录加载失败，暂按模板目录显示')
+      }
       if (!shouldApplyResponse(reqKey, currentProjectCacheKey.value)) return
       if (Array.isArray(notes) && notes.length) {
         noteTreeChildren.value = buildNoteTreeFromProjectData(notes)
@@ -1880,6 +1887,8 @@ const pushWpCode = computed(() => {
   const code = normalizeWpCode(selectedWpCode.value || props.wpCode || '').split('-')[0].toUpperCase()
   return pushWpCodes.value.includes(code) ? code : ''
 })
+/** 推送页空状态区分「还没选底稿」与「选了但未接入」 */
+const pushWpSelected = computed(() => !!(selectedWpCode.value || props.wpCode))
 
 // formula-management-ux-improvements B3：不需推送循环的具体原因
 const _PUSH_NOT_NEEDED_REASONS: Record<string, string> = {
@@ -2501,7 +2510,10 @@ function onTreeNodeClick(data: any) {
   // 表间审核分组节点（报表 ↔ 附注 / 合并 ↔ 报表 …）本身挂着规则集与内置勾稽问题清单，有子节点也要能选中
   // （原先只认叶子 ⇒ 有内置勾稽结论时的「报表 ↔ 附注」、恒有三个子项的「合并 ↔ 报表」，规则永远点不到）
   const isCrossCheckGroup = (Object.values(CROSS_CHECK_NODE_KEYS) as string[]).includes(data.key)
-  if (!data.children || data.children.length === 0 || isCrossCheckGroup) {
+  // 底稿工作簿节点（「E1 货币资金」，有子页、带 _wpCode 无 _sheetCode）：选中整本 —— 公式表列全册公式、
+  // 公式推送页按本底稿。原先只认叶子：点工作簿只高亮不切换，推送页还提示「本底稿尚未接入自动推送」（R5 走查）
+  const isWorkbookNode = data.key.startsWith('wp_') && !!data._wpCode && !data._sheetCode
+  if (!data.children || data.children.length === 0 || isCrossCheckGroup || isWorkbookNode) {
     selectedNodeKey.value = data.key
     // 构建路径
     if (data.key.startsWith('tb_')) {
@@ -3118,7 +3130,9 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
         description: data.description,
         expected_version: row.definition_version ?? undefined,
       })
-      if (saved?.definition_version != null) row.definition_version = saved.definition_version
+      // 版本在回执的 saved 下（原读顶层恒取不到 ⇒ 同一行第二次保存必 409）
+      const savedVersion = savedDefinitionVersion(saved)
+      if (savedVersion != null) row.definition_version = savedVersion
       Object.assign(row, {
         formula: data.formula,
         formula_category: data.category,
@@ -3126,7 +3140,9 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
         target_cell: data.target_cell || row.target_cell,
       })
       showFormulaEdit.value = false
-      ElMessage.success('公式已保存')
+      // R6.3：取不到数时格子留空，提示写明原因（不能只说「公式已保存」）
+      const notice = wpFormulaSaveNotice(saved, data.target_cell || row.target_cell || '')
+      ElMessage[notice.level]({ message: notice.text, duration: notice.level === 'warning' ? 8000 : 3000 })
       emit('saved')
       await propagateFormulaStale(targetLocation)
     } catch (e) {
@@ -3403,6 +3419,7 @@ async function onSaveAllFormulas() {
   let saved = 0
   let skippedReadonly = 0
   const reportBatch: any[] = []
+  const wpEvalFailures: Array<{ cell: string; warnings: string[] }> = []
   try {
     for (const row of rows) {
       // Task 1.4 / ADR-FMC-02 触类旁通：批量「保存全部」同样先按 kind 分派，
@@ -3443,7 +3460,12 @@ async function onSaveAllFormulas() {
           description: row.formula_description,
           expected_version: row.definition_version ?? undefined,
         }, { validateStatus: (s: number) => s < 600 })
-        if (savedRow?.definition_version != null) row.definition_version = savedRow.definition_version
+        const savedRowVersion = savedDefinitionVersion(savedRow)
+        if (savedRowVersion != null) row.definition_version = savedRowVersion
+        const rowNotice = wpFormulaSaveNotice(savedRow)
+        if (rowNotice.warnings.length) {
+          wpEvalFailures.push({ cell: row.target_cell || row.row_code || '', warnings: rowNotice.warnings })
+        }
         saved++
       } else if (row.id && dispatch === 'report' && rowChanged(row)) {
         // 报表行只收改过的，循环后一次保存（项目上下文 = 一次写本项目适配，原子）
@@ -3453,11 +3475,10 @@ async function onSaveAllFormulas() {
     const { projectSlotKeys } = reportBatch.length ? await saveReportRows(props.projectId, reportBatch) : { projectSlotKeys: [] }
     saved += reportBatch.length
     askApplyScope(projectSlotKeys)
-    ElMessage.success(
-      skippedReadonly
-        ? `已保存 ${saved} 个公式（跳过 ${skippedReadonly} 条只读投影）`
-        : `已保存 ${saved} 个公式`,
-    )
+    // R6.3：底稿公式算不出值（格子已留空）时列出单元格与原因
+    const batchNotice = wpFormulaBatchNotice(saved, wpEvalFailures,
+      skippedReadonly ? `（跳过 ${skippedReadonly} 条只读投影）` : '')
+    ElMessage[batchNotice.level]({ message: batchNotice.text, duration: batchNotice.level === 'warning' ? 8000 : 3000 })
     emit('saved')
 
     // 保存全部与单行保存共用传播；工作底稿域继续使用固定位置的项目/年度。

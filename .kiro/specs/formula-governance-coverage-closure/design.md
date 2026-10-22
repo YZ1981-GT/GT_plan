@@ -257,8 +257,30 @@
 
 清理：按写入表逐项对账（`formula_setting` / `formula_sync_item` / `formula_publish` / `formula_template*` / 审计日志 / 推送运行与状态），全局层改动复原；保留项写进 tasks 交付记录。
 
+### 8.1 勘误（实施与上表的差异，2026-10-22）
+
+- 第 1 步改用报表公式：tb_detail（与 push）全局层适用范围是「*」，全局发布会触达全部真实项目（即使选暂缓，也会给每个项目固定旧定义并生成待确认）；报表公式按适用范围分层，上市单体只有甲 / 乙。
+- 甲、乙有审计年度（`projects.audit_year = 2025`，只是没填审计期间），推送链路不用另建项目；底稿 E1 经平台「按编码生成」现建 —— 该端点恒 500，见 §8.2 ①。平台没有删除底稿的入口，E1 保留在甲上作回归数据。
+- 「停用的规则不再写入」：甲没有附注，停用的 `E1.note.main_rows` 原本每次都「跳过：附注尚未生成」；可观察的证据是停用后的运行明细里不再有这条规则（29 → 28 条），写入值的变化在甲上无法观察。
+
+### 8.2 走查发现并修复
+
+| # | 现象（真库 / 浏览器） | 根因 | 修法 |
+|---|---|---|---|
+| ① | 「按编码生成底稿」对任何调用 500（前端「生成底稿」在模板集生成 5xx 时回退到它，回退同样失败） | 函数体 import 全仓从未实现的 `populate_parsed_data`（懒导入守卫的待修基线里冻结着）；唯一的 property 测试在内存里模拟端点、从未真发请求 | 与准则转换生成路径共用 `wp_parsed_data_service.ensure_parsed_data_placeholder`（为空才写最小占位）；验证脚本同改；守卫基线删该条；端点守卫真发请求 |
+| ② | 底稿公式取不到数（REPORT 期初 / PREV 无上年 / 附注无章节）网格写成 0，回执带 `evaluated_value: "0"`；公式管理中心只提示「公式已保存」，自定义底稿编辑器只报「告警 N 条」 | 保存端点对网格单元格「逐字节零回归」：有错照写求值器的 0 占位（D-cycle 锚点早已不回值） | 求值有错 ⇒ 格子留空（清掉旧值）、只回 `eval_warnings`；三个调用方经 `wpFormulaSaveNotice` 写明单元格与原因（R6.3） |
+| ③ | 公式管理中心同一行第二次保存 409「已被他人修改」；自定义底稿编辑器改已有公式 428 | 版本号在回执的 `saved` 下，公式管理中心读顶层（恒取不到，行上版本不更新）；编辑器根本不带 `expected_version` | `savedDefinitionVersion` 取回执里的新版本；编辑器从公式清单带版本号；守卫：每处保存的请求体都带 `expected_version`、不从回执顶层读版本 |
+| ④ | 待确认选「保留本项目」后提示「相关报表 / 附注会按新定义重算」 | 前端提示写死；后端只在有效定义真的变了才发重算事件，但事件不回给前端 | 接口回 `recalc_domains`；全保留 ⇒「本项目有效公式未变，无需重算」 |
+| ⑤ | 模板发布预览「版本」列整列「— → —」 | 模板变更行没有逐公式位版本（模板版本在标题里） | 无逐位版本时不显示该列 |
+| ⑥ | 公式管理中心刚打开就点「订阅模板」，几秒内显示「没有可订阅的模板（看不到的模板说明未共享给你）」 | 先等域清单回来才开始加载模板清单，期间列表空、也不在加载态 | 并行加载（加载态随之同步进入） |
+| ⑦ | 树上点「E1 货币资金」只高亮不切换；推送页提示「本底稿尚未接入自动推送 · 已接入：…E1…」 | 树点击只认叶子；推送页空状态不区分「没选底稿」 | 底稿工作簿节点（带底稿编码、无页编码）可选中整本；空状态先引导去选底稿 |
+| ⑧ | 推送面板「最近一次推送」、运行历史、表间审核历史显示 `2026-10-22T15:19:56.808508+00:00` | 直接插值后端 ISO 串 | `fmtDateTime` |
+| ⑨ | 无附注项目每次打开公式管理中心 / 编辑公式弹窗都弹「附注数据不存在，请先生成附注」，且没加载模板目录 | `getDisclosureNoteTree` 只收两个参数（AI 采纳目标传的 `{ _silent: true }` 也被丢弃，HEAD 上 vue-tsc TS2554）；404 落进外层 catch，跳过了模板目录降级 | 透传请求配置；404 静默改用模板目录，其他错误提示「暂按模板目录显示」 |
+
 ## 9. 范围外发现（登记，不在本 spec 修）
 
+- **R5 走查发现（未修，登记）**：①`/working-papers/generate` 的请求模型没有 `selected_templates`，前端裁剪弹窗确认的编码被丢弃 ⇒ 按模板集整套生成；②`generate-from-codes` 按 `gt_template_library.json` 的 `code` 精确匹配，E1 这类多页底稿在库里是「E1-1至E1-11」⇒ 生成空白工作簿、名称「底稿E1」（其余入口有按编码解析多页册的逻辑，未复用）；③平台没有删除底稿的入口（回收站支持底稿类型，但没有任何端点把底稿置删除）；④两个生成端点只校验登录（已在鉴权基线「仅登录」里）；⑤自定义底稿编辑器保存写死 `template_type: 'soe'`，上市项目按国企口径校验引用；⑥d-cycle Tier A 三个测试文件 28 例恒红（假会话缺 `get`、`list_formulas` 形参改名，HEAD 同）—— 它们是保存端点锚点 / 网格分流的主要守卫，处于失效状态；⑦`backend/pytest.ini` 加 `pythonpath = tests`（cad40da77）后，`tests/playwright/` 包遮蔽真实 playwright，不带 `-p no:playwright` 的 pytest 一启动就崩；⑧`ChatAdoptNoteTarget.spec.ts` 8 例 HEAD 同红（请求体与后端模型不同步）。
+- **最终回归（8.1）的预存失败（未修，登记）**：后端 137 例全部在本 spec 开工点 d28f1de8a 同红 —— d-cycle 提取 85 例（`list_formulas` 不收 `_user` 37、假会话缺 `get` 21，其余 27 是 detail_prefill / 渲染基线键 / D6 汇总字段等契约过时）；推送 26 例（批次 E 附注 15：「H / I 不应有 note.main 规则」「L6 / N3 应在 sync_registry 中」；批次 C 附注 3：0 ≠ 800000；覆盖率 3：清册与注册表不一致；D4 canary、行包含匹配、安徽真库跳过 311 超棘轮 85、E1 独占键新增 `e1_builder.py`、K2 真库 canary 测试间污染各 1）；`test_note_edit_stamp_writers` 6（夹具缺 `project_assignments` 表）；`test_wp_generation_pipeline_property` 6 —— 5 例 import 全仓不存在的 `wp_parsed_data_service._read_xlsx_structure`，与 §8.2 ① 的 `populate_parsed_data` 同源（wp-generation-pipeline 设想的「按模板读 sheet 结构填 `html_data`」从未实现，`ensure_parsed_data_placeholder` 只写空占位），1 例 componentType 期望已过时（如期望 `e-control-test` 实为 `e1-monetary-fund`）；`test_formula_runtime_zero_regression` 4（`_FORMULA_RESOLVERS` 已删、注册表新增函数）；附注公式端点鉴权「不变」守卫 3（附注编辑门禁改造后鉴权写法变了，守卫仍按旧写法抽）；`test_adj_formula_function` 2；懒导入 2（他会话的缺失模块）；预设语法 / ACNR 漂移 2（`migrated` ≠ `pending`）；`test_user_formulas_override` 1。前端 9 个文件 20 例同在 d28f1de8a 红（AI 采纳请求体对账 8、销售标签 2、账龄 3、AI 能力 2、C24 1、C 控制测试 1、formulaPaths 2、views composables 1）。
 - **R6 发现（未修，登记）**：①预填充模板预设里 PREV 三参（上年底稿取数）184 条，统一预载层只按试算表取 ⇒ 恒 0（需上年底稿取数源，另评估）；②L1 `_handle_prev` 不看列名（恒取上年期末）、`_handle_report` 不看期间（报表 / 预填充路径；底稿求值器已绕开）；③地址库附注域只登记合计行（逐行登记约 6~9 千条 / 项目，选择器体量待评估）⇒ 底稿公式保存的 NOTE 只能引用合计行，求值器本身支持任意行；④预填充仍是非严格（缺数按 0），未接 `gaps`；⑤前端地址库 store 一次取 5000 条、后端按 report → tb → note → wp → aux 顺序截断 ⇒ 真实项目（安徽：报表 2810 + 试算表 2744 已超 5000）附注 / 底稿 / 辅助余额域在前端恒为空，各选择器只能回退旧端点（公式栏的回退已修；FormulaRefPicker / CellSelector 等其余选择器待查）。
 - 🔴 **签字前一致性门禁「取不到数冒充通过」**：`services/consistency_gate/_impl.py` 现算 82 处 `passed=True`，其中「数据不完整，跳过检查」41 处、「检查异常」40 处 ⇒ 数据缺失或代码异常时门禁放行。修它会让签字门禁在数据不全时开始阻断，属产品决策，需用户拍板后另立 spec。
 - L1 `_handle_report` 忽略期间参数（`REPORT('X','期初')` 与本期同值）；本 spec 只在底稿求值器前置代入规避，内核修正与报表 / 表间审核路径的影响面另评估。

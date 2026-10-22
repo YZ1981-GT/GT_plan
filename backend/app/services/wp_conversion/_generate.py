@@ -19,7 +19,6 @@ from pathlib import Path
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.workpaper_models import (
     WorkingPaper,
@@ -27,6 +26,7 @@ from app.models.workpaper_models import (
     WpSourceType,
     WpStatus,
 )
+from app.services.wp_parsed_data_service import ensure_parsed_data_placeholder
 
 logger = logging.getLogger(__name__)
 
@@ -394,12 +394,5 @@ class WpConversionGenerateMixin:
                 )
 
         # 回退：写入最小非空占位，确保 parsed_data 非 NULL（避免 HTML 渲染器
-        # "有记录无内容"）。结构对齐渲染器消费的 html_data 形态。
-        if not wp.parsed_data:
-            wp.parsed_data = {
-                "_created_by": "standard_conversion",
-                "wp_code": wp_code,
-                "html_data": {},
-                "generated_at": datetime.now(timezone.utc).isoformat(),
-            }
-            flag_modified(wp, "parsed_data")
+        # "有记录无内容"）。与按编码生成（generate-from-codes）共用同一兜底。
+        ensure_parsed_data_placeholder(wp, wp_code=wp_code, created_by="standard_conversion")

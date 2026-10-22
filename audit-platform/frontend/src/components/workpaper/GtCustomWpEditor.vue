@@ -141,6 +141,7 @@ import { handleApiError } from '@/utils/errorHandler'
 import GtCustomGridSheet from '@/components/workpaper/custom/GtCustomGridSheet.vue'
 import GtOnlyOfficeSheet from '@/components/workpaper/GtOnlyOfficeSheet.vue'
 import FormulaEditDialog from '@/components/formula/FormulaEditDialog.vue'
+import { wpFormulaSaveNotice, type WpFormulaSaveReceipt } from '@/composables/formula/wpFormulaSaveNotice'
 import { createDualMode } from '@/components/workpaper/composables/factories/createDualMode'
 import {
   buildFormulaCellOptions,
@@ -407,6 +408,10 @@ async function onFormulaSave(payload: {
     return
   }
   try {
+    // 🔴 已有公式的格再次保存必须带版本号（CAS）：原先不带 ⇒ 后端 428「更新前必须刷新并携带
+    //    definition_version」，改已有公式恒失败（spec formula-governance-coverage-closure R5 走查实测）
+    const existing = formulaList.value.find((f) => f.target_cell === targetCell
+      && (!f.sheet_name || f.sheet_name === props.sheetName))
     const res = (await api.put(apiPaths.workpapers.formulas(props.wpId), {
       sheet_name: props.sheetName,
       target_cell: targetCell,
@@ -415,16 +420,12 @@ async function onFormulaSave(payload: {
       template_type: 'soe',
       category: payload.category,
       description: payload.description,
-    })) as { evaluated_value?: string; eval_warnings?: string[] }
-    if (res?.eval_warnings?.length) {
-      ElMessage.warning(`公式已保存（部分引用求值告警: ${res.eval_warnings.length}）`)
-    } else if (res?.evaluated_value != null && res.evaluated_value !== '') {
-      // 🔴 求值结果必须让用户看见 —— 只读 eval_warnings 会让「保存成功但格里没值」
-      //    与「求值为空」无法区分（改造前即如此）。
-      ElMessage.success(`公式已保存，${targetCell} = ${res.evaluated_value}`)
-    } else {
-      ElMessage.success('公式已保存')
-    }
+      expected_version: existing?.definition_version ?? undefined,
+    })) as WpFormulaSaveReceipt
+    // 🔴 求值结果必须让用户看见：算出值报值；算不出（格子已留空）写明原因 ——
+    //    原先只报「部分引用求值告警: N」，看不出格子为什么空（spec formula-governance-coverage-closure R6.3）。
+    const notice = wpFormulaSaveNotice(res, targetCell)
+    ElMessage[notice.level]({ message: notice.text, duration: notice.level === 'warning' ? 8000 : 3000 })
     // 公式求值结果由后端写入 xlsx 与投影，需重投影才能在网格里看到
     await refreshProjection()
     // 🔴 必须同步刷新公式清单 —— `formulaCells` 由它派生，不刷新则新加的公式格

@@ -171,8 +171,23 @@ async def test_pending_read_resolve_permissions(api):
     api["as"]("editor")
     r = await c.post(f"/api/projects/{b}/formula-settings/pending/resolve", json=body)
     assert r.status_code == 200 and r.json()["resolved"] == [item["id"]]
+    assert r.json()["recalc_domains"] == ["report"], "采用新定义 ⇒ 有效定义变了，要重算"
     stale = await c.post(f"/api/projects/{b}/formula-settings/pending/resolve", json=body)
     assert stale.status_code == 409 and stale.json()["detail"]["error_code"] == "FORMULA_SYNC_ITEM_STALE"
+
+
+async def test_pending_resolve_keep_reports_no_recalc(api):
+    """全选「保留本项目」：有效定义不变 ⇒ recalc_domains 为空、不发重算事件（R5 走查：前端原先一律提示「会按新定义重算」）。"""
+    c, b = api["c"], api["p"]["B"]
+    assert (await c.post("/api/formula-settings/report/global/publish", json=_publish_body())).status_code == 200
+    api["as"]("editor")
+    item = (await c.get(f"/api/projects/{b}/formula-settings/pending")).json()["items"][0]
+    before = list(api["events"])
+    body = {"resolutions": [{"item_id": item["id"], "choice": "keep", "upstream_version": item["upstream_version"]}]}
+    r = await c.post(f"/api/projects/{b}/formula-settings/pending/resolve", json=body)
+    assert r.status_code == 200 and r.json()["resolved"] == [item["id"]]
+    assert r.json()["recalc_domains"] == []
+    assert api["events"] == before, "保留本项目不发重算事件"
 
 
 async def test_apply_to_projects_requires_edit_on_every_target(api):

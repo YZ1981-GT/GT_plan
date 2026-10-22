@@ -10,7 +10,7 @@
       </div>
       <el-table v-loading="loading" :data="runs" size="small" border max-height="240" empty-text="暂无执行记录">
         <el-table-column label="时间" width="165">
-          <template #default="{ row }">{{ row.created_at || '—' }}</template>
+          <template #default="{ row }">{{ row.created_at ? fmtDateTime(row.created_at) : '—' }}</template>
         </el-table-column>
         <el-table-column label="状态" width="90">
           <template #default="{ row }">
@@ -60,6 +60,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import api from '@/services/apiProxy'
+import { fmtDateTime } from '@/utils/formatters'
 
 const props = defineProps<{ projectId?: string; year?: number }>()
 

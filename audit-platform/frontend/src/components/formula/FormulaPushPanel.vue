@@ -31,7 +31,7 @@
         <span>未变化 {{ latest.unchanged_count }}</span>
         <span>保留 {{ latest.kept_count }}</span>
         <span>跳过 {{ latest.skipped_count }}</span>
-        <span class="gt-fp-muted">{{ latest.finished_at || latest.started_at || '' }}</span>
+        <span class="gt-fp-muted">{{ fmtDateTime(latest.finished_at || latest.started_at) }}</span>
       </div>
       <el-empty v-else description="本年度尚未推送过" :image-size="48" />
       <div v-if="dryRun" class="gt-fp-dry">{{ dryRunText }}</div>
@@ -54,7 +54,7 @@
         @current-change="onRunSelect"
       >
         <el-table-column label="时间" width="165">
-          <template #default="{ row }">{{ row.finished_at || row.started_at || '' }}</template>
+          <template #default="{ row }">{{ fmtDateTime(row.finished_at || row.started_at) }}</template>
         </el-table-column>
         <el-table-column label="触发" width="120">
           <template #default="{ row }">{{ labelOf(TRIGGER_LABELS, row.trigger) }}</template>
@@ -211,6 +211,7 @@ import { api } from '@/services/apiProxy'
 import { formulaPush } from '@/services/apiPaths'
 import { formulaSettingsApi } from '@/services/formulaSettingsApi'
 import { showFormulaError, type Definition } from '@/composables/formula/useFormulaSettings'
+import { fmtDateTime } from '@/utils/formatters'
 import FormulaDefinitionEditDialog from './settings/FormulaDefinitionEditDialog.vue'
 import FormulaPushVerifyPanel from './FormulaPushVerifyPanel.vue'
 import {

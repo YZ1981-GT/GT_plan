@@ -58,12 +58,14 @@ _FLAG_GATED_PLACEHOLDERS: frozenset[tuple[str, str, str]] = frozenset({
 # - ChecklistResponse ×3：`checklist_responses` 表**无 ORM 模型**（SQLAlchemy 注册表
 #   权威确认，该表走裸 SQL）⇒ 需新建模型或改裸 SQL
 # - TbAccount / TbAdjustment：全仓无定义，同模块无相近名
-# - save_formula_batch / populate_parsed_data：同上
+# - save_formula_batch：同上
+# - populate_parsed_data：✅ 已修（2026-10-22，spec formula-governance-coverage-closure R5 走查撞上：
+#   generate-from-codes 对任何调用都在此 ImportError 500）—— 改用 `ensure_parsed_data_placeholder`
+#   （与准则转换生成路径同一兜底），已从基线删除；端点守卫 `test_generate_from_codes_endpoint.py`。
 # - static_sheet_payload_for_adjudication ×3：✅ 已实现（2026-10-07），已从基线删除。
 _KNOWN_UNRESOLVED_BASELINE: frozenset[tuple[str, str, str]] = frozenset({
     ("app/routers/adjustments.py", "app.models.audit_platform_models", "ChecklistResponse"),
     ("app/routers/import_templates.py", "app.services.cell_formula_evaluator", "save_formula_batch"),
-    ("app/routers/wp_template.py", "app.services.wp_parsed_data_service", "populate_parsed_data"),
     ("app/services/contract_analysis_service.py", "app.models.audit_platform_models", "TbAccount"),
     ("app/services/contract_analysis_service.py", "app.models.audit_platform_models", "TbAdjustment"),
     ("app/services/m8_general_risk_reserve_service.py", "app.models.audit_platform_models", "ChecklistResponse"),
