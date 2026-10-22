@@ -1,11 +1,13 @@
 <!--
-  GtRowNameAlignmentTag.vue — 行内名称对齐状态标识 + 溯源 + 直达入口
-  spec: formula-row-name-alignment-confirmation Task 10
+  GtRowNameAlignmentTag.vue — 行名对齐状态标识 + 溯源 + 直达入口
+  spec: formula-row-name-alignment-confirmation Task 10；formula-governance-coverage-closure R4 接入对齐弹窗
 
-  可复用行内组件：底稿子组件在「按行名取数」的行上放它显示 match_state。
-  - unmatched / ambiguous：可见 tag（中文文案）+ 点击直达弹窗对应行（禁止静默显示 0）
+  match_state 四态的文案 / 颜色只在这里定义一份（对齐弹窗的行列表也用它，不再各写一份）。
+  - unmatched / ambiguous：可见 tag（禁止静默显示 0）；行内用法点击直达对齐弹窗并定位本行
   - user_confirmed：可溯源（hover 显示映射到哪些账套明细名、谁何时确认）+「重新确认」入口
-  - auto_matched：轻量成功标识
+  - auto_matched：轻量标识
+  in-dialog：已经在对齐弹窗里 —— 不再发「打开弹窗」事件（会把弹窗里没确认的勾选清空），
+  「重新确认」改为 emit select(row_key) 让弹窗激活这一行；其余点击由弹窗的行点击处理。
 -->
 <template>
   <span class="gt-rnat">
@@ -17,7 +19,7 @@
       trigger="hover"
     >
       <template #reference>
-        <el-tag size="small" type="success" effect="light" class="gt-rnat__tag">
+        <el-tag size="small" type="success" effect="light" class="gt-rnat__tag" data-state="user_confirmed">
           已确认
         </el-tag>
       </template>
@@ -34,7 +36,7 @@
           <span v-if="row.confirmed_at">· {{ formatTime(row.confirmed_at) }}</span>
           <span v-if="row.mapping_version"> · v{{ row.mapping_version }}</span>
         </div>
-        <el-button size="small" text type="primary" @click="emitJump">重新确认</el-button>
+        <el-button size="small" text type="primary" data-testid="rnat-reconfirm" @click="onReconfirm">重新确认</el-button>
       </div>
     </el-popover>
 
@@ -44,11 +46,14 @@
       size="small"
       type="danger"
       effect="light"
-      class="gt-rnat__tag gt-rnat__tag--click"
-      :title="row.stale_reason || '此行取不到数是因为账套明细名没对上，点击确认对应关系'"
-      @click="emitJump"
+      class="gt-rnat__tag"
+      :class="{ 'gt-rnat__tag--click': !inDialog }"
+      data-state="unmatched"
+      :title="row.stale_reason || (inDialog ? '账套明细名没对上，在右侧勾选对应明细'
+        : '此行取不到数是因为账套明细名没对上，点击确认对应关系')"
+      @click="onTagClick"
     >
-      未匹配 · 去对齐
+      {{ inDialog ? '未匹配' : '未匹配 · 去对齐' }}
     </el-tag>
 
     <el-tag
@@ -56,11 +61,13 @@
       size="small"
       type="warning"
       effect="light"
-      class="gt-rnat__tag gt-rnat__tag--click"
-      title="有多个候选账套明细，需人工确认"
-      @click="emitJump"
+      class="gt-rnat__tag"
+      :class="{ 'gt-rnat__tag--click': !inDialog }"
+      data-state="ambiguous"
+      :title="inDialog ? '有多个候选账套明细，在右侧勾选确认' : '有多个候选账套明细，需人工确认'"
+      @click="onTagClick"
     >
-      待确认 · 多候选
+      {{ inDialog ? '待确认（多候选）' : '待确认 · 多候选' }}
     </el-tag>
 
     <!-- 自动匹配：轻量提示 -->
@@ -70,9 +77,15 @@
       type="info"
       effect="plain"
       class="gt-rnat__tag"
+      data-state="auto_matched"
       title="按名称自动匹配"
     >
       自动匹配
+    </el-tag>
+
+    <!-- 后端新增了状态而这里没跟上：照实显示，不藏 -->
+    <el-tag v-else-if="row.match_state" size="small" type="info" effect="plain" class="gt-rnat__tag">
+      {{ row.match_state }}
     </el-tag>
   </span>
 </template>
@@ -80,18 +93,25 @@
 <script setup lang="ts">
 import { eventBus, type RowNameAlignmentRowWire } from '@/utils/eventBus'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   row: RowNameAlignmentRowWire
-  /** 直达弹窗所需上下文（与刷新入口一致）。 */
-  wpId: string
-  projectId: string
-  year: number
-  wpCode: string
-  sheetCode: string
+  /** 在对齐弹窗里使用（见文件头） */
+  inDialog?: boolean
+  /** 行内用法：直达弹窗所需上下文（与刷新入口一致）；弹窗内不用 */
+  wpId?: string
+  projectId?: string
+  year?: number
+  wpCode?: string
+  sheetCode?: string
   datasetId?: string | null
-  /** 同 sheet 的全部行 wire（点击直达时把整表带给弹窗，定位到本行）。 */
-  allRows: RowNameAlignmentRowWire[]
-}>()
+  /** 行内用法：同 sheet 的全部行 wire（点击直达时把整表带给弹窗，定位到本行） */
+  allRows?: RowNameAlignmentRowWire[]
+}>(), {
+  inDialog: false, wpId: '', projectId: '', year: 0, wpCode: '', sheetCode: '', datasetId: null,
+  allRows: () => [],
+})
+
+const emit = defineEmits<{ select: [rowKey: string] }>()
 
 function formatTime(iso: string): string {
   try {
@@ -101,8 +121,18 @@ function formatTime(iso: string): string {
   }
 }
 
-/** 点击 → 打开对齐弹窗（携带整表，弹窗默认激活本行）。 */
+function onTagClick() {
+  if (!props.inDialog) emitJump()
+}
+
+function onReconfirm() {
+  if (props.inDialog) emit('select', props.row.row_key)
+  else emitJump()
+}
+
+/** 行内用法：打开对齐弹窗（携带整表，弹窗默认激活本行）。缺上下文时不发（打开的弹窗会是空的）。 */
 function emitJump() {
+  if (!props.wpId || !props.sheetCode) return
   eventBus.emit('open-row-name-alignment', {
     wpId: props.wpId,
     projectId: props.projectId,

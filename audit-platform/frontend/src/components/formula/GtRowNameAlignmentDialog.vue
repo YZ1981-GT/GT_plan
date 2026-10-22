@@ -41,9 +41,8 @@
           >
             <div class="gt-rna-rowitem__label">{{ r.row_label || r.row_key }}</div>
             <div class="gt-rna-rowitem__meta">
-              <el-tag :type="stateTagType(r.match_state)" size="small" effect="light">
-                {{ stateLabel(r.match_state) }}
-              </el-tag>
+              <!-- 状态标签与行内用法同一组件（formula-governance-coverage-closure R4：不再在这里另写一份文案 / 颜色） -->
+              <GtRowNameAlignmentTag :row="r" in-dialog @select="activeRowKey = $event" />
               <el-tag v-if="selectionCount(r.row_key) > 0" size="small" type="success" effect="plain">
                 已选 {{ selectionCount(r.row_key) }}
               </el-tag>
@@ -131,6 +130,7 @@ import {
 } from '@/utils/eventBus'
 import { DisplayPrefs_Key } from '@/components/workpaper/composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import GtRowNameAlignmentTag from './GtRowNameAlignmentTag.vue'
 
 // 🔴 fmtAmount 是 store 成员、不是模块导出（memory 铁律）
 const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
@@ -161,27 +161,7 @@ const hasAnySelection = computed(() =>
   Object.values(selections.value).some((m) => m.size > 0),
 )
 
-// ─── 状态标签 ─────────────────────────────────────────────────────────────
-function stateLabel(s: string): string {
-  return (
-    {
-      auto_matched: '自动匹配',
-      ambiguous: '待确认（多候选）',
-      unmatched: '未匹配',
-      user_confirmed: '已确认',
-    } as Record<string, string>
-  )[s] ?? s
-}
-function stateTagType(s: string): '' | 'success' | 'warning' | 'danger' | 'info' {
-  return (
-    {
-      auto_matched: 'success',
-      ambiguous: 'warning',
-      unmatched: 'danger',
-      user_confirmed: 'success',
-    } as Record<string, 'success' | 'warning' | 'danger'>
-  )[s] ?? 'info'
-}
+// ─── 候选相似度标签（状态标签见 GtRowNameAlignmentTag） ────────────────────
 function simTagType(sim: number): '' | 'success' | 'warning' | 'info' {
   if (sim >= 0.8) return 'success'
   if (sim >= 0.55) return 'warning'

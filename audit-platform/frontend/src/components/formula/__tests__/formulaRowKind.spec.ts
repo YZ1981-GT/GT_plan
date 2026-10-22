@@ -93,6 +93,17 @@ describe('resolveSaveDispatch — 保存链按 kind 分派', () => {
   it('report 行 → report（report-config detail）', () => {
     expect(resolveSaveDispatch(REPORT_ROW)).toBe('report')
   })
+  // spec formula-governance-coverage-closure R4：附注章节公式行原先落到「其余 → report」，编辑后发 report-config 必失败
+  it('附注章节公式行（预设 / 用户集）→ note，不再派到 report-config', () => {
+    for (const id of ['note_preset_0', 'note_user_五、1_3']) {
+      expect(classifyFormulaRowKind({ id, formula_source: 'check_presets' })).toBe('note')
+      expect(resolveSaveDispatch({ id })).toBe('note')
+    }
+    // 只读投影判定优先：即便 id 形似附注行，标了只读仍拒绝保存
+    expect(resolveSaveDispatch({ id: 'note_preset_1', readonly: true })).toBe('reject')
+    // 报表行 id 里含 note 字样不算
+    expect(resolveSaveDispatch({ id: 'balance_sheet:note_x' })).toBe('report')
+  })
 })
 
 // ────────────────────────────────────────────────────────────────────────────

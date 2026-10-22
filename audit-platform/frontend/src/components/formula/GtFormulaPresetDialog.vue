@@ -87,16 +87,25 @@
               <span class="gt-fpd-presets-title">
                 {{ selectedPageKey || '请选择左侧页面' }}
               </span>
-              <el-button
-                v-if="canEdit"
-                size="small"
-                type="primary"
-                plain
-                :disabled="!selectedPageKey"
-                @click="openEditor(null)"
-              >
-                ➕ 新建公式
-              </el-button>
+              <div class="gt-fpd-presets-actions">
+                <!-- spec formula-governance-coverage-closure R4：预设库 Excel 导出模板 / 导出数据 / 导入数据 -->
+                <FormulaImportExportDropdown
+                  mode="preset"
+                  :page-key="selectedPageKey"
+                  :can-import="canImport"
+                  @imported="onPresetsImported"
+                />
+                <el-button
+                  v-if="canEdit"
+                  size="small"
+                  type="primary"
+                  plain
+                  :disabled="!selectedPageKey"
+                  @click="openEditor(null)"
+                >
+                  ➕ 新建公式
+                </el-button>
+              </div>
             </div>
             <el-table
               v-if="selectedPageKey"
@@ -161,12 +170,16 @@ import GtFormulaEditDialog, {
   type FormulaDialogScope,
 } from './GtFormulaEditDialog.vue'
 import {
+  canWritePresets,
   useFormulaImportExport,
+  type FormulaImportResult,
   type FormulaReportingDoc,
   type FormulaPresetPage,
   type FormulaPresetCoverage,
   type FormulaPresetEntry,
 } from '@/composables/useFormulaImportExport'
+import { useAuthStore } from '@/stores/auth'
+import FormulaImportExportDropdown from './FormulaImportExportDropdown.vue'
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
@@ -194,6 +207,9 @@ const emit = defineEmits<{
 }>()
 
 const ie = useFormulaImportExport()
+const authStore = useAuthStore()
+/** 导入入库与新增自定义预设同一角色口径（后端 _CUSTOM_PRESET_WRITE_ROLES） */
+const canImport = computed(() => canWritePresets(authStore.user?.role))
 
 const visible = computed({
   get: () => props.modelValue,
@@ -312,6 +328,15 @@ async function reloadCurrentPage() {
   if (selectedPageKey.value) {
     await selectPage(selectedPageKey.value)
   }
+}
+
+/** 导入直接入库后（管理员）：页面清单 / 覆盖度与当前页都可能变了，重取；转候选的审核前不生效，不用刷新 */
+async function onPresetsImported(result: FormulaImportResult) {
+  if (result.pending_review || !result.persisted) return
+  pages.value = []
+  const current = selectedPageKey.value
+  await loadPages()
+  if (current && current !== selectedPageKey.value) await selectPage(current)
 }
 
 defineExpose({ reloadCurrentPage })
@@ -441,6 +466,12 @@ watch(activeTab, (t) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.gt-fpd-presets-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 .gt-fpd-expr {
   font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;

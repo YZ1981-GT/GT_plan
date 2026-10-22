@@ -113,11 +113,15 @@
             <el-button size="small" @click="onOpenGlobalScopeOverview">🌐 全局公式</el-button>
             <!-- formula-global-settings-sync：全局设置 / 保存为模板 / 订阅模板（取代旧共享配置「公式审核配置」） -->
             <FormulaSettingsToolbar ref="settingsToolbarRef" :project-id="projectId" :domain="settingsDomain"
-              :default-scope="settingsScope" :can-edit-global="canEditGlobal" @navigate="visible = false"
+              :default-scope="settingsScope" :can-edit-global="canEditGlobal" :can-edit-project="!formulaReadOnly"
+              @navigate="visible = false"
               @changed="onFormulaSettingsChanged" />
             <el-button size="small" @click="onImportPresetFormulas" :loading="loadingData">📥 导入预设</el-button>
             <el-button size="small" @click="onExportFormulaTemplate">📤 导出模板</el-button>
             <el-button size="small" @click="showFormulaImport = true">📥 Excel导入</el-button>
+            <el-button v-if="isNoteDomainNodeKey(selectedNodeKey)" size="small" type="primary" plain
+              data-testid="fm-note-edit" :disabled="!noteEditTarget"
+              :title="noteEditTarget ? '' : '请先在左侧选择具体的附注章节'" @click="openNoteFormulaEditor()">✏️ 编辑本章节公式</el-button>
             <el-button size="small" @click="onAddFormulaRow">+ 新增公式</el-button>
             <el-button size="small" @click="onSaveAllFormulas" :loading="applying">💾 保存</el-button>
             <el-button size="small" type="primary" class="gt-fm-apply-btn" @click="onApplyFormulas" :loading="applying">⚡ 应用自动运算</el-button>
@@ -433,6 +437,9 @@
           :year="props.year"
           :layer-tag-type="layerTagType"
           :layer-label="layerLabel"
+          :issue-run="crossCheckIssueRun"
+          :exec-loading="crossCheckExecLoading"
+          @refresh-exec="cc.refreshExec()"
           @run="onRunCrossCheck"
           @add="onAddCrossRule"
           @edit="onEditCrossRule"
@@ -446,6 +453,10 @@
     <template #footer>
       <el-button @click="visible = false">关闭</el-button>
     </template>
+
+    <!-- 附注章节公式编辑 / 保存 / 应用（spec formula-governance-coverage-closure R4） -->
+    <NoteFormulaDialog v-if="projectId && year" v-model="showNoteFormulaDialog" :current-note="noteDialogTarget"
+      :project-id="projectId" :year="Number(year)" @saved="onNoteFormulasSaved" @applied="emit('applied')" />
 
     <!-- 公式看板弹窗（已拆出为独立组件 FormulaDashboardDialog） -->
     <FormulaDashboardDialog
@@ -543,6 +554,7 @@ import { canRestoreRow, fetchEffectiveReportRows, invalidateEffectiveReport, mar
 import { layerLabel, layerTagType, showFormulaError } from '@/composables/formula/useFormulaSettings'
 import { useTbDetailFormulas } from './composables/useTbDetailFormulas'
 import { useCrossCheckRules } from './composables/useCrossCheckRules'
+import { issueRunForNode } from './formulaIssueHint'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAddressRegistry } from '@/stores/addressRegistry'
@@ -600,6 +612,7 @@ import PushCoverageCard from './panels/PushCoverageCard.vue'
 import FormulaDashboardDialog from './FormulaDashboardDialog.vue'
 import FormulaGlobalScopeDialog from './FormulaGlobalScopeDialog.vue'
 import FormulaCrossCheckPanel from './FormulaCrossCheckPanel.vue'
+import NoteFormulaDialog from './NoteFormulaDialog.vue'
 
 /**
  * scope：当前公式管理器的目标范围
@@ -1706,6 +1719,9 @@ const cc = useCrossCheckRules({
 const crossCheckItems = cc.execItems
 const crossCheckLoaded = cc.execLoaded
 const crossCheckExecEmpty = cc.execEmpty
+const crossCheckExecLoading = cc.execLoading
+// 问题清单 / 提醒取自同一次勾稽响应，按当前树节点裁剪（spec formula-governance-coverage-closure R4）
+const crossCheckIssueRun = computed(() => issueRunForNode(cc.execRun.value, selectedNodeKey.value))
 const loadCrossCheckItems = cc.loadExecItems
 const crossCheckTokens = cc.tokens
 function applyCrossCheckRules(data: any) { cc.applyRulesData(data) }
@@ -1738,18 +1754,20 @@ const noteUserFormulasSection = ref<string>('')
  * onTreeNodeClick 再调一次，第一发还在飞 ⇒ 同一项目 + 章节只发一次（见 createKeyedSingleFlight）。
  */
 const noteUserFormulasFlight = createKeyedSingleFlight()
-function loadNoteUserFormulas(sectionId: string): Promise<void> {
+/** force：附注公式弹窗保存后重取（不用「已加载过本章节」的缓存） */
+function loadNoteUserFormulas(sectionId: string, force = false): Promise<void> {
   const sid = (sectionId || '').trim()
-  return noteUserFormulasFlight(`${currentProjectCacheKey.value}|${sid}`, () => fetchNoteUserFormulas(sid))
+  return noteUserFormulasFlight(`${currentProjectCacheKey.value}|${sid}|${force ? 'f' : ''}`,
+    () => fetchNoteUserFormulas(sid, force))
 }
 
-async function fetchNoteUserFormulas(sid: string): Promise<void> {
+async function fetchNoteUserFormulas(sid: string, force = false): Promise<void> {
   if (!props.projectId || !props.year || !sid) {
     noteUserFormulas.value = []
     noteUserFormulasSection.value = ''
     return
   }
-  if (noteUserFormulasSection.value === sid && noteUserFormulas.value.length) return
+  if (!force && noteUserFormulasSection.value === sid && noteUserFormulas.value.length) return
   try {
     const data = await api.get<{ formulas?: NoteUserFormula[] }>(
       P_nf.list(props.projectId, Number(props.year), sid),
@@ -1762,6 +1780,48 @@ async function fetchNoteUserFormulas(sid: string): Promise<void> {
     noteUserFormulas.value = []
     noteUserFormulasSection.value = ''
   }
+}
+
+// ── 附注章节公式的编辑 / 保存（spec formula-governance-coverage-closure R4）：附注行不是报表配置行，
+//    保存走附注章节公式集接口（整套 + 载入令牌），交给 NoteFormulaDialog；原先编辑后发 report-config 必失败。 ──
+const showNoteFormulaDialog = ref(false)
+type NoteEditTarget = { note_section: string; section_title: string; content_type: string }
+/** 当前树节点对应的附注章节（章级节点 / 附注未生成的静态树没有章节编号 ⇒ null） */
+const noteEditTarget = computed<NoteEditTarget | null>(() => {
+  if (!isNoteDomainNodeKey(selectedNodeKey.value)) return null
+  const { sectionId, sectionTitle } = resolveNoteSectionRef(selectedNodeKey.value)
+  return sectionId ? { note_section: sectionId, section_title: sectionTitle, content_type: '' } : null
+})
+/** 弹窗实际编辑的章节 */
+const noteDialogTarget = ref<NoteEditTarget | null>(null)
+/** 本项目附注树里的章节（预设行的章节号来自模板，国企 / 上市编号不同，不一定是本项目的章节） */
+function projectNoteSection(code: string): NoteEditTarget | null {
+  for (const chapter of noteTreeChildren.value) {
+    for (const child of (chapter.children || [])) {
+      if (code && child._sectionId === code) return { note_section: code, section_title: child._sectionTitle || child.label, content_type: '' }
+    }
+  }
+  return null
+}
+/** 选中了具体章节就编辑它；在附注根节点 / 章级节点从某行进入时，用该行所属章节（须是本项目附注里的章节） */
+function openNoteFormulaEditor(row?: any) {
+  if (!guardFormulaMutation()) return
+  if (!props.projectId || !props.year) { ElMessage.warning('缺少项目信息'); return }
+  const target = noteEditTarget.value || (row ? projectNoteSection(String(row.row_code || '')) : null)
+  if (!target) {
+    ElMessage.warning(row?.row_code
+      ? `该公式所属章节「${row.row_code}」在本项目附注里找不到，请先在左侧选择具体的附注章节`
+      : '请先在左侧选择具体的附注章节（章级节点或附注尚未生成时不能编辑章节公式）')
+    return
+  }
+  noteDialogTarget.value = target
+  showNoteFormulaDialog.value = true
+}
+async function onNoteFormulasSaved() {
+  const sid = noteDialogTarget.value?.note_section
+  // 右栏只并入「当前选中章节」的用户集：弹窗编辑的正是它才重取（从附注根节点某行进入时右栏列的是预设全集）
+  if (sid && sid === noteEditTarget.value?.note_section) await loadNoteUserFormulas(sid, true)
+  emit('saved')
 }
 
 // ── 底稿(wp)节点公式：从 GET /api/workpapers/{wp_id}/formulas 加载（含 wp_formula 网格公式、
@@ -2438,7 +2498,10 @@ function onTreeNodeClick(data: any) {
     return
   }
 
-  if (!data.children || data.children.length === 0) {
+  // 表间审核分组节点（报表 ↔ 附注 / 合并 ↔ 报表 …）本身挂着规则集与内置勾稽问题清单，有子节点也要能选中
+  // （原先只认叶子 ⇒ 有内置勾稽结论时的「报表 ↔ 附注」、恒有三个子项的「合并 ↔ 报表」，规则永远点不到）
+  const isCrossCheckGroup = (Object.values(CROSS_CHECK_NODE_KEYS) as string[]).includes(data.key)
+  if (!data.children || data.children.length === 0 || isCrossCheckGroup) {
     selectedNodeKey.value = data.key
     // 构建路径
     if (data.key.startsWith('tb_')) {
@@ -2475,6 +2538,31 @@ function onTreeNodeClick(data: any) {
   }
 }
 
+/**
+ * 附注树节点 → 章节编号 / 标题（动态树优先，降级静态树；树中未命中且落在「本页章节」或附注域根节点时，
+ * 用调用页传入的章节上下文）。章级节点（note_chapter_*）不套用调用页章节，否则点章节会错显示成本页章节。
+ * 静态树没有章节编号 ⇒ sectionId 为空（附注未生成，不能按章节读写公式）。
+ */
+function resolveNoteSectionRef(nodeKey: string): { sectionId: string; sectionTitle: string } {
+  for (const chapter of noteTreeChildren.value) {
+    for (const child of (chapter.children || [])) {
+      if (child.key === nodeKey) return { sectionId: child._sectionId || '', sectionTitle: child._sectionTitle || child.label }
+    }
+  }
+  for (const group of staticNoteTree) {
+    for (const child of (group.children || [])) {
+      if (child.key === nodeKey) return { sectionId: '', sectionTitle: (child as any)._sectionTitle || child.label }
+    }
+  }
+  const propSection = (props.noteSection || '').trim()
+  const isPageSectionNode = nodeKey === 'note'
+    || (!!propSection && nodeKey === noteSectionToNodeKey(propSection))
+  if (isPageSectionNode) {
+    return { sectionId: propSection, sectionTitle: (props.noteSectionTitle || '').trim() }
+  }
+  return { sectionId: '', sectionTitle: '' }
+}
+
 // ── 当前显示的行 ──
 const currentRows = computed(() => {
   // 试算平衡表节点
@@ -2497,47 +2585,7 @@ const currentRows = computed(() => {
   }
   // 附注节点：显示该章节的预设公式（含用户编辑集，Task 4.1 / ADR-FMC-04）
   if (isNoteDomainNodeKey(selectedNodeKey.value) && (notePresetFormulas.value.length || noteUserFormulas.value.length)) {
-    // 从树节点获取 _sectionTitle / _sectionId
-    const nodeKey = selectedNodeKey.value
-    let targetTitle = ''
-    let targetSectionId = ''
-
-    // 在动态树中查找
-    for (const chapter of noteTreeChildren.value) {
-      for (const child of (chapter.children || [])) {
-        if (child.key === nodeKey) {
-          targetTitle = child._sectionTitle || child.label
-          targetSectionId = child._sectionId || ''
-          break
-        }
-      }
-      if (targetTitle) break
-    }
-    // 降级到静态树
-    if (!targetTitle) {
-      for (const group of staticNoteTree) {
-        for (const child of (group.children || [])) {
-          if (child.key === nodeKey) {
-            targetTitle = (child as any)._sectionTitle || child.label
-            break
-          }
-        }
-        if (targetTitle) break
-      }
-    }
-    // 树中未命中且当前落在「本页章节」或附注域根节点 → 用调用页传入的章节上下文，
-    // 仍能列出本页对应公式（附注未生成/树未加载时也不至于一把倒出全部）。
-    // 章级节点（note_chapter_*）不套用，否则点章节会错显示成本页章节的公式。
-    if (!targetTitle && !targetSectionId) {
-      const propSection = (props.noteSection || '').trim()
-      const isPageSectionNode = nodeKey === 'note'
-        || (!!propSection && nodeKey === noteSectionToNodeKey(propSection))
-      if (isPageSectionNode) {
-        targetTitle = (props.noteSectionTitle || '').trim()
-        targetSectionId = propSection
-      }
-    }
-
+    const { sectionId: targetSectionId, sectionTitle: targetTitle } = resolveNoteSectionRef(selectedNodeKey.value)
     // 章节命中 → 只列本章节公式；章级节点/无上下文 → 列全部（规则见 noteScopeTargeting）
     const presetRows = buildNoteFormulaRows(notePresetFormulas.value, {
       sectionId: targetSectionId,
@@ -2944,6 +2992,7 @@ function startEdit(row: any) {
     ElMessage.info('取数/溯源说明为只读投影，不可编辑')
     return
   }
+  if (resolveSaveDispatch(row) === 'note') { openNoteFormulaEditor(row); return }
   if (!guardFormulaMutation()) return
   editingRow.value = row
   showFormulaEdit.value = true
@@ -3044,6 +3093,11 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
 
   if (dispatch === 'reject') {
     ElMessage.info('取数/溯源说明为只读投影，不可保存')
+    return
+  }
+  if (dispatch === 'note') {  // 附注章节公式集只能整套保存（附注公式弹窗），不能发 report-config
+    showFormulaEdit.value = false
+    openNoteFormulaEditor(row)
     return
   }
 
@@ -3279,12 +3333,14 @@ const settingsDomain = computed(() => {
 })
 const settingsScope = computed(() => projectReportScope.value || `${fmTemplateType.value}_standalone`)
 
-/** 订阅 / 退订 / 应用到其他 / 恢复全局之后：本项目有效定义变了，丢掉报表行缓存重取当前节点 */
-async function onFormulaSettingsChanged() {
+/** 订阅 / 退订 / 应用到其他 / 恢复全局 / 导入公式包之后：本项目有效定义变了，丢掉报表行缓存重取当前节点 */
+async function onFormulaSettingsChanged(domain?: string) {
   invalidateEffectiveReport(props.projectId)
   allRowsMap.value = {}
   reportStandardByType.value = {}
   await loadRowsForNode(selectedNodeKey.value)
+  // 表间审核规则不在报表行缓存里，单独重取
+  if (domain === 'cross_check') await loadCrossCheckUserRules()
   emit('saved')
 }
 
@@ -3313,6 +3369,7 @@ async function onRestoreGlobal(row: any) {
 }
 
 function onAddFormulaRow() {
+  if (isNoteDomainNodeKey(selectedNodeKey.value)) { openNoteFormulaEditor(); return }  // 附注公式在附注公式弹窗里新增
   if (!guardFormulaMutation()) return
   // 打开公式编辑弹窗，不绑定具体行——用户自由编辑
   editingRow.value = {
@@ -3334,6 +3391,8 @@ async function onSaveAllFormulas() {
     ElMessage.warning(gate.detail)
     return
   }
+  // 附注章节公式只能整套保存：交给附注公式弹窗（原先这里对附注行一条不存还报「已保存 0 个」）
+  if (isNoteDomainNodeKey(selectedNodeKey.value)) { openNoteFormulaEditor(); return }
   // 改过的行也算（含「清除公式」后为空的行，此前被 `r.formula` 过滤掉、清除从未落库）
   const rows = currentRows.value.filter(r => r.formula || rowChanged(r))
   if (!rows.length) {

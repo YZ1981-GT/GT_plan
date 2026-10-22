@@ -163,6 +163,51 @@ describe('GtRowNameAlignmentDialog', () => {
     w.unmount()
   })
 
+  // spec formula-governance-coverage-closure R4：行列表状态标签改用 GtRowNameAlignmentTag（弹窗内模式）
+  it('行列表用行内标签组件（弹窗内文案）；点标签只切换当前行，不重新打开弹窗、不清掉已勾选', async () => {
+    const w = mountDialog()
+    const a = candidate('预收甲客户')
+    const row = (key: string, state: string, extra: Record<string, unknown> = {}) => ({
+      row_key: key, row_label: `行${key}`, match_state: state, candidates: [a], target_identity: [],
+      amount: null, similarity: null, source_kind: null, confirmed_by: null, confirmed_at: null,
+      mapping_version: null, stale_reason: null, ...extra,
+    })
+    eventBus.emit('open-row-name-alignment', openPayload([
+      row('r1', 'unmatched'), row('r2', 'ambiguous'), row('r3', 'auto_matched'),
+      row('r4', 'user_confirmed', { target_identity: [a.target_identity] }),
+    ]))
+    await flushPromises()
+    const vm = w.vm as any
+    const tags = w.findAllComponents({ name: 'GtRowNameAlignmentTag' })
+    expect(tags).toHaveLength(4)
+    expect(tags.every((t) => t.props('inDialog') === true)).toBe(true)
+    const states = [...document.querySelectorAll('.gt-rna-rowitem [data-state]')].map((e) => [
+      e.getAttribute('data-state'), e.textContent!.trim()])
+    expect(states).toEqual([
+      ['unmatched', '未匹配'], ['ambiguous', '待确认（多候选）'], ['auto_matched', '自动匹配'],
+      ['user_confirmed', '已确认']])
+    vm.toggleSelection('r1', a, true)
+    const emitSpy = vi.spyOn(eventBus, 'emit')
+    // 点 el-tag 本体（测试里 transition 被桩成外层元素，透传属性在桩上，点桩到不了标签的点击处理）
+    ;(document.querySelector('.gt-rna-rowitem [data-state="ambiguous"] .el-tag') as HTMLElement).click()
+    await flushPromises()
+    expect(emitSpy).not.toHaveBeenCalledWith('open-row-name-alignment', expect.anything())
+    expect((w.vm as any).selections.r1.size).toBe(1)
+    // 已确认行的「重新确认」：激活该行
+    tags[3].vm.$emit('select', 'r4')
+    await flushPromises()
+    expect(document.querySelector('.gt-rna-rowitem.is-active .gt-rna-rowitem__label')!.textContent).toBe('行r4')
+    emitSpy.mockRestore()
+    w.unmount()
+  })
+
+  it('状态文案 / 颜色只在标签组件里定义一份', () => {
+    const src = readFileSync(resolve(__dirname, '../GtRowNameAlignmentDialog.vue'), 'utf-8')
+    expect(src).toContain('<GtRowNameAlignmentTag')
+    expect(src).not.toMatch(/function stateLabel|function stateTagType/)
+    expect(src).not.toContain("'待确认（多候选）'")
+  })
+
   it('取消零写入：关闭弹窗不发 confirm 请求', async () => {
     const w = mountDialog()
     eventBus.emit('open-row-name-alignment', openPayload([

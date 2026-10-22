@@ -12,7 +12,7 @@
     <template v-else>
       <div class="gt-nf-header">
         <span>{{ currentNote.note_section }} {{ currentNote.section_title }}</span>
-        <el-tag size="small" type="info">{{ currentNote.content_type }}</el-tag>
+        <el-tag v-if="currentNote.content_type" size="small" type="info">{{ currentNote.content_type }}</el-tag>
       </div>
 
       <!-- 分类 Tab -->
@@ -98,6 +98,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [val: boolean]
   'applied': []
+  /** 公式集已保存（宿主据此刷新自己展示的附注公式） */
+  'saved': []
 }>()
 
 const visible = computed({
@@ -252,6 +254,7 @@ async function persistFormulas(): Promise<boolean> {
         if (r) Object.assign(f, { layer: r.layer, layer_label: r.layer_label, pending: r.pending, slot_key: r.slot_key })
       }
     }
+    emit('saved')
     return true
   } catch (e: any) {
     handleApiError(e, '保存失败')

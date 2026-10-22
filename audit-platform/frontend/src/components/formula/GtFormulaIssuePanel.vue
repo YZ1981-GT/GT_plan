@@ -76,14 +76,15 @@
  * 消费后端 logic_check 执行端点返回的 **Issue_List**（勾稽不通过项）与逐条校验结果。
  * logic_check 绝不改值——本面板为只读展示。
  *
- * 数据由父级经 useFormulaIssueHint.loadIssues 拉取后以 props 注入（展示型组件，便于测试）。
+ * 数据以 props 注入（展示型组件）：挂在表间审核面板里，取自公式管理中心打开时那一次
+ * report-cross-check 响应（formulaIssueHint.ts，spec formula-governance-coverage-closure R4）。
  *
  * Requirements: 6.2
  */
 import { computed } from 'vue'
 import { Search, WarningFilled } from '@element-plus/icons-vue'
 import { fmtDateTime } from '@/utils/formatters'
-import type { FormulaIssueItem, FormulaCheckOutcome } from './useFormulaIssueHint'
+import type { FormulaIssueItem, FormulaCheckOutcome } from './formulaIssueHint'
 
 const props = withDefaults(
   defineProps<{

@@ -155,6 +155,8 @@ describe('NoteFormulaDialog — 加载/编辑/持久化（Req 15.1/15.2/15.4）'
     // 成功后退出编辑态 + 成功提示
     expect(row._editing).toBe(false)
     expect(mockMsgSuccess).toHaveBeenCalled()
+    // 通知宿主（公式管理中心据此重取本章节公式，formula-governance-coverage-closure R4）
+    expect(wrapper.emitted('saved')).toHaveLength(1)
 
     // 重开：modelValue false→true → 再次 GET 重填（跨重开存活）
     const getCallsBefore = mockGet.mock.calls.length

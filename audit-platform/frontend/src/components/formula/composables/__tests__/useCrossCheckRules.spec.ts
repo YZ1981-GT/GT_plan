@@ -101,8 +101,124 @@ describe('resetCache', () => {
   it('清空执行结果缓存', () => {
     const cc = useCrossCheckRules(makeDeps())
     cc.execLoaded.value = true
+    cc.execRun.value = { ...cc.execRun.value, executed: true }
     cc.resetCache()
     expect(cc.execLoaded.value).toBe(false)
     expect(cc.execEmpty.value).toBe(false)
+    expect(cc.execRun.value.executed).toBe(false)
+  })
+})
+
+// spec formula-governance-coverage-closure R4：问题清单 / 提醒取自打开时那一次勾稽响应
+describe('内置勾稽：同一次响应供树与问题清单', () => {
+  const RUN = {
+    issue_list: [{ formula_id: 'report-cross-check-1', addr_id: null, description: '资产 ≠ 负债 + 权益',
+      left_value: '100.00', right_value: '90.00' }],
+    results: [
+      { formula_id: 'report-cross-check-1', description: '资产 ≠ 负债 + 权益', expression: "ROW('a') = ROW('b')", passed: false },
+      { formula_id: 'report-cross-check-2', description: '净利润一致', expression: "ROW('c') = ROW('d')", passed: true },
+    ],
+    hints: ['毛利率较上年变动超过 30%'],
+    last_computed_at: '2026-10-22T08:00:00',
+    run_id: 'run-1', status: 'executed', no_result: false,
+  }
+  const crossCheckCalls = (deps: CrossCheckDeps) =>
+    (deps.api.get as any).mock.calls.filter((c: any[]) => String(c[0]).endsWith('/report-cross-check'))
+  const ruleCalls = (deps: CrossCheckDeps) =>
+    (deps.api.get as any).mock.calls.filter((c: any[]) => String(c[0]).endsWith('/cross-check-rules'))
+
+  function depsWith(run: unknown) {
+    const deps = makeDeps()
+    ;(deps.api.get as any).mockImplementation(async (url: string) => (url.endsWith('/report-cross-check') ? run : { rules: {} }))
+    return deps
+  }
+
+  it('一次请求：树节点 ✅/❌ 与问题清单 / 提醒 / 计算时间同源，不再另调一次', async () => {
+    const deps = depsWith(RUN)
+    const cc = useCrossCheckRules(deps)
+    await cc.loadExecItems()
+    expect(crossCheckCalls(deps)).toHaveLength(1)
+    // 失败如实上报：不再用 validateStatus 把 4xx / 5xx 吞成「无结果」
+    expect(crossCheckCalls(deps)[0][1]).toMatchObject({ params: { year: 2025 }, _silent: true })
+    expect(crossCheckCalls(deps)[0][1].validateStatus).toBeUndefined()
+    expect(cc.execItems.value.report_note.map((n: any) => [n.key, n.icon])).toEqual([
+      ['cross_exec_report-cross-check-1', '❌'], ['cross_exec_report-cross-check-2', '✅'],
+    ])
+    const run = cc.execRun.value
+    expect(run.executed).toBe(true)
+    expect(run.failed).toBe(false)
+    expect(run.issues).toEqual(RUN.issue_list)
+    expect(run.outcomes.map((o) => [o.formula_id, o.passed])).toEqual([
+      ['report-cross-check-1', false], ['report-cross-check-2', true],
+    ])
+    expect(run.hints).toEqual(['毛利率较上年变动超过 30%'])
+    expect(run.lastComputedAt).toBe('2026-10-22T08:00:00')
+    expect(run.runId).toBe('run-1')
+    expect(cc.execEmpty.value).toBe(false)
+    expect(cc.execLoading.value).toBe(false)
+    // 已缓存：再调 loadExecItems 不重复执行（该接口每调一次落一次运行记录）
+    await cc.loadExecItems()
+    expect(crossCheckCalls(deps)).toHaveLength(1)
+  })
+
+  it('请求失败：记为失败并带原因，不显示成「无结果」，也不冒充通过', async () => {
+    const deps = makeDeps()
+    ;(deps.api.get as any).mockImplementation(async (url: string) => {
+      if (url.endsWith('/report-cross-check')) throw { response: { status: 403, data: { detail: '无权查看该项目' } } }
+      return { rules: {} }
+    })
+    const cc = useCrossCheckRules(deps)
+    await cc.loadExecItems()
+    expect(cc.execRun.value.failed).toBe(true)
+    expect(cc.execRun.value.executed).toBe(false)
+    expect(cc.execRun.value.error).toBe('无权查看该项目')
+    expect(cc.execEmpty.value).toBe(false)
+    expect(cc.execItems.value.report_note).toEqual([])
+    expect(cc.execLoaded.value).toBe(true)
+    expect(ruleCalls(deps)).toHaveLength(1)
+  })
+
+  it('本年度无报表数据（no_result）：未执行、记为无结果', async () => {
+    const deps = depsWith({ issue_list: [], results: [], hints: [], last_computed_at: null, status: 'no_result', no_result: true })
+    const cc = useCrossCheckRules(deps)
+    await cc.loadExecItems()
+    expect(cc.execRun.value.executed).toBe(false)
+    expect(cc.execRun.value.failed).toBe(false)
+    expect(cc.execEmpty.value).toBe(true)
+  })
+
+  it('刷新：强制重新执行一次，只刷新勾稽结论，不重载用户规则（免得冲掉规则的执行结果）', async () => {
+    const deps = depsWith(RUN)
+    const cc = useCrossCheckRules(deps)
+    await cc.loadExecItems()
+    cc.rulesMap.value.cross_report_note = [{ label: 'R', _checked: true, _pass: true }]
+    ;(deps.api.get as any).mockImplementation(async (url: string) =>
+      (url.endsWith('/report-cross-check') ? { ...RUN, issue_list: [], results: [{ ...RUN.results[0], passed: true }] } : { rules: {} }))
+    await cc.refreshExec()
+    expect(crossCheckCalls(deps)).toHaveLength(2)
+    expect(ruleCalls(deps)).toHaveLength(1)
+    expect(cc.execRun.value.issues).toEqual([])
+    expect(cc.execItems.value.report_note[0].icon).toBe('✅')
+    expect(cc.rulesMap.value.cross_report_note[0]._checked).toBe(true)
+  })
+
+  it('换了项目：加载期间先清掉上一个项目的问题清单', async () => {
+    const deps = depsWith(RUN)
+    const cc = useCrossCheckRules(deps)
+    await cc.loadExecItems()
+    expect(cc.execRun.value.issues).toHaveLength(1)
+    let release!: (v: unknown) => void
+    ;(deps.api.get as any).mockImplementation((url: string) =>
+      (url.endsWith('/report-cross-check') ? new Promise((r) => { release = r }) : Promise.resolve({ rules: {} })))
+    deps.projectId.value = 'p2'
+    deps.currentProjectCacheKey.value = 'p2:v1:2025'
+    const pending = cc.loadExecItems()
+    expect(cc.execLoading.value).toBe(true)
+    expect(cc.execRun.value.issues).toEqual([])
+    expect(cc.execRun.value.executed).toBe(false)
+    release(RUN)
+    await pending
+    expect(cc.execLoading.value).toBe(false)
+    expect(cc.execRun.value.executed).toBe(true)
   })
 })

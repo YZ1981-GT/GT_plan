@@ -25,7 +25,7 @@
 | F9 | 上一条的后果：既有守卫 `test_user_rules_run_with_builtin_checks_and_unresolvable_is_failure` 现红（「取不到」规则得到「左侧 0 = 右侧 100.00 不成立」而非「无法取数」）；若另一侧也是 0 就会**冒充通过** | `tests/formula_settings/test_tb_detail_and_cross_check.py:139-160` |
 | F10 | 底稿可编辑公式求值器只代入 WP / SUM_TB / TB，再以空上下文执行；矩阵把其余 7 个函数判不支持（保存即 422，fail-closed） | `wp_formula_eval_service.py:267-359`、`function_support_matrix.py` |
 | F11 | 统一预载层 `aux_data` 恒为 `{}`；行次缓存必须调用方自带；`_load_tb` 裸写 `is_deleted` | `formula_preloader.py:355-401` |
-| F12 | 5 个组件从未被任何提交挂载（`git log -S "<Name"` 为空）：`GtFormulaHintPanel` 262 / `GtFormulaIssuePanel` 247 / `GtRowNameAlignmentTag` 145 / `FormulaImportExportDropdown` 110 / `GtDraftStateBadge` 90 | `components/formula/` |
+| F12 | 5 个组件从未被任何提交挂载（`git log -S "<Name"` 为空）：`GtFormulaHintPanel` 262 / `GtFormulaIssuePanel` 247 / `GtRowNameAlignmentTag` 145 / `FormulaImportExportDropdown` 110 / `GtDraftStateBadge` 90（实施时按「当前无生产引用」现算为 6 个：另有曾挂过又被替换的 `NoteFormulaDialog` 340，见 §6） | `components/formula/` |
 | F13 | `applyFormulaPackage` 用 `POST .../overrides`，后端只有 `PUT` ⇒ 「导入公式包」恒 405（唯一入口在未挂载的下拉里，所以无人发现） | `composables/useFormulaImportExport.ts:484`、`routers/formula_settings.py:323` |
 | F14 | 公式管理中心打开时执行一次表间审核（`report-cross-check`），只取 `results` 画 ✅/❌，问题清单 `issue_list` 与提醒 `hints` 被丢弃 | `components/formula/composables/useCrossCheckRules.ts:61-98` |
 | F15 | 初稿标记 `draft_marker` 无任何读接口；真库 16 行全是测试运行时产物（`_FMRUNTIME_*` sheet） | `services/draft_refresh_service.py`；真库现查 |
@@ -183,14 +183,31 @@
 
 ## 6. R4 零挂载组件处置
 
+现算 6 个（初稿写 5 个，漏了 `NoteFormulaDialog`：2026-04-29 挂进附注页，05-02 被公式管理中心替换后再没挂过）。逐个查来历、数据源与功能重叠：
+
 | 组件 | 判定 | 处置 |
 |---|---|---|
-| `GtFormulaIssuePanel` + `GtFormulaHintPanel`（+ `useFormulaIssueHint`） | 有独立价值：现有面板只画 ✅/❌（F14），问题明细与合理性提醒无处可看 | 接进 `FormulaCrossCheckPanel`；数据取自 `useCrossCheckRules.loadExecItems` **同一次**响应（新增 `issues / hints / lastComputedAt`），不再额外执行一次审核（该接口每调一次就落一次运行记录） |
-| `FormulaImportExportDropdown` | 有独立价值：导入导出后端在、前端无入口 | 接进 `FormulaSettingsToolbar`；修 F13（`POST` → `PUT`、请求体按 `OverridesBody`）；「导入数据」按角色门控 |
-| `GtRowNameAlignmentTag` | 与 `GtRowNameAlignmentDialog` 内联的状态标签重复（同一组 match_state 文案 / 颜色两份） | 弹窗行内改用该组件，删掉弹窗里的重复映射 |
-| `GtDraftStateBadge` | 无数据源：初稿标记无读接口，真库 16 行全是测试产物（F15） | 删除；「初稿状态展示」需新增标记查询接口与报表 / 底稿行级接入，另立 spec |
+| `GtFormulaIssuePanel` | 有独立价值：表间审核面板只画 ✅/❌（F14），不通过项的左右值 / 差额无处可看 | 接进 `FormulaCrossCheckPanel`：「报表 ↔ 附注」分组节点看全部，单条勾稽节点只看自己（`formulaIssueHint.issueRunForNode`）；树点击原先只认叶子 ⇒ 有子节点的分组节点选不中，「报表 ↔ 附注」（有内置结论时）与「合并 ↔ 报表」（恒有三个子项）的规则集恒点不到，一并修为分组节点可选中；数据取自 `loadExecItems` **同一次**响应（`issueHintFromRun`），不另调（该接口每调一次落一次运行记录）；「刷新 / 重试」= 显式重跑，只刷新勾稽结论不重载用户规则 |
+| `GtFormulaHintPanel`（+ `useFormulaIssueHint`） | 无数据源：接口的 `hints` 是字符串、组件按对象收；真库 33 次运行 `hint_count` 全 0，没有合理性公式产出提醒 | 删除；`hints` 非空时在表间审核面板内联显示。合理性提醒要先有产出方（另立 spec） |
+| `FormulaImportExportDropdown` | 有独立价值：后端在、前端无入口 | 按两类数据分开挂（`mode`）：**预设库 Excel**（导出模板 / 导出数据 / 导入数据）挂「公式预设库」弹窗，导入按写预设角色门控（`PRESET_WRITE_ROLES` 与后端 `_CUSTOM_PRESET_WRITE_ROLES` 守卫对齐），非管理员导入提示「已提交为全局候选」（原先一律报「成功导入」）；**本项目公式包**（JSON）挂公式管理中心顶栏 |
+| `GtRowNameAlignmentTag` | 与对齐弹窗内联的状态标签重复（同一组 match_state 文案 / 颜色两份） | 弹窗行列表改用该组件（弹窗内模式：点击不发「打开弹窗」事件 —— 会清掉弹窗里未确认的勾选；「重新确认」= 激活该行），删除弹窗里的重复映射；未知状态照实显示 |
+| `GtDraftStateBadge` | 无数据源：初稿标记无读接口，真库 16 行全是测试产物（F15）；且无标记时显示「已审定」会误导 | 删除；「初稿状态展示」需新增标记查询接口与报表 / 底稿行级接入，另立 spec |
+| `NoteFormulaDialog` | **不是被取代**：附注章节公式集的保存（PUT 附注章节公式，带载入令牌，写本项目适配）只有它在调；公式管理中心里附注行按 `formulaRowKind` 的「其余 → report」分派，「编辑」发 report-config 必失败，「+ 新增公式」只加在页面上不保存，「💾 保存」对附注行一条不存还报「已保存 0 个」 | 接进公式管理中心附注节点：「✏️ 编辑本章节公式」（没有具体章节时禁用），附注行的编辑 / 新增 / 保存全部交给它；在附注根节点从某行进入时用该行所属章节，且须是本项目附注里的章节（预设行章节号来自模板，国企 / 上市编号不同：实测安徽项目货币资金是「八、1」、预设行是「五、1」），找不到就提示、不打开空弹窗；`formulaRowKind` 新增 `note` 分派；保存后强制重取本章节公式（不用已加载缓存）并通知宿主 |
 
-守卫：`components/formula/**/*.vue` 每个组件至少被一处生产代码引用（排除测试、`components.d.ts`、stories），PascalCase 与 kebab-case 两种写法都认。
+本项目公式包（`composables/formula/formulaPackage.ts`）：
+
+- 导出只收本项目适配（本项目 / 模板 / 暂缓采用）；系统预设、全局设置不进包 —— 每个环境本来就有，带进包再导入会把全局复制成目标项目的适配，以后全局一更新这个项目反倒要逐条确认。任一类读取失败整体失败，不生成缺类的包；0 条不生成文件并说明原因。
+- 导入走 `PUT overrides`（F13：原 `POST` 恒 405）+ 本地修订号；与目标项目现有定义相同的不写；适用范围不同（同一行编号在国企 / 上市模板里不是同一项）或项目已归档整类跳过；逐类报告写入 / 未改 / 跳过 / 失败。须有本项目公式编辑权限。
+- 类别清单取后端 `/formula-settings/domains`（含推送规则），不在前端写死；只在项目上下文提供（原全局导出用 `scope='*'`，对多数类别取不到行）。
+
+守卫（`components/formula/__tests__/formulaComponentMounts.spec.ts`）：`components/formula/**/*.vue` 每个组件至少被一处**生产代码**引用（import 路径，或 PascalCase / kebab-case 标签）；测试、`components.d.ts`、stories、注释里提到、自身引用都不算；扫描面非空自检 + 判据双向自检。
+
+实施勘误（与初稿不同处）：
+
+- 导入导出下拉初稿整个挂公式管理中心顶栏：顶栏已有「📤 导出模板」（导出当前节点公式），预设库 Excel 再挂进去会出现两个含义不同的「导出模板」，且预设库是平台级不是项目级 ⇒ 按数据分开挂。
+- 提醒面板初稿接入，查实无产出方后删除。
+- `NoteFormulaDialog` 初判「被公式管理中心取代、删除」，核对保存路径后改为接入（详见上表）。
+- 表间审核内置勾稽的请求原用 `validateStatus < 600`，403 / 500 被当成「无结果」；改为失败如实呈现（原因 + 重试）。
 
 ## 7. R6 底稿可编辑公式补齐函数
 

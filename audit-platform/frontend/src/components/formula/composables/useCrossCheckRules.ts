@@ -6,6 +6,8 @@
  */
 import { computed, ref, type Ref } from 'vue'
 import type { CROSS_CHECK_NODE_KEYS as _Keys } from '../crossCheckKey'
+import { emptyIssueRun, failedIssueRun, issueHintFromRun, type FormulaIssueRun } from '../formulaIssueHint'
+import { formulaErrorText } from '@/composables/formula/useFormulaSettings'
 
 export interface CrossCheckDeps {
   projectId: Ref<string>
@@ -49,6 +51,10 @@ export function useCrossCheckRules(deps: CrossCheckDeps) {
   const execLoaded = ref(false)
   const execCacheKey = ref<string | null>(null)
   const execEmpty = ref(false)
+  // 同一次响应里的问题清单 / 提醒 / 计算时间（spec formula-governance-coverage-closure R4）
+  const execRun = ref<FormulaIssueRun>(emptyIssueRun())
+  const execLoading = ref(false)
+  let execSeq = 0
 
   // ── 用户可编辑规则（按树节点 key 分组） ──
   const rulesMap = ref<Record<string, any[]>>(
@@ -63,39 +69,60 @@ export function useCrossCheckRules(deps: CrossCheckDeps) {
   async function loadExecItems() {
     if ((execLoaded.value && deps.cacheKeyMatches(execCacheKey.value, deps.currentProjectCacheKey.value))
         || !deps.projectId.value) return
+    if (!(await fetchExecRun())) return
+    await loadUserRules()
+  }
+
+  /** 重新执行内置勾稽（问题清单「刷新」）；只刷新勾稽结论，不重载用户规则（免得冲掉规则的执行结果）。 */
+  async function refreshExec() {
+    if (!deps.projectId.value) return
+    await fetchExecRun()
+  }
+
+  /**
+   * 调一次 report-cross-check：树上的 ✅/❌、问题清单、提醒都取自这一次响应。
+   * 失败如实记为失败（原先 `validateStatus < 600` 把 403 / 500 也当成「无结果」）。
+   * 返回 false = 响应已过期（换了项目 / 年度），调用方不再继续。
+   */
+  async function fetchExecRun(): Promise<boolean> {
     const reqKey = deps.currentProjectCacheKey.value
+    const seq = ++execSeq
+    // 换了项目 / 年度：先清掉上一个项目的结论，加载期间不显示别人的问题清单
+    if (!deps.cacheKeyMatches(execCacheKey.value, reqKey)) execRun.value = emptyIssueRun()
+    let run: FormulaIssueRun = emptyIssueRun()
+    let results: any[] = []
     if (deps.year.value != null) {
+      execLoading.value = true
       try {
         const data = await deps.api.get(deps.projectFormula.reportCrossCheck(deps.projectId.value), {
-          params: { year: Number(deps.year.value) },
-          _silent: true, validateStatus: (s: number) => s < 600,
+          params: { year: Number(deps.year.value) }, _silent: true,
         } as any)
-        if (!deps.shouldApplyResponse(reqKey, deps.currentProjectCacheKey.value)) return
-        const results: any[] = Array.isArray(data?.results) ? data.results
+        if (!deps.shouldApplyResponse(reqKey, deps.currentProjectCacheKey.value)) return false
+        run = issueHintFromRun(data)
+        results = Array.isArray(data?.results) ? data.results
           : (Array.isArray(data?.data?.results) ? data.data.results : [])
-        if (results.length) {
-          execEmpty.value = false
-          execItems.value = {
-            report_note: results.map((o: any) => ({
-              key: `cross_exec_${o.formula_id}`, label: o.description || o.formula_id,
-              icon: o.passed === true ? '✅' : o.passed === false ? '❌' : '📌',
-              _formulaId: o.formula_id, _passed: o.passed,
-            })),
-            report_wp: [], note_wp: [],
-          }
-          execLoaded.value = true
-          execCacheKey.value = reqKey
-          await loadUserRules()
-          return
-        }
-      } catch { /* 落到「无结果」 */ }
+      } catch (e: any) {
+        if (!deps.shouldApplyResponse(reqKey, deps.currentProjectCacheKey.value)) return false
+        run = failedIssueRun(formulaErrorText(e, '报表勾稽执行失败'))
+      } finally {
+        if (seq === execSeq) execLoading.value = false
+      }
     }
-    if (!deps.shouldApplyResponse(reqKey, deps.currentProjectCacheKey.value)) return
-    execEmpty.value = true
-    execItems.value = { report_note: [], report_wp: [], note_wp: [] }
+    if (!deps.shouldApplyResponse(reqKey, deps.currentProjectCacheKey.value)) return false
+    execRun.value = run
+    // 「无结果」只指真没有结论；请求失败另由 execRun.failed 呈现
+    execEmpty.value = !results.length && !run.failed
+    execItems.value = {
+      report_note: results.map((o: any) => ({
+        key: `cross_exec_${o.formula_id}`, label: o.description || o.formula_id,
+        icon: o.passed === true ? '✅' : o.passed === false ? '❌' : '📌',
+        _formulaId: o.formula_id, _passed: o.passed,
+      })),
+      report_wp: [], note_wp: [],
+    }
     execLoaded.value = true
     execCacheKey.value = reqKey
-    await loadUserRules()
+    return true
   }
 
   async function loadUserRules() {
@@ -221,12 +248,13 @@ export function useCrossCheckRules(deps: CrossCheckDeps) {
 
   function resetCache() {
     execLoaded.value = false; execCacheKey.value = null; execEmpty.value = false
+    execRun.value = emptyIssueRun()
   }
 
   return {
-    execItems, execLoaded, execEmpty, isCrossCheckMode,
+    execItems, execLoaded, execEmpty, execRun, execLoading, isCrossCheckMode,
     rulesMap, rulesForCurrent, tokens,
-    loadExecItems, loadUserRules, applyRulesData, persist, resetCache,
+    loadExecItems, refreshExec, loadUserRules, applyRulesData, persist, resetCache,
     showDialog, dialogTitle, editIndex, form, onAdd, onEdit, onSave, onRemove,
     running, run,
   }

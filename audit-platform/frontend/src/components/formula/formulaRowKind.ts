@@ -20,6 +20,10 @@
  *                  保存走 `PUT /api/workpapers/{wp_id}/formulas`（wpFormula.upsert）。
  *   - surfaced   : 专属组件取数公式 surfacing（`*-surfaced-*` 伪 id，`readonly:true`）。只读，禁保存。
  *   - extraction : 四表提取只读溯源（Tier B，`readonly:true`，`tierB-*` id）。只读，禁保存。
+ *   - note       : 附注章节公式（`noteScopeTargeting` 组装的 `note_preset_*` / `note_user_*` 行）。
+ *                  保存走附注章节公式集接口（整套 + 载入令牌），由附注公式弹窗负责；
+ *                  原先落到「其余 → report」，编辑后发到 report-config detail 必失败
+ *                  （spec formula-governance-coverage-closure R4）。
  *   - report     : 报表模板公式（report_config），有真实 id，保存走 report-config detail。
  *   - tb_detail  : 试算表科目明细公式（持久化 wizard_state）。**在本模块之外**由
  *                  `persistTbDetailFormulas()` 分流（调用方在进入本模块前已拦截），此处不涉及。
@@ -31,10 +35,10 @@
  */
 
 /** 公式行的权威源 kind。 */
-export type FormulaRowKind = 'wp' | 'surfaced' | 'extraction' | 'report'
+export type FormulaRowKind = 'wp' | 'surfaced' | 'extraction' | 'note' | 'report'
 
-/** 保存分派目标。`reject` = 只读投影不可保存。 */
-export type SaveDispatchTarget = 'wp' | 'report' | 'reject'
+/** 保存分派目标。`reject` = 只读投影不可保存；`note` = 交给附注公式弹窗。 */
+export type SaveDispatchTarget = 'wp' | 'note' | 'report' | 'reject'
 
 /** 公式行投影的最小结构（只取分类所需字段，容忍其余任意字段）。 */
 export interface FormulaRowLike {
@@ -50,6 +54,8 @@ export interface FormulaRowLike {
 const SURFACED_ID_RE = /-surfaced-|^[A-Za-z0-9]+-surfaced$/
 /** Tier B 只读溯源 id：`tierB-*`。 */
 const TIER_B_ID_RE = /^tierB-/
+/** 附注章节公式行 id（noteScopeTargeting.buildNoteFormulaRows / mergeNoteUserFormulaRows）。 */
+const NOTE_ROW_ID_RE = /^note_(preset|user)_/
 
 function asStr(v: unknown): string {
   return typeof v === 'string' ? v : v == null ? '' : String(v)
@@ -96,6 +102,9 @@ export function classifyFormulaRowKind(row: FormulaRowLike | null | undefined): 
     return 'wp'
   }
 
+  // 附注章节公式行（不是报表配置行，不能发 report-config）。
+  if (NOTE_ROW_ID_RE.test(id)) return 'note'
+
   // 其余为报表模板公式（report_config）。
   return 'report'
 }
@@ -105,11 +114,13 @@ export function classifyFormulaRowKind(row: FormulaRowLike | null | undefined): 
  *   - wp         → 'wp'     （`PUT /api/workpapers/{wp_id}/formulas`，wpFormula.upsert）
  *   - surfaced   → 'reject' （只读投影，禁保存）
  *   - extraction → 'reject' （只读溯源，禁保存）
+ *   - note       → 'note'   （附注章节公式集，由附注公式弹窗保存）
  *   - report     → 'report' （report-config detail）
  */
 export function resolveSaveDispatch(row: FormulaRowLike | null | undefined): SaveDispatchTarget {
   const kind = classifyFormulaRowKind(row)
   if (kind === 'surfaced' || kind === 'extraction') return 'reject'
   if (kind === 'wp') return 'wp'
+  if (kind === 'note') return 'note'
   return 'report'
 }

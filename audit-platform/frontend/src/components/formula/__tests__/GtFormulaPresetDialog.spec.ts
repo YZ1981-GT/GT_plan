@@ -70,6 +70,7 @@ vi.mock('element-plus', async (importOriginal) => {
 
 // ─── Import after mocks ───────────────────────────────────────────────────────
 import ElementPlus from 'element-plus'
+import { createPinia } from 'pinia'
 import GtFormulaPresetDialog from '../GtFormulaPresetDialog.vue'
 import { useFormulaImportExport } from '@/composables/useFormulaImportExport'
 
@@ -129,9 +130,10 @@ function routeGet(url: string) {
 }
 
 function mountDialog(): VueWrapper {
+  // 弹窗读登录角色决定「导入数据」可用性（formula-governance-coverage-closure R4）⇒ 需要 pinia
   return mount(GtFormulaPresetDialog, {
     props: { modelValue: false, scope: 'workpaper' },
-    global: { plugins: [ElementPlus], stubs: STUBS },
+    global: { plugins: [ElementPlus, createPinia()], stubs: STUBS },
   })
 }
 

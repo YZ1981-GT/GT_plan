@@ -15,8 +15,10 @@ import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 const SECTION = '五、1'
 const SECTION_TITLE = '货币资金'
 
-const { get, scopeLoad, scopeGetRows, acnrListSheets, acnrListCells, addressState, getNoteTree } = vi.hoisted(() => ({
+const { get, put, post, scopeLoad, scopeGetRows, acnrListSheets, acnrListCells, addressState, getNoteTree } = vi.hoisted(() => ({
   get: vi.fn(),
+  put: vi.fn(),
+  post: vi.fn(),
   scopeLoad: vi.fn(),
   scopeGetRows: vi.fn(() => []),
   acnrListSheets: vi.fn(),
@@ -25,7 +27,7 @@ const { get, scopeLoad, scopeGetRows, acnrListSheets, acnrListCells, addressStat
   getNoteTree: vi.fn(),
 }))
 
-vi.mock('@/services/apiProxy', () => ({ api: { get } }))
+vi.mock('@/services/apiProxy', () => ({ api: { get, put, post } }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/components/formula/FormulaEditDialog.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@/components/formula/FormulaHistoryTab.vue', () => ({ default: { template: '<div />' } }))
@@ -187,5 +189,111 @@ describe('弹窗附注节点调 list_note_formulas（Task 4.1 / ADR-FMC-04）', 
     await flushPromises()
     expect((state(w).currentRows as any[]).some((r) => r._userTarget === '2:0')).toBe(false)
     w.unmount()
+  })
+})
+
+// spec formula-governance-coverage-closure R4：附注行原先按「其余 → report」保存，编辑后发 report-config 必失败；
+// 现交给附注公式弹窗（附注章节公式集接口，整套 + 载入令牌）。
+describe('附注章节公式的编辑 / 新增 / 保存交给附注公式弹窗', () => {
+  beforeEach(() => {
+    get.mockReset()
+    get.mockImplementation(async (url: string) => {
+      const u = String(url)
+      if (u.includes('/disclosure-notes/') && u.endsWith('/formulas')) return USER_FORMULAS
+      if (u.includes('note-templates/preset-formulas')) return PRESET_FORMULAS
+      if (u.includes('report-config/types')) return []
+      return {}
+    })
+    put.mockReset(); post.mockReset()
+    scopeLoad.mockReset(); scopeLoad.mockResolvedValue([])
+    scopeGetRows.mockReset(); scopeGetRows.mockReturnValue([])
+    acnrListSheets.mockReset(); acnrListSheets.mockResolvedValue([])
+    acnrListCells.mockReset(); acnrListCells.mockResolvedValue([])
+    getNoteTree.mockReset(); getNoteTree.mockResolvedValue(NOTE_TREE)
+  })
+
+  const pick = async (w: ReturnType<typeof create>) => {
+    state(w).onTreeNodeClick({ key: 'note_五_1', _sectionId: SECTION, _sectionTitle: SECTION_TITLE, label: SECTION_TITLE })
+    await flushPromises()
+  }
+
+  it('点附注行「编辑」：打开附注公式弹窗定位本章节，不进通用编辑框、不发任何写请求', async () => {
+    const w = await open()
+    await pick(w)
+    const row = (state(w).currentRows as any[]).find((r) => r._userTarget === '2:0')
+    state(w).startEdit(row)
+    await flushPromises()
+    expect(state(w).showNoteFormulaDialog).toBe(true)
+    expect(state(w).showFormulaEdit).toBe(false)
+    expect(state(w).noteEditTarget).toEqual({ note_section: SECTION, section_title: SECTION_TITLE, content_type: '' })
+    expect(put).not.toHaveBeenCalled()
+    expect(post).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('附注节点的「+ 新增公式」「💾 保存」同样交给附注公式弹窗（原先保存报「已保存 0 个」）', async () => {
+    const w = await open()
+    await pick(w)
+    state(w).onAddFormulaRow()
+    expect(state(w).showNoteFormulaDialog).toBe(true)
+    expect(state(w).showFormulaEdit).toBe(false)
+    state(w).showNoteFormulaDialog = false
+    await state(w).onSaveAllFormulas()
+    expect(state(w).showNoteFormulaDialog).toBe(true)
+    expect(put).not.toHaveBeenCalled()
+    expect(post).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('附注公式弹窗保存后：强制重取本章节用户集（不用已加载缓存）并通知宿主', async () => {
+    const w = await open()
+    await pick(w)
+    state(w).openNoteFormulaEditor()
+    expect(state(w).noteDialogTarget).toEqual({ note_section: SECTION, section_title: SECTION_TITLE, content_type: '' })
+    const before = get.mock.calls.filter((c) => String(c[0]).endsWith('/formulas')).length
+    await state(w).onNoteFormulasSaved()
+    const after = get.mock.calls.filter((c) => String(c[0]).endsWith('/formulas')).length
+    expect(after).toBe(before + 1)
+    expect(w.emitted('saved')).toHaveLength(1)
+    w.unmount()
+  })
+
+  it('附注根节点列着全部章节：点某行「编辑」打开该行所属的本项目章节；模板章节号本项目没有则不打开', async () => {
+    const w = await open({ noteSection: '', noteSectionTitle: '' })
+    state(w).selectedNodeKey = 'note'
+    await flushPromises()
+    expect(state(w).noteEditTarget).toBeNull()
+    // 预设章节号来自模板（国企 / 上市编号不同）：本项目附注里没有 ⇒ 不打开空弹窗
+    state(w).startEdit({ id: 'note_preset_7', row_code: '五、3', row_name: '应收账款' })
+    expect(state(w).showNoteFormulaDialog).toBe(false)
+    state(w).startEdit({ id: 'note_preset_0', row_code: SECTION, row_name: SECTION_TITLE })
+    expect(state(w).showNoteFormulaDialog).toBe(true)
+    expect(state(w).noteDialogTarget).toEqual({ note_section: SECTION, section_title: SECTION_TITLE, content_type: '' })
+    // 右栏列的是预设全集，不是该章节的用户集 ⇒ 保存后不重取，只通知宿主
+    const before = get.mock.calls.length
+    await state(w).onNoteFormulasSaved()
+    expect(get.mock.calls.length).toBe(before)
+    expect(w.emitted('saved')).toHaveLength(1)
+    w.unmount()
+  })
+
+  it('没有章节编号（附注未生成的静态树 / 章级节点）：不打开弹窗', async () => {
+    const w = await open({ noteSection: '', noteSectionTitle: '' })
+    state(w).selectedNodeKey = 'note_chapter_x'
+    await flushPromises()
+    expect(state(w).noteEditTarget).toBeNull()
+    state(w).openNoteFormulaEditor()
+    expect(state(w).showNoteFormulaDialog).toBe(false)
+    w.unmount()
+  })
+
+  it('模板挂载附注公式弹窗并绑定当前章节', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const src = readFileSync(resolve(__dirname, '../FormulaManagerDialog.vue'), 'utf-8')
+    expect(src).toMatch(/<NoteFormulaDialog[^>]*v-model="showNoteFormulaDialog"[^>]*:current-note="noteDialogTarget"/)
+    // 工具栏按钮：没有具体章节时禁用（不是点了才提示）
+    expect(src).toMatch(/data-testid="fm-note-edit" :disabled="!noteEditTarget"/)
+    expect(src).toContain('@saved="onNoteFormulasSaved"')
   })
 })

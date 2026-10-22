@@ -13,8 +13,27 @@
         <el-button size="small" type="primary" @click="onAdd">+ 新增规则</el-button>
       </div>
     </div>
+    <!-- spec formula-governance-coverage-closure R4：内置报表勾稽的问题清单 / 提醒（与树上 ✅/❌ 同一次执行） -->
+    <div v-if="issueRun" data-testid="cc-issue-run" style="margin-bottom: 10px;">
+      <el-alert v-if="issueRun.failed" type="warning" :closable="false" show-icon title="内置报表勾稽执行失败">
+        <span>{{ issueRun.error }}</span>
+        <el-button size="small" link type="primary" :loading="execLoading" data-testid="cc-issue-retry"
+          style="margin-left: 8px;" @click="$emit('refresh-exec')">重试</el-button>
+      </el-alert>
+      <GtFormulaIssuePanel v-else-if="issueRun.executed" :issues="issueRun.issues" :outcomes="issueRun.outcomes"
+        :last-computed-at="issueRun.lastComputedAt" :loading="execLoading" @refresh="$emit('refresh-exec')" />
+      <el-alert v-else-if="!execLoading" type="info" :closable="false" show-icon title="内置报表勾稽无结果">
+        <span>本项目当前年度还没有已生成的报表数据，内置勾稽没有可执行的结论。</span>
+        <el-button size="small" link type="primary" data-testid="cc-issue-rerun" style="margin-left: 8px;"
+          @click="$emit('refresh-exec')">重新执行</el-button>
+      </el-alert>
+      <el-alert v-if="issueRun.hints.length" type="info" :closable="false" show-icon title="提醒"
+        data-testid="cc-issue-hints" style="margin-top: 8px;">
+        <div v-for="(h, i) in issueRun.hints" :key="i">{{ h }}</div>
+      </el-alert>
+    </div>
     <el-alert
-      v-if="execEmpty && !rules.length"
+      v-if="execEmpty && !rules.length && !issueRun"
       type="info" :closable="false" show-icon title="无结果"
       description="本项目当前年度表间审核执行结果为空，且该节点尚无自定义规则。可点「+ 新增规则」添加后执行校验。"
       style="margin-bottom: 10px;" />
@@ -134,10 +153,12 @@ import { formulaSettingsApi } from '@/services/formulaSettingsApi'
 import { showFormulaError, type CheckRule } from '@/composables/formula/useFormulaSettings'
 import CrossCheckHistoryPanel from './panels/CrossCheckHistoryPanel.vue'
 import FormulaCheckCatalog from './settings/FormulaCheckCatalog.vue'
+import GtFormulaIssuePanel from './GtFormulaIssuePanel.vue'
+import type { FormulaIssueRun } from './formulaIssueHint'
 
 defineOptions({ name: 'FormulaCrossCheckPanel' })
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   selectedPath: string
   rules: any[]
   execEmpty: boolean
@@ -149,7 +170,10 @@ const props = defineProps<{
   year: number
   layerTagType: (layer: string) => string
   layerLabel: (layer: string) => string
-}>()
+  /** 当前节点该显示的内置勾稽产出；null = 本节点与内置勾稽无关（formulaIssueHint.issueRunForNode） */
+  issueRun?: FormulaIssueRun | null
+  execLoading?: boolean
+}>(), { issueRun: null, execLoading: false })
 
 const emit = defineEmits<{
   run: []
@@ -158,6 +182,8 @@ const emit = defineEmits<{
   remove: [index: number]
   save: []
   'update:showDialog': [val: boolean]
+  /** 重新执行内置勾稽 */
+  'refresh-exec': []
 }>()
 
 const historyRef = defineModel<any>('historyRef')

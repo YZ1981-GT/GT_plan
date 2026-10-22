@@ -18,7 +18,7 @@ vi.mock('element-plus', () => ({
 
 import http from '@/utils/http'
 import { ElMessage } from 'element-plus'
-import { useFormulaImportExport } from '@/composables/useFormulaImportExport'
+import { canWritePresets, useFormulaImportExport } from '@/composables/useFormulaImportExport'
 
 const mockPost = http.post as ReturnType<typeof vi.fn>
 
@@ -27,10 +27,8 @@ function isCustomEntry(row: { is_custom?: boolean; source?: string }): boolean {
   return row.is_custom === true || row.source === 'custom'
 }
 
-// ── 权限门控纯逻辑（复刻 FormulaTab.canEditPreset，Property 5 前端侧） ──
-function canEditPreset(role: string): boolean {
-  return role === 'admin' || role === 'partner'
-}
+// ── 权限门控：直接测生产函数（FormulaTab / 预设库弹窗共用；原先复刻一份角色判断，与生产代码会各自漂移） ──
+const canEditPreset = (role: string) => canWritePresets(role)
 
 describe('来源判定（Property 3）', () => {
   it('is_custom=true → 自定义', () => {

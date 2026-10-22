@@ -474,17 +474,14 @@ import { handleApiError } from '@/utils/errorHandler'
 import { useTemplateLibrarySource } from '@/composables/useTemplateLibrarySource'
 import { useAcnr } from '@/services/acnr/useAcnr'
 import { useAuthStore } from '@/stores/auth'
-import { useFormulaImportExport } from '@/composables/useFormulaImportExport'
+import { canWritePresets, useFormulaImportExport } from '@/composables/useFormulaImportExport'
 import FormulaCoverageChart from '@/components/template-library/FormulaCoverageChart.vue'
 import GtFormulaPresetDialog from '@/components/formula/GtFormulaPresetDialog.vue'
 
 // ─── 公式预设库（通用 vs 自定义）─────────────────────────────────────────────
 const authStore = useAuthStore()
-// 权限门控（D7 ADR，与 ReportConfigTab/SeedLoaderPanel 一致）：admin/partner 可编辑自定义预设
-const canEditPreset = computed(() => {
-  const role = authStore.user?.role || ''
-  return role === 'admin' || role === 'partner'
-})
+// 权限门控：与后端 /presets/custom 的 require_role 同一份角色清单（PRESET_WRITE_ROLES，守卫钉死逐值一致）
+const canEditPreset = computed(() => canWritePresets(authStore.user?.role))
 const presetDialogVisible = ref(false)
 const presetDialogRef = ref<InstanceType<typeof GtFormulaPresetDialog> | null>(null)
 const { saveCustomPreset } = useFormulaImportExport()
