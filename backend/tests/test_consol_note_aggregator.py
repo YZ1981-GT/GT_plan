@@ -419,3 +419,78 @@ class TestMatchColumnMultiHeader:
             [_norm("期末金额"), _norm("年初余额")],
         )
         assert result == 1
+
+
+# ─── 合计行重算 ──────────────────────────────────────────────────────────────
+
+
+class TestRecalcTotalRows:
+    """合计行表内重算。"""
+
+    def test_basic_sum(self):
+        """合计行 = 数据行之和。"""
+        from app.services.consol_note_aggregator import _recalc_total_rows
+
+        rows = [
+            ["库存现金", "100", "50"],
+            ["银行存款", "200", "300"],
+            ["合  计", "", ""],
+        ]
+        count = _recalc_total_rows(rows)
+        assert count > 0
+        assert rows[2][1] == "300"
+        assert rows[2][2] == "350"
+
+    def test_overwrites_old_value(self):
+        """强制覆盖旧合计值。"""
+        from app.services.consol_note_aggregator import _recalc_total_rows
+
+        rows = [
+            ["A", "100", ""],
+            ["B", "200", ""],
+            ["合计", "999", ""],  # 旧值 999
+        ]
+        _recalc_total_rows(rows)
+        assert rows[2][1] == "300"  # 被覆盖为 100+200
+
+    def test_subtotal_and_total(self):
+        """小计行和合计行分别重算。"""
+        from app.services.consol_note_aggregator import _recalc_total_rows
+
+        rows = [
+            ["A", "10", ""],
+            ["B", "20", ""],
+            ["小计", "", ""],
+            ["C", "30", ""],
+            ["合计", "", ""],
+        ]
+        _recalc_total_rows(rows)
+        assert rows[2][1] == "30"   # 小计 = A+B
+        assert rows[4][1] == "30"   # 合计 = C（从小计之后到合计之前）
+
+    def test_no_total_row(self):
+        """无合计行：不做任何操作。"""
+        from app.services.consol_note_aggregator import _recalc_total_rows
+
+        rows = [
+            ["A", "100", ""],
+            ["B", "200", ""],
+        ]
+        count = _recalc_total_rows(rows)
+        assert count == 0
+
+    def test_empty_rows(self):
+        from app.services.consol_note_aggregator import _recalc_total_rows
+        assert _recalc_total_rows([]) == 0
+
+    def test_decimal_precision(self):
+        """小数精度保持。"""
+        from app.services.consol_note_aggregator import _recalc_total_rows
+
+        rows = [
+            ["A", "100.50", ""],
+            ["B", "200.30", ""],
+            ["合计", "", ""],
+        ]
+        _recalc_total_rows(rows)
+        assert rows[2][1] == "300.80"

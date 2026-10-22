@@ -71,8 +71,10 @@ class CellValue:
     col_index: int
     row_label: str = ""
     col_name: str = ""
-    individual: float = 0.0
-    consolidated: float = 0.0
+    individual: float = 0.0       # 个别数汇总（来自单体附注）
+    adjustment: float | None = None   # 调整净额（来自差额节点分录，当前未填）
+    elimination: float | None = None  # 抵销净额（来自差额节点分录，当前未填）
+    consolidated: float = 0.0     # 合并数 = individual + (adjustment or 0) + (elimination or 0)
     source: str = "standalone_aggregate"
     by_company: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -484,6 +486,68 @@ def _find_matching_row(
     return None
 
 
+# ─── 合计行表内重算 ──────────────────────────────────────────────────────────
+
+_TOTAL_LABELS = frozenset({"合计", "小计", "合 计", "小 计"})
+
+
+def _is_total_row_label(label: str) -> bool:
+    """判断行标签是否是合计行。"""
+    return _norm(label) in _TOTAL_LABELS
+
+
+def _recalc_total_rows(rows: list) -> int:
+    """合计行 = 合计行上方数据行逐列之和（强制覆盖）。
+
+    仅处理 list 格式的行（合并附注 consol_note_data.data.rows 是二维数组）。
+    合计行判据：首列文本去空白后是"合计"或"小计"。
+    返回被重算的合计行数。
+    """
+    if not rows:
+        return 0
+
+    recalced = 0
+    for ri, row in enumerate(rows):
+        if not isinstance(row, (list, tuple)):
+            continue
+        label = str(row[0]).strip() if row else ""
+        if not _is_total_row_label(label):
+            continue
+
+        # 向上收集数据行（到上一个合计行或行首）
+        data_start = ri
+        for j in range(ri - 1, -1, -1):
+            prev = rows[j]
+            if not isinstance(prev, (list, tuple)):
+                continue
+            prev_label = str(prev[0]).strip() if prev else ""
+            if _is_total_row_label(prev_label):
+                break
+            data_start = j
+
+        # 逐列求和（跳过首列标签）
+        width = len(row)
+        for ci in range(1, width):
+            col_sum = 0.0
+            has_data = False
+            for j in range(data_start, ri):
+                dr = rows[j]
+                if not isinstance(dr, (list, tuple)) or ci >= len(dr):
+                    continue
+                v = _safe_float(dr[ci])
+                if v is not None:
+                    col_sum += v
+                    has_data = True
+            if has_data:
+                # 强制覆盖合计行（与 backfill_total_rows 不同：这里不管旧值是否为空）
+                while len(row) <= ci:
+                    row.append("")
+                row[ci] = f"{col_sum:.2f}" if col_sum != int(col_sum) else str(int(col_sum))
+                recalced += 1
+
+    return recalced
+
+
 # ─── 汇总核心 ────────────────────────────────────────────────────────────────
 
 
@@ -694,9 +758,17 @@ async def aggregate_section(
                 "reason": "所有子企业的单体附注中均无对应行",
             })
 
-    # 9. 合并数 = 个别数（Phase 1 差额节点不参与）
+    # 9. 合并数计算
+    #    individual 来自单体附注汇总
+    #    adjustment/elimination 来自差额节点的分录（需要"按公式填入"获取完整合并数）
+    #    当前 consolidated = individual（差额节点参与需走公式引擎路径 B）
     for cell in cells.values():
         cell.consolidated = cell.individual
+    if any(node.kind == "elim" for node in iter_nodes(tree)):
+        result.warnings.append(
+            "合并数 = 个别数汇总（未含调整/抵销分录）。"
+            "如需含差额的完整合并数，请使用「ƒx 按公式填入」"
+        )
 
     result.cells = list(cells.values())
     return result
@@ -811,14 +883,26 @@ async def reaggregate_from_standalone(
                 ]
 
                 new_rows, summary = fill_rows(saved_headers, saved_rows, fill_cells, manual_set, template_rows)
+
+                # C 修复：合计行 = 本表数据行逐列之和（表内计算，强制覆盖旧值）
+                _recalc_total_rows(new_rows)
+
                 data.update({"headers": saved_headers, "rows": new_rows})
+
+                # B 修复：记录写入来源，避免两条路径互相覆盖时用户不知道值从哪来
+                # _cell_sources: {row_index:col_index: source} 记录每格最后写入来源
+                cell_sources = data.get("_cell_sources", {})
+                for cell in agg.cells:
+                    key = f"{cell.row_index}:{cell.col_index}"
+                    cell_sources[key] = "standalone_aggregate"
+                data["_cell_sources"] = cell_sources
+                data["_last_write_source"] = "standalone_aggregate"
 
                 data["_aggregate_source"] = "standalone"
                 data["_aggregate_at"] = datetime.now(timezone.utc).isoformat()
                 data["_aggregate_leaf_count"] = len([ls for ls in agg.leaf_summary if ls.status == "found"])
                 data["_aggregate_cell_count"] = agg.cell_count
 
-                now = datetime.now(timezone.utc)
                 now = datetime.now(timezone.utc)
 
                 if record is None:

@@ -1304,6 +1304,14 @@ async def fill_by_formula(
                 manual_set.add((int(lc["row_index"]), int(lc["col_index"])))
     new_rows, summary = fill_rows(headers, rows, breakdown["cells"], manual_set, table.get("rows") or [])
     data.update({"headers": headers, "rows": new_rows})
+    # B 修复（consol-note-pull-from-standalone）：标记公式引擎写入来源
+    cell_sources = data.get("_cell_sources", {})
+    for c in breakdown.get("cells", []):
+        if c.get(MEASURE_CONSOLIDATED) is not None:
+            key = f"{c['row_index']}:{c['col_index']}"
+            cell_sources[key] = "formula"
+    data["_cell_sources"] = cell_sources
+    data["_last_write_source"] = "formula"
     now = datetime.now(timezone.utc)
     # V182：保存公式值快照（用于"当前值 vs 公式值"对比）
     formula_snapshot = {
