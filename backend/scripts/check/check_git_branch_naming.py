@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+_SPEC_FILES = ("requirements.md", "design.md", "tasks.md")
 
 PATTERNS = [
     (re.compile(r"^main$"), "main", "唯一主线"),
@@ -47,17 +48,40 @@ def get_current_branch() -> str:
         return ""
 
 
+def spec_exists(spec_name: str) -> bool:
+    """spec 在活跃区或归档区。
+
+    归档约定（`.kiro/specs/_archive/`）：单个 spec 归档为 ``NN-<name>/``，多个 spec 归成一组为
+    ``NN-<分组>/<name>/``；早期也有不带序号的 ``<name>/``。原实现只认最后一种 ⇒ 任何按约定归档过的
+    spec 分支都推不上去（2026-10-22 实测 ``spec/disclosure-note-doc-upload-and-batch-fill`` 被拒）。
+    """
+    specs = ROOT / ".kiro" / "specs"
+    if (specs / spec_name).is_dir():
+        return True
+    archive = specs / "_archive"
+    if not archive.is_dir():
+        return False
+    numbered = re.compile(rf"\d+-{re.escape(spec_name)}")
+    for group in archive.iterdir():
+        if not group.is_dir():
+            continue
+        if group.name == spec_name or (group / spec_name).is_dir():
+            return True
+        # NN-<name> 既可能是单个 spec 的归档，也可能是分组目录：只有里面直接放着 spec 文件才算
+        if numbered.fullmatch(group.name) and any((group / f).is_file() for f in _SPEC_FILES):
+            return True
+    return False
+
+
 def validate(branch: str) -> tuple[bool, str, str]:
     """返回 (合法?, 类型前缀, 错误描述)。"""
     for pat, prefix, desc in PATTERNS:
         m = pat.match(branch)
         if m:
-            # spec/<name> 还要校验目录存在
+            # spec/<name> 还要校验目录存在（活跃区或归档区）
             if prefix == "spec":
                 spec_name = m.group(1)
-                spec_dir = ROOT / ".kiro" / "specs" / spec_name
-                spec_archive = ROOT / ".kiro" / "specs" / "_archive" / spec_name
-                if not spec_dir.is_dir() and not spec_archive.is_dir():
+                if not spec_exists(spec_name):
                     return False, prefix, (
                         f"分支 spec/{spec_name} 但 .kiro/specs/{spec_name}/ 不存在；"
                         "先建 spec 三件套再开分支"
