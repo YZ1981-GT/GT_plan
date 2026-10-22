@@ -102,6 +102,7 @@ class Vocabulary:
     movements: tuple[tuple[str, str], ...] = ()  # (词, increase / decrease / movement)，按词表顺序
     balance_measures: frozenset[tuple[str, ...]] = frozenset()  # 余额列允许的计量（空计量 = 纯期间，恒算）
     net_measures: frozenset[tuple[str, ...]] = frozenset()  # 净额列计量（账面价值）
+    gross_measures: frozenset[tuple[str, ...]] = frozenset()  # 毛额列计量（账面余额，净额列的对应列）
 
 
 def _require_reason(entry: dict, kind: str) -> None:
@@ -157,6 +158,7 @@ def _build_vocabulary(raw: dict) -> Vocabulary:
         ),
         balance_measures=_measure_set(raw.get("balance_measures")),
         net_measures=_measure_set(raw.get("net_measures")),
+        gross_measures=_measure_set(raw.get("gross_measures")),
     )
 
 

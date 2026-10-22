@@ -52,20 +52,55 @@ SNAPSHOT_ROWS = "tests/fixtures/consol_report_config_snapshot.json"
 # ─────────────────────────────── 种子规则（纯函数） ───────────────────────────────
 
 
+#: 分组表：期末 / 期初各 账面余额 | 减值准备 | 账面价值（国企 五-23-1 固定资产汇总表同形）
+_BOOK = {
+    "headers": ["项  目"] + [f"{p}/{m}" for p in ("期末余额", "期初余额") for m in ("账面余额", "减值准备", "账面价值")],
+    "multi_header": [["项  目", "期末余额", "", "", "期初余额", "", ""],
+                     ["", "账面余额", "减值准备", "账面价值", "账面余额", "减值准备", "账面价值"]],
+}
+#: 分组表：期末 / 期初各 账面余额 | 坏账准备（没有账面价值列，国企 五-5-1 应收账款账龄表同形）
+_AGING = {
+    "headers": ["账  龄"] + [f"{p}/{m}" for p in ("期末数", "期初数") for m in ("账面余额", "坏账准备")],
+    "multi_header": [["账  龄", "期末数", "", "期初数", ""], ["", "账面余额", "坏账准备", "账面余额", "坏账准备"]],
+}
+
+
 class TestSeedRules:
     @pytest.mark.parametrize(("headers", "rt", "col", "why"), [
         (["项  目", "期末余额", "期初余额"], "balance_sheet", 1, None),
         (["项  目", "期初余额", "本期增加", "本期减少", "期末余额"], "balance_sheet", 4, None),  # 变动表取期末，不取本期增加
         (["项  目", "本期发生额", "上期发生额"], "income_statement", 1, None),
         (["项  目", "本期<br/>增加额", "期末余额"], "balance_sheet", 2, None),
-        (["票据种类", "期末数", "期初数", "", ""], "balance_sheet", None, "空列名"),  # 多级表头未展开
-        (["项  目", "期末账面价值", "期末公允价值"], "balance_sheet", None, "不止一个"),
-        (["项  目", "本期金额", "上期金额"], "balance_sheet", None, "没有期末列"),  # 未分配利润变动表
-        (["项  目", "期末余额", "期初余额"], "income_statement", None, "没有本期列"),
+        (["项  目", "本期金额", "上期金额"], "balance_sheet", 1, None),   # 未分配利润等：资产负债表项目用本期金额表头
+        (["项  目", "期末余额", "期初余额"], "income_statement", 1, None),  # 同侧另一期间
+        (["项  目", "期初余额", "上期发生额"], "balance_sheet", None, "没有期末列"),
+        (["项  目", "期初余额", "本期增加", "本期减少"], "balance_sheet", None, "没有期末列"),  # 变动列不当本期金额
+        (["票据种类", "期末数", "期初数", "", ""], "balance_sheet", None, "空列名"),   # 多级表头未展开
+        (["项  目", "期末余额", "期末余额"], "balance_sheet", None, "不止一个"),
     ])
-    def test_value_column(self, headers, rt, col, why):
-        got, reason = value_column(headers, rt)
-        assert got == col and (why is None) == (reason is None) and (why is None or why in reason)
+    def test_value_column_pure_period(self, headers, rt, col, why):
+        """纯期间列（期末余额 / 本期发生额）唯一就取它，与报表行是净额还是毛额无关。"""
+        for net in (False, True, None):
+            got, reason = value_column({"headers": headers}, rt, net=net)
+            assert got == col and (why is None) == (reason is None) and (why is None or why in reason), (net, reason)
+
+    @pytest.mark.parametrize(("table", "net", "col", "why"), [
+        (_BOOK, True, 3, None),     # 净额（固定资产 = 1601 − 1602）⇒ 账面价值，不种进组首的账面余额
+        (_BOOK, False, 1, None),    # 毛额 ⇒ 账面余额
+        (_BOOK, None, None, "分不出净额 / 毛额"),
+        (_AGING, False, 1, None),
+        (_AGING, True, None, "没有唯一的账面价值列"),  # 净额没有净额列可放：宁缺不错
+        ({"headers": ["项  目", "期末账面价值", "期末公允价值"]}, True, 1, None),
+        # 毛额、同期间有账面价值列：并列的公允价值是另一项披露（持有待售负债），不当余额
+        ({"headers": ["项  目", "期末账面价值", "期末公允价值"]}, False, None, "期末公允价值是另一项披露"),
+        ({"headers": ["项  目", "期末账面价值", "期初账面价值"]}, False, None, "没有唯一的账面余额列"),
+        ({"headers": ["项  目", "期末公允价值", "期初公允价值"]}, False, 1, None),   # 公允价值计量（交易性金融资产）
+    ])
+    def test_value_column_by_measure(self, table, net, col, why):
+        got, reason = value_column(table, "balance_sheet", net=net)
+        assert got == col and (why is None) == (reason is None) and (why is None or why in reason), reason
+        if reason:
+            assert "候选：" in reason, "不种要列出候选列"
 
     def test_total_row(self):
         assert total_row([["库存现金"], ["合  计"], ["其中：境外"]]) == (1, None)
@@ -117,12 +152,44 @@ class TestSeedRules:
         assert "同名报表行公式不一致" in reasons["五-3-1"] and "BS-018" in reasons["五-3-1"]
         assert "五-5-1" not in reasons, "没有同名报表行的章节不种、也不算跳过"
 
+    def test_net_rows_go_to_book_value_and_gross_rows_to_gross_balance(self):
+        """R6.7：分组表取数列按报表行（科目行按该行自身取数）是净额还是毛额定，逐行选列。"""
+        rows = [ReportRow("balance_sheet", "BS-028", "固定资产", 1,
+                          "TB('1601','期末余额') - TB('1602','期末余额') + TB('1606','期末余额')")]
+        table = {**_BOOK, "section_id": "五-2-1", "parent_section": "固定资产", "title": "固定资产",
+                 "rows": [["固定资产"] + [""] * 6, ["固定资产清理"] + [""] * 6, ["合  计"] + [""] * 6]}
+        single = [{"section_title": "固定资产", "tables": [{"name": "固定资产", "rows": [
+            {"label": "固定资产", "account_codes": ["1601", "1602"]}, {"label": "固定资产清理", "account_codes": ["1606"]}]}]}]
+        got = {(c.row_index, c.col_index): c.formula for c in plan_seed("soe", [table], single, rows).cells}
+        assert got == {
+            (2, 3): "REPORT('BS-028')",                                   # 报表行有减项 ⇒ 账面价值
+            (0, 3): "TB('1601','期末余额') - TB('1602','期末余额')",          # 净额行 ⇒ 账面价值
+            (1, 1): "TB('1606','期末余额')",                                # 毛额行 ⇒ 账面余额
+        }
+
+    def test_unexpandable_report_row_skips_measure_columns(self):
+        """报表行公式展开不到科目（引用排在后面的行）⇒ 分不出净额 / 毛额：分组表不种并说明，纯期间列照种。"""
+        rows = [ReportRow("balance_sheet", "BS-028", "固定资产", 1, "ROW('BS-099')"),
+                ReportRow("balance_sheet", "BS-099", "x", 2, "TB('1601','期末余额')")]
+        table = {**_BOOK, "section_id": "五-2-1", "parent_section": "固定资产", "title": "固定资产",
+                 "rows": [["合  计"] + [""] * 6]}
+        plan = plan_seed("soe", [table], [], rows)
+        assert plan.cells == [] and "分不出净额 / 毛额" in plan.skipped[0]["reason"]
+        flat = {**table, "multi_header": None, "headers": ["项  目", "期末余额", "期初余额"], "rows": [["合  计", "", ""]]}
+        assert [(c.row_index, c.col_index) for c in plan_seed("soe", [flat], [], rows).cells] == [(0, 1)]
+
 
 # 真模板 × 真库公式快照（2026-09-30）：两类种子的覆盖数（与真库探针 seed_plan_probe 同值）
 SEED_COUNTS = {
     # 2026-10-09: soe 51→57（A 类 30 张表 row0 提升为 mh 后更多表可定位期末列）
-    "soe": {"report_total": 57, "account_codes_tables": 4, "account_codes_cells": 6},
-    "listed": {"report_total": 39, "account_codes_tables": 5, "account_codes_cells": 7},
+    # 2026-10-10 5914e315b（模板同步增强）后本测试一直红、基线未跟：
+    #   国企表名按标记偏移同步（五-23-1「固定资产」→「在建工程」等），对不上单体表，科目行 (4, 6) → (1, 3)
+    #   （国企章节号错一节，另立 spec 重对齐）；上市合计行 39 → 45（续表识别后 6 张主表认出合计行 / 期末列）。
+    # 2026-10-22 R6.7 取数列改调标题行库：国企 57 → 52（五-23-1 固定资产净额改种账面价值列；五-25-1 / 五-31-1 /
+    #   五-59-1 / 五-60-1 / 五-79-1 原种在账面价值 / 暂时性差异 / 数量 / 税前金额列，不再种），上市 45 → 46
+    #   （五-16-1 长期应收款表头「期末余额.」带句点，原先认不出期末列）。
+    "soe": {"report_total": 52, "account_codes_tables": 1, "account_codes_cells": 3},
+    "listed": {"report_total": 46, "account_codes_tables": 5, "account_codes_cells": 7},
 }
 
 
@@ -146,12 +213,20 @@ def test_seed_counts_on_real_templates(tt):
         want["account_codes_tables"], want["account_codes_cells"])
     cells = {(c.section_id, c.row_index, c.col_index) for c in plan.cells}
     assert len(cells) == len(plan.cells), "同一单元格不重复种"
+    by = {(c.section_id, c.row_index): (c.col_index, c.formula) for c in plan.cells}
     if tt == "soe":
-        by = {(c.section_id, c.row_index): c.formula for c in plan.cells}
-        assert by[("五-1-1", 4)] == "REPORT('BS-002')" and by[("五-1-1", 0)] == "TB('1001','期末余额')"
-        assert by[("五-23-1", 0)] == "TB('1601','期末余额') - TB('1602','期末余额')"
-        # 变动表（期初 / 本期增加 / 本期减少 / 期末）取期末列
-        assert any(c.section_id.startswith("五-") and c.col_index == 4 and c.kind == KIND_REPORT_TOTAL for c in plan.cells)
+        assert by[("五-1-1", 4)] == (1, "REPORT('BS-002')") and by[("五-1-1", 0)] == (1, "TB('1001','期末余额')")
+        # 固定资产 BS-028 = 1601 − 1602（净额）⇒ 账面余额 | 减值准备 | 账面价值 里取账面价值（旧规则取组首的账面余额）
+        assert by[("五-23-1", 2)] == (3, "REPORT('BS-028')")
+        # 应收账款 BS-006 = TB('1122')（毛额）⇒ 账面余额 | 坏账准备 里取账面余额
+        assert by[("五-5-1", 4)] == (1, "REPORT('BS-006')")
+        # 变动表（期初 / 本期增加 / 本期减少 / 期末）取期末列，不取变动列
+        assert by[("五-29-1", 3)] == (7, "REPORT('BS-033')")
+        # 只有账面价值 / 数量列的毛额行不种（原先种进「期末账面价值」「期末/数量」）
+        assert not {sid for sid, _r in by} & {"五-25-1", "五-59-1", "五-60-1", "五-44-1"}
+    else:
+        assert by[("五-22-1", 0)] == (1, "TB('1601','期末余额') - TB('1602','期末余额')"), "纯期间列与净额无关"
+        assert by[("五-16-1", 10)] == (1, "REPORT('BS-023')")
 
 
 # ─────────────────────────────── 种子落库（幂等 / 不覆盖人工） ───────────────────────────────

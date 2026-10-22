@@ -4,11 +4,12 @@
 - 求值与合并报表同一函数：附注单元格作为「排在全部报表行之后」的伪行交给 ``report_values`` / ``node_report``，
   所以 ``REPORT('BS-002')`` 取到的就是同一节点同一度量的报表行值（design §7.2）。
 - 种子只写两类可确定的公式（ADR-CSP-005），其余单元格保持手工：
-  (a) 章节名 = 资产负债表 / 利润表项目名 ⇒ 该章主表唯一「合计」行、唯一期末列（利润表项目取本期列）⇒ ``REPORT('行次')``；
+  (a) 章节名 = 资产负债表 / 利润表项目名 ⇒ 该章主表唯一「合计」行 ⇒ ``REPORT('行次')``；
   (b) 表行对上单体附注模板行的科目码，且这些科目都是该章报表行公式的取数项 ⇒ 按报表公式的系数取这些科目
       （``TB('1601') - TB('1602')``）。科目不在报表行取数范围内的行不种 —— 单体模板的科目码有语义不符的
       （受限资产、供应商融资列报项目、备抵科目相加、6701 / 6702 互换），照搬就是错数。
-  表头含空列名 / 多级表头 / 多个期末列 / 多个合计行 ⇒ 列或行不确定，不种并记原因。
+  取数列见 ``value_column``（标题行库逐列语义；净额取账面价值、毛额取账面余额 / 公允价值，R6.7）；
+  列分不出 / 多个合计行 ⇒ 不种并记原因。
 - 种子幂等：只写 ``source='seed'``；人工公式（``manual``）不覆盖；人工删掉的种子不再补回；模板里已不存在的种子删除。
 """
 
@@ -58,6 +59,7 @@ from app.services.consol_report_values import (
     term_matches,
 )
 from app.services.consol_tree_service import iter_nodes
+from app.services.note_table_header_library import ColumnKey, column_keys, load_vocabulary, movement_kind
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 NOTE_ROW_TYPE = "consol_note"   # 不在 REPORT_TYPE_ORDER 里 ⇒ ordered_rows 排在全部报表行之后
@@ -71,8 +73,6 @@ KIND_LABELS = {
 }
 SOURCE_LABELS = {"seed": "自动种子", "seed_sub": "子表种子", "manual": "人工"}
 
-CLOSING_HEADERS = frozenset({"期末余额", "期末数", "期末", "期末金额", "期末账面价值", "期末公允价值"})
-PERIOD_HEADERS = frozenset({"本期发生额", "本期金额", "本期数", "本年发生额", "本年金额", "本年数"})
 TOTAL_LABELS = frozenset({"合计", "总计"})
 SEED_REPORT_TYPES = frozenset({"balance_sheet", "income_statement"})
 MAX_ROW_INDEX = 999
@@ -392,44 +392,61 @@ def report_rows_by_name(rows: Iterable[ReportRow]) -> tuple[dict[str, ReportRow]
     return unique, ambiguous
 
 
-def value_column(
-    headers: Sequence[Any],
-    report_type: str,
-    column_groups: Sequence[dict] | None = None,
-) -> tuple[int | None, str | None]:
-    """取数列：资产负债表项目取唯一期末列，利润表项目取唯一本期列。
+def value_column(table: dict, report_type: str, *, net: bool | None) -> tuple[int | None, str | None]:
+    """取数列（R6.7）：按标题行库逐列语义（``column_keys``，与展示 / 审核同口径）选列。
 
-    优先按 ``_column_groups`` 分组名定位（与单体附注同结构），
-    降级到 ``headers`` 关键词匹配。多级表头有 ``_column_groups`` 后不再因空列名拒绝。
+    表头有空列名（没有表头文字的列可能属于相邻分组）⇒ 不种。期间：资产负债表项目取期末、利润表项目取本期；
+    表里没有该期间的金额列时取同侧另一期间（未分配利润等资产负债表项目的附注用「本期金额」表头）。
+    该期间的金额列（不含变动 / 比例 / 说明列）里：
+
+    1. 纯期间列（期末余额 / 本期发生额，计量为空）唯一 ⇒ 取它；
+    2. 否则按报表行口径取计量列（词表计量清单）：净额（``net``：公式里有减项，如固定资产 = 1601 − 1602）⇒ 唯一的
+       账面价值列；毛额 ⇒ 唯一的账面余额 / 公允价值列，同期间又有账面价值列时只认账面余额（与账面价值并列的
+       公允价值是另一项披露）。分组表的期末组首列多是账面余额，按组首列取会把净额种进毛额列；
+    3. ``net`` 为 None（报表行公式展开不到科目，分不出净额 / 毛额）或计量列不唯一 ⇒ 不种，原因列出候选列。
     """
-    what = "期末" if report_type == "balance_sheet" else "本期"
-    wanted_groups = CLOSING_HEADERS if report_type == "balance_sheet" else PERIOD_HEADERS
+    vocab = load_vocabulary()
+    keys = column_keys(table, vocab=vocab)
+    blank = [k.label for k in keys[1:] if not k.path]
+    if blank:   # 没有表头文字的列可能属于相邻分组（「本期数 | 空 | 上期数 | 空」），哪一列都定不了
+        return None, f"表头有空列名（{'、'.join(blank)}），列不确定"
+    periods = ("end", "cur") if report_type == "balance_sheet" else ("cur", "end")
+    what = "期末" if periods[0] == "end" else "本期"
+    candidates: list[ColumnKey] = []
+    for period in periods:
+        candidates = [k for k in keys[1:]
+                      if k.kind == "amount" and k.period == period and movement_kind(k, vocab) is None]
+        if candidates:
+            break
+    if not candidates:
+        return None, f"没有{what}列（表头：{'、'.join(k.label for k in keys[1:])}）"
+    pure = [k for k in candidates if not k.measure]
+    if len(pure) == 1:
+        return pure[0].index, None
+    listing = "、".join(k.label for k in candidates)
+    if pure:
+        return None, f"{what}列不止一个（{listing}）"
+    if net is None:
+        return None, f"报表行公式展开不到科目，分不出净额 / 毛额，{what}列不确定（候选：{listing}）"
+    note = ""
+    if net:
+        measures, word = vocab.net_measures, "账面价值"
+    elif any(k.measure in vocab.net_measures for k in candidates):
+        measures, word = vocab.gross_measures, "账面余额"
+        aside = [k.label for k in candidates if k.measure in vocab.balance_measures - vocab.gross_measures]
+        note = f"；与账面价值并列的{'、'.join(aside)}是另一项披露，不算余额" if aside else ""
+    else:
+        measures, word = vocab.balance_measures, "账面余额 / 公允价值"
+    hits = [k for k in candidates if k.measure in measures]
+    if len(hits) == 1:
+        return hits[0].index, None
+    side = "净额（公式有减项）" if net else "毛额"
+    return None, f"报表行是{side}，{what}没有唯一的{word}列（候选：{listing}{note}）"
 
-    # ── 路径 A：按 _column_groups 定位 ──
-    if column_groups:
-        hits = [g for g in column_groups if header_key(g.get("group", "")) in wanted_groups]
-        if len(hits) == 1:
-            return hits[0]["start"], None
-        if len(hits) > 1:
-            return None, f"_column_groups 中{what}分组不止一个"
-        # 无命中 ⇒ 尝试对侧表头集合（未分配利润等：资产负债表科目用利润表表头）
-        alt_groups = PERIOD_HEADERS if report_type == "balance_sheet" else CLOSING_HEADERS
-        alt_hits = [g for g in column_groups if header_key(g.get("group", "")) in alt_groups]
-        if len(alt_hits) == 1:
-            return alt_hits[0]["start"], None
-        # 仍无命中 ⇒ 降级到路径 B
 
-    # ── 路径 B：按 headers 关键词匹配 ──
-    keys = [header_key(h) for h in headers]
-    # 有 _column_groups 时跳过空列名检查——空串是 multi_header 占位符，表头结构已由 cg 描述
-    if not column_groups and any(not k for k in keys[1:]):
-        return None, "表头有空列名（多级表头未展开），列不确定"
-    hits_idx = [i for i, k in enumerate(keys) if i and k in wanted_groups]
-    if not hits_idx:
-        return None, f"没有{what}列（表头：{'、'.join(keys[1:])}）"
-    if len(hits_idx) > 1:
-        return None, f"{what}列不止一个"
-    return hits_idx[0], None
+def _is_net(terms: dict[tuple, Decimal] | None) -> bool | None:
+    """报表行（或表行自身取数）是不是净额：展开到科目后有负系数项；展开不到科目 ⇒ None（分不出）。"""
+    return None if terms is None else any(coef < 0 for coef in terms.values())
 
 
 def total_row(rows: Sequence[Any]) -> tuple[int | None, str | None]:
@@ -466,8 +483,10 @@ def _term_formula(parts: list[tuple[Decimal, str, str]]) -> str:
     return out
 
 
-def _codes_formula(codes: Sequence[str], terms: dict[tuple, Decimal]) -> tuple[str | None, str | None]:
-    """表行科目 ⇒ 按报表行公式的系数与取数列取数；每个科目须恰落在报表行一个取数项里且系数为 ±1。"""
+def _codes_parts(
+    codes: Sequence[str], terms: dict[tuple, Decimal],
+) -> tuple[list[tuple[Decimal, str, str]] | None, str | None]:
+    """表行科目 ⇒ 按报表行公式的系数与取数列取数的 (系数, 科目, 取数列)；每个科目须恰落在报表行一个取数项里且系数为 ±1。"""
     parts: list[tuple[Decimal, str, str]] = []
     for code in codes:
         code = str(code or "").strip()
@@ -478,7 +497,7 @@ def _codes_formula(codes: Sequence[str], terms: dict[tuple, Decimal]) -> tuple[s
         if abs(coef) != 1:
             return None, f"科目 {code} 在报表行公式里的系数是 {coef}"
         parts.append((coef, code, term[-1]))   # 取数项末位即取数列（tb / sum_tb 同形）
-    return (_term_formula(parts), None) if parts else (None, "没有科目")
+    return (parts, None) if parts else (None, "没有科目")
 
 
 def plan_seed(
@@ -513,17 +532,18 @@ def plan_seed(
             if key in ambiguous:
                 skip(members[0], f"同名报表行公式不一致（{ambiguous[key]}），不确定取哪一行")
             continue
-        # (a) 主表（该章第一张表）合计行 ⇒ 报表行
+        terms = terms_of.get(row.row_code)
+        # (a) 主表（该章第一张表）合计行 ⇒ 报表行；取数列按报表行是净额还是毛额（R6.7）
         main = members[0]
-        col, why_col = value_column(main.get("headers") or [], row.report_type, main.get("_column_groups"))
+        col, why_col = value_column(main, row.report_type, net=_is_net(terms))
         total, why_total = total_row(main.get("rows") or [])
         if col is None or total is None:
             skip(main, why_col or why_total or "")
         else:
             add(SeedCell(main["section_id"], total, col, f"REPORT('{row.row_code}')", KIND_REPORT_TOTAL,
                          f"自动种子：「{chapter}」合计 = 合并报表 {row.row_code}「{row.row_name}」"))
-        # (b) 表行对上单体模板行的科目码，且科目都是本章报表行的取数项（按报表公式系数）
-        terms = terms_of.get(row.row_code)
+        # (b) 表行对上单体模板行的科目码，且科目都是本章报表行的取数项（按报表公式系数）；
+        #     取数列逐行按该行自身取数定（固定资产 = 1601 − 1602 是净额，库存现金 = 1001 是毛额）
         if not terms:
             continue
         for table in members:
@@ -532,21 +552,21 @@ def plan_seed(
                 continue
             codes_of = {label_key(r.get("label")): r.get("account_codes") or []
                         for r in source.get("rows") or [] if isinstance(r, dict)}
-            col, why_col = value_column(table.get("headers") or [], row.report_type, table.get("_column_groups"))
             for i, cells in enumerate(table.get("rows") or []):
                 codes = codes_of.get(label_key(_first_cell(cells)))
                 if not codes:
                     continue
-                if col is None:
-                    skip(table, why_col or "")
-                    break
-                formula, why = _codes_formula(codes, terms)
-                if formula is None:
-                    skip(table, f"「{_first_cell(cells).strip()}」{why}")
+                label = _first_cell(cells).strip()
+                parts, why = _codes_parts(codes, terms)
+                if parts is None:
+                    skip(table, f"「{label}」{why}")
                     continue
-                add(SeedCell(table["section_id"], i, col, formula, KIND_ACCOUNT_CODES,
-                             f"自动种子：「{_first_cell(cells).strip()}」= 科目 {'、'.join(codes)}"
-                             f"（按合并报表 {row.row_code} 的取数口径）"))
+                col, why_col = value_column(table, row.report_type, net=any(coef < 0 for coef, _c, _t in parts))
+                if col is None:
+                    skip(table, f"「{label}」{why_col}")
+                    continue
+                add(SeedCell(table["section_id"], i, col, _term_formula(parts), KIND_ACCOUNT_CODES,
+                             f"自动种子：「{label}」= 科目 {'、'.join(codes)}（按合并报表 {row.row_code} 的取数口径）"))
     return plan
 
 

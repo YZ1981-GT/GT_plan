@@ -126,73 +126,40 @@ from app.services.consol_note_formula_service import value_column
 
 
 class TestValueColumnWithColumnGroups:
-    """value_column 优先按 _column_groups 定位列的测试。"""
+    """value_column 按标题行库逐列语义选列，``_column_groups``（单体附注同结构）与多级表头同口径（R6.7）。
 
-    def test_column_groups_bs_hit(self):
-        """资产负债表项目：_column_groups 有"期末数"分组 ⇒ 取 start 列。"""
-        headers = ["账  龄", "期末数/账面余额", "期末数/坏账准备", "期初数/账面余额", "期初数/坏账准备"]
-        cg = [
-            {"group": "期末数", "start": 1, "span": 2},
-            {"group": "期初数", "start": 3, "span": 2},
-        ]
-        col, why = value_column(headers, "balance_sheet", cg)
-        assert col == 1
-        assert why is None
+    旧规则按分组名命中「期末…」取组首列：分组表的组首几乎都是账面余额，净额报表行种进去就是错列。
+    """
 
-    def test_column_groups_is_hit(self):
-        """利润表项目：_column_groups 有"本期金额"分组 ⇒ 取 start 列。"""
-        headers = ["项目", "本期金额/X", "本期金额/Y", "上期金额/X", "上期金额/Y"]
-        cg = [
-            {"group": "本期金额", "start": 1, "span": 2},
-            {"group": "上期金额", "start": 3, "span": 2},
-        ]
-        col, why = value_column(headers, "income_statement", cg)
-        assert col == 1
-        assert why is None
+    AGING = {"headers": ["账  龄", "账面余额", "坏账准备", "账面余额", "坏账准备"],
+             "_column_groups": [{"group": "期末数", "start": 1, "span": 2}, {"group": "期初数", "start": 3, "span": 2}]}
 
-    def test_column_groups_no_match_fallback(self):
-        """_column_groups 无匹配分组 ⇒ 降级到 headers 匹配。"""
-        headers = ["项目", "期末余额", "期初余额"]
-        cg = [{"group": "其他", "start": 1, "span": 2}]
-        col, why = value_column(headers, "balance_sheet", cg)
-        assert col == 1  # 降级到 headers 匹配 "期末余额"
-        assert why is None
+    def test_gross_line_takes_gross_balance(self):
+        """毛额行（应收账款 = TB('1122')）：期末数 下 账面余额 | 坏账准备 取账面余额。"""
+        assert value_column(self.AGING, "balance_sheet", net=False) == (1, None)
 
-    def test_column_groups_multiple_matches(self):
-        """_column_groups 多个期末分组 ⇒ 不确定。"""
-        headers = ["项目", "x", "y", "z", "w"]
-        cg = [
-            {"group": "期末数", "start": 1, "span": 2},
-            {"group": "期末余额", "start": 3, "span": 2},
-        ]
-        col, why = value_column(headers, "balance_sheet", cg)
-        assert col is None
-        assert "不止一个" in why
+    def test_net_line_without_book_value_column_is_not_seeded(self):
+        """净额行在只有 账面余额 | 坏账准备 的表里没有列可放 ⇒ 不种（旧规则取组首 = 账面余额）。"""
+        col, why = value_column(self.AGING, "balance_sheet", net=True)
+        assert col is None and "没有唯一的账面价值列" in why and "期末数/账面余额" in why
 
-    def test_no_column_groups_original_logic(self):
-        """无 _column_groups ⇒ 走原逻辑。"""
-        headers = ["项目", "期末余额", "期初余额"]
-        col, why = value_column(headers, "balance_sheet")
-        assert col == 1
-        assert why is None
+    def test_measure_columns_that_are_not_balances(self):
+        """利润表项目「本期金额」下 收入 | 成本：都不是余额计量 ⇒ 不种并列出候选（旧规则取组首 = 收入）。"""
+        table = {"headers": ["项目", "收入", "成本", "收入", "成本"], "_column_groups": [
+            {"group": "本期金额", "start": 1, "span": 2}, {"group": "上期金额", "start": 3, "span": 2}]}
+        col, why = value_column(table, "income_statement", net=False)
+        assert col is None and "候选：本期金额/收入、本期金额/成本" in why
 
-    def test_no_column_groups_empty_header_rejected(self):
-        """无 _column_groups + headers 有空列名 ⇒ 列不确定（原行为保持）。"""
-        headers = ["项目", "期末数", "", "期初数", ""]
-        col, why = value_column(headers, "balance_sheet")
-        assert col is None
-        assert "空列名" in why
+    def test_two_period_groups_without_leaf_names(self):
+        """组下叶子没有列名（「期末数 | 空」）：两列都只是「期末数」⇒ 分不出（旧规则取组首）。"""
+        table = {"headers": ["账  龄", "期末数", "", "期初数", ""], "_column_groups": self.AGING["_column_groups"]}
+        col, why = value_column(table, "balance_sheet", net=False)
+        assert col is None and "不止一个" in why
 
-    def test_column_groups_overrides_empty_header(self):
-        """有 _column_groups 时，即使 headers 有空列名也能定位。这是核心改进。"""
-        headers = ["账  龄", "期末数", "", "期初数", ""]
-        cg = [
-            {"group": "期末数", "start": 1, "span": 2},
-            {"group": "期初数", "start": 3, "span": 2},
-        ]
-        col, why = value_column(headers, "balance_sheet", cg)
-        assert col == 1
-        assert why is None
+    def test_flat_headers_without_groups(self):
+        assert value_column({"headers": ["项目", "期末余额", "期初余额"]}, "balance_sheet", net=True) == (1, None)
+        col, why = value_column({"headers": ["项目", "期末数", "", "期初数", ""]}, "balance_sheet", net=False)
+        assert col is None and "空列名" in why
 
 
 # ─── 端到端种子验证（复盘 ⑤） ──────────────────────────────────────────────────
@@ -227,7 +194,7 @@ class TestMultiHeaderSeedEndToEnd:
         ],
     )
     def test_soe_multi_header_table_seeds(self, section_id: str, expected_formula_prefix: str):
-        """soe 五-5-1：有 _column_groups → value_column 定位 col=1 → plan_seed 种出 REPORT 种子。"""
+        """soe 五-5-1：多级表头 期末数(账面余额 | 坏账准备) → 应收账款 BS-006 = TB('1122') 是毛额 → 账面余额列 col=1。"""
         table = find_table("soe", section_id)
         assert table is not None, f"模板中找不到 {section_id}"
 
@@ -235,10 +202,10 @@ class TestMultiHeaderSeedEndToEnd:
         cg = table.get("_column_groups")
         assert cg is not None, f"{section_id} 缺少 _column_groups"
 
-        # 2. value_column 通过路径 A 定位
-        col, why = value_column(table["headers"], "balance_sheet", cg)
+        # 2. value_column 按逐列语义定位（毛额行取账面余额）
+        col, why = value_column(table, "balance_sheet", net=False)
         assert col is not None, f"value_column 失败: {why}"
-        assert col == 1, f"期末列应为 1，实际 {col}"
+        assert col == 1, f"期末账面余额列应为 1，实际 {col}"
 
         # 3. total_row 定位合计行
         tr, tr_why = total_row(table.get("rows", []))
@@ -257,7 +224,8 @@ class TestMultiHeaderSeedEndToEnd:
         assert report_cells[0].col_index == col
 
     def test_soe_multi_header_tables_not_skipped(self):
-        """所有有 _column_groups 的 multi_header 表不应出现在 plan.skipped 中（因"列不确定"被跳过）。"""
+        """有多级表头的表都读得懂表头：不因空列名 / 报表行展开不到科目（「列不确定」）被跳过；
+        跳过只因报表口径对不上计量列，原因列出候选列（R6.7）。"""
         plan = plan_seed("soe", consol_note_tables("soe"), single_note_sections("soe"), _snapshot_rows("soe"))
         tables = consol_note_tables("soe")
         cg_sections = {t["section_id"] for t in tables if t.get("_column_groups")}
@@ -269,3 +237,5 @@ class TestMultiHeaderSeedEndToEnd:
         assert skipped_for_col == [], (
             f"有 _column_groups 的表不应因'列不确定'被跳过: {skipped_for_col}"
         )
+        measure_skips = [s for s in plan.skipped if s.get("section_id") in cg_sections and "没有唯一的" in s["reason"]]
+        assert measure_skips and all("候选：" in s["reason"] for s in measure_skips)
