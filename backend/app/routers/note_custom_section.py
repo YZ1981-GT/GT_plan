@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
-from app.models.disclosure import DisclosureNote
+from app.models.report_models import DisclosureNote
 from app.services.note_custom_section_service import NoteCustomSectionService
 from app.services.note_edit_gate import (
     assert_note_edit_access,

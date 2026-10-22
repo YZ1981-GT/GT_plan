@@ -1,6 +1,8 @@
 """报表附注数据锁定与版本快照路由
 
 Requirements: 53.1-53.7
+partner-manager-edit-permission Task 11.4: lock → assert_note_role_access({partner, manager})；
+  unlock → assert_note_role_access(frozenset(), admin-only)；snapshot → require_note_edit_access(consol_lock=False)
 """
 from __future__ import annotations
 
@@ -14,6 +16,10 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
 from app.services.note_data_lock_service import NoteDataLockService
+from app.services.note_edit_gate import (
+    assert_note_role_access,
+    require_note_edit_access,
+)
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/data-lock",
@@ -42,6 +48,11 @@ async def lock_on_sign_off(
     current_user: User = Depends(get_current_user),
 ):
     """签字后锁定报表和附注数据"""
+    await assert_note_role_access(
+        db, current_user, project_id,
+        project_roles=frozenset({"partner", "manager"}),
+        denied_message="仅本项目经理或合伙人可锁定报表附注数据",
+    )
     svc = NoteDataLockService(db)
     result = await svc.lock_on_sign_off(project_id, body.year)
     await db.commit()
@@ -56,6 +67,11 @@ async def unlock_data(
     current_user: User = Depends(get_current_user),
 ):
     """管理员解锁（需填写原因）"""
+    await assert_note_role_access(
+        db, current_user, project_id,
+        project_roles=frozenset(),
+        denied_message="仅管理员可解除报表附注数据锁定",
+    )
     svc = NoteDataLockService(db)
     result = await svc.unlock(project_id, body.year, current_user.id, body.reason)
     await db.commit()
@@ -67,7 +83,7 @@ async def create_snapshot(
     project_id: UUID,
     body: SnapshotRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
     """手动创建数据快照"""
     svc = NoteDataLockService(db)

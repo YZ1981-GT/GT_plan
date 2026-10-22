@@ -47,6 +47,11 @@ export interface UseNoteRefreshOptions {
   staleRecalc: () => Promise<{ cleared?: number; refilled?: number; kept_stale?: number } | null | void>
   /** 清空全部章节详情缓存（「全部刷新」用，使所有章节都反映最新科目数据而非仅当前节） */
   invalidateAllCache?: () => void
+  /**
+   * 可写态（partner-manager-edit-permission）。
+   * 缺省时按既有行为（不受限），提供时底稿保存事件仅可写时刷新，403 不置 syncError。
+   */
+  canWrite?: ComputedRef<boolean> | Ref<boolean>
 }
 
 export interface UseNoteRefreshReturn {
@@ -63,7 +68,7 @@ export interface UseNoteRefreshReturn {
 }
 
 export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshReturn {
-  const { projectId, year, currentNote, fetchDetail, fetchTree, staleRecalc, invalidateAllCache } = options
+  const { projectId, year, currentNote, fetchDetail, fetchTree, staleRecalc, invalidateAllCache, canWrite } = options
 
   const refreshLoading = ref(false)
   const refreshAllLoading = ref(false)
@@ -234,6 +239,9 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
 
   /** 底稿保存事件监听（自动同步附注数据） */
   function onWorkpaperSaved(payload: { projectId: string }) {
+    // partner-manager-edit-permission: 不可写时不刷新
+    if (canWrite && !canWrite.value) return
+
     if (payload.projectId !== projectId.value) return
     if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
     syncDebounceTimer = setTimeout(async () => {
@@ -241,7 +249,9 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
       try {
         await refreshDisclosureFromWorkpapers(projectId.value, year.value)
         if (currentNote.value) await fetchDetail(currentNote.value.note_section)
-      } catch {
+      } catch (err: any) {
+        // partner-manager-edit-permission: 403 被拒时不置 syncError、不显示底稿同步失败提示
+        if (canWrite && err?.response?.status === 403) return
         syncError.value = true
       }
     }, 1000)

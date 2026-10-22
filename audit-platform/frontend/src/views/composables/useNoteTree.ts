@@ -40,6 +40,8 @@ export interface UseNoteTreeOptions {
   year: ComputedRef<number> | Ref<number>
   templateType: Ref<string>
   isEqcrRole: ComputedRef<boolean>
+  /** 可写态（partner-manager-edit-permission）；缺省时不影响既有行为 */
+  canWrite?: ComputedRef<boolean> | Ref<boolean>
   /** Called after fetchTree succeeds to refresh section numbering */
   onTreeLoaded?: () => void
 }
@@ -218,7 +220,7 @@ function buildGroupedChildren(
 // ─── Composable 主体 ─────────────────────────────────────────────────────────────
 
 export function useNoteTree(options: UseNoteTreeOptions): UseNoteTreeReturn {
-  const { projectId, year, templateType, isEqcrRole, onTreeLoaded } = options
+  const { projectId, year, templateType, isEqcrRole, canWrite, onTreeLoaded } = options
 
   // ─── Reactive state ─────────────────────────────────────────────────────────
   const noteList = ref<DisclosureNoteTreeItem[]>([])

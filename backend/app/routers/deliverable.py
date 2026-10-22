@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.database import async_session, get_db
 import sqlalchemy as sa
 from app.deps import assert_project_permission, get_current_user
+from app.services.eqcr_resolver import is_project_eqcr
 from app.models.core import User
 from app.models.phase13_models import WordExportDocType, WordExportStatus, ExportJobItem
 from app.models.phase13_schemas import (
@@ -108,12 +109,6 @@ def _verified_version_path(version) -> Path:
         raise HTTPException(status_code=409, detail=f"版本文件校验失败：{exc}") from exc
     return Path(version.file_path)
 
-
-async def _is_project_eqcr(db: AsyncSession, user_id: UUID, project_id: UUID) -> bool:
-    from app.services.eqcr_workbench_service import EqcrWorkbenchService
-
-    svc = EqcrWorkbenchService(db)
-    return await svc._is_user_eqcr_on(user_id, project_id)
 
 
 async def _notify_deliverable(
@@ -234,13 +229,14 @@ async def _guard_action(
     """交付件操作鉴权：先要求是本项目成员，再按角色 × 操作 × 状态矩阵判定（EQCR 只读）。
 
     查看 / 下载要求 readonly 及以上；生成、编辑、确认、签署、审批、归档要求 review 及以上 ——
-    合伙人 / 经理 / 质控 / EQCR 在项目里是 review 级（assignment_service.ROLE_MAP），挂 edit 会把
-    复核人锁在外面。非项目成员 403「权限不足」；admin 跳过成员校验。一键生成全套也走本函数。
+    review 门禁放行 review 级的质控与 EQCR 的读与非写动作；合伙人 / 经理为 edit 级同样满足。
+    EQCR 由 ``is_project_eqcr`` 判定（需求 7.3），写操作被矩阵拒绝。
+    非项目成员 403「权限不足」；admin 跳过成员校验。一键生成全套也走本函数。
     """
     await assert_project_permission(
         db, user, project_id, "readonly" if action in READ_ACTIONS else "review"
     )
-    is_eqcr = await _is_project_eqcr(db, user.id, project_id)
+    is_eqcr = await is_project_eqcr(db, user, project_id)
     if not can_deliverable(
         user.role.value,
         action,

@@ -157,6 +157,10 @@ def register_report_routers(app: FastAPI) -> None:
     from app.routers.note_text_batch import router as note_tb_router
     app.include_router(note_tb_router, tags=["note-text-batch"])
 
+    # ═══ §108. partner-manager-edit-permission：附注编辑权限判定查询 ═══
+    from app.routers.note_edit_permission import router as note_edit_perm_router
+    app.include_router(note_edit_perm_router, tags=["note-edit-permission"])
+
     # ═══ §107. formula-global-settings-sync：公式全局设置 / 本项目适配 / 待确认 / 应用到其他 ═══
     from app.routers.formula_settings import project_router as fs_project_router
     from app.routers.formula_settings import router as fs_router

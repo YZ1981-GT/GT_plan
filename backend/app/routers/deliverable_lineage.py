@@ -16,7 +16,7 @@ POST /api/projects/{project_id}/deliverables/{word_export_task_id}/refresh-stale
     批量刷新所有过期章节（需求 5.7, 10.2, 10.3, 10.4, 11.1）
 
 鉴权：回填 / 刷新与交付中心同一判定 ``deliverable._guard_action``（项目成员 review 及以上 + 角色矩阵 +
-EQCR 只读）—— 原为 edit 级，合伙人 / 经理（项目里是 review 级）用不了（2026-10-19 用户拍板放开）。
+EQCR 只读）—— 合伙人 / 经理（edit 级）与质控（review 级）都满足 review 门禁。
 五个端点都先校验交付件属于路径上的项目（``_ensure_task_in_project``）。
 
 Requirements: 1.1, 3.1, 5.1, 5.7, 7.1, 10.1, 10.2, 10.3, 10.4, 11.1, 11.3

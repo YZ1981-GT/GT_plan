@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="gt-detail-panel">
     <template v-if="project">
       <!-- Tab 页签 -->
@@ -613,7 +613,7 @@ import { useRouter } from 'vue-router'
 import {
   DataLine, Edit, Document, TrendCharts, Notebook, Aim, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck, Finished, Loading, Guide,
 } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import { confirmForceReset, confirmDangerous } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
 import { projects as P_proj, attachments as P_att, accountChart as P_ac, adjustments as P_adj } from '@/services/apiPaths'
@@ -995,6 +995,11 @@ async function onCreateNextYear() {
     const data = await api.post(`${P_proj.detail(props.project.id)}/create-next-year`)
     const result = data
     ElMessage.success(`已创建下年项目，新项目ID: ${result.new_project_id?.slice(0, 8)}...`)
+    // EQCR skip notification (Requirements 11.4)
+    const skippedEqcr = result.items_copied?.team_skipped_eqcr ?? 0
+    if (skippedEqcr >= 1 && Array.isArray(result.notices) && result.notices.length > 0) {
+      ElNotification({ type: 'warning', title: '团队复制提示', message: result.notices[0], duration: 0 })
+    }
     router.push(`/projects/new?projectId=${result.new_project_id}`)
   } catch (err: any) {
     if (err !== 'cancel') {

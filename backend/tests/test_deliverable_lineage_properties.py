@@ -1801,7 +1801,7 @@ async def test_property_24_writeback_permission_gate(
 
     **Validates: Requirements 10.3**
 
-    对任意不是本项目成员（或只读成员）的用户，触发回填必被拒绝（403）；review 级（合伙人 / 经理）可回填；
+    对任意不是本项目成员（或只读成员）的用户，触发回填必被拒绝（403）；edit 级（合伙人 / 经理）与 review 级（质控）可回填；
     仅具备 project:read 的用户只能查看溯源面板，不能触发回填。
     """
     from httpx import ASGITransport, AsyncClient

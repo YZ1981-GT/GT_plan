@@ -159,11 +159,11 @@ async def test_409_wire_shape_through_app_error_handler():
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[get_current_user] = _user
     try:
-        # 真实鉴权链照跑（admin 跳过成员校验）；只把归档守卫 / RLS / EQCR 判定这几个取数点置空（db 是 AsyncMock）
+        # 真实鉴权链照跑（admin 跳过成员校验）；只把归档守卫 / RLS / EQCR 委派查询这几个取数点置空（db 是 AsyncMock）
         with (
             patch.object(deps, "_check_project_not_archived", new=AsyncMock(return_value=None)),
             patch.object(deps, "set_rls_context", new=AsyncMock(return_value=None)),
-            patch("app.routers.deliverable._is_project_eqcr", new=AsyncMock(return_value=False)),
+            patch("app.services.eqcr_resolver._count_project_eqcr_assignments", new=AsyncMock(return_value=0)),
             patch(_CHECK, new=AsyncMock(return_value=_INCONSISTENT)),
             patch(_EXECUTOR, new=executor_cls),
         ):

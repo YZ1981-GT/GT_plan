@@ -29,10 +29,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user, require_project_access
 from app.models.core import User
-from app.services.assignment_service import PARTNER_MANAGER_ROLE_ALIASES
 from app.services.note_edit_gate import assert_note_role_access
 
 logger = logging.getLogger(__name__)
+
+# 经理 / 合伙人项目角色集合（ProjectUserRole 枚举值）。
+# assert_note_role_access 按成员行的项目角色判定，不是委派角色别名。
+_PARTNER_MANAGER_ROLES = frozenset({"partner", "manager"})
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/notes/conversion",
@@ -196,7 +199,7 @@ async def execute_conversion(
     """
     await assert_note_role_access(
         db, current_user, project_id,
-        project_roles=frozenset(PARTNER_MANAGER_ROLE_ALIASES),
+        project_roles=_PARTNER_MANAGER_ROLES,
         denied_message="仅本项目经理或合伙人可切换附注模板类型",
     )
 
@@ -234,7 +237,7 @@ async def rollback_conversion(
     """
     await assert_note_role_access(
         db, current_user, project_id,
-        project_roles=frozenset(PARTNER_MANAGER_ROLE_ALIASES),
+        project_roles=_PARTNER_MANAGER_ROLES,
         denied_message="仅本项目经理或合伙人可切换附注模板类型",
     )
 

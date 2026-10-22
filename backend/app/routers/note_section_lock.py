@@ -1,6 +1,8 @@
 """附注章节锁定路由 — 多人协作
 
 Requirements: 44.1-44.6
+partner-manager-edit-permission Task 11.4: acquire/heartbeat → require_note_edit_access(consol_lock=False)；
+  release → require_project_access("readonly")；force-release → assert_note_role_access({manager, partner})
 """
 from __future__ import annotations
 
@@ -11,8 +13,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
+from app.services.note_edit_gate import (
+    assert_note_role_access,
+    require_note_edit_access,
+)
 from app.services.note_section_lock_service import NoteSectionLockService
 
 router = APIRouter(
@@ -41,7 +47,7 @@ async def acquire_lock(
     project_id: UUID,
     body: AcquireLockRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
     """获取章节编辑锁"""
     svc = NoteSectionLockService(db)
@@ -65,7 +71,7 @@ async def release_lock(
     project_id: UUID,
     body: ReleaseLockRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """释放章节编辑锁"""
     svc = NoteSectionLockService(db)
@@ -87,6 +93,11 @@ async def force_release_lock(
     current_user: User = Depends(get_current_user),
 ):
     """项目经理强制解锁"""
+    await assert_note_role_access(
+        db, current_user, project_id,
+        project_roles=frozenset({"manager", "partner"}),
+        denied_message="仅本项目经理或合伙人可强制释放章节锁",
+    )
     svc = NoteSectionLockService(db)
     released = await svc.force_release(
         project_id=project_id,
@@ -103,7 +114,7 @@ async def heartbeat(
     project_id: UUID,
     body: AcquireLockRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ):
     """心跳续期"""
     svc = NoteSectionLockService(db)

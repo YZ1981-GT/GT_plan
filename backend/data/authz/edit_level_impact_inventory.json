@@ -51,6 +51,14 @@
     },
     {
       "counted": true,
+      "domain": "report",
+      "file": "app/routers/formula_settings.py",
+      "function": "apply_targets",
+      "levels_by_caller": {},
+      "read": "attribute"
+    },
+    {
+      "counted": true,
       "domain": "unregistered",
       "file": "app/routers/office_preview.py",
       "function": "_ensure_project_access",
@@ -952,6 +960,53 @@
       "conditional": false,
       "domain": "system",
       "endpoints": [
+        "POST /api/ai-content/{log_id}/confirm"
+      ],
+      "file": "app/routers/ai_content.py",
+      "form": "assert_project_permission",
+      "function": "confirm_ai_content",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": [
+        "_confirm_or_revise"
+      ]
+    },
+    {
+      "conditional": true,
+      "domain": "system",
+      "endpoints": [
+        "POST /api/ai-content/{log_id}/confirm"
+      ],
+      "file": "app/routers/ai_content.py",
+      "form": "assert_project_permission",
+      "function": "confirm_ai_content",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": [
+        "_confirm_or_revise",
+        "_writeback_note"
+      ]
+    },
+    {
+      "conditional": false,
+      "domain": "system",
+      "endpoints": [
         "GET /api/projects/{project_id}/ai-content/pending"
       ],
       "file": "app/routers/ai_content.py",
@@ -960,6 +1015,27 @@
       "gate_internal": null,
       "in_note_coverage": false,
       "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "system",
+      "endpoints": [
+        "POST /api/ai-content/{log_id}/reject"
+      ],
+      "file": "app/routers/ai_content.py",
+      "form": "assert_project_permission",
+      "function": "reject_ai_content",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
       "ordinal": 1,
       "overlays": {
         "consol_lock": false,
@@ -2454,6 +2530,174 @@
       "file": "app/routers/consol_note_detail_templates.py",
       "form": "require_project_access",
       "function": "api_suggest_template",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "system",
+      "endpoints": [
+        "POST /api/projects/{project_id}/consol-note-structure-lock"
+      ],
+      "file": "app/routers/consol_note_mapping_templates.py",
+      "form": "require_project_access",
+      "function": "activate_structure_lock",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "system",
+      "endpoints": [
+        "POST /api/projects/{project_id}/consol-note-value/confirm"
+      ],
+      "file": "app/routers/consol_note_mapping_templates.py",
+      "form": "require_project_access",
+      "function": "confirm_value",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "system",
+      "endpoints": [
+        "GET /api/projects/{project_id}/consol-note-value/confirmation-status"
+      ],
+      "file": "app/routers/consol_note_mapping_templates.py",
+      "form": "require_project_access",
+      "function": "confirmation_status",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "system",
+      "endpoints": [
+        "GET /api/projects/{project_id}/consol-note-structure-lock"
+      ],
+      "file": "app/routers/consol_note_mapping_templates.py",
+      "form": "require_project_access",
+      "function": "list_structure_locks",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "system",
+      "endpoints": [
+        "POST /api/projects/{project_id}/consol-note-mapping/rules/{rule_id}/promote"
+      ],
+      "file": "app/routers/consol_note_mapping_templates.py",
+      "form": "require_project_access",
+      "function": "promote_rule",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "system",
+      "endpoints": [
+        "GET /api/projects/{project_id}/consol-note-value/readiness-check"
+      ],
+      "file": "app/routers/consol_note_mapping_templates.py",
+      "form": "require_project_access",
+      "function": "readiness_check",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "system",
+      "endpoints": [
+        "DELETE /api/projects/{project_id}/consol-note-structure-lock/{section_id}"
+      ],
+      "file": "app/routers/consol_note_mapping_templates.py",
+      "form": "require_project_access",
+      "function": "release_structure_lock",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "system",
+      "endpoints": [
+        "GET /api/projects/{project_id}/consol-note-value/stale-summary"
+      ],
+      "file": "app/routers/consol_note_mapping_templates.py",
+      "form": "require_project_access",
+      "function": "stale_summary",
       "gate_internal": null,
       "in_note_coverage": false,
       "level": "readonly",
@@ -5455,6 +5699,27 @@
       "conditional": false,
       "domain": "workpaper",
       "endpoints": [
+        "POST /api/formula/batch-execute"
+      ],
+      "file": "app/routers/formula.py",
+      "form": "assert_project_permission",
+      "function": "batch_execute_formulas",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "workpaper",
+      "endpoints": [
         "POST /api/formula/execute"
       ],
       "file": "app/routers/formula.py",
@@ -5502,6 +5767,48 @@
       "file": "app/routers/formula_audit_log.py",
       "form": "require_project_access",
       "function": "get_audit_log",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "system",
+      "endpoints": [
+        "POST /api/formula-audit-log/{project_id}/{year}/rollback"
+      ],
+      "file": "app/routers/formula_audit_log.py",
+      "form": "assert_project_permission",
+      "function": "rollback_formula",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "GET /api/projects/{project_id}/formula/cross-check-history"
+      ],
+      "file": "app/routers/formula_logic_check.py",
+      "form": "require_project_access",
+      "function": "cross_check_history",
       "gate_internal": null,
       "in_note_coverage": false,
       "level": "readonly",
@@ -5778,6 +6085,386 @@
       "gate_internal": null,
       "in_note_coverage": false,
       "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/formula-settings/{domain}/apply"
+      ],
+      "file": "app/routers/formula_settings.py",
+      "form": "require_project_access",
+      "function": "apply",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": true,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/formula-settings/{domain}/apply-preview"
+      ],
+      "file": "app/routers/formula_settings.py",
+      "form": "assert_project_permission",
+      "function": "apply_preview",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": [
+        "_authorize_targets"
+      ]
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/formula-settings/{domain}/apply-preview"
+      ],
+      "file": "app/routers/formula_settings.py",
+      "form": "require_project_access",
+      "function": "apply_preview",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "GET /api/projects/{project_id}/formula-settings/apply-targets"
+      ],
+      "file": "app/routers/formula_settings.py",
+      "form": "require_project_access",
+      "function": "apply_targets",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "GET /api/projects/{project_id}/formula-settings/dependencies"
+      ],
+      "file": "app/routers/formula_settings.py",
+      "form": "require_project_access",
+      "function": "formula_dependencies",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "GET /api/projects/{project_id}/formula-settings/{domain}/effective"
+      ],
+      "file": "app/routers/formula_settings.py",
+      "form": "require_project_access",
+      "function": "get_effective",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "GET /api/projects/{project_id}/formula-settings/pending"
+      ],
+      "file": "app/routers/formula_settings.py",
+      "form": "require_project_access",
+      "function": "get_pending",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/formula-settings/pending/resolve"
+      ],
+      "file": "app/routers/formula_settings.py",
+      "form": "require_project_access",
+      "function": "resolve",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "DELETE /api/projects/{project_id}/formula-settings/{domain}/overrides"
+      ],
+      "file": "app/routers/formula_settings.py",
+      "form": "require_project_access",
+      "function": "restore_global",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "PUT /api/projects/{project_id}/formula-settings/{domain}/overrides"
+      ],
+      "file": "app/routers/formula_settings.py",
+      "form": "require_project_access",
+      "function": "save_overrides",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": true,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/formula-templates"
+      ],
+      "file": "app/routers/formula_templates.py",
+      "form": "assert_project_permission",
+      "function": "create_template",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": true,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/formula-templates"
+      ],
+      "file": "app/routers/formula_templates.py",
+      "form": "assert_project_permission",
+      "function": "create_template",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "GET /api/projects/{project_id}/formula-templates/subscriptions"
+      ],
+      "file": "app/routers/formula_templates.py",
+      "form": "require_project_access",
+      "function": "list_subscriptions",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/formula-templates/subscribe"
+      ],
+      "file": "app/routers/formula_templates.py",
+      "form": "require_project_access",
+      "function": "subscribe",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/formula-templates/subscribe-preview"
+      ],
+      "file": "app/routers/formula_templates.py",
+      "form": "require_project_access",
+      "function": "subscribe_preview",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/formula-templates/unsubscribe"
+      ],
+      "file": "app/routers/formula_templates.py",
+      "form": "require_project_access",
+      "function": "unsubscribe",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/formula-templates/unsubscribe-preview"
+      ],
+      "file": "app/routers/formula_templates.py",
+      "form": "require_project_access",
+      "function": "unsubscribe_preview",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": true,
+      "domain": "report",
+      "endpoints": [
+        "PUT /api/formula-templates/{template_id}"
+      ],
+      "file": "app/routers/formula_templates.py",
+      "form": "assert_project_permission",
+      "function": "update_template",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
       "ordinal": 1,
       "overlays": {
         "consol_lock": false,
@@ -7871,13 +8558,170 @@
       "conditional": false,
       "domain": "report",
       "endpoints": [
-        "GET /api/projects/{project_id}/note-template"
+        "POST /api/projects/{project_id}/notes/conversion/execute"
+      ],
+      "file": "app/routers/note_conversion.py",
+      "form": "assert_note_role_access",
+      "function": "execute_conversion",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/notes/conversion/preview"
+      ],
+      "file": "app/routers/note_conversion.py",
+      "form": "require_project_access",
+      "function": "preview_conversion",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "GET /api/projects/{project_id}/notes/conversion/{year}/preview"
+      ],
+      "file": "app/routers/note_conversion.py",
+      "form": "require_project_access",
+      "function": "preview_note_section_conversion",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/notes/conversion/rollback"
+      ],
+      "file": "app/routers/note_conversion.py",
+      "form": "assert_note_role_access",
+      "function": "rollback_conversion",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/notes/custom-sections/apply-template"
+      ],
+      "file": "app/routers/note_custom_section.py",
+      "form": "require_note_edit_access",
+      "function": "apply_template",
+      "gate_internal": null,
+      "in_note_coverage": true,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/notes/custom-sections/create"
+      ],
+      "file": "app/routers/note_custom_section.py",
+      "form": "require_note_edit_access",
+      "function": "create_custom_section",
+      "gate_internal": null,
+      "in_note_coverage": true,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/notes/custom-sections/save-as-template"
+      ],
+      "file": "app/routers/note_custom_section.py",
+      "form": "require_note_edit_access",
+      "function": "save_as_template",
+      "gate_internal": null,
+      "in_note_coverage": true,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/note-template/restore"
       ],
       "file": "app/routers/note_custom_template.py",
       "form": "require_note_edit_access",
-      "function": "load_custom_template",
+      "function": "restore_custom_template",
       "gate_internal": null,
-      "in_note_coverage": false,
+      "in_note_coverage": true,
       "level": "review",
       "ordinal": 1,
       "overlays": {
@@ -7899,6 +8743,188 @@
       "file": "app/routers/note_custom_template.py",
       "form": "require_note_edit_access",
       "function": "save_custom_template",
+      "gate_internal": null,
+      "in_note_coverage": true,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/data-lock/snapshot"
+      ],
+      "file": "app/routers/note_data_lock.py",
+      "form": "require_note_edit_access",
+      "function": "create_snapshot",
+      "gate_internal": null,
+      "in_note_coverage": true,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/data-lock/lock"
+      ],
+      "file": "app/routers/note_data_lock.py",
+      "form": "assert_note_role_access",
+      "function": "lock_on_sign_off",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/data-lock/unlock"
+      ],
+      "file": "app/routers/note_data_lock.py",
+      "form": "assert_note_role_access",
+      "function": "unlock_data",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": true,
+      "domain": "report",
+      "endpoints": [
+        "GET /api/projects/{project_id}/disclosure-notes/edit-permission"
+      ],
+      "file": "app/routers/note_edit_permission.py",
+      "form": "assert_note_edit_access",
+      "function": "get_note_edit_permission",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "GET /api/projects/{project_id}/disclosure-notes/edit-permission"
+      ],
+      "file": "app/routers/note_edit_permission.py",
+      "form": "require_project_access",
+      "function": "get_note_edit_permission",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/notes/group-template/detach"
+      ],
+      "file": "app/routers/note_group_template.py",
+      "form": "require_note_edit_access",
+      "function": "detach_from_group_template",
+      "gate_internal": null,
+      "in_note_coverage": true,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/notes/group-template/distribute"
+      ],
+      "file": "app/routers/note_group_template.py",
+      "form": "assert_note_edit_access_on_projects",
+      "function": "distribute_template",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/notes/group-template/save"
+      ],
+      "file": "app/routers/note_group_template.py",
+      "form": "require_note_edit_access",
+      "function": "save_as_group_template",
       "gate_internal": null,
       "in_note_coverage": true,
       "level": "review",
@@ -7966,6 +8992,96 @@
       "file": "app/routers/note_offline.py",
       "form": "require_project_access",
       "function": "preview_import",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/notes/locks/acquire"
+      ],
+      "file": "app/routers/note_section_lock.py",
+      "form": "require_note_edit_access",
+      "function": "acquire_lock",
+      "gate_internal": null,
+      "in_note_coverage": true,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/notes/locks/force-release"
+      ],
+      "file": "app/routers/note_section_lock.py",
+      "form": "assert_note_role_access",
+      "function": "force_release_lock",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/notes/locks/heartbeat"
+      ],
+      "file": "app/routers/note_section_lock.py",
+      "form": "require_note_edit_access",
+      "function": "heartbeat",
+      "gate_internal": null,
+      "in_note_coverage": true,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/projects/{project_id}/notes/locks/release"
+      ],
+      "file": "app/routers/note_section_lock.py",
+      "form": "require_project_access",
+      "function": "release_lock",
       "gate_internal": null,
       "in_note_coverage": false,
       "level": "readonly",
@@ -8130,6 +9246,52 @@
         "global_capability": null,
         "global_role_bypass": [],
         "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/disclosure-notes/{project_id}/{year}/auto-trim"
+      ],
+      "file": "app/routers/note_trim.py",
+      "form": "require_note_edit_access",
+      "function": "auto_trim",
+      "gate_internal": null,
+      "in_note_coverage": true,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "PUT /api/disclosure-notes/{project_id}/sections/trim"
+      ],
+      "file": "app/routers/note_trim.py",
+      "form": "require_note_edit_access",
+      "function": "save_trim",
+      "gate_internal": null,
+      "in_note_coverage": true,
+      "level": "review",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": [
+          "note:edit"
+        ]
       },
       "via_helper": null
     },
@@ -8714,6 +9876,27 @@
       "conditional": true,
       "domain": "report",
       "endpoints": [
+        "POST /api/report-config/execute-formula"
+      ],
+      "file": "app/routers/report_config.py",
+      "form": "assert_project_permission",
+      "function": "execute_formula",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": true,
+      "domain": "report",
+      "endpoints": [
         "POST /api/report-config/execute-formulas-batch"
       ],
       "file": "app/routers/report_config.py",
@@ -8753,27 +9936,6 @@
       "via_helper": null
     },
     {
-      "conditional": false,
-      "domain": "report",
-      "endpoints": [
-        "GET /api/report-config/tb-detail-formulas/{project_id}"
-      ],
-      "file": "app/routers/report_config.py",
-      "form": "require_project_access",
-      "function": "get_tb_detail_formulas",
-      "gate_internal": null,
-      "in_note_coverage": false,
-      "level": "readonly",
-      "ordinal": 1,
-      "overlays": {
-        "consol_lock": false,
-        "global_capability": null,
-        "global_role_bypass": [],
-        "operations": []
-      },
-      "via_helper": null
-    },
-    {
       "conditional": true,
       "domain": "report",
       "endpoints": [
@@ -8792,70 +9954,9 @@
         "global_role_bypass": [],
         "operations": []
       },
-      "via_helper": null
-    },
-    {
-      "conditional": true,
-      "domain": "report",
-      "endpoints": [
-        "GET /api/report-config/types"
-      ],
-      "file": "app/routers/report_config.py",
-      "form": "assert_project_permission",
-      "function": "list_report_types",
-      "gate_internal": null,
-      "in_note_coverage": false,
-      "level": "readonly",
-      "ordinal": 1,
-      "overlays": {
-        "consol_lock": false,
-        "global_capability": null,
-        "global_role_bypass": [],
-        "operations": []
-      },
-      "via_helper": null
-    },
-    {
-      "conditional": false,
-      "domain": "report",
-      "endpoints": [
-        "POST /api/report-config/drill-down"
-      ],
-      "file": "app/routers/report_config.py",
-      "form": "assert_project_permission",
-      "function": "report_drill_down",
-      "gate_internal": null,
-      "in_note_coverage": false,
-      "level": "readonly",
-      "ordinal": 1,
-      "overlays": {
-        "consol_lock": false,
-        "global_capability": null,
-        "global_role_bypass": [],
-        "operations": []
-      },
-      "via_helper": null
-    },
-    {
-      "conditional": false,
-      "domain": "report",
-      "endpoints": [
-        "PUT /api/report-config/tb-detail-formulas/{project_id}"
-      ],
-      "file": "app/routers/report_config.py",
-      "form": "assert_project_permission",
-      "function": "save_tb_detail_formulas",
-      "gate_internal": null,
-      "in_note_coverage": false,
-      "level": "edit",
-      "ordinal": 1,
-      "overlays": {
-        "consol_lock": false,
-        "global_capability": null,
-        "global_role_bypass": [],
-        "operations": []
-      },
-      "via_helper": null
+      "via_helper": [
+        "_authorize_report_config_read"
+      ]
     },
     {
       "conditional": true,
@@ -8879,6 +9980,111 @@
       "via_helper": [
         "_authorize_report_config_write"
       ]
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/report-config/apply-master-update"
+      ],
+      "file": "app/routers/report_config_baseline.py",
+      "form": "assert_project_permission",
+      "function": "apply_master_update",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "GET /api/report-config/diff-vs-master/{project_id}"
+      ],
+      "file": "app/routers/report_config_baseline.py",
+      "form": "require_project_access",
+      "function": "diff_vs_master",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "GET /api/report-config/stale-status/{project_id}"
+      ],
+      "file": "app/routers/report_config_baseline.py",
+      "form": "require_project_access",
+      "function": "stale_status",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/report-config/suggest-to-master"
+      ],
+      "file": "app/routers/report_config_baseline.py",
+      "form": "assert_project_permission",
+      "function": "suggest_to_master",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "POST /api/report-config/drill-down"
+      ],
+      "file": "app/routers/report_drill_down.py",
+      "form": "assert_project_permission",
+      "function": "report_drill_down",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
     },
     {
       "conditional": false,
@@ -9478,6 +10684,69 @@
       "conditional": false,
       "domain": "system",
       "endpoints": [
+        "POST /api/shared-config/apply"
+      ],
+      "file": "app/routers/shared_config.py",
+      "form": "assert_project_permission",
+      "function": "apply_template",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "system",
+      "endpoints": [
+        "GET /api/shared-config/references/{project_id}"
+      ],
+      "file": "app/routers/shared_config.py",
+      "form": "require_project_access",
+      "function": "list_references",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": true,
+      "domain": "system",
+      "endpoints": [
+        "GET /api/shared-config/templates"
+      ],
+      "file": "app/routers/shared_config.py",
+      "form": "assert_project_permission",
+      "function": "list_templates",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "system",
+      "endpoints": [
         "POST /api/projects/{project_id}/datasets/{dataset_id}/sign-convention/anomalies/batch-confirm"
       ],
       "file": "app/routers/sign_convention.py",
@@ -9756,6 +11025,48 @@
       "file": "app/routers/task_events.py",
       "form": "assert_project_permission",
       "function": "replay_event",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "GET /api/report-config/tb-detail-formulas/{project_id}"
+      ],
+      "file": "app/routers/tb_detail_formulas.py",
+      "form": "require_project_access",
+      "function": "get_tb_detail_formulas",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "report",
+      "endpoints": [
+        "PUT /api/report-config/tb-detail-formulas/{project_id}"
+      ],
+      "file": "app/routers/tb_detail_formulas.py",
+      "form": "require_project_access",
+      "function": "save_tb_detail_formulas",
       "gate_internal": null,
       "in_note_coverage": false,
       "level": "edit",
@@ -10635,6 +11946,54 @@
         "consol_lock": false,
         "global_capability": null,
         "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "workpaper",
+      "endpoints": [
+        "POST /api/workpapers/{wp_id}/capability-assert"
+      ],
+      "file": "app/routers/wp_capability_snapshot.py",
+      "form": "authorize_wp_read",
+      "function": "assert_capability_action",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [
+          "admin",
+          "partner"
+        ],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": false,
+      "domain": "workpaper",
+      "endpoints": [
+        "GET /api/workpapers/{wp_id}/capability-snapshot"
+      ],
+      "file": "app/routers/wp_capability_snapshot.py",
+      "form": "authorize_wp_read",
+      "function": "get_capability_snapshot",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "readonly",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [
+          "admin",
+          "partner"
+        ],
         "operations": []
       },
       "via_helper": null
@@ -13028,6 +14387,44 @@
         ]
       },
       "via_helper": null
+    },
+    {
+      "conditional": true,
+      "domain": "unregistered",
+      "endpoints": [],
+      "file": "app/services/shared_config_access.py",
+      "form": "assert_project_permission",
+      "function": "check_create",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
+    },
+    {
+      "conditional": true,
+      "domain": "unregistered",
+      "endpoints": [],
+      "file": "app/services/shared_config_access.py",
+      "form": "assert_project_permission",
+      "function": "check_manage",
+      "gate_internal": null,
+      "in_note_coverage": false,
+      "level": "edit",
+      "ordinal": 1,
+      "overlays": {
+        "consol_lock": false,
+        "global_capability": null,
+        "global_role_bypass": [],
+        "operations": []
+      },
+      "via_helper": null
     }
   ],
   "schema": "edit_level_impact_inventory/v1",
@@ -13051,34 +14448,34 @@
       "gate_points": 7
     },
     "report": {
-      "direct_comparisons": 0,
-      "endpoints": 122,
-      "files": 22,
-      "gate_points": 122
+      "direct_comparisons": 1,
+      "endpoints": 163,
+      "files": 34,
+      "gate_points": 166
     },
     "system": {
       "direct_comparisons": 1,
-      "endpoints": 273,
-      "files": 43,
-      "gate_points": 274
+      "endpoints": 287,
+      "files": 45,
+      "gate_points": 289
     },
     "unregistered": {
       "direct_comparisons": 5,
       "endpoints": 0,
-      "files": 7,
-      "gate_points": 3
+      "files": 8,
+      "gate_points": 5
     },
     "workpaper": {
       "direct_comparisons": 0,
-      "endpoints": 140,
-      "files": 44,
-      "gate_points": 142
+      "endpoints": 143,
+      "files": 45,
+      "gate_points": 145
     }
   },
   "totals": {
-    "direct_comparisons": 6,
-    "endpoints": 598,
-    "files": 148,
-    "gate_points": 611
+    "direct_comparisons": 7,
+    "endpoints": 656,
+    "files": 164,
+    "gate_points": 675
   }
 }

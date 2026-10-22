@@ -39,6 +39,12 @@ export interface AutoSaveOptions {
   saveBeaconUrl?: string
   /** beforeunload 同步保存的 body 序列化函数 */
   serializeForBeacon?: () => string | Blob | null
+  /**
+   * 判断失败后是否应重试。缺省恒真（其他页面行为不变）。
+   * 返回 false 时不重试，直接标记失败。
+   * Feature: partner-manager-edit-permission, Requirements: 10.10
+   */
+  shouldRetry?: (error: unknown) => boolean
 }
 
 export function useWorkpaperAutoSave(
@@ -94,7 +100,14 @@ export function useWorkpaperAutoSave(
         resetTimer()
       }
     } catch (e: any) {
-      // V3 Req 12.3.2: 立即重试 1 次
+      // V3 Req 12.3.2: 立即重试 1 次（shouldRetry 返回 false 时不重试）
+      const retry = autoSaveOpts?.shouldRetry ? autoSaveOpts.shouldRetry(e) : true
+      if (!retry) {
+        isSaveFailed.value = true
+        lastError.value = e?.message || '自动保存失败'
+        saving.value = false
+        return
+      }
       try {
         await onSave()
         isDirty.value = false

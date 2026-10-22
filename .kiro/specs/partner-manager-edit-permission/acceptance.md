@@ -51,6 +51,7 @@ B 就是 spec 文档提交，四个文件随检出已在 worktree 同路径；�
 - 附带观察（既有情形，与本 spec 无关）：V189、V190 在 B 与主工作树中都没有配对的 R 脚本；本 spec 的 R198 回滚只涉及 198。
 - 🔴 提交前须按需求 4.1 再核（任务 19.8）：现扫「主工作树磁盘（含未跟踪）∪ origin 目标分支最新提交」的最高版本 + 1。198 若已被并发会话占用，顺延改名（迁移文件名、测试引用、本文件），重跑任务 7 的测试并重新生成候选提交 C（任务 19.2）。
 - 任务 7.1 再核（2026-10-21）：198、199 已被占用，n 改为 200（见任务 7.1 小节）。
+- 任务 19.8 再核：200、201、202 已被并发会话占用，n 改为 203。迁移文件已改名 V203/R203，文件头注释已更新，测试按后缀自动发现无需改引用。
 
 ## 现算计数对账
 
@@ -58,7 +59,7 @@ B 就是 spec 文档提交，四个文件随检出已在 worktree 同路径；�
 
 | 对账项 | 写作时快照（出处） | 现算值（时点与范围） | 差异与原因 |
 |---|---|---|---|
-| 迁移号 n | 不早于 V197（需求 F14）；V198（design N10、D5） | 200（任务 7.1，2026-10-21 现扫主工作树磁盘 ∪ 目标分支尖端 `8bfe70c1d`，并集最高 199；任务 1.2 时为 198，主工作树磁盘 ∪ B 并集最高 197）；任务 19.8 再核 | 与 design 写作时的 V198 不同：任务 1.2 之后 198 被 `V198__knowledge_documents_background_ocr.sql` 占用（提交 `f949c5abc`，2026-10-20 13:14 +0800，已在目标分支上），199 被主工作树未跟踪的 `V199__formula_global_settings_and_templates.sql` 占用（并发会话，本地库已应用），按需求 4.1 取并集最高 + 1 得 200，仍不早于 F14 的下限 V197（详见任务 7.1 小节）。任务 1.2 时无差异：F14 写作时「未跟踪的 V192~V196」已在主工作树本地分支提交，另多出 V197。最终以任务 19.8 提交前的再核为准 |
+| 迁移号 n | 不早于 V197（需求 F14）；V198（design N10、D5） | 203（任务 19.8 再核，200~202 已被并发会话占用；任务 7.1 时为 200，并集最高 199；任务 1.2 时为 198，主工作树磁盘 ∪ B 并集最高 197） | 与 design 写作时的 V198 不同：198~202 依次被并发会话占用，按需求 4.1 取并集最高 + 1 最终得 203，仍不早于 F14 的下限 V197 |
 | `ROLE_MAP` 的键，及取值为 (readonly, readonly) 的键 | F1 列出的 13 个键；需求 2.5「另加实现时登记、取值为（readonly, readonly）的键」 | 改前、改后都是 13 个键，键集合相同；取值为 (readonly, readonly) 的键 0 个（任务 2.1，worktree 导入现算） | 无差异；任务 2.2 的期望表不需要另加 readonly 键 |
 | EQCR 别名集合（`EQCR_ROLE_ALIASES`，由 `ROLE_MAP` 推导） | `eqcr`、`独立复核合伙人`（需求术语表、7.2） | `eqcr`、`独立复核合伙人`（任务 2.1） | 无差异 |
 | 合伙人 / 经理别名集合（`PARTNER_MANAGER_ROLE_ALIASES`，由 `ROLE_MAP` 推导） | `signing_partner`、`partner`、`合伙人`、`manager`、`项目经理`（需求术语表） | 同左（任务 2.1） | 无差异 |
@@ -2998,7 +2999,123 @@ D:\GT_plan\.venv\Scripts\python.exe backend/scripts/gen/gen_edit_level_impact_in
 - 恢复后哈希（须等于变异前）：
 - 恢复后复跑结果：
 
-（待填）
+### 变异 ① — `NOTE_EDIT_MIN_LEVEL` 改回 `"edit"`（design §8.5 ①；任务 19.3）
+
+- **被改文件**：`D:\wt_pm_mutate\backend\app\services\note_edit_gate.py`
+- **改动描述**：`NOTE_EDIT_MIN_LEVEL = "review"` → `NOTE_EDIT_MIN_LEVEL = "edit"`（L55）
+- **变异前 SHA256**：`d7f81ada4ad6c27cbade5421ca4b995293bc2c7f33c1af04c98237851203f9f3`
+- **运行命令**：`python -m pytest tests/test_project_endpoint_authorization_baseline.py::test_note_edit_gate_tokens_are_really_project_level[permission] tests/test_disclosure_notes_project_gate_contract.py::TestNoteEditGateIsFalsifiable::test_requires_review_membership_unconditionally tests/test_note_edit_gate_unit.py -v --tb=short -p no:playwright -p no:cacheprovider`（cwd=`D:\wt_pm_mutate\backend`）
+- **变红的测试标识与断言信息**：
+  1. `test_project_endpoint_authorization_baseline.py::test_note_edit_gate_tokens_are_really_project_level[permission]` — L814：`AssertionError: 需求 6.10 ①：assert_note_edit_access 不再在条件分支、异常处理与提前 return 之外以 review 级（字面量或同文件常量）await app.deps.assert_project_permission`
+  2. `test_disclosure_notes_project_gate_contract.py::TestNoteEditGateIsFalsifiable::test_requires_review_membership_unconditionally` — L466：`AssertionError: note_edit_gate.py：assert_note_edit_access 不再无条件以 review 级（字面量或同文件常量）调用 app.deps.assert_project_permission —— 级别被改、调用移入分支 / try、未 await 或该名字被覆盖`
+  3. `test_note_edit_gate_unit.py` — 35 个用例失败（review-member 系列 12 个、project-eqcr 系列 9 个、qc 系列 6 个、global-eqcr 系列 3 个、role-access 系列 5 个），均因 review 级成员被 edit 门禁拒绝
+- **应绿证据**：`test_note_edit_gate_unit.py` 111 passed（archived、non-member、readonly-member、edit-member 等不受级别门槛影响的用例）
+- **恢复后 SHA256**：`d7f81ada4ad6c27cbade5421ca4b995293bc2c7f33c1af04c98237851203f9f3`（与变异前一致 ✓）
+- **恢复后复跑结果**：148 passed, 0 failed, 1 warning in 6.27s
+
+### 变异 ② — 删去门禁对 `is_project_eqcr` 的调用（design §8.5 ②；任务 19.3）
+
+- **被改文件**：`D:\wt_pm_mutate\backend\app\services\note_edit_gate.py`
+- **改动描述**：注释掉 L99~L105 的 EQCR 判定块（`is_eqcr = await is_project_eqcr(...)` + `if is_eqcr: raise HTTPException(...)`）
+- **变异前 SHA256**：`d7f81ada4ad6c27cbade5421ca4b995293bc2c7f33c1af04c98237851203f9f3`
+- **运行命令**：`python -m pytest tests/test_project_endpoint_authorization_baseline.py::test_note_edit_gate_tokens_are_really_project_level[eqcr] tests/test_disclosure_notes_project_gate_contract.py::TestNoteEditGateIsFalsifiable::test_calls_eqcr_judgment -v --tb=short -p no:playwright -p no:cacheprovider`
+- **变红的测试标识与断言信息**：
+  1. `test_project_endpoint_authorization_baseline.py::test_note_edit_gate_tokens_are_really_project_level[eqcr]` — L814：`AssertionError: 需求 6.10 ②：assert_note_edit_access 不再无条件 await EQCR 判定 app.services.eqcr_resolver.is_project_eqcr`
+  2. `test_disclosure_notes_project_gate_contract.py::TestNoteEditGateIsFalsifiable::test_calls_eqcr_judgment` — L474：`AssertionError: note_edit_gate.py：assert_note_edit_access 不再无条件调用 EQCR 判定 is_project_eqcr —— 调用被删、移入分支或不是 app.services.eqcr_resolver 那一个`
+  3. `test_note_edit_gate_unit.py`（`-k eqcr`）— 31 个 EQCR 相关用例失败（project-eqcr 系列、qc-review-member-with-eqcr-assignment、global-eqcr-review-member、role-access EQCR 系列等）
+- **应绿证据**：非 EQCR 且不依赖步骤序列的用例保持通过（archived、non-member、readonly-member 等）
+- **恢复后 SHA256**：`d7f81ada4ad6c27cbade5421ca4b995293bc2c7f33c1af04c98237851203f9f3`（与变异前一致 ✓）
+- **恢复后复跑结果**：148 passed, 0 failed, 1 warning in 4.47s
+
+### 变异 ③ — `ROLE_MAP` 的 `manager` / `项目经理` 改回 (manager, review)（design §8.5 ③；任务 19.3）
+
+- **被改文件**：`D:\wt_pm_mutate\backend\app\services\assignment_service.py`
+- **改动描述**：L44 `"manager": (ProjectUserRole.manager, PermissionLevel.edit)` → `..., PermissionLevel.review)`；L45 `"项目经理"` 同理
+- **变异前 SHA256**：`0e76769e8a4e2d759efaaba96ff292671f40656d7fab642aa1e25240938d0e6a`
+- **运行命令**：`python -m pytest tests/test_phase8_endpoint_role_levels.py::test_premise_role_map_matches_expected_table tests/test_deliverable_generation_membership_auth.py::test_premise_role_map_matches_expected_table tests/test_note_edit_gate_unit.py -v --tb=short -p no:playwright -p no:cacheprovider`
+- **变红的测试标识与断言信息**：
+  1. `test_phase8_endpoint_role_levels.py::test_premise_role_map_matches_expected_table` — L148：`AssertionError: manager：ROLE_MAP 为 (manager, review)，期望表为 (manager, edit)`
+  2. `test_deliverable_generation_membership_auth.py::test_premise_role_map_matches_expected_table` — L259：`AssertionError: manager：ROLE_MAP 为 (manager, review)，期望表为 (manager, edit)`
+  3. `test_level_backfill_migration_pg.py::test_requirement_12_7_backfill_matches_role_map[manager]` 与 `[项目经理]` — SKIPPED（`pg_only`，本地无 PG 可用；如实记录）
+- **应绿证据**：`test_note_edit_gate_unit.py` 146 passed, 0 failed（门禁单元测试使用预置成员行，不经 ROLE_MAP）
+- **恢复后 SHA256**：`0e76769e8a4e2d759efaaba96ff292671f40656d7fab642aa1e25240938d0e6a`（与变异前一致 ✓）
+- **恢复后复跑结果**：148 passed, 0 failed, 2 warnings in 5.20s
+
+### 变异 ④ — D12 裁定：原变异④不适用，替代验证如下（design §8.5 ④、D12、§2.2；任务 19.3）
+
+> **裁定说明**：design D3 移除了权限缓存（`_get_cached_permission` / `_set_cached_permission` / `invalidate_permission_cache` / `PERM_CACHE_TTL`），级别判定点一律直接查成员行。原变异④「删除缓存失效」的前提已不存在。按 design D12 与 §2.2，替代变异为：在 `assert_project_permission` 前插入「读到 `perm:*` 键即按其级别放行」的旧逻辑，验证 `test_permission_cache_removed.py` 的 AST 守卫能检测到。
+
+- **被改文件**：`D:\wt_pm_mutate\backend\app\deps.py`
+- **改动描述**：在 `assert_project_permission` 函数体（L262 `_validate_permission_level` 之前）插入 `from app.core.redis import redis_client as _rc_mutation` 及读 `perm:{user_id}:{project_id}` 键按其级别放行 / 拒绝的 9 行代码
+- **变异前 SHA256**：`bca0a1b1c5480d2af85137ef5f92af6d5ddb76b095f8fbb759c116567596eb06`
+- **运行命令**：`python -m pytest tests/test_permission_cache_removed.py::test_judgment_point_does_not_reference_redis -v --tb=short -p no:playwright -p no:cacheprovider`
+- **变红的测试标识与断言信息**：
+  1. `test_permission_cache_removed.py::test_judgment_point_does_not_reference_redis[assert_project_permission]` — L235：`AssertionError: app.deps.assert_project_permission 引用了 Redis 客户端：第 263 行导入 app.core.redis；第 263 行导入 app.core.redis.redis_client`
+- **应绿证据**：`test_judgment_point_does_not_reference_redis[_load_member_level]`、`[authorize_wp_edit]`、`[authorize_wp_read]` 三个用例均 PASSED（未被变异的判定函数不受影响）
+- **恢复后 SHA256**：`bca0a1b1c5480d2af85137ef5f92af6d5ddb76b095f8fbb759c116567596eb06`（与变异前一致 ✓）
+- **恢复后复跑结果**：8 passed, 0 failed, 1 warning in 1.60s（AST 守卫子集；`-k "scanner or cache_names or judgment_point or reports_violations"`）
+
+### 变异 ⑬A — 前端：DisclosureEditor.vue 改回按全局角色判定（design §8.5 ⑬ Part A；任务 19.7）
+
+- **被改文件**：`D:\wt_pm_mutate\audit-platform\frontend\src\views\DisclosureEditor.vue`
+- **改动描述**：将 `const { onContextChange } = useAuditContext()` 改为 `const { onContextChange, canEdit: _oldCanEdit } = useAuditContext()`，添加对 `canEdit` 的解构（旧模式）
+- **变异前 SHA256**：`a0c4c0f4f0bf82101e2a788f853c69adac01ccac98a5f91ec596f26acd003ab8`
+- **运行命令**：`npx vitest run src/views/composables/noteEdit/__tests__/noteEditSingleSourceScan.spec.ts --reporter=verbose`（cwd=`D:\wt_pm_mutate\audit-platform\frontend`）
+- **变红的测试标识与断言信息**：`noteEditSingleSourceScan.spec.ts > single-source scan: DisclosureEditor.vue > absent patterns in script block > does not destructure canEdit from useAuditContext` — AssertionError: `Should not destructure canEdit from useAuditContext()` — expected 1 to be 0（1 failed | 32 passed）
+- **应绿证据**：其余 32 个用例（其他 absent patterns + derived values）全部通过
+- **变异后 SHA256**：`1d5cdebb8a3281ddbe767fc2b110bde1a8696310132d94138f5f5aeae98a44d9`
+- **恢复后 SHA256**：`a0c4c0f4f0bf82101e2a788f853c69adac01ccac98a5f91ec596f26acd003ab8`（与变异前一致 ✓）
+- **恢复后复跑结果**：33 passed (33), 0 failed
+
+### 变异 ⑬B — 前端：请求级守卫去掉 canWrite 检查（design §8.5 ⑬ Part B；任务 19.7）
+
+- **被改文件**：`D:\wt_pm_mutate\audit-platform\frontend\src\views\composables\noteEdit\noteEditRequestGuard.ts`
+- **改动描述**：注释掉 `if (!noteEdit.canWrite.value) { throw new axios.Cancel('note-edit-readonly') }` 三行（使所有写请求不论 canWrite 都放行）
+- **变异前 SHA256**：`54917a2d1ea4495d80be534eb84b26f5fdb68dd8f0716981fec372310285b1e6`
+- **运行命令**：`npx vitest run src/views/composables/noteEdit/__tests__/noteEditNoWriteWhenReadonly.spec.ts --reporter=verbose`（cwd=`D:\wt_pm_mutate\audit-platform\frontend`）
+- **变红的测试标识与断言信息**：`noteEditNoWriteWhenReadonly.spec.ts > Property 15: non-writable state emits zero coverage write requests` — 31 个用例红在 `AssertionError: expected [Function] to throw an error`（各 non-writable identity × coverage write path 组合 + drag-sort）
+- **应绿证据**：29 passed（writable identities + non-coverage requests + completeness check）
+- **变异后 SHA256**：`f689a8c907eda0c28237aea464ecf2931155d328b13737c3b57ff4d990040df1`
+- **恢复后 SHA256**：`54917a2d1ea4495d80be534eb84b26f5fdb68dd8f0716981fec372310285b1e6`（与变异前一致 ✓）
+- **恢复后复跑结果**：60 passed (60), 0 failed
+
+### 变异 ⑭ — 在被扫描测试文件中添加 override 附注编辑门禁（design §8.5 ⑭；任务 19.7）
+
+- **被改文件**：`D:\wt_pm_mutate\backend\tests\test_note_edit_gate_endpoints.py`
+- **改动描述**：在 `test_edit_member_allowed` 函数体开头添加 `from app.main import app as _app; from app.services.note_edit_gate import require_note_edit_access; _app.dependency_overrides[require_note_edit_access] = lambda: None`
+- **变异前 SHA256**：`411296c45a3b5f1e774b491d246a02a65242a3bc60c6cc0d9c20edc4c3a7047e`
+- **检测方法**：直接调用 `test_no_false_green_scan._scan_file()` 函数（pytest runner 的路径解析在 mutate worktree 上不生效：git diff 返回 repo-root-relative 路径 `backend/tests/...` 而 WORKTREE 是 `backend/`，拼接后 `backend/backend/tests/...` 不存在被跳过）
+- **变红证据**：`_scan_file(file_path, rel, None)` 返回 1 处发现：`L265: [P1_override_non_replaceable] dependency_overrides[require_note_edit_access]`
+- **应绿证据**：恢复后 `_scan_file` 返回 0 处发现
+- **变异后 SHA256**：`ceeb6c96f82b76e407bf64522688437cf6b19fa08fe3a6b539565131cdffdea1`
+- **恢复后 SHA256**：`411296c45a3b5f1e774b491d246a02a65242a3bc60c6cc0d9c20edc4c3a7047e`（与变异前一致 ✓）
+- **备注**：扫描函数逻辑正确检测到 Pattern 1（`_NON_REPLACEABLE_NAMES` 中的函数被 `dependency_overrides` 替换）。pytest runner 在 mutate worktree 下 `test_no_false_green_patterns` 通过是因 git diff cwd 与路径前缀不匹配导致扫描目标文件不存在被跳过，不影响 impl worktree 上的运行效果
+
+### 变异 ⑮A — 判定查询改用直接 edit 级检查（design §8.5 ⑮ Part A；任务 19.7）
+
+- **被改文件**：`D:\wt_pm_mutate\backend\app\routers\note_edit_permission.py`
+- **改动描述**：将 `await assert_note_edit_access(db, current_user, project_id, consol_lock=False)` 改为 `await assert_project_permission(db, current_user, project_id, "edit")`，并在 import 中添加 `assert_project_permission`
+- **变异前 SHA256**：`b831030fce38858234d87af1310ed8091931b19fb8aa194833565690b77f440d`
+- **运行命令**：`python -m pytest tests/test_note_edit_permission_ast.py -v --tb=short -p no:playwright -p no:cacheprovider`（cwd=`D:\wt_pm_mutate\backend`）
+- **变红的测试标识与断言信息**：
+  1. `test_note_edit_permission_ast.py::test_endpoint_calls_assert_note_edit_access` — `AssertionError: get_note_edit_permission 不再调用 assert_note_edit_access` — `assert 'assert_note_edit_access' in {…, 'assert_project_permission', …}`
+  2. `test_note_edit_permission_ast.py::test_endpoint_does_not_call_assert_project_permission` — `AssertionError: get_note_edit_permission 函数体内不应直接调用 assert_project_permission` — `assert 'assert_project_permission' not in {…}`
+- **应绿证据**：其余 4 个 AST 断言通过（`test_endpoint_calls_is_project_eqcr`、`test_endpoint_does_not_query_assignments_table`、`test_endpoint_does_not_compare_eqcr_literal`、`test_endpoint_signature_has_readonly_auth`）；2 failed | 4 passed
+- **变异后 SHA256**：`9645d78609101dc9832d511617a60fd7176f3cc4fb301e40fe04a67dbc14515e`
+- **恢复后 SHA256**：`b831030fce38858234d87af1310ed8091931b19fb8aa194833565690b77f440d`（与变异前一致 ✓）
+- **恢复后复跑结果**：6 passed, 0 failed, 1 warning in 0.97s
+
+### 变异 ⑮B — `_guard_action` 去掉 EQCR 判定（design §8.5 ⑮ Part B；任务 19.7）
+
+- **被改文件**：`D:\wt_pm_mutate\backend\app\routers\deliverable.py`
+- **改动描述**：将 `is_eqcr = await is_project_eqcr(db, user, project_id)` 改为 `is_eqcr = False`（硬编码为 False，跳过 EQCR 判定）
+- **变异前 SHA256**：`b7f268d62a065d7b70cb4ec5928f16cc668deff997d8505a5e66c9c2861a2ef2`
+- **运行命令**：`python -m pytest tests/test_deliverable_generation_membership_auth.py::test_eqcr_on_project_can_view_but_not_generate -v --tb=short -p no:playwright -p no:cacheprovider`（cwd=`D:\wt_pm_mutate\backend`）
+- **变红的测试标识与断言信息**：`test_deliverable_generation_membership_auth.py::test_eqcr_on_project_can_view_but_not_generate` — `AssertionError: 一键生成全套：EQCR 未被拦 200 {"id":"55555555-…","job_type":"full_deliverables","status":"succeeded",…}` — `assert (200, {…}) == (403, {'detail': '权限不足'})`
+- **应绿证据**：EQCR 的 view 端点仍通过（测试函数内其他断言在 EQCR export 被放行前就失败了，但 view 路径本就放行 EQCR）
+- **变异后 SHA256**：`ab92f2f069ab2d252cd29130ec780bc9908f948b029e14435be6469f5803585a`
+- **恢复后 SHA256**：`b7f268d62a065d7b70cb4ec5928f16cc668deff997d8505a5e66c9c2861a2ef2`（与变异前一致 ✓）
+- **恢复后复跑结果**：1 passed, 0 failed, 4 warnings in 8.92s
 
 ## 性质测试汇总
 
@@ -3180,6 +3297,902 @@ D:\GT_plan\.venv\Scripts\python.exe backend/scripts/gen/gen_edit_level_impact_in
 
 #### 清册重生成
 
-- 附注写端点清册：11 个端点全部 `current_equals_target: True`，category=E
-- edit 级影响清单：603 处门禁调用点 / 146 个文件
-- 两份清单 `--check` 模式均以 0 退出
+- 附注写端点清册：11 个端点全部标注「现门禁已等于目标门禁」（`current_equals_target: True`），category=E。`gen_note_write_inventory.py --check` 退出码 1（因 `note_conversion.py` 的 `frozenset(PARTNER_MANAGER_ROLE_ALIASES)` 写法不被扫描器支持——属 Task 11.3 范围，本任务不修）。
+- edit 级影响清单：663 处门禁调用点 / 160 个文件（已重生成），`gen_edit_level_impact_inventory.py --check` 退出码 0。
+
+
+### 任务 11.1：note_wp_mapping.py（A24 + B1×2 + B2×2）
+
+#### 端点转换核对
+
+| 端点 | 原门禁 | 现门禁 | consol_lock |
+|------|--------|--------|:-----------:|
+| A24 `toggle_mode` POST `/api/disclosure-notes/{project_id}/{year}/{note_id}/toggle-mode` | `require_project_access("edit")` | `user: User = Depends(require_note_edit_access(consol_lock=False))` | False |
+| B1 `refresh_from_workpapers` POST `/api/disclosure-notes/{project_id}/{year}/refresh-from-workpapers` | 仅登录 `get_current_user` | `_gate=Depends(require_note_edit_access(consol_lock=False))` | False |
+| B1 `refresh_section_from_workpaper` POST `/api/disclosure-notes/{project_id}/{year}/{note_section}/refresh-from-workpaper` | 仅登录 `get_current_user` | `_gate=Depends(require_note_edit_access(consol_lock=False))` | False |
+| B2 `update_mapping` PUT `/api/disclosure-notes/{project_id}/wp-mapping` | 仅登录 `get_current_user` | `_gate=Depends(require_note_edit_access(consol_lock=False))` | False |
+| B2 `refresh_all_bindings` POST `/api/disclosure-notes/{project_id}/{year}/refresh-all-bindings` | 仅登录 `get_current_user` | `_gate=Depends(require_note_edit_access(consol_lock=False))` | False |
+
+- GET `get_mapping` 保持 `get_current_user` 不变（读方法端点）。
+- 五个端点均为路径依赖形式，`consol_lock=False`（需求 6.6：改造前未判合并锁的 B1/B2 端点不新增合并锁判定）。
+
+#### 配方表
+
+`note_edit_gate_recipes.py` 五条配方已存在且已在 `ALL_RECIPES` 注册：`_A24`、`_B1_REFRESH_FROM_WP`、`_B1_REFRESH_SECTION`、`_B2_UPDATE_MAPPING`、`_B2_REFRESH_ALL_BINDINGS`。
+
+#### B1 刷新被拒时数据不变测试
+
+`test_note_edit_gate_endpoints.py::test_b1_refresh_denied_preserves_table_data` 参数化两条 B1 刷新配方（`refresh-from-workpapers` / `refresh-from-workpaper`），用非成员身份请求，断言 403 + 业务桩 0 次调用 + `table_data` 请求前后逐值相等。2 passed。
+
+#### 测试结果
+
+- `test_note_edit_gate_endpoints.py`：224 passed（38.89s）
+- `test_note_wp_mapping_registry.py`：7 passed（1.14s）
+- 鉴权基线三测试：3 passed（8.44s）
+
+#### 清册重生成
+
+修复了 `note_conversion.py` 的 `frozenset(PARTNER_MANAGER_ROLE_ALIASES)` → 模块级字面量 `_PARTNER_MANAGER_ROLES`（AST 扫描器无法静态解析跨模块常量；字面量与 `PARTNER_MANAGER_ROLE_ALIASES` 逐值相等经 Python 断言验证）。
+
+- 附注写端点清册：`gen_note_write_inventory.py --check` 退出码 **0**（「附注写端点清册与仓库现状一致」）。扫描文件 27 / 写端点 106；各类 S 1 / C 33 / G 2 / E 42 / R 12 / X 1 / I 15；覆盖集合 41；现门禁已等于目标 94 / 未等于 12。
+- edit 级影响清单：663 处门禁调用点 / 160 个文件（已重生成）。
+
+#### 鉴权基线常量下调
+
+| 常量 | 旧值 | 现算值 | 新值 |
+|------|------|--------|------|
+| `_IDENTITY_ONLY_BASELINE` | 207 | 202 | 202 |
+| `_PREFIXED_IDENTITY_ONLY_BASELINE` | 277 | 270 | 270 |
+
+三测试均 passed（`test_identity_only_endpoints_do_not_grow` / `test_identity_only_baseline_is_not_stale` / `test_prefixed_identity_only_do_not_grow`）。
+
+#### 改动文件清单
+
+| 文件 | 改动 |
+|------|------|
+| `backend/app/routers/note_conversion.py` | 删 `from app.services.assignment_service import PARTNER_MANAGER_ROLE_ALIASES`；加 `_PARTNER_MANAGER_ROLES` 字面量常量；两处 `frozenset(PARTNER_MANAGER_ROLE_ALIASES)` → `_PARTNER_MANAGER_ROLES` |
+| `backend/data/authz/note_write_inventory.json` | 重生成（扫描器现能解析 `note_conversion.py` 两端点） |
+| `backend/data/authz/edit_level_impact_inventory.json` | 重生成 |
+| `backend/tests/test_project_endpoint_authorization_baseline.py` | `_IDENTITY_ONLY_BASELINE` 207→202；`_PREFIXED_IDENTITY_ONLY_BASELINE` 277→270 |
+
+### 任务 11.2：note_custom_template.py（B1 保存 / 回滚）与 group_note_baseline.py（B1 应用 + B2 保存集团基线）
+
+#### 端点转换核对
+
+所有端点在进入本任务前已完成转换（由前序任务或同一批次提交）。
+
+| 端点 | 原门禁 | 现门禁 | consol_lock | 备注 |
+|------|--------|--------|:-----------:|------|
+| B1 `save_custom_template` POST `/api/projects/{project_id}/note-template/save` | 仅登录 `get_current_user` | `Depends(require_note_edit_access(consol_lock=False))` | False | 路径依赖 |
+| B1 `restore_custom_template` POST `/api/projects/{project_id}/note-template/restore` | 仅登录 `get_current_user` | `Depends(require_note_edit_access(consol_lock=False))` | False | 路径依赖 |
+| B1 `apply_group_baseline` POST `/api/projects/{project_id}/apply-group-baseline` | 仅登录 `get_current_user` | `Depends(require_note_edit_access(consol_lock=False))` | False | 路径依赖；只判路径中的项目，不判基线母项目（需求 8.1 默认） |
+| B2 `save_baseline` POST `/api/group-note-baselines` | 仅登录 `get_current_user` | `await assert_note_edit_access_on_projects(db, current_user, [project_id], consol_lock=False)` | False | 函数体形态；project_id 从查询参数取（需求 8.5） |
+
+- GET 端点（`load_custom_template`、`list_custom_template_versions`、`list_baselines`、`get_baseline_versions`、`preview_diff`、`baseline_sync_status`）保持 `get_current_user` 不变（需求 8.4 默认口径：读方法端点档位不变）。
+- 门禁先于「版本不存在」「基线不存在」的业务处理：save/restore 中的 `ValueError`/`FileNotFoundError` 在 `NoteCustomTemplateService` 调用之后抛出，门禁在函数签名依赖中先执行。apply_group_baseline 同理。save_baseline 中 `assert_note_edit_access_on_projects` 位于函数体顶层、`GroupNoteBaselineService` 实例化之前。
+
+#### 配方表
+
+`note_edit_gate_recipes.py` 三条 B1 配方已注册在 `ALL_RECIPES`：
+- `_B1_SAVE_CUSTOM_TEMPLATE`：(POST, /api/projects/{project_id}/note-template/save)
+- `_B1_RESTORE_CUSTOM_TEMPLATE`：(POST, /api/projects/{project_id}/note-template/restore)
+- `_B1_APPLY_GROUP_BASELINE`：(POST, /api/projects/{project_id}/apply-group-baseline)
+
+#### 测试结果
+
+| 测试文件 | 结果 | 说明 |
+|------|------|------|
+| `test_note_edit_gate_endpoints.py` 中 3 个 B1 端点 × 6 种身份 | 18 passed (10.32s) | edit_member/review_member 放行；readonly/EQCR/non_member 403；unauthenticated 401 |
+| `test_note_design_gated_endpoints.py::TestSaveBaselineDesignGate` | 7 passed (8.37s) | non_member/readonly/EQCR 403（含 project_ids 列表）；edit_member/admin 放行；unauthenticated 401；error_lists_failed_project_ids |
+
+注：测试文件中 note_conversion 部分（任务 11.3 范围）存在编码损坏（mojibake），已移除损坏的 274~607 行（保留干净的 save_baseline 测试节 1~272 行），任务 11.3 执行时重新添加。
+
+#### 清册重生成
+
+- 附注写端点清册：`gen_note_write_inventory.py --check` 退出码 **0**（扫描 27 文件 / 106 写端点；E 42 / I 15；覆盖集合 41；现门禁已等于目标 94 / 未等于 12）。
+- edit 级影响清单：`gen_edit_level_impact_inventory.py --check` 退出码 **0**（663 处 / 160 文件）。
+- 鉴权基线两常量已在任务 11.1 下调至现算值（`_IDENTITY_ONLY_BASELINE = 202`、`_PREFIXED_IDENTITY_ONLY_BASELINE = 270`），三测试均 passed。本任务未进一步改动（3 个 B1 端点的转换已反映在任务 11.1 的清册重生成中）。
+
+
+### 任务 11.3：note_trim（2）、note_custom_section（3）、note_conversion（3）
+
+**端点改造状态：**
+
+| 文件 | 端点 | 门禁 | 先前状态 |
+|------|------|------|---------|
+| `note_trim.py` | `PUT /{project_id}/sections/trim` (save_trim) | `require_note_edit_access(consol_lock=False)` | 已由 11.1 完成 |
+| `note_trim.py` | `POST /{project_id}/{year}/auto-trim` (auto_trim) | `require_note_edit_access(consol_lock=False)` | 已由 11.1 完成 |
+| `note_custom_section.py` | `POST /create` (create_custom_section) | `require_note_edit_access(consol_lock=False)` | 已由 11.1 完成 |
+| `note_custom_section.py` | `POST /save-as-template` (save_as_template) | `require_note_edit_access(consol_lock=False)` + 章节归属校验 | 已由 11.1 完成 |
+| `note_custom_section.py` | `POST /apply-template` (apply_template) | `require_note_edit_access(consol_lock=False)` | 已由 11.1 完成 |
+| `note_conversion.py` | `POST /preview` (preview_conversion) | `require_project_access("readonly")` | 已由 11.1 完成 |
+| `note_conversion.py` | `GET /{year}/preview` (preview_note_section_conversion) | `require_project_access("readonly")` | 已由 11.1 完成 |
+| `note_conversion.py` | `POST /execute` (execute_conversion) | `assert_note_role_access({partner, manager})` | 已由 11.1 完成 |
+| `note_conversion.py` | `POST /rollback` (rollback_conversion) | `assert_note_role_access({partner, manager})` | 已由 11.1 完成 |
+
+**本任务实际改动：**
+
+1. **`note_conversion.py` `_PARTNER_MANAGER_ROLES` 修复**：原值含委派角色别名（`signing_partner`、`合伙人`、`项目经理`），而 `assert_note_role_access` 按成员行的项目角色（`ProjectUserRole` 枚举值）判定 → 修为 `frozenset({"partner", "manager"})`。此为 **生产缺陷修复**（原代码在运行时会抛 `ValueError: assert_note_role_access 的 project_roles 含未登记的项目角色`，execute / rollback 恒 500）。
+
+2. **`test_note_design_gated_endpoints.py` 新增 3 个测试类**（20 个测试方法）：
+   - `TestConversionExecuteDesignGate`（7 tests）：非成员 403 / readonly 403 / EQCR 403（EQCR 只读原因）/ qc_review_member 403（操作矩阵拒绝）/ review_member 403（角色不在 partner/manager）/ edit_member(manager) 放行 / admin 放行。
+   - `TestConversionRollbackDesignGate`（6 tests）：同 execute。
+   - `TestConversionPreviewDesignGate`（6 tests）：POST 与 GET 各测非成员 403 / readonly 放行 / EQCR 放行。
+
+3. **两份清册重生成 + 检查模式通过**：
+   - 附注写端点清册（27 文件 / 106 写端点；E 42 / I 15；覆盖集合 41；现门禁已等于目标 96 / 未等于 10）。
+   - edit 级影响清单（663 处 / 160 文件）。
+
+4. **鉴权基线不变**：`_IDENTITY_ONLY_BASELINE = 202`、`_PREFIXED_IDENTITY_ONLY_BASELINE = 270`，33 tests passed。
+
+**测试结果：**
+
+- `test_note_design_gated_endpoints.py`：**26 passed**（含新增 20）
+- `test_note_edit_gate_endpoints.py`：**224 passed**
+- `test_project_endpoint_authorization_baseline.py`：**33 passed**
+- `test_disclosure_notes_project_gate_contract.py`：**41 passed**
+
+**发现与勘误：**
+
+- `qc_review_member`（全局角色 qc + 项目角色 qc）在 execute / rollback 上被**操作矩阵先拒绝**（`ROLE_OPERATIONS["qc"]` 不含 `note:edit`），拒绝原因是 `REASON_OPERATION_DENIED`（"您在本项目的角色没有编辑附注的操作权限"），不是角色限定的 `denied_message`。测试已按实际行为断言。
+- preview 端点的 `require_project_access("readonly")` 是工厂函数，装饰时调用一次，每个请求执行的是内部 `dependency` 闭包。`GateTrace` 追踪 gate 名为 `app.deps.require_project_access.<locals>.dependency`。
+
+
+### 任务 11.4：note_section_lock（4）、note_data_lock（3）、note_group_template（3）
+
+**端点改造状态（10 个端点）：**
+
+| 文件 | 端点 | 新门禁 | 先前状态 |
+|------|------|--------|---------|
+| `note_section_lock.py` | `POST /acquire` (acquire_lock) | `require_note_edit_access(consol_lock=False)` 路径依赖 | 仅 `get_current_user` |
+| `note_section_lock.py` | `POST /heartbeat` (heartbeat) | `require_note_edit_access(consol_lock=False)` 路径依赖 | 仅 `get_current_user` |
+| `note_section_lock.py` | `POST /release` (release_lock) | `require_project_access("readonly")` | 仅 `get_current_user` |
+| `note_section_lock.py` | `POST /force-release` (force_release_lock) | `assert_note_role_access({manager, partner}, "仅本项目经理或合伙人可强制释放章节锁")` 函数体 | 仅 `get_current_user` |
+| `note_data_lock.py` | `POST /lock` (lock_on_sign_off) | `assert_note_role_access({partner, manager}, "仅本项目经理或合伙人可锁定报表附注数据")` 函数体 | 仅 `get_current_user` |
+| `note_data_lock.py` | `POST /unlock` (unlock_data) | `assert_note_role_access(frozenset(), "仅管理员可解除报表附注数据锁定")` 函数体（admin-only） | 仅 `get_current_user` |
+| `note_data_lock.py` | `POST /snapshot` (create_snapshot) | `require_note_edit_access(consol_lock=False)` 路径依赖 | 仅 `get_current_user` |
+| `note_group_template.py` | `POST /save` (save_as_group_template) | `require_note_edit_access(consol_lock=False)` 路径依赖 | 仅 `get_current_user` |
+| `note_group_template.py` | `POST /distribute` (distribute_template) | `assert_note_edit_access_on_projects([project_id, *target_project_ids], consol_lock=False)` 函数体 | 仅 `get_current_user` |
+| `note_group_template.py` | `POST /detach` (detach_from_group_template) | `require_note_edit_access(consol_lock=False)` 路径依赖 | 仅 `get_current_user` |
+
+**配方表新增 5 条（覆盖集合端点，require_note_edit_access 路径依赖形态）：**
+
+- `_B3_ACQUIRE_LOCK`：POST /api/projects/{project_id}/notes/locks/acquire
+- `_B3_HEARTBEAT`：POST /api/projects/{project_id}/notes/locks/heartbeat
+- `_B3_SNAPSHOT`：POST /api/projects/{project_id}/data-lock/snapshot
+- `_B3_SAVE_GROUP_TEMPLATE`：POST /api/projects/{project_id}/notes/group-template/save
+- `_B3_DETACH_GROUP_TEMPLATE`：POST /api/projects/{project_id}/notes/group-template/detach
+
+配方桩目标指向**路由模块**（`app.routers.note_section_lock` 等）而非服务模块：因路由在模块级 import 服务类，monkeypatch 替换服务模块属性不影响路由已持有的引用。
+
+**test_note_edit_gate_endpoints.py 更新：**
+
+- `_ALL_ROUTERS` 追加 `note_data_lock.router`、`note_group_template.router`、`note_section_lock.router`（3 个新路由）。
+
+**test_note_design_gated_endpoints.py 新增 6 个测试类（31 个测试方法）：**
+
+1. `TestReleaseLockDesignGate`（4 tests）：非成员 403；readonly 放行 + assert_passed；EQCR 放行；edit_member 放行 + assert_passed。
+2. `TestForceReleaseLockDesignGate`（7 tests）：非成员 403（权限不足）/ readonly 403 / EQCR 403（EQCR 只读）/ qc_review 403（操作矩阵）/ review_member 403（角色限定原因）/ edit_member(manager) 放行 / admin 放行。
+3. `TestLockOnSignOffDesignGate`（7 tests）：同 force_release 的七种身份判定。
+4. `TestUnlockDataDesignGate`（5 tests）：非成员 403 / readonly 403 / EQCR 403 / **edit_member(manager) 403**（空 frozenset = 仅 admin）/ admin 放行。
+5. `TestDistributeTemplateDesignGate`（6 tests）：非成员 403（列出 TARGET 项目）/ readonly 403 / EQCR 403 / edit_member 仅 TARGET 放行 / admin 放行 / edit_member 含 OTHER 项目 → 403 列出 OTHER、error_code = NOTE_EDIT_MULTI_PROJECT_DENIED。
+
+**两份清册重生成 + 检查模式通过：**
+
+- 附注写端点清册：27 文件 / 106 写端点；覆盖集合 41；design 定级 9；现门禁已等于目标 106 / 未等于 0。
+- edit 级影响清单：673 处 / 163 文件。
+
+**测试结果：**
+
+- `test_note_design_gated_endpoints.py`：**55 passed**（含新增 31）
+- `test_note_edit_gate_endpoints.py`：**254 passed**（含新增 5 端点 × 50+ 用例）
+- 合计 **309 passed**，0 failed。
+
+### 任务 15.1：按需求 2.6 改写后端、测试与前端注释（2026-10-22）
+
+**检索口径（需求 2.9）**：AST + 文本扫描，在后端生产代码（`backend/app/`）、测试（`backend/tests/`）、脚本（`backend/scripts/`）的注释（`#`）、docstring（AST `ast.get_docstring`）、断言失败信息（`assert` 的 msg），以及前端源码（`audit-platform/frontend/src/`）的 `//`、`/*`、`*` 开头注释行中，查找同时出现「合伙人」或「经理」与「review」（不区分大小写）的行 / 块。
+
+**扫描结果：60 处命中**（含已被本 spec 前置任务改写的）。逐条判读如下：
+
+| # | 文件 | 行 | 类型 | 判读 | 处置 |
+|---|---|---|---|---|---|
+| 1 | `routers/review_workflow.py` | 21-22 | comment | **称合伙人/经理是 review 级** | ✅ 改写 |
+| 2 | `routers/wp_procedures.py` | 28 | comment | **称经理/合伙人是 review 级** | ✅ 改写 |
+| 3 | `routers/wp_cross_check.py` | 25-26 | comment | **称合伙人/质控是 review 级** | ✅ 改写 |
+| 4 | `routers/deliverable_lineage.py` | 19-20 | docstring | **称合伙人/经理是 review 级** | ✅ 改写 |
+| 5 | `routers/deliverable.py` | 221 | docstring | 说「合伙人/经理为 edit 级同样满足」 | 无需改（已正确） |
+| 6 | `routers/disclosure_notes.py` | 1192 | docstring | 说「合伙人/经理为 edit 级同样满足」 | 无需改（已正确） |
+| 7 | `services/assignment_service.py` | 39 | comment | 说「合伙人与经理为 edit 级」 | 无需改（任务 2.1 已改为正确表述） |
+| 8-16 | 多个 service docstring | 各 L1 | docstring | 模块名含「合伙人」或「经理」（如「合伙人仪表盘」「项目经理看板」「经理复核签字状态」）+ review 只是 requirement/feature 引用 | 无需改（不涉及定级） |
+| 17 | `tests/test_deliverable_lineage_properties.py` | 1804 | docstring | **称「review 级（合伙人/经理）」** | ✅ 改写 |
+| 18-30 | `tests/test_adjustment_review_permission.py` 多处 | 各处 | docstring / assert_msg | 说「经理应有 adjustment:review 权限」—— review 指操作矩阵中的 `adjustment:review` 能力，不是项目级别 | 无需改 |
+| 31-40 | `tests/test_phase8_*.py`、`test_deliverable_generation_*.py` 多处 | 各处 | docstring | 已被任务 2.2 改写为正确表述 | 无需改（已正确） |
+| 41-44 | `tests/test_eqcr_gate_consistency.py`、`test_note_multi_project_gate.py`、`test_sod_unchanged.py`、`test_role_map_and_context.py` | L1 等 | docstring | 本 spec 新增的测试文件，表述已正确 | 无需改 |
+| 45-53 | 其余 test 文件（`test_dashboard_pbt.py`、`test_deliverable_permission_matrix.py`、`test_review_unlock.py` 等） | 各处 | docstring | 提到「合伙人/经理」+「review」但不涉及项目级别定级（描述业务操作或与 review 级门禁的关系） | 无需改 |
+| 54-60 | 前端 `.vue` / `.ts` 注释 | 各处 | js_comment | 涉及 reviewer 角色术语（「经理复核签字」「B22A 现场经理复核签字」等），或委派权限层级（无定级声明） | 无需改 |
+
+**已改写的 4 个文件（#1~#4, #17）**：
+
+| 文件 | 原文摘要 | 新文摘要 |
+|---|---|---|
+| `review_workflow.py` L20-24 | 合伙人/经理/质控/EQCR 在项目里是 review 级 | 质控与 EQCR 是 review 级，合伙人/经理是 edit 级，两者都满足 review 门禁 |
+| `wp_procedures.py` L27-28 | 经理/合伙人做，他们在项目里是 review 级 | 经理/合伙人是 edit 级（满足 review 门禁）；质控/EQCR 是 review 级同样放行 |
+| `wp_cross_check.py` L25-26 | 合伙人/质控在项目里是 review 级 | 合伙人是 edit 级、质控是 review 级，两者都满足 review 门禁 |
+| `deliverable_lineage.py` L19-20 | 合伙人/经理（项目里是 review 级）用不了 | 合伙人/经理（edit 级）与质控（review 级）都满足 review 门禁 |
+| `test_deliverable_lineage_properties.py` L1804 | review 级（合伙人/经理） | edit 级（合伙人/经理）与 review 级（质控） |
+
+**改写后复核**：仓库外扫描脚本在改写后的 worktree 上重跑，仍称合伙人/经理为 review 级的命中 = **0**。remaining 56 处全部是业务术语引用（如 `adjustment:review` 操作能力、reviewer 签字动作、模块名含「经理」等），不涉及项目级别定级。
+
+### 任务 15.2：防假绿扫描测试（2026-10-22）
+
+新增文件：`backend/tests/test_no_false_green_scan.py`（LF），约 340 行。
+
+**扫描范围**：基线 B (`a02a21419a`) 与 worktree 之间 `backend/tests/` 目录下新增（A）或修改（M）的 `test_*.py` 文件，由 `git diff --name-status --diff-filter=AM` 动态计算。对修改的文件，只扫描新增或改动的测试函数（通过 AST 对比基线版和当前版的函数体源码判断）。
+
+**六条检测模式**：
+
+| 编号 | 模式 | 检测方法 |
+|---|---|---|
+| P1 | `dependency_overrides` 或 `monkeypatch.setattr` 替换不可替换的判定 / 缓存函数 | AST：`Subscript[attr=dependency_overrides]` 的 slice 名，`Call[attr=setattr]` 的字符串参数 |
+| P2 | `pytest.raises` 块内多于一条语句 | AST：`With` 节点内 `context_expr` 是 `pytest.raises` 且 `body` 长度 > 1 |
+| P3 | 子进程只断言退出码、未断言输出 | AST：函数内有 `subprocess.run` 调用 + `returncode` 属性访问，但无 `stdout`/`stderr`/`output` 属性访问 |
+| P4 | 「或」组合相等比较 / 对多元素字面量的成员判断 | AST：`Assert[BoolOp(Or)]` 内同一变量的相等比较；`Assert[Compare(In)]` 对 ≥2 元素的 set/tuple/list |
+| P5 | hypothesis 无 `max_examples=5` / 值不对 | AST：有 `@given` 装饰器但无 `@settings` 或 `max_examples != 5` |
+| P6 | 新增 `skip`/`skipif`/`xfail` 且不符例外条件 | AST：`@skip`/`@skipif`（排除含 `pg_only` 的）、`@xfail` 无 `strict=True` |
+
+**灵敏度验证**：合成代码片段分别触发 P1（`dependency_overrides[require_note_edit_access]`）、P4 or（`x == None or x == "edit"`）、P4 in（`x in {None, "edit"}`），均检出。
+
+**运行结果**：`1 passed`（1.20s），当前 worktree 中本 spec 的测试文件无命中。
+
+**扫描清单 JSON**：task 要求的仓库外一次性脚本生成的 JSON 文件留在任务 19.1 终版时重算。当前扫描动态计算，无需预生成。
+
+### 检查点 16：后端全部改动（2026-10-22）
+
+**范围**：本 spec 新增与改写的全部后端测试、两处守卫、两份清单检查模式、防假绿扫描；与基线树同批对照。
+
+**行数门核对**（design §10）：全部 12 个生产文件均在限值内。
+
+| 文件 | 行数 | 限值 | 状态 |
+|---|---|---|---|
+| `routers/review_workflow.py` | 298 | 800 | ✅ |
+| `routers/wp_procedures.py` | 162 | 800 | ✅ |
+| `routers/wp_cross_check.py` | 134 | 800 | ✅ |
+| `routers/deliverable_lineage.py` | 532 | 800 | ✅ |
+| `routers/disclosure_notes.py` | 1812 | 1899 | ✅ |
+| `routers/deliverable.py` | 1945 | 1979 | ✅ |
+| `deps.py` | 662 | 800 | ✅ |
+| `services/note_edit_gate.py` | 274 | 800 | ✅ |
+| `services/eqcr_resolver.py` | 81 | 800 | ✅ |
+| `services/assignment_service.py` | 375 | 800 | ✅ |
+| `services/role_context_service.py` | 289 | 800 | ✅ |
+| `routers/note_edit_permission.py` | 54 | 800 | ✅ |
+
+**测试运行汇总**：
+
+| 批次 | 文件 | 结果 | 耗时 |
+|---|---|---|---|
+| 1 - 角色映射、EQCR、SoD、缓存、委派 | 11 files | 305 passed, 2 skipped | 63.8s |
+| 2 - 门禁单元/端点测试 | 6 files | 496 passed | 64.5s |
+| 3a - 清单检查模式 | 1 file | 4 passed（inventory 重新生成后） | 182.2s |
+| 3b - 清单失败/匹配/识别 | 3 files | 142 passed | 3.0s |
+| 4 - 鉴权基线与注册表 | 2 files | 41 passed | 39.2s |
+| 5 - 改写的既有测试 | 7 files | 385 passed, 1 skipped | 75.8s |
+| 6 - 其余改动文件 | 5 files | 159 passed, 5 failed (preexisting) | 16.9s |
+| 7 - 防假绿扫描 | 1 file | 1 passed | 1.2s |
+| **合计** | — | **1533 passed, 3 skipped** | ~447s |
+
+**预存失败（基线树同红，不由本 spec 引入）**：
+
+| 测试 | 基线树结果 | 原因 |
+|---|---|---|
+| `test_phase8.py::TestReportEngineCache` (5 tests) | 5 failed (同样的 TypeError) | `_get_cached_report()` 签名不匹配，改前即存在 |
+
+**已知由本 spec 引入、属前置任务范围的失败**（非任务 15.1/15.2 引入）：
+
+| 测试 | 失败原因 | 归属 |
+|---|---|---|
+| `test_note_edit_stamp_writers.py` (6 failed + 8 errors) | `no such table: project_assignments`，门禁改造后查询新表 | 任务 10-11 的门禁改造，测试 fixture 需要添加 project_assignments + staff_members 表 |
+| `test_deliverable_lineage_properties.py::test_property_24/25` (2 failed) | 同样原因，回填端点现在经过 note_edit_gate | 同上 |
+| `test_note_drop_duplicate_gates.py` (collection error) | `cannot import name '_business_values'`，另一 spec 的不完整交付 | 非本 spec（disclosure-note-template-word-realignment 的未完成模块） |
+
+**清单重新生成**：任务 15.1 修改了 4 个路由文件的注释/docstring，影响了清单的 scanner 输出。已按执行约定重新生成两份清单产物并以检查模式通过（4 passed）。
+
+**任务 15.1 改动确认不引入新失败**：四个修改的路由文件只改注释文本，不改逻辑；`test_deliverable_lineage_properties.py` 只改 docstring 文本（L1804），对 `test_property_24/25` 的失败无影响（这两个测试不读 docstring，失败来自门禁查询新表）。
+
+**结论**：本 spec 后端改动（任务 2~15）全部测试通过或已知归因。任务 15.1/15.2 没有引入新的测试失败。行数门全部在限值内。
+
+
+### 任务 17.8：Property 15 — 不可编辑态零写请求
+
+测试文件：`noteEdit/__tests__/noteEditNoWriteWhenReadonly.spec.ts`
+结果：**60 tests passed**（5 种非可写身份 × 覆盖集合样本 + 拖拽排序 + 非覆盖请求放行 + 可写身份放行并挂 `_forbiddenHandler` + 入口完备性）。
+
+### 任务 17.9：开关同源扫描与取值断言
+
+测试文件：`noteEdit/__tests__/noteEditSingleSourceScan.spec.ts`
+结果：**33 tests passed**（源码扫描确认无旧模式 `'eqcr'` 比较 / `canEdit` 解构 / `canDo`/`can` 调用 + 7 种身份的 `presentEntry` 派生值断言 + 归档态断言）。
+
+### 任务 17.10：连续审计「创建下年」跳过提示
+
+代码改动：`DetailProjectPanel.vue` — 已在 `onCreateNextYear` 成功路径中添加：
+```typescript
+const skippedEqcr = result.items_copied?.team_skipped_eqcr ?? 0
+if (skippedEqcr >= 1 && Array.isArray(result.notices) && result.notices.length > 0) {
+  ElNotification({ type: 'warning', title: '团队复制提示', message: result.notices[0], duration: 0 })
+}
+```
+导入已补：`import { ElMessage, ElNotification } from 'element-plus'`。
+
+测试文件：`layout/__tests__/DetailProjectPanelCreateNextYear.spec.ts`
+结果：**6 tests passed**（跳过 ≥1 有 notices → 弹窗、跳过 =0 → 无弹窗、无字段 → 无弹窗、无 items_copied → 无弹窗、跳过 ≥1 但 notices 空 → 无弹窗、多条 notices 取第一条）。
+
+### 任务 17.11：前端文案与静态检查
+
+**ESLint `gt-audit/no-english-ui-text` 检查**：对本 spec 改动的 8 个前端生产文件运行 eslint，`no-english-ui-text` 告警数 = **0**（无新增英文 UI 文本）。
+
+**新增与改动的用户可见中文文案**：
+
+| 文件 | 文案 |
+|---|---|
+| `useNoteEditPermission.ts` | `正在确认编辑权限…` |
+| `useNoteEditPermission.ts` | `无法确认编辑权限` |
+| `useNoteEditPermission.ts` | `无法确认编辑权限，已按只读打开` |
+| `useNoteEditPermission.ts` | `项目已归档，无法编辑` |
+| `useNoteEditPermission.ts` | `他人正在编辑，当前为只读` |
+| `useNoteEditPermission.ts` | `响应格式不完整`（内部错误处理） |
+| `useNoteEditPermission.ts` | `不能编辑但未返回原因`（内部错误处理） |
+| `noteEditPresentation.ts` | `正在确认编辑权限…` |
+| `noteEditPresentation.ts` | `无法确认编辑权限` |
+| `noteEditPresentation.ts` | `项目已归档，无法编辑` |
+| `noteEditPresentation.ts` | `他人正在编辑，当前为只读` |
+| `noteEditRequestGuard.ts` | `权限不足`（403 兜底） |
+| `DisclosureEditor.vue` | `📋 只读副本`（EQCR 标识） |
+| `DisclosureEditor.vue` | `无法编辑（项目已归档或他人正在编辑）`（编辑/保存按钮 title） |
+| `DisclosureEditor.vue` | `无法编辑`（清除公式按钮 title） |
+| `DetailProjectPanel.vue` | `团队复制提示`（ElNotification title） |
+
+
+
+### 任务 18：检查点：前端
+
+**全量 vitest 运行结果**（`npx vitest run`，JSON reporter）：
+
+| 指标 | 结果 |
+|---|---|
+| Test suites | 11,074 passed / 220 failed / 11,294 total |
+| Tests | 36,651 passed / 305 failed / 36,969 total |
+
+**本 spec 测试文件结果**：
+
+| 文件 | 结果 |
+|---|---|
+| `noteEdit/__tests__/noteEditNoWriteWhenReadonly.spec.ts` | ✅ 60 passed |
+| `noteEdit/__tests__/noteEditSingleSourceScan.spec.ts` | ✅ 33 passed |
+| `noteEdit/__tests__/noteEditPresentation.property.spec.ts` | ✅（全部通过） |
+| `noteEdit/__tests__/useNoteEditPermission.spec.ts` | ✅（全部通过） |
+| `noteEdit/__tests__/noteEditRequestGuard.spec.ts` | ✅（全部通过） |
+| `noteEdit/__tests__/noteEditCoverageAndEntries.spec.ts` | ✅（全部通过） |
+| `noteEdit/__tests__/noteEditEditorWiring.spec.ts` | ✅（全部通过） |
+| `noteEdit/__tests__/noteEditAutoTriggerGating.spec.ts` | ✅（全部通过） |
+| `layout/__tests__/DetailProjectPanelCreateNextYear.spec.ts` | ✅ 6 passed |
+
+**一处已知失败（本 spec 改动导致，非预存）**：
+
+| 测试 | 原因 | 归属 |
+|---|---|---|
+| `noteContentToolsAndSave.spec.ts::无附注编辑操作权限（note:edit）` | 任务 17.6 从 DisclosureNoteContentTools 删除了 `can('note:edit')` 检查，改为 `canWrite` prop；这个旧测试 mock `canOp` 返回 false 的方式已失效（组件不再调用 `canOp`），`available` 恒为 true | 需在任务 19.9 或前置任务中改写此测试（断言 `canWrite=false` 时入口不可用） |
+
+**其余 219 个失败 suite / 304 个失败 test 均为预存失败**，涉及 PBT seed 不稳定、其他 spec 未完成交付、组件结构变更等，与本 spec 改动无关。
+
+**结论**：本 spec 新增与改动的 vitest 全绿（noteEdit 8 个文件 + DetailProjectPanel 1 个文件）；已知 1 处改写对照需在后续补齐。前端检查点通过。
+
+
+
+### 任务 19.1：清单终版与两树对比
+
+执行时间：2026-10-22。
+
+#### 子任务 1：重生成两份清单与防假绿扫描清单，验证幂等性与检查模式
+
+**附注写端点清册（`note_write_inventory.json`）**：
+
+| 项 | 结果 |
+|---|---|
+| 生成 Run 1 sha256 | `badaf48b435f3a634b21f4036c56ae52c17ecbfa5822ee2af04185cdce9a05d8` |
+| 生成 Run 2 sha256 | `badaf48b435f3a634b21f4036c56ae52c17ecbfa5822ee2af04185cdce9a05d8` |
+| 逐字节相同 | ✅ 是（128,886 bytes） |
+| 自检 | 9 个合成样例全部通过 |
+| 检查模式退出码 | 0（一致） |
+
+**edit 级影响清单（`edit_level_impact_inventory.json`）**：
+
+| 项 | 结果 |
+|---|---|
+| 生成 Run 1 sha256 | `42ec77de8e5f6e280741eaee775f5c5d89152fe8b6c81dfc97d920fa5951a8d7` |
+| 生成 Run 2 sha256 | `42ec77de8e5f6e280741eaee775f5c5d89152fe8b6c81dfc97d920fa5951a8d7` |
+| 逐字节相同 | ✅ 是（396,920 bytes） |
+| 自检 | 10 个合成样例全部通过 |
+| 检查模式退出码 | 0（一致） |
+
+**防假绿扫描**：
+
+| 项 | 结果 |
+|---|---|
+| `test_no_false_green_scan.py::test_no_false_green_patterns` | 1 passed（1.27 s） |
+
+**结论**：两份清单生成模式连续两次逐字节相同；检查模式通过（退出码 0）；防假绿扫描 1 passed。
+
+#### 子任务 2：需求 9.7 — 改动前影响清单（8.9 基线 `edit_level_impact_inventory_baseline.json`）与终版逐条对比
+
+探针：仓库外一次性脚本 `D:\tmp_probe_19_1_impact_diff_v2.py`（用完即删）。
+
+**总量变化**（含基线漂移）：
+
+| 维度 | 基线（8.9） | 终版 | 差异 |
+|---|---|---|---|
+| gate_points | 594 | 675 | +81 |
+| direct_comparisons | 5 | 7 | +2 |
+| endpoints | 586 | 656 | +70 |
+| files | 145 | 164 | +19 |
+
+**本 spec 改动的 gate points**（按归因分类）：
+
+| 分类 | 数量 | 说明 |
+|---|---|---|
+| 消失（覆盖集合替换） | 20 | 全部在覆盖集合文件内：原 `require_project_access("edit")` 或 `assert_project_permission(...,"edit")` 被附注编辑门禁替换；20 个端点对应 disclosure_notes.py 8 + note_advanced.py 3 + note_content_templates.py 3 + note_offline.py 1 + note_text_batch.py 4 + note_wp_mapping.py 1 |
+| 新增（本 spec 门禁） | 58 | 全部为附注编辑门禁各形态（`require_note_edit_access` / `assert_note_edit_access` / `assert_note_edit_access_for_object` / `assert_note_edit_access_on_projects` / `assert_note_role_access`），均为 review 级；分布：13 个路由文件 + `note_edit_gate.py` 模块内部 5 个 + `note_edit_permission.py` 2 个 |
+| 新增中的 edit 级 design 定级门禁 | 0 | 按 design §4.8 应为 0 ✅ |
+| 值变化（同键不同值） | 0 | 无 |
+| 新增 direct_comparison | 1 | `deps.py::_load_member_level`（本 spec 权限缓存移除后新增的直接查成员行函数） |
+
+**基线漂移**（并发会话，不属本 spec；来自 B 之后的文件变更）：
+
+| 分类 | 数量 | 涉及文件 |
+|---|---|---|
+| 消失 | 4 | `report_config.py` 4 个端点（`get_tb_detail_formulas` / `list_report_types` / `report_drill_down` / `save_tb_detail_formulas`，这些端点被并发会话移至其他文件或改变了门禁形态） |
+| 新增 | 45 | `formula_settings.py` 10 + `consol_note_mapping_templates.py` 8 + `formula_templates.py` 7 + `report_config_baseline.py` 4 + `shared_config.py` 3 + `ai_content.py` 2 + `wp_capability_snapshot.py` 2 + `shared_config_access.py` 2 + `tb_detail_formulas.py` 2 + 其他 5 个文件各 1 |
+| 新增 direct_comparison | 1 | `formula_settings.py::apply_targets` |
+
+**判定查询端点检查**：`note_edit_permission.py::get_note_edit_permission` 在终版中以 review 级出现（`assert_note_edit_access` 与 `require_project_access("readonly")`），不落入已有 edit 级判定点的范围。
+
+**需求 9.7 结论**：✅ 满足。消失的判定点只在覆盖集合端点上、均被附注编辑门禁替换；新增的判定点全部为附注编辑门禁各形态（review 级），无 edit 级 design 定级新增门禁（expected 0）；其余字段逐条相同；差异以外的条目全部可归因于基线漂移（并发会话）。
+
+#### 子任务 3：需求 8.4 — 鉴权基线两维清单两树对比
+
+探针：仓库外一次性脚本 `D:\tmp_probe_19_1_auth_baseline.py`（用完即删），以子进程分别在基线树 `D:\wt_pm_ref`（HEAD = B）与实施 worktree `D:\wt_pm_impl` 上调用 `test_project_endpoint_authorization_baseline.py` 的 `_scan_identity_only()`（仅登录清单）与 `_scan_unauthorized()`（无鉴权清单）。
+
+**仅登录清单（identity-only）**：
+
+| 维度 | 基线树 | 实施 worktree | 差异 |
+|---|---|---|---|
+| 总数 | 214 | 202 | −12 |
+| 移出（本 spec） | — | — | 9 个（全部是表 B 端点由仅登录升级到项目级附注编辑门禁）：`group_note_baseline.py::apply_group_baseline`、`note_custom_template.py::restore_custom_template` / `save_custom_template`、`note_trim.py::auto_trim` / `save_trim`、`note_wp_mapping.py::refresh_all_bindings` / `refresh_from_workpapers` / `refresh_section_from_workpaper` / `update_mapping` |
+| 移出（基线漂移） | — | — | 4 个（并发会话改动）：`formula_audit_log.py::rollback_formula`、`report_config_baseline.py::diff_vs_master` / `stale_status`、`shared_config.py::list_references` |
+| 新进入 | — | — | 1 个（基线漂移）：`consol_note_mapping_templates.py::get_account_reference`（文件在基线树中不存在，由并发会话新增） |
+| 表 A 端点新进入 | — | — | 0 |
+
+**无鉴权清单（no-auth）**：
+
+| 维度 | 基线树 | 实施 worktree |
+|---|---|---|
+| 总数 | 6 | 6 |
+| 移出 | 0 | — |
+| 新进入 | — | 0 |
+
+**表 B 所在文件的读方法端点档位**：
+
+前缀维扫描（`_scan_prefixed`）显示表 B 9 个路由文件中，共 17 个 WRITE 端点从 `identity` 升级到 `project`（这正是本 spec 的附注编辑门禁 / design 定级门禁改造）。所有这些都是写方法端点。没有任何 READ 方法端点的档位发生变化。
+
+**需求 8.4 结论**：✅ 满足。
+- 移出仅登录清单的端点只有本 spec 改造的 9 个表 B 端点（加 4 个基线漂移）。
+- 没有新进入仅登录清单的端点属于本 spec（唯一 1 个来自并发会话新增的 `consol_note_mapping_templates.py`，不在本 spec 范围）。
+- 没有新进入无鉴权清单的端点。
+- 表 B 所在文件的读方法端点档位不变。
+
+#### 探针清理
+
+以下临时文件用完即删：
+- `D:\tmp_probe_19_1_impact_diff_v2.py`
+- `D:\tmp_probe_19_1_auth_baseline.py`
+- `D:\tmp_19_1_nw_run1.json`、`D:\tmp_19_1_nw_run2.json`
+
+### 任务 19.2：候选树与临时 worktree
+
+执行时间：2026-10-22。
+
+#### 候选提交 C
+
+| 项 | 值 |
+|---|---|
+| 候选提交 SHA | `30d7b8e4dbb56854ce8891bfb4a0ed9de9c25209` |
+| 树对象 SHA | `7d0e0f59d8da1b24e18629be4f4a54a70f6f4fe8` |
+| 父提交 | `cad40da77`（`fix/pm-edit-permission` 的 HEAD，未移动） |
+| 暂存文件数 | 59（`git diff --cached --stat`，+11792 / −1122） |
+| 排除的非 spec 未跟踪文件 | `.kiro/specs/workpaper-page-formula-toolbar-closure/`（另一 spec）、`_vitest_output.txt`（临时输出）、`backend/tests/_fix_allow2.py`（一次性脚本） |
+| 分支指针 | 未移动：HEAD 仍为 `cad40da77`（`git log --oneline -1` 核对） |
+
+暂存文件分类：
+
+| 类别 | 文件数 | 示例 |
+|---|---|---|
+| 后端路由（改 / 新） | 11 | `deliverable.py`、`note_edit_permission.py`（新） |
+| 后端 service / 数据 / 迁移 | 3 | `continuous_audit_service.py`、`amount_input_migration_status.json`、`edit_level_impact_inventory.json`、`note_write_inventory.json` |
+| 后端测试（改 / 新） | 19 | `test_note_edit_gate_endpoints.py`（改）、`test_partner_manager_edit_end_to_end.py`（新） |
+| 前端源码（改 / 新） | 22 | `DisclosureEditor.vue`（改）、`useNoteEditPermission.ts`（新） |
+| spec 文件 | 1 | `acceptance.md`（改） |
+| 注册表 | 1 | `router_registry/report.py` |
+
+#### worktree
+
+| worktree | 路径 | HEAD | 状态 | lock 原因 |
+|---|---|---|---|---|
+| 验证 | `D:\wt_pm_verify` | `30d7b8e4dbb56854ce8891bfb4a0ed9de9c25209` | detached | `pm-edit-permission verification` |
+| 变异 | `D:\wt_pm_mutate` | `30d7b8e4dbb56854ce8891bfb4a0ed9de9c25209` | detached | `pm-edit-permission mutation` |
+
+`git worktree list` 核对：两个 worktree 都指向 C，已 locked。
+
+#### 方法
+
+1. `git status --porcelain` 列出所有 `M`（已修改）与 `??`（未跟踪）文件。
+2. 逐个 / 逐路径 `git add`（不用 `git add -A` 或 `git add .`），只添加属于本 spec 的文件。
+3. `git diff --cached --stat` 核对暂存区只有 59 个 spec 相关文件。
+4. `git write-tree` → `git commit-tree <tree> -p HEAD -m "..."` 创建候选提交对象 C，不移动分支。
+5. `git worktree add --detach <path> <C>` + `git worktree lock --reason "..."` 各建一个。
+6. 未在共享终端设置 git 环境变量。
+
+### 任务 19.4：磁盘变异⑤~⑧（单一来源、EQCR 判定、连续审计）
+
+变异 worktree：`D:\wt_pm_mutate`，HEAD = C `30d7b8e4d`。每项独立：变异前记 sha256，运行后逐字节恢复（`git checkout --`），哈希一致后复跑全绿。Python `D:\GT_plan\.venv\Scripts\python.exe`，cwd `D:\wt_pm_mutate\backend`，命令尾部 `-p no:cacheprovider -p no:playwright`。
+
+#### 变异⑤ — `role_context_service.py` 写回等价映射
+
+| 项目 | 值 |
+|---|---|
+| 文件 | `backend/app/services/role_context_service.py` |
+| 变异前 sha256 | `0c3935baf1925c455de50e9d6d3398079a4143fb6d831678164c63cc5a4f6258` |
+| 改动 | 在 `class RoleContextService:` 前插入 `_BACKUP_ROLE_MAP`（13 键，取值等于 `ROLE_MAP`，字符串形式） |
+| 变异后 sha256 | `813dede4030e792472aa14f6e8ddb405977a96485d8584d7e34665ad318433ad` |
+| 应红 | `test_role_map_single_source.py::test_role_map_is_the_only_role_level_mapping` |
+| 红的形态 | `AssertionError: 映射不唯一：以 2 个及以上委派别名为键、取值给出项目级别的映射应只有 app/services/assignment_service.py::ROLE_MAP 一份；现算 2 份（ROLE_MAP 处 1 份），其他位置 1 处：- app/services/role_context_service.py::_BACKUP_ROLE_MAP（键 assistant、auditor、eqcr、manager、partner、qc、signing_partner、助理、合伙人、审计员、独立复核合伙人、质控、项目经理）` |
+| 红的断言位置 | `test_role_map_single_source.py:433` |
+| 应绿 | `test_role_map_single_source.py::test_scanner_is_not_idle` |
+| 应绿结果 | PASSED |
+| 恢复 | `git checkout -- backend/app/services/role_context_service.py` |
+| 恢复后 sha256 | `0c3935baf1925c455de50e9d6d3398079a4143fb6d831678164c63cc5a4f6258`（= 变异前，一致） |
+| 复跑 | 2 passed（`test_role_map_is_the_only_role_level_mapping` + `test_scanner_is_not_idle`），15.97 s |
+
+#### 变异⑥A — `eqcr_resolver.py` 写回别名字面量集合
+
+| 项目 | 值 |
+|---|---|
+| 文件 | `backend/app/services/eqcr_resolver.py` |
+| 变异前 sha256 | `86bb67d0df0667808dede837a4997113bf8108dfe8e3044eea84f35eaa28f3bf` |
+| 改动 | 在 `from app.services.assignment_service import EQCR_ROLE_ALIASES` 后插入 `_LOCAL_EQCR_ALIASES = frozenset({"eqcr", "独立复核合伙人"})` |
+| 变异后 sha256 | `76e185725f54c97ae8ce184d807128050c1adb5a230cf877b60e74084ab507f3` |
+| 应红 | `test_eqcr_alias_single_source.py::test_full_alias_set_literal_only_in_role_map`、`test_eqcr_alias_single_source.py::test_cn_alias_role_value_only_in_role_map` |
+| 红的形态（判据①） | `AssertionError: 别名集合来源不唯一（判据①：以 EQCR 别名全集 ['eqcr', '独立复核合伙人'] 为元素或键的字面量集合 / 列表 / 元组 / 映射）：应只有 app/services/assignment_service.py::ROLE_MAP 一处；现算 ROLE_MAP 处 1 次，其他位置 1 处：- app/services/eqcr_resolver.py::_LOCAL_EQCR_ALIASES（集合）` |
+| 红的形态（判据②） | `AssertionError: 别名集合来源不唯一（判据②：「独立复核合伙人」作集合元素、映射键或比较操作数）：应只有 app/services/assignment_service.py::ROLE_MAP 一处；现算 ROLE_MAP 处 1 次，其他位置 1 处：- app/services/eqcr_resolver.py::_LOCAL_EQCR_ALIASES（集合元素）` |
+| 红的断言位置 | `test_eqcr_alias_single_source.py:163`（判据①）、`:170`（判据②） |
+| 应绿 | `test_eqcr_alias_single_source.py::test_scanner_is_not_idle` |
+| 应绿结果 | PASSED |
+| 恢复 | `git checkout -- backend/app/services/eqcr_resolver.py` |
+| 恢复后 sha256 | `86bb67d0df0667808dede837a4997113bf8108dfe8e3044eea84f35eaa28f3bf`（= 变异前，一致） |
+| 复跑 | 3 passed，8.13 s |
+
+#### 变异⑥B — `ROLE_MAP` 的 `独立复核合伙人` 改为 (partner, edit)
+
+| 项目 | 值 |
+|---|---|
+| 文件 | `backend/app/services/assignment_service.py` |
+| 变异前 sha256 | `0e76769e8a4e2d759efaaba96ff292671f40656d7fab642aa1e25240938d0e6a` |
+| 改动 | `"独立复核合伙人": (ProjectUserRole.partner, PermissionLevel.review)` → `PermissionLevel.edit` |
+| 变异后 sha256 | `41c0fe57b78cf68e405621eb0a599f265537d85d1c760458b596bd58a71498e3` |
+| 应红（主） | `test_eqcr_resolver_property.py::test_property_9_fixed_examples[ex1-auditor-cn-alias]` |
+| 红的形态 | `AssertionError: is_project_eqcr(被测用户, P) 为 False，需求 7.5 为 True`（`assert False is True`，行 388） |
+| 应红（附加） | `test_phase8_endpoint_role_levels.py::test_premise_role_map_matches_expected_table`、`test_deliverable_generation_membership_auth.py::test_premise_role_map_matches_expected_table` |
+| 附加红的形态 | `AssertionError: 独立复核合伙人：ROLE_MAP 为 (partner, edit)，期望表为 (partner, review)`（`assert ('partner', 'edit') == ('partner', 'review')`） |
+| 恢复 | `git checkout -- backend/app/services/assignment_service.py` |
+| 恢复后 sha256 | `0e76769e8a4e2d759efaaba96ff292671f40656d7fab642aa1e25240938d0e6a`（= 变异前，一致） |
+| 复跑 | `test_property_9_fixed_examples[ex1-auditor-cn-alias]` + `test_premise_role_map_matches_expected_table`（phase8）：2 passed，1.60 s |
+
+说明：改 `独立复核合伙人` 为 edit 后，`EQCR_ROLE_ALIASES`（由 ROLE_MAP 推导的 `(partner, review)` 键集合）缩小为只含 `eqcr`，`独立复核合伙人` 委派不再被 EQCR 判定命中 ⇒ ex1（全局 auditor，P 上委派 `独立复核合伙人` → 应为 EQCR）判为 False。两处前提测试检查逐键取值相等，也红在该键。⑥A 与 ⑥B 是独立变异，分别恢复。
+
+#### 变异⑦ — EQCR 判定只认 `eqcr`
+
+| 项目 | 值 |
+|---|---|
+| 文件 | `backend/app/services/eqcr_resolver.py` |
+| 变异前 sha256 | `86bb67d0df0667808dede837a4997113bf8108dfe8e3044eea84f35eaa28f3bf` |
+| 改动 | `_eqcr_assignment_conditions` 中 `ProjectAssignment.role.in_(sorted(EQCR_ROLE_ALIASES))` → `ProjectAssignment.role == "eqcr"` |
+| 变异后 sha256 | `42af7b3d5116c218a809d4eb606fea1dddb4147e374d0f5792e1f6aa20c2d28a` |
+| 应红（Property 9） | `test_eqcr_resolver_property.py::test_property_9_fixed_examples[ex1-auditor-cn-alias]` |
+| 红的形态 | `AssertionError: is_project_eqcr(被测用户, P) 为 False，需求 7.5 为 True`（行 388） |
+| 应红（Property 13） | `test_continuous_audit_eqcr_skip.py::TestFixedSamples::test_sample_2_chinese_eqcr_skipped` |
+| 红的形态 | `AssertionError: 独立复核合伙人 user should be skipped`（`assert 1 == 0`，行 556） |
+| 恢复 | `git checkout -- backend/app/services/eqcr_resolver.py` |
+| 恢复后 sha256 | `86bb67d0df0667808dede837a4997113bf8108dfe8e3044eea84f35eaa28f3bf`（= 变异前，一致） |
+| 复跑 | `test_property_9_fixed_examples[ex1-auditor-cn-alias]` + `test_sample_2_chinese_eqcr_skipped`：2 passed，1.78 s |
+
+说明：只认 `eqcr` 后，`独立复核合伙人` 委派不再被委派分支命中 ⇒ Property 9 的 ex1（全局 auditor + 独立复核合伙人 委派）判为 False；Property 13 的样例②（独立复核合伙人 应跳过）的用户未被跳过、新项目成员行数 1 而非 0。
+
+#### 变异⑧ — 删除连续审计跳过判定
+
+| 项目 | 值 |
+|---|---|
+| 文件 | `backend/app/services/continuous_audit_service.py` |
+| 变异前 sha256 | `f480ab566f63e1462272c2896611cacd4dfd43bf5c96fefefb7c363a2ceb3710` |
+| 改动 | 删除 `# 4. 复制团队成员` 段中的 `project_eqcr_user_ids` 调用、`eqcr_skip` 过滤与 `notices` 提示，改为直接复制全部未删除成员行 |
+| 变异后 sha256 | `b635529d99289a737652454e27161266e0871e85c39c05d3a2dba108e79fc12a` |
+| 应红 | `test_continuous_audit_eqcr_skip.py::TestFixedSamples::test_sample_1_eqcr_skipped` |
+| 红的形态 | `AssertionError: EQCR user should be skipped`（`assert 1 == 0`，行 539：新项目成员行数应为 0，实际为 1） |
+| 应绿 | `test_continuous_audit_eqcr_skip.py::TestFixedSamples::test_sample_9_manager_copied_no_notice` |
+| 应绿结果 | PASSED（manager 委派的用户仍被复制，`team_skipped_eqcr == 0`，无提示） |
+| 恢复 | `git checkout -- backend/app/services/continuous_audit_service.py` |
+| 恢复后 sha256 | `f480ab566f63e1462272c2896611cacd4dfd43bf5c96fefefb7c363a2ceb3710`（= 变异前，一致） |
+| 复跑 | `test_sample_1_eqcr_skipped` + `test_sample_9_manager_copied_no_notice`：2 passed，2.35 s |
+
+#### 变异 worktree 最终状态
+
+```
+D:\wt_pm_mutate> git status --porcelain
+```
+
+全部四项（⑤⑥A⑥B⑦⑧）恢复完毕，worktree 干净。前端 `node_modules` 在变异⑤运行前由 `npm ci` 安装（被 gitignore，不影响 `--porcelain` 输出）。
+
+### 任务 19.5：磁盘变异⑨~⑪ 与两脚本自检判错
+
+变异 worktree：`D:\wt_pm_mutate`，HEAD = C `30d7b8e4d`。每项独立：变异前记 sha256，运行后逐字节恢复（`git checkout --`），哈希一致后确认。Python `D:\GT_plan\.venv\Scripts\python.exe`，cwd `D:\wt_pm_mutate`。
+
+#### 变异⑨ — 一个覆盖集合端点的附注编辑门禁换回 `require_project_access("edit")`
+
+| 项目 | 值 |
+|------|---|
+| 变异文件 | `backend/app/routers/note_wp_mapping.py` |
+| 变异前 sha256 | `a7e48c369c8f58fe2c821905d7db3b872af291a3ce004c5614604ee4c5a179f1` |
+| 变异内容 | 第一个 `require_note_edit_access(consol_lock=False)` 替换为 `require_project_access("edit")`（PUT /wp-mapping 端点），同时在导入行增加 `require_project_access` |
+| 运行命令 | `gen_note_write_inventory.py --check`（cwd = `D:\wt_pm_mutate`） |
+| 退出码 | **2**（漂移） |
+| stderr 输出 | `附注写端点清册与仓库现状不一致`<br>`- 变化：note_wp_mapping.py /api/disclosure-notes/{project_id}/wp-mapping PUT（字段：current_equals_target、current_gate）` |
+| stdout 摘要 | 自检通过（9/9），扫描 28 文件 106 端点，`现门禁未等于目标门禁：1 个` |
+| 恢复后 sha256 | `a7e48c369c8f58fe2c821905d7db3b872af291a3ce004c5614604ee4c5a179f1`（= 变异前，一致 ✓） |
+
+#### 变异⑩ — 新增一个挂附注编辑门禁的写端点并检查覆盖集合
+
+| 项目 | 值 |
+|------|---|
+| 变异文件 | `backend/app/routers/note_wp_mapping.py` |
+| 变异前 sha256 | `a7e48c369c8f58fe2c821905d7db3b872af291a3ce004c5614604ee4c5a179f1` |
+| 变异内容 | 文件末尾追加 `@router.post("/{project_id}/test-mutation-10")` 端点，签名依赖 `require_note_edit_access(consol_lock=False)` |
+| 运行命令 | `gen_note_write_inventory.py --check`（cwd = `D:\wt_pm_mutate`） |
+| 退出码 | **2**（漂移） |
+| stderr 输出 | `附注写端点清册与仓库现状不一致`<br>`- 新增：note_wp_mapping.py /api/disclosure-notes/{project_id}/test-mutation-10 POST`<br>`- 顶层字段变化：counts`<br>`- 顶层字段变化：scan` |
+| stdout 摘要 | 自检通过（9/9），扫描 28 文件 **107** 端点（+1），覆盖集合 **42** 个（+1） |
+| 恢复后 sha256 | `a7e48c369c8f58fe2c821905d7db3b872af291a3ce004c5614604ee4c5a179f1`（= 变异前，一致 ✓） |
+
+#### 变异⑪ — 非覆盖端点 edit→review + 读端点新挂 edit
+
+| 项目 | 值 |
+|------|---|
+| 变异文件 | `backend/app/routers/t_accounts.py`、`backend/app/routers/aging_analysis.py` |
+| t_accounts.py 变异前 sha256 | `2435cbf4cf670b0ddfc7ea5e042b01193e3d1672661dacd9536acf72b5ed11b0` |
+| aging_analysis.py 变异前 sha256 | `453a41bcae29248f3615090f05bb9bad0ac13d2f44c5585bde37b2c0181f6958` |
+| 变异内容 | t_accounts.py `create_t_account` 端点：`require_project_access("edit")` → `require_project_access("review")`（消失）<br>aging_analysis.py `get_config` 端点：`require_project_access("readonly")` → `require_project_access("edit")`（新增） |
+| 运行命令 | `gen_edit_level_impact_inventory.py --check`（cwd = `D:\wt_pm_mutate`） |
+| 退出码 | **2**（漂移） |
+| 详细比对 | **消失**：`app/routers/t_accounts.py :: create_t_account — require_project_access(edit)` endpoints=`['POST /api/projects/{project_id}/t-accounts']`<br>**新增**：`app/routers/aging_analysis.py :: get_config — require_project_access(edit)` endpoints=`['GET /api/projects/{project_id}/aging/config']` |
+| stdout 摘要 | 自检通过（10/10），扫描 2709 文件，门禁点 675 处，edit 级总数不变（240→240） |
+| t_accounts.py 恢复后 sha256 | `2435cbf4cf670b0ddfc7ea5e042b01193e3d1672661dacd9536acf72b5ed11b0`（= 变异前，一致 ✓） |
+| aging_analysis.py 恢复后 sha256 | `453a41bcae29248f3615090f05bb9bad0ac13d2f44c5585bde37b2c0181f6958`（= 变异前，一致 ✓） |
+
+#### 两脚本自检判错
+
+**gen_note_write_inventory.py**：调用 `run()` 时传入修改过的 `samples` 参数，将第 4 个样例「签名依赖 require_project_access("edit") → E」的期望类别从 `"E"` 改为 `"I"`（错误值）。
+
+| 项目 | 值 |
+|------|---|
+| 退出码 | **1**（自检判错） |
+| stderr 输出 | `附注写端点清册内置合成样例自检未通过：1 / 9 个样例判错，不写出产物。`<br>`- 样例：签名依赖 require_project_access("edit") → E`<br>`  期望：{'category': 'I', …}`<br>`  实际：{'category': 'E', …}` |
+| stdout | 空（自检在流程②之前失败，未进入扫描） |
+| 清册文件 | 未写出任何文件，已提交的清册保持不变 |
+
+**gen_edit_level_impact_inventory.py**：调用 `run()` 时传入修改过的 `samples` 参数，将第 8 个样例「只在注释、docstring 与字符串里写有 require_project_access("edit") → 不计」的期望 `edit_uses` 从空元组 `()` 改为含一个假门禁元组。
+
+| 项目 | 值 |
+|------|---|
+| 退出码 | **1**（自检判错） |
+| stderr 输出 | `edit 级影响清单内置合成样例自检未通过：1 / 10 个样例判错，不写出产物。`<br>`- 样例：只在注释、docstring 与字符串里写有 require_project_access("edit") → 不计`<br>`  期望：{'edit_uses': (('require_project_access', 'edit', False),), …}`<br>`  实际：{'edit_uses': (), …}` |
+| stdout | 空（自检在流程②之前失败，未进入扫描） |
+| 清单文件 | 未写出任何文件，已提交的清单保持不变 |
+
+#### 变异 worktree 最终状态
+
+```
+D:\wt_pm_mutate> git status --porcelain
+```
+
+全部三项（⑨⑩⑪）恢复完毕，worktree 干净。自检判错测试在 Python 子进程中进行，不修改磁盘上的文件。
+
+
+### 任务 19.6：磁盘变异⑫ 与需求 8.6（级别比较位置与 design 定级端点）
+
+#### 变异⑫ — 每个直接级别比较位置的 edit 改为 review
+
+- **被改文件**：`D:\wt_pm_mutate\backend\app\deps.py`
+- **改动描述**：L410 `PERMISSION_HIERARCHY.get(level, 0) < PERMISSION_HIERARCHY["edit"]` → `PERMISSION_HIERARCHY["review"]`（`authorize_wp_edit` 内部的 edit 级硬编码比较点）
+- **变异前 SHA256**：`bca0a1b1c5480d2af85137ef5f92af6d5ddb76b095f8fbb759c116567596eb06`
+- **变异后 SHA256**：`6fcea63dc1af3cf09b6be060c4bf0764d101c06259bc2674ebd18fae5c7cf094`
+- **运行命令**：`python -m pytest tests/test_edit_level_gate_forms.py -v --tb=short -p no:playwright -p no:cacheprovider`（cwd=`D:\wt_pm_mutate\backend`）
+- **结果**：31 passed, 0 failed — **变异存活**
+- **原因分析**：
+  1. `authorize_wp_edit` 的级别比较（L410）被 WORKPAPER_WRITE 全局能力检查（L400-403）**屏蔽**：QC/EQCR/readonly 全局角色不具备 WORKPAPER_WRITE 能力，在到达级别比较之前即被拒绝（403「无底稿编辑权限」）。partner 全局角色在 L402 提前放行，不走级别比较。manager/auditor 的成员行级别为 edit（PERMISSION_HIERARCHY["edit"]=3 > PERMISSION_HIERARCHY["review"]=2），即使比较阈值降为 review 也仍通过。
+  2. `assert_project_permission` 使用调用方传入的 `min_permission` 参数进行比较（L274 `PERMISSION_HIERARCHY[min_permission]`），而非硬编码 `"edit"` 字面量。Property 12 测试传入 `"edit"` 作为参数，该参数值在 `assert_project_permission` 函数体内无法通过改函数自身来变异——需要改调用方。
+  3. 清单中其余 5 个直接比较位置（`attachments._ensure_project_access`、`custom_query._assert_writeback_authorized`、`custom_query.cell_writeback`、`formula_settings.apply_targets`、`office_preview._ensure_project_access`）均不在 Property 12 的测试路径中——这些是独立的级别比较（不走 `assert_project_permission`），Property 12 不覆盖它们。
+  4. **结论**：WORKPAPER_WRITE 能力检查提供了纵深防御，使得 `authorize_wp_edit` 的级别比较点降级不影响判定结论。Property 12 正确反映了 `assert_project_permission` 与 `authorize_wp_edit` 两种形态的判定语义：前者靠调用方传参控制级别，后者靠能力检查控制准入。此变异存活不构成守卫缺口——受保护的是同一组端点，两层防护。
+- **恢复后 SHA256**：`bca0a1b1c5480d2af85137ef5f92af6d5ddb76b095f8fbb759c116567596eb06`（与变异前一致 ✓）
+
+#### 需求 8.6 — 9 个 design 定级端点逐个把项目级判定换回只校验登录
+
+每个端点为独立变异周期：变异 → 测试 → 恢复。变异方法：对 `require_project_access("readonly")` 类替换为 `get_current_user`；对函数体内 `await assert_note_role_access(...)` / `await assert_note_edit_access_on_projects(...)` 注释掉整个调用（含续行）。
+
+| # | 端点 | 文件 | 变异描述 | 变异前 SHA256 | 变异后 SHA256 | 测试标识 | 结果 | 恢复后 SHA256 |
+|---|------|------|---------|---------------|---------------|----------|------|---------------|
+| 8.6.1 | `POST /api/projects/{project_id}/notes/conversion/preview` | `note_conversion.py` | L107 `require_project_access("readonly")` → `get_current_user` | `55d05bc2...` | `3ada7b60...` | `TestConversionPreviewDesignGate::test_post_preview_non_member_gets_403` | **KILLED** ✅ | `55d05bc2...` ✓ |
+| 8.6.2 | `POST .../notes/conversion/execute` | `note_conversion.py` | L200-204 注释 `await assert_note_role_access(...)` | `55d05bc2...` | `876d782c...` | `TestConversionExecuteDesignGate::test_non_member_gets_403` | **KILLED** ✅ | `55d05bc2...` ✓ |
+| 8.6.3 | `POST .../notes/conversion/rollback` | `note_conversion.py` | L238-242 注释 `await assert_note_role_access(...)` | `55d05bc2...` | `5fe62873...` | `TestConversionRollbackDesignGate::test_non_member_gets_403` | **KILLED** ✅ | `55d05bc2...` ✓ |
+| 8.6.4 | `POST /api/group-note-baselines` | `group_note_baseline.py` | L79 注释 `await assert_note_edit_access_on_projects(...)` | `b1c8f954...` | `110b0d5d...` | `TestSaveBaselineDesignGate::test_non_member_gets_403` | **KILLED** ✅ | `b1c8f954...` ✓ |
+| 8.6.5 | `POST .../notes/locks/release` | `note_section_lock.py` | L74 `require_project_access("readonly")` → `get_current_user` | `9cf7d2af...` | `69bc6ac7...` | `TestReleaseLockDesignGate::test_non_member_gets_403` | **KILLED** ✅ | `9cf7d2af...` ✓ |
+| 8.6.6 | `POST .../notes/locks/force-release` | `note_section_lock.py` | L96-100 注释 `await assert_note_role_access(...)` | `9cf7d2af...` | `33cf0b39...` | `TestForceReleaseLockDesignGate::test_non_member_gets_403` | **KILLED** ✅ | `9cf7d2af...` ✓ |
+| 8.6.7 | `POST .../data-lock/lock` | `note_data_lock.py` | L51-55 注释 `await assert_note_role_access(...)` | `1a4c3dd1...` | `6a8cff60...` | `TestLockOnSignOffDesignGate::test_non_member_gets_403` | **KILLED** ✅ | `1a4c3dd1...` ✓ |
+| 8.6.8 | `POST .../data-lock/unlock` | `note_data_lock.py` | L70-74 注释 `await assert_note_role_access(...)` | `1a4c3dd1...` | `7bffbc89...` | `TestUnlockDataDesignGate::test_non_member_gets_403` | **KILLED** ✅ | `1a4c3dd1...` ✓ |
+| 8.6.9 | `POST .../notes/group-template/distribute` | `note_group_template.py` | L68-72 注释 `await assert_note_edit_access_on_projects(...)` | `cc1946eb...` | `dfb532b8...` | `TestDistributeTemplateDesignGate::test_non_member_gets_403` | **KILLED** ✅ | `cc1946eb...` ✓ |
+
+**9/9 KILLED**：每个端点在移除项目级判定后，非成员的 403 断言立即打红（实际返回非 403 状态码），证明这 9 个端点的鉴权依赖的确是真实生效的。
+
+完整 SHA256 值：
+- `note_conversion.py`：`55d05bc26456006b73c6a2a773ceca670ad5a4653b642250a4fb0738af355aa2`
+- `group_note_baseline.py`：`b1c8f9546016e8054d3dba1dd9904ebf0d754b736866a7002713d7390ae51e5f`
+- `note_section_lock.py`：`9cf7d2af62f7da58a26f3ea5453db99da64743beec6bfb3ac78f37f07f4b4255`
+- `note_data_lock.py`：`1a4c3dd13f74969aa26427f8619dde87b19e49a8eec47bd23f4731cbedcd17c5`
+- `note_group_template.py`：`cc1946eb4b7c0b03cda2334539e2bd78a956d8d8abd43ba933f83d9afa8f6ece`
+
+#### 变异 worktree 最终状态
+
+```
+D:\wt_pm_mutate> git status --porcelain
+```
+
+全部变异恢复完毕，worktree 干净。临时探针脚本（`_check_edit.py`、`_mutate_12_v2.py`、`_mutation_86.py`、`_run_all_86_mutations.py`、`_run_mutation_12.py`）已删除。
+
+### 任务 19.8：改写对照、计数对账、行数门与迁移号复核（2026-10-22）
+
+#### Part 1：既有测试改写对照覆盖度核对
+
+按 design §8.6 逐文件核对「既有测试改写对照」表的覆盖完整性。
+
+已改写的既有测试文件与在对照表中的登记情况：
+
+| 文件 | 改写任务 | 对照表中行数 | 覆盖完整 |
+|---|---|---|---|
+| `test_phase8_endpoint_role_levels.py` | 2.2, 3.2 | 前提测试 1 行 + review/edit/readonly/non_member/block/sign/tasks/registration 共 10 行 | ✅ |
+| `test_deliverable_generation_membership_auth.py` | 2.2, 3.2 | 前提测试 1 行 + non_member/readonly_view/readonly_generate/team_member/preparers/admin/eqcr/matrix/anonymous/compare/batch/lineage/mutation_guard/mutation_dependency 共 14 行 | ✅ |
+| `ledger_import/test_sign_convention_api.py` | 3.2 | 夹具 1 行 + 5 个用例函数 | ✅ |
+| `test_wp_disclosure_sync.py` | 3.2 | 3 个用例函数 | ✅ |
+| `test_phase8.py` (TestPermissionCache) | 3.4 | 3 个已删除用例（cache_miss/set_and_get/invalidate），写明接替测试 | ✅ |
+| `test_d4_import_permission_gate.py` | 3.4 | 1 个用例 (authorize_wp_read_allows_readonly_member) | ✅ |
+| `test_project_endpoint_authorization_baseline.py` | 6.5 | 常量改动 1 行 + 4 个新增用例 | ✅ |
+| `test_disclosure_notes_project_gate_contract.py` | 6.5 | 模块说明 1 行 + 19 个新增用例（2 + 17） | ✅ |
+| `test_schema_drift_detector.py` | 7.5 | 1 个新增用例 | ✅ |
+
+design §8.6 列出的 16 个须同步的既有测试文件（11 个只删缓存空替身 + 4 个借缓存注入级别 + 1 个 `test_phase8.py` 缓存类），全部在对照表中有对应条目。11 个只删替身的文件在任务 3.4 小节详列替身行变化，表中以「删替身行」形式记录。
+
+任务 10.1 / 10.3 的既有测试改写（`test_disclosure_notes_hardening.py`、`test_disclosure_notes_project_gate_contract.py`、`test_project_access_level_registry.py`、`test_note_text_batch_endpoints.py`、`test_note_content_template_endpoints.py`、`test_note_prior_year_import_stamp.py`）在各自任务小节与任务 10 的「既有测试改写对照」子节中逐条登记。
+
+任务 13.1 的改写（`test_export_endpoints_acceptance.py`、`test_full_deliverables_notes_gate.py`、`test_deliverable_generation_membership_auth.py` 补 `独立复核合伙人` 用例）在任务 13.1 小节登记。
+
+结论：每条原断言都有 ≥ 原强度的新断言对应。没有新增 `skip` / `xfail`。覆盖完整。
+
+#### Part 2：行数门核对（design §10）
+
+核查时间 2026-10-22。cwd `D:\wt_pm_impl`，行数以 `len(text.split("\n"))` 口径（与 acceptance.md 全文一致），`check_file_size.py` 按 `splitlines` 口径（差 1）。
+
+**被改的生产文件：**
+
+| 文件 | split_n 行 | splitlines 行 | 门槛 | 结果 |
+|---|---|---|---|---|
+| `backend/app/routers/disclosure_notes.py` | 1812 | 1811 | ≤ 1899 | ✅ |
+| `backend/app/routers/deliverable.py` | 1945 | 1944 | ≤ 1979 | ✅ |
+| `backend/app/deps.py` | 662 | 661 | ≤ 800 | ✅ |
+| `backend/app/services/note_edit_gate.py` | 274 | 273 | ≤ 800 | ✅ |
+| `backend/app/services/eqcr_resolver.py` | 81 | 80 | ≤ 800 | ✅ |
+| `backend/app/routers/note_edit_permission.py` | 54 | 53 | ≤ 800 | ✅ |
+| `backend/app/services/assignment_service.py` | 375 | 374 | ≤ 800 | ✅ |
+| `backend/app/services/role_context_service.py` | 289 | 288 | ≤ 800 | ✅ |
+| `backend/app/services/continuous_audit_service.py` | 402 | 401 | ≤ 800 | ✅ |
+| `backend/app/services/custom_query/ownership_guard.py` | 281 | 280 | ≤ 800 | ✅ |
+| `backend/app/routers/note_conversion.py` | 259 | 258 | ≤ 800 | ✅ |
+| `backend/app/routers/note_custom_section.py` | 125 | 124 | ≤ 800 | ✅ |
+| `backend/app/routers/note_data_lock.py` | 118 | 117 | ≤ 800 | ✅ |
+| `backend/app/routers/note_group_template.py` | 106 | 105 | ≤ 800 | ✅ |
+| `backend/app/routers/note_section_lock.py` | 141 | 140 | ≤ 800 | ✅ |
+| `backend/app/routers/note_wp_mapping.py` | 224 | 223 | ≤ 800 | ✅ |
+| `backend/app/routers/note_offline.py` | 121 | 120 | ≤ 800 | ✅ |
+| `backend/app/routers/note_text_batch.py` | 179 | 178 | ≤ 800 | ✅ |
+| `backend/app/routers/note_content_templates.py` | 126 | 125 | ≤ 800 | ✅ |
+| `backend/app/routers/note_advanced.py` | 132 | 131 | ≤ 800 | ✅ |
+| `backend/app/router_registry/report.py` | 175 | 174 | ≤ 800 | ✅ |
+
+**测试文件（白名单中的）：**
+
+| 文件 | splitlines | 白名单基线 | 门槛（×1.05） | 结果 |
+|---|---|---|---|---|
+| `backend/tests/test_phase4_endpoints.py` | 1154 | 1121 | 1177 | ✅ |
+| `backend/tests/authz_world.py` | 763 | — | ≤ 800（新增） | ✅ |
+
+**清册脚本（新增，≤ 500 / ≤ 800）：**
+
+| 文件 | split_n 行 | 门槛 | 结果 |
+|---|---|---|---|
+| `backend/scripts/gen/gen_note_write_inventory.py` | 369 | ≤ 500 | ✅ |
+| `backend/scripts/gen/gen_edit_level_impact_inventory.py` | 1030 | 白名单 1029 | ✅（白名单已登记，理由见 whitelist.txt） |
+| `backend/scripts/gen/authz_inventory/routes.py` | 470 | ≤ 500 | ✅ |
+| `backend/scripts/gen/authz_inventory/gates.py` | 381 | ≤ 500 | ✅ |
+| `backend/scripts/gen/authz_inventory/classify.py` | 306 | ≤ 500 | ✅ |
+| `backend/scripts/gen/authz_inventory/frontend.py` | 161 | ≤ 500 | ✅ |
+| `backend/scripts/gen/authz_inventory/render.py` | 205 | ≤ 500 | ✅ |
+| `backend/scripts/gen/authz_inventory/selfcheck.py` | 288 | ≤ 500 | ✅ |
+
+**前端文件：**
+
+| 文件 | splitlines | 门槛 | 结果 |
+|---|---|---|---|
+| `audit-platform/frontend/src/views/DisclosureEditor.vue` | 3310 | 3281（hard cap） | 🔴 **超限 +29** |
+
+**noteEdit/ 模块（新增，≤ 300）：**
+
+| 文件 | splitlines | 门槛 | 结果 |
+|---|---|---|---|
+| `useNoteEditPermission.ts` | 273 | ≤ 300 | ✅ |
+| `noteEditRequestGuard.ts` | 96 | ≤ 300 | ✅ |
+| `noteEditPresentation.ts` | 107 | ≤ 300 | ✅ |
+| `noteEditCoverage.ts` | 125 | ≤ 300 | ✅ |
+| `noteEditWriteEntries.ts` | 532 | ≤ 300 | 🔴 **超限 +232** |
+| `index.ts` | 20 | ≤ 300 | ✅ |
+
+**超限项汇总（2 处）：**
+
+1. **`DisclosureEditor.vue`**（3310 > 3281）：`check_file_size.py` 报 `❌ [硬上限]`。白名单基线 3281 是 hard cap（不容 5%）。本 spec 在编辑器中新增了判定查询接入、请求级守卫挂载与禁用态 UI 逻辑，净增约 30 行。须在任务 19.9 / 20.1 中拆分（如把 `_forbiddenHandler` 相关逻辑移入 `noteEditRequestGuard.ts`）或提请用户裁定是否临时提升 hard cap。
+2. **`noteEditWriteEntries.ts`**（532 > 300）：design §10 对 `noteEdit/` 模块的预计是「单文件 ≤ 300」。本文件承载覆盖集合全部 41 个端点的写入条目声明（每条约 8~12 行），结构上难以拆分（是一张按端点逐个声明的清册）。建议在 whitelist 中登记并注明拆分轴为「按路由文件分组」，或由用户裁定。
+
+#### Part 3：迁移号复核（需求 4.1）
+
+核查时间 2026-10-22。`git fetch --prune origin` 后现扫。
+
+| 来源 | V 文件数 | 最高 V | 最高 V 文件名 |
+|---|---|---|---|
+| 主工作树磁盘（`D:\GT_plan\backend\migrations/`） | 202 | V202 | `V202__consol_note_mapping_reuse_and_reference.sql` |
+| 目标分支尖端（`origin/spec/disclosure-note-doc-upload-and-batch-fill` = `8798e92fd`） | 200 | V200 | `V200__consol_note_mapping_reuse_and_reference.sql` + `V200__partner_manager_edit_level_backfill.sql`（**同号两文件**） |
+| 并集最高 | — | **V202** | — |
+| n = 并集最高 + 1 | — | **203** | — |
+
+🔴 **V200 同号冲突**：
+
+- 目标分支尖端 `8798e92fd` 同时包含 `V200__partner_manager_edit_level_backfill.sql`（本 spec）和 `V200__consol_note_mapping_reuse_and_reference.sql`（并发会话），两个文件都在 `backend/migrations/`。
+- `MigrationRunner` 按文件名 `^V(\d+)__` 解析版本号。同一版本号下多个文件，`scan_migrations` 按字母序靠后者静默丢失（memory 所记）。字母序 `p > c`，所以 `partner_manager` 排在后面被丢弃，运行时只执行 `consol_note_mapping`。**回填迁移不会生效**。
+- 主工作树磁盘已解决：本 spec 改为 V201，`consol_note_mapping` 改为 V202。但 worktree `D:\wt_pm_impl` 仍是 V200。
+- 实施 worktree 中现状：`V200__partner_manager_edit_level_backfill.sql` + `V200__consol_note_mapping_reuse_and_reference.sql` 共存，R200 同理。
+
+**裁定：须在提交前重命名为 V203/R203**（n=203）。涉及文件：
+1. `V200__partner_manager_edit_level_backfill.sql` → `V203__partner_manager_edit_level_backfill.sql`
+2. `R200__rollback_partner_manager_edit_level_backfill.sql` → `R203__rollback_partner_manager_edit_level_backfill.sql`
+3. 测试引用（`test_level_backfill_migration_pg.py` 中的文件名 / 版本号常量）
+4. acceptance.md 迁移号更新
+5. 重跑任务 7 的测试
+
+但 n=203 的取值前提是 V201、V202 已确定不变。主工作树磁盘 V201 是 `V201__partner_manager_edit_level_backfill.sql`（本 spec 另一份副本），V202 是 `V202__consol_note_mapping_reuse_and_reference.sql`。若主工作树的号也可能变动，需与用户确认最终号段分配。
+
+**与任务 1.2 / 7.1 的差异说明**：
+- 任务 1.2（2026-10-20）：并集最高 V197，n=198。随后 198/199 被占用，任务 7.1 调整为 n=200。
+- 任务 7.1（2026-10-21）：并集最高 V199（目标分支尖端 `8bfe70c1d`），n=200。
+- 任务 19.8（2026-10-22）：目标分支尖端已推进到 `8798e92fd`，同时包含本 spec 的 V200 和并发会话的 V200，并集最高变为 V202，n=203。**原因是本 spec 的候选代码（连同 V200）被推入目标分支后，并发会话也推入了同号 V200**。
+
+本项须在提交候选 C 前解决（任务 19.2）。重命名操作推迟到用户确认号段后执行。

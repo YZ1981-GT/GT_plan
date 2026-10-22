@@ -228,7 +228,7 @@ _A14 = Recipe(
     path_template="/api/projects/{project_id}/disclosure-note-import/parse-upload",
     url=f"/api/projects/{TARGET_PROJECT_ID}/disclosure-note-import/parse-upload",
     request_kwargs={"files": {"file": ("附注.docx", b"PK" + b"\x00" * 100, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}},
-    stubs=(StubTarget("app.services.note_text_batch_flow", "parse_upload_bytes", awaitable=False),),
+    stubs=(StubTarget("app.routers.note_text_batch", "parse_upload_bytes", awaitable=False),),
 )
 
 # A15: POST /api/projects/{project_id}/disclosure-note-import/parse-knowledge
@@ -237,7 +237,7 @@ _A15 = Recipe(
     path_template="/api/projects/{project_id}/disclosure-note-import/parse-knowledge",
     url=f"/api/projects/{TARGET_PROJECT_ID}/disclosure-note-import/parse-knowledge",
     request_kwargs={"json": {"doc_ids": []}},
-    stubs=(StubTarget("app.services.note_text_batch_flow", "knowledge_source_payload"),),
+    stubs=(StubTarget("app.routers.note_text_batch", "knowledge_source_payload"),),
 )
 
 # A16: POST /api/projects/{project_id}/disclosure-note-text-batch/preview
@@ -246,7 +246,7 @@ _A16 = Recipe(
     path_template="/api/projects/{project_id}/disclosure-note-text-batch/preview",
     url=f"/api/projects/{TARGET_PROJECT_ID}/disclosure-note-text-batch/preview",
     request_kwargs={"json": {"year": _YEAR, "source": {"source_kind": "upload", "parsed_source": {}}}},
-    stubs=(StubTarget("app.services.note_text_batch_flow", "resolve_source"),),
+    stubs=(StubTarget("app.routers.note_text_batch", "resolve_source"),),
 )
 
 # A17: POST /api/projects/{project_id}/disclosure-note-text-batch/apply
@@ -259,7 +259,7 @@ _A17 = Recipe(
                  "selections": [], "preview_digest": "0" * 64},
         "headers": {"X-Mutation-Id": "test-mut-12345678"},
     },
-    stubs=(StubTarget("app.services.note_text_batch_flow", "resolve_source"),),
+    stubs=(StubTarget("app.routers.note_text_batch", "resolve_source"),),
 )
 
 # A18: POST /api/projects/{project_id}/note-content-templates/snapshot-preview
@@ -268,7 +268,7 @@ _A18 = Recipe(
     path_template="/api/projects/{project_id}/note-content-templates/snapshot-preview",
     url=f"/api/projects/{TARGET_PROJECT_ID}/note-content-templates/snapshot-preview",
     request_kwargs={"json": {"year": _YEAR, "owner_scope": "personal"}},
-    stubs=(StubTarget("app.services.note_content_template_snapshot", "snapshot_preview"),),
+    stubs=(StubTarget("app.routers.note_content_templates", "snapshot_preview"),),
 )
 
 # A19: POST /api/projects/{project_id}/note-content-templates
@@ -277,7 +277,7 @@ _A19 = Recipe(
     path_template="/api/projects/{project_id}/note-content-templates",
     url=f"/api/projects/{TARGET_PROJECT_ID}/note-content-templates",
     request_kwargs={"json": {"year": _YEAR, "name": "测试模板", "owner_scope": "personal", "snapshot_digest": "0" * 64}},
-    stubs=(StubTarget("app.services.note_content_template_snapshot", "save_snapshot"),),
+    stubs=(StubTarget("app.routers.note_content_templates", "save_snapshot"),),
 )
 
 # A20: DELETE /api/projects/{project_id}/note-content-templates/{template_id}
@@ -285,7 +285,7 @@ _A20 = Recipe(
     method="DELETE",
     path_template="/api/projects/{project_id}/note-content-templates/{template_id}",
     url=f"/api/projects/{TARGET_PROJECT_ID}/note-content-templates/5a1d0c3e-7b2f-4e61-9c84-2f0d6b9a1e20",
-    stubs=(StubTarget("app.services.note_content_template_snapshot", "soft_delete_template"),),
+    stubs=(StubTarget("app.routers.note_content_templates", "soft_delete_template"),),
 )
 
 # A21: POST /api/projects/{project_id}/notes/import-prior-year
@@ -418,7 +418,7 @@ _B2_SAVE_TRIM = Recipe(
     path_template="/api/disclosure-notes/{project_id}/sections/trim",
     url=f"/api/disclosure-notes/{TARGET_PROJECT_ID}/sections/trim",
     request_kwargs={"json": {"items": [{"id": "\u4e94\u3001\uff11", "status": "applicable", "skip_reason": None}]}},
-    stubs=(StubTarget("app.services.note_trim_service", "NoteTrimService", is_class=True),),
+    stubs=(StubTarget("app.routers.note_trim", "NoteTrimService", is_class=True),),
 )
 
 # B2: POST /api/disclosure-notes/{project_id}/{year}/auto-trim
@@ -426,7 +426,7 @@ _B2_AUTO_TRIM = Recipe(
     method="POST",
     path_template="/api/disclosure-notes/{project_id}/{year}/auto-trim",
     url=f"/api/disclosure-notes/{TARGET_PROJECT_ID}/{_YEAR}/auto-trim",
-    stubs=(StubTarget("app.services.note_trim_service", "NoteTrimService", is_class=True),),
+    stubs=(StubTarget("app.routers.note_trim", "NoteTrimService", is_class=True),),
 )
 
 # B2: POST /api/projects/{project_id}/notes/custom-sections/create
@@ -435,7 +435,7 @@ _B2_CUSTOM_SECTION_CREATE = Recipe(
     path_template="/api/projects/{project_id}/notes/custom-sections/create",
     url=f"/api/projects/{TARGET_PROJECT_ID}/notes/custom-sections/create",
     request_kwargs={"json": {"year": _YEAR, "section_type": "mixed", "title": "\u6d4b\u8bd5\u7ae0\u8282"}},
-    stubs=(StubTarget("app.services.note_custom_section_service", "NoteCustomSectionService", is_class=True),),
+    stubs=(StubTarget("app.routers.note_custom_section", "NoteCustomSectionService", is_class=True),),
 )
 
 # B2: POST /api/projects/{project_id}/notes/custom-sections/save-as-template
@@ -444,7 +444,7 @@ _B2_CUSTOM_SECTION_SAVE_AS_TEMPLATE = Recipe(
     path_template="/api/projects/{project_id}/notes/custom-sections/save-as-template",
     url=f"/api/projects/{TARGET_PROJECT_ID}/notes/custom-sections/save-as-template",
     request_kwargs={"json": {"section_id": str(TARGET_NOTE_ID), "template_name": "\u6d4b\u8bd5\u6a21\u677f"}},
-    stubs=(StubTarget("app.services.note_custom_section_service", "NoteCustomSectionService", is_class=True),),
+    stubs=(StubTarget("app.routers.note_custom_section", "NoteCustomSectionService", is_class=True),),
 )
 
 # B2: POST /api/projects/{project_id}/notes/custom-sections/apply-template
@@ -453,8 +453,58 @@ _B2_CUSTOM_SECTION_APPLY_TEMPLATE = Recipe(
     path_template="/api/projects/{project_id}/notes/custom-sections/apply-template",
     url=f"/api/projects/{TARGET_PROJECT_ID}/notes/custom-sections/apply-template",
     request_kwargs={"json": {"year": _YEAR, "template_id": "5a1d0c3e-7b2f-4e61-9c84-2f0d6b9a1e30"}},
-    stubs=(StubTarget("app.services.note_custom_section_service", "NoteCustomSectionService", is_class=True),),
+    stubs=(StubTarget("app.routers.note_custom_section", "NoteCustomSectionService", is_class=True),),
 )
+
+# ---------------------------------------------------------------------------
+# B3: note_section_lock acquire / heartbeat, note_data_lock snapshot,
+#     note_group_template save / detach — require_note_edit_access(consol_lock=False)
+# ---------------------------------------------------------------------------
+
+# B3: POST /api/projects/{project_id}/notes/locks/acquire
+_B3_ACQUIRE_LOCK = Recipe(
+    method="POST",
+    path_template="/api/projects/{project_id}/notes/locks/acquire",
+    url=f"/api/projects/{TARGET_PROJECT_ID}/notes/locks/acquire",
+    request_kwargs={"json": {"year": _YEAR, "section_code": "\u4e94\u30011"}},
+    stubs=(StubTarget("app.routers.note_section_lock", "NoteSectionLockService", is_class=True),),
+)
+
+# B3: POST /api/projects/{project_id}/notes/locks/heartbeat
+_B3_HEARTBEAT = Recipe(
+    method="POST",
+    path_template="/api/projects/{project_id}/notes/locks/heartbeat",
+    url=f"/api/projects/{TARGET_PROJECT_ID}/notes/locks/heartbeat",
+    request_kwargs={"json": {"year": _YEAR, "section_code": "\u4e94\u30011"}},
+    stubs=(StubTarget("app.routers.note_section_lock", "NoteSectionLockService", is_class=True),),
+)
+
+# B3: POST /api/projects/{project_id}/data-lock/snapshot
+_B3_SNAPSHOT = Recipe(
+    method="POST",
+    path_template="/api/projects/{project_id}/data-lock/snapshot",
+    url=f"/api/projects/{TARGET_PROJECT_ID}/data-lock/snapshot",
+    request_kwargs={"json": {"year": _YEAR}},
+    stubs=(StubTarget("app.routers.note_data_lock", "NoteDataLockService", is_class=True),),
+)
+
+# B3: POST /api/projects/{project_id}/notes/group-template/save
+_B3_SAVE_GROUP_TEMPLATE = Recipe(
+    method="POST",
+    path_template="/api/projects/{project_id}/notes/group-template/save",
+    url=f"/api/projects/{TARGET_PROJECT_ID}/notes/group-template/save",
+    request_kwargs={"json": {"year": _YEAR, "template_name": "\u6d4b\u8bd5\u96c6\u56e2\u6a21\u677f"}},
+    stubs=(StubTarget("app.routers.note_group_template", "NoteGroupTemplateService", is_class=True),),
+)
+
+# B3: POST /api/projects/{project_id}/notes/group-template/detach
+_B3_DETACH_GROUP_TEMPLATE = Recipe(
+    method="POST",
+    path_template="/api/projects/{project_id}/notes/group-template/detach",
+    url=f"/api/projects/{TARGET_PROJECT_ID}/notes/group-template/detach",
+    stubs=(StubTarget("app.routers.note_group_template", "NoteGroupTemplateService", is_class=True),),
+)
+
 
 # ---------------------------------------------------------------------------
 # 配方注册表
@@ -468,5 +518,7 @@ for _recipe in [_A1, _A2, _A3, _A4, _A5, _A6, _A7, _A8, _A9, _A10, _A11, _A12,
                 _B1_APPLY_GROUP_BASELINE,
                 _B2_SAVE_TRIM, _B2_AUTO_TRIM,
                 _B2_CUSTOM_SECTION_CREATE, _B2_CUSTOM_SECTION_SAVE_AS_TEMPLATE,
-                _B2_CUSTOM_SECTION_APPLY_TEMPLATE]:
+                _B2_CUSTOM_SECTION_APPLY_TEMPLATE,
+                _B3_ACQUIRE_LOCK, _B3_HEARTBEAT, _B3_SNAPSHOT,
+                _B3_SAVE_GROUP_TEMPLATE, _B3_DETACH_GROUP_TEMPLATE]:
     ALL_RECIPES[_recipe.key] = _recipe

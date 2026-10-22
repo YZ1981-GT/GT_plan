@@ -15,7 +15,6 @@ import { ElMessage } from 'element-plus'
 import type { ApplyResponse } from '@/composables/useNoteTextBatch'
 import type { ContentTemplateItem, ContentTemplateVersion } from '@/composables/useNoteContentTemplate'
 import type { AxiosRequestConfig } from 'axios'
-import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { api } from '@/services/apiProxy'
 import { consolidation as P_consol } from '@/services/apiPaths'
 import { eventBus } from '@/utils/eventBus'
@@ -32,7 +31,6 @@ const active = ref<'upload' | 'save' | 'pick' | null>(null)
 const applyTarget = ref<{ template: ContentTemplateItem; version: ContentTemplateVersion } | null>(null)
 
 // ── AC-6.3：合并锁定也要隐藏写入口（编辑器的 canEdit 只含归档与项目权限，不含合并锁）──
-const { can } = usePermissionMatrix()
 const consolLocked = ref(false)
 /**
  * 必须关掉 http 的 GET 去重：同页的合并锁定横幅几乎同时发同一个 GET，去重会**取消先发的那一个**，
@@ -54,18 +52,15 @@ watch(() => props.projectId, refreshLock)
 eventBus.on('consol-lock:detected', refreshLock)
 onUnmounted(() => eventBus.off('consol-lock:detected', refreshLock))
 
-/** 三个入口是否可用：编辑权限 + 附注编辑操作（与后端 require_operation('note:edit') 同码）+ 未合并锁定 */
-const available = computed(() => props.canWrite && can('note:edit') && !consolLocked.value)
+/** 三个入口是否可用：编辑权限（canWrite 由父组件经 noteEdit 判定查询提供）+ 未合并锁定 */
+const available = computed(() => props.canWrite && !consolLocked.value)
 
 function open(kind: 'upload' | 'save' | 'apply'): boolean {
   if (!props.canWrite) {
     ElMessage.warning('当前无编辑权限（只读、已归档、合并锁定或 EQCR 复核中），不能批量写入附注')
     return false
   }
-  if (!can('note:edit')) {
-    ElMessage.warning('当前账号没有附注编辑权限，不能批量写入附注')
-    return false
-  }
+
   if (consolLocked.value) {
     ElMessage.warning('项目已被合并锁定，不能批量写入附注')
     return false

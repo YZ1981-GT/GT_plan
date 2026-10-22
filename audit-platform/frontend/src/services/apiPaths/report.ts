@@ -173,6 +173,12 @@ export const disclosureNotes = {
   traceSource: (pid: string, cellId: string) => `/api/projects/${pid}/notes/trace-source?cell_id=${encodeURIComponent(cellId)}`,
 } as const
 
+// ─── 附注编辑权限（partner-manager-edit-permission §4.13）─────────────────
+
+export const noteEditPermission = {
+  query: (pid: string) => `/api/projects/${pid}/disclosure-notes/edit-permission`,
+} as const
+
 // ─── 审计报告 ───────────────────────────────────────────────────────────────
 
 export const auditReport = {

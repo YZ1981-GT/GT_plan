@@ -6,8 +6,8 @@ word-exports 整组（一键生成全套等）、交付中心（``deliverable._g
 
 - 查看（含 AI 预览，不落库）：本项目成员 readonly 及以上；
 - 生成交付件（交付中心 / 一键全套 / 导出附注 Word / 组合导出包）：同一判定 ``_guard_action`` —— 本项目成员
-  review 及以上 + 角色矩阵 + EQCR 只读。review 而非 edit：按 ROLE_MAP，合伙人（含签字合伙人）/ 经理 / 审计员 / 助理是
-  edit 级，质控 / EQCR 是 review 级，review 门让质控也能生成（EQCR 由「EQCR 只读」拦下）；
+  review 及以上 + 角色矩阵 + EQCR 只读。review 而非 edit：review 门禁放行 review 级的质控与 EQCR 的读与非写动作；
+  合伙人 / 经理为 edit 级同样满足（EQCR 由 ``is_project_eqcr`` 判定后被矩阵拒绝写操作）；
 - 编制（全链路执行 / 重试 / 附注同步与裁剪，会改写试算表 / 报表 / 附注）：edit，与附注模块写端点同级。
 
 同日用户拍板「合伙人和经理都要用」：附注编辑器导出 Word、交付件章节刷新 / 报告正文回填原为 edit 门、合伙人 / 经理
@@ -18,7 +18,7 @@ word-exports 整组（一键生成全套等）、交付中心（``deliverable._g
 做法同 test_phase8_endpoint_role_levels（memory ㉕；partner-manager-edit-permission 需求 12.1）：请求经权限世界
 （``tests/authz_world.py``）真发。身份是世界里的真实用户、成员行与委派：成员行取 ``ROLE_MAP`` 对委派角色给出的值
 （未登记角色取 ``UNMAPPED_ROLE``），并带一条该角色的现行委派；EQCR 由真实的 ``eqcr`` 现行委派给出（``_guard_action``
-经 ``_is_project_eqcr`` 读委派表与人员库）。判定由生产的 ``require_project_access`` / ``assert_project_permission`` /
+经 ``is_project_eqcr`` 读委派表与人员库）。判定由生产的 ``require_project_access`` / ``assert_project_permission`` /
 ``_guard_action`` 作出，门禁、归档守卫与 EQCR 判定都不替换。端点另读的交付件、执行记录、报表三张表
 在世界里补建（只建表，外键只留指向已建表的）。业务层打桩并计数 —— 被拦下的请求一次业务调用都不能有，放行的请求
 恰好调到它该调的那几个。
@@ -169,7 +169,7 @@ def _reset(stubs: dict[str, ServiceStub]) -> None:
 
 async def _delegated(world: AuthzWorld, alias: str, *, global_role: str = "auditor") -> Identity:
     """委派为 ``alias`` 的成员：成员行取 ROLE_MAP 对该角色给出的值（未登记取 UNMAPPED_ROLE），另建一条该角色的
-    现行委派（``eqcr_assignment`` 按任意委派角色建人员库记录与委派；只有 ``eqcr`` 会被 ``_is_project_eqcr`` 认作 EQCR）。"""
+    现行委派（``eqcr_assignment`` 按任意委派角色建人员库记录与委派；EQCR 别名集合中的角色会被 ``is_project_eqcr`` 认作 EQCR）。"""
     role, level = map_assignment_role(alias)
     identity = await world.member(level, role, global_role=global_role)
     await world.eqcr_assignment(alias, user=identity.user)
@@ -353,6 +353,26 @@ async def test_eqcr_on_project_can_view_but_not_generate(world) -> None:
     for name, method, path, body, calls in _VIEW:
         resp, _ = await _send(world, identity.user, method, path, body)
         assert resp.status_code == 200, f"{name}：EQCR 看不了 {resp.status_code}"
+        assert _counts(stubs) == calls, name
+        _reset(stubs)
+
+
+async def test_eqcr_chinese_alias_can_view_but_not_generate(world) -> None:
+    """委派角色为「独立复核合伙人」（EQCR 中文别名）的成员同样只读 —— 生成类写操作 403，列表 / 预览 / 下载放行。
+
+    需求 7.4：交付中心门禁改用 ``is_project_eqcr`` 后，中文别名「独立复核合伙人」也被识别为 EQCR。"""
+    stubs = _stub_business(world)
+    identity = await _delegated(world, "独立复核合伙人", global_role="partner")
+    assert _member_row(identity) == EXPECTED_ROLE_MAP["独立复核合伙人"]
+    assert await is_project_eqcr(world.db, identity.user, PID) is True
+    for name, method, path, body, _calls in _GENERATE:
+        resp, client = await _send(world, identity.user, method, path, body)
+        _assert_denied(resp, name, "独立复核合伙人 ")
+        assert _counts(stubs) == {}, name
+        client.assert_passed(GUARD, times=1)
+    for name, method, path, body, calls in _VIEW:
+        resp, _ = await _send(world, identity.user, method, path, body)
+        assert resp.status_code == 200, f"{name}：独立复核合伙人看不了 {resp.status_code}"
         assert _counts(stubs) == calls, name
         _reset(stubs)
 

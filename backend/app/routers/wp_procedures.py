@@ -25,7 +25,7 @@ from app.services.wp_quality_score_linkage import recalc_quality_score
 logger = logging.getLogger(__name__)
 
 # 路由级 readonly 保证项目隔离；complete/custom/copy-from-prior 是编制操作，各自再挂 edit（Phase 8 Task 8 补）。
-# trim 挂 review：裁剪由经理 / 合伙人做，他们在项目里是 review 级（assignment_service.ROLE_MAP），挂 edit 会被挡住。
+# trim 挂 review：裁剪由经理 / 合伙人做，他们是 edit 级（满足 review 门禁）；质控 / EQCR 是 review 级同样放行；挂 edit 会挡住质控。
 router = APIRouter(
     prefix="/api/projects/{project_id}/workpapers/{wp_id}/procedures",
     tags=["workpaper-procedures"],
