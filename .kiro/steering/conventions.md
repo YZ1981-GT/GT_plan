@@ -1953,3 +1953,57 @@ sheet_name 须含审定表子码，形如 审定表D2-1，即 D 到 N 字母加�
 顺带一条同源的：**PowerShell 的 `>` 重定向写的是 UTF-16LE + BOM**，不是 utf-8。
 把工具的 `--json` 输出重定向到文件再用 Python `read_text(encoding="utf-8")` 读，
 会在第一个字节就抛 `UnicodeDecodeError: 0xff`。要么让工具自己写文件，要么读时按 BOM 判编码。
+
+## Spec 三件套膨胀控制（2026-10-23 partner-manager-edit-permission 复盘沉淀）
+
+> 背景：pm-edit-permission spec 产出 137 文件 / +63,329 行，其中测试 52 文件 / ~6 万行验证 ~2000 行生产代码，acceptance.md 4577 行比三件套加起来还大。核心改动质量高（8 个配套缺陷、18 性质测试、15 项变异全覆盖），但文档与测试的投入产出比需要收紧。
+
+### 一、任务粒度按交付单元合并（禁止一文件一任务）
+
+- 一个任务 = 一个可独立测试的交付单元（一组关联文件 + 对应测试），不是一个原子步骤
+- 坏例：「ROLE_MAP 升级」「推导常量」「单元测试」「前提测试改写」拆成 4 个任务 → 每个任务的子代理都要重读 spec + 定位代码
+- 好例：「ROLE_MAP 升级与推导常量 + 单元测试 + 前提测试改写」= 1 个任务
+- 经验值：110 个任务应压到 40~50 个；每个任务平均 3~5 个文件改动 + 对应测试
+- 串行依赖的原子步骤写成任务内的 checklist（子弹点），不升为独立任务
+
+### 二、验收记录用聚合摘要（禁止逐条展开可机器核查的结果）
+
+- 变异记录：只写「变异描述 → 哪个测试打红 → 恢复确认」三列表格；SHA256 只留恢复后的，变异后的省略
+- 口径检索（如需求 2.9「合伙人/经理仍称 review」）：按类聚合——「spec 文档 32 处均为描述变更、测试 24 处均为验证新行为……仍称旧口径：0」；不逐条列出 80 处
+- 性质测试样例表：只列非 trivial 的固定样例，按逻辑组归纳；ROLE_MAP 全键遍历等机械枚举不展开
+- 预存失败：只列测试标识 + 失败摘要 + 基线提交，不贴完整 traceback
+- 目标：acceptance.md 控制在三件套总行数以内（requirements + design + tasks 行数之和）
+
+### 三、需求与设计禁止互相复述
+
+- requirements 只写「是什么」（功能需求 + 验收标准 + 现状事实表）
+- design 只写「怎么实现」（架构决策 + 裁定 + 变更矩阵 + 行数门），引用需求用「需求 X.Y」编号，不复制整段文字或整个表格
+- 现状事实表（F1~F16）只在 requirements 写一份，design 的「现状确认」只列新发现（N 编号），不重抄 F 表
+- 目标：三件套总量 ≤ 1500 行（requirements ≤ 500 / design ≤ 600 / tasks ≤ 400）
+
+### 四、端点权限测试在设计阶段规划表驱动
+
+- 多端点 × 多身份的组合测试从设计阶段就写成参数化结构（@pytest.mark.parametrize 或配方表 + 循环），不是先为每个组合写独立函数再想折叠
+- 每个端点一个配方字典：{url, method, body/params, stub_factory, allowed_identities, denied_identities}
+- 共用的断言逻辑提成 _assert_allowed / _assert_denied 辅助函数
+- 端点特有的 service 桩用工厂函数（stub_factory: Callable[[AuthzWorld], Mock]），不在每个测试里重复
+- 首次写新模式时允许先展开再折叠（理解清楚再抽象），但 tasks.md 里明确标注「任务 N 完成后重构为参数化」
+
+### 五、迁移号实施时动态取
+
+- spec 写作阶段在需求 / 设计里写「V{n}」占位，不写具体数字
+- 实施任务第一步现扫 MAX(V*.sql) + 1 取真实号，记入 acceptance.md
+- 避免并发 session 撞号后需要全面重命名（pm-edit-permission 的 V200→V203 教训）
+
+### 六、推送一律在 worktree 内完成
+
+- 实施 worktree 没有并发会话的未跟踪 / 已修改文件污染，pre-push hook 不会被无关文件阻塞
+- 收尾任务的推送步骤在 worktree 内执行（git push origin HEAD:target-branch），不切回主工作树
+- 主工作树只做勾选 tasks.md（然后 byte-for-byte 复制进 worktree）
+
+### 七、脚本标注生命周期
+
+- ackend/scripts/gen/ 下的脚本如果带 --check 模式且被 CI 或 pre-push 调用 = 长期守卫，不标生命周期
+- 一次性探针 / 数据修复脚本用 _ 前缀（已有约定），文件头注释标明「用完即删」
+- 介于两者之间的（如清单生成器，只在 spec 交付时跑一次但产物被守卫引用）：文件头注释标明「由 XX spec 引入，产物被 YY 守卫引用，删除前先确认守卫不依赖」
+
