@@ -1,0 +1,61 @@
+{
+  "_schema_version": 1,
+  "_description": "预置表间审核规则模板（spec: formula-management-deep-optimization · R4.4）。用户可一键导入。",
+  "_spec": "formula-management-deep-optimization · R4",
+  "rules": [
+    {
+      "label": "资产负债表平衡",
+      "left_ref": "ROW('资产合计')",
+      "operator": "=",
+      "right_ref": "ROW('负债和所有者权益合计')",
+      "tolerance": "0.01",
+      "description": "资产合计 = 负债合计 + 所有者权益合计",
+      "category": "balance_sheet"
+    },
+    {
+      "label": "利润表净利润勾稽",
+      "left_ref": "ROW('营业利润') + ROW('营业外收入') - ROW('营业外支出')",
+      "operator": "=",
+      "right_ref": "ROW('利润总额')",
+      "tolerance": "0.01",
+      "description": "营业利润 + 营业外收入 - 营业外支出 = 利润总额",
+      "category": "income_statement"
+    },
+    {
+      "label": "利润表所得税勾稽",
+      "left_ref": "ROW('利润总额') - ROW('所得税费用')",
+      "operator": "=",
+      "right_ref": "ROW('净利润')",
+      "tolerance": "0.01",
+      "description": "利润总额 - 所得税费用 = 净利润",
+      "category": "income_statement"
+    },
+    {
+      "label": "未分配利润勾稽",
+      "left_ref": "PREV('4104', '期末余额') + ROW('净利润')",
+      "operator": "=",
+      "right_ref": "TB('4104', '审定数')",
+      "tolerance": "1.00",
+      "description": "上年末未分配利润 + 本年净利润 ≈ 本年末未分配利润（不含分红转增等）",
+      "category": "cross_module"
+    },
+    {
+      "label": "货币资金附注一致",
+      "left_ref": "TB('1001', '审定数') + TB('1002', '审定数') + TB('1012', '审定数')",
+      "operator": "=",
+      "right_ref": "ROW('货币资金')",
+      "tolerance": "0.01",
+      "description": "库存现金+银行存款+其他货币资金 = 报表货币资金行",
+      "category": "tb_vs_report"
+    },
+    {
+      "label": "报表合计与TB汇总",
+      "left_ref": "SUM_TB('1001', '审定数')",
+      "operator": "=",
+      "right_ref": "ROW('货币资金')",
+      "tolerance": "0.01",
+      "description": "试算表 1001 科目审定数 = 报表货币资金行",
+      "category": "tb_vs_report"
+    }
+  ]
+}

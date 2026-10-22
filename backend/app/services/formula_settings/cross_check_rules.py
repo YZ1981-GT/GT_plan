@@ -131,11 +131,16 @@ async def _evaluate(expression: str, resolver: Any, row_cache: dict[str, Decimal
     if not text:
         return None, "未填写"
     try:
-        require_expression_support(text, Executor.REPORT_PATH)
+        # spec: formula-management-deep-optimization · R4：表间审核使用 CENTRAL_BATCH 维度
+        require_expression_support(text, Executor.CENTRAL_BATCH)
     except FormulaSupportViolation:
         return None, "含报表路径不支持的函数"
     try:
-        result = await evaluate_formula_result(text, resolver=resolver, row_cache=row_cache, strict_context=True)
+        # R4：表间审核启用 PREV/AUX 预载
+        result = await evaluate_formula_result(
+            text, resolver=resolver, row_cache=row_cache,
+            strict_context=True, enable_prev=True, enable_aux=True,
+        )
     except Exception as exc:  # noqa: BLE001 —— 取不到数如实记为不通过
         return None, str(exc)[:200]
     if not result.ok:

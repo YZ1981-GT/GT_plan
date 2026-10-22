@@ -250,6 +250,12 @@
               :read-only="formulaReadOnly"
               @rollback-applied="onHistoryRollbackApplied"
             />
+            <!-- spec: formula-management-deep-optimization · R6 — 公式版本时间轴 -->
+            <FormulaTimelinePanel
+              v-if="activeCategory === 'history' && projectId"
+              :project-id="projectId"
+              :year="year || new Date().getFullYear()"
+            />
           </el-tab-pane>
           <!-- chain-closure-phase2-formula-push-engine：公式推送（四表 / 试算表 / 调整分录 → 底稿 → 附注） -->
           <el-tab-pane v-if="projectId && year" name="formula_push">
@@ -523,6 +529,7 @@ import FormulaEditDialog from './FormulaEditDialog.vue'
 import FormulaInput from './FormulaInput.vue'
 import FormulaParamPicker from './FormulaParamPicker.vue'
 import FormulaHistoryTab from './FormulaHistoryTab.vue'
+import FormulaTimelinePanel from './FormulaTimelinePanel.vue'
 import FormulaPushPanel from './FormulaPushPanel.vue'
 import ConsolFormulaManagementPanel from './ConsolFormulaManagementPanel.vue'
 import {

@@ -174,6 +174,14 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.address_registry import router as addr_router
     app.include_router(addr_router, tags=["系统管理"])
 
+    # ═══ 公式管理深度优化（spec: formula-management-deep-optimization） ═══
+    from app.routers.formula_health import router as fh_router
+    from app.routers.formula_debug import router as fd_router
+    from app.routers.formula_push_verify import router as fpv_router
+    from app.routers.formula_timeline import router as ft_router
+    for r in [fh_router, fd_router, fpv_router, ft_router]:
+        app.include_router(r, tags=["公式管理"])
+
     # 系统字典（枚举字典集中管理）
     from app.routers.system_dicts import router as sdict_router
     app.include_router(sdict_router, tags=["系统管理"])

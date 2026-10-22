@@ -14,6 +14,15 @@
     class="gt-fm-dashboard-dialog"
   >
     <PushCoverageCard :show="visible" :project-id="projectId" :year="year" />
+
+    <!-- spec: formula-management-deep-optimization · R2 — 项目级公式健康度 -->
+    <details v-if="projectId && year" style="margin-bottom: 10px;">
+      <summary style="cursor: pointer; font-weight: 600; font-size: var(--gt-font-size-sm); padding: 4px 0;">
+        📊 项目公式健康度
+      </summary>
+      <FormulaHealthPanel :project-id="projectId" :year="year" />
+    </details>
+
     <div style="margin-bottom: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
       <el-input v-model="search" size="small" placeholder="搜索公式/行次/说明/域..." clearable style="width: 220px;" />
       <el-select v-model="groupBy" size="small" style="width: 130px;">
@@ -149,6 +158,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import PushCoverageCard from './panels/PushCoverageCard.vue'
+import FormulaHealthPanel from './FormulaHealthPanel.vue'
 
 defineOptions({ name: 'FormulaDashboardDialog' })
 

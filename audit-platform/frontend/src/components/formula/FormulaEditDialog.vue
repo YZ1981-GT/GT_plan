@@ -244,9 +244,21 @@
       </div>
     </div>
 
+    <!-- spec: formula-management-deep-optimization · R3 — 公式调试 -->
+    <div v-if="showDebugPanel" style="padding: 0 16px 8px;">
+      <FormulaDebugPanel :formula="currentEditFormula" :project-id="resolveProjectId()" :year="resolveYear()" scope="report" />
+    </div>
+
     <template #footer>
-      <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" @click="onSave">保存公式</el-button>
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <el-button size="small" :type="showDebugPanel ? 'primary' : 'default'" @click="showDebugPanel = !showDebugPanel">
+          {{ showDebugPanel ? '收起调试' : '▶ 调试运行' }}
+        </el-button>
+        <div>
+          <el-button @click="visible = false">取消</el-button>
+          <el-button type="primary" @click="onSave">保存公式</el-button>
+        </div>
+      </div>
     </template>
   </el-dialog>
 
@@ -429,6 +441,7 @@ import * as P from '@/services/apiPaths'
 import type { WpFormulaContext } from '@/components/workpaper/GtCustomWpEditor.vue'
 import { filterWpBrowserRows, mapRegistryToPickerRows, mapAcnrCellsToPickerRows } from '@/utils/wpFormulaPicker'
 import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
+import FormulaDebugPanel from './FormulaDebugPanel.vue'
 
 const route = useRoute()
 // ACNR 前端 SDK（acnr-consumer-wiring Req 14.3/14.5, task 18.3）
@@ -465,6 +478,14 @@ const visible = computed({
 
 const formulas = ref<FormulaItem[]>([])
 const initialDraftFingerprint = ref('')
+const showDebugPanel = ref(false)
+const currentEditFormula = computed(() => {
+  try {
+    const idx = activeFormulaIdx?.value ?? 0
+    if (idx >= 0 && idx < formulas.value.length) return formulas.value[idx]?.expression || ''
+  } catch { /* */ }
+  return formulas.value[0]?.expression || ''
+})
 
 function formulaDraftFingerprint(items: FormulaItem[]): string {
   return JSON.stringify(items.map(({ expression, category, description, target_cell }) => ({

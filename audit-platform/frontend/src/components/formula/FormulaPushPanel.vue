@@ -159,6 +159,9 @@
         <el-table-column label="说明" min-width="220" prop="description" show-overflow-tooltip />
       </el-table>
     </div>
+
+    <!-- spec: formula-management-deep-optimization · R5 — 推送反向校验 -->
+    <FormulaPushVerifyPanel v-if="props.projectId && props.year" :project-id="props.projectId" :year="props.year" />
   </div>
 </template>
 
@@ -173,6 +176,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { formulaPush } from '@/services/apiPaths'
+import FormulaPushVerifyPanel from './FormulaPushVerifyPanel.vue'
 import {
   POLICY_LABELS, RUN_STATUS_LABELS, STAGE_LABELS, STATE_LABELS, TRIGGER_LABELS,
   actionable, labelOf, pendingStates, runStatusTag, targetText, triggersText, valueText,

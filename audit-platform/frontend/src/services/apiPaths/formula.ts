@@ -187,7 +187,27 @@ export const formulaPush = {
   runItems: (projectId: string, runId: string) => `${pushBase(projectId)}/runs/${runId}/items`,
 } as const
 
-/** 公式域聚合（便于 `import { formulaApi } from '@/services/apiPaths/formula'`） */
+// ─── 公式健康度总览（spec: formula-management-deep-optimization · R2） ────────
+export const formulaHealth = {
+  get: (projectId: string, year: number | string) => `/api/formula-health/${projectId}/${year}`,
+} as const
+
+// ─── 公式调试（spec: formula-management-deep-optimization · R3） ──────────────
+export const formulaDebug = {
+  run: () => `/api/formula/debug`,
+} as const
+
+// ─── 推送反向校验（spec: formula-management-deep-optimization · R5） ──────────
+export const formulaPushVerify = {
+  verify: (projectId: string, year: number | string) => `/api/formula-push/${projectId}/${year}/verify`,
+} as const
+
+// ─── 公式版本时间轴（spec: formula-management-deep-optimization · R6） ────────
+export const formulaTimeline = {
+  list: (projectId: string, year: number | string) => `/api/formula-timeline/${projectId}/${year}`,
+} as const
+
+/** 公式域聚合 */（便于 `import { formulaApi } from '@/services/apiPaths/formula'`） */
 export const formulaApi = {
   wpFormula,
   wpUserFormula,
@@ -198,4 +218,8 @@ export const formulaApi = {
   draftRefresh,
   noteFormula,
   formulaPush,
+  formulaHealth,
+  formulaDebug,
+  formulaPushVerify,
+  formulaTimeline,
 } as const

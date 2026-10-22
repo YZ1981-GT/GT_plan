@@ -40,6 +40,40 @@ logger = logging.getLogger(__name__)
 # ─── 附注模板数据（按需加载，进程生命周期内缓存） ──────────────────────────
 _DATA_DIR = Path(__file__).resolve().parents[3] / "data"
 
+# ─── 附注行标签别名映射（spec: formula-management-deep-optimization · R1） ────
+_ALIAS_PATH = _DATA_DIR / "formula_push_note_row_aliases.json"
+_ALIAS_CACHE: dict[str, list[str]] | None = None
+_ALIAS_MTIME: float = 0.0
+
+
+def _load_aliases() -> dict[str, list[str]]:
+    """加载别名表（mtime 变化热重载，进程内缓存）。"""
+    global _ALIAS_CACHE, _ALIAS_MTIME
+    try:
+        mtime = _ALIAS_PATH.stat().st_mtime
+    except OSError:
+        return {}
+    if _ALIAS_CACHE is not None and mtime == _ALIAS_MTIME:
+        return _ALIAS_CACHE
+    try:
+        raw = json.loads(_ALIAS_PATH.read_text(encoding="utf-8"))
+        _ALIAS_CACHE = raw.get("aliases") or {}
+        _ALIAS_MTIME = mtime
+    except (OSError, json.JSONDecodeError, TypeError):
+        _ALIAS_CACHE = {}
+    return _ALIAS_CACHE
+
+
+def _build_reverse_aliases() -> dict[str, str]:
+    """反向映射：别名 → 标准名。"""
+    aliases = _load_aliases()
+    reverse: dict[str, str] = {}
+    for canonical, names in aliases.items():
+        for name in names:
+            reverse[name] = canonical
+        reverse[canonical] = canonical
+    return reverse
+
 _TEMPLATE_CACHE: dict[str, list[dict]] = {}
 
 
@@ -440,6 +474,24 @@ def find_row(rows: Sequence[Any], labels: Sequence[str]) -> int | None:
         if len(candidates) == 1:
             return candidates[0]  # AC 2.3: 唯一命中
         # len==0 or len>1: fall through
+
+    # ④ 别名表映射（spec: formula-management-deep-optimization · R1.2）
+    reverse = _build_reverse_aliases()
+    aliases = _load_aliases()
+    for label in wanted:
+        if not label:
+            continue
+        canonical = reverse.get(label)
+        if canonical is None:
+            continue
+        name_set = {canonical} | set(aliases.get(canonical, []))
+        name_set.discard(label)
+        for alias in sorted(name_set):
+            for index, row in enumerate(rows):
+                if isinstance(row, dict) and row.get("is_total"):
+                    continue
+                if row_label(row) == alias:
+                    return index
     return None
 
 
