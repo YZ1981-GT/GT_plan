@@ -20,6 +20,8 @@
       :visible="true"
       :cell-info="currentCellInfo"
       :project-id="props.projectId"
+      :year="props.year"
+      :template-type="props.templateType"
       executor="note_executor"
       @update-formula="onUpdateFormula"
       @update-value="onUpdateValue"

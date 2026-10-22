@@ -131,6 +131,9 @@ const props = defineProps<{
   visible?: boolean
   cellInfo: CellInfo | null
   projectId?: string
+  // 年度 / 模板类型：地址库按项目 + 年度 + 模板加载（附注章节编号国企版、上市版不同）
+  year?: number
+  templateType?: string
   // 当前执行器维度（函数支持矩阵查表用，需求 8）。缺省 wp evaluator；附注结构编辑器传 note_executor。
   executor?: Executor
 }>()
@@ -291,6 +294,10 @@ async function pickSource(fn: string) {
   sourceDialogTitle.value = titleMap[fn] || '选择数据源'
 
   try {
+    // 宿主页没加载地址库时先按本项目加载（地址库给出登记好的引用写法；旧端点回退只是兜底）
+    if (!addrStore.loaded && props.projectId && typeof addrStore.refresh === 'function') {
+      await addrStore.refresh(props.projectId, props.year, props.templateType)
+    }
     if (fn === 'TB') {
       sourceRows.value = await loadTbRows()
     } else if (fn === 'ROW' || fn === 'SUM_ROW' || fn === 'REPORT') {
@@ -376,8 +383,11 @@ async function loadNoteRows(): Promise<any[]> {
       _ref: e.formula_ref || `NOTE('${e.note_section || ''}','合计','期末余额')`,
     }))
   }
-  const data = await api.get('/api/disclosure-notes/tree', { validateStatus: (s: number) => s < 600 })
-  const items = data ?? []
+  // 附注目录树：GET /api/disclosure-notes/{project_id}/{year}（原写的 /tree 不存在，回退恒为空）
+  if (!props.projectId || !props.year) return []
+  const data = await api.get(`/api/disclosure-notes/${props.projectId}/${props.year}`,
+    { validateStatus: (s: number) => s < 600 })
+  const items = Array.isArray(data) ? data : []
   return items.map((r: any) => {
     const section = r.note_section || r.section_number || r.note_number || ''
     return {

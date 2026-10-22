@@ -211,15 +211,36 @@
 
 ## 7. R6 底稿可编辑公式补齐函数
 
-现状：求值器先把 WP / SUM_TB / TB 代成数值，再以空上下文跑 L1；矩阵把其余函数判不支持，保存即 422（fail-closed，F10）。改为：
+现状：求值器先把 WP / SUM_TB / TB 代成数值，再以空上下文跑 L1；矩阵把其余函数判不支持，保存即 422（fail-closed，F10）。但读取 / 渲染时求值预设不经保存端点，AUX / PREV / TB_AUX / LEDGER_DETAIL 等落进 L1 空上下文就是静默 0。改为（实施结果，与原设计的差异见文末勘误）：
 
-1. **统一预载层补数据源**（`formula_preloader.py`）：
-   - `_load_aux(specs)`：按（科目, 维度）汇总 `tb_aux_balance.closing_balance`，过滤条件 `get_active_filter(db, TbAuxBalance.__table__, pid, year)`；填 `ctx.aux_data[科目][维度]`（现恒 `{}`）。
-   - `_load_report_rows(codes)`：调用方未给 `row_cache` 且公式含 ROW / SUM_ROW / REPORT 时，从 `financial_report` 取本期 `current_period_amount` 与上期 `prior_period_amount`（项目 + 年度、未删除）。
-   - 返回取数缺口 `ctx.missing`（新增可选字段，供调用方报错）：上年试算表整体无行、辅助核算无该（科目, 维度）、报表行未生成、附注无该项。
-2. **求值器**（`wp_formula_eval_service.evaluate_wp_formula_expression`）：保留现有 WP / 跨 sheet / TB 代入；新增 `REPORT('行次','期间')` 代入（期间为期初 / 上期 / 年初取上期金额，其余取本期 —— L1 的 `REPORT` 忽略期间参数，代入前置可避开）；其余（ROW / SUM_ROW / NOTE / PREV / AUX / ADJ）由 `preload(..., adj_exclude_origins=frozenset())` 建上下文后交 L1；`ctx.missing` 逐条写进 `errors`（R6.3）。
-3. **矩阵**：`wp_evaluator` 维度 ROW / SUM_ROW / REPORT / NOTE / PREV / AUX / ADJ 改为支持，删除对应不支持原因；重算 golden `tests/fixtures/function_support_matrix.json`；前端 `functionSupportMatrix.ts` 同步（两侧对拍测试保持绿）。
-4. 预载层 `_load_tb` 的 `is_deleted` 裸写保留：`trial_balance` 不是四表（不受数据集版本治理），与报表取数同口径；只有 `tb_aux_balance` 走 `get_active_filter`。
+1. **严格按值代入**（`formula_ref_preload.substitute_value_refs`，与 R7a 表间审核同一模块）：PREV / AUX / ROW / SUM_ROW / REPORT / NOTE 在求值前换成数值，取不到数写原因：
+   - PREV：上年试算表、科目前缀聚合；上年整体无数据 ⇒ 缺数；有数据无该科目 ⇒ 0。三参 `PREV('底稿','表','单元格')` 是上年底稿取数 ⇒ 不支持（原先被当成试算表取数、报「列名无法识别」）。
+   - AUX：辅助余额当前数据集（`get_active_filter(strict=True)`）、科目前缀。四参按（辅助类型, 辅助项）；三参 / 两参的第二参先按辅助类型（该类型合计），不是类型再按辅助项名称或编码（地址选择器生成的就是这种写法）；同一辅助项出现在多个辅助类型下 ⇒ 缺数（报歧义，不跨类型相加）。列名另认地址库登记的「期末 / 期初」。
+   - ROW / SUM_ROW 取本年度报表本期金额；REPORT 期间按关键词先认上期（期初 / 上期 / 上年 / 年初）再认本期（期末 / 本期 / 本年 / 年末），认不出 ⇒ 缺数。本年度报表没有任何行、行次不存在、金额为空 ⇒ 缺数（【测试】项目上期金额全为空，`REPORT(…,'期初')` 如实报缺数）。
+   - NOTE（`disclosure_notes`）：先找主表，主表没有该行再找其余表格（多张都有 ⇒ 歧义）；「合计」无同名行时取主表最后一个合计行；列名精确匹配表头，只写期间（期末 / 期初 …）时按期间语义找唯一一列（多列 ⇒ 请写完整列名）；表头与数据列数不一致、单元格为空 ⇒ 缺数。
+2. **求值器流程**（`wp_formula_eval_service.evaluate_wp_formula_expression`）：含不支持函数（序时账 LEDGER / COUNT_LEDGER / LEDGER_DETAIL、TB_AUX、PREV 三参）⇒ 报错且不求值、不取数 → 跨 sheet 引用 → 严格代入（须先于 TB：`PREV(TB(…))` 里的 TB 是上年）→ WP / SUM_TB / TB（参数间允许空白，原正则不认空白 ⇒ 静默 0）→ 代入后仍残留取数函数 ⇒ 报「写法无法识别」→ ADJ 经 `preload(adj_exclude_origins=frozenset(), gaps=…)` 交 L1（底稿口径含底稿来源分录；报表口径排除，同一数据 130 / 100 两口径有用例钉住）。
+3. **统一预载层**（R6.5，预填充同一入口）：AUX 按引用写法逐个取数（与 1 同一取数函数 `resolve_aux_refs`），存 `aux_data[科目][aux_ref_key(参数)]`；L1 `_handle_aux` 先取该键、没有再退回旧口径 `aux_data[科目][维度]`（报表路径按维度预载，不受影响）。调用方没给 `row_cache` 且公式引用 ROW / SUM_ROW / REPORT 时读本年度报表本期金额。`gaps` 出参收集取数缺口（报表未生成、辅助核算取不到、调整分录取数失败），预填充不传、行为不变。
+4. **矩阵**：`wp_evaluator` 十个函数全部支持、删对应原因；golden 重算；前端 `functionSupportMatrix.ts` 同步（两侧对拍绿）。保存端点 422 逐项给原因（矩阵外函数的原因来自 `UNSUPPORTED_FUNCTION_REASONS`）并列出可编辑公式支持的函数（由矩阵算出）；F2 取数公式保留自己的拒绝清单（AUX / PREV / 序时账 / TB_AUX，F2 不走通用求值器）。
+5. **保存时的引用校验（地址库）三处缺陷**——函数门放开后才暴露：
+   - ROW 一律转成 `#本期`，资产负债表行登记的期间是「期末 / 期初」⇒ 资产负债表 ROW 恒判悬空；改按报表类型的本期名。
+   - 附注域按「模板是列表」遍历，而模板文件是 `{"sections": [...]}` ⇒ 遍历到的是字典键、异常被吞、附注域恒为空 ⇒ 任何 NOTE 都判悬空；章节键改用章节编号（`section_number`，= `note_section` = NOTE 第一参）。
+   - 辅助余额只登记辅助项、且按明细科目（真库 1122.01）登记，而 AUX 按科目前缀合计 ⇒ 类型合计与一级科目写法判悬空；补登记类型合计地址，AUX 校验认科目前缀。
+6. **前端**：公式栏只挂在附注结构编辑器里，却缺省按底稿求值器门控 ⇒ 改为显式 `executor="note_executor"`（否则矩阵改动后会放行附注执行器不认的 ROW / SUM_ROW），并把年度 / 模板类型传下去；新守卫要求每个公式栏挂载点都声明执行器。公式栏取数弹窗：宿主没加载地址库时先按本项目 + 年度 + 模板加载；NOTE 改用地址库登记写法（原先拿地址标签当章节、列写死「期末」，插入即悬空）；地址库给不出附注条目时回退附注目录接口（原写的 `/api/disclosure-notes/tree` 不存在 ⇒ 回退恒为空列表），章节用编号；REPORT 用登记写法（含期间）；ROW / SUM_ROW 按行次去重。
+7. 预载层 `_load_tb` 的 `is_deleted` 裸写保留：`trial_balance` 不是四表（不受数据集版本治理），与报表取数同口径；只有 `tb_aux_balance` 走 `get_active_filter`。
+
+### 7.1 勘误（实施与原设计的差异）
+
+- 原设计：ROW / SUM_ROW / NOTE / PREV / AUX / ADJ 由 `preload` 建上下文交 L1、`REPORT` 前置代入。实施：PREV / AUX / ROW / SUM_ROW / REPORT / NOTE 全部严格按值代入，只有 ADJ 走 `preload`。理由：①`preload._load_note` 依赖另一会话尚未入库的 `formula_push/bindings/disclosure_source.py`，干净检出走 `_load_note_fallback`（把 `values` 列表当字典取，附注存在即抛错），两条路径都不按「行 × 列」取数；②L1 `_handle_prev` 不看列名、`_handle_report` 不看期间，经 L1 会得到错误的数而不是缺数；③按值代入能逐条写明缺数原因。
+- 原设计：`_load_aux(specs)` 按（科目, 维度）汇总、填 `aux_data[科目][维度]`。按此实现，四参 `AUX('2001','金融机构','XX单位1','期末余额')` 会被 L1 读成「该类型合计」（L1 把第三参当列名）——比 0 更糟。改为按写法逐个取数 + L1 同键。
+- 原设计：`FormulaContext` 新增 `missing` 字段。实施改为 `preload(..., gaps=list)` 出参，L1 数据类不加字段（严格调用方传列表，预填充不传）。
+- 原设计未列、实施中发现并修：地址库三处缺陷（§7 第 5 条）、公式栏执行器与取数写法（第 6 条）、TB 参数空白静默 0、TB_AUX / LEDGER_DETAIL 在底稿求值器静默 0、F2 拒绝清单独立、PREV 三参被当成试算表取数。
+
+### 7.2 验证（2026-10-22）
+
+- 干净检出（基线 e018fc336 / 本提交 ebd13ffe6）同一测试集：基线 92 红 / 1476 绿，本提交 92 红 / 1506 绿，失败集合逐条相同（d-cycle 端点测试 `list_formulas() got an unexpected keyword argument '_user'` 等 HEAD 预存），新增失败 0。
+- 一次性变异 23（后端）+ 8（前端）全部打红：报表未生成静默 0 / REPORT 忽略期间 / 附注不优先主表 / 期间模糊匹配放宽 / 跨类型同名辅助项相加 / 三参不认辅助项 / 不支持函数照样求值 / 代入非严格 / TB 先于 PREV / 残留写法不报错 / ADJ 用报表口径 / 预载 AUX 键漏列名 / 预载不读报表 / L1 不认预载键 / ROW 写死本期 / 附注域遍历字典键 / 附注章节键用 section_id / AUX 校验不认前缀 / 不登记类型合计地址 / 422 只给矩阵内原因 / 矩阵 ROW 回退 / F2 放行 AUX / PREV 三参放行；前端：附注结构编辑器不声明执行器 / NOTE 用标签当章节 / REPORT 不用登记写法 / ROW 不去重 / 前端矩阵回退 / 地址库未加载不先加载 / 回退又用 /tree / 结构编辑器不传年度。未变异基线全绿、逐字节恢复。单区域 vue-tsc：报出 6 处均在未改动的行（FormulaStatusPanel 第 359 行 `category: null`、stores/project.ts 5 处），基线 e018fc336 同 6 处，本次新增 0。
+- 浏览器（无头 Chromium，安徽附注只读）：「📐 表样」→ 公式栏「📋 选择」：TB / NOTE / WP / REPORT 可点，ROW / SUM_ROW 置灰并提示附注执行器原因（修复前按底稿求值器门控，ROW / SUM_ROW / NOTE / REPORT 全灰）；NOTE 弹窗列出 166 个章节、插入 `NOTE('八、1','合计','期末余额')`（修复前空列表）；REPORT 弹窗插入 `REPORT('BS-002','期末')` / `REPORT('BS-002','期初')`；全程除登录外无写请求。底稿可编辑公式的保存 / 求值浏览器实测并入 R5（【测试】项目暂无底稿，走查中现建）。
+- 真库只读核对（事务回滚）：安徽 `NOTE('八、1','合计','期末余额')` = 9,182,572.99 = BS-002 本期 = 附注合计行；`NOTE('八、1','银行存款','期初')` = 22,944,619.45；`REPORT('IS-001','本期')` = 894,804,876.83；`AUX('1122','客户','期末余额')` = 624,025,343.06（当前数据集；全部未删行合计 12.49 亿含已被替换的数据集，证明走的是 `get_active_filter`）；`ADJ('1122','aje_net')` = −1,000,000（已审批手工分录贷方 100 万）；`PREV('1001','期末余额')` 报「上年（2024）试算表无数据」；【测试】甲 `REPORT('BS-002','期初')` 报「上期金额为空」、`ROW('BS-002')` = 350、`NOTE('五、1',…)` 报「附注没有章节」。保存时校验：上述 ROW / REPORT / NOTE 合计行 / PREV 两参在真库通过（修复前 ROW 资产负债表行与 NOTE 全部判悬空）。
 
 ## 8. R5 真库全链路走查
 
@@ -238,6 +259,7 @@
 
 ## 9. 范围外发现（登记，不在本 spec 修）
 
+- **R6 发现（未修，登记）**：①预填充模板预设里 PREV 三参（上年底稿取数）184 条，统一预载层只按试算表取 ⇒ 恒 0（需上年底稿取数源，另评估）；②L1 `_handle_prev` 不看列名（恒取上年期末）、`_handle_report` 不看期间（报表 / 预填充路径；底稿求值器已绕开）；③地址库附注域只登记合计行（逐行登记约 6~9 千条 / 项目，选择器体量待评估）⇒ 底稿公式保存的 NOTE 只能引用合计行，求值器本身支持任意行；④预填充仍是非严格（缺数按 0），未接 `gaps`；⑤前端地址库 store 一次取 5000 条、后端按 report → tb → note → wp → aux 顺序截断 ⇒ 真实项目（安徽：报表 2810 + 试算表 2744 已超 5000）附注 / 底稿 / 辅助余额域在前端恒为空，各选择器只能回退旧端点（公式栏的回退已修；FormulaRefPicker / CellSelector 等其余选择器待查）。
 - 🔴 **签字前一致性门禁「取不到数冒充通过」**：`services/consistency_gate/_impl.py` 现算 82 处 `passed=True`，其中「数据不完整，跳过检查」41 处、「检查异常」40 处 ⇒ 数据缺失或代码异常时门禁放行。修它会让签字门禁在数据不全时开始阻断，属产品决策，需用户拍板后另立 spec。
 - L1 `_handle_report` 忽略期间参数（`REPORT('X','期初')` 与本期同值）；本 spec 只在底稿求值器前置代入规避，内核修正与报表 / 表间审核路径的影响面另评估。
 - `prefill_engine` 内仍有旧 resolver 兼容残留（spec 60 Task 11 有意保留），不动。
