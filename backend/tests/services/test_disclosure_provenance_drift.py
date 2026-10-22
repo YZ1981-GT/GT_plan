@@ -1,12 +1,14 @@
-"""disclosure_notes provenance 三层一致 / drift 0 集成测试（Phase 3 / 需求 2.1 / 属性 T6）.
+"""disclosure_notes provenance 列 drift 0 测试（Phase 3 / 需求 2.1 / 属性 T6）.
 
-三层一致铁律：迁移 V039 + ORM DisclosureNote.Mapped 字段 + service 读写齐全。
-本测试断言：
+本测试断言（迁移 V039 与 ORM 一致，无 drift）：
 - ORM DisclosureNote 含 source_project_id + consolidation_breakdown 两个 Mapped 列
 - V039 迁移 SQL 同时 ADD 这两列（+ GIN 索引）；R039 回滚 DROP 两列
-- note_consol_drilldown_service 读 consolidation_breakdown；consol_disclosure_service 写之
 
-Validates: Requirements 2.1; Property T6 (三层一致 drift 0).
+读写这两列的 service（V2 汇总器写、「查看合并明细」读）已于 2026-10-22 随 V2 下线
+（spec consol-note-header-library-and-node-reaggregate R6.1）：两列保留（真库 0 行有值），
+现无读写方；合并附注个别数在 ``consol_note_data``，按已确认映射从单体附注拉取。
+
+Validates: Requirements 2.1; Property T6 (迁移 / ORM drift 0).
 """
 from __future__ import annotations
 
@@ -43,17 +45,6 @@ def test_r039_rollback_drops_columns():
     assert "drop column if exists consolidation_breakdown" in sql
     assert "drop column if exists source_project_id" in sql
     assert "drop index if exists idx_disclosure_notes_consol_breakdown" in sql
-
-
-def test_service_reads_and_writes_provenance():
-    """service 层读写 provenance（第三层）：读端 + 写端函数均存在。"""
-    # 读端：穿透服务读 consolidation_breakdown
-    from app.services.note_consol_drilldown_service import get_note_consol_breakdown
-    assert callable(get_note_consol_breakdown)
-
-    # 写端：V2 汇总构建 provenance
-    from app.services.consol_disclosure_service import _build_section_consolidation_breakdown
-    assert callable(_build_section_consolidation_breakdown)
 
 
 def test_v039_is_next_version_after_v038():

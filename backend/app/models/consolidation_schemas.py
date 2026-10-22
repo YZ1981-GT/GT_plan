@@ -625,32 +625,6 @@ class ResultResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# ========== 合并附注 ==========
-
-
-class ConsolDisclosureRow(BaseModel):
-    """合并附注行"""
-    row_index: int | None = None
-    col1: str | None = Field(None, alias="col_1")
-    col2: str | None = Field(None, alias="col_2")
-    col3: str | None = Field(None, alias="col_3")
-    col4: str | None = Field(None, alias="col_4")
-    col5: str | None = Field(None, alias="col_5")
-    col6: str | None = Field(None, alias="col_6")
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class ConsolDisclosureSection(BaseModel):
-    """合并附注章节"""
-    section_code: str
-    section_title: str
-    content: str | None = None
-    rows: list[ConsolDisclosureRow] = Field(default_factory=list)
-    is_editable: bool = True
-    is_group_header: bool = False
-
-
 # ========== 合并报表 ==========
 
 

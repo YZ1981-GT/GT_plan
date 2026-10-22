@@ -29,7 +29,6 @@ from app.deps import require_project_access
 from app.core.database import get_db
 from app.models.consolidation_schemas import (
     BalanceCheckResult,
-    ConsolDisclosureSection,
     ConsolReportGenerateRequest,
     ConsolReportRow,
 )

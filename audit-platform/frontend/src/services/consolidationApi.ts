@@ -770,14 +770,6 @@ export interface YoYAnalysis {
   change_pct: number
 }
 
-export interface ConsolScopeNote { section_code: string; section_title: string; content_type: string }
-export interface SubsidiaryNote { company_code: string; company_name: string }
-export interface GoodwillNote { subsidiary_company_code: string; goodwill_amount: number; opening_balance?: number; current_increase?: number; current_decrease?: number; current_impairment?: number; closing_balance?: number }
-export interface MinorityInterestNote { subsidiary_company_code: string; minority_equity: number }
-export interface InternalTradeNote { seller: string; buyer: string; amount: number }
-export interface InternalArApNote { debtor: string; creditor: string; amount: number }
-export interface ForexTranslationNote { company_code: string; functional_currency: string }
-
 export interface WorksheetNode {
   company_code: string
   company_name: string
@@ -1009,60 +1001,6 @@ export async function getMinorityInterestRows(projectId: string, year: number): 
 
 export async function getMinorityInterest(projectId: string, year: number): Promise<MinorityInterestRow[]> {
   return getMinorityInterestRows(projectId, year)
-}
-
-// ─── 合并附注 API ─────────────────────────────────────────────────────────────
-
-export async function getConsolNotes(projectId: string, year: number): Promise<any[]> {
-  return api.get(P.notes.list(projectId, year))
-}
-
-export async function createConsolNotes(projectId: string, year: number): Promise<any[]> {
-  return api.post(P.notes.list(projectId, year))
-}
-
-export async function saveConsolNotes(_projectId: string, _period: string, _data: any): Promise<any> {
-  const year = parseInt(_period) || new Date().getFullYear() - 1
-  return api.post(P.notes.save(_projectId, year))
-}
-
-export async function getConsolScopeNotes(projectId: string, period: string): Promise<ConsolScopeNote[]> {
-  const year = parseInt(period) || new Date().getFullYear() - 1
-  const notes = await getConsolNotes(projectId, year)
-  return notes.filter((n: any) => n.section_code?.startsWith('scope'))
-}
-
-export async function getSubsidiaryNotes(projectId: string, period: string): Promise<SubsidiaryNote[]> {
-  const year = parseInt(period) || new Date().getFullYear() - 1
-  const notes = await getConsolNotes(projectId, year)
-  return notes.filter((n: any) => n.section_code?.startsWith('subsidiary'))
-}
-
-export async function getGoodwillNotes(projectId: string, period: string): Promise<GoodwillNote[]> {
-  const year = parseInt(period) || new Date().getFullYear() - 1
-  const notes = await getConsolNotes(projectId, year)
-  return notes.filter((n: any) => n.section_code?.startsWith('goodwill'))
-}
-
-export async function getMinorityInterestNotes(projectId: string, period: string): Promise<MinorityInterestNote[]> {
-  const year = parseInt(period) || new Date().getFullYear() - 1
-  const notes = await getConsolNotes(projectId, year)
-  return notes.filter((n: any) => n.section_code?.startsWith('minority'))
-}
-
-export async function getInternalTradeNotes(projectId: string, period: string): Promise<{ trades: InternalTradeNote[]; arap: InternalArApNote[] }> {
-  const year = parseInt(period) || new Date().getFullYear() - 1
-  const notes = await getConsolNotes(projectId, year)
-  return {
-    trades: notes.filter((n: any) => n.section_code?.startsWith('internal_trade')),
-    arap: notes.filter((n: any) => n.section_code?.startsWith('internal_arap')),
-  }
-}
-
-export async function getForexTranslationNotes(projectId: string, period: string): Promise<ForexTranslationNote[]> {
-  const year = parseInt(period) || new Date().getFullYear() - 1
-  const notes = await getConsolNotes(projectId, year)
-  return notes.filter((n: any) => n.section_code?.startsWith('forex'))
 }
 
 // ─── 合并报表 API ─────────────────────────────────────────────────────────────

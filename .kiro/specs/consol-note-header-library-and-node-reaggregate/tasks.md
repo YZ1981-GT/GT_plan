@@ -90,3 +90,24 @@
 - [x] 23. 收尾：行数门、干净 worktree 跑要提交的树、只提交本会话文件
   - 行数门过（路由 1157 → 1032 行，白名单基线 1116）；库目录 `--check` 一致，映射生成器重跑字节不变；鉴权基线全过，lazy import 2 例红与 HEAD 相同（`consol_lock_service` / `disclosure_source` 不存在，非本轮文件）
   - 私有索引只提交本轮 12 个文件（含删除旧测试）；note_writer 未动（task 22）
+
+## Phase 7 V2 下线 / 种子表头 / 核销 / 单元格汇总 / 取数列 / 上年导入（R6，2026-10-22 用户追加）
+
+- [x] 24. V2 下线（后端）：删 `consol_disclosure_service` / `note_consol_drilldown_service` / `consol_cross_template_service` / mock CSV / V2 专用汇总函数与 `resolve_consol_aggregation` / `CONSOL_CROSS_TEMPLATE_ENABLED`；路由删 create / get / integrate / save / consol-breakdown；级联刷新第 6 步改调推送同一 `_refresh_notes`（同一把锁，partial / failed 记错误）；灰度开关注释改正；只测已删代码的测试删除、其余改（R6.1）
+  - 另删两处同族死代码：`consol_report_service` 里无调用方的 7 骨架附注生成器（构造的字段与 schema 不符）、只给 V2 用的 `ConsolDisclosureRow / ConsolDisclosureSection` 与 `dataset_query.bind_to_active_dataset_sync`；`consol_note_aggregation_service` 只剩 `validate_lineage_dag`；单元格取数源 9 → 8（顺带修好 HEAD 上一直红的 `test_binding_json_valid_sources_match`）
+  - 一键刷新第 6 步 = `consol_push_service.refresh_notes_exclusive`（进程锁 + 事务级咨询锁 + `_refresh_notes`）；第 4 / 5 / 6 步失败先回滚本步（PG 上失败语句让事务 aborted，原来会连带后续步骤失败）
+  - 端点台账（coverage ledger、两份鉴权清册、领域边界债务基线）按差量删本次端点 / 依赖边的条目，先核对计数与条目一致再改；三处历史超 800 行未登记的文件（取数源 / 模板差异 / 离线导出，本次行数只降不增）登记白名单
+- [x] 25. V2 下线（前端）：删 `useNoteAggregation` / `ConsolNoteTreeEnhanced` / 附注编辑器「🔗 查看合并明细」/ 合并明细弹窗附注模式 / 单元格取数源「合并汇总」选项 / 死 API 函数与 apiPaths；`components.d.ts`、领域边界基线同步；vitest / ESLint / 单区域 vue-tsc（R6.1）
+  - `ConsolBreakdownDialog` 只留报表模式（去掉 `source` 属性）；`consolidationApi` 删 9 个调已下线端点的函数与只给它们用的 7 个类型；两个 e2e 用例（V2 生成、附注右键合并明细）删除
+  - vitest：合并组件目录 + 附注编辑器 / 报表相关 65 个文件 838 passed，6 例失败与 HEAD 相同（`ConsolTrialBalanceTab` / `ConsolReportBreakdownView` 请求参数多了 `signal`）；ESLint 0 error；单区域 vue-tsc 与 HEAD 同一配置的错误集合逐条对比无新增，ts / vue 各注入一处 number = string 均报 TS2322
+- [x] 26. 残留扫描（全仓 grep 已删符号 / 端点 / 配置）+ 相关后端套件 + lazy import / 鉴权守卫；单独提交
+  - 残留只剩：报表穿透（保留）、迁移 V039 注释（不可改）、冻结的影响清单基线、断言「已下线」的测试与说明
+  - 干净 worktree（HEAD `1d8600593` + 本批 64 个文件）：后端 52 个测试文件 1049 passed，89 failed + 8 error 全部在 HEAD 同样失败（附注编辑门端点 / 鉴权清册 `--check` / `_assert_project_edit` 不存在 / lazy import 2 / 种子计数 2 / 推送往返），HEAD 多红的 1 例被本批修好
+- [ ] 27. 「核销」= 减少：词表 + 库测试 + 库目录重生成（R6.4）
+- [ ] 28. `/aggregate` 只从下级附注取数：删试算表兜底，响应 `missing_children`，前端提示；测试改为断言不取试算表（R6.5）
+- [ ] 29. 种子多级表头修复：一次性脚本按 Word 替换 / 退回数据行；删 `_fix_missing_multi_header.py`；守卫测试（期望来自 Word）；Word 同步 `--check` 前后对比、库目录与映射重生成并逐条审（R6.3）
+- [ ] 30. `value_column` 改调标题行库（净额 → 账面价值、毛额 → 账面余额 / 公允价值、纯期间优先、分不出写原因）；两版种子新旧逐格对比归类；真库种子与已填数据影响核对；测试 + 变异（R6.7）
+- [ ] 31. 上年导入解析：`note_word_table` 数据行取值；按块（含内容控件）切节、表名；单元测试（分组 / 续表 / 内容控件 / 上年年末）（R6.6）
+- [ ] 32. 上年导入规划 / 写入服务（标题行库对列、按表名 + 结构选表、行名 + 同名序号对行、状态与原因）；预览 / 写入端点（sha256 校验）；原端点只写自动认出的；测试（R6.6）
+- [ ] 33. 前端 `NotePriorYearImportDialog.vue`（预览 → 逐表确认 / 改选 / 逐列指定 → 写入 → 刷新目录）+ apiPaths + 附注编辑器入口（守行数上限）；vitest / ESLint / 单区域 vue-tsc（R6.6）
+- [ ] 34. 收尾：design §15 实施记录、INDEX / memory；干净 worktree 跑要提交的树；只提交本会话文件；fetch 后推送 `spec/disclosure-note-doc-upload-and-batch-fill` 并 `ls-remote` 核对；清理探针

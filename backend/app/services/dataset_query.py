@@ -189,7 +189,7 @@ async def bind_to_active_dataset(
 
     调用方：
     - Workpaper 首次生成时（template_engine.generate_project_workpapers / wp_template.py）
-    - DisclosureNote 创建时（disclosure_engine / consol_disclosure_service）
+    - DisclosureNote 创建时（disclosure_engine）
     - UnadjustedMisstatement 创建时（misstatement_service）
     - AuditReport 转 final 时（audit_report_service.update_status / sign_service.order=5）
 
@@ -205,45 +205,6 @@ async def bind_to_active_dataset(
     from datetime import datetime, timezone
 
     active_id = await DatasetService.get_active_dataset_id(db, project_id, year)
-    if active_id is not None:
-        obj.bound_dataset_id = active_id
-        obj.dataset_bound_at = datetime.now(timezone.utc)
-    return active_id
-
-
-def bind_to_active_dataset_sync(
-    db,
-    obj,
-    project_id: UUID,
-    year: int,
-) -> UUID | None:
-    """F50 / Sprint 8.19: 同步版本的下游对象绑定工具。
-
-    用于仍使用 sync ``sqlalchemy.orm.Session`` 的老 service（如
-    ``consol_disclosure_service``）。行为与 async 版一致：无 active dataset
-    时两字段保持 None 不抛异常。
-    """
-    from datetime import datetime, timezone
-
-    from app.models.dataset_models import DatasetStatus, LedgerDataset
-
-    try:
-        result = db.execute(
-            sa.select(LedgerDataset.id)
-            .where(
-                LedgerDataset.project_id == project_id,
-                LedgerDataset.year == year,
-                LedgerDataset.status == DatasetStatus.active,
-            )
-            .order_by(
-                LedgerDataset.activated_at.desc().nullslast(),
-                LedgerDataset.created_at.desc(),
-            )
-        )
-        active_id = result.scalars().first()
-    except Exception:
-        active_id = None
-
     if active_id is not None:
         obj.bound_dataset_id = active_id
         obj.dataset_bound_at = datetime.now(timezone.utc)

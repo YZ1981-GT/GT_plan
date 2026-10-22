@@ -1,7 +1,7 @@
 # ADR-CONSOL-202: V2 附注 feature flag 灰度接线（不破坏老版）
 
 ## 状态
-已接受 (2026-05-30)
+已接受 (2026-05-30) → **已废止 (2026-10-22)**：V2 汇总器（mock 章节映射、生产从未启用）与老版 7 骨架章节生成器连同 create / get / integrate / save 端点一并删除（spec consol-note-header-library-and-node-reaggregate R6.1）。合并附注个别数按已确认映射从单体附注拉取（V186 明细映射 +「🔄 重新汇总」子树汇总）。`CONSOL_NOTES_V2_ENABLED` 与项目级灰度保留，只门控试算表事件自动刷新合并附注。
 
 ## 背景
 

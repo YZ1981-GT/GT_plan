@@ -1,7 +1,7 @@
 # ADR-CONSOL-204: cross_template 随 V2 接线（接通国企↔上市孤儿）
 
 ## 状态
-已接受 (2026-05-30)
+已接受 (2026-05-30) → **已废止 (2026-10-22)**：随 V2 汇总器删除（spec consol-note-header-library-and-node-reaggregate R6.1），`consol_cross_template_service` 与 `CONSOL_CROSS_TEMPLATE_ENABLED` 一并删除；单体↔合并按标题行库对表对列（`note_table_header_library` / `note_table_header_match`）。
 
 ## 背景
 

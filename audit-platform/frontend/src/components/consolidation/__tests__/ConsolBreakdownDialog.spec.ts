@@ -1,9 +1,9 @@
 /**
- * ConsolBreakdownDialog 单测 — 统一合并穿透弹窗
+ * ConsolBreakdownDialog 单测 — 合并报表行穿透弹窗
  *
- * 核心证明 T1（穿透组件契约统一，ADR-CONSOL-301）：组件对 source='report' 与
- * source='note' 渲染同一结构契约——相同列（子公司名称/金额/占比/抵销额）、相同数据行数、
- * 相同合并数底部，即渲染结构与 source 无关（source 仅决定调哪个端点）。
+ * 渲染契约（ADR-CONSOL-301）：列（子公司名称/金额/占比/抵销额）、数据行数、合并数底部。
+ * 附注模式随 V2 汇总器于 2026-10-22 下线（consol-note-header-library-and-node-reaggregate R6.1），
+ * 组件只调报表端点。
  *
  * 另测：空态/has_breakdown=false → el-empty 后端 message；report 404 → 友好降级；
  * 行点击有权 → emit jump + 跳转；缺 source_project_id → ElMessage.info 不跳；
@@ -122,7 +122,7 @@ const SAME_BY_COMPANY = [
 
 function mountDialog(props: Record<string, any>) {
   return mount(ConsolBreakdownDialog, {
-    props: { modelValue: true, source: 'note', projectId: 'parent-001', year: 2024, ...props },
+    props: { modelValue: true, projectId: 'parent-001', year: 2024, accountCode: '1001', ...props },
     global: { stubs, directives },
   })
 }
@@ -138,47 +138,27 @@ describe('ConsolBreakdownDialog — T1 统一渲染契约', () => {
     mockProjectOptions = []
   })
 
-  it('source=report 与 source=note 在相同 by_company 数据下渲染同一结构契约', async () => {
+  it('按 by_company 渲染：四列、逐子公司一行、金额 / 抵销额走金额单元格、底部合并数', async () => {
     mockGet.mockResolvedValue({ has_breakdown: true, by_company: SAME_BY_COMPANY })
 
-    const reportWrapper = mountDialog({ source: 'report', accountCode: '1001' })
+    const wrapper = mountDialog({ accountCode: '1001' })
     await flushPromises()
-    const reportCols = columnLabels(reportWrapper)
-    const reportRows = dataRowCount(reportWrapper)
-    const reportFooter = reportWrapper.find('.consol-breakdown-footer').exists()
-    const reportAmtCols = amountBearingColumnCount(reportWrapper)
 
-    const noteWrapper = mountDialog({ source: 'note', sectionId: 'sec-货币资金' })
-    await flushPromises()
-    const noteCols = columnLabels(noteWrapper)
-    const noteRows = dataRowCount(noteWrapper)
-    const noteFooter = noteWrapper.find('.consol-breakdown-footer').exists()
-    const noteAmtCols = amountBearingColumnCount(noteWrapper)
-
-    expect(reportCols).toEqual(['子公司名称', '金额', '占比', '抵销额'])
-    expect(noteCols).toEqual(reportCols)
-    expect(reportRows).toBe(SAME_BY_COMPANY.length)
-    expect(noteRows).toBe(reportRows)
-    expect(reportFooter).toBe(true)
-    expect(noteFooter).toBe(true)
-    expect(reportAmtCols).toBe(noteAmtCols)
+    expect(columnLabels(wrapper)).toEqual(['子公司名称', '金额', '占比', '抵销额'])
+    expect(dataRowCount(wrapper)).toBe(SAME_BY_COMPANY.length)
+    expect(amountBearingColumnCount(wrapper)).toBe(1)
+    expect(wrapper.find('.consol-breakdown-footer').text()).toContain('4000')
   })
 
-  it('source=note 调附注端点 / source=report 调报表端点（端点不同但渲染同构）', async () => {
+  it('调报表行穿透端点', async () => {
     mockGet.mockResolvedValue({ has_breakdown: true, by_company: SAME_BY_COMPANY })
 
-    mountDialog({ source: 'note', sectionId: 'sec-1' })
-    await flushPromises()
-    expect(mockGet).toHaveBeenCalledWith(
-      '/api/consolidation/notes/parent-001/2024/sec-1/consol-breakdown',
-    )
-
-    mockGet.mockClear()
-    mountDialog({ source: 'report', accountCode: '1001' })
+    mountDialog({ accountCode: '1001' })
     await flushPromises()
     expect(mockGet).toHaveBeenCalledWith(
       '/api/consolidation/report/parent-001/2024/1001/consol-breakdown',
     )
+    expect(mockGet.mock.calls.every((call: any[]) => !String(call[0]).includes('/notes/'))).toBe(true)
   })
 })
 
@@ -197,20 +177,20 @@ describe('ConsolBreakdownDialog — 空态与降级', () => {
     mockGet.mockResolvedValue({
       has_breakdown: false,
       by_company: [],
-      message: '该章节暂无合并明细，请先用 V2 生成合并附注',
+      message: '该报表行暂无合并明细（未生成合并试算）',
     })
-    const wrapper = mountDialog({ source: 'note', sectionId: 'sec-1' })
+    const wrapper = mountDialog({ accountCode: '1001' })
     await flushPromises()
 
     const empty = wrapper.find('.el-empty')
     expect(empty.exists()).toBe(true)
-    expect(empty.text()).toContain('请先用 V2 生成合并附注')
+    expect(empty.text()).toContain('未生成合并试算')
     expect(wrapper.find('.el-table').exists()).toBe(false)
   })
 
   it('report 端点未就绪（抛错）→ 友好空态降级不崩溃', async () => {
     mockGet.mockRejectedValue(new Error('404 not found'))
-    const wrapper = mountDialog({ source: 'report', accountCode: '1001' })
+    const wrapper = mountDialog({ accountCode: '1001' })
     await flushPromises()
 
     const empty = wrapper.find('.el-empty')
@@ -236,7 +216,7 @@ describe('ConsolBreakdownDialog — 行点击跳转与权限（T3 / EH2）', () 
       { id: 'proj-a', name: '子公司A' },
       { id: 'proj-b', name: '子公司B' },
     ]
-    const wrapper = mountDialog({ source: 'note', sectionId: 'sec-1' })
+    const wrapper = mountDialog({ accountCode: '1001' })
     await flushPromises()
 
     await amountCellsOf(wrapper, '金额')[0].trigger('click')
@@ -244,10 +224,10 @@ describe('ConsolBreakdownDialog — 行点击跳转与权限（T3 / EH2）', () 
 
     const jumpEvents = wrapper.emitted('jump')
     expect(jumpEvents).toBeTruthy()
-    expect(jumpEvents![0][0]).toMatchObject({ source_project_id: 'proj-a', source: 'note' })
+    expect(jumpEvents![0][0]).toMatchObject({ source_project_id: 'proj-a' })
     expect(mockNavPush).toHaveBeenCalled()
     expect(mockPush).toHaveBeenCalledWith({
-      path: '/projects/proj-a/disclosure-notes',
+      path: '/projects/proj-a/reports',
       query: { year: '2024' },
     })
   })
@@ -257,7 +237,7 @@ describe('ConsolBreakdownDialog — 行点击跳转与权限（T3 / EH2）', () 
       has_breakdown: true,
       by_company: [{ company_code: 'SUB001', company_name: '子公司A', amount: '1000.00' }],
     })
-    const wrapper = mountDialog({ source: 'note', sectionId: 'sec-1' })
+    const wrapper = mountDialog({ accountCode: '1001' })
     await flushPromises()
 
     await amountCellsOf(wrapper, '金额')[0].trigger('click')
@@ -271,7 +251,7 @@ describe('ConsolBreakdownDialog — 行点击跳转与权限（T3 / EH2）', () 
   it('EH2：无目标子公司项目访问权 → ElMessage.warning 不跳转', async () => {
     mockGet.mockResolvedValue({ has_breakdown: true, by_company: SAME_BY_COMPANY })
     mockProjectOptions = [{ id: 'other-proj', name: '其他项目' }]
-    const wrapper = mountDialog({ source: 'note', sectionId: 'sec-1' })
+    const wrapper = mountDialog({ accountCode: '1001' })
     await flushPromises()
 
     await amountCellsOf(wrapper, '金额')[0].trigger('click')

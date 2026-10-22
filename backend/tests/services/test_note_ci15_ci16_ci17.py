@@ -1,6 +1,7 @@
 """Sprint B.0.10 — CI 卡点测试 CI-15 / CI-16 / CI-17.
 
-CI-15: consol_aggregation source 必有 child_section_id
+CI-15: 合并附注不走单元格取数源 —— ``consol_aggregation`` 已随 V2 汇总器下线（2026-10-22，
+       spec consol-note-header-library-and-node-reaggregate R6.1），个别数按已确认映射从单体附注拉取
 CI-16: 多层合并 lineage 链无环（DAG 校验）
 CI-17: elimination_rules 引用的 wp_code 必存在
 
@@ -10,94 +11,43 @@ Validates: Requirements D12, CI-15, CI-16, CI-17
 from __future__ import annotations
 
 import pytest
-from decimal import Decimal
 from uuid import uuid4, UUID
 
-from app.services.note_source_resolvers import VALID_SOURCES, SOURCE_RESOLVERS
-from app.services.consol_note_aggregation_service import (
-    validate_lineage_dag,
-    get_lineage_chain,
-    aggregate_cell,
-    AGGREGATION_METHODS,
-)
+from app.services.note_source_resolvers import VALID_SOURCES, SOURCE_RESOLVERS, dispatch_resolver
+from app.services.consol_note_aggregation_service import validate_lineage_dag
 from app.services.consol_elimination_rules import (
     ELIMINATION_RULES,
     VALID_WP_CODES,
     validate_wp_code_exists,
     validate_all_rules_wp_codes,
-    get_elimination_rules,
 )
 
 
 # ===========================================================================
-# CI-15: consol_aggregation source 必有 child_section_id
+# CI-15: consol_aggregation 取数源已下线
 # ===========================================================================
 
 
-class TestCI15ConsolAggregationSource:
-    """CI-15: consol_aggregation binding 必须包含 child_section_id."""
+class TestCI15ConsolAggregationRetired:
+    """CI-15：合并附注的个别数只从单体附注按映射拉取，单元格取数源里没有「合并汇总」。"""
 
-    def test_consol_aggregation_in_valid_sources(self):
-        """consol_aggregation 必须在 VALID_SOURCES 中."""
-        assert "consol_aggregation" in VALID_SOURCES
-
-    def test_consol_aggregation_in_source_resolvers(self):
-        """consol_aggregation 必须在 SOURCE_RESOLVERS 中有对应 resolver."""
-        assert "consol_aggregation" in SOURCE_RESOLVERS
+    def test_consol_aggregation_not_a_source(self):
+        assert "consol_aggregation" not in VALID_SOURCES
+        assert "consol_aggregation" not in SOURCE_RESOLVERS
 
     def test_source_resolvers_match_valid_sources(self):
         """SOURCE_RESOLVERS keys 必须与 VALID_SOURCES 完全一致."""
         assert set(SOURCE_RESOLVERS.keys()) == set(VALID_SOURCES)
+        assert len(VALID_SOURCES) == 8
 
     @pytest.mark.asyncio
-    async def test_resolver_returns_none_without_child_section_id(self):
-        """缺少 child_section_id 时 resolver 返回 None."""
-        from app.services.note_source_resolvers import resolve_consol_aggregation
-
-        # 无 child_section_id
-        result = await resolve_consol_aggregation(
-            binding={"source": "consol_aggregation", "aggregation_method": "simple_sum"},
-            ctx={"project_id": uuid4(), "year": 2025},
+    async def test_legacy_binding_resolves_to_none(self):
+        """残留的旧绑定按「未识别取数源」处理：返回 None，不报错。"""
+        result = await dispatch_resolver(
+            {"source": "consol_aggregation", "child_section_id": "section_cash"},
+            {"project_id": uuid4(), "year": 2025},
         )
         assert result is None
-
-    @pytest.mark.asyncio
-    async def test_resolver_returns_none_with_empty_child_section_id(self):
-        """child_section_id 为空字符串时 resolver 返回 None."""
-        from app.services.note_source_resolvers import resolve_consol_aggregation
-
-        result = await resolve_consol_aggregation(
-            binding={
-                "source": "consol_aggregation",
-                "child_section_id": "",
-                "aggregation_method": "simple_sum",
-            },
-            ctx={"project_id": uuid4(), "year": 2025},
-        )
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_resolver_accepts_valid_binding(self):
-        """有效 binding（含 child_section_id）不会因缺字段而 None.
-
-        注意：无 DB 时仍返回 None（无子公司数据），但不是因为缺 child_section_id。
-        """
-        from app.services.note_source_resolvers import resolve_consol_aggregation
-
-        result = await resolve_consol_aggregation(
-            binding={
-                "source": "consol_aggregation",
-                "child_section_id": "section_cash",
-                "aggregation_method": "simple_sum",
-            },
-            ctx={"project_id": uuid4(), "year": 2025, "db": None},
-        )
-        # 无 DB 返回 None 是正常的（无法查子公司）
-        assert result is None
-
-    def test_valid_sources_count(self):
-        """VALID_SOURCES 应有 9 种（原 8 + consol_aggregation）."""
-        assert len(VALID_SOURCES) == 9
 
 
 # ===========================================================================
@@ -113,13 +63,6 @@ class TestCI16LineageDAG:
         """单节点（无 parent）是有效 DAG."""
         result = await validate_lineage_dag(uuid4(), db=None)
         assert result is True
-
-    @pytest.mark.asyncio
-    async def test_lineage_chain_single(self):
-        """单节点 lineage chain 仅含自身."""
-        pid = uuid4()
-        chain = await get_lineage_chain(pid, db=None)
-        assert chain == [pid]
 
     @pytest.mark.asyncio
     async def test_validate_with_mock_db_no_cycle(self):
@@ -157,11 +100,6 @@ class TestCI16LineageDAG:
         try:
             result = await validate_lineage_dag(mock_db.a, db=mock_db)
             assert result is True
-
-            chain = await get_lineage_chain(mock_db.a, db=mock_db)
-            assert len(chain) == 2
-            assert chain[0] == mock_db.a
-            assert chain[1] == mock_db.b
         finally:
             svc._get_parent_project_id = original
 
@@ -183,30 +121,6 @@ class TestCI16LineageDAG:
         try:
             result = await validate_lineage_dag(a, db="fake")
             assert result is False
-        finally:
-            svc._get_parent_project_id = original
-
-    @pytest.mark.asyncio
-    async def test_lineage_chain_breaks_on_cycle(self):
-        """get_lineage_chain 遇到环时中断（不无限循环）."""
-        import app.services.consol_note_aggregation_service as svc
-
-        a = uuid4()
-        b = uuid4()
-        cycle_map = {a: b, b: a}
-
-        original = svc._get_parent_project_id
-
-        async def mock_get_parent(project_id, db=None):
-            return cycle_map.get(project_id)
-
-        svc._get_parent_project_id = mock_get_parent
-        try:
-            chain = await get_lineage_chain(a, db="fake")
-            # 应该在检测到环时停止
-            assert len(chain) == 2
-            assert a in chain
-            assert b in chain
         finally:
             svc._get_parent_project_id = original
 

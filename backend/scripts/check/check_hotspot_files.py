@@ -78,11 +78,6 @@ SPECIAL_GOVERNANCE_FILES = {
 
 # Python 专项治理文件
 SPECIAL_GOVERNANCE_PY = {
-    "consol_disclosure_service.py": {
-        "reason": "合并附注服务，1736 行，待拆分",
-        "target_lines": 800,
-        "owner": "待指定",
-    },
     "migration_runner.py": {
         "reason": "迁移运行器，1026 行，待拆分",
         "target_lines": 600,

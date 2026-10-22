@@ -42,7 +42,6 @@
           <el-option label="辅助账" value="aux_balance" />
           <el-option label="公式" value="formula" />
           <el-option label="上年附注" value="prior_year_note" />
-          <el-option label="合并汇总" value="consol_aggregation" />
         </el-select>
       </div>
     </div>
@@ -268,7 +267,6 @@ function getCellSourceTag(rowIdx: number, colIdx: number): string {
     aux_balance: '辅助账',
     formula: 'Σ',
     prior_year_note: '上年',
-    consol_aggregation: '汇总',
   }
   return map[p.source] || p.source
 }

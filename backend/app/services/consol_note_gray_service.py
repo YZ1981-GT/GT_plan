@@ -1,4 +1,8 @@
-"""合并附注 V2 灰度按项目服务（consol-disclosure-note-persistence Req3/Req5）。
+"""试算表事件自动刷新合并附注的按项目开关（consol-disclosure-note-persistence Req3/Req5）。
+
+开关名沿用 V2 时期；V2 汇总器已于 2026-10-22 下线（consol-note-header-library-and-node-reaggregate R6.1），
+现只门控 ``consol_note_formula_refresh_handler``（试算表更新后按公式刷新合并附注）。默认关闭。
+
 
 统一入口 `is_consol_note_v2_enabled(db, project_id)`：
 - 全局 `settings.CONSOL_NOTES_V2_ENABLED=True` → True（向后兼容全开，不查项目级）
@@ -21,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 async def is_consol_note_v2_enabled(db: AsyncSession, project_id: UUID) -> bool:
-    """判定指定项目是否启用合并附注 V2（生成 + 落库穿透）。
+    """判定指定项目是否开启试算表事件自动刷新合并附注。
 
     优先级：
     1. 全局 settings.CONSOL_NOTES_V2_ENABLED=True → True（向后兼容全开，不查项目级）

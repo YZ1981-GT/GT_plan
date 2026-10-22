@@ -168,10 +168,10 @@ async def handle_consol_note_formula_refresh(event: EventPayload) -> dict[str, o
             if not await is_consol_note_v2_enabled(db, project_id):
                 base["skipped"].append({
                     "scope": "event",
-                    "reason": "项目未启用合并附注 V2",
+                    "reason": "项目未启用试算表事件自动刷新合并附注",
                 })
                 base["ended_at"] = _now()
-                logger.info("合并附注自动刷新跳过 V2 关闭项目：%s", base)
+                logger.info("合并附注自动刷新跳过未开启项目：%s", base)
                 return base
 
             # ── 归口短路：push 内联 _refresh_notes 已刷新完毕时跳过 ──

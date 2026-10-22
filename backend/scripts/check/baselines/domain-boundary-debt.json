@@ -1,7 +1,7 @@
 {
   "metadata": {
     "description": "Exact domain-boundary debt identities. Checker fails on NEW identities only; shrink -> update this file.",
-    "count": 905
+    "count": 899
   },
   "entries": [
     {
@@ -270,21 +270,6 @@
       "detail": "consolidation may not depend on backend-services (backend/app/services/consol_auto_elimination_service.py -> backend/app/services/internal_trade_service.py)"
     },
     {
-      "identity": "forbidden_edge:consolidation->backend-services:backend/app/services/consol_disclosure_service.py->backend/app/services/dataset_query.py",
-      "kind": "forbidden_edge",
-      "detail": "consolidation may not depend on backend-services (backend/app/services/consol_disclosure_service.py -> backend/app/services/dataset_query.py)"
-    },
-    {
-      "identity": "forbidden_edge:consolidation->backend-services:backend/app/services/consol_disclosure_service.py->backend/app/services/goodwill_service.py",
-      "kind": "forbidden_edge",
-      "detail": "consolidation may not depend on backend-services (backend/app/services/consol_disclosure_service.py -> backend/app/services/goodwill_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:consolidation->backend-services:backend/app/services/consol_disclosure_service.py->backend/app/services/minority_interest_service.py",
-      "kind": "forbidden_edge",
-      "detail": "consolidation may not depend on backend-services (backend/app/services/consol_disclosure_service.py -> backend/app/services/minority_interest_service.py)"
-    },
-    {
       "identity": "forbidden_edge:consolidation->backend-services:backend/app/services/consol_report_service.py->backend/app/services/amount_resolver.py",
       "kind": "forbidden_edge",
       "detail": "consolidation may not depend on backend-services (backend/app/services/consol_report_service.py -> backend/app/services/amount_resolver.py)"
@@ -308,11 +293,6 @@
       "identity": "forbidden_edge:consolidation->workpapers:audit-platform/frontend/src/components/consolidation/worksheets/ConsolWorksheetTabs.vue->audit-platform/frontend/src/components/workpaper/composables/g7ConsolLinkageEntry.ts",
       "kind": "forbidden_edge",
       "detail": "consolidation may not depend on workpapers (audit-platform/frontend/src/components/consolidation/worksheets/ConsolWorksheetTabs.vue -> audit-platform/frontend/src/components/workpaper/composables/g7ConsolLinkageEntry.ts)"
-    },
-    {
-      "identity": "forbidden_edge:consolidation->workpapers:backend/app/services/consol_disclosure_service.py->backend/app/services/wp_disclosure_sync_service.py",
-      "kind": "forbidden_edge",
-      "detail": "consolidation may not depend on workpapers (backend/app/services/consol_disclosure_service.py -> backend/app/services/wp_disclosure_sync_service.py)"
     },
     {
       "identity": "forbidden_edge:core->ai:backend/app/core/startup_registry.py->backend/app/services/ai_chat/run_coordinator.py",
@@ -2090,11 +2070,6 @@
       "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/CellTraceDialog.vue)"
     },
     {
-      "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/ConsolNoteTreeEnhanced.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/ConsolNoteTreeEnhanced.vue)"
-    },
-    {
       "identity": "forbidden_edge:frontend-shell->notes:audit-platform/frontend/src/components.d.ts->audit-platform/frontend/src/components/notes/HistoricalUploadMenuItem.vue",
       "kind": "forbidden_edge",
       "detail": "frontend-shell may not depend on notes (audit-platform/frontend/src/components.d.ts -> audit-platform/frontend/src/components/notes/HistoricalUploadMenuItem.vue)"
@@ -2868,11 +2843,6 @@
       "identity": "forbidden_edge:notes->backend-services:backend/app/services/wp_note_linkage_service.py->backend/app/services/dataset_query.py",
       "kind": "forbidden_edge",
       "detail": "notes may not depend on backend-services (backend/app/services/wp_note_linkage_service.py -> backend/app/services/dataset_query.py)"
-    },
-    {
-      "identity": "forbidden_edge:notes->consolidation:backend/app/services/note_source_resolvers.py->backend/app/services/consol_note_aggregation_service.py",
-      "kind": "forbidden_edge",
-      "detail": "notes may not depend on consolidation (backend/app/services/note_source_resolvers.py -> backend/app/services/consol_note_aggregation_service.py)"
     },
     {
       "identity": "forbidden_edge:notes->import-export:backend/app/routers/note_ai.py->backend/app/services/export_mask_service.py",

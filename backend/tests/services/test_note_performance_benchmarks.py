@@ -3,10 +3,10 @@
 性能基准目标（来自 spec）：
 - 173 章节序号渲染 < 100ms（纯计算）
 - 集团基线 apply 60 章节 < 3s
-- 国企↔上市互转 < 1s
 - 离线导出 60 章节 < 5s
 - 离线导入 60 章节 diff 预览 < 2s
-- 合并附注汇总 N=10 子公司 < 5s
+
+合并附注汇总（V2）与跨模板翻译两项基准随 V2 汇总器于 2026-10-22 下线。
 
 注：这些是 service 层基准，不依赖真 PG 数据库，使用 mock 数据测算法本身性能。
 真实环境数据库 IO 会增加额外开销，由 UAT 验证（C.6.1）。
@@ -171,80 +171,6 @@ class TestOfflineImportPerformance:
         validate_and_diff()
         _, elapsed = _measure(validate_and_diff)
         assert elapsed < 2.0, f"60 章节 diff 耗时 {elapsed:.2f}s 超过 2s 目标"
-
-
-# ---------------------------------------------------------------------------
-# 4. Consol aggregation (D12)
-# ---------------------------------------------------------------------------
-
-
-class TestConsolAggregationPerformance:
-    """合并附注汇总性能 — N=10 子公司 < 5s（不含 DB IO）."""
-
-    def test_aggregate_10_subsidiaries_under_5s(self):
-        """10 子公司汇总 simple_sum 必须 < 5s."""
-        from app.services.consol_note_aggregation_service import _simple_sum
-
-        # Mock 10 subsidiaries × 20 rows each
-        child_data = []
-        for sub_idx in range(10):
-            child_data.append({
-                "subsidiary_id": f"sub_{sub_idx}",
-                "rows": [
-                    {
-                        "row_type": "dynamic_data",
-                        "label": f"客户_{sub_idx}_{r}",
-                        "cells": [f"客户_{sub_idx}_{r}", float(r * 100 + sub_idx)],
-                    }
-                    for r in range(20)
-                ],
-            })
-
-        def aggregate():
-            return _simple_sum(child_data, config={})
-
-        # Warmup
-        aggregate()
-        _, elapsed = _measure(aggregate)
-        assert elapsed < 5.0, f"10 子公司汇总耗时 {elapsed:.2f}s 超过 5s 目标"
-
-
-# ---------------------------------------------------------------------------
-# 5. Cross-template conversion (D14)
-# ---------------------------------------------------------------------------
-
-
-class TestTemplateConversionPerformance:
-    """国企↔上市互转性能 — < 1s（不含 DB）."""
-
-    def test_template_conversion_under_1s(self):
-        """模板转换计算必须 < 1s (173 章节，跳过 diff_data 加载用 mock)."""
-        from app.services.consol_cross_template_service import translate_child_section
-
-        # Build minimal diff_data mock
-        diff_data = {"common_sections": [{"section_id": f"s{i}"} for i in range(150)]}
-
-        sections = []
-        for i in range(173):
-            sections.append({
-                "section_id": f"s{i}",
-                "section_title": f"章节{i}",
-                "table_data": {
-                    "headers": ["项目", "金额"],
-                    "rows": [{"cells": [f"item{j}", j * 100]} for j in range(10)],
-                },
-            })
-
-        def translate_all():
-            return [
-                translate_child_section(sec, "soe", "listed", diff_data=diff_data)
-                for sec in sections
-            ]
-
-        # Warmup
-        translate_all()
-        _, elapsed = _measure(translate_all)
-        assert elapsed < 1.0, f"模板转换 173 章节耗时 {elapsed:.2f}s 超过 1s 目标"
 
 
 # ---------------------------------------------------------------------------

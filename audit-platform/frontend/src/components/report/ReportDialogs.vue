@@ -83,10 +83,9 @@
     @navigate="(uri: string) => $emit('cell-detail-navigate', uri)"
   />
 
-  <!-- 合并报表穿透弹窗（统一组件，source=report）：右键"查看合并明细"打开 -->
+  <!-- 合并报表穿透弹窗：右键"查看合并明细"打开 -->
   <ConsolBreakdownDialog
     :model-value="consolBreakdownVisible"
-    source="report"
     :project-id="projectId"
     :year="year"
     :account-code="consolBreakdownAccountCode"

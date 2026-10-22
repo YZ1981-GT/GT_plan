@@ -1,9 +1,9 @@
 <template>
   <!--
-    ConsolBreakdownDialog — 统一合并穿透弹窗（report + note 一个组件，ADR-CONSOL-301）
-    props.source 仅决定调哪个端点，渲染契约统一（T1：列/占比/抵销/合并数/跳转一致）。
-    - source=note   → Phase 3 端点 notes/{section}/consol-breakdown
-    - source=report → Phase 2 端点 report/{account_code}/consol-breakdown（前瞻，未就绪时友好降级）
+    ConsolBreakdownDialog — 合并报表行穿透弹窗（ADR-CONSOL-301）
+    调 report/{account_code}/consol-breakdown，列：子公司名称 / 金额 / 占比 / 抵销额，底部合并数。
+    附注模式（读 V2 汇总器写的 disclosure_notes.consolidation_breakdown）已随 V2 于 2026-10-22 下线
+    （spec consol-note-header-library-and-node-reaggregate R6.1）。
     所有文本中文；金额统一走 GtAmountCell；行点击跳转纳入 Backspace 返回栈（T3）。
   -->
   <el-dialog
@@ -15,7 +15,7 @@
     @open="handleOpen"
   >
     <div v-loading="loading">
-      <!-- 空态：无 breakdown / 未跑 V2 / 报表端点未就绪 -->
+      <!-- 空态：无 breakdown / 报表端点未就绪 -->
       <el-empty v-if="!loading && rows.length === 0" :description="emptyMessage" />
 
       <template v-else>
@@ -93,20 +93,17 @@ interface BreakdownResponse {
 
 const props = defineProps<{
   modelValue: boolean
-  source: 'report' | 'note'
   projectId: string
   year: number
-  /** source=report 用 */
+  /** 报表行科目（行码） */
   accountCode?: string
-  /** source=note 用 */
-  sectionId?: string
   /** 合并数（父传入用于底部显示，可选；不传则用 Σamount） */
   consolAmount?: number | string | null
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  jump: [payload: { source_project_id: string; source: 'report' | 'note'; row: BreakdownRow }]
+  jump: [payload: { source_project_id: string; row: BreakdownRow }]
 }>()
 
 const router = useRouter()
@@ -119,11 +116,8 @@ const rows = ref<BreakdownRow[]>([])
 const respMessage = ref('')
 const hasBreakdown = ref(true)
 
-/** 端点：source 决定调哪个；渲染契约统一不受 source 影响 */
 const endpoint = computed(() =>
-  props.source === 'note'
-    ? P_consol.notes.consolBreakdown(props.projectId, props.year, props.sectionId ?? '')
-    : P_consol.reports.consolBreakdown(props.projectId, props.year, props.accountCode ?? ''),
+  P_consol.reports.consolBreakdown(props.projectId, props.year, props.accountCode ?? ''),
 )
 
 /** Σamount（Decimal 累加避免浮点误差） */
@@ -145,7 +139,6 @@ const footerAmount = computed<number | string | null>(() => {
 /** 空态文案（中文）：优先用后端 message，其次默认提示 */
 const emptyMessage = computed(() => {
   if (respMessage.value) return respMessage.value
-  if (props.source === 'note') return '该章节暂无合并明细，请先用 V2 生成合并附注'
   return '该报表行暂无合并明细'
 })
 
@@ -197,18 +190,14 @@ async function fetchBreakdown() {
   } catch (e) {
     // 报表级穿透依赖 Phase 2 端点：未就绪时（404 等）降级为友好空态，不崩溃
     rows.value = []
-    if (props.source === 'report') {
-      respMessage.value = '报表合并明细端点尚未就绪（依赖 Phase 2）'
-    } else {
-      respMessage.value = '该章节暂无合并明细，请先用 V2 生成合并附注'
-    }
+    respMessage.value = '报表合并明细端点尚未就绪（依赖 Phase 2）'
   } finally {
     loading.value = false
   }
 }
 
 /**
- * 行点击 → 跳转子公司单体报表/附注，并纳入 Backspace 返回栈（T3）。
+ * 行点击 → 跳转子公司单体报表，并纳入 Backspace 返回栈（T3）。
  * EH2（2.4）：跳转前做项目访问权限预检——子公司单体项目必须在当前用户可见的项目列表
  *   （后端 /api/projects 已按 require_project_access 过滤）内才允许跳转；无权则 ElMessage 提示不跳。
  *   projectStore.loadProjectOptions() 拉取的 projectOptions 即用户有权访问的项目集合，
@@ -219,13 +208,11 @@ async function handleJump(row: BreakdownRow) {
   const targetProjectId = row.source_project_id
   emit('jump', {
     source_project_id: targetProjectId ?? row.company_code,
-    source: props.source,
     row,
   })
 
   if (!targetProjectId) {
     // 缺来源项目标识 → 无法定位子公司单体项目，仅 emit 不跳转
-    // （附注 by_company 行的 source_project_id 溯源字段属后端 provenance 后续补全项，缺失时降级）
     ElMessage.info('无法定位子公司项目（缺来源项目标识）')
     return
   }
@@ -246,11 +233,7 @@ async function handleJump(row: BreakdownRow) {
   }
   navPush(entry)
 
-  const path =
-    props.source === 'report'
-      ? `/projects/${targetProjectId}/reports`
-      : `/projects/${targetProjectId}/disclosure-notes`
-  router.push({ path, query: { year: String(props.year) } })
+  router.push({ path: `/projects/${targetProjectId}/reports`, query: { year: String(props.year) } })
 
   // 跳转后关闭弹窗
   emit('update:modelValue', false)

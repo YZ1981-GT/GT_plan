@@ -219,3 +219,83 @@ rollforward_columns(table)   RollForward(opening, closing, increase, decrease, u
 - 「核销」方向：坏账准备表里是减少，现按方向不定（有数的行跳过、不误报也不校验）；归减少要拍板。
 - 种子多级表头错位（五-22-1 / 五-22-2「本期减少/自用房地产或存货转入」、五-13-2「期末数/本期出售」、五-29-1 商誉原值套了开发支出的子表头等）是种子问题（R4.1）。挂到期末下的错位列已按方向不定处理；五-22-1 / 五-22-2 只有「自用房地产或存货转入」有数的行仍按减少算。
 - 单元格「汇总」（`/aggregate`）下级没有附注数据时用下级试算表兜底，与「只从单体附注拉数」不一致：保留原行为，只把兜底限在余额列，是否下线待拍板。
+
+## 15 R6（2026-10-22 追加）
+
+### 15.1 V2 汇总器 / `useNoteAggregation`：不需要，删除（R6.1）
+
+| 事实（2026-10-22 现读 + 探针 + 真库） | 说明 |
+|---|---|
+| 旧生成器 `ConsolDisclosureService` 在 AsyncSession 上调 `self.db.query` | 必抛 `AttributeError`，`GET/POST /api/consolidation/notes/{pid}/{year}`、`/integrate`、`/{pid}/{year}/save` 恒 500（探针实测）；产出的是 7 个写死的骨架章节 |
+| V2（`generate_full_consol_notes` 等）章节映射读 `consol_note_section_mapping.csv` | 文件头 `# is_mock=true`，章节 id 是 `section_cash` 这类假 id，对不上合并附注模板 |
+| 开关 | 全局 `CONSOL_NOTES_V2_ENABLED=False`；真库 0 个项目开项目级灰度；`disclosure_notes.consolidation_breakdown` 0 行 ⇒ 生产从未跑过 |
+| 事件 | `handle_consol_subsidiary_changed` 从未注册，`CONSOL_SUBSIDIARY_CHANGED` 从未发布 |
+| 前端 | `useNoteAggregation` 调不存在的 `/api/disclosure-notes/{pid}/{year}/reaggregate`，唯一使用方 `ConsolNoteTreeEnhanced.vue` 无挂载点；附注编辑器「🔗 查看合并明细」只读 V2 写的 `consolidation_breakdown`（0 行）⇒ 恒「暂无合并明细」；`consolidationApi.getConsolNotes` 等 0 调用方 |
+
+合并附注的真实链路是 V186 明细映射（单体附注拉数）+ 子树重新汇总（R3）+ 公式内核，写 `consol_note_data`；V2 是同一件事的第二条路径（还写到 `disclosure_notes`），优化它等于维护两套 ⇒ 删除。
+
+- 删除：`consol_disclosure_service.py`（2039 行）、路由 create / get / integrate / save / consol-breakdown、`note_consol_drilldown_service.py`、`consol_cross_template_service.py`、mock CSV、`consol_note_aggregation_service` 里只给 V2 用的函数、`note_source_resolvers.resolve_consol_aggregation`（注册键 `consol_aggregation`，无绑定用它）、配置 `CONSOL_CROSS_TEMPLATE_ENABLED`；前端 `useNoteAggregation.ts`、`ConsolNoteTreeEnhanced.vue`、附注编辑器「查看合并明细」、`ConsolBreakdownDialog` 的附注模式、`consolidationApi` 里的死函数与 apiPaths；只测这些的测试一并删除。
+- 保留：「🔄 重新汇总」端点、`validate_lineage_dag`（重新汇总 / 应用公式在用）、`ConsolBreakdownDialog` 报表模式（`ReportDialogs.vue` 在用）、灰度开关与 `consol_note_gray_service`（只作试算表事件自动刷新 `consol_note_formula_refresh_handler` 的门控，默认关，行为不变，注释改正）。
+- 级联刷新（「一键刷新」）第 6 步：原来调 V2（生产恒跳过）⇒ 改调 `consol_push_service._refresh_notes`（与合并推送同一函数：全部标待更新 → 逐节点按公式刷新、从单体附注拉来的数保留并标待更新），持推送同一把锁（进程锁 + 事务级咨询锁，与重新汇总互斥）；`note_status` 为 partial / failed 记入 `errors` 不算完成，skipped 记 `steps_skipped`。行为变化：一键刷新从此真的刷新附注，与推送一致。
+
+### 15.2 V202：只分析，待拍板（R6.2）
+
+`V202__consol_note_mapping_reuse_and_reference.sql` 建 4 张表（映射规则模板、结构锁定 + 锁定企业、合并附注数值确认）和 1 列（`consol_note_mapping_rule.promoted_to_template_id`），真库全 0 行；路由 `consol_note_mapping_templates.py` 有规则晋升模板 / 模板列表与删除 / 科目引用 / 数值待确认汇总 / 确认 / 确认状态 / 就绪检查 / 结构锁定加解锁；前端只有 `useConsolNoteReuse.ts`（0 调用方）与 apiPaths；数值变化时 `consol_note_value_change_service` 会把确认降级（后端已接线）。它不是第二条汇总路径，是设计好但没做界面的功能，删还是补界面要产品判断。
+
+### 15.3 合并种子多级表头错位（R6.3）
+
+根因：`backend/scripts/seed/_fix_missing_multi_header.py` 的 `_build_mh_and_cg`（commit d59512f33）从平表头 `headers` 反推多级表头 —— 空串当「沿用左侧」、「/」拆段 —— 与 Word 不符（如国企 五-5-1 `期末数/账面余额 | 期初数/坏账准备 | …` 把期末的坏账准备认成期初），重跑会重现。Word 生成器 `sync_note_templates_from_word.py` 按标记偏移推章节号，不能直接重跑（会动章节号与 `consol_note_data.section_id`）。
+
+修复（定点，按 Word 逐表）：
+
+- 换成 Word 多级表头并用 `multi_header_to_column_groups` 重算分组：国企 五-5-1、五-9-6、五-13-2、五-18-1、五-19-2、五-19-9、五-19-10、五-22-1、五-22-2、五-29-1、五-55-8；上市 五-10-8、五-11-3、五-24-2、五-78-9、十六-3。
+- 被误升进表头的数据行退回表体首部：国企 五-57-2（2 行）、五-64-4（1 行）；上市 九-1-27、九-1-28、五-9-6、五-9-7、五-11-1（2 行）、五-62-4。
+- 不动（与 Word 一致）：国企 五-11-1 / 五-11-2、上市 五-23-3、十二-股份支付总体情况-1。
+- 待人工核对（Word 网格列数与种子不同，不猜）：国企 五-12-2、五-15-1、五-16-1、五-17-1、五-18-3、五-21-1、五-23-2、五-28-1、五-31-1、五-64-1、五-65-4、五-79-1，上市 九-1-3。
+- 列数不变（已保存数据按列号存，不迁移）；国企 五-57-2 / 五-64-4 真库已保存 14 条全空。
+- 一次性修复脚本用完即删，删除 `_fix_missing_multi_header.py`；守卫测试在测试时解析 Word，逐表比对修复后的逐列路径（期望值来自 Word，不写死）。
+
+### 15.4 核销 = 减少（R6.4）
+
+词表 `movement_words` 把「核销」从方向不定移到减少（坏账准备变动表「本期核销」减少余额）。最长词优先不变：「转销或核销」本来就按减少。
+
+### 15.5 单元格汇总只从下级附注取数（R6.5）
+
+`/aggregate`（`consol_note_sections.aggregate_data`）下级没有该章节附注数据时用 `_load_tb_map` 取下级试算表审定数兜底 —— 违背「个别数从单体附注拉、不从试算表来」。改为：只汇总下级已保存的合并附注数据；没有附注数据的下级不计入，响应 `missing_children` 列出（企业名 + 原因），前端提示「以下下级没有附注数据，未计入」。
+
+### 15.6 上年附注导入找列（R6.6）
+
+`note_prior_year_import_service` 把上年 Word 表的期末列按行名填进本年表的期初列，分组表找不到列 / 填错的原因：
+
+1. 本年一侧：`_header_index` 只在平表头 `headers` 里按子串找「期初 / 年初 / 上年末 / 上期末」，不看 `_column_groups` / `columns[].group` / 多级表头 / 表名期间；分组表平表头里期间只写在组首列或全是空串 ⇒ 找不到，或只找到第一列（「期初数/账面余额」找到、「期初数/坏账准备」「期初数/账面价值」漏）；「上年年末」「上期」不在词里。
+2. 上年一侧：只读 Word 表第一行当表头，按原始 `w:tc` 位置取值（不按网格）⇒ 多级表头的期间在第一行、计量在第二行，横向合并单元格让列位置错开。
+3. 表按位置 `zip` 配对（Word 第 i 张 ↔ 章节第 i 张），表数或顺序不同就配错；对不上返回 0，不报。
+4. 解析跳过内容控件 `w:sdt` 里的内容（平台导出的交付件每节都包在内容控件里 ⇒ 整份解析为空）；表前题注被丢弃，没法按表名配对。
+
+新做法（一条路径，旧端点与新端点共用）：
+
+- 解析：`note_word_tree._iter_blocks`（下钻内容控件）+ `note_word_table.parse_word_table`（网格、多级表头、逻辑列）扩展数据行取值；表名 = 表前最近的非空段落。
+- 对应：本年表的期初一侧金额列（`period_side=previous`）← 上年表期末一侧同计量列（期间整体平移：期末→期初、本期→上期，再走 `match_columns`）；表按表名（`base_key`，期间括注与续表标记归一，本年「（续：期初数）」对上年「（期末数）」）+ 列对上数选，唯一最优才自动；行按「行名 + 同名序号」。
+- 认不出的不再静默丢：每张有期初列的本年表给出状态 `auto` / `needs_confirm` / `no_source` 与原因；预览 → 弹窗逐表确认（可改选上年表、逐列指定或不导入）→ 写入。写入时重传文件并校验 sha256（无服务端临时存储）。
+- 原端点保留：只写 `auto` 的表（与弹窗默认勾选一致），响应多报待确认表数。
+
+### 15.7 公式种子取数列 `value_column`（R6.7）
+
+现状：`plan_seed`（a）把章节主表合计行种成 `REPORT(报表行)`，（b）把带科目码的表行按报表行公式的系数种成 `TB(...)` 组合；列由 `value_column` 定：
+
+- 路径 A 只看顶层 `_column_groups`，组名命中「期末…」就返回该组 `start`，即组内第一个叶子列 —— 分组表里几乎都是「账面余额」（毛额）。
+- 报表行常是净额：资产负债表行公式带减项（应收账款 BS-006 = 1122 − 1231，见 `row_account_terms`），净额 = 账面价值，种进「账面余额」列就是错列。
+- 种子表头本身错位时（15.3，如国企 五-29-1 商誉套了开发支出的子表头）组的 `start` 也错 ⇒ 种到别的期间 / 计量列。
+- `ensure_seeded` 在模板文件或报表配置变化时自动重种，人工没碰过的种子跟着规则走。
+
+新规则（调标题行库逐列语义，`column_keys` 与展示同口径）：期间取资产负债表行「期末」、利润表行「本期」（无则取同侧另一期间，沿用「未分配利润用本期金额表头」）；该期间的金额列中 —— 纯期间列唯一 ⇒ 取它；否则报表行（b 类为该行自身公式）有减项 ⇒ 取唯一的账面价值列；否则取唯一的账面余额 / 公允价值列；都不唯一 ⇒ 不种并写原因（列出候选列）。毛额 / 坏账准备分列另种不做（报表公式里的减项常跨科目共用，拆不确定）。
+
+### 15.8 实施记录
+
+**V2 下线（任务 24~26）**
+
+- 删除范围比 15.1 多三处同族死代码（删前 grep 0 调用方）：`consol_report_service` 里另一份 7 骨架附注生成器（无路由、无调用方，构造 `ConsolDisclosureSection` 时传的 `content_type / summary / 中文键行` 都不是 schema 字段 ⇒ 产出空行）、`ConsolDisclosureRow / ConsolDisclosureSection`、`dataset_query.bind_to_active_dataset_sync`（只给旧生成器的同步会话用）。
+- `consol_aggregation` 取数源删除后单元格取数源 9 → 8：前端单元格编辑器的「合并汇总」选项一并删；绑定 JSON 本来就只有 8 项（HEAD 上 `test_binding_json_valid_sources_match` 一直红，本批修好）；残留的旧绑定按「未识别取数源」返回 None。
+- 一键刷新第 6 步：`consol_push_service.refresh_notes_exclusive` = 推送同一把锁 + `_refresh_notes`；第 4 / 5 / 6 步失败先回滚本步（PG 上失败语句让事务 aborted，原来报表步失败会连带附注步失败）。
+- 台账：coverage ledger 删 5 条 HTTP 条目、附注写端点清册删 3 条、edit 级影响清单删 5 个门禁点、领域边界债务基线删 6 条已消解的依赖边 —— 都先核对计数与条目一致再按差量改。这些台账在 HEAD 上本就有别的漂移（清册 `--check` 红、ledger 缺 219 条、领域边界新增 217 条），不在本 spec 范围。
+- `disclosure_notes.source_project_id / consolidation_breakdown` 两列保留（真库 0 行有值、现无读写方），删列要另起迁移。

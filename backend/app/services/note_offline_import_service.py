@@ -376,7 +376,7 @@ def _classify_field(cell_key: str, meta: dict[str, Any]) -> FieldCategory:
 
     if mode == "formula" or source == "formula":
         return FieldCategory.FORMULA
-    if source in ("wp_data", "trial_balance", "aux_balance", "consol_aggregation"):
+    if source in ("wp_data", "trial_balance", "aux_balance"):
         return FieldCategory.VALUE
     return FieldCategory.MANUAL
 

@@ -11,7 +11,10 @@ DAG 自底向上（顺序恒定，属性 S1）：
 失败隔离（属性 S2 / 错误场景 EH1）：
     每步 try/except 记 `errors[{step, node, error}]`；
     - 关键步（worksheet / trial）失败 → 中断剩余步骤（无正确合并数，下游无意义）；
-    - 下游步（reconcile / report / notes）失败 → 记错误并继续（部分成功）。
+    - 下游步（reconcile / report / notes）失败 → 回滚本步、记错误并继续（部分成功）。
+
+notes 步与合并推送同一附注刷新（``consol_push_service.refresh_notes_exclusive``，同一把锁）：
+全部附注行标待更新 → 逐节点按公式刷新，从单体附注拉来的数保留并标待更新；部分失败记错误。
 
 幂等（属性 S6）：同 project/year 连续两次 refresh_all 结果数值一致
 （recalc_full / recalculate_trial 都是全量重算覆盖式写入）。
@@ -34,16 +37,13 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.schemas.consol_context import ConsolContext
 from app.services.consol_context_service import build_consol_context, validate_context
-from app.services.consol_disclosure_service import generate_full_consol_notes
-from app.services.consol_note_formula_service import resolve_note_template_type
-from app.services.consol_note_gray_service import is_consol_note_v2_enabled
 from app.services.consol_reconciliation_service import (
     ReconciliationResult,
     reconcile_worksheet_vs_trial,
 )
+from app.services.consol_push_service import refresh_notes_exclusive
 from app.services.consol_report_service import generate_consol_reports_sync
 from app.services.consol_trial_service import recalculate_trial
 from app.services.consol_tree_service import TreeNode, build_tree, get_descendants
@@ -73,7 +73,7 @@ class CascadeRefreshResult:
     - nodes_refreshed: 企业树节点数（含根）
     - steps_completed: 已成功完成的步骤，按 DAG 顺序的子集
                        [tree, worksheet, trial, reconcile, report, notes]
-    - steps_skipped: 显式跳过的步骤（如 V2 关闭时的 notes），不在 steps_completed 中
+    - steps_skipped: 显式跳过的步骤（如无附注可刷新时的 notes），不在 steps_completed 中
     - errors: 失败步骤清单 [{step, node, error}]
     - duration_ms: 编排总耗时（毫秒）
     - reconciliation: Phase 0 对账结果（观测，不阻断）
@@ -87,6 +87,14 @@ class CascadeRefreshResult:
     errors: list[dict] = field(default_factory=list)
     duration_ms: int = 0
     reconciliation: ReconciliationResult | None = None
+
+
+async def _rollback_quietly(db: AsyncSession) -> None:
+    """下游步失败后回滚本步未提交的改动：PG 上失败语句让事务进入 aborted，不回滚后续步骤会连带失败。"""
+    try:
+        await db.rollback()
+    except Exception:  # noqa: BLE001 - 回滚失败只记日志，不掩盖原错误
+        logger.warning("级联刷新：下游步失败后回滚失败（已忽略）", exc_info=True)
 
 
 def _emit(
@@ -221,6 +229,7 @@ async def refresh_all(
         result.steps_completed.append(STEP_RECONCILE)
         _emit(progress_cb, STEP_RECONCILE, 4, TOTAL_STEPS, root_node_label, "completed")
     except Exception as exc:  # noqa: BLE001 - 失败隔离（下游步：记录后继续）
+        await _rollback_quietly(db)
         result.errors.append({"step": STEP_RECONCILE, "node": root_node_label, "error": str(exc)})
         logger.exception("级联刷新对账失败（下游步，继续）：项目=%s 年度=%s", parent_project_id, year)
         _emit(progress_cb, STEP_RECONCILE, 4, TOTAL_STEPS, root_node_label, "error")
@@ -241,48 +250,51 @@ async def refresh_all(
         result.steps_completed.append(STEP_REPORT)
         _emit(progress_cb, STEP_REPORT, 5, TOTAL_STEPS, root_node_label, "completed")
     except Exception as exc:  # noqa: BLE001 - 失败隔离（下游步：记录后继续）
+        await _rollback_quietly(db)
         result.errors.append({"step": STEP_REPORT, "node": root_node_label, "error": str(exc)})
         logger.exception("级联刷新报表失败（下游步，继续）：项目=%s 年度=%s", parent_project_id, year)
         _emit(progress_cb, STEP_REPORT, 5, TOTAL_STEPS, root_node_label, "error")
 
-    # ---- 步骤 6：notes V2（下游步，按项目级 feature flag 门控；失败记录后继续）--------
+    # ---- 步骤 6：notes（下游步：与合并推送同一附注刷新、同一把锁；失败记录后继续）--------
+    # 全部附注行标待更新 → 逐节点按公式刷新；从单体附注拉来的节点数据（明细映射 / 子树汇总）不覆盖、
+    # 保持待更新（差额变了汇总就过期，由用户「🔄 重新汇总」）。刷新服务逐节点自行提交。
     _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "running")
-    # 保留全局开关的短路语义：生产配置对象与灰度服务使用同一 settings，
-    # 这里显式短路也让旧的编排器测试/运维覆盖能在不构造 Project 行的情况下开启 V2。
-    # 全局关闭时再进入项目级 opt-in 判定，避免绕过项目级灰度。
-    if getattr(settings, "CONSOL_NOTES_V2_ENABLED", False) is True:
-        notes_enabled = True
+    try:
+        stats = await refresh_notes_exclusive(
+            db,
+            parent_project_id,
+            year,
+            context=resolved_context,
+            tree=resolved_tree,
+        )
+    except Exception as exc:  # noqa: BLE001 - 下游步，继续
+        await _rollback_quietly(db)
+        result.errors.append({"step": STEP_NOTES, "node": root_node_label, "error": str(exc)})
+        logger.exception("级联刷新合并附注失败（下游步，继续）：项目=%s 年度=%s", parent_project_id, year)
+        _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "error")
     else:
-        try:
-            notes_enabled = await is_consol_note_v2_enabled(db, parent_project_id)
-        except Exception as exc:  # pragma: no cover - 服务自身 fail-open，但保留编排器保护
-            notes_enabled = False
-            logger.warning("级联刷新：读取项目级附注开关失败，按关闭处理：%s", exc)
-
-    if notes_enabled:
-        try:
-            template_type = await resolve_note_template_type(db, parent_project_id)
-            await generate_full_consol_notes(
-                db,
-                parent_project_id,
-                year,
-                template_type=template_type,
-                context=resolved_context,
-                tree=resolved_tree,
-            )
-            # 生成服务可能写入 provenance；级联步骤必须提交，避免 worker 结束时回滚。
-            await db.commit()
+        note_status = stats.get("note_status")
+        if note_status == "persisted":
             result.steps_completed.append(STEP_NOTES)
             _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "completed")
-        except Exception as exc:  # noqa: BLE001 - 下游步，继续
-            result.errors.append({"step": STEP_NOTES, "node": root_node_label, "error": str(exc)})
-            logger.exception("级联刷新合并附注失败（下游步，继续）：项目=%s 年度=%s", parent_project_id, year)
+        elif note_status in ("partial", "failed"):
+            # 部分 / 全部章节×节点失败：如实记错误，不算完成（与推送 CP-03 同口径）
+            result.errors.append({
+                "step": STEP_NOTES,
+                "node": root_node_label,
+                "error": (
+                    f"合并附注刷新{'部分失败' if note_status == 'partial' else '失败'}："
+                    f"失败 {stats.get('failed_count', 0)} 个章节×节点，"
+                    f"按公式刷新 {stats.get('refreshed_count', 0)}，"
+                    f"保留单体附注拉数 {stats.get('kept_pulled_count', 0)}"
+                ),
+            })
             _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "error")
-    else:
-        # 项目级 flag 显式关闭：附注步骤跳过，不把 skipped 伪装成 success。
-        result.steps_skipped.append(STEP_NOTES)
-        logger.info("级联刷新：项目未启用 V2，跳过附注生成（项目=%s）", parent_project_id)
-        _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "skipped")
+        else:
+            # 没有可刷新的章节 / 节点（无模板类型、无企业树、上下文不可用等）：跳过，不伪装成完成
+            result.steps_skipped.append(STEP_NOTES)
+            logger.info("级联刷新：没有可刷新的合并附注，跳过（项目=%s 统计=%s）", parent_project_id, stats)
+            _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "skipped")
 
     result.duration_ms = int((time.monotonic() - t0) * 1000)
     logger.info(

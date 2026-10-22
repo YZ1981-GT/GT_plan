@@ -5,7 +5,6 @@
  * - 查看相关底稿
  * - 穿透到序时账
  * - 查看数据来源
- * - 查看合并明细
  * - 单元格溯源
  * - 数字信任度
  * - 来源追溯 (Phase 3 F1)
@@ -40,10 +39,6 @@ export function useNoteCellActions(options: UseNoteCellActionsOptions) {
   const cellDetailWpCode = ref('')
   const cellDetailSheet = ref('')
   const cellDetailLabel = ref('')
-
-  // 合并穿透
-  const consolBreakdownVisible = ref(false)
-  const consolBreakdownSectionId = ref('')
 
   // CellTrace 溯源
   const showCellTrace = ref(false)
@@ -101,14 +96,6 @@ export function useNoteCellActions(options: UseNoteCellActionsOptions) {
     cellDetailSheet.value = ''
     cellDetailLabel.value = ''
     showCellFormulaDetail.value = true
-  }
-
-  function onDeCtxViewConsolBreakdown() {
-    deCtx.closeContextMenu()
-    const note = currentNote.value
-    if (!note?.note_section) { ElMessage.warning('请先选择附注章节'); return }
-    consolBreakdownSectionId.value = note.note_section
-    consolBreakdownVisible.value = true
   }
 
   function onDeCtxOpenCellTrace() {
@@ -170,11 +157,10 @@ export function useNoteCellActions(options: UseNoteCellActionsOptions) {
   return {
     penetrate,
     showCellFormulaDetail, cellDetailWpCode, cellDetailSheet, cellDetailLabel,
-    consolBreakdownVisible, consolBreakdownSectionId,
     showCellTrace, cellTraceCtx,
     tracePopoverVisible, traceLoading, traceData, tracePopoverPos,
     onDeCtxRelatedWp, onDeCtxPenetrateToLedger, onDeCtxViewDataSource,
-    onDeCtxViewConsolBreakdown, onDeCtxOpenCellTrace, onCellTracePenetrateTb,
+    onDeCtxOpenCellTrace, onCellTracePenetrateTb,
     onCellDetailNavigate, onAutoCellTraceClick, onTraceJumpToTB,
   }
 }

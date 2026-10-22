@@ -355,13 +355,8 @@ export const consolidation = {
   forex: '/api/consolidation/forex',
   minorityInterest: '/api/consolidation/minority-interest',
   notes: {
-    list: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}`,
-    save: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}/save`,
-    // Phase 2 F3：重新汇总合并附注（消费子公司单体附注，V2 接线 → ReaggregateResponse）
+    // 重新汇总：所选节点子树逐节点拉数（单体附注）/ 差额 / 自下而上汇总 → ReaggregateResponse
     reaggregate: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}/reaggregate`,
-    // Phase 3：附注级合并穿透明细（disclosure_notes.consolidation_breakdown provenance）
-    consolBreakdown: (pid: string, year: number, sectionId: string) =>
-      `/api/consolidation/notes/${pid}/${year}/${sectionId}/consol-breakdown`,
   },
   reports: {
     list: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}`,

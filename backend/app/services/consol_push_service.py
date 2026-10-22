@@ -312,6 +312,16 @@ async def _refresh_notes(
     return stats
 
 
+async def refresh_notes_exclusive(
+    db: AsyncSession, project_id: UUID, year: int, *, context=None, tree=None,
+) -> dict:
+    """与推送同一附注刷新（``_refresh_notes``），持推送同一把锁（进程锁 + 事务级咨询锁）：
+    与合并推送、「🔄 重新汇总」互斥。给合并「一键刷新」（``consol_cascade_refresh_service``）用。"""
+    async with _process_lock("target", project_id, year):
+        await _advisory_lock(db, project_id, year)
+        return await _refresh_notes(db, project_id, year, context=context, tree=tree)
+
+
 async def _push_one(db: AsyncSession, project_id: UUID, year: int, steps: list[dict], warnings: list[str],
                     *, context=None, tree=None) -> bool:
     """推送一个合并项目的四步；返回是否全部成功。每步独立事务，失败回滚该步并留痕。"""

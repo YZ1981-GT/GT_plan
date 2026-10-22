@@ -3,7 +3,7 @@
  *
  * 覆盖（需求 NFR-1.2）：
  * - 7.1 一键刷新按钮 → SSE 进度显示 → 完成（refresh-all + events/stream 进度，需求 2）
- * - 7.2 V2 附注 flag 开启后前端「生成合并附注」表现（CONSOL_NOTES_V2_ENABLED，需求 3）
+ * - 7.2（V2 附注生成）已随 V2 汇总器于 2026-10-22 下线（consol-note-header-library-and-node-reaggregate R6.1）
  * - 7.3 F3 前端「一键刷新全部」+「重新汇总附注」入口调通后端（需求 9）
  *
  * 运行方式：
@@ -89,37 +89,5 @@ test.describe('Phase 2 编排 + 接线 (consol-phase2-orchestration)', () => {
 
     // 完成后切到「合并附注」tab
     await expect(page.locator('.el-tabs__item:has-text("合并附注")')).toBeVisible({ timeout: 5000 })
-  })
-
-  // ── 7.2 V2 附注 flag 开启后「生成合并附注」表现 ──
-  test('7.2 V2 附注 flag 开启 → 生成合并附注消费子公司数据（章节非空骨架）', async ({ page }) => {
-    test.skip(!CONSOL_PROJECT_ID, '需 CONSOL_PROJECT_ID 环境变量')
-    test.skip(
-      _env.CONSOL_NOTES_V2_ENABLED !== '1',
-      '需后端 CONSOL_NOTES_V2_ENABLED=True 启动（默认 False 老版）',
-    )
-    await page.goto(`/projects/${CONSOL_PROJECT_ID}/consolidation?year=${CONSOL_YEAR}`)
-    await page.waitForLoadState('networkidle')
-
-    // 切到合并附注 tab
-    await page.locator('.el-tabs__item:has-text("合并附注")').click()
-    await page.waitForLoadState('networkidle')
-
-    // 生成合并附注（V2：消费子公司单体附注汇总，章节数应 > 7 骨架）
-    const genBtn = page.locator('button:has-text("生成"), button:has-text("生成合并附注")').first()
-    if (await genBtn.isVisible().catch(() => false)) {
-      const [resp] = await Promise.all([
-        page.waitForResponse(
-          (r) => /\/api\/consolidation\/notes\/.+\/(\d+)$/.test(r.url()) && r.request().method() === 'POST',
-          { timeout: 30000 },
-        ),
-        genBtn.click(),
-      ])
-      expect(resp.ok()).toBeTruthy()
-      const sections = await resp.json()
-      // V2 应返回合法 ConsolDisclosureSection 列表（契约 S4 一致）
-      expect(Array.isArray(sections)).toBeTruthy()
-    }
-    // 0 console error（无运行时异常）
   })
 })

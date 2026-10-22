@@ -452,9 +452,8 @@ def adapt_table_data(
 ) -> dict[str, Any]:
     """Adapt table_data to target format using column/field remapping（薄壳）.
 
-    保留原签名与返回类型，供既有消费方（``consol_cross_template_service`` /
-    ``note_conversion_service``）与既有测试的 patch 点不变；需要知道「到底
-    改没改」的调用方走 :func:`adapt_table_data_with_report`。
+    保留原签名与返回类型，供既有消费方（``note_conversion_service``）与既有测试的
+    patch 点不变；需要知道「到底改没改」的调用方走 :func:`adapt_table_data_with_report`。
     """
     adapted, _report = adapt_table_data_with_report(table_data, target_format, field_mapping)
     return adapted

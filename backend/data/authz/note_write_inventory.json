@@ -1,6 +1,6 @@
 {
   "counts": {
-    "C": 28,
+    "C": 25,
     "E": 34,
     "G": 2,
     "I": 24,
@@ -1140,85 +1140,9 @@
         "stub": null
       },
       "file": "consol_notes.py",
-      "function": "integrate_notes",
-      "method": "POST",
-      "path": "/api/consolidation/notes/integrate",
-      "registered": true,
-      "registry_group": "system",
-      "target_gate": {
-        "declared": false,
-        "eqcr": null,
-        "gate": null,
-        "kind": "keep_current",
-        "params": null,
-        "project_from": null,
-        "reason": null
-      }
-    },
-    {
-      "category": "C",
-      "current_equals_target": true,
-      "current_gate": {
-        "consol_lock": false,
-        "eqcr_exclusion": false,
-        "forms": [
-          {
-            "conditional": false,
-            "helper": null,
-            "level": "edit",
-            "name": "require_project_access",
-            "params": {},
-            "via": "signature"
-          }
-        ],
-        "global_roles": [],
-        "identity_only": false,
-        "max_level": "edit",
-        "operations": [],
-        "stub": null
-      },
-      "file": "consol_notes.py",
       "function": "update_consol_note_gray",
       "method": "PUT",
       "path": "/api/consolidation/notes/{project_id}/config/consol-note-gray",
-      "registered": true,
-      "registry_group": "system",
-      "target_gate": {
-        "declared": false,
-        "eqcr": null,
-        "gate": null,
-        "kind": "keep_current",
-        "params": null,
-        "project_from": null,
-        "reason": null
-      }
-    },
-    {
-      "category": "C",
-      "current_equals_target": true,
-      "current_gate": {
-        "consol_lock": false,
-        "eqcr_exclusion": false,
-        "forms": [
-          {
-            "conditional": false,
-            "helper": null,
-            "level": "edit",
-            "name": "require_project_access",
-            "params": {},
-            "via": "signature"
-          }
-        ],
-        "global_roles": [],
-        "identity_only": false,
-        "max_level": "edit",
-        "operations": [],
-        "stub": null
-      },
-      "file": "consol_notes.py",
-      "function": "create_consol_notes",
-      "method": "POST",
-      "path": "/api/consolidation/notes/{project_id}/{year}",
       "registered": true,
       "registry_group": "system",
       "target_gate": {
@@ -1265,44 +1189,6 @@
       "function": "reaggregate_consol_notes",
       "method": "POST",
       "path": "/api/consolidation/notes/{project_id}/{year}/reaggregate",
-      "registered": true,
-      "registry_group": "system",
-      "target_gate": {
-        "declared": false,
-        "eqcr": null,
-        "gate": null,
-        "kind": "keep_current",
-        "params": null,
-        "project_from": null,
-        "reason": null
-      }
-    },
-    {
-      "category": "C",
-      "current_equals_target": true,
-      "current_gate": {
-        "consol_lock": false,
-        "eqcr_exclusion": false,
-        "forms": [
-          {
-            "conditional": false,
-            "helper": null,
-            "level": "edit",
-            "name": "require_project_access",
-            "params": {},
-            "via": "signature"
-          }
-        ],
-        "global_roles": [],
-        "identity_only": false,
-        "max_level": "edit",
-        "operations": [],
-        "stub": null
-      },
-      "file": "consol_notes.py",
-      "function": "save_consol_notes",
-      "method": "POST",
-      "path": "/api/consolidation/notes/{project_id}/{year}/save",
       "registered": true,
       "registry_group": "system",
       "target_gate": {
@@ -4420,7 +4306,7 @@
       "report_note_references.py"
     ],
     "frontend": "待接入（任务 8.3）",
-    "write_endpoint_total": 101
+    "write_endpoint_total": 98
   },
   "schema": "note_write_inventory/v1"
 }

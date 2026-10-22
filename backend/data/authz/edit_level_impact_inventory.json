@@ -2680,48 +2680,6 @@
       "conditional": false,
       "domain": "system",
       "endpoints": [
-        "POST /api/consolidation/notes/{project_id}/{year}"
-      ],
-      "file": "app/routers/consol_notes.py",
-      "form": "require_project_access",
-      "function": "create_consol_notes",
-      "gate_internal": null,
-      "in_note_coverage": false,
-      "level": "edit",
-      "ordinal": 1,
-      "overlays": {
-        "consol_lock": false,
-        "global_capability": null,
-        "global_role_bypass": [],
-        "operations": []
-      },
-      "via_helper": null
-    },
-    {
-      "conditional": false,
-      "domain": "system",
-      "endpoints": [
-        "GET /api/consolidation/notes/{project_id}/{year}/{section_id}/consol-breakdown"
-      ],
-      "file": "app/routers/consol_notes.py",
-      "form": "require_project_access",
-      "function": "get_consol_note_breakdown",
-      "gate_internal": null,
-      "in_note_coverage": false,
-      "level": "readonly",
-      "ordinal": 1,
-      "overlays": {
-        "consol_lock": false,
-        "global_capability": null,
-        "global_role_bypass": [],
-        "operations": []
-      },
-      "via_helper": null
-    },
-    {
-      "conditional": false,
-      "domain": "system",
-      "endpoints": [
         "GET /api/consolidation/notes/{project_id}/config/consol-note-gray"
       ],
       "file": "app/routers/consol_notes.py",
@@ -2743,74 +2701,11 @@
       "conditional": false,
       "domain": "system",
       "endpoints": [
-        "GET /api/consolidation/notes/{project_id}/{year}"
-      ],
-      "file": "app/routers/consol_notes.py",
-      "form": "require_project_access",
-      "function": "get_consol_notes",
-      "gate_internal": null,
-      "in_note_coverage": false,
-      "level": "readonly",
-      "ordinal": 1,
-      "overlays": {
-        "consol_lock": false,
-        "global_capability": null,
-        "global_role_bypass": [],
-        "operations": []
-      },
-      "via_helper": null
-    },
-    {
-      "conditional": false,
-      "domain": "system",
-      "endpoints": [
-        "POST /api/consolidation/notes/integrate"
-      ],
-      "file": "app/routers/consol_notes.py",
-      "form": "require_project_access",
-      "function": "integrate_notes",
-      "gate_internal": null,
-      "in_note_coverage": false,
-      "level": "edit",
-      "ordinal": 1,
-      "overlays": {
-        "consol_lock": false,
-        "global_capability": null,
-        "global_role_bypass": [],
-        "operations": []
-      },
-      "via_helper": null
-    },
-    {
-      "conditional": false,
-      "domain": "system",
-      "endpoints": [
         "POST /api/consolidation/notes/{project_id}/{year}/reaggregate"
       ],
       "file": "app/routers/consol_notes.py",
       "form": "require_project_access",
       "function": "reaggregate_consol_notes",
-      "gate_internal": null,
-      "in_note_coverage": false,
-      "level": "edit",
-      "ordinal": 1,
-      "overlays": {
-        "consol_lock": false,
-        "global_capability": null,
-        "global_role_bypass": [],
-        "operations": []
-      },
-      "via_helper": null
-    },
-    {
-      "conditional": false,
-      "domain": "system",
-      "endpoints": [
-        "POST /api/consolidation/notes/{project_id}/{year}/save"
-      ],
-      "file": "app/routers/consol_notes.py",
-      "form": "require_project_access",
-      "function": "save_consol_notes",
       "gate_internal": null,
       "in_note_coverage": false,
       "level": "edit",
@@ -13058,9 +12953,9 @@
     },
     "system": {
       "direct_comparisons": 1,
-      "endpoints": 273,
+      "endpoints": 268,
       "files": 43,
-      "gate_points": 274
+      "gate_points": 269
     },
     "unregistered": {
       "direct_comparisons": 5,
@@ -13077,8 +12972,8 @@
   },
   "totals": {
     "direct_comparisons": 6,
-    "endpoints": 598,
+    "endpoints": 593,
     "files": 148,
-    "gate_points": 611
+    "gate_points": 606
   }
 }

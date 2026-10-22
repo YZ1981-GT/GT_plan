@@ -2,7 +2,7 @@
  * consol-phase3-frontend-drilldown — Phase 3 前端联动 Playwright 实测（Task 8）
  *
  * 覆盖（需求 NFR-1.2）：
- * - 8.1 T3 报表/附注右键穿透 → ConsolBreakdownDialog → 点子公司跳转 → Backspace 返回
+ * - 8.1 T3 报表右键穿透 → ConsolBreakdownDialog → 点子公司跳转 → Backspace 返回（附注模式随 V2 下线）
  * - 8.2 双向导航：单体 header 跳合并 / 合并树进单体 / 锁定标签
  * - 8.3 自动建树：wizard 配置合并范围步骤 + scope 变更树刷新
  * - 8.4 F5 stale 感知：子公司改数 → 合并页 SSE 提示「建议重新汇总」+ 快捷入口（需求 7）
@@ -40,7 +40,7 @@ test.describe('Phase 3 前端联动 + 附注穿透 (consol-phase3-frontend-drill
     await expect(page).toHaveURL(/\/(dashboard|projects)/, { timeout: 10000 })
   })
 
-  // ── 8.1 报表/附注右键穿透 → ConsolBreakdownDialog → 跳转 → Backspace 返回（T3） ──
+  // ── 8.1 报表右键穿透 → ConsolBreakdownDialog → 跳转 → Backspace 返回（T3） ──
   test('8.1 合并报表右键"查看合并明细" → 弹窗 → 点子公司跳转 → Backspace 返回', async ({ page }) => {
     test.skip(!CONSOL_PROJECT_ID, '需 CONSOL_PROJECT_ID 环境变量')
     await page.goto(`/projects/${CONSOL_PROJECT_ID}/reports?year=2025`)
@@ -70,23 +70,6 @@ test.describe('Phase 3 前端联动 + 附注穿透 (consol-phase3-frontend-drill
       await page.keyboard.press('Backspace')
       await page.waitForLoadState('networkidle')
       expect(page.url()).toContain(CONSOL_PROJECT_ID)
-    }
-  })
-
-  test('8.1b 合并附注右键"查看合并明细" → 弹窗渲染（source=note）', async ({ page }) => {
-    test.skip(!CONSOL_PROJECT_ID, '需 CONSOL_PROJECT_ID 环境变量')
-    await page.goto(`/projects/${CONSOL_PROJECT_ID}/disclosure-notes?year=2025`)
-    await page.waitForLoadState('networkidle')
-
-    // 选中一个附注章节后在单元格右键
-    const cell = page.locator('.el-table__row .cell').first()
-    if (await cell.count()) {
-      await cell.click({ button: 'right' })
-      const menuItem = page.locator('.gt-ucell-ctx-item:has-text("查看合并明细")')
-      await expect(menuItem).toBeVisible({ timeout: 5000 })
-      await menuItem.click()
-      // 弹窗打开（有 breakdown 渲染表 / 无 breakdown 友好空态）
-      await expect(page.locator('.el-dialog:has-text("查看合并明细")')).toBeVisible({ timeout: 5000 })
     }
   })
 

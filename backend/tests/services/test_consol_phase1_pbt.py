@@ -242,7 +242,7 @@ def test_q7_minority_ratio_no_complement(minority_pct: int):
     """
     minority_share_ratio = Decimal(minority_pct)
 
-    # 附注展示口径（修复后 consol_disclosure_service / consol_report_service 一致）
+    # 附注展示口径：少数股东持股比例直接用 minority_share_ratio（不求补数）
     disclosure_ratio = float(minority_share_ratio or Decimal("0"))
     assert disclosure_ratio == float(minority_pct)
 

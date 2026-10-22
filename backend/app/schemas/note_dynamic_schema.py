@@ -97,14 +97,13 @@ class BindingSource(BaseModel):
     - formula: 公式计算
     - prior_year_note: 上年附注
     - manual: 手工填列
-    - consol_aggregation: 合并汇总（Phase 2）
     """
 
     source: str = Field(
         ...,
         description=(
             "数据源类型：trial_balance | aux_balance | aux_ledger_aging | "
-            "wp_data | formula | prior_year_note | manual | consol_aggregation"
+            "wp_data | formula | prior_year_note | manual"
         ),
     )
     # 以下为 source-specific 字段，用 dict 承载灵活配置

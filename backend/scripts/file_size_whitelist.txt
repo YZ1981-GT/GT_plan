@@ -1338,7 +1338,6 @@ backend/tests/test_formula_push_batch_e_note.py 1678
 #   M(10)+N(5)+F(4) 共 19 科目附注规则冻结映射 × 参数化（section/fields/policy/
 #   stage/rows/table/binding/sync_registry/TB 不可用）= 829 行；按循环拆会丢跨循环共性测试。
 backend/tests/test_formula_push_batch_e_mnf_note.py 829
-backend/app/services/consol_disclosure_service.py 1985
 
 # ThreeColumnLayout.vue —— 2026-10-06 入册。
 #   增量来源：consol-node-key-isolation-and-shared-context 四栏入口视觉引导
@@ -1471,6 +1470,13 @@ backend/app/services/financial_report_drift_service.py  915
 #     2026-10-16 disclosure-note-template-word-realignment Task 17：编制指引回写盖「最近一次编辑」+ 操作人解析（+15 行）。
 #     拆分方向：文件校验 / 差异比对 / 合并决策（纯函数）与落库服务分文件。
 backend/app/services/note_offline_import_service.py  987
+#   note_source_resolvers.py / note_template_diff.py / note_offline_export_service.py —— 附注取数源 / 模板差异 / 离线导出
+#     （非本次引入；触碰前已 1126 / 904 / 805 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-22 consol-note-header-library-and-node-reaggregate R6.1：只删 V2 汇总器的死引用（consol_aggregation 取数源
+#     −63 行、已删模块的说明 −1 行、导出分类元组一项），行数只降不增。拆分方向：取数源按 source 分文件 / 差异计算与适配分文件。
+backend/app/services/note_source_resolvers.py  1063
+backend/app/services/note_template_diff.py  903
+backend/app/services/note_offline_export_service.py  805
 
 #   deliverable_service.py —— 交付中心核心服务（HEAD 前即 735 行，本次未在册 ⇒ 任何改动都被门禁按 800 上限拒）。
 #     2026-10-18 deliverable-writeback-and-online-edit-integrity Task 7/8/9（design §2.1~2.3）：

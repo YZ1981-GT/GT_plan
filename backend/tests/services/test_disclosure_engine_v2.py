@@ -611,8 +611,8 @@ def test_loader_handles_bindings_not_dict(monkeypatch, tmp_path):
 
 
 def test_seven_sources_have_resolvers():
-    """9 个 source 都有 resolver 函数（含 consol_aggregation，Sprint B.0 新增）."""
-    assert len(VALID_SOURCES) == 9
+    """8 个 source 都有 resolver 函数（consol_aggregation 已随 V2 汇总器下线）."""
+    assert len(VALID_SOURCES) == 8
     for src in VALID_SOURCES:
         assert src in SOURCE_RESOLVERS
         assert callable(SOURCE_RESOLVERS[src])

@@ -283,7 +283,6 @@ _SYSTEM_WRITERS: dict[str, tuple[str, ...]] = {
     "services/formula_settings/note_settings.py": ("materialize", "save_section", "_import_legacy"),
     "services/note_wp_mapping_service.py": ("NoteWpMappingService.clear_formulas", "NoteWpMappingService.restore_auto_mode"),
     "services/note_trim_service.py": ("NoteTrimService.auto_trim_v2",),
-    "services/consol_disclosure_service.py": ("ConsolDisclosureService.save_consol_notes",),
     "routers/note_wp_mapping.py": ("refresh_all_bindings",),
     "routers/disclosure_notes.py": ("pull_from_workpapers",),
 }

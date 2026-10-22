@@ -94,7 +94,7 @@ def _classify_cell(cell_meta: dict[str, Any]) -> str:
 
     if mode == "formula" or source == "formula":
         return "formula"
-    if source in ("wp_data", "trial_balance", "aux_balance", "aux_ledger_aging", "consol_aggregation"):
+    if source in ("wp_data", "trial_balance", "aux_balance", "aux_ledger_aging"):
         return "locked"
     if is_required:
         return "required"

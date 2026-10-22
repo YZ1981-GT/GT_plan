@@ -1135,10 +1135,6 @@
     <div class="gt-ucell-ctx-item" @click="onDeCtxViewDataSource">
       <span class="gt-ucell-ctx-icon">🔍</span> 查看数据来源
     </div>
-    <!-- 合并明细穿透（统一组件 ConsolBreakdownDialog，source=note）：合并附注最相关，单体附注无 breakdown 时弹窗友好降级 -->
-    <div class="gt-ucell-ctx-item" @click="onDeCtxViewConsolBreakdown">
-      <span class="gt-ucell-ctx-icon">🔗</span> 查看合并明细
-    </div>
     <!-- Sprint 2 Task 2.4：CellTrace 单元格溯源 -->
     <div class="gt-ucell-ctx-item" @click="onDeCtxOpenCellTrace">
       <span class="gt-ucell-ctx-icon">🔎</span> 溯源到底稿/试算表
@@ -1163,15 +1159,6 @@
     :label="cellDetailLabel"
     @update:visible="showCellFormulaDetail = $event"
     @navigate="onCellDetailNavigate"
-  />
-
-  <!-- 合并附注穿透弹窗（统一组件，source=note）：右键"查看合并明细"打开 -->
-  <ConsolBreakdownDialog
-    v-model="consolBreakdownVisible"
-    source="note"
-    :project-id="projectId"
-    :year="year"
-    :section-id="consolBreakdownSectionId"
   />
 
   <!-- Sprint 2 Task 2.4: CellTrace 单元格溯源弹窗 -->
@@ -1295,7 +1282,6 @@ import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
 import StatusMachinePanel from '@/components/status_machine/StatusMachinePanel.vue'
 import TimeMachineDrawer from '@/components/time_machine/TimeMachineDrawer.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
-import ConsolBreakdownDialog from '@/components/consolidation/ConsolBreakdownDialog.vue'
 import TraceSourcePopover from '@/components/common/TraceSourcePopover.vue'
 import CellTraceDialog from '@/components/notes/CellTraceDialog.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
@@ -3232,11 +3218,10 @@ function deRowClassName({ row, rowIndex }: { row: any; rowIndex: number }): stri
 import { useNoteCellActions } from '@/views/composables/useNoteCellActions'
 const {
   showCellFormulaDetail, cellDetailWpCode, cellDetailSheet, cellDetailLabel,
-  consolBreakdownVisible, consolBreakdownSectionId,
   showCellTrace, cellTraceCtx,
   tracePopoverVisible, traceLoading, traceData, tracePopoverPos,
   onDeCtxRelatedWp, onDeCtxPenetrateToLedger, onDeCtxViewDataSource,
-  onDeCtxViewConsolBreakdown, onDeCtxOpenCellTrace, onCellTracePenetrateTb,
+  onDeCtxOpenCellTrace, onCellTracePenetrateTb,
   onCellDetailNavigate, onAutoCellTraceClick, onTraceJumpToTB,
 } = useNoteCellActions({ projectId, year, currentNote, activeTableData, deCtx, router, route })
 
