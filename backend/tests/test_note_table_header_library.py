@@ -225,6 +225,15 @@ class TestMatchColumns:
         m = M.match_columns(target, [source])
         assert m.col_map == {} and m.unmatched == [1, 2, 3]
 
+    def test_exact_claim_beats_weak_claims_on_the_same_column(self):
+        """同一来源列被精确命中与弱规则同时认领：精确的保留、弱的让位（原来全部放弃 —— 上年附注导入里本年多一列
+        「期初数量」按「只写了期间」认领上年「期末余额」，连带「期初余额 ↔ 期末余额」的精确对应也丢了）。"""
+        label = L.ColumnKey(0, (), None, (), "label")
+        target = [label, self._k(1, "end"), self._k(2, "end", "数量")]
+        source = [label, self._k(1, "end"), self._k(2, "prior")]
+        m = M.match_columns(target, [source])
+        assert m.col_map == {1: (0, 1)} and m.rules == {1: "exact"} and m.unmatched == [2]
+
     def test_pure_period_column_is_the_unique_balance_column(self):
         """单体「期末数」（纯期间 = 余额）↔ 合并「期末数/账面余额 | 期末数/坏账准备」：对唯一的余额列（两个方向）。"""
         label = L.ColumnKey(0, (), None, (), "label")
@@ -244,6 +253,20 @@ class TestMatchColumns:
         source = [label, self._k(1, "end")]
         assert M.match_columns(target, [source]).col_map == {}
         assert M.match_columns(source, [target]).col_map == {}
+
+    def test_fill_main_period(self):
+        """主表整表没期间：列续表同一期间 ⇒ 取对侧；否则目标表唯一期间；主表本有期间 / 续表期间不唯一 ⇒ 不动。
+        合并选表（``unit_member_keys``）与上年附注导入共用这一份规则。"""
+        label = L.ColumnKey(0, (), None, (), "label")
+        bare = [label, self._k(1, None, "账面余额"), self._k(2, None, "坏账准备")]
+        cont = [label, self._k(1, "prior", "账面余额")]
+        assert [k.period for k in M.fill_main_period(bare, [cont])] == [None, "end", "end"]
+        assert [k.period for k in M.fill_main_period(bare, [], [label, self._k(1, "cur")])] == [None, "cur", "cur"]
+        mixed = [label, self._k(1, "prior"), self._k(2, "end")]
+        assert [k.period for k in M.fill_main_period(bare, [mixed])] == [None, None, None]
+        assert [k.period for k in M.fill_main_period(bare, [mixed], [label, self._k(1, "cur")])] == [None, "cur", "cur"]
+        own = [label, self._k(1, "end", "账面余额")]
+        assert M.fill_main_period(own, [cont]) == own
 
 
 class TestChooseUnit:
@@ -268,6 +291,17 @@ class TestChooseUnit:
         has_plain_cont = "按坏账准备计提方法分类披露应收票据（续）" in names
         assert prior.method == ("structure" if has_plain_cont else "name")
         assert prior.match.exact_count == 3
+
+    def test_unit_member_keys_fills_main_from_its_column_continuation(self):
+        """主表没写期间、列续表是期初 ⇒ 主表按期末对列。目标表两个期间都有时只有这条规则能定（真实组合里目标表只有一个
+        期间，「取目标表唯一期间」的兜底会掩盖它）—— ``fill_main_period`` 抽出后钉住合并选表仍接着它。"""
+        headers = ["类别", "账面余额", "坏账准备"]
+        tables = [{"name": "按坏账计提方法分类", "headers": headers, "rows": []},
+                  {"name": "按坏账计提方法分类（续：期初数）", "headers": headers, "rows": []}]
+        target = L.column_keys({"headers": ["类别", "期末账面余额", "期初账面余额"]})
+        main, cont = M.unit_member_keys(tables, [0, 1], target_keys=target)
+        assert [k.period for k in main[1:]] == ["end", "end"]
+        assert [k.period for k in cont[1:]] == ["prior", "prior"]
 
     def test_generic_columns_never_chosen_by_structure(self):
         tables = [{"name": "货币资金", "headers": ["项目", "期末余额", "期初余额"], "rows": []}]

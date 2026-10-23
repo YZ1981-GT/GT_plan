@@ -368,6 +368,17 @@ def _add_guidance_paragraph(doc, text: str):
     return p
 
 
+def _set_outline_level(paragraph, level: int) -> None:
+    """标题段落设大纲级别（Word 第 ``level`` 级）：目录域 ``TOC \\o "1-3" \\u``、导航窗格与附注解析（上年附注导入 /
+    上传附注文档，``note_document_parser.docx_paragraph_heading``）都靠它认标题。只设大纲级别、不套标题样式（字体照旧）。"""
+    ppr = paragraph._p.get_or_add_pPr()
+    for old in ppr.findall(qn("w:outlineLvl")):
+        ppr.remove(old)
+    outline = OxmlElement("w:outlineLvl")
+    outline.set(qn("w:val"), str(level - 1))
+    ppr.insert_element_before(outline, "w:divId", "w:cnfStyle", "w:rPr", "w:sectPr", "w:pPrChange")
+
+
 def _add_bookmark(paragraph, bookmark_name: str):
     """Add a bookmark to a paragraph for cross-reference."""
     import random
@@ -1521,6 +1532,7 @@ class NoteWordExporter:
         run = p.add_run(f"{prefix}{title}")
         _set_run_font(run, bold=True, size=HEADING1_FONT_SIZE)
         _set_paragraph_format(p, space_before=Pt(6))
+        _set_outline_level(p, 1)
         _add_bookmark(p, f"note_section_{section_code}")
 
     def _add_heading2(self, doc: Document, idx: int, title: str, section_code: str):
@@ -1530,6 +1542,7 @@ class NoteWordExporter:
         run = p.add_run(f"{prefix}{title}")
         _set_run_font(run, size=HEADING2_FONT_SIZE)
         _set_paragraph_format(p)
+        _set_outline_level(p, 2)
         _add_bookmark(p, f"note_section_{section_code}")
 
     def _add_heading3(self, doc: Document, idx: int, title: str, section_code: str):
@@ -1538,6 +1551,7 @@ class NoteWordExporter:
         run = p.add_run(f"{idx}. {title}")
         _set_run_font(run, size=HEADING3_FONT_SIZE)
         _set_paragraph_format(p)
+        _set_outline_level(p, 3)
         _add_bookmark(p, f"note_section_{section_code}")
 
     def _render_note_content(self, doc: Document, note: DisclosureNote):

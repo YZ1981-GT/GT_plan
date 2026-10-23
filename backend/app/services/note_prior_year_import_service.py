@@ -2,19 +2,18 @@
 
 Requirements: 51.1, 51.2, 51.3, 51.4, 51.5, 51.7, 51.8
 
-功能：
-- 接受 .docx 上传，解析 Word 章节结构（按标题层级拆分）
-- 上年文字内容填入本年对应章节（按标题匹配）
-- 上年数据标记为"待更新"（黄色高亮）
-- 上年表格数据提取到"期初余额"列
-- 连续审计项目自动从上年数据库继承
+- 上年附注 .docx：按标题对上本年章节，填正文（内容模板写过的不覆盖）与表格期初列（上年期末 → 本年期初，只填空格），
+  标记「待更新」。表格逐张规划见 ``note_prior_year_plan``（spec consol-note-header-library-and-node-reaggregate R6.6）：
+  ``mode="auto"`` 只写自动认出的表（原端点行为），``preview`` 只返回逐表规划，``apply`` 按用户逐表确认写入
+  （重传文件、校验 sha256，服务端不存临时文件）。
+- 连续审计项目从本库上一年度附注继承正文。
 """
 from __future__ import annotations
 
 import copy
-import io
+import hashlib
 import logging
-import re
+from collections import defaultdict
 from typing import Any
 from uuid import UUID
 
@@ -22,217 +21,81 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.note_edit_stamp import stamp_note_edit
+from app.services.note_prior_year_plan import (
+    STATUS_AUTO,
+    STATUS_CONFIRM,
+    STATUS_NONE,
+    PriorDoc,
+    TablePlan,
+    apply_col_map,
+    match_sections,
+    note_tables,
+    parse_prior_docx,
+    plan_note_tables,
+)
 
 logger = logging.getLogger(__name__)
 
-#: 本年表的期初列 / 上年表的期末列（表头包含其一即算）
-_OPENING_HEADERS = ("期初", "年初", "上年末", "上期末")
-_CLOSING_HEADERS = ("期末", "年末", "本期末")
-_WS = re.compile(r"[\s\u3000]+")
+IMPORT_MODES = ("auto", "preview", "apply")
 
 
-def _norm_label(value: Any) -> str:
-    return _WS.sub("", str(value or ""))
+class PriorYearImportError(ValueError):
+    """请求与预览 / 文件对不上：``status`` 供路由转 400 / 409，消息是给用户看的中文。"""
+
+    def __init__(self, message: str, *, status: int = 400):
+        super().__init__(message)
+        self.status = status
 
 
-def _header_index(headers: list[Any], keys: tuple[str, ...]) -> int | None:
-    """第一个（跳过标签列）表头含任一关键字的列号。"""
-    for i, h in enumerate(headers):
-        if i and any(k in str(h or "") for k in keys):
-            return i
-    return None
-
-
-def _parse_amount(text: Any) -> float | None:
-    """Word 表格里的金额文字 → 数值：去千分位，（）/ () 表负数，空 / - / — 视为无值。"""
-    s = str(text or "").replace(",", "").replace("，", "").strip()
-    negative = s[:1] in ("(", "（") and s[-1:] in (")", "）")
-    s = s.strip("()（）").strip()
-    if s in ("", "-", "—", "--"):
-        return None
-    try:
-        value = float(s)
-    except ValueError:
-        return None
-    return -value if negative else value
-
-
-def _extract_to_opening_balance(table: dict[str, Any], prior_rows: list[list[str]]) -> int:
-    """把上年表「期末」列按行标签填进本年表「期初」列，只填空格（不覆盖已有值）；返回填入格数。
-
-    ``table`` 是附注表（``headers`` + ``rows[{label, values}]``，``values`` 不含标签列 ⇒ 下标 = 表头列号 - 1）；
-    ``prior_rows`` 是 Word 表格（首行表头，首列行标签）。
-    """
-    if len(prior_rows) < 2:
-        return 0
-    open_col = _header_index(list(table.get("headers") or []), _OPENING_HEADERS)
-    close_col = _header_index(list(prior_rows[0]), _CLOSING_HEADERS)
-    if open_col is None or close_col is None:
-        return 0
-    closing: dict[str, float] = {}
-    for row in prior_rows[1:]:
-        if len(row) > close_col and _norm_label(row[0]):
-            value = _parse_amount(row[close_col])
-            if value is not None:
-                closing.setdefault(_norm_label(row[0]), value)
-    filled = 0
-    for row in table.get("rows") or []:
-        if not isinstance(row, dict) or not isinstance(row.get("values"), list):
+def _decisions(raw: Any, plans: list[TablePlan], doc: PriorDoc) -> dict[str, tuple[str, dict[int, int]]]:
+    """用户逐表确认 → {本年表键: (上年表, 本年列 → 上年列)}；``prior_table_id`` 为空 = 不导入。逐项校验，不合法整单拒绝。"""
+    if not isinstance(raw, list):
+        raise PriorYearImportError("确认内容格式不对，请重新预览")
+    by_key = {p.key: p for p in plans}
+    out: dict[str, tuple[str, dict[int, int]]] = {}
+    for i, item in enumerate(raw, 1):
+        plan = by_key.get(item.get("key")) if isinstance(item, dict) else None
+        if plan is None:
+            raise PriorYearImportError(f"第 {i} 项确认对不上本年附注的表格（附注可能已被修改），请重新预览")
+        tid = item.get("prior_table_id")
+        if not tid:
             continue
-        value = closing.get(_norm_label(row.get("label")))
-        if value is None:
-            continue
-        values = row["values"]
-        while len(values) < open_col:
-            values.append(None)
-        if values[open_col - 1] in (None, ""):
-            values[open_col - 1] = value
-            filled += 1
-    return filled
-
-
-# ---------------------------------------------------------------------------
-# Word Document Parser
-# ---------------------------------------------------------------------------
-
-
-class DocxSectionParser:
-    """Parse a .docx file into sections by heading level."""
-
-    # Chinese numbering patterns for heading detection
-    HEADING_PATTERNS = [
-        # Level 1: 一、二、三、...
-        (1, re.compile(r'^[一二三四五六七八九十]+、')),
-        # Level 2: （一）（二）（三）...
-        (2, re.compile(r'^（[一二三四五六七八九十]+）')),
-        # Level 3: 1. 2. 3. or 1、2、3、
-        (3, re.compile(r'^\d+[.、]')),
-    ]
-
-    def parse(self, file_bytes: bytes) -> list[dict[str, Any]]:
-        """Parse docx bytes into a list of sections.
-
-        Each section: {
-            "title": str,
-            "level": int (1-3),
-            "text_content": str,
-            "tables": list[list[list[str]]],  # table -> rows -> cells
-        }
-        """
+        prior = doc.tables.get(str(tid))
+        if prior is None:
+            raise PriorYearImportError(f"第 {i} 项指定的上年表格不存在，请重新预览")
+        opening = {k.index for k in plan.opening}
+        col_map: dict[int, int] = {}
         try:
-            from docx import Document
-        except ImportError:
-            logger.warning("python-docx not installed, cannot parse docx")
-            return []
-
-        doc = Document(io.BytesIO(file_bytes))
-        sections: list[dict[str, Any]] = []
-        current_section: dict[str, Any] | None = None
-
-        for element in doc.element.body:
-            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
-
-            if tag == 'p':
-                # Process paragraph
-                from docx.oxml.ns import qn
-                paragraph = element
-                text = ''.join(
-                    node.text or ''
-                    for node in paragraph.iter(qn('w:t'))
-                )
-                text = text.strip()
-
-                if not text:
-                    if current_section:
-                        current_section["text_content"] += "\n"
-                    continue
-
-                # Check if this is a heading
-                heading_level = self._detect_heading_level(paragraph, text)
-
-                if heading_level:
-                    # Start new section
-                    if current_section:
-                        sections.append(current_section)
-                    current_section = {
-                        "title": text,
-                        "level": heading_level,
-                        "text_content": "",
-                        "tables": [],
-                    }
-                else:
-                    # Add to current section text
-                    if current_section:
-                        if current_section["text_content"]:
-                            current_section["text_content"] += "\n"
-                        current_section["text_content"] += text
-                    else:
-                        # Text before first heading - create implicit section
-                        current_section = {
-                            "title": "前言",
-                            "level": 0,
-                            "text_content": text,
-                            "tables": [],
-                        }
-
-            elif tag == 'tbl':
-                # Process table
-                if current_section:
-                    table_data = self._parse_table_element(element)
-                    if table_data:
-                        current_section["tables"].append(table_data)
-
-        # Don't forget the last section
-        if current_section:
-            sections.append(current_section)
-
-        return sections
-
-    def _detect_heading_level(self, paragraph_element, text: str) -> int | None:
-        """Detect heading level from paragraph style or text pattern."""
-        from docx.oxml.ns import qn
-
-        # Check Word heading style
-        pPr = paragraph_element.find(qn('w:pPr'))
-        if pPr is not None:
-            pStyle = pPr.find(qn('w:pStyle'))
-            if pStyle is not None:
-                style_val = pStyle.get(qn('w:val'), '')
-                if 'Heading' in style_val or '标题' in style_val:
-                    # Extract level from style name
-                    level_match = re.search(r'(\d+)', style_val)
-                    if level_match:
-                        return min(int(level_match.group(1)), 3)
-                    return 1
-
-        # Check text patterns
-        for level, pattern in self.HEADING_PATTERNS:
-            if pattern.match(text):
-                return level
-
-        return None
-
-    def _parse_table_element(self, tbl_element) -> list[list[str]]:
-        """Parse a table XML element into rows of cells."""
-        from docx.oxml.ns import qn
-
-        rows: list[list[str]] = []
-        for tr in tbl_element.iter(qn('w:tr')):
-            cells: list[str] = []
-            for tc in tr.iter(qn('w:tc')):
-                cell_text = ''.join(
-                    node.text or ''
-                    for node in tc.iter(qn('w:t'))
-                )
-                cells.append(cell_text.strip())
-            if cells:
-                rows.append(cells)
-        return rows
+            pairs = [(int(c), int(p)) for c, p in (item.get("col_map") or {}).items()]
+        except (TypeError, ValueError, AttributeError):
+            pairs = None
+        if pairs is None or any(c not in opening or not 0 < p < len(prior.keys) for c, p in pairs):
+            raise PriorYearImportError(f"「{plan.section_title}」{plan.table_name or '表格'}：列对应不合法，请重新预览")
+        col_map.update(pairs)
+        if col_map:
+            out[plan.key] = (prior.id, col_map)
+    return out
 
 
-# ---------------------------------------------------------------------------
-# NotePriorYearImportService
-# ---------------------------------------------------------------------------
+def _summary(doc: PriorDoc, notes: list[Any], sections: list[int | None]) -> dict[str, Any]:
+    """章节对应概况：对上的本年章节；没对上、也不在已对上标题之下、且有内容的上年标题。"""
+    matched = {h for h in sections if h is not None}
+
+    def covered(index: int | None) -> bool:
+        while index is not None:
+            if index in matched:
+                return True
+            index = doc.headings[index].parent
+        return False
+
+    unmatched = [h.title for h in doc.headings if (h.text or h.tables) and not covered(h.index)]
+    return {
+        "matched": len(matched),
+        "unmatched": len(unmatched),
+        "matched_sections": [n.section_title for n, h in zip(notes, sections) if h is not None][:20],
+        "unmatched_sections": unmatched[:20],
+        "total_prior_sections": len(doc.headings),
+    }
 
 
 class NotePriorYearImportService:
@@ -248,85 +111,121 @@ class NotePriorYearImportService:
         file_bytes: bytes,
         *,
         user_id: UUID | None = None,
+        mode: str = "auto",
+        decisions: Any = None,
+        file_sha256: str | None = None,
+        import_text: bool = True,
     ) -> dict[str, Any]:
-        """Import prior year notes from a .docx file.
+        """上年附注 .docx → 本年附注（只 flush）。
 
-        Steps:
-        1. Parse docx into sections
-        2. Match sections to current year note structure by title
-        3. Fill matched text content (marked as "待更新")
-        4. Extract table data to "期初余额" column
-
+        ``mode``：``auto`` 写正文与自动认出的表（期初列全部对上、有表名或位置证据），响应多报待确认表数；
+        ``preview`` 只返回章节对应与逐表规划（不写）；``apply`` 按 ``decisions`` 逐表写入，``file_sha256`` 须与本次上传一致。
         Requirements: 51.1, 51.2, 51.3, 51.4, 51.5
         """
-        parser = DocxSectionParser()
-        prior_sections = parser.parse(file_bytes)
+        if mode not in IMPORT_MODES:
+            raise PriorYearImportError(f"未知导入方式：{mode}")
+        try:
+            doc = parse_prior_docx(file_bytes)
+        except Exception:  # noqa: BLE001  不是合法 Word（损坏 / 改了扩展名）
+            logger.info("上年附注解析失败", exc_info=True)
+            doc = None
+        if doc is None or not (doc.headings or doc.tables):
+            return {"status": "error", "message": "无法解析文档内容，请确认文件格式正确", "matched": 0, "unmatched": 0}
+        sha = hashlib.sha256(file_bytes).hexdigest()
+        if mode == "apply" and file_sha256 != sha:
+            raise PriorYearImportError("上传的文件与预览时的文件不同，请重新预览", status=409)
 
-        if not prior_sections:
-            return {
-                "status": "error",
-                "message": "无法解析文档内容，请确认文件格式正确",
-                "matched": 0,
-                "unmatched": 0,
-            }
-
-        # Load current year notes
         from app.models.report_models import DisclosureNote
 
-        result = await self.db.execute(
+        notes = list((await self.db.execute(
             sa.select(DisclosureNote).where(
                 DisclosureNote.project_id == project_id,
                 DisclosureNote.year == year,
                 DisclosureNote.is_deleted == sa.false(),
-            )
-        )
-        current_notes = result.scalars().all()
+            ).order_by(DisclosureNote.sort_order, DisclosureNote.note_section)
+        )).scalars().all())
+        if not notes:
+            return {"status": "error", "message": "本年附注尚未生成，请先生成附注再导入上年数据",
+                    "matched": 0, "unmatched": len(doc.headings)}
 
-        if not current_notes:
+        sections = match_sections([n.section_title or "" for n in notes], doc)
+        plans: list[TablePlan] = []
+        for note, h in zip(notes, sections):
+            plans += plan_note_tables(
+                {"id": note.id, "note_section": note.note_section, "section_title": note.section_title,
+                 "table_data": note.table_data},
+                doc.headings[h] if h is not None else None, doc)
+        counts = {s: sum(1 for p in plans if p.status == s) for s in (STATUS_AUTO, STATUS_CONFIRM, STATUS_NONE)}
+        summary = _summary(doc, notes, sections)
+
+        if mode == "preview":
+            note_by_id = {str(n.id): n for n in notes}
+            tables = []
+            for plan in plans:
+                item = plan.to_dict()
+                table = note_tables(note_by_id[plan.note_id].table_data)[plan.table_index]
+                # 有列对应的候选表各能填进几个空格（弹窗改选上年表时据此核对；行名对不上 / 本年已有值 ⇒ 0）；
+                # 一列都对不上的不给数（「可填 0 格」会被读成行名对不上）
+                item["candidate_fillable"] = {
+                    tid: apply_col_map(copy.deepcopy(table), doc.tables[tid].word, cmap)
+                    for tid, cmap in plan.candidate_maps.items() if cmap
+                }
+                item["fillable"] = item["candidate_fillable"].get(plan.prior_table_id, 0) if plan.col_map else 0
+                tables.append(item)
             return {
-                "status": "error",
-                "message": "本年附注尚未生成，请先生成附注再导入上年数据",
-                "matched": 0,
-                "unmatched": len(prior_sections),
+                "status": "preview", "file_sha256": sha, **summary, "counts": counts, "tables": tables,
+                "text_sections": sum(1 for n, h in zip(notes, sections)
+                                     if h is not None and doc.headings[h].text.strip() and not n.is_local_override),
+                "prior_tables": [
+                    {"id": t.id, "section": doc.headings[t.heading].title if t.heading is not None else "",
+                     "caption": t.caption, "columns": t.columns(), "row_count": len(t.word.rows)}
+                    for t in doc.tables.values()
+                ],
             }
 
-        # Build title → note mapping for current year（标题列是 section_title；原来读不存在的 note.title ⇒ 整个导入必 500）
-        title_to_note: dict[str, Any] = {}
-        for note in current_notes:
-            title_key = self._normalize_title(note.section_title or "")
-            if title_key:
-                title_to_note[title_key] = note
-
-        # Match and fill
-        matched = 0
-        unmatched = 0
-        matched_sections: list[str] = []
-        unmatched_sections: list[str] = []
-
-        for prior_section in prior_sections:
-            prior_title_key = self._normalize_title(prior_section["title"])
-            if not prior_title_key:
-                continue
-
-            note = title_to_note.get(prior_title_key)
-            if note:
-                if self._fill_prior_year_content(note, prior_section):
-                    stamp_note_edit(note, user_id)
-                matched += 1
-                matched_sections.append(prior_section["title"])
-            else:
-                unmatched += 1
-                unmatched_sections.append(prior_section["title"])
-
+        chosen = (_decisions(decisions, plans, doc) if mode == "apply"
+                  else {p.key: (p.prior_table_id, p.col_map) for p in plans if p.status == STATUS_AUTO})
+        todo: dict[str, dict[int, tuple[str, dict[int, int]]]] = defaultdict(dict)
+        for plan in plans:
+            if plan.key in chosen:
+                todo[plan.note_id][plan.table_index] = chosen[plan.key]
+        filled_cells = tables_written = text_filled = 0
+        changed_sections: list[str] = []
+        for note, h in zip(notes, sections):
+            changed = False
+            text = doc.headings[h].text if h is not None else ""
+            if import_text and text.strip() and not note.is_local_override and note.text_content != text:
+                note.text_content = text
+                changed = True
+                text_filled += 1
+            work = todo.get(str(note.id))
+            if work and isinstance(note.table_data, dict):
+                td = copy.deepcopy(note.table_data)
+                tables = note_tables(td)
+                mirror = isinstance(td.get("_tables"), list) and isinstance(td.get("rows"), list)
+                filled = 0
+                for index, (tid, col_map) in work.items():
+                    n = apply_col_map(tables[index], doc.tables[tid].word, col_map)
+                    if index == 0 and mirror:
+                        apply_col_map(td, doc.tables[tid].word, col_map)  # 顶层镜像第一张表
+                    filled += n
+                    tables_written += int(n > 0)
+                if filled:
+                    note.table_data = td  # 整体赋值：原地改 JSONB 不会被识别为改动
+                    filled_cells += filled
+                    changed = True
+            if changed:
+                lineage = dict(note.template_lineage) if isinstance(note.template_lineage, dict) else {}
+                lineage["prior_year_imported"] = True
+                lineage["prior_year_status"] = "pending_update"
+                note.template_lineage = lineage
+                stamp_note_edit(note, user_id)
+                changed_sections.append(note.note_section)
         await self.db.flush()
-
         return {
-            "status": "success",
-            "matched": matched,
-            "unmatched": unmatched,
-            "matched_sections": matched_sections[:20],
-            "unmatched_sections": unmatched_sections[:20],
-            "total_prior_sections": len(prior_sections),
+            "status": "success", **summary, "filled_cells": filled_cells, "tables_written": tables_written,
+            "text_filled": text_filled, "pending_tables": counts[STATUS_CONFIRM] if mode == "auto" else 0,
+            "no_source_tables": counts[STATUS_NONE], "changed_sections": changed_sections,
         }
 
     async def inherit_from_prior_year(
@@ -417,51 +316,3 @@ class NotePriorYearImportService:
             "total_prior_notes": len(prior_notes),
             "total_current_notes": len(current_notes),
         }
-
-    # ---------------------------------------------------------------------------
-    # Private helpers
-    # ---------------------------------------------------------------------------
-
-    def _normalize_title(self, title: str) -> str:
-        """Normalize title for matching (remove numbering, whitespace)."""
-        # Remove leading numbering patterns
-        title = re.sub(r'^[一二三四五六七八九十]+、\s*', '', title)
-        title = re.sub(r'^（[一二三四五六七八九十]+）\s*', '', title)
-        title = re.sub(r'^\d+[.、]\s*', '', title)
-        # Remove whitespace
-        title = title.strip()
-        return title
-
-    def _fill_prior_year_content(
-        self,
-        note: Any,
-        prior_section: dict[str, Any],
-    ) -> bool:
-        """把上年 Word 一节填进本年章节：正文（内容模板写过的不覆盖）+ 表格期初列；有改动返回 True。
-
-        表格按表序配对（多表取 ``_tables``，顶层是第一张表的镜像、一并填）；改的是副本再整体赋值，
-        原地改 JSONB 不会被识别为改动、不落库。
-        """
-        changed = False
-        text = prior_section.get("text_content") or ""
-        if text.strip() and not note.is_local_override and note.text_content != text:
-            note.text_content = text
-            changed = True
-
-        prior_tables = prior_section.get("tables") or []
-        if prior_tables and isinstance(note.table_data, dict) and note.table_data:
-            td = copy.deepcopy(note.table_data)
-            tables = td.get("_tables") if isinstance(td.get("_tables"), list) else []
-            pairs = list(zip([t for t in tables if isinstance(t, dict)] or [td], prior_tables))
-            if tables and isinstance(td.get("rows"), list):
-                pairs.append((td, prior_tables[0]))  # 顶层镜像第一张表
-            if sum(_extract_to_opening_balance(t, p) for t, p in pairs):
-                note.table_data = td
-                changed = True
-
-        if changed:
-            lineage = dict(note.template_lineage) if isinstance(note.template_lineage, dict) else {}
-            lineage["prior_year_imported"] = True
-            lineage["prior_year_status"] = "pending_update"
-            note.template_lineage = lineage
-        return changed

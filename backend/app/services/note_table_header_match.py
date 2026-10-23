@@ -35,6 +35,7 @@ __all__ = [
     "ColumnMatch",
     "UnitChoice",
     "choose_unit",
+    "fill_main_period",
     "match_columns",
     "match_table_name",
     "row_values",
@@ -179,8 +180,11 @@ def match_columns(
     by_index = {t.index: t for t in target}
     kept: dict[int, str] = {}
     for cols in owners.values():
+        strong = [c for c in cols if claims[c][2] in STRONG_RULES]
         if len(cols) == 1:
             kept[cols[0]] = claims[cols[0]][2]
+        elif len(strong) == 1:
+            kept[strong[0]] = claims[strong[0]][2]  # 精确 / 同义命中唯一时它胜出，弱规则命中让位
         elif all(claims[c][2] == "period_only" for c in cols):
             # 同一纯期间列被同期间多列认领（合并「期末数/账面余额」「期末数/坏账准备」↔ 单体「期末数」）
             pick = _balance_pick([by_index[c] for c in cols], vocab)
@@ -263,21 +267,31 @@ def unit_member_keys(
     for pos, idx in enumerate(members):
         identity = identities[idx] if identities and idx < len(identities) else None
         out.append(column_keys(tables[idx], identity=identity, vocab=vocab))
-    if out and not _has_period(out[0]):
-        fill: str | None = None
-        cont_periods = {k.period for keys in out[1:] for k in keys[1:] if k.period}
-        if len(cont_periods) == 1:
-            fill = _OPPOSITE[next(iter(cont_periods))]
-        elif target_keys is not None:
-            periods = {k.period for k in target_keys[1:] if k.kind == "amount" and k.period}
-            if len(periods) == 1:
-                fill = next(iter(periods))
-        if fill:
-            out[0] = [
-                k if k.kind == "label" else ColumnKey(k.index, k.path, fill, k.measure, k.kind, k.source)
-                for k in out[0]
-            ]
+    if out:
+        out[0] = fill_main_period(out[0], out[1:], target_keys)
     return out
+
+
+def fill_main_period(
+    main: Sequence[ColumnKey],
+    continuations: Sequence[Sequence[ColumnKey]],
+    target_keys: Sequence[ColumnKey] | None = None,
+) -> list[ColumnKey]:
+    """主表整表没有期间时补期间：列续表都是同一期间 ⇒ 取对侧（「有『续：期初』续表的主表承载期末」）；
+    否则对照的目标表只有一个期间就取它。主表本有期间或补不出 ⇒ 原样。合并选表与上年附注导入共用。"""
+    if _has_period(main):
+        return list(main)
+    fill: str | None = None
+    cont_periods = {k.period for keys in continuations for k in keys[1:] if k.period}
+    if len(cont_periods) == 1:
+        fill = _OPPOSITE[next(iter(cont_periods))]
+    elif target_keys is not None:
+        periods = {k.period for k in target_keys[1:] if k.kind == "amount" and k.period}
+        if len(periods) == 1:
+            fill = next(iter(periods))
+    if not fill:
+        return list(main)
+    return [k if k.kind == "label" else ColumnKey(k.index, k.path, fill, k.measure, k.kind, k.source) for k in main]
 
 
 def row_values(row: Any) -> list[Any]:

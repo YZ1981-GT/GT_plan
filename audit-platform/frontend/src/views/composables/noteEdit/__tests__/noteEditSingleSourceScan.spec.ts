@@ -83,6 +83,34 @@ describe('single-source scan: DisclosureEditor.vue', () => {
     })
   })
 
+  describe('template reads noteEdit refs through .value', () => {
+    // noteEdit 是 useNoteEditPermission() 返回的普通对象、字段是 Ref / ComputedRef：模板只自动解包顶层 ref，
+    // `v-if="noteEdit.canWrite"` 拿到的是 ComputedRef 对象（恒真）⇒ 只读 / EQCR / 归档时入口照样显示、按钮不禁用、
+    // 「📋 只读副本」人人可见（40882b2b1 起 17 处；单区域 vue-tsc 只报出传给布尔 prop 的 2 处）
+    const source = fs.readFileSync(EDITOR_PATH, 'utf-8')
+    const wholeTemplate = source.slice(0, source.indexOf('<script setup'))
+    const composable = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/views/composables/noteEdit/useNoteEditPermission.ts'), 'utf-8')
+    const iface = composable.slice(composable.indexOf('export interface UseNoteEditPermissionReturn'))
+    const refFields = [...iface.slice(0, iface.indexOf('\n}')).matchAll(/^\s+(\w+):\s*(?:Computed)?Ref</gm)]
+      .map(m => m[1])
+
+    it('ref fields are read from the composable return type', () => {
+      expect(refFields).toEqual(expect.arrayContaining(['canWrite', 'canWriteLocked', 'showReadonlyBadge', 'showNonEqcrEntries']))
+    })
+
+    it('every template use of a noteEdit ref field goes through .value', () => {
+      const bare = [...wholeTemplate.matchAll(new RegExp(`noteEdit\\.(${refFields.join('|')})\\b(?!\\.value)`, 'g'))]
+        .map(m => m[0])
+      expect(bare).toEqual([])
+      expect(wholeTemplate.match(/noteEdit\.\w+\.value/g)?.length ?? 0).toBeGreaterThan(0)
+    })
+
+    it('template does not reference the removed isEqcrRole', () => {
+      expect(wholeTemplate).not.toMatch(/\bisEqcrRole\b/)
+    })
+  })
+
   describe('absent patterns in template block', () => {
     it('template does not use standalone canEdit (only noteEdit.canWrite*)', () => {
       // Match canEdit not preceded or followed by a dot or word char

@@ -23,7 +23,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from app.services.note_section_catalog import (
     DATA_DIR,
@@ -39,8 +39,8 @@ from app.services.note_section_kind import (
 )
 from app.services.note_word_table import (
     WordTable,
-    _q,
     compare_tables,
+    iter_blocks,
     norm_cell,
     parse_word_table,
 )
@@ -175,18 +175,6 @@ class Diff:
 # ── Word 文档 → 章节树 ─────────────────────────────────────────────────────
 
 
-def _iter_blocks(container: Any) -> Iterator[tuple[str, Any]]:
-    """按文档顺序产出 ("p"|"tbl", 元素)；内容控件 ``w:sdt`` 下钻其 ``w:sdtContent``。"""
-    for el in container.iterchildren():
-        tag = el.tag.rsplit("}", 1)[-1] if isinstance(el.tag, str) else ""
-        if tag in ("p", "tbl"):
-            yield tag, el
-        elif tag == "sdt":
-            content = el.find(_q("sdtContent"))
-            if content is not None:
-                yield from _iter_blocks(content)
-
-
 #: 模板标记（``##SECTION:…##`` / ``{{seq:七}}`` / ``{{section:…}}`` / ``{{table:…}}``）不是内容
 _MARKER = re.compile(r"##[^#]*##|\{\{[^{}]*\}\}")
 #: Word 模板的占位序号「X、数据资源」（真实附注里会换成数字）
@@ -218,7 +206,7 @@ def _chapter_events(path: Path | str) -> list[tuple[str, list[tuple[str, int | N
     outline_only: dict[int, bool] = {}
     style_levels: dict[str, int | None] = {}
     last_text = ""
-    for tag, el in _iter_blocks(document.element.body):
+    for tag, el in iter_blocks(document.element.body):
         if tag == "tbl":
             flat.append(("t", None, parse_word_table(el, last_text)))
             last_text = ""

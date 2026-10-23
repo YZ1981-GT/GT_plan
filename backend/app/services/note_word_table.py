@@ -11,11 +11,12 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any, Iterator, Sequence
 
 __all__ = [
     "WordTable",
     "compare_tables",
+    "iter_blocks",
     "norm_cell",
     "parse_word_table",
     "seed_header_paths",
@@ -30,6 +31,18 @@ def _q(tag: str) -> str:
     return f"{{{_W}}}{tag}"
 
 
+def iter_blocks(container: Any) -> Iterator[tuple[str, Any]]:
+    """按文档顺序产出 ("p"|"tbl", 元素)；内容控件 ``w:sdt`` 下钻其 ``w:sdtContent``（平台导出的交付件每节都包在内容控件里）。"""
+    for el in container.iterchildren():
+        tag = el.tag.rsplit("}", 1)[-1] if isinstance(el.tag, str) else ""
+        if tag in ("p", "tbl"):
+            yield tag, el
+        elif tag == "sdt":
+            content = el.find(_q("sdtContent"))
+            if content is not None:
+                yield from iter_blocks(content)
+
+
 @dataclass
 class WordTable:
     caption: str  # 表前最近的非空段落（可能是节内小标题）
@@ -39,6 +52,8 @@ class WordTable:
     groups: list[str | None]  # 每列直接上级表头；单层表头为 None
     row_labels: list[str]  # 数据行首列非空文字
     header_paths: list[list[str]] = field(default_factory=list)  # 每列自上而下的非空表头文字
+    #: 数据行按逻辑列取文字：[首列, 第 1 列, …]；单元格从本行本列起才取（横向 / 纵向合并的延续格为空串）
+    rows: list[list[str]] = field(default_factory=list)
 
 
 _WS = re.compile(r"\s+")
@@ -252,7 +267,23 @@ def parse_word_table(tbl_el: Any, caption: str) -> WordTable:
     return WordTable(
         caption=caption, columns=len(columns), header_rows=n_hdr,
         leaf_headers=leaf, groups=groups, row_labels=labels, header_paths=paths,
+        rows=[_data_row(r, columns, ncols, grid, texts) for r in range(n_hdr, nrows)],
     )
+
+
+def _data_row(r: int, columns: Sequence[int], ncols: int, grid: dict, texts: dict) -> list[str]:
+    """数据行按逻辑列取文字：逻辑列覆盖的网格列里，第一个从本行起始、有字的单元格（数据行常把一列拆成几格）。"""
+    out: list[str] = []
+    for i, start in enumerate(columns):
+        end = columns[i + 1] if i + 1 < len(columns) else ncols
+        text = ""
+        for c in range(start, end):
+            owner = grid.get((r, c))
+            if owner == (r, c) and texts.get(owner):
+                text = texts[owner].strip()
+                break
+        out.append(text)
+    return out
 
 
 def _clip(value: Any, limit: int = 160) -> str:

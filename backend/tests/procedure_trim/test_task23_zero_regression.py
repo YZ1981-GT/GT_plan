@@ -577,6 +577,13 @@ class TestNoteChainUnchanged:
     ``updated_by`` 两列，经盖章函数写、本模块不新增属性赋值（``test_a1`` / ``test_a2`` 冻结的
     赋值集合不变）；既有链路仍一个都不 import 联动模块 ⇒ 零回归结论不变。行为测试见
     ``tests/test_note_edit_stamp_writers.py::TestProcedureTrimLinkage``。
+
+    ─── 并发 spec 改动登记（2026-10-23，spec consol-note-header-library-and-node-reaggregate R6.6）───
+    `backend/app/services/note_word_exporter.py`：编辑器「导出 Word」的三级标题段落加大纲级别
+    （新增 `_set_outline_level`，`_add_heading1/2/3` 各调一次）—— 原来标题全是正文样式，目录域
+    `TOC \\o "1-3" \\u` 为空，上年附注导入 / 上传附注文档认不出标题。只加段落属性 `w:outlineLvl`，
+    文字、表格、书签不变；与程序裁剪联动无关，既有链路仍一个都不 import 联动模块 ⇒ 零回归结论不变。
+    行为测试见 ``tests/test_note_prior_year_plan.py::TestPlatformExportRoundTrip``。
     """
 
     def test_existing_chain_never_imports_linkage_module(self):

@@ -9,11 +9,12 @@ Word 导入 / 上年继承）以当前用户盖「最近一次编辑」。年度
 """
 from __future__ import annotations
 
+import json
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db, require_project_access
@@ -32,23 +33,46 @@ router = APIRouter(prefix="/api/projects/{project_id}/notes")
 async def import_prior_year_notes(
     project_id: UUID,
     year: int = Query(..., description="本年附注年度（上年 Word 内容填进这一年的章节）"),
+    mode: Literal["auto", "preview", "apply"] = Query(
+        "auto", description="auto：写正文与自动认出的表；preview：只返回逐表规划；apply：按 decisions 逐表写入"),
     file: UploadFile = File(...),
+    decisions: str | None = Form(None, description="apply：逐表确认 JSON [{key, prior_table_id, col_map}]"),
+    file_sha256: str | None = Form(None, description="apply：预览返回的文件指纹（重传同一文件）"),
+    import_text: bool = Form(True, description="是否同时填入上年正文"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_note_edit_access(consol_lock=False)),
 ) -> dict[str, Any]:
-    """上传上年附注 .docx，按标题匹配本年章节，填入正文与表格期初列。"""
-    if not file.filename or not file.filename.endswith('.docx'):
+    """上传上年附注 .docx，按标题匹配本年章节，填入正文与表格期初列（上年期末 → 本年期初，只填空格）。
+
+    表格逐张规划（spec consol-note-header-library-and-node-reaggregate R6.6）：认不出的表不静默丢弃，
+    ``preview`` 给出每张表的状态与原因，弹窗逐表确认后 ``apply``；``auto``（原行为）只写自动认出的表。
+    """
+    if not file.filename or not file.filename.lower().endswith('.docx'):  # 扩展名大小写不敏感（与前端同口径）
         raise HTTPException(status_code=400, detail="仅支持 .docx 格式文件")
 
     file_bytes = await file.read()
     if len(file_bytes) > 50 * 1024 * 1024:  # 50MB limit
         raise HTTPException(status_code=400, detail="文件大小超过 50MB 限制")
+    parsed: Any = None
+    if mode == "apply":
+        try:
+            parsed = json.loads(decisions or "")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="确认内容不是合法 JSON，请重新预览") from None
+        if not file_sha256:
+            raise HTTPException(status_code=400, detail="按确认写入需要带上预览返回的文件指纹，请重新预览")
 
-    from app.services.note_prior_year_import_service import NotePriorYearImportService
+    from app.services.note_prior_year_import_service import NotePriorYearImportService, PriorYearImportError
 
     service = NotePriorYearImportService(db)
-    import_result = await service.import_from_docx(project_id, year, file_bytes, user_id=current_user.id)
-    await db.commit()
+    try:
+        import_result = await service.import_from_docx(
+            project_id, year, file_bytes, user_id=current_user.id, mode=mode, decisions=parsed,
+            file_sha256=file_sha256, import_text=import_text)
+    except PriorYearImportError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from None
+    if mode != "preview":
+        await db.commit()
     return import_result
 
 

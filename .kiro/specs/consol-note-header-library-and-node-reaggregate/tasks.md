@@ -114,7 +114,13 @@
 - [x] 30. `value_column` 改调标题行库（净额 → 账面价值、毛额 → 账面余额 / 公允价值、纯期间优先、分不出写原因）；两版种子新旧逐格对比归类；真库种子与已填数据影响核对；测试 + 变异（R6.7）
   - 逐格对比（真库报表配置）：国企 60 → 55（五-23-1 固定资产净额改种账面价值列，5 格错种不再种，五-29-1 随任务 29 移到期末余额）、上市 52 → 53；补「空列名不种」「毛额行同期间有账面价值只认账面余额」（词表 `gross_measures`）；真库国企 60 条全是自动种子，重启后按新规则删 7 增 2，已保存数据只在测试项目、旧位置是 0.00 / 占位符，不迁移（design §15.8）
   - `SEED_COUNTS` 2026-10-10 起一直红：临时 worktree 逐提交跑旧代码归因到 `5914e315b`（国企表名偏移同步 + 上市续表识别），基线改为实测值并注明；`test_consol_note_formulas` / `test_consol_note_column_groups` 53 passed，变异 11 条全红；库目录随词表重生成（只变 `vocabulary_sha1`）
-- [ ] 31. 上年导入解析：`note_word_table` 数据行取值；按块（含内容控件）切节、表名；单元测试（分组 / 续表 / 内容控件 / 上年年末）（R6.6）
-- [ ] 32. 上年导入规划 / 写入服务（标题行库对列、按表名 + 结构选表、行名 + 同名序号对行、状态与原因）；预览 / 写入端点（sha256 校验）；原端点只写自动认出的；测试（R6.6）
-- [ ] 33. 前端 `NotePriorYearImportDialog.vue`（预览 → 逐表确认 / 改选 / 逐列指定 → 写入 → 刷新目录）+ apiPaths + 附注编辑器入口（守行数上限）；vitest / ESLint / 单区域 vue-tsc（R6.6）
+- [x] 31. 上年导入解析：`note_word_table` 数据行取值；按块（含内容控件）切节、表名；单元测试（分组 / 续表 / 内容控件 / 上年年末）（R6.6）
+  - `iter_blocks` 挪进 `note_word_table` 公开（Word 树核对改调它）、`WordTable.rows` 按逻辑列取数据行；`parse_prior_docx` 标题与上传解析同一读法、表名候选 = 表前全部段落（展示取短段落）、列键走标题行库新拆的 `path_keys`
+  - 编辑器「导出 Word」三级标题原是正文样式（目录域也是空的）⇒ 上年导入 / 上传附注文档一个标题都认不出：`note_word_exporter` 设大纲级别，往返用例钉住（真库重药安徽导出 → 和平：章节对上 0 → 161）
+- [x] 32. 上年导入规划 / 写入服务（标题行库对列、按表名 + 结构选表、行名 + 同名序号对行、状态与原因）；预览 / 写入端点（sha256 校验）；原端点只写自动认出的；测试（R6.6）
+  - `note_prior_year_plan`（纯函数）+ 服务 `import_from_docx(mode=auto|preview|apply)`，同一端点加 `mode`，apply 重传文件校验 sha256、逐项校验确认；补三条：精确命中优先于弱规则（共享 `match_columns`，目录 `--check` 不变）、主表按「（续：期初数）」续表补对侧期间（`fill_main_period` 从合并选表抽出共用）、对不上列的候选不给可填格数
+  - 真库只读核对（和平 ← 重药安徽）：编辑器导出 自动 82 / 待确认 62 / 上年没有 9，交付件 30 / 35 / 88；自动表逐张核对无认错（design §15.8）；后端用例 + 变异 9 条全红
+- [x] 33. 前端 `NotePriorYearImportDialog.vue`（预览 → 逐表确认 / 改选 / 逐列指定 → 写入 → 刷新目录）+ apiPaths + 附注编辑器入口（守行数上限）；vitest / ESLint / 单区域 vue-tsc（R6.6）
+  - `notePriorYearImport.ts` + 弹窗，挂 `DisclosureNoteContentTools`（同一门禁），编辑器菜单加一项（3265 行 / 上限 3281）；浏览器实测和平 2025（写入请求页面拦截应答、库里 0 行被写）
+  - 同批修编辑器模板 17 处 `noteEdit.*` 未解包（`40882b2b1` 起写入口门禁恒真、「只读副本」人人可见）、已删的 `isEqcrRole`、恒假的归档判定，守卫从返回类型读 ref 字段；vitest 24 个文件 382 passed，ESLint 0 error，单区域 vue-tsc 0 error（探针报 TS2345 / TS2322），变异 17 条全红
 - [ ] 34. 收尾：design §15 实施记录、INDEX / memory；干净 worktree 跑要提交的树；只提交本会话文件；fetch 后推送 `spec/disclosure-note-doc-upload-and-batch-fill` 并 `ls-remote` 核对；清理探针

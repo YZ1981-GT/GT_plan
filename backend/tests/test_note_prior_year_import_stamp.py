@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import io
+import json
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
@@ -158,6 +159,8 @@ async def test_import_fills_text_and_opening_column_and_stamps(env):
     resp = await _import(env)
     assert resp.status_code == 200, resp.text
     assert resp.json()["matched"] == 2
+    assert (resp.json()["filled_cells"], resp.json()["pending_tables"], resp.json()["no_source_tables"]) == (1, 0, 0)
+    assert resp.json()["changed_sections"] == ["八、1"], "只报真被改写的章节（内容模板写过的会计期间没动）"
     cash, period = await _note(env, "cash"), await _note(env, "period")
     assert cash.text_content == "上年货币资金说明正文。"
     # 期初列（下标 1）：空格填上年期末（千分位 / 括号负数照解析）；已有值的不覆盖
@@ -167,6 +170,96 @@ async def test_import_fills_text_and_opening_column_and_stamps(env):
     assert cash.updated_by == env["ids"]["me"] and _utc(cash.updated_at) >= since
     # 内容模板写过的正文不覆盖，也不算编辑
     assert (period.text_content, period.updated_by, _utc(period.updated_at)) == ("<p>内容模板写的</p>", None, OLD)
+
+
+async def _post(env: dict, mode: str, *, data: dict | None = None, file: bytes = PRIOR_DOCX):
+    url = f"/api/projects/{env['ids']['p']}/notes/import-prior-year?year={YEAR}&mode={mode}"
+    files = {"file": ("上年附注.docx", file, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
+    return await env["client"].post(url, files=files, data=data or {})
+
+
+@pytest.mark.asyncio
+async def test_preview_plans_each_table_without_writing(env):
+    """预览（R6.6）：逐表给出状态、上年表、列对应与可填格数；不写库。"""
+    resp = await _post(env, "preview")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "preview" and body["counts"] == {"auto": 1, "needs_confirm": 0, "no_source": 0}
+    [table] = body["tables"]
+    assert (table["note_section"], table["status"], table["prior_table_id"], table["col_map"], table["fillable"]) == (
+        "八、1", "auto", "t1", {"2": 1}, 1)
+    assert table["candidate_fillable"] == {"t1": 1}, "库存现金期初是空格可填；银行存款期初已有 7，不覆盖"
+    assert [c["label"] for c in table["opening_columns"]] == ["期初余额"]
+    assert [(t["id"], t["section"], [c["label"] for c in t["columns"]]) for t in body["prior_tables"]] == [
+        ("t1", "货币资金", ["期末余额", "期初余额"])]
+    cash = await _note(env, "cash")
+    assert [r["values"] for r in cash.table_data["_tables"][0]["rows"]] == [[None, None], [5, 7]]
+    assert (cash.text_content, cash.updated_by) == (None, None)
+
+
+@pytest.mark.asyncio
+async def test_preview_gives_fillable_only_for_candidates_with_columns(env):
+    """候选表一列都对不上 ⇒ 不给可填格数（原来给 0，弹窗显示「可填 0 格」像是行名对不上）。"""
+    two = _docx([("货币资金", "", [HEADERS, ["库存现金", "1", "2"]])])
+    import docx as _d
+
+    doc = _d.Document(io.BytesIO(two))
+    t = doc.add_table(rows=2, cols=3)
+    for i, row in enumerate([["项目", "本期增加", "本期减少"], ["库存现金", "5", "6"]]):
+        for j, value in enumerate(row):
+            t.cell(i, j).text = value
+    buf = io.BytesIO()
+    doc.save(buf)
+    [table] = (await _post(env, "preview", file=buf.getvalue())).json()["tables"]
+    assert table["candidates"] == ["t1", "t2"] and table["candidate_maps"]["t2"] == {}
+    assert table["candidate_fillable"] == {"t1": 1}
+
+
+@pytest.mark.asyncio
+async def test_apply_writes_only_what_was_confirmed(env):
+    preview = (await _post(env, "preview")).json()
+    [table] = preview["tables"]
+    sha = preview["file_sha256"]
+    skip = [{"key": table["key"], "prior_table_id": None}]
+    resp = await _post(env, "apply", data={"decisions": json.dumps(skip), "file_sha256": sha, "import_text": "false"})
+    assert resp.status_code == 200 and (resp.json()["filled_cells"], resp.json()["changed_sections"]) == (0, [])
+    assert (await _note(env, "cash")).updated_by is None, "不导入、不填正文 ⇒ 不算编辑"
+    # 弹窗里改选列：期初列取上年表的「期初余额」列
+    pick = [{"key": table["key"], "prior_table_id": table["prior_table_id"], "col_map": {"2": 2}}]
+    resp = await _post(env, "apply", data={"decisions": json.dumps(pick), "file_sha256": sha})
+    assert resp.status_code == 200, resp.text
+    assert (resp.json()["filled_cells"], resp.json()["text_filled"], resp.json()["changed_sections"]) == (1, 1, ["八、1"])
+    cash = await _note(env, "cash")
+    assert [r["values"] for r in cash.table_data["_tables"][0]["rows"]] == [[None, 800.0], [5, 7]]
+    assert [r["values"] for r in cash.table_data["rows"]] == [[None, 800.0], [5, 7]]  # 顶层镜像一并填
+    assert cash.text_content == "上年货币资金说明正文。" and cash.updated_by == env["ids"]["me"]
+
+
+@pytest.mark.asyncio
+async def test_apply_rejects_another_file_or_bad_decisions(env):
+    preview = (await _post(env, "preview")).json()
+    [table] = preview["tables"]
+    ok = {"file_sha256": preview["file_sha256"]}
+    other = _docx([("货币资金", "改过的正文", [HEADERS, ["库存现金", "1", "2"]])])
+    resp = await _post(env, "apply", data={**ok, "decisions": "[]"}, file=other)
+    assert resp.status_code == 409 and "重新预览" in resp.json()["detail"]
+    closing = [{"key": table["key"], "prior_table_id": "t1", "col_map": {"1": 1}}]  # 第 1 列是期末列，不收
+    resp = await _post(env, "apply", data={**ok, "decisions": json.dumps(closing)})
+    assert resp.status_code == 400 and "列对应不合法" in resp.json()["detail"]
+    for bad in ([{"key": "x:0", "prior_table_id": "t1"}], [{"key": table["key"], "prior_table_id": "t9"}]):
+        assert (await _post(env, "apply", data={**ok, "decisions": json.dumps(bad)})).status_code == 400
+    assert (await _post(env, "apply", data={**ok, "decisions": "不是 JSON"})).status_code == 400
+    assert (await _post(env, "apply", data={"decisions": "[]"})).status_code == 400, "没带文件指纹"
+    assert (await _note(env, "cash")).updated_by is None
+
+
+@pytest.mark.asyncio
+async def test_extension_check_is_case_insensitive(env):
+    """前端按扩展名大小写不敏感放行 ⇒ 后端同口径（原来「上年附注.DOCX」被 400「仅支持 .docx」）；别的格式仍拒。"""
+    url = f"/api/projects/{env['ids']['p']}/notes/import-prior-year?year={YEAR}&mode=preview"
+    for name, status in (("上年附注.DOCX", 200), ("上年附注.doc", 400)):
+        resp = await env["client"].post(url, files={"file": (name, PRIOR_DOCX, "application/octet-stream")})
+        assert resp.status_code == status, (name, resp.text)
 
 
 @pytest.mark.asyncio

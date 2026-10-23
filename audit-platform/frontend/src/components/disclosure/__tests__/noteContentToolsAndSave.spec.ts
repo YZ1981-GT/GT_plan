@@ -6,7 +6,7 @@
  * - 「保存为内容模板」走真实流程：预检 → 集团二次确认 → 携 digest 保存；来源变化 409 要求重新预检。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 
 const post = vi.fn()
@@ -33,6 +33,16 @@ vi.mock('@/utils/eventBus', () => ({
     off: (name: string, fn: (p: unknown) => void) => { busHandlers[name] = (busHandlers[name] || []).filter(h => h !== fn) },
     emit: vi.fn(),
   },
+}))
+vi.mock('@/components/disclosure/NotePriorYearImportDialog.vue', () => ({
+  __esModule: true,
+  default: defineComponent({
+    name: 'NotePriorYearImportDialogStub', emits: ['applied', 'update:visible'],
+    setup: (_p, { emit }) => () => h('button', {
+      class: 'prior-year-stub',
+      onClick: () => emit('applied', { status: 'success', changed_sections: ['五、1', '五、3'] }),
+    }, '上年导入弹窗'),
+  }),
 }))
 vi.mock('@/components/disclosure/NoteDocUploadDialog.vue', () => ({
   // defineAsyncComponent 只在模块带 __esModule 时取 default；否则把模块对象本身当组件
@@ -95,14 +105,15 @@ describe('DisclosureNoteContentTools', () => {
     expect(warning).toHaveBeenCalled()
   })
 
-  it('当前章节有未保存修改：三个入口都拒绝打开并提示先保存（写入后会重载附注，未保存修改会丢）', async () => {
+  it('当前章节有未保存修改：四个入口都拒绝打开并提示先保存（写入后会重载附注，未保存修改会丢）', async () => {
     warning.mockClear()
     const wrapper = mount(DisclosureNoteContentTools,
       { props: { projectId: 'p1', year: 2025, canWrite: true, hasUnsavedChanges: true } })
-    for (const kind of ['upload', 'apply', 'save']) expect((wrapper.vm as any).open(kind)).toBe(false)
+    for (const kind of ['upload', 'apply', 'save', 'prior-year']) expect((wrapper.vm as any).open(kind)).toBe(false)
     await flushPromises()
     expect(wrapper.find('.upload-stub').exists()).toBe(false)
-    expect(warning).toHaveBeenCalledTimes(3)
+    expect(wrapper.find('.prior-year-stub').exists()).toBe(false)
+    expect(warning).toHaveBeenCalledTimes(4)
     for (const [msg] of warning.mock.calls) expect(String(msg)).toContain('请先保存')
     await wrapper.setProps({ hasUnsavedChanges: false })
     expect((wrapper.vm as any).open('upload')).toBe(true)
@@ -130,14 +141,15 @@ describe('DisclosureNoteContentTools', () => {
     expect((wrapper.vm as any).available).toBe(true)
   })
 
-  it('无附注编辑操作权限（note:edit，与后端 require_operation 同码）：入口不可用', async () => {
+  it('附注编辑操作权限只看 canWrite（父组件 noteEdit 判定已含 note:edit 与成员行项目角色），不再按前端全局角色矩阵另判', async () => {
+    // partner-manager-edit-permission（40882b2b1）起：前端矩阵只看全局角色，合伙人 / 经理的项目角色有 note:edit 却会被误拦
     canOp.mockImplementation((op: string) => op !== 'note:edit')
     const wrapper = mount(DisclosureNoteContentTools, { props: { projectId: 'p1', year: 2025, canWrite: true } })
     await flushPromises()
+    expect((wrapper.vm as any).available).toBe(true)
+    expect((wrapper.vm as any).open('upload')).toBe(true)
+    await wrapper.setProps({ canWrite: false })
     expect((wrapper.vm as any).available).toBe(false)
-    warning.mockClear()
-    expect((wrapper.vm as any).open('save')).toBe(false)
-    expect(String(warning.mock.calls[0]?.[0])).toContain('附注编辑权限')
   })
 
   it('写入成功上报全部被改写章节并关闭弹窗', async () => {
@@ -149,6 +161,17 @@ describe('DisclosureNoteContentTools', () => {
     await flushPromises()
     expect(wrapper.find('.upload-stub').exists()).toBe(false)
   })
+
+  it('导入上年附注（R6.6）：同一套门禁打开；写入成功上报被改写章节并关闭', async () => {
+    const wrapper = mount(DisclosureNoteContentTools, { props: { projectId: 'p1', year: 2025, canWrite: true } })
+    expect((wrapper.vm as any).open('prior-year')).toBe(true)
+    await flushPromises()
+    expect(wrapper.find('.upload-stub').exists()).toBe(false)
+    await wrapper.find('.prior-year-stub').trigger('click')
+    expect(wrapper.emitted('applied')?.[0]).toEqual([['五、1', '五、3']])
+    await flushPromises()
+    expect(wrapper.find('.prior-year-stub').exists()).toBe(false)
+  })
 })
 
 describe('NoteContentTemplateSaveDialog', () => {
@@ -156,7 +179,9 @@ describe('NoteContentTemplateSaveDialog', () => {
     const wrapper = mount(NoteContentTemplateSaveDialog, { props: { visible: true, projectId: 'p1', year: 2025 }, global: { stubs } })
     await wrapper.find('input.el-input').setValue('全套模板')
     if (scope === 'group') {
-      wrapper.findComponent('.el-radio-group').vm.$emit('update:modelValue', 'group')
+      // 按选择器找到的是 WrapperLike（类型上没有 vm），stub 实际是组件：转一下类型（HEAD 上单区域 vue-tsc 即报 TS2339）
+      const group = wrapper.findComponent('.el-radio-group') as unknown as VueWrapper
+      group.vm.$emit('update:modelValue', 'group')
       await flushPromises()
     }
     return wrapper

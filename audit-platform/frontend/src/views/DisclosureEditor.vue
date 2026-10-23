@@ -30,7 +30,7 @@
           <template #left>
             <div class="gt-de-actions-row">
               <!-- 数据操作 -->
-              <el-button-group v-if="noteEdit.showNonEqcrEntries" size="small">
+              <el-button-group v-if="noteEdit.showNonEqcrEntries.value" size="small">
                 <el-tooltip content="从底稿同步最新数据到当前附注章节" placement="bottom" :show-after="400">
                   <el-button @click="onRefreshFromWP" :loading="refreshLoading">🔄 刷新</el-button>
                 </el-tooltip>
@@ -47,7 +47,7 @@
               <!-- 编辑 -->
               <el-button-group size="small">
                 <el-tooltip content="新增自定义附注章节" placement="bottom" :show-after="400">
-                  <el-button v-if="noteEdit.showNonEqcrEntries" data-test="de-add-section" @click="openAddSectionDialog">➕ 新增</el-button>
+                  <el-button v-if="noteEdit.showNonEqcrEntries.value" data-test="de-add-section" @click="openAddSectionDialog">➕ 新增</el-button>
                 </el-tooltip>
                 <el-tooltip content="编辑表格结构" placement="bottom" :show-after="400">
                   <el-button @click="openStructureEditor">📐 表样</el-button>
@@ -73,7 +73,7 @@
                 <el-button size="small" :loading="batchAiFillLoading">🤖 AI 助手 ▾</el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item v-if="noteEdit.showNonEqcrEntries" :disabled="batchAiFillLoading" @click="openBatchAiFill" title="对空/草稿章节一键 AI 预填充（逐章确认采纳，不自动写库）">📚 批量预填充（空/草稿章节）</el-dropdown-item>
+                    <el-dropdown-item v-if="noteEdit.showNonEqcrEntries.value" :disabled="batchAiFillLoading" @click="openBatchAiFill" title="对空/草稿章节一键 AI 预填充（逐章确认采纳，不自动写库）">📚 批量预填充（空/草稿章节）</el-dropdown-item>
                     <el-dropdown-item @click="showDocAiChat = true" title="与 AI 对话">💬 AI 对话</el-dropdown-item>
                     <el-dropdown-item @click="showAiPanel = true" title="AI 智能建议">🧠 AI 智能建议</el-dropdown-item>
                   </el-dropdown-menu>
@@ -108,6 +108,7 @@
                     <el-dropdown-item @click="showPrintPreview = true" title="打印预览当前附注">🖨️ 打印预览</el-dropdown-item>
                     <el-dropdown-item divided @click="showNoteImport = true" title="导入外部 Excel 附注数据（通用格式）">📥 Excel 导入</el-dropdown-item>
                     <el-dropdown-item v-if="noteContentTools?.available" @click="noteContentTools?.open('upload')" title="上传 Word/PDF 或选择知识库文档，批量填入叙述性章节">📄 上传附注文档</el-dropdown-item>
+                    <el-dropdown-item v-if="noteContentTools?.available" @click="noteContentTools?.open('prior-year')" title="上传上年附注 Word：上年表格期末数填进本年期初列（只填空格），认不出的表逐张确认后写入">📅 导入上年附注</el-dropdown-item>
                     <el-dropdown-item @click="showOfflineExport = true" title="导出系统格式离线编辑包（可再导回）">📦 离线导出</el-dropdown-item>
                     <el-dropdown-item @click="showOfflineImport = true" title="导入系统导出的离线编辑包">📥 离线导入</el-dropdown-item>
                   </el-dropdown-menu>
@@ -141,7 +142,7 @@
                   📋 就绪度<span v-if="readinessAlertCount" class="gt-de-readiness-badge">{{ readinessAlertCount }}</span>
                 </el-button>
               </el-tooltip>
-              <el-button v-if="noteEdit.showReadonlyBadge" size="small" type="info">📋 只读副本</el-button>
+              <el-button v-if="noteEdit.showReadonlyBadge.value" size="small" type="info">📋 只读副本</el-button>
               <!-- 使用手册：各功能键用途 / 数据提取来源 / 操作流程 -->
               <el-tooltip content="附注模块使用手册：各功能键用途、数据提取来源、标准操作流程" placement="bottom" :show-after="400">
                 <el-button size="small" @click="showNoteHandbook = true">📖 使用手册</el-button>
@@ -263,7 +264,7 @@
             :indent="10"
             highlight-current
             node-key="id"
-            :draggable="noteEdit.canWrite"
+            :draggable="noteEdit.canWrite.value"
             :allow-drop="allowTreeDrop"
             @node-click="onNodeClick"
             @node-contextmenu="onTreeNodeContextMenu"
@@ -452,7 +453,7 @@
               <el-tooltip content="保存后自动跳到下一未编制章节" placement="top">
                 <el-switch v-model="autoAdvance" size="small" @change="toggleAutoAdvance" style="margin-right:4px;" />
               </el-tooltip>
-              <template v-if="!isEqcrRole && (currentNote.content_type === 'text' || currentNote.content_type === 'mixed')">
+              <template v-if="noteEdit.showNonEqcrEntries.value && (currentNote.content_type === 'text' || currentNote.content_type === 'mixed')">
                 <el-tooltip content="参照知识库文档由 AI 起草本章节正文草稿" placement="bottom" :show-after="400">
                   <el-button size="small" @click="openNoteAiFill('ai')">🤖 AI 填充</el-button>
                 </el-tooltip>
@@ -464,10 +465,10 @@
                 {{ currentNote.status === 'confirmed' ? '已确认' : '草稿' }}
               </el-tag>
               <!-- 编辑操作按钮（置于标题行，随时可见，无需滚动到底部） -->
-              <el-button v-if="!editMode" size="small" @click="enterNoteEdit()" :disabled="!noteEdit.canWriteLocked" :title="!noteEdit.canWriteLocked ? '无法编辑（项目已归档或他人正在编辑）' : ''">编辑</el-button>
+              <el-button v-if="!editMode" size="small" @click="enterNoteEdit()" :disabled="!noteEdit.canWriteLocked.value" :title="!noteEdit.canWriteLocked.value ? '无法编辑（项目已归档或他人正在编辑）' : ''">编辑</el-button>
               <el-button v-if="editMode" size="small" @click="exitNoteEdit(true)">取消</el-button>
               <!-- 保存按钮始终可见：富文本编辑后无需先进编辑模式即可保存 -->
-              <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!noteEdit.canWriteLocked" :title="!noteEdit.canWriteLocked ? '无法编辑（项目已归档或他人正在编辑）' : ''">💾 保存</el-button>
+              <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!noteEdit.canWriteLocked.value" :title="!noteEdit.canWriteLocked.value ? '无法编辑（项目已归档或他人正在编辑）' : ''">💾 保存</el-button>
             </div>
           </div>
 
@@ -708,12 +709,12 @@
 
             <div class="gt-de-editor-footer" v-if="editMode">
               <div class="gt-de-footer-secondary">
-                <el-button size="small" plain @click="onClearAllFormulas" :disabled="!noteEdit.canWriteLocked" :title="!noteEdit.canWriteLocked ? '无法编辑' : '清除所有单元格公式'">一键清除公式</el-button>
-                <el-button size="small" plain @click="onRestoreAutoMode" :disabled="!noteEdit.canWrite" :title="!noteEdit.canWrite ? '项目已归档，无法编辑' : '恢复为自动提数模式'">恢复自动提数</el-button>
+                <el-button size="small" plain @click="onClearAllFormulas" :disabled="!noteEdit.canWriteLocked.value" :title="!noteEdit.canWriteLocked.value ? '无法编辑' : '清除所有单元格公式'">一键清除公式</el-button>
+                <el-button size="small" plain @click="onRestoreAutoMode" :disabled="!noteEdit.canWrite.value" :title="!noteEdit.canWrite.value ? '项目已归档，无法编辑' : '恢复为自动提数模式'">恢复自动提数</el-button>
               </div>
               <div class="gt-de-footer-primary">
                 <el-button size="small" @click="exitNoteEdit(true)">取消</el-button>
-                <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!noteEdit.canWriteLocked" :title="!noteEdit.canWriteLocked ? '无法编辑' : ''">保存</el-button>
+                <el-button size="small" type="primary" @click="onSave" :loading="saveLoading" :disabled="!noteEdit.canWriteLocked.value" :title="!noteEdit.canWriteLocked.value ? '无法编辑' : ''">保存</el-button>
               </div>
             </div>
 
@@ -948,7 +949,7 @@
       v-model="showNoteMappingDialog"
       :project-id="projectId"
       :loading="noteMappingLoading"
-      :can-edit="noteEdit.canWrite"
+      :can-edit="noteEdit.canWrite.value"
       :rules="noteMappingRules"
       :target-sections="targetSections"
       :template-type="templateType"
@@ -968,7 +969,7 @@
     />
 
     <!-- 附注正文批量写入：上传/知识库/内容模板（同一时刻只挂一个弹窗） -->
-    <DisclosureNoteContentTools ref="noteContentTools" :project-id="projectId" :year="year" :can-write="noteEdit.canWriteLocked" :has-unsaved-changes="editDirty || autoSave.isDirty.value" @applied="onNoteTextBatchApplied" />
+    <DisclosureNoteContentTools ref="noteContentTools" :project-id="projectId" :year="year" :can-write="noteEdit.canWriteLocked.value" :has-unsaved-changes="editDirty || autoSave.isDirty.value" @applied="onNoteTextBatchApplied" />
     <!-- D15 离线导出弹窗 -->
     <NoteOfflineExportDialog
       v-model="showOfflineExport"
@@ -1488,7 +1489,7 @@ const editLock = useEditingLock({
 // 附注编辑权限单一来源 + 请求级守卫 (partner-manager-edit-permission)
 const noteEdit = useNoteEditPermission({
   projectId,
-  isArchived: computed(() => projectStore.currentProject?.status === 'archived'),
+  isArchived: computed(() => projectStore.projectStatus === 'archived'),
   forcedReadonly: editLock.forcedReadonly,
 })
 const requestGuard = createNoteEditRequestGuard(noteEdit)

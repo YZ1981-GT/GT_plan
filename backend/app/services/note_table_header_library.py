@@ -42,6 +42,7 @@ __all__ = [
     "name_period",
     "norm",
     "parse_segment",
+    "path_keys",
     "period_side",
     "reset_vocabulary_cache",
     "rollforward_columns",
@@ -401,9 +402,23 @@ def column_keys(
     vocab: Vocabulary | None = None,
 ) -> list[ColumnKey]:
     """逐列语义键。``identity`` = (口径, 表标识)，用于套词表里的逐表覆盖。"""
+    return path_keys(column_paths(table), name=_name_of(table), identity=identity, vocab=vocab)
+
+
+def path_keys(
+    paths: Sequence[Sequence[str]],
+    *,
+    name: Any = None,
+    identity: tuple[str, str] | None = None,
+    vocab: Vocabulary | None = None,
+) -> list[ColumnKey]:
+    """逐列表头路径（第 0 列为标签列）→ 列语义键；``name`` 是表名（路径里没有期间时用表名期间）。
+
+    ``column_keys`` 的内核，给已有逐列路径的表格用（上年附注 Word 表格：``note_word_table.parse_word_table``）。
+    """
     vocab = vocab or load_vocabulary()
-    paths = column_paths(table)
-    table_period = name_period(_name_of(table), vocab)
+    paths = [tuple(norm(x) for x in p if norm(x)) for p in paths]
+    table_period = name_period(name, vocab)
     override_prefix = _override_table_key(*identity) if identity else None
     out: list[ColumnKey] = []
     for c, path in enumerate(paths):
