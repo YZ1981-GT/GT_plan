@@ -57,7 +57,7 @@ def test_column_groups_span_within_bounds(std: str):
     ("soe", "五-17-1"),  # 其他债权投资（P1列修复，8列→8列）
     ("soe", "五-64-1"),  # 未分配利润（P1列修复，5列，有cg）
     ("listed", "五-4-1"), # 应收票据主表（2行mh）
-    ("listed", "五-10-1"), # 合同资产（P1列修复，9列→9列）
+    ("listed", "五-10-1"), # 合同资产（R8.2 由网格 9 列折成逻辑 7 列）
 ])
 def test_representative_tables_word_header_rows(std: str, sid: str):
     """代表性表的 _column_groups 与 multi_header 产出正确的 Word 两级表头。"""

@@ -34,7 +34,7 @@ DOCX_DIR = DATA_DIR / "audit_report_templates" / "disclosure_notes"
 sys.path.insert(0, str(ROOT / "scripts" / "seed"))
 sys.path.insert(0, str(ROOT))
 from seed_consol_note_sections import multi_header_to_column_groups
-from app.services.note_word_table import seed_table_structure  # noqa: E402  新增 / 重建表的结构：与平台同一构建（R7.6）
+from app.services.note_word_table import seed_table_structure, sync_logical_columns  # noqa: E402  与平台同一构建（R7.6）
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -271,6 +271,9 @@ STANDALONE_INSTANTIATED = {
     ("listed", "五-24-2"): ("五、24", "（2）以公允价值计量"), ("listed", "五-25-1"): ("五、25", "使用权资产"),
     ("listed", "五-28-1"): ("五、28", "商誉账面原值"), ("listed", "五-28-2"): ("五、28", "商誉减值准备"),
 }
+#: Word 一格横跨两个网格列、数据行也拆成两格的合并表（口径, 条目号）：种子按逻辑列存，与单体模板 / Word 逻辑列一致
+#: （用户 2026-10-23 拍板；原按网格存，两列同键认不出），Phase 1 按逻辑列比对 / 重建（R8.2）
+LOGICAL_COLUMNS = {("listed", "五-10-1"), ("listed", "五-11-1")}
 IDENTITY_MISMATCHES: list[str] = []
 KNOWN_GAP_HITS: set[tuple[str, int]] = set()
 
@@ -373,6 +376,9 @@ def phase1_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
                 print(f"    P1-T {sid}: title '{j_title[:30]}' → '{w_title[:30]}'")
         if (std, sid) in STANDALONE_INSTANTIATED:
             continue  # 占位列已按单体模板实例化，不按 Word 改回
+        if (std, sid) in LOGICAL_COLUMNS:
+            struct_updated += sync_logical_columns(entry, wt["el"], apply=not dry_run)  # 按逻辑列比对 / 重建
+            continue
 
         j_cols = len(entry.get("headers", []))
         w_cols = wt["cols"]
@@ -1093,8 +1099,8 @@ def main():
             consol_data = json.loads(consol_json_path.read_text("utf-8"))
             print(f"  JSON 表格: {len(consol_data)}")
             sids = {e.get("section_id") for e in consol_data}
-            for key in (k for k in STANDALONE_INSTANTIATED if k[0] == std and k[1] not in sids):
-                IDENTITY_MISMATCHES.append(f"[{std}] {key[1]} 登记为占位列按单体实例化，但种子里没有该条目，请核对登记")
+            for key in (k for k in (*STANDALONE_INSTANTIATED, *LOGICAL_COLUMNS) if k[0] == std and k[1] not in sids):
+                IDENTITY_MISMATCHES.append(f"[{std}] {key[1]} 登记为占位列按单体实例化 / 按逻辑列存，但种子里没有该条目，请核对登记")
 
             if 1 in phases:
                 struct_n, title_n = phase1_consol(consol_word, consol_data, std, args.dry_run, args.verbose)

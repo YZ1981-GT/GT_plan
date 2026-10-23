@@ -481,3 +481,54 @@ rollforward_columns(table)   RollForward(opening, closing, increase, decrease, u
   - 上市 五-19-2 表名「其他权益工具投资」→「期末其他权益工具投资情况」：Word 这张表没有表名标记（同步工具不管），单体模板 五、19#1 同名同 5 列；改后按名选中 五、19#1，逐列对上（1 → 4）。按结构选表与按名选表分歧共 18 张（国企 7 / 上市 11），其余 17 张：4 张是单体模板表头拿了同节别的表（国企 五-4-9/10、五-18-7，上市 五-4-12，上面已归因），13 张是同构表（账龄表 / 组合计提表与余额百分比表、单项计提表、应收票据主表，在建工程 / 开发支出与其减值准备表），按名选的对。选表口径不改：结构优先会让 国企 五-5-1 选到「采用余额百分比…」表。
   - 结果：国企 对上 612 → 611（0.9027 → 0.9012），上市 814 → 815（0.9261 → 0.9272），目录棘轮随之调整并加显式断言。真库上年导入预览（重药安徽 → 和平药房，两种导出方式，只读回滚）状态 / 认列 / 原因与批 8c 逐表一致（auto 82 / needs_confirm 62 / no_source 9；模板方式 30 / 35 / 88），只少了两条需确认表的候选预填：八、50「年初应付利息」← 上年应付债券期末余额、八、54「计划资产的公允价值/期初数」← 上年长期应付职工薪酬期末数，都是另一项。
   - 测试 / 变异 / 回归：标题行库用例补同一项判定（单位注记、两侧方向、「…余额」、没写期间的金额列不算纯期间列）；磁盘变异 13 条全红（同一项恒成立、不看后缀、不看同表纯期间列、不去单位注记 / 只认括号注记 / 只认整段、后缀只认「金额」、没写期间的列也算、查错一侧、净额不算 / 余额类不算、只核 period_balance、种子表名改回），每条逐字节复原。批 8c 的 65 个回归文件：6 例失败与批 8c 相同，无新增。
+
+## 17 R8（2026-10-23 追加）
+
+批次：9a = R8.1 / R8.2 / R8.5（迁移执行、网格死列、V202 建议，互不依赖）；9b = R8.4（单体模板按底稿披露表校对）。R8.3「投资金额」不进词表余额类计量，维持 §16.9 批 8c 收尾复核的「…金额」后缀判定，不改。
+
+### 17.1 两个合成项目执行章节号迁移（R8.1）
+
+- 范围：真库有合并附注数据的只有某测试集团（`80b4355b…`）与甲测试（`7cd13170…`），名称都不带【测试】，R7 只演练未执行。按工具文档「部署时随新种子立即全量跑一次」全量执行（不带 `--project`）：比只迁这两个项目多出的动作只有 48 条模板级公式种子删除（`ensure_seeded` 本来就会对齐）；只迁项目不会在 `logs` 记全量迁移，以后全量跑时模板级种子仍按旧号。
+- 执行：`python scripts/migrate/remap_consol_note_section_ids.py --apply`，3464 个动作（合并附注数据改号 2436、并掉 980；公式种子删 48），与 R7 全量只读演练逐类相同；备份 `backend/backups/consol_note_remap_r7_20261023_230644.json`（目录不入库，确认无碍前保留）。
+- 核对（只读事务，按备份逐条）：改号的行在新号上且其余字段不变；删掉的行已不在；并掉的行在新号上（同项目 / 年度 / 节点）都有留下的那行；问题 0。重跑 0 个动作（「已全量迁过」）。某测试集团 4494 → 3514 行（321 → 251 个章节），甲测试 2 行（1 个章节）。有数的 36 行：9 行随 五-38-1 → 五-37-1 改号，其余在 五-1-1 / 五-5-1 / 六-主要税种及税率-1（号不变）；并掉的 980 行都没有数。
+- 公式：`ensure_seeded('soe')` 按新种子重种，新建 48、不变 12，国企种子 60 条（合计行 54 + 科目行 6，与批 8b 计数一致）；跳过 17 条，原因与种子化规则一致（没有合计行 / 科目不在报表行范围 / 同名报表行公式不一致 / 毛额没有唯一余额列）。上市库里 0 条，读时按需种子化。
+
+### 17.2 上市 五-10-1 / 五-11-1 折成逻辑列（R8.2）
+
+- 原状（§16.9 批 8c「网格死列」）：上市合并 Word 这两张表有一格横跨两个网格列、数据行也拆成两格，种子按网格存 9 列，期末账面价值（五-11-1 为期末账面余额）与上年年末减值准备各两列同键；标题行库按「同一单体列被多列认领全部放弃」认不出，单体这 4 列拉不过来。单体模板同名表与 Word 逻辑列都是 7 列。
+- 做法（平台一处 + 同步工具登记）：
+  - `note_word_table.logical_column_starts`：逻辑列与 `parse_word_table` 同口径（`_logical_columns`；表头空白格归一三处共用 `_normalized_grid`）。
+  - `seed_table_structure(tbl_el, logical=True)`：表头取各逻辑列的首个网格列（`seed_multi_header(cols=…)`），数据行每个逻辑列取覆盖网格列里第一个有字的格（`_data_row` 同一规则）。
+  - `sync_logical_columns(entry, tbl_el, apply=…)`：平表头 / 多级表头 / 分组与 Word 逻辑列一致 ⇒ 不动；否则改写这三项，仍是网格宽的行折成逻辑列（行保留原字、键原位更新），Word 逻辑列没有分组时删掉种子的 `_column_groups`。
+  - 同步工具 `LOGICAL_COLUMNS = {上市 五-10-1, 五-11-1}`：Phase 1 对这两条走 `sync_logical_columns`（`--check` 只比不写）；与 `STANDALONE_INSTANTIATED` 同一处查「登记失效」。
+  - 否掉：像 `STANDALONE_INSTANTIATED` 那样让 Phase 1 不按 Word 改（Word 再变也发现不了）；截断行（丢 五-11-1 的 A / B / C=A+B=报表数 注记）；只在认列时把同键重复列当一列（种子、编辑器、勾稽仍是 9 列）。上市 五-9-4~7 仍按 8 个网格列（R6.3 决定，不在本次范围）。
+- 落地：种子用同步工具 `--phase 1 --std listed` 折（只动这两条）：9 → 7 列，五-11-1 的字母注记随「期末账面价值」列落到第 3 列、X.XX 落到第 6 列；勾稽 F11-4 的 `peer_col_index` 3 → 2（同一列在逻辑列里的位置）。上市库里没有合并附注数据，不迁移。
+- 标题行库目录重生成（按 HEAD 单体模板）：上市覆盖 0.9272 → 0.9360（对上 815 → 819、分母 879 → 875，两张表各 4 → 6 列全精确对上），`duplicate_column_keys` 异常去掉 2 条、无新增；国企与明细映射不变；棘轮随之调整。
+- 测试：表头用例 D 类两张表的豁免只剩「行名」，新增逐列比 Word 逻辑列与单体模板（参数化 2 例）；同步工具读同一表头的用例按逻辑列比；折行（网格行 → 逻辑列、只比不写不动条目、折完再比无可写）、单行表头取首个有字格各 1 例；Word 身份守卫「登记都在种子里」含 `LOGICAL_COLUMNS`；目录两张表逐列精确对上 1 例。
+- 变异（独立 worktree 磁盘注入，每条逐字节复原并核对）10 条全红：逻辑列开关不生效 / 数据行只取首个网格列 / 结构一致恒成立 / 网格行不折 / 折行只取首个网格列 / 无分组时不删旧分组 / 只比不写也写 / 同步工具不按逻辑列 / 登记漏 五-11-1 / F11-4 对照列改回网格列号。
+- 回归：引用种子 / 平台表格函数 / 同步工具 / 标题行库的 123 个后端测试文件，HEAD `2da453244` 干净检出 201 例失败（183 failed + 18 error），HEAD + 本批同样 201 例逐条相同，新增 5 例全过；行数门、U+FFFD 通过。
+- 跨会话：并发会话 spec 69 的守卫（未提交）因此多报 2 条失效白名单（上市 五-10-1 / 五-11-1，「两侧已一致、白名单应删」），与本结论一致；现共报失效白名单 12 条、白名单外差异 1 处（上市 五-11-3「期初余额」↔「上年年末余额」）。
+
+### 17.3 V202 现状与建议（R8.5，只分析不改）
+
+V202（`V202__consol_note_mapping_reuse_and_reference.sql`，spec consol-note-mapping-reuse-and-reference-push）建 4 张表：映射规则模板 `consol_note_mapping_rule_template`、结构锁 `consol_note_structure_lock` 及其子企业表、值确认 `consol_note_value_confirmation`，并给 `consol_note_mapping_rule` 加 `promoted_to_template_id`。路由 `consol_note_mapping_templates.py` 12 个端点已注册（`router_registry/system.py`）。真库 4 张表 0 行。
+
+- 没有界面：前端唯一调用方 `useConsolNoteReuse.ts` 没有任何文件引用。
+- 接了但不起作用：`CONSOL_NOTE_VALUE_CHANGED` 只有定义、没有发布方（`on_note_section_saved` 返回 payload「由调用方发」，调用方不发）；`check_all_confirmed` 只被自己的 readiness-check 端点调用，没接进签发 / 出具闸门；`check_structure_lock`、`suggest_from_templates`、`find_previous_year_rules` 零调用方（锁了也不拦写入）。
+- 退役时必须一起改的耦合：
+  - `consol_note_value_change_service.on_note_section_saved` 是现行「单体附注保存 → 合并侧标待更新」的路径，同一函数里还降级值确认；两段 try/except 都没有保存点，PG 上一条语句失败会让调用方事务中止。
+  - ORM `ConsolNoteMappingRule.promoted_to_template_id` 与 `consol_note_mapping_models.py` 末尾对模板模型模块的导入。
+  - 章节号迁移工具导入 3 个 V202 模型（作为存章节号的表迁移）。
+- 鉴权缺口：停用模板 `DELETE /api/consol-note-mapping-templates/{id}` 只要登录；`GET /api/projects/{project_id}/consol-note-account-reference/{section_id}` 路径带项目却只要登录（可读别的项目）；提升 `POST …/rules/{rule_id}/promote` 校验的是路径项目的 review 权限，服务只按 `rule_id` 取规则、不核对 `rule.project_id`（可提升别的项目的规则，写对方规则的 `promoted_to_template_id` 并生成全局模板）。
+- 记录失真：`_archive/65-consol-note-pull-from-standalone/tasks.md` 第 87 行与 memory 一行说「V202 值确认端点已在 R6.1 退役（全仓 0 命中）」—— 端点、服务、表都还在（R6.1 删的是 V2 汇总器与 `useNoteAggregation`）。是并发会话的记录，未改，在此登记。
+- 建议：另立 spec 退役，不做界面。做界面要补服务端值指纹（现在「值变化」是每次保存都通知）、闸门接线、锁的写入拦截和上面 3 处鉴权，且与现有待更新横幅（`is_stale` + `consol.note_stale` SSE）、出具前就绪检查、V204 功能重叠。退役 = 一次协调改动：删路由 / 3 个服务 / composable / 3 个模型，`on_note_section_saved` 只留标待更新，迁移工具去掉 3 张表，ORM 去掉列；前向迁移 DROP 列与 4 张表（先备份；不改 V202 本身，运行时迁移按版本号记 checksum，改旧文件会让已执行过的库报漂移）。
+- 顺带发现（并发会话 spec 66 未提交的 `consol_note_template_push_service.py`，只登记）：`_push_to_one` 从不存在的 `app.models.disclosure_note_models` 导入 `DisclosureNote`（实际在 `report_models`）⇒ 每家子企业下推都失败；激活结构锁从 `consol_note_mapping_models` 导入结构锁模型（实际在 `consol_note_mapping_template_models`），`ImportError` 被吞后只记日志 ⇒ 锁永远不激活。
+
+### 17.4 单体附注模板按底稿披露表校对（R8.4，批 9b）
+
+- 权威：底稿模板 xlsx 的附注披露 sheet（如 D2「附注披露信息(上市公司)」）。前端载荷构建（`*NoteSectionMap.ts` 的 `build*Columns()`）的列是照附注模板抄的（如 D3 注释「表名 / 列头逐字取自附注模板」），不当独立证据，只用来核对改模板后推送是否仍对得上。
+- 读法（用户 2026-10-23 说明）：【】里是给用户的提示，先去掉，只剩提示的行不当表名 / 表头；行名、组合名（如「应收中央企业客户」「应收海外企业客户」）按实际情况填、只是参考，不比；比每张表的列（逐列表头路径；合并格展开，横跨的同一格算一个逻辑列）与表的有无 / 顺序。
+- 改模板会影响的链路：推送 `wp_disclosure_sync_service.sync_from_workpaper` 按表名把 `sub_table_data[name]` / `_sub_table_columns` 合进附注；读取 `note_sub_table_projector.project_sub_tables` 按列键投影、`note_table_enrichment.carry_template_table_names` 按位置把模板表名 / 表头配给已保存的表（模板列数 ≥ 已存列数时换表头）；公式推送规则按表名 + 表头认列；标题行库目录与明细映射；Word 对齐白名单。
+- 范围：批 8c 四方对照里单体模板与单体 Word 不一致的 72 张（国企 32、上市 40，按批 9a 后的种子重算）；加上并发会话 spec 69 改过的表与已按底稿对齐过的表（`_aligned_by`）。spec 69 现状（未提交）：两份单体模板里国企 52 张、上市 47 张表的 `headers` / `_column_groups` 变了，`columns` 未动；两份文件末尾换行丢了；依据是合并种子。
+- 已看到的冲突（实施前请用户定）：spec 69 以合并种子为准改单体列名，与「以底稿披露表为准」不一致，如组合计提表底稿列头是「应收账款」，spec 69 改成「账面余额」；按推送载荷比，spec 69 的改名让 32 张表（国企 19、上市 13）的列名与载荷对不上（HEAD 模板只有 5 张）。spec 69 的文件是并发会话未提交的改动：撤回其偏离底稿的改名，还是保留后在其上改。
+- 做法：探针切表 → 逐张清单（OK / 差异 / 无底稿表，附 spec 69 改动与载荷对比）→ 按底稿改单体模板（`columns` / `headers` / `_column_groups` 同改），逐张登记旧 → 新 → 重生成依赖产物，核对推送载荷与已保存附注数据（列数变化的表按列语义迁移或登记）。

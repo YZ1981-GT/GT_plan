@@ -5,7 +5,7 @@ CP-04 曾计划在种子里显式写 ``header_rows`` / ``_header_row_indexes``�
 - A 投影后表头行都在 ``header_rows``，表体行一行不少（``_header_row_indexes == []``）、金额留在存储坐标；
 - B 章节接口与公式服务两条读取路径投影一致；C 章节详情接口带 ``template_type``（前端身份校验）；
 - D 上市第五章每张表的列数 / 逐列表头路径 / 行名与上市合并 Word 一致（测试时解析 Word；有意保留的差异逐条登记，失效即报；
-  表头占位列按单体模板实例化的 6 张逐列比单体模板，R7.7）；
+  表头占位列按单体模板实例化的 6 张逐列比单体模板；上市 五-10-1 / 五-11-1 按逻辑列存，R8.2）；
 - E 上市 五-9-4~7 保留 8 个网格列（R6.3）；F 种子不带 ``header_rows`` / ``_header_row_indexes``。
 """
 from copy import deepcopy
@@ -23,7 +23,7 @@ from httpx import ASGITransport, AsyncClient
 from app.services.consol_note_headers import header_cells, normalize_consol_note_section
 from app.services.note_table_header_catalog import standalone_sections
 from app.services.note_table_header_library import column_paths, norm
-from app.services.note_word_table import _row_keys, _table_grid, parse_word_table
+from app.services.note_word_table import _row_keys, _table_grid, logical_column_starts, parse_word_table
 from scripts.seed import sync_note_templates_from_word as S
 
 DATA = Path(__file__).resolve().parents[1] / "data"
@@ -192,9 +192,9 @@ LISTED_WORD_EXEMPT: dict[str, tuple[list[str], str]] = {
     "五-5-1": (["列数 3≠4"], "Word 小计 / 减：坏账准备两行末格横跨两个网格列（其余行 3 格），逻辑上就是账龄 / 期末余额 / 上年年末余额 3 列"),
     **{sid: (["列数 8≠7"], "R6.3：保留 8 个网格列（Word 账面余额/金额拆成两格、数据行再并回一格），不折成 7 列；E 类钉住")
        for sid in ("五-9-4", "五-9-5", "五-9-6", "五-9-7")},
-    "五-10-1": (["列数 9≠7", "行名"], "网格 9 列（Word 账面价值、减值准备各拆两格，同 R6.3 口径）；Word 表下半截的净额简表"
-                "（合同资产 / 减：减值准备 / 小计…）与上半截同口径重复，单体也不收，种子不收（R7.8）"),
-    "五-11-1": (["列数 9≠7", "行名"], "网格 9 列（同上）；Word 表下半截另起表头的持有待售负债表与单体一致拆成 五-11-2"),
+    "五-10-1": (["行名"], "Word 表下半截的净额简表（合同资产 / 减：减值准备 / 小计…）与上半截同口径重复，单体也不收，"
+                "种子不收（R7.8）"),
+    "五-11-1": (["行名"], "Word 表下半截另起表头的持有待售负债表与单体一致拆成 五-11-2"),
     "五-23-3": (["表头路径 列[1, 2, 3, 4, 8]"], "Word 第 2 行是勾稽字母注记（A / B / C / D / E=A+B-C-D），平台按数据行判，"
                 "种子按第二层表头存（R6.3：字母注记列不做变动表勾稽）"),
     "五-28-3": (["列数 2≠1"], "列跨度表示差异：Word 表头一格横跨两个网格列，种子按两列存（design §16.8）"),
@@ -275,6 +275,17 @@ def test_every_listed_word_table_has_a_seed_entry_and_exemptions_are_live():
     assert set(LISTED_WORD_EXEMPT) <= set(_listed_positions()) and LISTED_EMBEDDED <= seed - set(_listed_positions())
     assert all(reason for _diffs, reason in LISTED_WORD_EXEMPT.values())
     assert LISTED_INSTANTIATED <= set(_listed_positions()) and not LISTED_INSTANTIATED & set(LISTED_WORD_EXEMPT)
+
+
+@pytest.mark.parametrize("sid", sorted(sid for std, sid in S.LOGICAL_COLUMNS if std == "listed"))
+def test_logical_column_entries_match_word_logical_columns_and_standalone(sid):
+    """按逻辑列存的条目（同步工具 ``LOGICAL_COLUMNS``，用户 2026-10-23 拍板）：Word 确有网格重复列（没有了 ⇒ 删登记），
+    种子列数 = Word 逻辑列数，逐列表头路径与单体模板同名表相同（单体的数逐列拉得过来）。"""
+    entry = section("listed", sid)
+    ncols, starts = logical_column_starts(_listed_positions()[sid]["el"])
+    assert len(entry["headers"]) == len(starts) < ncols, f"{sid} Word 已无网格重复列，请删登记"
+    single = next(t for t in dict(standalone_sections("listed"))[f"五、{sid.split('-')[1]}"] if t.get("name") == entry["title"])
+    assert column_paths(entry)[1:] == column_paths(single)[1:]
 
 
 # ─── E：上市 五-9-4~7 保留 8 个网格列（R6.3） ────────────────────────────

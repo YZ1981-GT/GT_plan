@@ -104,9 +104,11 @@ def test_mapping_agrees_with_runtime_choice(catalog, std):
 #: 2026-10-23 R7.7 收尾复核：「只写了期间」对上的两列须是同一项，去掉 3 处错配（国企 五-50-2「期初余额」↔ 单体「年初应付利息」、
 #:   上市 五-12-2 两列「面值」↔ 单体「期末余额 / 上年年末余额」）；上市 五-19-2 表名按单体模板改回「期末其他权益工具投资情况」
 #:   后选中同表（对上 1→4）：国企 0.9027→0.9012（对上 612→611）、上市 0.9261→0.9272（对上 814→815）。
+#: 2026-10-23 R8.2 上市 五-10-1 / 五-11-1 网格死列折成逻辑列（用户拍板）：两张表 6 列全对上（各 4→6），
+#:   上市 0.9272→0.9360（对上 815→819，分母 879→875）。
 _RATCHET = {
     "soe": {"coverage": 0.9012, "matched": 611, "none": 11},
-    "listed": {"coverage": 0.9272, "matched": 815, "none": 26},
+    "listed": {"coverage": 0.9360, "matched": 819, "none": 26},
 }
 
 
@@ -118,6 +120,15 @@ def test_period_only_requires_same_item_and_listed_19_2_title(catalog):
     item = items[("listed", "五-19-2")]
     assert item["standalone"] == "五、19#1" and item["chosen_name"] == "期末其他权益工具投资情况"
     assert item["unmatched"] == [] and item["matched"] == item["amount_columns"] == 4
+
+
+def test_listed_logical_column_tables_fully_correspond(catalog):
+    """R8.2：上市 五-10-1 / 五-11-1 折成逻辑列后与单体同表逐列精确对上（原网格存时两列同键，按多列认领全部放弃）。"""
+    items = {i["consol"]: i for i in catalog["correspondence"]["listed"]}
+    for sid, table in (("五-10-1", "五、10#0"), ("五-11-1", "五、11#0")):
+        assert items[sid]["unmatched"] == [] and items[sid]["columns"] == [[c, table, c, "exact"] for c in range(1, 7)]
+    dup = {a["id"] for a in catalog["anomalies"] if a["kind"] == "duplicate_column_keys" and a["variant"] == "listed_consolidated"}
+    assert not dup & {"五-10-1", "五-11-1"}
 
 
 def test_bare_amount_and_instantiated_placeholder_columns_correspond(catalog):

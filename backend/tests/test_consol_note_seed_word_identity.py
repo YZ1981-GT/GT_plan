@@ -149,8 +149,8 @@ def test_word_sync_tool_has_nothing_to_write(std, monkeypatch):
     assert S.check_title_drift(word, data, std, "consol", False) == []
     assert S.IDENTITY_MISMATCHES == KNOWN_MISMATCHES[std]
     assert S.KNOWN_GAP_HITS == {k for k in S.KNOWN_SECTION_GAPS if k[0] == std}  # 登记项仍对不上（未失效）
-    # 占位列按单体实例化的条目（R7.7）：Phase 1 不按 Word 改回（上面结构更新数为 0 即钉住），登记的条目都在种子里
-    assert {sid for s, sid in S.STANDALONE_INSTANTIATED if s == std} <= {e["section_id"] for e in data}
+    # 占位列按单体实例化（R7.7）/ 按逻辑列存的条目（R8.2）：Phase 1 不按 Word 网格改回（上面结构更新数为 0 即钉住），登记的条目都在种子里
+    assert {sid for s, sid in (*S.STANDALONE_INSTANTIATED, *S.LOGICAL_COLUMNS) if s == std} <= {e["section_id"] for e in data}
 
 
 def _tagged(std: str, section: str) -> list[dict]:

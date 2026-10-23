@@ -18,12 +18,14 @@ __all__ = [
     "compare_tables",
     "heading_key",
     "iter_blocks",
+    "logical_column_starts",
     "norm_cell",
     "parse_word_table",
     "rows_disjoint",
     "seed_header_paths",
     "seed_multi_header",
     "seed_table_structure",
+    "sync_logical_columns",
     "word_header_paths",
 ]
 
@@ -227,15 +229,27 @@ def _normalize_header_gaps(ncols: int, n_hdr: int, grid: dict, texts: dict, span
     return grid, texts, spans
 
 
+def _normalized_grid(tbl_el: Any) -> tuple[int, int, int, dict, dict, dict]:
+    """(行数, 网格列数, 表头行数, grid, texts, spans)，表头空白格已归一：多级表头、逐列路径、逻辑列共用。"""
+    nrows, ncols, grid, texts, spans = _table_grid(tbl_el)
+    n_hdr = min(_header_row_count(nrows, ncols, grid, texts, spans), nrows) if nrows else 0
+    grid, texts, spans = _normalize_header_gaps(ncols, n_hdr, grid, texts, spans)
+    return nrows, ncols, n_hdr, grid, texts, spans
+
+
+def logical_column_starts(tbl_el: Any) -> tuple[int, list[int]]:
+    """(网格列数, 每个逻辑列的首个网格列)，与 ``parse_word_table`` 同口径（``_logical_columns``）。"""
+    _nrows, ncols, n_hdr, grid, _texts, _spans = _normalized_grid(tbl_el)
+    return ncols, (_logical_columns(ncols, n_hdr, grid) if n_hdr else list(range(ncols)))
+
+
 def seed_multi_header(tbl_el: Any, cols: Sequence[int] | None = None) -> tuple[int, list[list[str]]]:
     """Word 表头 → 合并附注种子格式的多级表头：(表头行数, 每行每列文字)。按网格列（``cols`` 可指定种子各列对应的网格列）；
     单元格起点写字（去换行、去首尾空白）、合并延续格为空串。
 
     种子格式里空串 = 合并延续、表达不了留白：表头里没合并的空白格先按 ``_normalize_header_gaps`` 归一。
     """
-    nrows, ncols, grid, texts, spans = _table_grid(tbl_el)
-    n_hdr = min(_header_row_count(nrows, ncols, grid, texts, spans), nrows) if nrows else 0
-    grid, texts, spans = _normalize_header_gaps(ncols, n_hdr, grid, texts, spans)
+    _nrows, ncols, n_hdr, grid, texts, _spans = _normalized_grid(tbl_el)
     cols = list(range(ncols)) if cols is None else list(cols)
     clean = lambda o: (texts.get(o) or "").replace("\n", "").strip()  # noqa: E731
     return n_hdr, [[clean((r, c)) if grid.get((r, c)) == (r, c) else "" for c in cols] for r in range(n_hdr)]
@@ -263,7 +277,7 @@ def rows_disjoint(seed_rows: Any, word_rows: Any) -> bool:
     return bool(a) and bool(b) and not (a & b)
 
 
-def seed_table_structure(tbl_el: Any) -> dict[str, Any]:
+def seed_table_structure(tbl_el: Any, *, logical: bool = False) -> dict[str, Any]:
     """Word 表 → 合并附注种子的表结构（平表头 / 多级表头 / 分组 / 数据行）：Word 同步工具新增表、重建错表共用。
 
     与现有种子格式逐字段一致（R7.6 用国企 五-1~9 全部 47 张表核对）：
@@ -271,17 +285,23 @@ def seed_table_structure(tbl_el: Any) -> dict[str, Any]:
       （「/」连接，R6.3 口径），某列路径为空（标签列留白）取首行原字。
     - 单行表头：平表头 = 首行各网格列的字，``multi_header`` 为 None、无分组。
     - 数据行：按网格列取每格起点的字（合并延续格为空串）。
+    - ``logical``：按逻辑列（``logical_column_starts``；Word 一格横跨两个网格列、数据行也拆成两格的表，种子按逻辑列存，
+      R8.2）：表头取各逻辑列的首个网格列，数据行每个逻辑列取所覆盖网格列里第一个有字的格（``_data_row`` 同一规则）。
     """
     from app.services.consol_note_formula_service import multi_header_to_column_groups
     from app.services.consol_note_headers import header_cells, multi_header_rows
 
-    n_hdr, mh = seed_multi_header(tbl_el)
     nrows, ncols, grid, texts, _spans = _table_grid(tbl_el)
+    starts = logical_column_starts(tbl_el)[1] if logical else list(range(ncols))
+    n_hdr, mh = seed_multi_header(tbl_el, starts)
     clean = lambda o: (texts.get(o) or "").replace("\n", "").strip()  # noqa: E731
     n_hdr = max(n_hdr, 1)
-    rows = [[clean((r, c)) if grid.get((r, c)) == (r, c) else "" for c in range(ncols)] for r in range(n_hdr, nrows)]
+    if logical:
+        rows = [[x.replace("\n", "") for x in _data_row(r, starts, ncols, grid, texts)] for r in range(n_hdr, nrows)]
+    else:
+        rows = [[clean((r, c)) if grid.get((r, c)) == (r, c) else "" for c in starts] for r in range(n_hdr, nrows)]
     if n_hdr < 2:
-        heads = [clean((0, c)) if grid.get((0, c)) == (0, c) else "" for c in range(ncols)]
+        heads = [clean((0, c)) if grid.get((0, c)) == (0, c) else "" for c in starts]
         return {"headers": heads, "multi_header": None, "rows": rows}
     width = len(mh[0])
     paths: list[list[str]] = [[] for _ in range(width)]
@@ -298,10 +318,32 @@ def seed_table_structure(tbl_el: Any) -> dict[str, Any]:
     return out
 
 
+def sync_logical_columns(entry: dict[str, Any], tbl_el: Any, *, apply: bool = True) -> bool:
+    """按逻辑列存的种子条目（R8.2）对齐 Word 逻辑列的表头结构：一致 ⇒ False；不一致 ⇒ True，``apply`` 时改写
+    平表头 / 多级表头 / 分组 / 行（Word 逻辑列没有分组 ⇒ 删掉种子的 ``_column_groups``；原有键原位更新，不打乱键序）。
+    行保留种子原字：还是网格列宽的行，每个逻辑列取所覆盖网格列里第一个有字的格（``_data_row`` 同一规则），其余按列数
+    补齐 / 截断。"""
+    built = seed_table_structure(tbl_el, logical=True)
+    keys = ("headers", "multi_header", "_column_groups")
+    if all(entry.get(k) == built.get(k) for k in keys):
+        return False
+    if apply:
+        ncols, starts = logical_column_starts(tbl_el)
+        spans = list(zip(starts, [*starts[1:], ncols]))
+        width = len(built["headers"])
+        rows = []
+        for row in entry.get("rows") or []:
+            if isinstance(row, list) and len(row) == ncols != width:
+                row = [next((str(x) for x in row[a:b] if str(x or "").strip()), "") for a, b in spans]
+            rows.append((list(row) + [""] * width)[:width] if isinstance(row, list) else row)
+        if "_column_groups" not in built:
+            entry.pop("_column_groups", None)
+        entry.update({**{k: built[k] for k in keys if k in built}, "rows": rows})
+    return True
+
+
 def parse_word_table(tbl_el: Any, caption: str) -> WordTable:
-    nrows, ncols, grid, texts, spans = _table_grid(tbl_el)
-    n_hdr = min(_header_row_count(nrows, ncols, grid, texts, spans), nrows) if nrows else 0
-    grid, texts, spans = _normalize_header_gaps(ncols, n_hdr, grid, texts, spans)
+    nrows, ncols, n_hdr, grid, texts, _spans = _normalized_grid(tbl_el)
     columns = _logical_columns(ncols, n_hdr, grid) if n_hdr else list(range(ncols))
     leaf: list[str] = []
     groups: list[str | None] = []

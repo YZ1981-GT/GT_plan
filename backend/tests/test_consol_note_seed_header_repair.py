@@ -27,6 +27,7 @@ from app.services.consol_note_headers import header_cells, multi_header_rows, no
 from app.services.note_table_header_library import column_paths, norm
 from app.services.note_word_table import (
     _header_row_count, _logical_columns, _normalize_header_gaps, _table_grid, parse_word_table, seed_multi_header,
+    seed_table_structure, sync_logical_columns,
 )
 
 DATA = Path(__file__).resolve().parents[1] / "data"
@@ -285,14 +286,51 @@ class TestWordHeaderRules:
 
 
 def test_word_sync_tool_reads_the_same_headers() -> None:
-    """Word 同步工具（长期可重跑）表头走平台同一套：修过的表重跑同步，多级表头与种子逐格相同（不会改回去）。"""
-    from scripts.seed.sync_note_templates_from_word import extract_all_word_tables
+    """Word 同步工具（长期可重跑）表头走平台同一套：修过的表重跑同步，多级表头与种子逐格相同（不会改回去）；
+    按逻辑列存的表（``LOGICAL_COLUMNS``，R8.2）按逻辑列比。"""
+    from scripts.seed.sync_note_templates_from_word import LOGICAL_COLUMNS, extract_all_word_tables
 
     by_tag = {wt["tag"]: wt for wt in extract_all_word_tables(DOCX / "listed_consolidated.docx") if wt["tag"]}
     seed = _seed("listed")
     for sid, tag in (("五-9-4", "五、9:3"), ("五-9-6", "五、9:5"), ("五-10-1", "五、10:0"), ("五-11-1", "五、11:0"),
                      ("五-62-4", "五、62:3"), ("五-18-1", "五、18:0"), ("五-11-3", "五、11:1")):
         wt = by_tag[tag]
+        logical = ("listed", sid) in LOGICAL_COLUMNS
         assert wt["n_header_rows"] == len(seed[sid]["multi_header"]), sid
-        assert wt["multi_header"] == seed[sid]["multi_header"], sid
+        assert (seed_table_structure(wt["el"], logical=True)["multi_header"] if logical else wt["multi_header"]) \
+            == seed[sid]["multi_header"], sid
+        if logical:
+            assert sync_logical_columns(dict(seed[sid]), wt["el"], apply=False) is False, sid  # 已按逻辑列存：无可写
     assert by_tag["九、1:26"]["n_header_rows"] == 1 and by_tag["九、1:26"]["multi_header"] is None
+
+
+def test_sync_logical_columns_folds_grid_rows() -> None:
+    """网格列宽的种子行折成逻辑列（R8.2）：每个逻辑列取所覆盖网格列里第一个有字的格（``_data_row`` 同一规则），
+    上市 五-11-1 的勾稽字母注记随「期末账面价值」列走；只比不写时不动条目；折完再比 ⇒ 无可写。"""
+    el = _locate("listed", "五、11:0")
+    grid_entry = seed_table_structure(el)  # 按网格 9 列（折之前的种子形态）
+    assert len(grid_entry["headers"]) == 9
+    grid_entry["rows"][1][2] = "7"  # 期末账面余额的第二个网格列
+    before = json.dumps(grid_entry, ensure_ascii=False)
+    assert sync_logical_columns(grid_entry, el, apply=False) is True and json.dumps(grid_entry, ensure_ascii=False) == before
+    assert sync_logical_columns(grid_entry, el) is True
+    assert grid_entry["headers"] == _seed("listed")["五-11-1"]["headers"]
+    assert grid_entry["multi_header"] == _seed("listed")["五-11-1"]["multi_header"]
+    assert grid_entry["rows"][0][3] == "A" and grid_entry["rows"][1][1] == "7" and {len(r) for r in grid_entry["rows"]} == {7}
+    assert sync_logical_columns(grid_entry, el) is False
+
+
+def test_logical_structure_of_single_header_table_takes_first_filled_cell() -> None:
+    """单行表头：表头一格横跨两个网格列 ⇒ 并为一列；数据行这两格拆开时取第一个有字的格；没有分组 ⇒ 删掉种子里旧的分组。"""
+    t = Document().add_table(rows=3, cols=4)
+    t.cell(0, 1).merge(t.cell(0, 2))
+    for (r, c), text in {(0, 0): "项目", (0, 1): "期末余额", (0, 3): "上年年末余额",
+                         (1, 0): "甲", (1, 2): "5", (1, 3): "6", (2, 0): "合计", (2, 1): "5"}.items():
+        t.cell(r, c).text = text
+    built = seed_table_structure(t._tbl, logical=True)
+    assert built["headers"] == ["项目", "期末余额", "上年年末余额"] and built["multi_header"] is None
+    assert built["rows"] == [["甲", "5", "6"], ["合计", "5", ""]]
+    entry = {"headers": ["项目", "期末余额", "期末余额", "上年年末余额"], "_column_groups": [{"group": "x", "start": 1, "span": 2}],
+             "rows": [["甲", "", "5", "6"]]}
+    assert sync_logical_columns(entry, t._tbl) is True
+    assert "_column_groups" not in entry and entry["rows"] == [["甲", "5", "6"]] and entry["headers"] == built["headers"]
