@@ -212,6 +212,30 @@ class TestMatchColumns:
         assert m.col_map == {1: (0, 1), 2: (0, 2), 3: (0, 3)}
         assert m.rules == {1: "reverse_prefix", 2: "period_only", 3: "period_only"}
 
+    def test_period_only_requires_the_same_item(self):
+        """「只写了期间」对上的两列要是同一项（R7.7）：国企 五-50-2「期初余额」曾对到单体应付债券表的「年初应付利息」，
+        上市 五-12-2「期末余额/面值」对到单体「期末余额」，都是另一项。余额 / 净额 / 只是「金额（万元）」照对；「…金额」
+        （实收资本「年初余额/投资金额」）只在它那张表没有纯期间金额列时对。"""
+        label = L.ColumnKey(0, (), None, (), "label")
+        bare = [label, self._k(1, "prior")]
+
+        def with_pure(*measure):  # 写了计量的列 + 同表一列纯期间余额
+            return [[label, self._k(1, "prior", *measure), self._k(2, "end")]]
+
+        for measure in (("应付利息",), ("面值",), ("美元",)):  # 单位只认括号注记 / 整段
+            assert M.match_columns(bare, [[label, self._k(1, "prior", *measure)]]).col_map == {}, measure
+        for measure in (("账面价值",), ("公允价值",), ("账面余额", "金额"), ("金额(万元)",), ("金额(单位:元)",), ("万元",)):
+            m = M.match_columns(bare, with_pure(*measure))
+            assert m.col_map == {1: (0, 1)} and m.rules == {1: "period_only"}, measure
+        # 「…金额 / …余额」且它那张表没有纯期间金额列（没写期间的金额列不算）⇒ 是该项目的金额
+        for measured in ([self._k(1, "prior", "投资金额")], [self._k(1, "prior", "少数股东权益余额")],
+                         [self._k(1, "prior", "投资金额"), self._k(2, None)]):
+            m = M.match_columns([label, *measured], [bare])
+            assert m.col_map == {1: (0, 1)} and m.rules == {1: "period_only"}, measured
+        assert M.match_columns(bare, with_pure("转回金额")).col_map == {}  # 同表另有纯期间余额 ⇒ 另一项
+        # 方向对称：写了计量的是目标表、目标表另有纯期间列 ⇒ 不对
+        assert M.match_columns([label, self._k(1, "prior", "转回金额"), self._k(2, "end")], [bare]).col_map == {}
+
     def test_period_only_needs_a_single_candidate(self):
         label = L.ColumnKey(0, (), None, (), "label")
         target = [label, self._k(1, "end")]

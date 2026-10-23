@@ -101,10 +101,23 @@ def test_mapping_agrees_with_runtime_choice(catalog, std):
 #: 2026-10-23 R7.7 只写「金额」的无键金额列计入取数列并按表头文字对（国企分母 +7、对上 +6，五-54-5 单体表头与 Word 不符
 #:   对不上；上市 +4 / +4），上市 6 张表头占位列按单体模板实例化（对上 +8）：口径变了，国企 0.9031→0.9027（对上 606→612），
 #:   上市 0.9103→0.9261（R7.8 上市 五-10 改号后 0.9103）；对上列数一并钉住，分母口径再变也不会把退步藏在比例里。
+#: 2026-10-23 R7.7 收尾复核：「只写了期间」对上的两列须是同一项，去掉 3 处错配（国企 五-50-2「期初余额」↔ 单体「年初应付利息」、
+#:   上市 五-12-2 两列「面值」↔ 单体「期末余额 / 上年年末余额」）；上市 五-19-2 表名按单体模板改回「期末其他权益工具投资情况」
+#:   后选中同表（对上 1→4）：国企 0.9027→0.9012（对上 612→611）、上市 0.9261→0.9272（对上 814→815）。
 _RATCHET = {
-    "soe": {"coverage": 0.9027, "matched": 612, "none": 11},
-    "listed": {"coverage": 0.9261, "matched": 814, "none": 26},
+    "soe": {"coverage": 0.9012, "matched": 611, "none": 11},
+    "listed": {"coverage": 0.9272, "matched": 815, "none": 26},
 }
+
+
+def test_period_only_requires_same_item_and_listed_19_2_title(catalog):
+    """R7.7 收尾复核：「只写了期间」不把另一项（应付利息 / 面值）当成余额；上市 五-19-2 按表名选中单体同表、逐列对上。"""
+    items = {(std, i["consol"]): i for std in ("soe", "listed") for i in catalog["correspondence"][std]}
+    assert "期初余额" in items[("soe", "五-50-2")]["unmatched"]  # 单体只有「年初应付利息」，不是期初余额
+    assert {"期末余额/面值", "上年年末余额/面值"} <= set(items[("listed", "五-12-2")]["unmatched"])  # 单体只有余额没有面值
+    item = items[("listed", "五-19-2")]
+    assert item["standalone"] == "五、19#1" and item["chosen_name"] == "期末其他权益工具投资情况"
+    assert item["unmatched"] == [] and item["matched"] == item["amount_columns"] == 4
 
 
 def test_bare_amount_and_instantiated_placeholder_columns_correspond(catalog):

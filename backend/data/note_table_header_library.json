@@ -53,8 +53,8 @@
         "section_missing": 8
       },
       "amount_columns_of_chosen": 678,
-      "matched_columns": 612,
-      "coverage": 0.9027,
+      "matched_columns": 611,
+      "coverage": 0.9012,
       "mapping_disagreements": 0
     },
     "listed_correspondence": {
@@ -65,8 +65,8 @@
         "none": 26
       },
       "amount_columns_of_chosen": 879,
-      "matched_columns": 814,
-      "coverage": 0.9261,
+      "matched_columns": 815,
+      "coverage": 0.9272,
       "mapping_disagreements": 0
     },
     "anomalies": {
@@ -1245,7 +1245,7 @@
       {"id":"五-17-1","section":"五-17","name":"设定受益计划净资产","period":"prior","header_rows":[[["项  目",1,1],["期初余额",1,1],["本期增加",1,1],["本期减少",1,1],["期末余额",1,1]]],"columns":[["项目","§label"],["期初余额","prior|"],["本期增加","cur|增加"],["本期减少","cur|减少"],["期末余额","end|"]]},
       {"id":"五-18-1","section":"五-18","name":"长期股权投资","period":"prior","header_rows":[[["被投资单位",1,2],["期初余额（账面价值）",1,2],["减值准备期初余额",1,2],["本期增减变动",8,1],["期末余额（账面价值）",1,2],["减值准备期末余额",1,2]],[["追加/新增投资",1,1],["减少投资",1,1],["权益法下确认的投资损益",1,1],["其他综合收益调整",1,1],["其他权益变动",1,1],["宣告发放现金股利或利润",1,1],["计提减值准备",1,1],["其他",1,1]]],"columns":[["被投资单位","§label"],["期初余额(账面价值)","prior|账面价值"],["减值准备期初余额","prior|减值准备"],["本期增减变动/追加/新增投资","cur|增减变动/追加/新增投资"],["本期增减变动/减少投资","cur|增减变动/减少投资"],["本期增减变动/权益法下确认的投资损益","cur|增减变动/权益法下确认的投资损益"],["本期增减变动/其他综合收益调整","cur|增减变动/其他综合收益调整"],["本期增减变动/其他权益变动","cur|增减变动/其他权益变动"],["本期增减变动/宣告发放现金股利或利润","cur|增减变动/宣告发放现金股利或利润"],["本期增减变动/计提减值准备","cur|增减变动/计提减值准备"],["本期增减变动/其他","cur|增减变动/其他"],["期末余额(账面价值)","end|账面价值"],["减值准备期末余额","end|减值准备"]]},
       {"id":"五-19-1","section":"五-19","name":"（15号文第十九条（九）分项列示其他权益工具投资期初余额、期末余额、本期计入其他综合收益的利得和损失、本期末累计计入其他综合收益的利得和损失、本期确认的股利收入以及指定为以公允价值计量且其变动计入其他综合收益的原因。本期存在终止确认的，应分项披露终止确认的原因，以及因终止确认转入留存收益的累计利得和损失。）","period":"end","header_rows":[[["项  目",1,1],["期末余额",1,1],["上年年末余额",1,1]]],"columns":[["项目","§label"],["期末余额","end|"],["上年年末余额","prior|"]]},
-      {"id":"五-19-2","section":"五-19","name":"其他权益工具投资","period":"cur","header_rows":[[["项  目",1,1],["本期计入其他综合收益的利得和损失",1,1],["本期末累计计入其他综合收益的利得和损失",1,1],["本期确认的股利收入",1,1],["因终止确认转入留存收益的累计利得和损失",1,1],["终止确认的原因",1,1]]],"columns":[["项目","§label"],["本期计入其他综合收益的利得和损失","cur|计入其他综合收益的利得和损失"],["本期末累计计入其他综合收益的利得和损失","end|累计计入其他综合收益的利得和损失"],["本期确认的股利收入","cur|确认的股利收入"],["因终止确认转入留存收益的累计利得和损失","-|因终止确认转入留存收益的累计利得和损失"],["终止确认的原因","-|终止确认的原因|text"]]},
+      {"id":"五-19-2","section":"五-19","name":"期末其他权益工具投资情况","period":"cur","header_rows":[[["项  目",1,1],["本期计入其他综合收益的利得和损失",1,1],["本期末累计计入其他综合收益的利得和损失",1,1],["本期确认的股利收入",1,1],["因终止确认转入留存收益的累计利得和损失",1,1],["终止确认的原因",1,1]]],"columns":[["项目","§label"],["本期计入其他综合收益的利得和损失","cur|计入其他综合收益的利得和损失"],["本期末累计计入其他综合收益的利得和损失","end|累计计入其他综合收益的利得和损失"],["本期确认的股利收入","cur|确认的股利收入"],["因终止确认转入留存收益的累计利得和损失","-|因终止确认转入留存收益的累计利得和损失"],["终止确认的原因","-|终止确认的原因|text"]]},
       {"id":"五-20-1","section":"五-20","name":"其他非流动金融资产","period":"end","header_rows":[[["种  类",1,1],["期末余额",1,1],["上年年末余额",1,1]]],"columns":[["种类","§label"],["期末余额","end|"],["上年年末余额","prior|"]]},
       {"id":"五-21-1","section":"五-21","name":"按成本计量的投资性房地产","period":null,"header_rows":[[["项  目",1,1],["房屋、建筑物",1,1],["土地使用权",1,1],["在建工程",1,1],["合计",1,1]]],"columns":[["项目","§label"],["房屋、建筑物","-|房屋、建筑物"],["土地使用权","-|土地使用权"],["在建工程","-|在建工程"],["合计","-|合计"]]},
       {"id":"五-21-2","section":"五-21","name":"（采用公允价值计量模式的投资性房地产，分类列示期初余额、期末余额和本期增减变动情况。）","period":null,"header_rows":[[["项  目",1,1],["房屋、建筑物",1,1],["土地使用权",1,1],["在建工程",1,1],["合计",1,1]]],"columns":[["项目","§label"],["房屋、建筑物","-|房屋、建筑物"],["土地使用权","-|土地使用权"],["在建工程","-|在建工程"],["合计","-|合计"]]},
@@ -1617,7 +1617,7 @@
       {"consol":"五-48-1","standalone_section":"八、48","mapping_table":"其他流动负债","amount_columns":2,"via":"name","standalone":"八、48#0","chosen_name":"其他流动负债","members":["八、48#0"],"row_members":[],"matched":2,"columns":[[1,"八、48#0",1,"exact"],[2,"八、48#0",2,"exact"]],"unmatched":[]},
       {"consol":"五-49-1","standalone_section":"八、49","mapping_table":"长期借款","amount_columns":2,"via":"name","standalone":"八、49#0","chosen_name":"长期借款","members":["八、49#0"],"row_members":[],"matched":2,"columns":[[1,"八、49#0",1,"exact"],[2,"八、49#0",3,"exact"]],"unmatched":[]},
       {"consol":"五-50-1","standalone_section":"八、50","mapping_table":"应付债券","amount_columns":2,"via":"name","standalone":"八、50#0","chosen_name":"应付债券","members":["八、50#0"],"row_members":[],"matched":2,"columns":[[1,"八、50#0",1,"exact"],[2,"八、50#0",2,"exact"]],"unmatched":[]},
-      {"consol":"五-50-2","standalone_section":"八、50","mapping_table":"应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）","amount_columns":8,"via":"name","standalone":"八、50#1","chosen_name":"应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）","members":["八、50#1"],"row_members":[],"matched":4,"columns":[[1,"八、50#1",1,"exact"],[4,"八、50#1",4,"exact"],[5,"八、50#1",5,"period_only"],[10,"八、50#1",9,"exact"]],"unmatched":["本期发行","按面值计提利息","溢折价摊销","本期偿还"]},
+      {"consol":"五-50-2","standalone_section":"八、50","mapping_table":"应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）","amount_columns":8,"via":"name","standalone":"八、50#1","chosen_name":"应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）","members":["八、50#1"],"row_members":[],"matched":3,"columns":[[1,"八、50#1",1,"exact"],[4,"八、50#1",4,"exact"],[10,"八、50#1",9,"exact"]],"unmatched":["期初余额","本期发行","按面值计提利息","溢折价摊销","本期偿还"]},
       {"consol":"五-51-1","standalone_section":"八、51","mapping_table":"期末发行在外的优先股、永续债等金融工具情况","amount_columns":3,"via":"name","standalone":"八、51#0","chosen_name":"期末发行在外的优先股、永续债等金融工具情况","members":["八、51#0"],"row_members":[],"matched":3,"columns":[[4,"八、51#0",4,"exact"],[5,"八、51#0",5,"exact"],[6,"八、51#0",6,"bare_label"]],"unmatched":[]},
       {"consol":"五-51-2","standalone_section":"八、51","mapping_table":"发行在外的优先股、永续债等金融工具变动情况","amount_columns":8,"via":"name","standalone":"八、51#1","chosen_name":"发行在外的优先股、永续债等金融工具变动情况","members":["八、51#1"],"row_members":[],"matched":0,"columns":[],"unmatched":["期初余额/数量","期初余额/账面价值","本期增加/数量","本期增加/账面价值","本期减少/数量","本期减少/账面价值","期末余额/数量","期末余额/账面价值"]},
       {"consol":"五-52-1","standalone_section":"八、52","mapping_table":"租赁负债","amount_columns":2,"via":"name","standalone":"八、52#0","chosen_name":"租赁负债","members":["八、52#0"],"row_members":[],"matched":2,"columns":[[1,"八、52#0",1,"exact"],[2,"八、52#0",2,"exact"]],"unmatched":[]},
@@ -1878,7 +1878,7 @@
       {"consol":"五-11-5","standalone_section":"五、11","mapping_table":null,"amount_columns":3,"via":"none","reason":"单体附注该章节有 5 张表，没有与「子公司A」对应的表"},
       {"consol":"五-11-6","standalone_section":"五、11","mapping_table":null,"amount_columns":3,"via":"none","reason":"单体附注该章节有 5 张表，没有与「分公司B」对应的表"},
       {"consol":"五-12-1","standalone_section":"五、12","mapping_table":"一年内到期的非流动资产","amount_columns":2,"via":"name","standalone":"五、12#0","chosen_name":"一年内到期的非流动资产","members":["五、12#0"],"row_members":[],"matched":2,"columns":[[1,"五、12#0",1,"exact"],[2,"五、12#0",2,"exact"]],"unmatched":[]},
-      {"consol":"五-12-2","standalone_section":"五、12","mapping_table":"重要的债权投资/其他债权投资","amount_columns":2,"via":"name","standalone":"五、12#1","chosen_name":"重要的债权投资/其他债权投资","members":["五、12#1"],"row_members":[],"matched":2,"columns":[[1,"五、12#1",1,"period_only"],[5,"五、12#1",2,"period_only"]],"unmatched":[]},
+      {"consol":"五-12-2","standalone_section":"五、12","mapping_table":"重要的债权投资/其他债权投资","amount_columns":2,"via":"name","standalone":"五、12#1","chosen_name":"重要的债权投资/其他债权投资","members":["五、12#1"],"row_members":[],"matched":0,"columns":[],"unmatched":["期末余额/面值","上年年末余额/面值"]},
       {"consol":"五-13-1","standalone_section":"五、13","mapping_table":"其他流动资产","amount_columns":2,"via":"name","standalone":"五、13#0","chosen_name":"其他流动资产","members":["五、13#0"],"row_members":[],"matched":2,"columns":[[1,"五、13#0",1,"exact"],[2,"五、13#0",2,"exact"]],"unmatched":[]},
       {"consol":"五-13-2","standalone_section":"五、31","mapping_table":"[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如：","amount_columns":2,"via":"name","standalone":"五、31#1","chosen_name":"[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如：","members":["五、31#1"],"row_members":[],"matched":2,"columns":[[1,"五、31#1",1,"exact"],[3,"五、31#1",2,"exact"]],"unmatched":[]},
       {"consol":"五-13-3","standalone_section":"五、13","mapping_table":null,"amount_columns":4,"via":"none","reason":"单体附注该章节有 3 张表，没有与「其他流动资产（注：根据实际情况列示；不存在的项目请删除）」对应的表"},
@@ -1924,7 +1924,7 @@
       {"consol":"五-17-1","standalone_section":"五、17","mapping_table":"设定受益计划净资产","amount_columns":4,"via":"name","standalone":"五、17#0","chosen_name":"设定受益计划净资产","members":["五、17#0"],"row_members":[],"matched":4,"columns":[[1,"五、17#0",1,"exact"],[2,"五、17#0",2,"exact"],[3,"五、17#0",3,"exact"],[4,"五、17#0",4,"exact"]],"unmatched":[]},
       {"consol":"五-18-1","standalone_section":"五、18","mapping_table":"长期股权投资","amount_columns":12,"via":"name","standalone":"五、18#0","chosen_name":"长期股权投资","members":["五、18#0"],"row_members":[],"matched":12,"columns":[[1,"五、18#0",1,"exact"],[2,"五、18#0",2,"exact"],[3,"五、18#0",3,"exact"],[4,"五、18#0",4,"exact"],[5,"五、18#0",5,"exact"],[6,"五、18#0",6,"exact"],[7,"五、18#0",7,"exact"],[8,"五、18#0",8,"exact"],[9,"五、18#0",9,"exact"],[10,"五、18#0",10,"exact"],[11,"五、18#0",11,"exact"],[12,"五、18#0",12,"exact"]],"unmatched":[]},
       {"consol":"五-19-1","standalone_section":"五、19","mapping_table":null,"amount_columns":2,"via":"none","reason":"单体附注该章节有 2 张表，没有与「（15号文第十九条（九）分项列示其他权益工具投资期初余额、期末余额、本期计入其他综合收益的利得和损失、本期末累计计入其他综合收益的利得和损失、本期确认的股利收入以及指定为以公允价值计量且其变动计入其他综合收益的原因。本期存在终止确认的，应分项披露终止确认的原因，以及因终止确认转入留存收益的累计利得和损失。）」对应的表"},
-      {"consol":"五-19-2","standalone_section":"五、19","mapping_table":"其他权益工具投资","amount_columns":4,"via":"name","standalone":"五、19#0","chosen_name":"其他权益工具投资","members":["五、19#0"],"row_members":[],"matched":1,"columns":[[2,"五、19#0",1,"period_only"]],"unmatched":["本期计入其他综合收益的利得和损失","本期确认的股利收入","因终止确认转入留存收益的累计利得和损失"]},
+      {"consol":"五-19-2","standalone_section":"五、19","mapping_table":"期末其他权益工具投资情况","amount_columns":4,"via":"name","standalone":"五、19#1","chosen_name":"期末其他权益工具投资情况","members":["五、19#1"],"row_members":[],"matched":4,"columns":[[1,"五、19#1",1,"exact"],[2,"五、19#1",2,"exact"],[3,"五、19#1",3,"exact"],[4,"五、19#1",4,"exact"]],"unmatched":[]},
       {"consol":"五-20-1","standalone_section":"五、20","mapping_table":"其他非流动金融资产","amount_columns":2,"via":"name","standalone":"五、20#0","chosen_name":"其他非流动金融资产","members":["五、20#0"],"row_members":[],"matched":2,"columns":[[1,"五、20#0",1,"exact"],[2,"五、20#0",2,"exact"]],"unmatched":[]},
       {"consol":"五-21-1","standalone_section":"五、21","mapping_table":"按成本计量的投资性房地产","amount_columns":4,"via":"name","standalone":"五、21#0","chosen_name":"按成本计量的投资性房地产","members":["五、21#0"],"row_members":[],"matched":4,"columns":[[1,"五、21#0",1,"exact"],[2,"五、21#0",2,"exact"],[3,"五、21#0",3,"exact"],[4,"五、21#0",4,"exact"]],"unmatched":[]},
       {"consol":"五-21-2","standalone_section":"五、21","mapping_table":"（采用公允价值计量模式的投资性房地产，分类列示期初余额、期末余额和本期增减变动情况。）","amount_columns":4,"via":"name","standalone":"五、21#1","chosen_name":"（采用公允价值计量模式的投资性房地产，分类列示期初余额、期末余额和本期增减变动情况。）","members":["五、21#1"],"row_members":[],"matched":4,"columns":[[1,"五、21#1",1,"exact"],[2,"五、21#1",2,"exact"],[3,"五、21#1",3,"exact"],[4,"五、21#1",4,"exact"]],"unmatched":[]},

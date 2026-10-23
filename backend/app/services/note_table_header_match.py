@@ -8,6 +8,7 @@ spec: consol-note-header-library-and-node-reaggregate（design §5）
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import Any, Sequence
@@ -77,8 +78,39 @@ def _rule_reverse_prefix(t: ColumnKey, s: ColumnKey) -> bool:
 
 
 def _rule_period_only(t: ColumnKey, s: ColumnKey) -> bool:
-    """同期间、一侧只写了期间（合并「期末余额」↔ 单体「期末公允价值」）：靠唯一性兜底，多于一列即放弃。"""
+    """同期间、一侧只写了期间（合并「期末余额」↔ 单体「期末公允价值」）：靠唯一性兜底，多于一列即放弃；
+    最终只留两列是同一项的（``_same_item``）。"""
     return bool(t.period) and t.period == s.period and (not t.measure) != (not s.measure)
+
+
+#: 计量词末尾的金额单位注记（规范化后半角括号 / 冒号）：「金额（万元）」「金额（单位：元）」，或整段就是单位「万元」
+_UNIT_NOTE_RE = re.compile(r"\((?:单位:)?(?:万元|千元|亿元|元)\)$|^(?:单位:)?(?:万元|千元|亿元|元)$")
+
+
+#: 计量词以这些结尾 = 某项金额本身（实收资本「投资金额」），不是利息 / 面值 / 数量这类另一项
+_AMOUNT_SUFFIXES = ("金额", "余额")
+
+
+def _has_pure_amount(keys: Sequence[ColumnKey]) -> bool:
+    return any(k.kind == "amount" and k.period and not k.measure for k in keys[1:])
+
+
+def _same_item(
+    t: ColumnKey, s: ColumnKey, t_keys: Sequence[ColumnKey], s_keys: Sequence[ColumnKey], vocab: Vocabulary,
+) -> bool:
+    """「只写了期间」对上的两列是不是同一项（纯期间列 = 该项目的余额 / 发生额），R7.7：
+
+    - 写了计量的一侧去掉单位注记与「金额」这类纯余额词后什么都不剩，或是余额类（账面余额 / 公允价值）/ 净额（账面价值）⇒ 是；
+    - 是「…金额 / …余额」（实收资本「年初余额/投资金额」）且它那张表没有纯期间金额列 ⇒ 是；那张表另有纯期间金额列
+      ⇒ 余额在纯期间列里，这一列是另一项；
+    - 其余（「年初应付利息」「面值」「数量」）⇒ 不是。国企 五-50-2「期初余额」曾对到单体「年初应付利息」、上市 五-12-2
+      「期末余额/面值」对到单体「期末余额」。
+    """
+    measured, keys = (t, t_keys) if t.measure else (s, s_keys)
+    core = tuple(p for p in (_UNIT_NOTE_RE.sub("", m) for m in measured.measure) if p not in vocab.pure_remainders)
+    if not core or core in vocab.balance_measures or core in vocab.net_measures:
+        return True
+    return core[-1].endswith(_AMOUNT_SUFFIXES) and not _has_pure_amount(keys)
 
 
 def _rule_period_family(t: ColumnKey, s: ColumnKey) -> bool:
@@ -111,7 +143,8 @@ def _balance_pick(keys: Sequence[ColumnKey], vocab: Vocabulary) -> ColumnKey | N
 
 
 #: 强 → 弱；弱规则只在强规则零命中时才试；命中不唯一放弃（「只写了期间」多列时按 ``_balance_pick`` 取唯一余额列，
-#: 记作 period_balance）；同一单体列被多列认领全部放弃（都是「只写了期间」时同样按 ``_balance_pick``）。
+#: 记作 period_balance）；同一单体列被多列认领全部放弃（都是「只写了期间」时同样按 ``_balance_pick``）；
+#: 「只写了期间」单列命中最后再核两列是同一项（``_same_item``）。
 #: 无期间无计量的金额列不走这些规则，只按表头文字对（``_bare_hit``，记作 bare_label，R7.7）
 RULES = (
     ("exact", _rule_exact), ("synonym", None), ("suffix", _rule_suffix), ("prefix", _rule_prefix),
@@ -215,8 +248,12 @@ def match_columns(
             pick = _balance_pick([by_index[c] for c in cols], vocab)
             if pick is not None:
                 kept[pick.index] = "period_balance"
+    source_keys = {(pos, s.index): s for pos, s in sources}
     out = ColumnMatch(ratio=ratio, aux_matched=aux_matched)
     for c, rule in sorted(kept.items()):
+        pos = claims[c][0]
+        if rule == "period_only" and not _same_item(by_index[c], source_keys[claims[c][:2]], target, members[pos], vocab):
+            continue  # 两列不是同一项（宁缺不错）
         out.col_map[c] = claims[c][:2]
         out.rules[c] = rule
     out.unmatched = [t.index for t in target[1:] if takes_amount(t) and t.index not in out.col_map]
