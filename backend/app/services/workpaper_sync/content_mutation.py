@@ -1814,7 +1814,16 @@ class ContentMutationService:
                 f"adapter.materialize 必须返回 MaterializeResult，实得 {type(materialized)!r}"
             )
 
-        extracted = adapter.extract(artifact=output, contract=plan.contract)
+        # 骨架槽位复用退役的身份只在本次反读里豁免保留门；非空才传，
+        # 未复用路径与 Word adapter 的调用形态不变。
+        retired = tuple(getattr(materialized, "retired_row_identities", ()) or ())
+        extracted = (
+            adapter.extract(
+                artifact=output, contract=plan.contract, retired_row_identities=retired
+            )
+            if retired
+            else adapter.extract(artifact=output, contract=plan.contract)
+        )
         self._assert_roundtrip_equivalent(
             intended=projection, extracted=extracted, contract=plan.contract
         )
@@ -2256,7 +2265,17 @@ class ContentMutationService:
         room = await self._repo.lock_room(plan.room_id)
         # server last-applied：每次成功应用都推进（AC 2.9 前半句）。
         room.last_applied_version_id = version_id
-        if requires_refresh and RoomState(room.state) is not RoomState.refresh_required:
+        from app.services.workpaper_sync.rooms import room_generation_is_retired
+
+        # 终态 room（文档服务器已最终保存这一代 key ⇒ closed；或已 superseded）上没有在线
+        # 编辑器需要重载，下次进入必然换代（spec writeback-followup-issue-closure D2）。
+        # 不跳过的话 `closed → refresh_required` 是非法边 ⇒ 关闭之后的 retry / 重驱全部
+        # 在提交前最后一步失败。`requires_refresh` 照旧返回：application 终态语义不变。
+        if (
+            requires_refresh
+            and RoomState(room.state) is not RoomState.refresh_required
+            and not room_generation_is_retired(room)
+        ):
             # 走登记的状态边而不是裸赋值：非法边（如 closed → refresh_required）必须抛。
             assert_transition("room", room.state, RoomState.refresh_required)
             room.state = RoomState.refresh_required.value

@@ -7,15 +7,42 @@ spec: consol-note-detail-template-and-mapping（consol-note-pull-from-standalone
 """
 from __future__ import annotations
 
+import json
 from difflib import SequenceMatcher
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 _LABEL_WS = str.maketrans("", "", " \t\r\n\u3000")
 
 
 def _label_key(label: Any) -> str:
-    """行名比较键：去掉全部空白（模板「合  计」与来源「合计」是同一行）。"""
-    return str(label or "").translate(_LABEL_WS)
+    """行名比较键：去全部空白 + 去尾冒号（模板「合  计」与来源「合计」、「小计：」与「小计」是同一行）。"""
+    s = str(label or "").translate(_LABEL_WS)
+    return s.rstrip(":").rstrip("：")
+
+
+# ── 全局行名别名库 ──
+
+_ALIASES_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "note_row_label_aliases.json"
+
+
+@lru_cache(maxsize=1)
+def _load_global_aliases() -> dict[str, str]:
+    """加载全局别名库，返回 {变体归一键 → 标准名归一键}。"""
+    if not _ALIASES_PATH.exists():
+        return {}
+    raw = json.loads(_ALIASES_PATH.read_bytes())
+    index: dict[str, str] = {}
+    for entry in raw.get("aliases", []):
+        canonical = _label_key(entry.get("canonical", ""))
+        if not canonical:
+            continue
+        for v in entry.get("variants", []):
+            vk = _label_key(v)
+            if vk and vk != canonical:
+                index[vk] = canonical
+    return index
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -65,12 +92,18 @@ def suggest_template_rows(
     # 收集所有来源标签（去重保序）
     all_labels: list[str] = []
     seen: set[str] = set()
+    # V204: 同时收集来源行的 _pushed_row_id（集团下推的行）
+    label_to_pushed_rid: dict[str, str] = {}
     for group in source_groups:
         for sr in group.get("source_rows", []):
             label = sr["label"]
             if label and label not in seen:
                 all_labels.append(label)
                 seen.add(label)
+                # 来源行带 _pushed_row_id = 集团下推的行
+                rid = sr.get("_pushed_row_id") or ""
+                if rid:
+                    label_to_pushed_rid[label] = rid
 
     # 构建目标索引（按去空白的行名比较：模板「合  计」与来源「合计」是同一行）
     name_to_target: dict[str, dict[str, Any]] = {}
@@ -92,9 +125,25 @@ def suggest_template_rows(
         if sl and trid:
             history_index[sl] = trid
 
+    # 构建目标行 row_id 索引（V204: 第 0 级 row_id 精确匹配）
+    target_by_rid: dict[str, dict[str, Any]] = {}
+    for tr in template_rows:
+        trid = str(tr.get("target_row_id", "")).strip()
+        if trid:
+            target_by_rid[trid] = tr
+
     suggestions: list[dict[str, Any]] = []
     for label in all_labels:
         key = _label_key(label)
+
+        # 0. row_id 精确匹配（集团下推的行带 _pushed_row_id）
+        pushed_rid = label_to_pushed_rid.get(label, "")
+        if pushed_rid and pushed_rid in target_by_rid:
+            suggestions.append(_suggestion(
+                label, target_by_rid[pushed_rid], "exact_id", 1.0,
+            ))
+            continue
+
         # 1. 精确匹配 canonical_name
         if key in name_to_target:
             suggestions.append(_suggestion(
@@ -108,6 +157,27 @@ def suggest_template_rows(
                 label, alias_to_target[key], "alias", 0.95,
             ))
             continue
+
+        # 2.5. 全局别名库匹配（行名变体归一后找到等价的标准名）
+        global_aliases = _load_global_aliases()
+        canonical_key = global_aliases.get(key)
+        if canonical_key and canonical_key in name_to_target:
+            suggestions.append(_suggestion(
+                label, name_to_target[canonical_key], "global_alias", 0.93,
+            ))
+            continue
+        # 反向：来源用标准名、模板行用变体名
+        if key in {v for v in global_aliases.values()}:
+            for vk, ck in global_aliases.items():
+                if ck == key and vk in name_to_target:
+                    suggestions.append(_suggestion(
+                        label, name_to_target[vk], "global_alias", 0.93,
+                    ))
+                    break
+            else:
+                pass  # 没找到，继续下一级
+            if suggestions and suggestions[-1].get("match_type") == "global_alias":
+                continue
 
         # 3. 规则模板库匹配（confidence=0.92）
         if label in rule_tmpl_index:

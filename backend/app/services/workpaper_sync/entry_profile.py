@@ -48,6 +48,7 @@ CHECK 约束同域：
 from __future__ import annotations
 
 import json
+import threading
 from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
@@ -366,26 +367,56 @@ def assert_profile_consistent_with_room(profile: EntryProfile, room: RoomFacts) 
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-# @lru_cache(maxsize=1)  # temporarily disabled for manifest hot-reload
+#: 解析结果按 ``(路径, mtime_ns, size)`` 缓存（spec writeback-followup-issue-closure P4）。
+#:
+#: 清册 1.27 MB：每个同步请求（含前端 500 ms 一次的 operation 轮询）都要重新解析，一次冷注册
+#: 里 143 次（实测合计 1.2 s，全在事件循环上）。原先的 ``lru_cache`` 因「改清册要能热生效」被注释
+#: 掉；按文件状态做键两者都满足：文件一变（时间戳或大小）即重读。返回同一个对象 —— 与原
+#: ``lru_cache`` 同语义，调用方一律只读（本模块 docstring：「本模块永不写它」）。
+_MANIFEST_CACHE: dict[str, Any] = {"key": None, "payload": None}
+_MANIFEST_CACHE_LOCK = threading.Lock()
+
+
 def load_entry_manifest() -> Mapping[str, Any]:
     """只读加载 Task 1 的 manifest。本模块永不写它。"""
+    path = ENTRY_MANIFEST_PATH
     try:
-        payload = json.loads(ENTRY_MANIFEST_PATH.read_text(encoding="utf-8"))
+        stat = path.stat()
     except FileNotFoundError as exc:
         raise EntryProfileError(
-            f"入口清册缺失: {ENTRY_MANIFEST_PATH} —— 没有 source-backed manifest 时"
+            f"入口清册缺失: {path} —— 没有 source-backed manifest 时"
+            "不得注册任何 adapter"
+        ) from exc
+    key = (str(path), stat.st_mtime_ns, stat.st_size)
+    with _MANIFEST_CACHE_LOCK:
+        if _MANIFEST_CACHE["key"] == key:
+            return _MANIFEST_CACHE["payload"]
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise EntryProfileError(
+            f"入口清册缺失: {path} —— 没有 source-backed manifest 时"
             "不得注册任何 adapter"
         ) from exc
     except json.JSONDecodeError as exc:
-        raise EntryProfileError(f"入口清册不是合法 JSON: {ENTRY_MANIFEST_PATH}: {exc}") from exc
+        raise EntryProfileError(f"入口清册不是合法 JSON: {path}: {exc}") from exc
     if not isinstance(payload, dict) or not payload.get("entries"):
-        raise EntryProfileError(f"入口清册结构非法（缺 entries）: {ENTRY_MANIFEST_PATH}")
+        raise EntryProfileError(f"入口清册结构非法（缺 entries）: {path}")
+    with _MANIFEST_CACHE_LOCK:
+        _MANIFEST_CACHE["key"] = key
+        _MANIFEST_CACHE["payload"] = payload
     return payload
 
 
-# 兼容测试中的 load_entry_manifest.cache_clear() 调用
-load_entry_manifest.cache_clear = lambda: None  # no-op when cache is disabled
-load_entry_manifest.cache_info = lambda: None  # no-op
+def _clear_manifest_cache() -> None:
+    with _MANIFEST_CACHE_LOCK:
+        _MANIFEST_CACHE["key"] = None
+        _MANIFEST_CACHE["payload"] = None
+
+
+# 测试里的 load_entry_manifest.cache_clear() 调用（原 lru_cache 接口）现在真的清缓存
+load_entry_manifest.cache_clear = _clear_manifest_cache
+load_entry_manifest.cache_info = lambda: dict(_MANIFEST_CACHE)
 
 
 def manifest_entries_by_id(manifest: Mapping[str, Any] | None = None) -> dict[str, Mapping[str, Any]]:

@@ -51,7 +51,7 @@ from __future__ import annotations
 import ipaddress
 import logging
 import socket
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Final, Iterator, Mapping, Protocol, Sequence
 from urllib.parse import urlsplit, urlunsplit
@@ -594,6 +594,61 @@ class DownloadMetrics:
     content_type: str | None = None
 
 
+def _pinned_url_for(target: ResolvedTarget, address: str) -> str:
+    """把已验证地址填进下载 URL 的 netloc（path / query 原样，与 `resolve_and_verify` 同口径）。"""
+    parts = urlsplit(target.pinned_url)
+    literal = f"[{address}]" if ":" in address else address
+    return urlunsplit((target.scheme, f"{literal}:{target.port}", parts.path, parts.query, ""))
+
+
+def _open_first_reachable(
+    target: ResolvedTarget,
+    *,
+    policy: CallbackDownloadPolicy,
+    transport: CallbackDownloadTransport,
+    headers: Mapping[str, str],
+    metrics: DownloadMetrics,
+    stack: ExitStack,
+) -> DownloadResponse:
+    """按解析顺序连接**已逐个验证**的地址；只在「连不上」时换下一个。
+
+    🔴 为什么需要（2026-10-23 真栈实测）：`localhost` 先解析出 `::1`，而本机 Docker 只在
+    IPv4 上转发 OnlyOffice 的 8080 ⇒ 固定到 `[::1]:8080` 恒报 WinError 10013，平台从
+    2026-10-21 起拒收了全部 OO 保存回调（`working_paper_callback_delivery.state=rejected`），
+    在线编辑里的修改一条也没回到表单。浏览器能用是因为它对多地址自动回退。
+
+    安全口径不变：候选只取 `resolve_and_verify` 已经逐个过了 `assert_address_allowed` 的地址，
+    不重新解析（DNS rebinding 防线照旧）；拿到任何 HTTP 响应（含 3xx / 4xx）都不再换地址。
+    """
+    order = [target.pinned_address] + [
+        a for a in target.resolved_addresses if a != target.pinned_address
+    ]
+    failures: list[str] = []
+    for address in order:
+        request = DownloadRequest(
+            url=target.pinned_url if address == target.pinned_address
+            else _pinned_url_for(target, address),
+            headers=headers,
+            timeouts=policy.timeouts,
+            follow_redirects=policy.follow_redirects,
+            max_redirects=policy.max_redirects,
+        )
+        try:
+            response = stack.enter_context(transport.stream(request))
+        except DownloadTransportError as exc:
+            failures.append(f"{address}: {exc}")
+            continue
+        metrics.pinned_address = address
+        if failures:
+            logger.warning(
+                "callback 下载回退到已验证地址 %s（先前连不上：%s）", address, "；".join(failures)
+            )
+        return response
+    raise DownloadTransportError(
+        f"callback 下载传输失败：{len(order)} 个已验证地址都连不上 —— " + "；".join(failures)
+    )
+
+
 def stream_download(
     target: ResolvedTarget,
     *,
@@ -617,19 +672,15 @@ def stream_download(
         # 明确不带任何平台/用户凭证：OO 缓存 URL 自带签名，多带 Authorization 只会
         # 把长期 token 送到下载链路上（Requirement 10.7）。
     }
-    request = DownloadRequest(
-        url=target.pinned_url,
-        headers=headers,
-        timeouts=policy.timeouts,
-        follow_redirects=policy.follow_redirects,
-        max_redirects=policy.max_redirects,
-    )
-    if request.follow_redirects or request.max_redirects != 0:
+    if policy.follow_redirects or policy.max_redirects != 0:
         raise DownloadPolicyConfigError(
             "callback 下载不得跟随重定向（契约固定 follow_redirects=false / max_redirects=0）"
         )
 
-    with transport.stream(request) as response:
+    with ExitStack() as stack:
+        response = _open_first_reachable(
+            target, policy=policy, transport=transport, headers=headers, metrics=m, stack=stack
+        )
         status = int(getattr(response, "status_code", 0))
         m.status_code = status
         response_headers = getattr(response, "headers", {}) or {}
@@ -681,7 +732,10 @@ def download_to_staging(
 
     同步函数：调用方用 `asyncio.to_thread(...)` 移出事件循环（见模块 docstring §四）。
     """
-    target = resolve_and_verify(url, policy=policy, resolver=resolver)
+    from app.services.workpaper_sync import callback_download_address_hint as hint
+
+    # 上次连通的已验证地址排到首位（只重排本次已验证的地址，R7.1）
+    target = hint.prefer_last_reachable(resolve_and_verify(url, policy=policy, resolver=resolver))
     metrics = DownloadMetrics()
     staged = artifacts.stage_incoming(
         project_id=project_id,
@@ -692,6 +746,7 @@ def download_to_staging(
         ),
         document_type=document_type,
     )
+    hint.remember_reachable(target, metrics.pinned_address)
     return staged, metrics
 
 

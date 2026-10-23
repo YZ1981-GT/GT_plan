@@ -3415,24 +3415,21 @@ class TestProductionWiring:
     """**Validates: Requirements 12.1**（两个生产接线点各一条，且都过契约锁）"""
 
     def test_router_calls_the_g7_attach_on_both_paths(self) -> None:
-        source = _ROUTER.read_text(encoding="utf-8")
-        assert source.count("pilot_g7_two_level_dynamic import") == 2, source.count(
-            "pilot_g7_two_level_dynamic import"
-        )
-        assert source.count("attach_g7_pilot_adapters") == 4, source.count(
-            "attach_g7_pilot_adapters"
-        )
+        """两个生产接线点都接上本 pilot 的 attach（AST 判据，见 `router_registration_wiring_ast`）。
+
+        原判据数字符串出现次数（2 次 import、4 次名字）。spec writeback-followup-issue-closure P4
+        把 callback 一侧的冷建收进共享入口后只剩一处 import —— 次数判据量的是「写了几遍」，不是
+        「两个入口都接上了」。
+        """
+        from tests.workpaper_sync.router_registration_wiring_ast import assert_pilot_attach_wired
+
+        assert_pilot_attach_wired("attach_g7_pilot_adapters")
 
     def test_router_still_calls_the_other_three_pilot_attaches(self) -> None:
-        source = _ROUTER.read_text(encoding="utf-8")
-        for name in (
-            "pilot_simple_checklist import attach_pilot_adapters",
-            "attach_d2_pilot_adapters",
-            "attach_h1_pilot_adapters",
-        ):
-            assert name in source, name
-        assert source.count("attach_d2_pilot_adapters") >= 4
-        assert source.count("attach_h1_pilot_adapters") >= 4
+        from tests.workpaper_sync.router_registration_wiring_ast import assert_pilot_attach_wired
+
+        for name in ("attach_pilot_adapters", "attach_d2_pilot_adapters", "attach_h1_pilot_adapters"):
+            assert_pilot_attach_wired(name)
 
     def test_both_production_paths_go_through_the_contract_lock(self) -> None:
         """两个生产入口都必须经磁盘契约 ↔ 现算 payload 的双向锁。"""

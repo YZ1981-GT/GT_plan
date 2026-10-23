@@ -25,7 +25,7 @@ Requirements: 8.3, 8.5, 10.6
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -351,6 +351,7 @@ def _resolve_stable_key(
     contract: SyncContract,
     row_key: str | None,
     row_scoped_templates: set[str],
+    candidates: Callable[[str], Sequence[str]] | None = None,
 ) -> _ResolvedKey:
     """把 payload 的 stable key 归一化成域内约定的**实例化**形态。
 
@@ -403,7 +404,14 @@ def _resolve_stable_key(
     # 段级匹配要求 key 的分段数与模板一致、除占位段外逐段等值（与
     # `Projection._matches_any_template` 的比对方式对齐，两者口径统一）。
     prefix_matches: list[tuple[str, str, str]] = []
-    for template in row_scoped_templates:
+    # 段级候选（spec workpaper-sync-save-path-cpu-hotspots R2）：候选上至多一个命中时结论与
+    # 全量扫描相同；多于一个则走下面原循环（set 迭代序决定选谁，不改它）。
+    hits = (
+        None
+        if candidates is None
+        else [t for t in dict.fromkeys(candidates(key)) if _template_matches(t, key)]
+    )
+    for template in row_scoped_templates if hits is None or len(hits) > 1 else hits:
         head, _, tail = template.partition(ROW_UUID_PLACEHOLDER)
         if not _template_matches(template, key):
             continue
@@ -421,6 +429,24 @@ def _resolve_stable_key(
             "不一致 —— 二者必须指向同一行，否则三方合并会挂错行"
         )
     return _ResolvedKey(resolved_key=key, template_key=_template)
+
+
+def _row_scoped_candidates_of(contract: SyncContract) -> Callable[[str], list[str]] | None:
+    """`build_projection` 的行域模板集合同源的段级候选（R2；非候选必不匹配）。
+
+    契约没有索引（测试替身）时返回 ``None`` ⇒ `_resolve_stable_key` 走原来的全量循环。
+    """
+    candidates_of = getattr(contract, "template_candidate_indices", None)
+    if candidates_of is None:
+        return None
+    fields = contract.all_fields()
+
+    def candidates(key: str) -> list[str]:
+        return [
+            str(fields[i].stable_field_key) for i in candidates_of(key) if fields[i].row_scoped
+        ]
+
+    return candidates
 
 
 def build_projection(*, payload: Any, contract: SyncContract) -> Any:
@@ -474,6 +500,7 @@ def build_projection(*, payload: Any, contract: SyncContract) -> Any:
     row_scoped_templates = {
         str(spec.stable_field_key) for spec in contract.all_fields() if spec.row_scoped
     }
+    row_scoped_candidates = _row_scoped_candidates_of(contract)
     values: dict[str, Any] = {}
     row_keys: dict[str, list[str]] = {}
     for raw_key, raw_item in raw_values.items():
@@ -491,6 +518,7 @@ def build_projection(*, payload: Any, contract: SyncContract) -> Any:
             contract=contract,
             row_key=None if row_key is None else str(row_key),
             row_scoped_templates=row_scoped_templates,
+            candidates=row_scoped_candidates,
         )
         # 契约 spec 必须按**模板**取：`field_by_stable_key` 是等值匹配，行域字段
         # 实例化后的 key 未登记（BP-61-1 实测 `ContractSchemaError`）。

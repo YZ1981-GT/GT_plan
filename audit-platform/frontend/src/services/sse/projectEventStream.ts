@@ -14,6 +14,12 @@
  */
 import { createSSE, type SSEConnection } from '@/utils/sse'
 import { events as eventPaths } from '@/services/apiPaths'
+import { useAuthStore } from '@/stores/auth'
+import {
+  joinProjectStreamShare,
+  type ProjectStreamShare,
+  type ProjectStreamShareMessage,
+} from './projectEventStreamShare'
 
 export type ProjectEventHandler = (data: unknown, eventName: string) => void
 
@@ -40,6 +46,10 @@ interface _ProjectStream {
   errorCount: number
   everConnected: boolean
   degraded: boolean
+  /** 跨标签页共用（见 projectEventStreamShare）；null = 本标签页自己建连接。 */
+  share: ProjectStreamShare | null
+  /** 接替了先前的领导标签页：本次连上要按断线重连通知（期间可能漏事件）。 */
+  takeover: boolean
 }
 
 /** projectId → 共享流状态（模块级单例）。 */
@@ -80,6 +90,46 @@ function _dispatch(projectId: string, eventName: string, data: unknown): void {
   }
 }
 
+function _runHooks(hooks: Set<() => void>, label: string): void {
+  for (const hook of Array.from(hooks)) {
+    try {
+      hook()
+    } catch (e) {
+      console.warn(`[projectEventStream] ${label} hook error`, e)
+    }
+  }
+}
+
+function _markDegraded(st: _ProjectStream): void {
+  if (st.degraded) return
+  st.degraded = true
+  st.conn?.close()
+  st.conn = null
+  _runHooks(st.degradedHooks, 'degraded')
+}
+
+/** 当前登录用户 id（跨标签页共用的键）；拿不到 ⇒ 不共用。 */
+function _currentUserId(): string {
+  try {
+    return String(useAuthStore().userId ?? '')
+  } catch {
+    return ''
+  }
+}
+
+/** 跟随时收到领导标签页转来的消息（领导自己的消息不会回到自己）。 */
+function _onShareMessage(projectId: string, message: ProjectStreamShareMessage): void {
+  const st = _byProject.get(projectId)
+  if (!st) return
+  if (message.kind === 'event') {
+    _dispatch(projectId, message.event, message.data)
+  } else if (message.kind === 'reconnected') {
+    _runHooks(st.reconnectHooks, 'reconnect')
+  } else if (message.kind === 'degraded') {
+    _markDegraded(st)
+  }
+}
+
 /** 建立项目共享 SSE 连接（fetch-based createSSE：Authorization header，token 不入 URL）。 */
 function _ensureConnection(projectId: string): void {
   const st = _byProject.get(projectId)
@@ -94,20 +144,17 @@ function _ensureConnection(projectId: string): void {
       // 分发键 = Event_Name（不依赖 data.event_type，修复裸事件被丢弃，R2.3）
       if (!event) return
       _dispatch(projectId, event, data)
+      st.share?.publish({ kind: 'event', event, data })
     })
 
     conn.onOpen(() => {
-      if (st.everConnected) {
-        // 断线重连成功 → 通知订阅者恢复（R4.2）
-        for (const hook of Array.from(st.reconnectHooks)) {
-          try {
-            hook()
-          } catch (e) {
-            console.warn('[projectEventStream] reconnect hook error', e)
-          }
-        }
+      if (st.everConnected || st.takeover) {
+        // 断线重连成功 / 接替了别的标签页 → 通知订阅者恢复（R4.2），跟随的标签页一并恢复
+        _runHooks(st.reconnectHooks, 'reconnect')
+        st.share?.publish({ kind: 'reconnected' })
       }
       st.everConnected = true
+      st.takeover = false
       st.errorCount = 0
     })
 
@@ -115,16 +162,8 @@ function _ensureConnection(projectId: string): void {
       st.errorCount++
       // createSSE 重试上限后仍失败 → 降级 TTL-only（R4.3/R4.4；staleness 由消费者兜底约束）
       if (st.errorCount > _MAX_RECONNECT_ATTEMPTS && !st.degraded) {
-        st.degraded = true
-        st.conn?.close()
-        st.conn = null
-        for (const hook of Array.from(st.degradedHooks)) {
-          try {
-            hook()
-          } catch (e) {
-            console.warn('[projectEventStream] degraded hook error', e)
-          }
-        }
+        _markDegraded(st)
+        st.share?.publish({ kind: 'degraded' })
         console.warn(
           `[projectEventStream] 项目 ${projectId} SSE 重连失败超过 ${_MAX_RECONNECT_ATTEMPTS} 次，降级为 TTL-only（停止重试）`,
         )
@@ -159,8 +198,20 @@ export function subscribeProjectEvent(
       errorCount: 0,
       everConnected: false,
       degraded: false,
+      share: null,
+      takeover: false,
     }
     _byProject.set(projectId, st)
+    const created = st
+    // 同用户同项目的多个标签页共用一条连接（HTTP/1.1 每主机 6 连接上限，见 projectEventStreamShare）
+    created.share = joinProjectStreamShare(_currentUserId(), projectId, {
+      onLead: (takeover) => {
+        if (_byProject.get(projectId) !== created) return
+        created.takeover = takeover
+        _ensureConnection(projectId)
+      },
+      onMessage: (message) => _onShareMessage(projectId, message),
+    })
   }
 
   let set = st.listeners.get(eventName)
@@ -173,7 +224,8 @@ export function subscribeProjectEvent(
   if (options.onDegraded) st.degradedHooks.add(options.onDegraded)
   st.refCount++
 
-  if (!st.conn && !st.degraded) {
+  // 共用时由领导权回调建连接（跟随的标签页不建）；不共用才在这里直接建
+  if (!st.conn && !st.degraded && st.share === null) {
     _ensureConnection(projectId)
   }
 
@@ -194,6 +246,8 @@ export function subscribeProjectEvent(
       s.refCount--
       if (s.refCount <= 0) {
         s.conn?.close()
+        // 释放领导权（排队的下一个标签页接手）或放弃排队
+        s.share?.close()
         _byProject.delete(projectId)
       }
     },

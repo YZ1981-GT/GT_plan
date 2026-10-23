@@ -40,6 +40,15 @@
           </el-select>
         </template>
       </el-table-column>
+      <el-table-column label="类别" width="120">
+        <template #default="{ row }">
+          <el-select v-model="row.category" size="small" style="width:100px">
+            <el-option label="必填" value="required" />
+            <el-option label="可选" value="optional" />
+            <el-option label="动态行区" value="dynamic_zone" />
+          </el-select>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="120" align="center">
         <template #default="{ $index }">
           <el-button size="small" text :disabled="$index === 0" @click="moveRow($index, -1)">↑</el-button>
@@ -79,6 +88,7 @@ interface EditRow {
   _aliases_text: string
   row_type: 'data' | 'total' | 'subtotal'
   sort_order: number
+  category: 'required' | 'optional' | 'dynamic_zone'
 }
 
 const props = defineProps<{
@@ -122,11 +132,12 @@ function toEditRow(r: DetailTemplateRow): EditRow {
     _aliases_text: (r.aliases || []).join(', '),
     row_type: r.row_type || 'data',
     sort_order: r.sort_order || 0,
+    category: (r as any).category || 'required',
   }
 }
 
 function emptyRow(): EditRow {
-  return { target_row_id: '', canonical_name: '', _aliases_text: '', row_type: 'data', sort_order: editRows.value.length * 10 }
+  return { target_row_id: '', canonical_name: '', _aliases_text: '', row_type: 'data', sort_order: editRows.value.length * 10, category: 'required' }
 }
 
 function addRow() {
@@ -188,17 +199,18 @@ async function removeRow(idx: number) {
 function toApiRows(): Array<Partial<DetailTemplateRow>> {
   return editRows.value.map((r, i) => ({
     target_row_id: r.target_row_id || undefined,
-    canonical_name: r.canonical_name.trim(),
+    canonical_name: r.category === 'dynamic_zone' ? '' : r.canonical_name.trim(),
     aliases: r._aliases_text.split(/[,，]/).map(s => s.trim()).filter(Boolean),
     sort_order: i * 10,
     row_type: r.row_type,
+    category: r.category,
   }))
 }
 
 async function handleSave() {
   const rows = toApiRows()
-  if (rows.some(r => !r.canonical_name)) {
-    ElMessage.warning('所有行的规范名称不能为空')
+  if (rows.some(r => !r.canonical_name && (r as any).category !== 'dynamic_zone')) {
+    ElMessage.warning('所有行的规范名称不能为空（动态行区除外）')
     return
   }
   saving.value = true

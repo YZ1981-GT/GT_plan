@@ -119,8 +119,10 @@ from app.services.workpaper_sync.models import (
     IdempotencyConflictError,
 )
 from app.services.workpaper_sync.oo_to_html import (
+    ApplicationTerminalStaleError,
     OoToHtmlCoordinator,
     OoToHtmlResult,
+    ReapplyForbiddenError,
 )
 from app.services.workpaper_sync.materialize_reuse_verdict import (
     REUSE_METRIC,
@@ -128,6 +130,7 @@ from app.services.workpaper_sync.materialize_reuse_verdict import (
     single_pass_decline_scope,
 )
 from app.services.workpaper_sync.metrics import sync_metrics
+from app.services.workpaper_sync.callback_room_close import close_room_if_docserver_saved
 from app.services.workpaper_sync.recovery_case_listing import load_recovery_cases
 from app.services.workpaper_sync.repository import WorkpaperSyncRepository
 from app.services.workpaper_sync.request_application import RequestApplicationService
@@ -723,8 +726,19 @@ async def _attach_pilot_adapters(
         #    放在锁内：并发首请求若先拿到锁，同样不会在循环上首算。首算失败不在这里报 —— 原调用点
         #    会以原错误 fail closed（见 `warm_source_fact_caches` docstring）。
         from app.services.workpaper_sync.entry_source_facts import warm_source_fact_caches
+        from app.services.workpaper_sync.registration_template_warmup import (
+            provider_modules_for,
+            supplied_entry_ids,
+            warm_template_structure_hashes,
+        )
 
         await asyncio.to_thread(warm_source_fact_caches)
+        # 同理（spec writeback-followup-issue-closure P4）：各 attach 在循环上算模板结构 hash
+        # （整册解析，冷注册 36 份合计 15~19 s）。先在工作线程按同一组 provider 算好进内容寻址记忆。
+        await asyncio.to_thread(
+            warm_template_structure_hashes,
+            provider_modules_for(svc.registry, await supplied_entry_ids(svc.session)),
+        )
 
         explicit = await _isolated_pilot_attach(
             svc,
@@ -2903,10 +2917,12 @@ async def post_room_onlyoffice_callback(
     await _record_callback_metrics(db, room_id=room_id, outcome=outcome)
     if outcome.response_error != 0:
         return {"error": int(outcome.response_error)}
-    if outcome.application_id is None or outcome.operation_id is None:
-        # durable 但未归组（unmatched/ambiguous）⇒ recovery case 已建，三实体保持为 0。
-        return {"error": 0}
-    await _apply_durable_incoming(db, outcome=outcome)
+    if outcome.application_id is not None and outcome.operation_id is not None:
+        await _apply_durable_incoming(db, outcome=outcome)
+    # 否则：durable 但未归组（unmatched/ambiguous）⇒ recovery case 已建，三实体保持为 0；
+    # 或无内容 status（1/4）。最终保存（status 2）回 0 后文档服务器已作废这一代 doc key ⇒
+    # 关闭 room，下次进入换代（spec writeback-followup-issue-closure D1；放在 apply 之后）。
+    await close_room_if_docserver_saved(db, room_id=room_id, delivery_id=outcome.delivery_id)
     return {"error": 0}
 
 
@@ -2964,8 +2980,10 @@ async def _record_callback_metrics(
         )
 
 
-async def _apply_durable_incoming(db: AsyncSession, *, outcome: Any) -> None:
+async def _apply_durable_incoming(db: AsyncSession, *, outcome: Any, attempt: int = 1) -> None:
     """durable incoming → merged projection（Task 26 的**生产调用点**）。
+
+    `attempt>1` 是后台重驱（`oo_apply_redrive_worker`，R3.2）：同一入口、同一 operation timeline。
 
     这是 `oo_to_html.OoToHtmlCoordinator.apply_durable_incoming` 的第一条生产调用链：
     callback → delivery（durable + correlate）→ 本函数 → coordinator。Task 26 落地时
@@ -2991,42 +3009,23 @@ async def _apply_durable_incoming(db: AsyncSession, *, outcome: Any) -> None:
         return
     registry = build_production_registry()
     from app.services.workpaper_sync.adapters.registry import RegistryError
-    from app.services.workpaper_sync.pilot_d2_large_json import (
-        attach_pilot_adapters as attach_d2_pilot_adapters,
-    )
-    from app.services.workpaper_sync.pilot_h1_grouped_dynamic import (
-        attach_pilot_adapters as attach_h1_pilot_adapters,
-    )
-    from app.services.workpaper_sync.pilot_simple_checklist import attach_pilot_adapters
-    from app.services.workpaper_sync.pilot_g7_two_level_dynamic import (
-        attach_pilot_adapters as attach_g7_pilot_adapters,
-    )
 
     # 🔴 R16（2026-10-11 实测）：此处原先**每次** callback 都冷建整套注册（4 条 pilot +
     # 186 条 entry，30s+），于是用户点「保存并回到表单模式」后 operation 要 ~39s 才 applied
     # （重药安徽 application 688cf11d：durable 06:41:24.958 → finished 06:42:03.766）。
-    # 注册结果与端点路径同源同指纹，先查 ROI-0 缓存（命中即原样重放，`register()` 判据照跑）；
-    # 未命中才走下面原样的冷建。命中与否都不影响 adapter 绑定：随后一律按本底稿现绑（R14）。
+    #
+    # 注册与端点走**同一个**入口 `_attach_pilot_adapters`（spec writeback-followup-issue-closure
+    # P4）：命中 ROI-0 缓存即原样重放（`register()` 判据照跑）；未命中时拿同一把冷建锁、在锁内重查、
+    # 建完写回缓存、四条 pilot 逐条隔离。原先这里自带一份冷建：不拿锁、不写缓存 ⇒ 启动预热期间
+    # 到达的回调与预热各冷建一遍（实测一次回调 95.7 s），且一条 pilot 契约漂移就让所有 entry 的
+    # 回写 apply 落空（`_isolated_pilot_attach` 修过的同一问题，这里没跟上）。
+    # 命中与否都不影响 adapter 绑定：随后一律按本底稿现绑（R14）。
     #
     # 注册阶段与绑定一起放进下面的 try：incoming 已 durable，注册 / 重放抛的域异常同样只能
     # 留在 operation 上等用户 retry（本函数 docstring「失败不上抛」），不得冒成 500 让 OO 丢件。
     warm = _RegistrationWarmupContext(session=db, registry=registry)
     try:
-        cached = _REGISTRATION_CACHE.get(await _registration_state_fingerprint(warm))
-        if cached is not None:
-            _replay_cached_registrations(warm, cached)
-        else:
-            # Task 40 的第二个生产接线点：callback 之后的 apply 也必须能解析到 pilot adapter，
-            # 否则「HTML 侧能开 OO、OO 回写却找不到 adapter」会形成半接线。
-            await attach_pilot_adapters(registry, session=db)
-            # Task 41：D2 pilot 各自一条（同上，不复用别的 pilot 的 attach/契约）。
-            await attach_d2_pilot_adapters(registry, session=db)
-            # Task 42：H1 pilot 各自一条（同上）。
-            await attach_h1_pilot_adapters(registry, session=db)
-            # Task 43：G7 pilot 各自一条（同上）。
-            await attach_g7_pilot_adapters(registry, session=db)
-            # Task 75 追加（只加不动）：manifest 驱动的注册，覆盖全部 entry 并留显式原因。
-            await registry.register_from_manifest(session=db)
+        await _attach_pilot_adapters(warm)
 
         # 🔴 R14：apply 用的 adapter 必须绑在**本 application 所在底稿**的 current
         # representation 上（三方 extract 的 base/current/incoming 都按它的行身份清册比对），
@@ -3044,6 +3043,7 @@ async def _apply_durable_incoming(db: AsyncSession, *, outcome: Any) -> None:
             app_row.entry_id,
             getattr(exc, "error_code", type(exc).__name__),
         )
+        await _record_callback_apply_failure(db, outcome=outcome, exc=exc, stage="registry")
         return
     repo = WorkpaperSyncRepository(db)
     artifacts = CanonicalArtifactRepository(BACKEND_ROOT)
@@ -3073,16 +3073,29 @@ async def _apply_durable_incoming(db: AsyncSession, *, outcome: Any) -> None:
         )
     ).scalar_one_or_none()
     started = time.monotonic()
-    with timing_scope("oo_to_html_apply", wp=app_row.wp_id, entry=app_row.entry_id):
-        result = await coordinator.apply_durable_incoming(
-            operation_id=outcome.operation_id,
-            declared_project_id=app_row.project_id,
-            declared_wp_id=app_row.wp_id,
-            declared_entry_id=str(app_row.entry_id),
-            adapter=registration.adapter,
-            contract=registration.contract,
-            attempt=1,
+    try:
+        with timing_scope("oo_to_html_apply", wp=app_row.wp_id, entry=app_row.entry_id):
+            result = await coordinator.apply_durable_incoming(
+                operation_id=outcome.operation_id,
+                declared_project_id=app_row.project_id,
+                declared_wp_id=app_row.wp_id,
+                declared_entry_id=str(app_row.entry_id),
+                adapter=registration.adapter,
+                contract=registration.contract,
+                attempt=attempt,
+            )
+    except (ReapplyForbiddenError, ApplicationTerminalStaleError) as exc:
+        # 文档服务器重发了已处理过的回调（同一 incoming 再来一次）：application 已应用过 /
+        # 已作废，没有可做的事。原先冒成 HTTP 500 ⇒ 文档服务器按失败反复重投（R3.3）。
+        await db.rollback()
+        logger.info(
+            "callback 重投：application %s 已是终态（%s），不再 apply", app_row.id, exc.error_code
         )
+        return
+    except Exception as exc:  # noqa: BLE001 — durable 之后只能回 0，失败留在 operation 上
+        logger.exception("callback 后 apply 在协调器接手前失败 application=%s", app_row.id)
+        await _record_callback_apply_failure(db, outcome=outcome, exc=exc, stage="pre_apply")
+        return
     labels = {
         "room_id": app_row.room_id,
         "generation": int(app_row.generation),
@@ -3129,6 +3142,33 @@ async def _apply_durable_incoming(db: AsyncSession, *, outcome: Any) -> None:
                 landed=True,
                 **labels,
             )
+
+
+async def _record_callback_apply_failure(
+    db: AsyncSession, *, outcome: Any, exc: BaseException, stage: str
+) -> None:
+    """协调器接手前的失败写到 application / operation 上（R3.4，见 `callback_apply_failure`）。
+
+    记录本身失败也只打日志：incoming 已 durable，回调必须回 0。
+    """
+    from app.services.workpaper_sync.callback_apply_failure import record_pre_apply_failure
+
+    try:
+        await db.rollback()
+        await record_pre_apply_failure(
+            db,
+            application_id=outcome.application_id,
+            operation_id=outcome.operation_id,
+            error_code=str(getattr(exc, "error_code", None) or type(exc).__name__),
+            stage=stage,
+            detail=f"{type(exc).__name__}: {exc}",
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("callback 后 apply 的失败没能记到 operation %s 上", outcome.operation_id)
+        try:
+            await db.rollback()
+        except Exception:  # noqa: BLE001 — 连接已坏也只能回 0，不得冒成 500 让文档服务器重投
+            logger.debug("记录失败后的 rollback 也失败", exc_info=True)
 
 
 class _ServiceScopeVisibilityProbe:

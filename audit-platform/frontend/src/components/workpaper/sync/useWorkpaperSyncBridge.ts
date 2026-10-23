@@ -757,6 +757,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     // `forcesave_frozen` 的语义（保持 OO、允许重试）。具体原因走 `lastError`，
     // 它在 `feedback` 里优先级最高，用户看到的是人话而不是笼统的「未被受理」。
     if (accepted.callbackExpected === false) {
+      if (accepted.csOutcome === 'no_changes') dirty.value = false // CS 权威：无可存改动
       apply('forcesave_dispatch_failed')
       lastError.value = describeBridgeFailure('forcesave_dispatch', {
         response: {
@@ -772,6 +773,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
       return
     }
     apply('forcesave_command_accepted')
+    dirty.value = false // 命令已受理：回传快照含此前全部编辑；之后再改由 notifyDirty 置真
     apply('shell_tracking_started', { requestedOperationId: accepted.operationId })
     // 🔴 到此**刻意**结束：桥是被动的，不自己发定时器/不自己订 SSE。
     //    推进 `waiting_application` 的责任在宿主（`WorkpaperSyncEditorHost.vue` 用
@@ -1512,8 +1514,10 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     dirty.value = false
   }
 
+  /** OO `onDocumentStateChange`：只认 true。OO 的 false 只表示「已发给文档服务」（编辑后约 1 秒即翻转），照收会让
+   *  回表单走 clean close 丢编辑；清零只在命令受理 / CS `no_changes` / 会话结束（spec d2-skeleton-slot-reuse-and-writeback-speed R4）。 */
   function notifyDirty(next: boolean): void {
-    dirty.value = next === true
+    if (next === true) dirty.value = true
   }
 
   /**

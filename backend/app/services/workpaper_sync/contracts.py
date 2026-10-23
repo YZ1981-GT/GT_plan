@@ -875,6 +875,35 @@ class SyncContract:
                 f"contract {self.contract_id}: 未登记 stable_field_key {stable_key!r}"
             ) from None
 
+    def template_candidate_indices(self, key: str) -> tuple[int, ...]:
+        """可能与 ``key`` 段级匹配的模板在 :meth:`all_fields` 里的下标（升序）。
+
+        spec workpaper-sync-save-path-cpu-hotspots R2：`Projection.assert_matches_contract`、
+        `merge.ContractIndex.resolve`、`endpoint_payloads._resolve_stable_key` 原先都对每个键
+        扫一遍全部模板（D2 一次保存约 1,400 万次比较）。这里按「段数 + 占位位置 + 固定段」
+        一次建好索引，返回**超集**：段数相同、非占位段逐段相等（占位段匹配任何值，含空串）。
+        各调用方在候选上照旧跑自己的判据，结论与全量扫描相同 —— 非候选必有段数或固定段不同。
+        惰性 memoized，写法同 :meth:`_stable_key_index`（契约不可变）。
+        """
+        index = getattr(self, "_template_shape_index_cache", None)
+        if index is None:
+            index = {}
+            for position, field in enumerate(self.all_fields()):
+                segments = field.stable_field_key.split("/")
+                wild = tuple(i for i, s in enumerate(segments) if s == ROW_UUID_PLACEHOLDER)
+                fixed = tuple(s for i, s in enumerate(segments) if i not in wild)
+                index.setdefault(len(segments), {}).setdefault(wild, {}).setdefault(
+                    fixed, []
+                ).append(position)
+            object.__setattr__(self, "_template_shape_index_cache", index)
+        segments = key.split("/")
+        found: list[int] = []
+        for wild, by_fixed in index.get(len(segments), {}).items():
+            hit = by_fixed.get(tuple(s for i, s in enumerate(segments) if i not in wild))
+            if hit:
+                found.extend(hit)
+        return tuple(sorted(found))
+
     def editable_field_keys(self) -> tuple[str, ...]:
         return tuple(
             field.stable_field_key

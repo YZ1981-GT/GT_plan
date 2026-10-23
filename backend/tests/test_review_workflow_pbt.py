@@ -80,3 +80,15 @@ def test_template_config_integrity():
         for item in tmpl["items"]:
             assert "seq" in item
             assert "content" in item
+
+
+def test_a_only_template_matches_a_subcategory():
+    """项目存的是 A1~A8 子分类：A 类专属模板按主分类前缀判断（原先按完整代码比「A」，A 类项目全部漏掉）。"""
+    svc = ReviewWorkflowService(AsyncMock())
+    a_only = [t for t in _load_templates()["templates"].values() if t.get("a_only")]
+    assert a_only, "复核模板里没有 A 类专属模板，本用例失去意义"
+    for tmpl in a_only:
+        hit = svc._get_template_for_role(tmpl["role"], tmpl["audit_type"], "A3")
+        assert hit is not None and hit["role"] == tmpl["role"], tmpl["code"]
+        assert svc._get_template_for_role(tmpl["role"], tmpl["audit_type"], "B1") is None or \
+            not svc._get_template_for_role(tmpl["role"], tmpl["audit_type"], "B1").get("a_only")

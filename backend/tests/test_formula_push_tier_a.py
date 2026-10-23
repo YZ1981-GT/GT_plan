@@ -620,14 +620,14 @@ class TestColumnMapConsistency:
         """损益类科目用「本期发生额」列 + trial_balance_audited_occurrence 上下文。
 
         本期发生额 = audited_amount - opening_balance（sources.py 计算字段），
-        wp_formula_eval_service 走 _OCCURRENCE_COLUMNS 分支（不在 _COLUMN_MAP 里）。
-        两个系统殊途同归：都用 audited_amount - opening_balance 求发生额。
+        wp_formula_eval_service 走派生列 ``_DERIVED_COLUMNS``（不在只许真实列的 _COLUMN_MAP 里）。
+        🔴 原先这里写「走 _OCCURRENCE_COLUMNS 分支、殊途同归」是错的：本期发生额既不在 _COLUMN_MAP 也不在
+        _OCCURRENCE_COLUMNS，回退成审定数（spec formula-fetch-followup-defect-closure R7）；值的一致性由
+        ``tests/formula_settings/test_wp_eval_period_amount.py`` 真库钉住。
         """
-        from app.services.wp_formula_eval_service import _COLUMN_MAP
-        # 本期发生额不在 _COLUMN_MAP（它走 _OCCURRENCE_COLUMNS 独立分支）
-        assert "本期发生额" not in _COLUMN_MAP, (
-            "「本期发生额」不应在 _COLUMN_MAP 中（走 _OCCURRENCE_COLUMNS 分支）"
-        )
+        from app.services.wp_formula_eval_service import _COLUMN_MAP, _DERIVED_COLUMNS
+        assert "本期发生额" not in _COLUMN_MAP, "「本期发生额」不是 trial_balance 的真实列"
+        assert _DERIVED_COLUMNS["本期发生额"] == ("audited_amount", "opening_balance")
         # 但推送的 FormulaSources 计算了它
         from app.services.formula_push.sources import FormulaSources
         assert "trial_balance_audited_occurrence" in FormulaSources._TB_CONTEXTS

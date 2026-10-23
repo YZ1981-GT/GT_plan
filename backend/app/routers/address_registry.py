@@ -10,14 +10,17 @@ POST /api/address-registry/validate — 校验公式引用有效性
 POST /api/address-registry/jump     — 获取跳转路由
 POST /api/address-registry/invalidate — 失效缓存
 """
+import asyncio
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.offloop_json import encode_object_with_chunked_array, preencoded_json_response
 from app.deps import get_current_user
 from app.services.address_registry import (
     ADDRESS_DOMAIN_ORDER, ADDRESS_REGISTRY_MAX_LIMIT,
-    address_registry, parse_uri, formula_ref_to_uri,
+    AddressEntry, address_registry, parse_uri, formula_ref_to_uri,
     uri_to_formula_ref, build_jump_route,
 )
 
@@ -43,32 +46,41 @@ async def search_addresses(
     formula-fetch-and-wp-generation-defect-closure R3.2）。原 ``total`` 是截断后的条数，看不出截断。
     """
     matched = await address_registry.match(db, project_id, year, keyword, domain, template_type)
+    # 整库可达 5 万条 / 27 MB：在工作线程里分块编码并直接返回字节（不经 jsonable_encoder，
+    # 中间件按字节拼信封）。事件循环上原先要停 1.1 s（spec writeback-followup-issue-closure R5）
+    body = await asyncio.to_thread(encode_search_payload, matched, limit)
+    return preencoded_json_response(body)
+
+
+def _search_item(e: AddressEntry) -> dict:
+    return {
+        'uri': e.uri,
+        'domain': e.domain,
+        'source': e.source,
+        'path': e.path,
+        'cell': e.cell,
+        'label': e.label,
+        'formula_ref': e.formula_ref,
+        'jump_route': e.jump_route,
+        'row_code': e.row_code,
+        'account_code': e.account_code,
+        'note_section': e.note_section,
+        'wp_code': e.wp_code,
+        'tags': e.tags,
+    }
+
+
+def encode_search_payload(matched: list[AddressEntry], limit: int) -> bytes:
+    """搜索响应的业务载荷字节（键与顺序同原 dict 返回值）。同步纯函数，由路由放进工作线程。"""
     entries = matched[:limit]
     cut = {e.domain for e in matched[limit:]}
-    return {
+    head = {
         'total': len(matched),
         'returned': len(entries),
         'truncated': len(matched) > limit,
         'truncated_domains': [d for d in ADDRESS_DOMAIN_ORDER if d in cut] + sorted(cut - set(ADDRESS_DOMAIN_ORDER)),
-        'items': [
-            {
-                'uri': e.uri,
-                'domain': e.domain,
-                'source': e.source,
-                'path': e.path,
-                'cell': e.cell,
-                'label': e.label,
-                'formula_ref': e.formula_ref,
-                'jump_route': e.jump_route,
-                'row_code': e.row_code,
-                'account_code': e.account_code,
-                'note_section': e.note_section,
-                'wp_code': e.wp_code,
-                'tags': e.tags,
-            }
-            for e in entries
-        ],
     }
+    return encode_object_with_chunked_array(head, 'items', (_search_item(e) for e in entries))
 
 
 @router.get("/stats")

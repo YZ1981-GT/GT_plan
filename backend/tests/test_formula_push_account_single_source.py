@@ -42,15 +42,11 @@ _TB_RE = re.compile(r"TB\(\s*'([^']+)'")
 KNOWN_ACCOUNT_DEVIATIONS: dict[str, tuple[tuple[str, ...], str]] = {
     "D4": (("6051",), "营业收入审定表同时推主营业务收入（6001）与其他业务收入（6051）两个锚点；"
                       "d_cycle_specs 的 D4 只给主营的兜底码，其他业务收入按科目名定位"),
-    "D5": (("1124",), "1124 是 CAS 标准科目「应收款项融资」（财会[2019]6 号新增）；d_cycle_specs 因各项目科目表与试算表"
-                      "都没有它而不给兜底码（业务事实，不是错码），推送取不到就是 0"),
     "F2": (("1402", "1403", "1405", "1408", "1461"),
            "存货按科目族推送（材料采购 / 在途物资 / 原材料 / 库存商品 / 委托加工物资 / 存货跌价准备），"
            "f_cycle_specs 只给 1401 兜底码、其余按名定位。🔴 附注合计把 1461 存货跌价准备当正数相加、1405 / 1408 "
            "在两套编码体系里含义不同 —— 待按存货类别重做（本 spec 只登记，design §9）"),
     "F5": (("6402",), "营业成本 = 主营业务成本（6401）+ 其他业务成本（6402）；f_cycle_specs 只给主营的兜底码"),
-    "K4": (("2261",), "其他流动负债没有标准科目（k_cycle_specs 不给兜底码），规则仍取 2261 —— K 循环口径另有会话在改"
-                      "（2026-10-15 起），本 spec 不动"),
     "K6": (("2245",), "持有待售资产和负债同一张底稿推资产（1481）与负债（2245）两侧；k_cycle_specs 只给资产侧兜底码"),
 }
 
@@ -77,6 +73,9 @@ CORRECTED_CODES: dict[str, tuple[str, ...]] = {
     "M9": ("4003",),               # 原 4401 其他权益工具
     "M10": ("4401",),              # 原 4501（不存在）
     "K1": ("1221", "1231-03"),     # 原 1231（按前缀含全部坏账准备）
+    # spec formula-fetch-followup-defect-closure R6.2：全库不存在的码 ⇒ 无科目声明
+    "D5": (),                      # 原 1124
+    "K4": (),                      # 原 2261
 }
 
 
@@ -182,7 +181,7 @@ def test_corrected_formula_rules_use_binding_codes():
 
 def test_no_account_bindings_have_reason_and_no_tb_or_note_main_rules():
     no_account = [code for code in supported_wp_codes() if not get_binding(code).account_prefixes]
-    assert sorted(no_account) == ["I5", "L7", "M8"]
+    assert sorted(no_account) == ["D5", "I5", "K4", "L7", "M8"]
     rules = load_rules()
     for code in no_account:
         assert getattr(get_binding(code), "no_account_reason", "").strip(), code
@@ -286,8 +285,9 @@ def test_dual_family_note_rows_merge_into_one_row(wp_code: str, codes: tuple[str
     assert len(totals) == 1 and totals[0]["ending"] == data[0]["ending"]
 
 
-def test_non_dual_family_multi_code_note_rows_unchanged():
-    """不是双族的多科目底稿（I1 原价 / 累计摊销 / 减值准备）仍按科目各出一行 + 合计行。"""
+def test_non_dual_family_multi_code_note_rows_are_not_merged():
+    """不是双族的多科目底稿（I1 原价 / 累计摊销 / 减值准备）不按双族并成一行：按四段合计各出一行，备抵按减项
+    （spec formula-fetch-followup-defect-closure R6.3；原先各码一行 + 正数合计行）。"""
     from decimal import Decimal
 
     from app.services.formula_push.bindings.balance_adj import binding_for
@@ -296,7 +296,8 @@ def test_non_dual_family_multi_code_note_rows_unchanged():
     binding._last_tb_data = {c: {"期末余额": Decimal("1"), "年初余额": Decimal("1")} for c in ("1701", "1702", "1703")}
     rule = next(r for r in load_rules() if r.rule_id == "I1.note.main")
     rows = binding.note_rows({}, "soe", rule)
-    assert len([r for r in rows if not r["is_total"]]) == 3 and len([r for r in rows if r["is_total"]]) == 1
+    assert [r["ending"] for r in rows] == [1.0, 1.0, 1.0, -1.0]
+    assert not [r for r in rows if r["is_total"]]
 
 
 def test_bindings_without_account_must_state_reason():

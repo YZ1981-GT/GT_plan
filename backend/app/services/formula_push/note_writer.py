@@ -44,6 +44,8 @@ _DATA_DIR = Path(__file__).resolve().parents[3] / "data"
 _ALIAS_PATH = _DATA_DIR / "formula_push_note_row_aliases.json"
 _ALIAS_CACHE: dict[str, list[str]] | None = None
 _ALIAS_MTIME: float = 0.0
+_REVERSE_CACHE: dict[str, str] | None = None
+_REVERSE_MTIME: float = 0.0
 
 
 def _load_aliases() -> dict[str, list[str]]:
@@ -65,13 +67,19 @@ def _load_aliases() -> dict[str, list[str]]:
 
 
 def _build_reverse_aliases() -> dict[str, str]:
-    """反向映射：别名 → 标准名。"""
+    """反向映射：别名 → 标准名。带模块级缓存，与 _ALIAS_MTIME 联动。"""
+    global _REVERSE_CACHE, _REVERSE_MTIME
     aliases = _load_aliases()
+    # mtime 未变则复用缓存
+    if _REVERSE_CACHE is not None and _REVERSE_MTIME == _ALIAS_MTIME:
+        return _REVERSE_CACHE
     reverse: dict[str, str] = {}
     for canonical, names in aliases.items():
         for name in names:
             reverse[name] = canonical
         reverse[canonical] = canonical
+    _REVERSE_CACHE = reverse
+    _REVERSE_MTIME = _ALIAS_MTIME
     return reverse
 
 _TEMPLATE_CACHE: dict[str, list[dict]] = {}
@@ -327,6 +335,24 @@ def legacy_value_keys(table: Mapping[str, Any]) -> tuple[list[str], str | None]:
             keys[hits[0]] = field
         else:
             missing.append(label)
+
+    # 六列对称结构兜底：「账面余额|减值准备|账面价值|账面余额|减值准备|账面价值」
+    # 前三列=期末，后三列=期初。取每半段的「账面价值」列作为金额列。
+    if missing and len(headers) >= 4 and len(headers) % 2 == 0:
+        half = len(headers) // 2
+        front, back = headers[:half], headers[half:]
+        if front == back:  # 对称结构
+            # 优先取「账面价值」→ 「账面余额」→ 最后一列
+            _PREFER = ("账面价值", "账面余额")
+            end_idx = next((i for i, h in enumerate(front) if h in _PREFER), half - 1)
+            prior_idx = half + next((i for i, h in enumerate(back) if h in _PREFER), half - 1)
+            if "期末" in missing:
+                keys[end_idx] = "end_amount"
+                missing = [m for m in missing if m != "期末"]
+            if "期初" in missing:
+                keys[prior_idx] = "prior_amount"
+                missing = [m for m in missing if m != "期初"]
+
     note = None if not missing else (
         f"表头里找不到唯一的「{' / '.join(missing)}」金额列（{'、'.join(h for h in headers if h)}），不按位置猜")
     return keys, note
@@ -492,6 +518,30 @@ def find_row(rows: Sequence[Any], labels: Sequence[str]) -> int | None:
                     continue
                 if row_label(row) == alias:
                     return index
+
+    # ⑤ 去科目码后缀：「固定资产_1601」→「固定资产」再走精确+包含匹配
+    #    底稿多科目 binding 的 note_label 格式为 「科目名_科目码」，附注行标签是纯中文名。
+    for label in wanted:
+        if "_" not in label:
+            continue
+        stem = label.rsplit("_", 1)[0].strip()
+        if not stem:
+            continue
+        # 精确匹配去码后的中文名
+        for index, row in enumerate(rows):
+            if row_label(row) == stem and not (isinstance(row, dict) and row.get("is_total")):
+                return index
+        # 包含匹配去码后的中文名（唯一命中）
+        candidates_stem: list[int] = []
+        for index, row in enumerate(rows):
+            if isinstance(row, dict) and row.get("is_total"):
+                continue
+            rl = row_label(row)
+            if rl and _contains_match(stem, rl):
+                candidates_stem.append(index)
+        if len(candidates_stem) == 1:
+            return candidates_stem[0]
+
     return None
 
 

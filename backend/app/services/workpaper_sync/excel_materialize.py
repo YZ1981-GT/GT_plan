@@ -132,7 +132,7 @@ from decimal import Decimal
 from enum import Enum
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Final, Mapping, Sequence, Union
+from typing import TYPE_CHECKING, Any, Callable, Final, Mapping, Sequence, Union
 
 from openpyxl.utils import column_index_from_string
 
@@ -191,6 +191,11 @@ from app.services.workpaper_sync.excel_workbook_row_change import (
 )
 from app.services.workpaper_sync.limits import SyncLimits, load_limits
 from app.services.workpaper_sync.merge import ValueNormalizationError, normalize_value
+from app.services.workpaper_sync.skeleton_slot_reuse import (
+    NO_ADOPTION,
+    plan_slot_adoption,
+    skeleton_slot_candidates,
+)
 
 #: 位移载体协议：插行 `RowShiftPlan`、删行 `RowDeletionShift`，两者**鸭子兼容**
 #: （`shift` / `unshift` / `count` / `insert_at`）。
@@ -294,9 +299,16 @@ _PART_ASPECT_PATTERNS: Final[Mapping[str, re.Pattern[str]]] = {
 #: 🔴 自闭合分支必须在前、属性段必须**惰性**（`[^>]*?`）。Task 37 的 fixture 已经实测过
 #: 贪心写法的后果：`[^>]*` 会吃掉 `s="56"/`，随后 `>.*?</c>` 从下一格开始一路吞到**下一个**
 #: `</c>`，把紧邻的隐藏 UUID 格整个吃掉。
+_CELL_SELF_TAIL: Final[str] = "(?P<selfattrs>(?:\\s[^>]*?)?)/>"
+_CELL_OPEN_TAIL: Final[str] = "(?P<attrs>(?:\\s[^>]*?)?)>(?P<body>.*?)</c>"
 _CELL_RE_TPL: Final[str] = (
-    '(?:<c r="{coord}"(?P<selfattrs>(?:\\s[^>]*?)?)/>)'
-    '|(?:<c r="{coord}"(?P<attrs>(?:\\s[^>]*?)?)>(?P<body>.*?)</c>)'
+    f'(?:<c r="{{coord}}"{_CELL_SELF_TAIL})|(?:<c r="{{coord}}"{_CELL_OPEN_TAIL})'
+)
+#: `_CELL_RE_TPL` 去掉两支共同的字面前缀 `<c r="COORD"` 后的部分（预编译一次）。
+#: 字面前缀提出来与原式等价（`AB|AC ≡ A(?:B|C)`），坐标不再进正则 ⇒ 不必逐格编译
+#: （spec workpaper-sync-save-path-cpu-hotspots R1：D2 一次保存 39,619 格 × 74 µs）。
+_CELL_TAIL_RE: Final[re.Pattern[str]] = re.compile(
+    f"(?:{_CELL_SELF_TAIL})|(?:{_CELL_OPEN_TAIL})", re.S
 )
 #: 「这个渲染结果是数值字面量吗」——决定公式格要不要带 `t="str"`。
 _NUMERIC_LITERAL_RE: Final[re.Pattern[str]] = re.compile(
@@ -715,6 +727,10 @@ class CellWriteKind(str, Enum):
     blank = "blank"
     #: **只**改缓存值，`<f>` 逐字保留（受保护公式格）。
     cached_value_only = "cached_value_only"
+    #: **只**去掉缓存值，`<f>` 逐字保留：被复用的骨架行里 projection 没给值的公式格。模板缓存的
+    #: `<v>0</v>` 不是这一行的计算结果，留着会反读成该行的值（首版发布后同 store 再开在线编辑
+    #: 判成「内容变了」）；去掉后与新插入行的公式格同形（只有 `<f>`，见 `excel_row_shift`）。
+    cached_value_cleared = "cached_value_cleared"
     #: 隐藏 UUID 列的 row identity 字面量。
     row_identity = "row_identity"
 
@@ -817,6 +833,10 @@ class MaterializePlan:
     #: ``_GT_SYNC`` 的平行清册 ``GT_MANAGED_TABLES``/``GT_TEMPLATE_IDS`` 精确定位本区的
     #: per-template footer 键，只移位该键（不动 sibling 区）。
     managed_table_name: str | None = None
+    #: 骨架槽位复用（spec d2-skeleton-slot-reuse-and-writeback-speed）：本次被 store 行占用、
+    #: 身份随之退役的模板骨架身份。写盘前冻结，随 `MaterializeResult` 流到同一次提交的
+    #: roundtrip extract，供身份保留门豁免。空 = 本次没有复用（产物与启用前逐字节相同）。
+    retired_row_identities: tuple[str, ...] = ()
 
     @property
     def field_writes(self) -> tuple[CellWrite, ...]:
@@ -831,6 +851,13 @@ class MaterializePlan:
         return tuple(w.coord for w in self.writes)
 
     def as_dict(self) -> dict[str, Any]:
+        out = self._as_dict_base()
+        if self.retired_row_identities:
+            # 只在非空时出现：未启用复用的计划 `as_dict()` 与本 spec 之前逐键相同。
+            out["retired_row_identities"] = list(self.retired_row_identities)
+        return out
+
+    def _as_dict_base(self) -> dict[str, Any]:
         return {
             "sheet_part": self.sheet_part,
             "sheet_name": self.sheet_name,
@@ -910,8 +937,16 @@ class _CellView:
 
 
 def _cell_view(xml: str, coord: str) -> _CellView | None:
-    pattern = re.compile(_CELL_RE_TPL.format(coord=re.escape(coord)), re.S)
-    found = pattern.search(xml)
+    # 等价于 `re.compile(_CELL_RE_TPL.format(coord=re.escape(coord)), re.S).search(xml)`：
+    # 任何命中都以字面前缀开头 ⇒ 依次试每一处前缀，第一处尾部也能匹配的即 search 的结果。
+    needle = f'<c r="{coord}"'
+    start = xml.find(needle)
+    found = None
+    while start != -1:
+        found = _CELL_TAIL_RE.match(xml, start + len(needle))
+        if found is not None:
+            break
+        start = xml.find(needle, start + 1)
     if found is None:
         return None
     attrs = found.group("selfattrs") or found.group("attrs") or ""
@@ -928,7 +963,7 @@ def _cell_view(xml: str, coord: str) -> _CellView | None:
         shared_ref = ref.group(1) if ref else None
     return _CellView(
         coord=coord,
-        raw=found.group(0),
+        raw=xml[start : found.end()],
         attrs=attrs,
         body=body,
         formula_text=text,
@@ -1072,6 +1107,28 @@ def _replace_cached_value(view: _CellView, value: Any, formula_text: str = "") -
     return f'<c r="{view.coord}"{attrs}>{body}</c>'
 
 
+def _clear_cached_value(view: _CellView) -> str:
+    """去掉 `<v>`（及随之过期的 `t`），`<f>` 连同 `t="shared" si=` 属性逐字保留。"""
+    body = _VALUE_RE.sub("", view.body, count=1)
+    attrs = re.sub(r'\s+t="[^"]*"', "", view.attrs)
+    return f'<c r="{view.coord}"{attrs}>{body}</c>'
+
+
+#: 只能落在**已有公式格**上的两种写入（缺格时不得凭空造公式格）。
+_FORMULA_CELL_WRITES: Final[frozenset[CellWriteKind]] = frozenset(
+    {CellWriteKind.cached_value_only, CellWriteKind.cached_value_cleared}
+)
+
+
+def _render_existing(view: _CellView, write: CellWrite) -> str:
+    """已有格的写入渲染（两条 patch 路径共用，保证逐字节等价）。"""
+    if write.kind is CellWriteKind.cached_value_only:
+        return _replace_cached_value(view, write.value, write.formula_text)
+    if write.kind is CellWriteKind.cached_value_cleared:
+        return _clear_cached_value(view)
+    return _cell_xml(coord=write.coord, style=view.style, write=write)
+
+
 def _patch_sheet_xml(xml: str, writes: Sequence[CellWrite]) -> str:
     """在 sheet XML 上定点写受管格。缺格按列序插入、缺行按行序插入。
 
@@ -1086,13 +1143,9 @@ def _patch_sheet_xml(xml: str, writes: Sequence[CellWrite]) -> str:
         row = int(row_match.group(0))
         view = _cell_view(xml, write.coord)
         if view is not None:
-            if write.kind is CellWriteKind.cached_value_only:
-                new = _replace_cached_value(view, write.value, write.formula_text)
-            else:
-                new = _cell_xml(coord=write.coord, style=view.style, write=write)
-            xml = xml.replace(view.raw, new, 1)
+            xml = xml.replace(view.raw, _render_existing(view, write), 1)
             continue
-        if write.kind is CellWriteKind.cached_value_only:
+        if write.kind in _FORMULA_CELL_WRITES:
             raise ProtectedRegionWriteError(
                 f"受保护公式格 {write.coord} 在 substrate 里不存在 —— 不得凭空造一个公式格"
                 f"（stable key {write.stable_field_key!r}）"
@@ -1126,13 +1179,9 @@ def patch_sheet_xml_indexed(xml: str, writes: Sequence[CellWrite]) -> str:
         if span is not None:
             view = index.view(write.coord)
             assert view is not None  # span 存在 ⇒ view 必成功或已 fail visible
-            if write.kind is CellWriteKind.cached_value_only:
-                new = _replace_cached_value(view, write.value, write.formula_text)
-            else:
-                new = _cell_xml(coord=write.coord, style=view.style, write=write)
-            replacements[write.coord] = (span, new)
+            replacements[write.coord] = (span, _render_existing(view, write))
             continue
-        if write.kind is CellWriteKind.cached_value_only:
+        if write.kind in _FORMULA_CELL_WRITES:
             raise ProtectedRegionWriteError(
                 f"受保护公式格 {write.coord} 在 substrate 里不存在 —— 不得凭空造一个公式格"
                 f"（stable key {write.stable_field_key!r}）"
@@ -1759,8 +1808,12 @@ def plan_managed_writes(
     substrate_formulas: Mapping[str, str],
     runtime_binding: Mapping[str, str],
     intended_formulas: Mapping[str, str] | None = None,
+    skeleton_slots: Callable[[], Mapping[int, str]] | None = None,
 ) -> MaterializePlan:
     """算出「往哪些格写什么」。纯函数：不碰磁盘、不改 `substrate_entries`。
+
+    `skeleton_slots` 是零参可调用对象，给出 substrate 上可被复用的模板骨架行（行号 → 身份，
+    见 `skeleton_slot_reuse.skeleton_slot_candidates`）；只在有 orphan 时才调用。缺省 = 不复用。
 
     静态受管区（:attr:`BindingKind.static_region`）走 :func:`_plan_static_writes` ——
     按绝对坐标直写，无 row_shift / footer 两门 / minted UUID / workbook 传播（`scan=None`）。
@@ -1805,6 +1858,19 @@ def plan_managed_writes(
 
     wanted = tuple(projection.row_keys.get(dynamic_table.table_key, ()))
     orphan = [identity for identity in wanted if identity not in row_of_identity]
+
+    # ── 6.2a 骨架槽位复用（spec d2-skeleton-slot-reuse-and-writeback-speed）──────
+    #
+    # orphan 先落进「模板原样、未被声明、位于最后一个已声明行之后」的骨架行，剩余的才插行。
+    # 不复用时插入点是 `max(行身份行号)+1` ⇒ 模板骨架原样留在上方，新企业首次打开 OO 会看到
+    # 一整段空行（D2-2 实测 12 行）。判据与理由见 `skeleton_slot_reuse` 模块 docstring。
+    adoption = NO_ADOPTION
+    if orphan and skeleton_slots is not None:
+        adoption = plan_slot_adoption(
+            candidates=skeleton_slots(), physical=physical, wanted=wanted, orphan=orphan
+        )
+        row_of_identity.update(adoption.adopted)
+        orphan = [identity for identity in orphan if identity not in adoption.adopted]
 
     # ── 6.2b 受管行收敛：substrate 有物理行、而 store 已不认领的行 ──────────
     #
@@ -2038,6 +2104,44 @@ def plan_managed_writes(
                 continue
             _emit(spec, dynamic_table, row, identity)
 
+    # ── 6.7b 被复用的骨架行：projection 没给值的可编辑格一律清空 ────────
+    #
+    # 🔴 `_emit` 对 projection 里没有的键直接返回 ⇒ 不清的话模板示例文字（序号 1~12、
+    #    「单项计提 / 客户类型组合 / 组合1…组合X」）会留在已归属 store 行的格里，反读成该行的
+    #    字段 ⇒ roundtrip `extra`（身份已声明，不在骨架豁免之列）。清空形态与 6.8b 收敛同一种
+    #    `blank`；格里本就没值的不写（不新造空格）。受保护格不动。
+    #    公式格保留 `<f>`、只去掉模板缓存的 `<v>`：否则模板的 `<v>0</v>` 反读成该行的值，
+    #    首版发布记下的 projection（无此键）与发布产物（有此键）不一致 ⇒ 同 store 再开在线
+    #    编辑恒判「内容变了」、store 指纹直通永不命中。去掉后与新插入行的公式格同形。
+    for identity, row in sorted(adoption.adopted.items(), key=lambda item: item[1]):
+        for spec in dynamic_table.fields:
+            if spec.cell is None or spec.cell.row_from != "row_identity":
+                continue
+            if spec.mode in PROTECTED_MODES and spec.mode is not FieldMode.formula:
+                continue
+            if projection.get(_instantiate(spec.stable_field_key, identity)) is not None:
+                continue
+            column = _resolve_column(spec, table=dynamic_table, region=region, binding=binding)
+            view = cell_index.view(f"{column}{row}")
+            if view is None or ("<v" not in view.body and "<is" not in view.body):
+                continue
+            if spec.mode is FieldMode.formula and not view.has_formula:
+                continue  # 契约说是公式、模板却没公式：不在这里造或清，交既有判据
+            writes.append(
+                CellWrite(
+                    coord=f"{column}{row}",
+                    kind=(
+                        CellWriteKind.cached_value_cleared
+                        if spec.mode is FieldMode.formula
+                        else CellWriteKind.blank
+                    ),
+                    value=None,
+                    stable_field_key=None,
+                    row_key=identity,
+                    mode=spec.mode,
+                )
+            )
+
     # ── 6.8a 新插入行的 row identity 必须落进隐藏 UUID 列 ──────────
     #
     # 🔴 不写的后果不是「少一列数据」而是**身份丢失**：反读时那几行的 UUID 列是空的，
@@ -2057,6 +2161,16 @@ def plan_managed_writes(
                     row_key=identity,
                 )
             )
+    # 被复用的骨架行：UUID 列的骨架身份换成 store 行身份（骨架身份由此退役，见 6.2a）。
+    for identity, row in sorted(adoption.adopted.items(), key=lambda item: item[1]):
+        writes.append(
+            CellWrite(
+                coord=f"{region.uuid_column}{row}",
+                kind=CellWriteKind.row_identity,
+                value=identity,
+                row_key=identity,
+            )
+        )
 
     for row, minted in sorted(scan.minted_by_row.items()):
         if minted not in set(wanted):
@@ -2245,6 +2359,7 @@ def plan_managed_writes(
         stale_clear_reason=stale_clear_reason,
         row_deletion=row_deletion,
         deletion_change=deletion_change,
+        retired_row_identities=adoption.retired_identities,
     )
     # ── 降级原因必须有**外部**消费方（复盘补，Requirement 9.2 / 9.6）────────────
     #
@@ -4169,7 +4284,7 @@ def apply_plan_openpyxl(
         ws = wb[plan.sheet_name]
         for write in plan.writes:
             cell = ws[write.coord]
-            if write.kind is CellWriteKind.cached_value_only:
+            if write.kind in _FORMULA_CELL_WRITES:
                 # openpyxl 不保留「公式 + 缓存值」两者 ⇒ 公式格只能保公式本体。
                 continue
             cell.value = write.value
@@ -4295,6 +4410,13 @@ def _plan_materialize_step(
         substrate_formulas=substrate_view.formula_inventory,
         runtime_binding=runtime_binding,
         intended_formulas=intended_formulas,
+        # 候选只在有 orphan 时现算（未启用的表恒为空，且不读模板）。
+        skeleton_slots=lambda: skeleton_slot_candidates(
+            contract_id=definitions.contract.contract_id,
+            table_key=binding.table_key,
+            scan=substrate_view.scan,
+            substrate_projection=substrate_view.projection,
+        ),
     )
     return MaterializePlanStep(
         binding=binding,
@@ -4456,6 +4578,7 @@ def materialize_projection(
             row_shift=plan.row_shift,
             total_formula_rows=plan.total_formula_rows,
             workbook_row_change=plan.workbook_row_change,
+            retired_row_identities=plan.retired_row_identities,
         ),
         plan=plan,
         strategy=strategy,
@@ -4778,6 +4901,7 @@ def materialize_projection_single_pass(
             row_shift=primary_step.plan.row_shift,
             total_formula_rows=primary_step.plan.total_formula_rows,
             workbook_row_change=primary_step.plan.workbook_row_change,
+            retired_row_identities=primary_step.plan.retired_row_identities,
         ),
         plan=primary_step.plan,
         strategy=primary_step.strategy,

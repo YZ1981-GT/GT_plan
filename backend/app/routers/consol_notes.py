@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -241,4 +242,84 @@ async def update_consol_note_gray(
         project_enabled=project_enabled,
         global_enabled=global_enabled,
         effective_enabled=global_enabled or project_enabled,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 集团模板下推（V204，spec: consol-note-template-push-to-subsidiaries）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class PushTemplateRequest(BaseModel):
+    """下推集团模板到子企业的请求。"""
+    template_version_id: str
+    section_ids: list[str] | None = None  # None = 全部已绑定章节
+    activate_lock: bool = True
+
+
+class PushTemplateResponse(BaseModel):
+    """下推结果。"""
+    success: bool
+    results: list[dict[str, Any]] = []
+    total_entities: int = 0
+    total_success: int = 0
+    total_failure: int = 0
+
+
+@router.post(
+    "/{project_id}/{year}/push-template",
+    response_model=PushTemplateResponse,
+)
+async def push_template_to_subsidiaries(
+    project_id: UUID,
+    year: int,
+    request: PushTemplateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(require_project_access("edit")),
+):
+    """下推集团附注模板到各子企业——在子企业附注中预生成行骨架。
+
+    合并负责人定义好集团级披露模板后，通过此端点一键推送到全部子企业。
+    固定行锁定不可删改名，可选行子企业可以取消，动态行区子企业可自行添加。
+    """
+    from app.services.consol_note_template_push_service import push_template_to_subsidiaries as push_svc
+    from app.services.consol_note_detail_template_service import get_bindings
+
+    version_id = UUID(request.template_version_id)
+
+    if request.section_ids:
+        sections = request.section_ids
+    else:
+        # 全部已绑定章节
+        bindings = await get_bindings(db, project_id)
+        sections = [b["section_id"] for b in bindings]
+        if not sections:
+            return PushTemplateResponse(success=False, results=[], total_entities=0)
+
+    all_results = []
+    total_e = total_s = total_f = 0
+
+    for sid in sections:
+        result = await push_svc(
+            db,
+            consol_project_id=project_id,
+            section_id=sid,
+            year=year,
+            template_version_id=version_id,
+            pushed_by=current_user.id if hasattr(current_user, "id") else None,
+            activate_lock=request.activate_lock,
+        )
+        all_results.append(result.to_dict())
+        total_e += result.entity_count
+        total_s += result.success_count
+        total_f += result.failure_count
+
+    await db.commit()
+
+    return PushTemplateResponse(
+        success=total_f == 0,
+        results=all_results,
+        total_entities=total_e,
+        total_success=total_s,
+        total_failure=total_f,
     )

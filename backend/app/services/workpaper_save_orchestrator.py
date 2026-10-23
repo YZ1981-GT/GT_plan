@@ -151,6 +151,8 @@ class WorkpaperSaveOrchestrator:
                 "wp_id": str(wp.id),
                 "content_revision": content_revision,
                 "trigger": trigger,
+                # 保存人：附注刷新等下游据此记 `updated_by`（R7.2），缺了只能记成系统重算
+                **({"user_id": str(user.id)} if getattr(user, "id", None) else {}),
                 **{
                     k: str(v) if isinstance(v, UUID) else v
                     for k, v in extra.items()

@@ -81,6 +81,9 @@ export interface WorkpaperSyncTrackerOptions {
   readonly onDeadline?: (elapsedMs: number) => void
 }
 
+/** 连续读失败时的轮询间隔上限（毫秒）：间隔按 2 的幂退避，封顶于此。 */
+export const POLL_BACKOFF_CAP_MS = 5000
+
 /** 去重结果。`accepted=false` 表示这条事实此前已投递过。 */
 export interface WorkpaperSyncDedupeResult {
   readonly accepted: boolean
@@ -147,7 +150,25 @@ export class WorkpaperSyncOperationTracker {
 
   private subscription: WorkpaperSyncSubscription | null = null
 
-  private timer: ReturnType<typeof setInterval> | null = null
+  /**
+   * 下一轮轮询的定时器。🔴 自调度（上一轮读回来才排下一轮），不用 `setInterval`：
+   * 固定间隔不管上一轮回没回来，后端一慢（事件循环被占、GC）请求就在后端堆积，
+   * 而 http 层的同 URL GET 去重只取消浏览器这头、后端照样把每个都算完
+   * （spec writeback-followup-issue-closure R6）。
+   */
+  private timer: ReturnType<typeof setTimeout> | null = null
+
+  /** 轮询基准间隔；`null` = 没在轮询。 */
+  private pollIntervalMs: number | null = null
+
+  /** 连续读失败次数（成功清零），决定退避后的间隔。 */
+  private consecutiveFailures = 0
+
+  /** 正在飞的那一次读；同一时刻最多一个。 */
+  private inFlight: Promise<void> | null = null
+
+  /** 飞行中又有人要读（事件 / 重连）：这次读完再补一次，不并发。 */
+  private rereadRequested = false
 
   /** 观测面：真实发出的 operation GET 次数（含初次读）。 */
   pollCount = 0
@@ -189,19 +210,53 @@ export class WorkpaperSyncOperationTracker {
     this.stopped = true
     this.subscription?.close()
     this.subscription = null
+    this.pollIntervalMs = null
     if (this.timer !== null) {
-      clearInterval(this.timer)
+      clearTimeout(this.timer)
       this.timer = null
     }
   }
 
-  /** 显式读一次并按去重键投递。 */
+  /**
+   * 显式读一次并按去重键投递。单飞：已有一次在飞时不再并发发请求，
+   * 而是等它回来后补读一次（期间再多的请求也只合并成这一次）。
+   */
   async refresh(): Promise<void> {
     if (this.stopped) return
+    if (this.inFlight !== null) {
+      this.rereadRequested = true
+      return this.inFlight
+    }
+    const current = this.readOnce()
+    this.inFlight = current
+    let failure: { error: unknown } | null = null
+    try {
+      await current
+    } catch (error) {
+      failure = { error }
+    } finally {
+      this.inFlight = null
+    }
+    // 飞行期间有人要读：补一次，结果以补读为准（补读读到的才是最新事实）。
+    if (this.rereadRequested && !this.stopped) {
+      this.rereadRequested = false
+      return this.refresh()
+    }
+    if (failure !== null) throw failure.error
+  }
+
+  private async readOnce(): Promise<void> {
     if (this.exceededDeadline()) return
     const poll = this.options.poll ?? getOperation
     this.pollCount += 1
-    const snapshot = await poll(this.options.scope, this.options.operationId)
+    let snapshot: WorkpaperSyncOperationSnapshot
+    try {
+      snapshot = await poll(this.options.scope, this.options.operationId)
+    } catch (error) {
+      this.consecutiveFailures += 1
+      throw error
+    }
+    this.consecutiveFailures = 0
     this.deliver(snapshot)
   }
 
@@ -257,13 +312,29 @@ export class WorkpaperSyncOperationTracker {
     this.startPolling(this.options.degradedPollIntervalMs ?? 5000)
   }
 
-  /** 起轮询定时器（已有则不重起 —— 降级与窗口型轮询共用同一个 timer）。 */
+  /** 起轮询（已在轮询则不重起 —— 降级与窗口型轮询共用同一条自调度链）。 */
   private startPolling(intervalMs: number): void {
-    if (this.timer !== null || this.stopped) return
-    this.timer = setInterval(() => {
+    if (this.pollIntervalMs !== null || this.stopped) return
+    this.pollIntervalMs = Math.max(250, intervalMs)
+    this.scheduleNextPoll()
+  }
+
+  /** 下一轮的间隔：成功时按基准；连续失败按 2 的幂退避，封顶 {@link POLL_BACKOFF_CAP_MS}。 */
+  nextPollDelayMs(): number {
+    const base = this.pollIntervalMs ?? 0
+    if (this.consecutiveFailures === 0) return base
+    return Math.min(POLL_BACKOFF_CAP_MS, base * 2 ** this.consecutiveFailures)
+  }
+
+  private scheduleNextPoll(): void {
+    if (this.stopped || this.pollIntervalMs === null || this.timer !== null) return
+    this.timer = setTimeout(() => {
+      this.timer = null
       // `refresh()` 里会自查 deadline 并 stop；这里吞掉 rejection，
       // 否则定时器里的 rejection 变成 unhandled（控制台红、UI 无感）。
-      void this.refresh().catch(() => {})
-    }, Math.max(250, intervalMs))
+      void this.refresh()
+        .catch(() => {})
+        .finally(() => this.scheduleNextPoll())
+    }, this.nextPollDelayMs())
   }
 }

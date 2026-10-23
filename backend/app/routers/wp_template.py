@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_role
 from app.models.core import User
 from app.models.workpaper_models import WpIndex, WorkingPaper, WpStatus, WpSourceType
 from app.models.workpaper_schemas import TemplateResponse, TemplateSetResponse
@@ -161,9 +161,9 @@ async def create_version(
 async def delete_template(
     template_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
 ):
-    """删除模板（校验无引用）"""
+    """删除模板（校验无引用）。模板库是全平台共用的，删除只许管理员。"""
     engine = TemplateEngine()
     try:
         await engine.delete_template(db=db, template_id=template_id)

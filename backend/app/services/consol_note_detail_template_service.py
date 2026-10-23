@@ -407,8 +407,12 @@ def _validate_template_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not isinstance(row, dict):
             raise TemplateServiceError(400, "INVALID_ROW", f"第 {i + 1} 行不是对象")
         canonical_name = str(row.get("canonical_name", "")).strip()
-        if not canonical_name:
+        # V204: dynamic_zone 占位行允许空名字
+        category_hint = str(row.get("category", "")).strip()
+        if not canonical_name and category_hint != "dynamic_zone":
             raise TemplateServiceError(400, "MISSING_NAME", f"第 {i + 1} 行缺少 canonical_name")
+        if not canonical_name:
+            canonical_name = "[动态行区]"
         target_row_id = str(row.get("target_row_id", "")).strip()
         if not target_row_id:
             target_row_id = str(uuid.uuid4())
@@ -430,12 +434,17 @@ def _validate_template_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             rec_codes = [str(c).strip() for c in rec_codes_raw if str(c).strip()]
             if not rec_codes:
                 rec_codes = None
+        # V204: 行类别——required（固定行）/ optional（可选行）/ dynamic_zone（动态行区占位）
+        category = str(row.get("category", "required")).strip()
+        if category not in ("required", "optional", "dynamic_zone"):
+            category = "required"
         validated.append({
             "target_row_id": target_row_id,
             "canonical_name": canonical_name,
             "aliases": aliases,
             "sort_order": sort_order,
             "row_type": row_type,
+            "category": category,
             # V200: 推荐科目码（可选，不校验格式）
             **({"recommended_account_codes": rec_codes} if rec_codes else {}),
         })

@@ -99,6 +99,9 @@ from app.services.workpaper_sync.callback_download import (
     CallbackDownloadTransport,
     download_to_staging,
 )
+from app.services.workpaper_sync.callback_reject_settlement import (
+    settle_forcesave_after_pre_durable_rejection,
+)
 from app.services.workpaper_sync.callback_route import (
     CallbackRouteClaim,
     RoomRouteFacts,
@@ -1211,6 +1214,10 @@ class CallbackDeliveryService:
             await self._repo.mark_delivery_pre_durable_failure(
                 delivery_id=delivery.id, state=DeliveryState.rejected, response_error=1
             )
+            # OO 不重投 ⇒ 绑定的强制保存不会再有回调，就地终结（否则前端永远在等、leave 恒 409）。
+            await settle_forcesave_after_pre_durable_rejection(
+                repo=self._repo, request=bound_request, shell=shell, error_code=exc.error_code
+            )
             j.record(CallbackStage.responded, f"pre_durable_rejected:{exc.error_code}")
             return CallbackHandleOutcome(
                 response_error=1,
@@ -1232,6 +1239,10 @@ class CallbackDeliveryService:
             )
             await self._repo.mark_delivery_pre_durable_failure(
                 delivery_id=delivery.id, state=DeliveryState.rejected, response_error=1
+            )
+            await settle_forcesave_after_pre_durable_rejection(
+                repo=self._repo, request=bound_request, shell=shell,
+                error_code=sealed.rejection_error_code or "callback_incoming_quarantined",
             )
             j.record(CallbackStage.responded, "quarantined")
             return CallbackHandleOutcome(

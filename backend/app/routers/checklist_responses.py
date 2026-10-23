@@ -319,6 +319,7 @@ async def batch_save_checklist_responses(
         wp_code=wp_code_val,
         year=context.audit_year,
         item_ids=[item.item_id for item in body.items],
+        user_id=current_user.id,
     )
     if skipped_owned_keys:
         return {"items": results, "skipped_owned_keys": skipped_owned_keys}
@@ -377,8 +378,12 @@ async def _publish_checklist_saved(
     wp_code: str | None,
     year: int | None,
     item_ids: list[str],
+    user_id: uuid.UUID | None = None,
 ) -> None:
-    """提交成功后接入既有 WORKPAPER_SAVED；失败不回滚已提交数据。"""
+    """提交成功后接入既有 WORKPAPER_SAVED；失败不回滚已提交数据。
+
+    带上保存人：附注刷新等下游据此记 `updated_by`（R7.2），缺了只能记成系统重算。
+    """
     try:
         from app.models.audit_platform_schemas import EventPayload, EventType
         from app.services.event_bus import event_bus
@@ -393,6 +398,7 @@ async def _publish_checklist_saved(
                 "trigger": "checklist_response_save",
                 "item_ids": item_ids,
                 "atomic": True,
+                **({"user_id": str(user_id)} if user_id else {}),
             },
         ))
     except Exception as exc:  # 事件是提交后副作用，不得反向破坏持久化

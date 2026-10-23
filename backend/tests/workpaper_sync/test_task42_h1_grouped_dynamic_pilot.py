@@ -3349,24 +3349,21 @@ class TestProductionWiring:
     """**Validates: Requirements 12.1**"""
 
     def test_router_calls_the_h1_attach_on_both_paths(self) -> None:
-        source = _ROUTER.read_text(encoding="utf-8")
-        assert source.count("pilot_h1_grouped_dynamic import") == 2, source.count(
-            "pilot_h1_grouped_dynamic import"
-        )
-        assert source.count("attach_h1_pilot_adapters") == 4, source.count(
-            "attach_h1_pilot_adapters"
-        )
-        assert "await attach_h1_pilot_adapters(svc.registry, session=svc.session)" in source
-        assert "await attach_h1_pilot_adapters(registry, session=db)" in source
+        """两个生产接线点都接上本 pilot 的 attach（AST 判据，见 `router_registration_wiring_ast`）。
+
+        原判据数字符串出现次数（各 2 次 import、4 次名字、两句逐字 await），2026-10-04 pilot 逐条
+        隔离改成关键字实参后恒红；spec writeback-followup-issue-closure P4 起 callback 一侧也经同一入口。
+        """
+        from tests.workpaper_sync.router_registration_wiring_ast import assert_pilot_attach_wired
+
+        assert_pilot_attach_wired("attach_h1_pilot_adapters")
 
     def test_router_still_calls_the_other_two_pilot_attaches(self) -> None:
         """只加不动：Task 40/41 的两条接线一条都不许掉。"""
-        source = _ROUTER.read_text(encoding="utf-8")
-        assert source.count("pilot_simple_checklist import attach_pilot_adapters") == 2
-        assert source.count("pilot_d2_large_json import") == 2
-        assert source.count("attach_d2_pilot_adapters") == 4
-        assert "await attach_pilot_adapters(svc.registry, session=svc.session)" in source
-        assert "await attach_pilot_adapters(registry, session=db)" in source
+        from tests.workpaper_sync.router_registration_wiring_ast import assert_pilot_attach_wired
+
+        assert_pilot_attach_wired("attach_pilot_adapters")
+        assert_pilot_attach_wired("attach_d2_pilot_adapters")
 
     def test_both_production_paths_go_through_the_bidirectional_contract_lock(self) -> None:
         """AST 判据：两个生产入口都调 `assert_contract_file_matches_source`，都不直接 load。

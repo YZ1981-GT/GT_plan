@@ -35,6 +35,7 @@ observed_dynamic_columns``，**没有一个是 representation 标识**。这四�
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
@@ -643,7 +644,9 @@ async def publish_first_generation(
         store_payload=store_payload,
         contract=plan.contract,
     )
-    projection = _overlay_store_on_substrate_baseline(
+    # 整簿读文件 + 提取是纯 CPU：放工作线程（writeback-followup-issue-closure R9 / P11）
+    projection = await asyncio.to_thread(
+        _overlay_store_on_substrate_baseline,
         adapter=adapter,
         contract=plan.contract,
         substrate=staged.staged_path,

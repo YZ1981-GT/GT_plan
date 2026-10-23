@@ -11,6 +11,8 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 
+from app.core.offloop_json import PREENCODED_PAYLOAD_HEADER
+
 
 # 跳过包装的路径前缀
 _SKIP_PATHS = ("/docs", "/redoc", "/openapi.json", "/wopi/", "/api/events/", "/api/message/stream", "/livez", "/readyz")
@@ -33,6 +35,11 @@ class ResponseWrapperMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         response = await call_next(request)
+
+        # 路由已在工作线程里编好业务载荷（app.core.offloop_json）：按字节拼信封，不解析、不重编码；
+        # 不受下面 5MB 上限约束（那条是为了避开整包解析，这里没有解析）。标记头一律摘掉。
+        if response.headers.get(PREENCODED_PAYLOAD_HEADER) is not None:
+            return await _wrap_preencoded(response)
 
         # 仅处理 2xx 状态码
         if not (200 <= response.status_code < 300):
@@ -125,3 +132,18 @@ class ResponseWrapperMiddleware(BaseHTTPMiddleware):
             headers=headers,
             media_type="application/json",
         )
+
+
+async def _wrap_preencoded(response: Response) -> Response:
+    """预编码载荷：2xx 拼成与 ``json.dumps(wrapped)`` 同形的信封字节；其余状态原样返回。都摘掉标记头。"""
+    chunks = [c.encode("utf-8") if isinstance(c, str) else c async for c in response.body_iterator]  # type: ignore[union-attr]
+    body = b"".join(chunks)
+    if 200 <= response.status_code < 300:
+        body = b'{"code": %d, "message": "success", "data": ' % response.status_code + body + b"}"
+    drop = {"content-length", PREENCODED_PAYLOAD_HEADER}
+    return Response(
+        content=body,
+        status_code=response.status_code,
+        headers={k: v for k, v in response.headers.items() if k.lower() not in drop},
+        media_type="application/json",
+    )

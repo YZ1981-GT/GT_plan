@@ -316,7 +316,7 @@
             <template #default="{ row }">
               <div v-if="editingId === row.id" style="display: flex; flex-direction: column; gap: 2px;">
                 <!-- formula-management-ux-improvements A3：语法高亮输入 + 实时校验 -->
-                <FormulaInput v-model="editFormula" />
+                <FormulaInput v-model="editFormula" :project-id="projectId" :report-rows="formulaInputReportRows" :wp-codes="formulaInputWpCodes" />
                 <!-- formula-management-ux-improvements A4：快捷按钮改为参数选择器 -->
                 <div style="display: flex; gap: 2px; flex-wrap: wrap;">
                   <FormulaParamPicker mode="tb" :tb-items="paramPickerTbItems" @select="onParamPickerSelect" />
@@ -2989,6 +2989,21 @@ const paramPickerRowItems = computed(() =>
     .filter((r: any) => r.row_code)
     .map((r: any) => ({ rowCode: r.row_code, rowName: r.row_name || '' })),
 )
+// formula-input-param-completion Task 4：给 FormulaInput 传入报表行次和底稿编码
+const formulaInputReportRows = computed(() =>
+  currentRows.value
+    .filter((r: any) => r.row_code)
+    .map((r: any) => ({ row_code: r.row_code as string, row_name: (r.row_name || '') as string })),
+)
+const formulaInputWpCodes = computed(() => {
+  const seen = new Set<string>()
+  for (const r of currentRows.value) {
+    const wc = (r as any).wp_code || props.wpCode || ''
+    if (wc && !seen.has(wc)) seen.add(wc)
+  }
+  return [...seen]
+})
+
 function onParamPickerSelect(formulaText: string) {
   editFormula.value += formulaText
 }

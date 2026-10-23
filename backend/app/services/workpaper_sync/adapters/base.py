@@ -318,12 +318,16 @@ class Projection:
         templates = [
             (spec.stable_field_key, spec.row_scoped) for spec in contract.all_fields()
         ]
+        # 只在段级候选上跑原判据（spec workpaper-sync-save-path-cpu-hotspots R2）：
+        # 非候选必有段数或固定段不同，原判据对它们恒为假 ⇒ 结论与全量扫描相同。
+        candidates_of = getattr(contract, "template_candidate_indices", None)
         for key, value in self.values.items():
             if value.stable_key != key:
                 raise ProjectionShapeError(
                     f"projection 键 {key!r} 与 FieldValue.stable_key {value.stable_key!r} 不符"
                 )
-            if not _matches_any_template(key, templates, has_row_key=value.row_key is not None):
+            scope = templates if candidates_of is None else [templates[i] for i in candidates_of(key)]
+            if not _matches_any_template(key, scope, has_row_key=value.row_key is not None):
                 raise ProjectionShapeError(
                     f"projection 含 contract 未登记的 stable key: {key!r} —— "
                     "受管字段必须逐条在 per-entry contract 中声明（Property 21）"
@@ -435,6 +439,11 @@ class MaterializeResult:
     #: shift-aware 归一化 —— 修复"主 binding 未插行、sibling 插行时 sibling 的 managed_sheet_*
     #: 桶被判 unmanaged drift"（spec multi-sheet-materialize-defined-name-shift-normalization §4b）。
     per_table_shift: Any = None
+    #: 本次被 store 行占用、身份随之退役的模板骨架身份（spec
+    #: d2-skeleton-slot-reuse-and-writeback-speed）。写盘前冻结的声明，只供**同一次提交**
+    #: 的 roundtrip extract 豁免身份保留门；之后的代际由观测器从新 artifact 现算清册，
+    #: 不再需要它。Word 与未复用路径恒为 `()`。
+    retired_row_identities: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         for name in ("artifact_sha256", "structure_hash", "identity_inventory_sha256"):

@@ -227,8 +227,11 @@ async def substitute_prev_aux(expression: str, *, db: AsyncSession, project_id: 
                 put(m.group(0), hit.value, hit.reason)
             if prev_hits:
                 source = await resolver.source()
+                occurrence = any(COLUMN_ALIASES.get(column.strip()) in ("本期借方", "本期贷方")
+                                 for _, _, column in prev_hits)
                 prior = None if source.project_id is None else await _load_tb(
-                    db, source.project_id, source.year, {code for _, code, _ in prev_hits})
+                    db, source.project_id, source.year, {code for _, code, _ in prev_hits},
+                    with_occurrence=occurrence)
                 for token, code, column in prev_hits:
                     std = COLUMN_ALIASES.get(column.strip())
                     if std is None:

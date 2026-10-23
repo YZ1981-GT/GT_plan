@@ -1377,6 +1377,19 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 单次采集覆盖全部
                     "error_stage": res_f.error_stage,
                     "journal": [st.value for st in jf.order],
                 }
+                # spec d2-skeleton-slot-reuse-and-writeback-speed R4：OO 不重投 ⇒ 绑定的
+                # 强制保存 request / shell 必须就地终结（否则前端永远在等、leave 恒 409）。
+                shell_f = (
+                    await s.execute(
+                        sa.select(WorkpaperSyncOperation).where(
+                            WorkpaperSyncOperation.forcesave_request_id == outcome_f.request.id
+                        )
+                    )
+                ).scalar_one_or_none()
+                await s.refresh(outcome_f.request)
+                pre["request_state"] = str(outcome_f.request.state)
+                pre["shell_state"] = None if shell_f is None else str(shell_f.state)
+                pre["shell_error_code"] = None if shell_f is None else shell_f.error_code
                 snap["failures"] = {"pre_durable": pre}
                 await s.rollback()
 
@@ -2123,6 +2136,14 @@ def test_pre_durable_failure_returns_non_zero_with_zero_owner(snap: dict[str, An
     assert pre["error_code"], "失败必须留 error code"
     assert "sealed_durable" not in pre["journal"]
     assert "correlated" not in pre["journal"]
+
+
+def test_pre_durable_failure_settles_the_bound_forcesave(snap: dict[str, Any]) -> None:
+    """OO 对 `{"error":1}` 不重投 ⇒ request 落 terminal、shell 落 rejected 并带下载错误码。"""
+    pre = snap["failures"]["pre_durable"]
+    assert pre["request_state"] == "terminal", pre
+    assert pre["shell_state"] == "rejected", pre
+    assert pre["shell_error_code"] == pre["error_code"], pre
 
 
 # ═══════════════════════════════════════════════════════════════════════════

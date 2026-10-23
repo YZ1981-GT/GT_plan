@@ -862,6 +862,12 @@ class ContractIndex:
                 )
             )
         self._cache: dict[str, FieldLocator] = {}
+        # 段级候选（R2）只在 `_templates` 与 `all_fields()` 逐项同序时使用；不齐则全量扫。
+        self._candidates_of = getattr(contract, "template_candidate_indices", None)
+        if self._candidates_of is not None and [
+            t.spec.stable_field_key for t in self._templates
+        ] != [f.stable_field_key for f in contract.all_fields()]:
+            self._candidates_of = None
 
     # ── 保护策略 ──────────────────────────────────────────────────────
     @staticmethod
@@ -970,7 +976,12 @@ class ContractIndex:
             self._assert_row_key(cached, declared_row_key)
             return cached
         matches: list[tuple[_FieldTemplate, str]] = []
-        for template in self._templates:
+        scope = (
+            self._templates
+            if self._candidates_of is None
+            else [self._templates[i] for i in self._candidates_of(stable_key)]
+        )
+        for template in scope:
             ok, row_key = _segments_match(template.spec.stable_field_key, stable_key)
             if ok:
                 matches.append((template, row_key))

@@ -103,6 +103,7 @@ result 是**新生成**的 content-addressed canonical artifact（`.versions/…
 from __future__ import annotations
 
 import ast
+import asyncio
 import inspect
 import textwrap
 import uuid
@@ -2201,7 +2202,12 @@ class OoToHtmlCoordinator:
                 f"{base_resolved.bundle.bundle_id} 与 application 冻结的 "
                 f"{frozen.definition_bundle_id} 不同 —— 三方 merge 必须来自同一 frozen bundle"
             )
-        base = adapter.extract(artifact=base_resolved.artifact_path, contract=contract)
+        # 🔴 整簿提取放工作线程（spec workpaper-sync-save-path-cpu-hotspots R4）：同步调用会
+        #    占住事件循环 —— 单 worker 部署下每次 OO 保存全平台停顿（D2 实测 7.6 s，连本页轮询
+        #    都没有响应）。DB 解析与 journal 仍在事件循环上，先后次序与原来逐步相同。
+        base = await asyncio.to_thread(
+            adapter.extract, artifact=base_resolved.artifact_path, contract=contract
+        )
         journal.record(ApplyStage.base_extracted, str(base_resolved.representation_id))
 
         current_resolved = await self._resolution.resolve(
@@ -2210,10 +2216,20 @@ class OoToHtmlCoordinator:
             wp_id=frozen.wp_id,
             entry_id=frozen.entry_id,
         )
-        current = adapter.extract(artifact=current_resolved.artifact_path, contract=contract)
+        # current 与 base 是同一个 artifact（同一文件）⇒ adapter 对两次调用判出同一形态、
+        # 读同一份字节 ⇒ 结果相同，不再提第二遍（R3）。只比 sha 不够：路径不同时 OO→HTML
+        # adapter 会把 current 当 incoming 形态读（`_substrate_shape_of`）。
+        if current_resolved.artifact_id == base_resolved.artifact_id:
+            current = base
+        else:
+            current = await asyncio.to_thread(
+                adapter.extract, artifact=current_resolved.artifact_path, contract=contract
+            )
         journal.record(ApplyStage.current_extracted, str(current_resolved.representation_id))
 
-        incoming = adapter.extract(artifact=substrate.path, contract=contract)
+        incoming = await asyncio.to_thread(
+            adapter.extract, artifact=substrate.path, contract=contract
+        )
         journal.record(ApplyStage.incoming_extracted, substrate.sha256)
         return ThreeWayInputs(
             base=base,
@@ -2347,7 +2363,8 @@ class OoToHtmlCoordinator:
                 contract=contract,
                 journal=j,
             )
-            merge = merge_projections(
+            merge = await asyncio.to_thread(  # 纯计算，不占事件循环（R4）
+                merge_projections,
                 base=inputs.base,
                 current=inputs.current,
                 incoming=inputs.incoming,

@@ -499,9 +499,7 @@
       "wp_code": "D5",
       "cycle": "D",
       "wp_name": "应收款项融资审定表",
-      "account_codes": [
-        "1124"
-      ],
+      "account_codes": [],
       "account_name": "应收款项融资",
       "report_row": null,
       "note_section": null
@@ -756,7 +754,7 @@
       "cycle": "M",
       "wp_name": "库存股",
       "account_codes": [
-        "4002"
+        "4201"
       ],
       "account_name": "库存股",
       "report_row": null,
@@ -768,7 +766,7 @@
       "cycle": "M",
       "wp_name": "库存股审定表",
       "account_codes": [
-        "4002"
+        "4201"
       ],
       "account_name": "库存股审定",
       "report_row": null,
@@ -779,7 +777,7 @@
       "cycle": "M",
       "wp_name": "库存股明细表",
       "account_codes": [
-        "4002"
+        "4201"
       ],
       "account_name": "库存股明细",
       "report_row": null,
@@ -790,7 +788,7 @@
       "cycle": "M",
       "wp_name": "回购注销检查",
       "account_codes": [
-        "4002"
+        "4201"
       ],
       "account_name": "回购注销",
       "report_row": null,
@@ -801,7 +799,7 @@
       "cycle": "M",
       "wp_name": "库存股调整分录",
       "account_codes": [
-        "4002"
+        "4201"
       ],
       "account_name": "库存股调整",
       "report_row": null,
@@ -812,7 +810,7 @@
       "cycle": "M",
       "wp_name": "资本公积",
       "account_codes": [
-        "4101"
+        "4002"
       ],
       "account_name": "资本公积",
       "report_row": "BS-052",
@@ -824,7 +822,7 @@
       "cycle": "M",
       "wp_name": "资本公积审定表",
       "account_codes": [
-        "4101"
+        "4002"
       ],
       "account_name": "资本公积审定",
       "report_row": null,
@@ -835,7 +833,7 @@
       "cycle": "M",
       "wp_name": "资本公积明细表",
       "account_codes": [
-        "4101"
+        "4002"
       ],
       "account_name": "资本公积明细",
       "report_row": null,
@@ -846,7 +844,7 @@
       "cycle": "M",
       "wp_name": "资本公积变动分析",
       "account_codes": [
-        "4101"
+        "4002"
       ],
       "account_name": "资本公积变动",
       "report_row": null,
@@ -857,7 +855,7 @@
       "cycle": "M",
       "wp_name": "资本公积来源检查",
       "account_codes": [
-        "4101"
+        "4002"
       ],
       "account_name": "来源检查",
       "report_row": null,
@@ -868,7 +866,7 @@
       "cycle": "M",
       "wp_name": "股份支付联动",
       "account_codes": [
-        "4101"
+        "4002"
       ],
       "account_name": "股份支付联动",
       "report_row": null,
@@ -879,7 +877,7 @@
       "cycle": "M",
       "wp_name": "资本公积调整分录",
       "account_codes": [
-        "4101"
+        "4002"
       ],
       "account_name": "资本公积调整",
       "report_row": null,
@@ -890,7 +888,7 @@
       "cycle": "M",
       "wp_name": "盈余公积",
       "account_codes": [
-        "4103"
+        "4101"
       ],
       "account_name": "盈余公积",
       "report_row": "BS-054",
@@ -902,7 +900,7 @@
       "cycle": "M",
       "wp_name": "盈余公积审定表",
       "account_codes": [
-        "4103"
+        "4101"
       ],
       "account_name": "盈余公积审定",
       "report_row": null,
@@ -913,7 +911,7 @@
       "cycle": "M",
       "wp_name": "盈余公积明细表",
       "account_codes": [
-        "4103"
+        "4101"
       ],
       "account_name": "盈余公积明细",
       "report_row": null,
@@ -924,7 +922,7 @@
       "cycle": "M",
       "wp_name": "法定任意提取验证",
       "account_codes": [
-        "4103"
+        "4101"
       ],
       "account_name": "提取验证",
       "report_row": null,
@@ -935,7 +933,7 @@
       "cycle": "M",
       "wp_name": "盈余公积调整分录",
       "account_codes": [
-        "4103"
+        "4101"
       ],
       "account_name": "盈余公积调整",
       "report_row": null,
@@ -1046,7 +1044,7 @@
       "cycle": "M",
       "wp_name": "库存股程序表",
       "account_codes": [
-        "4002"
+        "4201"
       ],
       "account_name": "库存股程序",
       "report_row": null,
@@ -1057,7 +1055,7 @@
       "cycle": "M",
       "wp_name": "资本公积程序表",
       "account_codes": [
-        "4101"
+        "4002"
       ],
       "account_name": "资本公积程序",
       "report_row": null,
@@ -1068,7 +1066,7 @@
       "cycle": "M",
       "wp_name": "盈余公积程序表",
       "account_codes": [
-        "4103"
+        "4101"
       ],
       "account_name": "盈余公积程序",
       "report_row": null,
@@ -1090,7 +1088,7 @@
       "cycle": "M",
       "wp_name": "专项储备程序表",
       "account_codes": [
-        "4201"
+        "4301"
       ],
       "account_name": "专项储备程序",
       "report_row": null,
@@ -1100,9 +1098,7 @@
       "wp_code": "M8A",
       "cycle": "M",
       "wp_name": "一般风险准备程序表",
-      "account_codes": [
-        "4301"
-      ],
+      "account_codes": [],
       "account_name": "一般风险准备程序",
       "report_row": null,
       "note_section": null,
@@ -1119,7 +1115,7 @@
       "cycle": "M",
       "wp_name": "其他综合收益程序表",
       "account_codes": [
-        "4401"
+        "4003"
       ],
       "account_name": "OCI程序",
       "report_row": null,
@@ -1130,7 +1126,7 @@
       "cycle": "M",
       "wp_name": "其他权益工具程序表",
       "account_codes": [
-        "4501"
+        "4401"
       ],
       "account_name": "其他权益工具程序",
       "report_row": null,
@@ -1249,9 +1245,7 @@
       "wp_code": "D5-1",
       "cycle": "D",
       "wp_name": "应收款项融资审定表",
-      "account_codes": [
-        "1124"
-      ],
+      "account_codes": [],
       "account_name": "应收款项融资",
       "report_row": null,
       "note_section": null
@@ -1315,9 +1309,7 @@
       "wp_code": "L7",
       "cycle": "L",
       "wp_name": "其他非流动负债",
-      "account_codes": [
-        "2801"
-      ],
+      "account_codes": [],
       "account_name": "其他非流动负债",
       "report_row": null,
       "note_section": null,
@@ -2023,8 +2015,7 @@
       "cycle": "F",
       "wp_name": "合同履约成本（一）",
       "account_codes": [
-        "1411",
-        "1412"
+        "1411"
       ],
       "account_name": "合同履约成本一",
       "report_row": null,
@@ -2035,8 +2026,7 @@
       "cycle": "F",
       "wp_name": "合同履约成本（二）",
       "account_codes": [
-        "1411",
-        "1412"
+        "1411"
       ],
       "account_name": "合同履约成本二",
       "report_row": null,
@@ -2047,8 +2037,7 @@
       "cycle": "F",
       "wp_name": "合同履约成本（三）",
       "account_codes": [
-        "1411",
-        "1412"
+        "1411"
       ],
       "account_name": "合同履约成本三",
       "report_row": null,
@@ -2059,8 +2048,7 @@
       "cycle": "F",
       "wp_name": "合同履约成本（四）",
       "account_codes": [
-        "1411",
-        "1412"
+        "1411"
       ],
       "account_name": "合同履约成本四",
       "report_row": null,
@@ -2560,7 +2548,7 @@
       "cycle": "J",
       "wp_name": "设定受益计划",
       "account_codes": [
-        "2611"
+        "2705"
       ],
       "account_name": "长期应付职工薪酬",
       "report_row": null,
@@ -2571,9 +2559,7 @@
       "wp_code": "J3",
       "cycle": "J",
       "wp_name": "股份支付",
-      "account_codes": [
-        "2711"
-      ],
+      "account_codes": [],
       "account_name": "股份支付",
       "report_row": null,
       "note_section": null,
@@ -3020,9 +3006,7 @@
       "wp_code": "L7-1",
       "cycle": "L",
       "wp_name": "其他非流动负债审定表",
-      "account_codes": [
-        "2801"
-      ],
+      "account_codes": [],
       "account_name": "其他非流动负债审定",
       "report_row": null,
       "note_section": null
@@ -3031,9 +3015,7 @@
       "wp_code": "L7-2",
       "cycle": "L",
       "wp_name": "其他非流动负债明细表",
-      "account_codes": [
-        "2801"
-      ],
+      "account_codes": [],
       "account_name": "其他非流动负债明细",
       "report_row": null,
       "note_section": null
@@ -3042,9 +3024,7 @@
       "wp_code": "L7-3",
       "cycle": "L",
       "wp_name": "其他非流动负债检查",
-      "account_codes": [
-        "2801"
-      ],
+      "account_codes": [],
       "account_name": "其他非流动负债检查",
       "report_row": null,
       "note_section": null
@@ -3053,9 +3033,7 @@
       "wp_code": "L7-4",
       "cycle": "L",
       "wp_name": "其他非流动负债调整分录",
-      "account_codes": [
-        "2801"
-      ],
+      "account_codes": [],
       "account_name": "其他非流动负债调整",
       "report_row": null,
       "note_section": null
@@ -3143,7 +3121,7 @@
       "cycle": "M",
       "wp_name": "专项储备",
       "account_codes": [
-        "4201"
+        "4301"
       ],
       "account_name": "专项储备",
       "report_row": null,
@@ -3155,7 +3133,7 @@
       "cycle": "M",
       "wp_name": "专项储备审定表",
       "account_codes": [
-        "4201"
+        "4301"
       ],
       "account_name": "专项储备审定",
       "report_row": null,
@@ -3166,7 +3144,7 @@
       "cycle": "M",
       "wp_name": "专项储备明细表",
       "account_codes": [
-        "4201"
+        "4301"
       ],
       "account_name": "专项储备明细",
       "report_row": null,
@@ -3177,7 +3155,7 @@
       "cycle": "M",
       "wp_name": "安全生产费用检查",
       "account_codes": [
-        "4201"
+        "4301"
       ],
       "account_name": "安全生产费用",
       "report_row": null,
@@ -3188,7 +3166,7 @@
       "cycle": "M",
       "wp_name": "专项储备调整分录",
       "account_codes": [
-        "4201"
+        "4301"
       ],
       "account_name": "专项储备调整",
       "report_row": null,
@@ -3198,9 +3176,7 @@
       "wp_code": "M8",
       "cycle": "M",
       "wp_name": "一般风险准备",
-      "account_codes": [
-        "4301"
-      ],
+      "account_codes": [],
       "account_name": "一般风险准备",
       "report_row": null,
       "note_section": null,
@@ -3217,9 +3193,7 @@
       "wp_code": "M8-1",
       "cycle": "M",
       "wp_name": "一般风险准备审定表",
-      "account_codes": [
-        "4301"
-      ],
+      "account_codes": [],
       "account_name": "一般风险准备审定",
       "report_row": null,
       "note_section": null,
@@ -3235,9 +3209,7 @@
       "wp_code": "M8-2",
       "cycle": "M",
       "wp_name": "一般风险准备明细表",
-      "account_codes": [
-        "4301"
-      ],
+      "account_codes": [],
       "account_name": "一般风险准备明细",
       "report_row": null,
       "note_section": null,
@@ -3253,9 +3225,7 @@
       "wp_code": "M8-3",
       "cycle": "M",
       "wp_name": "提取比例验证",
-      "account_codes": [
-        "4301"
-      ],
+      "account_codes": [],
       "account_name": "提取比例",
       "report_row": null,
       "note_section": null,
@@ -3271,9 +3241,7 @@
       "wp_code": "M8-4",
       "cycle": "M",
       "wp_name": "一般风险准备调整分录",
-      "account_codes": [
-        "4301"
-      ],
+      "account_codes": [],
       "account_name": "一般风险准备调整",
       "report_row": null,
       "note_section": null,
@@ -3290,7 +3258,7 @@
       "cycle": "M",
       "wp_name": "其他综合收益",
       "account_codes": [
-        "4401"
+        "4003"
       ],
       "account_name": "其他综合收益",
       "report_row": "BS-053",
@@ -3302,7 +3270,7 @@
       "cycle": "M",
       "wp_name": "其他综合收益审定表",
       "account_codes": [
-        "4401"
+        "4003"
       ],
       "account_name": "OCI审定",
       "report_row": null,
@@ -3313,7 +3281,7 @@
       "cycle": "M",
       "wp_name": "其他综合收益明细表",
       "account_codes": [
-        "4401"
+        "4003"
       ],
       "account_name": "OCI明细",
       "report_row": null,
@@ -3324,7 +3292,7 @@
       "cycle": "M",
       "wp_name": "OCI分类检查",
       "account_codes": [
-        "4401"
+        "4003"
       ],
       "account_name": "OCI分类",
       "report_row": null,
@@ -3335,7 +3303,7 @@
       "cycle": "M",
       "wp_name": "OCI来源追溯",
       "account_codes": [
-        "4401"
+        "4003"
       ],
       "account_name": "OCI来源",
       "report_row": null,
@@ -3346,7 +3314,7 @@
       "cycle": "M",
       "wp_name": "转损益检查",
       "account_codes": [
-        "4401"
+        "4003"
       ],
       "account_name": "转损益",
       "report_row": null,
@@ -3357,7 +3325,7 @@
       "cycle": "M",
       "wp_name": "其他综合收益调整分录",
       "account_codes": [
-        "4401"
+        "4003"
       ],
       "account_name": "OCI调整",
       "report_row": null,
@@ -3368,7 +3336,7 @@
       "cycle": "M",
       "wp_name": "其他权益工具",
       "account_codes": [
-        "4501"
+        "4401"
       ],
       "account_name": "其他权益工具",
       "report_row": null,
@@ -3380,7 +3348,7 @@
       "cycle": "M",
       "wp_name": "其他权益工具审定表",
       "account_codes": [
-        "4501"
+        "4401"
       ],
       "account_name": "其他权益工具审定",
       "report_row": null,
@@ -3391,7 +3359,7 @@
       "cycle": "M",
       "wp_name": "其他权益工具明细表",
       "account_codes": [
-        "4501"
+        "4401"
       ],
       "account_name": "其他权益工具明细",
       "report_row": null,
@@ -3402,7 +3370,7 @@
       "cycle": "M",
       "wp_name": "权益负债分类检查",
       "account_codes": [
-        "4501"
+        "4401"
       ],
       "account_name": "分类检查",
       "report_row": null,
@@ -3413,7 +3381,7 @@
       "cycle": "M",
       "wp_name": "其他权益工具调整分录",
       "account_codes": [
-        "4501"
+        "4401"
       ],
       "account_name": "其他权益工具调整",
       "report_row": null,
@@ -7370,9 +7338,7 @@
       "wp_code": "D5-2",
       "cycle": "D",
       "wp_name": "应收款项融资明细",
-      "account_codes": [
-        "1124"
-      ],
+      "account_codes": [],
       "account_name": "应收款项融资明细",
       "report_row": null,
       "note_section": null
@@ -8944,7 +8910,7 @@
       "cycle": "H",
       "wp_name": "固定资产清理",
       "account_codes": [
-        "1606B"
+        "1606"
       ],
       "account_name": "固定资产清理",
       "report_row": "BS-028",
@@ -8956,7 +8922,7 @@
       "cycle": "H",
       "wp_name": "固定资产清理审定表",
       "account_codes": [
-        "1606B"
+        "1606"
       ],
       "account_name": "固定资产清理",
       "report_row": "BS-028",
@@ -8967,7 +8933,7 @@
       "cycle": "H",
       "wp_name": "固定资产清理明细表",
       "account_codes": [
-        "1606B"
+        "1606"
       ],
       "account_name": "固定资产清理明细",
       "report_row": null,
@@ -8978,7 +8944,7 @@
       "cycle": "H",
       "wp_name": "固定资产清理检查",
       "account_codes": [
-        "1606B"
+        "1606"
       ],
       "account_name": "固定资产清理检查",
       "report_row": null,
@@ -8989,7 +8955,7 @@
       "cycle": "H",
       "wp_name": "固定资产清理调整分录",
       "account_codes": [
-        "1606B"
+        "1606"
       ],
       "account_name": "固定资产清理调整",
       "report_row": null,
@@ -9096,7 +9062,8 @@
       "cycle": "H",
       "wp_name": "使用权资产",
       "account_codes": [
-        "1901"
+        "1641",
+        "1651"
       ],
       "account_name": "使用权资产",
       "report_row": "BS-033",
@@ -9108,7 +9075,8 @@
       "cycle": "H",
       "wp_name": "使用权资产审定表",
       "account_codes": [
-        "1901"
+        "1641",
+        "1651"
       ],
       "account_name": "使用权资产",
       "report_row": "BS-033",
@@ -9119,7 +9087,8 @@
       "cycle": "H",
       "wp_name": "使用权资产明细表",
       "account_codes": [
-        "1901"
+        "1641",
+        "1651"
       ],
       "account_name": "使用权资产明细",
       "report_row": null,
@@ -9130,7 +9099,8 @@
       "cycle": "H",
       "wp_name": "使用权资产折旧测算",
       "account_codes": [
-        "1901"
+        "1641",
+        "1651"
       ],
       "account_name": "使用权资产折旧",
       "report_row": null,
@@ -9141,7 +9111,8 @@
       "cycle": "H",
       "wp_name": "使用权资产租赁还原",
       "account_codes": [
-        "1901"
+        "1641",
+        "1651"
       ],
       "account_name": "租赁还原",
       "report_row": null,
@@ -9152,7 +9123,8 @@
       "cycle": "H",
       "wp_name": "使用权资产减值测试",
       "account_codes": [
-        "1901"
+        "1641",
+        "1651"
       ],
       "account_name": "使用权资产减值",
       "report_row": null,
@@ -9163,7 +9135,8 @@
       "cycle": "H",
       "wp_name": "使用权资产调整分录",
       "account_codes": [
-        "1901"
+        "1641",
+        "1651"
       ],
       "account_name": "使用权资产调整",
       "report_row": null,
@@ -9174,7 +9147,8 @@
       "cycle": "H",
       "wp_name": "租赁负债",
       "account_codes": [
-        "2802"
+        "2601",
+        "2651"
       ],
       "account_name": "租赁负债",
       "report_row": "BS-077",
@@ -9186,7 +9160,8 @@
       "cycle": "H",
       "wp_name": "租赁负债审定表",
       "account_codes": [
-        "2802"
+        "2601",
+        "2651"
       ],
       "account_name": "租赁负债",
       "report_row": "BS-077",
@@ -9197,7 +9172,8 @@
       "cycle": "H",
       "wp_name": "租赁负债明细表",
       "account_codes": [
-        "2802"
+        "2601",
+        "2651"
       ],
       "account_name": "租赁负债明细",
       "report_row": null,
@@ -9208,7 +9184,8 @@
       "cycle": "H",
       "wp_name": "租赁负债现值测算",
       "account_codes": [
-        "2802"
+        "2601",
+        "2651"
       ],
       "account_name": "租赁负债现值",
       "report_row": null,
@@ -9219,7 +9196,8 @@
       "cycle": "H",
       "wp_name": "租赁负债摊销表",
       "account_codes": [
-        "2802"
+        "2601",
+        "2651"
       ],
       "account_name": "租赁负债摊销",
       "report_row": null,
@@ -9230,7 +9208,8 @@
       "cycle": "H",
       "wp_name": "租赁负债分析程序",
       "account_codes": [
-        "2802"
+        "2601",
+        "2651"
       ],
       "account_name": "租赁负债分析",
       "report_row": null,
@@ -9241,7 +9220,8 @@
       "cycle": "H",
       "wp_name": "租赁负债调整分录",
       "account_codes": [
-        "2802"
+        "2601",
+        "2651"
       ],
       "account_name": "租赁负债调整",
       "report_row": null,
@@ -9310,7 +9290,7 @@
       "account_codes": [
         "1701",
         "1702",
-        "1703B"
+        "1703"
       ],
       "account_name": "无形资产",
       "report_row": "BS-037",
@@ -9324,7 +9304,7 @@
       "account_codes": [
         "1701",
         "1702",
-        "1703B"
+        "1703"
       ],
       "account_name": "无形资产",
       "report_row": "BS-037",
@@ -9357,7 +9337,7 @@
       "cycle": "I",
       "wp_name": "无形资产减值测试",
       "account_codes": [
-        "1703B"
+        "1703"
       ],
       "account_name": "无形资产减值准备",
       "report_row": null,
@@ -9414,7 +9394,7 @@
       "account_codes": [
         "1701",
         "1702",
-        "1703B"
+        "1703"
       ],
       "account_name": "无形资产程序表",
       "report_row": null,
@@ -9458,7 +9438,7 @@
       "cycle": "I",
       "wp_name": "减值准备测试表",
       "account_codes": [
-        "1703B"
+        "1703"
       ],
       "account_name": "减值测试",
       "report_row": null,
@@ -9469,7 +9449,7 @@
       "cycle": "I",
       "wp_name": "可收回金额测试",
       "account_codes": [
-        "1703B"
+        "1703"
       ],
       "account_name": "可收回金额DCF",
       "report_row": null,
@@ -9691,9 +9671,7 @@
       "wp_code": "I5",
       "cycle": "I",
       "wp_name": "其他非流动资产",
-      "account_codes": [
-        "1901"
-      ],
+      "account_codes": [],
       "account_name": "其他非流动资产",
       "report_row": "BS-041",
       "note_section": null,
@@ -9703,9 +9681,7 @@
       "wp_code": "I5-1",
       "cycle": "I",
       "wp_name": "其他非流动资产审定表",
-      "account_codes": [
-        "1901"
-      ],
+      "account_codes": [],
       "account_name": "其他非流动资产",
       "report_row": "BS-041",
       "note_section": null
@@ -9714,9 +9690,7 @@
       "wp_code": "I5-2",
       "cycle": "I",
       "wp_name": "其他非流动资产明细表",
-      "account_codes": [
-        "1901"
-      ],
+      "account_codes": [],
       "account_name": "其他非流动资产明细",
       "report_row": null,
       "note_section": null
@@ -9725,9 +9699,7 @@
       "wp_code": "I5-3",
       "cycle": "I",
       "wp_name": "其他非流动资产检查",
-      "account_codes": [
-        "1901"
-      ],
+      "account_codes": [],
       "account_name": "其他非流动资产检查",
       "report_row": null,
       "note_section": null
@@ -9736,9 +9708,7 @@
       "wp_code": "I5-4",
       "cycle": "I",
       "wp_name": "其他非流动资产调整分录",
-      "account_codes": [
-        "1901"
-      ],
+      "account_codes": [],
       "account_name": "其他非流动资产调整",
       "report_row": null,
       "note_section": null
@@ -9937,7 +9907,7 @@
       "cycle": "J",
       "wp_name": "设定受益计划程序表",
       "account_codes": [
-        "2611"
+        "2705"
       ],
       "account_name": "设定受益计划程序",
       "report_row": null,
@@ -9948,7 +9918,7 @@
       "cycle": "J",
       "wp_name": "设定受益计划-审定表",
       "account_codes": [
-        "2611"
+        "2705"
       ],
       "account_name": "长期应付职工薪酬",
       "report_row": null,
@@ -9959,7 +9929,7 @@
       "cycle": "J",
       "wp_name": "设定受益计划-明细表",
       "account_codes": [
-        "2611"
+        "2705"
       ],
       "account_name": "设定受益计划明细",
       "report_row": null,
@@ -9970,7 +9940,7 @@
       "cycle": "J",
       "wp_name": "精算假设评估",
       "account_codes": [
-        "2611"
+        "2705"
       ],
       "account_name": "精算假设",
       "report_row": null,
@@ -9981,7 +9951,7 @@
       "cycle": "J",
       "wp_name": "精算师工作利用",
       "account_codes": [
-        "2611"
+        "2705"
       ],
       "account_name": "精算师工作",
       "report_row": null,
@@ -9992,7 +9962,7 @@
       "cycle": "J",
       "wp_name": "精算重新计算",
       "account_codes": [
-        "2611"
+        "2705"
       ],
       "account_name": "精算重算",
       "report_row": null,
@@ -10003,7 +9973,7 @@
       "cycle": "J",
       "wp_name": "设定受益计划-调整分录",
       "account_codes": [
-        "2611"
+        "2705"
       ],
       "account_name": "设定受益调整分录",
       "report_row": null,
@@ -10013,9 +9983,7 @@
       "wp_code": "J3A",
       "cycle": "J",
       "wp_name": "股份支付程序表",
-      "account_codes": [
-        "2711"
-      ],
+      "account_codes": [],
       "account_name": "股份支付程序",
       "report_row": null,
       "note_section": null
@@ -10024,9 +9992,7 @@
       "wp_code": "J3-1",
       "cycle": "J",
       "wp_name": "股份支付-审定表",
-      "account_codes": [
-        "2711"
-      ],
+      "account_codes": [],
       "account_name": "股份支付",
       "report_row": null,
       "note_section": null
@@ -10035,9 +10001,7 @@
       "wp_code": "J3-2",
       "cycle": "J",
       "wp_name": "股份支付-明细表",
-      "account_codes": [
-        "2711"
-      ],
+      "account_codes": [],
       "account_name": "股份支付明细",
       "report_row": null,
       "note_section": null
@@ -10046,9 +10010,7 @@
       "wp_code": "J3-3",
       "cycle": "J",
       "wp_name": "授予条件检查",
-      "account_codes": [
-        "2711"
-      ],
+      "account_codes": [],
       "account_name": "授予条件",
       "report_row": null,
       "note_section": null
@@ -10057,9 +10019,7 @@
       "wp_code": "J3-4",
       "cycle": "J",
       "wp_name": "期权公允价值测算",
-      "account_codes": [
-        "2711"
-      ],
+      "account_codes": [],
       "account_name": "期权定价",
       "report_row": null,
       "note_section": null
@@ -10068,9 +10028,7 @@
       "wp_code": "J3-5",
       "cycle": "J",
       "wp_name": "等待期费用分摊",
-      "account_codes": [
-        "2711"
-      ],
+      "account_codes": [],
       "account_name": "费用分摊",
       "report_row": null,
       "note_section": null
@@ -10079,9 +10037,7 @@
       "wp_code": "J3-6",
       "cycle": "J",
       "wp_name": "股份支付-调整分录",
-      "account_codes": [
-        "2711"
-      ],
+      "account_codes": [],
       "account_name": "股份支付调整分录",
       "report_row": null,
       "note_section": null
@@ -10374,9 +10330,7 @@
       "wp_code": "K4",
       "cycle": "K",
       "wp_name": "其他流动负债",
-      "account_codes": [
-        "2261"
-      ],
+      "account_codes": [],
       "account_name": "其他流动负债",
       "report_row": null,
       "note_section": null,
@@ -10386,9 +10340,7 @@
       "wp_code": "K4-1",
       "cycle": "K",
       "wp_name": "其他流动负债审定表",
-      "account_codes": [
-        "2261"
-      ],
+      "account_codes": [],
       "account_name": "其他流动负债",
       "report_row": null,
       "note_section": null
@@ -10397,9 +10349,7 @@
       "wp_code": "K4-2",
       "cycle": "K",
       "wp_name": "其他流动负债明细表",
-      "account_codes": [
-        "2261"
-      ],
+      "account_codes": [],
       "account_name": "其他流动负债明细",
       "report_row": null,
       "note_section": null
@@ -10408,9 +10358,7 @@
       "wp_code": "K4-3",
       "cycle": "K",
       "wp_name": "其他流动负债检查",
-      "account_codes": [
-        "2261"
-      ],
+      "account_codes": [],
       "account_name": "其他流动负债检查",
       "report_row": null,
       "note_section": null
@@ -10419,9 +10367,7 @@
       "wp_code": "K4-4",
       "cycle": "K",
       "wp_name": "其他流动负债调整分录",
-      "account_codes": [
-        "2261"
-      ],
+      "account_codes": [],
       "account_name": "其他流动负债调整分录",
       "report_row": null,
       "note_section": null

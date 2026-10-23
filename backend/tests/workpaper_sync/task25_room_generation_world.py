@@ -7,6 +7,7 @@
 13a 终态 room + 内容未改 ⇒ materialize 自己换代（同 content version、revision 不变）
 13b 终态 room + 内容已改 ⇒ commit 直接落在新代际（不先落死代再换）
 13c 非终态拒绝（refresh-required）⇒ 不换代、409 透出
+13d 文档服务器已最终保存（closed，spec writeback-followup-issue-closure D1）⇒ 同 13a 换代、换 doc key
 
 必须排在阶段 12 之后：本阶段逐个把当前代际的 room 作废。
 """
@@ -33,23 +34,23 @@ async def collect_retired_generation_cases(ctx: Any) -> None:
     _projection, _phase_failed = ctx.projection, ctx.phase_failed
     _JsonCarrierAdapter, _HarnessError = ctx.json_adapter, ctx.harness_error  # noqa: N806
 
-    async def _room_at_pointer() -> tuple[uuid.UUID, int]:
+    async def _room_at_pointer() -> tuple[uuid.UUID, int, str]:
         ptr = await _pointers()
         async with Session() as s:
-            rid = (
+            row = (
                 await s.execute(
                     sa.text(
-                        "SELECT id FROM working_paper_oo_room WHERE wp_id = :w "
+                        "SELECT id, doc_key FROM working_paper_oo_room WHERE wp_id = :w "
                         "AND entry_id = :e AND generation = :g"
                     ),
                     {"w": wp, "e": ENTRY, "g": ptr["current_generation"]},
                 )
-            ).scalar_one_or_none()
-        if rid is None:
+            ).one_or_none()
+        if row is None:
             raise _HarnessError(
                 f"gen {ptr['current_generation']} 没有 room —— 阶段 13 前提不成立"
             )
-        return rid, int(ptr["current_generation"])
+        return row.id, int(ptr["current_generation"]), str(row.doc_key)
 
     async def _entry_counts() -> dict[str, int]:
         async with Session() as s:
@@ -73,11 +74,14 @@ async def collect_retired_generation_cases(ctx: Any) -> None:
     async def _retire_case(
         key: str, projection: Projection, *, retire: str
     ) -> dict[str, Any]:
-        room_id, room_gen = await _room_at_pointer()
+        room_id, room_gen, room_doc_key = await _room_at_pointer()
         async with Session() as s:
             svc = RoomService(WorkpaperSyncRepository(s))
             if retire == "supersede":
                 await svc.supersede_room(room_id=room_id, reason="task25-retired")
+            elif retire == "docserver_saved":
+                # status 2 已 durable 并回 0（spec writeback-followup-issue-closure D1）
+                await svc.close_after_docserver_saved(room_id=room_id)
             else:
                 await svc.mark_refresh_required(room_id=room_id, reason="task25-refresh")
             await s.commit()
@@ -105,6 +109,8 @@ async def collect_retired_generation_cases(ctx: Any) -> None:
         descriptor = None if outcome is None else outcome.descriptor
         return {
             "retired_room_generation": room_gen,
+            "retired_doc_key": room_doc_key,
+            "descriptor_doc_key": None if descriptor is None else str(descriptor.doc_key),
             "max_generation_before": max(
                 counts_before["max_rep"], counts_before["max_room"]
             ),
@@ -138,6 +144,10 @@ async def collect_retired_generation_cases(ctx: Any) -> None:
         )
         snap["retired"]["new_content"] = await _retire_case(
             "idem-retired-new", new_content, retire="supersede"
+        )
+        # 13d 文档服务器已最终保存 ⇒ closed ⇒ 同内容再进入必须换代、换 doc key
+        snap["retired"]["docserver_saved"] = await _retire_case(
+            "idem-retired-saved", new_content, retire="docserver_saved"
         )
         snap["retired"]["refresh_required"] = await _retire_case(
             "idem-retired-refresh", new_content, retire="refresh"

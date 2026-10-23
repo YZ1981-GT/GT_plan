@@ -302,14 +302,38 @@ class TestCallbackApplyUsesTheRegistrationCache:
         raise AssertionError("_apply_durable_incoming 里找不到包住绑定调用的 try")
 
     def test_cache_lookup_and_replay_happen_before_the_binding(self) -> None:
+        """callback apply 经共享注册入口（ROI-0 缓存 + 冷建锁 + 写回缓存），且在绑定之前。
+
+        原判据要求本函数自己查缓存 / 重放；那份内联冷建不拿锁、不写缓存（启动预热期间回调与
+        预热各冷建一遍，实测 95.7 s），spec writeback-followup-issue-closure P4 收进同一入口。
+        """
+        body = self._try_holding_the_binding().body
+        shared_at = next(
+            (i for i, stmt in enumerate(body)
+             if "_attach_pilot_adapters" in {
+                 getattr(n.value.func, "id", None)
+                 for n in ast.walk(stmt) if isinstance(n, ast.Await) and isinstance(n.value, ast.Call)
+             }),
+            None,
+        )
+        bind_at = next((i for i, stmt in enumerate(body) if _awaited_bind_calls(stmt)), None)
+        assert shared_at is not None and bind_at is not None and shared_at < bind_at, (
+            "callback apply 没在绑定之前经过共享注册入口 `_attach_pilot_adapters`"
+        )
+        shared = _function(_ROUTER, "_attach_pilot_adapters")
         names = {
-            node.func.id
-            for node in ast.walk(self._try_holding_the_binding())
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            n.func.id if isinstance(n.func, ast.Name) else n.func.attr
+            for n in ast.walk(shared)
+            if isinstance(n, ast.Call) and isinstance(n.func, (ast.Name, ast.Attribute))
         }
-        for required in ("_registration_state_fingerprint", "_replay_cached_registrations"):
+        for required in (
+            "_registration_state_fingerprint",
+            "_replay_cached_registrations",
+            "_registration_build_lock",
+            "put",
+        ):
             assert required in names, (
-                f"callback apply 没走 ROI-0 缓存（缺 {required}）—— 每次保存都要冷建 30s+ 的注册"
+                f"共享注册入口缺 {required} —— 每次保存都可能冷建 30s+ 的注册"
             )
 
     def test_registration_failures_stay_inside_the_apply(self) -> None:
@@ -320,8 +344,8 @@ class TestCallbackApplyUsesTheRegistrationCache:
             for sub in ast.walk(node)
             if isinstance(sub, ast.Await) and isinstance(sub.value, ast.Call)
         }
-        assert {"register_from_manifest", "attach_pilot_adapters"} <= awaited, (
-            "冷建分支不在同一个 try 里 —— 它抛的 SyncDomainError 会穿出 apply"
+        assert "_attach_pilot_adapters" in awaited, (
+            "注册不在包住绑定的同一个 try 里 —— 它抛的 SyncDomainError 会穿出 apply"
         )
         handled = {
             elt.id
@@ -397,6 +421,15 @@ async def _run_callback_registration(monkeypatch: pytest.MonkeyPatch, *, cache_h
         raise RG.AdapterNotRegisteredError("R16 探针：在绑定处截停")
 
     monkeypatch.setattr(SR, "bind_registration_to_target", stop_at_binding)
+    # 冷建前的两段线程预热：源码事实（扫前端文件）与模板结构 hash。这里只看顺序，不真算。
+    from app.services.workpaper_sync import entry_source_facts, registration_template_warmup
+
+    monkeypatch.setattr(entry_source_facts, "warm_source_fact_caches", lambda: None)
+    monkeypatch.setattr(
+        registration_template_warmup,
+        "warm_template_structure_hashes",
+        lambda modules: calls.append("warm") or 0,
+    )
     wp_id = uuid.uuid4()
     app_row = SimpleNamespace(entry_id=ENTRY, wp_id=wp_id)
     await SR._apply_durable_incoming(
@@ -417,4 +450,5 @@ async def test_callback_apply_skips_the_cold_build_on_a_cache_hit(monkeypatch) -
 @pytest.mark.asyncio
 async def test_callback_apply_still_cold_builds_on_a_cache_miss(monkeypatch) -> None:
     got = await _run_callback_registration(monkeypatch, cache_hit=False)
-    assert got["calls"] == ["simple", "d2", "h1", "g7", "manifest", f"bind:{got['wp_id']}"], got
+    # 模板结构 hash 在 attach 之前先在工作线程算（spec writeback-followup-issue-closure P4）
+    assert got["calls"] == ["warm", "simple", "d2", "h1", "g7", "manifest", f"bind:{got['wp_id']}"], got

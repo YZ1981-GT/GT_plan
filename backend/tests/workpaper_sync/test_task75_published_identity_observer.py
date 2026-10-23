@@ -1252,23 +1252,28 @@ class TestManifestRegistrar:
         AST 判据：两个生产接线点都真的 `await` 了 manifest 驱动注册；同时四条 pilot attach
         一条不许掉（只加不动）。
         """
-        source = ROUTER_PY.read_text(encoding="utf-8")
-        tree = ast.parse(source)
-        awaited_in: dict[str, set[str]] = {}
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                awaited_in[node.name] = awaited_call_names(node)
-        for func in ("_attach_pilot_adapters", "_apply_durable_incoming"):
-            assert func in awaited_in, f"router 里找不到 {func} ⇒ 判据无分母"
-            assert "register_from_manifest" in awaited_in[func], (
-                f"{func} 没 await manifest 驱动注册 ⇒ 计划永不执行（additive 死代码）"
-            )
-            assert "attach_pilot_adapters" in awaited_in[func], (
-                f"{func} 掉了 pilot 侧 attach ⇒ 只加不动被破坏"
-            )
-        assert source.count("attach_d2_pilot_adapters") >= 4
-        assert source.count("attach_h1_pilot_adapters") >= 4
-        assert source.count("attach_g7_pilot_adapters") >= 4
+        # 现行形态（spec writeback-followup-issue-closure P4）：两个生产接线点都 await 同一个
+        # `_attach_pilot_adapters`，由它 await manifest 驱动注册、并把四条 pilot attach 逐条交给
+        # `_isolated_pilot_attach`。原判据要求两处各自直接 await，而隔离修复（2026-10-04）后
+        # `_attach_pilot_adapters` 已不直接 await pilot attach ⇒ 恒红；callback 一侧自带的那份冷建
+        # 本 spec 收进了同一入口。
+        from tests.workpaper_sync.router_registration_wiring_ast import (
+            assert_pilot_attach_wired,
+            awaited_names,
+            router_functions,
+        )
+
+        fns = router_functions(ROUTER_PY)
+        assert "register_from_manifest" in awaited_names(fns["_attach_pilot_adapters"]), (
+            "共享注册入口没 await manifest 驱动注册 ⇒ 计划永不执行（additive 死代码）"
+        )
+        for attach in (
+            "attach_pilot_adapters",
+            "attach_d2_pilot_adapters",
+            "attach_h1_pilot_adapters",
+            "attach_g7_pilot_adapters",
+        ):
+            assert_pilot_attach_wired(attach)
 
     def test_word_adapter_remains_forbidden(self) -> None:
         """**Validates: Requirements 12.1**

@@ -273,7 +273,13 @@ backend/app/services/workpaper_sync/excel_entry_gate.py  1317
 #     （unextend_total_formula_chain 接线等）。拆分方向见本表顶部第 1 条。
 #     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（同 sheet 多区）
 backend/app/services/workpaper_sync/excel_extract.py  4397
-backend/app/services/workpaper_sync/excel_instrumentation.py  2200
+#   excel_instrumentation.py —— 基线 2200 早已 stale：e7f942ff2（2026-10-02 批量入库）+473 行
+#     未登记（HEAD 实测 2639）⇒ 此后任何触碰本文件的提交都被本门拒。2026-10-22 spec
+#     writeback-followup-issue-closure R4 只净增 6 行（normalized_structure_hash 改为委派记忆化，
+#     记忆本体放新模块 structure_hash_memo.py），baseline 取当前真实行数，门禁继续拦 >5%。
+#     拆分方向：候选升级一组（CandidateOnlyRepository / UpgradeCandidateOutcome /
+#     ExcelInstrumentationUpgrader，约 460 行）与 ExcelIdentityCarrierGate（约 230 行）各自成模块。
+backend/app/services/workpaper_sync/excel_instrumentation.py  2645
 #   excel_materialize.py —— 基线 3120 → 3660（+540）。D4 同 sheet 多区兄弟 Table ref 位移
 #     （_sheet_table_parts / _shift_sibling_table_refs / footer 同 sheet 放行）+ _GT_SYNC
 #     重冻结几轮修复累积。spec: workpaper-html-onlyoffice-bidirectional-writeback-closure
@@ -660,7 +666,11 @@ backend/app/services/workpaper_sync/excel_workbook_row_change.py  3021
 #     三源提取 + host policy 裁决 + 机器派生 exemptions + TS 投影渲染。提取器与它生成的
 #     manifest/投影/exemption 是同一处真源的多个投影，拆分会让 --check 的自洽判据跨文件。
 #   baseline 取当前真实行数（hook 计），门禁继续拦膨胀 >5%。
-backend/app/core/startup_registry.py  889
+#   2026-10-22 startup_registry.py 889 → 935：HEAD 已 932（阈值 933 只剩 1 行）。spec
+#     writeback-followup-issue-closure R3.2 新增常驻 worker oo_apply_redrive_worker，必须在
+#     _WORKER_BINDINGS 与 WORKER_TASK_NAMES 各登记一行（另 1 行注释，与相邻 worker 同格式）。
+#     登记表随 worker 数线性增长，不是打磨膨胀；单文件理由同上。
+backend/app/core/startup_registry.py  935
 backend/app/routers/wp_render_pipeline.py  1219
 backend/scripts/gen/generate_component_capability_manifest.py  852
 

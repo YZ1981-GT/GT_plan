@@ -197,6 +197,12 @@ interface RequestOptions {
   readonly query?: Readonly<Record<string, string | number>>
   readonly body?: unknown
   readonly idempotencyKey?: string
+  /**
+   * 调用方自管失败（`utils/http` 的 `_silent`）：不弹全局提示，也不走 5xx 自动重发两次。
+   * operation 读取的失败全由调用方处理（桥 fail-visible / 轮询退避 + 窗口超时），
+   * 自动重发会把一次轮询放大成三次并在后端叠加（spec writeback-followup-issue-closure R6）。
+   */
+  readonly silent?: boolean
 }
 
 async function request(options: RequestOptions): Promise<Record<string, unknown>> {
@@ -226,6 +232,9 @@ async function request(options: RequestOptions): Promise<Record<string, unknown>
   const config: Record<string, unknown> = { headers }
   if (options.query) {
     config.params = { ...options.query }
+  }
+  if (options.silent) {
+    config._silent = true
   }
 
   // envelope 的解包发生在 `utils/http` 的响应拦截器（唯一一次）；此处只取 `data`。
@@ -749,6 +758,7 @@ export async function getOperation(
     endpoint: 'get_operation',
     scope,
     params: { operation_id: operationId },
+    silent: true,
   })
   return parseOperationSnapshot(payload)
 }

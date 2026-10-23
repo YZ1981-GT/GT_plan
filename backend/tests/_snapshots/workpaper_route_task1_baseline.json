@@ -6,23 +6,23 @@
     },
     {
       "file": "src\\components\\workpaper\\GtH1FixedAssets.vue",
-      "line": 696
+      "line": 704
     },
     {
       "file": "src\\components\\workpaper\\GtH6AssetDisposalClearing.vue",
-      "line": 273
+      "line": 282
     },
     {
       "file": "src\\components\\workpaper\\GtH6AssetDisposalClearing.vue",
-      "line": 303
+      "line": 312
     },
     {
       "file": "src\\components\\workpaper\\GtH7BiologicalAssets.vue",
-      "line": 678
+      "line": 683
     },
     {
       "file": "src\\components\\workpaper\\GtK11AssetImpairmentLoss.vue",
-      "line": 293
+      "line": 298
     },
     {
       "file": "src\\components\\workpaper\\s12-cpa-expert\\GtS12CpaExpert.vue",
@@ -72,17 +72,17 @@
     },
     {
       "file": "src\\components\\workpaper\\composables\\__tests__\\formulaEndpointExistence.spec.ts",
-      "line": 249,
+      "line": 255,
       "pattern": "/user-formulas"
     },
     {
       "file": "src\\components\\workpaper\\composables\\__tests__\\formulaEndpointExistence.spec.ts",
-      "line": 282,
+      "line": 295,
       "pattern": "/user-formulas"
     },
     {
       "file": "src\\components\\workpaper\\composables\\__tests__\\formulaEndpointExistence.spec.ts",
-      "line": 283,
+      "line": 296,
       "pattern": "/user-formulas"
     },
     {
@@ -107,7 +107,17 @@
     },
     {
       "file": "src\\composables\\__tests__\\FormulaManagerPageWiring.spec.ts",
-      "line": 173,
+      "line": 74,
+      "pattern": "/user-formulas"
+    },
+    {
+      "file": "src\\composables\\__tests__\\FormulaManagerPageWiring.spec.ts",
+      "line": 91,
+      "pattern": "/user-formulas"
+    },
+    {
+      "file": "src\\composables\\__tests__\\FormulaManagerPageWiring.spec.ts",
+      "line": 226,
       "pattern": "/user-formulas"
     },
     {
@@ -167,7 +177,7 @@
     },
     {
       "file": "src\\services\\consolidationApi.ts",
-      "line": 763,
+      "line": 816,
       "pattern": "batchUpdate"
     },
     {
@@ -202,17 +212,17 @@
     },
     {
       "file": "src\\components\\formula\\FormulaManagerDialog.vue",
-      "line": 3790,
+      "line": 3795,
       "pattern": "wpUserFormula\\."
     },
     {
       "file": "src\\components\\formula\\FormulaManagerDialog.vue",
-      "line": 3829,
+      "line": 3835,
       "pattern": "wpUserFormula\\."
     },
     {
       "file": "src\\components\\formula\\FormulaManagerDialog.vue",
-      "line": 3852,
+      "line": 3859,
       "pattern": "wpUserFormula\\."
     },
     {
@@ -553,11 +563,11 @@
       },
       {
         "file": "src\\components\\workpaper\\cutoff\\GtCutoffAutoSampling.vue",
-        "line": 117
+        "line": 118
       },
       {
         "file": "src\\components\\workpaper\\cutoff\\GtCutoffAutoSampling.vue",
-        "line": 325
+        "line": 326
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1AuditNoteSection.vue",
@@ -637,15 +647,15 @@
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabDisclosure.vue",
-        "line": 861
+        "line": 863
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabDisclosure.vue",
-        "line": 866
+        "line": 868
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabDisclosure.vue",
-        "line": 886
+        "line": 888
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabEclCalc.vue",
@@ -744,20 +754,20 @@
         "line": 550
       },
       {
-        "file": "src\\components\\workpaper\\d1\\D1TabSamplingVouching.vue",
-        "line": 310
+        "file": "src\\components\\workpaper\\d1\\D1TabVoucherCheck.vue",
+        "line": 344
       },
       {
-        "file": "src\\components\\workpaper\\d1\\D1TabSamplingVouching.vue",
-        "line": 584
+        "file": "src\\components\\workpaper\\d1\\D1TabVoucherCheck.vue",
+        "line": 618
       },
       {
-        "file": "src\\components\\workpaper\\d1\\D1TabSamplingVouching.vue",
-        "line": 1187
+        "file": "src\\components\\workpaper\\d1\\D1TabVoucherCheck.vue",
+        "line": 1224
       },
       {
-        "file": "src\\components\\workpaper\\d1\\D1TabSamplingVouching.vue",
-        "line": 1212
+        "file": "src\\components\\workpaper\\d1\\D1TabVoucherCheck.vue",
+        "line": 1249
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabWriteoffCheck.vue",
@@ -805,19 +815,19 @@
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2DisclosureNoteBody.vue",
-        "line": 190
+        "line": 191
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2DisclosureNoteBody.vue",
-        "line": 250
+        "line": 251
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2DisclosureNoteBody.vue",
-        "line": 281
+        "line": 282
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2DisclosureNoteBody.vue",
-        "line": 1448
+        "line": 1449
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabAdjudication.vue",
@@ -885,7 +895,7 @@
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabDetail.vue",
-        "line": 540
+        "line": 542
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabEcl.vue",
@@ -929,31 +939,31 @@
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 131
+        "line": 140
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 205
+        "line": 240
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 210
+        "line": 245
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 211
+        "line": 246
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 445
+        "line": 483
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 454
+        "line": 492
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 488
+        "line": 526
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabWriteoffCheck.vue",
@@ -993,7 +1003,7 @@
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabDisclosureListed.vue",
-        "line": 321
+        "line": 322
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabLongTerm.vue",
@@ -1001,51 +1011,51 @@
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabVoucherCheck.vue",
-        "line": 470
+        "line": 479
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabVoucherCheck.vue",
-        "line": 477
+        "line": 486
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabVoucherCheck.vue",
-        "line": 531
+        "line": 540
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabVoucherCheck.vue",
-        "line": 743
+        "line": 799
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabVoucherCheck.vue",
-        "line": 750
+        "line": 806
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabVoucherCheck.vue",
-        "line": 755
+        "line": 811
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabVoucherCheck.vue",
-        "line": 769
+        "line": 826
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabVoucherCheck.vue",
-        "line": 772
+        "line": 829
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabVoucherCheck.vue",
-        "line": 774
+        "line": 831
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabVoucherCheck.vue",
-        "line": 777
+        "line": 834
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabVoucherCheck.vue",
-        "line": 781
+        "line": 838
       },
       {
         "file": "src\\components\\workpaper\\d3\\D3TabVoucherCheck.vue",
-        "line": 792
+        "line": 849
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerPrice.vue",
@@ -1133,47 +1143,47 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 160
+        "line": 167
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 186
+        "line": 193
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 188
+        "line": 195
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 201
+        "line": 208
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 203
+        "line": 210
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 215
+        "line": 222
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 217
+        "line": 224
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 221
+        "line": 228
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 338
+        "line": 345
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 435
+        "line": 442
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 450
+        "line": 457
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
@@ -1181,47 +1191,47 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 304
+        "line": 319
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 330
+        "line": 345
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 332
+        "line": 347
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 344
+        "line": 359
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 346
+        "line": 361
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 358
+        "line": 373
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 360
+        "line": 375
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 364
+        "line": 379
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 434
+        "line": 465
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 666
+        "line": 711
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 683
+        "line": 728
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
@@ -1373,27 +1383,27 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabDisclosureListed.vue",
-        "line": 424
+        "line": 425
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabDisclosureListed.vue",
-        "line": 507
+        "line": 508
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabDisclosureListed.vue",
-        "line": 717
+        "line": 718
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabDisclosureListed.vue",
-        "line": 733
+        "line": 734
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabDisclosureListed.vue",
-        "line": 781
+        "line": 782
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabDisclosureListed.vue",
-        "line": 792
+        "line": 793
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabDisclosureSoe.vue",
@@ -1401,23 +1411,23 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabDisclosureSoe.vue",
-        "line": 336
+        "line": 337
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabDisclosureSoe.vue",
-        "line": 407
+        "line": 408
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabDisclosureSoe.vue",
-        "line": 606
+        "line": 607
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabDisclosureSoe.vue",
-        "line": 622
+        "line": 623
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabDisclosureSoe.vue",
-        "line": 669
+        "line": 670
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabOtherRevenue.vue",
@@ -1676,38 +1686,6 @@
         "line": 408
       },
       {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 370
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 376
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 401
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 407
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 411
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 552
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 649
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 653
-      },
-      {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
         "line": 16
       },
@@ -1758,6 +1736,38 @@
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
         "line": 694
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabVoucherCheck.vue",
+        "line": 405
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabVoucherCheck.vue",
+        "line": 411
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabVoucherCheck.vue",
+        "line": 436
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabVoucherCheck.vue",
+        "line": 442
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabVoucherCheck.vue",
+        "line": 446
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabVoucherCheck.vue",
+        "line": 590
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabVoucherCheck.vue",
+        "line": 687
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabVoucherCheck.vue",
+        "line": 691
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerChecklist.vue",
@@ -2101,7 +2111,15 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
-        "line": 129
+        "line": 128
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
+        "line": 130
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
+        "line": 130
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
@@ -2113,23 +2131,23 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
-        "line": 132
+        "line": 241
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
-        "line": 132
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
-        "line": 246
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
-        "line": 246
+        "line": 241
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
-        "line": 97
+        "line": 96
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
+        "line": 98
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
+        "line": 98
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
@@ -2141,23 +2159,23 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
-        "line": 100
+        "line": 256
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
-        "line": 100
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
-        "line": 261
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
-        "line": 261
+        "line": 256
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
-        "line": 119
+        "line": 118
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
+        "line": 120
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
+        "line": 120
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
@@ -2169,47 +2187,39 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
-        "line": 122
+        "line": 259
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
-        "line": 122
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
-        "line": 264
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
-        "line": 264
+        "line": 259
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 152
+        "line": 146
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 154
+        "line": 148
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 154
+        "line": 148
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 155
+        "line": 149
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 155
+        "line": 149
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 292
+        "line": 286
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 292
+        "line": 286
       },
       {
         "file": "src\\components\\workpaper\\d4\\policy\\D4TabPolicyCheck.vue",
@@ -2296,20 +2306,8 @@
         "line": 363
       },
       {
-        "file": "src\\components\\workpaper\\d5\\D5TabDetail.vue",
-        "line": 425
-      },
-      {
-        "file": "src\\components\\workpaper\\d5\\D5TabDetail.vue",
-        "line": 445
-      },
-      {
-        "file": "src\\components\\workpaper\\d5\\D5TabDetail.vue",
-        "line": 703
-      },
-      {
         "file": "src\\components\\workpaper\\d5\\D5TabDisclosure.vue",
-        "line": 547
+        "line": 549
       },
       {
         "file": "src\\components\\workpaper\\d5\\D5TabFairValue.vue",
@@ -2318,6 +2316,18 @@
       {
         "file": "src\\components\\workpaper\\d5\\D5TabFairValue.vue",
         "line": 580
+      },
+      {
+        "file": "src\\components\\workpaper\\d5\\D5TabVoucherCheck.vue",
+        "line": 428
+      },
+      {
+        "file": "src\\components\\workpaper\\d5\\D5TabVoucherCheck.vue",
+        "line": 448
+      },
+      {
+        "file": "src\\components\\workpaper\\d5\\D5TabVoucherCheck.vue",
+        "line": 741
       },
       {
         "file": "src\\components\\workpaper\\d6\\D6TabAdjudication.vue",
@@ -2381,7 +2391,7 @@
       },
       {
         "file": "src\\components\\workpaper\\d6\\D6TabDisclosure.vue",
-        "line": 815
+        "line": 817
       },
       {
         "file": "src\\components\\workpaper\\d6\\D6TabEclCalculation.vue",
@@ -2485,7 +2495,7 @@
       },
       {
         "file": "src\\components\\workpaper\\d7\\D7TabDisclosure.vue",
-        "line": 299
+        "line": 301
       },
       {
         "file": "src\\components\\workpaper\\d7\\D7TabLongTerm.vue",
@@ -2621,19 +2631,19 @@
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabBankFlowReconcile.vue",
-        "line": 319
+        "line": 320
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabBankFlowReconcile.vue",
-        "line": 335
+        "line": 336
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabBankFlowReconcile.vue",
-        "line": 1079
+        "line": 1080
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabBankFlowReconcile.vue",
-        "line": 1103
+        "line": 1104
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabCashCount.vue",
@@ -2753,23 +2763,23 @@
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabDisclosure.vue",
-        "line": 974
+        "line": 975
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabDisclosure.vue",
-        "line": 982
+        "line": 983
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabDisclosure.vue",
-        "line": 1048
+        "line": 1049
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabDisclosure.vue",
-        "line": 1738
+        "line": 1739
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabDisclosure.vue",
-        "line": 1756
+        "line": 1757
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabInterestAnalysis.vue",
@@ -2817,15 +2827,15 @@
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabLargeCheck.vue",
-        "line": 317
+        "line": 364
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabLargeCheck.vue",
-        "line": 332
+        "line": 379
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabLargeCheck.vue",
-        "line": 344
+        "line": 391
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabReconciliation.vue",
@@ -2873,11 +2883,11 @@
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabComprehensiveCheck.vue",
-        "line": 996
+        "line": 1047
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabComprehensiveCheck.vue",
-        "line": 1007
+        "line": 1058
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabDisclosureListed.vue",
@@ -2893,11 +2903,7 @@
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabDisclosureListed.vue",
-        "line": 532
-      },
-      {
-        "file": "src\\components\\workpaper\\f1\\F1TabDisclosureListed.vue",
-        "line": 572
+        "line": 533
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabDisclosureListed.vue",
@@ -2909,7 +2915,11 @@
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabDisclosureListed.vue",
-        "line": 748
+        "line": 575
+      },
+      {
+        "file": "src\\components\\workpaper\\f1\\F1TabDisclosureListed.vue",
+        "line": 749
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabDisclosureSoe.vue",
@@ -2925,11 +2935,7 @@
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabDisclosureSoe.vue",
-        "line": 595
-      },
-      {
-        "file": "src\\components\\workpaper\\f1\\F1TabDisclosureSoe.vue",
-        "line": 634
+        "line": 596
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabDisclosureSoe.vue",
@@ -2941,7 +2947,11 @@
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabDisclosureSoe.vue",
-        "line": 804
+        "line": 637
+      },
+      {
+        "file": "src\\components\\workpaper\\f1\\F1TabDisclosureSoe.vue",
+        "line": 805
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1VoucherCheckDialog.vue",
@@ -3045,11 +3055,7 @@
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureListed.vue",
-        "line": 79
-      },
-      {
-        "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureListed.vue",
-        "line": 102
+        "line": 80
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureListed.vue",
@@ -3073,39 +3079,39 @@
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureListed.vue",
-        "line": 303
+        "line": 108
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureListed.vue",
-        "line": 442
+        "line": 304
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureListed.vue",
-        "line": 452
+        "line": 443
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureListed.vue",
-        "line": 661
+        "line": 453
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureListed.vue",
-        "line": 679
+        "line": 662
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureListed.vue",
-        "line": 854
+        "line": 680
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureListed.vue",
-        "line": 965
+        "line": 855
+      },
+      {
+        "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureListed.vue",
+        "line": 966
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureSoe.vue",
-        "line": 70
-      },
-      {
-        "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureSoe.vue",
-        "line": 89
+        "line": 71
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureSoe.vue",
@@ -3125,27 +3131,31 @@
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureSoe.vue",
-        "line": 316
+        "line": 94
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureSoe.vue",
-        "line": 326
+        "line": 317
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureSoe.vue",
-        "line": 460
+        "line": 327
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureSoe.vue",
-        "line": 480
+        "line": 461
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureSoe.vue",
-        "line": 573
+        "line": 481
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureSoe.vue",
-        "line": 614
+        "line": 574
+      },
+      {
+        "file": "src\\components\\workpaper\\f2\\core\\F2TabDisclosureSoe.vue",
+        "line": 615
       },
       {
         "file": "src\\components\\workpaper\\f2\\detail\\F2DetailSheet.vue",
@@ -3189,19 +3199,19 @@
       },
       {
         "file": "src\\components\\workpaper\\f2\\inspection\\F2CutoffSheet.vue",
-        "line": 923
-      },
-      {
-        "file": "src\\components\\workpaper\\f2\\inspection\\F2CutoffSheet.vue",
-        "line": 967
-      },
-      {
-        "file": "src\\components\\workpaper\\f2\\inspection\\F2CutoffSheet.vue",
-        "line": 972
+        "line": 933
       },
       {
         "file": "src\\components\\workpaper\\f2\\inspection\\F2CutoffSheet.vue",
         "line": 977
+      },
+      {
+        "file": "src\\components\\workpaper\\f2\\inspection\\F2CutoffSheet.vue",
+        "line": 982
+      },
+      {
+        "file": "src\\components\\workpaper\\f2\\inspection\\F2CutoffSheet.vue",
+        "line": 987
       },
       {
         "file": "src\\components\\workpaper\\f2\\shared\\F2SheetToolbar.vue",
@@ -3341,19 +3351,19 @@
       },
       {
         "file": "src\\components\\workpaper\\f2\\valuation\\F2TabMaterialUsageCheck.vue",
-        "line": 458
+        "line": 465
       },
       {
         "file": "src\\components\\workpaper\\f2\\valuation\\F2TabMaterialUsageCheck.vue",
-        "line": 459
+        "line": 466
       },
       {
         "file": "src\\components\\workpaper\\f2\\valuation\\F2TabMaterialUsageCheck.vue",
-        "line": 460
+        "line": 467
       },
       {
         "file": "src\\components\\workpaper\\f2\\valuation\\F2TabMaterialUsageCheck.vue",
-        "line": 462
+        "line": 469
       },
       {
         "file": "src\\components\\workpaper\\f2\\valuation\\F2TabObsoleteInventory.vue",
@@ -3405,23 +3415,23 @@
       },
       {
         "file": "src\\components\\workpaper\\f2\\valuation\\F2TabPurchaseInboundCheck.vue",
-        "line": 512
+        "line": 519
       },
       {
         "file": "src\\components\\workpaper\\f2\\valuation\\F2TabPurchaseInboundCheck.vue",
-        "line": 546
+        "line": 553
       },
       {
         "file": "src\\components\\workpaper\\f2\\valuation\\F2TabPurchaseInboundCheck.vue",
-        "line": 547
+        "line": 554
       },
       {
         "file": "src\\components\\workpaper\\f2\\valuation\\F2TabPurchaseInboundCheck.vue",
-        "line": 548
+        "line": 555
       },
       {
         "file": "src\\components\\workpaper\\f2\\valuation\\F2TabPurchaseInboundCheck.vue",
-        "line": 550
+        "line": 557
       },
       {
         "file": "src\\components\\workpaper\\f2\\valuation\\F2TabRelatedPurchase.vue",
@@ -3505,11 +3515,11 @@
       },
       {
         "file": "src\\components\\workpaper\\f2-special\\contract\\F2TabContractCostCheck.vue",
-        "line": 543
+        "line": 546
       },
       {
         "file": "src\\components\\workpaper\\f2-special\\contract\\F2TabContractCostCheck.vue",
-        "line": 544
+        "line": 547
       },
       {
         "file": "src\\components\\workpaper\\f2-special\\contract\\F2TabContractCostDetail.vue",
@@ -3765,19 +3775,19 @@
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3TabVoucherCheck.vue",
-        "line": 141
+        "line": 162
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3TabVoucherCheck.vue",
-        "line": 149
+        "line": 170
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3TabVoucherCheck.vue",
-        "line": 281
+        "line": 332
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3TabVoucherCheck.vue",
-        "line": 316
+        "line": 367
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3VoucherCheckDialog.vue",
@@ -3829,19 +3839,19 @@
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabDisclosureListed.vue",
-        "line": 125
+        "line": 127
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabDisclosureListed.vue",
-        "line": 349
+        "line": 351
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabDisclosureSOE.vue",
-        "line": 128
+        "line": 130
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabDisclosureSOE.vue",
-        "line": 321
+        "line": 323
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabLongOutstanding.vue",
@@ -3937,19 +3947,19 @@
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabVoucherCheck.vue",
-        "line": 174
+        "line": 221
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabVoucherCheck.vue",
-        "line": 185
+        "line": 232
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabVoucherCheck.vue",
-        "line": 338
+        "line": 389
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabVoucherCheck.vue",
-        "line": 362
+        "line": 413
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4VoucherCheckDialog.vue",
@@ -4025,11 +4035,11 @@
       },
       {
         "file": "src\\components\\workpaper\\f5-cost-of-sales\\F5TabMajorAdjustment.vue",
-        "line": 391
+        "line": 397
       },
       {
         "file": "src\\components\\workpaper\\f5-cost-of-sales\\F5TabMajorAdjustment.vue",
-        "line": 402
+        "line": 408
       },
       {
         "file": "src\\components\\workpaper\\f5-cost-of-sales\\F5TabMonthlyDetail.vue",
@@ -4173,11 +4183,11 @@
       },
       {
         "file": "src\\components\\workpaper\\g4-bond-investment-ecl\\voucher\\G4TabVoucherCheck.vue",
-        "line": 586
+        "line": 590
       },
       {
         "file": "src\\components\\workpaper\\g4-bond-investment-ecl\\voucher\\G4TabVoucherCheck.vue",
-        "line": 990
+        "line": 1053
       },
       {
         "file": "src\\components\\workpaper\\g4-bond-investment-main\\core\\G4TabDisclosureListed.vue",
@@ -4225,7 +4235,7 @@
       },
       {
         "file": "src\\components\\workpaper\\g6-other-bond-investment-ecl\\voucher\\G6TabVoucherCheck.vue",
-        "line": 339
+        "line": 342
       },
       {
         "file": "src\\components\\workpaper\\g6-other-bond-investment-main\\core\\G6TabDisclosureListed.vue",
@@ -4237,7 +4247,7 @@
       },
       {
         "file": "src\\components\\workpaper\\g6-other-bond-investment-main\\core\\G6TabDisclosureListed.vue",
-        "line": 705
+        "line": 706
       },
       {
         "file": "src\\components\\workpaper\\g6-other-bond-investment-main\\core\\G6TabDisclosureSOE.vue",
@@ -4325,7 +4335,7 @@
       },
       {
         "file": "src\\components\\workpaper\\g7-long-term-equity-main\\disclosure\\G7TabDisclosureListed.vue",
-        "line": 1035
+        "line": 1036
       },
       {
         "file": "src\\components\\workpaper\\g7-long-term-equity-main\\disclosure\\G7TabDisclosureSOE.vue",
@@ -4333,7 +4343,7 @@
       },
       {
         "file": "src\\components\\workpaper\\g7-long-term-equity-main\\disclosure\\G7TabDisclosureSOE.vue",
-        "line": 1202
+        "line": 1203
       },
       {
         "file": "src\\components\\workpaper\\g7-long-term-equity-method\\calculation\\G7TabEquityMethodCalc.vue",
@@ -4473,15 +4483,15 @@
       },
       {
         "file": "src\\components\\workpaper\\g7-long-term-equity-subsidiary\\voucher\\G7TabVoucherCheck.vue",
-        "line": 395
+        "line": 398
       },
       {
         "file": "src\\components\\workpaper\\g7-long-term-equity-subsidiary\\voucher\\G7TabVoucherCheck.vue",
-        "line": 903
+        "line": 969
       },
       {
         "file": "src\\components\\workpaper\\g7-long-term-equity-subsidiary\\voucher\\G7TabVoucherCheck.vue",
-        "line": 906
+        "line": 972
       },
       {
         "file": "src\\components\\workpaper\\g8-other-equity-instruments\\G8AuditTextCards.vue",
@@ -4493,19 +4503,19 @@
       },
       {
         "file": "src\\components\\workpaper\\g8-other-equity-instruments\\voucher\\G8TabVoucherCheck.vue",
-        "line": 975
+        "line": 1021
       },
       {
         "file": "src\\components\\workpaper\\g8-other-equity-instruments\\voucher\\G8TabVoucherCheck.vue",
-        "line": 976
+        "line": 1022
       },
       {
         "file": "src\\components\\workpaper\\g8-other-equity-instruments\\voucher\\G8TabVoucherCheck.vue",
-        "line": 979
+        "line": 1025
       },
       {
         "file": "src\\components\\workpaper\\g8-other-equity-instruments\\voucher\\G8TabVoucherCheck.vue",
-        "line": 982
+        "line": 1028
       },
       {
         "file": "src\\components\\workpaper\\g9-other-noncurrent-financial\\G9AuditTextCards.vue",
@@ -4517,23 +4527,23 @@
       },
       {
         "file": "src\\components\\workpaper\\g9-other-noncurrent-financial\\voucher\\G9TabVoucherCheck.vue",
-        "line": 556
+        "line": 559
       },
       {
         "file": "src\\components\\workpaper\\g9-other-noncurrent-financial\\voucher\\G9TabVoucherCheck.vue",
-        "line": 828
+        "line": 877
       },
       {
         "file": "src\\components\\workpaper\\g9-other-noncurrent-financial\\voucher\\G9TabVoucherCheck.vue",
-        "line": 829
+        "line": 878
       },
       {
         "file": "src\\components\\workpaper\\g9-other-noncurrent-financial\\voucher\\G9TabVoucherCheck.vue",
-        "line": 832
+        "line": 881
       },
       {
         "file": "src\\components\\workpaper\\g9-other-noncurrent-financial\\voucher\\G9TabVoucherCheck.vue",
-        "line": 835
+        "line": 884
       },
       {
         "file": "src\\components\\workpaper\\GoodwillImpairmentDialog.vue",
@@ -4609,11 +4619,15 @@
       },
       {
         "file": "src\\components\\workpaper\\GtA173ConsultationRecord.vue",
-        "line": 413
+        "line": 414
       },
       {
         "file": "src\\components\\workpaper\\GtA173ConsultationRecord.vue",
-        "line": 471
+        "line": 415
+      },
+      {
+        "file": "src\\components\\workpaper\\GtA173ConsultationRecord.vue",
+        "line": 473
       },
       {
         "file": "src\\components\\workpaper\\GtA174DisagreementRecord.vue",
@@ -5017,19 +5031,19 @@
       },
       {
         "file": "src\\components\\workpaper\\h1\\core\\H1TabDisclosureListed.vue",
-        "line": 629
+        "line": 630
       },
       {
         "file": "src\\components\\workpaper\\h1\\core\\H1TabDisclosureSoe.vue",
-        "line": 586
+        "line": 587
       },
       {
         "file": "src\\components\\workpaper\\h1\\inspection\\H1TabDisposalCheck.vue",
-        "line": 486
+        "line": 489
       },
       {
         "file": "src\\components\\workpaper\\h1\\inspection\\H1TabDisposalCheck.vue",
-        "line": 758
+        "line": 807
       },
       {
         "file": "src\\components\\workpaper\\h1\\inspection\\H1TabPolicyCheck.vue",
@@ -5097,11 +5111,11 @@
       },
       {
         "file": "src\\components\\workpaper\\h2\\core\\H2TabDisclosureListed.vue",
-        "line": 506
+        "line": 508
       },
       {
         "file": "src\\components\\workpaper\\h2\\core\\H2TabDisclosureSoe.vue",
-        "line": 368
+        "line": 370
       },
       {
         "file": "src\\components\\workpaper\\h2\\core\\H2TabIndex.vue",
@@ -5121,11 +5135,11 @@
       },
       {
         "file": "src\\components\\workpaper\\h4\\core\\H4TabDisclosureListed.vue",
-        "line": 178
+        "line": 179
       },
       {
         "file": "src\\components\\workpaper\\h4\\core\\H4TabDisclosureSoe.vue",
-        "line": 210
+        "line": 212
       },
       {
         "file": "src\\components\\workpaper\\h4\\inspection\\H4TabStocktakeCheck.vue",
@@ -5137,11 +5151,11 @@
       },
       {
         "file": "src\\components\\workpaper\\h5\\core\\H5TabDisclosureSoe.vue",
-        "line": 91
+        "line": 97
       },
       {
         "file": "src\\components\\workpaper\\h5\\core\\H5TabDisclosureSoe.vue",
-        "line": 162
+        "line": 168
       },
       {
         "file": "src\\components\\workpaper\\h5\\stocktake\\H5TabStocktakeSummary.vue",
@@ -5149,11 +5163,11 @@
       },
       {
         "file": "src\\components\\workpaper\\h6\\core\\H6TabDisclosure.vue",
-        "line": 312
+        "line": 314
       },
       {
         "file": "src\\components\\workpaper\\h6\\inspection\\H6TabCheck.vue",
-        "line": 685
+        "line": 688
       },
       {
         "file": "src\\components\\workpaper\\h7\\core\\H7TabDisclosureListed.vue",
@@ -5169,11 +5183,11 @@
       },
       {
         "file": "src\\components\\workpaper\\h8\\core\\H8TabDisclosureListed.vue",
-        "line": 278
+        "line": 279
       },
       {
         "file": "src\\components\\workpaper\\h8\\core\\H8TabDisclosureSoe.vue",
-        "line": 248
+        "line": 249
       },
       {
         "file": "src\\components\\workpaper\\h8\\depreciation\\H8TabDepreciationAlloc.vue",
@@ -5221,11 +5235,11 @@
       },
       {
         "file": "src\\components\\workpaper\\h9\\core\\H9TabDisclosureListed.vue",
-        "line": 311
+        "line": 312
       },
       {
         "file": "src\\components\\workpaper\\h9\\core\\H9TabDisclosureSoe.vue",
-        "line": 239
+        "line": 240
       },
       {
         "file": "src\\components\\workpaper\\i1\\core\\I1TabDisclosureListed.vue",
@@ -5421,7 +5435,7 @@
       },
       {
         "file": "src\\components\\workpaper\\j1\\inspection\\J1TabGeneralCheck.vue",
-        "line": 600
+        "line": 638
       },
       {
         "file": "src\\components\\workpaper\\j1\\inspection\\J1TabNonMonetaryCheck.vue",
@@ -5557,43 +5571,43 @@
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureListed.vue",
-        "line": 219
+        "line": 220
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureListed.vue",
-        "line": 244
+        "line": 245
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureListed.vue",
-        "line": 383
+        "line": 384
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureListed.vue",
-        "line": 452
+        "line": 453
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureListed.vue",
-        "line": 533
+        "line": 534
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureSoe.vue",
-        "line": 423
+        "line": 424
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureSoe.vue",
-        "line": 450
+        "line": 451
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureSoe.vue",
-        "line": 595
+        "line": 596
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureSoe.vue",
-        "line": 665
+        "line": 666
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureSoe.vue",
-        "line": 768
+        "line": 769
       },
       {
         "file": "src\\components\\workpaper\\j3\\core\\J3TabCheck.vue",
@@ -5681,7 +5695,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k1\\core\\K1TabDisclosureSoe.vue",
-        "line": 1071
+        "line": 1073
       },
       {
         "file": "src\\components\\workpaper\\k1\\impairment\\K1TabStageCheck.vue",
@@ -5737,7 +5751,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k1\\inspection\\K1TabReceivableCheck.vue",
-        "line": 905
+        "line": 943
       },
       {
         "file": "src\\components\\workpaper\\k1\\inspection\\K1TabWriteoffCheck.vue",
@@ -5825,11 +5839,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k10\\core\\K10TabDisclosureListed.vue",
-        "line": 454
+        "line": 455
       },
       {
         "file": "src\\components\\workpaper\\k10\\core\\K10TabDisclosureListed.vue",
-        "line": 456
+        "line": 457
       },
       {
         "file": "src\\components\\workpaper\\k10\\core\\K10TabDisclosureSoe.vue",
@@ -5849,11 +5863,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k10\\core\\K10TabDisclosureSoe.vue",
-        "line": 443
+        "line": 444
       },
       {
         "file": "src\\components\\workpaper\\k10\\core\\K10TabDisclosureSoe.vue",
-        "line": 445
+        "line": 446
       },
       {
         "file": "src\\components\\workpaper\\k10\\inspection\\K10TabGrantReconcile.vue",
@@ -5881,11 +5895,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k10\\inspection\\K10TabOtherIncomeCheck.vue",
-        "line": 559
+        "line": 563
       },
       {
         "file": "src\\components\\workpaper\\k10\\inspection\\K10TabOtherIncomeCheck.vue",
-        "line": 561
+        "line": 565
       },
       {
         "file": "src\\components\\workpaper\\k10\\inspection\\K10TabReceivableGrant.vue",
@@ -5933,7 +5947,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k11\\core\\K11TabDisclosureListed.vue",
-        "line": 405
+        "line": 406
       },
       {
         "file": "src\\components\\workpaper\\k11\\core\\K11TabDisclosureSoe.vue",
@@ -5953,7 +5967,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k11\\core\\K11TabDisclosureSoe.vue",
-        "line": 402
+        "line": 403
       },
       {
         "file": "src\\components\\workpaper\\k12\\core\\K12TabAdjudication.vue",
@@ -6029,7 +6043,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k12\\core\\K12TabNonOperatingCheck.vue",
-        "line": 556
+        "line": 560
       },
       {
         "file": "src\\components\\workpaper\\k13\\core\\K13TabAdjudication.vue",
@@ -6105,7 +6119,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k13\\core\\K13TabNonOperatingCheck.vue",
-        "line": 635
+        "line": 639
       },
       {
         "file": "src\\components\\workpaper\\k2\\amortization\\K2TabAmortization.vue",
@@ -6177,11 +6191,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k2\\core\\K2TabDisclosureListed.vue",
-        "line": 738
-      },
-      {
-        "file": "src\\components\\workpaper\\k2\\core\\K2TabDisclosureListed.vue",
-        "line": 779
+        "line": 739
       },
       {
         "file": "src\\components\\workpaper\\k2\\core\\K2TabDisclosureListed.vue",
@@ -6189,7 +6199,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k2\\core\\K2TabDisclosureListed.vue",
-        "line": 785
+        "line": 781
+      },
+      {
+        "file": "src\\components\\workpaper\\k2\\core\\K2TabDisclosureListed.vue",
+        "line": 786
       },
       {
         "file": "src\\components\\workpaper\\k2\\core\\K2TabDisclosureSoe.vue",
@@ -6197,11 +6211,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k2\\core\\K2TabDisclosureSoe.vue",
-        "line": 381
-      },
-      {
-        "file": "src\\components\\workpaper\\k2\\core\\K2TabDisclosureSoe.vue",
-        "line": 409
+        "line": 382
       },
       {
         "file": "src\\components\\workpaper\\k2\\core\\K2TabDisclosureSoe.vue",
@@ -6209,7 +6219,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k2\\core\\K2TabDisclosureSoe.vue",
-        "line": 415
+        "line": 411
+      },
+      {
+        "file": "src\\components\\workpaper\\k2\\core\\K2TabDisclosureSoe.vue",
+        "line": 416
       },
       {
         "file": "src\\components\\workpaper\\k2\\inspection\\K2TabCheck.vue",
@@ -6217,11 +6231,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k2\\inspection\\K2TabCheck.vue",
-        "line": 330
+        "line": 366
       },
       {
         "file": "src\\components\\workpaper\\k2\\inspection\\K2TabCheck.vue",
-        "line": 358
+        "line": 394
       },
       {
         "file": "src\\components\\workpaper\\k3\\core\\K3TabAdjudication.vue",
@@ -6249,15 +6263,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k3\\core\\K3TabDisclosureListed.vue",
-        "line": 459
+        "line": 460
       },
       {
         "file": "src\\components\\workpaper\\k3\\core\\K3TabDisclosureListed.vue",
-        "line": 479
-      },
-      {
-        "file": "src\\components\\workpaper\\k3\\core\\K3TabDisclosureListed.vue",
-        "line": 495
+        "line": 480
       },
       {
         "file": "src\\components\\workpaper\\k3\\core\\K3TabDisclosureListed.vue",
@@ -6265,7 +6275,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k3\\core\\K3TabDisclosureListed.vue",
-        "line": 501
+        "line": 497
+      },
+      {
+        "file": "src\\components\\workpaper\\k3\\core\\K3TabDisclosureListed.vue",
+        "line": 502
       },
       {
         "file": "src\\components\\workpaper\\k3\\core\\K3TabDisclosureSoe.vue",
@@ -6277,15 +6291,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k3\\core\\K3TabDisclosureSoe.vue",
-        "line": 393
+        "line": 394
       },
       {
         "file": "src\\components\\workpaper\\k3\\core\\K3TabDisclosureSoe.vue",
-        "line": 413
-      },
-      {
-        "file": "src\\components\\workpaper\\k3\\core\\K3TabDisclosureSoe.vue",
-        "line": 429
+        "line": 414
       },
       {
         "file": "src\\components\\workpaper\\k3\\core\\K3TabDisclosureSoe.vue",
@@ -6293,7 +6303,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k3\\core\\K3TabDisclosureSoe.vue",
-        "line": 435
+        "line": 431
+      },
+      {
+        "file": "src\\components\\workpaper\\k3\\core\\K3TabDisclosureSoe.vue",
+        "line": 436
       },
       {
         "file": "src\\components\\workpaper\\k3\\inspection\\K3TabLargeAmount.vue",
@@ -6309,7 +6323,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k3\\inspection\\K3TabLongOutstanding.vue",
-        "line": 222
+        "line": 225
       },
       {
         "file": "src\\components\\workpaper\\k3\\inspection\\K3TabPayableCheck.vue",
@@ -6321,7 +6335,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k3\\inspection\\K3TabRelatedParty.vue",
-        "line": 238
+        "line": 241
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabAdjudication.vue",
@@ -6361,15 +6375,15 @@
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabCheck.vue",
-        "line": 324
+        "line": 327
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabCheck.vue",
-        "line": 526
+        "line": 564
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabCheck.vue",
-        "line": 557
+        "line": 595
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabDetail.vue",
@@ -6389,11 +6403,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabDisclosureListed.vue",
-        "line": 423
-      },
-      {
-        "file": "src\\components\\workpaper\\k4\\core\\K4TabDisclosureListed.vue",
-        "line": 453
+        "line": 424
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabDisclosureListed.vue",
@@ -6401,7 +6411,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabDisclosureListed.vue",
-        "line": 459
+        "line": 455
+      },
+      {
+        "file": "src\\components\\workpaper\\k4\\core\\K4TabDisclosureListed.vue",
+        "line": 460
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabDisclosureSoe.vue",
@@ -6413,11 +6427,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabDisclosureSoe.vue",
-        "line": 284
-      },
-      {
-        "file": "src\\components\\workpaper\\k4\\core\\K4TabDisclosureSoe.vue",
-        "line": 317
+        "line": 285
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabDisclosureSoe.vue",
@@ -6425,7 +6435,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabDisclosureSoe.vue",
-        "line": 323
+        "line": 319
+      },
+      {
+        "file": "src\\components\\workpaper\\k4\\core\\K4TabDisclosureSoe.vue",
+        "line": 324
       },
       {
         "file": "src\\components\\workpaper\\k5\\contingency\\K5TabProvisionCheck.vue",
@@ -6449,11 +6463,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureListed.vue",
-        "line": 397
-      },
-      {
-        "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureListed.vue",
-        "line": 436
+        "line": 398
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureListed.vue",
@@ -6461,7 +6471,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureListed.vue",
-        "line": 442
+        "line": 438
+      },
+      {
+        "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureListed.vue",
+        "line": 443
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureSoe.vue",
@@ -6473,11 +6487,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureSoe.vue",
-        "line": 424
-      },
-      {
-        "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureSoe.vue",
-        "line": 468
+        "line": 425
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureSoe.vue",
@@ -6485,7 +6495,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureSoe.vue",
-        "line": 474
+        "line": 470
+      },
+      {
+        "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureSoe.vue",
+        "line": 475
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabAdjudication.vue",
@@ -6537,11 +6551,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabDisclosureListed.vue",
-        "line": 528
+        "line": 529
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabDisclosureListed.vue",
-        "line": 555
+        "line": 556
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabDisclosureSoe.vue",
@@ -6557,11 +6571,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabDisclosureSoe.vue",
-        "line": 485
+        "line": 486
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabDisclosureSoe.vue",
-        "line": 511
+        "line": 512
       },
       {
         "file": "src\\components\\workpaper\\k6\\impairment\\K6TabGroupImpairment.vue",
@@ -6673,15 +6687,15 @@
       },
       {
         "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureListed.vue",
-        "line": 403
-      },
-      {
-        "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureListed.vue",
         "line": 404
       },
       {
         "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureListed.vue",
-        "line": 409
+        "line": 405
+      },
+      {
+        "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureListed.vue",
+        "line": 410
       },
       {
         "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureSoe.vue",
@@ -6697,15 +6711,15 @@
       },
       {
         "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureSoe.vue",
-        "line": 681
-      },
-      {
-        "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureSoe.vue",
         "line": 682
       },
       {
         "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureSoe.vue",
-        "line": 687
+        "line": 683
+      },
+      {
+        "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureSoe.vue",
+        "line": 688
       },
       {
         "file": "src\\components\\workpaper\\k7\\inspection\\K7TabDeferredCheck.vue",
@@ -6793,15 +6807,15 @@
       },
       {
         "file": "src\\components\\workpaper\\k8\\core\\K8TabDisclosureListed.vue",
-        "line": 370
+        "line": 371
       },
       {
         "file": "src\\components\\workpaper\\k8\\core\\K8TabDisclosureListed.vue",
-        "line": 391
+        "line": 392
       },
       {
         "file": "src\\components\\workpaper\\k8\\core\\K8TabDisclosureListed.vue",
-        "line": 402
+        "line": 403
       },
       {
         "file": "src\\components\\workpaper\\k8\\core\\K8TabDisclosureSoe.vue",
@@ -6829,15 +6843,15 @@
       },
       {
         "file": "src\\components\\workpaper\\k8\\core\\K8TabDisclosureSoe.vue",
-        "line": 339
+        "line": 340
       },
       {
         "file": "src\\components\\workpaper\\k8\\core\\K8TabDisclosureSoe.vue",
-        "line": 360
+        "line": 361
       },
       {
         "file": "src\\components\\workpaper\\k8\\core\\K8TabDisclosureSoe.vue",
-        "line": 371
+        "line": 372
       },
       {
         "file": "src\\components\\workpaper\\k8\\cutoff\\K8TabCutoffS2V.vue",
@@ -6853,11 +6867,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k8\\cutoff\\K8TabCutoffS2V.vue",
-        "line": 257
+        "line": 260
       },
       {
         "file": "src\\components\\workpaper\\k8\\cutoff\\K8TabCutoffS2V.vue",
-        "line": 274
+        "line": 277
       },
       {
         "file": "src\\components\\workpaper\\k8\\cutoff\\K8TabCutoffV2S.vue",
@@ -6873,11 +6887,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k8\\cutoff\\K8TabCutoffV2S.vue",
-        "line": 258
+        "line": 261
       },
       {
         "file": "src\\components\\workpaper\\k8\\cutoff\\K8TabCutoffV2S.vue",
-        "line": 275
+        "line": 278
       },
       {
         "file": "src\\components\\workpaper\\k8\\inspection\\K8TabContractCheck.vue",
@@ -6889,11 +6903,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k8\\inspection\\K8TabContractCheck.vue",
-        "line": 298
+        "line": 301
       },
       {
         "file": "src\\components\\workpaper\\k8\\inspection\\K8TabContractCheck.vue",
-        "line": 314
+        "line": 317
       },
       {
         "file": "src\\components\\workpaper\\k8\\inspection\\K8TabSellingCheck.vue",
@@ -6905,15 +6919,15 @@
       },
       {
         "file": "src\\components\\workpaper\\k8\\inspection\\K8TabSellingCheck.vue",
-        "line": 243
+        "line": 246
       },
       {
         "file": "src\\components\\workpaper\\k8\\inspection\\K8TabSellingCheck.vue",
-        "line": 448
+        "line": 487
       },
       {
         "file": "src\\components\\workpaper\\k8\\inspection\\K8TabSellingCheck.vue",
-        "line": 463
+        "line": 502
       },
       {
         "file": "src\\components\\workpaper\\k9\\analysis\\K9TabSubstantiveAnalysis.vue",
@@ -7025,7 +7039,7 @@
       },
       {
         "file": "src\\components\\workpaper\\l1\\core\\L1TabDisclosureListed.vue",
-        "line": 216
+        "line": 221
       },
       {
         "file": "src\\components\\workpaper\\l1\\core\\L1TabDisclosureSoe.vue",
@@ -7037,7 +7051,7 @@
       },
       {
         "file": "src\\components\\workpaper\\l1\\core\\L1TabDisclosureSoe.vue",
-        "line": 192
+        "line": 197
       },
       {
         "file": "src\\components\\workpaper\\l1\\inspection\\L1TabContractCheck.vue",
@@ -7781,7 +7795,7 @@
       },
       {
         "file": "src\\components\\workpaper\\m1\\core\\M1TabDisclosureListed.vue",
-        "line": 268
+        "line": 269
       },
       {
         "file": "src\\components\\workpaper\\m1\\core\\M1TabDisclosureSoe.vue",
@@ -7793,7 +7807,7 @@
       },
       {
         "file": "src\\components\\workpaper\\m1\\core\\M1TabDisclosureSoe.vue",
-        "line": 237
+        "line": 238
       },
       {
         "file": "src\\components\\workpaper\\m1\\inspection\\M1TabDividendCheck.vue",
@@ -7801,11 +7815,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m1\\inspection\\M1TabDividendCheck.vue",
-        "line": 215
+        "line": 218
       },
       {
         "file": "src\\components\\workpaper\\m1\\inspection\\M1TabDividendCheck.vue",
-        "line": 512
+        "line": 551
       },
       {
         "file": "src\\components\\workpaper\\m10\\core\\M10TabAdjudication.vue",
@@ -7841,11 +7855,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m10\\core\\M10TabDisclosureListed.vue",
-        "line": 392
+        "line": 393
       },
       {
         "file": "src\\components\\workpaper\\m10\\core\\M10TabDisclosureListed.vue",
-        "line": 394
+        "line": 395
       },
       {
         "file": "src\\components\\workpaper\\m10\\core\\M10TabDisclosureSoe.vue",
@@ -7857,11 +7871,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m10\\core\\M10TabDisclosureSoe.vue",
-        "line": 325
+        "line": 326
       },
       {
         "file": "src\\components\\workpaper\\m10\\core\\M10TabDisclosureSoe.vue",
-        "line": 327
+        "line": 328
       },
       {
         "file": "src\\components\\workpaper\\m10\\inspection\\M10TabClassificationCheck.vue",
@@ -7969,7 +7983,7 @@
       },
       {
         "file": "src\\components\\workpaper\\m2\\core\\M2TabDisclosureListed.vue",
-        "line": 364
+        "line": 365
       },
       {
         "file": "src\\components\\workpaper\\m2\\core\\M2TabDisclosureSoe.vue",
@@ -7981,7 +7995,7 @@
       },
       {
         "file": "src\\components\\workpaper\\m2\\core\\M2TabDisclosureSoe.vue",
-        "line": 334
+        "line": 335
       },
       {
         "file": "src\\components\\workpaper\\m2\\inspection\\M2TabCapitalCheck.vue",
@@ -7989,11 +8003,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m2\\inspection\\M2TabCapitalCheck.vue",
-        "line": 222
+        "line": 225
       },
       {
         "file": "src\\components\\workpaper\\m2\\inspection\\M2TabCapitalCheck.vue",
-        "line": 416
+        "line": 455
       },
       {
         "file": "src\\components\\workpaper\\m3\\calc\\M3TabFxInvest.vue",
@@ -8061,11 +8075,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m3\\core\\M3TabDisclosureListed.vue",
-        "line": 376
+        "line": 377
       },
       {
         "file": "src\\components\\workpaper\\m3\\core\\M3TabDisclosureListed.vue",
-        "line": 378
+        "line": 379
       },
       {
         "file": "src\\components\\workpaper\\m3\\inspection\\M3TabTreasuryCheck.vue",
@@ -8129,11 +8143,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m4\\core\\M4TabDisclosureListed.vue",
-        "line": 343
+        "line": 345
       },
       {
         "file": "src\\components\\workpaper\\m4\\core\\M4TabDisclosureListed.vue",
-        "line": 362
+        "line": 364
       },
       {
         "file": "src\\components\\workpaper\\m4\\core\\M4TabDisclosureSoe.vue",
@@ -8145,11 +8159,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m4\\core\\M4TabDisclosureSoe.vue",
-        "line": 342
+        "line": 344
       },
       {
         "file": "src\\components\\workpaper\\m4\\core\\M4TabDisclosureSoe.vue",
-        "line": 361
+        "line": 363
       },
       {
         "file": "src\\components\\workpaper\\m4\\inspection\\M4TabReserveCheck.vue",
@@ -8185,15 +8199,15 @@
       },
       {
         "file": "src\\components\\workpaper\\m5\\core\\M5TabAdjudication.vue",
-        "line": 23
+        "line": 16
       },
       {
         "file": "src\\components\\workpaper\\m5\\core\\M5TabAdjudication.vue",
-        "line": 299
+        "line": 292
       },
       {
         "file": "src\\components\\workpaper\\m5\\core\\M5TabAdjudication.vue",
-        "line": 516
+        "line": 509
       },
       {
         "file": "src\\components\\workpaper\\m5\\core\\M5TabAdjustment.vue",
@@ -8229,11 +8243,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m5\\core\\M5TabDisclosureListed.vue",
-        "line": 355
+        "line": 357
       },
       {
         "file": "src\\components\\workpaper\\m5\\core\\M5TabDisclosureListed.vue",
-        "line": 356
+        "line": 358
       },
       {
         "file": "src\\components\\workpaper\\m5\\core\\M5TabDisclosureSoe.vue",
@@ -8245,11 +8259,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m5\\core\\M5TabDisclosureSoe.vue",
-        "line": 383
+        "line": 385
       },
       {
         "file": "src\\components\\workpaper\\m5\\core\\M5TabDisclosureSoe.vue",
-        "line": 384
+        "line": 386
       },
       {
         "file": "src\\components\\workpaper\\m5\\inspection\\M5TabReserveCheck.vue",
@@ -8317,11 +8331,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m6\\core\\M6TabDisclosureListed.vue",
-        "line": 374
+        "line": 375
       },
       {
         "file": "src\\components\\workpaper\\m6\\core\\M6TabDisclosureListed.vue",
-        "line": 375
+        "line": 376
       },
       {
         "file": "src\\components\\workpaper\\m6\\core\\M6TabDisclosureSoe.vue",
@@ -8329,11 +8343,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m6\\core\\M6TabDisclosureSoe.vue",
-        "line": 372
+        "line": 373
       },
       {
         "file": "src\\components\\workpaper\\m6\\core\\M6TabDisclosureSoe.vue",
-        "line": 373
+        "line": 374
       },
       {
         "file": "src\\components\\workpaper\\m6\\inspection\\M6TabRetainedCheck.vue",
@@ -8425,7 +8439,7 @@
       },
       {
         "file": "src\\components\\workpaper\\m7\\core\\M7TabDisclosureListed.vue",
-        "line": 273
+        "line": 279
       },
       {
         "file": "src\\components\\workpaper\\m7\\core\\M7TabDisclosureSoe.vue",
@@ -8437,7 +8451,7 @@
       },
       {
         "file": "src\\components\\workpaper\\m7\\core\\M7TabDisclosureSoe.vue",
-        "line": 282
+        "line": 288
       },
       {
         "file": "src\\components\\workpaper\\m7\\inspection\\M7TabExpenditureCheck.vue",
@@ -8537,7 +8551,7 @@
       },
       {
         "file": "src\\components\\workpaper\\m8\\core\\M8TabDisclosureListed.vue",
-        "line": 306
+        "line": 311
       },
       {
         "file": "src\\components\\workpaper\\m8\\core\\M8TabDisclosureSoe.vue",
@@ -8545,7 +8559,7 @@
       },
       {
         "file": "src\\components\\workpaper\\m8\\core\\M8TabDisclosureSoe.vue",
-        "line": 336
+        "line": 341
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabAdjudication.vue",
@@ -8585,15 +8599,15 @@
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabDetail.vue",
-        "line": 706
+        "line": 708
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabDetail.vue",
-        "line": 725
+        "line": 727
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabDetail.vue",
-        "line": 726
+        "line": 728
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabDisclosureListed.vue",
@@ -8605,11 +8619,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabDisclosureListed.vue",
-        "line": 382
+        "line": 383
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabDisclosureListed.vue",
-        "line": 383
+        "line": 384
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabDisclosureSoe.vue",
@@ -8621,11 +8635,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabDisclosureSoe.vue",
-        "line": 480
+        "line": 481
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabDisclosureSoe.vue",
-        "line": 481
+        "line": 482
       },
       {
         "file": "src\\components\\workpaper\\m9\\inspection\\M9TabOciReconcile.vue",
@@ -8733,7 +8747,7 @@
       },
       {
         "file": "src\\components\\workpaper\\n1\\core\\N1TabDisclosureListed.vue",
-        "line": 561
+        "line": 562
       },
       {
         "file": "src\\components\\workpaper\\n1\\core\\N1TabDisclosureSoe.vue",
@@ -8741,7 +8755,7 @@
       },
       {
         "file": "src\\components\\workpaper\\n1\\core\\N1TabDisclosureSoe.vue",
-        "line": 602
+        "line": 603
       },
       {
         "file": "src\\components\\workpaper\\n2\\calc\\N2TabLvt.vue",
@@ -8837,11 +8851,11 @@
       },
       {
         "file": "src\\components\\workpaper\\n2\\core\\N2TabDisclosureListed.vue",
-        "line": 318
+        "line": 319
       },
       {
         "file": "src\\components\\workpaper\\n2\\core\\N2TabDisclosureListed.vue",
-        "line": 365
+        "line": 366
       },
       {
         "file": "src\\components\\workpaper\\n2\\core\\N2TabDisclosureSoe.vue",
@@ -8849,11 +8863,11 @@
       },
       {
         "file": "src\\components\\workpaper\\n2\\core\\N2TabDisclosureSoe.vue",
-        "line": 288
+        "line": 289
       },
       {
         "file": "src\\components\\workpaper\\n2\\core\\N2TabDisclosureSoe.vue",
-        "line": 330
+        "line": 331
       },
       {
         "file": "src\\components\\workpaper\\n2\\inspection\\N2TabPolicyCheck.vue",
@@ -8869,19 +8883,19 @@
       },
       {
         "file": "src\\components\\workpaper\\n2\\inspection\\N2TabTaxCheck.vue",
-        "line": 213
+        "line": 216
       },
       {
         "file": "src\\components\\workpaper\\n2\\inspection\\N2TabTaxCheck.vue",
-        "line": 231
+        "line": 234
       },
       {
         "file": "src\\components\\workpaper\\n2\\inspection\\N2TabTaxCheck.vue",
-        "line": 463
+        "line": 502
       },
       {
         "file": "src\\components\\workpaper\\n2\\inspection\\N2TabTaxCheck.vue",
-        "line": 485
+        "line": 524
       },
       {
         "file": "src\\components\\workpaper\\n3\\core\\N3TabAdjudication.vue",
@@ -8941,11 +8955,11 @@
       },
       {
         "file": "src\\components\\workpaper\\n4\\core\\N4TabDisclosureListed.vue",
-        "line": 286
+        "line": 287
       },
       {
         "file": "src\\components\\workpaper\\n4\\core\\N4TabDisclosureListed.vue",
-        "line": 333
+        "line": 334
       },
       {
         "file": "src\\components\\workpaper\\n5\\benefit\\N5TabHighTechCheck.vue",
@@ -9799,7 +9813,7 @@
         },
         {
           "file": "src\\views\\DisclosureEditor.vue",
-          "line": 2109
+          "line": 2264
         }
       ]
     },
@@ -9835,6 +9849,10 @@
           "line": 84
         },
         {
+          "file": "src\\components\\formula\\__tests__\\wpFormulaFields.spec.ts",
+          "line": 30
+        },
+        {
           "file": "src\\components\\workpaper\\__tests__\\FormulaStatusPanel.spec.ts",
           "line": 62
         },
@@ -9848,27 +9866,31 @@
         },
         {
           "file": "src\\composables\\__tests__\\useFormulaImportExport.customPreset.spec.ts",
-          "line": 73
+          "line": 71
         },
         {
           "file": "src\\composables\\__tests__\\useFormulaImportExport.customPreset.spec.ts",
-          "line": 90
+          "line": 88
         },
         {
           "file": "src\\composables\\__tests__\\useFormulaImportExport.customPreset.spec.ts",
-          "line": 112
+          "line": 103
         },
         {
           "file": "src\\composables\\__tests__\\useFormulaImportExport.customPreset.spec.ts",
-          "line": 125
+          "line": 122
+        },
+        {
+          "file": "src\\composables\\__tests__\\useFormulaImportExport.customPreset.spec.ts",
+          "line": 135
         },
         {
           "file": "src\\composables\\useFormulaImportExport.ts",
-          "line": 101
+          "line": 118
         },
         {
           "file": "src\\composables\\useFormulaImportExport.ts",
-          "line": 120
+          "line": 137
         },
         {
           "file": "src\\components\\formula\\GtFormulaEditDialog.vue",
@@ -9876,11 +9898,11 @@
         },
         {
           "file": "src\\components\\template-library\\FormulaTab.vue",
-          "line": 495
+          "line": 492
         },
         {
           "file": "src\\components\\workpaper\\FormulaStatusPanel.vue",
-          "line": 307
+          "line": 311
         }
       ]
     }
@@ -9968,32 +9990,12 @@
     "components/workpaper/GtWpToolbar.vue"
   ],
   "gc0_contract_version_expected": "1.0",
-  "generated_at_epoch": 1791027815,
+  "generated_at_epoch": 1792716151,
   "nodekey_payloads": [
     {
       "file": "src\\components\\consolidation\\worksheets\\ConsolWorksheetTabs.vue",
-      "line": 1348,
+      "line": 1570,
       "nodeKey_literal": "`consol_${sheetKey"
-    },
-    {
-      "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
-      "line": 173,
-      "nodeKey_literal": "'wp_d4_35'"
-    },
-    {
-      "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
-      "line": 140,
-      "nodeKey_literal": "'wp_d4_34'"
-    },
-    {
-      "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
-      "line": 171,
-      "nodeKey_literal": "'wp_d4_36'"
-    },
-    {
-      "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-      "line": 36,
-      "nodeKey_literal": "'wp_d4_33'"
     }
   ],
   "out_of_scope_domain_files": [
@@ -10165,8 +10167,8 @@
       "line": 581
     },
     {
-      "file": "src\\components\\workpaper\\d1\\D1TabSamplingVouching.vue",
-      "line": 702
+      "file": "src\\components\\workpaper\\d1\\D1TabVoucherCheck.vue",
+      "line": 739
     },
     {
       "file": "src\\components\\workpaper\\d1\\D1TabWriteoffCheck.vue",
@@ -10186,7 +10188,7 @@
     },
     {
       "file": "src\\components\\workpaper\\d3\\D3TabVoucherCheck.vue",
-      "line": 504
+      "line": 513
     },
     {
       "file": "src\\components\\workpaper\\d3\\D3VoucherCheckDialog.vue",
@@ -10213,20 +10215,20 @@
       "line": 423
     },
     {
-      "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-      "line": 732
-    },
-    {
-      "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-      "line": 747
-    },
-    {
-      "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-      "line": 767
-    },
-    {
       "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
       "line": 723
+    },
+    {
+      "file": "src\\components\\workpaper\\d4\\inspection\\D4TabVoucherCheck.vue",
+      "line": 770
+    },
+    {
+      "file": "src\\components\\workpaper\\d4\\inspection\\D4TabVoucherCheck.vue",
+      "line": 785
+    },
+    {
+      "file": "src\\components\\workpaper\\d4\\inspection\\D4TabVoucherCheck.vue",
+      "line": 805
     },
     {
       "file": "src\\components\\workpaper\\d4\\ipo\\D4IpoFindingWriteback.vue",
@@ -10254,7 +10256,7 @@
     },
     {
       "file": "src\\components\\workpaper\\d7\\D7TabVoucherCheck.vue",
-      "line": 302
+      "line": 305
     },
     {
       "file": "src\\components\\workpaper\\DepreciationCalcDialog.vue",
@@ -10318,7 +10320,7 @@
     },
     {
       "file": "src\\components\\workpaper\\e1\\E1TabBankFlowReconcile.vue",
-      "line": 1131
+      "line": 1132
     },
     {
       "file": "src\\components\\workpaper\\e1\\E1TabCutoffTest.vue",
@@ -10326,7 +10328,7 @@
     },
     {
       "file": "src\\components\\workpaper\\e1\\E1TabLargeCheck.vue",
-      "line": 505
+      "line": 552
     },
     {
       "file": "src\\components\\workpaper\\ECLCalcDialog.vue",
@@ -10530,7 +10532,7 @@
     },
     {
       "file": "src\\components\\workpaper\\FormulaStatusPanel.vue",
-      "line": 526
+      "line": 533
     },
     {
       "file": "src\\components\\workpaper\\g1-trading-financial-assets\\core\\G1TabAdjudication.vue",
@@ -10558,7 +10560,7 @@
     },
     {
       "file": "src\\components\\workpaper\\g12-net-hedge-gains\\voucher\\G12TabVoucherCheck.vue",
-      "line": 466
+      "line": 469
     },
     {
       "file": "src\\components\\workpaper\\g13-fair-value-changes\\G13PreparationHandbookDialog.vue",
@@ -10642,11 +10644,11 @@
     },
     {
       "file": "src\\components\\workpaper\\g5-long-term-receivable\\voucher\\G5TabVoucherCheck.vue",
-      "line": 409
+      "line": 412
     },
     {
       "file": "src\\components\\workpaper\\g6-other-bond-investment-ecl\\voucher\\G6TabVoucherCheck.vue",
-      "line": 364
+      "line": 367
     },
     {
       "file": "src\\components\\workpaper\\g6-other-bond-investment-main\\G6PreparationHandbookDialog.vue",
@@ -10678,7 +10680,7 @@
     },
     {
       "file": "src\\components\\workpaper\\g8-other-equity-instruments\\voucher\\G8TabVoucherCheck.vue",
-      "line": 669
+      "line": 672
     },
     {
       "file": "src\\components\\workpaper\\g9-other-noncurrent-financial\\G9PreparationHandbookDialog.vue",
@@ -10686,7 +10688,7 @@
     },
     {
       "file": "src\\components\\workpaper\\g9-other-noncurrent-financial\\voucher\\G9TabVoucherCheck.vue",
-      "line": 571
+      "line": 574
     },
     {
       "file": "src\\components\\workpaper\\GoodwillImpairmentDialog.vue",
@@ -10698,11 +10700,11 @@
     },
     {
       "file": "src\\components\\workpaper\\GtA1Dashboard.vue",
-      "line": 301
+      "line": 307
     },
     {
       "file": "src\\components\\workpaper\\GtA1Dashboard.vue",
-      "line": 318
+      "line": 324
     },
     {
       "file": "src\\components\\workpaper\\GtA2AdjustmentConsole.vue",
@@ -10866,11 +10868,11 @@
     },
     {
       "file": "src\\components\\workpaper\\h1\\inspection\\H1TabAdditionCheck.vue",
-      "line": 863
+      "line": 866
     },
     {
       "file": "src\\components\\workpaper\\h1\\inspection\\H1TabDisposalCheck.vue",
-      "line": 533
+      "line": 536
     },
     {
       "file": "src\\components\\workpaper\\h1\\stocktake\\H1TabStocktakePlan.vue",
@@ -10910,7 +10912,7 @@
     },
     {
       "file": "src\\components\\workpaper\\h10\\inspection\\H10TabCheck.vue",
-      "line": 127
+      "line": 130
     },
     {
       "file": "src\\components\\workpaper\\h2\\H2PreparationHandbookDialog.vue",
@@ -10918,11 +10920,11 @@
     },
     {
       "file": "src\\components\\workpaper\\h2\\inspection\\H2TabAdditionCheck.vue",
-      "line": 347
+      "line": 350
     },
     {
       "file": "src\\components\\workpaper\\h2\\inspection\\H2TabDecreaseCheck.vue",
-      "line": 581
+      "line": 584
     },
     {
       "file": "src\\components\\workpaper\\h2\\inspection\\H2TabReviewRecord.vue",
@@ -10950,7 +10952,7 @@
     },
     {
       "file": "src\\components\\workpaper\\h3\\inspection\\H3TabAdditionCheck.vue",
-      "line": 693
+      "line": 696
     },
     {
       "file": "src\\components\\workpaper\\h4\\H4PreparationHandbookDialog.vue",
@@ -10958,11 +10960,11 @@
     },
     {
       "file": "src\\components\\workpaper\\h4\\inspection\\H4TabAdditionCheck.vue",
-      "line": 471
+      "line": 474
     },
     {
       "file": "src\\components\\workpaper\\h4\\inspection\\H4TabDisposalCheck.vue",
-      "line": 508
+      "line": 511
     },
     {
       "file": "src\\components\\workpaper\\h5\\H5PreparationHandbookDialog.vue",
@@ -10970,11 +10972,11 @@
     },
     {
       "file": "src\\components\\workpaper\\h5\\inspection\\H5TabAdditionCheck.vue",
-      "line": 95
+      "line": 98
     },
     {
       "file": "src\\components\\workpaper\\h5\\inspection\\H5TabDisposalCheck.vue",
-      "line": 96
+      "line": 99
     },
     {
       "file": "src\\components\\workpaper\\h6\\H6PreparationHandbookDialog.vue",
@@ -10982,7 +10984,7 @@
     },
     {
       "file": "src\\components\\workpaper\\h6\\inspection\\H6TabCheck.vue",
-      "line": 756
+      "line": 759
     },
     {
       "file": "src\\components\\workpaper\\h7\\H7PreparationHandbookDialog.vue",
@@ -10994,7 +10996,7 @@
     },
     {
       "file": "src\\components\\workpaper\\h8\\inspection\\H8TabDisposalCheck.vue",
-      "line": 566
+      "line": 569
     },
     {
       "file": "src\\components\\workpaper\\h9\\H9PreparationHandbookDialog.vue",
@@ -11006,11 +11008,11 @@
     },
     {
       "file": "src\\components\\workpaper\\i1\\inspection\\I1TabAdditionCheck.vue",
-      "line": 664
+      "line": 667
     },
     {
       "file": "src\\components\\workpaper\\i1\\inspection\\I1TabDisposalCheck.vue",
-      "line": 434
+      "line": 437
     },
     {
       "file": "src\\components\\workpaper\\i2\\cutoff\\I2TabCutoffBackward.vue",
@@ -11026,27 +11028,27 @@
     },
     {
       "file": "src\\components\\workpaper\\i2\\inspection\\I2TabMaterialCheck.vue",
-      "line": 411
+      "line": 414
     },
     {
       "file": "src\\components\\workpaper\\i2\\inspection\\I2TabOutsourceCheck.vue",
-      "line": 481
+      "line": 484
     },
     {
       "file": "src\\components\\workpaper\\i2\\inspection\\I2TabStaffCheck.vue",
-      "line": 362
+      "line": 365
     },
     {
       "file": "src\\components\\workpaper\\i2\\inspection\\I2TabTargetedCheck.vue",
-      "line": 607
+      "line": 610
     },
     {
       "file": "src\\components\\workpaper\\i2\\inspection\\I2TabWorkHourCheck.vue",
-      "line": 344
+      "line": 347
     },
     {
       "file": "src\\components\\workpaper\\i3\\core\\I3TabTargetedCheck.vue",
-      "line": 600
+      "line": 603
     },
     {
       "file": "src\\components\\workpaper\\i3\\I3PreparationHandbookDialog.vue",
@@ -11054,7 +11056,7 @@
     },
     {
       "file": "src\\components\\workpaper\\i4\\core\\I4TabTargetedCheck.vue",
-      "line": 804
+      "line": 807
     },
     {
       "file": "src\\components\\workpaper\\i4\\I4PreparationHandbookDialog.vue",
@@ -11062,7 +11064,7 @@
     },
     {
       "file": "src\\components\\workpaper\\i5\\core\\I5TabTargetedCheck.vue",
-      "line": 689
+      "line": 692
     },
     {
       "file": "src\\components\\workpaper\\i5\\I5PreparationHandbookDialog.vue",
@@ -11070,7 +11072,7 @@
     },
     {
       "file": "src\\components\\workpaper\\i6\\core\\I6TabTargetedCheck.vue",
-      "line": 704
+      "line": 707
     },
     {
       "file": "src\\components\\workpaper\\i6\\cutoff\\I6TabCutoffBackward.vue",
@@ -11110,7 +11112,7 @@
     },
     {
       "file": "src\\components\\workpaper\\j1\\inspection\\J1TabGeneralCheck.vue",
-      "line": 276
+      "line": 279
     },
     {
       "file": "src\\components\\workpaper\\j1\\J1PreparationHandbookDialog.vue",
@@ -11142,7 +11144,7 @@
     },
     {
       "file": "src\\components\\workpaper\\k1\\inspection\\K1TabReceivableCheck.vue",
-      "line": 581
+      "line": 584
     },
     {
       "file": "src\\components\\workpaper\\k1\\inspection\\K1VoucherCheckDialog.vue",
@@ -11190,7 +11192,7 @@
     },
     {
       "file": "src\\components\\workpaper\\k2\\inspection\\K2TabCheck.vue",
-      "line": 229
+      "line": 232
     },
     {
       "file": "src\\components\\workpaper\\k2\\K2PreparationHandbookDialog.vue",
@@ -11198,15 +11200,15 @@
     },
     {
       "file": "src\\components\\workpaper\\k3\\inspection\\K3TabLongOutstanding.vue",
-      "line": 249
+      "line": 252
     },
     {
       "file": "src\\components\\workpaper\\k3\\inspection\\K3TabPayableCheck.vue",
-      "line": 291
+      "line": 294
     },
     {
       "file": "src\\components\\workpaper\\k3\\inspection\\K3TabRelatedParty.vue",
-      "line": 265
+      "line": 268
     },
     {
       "file": "src\\components\\workpaper\\k3\\K3PreparationHandbookDialog.vue",
@@ -11214,7 +11216,7 @@
     },
     {
       "file": "src\\components\\workpaper\\k4\\core\\K4TabCheck.vue",
-      "line": 307
+      "line": 310
     },
     {
       "file": "src\\components\\workpaper\\k4\\K4PreparationHandbookDialog.vue",
@@ -11222,11 +11224,11 @@
     },
     {
       "file": "src\\components\\workpaper\\k5\\contingency\\K5TabLitigationCheck.vue",
-      "line": 166
+      "line": 169
     },
     {
       "file": "src\\components\\workpaper\\k5\\contingency\\K5TabProvisionCheck.vue",
-      "line": 307
+      "line": 310
     },
     {
       "file": "src\\components\\workpaper\\k5\\K5PreparationHandbookDialog.vue",
@@ -11238,7 +11240,7 @@
     },
     {
       "file": "src\\components\\workpaper\\k7\\inspection\\K7TabDeferredCheck.vue",
-      "line": 220
+      "line": 223
     },
     {
       "file": "src\\components\\workpaper\\k7\\K7PreparationHandbookDialog.vue",
@@ -11262,7 +11264,7 @@
     },
     {
       "file": "src\\components\\workpaper\\k8\\inspection\\K8TabSellingCheck.vue",
-      "line": 261
+      "line": 264
     },
     {
       "file": "src\\components\\workpaper\\k8\\K8PreparationHandbookDialog.vue",
@@ -11270,7 +11272,7 @@
     },
     {
       "file": "src\\components\\workpaper\\k9\\inspection\\K9TabAdminCheck.vue",
-      "line": 255
+      "line": 258
     },
     {
       "file": "src\\components\\workpaper\\k9\\K9PreparationHandbookDialog.vue",
@@ -11310,7 +11312,7 @@
     },
     {
       "file": "src\\components\\workpaper\\m1\\inspection\\M1TabDividendCheck.vue",
-      "line": 275
+      "line": 278
     },
     {
       "file": "src\\components\\workpaper\\m1\\M1PreparationHandbookDialog.vue",
@@ -11322,7 +11324,7 @@
     },
     {
       "file": "src\\components\\workpaper\\m2\\inspection\\M2TabCapitalCheck.vue",
-      "line": 249
+      "line": 252
     },
     {
       "file": "src\\components\\workpaper\\m2\\M2PreparationHandbookDialog.vue",
@@ -11366,7 +11368,7 @@
     },
     {
       "file": "src\\components\\workpaper\\n2\\inspection\\N2TabTaxCheck.vue",
-      "line": 253
+      "line": 256
     },
     {
       "file": "src\\components\\workpaper\\n2\\N2PreparationHandbookDialog.vue",
@@ -11438,7 +11440,7 @@
     },
     {
       "file": "src\\components\\workpaper\\shared\\RefreshSourceDialog.vue",
-      "line": 18
+      "line": 19
     },
     {
       "file": "src\\components\\workpaper\\SharePaymentDialog.vue",
@@ -11466,11 +11468,15 @@
     },
     {
       "file": "src\\components\\workpaper\\voucher-sampling\\SamplingPreviewDialog.vue",
-      "line": 207
+      "line": 292
     },
     {
       "file": "src\\components\\workpaper\\voucher-sampling\\SamplingPreviewDialog.vue",
-      "line": 451
+      "line": 619
+    },
+    {
+      "file": "src\\components\\workpaper\\voucher-sampling\\SamplingPreviewDialog.vue",
+      "line": 659
     },
     {
       "file": "src\\components\\workpaper\\WorkpaperAIConclusionPanel.vue",

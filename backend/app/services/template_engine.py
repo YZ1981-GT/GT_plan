@@ -232,17 +232,19 @@ class TemplateEngine:
         Validates: Requirements 1.4
         """
         result = await db.execute(
-            sa.select(WpTemplate).where(WpTemplate.id == template_id)
+            sa.select(WpTemplate).where(WpTemplate.id == template_id, WpTemplate.is_deleted == sa.false())
         )
         template = result.scalar_one_or_none()
         if template is None:
             raise ValueError("模板不存在")
 
-        # Check if any working_paper references this template's code
+        # 按底稿编码精确判断引用；原先按文件路径子串匹配，删除模板 H1 时 H10 的底稿也算作引用
         ref_result = await db.execute(
-            sa.select(sa.func.count()).select_from(WorkingPaper).where(
+            sa.select(sa.func.count()).select_from(WorkingPaper)
+            .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+            .where(
                 WorkingPaper.is_deleted == sa.false(),
-                WorkingPaper.file_path.contains(template.template_code),
+                WpIndex.wp_code == template.template_code,
             )
         )
         ref_count = ref_result.scalar() or 0
@@ -251,7 +253,9 @@ class TemplateEngine:
                 f"模板 {template.template_code} 已被 {ref_count} 个项目底稿引用，无法删除"
             )
 
-        template.soft_delete()
+        # WpTemplate 继承 Base，没有 soft_delete()（原调用每次删除都抛 AttributeError ⇒ 500），表里也没有 deleted_at 列
+        template.is_deleted = True
+        template.updated_at = sa.func.now()
         await db.flush()
 
     # ------------------------------------------------------------------

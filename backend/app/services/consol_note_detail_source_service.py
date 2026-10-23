@@ -125,10 +125,20 @@ def extract_source_rows(rows: list[Any]) -> list[dict[str, str]]:
 
 
 def compute_source_structure_hash(section_id: str, rows: list[Any]) -> str:
-    """计算来源结构指纹（SHA-256）。排除金额，只含标签/行类型/键。"""
+    """计算来源结构指纹（SHA-256）。排除金额，只含标签/行类型/键。
+
+    数据行排序后再算（行顺序不同但行名集合相同的子企业共用一条映射规则），
+    合计/小计行不参与排序（位置固定）。
+    """
     items = extract_source_rows(rows)
+    # 分离数据行和合计/小计行——合计行位置不参与指纹
+    data_items = [it for it in items if it.get("row_type") == "data"]
+    other_items = [it for it in items if it.get("row_type") != "data"]
+    # 数据行按 label 排序（忽略行顺序差异）
+    data_items.sort(key=lambda it: it.get("label", ""))
+    sorted_items = data_items + other_items
     payload = json.dumps(
-        {"section_id": section_id, "items": items},
+        {"section_id": section_id, "items": sorted_items},
         ensure_ascii=False,
         sort_keys=True,
     )
@@ -395,6 +405,21 @@ async def preview_detail_refresh(
         history_mappings=history,
     )
 
+    # 5.5 标记可自动确认的建议（confidence ≥ 0.93 且有明确目标行）
+    auto_confirm_threshold = 0.93
+    auto_confirmable_count = 0
+    needs_review_count = 0
+    for s in suggestions:
+        if (s.get("confidence", 0) >= auto_confirm_threshold
+                and s.get("suggested_target") is not None
+                and s.get("match_type") in ("exact", "alias", "global_alias")):
+            s["auto_confirmable"] = True
+            auto_confirmable_count += 1
+        else:
+            s["auto_confirmable"] = False
+            if s.get("match_type") == "manual":
+                needs_review_count += 1
+
     # 6. 为每组标注映射状态
     for group in groups:
         group_hash = group["hash"]
@@ -436,6 +461,8 @@ async def preview_detail_refresh(
         "groups": groups,
         "stale_entities": stale_entities,
         "suggestions": suggestions,
+        "auto_confirmable_count": auto_confirmable_count,
+        "needs_review_count": needs_review_count,
         "entity_count": len(entities),
         "group_count": len(groups),
         "stale_count": len(stale_entities),

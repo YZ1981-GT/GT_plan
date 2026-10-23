@@ -2149,42 +2149,20 @@ class TestProductionWiring:
     """**Validates: Requirements 12.1**"""
 
     def test_router_calls_the_d2_attach_on_both_paths(self) -> None:
-        """两个生产接线点都必须真的调用本 pilot 自己的 attach（AST 判据）。"""
-        tree = ast.parse(_ROUTER.read_text(encoding="utf-8"))
-        called_in: dict[str, bool] = {}
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            if node.name not in {"_attach_pilot_adapters", "_apply_durable_incoming"}:
-                continue
-            called_in[node.name] = any(
-                isinstance(inner, ast.Call)
-                and isinstance(inner.func, ast.Name)
-                and inner.func.id == "attach_d2_pilot_adapters"
-                for inner in ast.walk(node)
-            )
-        assert called_in.get("_attach_pilot_adapters") is True
-        assert called_in.get("_apply_durable_incoming") is True
+        """两个生产接线点都必须真的接上本 pilot 自己的 attach（AST 判据）。
+
+        现行形态见 `router_registration_wiring_ast`（两个入口经同一 `_attach_pilot_adapters`，
+        各 pilot 逐条隔离）。原判据只认直接调用，隔离修复后恒红。
+        """
+        from tests.workpaper_sync.router_registration_wiring_ast import assert_pilot_attach_wired
+
+        assert_pilot_attach_wired("attach_d2_pilot_adapters")
 
     def test_router_still_calls_the_checklist_pilot_attach(self) -> None:
-        """只加不动：Task 40 的两个调用点必须原样保留（本任务不复用也不顶掉它）。"""
-        tree = ast.parse(_ROUTER.read_text(encoding="utf-8"))
-        called_in: dict[str, bool] = {}
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            if node.name not in {"_attach_pilot_adapters", "_apply_durable_incoming"}:
-                continue
-            called_in[node.name] = any(
-                isinstance(inner, ast.Call)
-                and isinstance(inner.func, ast.Name)
-                and inner.func.id == "attach_pilot_adapters"
-                for inner in ast.walk(node)
-            )
-        assert called_in == {
-            "_attach_pilot_adapters": True,
-            "_apply_durable_incoming": True,
-        }, called_in
+        """只加不动：Task 40 的接线必须原样保留（本任务不复用也不顶掉它）。"""
+        from tests.workpaper_sync.router_registration_wiring_ast import assert_pilot_attach_wired
+
+        assert_pilot_attach_wired("attach_pilot_adapters")
 
     def test_both_production_paths_go_through_the_bidirectional_contract_lock(self) -> None:
         """发布与接线**都**必须经 `assert_contract_file_matches_source()` 取契约。

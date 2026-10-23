@@ -222,6 +222,30 @@ async def test_delete_template_with_reference(db_session, seeded_db):
 
 
 @pytest.mark.asyncio
+async def test_delete_template_reference_matches_code_exactly(db_session, seeded_db):
+    """被引用按底稿编码精确判断：模板 H1 不因 H10 的底稿（路径含「H1」）被拦下。"""
+    import sqlalchemy as sa
+
+    engine = TemplateEngine()
+    tpl = await engine.upload_template(db=db_session, template_code="H1", template_name="固定资产")
+    await db_session.flush()
+    wp_index = WpIndex(project_id=FAKE_PROJECT_ID, wp_code="H10", wp_name="资产处置损益")
+    db_session.add(wp_index)
+    await db_session.flush()
+    db_session.add(WorkingPaper(project_id=FAKE_PROJECT_ID, wp_index_id=wp_index.id,
+                                file_path=f"{FAKE_PROJECT_ID}/2025/H10.xlsx", source_type=WpSourceType.template))
+    await db_session.commit()
+
+    await engine.delete_template(db=db_session, template_id=tpl.id)
+    await db_session.commit()
+    row = (await db_session.execute(sa.select(WpTemplate).where(WpTemplate.id == tpl.id))).scalar_one()
+    assert row.is_deleted is True
+    # 已删除的模板再删 ⇒ 不存在（不重复置删除）
+    with pytest.raises(ValueError, match="不存在"):
+        await engine.delete_template(db=db_session, template_id=tpl.id)
+
+
+@pytest.mark.asyncio
 async def test_delete_template_nonexistent(db_session):
     """6.3: delete_template for nonexistent template raises error"""
     engine = TemplateEngine()
@@ -544,6 +568,23 @@ async def test_api_delete_template(client: AsyncClient):
 
     resp = await client.delete(f"/api/templates/{template_id}")
     assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_api_delete_template_requires_admin(db_session: AsyncSession, seeded_db):
+    """模板库全平台共用：非管理员删除 ⇒ 403，模板仍在。"""
+    import sqlalchemy as sa
+
+    from app.main import app
+    from tests._test_auth_helper import FakeAuthUser, override_auth
+
+    tpl = await TemplateEngine().upload_template(db=db_session, template_code="DEL-AUTH", template_name="删除鉴权")
+    await db_session.commit()
+    async with override_auth(app, db_session=db_session, user=FakeAuthUser(role="auditor")) as c:
+        resp = await c.delete(f"/api/templates/{tpl.id}")
+    assert resp.status_code == 403
+    row = (await db_session.execute(sa.select(WpTemplate).where(WpTemplate.id == tpl.id))).scalar_one()
+    assert row.is_deleted is False
 
 
 @pytest.mark.asyncio

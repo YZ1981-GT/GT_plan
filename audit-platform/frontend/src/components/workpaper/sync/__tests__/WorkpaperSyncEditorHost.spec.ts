@@ -696,6 +696,8 @@ describe('descriptor 是唯一 config 来源', () => {
         onDocumentReady: () => {},
         onDocumentStateChange: () => {},
         onError: () => {},
+        onRequestRefreshFile: () => {},
+        onOutdatedVersion: () => {},
       })
     } catch (error) {
       caught = error
@@ -925,9 +927,14 @@ describe('暴露的 API 与七个事件各有真实触发路径', () => {
     expect(h.bridge.canLeave.value).toBe(false)
     expect(h.bridge.leaveBlockReason.value).toBe('编辑器仍有未保存的修改')
 
+    // 🔴 OO 的 `false` 只表示「改动已发给文档服务」（实测每次编辑后约 1 秒内 true→false），
+    //    不是「已存进平台」⇒ 桥的 dirty 保持为真、离开仍被阻断，直到强制保存被受理或会话结束。
+    //    此前这里断言 false 会清零 —— 正是「改完停一秒点结构化视图只发 leave、编辑丢失」的根因
+    //    （spec d2-skeleton-slot-reuse-and-writeback-speed R4）。宿主事件仍原样转发 OO 的状态。
     lastEditor().events.onDocumentStateChange({ data: false })
     await flushPromises()
-    expect(h.bridge.dirty.value).toBe(false)
+    expect(h.bridge.dirty.value).toBe(true)
+    expect(h.bridge.canLeave.value).toBe(false)
     expect(wrapper.emitted('dirty')).toEqual([[{ dirty: true }], [{ dirty: false }]])
   })
 
@@ -1473,7 +1480,9 @@ describe('forcesave 之后宿主自行推进 operation 直到落地', () => {
       // 推过 3 分钟窗口
       await vi.advanceTimersByTimeAsync(190_000)
       expect(hostErrorText(wrapper)).toContain('等待 OnlyOffice 回传结果超时')
-      expect(hostErrorText(wrapper), '必须给下一步动作').toContain('重试回写')
+      // 下一步动作必须是此刻真实渲染的按钮（超时不是可重试裁决，「重试回写」此时并不出现）
+      expect(hostErrorText(wrapper), '必须给下一步动作').toContain('刷新状态')
+      expect(wrapper.find('[data-testid="wp-sync-host-refresh-status"]').exists()).toBe(true)
       const callsAfterDeadline = h.api.getOperation.mock.calls.length
       await vi.advanceTimersByTimeAsync(30_000)
       expect(

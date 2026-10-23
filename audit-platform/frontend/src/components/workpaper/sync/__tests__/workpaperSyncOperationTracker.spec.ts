@@ -243,11 +243,12 @@ describe('SSE 优先、轮询只用于恢复', () => {
     expect(h.poll).toHaveBeenCalledTimes(1)
     h.degrade()
     expect(h.tracker.degraded).toBe(true)
-    vi.advanceTimersByTime(3000)
+    // 轮询是自调度的（上一轮回来才排下一轮，R6），推进时钟须让每轮的 Promise 结算
+    await vi.advanceTimersByTimeAsync(3000)
     expect(h.poll.mock.calls.length).toBeGreaterThanOrEqual(4)
     const before = h.poll.mock.calls.length
     h.tracker.stop()
-    vi.advanceTimersByTime(10_000)
+    await vi.advanceTimersByTimeAsync(10_000)
     expect(h.poll.mock.calls.length).toBe(before)
   })
 

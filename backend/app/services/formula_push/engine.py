@@ -706,7 +706,14 @@ async def _push_note(
     all_note_rows = binding.note_rows(overlay, template_type, rule)
     data_rows = [r for r in all_note_rows if not r["is_total"] and not r["is_memo"]]
     # 合计按附注实际行重算（见 _push_note_total）；「其中：」备注行不由底稿取数
-    targets = [note_writer.find_row(table.rows, [r["note_label"], r["label"]]) for r in data_rows]
+    targets = [
+        _find_total_by_label(table.rows, r["note_label"]) if r.get("match_total")
+        else note_writer.find_row(table.rows, [r["note_label"], r["label"]])
+        for r in data_rows
+    ]
+    # 分段合计行（如 I1「一、原价合计」）由取数按行名直接写：写了就不再按「合计 = 上方各行」重算
+    # （首个合计行在表头时上方没有行，会被重算成 0；spec formula-fetch-followup-defect-closure R6.3）
+    explicit_totals = any(r.get("match_total") and i is not None for r, i in zip(data_rows, targets))
     # 撞行：多条取数行（不同 note_label）对上附注同一行 ⇒ 原来逐条覆盖写、后写的留下（实测 H1 的 固定资产_1601 /
     # _1602 / _1603 三行都对上「固定资产」，留下的是 1603 的 0）。同一格不知道该写哪条 ⇒ 都不写、逐格说明
     claims: dict[int, list[str]] = {}
@@ -776,7 +783,7 @@ async def _push_note(
             rule.rule_id, "note", "note", _paddr, _paction, reason=_preason
         ))
 
-    if not skip_total_recalc:
+    if not skip_total_recalc and not explicit_totals:
         wrote |= _push_note_total(ctx, rule=rule, section=section, table_name=table_name, table=table, paper=paper)
 
     if not wrote:
@@ -805,6 +812,16 @@ async def _push_note(
     await ctx.db.flush()
     ctx.result.note_sections.append(section)
     return section
+
+
+def _find_total_by_label(rows: Any, label: str) -> int | None:
+    """分段合计表：按行名精确、唯一地对上合计行（不做包含匹配）。"""
+    hits = [
+        index for index, row in enumerate(rows)
+        if isinstance(row, dict) and (row.get("is_total") or row.get("row_type") == "total")
+        and note_writer.row_label(row) == label
+    ]
+    return hits[0] if len(hits) == 1 else None
 
 
 def _push_note_cell(

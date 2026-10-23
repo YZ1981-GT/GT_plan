@@ -82,3 +82,31 @@ def test_get_category_prefix():
     assert get_category_prefix("C") == "C"
     assert get_category_prefix("") == "C"
     assert get_category_prefix("a2") == "A"
+
+
+def _by_code(category: str) -> dict[str, dict]:
+    return {t["wp_code"]: t for t in get_template_list_with_applicability(category)}
+
+
+def test_reference_exclusion_covers_sub_papers_by_family():
+    """参考标准清单按族匹配：``A17-5`` 覆盖 ``A17-5-1``、``A18`` 覆盖 ``A18-1``；``A1-12`` 不误伤 ``A1-11`` / ``A1-13``，``A24-1`` 不误伤 ``A24``。"""
+    c = _by_code("C")
+    for code in ("A17-5-1", "A18-1", "A18-2", "A26", "A1-16"):
+        assert c[code]["applicable"] is False, code
+        assert c[code]["applicable_reason"], code
+    for code in ("A1-11", "A1-13", "A24", "A25", "A21"):
+        assert c[code]["applicable"] is True, code
+    b = _by_code("B3")
+    assert b["A26"]["applicable"] is False and "A26" in b["A26"]["applicable_reason"]
+    assert b["A18"]["applicable"] is True  # B 类只排除专委会资料（参考标准「专委会不强制」）
+    assert all(t["applicable"] for t in get_template_list_with_applicability("A5"))
+
+
+def test_reference_exclusion_entries_are_not_stale():
+    """排除清单每一项都覆盖映射表里至少一个底稿（清单写错编码会静默失效）。"""
+    from app.services.business_category_service import _load_mapping, _load_reference
+
+    codes = [str(m.get("wp_code") or "") for m in _load_mapping()]
+    for prefix, cat in _load_reference()["categories"].items():
+        for entry in cat.get("excluded_templates") or ():
+            assert any(c == entry or c.startswith(f"{entry}-") for c in codes), f"{prefix}: {entry} 不覆盖任何底稿"

@@ -756,28 +756,19 @@ _ROUTER = _BACKEND / "app" / "routers" / "wp_sync_router.py"
 
 class TestProductionWiring:
     def test_router_calls_attach_pilot_adapters_on_both_paths(self) -> None:
-        """两个生产接线点都必须真的调用 attach（AST 判据，不是字符串出现即算）。
+        """两个生产接线点都必须真的接上 attach（AST 判据，不是字符串出现即算）。
 
         `_registration` 是 HTML→OO 的解析入口，`_apply_durable_incoming` 是 callback
         之后的 apply 入口。只接一侧会形成「能打开 OO、回写找不到 adapter」的半接线。
-        """
-        import ast
 
-        tree = ast.parse(_ROUTER.read_text(encoding="utf-8"))
-        called_in: dict[str, bool] = {}
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            if node.name not in {"_attach_pilot_adapters", "_apply_durable_incoming"}:
-                continue
-            called_in[node.name] = any(
-                isinstance(inner, ast.Call)
-                and isinstance(inner.func, ast.Name)
-                and inner.func.id == "attach_pilot_adapters"
-                for inner in ast.walk(node)
-            )
-        assert called_in.get("_attach_pilot_adapters") is True
-        assert called_in.get("_apply_durable_incoming") is True
+        现行形态：两个入口 await 同一个 `_attach_pilot_adapters`，后者把本 pilot 的 attach 交给
+        逐条隔离的 `_isolated_pilot_attach`（判据见 `router_registration_wiring_ast`）。原判据只认
+        「直接调用」，2026-10-04 隔离修复改成关键字实参后就恒红（spec
+        writeback-followup-issue-closure P4 / P17 一并改）。
+        """
+        from tests.workpaper_sync.router_registration_wiring_ast import assert_pilot_attach_wired
+
+        assert_pilot_attach_wired("attach_pilot_adapters")
 
     def test_registration_helper_awaits_the_attach(self) -> None:
         import ast

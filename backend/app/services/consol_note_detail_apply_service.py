@@ -209,8 +209,13 @@ async def apply_detail_refresh(
             })
             continue
         source_by_label: dict[str, list[Any]] = {}
+        # V204: 同时按 _pushed_row_id 索引（集团下推行即使改了名也能找到）
+        source_by_rid: dict[str, list[Any]] = {}
         for sr in source_rows:
             source_by_label.setdefault(_first_cell(sr).strip(), []).append(sr)
+            rid = sr.get("_pushed_row_id") or (sr if isinstance(sr, dict) else {}).get("_pushed_row_id", "")
+            if rid:
+                source_by_rid.setdefault(rid, []).append(sr)
 
         entity_contrib: list[dict[str, Any]] = []
         for m in (rule.mappings if isinstance(rule.mappings, list) else []):
@@ -221,7 +226,11 @@ async def apply_detail_refresh(
             if target_idx is None:
                 continue
             source_label = str(m.get("source_label", "")).strip()
-            for sr in source_by_label.get(source_label, []):
+            # 按 label 找来源行；找不到时 fallback 按 _pushed_row_id（V204）
+            matched_rows = source_by_label.get(source_label, [])
+            if not matched_rows:
+                matched_rows = source_by_rid.get(target_row_id, [])
+            for sr in matched_rows:
                 amounts = _extract_amounts(sr, width)
                 bucket = target_amounts.setdefault(target_idx, {})
                 for col, val in amounts.items():

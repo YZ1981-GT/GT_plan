@@ -126,6 +126,32 @@ _OCCURRENCE_COLUMNS: dict[str, str] = {
     if canonical in (DEBIT_KEY, CREDIT_KEY)
 }
 
+#: 派生列：不是 ``trial_balance`` 的真实列，由两列相减得出（被减列, 减列）。与 L1 预载（``formula_preloader``）、
+#: 推送取数（``formula_push.sources``）同口径：本期发生额 = 审定数 − 期初余额。
+#: 🔴 原先 ``本期发生额`` 不在 :data:`_COLUMN_MAP` 里，``.get(列名, "audited_amount")`` 回退成审定数，
+#: 专门处理它的 ``_period_amount`` 分支永远走不到（spec formula-fetch-followup-defect-closure R7）。
+_DERIVED_COLUMNS: dict[str, tuple[str, str]] = {
+    "本期发生额": ("audited_amount", "opening_balance"),
+}
+
+
+def _balance_field(column_name: str) -> str | tuple[str, str]:
+    """余额 / 派生列名 → 真实列名或（被减列, 减列）；未注册列名抛 ``ValueError``（不再静默按审定数取）。"""
+    if column_name in _DERIVED_COLUMNS:
+        return _DERIVED_COLUMNS[column_name]
+    field = _COLUMN_MAP.get(column_name)
+    if field is None:
+        raise ValueError(f"列名「{column_name}」未注册，无法取值（可用：{'、'.join(COLUMN_ALIASES)}）")
+    return field
+
+
+def _row_amount(row: TrialBalance, field: str | tuple[str, str]) -> Decimal:
+    if isinstance(field, tuple):
+        minuend, subtrahend = field
+        return (getattr(row, minuend) or Decimal("0")) - (getattr(row, subtrahend) or Decimal("0"))
+    val = getattr(row, field, None)
+    return val if val is not None else Decimal("0")
+
 
 async def _resolve_occurrence(
     db: AsyncSession,
@@ -164,7 +190,7 @@ async def _resolve_tb(
     if canonical is not None:
         occ = await _resolve_occurrence(db, project_id, year, column_name)
         return occ.get(account_code, {}).get(canonical, Decimal("0"))
-    field = _COLUMN_MAP.get(column_name, "audited_amount")
+    field = _balance_field(column_name)
     # 数据集版本口径统一（与 Tier B prefill 同口径，见决策3）：
     # 用 get_active_filter 替代裸 is_deleted，规避读到 superseded/staged 数据。
     active_filter = await get_active_filter(
@@ -180,12 +206,7 @@ async def _resolve_tb(
     ).scalar_one_or_none()
     if row is None:
         return Decimal("0")
-    val = getattr(row, field, None)
-    if field == "_period_amount":
-        amount = row.unadjusted_amount or Decimal("0")
-        opening = row.opening_balance or Decimal("0")
-        return amount - opening
-    return val if val is not None else Decimal("0")
+    return _row_amount(row, field)
 
 
 async def _resolve_sum_tb(
@@ -209,7 +230,7 @@ async def _resolve_sum_tb(
             if start_code <= code <= end_code:
                 total += cols.get(canonical, Decimal("0"))
         return total
-    field = _COLUMN_MAP.get(column_name, "audited_amount")
+    field = _balance_field(column_name)
     # 数据集版本口径统一（与 Tier B prefill 同口径，见决策3）。
     active_filter = await get_active_filter(
         db, TrialBalance.__table__, project_id, year
@@ -225,8 +246,7 @@ async def _resolve_sum_tb(
     ).scalars().all()
     total = Decimal("0")
     for row in rows:
-        val = getattr(row, field, None)
-        total += val if val is not None else Decimal("0")
+        total += _row_amount(row, field)
     return total
 
 

@@ -694,8 +694,17 @@ class ExcelSyncAdapter:
             per_table_shift=None,
         )
 
-    def extract(self, *, artifact: Path, contract: SyncContract) -> Projection:
+    def extract(
+        self,
+        *,
+        artifact: Path,
+        contract: SyncContract,
+        retired_row_identities: tuple[str, ...] = (),
+    ) -> Projection:
         """反读受管 projection。
+
+        `retired_row_identities`：同一次提交里物化刚退役的骨架身份，只给主 binding 的保留门
+        （spec d2-skeleton-slot-reuse-and-writeback-speed）。
 
         `artifact` 的 substrate 形态按**它是谁**判：
 
@@ -709,10 +718,18 @@ class ExcelSyncAdapter:
         `ContentMutationService` 读自己刚写的 staged 产物。
         """
         self._assert_same_contract(contract, where="extract")
-        baseline, baseline_formulas = self._baseline_pair()
         role, kind, state = self._substrate_shape_of(artifact)
-        if role is SubstrateRole.published_representation:
-            baseline, baseline_formulas = (None, None)
+        published = role is SubstrateRole.published_representation
+        # published 不套 baseline ⇒ 不先算；读的正是冻结 base 文件时，主 binding 的结果与
+        # `derive_baseline_from_representation` 入参逐项相同，直接填缓存（spec save-path R3）。
+        baseline, baseline_formulas = (None, None) if published else self._baseline_pair()
+        seed_baseline = (
+            published
+            and not retired_row_identities
+            and self.baseline_representation is not None
+            and "pair" not in self._baseline
+            and artifact.resolve() == self.baseline_representation.resolve()
+        )
         parts: list[Projection] = []
         # 🔴 多 binding 底稿（D4-营业收入实测 39 个 binding）每个 binding 都要读同一个
         # artifact 的两个视图（data_only True/False）⇒ 78 次全簿 openpyxl 解析、cProfile
@@ -722,21 +739,24 @@ class ExcelSyncAdapter:
         # 只改「解析几次」不改「解析出什么」——作用域外行为与优化前逐字节相同。
         with workbook_read_scope():
             for binding in self._all_bindings():
-                parts.append(
-                    extract_projection(
-                        artifact=artifact,
-                        definitions=self.definitions,
-                        binding=binding,
-                        substrate_role=role,
-                        artifact_kind=kind,
-                        artifact_state=state,
-                        baseline=baseline,
-                        baseline_formulas=baseline_formulas,
-                        limits=self._limits,
-                        # 冻结 inventory 只锁主 sheet；sibling 表列跨度不同，不得拿主表期望比对。
-                        retain_identity_inventory=binding.table_key == self.binding.table_key,
-                    ).projection
+                primary = binding.table_key == self.binding.table_key
+                outcome = extract_projection(
+                    artifact=artifact,
+                    definitions=self.definitions,
+                    binding=binding,
+                    substrate_role=role,
+                    artifact_kind=kind,
+                    artifact_state=state,
+                    baseline=baseline,
+                    baseline_formulas=baseline_formulas,
+                    limits=self._limits,
+                    # 冻结 inventory 只锁主 sheet；sibling 表列跨度不同，不得拿主表期望比对。
+                    retain_identity_inventory=primary,
+                    retired_row_identities=retired_row_identities if primary else (),
                 )
+                if seed_baseline and primary:
+                    self._baseline["pair"] = (outcome.projection, dict(outcome.formula_inventory))
+                parts.append(outcome.projection)
             from app.services.workpaper_sync.phase5_transposed_sheet import extract_file as _transposed_extract_file
             from app.services.workpaper_sync.transposed_registry import resolve_transposed_specs
             for spec in resolve_transposed_specs(contract):

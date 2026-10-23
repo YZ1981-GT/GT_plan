@@ -224,6 +224,13 @@ function isRowDynamic(rowIdx: number): boolean {
   return rt.startsWith('dynamic_')
 }
 
+/** V204: 集团下推的固定行不可删除不可改名 */
+function isPushedLocked(rowIdx: number): boolean {
+  const row = props.modelValue?.rows?.[rowIdx]
+  if (!row) return false
+  return row._pushed_category === 'required' && !!row._pushed_row_id
+}
+
 function isColDynamic(colIdx: number): boolean {
   const col = columnDefs.value[colIdx]
   return col?.col_type === 'dynamic'
@@ -233,6 +240,7 @@ function cellClassName({ row, columnIndex }: { row: any; columnIndex: number }):
   const classes: string[] = []
   const rowIdx = row?._row_idx ?? -1
   if (isRowDynamic(rowIdx)) classes.push('cell-dynamic-row')
+  if (isPushedLocked(rowIdx)) classes.push('cell-pushed-locked')
   if (isColDynamic(columnIndex)) classes.push('cell-dynamic-col')
   if (
     selectedCell.value?.rowIndex === rowIdx &&
@@ -338,6 +346,14 @@ async function handleDeleteRow() {
   hideContextMenu()
   const rowIdx = contextMenu.value.rowIndex
   if (rowIdx < 0) return
+  if (isPushedLocked(rowIdx)) {
+    ElMessage.warning('此行由集团模板下推，不可删除')
+    return
+  }
+  if (!isRowDynamic(rowIdx)) {
+    ElMessage.warning('仅支持删除动态行')
+    return
+  }
   if (!isRowDynamic(rowIdx)) {
     ElMessage.warning('仅支持删除动态行')
     return
@@ -446,6 +462,15 @@ defineExpose({ tableRef, selectedCell })
 :deep(.cell-dynamic-row .cell-value::before) {
   content: '★ ';
   color: #e6a23c;
+  font-size: 11px;
+}
+
+/* V204 集团下推锁定行：浅蓝底色 + 🔒 */
+:deep(.cell-pushed-locked) {
+  background-color: #ecf5ff !important;
+}
+:deep(.cell-pushed-locked .cell-value::before) {
+  content: '🔒 ';
   font-size: 11px;
 }
 

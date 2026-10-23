@@ -2407,61 +2407,6 @@
       "description": "合同负债附注主表推送（上市 五、39 / 国企 八、39）期末 / 期初数"
     },
     {
-      "rule_id": "D5.tb_amount",
-      "page_key": "workpaper:D5",
-      "stage": "source",
-      "policy": "system",
-      "target": {
-        "domain": "workpaper",
-        "wp_code": "D5",
-        "sheet_code": "D5-1",
-        "item_id": "D5-1-tb-amount"
-      },
-      "source": {
-        "kind": "formula",
-        "context": {
-          "tb": "trial_balance_audited"
-        },
-        "expression": "TB('1124','期末余额')"
-      },
-      "triggers": [
-        "TRIAL_BALANCE_UPDATED",
-        "manual"
-      ],
-      "description": "应收款项融资审定表锚点「D5-1-tb-amount」= TB('1124','期末余额')；批 D 附注直推族 binding"
-    },
-    {
-      "rule_id": "D5.note.main",
-      "page_key": "workpaper:D5",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、6",
-          "soe": "八、6"
-        },
-        "table": "应收款项融资",
-        "rows": "d5_note_main",
-        "fields": [
-          "end_amount",
-          "prior_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d5_note_main",
-        "params": {},
-        "formula_text": "应收款项融资附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
-      },
-      "triggers": [
-        "TRIAL_BALANCE_UPDATED",
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "应收款项融资附注主表推送（listed 五、6 / soe 八、6）期末 / 期初数；批 D 附注直推族 binding"
-    },
-    {
       "rule_id": "F1.tb_amount",
       "page_key": "workpaper:F1",
       "stage": "source",
@@ -5345,30 +5290,6 @@
       "description": "其他应付款附注主表推送（listed 五、42 / soe 八、42）期末 / 期初数；批 D 附注直推族 binding"
     },
     {
-      "rule_id": "K4.tb_amount",
-      "page_key": "workpaper:K4",
-      "stage": "source",
-      "policy": "system",
-      "target": {
-        "domain": "workpaper",
-        "wp_code": "K4",
-        "sheet_code": "K4-1",
-        "item_id": "K4-1-tb-amount"
-      },
-      "source": {
-        "kind": "formula",
-        "context": {
-          "tb": "trial_balance_audited"
-        },
-        "expression": "TB('2261','期末余额')"
-      },
-      "triggers": [
-        "TRIAL_BALANCE_UPDATED",
-        "manual"
-      ],
-      "description": "其他流动负债审定表锚点「K4-1-tb-amount」= TB('2261','期末余额')；批 D 附注直推族 binding"
-    },
-    {
       "rule_id": "K4.audited_total.receivable",
       "page_key": "workpaper:K4",
       "stage": "derived",
@@ -5419,37 +5340,6 @@
         "manual"
       ],
       "description": "其他流动负债审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
-    },
-    {
-      "rule_id": "K4.note.main",
-      "page_key": "workpaper:K4",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、44",
-          "soe": "八、48"
-        },
-        "table": "其他流动负债",
-        "rows": "k4_note_main",
-        "fields": [
-          "end_amount",
-          "prior_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "k4_note_main",
-        "params": {},
-        "formula_text": "其他流动负债附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
-      },
-      "triggers": [
-        "TRIAL_BALANCE_UPDATED",
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "其他流动负债附注主表推送（listed 五、44 / soe 八、48）期末 / 期初数；批 D 附注直推族 binding"
     },
     {
       "rule_id": "K5.tb_amount",
@@ -9593,34 +9483,6 @@
       "description": "转移应收账款且继续涉入形成的资产、负债子表推送（五、5/八、5）asset_amount/liability_amount；数据来源：披露表"
     },
     {
-      "rule_id": "D5.note.subtable_2",
-      "page_key": "workpaper:D5",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、6",
-          "soe": "八、6"
-        },
-        "table": "本期计提、收回或转回的减值准备情况",
-        "rows": "d5_note_main",
-        "fields": [
-          "amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d5_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D5 的子表「本期计提、收回或转回的减值准备情况」读取行数据，按 amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "本期计提、收回或转回的减值准备情况子表推送（五、6/八、6）amount；数据来源：披露表"
-    },
-    {
       "rule_id": "F2.note.subtable_3",
       "page_key": "workpaper:F2",
       "stage": "note",
@@ -11118,34 +10980,6 @@
         "manual"
       ],
       "description": "其中，账龄超过1年的重要其他应付款子表推送（五、42/八、42）end_amount；数据来源：披露表"
-    },
-    {
-      "rule_id": "K4.note.subtable_2",
-      "page_key": "workpaper:K4",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、44",
-          "soe": "八、48"
-        },
-        "table": "短期应付债券（续）",
-        "rows": "k4_note_main",
-        "fields": [
-          "end_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "k4_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 K4 的子表「短期应付债券（续）」读取行数据，按 end_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "短期应付债券（续）子表推送（五、44/八、48）end_amount；数据来源：披露表"
     },
     {
       "rule_id": "L4.note.subtable_2",

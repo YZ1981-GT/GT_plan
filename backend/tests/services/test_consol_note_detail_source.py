@@ -97,15 +97,14 @@ class TestComputeSourceStructureHash:
         assert all(c in "0123456789abcdef" for c in h)
 
     def test_order_with_stable_keys_same_hash(self):
-        """行顺序变化但有稳定行键时，指纹仍不同（按设计，顺序变化影响 items 数组顺序）。
-        注意：R3.2 说"行顺序变化有稳定键不触发重新确认"，但指纹本身会变——
-        stale 判断在 binding 层做，不在指纹层做。"""
+        """P1 优化：数据行排序后算 hash，行顺序不同但行名集合相同的子企业
+        共用一条映射规则——减少确认次数。"""
         rows_a = [{"label": "A", "row_id": "1"}, {"label": "B", "row_id": "2"}]
         rows_b = [{"label": "B", "row_id": "2"}, {"label": "A", "row_id": "1"}]
         ha = compute_source_structure_hash("x", rows_a)
         hb = compute_source_structure_hash("x", rows_b)
-        # 指纹按数组顺序计算，顺序不同则不同——这是有意设计
-        assert ha != hb
+        # 排序后 hash 相同——同样的行不同顺序的子企业共用规则
+        assert ha == hb
 
 
 class TestGroupEntitiesByStructure:

@@ -223,6 +223,7 @@ __all__ = [
     "ROW_IDENTITY_STORE_KEY",
     "SCALAR_FIELD_SPECS",
     "SHEET_KEY",
+    "SKELETON_SLOT_REUSE_TABLE_KEYS",
     "STORE_ITEM_ID",
     "TABLE_NAME",
     "TEMPLATE_ID",
@@ -1142,6 +1143,14 @@ def load_pilot_contract() -> SyncContract:
 #: 模板骨架基线缓存（键 = 模板哨兵 + instrumentation 几何）。模板受
 #: :data:`TEMPLATE_SHA256` 哨兵冻结、几何是代码常量 ⇒ 进程内建一次即可。
 _SKELETON_BASELINE_CACHE: dict[tuple[Any, ...], Any] = {}
+
+#: 启用「骨架槽位复用」的受管表（spec d2-skeleton-slot-reuse-and-writeback-speed）：store 行
+#: 先落进模板第 13~24 行里仍是模板原样的骨架行，剩余的才插行 —— 否则新企业首次打开在线编辑
+#: 会看到 12 行模板空行在上、业务数据从第 25 行起。判据由框架 `skeleton_slot_reuse` 执行，
+#: 「模板原样」用下面的 :func:`template_skeleton_baseline`。
+#: 🔴 只开 D2-2：D2-3 两区的骨架行含「其中：」标签行（版式内容），不在本次范围。
+#: 本常量不进 `build_contract_payload()` ⇒ 不改契约 digest、不触发 bundle 重发布。
+SKELETON_SLOT_REUSE_TABLE_KEYS: Final[tuple[str, ...]] = (ROWS_TABLE_KEY,)
 
 
 def template_skeleton_baseline() -> Any:

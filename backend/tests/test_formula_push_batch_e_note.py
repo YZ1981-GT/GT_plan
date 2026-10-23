@@ -1599,24 +1599,18 @@ def test_d4_note_rows_pl_dual_code():
     assert rows[2]["opening"] == 1200000.0
 
 
-def test_d5_note_rows_note_direct():
-    """D5 应收款项融资：走 NoteDirectBinding（非 Tier A），单科目 1124。"""
-    rules = load_rules()
-    d5_rule = next(r for r in rules if r.rule_id == "D5.note.main")
-    assert d5_rule.target.sections == {"listed": "五、6", "soe": "八、6"}
+def test_d5_has_no_account_and_no_rules():
+    """D5 应收款项融资：各项目科目表与试算表都没有 1124 ⇒ 无科目声明，不取试算表、不推附注（原规则恒推 0）。
 
-    binding = NoteDirectBinding(
-        wp_code="D5", account_codes=("1124",), account_name="应收款项融资",
-    )
-    binding._last_tb_data = {
-        "1124": {"期末余额": Decimal("250000"), "年初余额": Decimal("180000")},
-    }
-    rows = binding.note_rows({}, "soe", d5_rule)
+    spec formula-fetch-followup-defect-closure R6.2。
+    """
+    from app.services.formula_push.bindings.note_direct import note_direct_for
 
-    assert len(rows) == 1
-    assert rows[0]["ending"] == 250000.0
-    assert rows[0]["opening"] == 180000.0
-    assert rows[0]["ending_resolved"] is True
+    binding = note_direct_for("D5")
+    assert binding.account_prefixes == ()
+    assert "1124" in binding.no_account_reason
+    assert binding.derivations == frozenset()
+    assert [r.rule_id for r in load_rules() if r.wp_code == "D5"] == []
 
 
 def test_d6_note_rows_tb_path():
@@ -1661,7 +1655,7 @@ def test_d3_to_d7_rules_have_correct_fields():
     """D2~D7 全部使用 end_amount / prior_amount 双字段（D1 是六字段）。"""
     rules = load_rules()
     expected_fields = {"end_amount", "prior_amount"}
-    for code in ["D2", "D3", "D4", "D5", "D6", "D7"]:
+    for code in ["D2", "D3", "D4", "D6", "D7"]:  # D5 无科目、没有附注主表规则
         rule = next(r for r in rules if r.rule_id == f"{code}.note.main")
         actual = set(rule.target.fields)
         assert actual == expected_fields, f"{code} fields mismatch: {actual}"

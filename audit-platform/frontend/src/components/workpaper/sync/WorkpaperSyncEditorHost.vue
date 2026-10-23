@@ -61,6 +61,23 @@
       {{ hostError.message }}
     </p>
 
+    <!-- 追踪窗口到点 / 重试之后：手动读一次服务器上的回写状态（快照只读、不喂回桥，见
+         workpaperSyncOperationFollowUp） -->
+    <div v-if="showRefreshStatus" class="wp-sync-editor-host__follow-up" data-testid="wp-sync-host-follow-up">
+      <button
+        type="button"
+        class="wp-sync-editor-host__refresh-status"
+        data-testid="wp-sync-host-refresh-status"
+        :disabled="refreshingStatus"
+        @click="onRefreshStatusClick"
+      >
+        {{ refreshingStatus ? '正在刷新…' : '刷新状态' }}
+      </button>
+      <span v-if="followUp !== null" data-testid="wp-sync-host-follow-up-text" :data-state="followUp.state">
+        {{ followUp.message }}
+      </span>
+    </div>
+
     <!--
       Task 35：commit 后 `workpaper.content.updated` 的可见刷新条。
 
@@ -105,7 +122,17 @@
 
     <!-- 编辑器：mode=oo 且 descriptor 在手才渲染；确认前盖遮罩 -->
     <div v-if="editorLive" class="wp-sync-editor-host__editor" data-testid="wp-sync-host-editor">
-      <div v-if="!editing" class="wp-sync-editor-host__mask" data-testid="wp-sync-host-mask">
+      <!--
+        等文档就绪（descriptor_mounted）时只留顶部状态条且不拦截点击：文档服务器加载期间
+        自己弹的对话框（版本过期、连接异常等）必须点得到。确认中 / 失败态仍整块拦截。
+      -->
+      <div
+        v-if="!editing"
+        class="wp-sync-editor-host__mask"
+        :class="{ 'wp-sync-editor-host__mask--passthrough': maskPassthrough }"
+        :data-passthrough="maskPassthrough ? 'true' : 'false'"
+        data-testid="wp-sync-host-mask"
+      >
         {{ feedback.message }}
       </div>
       <div :id="containerId" class="wp-sync-editor-host__container" data-testid="wp-sync-host-container" />
@@ -120,7 +147,13 @@ import { describeBridgeFailure, type WorkpaperSyncBridge, type WorkpaperSyncBrid
 import { WorkpaperSyncOperationTracker } from './workpaperSyncOperationTracker'
 import WorkpaperSyncContentRefreshBanner from './WorkpaperSyncContentRefreshBanner.vue'
 import type { WorkpaperContentRefresh } from './workpaperSyncContentRefresh'
-import type { WorkpaperSyncEditorLaunchDescriptor } from './workpaperSyncDto'
+import type { WorkpaperSyncEditorLaunchDescriptor, WorkpaperSyncOperationSnapshot } from './workpaperSyncDto'
+import {
+  OPERATION_FOLLOW_UP_UNAVAILABLE,
+  describeOperationFollowUp,
+  snapshotIsRetryable,
+  type WorkpaperSyncOperationFollowUp,
+} from './workpaperSyncOperationFollowUp'
 import {
   buildDocEditorConfig,
   hostRefusal,
@@ -284,6 +317,8 @@ const activeDescriptor = computed<WorkpaperSyncEditorLaunchDescriptor | null>(
 
 const feedback = computed(() => props.bridge.feedback.value)
 const editing = computed(() => props.bridge.state.value === 'oo_editing')
+/** 遮罩只在「等文档就绪」时放行点击（文档尚不可编辑，挡住的只会是文档服务器自己的对话框）。 */
+const maskPassthrough = computed(() => props.bridge.state.value === 'descriptor_mounted')
 const canForcesave = computed(() => props.bridge.canForcesave.value)
 const editorLive = computed(
   () => activeDescriptor.value !== null && props.bridge.mode.value === 'oo',
@@ -315,9 +350,51 @@ const recoveryReasonText = computed(() => {
  */
 const showPlainRetry = computed(() => {
   if (inRecovery.value) return false
-  if (props.bridge.requestedOperationId.value === null) return false
-  return props.bridge.lastError.value?.verdict.retryableOperation === true
+  const requested = props.bridge.requestedOperationId.value
+  if (requested === null) return false
+  if (props.bridge.lastError.value?.verdict.retryableOperation === true) return true
+  // 回写失败落在 operation 上（已关联回写任务）⇒ 服务端可从已保存的文件重跑（R3.4 / R3.5）。
+  // 桥对这类失败记的是不可重试裁决（它只负责把原因摆出来），所以这里按宿主读到的快照判。
+  const latest = latestSnapshot.value
+  return latest !== null && latest.requestedOperationId === requested && snapshotIsRetryable(latest)
 })
+
+// ── 超时 / 重试之后的「刷新状态」（spec writeback-followup-issue-closure R3.5）
+
+/** 追踪窗口到点或用户点过重试之后为真：桥已是 sticky error，后续只能由用户手动刷新。 */
+const manualFollowUp = ref(false)
+const refreshingStatus = ref(false)
+const followUp = ref<WorkpaperSyncOperationFollowUp | null>(null)
+/** 宿主最近读到的快照（追踪器或「刷新状态」）。桥落 error 之后它自己那份不再更新。 */
+const latestSnapshot = ref<WorkpaperSyncOperationSnapshot | null>(null)
+const showRefreshStatus = computed(
+  () => manualFollowUp.value && !inRecovery.value && props.bridge.requestedOperationId.value !== null,
+)
+
+function resetFollowUp(): void {
+  manualFollowUp.value = false
+  followUp.value = null
+  latestSnapshot.value = null
+}
+
+async function refreshStatus(): Promise<void> {
+  const operationId = props.bridge.requestedOperationId.value
+  if (operationId === null || refreshingStatus.value) return
+  refreshingStatus.value = true
+  try {
+    const snapshot = await props.bridge.fetchOperationSnapshot(operationId)
+    latestSnapshot.value = snapshot
+    followUp.value = describeOperationFollowUp(snapshot)
+  } catch {
+    followUp.value = OPERATION_FOLLOW_UP_UNAVAILABLE
+  } finally {
+    refreshingStatus.value = false
+  }
+}
+
+function onRefreshStatusClick(): void {
+  void refreshStatus()
+}
 
 const RECOVERY_REASON_TEXT: Readonly<Record<string, string>> = Object.freeze({
   missing_request: '服务端收到了文件但找不到对应的保存请求',
@@ -382,6 +459,12 @@ async function mountEditor(descriptor: WorkpaperSyncEditorLaunchDescriptor): Pro
       },
       onError: (event: unknown) => {
         void onEditorError(event)
+      },
+      onRequestRefreshFile: () => {
+        onDocumentOutdated(seq)
+      },
+      onOutdatedVersion: () => {
+        onDocumentOutdated(seq)
       },
     })
   } catch (error) {
@@ -458,6 +541,18 @@ function onDocumentStateChange(event: unknown): void {
   const dirty = readDocumentDirty(event)
   props.bridge.notifyDirty(dirty)
   emit('dirty', { dirty })
+}
+
+/**
+ * 文档服务器说这个 doc key 已经保存过（或断线重连后会话已中断）：当前窗口里的文档不可信。
+ *
+ * 只做可见失败：换 key 必须由页面「回到表单模式 → 再进入」走 materialize（终结代际换代），
+ * 宿主不自己离开重进 —— 模式切换与 dirty 判据归页面所有（spec writeback-followup-issue-closure
+ * D3）。不调 `refreshFile()`：它要一份新 config，而 config 只来自 descriptor。
+ */
+function onDocumentOutdated(seq: number): void {
+  if (seq !== mountSeq) return
+  failHost('editor_runtime', hostRefusal('editor_host_document_outdated'), true)
 }
 
 /**
@@ -590,7 +685,12 @@ async function onRetryClick(): Promise<void> {
     await props.bridge.retryOperation()
   } catch (error) {
     failHost('retry_operation', error, false)
+    return
   }
+  // 服务端的重试是同步跑完 apply 再返回的，而桥停在 sticky error、不再观察 operation：
+  // 读一次快照把结果摆出来，之后由用户按需再刷新（R3.5）。
+  manualFollowUp.value = true
+  await refreshStatus()
 }
 
 /**
@@ -613,6 +713,7 @@ async function forceSave(): Promise<{ operationId: string }> {
     failHost('forcesave', refusal, false)
     throw refusal
   }
+  resetFollowUp() // 新一次保存：上一次的「刷新状态」结果作废
   try {
     await props.bridge.switchToHtml()
   } catch (error) {
@@ -680,6 +781,7 @@ function startOperationTracking(operationId: string): void {
     // 等于绕开注入 —— 判据会看到「宿主在打真实 HTTP 而 spy 没被调用」。
     poll: (_scope, id) => props.bridge.fetchOperationSnapshot(id),
     onSnapshot: (snapshot) => {
+      latestSnapshot.value = snapshot
       try {
         props.bridge.ingestOperationSnapshot(snapshot)
       } catch (error) {
@@ -693,6 +795,7 @@ function startOperationTracking(operationId: string): void {
     },
     onDeadline: () => {
       operationTracker = null
+      manualFollowUp.value = true
       failHost(
         'operation_tracking',
         hostRefusal('editor_host_operation_tracking_timeout'),
@@ -809,6 +912,32 @@ defineExpose({ forceSave, getSyncState })
   color: #c45656;
 }
 
+.wp-sync-editor-host__follow-up {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+  color: #606266;
+}
+
+.wp-sync-editor-host__refresh-status {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #4b2d77;
+  background: #fff;
+  border: 1px solid #d8b8ee;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.wp-sync-editor-host__refresh-status:disabled {
+  color: #a8abb2;
+  border-color: #e4e7ed;
+  cursor: not-allowed;
+}
+
 .wp-sync-editor-host__recovery {
   display: flex;
   gap: 12px;
@@ -835,6 +964,15 @@ defineExpose({ forceSave, getSyncState })
   font-size: 13px;
   color: #606266;
   background: rgb(255 255 255 / 92%);
+}
+
+/* 等文档就绪：退成顶部状态条，点击穿透到文档服务器的对话框 */
+.wp-sync-editor-host__mask--passthrough {
+  inset: 0 0 auto;
+  padding: 6px 12px;
+  pointer-events: none;
+  background: rgb(255 255 255 / 85%);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 8%);
 }
 
 .wp-sync-editor-host__container {

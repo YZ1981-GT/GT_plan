@@ -833,23 +833,36 @@ def _handle_sum_tb(args: list[Any], ctx: FormulaContext, trace: list[str]) -> De
         raise FormulaColumnError(
             f"SUM_TB('{code_range}','{col_name}')：列名「{col_name}」未注册，无法取值"
         )
-    val = Decimal("0")
     # 逐科目的「列无数据」只汇总计数，不逐条进 trace（宽区间如 1401~1499 会刷屏）
     sink: list[str] = []
-    parts = code_range.split("~")
-    if len(parts) == 2:
-        start, end = parts[0], parts[1]
-        prefix_len = len(start)
-        for code, data in ctx.tb_data.items():
-            code_prefix = code[:prefix_len]
-            if start <= code_prefix <= end:
-                val += _resolve_tb_column(data, col_name, code=code, trace=sink)
+    val = _sum_tb_value(ctx, code_range, col_name, sink)
     missing = sum(1 for t in sink if "列无数据" in t)
     if missing:
         trace.append(
             f"SUM_TB('{code_range}','{col_name}')：{missing} 个科目无该列数据（按 0 计）"
         )
     trace.append(f"SUM_TB('{code_range}','{col_name}') = {val}")
+    return val
+
+
+def _sum_tb_value(ctx: FormulaContext, code_range: str, col_name: str, sink: list[str]) -> Decimal:
+    """区间求和（AST / 正则两条路径共用）。
+
+    统一预载层按区间聚合好的值存在区间本身这个键下（``formula_preloader._load_tb``）⇒ 优先用它；原先预载层把
+    ``'6601~6699'`` 当科目前缀、一条也匹配不到，区间求和恒为 0（spec formula-fetch-followup-defect-closure R7）。
+    没有区间键时（报表路径给的是逐科目全量）逐科目按前缀区间求和；其他区间的聚合键不是科目，跳过。
+    """
+    precomputed = ctx.tb_data.get(code_range)
+    if precomputed is not None:
+        return _resolve_tb_column(precomputed, col_name, code=code_range, trace=sink)
+    val = Decimal("0")
+    parts = code_range.split("~")
+    if len(parts) == 2:
+        start, end = parts[0], parts[1]
+        prefix_len = len(start)
+        for code, data in ctx.tb_data.items():
+            if "~" not in code and start <= code[:prefix_len] <= end:
+                val += _resolve_tb_column(data, col_name, code=code, trace=sink)
     return val
 
 
@@ -1323,16 +1336,7 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
                     )
                 else:
                     sink: list[str] = []
-                    parts = code_range.split("~")
-                    if len(parts) == 2:
-                        start, end = parts[0], parts[1]
-                        prefix_len = len(start)
-                        for code, data in ctx.tb_data.items():
-                            code_prefix = code[:prefix_len]
-                            if start <= code_prefix <= end:
-                                val += _resolve_tb_column(
-                                    data, col_name, code=code, trace=sink
-                                )
+                    val = _sum_tb_value(ctx, code_range, col_name, sink)
                     missing = sum(1 for t in sink if "列无数据" in t)
                     if missing:
                         result.trace.append(

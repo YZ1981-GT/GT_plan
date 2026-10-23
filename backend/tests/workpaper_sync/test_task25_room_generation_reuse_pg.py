@@ -69,6 +69,24 @@ def test_new_content_on_a_retired_generation_commits_onto_a_fresh_one(
     assert row["rooms_delta"] == 1, row
 
 
+def test_room_closed_after_docserver_saved_rotates_to_a_fresh_doc_key(
+    snap: dict[str, Any],
+) -> None:
+    """status 2 回 0 后 room closed ⇒ 再进入换代、doc key 必须变（spec writeback-followup-issue-closure R1.4）。
+
+    修复前：没有任何代码关闭 room ⇒ 同代 key 被复用，而文档服务器已认定该 key 保存过 ⇒
+    编辑器「版本已更改」并载入 room 物化时的旧字节。内容未改 ⇒ revision 不动、同 artifact 换代。
+    """
+    row = snap["retired"]["docserver_saved"]
+    assert row["refusal"] is None, row
+    assert row["business_identity_reused"] is True, row
+    assert row["revision_delta"] == 0, row
+    assert row["descriptor_generation"] == row["max_generation_before"] + 1, row
+    assert row["rooms_delta"] == 1, row
+    assert row["representations_delta"] == 1, row
+    assert row["descriptor_doc_key"] and row["descriptor_doc_key"] != row["retired_doc_key"], row
+
+
 def test_non_terminal_refusal_is_409_and_does_not_rotate(snap: dict[str, Any]) -> None:
     """refresh-required 不是终态（可能仍有待恢复的 incoming）⇒ 不换代，409 透出。
 

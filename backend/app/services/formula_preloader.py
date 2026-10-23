@@ -115,8 +115,14 @@ def _safe_decimal(val: Any) -> Decimal:
 
 
 async def _load_tb(db: AsyncSession, project_id: uuid.UUID, year: int,
-                   codes: set[str]) -> dict[str, dict[str, Decimal]]:
-    """从 trial_balance 批量取科目数据（前缀聚合口径）。"""
+                   codes: set[str], *, with_occurrence: bool = False) -> dict[str, dict[str, Decimal]]:
+    """从 trial_balance 批量取科目数据（前缀聚合口径）。
+
+    ``'起~止'`` 形态（SUM_TB 的区间）按区间聚合，存在区间本身这个键下（L1 ``_sum_tb_value`` 优先用它）；原先当科目前缀，
+    一条也匹配不到 ⇒ 区间求和恒 0。发生额（本期借方 / 本期贷方）``trial_balance`` 没有这两列，原先 ``getattr`` 恒取到 0；
+    ``with_occurrence`` 时改取 ``tb_balance`` 叶子归集（与底稿求值器、初次预填同一共享件）。
+    spec formula-fetch-followup-defect-closure R7。
+    """
     if not codes:
         return {}
     from app.models.audit_platform_models import TrialBalance
@@ -130,33 +136,48 @@ async def _load_tb(db: AsyncSession, project_id: uuid.UUID, year: int,
         )
     )).scalars().all()
 
+    ranges = {c: tuple(p.strip() for p in c.split("~", 1)) for c in codes if c.count("~") == 1}
+    plain = [c for c in codes if c not in ranges]
+
+    def _targets(code: str) -> list[str]:
+        hits = [t for t in plain if code.startswith(t)]
+        return hits + [r for r, (start, end) in ranges.items() if start and start <= code[:len(start)] <= end]
+
     # 按前缀聚合（与 ReportFormulaParser._get_tb_rows_prefix 同口径）
     out: dict[str, dict[str, Decimal]] = {}
     for row in rows:
         code = row.standard_account_code
         if not code:
             continue
+        columns = {
+            "期末余额": _safe_decimal(row.audited_amount),
+            "年初余额": _safe_decimal(row.opening_balance),
+            "本期发生额": _safe_decimal(row.audited_amount) - _safe_decimal(row.opening_balance),
+            "AJE调整": _safe_decimal(row.aje_adjustment),
+            "RJE调整": _safe_decimal(row.rje_adjustment),
+        }
+        for target_code in _targets(code):
+            entry = out.setdefault(target_code, {})
+            for standard, val in columns.items():
+                entry[standard] = entry.get(standard, Decimal("0")) + val
+    if with_occurrence:
+        from app.services.four_table.occurrence_by_standard_code import (
+            CREDIT_KEY,
+            DEBIT_KEY,
+            fetch_occurrence_by_standard_code,
+        )
+
+        occurrence = await fetch_occurrence_by_standard_code(db, project_id, year)
         for target_code in codes:
-            if code.startswith(target_code) or code == target_code:
+            if target_code in ranges:
+                start, end = ranges[target_code]
+                picked = [v for c, v in occurrence.items() if start and start <= c[:len(start)] <= end]
+            else:  # 单科目与底稿求值器同口径：按标准码取归集结果
+                picked = [occurrence[target_code]] if target_code in occurrence else []
+            if picked:
                 entry = out.setdefault(target_code, {})
-                for alias, standard in COLUMN_ALIASES.items():
-                    if alias == standard:  # 只累加标准名一次
-                        val = Decimal("0")
-                        if standard == "期末余额":
-                            val = _safe_decimal(row.audited_amount)
-                        elif standard == "年初余额":
-                            val = _safe_decimal(row.opening_balance)
-                        elif standard == "本期发生额":
-                            val = _safe_decimal(row.audited_amount) - _safe_decimal(row.opening_balance)
-                        elif standard == "AJE调整":
-                            val = _safe_decimal(row.aje_adjustment)
-                        elif standard == "RJE调整":
-                            val = _safe_decimal(row.rje_adjustment)
-                        elif standard == "本期借方":
-                            val = _safe_decimal(getattr(row, "debit_amount", None))
-                        elif standard == "本期贷方":
-                            val = _safe_decimal(getattr(row, "credit_amount", None))
-                        entry[standard] = entry.get(standard, Decimal("0")) + val
+                entry["本期借方"] = sum((_safe_decimal(v.get(DEBIT_KEY)) for v in picked), Decimal("0"))
+                entry["本期贷方"] = sum((_safe_decimal(v.get(CREDIT_KEY)) for v in picked), Decimal("0"))
     # 别名映射
     for code_data in out.values():
         for alias, standard in COLUMN_ALIASES.items():
@@ -421,8 +442,17 @@ async def _load_note_fallback(db: AsyncSession, project_id: uuid.UUID, year: int
     return out
 
 
+def _mentions_occurrence(formulas: list[str]) -> bool:
+    """公式里用了发生额列（本期借方 / 本期贷方及其别名）⇒ 预载要取 ``tb_balance`` 归集。"""
+    from app.services.formula_engine import COLUMN_ALIASES
+
+    aliases = [a for a, s in COLUMN_ALIASES.items() if s in ("本期借方", "本期贷方")]
+    return any(a in (text or "") for text in formulas for a in aliases)
+
+
 async def _load_prev(db: AsyncSession, project_id: uuid.UUID, year: int, refs: dict[str, set],
-                     gaps: list[str] | None) -> tuple[dict[str, dict[str, Decimal]], dict, dict]:
+                     gaps: list[str] | None, *, with_occurrence: bool = False,
+                     ) -> tuple[dict[str, dict[str, Decimal]], dict, dict]:
     """PREV 两参 → 上年试算表（前缀聚合）；三参 → 逐个上年同底稿取数。上年来源同一（``prior_year_context``）。"""
     prior_tb: dict[str, dict[str, Decimal]] = {}
     values: dict[tuple[str, str, str], Decimal] = {}
@@ -437,7 +467,8 @@ async def _load_prev(db: AsyncSession, project_id: uuid.UUID, year: int, refs: d
         if source.project_id is None:
             _gap(gaps, f"PREV 上年试算表：{source.reason}")
         else:
-            prior_tb = await _load_tb(db, source.project_id, source.year, refs["prev_codes"])
+            prior_tb = await _load_tb(db, source.project_id, source.year, refs["prev_codes"],
+                                      with_occurrence=with_occurrence)
     for key in sorted(refs["prev_wp_refs"]):
         hit = await resolver.resolve(*key)
         if hit.value is None:
@@ -475,7 +506,8 @@ async def preload(
     refs = _scan_refs(formulas)
 
     # 批量查 DB（各数据源独立，失败不互相拖累）
-    tb_data = await _load_tb(db, project_id, year, refs["tb_codes"])
+    with_occurrence = _mentions_occurrence(formulas)
+    tb_data = await _load_tb(db, project_id, year, refs["tb_codes"], with_occurrence=with_occurrence)
     adj_data = await _load_adj(db, project_id, year, refs["adj_codes"], adj_exclude_origins, gaps)
     aux_data = await _load_aux(db, project_id, year, refs["aux_specs"], gaps)
     if row_cache is None and refs["report_refs"]:
@@ -486,7 +518,8 @@ async def preload(
     ledger_count = await _load_ledger_count(db, project_id, year, refs["ledger_specs"])
     tb_aux_data = await _load_tb_aux(db, project_id, year, refs["tb_aux_specs"])
 
-    prior_tb_data, prev_wp_data, prev_wp_missing = await _load_prev(db, project_id, year, refs, gaps)
+    prior_tb_data, prev_wp_data, prev_wp_missing = await _load_prev(db, project_id, year, refs, gaps,
+                                                                    with_occurrence=with_occurrence)
 
     return FormulaContext(
         tb_data=tb_data,

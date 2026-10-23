@@ -617,9 +617,12 @@ def _task_schedule_workpaper_sync_prewarm(ctx: StartupContext) -> None:
     task goes into ``ctx.worker_tasks`` so shutdown cancels it with the workers (a bare
     ``create_task`` reference could be garbage-collected mid-run).
     """
+    from app.core.gc_tuning import configure_gc, run_then_freeze
     from app.services.workpaper_sync.startup_prewarm import warm_workpaper_sync_registry
 
-    ctx.worker_tasks.append(asyncio.create_task(warm_workpaper_sync_registry()))
+    # 冷建之前抬 GC 阈值、预热之后冻结长寿对象（writeback-followup-issue-closure R9 / P12）
+    configure_gc()
+    ctx.worker_tasks.append(asyncio.create_task(run_then_freeze(warm_workpaper_sync_registry)))
 
 
 def _task_install_sigterm(_ctx: StartupContext) -> None:
@@ -686,9 +689,11 @@ _WORKER_BINDINGS: tuple[tuple[str, str], ...] = (
     ("invalidation_dispatcher_worker", "app.workers.invalidation_dispatcher_worker"),
     # 知识库扫描件后台 OCR（dsh-kb-ocr-local-first-routing；受 KNOWLEDGE_OCR_WORKER_ENABLED 控制）。
     ("knowledge_ocr_worker", "app.workers.knowledge_ocr_worker"),
+    # OO→HTML apply 中断后的重驱（writeback-followup-issue-closure R3.2；选主，一轮一条）。
+    ("oo_apply_redrive_worker", "app.workers.oo_apply_redrive_worker"),
 )
 
-# Stable worker names (12 always-on + 1 conditional ImportJobRunner) — pinned contract,
+# Stable worker names (13 always-on + 1 conditional ImportJobRunner) — pinned contract,
 # tests assert it equals the worker phase of ``STARTUP_TASKS`` in order.
 WORKER_TASK_NAMES: tuple[str, ...] = (
     "sla_worker",
@@ -703,6 +708,7 @@ WORKER_TASK_NAMES: tuple[str, ...] = (
     "procedure_dispatcher_worker",
     "invalidation_dispatcher_worker",
     "knowledge_ocr_worker",
+    "oo_apply_redrive_worker",
     "ImportJobRunner.run_forever",
 )
 

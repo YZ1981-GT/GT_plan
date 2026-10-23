@@ -28,7 +28,8 @@
         {"code": "B6", "name": "境外审计协作", "description": "作为集团审计组成部分参与境外审计"}
       ],
       "quality_measures": "需项目质量复核合伙人（A24/A25保留），专委会不强制",
-      "exclusive_templates": []
+      "exclusive_templates": [],
+      "excluded_templates": ["A26"]
     },
     "C": {
       "name": "C类（一般审计业务）",

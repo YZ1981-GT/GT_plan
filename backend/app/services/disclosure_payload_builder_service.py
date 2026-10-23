@@ -170,6 +170,17 @@ async def build_for_wp_code(
         return None
 
 
+async def _source_wp_id(db: AsyncSession, project_id: UUID, wp_code: str) -> UUID | None:
+    """builder 读的那张底稿（与 `load_disclosure_entries` 同一条关联；(项目, wp_code) 至多一张）。"""
+    row = (await db.execute(sa.text("""
+        SELECT wp.id FROM working_paper wp
+        JOIN wp_index wi ON wi.id = wp.wp_index_id
+        WHERE wi.project_id = :pid AND wi.wp_code = :code
+        LIMIT 1
+    """), {"pid": str(project_id), "code": wp_code})).first()
+    return None if row is None else UUID(str(row[0]))
+
+
 async def build_and_sync(
     db: AsyncSession,
     project_id: UUID,
@@ -181,28 +192,44 @@ async def build_and_sync(
     """builder → sync_from_workpaper 一步到位。
 
     返回 sync 结果 dict 或 {"skipped": True, "reason": ...}。
+
+    🔴 不用占位身份（spec writeback-followup-issue-closure R7.2）：原先无触发人时写
+    `User(id=UUID(int=0))`、底稿写 `UUID(int=0)` ⇒ `disclosure_notes.updated_by` 外键在下一次
+    查询的 autoflush 上炸，整次附注刷新失败（底稿保存的事件从来不带 user_id，所以每次都炸）。
+    现在无触发人 = 系统重算，`updated_by` 记 NULL；来源底稿取 builder 读的那张（`last_sync_wp_id`）。
+
+    全部读写在一个 SAVEPOINT 里（释放保存点时 flush，约束错误就地暴露）：builder 失败只回滚它
+    自己，调用方随后的附注刷新仍在健康的事务上（PG 上吞掉异常而不回滚到保存点，整个事务停在 aborted）。
     """
     from app.models.core import User
-
-    result = await build_for_wp_code(db, project_id, year, wp_code)
-    if result is None:
-        return {"skipped": True, "reason": f"{wp_code} 无 builder 或底稿无数据"}
-
-    # 构造一个最小 User 对象（事件触发没有 HTTP 请求上下文）
-    user = User(id=triggered_by) if triggered_by else User(id=UUID(int=0))
-
     from app.services.wp_disclosure_sync_service import sync_from_workpaper
-    sync_result = await sync_from_workpaper(
-        db, project_id,
-        wp_id=UUID(int=0),  # builder 没有真实 wp_id
-        sheet_name=result.sheet_name,
-        section_id=result.section_id,
-        sub_table_data=result.sub_table_data,
-        current_standard=result.current_standard,
-        user=user,
-        year=year,
-        sub_table_columns=result.sub_table_columns,
-        propagation_origin="system_recompute",
-        commit=False,
-    )
+
+    nested = await db.begin_nested()
+    try:
+        result = await build_for_wp_code(db, project_id, year, wp_code)
+        source_wp_id = None if result is None else await _source_wp_id(db, project_id, wp_code)
+        if result is None or source_wp_id is None:
+            # 什么都没写；builder 内部吞掉的查询失败（PG 上已 aborted）也就此回滚到保存点
+            await nested.rollback()
+            reason = "无 builder 或底稿无数据" if result is None else "在本项目没有底稿"
+            return {"skipped": True, "reason": f"{wp_code} {reason}"}
+        sync_result = await sync_from_workpaper(
+            db, project_id,
+            wp_id=source_wp_id,
+            sheet_name=result.sheet_name,
+            section_id=result.section_id,
+            sub_table_data=result.sub_table_data,
+            current_standard=result.current_standard,
+            # 只读 `.id`；事件触发没有 HTTP 请求上下文，无触发人即系统重算
+            user=User(id=triggered_by),
+            year=year,
+            sub_table_columns=result.sub_table_columns,
+            propagation_origin="system_recompute",
+            commit=False,
+        )
+        await nested.commit()
+    except Exception:
+        # flush 失败后保存点已失活（is_active=False）但仍须显式 rollback，会话才回到外层事务
+        await nested.rollback()
+        raise
     return sync_result

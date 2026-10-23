@@ -2137,7 +2137,9 @@ def test_every_scenario_produced_a_measurement(snap: dict[str, Any]) -> None:
     assert set(snap["candidate"]) == {
         "blocks_materialize", "finalize", "multi_generation_reuse"
     }
-    assert set(snap["retired"]) == {"same_content", "new_content", "refresh_required"}
+    assert set(snap["retired"]) == {
+        "same_content", "new_content", "docserver_saved", "refresh_required"
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────

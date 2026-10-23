@@ -13,11 +13,12 @@
   - aux://1001.成本中心.001#期末   → 辅助余额
 """
 import asyncio
-import json
 import re
 import logging
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Optional
+
+from app.core.offloop_json import encode_json_lines, iter_json_line_batches
 
 logger = logging.getLogger(__name__)
 
@@ -923,7 +924,12 @@ async def build_aux_entries(db, project_id: str, year: int) -> list[AddressEntry
     except Exception as e:
         logger.error("build_aux_entries query error: %s", e, exc_info=True)
         return entries
+    # 一个项目可达 5.6 万条：逐行构建放进工作线程（spec writeback-followup-issue-closure R5）
+    return await asyncio.to_thread(_aux_entries_from_rows, rows, columns, project_id, year)
 
+
+def _aux_entries_from_rows(rows, columns: list[str], project_id: str, year: int) -> list[AddressEntry]:
+    entries: list[AddressEntry] = []
     seen: set[tuple[str, str]] = set()
     # 辅助类型合计（AUX('科目','辅助类型','列')，求值口径见 formula_ref_preload）排在辅助项之后登记
     type_rows: dict[tuple[str, str], str] = {}
@@ -981,6 +987,18 @@ async def build_aux_entries(db, project_id: str, year: int) -> list[AddressEntry
 # ═══════════════════════════════════════════
 
 import time as _time
+
+#: Redis 二级缓存值：每行一个 JSON 数组（分块，见 app.core.offloop_json）；旧格式（整包一个数组）= 只有一行。
+#: 按字段逐个取值：asdict 会深拷贝，vars() 会给每个实例物化一份常驻的 __dict__。
+_ENTRY_FIELDS = tuple(f.name for f in fields(AddressEntry))
+
+
+def _encode_cached_entries(entries: list[AddressEntry]) -> bytes:
+    return encode_json_lines({name: getattr(e, name) for name in _ENTRY_FIELDS} for e in entries)
+
+
+def _decode_cached_entries(raw: bytes | str) -> list[AddressEntry]:
+    return [AddressEntry(**item) for batch in iter_json_line_batches(raw) for item in batch]
 
 
 @dataclass
@@ -1044,8 +1062,8 @@ class AddressRegistryService:
             raw = await redis.get(self._redis_key(slot_key))
             if raw is None:
                 return None
-            items = json.loads(raw)
-            return [AddressEntry(**item) for item in items]
+            # 辅助余额一个域可达 34 MB：逐行（分块）解码放进工作线程（spec writeback-followup-issue-closure R5）
+            return await asyncio.to_thread(_decode_cached_entries, raw)
         except Exception as e:
             logger.warning("address_registry Redis L2 get failed (key=%s): %s", slot_key, e)
             return None
@@ -1056,9 +1074,7 @@ class AddressRegistryService:
         if redis is None:
             return
         try:
-            serialized = json.dumps(
-                [asdict(e) for e in entries], ensure_ascii=False
-            )
+            serialized = await asyncio.to_thread(_encode_cached_entries, entries)
             ttl = self._TTL.get(domain, 120)
             await redis.set(self._redis_key(slot_key), serialized, ex=ttl)
         except Exception as e:

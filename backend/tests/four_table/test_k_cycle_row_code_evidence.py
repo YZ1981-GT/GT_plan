@@ -470,14 +470,18 @@ def judge_no_account_claim(
     chart_hits: set[str] = set()
     for n in names:
         chart_hits |= chart_by_name.get(_norm_name(n), set())
-    codes: set[str] = set(extra_codes)
+    wanted = {_norm_name(n) for n in names}
+    by_name: set[str] = set()
     for n in names:
-        codes |= name_to_codes.get(_norm_name(n), set())
+        by_name |= name_to_codes.get(_norm_name(n), set())
+    # 🔴 按名反查到的行号只看**同名**的那几行：同一行号在两套准则下可以是不同项目（BS-058 在 listed 是
+    #    其他流动负债、公式空；在 soe 是交易性金融负债 TB('2101')）。不按名过滤会把别的项目的公式算到
+    #    本科目头上（2026-10-16 正是据此把 K4 误改成 has_account=True）。extra_codes 是按码显式登记的，整码都看。
     with_formula = [
         f"{c}/{std}={fml}"
-        for c in sorted(codes)
-        for std, _rn, fml in code_rows.get(c, [])
-        if fml
+        for c in sorted(by_name | set(extra_codes))
+        for std, rn, fml in code_rows.get(c, [])
+        if fml and (c in extra_codes or _norm_name(rn) in wanted)
     ]
     if not chart_hits and not with_formula:
         return ""
@@ -517,6 +521,22 @@ def test_judge_no_account_claim_self_check():
     # ④ extra_codes 也参与判定（K6 的负债侧与备抵侧行号不由科目名反查得到）
     msg = judge_no_account_claim("XX", ("不存在的科目",), {"BS-012"}, empty, n2c, rows_fml)
     assert "BS-012" in msg, "extra_codes 未参与判定 ⇒ K6 负债侧/备抵侧的公式会被漏看"
+    # ⑤ 同一行号在别的准则下是另一个项目、且那边有公式 ⇒ 不算本科目有公式（真库 BS-058 即此形态）
+    rows_mixed: dict[str, list[tuple[str, str, str | None]]] = {
+        "BS-058": [
+            ("listed_standalone", "其他流动负债", None),
+            ("soe_standalone", "交易性金融负债", "TB('2101','期末余额')"),
+        ]
+    }
+    n2c_mixed = {"其他流动负债": {"BS-058"}, "交易性金融负债": {"BS-058"}}
+    assert judge_no_account_claim(
+        "XX", ("其他流动负债",), set(), empty, n2c_mixed, rows_mixed
+    ) == "", "别的项目同号行的公式被算到本科目头上"
+    # ⑤ 的反向：同名那一行有了公式 ⇒ 不成立
+    rows_mixed["BS-058"][0] = ("listed_standalone", "其他流动负债", "TB('2314','期末余额')")
+    assert "BS-058" in judge_no_account_claim(
+        "XX", ("其他流动负债",), set(), empty, n2c_mixed, rows_mixed
+    )
 
 
 def test_no_account_flag_matches_db_evidence():
@@ -560,20 +580,30 @@ def test_k6_accounts_exist_in_client_chart():
 
 
 def test_k4_no_account_evidence_still_holds():
-    """K4 现在有公式 → has_account=True，验证公式确实存在。"""
+    """Property 4 反向：K4 的宁缺勿造依据仍成立（stale 检测）。
+
+    🔴 只看**行名就是「其他流动负债」**的行：BS-058 在 soe 是交易性金融负债（公式 TB('2101')），
+    2026-10-16 曾因不按名过滤把它当成「K4 有公式了」并改 has_account=True（spec
+    formula-fetch-followup-defect-closure R6.2 复核后改回）。
+    """
     s = snap()
-    codes = s.name_to_codes.get(_norm_name("其他流动负债"), set())
+    want = _norm_name("其他流动负债")
+    codes = s.name_to_codes.get(want, set())
     assert codes, "report_config 无「其他流动负债」行（判据过期）"
     with_formula = [
         f"{c}/{std}={fml}"
         for c in sorted(codes)
-        for std, _rn, fml in s.code_rows.get(c, [])
-        if fml
+        for std, rn, fml in s.code_rows.get(c, [])
+        if fml and _norm_name(rn) == want
     ]
-    # 2026-10-15: BS-058 已有公式 TB('2101')，K4 已改为 has_account=True
-    assert with_formula, (
-        "「其他流动负债」公式又变回空了 ⇒ K4 的 has_account=True 需重新裁决"
+    assert not with_formula, (
+        f"「其他流动负债」现在有公式了：{with_formula} ⇒ "
+        "K4 的 has_account=False 需重新裁决（Requirement 1.8）"
     )
+    assert not s.chart_by_name.get(want), (
+        "account_chart 现在有「其他流动负债」科目了 ⇒ K4 宁缺勿造需重新裁决"
+    )
+    assert _load_specs()["K4"].has_account is False
 
 
 # ─────────────────────────────────────────────────────────────────────────────

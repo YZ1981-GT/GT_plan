@@ -279,6 +279,16 @@ async def refresh_all_notes(
 # ── WORKPAPER_SAVED 事件 handler ──────────────────────────────────────────────
 
 
+def _uuid_or_none(value: Any) -> UUID | None:
+    """事件 extra 里的 id（JSON 化后是字符串）；缺失或不是 UUID 一律当没给。"""
+    if isinstance(value, UUID):
+        return value
+    try:
+        return UUID(str(value)) if value else None
+    except ValueError:
+        return None
+
+
 async def handle_workpaper_saved(payload: Any) -> dict[str, Any]:
     """WORKPAPER_SAVED 事件处理：刷新该底稿对应的附注章节。
 
@@ -302,8 +312,8 @@ async def handle_workpaper_saved(payload: Any) -> dict[str, Any]:
     if not sections:
         return {"status": "no_mapping"}
 
-    user_id = extra.get("user_id")
-    triggered_by = UUID(user_id) if isinstance(user_id, str) and user_id else None
+    # 修前 `UUID(user_id)` 在 try 之外：一个不合法的 user_id 就让 handler 直接抛出
+    triggered_by = _uuid_or_none(extra.get("user_id"))
 
     try:
         from app.core.database import async_session
@@ -319,7 +329,8 @@ async def handle_workpaper_saved(payload: Any) -> dict[str, Any]:
                             triggered_by=triggered_by,
                         )
                     except Exception as build_exc:
-                        logger.debug(
+                        # builder 已回滚到自己的保存点，下面的刷新仍在健康的事务上
+                        logger.warning(
                             "note_disclosure_refresh: builder failed for %s, "
                             "falling back to refresh: %s", wp_code, build_exc,
                         )

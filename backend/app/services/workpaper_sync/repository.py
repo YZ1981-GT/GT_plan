@@ -38,7 +38,7 @@ from typing import Any, Mapping, Sequence
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession
 
 from app.models.workpaper_sync_models import (
     WorkpaperArtifact,
@@ -66,6 +66,7 @@ from app.models.workpaper_sync_models import (
     WorkpaperSyncOperationEvent,
     WorkpaperSyncScopeIndex,
 )
+from app.services.workpaper_sync.confirmation_rebase import is_rebase_onto_room_baseline
 from app.services.workpaper_sync.models import (
     CLOSE_INTENT_EDGES,
     ActorType,
@@ -212,6 +213,8 @@ class WorkpaperSyncRepository:
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+        #: room → (持 OO→HTML apply 锁的专用连接, 重入深度)，见 :meth:`lock_room_oo_apply`
+        self._oo_apply_locks: dict[uuid.UUID, tuple[AsyncConnection, int]] = {}
 
     @property
     def session(self) -> AsyncSession:
@@ -313,7 +316,7 @@ class WorkpaperSyncRepository:
         return room
 
     async def lock_room_oo_apply(self, room_id: uuid.UUID) -> None:
-        """per-room OO→HTML apply 串行锁（**会话级** advisory lock）。
+        """per-room OO→HTML apply 串行锁（**会话级** advisory lock，持在一条**专用连接**上）。
 
         `oo_to_html._apply_settled` 用它把「rematerialize + fence + publish」这段
         跨越内部 `commit` 的临界区串起来，避免两个并行 apply 在同一 room 的 fence 上
@@ -321,27 +324,60 @@ class WorkpaperSyncRepository:
 
         🔴 必须是**会话级** `pg_advisory_lock` 而不是事务级 `pg_advisory_xact_lock`：
         临界区内部会 `commit`（Task 15 的 content commit 自开事务边界），事务级锁会在
-        那次 commit 时**自动释放**，锁就形同虚设。会话级锁跨事务存活，由 `finally` 里的
-        :meth:`unlock_room_oo_apply` 显式释放（连接归还池前必须解锁，否则泄漏）。
+        那次 commit 时**自动释放**，锁就形同虚设。
+
+        🔴 持锁连接不能是会话自己的连接：会话每次 commit 都把连接还给池，之后的解锁
+        落到另一条连接上（返回 false），锁留在池里那条空闲连接上 —— 同 room 的下一个
+        apply 永久等待（spec writeback-followup-issue-closure R3.1）。这里另取一条连接持锁，
+        解锁在同一条上做、做完关掉（同 `migration_runner` 写法）；同一仓储内可重入。
+        非 PostgreSQL（SQLite 测试库）没有 advisory lock，不加锁。
 
         与 `lock_workpaper` 共用 :data:`_ADVISORY_NAMESPACE` 但 key 前缀不同
         （`oo_apply:` vs `workpaper_sync:`）⇒ 两把锁互不阻塞。
         """
-        await self._session.execute(
-            sa.text("SELECT pg_advisory_lock(:ns, hashtext(:key))"),
-            {"ns": _ADVISORY_NAMESPACE, "key": f"oo_apply:{room_id}"},
-        )
+        held = self._oo_apply_locks.get(room_id)
+        if held is not None:
+            self._oo_apply_locks[room_id] = (held[0], held[1] + 1)
+            return
+        bind = self._session.bind
+        engine = bind if isinstance(bind, AsyncEngine) else getattr(bind, "engine", None)
+        if engine is None or engine.dialect.name != "postgresql":
+            return
+        conn = await engine.connect()
+        try:
+            await conn.execute(
+                sa.text("SELECT pg_advisory_lock(:ns, hashtext(:key))"),
+                {"ns": _ADVISORY_NAMESPACE, "key": f"oo_apply:{room_id}"},
+            )
+            await conn.commit()  # 会话级锁不随事务结束；持锁期间连接不挂着未结束的事务
+        except BaseException:
+            await conn.invalidate()
+            raise
+        self._oo_apply_locks[room_id] = (conn, 1)
 
     async def unlock_room_oo_apply(self, room_id: uuid.UUID) -> None:
-        """释放 :meth:`lock_room_oo_apply` 取得的会话级 advisory lock。
+        """在加锁的那条连接上释放 :meth:`lock_room_oo_apply` 的锁，再关掉这条连接。
 
-        会话级锁不随事务结束自动释放，必须与加锁**同 key** 显式解锁；调用方在
-        `finally` 中调用，即使临界区异常也不泄漏锁（连接归池后残留会拖住后续 apply）。
+        调用方在 `finally` 中调用。解锁语句失败时作废这条连接（真正断开 ⇒ 数据库释放
+        该连接的全部会话级锁），不让它带着锁回到池里。
         """
-        await self._session.execute(
-            sa.text("SELECT pg_advisory_unlock(:ns, hashtext(:key))"),
-            {"ns": _ADVISORY_NAMESPACE, "key": f"oo_apply:{room_id}"},
-        )
+        held = self._oo_apply_locks.pop(room_id, None)
+        if held is None:
+            return
+        conn, depth = held
+        if depth > 1:
+            self._oo_apply_locks[room_id] = (conn, depth - 1)
+            return
+        try:
+            await conn.execute(
+                sa.text("SELECT pg_advisory_unlock(:ns, hashtext(:key))"),
+                {"ns": _ADVISORY_NAMESPACE, "key": f"oo_apply:{room_id}"},
+            )
+            await conn.commit()
+        except BaseException:
+            await conn.invalidate()
+            raise
+        await conn.close()
 
     # ─────────────────────────────────────────────────────────────────
     # 2. scope index（authorization-only，与 child 同事务）
@@ -935,8 +971,9 @@ class WorkpaperSyncRepository:
         # 触发多次 confirm-descriptor（编辑器重连 / 前端重放 / DocServer 重发 ready），
         # 直接再 INSERT 会撞唯一键抛 IntegrityError → 整个 confirm 端点 500，编辑器停在
         # 「已挂载但不能保存」。真正的重放（同 descriptor identity）必须是幂等 no-op：
-        # 返回既有 confirmation。identity 不同则是「同槽位换了内容」——那是真冲突，抛
-        # 领域错误（可映射 409）而不是让 DB 唯一键以 500 形态暴露。
+        # 返回既有 confirmation。identity 不同则是「同槽位换了内容」——除「前移到 room 已
+        # 认可的新快照」这一种（`confirmation_rebase`）外都是真冲突，抛领域错误（可映射
+        # 409）而不是让 DB 唯一键以 500 形态暴露。
         existing = (
             await self._session.execute(
                 sa.select(WorkpaperOoClientConfirmation)
@@ -959,12 +996,25 @@ class WorkpaperSyncRepository:
             if same_identity:
                 # 幂等重放：同一 descriptor 再确认一次 —— 返回既有行，不重复 INSERT。
                 return existing
-            raise ScopeIntegrityError(
-                "该 (room, participant, generation) 已存在一条 active client-confirmation，"
-                "且 descriptor identity 不同 —— 同一编辑会话不得用不同基线二次确认"
-                f"（existing rep={existing.representation_id} cv={existing.content_version_id}"
-                f" vs new rep={representation_id} cv={content_version_id}）"
-            )
+            if not await is_rebase_onto_room_baseline(
+                self._session,
+                room=room,
+                existing=existing,
+                representation_id=representation_id,
+                content_version_id=content_version_id,
+                projection_sha256=projection_sha256,
+            ):
+                raise ScopeIntegrityError(
+                    "该 (room, participant, generation) 已存在一条 active client-confirmation，"
+                    "且 descriptor identity 不同 —— 同一编辑会话不得用不同基线二次确认"
+                    f"（existing rep={existing.representation_id} cv={existing.content_version_id}"
+                    f" vs new rep={representation_id} cv={content_version_id}）"
+                )
+            # 同一 lease 重开编辑器、回传的正是 room 已认可的新快照 ⇒ 旧确认让位
+            # （判据与理由见 `confirmation_rebase`）。先单独 flush 作废、再 INSERT 新行：
+            # 顺序写死在这里，不依赖 unit-of-work 对 UPDATE/INSERT 的排序（`uq_wpocc_active`）。
+            existing.invalidated_at = _now()
+            await self._flush()
         conf = WorkpaperOoClientConfirmation(
             id=uuid.uuid4(),
             room_id=room_id,

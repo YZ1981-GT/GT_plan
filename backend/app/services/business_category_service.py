@@ -42,27 +42,32 @@ def get_category_prefix(category: str) -> str:
     return category[0].upper()
 
 
+def _excluded_entry(code: str, prefix: str) -> str | None:
+    """参考标准里该主分类排除的清单中覆盖 ``code`` 的那一项（按族：``A17-5`` 覆盖 ``A17-5-1``）；不排除 ⇒ None。"""
+    category = (_load_reference().get("categories") or {}).get(prefix) or {}
+    for entry in category.get("excluded_templates") or ():
+        if code == entry or code.startswith(f"{entry}-"):
+            return entry
+    return None
+
+
 def is_template_applicable(template: dict[str, Any], category: str) -> bool:
     """判定模板是否适用于给定业务分类。
 
-    逻辑：
-    - template.applicable_categories 存在时直接匹配主分类前缀
-    - 不存在时默认适用（向后兼容）
+    两个来源都生效：映射条目的 ``applicable_categories`` 标注（A17 族），以及业务分类参考标准
+    ``business_category_reference.json`` 里该主分类的 ``excluded_templates``（C 类排除 A 类专属底稿，
+    B 类排除专委会资料 A26）。原先只看标注、无标注默认全适用 ⇒ C 类项目下 A18 / A26 / A27 / A28 /
+    A1-12 / A1-16 仍判适用。
 
     Args:
         template: mapping 条目（含 wp_code, applicable_categories 等）
         category: 项目业务分类（如 'A1', 'B3', 'C'）
-
-    Returns:
-        True 如果模板适用于该分类
     """
-    applicable = template.get("applicable_categories")
-    if not applicable:
-        # 无标注 → 默认全适用
-        return True
-
     prefix = get_category_prefix(category)
-    return prefix in applicable
+    applicable = template.get("applicable_categories")
+    if applicable and prefix not in applicable:
+        return False
+    return _excluded_entry(str(template.get("wp_code") or ""), prefix) is None
 
 
 def get_applicable_templates(category: str) -> list[dict[str, Any]]:
@@ -83,8 +88,12 @@ def get_template_list_with_applicability(category: str) -> list[dict[str, Any]]:
         applicable = is_template_applicable(m, category)
         reason = ""
         if not applicable:
-            cats = m.get("applicable_categories", [])
-            reason = f"仅 {''.join(cats)} 类适用"
+            cats = m.get("applicable_categories") or []
+            if cats and prefix not in cats:
+                reason = f"仅 {''.join(cats)} 类适用"
+            else:
+                entry = _excluded_entry(str(m.get("wp_code") or ""), prefix)
+                reason = f"{prefix} 类不适用（业务分类参考标准排除 {entry}）"
         result.append({
             **m,
             "applicable": applicable,

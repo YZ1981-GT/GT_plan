@@ -259,7 +259,11 @@ K_CYCLE_SPECS: dict[str, KCycleSpec] = {
         row_code_listed="BS-053",
         row_code_soe="BS-053",
         fallback_standard="",
-        has_account=True,  # 2026-10-15: BS-058 有了公式 TB('2101')，宁缺勿造不再成立
+        # 🔴 2026-10-16 曾改成 True（依据「BS-058 有了公式 TB('2101')」），那是误读：soe 的 BS-058 是
+        #    **交易性金融负债**（G10 的科目 2101），listed 的 BS-058 才叫其他流动负债且公式为空；K4 自己的行
+        #    BS-053 四个准则公式全空、account_chart 按名零命中 ⇒ 宁缺勿造仍成立（判据按行名过滤后复核，
+        #    spec formula-fetch-followup-defect-closure R6.2）
+        has_account=False,
         is_liability=True,
         gross_direction="credit",
         row_code_evidence="原值 listed=BS-058 / soe=BS-081；BS-081 实为**实收资本（或股本）**"

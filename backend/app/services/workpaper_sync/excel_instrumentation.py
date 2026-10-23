@@ -115,6 +115,7 @@ from app.services.excel_structure_fingerprint import (
     visible_equivalence_report,
 )
 from app.services.workpaper_sync import excel_typography_rows as _typography
+from app.services.workpaper_sync import structure_hash_memo as _structure_hash_memo
 from app.services.workpaper_sync.canonical_paths import (
     TEMPLATE_ROOT,
     PathBoundaryError,
@@ -348,7 +349,12 @@ def normalized_structure_hash(data: bytes) -> str:
     由 Task 5 的六个 aspect digest **按 aspect 名排序**折成一个 digest。刻意不用
     字节 sha256：字节会随 zip 压缩参数与部件顺序变化，而这个 hash 要回答的是
     「可见业务结构有没有变」。采集报错时抛，绝不返回一个「看起来正常」的 hash。
+    按字节摘要记忆化，见 :mod:`app.services.workpaper_sync.structure_hash_memo`。
     """
+    return _structure_hash_memo.memoized(data, _compute_normalized_structure_hash)
+
+
+def _compute_normalized_structure_hash(data: bytes) -> str:
     fingerprint = structure_fingerprint(data)
     if fingerprint.errors:
         raise InstrumentationError(f"结构指纹采集报错: {fingerprint.errors}")

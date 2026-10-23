@@ -1893,6 +1893,17 @@ class RoomService:
                 "缺一侧时不得默认「等值」"
             )
         room = await self._repo.lock_room(room_id)
+        if room_generation_is_retired(room):
+            # 终态 room（文档服务器已最终保存这一代 key ⇒ closed，或已 superseded）：没有
+            # 在线客户端可推进 / 重载，下次进入必然换代并由新 descriptor confirmation 重建
+            # 基线。不跳过的话 `closed/superseded → refresh_required` 是非法边，协调器随后的
+            # supersede 也是 —— 关闭之后的 retry / 重驱会在最后一步失败
+            # （spec writeback-followup-issue-closure D2）。
+            return BaselineSettlement(
+                client_baseline_advanced=False,
+                refresh_required=False,
+                reason="room_retired",
+            )
         if merged_projection_sha256.strip() != incoming_projection_sha256.strip():
             await self._mark_refresh_required_locked(
                 room, reason="merged_projection_differs_from_incoming"
@@ -2235,6 +2246,37 @@ class RoomService:
         room.refresh_reason = reason
         room.updated_at = _now()
         await self._session.flush()
+        return room
+
+    async def close_after_docserver_saved(self, *, room_id: uuid.UUID) -> WorkpaperOoRoom:
+        """文档服务器已最终保存本代 doc key（status 2 已 durable 并回 ``error 0``）⇒ ``closed``。
+
+        回 0 之后文档服务器认定这个 key 已保存：之后再用同一个 key 打开，编辑器报「版本已
+        更改」并按原配置重载 —— 载入的是 room 物化时的旧字节，而 store 早已是新内容
+        （spec writeback-followup-issue-closure P1，契约 status 2 的 ``closing_to_closed``）。
+        这一代因此必须终结，下次进入由 materialize 的「终结代际换代」路径发新 generation。
+
+        不动的三种：已 ``superseded`` / ``closed``（重发的回调，幂等）、``recovery_required``
+        （它只能去 ``superseded``，且还在等恢复流程处理，不得被关闭抢掉）。participant 不动：
+        已关闭 room 不再接受 request（``_REQUEST_ALLOWED_ROOM_STATES``），而重驱 / 重试的最终
+        授权仍要求发起人 participant 处于 active/closing。
+        """
+        room = await self._repo.lock_room(room_id)
+        state = RoomState(room.state)
+        if state in RETIRED_ROOM_STATES or state is RoomState.recovery_required:
+            return room
+        assert_transition("room", room.state, RoomState.closed)
+        now = _now()
+        room.state = RoomState.closed.value
+        room.closed_at = now
+        room.updated_at = now
+        await self._session.flush()
+        logger.info(
+            "room %s（generation %s）：文档服务器已最终保存该 doc key，%s → closed",
+            room.id,
+            room.generation,
+            state.value,
+        )
         return room
 
     # ─────────────────────────────────────────────────────────────────

@@ -38,7 +38,7 @@ K_SECTIONS = [
     ("K1",  "五、8",  "八、9"),
     ("K2",  "五、13", "八、14"),
     ("K3",  "五、42", "八、42"),
-    ("K4",  "五、44", "八、48"),
+    # K4 其他流动负债没有标准科目：不推附注主表（见 test_k4_has_no_account_and_no_note_rules）
     ("K5",  "五、50", "八、55"),
     ("K6",  "五、11", "八、12"),
     ("K7",  "五、51", "八、56"),
@@ -125,10 +125,9 @@ def _make_tb(code: str, ending: str, opening: str, current: str = "0") -> dict:
 @pytest.mark.parametrize("code,account_code,account_name", [
     ("K2", "1901", "其他流动资产"),
     ("K3", "2241", "其他应付款"),
-    ("K4", "2261", "其他流动负债"),
     ("K5", "2801", "预计负债"),
     ("K7", "2401", "递延收益"),
-], ids=["K2", "K3", "K4", "K5", "K7"])
+], ids=["K2", "K3", "K5", "K7"])
 def test_balance_adj_note_rows_uses_ending_balance(code: str, account_code: str, account_name: str):
     """资产负债类 K 科目 note_rows: ending 取「期末余额」，opening 取「年初余额」。"""
     binding = balance_adj_for(code)
@@ -255,16 +254,18 @@ def test_k1_binding_note_rows_tb_unavailable():
     assert rows[0]["opening_resolved"] is False
 
 
-# ── K4 上市/国企章节号不对称 ──
+# ── K4 其他流动负债：没有标准科目 ──
 
 
-def test_k4_asymmetric_sections():
-    """K4 上市 五、44 / 国企 八、48 —— 非对称章节号验证。"""
-    rule = _k_note_rule("K4")
-    assert rule.target.sections.get("listed") == "五、44"
-    assert rule.target.sections.get("soe") == "八、48"
-    # 44 vs 48 不对称
-    assert rule.target.sections["listed"] != rule.target.sections["soe"].replace("八", "五")
+def test_k4_has_no_account_and_no_note_rules():
+    """K4 原规则取 TB('2261')，2261 在各项目科目表与试算表里都不存在 ⇒ 试算平衡表数与附注主表恒推 0。
+    改为无科目声明：只推审定表固定行的审定合计（spec formula-fetch-followup-defect-closure R6.2）。"""
+    binding = balance_adj_for("K4")
+    assert binding.account_prefixes == ()
+    assert "2261" in binding.no_account_reason
+    assert binding.derivations == frozenset({"k4_audited_total"})
+    k4_rules = sorted(r.rule_id for r in load_rules() if r.wp_code == "K4")
+    assert k4_rules == ["K4.audited_total.net", "K4.audited_total.receivable"]
 
 
 # ── K11 / K13 上市侧章节号截断形态 ──

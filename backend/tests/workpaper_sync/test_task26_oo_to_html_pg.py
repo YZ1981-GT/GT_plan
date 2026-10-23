@@ -2519,6 +2519,52 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         except Exception as exc:  # noqa: BLE001
             _phase_failed("settlement", exc)
 
+        # ═══ S21：room closed（文档服务器已最终保存）后 apply 仍能落库（writeback-followup D2）══
+        # 采集体住 `task26_closed_room_world.py`、判据住 `test_room_close_after_docserver_saved_pg.py`。
+        try:
+            from types import SimpleNamespace
+
+            from tests.workpaper_sync.task26_closed_room_world import collect_closed_room
+
+            snap["scenarios"]["closed_room"] = await collect_closed_room(SimpleNamespace(
+                Session=Session, project=project, user_a=user_a, contract=contract,
+                entry=ENTRY, period=PERIOD, total=TOTAL, err=_err,
+                recording_probe=_RecordingProbe, json_adapter=_JsonCarrierAdapter,
+                stage_world=_stage_world, coordinator=_coordinator, db_state=_db_state,
+            ))
+        except Exception as exc:  # noqa: BLE001
+            _phase_failed("closed_room", exc)
+
+        # ═══ S22：协调器接手前失败可见、可重试；重放被拒（writeback-followup R3.3 / R3.4）══
+        # 采集体住 `task26_pre_apply_failure_world.py`、判据住 `test_callback_apply_failure_pg.py`。
+        try:
+            from types import SimpleNamespace
+
+            from tests.workpaper_sync.task26_pre_apply_failure_world import collect_pre_apply_failure
+
+            snap["scenarios"]["pre_apply_failure"] = await collect_pre_apply_failure(SimpleNamespace(
+                Session=Session, project=project, user_a=user_a, contract=contract,
+                entry=ENTRY, period=PERIOD, total=TOTAL, err=_err,
+                recording_probe=_RecordingProbe, json_adapter=_JsonCarrierAdapter,
+                stage_world=_stage_world, coordinator=_coordinator, db_state=_db_state,
+            ))
+        except Exception as exc:  # noqa: BLE001
+            _phase_failed("pre_apply_failure", exc)
+
+        # ═══ S23：中断的 apply 被重驱候选查询选中（writeback-followup R3.2）══
+        # 采集体住 `task26_redrive_world.py`、判据住 `test_oo_apply_redrive_pg.py`。
+        try:
+            from tests.workpaper_sync.task26_redrive_world import collect_redrive
+
+            snap["scenarios"]["redrive"] = await collect_redrive(SimpleNamespace(
+                Session=Session, project=project, user_a=user_a, contract=contract,
+                entry=ENTRY, period=PERIOD, total=TOTAL, err=_err,
+                recording_probe=_RecordingProbe, json_adapter=_JsonCarrierAdapter,
+                stage_world=_stage_world, coordinator=_coordinator, db_state=_db_state,
+            ))
+        except Exception as exc:  # noqa: BLE001
+            _phase_failed("redrive", exc)
+
         return snap
     finally:
         if engine is not None:
@@ -2582,6 +2628,9 @@ class TestHarness:
             "close_capture_ok",
             "adjudication_applied",
             "settlement",
+            "closed_room",
+            "pre_apply_failure",
+            "redrive",
         }
 
 
@@ -2766,19 +2815,27 @@ class TestAppliedHappyPath:
     def test_p29_roundtrip_extract_ran_on_the_new_result(
         self, snap: dict[str, Any]
     ) -> None:
-        """adapter 调用序列证明：三方 extract → materialize → 反读 extract → 未管理区域。"""
+        """adapter 调用序列证明：三方 extract → materialize → 反读 extract → 未管理区域。
+
+        本场景 current 与 base 是同一个 published artifact ⇒ current 复用 base 的投影、不再
+        提第二遍（spec workpaper-sync-save-path-cpu-hotspots R3；不同 artifact 时仍各提一次，
+        见 `test_save_path_cpu_hotspots`）。因此三方只读 base 与 incoming 两份文件。
+        """
         calls = snap["scenarios"]["applied"]["adapter_calls"]
         assert calls.count("materialize") == 1
         assert calls.count("verify_unmanaged_regions") == 1
         extracts = [c for c in calls if c.startswith("extract:")]
-        assert len(extracts) == 4, (
-            f"应为 base/current/incoming 三次 + 反读一次，实得 {extracts}"
+        assert len(extracts) == 3, (
+            f"应为 base（current 同 artifact 复用）/ incoming 两次 + 反读一次，实得 {extracts}"
         )
-        assert calls.index("materialize") == 3, (
+        assert extracts[0].startswith("extract:00000000") and extracts[1].startswith(
+            "extract:callback-"
+        ), f"三方读取应依次是 base representation 与 incoming，实得 {extracts}"
+        assert calls.index("materialize") == 2, (
             "materialize 必须在三方 extract 之后 —— 顺序反了就等于「没读 base/current "
             "就直接覆盖」"
         )
-        assert calls[4].startswith("extract:"), "materialize 之后必须紧跟一次反读 extract"
+        assert calls[3] == "extract:materialized.xlsx", "materialize 之后必须紧跟一次反读 extract"
 
     def test_substrate_origin_is_the_application_fk(self, snap: dict[str, Any]) -> None:
         sc = snap["scenarios"]["applied"]

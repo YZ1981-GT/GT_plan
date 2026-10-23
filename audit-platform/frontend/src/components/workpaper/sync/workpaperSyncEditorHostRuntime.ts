@@ -56,11 +56,21 @@ export interface WorkpaperSyncDocsApi {
 /** 注入点：测试给 stub，生产走 :func:`loadDocsApi`。 */
 export type WorkpaperSyncDocsApiLoader = () => Promise<WorkpaperSyncDocsApi>
 
-/** DocEditor 的四个真实回调（每个都必须有真实触发路径，AC 11.5）。 */
+/**
+ * DocEditor 的真实回调（每个都必须有真实触发路径，AC 11.5）。
+ *
+ * `onRequestRefreshFile` / `onOutdatedVersion`：用一个**已被文档服务器保存过**的 doc key
+ * 打开（或断线重连后会话已中断）时文档服务器发出（9.x 先发前者；未声明时弹「版本已更改，
+ * 该页面将被重新加载」并按原配置重载 —— 载入的是 room 物化时的旧字节，而遮罩还挡着那个
+ * 对话框）。宿主收到即可见失败，换代 / 新 key 由页面「回到表单再进入」走 materialize 完成
+ * （spec writeback-followup-issue-closure R2 / D3）。
+ */
 export interface WorkpaperSyncDocEditorEvents {
   onDocumentReady: () => void
   onDocumentStateChange: (event: unknown) => void
   onError: (event: unknown) => void
+  onRequestRefreshFile: () => void
+  onOutdatedVersion: () => void
 }
 
 /** 宿主侧失败的中文文案。桥的状态文案在 `WP_BRIDGE_STATE_TEXT`，两者不重叠。 */
@@ -82,13 +92,16 @@ export const WP_SYNC_HOST_ERROR_TEXT: Readonly<Record<string, string>> = Object.
     '编辑器异常中断，但服务端未列出可认领的恢复项，请联系项目负责人重新授权',
   editor_host_recovery_before_confirmation:
     '编辑器身份尚未确认，异常中断不进入恢复流程',
+  editor_host_document_outdated:
+    '文档已在服务器端保存，这个编辑窗口的版本已过期。请回到表单模式后重新进入在线编辑。',
   // 🔴 2026-09-22：修复前这条链路**没有任何超时兜底**，保存后可以无限转圈
   //    （spec Task 34 明文「不得无限等待」）。宿主的 operation 追踪器超过窗口即报此码。
-  // 文案里点名「重试回写」= 宿主模板里真实存在的那个按钮（`showPlainRetry` 门后），
-  // 不是一句泛泛的「请稍后再试」——超时之后用户必须知道下一步点哪里。
+  // 文案里点名「刷新状态」= 超时后宿主模板里真实出现的那个按钮 —— 超时之后用户必须知道下一步
+  // 点哪里。原先点名的「重试回写」此刻并不渲染（超时不是可重试裁决），它只在刷新到「回写失败」
+  // 时才出现（spec writeback-followup-issue-closure R3.5）。
   editor_host_operation_tracking_timeout:
-    '等待 OnlyOffice 回传结果超时，保存尚未落地。请点「重试回写」重新发送保存命令，'
-    + '或退出在线编辑后重新进入。',
+    '等待 OnlyOffice 回传结果超时，暂不确定保存是否已落地。请点「刷新状态」查看服务器上的回写结果'
+    + '（回写失败时可在那里重试），或刷新页面后重新进入在线编辑。',
 })
 
 /**

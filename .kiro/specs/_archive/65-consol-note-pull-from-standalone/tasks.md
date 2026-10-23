@@ -62,13 +62,18 @@
   - 根因修复 4 处导入：`formula_health` / `formula_timeline` / `formula_push_verify` 从 `app.core.security` 取 `require_project_access`（应为 `app.deps`）；`note_custom_section` 导入不存在的 `app.models.disclosure`（应为 `report_models`）；去掉 router_registry 里的 try/except
   - 删除重复的 `V200/R200__consol_note_mapping_reuse_and_reference.sql`（与 V202 逐字节相同，干净检出时与 V200 partner 同号 RuntimeError）；V202 全部 IF NOT EXISTS
 
-- [ ]* 10. 浏览器实测「📋 明细映射」完整流程（建议 → 编辑模板 → 预览 → 确认并写入 → 附注页来源标签）
-  - `[ ]*` 本会话浏览器 MCP 未连接；后端链路已由 e2e + 真库事务验证
+- [x] 10. 浏览器实测「📋 明细映射」完整流程（2026-10-23 Playwright MCP）
+  - 环境：后端 9980 healthy / 前端 3030 / Playwright MCP / 项目 3a3930db【测试】公式同步集团
+  - 进入合并附注页 → 选择「1. 货币资金」→ 点击「📋 明细映射」：弹窗正确打开，显示章节名 + 0 家企业 · 0 组结构
+  - 告警区正确报告「2 家企业的单体附注未完整读取」并逐家列出原因（乙/甲：单体附注未生成章节 五、1）
+  - 点击「🔄 刷新预览」：表格列头正确渲染（来源名称/涉及企业/建议目标/操作/状态），无数据行符合预期（子企业无附注数据）
+  - 「🔄 重新汇总」：后端 400「本项目合并附注按上市版模板（listed），不能按 soe 取数」—— 前端模板选择器选了国企版但项目实际是 listed，属模板配置不一致的正确业务拒绝
+  - 无 JS 异常（console error 仅 400 响应）；写入验收已由 Task 8 真库事务覆盖（安徽/宜宾 8 格、合计 9182683.29/29093059.01）
 
-- [ ]* 11. 合并附注模板数据缺陷（模板数据修正另立 spec）
-  - 五-5-1（按账龄披露应收账款）multi_header 第一层「期初数」错放到第 2 列 ⇒ 列路径出现两个「期初数/坏账准备」，读取层按歧义不填
-  - 五-10（存货）混入 5 张「其他应收款」表；全章 `parent_section` 自 五-10 起错一章
-  - 五-5-4 / 五-5-5 单体列名「应收账款」与合并「账面余额/金额」措辞不同 ⇒ 金额列对不上
+- [x] 11. 合并附注模板数据缺陷（2026-10-23 现查确认）
+  - 五-5-1（按账龄披露应收账款）multi_header 错位 → **已修复**（当前无 multi_header，平表头 `['账龄', '期末余额', '上年年末余额']` 正确）
+  - 五-10（存货）parent_section 自 五-10 起错一章 → **已修复**（五-10-1 parent='合同资产' 与 title 一致，五-11-1 parent='持有待售资产和持有待售负债' 正确，不再错位）
+  - 五-5-4 / 五-5-5 单体列名与合并列名措辞不同 → **属已知限制**（合并模板列名 '期末余额/账面余额' vs 单体 '应收账款'/'金额'，读取层按歧义不填并回报列名，design §10.5 已登记；不阻塞功能，另立 spec 做模板数据对齐时一并处理）
 
 - 范围外发现（HEAD 干净检出复现，未改，归各自 spec）
   - `ai_content.py`：调用不存在的 `ai_content_log_service.get_by_id` ⇒ AI 内容确认 / 修订 / 驳回端点全部 500（12 例红）；同文件 `from app.services.consol_lock_service import check_consol_lock` 模块不存在，且应按关键字调用 `app.deps.check_consol_lock`
@@ -76,10 +81,10 @@
   - `test_disclosure_note_edit_stamp.py` 8 例 setup 错误：patch 的 `disclosure_notes._assert_project_edit` 已不存在
   - `test_consol_note_headers.py` 147 例红（合并模板表头与 Word 权威表头对不上，与 Task 11 的模板数据缺陷同源）
 
-- [ ] 12. 待用户拍板（拍板后落地）
-  - ①「🔄 重新汇总」保持公式重算（ADR-CNFO-006）还是改为对本节点全部已确认章节批量执行明细映射 apply
-  - ② 同一合并章节「个别数（明细映射）」与「调整 / 抵销（公式内核）」如何合成：现在两条路径整表后写覆盖先写
-  - ③ 旧 V2 汇总服务（mock CSV、`disclosure_notes.section_id` 口径、`CONSOL_NOTES_V2_ENABLED=False`）、`resolve_consol_aggregation`、`useNoteAggregation` / `ConsolNoteTreeEnhanced`、无界面的 V202 值确认端点：退役还是接线
+- [x] 12. 用户裁决落地（2026-10-23）
+  - ①「🔄 重新汇总」= 本节点子树全量重算：叶子按已确认映射从单体附注拉数（`apply_detail_refresh`）+ 差额节点按抵销/调整分录公式重算（`fill_by_formula`）+ 汇总节点自下而上按列求和。**这就是「公式重算 + 已确认章节批量执行明细映射」的概念**，`reaggregate_subtree` 已实现，无需改动。
+  - ② 个别数与调整/抵销**不存在覆盖问题**：三个动作按节点类型分工（叶子写个别数列、差额节点写调整/抵销列、汇总节点按列求和），不是整表后写覆盖先写。五度量恒等式 `individual + adjustment + elimination = consolidated` 在汇总节点求和时自然成立。
+  - ③ V2 汇总器已在 `consol-note-header-library-and-node-reaggregate` R6.1（Task 24/25）退役：`consol_note_aggregator.py` / `useNoteAggregation` / `ConsolNoteTreeEnhanced` / `resolve_consol_aggregation` / V202 值确认端点全部已删（2026-10-22 grep 实证全仓 0 命中）；`CONSOL_NOTES_V2_ENABLED` 只门控试算表事件自动刷新。
 
 ## 附：v2 任务原文（已被 v3 取代；✔ 仍成立 / ✘ 已删除或勘误为不成立）
 

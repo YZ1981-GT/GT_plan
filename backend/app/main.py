@@ -46,7 +46,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.gzip import GZipMiddleware
 
 from app.core.build_version import get_build_version
 from app.core.config import settings
@@ -65,6 +64,7 @@ from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.rate_limiter import LLMRateLimitMiddleware
 from app.middleware.app_version import AppVersionHeaderMiddleware
 from app.middleware.body_limit import RequestBodyLimitMiddleware
+from app.middleware.gzip_offload import OffloadingGZipMiddleware
 from app.middleware.observability import ObservabilityMiddleware
 from app.middleware.inflight import InflightTrackingMiddleware
 from app.router_registry import register_all_routers
@@ -271,7 +271,7 @@ app.add_middleware(LLMRateLimitMiddleware)      # LLM 限流
 app.add_middleware(RequestIDMiddleware)         # 注入 request_id
 app.add_middleware(ResponseWrapperMiddleware)   # 统一响应格式
 app.add_middleware(ObservabilityMiddleware)     # 请求指标采集 + 慢请求告警
-app.add_middleware(GZipMiddleware, minimum_size=1000)  # 压缩响应
+app.add_middleware(OffloadingGZipMiddleware, minimum_size=1000)  # 压缩响应（大响应体在工作线程里压）
 app.add_middleware(RequestBodyLimitMiddleware)  # 超大请求拦截
 app.add_middleware(AppVersionHeaderMiddleware)   # 注入 X-App-Version 头（所有响应含错误）
 app.add_middleware(

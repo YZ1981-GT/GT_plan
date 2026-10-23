@@ -130,12 +130,10 @@
     {
       "wp_code": "D5",
       "level": "L3",
-      "account_prefixes": [
-        "1124"
-      ],
-      "rule_count": 3,
-      "owned_key_count": 1,
-      "has_note_rules": true
+      "account_prefixes": [],
+      "rule_count": 0,
+      "owned_key_count": 0,
+      "has_note_rules": false
     },
     {
       "wp_code": "D6",
@@ -623,12 +621,10 @@
     {
       "wp_code": "K4",
       "level": "L3",
-      "account_prefixes": [
-        "2261"
-      ],
-      "rule_count": 5,
-      "owned_key_count": 3,
-      "has_note_rules": true
+      "account_prefixes": [],
+      "rule_count": 2,
+      "owned_key_count": 2,
+      "has_note_rules": false
     },
     {
       "wp_code": "K5",
@@ -1283,10 +1279,8 @@
     },
     {
       "wp_code": "J3",
-      "reason": "有科目码（2711），后续可接入候选",
-      "account_codes": [
-        "2711"
-      ]
+      "reason": "无科目码关联（股份支付），文档/管理类底稿",
+      "account_codes": []
     },
     {
       "wp_code": "K0",

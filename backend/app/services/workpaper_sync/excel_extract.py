@@ -154,6 +154,7 @@ from app.services.workpaper_sync.contracts import (
     SyncContract,
     TableSpec,
     ValueType,
+    is_template_skeleton_identity,
     parse_a1_range,
 )
 from app.services.workpaper_sync.definitions import canonical_digest
@@ -1346,6 +1347,7 @@ def assert_identity_inventory_retained(
     expected: EntryIdentityInventory,
     observed: RuntimeIdentityInventory,
     entry_id: str,
+    retired_row_identities: Iterable[str] = (),
 ) -> None:
     """Property 66：representation 冻结的 identity 预期在 OO 往返后必须仍然成立。
 
@@ -1354,7 +1356,16 @@ def assert_identity_inventory_retained(
     恰恰是「按 identity 而不是位置判定」。因此本门只判「有没有丢」与「列跨度有没有变」，
     行号与行区间一概不进判据；漏项风险由 :data:`RETENTION_CHECKED_FIELDS` /
     :data:`RETENTION_EXEMPT_FIELDS` 的并集守卫兜住。
+
+    `retired_row_identities`：同一次提交里物化计划**写盘前声明**退役的模板骨架身份
+    （骨架槽位复用，spec d2-skeleton-slot-reuse-and-writeback-speed）。只豁免其中的骨架身份
+    形态 —— 非骨架身份即使被传进来也照样判丢失。
     """
+    retired = {
+        str(identity)
+        for identity in retired_row_identities
+        if is_template_skeleton_identity(str(identity))
+    }
     where = f"entry {entry_id}"
     lost_names = sorted(set(expected.defined_names) - set(observed.defined_names))
     if lost_names:
@@ -1374,7 +1385,7 @@ def assert_identity_inventory_retained(
             "受管矩形的列边界变了，受管字段不可再按旧列解析"
             "（行区间随插删行变化属合法，不在此判）"
         )
-    lost_rows = sorted(set(expected.row_uuids.values()) - observed.identities)
+    lost_rows = sorted(set(expected.row_uuids.values()) - observed.identities - retired)
     if lost_rows:
         raise IdentityRetentionError(
             f"{where}: OO 往返后丢失 {len(lost_rows)} 个 row identity，首个 "
@@ -2459,6 +2470,14 @@ def verify_unmanaged_regions(
     # 哨兵）。不进键就会拿「另一组被删行算出来的 before digest」跟本次 after 比 ——
     # 那是**跨声明串味**，既可能假绿也可能假红。这条与 extra_managed_coords 同理。
     structure_collapse_rows = deletion_collapse_rows(row_shift) if row_shift else frozenset()
+    # 🔴 受管坐标集（`_managed_coordinates`）由 region 的行区间 / UUID 列与 scan 行号决定，
+    # 而 region 是从 **after** 解析的（插行后 Table ref 变长）⇒ 同一个 before 对不同行数的
+    # after 会算出不同的 before digest。这三项不进键时，同进程里先校验 3 行插入、再校验 20 行
+    # 插入会命中前一次的 digest ⇒ 假 `adapter_unmanaged_region_drift`（spec
+    # d2-skeleton-slot-reuse-and-writeback-speed 真链路实测：632 项 vs 728 项）。
+    scan_rows_key = (
+        ",".join(str(r) for r in sorted(scan.row_identity_by_row)) if scan is not None else "-"
+    )
     before_key = "|".join(
         (
             before_sha,
@@ -2467,6 +2486,9 @@ def verify_unmanaged_regions(
             str(binding.table_key),
             ",".join(sorted(str(p) for p in extra_managed_sheet_parts)),
             extra_coords_key,
+            f"{region.table_ref}@{region.uuid_column}",
+            scan_rows_key,
+            # 塌陷集合放最后一段：`test_row_deletion_verify_normalisation` 按末段断言它进了键。
             ",".join(str(r) for r in sorted(structure_collapse_rows)),
         )
     )
@@ -2903,8 +2925,12 @@ def extract_projection(
     limits: SyncLimits | None = None,
     sidecar_path: Path | None = None,
     retain_identity_inventory: bool = True,
+    retired_row_identities: Iterable[str] = (),
 ) -> ExcelExtractOutcome:
     """按 representation 固定的 stable identity 反读受管字段。
+
+    `retired_row_identities` 只用于同一次提交里反读刚物化的产物：见
+    :func:`assert_identity_inventory_retained`。
 
     执行顺序即判据（不可交换）：
 
@@ -3011,6 +3037,7 @@ def extract_projection(
             expected=definitions.identity_inventory,
             observed=inventory,
             entry_id=entry_id,
+            retired_row_identities=retired_row_identities,
         )
 
     budget = StreamingProjectionBudget(lim)

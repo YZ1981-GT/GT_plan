@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.phase10_models import ReviewConversation
 from app.models.review_workflow_models import ReviewChecklistRecord
+from app.services.business_category_service import get_category_prefix
 
 _logger = logging.getLogger(__name__)
 _TEMPLATE_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "review_checklist_templates.json"
@@ -348,8 +349,8 @@ class ReviewWorkflowService:
         templates = _load_templates()["templates"]
         for code, tmpl in templates.items():
             if tmpl["role"] == role and tmpl["audit_type"] == audit_type:
-                # A类专属检查
-                if tmpl.get("a_only") and business_category != "A":
+                # A类专属检查：按主分类前缀（项目存的是 A1~A8 子分类，原先按完整代码比「A」⇒ A 类项目全部漏掉）
+                if tmpl.get("a_only") and get_category_prefix(business_category) != "A":
                     continue
                 return tmpl
         return None

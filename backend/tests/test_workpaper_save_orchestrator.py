@@ -260,9 +260,10 @@ class TestAfterSaveEnqueuesDurableEventInsteadOfPublishing:
     async def test_enqueues_pending_outbox_row_with_full_payload(self, _patch_event_bus):
         wp = _make_wp(file_version=3, content_revision=9)
         db = _make_db()
+        user = _make_user()
 
         await orchestrator.after_save(
-            db, wp, _make_user(), trigger="custom_query_writeback",
+            db, wp, user, trigger="custom_query_writeback",
             extra={"year": 2025, "wp_code": "D2"},
             content_revision=10,
         )
@@ -283,6 +284,8 @@ class TestAfterSaveEnqueuesDurableEventInsteadOfPublishing:
         )
         assert row.payload["wp_id"] == str(wp.id)
         assert row.payload["wp_code"] == "D2"
+        # 保存人：附注刷新据此记 updated_by（writeback-followup-issue-closure R7.2）
+        assert row.payload["user_id"] == str(user.id)
         # year 是路由列，不重复进 payload。
         assert "year" not in row.payload
 
