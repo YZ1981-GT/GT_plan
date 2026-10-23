@@ -129,7 +129,19 @@ pythonpath、测试文件不得裸导入测试根目录模块、子进程不带 
 同参数（`-p no:playwright tests --ignore=tests/integration --ignore=tests/e2e --continue-on-collection-errors`），同一干净 worktree：
 
 - base `54e73f695`：2811 failed / 62927 passed / 1548 skipped / 584 errors（4 小时 26 分）
-- 本 spec 全量（同一 worktree、同参数）：结果见收尾提交（单边约 4 小时）
+- 本 spec 全量（临时提交 `8e974b2fe` = 上述 base + 本 spec 当时的全部文件，同一 worktree、同参数）：2719 failed / 63125 passed /
+  1549 skipped / 583 errors（4 小时 18 分）。逐条比对：base 红而本 spec 不红 109 条（d_cycle_extraction 84、tests 根目录 21、
+  workpaper_sync 3、playwright 1）；本 spec 新红 16 条，逐条处理：
+  - `test_address_registry_limit`（5）：本 spec 自己的两个新测试同进程互相干扰（见 tasks 4.1），推送前已修；
+  - `test_note_direct_integration` 的 L7 / M8（4）：R1 把两者改成「无科目」声明后，该测试仍按「每个批 D 科目都有科目和两条规则」断言 ⇒
+    按新契约改写（无科目、无派生、无规则，并断言写明了原因）；
+  - `test_wp_formula_endpoint`（2）/ `test_wp_formula_non_wp_kind_defense`（1）：R6 起请求不带口径时端点查 `projects.template_type`，
+    这几个机制测试只建 `wp_formula` 表 ⇒ 与其已有的鉴权 / 归属隔离同样桩住这一处（口径解析由 `test_wp_formula_ref_template_type` 用真行覆盖）；
+  - `workpaper_sync/test_task12_canonical_resolver::test_matrix_is_fresh`（1）：R5 去掉了生成端点里的自写路径判断，resolver 迁移矩阵的
+    证据随之变化（状态不变：migrated 14 / deferred 79 / regressed 0）⇒ 按其约定 `--apply` 重生成；
+  - 其余 3 条是间歇失败、与本 spec 无关：`test_business_category_pbt`（hypothesis 抽到 C 类就红 —— C 类下 A18 / A26 / A27 / A28 / A1-12 /
+    A1-16 仍判适用，base 直接调用结果相同）、`test_param_sql_builder_pbt::test_p18`（base 上 5 次红 1 次）、
+    `procedure_delegation/test_procedure_reconcile` 的 PG 用例（单独复跑 base 5 次、本 spec 7 次全过）。
 - 最终提交树定向回归（HEAD `5f4e8b54c` + 本 spec；后端 96 个目标 = 本 spec 改过的测试 + 并发会话两提交改过的测试 + formula_settings /
   formula_management / d_cycle_extraction / 全部 formula_push；前端 330 个文件）：后端 13 failed / 3170 passed，前端 4 failed / 966 passed。
   同一组目标在 `5f4e8b54c` 上整组复跑：后端 117 failed（含上述 13 条，其余 104 条在本 spec 上通过），前端同 4 条 ⇒ **新增失败 0**。
@@ -153,6 +165,7 @@ pythonpath、测试文件不得裸导入测试根目录模块、子进程不带 
   `addressRegistry.validate` 对非底稿域恒判有效；附注公式集保存接口本身不校验引用 ⇒ 附注公式弹窗可存入悬空引用。
 - **年度取值**：底稿管理页 `currentYear` 取 URL `?year=`，缺省日历年（直接打开页面生成底稿时请求带 2026）；附注公式弹窗取试算表行请求 `/api/trial-balance/`（404）。
 - **鉴权**：地址库路由只校验登录不校验项目；生成底稿两个端点缺项目级鉴权。`mcp_tools` / `address_mention` 写死 `soe`。
+- **业务分类**：C 类项目下 A 类专属底稿（A18 / A26 / A27 / A28 / A1-12 / A1-16）仍判适用，`test_business_category_pbt` 抽到 C 类就红（HEAD 上同样）。
 - **其他**：删除模板调用 `WpTemplate.soft_delete()`，而该模型继承 `Base`、没有这个方法 ⇒ 删除恒抛 AttributeError；`_get_tb_data_for_prefill` 不按年度过滤；HEAD 上的覆盖率 JSON 过期；`test_h_ledger_formula` 导入不存在的
   `_FORMULA_RESOLVERS`；全量运行会改写已跟踪文件（`tests/_snapshots/workpaper_route_task1_baseline.json`、已归档 spec 的证据产物）。
 - **HEAD 上已红、与本 spec 无关**（干净检出逐条复现）：后端 `test_note_formula_endpoints_auth_unchanged`（3）、

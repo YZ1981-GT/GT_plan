@@ -134,6 +134,17 @@ def _stub_project_authz():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _stub_ref_template_type():
+    """隔离引用校验口径（spec formula-fetch-and-wp-generation-defect-closure R6）：请求不带 template_type 时
+    端点按底稿所属项目查 `projects.template_type`，本测试只建 `wp_formula` 表 ⇒ 桩成原缺省 soe。
+    口径解析本身由 `test_wp_formula_ref_template_type` 用真 projects 行覆盖。"""
+    with patch(
+        "app.routers.wp_formula._resolve_ref_template_type", new=AsyncMock(return_value="soe")
+    ):
+        yield
+
+
 @pytest.fixture
 def anyio_backend():
     return "asyncio"

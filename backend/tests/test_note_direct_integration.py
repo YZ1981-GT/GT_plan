@@ -1,6 +1,9 @@
 """NoteDirectBinding 参数化集成测试：57 个批 D 科目全部能实例化 + note_rows 正确。
 
 spec: formula-push-note-rollout-batch-d · Task 7
+spec: formula-fetch-and-wp-generation-defect-closure R1 —— L7 其他非流动负债 / M8 一般风险准备没有标准科目
+（口径单一来源不给兜底码；原映射表写的 2801 是 K5 预计负债、4301 是专项储备，推的是别的科目的数）：
+两者改为「无科目」声明，不取试算表、不推附注主表，规则清单里也不得有它们的取数规则。
 """
 from __future__ import annotations
 
@@ -23,10 +26,12 @@ _TARGET_CODES = [
     "J1", "J2",
     # K2~K7 已迁移到 BalanceAdjudicationBinding（批 C 审定表族）
     "K8", "K9", "K10", "K11", "K12", "K13",
-    "L1", "L2", "L3", "L4", "L5", "L7", "L8",
-    "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10",
+    "L1", "L2", "L3", "L4", "L5", "L8",
+    "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M9", "M10",
     "N1", "N2", "N4", "N5",
 ]
+#: 没有标准科目的批 D 科目（R1）：binding 照常注册（底稿 / 附注页面仍能识别），但不取数、不推送
+_NO_ACCOUNT_CODES = ["L7", "M8"]
 
 # 规则清单（默认 binding_specs 自动获取）
 _RULES = {r.rule_id: r for r in load_rules()}
@@ -43,6 +48,16 @@ def test_binding_instantiation(code):
     assert binding.wp_code == code
     assert len(binding.account_prefixes) >= 1
     assert f"{code.lower()}_note_main" in binding.derivations
+
+
+@pytest.mark.parametrize("code", _NO_ACCOUNT_CODES)
+def test_no_account_binding_declares_reason_and_pushes_nothing(code):
+    binding = get_binding(code)
+    assert isinstance(binding, NoteDirectBinding) and binding.wp_code == code
+    assert binding.account_prefixes == ()
+    assert binding.no_account_reason.strip(), f"{code} 没有科目却没写原因"
+    assert binding.derivations == frozenset(), "没有科目就没有附注主表推送"
+    assert [r.rule_id for r in _RULES.values() if r.wp_code == code] == [], f"{code} 不得有取数 / 推送规则"
 
 
 # ── 2) 每科目都有两条规则（底稿锚点 + 附注推送） ───────────────────────────

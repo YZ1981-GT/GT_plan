@@ -2,7 +2,7 @@
   "generated_from": "backend/data/workpaper_writer_inventory.json",
   "inventory_digest": "6ed7718885b9391a238853cce715bb00244da2c24e2c436f6114a7748276495e",
   "inventory_source_digest": "a84c5dba4f26740632815e3476eb1942a2e04c2e7c724b88c7ff3008ecf9447a",
-  "matrix_digest": "3e0580db8dd708c1c23df120c8a360ca95ad93e5e45a2529c4d908a4d9a13d48",
+  "matrix_digest": "e6ae12d36732955f4af5f9f660ff0c30446bf640c82007afd24af231ac5e55a1",
   "policy_modules": [
     "app.routers.excel_html",
     "app.routers.wp_onlyoffice_router",
@@ -1307,7 +1307,6 @@
         "function_self_written_markers": [],
         "function_unified_entry_calls": [],
         "module_self_written_markers": [
-          "bare_exists_reachability",
           "manual_backend_root"
         ],
         "module_unified_entry_calls": []
@@ -1336,7 +1335,6 @@
         "function_self_written_markers": [],
         "function_unified_entry_calls": [],
         "module_self_written_markers": [
-          "bare_exists_reachability",
           "manual_backend_root"
         ],
         "module_unified_entry_calls": []
@@ -1363,7 +1361,6 @@
         "function_self_written_markers": [],
         "function_unified_entry_calls": [],
         "module_self_written_markers": [
-          "bare_exists_reachability",
           "manual_backend_root"
         ],
         "module_unified_entry_calls": []
@@ -1388,12 +1385,10 @@
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
-          "bare_exists_reachability",
           "manual_backend_root"
         ],
         "function_unified_entry_calls": [],
         "module_self_written_markers": [
-          "bare_exists_reachability",
           "manual_backend_root"
         ],
         "module_unified_entry_calls": []
@@ -1795,9 +1790,7 @@
       "domain": "template_provisioning",
       "evidence": {
         "function_found": true,
-        "function_self_written_markers": [
-          "manual_backend_root"
-        ],
+        "function_self_written_markers": [],
         "function_unified_entry_calls": [],
         "module_self_written_markers": [
           "manual_backend_root"

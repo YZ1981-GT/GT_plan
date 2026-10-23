@@ -66,9 +66,14 @@
 
 - [x] 6.1 一次性变异（每项至少 2 条）+ 干净 worktree 对比 HEAD 失败集合 + 单区域 vue-tsc
   - 变异 59 条全部打红（R1 / R4~R6 16、R7 6、R8 2、R2 / R3 后端 / R8b 16、R3 前端 5、提示与面板年度 7、底稿管理页年度 3、三参换列写法 2、子进程环境 2）
-  - 全量 pytest（同参数，干净 worktree）：base `54e73f695` 2811 failed / 62927 passed / 584 errors；本 spec 见 design §9.2
+  - 全量 pytest（同参数，干净 worktree）：base `54e73f695` 2811 failed / 62927 passed / 584 errors；本 spec 2719 failed / 63125 passed /
+    583 errors。base 红而本 spec 不红 109 条；本 spec 新红 16 条逐条处理（13 条修掉、3 条为 base 上同样间歇的失败），见 design §9.2
+  - 最终提交树定向回归（HEAD `5f4e8b54c` + 本 spec，后端 96 个目标 / 前端 330 个文件）：同组目标在 base 整组复跑对比，新增失败 0
   - vitest：相关 92 个文件 1043 passed；11 条红在 base 逐条同样红（同一断言消息）
   - 单区域 vue-tsc：改动文件的报错集合与 base 相同（探针 TS2322 命中，证明检查在跑）；`WorkpaperEditor.vue` 单区域也内存溢出，只改了一处传参
 - [x] 6.2 真库只读核对（推送规则取数、PREV 三参在和平 2025 / 2024 上的结果、地址库各域条数）+ 浏览器实测（地址选择器、生成底稿）
   - 证据见上文各任务；写入型实测只在临时【测试】项目 `c3774ad5`（用完走删除接口进回收站）
-- [ ] 6.3 提交并推送到 `spec/disclosure-note-doc-upload-and-batch-fill`；INDEX / memory 更新
+- [x] 6.3 提交并推送到 `spec/disclosure-note-doc-upload-and-batch-fill`；INDEX / memory 更新
+  - 实施提交 `d9f08b55c`（本 spec 103 个文件 + INDEX / memory 本 spec 的两段），推送后 `git ls-remote` = `d9f08b55c`；pre-push 的两道检查
+    （分支命名 / 暂存树自洽）在推送树上手工跑过、均 exit 0（钩子在 detached HEAD 下跳过）
+  - 收尾提交：全量对比里本 spec 新红的 3 组测试按新契约改写 / 桩住口径查询、resolver 迁移矩阵重生成，INDEX / memory 状态改为 19/19
