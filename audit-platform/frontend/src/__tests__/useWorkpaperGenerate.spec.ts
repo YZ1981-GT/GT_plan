@@ -73,6 +73,21 @@ describe('useWorkpaperGenerate', () => {
     expect(onSuccess).toHaveBeenCalledWith(5)
   })
 
+  it('回执带未生成的编码 → 警告提示列出编码（R4，不再一律报成功）', async () => {
+    ;(api.post as any).mockResolvedValue({ created: 2, count: 2, ignored_codes: ['ZZ9'] })
+    const onSuccess = vi.fn()
+    const { onTrimConfirm } = useWorkpaperGenerate({
+      projectId: 'p1',
+      templateSetId: 'ts1',
+      year: 2025,
+      onSuccess,
+    })
+    await onTrimConfirm(['E1', 'D2', 'ZZ9'])
+    expect(ElMessage.success).not.toHaveBeenCalled()
+    expect(ElMessage.warning).toHaveBeenCalledWith(expect.stringContaining('未生成：ZZ9'))
+    expect(onSuccess).toHaveBeenCalledWith(2)
+  })
+
   it('API 失败时显示 error', async () => {
     ;(api.post as any).mockRejectedValue(new Error('网络错误'))
     const { onTrimConfirm } = useWorkpaperGenerate({

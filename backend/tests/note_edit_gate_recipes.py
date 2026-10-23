@@ -12,7 +12,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-from authz_world import TARGET_NOTE_ID, TARGET_PROJECT_ID
+from tests.authz_world import TARGET_NOTE_ID, TARGET_PROJECT_ID
 
 
 # ---------------------------------------------------------------------------

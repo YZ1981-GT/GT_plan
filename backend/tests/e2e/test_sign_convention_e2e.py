@@ -16,7 +16,8 @@ Playwright 端到端测试：符号约定统一后的平衡校验
   # 设置项目 ID（可选，默认使用 df5b8403...首汽租车）
   set SIGN_E2E_PROJECT_ID=your-project-uuid-here
 
-  # 运行测试
+  # 运行测试（默认跳过：需要开发服务与真实数据，不进常规回归）
+  set GT_BROWSER_E2E=1
   python -m pytest backend/tests/e2e/test_sign_convention_e2e.py -v --headed
 
   # 无头模式
@@ -30,7 +31,13 @@ import re
 from decimal import Decimal
 
 import pytest
-from playwright.sync_api import Page, expect
+
+if os.environ.get("GT_BROWSER_E2E") != "1":
+    pytest.skip("浏览器端到端测试需要开发服务（3030 / 9980）与真实项目数据：设置 GT_BROWSER_E2E=1 后运行",
+                allow_module_level=True)
+pytest.importorskip("playwright.sync_api", reason="未安装 playwright（pip install pytest-playwright）")
+
+from playwright.sync_api import Page, expect  # noqa: E402
 
 # ─── 配置 ───────────────────────────────────────────────────────────────────
 

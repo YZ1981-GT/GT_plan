@@ -1,6 +1,7 @@
 """底稿可编辑公式保存端点的函数门（spec formula-governance-coverage-closure R6.1 / R6.4）与求值回执（R6.3）。
 
-端点级真发请求（权限世界 tests/authz_world.py）：R6 补齐的函数过函数门、进入保存；序时账 / PREV 三参仍 422，
+端点级真发请求（权限世界 tests/authz_world.py）：R6 补齐的函数与 PREV 三参（spec formula-fetch-and-wp-generation-
+defect-closure R2.2：上年同底稿取数不再以「不支持」拒收）过函数门、进入保存；序时账 / TB_AUX 仍 422，
 且一次保存调用都没有、逐项给出原因、提示里列出可编辑公式支持的函数（与函数支持矩阵同源）。
 求值有错（取不到数）时：格子留空、只回原因、不回 0（R5 真库走查发现原先照写 0 并提示「公式已保存」）。
 """
@@ -66,6 +67,7 @@ async def _put(world, expression: str):
     "ROW('BS-002') + SUM_ROW('BS-002','BS-003') + REPORT('BS-002','期初')",
     "NOTE('八、1','合计','期末余额') + PREV('1001','期末余额') + PREV(TB('1001','年初余额'))",
     "AUX('1122','客户','甲公司','期末余额') + AUX('1122','客户','期末') + ADJ('1122','aje_net')",
+    "TB('1001','期末余额') + PREV('D2','审定表D2-1','审定数')",  # R2.2：三参 PREV 不再被函数门拒收
 ])
 async def test_r6_functions_pass_the_gate_and_reach_save(world, expression):
     stub = world.stub(wp_formula_router.wp_formula_service, "save", returns=(None, _ISSUE))
@@ -78,7 +80,6 @@ async def test_r6_functions_pass_the_gate_and_reach_save(world, expression):
 
 @pytest.mark.parametrize(("expression", "fn", "reason"), [
     ("LEDGER('6001','借','全年')", "LEDGER", "序时账取数由底稿预填充承担"),
-    ("TB('1001','期末余额') + PREV('D2','审定表D2-1','审定数')", "PREV", "上年底稿取数"),
     ("TB_AUX('1121','客户','期末余额')", "TB_AUX", "AUX('科目','辅助类型','列')"),
 ])
 async def test_unsupported_functions_are_rejected_with_reasons_before_save(world, expression, fn, reason):

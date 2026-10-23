@@ -7,9 +7,10 @@ PREV / AUX / ROW / REPORT / NOTE 在上下文缺数时都返回 0，所以严格
 
 口径：
 
-* ``PREV('科目','列')`` / ``PREV(TB('科目','列'))``：上年（年度 − 1）试算表，科目按前缀聚合（与 TB 同口径）。
-  上年试算表整体没有数据 ⇒ 缺数；有数据但没有该科目 ⇒ 0（科目上年不存在，是合法的 0）。
-  ``PREV('底稿','表','单元格')`` 三参写法是上年底稿取数，这里不支持 ⇒ 缺数（写明原因，不当成试算表取数）。
+* ``PREV('科目','列')`` / ``PREV(TB('科目','列'))``：上年（年度 − 1）试算表，科目按前缀聚合（与 TB 同口径）；上年数据
+  来源是同项目上年 → 上年项目（``prior_year_context``）。都没有上年试算表 ⇒ 缺数；有数据但没有该科目 ⇒ 0（合法的 0）。
+* ``PREV('底稿','表','字段')`` 三参：上年同底稿取数 —— 本底稿该字段的现行取数定义在上年数据上求值（``prev_wp_field``）；
+  没有定义、定义不能在上年数据上重算、上年数据取不到 ⇒ 缺数并写明原因。
 * ``AUX('科目','辅助类型','辅助项','列')``：辅助核算余额表的当前数据集（``get_active_filter``），科目按前缀，
   辅助项按名称或编码匹配。该科目本年没有辅助核算余额、或找不到这个辅助项 ⇒ 缺数。
 * ``AUX('科目','类型或辅助项','列')`` / ``AUX('科目','类型或辅助项')``（列缺省期末余额）：第二参先按辅助类型
@@ -126,19 +127,6 @@ def _to_decimal(raw: Any) -> Decimal | None:
     return None
 
 
-async def _prior_tb(db: AsyncSession, project_id: uuid.UUID, year: int, codes: set[str]) -> dict[str, dict] | None:
-    """上年试算表按前缀聚合；上年没有任何行 ⇒ ``None``（与「有数据但无该科目」区分）。"""
-    from app.models.audit_platform_models import TrialBalance
-    from app.services.formula_preloader import _load_tb
-
-    exists = (await db.execute(sa.select(sa.func.count()).select_from(TrialBalance).where(
-        TrialBalance.project_id == project_id, TrialBalance.year == year,
-        TrialBalance.is_deleted == sa.false()))).scalar_one()
-    if not exists:
-        return None
-    return await _load_tb(db, project_id, year, codes)
-
-
 async def _aux_rows(db: AsyncSession, project_id: uuid.UUID, year: int, account: str) -> list[Any]:
     from app.models.audit_platform_models import TbAuxBalance
     from app.services.dataset_query import get_active_filter
@@ -227,19 +215,28 @@ async def substitute_prev_aux(expression: str, *, db: AsyncSession, project_id: 
         out.expression = out.expression.replace(token, _literal(value), 1)
 
     async with db.begin_nested():
-        for m in PREV3_RE.finditer(text):
-            put(m.group(0), None, "三参写法是上年底稿取数，当前不支持（上年试算表取数写「科目, 列」）")
+        prev3 = list(PREV3_RE.finditer(text))
         prev_hits = [(m.group(0), m.group(1), m.group(2)) for m in (*PREV_TB_RE.finditer(text), *PREV_RE.finditer(text))]
-        if prev_hits:
-            prior = await _prior_tb(db, project_id, year - 1, {code for _, code, _ in prev_hits})
-            for token, code, column in prev_hits:
-                std = COLUMN_ALIASES.get(column.strip())
-                if std is None:
-                    put(token, None, f"列名「{column}」无法识别")
-                elif prior is None:
-                    put(token, None, f"上年（{year - 1}）试算表无数据")
-                else:
-                    put(token, Decimal(str((prior.get(code) or {}).get(std, Decimal("0")))))
+        if prev3 or prev_hits:
+            from app.services.formula_preloader import _load_tb
+            from app.services.prev_wp_field import PriorWpFieldResolver
+
+            resolver = PriorWpFieldResolver(db, project_id, year)
+            for m in prev3:
+                hit = await resolver.resolve(m.group(1), m.group(2), m.group(3))
+                put(m.group(0), hit.value, hit.reason)
+            if prev_hits:
+                source = await resolver.source()
+                prior = None if source.project_id is None else await _load_tb(
+                    db, source.project_id, source.year, {code for _, code, _ in prev_hits})
+                for token, code, column in prev_hits:
+                    std = COLUMN_ALIASES.get(column.strip())
+                    if std is None:
+                        put(token, None, f"列名「{column}」无法识别")
+                    elif prior is None:
+                        put(token, None, source.reason)
+                    else:
+                        put(token, Decimal(str((prior.get(code) or {}).get(std, Decimal("0")))))
 
         refs = parse_aux_refs(text)
         if refs:
@@ -249,7 +246,8 @@ async def substitute_prev_aux(expression: str, *, db: AsyncSession, project_id: 
                 put(ref.token, value, reason)
 
     for m in _LEFTOVER_RE.finditer(out.expression):
-        out.missing.append(f"{m.group(1)} 写法无法识别（PREV 需「科目, 列」，AUX 需「科目, 辅助类型[, 辅助项], 列」）")
+        out.missing.append(f"{m.group(1)} 写法无法识别（PREV 需「科目, 列」或「底稿, 表, 字段」，"
+                           "AUX 需「科目, 辅助类型[, 辅助项], 列」）")
         break
     if not strict:
         out.missing = []

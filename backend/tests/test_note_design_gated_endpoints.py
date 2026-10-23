@@ -17,7 +17,7 @@ import pytest
 import pytest_asyncio
 from httpx import Response
 
-from authz_world import (
+from tests.authz_world import (
     TARGET_PROJECT_ID,
     AuthzWorld,
     Identity,
@@ -906,7 +906,7 @@ class TestUnlockDataDesignGate:
 # Task 11.4: assert_note_edit_access_on_projects([project_id, *target_project_ids])
 # ---------------------------------------------------------------------------
 from app.routers import note_group_template  # noqa: E402
-from authz_world import OTHER_PROJECT_ID  # noqa: E402
+from tests.authz_world import OTHER_PROJECT_ID  # noqa: E402
 
 _GROUP_TEMPLATE_ROUTERS = (note_group_template.router,)
 

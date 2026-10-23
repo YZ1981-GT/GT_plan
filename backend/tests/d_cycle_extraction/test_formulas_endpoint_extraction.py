@@ -27,6 +27,13 @@ from fastapi import HTTPException
 
 from app.core.config import settings
 from app.routers import wp_formula as router_mod
+from app.models.base import ProjectStatus
+from tests.d_cycle_extraction._endpoint_doubles import (
+    AuthGateSessionMixin,
+    admin_user,
+    formula_row,
+    member_user,
+)
 from app.services.d_cycle_extraction import presets as presets_mod
 from app.services.d_cycle_extraction.presets import (
     SOURCE_CUSTOM,
@@ -56,7 +63,7 @@ class _FakeResult:
         return SimpleNamespace(all=lambda: list(self._rows))
 
 
-class _FakeSession:
+class _FakeSession(AuthGateSessionMixin):
     """路由：
     * working_paper + is_deleted → _load_wp（返回完整 wp）
     * working_paper（仅 project_id 列）→ _verify_wp_ownership（返回 project_id）
@@ -107,7 +114,7 @@ def _wp_formula(target_cell, *, expression="TB('1141','期末余额')",
                 sheet_name="D6-1", category=None,
                 formula_type="auto_calc", description="用户公式", wp=None):
     """构造 WpFormula-like（同时满足 _formula_to_dict 与 resolve_effective._formula_to_binding）。"""
-    return SimpleNamespace(
+    return formula_row(
         id=uuid4(),
         project_id=(wp.project_id if wp else uuid4()),
         wp_id=(wp.id if wp else uuid4()),
@@ -160,7 +167,8 @@ def _disable(monkeypatch):
 
 
 def _user():
-    return SimpleNamespace(id=uuid4(), username="tester")
+    """管理员身份：端点内项目鉴权门照常执行（管理员分支），见 _auth_gate_double。"""
+    return admin_user()
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +190,7 @@ def test_get_merges_preset_custom_disabled_and_tier_b(monkeypatch):
     ]
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=user_formulas)
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     assert "extraction" in resp
     ext = resp["extraction"]
@@ -218,7 +226,7 @@ def test_get_surfaces_semantic_labels_p1_4(monkeypatch):
     _patch_presets(monkeypatch, {"D6": [_preset("D6-1-tb-amount")]})
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[])
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
     ext = resp["extraction"]
 
     # Tier A：语义标注 trial_balance 审定核对标量（与 tb_balance 未审 seed 消歧）
@@ -254,7 +262,7 @@ def test_get_tier_a_value_filled_when_year_resolves(monkeypatch):
     monkeypatch.setattr(router_mod, "evaluate_wp_formula_expression", _fake_eval)
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[], project_year=2025)
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
     ext = resp["extraction"]
 
     tb = next(b for b in ext["tierA"] if b["anchor"] == "D6-1-tb-amount")
@@ -286,7 +294,7 @@ def test_get_tier_a_value_fail_open_single_binding(monkeypatch):
     monkeypatch.setattr(router_mod, "evaluate_wp_formula_expression", _selective_eval)
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[], project_year=2025)
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
     tier_a = {b["anchor"]: b for b in resp["extraction"]["tierA"]}
 
     assert tier_a["D6-1-tb-amount"]["value"] == 777
@@ -307,7 +315,7 @@ def test_get_tier_a_value_none_on_eval_errors(monkeypatch):
     monkeypatch.setattr(router_mod, "evaluate_wp_formula_expression", _eval_with_errors)
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[], project_year=2025)
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
     tb = next(b for b in resp["extraction"]["tierA"] if b["anchor"] == "D6-1-tb-amount")
     assert tb["value"] is None
 
@@ -330,7 +338,7 @@ def test_get_tier_a_disabled_binding_value_none(monkeypatch):
     monkeypatch.setattr(router_mod, "evaluate_wp_formula_expression", _tracking_eval)
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=user_formulas, project_year=2025)
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
     tier_a = {b["anchor"]: b for b in resp["extraction"]["tierA"]}
 
     assert tier_a["D6-1-note-conclusion"]["source"] == SOURCE_DISABLED
@@ -346,7 +354,7 @@ def test_get_flag_off_no_year_query_no_extraction(monkeypatch):
     _patch_presets(monkeypatch, {"D6": [_preset("D6-1-tb-amount")]})
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[], project_year=2025)
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
     assert "extraction" not in resp
 
 
@@ -358,7 +366,7 @@ def test_get_items_backward_compatible(monkeypatch):
     user_formulas = [_wp_formula("D6-1-tb-amount", wp=wp)]
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=user_formulas)
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     assert resp["wp_id"] == str(wp.id)
     assert resp["count"] == 1
@@ -381,7 +389,7 @@ def test_get_flag_off_no_extraction(monkeypatch):
     _patch_presets(monkeypatch, {"D6": [_preset("D6-1-tb-amount")]})
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[])
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     assert "extraction" not in resp
     assert "items" in resp and resp["count"] == 0
@@ -394,7 +402,7 @@ def test_get_non_d_cycle_no_extraction(monkeypatch):
     _patch_presets(monkeypatch, {"D6": [_preset("D6-1-tb-amount")]})
     db = _FakeSession(wp=wp, wp_code="K1", user_formulas=[])
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     assert "extraction" not in resp
 
@@ -405,7 +413,7 @@ def test_get_no_wp_code_no_extraction(monkeypatch):
     wp = _wp(wp_code_present=False)
     db = _FakeSession(wp=wp, wp_code=None, user_formulas=[])
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     assert "extraction" not in resp
 
@@ -429,7 +437,7 @@ def test_get_uncovered_d_cycle_tier_b_empty_honest(monkeypatch):
     monkeypatch.setattr(router_mod, "tier_b_provenance", lambda code: [])  # 无溯源
     db = _FakeSession(wp=wp, wp_code="D7", user_formulas=[])
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     assert "extraction" in resp
     assert resp["extraction"]["wp_code"] == "D7"
@@ -449,7 +457,7 @@ def test_get_sheet_level_wp_code_normalized_to_base(monkeypatch):
     _patch_presets(monkeypatch, {"D6": []})
     db = _FakeSession(wp=wp, wp_code="D6-1", user_formulas=[])
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     assert "extraction" in resp
     assert resp["extraction"]["wp_code"] == "D6"
@@ -471,7 +479,7 @@ def test_get_unknown_anchor_dropped(monkeypatch):
     user_formulas = [_wp_formula("D6-1-also-bogus", wp=wp)]
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=user_formulas)
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     anchors = {b["anchor"] for b in resp["extraction"]["tierA"]}
     assert anchors == {"D6-1-tb-amount"}
@@ -523,3 +531,81 @@ def test_put_unsupported_function_returns_422(monkeypatch):
         _run(router_mod.save_formula(wp.id, body, db=db, user=_user()))
     assert ei.value.status_code == 422
     assert ei.value.detail["error_code"] == "FORMULA_UNSUPPORTED_FUNCTION"
+
+
+# ---------------------------------------------------------------------------
+# R7.1：替身只补会话方法，不绕过项目鉴权门（门禁代码原样执行）
+# ---------------------------------------------------------------------------
+
+
+def _save_body():
+    return router_mod.FormulaSaveRequest(
+        sheet_name="D6-1", target_cell="D6-1-tb-amount",
+        expression="TB('1141','期末余额')", year=2025,
+    )
+
+
+def _spy_save(monkeypatch):
+    calls: list = []
+
+    async def _fake_save(*a, **kw):
+        calls.append(kw)
+        return None, []
+
+    monkeypatch.setattr(router_mod.wp_formula_service, "save", _fake_save)
+    monkeypatch.setattr(router_mod, "find_unsupported_formula_functions", lambda expr: [])
+    return calls
+
+
+def test_get_gate_rejects_non_member(monkeypatch):
+    """非管理员且无成员行 → 403。"""
+    _enable(monkeypatch)
+    wp = _wp()
+    db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[])
+    with pytest.raises(HTTPException) as ei:
+        _run(router_mod.list_formulas(
+            wp.id, project_id=None, sheet_uid=None, db=db, user=member_user()))
+    assert ei.value.status_code == 403
+
+
+def test_get_gate_rejects_mismatched_project_id(monkeypatch):
+    """查询参数 project_id 与底稿所属项目不一致 → 403（管理员亦然，先于权限判定）。"""
+    wp = _wp()
+    db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[])
+    with pytest.raises(HTTPException) as ei:
+        _run(router_mod.list_formulas(
+            wp.id, project_id=uuid4(), sheet_uid=None, db=db, user=_user()))
+    assert ei.value.status_code == 403
+
+
+def test_get_admin_passes_gate_and_sets_rls_context(monkeypatch):
+    """管理员读：走管理员分支并设 RLS 上下文（触达 get_bind）；readonly 不查归档。"""
+    wp = _wp()
+    db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[])
+    _run(router_mod.list_formulas(
+        wp.id, project_id=wp.project_id, sheet_uid=None, db=db, user=_user()))
+    assert db.auth_gate_calls == [("get_bind",)]
+
+
+def test_put_gate_blocks_archived_project(monkeypatch):
+    """edit 级保存先过归档守卫：项目已归档 → 423，且不进入保存。"""
+    wp = _wp()
+    db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[])
+    db.project_status = ProjectStatus.archived
+    saves = _spy_save(monkeypatch)
+    with pytest.raises(HTTPException) as ei:
+        _run(router_mod.save_formula(wp.id, _save_body(), db=db, user=_user()))
+    assert ei.value.status_code == 423
+    assert saves == []
+    assert db.auth_gate_calls[0] == ("get", "Project", wp.project_id)
+
+
+def test_put_gate_rejects_non_member(monkeypatch):
+    """非管理员且无成员行 → 403，且不进入保存。"""
+    wp = _wp()
+    db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[])
+    saves = _spy_save(monkeypatch)
+    with pytest.raises(HTTPException) as ei:
+        _run(router_mod.save_formula(wp.id, _save_body(), db=db, user=member_user()))
+    assert ei.value.status_code == 403
+    assert saves == []

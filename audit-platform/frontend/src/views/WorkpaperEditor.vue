@@ -375,6 +375,7 @@
     <WorkpaperSidePanel
       :project-id="projectId"
       :wp-id="wpId"
+      :year="projectYear"
       :wp-code="wpDetail?.wp_code"
       :decision-trace="renderConfig?.decision_trace ?? null"
       @finecheck-update="fineCheckFailCount = $event"

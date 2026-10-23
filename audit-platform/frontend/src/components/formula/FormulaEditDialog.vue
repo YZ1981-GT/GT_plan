@@ -441,6 +441,7 @@ import * as P from '@/services/apiPaths'
 import type { WpFormulaContext } from '@/components/workpaper/GtCustomWpEditor.vue'
 import { filterWpBrowserRows, mapRegistryToPickerRows, mapAcnrCellsToPickerRows } from '@/utils/wpFormulaPicker'
 import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
+import { ADDRESS_REGISTRY_FULL_LOAD_LIMIT } from '@/stores/addressRegistry'
 import FormulaDebugPanel from './FormulaDebugPanel.vue'
 
 const route = useRoute()
@@ -857,7 +858,7 @@ async function loadWpFromLegacyRegistry() {
   }
   try {
     const resp = await api.get<{ items?: any[]; total?: number }>('/api/address-registry', {
-      params: { project_id: pid, year: resolveYear(), domain: 'wp', limit: 5000 },
+      params: { project_id: pid, year: resolveYear(), domain: 'wp', limit: ADDRESS_REGISTRY_FULL_LOAD_LIMIT },
     })
     const items = resp?.items ?? (Array.isArray(resp) ? resp : [])
     sourceBrowserRows.value = mapRegistryToPickerRows(items, (e) =>

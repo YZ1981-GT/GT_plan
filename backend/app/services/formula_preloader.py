@@ -12,6 +12,10 @@ spec: formula-execution-path-convergence Phase 1 · Task 2~6
 AUX 与报表行（spec formula-governance-coverage-closure R6.5）：AUX 按引用写法逐个取数（与表间审核严格代入
 同一口径），存 ``aux_data[科目][aux_ref_key(参数)]``；调用方没给 ``row_cache`` 且公式引用了 ROW / SUM_ROW /
 REPORT 时读本年度报表本期金额。``gaps`` 收集取数缺口，供严格调用方报错。
+
+PREV（spec formula-fetch-and-wp-generation-defect-closure R2）：两参 / ``PREV(TB(…))`` 读上年试算表，三参（上年同底稿）
+逐个预先求值进 ``prev_wp_data``、缺数原因进 ``prev_wp_missing``（L1 据此报错、不按 0）；两者的上年来源都是
+``prior_year_context``（同项目上年 → 上年项目）。
 """
 from __future__ import annotations
 
@@ -25,7 +29,15 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.formula_engine import FormulaContext, aux_ref_key
-from app.services.formula_ref_preload import AuxRef, load_report_rows, parse_aux_refs, resolve_aux_refs
+from app.services.formula_ref_preload import (
+    PREV3_RE,
+    PREV_RE,
+    PREV_TB_RE,
+    AuxRef,
+    load_report_rows,
+    parse_aux_refs,
+    resolve_aux_refs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +56,6 @@ _ADJ_RE = re.compile(r"ADJ\(\s*'([^']+)'")
 _REPORT_REF_RE = re.compile(r"(?<![A-Za-z0-9_])(?:ROW|SUM_ROW|REPORT)\s*\(")
 _WP_RE = re.compile(r"WP\(\s*'([^']+)'\s*,\s*'([^']+)'(?:\s*,\s*'([^']+)')?\s*\)")
 _NOTE_RE = re.compile(r"NOTE\(\s*'([^']+)'\s*,\s*'([^']+)'(?:\s*,\s*'([^']+)')?\s*\)")
-_PREV_RE = re.compile(r"PREV\(\s*'([^']+)'")
 _LEDGER_RE = re.compile(r"(?:COUNT_)?LEDGER\(\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)")
 _LEDGER_DETAIL_RE = re.compile(r"LEDGER_DETAIL\(\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)")
 _TB_AUX_RE = re.compile(r"TB_AUX\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)")
@@ -59,7 +70,8 @@ def _scan_refs(formulas: list[str]) -> dict[str, set]:
         "report_refs": set(),  # 出现过的 ROW / SUM_ROW / REPORT 调用（只用于判断要不要读报表）
         "wp_refs": set(),    # (wp_code, column) or (wp_code, sheet, cell)
         "note_refs": set(),  # (section, field) or (section, field, row_label)
-        "prev_codes": set(),
+        "prev_codes": set(),        # PREV 两参 / PREV(TB(…)) 的科目（上年试算表）
+        "prev_wp_refs": set(),      # PREV 三参 (底稿, 表, 字段)（上年同底稿取数）
         "ledger_specs": set(),       # (account, direction, period)
         "ledger_detail_specs": set(),  # (account, period, amount_filter)
         "tb_aux_specs": set(),       # (account, aux_type, column)
@@ -78,8 +90,10 @@ def _scan_refs(formulas: list[str]) -> dict[str, set]:
             refs["wp_refs"].add(tuple(g for g in m.groups() if g))
         for m in _NOTE_RE.finditer(t):
             refs["note_refs"].add(tuple(g for g in m.groups() if g))
-        for m in _PREV_RE.finditer(t):
+        for m in (*PREV_RE.finditer(t), *PREV_TB_RE.finditer(t)):
             refs["prev_codes"].add(m.group(1))
+        for m in PREV3_RE.finditer(t):
+            refs["prev_wp_refs"].add((m.group(1).strip(), m.group(2).strip(), m.group(3).strip()))
         for m in _LEDGER_RE.finditer(t):
             refs["ledger_specs"].add((m.group(1), m.group(2), m.group(3) or "全年"))
         for m in _LEDGER_DETAIL_RE.finditer(t):
@@ -407,6 +421,33 @@ async def _load_note_fallback(db: AsyncSession, project_id: uuid.UUID, year: int
     return out
 
 
+async def _load_prev(db: AsyncSession, project_id: uuid.UUID, year: int, refs: dict[str, set],
+                     gaps: list[str] | None) -> tuple[dict[str, dict[str, Decimal]], dict, dict]:
+    """PREV 两参 → 上年试算表（前缀聚合）；三参 → 逐个上年同底稿取数。上年来源同一（``prior_year_context``）。"""
+    prior_tb: dict[str, dict[str, Decimal]] = {}
+    values: dict[tuple[str, str, str], Decimal] = {}
+    missing: dict[tuple[str, str, str], str] = {}
+    if not refs["prev_codes"] and not refs["prev_wp_refs"]:
+        return prior_tb, values, missing
+    from app.services.prev_wp_field import PriorWpFieldResolver
+
+    resolver = PriorWpFieldResolver(db, project_id, year)
+    if refs["prev_codes"]:
+        source = await resolver.source()
+        if source.project_id is None:
+            _gap(gaps, f"PREV 上年试算表：{source.reason}")
+        else:
+            prior_tb = await _load_tb(db, source.project_id, source.year, refs["prev_codes"])
+    for key in sorted(refs["prev_wp_refs"]):
+        hit = await resolver.resolve(*key)
+        if hit.value is None:
+            missing[key] = hit.reason
+            _gap(gaps, f"PREV('{key[0]}','{key[1]}','{key[2]}')：{hit.reason}")
+        else:
+            values[key] = hit.value
+    return prior_tb, values, missing
+
+
 # ── 主入口 ────────────────────────────────────────────────────────────────────
 
 
@@ -445,15 +486,14 @@ async def preload(
     ledger_count = await _load_ledger_count(db, project_id, year, refs["ledger_specs"])
     tb_aux_data = await _load_tb_aux(db, project_id, year, refs["tb_aux_specs"])
 
-    # PREV: 取上年 TB 数据
-    prior_tb_data: dict[str, dict[str, Decimal]] = {}
-    if refs["prev_codes"]:
-        prior_tb_data = await _load_tb(db, project_id, year - 1, refs["prev_codes"])
+    prior_tb_data, prev_wp_data, prev_wp_missing = await _load_prev(db, project_id, year, refs, gaps)
 
     return FormulaContext(
         tb_data=tb_data,
         row_cache={k: Decimal(str(v)) for k, v in (row_cache or {}).items()},
         prior_tb_data=prior_tb_data,
+        prev_wp_data=prev_wp_data,
+        prev_wp_missing=prev_wp_missing,
         note_data=note_data,
         wp_data=wp_data,
         aux_data=aux_data,

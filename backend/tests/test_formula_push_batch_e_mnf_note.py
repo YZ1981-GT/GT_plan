@@ -123,7 +123,15 @@ M_NOTE_SECTIONS = [
     ("M10", "五、54", "八、59"),
 ]
 
-ALL_M_CODES = ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10"]
+#: M8 一般风险准备没有标准科目（m_cycle_specs 不给兜底码）⇒ 不取试算表、没有推送规则（原规则取 4301 专项储备，
+#: spec formula-fetch-and-wp-generation-defect-closure R1.4 删）。前端同步登记表仍有它（附注同步与推送无关）。
+M_NO_ACCOUNT_CODES = ["M8"]
+
+#: 有推送规则的 M 科目（规则类用例的参数）
+ALL_M_CODES = [c for c in ("M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10") if c not in M_NO_ACCOUNT_CODES]
+
+#: 规则类用例的章节号参数（同步登记表用例仍用全量 M_NOTE_SECTIONS）
+M_PUSH_NOTE_SECTIONS = [t for t in M_NOTE_SECTIONS if t[0] not in M_NO_ACCOUNT_CODES]
 
 # M3 单独：section_by_template 只有 listed
 M3_LISTED_SECTION = "五、56"
@@ -141,21 +149,23 @@ M_TABLE_EXPECTED = {
     "M10": "其他权益工具",
 }
 
+#: 推送取数科目 = 口径单一来源 four_table/m_cycle_specs（真库科目表对账）。原表抄的是 wp_account_mapping.json 的错码，
+#: M3~M10 整体错位一格（M3 写 4002 资本公积、M4 写 4101 盈余公积、M5 写 4103 本年利润、M7 写 4201 库存股、
+#: M9 写 4401、M10 写不存在的 4501），推送把别的科目的数写进附注（R1.4）。
 M_ACCOUNT_CODES = {
     "M1": "2232",
     "M2": "4001",
-    "M3": "4002",
-    "M4": "4101",
-    "M5": "4103",
+    "M3": "4201",
+    "M4": "4002",
+    "M5": "4101",
     "M6": "4104",
-    "M7": "4201",
-    "M8": "4301",
-    "M9": "4401",
-    "M10": "4501",
+    "M7": "4301",
+    "M9": "4003",
+    "M10": "4401",
 }
 
-# M 循环非对称章节号科目（除 M1 对称、M3 只 listed 外全部非对称）
-M_ASYMMETRIC_CODES = ["M2", "M4", "M5", "M6", "M7", "M8", "M9", "M10"]
+# M 循环非对称章节号科目（除 M1 对称、M3 只 listed 外全部非对称；M8 无推送规则）
+M_ASYMMETRIC_CODES = ["M2", "M4", "M5", "M6", "M7", "M9", "M10"]
 
 
 # ========================================================================
@@ -246,14 +256,26 @@ ALL_MNF_CODES = ALL_M_CODES + ALL_N_CODES + ALL_F_CODES
 # ── M 章节号冻结映射 ────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize(
-    "code,listed,soe", M_NOTE_SECTIONS, ids=[t[0] for t in M_NOTE_SECTIONS],
+    "code,listed,soe", M_PUSH_NOTE_SECTIONS, ids=[t[0] for t in M_PUSH_NOTE_SECTIONS],
 )
 def test_m_note_rule_section_by_template(code: str, listed: str, soe: str):
-    """M1/M2/M4~M10 章节号与前端 m*NoteSectionMap.ts 一致（双侧）。"""
+    """M1/M2/M4~M7/M9/M10 章节号与前端 m*NoteSectionMap.ts 一致（双侧）。"""
     rule = _note_rule(code)
     sections = rule.target.sections
     assert sections.get("listed") == listed, f"{code} listed section"
     assert sections.get("soe") == soe, f"{code} soe section"
+
+
+@pytest.mark.parametrize("code", M_NO_ACCOUNT_CODES, ids=M_NO_ACCOUNT_CODES)
+def test_m_no_account_code_has_no_push_rule(code: str):
+    """没有标准科目的 M 底稿：binding 不取科目且写明原因，规则清单里没有它的任何规则（取数 / 附注主表）。"""
+    from app.services.formula_push.rules import load_rules
+
+    binding = note_direct_for(code)
+    assert binding.account_prefixes == ()
+    assert binding.no_account_reason
+    assert binding.derivations == frozenset()
+    assert [r.rule_id for r in load_rules() if r.wp_code == code] == []
 
 
 def test_m3_only_listed_section():

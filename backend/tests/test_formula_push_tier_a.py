@@ -87,8 +87,8 @@ _TB_DATA: dict[str, dict[str, Decimal]] = {
     "1801": {"期末余额": Decimal("60000"), "年初余额": Decimal("80000")},
     # I5: 1911
     "1911": {"期末余额": Decimal("130000"), "年初余额": Decimal("110000")},
-    # I6: 6602（损益类）
-    "6602": {"期末余额": Decimal("90000"), "年初余额": Decimal("0"), "本期发生额": Decimal("90000")},
+    # I6: 6604 研发费用（损益类；原 6602 是管理费用）
+    "6604": {"期末余额": Decimal("90000"), "年初余额": Decimal("0"), "本期发生额": Decimal("90000")},
 }
 
 
@@ -285,7 +285,7 @@ class TestBannedColumnRewrite:
         ("D4", "D4-1-adj-tb-6001", "TB('6001','审定数')", "TB('6001','本期发生额')", "6001"),
         ("D4", "D4-1-adj-tb-6051", "TB('6051','审定数')", "TB('6051','本期发生额')", "6051"),
         ("H10", "H10-1-tb-amount", "TB('6115','审定数')", "TB('6115','本期发生额')", "6115"),
-        ("I6", "I6-1-tb-amount", "TB('6602','审定数')", "TB('6602','本期发生额')", "6602"),
+        ("I6", "I6-1-tb-amount", "TB('6604','审定数')", "TB('6604','本期发生额')", "6604"),
     ]
 
     @pytest.mark.parametrize("wp_code,anchor,old_expr,new_expr,account", _REWRITES)
@@ -483,10 +483,10 @@ class TestNoteRows:
         assert r["opening"] == 500000.0
 
     def test_pl_code_uses_occurrence_amount(self):
-        """损益类 I6（6602 研发费用）→ ending 取「本期发生额」。"""
+        """损益类 I6（6604 研发费用；原 6602 是管理费用）→ ending 取「本期发生额」。"""
         binding = binding_for("I6")
         _seed_tb_to_binding(binding, {
-            "6602": {"期末余额": Decimal("90000"), "年初余额": Decimal("0"), "本期发生额": Decimal("90000")},
+            "6604": {"期末余额": Decimal("90000"), "年初余额": Decimal("0"), "本期发生额": Decimal("90000")},
         })
         rule = _make_note_rule("I6", table="研发费用")
         rows = binding.note_rows({}, "listed", rule)

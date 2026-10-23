@@ -265,6 +265,8 @@ import { listWorkpapers, getWpIndex, downloadWorkpaperPack } from '@/services/wo
 import { listUsers } from '@/services/commonApi'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { summarizeWorkpaperGenerateResult } from '@/utils/workpaperGenerateResult'
+import { resolveAuditYearFromProject, resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
 import { useAuthStore } from '@/stores/auth'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useProjectStore } from '@/stores/project'
@@ -300,7 +302,11 @@ const { can: canOp, whyCannot } = usePermissionMatrix()
 // DEPRECATED: 旧 authStore.user?.role 直接判断仍保留，后续逐步替换为 canOp()
 
 const projectId = computed(() => route.params.projectId as string)
-const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear())
+/** 本项目的审计年度（挂载时随项目信息读取） */
+const projectAuditYear = ref<number | null>(null)
+// 审计年度：路由 ?year= > 本项目审计年度 > 去年（全平台同一解析）。原先缺省取今年：从编辑器「返回」等不带 ?year= 的
+// 入口进来，生成底稿 / 刷新全部公式都按今年发请求（2025 年度项目在 2026 年 → 2026：公式推送直接拒绝、生成的底稿绑不上数据集）
+const currentYear = computed(() => resolveEffectiveAuditYear({ routeYear: route.query.year, storeAuditYear: projectAuditYear.value }))
 const projectName = ref('')
 
 // ─── 核心数据 ─────────────────────────────────────────────────────────────────
@@ -747,8 +753,13 @@ async function onGenerateWorkpapers() {
         throw genErr
       }
     }
-    const created = (result as any)?.created || (result as any)?.count || 0
-    ElMessage.success(`底稿生成完成，共创建 ${created} 份底稿`)
+    // 回执里的未生成 / 空白底稿 / 失败编码如实提示（R4 / R5），不再一律报「生成完成」
+    const notice = summarizeWorkpaperGenerateResult(result)
+    ElMessage[notice.level]({
+      message: notice.message,
+      duration: notice.level === 'warning' ? 10000 : 3000,
+      showClose: notice.level === 'warning',
+    })
     // 4. 刷新列表
     await fetchWpIndex()
   } catch (e: any) {
@@ -884,6 +895,7 @@ onMounted(async () => {
     const resp = await http.get(`/api/projects/${projectId.value}`)
     const proj = resp.data
     projectName.value = proj?.name || proj?.project_name || ''
+    projectAuditYear.value = resolveAuditYearFromProject(proj)
   } catch { /* 静默 */ }
   // 加载用户列表
   try {

@@ -76,6 +76,28 @@ def _load_builtin_sets() -> list[dict[str, Any]]:
 BUILTIN_TEMPLATE_SETS = _load_builtin_sets()
 
 
+def select_generation_codes(
+    template_codes: list[str], selected_codes: list[str] | None
+) -> tuple[list[str], list[str]]:
+    """生成范围 = 模板集编码 ∩ 用户选中（按模板集顺序、去重）。
+
+    返回 ``(要生成的编码, 选中但不在模板集里的编码)``。
+
+    * ``selected_codes is None``：调用方没有做裁剪（旧调用方 / 整套生成）⇒ 原样返回模板集编码。
+    * 空列表：一个都没选 ⇒ 不生成（不能当成「没传」去生成整套）。
+    * 选中编码按去空白后比较；不在模板集里的如实返回，由调用方回报给用户，不静默丢弃。
+    """
+    ordered = list(dict.fromkeys(c for c in (template_codes or []) if c))
+    if selected_codes is None:
+        return ordered, []
+    wanted = list(dict.fromkeys(
+        str(c).strip() for c in selected_codes if c is not None and str(c).strip()
+    ))
+    chosen = set(wanted)
+    in_set = set(ordered)
+    return [c for c in ordered if c in chosen], [c for c in wanted if c not in in_set]
+
+
 class TemplateEngine:
     """底稿模板引擎
 
@@ -403,8 +425,29 @@ class TemplateEngine:
         template_set_id: UUID,
         year: int = 2025,
         created_by: UUID | None = None,
+        selected_codes: list[str] | None = None,
     ) -> list[WorkingPaper]:
+        """从模板集生成项目底稿（只要底稿列表；要「选中但不在模板集里」的编码用 *_detailed）。"""
+        workpapers, _ignored = await self.generate_project_workpapers_detailed(
+            db=db, project_id=project_id, template_set_id=template_set_id, year=year,
+            created_by=created_by, selected_codes=selected_codes,
+        )
+        return workpapers
+
+    async def generate_project_workpapers_detailed(
+        self,
+        db: AsyncSession,
+        project_id: UUID,
+        template_set_id: UUID,
+        year: int = 2025,
+        created_by: UUID | None = None,
+        selected_codes: list[str] | None = None,
+    ) -> tuple[list[WorkingPaper], list[str]]:
         """Generate project workpapers from a template set.
+
+        ``selected_codes``：用户在生成前裁剪弹窗里确认的编码（None = 整套生成，兼容旧调用方）。
+        只生成「模板集 ∩ 选中」，返回 (底稿, 选中但不在模板集里的编码)。此前端点不收这个字段，
+        用户裁剪掉的底稿照样全部生成（spec formula-fetch-and-wp-generation-defect-closure R4）。
 
         1. Iterate template codes in the set
         2. For each code, find the latest published (or draft) template
@@ -425,7 +468,9 @@ class TemplateEngine:
         if template_set is None:
             raise ValueError("模板集不存在")
 
-        template_codes = template_set.template_codes or []
+        template_codes, ignored_codes = select_generation_codes(
+            template_set.template_codes or [], selected_codes
+        )
         workpapers: list[WorkingPaper] = []
 
         # 加载程序裁剪结果（跳过被裁剪的底稿）
@@ -618,4 +663,4 @@ class TemplateEngine:
 
         await db.flush()
         logger.info("generate_project_workpapers: project=%s codes=%d files=%d", project_id, len(template_codes), len(workpapers))
-        return workpapers
+        return workpapers, ignored_codes

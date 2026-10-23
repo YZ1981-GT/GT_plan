@@ -34,6 +34,7 @@ from uuid import uuid4
 
 from app.core.config import Settings, settings
 from app.routers import wp_formula as router_mod
+from tests.d_cycle_extraction._endpoint_doubles import AuthGateSessionMixin, admin_user, formula_row
 from app.routers.wp_render_strategies import _d6_contract_assets as d6
 from app.services.d_cycle_extraction import presets as presets_mod
 from app.services.d_cycle_extraction.presets import SOURCE_PRESET
@@ -60,7 +61,7 @@ class _FakeResult:
         return SimpleNamespace(all=lambda: list(self._rows))
 
 
-class _FakeSession:
+class _FakeSession(AuthGateSessionMixin):
     def __init__(self, *, wp, wp_code, user_formulas=None, project_year=None):
         self.wp = wp
         self.wp_code = wp_code
@@ -102,7 +103,7 @@ def _wp():
 
 def _saved_formula(target_cell, *, sheet_name="D6-1", wp=None,
                    formula_type="auto_calc", expression="TB('1141','期末余额')"):
-    return SimpleNamespace(
+    return formula_row(
         id=uuid4(),
         project_id=(wp.project_id if wp else uuid4()),
         wp_id=(wp.id if wp else uuid4()),
@@ -128,7 +129,8 @@ def _saved_formula(target_cell, *, sheet_name="D6-1", wp=None,
 
 
 def _user():
-    return SimpleNamespace(id=uuid4(), username="tester")
+    """管理员身份：端点内项目鉴权门照常执行（管理员分支），见 _auth_gate_double。"""
+    return admin_user()
 
 
 def _enable(monkeypatch):
@@ -291,7 +293,7 @@ def test_get_tier_a_value_filled_when_year_and_eval_succeed(monkeypatch):
     monkeypatch.setattr(router_mod, "evaluate_wp_formula_expression", _fake_eval)
     db = _get_session(wp, project_year=2025)
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     tier_a = resp["extraction"]["tierA"]
     assert tier_a, "D6 应有 Tier A 预设"
@@ -311,7 +313,7 @@ def test_get_tier_a_value_none_when_year_unresolvable(monkeypatch):
     )
     db = _get_session(wp, project_year=None)  # 项目无 audit_year
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     tier_a = resp["extraction"]["tierA"]
     assert tier_a
@@ -333,7 +335,7 @@ def test_get_tier_a_value_fail_open_on_eval_error(monkeypatch):
     monkeypatch.setattr(router_mod, "evaluate_wp_formula_expression", _boom)
     db = _get_session(wp, project_year=2025)
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     tier_a = resp["extraction"]["tierA"]
     assert tier_a

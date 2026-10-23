@@ -5,8 +5,9 @@
 支持的取数函数（spec formula-governance-coverage-closure R6；与函数支持矩阵 ``wp_evaluator`` 列一致）：
 TB / SUM_TB / WP（含三参与 ``Sheet!Cell`` 跨 sheet 引用）/ ROW / SUM_ROW / REPORT / NOTE / PREV / AUX / ADJ。
 PREV / AUX / ROW / SUM_ROW / REPORT / NOTE 经 ``formula_ref_preload`` 严格按值代入（取不到数写进错误清单，
-不代入 0）；ADJ 经统一预载层（底稿口径：不排除底稿来源的调整分录）交 L1 内核。序时账（LEDGER /
-COUNT_LEDGER / LEDGER_DETAIL）、TB_AUX、PREV 三参（上年底稿）不支持：保存时 422，求值时报错不求值。
+不代入 0）；PREV 三参（上年同底稿）按本底稿该字段的现行取数定义在上年数据上求值（``prev_wp_field``，spec
+formula-fetch-and-wp-generation-defect-closure R2）；ADJ 经统一预载层（底稿口径：不排除底稿来源的调整分录）交 L1
+内核。序时账（LEDGER / COUNT_LEDGER / LEDGER_DETAIL）、TB_AUX 不支持：保存时 422，求值时报错不求值。
 """
 
 from __future__ import annotations
@@ -49,14 +50,13 @@ _KERNEL_FUNCTIONS = frozenset({"ADJ", "ABS", "ROUND", "MAX", "MIN", "IF", "PLACE
 #:
 #: 历史（d-cycle-four-table-extraction-formulas 决策3）：Tier A 可编辑公式曾只支持 TB / SUM_TB / WP，
 #: AUX / PREV 一并拒绝；spec formula-governance-coverage-closure R6 补齐了 AUX / PREV（两参）等 7 个函数，
-#: 序时账归集仍由底稿预填充（Tier B）承担。
+#: PREV 三参由 spec formula-fetch-and-wp-generation-defect-closure R2 补齐；序时账归集仍由底稿预填充（Tier B）承担。
 UNSUPPORTED_FUNCTION_REASONS: dict[str, str] = {
     "LEDGER": "序时账取数由底稿预填充承担，可编辑公式不支持",
     "COUNT_LEDGER": "序时账笔数由底稿预填充承担，可编辑公式不支持",
     "LEDGER_DETAIL": "序时账明细由底稿预填充承担，可编辑公式不支持",
     "TB_AUX": "辅助维度汇总请写 AUX('科目','辅助类型','列')",
 }
-_PREV3_REASON = "PREV 三参写法是上年底稿取数，可编辑公式不支持（上年试算表取数写 PREV('科目','列')）"
 
 
 def _strip_formula(expression: str | None) -> str:
@@ -75,7 +75,7 @@ def _called_functions(expression: str) -> list[str]:
 
 
 def unsupported_formula_function_issues(expression: str | None) -> list[dict[str, str]]:
-    """工作底稿可编辑公式里不支持的函数 → ``[{function, reason}]``（按声明顺序，PREV 三参在最后）。
+    """工作底稿可编辑公式里不支持的函数 → ``[{function, reason}]``（按声明顺序）。
 
     纯字符串检测（不依赖 DB），供保存端点写库前调用；求值时同样据此不求值（不静默 0）。
     """
@@ -83,13 +83,8 @@ def unsupported_formula_function_issues(expression: str | None) -> list[dict[str
     if not raw:
         return []
     called = set(_called_functions(raw))
-    issues = [{"function": name, "reason": reason}
-              for name, reason in UNSUPPORTED_FUNCTION_REASONS.items() if name in called]
-    from app.services.formula_ref_preload import PREV3_RE
-
-    if PREV3_RE.search(raw):
-        issues.append({"function": "PREV", "reason": _PREV3_REASON})
-    return issues
+    return [{"function": name, "reason": reason}
+            for name, reason in UNSUPPORTED_FUNCTION_REASONS.items() if name in called]
 
 
 def find_unsupported_formula_functions(expression: str | None) -> list[str]:
@@ -307,9 +302,9 @@ async def evaluate_wp_formula_expression(
     """求值自定义底稿公式表达式。
 
     支持：字面量、TB/SUM_TB、WP（含单元格地址 B5）、``Sheet!Cell`` 跨 sheet 引用
-    （经 CrossSheetResolver 追溯，Req 14.2）、ROW/SUM_ROW/REPORT/NOTE/PREV/AUX（严格按值代入）、
+    （经 CrossSheetResolver 追溯，Req 14.2）、ROW/SUM_ROW/REPORT/NOTE/PREV（两参 / 三参）/AUX（严格按值代入）、
     ADJ（统一预载层，底稿口径）、四则运算与内置函数（委托 L1 execute）。
-    取不到数（无上年试算表 / 无辅助核算 / 报表未生成 / 附注无该项）写进 errors，不静默 0；
+    取不到数（无上年试算表 / 上年同底稿字段无定义 / 无辅助核算 / 报表未生成 / 附注无该项）写进 errors，不静默 0；
     含不支持的函数时不求值，返回 (Decimal('0'), errors)。
 
     Args:

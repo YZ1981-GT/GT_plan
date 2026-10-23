@@ -76,7 +76,8 @@ async def test_prev_without_prior_year_tb_is_not_passed():
         await db.commit()
         passed, msgs = await _run_rules(db, pid, [_rule("上年", "PREV('1001','期末余额')", "ROW('BS-ZERO')")])
         assert passed == {"上年": False}
-        assert any("上年（2024）试算表无数据" in m for m in msgs), msgs
+        # 上年来源 = 同项目上年 → 上年项目（prior_year_context，R2.4）：两处都没有 ⇒ 原因写明两层
+        assert any("本项目没有 2024 年试算表" in m and "上年项目" in m for m in msgs), msgs
 
 
 async def test_prev_reads_prior_year_by_prefix_and_absent_account_is_zero():

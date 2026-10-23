@@ -96,8 +96,11 @@ class FormulaContext:
     tb_data: dict[str, dict[str, Decimal]] = field(default_factory=dict)
     # 行次编码 → 已计算值（供 ROW/SUM_ROW/REPORT 引用）
     row_cache: dict[str, Decimal] = field(default_factory=dict)
-    # 上年科目数据（供 PREV 引用）
+    # 上年科目数据（供 PREV 两参引用）
     prior_tb_data: dict[str, dict[str, Decimal]] = field(default_factory=dict)
+    # PREV 三参（上年同底稿取数）预载值：(底稿, 表, 字段) → 值；取不到的原因另存，L1 据此报错、不按 0
+    prev_wp_data: dict[tuple[str, str, str], Decimal] = field(default_factory=dict)
+    prev_wp_missing: dict[tuple[str, str, str], str] = field(default_factory=dict)
     # 附注数据源（供 NOTE 函数）：section_code → {field_name: 金额}
     note_data: dict[str, dict[str, Decimal]] = field(default_factory=dict)
     # 底稿数据源（供 WP 函数）：wp_code → {column: 金额}
@@ -882,26 +885,27 @@ def _handle_report(args: list[Any], ctx: FormulaContext, trace: list[str]) -> De
 
 
 def _handle_prev(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """PREV('code','column') 或 PREV(TB('code','column')) — 上年同期值"""
-    # PREV 可以嵌套：PREV(TB('1002','期末余额')) 或 PREV('1002','期末余额')
-    if len(args) >= 1 and isinstance(args[0], ASTFuncCall):
-        # 嵌套模式：PREV(TB('1002','期末余额')) → 从 prior_tb_data 取
-        inner = args[0]
-        if inner.name == "TB":
-            inner_str_args = _extract_string_args(inner.args, ctx, trace)
-            code = inner_str_args[0] if inner_str_args else ''
-            col_name = inner_str_args[1] if len(inner_str_args) > 1 else ctx.default_column
-            prior_data = ctx.prior_tb_data.get(code, {})
-            val = prior_data.get("期末余额", Decimal("0"))
-            trace.append(f"PREV(TB('{code}','{col_name}')) = {val}")
-            return val
-    # 简单模式：PREV('1002','期末余额')
-    str_args = _extract_string_args(args, ctx, trace)
-    code = str_args[0] if str_args else ''
-    col_name = str_args[1] if len(str_args) > 1 else ctx.default_column
-    prior_data = ctx.prior_tb_data.get(code, {})
-    val = prior_data.get("期末余额", Decimal("0"))
-    trace.append(f"PREV('{code}','{col_name}') = {val}")
+    """PREV('科目','列') / PREV(TB('科目','列'))：上年试算表按列取；PREV('底稿','表','字段')：上年同底稿取数（预载值）。"""
+    if len(args) >= 1 and isinstance(args[0], ASTFuncCall) and args[0].name == "TB":
+        args = args[0].args
+    return _prev_value(_extract_string_args(args, ctx, trace), ctx, trace)
+
+
+def _prev_value(str_args: list[str], ctx: FormulaContext, trace: list[str]) -> Decimal:
+    """AST / regex 两路径共用：三参缺预载值、两参列名未注册 ⇒ 抛 FormulaColumnError（报错，不按 0）。"""
+    shown = ",".join(f"'{a}'" for a in str_args)
+    if len(str_args) >= 3:
+        key = (str_args[0].strip(), str_args[1].strip(), str_args[2].strip())
+        if key not in ctx.prev_wp_data:
+            raise FormulaColumnError(f"PREV({shown})：{ctx.prev_wp_missing.get(key, '上年同底稿取数未预载')}")
+        val = ctx.prev_wp_data[key]
+    else:
+        code = str_args[0] if str_args else ''
+        col_name = str_args[1] if len(str_args) > 1 else ctx.default_column
+        if is_unregistered_column(col_name):
+            raise FormulaColumnError(f"PREV('{code}','{col_name}')：列名「{col_name}」未注册，无法取值")
+        val = _resolve_tb_column(ctx.prior_tb_data.get(code, {}), col_name, code=code, trace=trace)
+    trace.append(f"PREV({shown}) = {val}")
     return val
 
 
@@ -1003,7 +1007,7 @@ _REGISTRY = FunctionRegistry()
 # 取数函数
 _REGISTRY.register("TB", _handle_tb, arity=2, description="取科目余额", syntax="TB('科目编码','列名')", category="取数")
 _REGISTRY.register("SUM_TB", _handle_sum_tb, arity=2, description="范围科目求和", syntax="SUM_TB('起始~结束','列名')", category="取数")
-_REGISTRY.register("PREV", _handle_prev, arity=2, description="上年同期值", syntax="PREV('科目编码','列名')", category="取数")
+_REGISTRY.register("PREV", _handle_prev, arity=2, description="上年同期值", syntax="PREV('科目编码','列名') / PREV('底稿','表','字段')", category="取数")
 _REGISTRY.register("AUX", _handle_aux, arity=3, description="辅助核算取值", syntax="AUX('科目','维度','列名')", category="取数")
 _REGISTRY.register("NOTE", _handle_note, arity=3, description="附注数据取值", syntax="NOTE('章节','字段','列名')", category="取数")
 _REGISTRY.register("WP", _handle_wp, arity=2, description="底稿数据取值", syntax="WP('底稿编码','列名')", category="取数")
@@ -1355,12 +1359,13 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
                 trace_msg = f"REPORT('{row_code}') = {val}"
 
             elif token_name == "PREV":
-                code, col_name = match.group(1), match.group(2)
-                prior_data = ctx.prior_tb_data.get(code, {})
-                val = prior_data.get("期末余额", Decimal("0"))
-                if val == 0:
-                    result.warnings.append(f"PREV('{code}'): 无上年数据")
-                trace_msg = f"PREV('{code}','{col_name}') = {val}"
+                # 与 AST 路径同一取值函数（三参读预载值、两参按列名；取不到报错不按 0）
+                try:
+                    val = _prev_value([g for g in match.groups() if g is not None], ctx, result.trace)
+                except FormulaColumnError as exc:
+                    result.errors.append(str(exc))
+                if val == 0 and match.group(3) is None:
+                    result.warnings.append(f"PREV('{match.group(1)}'): 无上年数据")
 
             elif token_name in ("AUX", "NOTE", "WP"):
                 if token_name == "AUX":
@@ -1443,7 +1448,7 @@ def _execute_parallel(formula: str, ctx: FormulaContext) -> FormulaResult:
 def _check_prev_warnings(formula: str, ctx: FormulaContext, result: FormulaResult):
     """检查 PREV 函数是否有上年数据缺失的 warning。"""
     import re as _re
-    for m in _re.finditer(r"PREV\('([^']+)'", formula):
+    for m in _re.finditer(r"PREV\(\s*(?:TB\(\s*)?'([^']+)'\s*,\s*'[^']*'\s*\)", formula):  # 两参；三参缺数已是 error
         code = m.group(1)
         prior_data = ctx.prior_tb_data.get(code, {})
         if prior_data.get("期末余额", Decimal("0")) == 0:

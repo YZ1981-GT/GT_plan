@@ -86,10 +86,10 @@
     {"anchor": "H7-1-tb-amount", "expression": "TB('1621','期末余额')", "sheet_name": "H7-1", "formula_type": "auto_calc", "description": "试算表 1621 生产性生物资产期末余额（审定数），供 H7-1 审定表 TB↔审定核对行。资产类借方科目。"}
   ],
   "H8": [
-    {"anchor": "H8-1-tb-amount", "expression": "TB('1901','期末余额')", "sheet_name": "H8-1", "formula_type": "auto_calc", "description": "试算表 1901 使用权资产原值期末余额（审定数），供 H8-1 审定表 TB↔审定核对行。"}
+    {"anchor": "H8-1-tb-amount", "expression": "TB('1641','期末余额')+TB('1651','期末余额')", "sheet_name": "H8-1", "formula_type": "auto_calc", "description": "试算表使用权资产原值期末余额（审定数；双族 1641 / 1651 并取，逐项目只用一族，口径单一来源 four_table/dual_family_codes），供 H8-1 审定表 TB↔审定核对行。原写 1901 是待处理财产损溢。"}
   ],
   "H9": [
-    {"anchor": "H9-1-tb-amount", "expression": "TB('2205','期末余额')", "sheet_name": "H9-1", "formula_type": "auto_calc", "description": "试算表 2205 租赁负债期末余额（审定数），供 H9-1 审定表 TB↔审定核对行。负债类贷方科目。"}
+    {"anchor": "H9-1-tb-amount", "expression": "TB('2601','期末余额')+TB('2651','期末余额')", "sheet_name": "H9-1", "formula_type": "auto_calc", "description": "试算表租赁负债期末余额（审定数；双族 2601 / 2651 并取，未确认融资费用另列、不并取，口径单一来源 four_table/dual_family_codes），供 H9-1 审定表 TB↔审定核对行。负债类贷方科目。原写 2205 是合同负债。"}
   ],
   "H10": [
     {"anchor": "H10-1-tb-amount", "expression": "TB('6115','本期发生额')", "sheet_name": "H10-1", "formula_type": "auto_calc", "description": "试算表 6115 资产处置损益审定发生额（损益类，本期发生额 = audited_amount − opening_balance），供 H10-1 审定表 TB↔审定核对行。"}
@@ -100,7 +100,7 @@
     {"anchor": "I1-1-tb-impair", "expression": "TB('1703','期末余额')", "sheet_name": "I1-1", "formula_type": "auto_calc", "description": "试算表 1703 无形资产减值准备期末余额（审定数，备抵科目负值），供 I1-1 审定表减值段 TB核对。"}
   ],
   "I2": [
-    {"anchor": "I2-1-tb-amount", "expression": "TB('1717','期末余额')", "sheet_name": "I2-1", "formula_type": "auto_calc", "description": "试算表 1717 开发支出期末余额（审定数），供 I2-1 审定表 TB↔审定核对行。资产类借方科目。"}
+    {"anchor": "I2-1-tb-amount", "expression": "TB('1704','期末余额')", "sheet_name": "I2-1", "formula_type": "auto_calc", "description": "试算表 1704 开发支出期末余额（审定数；口径单一来源 four_table/i_cycle_accounts，报表行 BS-033 同码），供 I2-1 审定表 TB↔审定核对行。资产类借方科目。原写 1717 在标准科目表与试算表里都不存在。"}
   ],
   "I3": [
     {"anchor": "I3-1-tb-amount", "expression": "TB('1711','期末余额')", "sheet_name": "I3-1", "formula_type": "auto_calc", "description": "试算表 1711 商誉期末余额（审定数），供 I3-1 审定表 TB↔审定核对行。不摊销，仅减值。"}
@@ -108,10 +108,12 @@
   "I4": [
     {"anchor": "I4-1-tb-amount", "expression": "TB('1801','期末余额')", "sheet_name": "I4-1", "formula_type": "auto_calc", "description": "试算表 1801 长期待摊费用期末余额（审定数），供 I4-1 审定表 TB↔审定核对行。资产类借方科目。"}
   ],
-  "I5": [
-    {"anchor": "I5-1-tb-amount", "expression": "TB('1911','期末余额')", "sheet_name": "I5-1", "formula_type": "auto_calc", "description": "试算表 1911 其他非流动资产期末余额（审定数），供 I5-1 审定表 TB↔审定核对行。"}
-  ],
+  "_I5_removed": {
+    "_why": "🔴 2026-10-23 移除 I5 的 Tier A 预设（原 anchor=I5-1-tb-amount，expression=TB('1911','期末余额')）。依据：『其他非流动资产』没有标准科目 —— 1911 在标准科目表与各项目试算表里都不存在（报表行 BS-037 同样引用 1911，属平台级报表配置问题，本 spec 只报告不改），口径单一来源 four_table/i_cycle_accounts 的 I5 段兜底码为空（宁缺勿造）。该预设与推送规则恒为 0；推送 binding 还曾拿 1901 待处理财产损溢顶替。→ I5-1 审定表『试算平衡表数』与附注主表交给用户填写。若某客户确实单设了科目，可在公式管理面板按项目新增公式。",
+    "_anchor": "I5-1-tb-amount",
+    "_spec": ".kiro/specs/_archive/71-formula-fetch-and-wp-generation-defect-closure/ R1.3"
+  },
   "I6": [
-    {"anchor": "I6-1-tb-amount", "expression": "TB('6602','本期发生额')", "sheet_name": "I6-1", "formula_type": "auto_calc", "description": "试算表 6602 研发费用审定发生额（损益类借方，本期发生额 = audited_amount − opening_balance），供 I6-1 审定表 TB↔审定核对行。"}
+    {"anchor": "I6-1-tb-amount", "expression": "TB('6604','本期发生额')", "sheet_name": "I6-1", "formula_type": "auto_calc", "description": "试算表 6604 研发费用审定发生额（损益类借方，本期发生额 = audited_amount − opening_balance；口径单一来源 four_table/i_cycle_accounts，报表行 IS-006 同码），供 I6-1 审定表 TB↔审定核对行。原写 6602 是管理费用。"}
   ]
 }

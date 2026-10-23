@@ -410,7 +410,10 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #:
 #: 本断言只**冻结上限**：不得比现状更差。
 #: 🔴 阈值是现算值而非拍脑袋 —— 降到更低后应同步下调（棘轮只许向下）。
-_IDENTITY_ONLY_BASELINE = 202  # 2026-10-22：Task 11.1 note_wp_mapping 5 端点补附注编辑门禁后现算
+#: 2026-10-23 现算 200：formula-governance-coverage-closure R1（74c7c0a8f）给公式域端点补项目级判定后
+#: 降 2，当时未同步下调，`test_note_edit_gate_endpoints` 的相等断言因此一直红（spec
+#: formula-fetch-and-wp-generation-defect-closure R7 收口时下调）。
+_IDENTITY_ONLY_BASELINE = 200
 
 
 def test_identity_only_endpoints_do_not_grow():

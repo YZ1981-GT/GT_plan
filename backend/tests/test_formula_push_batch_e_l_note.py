@@ -3,15 +3,16 @@
 spec: formula-push-note-rollout-batch-e / Task 10
 
 覆盖范围：
-- 8 个科目全部有 note.main 规则：L1/L2/L3/L4/L5/L6/L7/L8
-  - section_by_template 冻结（L3/L4/L5/L7/L8 非对称章节号）
+- 7 个科目有 note.main 规则：L1/L2/L3/L4/L5/L6/L8（L7 其他非流动负债没有标准科目，不推送，见下）
+  - section_by_template 冻结（L3/L4/L5/L8 非对称章节号）
   - fields = end_amount / prior_amount
   - policy = editable（需求 E8）
   - stage = note
   - rows 命名 = {code}_note_main（小写）
   - table name 与附注模板一致
 - L2 与 K3/M1 共享章节 五、42 / 八、42（靠 table 名隔离：应付利息 vs 其他应付款 vs 应付股利）
-- L3/L4/L5/L7/L8 非对称章节号验证（上市 五、N ≠ 国企 八、M，N≠M）
+- L3/L4/L5/L8 非对称章节号验证（上市 五、N ≠ 国企 八、M，N≠M）
+- L7 没有标准科目：binding 不取科目、规则清单无它的规则（原规则取 2801 = K5 预计负债）
 - L8 损益类（account_code='6603'）ending 取「本期发生额」
 - L1~L7 资产负债类 ending 取「期末余额」
 - L6 不在科目清单中（已有 note.main 规则）
@@ -78,7 +79,14 @@ L_NOTE_SECTIONS = [
     ("L8", "五、67", "八、68"),
 ]
 
-ALL_L_NOTE_CODES = [t[0] for t in L_NOTE_SECTIONS]
+#: L7 其他非流动负债是报表行、由多个明细科目归集，没有标准科目（l_cycle_specs 不给兜底码）⇒ 不取试算表、没有推送规则。
+#: 原规则取 2801（K5 预计负债的科目，抄自 wp_account_mapping.json），把预计负债的数推进其他非流动负债附注
+#: （spec formula-fetch-and-wp-generation-defect-closure R1.4 删）。前端同步登记表仍有它（附注同步与推送无关）。
+L_NO_ACCOUNT_CODES = ["L7"]
+
+#: 有推送规则的 L 科目（规则类用例的参数；同步登记表用例仍用全量 L_NOTE_SECTIONS）
+L_PUSH_NOTE_SECTIONS = [t for t in L_NOTE_SECTIONS if t[0] not in L_NO_ACCOUNT_CODES]
+ALL_L_NOTE_CODES = [t[0] for t in L_PUSH_NOTE_SECTIONS]
 
 L_TABLE_EXPECTED = {
     "L1": "短期借款",
@@ -91,7 +99,7 @@ L_TABLE_EXPECTED = {
     "L8": "财务费用",
 }
 
-# L 科目的科目码（wp_account_mapping.json 实证）
+# L 科目的科目码（口径单一来源 four_table/l_cycle_specs；L7 没有标准科目）
 L_ACCOUNT_CODES = {
     "L1": "2001",
     "L2": "2231",
@@ -99,12 +107,11 @@ L_ACCOUNT_CODES = {
     "L4": "2502",
     "L5": "2701",
     "L6": "2711",
-    "L7": "2801",
     "L8": "6603",  # 损益类
 }
 
-# 非对称章节号科目（上市/国企数字部分不同）
-L_ASYMMETRIC_CODES = ["L3", "L4", "L5", "L7", "L8"]
+# 非对称章节号科目（上市/国企数字部分不同；L7 无推送规则）
+L_ASYMMETRIC_CODES = ["L3", "L4", "L5", "L8"]
 
 
 # ========================================================================
@@ -113,7 +120,7 @@ L_ASYMMETRIC_CODES = ["L3", "L4", "L5", "L7", "L8"]
 
 
 @pytest.mark.parametrize(
-    "code,listed,soe", L_NOTE_SECTIONS, ids=[t[0] for t in L_NOTE_SECTIONS],
+    "code,listed,soe", L_PUSH_NOTE_SECTIONS, ids=[t[0] for t in L_PUSH_NOTE_SECTIONS],
 )
 def test_l_note_rule_section_by_template(code: str, listed: str, soe: str):
     """每个 L 科目章节号与前端 l*NoteSectionMap.ts 一致。"""
@@ -208,13 +215,13 @@ def test_l2_k3_m1_share_same_section():
 
 
 # ========================================================================
-# L3/L4/L5/L7/L8 非对称章节号验证
+# L3/L4/L5/L8 非对称章节号验证
 # ========================================================================
 
 
 @pytest.mark.parametrize("code", L_ASYMMETRIC_CODES, ids=L_ASYMMETRIC_CODES)
 def test_l_asymmetric_sections(code: str):
-    """L3/L4/L5/L7/L8 上市/国企章节号数字部分不同（非对称）。"""
+    """L3/L4/L5/L8 上市/国企章节号数字部分不同（非对称）。"""
     rule = _l_note_rule(code)
     sections = rule.target.sections
     listed_num = sections["listed"].split("、")[1]
@@ -300,7 +307,7 @@ def test_l_sync_registry_matches_rule(code: str, listed: str, soe: str):
 
 
 # ========================================================================
-# note_direct binding note_rows — 资产负债类（L1~L7 除 L8）
+# note_direct binding note_rows — 资产负债类（L1~L6；L7 没有标准科目、L8 损益类）
 # ========================================================================
 
 
@@ -312,8 +319,19 @@ L_BALANCE_CODES = [
     ("L4", "2502", "应付债券"),
     ("L5", "2701", "长期应付款"),
     ("L6", "2711", "专项应付款"),
-    ("L7", "2801", "其他非流动负债"),
 ]
+
+
+@pytest.mark.parametrize("code", L_NO_ACCOUNT_CODES, ids=L_NO_ACCOUNT_CODES)
+def test_l_no_account_code_has_no_push_rule(code: str):
+    """没有标准科目的 L 底稿：binding 不取科目且写明原因，规则清单里没有它的任何规则（取数 / 附注主表）。"""
+    from app.services.formula_push.rules import load_rules
+
+    binding = note_direct_for(code)
+    assert binding.account_prefixes == ()
+    assert binding.no_account_reason
+    assert binding.derivations == frozenset()
+    assert [r.rule_id for r in load_rules() if r.wp_code == code] == []
 
 
 @pytest.mark.parametrize(
@@ -324,7 +342,7 @@ L_BALANCE_CODES = [
 def test_l_note_direct_note_rows_uses_ending_balance(
     code: str, account_code: str, account_name: str,
 ):
-    """L1~L7 资产负债类 note_rows: ending 取「期末余额」，opening 取「年初余额」。"""
+    """L1~L6 资产负债类 note_rows: ending 取「期末余额」，opening 取「年初余额」。"""
     binding = note_direct_for(code)
     binding._last_tb_data = _make_tb(account_code, "500000", "350000", "150000")
 

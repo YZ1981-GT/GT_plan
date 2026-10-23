@@ -323,6 +323,9 @@ OUT_OF_SCOPE_CHANGES: dict[str, str] = {
         "PREV() 跨年度定位需数据模型变更：working_paper 与 wp_index 实测**都没有 year 列**，"
         "底稿年度维度只在 project 层 ⇒ 需加 year 列或改走「同 company_code 的上年 project」"
         "反查。本 spec 只做 fail-closed（恒返 None），跨年度取数另立 spec。"
+        "【2026-10-23 更新】spec formula-fetch-and-wp-generation-defect-closure R2 已按「上年数据 + 本底稿"
+        "该字段的现行取数定义重算」落实三参 PREV（prior_year_context 找上年来源、prev_wp_field 求值），"
+        "不读上年底稿单元格；要取上年底稿里人工录入的值仍需本条的数据模型变更。"
     ),
     "frontend_persist_derived_columns": (
         "让后端可取用派生值的正解 = 前端把派生列/小计另存为独立标量 item_id"

@@ -23,6 +23,7 @@ from uuid import uuid4
 
 from app.core.config import settings
 from app.routers import wp_formula as router_mod
+from tests.d_cycle_extraction._endpoint_doubles import AuthGateSessionMixin, admin_user, formula_row
 
 
 def _run(coro):
@@ -46,7 +47,7 @@ class _FakeResult:
         return SimpleNamespace(all=lambda: list(self._rows))
 
 
-class _FakeSession:
+class _FakeSession(AuthGateSessionMixin):
     """记录所有 execute 的 SQL，用于断言无 checklist_responses/DB 写回（Property 13）。"""
 
     def __init__(self, *, wp, wp_code, user_formulas=None):
@@ -89,7 +90,7 @@ def _wp():
 
 def _saved_formula(target_cell, *, sheet_name="D6-1", wp=None,
                    formula_type="auto_calc", expression="TB('1141','期末余额')"):
-    return SimpleNamespace(
+    return formula_row(
         id=uuid4(),
         project_id=(wp.project_id if wp else uuid4()),
         wp_id=(wp.id if wp else uuid4()),
@@ -115,7 +116,8 @@ def _saved_formula(target_cell, *, sheet_name="D6-1", wp=None,
 
 
 def _user():
-    return SimpleNamespace(id=uuid4(), username="tester")
+    """管理员身份：端点内项目鉴权门照常执行（管理员分支），见 _auth_gate_double。"""
+    return admin_user()
 
 
 def _enable(monkeypatch):

@@ -9,7 +9,7 @@
 - **利润表 / 现金流量表 / 权益变动表 / 补充资料**（期间报表）：
   ① 同项目存在 ``year-1`` 试算表 → 沿用同项目上年重算（多年度项目的既有行为）；
   ② 上年项目（``prior_year_project_id``，否则同 ``company_code`` + ``audit_year=year-1`` +
-     同口径唯一项目）的报表行：编码相同且行名一致优先，否则行名唯一匹配；
+     同口径唯一项目；查找口径与 PREV 共用 ``prior_year_context``）的报表行：编码相同且行名一致优先，否则行名唯一匹配；
   ③ 上年项目只有试算表 → 用本年配置公式在上年项目试算表上求值；
   ④ 都没有 → ``None``。
 """
@@ -135,59 +135,18 @@ class PriorPeriodResolver:
         return self._prior_has_tb
 
     async def _has_tb(self, project_id: UUID, year: int) -> bool:
-        from app.models.audit_platform_models import TrialBalance
+        from app.services.prior_year_context import has_trial_balance
 
-        hit = (
-            await self.db.execute(
-                sa.select(TrialBalance.id).where(
-                    TrialBalance.project_id == project_id,
-                    TrialBalance.year == year,
-                    TrialBalance.is_deleted == sa.false(),
-                ).limit(1)
-            )
-        ).first()
-        return hit is not None
+        return await has_trial_balance(self.db, project_id, year)
 
     async def _find_prior_project(self) -> UUID | None:
+        """上年项目（与 PREV 同一查找口径，``prior_year_context.find_prior_project``）。"""
         if self._prior_project_resolved:
             return self._prior_project_id
         self._prior_project_resolved = True
-        from app.models.core import Project
+        from app.services.prior_year_context import find_prior_project
 
-        proj = (
-            await self.db.execute(sa.select(Project).where(Project.id == self.project_id))
-        ).scalar_one_or_none()
-        if proj is None:
-            return None
-        explicit = getattr(proj, "prior_year_project_id", None)
-        if explicit:
-            ok = (
-                await self.db.execute(
-                    sa.select(Project.id).where(
-                        Project.id == explicit, Project.is_deleted == sa.false()
-                    )
-                )
-            ).first()
-            if ok is not None:
-                self._prior_project_id = explicit
-                return explicit
-        code = getattr(proj, "company_code", None)
-        if not code:
-            return None
-        conds = [
-            Project.company_code == code,
-            Project.audit_year == self.year - 1,
-            Project.is_deleted == sa.false(),
-            Project.id != self.project_id,
-        ]
-        scope = getattr(proj, "report_scope", None)
-        if scope:
-            conds.append(Project.report_scope == scope)
-        ids = (await self.db.execute(sa.select(Project.id).where(*conds))).scalars().all()
-        if len(ids) == 1:
-            self._prior_project_id = ids[0]
-        elif len(ids) > 1:
-            logger.info("上年项目不唯一（%d 个），上期金额留空 project=%s", len(ids), self.project_id)
+        self._prior_project_id = (await find_prior_project(self.db, self.project_id, self.year)).project_id
         return self._prior_project_id
 
     async def _prior_report_value(self, prior_pid: UUID, report_type, config):

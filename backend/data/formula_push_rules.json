@@ -1570,13 +1570,13 @@
         "context": {
           "tb": "trial_balance_audited"
         },
-        "expression": "TB('1901','期末余额')"
+        "expression": "TB('1641','期末余额')+TB('1651','期末余额')"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "manual"
       ],
-      "description": "使用权资产审定表锚点「H8-1-tb-amount」= TB('1901','期末余额')；Tier A 单公式推送"
+      "description": "使用权资产审定表锚点「H8-1-tb-amount」= 使用权资产原值（双族 1641 / 1651 并取，逐项目只用一族；口径单一来源 four_table/dual_family_codes）；Tier A 单公式推送。原公式 TB('1901') 是待处理财产损溢"
     },
     {
       "rule_id": "H8.audited_total.receivable",
@@ -1646,13 +1646,13 @@
         "context": {
           "tb": "trial_balance_audited"
         },
-        "expression": "TB('2205','期末余额')"
+        "expression": "TB('2601','期末余额')+TB('2651','期末余额')"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "manual"
       ],
-      "description": "租赁负债审定表锚点「H9-1-tb-amount」= TB('2205','期末余额')；Tier A 单公式推送"
+      "description": "租赁负债审定表锚点「H9-1-tb-amount」= 租赁负债（双族 2601 / 2651 并取；未确认融资费用另列、不并取；口径单一来源 four_table/dual_family_codes）；Tier A 单公式推送。原公式 TB('2205') 是合同负债"
     },
     {
       "rule_id": "H9.audited_total.receivable",
@@ -1846,13 +1846,13 @@
         "context": {
           "tb": "trial_balance_audited"
         },
-        "expression": "TB('1717','期末余额')"
+        "expression": "TB('1704','期末余额')"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "manual"
       ],
-      "description": "开发支出审定表锚点「I2-1-tb-amount」= TB('1717','期末余额')；Tier A 单公式推送"
+      "description": "开发支出审定表锚点「I2-1-tb-amount」= TB('1704','期末余额')（口径单一来源 four_table/i_cycle_accounts，报表行 BS-033 同码）；Tier A 单公式推送。原公式 TB('1717') 在标准科目表与试算表里都不存在"
     },
     {
       "rule_id": "I2.audited_total.receivable",
@@ -2007,30 +2007,6 @@
       "description": "长期待摊费用审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
     },
     {
-      "rule_id": "I5.1_tb_amount",
-      "page_key": "workpaper:I5",
-      "stage": "source",
-      "policy": "system",
-      "target": {
-        "domain": "workpaper",
-        "wp_code": "I5",
-        "sheet_code": "I5-1",
-        "item_id": "I5-1-tb-amount"
-      },
-      "source": {
-        "kind": "formula",
-        "context": {
-          "tb": "trial_balance_audited"
-        },
-        "expression": "TB('1911','期末余额')"
-      },
-      "triggers": [
-        "TRIAL_BALANCE_UPDATED",
-        "manual"
-      ],
-      "description": "其他非流动资产审定表锚点「I5-1-tb-amount」= TB('1911','期末余额')；Tier A 单公式推送"
-    },
-    {
       "rule_id": "I5.audited_total.receivable",
       "page_key": "workpaper:I5",
       "stage": "derived",
@@ -2098,13 +2074,13 @@
         "context": {
           "tb": "trial_balance_audited_occurrence"
         },
-        "expression": "TB('6602','本期发生额')"
+        "expression": "TB('6604','本期发生额')"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "manual"
       ],
-      "description": "研发费用审定表锚点「I6-1-tb-amount」= TB('6602','本期发生额')；Tier A 单公式推送。损益类科目 6602 研发费用，本期发生额 = audited_amount − opening_balance（批 D 改写：列名从 '期末余额' 改为 '本期发生额'，上下文从 trial_balance_audited 改为 trial_balance_audited_occurrence，语义精确化）"
+      "description": "研发费用审定表锚点「I6-1-tb-amount」= TB('6604','本期发生额')（损益类，本期发生额 = audited_amount − opening_balance；口径单一来源 four_table/i_cycle_accounts，报表行 IS-006 同码）；Tier A 单公式推送。原公式 TB('6602') 是管理费用"
     },
     {
       "rule_id": "K1.note.main",
@@ -3758,13 +3734,13 @@
         "context": {
           "tb": "trial_balance_audited"
         },
-        "expression": "TB('1503','期末余额')"
+        "expression": "TB('1506','期末余额')"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "manual"
       ],
-      "description": "其他债权投资审定表锚点「G6-1-tb-amount」= TB('1503','期末余额')；批 D 附注直推族 binding"
+      "description": "其他债权投资审定表锚点「G6-1-tb-amount」= TB('1506','期末余额')（口径单一来源 four_table/g_cycle_specs）。原公式 TB('1503') 是旧准则「可供出售金融资产」，新准则下须人工拆分、不能自动归入本科目，且与 G8 同推一个数"
     },
     {
       "rule_id": "G6.audited_total.receivable",
@@ -3920,13 +3896,13 @@
         "context": {
           "tb": "trial_balance_audited"
         },
-        "expression": "TB('1503','期末余额')"
+        "expression": "TB('1507','期末余额')"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "manual"
       ],
-      "description": "其他权益工具投资审定表锚点「G8-1-tb-amount」= TB('1503','期末余额')；批 D 附注直推族 binding"
+      "description": "其他权益工具投资审定表锚点「G8-1-tb-amount」= TB('1507','期末余额')（口径单一来源 four_table/g_cycle_specs）。原公式 TB('1503') 是旧准则「可供出售金融资产」，新准则下须人工拆分、不能自动归入本科目，且与 G6 同推一个数"
     },
     {
       "rule_id": "G8.audited_total.receivable",
@@ -4687,37 +4663,6 @@
       "description": "长期待摊费用附注主表推送（listed 五、29 / soe 八、30）期末 / 期初数"
     },
     {
-      "rule_id": "I5.note.main",
-      "page_key": "workpaper:I5",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、31",
-          "soe": "八、32"
-        },
-        "table": "其他非流动资产",
-        "rows": "i5_note_main",
-        "fields": [
-          "end_amount",
-          "prior_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "i5_note_main",
-        "params": {},
-        "formula_text": "其他非流动资产附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
-      },
-      "triggers": [
-        "TRIAL_BALANCE_UPDATED",
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "其他非流动资产附注主表推送（listed 五、31 / soe 八、32）期末 / 期初数"
-    },
-    {
       "rule_id": "I6.note.main",
       "page_key": "workpaper:I6",
       "stage": "note",
@@ -4902,13 +4847,13 @@
         "context": {
           "tb": "trial_balance_audited"
         },
-        "expression": "TB('2611','期末余额')"
+        "expression": "TB('2705','期末余额')"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "manual"
       ],
-      "description": "长期应付职工薪酬审定表锚点「J2-1-tb-amount」= TB('2611','期末余额')；批 D 附注直推族 binding"
+      "description": "长期应付职工薪酬审定表锚点「J2-1-tb-amount」= TB('2705','期末余额')（口径单一来源 four_table/j_cycle_account_scope）；附注直推族单公式推送。原公式 TB('2611')（2611 在标准科目表与试算表里都不存在），取自 wp_account_mapping.json 的错码"
     },
     {
       "rule_id": "J2.note.main",
@@ -6225,61 +6170,6 @@
       "description": "长期应付款附注主表推送（listed 五、48 / soe 八、53）期末 / 期初数；批 D 附注直推族 binding"
     },
     {
-      "rule_id": "L7.tb_amount",
-      "page_key": "workpaper:L7",
-      "stage": "source",
-      "policy": "system",
-      "target": {
-        "domain": "workpaper",
-        "wp_code": "L7",
-        "sheet_code": "L7-1",
-        "item_id": "L7-1-tb-amount"
-      },
-      "source": {
-        "kind": "formula",
-        "context": {
-          "tb": "trial_balance_audited"
-        },
-        "expression": "TB('2801','期末余额')"
-      },
-      "triggers": [
-        "TRIAL_BALANCE_UPDATED",
-        "manual"
-      ],
-      "description": "其他非流动负债审定表锚点「L7-1-tb-amount」= TB('2801','期末余额')；批 D 附注直推族 binding"
-    },
-    {
-      "rule_id": "L7.note.main",
-      "page_key": "workpaper:L7",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、52",
-          "soe": "八、57"
-        },
-        "table": "其他非流动负债",
-        "rows": "l7_note_main",
-        "fields": [
-          "end_amount",
-          "prior_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "l7_note_main",
-        "params": {},
-        "formula_text": "其他非流动负债附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
-      },
-      "triggers": [
-        "TRIAL_BALANCE_UPDATED",
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "其他非流动负债附注主表推送（listed 五、52 / soe 八、57）期末 / 期初数；批 D 附注直推族 binding"
-    },
-    {
       "rule_id": "L8.tb_amount",
       "page_key": "workpaper:L8",
       "stage": "source",
@@ -6405,13 +6295,13 @@
         "context": {
           "tb": "trial_balance_audited"
         },
-        "expression": "TB('4501','期末余额')"
+        "expression": "TB('4401','期末余额')"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "manual"
       ],
-      "description": "其他权益工具审定表锚点「M10-1-tb-amount」= TB('4501','期末余额')；批 D 附注直推族 binding"
+      "description": "其他权益工具审定表锚点「M10-1-tb-amount」= TB('4401','期末余额')（口径单一来源 four_table/m_cycle_specs）；附注直推族单公式推送。原公式 TB('4501')（4501 在标准科目表与试算表里都不存在），取自 wp_account_mapping.json 的错码"
     },
     {
       "rule_id": "M10.note.main",
@@ -6515,13 +6405,13 @@
         "context": {
           "tb": "trial_balance_audited"
         },
-        "expression": "TB('4002','期末余额')"
+        "expression": "TB('4201','期末余额')"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "manual"
       ],
-      "description": "库存股审定表锚点「M3-1-tb-amount」= TB('4002','期末余额')；批 D 附注直推族 binding"
+      "description": "库存股审定表锚点「M3-1-tb-amount」= TB('4201','期末余额')（口径单一来源 four_table/m_cycle_specs）；附注直推族单公式推送。原公式 TB('4002')（4002 是资本公积），取自 wp_account_mapping.json 的错码"
     },
     {
       "rule_id": "M3.note.main",
@@ -6569,13 +6459,13 @@
         "context": {
           "tb": "trial_balance_audited"
         },
-        "expression": "TB('4101','期末余额')"
+        "expression": "TB('4002','期末余额')"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "manual"
       ],
-      "description": "资本公积审定表锚点「M4-1-tb-amount」= TB('4101','期末余额')；批 D 附注直推族 binding"
+      "description": "资本公积审定表锚点「M4-1-tb-amount」= TB('4002','期末余额')（口径单一来源 four_table/m_cycle_specs）；附注直推族单公式推送。原公式 TB('4101')（4101 是盈余公积），取自 wp_account_mapping.json 的错码"
     },
     {
       "rule_id": "M4.note.main",
@@ -6624,13 +6514,13 @@
         "context": {
           "tb": "trial_balance_audited"
         },
-        "expression": "TB('4103','期末余额')"
+        "expression": "TB('4101','期末余额')"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "manual"
       ],
-      "description": "盈余公积审定表锚点「M5-1-tb-amount」= TB('4103','期末余额')；批 D 附注直推族 binding"
+      "description": "盈余公积审定表锚点「M5-1-tb-amount」= TB('4101','期末余额')（口径单一来源 four_table/m_cycle_specs）；附注直推族单公式推送。原公式 TB('4103')（4103 是本年利润），取自 wp_account_mapping.json 的错码"
     },
     {
       "rule_id": "M5.note.main",
@@ -6734,13 +6624,13 @@
         "context": {
           "tb": "trial_balance_audited"
         },
-        "expression": "TB('4201','期末余额')"
+        "expression": "TB('4301','期末余额')"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "manual"
       ],
-      "description": "专项储备审定表锚点「M7-1-tb-amount」= TB('4201','期末余额')；批 D 附注直推族 binding"
+      "description": "专项储备审定表锚点「M7-1-tb-amount」= TB('4301','期末余额')（口径单一来源 four_table/m_cycle_specs）；附注直推族单公式推送。原公式 TB('4201')（4201 是库存股），取自 wp_account_mapping.json 的错码"
     },
     {
       "rule_id": "M7.note.main",
@@ -6774,61 +6664,6 @@
       "description": "专项储备附注主表推送（listed 五、58 / soe 八、61）期末 / 期初数；批 D 附注直推族 binding"
     },
     {
-      "rule_id": "M8.tb_amount",
-      "page_key": "workpaper:M8",
-      "stage": "source",
-      "policy": "system",
-      "target": {
-        "domain": "workpaper",
-        "wp_code": "M8",
-        "sheet_code": "M8-1",
-        "item_id": "M8-1-tb-amount"
-      },
-      "source": {
-        "kind": "formula",
-        "context": {
-          "tb": "trial_balance_audited"
-        },
-        "expression": "TB('4301','期末余额')"
-      },
-      "triggers": [
-        "TRIAL_BALANCE_UPDATED",
-        "manual"
-      ],
-      "description": "一般风险准备审定表锚点「M8-1-tb-amount」= TB('4301','期末余额')；批 D 附注直推族 binding"
-    },
-    {
-      "rule_id": "M8.note.main",
-      "page_key": "workpaper:M8",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、60",
-          "soe": "八、94"
-        },
-        "table": "一般风险准备",
-        "rows": "m8_note_main",
-        "fields": [
-          "end_amount",
-          "prior_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "m8_note_main",
-        "params": {},
-        "formula_text": "一般风险准备附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
-      },
-      "triggers": [
-        "TRIAL_BALANCE_UPDATED",
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "一般风险准备附注主表推送（listed 五、60 / soe 八、94）期末 / 期初数；批 D 附注直推族 binding"
-    },
-    {
       "rule_id": "M9.tb_amount",
       "page_key": "workpaper:M9",
       "stage": "source",
@@ -6844,13 +6679,13 @@
         "context": {
           "tb": "trial_balance_audited"
         },
-        "expression": "TB('4401','期末余额')"
+        "expression": "TB('4003','期末余额')"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "manual"
       ],
-      "description": "其他综合收益审定表锚点「M9-1-tb-amount」= TB('4401','期末余额')；批 D 附注直推族 binding"
+      "description": "其他综合收益审定表锚点「M9-1-tb-amount」= TB('4003','期末余额')（口径单一来源 four_table/m_cycle_specs）；附注直推族单公式推送。原公式 TB('4401')（4401 是其他权益工具），取自 wp_account_mapping.json 的错码"
     },
     {
       "rule_id": "M9.note.main",

@@ -89,7 +89,7 @@ def build_d6_detail_rows_from_aux(
 async def aggregate_d6_detail_rows(
     db: AsyncSession,
     project_id: str,
-    year: int | None = None,
+    year: int,
     *,
     row_limit: int = DEFAULT_ROW_LIMIT,
     row_id_factory: Callable[[], str] | None = None,
@@ -103,14 +103,16 @@ async def aggregate_d6_detail_rows(
     Args:
         db: 传入的异步会话（不自建 engine/sessionmaker）。
         project_id: 项目 ID（str）。
-        year: 审计年度（active dataset 过滤的必要维度）；None 时用 0（无 active dataset
-            则降级 is_deleted 过滤，仍不裸 GROUP BY）。
+        year: 审计年度（**必传**）。共享件的过滤条件恒含 ``year = :year``（有无 active dataset
+            都含），不传年度就只能查 ``year = 0`` ⇒ 恒空。此前本参数默认 ``None``→0，render
+            自动 seed 漏传年度，D6-2 明细 seed 在真实数据上从未产出过行（spec
+            formula-fetch-and-wp-generation-defect-closure R7.2）。
         row_limit: 行数上限。
         row_id_factory: rowId 工厂（默认 uuid4）。
     """
     from app.services.d_cycle_extraction.d_aux_import import aggregate_d_cycle_aux
 
-    agg = await aggregate_d_cycle_aux(db, str(project_id), int(year or 0), "D6")
+    agg = await aggregate_d_cycle_aux(db, str(project_id), int(year), "D6")
     if not agg.entries:
         return []
     # AuxEntry(aux_name, opening, debit, credit, closing) —— 纯函数按位置取 name + opening

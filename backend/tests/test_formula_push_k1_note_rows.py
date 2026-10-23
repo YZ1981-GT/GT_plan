@@ -5,7 +5,7 @@ spec: formula-push-note-rollout-batch-c · Task 3
 验证：
 - K1Binding.note_rows() 输出单行 label="其他应收款"
 - ending = audited_net = audited_receivable − audited_baddebt（从 entries 计算）
-- opening = TB 年初余额合计（codes 1221+1231）
+- opening = TB 年初余额净值：原值 1221 − 坏账准备 1231-03（试算表正数口径；只取其他应收款的坏账准备）
 - TB 不可用时 opening_resolved=False
 - 空 entries 时 ending=0（k1_calc 缺项=0 口径）
 """
@@ -67,10 +67,14 @@ def _make_k1_entries(
 def _make_tb_snapshot(
     code_1221_end: str = "500000",
     code_1221_opening: str = "300000",
-    code_1231_end: str = "-50000",
-    code_1231_opening: str = "-30000",
+    code_1231_end: str = "50000",
+    code_1231_opening: str = "30000",
 ) -> TbAuditedSnapshot:
-    """创建 K1 的 TB 快照。"""
+    """创建 K1 的 TB 快照（试算表正数口径：坏账准备存正数，与真库一致）。
+
+    原替身把坏账准备写成负数、键用前缀 ``1231`` —— 真库 1231-0x 都是正数，按原口径相加推出的是
+    「原值 + 全部坏账准备」（R1.4）。
+    """
     return TbAuditedSnapshot(
         tb_data={
             "1221": {
@@ -78,7 +82,7 @@ def _make_tb_snapshot(
                 "年初余额": Decimal(code_1221_opening),
                 "本期发生额": Decimal(code_1221_end) - Decimal(code_1221_opening),
             },
-            "1231": {
+            "1231-03": {
                 "期末余额": Decimal(code_1231_end),
                 "年初余额": Decimal(code_1231_opening),
                 "本期发生额": Decimal(code_1231_end) - Decimal(code_1231_opening),
@@ -126,16 +130,30 @@ class TestK1NoteRows:
         assert rows[0]["ending_resolved"] is True
 
     def test_opening_from_tb_annual_balance(self):
-        """opening = TB 年初余额合计（1221 + 1231）。"""
+        """opening = TB 年初余额净值（1221 − 1231-03）。"""
         binding = K1Binding()
         binding._last_tb_data = _make_tb_snapshot(
-            code_1221_opening="300000", code_1231_opening="-30000",
+            code_1221_opening="300000", code_1231_opening="30000",
         ).tb_data
         entries = _make_k1_entries(recv_r0_unadj="100")
         rows = binding.note_rows(entries, "listed", _make_rule())
-        # opening = 300000 + (-30000) = 270000
+        # opening = 300000 - 30000 = 270000
         assert rows[0]["opening"] == 270000.0
         assert rows[0]["opening_resolved"] is True
+
+    def test_opening_ignores_other_bad_debt_subaccounts(self):
+        """只扣其他应收款的坏账准备（1231-03）；应收票据 / 应收账款的坏账准备（1231-01 / -02）不进 K1。
+
+        真库重药控股安徽_2025：1231-01 / -02 年初 3,037,132.25 / 12,052,106.46，原实现按前缀 1231 全部加进期初。
+        """
+        assert K1_ACCOUNT_CODES == ("1221", "1231-03")
+        binding = K1Binding()
+        tb = dict(_make_tb_snapshot(code_1221_opening="150302795.09", code_1231_opening="639230.01").tb_data)
+        tb["1231-01"] = {"期末余额": Decimal("1162288.03"), "年初余额": Decimal("3037132.25")}
+        tb["1231-02"] = {"期末余额": Decimal("26901719.77"), "年初余额": Decimal("12052106.46")}
+        binding._last_tb_data = tb
+        rows = binding.note_rows(_make_k1_entries(recv_r0_unadj="100"), "listed", _make_rule())
+        assert rows[0]["opening"] == pytest.approx(149663565.08)
 
     def test_tb_unavailable_opening_unresolved(self):
         """TB 不可用（未导入四表）时 opening=0 且 opening_resolved=False。"""

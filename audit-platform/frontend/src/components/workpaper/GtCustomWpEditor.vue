@@ -417,7 +417,7 @@ async function onFormulaSave(payload: {
       target_cell: targetCell,
       expression: payload.formula,
       year: props.year ?? new Date().getFullYear(),
-      template_type: 'soe',
+      // 不传 template_type：后端按底稿所属项目的口径校验引用（R6；原先写死 soe ⇒ 上市项目按国企附注校验）
       category: payload.category,
       description: payload.description,
       expected_version: existing?.definition_version ?? undefined,

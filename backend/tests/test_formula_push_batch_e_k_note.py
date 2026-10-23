@@ -213,7 +213,10 @@ def test_k1_binding_note_rows_from_entries():
     binding = K1Binding()
     binding._last_tb_data = {
         "1221": {"年初余额": Decimal("500000")},
-        "1231": {"年初余额": Decimal("-50000")},
+        # 其他应收款坏账准备（试算表正数口径；原替身写负数、键用前缀 1231，R1.4）
+        "1231-03": {"年初余额": Decimal("50000")},
+        # 别的应收款项的坏账准备不进 K1
+        "1231-02": {"年初余额": Decimal("70000")},
     }
 
     entries = {
@@ -231,7 +234,7 @@ def test_k1_binding_note_rows_from_entries():
     row = rows[0]
     # ending = audited_net = (100+20+0) − (30+0+0) = 90
     assert row["ending"] == 90
-    # opening = TB('1221','年初余额') + TB('1231','年初余额') = 500000 + (-50000) = 450000
+    # opening = TB('1221','年初余额') − TB('1231-03','年初余额') = 500000 − 50000 = 450000
     assert row["opening"] == 450000.0
     assert row["note_label"] == "其他应收款"
 

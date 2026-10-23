@@ -56,7 +56,14 @@ def test_coverage_rule_counts_and_note_flags_match_registry_rules():
 
     assert set(by_code) == set(supported_wp_codes())
     assert set(entries) == set(supported_wp_codes())
-    assert all(by_code[code] for code in supported_wp_codes())
+    # 没有标准科目的 binding（写明 no_account_reason）可以没有规则：不取试算表、不推附注主表
+    # （I5 只剩由底稿行算出的审定合计，L7 / M8 一条都没有）。名单显式钉住，新增要在这里写明。
+    from app.services.formula_push.bindings import get_binding
+
+    no_account = {code for code in supported_wp_codes() if getattr(get_binding(code), "no_account_reason", "")}
+    assert no_account == {"I5", "L7", "M8"}
+    assert all(by_code[code] for code in supported_wp_codes() if code not in no_account)
+    assert by_code["L7"] == [] and by_code["M8"] == []
     for code in supported_wp_codes():
         entry = entries[code]
         code_rules = by_code[code]

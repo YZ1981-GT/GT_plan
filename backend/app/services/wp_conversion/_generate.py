@@ -2,7 +2,9 @@
 
 承载"目标准则独有底稿创建"链路：``_create_target_only_workpapers`` 编排，逐个
 委托 ``_generate_one_workpaper``（建 WpIndex + WorkingPaper + 模板文件 + parsed_data），
-配套模板库加载 / 模板文件复制 / parsed_data 填充 / 年度派生 helper。
+配套模板库加载（名称候选）/ parsed_data 填充 / 年度派生 helper。模板文件经
+``wp_generate_file.materialize_workpaper_file`` 与链路编排 / 按编码生成同一解析（spec
+formula-fetch-and-wp-generation-defect-closure R5.3；此前按模板库精确匹配，多页底稿落成空白册）。
 
 设计（pass4 大文件拆分）：这些方法均含 ``self`` 且通过 ``self.db`` 访问会话，
 以 mixin 形式被 ``WpStandardConversionService`` 多继承组合，保持方法仍挂在实例上、
@@ -12,8 +14,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
@@ -30,18 +30,13 @@ from app.services.wp_parsed_data_service import ensure_parsed_data_placeholder
 
 logger = logging.getLogger(__name__)
 
-# 致同标准底稿模板库目录（与 wp_template.generate_from_codes 同源）
+# 致同标准底稿模板库目录（与 wp_template.generate_from_codes 同源；只作名称 / 循环候选）
 # 注意：本模块比主文件深一层（services/wp_conversion/），故较主文件多一个 .parent
 # 以保持解析后的绝对路径与原 wp_standard_conversion_service 完全一致。
 _TEMPLATE_LIBRARY_PATH = (
     Path(__file__).resolve().parent.parent.parent.parent
     / "data"
     / "gt_template_library.json"
-)
-
-# 知识库底稿模板目录（与 generate_from_codes 一致）
-_KB_TEMPLATE_BASE = Path(
-    os.path.expanduser("~/.gt_audit_helper/knowledge/workpaper_templates")
 )
 
 
@@ -91,17 +86,24 @@ class WpConversionGenerateMixin:
 
         # 模板库目录加载一次（降级为空 dict，不阻塞创建——仍会兜底建空模板）
         template_lib = self._load_template_library()
+        from app.services.wp_generate_file import load_generation_scenario
+
+        scenario = await load_generation_scenario(self.db, project_id)
 
         created = 0
         for wp_code in target_only_codes:
             try:
-                if await self._generate_one_workpaper(
-                    project_id,
-                    wp_code,
-                    template_lib.get(wp_code, {}),
-                    new_standard,
-                    changed_by,
-                ):
+                # 单条 savepoint：失败时该底稿的 WpIndex / WorkingPaper 一并回滚，不留无文件的底稿行
+                async with self.db.begin_nested():
+                    made = await self._generate_one_workpaper(
+                        project_id,
+                        wp_code,
+                        template_lib.get(wp_code, {}),
+                        new_standard,
+                        changed_by,
+                        scenario=scenario,
+                    )
+                if made:
                     created += 1
             except Exception as exc:  # 单条失败隔离，不破坏整批切换
                 logger.warning(
@@ -162,6 +164,8 @@ class WpConversionGenerateMixin:
         lib_entry: dict,
         new_standard: dict,
         changed_by: UUID | None,
+        *,
+        scenario: tuple[str, bool] = ("normal", False),
     ) -> bool:
         """为单个 wp_code 创建底稿（建 WpIndex + WorkingPaper + 模板文件 + parsed_data）。
 
@@ -174,9 +178,9 @@ class WpConversionGenerateMixin:
            约束冲突。故此处**复活**（``is_deleted=False`` + 重置状态）该软删除行
            而非新建，避免约束违反。
         3. 否则新建 ``WpIndex``（``status=not_started``）并 ``flush`` 取主键。
-        4. 计算文件路径 ``storage/projects/{pid}/workpapers/{cycle}/{code}.xlsx``
-           并复制模板（知识库 → 原始 file_path → openpyxl 最小工作簿 → 空字节）。
-        5. 创建 ``WorkingPaper``（``source_type=template`` / ``file_version=1``）。
+        4. 创建 ``WorkingPaper``（``source_type=template`` / ``file_version=1``）并 ``flush`` 取 id。
+        5. 模板文件经 ``materialize_workpaper_file``（模板目录索引 + 多文件合并 + 按 ``scenario``
+           裁剪，落 ``wp_storage/{pid}/{wp_id}.*``；找不到模板建空白册）。
         6. 尽力（try/except 非致命）绑定 active dataset + 填充表头。
         7. **填充 ``parsed_data``** 使其非空（见 wp-generation-pipeline 发现）。
 
@@ -222,29 +226,27 @@ class WpConversionGenerateMixin:
             self.db.add(wp_index)
         await self.db.flush()  # 取 wp_index.id
 
-        # 4. 计算文件目录并复制模板
-        dest_file = (
-            Path("storage")
-            / "projects"
-            / str(project_id)
-            / "workpapers"
-            / cycle
-            / f"{wp_code}.xlsx"
-        )
-        dest_file.parent.mkdir(parents=True, exist_ok=True)
-        self._copy_template_file(dest_file, lib_entry, wp_code, wp_name, cycle)
-
-        # 5. 创建 WorkingPaper
+        # 4. 创建 WorkingPaper（先落行取 id：文件按 wp_storage/{项目}/{底稿 id} 存放）
         wp = WorkingPaper(
             project_id=project_id,
             wp_index_id=wp_index.id,
-            file_path=str(dest_file),
+            file_path="",
             source_type=WpSourceType.template,
             file_version=1,
             created_by=changed_by,
         )
         self.db.add(wp)
-        await self.db.flush()  # 取 wp.id，供表头/绑定/parsed_data 使用
+        await self.db.flush()  # 取 wp.id，供文件/表头/绑定/parsed_data 使用
+
+        # 5. 模板文件（与链路编排 / 按编码生成同一解析）
+        from app.services.wp_generate_file import materialize_workpaper_file
+
+        generated = materialize_workpaper_file(
+            project_id, wp.id, wp_code, wp_name,
+            scenario=scenario[0], has_foreign_currency=scenario[1],
+        )
+        wp.file_path = str(generated.path)
+        dest_file = generated.path
 
         # 6a. 尽力绑定 active dataset（非致命）
         bind_year = self._derive_year(new_standard)
@@ -257,23 +259,24 @@ class WpConversionGenerateMixin:
                 "_generate_one_workpaper: dataset 绑定失败 wp=%s: %s", wp_code, exc
             )
 
-        # 6b. 尽力填充底稿表头（非致命）
-        try:
-            from app.services.wp_header_service import fill_workpaper_header
+        # 6b. 尽力填充底稿表头（非致命；只动 xlsx：openpyxl 存 xlsm 会丢宏，docx 不是工作簿）
+        if dest_file.suffix.lower() == ".xlsx":
+            try:
+                from app.services.wp_header_service import fill_workpaper_header
 
-            await fill_workpaper_header(
-                db=self.db,
-                project_id=project_id,
-                wp_id=wp.id,
-                file_path=str(dest_file),
-                wp_code=wp_code,
-                wp_name=wp_name,
-                cycle=cycle,
-            )
-        except Exception as exc:
-            logger.warning(
-                "_generate_one_workpaper: 表头填充失败 wp=%s: %s", wp_code, exc
-            )
+                await fill_workpaper_header(
+                    db=self.db,
+                    project_id=project_id,
+                    wp_id=wp.id,
+                    file_path=str(dest_file),
+                    wp_code=wp_code,
+                    wp_name=wp_name,
+                    cycle=cycle,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "_generate_one_workpaper: 表头填充失败 wp=%s: %s", wp_code, exc
+                )
 
         # 7. 填充 parsed_data 使其非空
         #    （wp-generation-pipeline 发现：generate_from_codes 从不设
@@ -289,67 +292,6 @@ class WpConversionGenerateMixin:
         if isinstance(year, int) and year > 0:
             return year
         return datetime.now(timezone.utc).year - 1
-
-    def _copy_template_file(
-        self,
-        dest_file: Path,
-        lib_entry: dict,
-        wp_code: str,
-        wp_name: str,
-        cycle: str,
-    ) -> None:
-        """复制模板文件到目标路径（与 generate_from_codes 四级兜底一致）。
-
-        顺序：① 知识库 ``~/.gt_audit_helper/.../{cycle}/{name}.xlsx`` 或原始
-        文件名 → ② 原始 ``file_path``（含项目根回退）→ ③ openpyxl 最小工作簿
-        （写 code/name 占位）→ ④ 空字节兜底。
-        """
-        src_path = lib_entry.get("file_path", "")
-        template_name = lib_entry.get("name", "") or wp_name
-
-        # 1. 知识库底稿模板目录
-        candidates: list[Path] = []
-        if template_name:
-            candidates.append(_KB_TEMPLATE_BASE / cycle / f"{template_name}.xlsx")
-        if src_path:
-            candidates.append(_KB_TEMPLATE_BASE / cycle / Path(src_path).name)
-
-        for candidate in candidates:
-            if candidate and candidate.exists():
-                shutil.copy2(candidate, dest_file)
-                return
-
-        # 2. 回退：原始模板路径（含项目根回退）
-        if src_path:
-            src = Path(src_path)
-            if not src.exists():
-                # 本模块比主文件深一层（services/wp_conversion/），故较原实现多一个
-                # .parent 以保持解析后的项目根路径与原 wp_standard_conversion_service 一致。
-                root_src = (
-                    Path(__file__).resolve().parent.parent.parent.parent.parent
-                    / src_path
-                )
-                if root_src.exists():
-                    src = root_src
-            if src.exists():
-                shutil.copy2(src, dest_file)
-                return
-
-        # 3. openpyxl 最小工作簿兜底
-        try:
-            import openpyxl
-
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = wp_code[:31] if wp_code else "Sheet1"
-            ws["A1"] = f"底稿编号: {wp_code}"
-            ws["A2"] = f"底稿名称: {wp_name}"
-            ws["A3"] = f"审计阶段: {cycle}"
-            wb.save(str(dest_file))
-            wb.close()
-        except Exception:
-            # 4. 空字节兜底
-            dest_file.write_bytes(b"")
 
     async def _populate_parsed_data(
         self,

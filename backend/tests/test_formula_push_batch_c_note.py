@@ -15,11 +15,17 @@ import pytest
 import pytest_asyncio
 import sqlalchemy as sa
 
+from app.models.audit_platform_models import Adjustment, AdjustmentEntry
 from app.models.report_models import ContentType, DisclosureNote, NoteStatus
 from app.services.formula_push import engine as push
 from app.services.formula_push.bindings.k1 import K1Binding, K1Sources
 from app.services.formula_push.sources import FormulaSources, TbAuditedSnapshot
 from tests._formula_push_env import YEAR, Env, base_entries, make_env
+
+#: I3 是审定表族 binding（balance_adj），取数时还读调整大厅（``load_hall_adjustments``，真查询、不打桩）。
+#: 2026-10-06 I3 迁入该族后本文件的环境没建这两张表 ⇒ 底稿推送抛「no such table」被回滚、附注恒为 0，
+#: 这三个 I3 用例自那时起一直是红的（spec formula-fetch-and-wp-generation-defect-closure R1 修）。
+_HALL_TABLES = (Adjustment.__table__, AdjustmentEntry.__table__)
 
 # ── 附注 table_data 骨架 ──────────────────────────────────────────────────
 
@@ -73,10 +79,11 @@ K1_TB = TbAuditedSnapshot(
             "年初余额": Decimal("300000"),
             "本期发生额": Decimal("200000"),
         },
-        "1231": {
-            "期末余额": Decimal("-50000"),
-            "年初余额": Decimal("-30000"),
-            "本期发生额": Decimal("-20000"),
+        # 其他应收款坏账准备：试算表正数口径（真库 1231-0x 均为正数）；原替身写负数、键用前缀 1231（R1.4）
+        "1231-03": {
+            "期末余额": Decimal("50000"),
+            "年初余额": Decimal("30000"),
+            "本期发生额": Decimal("20000"),
         },
     },
     available=True,
@@ -101,7 +108,7 @@ I3_TB = TbAuditedSnapshot(
 @pytest_asyncio.fixture
 async def env(monkeypatch):
     """SQLite 真 ORM 环境：E1 + K1 + I3 三张底稿 + mock 取数。"""
-    async with make_env(monkeypatch) as e:
+    async with make_env(monkeypatch, extra_tables=_HALL_TABLES) as e:
         # ── 追加 K1 底稿 ──
         k1_idx, k1_wp = uuid.uuid4(), uuid.uuid4()
         async with e.factory() as db:
@@ -137,7 +144,7 @@ async def env(monkeypatch):
         # ── Mock load_tb_audited: 统一拦截所有 binding 的 TB 取数 ──
         _MOCK_TB = {
             "1221": K1_TB.tb_data["1221"],
-            "1231": K1_TB.tb_data["1231"],
+            "1231-03": K1_TB.tb_data["1231-03"],
             "1711": I3_TB.tb_data["1711"],
         }
 
@@ -206,7 +213,7 @@ async def test_k1_note_push_writes_end_and_prior_amount(env):
     """K1 推送后附注"其他应收款"行的 end_amount / prior_amount 等于 TB 取数。
 
     ending = audited_net(entries) = receivable − baddebt = (100+10) − 30 = 80
-    opening = TB 年初余额合计 = 300000 + (−30000) = 270000
+    opening = TB 年初余额净值 = 原值 300000 − 其他应收款坏账准备 30000 = 270000
     """
     # 种 K1 条目
     await _seed_k1_entries(env, {
@@ -232,7 +239,7 @@ async def test_k1_note_push_writes_end_and_prior_amount(env):
 
     # ending = audited_net = (100+10+0) − (30+0+0) = 80
     assert rows["其他应收款"]["end_amount"] == 80
-    # opening = TB 年初余额(1221) + TB 年初余额(1231) = 300000 + (-30000) = 270000
+    # opening = TB 年初余额(1221) − TB 年初余额(1231-03) = 300000 − 30000 = 270000
     assert rows["其他应收款"]["prior_amount"] == 270000
 
     # 合计行应该被引擎重算
@@ -352,7 +359,7 @@ def _i3_note_data_soe() -> dict:
 @pytest_asyncio.fixture
 async def env_soe(monkeypatch):
     """与 env 相同但 template_type=soe。"""
-    async with make_env(monkeypatch) as e:
+    async with make_env(monkeypatch, extra_tables=_HALL_TABLES) as e:
         # ── 追加 K1 底稿 ──
         k1_idx, k1_wp = uuid.uuid4(), uuid.uuid4()
         async with e.factory() as db:
@@ -387,7 +394,7 @@ async def env_soe(monkeypatch):
         # ── Mock load_tb_audited ──
         _MOCK_TB = {
             "1221": K1_TB.tb_data["1221"],
-            "1231": K1_TB.tb_data["1231"],
+            "1231-03": K1_TB.tb_data["1231-03"],
             "1711": I3_TB.tb_data["1711"],
         }
 

@@ -73,7 +73,7 @@ async def test_trial_balance_updated_fires_only_when_cash_accounts_touched(calls
 
 @pytest.mark.asyncio
 async def test_trial_balance_updated_passes_only_matching_binding_codes(monkeypatch, calls):
-    # K1 已永久注册（account_prefixes = ('1221', '1231')）；测试只验证科目前缀过滤逻辑。
+    # K1 已永久注册（account_prefixes = ('1221', '1231-03')）；测试只验证科目前缀过滤逻辑。
     await triggers.on_trial_balance_updated(tb(["1001", "1221.01"]))
     # E1 匹配 1001，K1 匹配 1221 → 两个 binding 都应跑
     assert len(calls) == 1
@@ -281,10 +281,28 @@ def test_startup_registers_formula_push_handlers():
     ("6051",  "D4"),   # D4 其他业务收入
     ("1121",  "D1"),   # D1 应收票据
     ("1122",  "D2"),   # D2 应收账款
-    ("6602",  "I6"),   # I6 研发费用
+    ("6604",  "I6"),   # I6 研发费用（原写 6602，那是管理费用、属 K9）
     ("1701",  "I1"),   # I1 无形资产原值
+    ("1703",  "I1"),   # I1 无形资产减值准备（原 binding 写映射码 1703B，试算表标准码改了也不触发）
     ("6115",  "H10"),  # H10 资产处置损益
     ("1631",  "H5"),   # H5 油气资产
+    # R1（spec formula-fetch-and-wp-generation-defect-closure）：以下科目原先改了试算表也不会触发对应底稿的推送
+    ("1606",  "H6"),   # H6 固定资产清理（原 binding 1606B）
+    ("1641",  "H8"),   # H8 使用权资产（双族之一；原 binding 1901 待处理财产损溢）
+    ("1651",  "H8"),   # H8 使用权资产（双族之二）
+    ("2601",  "H9"),   # H9 租赁负债（双族之一；原 binding 2802 不存在）
+    ("2651",  "H9"),   # H9 租赁负债（双族之二）
+    ("1704",  "I2"),   # I2 开发支出
+    ("1506",  "G6"),   # G6 其他债权投资（原 binding 1503 可供出售金融资产）
+    ("1507",  "G8"),   # G8 其他权益工具投资（原 binding 1503）
+    ("2705",  "J2"),   # J2 长期应付职工薪酬（原 binding 2611，该码不存在）
+    ("4201",  "M3"),   # M3 库存股（原 binding 4002 资本公积）
+    ("4002",  "M4"),   # M4 资本公积（原 binding 4101 盈余公积）
+    ("4101",  "M5"),   # M5 盈余公积（原 binding 4103 本年利润）
+    ("4301",  "M7"),   # M7 专项储备（原 binding 4201 库存股）
+    ("4003",  "M9"),   # M9 其他综合收益（原 binding 4401 其他权益工具）
+    ("4401",  "M10"),  # M10 其他权益工具（原 binding 4501，该码不存在）
+    ("1231-03", "K1"),  # K1 其他应收款坏账准备
 ])
 async def test_tier_a_tb_updated_selects_correct_binding(calls, account_code, expected_code):
     """试算表更新指定科目码时，对应 Tier A binding 被选中推送。"""
@@ -292,6 +310,29 @@ async def test_tier_a_tb_updated_selects_correct_binding(calls, account_code, ex
     assert len(calls) == 1
     _, _, _, _, codes = calls[0]
     assert expected_code in codes, f"科目码 {account_code} 应选中 {expected_code}，实得 {codes}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("account_code, not_expected", [
+    ("6602", "I6"),   # 管理费用不是研发费用
+    ("1901", "H8"),   # 待处理财产损溢不是使用权资产
+    ("1901", "I5"),   # 也不是其他非流动资产（I5 没有标准科目，不取试算表）
+    ("2205", "H9"),   # 合同负债不是租赁负债
+    ("2602", "H9"),   # 未确认融资费用另列，不并进租赁负债
+    ("1503", "G6"),   # 旧准则可供出售金融资产要人工拆分，不自动归入其他债权投资
+    ("1503", "G8"),   # 也不自动归入其他权益工具投资
+    ("4002", "M3"),   # 资本公积不是库存股
+    ("4103", "M5"),   # 本年利润不是盈余公积
+    ("4301", "M8"),   # 专项储备不是一般风险准备（M8 没有标准科目）
+    ("2801", "L7"),   # 预计负债（K5）不是其他非流动负债（L7 没有标准科目）
+    ("1231-02", "K1"),  # 应收账款的坏账准备不进其他应收款
+    ("1231-01", "K1"),  # 应收票据的坏账准备不进其他应收款
+])
+async def test_retired_wrong_codes_do_not_select_binding(calls, account_code, not_expected):
+    """R1 改正前 binding / 公式写错的科目：改了试算表不得再触发那张底稿（旧码只会推别的科目的数）。"""
+    await triggers.on_trial_balance_updated(tb([account_code]))
+    selected = set(calls[0][4]) if calls else set()
+    assert not_expected not in selected, f"科目码 {account_code} 不应选中 {not_expected}，实得 {selected}"
 
 
 @pytest.mark.asyncio

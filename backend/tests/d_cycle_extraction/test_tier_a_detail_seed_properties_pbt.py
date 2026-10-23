@@ -48,6 +48,12 @@ from hypothesis import strategies as st
 from app.core.config import settings
 from app.models.audit_platform_models import TrialBalance
 from app.routers import wp_formula as router_mod
+from tests.d_cycle_extraction._endpoint_doubles import (
+    AuthGateSessionMixin,
+    admin_user,
+    formula_row,
+    patch_d_cycle_aux_aggregation,
+)
 from app.routers.wp_render_strategies import _d6_contract_assets as d6
 from app.services import wp_formula_eval_service as eval_mod
 from app.services.d_cycle_extraction import prefill as prefill_mod
@@ -123,7 +129,7 @@ class _SaveResult:
         return SimpleNamespace(all=lambda: list(self._rows))
 
 
-class _SaveSession:
+class _SaveSession(AuthGateSessionMixin):
     """记录 execute SQL，用于断言无 DB 写回（Property 13）。"""
 
     def __init__(self, *, wp, wp_code, user_formulas=None):
@@ -163,7 +169,7 @@ def _wp():
 
 def _saved(target_cell, *, sheet_name="D6-1", wp=None, formula_type="auto_calc",
            expression="TB('1141','期末余额')"):
-    return SimpleNamespace(
+    return formula_row(
         id=uuid4(), project_id=(wp.project_id if wp else uuid4()),
         wp_id=(wp.id if wp else uuid4()), sheet_name=sheet_name,
         target_cell=target_cell, expression=expression, category=None,
@@ -177,7 +183,8 @@ def _saved(target_cell, *, sheet_name="D6-1", wp=None, formula_type="auto_calc",
 
 
 def _user():
-    return SimpleNamespace(id=uuid4(), username="tester")
+    """管理员身份：端点内项目鉴权门照常执行（管理员分支），见 _auth_gate_double。"""
+    return admin_user()
 
 
 def _patch_save(monkeypatch, *, saved, evaluated, eval_errors=None):
@@ -383,7 +390,7 @@ def test_pbt_p4_resolve_tb_via_active_filter_same_project_year(monkeypatch, year
 # ===========================================================================
 
 
-class _GetSession:
+class _GetSession(AuthGateSessionMixin):
     def __init__(self, *, wp, wp_code, user_formulas=None, project_year=None):
         self.wp = wp
         self.wp_code = wp_code
@@ -460,7 +467,7 @@ def test_pbt_p5_get_tier_a_value_single_fail_open(monkeypatch, fail_flags, value
     wp = _wp()
     db = _GetSession(wp=wp, wp_code="D6", user_formulas=[], project_year=2025)
 
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     tier_a = {b["anchor"]: b for b in resp["extraction"]["tierA"]}
     for b in bindings:
@@ -484,7 +491,7 @@ def test_pbt_p10_flag_off_get_no_extraction(monkeypatch, pair):
     _patch_presets(monkeypatch, [_preset(anchor)])
     wp = _wp()
     db = _GetSession(wp=wp, wp_code="D6", user_formulas=[], project_year=2025)
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
     assert "extraction" not in resp
 
 
@@ -527,16 +534,25 @@ def test_pbt_p12_logic_check_never_writes_value(monkeypatch, pair, ftype):
 
 
 @given(
-    fn=st.sampled_from(["PREV", "LEDGER", "COUNT_LEDGER", "LEDGER_DETAIL", "TB_AUX"]),
+    fn=st.sampled_from(["LEDGER", "COUNT_LEDGER", "LEDGER_DETAIL", "TB_AUX"]),
     code=st.from_regex(r"[1-6][0-9]{3}", fullmatch=True),
 )
 def test_pbt_p12_unsupported_four_table_functions_detected(fn, code):
-    """任意不受支持四表库函数（序时账 / TB_AUX / PREV 三参）→ find_unsupported 检出（保存端点据此 422，
-    不得当 auto_calc 可编辑目标 / R6.3）。AUX 与 PREV 两参自 formula-governance-coverage-closure R6 起支持。"""
+    """任意不受支持四表库函数（序时账 / TB_AUX）→ find_unsupported 检出（保存端点据此 422，
+    不得当 auto_calc 可编辑目标 / R6.3）。AUX 与 PREV 两参自 formula-governance-coverage-closure R6 起支持，
+    PREV 三参（上年同底稿）自 formula-fetch-and-wp-generation-defect-closure R2 起支持（见下一条）。"""
     from app.services.wp_formula_eval_service import find_unsupported_formula_functions
 
     expr = f"{fn}('{code}','x','期末余额')"
     assert find_unsupported_formula_functions(expr) == [fn], f"{fn} 应被检出为不受支持"
+
+
+@given(code=st.from_regex(r"[A-N][0-9]{1,2}", fullmatch=True))
+def test_pbt_p12_three_arg_prev_is_not_rejected(code):
+    """PREV 三参按上年数据求值（取不到写原因），保存不再以「不支持」拒收（R2.2）。"""
+    from app.services.wp_formula_eval_service import find_unsupported_formula_functions
+
+    assert find_unsupported_formula_functions(f"PREV('{code}','审定表{code}-1','审定数')") == []
 
 
 # ===========================================================================
@@ -695,19 +711,15 @@ class _DetailResult:
 
 
 class _DetailSession:
-    def __init__(self, *, checklist_rows=None, aux_rows=None, raise_on_aux=False):
+    """render 其余查询按 SQL 文本路由；明细归集走统一入口替身（patch_d_cycle_aux_aggregation）。"""
+
+    def __init__(self, *, checklist_rows=None):
         self.checklist_rows = checklist_rows or []
-        self.aux_rows = aux_rows or []
-        self.raise_on_aux = raise_on_aux
         self.executed_sql: list[str] = []
 
     async def execute(self, stmt, params=None):
         s = str(stmt).lower()
         self.executed_sql.append(s)
-        if "tb_aux_balance" in s:
-            if self.raise_on_aux:
-                raise RuntimeError("aux boom")
-            return _DetailResult(rows=self.aux_rows)
         if "tb_balance" in s and "trial_balance" not in s:
             return _DetailResult(rows=[])
         if "checklist_responses" in s:
@@ -727,7 +739,8 @@ class _DetailSession:
 
 
 def _aux_row(name, prior, current):
-    return SimpleNamespace(aux_name=name, prior_balance=prior, current_balance=current)
+    """归集统一入口条目 (aux_name, opening, debit, credit, closing)。"""
+    return (name, prior, 0.0, 0.0, current)
 
 
 def _detail_ctx(db):
@@ -769,11 +782,13 @@ def test_pbt_p8_detail_seed_gating_truth_table(monkeypatch, main, sub, has_rows)
     _set_gates(monkeypatch, main=main, sub=sub)
     _isolate_p0_1(monkeypatch)
     aux = [_aux_row("客户甲", 1000.0, 1500.0), _aux_row("客户乙", 0.0, 500.0)]
+    calls = patch_d_cycle_aux_aggregation(monkeypatch, aux)
     checklist = [_checklist_detail_row('[{"rowId":"r1","contractName":"手工"}]')] if has_rows else []
-    db = _DetailSession(checklist_rows=checklist, aux_rows=aux)
+    db = _DetailSession(checklist_rows=checklist)
     result = _run(d6.render(_detail_ctx(db)))
     expected_seed = main and sub and not has_rows
     assert ("detail_prefill" in result) is expected_seed
+    assert bool(calls) is expected_seed, "门关或已有行时不应去归集"
 
 
 # ---------------------------------------------------------------------------
@@ -784,23 +799,25 @@ def test_pbt_p8_detail_seed_gating_truth_table(monkeypatch, main, sub, has_rows)
 @given(n=st.integers(min_value=1, max_value=5))
 def test_pbt_p9_detail_seed_reuses_aggregate_function(monkeypatch, n):
     """任意 n 条 aux 归集 → detail seed 调既有 aggregate_d6_detail_rows（复用不新造），
-    SQL 命中 tb_aux_balance + 1141，detail_prefill 行数 = n。"""
+    后者经 D 循环 aux 归集统一入口以 (项目, render 年度, "D6") 归集，detail_prefill 行数 = n。"""
     _set_gates(monkeypatch, main=True, sub=True)
     _isolate_p0_1(monkeypatch)
     aux = [_aux_row(f"c{i}", float(i), float(i + 1)) for i in range(n)]
+    agg_calls = patch_d_cycle_aux_aggregation(monkeypatch, aux)
     called = {"hit": False}
     orig = d6.aggregate_d6_detail_rows
 
-    async def _spy(db, project_id, **kw):
+    async def _spy(db, project_id, year, **kw):
         called["hit"] = True
-        return await orig(db, project_id, **kw)
+        return await orig(db, project_id, year, **kw)
 
     monkeypatch.setattr(d6, "aggregate_d6_detail_rows", _spy)
-    db = _DetailSession(aux_rows=aux)
-    result = _run(d6.render(_detail_ctx(db)))
+    db = _DetailSession()
+    ctx = _detail_ctx(db)
+    result = _run(d6.render(ctx))
     assert called["hit"] is True, "必调既有 aggregate_d6_detail_rows（复用不新造 / Property 9）"
     assert len(result["detail_prefill"]) == n
-    assert any("tb_aux_balance" in s and "1141" in s for s in db.executed_sql)
+    assert agg_calls == [{"project_id": str(ctx.project_id), "year": ctx.year, "wp_code": "D6"}]
 
 
 # ---------------------------------------------------------------------------
@@ -814,7 +831,9 @@ def test_pbt_p11_detail_seed_fail_open(monkeypatch, raise_on_aux):
     _set_gates(monkeypatch, main=True, sub=True)
     _isolate_p0_1(monkeypatch)
     aux = [_aux_row("甲", 1.0, 2.0)]
-    db = _DetailSession(aux_rows=aux, raise_on_aux=raise_on_aux)
+    patch_d_cycle_aux_aggregation(
+        monkeypatch, aux, raise_exc=RuntimeError("aux boom") if raise_on_aux else None)
+    db = _DetailSession()
     result = _run(d6.render(_detail_ctx(db)))
     assert "project_context" in result, "render 始终正常返回（不阻断）"
     assert ("detail_prefill" in result) is (not raise_on_aux)
@@ -826,7 +845,8 @@ def test_pbt_p13_detail_seed_transient_no_db_write(monkeypatch, n):
     _set_gates(monkeypatch, main=True, sub=True)
     _isolate_p0_1(monkeypatch)
     aux = [_aux_row(f"c{i}", float(i), float(i + 1)) for i in range(n)]
-    db = _DetailSession(aux_rows=aux)
+    patch_d_cycle_aux_aggregation(monkeypatch, aux)
+    db = _DetailSession()
     result = _run(d6.render(_detail_ctx(db)))
     assert "detail_prefill" in result and len(result["detail_prefill"]) == n
     joined = " ".join(db.executed_sql)

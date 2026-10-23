@@ -207,6 +207,8 @@ const props = defineProps<{
   wpId?: string
   wpCode?: string
   decisionTrace?: RenderDecisionWire[] | null
+  /** 项目审计年度（宿主从项目取）；公式 / 一致性子面板按它取数、校验引用 */
+  year?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -221,7 +223,10 @@ const assistTab = ref('procedures')
 const qualityTab = ref('finecheck')
 const traceTab = ref('attachments')
 
-const currentYear = computed(() => new Date().getFullYear())
+// 原先恒取日历年：2025 年度项目在 2026 年打开时，公式面板按 2026 求值、保存时按 2026 校验引用
+// ⇒ 本年试算表科目一律判「引用地址不存在」、提取公式改不了（spec formula-fetch-and-wp-generation-defect-closure 实测发现）。
+// 取不到项目年度时与编辑器其余子组件同一兜底（上一日历年）。
+const currentYear = computed(() => props.year || new Date().getFullYear() - 1)
 
 // ─── Badge 汇总 ──────────────────────────────
 const assistBadge = computed(() => 0) // 编制辅助暂无汇总

@@ -21,6 +21,14 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+#: 一次搜索最多返回的地址条数（前端整库加载用同一个数：stores/addressRegistry.ts 的
+#: ADDRESS_REGISTRY_FULL_LOAD_LIMIT，守卫 test_address_registry_limit 比对）。原前端取 5000，真实项目附注 / 底稿 /
+#: 辅助余额排在后面的域整段被截掉、选择器里是空的（spec formula-fetch-and-wp-generation-defect-closure R3）。
+ADDRESS_REGISTRY_MAX_LIMIT = 50_000
+
+#: 不按域过滤时的返回顺序（与 get_all 一致）；截断回报按此顺序列出被截的域
+ADDRESS_DOMAIN_ORDER: tuple[str, ...] = ('report', 'tb', 'note', 'wp', 'aux')
+
 
 @dataclass
 class AddressEntry:
@@ -1190,7 +1198,7 @@ class AddressRegistryService:
                       template_type: str = 'soe') -> list[AddressEntry]:
         """获取项目所有可引用地址（按域分别缓存）"""
         all_entries: list[AddressEntry] = []
-        for domain in ('report', 'tb', 'note', 'wp', 'aux'):
+        for domain in ADDRESS_DOMAIN_ORDER:
             all_entries.extend(
                 await self._get_domain(db, project_id, year, template_type, domain)
             )
@@ -1205,7 +1213,13 @@ class AddressRegistryService:
                      keyword: str = '', domain: str = '',
                      template_type: str = 'soe',
                      limit: int = 100) -> list[AddressEntry]:
-        """搜索地址（支持关键词+域过滤）"""
+        """搜索地址（支持关键词+域过滤），最多返回 ``limit`` 条。"""
+        return (await self.match(db, project_id, year, keyword, domain, template_type))[:limit]
+
+    async def match(self, db, project_id: str, year: int,
+                    keyword: str = '', domain: str = '',
+                    template_type: str = 'soe') -> list[AddressEntry]:
+        """全部匹配的地址（不截断；调用方据此回报真实总数与是否截断）。"""
         if domain:
             # 只加载指定域，更快
             results = await self._get_domain(db, project_id, year, template_type, domain)
@@ -1221,7 +1235,7 @@ class AddressRegistryService:
                        kw in e.account_code.lower() or
                        kw in e.row_code.lower()]
 
-        return results[:limit]
+        return list(results)
 
     async def exists(self, db, project_id: str, year: int,
                      domain: str, uri: str,
@@ -1298,6 +1312,10 @@ class AddressRegistryService:
             for m in pattern.finditer(formula):
                 ref_text = m.group(0)
                 uri = formula_ref_to_uri(ref_text)
+                if fn_name == 'PREV' and uri and uri.startswith('wp://'):
+                    # 三参 PREV 是上年同底稿取数：按本底稿该字段的现行取数定义在上年数据上重算（prev_wp_field），
+                    # 不是本年目录里的地址；没有定义 / 取不到由求值写明原因（R2.2：保存不拒收）
+                    continue
                 if uri and uri not in uri_set and not (fn_name == 'AUX' and _aux_prefix_registered(uri)):
                     issues.append({
                         'ref': ref_text,

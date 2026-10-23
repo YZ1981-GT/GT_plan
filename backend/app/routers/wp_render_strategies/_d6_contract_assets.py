@@ -83,12 +83,18 @@ async def _seed_d6_detail_prefill(
     客户/合同维度，复用不新造第 3 套四表库读取 / Property 9）得明细行，附 `source:"four-table"`
     标注供前端识别为自动取数，作 `detail_prefill` transient 返回（不落库 / Property 13）。
     手工优先（已有行 → 返回 None 不 seed / Property 8）+ fail-open 空（归集异常 → None / R4.5）。
-    行字段用 aggregate_d6_detail_rows 产出的 30 列 schema。
+    行字段 = `build_d6_detail_rows_from_aux` 的录入列（four-table-extraction-entry-completion
+    Property 4：账龄 / 派生列不写，交前端 recalc）。
+
+    年度取 `ctx.year`（共享件按年度过滤，不传即恒空）；拿不到年度不 seed。
     """
     if not _detail_rows_empty(responses_snapshot):
         return None  # 手工优先：已有行 → 不覆盖
+    if ctx.year is None:
+        logger.warning("D6 render: 无审计年度，跳过 detail_prefill（project=%s）", ctx.project_id)
+        return None
     try:
-        rows = await aggregate_d6_detail_rows(ctx.db, str(ctx.project_id))
+        rows = await aggregate_d6_detail_rows(ctx.db, str(ctx.project_id), ctx.year)
     except Exception as e:  # noqa: BLE001 — 归集失败 fail-open 空（R4.5）
         logger.warning("D6 render: detail_prefill 归集失败（fail-open，省略）: %s", e)
         return None

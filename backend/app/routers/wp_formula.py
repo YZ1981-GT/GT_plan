@@ -270,7 +270,7 @@ async def _write_wp_formula_audit(
 
 
 def _unsupported_function_detail(expression: str | None) -> tuple[list[str], list[dict]]:
-    """保存前的函数门：``(不支持的函数名, 逐项原因)``；矩阵外的函数（序时账 / TB_AUX / PREV 三参）一并给原因。"""
+    """保存前的函数门：``(不支持的函数名, 逐项原因)``；矩阵外的函数（序时账 / TB_AUX）一并给原因。"""
     matrix_issues = support_issues(expression, Executor.WP_EVALUATOR)
     names = list(dict.fromkeys(
         [issue["function"] for issue in matrix_issues]
@@ -295,7 +295,9 @@ class FormulaSaveRequest(BaseModel):
     target_cell: str = Field(..., description="写入目标单元格，如 B5")
     expression: str = Field(..., description="公式表达式")
     year: int = Field(..., description="校验悬空引用所需年度")
-    template_type: str = Field("soe", description="模板类型")
+    template_type: str | None = Field(
+        None, description="引用校验口径 soe / listed；不传按底稿所属项目的口径（projects.template_type）"
+    )
     category: str | None = None
     description: str | None = None
     # ── formula-management-library 三类型（Req 14.5）──
@@ -455,6 +457,25 @@ async def _load_wp(db: AsyncSession, wp_id: UUID) -> WorkingPaper:
     if wp is None:
         raise HTTPException(status_code=404, detail="底稿不存在")
     return wp
+
+
+async def _resolve_ref_template_type(
+    db: AsyncSession, project_id: UUID, requested: str | None
+) -> str:
+    """公式引用校验的附注 / 报表口径（soe / listed）。
+
+    请求显式给了就用（归一）；没给取底稿所属项目的 ``projects.template_type`` —— 与附注渲染、底稿用户公式
+    （``wp_user_formulas``）同一权威。🔴 原先缺省恒为 ``soe``、自定义底稿编辑器又写死 ``soe`` ⇒ 上市项目
+    按国企附注校验引用（spec formula-fetch-and-wp-generation-defect-closure R6）。
+    """
+    from app.services.note_section_catalog import normalize_template_type
+
+    if requested and requested.strip():
+        return normalize_template_type(requested)
+    project_type = (
+        await db.execute(sa.select(Project.template_type).where(Project.id == project_id))
+    ).scalar_one_or_none()
+    return normalize_template_type(project_type)
 
 
 async def _authorize_wp_project(
@@ -891,7 +912,8 @@ async def save_formula(
 
     可编辑公式支持函数支持矩阵 ``wp_evaluator`` 列的全部函数（TB/SUM_TB/ROW/SUM_ROW/REPORT/NOTE/WP/
     PREV/AUX/ADJ，spec formula-governance-coverage-closure R6；此前 d-cycle 决策3 只开放 TB/SUM_TB/WP）。
-    含序时账（LEDGER/COUNT_LEDGER/LEDGER_DETAIL）、TB_AUX、PREV 三参（上年底稿）时返 422
+    含序时账（LEDGER/COUNT_LEDGER/LEDGER_DETAIL）、TB_AUX 时返 422（PREV 三参自 spec
+    formula-fetch-and-wp-generation-defect-closure R2 起按上年数据求值，不再拒收）
     （FORMULA_UNSUPPORTED_FUNCTION），不静默落库、不静默求值为 0——序时账归集由 Tier B prefill 承担。
 
     Task 1.4 / ADR-FMC-02 纵深防御：本端点仅承接**工作底稿正式公式（wp kind）**。
@@ -948,7 +970,7 @@ async def save_formula(
             target_cell=body.target_cell,
             expression=body.expression,
             year=body.year,
-            template_type=body.template_type,
+            template_type=await _resolve_ref_template_type(db, wp.project_id, body.template_type),
             category=body.category,
             description=body.description,
             created_by=user.id,
@@ -1191,7 +1213,7 @@ class FormulaBatchItem(BaseModel):
     sheet_name: str = Field(..., description="Sheet 名称")
     target_cell: str = Field(..., description="写入目标单元格，如 B5")
     expression: str = Field(..., description="公式表达式")
-    template_type: str = Field("soe", description="模板类型")
+    template_type: str | None = Field(None, description="引用校验口径；不传按项目口径（同单条保存）")
     category: str | None = None
     description: str | None = None
     formula_type: str = Field("auto_calc", description="auto_calc / logic_check / reasonability")
@@ -1259,6 +1281,7 @@ async def save_formulas_batch(
         )
 
     wp_code = await _resolve_wp_code(db, wp)
+    project_template_type = await _resolve_ref_template_type(db, wp.project_id, None)
 
     saved_rows: list[dict] = []
     try:
@@ -1310,7 +1333,10 @@ async def save_formulas_batch(
                 target_cell=item.target_cell,
                 expression=item.expression,
                 year=body.year,
-                template_type=item.template_type,
+                template_type=(
+                    await _resolve_ref_template_type(db, wp.project_id, item.template_type)
+                    if item.template_type else project_template_type
+                ),
                 category=item.category,
                 description=item.description,
                 created_by=user.id,

@@ -10,8 +10,9 @@
   PREV/AUX/ROW/SUM_ROW/REPORT/NOTE 经 ``formula_ref_preload.substitute_value_refs`` 严格按值代入
   （上年试算表 / 辅助核算当前数据集 / 本年度报表本期·上期金额 / 本年度附注单元格；取不到数写进
   错误清单而非代入 0）；ADJ 经统一预载层 ``preload(adj_exclude_origins=frozenset())`` 交 L1（底稿口径，
-  不排除底稿来源分录）。矩阵外的序时账 / TB_AUX / PREV 三参由 ``unsupported_formula_function_issues``
-  拒绝。通用 ``/api/formula`` 按 ``central_batch`` 能力校验。
+  不排除底稿来源分录）；PREV 三参（上年同底稿）按本底稿该字段的现行取数定义在上年数据上求值
+  （``prev_wp_field``，spec formula-fetch-and-wp-generation-defect-closure R2）。矩阵外的序时账 / TB_AUX 由
+  ``unsupported_formula_function_issues`` 拒绝。通用 ``/api/formula`` 按 ``central_batch`` 能力校验。
 
 - ``report_path`` = ``app.services.report_engine.evaluate_formula_result``。
   现状实证：TB/SUM_TB/ROW/SUM_ROW/REPORT 经 resolver 预载求值（report_engine.py

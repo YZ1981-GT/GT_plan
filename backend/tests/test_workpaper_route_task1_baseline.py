@@ -224,7 +224,7 @@ def test_reverse_dup_scan_f1_adds_zero_new_duplicates() -> None:
 
     # 豁免登记表的单一真源：反向扫描守卫。缺失时 fail closed（不静默放行）。
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from test_gc0_reverse_dup_scan import ALLOWED_EXEMPTIONS, _key_of_dup
+    from tests.test_gc0_reverse_dup_scan import ALLOWED_EXEMPTIONS, _key_of_dup
 
     owner = FRONTEND_GC0_OWNER if FRONTEND_GC0_OWNER.exists() else None
     findings = discover_local_dupes([FRONTEND_SRC], ts_owner_dir=owner)

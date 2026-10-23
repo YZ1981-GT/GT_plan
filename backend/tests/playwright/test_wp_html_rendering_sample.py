@@ -6,7 +6,8 @@ Playwright 抽样验证：每类（A/B/C/D/E/H）各选 2 个底稿打开确认 
   2. 数据库中有首汽租车_2025 项目（project_id=df5b8403...）且 is_deleted=false
   3. 底稿已通过 chain_orchestrator 生成
 
-运行方式：
+运行方式（默认跳过：需要开发服务与真实数据，不进常规回归）：
+  set GT_BROWSER_E2E=1
   python -m pytest backend/tests/playwright/test_wp_html_rendering_sample.py -v --headed
 
 依赖：
@@ -14,10 +15,17 @@ Playwright 抽样验证：每类（A/B/C/D/E/H）各选 2 个底稿打开确认 
   playwright install chromium
 """
 
+import os
 import re
 
 import pytest
-from playwright.sync_api import Page, expect
+
+if os.environ.get("GT_BROWSER_E2E") != "1":
+    pytest.skip("浏览器抽样测试需要开发服务（3030 / 9980）与真实项目数据：设置 GT_BROWSER_E2E=1 后运行",
+                allow_module_level=True)
+pytest.importorskip("playwright.sync_api", reason="未安装 playwright（pip install pytest-playwright）")
+
+from playwright.sync_api import Page, expect  # noqa: E402
 
 # ─── 配置 ───────────────────────────────────────────────────────────────────
 

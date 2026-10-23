@@ -20,7 +20,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.schema import CreateTable
 
-from authz_world import (
+from tests.authz_world import (
     IDENTITY_LABELS,
     STANDARD_IDENTITIES,
     SUPPLEMENTARY_IDENTITIES,
@@ -30,7 +30,7 @@ from authz_world import (
     Identity,
     sqlite_world,
 )
-from note_edit_gate_recipes import ALL_RECIPES, Recipe, _NOTE_ID, _VALIDATION_ID, _YEAR
+from tests.note_edit_gate_recipes import ALL_RECIPES, Recipe, _NOTE_ID, _VALIDATION_ID, _YEAR
 
 from app.services.note_edit_gate import (
     REASON_EQCR_READONLY,
@@ -136,7 +136,7 @@ def _default_return(st: Any) -> Any:
 
 async def _setup_stubs(world: AuthzWorld, recipe: Recipe) -> list[Any]:
     """为一个配方安装业务桩。"""
-    from note_edit_gate_recipes import StubTarget
+    from tests.note_edit_gate_recipes import StubTarget
 
     stubs = []
     for st in recipe.stubs:

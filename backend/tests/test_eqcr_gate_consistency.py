@@ -24,7 +24,7 @@ import pytest
 import pytest_asyncio
 from httpx import Response
 
-from authz_world import (
+from tests.authz_world import (
     TARGET_NOTE_ID,
     TARGET_PROJECT_ID,
     AuthzWorld,
@@ -32,7 +32,7 @@ from authz_world import (
     Identity,
     sqlite_world,
 )
-from note_edit_gate_recipes import ALL_RECIPES, Recipe, StubTarget, _NOTE_ID, _YEAR
+from tests.note_edit_gate_recipes import ALL_RECIPES, Recipe, StubTarget, _NOTE_ID, _YEAR
 from app.models.base import PermissionLevel, ProjectUserRole, UserRole
 from app.services.note_edit_gate import (
     REASON_EQCR_READONLY,

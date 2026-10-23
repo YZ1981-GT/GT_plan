@@ -15,7 +15,7 @@
  * ```
  */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, shallowRef, computed } from 'vue'
 import http from '@/utils/http'
 import { addressRegistry as paths } from '@/services/apiPaths'
 import { eventBus } from '@/utils/eventBus'
@@ -25,6 +25,13 @@ import {
   type AcnrCellEntry,
   type AcnrResolveResult,
 } from '@/services/acnr/useAcnr'
+
+/**
+ * 整库加载一次最多取的地址条数 = 后端 `ADDRESS_REGISTRY_MAX_LIMIT`（守卫 backend/tests/test_address_registry_limit.py 比对）。
+ * 原取 5000：真实项目里附注 / 底稿 / 辅助余额排在后面的域整段被截掉，选择器里是空的
+ * （spec formula-fetch-and-wp-generation-defect-closure R3）。公式编辑弹窗的底稿域直调用同一个数。
+ */
+export const ADDRESS_REGISTRY_FULL_LOAD_LIMIT = 50000
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
@@ -140,9 +147,17 @@ function _mapCellToEntry(c: AcnrCellEntry): AddressEntry {
 
 export const useAddressRegistry = defineStore('addressRegistry', () => {
   // ─── 状态 ───
-  const addresses = ref<AddressEntry[]>([])
+  // 上万条地址只会整体替换、从不改单条 ⇒ shallowRef（ref 会给每条套一层响应式代理）
+  const addresses = shallowRef<AddressEntry[]>([])
   const loaded = ref(false)
   const loading = ref(false)
+  /** 最近一次整库加载被上限截断、有地址没取回来的域（这些域不当成完整的用，见 isDomainComplete）。 */
+  const truncatedDomains = shallowRef<string[]>([])
+  /** 当前 addresses 属于哪个（项目, 年度, 口径）。 */
+  const _loadedKey = ref('')
+  /** 在途的整库加载（同一绑定共用；换绑定另发、旧的回来后丢弃）。 */
+  let _inflight: { key: string; promise: Promise<void> } | null = null
+  const _warnedTruncation = new Set<string>()
 
   /** 当前绑定的项目/年度（用于自动刷新判断） */
   const _projectId = ref('')
@@ -173,7 +188,30 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
     _year.value = yr
     _templateType.value = tpl
 
-    if (loading.value) return
+    const key = _bindingKey()
+    if (_loadedKey.value && _loadedKey.value !== key) {
+      // 换了项目 / 年度 / 口径：先清掉旧数据，加载完成前不能让选择器拿上一个项目的地址当本项目的（R3.4）
+      addresses.value = []
+      truncatedDomains.value = []
+      loaded.value = false
+      _loadedKey.value = ''
+    }
+    // 同一绑定的刷新共用在途请求；原先 loading 时直接 return ⇒ 切到 B 项目的刷新被吞、A 的数据回来后被当成 B 的
+    if (_inflight && _inflight.key === key) return _inflight.promise
+    const promise = _loadAll(key, pid, yr, tpl)
+    _inflight = { key, promise }
+    try {
+      await promise
+    } finally {
+      if (_inflight?.promise === promise) _inflight = null
+    }
+  }
+
+  function _bindingKey(): string {
+    return `${_projectId.value}|${_year.value}|${_templateType.value}`
+  }
+
+  async function _loadAll(key: string, pid: string, yr: number, tpl: string): Promise<void> {
     loading.value = true
     try {
       const { data } = await http.get(paths.search, {
@@ -181,17 +219,32 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
           project_id: pid,
           year: yr,
           template_type: tpl,
-          limit: 5000,
+          limit: ADDRESS_REGISTRY_FULL_LOAD_LIMIT,
         },
       })
+      if (key !== _bindingKey()) return // 回来时已经切到别的项目：丢弃
       const items = data?.items ?? data ?? []
       addresses.value = Array.isArray(items) ? items : []
+      truncatedDomains.value = data?.truncated && Array.isArray(data?.truncated_domains) ? data.truncated_domains : []
+      _loadedKey.value = key
       loaded.value = true
+      if (data?.truncated && !_warnedTruncation.has(key)) {
+        _warnedTruncation.add(key)
+        console.warn(
+          `[addressRegistry] 地址超过 ${ADDRESS_REGISTRY_FULL_LOAD_LIMIT} 条（共 ${data?.total}），`
+          + `这些域只加载了一部分：${truncatedDomains.value.join('、')}`,
+        )
+      }
     } catch (e) {
       console.warn('[addressRegistry] 加载地址注册表失败', e)
     } finally {
-      loading.value = false
+      if (!_inflight || _inflight.key === key) loading.value = false
     }
+  }
+
+  /** 该域的地址已为当前绑定完整加载（未被上限截断）；为否时选择器改用按关键词搜索或调用方自带的数据。 */
+  function isDomainComplete(domain: string): boolean {
+    return loaded.value && _loadedKey.value === _bindingKey() && !truncatedDomains.value.includes(domain)
   }
 
   // ─── ACNR-backed WP 域搜索（R16.3） ───
@@ -243,8 +296,9 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
       }
     }
 
-    // 本地过滤（已加载时优先本地搜索，减少请求）
-    if (loaded.value && addresses.value.length > 0) {
+    // 本地过滤（已加载时优先本地搜索，减少请求）；被截断的域本地不全 ⇒ 走后端按关键词搜
+    const localComplete = domain ? isDomainComplete(domain) : loaded.value && truncatedDomains.value.length === 0
+    if (localComplete && addresses.value.length > 0) {
       const kw = keyword.toLowerCase()
       return addresses.value.filter(a => {
         if (domain && a.domain !== domain) return false
@@ -369,6 +423,9 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
   // ─── 清空本地状态 ───
   function $reset() {
     addresses.value = []
+    truncatedDomains.value = []
+    _loadedKey.value = ''
+    _inflight = null
     loaded.value = false
     loading.value = false
     _projectId.value = ''
@@ -413,6 +470,7 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
     addresses,
     loaded,
     loading,
+    truncatedDomains,
     // 按域分组
     tbAddresses,
     reportAddresses,
@@ -421,6 +479,7 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
     auxAddresses,
     // 方法
     refresh,
+    isDomainComplete,
     search,
     resolve,
     validate,

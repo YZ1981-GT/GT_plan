@@ -280,7 +280,7 @@ function handleSaveError(err: any): void {
   if (code === 'FORMULA_UNSUPPORTED_FUNCTION') {
     const fns = (detail.unsupported_functions || []).join(' / ')
     ElMessage.error(
-      detail.message || `公式含不受支持的函数：${fns}；序时账取数（LEDGER 等）与上年底稿取数由底稿预填充承担。`,
+      detail.message || `公式含不受支持的函数：${fns}；序时账取数（LEDGER 等）由底稿预填充承担。`,
     )
   } else if (code === 'FORMULA_REF_NOT_FOUND') {
     const issues = (detail.issues || []).join('；')

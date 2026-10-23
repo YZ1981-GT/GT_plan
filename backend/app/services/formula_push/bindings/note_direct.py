@@ -6,7 +6,8 @@
 
 与 Tier A 的区别：
 - Tier A 从预设库（``d_cycle_extraction_presets.json``）取科目码；
-  NoteDirectBinding 从 ``wp_account_mapping.json`` 取。
+  NoteDirectBinding 从 ``wp_account_mapping.json`` 取 —— J / L / M 循环例外，改取四表口径单一来源
+  （见 :func:`_single_source_codes`）。
 - Tier A 只有底稿锚点（``stage=source``）；
   NoteDirectBinding 同时有底稿锚点 + 附注推送（``stage=note``）。
 - 两者不合并——Tier A 已在生产运行且有 250+ 测试守护，改动风险高于新建。
@@ -37,6 +38,13 @@ _WP_MAPPING_PATH = _DATA_DIR / "wp_account_mapping.json"
 
 #: 损益类科目前缀（6 开头）
 _PL_PREFIX = "6"
+
+#: 口径单一来源没有标准科目的底稿：不取试算表、不推附注主表，相关格子交给用户填写（规则清单里也不得有它们的取数规则）。
+_NO_ACCOUNT_REASONS: dict[str, str] = {
+    "L7": "其他非流动负债是报表行、由多个明细科目归集，没有标准科目（l_cycle_specs 不给兜底码）；"
+          "原映射表写的 2801 是 K5 预计负债",
+    "M8": "一般风险准备没有标准科目（各项目科目表都没有该科目，m_cycle_specs 不给兜底码）；原映射表写的 4301 是专项储备",
+}
 
 
 @dataclass
@@ -96,11 +104,19 @@ class NoteDirectBinding:
         account_name: str,
         *,
         is_income: bool = False,
+        no_account_reason: str = "",
     ) -> None:
+        if not account_codes and not no_account_reason:
+            raise ValueError(f"{wp_code}: 没有科目时必须写明 no_account_reason")
         self.wp_code = wp_code
         self.account_prefixes = account_codes
+        #: 非空 = 本科目没有标准科目（bindings 校验据此放行空 account_prefixes）
+        self.no_account_reason = no_account_reason if not account_codes else ""
         self.tb_columns: frozenset[str] = frozenset({"期末余额", "年初余额", "本期发生额"})
-        self.derivations: frozenset[str] = frozenset({f"{wp_code.lower()}_note_main"})
+        # 附注主表取自试算表；没有科目就没有附注主表推送
+        self.derivations: frozenset[str] = (
+            frozenset({f"{wp_code.lower()}_note_main"}) if account_codes else frozenset()
+        )
         self.four_table_slots: frozenset[str] = frozenset()
         self.paper_codes: tuple[str, ...] = (wp_code,)
         self._is_income = is_income
@@ -224,8 +240,31 @@ async def _load_template_type(db: Any, project_id: UUID) -> str | None:
 # ── 工厂函数 ────────────────────────────────────────────────────────────────
 
 
+def _single_source_codes(code: str) -> tuple[str, ...] | None:
+    """J / L / M 循环的科目取四表口径单一来源（单槽声明、已逐项真库对账）；None = 该循环未声明，沿用映射表。
+
+    🔴 映射表 ``wp_account_mapping.json`` 在这三个循环有 9 个底稿的科目码是错的（2026-10-23 对照模板册名与真库试算表）：
+    M3~M10 整体错位一格（M3 库存股写 4002 资本公积、M4 资本公积写 4101 盈余公积、M5 盈余公积写 4103 本年利润、
+    M7 专项储备写 4201 库存股、M8 一般风险准备写 4301、M9 其他综合收益写 4401、M10 其他权益工具写不存在的 4501），
+    J2 长期应付职工薪酬写不存在的 2611（实为 2705）、L7 其他非流动负债写 K5 的 2801 预计负债。推送因此把别的科目的数
+    写进附注（真库和平药房_2025：盈余公积附注期末 = 本年利润 53,384,067.82）或恒为 0（J2 / M9 有数却推 0）。
+    映射表另有十几个模块在读，本 spec 只改推送取数，映射表本身见 spec formula-fetch-and-wp-generation-defect-closure
+    design §9（R1.4）。只取原值侧（非备抵）槽，与审定表族 binding 同口径。
+    """
+    from app.services.four_table.j_cycle_account_scope import j_semantic_spec_of
+    from app.services.four_table.l_cycle_specs import L_CYCLE_SPECS
+    from app.services.four_table.m_cycle_specs import M_CYCLE_SPECS
+
+    spec = {"J": j_semantic_spec_of(code), "L": L_CYCLE_SPECS.get(code), "M": M_CYCLE_SPECS.get(code)}.get(code[:1])
+    if spec is None:
+        return None
+    return tuple(dict.fromkeys(
+        c for slot in spec.slots if not slot.is_provision for c in slot.fallback_standard_codes
+    ))
+
+
 def note_direct_for(code: str) -> NoteDirectBinding:
-    """族 binding 工厂：按 ``wp_account_mapping.json`` 为指定底稿编码创建实例。
+    """族 binding 工厂：按 ``wp_account_mapping.json`` 为指定底稿编码创建实例（J / L / M 循环科目取口径单一来源）。
 
     注册表写法：``"G1": "app.services.formula_push.bindings.note_direct:note_direct_for('G1')"``
     """
@@ -233,9 +272,13 @@ def note_direct_for(code: str) -> NoteDirectBinding:
     if code not in mapping:
         raise KeyError(f"底稿 {code} 在 wp_account_mapping.json 中不存在")
     item = mapping[code]
-    account_codes = tuple(item.get("account_codes", []))
-    if not account_codes:
-        raise ValueError(f"底稿 {code} 在 wp_account_mapping.json 中无科目码")
+    single = _single_source_codes(code)
+    account_codes = single if single is not None else tuple(item.get("account_codes", []))
+    reason = _NO_ACCOUNT_REASONS.get(code, "")
+    if not account_codes and not reason:
+        raise ValueError(f"底稿 {code} 没有科目码（口径单一来源 / wp_account_mapping.json），也没登记无科目原因")
+    if account_codes and reason:
+        raise ValueError(f"底稿 {code} 登记了无科目原因却取到科目 {account_codes}（_NO_ACCOUNT_REASONS 过时）")
     account_name = item.get("account_name", code)
     is_income = any(_is_pl_code(c) for c in account_codes)
     return NoteDirectBinding(
@@ -243,4 +286,5 @@ def note_direct_for(code: str) -> NoteDirectBinding:
         account_codes=account_codes,
         account_name=account_name,
         is_income=is_income,
+        no_account_reason=reason,
     )

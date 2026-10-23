@@ -83,16 +83,11 @@ def test_push_context_supplies_only_tb_and_adj_of_the_binding_accounts():
     assert "1122" in _refused(TB_RULE, {"expression": "TB('1122','期末余额')"}), "保存时同样拒收"
 
 
-#: 规则清单里推送取数给不出数的系统公式（试算表取不到该科目 ⇒ 恒推 0）。2026-10-22 现查：真库 H6 有两个项目
-#: 试算表 1606 有数（5,383.76 / 33,886.68）而审定表被推成 0。修法要定「科目以谁为准」，待用户裁决（design §9）。
-#: 只许减少：修好一条删一条。
-KNOWN_PRESET_CONTEXT_GAPS = {
-    "H6.1_tb_amount": "1606",  # binding 取映射码 1606B，试算表标准码是 1606
-    "I1.1_tb_impair": "1703",  # binding 取 1703B
-    "H9.1_tb_amount": "2205",  # 试算表 2205 是合同负债；binding 取 2802（试算表无此码）
-    "I2.1_tb_amount": "1717",  # 试算表无 1717；binding 取 1704 开发支出
-    "I5.1_tb_amount": "1911",  # 试算表无 1911；binding 取 1901
-}
+#: 规则清单里推送取数给不出数的系统公式（试算表取不到该科目 ⇒ 恒推 0）。
+#: 2026-10-23 清零（spec formula-fetch-and-wp-generation-defect-closure R1）：原登记 H6.1_tb_amount（binding 1606B）/
+#: I1.1_tb_impair（1703B）/ H9.1_tb_amount（2205 vs 2802）/ I2.1_tb_amount（1717）/ I5.1_tb_amount（1911）五条，binding 与
+#: 公式改为同取口径单一来源，I5 无标准科目、规则删除。今后新增一律修，不再登记（集合保持为空）。
+KNOWN_PRESET_CONTEXT_GAPS: dict[str, str] = {}
 
 
 def test_preset_formula_context_gaps_are_frozen():

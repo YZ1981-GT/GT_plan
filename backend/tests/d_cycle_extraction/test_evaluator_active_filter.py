@@ -203,7 +203,7 @@ def test_property10_sum_tb_expression_flows_through_active_filter(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Property 6: 不支持函数检出（序时账 / TB_AUX / PREV 三参）→ 供保存端点返 422
+# Property 6: 不支持函数检出（序时账 / TB_AUX）→ 供保存端点返 422（PREV 三参自 R2 起支持）
 #   R6（formula-governance-coverage-closure）起 AUX 与 PREV 两参已支持（严格按值代入），不再拒绝。
 # ---------------------------------------------------------------------------
 
@@ -215,9 +215,10 @@ def test_property6_aux_and_two_arg_prev_now_supported():
     assert find_unsupported_formula_functions("PREV(TB('1122','期末余额'))") == []
 
 
-def test_property6_detects_prev():
-    """PREV 三参是上年底稿取数，可编辑公式不支持。"""
-    assert find_unsupported_formula_functions("PREV('D2','sheet','B5')") == ["PREV"]
+def test_property6_three_arg_prev_now_supported():
+    """PREV 三参（上年同底稿取数）自 spec formula-fetch-and-wp-generation-defect-closure R2.2 起支持：
+    按上年数据 + 本底稿该字段的现行定义求值，取不到写原因；保存不再以「不支持」拒收。"""
+    assert find_unsupported_formula_functions("PREV('D2','sheet','B5')") == []
 
 
 def test_property6_detects_tb_aux_and_ledger_detail():
@@ -241,7 +242,7 @@ def test_property6_detects_multiple():
     hits = find_unsupported_formula_functions(
         "TB('1402','期末余额') + AUX('1122','客户','期末余额') + PREV('D2','s','B5') + LEDGER('6001','借','全年')"
     )
-    assert hits == ["LEDGER", "PREV"]
+    assert hits == ["LEDGER"]  # PREV 三参自 R2 起支持，只剩序时账
 
 
 def test_property6_supported_functions_pass():

@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.services.address_registry import (
+    ADDRESS_DOMAIN_ORDER, ADDRESS_REGISTRY_MAX_LIMIT,
     address_registry, parse_uri, formula_ref_to_uri,
     uri_to_formula_ref, build_jump_route,
 )
@@ -30,16 +31,25 @@ async def search_addresses(
     keyword: str = Query(''),
     domain: str = Query('', description="过滤域: report/note/wp/tb/aux"),
     template_type: str = Query('soe'),
-    limit: int = Query(100),
+    # 超过上限直接 422（不静默截断成上限）；前端整库加载取的就是这个上限
+    limit: int = Query(100, ge=1, le=ADDRESS_REGISTRY_MAX_LIMIT),
     db: AsyncSession = Depends(get_db),
     _user=Depends(get_current_user),
 ):
-    """搜索可引用地址（支持按域单独加载，减少首次加载量）"""
-    entries = await address_registry.search(
-        db, project_id, year, keyword, domain, template_type, limit
-    )
+    """搜索可引用地址（支持按域单独加载，减少首次加载量）。
+
+    ``total`` = 真实匹配数，``returned`` = 本次返回条数，``truncated`` = 是否被 ``limit`` 截断，
+    ``truncated_domains`` = 有地址没返回的域（前端据此不把这些域当成完整的，spec
+    formula-fetch-and-wp-generation-defect-closure R3.2）。原 ``total`` 是截断后的条数，看不出截断。
+    """
+    matched = await address_registry.match(db, project_id, year, keyword, domain, template_type)
+    entries = matched[:limit]
+    cut = {e.domain for e in matched[limit:]}
     return {
-        'total': len(entries),
+        'total': len(matched),
+        'returned': len(entries),
+        'truncated': len(matched) > limit,
+        'truncated_domains': [d for d in ADDRESS_DOMAIN_ORDER if d in cut] + sorted(cut - set(ADDRESS_DOMAIN_ORDER)),
         'items': [
             {
                 'uri': e.uri,

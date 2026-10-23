@@ -6,6 +6,14 @@
     append-to-body
     destroy-on-close
   >
+    <el-alert
+      v-if="truncatedHint"
+      type="warning"
+      :closable="false"
+      show-icon
+      :title="truncatedHint"
+      style="margin-bottom: 8px"
+    />
     <el-tabs v-model="activeTab">
       <!-- 报表引用 -->
       <el-tab-pane label="📊 报表行" name="report">
@@ -66,7 +74,8 @@
       <el-tab-pane label="📝 其他附注" name="note">
         <div class="gt-ref-filter">
           <el-input v-model="noteSearch" placeholder="搜索章节..." size="small" clearable style="width: 250px" />
-          <el-select v-model="notePeriod" size="small" style="width: 100px">
+          <!-- 地址库条目按「章节 × 合计行 × 表头列」逐条登记，选哪一条就插哪一列；期间选择只给页面自带的章节列表用 -->
+          <el-select v-if="!noteFromStore" v-model="notePeriod" size="small" style="width: 100px">
             <el-option label="期末" value="期末" />
             <el-option label="期初" value="期初" />
           </el-select>
@@ -203,7 +212,8 @@ const selectedWpSheetAddrId = ref('')
 const wpCells = ref<AcnrCellEntry[]>([])
 const wpCellsLoading = ref(false)
 const wpCellSearch = ref('')
-let wpSheetsLoaded = false
+/** 已向 ACNR 取过 sheet 目录（取到为空 ⇒ 底稿页签回退旧地址库）。 */
+const wpSheetsLoaded = ref(false)
 
 const selectedWpSheet = computed(
   () => wpSheets.value.find(s => s.addr_id === selectedWpSheetAddrId.value) || null,
@@ -261,7 +271,7 @@ const wpEmptyDescription = computed(() => {
 })
 
 async function ensureWpSheets() {
-  if (wpSheetsLoaded) return
+  if (wpSheetsLoaded.value) return
   wpSheetsLoading.value = true
   try {
     wpSheets.value = await acnr.listSheets()
@@ -269,7 +279,7 @@ async function ensureWpSheets() {
     wpSheets.value = []
   } finally {
     wpSheetsLoading.value = false
-    wpSheetsLoaded = true
+    wpSheetsLoaded.value = true
   }
 }
 
@@ -308,14 +318,39 @@ watch(visible, (v) => {
   }
 })
 
-// ─── 数据源：优先 store，回退 props ───
+// ─── 数据源：优先 store（该域完整加载时），回退 props ───
+
+/** 期间选择 → 地址库登记的期间列：资产负债表 期末 / 期初，利润表与现金流量表 本期 / 上期，权益变动表 本年 / 上年。 */
+const REPORT_PERIOD_CELLS: Record<string, readonly string[]> = {
+  期末: ['期末', '本期', '本年'],
+  期初: ['期初', '上期', '上年'],
+}
+/** 被截断后改用页面自带数据的域（各有页签）。辅助余额在本选择器没有页签；底稿页签走 ACNR 目录，只在回退旧地址库时受影响。 */
+const PAGE_FALLBACK_DOMAINS: Record<string, string> = { report: '报表', tb: '试算表', note: '附注' }
+
+// 该域被地址库加载上限截断时不当成完整的用（R3.2）：改用页面自带的数据
+const reportFromStore = computed(() => addrStore.isDomainComplete('report') && addrStore.reportAddresses.length > 0)
+const tbFromStore = computed(() => addrStore.isDomainComplete('tb') && addrStore.tbAddresses.length > 0)
+const noteFromStore = computed(() => addrStore.isDomainComplete('note') && addrStore.noteAddresses.length > 0)
+
+// 只提示本选择器页签真受影响的域：只截断了辅助余额（真实项目最常见）时不提示
+const truncatedHint = computed(() => {
+  const truncated = addrStore.truncatedDomains || []
+  const parts: string[] = []
+  const fallback = Object.keys(PAGE_FALLBACK_DOMAINS).filter(d => truncated.includes(d)).map(d => PAGE_FALLBACK_DOMAINS[d])
+  if (fallback.length) parts.push(`${fallback.join('、')}只加载了一部分，相关页签改用当前页面的数据`)
+  if (truncated.includes('wp') && wpSheetsLoaded.value && !wpAcnrAvailable.value) parts.push('底稿单元格只加载了一部分，列表不全')
+  return parts.length ? `地址库条目太多，${parts.join('；')}` : ''
+})
 
 const filteredReportRows = computed(() => {
   const kw = reportSearch.value.toLowerCase()
-  // 优先使用 store 中的报表地址
-  if (addrStore.loaded && addrStore.reportAddresses.length > 0) {
+  // 优先使用 store 中的报表地址（按期间列过滤，每行次一条）
+  if (reportFromStore.value) {
+    const cells = REPORT_PERIOD_CELLS[reportPeriod.value] || []
     return addrStore.reportAddresses.filter(e =>
-      !kw || (e.row_code || '').toLowerCase().includes(kw) || (e.label || '').toLowerCase().includes(kw)
+      cells.includes(e.cell)
+      && (!kw || (e.row_code || '').toLowerCase().includes(kw) || (e.label || '').toLowerCase().includes(kw)),
     )
   }
   return (props.reportRows || []).filter(r =>
@@ -326,7 +361,7 @@ const filteredReportRows = computed(() => {
 const filteredTbRows = computed(() => {
   const kw = tbSearch.value.toLowerCase()
   // 优先使用 store 中的试算表地址
-  if (addrStore.loaded && addrStore.tbAddresses.length > 0) {
+  if (tbFromStore.value) {
     return addrStore.tbAddresses.filter(e =>
       !kw || (e.account_code || '').includes(kw) || (e.label || '').toLowerCase().includes(kw)
     )
@@ -339,7 +374,7 @@ const filteredTbRows = computed(() => {
 const filteredNoteRows = computed(() => {
   const kw = noteSearch.value.toLowerCase()
   // 优先使用 store 中的附注地址
-  if (addrStore.loaded && addrStore.noteAddresses.length > 0) {
+  if (noteFromStore.value) {
     return addrStore.noteAddresses.filter(e =>
       !kw || (e.note_section || '').includes(kw) || (e.label || '').toLowerCase().includes(kw)
     )
@@ -351,9 +386,17 @@ const filteredNoteRows = computed(() => {
 
 const fmtAmt = fmtAmount
 
+// 地址库条目带登记的引用写法 ⇒ 原样插入（能过保存校验）；只有页面自带的行才按选择拼写法。
+// 原先一律拼 REPORT(行次,'期末') / NOTE(章节,'合计','期末')：利润表登记的是本期 / 上期、附注登记的是表头原文
+// （如「期末余额」），附注域有数之后插入的引用保存时都判悬空（R3.3）。
 function onSelectReport(row: any) {
   const code = row.row_code || ''
   const name = row.row_name || row.label || ''
+  if (row.formula_ref) {
+    selectedFormula.value = row.formula_ref
+    selectedLabel.value = `[${code}] ${name}`
+    return
+  }
   const period = reportPeriod.value
   selectedFormula.value = `REPORT('${code}','${period}')`
   selectedLabel.value = `[${code}] ${name} · ${period}`
@@ -370,6 +413,11 @@ function onSelectTb(row: any) {
 function onSelectNote(row: any) {
   const section = row.note_section || ''
   const title = row.section_title || row.label || ''
+  if (row.formula_ref) {
+    selectedFormula.value = row.formula_ref
+    selectedLabel.value = `[${section}] ${title}`
+    return
+  }
   const period = notePeriod.value
   selectedFormula.value = `NOTE('${section}','合计','${period}')`
   selectedLabel.value = `[${section}] ${title} · 合计 · ${period}`

@@ -54,8 +54,10 @@ def test_real_rules_load_and_distribution():
         "I1", "I2", "I3", "I4", "I5", "I6",
         "J1", "J2",
         "K2", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K10", "K11", "K12", "K13",
-        "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8",
-        "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10",
+        # L7 其他非流动负债 / M8 一般风险准备没有标准科目：不取试算表、没有推送规则（binding 仍注册、写明原因；
+        # spec formula-fetch-and-wp-generation-defect-closure R1.4 删了取别的科目的数的两条规则）
+        "L1", "L2", "L3", "L4", "L5", "L6", "L8",
+        "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M9", "M10",
         "N1", "N2", "N3", "N4", "N5",
     }
     assert len({r.target.identity() for r in _RULES}) == len(_RULES)

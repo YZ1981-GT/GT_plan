@@ -25,6 +25,7 @@ from uuid import uuid4
 
 from app.core.config import settings
 from app.routers import wp_formula as router_mod
+from tests.d_cycle_extraction._endpoint_doubles import AuthGateSessionMixin, admin_user, formula_row
 from app.routers.wp_render_strategies import _d3_prepaid_accounts as d3
 from app.services.d_cycle_extraction import presets as presets_mod
 from app.services.d_cycle_extraction.anchor_registry import is_known_anchor
@@ -264,7 +265,7 @@ def test_get_endpoint_surfaces_d3_preset_in_tier_a(monkeypatch):
     monkeypatch.setattr(settings, "D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED", True)
     wp = _wp()
     db = _FormulaFakeSession(wp=wp, wp_code="D3", user_formulas=[])
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     assert "extraction" in resp
     ext = resp["extraction"]
@@ -286,7 +287,7 @@ def test_get_endpoint_surfaces_d3_tier_b_provenance(monkeypatch):
     monkeypatch.setattr(settings, "D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED", True)
     wp = _wp()
     db = _FormulaFakeSession(wp=wp, wp_code="D3", user_formulas=[])
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
 
     tier_b = resp["extraction"]["tierB"]
     anchors = {e["anchor"]: e for e in tier_b}
@@ -303,7 +304,7 @@ def test_flag_off_no_extraction_for_d3(monkeypatch):
     monkeypatch.setattr(settings, "D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED", False)
     wp = _wp()
     db = _FormulaFakeSession(wp=wp, wp_code="D3", user_formulas=[])
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
     assert "extraction" not in resp
 
 
@@ -343,7 +344,7 @@ class _FormulaFakeResult:
         return SimpleNamespace(all=lambda: list(self._rows))
 
 
-class _FormulaFakeSession:
+class _FormulaFakeSession(AuthGateSessionMixin):
     def __init__(self, *, wp, wp_code, user_formulas=None):
         self.wp = wp
         self.wp_code = wp_code
@@ -376,7 +377,7 @@ def _wp():
 
 
 def _wp_formula(target_cell, *, expression, sheet_name="D3-1", wp=None):
-    return SimpleNamespace(
+    return formula_row(
         id=uuid4(),
         project_id=(wp.project_id if wp else uuid4()),
         wp_id=(wp.id if wp else uuid4()),
@@ -397,4 +398,5 @@ def _wp_formula(target_cell, *, expression, sheet_name="D3-1", wp=None):
 
 
 def _user():
-    return SimpleNamespace(id=uuid4(), username="tester")
+    """管理员身份：端点内项目鉴权门照常执行（管理员分支），见 _auth_gate_double。"""
+    return admin_user()

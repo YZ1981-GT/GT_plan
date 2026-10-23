@@ -1,7 +1,15 @@
 """Backend test environment configuration. Validates: Requirements 2.8"""
 import os
 from collections.abc import AsyncGenerator
+#: pytest 启动时的环境变量（本文件最先被导入）。起子进程跑 pytest 的用例用它，不继承之后被改过的环境 ——
+#: 如 tests/e2e/conftest.py 导入时 setdefault 的 sqlite DATABASE_URL，子进程导入本文件时建引擎即 TypeError。
+ENVIRON_AT_START: dict[str, str] = dict(os.environ)
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-unit-tests")
+# 🔴 load_test.py 是 locust 压测脚本（无测试函数），但文件名命中 pytest 默认的 `*_test.py` 会被收集：
+#    `import locust` 即 `gevent.monkey.patch_all()`，把整个 pytest 进程的 threading / socket / select / time 换成
+#    gevent 版，此后 TestClient（anyio 线程门户）与 asyncio 用例会卡死，全量 `pytest tests` 跑不完。
+#    压测脚本照旧 `locust -f backend/tests/load_test.py` 运行（守卫 test_pytest_import_isolation.py）。
+collect_ignore = ["load_test.py"]
 
 # ─── Hypothesis 全局「fast」profile：减少 example 数量、加快属性测试 ──────────────
 # 统一把 PBT 的 max_examples 收敛到较小值（默认 5，可用 HYPOTHESIS_MAX_EXAMPLES 覆盖），
@@ -179,6 +187,23 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(pytest.mark.evidence_governance)
         except Exception:
             pass
+
+
+def pytest_collection_finish(session):
+    """收集阶段若有模块（直接或经辅助模块）触发了 gevent 猴子补丁，在跑任何用例之前就报错。
+
+    补丁一旦打上，后续 TestClient / asyncio 用例会静默卡死（全量运行曾零输出挂起 30 分钟），
+    报错比挂起好查得多。常见来源是导入 locust（见本文件顶部 collect_ignore）。
+    """
+    import sys as _sys
+
+    monkey = _sys.modules.get("gevent.monkey")
+    if monkey is not None and monkey.is_module_patched("threading"):
+        raise pytest.UsageError(
+            "收集阶段有模块触发了 gevent.monkey.patch_all()（多半是导入了 locust），"
+            "本进程的 threading / socket 已被替换，继续运行会卡死；"
+            "把压测脚本加进 tests/conftest.py 的 collect_ignore，或别在测试模块里导入 locust。"
+        )
 
 
 # ---------------------------------------------------------------------------

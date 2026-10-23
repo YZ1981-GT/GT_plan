@@ -9,7 +9,7 @@ K1-2 组合原值 / 坏账准备 = editable（明细汇总可跟随，用户手�
 账龄 / 性质分布仍由前端同步，不由本 binding 推送。
 
 附注推送：``note_rows()`` 从 ``k1_calc`` 取审定净值（receivable − baddebt）推期末，
-从试算表 ``年初余额`` 推期初；输出单行 label="其他应收款"。
+从试算表 ``年初余额`` 推期初（同口径净值：其他应收款原值 − 其他应收款坏账准备）；输出单行 label="其他应收款"。
 
 spec: formula-push-all-subjects-rollout · design §八 · 需求 1.1~1.3
 spec: formula-push-note-rollout-batch-c · Task 3
@@ -28,9 +28,18 @@ from app.services.formula_push.bindings import TargetSkip, WorkpaperTarget, k1_c
 from app.services.formula_push.js_compat import js_number_to_string
 from app.services.formula_push.rules import PushRule, workpaper_addr_id
 from app.services.formula_push.sources import FormulaSources, load_tb_audited
+from app.services.four_table.k_cycle_specs import K_CYCLE_SPECS
 
 WP_CODE = "K1"
-K1_ACCOUNT_CODES: tuple[str, ...] = ("1221", "1231")
+#: 其他应收款原值 / 坏账准备的标准码（口径单一来源 k_cycle_specs：1221 / 1231-03）。试算表是正数口径，
+#: 坏账准备存正数 ⇒ 净值 = 原值 − 坏账准备（与 D1 / D2 的 ``TB('1121') - TB('1231-01')`` 同口径）。
+#: 🔴 原写 ``("1221", "1231")`` 且期初「原值 + 坏账准备」：``1231`` 按前缀把应收票据 / 应收账款的坏账准备（1231-01 /
+#: 1231-02）也算进来、还加而不是减 —— 真库重药控股安徽_2025 附注期初推成 166,031,263.81
+#: （= 1221 年初 150,302,795.09 + 1231-01~03 年初 15,728,468.72；应为 149,663,565.08）。
+#: spec formula-fetch-and-wp-generation-defect-closure R1.4。
+K1_GROSS_CODE: str = K_CYCLE_SPECS[WP_CODE].fallback_standard
+K1_PROVISION_CODES: tuple[str, ...] = tuple(K_CYCLE_SPECS[WP_CODE].fallback_provision)
+K1_ACCOUNT_CODES: tuple[str, ...] = (K1_GROSS_CODE, *K1_PROVISION_CODES)
 
 DERIVATIONS: frozenset[str] = frozenset({
     "k1_audited_total",
@@ -259,7 +268,7 @@ class K1Binding:
         """K1 附注主表推送：单行"其他应收款"。
 
         期末 = ``k1_calc.audited_net(entries)``（原值 − 坏账 = 审定净值，从条目计算）；
-        期初 = TB ``年初余额`` 合计（codes 1221+1231，试算表口径的上期净值）。
+        期初 = TB ``年初余额``：原值（1221）− 坏账准备（1231-03），试算表口径的上期净值。
         """
         # ending 从 entries 取审定净值
         ending = k1_calc.audited_net(entries)
@@ -268,10 +277,10 @@ class K1Binding:
         # opening 从 TB 年初余额取（load_sources 时已缓存）
         tb_data = self._last_tb_data
         if tb_data is not None:
-            opening = sum(
-                float(tb_data.get(code, {}).get("年初余额", Decimal("0")))
-                for code in K1_ACCOUNT_CODES
-            )
+            def _opening(code: str) -> float:
+                return float(tb_data.get(code, {}).get("年初余额", Decimal("0")))
+
+            opening = _round2(_opening(K1_GROSS_CODE) - sum(_opening(c) for c in K1_PROVISION_CODES))
             opening_resolved = True
         else:
             opening = 0.0

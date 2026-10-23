@@ -8,10 +8,10 @@ spec: formula-push-note-rollout-batch-e / Task 9
   - I3 资产负债类 ending 取「期末余额」
 - J1、J2 有 note.main 规则（note_direct binding）：section_by_template / fields / policy / stage / rows naming
   - J2 非对称章节号（上市 五、49 / 国企 八、54）
-- I1/I2/I4/I5/I6 不存在 note.main 规则的确认
-- I6 损益类（6602 研发费用）作为 tier_a 使用 trial_balance_audited_occurrence
+- I5 不存在 note.main 规则的确认（其他非流动资产没有标准科目，规则已删）
+- I6 损益类（6604 研发费用）作为 tier_a 使用 trial_balance_audited_occurrence，附注主表派生由 binding 提供
 - I3 balance_adj note_rows 取数行为（单科目码 1711）
-- J1/J2 note_direct note_rows 取数行为（J1: 2211 / J2: 2611）
+- J1/J2 note_direct note_rows 取数行为（J1: 2211 / J2: 2705；J2 原取 wp_account_mapping.json 的 2611，该码不存在）
 - sync_registry 章节号与规则章节号一致性
 """
 from __future__ import annotations
@@ -65,8 +65,11 @@ IJ_NOTE_SECTIONS = [
 
 ALL_IJ_NOTE_CODES = [t[0] for t in IJ_NOTE_SECTIONS]
 
-# I/J 系列中没有 note.main 规则的科目
-IJ_CODES_WITHOUT_NOTE = ["I1", "I2", "I4", "I5", "I6"]
+# I/J 系列中没有 note.main 规则的科目（2026-10-23 按规则清单现查）。原清单 I1/I2/I4/I5/I6 是批 E 时的快照：2026-10-06
+# 「附注模块全面修复」（1655ce8e0）补了 I1/I2/I4/I6 的 note.main，本清单没跟着改，此后一直是红的。
+# I5 其他非流动资产没有标准科目（i_cycle_accounts I5 段兜底码为空）⇒ 不取试算表、不推附注主表，原 I5.note.main 删除
+# （spec formula-fetch-and-wp-generation-defect-closure R1）。若有人加回，规则校验会因 binding 不提供 i5_note_main 拒收。
+IJ_CODES_WITHOUT_NOTE = ["I5"]
 
 
 # ========================================================================
@@ -204,7 +207,7 @@ def test_j2_asymmetric_sections():
 
 @pytest.mark.parametrize("code", IJ_CODES_WITHOUT_NOTE, ids=IJ_CODES_WITHOUT_NOTE)
 def test_ij_code_without_note_main(code: str):
-    """I1/I2/I4/I5/I6 不存在 note.main 规则。"""
+    """I5 不存在 note.main 规则（没有标准科目）。"""
     assert not _has_note_main_rule(code), f"{code} 不应有 note.main 规则"
 
 
@@ -270,23 +273,23 @@ def test_i3_balance_adj_tb_unavailable_returns_empty():
 
 
 # ========================================================================
-# I1 多科目码 balance_adj note_rows（1701/1702/1703B → 3 行 + 1 合计行）
+# I1 多科目码 balance_adj note_rows（1701/1702/1703 → 3 行 + 1 合计行）
 # ========================================================================
 
 
 def test_i1_multi_code_note_rows_produces_total():
-    """I1 无形资产有 3 个 account_codes（1701/1702/1703B），note_rows 应产生 3 行数据 + 1 行合计。"""
+    """I1 无形资产有 3 个 account_codes（1701/1702/1703，原映射码 1703B 已改标准码），note_rows 应产生 3 行数据 + 1 行合计。"""
     from app.services.formula_push.bindings.balance_adj import binding_for as balance_adj_for
 
     binding = balance_adj_for("I1")
     binding._last_tb_data = {
         "1701": {"期末余额": Decimal("200000"), "年初余额": Decimal("150000"), "本期发生额": Decimal("50000")},
         "1702": {"期末余额": Decimal("100000"), "年初余额": Decimal("80000"), "本期发生额": Decimal("20000")},
-        "1703B": {"期末余额": Decimal("50000"), "年初余额": Decimal("30000"), "本期发生额": Decimal("20000")},
+        "1703": {"期末余额": Decimal("50000"), "年初余额": Decimal("30000"), "本期发生额": Decimal("20000")},
     }
 
-    # I1 无 note.main 规则，借 I3 的 rule 做代理（仅测 TB 取数 + 合计逻辑）
-    rule = _note_rule("I3")
+    # I1 自有 note.main（2026-10-06 补；原先借 I3 的规则做代理）
+    rule = _note_rule("I1")
     rows = binding.note_rows({}, "listed", rule)
 
     # 3 个数据行 + 1 个合计行
@@ -328,11 +331,11 @@ def test_j1_note_direct_note_rows():
 
 
 def test_j2_note_direct_note_rows():
-    """J2 长期应付职工薪酬（资产负债类 2611）: ending 取「期末余额」，opening 取「年初余额」。"""
+    """J2 长期应付职工薪酬（资产负债类 2705，口径单一来源 j_cycle_account_scope）: ending 取「期末余额」，opening 取「年初余额」。"""
     from app.services.formula_push.bindings.note_direct import note_direct_for
 
     binding = note_direct_for("J2")
-    binding._last_tb_data = _make_tb("2611", "1200000", "900000", "300000")
+    binding._last_tb_data = _make_tb("2705", "1200000", "900000", "300000")
 
     rule = _note_rule("J2")
     rows = binding.note_rows({}, "listed", rule)
@@ -360,12 +363,12 @@ def test_j1_note_direct_tb_unavailable_returns_empty():
 
 
 # ========================================================================
-# I6 损益类验证（tier_a，无 note.main，但确认其 source 规则用 occurrence 上下文）
+# I6 损益类验证（tier_a：source 规则用 occurrence 上下文，附注主表派生由 binding 提供）
 # ========================================================================
 
 
 def test_i6_source_rule_uses_occurrence_context():
-    """I6 研发费用（损益类 6602）source 规则使用 trial_balance_audited_occurrence 上下文。"""
+    """I6 研发费用（损益类 6604）source 规则使用 trial_balance_audited_occurrence 上下文。"""
     rules = load_rules()
     i6_source = next(r for r in rules if r.rule_id == "I6.1_tb_amount")
     assert i6_source.source.context_map.get("tb") == "trial_balance_audited_occurrence", \
@@ -374,6 +377,14 @@ def test_i6_source_rule_uses_occurrence_context():
         "I6 表达式应包含「本期发生额」"
 
 
-def test_i6_no_note_main_rule():
-    """I6 研发费用无 note.main 规则（损益类走 tier_a，附注推送不在当前规则集中）。"""
-    assert not _has_note_main_rule("I6"), "I6 不应有 note.main 规则"
+def test_i6_note_main_rule_backed_by_tier_a_derivation():
+    """I6 研发费用的 note.main 由 Tier A binding 的附注派生提供，且取 6604（不是 6602 管理费用）。
+
+    原断言「I6 无 note.main」是批 E 时的快照；2026-10-06 补规则后一直是红的。
+    """
+    from app.services.formula_push.bindings import get_binding
+
+    rule = _note_rule("I6")
+    binding = get_binding("I6")
+    assert rule.source.name in binding.derivations
+    assert binding.account_prefixes == ("6604",)

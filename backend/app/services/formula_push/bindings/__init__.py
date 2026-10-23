@@ -204,8 +204,10 @@ def _validate_binding(wp_code: str, binding: Any) -> PushBinding:
             binding.paper_codes = (wp_code,)
         except (AttributeError, TypeError):
             errors.append("binding 缺少 paper_codes 且无法设置缺省值")
+    # 没有标准科目的科目（I5 其他非流动资产）：account_prefixes 为空，但必须写明原因（不取试算表、不推附注主表）
+    no_account = isinstance(getattr(binding, "no_account_reason", None), str) and bool(binding.no_account_reason.strip())
     for name, kind, required in (
-        ("account_prefixes", tuple, True), ("paper_codes", tuple, True),
+        ("account_prefixes", tuple, not no_account), ("paper_codes", tuple, True),
         ("derivations", frozenset, False), ("four_table_slots", frozenset, False),
         ("tb_columns", frozenset, True),
     ):

@@ -65,7 +65,7 @@ class WpStandardConversionService(WpConversionGenerateMixin):
 
     底稿生成相关方法（``_create_target_only_workpapers`` /
     ``_generate_one_workpaper`` / ``_load_template_library`` / ``_derive_year`` /
-    ``_copy_template_file`` / ``_populate_parsed_data``）由
+    ``_populate_parsed_data``；模板文件经 ``wp_generate_file``）由
     ``WpConversionGenerateMixin`` 提供（pass4 大文件拆分，方法仍挂在实例上）。
     """
 

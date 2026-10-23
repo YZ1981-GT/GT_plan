@@ -11,6 +11,10 @@
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import {
+  summarizeWorkpaperGenerateResult,
+  type WorkpaperGenerateResult,
+} from '@/utils/workpaperGenerateResult'
 
 export interface GenerateOptions {
   projectId: string
@@ -39,7 +43,7 @@ export function useWorkpaperGenerate(options: GenerateOptions) {
 
     generating.value = true
     try {
-      const result = await api.post<{ count: number }>(
+      const result = await api.post<WorkpaperGenerateResult>(
         `/api/projects/${projectId}/working-papers/generate`,
         {
           template_set_id: templateSetId,
@@ -47,8 +51,9 @@ export function useWorkpaperGenerate(options: GenerateOptions) {
           selected_templates: selectedCodes,
         },
       )
-      ElMessage.success(`已生成 ${result.count} 个底稿`)
-      onSuccess?.(result.count)
+      const notice = summarizeWorkpaperGenerateResult(result)
+      ElMessage[notice.level](notice.message)
+      onSuccess?.(result?.created ?? result?.count ?? 0)
     } catch (e: any) {
       ElMessage.error(e?.message || '生成失败')
     } finally {

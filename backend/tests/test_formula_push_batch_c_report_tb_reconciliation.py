@@ -194,8 +194,9 @@ async def test_batch_c_audited_total_matches_report_tb(
     monkeypatch, wp_code: str, batch_c_codes: tuple[str, ...]
 ) -> None:
     """Every registered Batch C subject matches ReportFormulaParser.resolve_tb."""
-    # Keep each parameter isolated: the shared account prefixes (1901/1503)
-    # must still be tested independently without duplicate TB unique keys.
+    # Keep each parameter isolated: subjects that shared account prefixes (1901 for H8 / I5 / K2,
+    # 1503 for G6 / G8 before spec formula-fetch-and-wp-generation-defect-closure R1) must still be
+    # tested independently without duplicate TB unique keys.
     async with make_env(
         monkeypatch,
         extra_tables=(TrialBalance.__table__, Adjustment.__table__, AdjustmentEntry.__table__),

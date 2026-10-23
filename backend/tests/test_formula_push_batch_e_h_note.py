@@ -5,8 +5,8 @@ spec: formula-push-note-rollout-batch-e / Task 8
 覆盖范围：
 - H2/H3/H4 三个有 note.main 规则的科目：section_by_template / fields / policy / stage / rows naming / table name
 - H2/H4 共用章节 五、23 / 八、23（在建工程 + 工程物资同一附注章节，靠 table 名隔离）
-- H5 上市版无独立章节（listed=null / soe=八、25）——无 note.main 规则符合预期（需求 E5）
-- H1/H5~H10 不存在 note.main 规则的确认
+- H5 上市版无独立章节（listed=null / soe=八、25）——note.main 只配国企章节（需求 E5；2026-10-06 补国企侧规则）
+- H6 不存在 note.main 规则的确认（固定资产清理是「固定资产」章节下的子表）
 - H2/H3/H4 均为 balance_adj binding，资产负债类 ending 取「期末余额」
 - H10 损益类（account_code='6115'）ending 取「本期发生额」（无 note.main 但 binding 行为正确）
 """
@@ -63,8 +63,11 @@ H_NOTE_SECTIONS = [
 
 ALL_H_NOTE_CODES = [t[0] for t in H_NOTE_SECTIONS]
 
-# H 系列中没有 note.main 规则的科目
-H_CODES_WITHOUT_NOTE = ["H1", "H5", "H6", "H7", "H8", "H9", "H10"]
+# H 系列中没有 note.main 规则的科目（2026-10-23 按规则清单现查）。原清单 H1/H5~H10 是批 E 时的快照：2026-10-06
+# 「附注模块全面修复」（1655ce8e0）补了 H1/H5/H7/H8/H9/H10 的 note.main，本清单没跟着改，此后一直是红的
+# （spec formula-fetch-and-wp-generation-defect-closure R1 修）。
+# H6 固定资产清理没有独立附注章节：附注模板里它是「固定资产」章节下的子表（规则清单里的目标表 H1.note.subtable_5）。
+H_CODES_WITHOUT_NOTE = ["H6"]
 
 
 # ========================================================================
@@ -172,9 +175,12 @@ def test_h2_h4_share_same_section():
 # ========================================================================
 
 
-def test_h5_no_note_main_rule():
-    """H5 油气资产无 note.main 规则（上市版无独立章节，国企侧不由公式推送覆盖）。"""
-    assert not _has_note_main_rule("H5"), "H5 不应有 note.main 规则"
+def test_h5_note_main_rule_is_soe_only():
+    """H5 油气资产：上市版无独立章节 ⇒ note.main 只配国企章节（八、25），不配上市章节。
+
+    原断言「H5 无 note.main」是批 E 时的快照（当时国企侧不由公式推送覆盖）；2026-10-06 补国企侧规则后一直是红的。
+    """
+    assert dict(_h_note_rule("H5").target.sections) == {"soe": "八、25"}
 
 
 def test_h5_listed_null_in_sync_registry():
@@ -198,7 +204,7 @@ def test_h5_listed_null_in_sync_registry():
 
 @pytest.mark.parametrize("code", H_CODES_WITHOUT_NOTE, ids=H_CODES_WITHOUT_NOTE)
 def test_h_code_without_note_main(code: str):
-    """H1/H5~H10 不存在 note.main 规则（这些科目的附注推送不在当前规则集中）。"""
+    """H6 不存在 note.main 规则（固定资产清理是「固定资产」章节下的子表，没有独立章节）。"""
     assert not _has_note_main_rule(code), f"{code} 不应有 note.main 规则"
 
 

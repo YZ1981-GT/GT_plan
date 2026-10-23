@@ -30,6 +30,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.core.config import settings
 from app.routers.wp_render_strategies import (
     _d1_notes_receivable as d1,
     _d2_accounts_receivable as d2,
@@ -109,6 +110,18 @@ _SHEET_BY_WP = {
     "D6": "合同资产审定表D6-1",
     "D7": "合同负债审定表D7-1",
 }
+
+
+@pytest.fixture(autouse=True)
+def _main_flag_on(monkeypatch):
+    """本文件刻画的是**主开关开**时的 render 键集合（新增键 / D1 坏账标量 / D4 基线键只在开时下发）。
+
+    🔴 原先不设开关、靠本地 `.env` 打开主开关才绿；CI 与干净检出没有 `.env`（默认关）⇒ 10 例
+    恒红（spec formula-fetch-and-wp-generation-defect-closure R7.2）。子开关固定关：本文件不测
+    D6 明细 seed，与本地 `.env` 无关。
+    """
+    monkeypatch.setattr(settings, "D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED", True)
+    monkeypatch.setattr(settings, "D_CYCLE_DETAIL_SEED_ENABLED", False)
 
 
 # ────────────────────────────────── 替身 ──────────────────────────────────

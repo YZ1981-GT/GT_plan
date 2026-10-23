@@ -20,7 +20,7 @@ import re
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -69,8 +69,14 @@ class TemplateSetUpdateRequest(BaseModel):
 
 
 class GenerateWorkpapersRequest(BaseModel):
+    # 🔴 未登记字段直接 422：前端曾发 `selected_templates` 而本模型没有该字段，pydantic 默认静默丢弃 ⇒
+    #    用户在裁剪弹窗里去掉的底稿照样全部生成（spec formula-fetch-and-wp-generation-defect-closure R4）。
+    model_config = ConfigDict(extra="forbid")
+
     template_set_id: UUID
     year: int = 2025
+    # 生成前裁剪弹窗确认的编码；不传 = 整套生成（兼容旧调用方），空列表 = 一个都不生成
+    selected_templates: list[str] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -280,23 +286,31 @@ async def generate_project_workpapers(
 
     engine = TemplateEngine()
     try:
-        workpapers = await engine.generate_project_workpapers(
+        workpapers, ignored_codes = await engine.generate_project_workpapers_detailed(
             db=db,
             project_id=project_id,
             template_set_id=data.template_set_id,
             year=data.year,
+            selected_codes=data.selected_templates,
         )
         await db.commit()
+        message = f"已生成 {len(workpapers)} 个底稿"
+        if ignored_codes:
+            shown = "、".join(ignored_codes[:10]) + (" 等" if len(ignored_codes) > 10 else "")
+            message += f"；{len(ignored_codes)} 个选中的编码不在所选模板集里，未生成：{shown}"
         return {
-            "message": f"已生成 {len(workpapers)} 个底稿",
+            "message": message,
             "created": len(workpapers),
             "count": len(workpapers),
+            "ignored_codes": ignored_codes,
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 class GenerateFromCodesRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")  # 同上：前后端字段漂移时报错而不是静默丢弃
+
     wp_codes: list[str]
     year: int = 2025
 
@@ -315,14 +329,23 @@ async def generate_from_codes(
     - savepoint 隔离：单条失败不影响整批
     - parsed_data：写最小非空占位（与准则转换生成路径同一兜底）供渲染器消费
     - 结构化返回：created/skipped/failures + codes 列表
+
+    文件与名称（spec formula-fetch-and-wp-generation-defect-closure R5）：模板经
+    ``wp_generate_file.materialize_workpaper_file`` 与链路编排同一解析（模板目录索引 + 多文件合并 +
+    场景裁剪）；找不到模板的编码仍建空白底稿，但单列 ``blank_codes``。名称经 ``resolve_wp_name``。
+    此前按 ``gt_template_library.json`` 精确匹配，E1 这类多页底稿不在库里 ⇒ 只生成叫「底稿E1」的空白册。
     """
     import json
     import logging
-    import os
-    import shutil
     from pathlib import Path
 
     from app.services.prerequisite_checker import PrerequisiteChecker
+    from app.services.wp_generate_file import (
+        discard_generated_file,
+        load_generation_scenario,
+        materialize_workpaper_file,
+    )
+    from app.services.wp_name_source import resolve_wp_name
     # 原 import 的 `populate_parsed_data` 全仓从未实现 ⇒ 本端点对任何调用都在这里 ImportError 500
     # （前端「生成底稿」在模板集生成 5xx 时回退到本端点，回退同样失败）
     from app.services.wp_parsed_data_service import ensure_parsed_data_placeholder
@@ -334,6 +357,7 @@ async def generate_from_codes(
     if not check["ok"]:
         raise HTTPException(status_code=422, detail=check)
 
+    # 模板库只作名称 / 循环的候选来源（文件解析不再走它）
     lib_path = Path(__file__).parent.parent.parent / "data" / "gt_template_library.json"
     template_lib: dict[str, dict] = {}
     if lib_path.exists():
@@ -343,15 +367,15 @@ async def generate_from_codes(
             for item in lib_data.get("templates", lib_data) if isinstance(lib_data, dict) else lib_data:
                 template_lib[item.get("code", item.get("wp_code", ""))] = item
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning("加载模板库 JSON 失败: %s", e)
+            _logger.warning("加载模板库 JSON 失败: %s", e)
 
-    project_wp_dir = Path("storage") / "projects" / str(project_id) / "workpapers"
+    scenario, has_foreign_currency = await load_generation_scenario(db, project_id)
     created = 0
     skipped = 0
     failures: list[dict] = []
     created_codes: list[str] = []
     skipped_codes: list[str] = []
+    blank_codes: list[str] = []
 
     for code in data.wp_codes:
         # 检查是否已存在
@@ -368,13 +392,13 @@ async def generate_from_codes(
             continue
 
         # [新增] savepoint 隔离单条处理
+        generated = None
         try:
             async with db.begin_nested():
                 lib_entry = template_lib.get(code, {})
-                wp_name = lib_entry.get("name", lib_entry.get("wp_name", f"底稿{code}"))
-                cycle = lib_entry.get("cycle_prefix", code[0] if code else "X")
+                wp_name = resolve_wp_name(code, lib_entry.get("name"), lib_entry.get("wp_name"))
+                cycle = lib_entry.get("cycle_prefix") or (code[0] if code else "X")
 
-                # 创建 wp_index
                 wp_index = WpIndex(
                     project_id=project_id,
                     wp_code=code,
@@ -385,65 +409,23 @@ async def generate_from_codes(
                 db.add(wp_index)
                 await db.flush()
 
-                # 文件目录
-                cycle_dir = project_wp_dir / cycle
-                cycle_dir.mkdir(parents=True, exist_ok=True)
-                dest_file = cycle_dir / f"{code}.xlsx"
-
-                # 复制模板文件（优先从知识库底稿模板目录查找）
-                copied = False
-                src_path = lib_entry.get("file_path", "")
-                template_name = lib_entry.get("name", "") or wp_name
-
-                # 1. 知识库底稿模板目录
-                kb_base = Path(os.path.expanduser("~/.gt_audit_helper/knowledge/workpaper_templates"))
-                kb_file = kb_base / cycle / f"{template_name}.xlsx" if template_name else None
-                if src_path:
-                    kb_file_by_name = kb_base / cycle / Path(src_path).name
-                else:
-                    kb_file_by_name = None
-
-                for candidate in [kb_file, kb_file_by_name]:
-                    if candidate and candidate.exists():
-                        shutil.copy2(candidate, dest_file)
-                        copied = True
-                        break
-
-                # 2. 回退：从原始模板路径查找（项目根目录）
-                if not copied and src_path:
-                    src = Path(src_path)
-                    if not src.exists():
-                        root_src = Path(__file__).resolve().parent.parent.parent.parent / src_path
-                        if root_src.exists():
-                            src = root_src
-                    if src.exists():
-                        shutil.copy2(src, dest_file)
-                        copied = True
-
-                if not copied:
-                    try:
-                        import openpyxl
-                        wb = openpyxl.Workbook()
-                        ws = wb.active
-                        ws.title = code
-                        ws["A1"] = f"底稿编号: {code}"
-                        ws["A2"] = f"底稿名称: {wp_name}"
-                        ws["A3"] = f"审计年度: {data.year}"
-                        wb.save(str(dest_file))
-                        wb.close()
-                    except Exception:
-                        dest_file.write_bytes(b"")
-
-                # 创建 working_paper
+                # 先落底稿行取 id：文件按 wp_storage/{项目}/{底稿 id} 存放
                 wp = WorkingPaper(
                     project_id=project_id,
                     wp_index_id=wp_index.id,
-                    file_path=str(dest_file),
+                    file_path="",
                     source_type=WpSourceType.template,
                     file_version=1,
                     created_by=current_user.id,
                 )
                 db.add(wp)
+                await db.flush()
+
+                generated = materialize_workpaper_file(
+                    project_id, wp.id, code, wp_name,
+                    scenario=scenario, has_foreign_currency=has_foreign_currency,
+                )
+                wp.file_path = str(generated.path)
 
                 # 底稿快照绑定
                 try:
@@ -452,34 +434,43 @@ async def generate_from_codes(
                 except Exception as _bind_err:
                     _logger.warning("dataset binding failed for wp %s: %s", code, _bind_err)
 
-                # 填充底稿表头
-                try:
-                    from app.services.wp_header_service import fill_workpaper_header
-                    await fill_workpaper_header(
-                        db=db, project_id=project_id, wp_id=wp.id,
-                        file_path=str(dest_file), wp_code=code, wp_name=wp_name,
-                        cycle=cycle,
-                    )
-                except Exception as _e:
-                    _logger.warning("fill header failed for %s: %s", code, _e)
+                # 填充底稿表头（只动 xlsx：openpyxl 存 xlsm 会丢宏，docx 不是工作簿）
+                if generated.path.suffix.lower() == ".xlsx":
+                    try:
+                        from app.services.wp_header_service import fill_workpaper_header
+                        await fill_workpaper_header(
+                            db=db, project_id=project_id, wp_id=wp.id,
+                            file_path=str(generated.path), wp_code=code, wp_name=wp_name,
+                            cycle=cycle,
+                        )
+                    except Exception as _e:
+                        _logger.warning("fill header failed for %s: %s", code, _e)
 
                 # 填充 parsed_data（核心产物；为空时写最小非空占位）
                 ensure_parsed_data_placeholder(wp, wp_code=code, created_by="generate_from_codes")
 
             created += 1
             created_codes.append(code)
+            if not generated.from_template:
+                blank_codes.append(code)
         except Exception as e:
+            discard_generated_file(generated)
             failures.append({"wp_code": code, "error": str(e)})
             _logger.warning("generate failed for %s: %s", code, e)
 
     await db.commit()
+    message = f"已生成 {created} 个底稿，跳过 {skipped} 个，失败 {len(failures)} 个"
+    if blank_codes:
+        shown = "、".join(blank_codes[:10]) + (" 等" if len(blank_codes) > 10 else "")
+        message += f"；{len(blank_codes)} 个编码没有找到底稿模板，已建空白底稿：{shown}"
     return {
         "created": created,
         "skipped": skipped,
         "created_codes": created_codes,
         "skipped_codes": skipped_codes,
+        "blank_codes": blank_codes,
         "failures": failures,
-        "message": f"已生成 {created} 个底稿，跳过 {skipped} 个，失败 {len(failures)} 个",
+        "message": message,
     }
 
 

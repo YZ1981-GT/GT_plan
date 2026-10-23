@@ -161,7 +161,8 @@ async def test_prev_reads_prior_year_and_prev_tb_nesting_is_not_broken_by_tb_sub
         value, errs = await _eval(db, pid, "PREV(TB('1001','年初余额')) + PREV('1001','期末余额') + TB('1001','期末余额')")
         assert (value, errs) == (Decimal("140"), [])
         _, errs = await _eval(db, pid, "PREV('1001','期末余额')", year=2024)
-        assert any("上年（2023）试算表无数据" in e for e in errs), errs
+        # 上年来源同项目上年 → 上年项目（prior_year_context，R2.4）：本项目无 2023 年试算表、也没有可认的上年项目
+        assert any("本项目没有 2023 年试算表" in e for e in errs), errs
 
 
 async def test_aux_four_three_and_two_arg_forms():
@@ -224,7 +225,8 @@ async def test_mixed_formula_and_whitespace_tolerant_tb():
     ("LEDGER('6001','借','全年')", "LEDGER"),
     ("COUNT_LEDGER('6001','借','全年')", "COUNT_LEDGER"),
     ("TB_AUX('1121','客户','期末余额') + 1", "TB_AUX"),
-    ("PREV('D2','审定表D2-1','审定数')", "PREV"),
+    # PREV 三参自 spec formula-fetch-and-wp-generation-defect-closure R2 起支持（上年同底稿取数），
+    # 见 test_prev_prior_wp_field.py
 ])
 async def test_unsupported_functions_are_not_evaluated_to_zero(expr, fn):
     class _NoDb:  # 不支持就不该碰数据库

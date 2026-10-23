@@ -31,6 +31,10 @@ from app.services.formula_push.bindings.balance_adj_calc import (
 from app.services.formula_push.js_compat import js_number_to_string
 from app.services.formula_push.rules import PushRule, workpaper_addr_id
 from app.services.formula_push.sources import FormulaSources, load_hall_adjustments, load_tb_audited
+from app.services.four_table.dual_family_codes import codes_for_cycle_slot
+from app.services.four_table.g_cycle_specs import G_CYCLE_SPECS
+from app.services.four_table.h6_account_scope import H6_ACCOUNT_SPEC
+from app.services.four_table.i_cycle_accounts import I_CYCLE_SEGMENTS
 
 
 # ── 数据结构 ────────────────────────────────────────────────────────────────
@@ -64,6 +68,11 @@ class AdjudicationSpec:
     sections: tuple[tuple[str, tuple[str, ...]], ...] = ()
     #: 动态行的金额字段后缀列表（用于审定合计计算）
     value_suffixes: tuple[str, ...] = ("unadj", "aje", "rje")
+    #: 多个科目是同一报表项目的互斥写法（双族：使用权资产 1641 / 1651、租赁负债 2601 / 2651，逐项目只用一族），
+    #: 附注主表只出一行（各码合计）。不并行时每码一行会全部对上附注同一行 ⇒ 撞行、一格都不写。
+    merge_note_codes: bool = False
+    #: 没有标准科目时的原因（``account_codes`` 为空时必填）：不取试算表、不推附注主表，相关格子交给用户填写
+    no_account_reason: str = ""
 
 
 @dataclass
@@ -132,12 +141,16 @@ class BalanceAdjudicationBinding:
     """
 
     def __init__(self, spec: AdjudicationSpec) -> None:
+        if not spec.account_codes and not spec.no_account_reason:
+            raise ValueError(f"{spec.wp_code}: 没有科目时必须写明 no_account_reason")
         self.wp_code = spec.wp_code
         self.account_prefixes = spec.account_codes
-        self.derivations: frozenset[str] = frozenset({
-            f"{spec.wp_code.lower()}_audited_total",
-            f"{spec.wp_code.lower()}_note_main",
-        })
+        #: 非空 = 本科目没有标准科目（bindings 校验据此放行空 account_prefixes）
+        self.no_account_reason = spec.no_account_reason if not spec.account_codes else ""
+        derivations = {f"{spec.wp_code.lower()}_audited_total"}
+        if spec.account_codes:  # 附注主表取自试算表；没有科目就没有附注主表推送
+            derivations.add(f"{spec.wp_code.lower()}_note_main")
+        self.derivations: frozenset[str] = frozenset(derivations)
         self.four_table_slots: frozenset[str] = frozenset()
         self.tb_columns: frozenset[str] = frozenset({"期末余额", "年初余额", "本期发生额"})
         self.paper_codes: tuple[str, ...] = (spec.wp_code,)
@@ -325,6 +338,8 @@ class BalanceAdjudicationBinding:
 
         rows: list[dict] = []
         account_name = _load_account_name(spec.wp_code)
+        if spec.merge_note_codes and len(codes) > 1:
+            return _merged_note_rows(spec.wp_code, account_name, codes, tb_data)
         for code in codes:
             is_pl = _is_pl_code(code)
             ending_col = "本期发生额" if is_pl else "期末余额"
@@ -366,6 +381,51 @@ class BalanceAdjudicationBinding:
 
 
 # ── 辅助 ────────────────────────────────────────────────────────────────────
+
+
+def _merged_note_rows(
+    wp_code: str, account_name: str, codes: tuple[str, ...],
+    tb_data: Mapping[str, Mapping[str, Decimal]],
+) -> list[dict]:
+    """互斥双族科目并成一行（各码合计），另附同值合计行供附注找不到同名行时兜底写合计。"""
+    from app.services.formula_push.bindings.note_direct import _tb_value
+
+    ending = opening = 0.0
+    ending_resolved = opening_resolved = False
+    for code in codes:
+        e, e_ok = _tb_value(tb_data, code, "期末余额")
+        o, o_ok = _tb_value(tb_data, code, "年初余额")
+        ending, opening = ending + e, opening + o
+        ending_resolved, opening_resolved = ending_resolved or e_ok, opening_resolved or o_ok
+    row = {
+        "key": f"{wp_code}-note-{'+'.join(codes)}",
+        "label": account_name,
+        "note_label": account_name,
+        "is_total": False,
+        "is_memo": False,
+        "ending": _round2(ending),
+        "opening": _round2(opening),
+        "ending_resolved": ending_resolved,
+        "opening_resolved": opening_resolved,
+    }
+    return [row, {**row, "key": f"{wp_code}-note-total", "is_total": True}]
+
+
+def _h6_codes() -> tuple[str, ...]:
+    """H6 固定资产清理：语义科目规格的兜底标准码（``h6_account_scope``，1606）。"""
+    return tuple(c for slot in H6_ACCOUNT_SPEC.slots for c in slot.fallback_standard_codes)
+
+
+def _g_codes(wp_code: str) -> tuple[str, ...]:
+    """G 循环：语义科目规格里原值侧（非备抵）槽的兜底标准码（``g_cycle_specs.G_CYCLE_SPECS``）。"""
+    return tuple(dict.fromkeys(
+        c for slot in G_CYCLE_SPECS[wp_code].slots if not slot.is_provision for c in slot.fallback_standard_codes
+    ))
+
+
+def _i_codes(wp_code: str) -> tuple[str, ...]:
+    """I 循环：段声明的兜底标准码（``i_cycle_accounts.I_CYCLE_SEGMENTS``，按声明顺序）；空 = 无标准科目。"""
+    return tuple(dict.fromkeys(c for seg in I_CYCLE_SEGMENTS[wp_code] for c in seg.fallback))
 
 
 def _load_account_name(wp_code: str) -> str:
@@ -487,8 +547,11 @@ _SPECS: dict[str, AdjudicationSpec] = {
     "G3": AdjudicationSpec(wp_code="G3", account_codes=('1131',), sheet_code="G3-1", has_provision=False, dynamic_rows=True),  # 应收股利
     "G4": AdjudicationSpec(wp_code="G4", account_codes=('1504',), sheet_code="G4-1", has_provision=False, dynamic_rows=True),  # 债权投资
     "G5": AdjudicationSpec(wp_code="G5", account_codes=('1531',), sheet_code="G5-1", has_provision=False, dynamic_rows=True),  # 长期应收款
-    "G6": AdjudicationSpec(wp_code="G6", account_codes=('1503',), sheet_code="G6-1", has_provision=False, dynamic_rows=True),  # 其他债权投资
-    "G8": AdjudicationSpec(wp_code="G8", account_codes=('1503',), sheet_code="G8-1", has_provision=False, dynamic_rows=True),  # 其他权益工具投资
+    # 🔴 G6 / G8 原先都手写 `1503`（旧准则「可供出售金融资产」）：新准则下要按业务模式与合同现金流量特征人工拆分，
+    #    不能自动归到任一科目（g_cycle_specs「旧准则拆分不可自动化」），两张底稿还会同推一个数。改取口径单一来源
+    #    （spec formula-fetch-and-wp-generation-defect-closure R1.4）。
+    "G6": AdjudicationSpec(wp_code="G6", account_codes=_g_codes("G6"), sheet_code="G6-1", has_provision=False, dynamic_rows=True),  # 其他债权投资（1506）
+    "G8": AdjudicationSpec(wp_code="G8", account_codes=_g_codes("G8"), sheet_code="G8-1", has_provision=False, dynamic_rows=True),  # 其他权益工具投资（1507）
     "G9": AdjudicationSpec(wp_code="G9", account_codes=('1519',), sheet_code="G9-1", has_provision=False, dynamic_rows=True),  # 其他非流动金融资产
     "G10": AdjudicationSpec(wp_code="G10", account_codes=('2101',), sheet_code="G10-1", has_provision=False, is_liability=True, dynamic_rows=True),  # 交易性金融负债
     # ── H 循环（固定资产，H1~H10） ──────────────────────────────────────────
@@ -497,17 +560,25 @@ _SPECS: dict[str, AdjudicationSpec] = {
     "H3": AdjudicationSpec(wp_code="H3", account_codes=('1521',), sheet_code="H3-1", has_provision=False, dynamic_rows=True),  # 投资性房地产
     "H4": AdjudicationSpec(wp_code="H4", account_codes=('1605',), sheet_code="H4-1", has_provision=False, dynamic_rows=True),  # 工程物资
     "H5": AdjudicationSpec(wp_code="H5", account_codes=('1631',), sheet_code="H5-1", has_provision=False, dynamic_rows=True),  # 油气资产
-    "H6": AdjudicationSpec(wp_code="H6", account_codes=('1606B',), sheet_code="H6-1", has_provision=False, dynamic_rows=True),  # 固定资产清理
+    # 🔴 H6 / H8 / H9 / I1~I5 的科目取自口径单一来源（不在这里再写一份字面量）。原先手写的是映射码 / 错码：
+    #    H6 `1606B`、I1 `1703B`（试算表标准码里没有字母后缀）、H8 `1901`（待处理财产损溢）、H9 `2802`（不存在）、
+    #    I5 `1901` ⇒ 推送恒为 0 或推别的科目（spec formula-fetch-and-wp-generation-defect-closure R1）。
+    "H6": AdjudicationSpec(wp_code="H6", account_codes=_h6_codes(), sheet_code="H6-1", has_provision=False, dynamic_rows=True),  # 固定资产清理
     "H7": AdjudicationSpec(wp_code="H7", account_codes=('1621',), sheet_code="H7-1", has_provision=False, dynamic_rows=True),  # 生产性生物资产
-    "H8": AdjudicationSpec(wp_code="H8", account_codes=('1901',), sheet_code="H8-1", has_provision=False, dynamic_rows=True),  # 使用权资产
-    "H9": AdjudicationSpec(wp_code="H9", account_codes=('2802',), sheet_code="H9-1", has_provision=False, is_liability=True, dynamic_rows=True),  # 租赁负债
+    "H8": AdjudicationSpec(wp_code="H8", account_codes=codes_for_cycle_slot("H8", "gross"), sheet_code="H8-1", has_provision=False, dynamic_rows=True, merge_note_codes=True),  # 使用权资产（原值，双族）
+    "H9": AdjudicationSpec(wp_code="H9", account_codes=codes_for_cycle_slot("H9", "gross"), sheet_code="H9-1", has_provision=False, is_liability=True, dynamic_rows=True, merge_note_codes=True),  # 租赁负债（双族；未确认融资费用另列，不并取）
     "H10": AdjudicationSpec(wp_code="H10", account_codes=('6115',), sheet_code="H10-1", has_provision=False, dynamic_rows=True),  # 资产处置损益
     # ── I 循环（无形资产，I1~I5） ────────────────────────────────────────────
-    "I1": AdjudicationSpec(wp_code="I1", account_codes=('1701', '1702', '1703B'), sheet_code="I1-1", has_provision=False, dynamic_rows=True),  # 无形资产
-    "I2": AdjudicationSpec(wp_code="I2", account_codes=('1704',), sheet_code="I2-1", has_provision=False, dynamic_rows=True),  # 开发支出
-    "I3": AdjudicationSpec(wp_code="I3", account_codes=('1711',), sheet_code="I3-1", has_provision=False, dynamic_rows=True),  # 商誉
-    "I4": AdjudicationSpec(wp_code="I4", account_codes=('1801',), sheet_code="I4-1", has_provision=False, dynamic_rows=True),  # 长期待摊费用
-    "I5": AdjudicationSpec(wp_code="I5", account_codes=('1901',), sheet_code="I5-1", has_provision=False, dynamic_rows=True),  # 其他非流动资产
+    "I1": AdjudicationSpec(wp_code="I1", account_codes=_i_codes("I1"), sheet_code="I1-1", has_provision=False, dynamic_rows=True),  # 无形资产（原价 / 累计摊销 / 减值准备）
+    "I2": AdjudicationSpec(wp_code="I2", account_codes=_i_codes("I2"), sheet_code="I2-1", has_provision=False, dynamic_rows=True),  # 开发支出
+    "I3": AdjudicationSpec(wp_code="I3", account_codes=_i_codes("I3"), sheet_code="I3-1", has_provision=False, dynamic_rows=True),  # 商誉
+    "I4": AdjudicationSpec(wp_code="I4", account_codes=_i_codes("I4"), sheet_code="I4-1", has_provision=False, dynamic_rows=True),  # 长期待摊费用
+    "I5": AdjudicationSpec(
+        wp_code="I5", account_codes=_i_codes("I5"), sheet_code="I5-1", has_provision=False, has_account=False,
+        dynamic_rows=True,
+        no_account_reason="其他非流动资产没有标准科目（报表行 BS-037 引用的 1911 在标准科目表与各项目试算表里都不存在），"
+                          "试算平衡表数与附注主表交给用户填写",
+    ),  # 其他非流动资产
 }
 
 

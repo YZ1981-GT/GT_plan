@@ -7,7 +7,9 @@ spec: .kiro/specs/d-cycle-four-table-extraction-formulas/
   * D4 营业收入（6001/6051，收入类 occurrence）：D4-1 审定表主营/其他明细行**按产品/项目**，
     由 D4-2/D4-3 明细（序时账 6001 贷方按产品×月归集）SUMIF 派生。TB 6001/6051 只有科目
     总额、无产品维度 → render **不返回 adjudication_prefill**。Tier A = D4-1-adj-tb-6001 /
-    D4-1-adj-tb-6051（TB('6001','审定数') / TB('6051','审定数')，收入 audited_amount 存审定发生额）。
+    D4-1-adj-tb-6051（TB('6001','本期发生额') / TB('6051','本期发生额')；损益类取发生额列，
+    = audited_amount − opening_balance，73a1c358d 起与 H10 / I6 同口径，守卫见
+    test_formula_push_tier_a.TestBannedColumnRewrite）。
   * D5 应收款项融资（1124/balance）：D5-1 审定表两固定分类行（应收票据/应收账款），由 D5-2
     按类别 SUMIF 派生。TB 1124 无类别拆分 → render **不返回 adjudication_prefill**。
     Tier A = D5-1-tb-amount（TB('1124','期末余额')）。
@@ -28,6 +30,7 @@ import pytest
 
 from app.core.config import settings
 from app.routers import wp_formula as router_mod
+from tests.d_cycle_extraction._endpoint_doubles import AuthGateSessionMixin, admin_user, formula_row
 from app.routers.wp_render_strategies import _d4_operating_revenue as d4
 from app.routers.wp_render_strategies import _d5_receivables_financing as d5
 from app.routers.wp_render_strategies import _d7_contract_liabilities as d7
@@ -250,7 +253,7 @@ def test_no_fabricated_classification_rows(monkeypatch, wp_code):
 
 
 # ---------------------------------------------------------------------------
-# D4：两 Tier A 标量（6001 主营 / 6051 其他，收入 audited_amount = 审定发生额）
+# D4：两 Tier A 标量（6001 主营 / 6051 其他，损益类取「本期发生额」列）
 # ---------------------------------------------------------------------------
 
 
@@ -260,8 +263,8 @@ def test_d4_presets_two_scalars_pass_gates(monkeypatch):
     presets = load_presets("D4")
     assert len(presets) == 2, "Task 6.1：D4 应有 2 条 Tier A 预设（6001 主营 + 6051 其他）"
     by_anchor = {p["anchor"]: p for p in presets}
-    assert by_anchor["D4-1-adj-tb-6001"]["expression"] == "TB('6001','审定数')"
-    assert by_anchor["D4-1-adj-tb-6051"]["expression"] == "TB('6051','审定数')"
+    assert by_anchor["D4-1-adj-tb-6001"]["expression"] == "TB('6001','本期发生额')"
+    assert by_anchor["D4-1-adj-tb-6051"]["expression"] == "TB('6051','本期发生额')"
     for p in presets:
         assert is_known_anchor("D4", p["anchor"]) is True
         assert find_unsupported_formula_functions(p["expression"]) == []
@@ -285,7 +288,7 @@ def test_d4_get_endpoint_surfaces_both_tier_a(monkeypatch):
     monkeypatch.setattr(settings, "D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED", True)
     wp = _wp()
     db = _FormulaFakeSession(wp=wp, wp_code="D4", user_formulas=[])
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
     ext = resp["extraction"]
     assert ext["wp_code"] == "D4"
     assert ext["enabled"] is True
@@ -396,7 +399,7 @@ def test_get_endpoint_surfaces_tier_b(monkeypatch, wp_code):
     monkeypatch.setattr(settings, "D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED", True)
     wp = _wp()
     db = _FormulaFakeSession(wp=wp, wp_code=wp_code, user_formulas=[])
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
     tier_b = resp["extraction"]["tierB"]
     assert len(tier_b) == _EXPECTED_TIER_B_COUNT[wp_code]
     for e in tier_b:
@@ -411,7 +414,7 @@ def test_flag_off_no_extraction(monkeypatch, wp_code):
     monkeypatch.setattr(settings, "D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED", False)
     wp = _wp()
     db = _FormulaFakeSession(wp=wp, wp_code=wp_code, user_formulas=[])
-    resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
+    resp = _run(router_mod.list_formulas(wp.id, project_id=None, sheet_uid=None, db=db, user=_user()))
     assert "extraction" not in resp
 
 
@@ -432,7 +435,7 @@ class _FormulaFakeResult:
         return SimpleNamespace(all=lambda: list(self._rows))
 
 
-class _FormulaFakeSession:
+class _FormulaFakeSession(AuthGateSessionMixin):
     def __init__(self, *, wp, wp_code, user_formulas=None):
         self.wp = wp
         self.wp_code = wp_code
@@ -465,7 +468,7 @@ def _wp():
 
 
 def _wp_formula(target_cell, *, expression, sheet_name="D5-1", wp=None):
-    return SimpleNamespace(
+    return formula_row(
         id=uuid4(),
         project_id=(wp.project_id if wp else uuid4()),
         wp_id=(wp.id if wp else uuid4()),
@@ -486,7 +489,8 @@ def _wp_formula(target_cell, *, expression, sheet_name="D5-1", wp=None):
 
 
 def _user():
-    return SimpleNamespace(id=uuid4(), username="tester")
+    """管理员身份：端点内项目鉴权门照常执行（管理员分支），见 _auth_gate_double。"""
+    return admin_user()
 
 
 # ---------------------------------------------------------------------------
@@ -520,12 +524,17 @@ def test_task8_provenance_anchor_never_uses_old_write_key():
 
 
 def test_task8_tier_a_tb_scalars_preserved():
-    """D4-1-adj-tb-6001/6051 Tier A 公式保持不动（TB↔审定核对标量，非明细行未审数）。"""
+    """D4-1-adj-tb-6001/6051 Tier A 公式保持不动（TB↔审定核对标量，非明细行未审数）。
+
+    口径随 73a1c358d 改为损益类「本期发生额」：试算表取数里「审定数」等同期末余额，
+    损益类期初非零时会把期初算进本期。本用例原断言旧口径、自那次起一直红，现按现行预设
+    更新（spec formula-fetch-and-wp-generation-defect-closure R7.2）。
+    """
     presets = load_presets("D4")
     assert len(presets) == 2, "D4 应有 2 条 Tier A 预设（6001 主营 + 6051 其他）"
     by_anchor = {p["anchor"]: p for p in presets}
-    assert by_anchor["D4-1-adj-tb-6001"]["expression"] == "TB('6001','审定数')"
-    assert by_anchor["D4-1-adj-tb-6051"]["expression"] == "TB('6051','审定数')"
+    assert by_anchor["D4-1-adj-tb-6001"]["expression"] == "TB('6001','本期发生额')"
+    assert by_anchor["D4-1-adj-tb-6051"]["expression"] == "TB('6051','本期发生额')"
 
 
 def test_task8_tb_scalars_not_flagged_by_no_fabrication_guard():
