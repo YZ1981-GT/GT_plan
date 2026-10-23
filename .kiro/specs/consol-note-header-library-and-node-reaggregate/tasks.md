@@ -172,4 +172,5 @@
 - [x] 49. 跨表 / 跨期规则逐条核对：说明成立的按标题行库语义改对两侧单元格，不成立的删除并记理由；守卫（两侧语义键可比、行存在、说明与章节一致）（R7.5）
   - 117 → 70 条（国企 34 / 上市 36）：跨表 38 条改对 24、删 14；跨期 24 条全删；列平衡去掉种子列号改由标题行库认（与审核规则 2 共用 `rollforward_balance`），认不出的 5 条删、重复 4 条去重；逐条理由见 design §16.9 批 8c
   - 守卫 `test_consol_note_check_rules_semantics.py`（同父章节、行唯一、期间与计量可比、说明逐侧写明行 / 期间 / 计量，可伪证用例 6 条）；变异 19 条全红
-- [ ] 50. 收尾：design §16 实施记录、INDEX / memory；干净 worktree 回归；私有索引提交、推送、`ls-remote` 核对；清理探针与临时文件
+- [x] 50. 收尾：design §16 实施记录、INDEX / memory；干净 worktree 回归；私有索引提交、推送、`ls-remote` 核对；清理探针与临时文件
+  - `af9242b21`（在 8b `54e73f695` 之上，31 个文件）推到 `spec/disclosure-note-doc-upload-and-batch-fill`，`ls-remote` 一致；提交前在要提交的那棵树上回归、行数门、U+FFFD、gitleaks（no leaks）；INDEX 与 `ConsolNoteTab.vue` 按 HEAD + 本会话改动块提交，并发会话已暂存的 INDEX 改动在提交后原样恢复；design §16.9 批 8c、memory 已记；本会话测试 worktree、临时 tsconfig / 类型探针、截图已清理，推送用 worktree 与一次性脚本目录在本条推送后删除
