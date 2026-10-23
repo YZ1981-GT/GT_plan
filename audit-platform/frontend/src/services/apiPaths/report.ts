@@ -363,6 +363,8 @@ export const consolidation = {
   notes: {
     // 重新汇总：所选节点子树逐节点拉数（单体附注）/ 差额 / 自下而上汇总 → ReaggregateResponse
     reaggregate: (pid: string, year: number) => `/api/consolidation/notes/${pid}/${year}/reaggregate`,
+    // GET / PUT 试算表变动后自动按公式刷新合并附注的项目级开关（后端路由沿用 V2 时期名 consol-note-gray）
+    autoRefresh: (pid: string) => `/api/consolidation/notes/${pid}/config/consol-note-gray`,
   },
   reports: {
     list: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}`,

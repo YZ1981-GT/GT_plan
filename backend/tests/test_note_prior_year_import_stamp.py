@@ -285,3 +285,69 @@ async def test_inherit_copies_prior_text_stamps_and_ignores_recycle_bin(env):
     assert cash.updated_by == env["ids"]["me"] and _utc(cash.updated_at) >= since
     assert cash.template_lineage["prior_year_source"] == YEAR - 1
     assert period.text_content == "<p>内容模板写的</p>" and period.updated_by is None
+
+
+# ── R7.2 合并锁定时拒绝；R7.3 上年正文只是占位话不导入（spec consol-note-header-library-and-node-reaggregate） ──
+
+
+async def _lock(env: dict) -> None:
+    async with env["factory"]() as db:
+        project = await db.get(Project, env["ids"]["p"])
+        project.consol_lock = True
+        await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_consol_lock_rejects_import_preview_and_inherit(env):
+    """合并锁定 ⇒ 上年导入（含预览）与上年继承 423，库里一格不动（原来 consol_lock=False 照写）。"""
+    await _lock(env)
+    base = f"/api/projects/{env['ids']['p']}/notes"
+    responses = [await _post(env, "preview"), await _post(env, "auto"),
+                 await env["client"].post(f"{base}/inherit-prior-year?year={YEAR}")]
+    assert [r.status_code for r in responses] == [423, 423, 423], [r.text for r in responses]
+    assert {r.json()["detail"] for r in responses} == {"项目已被合并锁定，无法修改"}
+    cash = await _note(env, "cash")
+    assert (cash.text_content, cash.updated_by) == (None, None)
+    assert [r["values"] for r in cash.table_data["_tables"][0]["rows"]] == [[None, None], [5, 7]]
+
+
+PLACEHOLDER_DOCX = _docx([
+    ("货币资金", "本期无此项业务。", [HEADERS, ["库存现金", "1,234.50", "800"], ["银行存款", "(66)", "9"]]),
+    ("会计期间", "不适用。", None),
+])
+
+
+@pytest.mark.asyncio
+async def test_placeholder_prior_text_is_not_imported(env):
+    """上年正文只是「本期无此项业务。」⇒ 不覆盖本年正文（表格照填）；预览的「将导入正文」章节数不算它。"""
+    async with env["factory"]() as db:
+        note = await db.get(DisclosureNote, env["ids"]["cash"])
+        note.text_content = "本年已写的货币资金说明。"
+        await db.commit()
+    preview = (await _post(env, "preview", file=PLACEHOLDER_DOCX)).json()
+    assert preview["text_sections"] == 0
+    resp = await _post(env, "auto", file=PLACEHOLDER_DOCX)
+    assert resp.status_code == 200, resp.text
+    assert (resp.json()["text_filled"], resp.json()["filled_cells"]) == (0, 1)
+    cash = await _note(env, "cash")
+    assert cash.text_content == "本年已写的货币资金说明。"
+    assert [r["values"] for r in cash.table_data["_tables"][0]["rows"]] == [[None, 1234.5], [5, 7]]
+    # 按确认写入同口径：勾了表、正文照样不覆盖
+    [table] = preview["tables"]
+    pick = [{"key": table["key"], "prior_table_id": table["prior_table_id"], "col_map": table["col_map"]}]
+    resp = await _post(env, "apply", file=PLACEHOLDER_DOCX,
+                       data={"decisions": json.dumps(pick), "file_sha256": preview["file_sha256"]})
+    assert resp.status_code == 200 and resp.json()["text_filled"] == 0, resp.text
+    assert (await _note(env, "cash")).text_content == "本年已写的货币资金说明。"
+
+
+@pytest.mark.asyncio
+async def test_inherit_skips_placeholder_prior_text(env):
+    async with env["factory"]() as db:
+        prior = await db.get(DisclosureNote, env["ids"]["prior_cash"])
+        prior.text_content = "<p>本期无此项业务。</p>"
+        await db.commit()
+    resp = await env["client"].post(f"/api/projects/{env['ids']['p']}/notes/inherit-prior-year?year={YEAR}")
+    assert resp.status_code == 200 and resp.json()["inherited"] == 0, resp.text
+    cash = await _note(env, "cash")
+    assert (cash.text_content, cash.updated_by) == (None, None)

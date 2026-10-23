@@ -36,6 +36,7 @@
             <el-tooltip content="重新汇总：本节点下各企业按已确认映射从单体附注重新拉数，差额节点按抵销分录重算，再自下而上汇总到本节点（映射在「📋 明细映射」确认）" placement="bottom">
               <el-button size="small" @click="handleReaggregate" :loading="reaggregating">🔄 重新汇总</el-button>
             </el-tooltip>
+            <ConsolNoteAutoRefreshSwitch v-if="props.projectId" :project-id="props.projectId" />
             <el-tooltip content="审核当前表格公式一致性" placement="bottom">
               <el-button size="small" @click="auditCurrentNote" :loading="noteSingleAuditLoading">✅</el-button>
             </el-tooltip>
@@ -774,6 +775,7 @@ import {
 import { useAcnr } from '@/services/acnr/useAcnr'
 import ConsolNoteMappingDialog from '@/components/consolidation/ConsolNoteMappingDialog.vue'
 import ConsolNoteTemplateManagerDialog from '@/components/consolidation/ConsolNoteTemplateManagerDialog.vue'
+import ConsolNoteAutoRefreshSwitch from '@/components/consolidation/ConsolNoteAutoRefreshSwitch.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'

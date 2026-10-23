@@ -25,14 +25,14 @@ import pytest
 import pytest_asyncio
 from httpx import Response
 
-from authz_world import (
+from tests.authz_world import (
     TARGET_NOTE_ID,
     TARGET_PROJECT_ID,
     AuthzWorld,
     Identity,
     sqlite_world,
 )
-from note_edit_gate_recipes import ALL_RECIPES, Recipe
+from tests.note_edit_gate_recipes import ALL_RECIPES, Recipe
 
 # ---------------------------------------------------------------------------
 # 清册加载与覆盖集合
@@ -195,7 +195,7 @@ async def world(monkeypatch: pytest.MonkeyPatch) -> AuthzWorld:
         # A2 需要目标项目上的 DisclosureNote（对象 id 端点反查用）——world 已建 disclosure_notes 表
         from app.models.report_models import DisclosureNote as DN, NoteValidationResult as NVR
         from sqlalchemy.schema import CreateTable
-        from note_edit_gate_recipes import _NOTE_ID, _VALIDATION_ID, _YEAR
+        from tests.note_edit_gate_recipes import _NOTE_ID, _VALIDATION_ID, _YEAR
         await w.db.execute(
             DN.__table__.insert().values(
                 id=_NOTE_ID,
@@ -427,7 +427,7 @@ async def test_b1_refresh_denied_preserves_table_data(world: AuthzWorld, recipe:
 
     用非成员发 B1 刷新请求，在请求前后分别读取目标附注的 table_data，断言二者逐值相等。
     """
-    from note_edit_gate_recipes import _NOTE_ID, _YEAR
+    from tests.note_edit_gate_recipes import _NOTE_ID, _YEAR
 
     # 记录刷新前的 table_data
     from app.models.report_models import DisclosureNote as DN
@@ -512,8 +512,9 @@ def _load_design_gate_set_11_6() -> set[tuple[str, str]]:
     }
 
 
-# ---- 需求 8.9 冻结的 13 个合并锁端点 ----
-_FROZEN_CONSOL_LOCK_13: frozenset[tuple[str, str]] = frozenset({
+# ---- 需求 8.9 冻结的 13 个合并锁端点 + R7.2（用户 2026-10-22「后端导入接口在合并锁定时也要拦」）上年导入 / 继承 2 个 ----
+_FROZEN_CONSOL_LOCK: frozenset[tuple[str, str]] = frozenset({
+    ("POST", "/api/projects/{project_id}/notes/import-prior-year"), ("POST", "/api/projects/{project_id}/notes/inherit-prior-year"),
     ("POST", "/api/disclosure-notes/generate"),
     ("PUT", "/api/disclosure-notes/{note_id}"),
     ("PATCH", "/api/disclosure-notes/{project_id}/{year}/restore/{note_id}"),
@@ -583,15 +584,15 @@ class TestCoverageSetClosure:
 
 
 class TestConsolLockClosure:
-    """Task 11.6: 覆盖集合 ∩ 合并锁 == 8.9 冻结的 13 个。
+    """Task 11.6: 覆盖集合 ∩ 合并锁 == 冻结集合（8.9 的 13 个 + R7.2 的上年导入 / 继承 2 个）。
 
     _Requirements: 6.6, 8.9_
     """
 
-    def test_consol_lock_equals_frozen_13(self) -> None:
-        """覆盖集合内合并锁适用端点 == 冻结的 13 个。"""
+    def test_consol_lock_equals_frozen_set(self) -> None:
+        """覆盖集合内合并锁适用端点 == 冻结集合（15 个）。"""
         actual = _load_consol_lock_in_coverage()
-        expected = _FROZEN_CONSOL_LOCK_13
+        expected = _FROZEN_CONSOL_LOCK
 
         only_in_actual = actual - expected
         only_in_expected = expected - actual
@@ -607,7 +608,7 @@ class TestConsolLockClosure:
                 diff_lines.append(f"  - {m} {p}")
 
         assert actual == expected, (
-            f"覆盖集合 ∩ 合并锁 != 冻结的 13 个"
+            f"覆盖集合 ∩ 合并锁 != 冻结集合"
             f"（实际 {len(actual)} 个 vs 冻结 {len(expected)} 个）：\n"
             + "\n".join(diff_lines)
         )
@@ -734,7 +735,7 @@ class TestAuthorizationBaselineTerminalValues:
 
     def test_identity_only_baseline_matches_scan(self) -> None:
         """_IDENTITY_ONLY_BASELINE 与现算值相等（棘轮只许向下）。"""
-        from test_project_endpoint_authorization_baseline import (
+        from tests.test_project_endpoint_authorization_baseline import (
             _IDENTITY_ONLY_BASELINE,
             _scan_identity_only,
         )
@@ -750,7 +751,7 @@ class TestAuthorizationBaselineTerminalValues:
         基线只许向下；差距超过 20 时应下调常量锁住成果。
         提交前的最终收口任务会将常量调为精确等于现算值。
         """
-        from test_project_endpoint_authorization_baseline import (
+        from tests.test_project_endpoint_authorization_baseline import (
             _PREFIXED_IDENTITY_ONLY_BASELINE,
             _scan_prefixed,
         )
@@ -771,7 +772,7 @@ class TestAuthorizationBaselineTerminalValues:
         design_gate = _load_design_gate_set_11_6()
         table_b_keys = coverage | design_gate
 
-        from test_project_endpoint_authorization_baseline import (
+        from tests.test_project_endpoint_authorization_baseline import (
             _scan_identity_only,
             _scan_prefixed,
         )

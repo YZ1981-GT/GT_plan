@@ -2360,7 +2360,7 @@
       "category": "E",
       "current_equals_target": true,
       "current_gate": {
-        "consol_lock": false,
+        "consol_lock": true,
         "eqcr_exclusion": true,
         "forms": [
           {
@@ -2369,7 +2369,7 @@
             "level": "review",
             "name": "require_note_edit_access",
             "params": {
-              "consol_lock": false
+              "consol_lock": true
             },
             "via": "signature"
           }
@@ -2404,7 +2404,7 @@
       "category": "E",
       "current_equals_target": true,
       "current_gate": {
-        "consol_lock": false,
+        "consol_lock": true,
         "eqcr_exclusion": true,
         "forms": [
           {
@@ -2413,7 +2413,7 @@
             "level": "review",
             "name": "require_note_edit_access",
             "params": {
-              "consol_lock": false
+              "consol_lock": true
             },
             "via": "signature"
           }

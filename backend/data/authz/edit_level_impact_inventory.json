@@ -8136,7 +8136,7 @@
       "level": "review",
       "ordinal": 1,
       "overlays": {
-        "consol_lock": false,
+        "consol_lock": true,
         "global_capability": null,
         "global_role_bypass": [],
         "operations": [
@@ -8159,7 +8159,7 @@
       "level": "review",
       "ordinal": 1,
       "overlays": {
-        "consol_lock": false,
+        "consol_lock": true,
         "global_capability": null,
         "global_role_bypass": [],
         "operations": [

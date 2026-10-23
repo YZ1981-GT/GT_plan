@@ -551,6 +551,26 @@ export interface ConsolNoteReaggregateResult {
   pending_entities: Array<{ node_key: string; label: string; section_count: number; sections: string[]; reasons: string[] }>
 }
 
+/**
+ * 试算表变动后自动按公式刷新合并附注的开关（spec consol-note-header-library-and-node-reaggregate R7.1）。
+ * 生效值 = 全局 OR 项目；从单体附注拉来的数不覆盖、只标待更新。
+ */
+export interface ConsolNoteAutoRefreshState {
+  project_enabled: boolean
+  global_enabled: boolean
+  effective_enabled: boolean
+}
+
+/** 读开关（调用方自管错误提示） */
+export async function getConsolNoteAutoRefresh(projectId: string): Promise<ConsolNoteAutoRefreshState> {
+  return api.get(P.notes.autoRefresh(projectId), { _silent: true } as any)
+}
+
+/** 写项目级开关（需本项目编辑权限；调用方自管错误提示） */
+export async function setConsolNoteAutoRefresh(projectId: string, enabled: boolean): Promise<ConsolNoteAutoRefreshState> {
+  return api.put(P.notes.autoRefresh(projectId), { enabled }, { _silent: true } as any)
+}
+
 // ─── 合并企业树（三码推导，spec consol-tree-three-code-autobuild）─────────────────
 
 /** 节点角色：合并 / 合并差额 / 母公司 / 本部 / 母分差额 / 子公司 / 分公司 */

@@ -173,6 +173,26 @@ class TestPlan:
         apply_col_map(cont, parsed.tables["t1"].word, plans[0].col_map)
         assert cont["rows"][0]["values"] == [100.0, 5.0, 95.0]
 
+    def test_book_amount_header_is_book_balance(self):
+        """R7.4：国企单体模板 八、5 坏账分类表分组表头写「账面金额」，上年交付件 / 其他项目写「账面余额」⇒ 同义，
+        本年「（续：期初数）」三列金额都认到上年期末表（真库和平药房 ← 重药安徽两种导出均如此，2026-10-23 只读核对）。"""
+        doc = docx.Document()
+        doc.add_heading("应收账款", level=2)
+        doc.add_paragraph("（2）按坏账准备计提方法分类披露应收账款")
+        _add_table(doc, [
+            ["类  别", "账面余额", None, "坏账准备", None, "账面价值"],
+            [None, "金额", "比例(%)", "金额", "预期信用损失率(%)", None],
+            ["按单项计提坏账准备", "100", "10", "5", "5", "95"],
+        ], merges=((0, 0, 1, 0), (0, 1, 0, 2), (0, 3, 0, 4), (0, 5, 1, 5)))
+        cont = {"name": "（2）按坏账准备计提方法分类披露应收账款（续：期初数）",
+                "headers": ["类 别", "金额", "比例(%)", "金额", "预期信用损失率(%)", "账面价值"],
+                "_column_groups": [{"group": "账面金额", "start": 1, "span": 2}, {"group": "坏账准备", "start": 3, "span": 2}],
+                "rows": _rows("按单项计提坏账准备", width=5)}
+        parsed, [plan] = _plan(_save(doc), _note("应收账款", [cont]))
+        assert (plan.status, plan.col_map) == (STATUS_AUTO, {1: 1, 3: 3, 5: 5})
+        assert apply_col_map(cont, parsed.tables[plan.prior_table_id].word, plan.col_map) == 3
+        assert cont["rows"][0]["values"] == [100.0, None, 5.0, None, 95.0]
+
     def test_continuation_is_not_linked_to_another_section_by_adjacency_alone(self):
         """续表只凭「紧挨着上一张」认主表时须在同一标题下：交付件删掉了空主表，续表不认到上一节的表上去补期间。"""
         doc = docx.Document()

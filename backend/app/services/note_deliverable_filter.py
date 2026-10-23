@@ -36,6 +36,7 @@ __all__ = [
     "deliverable_text_blocks",
     "filter_note_blocks",
     "is_guidance_line",
+    "is_placeholder_text",
     "table_blank_for_delivery",
     "make_block_filter",
     "note_has_deliverable_content",
@@ -235,6 +236,20 @@ def _judge(line: str) -> _LineVerdict:
     ):
         return _LineVerdict(drop=True)
     return _LineVerdict()
+
+
+def is_placeholder_text(text: str | None) -> bool:
+    """正文只是无业务占位话（「本期无此项业务。」「不适用。」）：每个非空行规范化后都是这类句子。
+
+    交付件按 ``_NO_BUSINESS_RE`` 删的就是这些行；上年附注导入 / 继承用同一判定：上年正文是占位话就不导入、
+    不覆盖本年（spec consol-note-header-library-and-node-reaggregate R7.3）。HTML 正文按交付件提取口径取文字；
+    空文本不算占位（调用方另判空）。
+    """
+    from app.services.note_text_word_render import note_text_plain
+
+    lines = [_BULLET_RE.sub("", _nfkc(line).strip()) for line in note_text_plain(text).splitlines()]
+    lines = [line for line in lines if line]
+    return bool(lines) and all(_NO_BUSINESS_RE.match(line) for line in lines)
 
 
 # ── 块操作 ────────────────────────────────────────────────────────────────────

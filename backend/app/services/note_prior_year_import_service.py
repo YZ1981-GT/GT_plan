@@ -2,7 +2,8 @@
 
 Requirements: 51.1, 51.2, 51.3, 51.4, 51.5, 51.7, 51.8
 
-- 上年附注 .docx：按标题对上本年章节，填正文（内容模板写过的不覆盖）与表格期初列（上年期末 → 本年期初，只填空格），
+- 上年附注 .docx：按标题对上本年章节，填正文（内容模板写过的不覆盖；上年正文只是「本期无此项业务。」这类占位话的
+  不导入，R7.3）与表格期初列（上年期末 → 本年期初，只填空格），
   标记「待更新」。表格逐张规划见 ``note_prior_year_plan``（spec consol-note-header-library-and-node-reaggregate R6.6）：
   ``mode="auto"`` 只写自动认出的表（原端点行为），``preview`` 只返回逐表规划，``apply`` 按用户逐表确认写入
   （重传文件、校验 sha256，服务端不存临时文件）。
@@ -37,6 +38,13 @@ from app.services.note_prior_year_plan import (
 logger = logging.getLogger(__name__)
 
 IMPORT_MODES = ("auto", "preview", "apply")
+
+
+def _importable_text(text: str | None) -> bool:
+    """上年正文值得导入 / 继承：有字，且不只是「本期无此项业务。」这类占位话（与交付件过滤同一判定，R7.3）。"""
+    from app.services.note_deliverable_filter import is_placeholder_text
+
+    return bool((text or "").strip()) and not is_placeholder_text(text)
 
 
 class PriorYearImportError(ValueError):
@@ -175,7 +183,7 @@ class NotePriorYearImportService:
             return {
                 "status": "preview", "file_sha256": sha, **summary, "counts": counts, "tables": tables,
                 "text_sections": sum(1 for n, h in zip(notes, sections)
-                                     if h is not None and doc.headings[h].text.strip() and not n.is_local_override),
+                                     if h is not None and _importable_text(doc.headings[h].text) and not n.is_local_override),
                 "prior_tables": [
                     {"id": t.id, "section": doc.headings[t.heading].title if t.heading is not None else "",
                      "caption": t.caption, "columns": t.columns(), "row_count": len(t.word.rows)}
@@ -194,7 +202,7 @@ class NotePriorYearImportService:
         for note, h in zip(notes, sections):
             changed = False
             text = doc.headings[h].text if h is not None else ""
-            if import_text and text.strip() and not note.is_local_override and note.text_content != text:
+            if import_text and _importable_text(text) and not note.is_local_override and note.text_content != text:
                 note.text_content = text
                 changed = True
                 text_filled += 1
@@ -292,7 +300,7 @@ class NotePriorYearImportService:
             if not note.note_section:
                 continue
             prior = prior_by_section.get(note.note_section)
-            if prior and prior.text_content:
+            if prior and _importable_text(prior.text_content):
                 # 跳过 is_local_override 的章节：用户已通过内容模板写入自定义正文，
                 # 上年继承不得覆盖（与 disclosure_engine / wp_disclosure_sync_service 同口径）
                 if note.is_local_override or note.text_content == prior.text_content:

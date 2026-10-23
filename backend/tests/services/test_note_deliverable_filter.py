@@ -321,3 +321,26 @@ def test_short_bracket_is_a_placeholder_kept_and_counted():
     text = "本公司会计核算以权责发生制为基础。除某些金融工具【和投资性房地产】外，本财务报表均以历史成本为计量基础。"
     assert _lines(deliverable_text_blocks(_note(text, code="四、2", title="会计基础"), stats=st)) == [text]
     assert st.placeholders_left == 1
+
+
+# ── 占位正文判定（spec consol-note-header-library-and-node-reaggregate R7.3：上年导入 / 继承共用） ──
+
+
+@pytest.mark.parametrize("text", [
+    "本期无此项业务。", "本期无此项业务", "  本期无此项业务。\n", "不适用。", "本年无此类业务。",
+    "报告期内无此业务", "* 本期无此项业务。", "<p>本期无此项业务。</p>", "本期无此项业务。\n\n不适用。",
+])
+def test_placeholder_text_is_recognised(text):
+    from app.services.note_deliverable_filter import is_placeholder_text
+
+    assert is_placeholder_text(text)
+
+
+@pytest.mark.parametrize("text", [
+    "", None, "   ", "截至 2025 年 12 月 31 日，本公司无交易性金融资产。", "本期无此项业务。期末余额 100 元。",
+    "本期无此项业务。\n本公司本期新增应收票据 300 万元。", "<p>上年货币资金说明正文。</p>", "本期无此情形。",
+])
+def test_real_text_is_not_placeholder(text):
+    from app.services.note_deliverable_filter import is_placeholder_text
+
+    assert not is_placeholder_text(text)

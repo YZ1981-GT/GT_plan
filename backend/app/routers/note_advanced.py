@@ -4,8 +4,8 @@ Requirements: 42.1-42.5, 43.1-43.5, 51.1-51.8
 
 鉴权（spec disclosure-note-template-word-realignment Task 15）：路由前缀带 ``{project_id}``，原来五个端点一个鉴权依赖
 都没挂 ⇒ 未登录即可读写任意项目附注。改为与附注其余端点同级：读 ``readonly``、写 ``edit``；写附注的两处（上年
-Word 导入 / 上年继承）以当前用户盖「最近一次编辑」。年度改为必填查询参数（原来取不存在的 ``project.current_year``
-⇒ 恒为 2025）。
+Word 导入 / 上年继承）以当前用户盖「最近一次编辑」，项目合并锁定时拒绝（423；spec consol-note-header-library-and-node-reaggregate
+R7.2）。年度改为必填查询参数（原来取不存在的 ``project.current_year`` ⇒ 恒为 2025）。
 """
 from __future__ import annotations
 
@@ -40,7 +40,8 @@ async def import_prior_year_notes(
     file_sha256: str | None = Form(None, description="apply：预览返回的文件指纹（重传同一文件）"),
     import_text: bool = Form(True, description="是否同时填入上年正文"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
+    # 合并锁定时拒绝（423，含预览）：上年内容会写进本年附注，与其余附注批量写入同口径（R7.2）
+    current_user: User = Depends(require_note_edit_access(consol_lock=True)),
 ) -> dict[str, Any]:
     """上传上年附注 .docx，按标题匹配本年章节，填入正文与表格期初列（上年期末 → 本年期初，只填空格）。
 
@@ -81,7 +82,7 @@ async def inherit_prior_year_notes(
     project_id: UUID,
     year: int = Query(..., description="本年附注年度（从 year-1 年继承正文）"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_note_edit_access(consol_lock=False)),
+    current_user: User = Depends(require_note_edit_access(consol_lock=True)),  # 合并锁定时拒绝（R7.2）
 ) -> dict[str, Any]:
     """连续审计：从本库上一年度附注继承正文（标记待更新）。"""
     from app.services.note_prior_year_import_service import NotePriorYearImportService

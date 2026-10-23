@@ -66,6 +66,7 @@ function mountTab(extra: Record<string, unknown> = {}) {
       'el-divider': true, 'el-tag': Pass, 'el-radio-group': Pass, 'el-radio-button': Pass, 'el-tree': true,
       teleport: true, 'el-radio': true,
       CellContextMenu: true, CommentTooltip: Pass, SelectionBar: true, GtAmountCell: true,
+      ConsolNoteAutoRefreshSwitch: true,
     } },
   })
   wrappers.push(wrapper)
@@ -703,5 +704,15 @@ describe('重新汇总 = 节点子树逐节点更新 + 自下而上汇总（spec
     expect(message.success).not.toHaveBeenCalled()
     expect(message.warning).toHaveBeenCalledWith('重新汇总完成：写入 0 个节点（拉数 0 / 差额 0 / 汇总 0）；'
       + '本节点未更新：下级企业都没有可汇总的单体附注数据；1 家企业待在「📋 明细映射」确认映射（乙公司）')
+  })
+})
+
+describe('自动刷新开关挂载（R7.1）', () => {
+  it('工具栏挂自动刷新开关，传当前项目', async () => {
+    api.get.mockImplementation(async (url: string) => (url.includes('/cell-comments/') ? [] : section('soe')))
+    const w = await loaded()
+    const sw = w.findComponent({ name: 'ConsolNoteAutoRefreshSwitch' })
+    expect(sw.exists()).toBe(true)
+    expect(sw.props('projectId')).toBe('fixture-project')
   })
 })
