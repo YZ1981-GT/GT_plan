@@ -47,7 +47,7 @@ _TABLES = [
     ConsolNoteMappingRule.__table__, ConsolNoteMappingBinding.__table__,
     ConsolNoteData.__table__, DisclosureNote.__table__,
 ]
-_SECTION = "五-67-1"
+_SECTION = "五-66-1"  # 管理费用（R7.6 重对齐前是 五-67-1）
 _YEAR = 2025
 
 
@@ -113,8 +113,8 @@ def _tables_row(row: list) -> dict:
 async def _seed_disclosure(db: AsyncSession, project_id: UUID, rows: list) -> None:
     """向子企业 disclosure_notes 写入真实形态的来源数据。
 
-    单体附注里没有合并章节号：合并 ``五-67-1`` 经章节映射是单体「八、66 管理费用」，
-    表格放 ``_tables``（附注编辑器显示的那张表）。旧测试两侧共用 ``五-67-1`` 会掩盖
+    单体附注里没有合并章节号：合并 ``五-66-1`` 经章节映射是单体「八、66 管理费用」，
+    表格放 ``_tables``（附注编辑器显示的那张表）。旧测试两侧共用合并章节号会掩盖
     读取层从不换算章节号的缺陷。
     """
     db.add(DisclosureNote(

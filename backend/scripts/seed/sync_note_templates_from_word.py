@@ -11,6 +11,8 @@ Phase:
   3  合并模板: 非报表注释章节
   4  单体模板: columns.group 补齐
   all (默认) 全部执行
+
+合并模板按表标记位置对条目前先核对身份（Word 节标题 ↔ 种子父章节、行名），对不上的不写、逐条报出（R7.6）。
 """
 from __future__ import annotations
 
@@ -32,6 +34,7 @@ DOCX_DIR = DATA_DIR / "audit_report_templates" / "disclosure_notes"
 sys.path.insert(0, str(ROOT / "scripts" / "seed"))
 sys.path.insert(0, str(ROOT))
 from seed_consol_note_sections import multi_header_to_column_groups
+from app.services.note_word_table import seed_table_structure  # noqa: E402  新增 / 重建表的结构：与平台同一构建（R7.6）
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -126,6 +129,8 @@ def extract_all_word_tables(docx_path: Path) -> list[dict]:
     table_idx = 0
     current_tag = ""
     last_para_text = ""  # 表格前最近的非空段落（用作 title）
+    # 所在 ##SECTION:…## 节与节标题（节标记后第一段正文）：写种子前核对身份用（R7.6）
+    section, heading, want_heading = "", "", False
     # ── text_after 收集 ──
     collecting_after = False  # 是否正在收集上一张表后的段落
     after_paras: list[str] = []
@@ -142,6 +147,12 @@ def extract_all_word_tables(docx_path: Path) -> list[dict]:
         if elem.tag == qn("w:p"):
             runs = elem.findall(f".//{qn('w:t')}")
             text = "".join(r.text or "" for r in runs).strip()
+            sec_m = re.match(r"^##SECTION:(.+?)##$", text)
+            if sec_m:  # 节边界：其后的节标题 / 小标题属于下一节，不再算上一张表的表后文字（R7.6）
+                _flush_after()
+                section, heading, want_heading = sec_m.group(1), "", True
+            elif want_heading and text and not text.startswith(("##", "{{")):
+                heading, want_heading = text, False
             tag_m = re.search(r"\{\{table:([^}]+)\}\}", text)
             if tag_m:
                 _flush_after()
@@ -193,6 +204,9 @@ def extract_all_word_tables(docx_path: Path) -> list[dict]:
             results.append({
                 "idx": table_idx,
                 "tag": current_tag,
+                "section": section,
+                "section_heading": heading,
+                "el": table._tbl,
                 "title_text": last_para_text,  # Word 中表格前的段落文本
                 "text_after_raw": "",           # 表格后段落文字（后续 _flush_after 填充）
                 "cols": nc,
@@ -238,6 +252,39 @@ def parse_tag(tag: str) -> dict | None:
 def note_chapter_for_std(std: str) -> str:
     """报表注释章节号：国企=八，上市=五。"""
     return "八" if std == "soe" else "五"
+
+
+#: Word 模板节标记已知缺陷（口径, Word 节号）：按标记与种子身份对不上，不写、--check 不计；对上了报「登记失效」（R7.6）
+KNOWN_SECTION_GAPS = {
+    ("listed", n): "上市合并 Word 缺 五、71~78 节标记（公允价值变动收益…现金流量表项目注释的表都落在 五、70 下），"
+                   "其后 五、79/81/82 被标成 五、71/73/74；种子章节号与单体模板一致，不按 Word 改号"
+    for n in (71, 73, 74)
+}
+IDENTITY_MISMATCHES: list[str] = []
+KNOWN_GAP_HITS: set[tuple[str, int]] = set()
+
+
+def identity_mismatch(entry: dict, wt: dict, std: str, sid: str, *, rows: bool = True) -> bool:
+    """按标记对到的 Word 表与种子条目不是同一张（节标题 ≠ 父章节，或双方实质行名无交集）⇒ 不写并记录（R7.6）。
+
+    原来只按位置对（``八、N:k`` → ``五-N-(k+1)``）：种子假章节 五-10 让其后每节错一节，Phase 1 用错表覆盖表名 / 表头，
+    Phase 2 按错的父章节补表。
+    """
+    from app.services.note_word_table import heading_key, rows_disjoint
+
+    reason = None
+    if heading_key(wt.get("section_heading")) != heading_key(entry.get("parent_section")):
+        reason = f"Word 节「{(wt.get('section_heading') or '')[:20]}」≠ 种子父章节「{(entry.get('parent_section') or '')[:20]}」"
+    elif rows and rows_disjoint(entry.get("rows"), wt.get("data_rows")):
+        reason = "行名没有交集"
+    if reason is None:
+        return False
+    section = (parse_tag(wt["tag"]) or {}).get("section")
+    if (std, section) in KNOWN_SECTION_GAPS:
+        KNOWN_GAP_HITS.add((std, section))
+    elif (msg := f"[{std}] {sid} ← Word {wt['tag']}：{reason}") not in IDENTITY_MISMATCHES:
+        IDENTITY_MISMATCHES.append(msg)
+    return True
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -291,6 +338,8 @@ def phase1_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
         entry = by_sid.get(sid)
         if not entry:
             continue  # Phase 2 处理
+        if identity_mismatch(entry, wt, std, sid):
+            continue
 
         # ── title 同步：以 Word 表格前段落文本为准 ──
         w_title = (wt.get("title_text") or "").strip()
@@ -338,17 +387,13 @@ def phase1_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
             print(f"    P1-B {sid}: W={w_cols}col J={j_cols}col → 以 Word 为准")
 
         if not dry_run:
-            entry["headers"] = list(mh[0])
-            new_rows = []
-            for row in entry.get("rows", []):
-                new_rows.append(align_row_columns(row, j_cols, w_cols))
-            entry["rows"] = new_rows
-            entry["multi_header"] = mh
-            cg = multi_header_to_column_groups(mh)
-            if cg:
-                entry["_column_groups"] = cg
-            elif "_column_groups" in entry:
-                del entry["_column_groups"]
+            built = seed_table_structure(wt["el"])  # 平表头取展示全路径（R6.3 口径，原来写多级表头首行）
+            entry["headers"] = built["headers"]
+            entry["rows"] = [align_row_columns(row, j_cols, w_cols) for row in entry.get("rows", [])]
+            entry["multi_header"] = built["multi_header"]
+            entry.pop("_column_groups", None)
+            if built.get("_column_groups"):
+                entry["_column_groups"] = built["_column_groups"]
 
         struct_updated += 1
 
@@ -364,13 +409,6 @@ def phase2_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
     note_ch = note_chapter_for_std(std)
     existing_sids = {e["section_id"] for e in json_data}
 
-    # 收集已有的 parent_section 信息（用于继承元数据）
-    parent_info: dict[int, dict] = {}
-    for e in json_data:
-        ps = e.get("parent_seq", 0)
-        if ps and ps not in parent_info:
-            parent_info[ps] = {"parent_section": e.get("parent_section", ""), "parent_seq": ps}
-
     added = 0
     max_seq = max((e.get("seq", 0) for e in json_data), default=0)
 
@@ -383,13 +421,16 @@ def phase2_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
         if sid in existing_sids:
             continue
 
-        # 构建新条目
+        # 构建新条目：父章节取 Word 节标题（原来沿用同号旧条目或「科目N」，种子错节时一并错）；同节已有条目须对得上节标题
         ps = p["section"]
-        pi = parent_info.get(ps, {"parent_section": f"科目{ps}", "parent_seq": ps})
+        same = next((e for e in json_data if e.get("parent_seq") == ps and str(e.get("section_id", "")).startswith("五-")), None)
+        if same is not None and identity_mismatch(same, wt, std, sid, rows=False):
+            continue
+        parent = same["parent_section"] if same is not None else (
+            clean_parent_section(wt.get("section_heading") or "") or f"科目{ps}")
+        pi = {"parent_section": parent, "parent_seq": ps}
         max_seq += 1
-
-        mh = normalize_mh(wt["multi_header"]) if wt.get("multi_header") else None
-        headers = list(mh[0]) if mh else wt["leaf_headers"]
+        built = seed_table_structure(wt["el"])
 
         new_entry = {
             "id": str(uuid.uuid4()),
@@ -399,19 +440,15 @@ def phase2_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
             "parent_seq": pi["parent_seq"],
             "title": wt.get("title_text") or pi["parent_section"] or "",
             "seq": max_seq,
-            "headers": headers,
-            "rows": wt["data_rows"],
-            "multi_header": mh if mh and len(mh) >= 2 else None,
+            "headers": built["headers"],
+            "rows": built["rows"],
+            "multi_header": built["multi_header"],
         }
-
-        # _column_groups
-        if new_entry["multi_header"]:
-            cg = multi_header_to_column_groups(new_entry["multi_header"])
-            if cg:
-                new_entry["_column_groups"] = cg
+        if built.get("_column_groups"):
+            new_entry["_column_groups"] = built["_column_groups"]
 
         if verbose:
-            print(f"    P2 +{sid}: {wt['cols']}col, mh={'Y' if mh else 'N'}, rows={len(wt['data_rows'])}")
+            print(f"    P2 +{sid}: {wt['cols']}col, mh={'Y' if built['multi_header'] else 'N'}, rows={len(built['rows'])}")
 
         if not dry_run:
             json_data.append(new_entry)
@@ -812,7 +849,7 @@ def phase6_text_after_and_parent(
             else:
                 sid = f"{ch}-{tidx + 1}"
             entry = by_sid.get(sid)
-            if not entry:
+            if not entry or (ch == note_ch and sec is not None and identity_mismatch(entry, wt, std, sid)):
                 continue
             # text_after_table
             raw = wt.get("text_after_raw", "")
@@ -935,7 +972,7 @@ def check_title_drift(
                 sid = f"{ch}-{tidx + 1}"
             word_sids.add(sid)
             entry = by_sid.get(sid)
-            if not entry:
+            if not entry or (ch == note_ch and sec is not None and identity_mismatch(entry, wt, std, sid)):
                 continue
             w_title = (wt.get("title_text") or "").strip()
             j_title = (entry.get("title") or "").strip()
@@ -1158,6 +1195,17 @@ def main():
                 drifts = check_title_drift(standalone_word, standalone_data, std, "standalone", args.verbose)
                 if drifts:
                     total_title_drift.extend([f"[{std} standalone] {d}" for d in drifts])
+
+    # ── 身份校验（R7.6）：对不上的不写；已知标记缺陷单列，登记了却对上了 = 登记失效 ──
+    if IDENTITY_MISMATCHES:
+        print(f"\n🔴 Word 表与种子身份对不上 {len(IDENTITY_MISMATCHES)} 处（未写入）:")
+        print("\n".join(f"  {m}" for m in IDENTITY_MISMATCHES))
+    for key, reason in KNOWN_SECTION_GAPS.items():
+        if key[0] in stds and (1 in phases or 6 in phases) and key not in KNOWN_GAP_HITS:
+            IDENTITY_MISMATCHES.append(f"[{key[0]}] Word 节 {key[1]} 登记为已知标记缺陷但已对得上，请删除该登记")
+            print(f"🔴 {IDENTITY_MISMATCHES[-1]}")
+    if args.check and IDENTITY_MISMATCHES:
+        total_drift += 1
 
     # ── 最终结果 ──
     if args.check:

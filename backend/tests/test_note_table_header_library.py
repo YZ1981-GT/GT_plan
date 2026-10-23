@@ -473,11 +473,11 @@ class TestColumnRoles:
         assert key.period == "end" and L.movement_kind(key) is None and L.column_role(key) is None
 
     def test_template_header_rows_beat_flat_headers(self):
-        """角色按展示表头（多级表头）算，平表头不参与（五-24-1：期末余额 / 期初余额 各含 账面余额 / 减值准备 / 账面价值）。
+        """角色按展示表头（多级表头）算，平表头不参与（五-23-1 在建工程：期末余额 / 期初余额 各含 账面余额 / 减值准备 / 账面价值）。
 
         种子平表头已改成逐列全路径（R6.3），与展示表头逐列同路径；旧种子平表头只在分组起始列写期间
         （「期初余额」落在期末余额/减值准备上），换回这种错位平表头，角色也照展示表头。"""
-        table = find_table("soe", "五-24-1")
+        table = find_table("soe", "五-23-1")
         roles = ["label", "closing", None, None, "opening", None, None]
         assert L.column_roles(table) == roles
         assert [tuple(L.norm(p) for p in h.split("/")) for h in table["headers"][1:]] == L.column_paths(table)[1:]
@@ -523,15 +523,15 @@ class TestRollForward:
         assert flow.unknown == (3, 5, 6, 7, 8, 9, 10)
 
     def test_same_measure_pair_without_balance_columns(self):
-        """五-25-1 期初 / 期末账面价值；五-58-1 期初 / 期末投资金额（所占比例是比例列）。"""
-        assert L.rollforward_columns(find_table("soe", "五-25-1")) == L.RollForward(1, 4, (2,), (3,), ())
+        """五-24-1 生产性生物资产期初 / 期末账面价值；五-58-1 期初 / 期末投资金额（所占比例是比例列）。"""
+        assert L.rollforward_columns(find_table("soe", "五-24-1")) == L.RollForward(1, 4, (2,), (3,), ())
         assert L.rollforward_columns(find_table("soe", "五-58-1")) == L.RollForward(1, 5, (3,), (4,), ())
 
     def test_repaired_seed_movement_columns(self):
         """种子多级表头按 Word 修复后（R6.3）：「处置 / 转为自用房地产」回到「本期减少」下，变动列都有方向。"""
-        assert L.rollforward_columns(find_table("soe", "五-22-1")) == L.RollForward(1, 6, (2, 3), (4, 5), ())
-        assert L.rollforward_columns(find_table("soe", "五-13-2")) == L.RollForward(1, 5, (2,), (3, 4), ())
-        assert L.rollforward_columns(find_table("soe", "五-29-1")) == L.RollForward(1, 7, (2, 3), (4, 5, 6), ())
+        assert L.rollforward_columns(find_table("soe", "五-21-1")) == L.RollForward(1, 6, (2, 3), (4, 5), ())
+        assert L.rollforward_columns(find_table("soe", "五-12-2")) == L.RollForward(1, 5, (2,), (3, 4), ())
+        assert L.rollforward_columns(find_table("soe", "五-28-1")) == L.RollForward(1, 7, (2, 3), (4, 5, 6), ())
 
     def test_not_a_single_rollforward(self):
         """五-51-2 数量 / 账面价值各有一对期初、期末：不唯一不校验；期末列重复、余额表、空表都不校验。"""

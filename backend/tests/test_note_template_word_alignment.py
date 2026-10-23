@@ -29,9 +29,11 @@ multi_header_to_column_groups = _mod.multi_header_to_column_groups
 
 # ─── 合并模板基线 ──────────────────────────────────────────────────
 # 2026-10-09: P0-P3 全量对齐后的基线
+# 2026-10-23 R7.6：同一张 Word 表的重复条目并成一条（国企 70 条、上市 9 条），表数 321 → 251 / 432 → 423；
+#   一张 Word 表恰一条种子由 test_consol_note_seed_word_identity.py 逐表钉住
 CONSOL_BASELINES = {
-    "soe": {"total": 321, "with_mh": 37},
-    "listed": {"total": 432, "with_mh": 115},
+    "soe": {"total": 251, "with_mh": 37},
+    "listed": {"total": 423, "with_mh": 115},
 }
 
 
@@ -165,10 +167,10 @@ class TestStandaloneGroupCoverage:
 class TestSectionIdStability:
     """section_id 集合棘轮——只许增不许减。"""
 
-    # 2026-10-09 基线
+    # 2026-10-09 基线；2026-10-23 R7.6 去掉重复条目后 251 / 423（见 CONSOL_BASELINES）
     SECTION_ID_BASELINES = {
-        "soe": 321,
-        "listed": 432,
+        "soe": 251,
+        "listed": 423,
     }
 
     @pytest.mark.parametrize("std", ["soe", "listed"])

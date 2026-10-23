@@ -13,7 +13,7 @@
  *   这是绕行而非修复：前端推的键在模板里**根本不存在** → 孤儿子表（未同步项目的 seed
  *   `_tables` 里是两张同名表，附注 TAB 页签重复且按 name 建键互相覆盖；契约 P1 必失败）。
  *   现已改模板（`fix_note_j1_employee_comp_structure.py`，`consol_note_sections_soe`
- *   五-41-3 的 title 即「设定提存计划列示」，是致同原本措辞）→ 前端键不变即自动对齐。
+ *   五-40-3 的 title 即「设定提存计划列示」，是致同原本措辞）→ 前端键不变即自动对齐。
  *
  * 列头（Decision 2 已废止，2026-08-02 j-cycle-four-table spec Task 7+11）：
  *   原 Decision 2 "组件列头「上年年末数 / 期末数」不外溢到附注"——

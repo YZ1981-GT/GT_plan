@@ -492,7 +492,7 @@ function persistContingent(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  // 附注 八、55 只有 2 个值列（附注模版 L3952 / note headers / consol 五-56-1 三源一致，
+  // 附注 八、55 只有 2 个值列（附注模版 L3952 / note headers / consol 五-55-1 三源一致，
   // 形成原因降级为表下注文字）→ 不传 `reason`；`basis`/`riskLevel` 是审计列，附注无落点。
   const rows = provisionTable.value.filter(r => !r.isTotal).map(r => ({
     project: r.category,

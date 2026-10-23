@@ -475,9 +475,9 @@
       },
       {
         "consol_section_id": "五-10-1",
-        "consol_parent": "续：",
+        "consol_parent": "存货",
         "consol_title": "存货分类",
-        "consol_seq": 40,
+        "consol_seq": 48,
         "standalone_note_section": "八、10",
         "standalone_section_title": "存货",
         "match_type": "table_title",
@@ -485,9 +485,9 @@
       },
       {
         "consol_section_id": "五-10-2",
-        "consol_parent": "续：",
+        "consol_parent": "存货",
         "consol_title": "存货跌价准备及合同履约成本减值准备",
-        "consol_seq": 41,
+        "consol_seq": 49,
         "standalone_note_section": "八、10",
         "standalone_section_title": "存货",
         "match_type": "table_title",
@@ -495,69 +495,19 @@
       },
       {
         "consol_section_id": "五-10-3",
-        "consol_parent": "续：",
+        "consol_parent": "存货",
         "consol_title": "确认为存货的数据资源",
-        "consol_seq": 42,
+        "consol_seq": 50,
         "standalone_note_section": "八、10",
         "standalone_section_title": "存货",
         "match_type": "table_title",
         "standalone_table_name": "确认为存货的数据资源"
       },
       {
-        "consol_section_id": "五-10-4",
-        "consol_parent": "续：",
-        "consol_title": "采用余额百分比法或其他组合方法计提坏账准备的其他应收款项",
-        "consol_seq": 43,
-        "standalone_note_section": "八、9",
-        "standalone_section_title": "其他应收款",
-        "match_type": "table_title",
-        "standalone_table_name": "采用余额百分比法或其他组合方法计提坏账准备的其他应收款项"
-      },
-      {
-        "consol_section_id": "五-10-5",
-        "consol_parent": "续：",
-        "consol_title": "其他应收款项坏账准备计提情况",
-        "consol_seq": 44,
-        "standalone_note_section": "八、9",
-        "standalone_section_title": "其他应收款",
-        "match_type": "table_title",
-        "standalone_table_name": "其他应收款项坏账准备计提情况"
-      },
-      {
-        "consol_section_id": "五-10-6",
-        "consol_parent": "续：",
-        "consol_title": "收回或转回的坏账准备",
-        "consol_seq": 45,
-        "standalone_note_section": "八、5",
-        "standalone_section_title": "应收账款",
-        "match_type": "table_title",
-        "standalone_table_name": "收回或转回的坏账准备"
-      },
-      {
-        "consol_section_id": "五-10-7",
-        "consol_parent": "续：",
-        "consol_title": "本期实际核销的其他应收款项",
-        "consol_seq": 46,
-        "standalone_note_section": "八、9",
-        "standalone_section_title": "其他应收款",
-        "match_type": "table_title",
-        "standalone_table_name": "本期实际核销的其他应收款项"
-      },
-      {
-        "consol_section_id": "五-10-8",
-        "consol_parent": "续：",
-        "consol_title": "按欠款方归集的期末余额前五名的其他应收款项",
-        "consol_seq": 47,
-        "standalone_note_section": "八、9",
-        "standalone_section_title": "其他应收款",
-        "match_type": "table_title",
-        "standalone_table_name": "按欠款方归集的期末余额前五名的其他应收款项"
-      },
-      {
         "consol_section_id": "五-11-1",
-        "consol_parent": "存货",
+        "consol_parent": "合同资产",
         "consol_title": "合同资产情况",
-        "consol_seq": 48,
+        "consol_seq": 51,
         "standalone_note_section": "八、11",
         "standalone_section_title": "合同资产",
         "match_type": "table_title",
@@ -565,9 +515,9 @@
       },
       {
         "consol_section_id": "五-11-2",
-        "consol_parent": "存货",
+        "consol_parent": "合同资产",
         "consol_title": "合同资产减值准备",
-        "consol_seq": 49,
+        "consol_seq": 52,
         "standalone_note_section": "八、11",
         "standalone_section_title": "合同资产",
         "match_type": "table_title",
@@ -575,9 +525,9 @@
       },
       {
         "consol_section_id": "五-11-3",
-        "consol_parent": "存货",
+        "consol_parent": "合同资产",
         "consol_title": "本期合同资产账面价值的重大变动",
-        "consol_seq": 50,
+        "consol_seq": 53,
         "standalone_note_section": "八、11",
         "standalone_section_title": "合同资产",
         "match_type": "table_title",
@@ -585,36 +535,6 @@
       },
       {
         "consol_section_id": "五-12-1",
-        "consol_parent": "合同资产",
-        "consol_title": "4.应披露与持有待售的非流动资产或处置组有关的其他综合收益累计金额。】",
-        "consol_seq": 51,
-        "standalone_note_section": "八、12",
-        "standalone_section_title": "持有待售资产",
-        "match_type": "table_title",
-        "standalone_table_name": "4.应披露与持有待售的非流动资产或处置组有关的其他综合收益累计金额。】"
-      },
-      {
-        "consol_section_id": "五-12-2",
-        "consol_parent": "合同资产",
-        "consol_title": "持有待售资产减值准备",
-        "consol_seq": 52,
-        "standalone_note_section": "八、12",
-        "standalone_section_title": "持有待售资产",
-        "match_type": "table_title",
-        "standalone_table_name": "持有待售资产减值准备"
-      },
-      {
-        "consol_section_id": "五-12-3",
-        "consol_parent": "合同资产",
-        "consol_title": "持有待售非流动资产",
-        "consol_seq": 53,
-        "standalone_note_section": "八、12",
-        "standalone_section_title": "持有待售资产",
-        "match_type": "table_title",
-        "standalone_table_name": "持有待售非流动资产"
-      },
-      {
-        "consol_section_id": "五-13-1",
         "consol_parent": "持有待售资产",
         "consol_title": "4.应披露与持有待售的非流动资产或处置组有关的其他综合收益累计金额。】",
         "consol_seq": 54,
@@ -624,7 +544,7 @@
         "standalone_table_name": "4.应披露与持有待售的非流动资产或处置组有关的其他综合收益累计金额。】"
       },
       {
-        "consol_section_id": "五-13-2",
+        "consol_section_id": "五-12-2",
         "consol_parent": "持有待售资产",
         "consol_title": "持有待售资产减值准备",
         "consol_seq": 55,
@@ -634,7 +554,7 @@
         "standalone_table_name": "持有待售资产减值准备"
       },
       {
-        "consol_section_id": "五-13-3",
+        "consol_section_id": "五-12-3",
         "consol_parent": "持有待售资产",
         "consol_title": "持有待售非流动资产",
         "consol_seq": 56,
@@ -644,7 +564,7 @@
         "standalone_table_name": "持有待售非流动资产"
       },
       {
-        "consol_section_id": "五-13-4",
+        "consol_section_id": "五-12-4",
         "consol_parent": "持有待售资产",
         "consol_title": "持有待售处置组中的资产",
         "consol_seq": 57,
@@ -654,10 +574,20 @@
         "standalone_table_name": "持有待售处置组中的资产"
       },
       {
-        "consol_section_id": "五-14-1",
+        "consol_section_id": "五-13-1",
         "consol_parent": "一年内到期的非流动资产",
-        "consol_title": "其他流动资产",
+        "consol_title": "一年内到期的非流动资产",
         "consol_seq": 58,
+        "standalone_note_section": "八、13",
+        "standalone_section_title": "一年内到期的非流动资产",
+        "match_type": "table_title",
+        "standalone_table_name": "一年内到期的非流动资产"
+      },
+      {
+        "consol_section_id": "五-14-1",
+        "consol_parent": "其他流动资产",
+        "consol_title": "其他流动资产",
+        "consol_seq": 59,
         "standalone_note_section": "八、14",
         "standalone_section_title": "其他流动资产",
         "match_type": "table_title",
@@ -665,9 +595,9 @@
       },
       {
         "consol_section_id": "五-15-1",
-        "consol_parent": "其他流动资产",
+        "consol_parent": "债权投资",
         "consol_title": "债权投资情况",
-        "consol_seq": 59,
+        "consol_seq": 60,
         "standalone_note_section": "八、15",
         "standalone_section_title": "债权投资",
         "match_type": "table_title",
@@ -675,9 +605,9 @@
       },
       {
         "consol_section_id": "五-15-2",
-        "consol_parent": "其他流动资产",
+        "consol_parent": "债权投资",
         "consol_title": "期末重要的债权投资",
-        "consol_seq": 230,
+        "consol_seq": 61,
         "standalone_note_section": "八、15",
         "standalone_section_title": "债权投资",
         "match_type": "table_title",
@@ -685,56 +615,6 @@
       },
       {
         "consol_section_id": "五-15-3",
-        "consol_parent": "其他流动资产",
-        "consol_title": "期末，处于第一阶段的债权投资的减值准备",
-        "consol_seq": 231,
-        "standalone_note_section": "八、15",
-        "standalone_section_title": "债权投资",
-        "match_type": "table_title",
-        "standalone_table_name": "期末，处于第一阶段的债权投资的减值准备"
-      },
-      {
-        "consol_section_id": "五-15-4",
-        "consol_parent": "其他流动资产",
-        "consol_title": "期末，处于第二阶段的债权投资的减值准备",
-        "consol_seq": 232,
-        "standalone_note_section": "八、15",
-        "standalone_section_title": "债权投资",
-        "match_type": "table_title",
-        "standalone_table_name": "期末，处于第二阶段的债权投资的减值准备"
-      },
-      {
-        "consol_section_id": "五-15-5",
-        "consol_parent": "其他流动资产",
-        "consol_title": "期末，处于第三阶段的债权投资的减值准备",
-        "consol_seq": 233,
-        "standalone_note_section": "八、15",
-        "standalone_section_title": "债权投资",
-        "match_type": "table_title",
-        "standalone_table_name": "期末，处于第三阶段的债权投资的减值准备"
-      },
-      {
-        "consol_section_id": "五-16-1",
-        "consol_parent": "债权投资",
-        "consol_title": "其他债权投资情况",
-        "consol_seq": 60,
-        "standalone_note_section": "八、16",
-        "standalone_section_title": "其他债权投资",
-        "match_type": "table_title",
-        "standalone_table_name": "其他债权投资情况"
-      },
-      {
-        "consol_section_id": "五-16-2",
-        "consol_parent": "债权投资",
-        "consol_title": "期末重要的其他债权投资",
-        "consol_seq": 61,
-        "standalone_note_section": "八、16",
-        "standalone_section_title": "其他债权投资",
-        "match_type": "table_title",
-        "standalone_table_name": "期末重要的其他债权投资"
-      },
-      {
-        "consol_section_id": "五-16-3",
         "consol_parent": "债权投资",
         "consol_title": "期末，处于第一阶段的债权投资的减值准备",
         "consol_seq": 62,
@@ -744,7 +624,7 @@
         "standalone_table_name": "期末，处于第一阶段的债权投资的减值准备"
       },
       {
-        "consol_section_id": "五-16-4",
+        "consol_section_id": "五-15-4",
         "consol_parent": "债权投资",
         "consol_title": "期末，处于第二阶段的债权投资的减值准备",
         "consol_seq": 63,
@@ -754,7 +634,7 @@
         "standalone_table_name": "期末，处于第二阶段的债权投资的减值准备"
       },
       {
-        "consol_section_id": "五-16-5",
+        "consol_section_id": "五-15-5",
         "consol_parent": "债权投资",
         "consol_title": "期末，处于第三阶段的债权投资的减值准备",
         "consol_seq": 64,
@@ -764,7 +644,7 @@
         "standalone_table_name": "期末，处于第三阶段的债权投资的减值准备"
       },
       {
-        "consol_section_id": "五-16-6",
+        "consol_section_id": "五-15-6",
         "consol_parent": "债权投资",
         "consol_title": "本期计提、收回或转回的减值准备情况",
         "consol_seq": 65,
@@ -774,10 +654,30 @@
         "standalone_table_name": "本期计提、收回或转回的减值准备情况"
       },
       {
-        "consol_section_id": "五-17-1",
+        "consol_section_id": "五-16-1",
         "consol_parent": "其他债权投资",
-        "consol_title": "长期应收款按性质披露",
+        "consol_title": "其他债权投资情况",
         "consol_seq": 66,
+        "standalone_note_section": "八、16",
+        "standalone_section_title": "其他债权投资",
+        "match_type": "table_title",
+        "standalone_table_name": "其他债权投资情况"
+      },
+      {
+        "consol_section_id": "五-16-2",
+        "consol_parent": "其他债权投资",
+        "consol_title": "期末重要的其他债权投资",
+        "consol_seq": 67,
+        "standalone_note_section": "八、16",
+        "standalone_section_title": "其他债权投资",
+        "match_type": "table_title",
+        "standalone_table_name": "期末重要的其他债权投资"
+      },
+      {
+        "consol_section_id": "五-17-1",
+        "consol_parent": "长期应收款",
+        "consol_title": "长期应收款按性质披露",
+        "consol_seq": 68,
         "standalone_note_section": "八、17",
         "standalone_section_title": "长期应收款",
         "match_type": "table_title",
@@ -785,9 +685,9 @@
       },
       {
         "consol_section_id": "五-17-2",
-        "consol_parent": "其他债权投资",
+        "consol_parent": "长期应收款",
         "consol_title": "终止确认的长期应收款",
-        "consol_seq": 67,
+        "consol_seq": 69,
         "standalone_note_section": "八、17",
         "standalone_section_title": "长期应收款",
         "match_type": "table_title",
@@ -795,9 +695,9 @@
       },
       {
         "consol_section_id": "五-17-3",
-        "consol_parent": "其他债权投资",
+        "consol_parent": "长期应收款",
         "consol_title": "转移长期应收款且继续涉入形成的资产、负债的金额",
-        "consol_seq": 234,
+        "consol_seq": 70,
         "standalone_note_section": "八、17",
         "standalone_section_title": "长期应收款",
         "match_type": "table_title",
@@ -805,9 +705,9 @@
       },
       {
         "consol_section_id": "五-18-1",
-        "consol_parent": "长期应收款",
+        "consol_parent": "长期股权投资",
         "consol_title": "长期股权投资分类",
-        "consol_seq": 68,
+        "consol_seq": 71,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
         "match_type": "table_title",
@@ -815,9 +715,9 @@
       },
       {
         "consol_section_id": "五-18-2",
-        "consol_parent": "长期应收款",
+        "consol_parent": "长期股权投资",
         "consol_title": "长期股权投资明细",
-        "consol_seq": 69,
+        "consol_seq": 72,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
         "match_type": "table_title",
@@ -825,9 +725,9 @@
       },
       {
         "consol_section_id": "五-18-3",
-        "consol_parent": "长期应收款",
+        "consol_parent": "长期股权投资",
         "consol_title": "（如果母公司为投资性主体，无需披露下列财务信息。）",
-        "consol_seq": 70,
+        "consol_seq": 73,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
         "match_type": "table_title",
@@ -835,9 +735,9 @@
       },
       {
         "consol_section_id": "五-18-4",
-        "consol_parent": "长期应收款",
+        "consol_parent": "长期股权投资",
         "consol_title": "续：",
-        "consol_seq": 235,
+        "consol_seq": 74,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
         "match_type": "continuation",
@@ -845,9 +745,9 @@
       },
       {
         "consol_section_id": "五-18-5",
-        "consol_parent": "长期应收款",
+        "consol_parent": "长期股权投资",
         "consol_title": "（如果母公司为投资性主体，无需披露下列财务信息。）",
-        "consol_seq": 236,
+        "consol_seq": 75,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
         "match_type": "table_title",
@@ -855,9 +755,9 @@
       },
       {
         "consol_section_id": "五-18-6",
-        "consol_parent": "长期应收款",
+        "consol_parent": "长期股权投资",
         "consol_title": "续：",
-        "consol_seq": 237,
+        "consol_seq": 76,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
         "match_type": "continuation",
@@ -865,106 +765,6 @@
       },
       {
         "consol_section_id": "五-18-7",
-        "consol_parent": "长期应收款",
-        "consol_title": "不重要合营企业和联营企业的汇总信息",
-        "consol_seq": 238,
-        "standalone_note_section": "八、18",
-        "standalone_section_title": "长期股权投资",
-        "match_type": "table_title",
-        "standalone_table_name": "不重要合营企业和联营企业的汇总信息"
-      },
-      {
-        "consol_section_id": "五-18-8",
-        "consol_parent": "长期应收款",
-        "consol_title": "②对合营企业或联营企业发生超额亏损的分担额",
-        "consol_seq": 239,
-        "standalone_note_section": "八、18",
-        "standalone_section_title": "长期股权投资",
-        "match_type": "table_title",
-        "standalone_table_name": "②对合营企业或联营企业发生超额亏损的分担额"
-      },
-      {
-        "consol_section_id": "五-18-9",
-        "consol_parent": "长期应收款",
-        "consol_title": "C.在财务报表中确认的与企业在未纳入合并财务报表范围的结构化主体中权益相关的资产和负债的账面价值与其最大损失敞口的比较。",
-        "consol_seq": 240,
-        "standalone_note_section": "八、18",
-        "standalone_section_title": "长期股权投资",
-        "match_type": "structure",
-        "standalone_table_name": "不重要合营企业和联营企业的汇总信息"
-      },
-      {
-        "consol_section_id": "五-18-10",
-        "consol_parent": "长期应收款",
-        "consol_title": "本公司发起多个结构化主体，但在结构化中均不持有权益。2023年，本公司从发起的结构化主体获得收益的情况以及当期向结构化主体转移资产的情况如下表所示：",
-        "consol_seq": 241,
-        "standalone_note_section": "八、18",
-        "standalone_section_title": "长期股权投资",
-        "match_type": "structure",
-        "standalone_table_name": "②对合营企业或联营企业发生超额亏损的分担额"
-      },
-      {
-        "consol_section_id": "五-19-1",
-        "consol_parent": "长期股权投资",
-        "consol_title": "其他权益工具投资情况",
-        "consol_seq": 71,
-        "standalone_note_section": "八、19",
-        "standalone_section_title": "其他权益工具投资",
-        "match_type": "table_title",
-        "standalone_table_name": "其他权益工具投资情况"
-      },
-      {
-        "consol_section_id": "五-19-2",
-        "consol_parent": "长期股权投资",
-        "consol_title": "期末其他权益工具投资情况",
-        "consol_seq": 72,
-        "standalone_note_section": "八、19",
-        "standalone_section_title": "其他权益工具投资",
-        "match_type": "table_title",
-        "standalone_table_name": "期末其他权益工具投资情况"
-      },
-      {
-        "consol_section_id": "五-19-3",
-        "consol_parent": "长期股权投资",
-        "consol_title": "重要合营企业的主要财务信息",
-        "consol_seq": 73,
-        "standalone_note_section": "八、19",
-        "standalone_section_title": "其他权益工具投资",
-        "match_type": "chapter",
-        "standalone_table_name": null
-      },
-      {
-        "consol_section_id": "五-19-4",
-        "consol_parent": "长期股权投资",
-        "consol_title": "重要合营企业的主要财务信息",
-        "consol_seq": 74,
-        "standalone_note_section": "八、19",
-        "standalone_section_title": "其他权益工具投资",
-        "match_type": "chapter",
-        "standalone_table_name": null
-      },
-      {
-        "consol_section_id": "五-19-5",
-        "consol_parent": "长期股权投资",
-        "consol_title": "重要联营企业的主要财务信息",
-        "consol_seq": 75,
-        "standalone_note_section": "八、19",
-        "standalone_section_title": "其他权益工具投资",
-        "match_type": "chapter",
-        "standalone_table_name": null
-      },
-      {
-        "consol_section_id": "五-19-6",
-        "consol_parent": "长期股权投资",
-        "consol_title": "重要联营企业的主要财务信息",
-        "consol_seq": 76,
-        "standalone_note_section": "八、19",
-        "standalone_section_title": "其他权益工具投资",
-        "match_type": "chapter",
-        "standalone_table_name": null
-      },
-      {
-        "consol_section_id": "五-19-7",
         "consol_parent": "长期股权投资",
         "consol_title": "不重要合营企业和联营企业的汇总信息",
         "consol_seq": 77,
@@ -974,47 +774,47 @@
         "standalone_table_name": "不重要合营企业和联营企业的汇总信息"
       },
       {
-        "consol_section_id": "五-19-8",
+        "consol_section_id": "五-18-8",
         "consol_parent": "长期股权投资",
-        "consol_title": "在合营企业和联营企业中权益的相关风险",
+        "consol_title": "②对合营企业或联营企业发生超额亏损的分担额",
         "consol_seq": 78,
-        "standalone_note_section": "八、19",
-        "standalone_section_title": "其他权益工具投资",
-        "match_type": "chapter",
-        "standalone_table_name": null
-      },
-      {
-        "consol_section_id": "五-19-9",
-        "consol_parent": "长期股权投资",
-        "consol_title": "未纳入合并财务报表范围的结构化主体的相关信息",
-        "consol_seq": 79,
-        "standalone_note_section": "八、19",
-        "standalone_section_title": "其他权益工具投资",
-        "match_type": "chapter",
-        "standalone_table_name": null
-      },
-      {
-        "consol_section_id": "五-19-10",
-        "consol_parent": "长期股权投资",
-        "consol_title": "未纳入合并财务报表范围的结构化主体的相关信息",
-        "consol_seq": 80,
-        "standalone_note_section": "八、19",
-        "standalone_section_title": "其他权益工具投资",
-        "match_type": "chapter",
-        "standalone_table_name": null
-      },
-      {
-        "consol_section_id": "五-20-1",
-        "consol_parent": "其他权益工具投资",
-        "consol_title": "其他非流动金融资产",
-        "consol_seq": 81,
-        "standalone_note_section": "八、20",
-        "standalone_section_title": "其他非流动金融资产",
+        "standalone_note_section": "八、18",
+        "standalone_section_title": "长期股权投资",
         "match_type": "table_title",
-        "standalone_table_name": "其他非流动金融资产"
+        "standalone_table_name": "②对合营企业或联营企业发生超额亏损的分担额"
       },
       {
-        "consol_section_id": "五-20-2",
+        "consol_section_id": "五-18-9",
+        "consol_parent": "长期股权投资",
+        "consol_title": "C.在财务报表中确认的与企业在未纳入合并财务报表范围的结构化主体中权益相关的资产和负债的账面价值与其最大损失敞口的比较。",
+        "consol_seq": 79,
+        "standalone_note_section": "八、18",
+        "standalone_section_title": "长期股权投资",
+        "match_type": "structure",
+        "standalone_table_name": "不重要合营企业和联营企业的汇总信息"
+      },
+      {
+        "consol_section_id": "五-18-10",
+        "consol_parent": "长期股权投资",
+        "consol_title": "本公司发起多个结构化主体，但在结构化中均不持有权益。2023年，本公司从发起的结构化主体获得收益的情况以及当期向结构化主体转移资产的情况如下表所示：",
+        "consol_seq": 80,
+        "standalone_note_section": "八、18",
+        "standalone_section_title": "长期股权投资",
+        "match_type": "structure",
+        "standalone_table_name": "②对合营企业或联营企业发生超额亏损的分担额"
+      },
+      {
+        "consol_section_id": "五-19-1",
+        "consol_parent": "其他权益工具投资",
+        "consol_title": "其他权益工具投资情况",
+        "consol_seq": 81,
+        "standalone_note_section": "八、19",
+        "standalone_section_title": "其他权益工具投资",
+        "match_type": "table_title",
+        "standalone_table_name": "其他权益工具投资情况"
+      },
+      {
+        "consol_section_id": "五-19-2",
         "consol_parent": "其他权益工具投资",
         "consol_title": "期末其他权益工具投资情况",
         "consol_seq": 82,
@@ -1024,10 +824,20 @@
         "standalone_table_name": "期末其他权益工具投资情况"
       },
       {
-        "consol_section_id": "五-21-1",
+        "consol_section_id": "五-20-1",
         "consol_parent": "其他非流动金融资产",
-        "consol_title": "以成本计量",
+        "consol_title": "其他非流动金融资产",
         "consol_seq": 83,
+        "standalone_note_section": "八、20",
+        "standalone_section_title": "其他非流动金融资产",
+        "match_type": "table_title",
+        "standalone_table_name": "其他非流动金融资产"
+      },
+      {
+        "consol_section_id": "五-21-1",
+        "consol_parent": "投资性房地产",
+        "consol_title": "以成本计量",
+        "consol_seq": 84,
         "standalone_note_section": "八、21",
         "standalone_section_title": "投资性房地产",
         "match_type": "table_title",
@@ -1035,19 +845,29 @@
       },
       {
         "consol_section_id": "五-21-2",
-        "consol_parent": "其他非流动金融资产",
+        "consol_parent": "投资性房地产",
         "consol_title": "以公允价值计量",
-        "consol_seq": 242,
+        "consol_seq": 85,
         "standalone_note_section": "八、21",
         "standalone_section_title": "投资性房地产",
         "match_type": "table_title",
         "standalone_table_name": "以公允价值计量"
       },
       {
-        "consol_section_id": "五-22-1",
+        "consol_section_id": "五-21-3",
         "consol_parent": "投资性房地产",
+        "consol_title": "未办妥产权证书的投资性房地产",
+        "consol_seq": 86,
+        "standalone_note_section": "八、21",
+        "standalone_section_title": "投资性房地产",
+        "match_type": "table_title",
+        "standalone_table_name": "未办妥产权证书的投资性房地产"
+      },
+      {
+        "consol_section_id": "五-22-1",
+        "consol_parent": "固定资产",
         "consol_title": "固定资产",
-        "consol_seq": 84,
+        "consol_seq": 87,
         "standalone_note_section": "八、22",
         "standalone_section_title": "固定资产",
         "match_type": "table_title",
@@ -1055,9 +875,9 @@
       },
       {
         "consol_section_id": "五-22-2",
-        "consol_parent": "投资性房地产",
+        "consol_parent": "固定资产",
         "consol_title": "固定资产情况",
-        "consol_seq": 85,
+        "consol_seq": 88,
         "standalone_note_section": "八、22",
         "standalone_section_title": "固定资产",
         "match_type": "table_title",
@@ -1065,9 +885,9 @@
       },
       {
         "consol_section_id": "五-22-3",
-        "consol_parent": "投资性房地产",
+        "consol_parent": "固定资产",
         "consol_title": "暂时闲置的固定资产情况",
-        "consol_seq": 86,
+        "consol_seq": 89,
         "standalone_note_section": "八、22",
         "standalone_section_title": "固定资产",
         "match_type": "table_title",
@@ -1075,56 +895,6 @@
       },
       {
         "consol_section_id": "五-22-4",
-        "consol_parent": "投资性房地产",
-        "consol_title": "未办妥产权证书的固定资产情况",
-        "consol_seq": 243,
-        "standalone_note_section": "八、22",
-        "standalone_section_title": "固定资产",
-        "match_type": "table_title",
-        "standalone_table_name": "未办妥产权证书的固定资产情况"
-      },
-      {
-        "consol_section_id": "五-22-5",
-        "consol_parent": "投资性房地产",
-        "consol_title": "固定资产清理",
-        "consol_seq": 244,
-        "standalone_note_section": "八、22",
-        "standalone_section_title": "固定资产",
-        "match_type": "table_title",
-        "standalone_table_name": "固定资产清理"
-      },
-      {
-        "consol_section_id": "五-23-1",
-        "consol_parent": "固定资产",
-        "consol_title": "在建工程",
-        "consol_seq": 87,
-        "standalone_note_section": "八、23",
-        "standalone_section_title": "在建工程",
-        "match_type": "table_title",
-        "standalone_table_name": "在建工程"
-      },
-      {
-        "consol_section_id": "五-23-2",
-        "consol_parent": "固定资产",
-        "consol_title": "（1）在建工程情况",
-        "consol_seq": 88,
-        "standalone_note_section": "八、23",
-        "standalone_section_title": "在建工程",
-        "match_type": "table_title",
-        "standalone_table_name": "（1）在建工程情况"
-      },
-      {
-        "consol_section_id": "五-23-3",
-        "consol_parent": "固定资产",
-        "consol_title": "（2）重要在建工程项目本期变动情况",
-        "consol_seq": 89,
-        "standalone_note_section": "八、23",
-        "standalone_section_title": "在建工程",
-        "match_type": "table_title",
-        "standalone_table_name": "（2）重要在建工程项目本期变动情况"
-      },
-      {
-        "consol_section_id": "五-23-4",
         "consol_parent": "固定资产",
         "consol_title": "未办妥产权证书的固定资产情况",
         "consol_seq": 90,
@@ -1134,7 +904,7 @@
         "standalone_table_name": "未办妥产权证书的固定资产情况"
       },
       {
-        "consol_section_id": "五-23-5",
+        "consol_section_id": "五-22-5",
         "consol_parent": "固定资产",
         "consol_title": "固定资产清理",
         "consol_seq": 91,
@@ -1144,27 +914,27 @@
         "standalone_table_name": "固定资产清理"
       },
       {
-        "consol_section_id": "五-24-1",
+        "consol_section_id": "五-23-1",
         "consol_parent": "在建工程",
-        "consol_title": "以成本计量",
+        "consol_title": "在建工程",
         "consol_seq": 92,
-        "standalone_note_section": "八、21",
-        "standalone_section_title": "投资性房地产",
+        "standalone_note_section": "八、23",
+        "standalone_section_title": "在建工程",
         "match_type": "table_title",
-        "standalone_table_name": "以成本计量"
+        "standalone_table_name": "在建工程"
       },
       {
-        "consol_section_id": "五-24-2",
+        "consol_section_id": "五-23-2",
         "consol_parent": "在建工程",
-        "consol_title": "以公允价值计量",
+        "consol_title": "（1）在建工程情况",
         "consol_seq": 93,
-        "standalone_note_section": "八、21",
-        "standalone_section_title": "投资性房地产",
+        "standalone_note_section": "八、23",
+        "standalone_section_title": "在建工程",
         "match_type": "table_title",
-        "standalone_table_name": "以公允价值计量"
+        "standalone_table_name": "（1）在建工程情况"
       },
       {
-        "consol_section_id": "五-24-3",
+        "consol_section_id": "五-23-3",
         "consol_parent": "在建工程",
         "consol_title": "（2）重要在建工程项目本期变动情况",
         "consol_seq": 94,
@@ -1174,7 +944,7 @@
         "standalone_table_name": "（2）重要在建工程项目本期变动情况"
       },
       {
-        "consol_section_id": "五-24-4",
+        "consol_section_id": "五-23-4",
         "consol_parent": "在建工程",
         "consol_title": "（3）本期计提在建工程减值准备情况",
         "consol_seq": 95,
@@ -1184,7 +954,7 @@
         "standalone_table_name": "（3）本期计提在建工程减值准备情况"
       },
       {
-        "consol_section_id": "五-25-1",
+        "consol_section_id": "五-24-1",
         "consol_parent": "生产性生物资产",
         "consol_title": "以成本计量",
         "consol_seq": 96,
@@ -1194,7 +964,7 @@
         "standalone_table_name": "以成本计量"
       },
       {
-        "consol_section_id": "五-25-2",
+        "consol_section_id": "五-24-2",
         "consol_parent": "生产性生物资产",
         "consol_title": "以公允价值计量",
         "consol_seq": 97,
@@ -1204,10 +974,20 @@
         "standalone_table_name": "以公允价值计量"
       },
       {
-        "consol_section_id": "五-26-1",
+        "consol_section_id": "五-25-1",
         "consol_parent": "油气资产",
-        "consol_title": "使用权资产",
+        "consol_title": "油气资产分类",
         "consol_seq": 98,
+        "standalone_note_section": "八、25",
+        "standalone_section_title": "油气资产",
+        "match_type": "structure",
+        "standalone_table_name": "油气资产"
+      },
+      {
+        "consol_section_id": "五-26-1",
+        "consol_parent": "使用权资产",
+        "consol_title": "使用权资产",
+        "consol_seq": 99,
         "standalone_note_section": "八、26",
         "standalone_section_title": "使用权资产",
         "match_type": "table_title",
@@ -1215,9 +995,9 @@
       },
       {
         "consol_section_id": "五-27-1",
-        "consol_parent": "使用权资产",
+        "consol_parent": "无形资产",
         "consol_title": "无形资产情况",
-        "consol_seq": 99,
+        "consol_seq": 100,
         "standalone_note_section": "八、27",
         "standalone_section_title": "无形资产",
         "match_type": "table_title",
@@ -1225,26 +1005,6 @@
       },
       {
         "consol_section_id": "五-27-2",
-        "consol_parent": "使用权资产",
-        "consol_title": "确认为无形资产的数据资源",
-        "consol_seq": 245,
-        "standalone_note_section": "八、27",
-        "standalone_section_title": "无形资产",
-        "match_type": "table_title",
-        "standalone_table_name": "确认为无形资产的数据资源"
-      },
-      {
-        "consol_section_id": "五-28-1",
-        "consol_parent": "无形资产",
-        "consol_title": "开发支出",
-        "consol_seq": 100,
-        "standalone_note_section": "八、28",
-        "standalone_section_title": "开发支出",
-        "match_type": "table_title",
-        "standalone_table_name": "开发支出"
-      },
-      {
-        "consol_section_id": "五-28-2",
         "consol_parent": "无形资产",
         "consol_title": "确认为无形资产的数据资源",
         "consol_seq": 101,
@@ -1254,27 +1014,17 @@
         "standalone_table_name": "确认为无形资产的数据资源"
       },
       {
-        "consol_section_id": "五-29-1",
+        "consol_section_id": "五-28-1",
         "consol_parent": "开发支出",
-        "consol_title": "（1）商誉账面原值",
+        "consol_title": "开发支出",
         "consol_seq": 102,
-        "standalone_note_section": "八、29",
-        "standalone_section_title": "商誉",
+        "standalone_note_section": "八、28",
+        "standalone_section_title": "开发支出",
         "match_type": "table_title",
-        "standalone_table_name": "（1）商誉账面原值"
+        "standalone_table_name": "开发支出"
       },
       {
-        "consol_section_id": "五-29-2",
-        "consol_parent": "开发支出",
-        "consol_title": "（2）商誉减值准备",
-        "consol_seq": 246,
-        "standalone_note_section": "八、29",
-        "standalone_section_title": "商誉",
-        "match_type": "table_title",
-        "standalone_table_name": "（2）商誉减值准备"
-      },
-      {
-        "consol_section_id": "五-30-1",
+        "consol_section_id": "五-29-1",
         "consol_parent": "商誉",
         "consol_title": "（1）商誉账面原值",
         "consol_seq": 103,
@@ -1284,7 +1034,7 @@
         "standalone_table_name": "（1）商誉账面原值"
       },
       {
-        "consol_section_id": "五-30-2",
+        "consol_section_id": "五-29-2",
         "consol_parent": "商誉",
         "consol_title": "（2）商誉减值准备",
         "consol_seq": 104,
@@ -1294,10 +1044,20 @@
         "standalone_table_name": "（2）商誉减值准备"
       },
       {
-        "consol_section_id": "五-31-1",
+        "consol_section_id": "五-30-1",
         "consol_parent": "长期待摊费用",
-        "consol_title": "未经抵销的递延所得税资产和递延所得税负债",
+        "consol_title": "长期待摊费用",
         "consol_seq": 105,
+        "standalone_note_section": "八、30",
+        "standalone_section_title": "长期待摊费用",
+        "match_type": "table_title",
+        "standalone_table_name": "长期待摊费用"
+      },
+      {
+        "consol_section_id": "五-31-1",
+        "consol_parent": "递延所得税资产和递延所得税负债",
+        "consol_title": "未经抵销的递延所得税资产和递延所得税负债",
+        "consol_seq": 106,
         "standalone_note_section": "八、31",
         "standalone_section_title": "递延所得税资产和递延所得税负债",
         "match_type": "table_title",
@@ -1305,9 +1065,9 @@
       },
       {
         "consol_section_id": "五-31-2",
-        "consol_parent": "长期待摊费用",
+        "consol_parent": "递延所得税资产和递延所得税负债",
         "consol_title": "以抵销后净额列示的递延所得税资产或负债",
-        "consol_seq": 247,
+        "consol_seq": 107,
         "standalone_note_section": "八、31",
         "standalone_section_title": "递延所得税资产和递延所得税负债",
         "match_type": "table_title",
@@ -1315,46 +1075,6 @@
       },
       {
         "consol_section_id": "五-31-3",
-        "consol_parent": "长期待摊费用",
-        "consol_title": "未确认递延所得税资产明细",
-        "consol_seq": 248,
-        "standalone_note_section": "八、31",
-        "standalone_section_title": "递延所得税资产和递延所得税负债",
-        "match_type": "table_title",
-        "standalone_table_name": "未确认递延所得税资产明细"
-      },
-      {
-        "consol_section_id": "五-31-4",
-        "consol_parent": "长期待摊费用",
-        "consol_title": "未确认递延所得税资产的可抵扣亏损将于以下年度到期",
-        "consol_seq": 249,
-        "standalone_note_section": "八、31",
-        "standalone_section_title": "递延所得税资产和递延所得税负债",
-        "match_type": "table_title",
-        "standalone_table_name": "未确认递延所得税资产的可抵扣亏损将于以下年度到期"
-      },
-      {
-        "consol_section_id": "五-32-1",
-        "consol_parent": "递延所得税资产和递延所得税负债",
-        "consol_title": "其他非流动资产",
-        "consol_seq": 106,
-        "standalone_note_section": "八、32",
-        "standalone_section_title": "其他非流动资产",
-        "match_type": "table_title",
-        "standalone_table_name": "其他非流动资产"
-      },
-      {
-        "consol_section_id": "五-32-2",
-        "consol_parent": "递延所得税资产和递延所得税负债",
-        "consol_title": "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如：",
-        "consol_seq": 107,
-        "standalone_note_section": "八、32",
-        "standalone_section_title": "其他非流动资产",
-        "match_type": "table_title",
-        "standalone_table_name": "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如："
-      },
-      {
-        "consol_section_id": "五-32-3",
         "consol_parent": "递延所得税资产和递延所得税负债",
         "consol_title": "未确认递延所得税资产明细",
         "consol_seq": 108,
@@ -1364,7 +1084,7 @@
         "standalone_table_name": "未确认递延所得税资产明细"
       },
       {
-        "consol_section_id": "五-32-4",
+        "consol_section_id": "五-31-4",
         "consol_parent": "递延所得税资产和递延所得税负债",
         "consol_title": "未确认递延所得税资产的可抵扣亏损将于以下年度到期",
         "consol_seq": 109,
@@ -1374,10 +1094,30 @@
         "standalone_table_name": "未确认递延所得税资产的可抵扣亏损将于以下年度到期"
       },
       {
-        "consol_section_id": "五-33-1",
+        "consol_section_id": "五-32-1",
         "consol_parent": "其他非流动资产",
-        "consol_title": "短期借款分类",
+        "consol_title": "其他非流动资产",
         "consol_seq": 110,
+        "standalone_note_section": "八、32",
+        "standalone_section_title": "其他非流动资产",
+        "match_type": "table_title",
+        "standalone_table_name": "其他非流动资产"
+      },
+      {
+        "consol_section_id": "五-32-2",
+        "consol_parent": "其他非流动资产",
+        "consol_title": "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如：",
+        "consol_seq": 111,
+        "standalone_note_section": "八、32",
+        "standalone_section_title": "其他非流动资产",
+        "match_type": "table_title",
+        "standalone_table_name": "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如："
+      },
+      {
+        "consol_section_id": "五-33-1",
+        "consol_parent": "短期借款",
+        "consol_title": "短期借款分类",
+        "consol_seq": 112,
         "standalone_note_section": "八、33",
         "standalone_section_title": "短期借款",
         "match_type": "table_title",
@@ -1385,9 +1125,9 @@
       },
       {
         "consol_section_id": "五-33-2",
-        "consol_parent": "其他非流动资产",
+        "consol_parent": "短期借款",
         "consol_title": "已逾期未偿还的短期借款情况",
-        "consol_seq": 111,
+        "consol_seq": 113,
         "standalone_note_section": "八、33",
         "standalone_section_title": "短期借款",
         "match_type": "table_title",
@@ -1395,9 +1135,9 @@
       },
       {
         "consol_section_id": "五-34-1",
-        "consol_parent": "短期借款",
+        "consol_parent": "交易性金融负债",
         "consol_title": "交易性金融负债",
-        "consol_seq": 112,
+        "consol_seq": 114,
         "standalone_note_section": "八、34",
         "standalone_section_title": "交易性金融负债",
         "match_type": "table_title",
@@ -1405,26 +1145,6 @@
       },
       {
         "consol_section_id": "五-34-2",
-        "consol_parent": "短期借款",
-        "consol_title": "对于指定为以公允价值计量且其变动计入当期损益的金融负债，202X年公允价值的变动情况如下表所示：",
-        "consol_seq": 113,
-        "standalone_note_section": "八、34",
-        "standalone_section_title": "交易性金融负债",
-        "match_type": "table_title",
-        "standalone_table_name": "对于指定为以公允价值计量且其变动计入当期损益的金融负债，202X年公允价值的变动情况如下表所示："
-      },
-      {
-        "consol_section_id": "五-35-1",
-        "consol_parent": "交易性金融负债",
-        "consol_title": "衍生金融负债",
-        "consol_seq": 114,
-        "standalone_note_section": "八、35",
-        "standalone_section_title": "衍生金融负债",
-        "match_type": "table_title",
-        "standalone_table_name": "衍生金融负债"
-      },
-      {
-        "consol_section_id": "五-35-2",
         "consol_parent": "交易性金融负债",
         "consol_title": "对于指定为以公允价值计量且其变动计入当期损益的金融负债，202X年公允价值的变动情况如下表所示：",
         "consol_seq": 115,
@@ -1434,10 +1154,20 @@
         "standalone_table_name": "对于指定为以公允价值计量且其变动计入当期损益的金融负债，202X年公允价值的变动情况如下表所示："
       },
       {
-        "consol_section_id": "五-36-1",
+        "consol_section_id": "五-35-1",
         "consol_parent": "衍生金融负债",
-        "consol_title": "应付票据",
+        "consol_title": "衍生金融负债",
         "consol_seq": 116,
+        "standalone_note_section": "八、35",
+        "standalone_section_title": "衍生金融负债",
+        "match_type": "table_title",
+        "standalone_table_name": "衍生金融负债"
+      },
+      {
+        "consol_section_id": "五-36-1",
+        "consol_parent": "应付票据",
+        "consol_title": "应付票据",
+        "consol_seq": 117,
         "standalone_note_section": "八、36",
         "standalone_section_title": "应付票据",
         "match_type": "table_title",
@@ -1445,26 +1175,16 @@
       },
       {
         "consol_section_id": "五-37-1",
-        "consol_parent": "应付票据",
+        "consol_parent": "应付账款",
         "consol_title": "应付账款",
-        "consol_seq": 117,
+        "consol_seq": 118,
         "standalone_note_section": "八、37",
         "standalone_section_title": "应付账款",
         "match_type": "table_title",
         "standalone_table_name": "应付账款"
       },
       {
-        "consol_section_id": "五-38-1",
-        "consol_parent": "应付账款",
-        "consol_title": "预收款项",
-        "consol_seq": 118,
-        "standalone_note_section": "八、38",
-        "standalone_section_title": "预收款项",
-        "match_type": "table_title",
-        "standalone_table_name": "预收款项"
-      },
-      {
-        "consol_section_id": "五-38-2",
+        "consol_section_id": "五-37-2",
         "consol_parent": "应付账款",
         "consol_title": "账龄超过1 年的重要应付账款",
         "consol_seq": 119,
@@ -1474,10 +1194,30 @@
         "standalone_table_name": "账龄超过1 年的重要应付账款"
       },
       {
-        "consol_section_id": "五-39-1",
+        "consol_section_id": "五-38-1",
         "consol_parent": "预收款项",
-        "consol_title": "合同负债",
+        "consol_title": "预收款项",
         "consol_seq": 120,
+        "standalone_note_section": "八、38",
+        "standalone_section_title": "预收款项",
+        "match_type": "table_title",
+        "standalone_table_name": "预收款项"
+      },
+      {
+        "consol_section_id": "五-38-2",
+        "consol_parent": "预收款项",
+        "consol_title": "账龄超过1年的重要预收款项",
+        "consol_seq": 121,
+        "standalone_note_section": "八、38",
+        "standalone_section_title": "预收款项",
+        "match_type": "chapter",
+        "standalone_table_name": "账龄超过1年的重要预收账款"
+      },
+      {
+        "consol_section_id": "五-39-1",
+        "consol_parent": "合同负债",
+        "consol_title": "合同负债",
+        "consol_seq": 122,
         "standalone_note_section": "八、39",
         "standalone_section_title": "合同负债",
         "match_type": "table_title",
@@ -1485,19 +1225,19 @@
       },
       {
         "consol_section_id": "五-39-2",
-        "consol_parent": "预收款项",
-        "consol_title": "账龄超过1年的重要预收款项",
-        "consol_seq": 121,
+        "consol_parent": "合同负债",
+        "consol_title": "本期合同负债账面价值的重大变动",
+        "consol_seq": 123,
         "standalone_note_section": "八、39",
         "standalone_section_title": "合同负债",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "table_title",
+        "standalone_table_name": "本期合同负债账面价值的重大变动"
       },
       {
         "consol_section_id": "五-40-1",
-        "consol_parent": "合同负债",
+        "consol_parent": "应付职工薪酬",
         "consol_title": "应付职工薪酬列示",
-        "consol_seq": 122,
+        "consol_seq": 124,
         "standalone_note_section": "八、40",
         "standalone_section_title": "应付职工薪酬",
         "match_type": "table_title",
@@ -1505,26 +1245,6 @@
       },
       {
         "consol_section_id": "五-40-2",
-        "consol_parent": "合同负债",
-        "consol_title": "短期薪酬列示",
-        "consol_seq": 123,
-        "standalone_note_section": "八、40",
-        "standalone_section_title": "应付职工薪酬",
-        "match_type": "table_title",
-        "standalone_table_name": "短期薪酬列示"
-      },
-      {
-        "consol_section_id": "五-41-1",
-        "consol_parent": "应付职工薪酬",
-        "consol_title": "应交税费",
-        "consol_seq": 124,
-        "standalone_note_section": "八、41",
-        "standalone_section_title": "应交税费",
-        "match_type": "table_title",
-        "standalone_table_name": "应交税费"
-      },
-      {
-        "consol_section_id": "五-41-2",
         "consol_parent": "应付职工薪酬",
         "consol_title": "短期薪酬列示",
         "consol_seq": 125,
@@ -1534,7 +1254,7 @@
         "standalone_table_name": "短期薪酬列示"
       },
       {
-        "consol_section_id": "五-41-3",
+        "consol_section_id": "五-40-3",
         "consol_parent": "应付职工薪酬",
         "consol_title": "设定提存计划列示",
         "consol_seq": 126,
@@ -1544,10 +1264,20 @@
         "standalone_table_name": "设定提存计划列示"
       },
       {
-        "consol_section_id": "五-42-1",
+        "consol_section_id": "五-41-1",
         "consol_parent": "应交税费",
-        "consol_title": "其他应付款",
+        "consol_title": "应交税费",
         "consol_seq": 127,
+        "standalone_note_section": "八、41",
+        "standalone_section_title": "应交税费",
+        "match_type": "table_title",
+        "standalone_table_name": "应交税费"
+      },
+      {
+        "consol_section_id": "五-42-1",
+        "consol_parent": "其他应付款",
+        "consol_title": "其他应付款",
+        "consol_seq": 128,
         "standalone_note_section": "八、42",
         "standalone_section_title": "其他应付款",
         "match_type": "table_title",
@@ -1555,56 +1285,6 @@
       },
       {
         "consol_section_id": "五-42-2",
-        "consol_parent": "应交税费",
-        "consol_title": "应付利息",
-        "consol_seq": 250,
-        "standalone_note_section": "八、42",
-        "standalone_section_title": "其他应付款",
-        "match_type": "table_title",
-        "standalone_table_name": "应付利息"
-      },
-      {
-        "consol_section_id": "五-42-3",
-        "consol_parent": "应交税费",
-        "consol_title": "重要的已逾期未支付的利息情况",
-        "consol_seq": 251,
-        "standalone_note_section": "八、42",
-        "standalone_section_title": "其他应付款",
-        "match_type": "table_title",
-        "standalone_table_name": "重要的已逾期未支付的利息情况"
-      },
-      {
-        "consol_section_id": "五-42-4",
-        "consol_parent": "应交税费",
-        "consol_title": "应付股利",
-        "consol_seq": 252,
-        "standalone_note_section": "八、42",
-        "standalone_section_title": "其他应付款",
-        "match_type": "table_title",
-        "standalone_table_name": "应付股利"
-      },
-      {
-        "consol_section_id": "五-42-5",
-        "consol_parent": "应交税费",
-        "consol_title": "按款项性质列示",
-        "consol_seq": 253,
-        "standalone_note_section": "八、42",
-        "standalone_section_title": "其他应付款",
-        "match_type": "table_title",
-        "standalone_table_name": "按款项性质列示"
-      },
-      {
-        "consol_section_id": "五-43-1",
-        "consol_parent": "其他应付款",
-        "consol_title": "持有待售负债",
-        "consol_seq": 128,
-        "standalone_note_section": "八、43",
-        "standalone_section_title": "持有待售负债",
-        "match_type": "table_title",
-        "standalone_table_name": "持有待售负债"
-      },
-      {
-        "consol_section_id": "五-43-2",
         "consol_parent": "其他应付款",
         "consol_title": "应付利息",
         "consol_seq": 129,
@@ -1614,7 +1294,7 @@
         "standalone_table_name": "应付利息"
       },
       {
-        "consol_section_id": "五-43-3",
+        "consol_section_id": "五-42-3",
         "consol_parent": "其他应付款",
         "consol_title": "重要的已逾期未支付的利息情况",
         "consol_seq": 130,
@@ -1624,7 +1304,7 @@
         "standalone_table_name": "重要的已逾期未支付的利息情况"
       },
       {
-        "consol_section_id": "五-43-4",
+        "consol_section_id": "五-42-4",
         "consol_parent": "其他应付款",
         "consol_title": "应付股利",
         "consol_seq": 131,
@@ -1634,7 +1314,7 @@
         "standalone_table_name": "应付股利"
       },
       {
-        "consol_section_id": "五-43-5",
+        "consol_section_id": "五-42-5",
         "consol_parent": "其他应付款",
         "consol_title": "按款项性质列示",
         "consol_seq": 132,
@@ -1644,7 +1324,7 @@
         "standalone_table_name": "按款项性质列示"
       },
       {
-        "consol_section_id": "五-43-6",
+        "consol_section_id": "五-42-6",
         "consol_parent": "其他应付款",
         "consol_title": "账龄超过1年的重要其他应付款项",
         "consol_seq": 133,
@@ -1654,7 +1334,7 @@
         "standalone_table_name": "账龄超过1年的重要其他应付款项"
       },
       {
-        "consol_section_id": "五-44-1",
+        "consol_section_id": "五-43-1",
         "consol_parent": "持有待售负债",
         "consol_title": "持有待售负债",
         "consol_seq": 134,
@@ -1664,7 +1344,7 @@
         "standalone_table_name": "持有待售负债"
       },
       {
-        "consol_section_id": "五-45-1",
+        "consol_section_id": "五-44-1",
         "consol_parent": "一年内到期的非流动负债",
         "consol_title": "一年内到期的非流动负债",
         "consol_seq": 135,
@@ -1674,17 +1354,17 @@
         "standalone_table_name": "一年内到期的非流动负债"
       },
       {
-        "consol_section_id": "五-46-1",
+        "consol_section_id": "五-45-1",
         "consol_parent": "（1）一年内到期的长期借款",
-        "consol_title": "（2）一年内到期的应付债券",
+        "consol_title": "（1）一年内到期的长期借款",
         "consol_seq": 136,
-        "standalone_note_section": "八、46",
-        "standalone_section_title": "（2）一年内到期的应付债券",
+        "standalone_note_section": "八、45",
+        "standalone_section_title": "（1）一年内到期的长期借款",
         "match_type": "table_title",
-        "standalone_table_name": "（2）一年内到期的应付债券"
+        "standalone_table_name": "（1）一年内到期的长期借款"
       },
       {
-        "consol_section_id": "五-47-1",
+        "consol_section_id": "五-46-1",
         "consol_parent": "（2）一年内到期的应付债券",
         "consol_title": "（2）一年内到期的应付债券",
         "consol_seq": 137,
@@ -1694,7 +1374,7 @@
         "standalone_table_name": "（2）一年内到期的应付债券"
       },
       {
-        "consol_section_id": "五-47-2",
+        "consol_section_id": "五-46-2",
         "consol_parent": "（2）一年内到期的应付债券",
         "consol_title": "一年内到期的应付债券",
         "consol_seq": 138,
@@ -1704,10 +1384,20 @@
         "standalone_table_name": "（2）一年内到期的应付债券"
       },
       {
-        "consol_section_id": "五-48-1",
+        "consol_section_id": "五-47-1",
         "consol_parent": "（3）一年内到期的长期应付款",
-        "consol_title": "其他流动负债",
+        "consol_title": "（3）一年内到期的长期应付款",
         "consol_seq": 139,
+        "standalone_note_section": "八、47",
+        "standalone_section_title": "（3）一年内到期的长期应付款",
+        "match_type": "table_title",
+        "standalone_table_name": "（3）一年内到期的长期应付款"
+      },
+      {
+        "consol_section_id": "五-48-1",
+        "consol_parent": "其他流动负债",
+        "consol_title": "其他流动负债",
+        "consol_seq": 140,
         "standalone_note_section": "八、48",
         "standalone_section_title": "其他流动负债",
         "match_type": "table_title",
@@ -1715,9 +1405,9 @@
       },
       {
         "consol_section_id": "五-49-1",
-        "consol_parent": "其他流动负债",
+        "consol_parent": "长期借款",
         "consol_title": "长期借款",
-        "consol_seq": 140,
+        "consol_seq": 141,
         "standalone_note_section": "八、49",
         "standalone_section_title": "长期借款",
         "match_type": "table_title",
@@ -1725,9 +1415,9 @@
       },
       {
         "consol_section_id": "五-50-1",
-        "consol_parent": "长期借款",
+        "consol_parent": "应付债券",
         "consol_title": "应付债券",
-        "consol_seq": 141,
+        "consol_seq": 142,
         "standalone_note_section": "八、50",
         "standalone_section_title": "应付债券",
         "match_type": "table_title",
@@ -1735,9 +1425,9 @@
       },
       {
         "consol_section_id": "五-50-2",
-        "consol_parent": "长期借款",
+        "consol_parent": "应付债券",
         "consol_title": "应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）",
-        "consol_seq": 254,
+        "consol_seq": 143,
         "standalone_note_section": "八、50",
         "standalone_section_title": "应付债券",
         "match_type": "table_title",
@@ -1745,9 +1435,9 @@
       },
       {
         "consol_section_id": "五-51-1",
-        "consol_parent": "应付债券",
+        "consol_parent": "优先股、永续债等金融工具",
         "consol_title": "期末发行在外的优先股、永续债等金融工具情况",
-        "consol_seq": 142,
+        "consol_seq": 144,
         "standalone_note_section": "八、51",
         "standalone_section_title": "优先股、永续债等金融工具",
         "match_type": "table_title",
@@ -1755,26 +1445,6 @@
       },
       {
         "consol_section_id": "五-51-2",
-        "consol_parent": "应付债券",
-        "consol_title": "发行在外的优先股、永续债等金融工具变动情况",
-        "consol_seq": 143,
-        "standalone_note_section": "八、51",
-        "standalone_section_title": "优先股、永续债等金融工具",
-        "match_type": "table_title",
-        "standalone_table_name": "发行在外的优先股、永续债等金融工具变动情况"
-      },
-      {
-        "consol_section_id": "五-52-1",
-        "consol_parent": "优先股、永续债等金融工具",
-        "consol_title": "租赁负债",
-        "consol_seq": 144,
-        "standalone_note_section": "八、52",
-        "standalone_section_title": "租赁负债",
-        "match_type": "table_title",
-        "standalone_table_name": "租赁负债"
-      },
-      {
-        "consol_section_id": "五-52-2",
         "consol_parent": "优先股、永续债等金融工具",
         "consol_title": "发行在外的优先股、永续债等金融工具变动情况",
         "consol_seq": 145,
@@ -1784,10 +1454,20 @@
         "standalone_table_name": "发行在外的优先股、永续债等金融工具变动情况"
       },
       {
-        "consol_section_id": "五-53-1",
+        "consol_section_id": "五-52-1",
         "consol_parent": "租赁负债",
-        "consol_title": "长期应付款",
+        "consol_title": "租赁负债",
         "consol_seq": 146,
+        "standalone_note_section": "八、52",
+        "standalone_section_title": "租赁负债",
+        "match_type": "table_title",
+        "standalone_table_name": "租赁负债"
+      },
+      {
+        "consol_section_id": "五-53-1",
+        "consol_parent": "长期应付款",
+        "consol_title": "长期应付款",
+        "consol_seq": 147,
         "standalone_note_section": "八、53",
         "standalone_section_title": "长期应付款",
         "match_type": "table_title",
@@ -1795,9 +1475,9 @@
       },
       {
         "consol_section_id": "五-53-2",
-        "consol_parent": "租赁负债",
+        "consol_parent": "长期应付款",
         "consol_title": "①长期应付款项期末余额最大的前5 项",
-        "consol_seq": 255,
+        "consol_seq": 148,
         "standalone_note_section": "八、53",
         "standalone_section_title": "长期应付款",
         "match_type": "table_title",
@@ -1805,9 +1485,9 @@
       },
       {
         "consol_section_id": "五-53-3",
-        "consol_parent": "租赁负债",
+        "consol_parent": "长期应付款",
         "consol_title": "①专项应付款期末余额最大的前5 项",
-        "consol_seq": 256,
+        "consol_seq": 149,
         "standalone_note_section": "八、53",
         "standalone_section_title": "长期应付款",
         "match_type": "table_title",
@@ -1815,9 +1495,9 @@
       },
       {
         "consol_section_id": "五-54-1",
-        "consol_parent": "长期应付款",
+        "consol_parent": "长期应付职工薪酬",
         "consol_title": "长期应付职工薪酬",
-        "consol_seq": 147,
+        "consol_seq": 150,
         "standalone_note_section": "八、54",
         "standalone_section_title": "长期应付职工薪酬",
         "match_type": "table_title",
@@ -1825,86 +1505,6 @@
       },
       {
         "consol_section_id": "五-54-2",
-        "consol_parent": "长期应付款",
-        "consol_title": "设定受益计划义务现值",
-        "consol_seq": 148,
-        "standalone_note_section": "八、54",
-        "standalone_section_title": "长期应付职工薪酬",
-        "match_type": "chapter",
-        "standalone_table_name": null
-      },
-      {
-        "consol_section_id": "五-54-3",
-        "consol_parent": "长期应付款",
-        "consol_title": "计划资产",
-        "consol_seq": 149,
-        "standalone_note_section": "八、54",
-        "standalone_section_title": "长期应付职工薪酬",
-        "match_type": "table_title",
-        "standalone_table_name": "计划资产"
-      },
-      {
-        "consol_section_id": "五-54-4",
-        "consol_parent": "长期应付款",
-        "consol_title": "设定受益计划净负债（净资产）",
-        "consol_seq": 257,
-        "standalone_note_section": "八、54",
-        "standalone_section_title": "长期应付职工薪酬",
-        "match_type": "table_title",
-        "standalone_table_name": "设定受益计划净负债（净资产）"
-      },
-      {
-        "consol_section_id": "五-54-5",
-        "consol_parent": "长期应付款",
-        "consol_title": "未折现的离职后福利预计到期分析",
-        "consol_seq": 258,
-        "standalone_note_section": "八、54",
-        "standalone_section_title": "长期应付职工薪酬",
-        "match_type": "table_title",
-        "standalone_table_name": "未折现的离职后福利预计到期分析"
-      },
-      {
-        "consol_section_id": "五-54-6",
-        "consol_parent": "长期应付款",
-        "consol_title": "计划资产",
-        "consol_seq": 259,
-        "standalone_note_section": "八、54",
-        "standalone_section_title": "长期应付职工薪酬",
-        "match_type": "table_title",
-        "standalone_table_name": "计划资产"
-      },
-      {
-        "consol_section_id": "五-54-7",
-        "consol_parent": "长期应付款",
-        "consol_title": "精算假设",
-        "consol_seq": 260,
-        "standalone_note_section": "八、54",
-        "standalone_section_title": "长期应付职工薪酬",
-        "match_type": "chapter",
-        "standalone_table_name": null
-      },
-      {
-        "consol_section_id": "五-54-8",
-        "consol_parent": "长期应付款",
-        "consol_title": "敏感性分析",
-        "consol_seq": 261,
-        "standalone_note_section": "八、54",
-        "standalone_section_title": "长期应付职工薪酬",
-        "match_type": "structure",
-        "standalone_table_name": "计划资产"
-      },
-      {
-        "consol_section_id": "五-55-1",
-        "consol_parent": "长期应付职工薪酬",
-        "consol_title": "预计负债",
-        "consol_seq": 150,
-        "standalone_note_section": "八、55",
-        "standalone_section_title": "预计负债",
-        "match_type": "table_title",
-        "standalone_table_name": "预计负债"
-      },
-      {
-        "consol_section_id": "五-55-2",
         "consol_parent": "长期应付职工薪酬",
         "consol_title": "设定受益计划义务现值",
         "consol_seq": 151,
@@ -1914,7 +1514,7 @@
         "standalone_table_name": null
       },
       {
-        "consol_section_id": "五-55-3",
+        "consol_section_id": "五-54-3",
         "consol_parent": "长期应付职工薪酬",
         "consol_title": "计划资产",
         "consol_seq": 152,
@@ -1924,7 +1524,7 @@
         "standalone_table_name": "计划资产"
       },
       {
-        "consol_section_id": "五-55-4",
+        "consol_section_id": "五-54-4",
         "consol_parent": "长期应付职工薪酬",
         "consol_title": "设定受益计划净负债（净资产）",
         "consol_seq": 153,
@@ -1934,7 +1534,7 @@
         "standalone_table_name": "设定受益计划净负债（净资产）"
       },
       {
-        "consol_section_id": "五-55-5",
+        "consol_section_id": "五-54-5",
         "consol_parent": "长期应付职工薪酬",
         "consol_title": "未折现的离职后福利预计到期分析",
         "consol_seq": 154,
@@ -1944,7 +1544,7 @@
         "standalone_table_name": "未折现的离职后福利预计到期分析"
       },
       {
-        "consol_section_id": "五-55-6",
+        "consol_section_id": "五-54-6",
         "consol_parent": "长期应付职工薪酬",
         "consol_title": "计划资产",
         "consol_seq": 155,
@@ -1954,7 +1554,7 @@
         "standalone_table_name": "计划资产"
       },
       {
-        "consol_section_id": "五-55-7",
+        "consol_section_id": "五-54-7",
         "consol_parent": "长期应付职工薪酬",
         "consol_title": "精算假设",
         "consol_seq": 156,
@@ -1964,7 +1564,7 @@
         "standalone_table_name": null
       },
       {
-        "consol_section_id": "五-55-8",
+        "consol_section_id": "五-54-8",
         "consol_parent": "长期应付职工薪酬",
         "consol_title": "敏感性分析",
         "consol_seq": 157,
@@ -1974,27 +1574,17 @@
         "standalone_table_name": "计划资产"
       },
       {
-        "consol_section_id": "五-56-1",
+        "consol_section_id": "五-55-1",
         "consol_parent": "预计负债",
-        "consol_title": "递延收益",
+        "consol_title": "预计负债",
         "consol_seq": 158,
-        "standalone_note_section": "八、56",
-        "standalone_section_title": "递延收益",
+        "standalone_note_section": "八、55",
+        "standalone_section_title": "预计负债",
         "match_type": "table_title",
-        "standalone_table_name": "递延收益"
+        "standalone_table_name": "预计负债"
       },
       {
-        "consol_section_id": "五-56-2",
-        "consol_parent": "预计负债",
-        "consol_title": "其中：递延收益-政府补助情况",
-        "consol_seq": 262,
-        "standalone_note_section": "八、56",
-        "standalone_section_title": "递延收益",
-        "match_type": "table_title",
-        "standalone_table_name": "其中：递延收益-政府补助情况"
-      },
-      {
-        "consol_section_id": "五-57-1",
+        "consol_section_id": "五-56-1",
         "consol_parent": "递延收益",
         "consol_title": "递延收益",
         "consol_seq": 159,
@@ -2004,20 +1594,30 @@
         "standalone_table_name": "递延收益"
       },
       {
-        "consol_section_id": "五-57-2",
+        "consol_section_id": "五-56-2",
         "consol_parent": "递延收益",
-        "consol_title": "其中：递延收益-政府补助情况【参考披露格式如下】",
+        "consol_title": "其中：递延收益-政府补助情况",
         "consol_seq": 160,
         "standalone_note_section": "八、56",
         "standalone_section_title": "递延收益",
-        "match_type": "structure",
+        "match_type": "table_title",
         "standalone_table_name": "其中：递延收益-政府补助情况"
       },
       {
-        "consol_section_id": "五-58-1",
+        "consol_section_id": "五-57-1",
         "consol_parent": "其他非流动负债",
-        "consol_title": "实收资本",
+        "consol_title": "其他非流动负债",
         "consol_seq": 161,
+        "standalone_note_section": "八、57",
+        "standalone_section_title": "其他非流动负债",
+        "match_type": "table_title",
+        "standalone_table_name": "其他非流动负债"
+      },
+      {
+        "consol_section_id": "五-58-1",
+        "consol_parent": "实收资本",
+        "consol_title": "实收资本",
+        "consol_seq": 162,
         "standalone_note_section": "八、58",
         "standalone_section_title": "实收资本",
         "match_type": "table_title",
@@ -2025,9 +1625,9 @@
       },
       {
         "consol_section_id": "五-59-1",
-        "consol_parent": "实收资本",
+        "consol_parent": "其他权益工具",
         "consol_title": "其他权益工具",
-        "consol_seq": 162,
+        "consol_seq": 163,
         "standalone_note_section": "八、59",
         "standalone_section_title": "其他权益工具",
         "match_type": "table_title",
@@ -2035,9 +1635,9 @@
       },
       {
         "consol_section_id": "五-60-1",
-        "consol_parent": "其他权益工具",
+        "consol_parent": "资本公积",
         "consol_title": "资本公积",
-        "consol_seq": 163,
+        "consol_seq": 164,
         "standalone_note_section": "八、60",
         "standalone_section_title": "资本公积",
         "match_type": "table_title",
@@ -2045,9 +1645,9 @@
       },
       {
         "consol_section_id": "五-61-1",
-        "consol_parent": "资本公积",
+        "consol_parent": "专项储备",
         "consol_title": "专项储备",
-        "consol_seq": 164,
+        "consol_seq": 165,
         "standalone_note_section": "八、61",
         "standalone_section_title": "专项储备",
         "match_type": "table_title",
@@ -2055,9 +1655,9 @@
       },
       {
         "consol_section_id": "五-62-1",
-        "consol_parent": "专项储备",
+        "consol_parent": "盈余公积",
         "consol_title": "盈余公积",
-        "consol_seq": 165,
+        "consol_seq": 166,
         "standalone_note_section": "八、62",
         "standalone_section_title": "盈余公积",
         "match_type": "table_title",
@@ -2065,9 +1665,9 @@
       },
       {
         "consol_section_id": "五-63-1",
-        "consol_parent": "盈余公积",
+        "consol_parent": "未分配利润",
         "consol_title": "未分配利润",
-        "consol_seq": 166,
+        "consol_seq": 167,
         "standalone_note_section": "八、63",
         "standalone_section_title": "未分配利润",
         "match_type": "table_title",
@@ -2075,56 +1675,6 @@
       },
       {
         "consol_section_id": "五-64-1",
-        "consol_parent": "未分配利润",
-        "consol_title": "营业收入、营业成本",
-        "consol_seq": 167,
-        "standalone_note_section": "八、64",
-        "standalone_section_title": "营业收入、营业成本",
-        "match_type": "table_title",
-        "standalone_table_name": "营业收入、营业成本"
-      },
-      {
-        "consol_section_id": "五-64-2",
-        "consol_parent": "未分配利润",
-        "consol_title": "按行业（或产品类型）划分",
-        "consol_seq": 263,
-        "standalone_note_section": "八、64",
-        "standalone_section_title": "营业收入、营业成本",
-        "match_type": "table_title",
-        "standalone_table_name": "按行业（或产品类型）划分"
-      },
-      {
-        "consol_section_id": "五-64-3",
-        "consol_parent": "未分配利润",
-        "consol_title": "营业收入、营业成本按地区划分",
-        "consol_seq": 264,
-        "standalone_note_section": "八、64",
-        "standalone_section_title": "营业收入、营业成本",
-        "match_type": "table_title",
-        "standalone_table_name": "营业收入、营业成本按地区划分"
-      },
-      {
-        "consol_section_id": "五-64-4",
-        "consol_parent": "未分配利润",
-        "consol_title": "营业收入、营业成本按商品转让时间划分",
-        "consol_seq": 265,
-        "standalone_note_section": "八、63",
-        "standalone_section_title": "未分配利润",
-        "match_type": "exact",
-        "standalone_table_name": null
-      },
-      {
-        "consol_section_id": "五-64-5",
-        "consol_parent": "未分配利润",
-        "consol_title": "分摊至尚未履行的履约义务的交易价格为xxx元，截止xx年xx月xx日，对于上述金额确认为收入的预计时间如下：",
-        "consol_seq": 266,
-        "standalone_note_section": "八、63",
-        "standalone_section_title": "未分配利润",
-        "match_type": "exact",
-        "standalone_table_name": null
-      },
-      {
-        "consol_section_id": "五-65-1",
         "consol_parent": "营业收入、营业成本",
         "consol_title": "营业收入、营业成本",
         "consol_seq": 168,
@@ -2134,7 +1684,7 @@
         "standalone_table_name": "营业收入、营业成本"
       },
       {
-        "consol_section_id": "五-65-2",
+        "consol_section_id": "五-64-2",
         "consol_parent": "营业收入、营业成本",
         "consol_title": "按行业（或产品类型）划分",
         "consol_seq": 169,
@@ -2144,7 +1694,7 @@
         "standalone_table_name": "按行业（或产品类型）划分"
       },
       {
-        "consol_section_id": "五-65-3",
+        "consol_section_id": "五-64-3",
         "consol_parent": "营业收入、营业成本",
         "consol_title": "营业收入、营业成本按地区划分",
         "consol_seq": 170,
@@ -2154,17 +1704,17 @@
         "standalone_table_name": "营业收入、营业成本按地区划分"
       },
       {
-        "consol_section_id": "五-65-4",
+        "consol_section_id": "五-64-4",
         "consol_parent": "营业收入、营业成本",
         "consol_title": "营业收入、营业成本按商品转让时间划分",
         "consol_seq": 171,
         "standalone_note_section": "八、64",
         "standalone_section_title": "营业收入、营业成本",
-        "match_type": "exact",
-        "standalone_table_name": null
+        "match_type": "structure",
+        "standalone_table_name": "营业收入分解信息"
       },
       {
-        "consol_section_id": "五-65-5",
+        "consol_section_id": "五-64-5",
         "consol_parent": "营业收入、营业成本",
         "consol_title": "分摊至尚未履行的履约义务的交易价格为xxx元，截止xx年xx月xx日，对于上述金额确认为收入的预计时间如下：",
         "consol_seq": 172,
@@ -2174,17 +1724,17 @@
         "standalone_table_name": null
       },
       {
-        "consol_section_id": "五-66-1",
+        "consol_section_id": "五-65-1",
         "consol_parent": "销售费用",
-        "consol_title": "管理费用",
+        "consol_title": "销售费用",
         "consol_seq": 173,
-        "standalone_note_section": "八、66",
-        "standalone_section_title": "管理费用",
+        "standalone_note_section": "八、65",
+        "standalone_section_title": "销售费用",
         "match_type": "table_title",
-        "standalone_table_name": "管理费用"
+        "standalone_table_name": "销售费用"
       },
       {
-        "consol_section_id": "五-67-1",
+        "consol_section_id": "五-66-1",
         "consol_parent": "管理费用",
         "consol_title": "管理费用",
         "consol_seq": 174,
@@ -2194,10 +1744,20 @@
         "standalone_table_name": "管理费用"
       },
       {
-        "consol_section_id": "五-68-1",
+        "consol_section_id": "五-67-1",
         "consol_parent": "研发费用",
-        "consol_title": "财务费用",
+        "consol_title": "研发费用",
         "consol_seq": 175,
+        "standalone_note_section": "八、67",
+        "standalone_section_title": "研发费用",
+        "match_type": "exact",
+        "standalone_table_name": "研发费用（按费用性质列示）"
+      },
+      {
+        "consol_section_id": "五-68-1",
+        "consol_parent": "财务费用",
+        "consol_title": "财务费用",
+        "consol_seq": 176,
         "standalone_note_section": "八、68",
         "standalone_section_title": "财务费用",
         "match_type": "table_title",
@@ -2205,9 +1765,9 @@
       },
       {
         "consol_section_id": "五-69-1",
-        "consol_parent": "财务费用",
+        "consol_parent": "其他收益",
         "consol_title": "其他收益",
-        "consol_seq": 176,
+        "consol_seq": 177,
         "standalone_note_section": "八、69",
         "standalone_section_title": "其他收益",
         "match_type": "table_title",
@@ -2215,9 +1775,9 @@
       },
       {
         "consol_section_id": "五-70-1",
-        "consol_parent": "其他收益",
+        "consol_parent": "投资收益【下表中不适用的项目，删除】",
         "consol_title": "投资收益",
-        "consol_seq": 177,
+        "consol_seq": 178,
         "standalone_note_section": "八、70",
         "standalone_section_title": "投资收益【下表中不适用的项目，删除】",
         "match_type": "table_title",
@@ -2225,16 +1785,6 @@
       },
       {
         "consol_section_id": "五-71-1",
-        "consol_parent": "投资收益【下表中不适用的项目，删除】",
-        "consol_title": "净敞口套期收益",
-        "consol_seq": 178,
-        "standalone_note_section": "八、71",
-        "standalone_section_title": "净敞口套期收益",
-        "match_type": "table_title",
-        "standalone_table_name": "净敞口套期收益"
-      },
-      {
-        "consol_section_id": "五-72-1",
         "consol_parent": "净敞口套期收益",
         "consol_title": "净敞口套期收益",
         "consol_seq": 179,
@@ -2244,7 +1794,7 @@
         "standalone_table_name": "净敞口套期收益"
       },
       {
-        "consol_section_id": "五-73-1",
+        "consol_section_id": "五-72-1",
         "consol_parent": "公允价值变动收益",
         "consol_title": "公允价值变动收益",
         "consol_seq": 180,
@@ -2254,7 +1804,7 @@
         "standalone_table_name": "产生公允价值变动收益的来源"
       },
       {
-        "consol_section_id": "五-74-1",
+        "consol_section_id": "五-73-1",
         "consol_parent": "信用减值损失",
         "consol_title": "信用减值损失",
         "consol_seq": 181,
@@ -2264,10 +1814,20 @@
         "standalone_table_name": "信用减值损失"
       },
       {
-        "consol_section_id": "五-75-1",
+        "consol_section_id": "五-74-1",
         "consol_parent": "资产减值损失",
-        "consol_title": "资产处置收益（损失以“-”号填列）",
+        "consol_title": "资产减值损失",
         "consol_seq": 182,
+        "standalone_note_section": "八、74",
+        "standalone_section_title": "资产减值损失",
+        "match_type": "table_title",
+        "standalone_table_name": "资产减值损失"
+      },
+      {
+        "consol_section_id": "五-75-1",
+        "consol_parent": "资产处置收益",
+        "consol_title": "资产处置收益（损失以“-”号填列）",
+        "consol_seq": 183,
         "standalone_note_section": "八、75",
         "standalone_section_title": "资产处置收益",
         "match_type": "table_title",
@@ -2275,9 +1835,9 @@
       },
       {
         "consol_section_id": "五-76-1",
-        "consol_parent": "资产处置收益",
+        "consol_parent": "营业外收入",
         "consol_title": "营业外收入",
-        "consol_seq": 183,
+        "consol_seq": 184,
         "standalone_note_section": "八、76",
         "standalone_section_title": "营业外收入",
         "match_type": "table_title",
@@ -2285,9 +1845,9 @@
       },
       {
         "consol_section_id": "五-77-1",
-        "consol_parent": "营业外收入",
+        "consol_parent": "营业外支出",
         "consol_title": "营业外支出",
-        "consol_seq": 184,
+        "consol_seq": 185,
         "standalone_note_section": "八、77",
         "standalone_section_title": "营业外支出",
         "match_type": "table_title",
@@ -2295,36 +1855,26 @@
       },
       {
         "consol_section_id": "五-78-1",
-        "consol_parent": "营业外支出",
+        "consol_parent": "所得税费用",
         "consol_title": "所得税费用",
-        "consol_seq": 185,
+        "consol_seq": 186,
         "standalone_note_section": "八、78",
         "standalone_section_title": "所得税费用",
         "match_type": "table_title",
         "standalone_table_name": "所得税费用"
       },
       {
-        "consol_section_id": "五-79-1",
-        "consol_parent": "所得税费用",
-        "consol_title": "其他综合收益各项目及其所得税影响和转入损益情况",
-        "consol_seq": 186,
-        "standalone_note_section": "八、79",
-        "standalone_section_title": "归属于母公司所有者的其他综合收益",
-        "match_type": "table_title",
-        "standalone_table_name": "其他综合收益各项目及其所得税影响和转入损益情况"
-      },
-      {
-        "consol_section_id": "五-79-2",
+        "consol_section_id": "五-78-2",
         "consol_parent": "所得税费用",
         "consol_title": "会计利润与所得税费用调整过程【国资委格式未要求披露，建议披露】",
         "consol_seq": 187,
-        "standalone_note_section": "八、79",
-        "standalone_section_title": "归属于母公司所有者的其他综合收益",
+        "standalone_note_section": "八、78",
+        "standalone_section_title": "所得税费用",
         "match_type": "chapter",
         "standalone_table_name": null
       },
       {
-        "consol_section_id": "五-80-1",
+        "consol_section_id": "五-79-1",
         "consol_parent": "归属于母公司所有者的其他综合收益",
         "consol_title": "其他综合收益各项目及其所得税影响和转入损益情况",
         "consol_seq": 188,
@@ -2334,97 +1884,17 @@
         "standalone_table_name": "其他综合收益各项目及其所得税影响和转入损益情况"
       },
       {
-        "consol_section_id": "五-81-1",
+        "consol_section_id": "五-80-1",
         "consol_parent": "每股收益",
-        "consol_title": "收到的重要的投资活动有关的现金",
+        "consol_title": "每股收益",
         "consol_seq": 189,
-        "standalone_note_section": "八、81",
-        "standalone_section_title": "现金流量表项目注释",
+        "standalone_note_section": "八、80",
+        "standalone_section_title": "每股收益",
         "match_type": "table_title",
-        "standalone_table_name": "收到的重要的投资活动有关的现金"
+        "standalone_table_name": "每股收益"
       },
       {
-        "consol_section_id": "五-81-2",
-        "consol_parent": "每股收益",
-        "consol_title": "支付的重要的投资活动有关的现金",
-        "consol_seq": 267,
-        "standalone_note_section": "八、81",
-        "standalone_section_title": "现金流量表项目注释",
-        "match_type": "table_title",
-        "standalone_table_name": "支付的重要的投资活动有关的现金"
-      },
-      {
-        "consol_section_id": "五-81-3",
-        "consol_parent": "每股收益",
-        "consol_title": "收到的其他与经营活动有关的现金",
-        "consol_seq": 268,
-        "standalone_note_section": "八、81",
-        "standalone_section_title": "现金流量表项目注释",
-        "match_type": "table_title",
-        "standalone_table_name": "收到的其他与经营活动有关的现金"
-      },
-      {
-        "consol_section_id": "五-81-4",
-        "consol_parent": "每股收益",
-        "consol_title": "支付的其他与经营活动有关的现金",
-        "consol_seq": 269,
-        "standalone_note_section": "八、81",
-        "standalone_section_title": "现金流量表项目注释",
-        "match_type": "table_title",
-        "standalone_table_name": "支付的其他与经营活动有关的现金"
-      },
-      {
-        "consol_section_id": "五-81-5",
-        "consol_parent": "每股收益",
-        "consol_title": "收到的其他与投资活动有关的现金",
-        "consol_seq": 270,
-        "standalone_note_section": "八、81",
-        "standalone_section_title": "现金流量表项目注释",
-        "match_type": "table_title",
-        "standalone_table_name": "收到的其他与投资活动有关的现金"
-      },
-      {
-        "consol_section_id": "五-81-6",
-        "consol_parent": "每股收益",
-        "consol_title": "支付的其他与投资活动有关的现金",
-        "consol_seq": 271,
-        "standalone_note_section": "八、81",
-        "standalone_section_title": "现金流量表项目注释",
-        "match_type": "table_title",
-        "standalone_table_name": "支付的其他与投资活动有关的现金"
-      },
-      {
-        "consol_section_id": "五-81-7",
-        "consol_parent": "每股收益",
-        "consol_title": "收到的其他与筹资活动有关的现金",
-        "consol_seq": 272,
-        "standalone_note_section": "八、81",
-        "standalone_section_title": "现金流量表项目注释",
-        "match_type": "table_title",
-        "standalone_table_name": "收到的其他与筹资活动有关的现金"
-      },
-      {
-        "consol_section_id": "五-81-8",
-        "consol_parent": "每股收益",
-        "consol_title": "支付的其他与筹资活动有关的现金",
-        "consol_seq": 273,
-        "standalone_note_section": "八、81",
-        "standalone_section_title": "现金流量表项目注释",
-        "match_type": "table_title",
-        "standalone_table_name": "支付的其他与筹资活动有关的现金"
-      },
-      {
-        "consol_section_id": "五-81-9",
-        "consol_parent": "每股收益",
-        "consol_title": "筹资活动产生的各项负债的变动情况",
-        "consol_seq": 274,
-        "standalone_note_section": "八、81",
-        "standalone_section_title": "现金流量表项目注释",
-        "match_type": "table_title",
-        "standalone_table_name": "筹资活动产生的各项负债的变动情况"
-      },
-      {
-        "consol_section_id": "五-82-1",
+        "consol_section_id": "五-81-1",
         "consol_parent": "现金流量表项目注释",
         "consol_title": "收到的重要的投资活动有关的现金",
         "consol_seq": 190,
@@ -2434,7 +1904,7 @@
         "standalone_table_name": "收到的重要的投资活动有关的现金"
       },
       {
-        "consol_section_id": "五-82-2",
+        "consol_section_id": "五-81-2",
         "consol_parent": "现金流量表项目注释",
         "consol_title": "支付的重要的投资活动有关的现金",
         "consol_seq": 191,
@@ -2444,7 +1914,7 @@
         "standalone_table_name": "支付的重要的投资活动有关的现金"
       },
       {
-        "consol_section_id": "五-82-3",
+        "consol_section_id": "五-81-3",
         "consol_parent": "现金流量表项目注释",
         "consol_title": "收到的其他与经营活动有关的现金",
         "consol_seq": 192,
@@ -2454,7 +1924,7 @@
         "standalone_table_name": "收到的其他与经营活动有关的现金"
       },
       {
-        "consol_section_id": "五-82-4",
+        "consol_section_id": "五-81-4",
         "consol_parent": "现金流量表项目注释",
         "consol_title": "支付的其他与经营活动有关的现金",
         "consol_seq": 193,
@@ -2464,7 +1934,7 @@
         "standalone_table_name": "支付的其他与经营活动有关的现金"
       },
       {
-        "consol_section_id": "五-82-5",
+        "consol_section_id": "五-81-5",
         "consol_parent": "现金流量表项目注释",
         "consol_title": "收到的其他与投资活动有关的现金",
         "consol_seq": 194,
@@ -2474,7 +1944,7 @@
         "standalone_table_name": "收到的其他与投资活动有关的现金"
       },
       {
-        "consol_section_id": "五-82-6",
+        "consol_section_id": "五-81-6",
         "consol_parent": "现金流量表项目注释",
         "consol_title": "支付的其他与投资活动有关的现金",
         "consol_seq": 195,
@@ -2484,7 +1954,7 @@
         "standalone_table_name": "支付的其他与投资活动有关的现金"
       },
       {
-        "consol_section_id": "五-82-7",
+        "consol_section_id": "五-81-7",
         "consol_parent": "现金流量表项目注释",
         "consol_title": "收到的其他与筹资活动有关的现金",
         "consol_seq": 196,
@@ -2494,7 +1964,7 @@
         "standalone_table_name": "收到的其他与筹资活动有关的现金"
       },
       {
-        "consol_section_id": "五-82-8",
+        "consol_section_id": "五-81-8",
         "consol_parent": "现金流量表项目注释",
         "consol_title": "支付的其他与筹资活动有关的现金",
         "consol_seq": 197,
@@ -2504,7 +1974,7 @@
         "standalone_table_name": "支付的其他与筹资活动有关的现金"
       },
       {
-        "consol_section_id": "五-82-9",
+        "consol_section_id": "五-81-9",
         "consol_parent": "现金流量表项目注释",
         "consol_title": "筹资活动产生的各项负债的变动情况",
         "consol_seq": 198,
@@ -2515,9 +1985,9 @@
       },
       {
         "consol_section_id": "五-83-1",
-        "consol_parent": "科目83",
+        "consol_parent": "股份支付",
         "consol_title": "股份支付总体情况",
-        "consol_seq": 275,
+        "consol_seq": 199,
         "standalone_note_section": "八、83",
         "standalone_section_title": "股份支付",
         "match_type": "table_title",
@@ -2525,9 +1995,9 @@
       },
       {
         "consol_section_id": "五-83-2",
-        "consol_parent": "科目83",
+        "consol_parent": "股份支付",
         "consol_title": "以权益结算的股份支付情况",
-        "consol_seq": 276,
+        "consol_seq": 200,
         "standalone_note_section": "八、83",
         "standalone_section_title": "股份支付",
         "match_type": "table_title",
@@ -2535,9 +2005,9 @@
       },
       {
         "consol_section_id": "五-83-3",
-        "consol_parent": "科目83",
+        "consol_parent": "股份支付",
         "consol_title": "以现金结算的股份支付情况",
-        "consol_seq": 277,
+        "consol_seq": 201,
         "standalone_note_section": "八、83",
         "standalone_section_title": "股份支付",
         "match_type": "table_title",
@@ -2545,46 +2015,6 @@
       },
       {
         "consol_section_id": "五-84-1",
-        "consol_parent": "股份支付",
-        "consol_title": "债务人披露情况",
-        "consol_seq": 199,
-        "standalone_note_section": "八、84",
-        "standalone_section_title": "债务重组",
-        "match_type": "table_title",
-        "standalone_table_name": "债务人披露情况"
-      },
-      {
-        "consol_section_id": "五-84-2",
-        "consol_parent": "股份支付",
-        "consol_title": "企业应披露转让非现金资产的公允价值、债务转成的股份的公允价值和修改其他债务条件后债务的公允价值的确定方法及依据。",
-        "consol_seq": 200,
-        "standalone_note_section": "八、84",
-        "standalone_section_title": "债务重组",
-        "match_type": "table_title",
-        "standalone_table_name": "企业应披露转让非现金资产的公允价值、债务转成的股份的公允价值和修改其他债务条件后债务的公允价值的确定方法及依据。"
-      },
-      {
-        "consol_section_id": "五-84-3",
-        "consol_parent": "股份支付",
-        "consol_title": "债权人披露情况",
-        "consol_seq": 201,
-        "standalone_note_section": "八、84",
-        "standalone_section_title": "债务重组",
-        "match_type": "table_title",
-        "standalone_table_name": "债权人披露情况"
-      },
-      {
-        "consol_section_id": "五-84-4",
-        "consol_parent": "股份支付",
-        "consol_title": "企业应披露受让非现金资产的公允价值、债权转成的股权的公允价值和修改其他债务条件后债权的公允价值的确定方法及依据。",
-        "consol_seq": 278,
-        "standalone_note_section": "八、84",
-        "standalone_section_title": "债务重组",
-        "match_type": "table_title",
-        "standalone_table_name": "企业应披露受让非现金资产的公允价值、债权转成的股权的公允价值和修改其他债务条件后债权的公允价值的确定方法及依据。"
-      },
-      {
-        "consol_section_id": "五-85-1",
         "consol_parent": "债务重组",
         "consol_title": "债务人披露情况",
         "consol_seq": 202,
@@ -2594,17 +2024,17 @@
         "standalone_table_name": "债务人披露情况"
       },
       {
-        "consol_section_id": "五-85-2",
+        "consol_section_id": "五-84-2",
         "consol_parent": "债务重组",
-        "consol_title": "债务人披露情况",
+        "consol_title": "企业应披露转让非现金资产的公允价值、债务转成的股份的公允价值和修改其他债务条件后债务的公允价值的确定方法及依据。",
         "consol_seq": 203,
         "standalone_note_section": "八、84",
         "standalone_section_title": "债务重组",
         "match_type": "table_title",
-        "standalone_table_name": "债务人披露情况"
+        "standalone_table_name": "企业应披露转让非现金资产的公允价值、债务转成的股份的公允价值和修改其他债务条件后债务的公允价值的确定方法及依据。"
       },
       {
-        "consol_section_id": "五-85-3",
+        "consol_section_id": "五-84-3",
         "consol_parent": "债务重组",
         "consol_title": "债权人披露情况",
         "consol_seq": 204,
@@ -2614,17 +2044,17 @@
         "standalone_table_name": "债权人披露情况"
       },
       {
-        "consol_section_id": "五-85-4",
+        "consol_section_id": "五-84-4",
         "consol_parent": "债务重组",
-        "consol_title": "债权人披露情况",
+        "consol_title": "企业应披露受让非现金资产的公允价值、债权转成的股权的公允价值和修改其他债务条件后债权的公允价值的确定方法及依据。",
         "consol_seq": 205,
         "standalone_note_section": "八、84",
         "standalone_section_title": "债务重组",
         "match_type": "table_title",
-        "standalone_table_name": "债权人披露情况"
+        "standalone_table_name": "企业应披露受让非现金资产的公允价值、债权转成的股权的公允价值和修改其他债务条件后债权的公允价值的确定方法及依据。"
       },
       {
-        "consol_section_id": "五-86-1",
+        "consol_section_id": "五-85-1",
         "consol_parent": "借款费用",
         "consol_title": "借款费用",
         "consol_seq": 206,
@@ -2635,36 +2065,6 @@
       },
       {
         "consol_section_id": "五-87-1",
-        "consol_parent": "科目87",
-        "consol_title": "承租人信息",
-        "consol_seq": 279,
-        "standalone_note_section": "八、87",
-        "standalone_section_title": "租赁",
-        "match_type": "table_title",
-        "standalone_table_name": "承租人信息"
-      },
-      {
-        "consol_section_id": "五-87-2",
-        "consol_parent": "科目87",
-        "consol_title": "融资租赁出租人",
-        "consol_seq": 280,
-        "standalone_note_section": "八、87",
-        "standalone_section_title": "租赁",
-        "match_type": "table_title",
-        "standalone_table_name": "融资租赁出租人"
-      },
-      {
-        "consol_section_id": "五-87-3",
-        "consol_parent": "科目87",
-        "consol_title": "经营租赁出租人",
-        "consol_seq": 281,
-        "standalone_note_section": "八、87",
-        "standalone_section_title": "租赁",
-        "match_type": "table_title",
-        "standalone_table_name": "经营租赁出租人"
-      },
-      {
-        "consol_section_id": "五-88-1",
         "consol_parent": "租赁",
         "consol_title": "承租人信息",
         "consol_seq": 207,
@@ -2674,7 +2074,7 @@
         "standalone_table_name": "承租人信息"
       },
       {
-        "consol_section_id": "五-88-2",
+        "consol_section_id": "五-87-2",
         "consol_parent": "租赁",
         "consol_title": "融资租赁出租人",
         "consol_seq": 208,
@@ -2684,7 +2084,7 @@
         "standalone_table_name": "融资租赁出租人"
       },
       {
-        "consol_section_id": "五-88-3",
+        "consol_section_id": "五-87-3",
         "consol_parent": "租赁",
         "consol_title": "经营租赁出租人",
         "consol_seq": 209,
@@ -2695,106 +2095,6 @@
       },
       {
         "consol_section_id": "五-89-1",
-        "consol_parent": "科目89",
-        "consol_title": "终止经营",
-        "consol_seq": 282,
-        "standalone_note_section": "八、89",
-        "standalone_section_title": "终止经营",
-        "match_type": "table_title",
-        "standalone_table_name": "终止经营"
-      },
-      {
-        "consol_section_id": "五-90-1",
-        "consol_parent": "科目90",
-        "consol_title": "分部信息",
-        "consol_seq": 283,
-        "standalone_note_section": "八、90",
-        "standalone_section_title": "分部信息",
-        "match_type": "table_title",
-        "standalone_table_name": "分部信息"
-      },
-      {
-        "consol_section_id": "五-90-2",
-        "consol_parent": "科目90",
-        "consol_title": "产品和劳务对外交易收入",
-        "consol_seq": 284,
-        "standalone_note_section": "八、90",
-        "standalone_section_title": "分部信息",
-        "match_type": "table_title",
-        "standalone_table_name": "产品和劳务对外交易收入"
-      },
-      {
-        "consol_section_id": "五-90-3",
-        "consol_parent": "科目90",
-        "consol_title": "地区信息",
-        "consol_seq": 285,
-        "standalone_note_section": "八、90",
-        "standalone_section_title": "分部信息",
-        "match_type": "table_title",
-        "standalone_table_name": "地区信息"
-      },
-      {
-        "consol_section_id": "五-90-4",
-        "consol_parent": "科目90",
-        "consol_title": "科目90",
-        "consol_seq": 286,
-        "standalone_note_section": "八、90",
-        "standalone_section_title": "分部信息",
-        "match_type": "chapter",
-        "standalone_table_name": null
-      },
-      {
-        "consol_section_id": "五-91-1",
-        "consol_parent": "科目91",
-        "consol_title": "现金流量表补充资料",
-        "consol_seq": 287,
-        "standalone_note_section": "八、91",
-        "standalone_section_title": "合并现金流量表相关事项",
-        "match_type": "table_title",
-        "standalone_table_name": "现金流量表补充资料"
-      },
-      {
-        "consol_section_id": "五-91-2",
-        "consol_parent": "科目91",
-        "consol_title": "本期取得子公司和收到处置子公司的现金净额",
-        "consol_seq": 288,
-        "standalone_note_section": "八、91",
-        "standalone_section_title": "合并现金流量表相关事项",
-        "match_type": "table_title",
-        "standalone_table_name": "本期取得子公司和收到处置子公司的现金净额"
-      },
-      {
-        "consol_section_id": "五-91-3",
-        "consol_parent": "科目91",
-        "consol_title": "现金和现金等价物的构成",
-        "consol_seq": 289,
-        "standalone_note_section": "八、91",
-        "standalone_section_title": "合并现金流量表相关事项",
-        "match_type": "table_title",
-        "standalone_table_name": "现金和现金等价物的构成"
-      },
-      {
-        "consol_section_id": "五-91-4",
-        "consol_parent": "科目91",
-        "consol_title": "资产负债表中的列报项目和相关信息",
-        "consol_seq": 290,
-        "standalone_note_section": "八、91",
-        "standalone_section_title": "合并现金流量表相关事项",
-        "match_type": "table_title",
-        "standalone_table_name": "资产负债表中的列报项目和相关信息"
-      },
-      {
-        "consol_section_id": "五-91-5",
-        "consol_parent": "科目91",
-        "consol_title": "付款到期日的区间",
-        "consol_seq": 291,
-        "standalone_note_section": "八、91",
-        "standalone_section_title": "合并现金流量表相关事项",
-        "match_type": "table_title",
-        "standalone_table_name": "付款到期日的区间"
-      },
-      {
-        "consol_section_id": "五-93-1",
         "consol_parent": "终止经营",
         "consol_title": "终止经营",
         "consol_seq": 210,
@@ -2804,7 +2104,7 @@
         "standalone_table_name": "终止经营"
       },
       {
-        "consol_section_id": "五-94-1",
+        "consol_section_id": "五-90-1",
         "consol_parent": "分部信息",
         "consol_title": "分部信息",
         "consol_seq": 211,
@@ -2814,7 +2114,7 @@
         "standalone_table_name": "分部信息"
       },
       {
-        "consol_section_id": "五-94-2",
+        "consol_section_id": "五-90-2",
         "consol_parent": "分部信息",
         "consol_title": "产品和劳务对外交易收入",
         "consol_seq": 212,
@@ -2824,7 +2124,7 @@
         "standalone_table_name": "产品和劳务对外交易收入"
       },
       {
-        "consol_section_id": "五-94-3",
+        "consol_section_id": "五-90-3",
         "consol_parent": "分部信息",
         "consol_title": "地区信息",
         "consol_seq": 213,
@@ -2834,7 +2134,7 @@
         "standalone_table_name": "地区信息"
       },
       {
-        "consol_section_id": "五-94-4",
+        "consol_section_id": "五-90-4",
         "consol_parent": "分部信息",
         "consol_title": "地区信息",
         "consol_seq": 214,
@@ -2844,7 +2144,7 @@
         "standalone_table_name": "地区信息"
       },
       {
-        "consol_section_id": "五-95-1",
+        "consol_section_id": "五-91-1",
         "consol_parent": "合并现金流量表相关事项",
         "consol_title": "现金流量表补充资料",
         "consol_seq": 215,
@@ -2854,7 +2154,7 @@
         "standalone_table_name": "现金流量表补充资料"
       },
       {
-        "consol_section_id": "五-95-2",
+        "consol_section_id": "五-91-2",
         "consol_parent": "合并现金流量表相关事项",
         "consol_title": "本期取得子公司和收到处置子公司的现金净额",
         "consol_seq": 216,
@@ -2864,7 +2164,7 @@
         "standalone_table_name": "本期取得子公司和收到处置子公司的现金净额"
       },
       {
-        "consol_section_id": "五-95-3",
+        "consol_section_id": "五-91-3",
         "consol_parent": "合并现金流量表相关事项",
         "consol_title": "现金和现金等价物的构成",
         "consol_seq": 217,
@@ -2874,7 +2174,7 @@
         "standalone_table_name": "现金和现金等价物的构成"
       },
       {
-        "consol_section_id": "五-95-4",
+        "consol_section_id": "五-91-4",
         "consol_parent": "合并现金流量表相关事项",
         "consol_title": "资产负债表中的列报项目和相关信息",
         "consol_seq": 218,
@@ -2884,7 +2184,7 @@
         "standalone_table_name": "资产负债表中的列报项目和相关信息"
       },
       {
-        "consol_section_id": "五-95-5",
+        "consol_section_id": "五-91-5",
         "consol_parent": "合并现金流量表相关事项",
         "consol_title": "付款到期日的区间",
         "consol_seq": 219,
@@ -2894,7 +2194,7 @@
         "standalone_table_name": "付款到期日的区间"
       },
       {
-        "consol_section_id": "五-96-1",
+        "consol_section_id": "五-92-1",
         "consol_parent": "外币货币性项目",
         "consol_title": "外币货币性项目",
         "consol_seq": 220,
@@ -2904,7 +2204,7 @@
         "standalone_table_name": "外币货币性项目"
       },
       {
-        "consol_section_id": "五-97-1",
+        "consol_section_id": "五-93-1",
         "consol_parent": "所有权和使用权受到限制的资产",
         "consol_title": "所有权和使用权受到限制的资产",
         "consol_seq": 221,
@@ -6378,72 +5678,22 @@
       {
         "consol_section_id": "五-71-1",
         "consol_parent": "公允价值变动收益",
-        "consol_title": "现金流量表补充资料",
+        "consol_title": "公允价值变动收益（注：以下不存在的项目可以删除）",
         "consol_seq": 250,
-        "standalone_note_section": "五、71",
-        "standalone_section_title": "现金流量表补充资料",
-        "match_type": "table_title",
-        "standalone_table_name": "现金流量表补充资料"
+        "standalone_note_section": "五、75",
+        "standalone_section_title": "公允价值变动收益",
+        "match_type": "exact",
+        "standalone_table_name": null
       },
       {
         "consol_section_id": "五-71-2",
         "consol_parent": "公允价值变动收益",
-        "consol_title": "本期支付的取得子公司的现金净额",
+        "consol_title": "注1：交易性金融资产公允价值变动收益明细如下：【存在套期业务的，增加本注释内容，注意与附注九、3保持一致】",
         "consol_seq": 251,
-        "standalone_note_section": "五、71",
-        "standalone_section_title": "现金流量表补充资料",
-        "match_type": "table_title",
-        "standalone_table_name": "本期支付的取得子公司的现金净额"
-      },
-      {
-        "consol_section_id": "五-71-3",
-        "consol_parent": "公允价值变动收益",
-        "consol_title": "本期收到的处置子公司的现金净额",
-        "consol_seq": 283,
-        "standalone_note_section": "五、71",
-        "standalone_section_title": "现金流量表补充资料",
-        "match_type": "table_title",
-        "standalone_table_name": "本期收到的处置子公司的现金净额"
-      },
-      {
-        "consol_section_id": "五-71-4",
-        "consol_parent": "公允价值变动收益",
-        "consol_title": "现金及现金等价物的构成",
-        "consol_seq": 284,
-        "standalone_note_section": "五、71",
-        "standalone_section_title": "现金流量表补充资料",
-        "match_type": "table_title",
-        "standalone_table_name": "现金及现金等价物的构成"
-      },
-      {
-        "consol_section_id": "五-71-5",
-        "consol_parent": "公允价值变动收益",
-        "consol_title": "不属于现金及现金等价物的货币资金",
-        "consol_seq": 285,
-        "standalone_note_section": "五、71",
-        "standalone_section_title": "现金流量表补充资料",
-        "match_type": "table_title",
-        "standalone_table_name": "不属于现金及现金等价物的货币资金"
-      },
-      {
-        "consol_section_id": "五-71-6",
-        "consol_parent": "公允价值变动收益",
-        "consol_title": "资产负债表中的列报项目和相关信息",
-        "consol_seq": 286,
-        "standalone_note_section": "五、71",
-        "standalone_section_title": "现金流量表补充资料",
-        "match_type": "table_title",
-        "standalone_table_name": "资产负债表中的列报项目和相关信息"
-      },
-      {
-        "consol_section_id": "五-71-7",
-        "consol_parent": "公允价值变动收益",
-        "consol_title": "付款到期日的区间",
-        "consol_seq": 287,
-        "standalone_note_section": "五、71",
-        "standalone_section_title": "现金流量表补充资料",
-        "match_type": "table_title",
-        "standalone_table_name": "付款到期日的区间"
+        "standalone_note_section": "五、75",
+        "standalone_section_title": "公允价值变动收益",
+        "match_type": "exact",
+        "standalone_table_name": null
       },
       {
         "consol_section_id": "五-72-1",
@@ -6458,72 +5708,32 @@
       {
         "consol_section_id": "五-73-1",
         "consol_parent": "资产减值损失（损失以“—”号填列）",
-        "consol_title": "外币货币性项目",
+        "consol_title": "资产减值损失（损失以“—”号填列）（注：以下不存在的项目可以删除）",
         "consol_seq": 253,
-        "standalone_note_section": "五、73",
-        "standalone_section_title": "外币货币性项目",
-        "match_type": "table_title",
-        "standalone_table_name": "外币货币性项目"
+        "standalone_note_section": "五、77",
+        "standalone_section_title": "资产减值损失",
+        "match_type": "fuzzy",
+        "standalone_table_name": "资产减值损失"
       },
       {
         "consol_section_id": "五-74-1",
         "consol_parent": "资产处置收益（损失以“-”填列）",
-        "consol_title": "（公司作为承租人的租赁，应披露未纳入租赁负债计量的可变租赁付款额、简化处理的短期租赁费用和低价值资产租赁费用、与租赁相关的现金流出总额等相关信息。涉及售后租回交易的，应披露是否满足销售及其判断依据。）",
+        "consol_title": "资产处置收益（损失以“-”填列）（注：以下不存在的项目可以删除）",
         "consol_seq": 254,
-        "standalone_note_section": "五、74",
-        "standalone_section_title": "租赁",
-        "match_type": "table_title",
-        "standalone_table_name": "（公司作为承租人的租赁，应披露未纳入租赁负债计量的可变租赁付款额、简化处理的短期租赁费用和低价值资产租赁费用、与租赁相关的现金流出总额等相关信息。涉及售后租回交易的，应披露是否满足销售及其判断依据。）"
-      },
-      {
-        "consol_section_id": "五-74-2",
-        "consol_parent": "资产处置收益（损失以“-”填列）",
-        "consol_title": "①销售损益、租赁投资净额的融资收益以及与未纳入租赁投资净额的可变租赁付款额相关的收入",
-        "consol_seq": 255,
-        "standalone_note_section": "五、74",
-        "standalone_section_title": "租赁",
-        "match_type": "table_title",
-        "standalone_table_name": "①销售损益、租赁投资净额的融资收益以及与未纳入租赁投资净额的可变租赁付款额相关的收入"
-      },
-      {
-        "consol_section_id": "五-74-3",
-        "consol_parent": "资产处置收益（损失以“-”填列）",
-        "consol_title": "②资产负债表日后连续五个会计年度每年将收到的未折现租赁收款额，以及剩余年度将收到的未折现租赁收款额总额",
-        "consol_seq": 288,
-        "standalone_note_section": "五、74",
-        "standalone_section_title": "租赁",
-        "match_type": "table_title",
-        "standalone_table_name": "②资产负债表日后连续五个会计年度每年将收到的未折现租赁收款额，以及剩余年度将收到的未折现租赁收款额总额"
-      },
-      {
-        "consol_section_id": "五-74-4",
-        "consol_parent": "资产处置收益（损失以“-”填列）",
-        "consol_title": "③未折现租赁收款额与租赁投资净额的调节表",
-        "consol_seq": 289,
-        "standalone_note_section": "五、74",
-        "standalone_section_title": "租赁",
-        "match_type": "table_title",
-        "standalone_table_name": "③未折现租赁收款额与租赁投资净额的调节表"
-      },
-      {
-        "consol_section_id": "五-74-5",
-        "consol_parent": "资产处置收益（损失以“-”填列）",
-        "consol_title": "①租赁收入",
-        "consol_seq": 290,
-        "standalone_note_section": "五、74",
-        "standalone_section_title": "租赁",
+        "standalone_note_section": "五、78",
+        "standalone_section_title": "资产处置收益",
         "match_type": "chapter",
         "standalone_table_name": null
       },
       {
-        "consol_section_id": "五-74-6",
+        "consol_section_id": "五-74-2",
         "consol_parent": "资产处置收益（损失以“-”填列）",
-        "consol_title": "②资产负债表日后连续五个会计年度每年将收到的未折现租赁收款额，以及剩余年度将收到的未折现租赁收款额总额。",
-        "consol_seq": 291,
-        "standalone_note_section": "五、74",
-        "standalone_section_title": "租赁",
+        "consol_title": "试运行销售损益",
+        "consol_seq": 255,
+        "standalone_note_section": "五、78",
+        "standalone_section_title": "资产处置收益",
         "match_type": "table_title",
-        "standalone_table_name": "②资产负债表日后连续五个会计年度每年将收到的未折现租赁收款额，以及剩余年度将收到的未折现租赁收款额总额"
+        "standalone_table_name": "试运行销售损益"
       },
       {
         "consol_section_id": "五-75-1",

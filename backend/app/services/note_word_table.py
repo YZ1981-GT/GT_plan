@@ -16,11 +16,14 @@ from typing import Any, Iterator, Sequence
 __all__ = [
     "WordTable",
     "compare_tables",
+    "heading_key",
     "iter_blocks",
     "norm_cell",
     "parse_word_table",
+    "rows_disjoint",
     "seed_header_paths",
     "seed_multi_header",
+    "seed_table_structure",
     "word_header_paths",
 ]
 
@@ -236,6 +239,63 @@ def seed_multi_header(tbl_el: Any, cols: Sequence[int] | None = None) -> tuple[i
     cols = list(range(ncols)) if cols is None else list(cols)
     clean = lambda o: (texts.get(o) or "").replace("\n", "").strip()  # noqa: E731
     return n_hdr, [[clean((r, c)) if grid.get((r, c)) == (r, c) else "" for c in cols] for r in range(n_hdr)]
+
+
+_LEAD_ENUM = re.compile(r"^(?:（\d{1,2}）|\d{1,2}[.、．])")
+_PAREN_OPEN = re.compile(r"[（【\[]")
+_TOTAL_ROW = re.compile(r"^(?:合计|小计|总计)")
+
+
+def heading_key(text: str | None) -> str:
+    """节标题 / 父章节的身份比对键（R7.6）：去空白与行首序号，取首个括注前的部分
+    （「信用减值损失（损失以“—”号填列）」≡「信用减值损失」，「（1）一年内到期的长期借款」≡「一年内到期的长期借款」）。"""
+    return _PAREN_OPEN.split(_LEAD_ENUM.sub("", norm_cell(text)), 1)[0]
+
+
+def rows_disjoint(seed_rows: Any, word_rows: Any) -> bool:
+    """两张表的实质行名（去合计 / 小计 / 占位行）都不为空且没有交集 ⇒ 不是同一张表（R7.6 身份校验）。"""
+    def keys(rows: Any) -> set[str]:
+        labels = [(r[0] if r else "") if isinstance(r, list) else (r.get("label") if isinstance(r, dict) else "")
+                  for r in rows or []]
+        return {k for k in _row_keys(labels) if not _TOTAL_ROW.match(k)}
+
+    a, b = keys(seed_rows), keys(word_rows)
+    return bool(a) and bool(b) and not (a & b)
+
+
+def seed_table_structure(tbl_el: Any) -> dict[str, Any]:
+    """Word 表 → 合并附注种子的表结构（平表头 / 多级表头 / 分组 / 数据行）：Word 同步工具新增表、重建错表共用。
+
+    与现有种子格式逐字段一致（R7.6 用国企 五-1~9 全部 47 张表核对）：
+    - 表头 ≥ 2 行：``multi_header`` = ``seed_multi_header``，``_column_groups`` 由它推出；平表头 = 展示表头逐列全路径
+      （「/」连接，R6.3 口径），某列路径为空（标签列留白）取首行原字。
+    - 单行表头：平表头 = 首行各网格列的字，``multi_header`` 为 None、无分组。
+    - 数据行：按网格列取每格起点的字（合并延续格为空串）。
+    """
+    from app.services.consol_note_formula_service import multi_header_to_column_groups
+    from app.services.consol_note_headers import header_cells, multi_header_rows
+
+    n_hdr, mh = seed_multi_header(tbl_el)
+    nrows, ncols, grid, texts, _spans = _table_grid(tbl_el)
+    clean = lambda o: (texts.get(o) or "").replace("\n", "").strip()  # noqa: E731
+    n_hdr = max(n_hdr, 1)
+    rows = [[clean((r, c)) if grid.get((r, c)) == (r, c) else "" for c in range(ncols)] for r in range(n_hdr, nrows)]
+    if n_hdr < 2:
+        heads = [clean((0, c)) if grid.get((0, c)) == (0, c) else "" for c in range(ncols)]
+        return {"headers": heads, "multi_header": None, "rows": rows}
+    width = len(mh[0])
+    paths: list[list[str]] = [[] for _ in range(width)]
+    for _r, c0, cell in sorted(header_cells(multi_header_rows(mh, width), width), key=lambda x: x[:2]):
+        text = str(cell["text"] or "").replace("\n", "").strip()
+        if text:
+            for c in range(c0, c0 + cell["colspan"]):
+                paths[c].append(text)
+    out: dict[str, Any] = {"headers": ["/".join(p) if p else h for p, h in zip(paths, mh[0])], "multi_header": mh}
+    groups = multi_header_to_column_groups(mh)
+    if groups:
+        out["_column_groups"] = groups
+    out["rows"] = rows
+    return out
 
 
 def parse_word_table(tbl_el: Any, caption: str) -> WordTable:

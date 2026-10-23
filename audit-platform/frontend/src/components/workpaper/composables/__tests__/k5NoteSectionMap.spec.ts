@@ -19,7 +19,7 @@ import type { ColumnDef } from '../disclosureColumnDefs'
  * spec `disclosure-columns-coverage-rollout` design §批 2 列头清查 §4（上市）/§5（国企）
  * 口径证据：源 `K 管理循环/K5 预计负债.xlsx` 两张披露 sheet +
  *   `附注模版/上市报表附注.md` L4930 / `国企报表附注.md` L3952 +
- *   `note_template_{listed,soe}.json` 五、50 / 八、55 + consol 五-50-1 / 五-56-1 +
+ *   `note_template_{listed,soe}.json` 五、50 / 八、55 + consol 五-50-1 / 五-55-1 +
  *   校验预设 F50-1/2/3（2 个数值列 + 合计行，无变动表）。
  *
  * 覆盖 T5 八族断言，重点是 **T4 变体列集差异**：上市 3 值列（末列 `形成原因`）/

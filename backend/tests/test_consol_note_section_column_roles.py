@@ -42,15 +42,15 @@ def _roles(table: dict) -> list[str | None]:
 
 class TestHeaderTable:
     def test_template_header_rows_when_columns_match(self):
-        """五-24-1 种子平表头只在分组起始列写期间：按模板多级表头认，列名取展示路径。"""
-        sec = _section("五-24-1")
+        """五-23-1（在建工程）种子平表头只在分组起始列写期间：按模板多级表头认，列名取展示路径。"""
+        sec = _section("五-23-1")
         labels, roles = R._column_view(R._header_table(sec, sec["headers"]))
         assert roles == ["label", "closing", None, None, "opening", None, None]
         assert labels[2] == "期末余额/减值准备" and labels[4] == "期初余额/账面余额"
 
     def test_flat_headers_when_column_count_differs(self):
         headers = ["项目", "期末余额", "期初余额"]
-        table = R._header_table(_section("五-24-1"), headers)
+        table = R._header_table(_section("五-23-1"), headers)
         assert table == {"headers": headers} and _roles(table) == ["label", "closing", "opening"]
         assert R._column_view(R._header_table(None, [])) == ([], [])
 
@@ -75,7 +75,7 @@ class TestHeaderTable:
         ("soe", "五-5-2", [1], [6]),  # 三级表头：账面余额/金额；比例 / 坏账准备 / 账面价值 不算
         ("soe", "五-5-6", [1], [4]),  # 种子平表头把「期初数」写在第 2 列（实际是 期末数/计提比例）
         ("listed", "五-5-6", [1], [4]),  # 上年年末余额
-        ("soe", "五-57-1", [4], [1]),  # 变动表
+        ("soe", "五-56-1", [4], [1]),  # 变动表（递延收益）
     ])
     def test_real_template_balance_columns(self, std, section_id, closing, opening):
         sec = _section(section_id, std)
@@ -132,13 +132,13 @@ def _brief(results: list[dict], prefix: str) -> list[tuple[str, str, str]]:
 class TestAuditAll:
     @pytest.mark.asyncio
     async def test_tb_check_compares_only_balance_columns(self, env):
-        """五-24-1：只比 期末余额/账面余额、期初余额/账面余额；平表头会把「期末余额/减值准备」当期初列去比。"""
+        """五-23-1：只比 期末余额/账面余额、期初余额/账面余额；平表头会把「期末余额/减值准备」当期初列去比。"""
         factory, project, app = env
-        sec = _section("五-24-1")
+        sec = _section("五-23-1")
         rows = [["在建工程", "100", "5", "95", "80", "4", "76"], ["工程物资", "100", "0", "100", "70", "0", "70"]]
         async with factory() as db:
             db.add(ConsolNoteData(
-                project_id=project.id, year=Y, section_id="五-24-1", data={"headers": sec["headers"], "rows": rows},
+                project_id=project.id, year=Y, section_id="五-23-1", data={"headers": sec["headers"], "rows": rows},
             ))
             await db.commit()
         tb = {"在建工程": {"audited": 100.0, "opening": 80.0}, "工程物资": {"audited": 100.0, "opening": 80.0}}
@@ -187,7 +187,7 @@ class TestAuditSingle:
     async def test_tb_check_names_columns_by_header_rows(self, env):
         _, project, app = env
         rows = [["工程物资", "100", "0", "100", "70", "0", "70"]]
-        results = await self._audit(app, project, "五-24-1", rows, tb={"工程物资": {"audited": 100.0, "opening": 80.0}})
+        results = await self._audit(app, project, "五-23-1", rows, tb={"工程物资": {"audited": 100.0, "opening": 80.0}})
         assert _brief(results, "试算表校验") == [("试算表校验 - 工程物资/期初余额/账面余额", "80.00", "70.00")]
 
 
@@ -201,16 +201,16 @@ class TestAggregateNotesOnly:
             for code in ("A", "B", "C")
         ]
         root = TreeNode(None, "P", "母公司", None, None, 0, children=children, node_key="P:consol", role="consol")
-        scope = NodeScope(project.id, Y, "五-24-1", "P:consol", root, root)
-        headers = _section("五-24-1")["headers"]
+        scope = NodeScope(project.id, Y, "五-23-1", "P:consol", root, root)
+        headers = _section("五-23-1")["headers"]
         async with factory() as db:
             for node_key, rows in saved.items():
-                db.add(ConsolNoteData(project_id=project.id, year=Y, section_id="五-24-1", node_key=node_key,
+                db.add(ConsolNoteData(project_id=project.id, year=Y, section_id="五-23-1", node_key=node_key,
                                       data={"headers": headers, "rows": rows}))
             await db.commit()
         # 试算表一定有数：结果里出现试算表的数就是兜底没删干净
         tb_loader = AsyncMock(return_value={"在建工程": {"audited": 999.0, "opening": 888.0}})
-        body = {"standard": "soe", "section_id": "五-24-1", "row_idx": 0, "col_idx": col_idx, "mode": "direct"}
+        body = {"standard": "soe", "section_id": "五-23-1", "row_idx": 0, "col_idx": col_idx, "mode": "direct"}
         with patch.object(R, "_resolve_note_scope", AsyncMock(return_value=scope)), patch.object(R, "_load_tb_map", tb_loader):
             result = await _post(app, f"{BASE}/aggregate/{project.id}/{Y}?node_key=P:consol", body)
         return result, tb_loader

@@ -84,7 +84,7 @@ def test_soe_third_table_is_defined_contribution() -> None:
     """soe 第 3 张表必须叫「设定提存计划列示」，与前端推送键一致。
 
     回归：原为「短期薪酬列示」（与第 2 张重名）→ 前端推的键在模板里不存在 →
-    孤儿子表。`consol_note_sections_soe.json` 五-41-3 的 title 印证此措辞。
+    孤儿子表。`consol_note_sections_soe.json` 五-40-3（R7.6 重对齐前编号 五-41-3）的 title 印证此措辞。
     """
     tables = _tables("soe")
     assert tables[2]["name"] == "设定提存计划列示"

@@ -35,14 +35,14 @@ def _load_template(std: str) -> list[dict]:
 class TestP2_1_TemplateCoverage:
 
     def test_soe_section_count_baseline(self):
-        """soe 模板章节数 ≥ 321（棘轮基线）。"""
+        """soe 模板章节数 ≥ 251（棘轮基线；2026-10-23 R7.6 去掉重复条目前为 321）。"""
         data = _load_template("soe")
-        assert len(data) >= 321, f"soe 只有 {len(data)} 章节"
+        assert len(data) >= 251, f"soe 只有 {len(data)} 章节"
 
     def test_listed_section_count_baseline(self):
-        """listed 模板章节数 ≥ 432。"""
+        """listed 模板章节数 ≥ 423（2026-10-23 R7.6 去掉 9 张重复表前为 432）。"""
         data = _load_template("listed")
-        assert len(data) >= 432, f"listed 只有 {len(data)} 章节"
+        assert len(data) >= 423, f"listed 只有 {len(data)} 章节"
 
     def test_soe_covers_key_sections(self):
         """soe 覆盖关键科目章节（应收/存货/固定/无形/权益）。"""

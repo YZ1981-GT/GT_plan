@@ -322,10 +322,19 @@ class TestProtectionAndSkips:
 
 
     @pytest.mark.asyncio
-    async def test_embedded_sub_header_row_is_kept_verbatim(self, db, user, group):
-        """未绑定章节按合并附注模板行汇总：表内嵌的子表头行（国企 五-10-5 坏账准备三阶段）原样保留、不参与求和。"""
-        section = "五-10-5"
-        header = formula_service.find_table("soe", section)["rows"][0]
+    async def test_embedded_sub_header_row_is_kept_verbatim(self, db, user, group, monkeypatch):
+        """未绑定章节按合并附注模板行汇总：表内嵌的子表头行原样保留、不参与求和。
+
+        R7.6 后国企种子已没有表内嵌子表头（原 五-10-5 坏账准备三阶段按 Word 改成多级表头，现 五-9-12）；
+        模板表首行重复首列表头的判定与 ``_ensure_row_types`` 同一条，这里用这种形态的模板表钉住汇总的处理。"""
+        section = "五-9-12"
+        real = formula_service.find_table("soe", section)
+        header = ["坏账准备", "未来12个月预期信用损失", "整个存续期预期信用损失（未发生信用减值）",
+                  "整个存续期预期信用损失（已发生信用减值）", "合计"]
+        legacy = {**real, "headers": ["坏账准备", "第一阶段", "第二阶段", "第三阶段", "合计"], "multi_header": None,
+                  "rows": [header] + [list(r) for r in real["rows"]]}
+        monkeypatch.setattr(reaggregate_module, "find_table", lambda tt, sid: legacy if (tt, sid) == ("soe", section)
+                            else formula_service.find_table(tt, sid))
         db.add_all([
             ConsolNoteData(project_id=group["G"].id, year=_YEAR, section_id=section, node_key=key,
                            data={"rows": [list(header), ["期初余额", amount, "", "", amount]]})

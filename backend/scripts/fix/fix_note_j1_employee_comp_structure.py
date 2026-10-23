@@ -11,7 +11,7 @@
   `j1NoteSectionMap.J1_SUB_TABLE_KEYS.soe.postEmployment` 推的是 `设定提存计划列示`
   → 模板里没有该表名 → **孤儿子表**（模板第 3 张表永空 + 契约 P1 必失败）。
   原 spec 的 "Decision 3：允许偏离模板，键取 text_sections 章节标题" 是绕行而非修复。
-  `consol_note_sections_soe.json` 五-41-3 的 `title` 就是 `设定提存计划列示`
+  `consol_note_sections_soe.json` 五-40-3（R7.6 重对齐前编号 五-41-3）的 `title` 就是 `设定提存计划列示`
   → 证明这是致同原本措辞，改模板不是自造。
 - **6 张表全部 `columns` 未表态**：5 列里「本期增加」「本期减少」共享前缀「本期」，
   seed 路径会被 `_infer_groups_from_headers` 反猜出源模板**不存在**的「本期」父表头
@@ -335,7 +335,7 @@ SECTION_PLANS: dict[str, dict[str, Any]] = {
             },
             {
                 # 🔴 第 3 张表在模板里与第 2 张重名（都叫 `短期薪酬列示`）；游标已走过第 2 张，
-                #    故此处按 alias 命中第 3 张并改名。`consol_note_sections_soe` 五-41-3
+                #    故此处按 alias 命中第 3 张并改名。`consol_note_sections_soe` 五-40-3
                 #    的 title 即 `设定提存计划列示`（致同原本措辞）。
                 "aliases": [T_SOE_SHORT_TERM, T_SOE_POST],
                 "new_name": T_SOE_POST,

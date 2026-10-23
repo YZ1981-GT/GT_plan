@@ -16,8 +16,10 @@ DATA = Path(__file__).resolve().parents[1] / "data"
 
 # ── 基线（只许 >= 不许 <）──────────────────────────────────────────────────────
 
+# 2026-10-23 R7.6 国企章节号按 Word 重对齐：同一张 Word 表的重复条目并成一条、规则随之合并（53 条一条不少），
+# 带规则的章节 48 → 43（规则逐条核对见 R7.5）。
 _BASELINE = {
-    "soe": {"sections_with_rules": 48, "total_rules": 53, "mode_a": 24, "mode_b": 29, "cross_period": 6},
+    "soe": {"sections_with_rules": 43, "total_rules": 53, "mode_a": 24, "mode_b": 29, "cross_period": 6},
     "listed": {"sections_with_rules": 56, "total_rules": 64, "mode_a": 38, "mode_b": 26, "cross_period": 18},
 }
 

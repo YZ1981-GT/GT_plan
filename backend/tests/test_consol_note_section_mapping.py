@@ -3,6 +3,7 @@
 spec: consol-note-pull-from-standalone · Task 1.4
 """
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -60,14 +61,19 @@ class TestResolveStandaloneSection:
         assert resolve_standalone_section("soe", "五-10-1") == "八、10"
         assert resolve_standalone_table_name("soe", "五-10-1") == "存货分类"
 
-    def test_parent_section_shift_does_not_misroute(self):
-        """合并模板 parent_section 自 五-10 起错后一章（五-11 合同资产表的 parent 是「存货」）。
-
-        按表标题映射：合同资产 → 八、11，固定资产 → 八、22，不被 parent 带偏。
-        """
+    def test_soe_chapter_numbers_follow_standalone(self):
+        """国企合并种子章节号按 Word 重对齐后（R7.6），合并 五-N 的表都映射到单体 八、N（原自 五-10 起错后一节，
+        靠表标题优先才没映错）。"""
         assert resolve_standalone_section("soe", "五-11-1") == "八、11"
         assert resolve_standalone_table_name("soe", "五-11-1") == "合同资产情况"
         assert resolve_standalone_section("soe", "五-22-2") == "八、22"
+        data = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
+        off = [
+            (e["consol_section_id"], e["standalone_note_section"]) for e in data["mappings"]["soe"]
+            if e.get("standalone_note_section") and re.match(r"^五-\d+-\d+$", e["consol_section_id"])
+            and e["standalone_note_section"] != "八、" + e["consol_section_id"].split("-")[1]
+        ]
+        assert off == []
 
     def test_duplicate_table_name_follows_chapter(self):
         """「收回或转回的坏账准备」八、5 与 八、9 都有：其他应收款章节的那张映射到 八、9。"""

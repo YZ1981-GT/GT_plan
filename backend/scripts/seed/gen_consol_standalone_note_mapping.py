@@ -18,8 +18,8 @@
    列语义键重合度定，与运行时读取层同一函数）—— 只按表名会把国企 五-4-3（期初数续表）对到同名的
    「（续）」单项计提表。按表头改了子表名的标 match_type=structure
 
-⚠ 合并模板 ``parent_section`` 自 五-10 起整体错后一章（如 五-11「合同资产」表的 parent 是
-「存货」），只按 parent_section 映射会把合同资产拉成存货 —— 所以表标题优先，parent 兜底。
+表标题优先、parent_section 兜底：表名比章节名具体（同一合并章节的表可能分属单体不同子表）。国企合并种子的章节号
+与父章节曾自 五-10 起错后一章，R7.6 已按 Word 重对齐（守卫 ``test_consol_note_seed_word_identity.py``）。
 """
 from __future__ import annotations
 

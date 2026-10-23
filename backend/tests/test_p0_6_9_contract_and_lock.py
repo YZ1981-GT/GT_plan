@@ -100,7 +100,8 @@ class TestConsolNoteTemplateFiles:
         assert path.exists(), f"缺少 consol_note_sections_soe.json (tried {path})"
         data = json.loads(path.read_text(encoding="utf-8"))
         assert isinstance(data, list)
-        assert len(data) >= 300, f"soe 模板章节数 {len(data)} 低于基线 300"
+        # 2026-10-23 R7.6 去掉同一张 Word 表的重复条目：321 → 251（Word 第八章 221 张表 + 其他章 30 张）
+        assert len(data) >= 251, f"soe 模板章节数 {len(data)} 低于基线 251"
 
     def test_listed_json_exists_and_has_sections(self):
         """上市 listed 合并附注模板 JSON 存在且含章节。"""

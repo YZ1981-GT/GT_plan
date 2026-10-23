@@ -13,7 +13,7 @@ import type { ColumnDef } from '../disclosureColumnDefs'
  * spec `disclosure-columns-coverage-rollout` design §批 1 列头清查 §4/§5（Task 5.1 实证）
  * 口径证据：源 `L 债务循环/L3 长期借款.xlsx` 两张披露 sheet +
  *   `附注模版/上市报表附注.md` L4630~4641（+ L4554）/ `国企报表附注.md` L3677~3691（+ L3626）+
- *   `note_template_{listed,soe}.json` 五、45 / 八、49（+ 八、45）+ consol 五-50-1 / 五-46-1。
+ *   `note_template_{listed,soe}.json` 五、45 / 八、49（+ 八、45）+ consol 五-49-1 / 五-45-1。
  *
  * 覆盖 Property 1 / Property 2 / Property 6 + 单行表头 `flat`（0 处 group）+ values 位置对齐
  * （后者是国企 3 列方案 A 重排 `[期末余额, 期初余额, 期末利率期间]` 的守卫）。
