@@ -123,4 +123,7 @@
 - [x] 33. 前端 `NotePriorYearImportDialog.vue`（预览 → 逐表确认 / 改选 / 逐列指定 → 写入 → 刷新目录）+ apiPaths + 附注编辑器入口（守行数上限）；vitest / ESLint / 单区域 vue-tsc（R6.6）
   - `notePriorYearImport.ts` + 弹窗，挂 `DisclosureNoteContentTools`（同一门禁），编辑器菜单加一项（3265 行 / 上限 3281）；浏览器实测和平 2025（写入请求页面拦截应答、库里 0 行被写）
   - 同批修编辑器模板 17 处 `noteEdit.*` 未解包（`40882b2b1` 起写入口门禁恒真、「只读副本」人人可见）、已删的 `isEqcrRole`、恒假的归档判定，守卫从返回类型读 ref 字段；vitest 24 个文件 382 passed，ESLint 0 error，单区域 vue-tsc 0 error（探针报 TS2345 / TS2322），变异 17 条全红
-- [ ] 34. 收尾：design §15 实施记录、INDEX / memory；干净 worktree 跑要提交的树；只提交本会话文件；fetch 后推送 `spec/disclosure-note-doc-upload-and-batch-fill` 并 `ls-remote` 核对；清理探针
+- [x] 34. 收尾：design §15 实施记录、INDEX / memory；干净 worktree 跑要提交的树；只提交本会话文件；fetch 后推送 `spec/disclosure-note-doc-upload-and-batch-fill` 并 `ls-remote` 核对；清理探针
+  - design §15.8 补任务 31~33 实施记录（规则补充、真库只读核对、浏览器实测、编辑器模板缺陷、回归与变异）；INDEX 本 spec 行与 memory 按现状改写（memory 300 行）
+  - R6 四批提交（bfa0048ab / 70e718922 / 3256fc491 / e3176af66）都在干净 worktree 跑要提交的树、私有索引只提交本会话文件；并发会话把本会话文件 `git add` 进共享索引一次，已退回；推送前 fetch、推送后 `ls-remote` 核对
+  - 临时引用 7 个、基线 worktree 与 2 个过期登记、单区域 tsconfig 4 个、类型探针、浏览器截图 / 上年 Word 副本已清；推送用的 worktree 与工作目录在最后一次推送后删除
