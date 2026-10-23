@@ -293,6 +293,23 @@ async def _report_auto_map_outcome(
         except Exception as sse_err:  # noqa: BLE001
             logger.warning("[auto-map] sync.failed 推送失败: %s", sse_err)
 
+    # ③ F-2：成功 / low_coverage 推 sync.completed SSE，前端顶栏提示映射已完成
+    elif outcome["status"] in ("ok", "low_coverage"):
+        try:
+            from app.services.event_bus import event_bus
+
+            event_bus.broadcast_raw("sync.completed", {
+                "project_id": str(payload.project_id),
+                "year": payload.year,
+                "handler": "自动科目映射",
+                "message": outcome["message"],
+                "status": outcome["status"],
+                "completion_rate": outcome.get("completion_rate"),
+                "unmatched_count": outcome.get("unmatched_count", 0),
+            })
+        except Exception as sse_err:  # noqa: BLE001
+            logger.warning("[auto-map] sync.completed 推送失败: %s", sse_err)
+
 
 async def _advance_project_status_on_dataset_activated(payload: "EventPayload") -> None:
     """账套入库激活后把项目状态从 计划中/已创建 自动推进到 执行中。

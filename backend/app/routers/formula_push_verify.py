@@ -19,10 +19,14 @@ router = APIRouter(prefix="/api/formula-push", tags=["formula-push-verify"])
 async def verify_formula_push(
     project_id: uuid.UUID,
     year: int,
+    deep: bool = False,
     db: AsyncSession = Depends(get_db),
     _user=Depends(require_project_access("readonly")),
 ):
-    """反向校验：对比源头值与已推送目标值的一致性。"""
-    from app.services.formula_push.verify import verify_push
+    """反向校验：对比源头值与已推送目标值的一致性。deep=true 时重跑推送引擎取实时源头值。"""
+    if deep:
+        from app.services.formula_push.verify import deep_verify_push
+        return await deep_verify_push(db, project_id, year)
 
+    from app.services.formula_push.verify import verify_push
     return await verify_push(db, project_id, year)

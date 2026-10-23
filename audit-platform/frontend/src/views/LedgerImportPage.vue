@@ -199,6 +199,8 @@ function retrySubmit() {
 
 function onImportComplete() {
   isSuccess.value = true
+  // F-3：检查是否属于合并集团，提示合并项目联动
+  _checkConsolLinkage()
   // 导入成功后跳转至查账页
   router.push({ path: `/projects/${projectId}/ledger` })
 }
@@ -219,6 +221,30 @@ function onImportCanceled() {
 function onMoveToBackground() {
   // 放后台继续——跳回项目列表或查账页
   router.push({ path: `/projects/${projectId}/ledger` })
+}
+
+/**
+ * F-3：四表导入完成后检查当前项目是否属于某个合并集团。
+ * 如果有上级合并项目（parent_project_id 非空），弹 ElNotification 提示用户
+ * 合并项目的合并报表/试算表可能需要重新推送（后端 consol_trial_stale_handler
+ * 已自动标 stale 并推 SSE，但用户可能不在合并页面所以看不到横幅）。
+ */
+async function _checkConsolLinkage() {
+  try {
+    const { api: _api } = await import('@/services/apiProxy')
+    const proj = await _api.get(`/api/projects/${projectId}`, { _silent: true } as any)
+    if (proj && (proj as any).parent_project_id) {
+      const { ElNotification: Notify } = await import('element-plus')
+      Notify({
+        title: '合并项目数据已更新',
+        message: '本项目属于合并集团，四表导入后合并报表数据已标记为待更新。如需立即更新合并报表，请前往合并模块点击「重新推送」。',
+        type: 'info',
+        duration: 8000,
+      })
+    }
+  } catch {
+    // 静默：查不到不影响导入主流程
+  }
 }
 </script>
 

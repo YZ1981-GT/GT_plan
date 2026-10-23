@@ -36,7 +36,7 @@ async def build_timeline(
     events: list[dict[str, Any]] = []
 
     events.extend(await _audit_log_events(db, project_id, year, limit))
-    events.extend(await _publish_events(db, limit))
+    events.extend(await _publish_events(db, project_id, limit))
     events.extend(await _template_events(db, project_id, limit))
     events.extend(await _push_events(db, project_id, year, limit))
     events.extend(await _conflict_events(db, project_id, limit))
@@ -82,15 +82,35 @@ async def _audit_log_events(
         return []
 
 
-async def _publish_events(db: AsyncSession, limit: int) -> list[dict[str, Any]]:
-    """全局发布历史。"""
+async def _publish_events(db: AsyncSession, project_id: uuid.UUID, limit: int) -> list[dict[str, Any]]:
+    """全局发布历史（按项目适用准则 scope 过滤）。"""
     try:
         from app.models.formula_setting_models import FormulaPublish
 
+        # 查本项目适用的 scope（从 projects 表的 accounting_standard 推导）
+        _project_scope = None
+        try:
+            from app.models.audit_platform_models import Project
+            _proj = (await db.execute(
+                sa.select(Project.accounting_standard).where(Project.id == project_id)
+            )).scalar_one_or_none()
+            if _proj:
+                _project_scope = str(_proj).lower()
+        except Exception:
+            pass  # scope 查不到就不过滤
+
+        q = sa.select(FormulaPublish).where(FormulaPublish.status == "applied")
+        if _project_scope:
+            # 只展示影响本项目准则范围的发布（scope 匹配或 scope='*'）
+            q = q.where(
+                sa.or_(
+                    FormulaPublish.scope == _project_scope,
+                    FormulaPublish.scope == "*",
+                    FormulaPublish.scope.is_(None),
+                )
+            )
         rows = (await db.execute(
-            sa.select(FormulaPublish).where(
-                FormulaPublish.status == "applied",
-            ).order_by(FormulaPublish.created_at.desc()).limit(limit)
+            q.order_by(FormulaPublish.created_at.desc()).limit(limit)
         )).scalars().all()
 
         return [{

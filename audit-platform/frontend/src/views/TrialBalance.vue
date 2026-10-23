@@ -1276,6 +1276,23 @@
         <span class="gt-trace-name">{{ (traceRow as any).account_name || traceRow.row_name || '' }}</span>
       </div>
 
+      <!-- A-2：审定数精确构成表 -->
+      <div class="gt-trace-composition">
+        <h4 style="margin:12px 0 8px;font-size:14px;font-weight:600">审定数构成</h4>
+        <el-table :data="traceComposition" border size="small" style="width:100%"
+          :show-summary="false" :header-cell-style="{ fontSize: '12px' }">
+          <el-table-column prop="label" label="分量" min-width="180" />
+          <el-table-column label="金额" width="160" align="right">
+            <template #default="{ row: r }">
+              <span :style="{ fontWeight: r.isTotal ? '700' : '400', color: r.amount < 0 ? 'var(--gt-color-coral)' : '' }">
+                {{ displayPrefs.fmtAmount(r.amount) }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="source" label="来源" min-width="200" show-overflow-tooltip />
+        </el-table>
+      </div>
+
       <!-- 溯源链可视化 -->
       <div class="gt-trace-chain">
         <div class="gt-trace-node">
@@ -1719,6 +1736,30 @@ function getRowAdjustments(row: any): { type: string; amount: number }[] {
   if (rje !== 0) items.push({ type: 'RJE（重分类调整）', amount: rje })
   return items
 }
+
+/** A-2：审定数精确构成表（未审数 + RJE + AJE + 底稿调整 = 审定数） */
+const traceComposition = computed(() => {
+  const row = traceRow.value
+  if (!row) return []
+  const unadj = Number(row.unadjusted_amount) || 0
+  const rje = Number(row.rje_adjustment) || 0
+  const aje = Number(row.aje_adjustment) || 0
+  const wp = Number(row.wp_adjustment) || 0
+  const audited = Number(row.audited_amount) || 0
+  const items: Array<{ label: string; amount: number; source: string; isTotal?: boolean }> = [
+    { label: '未审数', amount: unadj, source: '四表库科目余额汇总（tb_balance 叶子科目按方向求和）' },
+  ]
+  if (rje !== 0) items.push({ label: '+ RJE（重分类调整）', amount: rje, source: '调整分录大厅已审批的重分类分录' })
+  if (aje !== 0) items.push({ label: '+ AJE（审计调整）', amount: aje, source: '调整分录大厅已审批的审计调整分录' })
+  if (wp !== 0) items.push({ label: '+ 底稿调整', amount: wp, source: '各循环审定表经发布门写入' })
+  items.push({ label: '= 审定数', amount: audited, source: '未审数 + RJE + AJE + 底稿调整', isTotal: true })
+  // 校验：构成之和是否等于审定数（不等则加警告行）
+  const sum = unadj + rje + aje + wp
+  if (Math.abs(sum - audited) > 0.005) {
+    items.push({ label: '⚠ 差异', amount: audited - sum, source: '构成之和与审定数不一致，请重算试算表' })
+  }
+  return items
+})
 
 // ─── 多人协作冲突提示 ───
 // 锁定后其他人尝试重算时弹出醒目提示（而非仅 disabled tooltip）

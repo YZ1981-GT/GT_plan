@@ -104,7 +104,15 @@
             <template #prepend>源</template>
           </el-input>
           <div style="font-size: 11px; color: var(--gt-color-text-tertiary); margin-top: 4px;">
-            语法：REPORT('行次','字段') 或 ROW('行次')。示例：REPORT('BS-002','期末')
+            语法：REPORT('行次','字段') 或 ROW('行次') 或 PREV('科目','字段')。示例：REPORT('BS-002','期末')
+          </div>
+          <!-- spec: formula-management-deep-optimization P2-9 — 快捷按钮 -->
+          <div style="display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap;">
+            <el-button size="small" @click="form.left_ref += &quot;ROW('')&quot;">ROW</el-button>
+            <el-button size="small" @click="form.left_ref += &quot;REPORT('','')&quot;">REPORT</el-button>
+            <el-button size="small" @click="form.left_ref += &quot;TB('','')&quot;">TB</el-button>
+            <el-button size="small" @click="form.left_ref += &quot;PREV('','期末余额')&quot;">PREV</el-button>
+            <el-button size="small" @click="form.left_ref += &quot;SUM_TB('','')&quot;">SUM_TB</el-button>
           </div>
         </el-form-item>
         <el-form-item label="关系运算符">
@@ -119,7 +127,15 @@
             <template #prepend>目标</template>
           </el-input>
           <div style="font-size: 11px; color: var(--gt-color-text-tertiary); margin-top: 4px;">
-            语法：NOTE('章节','字段') / WP('底稿','sheet','坐标') / TB('科目','字段')
+            语法：NOTE('章节','字段') / WP('底稿','sheet','坐标') / TB('科目','字段') / AUX('科目','维度','字段') / PREV('科目','字段')
+          </div>
+          <!-- spec: formula-management-deep-optimization P2-9 — 快捷按钮 -->
+          <div style="display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap;">
+            <el-button size="small" @click="form.right_ref += &quot;NOTE('','合计')&quot;">NOTE</el-button>
+            <el-button size="small" @click="form.right_ref += &quot;WP('','','')&quot;">WP</el-button>
+            <el-button size="small" @click="form.right_ref += &quot;TB('','')&quot;">TB</el-button>
+            <el-button size="small" @click="form.right_ref += &quot;AUX('','','期末余额')&quot;">AUX</el-button>
+            <el-button size="small" @click="form.right_ref += &quot;PREV('','期末余额')&quot;">PREV</el-button>
           </div>
         </el-form-item>
         <el-form-item label="说明（选填）">

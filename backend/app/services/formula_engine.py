@@ -369,6 +369,7 @@ class ASTCompare:
 _AST_TOKEN_PATTERNS = [
     ('NUMBER',   r'\d+\.?\d*'),
     ('STRING',   r"'[^']*'"),
+    ('DSTRING',  r'"[^"]*"'),  # spec: formula-management-deep-optimization P2-8 双引号字符串
     ('FUNC',     r'[A-Z_][A-Z_0-9]*(?=\s*\()'),
     ('IDENT',    r'[A-Za-z_][A-Za-z_0-9\-]*'),
     ('LPAREN',   r'\('),
@@ -507,6 +508,10 @@ class _RecursiveDescentParser:
         if tok.type == 'STRING':
             self.consume()
             return ASTString(value=tok.value.strip("'"))
+
+        if tok.type == 'DSTRING':
+            self.consume()
+            return ASTString(value=tok.value.strip('"'))
 
         if tok.type == 'FUNC':
             return self._func_call()

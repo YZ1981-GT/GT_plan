@@ -166,6 +166,30 @@
         :rows="g7SuggestionDraft.rows" :note="g7SuggestionDraft.note"
         :imported-at="g7SuggestionDraft.importedAt"
         @goto-sheet="onGotoSheet" @refresh="loadAllData" />
+      <!-- D-1：分录汇总表（只读，从 entry-summary 端点读取） -->
+      <div v-else-if="activeSheet === 'entry_summary'" class="cw-entry-summary">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span style="font-weight:600">抵销分录汇总表（仅已审批分录）</span>
+          <el-button size="small" :loading="entrySummaryLoading" @click="loadEntrySummary">🔄 刷新</el-button>
+        </div>
+        <el-table :data="entrySummaryTypes" border size="small" show-summary :summary-method="entrySummaryMethod"
+          empty-text="暂无已审批的抵销分录">
+          <el-table-column prop="type_label" label="分录类型" min-width="180" />
+          <el-table-column prop="count" label="笔数" width="80" align="center" />
+          <el-table-column label="借方合计" width="150" align="right">
+            <template #default="{ row }"><span>{{ fmtAmt(row.debit_total) }}</span></template>
+          </el-table-column>
+          <el-table-column label="贷方合计" width="150" align="right">
+            <template #default="{ row }"><span>{{ fmtAmt(row.credit_total) }}</span></template>
+          </el-table-column>
+          <el-table-column label="净额" width="150" align="right">
+            <template #default="{ row }"><span :style="{ color: Number(row.net) !== 0 ? 'var(--el-color-danger)' : '' }">{{ fmtAmt(row.net) }}</span></template>
+          </el-table-column>
+        </el-table>
+        <el-alert v-if="entrySummaryTotals && Number(entrySummaryTotals.net) !== 0"
+          type="warning" show-icon :closable="false" style="margin-top:12px"
+          :title="`借贷不平衡：净额 ${fmtAmt(entrySummaryTotals.net)}（应为 0）`" />
+      </div>
     </main>
 
     <el-dialog v-model="g7LinkageVisible" title="G7 → 合并工作底稿联动" width="920px" destroy-on-close>
@@ -395,6 +419,7 @@ import { ref, computed, reactive, markRaw, onMounted, onUnmounted, watch } from 
 import { ElMessage } from 'element-plus'
 import { List, Coin, TrendCharts, DataBoard, SetUp, Tickets, PieChart } from '@element-plus/icons-vue'
 import { getConsolScope, getWorksheetTree } from '@/services/consolidationApi'
+import { api } from '@/services/apiProxy'
 import { directSubsidiaryMembers } from '@/components/consolidation/composables/consolTreeView'
 import {
   declaredOrigins,
@@ -633,6 +658,7 @@ const staticSheets = [
   { key: 'net_asset', label: '净资产表', desc: '净资产和损益变动·长投校对', icon: markRaw(DataBoard), tag: '核心', tagType: 'warning' as const },
   { key: 'equity_sim', label: '模拟权益法', desc: '直接持股+间接持股·9步模拟', icon: markRaw(SetUp), tag: '引擎', tagType: 'danger' as const },
   { key: 'elimination', label: '合并抵消分录', desc: '全部调整抵销分录·待生成·审批后推送', icon: markRaw(Tickets), tag: '输出', tagType: 'success' as const },
+  { key: 'entry_summary', label: '分录汇总表', desc: '按类型汇总借贷净额·与差额表对账', icon: markRaw(DataBoard), tag: '汇总', tagType: 'info' as const },
   { key: 'capital', label: '资本公积变动', desc: '从抵消分录提取·差异核查', icon: markRaw(PieChart), tag: '核查', tagType: 'info' as const },
   { key: 'post_invest', label: '抵消后长投明细', desc: '账面+模拟-抵消=合并列示数', icon: markRaw(DataBoard), tag: '汇总', tagType: 'success' as const },
   { key: 'post_income', label: '抵消后投资收益', desc: '红利+模拟-还原-抵消', icon: markRaw(Coin), tag: '汇总', tagType: 'success' as const },
@@ -749,6 +775,47 @@ const g7SuggestionDraft = reactive<{
   note: string
   importedAt: string
 }>({ rows: [], note: '', importedAt: '' })
+
+// ─── D-1：分录汇总表 ──────────────────────────────────────────────────────────
+const entrySummaryLoading = ref(false)
+const entrySummaryTypes = ref<any[]>([])
+const entrySummaryTotals = ref<any>(null)
+
+async function loadEntrySummary() {
+  if (!projectId.value || !year.value) return
+  entrySummaryLoading.value = true
+  try {
+    const res = await api.get('/api/consolidation/worksheet/entry-summary', {
+      params: { project_id: projectId.value, year: year.value },
+      _dedupe: false,
+    } as any)
+    entrySummaryTypes.value = (res as any)?.types || []
+    entrySummaryTotals.value = (res as any)?.totals || null
+  } catch {
+    entrySummaryTypes.value = []
+    entrySummaryTotals.value = null
+  } finally {
+    entrySummaryLoading.value = false
+  }
+}
+
+function entrySummaryMethod({ columns }: { columns: any[] }) {
+  return columns.map((col, i) => {
+    if (i === 0) return '合计'
+    if (!entrySummaryTotals.value) return ''
+    const key = ['', 'count', 'debit_total', 'credit_total', 'net'][i]
+    if (!key) return ''
+    const v = entrySummaryTotals.value[key]
+    return key === 'count' ? String(v ?? '') : fmtAmt(v)
+  })
+}
+
+function fmtAmt(v: any): string {
+  if (v == null || v === '') return ''
+  const n = Number(v)
+  if (Number.isNaN(n)) return String(v)
+  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 /** 从 importable equity_inv 提取 G7-16 结构化备查字段 */
 const g7UnrecognizedMetaRows = computed(() => {
@@ -1516,6 +1583,11 @@ function onOpenFormula(sheetKey: string) {
 function onGotoSheet(k: string) {
   activeSheet.value = k
 }
+
+// D-1：切到分录汇总表时自动加载
+watch(() => activeSheet.value, (sheet) => {
+  if (sheet === 'entry_summary' && !entrySummaryTypes.value.length) loadEntrySummary()
+})
 
 defineExpose({ reload, activeSheet })
 </script>

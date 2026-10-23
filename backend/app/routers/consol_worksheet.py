@@ -398,3 +398,19 @@ async def get_templates(
 
     templates = await list_templates(db, project_id)
     return {"templates": templates}
+
+
+@router.get("/entry-summary")
+async def get_entry_summary(
+    project_id: UUID = Query(...),
+    year: int | None = Query(None, description="年度；不传取本项目审计年度"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """D-1：合并抵销分录汇总表 — 按分录类型分类汇总借方/贷方/净额。
+
+    返回 {types: [{type, type_label, debit_total, credit_total, net, count}], totals: {...}, year}
+    """
+    from app.services.consol_entry_summary_service import entry_summary
+
+    return await entry_summary(db, project_id, year)

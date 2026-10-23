@@ -913,6 +913,16 @@ function connectSSE(projectId: string) {
         eventBus.emit('sse:sync-failed', d)
       } else {
         eventBus.emit('sse:sync-event', d)
+        // F-2：科目映射完成后给用户 toast 提示
+        if (d.event_type === 'sync.completed' && (d as any).handler === '自动科目映射') {
+          const msg = (d as any).message || '科目映射已完成，试算表已重算'
+          const status = (d as any).status
+          if (status === 'low_coverage') {
+            ElMessage.warning(msg)
+          } else {
+            ElMessage.success(msg)
+          }
+        }
       }
     },
     {

@@ -28,6 +28,7 @@ async def compute_health(
         "project_id": str(project_id),
         "year": year,
         "push_coverage": _push_coverage(),
+        "project_push_coverage": await _project_push_coverage(db, project_id, year),
         "push_success_rate": await _last_run_stats(db, project_id, year),
         "formula_config_rate": await _config_coverage(db, project_id, year),
         "pending_conflicts": await _pending_count(db, project_id),
@@ -47,6 +48,36 @@ def _push_coverage() -> dict[str, Any]:
     except Exception:
         logger.warning("推送覆盖率计算失败", exc_info=True)
         return {"total_registered": 0, "total_codes": 0, "percentage": 0, "cycles": []}
+
+
+async def _project_push_coverage(
+    db: AsyncSession, project_id: uuid.UUID, year: int
+) -> dict[str, Any]:
+    """项目级推送覆盖率：该项目实际推送覆盖了多少个 wp_code。"""
+    try:
+        from app.models.formula_push_models import FormulaPushState
+
+        # 该项目有推送状态的去重 wp_code（从 addr_id 提取首段）
+        rows = (await db.execute(
+            sa.select(FormulaPushState.addr_id).where(
+                FormulaPushState.project_id == project_id,
+                FormulaPushState.year == year,
+            )
+        )).scalars().all()
+        # addr_id 格式: "E1/明细表E1-1/item.field" 或 "note://五、1/表/行.end"
+        covered_codes: set[str] = set()
+        for addr in rows:
+            if addr and not addr.startswith("note://"):
+                code = addr.split("/")[0].split("[")[0]
+                if code:
+                    covered_codes.add(code)
+        return {
+            "project_covered_codes": len(covered_codes),
+            "covered_wp_codes": sorted(covered_codes)[:50],
+        }
+    except Exception:
+        logger.warning("项目推送覆盖率查询失败", exc_info=True)
+        return {"project_covered_codes": 0, "covered_wp_codes": []}
 
 
 # ── 维度 2：最近一次推送统计 ────────────────────────────────────────────────

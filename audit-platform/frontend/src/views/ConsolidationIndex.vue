@@ -104,6 +104,56 @@
       </template>
     </GtPageHeader>
 
+    <!-- U-1：左侧企业树常驻面板 + 右侧 Tab 内容 -->
+    <div class="gt-consol-main" :class="{ 'gt-consol-main--collapsed': consolSidebarCollapsed }">
+      <!-- 左侧常驻企业树 -->
+      <aside class="gt-consol-sidebar" v-show="!consolSidebarCollapsed">
+        <div class="gt-consol-sidebar__header">
+          <span class="gt-consol-sidebar__title">企业树</span>
+          <el-button size="small" text @click="consolSidebarCollapsed = true" title="收起企业树">✕</el-button>
+        </div>
+        <el-input
+          v-model="sidebarSearch"
+          size="small"
+          placeholder="搜索企业"
+          clearable
+          style="margin-bottom:8px"
+        />
+        <div class="gt-consol-sidebar__tree">
+          <el-tree
+            v-if="groupTree.length"
+            ref="sidebarTreeRef"
+            :data="groupTree"
+            :props="{ label: 'display_name', children: 'children' }"
+            default-expand-all
+            node-key="node_key"
+            highlight-current
+            :filter-node-method="sidebarFilterNode"
+            @node-click="onSidebarNodeClick"
+          >
+            <template #default="{ data }">
+              <span class="gt-sidebar-node" :class="{ 'gt-sidebar-node--elim': data.kind === 'elim' }">
+                <span>{{ nodeLabel(data) }}</span>
+                <el-tag v-if="relationLabel(data.relation)" size="small" effect="plain" style="margin-left:4px;font-size:10px">{{ relationLabel(data.relation) }}</el-tag>
+              </span>
+            </template>
+          </el-tree>
+          <div v-else class="gt-consol-sidebar__empty">
+            {{ groupTreeLoaded ? '暂无企业树' : '加载中…' }}
+          </div>
+        </div>
+        <div v-if="selectedNode" class="gt-consol-sidebar__info">
+          <div class="gt-consol-sidebar__info-name">{{ nodeLabel(selectedNode) }}</div>
+          <div class="gt-consol-sidebar__info-code">{{ selectedNode.company_code || '—' }}</div>
+        </div>
+      </aside>
+      <!-- 左侧收起时的展开按钮 -->
+      <div v-if="consolSidebarCollapsed" class="gt-consol-sidebar-toggle" @click="consolSidebarCollapsed = false" title="展开企业树">
+        <span>🌳</span>
+      </div>
+      <!-- 右侧主内容 -->
+      <div class="gt-consol-content">
+
     <el-tabs v-model="activeTab" class="gt-consol-tabs">
       <!-- Tab 0: 合并工作底稿 -->
       <el-tab-pane label="合并工作底稿" name="worksheets">
@@ -374,6 +424,8 @@
         />
       </el-tab-pane>
     </el-tabs>
+      </div><!-- .gt-consol-content -->
+    </div><!-- .gt-consol-main -->
 
 
     <!-- 报表转换规则弹窗 -->
@@ -1218,6 +1270,28 @@ const groupTree = ref<ConsolTreeNode[]>([])
 const selectedNode = ref<ConsolTreeNode | null>(null)
 const orgViewMode = ref<'chart' | 'tree'>('chart')
 const orgZoom = ref(0.85)
+
+// ─── U-1：左侧常驻企业树面板 ──────────────────────────────────────────────
+const consolSidebarCollapsed = ref(false)
+const sidebarSearch = ref('')
+const sidebarTreeRef = ref<any>(null)
+
+watch(sidebarSearch, (q) => {
+  sidebarTreeRef.value?.filter(q)
+})
+
+function sidebarFilterNode(value: string, data: ConsolTreeNode): boolean {
+  if (!value) return true
+  const q = value.toLowerCase()
+  const name = (data.display_name || data.company_name || '').toLowerCase()
+  const code = (data.company_code || '').toLowerCase()
+  return name.includes(q) || code.includes(q)
+}
+
+function onSidebarNodeClick(data: ConsolTreeNode) {
+  // 复用现有的树节点点击逻辑
+  onTreeNodeClick(data)
+}
 
 const orgNodeCount = computed(() => countNodes(groupTree.value[0]))
 const orgMaxDepth = computed(() => maxDepth(groupTree.value[0]))
@@ -2072,6 +2146,94 @@ watch(() => route.query.tab, syncTabFromQuery)
 <style scoped>
 .gt-consol { padding: 12px; overflow: hidden; }
 .gt-consol-tabs { margin-top: 8px; }
+
+/* U-1：左侧常驻企业树 + 右侧内容的 flex 布局 */
+.gt-consol-main {
+  display: flex;
+  gap: 0;
+  min-height: calc(100vh - 200px);
+}
+.gt-consol-sidebar {
+  width: 240px;
+  min-width: 240px;
+  border-right: 1px solid var(--gt-color-border-light, #f0f0f5);
+  padding: 8px;
+  background: var(--gt-color-bg-elevated, #faf9fd);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.gt-consol-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.gt-consol-sidebar__title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--gt-color-primary, #4b2d77);
+}
+.gt-consol-sidebar__tree {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 12px;
+}
+.gt-consol-sidebar__empty {
+  text-align: center;
+  color: var(--gt-color-text-placeholder);
+  padding: 24px 0;
+  font-size: 12px;
+}
+.gt-consol-sidebar__info {
+  border-top: 1px solid var(--gt-color-border-light, #f0f0f5);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+.gt-consol-sidebar__info-name {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--gt-color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gt-consol-sidebar__info-code {
+  font-size: 11px;
+  color: var(--gt-color-text-tertiary);
+}
+.gt-sidebar-node {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.gt-sidebar-node--elim {
+  color: var(--gt-color-text-secondary);
+  font-style: italic;
+}
+.gt-consol-sidebar-toggle {
+  width: 28px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12px;
+  cursor: pointer;
+  border-right: 1px solid var(--gt-color-border-light, #f0f0f5);
+  background: var(--gt-color-bg-elevated, #faf9fd);
+  font-size: 16px;
+}
+.gt-consol-sidebar-toggle:hover {
+  background: var(--gt-color-bg-hover, #f5f3fa);
+}
+.gt-consol-content {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.gt-consol-main--collapsed .gt-consol-content {
+  /* 收起时内容区占满 */
+}
 
 .gt-tab-content { padding: var(--gt-space-3) 0; }
 

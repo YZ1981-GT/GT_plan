@@ -392,8 +392,15 @@ class ChainOrchestrator:
         """Execute trial balance recalculation."""
         from app.services.trial_balance_service import TrialBalanceService
         svc = TrialBalanceService(db)
-        await svc.full_recalc(project_id, year)
-        return {"recalculated": True}
+        result = await svc.full_recalc(project_id, year)
+        fallback = result.get("income_expense_fallback_accounts", [])
+        out: dict = {"recalculated": True}
+        if fallback:
+            out["warnings"] = [
+                f"损益类科目 {', '.join(fallback[:10])}{'等' if len(fallback) > 10 else ''}"
+                f" 的余额表缺少借方/贷方发生额列，已按期末余额绝对值替代（结果可能不准确，建议导入含发生额的余额表）"
+            ]
+        return out
 
     async def _step_generate_workpapers(self, db: AsyncSession, project_id: UUID, year: int) -> dict:
         """Execute workpaper generation with smart matching.

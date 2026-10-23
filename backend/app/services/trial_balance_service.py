@@ -61,18 +61,24 @@ class TrialBalanceService:
         year: int,
         company_code: str = "001",
         account_codes: list[str] | None = None,
-    ) -> None:
+    ) -> list[str]:
         """
         通过 JOIN account_mapping 汇总 tb_balance.closing_balance 到标准科目。
         account_codes=None → 全量; 指定列表 → 增量。
 
         全量模式下，不在汇总结果中的已有试算表行会被清零（解决回滚后残留问题）。
         使用批量操作减少数据库往返。
+
+        Returns:
+            损益类科目中因发生额列为空而 fallback 到 closing_balance abs 的标准科目码列表
+            （空列表 = 所有损益类科目的发生额列都正常）。
         """
         bal = TbBalance.__table__
         mp = AccountMapping.__table__
         ac = AccountChart.__table__
         balance_filter = await get_active_filter(self.db, bal, project_id, year)
+        # C-4: 收集损益类科目因余额表缺发生额列而 fallback 到 closing_balance 的科目
+        _income_expense_fallback: list[str] = []
 
         # 叶子节点过滤：客户科目表是多级树（1122 父级 / 1122.01 子级），
         # 父级余额 = 子级之和。account_mapping 把每一级 original_account_code 都
@@ -298,6 +304,9 @@ class TrialBalanceService:
                     # 无序时账发生额时 fallback 到 tb_balance.closing_balance abs
                     direction, _source = resolve_account_direction(code, name or "")
                     closing = abs(closing) if direction == "credit" else closing
+                    # C-4: 有余额但发生额列为空 → 记录以供 warning
+                    if closing != Decimal("0"):
+                        _income_expense_fallback.append(code)
                 opening = Decimal("0")  # 损益类无期初余额
             else:
                 # 资产负债权益类：tb_balance.closing_balance 是"借正贷负"原始口径，
@@ -339,6 +348,7 @@ class TrialBalanceService:
             self.db.add_all(new_rows)
 
         await self.db.flush()
+        return _income_expense_fallback
 
     # ------------------------------------------------------------------
     # 调整列重算
@@ -485,11 +495,16 @@ class TrialBalanceService:
         project_id: UUID,
         year: int,
         company_code: str = "001",
-    ) -> None:
-        """全量重算：未审数 → 调整列 → 审定数"""
-        await self.recalc_unadjusted(project_id, year, company_code)
+    ) -> dict:
+        """全量重算：未审数 → 调整列 → 审定数
+
+        Returns:
+            {"income_expense_fallback_accounts": [...]} — 损益类因缺发生额列 fallback 的科目
+        """
+        fallback = await self.recalc_unadjusted(project_id, year, company_code)
         await self.recalc_adjustments(project_id, year, company_code)
         await self.recalc_audited(project_id, year, company_code)
+        return {"income_expense_fallback_accounts": fallback}
 
     # ------------------------------------------------------------------
     # 一致性校验

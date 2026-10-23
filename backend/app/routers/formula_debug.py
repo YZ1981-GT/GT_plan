@@ -166,7 +166,33 @@ async def _build_context(
     except Exception:
         logger.warning("调试：报表行取数失败", exc_info=True)
 
-    return FormulaContext(tb_data=tb_data, row_cache=row_cache)
+    # P1-5: 按 scope 预载 NOTE/WP 数据
+    note_data: dict[str, dict[str, Decimal]] = {}
+    wp_data: dict[str, dict[str, Decimal]] = {}
+
+    if scope in ("note", "report"):
+        try:
+            import sqlalchemy as sa
+            # 预载附注表格数据（从 disclosure_notes 取各章节合计值）
+            from app.models.disclosure_models import DisclosureNote
+            note_rows = (await db.execute(
+                sa.select(
+                    DisclosureNote.section_number,
+                    DisclosureNote.total_amount,
+                ).where(
+                    DisclosureNote.project_id == project_id,
+                    DisclosureNote.year == year,
+                    DisclosureNote.is_deleted == sa.false(),
+                )
+            )).all()
+            for row in note_rows:
+                sec = row.section_number or ""
+                if sec:
+                    note_data[sec] = {"合计": Decimal(str(row.total_amount or 0))}
+        except Exception:
+            logger.warning("调试：附注取数失败（模型可能不存在）", exc_info=True)
+
+    return FormulaContext(tb_data=tb_data, row_cache=row_cache, note_data=note_data, wp_data=wp_data)
 
 
 def _context_summary(ctx: Any) -> dict[str, Any]:

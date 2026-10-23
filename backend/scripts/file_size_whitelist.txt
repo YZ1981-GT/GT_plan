@@ -1324,10 +1324,14 @@ backend/app/services/formula_push/engine.py 951
 audit-platform/frontend/src/components/consolidation/ConsolNoteTab.vue 3263
 audit-platform/frontend/src/components/formula/FormulaEditDialog.vue 1541
 backend/tests/test_formula_push_engine.py 934
-audit-platform/frontend/src/views/ConsolidationIndex.vue 2180
+#   ConsolidationIndex.vue —— 2026-10-23 汇总提交（用户要求推送并发会话的在制改动）：合并首页左侧常驻企业树面板
+#     （U-1：搜索 / 收起 / 点击复用原节点逻辑）+ 样式，HEAD 2206 → 2368。拆分方向：企业树侧栏连同搜索、收起状态与样式抽成独立组件。
+audit-platform/frontend/src/views/ConsolidationIndex.vue 2368
 backend/tests/test_module_cell_resolver.py 835
 audit-platform/frontend/src/views/DisclosureEditor.vue 3281
-audit-platform/frontend/src/components/consolidation/worksheets/ConsolWorksheetTabs.vue 1543
+#   ConsolWorksheetTabs.vue —— 2026-10-23 同上：合并工作底稿新增只读「分录汇总表」页签（D-1，读 /api/consolidation/worksheet/entry-summary），
+#     HEAD 1577 → 1649。拆分方向：各静态表页签（分录汇总 / 抵销表等）抽成子组件，主组件只保留页签调度。
+audit-platform/frontend/src/components/consolidation/worksheets/ConsolWorksheetTabs.vue 1649
 
 # test_formula_push_batch_e_note.py — 2026-10-06 入册。
 #   Batch E 附注推送六字段测试（D1~D7 分类+坏账聚合 + Tier A 多科目行），
@@ -1565,3 +1569,7 @@ backend/scripts/seed/sync_note_templates_from_word.py  1179
 #     拆分方向：模板 / 模板集（/api/templates、/api/template-sets）与项目底稿生成（generate / generate-from-codes 约 360 行 /
 #     create-custom 系列）拆成两个路由模块。
 backend/app/routers/wp_template.py  872
+#   chain_orchestrator.py —— 历史大文件（HEAD 已 963 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-23 汇总提交：试算表重算步骤透传「损益类科目缺发生额列、按期末余额替代」的提醒（C-4，+7 行，
+#     配合 trial_balance_service.full_recalc 返回的替代科目清单）。拆分方向：各 _step_* 步骤按链路环节拆到独立模块，编排类只保留顺序与状态。
+backend/app/services/chain_orchestrator.py  970

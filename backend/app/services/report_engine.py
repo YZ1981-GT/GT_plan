@@ -885,19 +885,19 @@ async def evaluate_formula_result(
                     code = match.group(1)
                     if code not in prior_tb_data:
                         prior_tb_data[code] = {}
-                    _prev_row = await resolver.db.execute(
+                    # P0-1 修复：与 resolve_tb 同口径用 like 前缀聚合，而非精确单科目
+                    _prev_rows = await resolver.db.execute(
                         sa.select(TrialBalance).where(
                             TrialBalance.project_id == resolver.project_id,
                             TrialBalance.year == prior_year,
-                            TrialBalance.standard_account_code == code,
+                            TrialBalance.standard_account_code.like(f"{code}%"),
                             TrialBalance.is_deleted == sa.false(),
                         )
                     )
-                    _prev_tb = _prev_row.scalar_one_or_none()
-                    if _prev_tb is not None:
-                        prior_tb_data[code]["期末余额"] = Decimal(str(_prev_tb.audited_amount or 0))
-                    else:
-                        prior_tb_data[code]["期末余额"] = Decimal("0")
+                    _total = Decimal("0")
+                    for _pr in _prev_rows.scalars().all():
+                        _total += Decimal(str(_pr.audited_amount or 0))
+                    prior_tb_data[code]["期末余额"] = _total
             except Exception:
                 logger.warning("PREV 预载失败", exc_info=True)
     else:
@@ -908,22 +908,30 @@ async def evaluate_formula_result(
         _aux_refs = list(_AUX_PATTERN.finditer(formula))
         if _aux_refs:
             try:
+                from app.models.four_table_models import TbAuxBalance
                 for match in _aux_refs:
                     code = match.group(1)
+                    # P0-2 修复：aux_type 做 key（与 _handle_aux 的 dimension 参数对齐），
+                    # SUM(closing_balance) 按 aux_type 分组（非单行 aux_name）
                     if code not in aux_data:
                         aux_data[code] = {}
-                    from app.models.four_table_models import TbAuxBalance
                     _aux_rows = await resolver.db.execute(
-                        sa.select(TbAuxBalance).where(
+                        sa.select(
+                            TbAuxBalance.aux_type,
+                            sa.func.sum(TbAuxBalance.closing_balance).label("total"),
+                        ).where(
                             TbAuxBalance.project_id == resolver.project_id,
                             TbAuxBalance.year == resolver.year,
                             TbAuxBalance.account_code == code,
                             TbAuxBalance.is_deleted == sa.false(),
-                        )
+                        ).group_by(TbAuxBalance.aux_type)
                     )
-                    for _arow in _aux_rows.scalars().all():
-                        _akey = getattr(_arow, 'aux_name', '') or ''
-                        aux_data[code][_akey] = Decimal(str(getattr(_arow, 'balance', 0) or 0))
+                    for _arow in _aux_rows.all():
+                        _atype = _arow[0] or ''
+                        _atotal = Decimal(str(_arow[1] or 0))
+                        aux_data[code][_atype] = _atotal
+            except Exception:
+                logger.warning("AUX 预载失败", exc_info=True)
             except Exception:
                 logger.warning("AUX 预载失败", exc_info=True)
     else:
