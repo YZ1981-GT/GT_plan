@@ -1,45 +1,34 @@
-"""附注子表跨表勾稽校验。
+"""合并附注子表勾稽校验（spec note-sub-table-formula-and-cross-check Phase 0；R7.5 重做读取与规则）。
 
-spec: note-sub-table-formula-and-cross-check Phase 0
+规则声明在合并模板各表条目的 ``check_rules``：
 
-check_rules 声明格式（合并模板 JSON 中各表条目的可选字段）：
-```json
-{
-  "check_rules": [
-    {
-      "check_id": "F5-8",
-      "peer_section_id": "五-5-1",
-      "peer_row_label": "合  计",
-      "peer_col_index": 1,
-      "self_row_label": "合  计",
-      "self_col_index": 1,
-      "relation": "equal",
-      "tolerance": 0.01,
-      "description": "账龄表合计账面余额 = 坏账分类表合计账面余额"
-    }
-  ]
-}
-```
+- 模式 A 跨表（``mode`` 缺省 ``cross_table``）：本表 ``self_row_label`` 行第 ``self_col_index`` 列 = 同章另一张表
+  ``peer_section_id`` 的 ``peer_row_label`` 行第 ``peer_col_index`` 列。两侧须同章节、行唯一、标题行库语义同期间同计量，
+  说明写明两侧期间与行（守卫 ``tests/test_consol_note_check_rules_semantics.py``）。
+- 模式 B 列平衡（``mode = column_balance``）：变动表逐行 期初 + Σ增加 − Σ减少 = 期末。期初 / 期末 / 增减列不在种子里写，
+  一律由标题行库 ``rollforward_columns`` 按表头认；逐行函数 ``consol_note_table_totals.rollforward_balance`` 与「审核」共用。
 
-校验执行：读两张子表的持久化 disclosure_notes 数据，按 row_label + col_index 定位单元格值，
-返回 [{check_id, status, expected, actual, diff, description}]。
+执行：两张表都读**当前合并节点**已保存的合并附注（``resolve_node_scope`` + ``load_scoped_note_record``，与章节读写同一作用域，
+根合并节点没有专属行时兼容读项目级旧行）；单元格转数与合计重算同一口径（``consol_note_table_totals.to_decimal``）。
+返回 [{check_id, status, expected, actual, diff, description, reason}]。
 """
 from __future__ import annotations
 
-import json
 import logging
-from dataclasses import dataclass, field
-from decimal import Decimal, InvalidOperation
-from pathlib import Path
+from dataclasses import dataclass, replace
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
+from app.services.consol_node_scope import NodeScope, load_scoped_note_record, resolve_node_scope
+from app.services.consol_note_formula_service import consol_note_tables, find_table
+from app.services.consol_note_table_totals import rollforward_balance
+from app.services.consol_note_table_totals import to_decimal as _to_decimal
+from app.services.note_table_header_library import RollForward, rollforward_columns
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+logger = logging.getLogger(__name__)
 
 
 # ─── 数据模型 ─────────────────────────────────────────────────────
@@ -56,12 +45,7 @@ class CheckRule:
     relation: str  # "equal" | "column_balance"
     tolerance: float
     description: str
-    mode: str = "cross_table"  # "cross_table" (模式 A) | "column_balance" (模式 B)
-    # 模式 B 专用：列驱动变动表的列索引（期初 + 增加 - 减少 = 期末）
-    opening_col: int = -1
-    increase_col: int = -1
-    decrease_col: int = -1
-    closing_col: int = -1
+    mode: str = "cross_table"  # "cross_table"（模式 A）| "column_balance"（模式 B，列由标题行库认）
 
 
 @dataclass
@@ -87,7 +71,7 @@ class CheckResult:
         return d
 
 
-# ─── 模板加载 ─────────────────────────────────────────────────────
+# ─── 模板加载（合并附注模板，mtime 缓存，与章节接口 / 公式服务同一份） ─────────────────
 
 
 def _rule_from_dict(r: dict) -> CheckRule:
@@ -103,95 +87,57 @@ def _rule_from_dict(r: dict) -> CheckRule:
         tolerance=float(r.get("tolerance", 0.01)),
         description=r.get("description", ""),
         mode=r.get("mode", "cross_table"),
-        opening_col=int(r.get("opening_col", -1)),
-        increase_col=int(r.get("increase_col", -1)),
-        decrease_col=int(r.get("decrease_col", -1)),
-        closing_col=int(r.get("closing_col", -1)),
     )
 
 
+def _rules_of(entry: dict | None) -> list[CheckRule]:
+    raw = entry.get("check_rules") if isinstance(entry, dict) else None
+    return [_rule_from_dict(r) for r in raw or [] if isinstance(r, dict) and r.get("check_id")]
+
+
 def _load_check_rules(template_type: str, section_id: str) -> list[CheckRule]:
-    """从合并模板 JSON 加载指定章节的 check_rules。"""
-    json_name = f"consol_note_sections_{template_type}.json"
-    path = DATA_DIR / json_name
-    if not path.exists():
-        return []
-    data = json.loads(path.read_text(encoding="utf-8"))
-    for entry in data:
-        if entry.get("section_id") != section_id:
-            continue
-        raw_rules = entry.get("check_rules")
-        if not isinstance(raw_rules, list):
-            return []
-        rules = []
-        for r in raw_rules:
-            if not isinstance(r, dict) or not r.get("check_id"):
-                continue
-            rules.append(_rule_from_dict(r))
-        return rules
-    return []
+    """指定章节的 check_rules（模板不存在 / 章节不存在 / 没有规则 ⇒ 空）。"""
+    return _rules_of(find_table(template_type, section_id))
 
 
 def load_all_check_rules(template_type: str) -> dict[str, list[CheckRule]]:
-    """加载所有章节的 check_rules，返回 {section_id: [CheckRule]}。"""
-    json_name = f"consol_note_sections_{template_type}.json"
-    path = DATA_DIR / json_name
-    if not path.exists():
-        return {}
-    data = json.loads(path.read_text(encoding="utf-8"))
-    result: dict[str, list[CheckRule]] = {}
-    for entry in data:
-        raw = entry.get("check_rules")
-        if not isinstance(raw, list) or not raw:
-            continue
-        sid = entry.get("section_id", "")
-        rules = []
-        for r in raw:
-            if not isinstance(r, dict) or not r.get("check_id"):
-                continue
-            rules.append(_rule_from_dict(r))
-        if rules:
-            result[sid] = rules
-    return result
+    """所有章节的 check_rules：{section_id: [CheckRule]}（没有规则的章节不出现）。"""
+    return {e["section_id"]: rules for e in consol_note_tables(template_type) if (rules := _rules_of(e))}
 
 
-# ─── 单元格值提取 ─────────────────────────────────────────────────
+def rollforward_for(template_type: str, section_id: str) -> RollForward | None:
+    """模式 B 用的期初 / 期末 / 增减列：标题行库按该表模板表头认；不是变动表 ⇒ None。"""
+    table = find_table(template_type, section_id)
+    return rollforward_columns(table) if table else None
 
 
-def _to_decimal(value: Any) -> Decimal | None:
-    """尝试把任意值转成 Decimal。"""
-    if value is None or value == "":
-        return None
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, ValueError, TypeError):
-        return None
+# ─── 单元格定位 ─────────────────────────────────────────────────
+
+
+def _label(row: Any) -> str:
+    if isinstance(row, list) and row:
+        return str(row[0]).strip()
+    if isinstance(row, dict):
+        return str(row.get("label", "")).strip()
+    return ""
 
 
 def _find_row_by_label(rows: list, label: str) -> int | None:
-    """按行标签（第一列）在 rows 中查找行索引。支持模糊匹配（去空格后比较）。"""
+    """按行名（第一列）找行：去半角 / 全角空格后相等，取第一行（规则的行在模板里唯一由守卫保证）。"""
     target = label.replace(" ", "").replace("\u3000", "").strip()
     for i, row in enumerate(rows):
-        if isinstance(row, list) and row:
-            cell = str(row[0]).replace(" ", "").replace("\u3000", "").strip()
-            if cell == target:
-                return i
-        elif isinstance(row, dict):
-            cell = str(row.get("label", "")).replace(" ", "").replace("\u3000", "").strip()
-            if cell == target:
-                return i
+        if _label(row).replace(" ", "").replace("\u3000", "") == target:
+            return i
     return None
 
 
 def _cell_value(rows: list, row_index: int, col_index: int) -> Any:
-    """从 rows 中提取指定位置的单元格值。"""
+    """从 rows 中提取指定位置的单元格值（二维行或 ``{label, values}`` 对象行）。"""
     if row_index < 0 or row_index >= len(rows):
         return None
     row = rows[row_index]
     if isinstance(row, list):
-        if col_index < 0 or col_index >= len(row):
-            return None
-        return row[col_index]
+        return row[col_index] if 0 <= col_index < len(row) else None
     if isinstance(row, dict):
         values = row.get("values", [])
         if isinstance(values, list) and 0 <= col_index < len(values):
@@ -199,135 +145,91 @@ def _cell_value(rows: list, row_index: int, col_index: int) -> Any:
     return None
 
 
-# ─── 校验执行 ─────────────────────────────────────────────────────
+# ─── 已保存数据 ─────────────────────────────────────────────────
 
 
 async def _load_note_rows(
-    db: AsyncSession, project_id: UUID, year: int, section_id: str,
-) -> list | None:
-    """从 disclosure_notes 或 consol_note_data 加载指定章节的 rows 数据。
+    db: AsyncSession, scope: NodeScope, template_type: str, section_id: str, label: str,
+) -> tuple[list | None, str | None]:
+    """当前节点某章节已保存的合并附注行 → (行, None)；用不了 ⇒ (None, 原因)。``label`` = 「本章节」/「对照章节」。
 
-    优先查 disclosure_notes（单体附注），无结果则查 consol_note_data（合并附注）。
+    读取与章节读写同一函数（``load_scoped_note_record``）：显式节点只读本节点专属行，根合并节点没有专属行时兼容读项目级旧行，
+    省略节点 = 项目级旧行。合并附注章节号（「五-5-1」）与单体附注（「八、5」）不是一套，这里不读单体附注。
+    已保存数据的列数与模板不同（旧数据）时列号对不上，不校验。
     """
-    # 先查 disclosure_notes
-    from app.models.report_models import DisclosureNote
-
-    result = await db.execute(
-        sa.select(DisclosureNote.table_data).where(
-            DisclosureNote.project_id == project_id,
-            DisclosureNote.year == year,
-            DisclosureNote.note_section == section_id,
-            DisclosureNote.is_deleted == sa.false(),
-        )
-    )
-    row = result.first()
-    rows = _extract_rows_from_table_data(row[0] if row else None)
-    if rows:
-        return rows
-
-    # 回退查 consol_note_data
-    try:
-        from app.models.consol_note_data_models import ConsolNoteData
-
-        result = await db.execute(
-            sa.select(ConsolNoteData.data).where(
-                ConsolNoteData.project_id == project_id,
-                ConsolNoteData.year == year,
-                ConsolNoteData.section_id == section_id,
-                ConsolNoteData.is_deleted == sa.false(),
-            )
-        )
-        row = result.first()
-        return _extract_rows_from_table_data(row[0] if row else None)
-    except Exception:
-        # consol_note_data 表可能不存在（SQLite 测试等）
-        return None
+    record = await load_scoped_note_record(db, replace(scope, section_id=section_id))
+    data = record.data if record is not None and isinstance(record.data, dict) else {}
+    rows = data.get("rows")
+    if not isinstance(rows, list) or not rows:
+        return None, f"{label} {section_id} 无附注数据"
+    headers, template = data.get("headers"), find_table(template_type, section_id)
+    width = len(template.get("headers") or []) if template else 0
+    if isinstance(headers, list) and headers and width and len(headers) != width:
+        return None, f"{label} {section_id} 已保存数据 {len(headers)} 列，与模板 {width} 列不符"
+    return rows, None
 
 
-def _extract_rows_from_table_data(table_data: Any) -> list | None:
-    """从 table_data JSON 提取 rows。"""
-    if not table_data:
-        return None
-    if isinstance(table_data, str):
-        table_data = json.loads(table_data)
-    if not isinstance(table_data, dict):
-        return None
-    # sub_table_data 中找
-    sub = table_data.get("sub_table_data", {})
-    rows = table_data.get("rows")
-    if isinstance(rows, list) and rows:
-        return rows
-    for _key, val in sub.items():
-        if isinstance(val, list):
-            return val
-    return None
+# ─── 校验 ───────────────────────────────────────────────────────
 
 
-def _check_column_balance(rule: CheckRule, rows: list) -> list[CheckResult]:
-    """模式 B：变动表列平衡校验——期初 + 增加 - 减少 = 期末。
-    
-    对 self_row_label 指定的行（通常是"合计"行）校验四列恒等式。
-    若 self_row_label 为 "*"，则对所有非空数据行逐行校验。
+def _check_column_balance(rule: CheckRule, rows: list, flow: RollForward | None) -> list[CheckResult]:
+    """模式 B：变动表逐行 期初 + Σ增加 − Σ减少 = 期末（列由标题行库认，逐行函数与「审核」共用）。
+
+    ``self_row_label`` 为 ``*`` 时逐个有行名的行校验，否则只校验该行；没法勾稽的行（期初 / 期末都没数、方向不定的变动列有数、
+    只填了余额）跳过，一行都校验不了时回一条 skipped。
     """
-    results: list[CheckResult] = []
-    oc, ic, dc, cc = rule.opening_col, rule.increase_col, rule.decrease_col, rule.closing_col
-    if any(c < 0 for c in (oc, ic, dc, cc)):
-        results.append(CheckResult(
-            check_id=rule.check_id, status="skipped", description=rule.description,
-            reason="列索引配置不完整",
-        ))
-        return results
+    def skipped(reason: str) -> list[CheckResult]:
+        return [CheckResult(check_id=rule.check_id, status="skipped", description=rule.description, reason=reason)]
 
-    target_rows: list[tuple[int, str]] = []  # (行号, 行标签)
-    if rule.self_row_label == "*":
-        for i, r in enumerate(rows):
-            label = str(r[0]).strip() if isinstance(r, list) and r else ""
-            if label:
-                target_rows.append((i, label))
+    if flow is None:
+        return skipped("标题行库认不出这张表的期初 / 期末 / 增减列（不是变动表）")
+    every = rule.self_row_label == "*"
+    if every:
+        targets = [(i, _label(r)) for i, r in enumerate(rows) if _label(r)]
     else:
         ri = _find_row_by_label(rows, rule.self_row_label)
-        if ri is not None:
-            label = str(rows[ri][0]).strip() if isinstance(rows[ri], list) and rows[ri] else rule.self_row_label
-            target_rows.append((ri, label))
-        else:
-            results.append(CheckResult(
-                check_id=rule.check_id, status="skipped", description=rule.description,
-                reason=f"找不到行「{rule.self_row_label}」",
-            ))
-            return results
-
-    for ri, label in target_rows:
-        opening = _to_decimal(_cell_value(rows, ri, oc))
-        increase = _to_decimal(_cell_value(rows, ri, ic))
-        decrease = _to_decimal(_cell_value(rows, ri, dc))
-        closing = _to_decimal(_cell_value(rows, ri, cc))
-
-        # 全空跳过
-        if all(v is None for v in (opening, increase, decrease, closing)):
+        if ri is None:
+            return skipped(f"找不到行「{rule.self_row_label}」")
+        targets = [(ri, _label(rows[ri]) or rule.self_row_label)]
+    tolerance = Decimal(str(rule.tolerance))
+    results: list[CheckResult] = []
+    for ri, label in targets:
+        balance = rollforward_balance(flow, rows[ri]) if isinstance(rows[ri], list) else None
+        if balance is None:
             continue
+        expected, closing = balance
+        diff = abs(expected - closing)
+        results.append(CheckResult(
+            check_id=f"{rule.check_id}[{label[:15]}]" if every else rule.check_id,
+            status="pass" if diff <= tolerance else "fail",
+            expected=str(expected), actual=str(closing), diff=None if diff <= tolerance else str(diff),
+            description=f"{rule.description}（{label}）" if every else rule.description,
+        ))
+    return results or skipped("本表没有可勾稽的行（期初 / 期末 / 增减都没填，或方向不定的变动列有数）")
 
-        o = opening or Decimal("0")
-        i_val = increase or Decimal("0")
-        d = decrease or Decimal("0")
-        c = closing or Decimal("0")
-        expected = o + i_val - d
-        diff = abs(expected - c)
-        tolerance = Decimal(str(rule.tolerance))
 
-        cid = f"{rule.check_id}[{label[:15]}]" if rule.self_row_label == "*" else rule.check_id
-        if diff <= tolerance:
-            results.append(CheckResult(
-                check_id=cid, status="pass", expected=str(expected), actual=str(c),
-                description=f"{rule.description}（{label}）" if rule.self_row_label == "*" else rule.description,
-            ))
-        else:
-            results.append(CheckResult(
-                check_id=cid, status="fail", expected=str(expected), actual=str(c),
-                diff=str(diff),
-                description=f"{rule.description}（{label}）" if rule.self_row_label == "*" else rule.description,
-            ))
+def _check_cross_table(rule: CheckRule, self_rows: list, peer_rows: list) -> CheckResult:
+    """模式 A：本表一格 = 对照表一格（容差内）；两格都空算通过，只有一边有数跳过。"""
+    def result(status: str, **kw: Any) -> CheckResult:
+        return CheckResult(check_id=rule.check_id, status=status, description=rule.description, **kw)
 
-    return results
+    self_ri = _find_row_by_label(self_rows, rule.self_row_label)
+    if self_ri is None:
+        return result("skipped", reason=f"本表找不到行「{rule.self_row_label}」")
+    peer_ri = _find_row_by_label(peer_rows, rule.peer_row_label)
+    if peer_ri is None:
+        return result("skipped", reason=f"对照表找不到行「{rule.peer_row_label}」")
+    self_val = _to_decimal(_cell_value(self_rows, self_ri, rule.self_col_index))
+    peer_val = _to_decimal(_cell_value(peer_rows, peer_ri, rule.peer_col_index))
+    if self_val is None and peer_val is None:
+        return result("pass")
+    if self_val is None or peer_val is None:
+        return result("skipped", expected=None if peer_val is None else str(peer_val),
+                      actual=None if self_val is None else str(self_val), reason="一方有值另一方为空")
+    diff = abs(self_val - peer_val)
+    if diff <= Decimal(str(rule.tolerance)):
+        return result("pass", expected=str(peer_val), actual=str(self_val))
+    return result("fail", expected=str(peer_val), actual=str(self_val), diff=str(diff))
 
 
 async def check_note_cross_rules(
@@ -336,110 +238,36 @@ async def check_note_cross_rules(
     year: int,
     section_id: str,
     template_type: str,
+    *,
+    node_key: str | None = None,
 ) -> list[CheckResult]:
-    """执行指定章节的全部 check_rules，返回校验结果列表。"""
+    """执行指定章节的全部 check_rules，返回校验结果列表。
+
+    本表与对照表都读 ``node_key`` 节点已保存的合并附注（省略 = 项目级旧行）；项目 / 年度 / 节点不合法抛
+    ``NodeScopeError``（路由转 4xx）。``template_type`` 由调用方按项目实际口径解析（``resolve_note_template_type``）后传入。
+    """
     rules = _load_check_rules(template_type, section_id)
     if not rules:
         return []
-
-    # 加载本表数据
-    self_rows = await _load_note_rows(db, project_id, year, section_id)
-
+    scope = await resolve_node_scope(db, project_id, year, node_key, section_id)
+    self_rows, self_reason = await _load_note_rows(db, scope, template_type, section_id, "本章节")
+    flow = rollforward_for(template_type, section_id) if any(r.mode == "column_balance" for r in rules) else None
+    peers: dict[str, tuple[list | None, str | None]] = {}
     results: list[CheckResult] = []
-    # 缓存 peer 表数据
-    peer_cache: dict[str, list | None] = {}
-
     for rule in rules:
         if self_rows is None:
-            results.append(CheckResult(
-                check_id=rule.check_id,
-                status="skipped",
-                description=rule.description,
-                reason=f"本章节 {section_id} 无附注数据",
-            ))
-            continue
-
-        # ── 模式 B：列平衡（期初+增加-减少=期末）──
-        if rule.mode == "column_balance":
-            results.extend(_check_column_balance(rule, self_rows))
-            continue
-
-        # ── 模式 A：跨表比较 ──
-        peer_sid = rule.peer_section_id
-        if peer_sid not in peer_cache:
-            peer_cache[peer_sid] = await _load_note_rows(db, project_id, year, peer_sid)
-        peer_rows = peer_cache[peer_sid]
-
-        if peer_rows is None:
-            results.append(CheckResult(
-                check_id=rule.check_id,
-                status="skipped",
-                description=rule.description,
-                reason=f"对照章节 {peer_sid} 无附注数据",
-            ))
-            continue
-
-        # 定位 self 单元格
-        self_ri = _find_row_by_label(self_rows, rule.self_row_label)
-        if self_ri is None:
-            results.append(CheckResult(
-                check_id=rule.check_id,
-                status="skipped",
-                description=rule.description,
-                reason=f"本表找不到行「{rule.self_row_label}」",
-            ))
-            continue
-        self_val = _to_decimal(_cell_value(self_rows, self_ri, rule.self_col_index))
-
-        # 定位 peer 单元格
-        peer_ri = _find_row_by_label(peer_rows, rule.peer_row_label)
-        if peer_ri is None:
-            results.append(CheckResult(
-                check_id=rule.check_id,
-                status="skipped",
-                description=rule.description,
-                reason=f"对照表找不到行「{rule.peer_row_label}」",
-            ))
-            continue
-        peer_val = _to_decimal(_cell_value(peer_rows, peer_ri, rule.peer_col_index))
-
-        # 校验
-        if self_val is None and peer_val is None:
-            results.append(CheckResult(
-                check_id=rule.check_id,
-                status="pass",
-                expected=None,
-                actual=None,
-                description=rule.description,
-            ))
-        elif self_val is None or peer_val is None:
-            results.append(CheckResult(
-                check_id=rule.check_id,
-                status="skipped",
-                expected=str(peer_val) if peer_val is not None else None,
-                actual=str(self_val) if self_val is not None else None,
-                description=rule.description,
-                reason="一方有值另一方为空",
-            ))
+            results.append(CheckResult(check_id=rule.check_id, status="skipped", description=rule.description,
+                                       reason=self_reason))
+        elif rule.mode == "column_balance":
+            results.extend(_check_column_balance(rule, self_rows, flow))
         else:
-            diff = abs(self_val - peer_val)
-            tolerance = Decimal(str(rule.tolerance))
-            if diff <= tolerance:
-                results.append(CheckResult(
-                    check_id=rule.check_id,
-                    status="pass",
-                    expected=str(peer_val),
-                    actual=str(self_val),
-                    description=rule.description,
-                ))
+            if rule.peer_section_id not in peers:
+                peers[rule.peer_section_id] = await _load_note_rows(
+                    db, scope, template_type, rule.peer_section_id, "对照章节")
+            peer_rows, peer_reason = peers[rule.peer_section_id]
+            if peer_rows is None:
+                results.append(CheckResult(check_id=rule.check_id, status="skipped", description=rule.description,
+                                           reason=peer_reason))
             else:
-                results.append(CheckResult(
-                    check_id=rule.check_id,
-                    status="fail",
-                    expected=str(peer_val),
-                    actual=str(self_val),
-                    diff=str(diff),
-                    description=rule.description,
-                ))
-
+                results.append(_check_cross_table(rule, self_rows, peer_rows))
     return results

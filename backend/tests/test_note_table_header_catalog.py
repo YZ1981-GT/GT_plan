@@ -98,10 +98,23 @@ def test_mapping_agrees_with_runtime_choice(catalog, std):
 #: 2026-10-22 R6.3 种子多级表头修复 + 纯期间列对唯一余额列：国企 656→660 列、上市 803→815 列，上市 五-11-3 由 none 转为对上。
 #: 2026-10-23 R7.6 国企章节号按 Word 重对齐、两版去掉重复条目：国企 0.7774→0.9031、none 27→11（原错位章节的表对上了），
 #:   上市 0.9015→0.9089（9 张重复表不再计入）。
+#: 2026-10-23 R7.7 只写「金额」的无键金额列计入取数列并按表头文字对（国企分母 +7、对上 +6，五-54-5 单体表头与 Word 不符
+#:   对不上；上市 +4 / +4），上市 6 张表头占位列按单体模板实例化（对上 +8）：口径变了，国企 0.9031→0.9027（对上 606→612），
+#:   上市 0.9103→0.9261（R7.8 上市 五-10 改号后 0.9103）；对上列数一并钉住，分母口径再变也不会把退步藏在比例里。
 _RATCHET = {
-    "soe": {"coverage": 0.9031, "none": 11},
-    "listed": {"coverage": 0.9089, "none": 26},
+    "soe": {"coverage": 0.9027, "matched": 612, "none": 11},
+    "listed": {"coverage": 0.9261, "matched": 814, "none": 26},
 }
+
+
+def test_bare_amount_and_instantiated_placeholder_columns_correspond(catalog):
+    """R7.7：只写「金额」的单金额列表按表头文字对上；上市表头占位列按单体实例化后逐列对上（不再有没对上的列）。"""
+    items = {(std, i["consol"]): i for std in ("soe", "listed") for i in catalog["correspondence"][std]}
+    assert items[("soe", "五-87-1")]["columns"] == [[1, "八、87#0", 1, "bare_label"]]
+    assert items[("listed", "五-49-5")]["columns"] == [[1, "五、49#4", 1, "bare_label"]]
+    for sid in ("五-22-2", "五-24-1", "五-24-2", "五-25-1", "五-28-1", "五-28-2"):
+        item = items[("listed", sid)]
+        assert item["unmatched"] == [] and item["matched"] == item["amount_columns"], sid
 
 
 def test_receivable_aging_pure_period_correspondence(catalog):
@@ -117,6 +130,7 @@ def test_receivable_aging_pure_period_correspondence(catalog):
 def test_correspondence_ratchet(catalog, std):
     stats = catalog["stats"][f"{std}_correspondence"]
     assert stats["coverage"] >= _RATCHET[std]["coverage"]
+    assert stats["matched_columns"] >= _RATCHET[std]["matched"]
     assert stats["by_via"].get("none", 0) <= _RATCHET[std]["none"]
 
 

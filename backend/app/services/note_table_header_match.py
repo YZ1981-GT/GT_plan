@@ -39,6 +39,7 @@ __all__ = [
     "match_columns",
     "match_table_name",
     "row_values",
+    "takes_amount",
     "to_number",
     "unit_member_keys",
 ]
@@ -110,7 +111,8 @@ def _balance_pick(keys: Sequence[ColumnKey], vocab: Vocabulary) -> ColumnKey | N
 
 
 #: 强 → 弱；弱规则只在强规则零命中时才试；命中不唯一放弃（「只写了期间」多列时按 ``_balance_pick`` 取唯一余额列，
-#: 记作 period_balance）；同一单体列被多列认领全部放弃（都是「只写了期间」时同样按 ``_balance_pick``）
+#: 记作 period_balance）；同一单体列被多列认领全部放弃（都是「只写了期间」时同样按 ``_balance_pick``）。
+#: 无期间无计量的金额列不走这些规则，只按表头文字对（``_bare_hit``，记作 bare_label，R7.7）
 RULES = (
     ("exact", _rule_exact), ("synonym", None), ("suffix", _rule_suffix), ("prefix", _rule_prefix),
     ("reverse_suffix", _rule_reverse_suffix), ("reverse_prefix", _rule_reverse_prefix),
@@ -118,6 +120,24 @@ RULES = (
 )
 #: 选表打分里算「强命中」的规则
 STRONG_RULES = frozenset({"exact", "synonym"})
+
+
+def _bare_text(k: ColumnKey) -> str:
+    """无期间、无计量的金额列（表头只写「金额」）的表头文字；有期间 / 计量的列、空表头返回空串。"""
+    return "/".join(k.path) if k.kind == "amount" and not (k.period or k.measure) else ""
+
+
+def takes_amount(k: ColumnKey) -> bool:
+    """这一列取不取数：有期间或计量的金额列，加上表头只写「金额」这类无键但有字的金额列；空表头不取。"""
+    return k.kind == "amount" and bool(k.period or k.measure or _bare_text(k))
+
+
+def _bare_hit(t: ColumnKey, sources: Sequence[tuple[int, ColumnKey]]):
+    """无键金额列按表头文字对：来源单元里同字的列恰有一列（同名同结构的单金额列表「项目 | 金额」）。目标侧两列同字时
+    两列认领同一来源列，由「同一单体列被多列认领全部放弃」挡掉。"""
+    text = _bare_text(t)
+    hits = [(pos, s.index) for pos, s in sources if text and _bare_text(s) == text]
+    return hits[0] if len(hits) == 1 else None
 
 
 @dataclass
@@ -162,7 +182,12 @@ def match_columns(
             continue
         if t.kind == "text":
             continue
-        if t.kind != "amount" or not (t.period or t.measure):
+        if t.kind != "amount":
+            continue
+        if not (t.period or t.measure):
+            hit = _bare_hit(t, sources)
+            if hit is not None:
+                claims[t.index] = (*hit, "bare_label")
             continue  # 空表头不取数
         for name, rule in rules:
             hits = [(pos, s) for pos, s in sources if rule(t, s)]
@@ -194,10 +219,7 @@ def match_columns(
     for c, rule in sorted(kept.items()):
         out.col_map[c] = claims[c][:2]
         out.rules[c] = rule
-    out.unmatched = [
-        t.index for t in target[1:]
-        if t.kind == "amount" and (t.period or t.measure) and t.index not in out.col_map
-    ]
+    out.unmatched = [t.index for t in target[1:] if takes_amount(t) and t.index not in out.col_map]
     return out
 
 
@@ -481,7 +503,7 @@ def choose_unit(
             not norm(_name_of(only)) and section_title and table_key(table_name) == table_key(section_title)
         ):
             only_choice = evaluate(only_index, "single_table")[0]
-            has_amounts = any(k.kind == "amount" and (k.period or k.measure) for k in (target_keys or [])[1:])
+            has_amounts = any(takes_amount(k) for k in (target_keys or [])[1:])
             if not has_amounts or (only_choice.match and only_choice.match.col_map):
                 return only_choice
             # 章节只有一张表、但一列金额都对不上：多半是章节映射错位，不拿它凑数

@@ -32,8 +32,8 @@ LISTED_TAIL = ("五-70-1", "五-71-1", "五-71-2", "五-72-1", "五-73-1", "五-
                "五-77-1", "五-77-2", *(f"五-78-{k}" for k in range(1, 10)))
 #: 同步工具错加的重复表（与 五-79-3~7、五-82-3~6 是同一张 Word 表），R7.6 已删
 LISTED_DROPPED = (*(f"五-71-{k}" for k in range(3, 8)), *(f"五-74-{k}" for k in range(3, 7)))
-#: 同步工具重跑时身份对不上、待修的条目（R7.8：上市 五-10-2~8 内容错位，修好后删本条）
-KNOWN_MISMATCHES = {"soe": [], "listed": ["[listed] 五-10-6 ← Word 五、10:5：行名没有交集"]}
+#: 同步工具重跑时身份对不上、待修的条目（R7.8 已修上市 五-10 / 五-11 错位，现无）
+KNOWN_MISMATCHES = {"soe": [], "listed": []}
 
 
 @lru_cache(maxsize=None)
@@ -149,6 +149,36 @@ def test_word_sync_tool_has_nothing_to_write(std, monkeypatch):
     assert S.check_title_drift(word, data, std, "consol", False) == []
     assert S.IDENTITY_MISMATCHES == KNOWN_MISMATCHES[std]
     assert S.KNOWN_GAP_HITS == {k for k in S.KNOWN_SECTION_GAPS if k[0] == std}  # 登记项仍对不上（未失效）
+    # 占位列按单体实例化的条目（R7.7）：Phase 1 不按 Word 改回（上面结构更新数为 0 即钉住），登记的条目都在种子里
+    assert {sid for s, sid in S.STANDALONE_INSTANTIATED if s == std} <= {e["section_id"] for e in data}
+
+
+def _tagged(std: str, section: str) -> list[dict]:
+    return [wt for wt in _word(std) if wt.get("section") == section and wt.get("tag")]
+
+
+def test_listed_embedded_split_and_section_ten_follow_word():
+    """上市 五、11 第 1 张 Word 表下半截另起表头是持有待售负债表：种子与单体一致拆成 五-11-2，其后 ``:k`` 对 五-11-(k+2)；
+    五、10 合同资产表下半截的净额简表与上半截同口径重复（单体也不收）不收，``:k`` 对 五-10-(k+1)（R7.8）。
+    原同步工具一律按 k+1 对位，两节自第 2 张起逐张写错表名 / 表头 / 表后文字。"""
+    by = {e["section_id"]: e for e in _seed("listed")}
+    assert set(S.EMBEDDED_SPLITS) == {("listed", 11)}
+    for section, split in (("五、10", 0), ("五、11", 1)):
+        for wt in _tagged("listed", section):
+            sid = S.entry_sid("listed", S.parse_tag(wt["tag"]))
+            k = S.parse_tag(wt["tag"])["table_idx"]
+            assert sid == f"五-{section[2:]}-{k + 1 + (split if k else 0)}", (wt["tag"], sid)
+            assert by[sid]["title"] == wt["title_text"], (sid, by[sid]["title"], wt["title_text"])
+    # 登记可伪证：五、11 第 1 张 Word 表确实在数据行之后另起「项 目」表头行，下面是持有待售负债的行
+    first = parse_word_table(_tagged("listed", "五、11")[0]["el"], "")
+    cut = first.row_labels.index("项  目")
+    assert first.row_labels[:cut][-1] == "合  计" and _row_keys(first.row_labels[cut + 1:]) == _row_keys(
+        [r[0] for r in by["五-11-2"]["rows"]])
+    assert by["五-11-2"]["title"] == "持有待售负债" and by["五-11-2"]["headers"] == ["项  目", "期末余额", "上年年末余额"]
+    assert _row_keys([r[0] for r in by["五-11-1"]["rows"]]) == _row_keys(first.row_labels[:cut])
+    # 五、10 节 8 张 Word 表（末张没有标记）= 种子 五-10-1~8，没有第 9 条
+    ten = [wt for wt in _word("listed") if wt.get("section") == "五、10"]
+    assert len(ten) == 8 and "五-10-9" not in by and by["五-10-8"]["title"] == ten[-1]["title_text"]
 
 
 def test_text_after_stops_at_section_marker(tmp_path):

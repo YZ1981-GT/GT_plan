@@ -246,6 +246,24 @@ class TestMatchColumns:
         back = M.match_columns(source, [target])
         assert back.col_map == {1: (0, 1), 2: (0, 3)} and set(back.rules.values()) == {"period_balance"}
 
+    def test_bare_amount_column_matches_by_header_text(self):
+        """只写「金额」的列（无期间、无计量）：两侧同字且各只一列时对上（单金额列表「项目 | 金额」，R7.7）；字不同、
+        任一侧同字两列、空表头都不对。计入取数列（没对上的进 unmatched，空表头不进）。"""
+        label = L.ColumnKey(0, (), None, (), "label")
+
+        def bare(i, text="金额"):
+            return L.ColumnKey(i, (text,) if text else (), None, (), "amount")
+
+        m = M.match_columns([label, bare(1)], [[label, bare(1)]])
+        assert m.col_map == {1: (0, 1)} and m.rules == {1: "bare_label"} and m.unmatched == []
+        assert M.match_columns([label, bare(1)], [[label, bare(1, "数额")]]).unmatched == [1]
+        assert M.match_columns([label, bare(1), bare(2)], [[label, bare(1)]]).col_map == {}
+        assert M.match_columns([label, bare(1)], [[label, bare(1), bare(2)]]).col_map == {}
+        empty = M.match_columns([label, bare(1, "")], [[label, bare(1, "")]])
+        assert empty.col_map == {} and empty.unmatched == []
+        assert [M.takes_amount(k) for k in (bare(1), bare(1, ""), self._k(1, "end"), self._k(1, None, "比例", kind="ratio"))] \
+            == [True, False, True, False]
+
     def test_pure_period_column_next_to_a_net_column_is_ambiguous(self):
         """同期间既有账面余额又有账面价值：纯期间列对余额还是净额分不出，不对应（宁缺不错）。"""
         label = L.ColumnKey(0, (), None, (), "label")

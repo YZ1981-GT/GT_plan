@@ -30,7 +30,7 @@ from app.services.note_table_header_library import (
     norm,
     table_identity,
 )
-from app.services.note_table_header_match import choose_unit
+from app.services.note_table_header_match import choose_unit, takes_amount
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 LIBRARY_PATH = DATA_DIR / "note_table_header_library.json"
@@ -205,7 +205,7 @@ def _correspondence(std: str, standalone: dict[str, list[dict]]) -> list[dict]:
             mapped = resolve_mapping_entry(std, sid) or {}
             sec = mapped.get("standalone_note_section")
             target = column_keys(entry, identity=table_identity(f"{std}_consolidated", sid), vocab=vocab)
-            amount = [k for k in target[1:] if k.kind == "amount" and (k.period or k.measure)]
+            amount = [k for k in target[1:] if takes_amount(k)]
             item: dict[str, Any] = {
                 "consol": sid, "standalone_section": sec,
                 "mapping_table": mapped.get("standalone_table_name"), "amount_columns": len(amount),

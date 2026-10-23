@@ -87,6 +87,9 @@ export const consolNoteSections = {
     `/api/consol-note-sections/breakdown/${pid}/${year}/${sectionId}`,
   fillByFormula: (pid: string, year: number, sectionId: string) =>
     `/api/consol-note-sections/fill-by-formula/${pid}/${year}/${sectionId}`,
+  /** GET `?node_key=&template_type=` 章节勾稽规则 + 按所选节点已保存数据的执行结果 */
+  checkRules: (pid: string, year: number, sectionId: string) =>
+    `/api/consol-note-sections/check-rules/${pid}/${year}/${sectionId}`,
 } as const
 
 // 合并附注单元格公式（公式管理「合并附注」节点，需求 7.2）

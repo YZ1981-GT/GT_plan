@@ -8,6 +8,7 @@ GET /api/consol-note-sections/{project_id}/{year}/{section_id}/data — 加载�
 
 import json
 from dataclasses import replace as _replace
+from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
@@ -28,6 +29,7 @@ from app.services.consol_node_scope import (
     resolve_requested_node_key,
     save_scoped_note_record,
 )
+from app.services.consol_note_table_totals import rollforward_balance
 from app.services.note_table_header_library import column_keys, column_role, rollforward_columns
 
 router = APIRouter(prefix="/api/consol-note-sections", tags=["consol-note-sections"])
@@ -205,6 +207,8 @@ async def get_section_detail(standard: str, section_id: str):
         if sec["section_id"] == section_id:
             result = {
                 "section_id": sec["section_id"],
+                # 前端 CP-05 身份校验：回的是哪一版模板的章节（与请求的 standard 不符即拒用）
+                "template_type": standard,
                 "title": sec["title"],
                 "parent_section": sec.get("parent_section", ""),
                 "headers": sec.get("headers", []),
@@ -421,14 +425,6 @@ def _column_view(table: dict) -> tuple[list[str], list[str | None]]:
     """逐列（列名, 角色）：列名取展示表头路径（「期初数/账面余额」），角色见 ``column_role``。"""
     keys = column_keys(table)
     return [k.label for k in keys], [column_role(k) for k in keys]
-
-
-def _cell_amount(row: list, ci: int) -> float:
-    """单元格数值；空 / 越界 / 不是数字记 0。"""
-    try:
-        return float(str(row[ci]).replace(",", "")) if ci < len(row) and row[ci] else 0.0
-    except ValueError:
-        return 0.0
 
 
 def _tb_expected(role: str | None, tb_entry: dict) -> float | None:
@@ -742,7 +738,8 @@ async def audit_single_note(
                     "message": "通过",
                 })
 
-    # 规则2：期末 = 期初 + 增加 - 减少（变动表才校验；期初 / 期末 / 增加 / 减少列由标题行库认）
+    # 规则2：期末 = 期初 + 增加 - 减少（变动表才校验；期初 / 期末 / 增加 / 减少列由标题行库认，
+    # 逐行函数与勾稽规则列平衡共用：方向不定的变动列有数、只填了余额的行不勾稽）
     flow = rollforward_columns(table)
     if flow is not None:
         for ri, row in enumerate(data_rows):
@@ -751,26 +748,12 @@ async def audit_single_note(
             cell0 = str(row[0]).replace(" ", "")
             if "合计" in cell0 or "小计" in cell0 or "其中" in cell0:
                 continue
-            try:
-                opening = float(str(row[flow.opening]).replace(",", "")) if row[flow.opening] else 0
-                closing = float(str(row[flow.closing]).replace(",", "")) if row[flow.closing] else 0
-            except (ValueError, IndexError):
+            balance = rollforward_balance(flow, row)
+            if balance is None:
                 continue
-
-            if opening == 0 and closing == 0:
-                continue
-            # 方向不定的变动列（核销 / 其他 / 现金流量净额…）有数：这一行无法按「增加 − 减少」勾稽
-            if any(_cell_amount(row, ci) for ci in flow.unknown):
-                continue
-
-            inc_sum = sum(_cell_amount(row, ci) for ci in flow.increase)
-            dec_sum = sum(_cell_amount(row, ci) for ci in flow.decrease)
-            if inc_sum == 0 and dec_sum == 0:
-                continue
-
-            expected_closing = opening + inc_sum - dec_sum
-            diff = round(closing - expected_closing, 2)
-            if abs(diff) > 0.01:
+            expected_closing, closing = balance
+            diff = closing - expected_closing
+            if abs(diff) > Decimal("0.01"):
                 results.append({
                     "section_title": title,
                     "rule_name": f"勾稽校验 - {row[0]}",
@@ -995,21 +978,31 @@ async def get_check_rules(
     project_id: UUID,
     year: int,
     section_id: str,
-    template_type: str = Query("soe", description="soe 或 listed"),
+    node_key: str | None = Query(None, description="企业树节点；不传读取项目级兼容行（与章节读写同一作用域）"),
+    template_type: str | None = Query(None, description="合并附注模板（soe / listed）；不传按项目口径，传了须与项目口径一致"),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_project_access("readonly")),
 ):
-    """返回指定章节的 check_rules 声明 + 执行结果。"""
+    """返回指定章节的 check_rules 声明 + 按所选节点已保存合并附注的执行结果。
+
+    模板按项目实际口径（与请求不符 400）；本表与对照表都读 ``node_key`` 节点的已保存数据，
+    节点 / 年度不合法 4xx。章节没有规则时不读数据、直接返回空。
+    """
     from app.services.note_check_rules import _load_check_rules, check_note_cross_rules
 
-    rules = _load_check_rules(template_type, section_id)
+    template = await _resolve_requested_template(db, project_id, {"template_type": template_type})
+    rules = _load_check_rules(template, section_id)
     if not rules:
-        return {"section_id": section_id, "template_type": template_type, "rules": [], "results": []}
+        return {"section_id": section_id, "template_type": template, "node_key": node_key, "rules": [], "results": []}
 
-    results = await check_note_cross_rules(db, project_id, year, section_id, template_type)
+    try:
+        results = await check_note_cross_rules(db, project_id, year, section_id, template, node_key=node_key)
+    except NodeScopeError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
     return {
         "section_id": section_id,
-        "template_type": template_type,
+        "template_type": template,
+        "node_key": node_key,
         "rules": [
             {
                 "check_id": r.check_id,

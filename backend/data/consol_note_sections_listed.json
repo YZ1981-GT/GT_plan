@@ -5821,7 +5821,7 @@
         "self_col_index": 1,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "应收票据分类表合计 = 坏账分类表合计期末余额"
+        "description": "应收票据：坏账分类表「合计」期末账面余额 = 应收票据表「合计」期末账面余额"
       }
     ]
   },
@@ -5948,20 +5948,7 @@
         "span": 5
       }
     ],
-    "continuation_of": "五-4-5",
-    "check_rules": [
-      {
-        "check_id": "CT-4_6",
-        "peer_section_id": "五-4-5",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ]
+    "continuation_of": "五-4-5"
   },
   {
     "id": "719a9df2-1cea-4153-beb4-88ad52f1b387",
@@ -6087,19 +6074,6 @@
       }
     ],
     "continuation_of": "五-4-7",
-    "check_rules": [
-      {
-        "check_id": "CT-4_8",
-        "peer_section_id": "五-4-7",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ],
     "text_after_table": "按组合计提坏账准备的应收票据"
   },
   {
@@ -6640,13 +6614,13 @@
       {
         "check_id": "F5-8",
         "peer_section_id": "五-5-1",
-        "peer_row_label": "合  计",
+        "peer_row_label": "小  计",
         "peer_col_index": 1,
         "self_row_label": "合  计",
         "self_col_index": 1,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "账龄表合计期末余额 = 坏账分类表合计账面余额"
+        "description": "应收账款：坏账分类表「合计」期末账面余额 = 账龄表「小计」期末余额"
       },
       {
         "check_id": "F5-4",
@@ -6657,7 +6631,7 @@
         "self_col_index": 1,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "单项计提明细合计 = 坏账分类表「按单项计提坏账准备」行账面余额"
+        "description": "应收账款：坏账分类表「按单项计提坏账准备」期末账面余额 = 单项计提明细表「合计」期末账面余额"
       }
     ]
   },
@@ -6784,20 +6758,7 @@
         "span": 5
       }
     ],
-    "continuation_of": "五-5-2",
-    "check_rules": [
-      {
-        "check_id": "CT-5_3",
-        "peer_section_id": "五-5-2",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ]
+    "continuation_of": "五-5-2"
   },
   {
     "id": "2a28b22b-cdc7-4730-94ec-f0cf130b39b3",
@@ -6937,19 +6898,6 @@
       }
     ],
     "continuation_of": "五-5-4",
-    "check_rules": [
-      {
-        "check_id": "CT-5_5",
-        "peer_section_id": "五-5-4",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ],
     "text_after_table": "按组合计提坏账准备的应收账款"
   },
   {
@@ -7145,20 +7093,7 @@
         "span": 3
       }
     ],
-    "continuation_of": "五-5-6",
-    "check_rules": [
-      {
-        "check_id": "CT-5_7",
-        "peer_section_id": "五-5-6",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ]
+    "continuation_of": "五-5-6"
   },
   {
     "id": "1084eaa8-87eb-46a5-b8a0-ea167df74166",
@@ -7256,20 +7191,7 @@
         "span": 3
       }
     ],
-    "continuation_of": "五-5-7",
-    "check_rules": [
-      {
-        "check_id": "CT-5_8",
-        "peer_section_id": "五-5-7",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ]
+    "continuation_of": "五-5-7"
   },
   {
     "id": "367aaa68-eb45-4179-9e29-d76202b8316a",
@@ -7767,20 +7689,7 @@
         ""
       ]
     ],
-    "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F5b-4",
-        "peer_section_id": "五-6-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "应收款项融资减值合计 = 主表合计期末余额"
-      }
-    ]
+    "multi_header": null
   },
   {
     "id": "eb88105e-a8b2-4702-9e0d-d9b97e790c3e",
@@ -7979,19 +7888,6 @@
       ]
     ],
     "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F6-8",
-        "peer_section_id": "五-7-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "预付款项账龄合计 = 主表合计期末余额"
-      }
-    ],
     "text_after_table": "（账龄超过1年的金额重要预付账款，应说明未及时结算的原因。）\n按预付对象归集的预付款项期末余额前五名单位情况\n（按预付对象集中度，汇总或分别披露期末余额前五名的预付款项的期末余额及占预付款项期末余额合计数的比例。）\n汇总披露格式：\n本期按预付对象归集的期末余额前五名预付款项汇总金额XXXX元，占预付款项期末余额合计数的比例XX%。"
   },
   {
@@ -8119,20 +8015,7 @@
         ""
       ]
     ],
-    "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F7-8",
-        "peer_section_id": "五-8-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "其他应收款账龄合计 = 坏账分类合计期末余额"
-      }
-    ]
+    "multi_header": null
   },
   {
     "id": "a9583435-be61-4224-bd4b-1dd62b469e2e",
@@ -9440,12 +9323,12 @@
         "check_id": "F6-4",
         "peer_section_id": "五-9-1",
         "peer_row_label": "合  计",
-        "peer_col_index": 1,
+        "peer_col_index": 2,
         "self_row_label": "合  计",
-        "self_col_index": 1,
+        "self_col_index": 6,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "存货跌价准备合计 = 存货主表合计期末余额"
+        "description": "存货：跌价准备变动表「合计」期末余额 = 存货分类表「合计」期末跌价准备"
       },
       {
         "check_id": "MV-9_2",
@@ -9457,22 +9340,7 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
-      },
-      {
-        "check_id": "CT-9_2",
-        "peer_section_id": "五-9-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
       }
     ],
     "continuation_of": "五-9-1"
@@ -9726,19 +9594,6 @@
       }
     ],
     "continuation_of": "五-9-4",
-    "check_rules": [
-      {
-        "check_id": "CT-9_5",
-        "peer_section_id": "五-9-4",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ],
     "text_after_table": "或："
   },
   {
@@ -9942,19 +9797,6 @@
       }
     ],
     "continuation_of": "五-9-6",
-    "check_rules": [
-      {
-        "check_id": "CT-9_7",
-        "peer_section_id": "五-9-6",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ],
     "text_after_table": "（15号文第十九条（六）披露存货期末余额中含有的借款费用资本化金额及其计算标准和依据。）\n（说明合同履约成本本期摊销金额。）\n（房地产开发企业，应按下列格式披露“开发成本”、“开发产品”等相关信息)"
   },
   {
@@ -10266,10 +10108,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 2,
-        "increase_col": 3,
-        "decrease_col": 4,
-        "closing_col": 5,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -10331,10 +10169,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -10498,36 +10332,46 @@
     ]
   },
   {
-    "id": "529591b8-e472-4156-9702-be3e5486f138",
+    "id": "417acc16-6610-4365-9b6b-0765e010125a",
     "standard": "listed",
     "section_id": "五-10-2",
     "parent_section": "合同资产",
     "parent_seq": 10,
     "title": "本期合同资产账面价值的重大变动",
-    "seq": 70,
+    "seq": 71,
     "headers": [
       "项  目",
-      "期末余额",
-      "上年年末余额"
+      "变动金额",
+      "变动原因"
     ],
     "rows": [
       [
-        "合同资产",
+        "",
         "",
         ""
       ],
       [
-        "减：合同资产减值准备",
+        "",
         "",
         ""
       ],
       [
-        "小  计",
+        "",
         "",
         ""
       ],
       [
-        "减：列示于其他非流动资产的合同资产",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
         "",
         ""
       ],
@@ -10538,30 +10382,16 @@
       ]
     ],
     "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F9-4",
-        "peer_section_id": "五-10-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "合同资产减值准备合计 = 合同资产主表合计期末余额"
-      }
-    ],
-    "continuation_of": "五-10-1",
     "text_after_table": "1、说明履行履约义务的时间与通常的付款时间之间的关系，以及此类因素对合同资产（如果对合同负债产生影响在合同负债科目下说明）账面价值的影响的定量或定性信息。\n2、合同资产的账面价值在本期内发生的重大变动的情形包括：\n①企业合并导致的变动；\n②对收入进行累积追加调整导致的相关合同资产和合同负债的变动，此类调整可能源于估计履约进度的变化、估计交易价格的变化（包括对于可变对价是否受到限制的评估发生变化）或者合同变更；\n③对合同对价的权利成为无条件权利（即，合同资产重分类为应收款项）的时间安排发生变化。"
   },
   {
-    "id": "417acc16-6610-4365-9b6b-0765e010125a",
+    "id": "6969e32d-178c-4aa4-823d-73b1adc93dab",
     "standard": "listed",
     "section_id": "五-10-3",
     "parent_section": "合同资产",
     "parent_seq": 10,
     "title": "合同资产减值准备计提情况",
-    "seq": 71,
+    "seq": 72,
     "headers": [
       "类  别",
       "期末余额/账面余额/金额",
@@ -10577,7 +10407,20 @@
     ],
     "rows": [
       [
+        "按单项计提坏账准备",
         "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "其中：",
         "",
         "",
         "",
@@ -10616,7 +10459,20 @@
         ""
       ],
       [
+        "按组合计提坏账准备",
         "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "其中：",
         "",
         "",
         "",
@@ -10655,7 +10511,7 @@
         ""
       ],
       [
-        "合  计",
+        "合 计",
         "",
         "",
         "",
@@ -10725,148 +10581,30 @@
       {
         "check_id": "F9-4b",
         "peer_section_id": "五-10-1",
-        "peer_row_label": "合  计",
+        "peer_row_label": "小  计",
         "peer_col_index": 1,
         "self_row_label": "合  计",
         "self_col_index": 1,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "合同资产坏账分类（续）合计 = 主表合计"
-      }
-    ]
-  },
-  {
-    "id": "6969e32d-178c-4aa4-823d-73b1adc93dab",
-    "standard": "listed",
-    "section_id": "五-10-4",
-    "parent_section": "合同资产",
-    "parent_seq": 10,
-    "title": "按单项计提减值准备：",
-    "seq": 72,
-    "headers": [
-      "名  称",
-      "期末余额/账面余额",
-      "期末余额/减值准备",
-      "期末余额/预期信用损失率(%)",
-      "期末余额/计提依据"
-    ],
-    "rows": [
-      [
-        "类  别",
-        "账面余额",
-        "减值准备",
-        "账面价值",
-        "账面余额"
-      ],
-      [
-        "类  别",
-        "金额",
-        "比例(%)",
-        "金额",
-        "预期信用损失率(%)"
-      ],
-      [
-        "按单项计提坏账准备",
-        "",
-        "",
-        "",
-        ""
-      ],
-      [
-        "其中：",
-        "",
-        "",
-        "",
-        ""
-      ],
-      [
-        "",
-        "",
-        "",
-        "",
-        ""
-      ],
-      [
-        "",
-        "",
-        "",
-        "",
-        ""
-      ],
-      [
-        "按组合计提坏账准备",
-        "",
-        "",
-        "",
-        ""
-      ],
-      [
-        "其中：",
-        "",
-        "",
-        "",
-        ""
-      ],
-      [
-        "",
-        "",
-        "",
-        "",
-        ""
-      ],
-      [
-        "",
-        "",
-        "",
-        "",
-        ""
-      ],
-      [
-        "合 计",
-        "",
-        "",
-        "",
-        ""
-      ]
-    ],
-    "multi_header": [
-      [
-        "名  称",
-        "期末余额",
-        "",
-        "",
-        ""
-      ],
-      [
-        "",
-        "账面余额",
-        "减值准备",
-        "预期信用损失率(%)",
-        "计提依据"
-      ]
-    ],
-    "_column_groups": [
-      {
-        "group": "期末余额",
-        "start": 1,
-        "span": 4
+        "description": "合同资产：减值准备计提情况表「合计」期末账面余额 = 合同资产表「小计」期末账面余额"
       }
     ]
   },
   {
     "id": "22a1dae8-66c4-4b3d-9668-4507cafc61cd",
     "standard": "listed",
-    "section_id": "五-10-5",
+    "section_id": "五-10-4",
     "parent_section": "合同资产",
     "parent_seq": 10,
-    "title": "续：",
+    "title": "按单项计提减值准备：",
     "seq": 73,
     "headers": [
       "名  称",
-      "上年年末余额/账面余额",
-      "上年年末余额/减值准备",
-      "上年年末余额/预期信用损失率(%)",
-      "上年年末余额/计提依据"
+      "期末余额/账面余额",
+      "期末余额/减值准备",
+      "期末余额/预期信用损失率(%)",
+      "期末余额/计提依据"
     ],
     "rows": [
       [
@@ -10894,7 +10632,7 @@
     "multi_header": [
       [
         "名  称",
-        "上年年末余额",
+        "期末余额",
         "",
         "",
         ""
@@ -10909,43 +10647,29 @@
     ],
     "_column_groups": [
       {
-        "group": "上年年末余额",
+        "group": "期末余额",
         "start": 1,
         "span": 4
       }
-    ],
-    "text_after_table": "按组合计提减值准备："
+    ]
   },
   {
     "id": "0028e396-3d30-42af-9d76-56f3560f3041",
     "standard": "listed",
-    "section_id": "五-10-6",
+    "section_id": "五-10-5",
     "parent_section": "合同资产",
     "parent_seq": 10,
-    "title": "组合计提项目：工程施工",
+    "title": "续：",
     "seq": 74,
     "headers": [
-      "",
-      "期末余额/合同资产",
-      "期末余额/减值准备",
-      "期末余额/预期信用损失率(%)",
-      "上年年末余额/合同资产",
+      "名  称",
+      "上年年末余额/账面余额",
       "上年年末余额/减值准备",
-      "上年年末余额/预期信用损失率(%)"
+      "上年年末余额/预期信用损失率(%)",
+      "上年年末余额/计提依据"
     ],
     "rows": [
       [
-        "名  称",
-        "账面余额",
-        "减值准备",
-        "预期信用损失率(%)",
-        "计提依据",
-        "",
-        ""
-      ],
-      [
-        "",
-        "",
         "",
         "",
         "",
@@ -10953,8 +10677,6 @@
         ""
       ],
       [
-        "",
-        "",
         "",
         "",
         "",
@@ -10966,52 +10688,42 @@
         "",
         "",
         "",
-        "",
-        "",
         ""
       ]
     ],
     "multi_header": [
       [
-        "",
-        "期末余额",
-        "",
-        "",
+        "名  称",
         "上年年末余额",
+        "",
         "",
         ""
       ],
       [
         "",
-        "合同资产",
+        "账面余额",
         "减值准备",
         "预期信用损失率(%)",
-        "合同资产",
-        "减值准备",
-        "预期信用损失率(%)"
+        "计提依据"
       ]
     ],
+    "continuation_of": "五-10-4",
     "_column_groups": [
       {
-        "group": "期末余额",
-        "start": 1,
-        "span": 3
-      },
-      {
         "group": "上年年末余额",
-        "start": 4,
-        "span": 3
+        "start": 1,
+        "span": 4
       }
     ],
-    "continuation_of": "五-10-5"
+    "text_after_table": "按组合计提减值准备："
   },
   {
     "id": "1b3512fd-e4c7-421f-8849-9e8701001f60",
     "standard": "listed",
-    "section_id": "五-10-7",
+    "section_id": "五-10-6",
     "parent_section": "合同资产",
     "parent_seq": 10,
-    "title": "组合计提项目：质量保证金",
+    "title": "组合计提项目：工程施工",
     "seq": 75,
     "headers": [
       "列1",
@@ -11105,7 +10817,7 @@
   {
     "id": "d51be6aa-5679-4ba0-83e2-540a5dbc3640",
     "standard": "listed",
-    "section_id": "五-10-8",
+    "section_id": "五-10-7",
     "parent_section": "合同资产",
     "parent_seq": 10,
     "title": "组合计提项目：质量保证金",
@@ -11202,7 +10914,7 @@
   {
     "id": "9cd8b982-3c0b-49a9-985d-88b3623430aa",
     "standard": "listed",
-    "section_id": "五-10-9",
+    "section_id": "五-10-8",
     "parent_section": "合同资产",
     "parent_seq": 10,
     "title": "本期计提、收回或转回的合同资产减值准备情况",
@@ -11410,129 +11122,42 @@
     "section_id": "五-11-2",
     "parent_section": "持有待售资产和持有待售负债",
     "parent_seq": 11,
-    "title": "持有待售资产减值准备",
+    "title": "持有待售负债",
     "seq": 79,
     "headers": [
       "项  目",
-      "期初余额",
-      "本期增加",
-      "本期减少/本期转回",
-      "本期减少/本期出售",
-      "期末余额"
+      "期末余额",
+      "上年年末余额"
     ],
     "rows": [
       [
         "持有待售负债：",
-        "",
-        "",
-        "",
         "",
         ""
       ],
       [
         "持有待售的处置组中的负债",
         "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "其中：子公司A",
-        "",
-        "",
-        "",
         "",
         ""
       ],
       [
         "分公司B",
         "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "合  计",
         "X.XX",
-        "X.XX",
-        "",
-        "",
-        ""
+        "X.XX"
       ]
     ],
-    "multi_header": [
-      [
-        "项  目",
-        "期初余额",
-        "本期增加",
-        "本期减少",
-        "",
-        "期末余额"
-      ],
-      [
-        "",
-        "",
-        "",
-        "本期转回",
-        "本期出售",
-        ""
-      ]
-    ],
-    "_column_groups": [
-      {
-        "group": "期初余额",
-        "start": 1,
-        "span": 1
-      },
-      {
-        "group": "本期增加",
-        "start": 2,
-        "span": 1
-      },
-      {
-        "group": "本期减少",
-        "start": 3,
-        "span": 2
-      },
-      {
-        "group": "期末余额",
-        "start": 5,
-        "span": 1
-      }
-    ],
-    "check_rules": [
-      {
-        "check_id": "F11-4",
-        "peer_section_id": "五-11-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "持有待售减值合计 = 主表合计期末余额"
-      },
-      {
-        "check_id": "MV-11_2",
-        "mode": "column_balance",
-        "self_row_label": "*",
-        "self_col_index": 0,
-        "peer_section_id": "",
-        "peer_row_label": "",
-        "peer_col_index": 0,
-        "relation": "column_balance",
-        "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 5,
-        "description": "变动表平衡：期初+增加-减少=期末"
-      }
-    ],
-    "continuation_of": "五-11-1",
-    "text_after_table": "持有待售的非流动资产"
+    "multi_header": null,
+    "continuation_of": "五-11-1"
   },
   {
     "id": "8ea98243-b0ca-4889-834e-fb9d487adc44",
@@ -11540,7 +11165,7 @@
     "section_id": "五-11-3",
     "parent_section": "持有待售资产和持有待售负债",
     "parent_seq": 11,
-    "title": "期末，持有待售资产的情况：",
+    "title": "持有待售资产减值准备",
     "seq": 80,
     "headers": [
       "项  目",
@@ -11642,7 +11267,7 @@
         ""
       ]
     ],
-    "continuation_of": "五-11-2",
+    "continuation_of": null,
     "check_rules": [
       {
         "check_id": "MV-11_3",
@@ -11654,24 +11279,21 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       },
       {
-        "check_id": "CT-11_3",
-        "peer_section_id": "五-11-2",
+        "check_id": "F11-4",
+        "peer_section_id": "五-11-1",
         "peer_row_label": "合  计",
-        "peer_col_index": 1,
+        "peer_col_index": 3,
         "self_row_label": "合  计",
-        "self_col_index": 1,
+        "self_col_index": 5,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
+        "description": "持有待售资产和持有待售负债：减值准备变动表「合计」期末余额 = 持有待售资产表「合计」期末减值准备"
       }
     ],
+    "text_after_table": "持有待售的非流动资产",
     "_column_groups": [
       {
         "group": "期初余额",
@@ -11693,8 +11315,7 @@
         "start": 5,
         "span": 1
       }
-    ],
-    "text_after_table": "持有待售的处置组"
+    ]
   },
   {
     "id": "73360d98-4040-48a4-a720-37f5bc9e4aa3",
@@ -11702,7 +11323,7 @@
     "section_id": "五-11-4",
     "parent_section": "持有待售资产和持有待售负债",
     "parent_seq": 11,
-    "title": "子公司A",
+    "title": "期末，持有待售资产的情况：",
     "seq": 81,
     "headers": [
       "项  目",
@@ -11748,7 +11369,8 @@
         ""
       ]
     ],
-    "multi_header": null
+    "multi_header": null,
+    "text_after_table": "持有待售的处置组"
   },
   {
     "id": "4bd8a910-b8a3-4dc3-98ab-39905c6328cd",
@@ -11756,7 +11378,7 @@
     "section_id": "五-11-5",
     "parent_section": "持有待售资产和持有待售负债",
     "parent_seq": 11,
-    "title": "分公司B",
+    "title": "子公司A",
     "seq": 82,
     "headers": [
       "项  目",
@@ -11844,8 +11466,7 @@
         ""
       ]
     ],
-    "multi_header": null,
-    "text_after_table": "（如存在专为转售而取得的持有待售的子公司，需披露该子公司出售原因、方式和时间安排；列报该子公司的分部；该子公司确认的减值损失及其转回金额；与该子公司有关的其他综合收益累计金额；归属于母公司股东的持续经营损益和终止经营损益。）\n（如果子公司、共同经营、合营企业、联营企业以及部分对合营企业或联营企业的投资不再继续划分为持有待售类别或从持有待售的处置组中移除的，应在当期财务报表中相应调整各个划分为持有待售类别后可比会计期间的比较数据，且需披露改变非流动资产或处置组出售计划的原因及可比会计期间财务报表中受影响的项目名称和影响金额。）"
+    "multi_header": null
   },
   {
     "id": "c5d97bfc-8815-4004-adf5-9c618517aee0",
@@ -11941,7 +11562,8 @@
         ""
       ]
     ],
-    "multi_header": null
+    "multi_header": null,
+    "text_after_table": "（如存在专为转售而取得的持有待售的子公司，需披露该子公司出售原因、方式和时间安排；列报该子公司的分部；该子公司确认的减值损失及其转回金额；与该子公司有关的其他综合收益累计金额；归属于母公司股东的持续经营损益和终止经营损益。）\n（如果子公司、共同经营、合营企业、联营企业以及部分对合营企业或联营企业的投资不再继续划分为持有待售类别或从持有待售的处置组中移除的，应在当期财务报表中相应调整各个划分为持有待售类别后可比会计期间的比较数据，且需披露改变非流动资产或处置组出售计划的原因及可比会计期间财务报表中受影响的项目名称和影响金额。）"
   },
   {
     "id": "5d4f88b0-b8b1-4aed-a138-a84d8467136a",
@@ -12514,13 +12136,13 @@
       {
         "check_id": "F10-4",
         "peer_section_id": "五-14-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
+        "peer_row_label": "小  计",
+        "peer_col_index": 2,
         "self_row_label": "合  计",
-        "self_col_index": 1,
+        "self_col_index": 4,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "债权投资减值合计 = 主表合计期末余额"
+        "description": "债权投资：减值准备变动表「合计」期末余额 = 债权投资表「小计」期末减值准备"
       },
       {
         "check_id": "MV-14_2",
@@ -12532,10 +12154,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -12692,19 +12310,6 @@
       }
     ],
     "continuation_of": "五-14-3",
-    "check_rules": [
-      {
-        "check_id": "CT-14_4",
-        "peer_section_id": "五-14-3",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ],
     "text_after_table": "减值准备计提情况"
   },
   {
@@ -13579,20 +13184,7 @@
         ""
       ]
     ],
-    "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F10-4b",
-        "peer_section_id": "五-15-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "其他债权投资减值合计 = 主表合计期末余额"
-      }
-    ]
+    "multi_header": null
   },
   {
     "id": "efca6390-4118-41cb-834d-d5f39908bea1",
@@ -13651,10 +13243,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -13811,19 +13399,6 @@
       }
     ],
     "continuation_of": "五-15-4",
-    "check_rules": [
-      {
-        "check_id": "CT-15_5",
-        "peer_section_id": "五-15-4",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ],
     "text_after_table": "减值准备计提情况"
   },
   {
@@ -14974,13 +14549,13 @@
       {
         "check_id": "F12-4",
         "peer_section_id": "五-16-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
+        "peer_row_label": "小  计",
+        "peer_col_index": 2,
         "self_row_label": "合  计",
-        "self_col_index": 1,
+        "self_col_index": 3,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "长期应收款减值合计 = 主表合计期末余额"
+        "description": "长期应收款：坏账准备计提情况表「合计」期末坏账准备 = 长期应收款表「小计」期末坏账准备"
       }
     ]
   },
@@ -15136,19 +14711,6 @@
       }
     ],
     "continuation_of": "五-16-3",
-    "check_rules": [
-      {
-        "check_id": "CT-16_4",
-        "peer_section_id": "五-16-3",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ],
     "text_after_table": "按组合计提坏账准备"
   },
   {
@@ -15346,19 +14908,6 @@
       }
     ],
     "continuation_of": "五-16-5",
-    "check_rules": [
-      {
-        "check_id": "CT-16_6",
-        "peer_section_id": "五-16-5",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ],
     "text_after_table": "组合计提项目：XXX"
   },
   {
@@ -15458,19 +15007,6 @@
       }
     ],
     "continuation_of": "五-16-6",
-    "check_rules": [
-      {
-        "check_id": "CT-16_7",
-        "peer_section_id": "五-16-6",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ],
     "text_after_table": "组合计提项目：XXX"
   },
   {
@@ -15570,19 +15106,6 @@
       }
     ],
     "continuation_of": "五-16-7",
-    "check_rules": [
-      {
-        "check_id": "CT-16_8",
-        "peer_section_id": "五-16-7",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ],
     "text_after_table": "组合计提项目：XXX"
   },
   {
@@ -15681,20 +15204,7 @@
         "span": 3
       }
     ],
-    "continuation_of": "五-16-8",
-    "check_rules": [
-      {
-        "check_id": "CT-16_9",
-        "peer_section_id": "五-16-8",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ]
+    "continuation_of": "五-16-8"
   },
   {
     "id": "4b0ce706-4d2e-449a-a4ee-b6c5686d46f5",
@@ -15862,10 +15372,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -16716,12 +16222,14 @@
       "房屋及建筑物",
       "机器设备",
       "运输设备",
-      "……",
+      "办公设备",
+      "其他设备",
       "合  计"
     ],
     "rows": [
       [
         "一、账面原值：",
+        "",
         "",
         "",
         "",
@@ -16734,10 +16242,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "2.本期增加金额",
+        "",
         "",
         "",
         "",
@@ -16750,10 +16260,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "（2）在建工程转入",
+        "",
         "",
         "",
         "",
@@ -16766,10 +16278,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "……",
+        "",
         "",
         "",
         "",
@@ -16782,10 +16296,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "（1）处置或报废",
+        "",
         "",
         "",
         "",
@@ -16798,6 +16314,7 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
@@ -16806,10 +16323,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "4.期末余额",
+        "",
         "",
         "",
         "",
@@ -16822,10 +16341,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "1.期初余额",
+        "",
         "",
         "",
         "",
@@ -16838,10 +16359,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "（1）计提",
+        "",
         "",
         "",
         "",
@@ -16854,10 +16377,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "……",
+        "",
         "",
         "",
         "",
@@ -16870,10 +16395,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "（1）处置或报废",
+        "",
         "",
         "",
         "",
@@ -16886,6 +16413,7 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
@@ -16894,10 +16422,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "4.期末余额",
+        "",
         "",
         "",
         "",
@@ -16910,10 +16440,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "1.期初余额",
+        "",
         "",
         "",
         "",
@@ -16926,10 +16458,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "（1）计提",
+        "",
         "",
         "",
         "",
@@ -16942,10 +16476,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "……",
+        "",
         "",
         "",
         "",
@@ -16958,10 +16494,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "（1）处置或报废",
+        "",
         "",
         "",
         "",
@@ -16974,10 +16512,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "……",
+        "",
         "",
         "",
         "",
@@ -16990,10 +16530,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "四、账面价值",
+        "",
         "",
         "",
         "",
@@ -17006,10 +16548,12 @@
         "",
         "",
         "",
+        "",
         ""
       ],
       [
         "2.期初账面价值",
+        "",
         "",
         "",
         "",
@@ -17612,22 +17156,14 @@
     "headers": [
       "项  目",
       "种植业/类别",
-      "种植业/……",
       "畜牧养殖业/类别",
-      "畜牧养殖业/……",
       "林业/类别",
-      "林业/……",
       "水产业/类别",
-      "水产业/……",
       "合计"
     ],
     "rows": [
       [
         "一、账面原值",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17640,18 +17176,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "2.本期增加金额",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17664,18 +17192,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "（2）自行培育",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17688,18 +17208,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "3.本期减少金额",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17712,18 +17224,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "（2）其他",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17736,18 +17240,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "4.期末余额",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17760,18 +17256,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "1.期初余额",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17784,18 +17272,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "（1）计提",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17808,18 +17288,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "3.本期减少金额",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17832,18 +17304,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "（2）其他",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17856,18 +17320,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "4.期末余额",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17880,18 +17336,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "1.期初余额",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17904,18 +17352,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "（1）计提",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17928,18 +17368,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "3.本期减少金额",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17952,10 +17384,6 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
@@ -17964,18 +17392,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "……",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -17988,18 +17408,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "四、账面价值",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -18012,18 +17424,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "2.期初账面价值",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -18035,56 +17439,48 @@
       [
         "项  目",
         "种植业",
-        "",
         "畜牧养殖业",
-        "",
         "林业",
-        "",
         "水产业",
-        "",
         "合计"
       ],
       [
         "",
         "类别",
-        "……",
         "类别",
-        "……",
         "类别",
-        "……",
         "类别",
-        "……",
         ""
       ]
     ],
+    "text_after_table": "注意：本年执行减值测试的，即使未计提减值，也要参照上述要求披露。\n（提示：如有天然起源的生物资产，还应披露该资产的类别、取得方式和数量等。各类生产性生物资产的预计使用寿命、预计净残值、折旧方法、累计折旧和减值准备累计金额。与生物资产相关的风险情况与管理措施。）",
     "_column_groups": [
       {
         "group": "种植业",
         "start": 1,
-        "span": 2
+        "span": 1
       },
       {
         "group": "畜牧养殖业",
-        "start": 3,
-        "span": 2
+        "start": 2,
+        "span": 1
       },
       {
         "group": "林业",
-        "start": 5,
-        "span": 2
+        "start": 3,
+        "span": 1
       },
       {
         "group": "水产业",
-        "start": 7,
-        "span": 2
+        "start": 4,
+        "span": 1
       },
       {
         "group": "合计",
-        "start": 9,
+        "start": 5,
         "span": 1
       }
-    ],
-    "text_after_table": "注意：本年执行减值测试的，即使未计提减值，也要参照上述要求披露。\n（提示：如有天然起源的生物资产，还应披露该资产的类别、取得方式和数量等。各类生产性生物资产的预计使用寿命、预计净残值、折旧方法、累计折旧和减值准备累计金额。与生物资产相关的风险情况与管理措施。）"
+    ]
   },
   {
     "id": "40fa78fb-ec68-470a-a7cc-b0a5e9f4f51a",
@@ -18097,22 +17493,14 @@
     "headers": [
       "项  目",
       "种植业/类别",
-      "种植业/……",
       "畜牧养殖业/类别",
-      "畜牧养殖业/……",
       "林业/类别",
-      "林业/……",
       "水产业/类别",
-      "水产业/……",
       "合计"
     ],
     "rows": [
       [
         "一、期初余额",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -18125,18 +17513,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "加：外购",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -18149,18 +17529,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "企业合并增加",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -18173,18 +17545,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "减：处置",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -18197,17 +17561,9 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -18221,18 +17577,10 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ],
       [
         "……",
-        "",
-        "",
-        "",
-        "",
         "",
         "",
         "",
@@ -18245,10 +17593,6 @@
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
         ""
       ]
     ],
@@ -18256,25 +17600,17 @@
       [
         "项  目",
         "种植业",
-        "",
         "畜牧养殖业",
-        "",
         "林业",
-        "",
         "水产业",
-        "",
         "合计"
       ],
       [
         "",
         "类别",
-        "……",
         "类别",
-        "……",
         "类别",
-        "……",
         "类别",
-        "……",
         ""
       ]
     ],
@@ -18282,26 +17618,26 @@
       {
         "group": "种植业",
         "start": 1,
-        "span": 2
+        "span": 1
       },
       {
         "group": "畜牧养殖业",
-        "start": 3,
-        "span": 2
+        "start": 2,
+        "span": 1
       },
       {
         "group": "林业",
-        "start": 5,
-        "span": 2
+        "start": 3,
+        "span": 1
       },
       {
         "group": "水产业",
-        "start": 7,
-        "span": 2
+        "start": 4,
+        "span": 1
       },
       {
         "group": "合计",
-        "start": 9,
+        "start": 5,
         "span": 1
       }
     ]
@@ -18319,7 +17655,7 @@
       "房屋及建筑物",
       "机器设备",
       "运输设备",
-      "……",
+      "其他",
       "合  计"
     ],
     "rows": [
@@ -19274,10 +18610,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -19295,9 +18627,10 @@
       "被投资单位名称或形成商誉的事项",
       "期初余额",
       "本期增加/企业合并形成",
-      "本期增加/可无限量添加列",
+      "本期增加/取得构成业务的共同经营的利益份额形成",
+      "本期增加/其他",
       "本期减少/处置",
-      "本期减少/可无限量添加列",
+      "本期减少/其他",
       "期末余额"
     ],
     "rows": [
@@ -19308,18 +18641,21 @@
         "",
         "",
         "",
-        ""
-      ],
-      [
-        "",
-        "",
-        "",
-        "",
-        "",
         "",
         ""
       ],
       [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
         "",
         "",
         "",
@@ -19335,6 +18671,7 @@
         "",
         "",
         "",
+        "",
         ""
       ]
     ],
@@ -19344,6 +18681,7 @@
         "期初余额",
         "本期增加",
         "",
+        "",
         "本期减少",
         "",
         "期末余额"
@@ -19352,33 +18690,12 @@
         "",
         "",
         "企业合并形成",
-        "可无限量添加列",
+        "取得构成业务的共同经营的利益份额形成",
+        "其他",
         "处置",
-        "可无限量添加列",
+        "其他",
         ""
       ]
-    ],
-    "_column_groups": [
-      {
-        "group": "期初余额",
-        "start": 1,
-        "span": 1
-      },
-      {
-        "group": "本期增加",
-        "start": 2,
-        "span": 2
-      },
-      {
-        "group": "本期减少",
-        "start": 4,
-        "span": 2
-      },
-      {
-        "group": "期末余额",
-        "start": 6,
-        "span": 1
-      }
     ],
     "check_rules": [
       {
@@ -19391,14 +18708,32 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
-    "text_after_table": "（提示：其他增减变动原因包括境外子公司汇率变化的影响等）"
+    "text_after_table": "（提示：其他增减变动原因包括境外子公司汇率变化的影响等）",
+    "_column_groups": [
+      {
+        "group": "期初余额",
+        "start": 1,
+        "span": 1
+      },
+      {
+        "group": "本期增加",
+        "start": 2,
+        "span": 3
+      },
+      {
+        "group": "本期减少",
+        "start": 5,
+        "span": 2
+      },
+      {
+        "group": "期末余额",
+        "start": 7,
+        "span": 1
+      }
+    ]
   },
   {
     "id": "41783337-395e-495a-9fed-b488fd526fdc",
@@ -19412,9 +18747,9 @@
       "被投资单位名称或形成商誉的事项",
       "期初余额",
       "本期增加/计提",
-      "本期增加/可无限量添加行",
+      "本期增加/其他增加",
       "本期减少/处置",
-      "本期减少/可无限量添加行",
+      "本期减少/其他减少",
       "期末余额"
     ],
     "rows": [
@@ -19469,12 +18804,27 @@
         "",
         "",
         "计提",
-        "可无限量添加行",
+        "其他增加",
         "处置",
-        "可无限量添加行",
+        "其他减少",
         ""
       ]
     ],
+    "check_rules": [
+      {
+        "check_id": "MV-28_2",
+        "mode": "column_balance",
+        "self_row_label": "*",
+        "self_col_index": 0,
+        "peer_section_id": "",
+        "peer_row_label": "",
+        "peer_col_index": 0,
+        "relation": "column_balance",
+        "tolerance": 0.01,
+        "description": "变动表平衡：期初+增加-减少=期末"
+      }
+    ],
+    "text_after_table": "（公司应披露商誉减值测试过程、参数及商誉减值损失的确认方法，包括但不限于以下内容：\n1.商誉所属资产组或资产组组合的构成,所属经营分部和依据，以及是否与以前年度保持一致。资产组或资产组组合发生变化的，应披露变化前后的构成，以及导致变化的客观事实及依据。\n2.可收回金额的具体确定方法。可收回金额按公允价值减去处置费用后的净额确定的，应披露公允价值和处置费用的确定方式、关键参数及其确定依据；若可收回金额按预计未来现金流量的现值确定的，应披露预测期的年限及预测期内的收入增长率、利润率等参数及其确定依据，以及稳定期增长率、利润率、折现率等参数及其确定依据。前述信息与以前年度减值测试采用的信息或外部信息明显不一致的，或公司以前年度减值测试采用信息与当年实际情况明显不一致的，应披露差异原因。\n3.形成商誉时存在业绩承诺，且报告期或报告期上一期间处于业绩承诺期内的，应披露业绩承诺完成情况，以及报告期或报告期上一期间商誉减值情况。（15号文第十九条（二十））\n示例：\n商誉系本公司于2X21年1月1日收购XX铁路业务时形成。\n于2X23年1月1日前，商誉已分配到与XX铁路业务相关的最小现金产出单元GP段铁路资产组。于2X23年1月1日，为了提高铁路的运营效率，管理层对GP段铁路资产与公司原有的铁路资产进行了整合。整合后，管理层认为GP段铁路资产与公司原有的铁路资产构成了新的最小现金产出单元（以下合称“整合后的铁路资产组”）。此外，整合后的铁路资产组不大于按照《企业会计准则第35号——分部报告》中所确定的报告分部。\n经过评估，管理层认为本公司无需对该等资产组计提减值准备。",
     "_column_groups": [
       {
         "group": "期初余额",
@@ -19496,37 +18846,7 @@
         "start": 6,
         "span": 1
       }
-    ],
-    "check_rules": [
-      {
-        "check_id": "F13-4",
-        "peer_section_id": "五-28-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "商誉减值合计 = 商誉主表合计期末余额"
-      },
-      {
-        "check_id": "MV-28_2",
-        "mode": "column_balance",
-        "self_row_label": "*",
-        "self_col_index": 0,
-        "peer_section_id": "",
-        "peer_row_label": "",
-        "peer_col_index": 0,
-        "relation": "column_balance",
-        "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
-        "description": "变动表平衡：期初+增加-减少=期末"
-      }
-    ],
-    "text_after_table": "（公司应披露商誉减值测试过程、参数及商誉减值损失的确认方法，包括但不限于以下内容：\n1.商誉所属资产组或资产组组合的构成,所属经营分部和依据，以及是否与以前年度保持一致。资产组或资产组组合发生变化的，应披露变化前后的构成，以及导致变化的客观事实及依据。\n2.可收回金额的具体确定方法。可收回金额按公允价值减去处置费用后的净额确定的，应披露公允价值和处置费用的确定方式、关键参数及其确定依据；若可收回金额按预计未来现金流量的现值确定的，应披露预测期的年限及预测期内的收入增长率、利润率等参数及其确定依据，以及稳定期增长率、利润率、折现率等参数及其确定依据。前述信息与以前年度减值测试采用的信息或外部信息明显不一致的，或公司以前年度减值测试采用信息与当年实际情况明显不一致的，应披露差异原因。\n3.形成商誉时存在业绩承诺，且报告期或报告期上一期间处于业绩承诺期内的，应披露业绩承诺完成情况，以及报告期或报告期上一期间商誉减值情况。（15号文第十九条（二十））\n示例：\n商誉系本公司于2X21年1月1日收购XX铁路业务时形成。\n于2X23年1月1日前，商誉已分配到与XX铁路业务相关的最小现金产出单元GP段铁路资产组。于2X23年1月1日，为了提高铁路的运营效率，管理层对GP段铁路资产与公司原有的铁路资产进行了整合。整合后，管理层认为GP段铁路资产与公司原有的铁路资产构成了新的最小现金产出单元（以下合称“整合后的铁路资产组”）。此外，整合后的铁路资产组不大于按照《企业会计准则第35号——分部报告》中所确定的报告分部。\n经过评估，管理层认为本公司无需对该等资产组计提减值准备。"
+    ]
   },
   {
     "id": "7b691f62-f793-49b3-8561-db20930b5a3f",
@@ -19750,10 +19070,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -19941,20 +19257,7 @@
         ""
       ]
     ],
-    "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F16-4",
-        "peer_section_id": "五-30-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "递延所得税负债合计 = 递延所得税资产合计期末余额"
-      }
-    ]
+    "multi_header": null
   },
   {
     "id": "71bd8263-68ac-4f46-b7ef-26bae821a88c",
@@ -20456,20 +19759,7 @@
         "span": 4
       }
     ],
-    "continuation_of": "五-32-1",
-    "check_rules": [
-      {
-        "check_id": "CT-32_2",
-        "peer_section_id": "五-32-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ]
+    "continuation_of": "五-32-1"
   },
   {
     "id": "feae44cc-deef-496c-a422-0ba8283c6110",
@@ -20646,10 +19936,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -21211,10 +20497,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -21361,13 +20643,13 @@
       {
         "check_id": "F17-4",
         "peer_section_id": "五-40-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
+        "peer_row_label": "短期薪酬",
+        "peer_col_index": 4,
         "self_row_label": "合  计",
-        "self_col_index": 1,
+        "self_col_index": 4,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "应付职工薪酬明细合计 = 主表合计期末余额"
+        "description": "应付职工薪酬：短期薪酬表「合计」期末余额 = 应付职工薪酬表「短期薪酬」行期末余额"
       },
       {
         "check_id": "MV-40_2",
@@ -21379,10 +20661,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -21480,10 +20758,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -21629,20 +20903,7 @@
         ""
       ]
     ],
-    "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F19-4",
-        "peer_section_id": "五-42-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "其他应付款明细合计 = 主表合计期末余额"
-      }
-    ]
+    "multi_header": null
   },
   {
     "id": "efe7457e-d7b6-493a-80f5-1227e2f47c23",
@@ -21805,7 +21066,20 @@
         ""
       ]
     ],
-    "multi_header": null
+    "multi_header": null,
+    "check_rules": [
+      {
+        "check_id": "F19-4",
+        "peer_section_id": "五-42-1",
+        "peer_row_label": "其他应付款",
+        "peer_col_index": 1,
+        "self_row_label": "合  计",
+        "self_col_index": 1,
+        "relation": "equal",
+        "tolerance": 0.01,
+        "description": "其他应付款：按款项性质列示表「合计」期末余额 = 其他应付款表「其他应付款」行期末余额"
+      }
+    ]
   },
   {
     "id": "1f1638c9-a8d0-4be1-9ece-16491f983ac2",
@@ -21936,13 +21210,13 @@
       {
         "check_id": "F19b-4",
         "peer_section_id": "五-43-1",
-        "peer_row_label": "合  计",
+        "peer_row_label": "一年内到期的长期借款",
         "peer_col_index": 1,
         "self_row_label": "合  计",
         "self_col_index": 1,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "一年内到期非流动负债明细合计 = 主表合计期末余额"
+        "description": "一年内到期的非流动负债：一年内到期的长期借款表「合计」期末余额 = 主表「一年内到期的长期借款」行期末余额"
       }
     ]
   },
@@ -22408,19 +21682,6 @@
       ]
     ],
     "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F21-4",
-        "peer_section_id": "五-46-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "应付债券变动合计 = 主表合计期末余额"
-      }
-    ],
     "continuation_of": "五-46-1"
   },
   {
@@ -22505,7 +21766,20 @@
     ],
     "multi_header": null,
     "continuation_of": "五-46-2",
-    "text_after_table": "可转换公司债券\n（披露可转换公司债券的转股条件、转股时间、转股权会计处理及相关判断依据等。（15号文第二十条（十））\n根据中国证券监督管理委员会证监发行字[201x]XX号核准，本公司于202X年X月X日至202X年X月X日公开发行XX份可转换公司债券，每份面值100元，发行总额XXX元，债券期限为X年。\n本公司发行的可转换公司债券的票面利率为X%，利息按季支付，202X年X月X日为第一次派息日。转股期自发行之日起(202X年X月X日)X个月后的第一个交易日(202X年X月X日)起(含当日)，至可转换公司债券到期日(202X年X月X日)前一个交易日止(含当日)。持有人可在转股期内申请转股。该转股权符合《企业会计准则第37号——金融工具列报》有关权益工具的定义，即满足“固定换固定”原则，本公司将其确认为一项权益工具（其他权益工具），并以发行价格减去不附认股权且其他条件相同的公司债券公允价值后的净额进行计量。\n可转换公司债券发行时的初始转股价格为每股X元，本公司在202X年X月X日实施202X年度每股派发现金股息X元及用资本公积每十股转增X股的方案后，可转债初始转股价格相应调整为每股X元。\n划分为金融负债的其他金融工具\n期末发行在外的优先股、永续债等其他金融工具的基本情况："
+    "text_after_table": "可转换公司债券\n（披露可转换公司债券的转股条件、转股时间、转股权会计处理及相关判断依据等。（15号文第二十条（十））\n根据中国证券监督管理委员会证监发行字[201x]XX号核准，本公司于202X年X月X日至202X年X月X日公开发行XX份可转换公司债券，每份面值100元，发行总额XXX元，债券期限为X年。\n本公司发行的可转换公司债券的票面利率为X%，利息按季支付，202X年X月X日为第一次派息日。转股期自发行之日起(202X年X月X日)X个月后的第一个交易日(202X年X月X日)起(含当日)，至可转换公司债券到期日(202X年X月X日)前一个交易日止(含当日)。持有人可在转股期内申请转股。该转股权符合《企业会计准则第37号——金融工具列报》有关权益工具的定义，即满足“固定换固定”原则，本公司将其确认为一项权益工具（其他权益工具），并以发行价格减去不附认股权且其他条件相同的公司债券公允价值后的净额进行计量。\n可转换公司债券发行时的初始转股价格为每股X元，本公司在202X年X月X日实施202X年度每股派发现金股息X元及用资本公积每十股转增X股的方案后，可转债初始转股价格相应调整为每股X元。\n划分为金融负债的其他金融工具\n期末发行在外的优先股、永续债等其他金融工具的基本情况：",
+    "check_rules": [
+      {
+        "check_id": "F21-4",
+        "peer_section_id": "五-46-1",
+        "peer_row_label": "合  计",
+        "peer_col_index": 1,
+        "self_row_label": "合  计",
+        "self_col_index": 6,
+        "relation": "equal",
+        "tolerance": 0.01,
+        "description": "应付债券：增减变动表（续）「合计」期末余额 = 应付债券表「合计」期末余额"
+      }
+    ]
   },
   {
     "id": "2249a5d0-d961-4d9a-9e3f-ae2e7a17bfc4",
@@ -22704,24 +21978,6 @@
       }
     ],
     "continuation_of": "五-46-4",
-    "check_rules": [
-      {
-        "check_id": "MV-46_5",
-        "mode": "column_balance",
-        "self_row_label": "*",
-        "self_col_index": 0,
-        "peer_section_id": "",
-        "peer_row_label": "",
-        "peer_col_index": 0,
-        "relation": "column_balance",
-        "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
-        "description": "变动表平衡：期初+增加-减少=期末"
-      }
-    ],
     "text_after_table": "说明划分至金融负债的依据。"
   },
   {
@@ -22854,13 +22110,13 @@
       {
         "check_id": "F20-4",
         "peer_section_id": "五-48-1",
-        "peer_row_label": "合  计",
+        "peer_row_label": "长期应付款",
         "peer_col_index": 1,
         "self_row_label": "合  计",
         "self_col_index": 1,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "长期应付款明细合计 = 主表合计期末余额"
+        "description": "长期应付款：按款项性质列示表「合计」期末余额 = 长期应付款表「长期应付款」行期末余额"
       }
     ]
   },
@@ -22926,10 +22182,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -23584,10 +22836,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -23898,24 +23146,6 @@
       }
     ],
     "continuation_of": "五-54-1",
-    "check_rules": [
-      {
-        "check_id": "MV-54_2",
-        "mode": "column_balance",
-        "self_row_label": "*",
-        "self_col_index": 0,
-        "peer_section_id": "",
-        "peer_row_label": "",
-        "peer_col_index": 0,
-        "relation": "column_balance",
-        "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
-        "description": "变动表平衡：期初+增加-减少=期末"
-      }
-    ],
     "text_after_table": "（说明其他权益工具的本期增减变动情况、变动原因，以及相关会计处理依据。）\n权益工具持有者的相关信息"
   },
   {
@@ -24035,10 +23265,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -24101,10 +23327,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -24489,10 +23711,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -24562,10 +23780,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -27725,10 +26939,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -28241,10 +27451,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 5,
-        "closing_col": 7,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],

@@ -71,6 +71,15 @@
             </div>
           </template>
         </el-alert>
+        <el-alert
+          v-if="checkRulesError"
+          type="warning"
+          :closable="false"
+          show-icon
+          style="margin-bottom:8px"
+          :title="`勾稽校验未执行：${checkRulesError}`"
+          data-testid="consol-note-check-rules-error"
+        />
         <div v-if="checkRulesResults.length" style="margin-bottom:8px">
           <el-alert
             v-for="cr in checkRulesResults"
@@ -888,23 +897,39 @@ const isTextAfterLong = computed(() => {
 // ─── 跨表勾稽校验结果 ──────────────────────────────────────────────────────
 const checkRulesResults = ref<Array<{ check_id: string; status: string; description: string; expected?: string; actual?: string; diff?: string; reason?: string }>>([])
 const checkRulesLoading = ref(false)
+/** 这次勾稽校验没执行成功的原因：结果是辅助信息，读不到不打断章节展示，但要让人知道没校验 */
+const checkRulesError = ref('')
 
-async function loadCheckRules(sectionId: string) {
-  if (!props.projectId || !props.year || !sectionId) {
-    checkRulesResults.value = []
-    return
-  }
+/**
+ * 按章节加载时的上下文执行勾稽校验（R7.5）：本表与对照表都读当前节点已保存的合并附注，
+ * 模板按加载时的变体（与项目口径不符时后端 400）。signal 随章节加载票据，切走即取消；
+ * 节点 / 章节已切换时晚到的结果与错误都不落到新章节。
+ */
+let checkRulesSeq = 0
+async function loadCheckRules(context: NoteContextSnapshot, signal?: AbortSignal) {
+  const seq = ++checkRulesSeq
+  checkRulesResults.value = []
+  checkRulesError.value = ''
   checkRulesLoading.value = true
+  const params: Record<string, string> = { template_type: context.variant }
+  if (context.nodeKey) params.node_key = context.nodeKey
+  // 只认最后一次发起、且上下文未变的结果（加载触发与保存后重跑可能并发）
+  const isCurrent = () => {
+    const latest = currentRequestedNoteContext()
+    return seq === checkRulesSeq && !!latest && sameNoteContext(context, latest)
+  }
   try {
     const res: any = await api.get(
-      `/api/consol-note-sections/check-rules/${props.projectId}/${props.year}/${sectionId}`,
-      { params: { template_type: props.standard || 'soe' } },
+      P_cn.checkRules(context.projectId, context.year, context.sectionId),
+      { params, signal, _silent: true } as any,
     )
-    checkRulesResults.value = res?.results || []
-  } catch {
-    checkRulesResults.value = []
+    if (!isCurrent()) return
+    checkRulesResults.value = Array.isArray(res?.results) ? res.results : []
+  } catch (err) {
+    if (isAborted(err) || !isCurrent()) return
+    checkRulesError.value = noteErrorMessage(err, '勾稽校验读取失败')
   } finally {
-    checkRulesLoading.value = false
+    if (isCurrent()) checkRulesLoading.value = false
   }
 }
 
@@ -2276,6 +2301,8 @@ async function saveNoteData(): Promise<boolean> {
     // 落库快照 = 发起时冻结的 data；PUT 期间的实时编辑保留在 editRows 中不被覆盖。
     sec.savedData = data
     ElMessage.success('附注数据已保存')
+    // 勾稽校验读的是已保存数据：保存后按同一上下文重跑
+    loadCheckRules(context)
     // 仅当 PUT 期间没有产生新编辑时才清 dirty；否则保留新 dirty（用户在保存中又改了）。
     if (noteDirtyEpoch.value === epochAtStart) {
       clearNoteDirty()
@@ -2955,8 +2982,8 @@ async function onNoteNodeClick(
     loadedNoteContext.value = { ...context }
     // 批注加载带本次请求的 signal：切模板/章节后旧批注响应（signal 已 abort）不得覆盖新章节
     cellComments.loadComments(sec.section_id, ticket.signal)
-    // 异步加载跨表勾稽结果（不阻塞章节展示）
-    loadCheckRules(sec.section_id)
+    // 异步加载跨表勾稽结果（不阻塞章节展示）：与本次章节加载同一上下文 / 取消信号
+    loadCheckRules(context, ticket.signal)
     return noteRefreshResult(
       hasPersistedNoteContent(savedContent) ? 'done' : 'skipped',
       context,

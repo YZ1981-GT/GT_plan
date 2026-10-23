@@ -716,3 +716,116 @@ describe('自动刷新开关挂载（R7.1）', () => {
     expect(sw.props('projectId')).toBe('fixture-project')
   })
 })
+
+describe('勾稽校验按当前节点读取（R7.5）', () => {
+  const checkCalls = () => api.get.mock.calls.filter(([url]) => String(url).includes('/check-rules/'))
+  const sectionOf = (url: string) => section(url.includes('/listed/') ? 'listed' : 'soe', decodeURIComponent(url.split('/').at(-1)!))
+  const nodeOf = (url: string) => (url.includes('A%3Asubsidiary') ? 'A:subsidiary' : 'G:consol')
+
+  it('章节加载后带当前节点、加载时模板变体与静默标记请求勾稽，结果落到本章节', async () => {
+    api.get.mockImplementation(async (url: string) => {
+      if (url.includes('/cell-comments/')) return []
+      if (url.includes('/data/')) return { content: {}, node_key: nodeOf(url) }
+      if (url.includes('/check-rules/')) {
+        return { node_key: 'A:subsidiary', results: [{ check_id: 'F5-8', status: 'fail', description: '账龄表合计', diff: '1', expected: '2', actual: '3' }] }
+      }
+      return sectionOf(url)
+    })
+    const w = await loaded({ standard: 'listed', currentEntity: { nodeKey: 'A:subsidiary', code: 'A' } })
+    const calls = checkCalls()
+    expect(calls).toHaveLength(1)
+    const [url, options] = calls[0] as [string, any]
+    expect(url).toBe('/api/consol-note-sections/check-rules/fixture-project/2025/五-5-2')
+    expect(options.params).toEqual({ template_type: 'listed', node_key: 'A:subsidiary' })
+    expect(options._silent).toBe(true)
+    expect(options.signal).toBeInstanceOf(AbortSignal)
+    expect(state(w).checkRulesResults.map((r: any) => r.check_id)).toEqual(['F5-8'])
+    expect(state(w).checkRulesError).toBe('')
+  })
+
+  it.each(['resolve', 'reject'])('切换节点后旧节点晚到的勾稽%s不落到新节点（取消被忽略也一样）', async (outcome) => {
+    const pending = deferred()
+    let first: AbortSignal | undefined
+    api.get.mockImplementation((url: string, options?: any) => {
+      if (url.includes('/cell-comments/')) return Promise.resolve([])
+      if (url.includes('/data/')) return Promise.resolve({ content: {}, node_key: nodeOf(url) })
+      if (url.includes('/check-rules/')) {
+        if (!first) { first = options.signal; return pending.promise }
+        return Promise.resolve({ results: [{ check_id: 'NEW', status: 'pass', description: '新节点' }] })
+      }
+      return Promise.resolve(sectionOf(url))
+    })
+    const w = await loaded()
+    // 切节点：组件清空当前章节、取消飞行中的请求（这里的模拟接口不理会取消，晚到照样返回）
+    await w.setProps({ currentEntity: { nodeKey: 'A:subsidiary', code: 'A' } })
+    await flushPromises()
+    expect(first?.aborted).toBe(true)
+    if (outcome === 'resolve') pending.resolve({ results: [{ check_id: 'OLD', status: 'fail', description: '旧节点' }] })
+    else pending.reject({ response: { status: 500, data: { detail: '旧节点失败' } } })
+    await flushPromises()
+    expect(state(w).checkRulesResults).toEqual([])
+    expect(state(w).checkRulesError).toBe('')
+    // 父组件再按新节点打开章节
+    await exposed(w).onNoteNodeClick({ section_id: '五-5-2' })
+    await flushPromises()
+    expect(checkCalls()).toHaveLength(2)
+    expect(checkCalls()[1][1]).toEqual(expect.objectContaining({ params: { template_type: 'soe', node_key: 'A:subsidiary' } }))
+    expect(state(w).checkRulesResults.map((r: any) => r.check_id)).toEqual(['NEW'])
+    expect(state(w).checkRulesError).toBe('')
+  })
+
+  it('同一上下文并发两次（加载触发 + 保存后重跑）只认最后一次发起的', async () => {
+    const slow = deferred()
+    let n = 0
+    api.get.mockImplementation((url: string) => {
+      if (url.includes('/cell-comments/')) return Promise.resolve([])
+      if (url.includes('/data/')) return Promise.resolve({ content: {}, node_key: 'G:consol' })
+      if (url.includes('/check-rules/')) {
+        n += 1
+        return n === 1 ? slow.promise : Promise.resolve({ results: [{ check_id: 'NEW', status: 'pass', description: '保存后' }] })
+      }
+      return Promise.resolve(sectionOf(url))
+    })
+    const w = await loaded()
+    markDirty(w)
+    expect(await exposed(w).saveNoteData()).toBe(true)
+    await flushPromises()
+    expect(state(w).checkRulesResults.map((r: any) => r.check_id)).toEqual(['NEW'])
+    slow.resolve({ results: [{ check_id: 'OLD', status: 'fail', description: '保存前' }] })
+    await flushPromises()
+    expect(state(w).checkRulesResults.map((r: any) => r.check_id)).toEqual(['NEW'])
+  })
+
+  it('读取失败显示未执行原因、不动章节；被取消不算失败', async () => {
+    let failure: unknown = { response: { status: 400, data: { detail: '本项目合并附注按国企版模板（soe），不能按 listed 取数' } } }
+    api.get.mockImplementation(async (url: string) => {
+      if (url.includes('/cell-comments/')) return []
+      if (url.includes('/data/')) return { content: {}, node_key: 'G:consol' }
+      if (url.includes('/check-rules/')) throw failure
+      return sectionOf(url)
+    })
+    const w = await loaded()
+    expect(exposed(w).selectedNoteSection?.section_id).toBe('五-5-2')
+    expect(state(w).checkRulesError).toBe('本项目合并附注按国企版模板（soe），不能按 listed 取数')
+    const alert = w.find('[data-testid="consol-note-check-rules-error"]')
+    expect(alert.exists()).toBe(true)
+    expect(alert.attributes('title')).toBe('勾稽校验未执行：本项目合并附注按国企版模板（soe），不能按 listed 取数')
+
+    failure = { code: 'ERR_CANCELED' }
+    await exposed(w).onNoteNodeClick({ section_id: '五-5-3' })
+    await flushPromises()
+    expect(state(w).checkRulesError).toBe('')
+    expect(w.find('[data-testid="consol-note-check-rules-error"]').exists()).toBe(false)
+  })
+
+  it('保存成功后按同一上下文重跑勾稽（读的是已保存数据）', async () => {
+    const w = await loaded()
+    markDirty(w)
+    api.get.mockClear()
+    expect(await exposed(w).saveNoteData()).toBe(true)
+    await flushPromises()
+    const calls = checkCalls()
+    expect(calls).toHaveLength(1)
+    expect((calls[0] as [string, any])[1].params).toEqual({ template_type: 'soe', node_key: 'G:consol' })
+  })
+})

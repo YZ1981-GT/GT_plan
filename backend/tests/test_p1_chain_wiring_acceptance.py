@@ -266,22 +266,24 @@ class TestP1_7_AccountsReceivableSubtable:
     def test_column_balance_pass_and_fail(self):
         """模式 B 列平衡：平衡→pass，不平衡→fail。"""
         from app.services.note_check_rules import CheckRule, _check_column_balance
+        from app.services.note_table_header_library import RollForward
 
         rule = CheckRule(
             check_id="MV-TEST", peer_section_id="", peer_row_label="",
             peer_col_index=0, self_row_label="*", self_col_index=0,
             relation="column_balance", tolerance=0.01,
             description="测试", mode="column_balance",
-            opening_col=1, increase_col=2, decrease_col=3, closing_col=4,
         )
+        # 列由标题行库按表头认（R7.5）：期初 1 / 增加 2 / 减少 3 / 期末 4
+        flow = RollForward(opening=1, closing=4, increase=(2,), decrease=(3,), unknown=())
         rows = [
             ["固定资产", 1000, 200, 100, 1100],  # 1000+200-100=1100 ✓
-            ["商誉", 300, 0, 0, 400],              # 300+0-0≠400 ✗
+            ["商誉", 300, 50, 0, 400],             # 300+50-0≠400 ✗
+            ["无形资产", 300, 0, 0, 400],          # 只填了余额（与「审核」同口径不勾稽）
         ]
-        results = _check_column_balance(rule, rows)
+        results = _check_column_balance(rule, rows, flow)
         statuses = {r.check_id: r.status for r in results}
-        assert any(s == "pass" for s in statuses.values())
-        assert any(s == "fail" for s in statuses.values())
+        assert statuses == {"MV-TEST[固定资产]": "pass", "MV-TEST[商誉]": "fail"}
 
     def test_check_rules_endpoint_registered(self):
         """check-rules 端点已注册。"""

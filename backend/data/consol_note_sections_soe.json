@@ -353,7 +353,7 @@
         "self_col_index": 1,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "应收票据分类表合计 = 坏账分类表合计账面余额"
+        "description": "应收票据：坏账分类表「合计」期末账面余额 = 应收票据分类表「合计」期末账面余额"
       }
     ]
   },
@@ -432,20 +432,7 @@
         "span": 5
       }
     ],
-    "continuation_of": "五-4-2",
-    "check_rules": [
-      {
-        "check_id": "CT-4_3",
-        "peer_section_id": "五-4-2",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ]
+    "continuation_of": "五-4-2"
   },
   {
     "id": "a1d7d0cf-002c-4e2a-b2ea-855cebd3ea26",
@@ -1151,7 +1138,7 @@
         "self_col_index": 1,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "账龄表合计账面余额 = 坏账分类表合计账面余额"
+        "description": "应收账款：坏账分类表「合计」期末账面余额 = 账龄表「合计」期末账面余额"
       },
       {
         "check_id": "F5-4",
@@ -1162,7 +1149,7 @@
         "self_col_index": 1,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "单项计提明细合计 = 坏账分类表「按单项计提坏账准备」行账面余额"
+        "description": "应收账款：坏账分类表「按单项计提坏账准备」期末账面余额 = 期末单项计提明细表「合计」账面余额"
       }
     ]
   },
@@ -1935,20 +1922,7 @@
         "——"
       ]
     ],
-    "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F6-8",
-        "peer_section_id": "五-7-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "预付款项账龄合计 = 主表合计期末余额"
-      }
-    ]
+    "multi_header": null
   },
   {
     "id": "33aa3c15-b326-4378-87f7-4c91874cad99",
@@ -2117,20 +2091,7 @@
         ""
       ]
     ],
-    "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F7-8",
-        "peer_section_id": "五-9-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "其他应收款账龄合计 = 坏账分类合计账面余额"
-      }
-    ]
+    "multi_header": null
   },
   {
     "id": "7a6d1b16-d5bc-4f21-874f-84601dea646d",
@@ -2587,6 +2548,19 @@
         "start": 1,
         "span": 5
       }
+    ],
+    "check_rules": [
+      {
+        "check_id": "F7-8",
+        "peer_section_id": "五-9-6",
+        "peer_row_label": "合  计",
+        "peer_col_index": 1,
+        "self_row_label": "合  计",
+        "self_col_index": 1,
+        "relation": "equal",
+        "tolerance": 0.01,
+        "description": "其他应收款：坏账分类表「合计」期末账面余额 = 账龄表「合计」期末账面余额"
+      }
     ]
   },
   {
@@ -2680,20 +2654,7 @@
         "span": 5
       }
     ],
-    "continuation_of": "五-9-7",
-    "check_rules": [
-      {
-        "check_id": "CT-9_8",
-        "peer_section_id": "五-9-7",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ]
+    "continuation_of": "五-9-7"
   },
   {
     "id": "f42a7a5e-ec88-4eca-a4fe-5c6355b44747",
@@ -2944,20 +2905,7 @@
         "span": 3
       }
     ],
-    "continuation_of": "五-9-10",
-    "check_rules": [
-      {
-        "check_id": "CT-9_11",
-        "peer_section_id": "五-9-10",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ]
+    "continuation_of": "五-9-10"
   },
   {
     "id": "2ee51b4c-ae9b-4ff6-81ad-9561529988e9",
@@ -3576,12 +3524,12 @@
         "check_id": "F8-4",
         "peer_section_id": "五-10-1",
         "peer_row_label": "合  计",
-        "peer_col_index": 1,
+        "peer_col_index": 2,
         "self_row_label": "合  计",
-        "self_col_index": 1,
+        "self_col_index": 7,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "存货跌价准备合计 = 存货主表合计期末余额"
+        "description": "存货：跌价准备变动表「合计」期末数 = 存货分类表「合计」期末跌价准备"
       }
     ]
   },
@@ -3958,12 +3906,12 @@
         "check_id": "F9-4",
         "peer_section_id": "五-11-1",
         "peer_row_label": "合  计",
-        "peer_col_index": 1,
+        "peer_col_index": 2,
         "self_row_label": "合  计",
-        "self_col_index": 1,
+        "self_col_index": 6,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "合同资产减值准备合计 = 合同资产主表合计期末余额"
+        "description": "合同资产：减值准备变动表「合计」期末数 = 合同资产情况表「合计」期末减值准备"
       }
     ]
   },
@@ -4278,12 +4226,12 @@
         "check_id": "F11-4",
         "peer_section_id": "五-12-1",
         "peer_row_label": "合  计",
-        "peer_col_index": 1,
+        "peer_col_index": 2,
         "self_row_label": "合  计",
-        "self_col_index": 1,
+        "self_col_index": 5,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "持有待售资产减值合计 = 主表合计期末余额"
+        "description": "持有待售资产：减值准备变动表「合计」期末数 = 持有待售资产表「合计」期末减值准备"
       }
     ]
   },
@@ -4634,19 +4582,6 @@
       ]
     ],
     "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F10-4b",
-        "peer_section_id": "五-15-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "债权投资减值合计 = 主表合计期末余额"
-      }
-    ],
     "text_after_table": "减值准备计提情况",
     "continuation_of": "五-15-1"
   },
@@ -5067,6 +5002,19 @@
         "start": 4,
         "span": 1
       }
+    ],
+    "check_rules": [
+      {
+        "check_id": "F10-4b",
+        "peer_section_id": "五-15-1",
+        "peer_row_label": "合  计",
+        "peer_col_index": 2,
+        "self_row_label": "期末余额",
+        "self_col_index": 4,
+        "relation": "equal",
+        "tolerance": 0.01,
+        "description": "债权投资：减值准备变动情况表「期末余额」行合计 = 债权投资情况表「合计」期末减值准备"
+      }
     ]
   },
   {
@@ -5165,19 +5113,6 @@
       ]
     ],
     "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F10-4",
-        "peer_section_id": "五-16-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "其他债权投资减值合计 = 主表合计期末余额"
-      }
-    ],
     "text_after_table": "减值准备计提情况\n参照“附注八、15、债权投资（3）减值准备计提情况”进行披露。"
   },
   {
@@ -5361,20 +5296,7 @@
         "--"
       ]
     ],
-    "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F12-4",
-        "peer_section_id": "五-17-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "长期应收款减值合计 = 主表合计期末余额"
-      }
-    ]
+    "multi_header": null
   },
   {
     "id": "cacf730f-dc68-4fea-9382-430b18e0af69",
@@ -5482,10 +5404,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -6729,25 +6647,7 @@
         "X.XX"
       ]
     ],
-    "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "MV-21_1",
-        "mode": "column_balance",
-        "self_row_label": "*",
-        "self_col_index": 0,
-        "peer_section_id": "",
-        "peer_row_label": "",
-        "peer_col_index": 0,
-        "relation": "column_balance",
-        "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 4,
-        "closing_col": 6,
-        "description": "变动表平衡：期初+增加-减少=期末"
-      }
-    ]
+    "multi_header": null
   },
   {
     "id": "46ce26eb-c0f1-4dbf-ae69-7c51c465c02b",
@@ -6956,10 +6856,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -7121,22 +7017,6 @@
     ],
     "check_rules": [
       {
-        "check_id": "MV-22_2",
-        "mode": "column_balance",
-        "self_row_label": "*",
-        "self_col_index": 0,
-        "peer_section_id": "",
-        "peer_row_label": "",
-        "peer_col_index": 0,
-        "relation": "column_balance",
-        "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
-        "description": "变动表平衡：期初+增加-减少=期末"
-      },
-      {
         "check_id": "MV-21_2",
         "mode": "column_balance",
         "self_row_label": "*",
@@ -7146,10 +7026,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 5,
-        "closing_col": 7,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -8251,10 +8127,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -8380,10 +8252,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -8523,10 +8391,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -8735,10 +8599,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -9108,10 +8968,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 4,
-        "closing_col": 7,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -9452,10 +9308,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -9518,10 +9370,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -9574,33 +9422,6 @@
     "multi_header": null,
     "check_rules": [
       {
-        "check_id": "F13-4",
-        "peer_section_id": "五-29-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "商誉减值准备合计 = 商誉原值合计期末余额"
-      },
-      {
-        "check_id": "MV-30_2",
-        "mode": "column_balance",
-        "self_row_label": "*",
-        "self_col_index": 0,
-        "peer_section_id": "",
-        "peer_row_label": "",
-        "peer_col_index": 0,
-        "relation": "column_balance",
-        "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
-        "description": "变动表平衡：期初+增加-减少=期末"
-      },
-      {
         "check_id": "MV-29_2",
         "mode": "column_balance",
         "self_row_label": "*",
@@ -9610,10 +9431,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -9892,30 +9709,6 @@
         "group": "期初",
         "start": 3,
         "span": 2
-      }
-    ],
-    "check_rules": [
-      {
-        "check_id": "F16-4",
-        "peer_section_id": "五-31-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "递延所得税（抵销后）合计 = 递延所得税（未抵销）合计期末余额"
-      },
-      {
-        "check_id": "F15-4",
-        "peer_section_id": "五-30-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "长期待摊费用变动表合计 = 主表合计期末余额"
       }
     ],
     "continuation_of": "五-31-1"
@@ -10693,10 +10486,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -10807,13 +10596,13 @@
       {
         "check_id": "F17-4",
         "peer_section_id": "五-40-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
+        "peer_row_label": "短期薪酬",
+        "peer_col_index": 4,
         "self_row_label": "合  计",
-        "self_col_index": 1,
+        "self_col_index": 4,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "应付职工薪酬明细合计 = 主表合计期末余额"
+        "description": "应付职工薪酬：短期薪酬列示表「合计」期末余额 = 应付职工薪酬列示表「短期薪酬」行期末余额"
       },
       {
         "check_id": "MV-41_2",
@@ -10825,10 +10614,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -10925,10 +10710,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -11088,41 +10869,6 @@
       ]
     ],
     "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "F19-4",
-        "peer_section_id": "五-42-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "其他应付款明细合计 = 主表合计期末余额"
-      },
-      {
-        "check_id": "F18-4",
-        "peer_section_id": "五-41-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "应交税费明细合计 = 主表合计期末余额"
-      },
-      {
-        "check_id": "CT-42_2",
-        "peer_section_id": "五-41-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
-      }
-    ],
     "continuation_of": "五-42-1"
   },
   {
@@ -11238,20 +10984,20 @@
       ]
     ],
     "multi_header": null,
+    "continuation_of": "五-42-4",
     "check_rules": [
       {
-        "check_id": "CT-42_5",
-        "peer_section_id": "五-42-4",
-        "peer_row_label": "合  计",
+        "check_id": "F19-4",
+        "peer_section_id": "五-42-1",
+        "peer_row_label": "其他应付款项",
         "peer_col_index": 1,
         "self_row_label": "合  计",
         "self_col_index": 1,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
+        "description": "其他应付款：按款项性质列示表「合计」期末余额 = 其他应付款表「其他应付款项」行期末余额"
       }
-    ],
-    "continuation_of": "五-42-4"
+    ]
   },
   {
     "id": "074de92d-6995-40ff-936a-502bcf3ddd7c",
@@ -11827,10 +11573,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 3,
-        "decrease_col": 5,
-        "closing_col": 7,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -12045,24 +11787,6 @@
       }
     ],
     "continuation_of": "五-51-1",
-    "check_rules": [
-      {
-        "check_id": "MV-52_2",
-        "mode": "column_balance",
-        "self_row_label": "*",
-        "self_col_index": 0,
-        "peer_section_id": "",
-        "peer_row_label": "",
-        "peer_col_index": 0,
-        "relation": "column_balance",
-        "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
-        "description": "变动表平衡：期初+增加-减少=期末"
-      }
-    ],
     "text_after_table": "股利（或利息）的设定机制"
   },
   {
@@ -12206,24 +11930,13 @@
       {
         "check_id": "F20-4",
         "peer_section_id": "五-53-1",
-        "peer_row_label": "合  计",
+        "peer_row_label": "长期应付款",
         "peer_col_index": 1,
         "self_row_label": "合  计",
         "self_col_index": 1,
         "relation": "equal",
         "tolerance": 0.01,
-        "description": "长期应付款明细合计 = 主表合计期末余额"
-      },
-      {
-        "check_id": "CT-54_2",
-        "peer_section_id": "五-53-1",
-        "peer_row_label": "合  计",
-        "peer_col_index": 1,
-        "self_row_label": "合  计",
-        "self_col_index": 1,
-        "relation": "equal",
-        "tolerance": 0.01,
-        "description": "续表合计 = 前表合计（跨期对应）"
+        "description": "长期应付款：长期应付款项明细表「合计」期末余额 = 长期应付款表「长期应付款」行期末余额"
       }
     ],
     "continuation_of": "五-53-1",
@@ -12298,22 +12011,6 @@
     "multi_header": null,
     "check_rules": [
       {
-        "check_id": "MV-54_3",
-        "mode": "column_balance",
-        "self_row_label": "*",
-        "self_col_index": 0,
-        "peer_section_id": "",
-        "peer_row_label": "",
-        "peer_col_index": 0,
-        "relation": "column_balance",
-        "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
-        "description": "变动表平衡：期初+增加-减少=期末"
-      },
-      {
         "check_id": "MV-53_3",
         "mode": "column_balance",
         "self_row_label": "*",
@@ -12323,10 +12020,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -12397,10 +12090,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -12990,10 +12679,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -13107,25 +12792,7 @@
         "xx"
       ]
     ],
-    "multi_header": null,
-    "check_rules": [
-      {
-        "check_id": "MV-58_1",
-        "mode": "column_balance",
-        "self_row_label": "*",
-        "self_col_index": 0,
-        "peer_section_id": "",
-        "peer_row_label": "",
-        "peer_col_index": 0,
-        "relation": "column_balance",
-        "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 3,
-        "decrease_col": 4,
-        "closing_col": 5,
-        "description": "变动表平衡：期初+增加-减少=期末"
-      }
-    ]
+    "multi_header": null
   },
   {
     "id": "86df990e-b1db-4187-9ca3-2f94c8f4d433",
@@ -13414,10 +13081,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -13485,10 +13148,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ],
@@ -13572,10 +13231,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -19291,10 +18946,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]
@@ -19484,10 +19135,6 @@
         "peer_col_index": 0,
         "relation": "column_balance",
         "tolerance": 0.01,
-        "opening_col": 1,
-        "increase_col": 2,
-        "decrease_col": 3,
-        "closing_col": 4,
         "description": "变动表平衡：期初+增加-减少=期末"
       }
     ]

@@ -433,13 +433,17 @@ class TestNoteCheckRulesE2E:
         assert len(rules) >= 1
 
     def test_load_all_check_rules_coverage(self):
-        """全科目 check_rules 总量基线：至少 100 条（棘轮，只许增不许减）。"""
+        """全科目 check_rules 总量基线：至少 70 条（棘轮，只许增不许减）。
+
+        2026-10-23 R7.5 逐条核对：117 → 70，删的都是不成立的（跨期 CT 24 条、说明关系不成立的跨表 14 条、标题行库认不出
+        变动表或重复的列平衡 9 条），明细见 test_note_check_rules_coverage 与 design §16.9 批 8c。
+        """
         from app.services.note_check_rules import load_all_check_rules
 
         soe_rules = load_all_check_rules("soe")
         listed_rules = load_all_check_rules("listed")
         total = sum(len(v) for v in soe_rules.values()) + sum(len(v) for v in listed_rules.values())
-        assert total >= 100, f"check_rules 总量 {total} 低于基线 100"
+        assert total >= 70, f"check_rules 总量 {total} 低于基线 70"
 
     def test_check_rule_mode_a_cross_table_pass(self):
         """模式 A 跨表校验：两表同标签同列同值 → pass。"""
@@ -490,6 +494,7 @@ class TestNoteCheckRulesE2E:
     def test_check_rule_mode_b_column_balance_pass(self):
         """模式 B 列平衡：期初 + 增加 - 减少 = 期末。"""
         from app.services.note_check_rules import CheckRule, _check_column_balance
+        from app.services.note_table_header_library import RollForward
 
         # 构造一个变动表：期初 1000 + 增加 500 - 减少 200 = 期末 1300
         rows = [
@@ -506,12 +511,10 @@ class TestNoteCheckRulesE2E:
             tolerance=0.01,
             description="变动表列平衡测试",
             mode="column_balance",
-            opening_col=1,
-            increase_col=2,
-            decrease_col=3,
-            closing_col=4,
         )
-        results = _check_column_balance(rule, rows)
+        # 列由标题行库按表头认（R7.5）：期初 1 / 增加 2 / 减少 3 / 期末 4
+        flow = RollForward(opening=1, closing=4, increase=(2,), decrease=(3,), unknown=())
+        results = _check_column_balance(rule, rows, flow)
         assert len(results) >= 1
         pass_count = sum(1 for r in results if r.status == "pass")
         assert pass_count >= 1
@@ -519,6 +522,7 @@ class TestNoteCheckRulesE2E:
     def test_check_rule_mode_b_column_balance_fail(self):
         """模式 B 列平衡：不平 → fail。"""
         from app.services.note_check_rules import CheckRule, _check_column_balance
+        from app.services.note_table_header_library import RollForward
 
         # 构造不平衡数据：期初 1000 + 增加 500 - 减少 200 ≠ 期末 1500
         rows = [
@@ -535,12 +539,9 @@ class TestNoteCheckRulesE2E:
             tolerance=0.01,
             description="变动表列不平衡测试",
             mode="column_balance",
-            opening_col=1,
-            increase_col=2,
-            decrease_col=3,
-            closing_col=4,
         )
-        results = _check_column_balance(rule, rows)
+        flow = RollForward(opening=1, closing=4, increase=(2,), decrease=(3,), unknown=())
+        results = _check_column_balance(rule, rows, flow)
         fail_count = sum(1 for r in results if r.status == "fail")
         assert fail_count >= 1
 

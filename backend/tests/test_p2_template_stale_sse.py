@@ -40,9 +40,9 @@ class TestP2_1_TemplateCoverage:
         assert len(data) >= 251, f"soe 只有 {len(data)} 章节"
 
     def test_listed_section_count_baseline(self):
-        """listed 模板章节数 ≥ 423（2026-10-23 R7.6 去掉 9 张重复表前为 432）。"""
+        """listed 模板章节数 ≥ 422（2026-10-23 R7.6 去掉 9 张重复表前为 432；R7.8 去掉与合同资产表同口径重复的净额简表）。"""
         data = _load_template("listed")
-        assert len(data) >= 423, f"listed 只有 {len(data)} 章节"
+        assert len(data) >= 422, f"listed 只有 {len(data)} 章节"
 
     def test_soe_covers_key_sections(self):
         """soe 覆盖关键科目章节（应收/存货/固定/无形/权益）。"""
@@ -126,11 +126,11 @@ class TestP2_3_MultiHeaderCoverage:
                     )
 
     def test_check_rules_total_baseline(self):
-        """check_rules 总量 ≥ 100（棘轮）。"""
+        """check_rules 总量 ≥ 70（棘轮；2026-10-23 R7.5 逐条核对删去不成立的规则 117 → 70，见 test_note_check_rules_coverage）。"""
         from app.services.note_check_rules import load_all_check_rules
         total = sum(len(v) for v in load_all_check_rules("soe").values()) + \
                 sum(len(v) for v in load_all_check_rules("listed").values())
-        assert total >= 100, f"check_rules 总量 {total} < 100"
+        assert total >= 70, f"check_rules 总量 {total} < 70"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

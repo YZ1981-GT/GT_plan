@@ -13,6 +13,7 @@ from app.services.note_check_rules import (
     _find_row_by_label,
     _to_decimal,
     load_all_check_rules,
+    rollforward_for,
 )
 from decimal import Decimal
 
@@ -90,5 +91,5 @@ class TestLoadAllCheckRules:
                     assert rule.relation in ("equal",), f"{std} {sid} {rule.check_id}: 未知关系 {rule.relation}"
                 elif rule.mode == "column_balance":
                     assert rule.relation in ("column_balance",), f"{std} {sid} {rule.check_id}: 模式B关系应为column_balance"
-                    assert all(c >= 0 for c in (rule.opening_col, rule.increase_col, rule.decrease_col, rule.closing_col)), \
-                        f"{std} {sid} {rule.check_id}: 模式B列索引不完整"
+                    # 期初 / 期末 / 增减列由标题行库按表头认（R7.5），认不出的表不该挂列平衡
+                    assert rollforward_for(std, sid) is not None, f"{std} {sid} {rule.check_id}: 标题行库认不出变动表"

@@ -31,9 +31,11 @@ multi_header_to_column_groups = _mod.multi_header_to_column_groups
 # 2026-10-09: P0-P3 全量对齐后的基线
 # 2026-10-23 R7.6：同一张 Word 表的重复条目并成一条（国企 70 条、上市 9 条），表数 321 → 251 / 432 → 423；
 #   一张 Word 表恰一条种子由 test_consol_note_seed_word_identity.py 逐表钉住
+# 2026-10-23 R7.8：上市 五-10 去掉 Word 合同资产表下半截的净额简表（与上半截同口径重复，单体也不收），423 → 422；
+#   多级表头 118 → 116：被同步工具错位写成多级表头的两张单行表头表（本期合同资产账面价值的重大变动、持有待售负债）按 Word 改回
 CONSOL_BASELINES = {
     "soe": {"total": 251, "with_mh": 37},
-    "listed": {"total": 423, "with_mh": 115},
+    "listed": {"total": 422, "with_mh": 116},
 }
 
 
@@ -167,10 +169,10 @@ class TestStandaloneGroupCoverage:
 class TestSectionIdStability:
     """section_id 集合棘轮——只许增不许减。"""
 
-    # 2026-10-09 基线；2026-10-23 R7.6 去掉重复条目后 251 / 423（见 CONSOL_BASELINES）
+    # 2026-10-09 基线；2026-10-23 R7.6 去掉重复条目后 251 / 423，R7.8 上市去掉合同资产净额简表 422（见 CONSOL_BASELINES）
     SECTION_ID_BASELINES = {
         "soe": 251,
-        "listed": 423,
+        "listed": 422,
     }
 
     @pytest.mark.parametrize("std", ["soe", "listed"])

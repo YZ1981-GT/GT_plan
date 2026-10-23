@@ -18,9 +18,15 @@ DATA = Path(__file__).resolve().parents[1] / "data"
 
 # 2026-10-23 R7.6 国企章节号按 Word 重对齐：同一张 Word 表的重复条目并成一条、规则随之合并（53 条一条不少），
 # 带规则的章节 48 → 43（规则逐条核对见 R7.5）。
+# 2026-10-23 R7.5 规则逐条核对（design §16.9 批 8c）：主动删的不是回退 ——
+#   跨期 CT 24 条全删（同一年度内比续表期初与前表期末，不成立；只有比上年同表才成立，几条「续表」还不是续表）；
+#   跨表 国企删 7 / 上市删 7（说明的关系不成立：大额 / 重要明细 ≠ 全表合计、减值准备 ≠ 原值、抵销后 ≠ 未抵销、
+#   错挂的规则、上市没有坏账分类表；上市 F9-4 随合同资产净额简表删）、其余按标题行库语义改对两侧单元格；
+#   列平衡 删 5 张标题行库认不出变动表的（两期余额表 / 数量 + 账面价值两套期初期末）、合并位置带来的重复 4 条。
+#   语义另由 test_consol_note_check_rules_semantics.py 逐条钉住。
 _BASELINE = {
-    "soe": {"sections_with_rules": 43, "total_rules": 53, "mode_a": 24, "mode_b": 29, "cross_period": 6},
-    "listed": {"sections_with_rules": 56, "total_rules": 64, "mode_a": 38, "mode_b": 26, "cross_period": 18},
+    "soe": {"sections_with_rules": 32, "total_rules": 34, "mode_a": 11, "mode_b": 23, "cross_period": 0},
+    "listed": {"sections_with_rules": 31, "total_rules": 36, "mode_a": 13, "mode_b": 23, "cross_period": 0},
 }
 
 
@@ -79,16 +85,18 @@ class TestCheckRulesStructuralIntegrity:
         assert not dupes, f"{std}: 重复 check_id: {set(dupes)}"
 
     @pytest.mark.parametrize("std", ["soe", "listed"])
-    def test_mode_b_has_valid_columns(self, std: str):
-        """模式 B 的四个列索引必须 >= 0 且互不相同。"""
-        all_rules = load_all_check_rules(std)
-        for sid, rules in all_rules.items():
-            for r in rules:
-                if r.mode != "column_balance":
+    def test_mode_b_columns_come_from_header_library(self, std: str):
+        """模式 B 不在种子里写列号（R7.5：原手写列号 16 条与表头不符），期初 / 期末 / 增减列由标题行库按表头认。"""
+        from app.services.note_check_rules import rollforward_for
+
+        data = json.loads((DATA / f"consol_note_sections_{std}.json").read_text("utf-8"))
+        for t in data:
+            for r in t.get("check_rules") or []:
+                if r.get("mode") != "column_balance":
                     continue
-                cols = (r.opening_col, r.increase_col, r.decrease_col, r.closing_col)
-                assert all(c >= 0 for c in cols), f"{std} {sid} {r.check_id}: 列索引有负值 {cols}"
-                assert len(set(cols)) == 4, f"{std} {sid} {r.check_id}: 四列索引不互相独立 {cols}"
+                written = sorted(k for k in ("opening_col", "increase_col", "decrease_col", "closing_col") if k in r)
+                assert not written, f"{std} {t['section_id']} {r['check_id']}: 种子里写了列号 {written}"
+                assert rollforward_for(std, t["section_id"]) is not None, f"{std} {t['section_id']}: 标题行库认不出变动表"
 
     @pytest.mark.parametrize("std", ["soe", "listed"])
     def test_cross_table_peer_exists(self, std: str):

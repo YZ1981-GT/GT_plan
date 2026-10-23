@@ -260,8 +260,29 @@ KNOWN_SECTION_GAPS = {
                    "其后 五、79/81/82 被标成 五、71/73/74；种子章节号与单体模板一致，不按 Word 改号"
     for n in (71, 73, 74)
 }
+#: 第 1 张 Word 表下半截另起表头内嵌第二张表、种子（与单体一致）拆成两条的节（口径, 节号）：
+#: 种子第 2 条没有 Word 标记，``:k``（k ≥ 1）对 五-N-(k+2)（R7.8；原按 k+1 对，表名 / 表头 / 表后文字逐张错后一张）
+EMBEDDED_SPLITS = {("listed", 11): "持有待售资产表下半截是持有待售负债表（单体也拆成两张）"}
+#: 表头占位列已按单体模板实例化的合并表（口径, 条目号）→ (单体章节号, 单体表名)：Word 表头是「……」「可无限量添加列」
+#: 这类按需增加的列（编辑器只能增行不能增列；表体「可无限量添加行」是动态行，照 Word 留着），种子取单体模板（底稿披露表
+#: 写进的那张表）的列，合并才收得下单体的数；Phase 1 不按 Word 改回，种子里没有该条目报「登记失效」（R7.7）
+STANDALONE_INSTANTIATED = {
+    ("listed", "五-22-2"): ("五、22", "固定资产情况"), ("listed", "五-24-1"): ("五、24", "（1）以成本计量"),
+    ("listed", "五-24-2"): ("五、24", "（2）以公允价值计量"), ("listed", "五-25-1"): ("五、25", "使用权资产"),
+    ("listed", "五-28-1"): ("五、28", "商誉账面原值"), ("listed", "五-28-2"): ("五、28", "商誉减值准备"),
+}
 IDENTITY_MISMATCHES: list[str] = []
 KNOWN_GAP_HITS: set[tuple[str, int]] = set()
+
+
+def entry_sid(std: str, p: dict) -> str:
+    """Word 表标记 → 合并种子条目号：报表注释章 五-N-(k+1)（拆表节 k ≥ 1 再 +1），其余章 章-节号或节名-(k+1)。"""
+    ch, sec, k = p.get("chapter", ""), p.get("section"), p.get("table_idx", 0) + 1
+    if ch == note_chapter_for_std(std) and sec is not None:
+        return f"五-{sec}-{k + (k > 1 and (std, sec) in EMBEDDED_SPLITS)}"
+    if p.get("section_name"):
+        return f"{ch}-{re.sub(r'[^\w]', '', p['section_name'])[:20]}-{k}"
+    return f"{ch}-{sec}-{k}" if sec is not None else f"{ch}-{k}"
 
 
 def identity_mismatch(entry: dict, wt: dict, std: str, sid: str, *, rows: bool = True) -> bool:
@@ -334,7 +355,7 @@ def phase1_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
         if not p or p.get("chapter") != note_ch or p.get("section") is None:
             continue
 
-        sid = f"五-{p['section']}-{p['table_idx'] + 1}"
+        sid = entry_sid(std, p)
         entry = by_sid.get(sid)
         if not entry:
             continue  # Phase 2 处理
@@ -350,6 +371,8 @@ def phase1_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
             title_updated += 1
             if verbose:
                 print(f"    P1-T {sid}: title '{j_title[:30]}' → '{w_title[:30]}'")
+        if (std, sid) in STANDALONE_INSTANTIATED:
+            continue  # 占位列已按单体模板实例化，不按 Word 改回
 
         j_cols = len(entry.get("headers", []))
         w_cols = wt["cols"]
@@ -417,7 +440,7 @@ def phase2_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
         if not p or p.get("chapter") != note_ch or p.get("section") is None:
             continue
 
-        sid = f"五-{p['section']}-{p['table_idx'] + 1}"
+        sid = entry_sid(std, p)
         if sid in existing_sids:
             continue
 
@@ -483,19 +506,9 @@ def phase3_consol(word_tables: list[dict], json_data: list[dict], std: str, dry_
         if ch == note_ch:
             continue  # Phase 1/2 已处理
 
-        # 非报表注释章节：构建 section_id
-        sec = p.get("section")
+        # 非报表注释章节：构建 section_id（中文名称章节用名称简写）
         sec_name = p.get("section_name", "")
-        tidx = p.get("table_idx", 0)
-
-        if sec is not None:
-            sid = f"{ch}-{sec}-{tidx + 1}"
-        elif sec_name:
-            # 中文名称章节：用名称简写
-            safe_name = re.sub(r"[^\w]", "", sec_name)[:20]
-            sid = f"{ch}-{safe_name}-{tidx + 1}"
-        else:
-            sid = f"{ch}-{tidx + 1}"
+        sid = entry_sid(std, p)
 
         if sid in existing_sids:
             # ── title 同步（与 Phase 1 同逻辑） ──
@@ -835,19 +848,8 @@ def phase6_text_after_and_parent(
             p = parse_tag(wt["tag"])
             if not p:
                 continue
-            ch = p.get("chapter", "")
-            sec = p.get("section")
-            tidx = p.get("table_idx", 0)
-            sec_name = p.get("section_name", "")
-            if ch == note_ch and sec is not None:
-                sid = f"五-{sec}-{tidx + 1}"
-            elif sec_name:
-                safe = re.sub(r"[^\w]", "", sec_name)[:20]
-                sid = f"{ch}-{safe}-{tidx + 1}"
-            elif sec is not None:
-                sid = f"{ch}-{sec}-{tidx + 1}"
-            else:
-                sid = f"{ch}-{tidx + 1}"
+            ch, sec = p.get("chapter", ""), p.get("section")
+            sid = entry_sid(std, p)
             entry = by_sid.get(sid)
             if not entry or (ch == note_ch and sec is not None and identity_mismatch(entry, wt, std, sid)):
                 continue
@@ -958,18 +960,8 @@ def check_title_drift(
             p = parse_tag(wt["tag"])
             if not p or p.get("section") is None:
                 continue
-            ch = p.get("chapter", "")
-            sec = p.get("section")
-            tidx = p.get("table_idx", 0)
-            if ch == note_ch and sec is not None:
-                sid = f"五-{sec}-{tidx + 1}"
-            elif p.get("section_name"):
-                safe = re.sub(r"[^\w]", "", p["section_name"])[:20]
-                sid = f"{ch}-{safe}-{tidx + 1}"
-            elif sec is not None:
-                sid = f"{ch}-{sec}-{tidx + 1}"
-            else:
-                sid = f"{ch}-{tidx + 1}"
+            ch, sec = p.get("chapter", ""), p.get("section")
+            sid = entry_sid(std, p)
             word_sids.add(sid)
             entry = by_sid.get(sid)
             if not entry or (ch == note_ch and sec is not None and identity_mismatch(entry, wt, std, sid)):
@@ -1100,6 +1092,9 @@ def main():
 
             consol_data = json.loads(consol_json_path.read_text("utf-8"))
             print(f"  JSON 表格: {len(consol_data)}")
+            sids = {e.get("section_id") for e in consol_data}
+            for key in (k for k in STANDALONE_INSTANTIATED if k[0] == std and k[1] not in sids):
+                IDENTITY_MISMATCHES.append(f"[{std}] {key[1]} 登记为占位列按单体实例化，但种子里没有该条目，请核对登记")
 
             if 1 in phases:
                 struct_n, title_n = phase1_consol(consol_word, consol_data, std, args.dry_run, args.verbose)

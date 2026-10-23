@@ -76,15 +76,20 @@ def _cross_check_preset() -> list[Rule]:
 
 
 def _consol_note_checks() -> list[Rule]:
-    from app.services.note_check_rules import load_all_check_rules
+    from app.services.note_check_rules import load_all_check_rules, rollforward_for
+
+    def cols(indexes) -> str:
+        return "、".join(str(i) for i in indexes) or "无"
 
     out = []
     for std in ("soe", "listed"):
         for section, rules in sorted(load_all_check_rules(std).items()):
             for r in rules:
-                if r.mode == "column_balance":
-                    expr = (f"期初（列{r.opening_col}）+ 增加（列{r.increase_col}）− 减少（列{r.decrease_col}）"
-                            f"= 期末（列{r.closing_col}）")
+                if r.mode == "column_balance":  # 列由标题行库按表头认（与执行同一份）
+                    flow = rollforward_for(std, section)
+                    expr = ("标题行库认不出期初 / 期末 / 增减列" if flow is None else
+                            f"期初（列{flow.opening}）+ 增加（列{cols(flow.increase)}）− 减少（列{cols(flow.decrease)}）"
+                            f"= 期末（列{flow.closing}）")
                 else:
                     expr = (f"{r.self_row_label}（列{r.self_col_index}）= {r.peer_section_id} "
                             f"{r.peer_row_label}（列{r.peer_col_index}）")

@@ -7,15 +7,19 @@ spec: consol-note-header-library-and-node-reaggregate（Task 9，从 ``consol_no
 - 合计 / 小计 = 本表数据行之和（表内计算，不取来源合计）：小计只加到上一个合计 / 小计为止，合计加全部
   数据行；整列都没有数据保持空白；
 - 手工 / 锁定单元格保留原值并回报。
+
+变动表逐行勾稽（期初 + Σ增加 − Σ减少 = 期末，``rollforward_balance``）：「审核」与勾稽规则列平衡共用同一个函数（R7.5）。
 """
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any, Sequence
 
-__all__ = ["TOTAL_ROW_TYPES", "build_table_rows", "existing_cell", "fmt_amount", "to_decimal"]
+__all__ = ["TOTAL_ROW_TYPES", "build_table_rows", "existing_cell", "fmt_amount", "rollforward_balance", "to_decimal"]
 
 TOTAL_ROW_TYPES = ("total", "subtotal")
+#: 空格与占位符（「—」「-」）：没有金额
+_BLANK_CELLS = ("", "-", "—", "－")
 
 
 def to_decimal(value: Any) -> Decimal | None:
@@ -29,12 +33,36 @@ def to_decimal(value: Any) -> Decimal | None:
     if isinstance(value, dict):  # 带元数据的单元格
         return to_decimal(value.get("value", value.get("manual_value")))
     s = str(value).strip().replace(",", "").replace("，", "")
-    if not s or s in ("-", "—", "－"):
+    if s in _BLANK_CELLS:
         return None
     try:
         return Decimal(s)
     except InvalidOperation:
         return None
+
+
+def rollforward_balance(flow: Any, row: Sequence[Any]) -> tuple[Decimal, Decimal] | None:
+    """变动表一行：(期初 + Σ增加 − Σ减少, 期末)；这一行没法勾稽 ⇒ None。「审核」的勾稽校验与勾稽规则列平衡共用。
+
+    ``flow`` 是标题行库 ``rollforward_columns`` 按表头认出的列（期初 / 期末 / 增加 / 减少 / 方向不定）。没法勾稽：期初或期末格
+    有字但不是金额；期初、期末都是零；方向不定的变动列有数；增加、减少合计都是零（只填了余额）。空格、越界、占位符按零。
+    """
+    def amount(ci: int) -> Decimal | None:
+        raw = row[ci] if 0 <= ci < len(row) else None
+        if raw is None or (not isinstance(raw, dict) and str(raw).strip() in _BLANK_CELLS):
+            return Decimal(0)
+        return to_decimal(raw)
+
+    opening, closing = amount(flow.opening), amount(flow.closing)
+    if opening is None or closing is None or not (opening or closing):
+        return None
+    if any(amount(ci) for ci in flow.unknown):
+        return None
+    increase = sum((amount(ci) or Decimal(0) for ci in flow.increase), Decimal(0))
+    decrease = sum((amount(ci) or Decimal(0) for ci in flow.decrease), Decimal(0))
+    if not (increase or decrease):
+        return None
+    return opening + increase - decrease, closing
 
 
 def fmt_amount(value: Decimal) -> str:
