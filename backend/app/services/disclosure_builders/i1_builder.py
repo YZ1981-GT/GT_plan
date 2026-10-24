@@ -32,15 +32,18 @@ _COLUMNS = [
 ]
 
 
-def _num(v: Any) -> float:
+def _num_or_none(v: Any) -> float | None:
+    """数值或 ``None``（缺失 / 空串 / 不是数）—— 用于「读不到不写」的取值。"""
+    if isinstance(v, bool):
+        return None
     if isinstance(v, (int, float)):
         return float(v)
-    if isinstance(v, str):
+    if isinstance(v, str) and v.strip():
         try:
             return float(v.strip())
-        except (ValueError, AttributeError):
-            pass
-    return 0.0
+        except ValueError:
+            return None
+    return None
 
 
 @register_builder
@@ -52,19 +55,20 @@ class I1Builder(DisclosurePayloadBuilder):
         if not entries:
             return None
 
+        # 审定净值由公式推送按审定表三段行清单算出（原价 − 累计摊销 − 减值准备）；行清单没存时推送写空。
+        # 空 ≠ 0：原先 _num('') 当 0 写进附注主表（spec formula-fetch-followup-defect-closure R6.3）
+        net = _num_or_none(entries.get("I1-1-audited-net"))
+        if net is None:
+            return None
+
         template_type = await load_project_template_type(db, project_id)
         variant = "soe" if "soe" in template_type.lower() else "listed"
         current_standard = await load_project_standard(db, project_id)
 
-        net = _num(entries.get("I1-1-audited-net"))
-        cost = _num(entries.get("I1-1-tb-cost"))
-        amort = _num(entries.get("I1-1-tb-amort"))
-        impair = _num(entries.get("I1-1-tb-impair"))
-
-        # 主表：审定净值 = 期末，无期初数据（checklist_responses 不存 opening）
+        # 主表：审定净值 = 期末；底稿不存期初净值 ⇒ 期初留空（原先写 0.0，把「没有」写成了「为零」）
         rows: list[dict[str, Any]] = [
-            {"label": "无形资产", "end_amount": net, "prior_amount": 0.0},
-            {"label": "合计", "end_amount": net, "prior_amount": 0.0, "is_total": True},
+            {"label": "无形资产", "end_amount": net, "prior_amount": None},
+            {"label": "合计", "end_amount": net, "prior_amount": None, "is_total": True},
         ]
 
         return PayloadBuildResult(

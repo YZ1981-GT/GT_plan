@@ -263,8 +263,8 @@ async def test_k2_second_push_idempotent(env):
 
 
 @pytest.mark.asyncio
-async def test_k2_empty_rows_pushes_zero(env):
-    """C4：无动态行时审定合计 = 0。"""
+async def test_k2_empty_rows_leave_audited_total_blank(env):
+    """C4：无动态行清单 ⇒ 审定合计留空，不推 0（spec formula-fetch-followup-defect-closure R6.3 读不到不写假的 0）。"""
     from tests._formula_push_env import base_entries
 
     await env.seed_entries(base_entries())
@@ -273,8 +273,10 @@ async def test_k2_empty_rows_pushes_zero(env):
 
     result = await env.push()
     k2_saved = await _k2_entries(env)
-    assert k2_saved.get("K2-1-audited-receivable") == "0"
-    assert k2_saved.get("K2-1-audited-net") == "0"
+    assert k2_saved.get("K2-1-audited-receivable") in (None, "")
+    assert k2_saved.get("K2-1-audited-net") in (None, "")
+    k2 = [i for i in result.items if i.rule_id.startswith("K2.audited_total")]
+    assert k2 and all(i.formula is None for i in k2)
 
 
 @pytest.mark.asyncio

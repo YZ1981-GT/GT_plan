@@ -73,6 +73,9 @@ async def _scenario() -> dict:
                     out["control"] = type(exc.orig).__name__ if exc.orig is not None else "DBAPIError"
         finally:
             await trans.rollback()
+    # 共享引擎的连接池绑在本次 asyncio.run 的事件循环上：用完释放，否则同一进程里下一个 asyncio.run 的真库用例
+    # 从池里拿到旧循环的连接，报「Event loop is closed」
+    await engine.dispose()
     return out
 
 

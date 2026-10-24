@@ -1291,14 +1291,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "资产处置损益审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "资产处置损益审定合计（原值）= 前端已保存的合计「H10-1-adjudicated-amount」（结论列）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "资产处置损益审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "资产处置损益审定表 derived 合计「原值」；来源：useH10Adjudication.emitAdjudicated（本期审定数）写入结论列"
     },
     {
       "rule_id": "H10.audited_total.net",
@@ -1317,14 +1317,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "资产处置损益审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "资产处置损益审定合计（净值）= 前端已保存的合计「H10-1-adjudicated-amount」（结论列）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "资产处置损益审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "资产处置损益审定表 derived 合计「净值」；来源：useH10Adjudication.emitAdjudicated（本期审定数）写入结论列"
     },
     {
       "rule_id": "H5.1_tb_amount",
@@ -1367,14 +1367,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "油气资产审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "油气资产审定合计（原值）= 行合计：「H5-1-cost-rows」（每行 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "油气资产审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "油气资产审定表 derived 合计「原值」；来源：useH5Adjudication（原值 / 累计折耗 / 减值准备三段行清单）"
     },
     {
       "rule_id": "H5.audited_total.net",
@@ -1393,14 +1393,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "油气资产审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "油气资产审定合计（净值）= 行合计：「H5-1-cost-rows」 − 「H5-1-depletion-rows」 − 「H5-1-impairment-rows」（每行 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "油气资产审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "油气资产审定表 derived 合计「净值」；来源：useH5Adjudication（原值 / 累计折耗 / 减值准备三段行清单）"
     },
     {
       "rule_id": "H6.1_tb_amount",
@@ -1443,14 +1443,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "固定资产清理审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "固定资产清理审定合计（原值）= 前端已保存的合计「H6-1-end-balance-audited」；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "固定资产清理审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "固定资产清理审定表 derived 合计「原值」；来源：useH6Adjudication._persist（期末审定合计）"
     },
     {
       "rule_id": "H6.audited_total.net",
@@ -1469,14 +1469,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "固定资产清理审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "固定资产清理审定合计（净值）= 前端已保存的合计「H6-1-end-balance-audited」；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "固定资产清理审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "固定资产清理审定表 derived 合计「净值」；来源：useH6Adjudication._persist（期末审定合计）"
     },
     {
       "rule_id": "H7.1_tb_amount",
@@ -1519,14 +1519,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "生产性生物资产审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "生产性生物资产审定合计（原值）= 留空：生产性生物资产审定表前端尚未实现（只有取数函数，没有行、没有写入）"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "生产性生物资产审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "生产性生物资产审定表 derived 合计「原值」；来源：useH7AdjudicationCost（桩）"
     },
     {
       "rule_id": "H7.audited_total.net",
@@ -1545,14 +1545,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "生产性生物资产审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "生产性生物资产审定合计（净值）= 留空：生产性生物资产审定表前端尚未实现（只有取数函数，没有行、没有写入）"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "生产性生物资产审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "生产性生物资产审定表 derived 合计「净值」；来源：useH7AdjudicationCost（桩）"
     },
     {
       "rule_id": "H8.1_tb_amount",
@@ -1595,14 +1595,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "使用权资产审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "使用权资产审定合计（原值）= 前端已保存的合计「H8-1-cost-audited-total」；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "使用权资产审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "使用权资产审定表 derived 合计「原值」；来源：useH8Adjudication._writeTotals（原值审定合计；净值 = 原值 − 累计折旧 − 减值准备）"
     },
     {
       "rule_id": "H8.audited_total.net",
@@ -1621,14 +1621,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "使用权资产审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "使用权资产审定合计（净值）= 前端已保存的合计「H8-1-net-audited」；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "使用权资产审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "使用权资产审定表 derived 合计「净值」；来源：useH8Adjudication._writeTotals（原值审定合计；净值 = 原值 − 累计折旧 − 减值准备）"
     },
     {
       "rule_id": "H9.1_tb_amount",
@@ -1671,14 +1671,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "租赁负债审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "租赁负债审定合计（原值）= 前端已保存的合计「H9-1-liability-audited」；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "租赁负债审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "租赁负债审定表 derived 合计「原值」；来源：useH9Adjudication._persist（租赁负债审定合计；净额 = 租赁负债 − 未确认融资费用）"
     },
     {
       "rule_id": "H9.audited_total.net",
@@ -1697,14 +1697,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "租赁负债审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "租赁负债审定合计（净值）= 前端已保存的合计「H9-1-net-audited」；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "租赁负债审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "租赁负债审定表 derived 合计「净值」；来源：useH9Adjudication._persist（租赁负债审定合计；净额 = 租赁负债 − 未确认融资费用）"
     },
     {
       "rule_id": "I1.1_tb_cost",
@@ -1795,14 +1795,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "无形资产审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "无形资产审定合计（原值）= 行合计：「I1-adj-cost-rows」（每行 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "无形资产审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "无形资产审定表 derived 合计「原值」；来源：useI1Adjudication._persist（原价 / 累计摊销 / 减值准备三段行清单）"
     },
     {
       "rule_id": "I1.audited_total.net",
@@ -1821,14 +1821,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "无形资产审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "无形资产审定合计（净值）= 行合计：「I1-adj-cost-rows」 − 「I1-adj-amort-rows」 − 「I1-adj-impair-rows」（每行 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "无形资产审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "无形资产审定表 derived 合计「净值」；来源：useI1Adjudication._persist（原价 / 累计摊销 / 减值准备三段行清单）"
     },
     {
       "rule_id": "I2.1_tb_amount",
@@ -1871,14 +1871,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "开发支出审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "开发支出审定合计（原值）= 行合计：「I2-1-rows」（每行 期末未审数 + 期末调整，或 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "开发支出审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "开发支出审定表 derived 合计「原值」；来源：i2AdjudicationModel（期末审定 = 期末未审 + 期末账项调整）"
     },
     {
       "rule_id": "I2.audited_total.net",
@@ -1897,14 +1897,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "开发支出审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "开发支出审定合计（净值）= 行合计：「I2-1-rows」（每行 期末未审数 + 期末调整，或 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "开发支出审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "开发支出审定表 derived 合计「净值」；来源：i2AdjudicationModel（期末审定 = 期末未审 + 期末账项调整）"
     },
     {
       "rule_id": "I3.1_tb_amount",
@@ -1971,14 +1971,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "长期待摊费用审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "长期待摊费用审定合计（原值）= 行合计：「I4-adj-rows」（每行 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "长期待摊费用审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "长期待摊费用审定表 derived 合计「原值」；来源：i4AdjudicationModel（审定 = 未审 + AJE + RJE）"
     },
     {
       "rule_id": "I4.audited_total.net",
@@ -1997,14 +1997,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "长期待摊费用审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "长期待摊费用审定合计（净值）= 行合计：「I4-adj-rows」（每行 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "长期待摊费用审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "长期待摊费用审定表 derived 合计「净值」；来源：i4AdjudicationModel（审定 = 未审 + AJE + RJE）"
     },
     {
       "rule_id": "I5.audited_total.receivable",
@@ -2023,14 +2023,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "其他非流动资产审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "其他非流动资产审定合计（原值）= 留空：其他非流动资产审定表各行是 I5-2 明细的净值（已扣减值准备），没有审定原值"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "其他非流动资产审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "其他非流动资产审定表 derived 合计「原值」；来源：i5AdjudicationModel（审定 = 未审 + AJE + RJE，按明细净值带入）"
     },
     {
       "rule_id": "I5.audited_total.net",
@@ -2049,14 +2049,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "其他非流动资产审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "其他非流动资产审定合计（净值）= 行合计：「I5-adj-rows」（每行 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "其他非流动资产审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "其他非流动资产审定表 derived 合计「净值」；来源：i5AdjudicationModel（审定 = 未审 + AJE + RJE，按明细净值带入）"
     },
     {
       "rule_id": "I6.1_tb_amount",
@@ -2165,14 +2165,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "商誉审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "商誉审定合计（原值）= 留空：商誉审定表按被投资单位一行承载净额，原值列不做账项调整，没有审定原值"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "商誉审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "商誉审定表 derived 合计「原值」；来源：i3AdjudicationModel（审定 = 期末净额未审 + AJE + RJE）"
     },
     {
       "rule_id": "I3.audited_total.net",
@@ -2191,14 +2191,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "商誉审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "商誉审定合计（净值）= 行合计：「I3-adj-rows」（每行 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "商誉审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "商誉审定表 derived 合计「净值」；来源：i3AdjudicationModel（审定 = 期末净额未审 + AJE + RJE）"
     },
     {
       "rule_id": "D1.note.main",
@@ -2619,22 +2619,30 @@
         "table": "存货",
         "rows": "f2_note_main",
         "fields": [
-          "end_amount",
-          "prior_amount"
-        ]
+          "end_gross",
+          "end_impairment",
+          "end_net",
+          "prior_gross",
+          "prior_impairment",
+          "prior_net"
+        ],
+        "table_by_template": {
+          "listed": "存货分类",
+          "soe": "存货分类"
+        }
       },
       "source": {
         "kind": "derivation",
         "name": "f2_note_main",
         "params": {},
-        "formula_text": "存货附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+        "formula_text": "存货附注「存货分类」表合计行：账面余额 = 试算表 1401~1499 区间（与报表 BS-010 同口径）原值科目合计、商品进销差价从中减去；跌价准备 = 存货跌价准备 / 减值准备科目合计；账面价值 = 账面余额 − 跌价准备。科目按名称归类（同一个码在两套科目表里是不同科目），期末取审定数、期初取年初余额；明细行由底稿同步"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "存货附注主表推送（listed 五、9 / soe 八、10）期末 / 期初数；批 D 附注直推族 binding"
+      "description": "存货附注主表合计行推送（listed 五、9 / soe 八、10「存货分类」）账面余额 / 跌价准备 / 账面价值；spec formula-fetch-followup-defect-closure R6.1"
     },
     {
       "rule_id": "F3.tb_amount",
@@ -2842,14 +2850,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "交易性金融资产审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "交易性金融资产审定合计（原值）= 留空：交易性金融资产审定表行存为按行键的对象（合计依赖前端静态行清单）；前端发布审定数时宿主只收科目码 1501 的事件，本底稿发的是 1101，「G1-1-adjudicated-amount」从未写入"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "交易性金融资产审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "交易性金融资产审定表 derived 合计「原值」；来源：useG1Adjudication / GtG1TradingFinancialAssets"
     },
     {
       "rule_id": "G1.audited_total.net",
@@ -2868,14 +2876,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "交易性金融资产审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "交易性金融资产审定合计（净值）= 留空：交易性金融资产审定表行存为按行键的对象（合计依赖前端静态行清单）；前端发布审定数时宿主只收科目码 1501 的事件，本底稿发的是 1101，「G1-1-adjudicated-amount」从未写入"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "交易性金融资产审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "交易性金融资产审定表 derived 合计「净值」；来源：useG1Adjudication / GtG1TradingFinancialAssets"
     },
     {
       "rule_id": "G1.note.main",
@@ -2949,14 +2957,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "交易性金融负债审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "交易性金融负债审定合计（原值）= 前端已保存的合计「G10-1-adjudicated-amount」（结论列）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "交易性金融负债审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "交易性金融负债审定表 derived 合计「原值」；来源：useG10Adjudication.notifyAdjudicated（三、账面余额合计）写入结论列"
     },
     {
       "rule_id": "G10.audited_total.net",
@@ -2975,14 +2983,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "交易性金融负债审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "交易性金融负债审定合计（净值）= 前端已保存的合计「G10-1-adjudicated-amount」（结论列）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "交易性金融负债审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "交易性金融负债审定表 derived 合计「净值」；来源：useG10Adjudication.notifyAdjudicated（三、账面余额合计）写入结论列"
     },
     {
       "rule_id": "G10.note.main",
@@ -3276,14 +3284,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "应收利息审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "应收利息审定合计（原值）= 留空：应收利息审定表行存为按行键的对象（合计依赖前端静态行清单），前端只发布净额"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "应收利息审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "应收利息审定表 derived 合计「原值」；来源：useG2Adjudication.subtotalRow（footer-total = 原值 − 坏账准备）经 GtG2InterestReceivable 写入结论列"
     },
     {
       "rule_id": "G2.audited_total.net",
@@ -3302,14 +3310,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "应收利息审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "应收利息审定合计（净值）= 前端已保存的合计「G2-1-adjudicated-amount」（结论列）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "应收利息审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "应收利息审定表 derived 合计「净值」；来源：useG2Adjudication.subtotalRow（footer-total = 原值 − 坏账准备）经 GtG2InterestReceivable 写入结论列"
     },
     {
       "rule_id": "G2.note.main",
@@ -3383,14 +3391,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "应收股利审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "应收股利审定合计（原值）= 前端已保存的合计「G3-1-adjudicated-amount」（结论列）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "应收股利审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "应收股利审定表 derived 合计「原值」；来源：useG3Adjudication 发布的审定合计（应收股利无备抵）经 GtG3DividendReceivable 写入结论列"
     },
     {
       "rule_id": "G3.audited_total.net",
@@ -3409,14 +3417,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "应收股利审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "应收股利审定合计（净值）= 前端已保存的合计「G3-1-adjudicated-amount」（结论列）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "应收股利审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "应收股利审定表 derived 合计「净值」；来源：useG3Adjudication 发布的审定合计（应收股利无备抵）经 GtG3DividendReceivable 写入结论列"
     },
     {
       "rule_id": "G3.note.main",
@@ -3490,14 +3498,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "债权投资审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "债权投资审定合计（原值）= 留空：债权投资审定表行存为按行键的对象（合计依赖前端静态行清单），前端只发布净值"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "债权投资审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "债权投资审定表 derived 合计「原值」；来源：useG4MainAdjudication.amortizedCostRow（三、债权投资净值 = 原值 − 减值准备，已扣一年内到期）经 GtG4BondInvestmentMain 写入结论列"
     },
     {
       "rule_id": "G4.audited_total.net",
@@ -3516,14 +3524,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "债权投资审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "债权投资审定合计（净值）= 前端已保存的合计「G4-1-adjudicated-amount」（结论列）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "债权投资审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "债权投资审定表 derived 合计「净值」；来源：useG4MainAdjudication.amortizedCostRow（三、债权投资净值 = 原值 − 减值准备，已扣一年内到期）经 GtG4BondInvestmentMain 写入结论列"
     },
     {
       "rule_id": "G4.note.main",
@@ -3597,14 +3605,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "长期应收款审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "长期应收款审定合计（原值）= 留空：长期应收款审定表行存为按行键的对象（合计依赖前端静态行清单），前端只发布净额"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "长期应收款审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "长期应收款审定表 derived 合计「原值」；来源：useG5Adjudication 的 net__row（原值 − 坏账准备，已扣一年内到期）经 GtG5LongTermReceivable 写入结论列"
     },
     {
       "rule_id": "G5.audited_total.net",
@@ -3623,14 +3631,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "长期应收款审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "长期应收款审定合计（净值）= 前端已保存的合计「G5-1-adjudicated-amount」（结论列）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "长期应收款审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "长期应收款审定表 derived 合计「净值」；来源：useG5Adjudication 的 net__row（原值 − 坏账准备，已扣一年内到期）经 GtG5LongTermReceivable 写入结论列"
     },
     {
       "rule_id": "G5.note.main",
@@ -3704,14 +3712,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "其他债权投资审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "其他债权投资审定合计（原值）= 留空：其他债权投资审定表行存为按行键的对象（合计依赖前端静态行清单）；前端发布审定数用的科目码（1505）与宿主监听的（1503）对不上，「G6-1-adjudicated-amount」从未写入"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "其他债权投资审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "其他债权投资审定表 derived 合计「原值」；来源：useG6MainAdjudication / GtG6OtherBondMain"
     },
     {
       "rule_id": "G6.audited_total.net",
@@ -3730,14 +3738,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "其他债权投资审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "其他债权投资审定合计（净值）= 留空：其他债权投资审定表行存为按行键的对象（合计依赖前端静态行清单）；前端发布审定数用的科目码（1505）与宿主监听的（1503）对不上，「G6-1-adjudicated-amount」从未写入"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "其他债权投资审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "其他债权投资审定表 derived 合计「净值」；来源：useG6MainAdjudication / GtG6OtherBondMain"
     },
     {
       "rule_id": "G6.note.main",
@@ -3866,14 +3874,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "其他权益工具投资审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "其他权益工具投资审定合计（原值）= 留空：其他权益工具投资审定表行存为按行键的对象（合计依赖前端静态行清单）；「G8-1-adjudicated-amount」会被调整回写覆盖成单行金额（g8CrossHelpers），不是审定合计"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "其他权益工具投资审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "其他权益工具投资审定表 derived 合计「原值」；来源：useG8Adjudication / g8CrossHelpers"
     },
     {
       "rule_id": "G8.audited_total.net",
@@ -3892,14 +3900,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "其他权益工具投资审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "其他权益工具投资审定合计（净值）= 留空：其他权益工具投资审定表行存为按行键的对象（合计依赖前端静态行清单）；「G8-1-adjudicated-amount」会被调整回写覆盖成单行金额（g8CrossHelpers），不是审定合计"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "其他权益工具投资审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "其他权益工具投资审定表 derived 合计「净值」；来源：useG8Adjudication / g8CrossHelpers"
     },
     {
       "rule_id": "G8.note.main",
@@ -3973,14 +3981,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "其他非流动金融资产审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "其他非流动金融资产审定合计（原值）= 前端已保存的合计「G9-1-adjudicated-amount」（结论列）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "其他非流动金融资产审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "其他非流动金融资产审定表 derived 合计「原值」；来源：useG9Adjudication.notifyAdjudicated（三类合计，无备抵）写入结论列"
     },
     {
       "rule_id": "G9.audited_total.net",
@@ -3999,14 +4007,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "其他非流动金融资产审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "其他非流动金融资产审定合计（净值）= 前端已保存的合计「G9-1-adjudicated-amount」（结论列）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "其他非流动金融资产审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "其他非流动金融资产审定表 derived 合计「净值」；来源：useG9Adjudication.notifyAdjudicated（三类合计，无备抵）写入结论列"
     },
     {
       "rule_id": "G9.note.main",
@@ -4080,14 +4088,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "在建工程审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "在建工程审定合计（原值）= 行合计：「H2-1-rows」（每行 期末未审数 + 期末调整，或 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "在建工程审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "在建工程审定表 derived 合计「原值」；来源：useH2Adjudication（原值 / 减值准备行清单，行期末审定 = 期末未审 + 期末调整）"
     },
     {
       "rule_id": "H2.audited_total.net",
@@ -4106,14 +4114,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "在建工程审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "在建工程审定合计（净值）= 行合计：「H2-1-rows」 − 「H2-1-impair-rows」（每行 期末未审数 + 期末调整，或 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "在建工程审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "在建工程审定表 derived 合计「净值」；来源：useH2Adjudication（原值 / 减值准备行清单，行期末审定 = 期末未审 + 期末调整）"
     },
     {
       "rule_id": "H2.note.main",
@@ -4187,14 +4195,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "投资性房地产审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "投资性房地产审定合计（原值）= 按「H3-measurement-model」取：公允价值模式：行合计：「H3-1-fair-rows」（每行 未审数 + AJE + RJE）；成本模式：行合计：「H3-1-cost-original-rows」（每行 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "投资性房地产审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "投资性房地产审定表 derived 合计「原值」；来源：useH3AdjudicationCost / useH3AdjudicationFair（按 H3-measurement-model 选成本或公允价值模式）"
     },
     {
       "rule_id": "H3.audited_total.net",
@@ -4213,14 +4221,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "投资性房地产审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "投资性房地产审定合计（净值）= 按「H3-measurement-model」取：公允价值模式：行合计：「H3-1-fair-rows」（每行 未审数 + AJE + RJE）；成本模式：行合计：「H3-1-cost-original-rows」 − 「H3-1-cost-dep-rows」 − 「H3-1-cost-impair-rows」（每行 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "投资性房地产审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "投资性房地产审定表 derived 合计「净值」；来源：useH3AdjudicationCost / useH3AdjudicationFair（按 H3-measurement-model 选成本或公允价值模式）"
     },
     {
       "rule_id": "H3.note.main",
@@ -4294,14 +4302,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "工程物资审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "工程物资审定合计（原值）= 行合计：「H4-1-rows」中 section=original 的行（每行 期末未审数 + 期末调整，或 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "工程物资审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "工程物资审定表 derived 合计「原值」；来源：useH4Adjudication（一个数组分原值 / 减值两段；净值与前端 H4-1-adjudicated-total 同口径）"
     },
     {
       "rule_id": "H4.audited_total.net",
@@ -4320,14 +4328,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "工程物资审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "工程物资审定合计（净值）= 行合计：「H4-1-rows」中 section=original 的行 − 「H4-1-rows」中 section=impairment 的行（每行 期末未审数 + 期末调整，或 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "工程物资审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "工程物资审定表 derived 合计「净值」；来源：useH4Adjudication（一个数组分原值 / 减值两段；净值与前端 H4-1-adjudicated-total 同口径）"
     },
     {
       "rule_id": "H4.note.main",
@@ -4382,7 +4390,7 @@
         "kind": "derivation",
         "name": "h1_note_main",
         "params": {},
-        "formula_text": "固定资产附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+        "formula_text": "固定资产附注主表推送：「固定资产」= 固定资产 − 累计折旧 − 固定资产减值准备（1601 − 1602 − 1603；期末取审定数、期初取年初余额），合计按附注上方各行重算"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
@@ -4536,7 +4544,7 @@
         "kind": "derivation",
         "name": "i1_note_main",
         "params": {},
-        "formula_text": "无形资产附注主表推送：期末 = TB 审定数，期初 = TB 年初余额"
+        "formula_text": "无形资产附注推送（国企「无形资产情况」四段合计）：原价合计 = 1701、累计摊销合计 = 1702、减值准备合计 = 1703、账面价值合计 = 1701 − 1702 − 1703（期末取审定数、期初取年初余额）；上市模板该表是类别矩阵，对不上不写"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
@@ -4686,14 +4694,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "固定资产审定合计（原值）= Σ 全部行 (未审数 + AJE + RJE)"
+        "formula_text": "固定资产审定合计（原值）= 行合计：「H1-1-cost-rows」（每行 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "固定资产审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "固定资产审定表 derived 合计「原值」；来源：useH1Adjudication（原值 / 累计折旧 / 减值准备三段行清单，行审定 = 未审 + AJE + RJE）"
     },
     {
       "rule_id": "H1.audited_total.net",
@@ -4712,14 +4720,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "固定资产审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "固定资产审定合计（净值）= 行合计：「H1-1-cost-rows」 − 「H1-1-dep-rows」 − 「H1-1-impair-rows」（每行 未审数 + AJE + RJE）；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "固定资产审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "固定资产审定表 derived 合计「净值」；来源：useH1Adjudication（原值 / 累计折旧 / 减值准备三段行清单，行审定 = 未审 + AJE + RJE）"
     },
     {
       "rule_id": "J1.tb_amount",
@@ -5116,7 +5124,7 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "其他流动资产审定合计（原值）= Σ 全部动态行 (未审数 + AJE + RJE)"
+        "formula_text": "其他流动资产审定合计（原值）= Σ 全部动态行 (未审数 + AJE + RJE)；没有行清单时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
@@ -5142,7 +5150,7 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "其他流动资产审定合计（净值）= 原值合计（无坏账准备）"
+        "formula_text": "其他流动资产审定合计（净值）= 原值合计（无坏账准备）；没有行清单时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
@@ -5223,7 +5231,7 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "其他应付款审定合计（原值）= Σ 性质分类行 (未审数 + AJE + RJE)"
+        "formula_text": "其他应付款审定合计（原值）= Σ 性质分类行 (未审数 + AJE + RJE)；一个行键都没存过时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
@@ -5249,7 +5257,7 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "其他应付款审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "其他应付款审定合计（净值）= 原值合计（无备抵）；一个行键都没存过时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
@@ -5306,7 +5314,7 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "其他流动负债审定合计（原值）= Σ 全部固定行 (未审数 + AJE + RJE)"
+        "formula_text": "其他流动负债审定合计（原值）= Σ 全部固定行 (未审数 + AJE + RJE)；一个行键都没存过时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
@@ -5332,7 +5340,7 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "其他流动负债审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "其他流动负债审定合计（净值）= 原值合计（无备抵）；一个行键都没存过时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
@@ -5382,7 +5390,7 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "预计负债审定合计（原值）= Σ 全部类型行 (未审数 + AJE + RJE)"
+        "formula_text": "预计负债审定合计（原值）= Σ 全部类型行 (未审数 + AJE + RJE)；一个行键都没存过时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
@@ -5408,7 +5416,7 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "预计负债审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "预计负债审定合计（净值）= 原值合计（无备抵）；一个行键都没存过时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
@@ -5489,7 +5497,7 @@
         "params": {
           "kind": "asset"
         },
-        "formula_text": "持有待售资产审定合计 = Σ 资产区块行 (未审数 + AJE + RJE)"
+        "formula_text": "持有待售资产审定合计 = Σ 资产区块行 (未审数 + AJE + RJE)；一个行键都没存过时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
@@ -5515,7 +5523,7 @@
         "params": {
           "kind": "liab"
         },
-        "formula_text": "持有待售负债审定合计 = Σ 负债区块行 (未审数 + AJE + RJE)"
+        "formula_text": "持有待售负债审定合计 = Σ 负债区块行 (未审数 + AJE + RJE)；一个行键都没存过时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
@@ -5600,14 +5608,14 @@
         "params": {
           "kind": "receivable"
         },
-        "formula_text": "递延收益审定合计（原值）= Σ 全部动态行 (未审数 + AJE + RJE)"
+        "formula_text": "递延收益审定合计（原值）= 前端已保存的合计「K7-1-audited-total」；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "递延收益审定表 derived 合计「原值」= Σ 行审定数；批 C 审定表族 binding"
+      "description": "递延收益审定表 derived 合计「原值」；来源：useK7Adjudication._persist（递延收益审定合计）"
     },
     {
       "rule_id": "K7.audited_total.net",
@@ -5626,14 +5634,14 @@
         "params": {
           "kind": "net"
         },
-        "formula_text": "递延收益审定合计（净值）= 原值合计（无备抵）"
+        "formula_text": "递延收益审定合计（净值）= 前端已保存的合计「K7-1-audited-total」；读不到时留空，不写 0"
       },
       "triggers": [
         "TRIAL_BALANCE_UPDATED",
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "递延收益审定表 derived 合计「净值」= 原值（无备抵）；批 C 审定表族 binding"
+      "description": "递延收益审定表 derived 合计「净值」；来源：useK7Adjudication._persist（递延收益审定合计）"
     },
     {
       "rule_id": "K7.note.main",
@@ -7866,39 +7874,6 @@
         "manual"
       ],
       "description": "按欠款方归集的期末余额前五名的预付款项子表推送（五、7/八、7）end_amount；数据来源：披露表"
-    },
-    {
-      "rule_id": "F2.note.subtable_0",
-      "page_key": "workpaper:F2",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、9",
-          "soe": "八、10"
-        },
-        "table": "存货分类",
-        "rows": "f2_note_main",
-        "fields": [
-          "end_gross",
-          "end_impairment",
-          "end_net",
-          "prior_gross",
-          "prior_impairment",
-          "prior_net"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "f2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 F2 的子表「存货分类」读取行数据，按 end_gross/end_impairment/end_net/prior_gross/prior_impairment/prior_net 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "存货分类子表推送（五、9/八、10）end_gross/end_impairment/end_net/prior_gross/prior_impairment/prior_net；数据来源：披露表"
     },
     {
       "rule_id": "F2.note.subtable_1",

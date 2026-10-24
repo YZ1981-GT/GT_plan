@@ -277,8 +277,12 @@ def test_i3_balance_adj_tb_unavailable_returns_empty():
 # ========================================================================
 
 
-def test_i1_multi_code_note_rows_produces_total():
-    """I1 无形资产有 3 个 account_codes（1701/1702/1703，原映射码 1703B 已改标准码），note_rows 应产生 3 行数据 + 1 行合计。"""
+def test_i1_note_rows_are_four_block_totals():
+    """I1 无形资产附注出国企「无形资产情况」表的四段合计行：原价 / 累计摊销 / 减值准备 / 账面价值（= 原价 − 后两段）。
+
+    🔴 原断言「合计 = 1701 + 1702 + 1703 = 350000」把累计摊销 / 减值准备当正数相加；和平 2025 该数被兜底写进
+    「一、原价合计」（8,471,537.70 = 1701 + 1702）。spec formula-fetch-followup-defect-closure R6.3 改写。
+    """
     from app.services.formula_push.bindings.balance_adj import binding_for as balance_adj_for
 
     binding = balance_adj_for("I1")
@@ -288,21 +292,17 @@ def test_i1_multi_code_note_rows_produces_total():
         "1703": {"期末余额": Decimal("50000"), "年初余额": Decimal("30000"), "本期发生额": Decimal("20000")},
     }
 
-    # I1 自有 note.main（2026-10-06 补；原先借 I3 的规则做代理）
     rule = _note_rule("I1")
-    rows = binding.note_rows({}, "listed", rule)
+    rows = binding.note_rows({}, "soe", rule)
 
-    # 3 个数据行 + 1 个合计行
-    assert len(rows) == 4
-    data_rows = [r for r in rows if not r["is_total"]]
-    total_rows = [r for r in rows if r["is_total"]]
-    assert len(data_rows) == 3
-    assert len(total_rows) == 1
-
-    # 合计行 ending = 200000 + 100000 + 50000 = 350000
-    assert total_rows[0]["ending"] == 350000.0
-    assert total_rows[0]["opening"] == 260000.0  # 150000 + 80000 + 30000
-    assert total_rows[0]["label"] == "无形资产"
+    assert [(r["label"], r["ending"], r["opening"]) for r in rows] == [
+        ("一、原价合计", 200000.0, 150000.0),
+        ("二、累计摊销合计", 100000.0, 80000.0),
+        ("三、无形资产减值准备合计", 50000.0, 30000.0),
+        ("四、账面价值合计", 50000.0, 40000.0),
+    ]
+    # 分段合计行按行名对上附注的合计行；没有「整表合计」兜底行（兜底会把数写进首段合计）
+    assert all(r["match_total"] and not r["is_total"] for r in rows)
 
 
 # ========================================================================

@@ -319,6 +319,9 @@ def db_snapshot() -> dict[str, object]:
                 ).scalar()
                 or 0
             )
+        # 本文件内只跑一次 asyncio.run 还不够：连接池绑在这次的事件循环上，不释放的话同一进程里**别的文件**下一个
+        # asyncio.run 的真库用例从池里拿到旧循环的连接，照样报 `Event loop is closed`
+        await engine.dispose()
         return {
             "template_refs": tpl_refs,
             "shared": [(r[0], int(r[1])) for r in shared_rows],

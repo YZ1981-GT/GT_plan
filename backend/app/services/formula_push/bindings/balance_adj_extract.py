@@ -32,6 +32,12 @@ _SKIP_FLAGS = ("isSubtotal", "isTotal")
 #: 行金额字段组
 U_AJE_RJE = ("unadjusted", "aje", "rje")
 END_UNADJ_ADJ = ("endUnadjusted", "endAdjustment")
+#: 算式说明里的字段中文名（推送面板展示）
+_FIELD_LABELS = {
+    "unadjusted": "未审数", "aje": "AJE", "rje": "RJE",
+    "endUnadjusted": "期末未审数", "endAdjustment": "期末调整",
+    "endUnadj": "期末未审数", "endAdj": "期末调整",
+}
 
 
 @dataclass(frozen=True)
@@ -73,6 +79,9 @@ class ByMode:
     mode_key: str
     cases: tuple[tuple[str, "Source"], ...]
     default: "Source"
+    #: 算式说明里各模式的中文名（与 ``cases`` 同序）与默认分支名
+    case_labels: tuple[str, ...] = ()
+    default_label: str = "其他"
 
 
 Source = Union[Rows, Key, Unavailable, ByMode]
@@ -238,8 +247,9 @@ def describe(source: Source) -> str:
         where = "（结论列）" if source.column == "conclusion" else ""
         return f"前端已保存的合计「{source.item_id}」{where}"
     if isinstance(source, ByMode):
-        cases = "；".join(f"{value}：{describe(case)}" for value, case in source.cases)
-        return f"按「{source.mode_key}」取：{cases}；其他：{describe(source.default)}"
+        labels = source.case_labels or tuple(value for value, _ in source.cases)
+        cases = "；".join(f"{label}：{describe(case)}" for label, (_, case) in zip(labels, source.cases))
+        return f"按「{source.mode_key}」取：{cases}；{source.default_label}：{describe(source.default)}"
     if isinstance(source, Rows):
         terms = []
         for index, rl in enumerate(source.lists):
@@ -248,8 +258,8 @@ def describe(source: Source) -> str:
                 name += f"中 {rl.section_field}={rl.section} 的行"
             sign = "" if index == 0 and rl.sign > 0 else ("+ " if rl.sign > 0 else "− ")
             terms.append(f"{sign}{name}")
-        fields = "，或 ".join(" + ".join(group) for group in source.amount_fields)
-        return f"行合计 {' '.join(terms)}（每行 {fields}）"
+        fields = "，或 ".join(" + ".join(_FIELD_LABELS.get(f, f) for f in group) for group in source.amount_fields)
+        return f"行合计：{' '.join(terms)}（每行 {fields}）"
     raise TypeError(f"未知的审定合计来源 {source!r}")
 
 
@@ -287,6 +297,8 @@ def _conclusion(item_id: str) -> Key:
 _KEYED_STORE = "行存为按行键的对象（合计依赖前端静态行清单）"
 
 _H3_FAIR = Rows((RowList("H3-1-fair-rows"),))
+#: 前端 useH3MeasurementModel：存 'fair_value' 即公允价值模式，其余（含未存）按成本模式
+_H3_LABELS = {"case_labels": ("公允价值模式",), "default_label": "成本模式"}
 _H4_ORIGINAL = RowList("H4-1-rows", section="original", section_default="original")
 _H4_IMPAIRMENT = RowList("H4-1-rows", -1, section="impairment", section_default="original")
 
@@ -331,10 +343,10 @@ AUDITED_SOURCES: dict[str, AuditedTotals] = {
                   origin="useH2Adjudication（原值 / 减值准备行清单，行期末审定 = 期末未审 + 期末调整）"),
     "H3": AuditedTotals(
         receivable=ByMode("H3-measurement-model", (("fair_value", _H3_FAIR),),
-                          Rows((RowList("H3-1-cost-original-rows"),))),
+                          Rows((RowList("H3-1-cost-original-rows"),)), **_H3_LABELS),
         net=ByMode("H3-measurement-model", (("fair_value", _H3_FAIR),),
                    Rows((RowList("H3-1-cost-original-rows"), RowList("H3-1-cost-dep-rows", -1),
-                         RowList("H3-1-cost-impair-rows", -1)))),
+                         RowList("H3-1-cost-impair-rows", -1))), **_H3_LABELS),
         origin="useH3AdjudicationCost / useH3AdjudicationFair（按 H3-measurement-model 选成本或公允价值模式）"),
     "H4": AuditedTotals(
         receivable=Rows((_H4_ORIGINAL,), (END_UNADJ_ADJ, U_AJE_RJE)),

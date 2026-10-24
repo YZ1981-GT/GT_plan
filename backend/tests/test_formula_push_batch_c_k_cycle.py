@@ -241,26 +241,43 @@ async def test_k6_dual_section_audited(env):
 
 
 @pytest.mark.asyncio
-async def test_k7_dynamic_rows_audited(env):
-    """C6：K7 负债类动态行汇总审定合计。"""
+async def test_k7_audited_total_reads_frontend_total(env):
+    """C6（spec formula-fetch-followup-defect-closure R6.3 改写）：K7 前端（useK7Adjudication._persist）把审定合计存在
+    ``K7-1-audited-total``，行清单 ``K7-1-rows`` 用 ``rowKey`` 且金额在行内 —— 不是原先假设的 rowId 清单 + 扁平
+    ``K7-1-{rowId}-unadj`` 键（那种写法前端从不写，真库恒推 0）。审定合计取前端合计键。
+    """
     from tests._formula_push_env import base_entries
     await env.seed_entries(base_entries())
 
     await _seed(env, "K7", {
-        "K7-1-rows": _dynamic_rows_json("equip-subsidy", "rd-subsidy"),
-        "K7-1-equip-subsidy-unadj": "50000",
-        "K7-1-equip-subsidy-aje": "0",
-        "K7-1-equip-subsidy-rje": "0",
-        "K7-1-rd-subsidy-unadj": "20000",
-        "K7-1-rd-subsidy-aje": "3000",
-        "K7-1-rd-subsidy-rje": "0",
+        "K7-1-rows": json.dumps([
+            {"rowKey": "r0", "project": "设备补助", "group": "与资产相关", "unadj": 50000, "aje": 0, "rje": 0, "audited": 50000},
+            {"rowKey": "r1", "project": "研发补助", "group": "与收益相关", "unadj": 20000, "aje": 3000, "rje": 0, "audited": 23000},
+        ], ensure_ascii=False),
+        "K7-1-audited-total": "73000",
+        # 旧假设的扁平键：前端不写；即便存在也不得被读
+        "K7-1-r0-unadj": "999",
     })
 
     await env.push()
     saved = await _entries(env, "K7")
-    # equip: 50000, rd: 23000
     assert saved["K7-1-audited-receivable"] == "73000"
     assert saved["K7-1-audited-net"] == "73000"
+
+
+@pytest.mark.asyncio
+async def test_k7_without_frontend_total_writes_blank_not_zero(env):
+    """前端还没存审定合计 ⇒ 派生合计写空（原先恒推 0；R6.3「读不到不写假的 0」），已有的旧 0 被清掉。"""
+    from tests._formula_push_env import base_entries
+    await env.seed_entries(base_entries())
+    await _seed(env, "K7", {"K7-1-audited-receivable": "0", "K7-1-audited-net": "0"})
+
+    result = await env.push()
+    saved = await _entries(env, "K7")
+    assert saved.get("K7-1-audited-receivable") == ""
+    assert saved.get("K7-1-audited-net") == ""
+    actions = {i.rule_id: i.action for i in result.items if i.rule_id.startswith("K7.audited_total")}
+    assert set(actions.values()) == {"write"}
 
 
 # ── 幂等性 ─────────────────────────────────────────────────────────────────
@@ -291,15 +308,30 @@ async def test_k5_second_push_idempotent(env):
     assert all(i.action == "unchanged" for i in k5_derived)
 
 
-# ── 空行 = 0 ───────────────────────────────────────────────────────────────
+# ── 没有任何行数据 ⇒ 写空，不是 0 ─────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_k4_empty_entries_pushes_zero(env):
-    """K4 无条目时审定合计 = 0。"""
+async def test_k4_empty_entries_leave_audited_total_blank(env):
+    """K4 一个行键都没存过 ⇒ 审定合计留空（原先推 0；spec formula-fetch-followup-defect-closure R6.3 读不到不写假的 0）。"""
     from tests._formula_push_env import base_entries
     await env.seed_entries(base_entries())
     await _seed(env, "K4", {})
+
+    result = await env.push()
+    saved = await _entries(env, "K4")
+    assert saved.get("K4-1-audited-receivable") in (None, "")
+    assert saved.get("K4-1-audited-net") in (None, "")
+    k4 = [i for i in result.items if i.rule_id.startswith("K4.audited_total")]
+    assert k4 and all(i.formula is None for i in k4)
+
+
+@pytest.mark.asyncio
+async def test_k4_one_stored_row_key_counts_and_missing_keys_are_zero(env):
+    """存过任一行键即按 Σ 计（没存的行键按 0，与前端空格一致）；真为 0 的合计照常写 0。"""
+    from tests._formula_push_env import base_entries
+    await env.seed_entries(base_entries())
+    await _seed(env, "K4", {"K4-1-r2-unadj": "0"})
 
     await env.push()
     saved = await _entries(env, "K4")

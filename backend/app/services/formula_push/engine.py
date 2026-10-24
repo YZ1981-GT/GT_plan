@@ -70,6 +70,11 @@ FROZEN_WP_STATUSES: Mapping[str, str] = {
 }
 FROZEN_NOTE_STATUSES: frozenset[str] = frozenset({"confirmed"})
 PERIOD_LABELS: Mapping[str, str] = {"end": "期末", "prior": "期初"}
+#: 分「账面余额 / 减值准备 / 账面价值」三列写的字段：旧格式表（按列序存数）只认得出期末 / 期初金额列，这几列不按位置猜
+SPLIT_FIELD_LABELS: Mapping[str, str] = {
+    "end_gross": "期末账面余额", "end_impairment": "期末减值准备", "end_net": "期末账面价值",
+    "prior_gross": "期初账面余额", "prior_impairment": "期初减值准备", "prior_net": "期初账面价值",
+}
 
 
 @dataclass
@@ -832,7 +837,11 @@ def _push_note_cell(
     if not ok:
         period = note_writer.NOTE_FIELDS[field_name][1]
         detail = f"：{table.column_note}" if table.column_note else ""
-        ctx.skip(rule.rule_id, "note", "note", addr, f"附注表缺少「{PERIOD_LABELS[period]}」列{detail}")
+        reason = f"附注表缺少「{PERIOD_LABELS[period]}」列{detail}"
+        if field_name in SPLIT_FIELD_LABELS and isinstance(row.get("values"), list):
+            reason = (f"附注表是旧格式（按列序存数），表头只认得出期末 / 期初金额列，找不到唯一的"
+                      f"「{SPLIT_FIELD_LABELS[field_name]}」列，不按位置猜，附注保持原值")
+        ctx.skip(rule.rule_id, "note", "note", addr, reason)
         return False
     mode = note_writer.external_mode(table.section_locked, cell_mode)
     decision = decide_note(formula_value=value, current_value=current, cell_mode=mode)

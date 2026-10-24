@@ -284,8 +284,12 @@ def test_h10_is_income_type_uses_current_amount():
 # ========================================================================
 
 
-def test_h1_multi_code_note_rows_produces_total():
-    """H1 固定资产有 3 个 account_codes，note_rows 应产生 3 行数据 + 1 行合计。"""
+def test_h1_note_rows_are_book_value():
+    """H1 固定资产附注主表按账面价值出一行（原值 − 累计折旧 − 减值准备）+ 同值合计行。
+
+    🔴 原断言「合计 = 1601 + 1602 + 1603 = 180000」把累计折旧 / 减值准备当正数相加（和平 2025 附注固定资产合计
+    因此被推成 74,301,896.81；spec formula-fetch-followup-defect-closure R6.3 改写）。
+    """
     binding = balance_adj_for("H1")
     binding._last_tb_data = {
         "1601": {"期末余额": Decimal("100000"), "年初余额": Decimal("80000"), "本期发生额": Decimal("20000")},
@@ -293,18 +297,24 @@ def test_h1_multi_code_note_rows_produces_total():
         "1603": {"期末余额": Decimal("30000"), "年初余额": Decimal("20000"), "本期发生额": Decimal("10000")},
     }
 
-    # H1 无 note.main 规则，借 H2 的 rule 做代理（仅测 TB 取数 + 合计逻辑）
-    rule = _h_note_rule("H2")
+    rule = _h_note_rule("H1")
     rows = binding.note_rows({}, "listed", rule)
 
-    # 3 个数据行 + 1 个合计行
-    assert len(rows) == 4
     data_rows = [r for r in rows if not r["is_total"]]
     total_rows = [r for r in rows if r["is_total"]]
-    assert len(data_rows) == 3
-    assert len(total_rows) == 1
+    assert [r["label"] for r in data_rows] == ["固定资产"]
+    assert data_rows[0]["ending"] == 20000.0  # 100000 − 50000 − 30000
+    assert data_rows[0]["opening"] == 20000.0  # 80000 − 40000 − 20000
+    assert len(total_rows) == 1 and total_rows[0]["ending"] == 20000.0 and total_rows[0]["opening"] == 20000.0
 
-    # 合计行 ending = 100000 + 50000 + 30000 = 180000
-    assert total_rows[0]["ending"] == 180000.0
-    assert total_rows[0]["opening"] == 140000.0  # 80000 + 40000 + 20000
-    assert total_rows[0]["label"] == "固定资产"
+
+def test_h1_note_rows_without_contra_accounts_use_cost_only():
+    """项目没有累计折旧 / 减值准备科目 ⇒ 减项按 0；没有原值科目 ⇒ 未取到（附注保持原值，不写 0）。"""
+    binding = balance_adj_for("H1")
+    binding._last_tb_data = {"1601": {"期末余额": Decimal("100"), "年初余额": Decimal("90")}}
+    rows = binding.note_rows({}, "soe", _h_note_rule("H1"))
+    assert rows[0]["ending"] == 100.0 and rows[0]["ending_resolved"] is True
+
+    binding._last_tb_data = {"1602": {"期末余额": Decimal("30"), "年初余额": Decimal("20")}}
+    rows = binding.note_rows({}, "soe", _h_note_rule("H1"))
+    assert rows[0]["ending_resolved"] is False and rows[0]["opening_resolved"] is False

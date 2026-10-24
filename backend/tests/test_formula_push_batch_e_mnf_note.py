@@ -15,7 +15,7 @@ spec: formula-push-note-rollout-batch-e / Task 11
   - N1/N2 资产负债类，ending 取「期末余额」
 - F 循环 4 个科目全部有 note.main 规则
   - F2 存货非对称章节号（listed 五、9 / soe 八、10）
-  - F2 多科目码（1401/1402/1403/1405/1408/1461），产出多行 + 合计行
+  - F2 按「存货分类」表合计行写账面余额 / 跌价准备 / 账面价值（R6.1；不再逐码出行、把跌价准备当正数相加）
   - F1/F3/F4 对称章节号
   - 全部资产负债类，ending 取「期末余额」
 - sync_registry 章节号与规则一致性
@@ -642,10 +642,26 @@ def test_f_symmetric_sections(code: str):
 
 # ── F 全科目字段统一验证 ────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("code", ALL_F_CODES, ids=ALL_F_CODES)
+@pytest.mark.parametrize("code", F_SYMMETRIC_CODES, ids=F_SYMMETRIC_CODES)
 def test_f_note_rule_fields_are_end_and_prior(code: str):
     rule = _note_rule(code)
     assert set(rule.target.fields) == {"end_amount", "prior_amount"}, f"{code} fields"
+
+
+def test_f2_note_rule_writes_book_value_columns_of_classification_table():
+    """F2 主表规则写「存货分类」表合计行的六列（与底稿同步写入的列键一致），章节标题仍按「存货」校验。
+
+    spec formula-fetch-followup-defect-closure R6.1：原规则只有期末 / 期初两个字段，三列分组表（账面余额 / 跌价准备 /
+    账面价值）认不出列；国企、上市两个模板该表都叫「存货分类」，原表名「存货」建骨架找不到表。
+    """
+    from app.services.formula_push.bindings.note_direct import BOOK_VALUE_FIELDS
+
+    rule = _note_rule("F2")
+    assert rule.target.fields == BOOK_VALUE_FIELDS
+    assert rule.target.table == "存货"
+    assert rule.target.tables_by_template == {"listed": "存货分类", "soe": "存货分类"}
+    # 原 subtable_0 与主表同表同字段、行源相同 ⇒ 已删，不得重复推送同一张表
+    assert not [r for r in load_rules() if r.rule_id == "F2.note.subtable_0"]
 
 
 # ── F policy = editable ─────────────────────────────────────────────────────
@@ -708,65 +724,41 @@ def test_f_single_code_note_rows_uses_ending_balance(
     assert row["label"] == account_name
 
 
-# ── F2 多科目码 binding note_rows（产出多行 + 合计行） ───────────────────────
+# ── F2 账面价值口径 binding note_rows（只出合计行） ──────────────────────────
+#
+# 🔴 原两条用例断言「合计 = 6 个科目码之和」（含 1461 存货跌价准备按正数相加）——那正是要修的缺陷
+# （spec formula-fetch-followup-defect-closure R6.1）。取数 / 归类的端到端见 test_formula_push_f2_note_book_value.py。
 
-def test_f2_multi_code_note_rows():
-    """F2 存货 6 个科目码产出 6 行数据行 + 1 行合计行。"""
-    f2_codes = ["1401", "1402", "1403", "1405", "1408", "1461"]
+_F2_VALUES = {"found": True, "end_gross": 300.0, "end_impairment": 20.0, "end_net": 280.0,
+              "prior_gross": 200.0, "prior_impairment": 10.0, "prior_net": 190.0}
+
+
+def test_f2_note_rows_are_one_book_value_total_row():
+    from app.services.formula_push.bindings.note_direct import BOOK_VALUE_FIELDS
+
     binding = note_direct_for("F2")
-    binding._last_tb_data = _make_multi_tb(f2_codes, "100000", "80000")
-
-    rule = _note_rule("F2")
-    rows = binding.note_rows({}, "listed", rule)
-
-    # 6 数据行 + 1 合计行
-    assert len(rows) == 7, "F2 应产出 6 数据行 + 1 合计行"
-
-    # 数据行
-    for i, code in enumerate(f2_codes):
-        row = rows[i]
-        assert row["ending"] == 100000.0
-        assert row["opening"] == 80000.0
-        assert row["is_total"] is False
-
-    # 合计行
-    total_row = rows[-1]
-    assert total_row["is_total"] is True
-    assert total_row["ending"] == 600000.0, "合计 ending = 100000 * 6"
-    assert total_row["opening"] == 480000.0, "合计 opening = 80000 * 6"
-    assert total_row["label"] == "存货"
+    binding._last_tb_data = _make_multi_tb(["1401", "1461"], "100000", "80000")
+    binding._last_book_values = dict(_F2_VALUES)
+    rows = binding.note_rows({}, "listed", _note_rule("F2"))
+    assert len(rows) == 1
+    row = rows[0]
+    assert (row["note_label"], row["match_total"], row["is_total"]) == ("合计", True, False)
+    assert {f: row[f] for f in BOOK_VALUE_FIELDS} == {f: _F2_VALUES[f] for f in BOOK_VALUE_FIELDS}
+    assert all(row[f"{f}_resolved"] is True for f in BOOK_VALUE_FIELDS)
+    # 子表规则不取试算表：不出行（原先逐码行的合计会被兜底写进子表合计行）
+    for rule in (r for r in load_rules() if r.rule_id.startswith("F2.note.subtable_")):
+        assert binding.note_rows({}, "listed", rule) == [], rule.rule_id
 
 
-def test_f2_partial_tb_data():
-    """F2 部分科目码有 TB 数据时，只有有数据的科目产出行。"""
+def test_f2_without_inventory_accounts_marks_all_fields_unresolved():
     binding = note_direct_for("F2")
-    # 只给 1401 和 1402 数据
-    binding._last_tb_data = {
-        "1401": {"期末余额": Decimal("300000"), "年初余额": Decimal("200000"), "本期发生额": Decimal("0")},
-        "1402": {"期末余额": Decimal("150000"), "年初余额": Decimal("100000"), "本期发生额": Decimal("0")},
-    }
-
-    rule = _note_rule("F2")
-    rows = binding.note_rows({}, "listed", rule)
-
-    # 6 数据行 + 1 合计行（未命中的科目 ending/opening = 0.0, resolved=False）
-    assert len(rows) == 7
-
-    # 有数据的行
-    r1401 = rows[0]
-    assert r1401["ending"] == 300000.0
-    assert r1401["ending_resolved"] is True
-
-    # 无数据的行（如 1403）
-    r1403 = rows[2]
-    assert r1403["ending"] == 0.0
-    assert r1403["ending_resolved"] is False
-
-    # 合计行
-    total_row = rows[-1]
-    assert total_row["is_total"] is True
-    assert total_row["ending"] == 450000.0, "合计 = 300000 + 150000"
-    assert total_row["opening"] == 300000.0, "合计 = 200000 + 100000"
+    binding._last_tb_data = {}
+    binding._last_book_values = {**_F2_VALUES, "found": False}
+    row = binding.note_rows({}, "soe", _note_rule("F2"))[0]
+    assert not any(v for k, v in row.items() if k.endswith("_resolved"))
+    # 试算表不可用 ⇒ 不出行（与其他科目同）
+    binding._last_tb_data = None
+    assert binding.note_rows({}, "soe", _note_rule("F2")) == []
 
 
 # ========================================================================

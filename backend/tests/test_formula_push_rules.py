@@ -46,7 +46,9 @@ def test_real_rules_load_and_distribution():
     assert len(_RULES) == len(_DOC["rules"])
     assert {r.wp_code for r in _RULES} == {
         "E1", "K1",
-        "D1", "D2", "D3", "D4", "D5", "D6", "D7",
+        # D5 应收款项融资没有标准科目（原规则取的 1124 在各项目科目表与试算表里都不存在）：试算表取数与附注主表
+        # 规则已删，binding 仍注册、写明原因（spec formula-fetch-followup-defect-closure R6.2）
+        "D1", "D2", "D3", "D4", "D6", "D7",
         "F1", "F2", "F3", "F4", "F5",
         "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10",
         "G11", "G12", "G13", "G14",

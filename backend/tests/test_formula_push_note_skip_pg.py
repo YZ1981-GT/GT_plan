@@ -272,6 +272,9 @@ def test_categorize_known_patterns():
     assert _categorize("K1-2 明细数据缺失，组合未审数保持原值") == "K"
     # L: 旧格式表头认不出列
     assert _categorize("附注表缺少「期末」列：表头里找不到唯一的「期末 / 期初」金额列（账面余额、减值准备），不按位置猜") == "L"
+    # 账面余额 / 减值准备 / 账面价值分列写的字段落到旧格式表（spec formula-fetch-followup-defect-closure R6.1）
+    assert _categorize("附注表是旧格式（按列序存数），表头只认得出期末 / 期初金额列，找不到唯一的「期末账面余额」列，"
+                       "不按位置猜，附注保持原值") == "L"
     # M: 撞行
     assert _categorize("取数行「固定资产_1601」「固定资产_1602」都对上附注「固定资产」行，同一格不能由多条取数覆盖写，"
                        "附注保持原值") == "M"

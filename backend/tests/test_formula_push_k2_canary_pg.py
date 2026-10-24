@@ -306,8 +306,12 @@ async def _scenario(monkeypatch) -> dict:
                 "run_count": run_count,
             }
     finally:
-        async with engine.begin() as admin:
-            await admin.execute(sa.text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
+        try:
+            async with engine.begin() as admin:
+                await admin.execute(sa.text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
+        finally:
+            # 连接池绑在本次 asyncio.run 的事件循环上，用完释放（见 test_formula_push_k1_d4_canary_pg 同处说明）
+            await engine.dispose()
 
 
 def test_k2_canary_real_postgres(monkeypatch):

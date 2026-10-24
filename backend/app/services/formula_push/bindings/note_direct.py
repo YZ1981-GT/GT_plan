@@ -39,6 +39,20 @@ _WP_MAPPING_PATH = _DATA_DIR / "wp_account_mapping.json"
 #: 损益类科目前缀（6 开头）
 _PL_PREFIX = "6"
 
+#: 附注主表按「账面余额 / 跌价准备 / 账面价值」写合计行的底稿 → 试算表科目区间（spec formula-fetch-followup-defect-closure R6.1）。
+#:
+#: 🔴 F2 存货原先逐码出行（映射表的 1401 / 1402 / 1403 / 1405 / 1408 / 1461），合计行把 1461 存货跌价准备当正数加进存货；
+#:    且映射表码不全 —— 同一个码在两套标准科目表变体里是不同科目（``f2_extraction.category_rules`` 实证：1406 一半项目是
+#:    库存商品、一半是发出商品；存货跌价准备落在 1416 / 1461 / 1471），和平 2025 的 1406 库存商品 1.2 亿、1416 跌价准备
+#:    都不在那 6 个码里。改为：取报表 BS-010 同一区间（``f_cycle_specs``：``SUM_TB('1401~1499')``）的全部试算表行，
+#:    按科目名归类（同一单一来源 ``classify_f2_category``，F2 审定表也用它）：跌价准备 / 减值准备计入跌价准备列，
+#:    商品进销差价从账面余额中减去，其余计入账面余额；账面价值 = 账面余额 − 跌价准备。只写合计行，明细行由底稿同步。
+_BOOK_VALUE_RANGES: dict[str, tuple[str, str]] = {"F2": ("1401", "1499")}
+#: 合计行六个字段：与底稿同步写入的「存货分类」列键一致（真库 ``_sub_table_columns['存货分类']``）
+BOOK_VALUE_FIELDS: tuple[str, ...] = (
+    "end_gross", "end_impairment", "end_net", "prior_gross", "prior_impairment", "prior_net",
+)
+
 #: 口径单一来源没有标准科目的底稿：不取试算表、不推附注主表，相关格子交给用户填写（规则清单里也不得有它们的取数规则）。
 _NO_ACCOUNT_REASONS: dict[str, str] = {
     "L7": "其他非流动负债是报表行、由多个明细科目归集，没有标准科目（l_cycle_specs 不给兜底码）；"
@@ -107,9 +121,13 @@ class NoteDirectBinding:
         *,
         is_income: bool = False,
         no_account_reason: str = "",
+        book_value_range: tuple[str, str] | None = None,
     ) -> None:
         if not account_codes and not no_account_reason:
             raise ValueError(f"{wp_code}: 没有科目时必须写明 no_account_reason")
+        #: 非空 = 附注主表按账面余额 / 跌价准备 / 账面价值写合计行（见 ``_BOOK_VALUE_RANGES``）
+        self._book_value_range = book_value_range
+        self._last_book_values: dict[str, Any] | None = None
         self.wp_code = wp_code
         self.account_prefixes = account_codes
         #: 非空 = 本科目没有标准科目（bindings 校验据此放行空 account_prefixes）
@@ -135,6 +153,9 @@ class NoteDirectBinding:
         if len(tb.company_codes) > 1:
             warnings.append(f"试算表含多个公司编码 {list(tb.company_codes)}，按全部合计")
         self._last_tb_data = tb.tb_data if tb.available else None
+        self._last_book_values = None
+        if self._book_value_range is not None and tb.available:
+            self._last_book_values = await _load_book_values(db, project_id, year, *self._book_value_range)
         template_type = await _load_template_type(db, project_id)
         return NoteDirectSources(formula=FormulaSources(tb=tb), template_type=template_type, warnings=warnings)
 
@@ -185,6 +206,8 @@ class NoteDirectBinding:
         tb_data = self._last_tb_data
         if tb_data is None:
             return []
+        if self._book_value_range is not None:
+            return self._book_value_rows(rule)
 
         codes = self.account_prefixes
         rows: list[dict] = []
@@ -224,8 +247,70 @@ class NoteDirectBinding:
 
         return rows
 
+    def _book_value_rows(self, rule: PushRule) -> list[dict]:
+        """账面价值口径：只给主表规则出一行，按行名「合计」对上附注合计行写六个字段（写后不再按上方各行重算）。
+
+        子表规则（同一 binding 的 ``subtable_*``）不取试算表 ⇒ 不出行（原先逐码行的合计会被兜底写进子表合计行）。
+        区间内一行科目都没有 ⇒ 六个字段都标未取到（附注保持原值，不写 0）。
+        """
+        values = self._last_book_values
+        if values is None or getattr(rule, "rule_id", None) != f"{self.wp_code}.note.main":
+            return []
+        row: dict[str, Any] = {
+            "key": f"{self.wp_code}-note-total",
+            "label": "合计",
+            "note_label": "合计",
+            "is_total": False,
+            "is_memo": False,
+            "match_total": True,
+        }
+        for name in BOOK_VALUE_FIELDS:
+            row[name] = values[name]
+            row[f"{name}_resolved"] = values["found"]
+        return [row]
+
     def entry_warnings(self, entries: Mapping[str, Any]) -> list[str]:
         return []
+
+
+async def _load_book_values(db: Any, project_id: UUID, year: int, lo: str, hi: str) -> dict[str, Any]:
+    """试算表 ``lo ≤ 标准码 ≤ hi``（与报表 ``SUM_TB`` 同口径的字符串区间）逐行按科目名归类后合计。
+
+    期末取审定数、期初取年初余额；跌价准备 / 进销差价取绝对值（与 F2 审定表 ``_f2_inventory_main`` 同口径：
+    备抵按名称识别，方向口径不一致的历史数据也不会把减项变成加项）。
+    """
+    import sqlalchemy as sa
+
+    from app.models.audit_platform_models import TrialBalance
+    from app.services.f2_extraction.category_rules import classify_f2_category, is_f2_impairment_category
+
+    rows = (await db.execute(
+        sa.select(TrialBalance.account_name, TrialBalance.audited_amount, TrialBalance.opening_balance).where(
+            TrialBalance.project_id == project_id,
+            TrialBalance.year == year,
+            TrialBalance.is_deleted == sa.false(),
+            TrialBalance.standard_account_code >= lo,
+            TrialBalance.standard_account_code <= hi,
+        )
+    )).all()
+    gross = {"end": Decimal("0"), "prior": Decimal("0")}
+    impairment = {"end": Decimal("0"), "prior": Decimal("0")}
+    for name, audited, opening in rows:
+        category = classify_f2_category(name)
+        for period, amount in (("end", audited), ("prior", opening)):
+            value = Decimal(str(amount or 0))
+            if is_f2_impairment_category(category):
+                impairment[period] += abs(value)
+            elif category == "price-difference":
+                gross[period] -= abs(value)
+            else:
+                gross[period] += value
+    out: dict[str, Any] = {"found": bool(rows)}
+    for period in ("end", "prior"):
+        out[f"{period}_gross"] = float(gross[period])
+        out[f"{period}_impairment"] = float(impairment[period])
+        out[f"{period}_net"] = float(gross[period] - impairment[period])
+    return out
 
 
 # ── 模板类型加载（复用 Tier A 同源） ───────────────────────────────────────
@@ -289,4 +374,5 @@ def note_direct_for(code: str) -> NoteDirectBinding:
         account_name=account_name,
         is_income=is_income,
         no_account_reason=reason,
+        book_value_range=_BOOK_VALUE_RANGES.get(code),
     )

@@ -262,8 +262,13 @@ async def _scenario(monkeypatch) -> dict:
                 "d4_wp": str(d4_wp),
             }
     finally:
-        async with engine.begin() as admin:
-            await admin.execute(sa.text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
+        try:
+            async with engine.begin() as admin:
+                await admin.execute(sa.text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
+        finally:
+            # 共享引擎的连接池绑在本次 asyncio.run 的事件循环上：不释放的话，同一进程里下一个用 asyncio.run 的真库用例
+            # 从池里拿到旧循环的连接，ping 时报「Event loop is closed」（全量跑 K2 canary 即因此红）
+            await engine.dispose()
 
 
 # ══════════════════════════════════════════════════════════════════════════
