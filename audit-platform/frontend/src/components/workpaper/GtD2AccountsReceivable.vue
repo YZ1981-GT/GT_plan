@@ -34,49 +34,6 @@
         <el-tag v-if="saving" type="info" size="small">保存中…</el-tag>
       </div>
 
-      <!-- 勾稽差异提示 -->
-      <el-alert
-        v-if="!crossSheet.reconciliationDiff.value.isBalanced"
-        type="warning"
-        :closable="false"
-        show-icon
-        style="margin-bottom: 8px"
-      >
-        <template #title>
-          D2-1审定表合计({{ fmtAmt(crossSheet.reconciliationDiff.value.adjTotal) }})
-          与D2-2明细表合计({{ fmtAmt(crossSheet.reconciliationDiff.value.detailTotal) }})
-          差异 {{ fmtAmt(crossSheet.reconciliationDiff.value.diff) }} 元，请核实
-        </template>
-      </el-alert>
-      <el-alert
-        v-if="crossSheet.detailVsTbDiff.value && !crossSheet.detailVsTbDiff.value.isBalanced"
-        type="warning"
-        :closable="false"
-        show-icon
-        style="margin-bottom: 8px"
-      >
-        <template #title>
-          D2-2明细表合计({{ fmtAmt(crossSheet.detailVsTbDiff.value.detailTotal) }})
-          与TB科目1122审定额({{ fmtAmt(crossSheet.detailVsTbDiff.value.tbAmount) }})
-          差异 {{ fmtAmt(crossSheet.detailVsTbDiff.value.diff) }} 元，请核实
-        </template>
-      </el-alert>
-      <!-- ECL↔坏账准备期末勾稽（全局提示；ECL tab 内已单独展示，此处避免重复） -->
-      <el-alert
-        v-if="currentSheet !== 'D2-9' && currentSheet !== 'D2-10'
-          && crossSheet.eclVsBadDebtDiff.value && !crossSheet.eclVsBadDebtDiff.value.isBalanced"
-        type="warning"
-        :closable="false"
-        show-icon
-        style="margin-bottom: 8px"
-      >
-        <template #title>
-          D2-10 ECL单项合计({{ fmtAmt(crossSheet.eclVsBadDebtDiff.value.eclTotal) }})
-          与D2-3坏账准备期末({{ fmtAmt(crossSheet.eclVsBadDebtDiff.value.badDebtCurrent) }})
-          差异 {{ fmtAmt(crossSheet.eclVsBadDebtDiff.value.diff) }} 元，请核实
-        </template>
-      </el-alert>
-
       <!-- OnlyOffice 在线编辑（统一路径：descriptor → WorkpaperSyncEditorHost） -->
       <!-- D2-2 canary：只在明细表走 USER_SYNC_PREFIX；其它 sheet 不挂 legacy GtOnlyOfficeSheet -->
       <!-- 🔴 必须包在带确定高度的容器里，否则 host 的 height:100% 解析成 auto、
@@ -280,6 +237,7 @@ import { ref, computed, onMounted, onBeforeUnmount, provide, inject, toRef, defi
 import { useAgingConfig } from '@/composables/useAgingConfig'
 import { useD2FormData, type ChecklistResponse } from './composables/useD2FormData'
 import { useD2CrossSheet } from './composables/useD2CrossSheet'
+import { useD2TabImportExport } from './composables/useD2TabImportExport'
 // 2026-09-10: DEC-10 解除后迁统一路径。`useD2SyncBridge` + `/d2-sync/*` 仍保留
 // 至 ONLYOFFICE_VERIFIED（DEC-08），但本宿主不再调用它们。
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
@@ -400,7 +358,12 @@ const { segments: d2AgingSegments, preset: d2AgingPreset } = useAgingConfig(
   toRef(props, 'projectId') as Ref<string>,
   'D2',
 )
-const crossSheet = useD2CrossSheet({ allResponses, agingSegments: d2AgingSegments })
+const crossSheet = useD2CrossSheet({
+  allResponses,
+  agingSegments: d2AgingSegments,
+  // D2-2↔TB 核对用 1122 **原值**审定额（不是净额锚点 D2-adj-tb-amount）
+  tbGrossAmount: computed(() => formData.tbReference.value.grossAudited),
+})
 
 // D2 只消费 GtWpRenderer 已初始化的版本能力，不再创建第二个 toolbar/Host。
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
@@ -412,12 +375,6 @@ const bsDate = computed(() => {
   if (props.year) return `${props.year}-12-31`
   return ''
 })
-
-/** 金额格式化(千分位 + 2位小数) */
-function fmtAmt(v: number): string {
-  if (v == null || Number.isNaN(v)) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 
 const relatedParties = computed<string[]>(() => {
   const raw = props.htmlData?.project_context?.related_parties
@@ -646,6 +603,8 @@ async function selfLoad(): Promise<void> {
     })
     formData.hydrate(items)
     isLoading.value = false
+    // 快照路径不走 loadAll：单独取一次试算表参考数（D2-2↔TB 原值核对），不阻塞首屏
+    void formData.loadTbReference()
     return
   }
   // P1-5: 否则从 API 加载完整数据
@@ -666,6 +625,34 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('d2:save-items', handleD2SaveItems)
   void formData.flushPendingSave().catch(() => undefined)
+})
+
+// ─── 导入导出委托：宿主工具栏经 GtWpRenderer.activeComponentRef 调用 ─────────
+const d2Io = useD2TabImportExport(
+  toRef(props, 'wpId') as Ref<string>,
+  toRef(props, 'projectId') as Ref<string>,
+  currentSheet,
+)
+
+function handleExportTemplate() { d2Io.onExportTemplate() }
+function handleExportData() { d2Io.onExportData() }
+function handleImportClick() {
+  // 宿主工具栏点「导入」时，创建隐藏的 file input 供用户选文件
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx'
+  input.onchange = () => {
+    const file = input.files?.[0]
+    if (file) d2Io.onImportFile(file)
+  }
+  input.click()
+}
+
+defineExpose({
+  syncEntryId: D2_SYNC_ENTRY_ID,
+  handleExportTemplate,
+  handleExportData,
+  handleImportClick,
 })
 </script>
 

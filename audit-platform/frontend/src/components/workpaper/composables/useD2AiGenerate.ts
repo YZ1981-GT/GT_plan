@@ -11,6 +11,7 @@ export type D2AiSection =
   | 'policy-evaluation'
   | 'analysis-note'
   | 'detail-note'
+  | 'detail-conclusion'
   | 'writeoff-analysis'
   | 'pledge-note'
   | 'pledge-conclusion'

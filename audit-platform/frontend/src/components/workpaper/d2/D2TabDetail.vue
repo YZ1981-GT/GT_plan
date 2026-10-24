@@ -11,9 +11,9 @@ import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import { useVirtualTable, type VirtualColumn } from '@/composables/useVirtualTable'
 import { useAutoColumnWidth } from '@/composables/useAutoColumnWidth'
 import { useContainerWidth } from '@/composables/useContainerWidth'
-import type { AgingBand } from '@/composables/useAgingConfig'
+import type { AgingBand, AgingPreset } from '@/composables/useAgingConfig'
 import GtReviewDot from '../GtReviewDot.vue'
-import GtReviewTrigger from '../GtReviewTrigger.vue'
+import AgingConfigDialog from '../AgingConfigDialog.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
@@ -33,6 +33,22 @@ const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
 )
 
 const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
+
+// 账龄段配置
+const agingPreset = inject<Ref<AgingPreset>>('d2AgingPreset', ref('FIVE_YEAR') as Ref<AgingPreset>)
+const agingDialogVisible = ref(false)
+
+const AGING_PRESET_LABELS: Record<AgingPreset, string> = {
+  THREE_YEAR: '3年段',
+  FIVE_YEAR: '5年段',
+  CUSTOM: '自定义',
+}
+const agingPresetLabel = computed(() => AGING_PRESET_LABELS[agingPreset.value] ?? agingPreset.value)
+
+function onAgingConfigSaved(): void {
+  agingDialogVisible.value = false
+  // EventBus 会自动触发 useAgingConfig refresh，无需手动处理
+}
 
 // 复核对话集成 (Task 47.1)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -190,7 +206,8 @@ async function handleImportFromAux(): Promise<void> {
   importing.value = true
   try {
     const result = await importFromAuxBalance(props.projectId)
-    ElMessage.success(`导入完成：新增 ${result.added} 行，更新 ${result.updated} 行`)
+    // 截断时导入函数已弹出常驻警告，这里不再叠一条「导入完成」把它盖掉
+    if (!result.truncated) ElMessage.success(`导入完成：新增 ${result.added} 行，更新 ${result.updated} 行`)
   } catch {
     ElMessage.error('从余额表导入失败')
   } finally {
@@ -234,6 +251,17 @@ async function onAiDetailNote(): Promise<void> {
   }
 }
 
+async function onAiDetailConclusion(): Promise<void> {
+  const content = await generateAndConfirm('detail-conclusion', detailConclusion.value, {
+    rowCount: rows.value.length,
+    totalAudited: totalRow.value.currentAudited,
+  }, 'AI 生成明细表结论')
+  if (content) {
+    detailConclusion.value = content
+    saveDetailConclusion()
+  }
+}
+
 function getRowClassName({ row }: { row: DetailRow }): string {
   if (row.relationType && row.relationType !== '非关联方') return 'related-party-row'
   return ''
@@ -247,25 +275,21 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 
 <template>
   <div class="d2-tab-detail">
-    <div class="tab-header">
-      <h4>应收账款明细表 D2-2</h4>
-      <GtReviewTrigger section-id="D2-detail-header" />
-    </div>
-
-    <el-alert type="info" :closable="false" show-icon title="审计目标" class="audit-objective">
-      <template #default>
-        <p>核实应收账款客户明细的完整性与准确性，按账龄/信用风险组合归集，驱动审定表 SUMIF 汇总与 ECL 计提。</p>
-      </template>
-    </el-alert>
-
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
-        <el-button size="small" @click="onExportData">导出数据</el-button>
-        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
-          <el-button size="small">导入数据</el-button>
-        </el-upload>
+        <!-- 账龄段配置 -->
+        <el-tag
+          :type="agingPreset === 'CUSTOM' ? 'warning' : 'info'"
+          size="small"
+          class="aging-preset-tag"
+        >
+          {{ agingPresetLabel }}
+        </el-tag>
+        <el-button size="small" @click="agingDialogVisible = true">
+          账龄段设置
+        </el-button>
+        <el-divider direction="vertical" />
         <el-button size="small" type="success" :disabled="isReadonly" :loading="importing" @click="handleImportFromAux">
           从余额表导入
         </el-button>
@@ -288,6 +312,13 @@ function handleEdit(row: DetailRow, field: string, value: any) {
         />
       </div>
     </div>
+
+    <!-- 账龄段配置弹窗 -->
+    <AgingConfigDialog
+      v-model:visible="agingDialogVisible"
+      :project-id="projectId"
+      @config-saved="onAgingConfigSaved"
+    />
 
     <!-- 虚拟滚动：速览 / 编辑切换 -->
     <div v-if="useVirtualScroll" class="virtual-toolbar">
@@ -381,62 +412,100 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 
       <!-- 期初 -->
       <el-table-column label="期初未审" min-width="110" align="right">
-        <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorUnadjusted) }}</template>
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.priorUnadjusted ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'priorUnadjusted', v ?? 0)" />
+          <span v-else>{{ displayPrefs.fmtAmount(row.priorUnadjusted) }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="期初AJE" min-width="100" align="right">
-        <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorAje) }}</template>
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.priorAje ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'priorAje', v ?? 0)" />
+          <span v-else>{{ displayPrefs.fmtAmount(row.priorAje) }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="期初RJE" min-width="100" align="right">
-        <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorRje) }}</template>
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.priorRje ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'priorRje', v ?? 0)" />
+          <span v-else>{{ displayPrefs.fmtAmount(row.priorRje) }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="期初审定" min-width="110" align="right">
         <template #default="{ row }">
-          <span style="font-weight: 600">{{ displayPrefs.fmtAmount(row.priorAudited) }}</span>
+          <el-input-number v-if="!isReadonly" :model-value="row.priorAudited ?? 0" :controls="false" size="small" class="aging-input" style="font-weight: 600" @change="(v: number) => handleEdit(row, 'priorAudited', v ?? 0)" />
+          <span v-else style="font-weight: 600">{{ displayPrefs.fmtAmount(row.priorAudited) }}</span>
         </template>
       </el-table-column>
 
       <!-- 期初审定账龄 -->
       <el-table-column label="期初审定账龄" align="center">
         <el-table-column v-for="band in bands" :key="'p-' + band.key" :label="band.label" min-width="95" align="right">
-          <template #default="{ row }">{{ displayPrefs.fmtAmount(row.agingPrior?.[band.key] ?? 0) }}</template>
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.agingPrior?.[band.key] ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, `agingPrior.${band.key}`, v ?? 0)" />
+            <span v-else>{{ displayPrefs.fmtAmount(row.agingPrior?.[band.key] ?? 0) }}</span>
+          </template>
         </el-table-column>
       </el-table-column>
 
       <!-- 本期发生 -->
       <el-table-column label="借方发生" min-width="110" align="right">
-        <template #default="{ row }">{{ displayPrefs.fmtAmount(row.debitOccurrence) }}</template>
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.debitOccurrence ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'debitOccurrence', v ?? 0)" />
+          <span v-else>{{ displayPrefs.fmtAmount(row.debitOccurrence) }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="贷方发生" min-width="110" align="right">
-        <template #default="{ row }">{{ displayPrefs.fmtAmount(row.creditOccurrence) }}</template>
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.creditOccurrence ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'creditOccurrence', v ?? 0)" />
+          <span v-else>{{ displayPrefs.fmtAmount(row.creditOccurrence) }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="期末余额" min-width="110" align="right">
-        <template #default="{ row }">{{ displayPrefs.fmtAmount(row.endBalance) }}</template>
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.endBalance ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'endBalance', v ?? 0)" />
+          <span v-else>{{ displayPrefs.fmtAmount(row.endBalance) }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="重分类" min-width="100" align="right">
-        <template #default="{ row }">{{ displayPrefs.fmtAmount(row.reclassification) }}</template>
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.reclassification ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'reclassification', v ?? 0)" />
+          <span v-else>{{ displayPrefs.fmtAmount(row.reclassification) }}</span>
+        </template>
       </el-table-column>
 
       <!-- 期末未审 -->
       <el-table-column label="期末未审" min-width="110" align="right">
-        <template #default="{ row }">{{ displayPrefs.fmtAmount(row.currentUnadjusted) }}</template>
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.currentUnadjusted ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'currentUnadjusted', v ?? 0)" />
+          <span v-else>{{ displayPrefs.fmtAmount(row.currentUnadjusted) }}</span>
+        </template>
       </el-table-column>
 
       <!-- 期末未审账龄 -->
       <el-table-column label="期末未审账龄" align="center">
         <el-table-column v-for="band in bands" :key="'c-' + band.key" :label="band.label" min-width="95" align="right">
-          <template #default="{ row }">{{ displayPrefs.fmtAmount(row.agingCurrent?.[band.key] ?? 0) }}</template>
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.agingCurrent?.[band.key] ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, `agingCurrent.${band.key}`, v ?? 0)" />
+            <span v-else>{{ displayPrefs.fmtAmount(row.agingCurrent?.[band.key] ?? 0) }}</span>
+          </template>
         </el-table-column>
       </el-table-column>
 
       <el-table-column label="期末AJE" min-width="100" align="right">
-        <template #default="{ row }">{{ displayPrefs.fmtAmount(row.currentAje) }}</template>
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.currentAje ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'currentAje', v ?? 0)" />
+          <span v-else>{{ displayPrefs.fmtAmount(row.currentAje) }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="期末RJE" min-width="100" align="right">
-        <template #default="{ row }">{{ displayPrefs.fmtAmount(row.currentRje) }}</template>
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.currentRje ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'currentRje', v ?? 0)" />
+          <span v-else>{{ displayPrefs.fmtAmount(row.currentRje) }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="期末审定" min-width="110" align="right">
         <template #default="{ row }">
-          <span style="font-weight: 600">{{ displayPrefs.fmtAmount(row.currentAudited) }}</span>
+          <el-input-number v-if="!isReadonly" :model-value="row.currentAudited ?? 0" :controls="false" size="small" class="aging-input" style="font-weight: 600" @change="(v: number) => handleEdit(row, 'currentAudited', v ?? 0)" />
+          <span v-else style="font-weight: 600">{{ displayPrefs.fmtAmount(row.currentAudited) }}</span>
         </template>
       </el-table-column>
 
@@ -538,8 +607,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
     <div class="audit-note-block">
       <div class="audit-note-header">
         <span>三、审计说明</span>
-        <GtReviewTrigger section-id="D2-detail-audit-note" />
-        <el-button v-if="aiAvailable && !isReadonly" size="small" text type="primary" @click="onAiDetailNote">🤖 AI生成</el-button>
+        <el-button v-if="aiAvailable && !isReadonly" size="small" type="primary" plain @click="onAiDetailNote">🤖 AI生成</el-button>
       </div>
       <el-input
         v-model="detailNote"
@@ -551,13 +619,11 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       />
     </div>
 
-    <!-- 审计结论（源模板 A33「四、审计结论：」，正文 34..35）
-         🔴 补齐项：此前 HTML 侧缺这一块，与源模板不对齐，导致 Excel 里的
-         审计结论无处回写。两侧字段必须与模板一一对应。 -->
+    <!-- 审计结论（源模板 A33「四、审计结论：」，正文 34..35） -->
     <div class="audit-note-block">
       <div class="audit-note-header">
         <span>四、审计结论</span>
-        <GtReviewTrigger section-id="D2-detail-audit-conclusion" />
+        <el-button v-if="aiAvailable && !isReadonly" size="small" type="primary" plain @click="onAiDetailConclusion">🤖 AI生成</el-button>
       </div>
       <el-input
         v-model="detailConclusion"
@@ -573,6 +639,8 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 
 <style scoped>
 .d2-tab-detail { padding: 12px; }
+.d2-tab-detail :deep(.el-table) { font-size: 12px; }
+.d2-tab-detail :deep(.el-table .cell) { font-size: 12px; }
 .tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .tab-header h4 { margin: 0; font-size: 15px; }
 .audit-objective { margin-bottom: 12px; }
@@ -601,5 +669,5 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 .audited-aging { background: #e6f7ff; padding: 1px 4px; border-radius: 2px; }
 .confirmation-auto { background: #b7eb8f !important; border-color: #52c41a !important; color: #135200 !important; }
 .audit-note-block { margin-top: 16px; }
-.audit-note-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 600; font-size: var(--wp-font-size, 13px); }
+.audit-note-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-weight: 600; font-size: var(--wp-font-size, 13px); }
 </style>
