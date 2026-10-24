@@ -28,6 +28,7 @@ import {
   calcVarianceRate,
 } from './useM2FormulaEngine'
 import type { useM2FormData } from './useM2FormData'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -254,7 +255,7 @@ export function useM2Adjudication(
       if (oldVal !== undefined && newVal !== oldVal) {
         await saveAdjudication()
         eventBus.emit('substantive:adjudicated', {
-          accountCode: '4001',
+          accountCode: M_CYCLE_ACCOUNT.M2.code,
           auditedAmount: newVal,
           wpCode: 'M2',
           timestamp: Date.now(),
@@ -278,7 +279,7 @@ export function useM2Adjudication(
 
     try {
       await ElMessageBox.confirm(
-        '发布后将把实收资本/股本审定数（科目 4001）写入试算表（trial_balance），'
+        `发布后将把实收资本/股本审定数（科目 ${M_CYCLE_ACCOUNT.M2.code}）写入试算表（trial_balance），`
         + '并触发报表/错报评价等下游重算。确认发布？',
         '发布到试算表确认',
         { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },

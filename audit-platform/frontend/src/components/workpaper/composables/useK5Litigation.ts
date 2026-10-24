@@ -13,7 +13,7 @@
  * - 行级抽凭+行级OCR（律师函）
  * - Save with prefix "K5-6-"
  *
- * 科目：2701 预计负债-未决诉讼（**贷方/负债类**）
+ * 科目：2801 预计负债-未决诉讼（**贷方/负债类**）
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'

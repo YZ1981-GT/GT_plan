@@ -6,7 +6,7 @@
         <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
         <h3 class="section-title">M8-1 一般风险准备审定表</h3>
         <el-tag type="success" effect="dark" size="small" class="equity-badge">
-          权益类·贷方余额·4104
+          权益类·贷方余额·一般风险准备
         </el-tag>
       </div>
       <div class="section-header-right">
@@ -37,19 +37,19 @@
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>一般风险准备（4104）为权益类贷方科目：</strong>
+        <strong>一般风险准备为权益类贷方科目：</strong>
         期末余额 = 期初 + 贷方（计提增加） − 借方（转回/使用减少）。
         审定数 = 未审数 + AJE + RJE。
         金融企业从净利润中计提一般风险准备（贷方增加），原则上不低于风险资产期末余额的1.5%；
         弥补损失或经批准转回时借方减少。
-        本表数据从明细表M8-2自动引用，审定数变化自动回写试算表（4104）并通知附注组件。
+        本表数据从明细表M8-2自动引用，审定数变化自动回写试算表（一般风险准备科目）并通知附注组件。
       </div>
     </div>
 
     <!-- ═══ 单区块：一般风险准备审定 ═══ -->
     <div class="block-section">
       <div class="block-header">
-        <h4 class="block-title">一般风险准备（4104 贷方/权益类）</h4>
+        <h4 class="block-title">一般风险准备（贷方/权益类）</h4>
       </div>
 
       <el-table
@@ -239,7 +239,7 @@
         期末审定合计: {{ fmtAmount(adjudication.totalRow.value.endAudited) }}
       </el-tag>
       <el-tag type="success" size="small" effect="plain">
-        TB回写: 科目4104 一般风险准备（贷方/权益类）
+        TB回写: {{ m8SubjectLabel }}（贷方/权益类）
       </el-tag>
       <el-tag
         :type="crossValidation.isMatch ? 'success' : 'danger'"
@@ -283,7 +283,7 @@
     <details class="m8-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>一般风险准备（4104）为<strong>权益类贷方科目</strong>：期末 = 期初 + 贷方（计提） − 借方（转回/使用）</li>
+        <li>一般风险准备为<strong>权益类贷方科目</strong>：期末 = 期初 + 贷方（计提） − 借方（转回/使用）</li>
         <li><strong>金融企业专属</strong>：仅银行/证券/保险/金融企业适用</li>
         <li>计提：从净利润中计提，原则上不低于风险资产期末余额的1.5%</li>
         <li>转回/使用：弥补尚未识别的可能性损失或经批准转回</li>
@@ -291,8 +291,8 @@
         <li>变动额 = 期末审定 − 期初审定；变动率 = 变动额 / 期初审定</li>
         <li>本表数据从M8-2明细表自动引用（Row 7-12），合计行SUM(B7:B12)</li>
         <li>Row 14: 上期审定数；Row 15: 差异 = 合计 − 上期审定数</li>
-        <li>审定数变化自动回写 TB（科目 4104）并通知附注组件</li>
-        <li>「带入调整」：从集中登记按科目 4104 拉取调整分录，逐笔分配到各明细行的期末 AJE/RJE，带入后审定数自动更新并联动附注</li>
+        <li>审定数变化自动回写 TB（一般风险准备科目）并通知附注组件</li>
+        <li>「带入调整」：从集中登记按本项目定位到的一般风险准备科目拉取调整分录（定位不到不带入），逐笔分配到各明细行的期末 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
 
@@ -300,7 +300,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="4104 一般风险准备"
+      :subject-label="m8SubjectLabel"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -315,14 +315,14 @@
  * Task: 4.2
  * Requirements: 2.1-2.7
  *
- * 权益类单区块（4104 一般风险准备, 贷方权益类, 金融企业专属）
+ * 权益类单区块（一般风险准备, 贷方权益类, 金融企业专属）
  * xlsx结构：25×12 (A:L), 84公式
  * Columns: 项目名称 | 期初未审 | 期初AJE | 期初RJE | 期初审定 | 期末未审 | 期末AJE | 期末RJE | 期末审定 | 变动额 | 变动率 | 原因分析
  * Rows 7-12: Detail (引用M8-2), Row 13: 合计SUM, Row 14: 上期审定, Row 15: 差异
  *
  * - useM8FormData + useM8Adjudication composable
  * - Font 13px, formula columns with dashed underline + cursor:help + tooltip
- * - TB回写(4104) on 审定数变化
+ * - TB回写(一般风险准备) on 审定数变化
  * - EventBus 'substantive:adjudicated' publish
  * - 双模式 (HTML/OO) 由主入口 GtM8GeneralRiskReserve 统一承载（本 tab 仅结构化）
  * - 方法论上下文琥珀色块 (权益类贷方方向说明)
@@ -345,6 +345,7 @@ import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBring
 import { useVersionTrail } from '../../composables/useVersionTrail'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
+import { mAccountLabel } from '../../composables/mCycleAccountScope'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
@@ -363,7 +364,10 @@ const rows = ref<M8AdjudicationRow[]>([])
 
 const adjudication = useM8Adjudication(formData, rows)
 
-// ─── 从集中登记带入调整（4104 一般风险准备，权益贷方；双列 endAje/endRje，固定明细行） ───
+/** 一般风险准备没有统一标准码：标签带本项目定位到的码，定位不到显示「本项目无此科目」 */
+const m8SubjectLabel = computed(() => mAccountLabel('M8', formData.accountCode.value))
+
+// ─── 从集中登记带入调整（一般风险准备，权益贷方；双列 endAje/endRje，固定明细行） ───
 const bringInRows = computed(() =>
   adjudication.computedRows.value.map((r) => ({
     rowKey: r.key,
@@ -381,11 +385,12 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '4104',
+  // 定位不到科目时前缀为空 ⇒ 不拉取（不拿别的科目顶替）
+  subjectPrefix: () => formData.accountCode.value,
   direction: 'credit',
-  subjectCode: '4104',
+  subjectCode: () => formData.accountCode.value,
   wpCode: 'M8',
-  subjectLabel: '一般风险准备(4104)',
+  subjectLabel: () => m8SubjectLabel.value,
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) => {
     const idx = rows.value.findIndex((r) => r.key === rowKey)
@@ -546,7 +551,7 @@ async function handleAI(section: string): Promise<void> {
   try {
     const t = adjudication.totalRow.value
     const context: Record<string, string> = {
-      科目: '4104 一般风险准备（权益类/贷方）',
+      科目: '一般风险准备（权益类/贷方）',
       底稿: 'M8-1 一般风险准备审定表',
       期初审定合计: fmtAmount(t.beginAudited),
       期末审定合计: fmtAmount(t.endAudited),

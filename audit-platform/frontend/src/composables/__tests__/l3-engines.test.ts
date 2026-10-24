@@ -242,7 +242,8 @@ describe('useL3ReclassEngine', () => {
       expect(entry.debit.accountCode).toBe('2501')
       expect(entry.debit.amount).toBe(3000000)
       expect(entry.credit.account).toBe('一年内到期的非流动负债')
-      expect(entry.credit.accountCode).toBe('2801')
+      // 报表项目没有统一科目码，留空按名称同步（原写 2801 = 预计负债，错）
+      expect(entry.credit.accountCode).toBe('')
       expect(entry.credit.amount).toBe(3000000)
     })
 

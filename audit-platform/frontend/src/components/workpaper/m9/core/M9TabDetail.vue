@@ -711,7 +711,7 @@ async function handleAI(sectionId: string): Promise<void> {
   aiLoading.value = sectionId
   try {
     const context: Record<string, string> = {
-      科目: '4103 其他综合收益 / 明细表（M9-2 OCI分项·税后净额）',
+      科目: '4003 其他综合收益 / 明细表（M9-2 OCI分项·税后净额）',
       期初合计: fmtAmount(detail.totals.value.beginning),
       本期税前发生合计: fmtAmount(detail.totals.value.preTaxAmount),
       所得税影响合计: fmtAmount(detail.totals.value.taxEffect),

@@ -118,15 +118,15 @@
  * 组件接收 sheetName prop，正则提取编码（M3/M3A/M3-1~M3-5），v-if 分发到对应子组件。
  * 不使用内部 el-tabs（避免双层 Tab 问题）。
  *
- * 科目覆盖：4002 库存股（**借方/权益备抵类！**）
+ * 科目覆盖：4201 库存股（**借方/权益备抵类！**）
  * 核心铁律：期末=期初+借方-贷方（回购在借方增加，注销/再售在贷方减少，与其他M权益类方向相反！）
  * 特殊功能：①权益备抵借方公式 ②回购/注销核对(M3-5) ③外币回购折算(M3-4) ④按回购批次列示(M3-2)
  *
  * selfLoad: 当 htmlData 为 null 时自行调 render-config 加载数据。
  *
  * 集成（Phase 6）：
- * - EventBus: substantive:adjudicated(4002) / adjustment:created
- * - 跨底稿联动: TB回写(4002) + 注销冲减→M2实收资本 + 注销冲减→M4资本公积
+ * - EventBus: substantive:adjudicated(4201) / adjustment:created
+ * - 跨底稿联动: TB回写(4201) + 注销冲减→M2实收资本 + 注销冲减→M4资本公积
  * - 版本追踪: useVersionTrail(autoSnapshot)
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */

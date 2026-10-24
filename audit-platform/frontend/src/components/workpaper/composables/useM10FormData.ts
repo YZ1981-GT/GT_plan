@@ -9,18 +9,19 @@
  * - selfLoad(): bundle内嵌场景从 render-config 加载上下文
  * - checklist_responses 持久化: GET/PUT /api/workpapers/:wpId/checklist-responses
  * - item_id 命名: 前缀 "M10-{sheet}-{field}"（如 "M10-1-adjudicated-amount", "M10-2-detail-begin"）
- * - writebackTB(4003): 审定数回写 trial_balance 科目 4003 其他权益工具
+ * - writebackTB(4401): 审定数回写 trial_balance 科目 4401 其他权益工具
  * - EventBus: 回写成功后发布 'substantive:adjudicated'
  * - debounce/即时保存: 文本字段 debounce 2s，枚举/结论即时保存
  * - 组件卸载时 flush 未保存数据（onScopeDispose）
  *
- * 科目：4003 其他权益工具（**贷方/权益类！期末=期初+贷方-借方**）
+ * 科目：4401 其他权益工具（**贷方/权益类！期末=期初+贷方-借方**）
  * 发行时贷方增加，赎回/转换时借方减少
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ export interface UseM10FormDataOptions {
 
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'M10-'
-const ACCOUNT_CODE = '4003' // 其他权益工具（贷方/权益类！）
+const ACCOUNT_CODE = M_CYCLE_ACCOUNT.M10.code // 其他权益工具（贷方/权益类！）
 /** 审定表 sheet 名（含子码 M10-1，供后端 extract_determination_wp_code 解出） */
 const DETERMINATION_SHEET_NAME = '审定表M10-1'
 
@@ -272,10 +273,10 @@ export function useM10FormData(options: UseM10FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── writebackTB (回写审定数到 trial_balance 4003) ─────────────────────────
+  // ─── writebackTB (回写审定数到 trial_balance 4401) ─────────────────────────
 
   /**
-   * 回写审定数到 trial_balance（科目 4003 其他权益工具，**贷方/权益类！**）。
+   * 回写审定数到 trial_balance（科目 4401 其他权益工具，**贷方/权益类！**）。
    *
    * 权益类贷方方向铁律：
    * - 期末 = 期初 + 贷方(增加：发行) - 借方(减少：赎回/转换)

@@ -3,7 +3,7 @@
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <strong>CAS37核心判定：</strong>发行方是否存在交付现金/其他金融资产的合同义务。
-      无合同义务→权益工具(4003)；有合同义务→金融负债(负债科目)。
+      无合同义务→权益工具(4401)；有合同义务→金融负债(负债科目)。
     </div>
 
     <!-- ═══ 引导步骤（蓝色渐变引导区） ═══ -->
@@ -145,7 +145,7 @@
             <el-tag
               v-if="instrument.classification === 'equity'"
               type="success" effect="dark" size="default"
-            >权益工具 → 计入4003其他权益工具</el-tag>
+            >权益工具 → 计入4401其他权益工具</el-tag>
             <el-tag
               v-else-if="instrument.classification === 'liability'"
               type="danger" effect="dark" size="default"
@@ -297,7 +297,7 @@
         <li>逐项判定CAS37各维度：本金义务、利息义务、递延权利、或有结算、转股特征、清算优先、结算方式</li>
         <li>核心规则：有交付现金/金融资产的合同义务→金融负债，无→权益工具</li>
         <li>复合金融工具需手动拆分权益/负债部分金额，确保权益+负债=总额（金额守恒）</li>
-        <li>判定为负债的工具应从M10(4003)转出至负债科目，并在明细表中标注</li>
+        <li>判定为负债的工具应从M10(4401)转出至负债科目，并在明细表中标注</li>
       </ul>
     </details>
   </div>
@@ -396,7 +396,7 @@ async function handleAI(sectionId: string): Promise<void> {
   try {
     const s = cc.summary.value
     const context: Record<string, string> = {
-      科目: '4003 其他权益工具 / 负债与权益区分检查表（M10-4，CAS37）',
+      科目: '4401 其他权益工具 / 负债与权益区分检查表（M10-4，CAS37）',
       工具总数: String(s.totalInstruments),
       权益工具数: String(s.equityCount),
       金融负债数: String(s.liabilityCount),

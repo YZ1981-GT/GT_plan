@@ -117,14 +117,14 @@
  * 组件接收 sheetName prop，正则提取末尾编码（L7/L7A/L7-1~L7-4），v-if 分发到对应子组件。
  * 不使用内部 el-tabs（避免双层 Tab 问题）。
  *
- * 科目覆盖：2801 其他非流动负债（贷方/负债类！期末=期初+贷方-借方）
+ * 科目覆盖：其他非流动负债（无专属科目码；贷方/负债类！期末=期初+贷方-借方）
  * L筹资循环最简标准负债底稿，无复杂计算引擎。
  *
  * selfLoad: 当 htmlData 为 null 时自行调 render-config 加载数据。
  *
  * 集成（Phase 6）：
  * - EventBus: substantive:adjudicated / adjustment:created
- * - 跨底稿联动: TB回写(2801)
+ * - 跨底稿联动: TB回写(BS-071)
  * - 版本追踪: useVersionTrail(autoSnapshot)
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */

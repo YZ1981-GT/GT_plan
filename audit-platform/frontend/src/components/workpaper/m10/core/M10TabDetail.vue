@@ -692,7 +692,7 @@
  * - 与M10-1审定表交叉验证
  * - el-segmented双模式（HTML/OnlyOffice）
  *
- * 科目：4003 其他权益工具（**贷方/权益类！期末=期初+贷方-借方**）
+ * 科目：4401 其他权益工具（**贷方/权益类！期末=期初+贷方-借方**）
  */
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { Plus, Check } from '@element-plus/icons-vue'

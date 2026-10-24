@@ -22,6 +22,7 @@ import { calcRepurchaseAmount, calcCancelDiff } from './useM3TreasuryEngine'
 import { calcSubtotal } from './useM3FormulaEngine'
 import { eventBus } from '@/utils/eventBus'
 import type { useM3FormData } from './useM3FormData'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -315,8 +316,11 @@ export function useM3TreasuryCheck(formData: ReturnType<typeof useM3FormData>) {
 
   /**
    * 当注销冲减差额>0时自动建议AJE分录:
-   * - 差额优先冲减盈余公积(M5/3101)
-   * - 盈余公积不足部分冲减未分配利润(M6/3104)
+   * - 差额优先冲减盈余公积(M5/4101)
+   * - 盈余公积不足部分冲减未分配利润(M6/4104)
+   *
+   * 🔴 科目码取 mCycleAccountScope：原先写的 3101 / 3002 是旧制编码（现行科目表 3101 是「衍生工具」），
+   *    库存股写的 4002 实为资本公积 —— 推送到调整分录后会落到错误科目。
    *
    * CAS准则：注销库存股冲减顺序=实收资本(面值)→资本公积→盈余公积→未分配利润
    * 此处差额=注销金额−冲减M2−冲减M4，即M2/M4已冲减完的剩余部分
@@ -334,7 +338,7 @@ export function useM3TreasuryCheck(formData: ReturnType<typeof useM3FormData>) {
           description: `注销库存股"${row.batchName}"冲减差额${diff.toFixed(2)}元，建议冲减盈余公积`,
           category: '账项调整',
           accountName: '盈余公积',
-          accountCode: '3101',
+          accountCode: M_CYCLE_ACCOUNT.M5.code,
           debit: diff,
           credit: 0,
           batchName: row.batchName,
@@ -343,7 +347,7 @@ export function useM3TreasuryCheck(formData: ReturnType<typeof useM3FormData>) {
           description: `注销库存股"${row.batchName}"冲减差额对应贷记库存股`,
           category: '账项调整',
           accountName: '库存股',
-          accountCode: '4002',
+          accountCode: M_CYCLE_ACCOUNT.M3.code,
           debit: 0,
           credit: diff,
           batchName: row.batchName,
@@ -355,7 +359,7 @@ export function useM3TreasuryCheck(formData: ReturnType<typeof useM3FormData>) {
           description: `注销库存股"${row.batchName}"低于冲减合计${absDiff.toFixed(2)}元，建议增加资本公积`,
           category: '账项调整',
           accountName: '资本公积',
-          accountCode: '3002',
+          accountCode: M_CYCLE_ACCOUNT.M4.code,
           debit: 0,
           credit: absDiff,
           batchName: row.batchName,
@@ -364,7 +368,7 @@ export function useM3TreasuryCheck(formData: ReturnType<typeof useM3FormData>) {
           description: `注销库存股"${row.batchName}"差额对应借记库存股`,
           category: '账项调整',
           accountName: '库存股',
-          accountCode: '4002',
+          accountCode: M_CYCLE_ACCOUNT.M3.code,
           debit: absDiff,
           credit: 0,
           batchName: row.batchName,

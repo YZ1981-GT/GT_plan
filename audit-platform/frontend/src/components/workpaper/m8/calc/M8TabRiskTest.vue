@@ -6,7 +6,7 @@
         <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
         <h3 class="section-title">M8-4 一般风险准备计提测试表</h3>
         <el-tag type="success" effect="dark" size="small" class="equity-badge">
-          权益类·贷方余额·4104
+          权益类·贷方余额·一般风险准备
         </el-tag>
       </div>
       <div class="section-header-right">
@@ -296,7 +296,7 @@
  * - Section header with AI辅助 + 复核按钮
  * - 编制提示 details折叠
  *
- * 科目：4104 一般风险准备（**贷方/权益类！金融企业专属**）
+ * 科目：一般风险准备（**贷方/权益类！金融企业专属**）
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -416,7 +416,7 @@ async function handleAI(section: string): Promise<void> {
     const t = riskTest.totalRow.value
     const adequacy = riskTest.provisionAdequacy.value
     const context: Record<string, string> = {
-      科目: '4104 一般风险准备（权益类/贷方，金融企业专属）',
+      科目: '一般风险准备（权益类/贷方，金融企业专属）',
       底稿: 'M8-4 一般风险准备计提测试表',
       合计本期计提: fmtAmount(t.currentProvision),
       合计应计金额: fmtAmount(t.estimatedAmount),

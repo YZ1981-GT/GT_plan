@@ -11,8 +11,8 @@
  * - EventBus publish 'adjustment:created'
  * - 双向同步M9-1审定表（M9-1订阅该事件刷新AJE/RJE列）
  *
- * 科目：4103 其他综合收益（**贷方/权益类！**）
- * 调增OCI→贷方增加（贷记4103），调减OCI→借方减少（借记4103）
+ * 科目：4003 其他综合收益（**贷方/权益类！**）
+ * 调增OCI→贷方增加（贷记4003），调减OCI→借方减少（借记4003）
  *
  * 其他综合收益调整典型场景：
  * - OCI公允价值调整：借:其他综合收益 贷:其他权益工具投资（减少OCI）
@@ -24,6 +24,7 @@ import { computed, ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { calcSubtotal } from './useM9FormulaEngine'
 import type { useM9FormData } from './useM9FormData'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -128,22 +129,22 @@ export function useM9Adjustment(formData: ReturnType<typeof useM9FormData>) {
   })
 
   /**
-   * AJE 对科目4103其他综合收益的净影响
+   * AJE 对科目4003其他综合收益的净影响
    * 其他综合收益是贷方权益类：贷方增加=OCI增加，借方减少=OCI减少/重分类
    * 净影响 = 贷方 - 借方（正=净增，负=净减）
    */
-  const ajeNet4103: ComputedRef<number> = computed(() => {
-    const entries4103 = ajeEntries.value.filter(e => e.accountName.includes('其他综合收益'))
-    const debit = calcSubtotal(entries4103.map(e => e.debitAmount))
-    const credit = calcSubtotal(entries4103.map(e => e.creditAmount))
+  const ajeNet4003: ComputedRef<number> = computed(() => {
+    const entries4003 = ajeEntries.value.filter(e => e.accountName.includes('其他综合收益'))
+    const debit = calcSubtotal(entries4003.map(e => e.debitAmount))
+    const credit = calcSubtotal(entries4003.map(e => e.creditAmount))
     return credit - debit // 权益类贷方：贷方净增=OCI调增
   })
 
-  /** RJE 对科目4103的净影响 */
-  const rjeNet4103: ComputedRef<number> = computed(() => {
-    const entries4103 = rjeEntries.value.filter(e => e.accountName.includes('其他综合收益'))
-    const debit = calcSubtotal(entries4103.map(e => e.debitAmount))
-    const credit = calcSubtotal(entries4103.map(e => e.creditAmount))
+  /** RJE 对科目4003的净影响 */
+  const rjeNet4003: ComputedRef<number> = computed(() => {
+    const entries4003 = rjeEntries.value.filter(e => e.accountName.includes('其他综合收益'))
+    const debit = calcSubtotal(entries4003.map(e => e.debitAmount))
+    const credit = calcSubtotal(entries4003.map(e => e.creditAmount))
     return credit - debit // 权益类贷方：贷方净增=OCI调增
   })
 
@@ -265,9 +266,9 @@ export function useM9Adjustment(formData: ReturnType<typeof useM9FormData>) {
     // EventBus publish（双向同步M9-1 + 通知A13）
     eventBus.emit('adjustment:created', {
       wpCode: 'M9',
-      accountCode: '4103',
-      ajeNet: ajeNet4103.value,
-      rjeNet: rjeNet4103.value,
+      accountCode: M_CYCLE_ACCOUNT.M9.code,
+      ajeNet: ajeNet4003.value,
+      rjeNet: rjeNet4003.value,
       ajeNetByBlock: ajeNetByBlock.value,
       rjeNetByBlock: rjeNetByBlock.value,
       timestamp: Date.now(),
@@ -367,8 +368,8 @@ export function useM9Adjustment(formData: ReturnType<typeof useM9FormData>) {
     ajeBalance,
     rjeBalance,
     currentBalance,
-    ajeNet4103,
-    rjeNet4103,
+    ajeNet4003,
+    rjeNet4003,
     ajeNetByBlock,
     rjeNetByBlock,
 

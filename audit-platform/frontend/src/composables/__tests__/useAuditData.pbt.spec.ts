@@ -306,20 +306,20 @@ describe('Property 7: 字段归一化在任意别名组合下产出稳定语义�
 // **Validates: Requirements 5.4**
 
 describe('Property 8: 取数口径按数据域正确解析', () => {
-  /** Generate account code in asset domain (1xxx) */
-  const arbAssetCode = fc.integer({ min: 1000, max: 1999 }).map(String)
+  /** Generate account code in asset domain (1xxx 资产 / 3xxx 共同类 / 5xxx 成本类，均取余额) */
+  const arbAssetCode = fc.oneof(
+    fc.integer({ min: 1000, max: 1999 }).map(String),
+    fc.integer({ min: 3000, max: 3999 }).map(String),
+    fc.integer({ min: 5000, max: 5999 }).map(String),
+  )
   /** Generate account code in liability domain (2xxx) */
   const arbLiabilityCode = fc.integer({ min: 2000, max: 2999 }).map(String)
-  /** Generate account code in equity domain (3xxx) */
-  const arbEquityCode = fc.integer({ min: 3000, max: 3999 }).map(String)
-  /** Generate account code in income_expense domain (4xxx/5xxx/6xxx) */
-  const arbIncomeExpenseCode = fc.oneof(
-    fc.integer({ min: 4000, max: 4999 }).map(String),
-    fc.integer({ min: 5000, max: 5999 }).map(String),
-    fc.integer({ min: 6000, max: 6999 }).map(String),
-  )
+  /** Generate account code in equity domain (4xxx，现行科目表所有者权益) */
+  const arbEquityCode = fc.integer({ min: 4000, max: 4999 }).map(String)
+  /** Generate account code in income_expense domain (6xxx，现行科目表损益类) */
+  const arbIncomeExpenseCode = fc.integer({ min: 6000, max: 6999 }).map(String)
 
-  it('asset codes (1xxx) SHALL resolve to v1_debit_positive', () => {
+  it('asset/common/cost codes (1xxx/3xxx/5xxx) SHALL resolve to v1_debit_positive', () => {
     fc.assert(
       fc.property(arbAssetCode, (code) => {
         const koujing = resolveKoujing(code)
@@ -341,7 +341,7 @@ describe('Property 8: 取数口径按数据域正确解析', () => {
     )
   })
 
-  it('equity codes (3xxx) SHALL resolve to v2_positive', () => {
+  it('equity codes (4xxx) SHALL resolve to v2_positive', () => {
     fc.assert(
       fc.property(arbEquityCode, (code) => {
         const koujing = resolveKoujing(code)
@@ -352,7 +352,7 @@ describe('Property 8: 取数口径按数据域正确解析', () => {
     )
   })
 
-  it('income/expense codes (4xxx/5xxx/6xxx) SHALL resolve to pl_occurrence', () => {
+  it('income/expense codes (6xxx) SHALL resolve to pl_occurrence', () => {
     fc.assert(
       fc.property(arbIncomeExpenseCode, (code) => {
         const koujing = resolveKoujing(code)

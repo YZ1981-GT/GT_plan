@@ -53,7 +53,7 @@
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>专项应付款为负债类贷方科目（2601）：</strong>
+        <strong>专项应付款为负债类贷方科目（2711）：</strong>
         审定数 = 未审数 + 账项调整(AJE) + 重分类调整(RJE)。
         变动额 = 期末审定 − 期初审定。变动率 = IF(期初=0且变动=0, 0, IF(期初=0且变动>0, 100%, 变动额/期初审定))。
         各专项项目按行列示，合计行自动汇总。
@@ -62,7 +62,7 @@
 
     <!-- ═══ 专项应付款审定表（单区块 负债类贷方） ═══ -->
     <div class="block-section">
-      <h4 class="block-title">专项应付款（贷方/负债类 科目2601）</h4>
+      <h4 class="block-title">专项应付款（贷方/负债类 科目2711）</h4>
       <el-table
         :data="computedRows"
         border
@@ -298,13 +298,13 @@
     <details class="l6-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>专项应付款为负债类贷方科目（2601）：期末=期初+贷方−借方</li>
+        <li>专项应付款为负债类贷方科目（2711）：期末=期初+贷方−借方</li>
         <li>审定数 = 未审数 + 账项调整(AJE) + 重分类调整(RJE)</li>
         <li>变动额 = 期末审定 − 期初审定</li>
         <li>变动率 = IF(期初=0且变动=0, 0, IF(期初=0且变动>0, 100%, 变动额/期初))</li>
         <li>各项目从明细表L6-2引用，合计行自动汇总</li>
-        <li>审定合计变化自动回写TB（科目2601）并通知附注组件</li>
-        <li>「带入调整」：可从集中登记按科目 2601 拉取调整分录，逐笔分配到各专项项目行的期末账项/重分类调整，带入后审定数自动更新并联动附注</li>
+        <li>审定合计变化自动回写TB（科目2711）并通知附注组件</li>
+        <li>「带入调整」：可从集中登记按科目 2711 拉取调整分录，逐笔分配到各专项项目行的期末账项/重分类调整，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
 
@@ -315,7 +315,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="2601 专项应付款"
+      subject-label="2711 专项应付款"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -332,7 +332,7 @@
  * - 公式列(readonly): 期初审定=B+C+D, 期末审定=F+G+H, 变动额=I-E, 变动率=IF logic
  * - 公式列虚线下划线 + cursor:help + tooltip来源
  * - 合计行(小计)
- * - TB回写: 审定合计变化 → writebackTB(2601)
+ * - TB回写: 审定合计变化 → writebackTB(2711)
  * - EventBus: publish 'substantive:adjudicated' after writeback
  * - Section标题行右侧: 复核按钮 + AI辅助按钮
  */
@@ -348,6 +348,7 @@ import {
   type L6AdjudicationRow,
 } from '../../composables/useL6Adjudication'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { L6_GROSS_FALLBACK_STANDARD } from '../../composables/l6AccountScope'
 import { useAuditContext } from '@/composables/useAuditContext'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
@@ -406,7 +407,9 @@ const {
   subscribeDisclosure,
 } = useL6Adjudication(formData, adjudicationRows)
 
-// ─── 从集中登记带入调整（2601 专项应付款，负债贷方；带入期末 AJE/RJE） ───────────
+// ─── 从集中登记带入调整（专项应付款，负债贷方；带入期末 AJE/RJE） ───────────────
+// 🔴 原写死 `2601` —— 那是租赁负债（H8/H9），带入的是租赁负债调整。
+//    改用与发布同一真源 L6_GROSS_FALLBACK_STANDARD（2711 专项应付款）。
 const bringInRows = computed(() =>
   computedRows.value.map((r) => ({ rowKey: r.key, name: r.project || '(未命名专项)', aje: r.endAje, rje: r.endRje })),
 )
@@ -419,11 +422,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '2601',
+  subjectPrefix: L6_GROSS_FALLBACK_STANDARD,
   direction: 'credit',
-  subjectCode: '2601',
+  subjectCode: L6_GROSS_FALLBACK_STANDARD,
   wpCode: 'L6',
-  subjectLabel: '专项应付款(2601)',
+  subjectLabel: `专项应付款(${L6_GROSS_FALLBACK_STANDARD})`,
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) => {
     const i = adjudicationRows.value.findIndex((r) => r.key === rowKey)

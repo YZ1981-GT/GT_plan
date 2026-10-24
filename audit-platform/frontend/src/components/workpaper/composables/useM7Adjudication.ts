@@ -6,7 +6,7 @@
  * Requirements: 2.1-2.7
  *
  * 职责：
- * - 管理权益类单区块数据（专项储备4201）
+ * - 管理权益类单区块数据（专项储备4301）
  * - 行结构: 按类别分类(安全生产费/其他专项储备)+小计+合计行
  * - 列结构：项目 | 期初 | 贷方发生(计提) | 借方发生(使用) | 期末 | 未审 | AJE | RJE | 审定
  *           + 试算平衡表数 | 审定与试算差异 | 变动率
@@ -14,11 +14,11 @@
  * - 权益类贷方期末：期末=期初+贷方-借方（calcEquityEndBalance）
  * - 小计：按类别分组 calcSubtotal
  * - 变动率: IF(AND(B=0,E=0),0, IF(B=0,1, E/B))
- * - 审定数变化→writebackTB(4201)+EventBus 'substantive:adjudicated'
+ * - 审定数变化→writebackTB(4301)+EventBus 'substantive:adjudicated'
  * - 与M7-2明细表交叉验证
  * - subscribe EventBus 'substantive:adjudicated' 刷新
  *
- * 科目：4201 专项储备（**贷方/权益类！期末=期初+贷方-借方**）
+ * 科目：4301 专项储备（**贷方/权益类！期末=期初+贷方-借方**）
  * 安全生产费计提在贷方增加，费用化/资本化使用在借方减少
  *
  * 32×12结构，66公式
@@ -32,6 +32,7 @@ import {
   calcSubtotal,
 } from './useM7FormulaEngine'
 import type { useM7FormData } from './useM7FormData'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -259,7 +260,7 @@ export function useM7Adjudication(
 
   /**
    * 保存审定表并触发TB回写 + EventBus
-   * - 回写 trial_balance 科目 4201（贷方/权益类！）
+   * - 回写 trial_balance 科目 4301（贷方/权益类！）
    * - publish 'substantive:adjudicated'
    */
   async function saveAdjudication(): Promise<void> {
@@ -296,7 +297,7 @@ export function useM7Adjudication(
       if (oldVal !== undefined && newVal !== oldVal) {
         await saveAdjudication()
         eventBus.emit('substantive:adjudicated', {
-          accountCode: '4201',
+          accountCode: M_CYCLE_ACCOUNT.M7.code,
           auditedAmount: newVal,
           wpCode: 'M7',
           timestamp: Date.now(),
@@ -308,7 +309,7 @@ export function useM7Adjudication(
   // ─── 7b. 显式发布到试算表（显式确认门，复刻 D2/D4-1 范式） ────────────────
 
   /**
-   * 确认发布审定数到试算表（科目 4201 专项储备）。
+   * 确认发布审定数到试算表（科目 4301 专项储备）。
    * spec: tb-writeback-explicit-publish-gate Task 5 / Req 2。
    * 二次确认（中文）→ 保存明细 → formData.writebackTB 走 publish-to-tb。用户取消 → 无副作用。
    */
@@ -316,7 +317,7 @@ export function useM7Adjudication(
     if (publishing.value) return
     try {
       await ElMessageBox.confirm(
-        '发布后将把专项储备审定数（科目 4201）写入试算表（trial_balance），'
+        `发布后将把专项储备审定数（科目 ${M_CYCLE_ACCOUNT.M7.code}）写入试算表（trial_balance），`
         + '并触发报表/错报评价等下游重算。确认发布？',
         '发布到试算表确认',
         { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
@@ -358,7 +359,7 @@ export function useM7Adjudication(
   function subscribeAdjudicated(callback: () => void): () => void {
     const handler = (payload: any) => {
       // 仅对非本组件发出的事件响应
-      if (payload?.wpCode !== 'M7' || payload?.accountCode !== '4201') {
+      if (payload?.wpCode !== 'M7' || payload?.accountCode !== M_CYCLE_ACCOUNT.M7.code) {
         callback()
       }
     }

@@ -40,10 +40,6 @@ export interface UseK1FormDataOptions {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEBOUNCE_MS = 2000
-/** 科目：1221 其他应收款（借方/资产类） */
-const ACCOUNT_CODE_1221 = '1221'
-/** 科目：坏账准备（贷方/资产备抵类） */
-const ACCOUNT_CODE_BAD_DEBT = '1231'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -234,23 +230,33 @@ export function useK1FormData(opts: UseK1FormDataOptions) {
    * 回写成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新等。
    * Req 2.8: WHEN 审定数变化时 SHALL 回写trial_balance(1221+坏账准备)+发布'substantive:adjudicated'
    */
-  async function writebackTB(auditedReceivable: number, auditedBadDebt: number): Promise<void> {
+  async function writebackTB(
+    auditedReceivable: number,
+    auditedBadDebt: number,
+    codes: { receivable: string; badDebt: string },
+  ): Promise<void> {
     if (!wpId.value) return
     // spec: tb-writeback-explicit-publish-gate Task 8 / Req 1,2,5,8。
     // 此前两次 `PUT /projects/{pid}/trial-balance/writeback`（1221 + 坏账准备）绕过确认门。
     // 现改为单次 `POST /workpapers/{wpId}/audit-determination/publish-to-tb`，双科目在同一次
     // writeback_rows 原子发布（balance 口径），二次确认在调用方 K1TabAdjudication.handleWritebackTB。
+    //
+    // 🔴 科目码由调用方按本项目口径传入（k1AccountCode / k1ProvisionQueryCodes）。
+    //    原写死坏账准备为宽口径 `1231` —— 该行同时承载应收票据 / 应收账款等的坏账，
+    //    用 K1 一家的金额覆盖会改掉别的循环的审定数；空串的科目不发布。
+    const rows = [
+      { account_code: codes.receivable, audited_amount: auditedReceivable, amount_kind: 'balance' as const },
+      { account_code: codes.badDebt, audited_amount: auditedBadDebt, amount_kind: 'balance' as const },
+    ].filter((r) => !!r.account_code)
+    if (!rows.length) return
     await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
       sheet_name: '审定表K1-1',
-      writeback_rows: [
-        { account_code: ACCOUNT_CODE_1221, audited_amount: auditedReceivable, amount_kind: 'balance' },
-        { account_code: ACCOUNT_CODE_BAD_DEBT, audited_amount: auditedBadDebt, amount_kind: 'balance' },
-      ],
+      writeback_rows: rows,
     })
 
     // EventBus publish 'substantive:adjudicated'
     eventBus.emit('substantive:adjudicated', {
-      accountCode: ACCOUNT_CODE_1221,
+      accountCode: codes.receivable,
       auditedAmount: auditedReceivable,
       wpCode: 'K1',
       timestamp: Date.now(),

@@ -230,7 +230,7 @@
  *           publish 'disclosure:note-text-updated' on text change
  * 科目：2245 其他流动负债（负债类）
  */
-import { ref, reactive, computed, inject, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, inject, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { fmtAmount } from '@/utils/formatters'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick, Delete } from '@element-plus/icons-vue'
@@ -241,8 +241,18 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK4SyncPayload, K4_NOTE_SECTION } from '../../composables/k4NoteSectionMap'
+import { isK4Event as matchesK4Event, k4AccountCode, type K4TbSourceCodes } from '../../composables/k4AccountScope'
 
-const K4_ACCOUNT_CODE = '2245'
+// 🔴 原写死 '2245' —— 该码不是其他流动负债：按它监听会把别的科目的审定事件当成 K4 的，
+//    按它发事件会让按科目码匹配的下游认错科目。现取宿主 provide 的 tb_source_codes 解析结果，
+//    解析不出为空串（只按 wpCode 匹配，不用空串去匹配别人的事件）。
+const _injectedTbSrc = inject<Ref<K4TbSourceCodes | null> | null>('tbSourceCodes', null)
+function k4EventCode(): string {
+  return k4AccountCode(_injectedTbSrc?.value ?? null)
+}
+function isK4Event(payload: any): boolean {
+  return matchesK4Event(payload, k4EventCode())
+}
 
 const props = defineProps<{
   wpId: string
@@ -353,7 +363,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
-      wpCode: 'K4', variant: 'listed', accountCode: '2245',
+      wpCode: 'K4', variant: 'listed', accountCode: k4EventCode(),
       projectId: props.projectId, sectionIds: [K4_NOTE_SECTION.listed],
     })
     ElMessage.success('已同步到附注')
@@ -409,7 +419,7 @@ function onSummaryEdit(row: SummaryRow, field: string, value: any): void {
 function onNoteTextChange(): void {
   persistNote()
   try {
-    eventBus.emit('disclosure:note-text-updated', { accountCode: K4_ACCOUNT_CODE, section: 'listed', text: noteText.value })
+    eventBus.emit('disclosure:note-text-updated', { wpCode: 'K4', accountCode: k4EventCode(), section: 'listed', text: noteText.value })
   } catch { /* silent */ }
 }
 
@@ -438,7 +448,7 @@ async function handleAiGenerate(): Promise<void> {
         + '只能使用已提供的项目名称、笔数与金额，不得虚构债券名称、票面利率、发行批文或补助项目，'
         + '无把握的内容留空由审计师补充。',
       context: {
-        科目: '2245 其他流动负债（负债类）',
+        科目: '其他流动负债（负债类）',
         汇总表期末合计: String(summaryEndTotal.value),
         债券数量: String(bondRows.value.length),
         是否存在违约: hasDefault.value ? '是' : '否',
@@ -490,7 +500,7 @@ function loadSavedData(): void {
 
 // ─── EventBus ─────────────────────────────────────────────────────────────────
 function handleAdjudicated(payload: any): void {
-  if (!payload || payload.accountCode === K4_ACCOUNT_CODE || payload.wpCode === 'K4') applyAutoFill()
+  if (isK4Event(payload)) applyAutoFill()
 }
 
 onMounted(() => {

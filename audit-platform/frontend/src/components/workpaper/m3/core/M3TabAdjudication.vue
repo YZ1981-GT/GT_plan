@@ -38,7 +38,7 @@
     <el-alert type="info" :closable="false" show-icon class="audit-objective-alert">
       <template #title>审计目标</template>
       <div class="audit-objective-text">
-        确认库存股（4002）的<strong>存在性</strong>（回购交易真实发生）、
+        确认库存股（4201）的<strong>存在性</strong>（回购交易真实发生）、
         <strong>计价准确性</strong>（按回购成本法核算，注销/再售会计处理正确）、
         <strong>完整性</strong>、<strong>列报恰当性</strong>（作为所有者权益备减项列示）。
       </div>
@@ -47,12 +47,12 @@
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景）─── 借方方向说明 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>库存股（4002）为权益备抵类借方科目：</strong>
+        <strong>库存股（4201）为权益备抵类借方科目：</strong>
         期末余额 = 期初 + 借方（回购增加） − 贷方（注销/再售减少）。
         审定数 = 未审数 + AJE + RJE。
         回购股份增加库存股记借方，注销或再出售减少库存股记贷方，
         与其他M权益类科目方向<strong>完全相反</strong>。按回购批次分类列示，
-        审定数变化自动回写试算表（4002）并通知附注组件。
+        审定数变化自动回写试算表（4201）并通知附注组件。
       </div>
     </div>
 
@@ -237,7 +237,7 @@
       <!-- 权益备抵期末校验 + TB回写状态 + M3-2勾稽 -->
       <div class="adjudication-footer">
         <el-tag type="warning" size="small" effect="plain">
-          TB回写: 科目4002 库存股（借方/权益备抵）
+          TB回写: 科目4201 库存股（借方/权益备抵）
         </el-tag>
         <el-tag
           :type="contraEquityCheck.isMatch ? 'success' : 'danger'"
@@ -314,14 +314,14 @@
     <details class="m3-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>库存股（4002）为权益备抵类借方科目：期末 = 期初 + 借方（回购） − 贷方（注销/再售）</li>
+        <li>库存股（4201）为权益备抵类借方科目：期末 = 期初 + 借方（回购） − 贷方（注销/再售）</li>
         <li>方向相反：回购增加库存股记<strong>借方</strong>，注销/再售减少记<strong>贷方</strong>（与M2/M4/M5/M6权益类方向相反）</li>
         <li>审定数 = 未审数 + AJE（账项调整） + RJE（重分类调整）</li>
         <li>按回购批次分类填列：逐一列示各回购批次的库存股变动</li>
         <li>小计行按批次分类自动汇总，合计行汇总全部批次</li>
-        <li>审定数变化自动回写 TB（科目 4002）并通知附注组件</li>
+        <li>审定数变化自动回写 TB（科目 4201）并通知附注组件</li>
         <li>期末校验：期末审定 应等于 期初 + 借方(回购) − 贷方(注销/再售)</li>
-        <li>「带入调整」：从集中登记按科目 4002 拉取调整分录（库存股为借方，净额=借−贷），逐笔分配到各回购批次行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
+        <li>「带入调整」：从集中登记按科目 4201 拉取调整分录（库存股为借方，净额=借−贷），逐笔分配到各回购批次行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
 
@@ -329,7 +329,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="4002 库存股"
+      :subject-label="mAccountLabel('M3')"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -347,7 +347,7 @@
  *   | E:期末[公式=期初+借方-贷方] | F:未审 | G:AJE | H:RJE | I:审定[公式=未审+AJE+RJE]
  * - 公式列: 虚线下划线 + cursor:help + tooltip showing formula source
  * - 权益备抵校验: 期末=期初+借方-贷方（借方余额！）
- * - TB回写: 审定数变化 → writebackTB(4002)
+ * - TB回写: 审定数变化 → writebackTB(4201)
  * - EventBus: publish 'substantive:adjudicated' on save
  * - 双模式(HTML/OO) 由入口 GtM3TreasuryStock 统一提供（entry 级），本 tab 不再自建
  * - 复核按钮 (inject openReviewDialog)
@@ -356,7 +356,7 @@
  * - Uses useM3FormData + useM3Adjudication composables
  * - Props: wpId, projectId, isReadonly
  *
- * 科目：4002 库存股（**借方/权益备抵类！期末=期初+借方-贷方**）
+ * 科目：4201 库存股（**借方/权益备抵类！期末=期初+借方-贷方**）
  * 回购股份在借方增加库存股，注销/再售在贷方减少库存股（与其他M权益类方向相反！）
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
@@ -372,6 +372,7 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
+import { M_CYCLE_ACCOUNT, mAccountLabel } from '../../composables/mCycleAccountScope'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -418,7 +419,7 @@ const {
   publishing,
 } = useM3Adjudication(formData, rows)
 
-// ─── 从集中登记带入调整（4002 库存股，权益备抵借方 debit；单期 aje/rje，按回购批次行） ───
+// ─── 从集中登记带入调整（4201 库存股，权益备抵借方 debit；单期 aje/rje，按回购批次行） ───
 const bringInRows = computed(() =>
   rawComputedRows.value.map((r) => ({
     rowKey: r.key,
@@ -436,11 +437,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '4002',
+  subjectPrefix: M_CYCLE_ACCOUNT.M3.code,
   direction: 'debit',
-  subjectCode: '4002',
+  subjectCode: M_CYCLE_ACCOUNT.M3.code,
   wpCode: 'M3',
-  subjectLabel: '库存股(4002)',
+  subjectLabel: mAccountLabel('M3'),
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) => {
     const idx = rows.value.findIndex((r) => r.key === rowKey)
@@ -720,7 +721,7 @@ async function handleAI(section: string) {
   try {
     const total = totalRow.value
     const context: Record<string, string> = {
-      科目: '4002 库存股（权益备抵类·借方余额）',
+      科目: '4201 库存股（权益备抵类·借方余额）',
       期初合计: fmtAmount(total.beginning),
       借方发生合计: fmtAmount(total.debitAmount),
       贷方发生合计: fmtAmount(total.creditAmount),

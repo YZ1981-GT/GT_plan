@@ -110,15 +110,15 @@
  * 组件接收 sheetName prop，正则提取编码（M9/M9A/M9-1~M9-4），v-if 分发到对应子组件。
  * 不使用内部 el-tabs（避免双层 Tab 问题）。
  *
- * 科目覆盖：4103 其他综合收益（**贷方/权益类！**）
+ * 科目覆盖：4003 其他综合收益（**贷方/权益类！**）
  * 核心铁律：期末=期初+贷方-借方（OCI增加时贷方增加，减少/重分类进损益时借方减少）
  * 特殊功能：①权益类贷方公式 ②OCI双大类(不可/可重分类) ③OCI核对(接收G8/J2/外币折算) ④税后净额
  *
  * selfLoad: 当 htmlData 为 null 时自行调 render-config 加载数据。
  *
  * 集成（Phase 6）：
- * - EventBus: substantive:adjudicated(4103) / adjustment:created
- * - 跨底稿联动: TB回写(4103) + G8公允变动→OCI核对 + J2重计量→OCI核对
+ * - EventBus: substantive:adjudicated(4003) / adjustment:created
+ * - 跨底稿联动: TB回写(4003) + G8公允变动→OCI核对 + J2重计量→OCI核对
  * - 版本追踪: useVersionTrail(autoSnapshot)
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */

@@ -5,7 +5,7 @@
  * Tasks: 2.5 ~ 2.7
  *
  * 使用 fast-check + vitest 验证 Correctness Properties P3, P4, P5。
- * 科目：4201 专项储备（**贷方/权益类！**）
+ * 科目：4301 专项储备（**贷方/权益类！**）
  *
  * 计提引擎覆盖：
  * - P3: 按产量分档计提 Σ(output×rate)

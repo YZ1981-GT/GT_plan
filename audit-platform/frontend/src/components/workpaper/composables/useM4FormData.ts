@@ -16,12 +16,14 @@
  *
  * 科目：4002 资本公积（**贷方/权益类！期末=期初+贷方-借方**）
  * 资本溢价（出资超面值）在贷方增加，资本公积转增资本在借方减少
- * 注：M3库存股也是4002但属于权益备抵借方（方向完全相反！），M4是正常权益贷方
+ * 注：M3 库存股是 4201（权益备抵借方，方向完全相反！），M4 是正常权益贷方。
+ *     2026-10-24 前 M3 误写 4002，发布审定数会覆盖本科目的试算表行（R1.4 已改走 mCycleAccountScope）
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -41,7 +43,7 @@ export interface UseM4FormDataOptions {
 
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'M4-'
-const ACCOUNT_CODE = '4002' // 资本公积（贷方/权益类！）
+const ACCOUNT_CODE = M_CYCLE_ACCOUNT.M4.code // 资本公积（贷方/权益类！）
 /** 审定表 sheet 名（含子码 M4-1，供后端 extract_determination_wp_code 解出） */
 const DETERMINATION_SHEET_NAME = '审定表M4-1'
 

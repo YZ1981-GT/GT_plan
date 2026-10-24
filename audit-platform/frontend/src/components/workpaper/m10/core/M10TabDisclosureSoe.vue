@@ -306,7 +306,7 @@ async function handleAI(section: string) {
   try {
     const totalRow = disclosureRows.value.find(r => r._isTotal)
     const context: Record<string, string> = {
-      科目: '4003 其他权益工具 / 附注披露信息（国有企业）',
+      科目: '4401 其他权益工具 / 附注披露信息（国有企业）',
       区段: section,
       期末余额合计: fmtAmount(totalRow?.endBalance ?? 0),
       本期发行合计: fmtAmount(totalRow?.issuance ?? 0),

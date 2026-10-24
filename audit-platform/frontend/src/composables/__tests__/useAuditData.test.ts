@@ -185,15 +185,25 @@ describe('detectAccountDomain - 科目数据域判定', () => {
     expect(detectAccountDomain('2501')).toBe('liability')
   })
 
-  it('should detect equity domain for 3xxx codes', () => {
-    expect(detectAccountDomain('3001')).toBe('equity')
-    expect(detectAccountDomain('3101')).toBe('equity')
-    expect(detectAccountDomain('3104')).toBe('equity')
+  // 现行企业会计准则科目表：4xxx 所有者权益（4001 实收资本 / 4002 资本公积 / 4003 其他综合收益 /
+  // 4101 盈余公积 / 4104 利润分配 / 4201 库存股 / 4301 专项储备 / 4401 其他权益工具）。
+  // 旧版本按旧制科目表把 4001 判成损益、3xxx 判成权益 —— 实收资本会去取发生额。
+  it('should detect equity domain for 4xxx codes', () => {
+    expect(detectAccountDomain('4001')).toBe('equity')
+    expect(detectAccountDomain('4003')).toBe('equity')
+    expect(detectAccountDomain('4104')).toBe('equity')
+    expect(detectAccountDomain('4201')).toBe('equity')
+    expect(detectAccountDomain('4401')).toBe('equity')
   })
 
-  it('should detect income_expense domain for 4xxx/5xxx/6xxx codes', () => {
-    expect(detectAccountDomain('4001')).toBe('income_expense')
-    expect(detectAccountDomain('5001')).toBe('income_expense')
+  it('should treat 3xxx common and 5xxx cost codes as balance (asset) accounts', () => {
+    expect(detectAccountDomain('3101')).toBe('asset') // 衍生工具
+    expect(detectAccountDomain('3201')).toBe('asset') // 套期工具
+    expect(detectAccountDomain('5001')).toBe('asset') // 生产成本
+    expect(detectAccountDomain('5301')).toBe('asset') // 研发支出
+  })
+
+  it('should detect income_expense domain for 6xxx codes', () => {
     expect(detectAccountDomain('6001')).toBe('income_expense')
     expect(detectAccountDomain('6403')).toBe('income_expense')
     expect(detectAccountDomain('6711')).toBe('income_expense')
@@ -221,15 +231,18 @@ describe('resolveKoujing - 三口径按数据域', () => {
   })
 
   it('should return v2_positive for equity codes', () => {
-    expect(resolveKoujing('3001')).toBe('v2_positive')
-    expect(resolveKoujing('3101')).toBe('v2_positive')
+    expect(resolveKoujing('4001')).toBe('v2_positive')
+    expect(resolveKoujing('4201')).toBe('v2_positive')
   })
 
   it('should return pl_occurrence for income/expense codes', () => {
     expect(resolveKoujing('6001')).toBe('pl_occurrence')
     expect(resolveKoujing('6403')).toBe('pl_occurrence')
-    expect(resolveKoujing('5001')).toBe('pl_occurrence')
-    expect(resolveKoujing('4001')).toBe('pl_occurrence')
+  })
+
+  it('should return v1_debit_positive (balance) for 3xxx common / 5xxx cost codes', () => {
+    expect(resolveKoujing('3101')).toBe('v1_debit_positive')
+    expect(resolveKoujing('5001')).toBe('v1_debit_positive')
   })
 })
 
@@ -241,13 +254,16 @@ describe('isDebitAccount', () => {
     expect(isDebitAccount('1122')).toBe(true)
   })
 
-  it('should identify 3101 treasury stock as debit', () => {
-    expect(isDebitAccount('3101')).toBe(true)
+  it('should identify 4201 treasury stock (and its sub-accounts) and 5xxx cost codes as debit', () => {
+    expect(isDebitAccount('4201')).toBe(true)
+    expect(isDebitAccount('4201-01')).toBe(true)
+    expect(isDebitAccount('5001')).toBe(true)
   })
 
   it('should return false for liability/equity/income codes', () => {
     expect(isDebitAccount('2001')).toBe(false)
-    expect(isDebitAccount('3001')).toBe(false)
+    expect(isDebitAccount('4001')).toBe(false)
+    expect(isDebitAccount('4002')).toBe(false)
     expect(isDebitAccount('6001')).toBe(false)
   })
 })

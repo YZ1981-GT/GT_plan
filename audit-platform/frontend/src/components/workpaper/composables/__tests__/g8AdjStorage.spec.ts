@@ -14,7 +14,7 @@ describe('calcG8AdjustmentNet', () => {
   it('仅汇总 1503 借−贷', () => {
     const net = calcG8AdjustmentNet([
       { accountCode: '1503', debitAmount: 100, creditAmount: 0 },
-      { accountCode: '4002', debitAmount: 0, creditAmount: 100 },
+      { accountCode: '4003', debitAmount: 0, creditAmount: 100 },
       { accountCode: '1503', debitAmount: 0, creditAmount: 30 },
     ])
     expect(net).toBe(70)
@@ -29,7 +29,7 @@ describe('summarizeG8Adjustment', () => {
   it('汇总借贷、AJE/RJE 与 OCI', () => {
     const s = summarizeG8Adjustment([
       { entryType: 'AJE', accountCode: '1503', debitAmount: 200, creditAmount: 0 },
-      { entryType: 'AJE', accountCode: '4002', debitAmount: 0, creditAmount: 200 },
+      { entryType: 'AJE', accountCode: '4003', debitAmount: 0, creditAmount: 200 },
       { entryType: 'RJE', accountCode: '1503', debitAmount: 0, creditAmount: 50 },
       { entryType: 'RJE', accountCode: '1503', debitAmount: 50, creditAmount: 0 },
     ])
@@ -56,7 +56,7 @@ describe('aggregateG8AdjustmentWriteback', () => {
   it('回写至 fv_1', () => {
     const wb = aggregateG8AdjustmentWriteback([
       { accountCode: '1503', debitAmount: 80, creditAmount: 0 },
-      { accountCode: '4002', debitAmount: 0, creditAmount: 80 },
+      { accountCode: '4003', debitAmount: 0, creditAmount: 80 },
     ])
     expect(wb.rowKey).toBe('fv_1')
     expect(wb.closingAdjustment).toBe(80)

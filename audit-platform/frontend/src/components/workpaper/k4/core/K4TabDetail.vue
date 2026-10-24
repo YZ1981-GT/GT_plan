@@ -195,7 +195,7 @@
         </el-table-column>
         <el-table-column label="期后偿付金额" min-width="130" align="right">
           <template #header>
-            <el-tooltip content="次年序时账2245借方按项目归集（验证完整性核心证据）" placement="top">
+            <el-tooltip content="次年序时账本科目借方按项目归集（验证完整性核心证据）" placement="top">
               <span style="border-bottom:1px dashed;cursor:help">期后偿付 ⓘ</span>
             </el-tooltip>
           </template>
@@ -464,7 +464,7 @@ async function handleAiGenerate(): Promise<void> {
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       prompt: '请根据K4-2其他流动负债明细表数据，分析各项目增减变动原因并生成审计核查建议',
       context: {
-        科目: '2245 其他流动负债（负债类，完整性为核心认定）',
+        科目: '其他流动负债（负债类，完整性为核心认定）',
         项目数: String(detail.detailRows.value.length),
         期末合计: String(detail.subtotals.value.endBalance),
         审定合计: String(detail.subtotals.value.auditedEnd),

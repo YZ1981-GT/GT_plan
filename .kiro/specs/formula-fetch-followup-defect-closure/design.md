@@ -181,3 +181,72 @@
 4. `scripts/gen/generate_report_seed.py` 已过期：现 `report_config_seed.json` 是另一套编号的模板结构种子（公式为空），重跑生成器会覆盖它。
 5. 既有红（HEAD 干净检出同样红）：`test_report_config_account_integrity` 6 条（行次编码各准则不一致）、`test_wp_templates_readonly` 3 条、
    H 循环 72 条（导入导出登记 / H0 预设 / 迁移进度等）。
+6. **其他综合收益报表公式仍按 3102 取数**：IS-030（四个准则）、国企 IS-053、BS-115、BS-126，以及 `report_formula_service.py` 的名称→科目码表
+   （3102 其他综合收益、4102 一般风险准备）。实证：和平药房 2024 其他综合收益记在 3102（12,989,000），2025 记在 4003；医疗器械 2025 4003 有 791,000；
+   和平物流 2025 3102 期初 619,000 —— 两种口径在真库并存，改公式会改变已出具报表的取数，需用户拍板。
+7. `report_line_mapping_service._determine_report_type_from_code` 仍按旧科目表把 4xxx 判为利润表；`financial_ratio_service` 引用的行码
+   （BS-019 / 040 / 059 / 079、PL-xxx）与现行报表配置不符。
+8. `M9 /tb-writeback` 端点直写试算表、绕过显式发布门，前端无调用方（是否删除需拍板）。
+9. G 循环 1501 拆分：G1 旧口径写 1501（应为 1101）、G4 1501 与 1504 新旧准则并存、G11 / G13 选项含 1501，大量测试按 1501 断言。
+10. I 循环组合函数仍以旧码驱动取数 / 发布 / 调整码：I2 `1717`（真实库无此码，真源 1704）、I5 `1911`（其他非流动资产无标准独立码）、
+    I6 `6602`（管理费用，真源 6604；`i6Integration.spec` 断言发布 6602）。发布目标一改就改变试算表落点，需拍板；现冻结为棘轮（§10.4）。
+11. D5 带入调整 `1124`（应收款项融资无标准独立码、映射表为空；D 循环另有会话在改）。
+12. 后端公式说明目录（`wp_surfaced_*.py`）其余错码：G1-1 / G4-1 `1501`、H2-1 `1604 / 1605` 并列、H3-1 `1503/1504/1505`（投资性房地产应为 1521）、
+    H8-1 `TB('1901')`、H9-1 `TB('2205')`、I2-1 `1717`、I6-1 `6602`、K1-12 `TB('1901')`（只读展示，随第 9、10 条一起定）。
+13. K1-4 调整表把所有 `1231*` 算作 K1 坏账（`useK1Adjustment.isBadDebtAccount`、中央同步前缀含 1231）：会把应收账款的坏账调整（1231-02）
+    拉进 K1-4 并回写 K1-1。改它要把项目口径穿进 3 个以上组合函数，且对不分子目的客户会让分录消失，需定口径。
+14. **L7 发布用报表行 BS-071 当科目码**：`tb_audited_writer.publish_rows` 只按 `standard_account_code` 精确匹配，BS-071 永远找不到行 ⇒ 跳过并记日志，
+    而发布端点按载荷行数回「已发布 1 个科目」（假成功）。同根问题是全平台的：事件处理器跳过某科目时，端点仍报成功。
+    L7 是否应像 K4 那样「无科目即禁用发布」需拍板。
+
+### 10.4 R1.4 科目码单一来源（含触类旁通，2026-10-24）
+
+**M 循环（股东权益，4xxx）**
+
+- 前端 `mCycleAccountScope.ts`：M1~M10 码、显示名、`isOwnMSource`（溯源槽名 = 本循环科目名才采用，防嵌入宿主注入别的循环的溯源）、
+  `mAccountCodeOf` / `mPublishBlockReason`（M8 一般风险准备没有统一标准码：定位不到或多码时拦发布，不换成别的科目）、`OCI_ACCOUNT_CODE`（4003）。
+  M1~M10 组合函数 / 页签 / 主入口的字面量全部换成常量；错码文案改正（M3 4002→4201、M7 4201→4301、M9 4103→4003、M10 4003→4401，M8 去掉 4104）。
+- G 循环其他综合收益统一取 `OCI_ACCOUNT_CODE`（G8 / G9 / G12 / G14 的选项、认领前缀、配对、净额）。
+- `useAuditData` 按 2006 科目表分类（3xxx / 5xxx 资产与成本、4xxx 权益、6xxx 损益），借方类含 5xxx 与 4201 库存股；`WorkpaperSummary` 权益选项改 4xxx。
+- 后端 `four_table/m_cycle_specs.py` 增 `fallback_code_of` / `row_code_of`；M1~M10 render 策略（M8 除外）、M3 / M4 / M5 服务、M9 `TBWritebackRequest`
+  缺省值、J3 `account_codes` 改取单一来源；新增行码 M4 BS-083 / M5 BS-087 / M7 BS-086 / M9 BS-085。phase5 m3 / m8 / m9 / m10 的 `ACCOUNT_CODE`
+  保留字面量、由测试与 `fallback_code_of` 交叉核对（不在 workpaper_sync 里引 four_table，避免 import 闭包与 golden 摘要变动）。
+- 冻结的 `reviewed_basis` 文案（phase5_m3「4102 库存股」、phase5_m10「4001 其他权益工具」）不改：改它要重生成契约与 golden 摘要，登记在 `_PAIR_ALLOWLIST`。
+
+**触类旁通：真源已声明错码的循环（J2 / K1 / K2 / K4 / K5 / L3 / L6 / L7）**
+
+起因：这些循环的 `*AccountScope.ts` 早已写明「哪个码是错的」并注「守卫用」，但没有任何守卫扫源码（`L6_WRONG_LEGACY_ACCOUNT` /
+`J2_WRONG_LEGACY_ACCOUNTS` 只断言了常量值本身）；既有 `k5AccountCodeNoHardcode` 只扫 `k5/` 目录，漏了组合函数。
+
+- J2 带入调整按 2221（应交税费）拉分录 → `j2GrossQueryCodes` / `j2AccountCode`（缺省 2705）。
+- L6 带入调整按 2601（租赁负债）→ `L6_GROSS_FALLBACK_STANDARD`（2711，与发布同源）。
+- L7 带入调整按 2801（预计负债）→ 无专属科目码不拉取、按钮禁用；事件码沿用发布口径 `L7_REPORT_ROW_CODE`。
+- L3「生成一年内到期重分类」的贷方写 2801（预计负债）：中央同步后记到预计负债上，K5 带入调整也会把它拉进去 → 科目码留空、按科目名同步
+  （`AdjustmentSyncLineItem.standard_account_code` 允许空，服务层按名称解析）。
+- K1 坏账准备的带入与发布用宽口径 1231（同时承载应收票据 / 应收账款的坏账，发布会用 K1 一家的金额覆盖该行）→ `k1ProvisionQueryCodes`
+  （render 溯源 `provision_standard`，缺省 1231-03）；`useK1FormData.writebackTB` 改为由调用方传码，空码不发。
+- K4：`writebackTB` 删除缺省值 2245（漏传科目时会写进别的科目）；`loadTbData` 改读后端真实下发的 `tb_values.liability_*`
+  （原读从未下发的 `other_current_liabilities_2245_*` ⇒ 恒按 2245 取数）、解析不出科目不发请求；K4-3 新增分录 / 事件 / 推送的科目码改取本项目解析结果
+  （缺省空，留待填写）；两个附注页签的事件归属改用共享 `isK4Event`（按 wpCode；空码不去匹配别人的事件，不再认 2245）；
+  K4-1 的 `tbData` 形状与宿主对齐（宿主传 `{unadjusted, audited}`，K4-1 原声明 `{unadjusted2245, audited2245}`，单区域 vue-tsc 在 HEAD 报 TS2739，本次消除）。
+- K5：发布后事件载荷写死 2701（长期应付款）→ 事件码 = 本次发布码（`publishAdjudicated(accountCode)`）；带入与提示改为取值函数（溯源晚到仍按最新口径）；
+  删除 `provisions_2701_*` 旧键兼容（2026-08-03 后端已改名并标注一个月后删）。
+- 文案（含 `?raw` 渲染给用户的手册、后端公式说明目录 `wp_surfaced_j / k / l` 的 J2 / K2 / K4 / K5 / L3 / L6 / L7 段）：J2 2221→2705、K5 2701→2801、
+  L6 2601→2711、K2 1231→1901；K4 / L7 / L3 去掉科目码，改为「没有统一标准科目码，按本项目科目表定位」/「无专属科目码」/「报表项目，按名称同步」。
+  标识符 L6 `ajeNet2601`→`ajeNet2711`、L7 `ajeNet2801`→`ajeNetAccount`。解释「为什么不是这个码」的注释保留原码。
+- 范围说明：`k5NoteSectionMap.ts` 文件头注释仍写 `account_code: 2701`，该文件属附注子表并发会话的工作区，本次未动（注释不影响取数，守卫剔注释后不计）。
+
+**守卫**
+
+- 前端 `mCycleAccountCodes.spec.ts`（与后端规格对齐 / 无字面量 / 标识符 / 全前端名码配对）、`mCycleAccountRuntime.spec.ts`、`gCycleOciAccount.spec.ts`；
+  后端 `four_table/test_m_cycle_account_single_source.py` 41 例。
+- 前端 `cycleWrongLegacyAccountCodes.spec.ts` 51 例：①零容忍组（J2 / K2 / K4 / K5 / L3 / L6 / L7，错码取自真源导出，K4 / K5 本次补
+  `K4_WRONG_LEGACY_ACCOUNTS` / `K5_WRONG_LEGACY_ACCOUNT`；文件集含 `src/composables/use{X}{n}*`；向用户解释的文案逐条登记且须恰好命中一行；
+  后端说明目录该底稿段同查）；②棘轮组（G1 44 / I2 60 / I5 55 / I6 69，只许减少，基线比现扫多 5 以上打红）；③K1 坏账不得用宽口径；
+  ④全前端带入调整的字面量码 ⊆ 该底稿映射科目（H5 1632 / L5 2702 为备抵科目；G1 / G4 1501、D5 1124 已登记）；
+  ⑤运行态：K4 事件归属、K5 事件码 = 发布码、L7 带入按钮禁用。
+- 变异：M 部分前端 22 条、后端 12 条；触类旁通 29 条（FB1~FB29，含后端说明目录 3 条）全部打红后逐字节恢复。
+- 单区域 vue-tsc（本次改动的 .ts / .vue 及 K1 / K4 宿主共 193 个入口 + 传递依赖，独立 worktree 与 HEAD 同口径对比）：新增 0、消除 1（上面的 K4 TS2739）；
+  注入 `const x: number = 'x'` 报 TS2322（变异证明）。
+- 回归：前端相关 115 个测试文件 2306 通过；失败 15 例全部来自 4 个 HEAD 同样失败的文件（`j2NoteSubtableContract` 2、`k1FormulaPushHost` 3、
+  `k1NoteSubtableContract` 8、`k4NoteSectionMap` 2，附注子表契约 / 保存键集合，属其他会话）。后端 M 相关集合失败 117 例与 HEAD 逐条一致。

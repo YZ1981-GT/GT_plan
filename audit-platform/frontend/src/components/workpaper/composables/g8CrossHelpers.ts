@@ -2,6 +2,7 @@
  * G8 跨表联动辅助 — G8-2 / G8-3 / G8-4 / G8-5
  */
 import { G8_ACCOUNT_CODE, G8_ADJ_WRITEBACK_ROW_KEY } from './g8Constants'
+import { OCI_ACCOUNT_CODE } from './mCycleAccountScope'
 import { parseNum, calcAdjustedAmount } from './useG8FormulaEngine'
 import { parseG8AdjStore, patchG8AdjRow } from './g8AdjStorage'
 import { G8_SHEET_LABEL_MAP, resolveG8SheetLabel } from './g8SheetLabels'
@@ -337,7 +338,7 @@ export function pushG8FvDiffToAdjustment(
       rowId: `g8fv-adj-${Date.now().toString(36)}-${i}b`,
       seq: existing.length + added.length + 1,
       summary: `${it.summary}（OCI）`,
-      accountCode: '4002',
+      accountCode: OCI_ACCOUNT_CODE,
       accountName: '其他综合收益',
       debitAmount: isIncrease ? 0 : amt,
       creditAmount: isIncrease ? amt : 0,

@@ -505,7 +505,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="4002 资本公积"
+      :subject-label="mAccountLabel('M4')"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -551,6 +551,7 @@ import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn
 import { useAuditContext } from '@/composables/useAuditContext'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
+import { M_CYCLE_ACCOUNT, mAccountLabel } from '../../composables/mCycleAccountScope'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -619,11 +620,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '4002',
+  subjectPrefix: M_CYCLE_ACCOUNT.M4.code,
   direction: 'credit',
-  subjectCode: '4002',
+  subjectCode: M_CYCLE_ACCOUNT.M4.code,
   wpCode: 'M4',
-  subjectLabel: '资本公积(4002)',
+  subjectLabel: mAccountLabel('M4'),
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) => {
     const idx = rows.value.findIndex((r) => r.key === rowKey)

@@ -3,7 +3,7 @@
  *
  * Phase 7 Task 7.2:
  * - sheetName正则提取 → 正确子组件路由
- * - 负债类回写 TB(2245) + EventBus substantive:adjudicated
+ * - 负债类回写 TB（科目由调用方传入；K4 没有统一标准码）+ EventBus substantive:adjudicated
  * - 跨sheet: 明细合计 → 审定表交叉验证
  * - 导入导出 composable 初始化
  *
@@ -100,9 +100,16 @@ describe('K4 Integration — sheetName分发路由', () => {
   })
 })
 
-// ═══ 7.2-B: TB writeback flow — writebackTB(2245) + EventBus emit ═══
+// ═══ 7.2-B: TB writeback flow — writebackTB(调用方传入的科目) + EventBus emit ═══
+//
+// 🔴 K4 其他流动负债**没有统一标准科目码**（宁缺勿造，见 k4AccountScope.ts）。
+//    原用例断言 writebackTB 缺省发布到 `2245` —— 那是缺省值写死的错码，不是其他流动负债。
+//    现 writebackTB 必须由调用方传科目（K4TabAdjudication 取 k4Code）；传空串不发布。
 
-describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
+/** 模拟本项目从 tb_source_codes 解析出的科目码（K4 没有统一标准码，各项目不同） */
+const RESOLVED = '2249'
+
+describe('K4 Integration — TB回写(负债类，科目由调用方传入) + EventBus', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockPut.mockResolvedValue({})
@@ -110,107 +117,134 @@ describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
     mockGet.mockResolvedValue({})
   })
 
-  it('writebackTB calls PUT with account_code=2245 + correct amount', async () => {
+  async function makeFormData(wpId: string) {
     const { useK4FormData } = await import('../composables/useK4FormData')
     const { ref } = await import('vue')
+    return useK4FormData({ wpId: ref(wpId), projectId: ref('proj-k4'), sheetPrefix: 'K4-1' })
+  }
 
-    const formData = useK4FormData({
-      wpId: ref('wp-k4-001'),
-      projectId: ref('proj-001'),
-      sheetPrefix: 'K4-1',
-    })
+  it('writebackTB 按调用方传入的科目发布（publish-to-tb，balance 口径）', async () => {
+    const formData = await makeFormData('wp-k4-001')
+    await formData.writebackTB(800_000, RESOLVED)
 
-    await formData.writebackTB(800_000)
-
-    // spec: tb-writeback-explicit-publish-gate Task 7 — K4 改走显式发布门 publish-to-tb（默认科目 2245）
     expect(mockPut).not.toHaveBeenCalled()
     expect(mockPost).toHaveBeenCalledWith(
       '/api/workpapers/wp-k4-001/audit-determination/publish-to-tb',
       expect.objectContaining({
         sheet_name: expect.stringMatching(/K4-1/),
-        writeback_rows: [{ account_code: '2245', audited_amount: 800_000, amount_kind: 'balance' }],
+        writeback_rows: [{ account_code: RESOLVED, audited_amount: 800_000, amount_kind: 'balance' }],
       }),
     )
   })
 
-  it('writebackTB emits substantive:adjudicated with 2245/K4 payload', async () => {
-    const { useK4FormData } = await import('../composables/useK4FormData')
-    const { ref } = await import('vue')
-
-    const formData = useK4FormData({
-      wpId: ref('wp-k4-002'),
-      projectId: ref('proj-002'),
-      sheetPrefix: 'K4-1',
-    })
-
-    await formData.writebackTB(1_200_000)
+  it('writebackTB 发布后 emit substantive:adjudicated，事件码 = 发布码', async () => {
+    const formData = await makeFormData('wp-k4-002')
+    await formData.writebackTB(1_200_000, RESOLVED)
 
     expect(mockEmit).toHaveBeenCalledWith(
       'substantive:adjudicated',
-      expect.objectContaining({
-        accountCode: '2245',
-        auditedAmount: 1_200_000,
-        wpCode: 'K4',
-      }),
+      expect.objectContaining({ accountCode: RESOLVED, auditedAmount: 1_200_000, wpCode: 'K4' }),
     )
   })
 
-  it('writebackTB updates local tbData.audited2245', async () => {
-    const { useK4FormData } = await import('../composables/useK4FormData')
-    const { ref } = await import('vue')
-
-    const formData = useK4FormData({
-      wpId: ref('wp-k4-003'),
-      projectId: ref('proj-003'),
-      sheetPrefix: 'K4-1',
-    })
-
-    expect(formData.tbData.value.audited2245).toBe(0)
-    await formData.writebackTB(2_500_000)
-    expect(formData.tbData.value.audited2245).toBe(2_500_000)
+  it('writebackTB 更新本地 tbData.audited', async () => {
+    const formData = await makeFormData('wp-k4-003')
+    expect(formData.tbData.value.audited).toBe(0)
+    await formData.writebackTB(2_500_000, RESOLVED)
+    expect(formData.tbData.value.audited).toBe(2_500_000)
   })
 
   it('writebackTB zero amount is valid (全部清偿)', async () => {
-    const { useK4FormData } = await import('../composables/useK4FormData')
-    const { ref } = await import('vue')
-
-    const formData = useK4FormData({
-      wpId: ref('wp-k4-004'),
-      projectId: ref('proj-004'),
-      sheetPrefix: 'K4-1',
-    })
-
-    await formData.writebackTB(0)
+    const formData = await makeFormData('wp-k4-004')
+    await formData.writebackTB(0, RESOLVED)
 
     expect(mockPut).not.toHaveBeenCalled()
     expect(mockPost).toHaveBeenCalledWith(
       '/api/workpapers/wp-k4-004/audit-determination/publish-to-tb',
       expect.objectContaining({
-        writeback_rows: [{ account_code: '2245', audited_amount: 0, amount_kind: 'balance' }],
+        writeback_rows: [{ account_code: RESOLVED, audited_amount: 0, amount_kind: 'balance' }],
       }),
     )
-    expect(formData.tbData.value.audited2245).toBe(0)
+    expect(formData.tbData.value.audited).toBe(0)
   })
 
   it('writebackTB negative amount (负债转出) still calls API', async () => {
-    const { useK4FormData } = await import('../composables/useK4FormData')
-    const { ref } = await import('vue')
-
-    const formData = useK4FormData({
-      wpId: ref('wp-k4-005'),
-      projectId: ref('proj-005'),
-      sheetPrefix: 'K4-1',
-    })
-
-    await formData.writebackTB(-100_000)
+    const formData = await makeFormData('wp-k4-005')
+    await formData.writebackTB(-100_000, RESOLVED)
 
     expect(mockPut).not.toHaveBeenCalled()
     expect(mockPost).toHaveBeenCalledWith(
       '/api/workpapers/wp-k4-005/audit-determination/publish-to-tb',
       expect.objectContaining({
-        writeback_rows: [{ account_code: '2245', audited_amount: -100_000, amount_kind: 'balance' }],
+        writeback_rows: [{ account_code: RESOLVED, audited_amount: -100_000, amount_kind: 'balance' }],
       }),
     )
+  })
+
+  it('🔴 科目为空串（本项目未定位到）⇒ 不发布、不发事件（宁缺勿造，不回退任何码）', async () => {
+    const formData = await makeFormData('wp-k4-006')
+    await formData.writebackTB(300_000, '')
+
+    expect(mockPost).not.toHaveBeenCalled()
+    expect(mockEmit).not.toHaveBeenCalledWith('substantive:adjudicated', expect.anything())
+    expect(formData.tbData.value.audited).toBe(0)
+  })
+})
+
+// ═══ 7.2-B2: loadTbData —— 读后端真实下发的键；解析不出科目不取数 ═══
+
+describe('K4 Integration — loadTbData 取数口径', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  /** selfLoad 依次 GET render-config / checklist-responses / (可选) trial-balance */
+  function stubGets(htmlData: Record<string, unknown>, tbRows: unknown[] = []) {
+    mockGet.mockImplementation(async (url: string) => {
+      if (url.includes('/render-config')) return { html_data: htmlData }
+      if (url.includes('/checklist-responses')) return []
+      if (url.includes('/trial-balance')) return tbRows
+      return {}
+    })
+  }
+
+  function tbCalls() {
+    return mockGet.mock.calls.filter(([url]) => String(url).includes('/trial-balance'))
+  }
+
+  async function load(htmlData: Record<string, unknown>, tbRows: unknown[] = []) {
+    stubGets(htmlData, tbRows)
+    const { useK4FormData } = await import('../composables/useK4FormData')
+    const { ref } = await import('vue')
+    const fd = useK4FormData({ wpId: ref('wp-k4-load'), projectId: ref('proj-k4'), sheetPrefix: 'K4-1' })
+    await fd.selfLoad()
+    return fd
+  }
+
+  it('render 下发 tb_values.liability_* ⇒ 直接取用，不再请求试算表', async () => {
+    const fd = await load({ tb_values: { liability_unadjusted: 51_000, liability_audited: 52_000 } })
+    expect(fd.tbData.value).toEqual({ unadjusted: 51_000, audited: 52_000 })
+    expect(tbCalls()).toHaveLength(0)
+  })
+
+  it('🔴 解析不出科目（gross 为空）⇒ 不请求试算表（原实现按写死的 2245 去取）', async () => {
+    const fd = await load({ tb_source_codes: { gross: [], gross_standard: [] } })
+    expect(tbCalls()).toHaveLength(0)
+    expect(fd.tbData.value).toEqual({ unadjusted: 0, audited: 0 })
+  })
+
+  it('解析出科目 ⇒ 按该科目请求并只累加该科目及其子目', async () => {
+    const fd = await load(
+      { tb_source_codes: { gross: [RESOLVED], gross_standard: [RESOLVED] } },
+      [
+        { standard_account_code: RESOLVED, unadjusted_amount: 100, audited_amount: 110 },
+        { standard_account_code: `${RESOLVED}.01`, unadjusted_amount: 5, audited_amount: 6 },
+        { standard_account_code: '2245', unadjusted_amount: 9_999, audited_amount: 9_999 },
+      ],
+    )
+    expect(tbCalls()).toHaveLength(1)
+    expect(tbCalls()[0][1]).toMatchObject({ params: { account_prefix: RESOLVED } })
+    expect(fd.tbData.value).toEqual({ unadjusted: 105, audited: 116 })
   })
 })
 

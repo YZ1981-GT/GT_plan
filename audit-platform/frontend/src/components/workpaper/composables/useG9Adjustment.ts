@@ -3,14 +3,15 @@
  *
  * 编制逻辑：
  * 1. 登记 1504 相关 AJE/RJE，整表借贷须平衡
- * 2. FVTPL 公允变动通常成对：Dr/Cr 1504 ↔ 6101；FVOCI 可用 4002
+ * 2. FVTPL 公允变动通常成对：Dr/Cr 1504 ↔ 6101；FVOCI 可用 4003（其他综合收益）
  * 3. 仅汇总科目代码以 1504 开头的借−贷净额，分 AJE/RJE 回写 G9-1「fvtpl_1」
- * 4. 可与中央调整分录模块双向同步（1504/6101/4002 等）
+ * 4. 可与中央调整分录模块双向同步（1504/6101/4003 等）
  * 5. G9-4 推送差异、截止测试填入均复用本表持久化与回写
  */
 import { computed, ref, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { G9_ACCOUNT_CODE } from './g9Constants'
+import { OCI_ACCOUNT_CODE } from './mCycleAccountScope'
 import {
   aggregateG9AdjustmentAjeRje,
   applyG9AdjustmentWriteback,
@@ -46,7 +47,7 @@ export interface G9AdjustmentEntry {
 export const G9_ADJ_ACCOUNT_OPTIONS: { code: string; name: string }[] = [
   { code: G9_ACCOUNT_CODE, name: '其他非流动金融资产' },
   { code: '6101', name: '公允价值变动损益' },
-  { code: '4002', name: '其他综合收益' },
+  { code: OCI_ACCOUNT_CODE, name: '其他综合收益' },
   { code: '6111', name: '投资收益' },
   { code: '6701', name: '资产减值损失' },
   { code: '1002', name: '银行存款' },
@@ -58,7 +59,7 @@ const ITEM_ID_ROWS = 'G9-adjustment-rows'
 const ITEM_ID_ADJ_ROWS = 'G9-adj-rows'
 export const G9_AJE_ADJ_OVERLAY_ID = 'G9-aje-adj-overlay'
 
-const G9_RELATED_PREFIXES = [G9_ACCOUNT_CODE, '1510', '1504', '6101', '4002', '6111', '6701']
+const G9_RELATED_PREFIXES = [G9_ACCOUNT_CODE, '1510', '1504', '6101', OCI_ACCOUNT_CODE, '6111', '6701']
 
 function genId(): string {
   return `g9a-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
@@ -68,7 +69,8 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-function isG9RelatedAccount(code: string): boolean {
+/** 中央调整分录同步时认领的相关科目（导出供守卫测试） */
+export function isG9RelatedAccount(code: string): boolean {
   const c = String(code || '')
   return G9_RELATED_PREFIXES.some((p) => c === p || c.startsWith(p))
 }
@@ -296,7 +298,7 @@ export function useG9Adjustment(opts: {
           entryType: 'AJE',
           date,
           summary: `${summary}（OCI）`,
-          accountCode: '4002',
+          accountCode: OCI_ACCOUNT_CODE,
           accountName: '其他综合收益',
           debitAmount: isIncrease ? 0 : abs,
           creditAmount: isIncrease ? abs : 0,

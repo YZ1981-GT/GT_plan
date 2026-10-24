@@ -12,10 +12,10 @@
  * - 审定数公式：审定=未审+AJE+RJE（calcAuditedAmount）
  * - 权益类贷方期末：期末=期初+贷方-借方（calcEquityEndBalance）
  * - 小计：按组(perpetualBond/preferredStock/other)分组 calcSubtotal
- * - 审定数变化→writebackTB(4003)+EventBus 'substantive:adjudicated'
+ * - 审定数变化→writebackTB(4401)+EventBus 'substantive:adjudicated'
  * - 与M10-2明细表交叉验证
  *
- * 科目：4003 其他权益工具（**贷方/权益类！期末=期初+贷方-借方**）
+ * 科目：4401 其他权益工具（**贷方/权益类！期末=期初+贷方-借方**）
  * 永续债/优先股发行在贷方增加，赎回/转换在借方减少
  *
  * 38×14结构，29公式
@@ -29,6 +29,7 @@ import {
   calcSubtotal,
 } from './useM10FormulaEngine'
 import type { useM10FormData } from './useM10FormData'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -261,7 +262,7 @@ export function useM10Adjudication(
 
   /**
    * 保存审定表并触发TB回写 + EventBus
-   * - 回写 trial_balance 科目 4003（贷方/权益类！）
+   * - 回写 trial_balance 科目 4401（贷方/权益类！）
    * - publish 'substantive:adjudicated'
    */
   async function saveAdjudication(): Promise<void> {
@@ -291,7 +292,7 @@ export function useM10Adjudication(
   function emitAdjudicated(): void {
     eventBus.emit('substantive:adjudicated', {
       wpCode: 'M10',
-      accountCode: '4003',
+      accountCode: M_CYCLE_ACCOUNT.M10.code,
       audited: totalRow.value.audited,
       perpetualBondAudited: perpetualBondSubtotal.value.audited,
       preferredStockAudited: preferredStockSubtotal.value.audited,
@@ -318,7 +319,7 @@ export function useM10Adjudication(
   // ─── 7b. 显式发布到试算表（显式确认门，复刻 D2/D4-1 范式） ────────────────
 
   /**
-   * 确认发布审定数到试算表（科目 4003 其他权益工具）。
+   * 确认发布审定数到试算表（科目 4401 其他权益工具）。
    * spec: tb-writeback-explicit-publish-gate Task 5 / Req 2。
    * 二次确认（中文）→ 保存明细 → formData.writebackTB 走 publish-to-tb → 联动 emit。
    * 用户取消 → 无副作用。
@@ -327,7 +328,7 @@ export function useM10Adjudication(
     if (publishing.value) return
     try {
       await ElMessageBox.confirm(
-        '发布后将把其他权益工具审定数（科目 4003）写入试算表（trial_balance），'
+        `发布后将把其他权益工具审定数（科目 ${M_CYCLE_ACCOUNT.M10.code}）写入试算表（trial_balance），`
         + '并触发报表/错报评价等下游重算。确认发布？',
         '发布到试算表确认',
         { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },

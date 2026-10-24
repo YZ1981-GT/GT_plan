@@ -40,8 +40,8 @@
         <strong>权益类贷方科目：</strong>期末 = 期初 + 贷方 − 借方。
         发行计入贷方增加，赎回/转换计入借方减少。
         审定数 = 未审数 + AJE + RJE。
-        其他权益工具（4003）按工具类型分组：永续债 / 优先股 / 其他权益工具。
-        审定数变化自动回写试算表（4003）并通知附注组件。
+        其他权益工具（4401）按工具类型分组：永续债 / 优先股 / 其他权益工具。
+        审定数变化自动回写试算表（4401）并通知附注组件。
       </div>
     </div>
 
@@ -395,7 +395,7 @@
     <!-- ═══ 合计 + 期末校验 + TB回写状态 ═══ -->
     <div class="adjudication-footer">
       <el-tag type="primary" size="small" effect="dark">合计审定: {{ fmtAmount(totalRow.audited) }}</el-tag>
-      <el-tag type="success" size="small" effect="plain">TB回写: 科目4003 其他权益工具（贷方/权益类）</el-tag>
+      <el-tag type="success" size="small" effect="plain">TB回写: 科目4401 其他权益工具（贷方/权益类）</el-tag>
       <el-tag :type="equityEndCheck.isMatch ? 'success' : 'danger'" size="small" effect="plain">
         期末校验: {{ fmtAmount(equityEndCheck.actual) }}
         {{ equityEndCheck.isMatch ? '=' : '≠' }}
@@ -429,15 +429,15 @@
     <details class="m10-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>其他权益工具（4003）为<strong>权益类贷方科目</strong>：期末 = 期初 + 贷方（发行） − 借方（赎回/转换）</li>
+        <li>其他权益工具（4401）为<strong>权益类贷方科目</strong>：期末 = 期初 + 贷方（发行） − 借方（赎回/转换）</li>
         <li>永续债：无固定到期日、无强制付息义务的债券，CAS37判定为权益工具</li>
         <li>优先股：如发行方无赎回义务且股息非强制，CAS37判定为权益工具</li>
         <li>审定数 = 未审数 + AJE（账项调整） + RJE（重分类调整）</li>
         <li>三组展示：永续债 / 优先股 / 其他权益工具</li>
-        <li>审定数变化自动回写 TB（科目 4003）并通知附注组件</li>
+        <li>审定数变化自动回写 TB（科目 4401）并通知附注组件</li>
         <li>合计行应与明细表M10-2的合计一致（交叉验证）</li>
         <li>如有工具被CAS37判定为负债，应从M10移出计入负债科目（参见M10-4区分检查表）</li>
-        <li>「带入调整」：从集中登记按科目 4003 拉取调整分录，逐笔分配到各工具组项目行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
+        <li>「带入调整」：从集中登记按科目 4401 拉取调整分录，逐笔分配到各工具组项目行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
 
@@ -445,7 +445,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="4003 其他权益工具"
+      :subject-label="mAccountLabel('M10')"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -458,7 +458,7 @@
  * Requirements: 2.1-2.7
  * 单区块按工具类型(永续债/优先股/其他)分三组 + 各组小计 + 合计行
  * 公式列虚线下划线+cursor:help+tooltip
- * TB回写(4003) + EventBus 'substantive:adjudicated'
+ * TB回写(4401) + EventBus 'substantive:adjudicated'
  * 与M10-2明细表交叉验证（绿勾/红警）
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
@@ -478,6 +478,7 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { fmtAmount } from '@/utils/formatters'
 import { eventBus } from '@/utils/eventBus'
+import { M_CYCLE_ACCOUNT, mAccountLabel } from '../../composables/mCycleAccountScope'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
@@ -511,7 +512,7 @@ const {
 
 const { adjudicationVsDetail: crossValidation } = useM10CrossSheet(formData.allResponses)
 
-// ─── 从集中登记带入调整（4003 其他权益工具，权益贷方；单期 aje/rje，三组工具行） ───
+// ─── 从集中登记带入调整（4401 其他权益工具，权益贷方；单期 aje/rje，三组工具行） ───
 const bringInRows = computed(() =>
   computedRows.value.map((r) => ({
     rowKey: r.key,
@@ -529,11 +530,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '4003',
+  subjectPrefix: M_CYCLE_ACCOUNT.M10.code,
   direction: 'credit',
-  subjectCode: '4003',
+  subjectCode: M_CYCLE_ACCOUNT.M10.code,
   wpCode: 'M10',
-  subjectLabel: '其他权益工具(4003)',
+  subjectLabel: mAccountLabel('M10'),
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) => {
     const idx = rows.value.findIndex((r) => r.key === rowKey)
@@ -673,7 +674,7 @@ async function handleAI(section: string) {
   try {
     const t: any = (totalRow as any)?.value ?? {}
     const context: Record<string, string> = {
-      科目: '4003 其他权益工具 / 审定表（M10-1 权益类贷方）',
+      科目: '4401 其他权益工具 / 审定表（M10-1 权益类贷方）',
       区段: section,
       期初审定合计: fmtAmount(Number(t.beginAudited) || 0),
       期末审定合计: fmtAmount(Number(t.endAudited) || 0),

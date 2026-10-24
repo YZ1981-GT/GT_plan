@@ -31,6 +31,7 @@ import {
   calcSubtotal,
 } from './useM5FormulaEngine'
 import type { useM5FormData } from './useM5FormData'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -295,7 +296,7 @@ export function useM5Adjudication(
     // EventBus publish 'substantive:adjudicated'（通知附注组件刷新）
     eventBus.emit('substantive:adjudicated', {
       wpCode: 'M5',
-      accountCode: '4101',
+      accountCode: M_CYCLE_ACCOUNT.M5.code,
       audited: totalRow.value.audited,
       statutoryAudited: statutorySubtotal.value.audited,
       discretionaryAudited: discretionarySubtotal.value.audited,
@@ -339,7 +340,7 @@ export function useM5Adjudication(
     if (publishing.value) return
     try {
       await ElMessageBox.confirm(
-        '发布后将把盈余公积审定数（科目 4101）写入试算表（trial_balance），'
+        `发布后将把盈余公积审定数（科目 ${M_CYCLE_ACCOUNT.M5.code}）写入试算表（trial_balance），`
         + '并触发报表/错报评价等下游重算。确认发布？',
         '发布到试算表确认',
         { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },

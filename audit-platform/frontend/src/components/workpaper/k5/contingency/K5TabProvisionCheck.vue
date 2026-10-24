@@ -9,7 +9,7 @@
     五、审计结论
 
   复用 useK1VoucherCheck（通用凭证检查状态）+ 预计负债专属核对标签覆盖。
-  科目 2701 预计负债（贷方/负债类）。
+  科目 2801 预计负债（贷方/负债类）。
 
   🔴 与 K1-12 的关键差异（预计负债特异性）：
   - 核对内容5项对齐预计负债审计要点（非应收款通用）
@@ -318,7 +318,7 @@
  * K5TabProvisionCheck.vue — K5-7 预计负债检查表（凭证级测试，复用 useK1VoucherCheck）
  *
  * Spec: .kiro/specs/k5-provisions/ | Task: 4.5, 6.3（源模板对齐重建）
- * 科目 2701 预计负债（贷方/负债类）。
+ * 科目 2801 预计负债（贷方/负债类）。
  */
 import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
 import type { Ref } from 'vue'

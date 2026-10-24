@@ -6,7 +6,7 @@
         <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
         <h3 class="section-title">M10-3 其他权益工具调整分录汇总</h3>
         <el-tag type="success" effect="dark" size="small" class="equity-badge">
-          科目4003·贷方增加=调增
+          科目4401·贷方增加=调增
         </el-tag>
       </div>
       <div class="section-header-right">
@@ -46,7 +46,7 @@
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>其他权益工具（4003）调整分录方向说明：</strong>
+        <strong>其他权益工具（4401）调整分录方向说明：</strong>
         其他权益工具为权益类贷方科目 —
         <strong>贷方增加 = 调增其他权益工具</strong>（如补确认永续债发行、CAS37重分类负债→权益），
         <strong>借方减少 = 调减其他权益工具</strong>（如补确认赎回、CAS37重分类权益→负债）。
@@ -216,13 +216,13 @@
       </el-button>
     </div>
 
-    <!-- ═══ 4003净影响汇总 ═══ -->
+    <!-- ═══ 4401净影响汇总 ═══ -->
     <div class="net-impact-section">
       <el-tag type="info" size="small" effect="plain">
-        AJE对4003净影响: {{ fmtAmount(adjustment.ajeNet4003.value) }}（正=调增，负=调减）
+        AJE对4401净影响: {{ fmtAmount(adjustment.ajeNet4401.value) }}（正=调增，负=调减）
       </el-tag>
       <el-tag type="info" size="small" effect="plain">
-        RJE对4003净影响: {{ fmtAmount(adjustment.rjeNet4003.value) }}（正=调增，负=调减）
+        RJE对4401净影响: {{ fmtAmount(adjustment.rjeNet4401.value) }}（正=调增，负=调减）
       </el-tag>
     </div>
 
@@ -230,7 +230,7 @@
     <details class="m10-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>科目4003其他权益工具：<strong>贷方增加=调增</strong>（补确认发行/CAS37负债→权益重分类），<strong>借方减少=调减</strong>（补确认赎回/CAS37权益→负债重分类）</li>
+        <li>科目4401其他权益工具：<strong>贷方增加=调增</strong>（补确认发行/CAS37负债→权益重分类），<strong>借方减少=调减</strong>（补确认赎回/CAS37权益→负债重分类）</li>
         <li>借贷必须平衡（Σ借方 === Σ贷方）后方可保存发布</li>
         <li>保存后发布 'adjustment:created' 事件通知M10-1审定表刷新AJE/RJE列</li>
         <li>永续债发行：借:银行存款 贷:其他权益工具</li>
@@ -258,7 +258,7 @@
  * - 平衡状态指示：绿色=平衡, 红色=不平衡+差额
  * - EventBus publish 'adjustment:created' on save
  * - 双向同步M10-1审定表
- * - 科目4003 其他权益工具: 贷方增加=调增, 借方减少=调减
+ * - 科目4401 其他权益工具: 贷方增加=调增, 借方减少=调减
  */
 import { computed, inject, onMounted, ref, toRef, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -380,7 +380,7 @@ async function handleAI(section: string) {
       .map(e => `${e.description || '调整'}: ${e.accountName} 借${fmtAmount(e.debitAmount)}/贷${fmtAmount(e.creditAmount)} [${e.category || ''}]`)
       .join('；') || '（暂无调整分录）'
     const context: Record<string, string> = {
-      科目: '4003 其他权益工具 / 调整分录汇总（M10-3）',
+      科目: '4401 其他权益工具 / 调整分录汇总（M10-3）',
       调整类型: adjustment.activeType.value,
       调整分录: entriesCtx,
       借方合计: fmtAmount(bal.totalDebit),

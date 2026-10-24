@@ -105,7 +105,8 @@ describe('buildReclassEntry', () => {
     expect(entry.debit.accountCode).toBe('2501')
     expect(entry.debit.amount).toBe(10_000_000)
     expect(entry.credit.account).toBe('一年内到期的非流动负债')
-    expect(entry.credit.accountCode).toBe('2801')
+    // 一年内到期的非流动负债是报表项目、没有统一科目码：留空（原写 2801 = 预计负债，错）
+    expect(entry.credit.accountCode).toBe('')
     expect(entry.credit.amount).toBe(10_000_000)
   })
 
@@ -146,7 +147,7 @@ describe('集成场景：一年内到期重分类全流程', () => {
     expect(entry.debit.amount).toBe(30_000_000)
     expect(entry.credit.amount).toBe(30_000_000)
     expect(entry.debit.accountCode).toBe('2501')
-    expect(entry.credit.accountCode).toBe('2801')
+    expect(entry.credit.accountCode).toBe('')
   })
 
   it('一笔非一年内到期借款 → 无需RJE', () => {

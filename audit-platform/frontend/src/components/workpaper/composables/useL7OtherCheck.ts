@@ -17,7 +17,7 @@
  *   实际：A(序号) B-E(核对项目描述+明细) F(借方) G(贷方) H-M(凭证金额/内容) N(审计说明) O(结论) P(索引)
  *   row22=SUM(F12:F21), row23=明细表L7-2'!N17, row24=F22/F23
  *
- * 科目：2801 其他非流动负债（贷方/负债类）
+ * 科目：其他非流动负债（无专属科目码，宁缺勿造；贷方/负债类）
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistResponse } from './useL7FormData'

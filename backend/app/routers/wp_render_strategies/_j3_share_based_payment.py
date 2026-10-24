@@ -1,6 +1,6 @@
 """J3 股份支付 — 专属渲染策略.
 
-J3 无独立科目（跨多科目：资本公积3002/管理费用6602/应付职工薪酬2211）。
+J3 无独立科目（跨多科目：资本公积4002/管理费用6602/应付职工薪酬2211）。
 费用确认走 EventBus → M4(权益结算)/J1(现金结算)/K8K9(管理费用)。
 
 Spec: .kiro/specs/j3-share-based-payment/
@@ -9,6 +9,7 @@ Requirements: 1.1, 5.1
 from __future__ import annotations
 import logging
 import sqlalchemy as sa
+from app.services.four_table.m_cycle_specs import fallback_code_of
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,8 @@ async def render(ctx: RenderContext) -> dict | None:
         "component_type": "j3-share-based-payment",
         "cross_account": True,
         "no_tb_writeback": True,
-        "account_codes": ["3002", "6602", "2211"],
+        # 资本公积取 M4 口径（原写 3002 —— 旧制编码，现行科目表 3002 是「货币兑换」）
+        "account_codes": [fallback_code_of("M4"), "6602", "2211"],
         "plans": plans,
         "responses": responses_snapshot,
         "sheets": J3_SHEETS,

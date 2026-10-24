@@ -112,14 +112,20 @@ export function normalizeLedgerEntry(raw: Record<string, any>): NormalizedLedger
 // ─── 口径决策（Task 7.3） ───────────────────────────────────────────────────────
 
 /**
- * 根据科目代码判定数据域。
+ * 根据科目代码判定数据域（现行企业会计准则科目表编码，与试算表 `standard_account_code`、
+ * 报表公式 `TB('4001')` 同一套）。
  *
  * 规则：
  * - 1xxx → 资产（asset）
  * - 2xxx → 负债（liability）
- * - 3xxx → 权益（equity），注：3101 库存股为权益备抵借方，域仍为 equity
- * - 6xxx / 5xxx / 4xxx → 损益（income_expense）
+ * - 3xxx → 共同类（衍生工具 3101 / 套期工具 3201 …，余额方向不定）→ 按 asset 取借正贷负余额
+ * - 4xxx → 所有者权益（equity），注：4201 库存股为权益备抵借方，域仍为 equity
+ * - 5xxx → 成本类（生产成本 / 制造费用 / 研发支出，借方余额）→ 按 asset 取余额
+ * - 6xxx → 损益（income_expense）
  * - 其他 → 默认 asset
+ *
+ * 🔴 2026-10-24 前按旧制科目表判（3xxx 权益、4xxx/5xxx 损益）⇒ 4001 实收资本被当成损益取发生额、
+ * 3101（现行为衍生工具）被当成库存股（spec formula-fetch-followup-defect-closure R1.4 触类旁通）。
  */
 export function detectAccountDomain(accountCode: string): AccountDomain {
   const code = String(accountCode).trim()
@@ -129,9 +135,9 @@ export function detectAccountDomain(accountCode: string): AccountDomain {
   switch (firstChar) {
     case '1': return 'asset'
     case '2': return 'liability'
-    case '3': return 'equity'
-    case '4':
-    case '5':
+    case '3': return 'asset'
+    case '4': return 'equity'
+    case '5': return 'asset'
     case '6': return 'income_expense'
     default: return 'asset'
   }
@@ -169,12 +175,12 @@ export function resolveKoujing(accountCode: string): Koujing {
 
 /**
  * 判断是否为借方科目（余额方向为借方）。
- * 资产类 + 3101 库存股 = 借方科目。
+ * 资产类 + 成本类（5xxx）+ 4201 库存股 = 借方科目。
  */
 export function isDebitAccount(accountCode: string): boolean {
   const code = String(accountCode).trim()
-  if (code.startsWith('1')) return true
-  if (code === '3101') return true // 库存股=权益备抵借方
+  if (code.startsWith('1') || code.startsWith('5')) return true
+  if (code.startsWith('4201')) return true // 库存股=权益备抵借方（含明细子目）
   return false
 }
 

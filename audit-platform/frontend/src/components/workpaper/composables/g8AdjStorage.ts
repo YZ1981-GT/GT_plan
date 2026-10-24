@@ -1,6 +1,7 @@
 /** G8-1 审定表 rowStore 读写辅助 */
 import { G8_ADJUDICATION_ITEMS, G8_ADJ_WRITEBACK_ROW_KEY } from './g8Constants'
 import { parseNum } from './useG8FormulaEngine'
+import { OCI_ACCOUNT_CODE } from './mCycleAccountScope'
 
 export { G8_ADJ_WRITEBACK_ROW_KEY }
 
@@ -114,7 +115,8 @@ export function summarizeG8Adjustment(
     net1503: calcG8AdjustmentNet(list),
     ajeNet1503: calcG8AdjustmentNet(aje),
     rjeNet1503: calcG8AdjustmentNet(rje),
-    ociNet: accountNet(list, '4002'),
+    // OCI = 其他综合收益 4003（原先按 4002 资本公积汇总，OCI 净额恒为 0 或算成资本公积）
+    ociNet: accountNet(list, OCI_ACCOUNT_CODE),
   }
 }
 

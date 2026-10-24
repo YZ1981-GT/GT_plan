@@ -30,6 +30,7 @@ import {
   calcSubtotal,
 } from './useM6FormulaEngine'
 import type { useM6FormData } from './useM6FormData'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -264,7 +265,7 @@ export function useM6Adjudication(
   function emitAdjudicated(): void {
     eventBus.emit('substantive:adjudicated', {
       wpCode: 'M6',
-      accountCode: '4104',
+      accountCode: M_CYCLE_ACCOUNT.M6.code,
       audited: totalRow.value.audited,
       endBalance: totalRow.value.endBalance,
       timestamp: Date.now(),
@@ -298,7 +299,7 @@ export function useM6Adjudication(
     if (publishing.value) return
     try {
       await ElMessageBox.confirm(
-        '发布后将把未分配利润审定数（科目 4104）写入试算表（trial_balance），'
+        `发布后将把未分配利润审定数（科目 ${M_CYCLE_ACCOUNT.M6.code}）写入试算表（trial_balance），`
         + '并触发报表/错报评价等下游重算。确认发布？',
         '发布到试算表确认',
         { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },

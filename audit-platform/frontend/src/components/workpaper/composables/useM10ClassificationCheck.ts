@@ -10,7 +10,7 @@
  * - 使用 classifyInstrument, splitAmount, calcClassificationConsistency from useM10ClassificationEngine
  * - 逐工具判定：是否存在交付现金/金融资产的合同义务
  * - 跟踪每项工具的分类状态（per-instrument judgment）
- * - 归入权益的部分→M10(4003)；归入负债的→生成负债警告
+ * - 归入权益的部分→M10(4401)；归入负债的→生成负债警告
  * - 金额守恒校验：权益部分 + 负债部分 === 工具总额
  *
  * CAS37《金融工具列报》核心判定维度：
@@ -217,7 +217,7 @@ export function useM10ClassificationCheck(formData: ReturnType<typeof useM10Form
         instrumentKey: j.instrumentKey,
         instrumentName: j.instrumentName,
         amount: j.liabilityAmount,
-        message: `"${j.instrumentName}" 已判定为金融负债（CAS37），金额 ${j.liabilityAmount.toLocaleString()} 元应计入负债科目而非权益（4003）`,
+        message: `"${j.instrumentName}" 已判定为金融负债（CAS37），金额 ${j.liabilityAmount.toLocaleString()} 元应计入负债科目而非权益（4401）`,
       }))
   })
 

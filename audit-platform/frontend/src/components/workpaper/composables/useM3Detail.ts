@@ -13,7 +13,7 @@
  * - 动态行新增（ElMessageBox.prompt 输入批次名）
  * - 与M3-1审定表交叉验证（totalEndAmount）
  *
- * 科目：4002 库存股（**借方/权益备抵类！**）
+ * 科目：4201 库存股（**借方/权益备抵类！**）
  * 回购=借方增加（期末股数增加），注销=贷方减少（期末股数减少）
  */
 import { computed, ref, type ComputedRef } from 'vue'

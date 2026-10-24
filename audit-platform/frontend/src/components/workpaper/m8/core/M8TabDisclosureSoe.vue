@@ -325,7 +325,7 @@ async function handleAI(section: string): Promise<void> {
   try {
     const total = tableRows.value.find(r => r._rowType === 'total')
     const context: Record<string, string> = {
-      科目: '4104 一般风险准备（权益类/贷方）',
+      科目: '一般风险准备（权益类/贷方）',
       底稿: 'M8 附注披露信息（国有企业）',
       期初余额合计: fmtAmount(total?.beginBalance ?? 0),
       本期增加合计: fmtAmount(total?.currentIncrease ?? 0),
@@ -350,7 +350,8 @@ function getRowClassName({ row }: { row: TableRow; rowIndex: number }): string {
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────
 
 function onAdjudicatedRefresh(payload: { accountCode: string; auditedAmount: number; wpCode: string; timestamp: number }): void {
-  if (payload?.wpCode === 'M8' || payload?.accountCode === '4104') {
+  // 🔴 原先还认 accountCode 4104（利润分配）⇒ M6 未分配利润的审定事件也会刷新本表；改认本项目定位到的码
+  if (payload?.wpCode === 'M8' || (!!formData.accountCode.value && payload?.accountCode === formData.accountCode.value)) {
     formData.loadData().then(() => _restoreData())
   }
 }

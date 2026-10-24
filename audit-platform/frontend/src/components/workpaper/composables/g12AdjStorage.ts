@@ -1,5 +1,6 @@
 /** G12-3 调整分录汇总 — 存储与回写辅助 */
 import { G12_ACCOUNT_CODE } from './g12Constants'
+import { OCI_ACCOUNT_CODE } from './mCycleAccountScope'
 import { parseNum, isDebitCreditBalanced } from './useG12FormulaEngine'
 
 export type G12AdjCategory = 'account' | 'report' | 'other'
@@ -48,7 +49,7 @@ export const G12_ADJ_NOTE_ITEMS = [
 export const G12_ADJ_ACCOUNT_OPTIONS: { code: string; name: string }[] = [
   { code: G12_ACCOUNT_CODE, name: '净敞口套期收益' },
   { code: '6101', name: '公允价值变动损益' },
-  { code: '4002', name: '其他综合收益' },
+  { code: OCI_ACCOUNT_CODE, name: '其他综合收益' },
   { code: '1403', name: '存货' },
   { code: '3101', name: '衍生工具' },
   { code: '1002', name: '银行存款' },
@@ -68,7 +69,7 @@ export function entryTypeToCategory(entryType: string | undefined): G12AdjCatego
 
 export function isG12RelatedAccount(code: string): boolean {
   const c = String(code || '')
-  return ['6103', '6101', '4002', '1403', '3101'].some((p) => c === p || c.startsWith(p))
+  return ['6103', '6101', OCI_ACCOUNT_CODE, '1403', '3101'].some((p) => c === p || c.startsWith(p))
 }
 
 export function calcG12AdjustmentNet6103(rows: G12AdjustmentEntryLike[]): number {

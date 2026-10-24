@@ -28,6 +28,7 @@ from typing import Any
 
 import sqlalchemy as sa
 
+from app.services.four_table.m_cycle_specs import fallback_code_of
 from ._context import RenderContext
 from ._lmn_tb_helper import fetch_tb_for_balance
 
@@ -89,7 +90,7 @@ async def render(ctx: RenderContext) -> dict | None:
         logger.warning("M2 render: project context 查询失败: %s", e)
 
     # ─── TB 取数（LMN 四表取数 spec） ─────────────────────────────────────
-    tb = await fetch_tb_for_balance(ctx, "4001")
+    tb = await fetch_tb_for_balance(ctx, fallback_code_of("M2"))
 
     return {
         "sheet_name": ctx.classification.sheet_name if ctx.classification else "",
@@ -98,7 +99,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "trial_balance": tb,
         # 权益类公式方向元数据（前端可用于初始化校验）
         "formula_direction": {
-            "account_code": "4001",
+            "account_code": fallback_code_of("M2"),
             "account_name": "实收资本",
             "direction": "credit",  # 贷方/权益类
             "end_balance_formula": "begin + credit - debit",  # 期末=期初+贷方-借方

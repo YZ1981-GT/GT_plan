@@ -209,7 +209,7 @@
       <summary>编制提示</summary>
       <ul>
         <li>国企附注格式（约31行×14列），含风险等级列（高/中/低）</li>
-        <li>监听 substantive:adjudicated(2701) 自动同步审定数据（浅蓝色=跨sheet自动取数）</li>
+        <li>监听 substantive:adjudicated(2801) 自动同步审定数据（浅蓝色=跨sheet自动取数）</li>
         <li>与上市公司版区别：含风险等级/确认依据列；使用中文编号（一、二...）</li>
         <li>或有负债+担保从K5-2明细和K5-6诉讼自动筛选"可能"级别事项</li>
       </ul>
@@ -452,7 +452,7 @@ async function handleAiGenerate(): Promise<void> {
         + '只能使用已提供的项目名称与金额，不得虚构诉讼、担保、合同、环保义务或金额，'
         + '无把握的内容留空由审计师补充。',
       context: {
-        科目: '2701 预计负债（国有企业版）',
+        科目: '2801 预计负债（国有企业版）',
         附注章节: K5_NOTE_SECTION.soe,
         预计负债明细: detail || '（暂无数据）',
         或有负债与担保: contingent || '（暂无数据）',

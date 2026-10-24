@@ -11,7 +11,7 @@
  * - 行级抽凭 + 行级OCR（评估报告）
  * - Save with prefix "K5-7-"
  *
- * 科目：2701 预计负债（**贷方/负债类**）
+ * 科目：2801 预计负债（**贷方/负债类**）
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 

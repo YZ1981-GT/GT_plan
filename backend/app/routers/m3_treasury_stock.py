@@ -5,9 +5,9 @@
 - GET  /api/m3-treasury-stock/{wp_id}/export-data         当前数据xlsx
 - POST /api/m3-treasury-stock/{wp_id}/import-data         解析xlsx写入（multipart）
 - POST /api/m3-treasury-stock/{wp_id}/validate-formulas   权益备抵类公式方向验证
-- GET  /api/m3-treasury-stock/{wp_id}/tb-seed             TB取数（科目4002）
+- GET  /api/m3-treasury-stock/{wp_id}/tb-seed             TB取数（科目4201）
 
-科目编码: 4002库存股（**借方/权益备抵类！**）
+科目编码: 4201库存股（**借方/权益备抵类！**）
 公式方向: 期末=期初+借方-贷方（回购在借方增加，注销在贷方减少，与其他M权益类方向相反！）
 RFC5987 Content-Disposition header with Chinese filename encoding
 
@@ -204,7 +204,7 @@ async def m3_validate_formulas(
 ) -> ValidateFormulasResponse:
     """校验权益备抵类公式方向（期末=期初+借方-贷方）
 
-    库存股（4002）为借方/权益备抵科目：
+    库存股（4201）为借方/权益备抵科目：
     - 回购股份（借记库存股）在借方增加
     - 注销/再售（贷记库存股）在贷方减少
     - 期末 = 期初 + 借方 - 贷方（与M2/M4/M5/M6方向相反！）
@@ -224,7 +224,7 @@ async def m3_validate_formulas(
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TB 取数（科目4002库存股）
+# TB 取数（科目4201库存股）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -234,14 +234,14 @@ async def m3_tb_seed(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """获取TB科目4002库存股的种子数据
+    """获取TB科目4201库存股的种子数据
 
-    从 tb_balance 查询科目4002（库存股），返回借方/贷方发生额和当前净额。
+    从 tb_balance 查询科目4201（库存股），返回借方/贷方发生额和当前净额。
     库存股为权益备抵借方科目：current_amount = debit - credit（借方净额）
 
     Returns:
         {
-            account_code: "4002",
+            account_code: "4201",
             debit_amount: float,   # 本期借方发生额（回购增加）
             credit_amount: float,  # 本期贷方发生额（注销减少）
             current_amount: float, # 借方净额

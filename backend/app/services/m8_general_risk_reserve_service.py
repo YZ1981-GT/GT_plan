@@ -5,7 +5,7 @@
 - 风险资产计提测试（纯函数）
 - 公式一致性验证
 
-科目4104一般风险准备（**贷方/权益类！**）：期末=期初+贷方-借方
+一般风险准备（**贷方/权益类！**；没有统一标准码，按本项目科目表名称定位）：期末=期初+贷方-借方
 金融企业按风险资产期末余额×比例计提（原则上不低于1.5%）。
 
 Requirements: 3.4, 6.6
@@ -24,7 +24,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-_M8_ACCOUNT_CODE = "4104"
 _ROW_LIMIT = 500
 _DEFAULT_PROVISION_RATE = 0.015  # 1.5%
 

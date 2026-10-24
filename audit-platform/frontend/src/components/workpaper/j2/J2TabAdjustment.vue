@@ -146,7 +146,7 @@ async function aiGen(target: 'note' | 'conclusion') {
   try {
     const ctx = entries.map(e => `${e.description || '调整'}: ${e.accountName} 借${fmt(e.debitAmount)}/贷${fmt(e.creditAmount)} [${e.category}]`).join('；') || '（暂无调整分录）'
     const context: Record<string, string> = {
-      科目: '2221 长期应付职工薪酬 / 设定受益计划净资产调整分录汇总表（J2-3）',
+      科目: '2705 长期应付职工薪酬 / 设定受益计划净资产调整分录汇总表（J2-3）',
       调整分录: ctx,
       借方合计: fmt(totalDebit.value),
       贷方合计: fmt(totalCredit.value),
@@ -184,7 +184,7 @@ watch(() => props.allResponses, load, { deep: false })
         <p>1. 汇总本底稿形成的审计调整分录，区分"报表调整"(RJE，仅影响报表列报的重分类)与"账项调整"(AJE，涉及科目余额)。</p>
         <p>2. 每笔调整须借贷平衡（借方合计=贷方合计），不平衡时无法确认。</p>
         <p>3. 注明调整事项说明、报表项目、科目名称、附注项目及索引来源。</p>
-        <p>4. 调整后金额传导至审定表（J2-1）审定数列，并回写试算平衡表科目 2221；可推送至 A13 错报汇总表。</p>
+        <p>4. 调整后金额传导至审定表（J2-1）审定数列，并回写试算平衡表科目 2705；可推送至 A13 错报汇总表。</p>
         <p>5. 【注：本底稿适用于调整分录较多、较复杂的项目，且仅列示与本报表项目相关的审计调整。项目组可根据项目实际情况选择是否使用该底稿。】</p>
       </div>
     </details>
@@ -246,7 +246,7 @@ watch(() => props.allResponses, load, { deep: false })
       </el-table-column>
       <el-table-column label="科目名称" width="160">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" v-model="row.accountName" size="small" placeholder="如 2221-设定受益计划" @change="scheduleSave" />
+          <el-input v-if="!isReadonly" v-model="row.accountName" size="small" placeholder="如 2705-设定受益计划" @change="scheduleSave" />
           <span v-else>{{ row.accountName || '-' }}</span>
         </template>
       </el-table-column>

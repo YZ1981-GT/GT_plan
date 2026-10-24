@@ -11,9 +11,9 @@
  * - 审定数公式：审定=未审+AJE+RJE（calcAuditedAmount）
  * - 权益备抵类期末：期末=期初+借方-贷方（calcContraEquityEndBalance）
  * - 小计：按回购批次分组 calcSubtotal
- * - 审定数变化→writebackTB(4002)+EventBus 'substantive:adjudicated'
+ * - 审定数变化→writebackTB(4201)+EventBus 'substantive:adjudicated'
  *
- * 科目：4002 库存股（**借方/权益备抵类！期末=期初+借方-贷方**）
+ * 科目：4201 库存股（**借方/权益备抵类！期末=期初+借方-贷方**）
  * 回购股份在借方增加库存股，注销/再售在贷方减少库存股（与其他M权益类方向相反！）
  */
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
@@ -25,6 +25,7 @@ import {
   calcSubtotal,
 } from './useM3FormulaEngine'
 import type { useM3FormData } from './useM3FormData'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -240,7 +241,7 @@ export function useM3Adjudication(
       if (oldVal !== undefined && newVal !== oldVal) {
         await saveAdjudication()
         eventBus.emit('substantive:adjudicated', {
-          accountCode: '4002',
+          accountCode: M_CYCLE_ACCOUNT.M3.code,
           auditedAmount: newVal,
           wpCode: 'M3',
           timestamp: Date.now(),
@@ -252,7 +253,7 @@ export function useM3Adjudication(
   // ─── 7b. 显式发布到试算表（显式确认门，复刻 D2/D4-1 范式） ────────────────
 
   /**
-   * 确认发布审定数到试算表（科目 4002 库存股，借方/权益备抵类）。
+   * 确认发布审定数到试算表（科目 4201 库存股，借方/权益备抵类）。
    * spec: tb-writeback-explicit-publish-gate Task 5 / Req 2。
    * 二次确认（中文）→ 保存明细 → formData.writebackTB 走 publish-to-tb。用户取消 → 无副作用。
    */
@@ -260,7 +261,7 @@ export function useM3Adjudication(
     if (publishing.value) return
     try {
       await ElMessageBox.confirm(
-        '发布后将把库存股审定数（科目 4002）写入试算表（trial_balance），'
+        `发布后将把库存股审定数（科目 ${M_CYCLE_ACCOUNT.M3.code}）写入试算表（trial_balance），`
         + '并触发报表/错报评价等下游重算。确认发布？',
         '发布到试算表确认',
         { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },

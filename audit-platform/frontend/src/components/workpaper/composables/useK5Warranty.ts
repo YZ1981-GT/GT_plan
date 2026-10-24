@@ -12,7 +12,7 @@
  * - AI辅助生成结论
  * - Save with prefix "K5-4-"
  *
- * 科目：2701 预计负债-产品质量保证（**贷方/负债类**）
+ * 科目：2801 预计负债-产品质量保证（**贷方/负债类**）
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'

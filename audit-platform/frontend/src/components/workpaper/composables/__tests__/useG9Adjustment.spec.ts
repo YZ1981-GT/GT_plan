@@ -35,7 +35,7 @@ describe('g9AdjStorage 汇总', () => {
       { entryType: 'AJE', accountCode: '1504', debitAmount: 100, creditAmount: 0 },
       { entryType: 'AJE', accountCode: '6101', debitAmount: 0, creditAmount: 100 },
       { entryType: 'RJE', accountCode: '1504', debitAmount: 0, creditAmount: 30 },
-      { entryType: 'RJE', accountCode: '4002', debitAmount: 30, creditAmount: 0 },
+      { entryType: 'RJE', accountCode: '4003', debitAmount: 30, creditAmount: 0 },
     ])
     expect(s.rowCount).toBe(4)
     expect(s.ajeCount).toBe(2)
@@ -78,11 +78,12 @@ describe('useG9Adjustment', () => {
     vi.clearAllMocks()
   })
 
-  it('科目选项含 1519/6101/4002', () => {
+  it('科目选项含 1519/6101/4003（其他综合收益，不是 4002 资本公积）', () => {
     const codes = G9_ADJ_ACCOUNT_OPTIONS.map((o) => o.code)
     expect(codes).toContain('1519')
     expect(codes).toContain('6101')
-    expect(codes).toContain('4002')
+    expect(codes).toContain('4003')
+    expect(codes).not.toContain('4002')
   })
 
   it('加载行并计算借贷平衡与回写预览', () => {

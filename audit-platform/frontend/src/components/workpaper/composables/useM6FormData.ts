@@ -26,6 +26,7 @@ import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ export interface UseM6FormDataOptions {
 
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'M6-'
-const ACCOUNT_CODE = '4104' // 利润分配-未分配利润（贷方/权益类！）
+const ACCOUNT_CODE = M_CYCLE_ACCOUNT.M6.code // 利润分配-未分配利润（贷方/权益类！）
 /** 审定表 sheet 名（含子码 M6-1，供后端 extract_determination_wp_code 解出） */
 const DETERMINATION_SHEET_NAME = '审定表M6-1'
 

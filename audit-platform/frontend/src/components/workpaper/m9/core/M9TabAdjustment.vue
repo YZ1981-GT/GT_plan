@@ -43,7 +43,7 @@
     <div class="methodology-context">
       <div class="methodology-text">
         <strong>调整分录（AJE/RJE）：</strong>
-        涉及科目4103其他综合收益（贷方/权益类！）。OCI增加在贷方增加（公允变动/重计量），
+        涉及科目4003其他综合收益（贷方/权益类！）。OCI增加在贷方增加（公允变动/重计量），
         OCI减少/重分类进损益在借方减少。借贷必须平衡（∑借方 = ∑贷方）。
         保存后通过EventBus双向同步M9-1审定表和通知A13。
       </div>
@@ -196,8 +196,8 @@
     <!-- ═══ 对科目影响 ═══ -->
     <div v-if="filteredEntries.length > 0" class="impact-area">
       <el-descriptions :column="2" border size="small">
-        <el-descriptions-item label="AJE对其他综合收益(4103)净影响">{{ fmtAmount(ajeNet4103) }}</el-descriptions-item>
-        <el-descriptions-item label="RJE对其他综合收益(4103)净影响">{{ fmtAmount(rjeNet4103) }}</el-descriptions-item>
+        <el-descriptions-item label="AJE对其他综合收益(4003)净影响">{{ fmtAmount(ajeNet4003) }}</el-descriptions-item>
+        <el-descriptions-item label="RJE对其他综合收益(4003)净影响">{{ fmtAmount(rjeNet4003) }}</el-descriptions-item>
         <el-descriptions-item label="AJE不可重分类净影响">{{ fmtAmount(ajeNetByBlock.nonReclass) }}</el-descriptions-item>
         <el-descriptions-item label="AJE可重分类净影响">{{ fmtAmount(ajeNetByBlock.reclass) }}</el-descriptions-item>
       </el-descriptions>
@@ -210,7 +210,7 @@
         <li>借贷必须平衡（∑借方 = ∑贷方）才能保存发布</li>
         <li>发布后自动同步M9-1审定表AJE/RJE列</li>
         <li>通知A13审计调整汇总</li>
-        <li>涉及科目：4103其他综合收益（贷方/权益类）</li>
+        <li>涉及科目：4003其他综合收益（贷方/权益类）</li>
         <li>OCI增加在贷方（公允变动/重计量），OCI减少/重分类进损益在借方</li>
         <li>OCI分类选择：不可重分类（G8公允变动/J2重计量）/ 可重分类（债权/套期/外币折算）</li>
       </ul>
@@ -270,8 +270,8 @@ const {
   activeType,
   filteredEntries,
   currentBalance,
-  ajeNet4103,
-  rjeNet4103,
+  ajeNet4003,
+  rjeNet4003,
   ajeNetByBlock,
   addEntry,
   removeEntry,
@@ -319,13 +319,13 @@ async function handleAI(section: string): Promise<void> {
   aiLoading.value = section
   try {
     const context: Record<string, string> = {
-      科目: '4103 其他综合收益 / 调整分录汇总（M9-3 权益类贷方）',
+      科目: '4003 其他综合收益 / 调整分录汇总（M9-3 权益类贷方）',
       当前类型: activeType.value,
       借方合计: fmtAmount(currentBalance.value.totalDebit),
       贷方合计: fmtAmount(currentBalance.value.totalCredit),
       是否平衡: currentBalance.value.isBalanced ? '平衡' : '不平衡',
-      'AJE对4103净影响': fmtAmount(ajeNet4103.value),
-      'RJE对4103净影响': fmtAmount(rjeNet4103.value),
+      'AJE对4003净影响': fmtAmount(ajeNet4003.value),
+      'RJE对4003净影响': fmtAmount(rjeNet4003.value),
       'AJE不可重分类净影响': fmtAmount(ajeNetByBlock.value.nonReclass),
       'AJE可重分类净影响': fmtAmount(ajeNetByBlock.value.reclass),
     }

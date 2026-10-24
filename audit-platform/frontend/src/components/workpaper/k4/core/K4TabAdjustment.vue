@@ -51,8 +51,8 @@
 
     <!-- 负债类方向提示 -->
     <div class="direction-hint">
-      <span class="dh-tag credit">贷方 2245 = 增加负债（少计→补提）</span>
-      <span class="dh-tag debit">借方 2245 = 减少负债（多计→冲回）</span>
+      <span class="dh-tag credit">贷方 = 增加负债（少计→补提）</span>
+      <span class="dh-tag debit">借方 = 减少负债（多计→冲回）</span>
       <span class="dh-example">示例：借 管理费用 / 贷 其他流动负债—预提XX费用 → 补提预提费用(增加负债)</span>
     </div>
 
@@ -90,7 +90,7 @@
 
       <el-table-column label="科目代码" width="100">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.accountCode" size="small" placeholder="2245" @change="(v: string) => updateCell(row.id, 'accountCode', v)" />
+          <el-input v-if="!isReadonly" :model-value="row.accountCode" size="small" placeholder="按本项目科目表" @change="(v: string) => updateCell(row.id, 'accountCode', v)" />
           <span v-else>{{ row.accountCode }}</span>
         </template>
       </el-table-column>
@@ -189,7 +189,7 @@
         <p>1. 调整分录(AJE)用于更正被审计单位财务报表中的错报；重分类分录(RJE)用于分析性归类调整。</p>
         <p>2. 借贷必须平衡后方可保存回写。点击"保存&amp;回写"将汇总AJE/RJE数据回写K4-1审定表。</p>
         <p>3. 保存后自动发布 adjustment:created 事件联动 A13 错报汇总底稿。</p>
-        <p>4. 其他流动负债科目代码 2245（<strong>负债类</strong>，贷方增加/借方减少）。</p>
+        <p>4. 其他流动负债没有统一标准科目码，科目代码按本项目科目表填写（<strong>负债类</strong>，贷方增加/借方减少）。</p>
         <p>5. 负债类AJE方向：借方记录=减少负债；贷方记录=增加负债。对方科目记反向。</p>
         <p>6. 编号规则：K4-AJE-001 / K4-RJE-001，便于A13引用追溯。</p>
         <p>7. "从K4-4异常带入"将自动填入异常凭证信息并标注来源，减少重复录入。</p>
@@ -212,9 +212,9 @@
  * - 导入导出（useK4ImportExport sheetCode='K4-3'）
  * - 动态行增删（ElMessageBox.prompt输入摘要确认后创建）
  *
- * 科目：2245 其他流动负债（负债类）
+ * 科目：其他流动负债（负债类；没有统一标准科目码，按本项目科目表定位）
  */
-import { ref, computed, inject, onMounted, toRef } from 'vue'
+import { ref, computed, inject, onMounted, toRef, type Ref } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
@@ -223,8 +223,14 @@ import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaf
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { k4AccountCode, type K4TbSourceCodes } from '../../composables/k4AccountScope'
 
-const K4_ACCOUNT_CODE = '2245'
+// 🔴 原写死 '2245' —— 该码不是其他流动负债，新增分录 / 事件 / 推送都带着别的科目码。
+//    现取宿主 provide 的 tb_source_codes 解析结果；解析不出为空串（分录科目代码留空待填，不臆造）。
+const _injectedTbSrc = inject<Ref<K4TbSourceCodes | null> | null>('tbSourceCodes', null)
+function k4EntryCode(): string {
+  return k4AccountCode(_injectedTbSrc?.value ?? null)
+}
 const ITEM_PREFIX = 'K4-3-adj'
 
 const props = defineProps<{
@@ -353,7 +359,7 @@ async function handleAddEntry(): Promise<void> {
         seq: entries.value.length + 1,
         entryNo: generateEntryNo('AJE'),
         entryType: 'AJE',
-        accountCode: K4_ACCOUNT_CODE,
+        accountCode: k4EntryCode(),
         accountName: '其他流动负债',
         offsetAccount: '',
         debitAmount: 0,
@@ -431,7 +437,7 @@ function handleSaveWriteback(): void {
     return
   }
 
-  // 负债类2245: AJE对科目影响 = 贷方(增加负债) - 借方(减少负债)
+  // 负债类: AJE对科目影响 = 贷方(增加负债) - 借方(减少负债)
   const ajeTotal = entries.value
     .filter(e => e.entryType === 'AJE')
     .reduce((sum, e) => sum + (e.creditAmount - e.debitAmount), 0)
@@ -452,7 +458,7 @@ function handleSaveWriteback(): void {
   try {
     eventBus.emit('adjustment:created', {
       wpCode: 'K4',
-      accountCode: K4_ACCOUNT_CODE,
+      accountCode: k4EntryCode(),
       projectId: props.projectId,
       ajeTotal,
       rjeTotal,
@@ -464,7 +470,7 @@ function handleSaveWriteback(): void {
   try {
     eventBus.emit('a13:push-misstatement', {
       wpCode: 'K4',
-      accountCode: K4_ACCOUNT_CODE,
+      accountCode: k4EntryCode(),
       projectId: props.projectId,
       ajeTotal,
       rjeTotal,
@@ -536,7 +542,7 @@ function importFromK44Abnormal(): void {
         seq: entries.value.length + 1,
         entryNo: generateEntryNo('AJE'),
         entryType: 'AJE',
-        accountCode: K4_ACCOUNT_CODE,
+        accountCode: k4EntryCode(),
         accountName: '其他流动负债',
         offsetAccount: r.offsetAccount || '',
         debitAmount: 0,
@@ -566,12 +572,12 @@ async function handleAddPairEntry(): Promise<void> {
     entries.value.push({
       id: `entry-${Date.now()}-${++nextId}`, seq: entries.value.length + 1,
       entryNo: no, entryType: 'AJE', accountCode: '', accountName: '',
-      offsetAccount: K4_ACCOUNT_CODE, debitAmount: 0, creditAmount: 0,
+      offsetAccount: k4EntryCode(), debitAmount: 0, creditAmount: 0,
       summary: `${value.trim()}（借方）`, preparedBy: '', source: '手工', remark: '',
     })
     entries.value.push({
       id: `entry-${Date.now()}-${++nextId}`, seq: entries.value.length + 1,
-      entryNo: no, entryType: 'AJE', accountCode: K4_ACCOUNT_CODE, accountName: '其他流动负债',
+      entryNo: no, entryType: 'AJE', accountCode: k4EntryCode(), accountName: '其他流动负债',
       offsetAccount: '', debitAmount: 0, creditAmount: 0,
       summary: `${value.trim()}（贷方）`, preparedBy: '', source: '手工', remark: '',
     })
@@ -588,7 +594,7 @@ async function handleAiGenerateNote(): Promise<void> {
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       prompt: '请根据调整分录情况，生成K4-3调整分录汇总的审计说明',
       context: {
-        科目: '2245 其他流动负债（负债类）',
+        科目: '其他流动负债（负债类）',
         分录笔数: String(entries.value.length),
         净影响: String(netImpact.value),
         来源K44: String(entries.value.filter(e => e.source === 'K4-4').length),

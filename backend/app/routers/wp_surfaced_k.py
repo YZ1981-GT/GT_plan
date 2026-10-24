@@ -15,10 +15,10 @@
 
 科目方向（从各 useK{n}* composable 的 ACCOUNT_CODE / writebackTB 常量核实）：
   K1 其他应收款(1221 资产借方) + 坏账准备(1231 备抵)
-  K2 其他流动资产(1231 资产借方)
+  K2 其他流动资产(1901 资产借方；1231 是坏账准备)
   K3 其他应付款(2241 负债贷方)
-  K4 其他流动负债(2245 负债贷方)
-  K5 预计负债(2701 负债贷方，CAS13 或有事项)
+  K4 其他流动负债(负债贷方；没有统一标准科目码，按本项目科目表定位)
+  K5 预计负债(2801 负债贷方，CAS13 或有事项；2701 是长期应付款)
   K6 持有待售(1481 资产借方 + 2605 负债贷方，CAS42 孰低)
   K7 递延收益(2401 负债贷方，CAS16 政府补助)
   K8 销售费用(6601 损益借方，取发生额=借−贷)
@@ -419,16 +419,16 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # K4 其他流动负债（负债贷方 2245；含凭证检查 K4-4 复用 useK1VoucherCheck）
+    # K4 其他流动负债（负债贷方，无统一标准科目码；含凭证检查 K4-4 复用 useK1VoucherCheck）
     # ═══════════════════════════════════════════════════════════════════════
     "K4": {
         "K4-1": [
-            ("TB 取数（期末余额）", "ABS(TB('2245子科目','期末余额'))", "取数",
-             "从 tb_balance 2245 叶子子科目取期初/期末余额预填审定表（负债取绝对值）", "_k4_other_current_liabilities.py render"),
+            ("TB 取数（期末余额）", "ABS(TB('本项目定位到的其他流动负债子科目','期末余额'))", "取数",
+             "按本项目科目表定位到的其他流动负债叶子子科目取期初/期末余额预填审定表（负债取绝对值；定位不到不预填）", "_k4_other_current_liabilities.py render"),
             ("审定数", "未审 + AJE + RJE", "计算",
              "各行审定金额（calcAuditedAmount）", "useK4Adjudication / useK4FormulaEngine"),
             ("期末余额", "期初 + 贷方 − 借方", "计算",
-             "负债类期末，2245 贷方（calcLiabilityEndBalance）", "useK4Adjudication / useK4FormulaEngine"),
+             "负债类期末，贷方（calcLiabilityEndBalance）", "useK4Adjudication / useK4FormulaEngine"),
             ("变动率", "(审定 − 上期审定) ÷ 上期审定", "计算",
              "变动率，除零特判（calcChangeRate）", "useK4Adjudication / useK4FormulaEngine"),
             ("合计", "Σ 各行", "计算",
@@ -439,7 +439,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "负债类三角勾稽（calcTriangleReconciliation / reconciliation）", "useK4Adjudication / useK4FormulaEngine"),
             ("K4-1↔K4-2勾稽", "|K4-1 审定合计 − K4-2 明细期末合计| < 0.01", "logic_check",
              "审定表与明细交叉验证（adjudicationVsDetail）", "useK4CrossSheet"),
-            ("TB回写2245", "审定合计 → trial_balance(2245)", "取数",
+            ("TB回写", "审定合计 → trial_balance（定位到的其他流动负债科目；定位不到不发布）", "取数",
              "审定数合计回写试算表（getAuditedTotal）", "useK4Adjudication"),
         ],
         "K4-2": [
@@ -474,25 +474,25 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # K5 预计负债（负债贷方 2701；CAS13 或有事项：保修/弃置/诉讼 + 凭证检查）
+    # K5 预计负债（负债贷方 2801；CAS13 或有事项：保修/弃置/诉讼 + 凭证检查）
     # ═══════════════════════════════════════════════════════════════════════
     "K5": {
         "K5-1": [
-            ("TB 取数（期末余额）", "ABS(TB('2701子科目','期末余额'))", "取数",
-             "从 tb_balance 2701 叶子子科目取期初/期末余额预填审定表（负债取绝对值）", "_k5_provisions.py render"),
+            ("TB 取数（期末余额）", "ABS(TB('2801子科目','期末余额'))", "取数",
+             "从 tb_balance 2801 叶子子科目取期初/期末余额预填审定表（负债取绝对值）", "_k5_provisions.py render"),
             ("审定数", "未审 + AJE + RJE", "计算",
              "审定金额（calcAuditedAmount）", "useK5Adjudication / useK5FormulaEngine"),
             ("期末余额", "期初 + 计提 − 转销", "计算",
-             "负债类期末，2701 贷方（calcLiabilityEndBalance）", "useK5Adjudication / useK5FormulaEngine"),
+             "负债类期末，2801 贷方（calcLiabilityEndBalance）", "useK5Adjudication / useK5FormulaEngine"),
             ("合计", "Σ 各类型行", "计算",
              "8 类型行合计（calcSubtotal / subtotalRow）", "useK5Adjudication"),
             ("差异", "审定合计 − 期末合计", "计算",
              "差异行（diffRow）", "useK5Adjudication"),
             ("三角勾稽", "|期末 − (期初 + 计提 − 转销)| < 0.01", "logic_check",
              "期末 vs 期初计提转销勾稽（reconciliation）", "useK5Adjudication / useK5FormulaEngine"),
-            ("TB核对2701", "|审定合计 − TB 审定(2701)| < 0.01", "logic_check",
+            ("TB核对2801", "|审定合计 − TB 审定(2801)| < 0.01", "logic_check",
              "审定数与试算表核对（tbReconciliation）", "useK5Adjudication"),
-            ("TB回写2701", "审定合计 → trial_balance(2701)", "取数",
+            ("TB回写2801", "审定合计 → trial_balance(2801)", "取数",
              "审定合计回写 + substantive:adjudicated 事件（getAuditedTotal / publishAdjudicated）", "useK5Adjudication"),
         ],
         "K5-2": [

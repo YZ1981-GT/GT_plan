@@ -36,7 +36,7 @@
     <div class="methodology-context">
       <div class="methodology-text">
         <strong>调整分录（AJE/RJE）：</strong>
-        涉及科目2801其他非流动负债（贷方/负债类）。
+        涉及科目：其他非流动负债（无专属科目码；贷方/负债类）。
         借贷必须平衡（∑借方 = ∑贷方）。保存后通过EventBus双向同步L7-1审定表和通知A13。
       </div>
     </div>
@@ -135,8 +135,8 @@
     <!-- ═══ 对科目影响 ═══ -->
     <div v-if="filteredEntries.length > 0" class="impact-area">
       <el-descriptions :column="2" border size="small">
-        <el-descriptions-item label="AJE对其他非流动负债(2801)净影响">{{ fmtAmount(ajeNet2801) }}</el-descriptions-item>
-        <el-descriptions-item label="RJE对其他非流动负债(2801)净影响">{{ fmtAmount(rjeNet2801) }}</el-descriptions-item>
+        <el-descriptions-item label="AJE对其他非流动负债净影响">{{ fmtAmount(ajeNetAccount) }}</el-descriptions-item>
+        <el-descriptions-item label="RJE对其他非流动负债净影响">{{ fmtAmount(rjeNetAccount) }}</el-descriptions-item>
       </el-descriptions>
     </div>
 
@@ -147,7 +147,7 @@
         <li>借贷必须平衡（∑借方 = ∑贷方）才能保存发布</li>
         <li>发布后自动同步L7-1审定表AJE/RJE列</li>
         <li>通知A13审计调整汇总</li>
-        <li>涉及科目：2801其他非流动负债（贷方/负债类）</li>
+        <li>涉及科目：其他非流动负债（无专属科目码；贷方/负债类）</li>
       </ul>
     </details>
   </div>
@@ -192,8 +192,8 @@ const {
   activeType,
   filteredEntries,
   currentBalance,
-  ajeNet2801,
-  rjeNet2801,
+  ajeNetAccount,
+  rjeNetAccount,
   addEntry,
   removeEntry,
   updateEntry,

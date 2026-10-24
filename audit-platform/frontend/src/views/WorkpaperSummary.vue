@@ -156,12 +156,19 @@ const accountTree = ref<TreeNode[]>([
     ],
   },
   {
-    id: 'equity', label: '3-权益类', children: [
-      { id: '3001', label: '3001 实收资本' },
-      { id: '3002', label: '3002 资本公积' },
-      { id: '3101', label: '3101 盈余公积' },
-      { id: '3103', label: '3103 本年利润' },
-      { id: '3104', label: '3104 利润分配' },
+    // 🔴 现行科目表所有者权益是 4xxx（与试算表 standard_account_code、报表公式同一套）；
+    //    原先写的 3001/3002/3101/3103/3104 是旧制编码，勾选后按码汇总一行都取不到
+    //    （现行表 3101 还是「衍生工具」）。spec formula-fetch-followup-defect-closure R1.4 触类旁通。
+    id: 'equity', label: '4-所有者权益类', children: [
+      { id: '4001', label: '4001 实收资本' },
+      { id: '4002', label: '4002 资本公积' },
+      { id: '4003', label: '4003 其他综合收益' },
+      { id: '4101', label: '4101 盈余公积' },
+      { id: '4103', label: '4103 本年利润' },
+      { id: '4104', label: '4104 利润分配' },
+      { id: '4201', label: '4201 库存股' },
+      { id: '4301', label: '4301 专项储备' },
+      { id: '4401', label: '4401 其他权益工具' },
     ],
   },
   {

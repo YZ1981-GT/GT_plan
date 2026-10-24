@@ -156,7 +156,7 @@
       <summary>编制提示</summary>
       <ul>
         <li>上市公司附注格式（约16行×12列），按性质分类披露预计负债变动</li>
-        <li>监听 substantive:adjudicated(2701) 自动同步审定数据（浅蓝色=跨sheet自动取数）</li>
+        <li>监听 substantive:adjudicated(2801) 自动同步审定数据（浅蓝色=跨sheet自动取数）</li>
         <li>编辑后发布 disclosure:note-text-updated 联动附注模块</li>
         <li>或有负债段自动从K5-2明细表中筛选"可能"级别的事项</li>
         <li>负债类科目关注完整性认定：确保所有应确认的预计负债已完整披露</li>
@@ -421,7 +421,7 @@ async function handleAiGenerate(): Promise<void> {
         + '只能使用已提供的项目名称与金额，不得虚构诉讼、担保、合同或金额，'
         + '无把握的内容留空由审计师补充。',
       context: {
-        科目: '2701 预计负债（上市公司版）',
+        科目: '2801 预计负债（上市公司版）',
         附注章节: K5_NOTE_SECTION.listed,
         披露明细: detail || '（暂无数据）',
         既有说明: narrativeText.value || '（空）',

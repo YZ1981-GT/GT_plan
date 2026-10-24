@@ -127,15 +127,15 @@
  * 组件接收 sheetName prop，正则提取编码（M10/M10A/M10-1~M10-5），v-if 分发到对应子组件。
  * 不使用内部 el-tabs（避免双层 Tab 问题）。
  *
- * 科目覆盖：4003 其他权益工具（**贷方/权益类！**）
+ * 科目覆盖：4401 其他权益工具（**贷方/权益类！**）
  * 核心铁律：期末=期初+贷方-借方（发行时贷方增加，赎回/转换时借方减少）
  * 特殊功能：①权益类贷方公式 ②CAS37负债与权益区分（永续债/优先股判定） ③权益+负债金额守恒
  *
  * selfLoad: 当 htmlData 为 null 时自行调 render-config 加载数据。
  *
  * 集成（Phase 6）：
- * - EventBus: substantive:adjudicated(4003) / adjustment:created
- * - 跨底稿联动: TB回写(4003) + 负债部分→负债科目 + 附注subscribe
+ * - EventBus: substantive:adjudicated(4401) / adjustment:created
+ * - 跨底稿联动: TB回写(4401) + 负债部分→负债科目 + 附注subscribe
  * - 版本追踪: useVersionTrail(autoSnapshot)
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */

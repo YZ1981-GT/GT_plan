@@ -354,7 +354,7 @@
  * - 期末公式自动计算（权益备抵借方：期末=期初+回购-注销）
  * - 与M3-1审定表交叉验证
  *
- * 科目：4002 库存股（**借方/权益备抵类！**）
+ * 科目：4201 库存股（**借方/权益备抵类！**）
  */
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
@@ -465,7 +465,7 @@ async function handleAI(section: string) {
   aiLoading.value = section
   try {
     const context: Record<string, string> = {
-      科目: '4002 库存股（权益备抵类·借方，明细表 M3-2 按回购批次列示）',
+      科目: '4201 库存股（权益备抵类·借方，明细表 M3-2 按回购批次列示）',
       期末金额合计: fmtAmount(detail.totalEndAmount.value),
       期末股数合计: fmtNumber(detail.totalEndShares.value),
       回购金额合计: fmtAmount(detail.totalRepurchaseAmount.value),

@@ -45,7 +45,7 @@ export interface K4DetailRow {
   auditedDecrease: number      // 审定本期减少
   auditedEnd: number           // 审定期末
   // 期后偿付（完整性验证核心证据）
-  postPayment: number          // 期后偿付金额（次年序时账2245借方按项目归集）
+  postPayment: number          // 期后偿付金额（次年序时账本科目借方按项目归集）
   postPaymentDate: string      // 期后偿付日期
   // 区段1 检查
   increaseReason: string       // 增减原因
@@ -105,7 +105,7 @@ const CHECK_COLUMNS: K4DetailColumn[] = [
   { key: 'projectName', label: '项目', width: 200, editable: false, type: 'text' },
   { key: 'increaseReason', label: '增减原因', width: 220, editable: true, type: 'text' },
   { key: 'voucherRef', label: '凭证号', width: 120, editable: true, type: 'text' },
-  { key: 'postPayment', label: '期后偿付金额', width: 130, editable: true, type: 'number', tooltip: '次年序时账2245借方按项目归集' },
+  { key: 'postPayment', label: '期后偿付金额', width: 130, editable: true, type: 'number', tooltip: '次年序时账本科目借方按项目归集' },
   { key: 'postPaymentDate', label: '偿付日期', width: 120, editable: true, type: 'text' },
   { key: 'checkConclusion', label: '核查结论', width: 120, editable: true, type: 'select', options: CONCLUSION_OPTIONS },
   { key: 'remark', label: '备注', width: 200, editable: true, type: 'text' },

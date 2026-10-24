@@ -11,14 +11,15 @@
  * - EventBus publish 'adjustment:created'
  * - 双向同步M3-1审定表（M3-1订阅该事件刷新AJE/RJE列）
  *
- * 科目：4002 库存股（**借方/权益备抵类！**）
- * 调增库存股→借方增加（借记4002），调减库存股→贷方减少（贷记4002）
+ * 科目：4201 库存股（**借方/权益备抵类！**）
+ * 调增库存股→借方增加（借记4201），调减库存股→贷方减少（贷记4201）
  * 注意方向与M2（权益类贷方增加）相反！
  */
 import { computed, ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { calcSubtotal } from './useM3FormulaEngine'
 import type { useM3FormData } from './useM3FormData'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -118,22 +119,22 @@ export function useM3Adjustment(formData: ReturnType<typeof useM3FormData>) {
   })
 
   /**
-   * AJE 对科目4002库存股的净影响
+   * AJE 对科目4201库存股的净影响
    * 库存股是借方备抵：借方增加=调增库存股，贷方减少=调减库存股
    * 净影响 = 借方 - 贷方（正=净增，负=净减）
    */
-  const ajeNet4002: ComputedRef<number> = computed(() => {
-    const entries4002 = ajeEntries.value.filter(e => e.accountName.includes('库存股'))
-    const debit = calcSubtotal(entries4002.map(e => e.debitAmount))
-    const credit = calcSubtotal(entries4002.map(e => e.creditAmount))
+  const ajeNet4201: ComputedRef<number> = computed(() => {
+    const entries4201 = ajeEntries.value.filter(e => e.accountName.includes('库存股'))
+    const debit = calcSubtotal(entries4201.map(e => e.debitAmount))
+    const credit = calcSubtotal(entries4201.map(e => e.creditAmount))
     return debit - credit // 备抵借方：借方净增=调增
   })
 
-  /** RJE 对科目4002的净影响 */
-  const rjeNet4002: ComputedRef<number> = computed(() => {
-    const entries4002 = rjeEntries.value.filter(e => e.accountName.includes('库存股'))
-    const debit = calcSubtotal(entries4002.map(e => e.debitAmount))
-    const credit = calcSubtotal(entries4002.map(e => e.creditAmount))
+  /** RJE 对科目4201的净影响 */
+  const rjeNet4201: ComputedRef<number> = computed(() => {
+    const entries4201 = rjeEntries.value.filter(e => e.accountName.includes('库存股'))
+    const debit = calcSubtotal(entries4201.map(e => e.debitAmount))
+    const credit = calcSubtotal(entries4201.map(e => e.creditAmount))
     return debit - credit
   })
 
@@ -233,9 +234,9 @@ export function useM3Adjustment(formData: ReturnType<typeof useM3FormData>) {
     // EventBus publish（双向同步M3-1 + 通知A13）
     eventBus.emit('adjustment:created', {
       wpCode: 'M3',
-      accountCode: '4002',
-      ajeNet: ajeNet4002.value,
-      rjeNet: rjeNet4002.value,
+      accountCode: M_CYCLE_ACCOUNT.M3.code,
+      ajeNet: ajeNet4201.value,
+      rjeNet: rjeNet4201.value,
       timestamp: Date.now(),
     } as any)
   }
@@ -283,8 +284,8 @@ export function useM3Adjustment(formData: ReturnType<typeof useM3FormData>) {
     ajeBalance,
     rjeBalance,
     currentBalance,
-    ajeNet4002,
-    rjeNet4002,
+    ajeNet4201,
+    rjeNet4201,
 
     // 行操作
     addEntry,

@@ -105,7 +105,7 @@
 
       <el-table-column label="科目代码" width="100">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.accountCode" size="small" placeholder="如2701" @change="(v: string) => updateCell(row.id, 'accountCode', v)" />
+          <el-input v-if="!isReadonly" :model-value="row.accountCode" size="small" placeholder="如2801" @change="(v: string) => updateCell(row.id, 'accountCode', v)" />
           <span v-else>{{ row.accountCode }}</span>
         </template>
       </el-table-column>
@@ -203,7 +203,7 @@
         <li>调整分录(AJE)用于更正被审计单位财务报表中的错报；重分类分录(RJE)用于分析性归类调整。</li>
         <li>借贷必须平衡后方可保存回写。点击"保存&amp;回写"将汇总AJE/RJE数据回写K5-1审定表。</li>
         <li>保存后自动发布 adjustment:created 事件联动 A13 错报汇总底稿。</li>
-        <li>预计负债科目代码 2701（<strong>负债类</strong>，贷方增加/借方减少）。</li>
+        <li>预计负债科目代码 2801（<strong>负债类</strong>，贷方增加/借方减少）。</li>
         <li>负债类AJE方向：借方记录=减少负债；贷方记录=增加负债。</li>
       </ul>
     </details>
@@ -386,7 +386,7 @@ function handleSaveWriteback(): void {
     return
   }
 
-  // 汇总 AJE/RJE 合计（针对2701科目的净调整）
+  // 汇总 AJE/RJE 合计（针对2801科目的净调整）
   let ajeTotal = 0
   let rjeTotal = 0
   for (const e of entries.value) {
@@ -482,7 +482,7 @@ async function pushToA13(): Promise<void> {
   }
   try {
     await ElMessageBox.confirm(
-      `将 ${entries.value.length} 条调整分录推送至 A13 错报汇总底稿？\n\nAJE净调整(2701)：${fmtAmt(entries.value.filter(e => e.entryType === 'AJE').reduce((s, e) => s + (e.credit || 0) - (e.debit || 0), 0))}`,
+      `将 ${entries.value.length} 条调整分录推送至 A13 错报汇总底稿？\n\nAJE净调整(2801)：${fmtAmt(entries.value.filter(e => e.entryType === 'AJE').reduce((s, e) => s + (e.credit || 0) - (e.debit || 0), 0))}`,
       '推送至A13',
       { confirmButtonText: '推送', cancelButtonText: '取消', type: 'info' }
     )

@@ -179,7 +179,7 @@
  * selfLoad: 当 htmlData prop 为 null 时自行调 render-config。
  * checklist_responses 前缀: "K5-{sheet}-{field}"
  *
- * 科目：2701预计负债（贷方/负债类）
+ * 科目：2801预计负债（贷方/负债类）
  * 核心：期末=期初+计提-转销（负债类！方向与资产类相反）
  *       或有事项三级可能性判断（CAS13）
  *       最佳估计数引擎（单值/区间中值/期望值加权）

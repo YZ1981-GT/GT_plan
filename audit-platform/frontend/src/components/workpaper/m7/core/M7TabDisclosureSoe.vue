@@ -139,6 +139,7 @@ import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildMEquitySyncPayload, M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { handleDisclosureSyncError } from '../../composables/disclosureSyncError'
+import { M_CYCLE_ACCOUNT } from '../../composables/mCycleAccountScope'
 
 const props = defineProps<{
   wpId: string
@@ -200,7 +201,7 @@ const autoFill = useNoteAutoFill({
     other: 'M7-1-other-subtotal',
     total: 'M7-1-total-audited',
   },
-  accountCodes: ['4201'],
+  accountCodes: [M_CYCLE_ACCOUNT.M7.code],
   reload: () => formData.loadData(),
   onRefresh: (v) => {
     if ((v.total ?? 0) !== 0 || (v.safety ?? 0) !== 0) {
@@ -275,7 +276,7 @@ async function handleAI(section: string): Promise<void> {
   aiLoading.value = section
   try {
     const context: Record<string, string> = {
-      科目: '4201 专项储备 / 附注披露（国有企业）',
+      科目: '4301 专项储备 / 附注披露（国有企业）',
       安全生产费期末: fmtAmount(disclosureRows.value[0]?.endBalance ?? 0),
       维简费期末: fmtAmount(disclosureRows.value[1]?.endBalance ?? 0),
       其他专项储备期末: fmtAmount(disclosureRows.value[2]?.endBalance ?? 0),

@@ -3,7 +3,7 @@
 
 spec: m-cycle-bidirectional-pipeline
 entry: xlsx/gt-m9-other-comprehensive-income
-科目: 4103 其他综合收益（贷方/权益类）
+科目: 4003 其他综合收益（贷方/权益类）
 受管 sheet: 审定表M9-1 + 明细表M9-2
 🔴 M9 是唯一 dual_mode_carrier.kind=='none' 的 entry
 🔴 明细表 M9-2 是 46r×30c 宽表（30 列中 17 列公式、仅 3 列 editable）
@@ -23,7 +23,9 @@ ADAPTER_ID: Final[str] = "m9.other_comprehensive_income"
 WP_CODES: Final[frozenset[str]] = frozenset({"M9O"})
 TEMPLATE_RELATIVE_PATH: Final[str] = "M/M9 其他综合收益.xlsx"
 TEMPLATE_SHA256: Final[str] = "0cfdc95ce3f9410610037b684f50a07f874df1cab4cebe09aa63c6461b6fbc66"
-ACCOUNT_CODE: Final[str] = "4103"
+#: 元数据（构建器不读）。须与 four_table.m_cycle_specs.fallback_code_of("M9") 一致，
+#: 守卫 tests/four_table/test_m_cycle_account_single_source.py。原写 4103（本年利润）。
+ACCOUNT_CODE: Final[str] = "4003"
 ITEM_PREFIX: Final[str] = "M9-"
 STORE_ITEM_ID: Final[str] = "M9-"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"

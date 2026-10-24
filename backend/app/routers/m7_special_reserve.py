@@ -7,7 +7,7 @@
 - POST /api/m7-special-reserve/{wp_id}/accrual-test        安全生产费计提测试
 
 三态目前只支持 M7-2（界面唯一有导入导出入口的动态行表）；其他 sheet 返回 400。
-科目编码: 4201专项储备（**贷方/权益类！**）
+科目编码: 4301专项储备（**贷方/权益类！**）
 公式方向: 期末=期初+贷方-借方（计提在贷方增加，使用在借方减少）
 安全生产费: 高危行业按产量分档计提 / 其他按营业收入比例计提
 RFC5987 Content-Disposition header with Chinese filename encoding

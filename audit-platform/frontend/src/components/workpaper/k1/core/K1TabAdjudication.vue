@@ -261,7 +261,7 @@
       <el-divider content-position="left">TB 数据核对</el-divider>
       <div class="tb-reconcile">
         <div class="tb-row">
-          <span>1221 审定合计</span>
+          <span>{{ k1RecCode }} 审定合计</span>
           <span>{{ fmtAmt(tbReconciliation.auditedReceivable) }}</span>
           <span class="muted">TB</span>
           <span>{{ fmtAmt(tbReconciliation.tbReceivable) }}</span>
@@ -270,7 +270,7 @@
           </el-tag>
         </div>
         <div class="tb-row">
-          <span>1231 审定合计</span>
+          <span>坏账准备 {{ k1BadDebtCode }} 审定合计</span>
           <span>{{ fmtAmt(tbReconciliation.auditedBadDebt) }}</span>
           <span class="muted">TB</span>
           <span>{{ fmtAmt(tbReconciliation.tbBadDebt) }}</span>
@@ -366,8 +366,8 @@
         <li>三角勾稽：期末=期初+增加-减少，差额须为0</li>
         <li>审定数=未审数+AJE+RJE，未审数从TB自动取入(只读)</li>
         <li>K1-4 保存后可「从 K1-4 回写 AJE/RJE」，1221/1231 净额按未审数权重分摊至各行</li>
-        <li>「带入调整」：应收原值(1221)/坏账准备(1231)各按科目拉取调整分录，逐笔选目标组合行累加到期末 AJE/RJE，带入后自动联动披露/附注；账龄/性质分布表为同一余额的分析视图（二级），不在带入范围</li>
-        <li>"确认审定"将回写trial_balance(1221+坏账准备)并发布EventBus事件</li>
+        <li>「带入调整」：应收原值 / 本循环专属坏账准备（按本项目科目表定位，缺省 1221 / 1231-03，不取宽口径 1231）各按科目拉取调整分录，逐笔选目标组合行累加到期末 AJE/RJE，带入后自动联动披露/附注；账龄/性质分布表为同一余额的分析视图（二级），不在带入范围</li>
+        <li>"确认审定"将回写trial_balance（其他应收款原值 + 本循环专属坏账准备子科目）并发布EventBus事件</li>
       </ul>
     </details>
 
@@ -375,7 +375,7 @@
       v-model="recBringInVisible"
       :matches="recAdjPull.matches.value"
       :row-options="recBringInRowOptions"
-      subject-label="1221 其他应收款原值"
+      :subject-label="`${k1RecCode} 其他应收款原值`"
       :loading="recAdjPull.loading.value"
       @apply="onRecBringInApply"
     />
@@ -383,7 +383,7 @@
       v-model="bdBringInVisible"
       :matches="bdAdjPull.matches.value"
       :row-options="bdBringInRowOptions"
-      subject-label="1231 坏账准备"
+      :subject-label="`${k1BadDebtCode} 坏账准备`"
       :loading="bdAdjPull.loading.value"
       @apply="onBdBringInApply"
     />
@@ -414,6 +414,7 @@ import { useK1AiGenerate } from '../../composables/useK1AiGenerate'
 import { useAgingConfig } from '@/composables/useAgingConfig'
 import K1FourTableSourcePanel from './K1FourTableSourcePanel.vue'
 import type { K1TbSourceCodes } from '../../composables/k1TbSourceCodes'
+import { k1AccountCode, k1GrossQueryCodes, k1ProvisionQueryCodes } from '../../composables/k1AccountScope'
 import DistributionTripleTable from './K1DistributionTripleTable.vue'
 import K1AdjWideTable from './K1AdjWideTable.vue'
 import {
@@ -581,7 +582,11 @@ const receivableSection = computed(() => adjudicationSections.value[0])
 const badDebtSection = computed(() => adjudicationSections.value[1])
 const netValueSection = computed(() => adjudicationSections.value[2])
 
-// ─── 从集中登记带入调整（K1 双科目：应收原值1221借方 + 坏账准备1231贷方，两独立流） ──
+/** 本项目口径的原值 / 坏账科目码（render 溯源优先，缺省 1221 / 1231-03）——带入、发布、提示统一取此 */
+const k1RecCode = computed(() => k1AccountCode(props.tbSourceCodes))
+const k1BadDebtCode = computed(() => k1ProvisionQueryCodes(props.tbSourceCodes)[0])
+
+// ─── 从集中登记带入调整（K1 双科目：应收原值借方 + 本循环专属坏账准备贷方，两独立流） ──
 // 目标行为组合计提方式行（单项计提/账龄组合/客户类型组合/其他组合），带入至期末 AJE/RJE 列。
 // 账龄/性质分布表为同一余额的分析性拆分视图（二级），不在带入范围。
 const {
@@ -593,11 +598,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1221',
+  subjectPrefix: () => k1GrossQueryCodes(props.tbSourceCodes),
   direction: 'debit', // 其他应收款原值（资产借方）：净发生额 = 借 − 贷
-  subjectCode: '1221',
+  subjectCode: () => k1RecCode.value,
   wpCode: 'K1',
-  subjectLabel: '其他应收款原值(1221)',
+  subjectLabel: () => `其他应收款原值(${k1RecCode.value})`,
   rows: computed(() => (receivableSection.value?.rows ?? []).map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
   updateCell: (rowKey: string, field: any, value: number) => { writeRowField('receivable', rowKey, field, value); persistAuditedTotals() },
   totalAudited: () => receivableSection.value?.subtotalRow.audited ?? 0,
@@ -612,11 +617,13 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1231',
+  // 🔴 原写死宽口径 `1231` —— 会把应收票据 / 应收账款的坏账调整一并带进 K1。
+  //    改用本循环专属备抵口径（render 溯源 provision_standard，兜底 1231-03）。
+  subjectPrefix: () => k1ProvisionQueryCodes(props.tbSourceCodes),
   direction: 'credit', // 坏账准备（备抵/贷方）：净发生额 = 贷 − 借
-  subjectCode: '1231',
+  subjectCode: () => k1BadDebtCode.value,
   wpCode: 'K1',
-  subjectLabel: '坏账准备(1231)',
+  subjectLabel: () => `坏账准备(${k1BadDebtCode.value})`,
   rows: computed(() => (badDebtSection.value?.rows ?? []).map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
   updateCell: (rowKey: string, field: any, value: number) => { writeRowField('baddebt', rowKey, field, value); persistAuditedTotals() },
   totalAudited: () => badDebtSection.value?.subtotalRow.audited ?? 0,
@@ -755,9 +762,13 @@ async function handleWritebackTB() {
   const recSec = receivableSection.value
   const bdSec = badDebtSection.value
   if (!recSec || !bdSec) return
+  // 🔴 坏账准备发布到本循环**专属**备抵子科目（k1ProvisionQueryCodes，兜底 1231-03）。
+  //    原发布到宽口径 `1231` —— 该行同时承载应收票据 / 应收账款等的坏账，
+  //    用 K1 一家的金额覆盖它会改掉别的循环的审定数。
+  const codes = { receivable: k1RecCode.value, badDebt: k1BadDebtCode.value }
   try {
     await ElMessageBox.confirm(
-      '发布后将把其他应收款审定数（科目 1221 及坏账准备，期末余额）写入试算表（trial_balance），'
+      `发布后将把其他应收款审定数（科目 ${codes.receivable} 及坏账准备 ${codes.badDebt}，期末余额）写入试算表（trial_balance），`
       + '并触发报表/错报评价等下游重算。确认发布？',
       '发布到试算表确认',
       { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
@@ -767,9 +778,9 @@ async function handleWritebackTB() {
   }
   publishing.value = true
   try {
-    await writebackTB(recSec.subtotalRow.audited, bdSec.subtotalRow.audited)
+    await writebackTB(recSec.subtotalRow.audited, bdSec.subtotalRow.audited, codes)
     persistAuditedTotals()
-    ElMessage.success('已发布到试算表（1221+坏账准备）')
+    ElMessage.success(`已发布到试算表（${codes.receivable}+坏账准备 ${codes.badDebt}）`)
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
   }

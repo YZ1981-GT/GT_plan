@@ -6,11 +6,12 @@
  *
  * 业务背景：
  * 根据CAS30/企业会计准则，长期借款中将于报告期后一年内到期的部分
- * 应重分类至"一年内到期的非流动负债"（流动负债科目2801）。
+ * 应重分类至"一年内到期的非流动负债"（报表项目，没有统一科目码；调整分录同步时后端按科目名解析）。
+ * 🔴 原写 `2801` —— 那是预计负债（K5），重分类贷方会记到预计负债上（K5 带入调整也会把它拉进去）。
  *
  * 重分类分录：
  *   借：长期借款（2501）  — currentPortion
- *   贷：一年内到期的非流动负债（2801）— currentPortion
+ *   贷：一年内到期的非流动负债（无统一科目码，按名称）— currentPortion
  *
  * 公式来源：L3 长期借款.xlsx → Sheet "明细表L3-2" V/W列
  * 判定规则：到期日 ≤ 报告日 + 1年 → 全额重分类
@@ -81,7 +82,7 @@ export function calcCurrentPortion(dueDate: string, reportDate: string, amount: 
  *
  * 重分类分录：
  *   借：长期借款（2501）  — currentPortion
- *   贷：一年内到期的非流动负债（2801）— currentPortion
+ *   贷：一年内到期的非流动负债（无统一科目码，按名称）— currentPortion
  *
  * 边界处理：
  * - currentPortion = 0 → 仍返回结构，金额为0（调用方可据此判断是否提交）
@@ -102,7 +103,8 @@ export function buildReclassEntry(currentPortion: number): ReclassEntry {
     },
     credit: {
       account: '一年内到期的非流动负债',
-      accountCode: '2801',
+      // 宁缺勿造：报表项目没有统一科目码，留空由后端按科目名解析（AdjustmentSyncLineItem 允许空码）
+      accountCode: '',
       amount: absAmount,
     },
   }

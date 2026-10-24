@@ -12,7 +12,7 @@
  * Spec: .kiro/specs/m3-treasury-stock/ Task 7.1
  * Requirements: P1-P6
  *
- * 科目：4002 库存股（**借方/权益备抵类！期末=期初+借方-贷方**）
+ * 科目：4201 库存股（**借方/权益备抵类！期末=期初+借方-贷方**）
  */
 import { describe, it, expect } from 'vitest'
 import {

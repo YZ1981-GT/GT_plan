@@ -15,14 +15,14 @@ surface 到公式管理中心，让每张 sheet 都能体现其取数逻辑。
 ─── 科目方向（以各 composable 的 ACCOUNT_CODE 常量核实，非臆造） ───
   M1  应付股利           2232  负债贷方       期末=期初+贷(宣告)−借(支付)
   M2  实收资本/股本       4001  权益贷方       期末=期初+贷(增资)−借(减资)
-  M3  库存股             4002  权益备抵借方   期末=期初+借(回购)−贷(注销/再售)  ← 方向特殊，与其余 M 相反！
+  M3  库存股             4201  权益备抵借方   期末=期初+借(回购)−贷(注销/再售)  ← 方向特殊，与其余 M 相反！
   M4  资本公积           4002  权益贷方       期末=期初+贷(增加)−借(减少)
   M5  盈余公积           4101  权益贷方       期末=期初+贷(计提)−借(转增/弥补)
   M6  利润分配-未分配利润 4104  权益贷方(枢纽) 期末=期初+贷(净利润转入)−借(分配)
-  M7  专项储备           4201  权益贷方       期末=期初+贷(计提)−借(使用)
-  M8  一般风险准备        4104  权益贷方(金融专属) 期末=期初+贷(计提)−借(转回/使用)
-  M9  其他综合收益        4103  权益贷方       期末=期初+贷(OCI增加)−借(减少/重分类)
-  M10 其他权益工具        4003  权益贷方       期末=期初+贷(发行)−借(赎回/转换)
+  M7  专项储备           4301  权益贷方       期末=期初+贷(计提)−借(使用)
+  M8  一般风险准备        —     权益贷方(金融专属，无统一标准码，按名定位) 期末=期初+贷(计提)−借(转回/使用)
+  M9  其他综合收益        4003  权益贷方       期末=期初+贷(OCI增加)−借(减少/重分类)
+  M10 其他权益工具        4401  权益贷方       期末=期初+贷(发行)−借(赎回/转换)
 
 注：M 循环各底稿的 composable 内容与其 ACCOUNT_CODE 注释完全一致，据此确定循环名称
 （部分与旧映射不同，一律以 composable 为准）。审定数公式全 M 统一
@@ -170,7 +170,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # M3 库存股（权益备抵借方 4002；方向特殊！回购/注销 + 注销冲减→M2/M4联动）
+    # M3 库存股（权益备抵借方 4201；方向特殊！回购/注销 + 注销冲减→M2/M4联动）
     # ═══════════════════════════════════════════════════════════════════════
     "M3": {
         # M3-1 审定表（按回购批次 + 小计）
@@ -181,8 +181,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "权益备抵类借方方向，与其余 M 相反（calcContraEquityEndBalance）", "useM3FormulaEngine"),
             ("分类小计", "Σ 各回购批次行", "计算",
              "按回购批次分类合计（calcSubtotal）", "useM3FormulaEngine"),
-            ("试算平衡表数核对", "审定期末合计 − 试算平衡表数(4002 库存股)", "logic_check",
-             "审定数变化→writebackTB(4002)回写核对（saveAndWriteback）", "useM3Adjudication"),
+            ("试算平衡表数核对", "审定期末合计 − 试算平衡表数(4201 库存股)", "logic_check",
+             "审定数变化→writebackTB(4201)回写核对（saveAndWriteback）", "useM3Adjudication"),
             ("M3-1审定表 ↔ M3-2明细表勾稽", "M3-1 期末审定合计 − M3-2 各批次期末金额合计", "logic_check",
              "审定↔明细交叉验证（adjudicationVsDetail，容差 1 元）", "useM3CrossSheet"),
         ],
@@ -408,7 +408,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # M7 专项储备（权益贷方 4201；安全生产费计提 + 资本化支出→H1联动）
+    # M7 专项储备（权益贷方 4301；安全生产费计提 + 资本化支出→H1联动）
     # ═══════════════════════════════════════════════════════════════════════
     "M7": {
         # M7-1 审定表（按类别 + 小计）
@@ -419,8 +419,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "权益类贷方方向，xlsx E10=B10+C10-D10（calcEquityEndBalance）", "useM7FormulaEngine"),
             ("分类小计", "Σ 各类别行", "计算",
              "按类别分类合计 SUM(B7:B12)（calcSubtotal）", "useM7FormulaEngine"),
-            ("试算平衡表数核对", "审定期末合计 − 试算平衡表数(4201 专项储备)", "logic_check",
-             "审定数变化→writebackTB(4201)回写核对（saveAndWriteback）", "useM7Adjudication"),
+            ("试算平衡表数核对", "审定期末合计 − 试算平衡表数(4301 专项储备)", "logic_check",
+             "审定数变化→writebackTB(4301)回写核对（saveAndWriteback）", "useM7Adjudication"),
             ("M7-1审定表 ↔ M7-2明细表勾稽", "M7-1 期末合计(O17) − M7-2 明细汇总行", "logic_check",
              "审定↔明细交叉验证（adjudicationVsDetail，容差 1 元）", "useM7CrossSheet"),
         ],
@@ -470,7 +470,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # M8 一般风险准备（权益贷方 4104；金融企业专属！风险资产计提 + 行业守卫）
+    # M8 一般风险准备（权益贷方，无统一标准码；金融企业专属！风险资产计提 + 行业守卫）
     # ═══════════════════════════════════════════════════════════════════════
     "M8": {
         # M8-1 审定表
@@ -483,8 +483,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "审定表期末合计（calcSubtotal）", "useM8FormulaEngine"),
             ("变动额", "期末审定 − 期初审定（J=I−E）", "计算",
              "本期变动额（M 循环统一）", "useM8Adjudication"),
-            ("试算平衡表数核对", "审定期末合计 − 试算平衡表数(4104 一般风险准备)", "logic_check",
-             "审定数变化→writebackTB(4104)回写核对（saveAndWriteback）", "useM8Adjudication"),
+            ("试算平衡表数核对", "审定期末合计 − 试算平衡表数(一般风险准备，按本项目科目表名称定位)", "logic_check",
+             "审定数变化→writebackTB(定位到的一般风险准备科目；定位不到不发布)回写核对", "useM8Adjudication"),
             ("M8-1审定表 ↔ M8-2明细表勾稽", "M8-1 合计(row13) − M8-2 合计(row17)", "logic_check",
              "审定↔明细交叉验证（adjudicationVsDetail，容差 1 元）", "useM8CrossSheet"),
         ],
@@ -526,7 +526,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # M9 其他综合收益（权益贷方 4103；OCI两大类 + 税后净额 + G8/J2来源核对）
+    # M9 其他综合收益（权益贷方 4003；OCI两大类 + 税后净额 + G8/J2来源核对）
     # ═══════════════════════════════════════════════════════════════════════
     "M9": {
         # M9-1 审定表（不可重分类 + 可重分类 双大类）
@@ -539,8 +539,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "双大类分组合计（calcSubtotal）", "useM9FormulaEngine"),
             ("变动率", "IF(期初=0∧期末=0,0; 期初=0,1; 变动÷期初)", "计算",
              "审定表条件除法（M 循环统一）", "useM9Adjudication"),
-            ("试算平衡表数核对", "审定期末合计 − 试算平衡表数(4103 其他综合收益)", "logic_check",
-             "审定数变化→writebackTB(4103)回写核对（saveAndWriteback）", "useM9Adjudication"),
+            ("试算平衡表数核对", "审定期末合计 − 试算平衡表数(4003 其他综合收益)", "logic_check",
+             "审定数变化→writebackTB(4003)回写核对（saveAndWriteback）", "useM9Adjudication"),
             ("M9-1审定表 ↔ M9-2明细表勾稽", "M9-1 期末合计 − M9-2(不可+可重分类)合计", "logic_check",
              "审定↔明细交叉验证（adjudicationVsDetail，容差 1 元）", "useM9CrossSheet"),
         ],
@@ -586,7 +586,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # M10 其他权益工具（权益贷方 4003；CAS37 权益/负债区分 + 金额守恒 + →L4/L7）
+    # M10 其他权益工具（权益贷方 4401；CAS37 权益/负债区分 + 金额守恒 + →L4/L7）
     # ═══════════════════════════════════════════════════════════════════════
     "M10": {
         # M10-1 审定表（按工具类型 永续债/优先股/其他）
@@ -601,8 +601,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "本期变动额（calcVariance）", "useM10FormulaEngine"),
             ("变动率", "IF(期初=0∧期末=0,null; 期初=0∧期末>0,1; (期末−期初)÷期初)", "计算",
              "审定表 K 列条件除法（calcVarianceRate）", "useM10FormulaEngine"),
-            ("试算平衡表数核对", "审定期末合计 − 试算平衡表数(4003 其他权益工具)", "logic_check",
-             "审定数变化→writebackTB(4003)回写核对（saveAndWriteback）", "useM10Adjudication"),
+            ("试算平衡表数核对", "审定期末合计 − 试算平衡表数(4401 其他权益工具)", "logic_check",
+             "审定数变化→writebackTB(4401)回写核对（saveAndWriteback）", "useM10Adjudication"),
             ("M10-1审定表 ↔ M10-2明细表勾稽", "M10-1 期末审定合计 − M10-2 各工具期末合计", "logic_check",
              "审定↔明细交叉验证（adjudicationVsDetail，容差 1 元）", "useM10CrossSheet"),
         ],

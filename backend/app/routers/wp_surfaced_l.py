@@ -17,8 +17,8 @@ L4~L8 无独立披露 composable（附注仅经 EventBus 刷新，非公式源�
 
 科目方向（负债类：期末=期初+贷方−借方；审定=未审+账项调整(AJE)+重分类调整(RJE)）：
   L1 短期借款(2001)/L2 应付利息(2231)/L3 长期借款(2501)/L4 应付债券(2502)/
-  L5 长期应付款(2701 原值 + 未确认融资费用备抵借方)/L6 专项应付款(2601)/
-  L7 其他非流动负债(2801) 均为负债贷方；
+  L5 长期应付款(2701 原值 + 未确认融资费用备抵借方)/L6 专项应付款(2711)/
+  L7 其他非流动负债(无专属科目码) 均为负债贷方；
   L8 财务费用(6603) 为损益类借方，取本期发生额（借方发生−贷方发生），无余额概念。
 """
 from __future__ import annotations
@@ -225,7 +225,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "AJE/RJE 借贷平衡", "useL3Adjustment"),
             ("一年内到期判定", "到期日 ≤ 报告日+1年 → 全额重分类；否则 0", "logic_check",
              "日历年+1（含边界，calcCurrentPortion）", "useL3ReclassEngine"),
-            ("重分类分录(RJE)", "借：长期借款(2501) / 贷：一年内到期的非流动负债(2801)", "计算",
+            ("重分类分录(RJE)", "借：长期借款(2501) / 贷：一年内到期的非流动负债（报表项目，无统一科目码，按名称同步）", "计算",
              "一年内到期重分类（buildReclassEntry）", "useL3ReclassEngine"),
             ("一年内到期合计", "Σ L3-2 明细各行 currentPortion", "取数",
              "供 L3-1 披露审定 + 流动/非流动列报（currentPortionTotal）", "useL3CrossSheet"),
@@ -394,7 +394,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # L6 专项应付款（负债贷方 2601；审定 + 明细 + 调整 + 检查）
+    # L6 专项应付款（负债贷方 2711；审定 + 明细 + 调整 + 检查）
     # ═══════════════════════════════════════════════════════════════════════
     "L6": {
         # L6-1 审定表（按专项项目 + 合计）
@@ -407,7 +407,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "本期变动额（calcVariance）", "useL6FormulaEngine"),
             ("变动率", "期初=0∧变动=0→0；期初=0∧变动>0→1；否则 变动额÷期初", "计算",
              "源模板 K7 逻辑（calcVarianceRate）", "useL6FormulaEngine"),
-            ("TB 回写(2601)", "期末审定合计 → 回写 trial_balance 科目 2601", "取数",
+            ("TB 回写(2711)", "期末审定合计 → 回写 trial_balance 科目 2711", "取数",
              "saveAndWriteback + EventBus 'substantive:adjudicated'", "useL6Adjudication"),
             ("审定表 ↔ 明细表勾稽", "审定表合计期末审定 − Σ 明细各专项项目期末余额", "logic_check",
              "差额=0 视为匹配（validateAdjudicationVsDetail / adjudicationVsDetail）", "useL6CrossSheet / useL6FormulaEngine"),
@@ -429,7 +429,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # L7 其他非流动负债（负债贷方 2801；审定 + 明细 + 调整）
+    # L7 其他非流动负债（负债贷方，无专属科目码；审定 + 明细 + 调整）
     # ═══════════════════════════════════════════════════════════════════════
     "L7": {
         # L7-1 审定表（5 项目行 + 合计）
@@ -442,7 +442,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "本期变动额（calcVariance）", "useL7FormulaEngine"),
             ("变动率", "上期=0∧本期=0→0；上期=0∧本期>0→1；否则 本期÷上期", "计算",
              "源模板 IF 逻辑（calcVarianceRate）", "useL7FormulaEngine"),
-            ("TB 回写(2801)", "期末审定合计 → 回写 trial_balance 科目 2801", "取数",
+            ("TB 回写(BS-071)", "期末审定合计 → 回写 trial_balance（报表行 BS-071，无专属科目码）", "取数",
              "saveAndWriteback + EventBus 'substantive:adjudicated'", "useL7Adjudication"),
             ("审定表 ↔ 明细表勾稽", "审定表合计期末审定 − Σ 明细各项目期末余额", "logic_check",
              "差额=0 视为匹配（validateAdjudicationVsDetail）", "useL7CrossSheet / useL7FormulaEngine"),

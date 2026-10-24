@@ -40,6 +40,15 @@ export const K4_REPORT_ROW_CODE_SOE = 'BS-053'
  */
 export const K4_FALLBACK_STANDARD = ''
 
+/**
+ * 🔴 曾被误当作其他流动负债的科目 —— 守卫用（K4 文件集的代码 / 文案不得再出现该码，
+ * 解释性注释除外）。`2301` = `report_config` 公式里写过、全库零命中的码；
+ * `2245` = 原前端写死的取数 / 发布 / 事件码（后端 `_k4_other_current_liabilities.py`
+ * 文件头记录：三张表都零命中，且不是其他流动负债）。
+ * 判据见 `__tests__/cycleWrongLegacyAccountCodes.spec.ts`。
+ */
+export const K4_WRONG_LEGACY_ACCOUNTS = ['2245', '2301'] as const
+
 /** 科目中文名（展示用） */
 export const K4_ACCOUNT_NAME = '其他流动负债'
 
@@ -80,4 +89,19 @@ export function k4QueryCodes(src?: K4TbSourceCodes | null): string[] {
 export function k4AccountCode(src?: K4TbSourceCodes | null): string {
   const resolved = normalize(src?.gross_standard)
   return resolved[0] || ''
+}
+
+/**
+ * 事件是否属于 K4（附注页签监听 `substantive:adjudicated` / `adjustment:created` 用）。
+ *
+ * 按 `wpCode` 认；科目码只在本项目解析出来时才参与匹配 —— 解析不出时 `code` 为空串，
+ * 若拿空串去比，会把别的循环里同样没带科目码的事件当成 K4 的。
+ * 🔴 原写法 `payload.accountCode === '2245'`：K4 不用这个码，却会被持有该码的事件误触发。
+ */
+export function isK4Event(
+  payload: { wpCode?: unknown; accountCode?: unknown } | null | undefined,
+  code: string,
+): boolean {
+  if (!payload) return true
+  return payload.wpCode === 'K4' || (!!code && payload.accountCode === code)
 }

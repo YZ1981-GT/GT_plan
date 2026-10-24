@@ -324,7 +324,7 @@
  * - 方法论上下文琥珀块 + section AI button + 复核按钮
  * - 编制提示details折叠底部
  *
- * 科目：4201 专项储备（贷方/权益类！期末=期初+贷方-借方）
+ * 科目：4301 专项储备（贷方/权益类！期末=期初+贷方-借方）
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
@@ -446,7 +446,7 @@ async function handleAI(section: string): Promise<void> {
   aiLoading.value = section
   try {
     const context: Record<string, string> = {
-      科目: '4201 专项储备（权益类·贷方）/ 明细表 M7-2',
+      科目: '4301 专项储备（权益类·贷方）/ 明细表 M7-2',
       审定期末合计: fmtAmount(totals.value.auditedEnd),
       审定计提合计: fmtAmount(totals.value.auditedAccrual),
       审定使用合计: fmtAmount(totals.value.auditedUsage),

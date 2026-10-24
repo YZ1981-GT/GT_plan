@@ -7,7 +7,7 @@
 
 ## 1. 打开与模式
 
-1. 在项目底稿树打开 **K2 其他流动资产**（`componentType: k2-other-current-assets`，覆盖科目 1231）。
+1. 在项目底稿树打开 **K2 其他流动资产**（`componentType: k2-other-current-assets`，覆盖科目 1901）。
 2. 通过 sheet 页签切换分表（K2A、K2-1～K2-6、附注上市/国企、底稿目录）。
 3. 复杂 sheet 支持 **结构化 HTML ↔ OnlyOffice** 双模式；以项目配置为准（目录页不显示双模式）。
 4. 只读阶段工具栏「取数 / 回写 / 确认」类按钮会禁用。

@@ -317,7 +317,7 @@
         <li><strong>交通运输：</strong>铁路/公路按营业收入×1.5%、水运×1.5%、民航参照行业标准</li>
         <li><strong>冶金/机械：</strong>按营业收入×1%~2%计提</li>
         <li>计提差异 = 应计提 − 账面计提：正数=少计提（需补提），负数=多计提（需说明）</li>
-        <li>会计分录：借:生产成本/制造费用/管理费用 贷:专项储备（4201）</li>
+        <li>会计分录：借:生产成本/制造费用/管理费用 贷:专项储备（4301）</li>
         <li>9公式全部前端实时计算，切换产量/收入模式后自动重算</li>
       </ul>
     </details>
@@ -336,7 +336,7 @@
  * - 4.5: |计提差异|>阈值时红色高亮
  * - 4.6: 9公式全部前端实时计算
  *
- * 科目：4201 专项储备（贷方/权益类）
+ * 科目：4301 专项储备（贷方/权益类）
  * 安全生产费计提（贷方增加）：借:生产成本/管理费用 贷:专项储备
  */
 import { computed, inject, onMounted, ref } from 'vue'
@@ -416,7 +416,7 @@ async function handleAI(section: string): Promise<void> {
   aiLoading.value = section
   try {
     const context: Record<string, string> = {
-      科目: '4201 专项储备 / 计提测试 M7-4',
+      科目: '4301 专项储备 / 计提测试 M7-4',
       行业分类: localIndustry.value || '未选择',
       计提基础: localBasis.value === 'output' ? '按产量分档' : '按营业收入',
       应计提: fmtAmount(accrualTest.estimated.value),

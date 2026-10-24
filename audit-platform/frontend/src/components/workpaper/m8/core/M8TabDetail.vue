@@ -6,7 +6,7 @@
         <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
         <h3 class="section-title">M8-2 一般风险准备明细表</h3>
         <el-tag type="success" effect="dark" size="small" class="equity-badge">
-          权益类·贷方余额·4104
+          权益类·贷方余额·一般风险准备
         </el-tag>
       </div>
       <div class="section-header-right">
@@ -354,7 +354,7 @@
     <details class="m8-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>一般风险准备（4104）为<strong>权益类贷方科目</strong>：期末 = 期初 + 贷方（计提增加） − 借方（转回/使用减少）</li>
+        <li>一般风险准备为<strong>权益类贷方科目</strong>：期末 = 期初 + 贷方（计提增加） − 借方（转回/使用减少）</li>
         <li><strong>未审数公式</strong>：E = B + C − D（未审期末 = 期初 + 增加 − 减少）</li>
         <li><strong>审定期初公式</strong>：L = B + F + G（未审期初 + 期初AJE + 期初RJE）</li>
         <li><strong>审定增加公式</strong>：M = C + H + J（未审增加 + AJE增加 + RJE增加）</li>
@@ -391,7 +391,7 @@
  * 动态行：ElMessageBox.prompt 输入名称后创建
  * 导入导出：el-dropdown "导入导出▾" 三级（useM8ImportExport）
  *
- * 科目：4104 一般风险准备（**贷方/权益类！期末=期初+贷方-借方**）
+ * 科目：一般风险准备（**贷方/权益类！期末=期初+贷方-借方**）
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -550,7 +550,7 @@ async function handleAI(section: string): Promise<void> {
   try {
     const t = detail.totals.value
     const context: Record<string, string> = {
-      科目: '4104 一般风险准备（权益类/贷方）',
+      科目: '一般风险准备（权益类/贷方）',
       底稿: 'M8-2 一般风险准备明细表',
       审定期初合计: fmtAmount(t.auditedBegin),
       审定增加合计: fmtAmount(t.auditedIncrease),

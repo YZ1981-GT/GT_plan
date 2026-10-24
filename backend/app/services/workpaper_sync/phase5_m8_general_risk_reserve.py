@@ -3,7 +3,7 @@
 
 spec: m-cycle-bidirectional-pipeline
 entry: xlsx/gt-m8-general-risk-reserve
-科目: 4104 一般风险准备（贷方/权益类/金融企业专属）
+科目: 一般风险准备（贷方/权益类/金融企业专属；没有统一标准码）
 受管 sheet: 审定表M8-1 + 明细表M8-2
 🔴 「针对性测试M8-5-删除」和 Q8A 修订前 不在受管范围
 """
@@ -22,7 +22,9 @@ ADAPTER_ID: Final[str] = "m8.general_risk_reserve"
 WP_CODES: Final[frozenset[str]] = frozenset({"M8G"})
 TEMPLATE_RELATIVE_PATH: Final[str] = "M/M8 一般风险准备.xlsx"
 TEMPLATE_SHA256: Final[str] = "248a8bb72f1b3c2f8ec28950f718138462ec26a33b6e46c58884a47a74cbbcc1"
-ACCOUNT_CODE: Final[str] = "4104"
+#: 元数据（构建器不读）。须与 four_table.m_cycle_specs.fallback_code_of("M8") 一致，
+#: 守卫 tests/four_table/test_m_cycle_account_single_source.py。原写 4104（利润分配）；一般风险准备没有统一标准码。
+ACCOUNT_CODE: Final[str] = ""
 ITEM_PREFIX: Final[str] = "M8-"
 STORE_ITEM_ID: Final[str] = "M8-"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"

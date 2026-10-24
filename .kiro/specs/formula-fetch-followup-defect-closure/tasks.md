@@ -40,7 +40,13 @@
 
 - [ ] 3.1 全表探针：映射码 vs 标准科目表 / 真库科目表 / 口径单一来源；`report_row` vs `report_config` 行名（R1.1~R1.3）
 - [ ] 3.2 修正脚本扩展（J2 / J3 / L7 / M3~M10 / K4 / D5 及探针新发现）+ 勘误文档；`--apply` 后 `--check` 通过（R1.1~R1.3）
-- [ ] 3.3 4xxx 写死码统一（前端 M 组合函数 / 后端 M 服务与路由 / phase5 / equity_method），逐处现读用途（R1.4）
+- [x] 3.3 4xxx 写死码统一（前端 M 组合函数 / 后端 M 服务与路由 / phase5 / equity_method），逐处现读用途（R1.4）
+  - 证据：前端 `mCycleAccountScope` 单一来源 + `mCycleAccountCodes` / `mCycleAccountRuntime` / `gCycleOciAccount` 守卫；后端
+    `test_m_cycle_account_single_source.py` 41 例；变异前端 22 条、后端 12 条全部打红；M 相关后端失败集与 HEAD 逐条一致（117 例）
+  - 触类旁通（design §10.4）：J2 / K1 / K2 / K4 / K5 / L3 / L6 / L7 的带入调整、发布、事件码、调整分录码与文案改用各自真源；
+    新守卫 `cycleWrongLegacyAccountCodes.spec.ts` 51 例（零容忍组 + G1 / I2 / I5 / I6 棘轮 + 带入码 ⊆ 映射 + 运行态）；变异 FB1~FB29 全部打红；
+    单区域 vue-tsc 与 HEAD 对比新增 0、消除 1（K4 宿主 / 审定表 tbData 形状不符 TS2739），注入 TS2322 被报出
+  - 未改并登记：design §10.3 第 6~14 条（报表 OCI 公式 3102、I 循环旧码、G 循环 1501、K1-4 宽口径、L7 发布假成功等）
 - [ ] 3.4 派生物：补 `gen_account_to_wp_ts.py`（`--check`）并重生成前端映射；重生成 `note_template_bindings.json` / 覆盖率并解释 diff（R1.5）
 - [ ] 3.5 守卫 `test_wp_account_mapping_single_source.py` + 读取方行为变化钉住（R1.6）
 

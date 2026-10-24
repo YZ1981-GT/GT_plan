@@ -9,7 +9,7 @@
  * Spec: .kiro/specs/m8-general-risk-reserve/ Task 7.2
  * Requirements: 3.3-3.7, 5.1-5.3
  *
- * 科目：4104 一般风险准备（**贷方/权益类！期末=期初+贷方-借方**）
+ * 科目：一般风险准备（**贷方/权益类！期末=期初+贷方-借方**）
  * 金融企业专属：银行/证券/保险/信托/基金/期货/金融租赁
  */
 import { describe, it, expect, beforeEach } from 'vitest'

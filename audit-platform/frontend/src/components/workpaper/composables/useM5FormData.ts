@@ -21,6 +21,7 @@ import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ export interface UseM5FormDataOptions {
 
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'M5-'
-const ACCOUNT_CODE = '4101' // 盈余公积（贷方/权益类！）
+const ACCOUNT_CODE = M_CYCLE_ACCOUNT.M5.code // 盈余公积（贷方/权益类！）
 /** 审定表 sheet 名（含子码 M5-1，供后端 extract_determination_wp_code 解出） */
 const DETERMINATION_SHEET_NAME = '审定表M5-1'
 

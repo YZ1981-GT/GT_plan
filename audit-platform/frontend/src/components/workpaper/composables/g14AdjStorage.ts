@@ -3,6 +3,7 @@
  * 对齐 Excel「信用减值损失调整分录汇总表 G14-3」
  */
 import { G14_ACCOUNT_CODE, G14_LINE_ITEMS } from './g14Constants'
+import { OCI_ACCOUNT_CODE } from './mCycleAccountScope'
 import { parseNum } from './useG14FormulaEngine'
 
 export const G14_CATEGORY_OPTIONS = ['账项调整', '报表调整', '其他'] as const
@@ -16,13 +17,13 @@ export const G14_ADJ_ACCOUNT_OPTIONS = [
   { code: '1505', name: '债权投资减值准备' },
   { code: '1502', name: '持有至到期投资减值准备' },
   { code: '2801', name: '预计负债' },
-  { code: '4104', name: '其他综合收益' },
+  { code: OCI_ACCOUNT_CODE, name: '其他综合收益' },
   { code: '1002', name: '银行存款' },
 ] as const
 
 /** 中央调整分录模块同步时识别的相关科目前缀 */
 export const G14_RELATED_ACCOUNT_PREFIXES = [
-  '6702', '1231', '1142', '1505', '1502', '2801', '4104',
+  '6702', '1231', '1142', '1505', '1502', '2801', OCI_ACCOUNT_CODE,
 ] as const
 
 export const G14_WRITEBACK_OPTIONS = [

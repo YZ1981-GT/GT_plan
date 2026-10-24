@@ -12,7 +12,7 @@
  * - 使用 calcDetailEndBalance, calcNetIssuance from useM10FormulaEngine
  * - 与M10-1审定表合计交叉验证
  *
- * 科目：4003 其他权益工具（**贷方/权益类！期末=期初+贷方-借方**）
+ * 科目：4401 其他权益工具（**贷方/权益类！期末=期初+贷方-借方**）
  * 45×30结构，13公式
  */
 import { computed, ref, type ComputedRef } from 'vue'

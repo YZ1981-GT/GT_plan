@@ -302,7 +302,7 @@
         <li>本期发生额检查：逐笔核对记账凭证与原始凭证，检查会计处理与披露是否正确</li>
         <li>检查比例 = 检查金额 / 账面金额（自动从K4-1审定表取数）；比例偏低（&lt;30%）须扩样或说明</li>
         <li>核对内容5项（K4专属）：入账依据/会计处理/金额计量/记录期间/披露分类</li>
-        <li>抽凭引擎复用序时账，科目 2245 其他流动负债（贷方/负债类）</li>
+        <li>抽凭引擎复用序时账，科目：其他流动负债（贷方/负债类；按本项目科目表定位，定位不到不抽凭）</li>
         <li>每笔凭证应标注选取原因（大额/关联方/随机/MUS高值等），便于复核追溯抽样依据</li>
       </ul>
     </details>
@@ -574,7 +574,7 @@ async function handleAiGenerate(): Promise<void> {
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       prompt: '请根据凭证检查情况，生成K4其他流动负债检查表的审计说明（概述测试情况、测试结果、异常事项及处理意见）',
       context: {
-        科目: '2245 其他流动负债（负债类，完整性为核心认定）',
+        科目: '其他流动负债（负债类，完整性为核心认定）',
         检查比例: ratioSummary,
         异常情况: abnormalSummary,
         检查笔数: String(occurrenceRows.value.length),

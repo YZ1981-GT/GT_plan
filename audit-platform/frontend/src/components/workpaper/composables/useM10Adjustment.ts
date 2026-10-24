@@ -11,8 +11,8 @@
  * - EventBus publish 'adjustment:created'
  * - 双向同步M10-1审定表（M10-1订阅该事件刷新AJE/RJE列）
  *
- * 科目：4003 其他权益工具（**贷方/权益类！**）
- * 调增其他权益工具→贷方增加（贷记4003），调减→借方减少（借记4003）
+ * 科目：4401 其他权益工具（**贷方/权益类！**）
+ * 调增其他权益工具→贷方增加（贷记4401），调减→借方减少（借记4401）
  *
  * 其他权益工具调整典型场景：
  * - 补确认永续债发行：借:银行存款 贷:其他权益工具
@@ -24,6 +24,7 @@ import { computed, ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { calcSubtotal } from './useM10FormulaEngine'
 import type { useM10FormData } from './useM10FormData'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -123,26 +124,36 @@ export function useM10Adjustment(formData: ReturnType<typeof useM10FormData>) {
   })
 
   /**
-   * AJE 对科目4003其他权益工具的净影响
+   * 分录是否落在其他权益工具科目（按科目名或本循环码认）。
+   * 🔴 「其他权益工具投资」（G8 资产类 1503）也包含「其他权益工具」四个字，须排除。
+   */
+  function _isOwnAccountEntry(e: M10AdjustmentEntry): boolean {
+    const name = e.accountName || ''
+    const byName = name.includes('其他权益工具') && !name.includes('其他权益工具投资')
+    return byName || name.includes(M_CYCLE_ACCOUNT.M10.code)
+  }
+
+  /**
+   * AJE 对科目4401其他权益工具的净影响
    * 其他权益工具是贷方权益类：贷方增加=调增，借方减少=调减
    * 净影响 = 贷方 - 借方（正=净增，负=净减）
    */
-  const ajeNet4003: ComputedRef<number> = computed(() => {
-    const entries4003 = ajeEntries.value.filter(e =>
-      e.accountName.includes('其他权益工具') || e.accountName.includes('4003'),
+  const ajeNet4401: ComputedRef<number> = computed(() => {
+    const entries4401 = ajeEntries.value.filter(e =>
+      _isOwnAccountEntry(e),
     )
-    const debit = calcSubtotal(entries4003.map(e => e.debitAmount))
-    const credit = calcSubtotal(entries4003.map(e => e.creditAmount))
+    const debit = calcSubtotal(entries4401.map(e => e.debitAmount))
+    const credit = calcSubtotal(entries4401.map(e => e.creditAmount))
     return credit - debit // 权益类贷方：贷方净增=调增
   })
 
-  /** RJE 对科目4003的净影响 */
-  const rjeNet4003: ComputedRef<number> = computed(() => {
-    const entries4003 = rjeEntries.value.filter(e =>
-      e.accountName.includes('其他权益工具') || e.accountName.includes('4003'),
+  /** RJE 对科目4401的净影响 */
+  const rjeNet4401: ComputedRef<number> = computed(() => {
+    const entries4401 = rjeEntries.value.filter(e =>
+      _isOwnAccountEntry(e),
     )
-    const debit = calcSubtotal(entries4003.map(e => e.debitAmount))
-    const credit = calcSubtotal(entries4003.map(e => e.creditAmount))
+    const debit = calcSubtotal(entries4401.map(e => e.debitAmount))
+    const credit = calcSubtotal(entries4401.map(e => e.creditAmount))
     return credit - debit // 权益类贷方：贷方净增=调增
   })
 
@@ -242,9 +253,9 @@ export function useM10Adjustment(formData: ReturnType<typeof useM10FormData>) {
     // EventBus publish（双向同步M10-1 + 通知A13）
     eventBus.emit('adjustment:created', {
       wpCode: 'M10',
-      accountCode: '4003',
-      ajeNet: ajeNet4003.value,
-      rjeNet: rjeNet4003.value,
+      accountCode: M_CYCLE_ACCOUNT.M10.code,
+      ajeNet: ajeNet4401.value,
+      rjeNet: rjeNet4401.value,
       timestamp: Date.now(),
     } as any)
   }
@@ -292,8 +303,8 @@ export function useM10Adjustment(formData: ReturnType<typeof useM10FormData>) {
     ajeBalance,
     rjeBalance,
     currentBalance,
-    ajeNet4003,
-    rjeNet4003,
+    ajeNet4401,
+    rjeNet4401,
 
     // 行操作
     addEntry,

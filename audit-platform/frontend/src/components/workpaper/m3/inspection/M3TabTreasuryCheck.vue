@@ -396,7 +396,7 @@
  * - 注销冲减核对(M2/M4)
  * - calcRepurchaseAmount / calcCancelDiff formulas
  *
- * 科目：4002 库存股（**借方/权益备抵类！**）
+ * 科目：4201 库存股（**借方/权益备抵类！**）
  */
 import { computed, inject, onMounted, ref, defineAsyncComponent } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
@@ -510,7 +510,7 @@ async function handleAI(section: string) {
   aiLoading.value = section
   try {
     const context: Record<string, string> = {
-      科目: '4002 库存股（权益备抵类·借方，检查表 M3-5 回购/注销核对）',
+      科目: '4201 库存股（权益备抵类·借方，检查表 M3-5 回购/注销核对）',
       回购金额合计: fmtAmount(check.repurchaseTotal.value),
       注销金额合计: fmtAmount(check.cancelTotal.value),
       存在未处理冲减差额: check.hasUnresolvedDiff.value ? '是' : '否',

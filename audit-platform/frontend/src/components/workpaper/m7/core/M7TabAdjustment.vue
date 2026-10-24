@@ -4,7 +4,7 @@
     <div class="section-header">
       <div class="section-header-left">
         <h3 class="section-title">M7-3 调整分录汇总</h3>
-        <el-tag type="success" effect="dark" size="small">科目4201·专项储备</el-tag>
+        <el-tag type="success" effect="dark" size="small">科目4301·专项储备</el-tag>
       </div>
       <div class="section-header-right">
         <CycleImportExportDropdown
@@ -32,8 +32,8 @@
     <!-- ═══ 方法论上下文（琥珀色） ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>专项储备调整分录（4201 贷方/权益类）：</strong>
-        调增专项储备 → 贷方增加（贷记4201）；调减专项储备 → 借方减少（借记4201）。
+        <strong>专项储备调整分录（4301 贷方/权益类）：</strong>
+        调增专项储备 → 贷方增加（贷记4301）；调减专项储备 → 借方减少（借记4301）。
         典型场景：补提安全生产费（借:成本/费用 贷:专项储备）、冲回多计提、资本化支出调整。
         借贷必须平衡后方可保存发布。保存后通知M7-1审定表刷新AJE/RJE列。
       </div>
@@ -117,13 +117,13 @@
       <span v-if="!currentBalance.isBalanced" class="balance-warning">借贷不平衡，无法发布</span>
     </div>
 
-    <!-- ═══ 4201净影响 ═══ -->
+    <!-- ═══ 4301净影响 ═══ -->
     <div class="net-impact">
       <el-tag type="info" size="small" effect="plain">
-        AJE对4201净影响: {{ fmtAmount(ajeNet4201) }}（{{ ajeNet4201 >= 0 ? '净增' : '净减' }}）
+        AJE对4301净影响: {{ fmtAmount(ajeNet4301) }}（{{ ajeNet4301 >= 0 ? '净增' : '净减' }}）
       </el-tag>
       <el-tag type="info" size="small" effect="plain">
-        RJE对4201净影响: {{ fmtAmount(rjeNet4201) }}（{{ rjeNet4201 >= 0 ? '净增' : '净减' }}）
+        RJE对4301净影响: {{ fmtAmount(rjeNet4301) }}（{{ rjeNet4301 >= 0 ? '净增' : '净减' }}）
       </el-tag>
     </div>
 
@@ -131,8 +131,8 @@
     <details class="m7-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>专项储备（4201）为<strong>权益类贷方科目</strong></li>
-        <li>调增=贷方增加（贷记4201）；调减=借方减少（借记4201）</li>
+        <li>专项储备（4301）为<strong>权益类贷方科目</strong></li>
+        <li>调增=贷方增加（贷记4301）；调减=借方减少（借记4301）</li>
         <li>补提安全生产费：借:生产成本/管理费用 贷:专项储备</li>
         <li>冲回多计提：借:专项储备 贷:生产成本/管理费用</li>
         <li>资本化支出调整：借:专项储备 贷:累计折旧—专项储备折旧</li>
@@ -181,8 +181,8 @@ const {
   ajeBalance,
   rjeBalance,
   currentBalance,
-  ajeNet4201,
-  rjeNet4201,
+  ajeNet4301,
+  rjeNet4301,
   addEntry,
   removeEntry,
   updateEntry,
@@ -265,13 +265,13 @@ async function handleAI(section: string): Promise<void> {
   aiLoading.value = section
   try {
     const context: Record<string, string> = {
-      科目: '4201 专项储备（权益类·贷方）/ 调整分录 M7-3',
+      科目: '4301 专项储备（权益类·贷方）/ 调整分录 M7-3',
       调整类型: activeType.value,
       借方合计: fmtAmount(currentBalance.value.totalDebit),
       贷方合计: fmtAmount(currentBalance.value.totalCredit),
       借贷平衡: currentBalance.value.isBalanced ? '已平衡' : `差额 ${fmtAmount(currentBalance.value.diff)}`,
-      AJE对4201净影响: fmtAmount(ajeNet4201.value),
-      RJE对4201净影响: fmtAmount(rjeNet4201.value),
+      AJE对4301净影响: fmtAmount(ajeNet4301.value),
+      RJE对4301净影响: fmtAmount(rjeNet4301.value),
     }
     const text = await generateAiText({ section: `m7-adjustment-${section}`, context })
     if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }

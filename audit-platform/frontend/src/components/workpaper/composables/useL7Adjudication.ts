@@ -11,9 +11,9 @@
  *   项目(A) | 期初(未审B/AJE_C/RJE_D/审定E) | 期末(未审F/AJE_G/RJE_H/审定I) | 变动额J | 变动率K
  * - 审定数公式：审定=未审+AJE+RJE
  * - 负债类期末校验：calcLiabilityEndBalance
- * - 审定数变化→writebackTB(2801)+EventBus
+ * - 审定数变化→writebackTB(BS-071)+EventBus
  *
- * 科目：2801 其他非流动负债（贷方/负债类！期末=期初+贷方-借方）
+ * 科目：其他非流动负债（无专属科目码，宁缺勿造；贷方/负债类！期末=期初+贷方-借方）
  */
 import { computed, ref, watch, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'

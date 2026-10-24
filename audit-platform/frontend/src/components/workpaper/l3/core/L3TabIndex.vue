@@ -46,7 +46,7 @@
         <ul>
           <li>长期借款为<strong>负债类贷方科目</strong>（2501）：期末 = 期初 + 贷方（借入）− 借方（归还）</li>
           <li>审定表按<strong>借款种类</strong>（信用/抵押/保证/质押）分类，双期列示（期初/期末各未审、账项调整、重分类、审定）</li>
-          <li><strong>减一年内到期 → 披露审定数</strong>：披露审定 = 审定 − 一年内到期；一年内到期经 L3-3 重分类（借 2501 / 贷 2801）转入流动负债</li>
+          <li><strong>减一年内到期 → 披露审定数</strong>：披露审定 = 审定 − 一年内到期；一年内到期经 L3-3 重分类（借 2501 / 贷 一年内到期的非流动负债）转入流动负债</li>
           <li>利息测算采用 <strong>365 天制</strong>：应计利息 = 本金 × 年利率 × 天数 / 365，区分资本化/费用化，联动 L2 应付利息 / L8 财务费用</li>
           <li>征信报告核对（L3-4）与逾期检查（L3-7）保证完整性：与账面借款双向差集，防账外借款</li>
           <li>审定合计（按种类）回写 TB(2501)，披露审定（非流动数）驱动附注披露；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
@@ -103,7 +103,7 @@
  * 编制信息由页面级头部渲染，此处不重复。自包含：自行拉取 checklist-responses。
  *
  * 负债类贷方科目（2501 长期借款）— 期末=期初+贷方−借方；审定按种类(信用/抵押/保证/质押)双期，
- * 减一年内到期得披露审定数（一年内到期经 L3-3 重分类借 2501/贷 2801）；
+ * 减一年内到期得披露审定数（一年内到期经 L3-3 重分类借 2501/贷 一年内到期的非流动负债）；
  * L3-5 利息测算(365 天制，资本化/费用化)联动 L2/L8，L3-4 征信/L3-7 逾期保证完整性。
  *
  * 🔴 L3 各表审计说明/结论存储键前缀经 grep 实测（非照抄 L1）：
@@ -186,7 +186,7 @@ const allSheets = computed<SheetRow[]>(() => [
   { name: '长期借款实质性程序表', code: 'L3A', sheetKey: '长期借款实质性程序表L3A', progress: calcSheetProgress('L3-L3A-', 5) },
   { name: '审定表（按种类：信用/抵押/保证/质押，双期，含减一年内到期）', code: 'L3-1', sheetKey: '审定表L3-1', progress: calcSheetProgress('L3-L3-1-', 6), conclPrefix: 'L3-L3-1-' },
   { name: '明细表（按银行/合同逐笔，标记一年内到期）', code: 'L3-2', sheetKey: '明细表L3-2', progress: calcSheetProgress('L3-L3-2-', 4) },
-  { name: '调整分录汇总（含重分类 RJE：一年内到期→2801）', code: 'L3-3', sheetKey: '调整分录汇总L3-3', progress: calcSheetProgress('L3-adj-', 2) },
+  { name: '调整分录汇总（含重分类 RJE：一年内到期→一年内到期的非流动负债）', code: 'L3-3', sheetKey: '调整分录汇总L3-3', progress: calcSheetProgress('L3-adj-', 2) },
   { name: '征信报告核对表', code: 'L3-4', sheetKey: '征信报告核对表L3-4', progress: calcSheetProgress('L3-cred-', 4), conclPrefix: 'L3-cred-' },
   { name: '利息测算表（本金×利率×天数/365，资本化/费用化，联动 L2/L8）', code: 'L3-5', sheetKey: '利息测算表L3-5', progress: calcSheetProgress('L3-L3-5-', 4) },
   { name: '贷款合同检查', code: 'L3-6', sheetKey: '贷款合同检查L3-6', progress: calcSheetProgress('L3-L3-6-', 4) },

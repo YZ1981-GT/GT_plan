@@ -7,7 +7,7 @@
 - GET  /api/m8-general-risk-reserve/{wp_id}/validate-formulas   公式一致性验证
 - POST /api/m8-general-risk-reserve/{wp_id}/risk-provision-test 风险资产计提测试
 
-科目编码: 4104一般风险准备（**贷方/权益类！**）
+科目: 一般风险准备（**贷方/权益类！**；没有统一标准码，按本项目科目表名称定位）
 公式方向: 期末=期初+贷方-借方（计提在贷方增加，转回在借方减少）
 金融企业专属: 按风险资产期末余额×比例（原则上不低于1.5%）
 RFC5987 Content-Disposition header with Chinese filename encoding

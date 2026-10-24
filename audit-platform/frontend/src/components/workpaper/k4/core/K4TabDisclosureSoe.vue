@@ -97,7 +97,7 @@
       <summary>编制提示</summary>
       <ul>
         <li>国企附注格式（约14行×12列），按性质分类精简披露</li>
-        <li>监听 substantive:adjudicated(2245) 自动同步审定数据（浅蓝色=跨sheet自动取数）</li>
+        <li>监听 substantive:adjudicated（K4）自动同步审定数据（浅蓝色=跨sheet自动取数）</li>
         <li>编辑后发布 disclosure:note-text-updated 联动附注模块</li>
         <li>与上市公司版区别：使用中文编号（一、二...）；无到期期限分析；无占比列</li>
         <li>负债类科目关注完整性认定：确保所有应入账的其他流动负债已完整披露</li>
@@ -123,7 +123,7 @@
  *
  * 科目：2245 其他流动负债（负债类）
  */
-import { reactive, inject, onMounted, onBeforeUnmount } from 'vue'
+import { reactive, inject, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { fmtAmount } from '@/utils/formatters'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
@@ -134,8 +134,18 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { buildK4SyncPayload, K4_NOTE_SECTION } from '../../composables/k4NoteSectionMap'
 import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
+import { isK4Event as matchesK4Event, k4AccountCode, type K4TbSourceCodes } from '../../composables/k4AccountScope'
 
-const K4_ACCOUNT_CODE = '2245'
+// 🔴 原写死 '2245' —— 该码不是其他流动负债：按它监听会把别的科目的审定事件当成 K4 的，
+//    按它发事件会让按科目码匹配的下游认错科目。现取宿主 provide 的 tb_source_codes 解析结果，
+//    解析不出为空串（只按 wpCode 匹配，不用空串去匹配别人的事件）。
+const _injectedTbSrc = inject<Ref<K4TbSourceCodes | null> | null>('tbSourceCodes', null)
+function k4EventCode(): string {
+  return k4AccountCode(_injectedTbSrc?.value ?? null)
+}
+function isK4Event(payload: any): boolean {
+  return matchesK4Event(payload, k4EventCode())
+}
 
 const props = defineProps<{
   wpId: string
@@ -228,13 +238,13 @@ function getResponseNumber(key: string): number {
 
 // ═══ EventBus: subscribe 'substantive:adjudicated' + 'adjustment:created' ═══
 function handleAdjudicated(payload: any): void {
-  if (!payload || payload.accountCode === K4_ACCOUNT_CODE || payload.wpCode === 'K4') {
+  if (isK4Event(payload)) {
     applyAutoFill()
   }
 }
 
 function handleAdjustmentCreated(payload: any): void {
-  if (!payload || payload.accountCode === K4_ACCOUNT_CODE || payload.wpCode === 'K4') {
+  if (isK4Event(payload)) {
     applyAutoFill()
   }
 }
@@ -275,7 +285,8 @@ function publishNoteText(): void {
     .join('\n\n')
   try {
     eventBus.emit('disclosure:note-text-updated', {
-      accountCode: K4_ACCOUNT_CODE,
+      wpCode: 'K4',
+      accountCode: k4EventCode(),
       section: 'soe',
       text: allText,
     })
@@ -301,7 +312,7 @@ async function handleAiGenerate(sIdx: number): Promise<void> {
         + `只能使用已提供的项目名称与金额，不得虚构项目、批文、拨付单位或金额，`
         + `无把握的内容留空由审计师补充。`,
       context: {
-        科目: '2245 其他流动负债（负债类）',
+        科目: '其他流动负债（负债类）',
         格式: '国有企业报表附注',
         当前节: section.title,
         行数: String(section.rows.length),
@@ -344,7 +355,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
-      wpCode: 'K4', variant: 'soe', accountCode: '2245',
+      wpCode: 'K4', variant: 'soe', accountCode: k4EventCode(),
       projectId: props.projectId, sectionIds: [K4_NOTE_SECTION.soe],
     })
     ElMessage.success('已同步到附注')

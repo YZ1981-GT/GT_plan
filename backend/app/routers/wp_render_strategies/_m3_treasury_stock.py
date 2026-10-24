@@ -8,7 +8,7 @@ M3 前端组件 GtM3TreasuryStock 为自加载组件（子组件各自拉取 che
 关键作用是：让 component_type 在 RENDERER_DISPATCH 中命中，避免多 sheet dispatch
 循环把 M3 各 sheet 误判为非白名单而重写成 onlyoffice-sheet。
 
-科目4002库存股（**借方/权益备抵类！**）：期末=期初+借方-贷方
+科目4201库存股（**借方/权益备抵类！**）：期末=期初+借方-贷方
 M股东权益循环中唯一的备抵科目。回购在借方增加，注销/再售在贷方减少。
 数据持久化在 checklist_responses 表，item_id 前缀为 "M3-*"。
 
@@ -31,12 +31,13 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.m_cycle_specs import fallback_code_of
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-_M3_ACCOUNT_CODE = "4201"
+_M3_ACCOUNT_CODE = fallback_code_of("M3")  # 4201 库存股
 _ADJUDICATED_ITEM_ID = "M3-1-adjudicated-amount"
 
 M3_SHEETS = [
@@ -72,7 +73,7 @@ def _parse_num(v: Any) -> float:
 def calc_contra_equity_end_balance(begin: float, debit: float, credit: float) -> float:
     """权益备抵类期末余额公式：期末 = 期初 + 借方 - 贷方（借方科目！）.
 
-    库存股（4002）是所有者权益的备抵科目：
+    库存股（4201）是所有者权益的备抵科目：
     - 回购股份 → 借方增加
     - 注销/再出售 → 贷方减少
     - 与 M2/M4/M5/M6 等权益类（贷方增加）方向完全相反！
@@ -204,7 +205,7 @@ async def render(ctx: RenderContext) -> dict | None:
     包含：
     - project_context: 项目基础信息
     - responses_snapshot: M3-* 已有 checklist_responses 快照
-    - trial_balance: 科目4002的TB余额数据（借方/贷方/净额）
+    - trial_balance: 科目4201的TB余额数据（借方/贷方/净额）
     - formula_direction: 权益备抵类公式方向元数据
     - formula_errors: 公式校验错误列表（如果快照中有结构化数据）
     - negative_balance_warnings: 负余额异常警告
@@ -260,7 +261,7 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("M3 render: project context 查询失败: %s", e)
 
-    # ─── TB 取数（科目4002库存股）─────────────────────────────────────────
+    # ─── TB 取数（科目4201库存股）─────────────────────────────────────────
     tb = await _fetch_tb_data(ctx)
 
     # ─── 公式校验（从快照提取结构化数据行）────────────────────────────────
@@ -293,11 +294,11 @@ async def render(ctx: RenderContext) -> dict | None:
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
         "adjudicated_amount": adjudicated_amount,
-        # TB 余额数据（科目4002，借方/贷方/净额）
+        # TB 余额数据（科目4201，借方/贷方/净额）
         "trial_balance": tb,
         # 权益备抵类公式方向元数据（前端可用于初始化校验）
         "formula_direction": {
-            "account_code": "4002",
+            "account_code": _M3_ACCOUNT_CODE,  # 原写 4002（资本公积）
             "account_name": "库存股",
             "direction": "debit",  # 借方/权益备抵类！
             "end_balance_formula": "begin + debit - credit",  # 期末=期初+借方-贷方

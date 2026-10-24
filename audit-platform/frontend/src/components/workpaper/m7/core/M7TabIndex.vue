@@ -44,11 +44,11 @@
       <details class="methodology-hint">
         <summary>编制提示</summary>
         <ul>
-          <li>专项储备为<strong>权益类贷方科目</strong>（4201）：期末 = 期初 + 贷方（计提）− 借方（使用）</li>
+          <li>专项储备为<strong>权益类贷方科目</strong>（4301）：期末 = 期初 + 贷方（计提）− 借方（使用）</li>
           <li>明细表 M7-2 列示计提 + 使用明细，与审定表 M7-1 合计交叉核对</li>
           <li>M7-4 计提测试：安全生产费按产量/收入分档标准计提（煤炭、非煤矿山、危化品等）</li>
           <li>M7-5 支出检查：费用化计入成本费用，资本化支出转 H1 固定资产</li>
-          <li>审定合计回写 TB(4201) 并驱动附注披露；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
+          <li>审定合计回写 TB(4301) 并驱动附注披露；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
         </ul>
       </details>
     </div>
@@ -101,7 +101,7 @@
  *       + 底稿架构 4 阶段泳道（GtBArchitectureTree）+ 本循环底稿目录 grid。
  * 编制信息由页面级头部渲染，此处不重复。自包含：自行拉取 checklist-responses。
  *
- * 权益类贷方科目（4201 专项储备）— 期末=期初+贷方−借方；安全生产费计提测试、支出检查。
+ * 权益类贷方科目（4301 专项储备）— 期末=期初+贷方−借方；安全生产费计提测试、支出检查。
  */
 import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'

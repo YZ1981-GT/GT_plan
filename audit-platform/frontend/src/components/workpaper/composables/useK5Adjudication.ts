@@ -11,10 +11,10 @@
  * - 负债类公式：期末=期初+计提-转销
  * - 审定数=未审+AJE+RJE
  * - 三角勾稽校验（期末 vs 审定数）+ 红色高亮
- * - TB回写2701
+ * - TB回写2801
  * - Save with prefix "K5-1-"
  *
- * 科目：2701 预计负债（**贷方/负债类**）
+ * 科目：2801 预计负债（**贷方/负债类**）
  * ⚠️ 负债类！期末=期初+计提-转销（与资产类相反）
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
@@ -219,12 +219,17 @@ export function useK5Adjudication(params: UseK5AdjudicationParams) {
 
   // ─── 发布审定数事件（对齐 F4/D2 范式，通知附注/A13/下游） ───────────────────
 
-  function publishAdjudicated(): void {
+  /**
+   * @param accountCode 本次实际发布到试算表的科目码（调用方取自 `k5AccountCode`）。
+   *   🔴 原写死 `'2701'` —— 那是长期应付款（L5），事件载荷带着别的循环的科目码，
+   *   按科目码匹配的下游会把预计负债的审定数当成长期应付款。事件码必须等于发布码。
+   */
+  function publishAdjudicated(accountCode: string): void {
     const auditedAmount = subtotalRow.value.audited
     try {
       eventBus.emit('substantive:adjudicated', {
         wpCode: 'K5',
-        accountCode: '2701',
+        accountCode,
         auditedAmount,
         adjudicatedAmount: auditedAmount,
         timestamp: Date.now(),

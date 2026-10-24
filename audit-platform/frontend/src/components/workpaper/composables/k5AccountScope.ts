@@ -44,6 +44,13 @@ export const K5_REPORT_ROW_CODE_SOE = 'BS-065'
  */
 export const K5_FALLBACK_STANDARD = '2801'
 
+/**
+ * 🔴 曾被误当作预计负债的科目 —— 守卫用（K5 文件集的代码 / 文案不得再出现该码，
+ * 解释性注释除外）。`2701` = 长期应付款（L5 循环）。
+ * 判据见 `__tests__/cycleWrongLegacyAccountCodes.spec.ts`。
+ */
+export const K5_WRONG_LEGACY_ACCOUNT = '2701'
+
 /** 科目中文名（展示用，与 `account_chart.account_name` 一致） */
 export const K5_ACCOUNT_NAME = '预计负债'
 

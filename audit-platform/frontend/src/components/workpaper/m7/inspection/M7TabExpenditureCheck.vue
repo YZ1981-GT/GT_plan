@@ -367,7 +367,7 @@
     <details class="m7-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>专项储备（4201）为<strong>权益类贷方科目</strong>：期末 = 期初 + 贷方（计提） − 借方（使用支出）</li>
+        <li>专项储备（4301）为<strong>权益类贷方科目</strong>：期末 = 期初 + 贷方（计提） − 借方（使用支出）</li>
         <li><strong>费用性支出</strong>：安全培训费、安全评价检测费等直接冲减专项储备</li>
         <li><strong>资本性支出</strong>：安全设备购置等形成固定资产，同时全额计提折旧冲减专项储备</li>
         <li>资本性支出检查须联动H1固定资产底稿，确认折旧是否已全额计提</li>
@@ -402,7 +402,7 @@
  * - useM7FormData 持久化
  * - 复核按钮（inject openReviewDialog）
  *
- * 科目：4201 专项储备（**贷方/权益类！**）
+ * 科目：4301 专项储备（**贷方/权益类！**）
  * 使用支出在借方减少：费用化直接冲减 / 资本化转固定资产同时冲减
  */
 import { computed, inject, onMounted, reactive, ref } from 'vue'
@@ -606,7 +606,7 @@ async function handleAI(section: string): Promise<void> {
   aiLoading.value = section
   try {
     const context: Record<string, string> = {
-      科目: '4201 专项储备 / 支出检查 M7-5',
+      科目: '4301 专项储备 / 支出检查 M7-5',
       资本性支出笔数: String(capitalRows.value.length),
       资本性支出合计: fmtAmount(capitalTotal.value),
       费用性支出笔数: String(expenseRows.value.length),

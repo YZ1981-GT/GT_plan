@@ -12,8 +12,8 @@
  * - 双向同步M7-1审定表（M7-1订阅该事件刷新AJE/RJE列）
  * - 动态行管理
  *
- * 科目：4201 专项储备（**贷方/权益类！**）
- * 调增专项储备→贷方增加（贷记4201），调减专项储备→借方减少（借记4201）
+ * 科目：4301 专项储备（**贷方/权益类！**）
+ * 调增专项储备→贷方增加（贷记4301），调减专项储备→借方减少（借记4301）
  *
  * 专项储备调整典型场景：
  * - 补提安全生产费：借:生产成本/管理费用 贷:专项储备
@@ -25,6 +25,7 @@ import { computed, ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { calcSubtotal } from './useM7FormulaEngine'
 import type { useM7FormData } from './useM7FormData'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -124,22 +125,22 @@ export function useM7Adjustment(formData: ReturnType<typeof useM7FormData>) {
   })
 
   /**
-   * AJE 对科目4201专项储备的净影响
+   * AJE 对科目4301专项储备的净影响
    * 专项储备是贷方权益类：贷方增加=调增专项储备，借方减少=调减专项储备
    * 净影响 = 贷方 - 借方（正=净增，负=净减）
    */
-  const ajeNet4201: ComputedRef<number> = computed(() => {
-    const entries4201 = ajeEntries.value.filter(e => e.accountName.includes('专项储备'))
-    const debit = calcSubtotal(entries4201.map(e => e.debitAmount))
-    const credit = calcSubtotal(entries4201.map(e => e.creditAmount))
+  const ajeNet4301: ComputedRef<number> = computed(() => {
+    const entries4301 = ajeEntries.value.filter(e => e.accountName.includes('专项储备'))
+    const debit = calcSubtotal(entries4301.map(e => e.debitAmount))
+    const credit = calcSubtotal(entries4301.map(e => e.creditAmount))
     return credit - debit // 权益类贷方：贷方净增=调增
   })
 
-  /** RJE 对科目4201的净影响 */
-  const rjeNet4201: ComputedRef<number> = computed(() => {
-    const entries4201 = rjeEntries.value.filter(e => e.accountName.includes('专项储备'))
-    const debit = calcSubtotal(entries4201.map(e => e.debitAmount))
-    const credit = calcSubtotal(entries4201.map(e => e.creditAmount))
+  /** RJE 对科目4301的净影响 */
+  const rjeNet4301: ComputedRef<number> = computed(() => {
+    const entries4301 = rjeEntries.value.filter(e => e.accountName.includes('专项储备'))
+    const debit = calcSubtotal(entries4301.map(e => e.debitAmount))
+    const credit = calcSubtotal(entries4301.map(e => e.creditAmount))
     return credit - debit // 权益类贷方：贷方净增=调增
   })
 
@@ -239,9 +240,9 @@ export function useM7Adjustment(formData: ReturnType<typeof useM7FormData>) {
     // EventBus publish（双向同步M7-1 + 通知A13）
     eventBus.emit('adjustment:created', {
       wpCode: 'M7',
-      accountCode: '4201',
-      ajeNet: ajeNet4201.value,
-      rjeNet: rjeNet4201.value,
+      accountCode: M_CYCLE_ACCOUNT.M7.code,
+      ajeNet: ajeNet4301.value,
+      rjeNet: rjeNet4301.value,
       timestamp: Date.now(),
     } as any)
   }
@@ -253,7 +254,7 @@ export function useM7Adjustment(formData: ReturnType<typeof useM7FormData>) {
    */
   function subscribeAdjudicated(callback: (payload: any) => void): () => void {
     const handler = (payload: any) => {
-      if (payload?.wpCode === 'M7' && payload?.accountCode === '4201') {
+      if (payload?.wpCode === 'M7' && payload?.accountCode === M_CYCLE_ACCOUNT.M7.code) {
         callback(payload)
       }
     }
@@ -304,8 +305,8 @@ export function useM7Adjustment(formData: ReturnType<typeof useM7FormData>) {
     ajeBalance,
     rjeBalance,
     currentBalance,
-    ajeNet4201,
-    rjeNet4201,
+    ajeNet4301,
+    rjeNet4301,
 
     // 行操作（动态行管理）
     addEntry,

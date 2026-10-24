@@ -311,7 +311,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="2232 应付股利"
+      :subject-label="mAccountLabel('M1')"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -352,6 +352,7 @@ import { eventBus } from '@/utils/eventBus'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { M_CYCLE_ACCOUNT, mAccountLabel } from '../../composables/mCycleAccountScope'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -413,11 +414,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '2232',
+  subjectPrefix: M_CYCLE_ACCOUNT.M1.code,
   direction: 'credit',
-  subjectCode: '2232',
+  subjectCode: M_CYCLE_ACCOUNT.M1.code,
   wpCode: 'M1',
-  subjectLabel: '应付股利(2232)',
+  subjectLabel: mAccountLabel('M1'),
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) => {
     const idx = Number(rowKey)

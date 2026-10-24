@@ -14,8 +14,8 @@
  *   A:调整事项说明 | B:类别 | C:报表项目 | D:科目名称 | E:附注项目
  *   F:…… | G:借方调整金额 | H:贷方调整金额 | I:索引 | J:备注
  *
- * 科目：4104 一般风险准备（**贷方/权益类！**）
- * 调增一般风险准备→贷方增加（贷记4104），调减→借方减少（借记4104）
+ * 科目：一般风险准备（**贷方/权益类！**）
+ * 调增一般风险准备→贷方增加（贷记一般风险准备），调减→借方减少（借记一般风险准备）
  *
  * 一般风险准备调整典型场景：
  * - 补提一般风险准备：借:利润分配-提取一般风险准备 贷:一般风险准备
@@ -125,26 +125,35 @@ export function useM8Adjustment(formData: ReturnType<typeof useM8FormData>) {
   })
 
   /**
-   * AJE 对科目4104一般风险准备的净影响
+   * 分录是否落在一般风险准备科目：按科目名认；本项目定位到标准码时也认带码的写法。
+   * 🔴 原先还认 `4104`（利润分配）—— 会把未分配利润的分录算进一般风险准备。
+   */
+  function _isOwnAccountEntry(e: M8AdjustmentEntry): boolean {
+    const code = formData.accountCode.value
+    return e.accountName.includes('一般风险准备') || (!!code && e.accountName.includes(code))
+  }
+
+  /**
+   * AJE 对一般风险准备科目的净影响
    * 一般风险准备是贷方权益类：贷方增加=调增，借方减少=调减
    * 净影响 = 贷方 - 借方（正=净增，负=净减）
    */
-  const ajeNet4104: ComputedRef<number> = computed(() => {
-    const entries4104 = ajeEntries.value.filter(e =>
-      e.accountName.includes('一般风险准备') || e.accountName.includes('4104'),
+  const ajeNetAccount: ComputedRef<number> = computed(() => {
+    const entriesAccount = ajeEntries.value.filter(e =>
+      _isOwnAccountEntry(e),
     )
-    const debit = calcSubtotal(entries4104.map(e => e.debitAmount))
-    const credit = calcSubtotal(entries4104.map(e => e.creditAmount))
+    const debit = calcSubtotal(entriesAccount.map(e => e.debitAmount))
+    const credit = calcSubtotal(entriesAccount.map(e => e.creditAmount))
     return credit - debit // 权益类贷方：贷方净增=调增
   })
 
-  /** RJE 对科目4104的净影响 */
-  const rjeNet4104: ComputedRef<number> = computed(() => {
-    const entries4104 = rjeEntries.value.filter(e =>
-      e.accountName.includes('一般风险准备') || e.accountName.includes('4104'),
+  /** RJE 对一般风险准备科目的净影响 */
+  const rjeNetAccount: ComputedRef<number> = computed(() => {
+    const entriesAccount = rjeEntries.value.filter(e =>
+      _isOwnAccountEntry(e),
     )
-    const debit = calcSubtotal(entries4104.map(e => e.debitAmount))
-    const credit = calcSubtotal(entries4104.map(e => e.creditAmount))
+    const debit = calcSubtotal(entriesAccount.map(e => e.debitAmount))
+    const credit = calcSubtotal(entriesAccount.map(e => e.creditAmount))
     return credit - debit // 权益类贷方：贷方净增=调增
   })
 
@@ -244,9 +253,9 @@ export function useM8Adjustment(formData: ReturnType<typeof useM8FormData>) {
     // EventBus publish（双向同步M8-1 + 通知A13）
     eventBus.emit('adjustment:created', {
       wpCode: 'M8',
-      accountCode: '4104',
-      ajeNet: ajeNet4104.value,
-      rjeNet: rjeNet4104.value,
+      accountCode: formData.accountCode.value,
+      ajeNet: ajeNetAccount.value,
+      rjeNet: rjeNetAccount.value,
       timestamp: Date.now(),
     })
   }
@@ -258,7 +267,8 @@ export function useM8Adjustment(formData: ReturnType<typeof useM8FormData>) {
    */
   function subscribeAdjudicated(callback: (payload: any) => void): () => void {
     const handler = (payload: any) => {
-      if (payload?.wpCode === 'M8' && payload?.accountCode === '4104') {
+      // 一般风险准备没有统一码：本底稿事件按 wpCode 认
+      if (payload?.wpCode === 'M8') {
         callback(payload)
       }
     }
@@ -309,8 +319,8 @@ export function useM8Adjustment(formData: ReturnType<typeof useM8FormData>) {
     ajeBalance,
     rjeBalance,
     currentBalance,
-    ajeNet4104,
-    rjeNet4104,
+    ajeNetAccount,
+    rjeNetAccount,
 
     // 行操作（动态行管理）
     addEntry,

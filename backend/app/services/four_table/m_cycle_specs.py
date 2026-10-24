@@ -162,8 +162,36 @@ def spec_of(wp_code: str) -> SemanticAccountSpec | None:
     return M_CYCLE_SPECS.get(str(wp_code or "").strip().upper())
 
 
+def fallback_code_of(wp_code: str) -> str:
+    """M 循环主槽的兜底标准码（M8 没有标准科目 ⇒ 空串）。
+
+    M 循环 render 策略 / 服务 / 发布元数据写死科目码时一律取这里（spec
+    formula-fetch-followup-defect-closure R1.4：2026-10-24 前 M3 服务写 4002 资本公积、
+    M7/M9 render 指向别的报表行、phase5 元数据写 4102/4104/4103/4001，各自错位）。
+    前端单一来源 `mCycleAccountScope.ts` 由守卫逐项比对本表。
+    """
+    spec = spec_of(wp_code)
+    if spec is None:
+        raise KeyError(f"未知 M 循环底稿：{wp_code!r}")
+    codes = spec.slots[0].fallback_standard_codes if spec.slots else ()
+    return codes[0] if codes else ""
+
+
+def row_code_of(wp_code: str) -> str:
+    """M 循环报表行次。
+
+    M2~M7、M9、M10 四个准则同号同名（2026-10-24 现查 report_config）；M1 只有上市准则有行、
+    M8 只有国企准则有行（见各 spec 注释）。
+    """
+    spec = spec_of(wp_code)
+    if spec is None:
+        raise KeyError(f"未知 M 循环底稿：{wp_code!r}")
+    return spec.row_code
+
+
 __all__ = [
     "M1_SPEC", "M2_SPEC", "M3_SPEC", "M4_SPEC", "M5_SPEC",
     "M6_SPEC", "M7_SPEC", "M8_SPEC", "M9_SPEC", "M10_SPEC",
     "M_CYCLE_SPECS", "M_PL_CYCLES", "M_PL_POSITIVE_SIDE", "spec_of",
+    "fallback_code_of", "row_code_of",
 ]

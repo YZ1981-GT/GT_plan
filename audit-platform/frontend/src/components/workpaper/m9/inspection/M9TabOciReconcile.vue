@@ -707,7 +707,7 @@ async function handleAI(section: string): Promise<void> {
   aiLoading.value = section
   try {
     const context: Record<string, string> = {
-      科目: '4103 其他综合收益 / OCI核对表（M9-4 多来源核对：G8/J2/外币折算）',
+      科目: '4003 其他综合收益 / OCI核对表（M9-4 多来源核对：G8/J2/外币折算）',
       来源税前合计: fmtAmount(grandTotalPreTax.value),
       所得税影响合计: fmtAmount(grandTotalTaxEffect.value),
       不可重分类税后合计: fmtAmount(nonReclassSummary.value.totalSourceAfterTax),

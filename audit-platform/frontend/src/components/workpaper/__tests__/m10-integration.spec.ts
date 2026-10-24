@@ -17,7 +17,7 @@
  * Spec: .kiro/specs/m10-other-equity-instruments/ Task 7.2
  * Requirements: 4.1-4.5
  *
- * 科目：4003 其他权益工具（贷方/权益类！期末=期初+贷方-借方）
+ * 科目：4401 其他权益工具（贷方/权益类！期末=期初+贷方-借方）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, nextTick } from 'vue'

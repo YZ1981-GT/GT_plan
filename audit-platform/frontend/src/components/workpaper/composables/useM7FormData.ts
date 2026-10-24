@@ -9,13 +9,13 @@
  * - selfLoad(): bundle内嵌场景从 render-config 加载上下文
  * - checklist_responses 持久化: GET/PUT /api/workpapers/:wpId/checklist-responses
  * - item_id 命名: 前缀 "M7-{sheet}-{field}"（如 "M7-1-adjudicated-amount", "M7-2-accrual-total"）
- * - writebackTB(4201): 审定数回写 trial_balance 科目 4201 专项储备
+ * - writebackTB(4301): 审定数回写 trial_balance 科目 4301 专项储备
  * - EventBus: 回写成功后发布 'substantive:adjudicated'
  * - debounce/即时保存: 文本字段 debounce 2s，枚举/结论即时保存
  * - 组件卸载时 flush 未保存数据（onScopeDispose）
  *
  * ─── 权益类方向铁律 ───
- * 科目：4201 专项储备（**贷方/权益类！期末=期初+贷方-借方**）
+ * 科目：4301 专项储备（**贷方/权益类！期末=期初+贷方-借方**）
  * 计提（安全生产费等）在贷方增加，使用（费用化/资本化支出）在借方减少
  * 回写TB用期末余额口径（audited_amount = 审定期末余额）
  * ─────────────────────────────────────────────────
@@ -24,6 +24,7 @@ import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ export interface UseM7FormDataOptions {
 
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'M7-'
-const ACCOUNT_CODE = '4201' // 专项储备（贷方/权益类！）
+const ACCOUNT_CODE = M_CYCLE_ACCOUNT.M7.code // 专项储备（贷方/权益类！）
 /** 审定表 sheet 名（含子码 M7-1，供后端 extract_determination_wp_code 解出） */
 const DETERMINATION_SHEET_NAME = '审定表M7-1'
 
@@ -277,10 +278,10 @@ export function useM7FormData(options: UseM7FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── writebackTB (回写审定数到 trial_balance 4201) ─────────────────────────
+  // ─── writebackTB (回写审定数到 trial_balance 4301) ─────────────────────────
 
   /**
-   * 回写审定数到 trial_balance（科目 4201 专项储备，**贷方/权益类！**）。
+   * 回写审定数到 trial_balance（科目 4301 专项储备，**贷方/权益类！**）。
    *
    * 权益类贷方方向铁律：
    * - 期末 = 期初 + 贷方(增加：安全生产费计提) - 借方(减少：使用支出)

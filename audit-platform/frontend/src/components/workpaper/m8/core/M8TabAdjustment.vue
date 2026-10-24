@@ -238,13 +238,13 @@
       <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
     </div>
 
-    <!-- ═══ 4104净影响 ═══ -->
-    <div class="net-impact" v-if="adjustment.ajeNet4104.value !== 0 || adjustment.rjeNet4104.value !== 0">
+    <!-- ═══ 一般风险准备净影响 ═══ -->
+    <div class="net-impact" v-if="adjustment.ajeNetAccount.value !== 0 || adjustment.rjeNetAccount.value !== 0">
       <el-tag type="warning" size="small" effect="plain">
-        AJE对4104净影响: {{ fmtAmount(adjustment.ajeNet4104.value) }}（{{ adjustment.ajeNet4104.value >= 0 ? '调增' : '调减' }}）
+        AJE对一般风险准备净影响: {{ fmtAmount(adjustment.ajeNetAccount.value) }}（{{ adjustment.ajeNetAccount.value >= 0 ? '调增' : '调减' }}）
       </el-tag>
-      <el-tag type="warning" size="small" effect="plain" v-if="adjustment.rjeNet4104.value !== 0">
-        RJE对4104净影响: {{ fmtAmount(adjustment.rjeNet4104.value) }}（{{ adjustment.rjeNet4104.value >= 0 ? '重分类入' : '重分类出' }}）
+      <el-tag type="warning" size="small" effect="plain" v-if="adjustment.rjeNetAccount.value !== 0">
+        RJE对一般风险准备净影响: {{ fmtAmount(adjustment.rjeNetAccount.value) }}（{{ adjustment.rjeNetAccount.value >= 0 ? '重分类入' : '重分类出' }}）
       </el-tag>
     </div>
 
@@ -272,7 +272,7 @@
     <details class="m8-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>一般风险准备（4104）为<strong>权益类贷方科目</strong>：调增=贷方增加，调减=借方减少</li>
+        <li>一般风险准备为<strong>权益类贷方科目</strong>：调增=贷方增加，调减=借方减少</li>
         <li>每笔分录必须<strong>借贷平衡</strong>（∑借方 = ∑贷方，阈值0.01元）</li>
         <li>类别选项：报表调整 / 账项调整 / 重分类调整 / 其他</li>
         <li>AJE（审计调整分录）：改变账面数的调整</li>
@@ -444,15 +444,15 @@ async function handleAI(section: string): Promise<void> {
   try {
     const b = adjustment.currentBalance.value
     const context: Record<string, string> = {
-      科目: '4104 一般风险准备（权益类/贷方）',
+      科目: '一般风险准备（权益类/贷方）',
       底稿: 'M8-3 一般风险准备调整分录汇总',
       当前类型: adjustment.activeType.value,
       借方合计: fmtAmount(b.totalDebit),
       贷方合计: fmtAmount(b.totalCredit),
       借贷差额: fmtAmount(b.diff),
       是否平衡: b.isBalanced ? '平衡' : '不平衡',
-      'AJE对4104净影响': fmtAmount(adjustment.ajeNet4104.value),
-      'RJE对4104净影响': fmtAmount(adjustment.rjeNet4104.value),
+      'AJE对一般风险准备净影响': fmtAmount(adjustment.ajeNetAccount.value),
+      'RJE对一般风险准备净影响': fmtAmount(adjustment.rjeNetAccount.value),
     }
     const text = await generateAiText({ section: `m8-adjustment-${section}`, context, existingContent: adjustmentNote.value })
     if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }

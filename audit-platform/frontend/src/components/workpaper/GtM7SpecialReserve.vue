@@ -128,15 +128,15 @@
  * 组件接收 sheetName prop，正则提取编码（M7/M7A/M7-1~M7-5），v-if 分发到对应子组件。
  * 不使用内部 el-tabs（避免双层 Tab 问题）。
  *
- * 科目覆盖：4201 专项储备（**贷方/权益类！**）
+ * 科目覆盖：4301 专项储备（**贷方/权益类！**）
  * 核心铁律：期末=期初+贷方-借方（计提时贷方增加，使用时借方减少）
  * 特殊功能：①权益类贷方公式 ②安全生产费计提测试（按产量/收入分档） ③支出检查（资本化转H1/费用化冲减）
  *
  * selfLoad: 当 htmlData 为 null 时自行调 render-config 加载数据。
  *
  * 集成（Phase 6）：
- * - EventBus: substantive:adjudicated(4201) / adjustment:created
- * - 跨底稿联动: TB回写(4201) + 资本化支出→H1固定资产
+ * - EventBus: substantive:adjudicated(4301) / adjustment:created
+ * - 跨底稿联动: TB回写(4301) + 资本化支出→H1固定资产
  * - 版本追踪: useVersionTrail(autoSnapshot)
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */

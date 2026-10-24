@@ -338,7 +338,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="4104 未分配利润"
+      :subject-label="mAccountLabel('M6')"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -370,6 +370,7 @@ import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBring
 import { eventBus } from '@/utils/eventBus'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { M_CYCLE_ACCOUNT, mAccountLabel } from '../../composables/mCycleAccountScope'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
@@ -406,11 +407,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '4104',
+  subjectPrefix: M_CYCLE_ACCOUNT.M6.code,
   direction: 'credit',
-  subjectCode: '4104',
+  subjectCode: M_CYCLE_ACCOUNT.M6.code,
   wpCode: 'M6',
-  subjectLabel: '未分配利润(4104)',
+  subjectLabel: mAccountLabel('M6'),
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) => {
     const idx = rows.value.findIndex((r) => r.key === rowKey)

@@ -5,10 +5,10 @@
 - GET  /api/m9-other-comprehensive-income/{wp_id}/export-data         明细表 M9-2 当前数据xlsx
 - POST /api/m9-other-comprehensive-income/{wp_id}/import-data         解析xlsx整表替换 M9-2（multipart）
 - GET  /api/m9-other-comprehensive-income/{wp_id}/validate-formulas   审定表 M9-1 权益类公式方向验证
-- POST /api/m9-other-comprehensive-income/{wp_id}/tb-writeback        回写TB（科目4103）
+- POST /api/m9-other-comprehensive-income/{wp_id}/tb-writeback        回写TB（科目4003）
 
 三态目前只支持 M9-2（界面唯一有导入导出入口的动态行表）；其他 sheet 返回 400。
-科目编码: 4103其他综合收益（**贷方/权益类！**）
+科目编码: 4003其他综合收益（**贷方/权益类！**）
 公式方向: 期末=期初+贷方-借方（OCI增加在贷方，重分类/减少在借方）
 OCI特征: 税后净额列示=税前发生-所得税影响；分两大类（不可/可重分类进损益）
 RFC5987 Content-Disposition header with Chinese filename encoding
@@ -33,6 +33,7 @@ from app.deps import authorize_wp_edit, get_current_user
 from app.models.core import User
 from app.services.project_audit_year import fetch_project_audit_year
 from app.services.tb_audited_writer import publish_rows
+from app.services.four_table.m_cycle_specs import fallback_code_of
 
 from app.routers.wp_render_strategies._x3_adjustment_import_export import (
     X3_SHEET_SPECS,
@@ -117,9 +118,10 @@ class ValidateFormulasResponse(BaseModel):
 
 
 class TBWritebackRequest(BaseModel):
-    """TB回写请求（科目4103其他综合收益）"""
+    """TB回写请求（科目4003其他综合收益）"""
     audited_amount: float = Field(description="审定金额")
-    account_code: str = Field("4103", description="科目编码，默认4103")
+    # 🔴 原默认 4103（本年利润）—— 不传科目码时会把 OCI 审定数写进本年利润（R1.4）
+    account_code: str = Field(fallback_code_of("M9"), description="科目编码，默认 4003 其他综合收益")
 
 
 class TBWritebackResponse(BaseModel):
@@ -237,7 +239,7 @@ async def m9_validate_formulas(
 ) -> ValidateFormulasResponse:
     """校验权益类公式方向（期末=期初+贷方-借方）
 
-    其他综合收益为贷方/权益类科目（4103）：
+    其他综合收益为贷方/权益类科目（4003）：
     - OCI增加时贷方增加（如公允价值上升计入OCI）
     - OCI减少/重分类进损益时借方减少
     - 期末余额 = 期初 + 贷方发生额 - 借方发生额
@@ -297,7 +299,7 @@ async def m9_validate_formulas(
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TB 回写（科目4103其他综合收益）
+# TB 回写（科目4003其他综合收益）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -308,7 +310,7 @@ async def m9_tb_writeback(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> TBWritebackResponse:
-    """审定数回写到 trial_balance（科目4103其他综合收益）
+    """审定数回写到 trial_balance（科目4003其他综合收益）
 
     权益类贷方科目 — 审定数回写后触发 TB 缓存失效和事件通知。
     前端 useM9FormData.writebackTB(amount) 调用。

@@ -11,7 +11,7 @@
  *  ⑥ (4) 敏感性分析
  *  ⑦ 试算平衡表勾稽 + 审计说明 + 审计结论
  *
- * 未审数默认从 TB(2221) seed；各区块 JSON 持久化到 checklist_responses.remark。
+ * 未审数默认从 TB(2705) seed；各区块 JSON 持久化到 checklist_responses.remark。
  * Spec: .kiro/specs/j2-defined-benefit-plan/
  */
 import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
@@ -25,6 +25,7 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import WpFourTableSourcePanel from '../shared/WpFourTableSourcePanel.vue'
 import WpAmountInput from '../shared/WpAmountInput.vue'
 import type { TbSourceCodes } from '../composables/shared/tbSourceCodes'
+import { j2AccountCode, j2GrossQueryCodes } from '../composables/jAccountScope'
 
 interface RespItem { item_id: string; conclusion: string | null; remark: string | null }
 
@@ -186,7 +187,7 @@ async function aiGenerate(kind: 'note' | 'conclusion') {
   try {
     // 端点要求 context 为 dict[str,str]，所有值转字符串
     const context: Record<string, string> = {
-      科目: '2221 长期应付职工薪酬 / 设定受益计划净资产',
+      科目: '2705 长期应付职工薪酬 / 设定受益计划净资产',
       期初审定合计: fmt(mainTotal.value.beginAudited),
       期末审定合计: fmt(mainTotal.value.endAudited),
       试算平衡表数: fmt(tbAmount.value),
@@ -223,6 +224,8 @@ const tbSourceCodes = computed<TbSourceCodes | null>(() => {
   const src = props.htmlData?.tb_source_codes
   return src && typeof src === 'object' ? (src as TbSourceCodes) : null
 })
+/** 本项目口径的长期应付职工薪酬科目码（render 溯源优先，缺省 2705）——带入 / 提示统一取此 */
+const j2Code = computed(() => j2AccountCode(tbSourceCodes.value))
 
 // ─── 从四表库带入未审数 ───────────────────────────────────────────────────────
 const fourTableApplying = ref(false)
@@ -300,7 +303,7 @@ function load() {
   assignRows(sensRows, parseJson(KEY.sens, null))
   auditNote.value = props.allResponses?.get(KEY.note)?.remark || ''
   auditConclusion.value = props.allResponses?.get(KEY.concl)?.remark || ''
-  // TB seed（未审数默认取 2221 审定/未审额，仅在主表未审全为 0 时 seed 到设定受益计划行）
+  // TB seed（未审数默认取本科目审定/未审额，仅在主表未审全为 0 时 seed 到设定受益计划行）
   const tb = (props.htmlData?.tb_data || {}) as Record<string, number>
   tbAmount.value = n(tb.audited_amount)
   const anyMain = mainRows.some(r => n(r.endUnadj) !== 0 || n(r.beginUnadj) !== 0)
@@ -346,7 +349,9 @@ function scheduleSave() {
   props.saveImmediate(items)
 }
 
-// ─── 从集中登记带入调整（2221 长期应付职工薪酬，负债贷方；带入期末调整 endAje，单一调整列） ───
+// ─── 从集中登记带入调整（长期应付职工薪酬，负债贷方；带入期末调整 endAje，单一调整列） ───
+// 🔴 原写死 `2221` —— 那是应交税费（见 jAccountScope.J2_WRONG_LEGACY_ACCOUNTS），
+//    带入的是税费调整。改按本项目口径（j2GrossQueryCodes，缺省 2705）。
 const bringInRows = computed(() =>
   mainRows.map((r) => ({ rowKey: r.key, name: r.label, aje: 0, rje: 0 })),
 )
@@ -359,11 +364,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '2221',
+  subjectPrefix: () => j2GrossQueryCodes(tbSourceCodes.value),
   direction: 'credit',
-  subjectCode: '2221',
+  subjectCode: () => j2Code.value,
   wpCode: 'J2',
-  subjectLabel: '长期应付职工薪酬(2221)',
+  subjectLabel: () => `长期应付职工薪酬(${j2Code.value})`,
   rows: bringInRows,
   // 单一「账项调整」列：净额累加至期末调整 endAje（mutate reactive + scheduleSave）
   updateCell: (rowKey: string, _field: any, value: number) => {
@@ -407,7 +412,7 @@ watch(() => props.allResponses, load, { deep: false })
     <!-- 审计目标 -->
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
       <template #title>
-        审计目标：确认设定受益计划净负债/净资产、其他长期职工福利及辞退福利的期初、期末审定数的准确性，分析变动合理性，形成审定结论并回写试算平衡表（科目 2221）。
+        审计目标：确认设定受益计划净负债/净资产、其他长期职工福利及辞退福利的期初、期末审定数的准确性，分析变动合理性，形成审定结论并回写试算平衡表（科目 2705）。
       </template>
     </el-alert>
 
@@ -480,7 +485,7 @@ watch(() => props.allResponses, load, { deep: false })
 
       <!-- 试算平衡表勾稽 -->
       <div class="tb-reconcile">
-        <span class="tb-label">试算平衡表数（2221）</span><span class="tb-val">{{ fmt(tbAmount) }}</span>
+        <span class="tb-label">试算平衡表数（{{ j2Code }}）</span><span class="tb-val">{{ fmt(tbAmount) }}</span>
         <span class="tb-label">期末审定合计</span><span class="tb-val">{{ fmt(mainTotal.endAudited) }}</span>
         <span class="tb-label">差异</span>
         <span class="tb-val" :class="{ 'text-danger': Math.abs(tbDiff) > 0.01 }">{{ fmt(tbDiff) }}</span>
@@ -641,8 +646,8 @@ watch(() => props.allResponses, load, { deep: false })
         <p>2. DBO 期末余额 = 期初 + 当期服务成本 + 利息费用 ± 精算利得损失 − 已支付福利（分解见"(1)设定受益计划情况"）。</p>
         <p>3. 灰底"审定数/净负债"列为自动计算列，不可手动编辑。</p>
         <p>4. 精算假设与敏感性分析须利用管理层的精算专家工作（ISA 620），关注折现率、死亡率、工资增长率的合理性。</p>
-        <p>5. 审定期末合计回写试算平衡表科目 2221，并与明细表(J2-2)、计提检查表(J2-4)勾稽一致。</p>
-        <p>6.「带入调整」：可从集中登记按科目 2221 拉取调整分录，逐笔分配到各行期末账项调整，带入后审定数自动更新并联动附注。</p>
+        <p>5. 审定期末合计回写试算平衡表科目 2705，并与明细表(J2-2)、计提检查表(J2-4)勾稽一致。</p>
+        <p>6.「带入调整」：可从集中登记按科目 2705 拉取调整分录，逐笔分配到各行期末账项调整，带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
 
@@ -650,7 +655,7 @@ watch(() => props.allResponses, load, { deep: false })
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="2221 长期应付职工薪酬"
+      :subject-label="`${j2Code} 长期应付职工薪酬`"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />

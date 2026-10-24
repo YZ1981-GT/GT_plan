@@ -9,12 +9,12 @@
  * - selfLoad(): bundle内嵌场景从 render-config 加载上下文
  * - checklist_responses 持久化: GET/PUT /api/workpapers/:wpId/checklist-responses
  * - item_id 命名: 前缀 "L6-{sheet}-{field}"（如 "L6-1-row1-audited", "L6-2-row1-end_balance"）
- * - writebackTB(2601): 审定数回写 trial_balance
+ * - writebackTB(2711): 审定数回写 trial_balance
  * - EventBus: 回写成功后发布 'substantive:adjudicated'
  * - debounce/即时保存: 文本字段 debounce 2s，枚举/结论即时保存
  * - 组件卸载时 flush 未保存数据（onScopeDispose）
  *
- * 科目：2601 专项应付款（贷方/负债类！期末=期初+贷方-借方）
+ * 科目：2711 专项应付款（贷方/负债类！期末=期初+贷方-借方）
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -225,7 +225,7 @@ export function useL6FormData(options: UseL6FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── writebackTB (回写审定数到 trial_balance 2601) ─────────────────────────
+  // ─── writebackTB (回写审定数到 trial_balance 2711) ─────────────────────────
 
   /**
    * 发布审定数到 trial_balance（科目 2711 专项应付款，贷方/负债类）。

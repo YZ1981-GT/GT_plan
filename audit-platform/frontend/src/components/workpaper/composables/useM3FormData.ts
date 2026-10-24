@@ -9,18 +9,19 @@
  * - selfLoad(): bundle内嵌场景从 render-config 加载上下文
  * - checklist_responses 持久化: GET/PUT /api/workpapers/:wpId/checklist-responses
  * - item_id 命名: 前缀 "M3-{sheet}-{field}"（如 "M3-M3-1-audited_amount", "M3-M3-2-batch-001"）
- * - writebackTB(4002): 审定数回写 trial_balance 科目 4002 库存股
+ * - writebackTB(4201): 审定数回写 trial_balance 科目 4201 库存股
  * - EventBus: 回写成功后发布 'substantive:adjudicated'
  * - debounce/即时保存: 文本字段 debounce 2s，枚举/结论即时保存
  * - 组件卸载时 flush 未保存数据（onScopeDispose）
  *
- * 科目：4002 库存股（**借方/权益备抵类！期末=期初+借方-贷方**）
+ * 科目：4201 库存股（**借方/权益备抵类！期末=期初+借方-贷方**）
  * 回购股份在借方增加库存股，注销/再出售在贷方减少库存股（与其他M权益类方向相反！）
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ export interface UseM3FormDataOptions {
 
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'M3-'
-const ACCOUNT_CODE = '4002' // 库存股（借方/权益备抵类！）
+const ACCOUNT_CODE = M_CYCLE_ACCOUNT.M3.code // 库存股（借方/权益备抵类！）
 /** 审定表 sheet 名（含子码 M3-1，供后端 extract_determination_wp_code 解出） */
 const DETERMINATION_SHEET_NAME = '审定表M3-1'
 
@@ -272,10 +273,10 @@ export function useM3FormData(options: UseM3FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── writebackTB (回写审定数到 trial_balance 4002) ─────────────────────────
+  // ─── writebackTB (回写审定数到 trial_balance 4201) ─────────────────────────
 
   /**
-   * 回写审定数到 trial_balance（科目 4002 库存股，**借方/权益备抵类！**）。
+   * 回写审定数到 trial_balance（科目 4201 库存股，**借方/权益备抵类！**）。
    *
    * 权益备抵借方方向铁律：
    * - 期末 = 期初 + 借方(回购) - 贷方(注销/再售)

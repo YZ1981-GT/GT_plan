@@ -16,7 +16,7 @@
  *   D(科目名称) | E(附注项目) | F(借方调整金额) | G(贷方调整金额)
  *   H(索引) | I(备注)
  *
- * 科目：2601 专项应付款（贷方/负债类）
+ * 科目：2711 专项应付款（贷方/负债类）
  */
 import { computed, ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
@@ -122,19 +122,19 @@ export function useL6Adjustment(formData: ReturnType<typeof useL6FormData>) {
     return activeType.value === 'AJE' ? ajeBalance.value : rjeBalance.value
   })
 
-  /** AJE 对科目2601专项应付款的净影响（贷方增加-借方减少，负债类贷方） */
-  const ajeNet2601: ComputedRef<number> = computed(() => {
-    const entries2601 = ajeEntries.value.filter(e => e.accountName.includes('专项应付款'))
-    const credit = calcSubtotal(entries2601.map(e => e.creditAmount))
-    const debit = calcSubtotal(entries2601.map(e => e.debitAmount))
+  /** AJE 对科目2711专项应付款的净影响（贷方增加-借方减少，负债类贷方） */
+  const ajeNet2711: ComputedRef<number> = computed(() => {
+    const entries2711 = ajeEntries.value.filter(e => e.accountName.includes('专项应付款'))
+    const credit = calcSubtotal(entries2711.map(e => e.creditAmount))
+    const debit = calcSubtotal(entries2711.map(e => e.debitAmount))
     return credit - debit
   })
 
-  /** RJE 对科目2601的净影响 */
-  const rjeNet2601: ComputedRef<number> = computed(() => {
-    const entries2601 = rjeEntries.value.filter(e => e.accountName.includes('专项应付款'))
-    const credit = calcSubtotal(entries2601.map(e => e.creditAmount))
-    const debit = calcSubtotal(entries2601.map(e => e.debitAmount))
+  /** RJE 对科目2711的净影响 */
+  const rjeNet2711: ComputedRef<number> = computed(() => {
+    const entries2711 = rjeEntries.value.filter(e => e.accountName.includes('专项应付款'))
+    const credit = calcSubtotal(entries2711.map(e => e.creditAmount))
+    const debit = calcSubtotal(entries2711.map(e => e.debitAmount))
     return credit - debit
   })
 
@@ -236,8 +236,8 @@ export function useL6Adjustment(formData: ReturnType<typeof useL6FormData>) {
     eventBus.emit('adjustment:created', {
       wpCode: 'L6',
       accountCode: L6_GROSS_FALLBACK_STANDARD,
-      ajeNet: ajeNet2601.value,
-      rjeNet: rjeNet2601.value,
+      ajeNet: ajeNet2711.value,
+      rjeNet: rjeNet2711.value,
       timestamp: Date.now(),
     })
   }
@@ -340,8 +340,8 @@ export function useL6Adjustment(formData: ReturnType<typeof useL6FormData>) {
     ajeBalance,
     rjeBalance,
     currentBalance,
-    ajeNet2601,
-    rjeNet2601,
+    ajeNet2711,
+    rjeNet2711,
 
     // 行操作
     addEntry,

@@ -16,7 +16,7 @@
  * - splitAmount: 复合工具金额拆分
  * - calcClassificationConsistency: 金额守恒校验+浮点容差
  *
- * 科目：4003 其他权益工具（贷方/权益类！期末=期初+贷方-借方）
+ * 科目：4401 其他权益工具（贷方/权益类！期末=期初+贷方-借方）
  */
 import { describe, it, expect } from 'vitest'
 import {

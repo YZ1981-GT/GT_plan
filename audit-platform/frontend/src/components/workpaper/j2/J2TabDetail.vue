@@ -228,7 +228,7 @@ async function aiGen(target: 'note' | 'conclusion') {
     const termEnd = endAud(mainRows, findRow(mainRows, 'termination')!)
     const totalEnd = endAud(mainRows, findRow(mainRows, 'total')!)
     const context: Record<string, string> = {
-      科目: '2221 长期应付职工薪酬 / 设定受益计划净资产明细表（J2-2）',
+      科目: '2705 长期应付职工薪酬 / 设定受益计划净资产明细表（J2-2）',
       设定受益计划审定期末: fmt(dbpEnd),
       辞退福利审定期末: fmt(termEnd),
       合计审定期末: fmt(totalEnd),

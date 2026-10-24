@@ -408,7 +408,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="4001 实收资本/股本"
+      :subject-label="mAccountLabel('M2')"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -453,6 +453,7 @@ import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn
 import { useAuditContext } from '@/composables/useAuditContext'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
+import { M_CYCLE_ACCOUNT, mAccountLabel } from '../../composables/mCycleAccountScope'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -517,11 +518,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '4001',
+  subjectPrefix: M_CYCLE_ACCOUNT.M2.code,
   direction: 'credit',
-  subjectCode: '4001',
+  subjectCode: M_CYCLE_ACCOUNT.M2.code,
   wpCode: 'M2',
-  subjectLabel: '实收资本/股本(4001)',
+  subjectLabel: mAccountLabel('M2'),
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) => {
     const idx = rows.value.findIndex((r) => r.key === rowKey)
@@ -819,7 +820,7 @@ async function _loadTbData(): Promise<void> {
   try {
     const resp = await import('@/utils/http').then(m => m.default.get(
       `/api/projects/${props.projectId}/trial-balance`,
-      { params: { account_code: '4001' }, _silent: true } as any,
+      { params: { account_code: M_CYCLE_ACCOUNT.M2.code }, _silent: true } as any,
     ))
     const data = resp?.data?.data ?? resp?.data
     if (data) {

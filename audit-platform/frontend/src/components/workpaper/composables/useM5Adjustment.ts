@@ -23,6 +23,7 @@ import { computed, ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { calcSubtotal } from './useM5FormulaEngine'
 import type { useM5FormData } from './useM5FormData'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -237,7 +238,7 @@ export function useM5Adjustment(formData: ReturnType<typeof useM5FormData>) {
     // EventBus publish（双向同步M5-1 + 通知A13）
     eventBus.emit('adjustment:created', {
       wpCode: 'M5',
-      accountCode: '4101',
+      accountCode: M_CYCLE_ACCOUNT.M5.code,
       ajeNet: ajeNet4101.value,
       rjeNet: rjeNet4101.value,
       timestamp: Date.now(),

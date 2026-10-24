@@ -7,7 +7,7 @@
         <h3 class="section-title">L7-1 其他非流动负债审定表</h3>
       </div>
       <div class="section-header-right">
-        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" :disabled="!l7BringInCodes.length" title="其他非流动负债没有专属科目码，本项目无可按科目带入的调整分录" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon> 带入调整
         </el-button>
         <!-- BP-7 / AC 1.4：能力诚实披露（BP-4 inert 开关已摘除） -->
@@ -51,7 +51,7 @@
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>其他非流动负债为负债类贷方科目（2801）：</strong>
+        <strong>其他非流动负债为负债类贷方科目（无专属科目码）：</strong>
         期末审定数 = 未审数 + AJE（账项调整） + RJE（重分类调整）。
         变动额 = 期末审定 − 期初审定。按项目分类列示，包括递延收益（非流动）、保证金、押金等。
         审定数变化自动回写试算表并通知附注组件。
@@ -278,14 +278,14 @@
     <details class="l7-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>其他非流动负债为负债类贷方科目（2801）：期末 = 期初 + 贷方 − 借方</li>
+        <li>其他非流动负债为负债类贷方科目（无专属科目码）：期末 = 期初 + 贷方 − 借方</li>
         <li>审定数 = 未审数 + AJE（账项调整） + RJE（重分类调整）</li>
         <li>变动额 = 期末审定 − 期初审定；变动率 = 变动额 / 期初审定</li>
         <li>按项目分类填列：递延收益（非流动）、保证金、押金、其他等</li>
         <li>合计行自动汇总各项目行数据</li>
         <li>TB核对行自动从试算表取数，用于校验录入正确性</li>
-        <li>审定数变化自动回写 TB（科目 2801）并通知附注组件</li>
-        <li>「带入调整」：可从集中登记按科目 2801 拉取调整分录，逐笔分配到各项目行的期末账项/重分类调整，带入后审定数自动更新并联动附注</li>
+        <li>审定数变化自动回写 TB（报表行 BS-071）并通知附注组件</li>
+        <li>「带入调整」：其他非流动负债没有专属科目码，无法按科目从集中登记拉取调整分录（按钮禁用），调整请在 L7-3 录入</li>
       </ul>
     </details>
 
@@ -293,7 +293,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="2801 其他非流动负债"
+      subject-label="其他非流动负债（本项目无可映射科目）"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -309,7 +309,7 @@
  * - 12列结构（xlsx B~K）：
  *   A:项目名称 | B-E:期初(未审/AJE/RJE/审定[公式]) | F-I:期末(未审/AJE/RJE/审定[公式]) | J:变动额[公式] | K:变动率[公式]
  * - 公式列: 虚线下划线 + cursor:help + tooltip showing formula source
- * - TB回写: 审定数变化 → writebackTB(2801)
+ * - TB回写: 审定数变化 → writebackTB(BS-071)
  * - EventBus: subscribe 'adjustment:created' → refresh AJE/RJE columns
  * - 顶部能力提示走 GtEntrySyncCapabilityNotice（BP-4 路线②：原 el-segmented 双模式开关
  *   是死开关 —— 切到 OnlyOffice 不渲染任何 OO 宿主，已连同 `useL7DualMode` 一并摘除）
@@ -319,7 +319,7 @@
  * - Props: wpId, projectId, isReadonly
  * - inject 'openReviewDialog' for review button
  *
- * 科目：2801 其他非流动负债（贷方/负债类！期末=期初+贷方-借方）
+ * 科目：其他非流动负债（无专属科目码，宁缺勿造；贷方/负债类！期末=期初+贷方-借方）
  */
 import { computed, inject, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { MagicStick, Check, Download } from '@element-plus/icons-vue'
@@ -332,6 +332,7 @@ import {
   type L7AdjudicationRow,
 } from '../../composables/useL7Adjudication'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { l7GrossQueryCodes, L7_REPORT_ROW_CODE } from '../../composables/l7AccountScope'
 import { useAuditContext } from '@/composables/useAuditContext'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
@@ -360,6 +361,8 @@ const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => vo
  * L7 宁缺勿造时 prefill_supported=false + empty_reason 非空 → 面板显示 absent 态。
  */
 const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
+/** 带入调整的科目口径（宁缺勿造，恒为空 ⇒ 带入按钮禁用） */
+const l7BringInCodes = computed(() => l7GrossQueryCodes(tbSourceCodes.value))
 
 /**
  * L7 溯源面板口径说明。
@@ -472,7 +475,9 @@ function updateRow(index: number, field: string, value: string | number): void {
   composableUpdateRow(index, field as any, value)
 }
 
-// ─── 从集中登记带入调整（2801 其他非流动负债，负债贷方；带入期末 AJE/RJE） ─────────
+// ─── 从集中登记带入调整（其他非流动负债，负债贷方；带入期末 AJE/RJE） ───────────
+// 🔴 原写死 `2801` —— 那是预计负债（K5），带入的是别的循环的调整。
+//    L7 宁缺勿造：l7GrossQueryCodes 恒返空 ⇒ 不拉取（按钮禁用），事件码沿用发布同口径 L7_REPORT_ROW_CODE。
 const bringInRows = computed(() =>
   rawComputedRows.value.map((r) => ({ rowKey: r.key, name: r.itemName || '(未命名项目)', aje: r.endAje, rje: r.endRje })),
 )
@@ -485,11 +490,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '2801',
+  subjectPrefix: () => l7GrossQueryCodes(tbSourceCodes.value),
   direction: 'credit',
-  subjectCode: '2801',
+  subjectCode: L7_REPORT_ROW_CODE,
   wpCode: 'L7',
-  subjectLabel: '其他非流动负债(2801)',
+  subjectLabel: '其他非流动负债（本项目无可映射科目）',
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) => {
     const i = rows.value.findIndex((r) => r.key === rowKey)

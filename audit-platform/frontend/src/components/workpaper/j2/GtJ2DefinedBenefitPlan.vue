@@ -126,7 +126,7 @@
  * GtJ2DefinedBenefitPlan — J2 设定受益计划主入口组件
  *
  * 按 sheetName v-if 分发到各子组件（defineAsyncComponent lazy 加载）。
- * 科目2221长期应付职工薪酬-设定受益计划（贷方/负债类）：期末=期初+贷方-借方
+ * 科目2705长期应付职工薪酬-设定受益计划（贷方/负债类）：期末=期初+贷方-借方
  *
  * 真双向回写：useWorkpaperSyncBridge + WorkpaperSyncEditorHost（参照 D2 接线模式）。
  * persistence三连环：selfLoad(checklist-responses GET) + allResponses Map + handleChildSave(PUT)

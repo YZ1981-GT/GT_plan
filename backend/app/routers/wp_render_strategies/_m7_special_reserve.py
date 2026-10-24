@@ -26,14 +26,16 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.m_cycle_specs import fallback_code_of, row_code_of
 from app.services.report_account_mapping import resolve_report_line_account_codes
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-_M7_ACCOUNT_CODE = "4301"
-_M7_ROW_CODE = "BS-082"  # 专项储备报表行（listed_standalone；soe 为 BS-117）
+_M7_ACCOUNT_CODE = fallback_code_of("M7")  # 4301 专项储备
+#: 专项储备 BS-086（四个准则同号）。原 BS-082 是「其他权益工具」(4401)。
+_M7_ROW_CODE = row_code_of("M7")
 _ADJUDICATED_ITEM_ID = "M7-1-adjudicated-amount"
 
 M7_SHEETS = [
@@ -193,7 +195,7 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         logger.warning("M7 render: project context 查询失败: %s", e)
 
-    # ─── TB 取数（科目4201专项储备）─────────────────────────────────────
+    # ─── TB 取数（科目4301专项储备）─────────────────────────────────────
     tb = await _fetch_tb_data(ctx)
 
     # ─── 取数溯源：报表行解析科目集 ───────────────────────────────────────
@@ -238,13 +240,13 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
         "adjudicated_amount": adjudicated_amount,
-        # TB 余额数据（科目4201，贷方/权益类）
+        # TB 余额数据（科目4301，贷方/权益类）
         "trial_balance": tb,
         # 取数溯源（供前端 WpFourTableSourcePanel 展示）
         "tb_source_codes": tb_source_codes,
         # 权益类公式方向元数据（前端可用于初始化校验）
         "formula_direction": {
-            "account_code": "4301",
+            "account_code": _M7_ACCOUNT_CODE,
             "account_name": "专项储备",
             "direction": "credit",  # 贷方/权益类！
             "end_balance_formula": "begin + credit - debit",  # 期末=期初+贷方-借方

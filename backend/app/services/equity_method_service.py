@@ -296,13 +296,13 @@ def calculate_equity_method(inp: EquityMethodInput) -> EquityMethodResult:
                 "description": "其他综合收益调整",
                 "debit_account": "1511 长期股权投资—其他综合收益",
                 "debit_amount": str(result.oci_adjustment),
-                "credit_account": "4002 其他综合收益",
+                "credit_account": "4003 其他综合收益",
                 "credit_amount": str(result.oci_adjustment),
             })
         else:
             entries.append({
                 "description": "其他综合收益调整（减少）",
-                "debit_account": "4002 其他综合收益",
+                "debit_account": "4003 其他综合收益",
                 "debit_amount": str(abs(result.oci_adjustment)),
                 "credit_account": "1511 长期股权投资—其他综合收益",
                 "credit_amount": str(abs(result.oci_adjustment)),

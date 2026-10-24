@@ -16,11 +16,11 @@
  * - 权益类贷方期末：期末=期初+贷方-借方（calcEquityEndBalance）
  * - 双区块小计：按nonReclass/reclass分组 calcSubtotal
  * - 变动率: IF(AND(B=0,E=0),0, IF(B=0,1, E/B))
- * - 审定数变化→writebackTB(4103)+EventBus 'substantive:adjudicated'
+ * - 审定数变化→writebackTB(4003)+EventBus 'substantive:adjudicated'
  * - 与M9-2明细合计交叉验证
  * - subscribe EventBus 'disclosure:note-text-updated' 刷新
  *
- * 科目：4103 其他综合收益（**贷方/权益类！期末=期初+贷方-借方**）
+ * 科目：4003 其他综合收益（**贷方/权益类！期末=期初+贷方-借方**）
  * OCI增加在贷方增加，OCI减少/重分类进损益在借方减少
  *
  * 47×12结构，41公式
@@ -34,6 +34,7 @@ import {
   calcSubtotal,
 } from './useM9FormulaEngine'
 import type { useM9FormData } from './useM9FormData'
+import { M_CYCLE_ACCOUNT } from './mCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -269,7 +270,7 @@ export function useM9Adjudication(
 
   /**
    * 保存审定表并触发TB回写 + EventBus
-   * - 回写 trial_balance 科目 4103（贷方/权益类！）
+   * - 回写 trial_balance 科目 4003（贷方/权益类！）
    * - publish 'substantive:adjudicated'
    */
   async function saveAdjudication(): Promise<void> {
@@ -306,7 +307,7 @@ export function useM9Adjudication(
       if (oldVal !== undefined && newVal !== oldVal) {
         await saveAdjudication()
         eventBus.emit('substantive:adjudicated', {
-          accountCode: '4103',
+          accountCode: M_CYCLE_ACCOUNT.M9.code,
           auditedAmount: newVal,
           wpCode: 'M9',
           timestamp: Date.now(),
@@ -318,7 +319,7 @@ export function useM9Adjudication(
   // ─── 7b. 显式发布到试算表（显式确认门，复刻 D2/D4-1 范式） ────────────────
 
   /**
-   * 确认发布审定数到试算表（科目 4103 其他综合收益）。
+   * 确认发布审定数到试算表（科目 4003 其他综合收益）。
    * spec: tb-writeback-explicit-publish-gate Task 5 / Req 2。
    * 二次确认（中文）→ 保存明细 → formData.writebackTB 走 publish-to-tb。用户取消 → 无副作用。
    */
@@ -326,7 +327,7 @@ export function useM9Adjudication(
     if (publishing.value) return
     try {
       await ElMessageBox.confirm(
-        '发布后将把其他综合收益审定数（科目 4103）写入试算表（trial_balance），'
+        `发布后将把其他综合收益审定数（科目 ${M_CYCLE_ACCOUNT.M9.code}）写入试算表（trial_balance），`
         + '并触发报表/错报评价等下游重算。确认发布？',
         '发布到试算表确认',
         { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
@@ -376,7 +377,7 @@ export function useM9Adjudication(
   function subscribeAdjudicated(callback: () => void): () => void {
     const handler = (payload: any) => {
       // 仅对非本组件发出的事件响应
-      if (payload?.wpCode !== 'M9' || payload?.accountCode !== '4103') {
+      if (payload?.wpCode !== 'M9' || payload?.accountCode !== M_CYCLE_ACCOUNT.M9.code) {
         callback()
       }
     }

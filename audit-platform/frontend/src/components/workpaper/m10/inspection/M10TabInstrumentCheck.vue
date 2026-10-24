@@ -6,7 +6,7 @@
         <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
         <h3 class="section-title">M10-5 其他权益工具检查表</h3>
         <el-tag type="success" effect="dark" size="small" class="equity-badge">
-          科目4003·权益类贷方
+          科目4401·权益类贷方
         </el-tag>
       </div>
       <div class="section-header-right">
@@ -262,7 +262,7 @@ async function handleAI(section: string) {
     const items = instrumentCheck.checkItems.value
     const done = items.filter(i => i.status && i.status !== 'pending').length
     const context: Record<string, string> = {
-      科目: '4003 其他权益工具 / 其他权益工具检查表（M10-5）',
+      科目: '4401 其他权益工具 / 其他权益工具检查表（M10-5）',
       区段: section,
       检查项总数: String(items.length),
       已完成检查项: String(done),

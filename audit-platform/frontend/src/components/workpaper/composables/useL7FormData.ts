@@ -9,12 +9,12 @@
  * - selfLoad(): bundle内嵌场景从 render-config 加载上下文
  * - checklist_responses 持久化: GET/PUT /api/workpapers/:wpId/checklist-responses
  * - item_id 命名: 前缀 "L7-{sheet}-{field}"（如 "L7-L7-1-audited_amount", "L7-L7-2-detail-row1-end"）
- * - writebackTB(2801): 审定数回写 trial_balance 科目 2801 其他非流动负债
+ * - writebackTB(BS-071): 审定数回写 trial_balance（报表行 BS-071，无专属科目码）
  * - EventBus: 回写成功后发布 'substantive:adjudicated'
  * - debounce/即时保存: 文本字段 debounce 2s，枚举/结论即时保存
  * - 组件卸载时 flush 未保存数据（onScopeDispose）
  *
- * 科目：2801 其他非流动负债（贷方/负债类！期末=期初+贷方-借方）
+ * 科目：其他非流动负债（无专属科目码，宁缺勿造；贷方/负债类！期末=期初+贷方-借方）
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -226,7 +226,7 @@ export function useL7FormData(options: UseL7FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── writebackTB (回写审定数到 trial_balance 2801) ─────────────────────────
+  // ─── writebackTB (回写审定数到 trial_balance，报表行 BS-071) ─────────────────────────
 
   /**
    * 发布审定数到 trial_balance（其他非流动负债；回写用报表行 BS-071，非科目码）。

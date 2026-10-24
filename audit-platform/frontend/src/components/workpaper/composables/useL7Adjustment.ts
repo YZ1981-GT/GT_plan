@@ -16,7 +16,7 @@
  *   D(科目名称) | E(附注项目) | F(...) | G(借方调整金额) | H(贷方调整金额)
  *   I(索引) | J(备注)
  *
- * 科目：2801 其他非流动负债（贷方/负债类）
+ * 科目：其他非流动负债（无专属科目码，宁缺勿造；贷方/负债类）
  */
 import { computed, ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
@@ -119,19 +119,19 @@ export function useL7Adjustment(formData: ReturnType<typeof useL7FormData>) {
     return activeType.value === 'AJE' ? ajeBalance.value : rjeBalance.value
   })
 
-  /** AJE 对科目2801其他非流动负债的净影响（贷方增加-借方减少，负债类贷方） */
-  const ajeNet2801: ComputedRef<number> = computed(() => {
-    const entries2801 = ajeEntries.value.filter(e => e.accountName.includes('其他非流动负债'))
-    const credit = calcSubtotal(entries2801.map(e => e.creditAmount))
-    const debit = calcSubtotal(entries2801.map(e => e.debitAmount))
+  /** AJE 对其他非流动负债的净影响（贷方增加-借方减少，负债类贷方） */
+  const ajeNetAccount: ComputedRef<number> = computed(() => {
+    const entriesAccount = ajeEntries.value.filter(e => e.accountName.includes('其他非流动负债'))
+    const credit = calcSubtotal(entriesAccount.map(e => e.creditAmount))
+    const debit = calcSubtotal(entriesAccount.map(e => e.debitAmount))
     return credit - debit
   })
 
-  /** RJE 对科目2801的净影响 */
-  const rjeNet2801: ComputedRef<number> = computed(() => {
-    const entries2801 = rjeEntries.value.filter(e => e.accountName.includes('其他非流动负债'))
-    const credit = calcSubtotal(entries2801.map(e => e.creditAmount))
-    const debit = calcSubtotal(entries2801.map(e => e.debitAmount))
+  /** RJE 对其他非流动负债的净影响 */
+  const rjeNetAccount: ComputedRef<number> = computed(() => {
+    const entriesAccount = rjeEntries.value.filter(e => e.accountName.includes('其他非流动负债'))
+    const credit = calcSubtotal(entriesAccount.map(e => e.creditAmount))
+    const debit = calcSubtotal(entriesAccount.map(e => e.debitAmount))
     return credit - debit
   })
 
@@ -231,8 +231,8 @@ export function useL7Adjustment(formData: ReturnType<typeof useL7FormData>) {
     eventBus.emit('adjustment:created', {
       wpCode: 'L7',
       accountCode: 'BS-071', // L7 宁缺勿造，EventBus 用报表行标识（2801 是预计负债 K5）
-      ajeNet: ajeNet2801.value,
-      rjeNet: rjeNet2801.value,
+      ajeNet: ajeNetAccount.value,
+      rjeNet: rjeNetAccount.value,
       timestamp: Date.now(),
     } as any)
   }
@@ -279,8 +279,8 @@ export function useL7Adjustment(formData: ReturnType<typeof useL7FormData>) {
     ajeBalance,
     rjeBalance,
     currentBalance,
-    ajeNet2801,
-    rjeNet2801,
+    ajeNetAccount,
+    rjeNetAccount,
 
     // 行操作
     addEntry,

@@ -1583,3 +1583,7 @@ backend/app/routers/wp_template.py  872
 #     2026-10-23 汇总提交：试算表重算步骤透传「损益类科目缺发生额列、按期末余额替代」的提醒（C-4，+7 行，
 #     配合 trial_balance_service.full_recalc 返回的替代科目清单）。拆分方向：各 _step_* 步骤按链路环节拆到独立模块，编排类只保留顺序与状态。
 backend/app/services/chain_orchestrator.py  970
+#   wp_surfaced_k.py —— 历史大文件（HEAD 已 1225 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-24 formula-fetch-followup-defect-closure R1.4：K2 / K4 / K5 段把真源已声明的错码（1231 / 2245 / 2701）
+#     展示给用户，逐条改文案（行数不变）。拆分方向：按底稿编码拆成 K1~K13 各自的目录模块，入口只做合并（同 wp_surfaced_formulas）。
+backend/app/routers/wp_surfaced_k.py  1225

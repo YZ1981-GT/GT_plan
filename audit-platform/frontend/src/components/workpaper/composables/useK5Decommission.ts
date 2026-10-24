@@ -12,7 +12,7 @@
  * - 与K5-1弃置义务行交叉验证
  * - Save with prefix "K5-5-"
  *
- * 科目：2701 预计负债-弃置义务（**贷方/负债类**）
+ * 科目：2801 预计负债-弃置义务（**贷方/负债类**）
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'

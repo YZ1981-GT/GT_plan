@@ -77,11 +77,12 @@ interface FormDataCase {
 
 const FORM_DATA_CASES: FormDataCase[] = [
   {
-    cycle: 'K1', wpId: 'wp-k1-001', sheetCodeRe: /K1-1/, expectAccountCodes: ['1221', '1231'],
+    cycle: 'K1', wpId: 'wp-k1-001', sheetCodeRe: /K1-1/, expectAccountCodes: ['1221', '1231-03'],
     amountKind: 'balance', wpCode: 'K1',
     invoke: async (wpId) => {
       const fd = useK1FormData({ wpId, projectId: ref('proj-k1') })
-      await fd.writebackTB(500000, 30000) // 双科目：其他应收款 + 坏账准备
+      // 双科目：其他应收款 + 本循环专属坏账准备（科目由调用方按本项目口径传入）
+      await fd.writebackTB(500000, 30000, { receivable: '1221', badDebt: '1231-03' })
     },
   },
   {
@@ -180,17 +181,18 @@ describe.each(FORM_DATA_CASES)(
 )
 
 describe('K1 双科目在单次 writeback_rows 原子发布（Task 8 / Req 5）', () => {
-  it('1221 + 坏账准备 1231 同在一次 POST', async () => {
+  it('1221 + 本循环专属坏账准备 1231-03 同在一次 POST（不发布宽口径 1231）', async () => {
     const scope = effectScope()
     try {
       const fd = scope.run(() => useK1FormData({ wpId: ref('wp-k1-002'), projectId: ref('proj-k1') }))!
-      await fd.writebackTB(500000, 30000)
+      await fd.writebackTB(500000, 30000, { receivable: '1221', badDebt: '1231-03' })
       expect(mockPost).toHaveBeenCalledTimes(1)
       const body = mockPost.mock.calls[0]![1]
       expect(body.writeback_rows).toHaveLength(2)
       const byCode = Object.fromEntries(body.writeback_rows.map((r: any) => [r.account_code, r.audited_amount]))
       expect(byCode['1221']).toBe(500000)
-      expect(byCode['1231']).toBe(30000)
+      expect(byCode['1231-03']).toBe(30000)
+      expect(byCode['1231'], '宽口径 1231 同时承载应收票据/应收账款的坏账，不得被 K1 覆盖').toBeUndefined()
     } finally {
       scope.stop()
     }

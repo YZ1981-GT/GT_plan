@@ -6,7 +6,7 @@
  * Requirements: 2.1-2.7
  *
  * 职责：
- * - 管理权益类单区块数据（一般风险准备4104）
+ * - 管理权益类单区块数据（一般风险准备）
  * - 行结构: 6 detail rows (rows 7-12 in xlsx) + 1 total row (row 13)
  * - 列结构：项目 | 期初未审 | 期初AJE | 期初RJE | 期初审定 | 期末未审 | 期末AJE | 期末RJE | 期末审定 | 变动额 | 变动率 | 原因
  * - 审定数公式：审定=未审+AJE+RJE（calcAuditedAmount）
@@ -14,11 +14,11 @@
  * - 合计行: SUM(B7:B12) 等区域求和
  * - 变动率: IF(AND(E=0,J=0),0, IF(E=0,1, J/E))
  * - 变动额: J=I-E（期末审定-期初审定）
- * - 审定数变化→writebackTB(4104)+EventBus 'substantive:adjudicated'
+ * - 审定数变化→writebackTB(一般风险准备)+EventBus 'substantive:adjudicated'
  * - 与M8-2明细表交叉验证
  * - subscribe EventBus 'substantive:adjudicated' 刷新
  *
- * 科目：4104 一般风险准备（**贷方/权益类！期末=期初+贷方-借方**）
+ * 科目：一般风险准备（**贷方/权益类！期末=期初+贷方-借方**）
  * 金融企业从净利润中计提时贷方增加，转回/使用时借方减少
  *
  * 25×12结构，84公式
@@ -181,9 +181,9 @@ export function useM8Adjudication(
   // ─── 6. 保存 + TB回写 ─────────────────────────────────────────────────
 
   /**
-   * 保存审定表并触发TB回写 + EventBus
-   * - 回写 trial_balance 科目 4104（贷方/权益类！）
-   * - publish 'substantive:adjudicated'
+   * 保存审定表明细（checklist_responses）。
+   * - 不写 trial_balance（发布走 publishToTb 显式确认；一般风险准备按本项目科目表定位，贷方/权益类！）
+   * - 'substantive:adjudicated' 由下方审定数 watch 发布
    */
   async function saveAdjudication(): Promise<void> {
     const items = computedRows.value.map((row) => {
@@ -216,7 +216,8 @@ export function useM8Adjudication(
       if (oldVal !== undefined && newVal !== oldVal) {
         await saveAdjudication()
         eventBus.emit('substantive:adjudicated', {
-          accountCode: '4104',
+          // 一般风险准备没有统一标准码：取本项目定位结果，定位不到为空串（附注按 wpCode 认领）
+          accountCode: formData.accountCode.value,
           auditedAmount: newVal,
           wpCode: 'M8',
           timestamp: Date.now(),
@@ -228,15 +229,22 @@ export function useM8Adjudication(
   // ─── 7b. 显式发布到试算表（显式确认门，复刻 D2/D4-1 范式） ────────────────
 
   /**
-   * 确认发布审定数到试算表（科目 4104 一般风险准备）。
+   * 确认发布审定数到试算表（一般风险准备科目，码取本项目定位结果）。
    * spec: tb-writeback-explicit-publish-gate Task 5 / Req 2。
    * 二次确认（中文）→ 保存明细 → formData.writebackTB 走 publish-to-tb。用户取消 → 无副作用。
+   * 定位不到科目 / 定位到多个标准码 → 直接提示原因，不弹确认、不发请求
+   * （spec formula-fetch-followup-defect-closure R1.4：原写死 4104 会覆盖利润分配）。
    */
   async function publishToTb(): Promise<void> {
     if (publishing.value) return
+    const blocked = formData.publishBlockReason.value
+    if (blocked) {
+      ElMessage.warning(blocked)
+      return
+    }
     try {
       await ElMessageBox.confirm(
-        '发布后将把一般风险准备审定数（科目 4104）写入试算表（trial_balance），'
+        `发布后将把一般风险准备审定数（科目 ${formData.accountCode.value}）写入试算表（trial_balance），`
         + '并触发报表/错报评价等下游重算。确认发布？',
         '发布到试算表确认',
         { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
@@ -276,7 +284,8 @@ export function useM8Adjudication(
   /** 订阅 'substantive:adjudicated' 事件刷新（其他sheet调整后同步） */
   function subscribeAdjudicated(callback: () => void): () => void {
     const handler = (payload: any) => {
-      if (payload?.wpCode !== 'M8' || payload?.accountCode !== '4104') {
+      // 只跳过本底稿自己发出的事件（一般风险准备没有统一码，按 wpCode 认）
+      if (payload?.wpCode !== 'M8') {
         callback()
       }
     }

@@ -50,7 +50,7 @@
 
     <!-- ═══ 方法论上下文（琥珀色块） ═══ -->
     <div class="methodology-context">
-      <p>预计负债（2701）为<strong>贷方/负债类</strong>科目。期末 = 期初 + 本期计提（增加） − 本期转销/冲回（减少）。按产品质保、诉讼、亏损合同、重组、弃置等类型分行，审定数 = 未审 + AJE + RJE。</p>
+      <p>预计负债（2801）为<strong>贷方/负债类</strong>科目。期末 = 期初 + 本期计提（增加） − 本期转销/冲回（减少）。按产品质保、诉讼、亏损合同、重组、弃置等类型分行，审定数 = 未审 + AJE + RJE。</p>
     </div>
 
     <!-- ═══ TB勾稽指示器 ═══ -->
@@ -223,11 +223,11 @@
     <details class="k5-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>负债类科目(2701)：期末 = 期初 + 计提(增加) − 转销/冲回(减少)</li>
+        <li>负债类科目(2801)：期末 = 期初 + 计提(增加) − 转销/冲回(减少)</li>
         <li>审定数 = 未审数 + AJE + RJE</li>
         <li>三角勾稽：审定合计应等于各类型行审定数之和</li>
         <li>各专项检查表期末应与对应类型行审定数一致</li>
-        <li>「带入调整」：按科目2701拉取调整分录，逐笔选目标类型行累加到 AJE/RJE，带入后自动联动披露/附注</li>
+        <li>「带入调整」：按科目2801拉取调整分录，逐笔选目标类型行累加到 AJE/RJE，带入后自动联动披露/附注</li>
       </ul>
     </details>
 
@@ -235,7 +235,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="2701 预计负债"
+      :subject-label="`${k5Code} 预计负债`"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -303,15 +303,20 @@ const {
   },
 })
 
-// ─── 从集中登记带入调整（2701 预计负债，负债贷方） ────────────────────────────
+/** 当前口径的科目码与标签（报表映射解析，兜底 2801）——带入弹窗 / 提示文案统一取此 */
+const k5Code = computed(() => k5AccountCode(props.tbSourceCodes as any))
+const k5SubjectLabel = computed(() => `预计负债(${k5Code.value})`)
+
+// ─── 从集中登记带入调整（预计负债，负债贷方） ────────────────────────────────
 const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: k5AccountCode(props.tbSourceCodes as any),
+  // 取值函数：溯源（tbSourceCodes）晚于挂载到达时仍按最新口径拉取
+  subjectPrefix: () => k5AccountCode(props.tbSourceCodes as any),
   direction: 'credit', // 负债贷方：净发生额 = 贷 − 借
-  subjectCode: k5AccountCode(props.tbSourceCodes as any),
+  subjectCode: () => k5AccountCode(props.tbSourceCodes as any),
   wpCode: 'K5',
-  subjectLabel: '预计负债(2701)',
+  subjectLabel: () => k5SubjectLabel.value,
   rows: computed(() => rows.value.map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
   updateCell: (rowKey: string, field: any, value: number) => handleCellChange(rowKey, field, value),
   totalAudited: () => subtotalRow.value.audited,
@@ -373,8 +378,8 @@ async function publishToTb(): Promise<void> {
       },
     )
     emit('save', 'K5-1-audited-total', { remark: String(auditedTotal) })
-    // 保留下游联动：发布审定数事件通知附注/A13/下游
-    publishAdjudicated()
+    // 保留下游联动：发布审定数事件通知附注/A13/下游（事件码 = 本次发布码）
+    publishAdjudicated(accountCode)
     ElMessage.success(resp?.message || '已发布到试算表')
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
@@ -454,10 +459,10 @@ async function syncFromSpecialSheets(): Promise<void> {
   } catch { /* 用户取消 */ }
 }
 
-// ─── 从TB 2701子科目预填未审数 ───────────────────────────────────────────────
+// ─── 从TB 预计负债子科目预填未审数 ─────────────────────────────────────────────
 
 /**
- * 从 tb_balance 查询 2701 子科目，按科目名称关键词映射到审定表类型行。
+ * 从 tb_balance 查询预计负债子科目（科目码取 k5Code），按科目名称关键词映射到审定表类型行。
  * 映射规则：质量/保修/保证→产品质量保证 | 诉讼/仲裁/赔偿→未决诉讼 |
  *           亏损/合同→亏损合同 | 重组/搬迁→重组义务 | 弃置/复垦/环保→弃置义务 | 其余→其他
  */
@@ -480,12 +485,12 @@ function classifySubAccount(name: string): number {
 async function prefillFromTbSubAccounts(): Promise<void> {
   try {
     const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: k5AccountCode(props.tbSourceCodes as any) },
+      params: { account_prefix: k5Code.value },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
     if (list.length === 0) {
-      ElMessage.warning('未查到2701子科目数据')
+      ElMessage.warning(`未查到${k5Code.value}子科目数据`)
       return
     }
 
@@ -494,7 +499,7 @@ async function prefillFromTbSubAccounts(): Promise<void> {
     const details: string[] = []
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (!code.startsWith(k5AccountCode(props.tbSourceCodes as any))) continue
+      if (!code.startsWith(k5Code.value)) continue
       const name = String(item.account_name ?? item.standard_account_name ?? code)
       const amt = Math.abs(Number(item.unadjusted_amount ?? item.closing_balance ?? 0))
       if (amt <= 0) continue
@@ -504,7 +509,7 @@ async function prefillFromTbSubAccounts(): Promise<void> {
     }
 
     if (Object.keys(grouped).length === 0) {
-      ElMessage.warning('2701子科目余额全部为0')
+      ElMessage.warning(`${k5Code.value}子科目余额全部为0`)
       return
     }
 
@@ -513,7 +518,7 @@ async function prefillFromTbSubAccounts(): Promise<void> {
       .join('\n')
 
     await ElMessageBox.confirm(
-      `从TB(2701)子科目预填未审数（仅填空值不覆盖）：\n${preview}\n\n明细（${details.length}个子科目）：\n${details.slice(0, 8).join('\n')}${details.length > 8 ? '\n...' : ''}`,
+      `从TB(${k5Code.value})子科目预填未审数（仅填空值不覆盖）：\n${preview}\n\n明细（${details.length}个子科目）：\n${details.slice(0, 8).join('\n')}${details.length > 8 ? '\n...' : ''}`,
       '从TB预填未审数',
       { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }
     )
@@ -552,7 +557,7 @@ const reportReconciliationRows = computed(() => {
 
   return [
     { label: 'K5-1 审定合计', amount: audited, isOk: true, isDiff: false },
-    { label: 'TB(2701) 审定数', amount: tbAudited, isOk: Math.abs(tbDiff) < 0.01, isDiff: Math.abs(tbDiff) > 0.01 },
+    { label: `TB(${k5Code.value}) 审定数`, amount: tbAudited, isOk: Math.abs(tbDiff) < 0.01, isDiff: Math.abs(tbDiff) > 0.01 },
     { label: 'K5-2 明细期末合计', amount: detailTotal || 0, isOk: !detailTotal || Math.abs(detailDiff) < 0.01, isDiff: detailTotal > 0 && Math.abs(detailDiff) > 0.01 },
     { label: '审定 vs TB 差异', amount: tbDiff, isOk: Math.abs(tbDiff) < 0.01, isDiff: Math.abs(tbDiff) > 0.01 },
     { label: '审定 vs 明细差异', amount: detailDiff, isOk: !detailTotal || Math.abs(detailDiff) < 0.01, isDiff: detailTotal > 0 && Math.abs(detailDiff) > 0.01 },

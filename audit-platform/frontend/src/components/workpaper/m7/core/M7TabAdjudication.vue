@@ -12,7 +12,7 @@
         <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
         <h3 class="section-title">M7-1 专项储备审定表</h3>
         <el-tag type="success" effect="dark" size="small" class="equity-badge">
-          权益类·贷方余额·4201
+          权益类·贷方余额·4301
         </el-tag>
       </div>
       <div class="section-header-right">
@@ -43,21 +43,21 @@
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>专项储备（4201）为权益类贷方科目：</strong>
+        <strong>专项储备（4301）为权益类贷方科目：</strong>
         期末余额 = 期初 + 贷方（计提增加） − 借方（使用减少）。
         审定数 = 未审数 + AJE + RJE。
         安全生产费计提在贷方增加（借:生产成本/管理费用 贷:专项储备）；
         费用性支出直接冲减专项储备（借方减少）；
         资本性支出形成固定资产同时全额计提折旧冲减专项储备。
         本表按安全生产费/维简费/其他专项储备分类小计。
-        审定数变化自动回写试算表（4201）并通知附注组件。
+        审定数变化自动回写试算表（4301）并通知附注组件。
       </div>
     </div>
 
     <!-- ═══ 单区块：专项储备（按类别分组+小计） ═══ -->
     <div class="block-section">
       <div class="block-header">
-        <h4 class="block-title">专项储备明细（4201 贷方/权益类）</h4>
+        <h4 class="block-title">专项储备明细（4301 贷方/权益类）</h4>
         <el-button
           v-if="!isReadonly"
           size="small"
@@ -231,7 +231,7 @@
     <!-- ═══ 合计 + 期末校验 + TB回写状态 ═══ -->
     <div class="adjudication-footer">
       <el-tag type="primary" size="small" effect="dark">合计审定: {{ fmtAmount(totalRow.audited) }}</el-tag>
-      <el-tag type="success" size="small" effect="plain">TB回写: 科目4201 专项储备（贷方/权益类）</el-tag>
+      <el-tag type="success" size="small" effect="plain">TB回写: 科目4301 专项储备（贷方/权益类）</el-tag>
       <el-tag :type="equityEndCheck.isMatch ? 'success' : 'danger'" size="small" effect="plain">
         期末校验: {{ fmtAmount(equityEndCheck.actual) }}
         {{ equityEndCheck.isMatch ? '=' : '≠' }}
@@ -274,15 +274,15 @@
     <details class="m7-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>专项储备（4201）为<strong>权益类贷方科目</strong>：期末 = 期初 + 贷方（计提） − 借方（使用）</li>
+        <li>专项储备（4301）为<strong>权益类贷方科目</strong>：期末 = 期初 + 贷方（计提） − 借方（使用）</li>
         <li>安全生产费：高危行业按产量或营业收入分档计提，贷方增加</li>
         <li>费用性支出：直接冲减专项储备（借方减少）</li>
         <li>资本性支出：形成固定资产 + 同时全额折旧冲减专项储备（联动H1）</li>
         <li>审定数 = 未审数 + AJE（账项调整） + RJE（重分类调整）</li>
-        <li>审定数变化自动回写 TB（科目 4201）并通知附注组件</li>
+        <li>审定数变化自动回写 TB（科目 4301）并通知附注组件</li>
         <li>合计行应与M7-2明细表合计一致（交叉验证）</li>
         <li>分类：安全生产费 / 维简费 / 其他专项储备</li>
-        <li>「带入调整」：从集中登记按科目 4201 拉取调整分录，逐笔分配到各项目行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
+        <li>「带入调整」：从集中登记按科目 4301 拉取调整分录，逐笔分配到各项目行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
 
@@ -290,7 +290,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="4201 专项储备"
+      :subject-label="mAccountLabel('M7')"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -305,11 +305,11 @@
  * Task: 4.2
  * Requirements: 2.1-2.7
  *
- * 权益类单区块（4201 专项储备, 贷方权益类）
+ * 权益类单区块（4301 专项储备, 贷方权益类）
  * Columns: 项目 | 期初 | 贷方发生(计提) | 借方发生(使用) | 期末 | 未审 | AJE | RJE | 审定 | TB数 | 差异 | 变动率
  * - useM7FormData + useM7Adjudication composable
  * - Font 13px, formula columns with dashed underline + cursor:help + tooltip
- * - TB回写(4201) on 审定数变化
+ * - TB回写(4301) on 审定数变化
  * - EventBus 'substantive:adjudicated' publish
  * - 双模式 (HTML/OO) 由入口 GtM7SpecialReserve 统一承载（本 tab 不再自建 segmented）
  * - 方法论上下文琥珀色块 (权益类贷方方向说明)
@@ -334,6 +334,7 @@ import { useVersionTrail } from '../../composables/useVersionTrail'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import { M_CYCLE_ACCOUNT, mAccountLabel } from '../../composables/mCycleAccountScope'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean; tbSourceCodes?: Record<string, any> | null }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
@@ -365,7 +366,7 @@ const {
   subscribeDisclosure,
 } = useM7Adjudication(formData, rows)
 
-// ─── 从集中登记带入调整（4201 专项储备，权益贷方；单期 aje/rje，按类别项目行） ───
+// ─── 从集中登记带入调整（4301 专项储备，权益贷方；单期 aje/rje，按类别项目行） ───
 const bringInRows = computed(() =>
   computedRows.value.map((r) => ({
     rowKey: r.key,
@@ -383,11 +384,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '4201',
+  subjectPrefix: M_CYCLE_ACCOUNT.M7.code,
   direction: 'credit',
-  subjectCode: '4201',
+  subjectCode: M_CYCLE_ACCOUNT.M7.code,
   wpCode: 'M7',
-  subjectLabel: '专项储备(4201)',
+  subjectLabel: mAccountLabel('M7'),
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) => {
     const idx = rows.value.findIndex((r) => r.key === rowKey)
@@ -566,7 +567,7 @@ async function handleAI(section: string): Promise<void> {
   aiLoading.value = section
   try {
     const context: Record<string, string> = {
-      科目: '4201 专项储备（权益类·贷方）/ 审定表 M7-1',
+      科目: '4301 专项储备（权益类·贷方）/ 审定表 M7-1',
       合计审定: fmtAmount(totalRow.value.audited),
       期末校验: equityEndCheck.value.isMatch ? '平衡' : `差异 ${fmtAmount(equityEndCheck.value.diff)}`,
       安全生产费小计: fmtAmount(safetyProductionSubtotal.value.audited),

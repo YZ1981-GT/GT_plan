@@ -11,10 +11,10 @@
  *   项目(A) | 期初(未审B/AJE_C/RJE_D/审定E) | 期末(未审F/AJE_G/RJE_H/审定I) | 变动额J | 变动率K
  * - 审定数公式：审定=未审+AJE+RJE
  * - 负债类：期末=期初+贷方-借方
- * - 审定数变化→writebackTB(2601)+EventBus
+ * - 审定数变化→writebackTB(2711)+EventBus
  * - subscribe附注刷新
  *
- * 科目：2601 专项应付款（贷方/负债类！期末=期初+贷方-借方）
+ * 科目：2711 专项应付款（贷方/负债类！期末=期初+贷方-借方）
  */
 import { computed, ref, watch, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'

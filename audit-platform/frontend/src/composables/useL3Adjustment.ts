@@ -181,7 +181,7 @@ export function useL3Adjustment(formData: ReturnType<typeof useL3FormData>) {
   /**
    * 生成一年内到期重分类RJE分录
    * 借：长期借款（2501）
-   * 贷：一年内到期的非流动负债（2801）
+   * 贷：一年内到期的非流动负债（报表项目，无统一科目码；同步时按科目名解析）
    *
    * @param currentPortion 一年内到期金额
    */

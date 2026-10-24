@@ -3,7 +3,7 @@
 
 spec: m2-m3-m4-m7-m10-bidirectional-pipeline
 entry: xlsx/gt-m10-other-equity-instruments
-科目: 4001 其他权益工具（贷方/权益类）
+科目: 4401 其他权益工具（贷方/权益类）
 受管 sheet: 明细表M10-2
 审定表 M10-1 除 A 列外全公式（1e+10f），不做 instrumentation。
 
@@ -32,7 +32,9 @@ ADAPTER_ID: Final[str] = "m10.other_equity_instruments"
 WP_CODES: Final[frozenset[str]] = frozenset({"M10O"})
 TEMPLATE_RELATIVE_PATH: Final[str] = "M/M10 其他权益工具.xlsx"
 TEMPLATE_SHA256: Final[str] = "073d75ae83274d4d54147934b5a4ef2b00d4be5c8a020b7cd074a99613ac8077"
-ACCOUNT_CODE: Final[str] = "4001"
+#: 元数据（构建器不读）。须与 four_table.m_cycle_specs.fallback_code_of("M10") 一致，
+#: 守卫 tests/four_table/test_m_cycle_account_single_source.py。原写 4001（实收资本）。
+ACCOUNT_CODE: Final[str] = "4401"
 ITEM_PREFIX: Final[str] = "M10-"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 STORE_ITEM_ID: Final[str] = "M10-"

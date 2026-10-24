@@ -2,7 +2,7 @@
   <div class="k4-tab-adjudication">
     <!-- 方法论上下文 -->
     <div class="methodology-context">
-      <p>K4-1审定表审定其他流动负债(2245贷方/<strong>负债类</strong>)。负债类期末=期初+贷方-借方（与资产类方向相反）。增加=贷方发生，减少=借方发生。审计重点为<strong>完整性认定</strong>（负债易少计）。</p>
+      <p>K4-1审定表审定其他流动负债(贷方/<strong>负债类</strong>；没有统一标准科目码，按本项目科目表定位)。负债类期末=期初+贷方-借方（与资产类方向相反）。增加=贷方发生，减少=借方发生。审计重点为<strong>完整性认定</strong>（负债易少计）。</p>
     </div>
 
     <!-- 审计目标（认定） -->
@@ -228,14 +228,14 @@
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>其他流动负债(2245)：<strong>负债类贷方科目</strong>，期末=期初+贷方-借方</li>
+        <li>其他流动负债：<strong>负债类贷方科目</strong>，期末=期初+贷方-借方；没有统一标准科目码，按本项目科目表定位（定位不到时手工录入、不回写试算表）</li>
         <li>增加在贷方、减少在借方（与资产类方向相反）</li>
         <li>审定数=未审数+AJE+RJE，未审数从TB自动取入(只读)</li>
         <li>三角勾稽：期末=期初+增加(贷)-减少(借)，差额须为0</li>
         <li>审计重点为<strong>完整性认定</strong>（负债易少计）→ 反向截止（期后偿付倒查未入账负债）</li>
-        <li>"确认审定"将回写trial_balance(2245)并发布EventBus事件通知附注刷新</li>
+        <li>"确认审定"将回写trial_balance（本项目定位到的其他流动负债科目）并发布EventBus事件通知附注刷新</li>
         <li>明细表（K4-2）合计应与本表审定数一致</li>
-        <li>「带入调整」：按科目2245拉取调整分录，逐笔选目标分类行累加到 AJE/RJE，带入后自动联动披露/附注</li>
+        <li>「带入调整」：按本项目定位到的其他流动负债科目拉取调整分录（定位不到不带入），逐笔选目标分类行累加到 AJE/RJE，带入后自动联动披露/附注</li>
       </ul>
     </details>
 
@@ -243,7 +243,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="2245 其他流动负债"
+      :subject-label="k4SubjectLabel"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -252,7 +252,7 @@
 
 <script setup lang="ts">
 /**
- * K4TabAdjudication.vue — K4-1 审定表（负债类2245，72公式）
+ * K4TabAdjudication.vue — K4-1 审定表（负债类，72公式）
  * Spec: .kiro/specs/k4-other-current-liabilities/ | Task: 4.2
  * Requirements: 2.1-2.7
  *
@@ -260,14 +260,14 @@
  * 列：项目|期初|本期贷方|本期借方|期末(公式)|未审|AJE|RJE|审定(公式)|变动率(公式)|备注
  * 公式列：虚线下划线+cursor:help+tooltip显示来源
  * 三角勾稽不平→红色高亮
- * TB回写按钮(2245其他流动负债→writebackTB)
+ * TB回写按钮(其他流动负债→writebackTB，科目取 k4Code，定位不到即禁用)
  * 底部审计说明el-card(审计结论textarea)
  * 复核对话按钮(inject openReviewDialog)
  * AI辅助按钮(section标题行右侧)
  * 编制提示details折叠底部
  * Consumes: useK4Adjudication + useK4FormData
  *
- * 科目：2245 其他流动负债（**贷方/负债类**）
+ * 科目：其他流动负债（**贷方/负债类**；没有统一标准科目码，按本项目科目表定位）
  * ⚠️ 负债类！期末=期初+贷方-借方（与资产类相反）
  */
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
@@ -289,7 +289,8 @@ const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
-  tbData: { unadjusted2245: number; audited2245: number }
+  /** 与宿主 GtK4OtherCurrentLiabilities 的 tbData 同形（原字段名带错码，且宿主从未提供该键） */
+  tbData: { unadjusted: number; audited: number }
   prefill?: Array<Record<string, unknown>>
   isReadonly: boolean
   tbSourceCodes?: Record<string, any> | null
@@ -302,6 +303,10 @@ const emit = defineEmits<{
 
 // K4 是宁缺勿造循环（三表零命中），科目码从 scope 取（无科目时返空串 → 带入调整按钮禁用）
 const k4Code = computed(() => k4QueryCodes(props.tbSourceCodes)[0] || '')
+/** 带入弹窗 / 提示用标签：定位不到科目时如实说明（不臆造科目码） */
+const k4SubjectLabel = computed(() =>
+  k4Code.value ? `其他流动负债(${k4Code.value})` : '其他流动负债（本项目未定位到科目）',
+)
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 const allResponsesRef = computed(() => props.allResponses)
@@ -329,7 +334,7 @@ const { writebackTB, debouncedSave } = useK4FormData({
 const publishing = ref(false)
 const isReadonly = computed(() => props.isReadonly)
 
-// ─── 从集中登记带入调整（2245 其他流动负债，负债贷方） ────────────────────────
+// ─── 从集中登记带入调整（其他流动负债，负债贷方） ─────────────────────────────
 const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
@@ -337,7 +342,7 @@ const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: o
   direction: 'credit', // 负债贷方：净发生额 = 贷 − 借
   subjectCode: k4Code,
   wpCode: 'K4',
-  subjectLabel: '其他流动负债(2245)',
+  subjectLabel: k4SubjectLabel,
   rows: computed(() => rows.value.map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
   updateCell: (rowKey: string, field: any, value: number) => onFieldChange(rowKey, field, value),
   totalAudited: () => subtotalRow.value.audited,
@@ -449,7 +454,9 @@ async function handleAiGenerate(section: string): Promise<void> {
         ? '请根据K4-1审定表数据，生成其他流动负债审定结论（概述审定数变动/三角勾稽/主要增减项目及原因）'
         : '请根据K4-1审定表数据，分析各项目变动原因并生成审计说明',
       context: {
-        科目: '2245 其他流动负债（负债类，完整性为核心认定）',
+        科目: k4Code.value
+          ? `${k4Code.value} 其他流动负债（负债类，完整性为核心认定）`
+          : '其他流动负债（负债类，完整性为核心认定；本项目未定位到科目）',
         审定合计: String(subtotalRow.value.audited),
         三角勾稽: reconciliation.value.isBalanced ? '平衡' : `不平，差额${reconciliation.value.diff}`,
         行数: String(rows.value.length),
@@ -502,13 +509,13 @@ function seedUnadjustedFromTB(): void {
   // 如果已有手工数据则不覆盖
   const hasExisting = rows.value.some(r => r.unadjusted !== 0)
   if (hasExisting) return
-  // tbData.unadjusted2245 是 2245 科目未审总额
-  if (props.tbData.unadjusted2245 > 0 && rows.value.length > 0) {
+  // tbData.unadjusted 是本项目定位到的其他流动负债科目未审总额（定位不到为 0）
+  if (props.tbData.unadjusted > 0 && rows.value.length > 0) {
     // 无法按子科目拆分时，仅填到第一个"其他"行作为参考
     // 实际应从后端 render project_context 按子科目映射（铁律），此处做最低限度 seed
     const firstRow = rows.value[0]
     if (firstRow && firstRow.unadjusted === 0) {
-      onFieldChange(firstRow.rowKey, 'unadj', props.tbData.unadjusted2245)
+      onFieldChange(firstRow.rowKey, 'unadj', props.tbData.unadjusted)
     }
   }
 }

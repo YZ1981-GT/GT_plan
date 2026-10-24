@@ -2,6 +2,7 @@
 import { G9_ADJUDICATION_ITEMS, G9_ADJ_WRITEBACK_ROW_KEY, G9_ACCOUNT_CODE } from './g9Constants'
 import { isG9AccountCode } from './g9AccountMatch'
 import { parseNum } from './useG9FormulaEngine'
+import { OCI_ACCOUNT_CODE } from './mCycleAccountScope'
 
 export { G9_ADJ_WRITEBACK_ROW_KEY }
 
@@ -42,7 +43,7 @@ export interface G9AdjustmentSummary {
   rjeNet1504: number
   /** 6101 公允变动损益净额 */
   fvPlNet: number
-  /** 4002 OCI 净额 */
+  /** 其他综合收益（4003，OCI）净额 */
   ociNet: number
 }
 
@@ -122,7 +123,8 @@ export function summarizeG9Adjustment(
     ajeNet1504: calcG9AdjustmentNet(aje),
     rjeNet1504: calcG9AdjustmentNet(rje),
     fvPlNet: accountNet(list, (c) => c.startsWith('6101')),
-    ociNet: accountNet(list, (c) => c.startsWith('4002')),
+    // 原先按 4002（资本公积）汇总 ⇒ OCI 净额取错科目
+    ociNet: accountNet(list, (c) => c.startsWith(OCI_ACCOUNT_CODE)),
   }
 }
 

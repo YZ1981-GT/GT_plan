@@ -44,11 +44,11 @@
       <details class="methodology-hint">
         <summary>编制提示</summary>
         <ul>
-          <li>库存股为<strong>权益备抵借方科目</strong>（4002）：期末 = 期初 + 借方（回购）− 贷方（注销/再售），<strong>方向与其他 M 权益类相反</strong></li>
+          <li>库存股为<strong>权益备抵借方科目</strong>（4201）：期末 = 期初 + 借方（回购）− 贷方（注销/再售），<strong>方向与其他 M 权益类相反</strong></li>
           <li>明细表 M3-2 按回购批次列示成本与数量，与审定表 M3-1 合计交叉核对</li>
           <li>M3-4 外币投资汇率测算：外币回购按汇率折算本位币</li>
           <li>M3-5 检查：回购决议、注销/再售冲减处理（冲减 M2 实收资本、M4 资本公积）</li>
-          <li>库存股主要为上市公司业务，仅提供上市公司附注；审定合计回写 TB(4002)；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
+          <li>库存股主要为上市公司业务，仅提供上市公司附注；审定合计回写 TB(4201)；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
         </ul>
       </details>
     </div>
@@ -101,7 +101,7 @@
  *       + 底稿架构 4 阶段泳道（GtBArchitectureTree）+ 本循环底稿目录 grid。
  * 编制信息由页面级头部渲染，此处不重复。自包含：自行拉取 checklist-responses。
  *
- * 权益备抵借方科目（4002 库存股）— 期末=期初+借方−贷方（方向与其他 M 权益类相反）。仅上市公司附注。
+ * 权益备抵借方科目（4201 库存股）— 期末=期初+借方−贷方（方向与其他 M 权益类相反）。仅上市公司附注。
  */
 import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'

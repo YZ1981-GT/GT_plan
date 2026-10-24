@@ -17,6 +17,12 @@
  * 3. writebackTB 成功后仍 emit substantive:adjudicated（下游附注刷新回归 / Req 8）。
  * 4. publishToTb 用户取消二次确认 → 不发请求、不 emit substantive:adjudicated。
  * 5. publishToTb 确认后 → 经 writebackTB 调 POST publish-to-tb。
+ *
+ * 🔴 期望科目码写成字面量（独立判据），不从 M_CYCLE_ACCOUNT 派生 —— 派生会让「常量写错」与
+ * 「测试期望」同步错掉。2026-10-24 前本表 M3/M7/M8/M9/M10 的期望就是照抄错码写的
+ * （4002/4201/4104/4103/4003），守卫与代码一起错、一直是绿的（spec formula-fetch-followup R1.4）。
+ * M8 一般风险准备没有统一标准码：用例注入本循环的语义定位结果（4102），定位不到的拦截见
+ * mCycleAccountRuntime.spec.ts。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, effectScope } from 'vue'
@@ -42,6 +48,15 @@ import { useM9FormData } from '../useM9FormData'
 import { useM9Adjudication } from '../useM9Adjudication'
 import { useM10FormData } from '../useM10FormData'
 import { useM10Adjudication } from '../useM10Adjudication'
+import type { TbSourceCodes } from '../shared/tbSourceCodes'
+
+/** M8 本循环语义定位结果（render 下发的 tb_source_codes 形态） */
+const M8_SRC: TbSourceCodes = {
+  row_code: 'BS-124',
+  gross_standard: ['4102'],
+  chart_available: true,
+  slots: { gross: { key: 'gross', label: '一般风险准备', standard_codes: ['4102'], found: true } },
+}
 
 // ─── mock apiProxy（隔离网络） ───
 const { mockPost, mockPut, mockGet, confirmRef } = vi.hoisted(() => ({
@@ -73,19 +88,24 @@ interface MCase {
   sheetCode: string
   useFormData: (opts: any) => any
   useAdjudication: (formData: any, rows: any) => any
+  /** 额外的 useFormData 选项（M8 注入科目定位结果） */
+  extra?: Record<string, unknown>
 }
 
 const M_CASES: MCase[] = [
   { cycle: 'M1', account: '2232', sheetCode: 'M1-1', useFormData: useM1FormData, useAdjudication: useM1Adjudication },
   { cycle: 'M2', account: '4001', sheetCode: 'M2-1', useFormData: useM2FormData, useAdjudication: useM2Adjudication },
-  { cycle: 'M3', account: '4002', sheetCode: 'M3-1', useFormData: useM3FormData, useAdjudication: useM3Adjudication },
+  { cycle: 'M3', account: '4201', sheetCode: 'M3-1', useFormData: useM3FormData, useAdjudication: useM3Adjudication },
   { cycle: 'M4', account: '4002', sheetCode: 'M4-1', useFormData: useM4FormData, useAdjudication: useM4Adjudication },
   { cycle: 'M5', account: '4101', sheetCode: 'M5-1', useFormData: useM5FormData, useAdjudication: useM5Adjudication },
   { cycle: 'M6', account: '4104', sheetCode: 'M6-1', useFormData: useM6FormData, useAdjudication: useM6Adjudication },
-  { cycle: 'M7', account: '4201', sheetCode: 'M7-1', useFormData: useM7FormData, useAdjudication: useM7Adjudication },
-  { cycle: 'M8', account: '4104', sheetCode: 'M8-1', useFormData: useM8FormData, useAdjudication: useM8Adjudication },
-  { cycle: 'M9', account: '4103', sheetCode: 'M9-1', useFormData: useM9FormData, useAdjudication: useM9Adjudication },
-  { cycle: 'M10', account: '4003', sheetCode: 'M10-1', useFormData: useM10FormData, useAdjudication: useM10Adjudication },
+  { cycle: 'M7', account: '4301', sheetCode: 'M7-1', useFormData: useM7FormData, useAdjudication: useM7Adjudication },
+  {
+    cycle: 'M8', account: '4102', sheetCode: 'M8-1', useFormData: useM8FormData, useAdjudication: useM8Adjudication,
+    extra: { tbSourceCodes: ref(M8_SRC) },
+  },
+  { cycle: 'M9', account: '4003', sheetCode: 'M9-1', useFormData: useM9FormData, useAdjudication: useM9Adjudication },
+  { cycle: 'M10', account: '4401', sheetCode: 'M10-1', useFormData: useM10FormData, useAdjudication: useM10Adjudication },
 ]
 
 beforeEach(() => {
@@ -97,13 +117,13 @@ beforeEach(() => {
 
 describe.each(M_CASES)(
   '$cycle-1 审定表发布经显式确认门（tb-writeback-explicit-publish-gate Task 5）',
-  ({ cycle, account, sheetCode, useFormData, useAdjudication }) => {
+  ({ cycle, account, sheetCode, useFormData, useAdjudication, extra }) => {
     const codeRe = new RegExp(sheetCode.replace('-', '\\-'))
 
     it(`writebackTB 走 POST publish-to-tb，body 含 sheet_name(${sheetCode}) + writeback_rows(${account}, balance)`, async () => {
       const scope = effectScope()
       await scope.run(async () => {
-        const formData = useFormData({ wpId: ref('wp-001'), projectId: ref('proj-001') })
+        const formData = useFormData({ wpId: ref('wp-001'), projectId: ref('proj-001'), ...extra })
         await formData.writebackTB(500000)
 
         expect(mockPost).toHaveBeenCalledTimes(1)
@@ -122,7 +142,7 @@ describe.each(M_CASES)(
     it('writebackTB 不再调旧端点 trial-balance/writeback（PUT）', async () => {
       const scope = effectScope()
       await scope.run(async () => {
-        const formData = useFormData({ wpId: ref('wp-001'), projectId: ref('proj-001') })
+        const formData = useFormData({ wpId: ref('wp-001'), projectId: ref('proj-001'), ...extra })
         await formData.writebackTB(500000)
         expect(mockPut).not.toHaveBeenCalled()
         for (const call of mockPost.mock.calls) {
@@ -137,7 +157,7 @@ describe.each(M_CASES)(
       eventBus.on('substantive:adjudicated', emitSpy)
       const scope = effectScope()
       await scope.run(async () => {
-        const formData = useFormData({ wpId: ref('wp-001'), projectId: ref('proj-001') })
+        const formData = useFormData({ wpId: ref('wp-001'), projectId: ref('proj-001'), ...extra })
         await formData.writebackTB(500000)
         expect(mockPost).toHaveBeenCalledTimes(1)
         expect(emitSpy).toHaveBeenCalled()
@@ -156,7 +176,7 @@ describe.each(M_CASES)(
       eventBus.on('substantive:adjudicated', emitSpy)
       const scope = effectScope()
       await scope.run(async () => {
-        const formData = useFormData({ wpId: ref('wp-001'), projectId: ref('proj-001') })
+        const formData = useFormData({ wpId: ref('wp-001'), projectId: ref('proj-001'), ...extra })
         const adj = useAdjudication(formData, ref([]))
         await adj.publishToTb()
         expect(mockPost).not.toHaveBeenCalled()
@@ -169,7 +189,7 @@ describe.each(M_CASES)(
     it('publishToTb 确认后 → 调 POST publish-to-tb（经 writebackTB）', async () => {
       const scope = effectScope()
       await scope.run(async () => {
-        const formData = useFormData({ wpId: ref('wp-002'), projectId: ref('proj-002') })
+        const formData = useFormData({ wpId: ref('wp-002'), projectId: ref('proj-002'), ...extra })
         const adj = useAdjudication(formData, ref([]))
         await adj.publishToTb()
         const publishCall = mockPost.mock.calls.find((c) =>

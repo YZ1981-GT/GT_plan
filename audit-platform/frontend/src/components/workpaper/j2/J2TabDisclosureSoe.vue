@@ -427,7 +427,7 @@ async function aiGen(target: 'term' | 'dbp' | 'sens') {
   aiLoading.value = target
   try {
     const context: Record<string, string> = {
-      科目: '2221 长期应付职工薪酬 / 设定受益计划净资产（国有企业附注披露）',
+      科目: '2705 长期应付职工薪酬 / 设定受益计划净资产（国有企业附注披露）',
       设定受益计划净负债期末: fmt(sumEnd(summaryRows.find(r => r.key === 'dbp_net')!)),
       辞退福利期末: fmt(sumEnd(summaryRows.find(r => r.key === 'termination')!)),
       合计期末: fmt(summaryTotal.value.end),

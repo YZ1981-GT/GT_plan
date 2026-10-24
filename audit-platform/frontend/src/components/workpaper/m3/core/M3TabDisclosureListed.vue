@@ -175,7 +175,7 @@
  * - 回购目的/方案执行/权益影响 textarea sections
  * - AI辅助 per section
  *
- * 科目：4002 库存股（**借方/权益备抵类！**）
+ * 科目：4201 库存股（**借方/权益备抵类！**）
  */
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import WpAmountInput from '../../shared/WpAmountInput.vue'

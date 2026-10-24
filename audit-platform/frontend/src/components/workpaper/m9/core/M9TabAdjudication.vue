@@ -6,7 +6,7 @@
         <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
         <h3 class="section-title">M9-1 其他综合收益审定表</h3>
         <el-tag type="success" effect="dark" size="small" class="equity-badge">
-          权益类·贷方余额·4103
+          权益类·贷方余额·4003
         </el-tag>
       </div>
       <div class="section-header-right">
@@ -43,7 +43,7 @@
       <div class="m9-guide-steps">
         <div class="step-item">
           <span class="step-num">①</span>
-          <span class="step-text">核对试算表科目4103期初/未审数据</span>
+          <span class="step-text">核对试算表科目4003期初/未审数据</span>
         </div>
         <div class="step-item">
           <span class="step-num">②</span>
@@ -55,7 +55,7 @@
         </div>
         <div class="step-item">
           <span class="step-num">④</span>
-          <span class="step-text">保存后自动回写TB(4103)并通知附注组件</span>
+          <span class="step-text">保存后自动回写TB(4003)并通知附注组件</span>
         </div>
       </div>
     </div>
@@ -63,12 +63,12 @@
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>其他综合收益（4103）为权益类贷方科目：</strong>
+        <strong>其他综合收益（4003）为权益类贷方科目：</strong>
         期末余额 = 期初 + 贷方（OCI增加） − 借方（OCI减少/重分类进损益）。
         审定数 = 未审数 + AJE + RJE。
         OCI分两大类：①以后不能重分类进损益（其他权益工具投资公允变动G8、设定受益计划重计量J2）；
         ②以后能重分类进损益（其他债权投资公允变动、现金流量套期损益、外币财务报表折算差额）。
-        审定数变化自动回写试算表（4103）并发布'substantive:adjudicated'事件通知附注等组件。
+        审定数变化自动回写试算表（4003）并发布'substantive:adjudicated'事件通知附注等组件。
       </div>
     </div>
 
@@ -467,7 +467,7 @@
     <!-- ═══ 校验状态 + TB回写状态 ═══ -->
     <div class="adjudication-footer">
       <el-tag type="primary" size="small" effect="dark">合计审定: {{ fmtAmount(totalRow.audited) }}</el-tag>
-      <el-tag type="success" size="small" effect="plain">TB回写: 科目4103 其他综合收益（贷方/权益类）</el-tag>
+      <el-tag type="success" size="small" effect="plain">TB回写: 科目4003 其他综合收益（贷方/权益类）</el-tag>
       <el-tag :type="equityEndCheck.isMatch ? 'success' : 'danger'" size="small" effect="plain">
         期末校验: {{ fmtAmount(equityEndCheck.actual) }}
         {{ equityEndCheck.isMatch ? '=' : '≠' }}
@@ -509,15 +509,15 @@
     <details class="m9-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>其他综合收益（4103）为<strong>权益类贷方科目</strong>：期末 = 期初 + 贷方（OCI增加） − 借方（OCI减少/重分类进损益）</li>
+        <li>其他综合收益（4003）为<strong>权益类贷方科目</strong>：期末 = 期初 + 贷方（OCI增加） − 借方（OCI减少/重分类进损益）</li>
         <li>以后不能重分类进损益：其他权益工具投资公允价值变动(G8)、设定受益计划重计量(J2)</li>
         <li>以后能重分类进损益：其他债权投资公允变动、现金流量套期损益、外币财务报表折算差额</li>
         <li>审定数 = 未审数 + AJE（账项调整） + RJE（重分类调整）</li>
-        <li>审定数变化自动回写 TB（科目 4103）并通知附注组件</li>
+        <li>审定数变化自动回写 TB（科目 4003）并通知附注组件</li>
         <li>合计行应与M9-2明细表合计一致（交叉验证）</li>
         <li>变动率: IF(AND(期初=0,期末=0),0; IF(期初=0,100%; 否则期末/期初))</li>
         <li>试算差异≠0时，检查是否遗漏调整分录或TB数据需更新</li>
-        <li>「带入调整」：从集中登记按科目 4103 拉取调整分录，逐笔分配到各 OCI 项目行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
+        <li>「带入调整」：从集中登记按科目 4003 拉取调整分录，逐笔分配到各 OCI 项目行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
 
@@ -525,7 +525,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="4103 其他综合收益"
+      :subject-label="mAccountLabel('M9')"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -541,14 +541,14 @@
  * Task: 4.2
  * Requirements: 2.1-2.7
  *
- * 权益类双区块（4103 其他综合收益, 贷方权益类）
+ * 权益类双区块（4003 其他综合收益, 贷方权益类）
  * 区块1: 以后不能重分类进损益的OCI（G8公允变动+J2重计量）
  * 区块2: 以后能重分类进损益的OCI（其他债权投资+套期+外币折算）
  * Columns: 项目 | 期初 | 贷方发生(OCI增加) | 借方发生(减少/重分类) | 期末 | 未审 | AJE | RJE | 审定
  *          | 试算平衡表数 | 审定与试算差异 | 变动率
  * - useM9FormData + useM9Adjudication composable
  * - Font 13px, formula columns with dashed underline + cursor:help + tooltip
- * - TB回写(4103) on 审定数变化
+ * - TB回写(4003) on 审定数变化
  * - EventBus 'substantive:adjudicated' publish
  * - el-segmented 双模式 (HTML/OO) via useM9DualMode
  * - 蓝色渐变引导区(序号步骤,2列grid)
@@ -576,6 +576,7 @@ import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBring
 import { useVersionTrail } from '../../composables/useVersionTrail'
 import { eventBus } from '@/utils/eventBus'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import { M_CYCLE_ACCOUNT, mAccountLabel } from '../../composables/mCycleAccountScope'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
@@ -606,7 +607,7 @@ const {
   subscribeDisclosure,
 } = useM9Adjudication(formData, rows)
 
-// ─── 从集中登记带入调整（4103 其他综合收益，权益贷方；单期 aje/rje，双大类OCI项目行） ───
+// ─── 从集中登记带入调整（4003 其他综合收益，权益贷方；单期 aje/rje，双大类OCI项目行） ───
 const bringInRows = computed(() =>
   computedRows.value.map((r) => ({
     rowKey: r.key,
@@ -624,11 +625,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '4103',
+  subjectPrefix: M_CYCLE_ACCOUNT.M9.code,
   direction: 'credit',
-  subjectCode: '4103',
+  subjectCode: M_CYCLE_ACCOUNT.M9.code,
   wpCode: 'M9',
-  subjectLabel: '其他综合收益(4103)',
+  subjectLabel: mAccountLabel('M9'),
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) => {
     const idx = rows.value.findIndex((r) => r.key === rowKey)
@@ -785,7 +786,7 @@ async function handleAI(section: string): Promise<void> {
   aiLoading.value = section
   try {
     const context: Record<string, string> = {
-      科目: '4103 其他综合收益 / 审定表（M9-1 权益类贷方·双大类：不可/可重分类）',
+      科目: '4003 其他综合收益 / 审定表（M9-1 权益类贷方·双大类：不可/可重分类）',
       审定合计: fmtAmount(totalRow.value.audited),
       期末未审合计: fmtAmount(totalRow.value.unadjusted),
       不可重分类小计: fmtAmount(nonReclassSubtotal.value.audited),

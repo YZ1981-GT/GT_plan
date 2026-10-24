@@ -11,7 +11,7 @@
  * - K5-6 诉讼预计损失合计 vs K5-1 "未决诉讼" 行（litigationVsAdjudication）
  *
  * 科目方向：
- * - 2701 预计负债（贷方/负债类）：期末=期初+计提-转销
+ * - 2801 预计负债（贷方/负债类）：期末=期初+计提-转销
  *
  * Spec: .kiro/specs/k5-provisions/
  * Task: 3.2

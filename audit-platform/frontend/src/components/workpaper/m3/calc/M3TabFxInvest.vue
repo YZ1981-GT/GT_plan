@@ -219,7 +219,7 @@
  * - All formulas real-time frontend
  * - 导入导出 (useM3ImportExport)
  *
- * 科目：4002 库存股（**借方/权益备抵类！**）
+ * 科目：4201 库存股（**借方/权益备抵类！**）
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
@@ -439,7 +439,7 @@ async function handleAI(section: string) {
   aiLoading.value = section
   try {
     const context: Record<string, string> = {
-      科目: '4002 库存股（权益备抵类·借方，外币投资汇率测算 M3-4）',
+      科目: '4201 库存股（权益备抵类·借方，外币投资汇率测算 M3-4）',
       折算本位币合计: fmtAmount(totalConverted.value),
       折算差异合计: fmtAmount(totalDiff.value),
       外币批次数: String(computedFxRows.value.length),

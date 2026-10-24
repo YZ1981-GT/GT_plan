@@ -11,6 +11,7 @@
 import { computed, ref, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { G8_ACCOUNT_CODE } from './g8Constants'
+import { OCI_ACCOUNT_CODE } from './mCycleAccountScope'
 import {
   aggregateG8AdjustmentWriteback,
   applyG8AdjustmentWriteback,
@@ -45,7 +46,7 @@ export interface G8AdjustmentEntry {
 /** FVOCI 常用对方科目（科目代码 → 名称） */
 export const G8_ADJ_ACCOUNT_OPTIONS: { code: string; name: string }[] = [
   { code: '1503', name: '其他权益工具投资' },
-  { code: '4002', name: '其他综合收益' },
+  { code: OCI_ACCOUNT_CODE, name: '其他综合收益' },
   { code: '4104', name: '利润分配—未分配利润' },
   { code: '4101', name: '盈余公积' },
   { code: '1221', name: '其他应收款' },
@@ -56,7 +57,7 @@ const ITEM_ID_ROWS = 'G8-adjustment-rows'
 const ITEM_ID_ADJ_ROWS = 'G8-adj-rows'
 export const G8_ADJ_OVERLAY_ID = 'G8-adj-overlay'
 
-const G8_RELATED_PREFIXES = ['1503', '4002']
+const G8_RELATED_PREFIXES = ['1503', OCI_ACCOUNT_CODE]
 
 function genId(): string {
   return `g8a-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
@@ -66,7 +67,8 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-function isG8RelatedAccount(code: string): boolean {
+/** 中央调整分录同步时认领的相关科目（导出供守卫测试） */
+export function isG8RelatedAccount(code: string): boolean {
   const c = String(code || '')
   return G8_RELATED_PREFIXES.some((p) => c === p || c.startsWith(p))
 }
@@ -237,7 +239,7 @@ export function useG8Adjustment(opts: {
           entryType: 'AJE',
           date,
           summary: `${summary}（OCI）`,
-          accountCode: '4002',
+          accountCode: OCI_ACCOUNT_CODE,
           accountName: '其他综合收益',
           debitAmount: isIncrease ? 0 : abs,
           creditAmount: isIncrease ? abs : 0,

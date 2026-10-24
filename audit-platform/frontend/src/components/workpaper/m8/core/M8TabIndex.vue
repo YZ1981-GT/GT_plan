@@ -44,11 +44,11 @@
       <details class="methodology-hint">
         <summary>编制提示</summary>
         <ul>
-          <li>一般风险准备为<strong>权益类贷方科目</strong>（4104）：期末 = 期初 + 贷方（计提）− 借方（转回/使用）</li>
+          <li>一般风险准备为<strong>权益类贷方科目</strong>（没有统一标准码，按本项目科目表名称定位）：期末 = 期初 + 贷方（计提）− 借方（转回/使用）</li>
           <li><strong>仅金融企业适用</strong>（银行/证券/保险等）；非金融企业标记为不适用</li>
           <li>明细表 M8-2 列示计提明细，与审定表 M8-1 合计交叉核对</li>
           <li>M8-4 计提测试：按风险资产期末余额一定比例（一般 1.5%）从净利润中计提</li>
-          <li>审定合计回写 TB(4104) 并驱动附注披露；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
+          <li>审定合计回写 TB(一般风险准备) 并驱动附注披露；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
         </ul>
       </details>
     </div>
@@ -101,7 +101,7 @@
  *       + 底稿架构 4 阶段泳道（GtBArchitectureTree）+ 本循环底稿目录 grid。
  * 编制信息由页面级头部渲染，此处不重复。自包含：自行拉取 checklist-responses。
  *
- * 权益类贷方科目（4104 一般风险准备）— 期末=期初+贷方−借方；仅金融企业适用，按风险资产计提测试。
+ * 权益类贷方科目（一般风险准备）— 期末=期初+贷方−借方；仅金融企业适用，按风险资产计提测试。
  */
 import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'

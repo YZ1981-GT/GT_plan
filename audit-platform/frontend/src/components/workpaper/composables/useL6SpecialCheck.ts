@@ -18,7 +18,7 @@
  *   I~M(检查项1~5: 用途合规/金额准确/手续完备/进度匹配/结余处理)
  *   N(索引) | O(是否异常) | P(备注)
  *
- * 科目：2601 专项应付款（贷方/负债类）
+ * 科目：2711 专项应付款（贷方/负债类）
  */
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import { calcCheckRatio, calcSubtotal } from './useL6FormulaEngine'

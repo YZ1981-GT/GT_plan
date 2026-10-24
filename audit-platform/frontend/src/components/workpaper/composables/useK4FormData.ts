@@ -1,26 +1,31 @@
 /**
- * useK4FormData — K4 其他流动负债 selfLoad/checklist_responses/writebackTB(2245 负债口径)/TB取数
+ * useK4FormData — K4 其他流动负债 selfLoad/checklist_responses/writebackTB(负债口径)/TB取数
  *
  * Spec: .kiro/specs/k4-other-current-liabilities/
  * Task: 3.1
  * Requirements: 1.9, 1.10, 2.6
  *
+ * 🔴 其他流动负债**没有统一标准科目码**（宁缺勿造，见 `k4AccountScope.ts`）。
+ * 原实现写死 `2245` —— 该码不是其他流动负债，按它取数 / 发布会读写别的科目。
+ * 现一律按 render 下发的 `tb_source_codes` 解析；解析不出就不取数、不发布。
+ *
  * 职责：
  * - selfLoad(): bundle内嵌场景从 render-config 加载上下文 + checklist_responses
- * - loadTbData(): 从 trial_balance 获取科目 2245 未审/审定数据
- * - writebackTB(): 审定数回写 trial_balance(2245) + EventBus 'substantive:adjudicated'
+ * - loadTbData(): 读 render 下发的 `tb_values.liability_*`；没有时按解析出的科目取 trial_balance
+ * - writebackTB(): 审定数发布到 trial_balance（科目由调用方传入）+ EventBus 'substantive:adjudicated'
  * - checklist_responses 持久化: GET/PUT /api/workpapers/:wpId/checklist-responses
  * - item_id 命名: 前缀 "K4-{sheet}-{field}"（如 "K4-1-audited-total", "K4-2-detail-total"）
  * - debounce/即时保存: 文本字段 debounce 2s，枚举/结论即时保存
  * - 组件卸载时 flush 未保存数据（onScopeDispose）
  *
- * 科目：2245 其他流动负债（**贷方/负债类**）
+ * 科目：其他流动负债（**贷方/负债类**；没有统一标准科目码，按本项目科目表定位）
  * ⚠️ 负债类！期末=期初+贷方-借方（与资产类方向相反）
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { k4QueryCodes } from './k4AccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -30,18 +35,21 @@ export interface ChecklistItem {
   remark: string | null
 }
 
+/**
+ * K4 的试算表数（与宿主 `GtK4OtherCurrentLiabilities` 下传给 K4-1 的形状一致）。
+ * 🔴 原字段名 `unadjusted2245` / `audited2245` 带着错码，且与宿主下传的
+ * `{ unadjusted, audited }` 对不上 ⇒ K4-1 读到 undefined，TB 预填从不生效。
+ */
 export interface K4TbData {
-  /** 2245其他流动负债 未审数 */
-  unadjusted2245: number
-  /** 2245其他流动负债 审定数 */
-  audited2245: number
+  /** 其他流动负债 未审数 */
+  unadjusted: number
+  /** 其他流动负债 审定数 */
+  audited: number
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEBOUNCE_MS = 2000
-/** 科目：2245 其他流动负债（贷方/负债类） */
-const ACCOUNT_CODE_2245 = '2245'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -55,7 +63,7 @@ export function useK4FormData(params: {
   // ─── Reactive state ────────────────────────────────────────────────────────
   const isLoading = ref(false)
   const allResponses = ref<Map<string, any>>(new Map())
-  const tbData = ref<K4TbData>({ unadjusted2245: 0, audited2245: 0 })
+  const tbData = ref<K4TbData>({ unadjusted: 0, audited: 0 })
   const renderMeta = ref<Record<string, any>>({})
 
   // Per-item debounce timers
@@ -117,31 +125,42 @@ export function useK4FormData(params: {
     }
   }
 
-  // ─── loadTbData: 从 trial_balance 获取 2245 数据 ───────────────────────────
+  // ─── loadTbData: 取其他流动负债的试算表数 ─────────────────────────────────
 
   /**
-   * 从 trial_balance 获取科目 2245 的未审数和审定数。
-   * 优先从 renderMeta seed 读取，否则请求 TB 端点。
+   * 取其他流动负债的未审数和审定数。
    *
-   * 科目：2245 其他流动负债（贷方/负债类）
+   * 1. 优先读 render 下发的 `tb_values.liability_unadjusted / liability_audited`
+   *    （后端 `_k4_other_current_liabilities.build_tb_values` 的键）；
+   * 2. 没有时按 `tb_source_codes` 解析出的科目取 trial_balance；
+   * 3. 解析不出科目（宁缺勿造）⇒ 不发请求，未审 / 审定记 0，提示手工录入。
+   *
+   * 🔴 原实现读的是后端从未下发过的 `other_current_liabilities_2245_*` 键，
+   *    于是恒走第 2 步，并按写死的 `2245` 取数 —— 取到的不是其他流动负债。
    */
   async function loadTbData(): Promise<void> {
     if (!projectId.value) return
 
-    // 优先从 render-config seed 取值
-    const seededUnadj = renderMeta.value?.tb_values?.other_current_liabilities_2245_unadjusted
-    const seededAudited = renderMeta.value?.tb_values?.other_current_liabilities_2245_audited
+    const seededUnadj = renderMeta.value?.tb_values?.liability_unadjusted
+    const seededAudited = renderMeta.value?.tb_values?.liability_audited
     if (seededUnadj != null) {
       tbData.value = {
-        unadjusted2245: Number(seededUnadj) || 0,
-        audited2245: Number(seededAudited) || 0,
+        unadjusted: Number(seededUnadj) || 0,
+        audited: Number(seededAudited) || 0,
       }
+      return
+    }
+
+    const codes = k4QueryCodes(renderMeta.value?.tb_source_codes)
+    if (!codes.length) {
+      tbData.value = { unadjusted: 0, audited: 0 }
+      ElMessage.info('其他流动负债没有统一标准科目码，本项目未定位到对应科目，未审数请手工录入')
       return
     }
 
     try {
       const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: '2245' },
+        params: { account_prefix: codes[0] },
         _silent: true,
       } as any)
       const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
@@ -152,24 +171,24 @@ export function useK4FormData(params: {
 
       for (const item of list) {
         const code = String(item.standard_account_code ?? item.account_code ?? '')
-        if (code.startsWith(ACCOUNT_CODE_2245)) {
+        if (codes.some((c) => code === c || code.startsWith(c + '.') || code.startsWith(c + '-'))) {
           unadjusted += Number(item.unadjusted_amount ?? 0)
           audited += Number(item.audited_amount ?? 0)
           found = true
         }
       }
 
-      tbData.value = { unadjusted2245: unadjusted, audited2245: audited }
+      tbData.value = { unadjusted, audited }
 
       if (!found) {
-        ElMessage.warning('科目2245其他流动负债未在试算表中找到，请先导入试算表')
+        ElMessage.warning(`科目 ${codes.join('/')}（其他流动负债）未在试算表中找到，请先导入试算表`)
       }
     } catch {
-      tbData.value = { unadjusted2245: 0, audited2245: 0 }
+      tbData.value = { unadjusted: 0, audited: 0 }
     }
   }
 
-  // ─── writebackTB（2245 其他流动负债 负债口径） ────────────────────────────────
+  // ─── writebackTB（其他流动负债 负债口径） ──────────────────────────────────
 
   /**
    * 审定数发布到 trial_balance（显式发布门）：其他流动负债（贷方/负债类）。
@@ -181,9 +200,11 @@ export function useK4FormData(params: {
    * 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback` 绕过确认门。现改走
    * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（writeback_rows，balance 口径）；
    * 二次确认在调用方 K4TabAdjudication.handleWritebackTB。
-   * 科目码由调用方传入（K4 宁缺勿造循环，科目取自 k4QueryCodes 动态解析，缺省回退 2245）。
+   * 科目码**必须**由调用方传入（K4 宁缺勿造循环，科目取自 k4QueryCodes 动态解析）；
+   * 传空串即不发布。🔴 原参数缺省回退 `2245` —— 漏传科目时会把其他流动负债的
+   * 审定数写进别的科目，现删掉缺省值。
    */
-  async function writebackTB(auditedAmount: number, accountCode: string = ACCOUNT_CODE_2245): Promise<void> {
+  async function writebackTB(auditedAmount: number, accountCode: string): Promise<void> {
     if (!wpId.value || !accountCode) return
     await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
       sheet_name: '审定表K4-1',
@@ -201,7 +222,7 @@ export function useK4FormData(params: {
     })
 
     // 同步更新本地 tbData
-    tbData.value.audited2245 = auditedAmount
+    tbData.value.audited = auditedAmount
   }
 
   // ─── Save core ─────────────────────────────────────────────────────────────
@@ -335,11 +356,11 @@ export function useK4FormData(params: {
    * 外部设置 TB 值（从 render 策略 seed 或组件 watch 调用）。
    */
   function setTbValues(values: Partial<K4TbData>): void {
-    if (values.unadjusted2245 != null) {
-      tbData.value.unadjusted2245 = values.unadjusted2245
+    if (values.unadjusted != null) {
+      tbData.value.unadjusted = values.unadjusted
     }
-    if (values.audited2245 != null) {
-      tbData.value.audited2245 = values.audited2245
+    if (values.audited != null) {
+      tbData.value.audited = values.audited
     }
   }
 

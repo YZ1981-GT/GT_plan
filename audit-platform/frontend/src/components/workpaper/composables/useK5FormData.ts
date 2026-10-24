@@ -1,5 +1,5 @@
 /**
- * useK5FormData — K5 预计负债 selfLoad/checklist_responses/writebackTB(2701 负债口径)/TB取数
+ * useK5FormData — K5 预计负债 selfLoad/checklist_responses/writebackTB(2801 负债口径)/TB取数
  *
  * Spec: .kiro/specs/k5-provisions/
  * Task: 3.1
@@ -7,14 +7,14 @@
  *
  * 职责：
  * - selfLoad(): bundle内嵌场景从 render-config 加载上下文 + checklist_responses
- * - loadTbData(): 从 trial_balance 获取科目 2701 未审/审定数据
- * - writebackTB(): 审定数回写 trial_balance(2701) + EventBus 'substantive:adjudicated'
+ * - loadTbData(): 从 trial_balance 获取科目 2801 未审/审定数据
+ * - writebackTB(): 审定数回写 trial_balance(2801) + EventBus 'substantive:adjudicated'
  * - checklist_responses 持久化: GET/PUT /api/workpapers/:wpId/checklist-responses
  * - item_id 命名: 前缀 "K5-{sheet}-{field}"（如 "K5-1-audited-total", "K5-2-detail-row-1"）
  * - debounce/即时保存: 文本字段 debounce 2s，枚举/结论即时保存
  * - 组件卸载时 flush 未保存数据（onScopeDispose）
  *
- * 科目：2701 预计负债（**贷方/负债类**）
+ * 科目：2801 预计负债（**贷方/负债类**）
  * ⚠️ 负债类！期末=期初+计提-转销（与资产类方向相反）
  */
 import { computed, ref, type Ref } from 'vue'
@@ -148,12 +148,11 @@ export function useK5FormData(params: {
   async function loadTbData(): Promise<void> {
     if (!projectId.value) return
 
-    // 优先从 render-config seed 取值（键名不含科目码，见后端 `_KEY`）
-    // 旧键兼容：一个月后可删 `provisions_2701_*` fallback
+    // 优先从 render-config seed 取值（键名不含科目码，见后端 `_KEY`）。
+    // 带错码的旧键（2026-08-03 后端已改名，标注「一个月后可删」）已删除：后端不再下发，
+    // 留着只会让人以为错码仍是契约的一部分。
     const seededUnadj = renderMeta.value?.tb_values?.provisions_unadjusted
-      ?? renderMeta.value?.tb_values?.provisions_2701_unadjusted
     const seededAudited = renderMeta.value?.tb_values?.provisions_audited
-      ?? renderMeta.value?.tb_values?.provisions_2701_audited
     if (seededUnadj != null) {
       tbData.value = {
         unadjusted: Number(seededUnadj) || 0,

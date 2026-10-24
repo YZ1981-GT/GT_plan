@@ -9,13 +9,16 @@
  * - selfLoad(): bundle内嵌场景从 render-config 加载上下文
  * - checklist_responses 持久化: GET/PUT /api/workpapers/:wpId/checklist-responses
  * - item_id 命名: 前缀 "M8-{sheet}-{field}"（如 "M8-1-adjudicated-amount", "M8-2-detail-total"）
- * - writebackTB(4104): 审定数回写 trial_balance 科目 4104 一般风险准备
+ * - writebackTB: 审定数回写 trial_balance 的一般风险准备科目 —— 该科目没有统一标准码，
+ *   码取 render 下发的本项目语义定位结果（`tb_source_codes.gross_standard`）；定位不到 / 定位到
+ *   多个标准码时**不发布**（`publishBlockReason` 给原因），不拿别的科目顶替
+ *   （2026-10-24 前写死 4104 = 利润分配，发布会覆盖未分配利润的试算表行）
  * - EventBus: 回写成功后发布 'substantive:adjudicated'
  * - debounce/即时保存: 文本字段 debounce 2s，枚举/结论即时保存
  * - 组件卸载时 flush 未保存数据（onScopeDispose）
  *
  * ─── 权益类方向铁律 ───
- * 科目：4104 一般风险准备（**贷方/权益类！期末=期初+贷方-借方**）
+ * 科目：一般风险准备（**贷方/权益类！期末=期初+贷方-借方**）
  * 金融企业从净利润中计提时贷方增加，转回/使用时借方减少
  * 回写TB用期末余额口径（audited_amount = 审定期末余额）
  * ─── 金融企业专属 ───
@@ -23,10 +26,12 @@
  * 原则上不低于风险资产期末余额的1.5%
  * ─────────────────────────────────────────────────
  */
-import { ref, onScopeDispose, type Ref } from 'vue'
+import { computed, ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { mAccountCodeOf, mPublishBlockReason, pickMTbSourceCodes, useMTbSource } from './mCycleAccountScope'
+import type { TbSourceCodes } from './shared/tbSourceCodes'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -40,15 +45,29 @@ export interface UseM8FormDataOptions {
   wpId: Ref<string>
   projectId: Ref<string>
   sheetName?: Ref<string> | string
+  /**
+   * render 溯源（`tb_source_codes`）。不传时取主入口 GtM8 provide 的 `tbSourceCodes`；
+   * 都没有（bundle 内嵌）时用 selfLoad 拉到的 render-config。
+   */
+  tbSourceCodes?: Ref<TbSourceCodes | null | undefined>
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'M8-'
-const ACCOUNT_CODE = '4104' // 一般风险准备（贷方/权益类！金融企业专属）
 /** 审定表 sheet 名（含子码 M8-1，供后端 extract_determination_wp_code 解出） */
 const DETERMINATION_SHEET_NAME = '审定表M8-1'
+
+/** render-config 响应里取 `tb_source_codes`（html_data 在 `sheets[].html_data`，兼容顶层） */
+function pickRenderConfigTbSource(res: any): TbSourceCodes | null {
+  const cfg = res?.data ?? res
+  for (const s of Array.isArray(cfg?.sheets) ? cfg.sheets : []) {
+    const found = pickMTbSourceCodes(s?.html_data)
+    if (found) return found
+  }
+  return pickMTbSourceCodes(cfg?.html_data) ?? pickMTbSourceCodes(cfg)
+}
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -57,6 +76,15 @@ export function useM8FormData(options: UseM8FormDataOptions) {
 
   const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
   const isLoading = ref(false)
+
+  // ─── 科目定位（一般风险准备没有统一标准码） ─────────────────────────────────
+  const providedSrc = useMTbSource(options.tbSourceCodes)
+  const selfLoadedSrc = ref<TbSourceCodes | null>(null)
+  const tbSource = computed<TbSourceCodes | null>(() => providedSrc.value ?? selfLoadedSrc.value)
+  /** 本项目一般风险准备的标准码；空串 = 定位不到（不发布、不带入） */
+  const accountCode = computed(() => mAccountCodeOf('M8', tbSource.value))
+  /** 不能发布到试算表的原因；空串 = 可以发布 */
+  const publishBlockReason = computed(() => mPublishBlockReason('M8', tbSource.value))
 
   // Per-item debounce timers
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -72,10 +100,11 @@ export function useM8FormData(options: UseM8FormDataOptions) {
   async function selfLoad(): Promise<void> {
     if (!wpId.value) return
     try {
-      await api.get(
+      const res = await api.get(
         `/api/workpapers/${wpId.value}/render-config?force_component_type=m8-general-risk-reserve`,
         { _silent: true } as any,
       )
+      selfLoadedSrc.value = pickRenderConfigTbSource(res)
     } catch {
       // selfLoad 失败不阻塞：组件仍可从 checklist_responses 加载数据
     }
@@ -282,10 +311,12 @@ export function useM8FormData(options: UseM8FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── writebackTB (回写审定数到 trial_balance 4104) ─────────────────────────
+  // ─── writebackTB (回写审定数到 trial_balance 的一般风险准备科目) ─────────────────
 
   /**
-   * 回写审定数到 trial_balance（科目 4104 一般风险准备，**贷方/权益类！金融企业专属**）。
+   * 回写审定数到 trial_balance（一般风险准备科目，**贷方/权益类！金融企业专属**）。
+   *
+   * 科目码取本项目定位结果；`publishBlockReason` 非空时抛错、不发请求（调用方 catch 后提示原因）。
    *
    * 权益类贷方方向铁律：
    * - 期末 = 期初 + 贷方(增加：从净利润计提) - 借方(减少：转回/使用)
@@ -302,15 +333,18 @@ export function useM8FormData(options: UseM8FormDataOptions) {
   // 此前直调旧端点 PUT trial-balance/writeback 且由 watcher 数据变化自动触发（违反 Req 1）。
   async function writebackTB(auditedAmount: number): Promise<void> {
     if (!wpId.value) return
+    const blocked = publishBlockReason.value
+    if (blocked) throw new Error(blocked)
+    const code = accountCode.value
     await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
       sheet_name: DETERMINATION_SHEET_NAME,
       writeback_rows: [
-        { account_code: ACCOUNT_CODE, audited_amount: auditedAmount, amount_kind: 'balance' },
+        { account_code: code, audited_amount: auditedAmount, amount_kind: 'balance' },
       ],
     })
     // 发布 EventBus 通知审定数变更（附注等组件订阅刷新）
     eventBus.emit('substantive:adjudicated', {
-      accountCode: ACCOUNT_CODE,
+      accountCode: code,
       auditedAmount,
       wpCode: 'M8',
       timestamp: Date.now(),
@@ -352,6 +386,10 @@ export function useM8FormData(options: UseM8FormDataOptions) {
     // State
     isLoading,
     allResponses,
+    /** 本项目一般风险准备标准码（空串 = 定位不到） */
+    accountCode,
+    /** 不能发布到试算表的原因（空串 = 可以发布） */
+    publishBlockReason,
     // Actions
     loadData,
     getField,

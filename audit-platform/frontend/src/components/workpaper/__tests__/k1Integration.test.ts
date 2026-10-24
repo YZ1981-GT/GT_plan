@@ -54,6 +54,13 @@ vi.mock('element-plus', () => ({
 
 import { useK1FormData } from '@/components/workpaper/composables/useK1FormData'
 
+/**
+ * 调用方（K1TabAdjudication）按本项目口径传入的科目码：原值 1221 + **本循环专属**坏账准备 1231-03。
+ * 🔴 原用例断言坏账准备发布到宽口径 `1231` —— 该行同时承载应收票据 / 应收账款的坏账，
+ *    用 K1 一家的金额覆盖会改掉别的循环的审定数。
+ */
+const K1_CODES = { receivable: '1221', badDebt: '1231-03' }
+
 // ─── Test Suite ──────────────────────────────────────────────────────────────
 
 describe('K1 EventBus Integration: TB回写 → substantive:adjudicated → 附注', () => {
@@ -73,12 +80,12 @@ describe('K1 EventBus Integration: TB回写 → substantive:adjudicated → 附�
   })
 
   // ═══ Part A: writebackTB → 显式发布门 publish-to-tb + EventBus emit ═══
-  // spec: tb-writeback-explicit-publish-gate Task 8。K1 双科目(1221+坏账准备1231)改走单次
+  // spec: tb-writeback-explicit-publish-gate Task 8。K1 双科目(1221+本循环专属坏账准备 1231-03)改走单次
   // POST /workpapers/{wpId}/audit-determination/publish-to-tb（writeback_rows），不再两次 PUT 旧端点。
 
   describe('writebackTB → 显式发布门双科目 + EventBus emit', () => {
     it('should POST 1221 + 坏账准备 to publish-to-tb in a single writeback_rows', async () => {
-      await formData.writebackTB(500000, 35000)
+      await formData.writebackTB(500000, 35000, K1_CODES)
 
       // 单次 POST 到显式发布门（不再两次 PUT 旧端点）
       expect(mockPut).not.toHaveBeenCalled()
@@ -88,12 +95,12 @@ describe('K1 EventBus Integration: TB回写 → substantive:adjudicated → 附�
       expect(body.sheet_name).toMatch(/K1-1/)
       expect(body.writeback_rows).toEqual([
         { account_code: '1221', audited_amount: 500000, amount_kind: 'balance' },
-        { account_code: '1231', audited_amount: 35000, amount_kind: 'balance' },
+        { account_code: '1231-03', audited_amount: 35000, amount_kind: 'balance' },
       ])
     })
 
     it('should emit substantive:adjudicated after successful writeback', async () => {
-      await formData.writebackTB(800000, 50000)
+      await formData.writebackTB(800000, 50000, K1_CODES)
 
       expect(emitSpy).toHaveBeenCalledTimes(1)
       expect(emitSpy).toHaveBeenCalledWith(
@@ -108,7 +115,7 @@ describe('K1 EventBus Integration: TB回写 → substantive:adjudicated → 附�
 
     it('should include timestamp in payload', async () => {
       const before = Date.now()
-      await formData.writebackTB(100000, 5000)
+      await formData.writebackTB(100000, 5000, K1_CODES)
       const after = Date.now()
 
       const payload = emitSpy.mock.calls[0][1]
@@ -120,7 +127,7 @@ describe('K1 EventBus Integration: TB回写 → substantive:adjudicated → 附�
       mockPost.mockRejectedValueOnce(new Error('network error'))
 
       // writebackTB 不吞异常（二次确认+错误提示在宿主 Tab），故此处 catch
-      await formData.writebackTB(100000, 5000).catch(() => {})
+      await formData.writebackTB(100000, 5000, K1_CODES).catch(() => {})
 
       expect(emitSpy).not.toHaveBeenCalled()
     })
@@ -131,7 +138,7 @@ describe('K1 EventBus Integration: TB回写 → substantive:adjudicated → 附�
         projectId: ref('proj-001'),
       })
 
-      await emptyWp.writebackTB(100000, 5000)
+      await emptyWp.writebackTB(100000, 5000, K1_CODES)
 
       expect(mockPost).not.toHaveBeenCalled()
       expect(emitSpy).not.toHaveBeenCalled()
@@ -142,7 +149,7 @@ describe('K1 EventBus Integration: TB回写 → substantive:adjudicated → 附�
 
   describe('EventBus payload structure matches disclosure component expectations', () => {
     it('payload should have accountCode, auditedAmount, wpCode, timestamp fields', async () => {
-      await formData.writebackTB(1234567.89, 99999.99)
+      await formData.writebackTB(1234567.89, 99999.99, K1_CODES)
 
       const [eventName, payload] = emitSpy.mock.calls[0]
 
@@ -160,7 +167,7 @@ describe('K1 EventBus Integration: TB回写 → substantive:adjudicated → 附�
     it('disclosure Listed handleAdjudicated accepts payload where accountCode=1221', async () => {
       // Simulates what K1TabDisclosureListed.handleAdjudicated does:
       // if (!payload || payload.accountCode === '1221' || payload.wpCode === 'K1') → applyAutoFill()
-      await formData.writebackTB(600000, 40000)
+      await formData.writebackTB(600000, 40000, K1_CODES)
 
       const payload = emitSpy.mock.calls[0][1]
 
@@ -169,7 +176,7 @@ describe('K1 EventBus Integration: TB回写 → substantive:adjudicated → 附�
     })
 
     it('disclosure Soe handleAdjudicated accepts payload where wpCode=K1', async () => {
-      await formData.writebackTB(700000, 45000)
+      await formData.writebackTB(700000, 45000, K1_CODES)
 
       const payload = emitSpy.mock.calls[0][1]
 
@@ -237,7 +244,7 @@ describe('K1 EventBus Integration: TB回写 → substantive:adjudicated → 附�
     })
 
     it('TB 发布端点路径匹配显式发布门契约（publish-to-tb）', async () => {
-      await formData.writebackTB(300000, 20000)
+      await formData.writebackTB(300000, 20000, K1_CODES)
 
       // spec: tb-writeback-explicit-publish-gate Task 8 — 单次 POST 到显式发布门，非旧 PUT 端点
       expect(mockPut).not.toHaveBeenCalled()

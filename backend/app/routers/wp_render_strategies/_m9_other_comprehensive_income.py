@@ -28,14 +28,16 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.m_cycle_specs import fallback_code_of, row_code_of
 from app.services.report_account_mapping import resolve_report_line_account_codes
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-_M9_ACCOUNT_CODE = "4003"
-_M9_ROW_CODE = "BS-081"  # 其他综合收益报表行（listed_standalone；soe 为 BS-115）
+_M9_ACCOUNT_CODE = fallback_code_of("M9")  # 4003 其他综合收益
+#: 其他综合收益 BS-085（四个准则同号）。原 BS-081 是「实收资本（或股本）」(4001)。
+_M9_ROW_CODE = row_code_of("M9")
 _ADJUDICATED_ITEM_ID = "M9-1-adjudicated-amount"
 
 M9_SHEETS = [
@@ -285,7 +287,7 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         "tb_source_codes": tb_source_codes,
         # 权益类公式方向元数据（前端可用于初始化校验）
         "formula_direction": {
-            "account_code": "4003",
+            "account_code": _M9_ACCOUNT_CODE,
             "account_name": "其他综合收益",
             "direction": "credit",  # 贷方/权益类！
             "end_balance_formula": "begin + credit - debit",  # 期末=期初+贷方-借方

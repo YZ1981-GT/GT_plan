@@ -22,7 +22,7 @@
  *   L~O(审定数：未审L=B+F+G / AJE_M=C+H+J / RJE_N=D+I+K / 审定O=L+M-N)
  *   P(性质) | Q(形成原因) | R(到期日)
  *
- * 科目：2801 其他非流动负债（贷方/负债类！期末=期初+贷方-借方）
+ * 科目：其他非流动负债（无专属科目码，宁缺勿造；贷方/负债类！期末=期初+贷方-借方）
  */
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'

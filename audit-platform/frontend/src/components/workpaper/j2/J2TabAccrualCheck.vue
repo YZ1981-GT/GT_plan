@@ -125,7 +125,7 @@ async function aiGen(target: 'note' | 'conclusion' | string) {
   try {
     const judged = judgeRows.filter(r => r.conclusion).map(r => `${r.item.slice(0, 20)}…=${r.conclusion}`).join('；')
     const context: Record<string, string> = {
-      科目: '2221 长期应付职工薪酬 / 设定受益计划净资产检查表（J2-4）',
+      科目: '2705 长期应付职工薪酬 / 设定受益计划净资产检查表（J2-4）',
       设定受益计划判断: judged || '（未判断）',
       精算假设条款数: String(assumeRows.length),
     }

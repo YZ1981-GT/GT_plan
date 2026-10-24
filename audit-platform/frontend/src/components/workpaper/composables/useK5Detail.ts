@@ -15,7 +15,7 @@
  * - 虚拟滚动42行
  * - Save with prefix "K5-2-"
  *
- * 科目：2701 预计负债（**贷方/负债类**）
+ * 科目：2801 预计负债（**贷方/负债类**）
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'

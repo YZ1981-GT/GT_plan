@@ -370,7 +370,7 @@ async function handleAI(section: string): Promise<void> {
   aiLoading.value = section
   try {
     const context: Record<string, string> = {
-      科目: '4103 其他综合收益 / 附注披露（上市公司，30×18）',
+      科目: '4003 其他综合收益 / 附注披露（上市公司，30×18）',
       不可重分类税后合计: fmtAmount(nonReclassTotalNet.value),
       可重分类税后合计: fmtAmount(reclassTotalNet.value),
       OCI税后净额合计: fmtAmount(totalNet.value),

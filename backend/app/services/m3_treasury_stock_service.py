@@ -4,9 +4,9 @@
 - 导出模板 / 导出数据 / 导入数据（xlsx三级）
 - 外币折算批量计算
 - 回购注销核对
-- TB取数（科目4002）
+- TB取数（科目4201）
 
-科目4002库存股（**借方/权益备抵类！**）：期末=期初+借方-贷方
+科目4201库存股（**借方/权益备抵类！**）：期末=期初+借方-贷方
 回购在借方增加，注销/再售在贷方减少，与M2/M4/M5/M6方向相反！
 
 Requirements: 5.2, 5.4, 7.7
@@ -27,10 +27,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.m_cycle_specs import fallback_code_of
 
 logger = logging.getLogger(__name__)
 
-_M3_ACCOUNT_CODE = "4002"
+#: 4201 库存股（客户科目表实证）。🔴 2026-10-24 前写 4002 —— 客户科目表里是「资本公积」，
+#: tb-seed 取到的是资本公积余额（spec formula-fetch-followup-defect-closure R1.4）。
+_M3_ACCOUNT_CODE = fallback_code_of("M3")
 _ROW_LIMIT = 500
 
 
@@ -305,14 +308,14 @@ async def import_data(
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TB 取数（科目4002库存股）
+# TB 取数（科目4201库存股）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 async def get_tb_seed(wp_id: str, db: AsyncSession) -> dict[str, Any]:
-    """获取TB科目4002库存股的种子数据
+    """获取TB科目4201库存股的种子数据
 
-    查 tb_balance 科目4002（库存股），返回借方/贷方发生额和当前净额。
+    查 tb_balance 科目4201（库存股），返回借方/贷方发生额和当前净额。
     库存股为权益备抵借方科目：current_amount = debit - credit（借方净额）
 
     Requirements: 7.7
@@ -340,7 +343,7 @@ async def get_tb_seed(wp_id: str, db: AsyncSession) -> dict[str, Any]:
     project_id = str(wp_row.project_id)
     year = str(wp_row.audit_year) if wp_row.audit_year else ""
 
-    # 查 tb_balance 科目 4002
+    # 查 tb_balance 科目 4201
     try:
         active_filter = await get_active_filter(
             db, TbBalance.__table__, project_id, year
@@ -381,7 +384,7 @@ async def get_tb_seed(wp_id: str, db: AsyncSession) -> dict[str, Any]:
 
 
 def _empty_tb_result() -> dict[str, Any]:
-    """返回空的TB结果（科目4002未找到）。"""
+    """返回空的TB结果（科目4201未找到）。"""
     return {
         "account_code": _M3_ACCOUNT_CODE,
         "debit_amount": 0.0,

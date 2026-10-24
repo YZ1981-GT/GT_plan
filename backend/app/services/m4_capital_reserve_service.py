@@ -25,9 +25,11 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.four_table.m_cycle_specs import fallback_code_of
+
 logger = logging.getLogger(__name__)
 
-_M4_ACCOUNT_CODE = "4002"
+_M4_ACCOUNT_CODE = fallback_code_of("M4")
 _ROW_LIMIT = 500
 _TOLERANCE = 0.01
 

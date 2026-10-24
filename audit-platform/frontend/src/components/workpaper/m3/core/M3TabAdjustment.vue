@@ -43,8 +43,8 @@
     <div class="methodology-context">
       <div class="methodology-text">
         <strong>调整分录（AJE/RJE）：</strong>
-        涉及科目4002库存股（<strong>借方/权益备抵类</strong>）。
-        调增库存股→借方增加（借记4002），调减库存股→贷方减少（贷记4002）。
+        涉及科目4201库存股（<strong>借方/权益备抵类</strong>）。
+        调增库存股→借方增加（借记4201），调减库存股→贷方减少（贷记4201）。
         方向与M2(贷方增加)相反！借贷必须平衡（∑借方 = ∑贷方）。
         保存后通过EventBus双向同步M3-1审定表和通知A13。
       </div>
@@ -192,8 +192,8 @@
     <!-- ═══ 对科目影响 ═══ -->
     <div v-if="filteredEntries.length > 0" class="impact-area">
       <el-descriptions :column="2" border size="small">
-        <el-descriptions-item label="AJE对库存股(4002)净影响">{{ fmtAmount(ajeNet4002) }}</el-descriptions-item>
-        <el-descriptions-item label="RJE对库存股(4002)净影响">{{ fmtAmount(rjeNet4002) }}</el-descriptions-item>
+        <el-descriptions-item label="AJE对库存股(4201)净影响">{{ fmtAmount(ajeNet4201) }}</el-descriptions-item>
+        <el-descriptions-item label="RJE对库存股(4201)净影响">{{ fmtAmount(rjeNet4201) }}</el-descriptions-item>
       </el-descriptions>
     </div>
 
@@ -204,8 +204,8 @@
         <li>借贷必须平衡（∑借方 = ∑贷方）才能保存发布</li>
         <li>发布后自动同步M3-1审定表AJE/RJE列</li>
         <li>通过EventBus发布 'adjustment:created' 通知A13</li>
-        <li>涉及科目：4002库存股（<strong>借方/权益备抵类</strong>）</li>
-        <li>调增库存股→借方增加（借记4002），调减库存股→贷方减少（贷记4002）</li>
+        <li>涉及科目：4201库存股（<strong>借方/权益备抵类</strong>）</li>
+        <li>调增库存股→借方增加（借记4201），调减库存股→贷方减少（贷记4201）</li>
         <li>方向铁律：与M2(贷方增加)完全相反！</li>
       </ul>
     </details>
@@ -227,7 +227,7 @@
  * - 双向同步M3-1审定表
  * - Uses useM3Adjustment composable
  *
- * 科目：4002 库存股（**借方/权益备抵类！**）
+ * 科目：4201 库存股（**借方/权益备抵类！**）
  */
 import { computed, inject, onMounted, onUnmounted, ref, toRef, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -267,8 +267,8 @@ const {
   activeType,
   filteredEntries,
   currentBalance,
-  ajeNet4002,
-  rjeNet4002,
+  ajeNet4201,
+  rjeNet4201,
   addEntry,
   removeEntry,
   updateEntry,
@@ -325,13 +325,13 @@ async function handleAI(section: string) {
   try {
     const bal = currentBalance.value
     const context: Record<string, string> = {
-      科目: '4002 库存股（权益备抵类·借方，调整分录 M3-3）',
+      科目: '4201 库存股（权益备抵类·借方，调整分录 M3-3）',
       当前类型: activeType.value,
       借方合计: fmtAmount(bal.totalDebit),
       贷方合计: fmtAmount(bal.totalCredit),
       是否平衡: bal.isBalanced ? '平衡' : `不平衡（差额${fmtAmount(bal.diff)}）`,
-      AJE对库存股净影响: fmtAmount(ajeNet4002.value),
-      RJE对库存股净影响: fmtAmount(rjeNet4002.value),
+      AJE对库存股净影响: fmtAmount(ajeNet4201.value),
+      RJE对库存股净影响: fmtAmount(rjeNet4201.value),
       分录数: String(filteredEntries.value.length),
     }
     const text = await generateAiText({ section: `m3-adjustment-${section}`, context, existingContent: '' })

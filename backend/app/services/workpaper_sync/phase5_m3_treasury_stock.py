@@ -3,7 +3,7 @@
 
 spec: m2-m3-m4-m7-m10-bidirectional-pipeline
 entry: xlsx/gt-m3-treasury-stock
-科目: 4102 库存股（贷方/权益类，借方减）
+科目: 4201 库存股（借方/权益备抵类）
 受管 sheet: 明细表M3-2
 审定表 M3-1 全公式（0e+11f），不做 instrumentation。
 """
@@ -28,7 +28,9 @@ ADAPTER_ID: Final[str] = "m3.treasury_stock"
 WP_CODES: Final[frozenset[str]] = frozenset({"M3T"})
 TEMPLATE_RELATIVE_PATH: Final[str] = "M/M3 库存股.xlsx"
 TEMPLATE_SHA256: Final[str] = "ec8448c9df0fc5ae93f83fd2016e2ab26091e38749397595f66da818e9162115"
-ACCOUNT_CODE: Final[str] = "4102"
+#: 元数据（构建器不读）。须与 four_table.m_cycle_specs.fallback_code_of("M3") 一致，
+#: 守卫 tests/four_table/test_m_cycle_account_single_source.py。原写 4102（全库不存在）。
+ACCOUNT_CODE: Final[str] = "4201"
 ITEM_PREFIX: Final[str] = "M3-"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 STORE_ITEM_ID: Final[str] = "M3-"

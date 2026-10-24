@@ -21,7 +21,7 @@
  *   S(审定期初) | T(审定拨入) | U(审定结转) | V(审定返还) | W(审定期末)
  *   X(底稿索引) | Y(凭证索引) | Z(完成状态) | AA(备注)
  *
- * 科目：2601 专项应付款（贷方/负债类！期末=期初+贷方-借方）
+ * 科目：2711 专项应付款（贷方/负债类！期末=期初+贷方-借方）
  */
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'

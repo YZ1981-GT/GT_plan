@@ -8,11 +8,11 @@ M10 前端组件 GtM10OtherEquityInstruments 为自加载组件（子组件各�
 关键作用是：让 component_type 在 RENDERER_DISPATCH 中命中，避免多 sheet dispatch
 循环把 M10 各 sheet 误判为非白名单而重写成 onlyoffice-sheet。
 
-科目4003其他权益工具（**贷方/权益类！**）：期末=期初+贷方-借方
+科目4401其他权益工具（**贷方/权益类！**）：期末=期初+贷方-借方
 M股东权益循环中的权益类科目。发行时贷方增加，赎回/转换时借方减少。
 核心特殊：①贷方权益类科目 ②负债与权益区分（CAS37）：永续债/优先股等金融工具
 需按CAS37《金融工具列报》判定是否分类为权益工具（是否存在交付现金/金融资产的合同义务），
-归入权益的部分计入M10(4003)，归入负债的计入负债科目。
+归入权益的部分计入M10(4401)，归入负债的计入负债科目。
 数据持久化在 checklist_responses 表，item_id 前缀为 "M10-*"。
 
 Requirements: 1.6
@@ -28,12 +28,13 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.m_cycle_specs import fallback_code_of
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-_M10_ACCOUNT_CODE = "4401"
+_M10_ACCOUNT_CODE = fallback_code_of("M10")  # 4401 其他权益工具
 _ADJUDICATED_ITEM_ID = "M10-1-adjudicated-amount"
 
 M10_SHEETS = [
@@ -195,7 +196,7 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         logger.warning("M10 render: project context 查询失败: %s", e)
 
-    # ─── TB 取数（科目4003其他权益工具）─────────────────────────────────
+    # ─── TB 取数（科目4401其他权益工具）─────────────────────────────────
     tb = await _fetch_tb_data(ctx)
 
     # ─── 公式校验（从快照提取结构化数据行）────────────────────────────────
@@ -225,15 +226,15 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
         "adjudicated_amount": adjudicated_amount,
-        # TB 余额数据（科目4003，贷方/权益类）
+        # TB 余额数据（科目4401，贷方/权益类）
         "trial_balance": tb,
         # 权益类公式方向元数据（前端可用于初始化校验）
         "formula_direction": {
-            "account_code": "4401",
+            "account_code": _M10_ACCOUNT_CODE,
             "account_name": "其他权益工具",
             "direction": "credit",  # 贷方/权益类！
             "end_balance_formula": "begin + credit - debit",  # 期末=期初+贷方-借方
-            "note": "权益类贷方科目：发行（永续债/优先股）在贷方增加，赎回/转换在借方减少。CAS37负债权益区分后归入权益的部分计入4003",
+            "note": "权益类贷方科目：发行（永续债/优先股）在贷方增加，赎回/转换在借方减少。CAS37负债权益区分后归入权益的部分计入4401",
         },
         # 公式校验错误（前端可展示红色提示）
         "formula_errors": formula_errors,

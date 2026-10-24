@@ -7,7 +7,7 @@
 - POST /api/m10-other-equity-instruments/{wp_id}/validate-formulas      权益类公式校验（期末=期初+贷方-借方）
 - GET  /api/m10-other-equity-instruments/{wp_id}/classification-summary CAS37负债权益区分汇总
 
-科目编码: 4003其他权益工具（**贷方/权益类！**）
+科目编码: 4401其他权益工具（**贷方/权益类！**）
 公式方向: 期末=期初+贷方-借方（发行在贷方增加，赎回/转换在借方减少）
 CAS37核心: 永续债/优先股按合同义务判定分类为权益工具或金融负债
 RFC5987 Content-Disposition header with Chinese filename encoding
