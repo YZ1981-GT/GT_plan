@@ -571,6 +571,27 @@ async def test_api_delete_template(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_api_delete_referenced_template_is_rejected(client: AsyncClient, db_session: AsyncSession):
+    """端点级：被底稿引用的模板 ⇒ 400 并说明被引用，模板仍在（spec formula-fetch-followup-defect-closure R9.3）。"""
+    import sqlalchemy as sa
+
+    tpl = await TemplateEngine().upload_template(db=db_session, template_code="REF-API", template_name="被引用模板")
+    await db_session.flush()
+    idx = WpIndex(project_id=FAKE_PROJECT_ID, wp_code="REF-API", wp_name="被引用底稿")
+    db_session.add(idx)
+    await db_session.flush()
+    db_session.add(WorkingPaper(project_id=FAKE_PROJECT_ID, wp_index_id=idx.id,
+                                file_path=f"{FAKE_PROJECT_ID}/2025/REF-API.xlsx", source_type=WpSourceType.template))
+    await db_session.commit()
+
+    resp = await client.delete(f"/api/templates/{tpl.id}")
+    assert resp.status_code == 400
+    assert "引用" in resp.text
+    row = (await db_session.execute(sa.select(WpTemplate).where(WpTemplate.id == tpl.id))).scalar_one()
+    assert row.is_deleted is False
+
+
+@pytest.mark.asyncio
 async def test_api_delete_template_requires_admin(db_session: AsyncSession, seeded_db):
     """模板库全平台共用：非管理员删除 ⇒ 403，模板仍在。"""
     import sqlalchemy as sa

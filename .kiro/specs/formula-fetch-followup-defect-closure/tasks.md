@@ -5,9 +5,17 @@
 
 ## 1. 小项（R7 / R8 / R9）
 
-- [ ] 1.1 底稿求值器 `本期发生额` = 审定数 − 期初余额（TB / SUM_TB），删死分支；未注册列名记 errors；先扫全部经底稿求值器的预设列名（R7）
-- [ ] 1.2 业务分类以参考标准为单一来源（C / B 排除清单、族匹配、映射表标注仍生效）；`review_workflow_service` 按主分类前缀；PBT 全过（R8）
-- [ ] 1.3 删除模板：`is_deleted` + 更新时间、管理员权限、被引用按底稿编码精确判断；端点测试（R9）
+- [x] 1.1 底稿求值器 `本期发生额` = 审定数 − 期初余额（TB / SUM_TB），删死分支；未注册列名记 errors；先扫全部经底稿求值器的预设列名（R7）
+  - 证据：`wp_formula_eval_service._DERIVED_COLUMNS` / `_balance_field`（提交 25a506a57）；`formula_settings/test_wp_eval_period_amount.py`
+    （与 L1 预载同值、未注册列名报错、预载发生额与区间）+ 本轮补「Tier A 预设列名全部已注册」常驻守卫与扫描自检；变异 MR7a / MR7b 打红
+- [x] 1.2 业务分类以参考标准为单一来源（C / B 排除清单、族匹配、映射表标注仍生效）；`review_workflow_service` 按主分类前缀；PBT 全过（R8）
+  - 证据：`business_category_service.is_template_applicable`（提交 25a506a57），`test_business_category_pbt.py` 6 例全过；
+    本轮复核发现复核模板另有一份适用性（`review_checklist_templates.json` 的 `a_only`），按前缀判断后 B 类质量复核合伙人 / EQCR 仍拿不到模板，
+    与参考标准「B 类保留 A24 / A25」矛盾 ⇒ `_get_template_for_role` 改调 `is_template_applicable`、删掉 `a_only`，`test_review_workflow_pbt.py` 按参考标准改写；
+    变异 MR8a / MR8b 打红
+- [x] 1.3 删除模板：`is_deleted` + 更新时间、管理员权限、被引用按底稿编码精确判断；端点测试（R9）
+  - 证据：`TemplateEngine.delete_template` + `DELETE /api/templates/{id}` 只许管理员（提交 25a506a57）；`test_template_engine.py` 服务层 4 例、
+    端点成功 / 非管理员 403 + 本轮补「被引用 400、模板仍在」；变异 MR9a / MR9b / MR9c 打红。同文件 3 例模板集种子用例在 HEAD 同样红（与本项无关）
 
 ## 2. 推错数的规则（R6）
 

@@ -7,7 +7,6 @@
       "code": "A21-1",
       "role": "field_lead",
       "audit_type": "financial",
-      "a_only": false,
       "items": [
         {"seq": 1, "content": "审计计划是否得到执行，包括审计程序的性质、时间安排和范围", "auto_check": "workpaper_plan_coverage"},
         {"seq": 2, "content": "是否取得充分适当的审计证据支持审计结论", "auto_check": null},
@@ -26,7 +25,6 @@
       "code": "A21-2",
       "role": "field_lead",
       "audit_type": "internal_control",
-      "a_only": false,
       "items": [
         {"seq": 1, "content": "内部控制了解程序是否充分", "auto_check": null},
         {"seq": 2, "content": "控制测试的范围是否充分", "auto_check": null},
@@ -40,7 +38,6 @@
       "code": "A22-1",
       "role": "manager",
       "audit_type": "financial",
-      "a_only": false,
       "items": [
         {"seq": 1, "content": "审计计划是否根据实际情况进行了适当调整", "auto_check": null},
         {"seq": 2, "content": "重要性水平的确定和运用是否恰当", "auto_check": "materiality_set"},
@@ -59,7 +56,6 @@
       "code": "A22-2",
       "role": "manager",
       "audit_type": "internal_control",
-      "a_only": false,
       "items": [
         {"seq": 1, "content": "控制环境的了解是否充分", "auto_check": null},
         {"seq": 2, "content": "控制测试样本量是否充分", "auto_check": null},
@@ -73,7 +69,6 @@
       "code": "A23-1",
       "role": "partner",
       "audit_type": "financial",
-      "a_only": false,
       "items": [
         {"seq": 1, "content": "审计总体策略和详细计划是否恰当", "auto_check": "review_progress"},
         {"seq": 2, "content": "重大事项的判断是否恰当", "auto_check": null},
@@ -88,7 +83,6 @@
       "code": "A23-2",
       "role": "partner",
       "audit_type": "internal_control",
-      "a_only": false,
       "items": [
         {"seq": 1, "content": "内控缺陷的严重程度分类是否恰当", "auto_check": null},
         {"seq": 2, "content": "内控审计意见是否恰当", "auto_check": null},
@@ -100,7 +94,6 @@
       "code": "A24-1",
       "role": "quality_reviewer",
       "audit_type": "financial",
-      "a_only": true,
       "items": [
         {"seq": 1, "content": "项目合伙人做出的重大判断是否恰当", "auto_check": null},
         {"seq": 2, "content": "审计报告是否恰当", "auto_check": null},
@@ -114,7 +107,6 @@
       "code": "A25-1",
       "role": "eqcr",
       "audit_type": "financial",
-      "a_only": true,
       "items": [
         {"seq": 1, "content": "项目组独立性是否确认", "auto_check": "independence_signing_status"},
         {"seq": 2, "content": "重大风险的识别和应对是否充分", "auto_check": null},
@@ -181,7 +173,7 @@
     "field_lead": {"level": 1, "label": "现场负责人"},
     "manager": {"level": 2, "label": "项目经理"},
     "partner": {"level": 3, "label": "项目合伙人"},
-    "quality_reviewer": {"level": 4, "label": "质量复核合伙人", "a_only": true},
-    "eqcr": {"level": 5, "label": "EQCR", "a_only": true}
+    "quality_reviewer": {"level": 4, "label": "质量复核合伙人"},
+    "eqcr": {"level": 5, "label": "EQCR"}
   }
 }

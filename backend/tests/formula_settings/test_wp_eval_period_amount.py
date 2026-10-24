@@ -6,7 +6,10 @@
 """
 from __future__ import annotations
 
+import json
+import re
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
@@ -66,6 +69,32 @@ async def test_unregistered_column_is_an_error_not_audited():
         value, errors = await evaluate_wp_formula_expression(db, project_id=pid, year=YEAR,
                                                              expression="TB('6601','期末余额') - TB('6601','期初余额')")
         assert (value, errors) == (Decimal("1100"), [])
+
+
+_COLUMN_ARG_RE = re.compile(r"\b(?:SUM_TB|TB_SUM|TB)\(\s*'[^']*'\s*,\s*'([^']*)'\s*\)")
+
+
+def test_every_preset_column_is_registered_in_wp_evaluator():
+    """经底稿求值器求值的 Tier A 预设（D / H / I 循环 render 逐条求值）：TB / SUM_TB 的列名都已注册 ——
+    未注册列名现在报错、不再静默按审定数取，预设里留一个就会让该锚点从「错数」变成「报错」。"""
+    from app.services.d_cycle_extraction.presets import _PRESETS_PATH
+    from app.services.wp_formula_eval_service import _COLUMN_MAP, _DERIVED_COLUMNS, _OCCURRENCE_COLUMNS
+
+    registered = set(_COLUMN_MAP) | set(_DERIVED_COLUMNS) | set(_OCCURRENCE_COLUMNS)
+    raw = json.loads(Path(_PRESETS_PATH).read_text(encoding="utf-8"))
+    seen = [
+        (wp_code, entry.get("anchor"), column)
+        for wp_code, entries in raw.items() if not wp_code.startswith("_")
+        for entry in entries
+        for column in _COLUMN_ARG_RE.findall(str(entry.get("expression") or ""))
+    ]
+    assert len(seen) > 20, f"只扫到 {len(seen)} 处列名，扫描口径可能失效"
+    assert [s for s in seen if s[2] not in registered] == []
+    assert {c for _w, _a, c in seen} & set(_DERIVED_COLUMNS), "预设里应有本期发生额（H10 / I6 / D4 等损益类）"
+
+
+def test_column_scan_catches_a_planted_unregistered_column():
+    assert _COLUMN_ARG_RE.findall("TB('6601','期末数') + SUM_TB('6601~6699', '本期发生额')") == ["期末数", "本期发生额"]
 
 
 @pytest.mark.asyncio
