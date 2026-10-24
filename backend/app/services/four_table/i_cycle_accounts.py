@@ -255,7 +255,7 @@ class ICycleAccounts:
 #: ``adjudication_prefill`` **实质差异 0 处**；唯一变化是 ``resolved_from``
 #: 由 ``fallback`` 转 ``report_config`` **34 处**（溯源标签，非取数结果）。
 I_CYCLE_ROW_CODES: dict[str, dict[str, str]] = {
-    # 无形资产 = TB('1701','期末余额') - TB('1702','期末余额')
+    # 无形资产 = TB('1701','期末余额') - TB('1702','期末余额') - TB('1703','期末余额')（2026-10-24 起补减减值准备）
     "I1": {"listed": "BS-032", "soe": "BS-032"},
     # 开发支出 = TB('1704','期末余额')
     "I2": {"listed": "BS-033", "soe": "BS-033"},
@@ -263,7 +263,7 @@ I_CYCLE_ROW_CODES: dict[str, dict[str, str]] = {
     "I3": {"listed": "BS-034", "soe": "BS-034"},
     # 长期待摊费用 = TB('1801','期末余额')
     "I4": {"listed": "BS-035", "soe": "BS-035"},
-    # 其他非流动资产 = TB('1911','期末余额')；🔴 `1911` 全库两张科目表都不存在
+    # 其他非流动资产：原公式 TB('1911','期末余额')，🔴 `1911` 全库两张科目表都不存在；2026-10-24 起四准则公式置空
     # → 段兜底为空 tuple → `found=False`（宁缺勿造），见 I5 段声明
     "I5": {"listed": "BS-037", "soe": "BS-037"},
     # 研发费用 = TB('6604','本期发生额')（损益类，走 trial_balance 发生额）

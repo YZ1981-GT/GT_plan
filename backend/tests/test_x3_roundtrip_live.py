@@ -243,7 +243,10 @@ class TestGS7RoundtripLive:
                         failures.append(f"{sheet}: {type(exc).__name__}: {exc}")
             return checked, failures
 
-        checked, failures = asyncio.run(_run())
+        from tests._pg_shared_engine import run_and_dispose
+
+        # 用完释放共享连接池（见 tests/_pg_shared_engine.py）
+        checked, failures = asyncio.run(run_and_dispose(_run()))
         assert not failures, f"往返失败 {len(failures)} 项: {failures}"
         # 反空转：必须是 16 个**互不相同**的 sheet，且与 X3_SHEET_SPECS 键集逐一相等
         assert len(set(checked)) == 16, f"应覆盖 16 张互不相同，实测 {len(set(checked))}: {sorted(checked)}"

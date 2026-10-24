@@ -315,8 +315,10 @@ def _live_404_wp_codes() -> list[str] | None:
                         distinct.add(wp_code)
         return sorted(distinct)
 
+    from tests._pg_shared_engine import run_and_dispose
+
     try:
-        return asyncio.run(_run())
+        return asyncio.run(run_and_dispose(_run()))  # 用完释放共享连接池（见 tests/_pg_shared_engine.py）
     except Exception:
         return None
 

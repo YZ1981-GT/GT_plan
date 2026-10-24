@@ -14,8 +14,8 @@
         {"row_code": "BS-009", "row_name": "流动资产合计", "indent_level": 0, "formula": "ROW(BS-002:BS-008)"},
         {"row_code": "BS-010", "row_name": "非流动资产:", "indent_level": 0, "formula": null},
         {"row_code": "BS-011", "row_name": "长期股权投资", "indent_level": 1, "formula": "TB(1511)"},
-        {"row_code": "BS-012", "row_name": "固定资产", "indent_level": 1, "formula": "TB(1601)-TB(1602)"},
-        {"row_code": "BS-013", "row_name": "无形资产", "indent_level": 1, "formula": "TB(1701)-TB(1702)"},
+        {"row_code": "BS-012", "row_name": "固定资产", "indent_level": 1, "formula": "TB(1601)-TB(1602)-TB(1603)+TB(1606)"},
+        {"row_code": "BS-013", "row_name": "无形资产", "indent_level": 1, "formula": "TB(1701)-TB(1702)-TB(1703)"},
         {"row_code": "BS-014", "row_name": "非流动资产合计", "indent_level": 0, "formula": "ROW(BS-011:BS-013)"},
         {"row_code": "BS-015", "row_name": "资产总计", "indent_level": 0, "formula": "ROW(BS-009)+ROW(BS-014)"}
       ],

@@ -2,9 +2,8 @@
 
 **报表行**（`report_config` 实证）::
 
-    BS-028 固定资产
-      listed_standalone   : TB('1601','期末余额') - TB('1602','期末余额')
-      soe_standalone      : TB('1601') - TB('1602') + TB('1606')
+    BS-028 固定资产（四个准则一致，2026-10-24 起；原先只有 soe_standalone 加了 1606、都没减 1603）
+      TB('1601') - TB('1602') - TB('1603') + TB('1606')
     IMP-011 固定资产减值准备
       soe_standalone      : TB('1603','期末余额')
 

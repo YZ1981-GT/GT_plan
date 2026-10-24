@@ -12,7 +12,7 @@
       :source="htmlData?.tb_source_codes"
       :slot-order="['gross', 'accum_dep', 'impairment']"
       :slot-labels="{ gross: '固定资产原值', accum_dep: '累计折旧', impairment: '减值准备' }"
-      hint="科目定位：BS-028 固定资产 = TB('1601') − TB('1602') + TB('1606')"
+      hint="科目定位：BS-028 固定资产 = TB('1601') − TB('1602') − TB('1603') + TB('1606')"
     />
 
     <div class="tab-toolbar">

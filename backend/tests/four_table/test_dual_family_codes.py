@@ -43,6 +43,7 @@ from app.services.four_table.dual_family_codes import (  # noqa: E402
     dual_family_formula,
     tb_expression,
 )
+from tests._pg_shared_engine import run_and_dispose  # noqa: E402
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -108,7 +109,7 @@ async def _load() -> Snapshot:
     return snap
 
 
-_SNAP: Snapshot = asyncio.run(_load())
+_SNAP: Snapshot = asyncio.run(run_and_dispose(_load()))  # 用完释放共享连接池（见 tests/_pg_shared_engine.py）
 
 _needs_db = pytest.mark.skipif(not _SNAP.ok, reason=f"无法连库: {_SNAP.reason}")
 

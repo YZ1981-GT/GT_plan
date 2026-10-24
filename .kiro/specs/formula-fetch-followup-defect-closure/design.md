@@ -116,3 +116,68 @@
 ## 9. R9 删除模板
 
 `TemplateEngine.delete_template`：被引用判断改为按底稿编码精确匹配；`template.is_deleted = True` + 更新时间；端点改为只许管理员（与同文件模板管理端点一致，改前现读）。
+
+## 10. 实施记录与偏离（2026-10-24）
+
+### 10.1 R6 推错数的规则
+
+- **F2（R6.1）**：取试算表 1401~1499 全部行（与报表 BS-010 同区间），按科目名归类（单一来源 `classify_f2_category`）：
+  跌价准备 / 减值准备取绝对值计入跌价准备列，商品进销差价取绝对值从账面余额中减去，其余计入账面余额，账面价值 = 差；
+  只写「存货分类」合计行（按行名「合计」唯一对上），明细行由底稿同步；删 `F2.note.subtable_0`（跌价准备变动表没有取数行，
+  原先被兜底写进存货原值合计）。
+  - **偏离 §6**：字段名用 `end_gross / end_impairment / end_net / prior_*`（真库底稿同步写入「存货分类」的列键，
+    `_sub_table_columns['存货分类']`），不用设计里 D1 写法 `end_balance / end_provision / end_book_value` —— 那套键读取方对不上列。
+  - **旧格式表**（`_tables` + values 列）六个字段认不出列 ⇒ 逐格跳过，原因写明哪一列、为什么不按位置猜
+    （`engine.SPLIT_FIELD_LABELS`；原先只写「附注表缺少「期末」列」，而表里有期末列）。按表头认列属另一 spec
+    `consol-note-header-library-and-node-reaggregate` R5.3（该 spec 写明需先与用户确认），本 spec 不动 `note_writer`。
+- **K4 / D5（R6.2）**：无科目声明；K4 只剩审定合计两条规则，D5 无规则，`KNOWN_ACCOUNT_DEVIATIONS` 只剩 D4。
+- **审定表族（R6.3）**：`bindings/balance_adj_extract.AUDITED_SOURCES` 逐底稿声明 G1~G10（无 G7）/ H1~H10 / I1~I5 / K7 的真实来源
+  （行清单 / 合计键 / 按模式 / 不可取）；读不出 ⇒ None ⇒ 派生目标写空，不写 0。H1 / I1 披露 builder 净值读不出返回 None。
+  推送面板算式说明与规则清单 62 条文案由声明生成（中文字段名、按模式分支写模式名）。
+- **报表（R6.4）**：脚本 `scripts/fix/fix_report_bs_book_value_formulas.py`（默认预览只读；`--apply --backup <文件>` 先四个准则
+  全部校验行名与版本、再留底、再逐准则 `publish_global(source="seed")`、再按项目审计年度传播；每个准则固定 request_id，重跑不再发布）。
+  - BS-028 四个准则 = 1601 − 1602 − 1603 + 1606（各准则都没有单列「固定资产清理」行，现查）；BS-032 = 1701 − 1702 − 1703；
+    BS-037 公式置空（登记进 `DERIVED_ROWS_WITHOUT_ACCOUNT`，移出零命中白名单）。
+  - 同步：`report_formula_service._BS_SPECIAL`（固定资产 / 无形资产同上，删「其他非流动资产→1901」）、`_NAME_TO_ACCOUNT`
+    删「其他非流动资产→1901」、按名拦截集合加「其他非流动资产」、`multi_standard_report_formats.json` 的 CAS 两行、
+    `scripts/gen/generate_report_seed.py` 三行；新增守卫「置空的派生行必须同时按行名拦住」（原先删掉按名拦截条目零测试打红，变异实测）。
+  - **H6 层③关闭**：BS-028 是固定资产行、不是 H6 自己的行；单槽规格允许层③时，客户科目表里没有叫「固定资产清理」的科目就会把
+    1601 / 1602 / 1603（补齐后还有 1606）一并当清理科目（对照用例实测）。`H6_ACCOUNT_SPEC.trust_report_config=False`。
+    补齐 BS-028 同时消掉 H1 减值准备槽、H6 清理槽恒报的「报表公式与科目不一致」假冲突。
+  - `tests/fixtures/consol_report_config_snapshot.json` 保持冻结：它是 2026-09-30 真库快照，用例测的是分解与种子机制，与当前公式无关。
+  - **已在真库发布**（2026-10-24）：publish_id soe_consolidated `17b5d68d…` / soe_standalone `bb8ece06…` / listed_consolidated
+    `c2916c3f…` / listed_standalone `019af23f…`，各公式位 v1→v2，无冲突、无待确认；跟随全局的项目副本（和平 2024）随之更新。
+    留底 `C:\Users\Administrator\gt_data_backups\formula-fetch-followup-R6.4\backup_report_bs_20261024.json`
+    （report_config 15 行 + 资产负债表 financial_report 973 行，`row_to_json` 原文）。
+  - 传播结果：9 个有报表的项目重算 5~7 行、失败 0。金额只在报表本就落后于现试算表的项目变：和平 2025 BS-028
+    148,536,020.26 → 18,857,032.69、BS-032 16,943,075.40 → 2,418,592.54（BS-038 / BS-039 随之）；陕西华氏 BS-032
+    485,423.82 → 0.00；另两项目原已标过期的 BS-053（V144 置空）重算为 0。其余项目金额不变（1603 / 1703 全库为 0，1606 原已含在国企单体公式里）。
+    这两个项目的报表发布前就与试算表不一致（资产总计 ≠ 负债和所有者权益总计），内核只重算受影响的行，整张报表需在报表页重新生成。
+  - 脚本在独立进程里发布：正在运行的后端进程内「谁引用了该单元格」反向索引缓存要等下一次公式发布或重启才刷新（只影响 linkage 查询展示）。
+- **推送 dry-run（R6.5）**：见 tasks 2.6 证据。
+
+### 10.2 测试基础设施（同类修复）
+
+共享连接池（`app.core.database` 的 `engine` / `async_engine` / `async_session`）绑在建连时的事件循环上，`asyncio.run` 退出不释放，
+同进程下一个 `asyncio.run` 的真库用例报 `Event loop is closed`（全量跑公式推送 K2 canary 即因此红，单跑全绿）。全仓 AST 扫描同类 12 个文件：
+4 个在用完的 `finally` 里 `engine.dispose()`，8 个改 `asyncio.run(run_and_dispose(...))`（`tests/_pg_shared_engine.py`）；
+守卫 `test_pg_tests_dispose_shared_engine.py`（AST 判定，注释 / 文档字符串不算；只把 `get_db` 当依赖覆盖键的不在此列）。
+修后原先被前一个文件连带 skip 的 5 个真库用例真正跑起来并通过。`test_x3_roundtrip_live.py` 会写真库非测试项目，未实跑。
+
+### 10.3 范围外发现（登记，未改）
+
+1. **同类报表公式**（全局、四个准则写法不一，需用户拍板；金额为 2026-10-24 全库审定数绝对值合计）：
+   - BS-006 应收账款：上市单体减 1231 整科目、国企单体减 1231-02、两个合并口径不减（1231-02 坏账准备 5 个项目 2.15 亿）；
+     BS-005 应收票据只国企单体减 1231-01（116 万）；BS-009 其他应收款只国企单体减 1231-03（938 万）。
+   - BS-010 存货：只有上市单体减 1416，其余三个准则不减（1416 / 1461 跌价准备 4 个项目 598 万）。
+   - BS-024 长期股权投资四个准则都不减 1512 减值准备（2 个项目 763 万）。
+   - BS-027 投资性房地产：上市单体减 1525 / 1526、国企单体只减 1525、合并口径都不减（1525 844 万、1526 48 万）。
+   - BS-029 在建工程四个准则都不含 1605 工程物资（现行报表格式工程物资并入在建工程行）；BS-030 生产性生物资产不减累计折旧；
+     BS-011 合同资产、BS-021 债权投资、BS-023 长期应收款、BS-034 商誉均不减各自减值准备（这些科目全库当前为 0）。
+2. **公式推送真库跳过棘轮** `test_formula_push_note_skip_pg` 自 `8798e92fd`（2026-10-22 新增 153 条子表推送规则）起红：
+   安徽跳过 74 → 311（章节不符类 13 → 155、找不到行类 2 → 96），棘轮 85。本 spec 改动后 299 → 262，仍超棘轮。
+3. **其余单槽规格的层③隐患**（与 H6 同类，报表行不是本槽自己的行或跨准则行次错位）：J2 → BS-093 = TB('2711')（2711 是专项应付款）、
+   M1 → 国企 BS-055 = TB('2001')（短期借款）、G12 → IS-014 = TB('6113')（槽兜底码 6103）。
+4. `scripts/gen/generate_report_seed.py` 已过期：现 `report_config_seed.json` 是另一套编号的模板结构种子（公式为空），重跑生成器会覆盖它。
+5. 既有红（HEAD 干净检出同样红）：`test_report_config_account_integrity` 6 条（行次编码各准则不一致）、`test_wp_templates_readonly` 3 条、
+   H 循环 72 条（导入导出登记 / H0 预设 / 迁移进度等）。

@@ -216,8 +216,8 @@ _CODES_LEGITIMATELY_REUSED: dict[str, str] = {
     "1703": (
         "1703 的真实科目名就是「无形资产减值准备」，filler 的 "
         "_IMP_SPECIAL['无形资产减值准备'] / ['无形资产减值准备年初'] / 合计公式"
-        "正确使用它。本 spec 修的是「开发支出」误用 1703，不是禁用该码。"
-        "2026-08-05 实证"
+        "正确使用它，_BS_SPECIAL['无形资产'] 按备抵减去它（2026-10-24，与 report_config BS-032 同源）。"
+        "本 spec 修的是「开发支出」误用 1703，不是禁用该码。2026-08-05 实证"
     ),
 }
 
@@ -268,6 +268,19 @@ class TestDerivedRowsBlocked:
         assert not offenders, (
             f"派生行 {row_name!r} 仍作为键存在于 {list(offenders)}：{offenders}\n"
             f"它应保持 NULL（V138 已置 NULL），名索引表里不该有它"
+        )
+
+    @pytest.mark.parametrize("row_code", sorted(set(DERIVED_ROWS_WITHOUT_ACCOUNT) - set(DERIVED_ROWS_EXEMPT_FROM_NAME_BLOCK)))
+    def test_every_null_row_is_blocked_by_name(self, row_code: str) -> None:
+        """置空的派生行（按 row_code 登记）必须同时按行名拦住，否则第二写入路径按名把错码填回。
+
+        判定依据的行名 = 登记理由「：」之前那段（与 report_config 行名同写法，经真源归一剥掉序号 / 尾部括注）。
+        2026-10-24 BS-037 其他非流动资产置空时补上本断言：原先只有「名索引表里没有该键」一道，删掉按名拦截
+        集合里的条目没有任何测试打红（变异实测）。有意不按名拦截的行登记在 DERIVED_ROWS_EXEMPT_FROM_NAME_BLOCK。
+        """
+        name = normalize_name(DERIVED_ROWS_WITHOUT_ACCOUNT[row_code].split("：", 1)[0])
+        assert name in DERIVED_ROW_NAMES_WITHOUT_ACCOUNT, (
+            f"{row_code}（{name}）已登记为置空的派生行，但不在按名拦截集合 DERIVED_ROW_NAMES_WITHOUT_ACCOUNT 里"
         )
 
     @pytest.mark.parametrize("row_name", sorted(DERIVED_ROW_NAMES_WITHOUT_ACCOUNT))

@@ -47,6 +47,7 @@ from app.services.four_table.report_config_account_names import (  # noqa: E402
     names_match,
     normalize_name,
 )
+from tests._pg_shared_engine import run_and_dispose
 
 # 本仓库 `backend/pytest.ini` 设 `asyncio_mode = auto` → async 测试无需显式标记；
 # 显式加 `pytestmark = pytest.mark.asyncio` 会让同类里的同步测试全部报
@@ -170,7 +171,7 @@ def snap() -> Snapshot:
             "也未能从 app.core.config.settings 读到。CI 上本 job 必须挂在有 DB 的 job。"
         )
     try:
-        return asyncio.run(_load_all())
+        return asyncio.run(run_and_dispose(_load_all()))  # 用完释放共享连接池（见 tests/_pg_shared_engine.py）
     except Exception as exc:  # noqa: BLE001
         pytest.skip(
             f"DB 取数失败（{type(exc).__name__}: {exc}）—— 守卫需要真实 report_config × account_chart"

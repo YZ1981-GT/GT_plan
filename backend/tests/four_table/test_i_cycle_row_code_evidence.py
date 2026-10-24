@@ -53,13 +53,16 @@ EXPECTED_ROW_NAMES: dict[str, str] = {
     "IS-006": "研发费用",
 }
 
-#: 正确 row_code → 期望 formula（四准则一致）
-EXPECTED_FORMULAS: dict[str, str] = {
-    "BS-032": "TB('1701','期末余额') - TB('1702','期末余额')",
+#: 正确 row_code → 期望 formula（四准则一致；``None`` = 四准则都置空）
+#: 🔴 2026-10-24（spec formula-fetch-followup-defect-closure R6.4，经公式同步内核全局发布）：
+#:    BS-032 补减 1703 无形资产减值准备；BS-037 原 ``TB('1911')`` 的 1911 在标准科目表与各项目试算表里都不存在，
+#:    「其他非流动资产」没有对应的标准科目 ⇒ 置空（I5 段兜底码本就为空，取数结果不变）。
+EXPECTED_FORMULAS: dict[str, str | None] = {
+    "BS-032": "TB('1701','期末余额') - TB('1702','期末余额') - TB('1703','期末余额')",
     "BS-033": "TB('1704','期末余额')",
     "BS-034": "TB('1711','期末余额')",
     "BS-035": "TB('1801','期末余额')",
-    "BS-037": "TB('1911','期末余额')",
+    "BS-037": None,
     "IS-006": "TB('6604','本期发生额')",
 }
 
@@ -262,15 +265,16 @@ class TestClassAReportConfigEvidence:
     def test_expected_formula_identical_across_standards(
         self, live: Snapshot, code: str
     ):
-        """六个正确 row_code 的 formula 四准则一致且等于期望值。"""
+        """六个正确 row_code 的 formula 四准则一致且等于期望值（期望 ``None`` 即四准则都为 NULL）。"""
         want = EXPECTED_FORMULAS[code]
-        seen: set[str] = set()
+        seen: set[str | None] = set()
         for std in ALL_STANDARDS:
             got = live.rows.get((code, std))
             assert got is not None, f"{code} 在 {std} 下不存在"
-            assert got[1] is not None, f"{code}/{std} formula 为 NULL"
-            seen.add(str(got[1]).strip())
-        assert len(seen) == 1, f"{code} 的 formula 跨准则不一致：{sorted(seen)}"
+            if want is not None:
+                assert got[1] is not None, f"{code}/{std} formula 为 NULL"
+            seen.add(None if got[1] is None else str(got[1]).strip())
+        assert len(seen) == 1, f"{code} 的 formula 跨准则不一致：{sorted(seen, key=str)}"
         assert seen.pop() == want, f"{code} formula 与期望不符"
 
     @pytest.mark.parametrize("code", sorted(LEGACY_WRONG_MEANINGS))

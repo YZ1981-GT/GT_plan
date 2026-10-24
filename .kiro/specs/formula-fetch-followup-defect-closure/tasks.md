@@ -11,12 +11,30 @@
 
 ## 2. 推错数的规则（R6）
 
-- [ ] 2.1 K4 / D5 改无科目声明，删试算表取数与附注主表规则，删已知偏差条目；生成物重生成（R6.2）
-- [ ] 2.2 F2 附注主表：备抵科目按减项，六字段只写合计行（R6.1）
-- [ ] 2.3 审定表族审定合计按前端真实持久化取数（逐底稿现读声明），备抵按减项，读不到不写 0（R6.3）
-- [ ] 2.4 H1 / I1 附注主表按账面价值出行，行名对齐两种准则模板（R6.3）
-- [ ] 2.5 报表 BS-037 置空、BS-028 / BS-032 补减减值准备：发布脚本（`publish_global`，幂等）+ 种子 / 生成器 / 按名回填拦截 + 测试（R6.4）
-- [ ] 2.6 推送 dry-run：和平 2025 / 安徽 2025 改动前后逐地址对比，变化逐条可解释（R6.5）
+- [x] 2.1 K4 / D5 改无科目声明，删试算表取数与附注主表规则，删已知偏差条目；生成物重生成（R6.2）
+  - 证据：规则清单 K4 只剩 `audited_total.receivable / net`、D5 无规则；`KNOWN_ACCOUNT_DEVIATIONS` 只剩 D4；
+    `gen_formula_push_coverage.py --check`（81 条）/ `gen_formula_push_owned_keys.py --check`（172 键）通过；
+    `test_formula_push_account_single_source.py` / `test_formula_push_rules.py` 绿（提交 25a506a57、6b0e7889d）
+- [x] 2.2 F2 附注主表：备抵科目按减项，六字段只写合计行（R6.1）
+  - 证据：`test_formula_push_f2_note_book_value.py` 4 例；变异 ME（跌价准备算进账面余额）/ MF（进销差价按加项）/ M1（旧格式表原因退回旧文案）
+    均打红后逐字节恢复；真库 dry-run 安徽 6 格写入与试算表逐值一致、和平旧格式表 6 格跳过并写明原因（提交 6b0e7889d）
+  - 偏离：字段名用真实同步列键 `end_gross / end_impairment / end_net / prior_*`（design §10.1）
+- [x] 2.3 审定表族审定合计按前端真实持久化取数（逐底稿现读声明），备抵按减项，读不到不写 0（R6.3）
+  - 证据：`balance_adj_extract.AUDITED_SOURCES` + `test_formula_push_balance_adj_extract.py` 20 例、批 C 对账 34 例（含前端键存在性守卫）；
+    变异 MA（不可取→0）/ MB（备抵按加项）/ MC（主清单读不到→0）/ MD（合计键空串→0）均打红
+- [x] 2.4 H1 / I1 附注主表按账面价值出行，行名对齐两种准则模板（R6.3）
+  - 证据：`test_formula_push_h1_i1_note_book_value.py` 3 例、`test_disclosure_builders_h1_i1_net.py` 10 例；变异 MG / MH（净值读不到写 0）打红
+- [x] 2.5 报表 BS-037 置空、BS-028 / BS-032 补减减值准备：发布脚本（`publish_global`，幂等）+ 种子 / 生成器 / 按名回填拦截 + 测试（R6.4）
+  - 证据：`scripts/fix/fix_report_bs_book_value_formulas.py`；`tests/formula_settings/test_fix_report_bs_book_value_formulas.py` 5 例
+    （预览不写 / 必须留底 / 四准则发布 + 跟随副本更新 + 改过的行进待确认 + 传播 + 重跑不再发布 / 行名漂移一个都不发布 / 真库留底）；
+    `four_table/test_h6_report_tier_closed.py` 7 例；新守卫「置空的派生行必须按名拦住」11 例；
+    变异 M3 来源 / M4 不留底 / M5 固定资产不减 1603 / M7 不传播 / M8 先发布后校验 / M9 filler 恢复 1901 / M10 / M10b 拦截集合删条目 /
+    M11 H6 打开层③ 全部打红（M10 首轮存活 → 补守卫后打红）
+  - 真库已发布（四个准则 v1→v2，无冲突、无待确认），留底与传播结果见 design §10.1；`test_i_cycle_row_code_evidence.py` 连库绿
+- [x] 2.6 推送 dry-run：和平 2025 / 安徽 2025 改动前后逐地址对比，变化逐条可解释（R6.5）
+  - 证据：base（bf759b369）→ 现状逐地址对比：G / H / I / K 审定合计由恒 0 改为按底稿行清单的实数（H1 / H8 / H9 有行清单）或写空
+    （底稿未存行清单）；H1 / I1 附注按账面价值行写入；F2 见 2.2；D5 / K4 规则删除；D6 / H2 附注合计与人工格变化来自并发会话
+    `note_writer` 六列对称兜底（不在本 spec）。报表公式发布前后推送结果逐地址 0 变化。
 
 ## 3. 映射表（R1）
 

@@ -68,7 +68,9 @@ def _load_pg_schema_sync() -> dict[str, set[str]]:
             schema.setdefault(tbl.lower(), set()).add(col.lower())
         return schema
 
-    return asyncio.run(_load())
+    from tests._pg_shared_engine import run_and_dispose
+
+    return asyncio.run(run_and_dispose(_load()))  # 用完释放共享连接池（见 tests/_pg_shared_engine.py）
 
 
 def _check_sql_columns(sql: str, schema: dict[str, set[str]]) -> list[str]:

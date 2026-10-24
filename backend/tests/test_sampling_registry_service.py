@@ -593,8 +593,10 @@ def _load_snapshot() -> _Snapshot:
                     snap.batch_index_def = definition
             snap.available = True
 
+    from tests._pg_shared_engine import run_and_dispose
+
     try:
-        asyncio.run(_all())
+        asyncio.run(run_and_dispose(_all()))  # 用完释放共享连接池（见 tests/_pg_shared_engine.py）
     except Exception as exc:  # noqa: BLE001
         snap.available = False
         snap.reason = f"{type(exc).__name__}: {exc}"

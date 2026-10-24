@@ -4,7 +4,7 @@
   原值 = 1601 固定资产
   累计折旧 = 1602 累计折旧
   减值准备 = 1603 固定资产减值准备
-  报表行 BS-028 = TB('1601')-TB('1602')+TB('1606')  (soe)
+  报表行 BS-028 = TB('1601')-TB('1602')-TB('1603')+TB('1606')  (四个准则，2026-10-24 起)
 
 返回 allResponses + projectContext + TB汇总 + 按分类预填 + tb_source_codes
 
@@ -636,10 +636,9 @@ async def render(ctx: RenderContext) -> dict | None:
     # Wave 6: 审定表 TB 核对走报表行规则映射（Req5.1-5.3）
     try:
         from app.services.report_account_mapping import resolve_report_line_account_codes
-        # 固定资产报表行 = BS-028（report_config 实测：listed=TB('1601')-TB('1602')，
-        # soe=…+TB('1606')）。此前误用 BS-024（实为「长期股权投资」TB('1511')）→ 反解出 1511，
-        # 与固定资产完全无关。fallback 仍含 1603 减值准备（BS-028 公式不含 1603，但 H1 审定表
-        # 需覆盖原值/折旧/减值三段，故无映射时兜底三码）。
+        # 固定资产报表行 = BS-028（2026-10-24 起四个准则：TB('1601')-TB('1602')-TB('1603')+TB('1606')）。
+        # 此前误用 BS-024（实为「长期股权投资」TB('1511')）→ 反解出 1511，与固定资产完全无关。
+        # 无映射时兜底原值 / 折旧 / 减值三码（H1 审定表的三段）。
         h1_source_codes = await resolve_report_line_account_codes(
             ctx.db, ctx.project_id, "BS-028", fallback=["1601", "1602", "1603"]
         )

@@ -51,16 +51,18 @@ def _bs_rows(is_consolidated: bool, is_listed: bool) -> list[dict]:
         {"row_code": "BS-025", "row_number": 25, "row_name": "其他权益工具投资", "indent_level": 1, "formula": "TB('1506','期末余额')"},
         {"row_code": "BS-026", "row_number": 26, "row_name": "其他非流动金融资产", "indent_level": 1, "formula": "TB('1507','期末余额')"},
         {"row_code": "BS-027", "row_number": 27, "row_name": "投资性房地产", "indent_level": 1, "formula": "TB('1521','期末余额')"},
-        {"row_code": "BS-028", "row_number": 28, "row_name": "固定资产", "indent_level": 1, "formula": "TB('1601','期末余额') - TB('1602','期末余额')"},
+        # BS-028 / BS-032 补减减值准备、BS-028 并入固定资产清理、BS-037 置空：与 report_config 全局发布同源
+        # （spec formula-fetch-followup-defect-closure R6.4，scripts/fix/fix_report_bs_book_value_formulas.py）
+        {"row_code": "BS-028", "row_number": 28, "row_name": "固定资产", "indent_level": 1, "formula": "TB('1601','期末余额') - TB('1602','期末余额') - TB('1603','期末余额') + TB('1606','期末余额')"},
         {"row_code": "BS-029", "row_number": 29, "row_name": "在建工程", "indent_level": 1, "formula": "TB('1604','期末余额')"},
         {"row_code": "BS-030", "row_number": 30, "row_name": "生产性生物资产", "indent_level": 1, "formula": "TB('1621','期末余额')"},
         {"row_code": "BS-031", "row_number": 31, "row_name": "使用权资产", "indent_level": 1, "formula": "TB('1641','期末余额')-TB('1642','期末余额')-TB('1643','期末余额')"},
-        {"row_code": "BS-032", "row_number": 32, "row_name": "无形资产", "indent_level": 1, "formula": "TB('1701','期末余额') - TB('1702','期末余额')"},
+        {"row_code": "BS-032", "row_number": 32, "row_name": "无形资产", "indent_level": 1, "formula": "TB('1701','期末余额') - TB('1702','期末余额') - TB('1703','期末余额')"},
         {"row_code": "BS-033", "row_number": 33, "row_name": "开发支出", "indent_level": 1, "formula": "TB('1703','期末余额')"},
         {"row_code": "BS-034", "row_number": 34, "row_name": "商誉", "indent_level": 1, "formula": "TB('1711','期末余额')"},
         {"row_code": "BS-035", "row_number": 35, "row_name": "长期待摊费用", "indent_level": 1, "formula": "TB('1801','期末余额')"},
         {"row_code": "BS-036", "row_number": 36, "row_name": "递延所得税资产", "indent_level": 1, "formula": "TB('1811','期末余额')"},
-        {"row_code": "BS-037", "row_number": 37, "row_name": "其他非流动资产", "indent_level": 1, "formula": "TB('1911','期末余额')"},
+        {"row_code": "BS-037", "row_number": 37, "row_name": "其他非流动资产", "indent_level": 1, "formula": None},
         {"row_code": "BS-038", "row_number": 38, "row_name": "非流动资产合计", "indent_level": 0, "formula": "ROW('BS-021') + ROW('BS-022') + ROW('BS-023') + ROW('BS-024') + ROW('BS-025') + ROW('BS-026') + ROW('BS-027') + ROW('BS-028') + ROW('BS-029') + ROW('BS-030') + ROW('BS-031') + ROW('BS-032') + ROW('BS-033') + ROW('BS-034') + ROW('BS-035') + ROW('BS-036') + ROW('BS-037')", "is_total_row": True},
         {"row_code": "BS-039", "row_number": 39, "row_name": "资产总计", "indent_level": 0, "formula": "ROW('BS-015') + ROW('BS-038')", "is_total_row": True},
         # ── 流动负债 ──

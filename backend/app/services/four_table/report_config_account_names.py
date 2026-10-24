@@ -82,9 +82,8 @@ ZERO_HIT_WHITELIST: dict[str, str] = {
         "1124 应收款项融资：码与名在全库 account_chart 均零命中"
         "（2026-08-03 实证；memory 亦已记该码不存在）"
     ),
-    "BS-037": (
-        "1911 其他非流动资产：码与名在全库 account_chart 均零命中（2026-08-03 实证）"
-    ),
+    # 🔴 BS-037 已于 2026-10-24 从白名单**移出**、改登记为派生行（DERIVED_ROWS_WITHOUT_ACCOUNT）：
+    #    「其他非流动资产」没有对应的标准科目，全局公式置空（spec formula-fetch-followup-defect-closure R6.4）。
     # 🔴 BS-066 已于 2026-08-04 从白名单**移出** —— spec 立项时的白名单依据错了：
     #    `2811` 确实零命中，但「递延收益」在库中**有归属**（`2401`，standard 9 / client 6 项目）
     #    → 按判据边界 2「码零命中 + 名有归属 = 错码」，它是第 14 个错码而非业务事实。
@@ -164,6 +163,13 @@ DERIVED_ROWS_WITHOUT_ACCOUNT: dict[str, str] = {
         "`2651.99 租赁负债_一年内到期的租赁负债` 7 项目 / `2701.99 长期应付款_一年内到期的长期应付款`"
         " 4 项目）⇒ 只能是重分类合计，不对应任何单一科目。2026-08-05 用户裁决置 NULL（V144）"
     ),
+    # ─── 2026-10-24（spec formula-fetch-followup-defect-closure R6.4，经公式同步内核全局发布） ───
+    "BS-037": (
+        "其他非流动资产：原写 1911，码与名在全库 account_chart 均零命中（2026-08-03 实证，原登记在零命中白名单），"
+        "各项目试算表也没有 1911（取数恒空）；第二写入路径原写 1901 实为待处理财产损溢。CAS 下它是「其他」性质汇总行，"
+        "没有对应的标准科目 ⇒ 全局公式置空，需要的项目在本项目公式里按客户科目配置（脚本 "
+        "scripts/fix/fix_report_bs_book_value_formulas.py，publish_global 来源 seed）"
+    ),
 }
 
 #: 派生行的**归一后行名**集合 —— 供按行名索引的下游（`report_formula_service`
@@ -188,6 +194,9 @@ DERIVED_ROW_NAMES_WITHOUT_ACCOUNT: frozenset[str] = frozenset(
         # 「一年内到期的非流动负债」：filler 原写 2502（实为应付债券，且同表「应付债券」
         # 也写 2502 = 同码双认领）→ 条目删除 + 按名拦截，双保险。
         "一年内到期的非流动负债",
+        # 「其他非流动资产」：filler 原写 1901（待处理财产损溢），report_config 原写 1911（全库零命中）→
+        # 无对应标准科目，条目删除 + 按名拦截（2026-10-24，R6.4；报表行 BS-037 已全局置空）
+        "其他非流动资产",
     }
 )
 
@@ -388,14 +397,12 @@ FORMULA_FILLER_SUSPECTED_ISSUES: dict[str, str] = {
         "重分类合计，实证散落在 2501.02 / 2651.99 / 2701.99，顶层无对应科目）。"
         "「应付债券」保留 2502 不动"
     ),
-    "其他非流动资产": (
-        "`_BS_SPECIAL` / `_NAME_TO_ACCOUNT` 两表均写 **1901**，而 1901 实为"
-        "「待处理财产损溢/损益」（standard 8 / client 5 项目）；且同表「其他流动资产」"
-        "原先也写 1901 → 同码双认领（本轮已删「其他流动资产」，双认领随之解除，"
-        "但「其他非流动资产 → 1901」这条名实不符仍在）。report_config 侧 BS-037 用的是 "
-        "1911（码与名均零命中，在 ZERO_HIT_WHITELIST）→ 两条路径取不同的码，"
-        "且两个码都不叫「其他非流动资产」。按「宁缺勿造」大概率应删条目让该行保持 NULL。"
-        "2026-08-05 实测（本轮顺带查出，与三项裁决无交集），待裁决"
+    "（已修，保留记录）其他非流动资产": (
+        "**2026-10-24 已修**（spec formula-fetch-followup-defect-closure R6.4）。原状：`_BS_SPECIAL` / "
+        "`_NAME_TO_ACCOUNT` 两表均写 **1901**，而 1901 实为「待处理财产损溢/损益」（standard 8 / client 5 项目）；"
+        "report_config 侧 BS-037 用的是 1911（码与名均零命中，原在 ZERO_HIT_WHITELIST）→ 两条路径取不同的码，"
+        "且两个码都不叫「其他非流动资产」。处置 = 两表删条目 + 加入 DERIVED_ROW_NAMES_WITHOUT_ACCOUNT 按名拦截 + "
+        "BS-037 经公式同步内核全局置空（登记进 DERIVED_ROWS_WITHOUT_ACCOUNT）。2026-08-05 实测查出"
     ),
     "其他债权投资": (
         "`_BS_SPECIAL` / `_NAME_TO_ACCOUNT` 均写 1505，而 1505 实为债权投资减值准备"

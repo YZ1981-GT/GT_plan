@@ -4,7 +4,8 @@ component_type = "h6-asset-disposal-clearing"
 
 科目定位（语义驱动）：
   固定资产清理 = 1606（借方/资产类，过渡科目）
-  含于报表行 BS-028（公式 soe: TB('1601')-TB('1602')+TB('1606')）
+  含于报表行 BS-028（四个准则：TB('1601')-TB('1602')-TB('1603')+TB('1606')；BS-028 不是本科目自己的行，
+  语义定位不用它的公式码，见 h6_account_scope）
 
 返回 allResponses + tb_values + transit_status + sheets元数据 + tb_source_codes
 过渡科目规则：期末余额应为0（清理完毕结转H10）

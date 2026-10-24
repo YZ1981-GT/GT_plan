@@ -107,7 +107,7 @@ export const I_CYCLE_ACCOUNT_SPECS: Readonly<Record<ICycleWpCode, ICycleAccountS
   I1: {
     wpCode: 'I1',
     accountName: '无形资产',
-    // 无形资产 = TB('1701','期末余额') - TB('1702','期末余额')
+    // 无形资产 = TB('1701','期末余额') - TB('1702','期末余额') - TB('1703','期末余额')（2026-10-24 起补减减值准备）
     rowCode: { listed: 'BS-032', soe: 'BS-032' },
     segments: [
       { segment: I_SEGMENT_COST, label: '账面原值', fallback: ['1701'] },
@@ -150,7 +150,7 @@ export const I_CYCLE_ACCOUNT_SPECS: Readonly<Record<ICycleWpCode, ICycleAccountS
   I5: {
     wpCode: 'I5',
     accountName: '其他非流动资产',
-    // 其他非流动资产 = TB('1911','期末余额')；🔴 `1911` 全库两张科目表都不存在
+    // 其他非流动资产：原公式 TB('1911','期末余额')，🔴 `1911` 全库两张科目表都不存在；2026-10-24 起四准则公式置空
     rowCode: { listed: 'BS-037', soe: 'BS-037' },
     segments: [
       // 🔴 无标准科目且 report_config formula 为 None → 空兜底（宁缺勿造，R1.4）
