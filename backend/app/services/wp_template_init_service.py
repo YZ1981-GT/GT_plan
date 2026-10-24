@@ -21,7 +21,7 @@ import json
 import logging
 import shutil
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 # pass4: 模板查找域子模块（re-export 保导入路径不变）
@@ -572,6 +572,7 @@ def prefill_workpaper_xlsx(
     adj_data: dict[str, dict[str, float]] | None = None,
     user_formulas: dict[str, dict] | None = None,
     mapping_overrides: dict[str, str] | None = None,
+    prev_values: dict[str, Any] | None = None,
 ) -> int:
     """在已复制的底稿 xlsx 中写入预填充数据
 
@@ -590,6 +591,8 @@ def prefill_workpaper_xlsx(
         adj_data: 调整分录数据 {科目编码: {aje_net: 值, rje_net: 值}}
         user_formulas: 用户自定义公式 {sheet!cell_ref: {formula, formula_type, ...}}
         mapping_overrides: 映射单元格的有效公式（本项目 / 全局改过）{sheet!cell_ref: formula}，按它取值
+        prev_values: 三参 PREV 格的上年同底稿取数 {sheet!cell_ref: PrevPrefill}（``prev3_prefill_locator.resolve_prev_prefill``）；
+            三参 PREV 格（全部块）按定位表落格，不按列头关键词猜；不传则这些格不动
 
     Returns:
         写入的单元格数量
@@ -669,11 +672,14 @@ def prefill_workpaper_xlsx(
                 except Exception as e:
                     logger.debug("user_formula 写入失败 %s: %s", key, e)
 
+    from app.services import prev3_prefill_locator as prev3
+
+    prev3_slots = prev3.slot_keys(wp_code)  # 三参 PREV 公式位只按定位表落格（见下方 apply_prefills）
     for cell_def in wp_mapping.get("cells", []):
         formula_type = cell_def.get("formula_type", "")
         cell_ref = cell_def.get("cell_ref", "")
         # E1 spec Task 1.20: 用户自定义已覆盖此 cell,跳过预设写入
-        if cell_ref in user_overridden_cells:
+        if cell_ref in user_overridden_cells or (sheet_name.strip(), cell_ref.strip()) in prev3_slots:
             continue
         # 占位 cell_ref(以下划线开头)是"汇总驱动 cell",不写入 Univer
         if cell_ref.startswith("_"):
@@ -759,6 +765,11 @@ def prefill_workpaper_xlsx(
                         cell_obj.value = value
                         _mark_prefilled_cell(ws, cell_obj)
                         filled_count += 1
+
+    prefills = {**(prev_values or {}),
+                **prev3.override_prefills(mapping_data, wp_code, mapping_overrides, tb_data, adj_data)}
+    user_cells = {(k.split("!", 1)[0].strip(), k.split("!", 1)[1].strip().upper()) for k in user_formulas if "!" in k}
+    filled_count += prev3.apply_prefills(wb, wp_code, prefills, skip_cells=user_cells)
 
     try:
         wb.save(str(target_path))

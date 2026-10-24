@@ -323,23 +323,25 @@ async def _load_wp(db: AsyncSession, project_id: uuid.UUID, year: int,
     if not refs:
         return {}
     out: dict[str, dict[str, Decimal]] = {}
-    try:
-        from app.services.prefill_anchor_map import read_anchor_value, resolve_anchor
-        for ref_tuple in refs:
-            wp_code = ref_tuple[0]
-            sheet = ref_tuple[1] if len(ref_tuple) > 1 else ""
-            cell = ref_tuple[2] if len(ref_tuple) > 2 else sheet  # 2 参形式
-            spec = resolve_anchor(wp_code, sheet, cell)
-            if spec is None:
-                continue
-            try:
+    from app.services.prefill_anchor_map import read_anchor_value, resolve_anchor
+
+    for ref_tuple in sorted(refs):
+        wp_code = ref_tuple[0]
+        sheet = ref_tuple[1] if len(ref_tuple) > 1 else ""
+        cell = ref_tuple[2] if len(ref_tuple) > 2 else sheet  # 2 参形式
+        spec = resolve_anchor(wp_code, sheet, cell)
+        if spec is None:
+            # 未对齐的锚点留日志：静默跳过会让「接线没生效」伪装成「本项目无此数据」
+            logger.warning("preloader: WP 锚点未对齐，不取值 WP('%s','%s','%s')", wp_code, sheet, cell)
+            continue
+        try:
+            async with db.begin_nested():  # 取值 SQL 出错只回滚自己，不让后续预载停在中止的事务里
                 res = await read_anchor_value(db, project_id, wp_code, spec)
-                if res.value is not None:
-                    out.setdefault(wp_code, {})[cell or sheet] = _safe_decimal(res.value)
-            except Exception:
-                pass
-    except ImportError:
-        logger.warning("preloader: prefill_anchor_map not available")
+        except Exception:  # noqa: BLE001 —— fail-soft，但不得静默
+            logger.warning("preloader: WP 取值失败 WP('%s','%s','%s')", wp_code, sheet, cell, exc_info=True)
+            continue
+        if res.value is not None:
+            out.setdefault(wp_code, {})[cell or sheet] = _safe_decimal(res.value)
     return out
 
 

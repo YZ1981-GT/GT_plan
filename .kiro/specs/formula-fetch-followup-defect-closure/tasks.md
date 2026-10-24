@@ -110,13 +110,34 @@
 
 ## 6. 三参 PREV 定位表与陈旧测试（R2 / R3）
 
-- [ ] 6.1 生成器 + 定位表（扫模板、歧义格人工裁定、幂等、`--check`）（R2.1 / R2.2）
-- [ ] 6.2 初次预填按定位表：路由解析上年值、`write` 写值、`verify` 批注、取不到写原因；重新预填落格查定位表（R2.3 / R2.4）
-- [ ] 6.3 守卫与变异（R2.5）
-- [ ] 6.4 改写 `test_prefill_wp_prev_resolution.py`、`four_table/test_k_cycle_preset_closure.py`（R3）
+- [x] 6.1 生成器 + 定位表（扫模板、歧义格人工裁定、幂等、`--check`）（R2.1 / R2.2）
+  - 证据：`scripts/gen/gen_prev3_prefill_locator.py`（`--check` 漂移 exit 2、`--report` 审阅清单、`MANUAL` 34 条各写原因、失效 / 缺原因即中止）；
+    `data/prev3_prefill_locator.json` 192 格（verify 167 / write 3 / none 22，85 本模板指纹），`--check` 通过、重跑无差异
+  - 偏离：覆盖全部映射块的三参格（设计稿只算首块）；审定表族按「原值小计 → 差异数核对行 → 首个合计行」落行（design §10.9）
+- [x] 6.2 初次预填按定位表：路由解析上年值、`write` 写值、`verify` 批注、取不到写原因；重新预填落格查定位表（R2.3 / R2.4）
+  - 证据：`services/prev3_prefill_locator.py`（`resolve_prev_prefill` / `override_prefills` / `apply_prefills` / `locate`）；
+    `prefill_workpaper_xlsx(prev_values=…)` 首块循环跳过三参格；`get_workpaper_xlsx` 传上年值；`wp_effective.locate_cell` 三参格只认定位表；
+    一并修 `_get_tb_data_for_prefill` 按审计年度 + 排除已删除（ORM、保存点）
+- [x] 6.3 守卫与变异（R2.5）
+  - 证据：`test_prev3_prefill_locator.py` 15 例（定位表 = 生成器输出、映射三参格一一对应、目标格对模板逐格核对、列头上年语义、同格同参、
+    模板列头改动使 `--check` 红、写值 / 批注 / 取不到 / 去重、模板不符与用户公式格不落、初次预填不猜格、重新预填只认定位表、取值与原因、
+    试算表按年度与删除标记、路由首次打开端到端）；变异 MR2a~MR2o 15 条全部打红后逐字节恢复
+- [x] 6.4 改写 `test_prefill_wp_prev_resolution.py`、`four_table/test_k_cycle_preset_closure.py`（R3）
+  - 证据：前者 1037 → 523 行 28 例、后者 33 例全过；变异 MR3a~MR3h 8 条全部打红；`prefill_anchor_map.OUT_OF_SCOPE_CHANGES['prev_year_dimension']` 改为现行说法
+  - 回归：引用改动模块的 186 个测试文件与基线 `3c8fe7726` 逐条对比，新增失败 0、消除 18（双方其余 93 例相同，预存）
+- [ ] 6.5 同根陈旧测试（`2638b32fd` 删 `_FORMULA_RESOLVERS` / `_resolve_*_formula` / `_resolve_tb_aux` 后整文件或部分红）按现行预载层 + L1 改写：
+  `test_e1_formula_types` / `test_h_ledger_formula` / `test_k_prefill_ledger_detail`（收集即错）、`test_adj_formula_resolution` /
+  `test_adj_domain_caliber_boundaries` / `test_adj_e2e_integration` / `test_f_prefill_extension` / `test_formula_runtime_zero_regression` /
+  `test_formula_wp_semantics` / `test_user_formulas_override`；改写中发现的取数缺陷逐条复现后修或登记待拍板
+- [ ] 6.6 `report_engine.evaluate_formula_result` 的 `enable_prev` 死分支；运行时改写已跟踪文件的测试（`tests/_snapshots/workpaper_route_task1_baseline.json`、归档证据）
 
 ## 7. 回归与交付（R10）
 
 - [ ] 7.1 变异汇总；定向回归（改动涉及的全部测试目录）对比 base；前端相关 vitest + 单区域 vue-tsc
 - [ ] 7.2 浏览器实测：地址选择器 / 附注公式保存悬空提示 / 生成底稿入口权限 / 初次预填批注（【测试】项目）
 - [ ] 7.3 提交推送到 `spec/disclosure-note-doc-upload-and-batch-fill`；INDEX / memory 更新
+
+## 8. 年度兜底（另立 spec）
+
+- [ ] 8.1 另立 spec `audit-year-calendar-fallback-ratchet`（三件套），先加只许减少的守卫：前端拿不到审计年度时用今年的写法（251 处）；
+  后端同类（`wp_prefill_preview.py` 两处 `year = 2025`）一并登记

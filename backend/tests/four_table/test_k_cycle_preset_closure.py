@@ -253,42 +253,70 @@ def test_pl_prior_period_goes_through_prev(k_blocks):
     assert not offenders, f"损益类期初格口径错：{offenders}"
 
 
-def test_prev_is_fail_closed_and_registered_as_out_of_scope():
-    """🔴 `PREV()` **当前恒返 None**（fail-closed）—— 本条钉死这个事实，防误判。
+#: 损益类审定表：「期初余额」格 = 三参 PREV 取上年同底稿「未审数」
+_K_PL_CODES = ("K8", "K9", "K10", "K11", "K12", "K13")
 
-    这条守卫的价值不在「检查预设写得对不对」，而在**防止下一个人误以为 `PREV()` 能
-    取到上年数**。实证（`prefill_engine._resolve_prev_formula` 的实现与 docstring）：
 
-    - `working_paper` / `wp_index` **都没有 `year` 列**，底稿的年度维度只在 project 层；
-    - 改造前的实现声称「从上年底稿取值」，但查询里**没有任何 year 条件**，
-      取值又走真实库零命中的 `parsed_data['cells']` ⇒ 表面恒返 None；
-    - 全平台 161 条 `PREV()` 里 **117 条**第三参是「审定数」，若哪天有人把
-      `cells` 链「修通」而不修年度维度，它会取到**本年**值并显示在「上年数」列 ——
-      那是数字级错误，比现在的恒空危险得多；
-    - 故该函数 fail-closed：宁缺勿造，绝不回退本年值。跨年度取数需数据模型变更，
-      已登记在 `prefill_anchor_map.OUT_OF_SCOPE_CHANGES['prev_year_dimension']`。
+def test_pl_opening_prev_reads_unadjusted_definition(k_blocks):
+    """K8~K13「期初余额」= ``PREV('Kn','审定表Kn-1','未审数')``，取数定义是同表「未审数」= ``TB('6xxx','本期发生额')``。
 
-    **对本 spec 的含义**：Task 11 把 K8/K9/K10~K13 六个「期初余额」格从
-    `TB('6xxx', …)` 改成 `PREV(…)` 后，这些格**取不到数**。这是有意的改进 ——
-    改前它们与「未审数」格公式**逐字相同**（本期发生额冒充期初数 = 错数，会被
-    审计师当真并污染同比分析），改后是显示空、由审计师手工填。
+    R3 改写：原守卫断言 ``prefill_engine._resolve_prev_formula`` 恒返 None（该函数已随 2638b32fd 删除）；
+    三参 PREV 现在按上年同底稿取数（本表「未审数」的定义在上年数据上重算），见下一条的取值断言。
     """
-    import inspect
+    by_slot = {(str(b.get("wp_code")), str(b.get("sheet")), str(c.get("cell_ref") or "")): str(c.get("formula") or "")
+               for b in k_blocks for c in _cells(b)}
+    for code in _K_PL_CODES:
+        sheet = f"审定表{code}-1"
+        assert by_slot.get((code, sheet, "期初余额")) == f"=PREV('{code}','{sheet}','未审数')", code
+        assert re.fullmatch(r"=TB\('6\d{3}','本期发生额'\)", by_slot.get((code, sheet, "未审数"), "")), (
+            f"{code}「未审数」不是单科目本期发生额，三参 PREV 换不出上年期初数：{by_slot.get((code, sheet, '未审数'))}")
 
+
+async def test_pl_opening_prev_takes_prior_year_or_reason():
+    """有上年数据 ⇒ 上年本期发生额（审定数 − 期初余额）；没有 ⇒ 空 + 原因，不为 0。"""
+    import uuid
+    from decimal import Decimal
+
+    from app.models.audit_platform_models import AccountCategory, TrialBalance
+    from app.models.base import ProjectStatus
+    from app.models.core import Project
+    from app.models.dataset_models import LedgerDataset
+    from app.models.workpaper_models import WorkingPaper, WpFormula, WpIndex
+    from app.services.prev_wp_field import PriorWpFieldResolver
+    from tests.formula_settings._env import make_db
+
+    async def world(db, with_prior: bool):
+        ids = []
+        for name, year in (("【测试】K8 本年", 2025), ("【测试】K8 上年", 2024)):
+            pid = uuid.uuid4()
+            db.add(Project(id=pid, name=name, client_name=name, status=ProjectStatus.execution, template_type="soe",
+                           report_scope="standalone", audit_year=year, company_code="C-K8"))
+            ids.append(pid)
+        if with_prior:
+            db.add(TrialBalance(project_id=ids[1], year=2024, company_code="001", standard_account_code="6601",
+                                account_name="销售费用", account_category=AccountCategory.expense,
+                                audited_amount=Decimal("300"), opening_balance=Decimal("0")))
+        await db.commit()
+        return ids[0]
+
+    for with_prior in (True, False):
+        async with make_db(extra_models=(TrialBalance, LedgerDataset, WpIndex, WorkingPaper, WpFormula)) as factory, \
+                factory() as db:
+            cur = await world(db, with_prior)
+            hit = await PriorWpFieldResolver(db, cur, 2025).resolve("K8", "审定表K8-1", "未审数")
+            if with_prior:
+                assert (hit.value, hit.reason) == (Decimal("300"), ""), hit
+            else:
+                assert hit.value is None and "没有 2024 年试算表" in hit.reason, hit
+
+
+def test_prev_year_dimension_change_is_still_registered():
+    """跨年度读上年底稿录入值仍需数据模型变更：登记条目写明现行做法与剩余缺口（不再写「恒返 None」）。"""
     from app.services import prefill_anchor_map as pam
-    from app.services.prefill_engine import _resolve_prev_formula
 
-    body = inspect.getsource(_resolve_prev_formula)
-    stripped = re.sub(r'"""[\s\S]*?"""', "", body)
-    assert re.search(r"return\s+None", stripped), (
-        "`_resolve_prev_formula` 不再 fail-closed。若已实现真正的跨年度取数，"
-        "请同时更新本守卫与 OUT_OF_SCOPE_CHANGES 登记；若只是把 cells 链修通而"
-        "**没有**加年度条件，那会取到本年值冒充上年数 —— 必须回退。"
-    )
-    out_of_scope = getattr(pam, "OUT_OF_SCOPE_CHANGES", {})
-    assert "prev_year_dimension" in out_of_scope, (
-        "跨年度取数的登记条目消失了 —— 该缺口必须一直有案可查"
-    )
+    text = getattr(pam, "OUT_OF_SCOPE_CHANGES", {}).get("prev_year_dimension", "")
+    assert "PriorWpFieldResolver" in text and "year 列" in text, text
+    assert "恒返 None" not in text and "fail-closed" not in text, "登记条目仍是 PREV 恒空的旧说法"
 
 
 def test_prev_third_arg_is_chinese_anchor_name(k_blocks):

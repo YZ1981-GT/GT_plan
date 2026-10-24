@@ -91,8 +91,12 @@ async def get_workpaper_xlsx(
                 from app.services.formula_settings.wp_effective import init_prefill_overrides
 
                 user_formulas, overrides = await init_prefill_overrides(db, pid, wid)
+                # 三参 PREV：上年同底稿取数（与重新预填 / 公式运行时同一来源），按定位表落格
+                from app.services.prev3_prefill_locator import resolve_prev_prefill
+
+                prev_values = await resolve_prev_prefill(db, pid, wp_code, overrides)
                 filled = prefill_workpaper_xlsx(result, wp_code, tb_data, user_formulas=user_formulas,
-                                                mapping_overrides=overrides)
+                                                mapping_overrides=overrides, prev_values=prev_values)
                 if filled > 0:
                     logger.info("Auto-prefill on init: wp_code=%s, filled=%d cells", wp_code, filled)
             except Exception as e:
@@ -150,19 +154,25 @@ async def _get_tb_data_for_prefill(
     """P1-1: Query trial_balance data for prefill.
 
     Returns: {standard_account_code: {列名: 值}} dict suitable for prefill_workpaper_xlsx.
+
+    只取本项目审计年度、未删除的行（年度经单一真源 ``resolve_project_year``；取不到年度不猜今年、不预填）。
     """
+    import sqlalchemy as sa
+
+    from app.models.audit_platform_models import TrialBalance
+    from app.services.sampling_registry_service import resolve_project_year
+
     try:
-        result = await db.execute(text("""
-            SELECT
-                tb.standard_account_code,
-                tb.opening_balance,
-                tb.unadjusted_amount,
-                tb.audited_amount
-            FROM trial_balance tb
-            WHERE tb.project_id = :pid
-            LIMIT 5000
-        """), {"pid": str(project_id)})
-        rows = result.fetchall()
+        async with db.begin_nested():
+            audit_year = await resolve_project_year(db, project_id)
+            if audit_year is None:
+                logger.warning("预填充跳过：项目没有审计年度 pid=%s", project_id)
+                return {}
+            rows = (await db.execute(sa.select(
+                TrialBalance.standard_account_code, TrialBalance.opening_balance,
+                TrialBalance.unadjusted_amount, TrialBalance.audited_amount,
+            ).where(TrialBalance.project_id == project_id, TrialBalance.year == int(audit_year),
+                    TrialBalance.is_deleted == sa.false()).limit(5000))).all()
     except Exception as e:
         # trial_balance table may not exist or have different schema
         logger.warning("预填充查询试算表失败 pid=%s: %s", project_id, e)
@@ -197,29 +207,10 @@ async def _get_tb_data_for_prefill(
     # 否则 48 格从「错数字」变成「恒 0」——对使用方仍是取不到数。
     #
     # 复用共享件（含叶子聚合防父子双算 + 未映射叶子按最长前缀继承祖先映射 +
-    # fail-open），**禁**在此另写一份 tb_balance 查询。
-    try:
-        year_row = await db.execute(
-            text("SELECT audit_year FROM projects WHERE id = :pid LIMIT 1"),
-            {"pid": str(project_id)},
-        )
-        audit_year = year_row.scalar_one_or_none()
-    except Exception as e:  # noqa: BLE001
-        logger.warning("预填充解析审计年度失败 pid=%s: %s", project_id, e)
-        audit_year = None
-
-    if audit_year is not None:
-        occurrence = await fetch_occurrence_by_standard_code(
-            db, project_id, int(audit_year)
-        )
-        # as_float=True：本函数对外契约是 dict[str, dict[str, float]]
-        merge_occurrence_into_tb_data(tb_data, occurrence, as_float=True)
-    else:
-        logger.warning(
-            "预填充跳过发生额归集（审计年度未解析）pid=%s —— "
-            "TB(code,'本期借方') 将落到「列无数据」分支返 0",
-            project_id,
-        )
+    # fail-open），**禁**在此另写一份 tb_balance 查询。年度与上面试算表同一个（单一真源）。
+    occurrence = await fetch_occurrence_by_standard_code(db, project_id, int(audit_year))
+    # as_float=True：本函数对外契约是 dict[str, dict[str, float]]
+    merge_occurrence_into_tb_data(tb_data, occurrence, as_float=True)
 
     return tb_data
 

@@ -13,11 +13,9 @@
    其余取不到 ⇒ 缺数并写明原因。缺数一律不代入 0，由调用方报错 / 留空。
 
 调用方：严格路径 ``formula_ref_preload.substitute_prev_aux``（底稿可编辑公式、表间审核、Tier A 预设求值）、
-统一预载层 ``formula_preloader.preload``（重新预填 / 用户公式试算 → L1）。
-
-初次预填（``prefill_workpaper_xlsx``）不写三参 PREV 的格：映射里这些格的位置是语义名（「上年审定数」等），现有定位
-规则（列头含「上年」或「审定数」）在模板上落到「本期审定数」或「本期与上期审定数比较」列，写入会把上年数写进
-错误的列（宁缺勿造，见 spec design §9）。
+统一预载层 ``formula_preloader.preload``（重新预填 / 用户公式试算 → L1）、初次预填
+``prev3_prefill_locator.resolve_prev_prefill``（按逐格定位表落格：模板公式格只批注核对、取不到批注原因，不写 0；
+spec formula-fetch-followup-defect-closure R2）。
 """
 from __future__ import annotations
 

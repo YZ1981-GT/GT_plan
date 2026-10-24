@@ -320,12 +320,12 @@ OUT_OF_SCOPE_NON_WORKPAPER_TARGETS: dict[str, str] = {
 #: 需另立 spec 的数据模型 / 前端变更（Property 16）
 OUT_OF_SCOPE_CHANGES: dict[str, str] = {
     "prev_year_dimension": (
-        "PREV() 跨年度定位需数据模型变更：working_paper 与 wp_index 实测**都没有 year 列**，"
-        "底稿年度维度只在 project 层 ⇒ 需加 year 列或改走「同 company_code 的上年 project」"
-        "反查。本 spec 只做 fail-closed（恒返 None），跨年度取数另立 spec。"
-        "【2026-10-23 更新】spec formula-fetch-and-wp-generation-defect-closure R2 已按「上年数据 + 本底稿"
-        "该字段的现行取数定义重算」落实三参 PREV（prior_year_context 找上年来源、prev_wp_field 求值），"
-        "不读上年底稿单元格；要取上年底稿里人工录入的值仍需本条的数据模型变更。"
+        "三参 PREV 取上年同底稿数的现行做法（spec formula-fetch-and-wp-generation-defect-closure R2）："
+        "上年来源 prior_year_context（同项目上年试算表 → 上年项目），按本底稿该字段的现行取数定义在上年数据上重算"
+        "（prev_wp_field.PriorWpFieldResolver），取不到报原因、不代入 0；初次预填按逐格定位表落格"
+        "（prev3_prefill_locator，spec formula-fetch-followup-defect-closure R2）。"
+        "仍属范围外的数据模型变更：working_paper 与 wp_index 都没有 year 列、底稿年度维度只在 project 层，"
+        "要读上年底稿里人工录入的值（而非按定义重算）需加年度维度或按上年项目反查底稿，另立 spec。"
     ),
     "frontend_persist_derived_columns": (
         "让后端可取用派生值的正解 = 前端把派生列/小计另存为独立标量 item_id"
@@ -337,9 +337,10 @@ OUT_OF_SCOPE_CHANGES: dict[str, str] = {
 
 #: 两条 `WP` 实现路径的差异登记（Property 15）—— 防后来者"统一"时覆盖本 spec 的修复
 WP_IMPLEMENTATION_PATHS: dict[str, str] = {
-    "prefill_engine._resolve_wp_formula": (
+    "formula_preloader._load_wp": (
         "三参 WP(wp_code, sheet, cell_ref)，经 ANCHOR_MAP 解析后读 "
         "checklist_responses(wp_id, item_id).remark，本 spec 修复的就是这一条"
+        "（原 prefill_engine._resolve_wp_formula，2638b32fd 删 resolver 后由统一预载层接手）"
     ),
     "formula_engine._handle_wp": (
         "读 ctx.wp_data（调用方预载的 dict），**第三参被静默忽略** ⇒ 与上者是两套独立"

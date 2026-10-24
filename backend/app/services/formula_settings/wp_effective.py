@@ -193,7 +193,12 @@ def override_value(formula: str, preset_formula: str, tb_data: dict, adj_data: d
 
 
 def locate_cell(ws: Any, ref: str, wp_code: str) -> str | None:
-    """公式位单元格 → A1 坐标。语义位置与初始化预填同一套规则；落在公式单元格上不覆盖（同初始化）。"""
+    """公式位单元格 → A1 坐标。语义位置与初始化预填同一套规则；落在公式单元格上不覆盖（同初始化）。
+
+    三参 PREV 公式位（系统预设是三参 PREV 的语义名）只认定位表（``prev3_prefill_locator``）：``write`` 格给坐标，
+    ``verify``（模板公式）/ ``none`` / 模板与定位表不符一律不落格，不退回列头关键词猜格。
+    """
+    from app.services import prev3_prefill_locator as prev3
     from app.services.wp_template_xlsx_ops import (
         _find_column_by_keyword,
         _find_data_column,
@@ -205,6 +210,9 @@ def locate_cell(ws: Any, ref: str, wp_code: str) -> str | None:
     ref = (ref or "").strip()
     if _A1.match(ref.upper()):
         return ref.upper()
+    if prev3.is_prev3_slot(wp_code, ws.title.strip(), ref):
+        entry, _why = prev3.locate(ws, wp_code, ref)
+        return entry.cell if entry is not None and entry.action == "write" else None
     col = _find_column_by_keyword(ws, ref)
     row = _find_first_data_row(ws, col) if col else None
     if col and row:

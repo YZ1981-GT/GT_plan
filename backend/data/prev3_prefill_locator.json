@@ -1,0 +1,3949 @@
+{
+ "_doc": "三参 PREV 预填逐格定位表（生成器 backend/scripts/gen/gen_prev3_prefill_locator.py，勿手改）",
+ "source": "backend/data/prefill_formula_mapping.json",
+ "templates": {
+  "wp_templates/D/D0 收入循环函证.xlsx": "23d46c846640ab8d0931a79f4451605b6ead1c905b98fe5a728c6c3b70d66977",
+  "wp_templates/D/D1 应收票据.xlsx": "efa8e23d3531294ed7d4f30cc207339634b83ce58335ebf885a402e7263571ef",
+  "wp_templates/D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa",
+  "wp_templates/D/D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx": "50b52a4e1638918d5fef52d99f8d361a60a0541816d85fbca8304ee61f8eeabf",
+  "wp_templates/D/D3 预收账款.xlsx": "699a9be0e7da639f3e5cd3a2d3bfdf38f7e777b330f9ec6959f5cc390fb6c2d2",
+  "wp_templates/D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx": "fa69c92d1af6548974fb3fe1a0a45236ddf1c64037b4ac811d7e084de934340b",
+  "wp_templates/D/D5 应收款项融资.xlsx": "92c5f7f2d2d54340c29bef6094b24a9360edcfa730fcfd406aeb071d4d138ac4",
+  "wp_templates/D/D6 合同资产.xlsx": "88125e42d79d72813c5d460be2d925adb623d85f881a177dcb4eb7c9ec1e218c",
+  "wp_templates/D/D7 合同负债.xlsx": "0facd3fe2297dbf72804d513d54ca08c55d6a26a41bf1d5c59fc3d7ea1c76a9a",
+  "wp_templates/E/E1-14至E1-15  货币资金 -分析程序（Leap应对措施-分析程序）.xlsx": "c8ee99bddd417e12a94f88aaa66e43c24ab1eaafd4bdb9fbce58d422a70181ef",
+  "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx": "8317e2bac2e57a70778755923332450bd07634e1ff68eb8c14e74d259e58a9ea",
+  "wp_templates/F/F1 预付账款.xlsx": "68b0e9e9d1ea33adbefc10fe8a445b3b6e78dc50d89e080adbf906bdea5dbc7f",
+  "wp_templates/F/F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx": "ed99116207b8675b6821cd4af67e6146b26d41c621312bbdda3a4a658901da6d",
+  "wp_templates/F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx": "9e57efd242b47171423e61f63a35be6ae5b46889baa14c246595ea95591fd0d8",
+  "wp_templates/F/F3 应付票据.xlsx": "06de707ba4d4f8d91534e872c7d135b9576cc3a012e3877b1f60db59ce6b3a6b",
+  "wp_templates/F/F4 应付账款.xlsx": "e20e62725c209b716eab4977231f21c627ab92346a72b58c20acdc7a6f1711fd",
+  "wp_templates/F/F5 营业成本.xlsx": "daca3810d6ae20aa37f36fed6638bd293abd50dc5b14cea30458eb96d5fbc6f1",
+  "wp_templates/G/G1 交易性金融资产.xlsx": "eba510b3b7cef68a0e3ea1a16eaa1262468bee11fccbee47a39ff513c33fba73",
+  "wp_templates/G/G10 交易性金融负债.xlsx": "3afd5131f3783c017f3b7e728e1b081188de71acebb46bdb43e2f8b24fb63da3",
+  "wp_templates/G/G11 投资收益.xlsx": "a1b1d87f29e2dc63e279326d887b3d09bcda6b48c9c54881d82a875a0fe0f513",
+  "wp_templates/G/G12 净敞口套期收益.xlsx": "6645caf0fdfadf38b5cc5919d8b4bc60e59dda7bda54747085a40bdf4b66a8f8",
+  "wp_templates/G/G13 公允价值变动收益.xlsx": "fd5e5e9eeca7b392d59ca54beac51e96bb1575894113c0f3e69f05a234b0f099",
+  "wp_templates/G/G14 信用减值损失.xlsx": "5ca770907cfd3723159f4eb45871102f1cee382255e391f3aca0b1d57a287dc6",
+  "wp_templates/G/G2 应收利息.xlsx": "c7563e85a3ebffb7f60a5800dca66f76a5baef97e57cd4be4147f484e7decc84",
+  "wp_templates/G/G3 应收股利.xlsx": "02a5727230a7e2b1f0d3504b87e45ab1998505bb891e8687f3fe0bd9be17a093",
+  "wp_templates/G/G4 债权投资.xlsx": "df73c58aa3ec6b7d0c85053c24e1bc045fce62cebe83655a4276e5b7d5a4e58a",
+  "wp_templates/G/G5 长期应收款.xlsx": "c59bba69789eba3f25a8037a5ed32f7482f5eacd08007ef632d04ef2ca0f4b99",
+  "wp_templates/G/G6 其他债权投资.xlsx": "63bf38c797d4612e71eeea6fad9dd049765399663af56bc95f235023d2df8f34",
+  "wp_templates/G/G7 长期股权投资.xlsx": "6bf9e2ebcdf50a1c4a32f8733353dd1de994e7dc483232ad43680043577c3335",
+  "wp_templates/G/G8 其他权益工具投资.xlsx": "5c8d3de7ee60ffef8677768c6c3966a313d4210ebc96b19a12c56721954b83b6",
+  "wp_templates/G/G9 其他非流动金融资产.xlsx": "264322c0ed1b4bf6882687b973377ff0e90bdb5664edb4d7e3752ba39fec2379",
+  "wp_templates/H/H1 固定资产.xlsx": "344f83216b9024e3c3fde7c1ed545eb0026a6cf088a0b0dfd0916e47b64fdc87",
+  "wp_templates/H/H10 资产处置损益.xlsx": "9f0d2a64dab1fd7661bb512194b4eba9a22f5afe28db38ec64fc22867421ac8a",
+  "wp_templates/H/H2 在建工程.xlsx": "e6b1ce14cb90c2f2383ddd0cc39467b0896b260716e04527e988d56f70c3023d",
+  "wp_templates/H/H3 投资性房地产.xlsx": "ca856caebfc5b09b3ad9fbe3980ccf8e5c46260da9ba1a0ecd8acdb44498bc89",
+  "wp_templates/H/H4 工程物资.xlsx": "dfbe06ef6e0b8420d56d7bb142193fe0edd4656bb9a2980f503e0bd84b883e84",
+  "wp_templates/H/H5 油气资产.xlsx": "4fc5ec55eba9418d5651398da617fa666f0b0719799cf1e802f52c55a62e5612",
+  "wp_templates/H/H6 固定资产清理.xlsx": "c7d0d78a798ce9c3c47aab64ea02ffc93919a9b02474d8801d115c614656e8a8",
+  "wp_templates/H/H7 生产性生物资产.xlsx": "109a0e4ba6d08da93fc727adac7473c4047f588253fd62c955db67804bf151ec",
+  "wp_templates/H/H8 使用权资产.xlsx": "05abaabbc46fe8861e171ea35b580fe7c69659363ab6d85e3be096a1e23747e9",
+  "wp_templates/H/H9 租赁负债.xlsx": "7b1afdb49f190854160548349a24a07a65ac39f2014fbe8c1014b86c92c598a4",
+  "wp_templates/I/I1 无形资产、累计摊销及减值准备.xlsx": "97eced1f58ab392551d2dca25db7267ca0ea0a120381b0126f8391e2b2977b63",
+  "wp_templates/I/I2 开发支出.xlsx": "90e7199909bdb70a21b071b0b69c90d2bb3dbe16f77be049ceaa2d21260dd3ef",
+  "wp_templates/I/I3 商誉.xlsx": "99512b340ccb79bf884d9f3362010f302bd8aaf45be0f3b082c99899f5253085",
+  "wp_templates/I/I4 长期待摊费用.xlsx": "94a5baab24adb2990678e9d1cf7a91f75f83ce34ebed7cf725634009dad81a8b",
+  "wp_templates/I/I5 其他非流动资产.xlsx": "dacd18184ef82195b489d014ac2dc7a4dc5edb9df5306d85f7ceb433be56068f",
+  "wp_templates/I/I6 研发费用.xlsx": "924a1e8348a897c268dcef7231c6c3d0db2f8382446a729d051e825ea71748eb",
+  "wp_templates/J/J1 应付职工薪酬.xlsx": "6830eda60b73a7f14adc336e9a9e3610deee6ce5c24b983e78fab822cfb4c8ce",
+  "wp_templates/J/J2 长期应付职工薪酬-设定受益计划净资产.xlsx": "10c0518352105d5efd5256a6245b78123b57f4c9af9673ceeee97f63125541e8",
+  "wp_templates/J/J3 股份支付.xlsx": "d2e9d7eb236b6476ccdc6edde1fadbd7119476bb2769bd95c9c9cc1699621bb4",
+  "wp_templates/K/K1 其他应收款.xlsx": "4abf05902fe09f7f6bec947c991c648669d26f39187f2f285866392c1c633eab",
+  "wp_templates/K/K10 其他收益.xlsx": "04996321e9ff9525b293ef3fd2bd0fffbc1249aae2e760ddd7c90aa836afbc0d",
+  "wp_templates/K/K11 资产减值损失.xlsx": "dc0e5434b7c8e345913864ce524ad30a0a3729b5655627f3c30bce52294a9190",
+  "wp_templates/K/K12 营业外收入.xlsx": "7f9367a0bdf3d1ac1989c43592829f8b128b58db7b5aac6fe84b6c9f5934317c",
+  "wp_templates/K/K13 营业外支出.xlsx": "2a50b18a21de3b01afb9e586777fa2dd8215e0d59fc5f5c7c95d939f08eb1373",
+  "wp_templates/K/K2 其他流动资产.xlsx": "5ae401411039385e70766635dc9eeb9c0a79c6da4f8c1af316b2ad1430589162",
+  "wp_templates/K/K3 其他应付款.xlsx": "b2770bdc8a67aaca5a3e2eefd8934a189abd3e57ffd872597d22176540718d4e",
+  "wp_templates/K/K4 其他流动负债.xlsx": "eba8df02b32f2da217b0211481517ef41a6ecd54e98a2ba0c659fa1a29dd3612",
+  "wp_templates/K/K5 预计负债.xlsx": "01780f5ee08b4ea659651ae0d40f28b15388a4e140f28840e8b1ad50f0a9c8e0",
+  "wp_templates/K/K6 持有待售资产和负债.xlsx": "f75f730e959f711c3cd8a7f0d8e33637cc32b6e1f034c103f3b8d88ff0b6076b",
+  "wp_templates/K/K7 递延收益.xlsx": "90e915f70395698363b3aae3fef0ea0c38de7883292380eabaefa77d415c0e0b",
+  "wp_templates/K/K8 销售费用.xlsx": "41918d65caba05fe70a9726cee12ee5ea9a83723f8ec1053d9ba44b3ebe04015",
+  "wp_templates/K/K9 管理费用.xlsx": "ad2f7a863e6d90031abee12875fccf9ca1c196e69f713cda938d9d37051eedbf",
+  "wp_templates/L/L1 短期借款.xlsx": "78033d804a379d42e7e0bc500aefb617fe6175537373126f88827d70b728ceeb",
+  "wp_templates/L/L2 应付利息.xlsx": "8a747c9931f5a5e0f3a89d243b1eb6aea13ce9b16743664e7ce1a3d4678c989a",
+  "wp_templates/L/L3 长期借款.xlsx": "ca0ac1e878fde45f8aa91f5ecae4fc685b82c83d5ec765a8094ef263999e2b60",
+  "wp_templates/L/L4 应付债券.xlsx": "b4ba30cfde3d929908ab4989363c04944ed1134b9c25813370307db54443c255",
+  "wp_templates/L/L5 长期应付款.xlsx": "09380626107dc1b975662eaa60fa99ec541901c0729bb0d2b35bbb60807a9b68",
+  "wp_templates/L/L6 专项应付款.xlsx": "08630e1cbc962fabbbf580f591374157a2d6705966c2f3c8ecba4a0705f59f62",
+  "wp_templates/L/L7 其他非流动负债.xlsx": "35e47cf951e4ec008525d9f65008b3fc48852d59b1f25ac0089b5426394b9436",
+  "wp_templates/L/L8 财务费用.xlsx": "f56843b02c3a34a443107d69207904b363187e887d2a359163fd2175381a368c",
+  "wp_templates/M/M1 应付股利（利润）.xlsx": "0a3697a485d16b843be7870db54fa92a732a39c5d7edea92d03585ef6695115d",
+  "wp_templates/M/M10 其他权益工具.xlsx": "073d75ae83274d4d54147934b5a4ef2b00d4be5c8a020b7cd074a99613ac8077",
+  "wp_templates/M/M2 实收资本（股本）.xlsx": "9fb504204d6ab731d85c67ba43fdfc7ccda92787bc0a6d95bc83d14c74ffe15b",
+  "wp_templates/M/M3 库存股.xlsx": "ec8448c9df0fc5ae93f83fd2016e2ab26091e38749397595f66da818e9162115",
+  "wp_templates/M/M4 资本公积.xlsx": "40a8fa32902252105c2fe06409f6366a83881c305d97c7a08419f0fc84596a0a",
+  "wp_templates/M/M5 盈余公积.xlsx": "0e32a0567e4e3a36e137fa2f2d8ae66a0b1d5eaf266dfd57f9ffd1ce24ae2316",
+  "wp_templates/M/M6 未分配利润.xlsx": "bedd8b0799b4170b06e0257e9a19e3a5ea5585dae02704231bf93a57cf830bf5",
+  "wp_templates/M/M7 专项储备.xlsx": "9604cf8805dbf0446853c3f718bab1f7e0f126002c4df4bf468d04923086dbfc",
+  "wp_templates/M/M8 一般风险准备.xlsx": "248a8bb72f1b3c2f8ec28950f718138462ec26a33b6e46c58884a47a74cbbcc1",
+  "wp_templates/M/M9 其他综合收益.xlsx": "0cfdc95ce3f9410610037b684f50a07f874df1cab4cebe09aa63c6461b6fbc66",
+  "wp_templates/N/N2 应交税费.xlsx": "ec6e6712cc4b52edaf5bcaa794f90cd9345edd8c0273473f21b8c5d31e542f43",
+  "wp_templates/N/N3 递延所得税负债.xlsx": "672addf15523e92b91bc8f9e581f313f8757d3fa3310ff8f02cc888803fa5633",
+  "wp_templates/N/N4 税金及附加.xlsx": "2005eada32506e9e2b1b6f68c704ca4f6626b8a78e9e2a3a221ca00602cad638",
+  "wp_templates/N/N5 所得税费用.xlsx": "d5dd5b29ac649dbbd2959496bcdad4c984f0210996bdaba2407072758c4e89b3"
+ },
+ "entries": {
+  "D0": {
+   "跟函函证过程控制D0-3": {
+    "上年审定数": {
+     "prev": [
+      "D0",
+      "函证结果汇总表D0-1",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D0 收入循环函证.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "跟函过程记录是文字备忘录，没有金额栏"
+    }
+   }
+  },
+  "D1": {
+   "原值明细表（按客户）D1-3": {
+    "上年审定数": {
+     "prev": [
+      "D1",
+      "审定表D1-1",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D1 应收票据.xlsx",
+     "cell": "G21",
+     "header": [
+      "期初审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "审定表D1-1": {
+    "上年审定数": {
+     "prev": [
+      "D1",
+      "审定表D1-1",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D1 应收票据.xlsx",
+     "cell": "E10",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "小计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "上年账面价值": {
+     "prev": [
+      "D1",
+      "附注披露信息（上市公司）",
+      "期末账面价值"
+     ],
+     "template": "wp_templates/D/D1 应收票据.xlsx",
+     "cell": "G11",
+     "header": [
+      "上年年末余额",
+      "期初账面价值"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "上年账面价值": {
+     "prev": [
+      "D1",
+      "附注披露信息（国企）",
+      "期末账面价值"
+     ],
+     "template": "wp_templates/D/D1 应收票据.xlsx",
+     "cell": "G10",
+     "header": [
+      "期初数",
+      "年初账面价值"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "D2": {
+   "坏账准备明细表D2-3": {
+    "上年坏账准备余额": {
+     "prev": [
+      "D2",
+      "坏账准备明细表D2-3",
+      "期末余额"
+     ],
+     "template": "wp_templates/D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+     "cell": "E22",
+     "header": [
+      "期初数",
+      "期初审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "上年坏账准备期末余额 = 本年期初审定数（期初数 / 期初审定数列）"
+    }
+   },
+   "审定表D2-1": {
+    "上年审定数": {
+     "prev": [
+      "D2",
+      "审定表D2-1",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+     "cell": "E13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "小计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   },
+   "应收账款分析表D2-5": {
+    "上年审定数": {
+     "prev": [
+      "D2",
+      "审定表D2-1",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "本表没有上年 / 期初金额栏（借贷方发生额核对）"
+    }
+   },
+   "附注披露信息(上市公司)": {
+    "上年账面价值": {
+     "prev": [
+      "D2",
+      "附注披露信息(上市公司)",
+      "期末账面价值"
+     ],
+     "template": "wp_templates/D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+     "cell": "C20",
+     "header": [
+      "上年年末余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息(国企)": {
+    "上年账面价值": {
+     "prev": [
+      "D2",
+      "附注披露信息(国企)",
+      "期末账面价值"
+     ],
+     "template": "wp_templates/D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+     "cell": "C15",
+     "header": [
+      "期初数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "D3": {
+   "审定表D3-1": {
+    "上年审定数": {
+     "prev": [
+      "D3",
+      "审定表D3-1",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D3 预收账款.xlsx",
+     "cell": "E21",
+     "header": [
+      "期初数",
+      "审定数",
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息(上市公司)": {
+    "上年账面价值": {
+     "prev": [
+      "D3",
+      "附注披露信息(上市公司)",
+      "期末账面价值"
+     ],
+     "template": "wp_templates/D/D3 预收账款.xlsx",
+     "cell": "C13",
+     "header": [
+      "上年年末余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息(国企)": {
+    "上年账面价值": {
+     "prev": [
+      "D3",
+      "附注披露信息(国企)",
+      "期末账面价值"
+     ],
+     "template": "wp_templates/D/D3 预收账款.xlsx",
+     "cell": "C9",
+     "header": [
+      "期初余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "预收账款分析表D3-4": {
+    "上年审定数": {
+     "prev": [
+      "D3",
+      "审定表D3-1",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D3 预收账款.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "本表没有上年 / 期初金额栏（借方发生额分析）"
+    }
+   },
+   "预收账款明细表D3-2": {
+    "上年期末合计": {
+     "prev": [
+      "D3",
+      "预收账款明细表D3-2",
+      "期末合计"
+     ],
+     "template": "wp_templates/D/D3 预收账款.xlsx",
+     "cell": "H24",
+     "header": [
+      "期初审定余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "D4": {
+   "主营业务收入明细表D4-2": {
+    "上年收入合计": {
+     "prev": [
+      "D4",
+      "主营业务收入明细表D4-2",
+      "全年收入合计"
+     ],
+     "template": "wp_templates/D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+     "cell": "S24",
+     "header": [
+      "上期审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "其他业务收入明细表D4-3": {
+    "上年审定数": {
+     "prev": [
+      "D4",
+      "营业收入审定表D4-1",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+     "cell": "J20",
+     "header": [
+      "上期数",
+      "上期审定额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "营业收入审定表D4-1": {
+    "上年审定数": {
+     "prev": [
+      "D4",
+      "营业收入审定表D4-1",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+     "cell": "I19",
+     "header": [
+      "上期数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    },
+    "期初余额": {
+     "prev": [
+      "D4",
+      "营业收入审定表D4-1",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+     "cell": "I19",
+     "header": [
+      "上期数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "上年主营业务收入": {
+     "prev": [
+      "D4",
+      "附注披露信息（上市公司）",
+      "主营业务收入本期"
+     ],
+     "template": "wp_templates/D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+     "cell": "D10",
+     "header": [
+      "上期发生额",
+      "收入"
+     ],
+     "row_label": "主营业务",
+     "cell_is_formula": false,
+     "action": "write",
+     "rule": "manual",
+     "reason": "上期发生额 / 收入列的「主营业务」行"
+    },
+    "上年营业成本合计": {
+     "prev": [
+      "D4",
+      "附注披露信息（上市公司）",
+      "营业成本合计本期"
+     ],
+     "template": "wp_templates/D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+     "cell": "E12",
+     "header": [
+      "上期发生额",
+      "成本"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "上期发生额 / 成本列的合计行"
+    }
+   },
+   "附注披露信息（国企）": {
+    "上年主营业务收入": {
+     "prev": [
+      "D4",
+      "附注披露信息（国企）",
+      "主营业务收入本期"
+     ],
+     "template": "wp_templates/D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+     "cell": "D9",
+     "header": [
+      "上期发生额",
+      "收入"
+     ],
+     "row_label": "主营业务",
+     "cell_is_formula": false,
+     "action": "write",
+     "rule": "manual",
+     "reason": "上期发生额 / 收入列的「主营业务」行"
+    },
+    "上年营业成本合计": {
+     "prev": [
+      "D4",
+      "附注披露信息（国企）",
+      "营业成本合计本期"
+     ],
+     "template": "wp_templates/D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+     "cell": "E11",
+     "header": [
+      "上期发生额",
+      "成本"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "上期发生额 / 成本列的合计行"
+    }
+   }
+  },
+  "D5": {
+   "审定表D5": {
+    "上年审定数": {
+     "prev": [
+      "D5",
+      "审定表D5",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D5 应收款项融资.xlsx",
+     "cell": "E11",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "应收款项融资公允价值合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "应收款项融资公允价值测算表D5-4": {
+    "上年公允价值合计": {
+     "prev": [
+      "D5",
+      "应收款项融资公允价值测算表D5-4",
+      "公允价值合计"
+     ],
+     "template": "wp_templates/D/D5 应收款项融资.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "本表没有上年 / 期初金额栏（期末公允价值测算）"
+    }
+   },
+   "应收款项融资明细表D5-2": {
+    "上年期末合计": {
+     "prev": [
+      "D5",
+      "应收款项融资明细表D5-2",
+      "期末合计"
+     ],
+     "template": "wp_templates/D/D5 应收款项融资.xlsx",
+     "cell": "F17",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "上年账面价值": {
+     "prev": [
+      "D5",
+      "附注披露信息（上市公司）",
+      "期末账面价值"
+     ],
+     "template": "wp_templates/D/D5 应收款项融资.xlsx",
+     "cell": "C13",
+     "header": [
+      "上年年末余额"
+     ],
+     "row_label": "期末公允价值",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "第一张表没有合计行，账面价值 = 「期末公允价值」行；第一个合计行（第 33 行）是已质押票据表"
+    }
+   },
+   "附注披露信息（国企）": {
+    "上年账面价值": {
+     "prev": [
+      "D5",
+      "附注披露信息（国企）",
+      "期末账面价值"
+     ],
+     "template": "wp_templates/D/D5 应收款项融资.xlsx",
+     "cell": "C10",
+     "header": [
+      "期初余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "D6": {
+   "合同资产减值准备明细表D6-3": {
+    "上年期末合计": {
+     "prev": [
+      "D6",
+      "合同资产减值准备明细表D6-3",
+      "期末合计"
+     ],
+     "template": "wp_templates/D/D6 合同资产.xlsx",
+     "cell": "E22",
+     "header": [
+      "期初数",
+      "审定余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "审定表D6-1": {
+    "上年审定数": {
+     "prev": [
+      "D6",
+      "审定表D6-1",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D6 合同资产.xlsx",
+     "cell": "E13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "小计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   },
+   "明细表D6-2": {
+    "上年期末合计": {
+     "prev": [
+      "D6",
+      "明细表D6-2",
+      "期末合计"
+     ],
+     "template": "wp_templates/D/D6 合同资产.xlsx",
+     "cell": "J26",
+     "header": [
+      "期初审定余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息(上市公司）": {
+    "上年账面价值": {
+     "prev": [
+      "D6",
+      "附注披露信息(上市公司）",
+      "期末账面价值"
+     ],
+     "template": "wp_templates/D/D6 合同资产.xlsx",
+     "cell": "G18",
+     "header": [
+      "上年年末余额",
+      "账面价值"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "上年账面价值": {
+     "prev": [
+      "D6",
+      "附注披露信息（国企）",
+      "期末账面价值"
+     ],
+     "template": "wp_templates/D/D6 合同资产.xlsx",
+     "cell": "G16",
+     "header": [
+      "期初数",
+      "账面价值"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "D7": {
+   "合同负债分析表D7-4": {
+    "上年审定数": {
+     "prev": [
+      "D7",
+      "审定表D7-1",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D7 合同负债.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "本表没有上年 / 期初金额栏（借方发生额分析）"
+    }
+   },
+   "审定表D7-1": {
+    "上年审定数": {
+     "prev": [
+      "D7",
+      "审定表D7-1",
+      "审定数"
+     ],
+     "template": "wp_templates/D/D7 合同负债.xlsx",
+     "cell": "E24",
+     "header": [
+      "期初数",
+      "审定数",
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "明细表D7-2": {
+    "上年期末合计": {
+     "prev": [
+      "D7",
+      "明细表D7-2",
+      "期末合计"
+     ],
+     "template": "wp_templates/D/D7 合同负债.xlsx",
+     "cell": "I23",
+     "header": [
+      "期初审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息(上市公司)": {
+    "上年账面价值": {
+     "prev": [
+      "D7",
+      "附注披露信息(上市公司)",
+      "期末账面价值"
+     ],
+     "template": "wp_templates/D/D7 合同负债.xlsx",
+     "cell": "C15",
+     "header": [
+      "上年年末余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息(国企)": {
+    "上年账面价值": {
+     "prev": [
+      "D7",
+      "附注披露信息(国企)",
+      "期末账面价值"
+     ],
+     "template": "wp_templates/D/D7 合同负债.xlsx",
+     "cell": "C13",
+     "header": [
+      "期初余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "E1": {
+   "货币资金分析表E1-14": {
+    "分析表上年审定数": {
+     "prev": [
+      "E1",
+      "货币资金分析表E1-14",
+      "审定数"
+     ],
+     "template": "wp_templates/E/E1-14至E1-15  货币资金 -分析程序（Leap应对措施-分析程序）.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "构成分析表列头是固定日期（2025 / 2024 / 2023-12-31），没有「上年 / 期初」字样"
+    }
+   },
+   "货币资金审定表E1-1": {
+    "上年审定数": {
+     "prev": [
+      "E1",
+      "货币资金审定表E1-1",
+      "审定数"
+     ],
+     "template": "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+     "cell": "D18",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "F1": {
+   "审定表F1-1": {
+    "上年审定数": {
+     "prev": [
+      "F1",
+      "审定表F1-1",
+      "审定数"
+     ],
+     "template": "wp_templates/F/F1 预付账款.xlsx",
+     "cell": "E22",
+     "header": [
+      "期初数",
+      "审定数",
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "F2": {
+   "存货审定表F2-1": {
+    "上年审定数": {
+     "prev": [
+      "F2",
+      "存货审定表F2-1",
+      "审定数"
+     ],
+     "template": "wp_templates/F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+     "cell": "B35",
+     "header": [
+      "期初数"
+     ],
+     "row_label": "审定数（原值）",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "存货审定表按「未审数 / 账项调整 / 审定数」分段，没有小计行；取「一、原值」段的审定数（原值）期初数"
+    }
+   },
+   "存货总体分析表F2-18": {
+    "上年审定数（分析程序）": {
+     "prev": [
+      "F2",
+      "存货总体分析表F2-18",
+      "审定数"
+     ],
+     "template": "wp_templates/F/F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "构成分析表列头是年份占位（20X5 / 20X4 / 20X3），没有「上年 / 期初」字样；金额由明细汇总表公式引用"
+    }
+   },
+   "明细汇总表F2-2": {
+    "上年审定数_明细": {
+     "prev": [
+      "F2",
+      "明细汇总表F2-2",
+      "审定数"
+     ],
+     "template": "wp_templates/F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+     "cell": "I31",
+     "header": [
+      "审定数",
+      "期初余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "F3": {
+   "审定表F3-1": {
+    "上年审定数": {
+     "prev": [
+      "F3",
+      "审定表F3-1",
+      "审定数"
+     ],
+     "template": "wp_templates/F/F3 应付票据.xlsx",
+     "cell": "E11",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "F4": {
+   "审定表F4-1": {
+    "上年审定数": {
+     "prev": [
+      "F4",
+      "审定表F4-1",
+      "审定数"
+     ],
+     "template": "wp_templates/F/F4 应付账款.xlsx",
+     "cell": "E22",
+     "header": [
+      "期初数",
+      "审定数",
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "F5": {
+   "营业务成本审定表F5-1": {
+    "上年发生额": {
+     "prev": [
+      "F5",
+      "营业务成本审定表F5-1",
+      "本期审定发生额"
+     ],
+     "template": "wp_templates/F/F5 营业成本.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "与「上年审定数」落同一格（上期数 / 上期审定数合计）而取数参数不同，以「上年审定数」为准"
+    },
+    "上年审定数": {
+     "prev": [
+      "F5",
+      "营业务成本审定表F5-1",
+      "审定数"
+     ],
+     "template": "wp_templates/F/F5 营业成本.xlsx",
+     "cell": "I27",
+     "header": [
+      "上期数",
+      "上期审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "G1": {
+   "审定表G1-1": {
+    "上年审定数": {
+     "prev": [
+      "G1",
+      "审定表G1-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G1 交易性金融资产.xlsx",
+     "cell": "D69",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "小计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "G10": {
+   "审定表G10-1": {
+    "上年审定数": {
+     "prev": [
+      "G10",
+      "审定表G10-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G10 交易性金融负债.xlsx",
+     "cell": "D36",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "账面余额（公允价值）合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "G11": {
+   "审定表G11-1": {
+    "上年审定数": {
+     "prev": [
+      "G11",
+      "审定表G11-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G11 投资收益.xlsx",
+     "cell": "G25",
+     "header": [
+      "上期数",
+      "上期审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "投资收益_上期": {
+     "prev": [
+      "G11",
+      "审定表G11-1",
+      "投资收益_本期"
+     ],
+     "template": "wp_templates/G/G11 投资收益.xlsx",
+     "cell": "D21",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "投资收益_上期": {
+     "prev": [
+      "G11",
+      "审定表G11-1",
+      "投资收益_本期"
+     ],
+     "template": "wp_templates/G/G11 投资收益.xlsx",
+     "cell": "D25",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "G12": {
+   "审定表G12-1": {
+    "上年审定数": {
+     "prev": [
+      "G12",
+      "审定表G12-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G12 净敞口套期收益.xlsx",
+     "cell": "G12",
+     "header": [
+      "上期数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "净敞口套期收益_上期": {
+     "prev": [
+      "G12",
+      "审定表G12-1",
+      "净敞口套期收益_本期"
+     ],
+     "template": "wp_templates/G/G12 净敞口套期收益.xlsx",
+     "cell": "C11",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "净敞口套期收益_上期": {
+     "prev": [
+      "G12",
+      "审定表G12-1",
+      "净敞口套期收益_本期"
+     ],
+     "template": "wp_templates/G/G12 净敞口套期收益.xlsx",
+     "cell": "C10",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "G13": {
+   "审定表G13-1": {
+    "上年审定数": {
+     "prev": [
+      "G13",
+      "审定表G13-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G13 公允价值变动收益.xlsx",
+     "cell": "G17",
+     "header": [
+      "上期数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "公允价值变动收益_上期": {
+     "prev": [
+      "G13",
+      "审定表G13-1",
+      "公允价值变动收益_本期"
+     ],
+     "template": "wp_templates/G/G13 公允价值变动收益.xlsx",
+     "cell": "C17",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "公允价值变动收益_上期": {
+     "prev": [
+      "G13",
+      "审定表G13-1",
+      "公允价值变动收益_本期"
+     ],
+     "template": "wp_templates/G/G13 公允价值变动收益.xlsx",
+     "cell": "C15",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "G14": {
+   "审定表G14-1": {
+    "上年审定数": {
+     "prev": [
+      "G14",
+      "审定表G14-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G14 信用减值损失.xlsx",
+     "cell": "G16",
+     "header": [
+      "上期数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "信用减值损失_上期": {
+     "prev": [
+      "G14",
+      "审定表G14-1",
+      "信用减值损失_本期"
+     ],
+     "template": "wp_templates/G/G14 信用减值损失.xlsx",
+     "cell": "C17",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "信用减值损失_上期": {
+     "prev": [
+      "G14",
+      "审定表G14-1",
+      "信用减值损失_本期"
+     ],
+     "template": "wp_templates/G/G14 信用减值损失.xlsx",
+     "cell": "C12",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "G2": {
+   "审定表G2-1": {
+    "上年审定数": {
+     "prev": [
+      "G2",
+      "审定表G2-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G2 应收利息.xlsx",
+     "cell": "D13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "小计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   }
+  },
+  "G3": {
+   "审定表G3-1": {
+    "上年审定数": {
+     "prev": [
+      "G3",
+      "审定表G3-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G3 应收股利.xlsx",
+     "cell": "E10",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   }
+  },
+  "G4": {
+   "审定表G4-1": {
+    "上年审定数": {
+     "prev": [
+      "G4",
+      "审定表G4-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G4 债权投资.xlsx",
+     "cell": "D13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "小计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   },
+   "明细表G4-2": {
+    "上年审定数": {
+     "prev": [
+      "G4",
+      "审定表G4-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G4 债权投资.xlsx",
+     "cell": "O27",
+     "header": [
+      "期初审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "G5": {
+   "余额明细表G5-2": {
+    "上年审定数": {
+     "prev": [
+      "G5",
+      "余额明细表G5-2",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G5 长期应收款.xlsx",
+     "cell": "G40",
+     "header": [
+      "期初审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "审定表G5-1": {
+    "上年审定数": {
+     "prev": [
+      "G5",
+      "审定表G5-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G5 长期应收款.xlsx",
+     "cell": "E18",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "小计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   }
+  },
+  "G6": {
+   "审定表G6-1": {
+    "上年审定数": {
+     "prev": [
+      "G6",
+      "审定表G6-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G6 其他债权投资.xlsx",
+     "cell": "D12",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "小计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   },
+   "明细表G6-2": {
+    "上年审定数": {
+     "prev": [
+      "G6",
+      "审定表G6-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G6 其他债权投资.xlsx",
+     "cell": "O22",
+     "header": [
+      "期初余额",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "G7": {
+   "明细表G7-2": {
+    "上年审定数": {
+     "prev": [
+      "G7",
+      "长期股权投资审定表G7-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G7 长期股权投资.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "明细表按成本法 / 权益法两张子表叠放，审定数「期初余额」列头只在投资比例列，金额列没有期初字样；上年审定数已由审定表 G7-1 核对"
+    }
+   },
+   "长期股权投资审定表G7-1": {
+    "上年审定数": {
+     "prev": [
+      "G7",
+      "长期股权投资审定表G7-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G7 长期股权投资.xlsx",
+     "cell": "C22",
+     "header": [
+      "期初数"
+     ],
+     "row_label": "审定数1",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "长期股权投资审定表按「未审数 / 账项调整 / 重分类调整 / 审定数」分段；取「一、原值」段的审定数1 期初数"
+    }
+   }
+  },
+  "G8": {
+   "审定表G8-1": {
+    "上年审定数": {
+     "prev": [
+      "G8",
+      "审定表G8-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G8 其他权益工具投资.xlsx",
+     "cell": "D18",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "明细表G8-2": {
+    "上年审定数": {
+     "prev": [
+      "G8",
+      "审定表G8-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G8 其他权益工具投资.xlsx",
+     "cell": "H21",
+     "header": [
+      "期初审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "G9": {
+   "审定表G9-1": {
+    "上年审定数": {
+     "prev": [
+      "G9",
+      "审定表G9-1",
+      "审定数"
+     ],
+     "template": "wp_templates/G/G9 其他非流动金融资产.xlsx",
+     "cell": "E51",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "账面余额（公允价值）合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "H1": {
+   "减值测算表H1-14": {
+    "上年减值测算审定": {
+     "prev": [
+      "H1",
+      "减值测算表H1-14",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H1 固定资产.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "本表没有上年 / 期初金额栏（期末减值测算）"
+    }
+   },
+   "分析程序H1-3": {
+    "上年审定数": {
+     "prev": [
+      "H1",
+      "分析程序H1-3",
+      "审定数"
+     ],
+     "template": "",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "模板无该表",
+     "reason": "系统模板里没有该表（H1 固定资产.xlsx）"
+    }
+   },
+   "审定表H1-1": {
+    "上年审定数": {
+     "prev": [
+      "H1",
+      "审定表H1-1",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H1 固定资产.xlsx",
+     "cell": "D13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   },
+   "折旧分配分析表H1-13": {
+    "上年折旧分配审定": {
+     "prev": [
+      "H1",
+      "折旧分配分析表H1-13",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H1 固定资产.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "本表没有上年 / 期初金额栏（本期折旧按费用项目分配）"
+    }
+   },
+   "明细表H1-2": {
+    "固定资产净值_上年审定": {
+     "prev": [
+      "H1",
+      "明细表H1-2",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H1 固定资产.xlsx",
+     "cell": "AV33",
+     "header": [
+      "期初净值",
+      "审定净值"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "格名是净值：取「期初净值 / 审定净值」列合计"
+    }
+   }
+  },
+  "H10": {
+   "审定表H10-1": {
+    "上年审定数": {
+     "prev": [
+      "H10",
+      "审定表H10-1",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H10 资产处置损益.xlsx",
+     "cell": "J15",
+     "header": [
+      "上期审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    },
+    "期初余额": {
+     "prev": [
+      "H10",
+      "审定表H10-1",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H10 资产处置损益.xlsx",
+     "cell": "J15",
+     "header": [
+      "上期审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "明细表H10-2": {
+    "上年处置明细审定": {
+     "prev": [
+      "H10",
+      "明细表H10-2",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H10 资产处置损益.xlsx",
+     "cell": "X17",
+     "header": [
+      "上年同期审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "H2": {
+   "审定表H2-1": {
+    "上年审定数": {
+     "prev": [
+      "H2",
+      "审定表H2-1",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H2 在建工程.xlsx",
+     "cell": "D16",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   }
+  },
+  "H3": {
+   "审定表（成本模式）H3-1": {
+    "上年审定数": {
+     "prev": [
+      "H3",
+      "审定表（成本模式）H3-1",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H3 投资性房地产.xlsx",
+     "cell": "D12",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   },
+   "明细表（公允价值模式）H3-2": {
+    "上年明细审定": {
+     "prev": [
+      "H3",
+      "明细表（公允价值模式）H3-2",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H3 投资性房地产.xlsx",
+     "cell": "X27",
+     "header": [
+      "期初净值"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "公允价值模式下科目余额 = 成本 + 公允价值变动：取「期初净值」列合计"
+    }
+   },
+   "明细表（成本模式）H3-2": {
+    "上年明细审定": {
+     "prev": [
+      "H3",
+      "明细表（成本模式）H3-2",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H3 投资性房地产.xlsx",
+     "cell": "L28",
+     "header": [
+      "投资性房地产原值",
+      "审定数",
+      "期初余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "成本模式下科目余额是原值（累计折旧 / 减值准备另列）：取原值 / 审定数 / 期初余额列合计"
+    }
+   }
+  },
+  "H4": {
+   "审定表H4-1": {
+    "上年审定数": {
+     "prev": [
+      "H4",
+      "审定表H4-1",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H4 工程物资.xlsx",
+     "cell": "D13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   }
+  },
+  "H5": {
+   "审定表H5-1": {
+    "上年审定数": {
+     "prev": [
+      "H5",
+      "审定表H5-1",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H5 油气资产.xlsx",
+     "cell": "D13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   }
+  },
+  "H6": {
+   "审定表H6-1": {
+    "上年审定数": {
+     "prev": [
+      "H6",
+      "审定表H6-1",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H6 固定资产清理.xlsx",
+     "cell": "D12",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "H7": {
+   "审定表（成本模式）H7-1": {
+    "上年审定数": {
+     "prev": [
+      "H7",
+      "审定表（成本模式）H7-1",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H7 生产性生物资产.xlsx",
+     "cell": "D13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   }
+  },
+  "H8": {
+   "审定表H8-1": {
+    "上年审定数": {
+     "prev": [
+      "H8",
+      "审定表H8-1",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H8 使用权资产.xlsx",
+     "cell": "D13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   },
+   "明细表H8-2": {
+    "上年明细审定": {
+     "prev": [
+      "H8",
+      "明细表H8-2",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H8 使用权资产.xlsx",
+     "cell": "S32",
+     "header": [
+      "使用权资产原值",
+      "审定数",
+      "期初数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "使用权资产科目余额是原值（累计折旧 / 减值准备另列）：取原值 / 审定数 / 期初数列合计"
+    }
+   }
+  },
+  "H9": {
+   "审定表H9-1": {
+    "上年审定数": {
+     "prev": [
+      "H9",
+      "审定表H9-1",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H9 租赁负债.xlsx",
+     "cell": "D11",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   },
+   "未确认融资费用明细表H9-3": {
+    "上年未确认融资费用审定": {
+     "prev": [
+      "H9",
+      "未确认融资费用明细表H9-3",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H9 租赁负债.xlsx",
+     "cell": "J14",
+     "header": [
+      "审定数",
+      "期初余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "租赁负债明细表H9-2": {
+    "上年租赁负债审定": {
+     "prev": [
+      "H9",
+      "租赁负债明细表H9-2",
+      "审定数"
+     ],
+     "template": "wp_templates/H/H9 租赁负债.xlsx",
+     "cell": "I14",
+     "header": [
+      "审定数",
+      "期初余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "I1": {
+   "审定表I1": {
+    "上年审定数": {
+     "prev": [
+      "I1",
+      "审定表I1",
+      "审定数"
+     ],
+     "template": "wp_templates/I/I1 无形资产、累计摊销及减值准备.xlsx",
+     "cell": "D18",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   }
+  },
+  "I2": {
+   "审定表I2-1": {
+    "上年审定数": {
+     "prev": [
+      "I2",
+      "审定表I2-1",
+      "审定数"
+     ],
+     "template": "wp_templates/I/I2 开发支出.xlsx",
+     "cell": "D13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "明细表I2-2": {
+    "上年开发支出_审定": {
+     "prev": [
+      "I2",
+      "明细表I2-2",
+      "审定数"
+     ],
+     "template": "wp_templates/I/I2 开发支出.xlsx",
+     "cell": "L23",
+     "header": [
+      "审定数",
+      "期初数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "I3": {
+   "审定表I3-1": {
+    "上年审定数": {
+     "prev": [
+      "I3",
+      "审定表I3-1",
+      "审定数"
+     ],
+     "template": "wp_templates/I/I3 商誉.xlsx",
+     "cell": "J17",
+     "header": [
+      "审定数",
+      "期初数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   },
+   "明细表I3-2": {
+    "上年商誉_审定": {
+     "prev": [
+      "I3",
+      "明细表I3-2",
+      "审定数"
+     ],
+     "template": "wp_templates/I/I3 商誉.xlsx",
+     "cell": "M23",
+     "header": [
+      "商誉原值",
+      "审定数",
+      "期初数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "商誉科目余额是原值（减值准备另列，另一格「上年商誉减值_审定」取减值列）：取商誉原值 / 审定数 / 期初数列合计"
+    },
+    "上年商誉减值_审定": {
+     "prev": [
+      "I3",
+      "明细表I3-2",
+      "减值审定数"
+     ],
+     "template": "wp_templates/I/I3 商誉.xlsx",
+     "cell": "AA23",
+     "header": [
+      "减值准备",
+      "审定数",
+      "期初数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "I4": {
+   "审定表I4-1": {
+    "上年审定数": {
+     "prev": [
+      "I4",
+      "审定表I4-1",
+      "审定数"
+     ],
+     "template": "wp_templates/I/I4 长期待摊费用.xlsx",
+     "cell": "D10",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "I5": {
+   "审定表I5-1": {
+    "上年审定数": {
+     "prev": [
+      "I5",
+      "审定表I5-1",
+      "审定数"
+     ],
+     "template": "wp_templates/I/I5 其他非流动资产.xlsx",
+     "cell": "E19",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   }
+  },
+  "I6": {
+   "审定表I6-1": {
+    "上年审定数": {
+     "prev": [
+      "I6",
+      "审定表I6-1",
+      "审定数"
+     ],
+     "template": "wp_templates/I/I6 研发费用.xlsx",
+     "cell": "E17",
+     "header": [
+      "上期数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "明细表I6-2": {
+    "上年研发费用_审定": {
+     "prev": [
+      "I6",
+      "明细表I6-2",
+      "审定数"
+     ],
+     "template": "wp_templates/I/I6 研发费用.xlsx",
+     "cell": "W19",
+     "header": [
+      "上期审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "J1": {
+   "审定表J1-1": {
+    "上年审定数": {
+     "prev": [
+      "J1",
+      "审定表J1-1",
+      "审定数"
+     ],
+     "template": "wp_templates/J/J1 应付职工薪酬.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "应付职工薪酬审定表分短期薪酬 / 离职后福利 / 辞退福利三张子表，没有单一合计行（模板差异数 = 三表合计之和 − 试算平衡表数）"
+    }
+   },
+   "月度分析表J1-4": {
+    "上年同期期末": {
+     "prev": [
+      "J1",
+      "月度分析表J1-4",
+      "期末余额"
+     ],
+     "template": "wp_templates/J/J1 应付职工薪酬.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "月度分析表按月列示本期 / 上期计提数，没有期末余额栏"
+    },
+    "上年同期费用率": {
+     "prev": [
+      "J1",
+      "月度分析表J1-4",
+      "薪酬费用率"
+     ],
+     "template": "wp_templates/J/J1 应付职工薪酬.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "月度分析表没有费用率栏"
+    }
+   },
+   "调整分录汇总表J1-3": {
+    "上年审定数": {
+     "prev": [
+      "J1",
+      "分析程序J1-3",
+      "审定数"
+     ],
+     "template": "wp_templates/J/J1 应付职工薪酬.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "调整分录汇总表是分录清单，没有金额合计栏"
+    }
+   }
+  },
+  "J2": {
+   "审定表J2-1": {
+    "上年审定数": {
+     "prev": [
+      "J2",
+      "审定表J2-1",
+      "审定数"
+     ],
+     "template": "wp_templates/J/J2 长期应付职工薪酬-设定受益计划净资产.xlsx",
+     "cell": "D12",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "明细表J2-2": {
+    "上年审定数": {
+     "prev": [
+      "J2",
+      "明细表J2-2",
+      "审定数"
+     ],
+     "template": "wp_templates/J/J2 长期应付职工薪酬-设定受益计划净资产.xlsx",
+     "cell": "J18",
+     "header": [
+      "审定数",
+      "期初数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "J3": {
+   "股份支付情况表J3-1": {
+    "上年审定数": {
+     "prev": [
+      "J3",
+      "审定表J3-1",
+      "审定数"
+     ],
+     "template": "wp_templates/J/J3 股份支付.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "股份支付情况表是文字与清单，没有金额合计行（股份支付底稿没有审定表）"
+    }
+   }
+  },
+  "K1": {
+   "审定表K1-1": {
+    "上年审定数": {
+     "prev": [
+      "K1",
+      "审定表K1-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K1 其他应收款.xlsx",
+     "cell": "E14",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "小计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   },
+   "附注披露信息(上市公司）": {
+    "上年账面价值_上市": {
+     "prev": [
+      "K1",
+      "附注披露信息(上市公司）",
+      "期末账面价值_上市"
+     ],
+     "template": "wp_templates/K/K1 其他应收款.xlsx",
+     "cell": "C20",
+     "header": [
+      "上年年末数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "上年账面价值_国企": {
+     "prev": [
+      "K1",
+      "附注披露信息（国企）",
+      "期末账面价值_国企"
+     ],
+     "template": "wp_templates/K/K1 其他应收款.xlsx",
+     "cell": "C15",
+     "header": [
+      "期初数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "K10": {
+   "审定表K10-1": {
+    "上年审定数": {
+     "prev": [
+      "K10",
+      "审定表K10-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K10 其他收益.xlsx",
+     "cell": "J12",
+     "header": [
+      "上期审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    },
+    "期初余额": {
+     "prev": [
+      "K10",
+      "审定表K10-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K10 其他收益.xlsx",
+     "cell": "G12",
+     "header": [
+      "上期未审数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "其他收益_上期_上市": {
+     "prev": [
+      "K10",
+      "审定表K10-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K10 其他收益.xlsx",
+     "cell": "C14",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "其他收益_上期_国企": {
+     "prev": [
+      "K10",
+      "审定表K10-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K10 其他收益.xlsx",
+     "cell": "C14",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "K11": {
+   "审定表K11-1": {
+    "上年审定数": {
+     "prev": [
+      "K11",
+      "审定表K11-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K11 资产减值损失.xlsx",
+     "cell": "D26",
+     "header": [
+      "上期数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    },
+    "期初余额": {
+     "prev": [
+      "K11",
+      "审定表K11-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K11 资产减值损失.xlsx",
+     "cell": "B26",
+     "header": [
+      "上期数",
+      "未审数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "资产减值损失_上期_上市": {
+     "prev": [
+      "K11",
+      "审定表K11-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K11 资产减值损失.xlsx",
+     "cell": "C26",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "资产减值损失_上期_国企": {
+     "prev": [
+      "K11",
+      "审定表K11-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K11 资产减值损失.xlsx",
+     "cell": "C26",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "K12": {
+   "审定表K12-1": {
+    "上年审定数": {
+     "prev": [
+      "K12",
+      "审定表K12-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K12 营业外收入.xlsx",
+     "cell": "J13",
+     "header": [
+      "上期审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    },
+    "期初余额": {
+     "prev": [
+      "K12",
+      "审定表K12-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K12 营业外收入.xlsx",
+     "cell": "G13",
+     "header": [
+      "上期未审数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "营业外收入_上期_上市": {
+     "prev": [
+      "K12",
+      "审定表K12-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K12 营业外收入.xlsx",
+     "cell": "C15",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "营业外收入_上期_国企": {
+     "prev": [
+      "K12",
+      "审定表K12-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K12 营业外收入.xlsx",
+     "cell": "C15",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "K13": {
+   "审定表K13-1": {
+    "上年审定数": {
+     "prev": [
+      "K13",
+      "审定表K13-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K13 营业外支出.xlsx",
+     "cell": "J13",
+     "header": [
+      "上期审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    },
+    "期初余额": {
+     "prev": [
+      "K13",
+      "审定表K13-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K13 营业外支出.xlsx",
+     "cell": "G13",
+     "header": [
+      "上期未审数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "营业外支出_上期_上市": {
+     "prev": [
+      "K13",
+      "审定表K13-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K13 营业外支出.xlsx",
+     "cell": "C14",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "营业外支出_上期_国企": {
+     "prev": [
+      "K13",
+      "审定表K13-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K13 营业外支出.xlsx",
+     "cell": "C15",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "K2": {
+   "审定表K2-1": {
+    "上年审定数": {
+     "prev": [
+      "K2",
+      "审定表K2-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K2 其他流动资产.xlsx",
+     "cell": "E15",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "上年账面价值_上市": {
+     "prev": [
+      "K2",
+      "附注披露信息（上市公司）",
+      "期末账面价值_上市"
+     ],
+     "template": "wp_templates/K/K2 其他流动资产.xlsx",
+     "cell": "C12",
+     "header": [
+      "期初数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "上年账面价值_国企": {
+     "prev": [
+      "K2",
+      "附注披露信息（国企）",
+      "期末账面价值_国企"
+     ],
+     "template": "wp_templates/K/K2 其他流动资产.xlsx",
+     "cell": "C13",
+     "header": [
+      "年初账面价值"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "K3": {
+   "审定表K3-1": {
+    "上年审定数": {
+     "prev": [
+      "K3",
+      "审定表K3-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K3 其他应付款.xlsx",
+     "cell": "E11",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息(上市公司)": {
+    "上年账面价值_上市": {
+     "prev": [
+      "K3",
+      "附注披露信息(上市公司)",
+      "期末账面价值_上市"
+     ],
+     "template": "wp_templates/K/K3 其他应付款.xlsx",
+     "cell": "C10",
+     "header": [
+      "期初数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息(国企)": {
+    "上年账面价值_国企": {
+     "prev": [
+      "K3",
+      "附注披露信息(国企)",
+      "期末账面价值_国企"
+     ],
+     "template": "wp_templates/K/K3 其他应付款.xlsx",
+     "cell": "C10",
+     "header": [
+      "期初数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "K4": {
+   "审定表 K4-1": {
+    "上年审定数": {
+     "prev": [
+      "K4",
+      "审定表 K4-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K4 其他流动负债.xlsx",
+     "cell": "E12",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "K5": {
+   "审定表 K5-1": {
+    "上年审定数": {
+     "prev": [
+      "K5",
+      "审定表 K5-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K5 预计负债.xlsx",
+     "cell": "E15",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司)": {
+    "上年账面价值_上市": {
+     "prev": [
+      "K5",
+      "附注披露信息（上市公司)",
+      "期末账面价值_上市"
+     ],
+     "template": "wp_templates/K/K5 预计负债.xlsx",
+     "cell": "C15",
+     "header": [
+      "期初数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "上年账面价值_国企": {
+     "prev": [
+      "K5",
+      "附注披露信息（国企）",
+      "期末账面价值_国企"
+     ],
+     "template": "wp_templates/K/K5 预计负债.xlsx",
+     "cell": "C15",
+     "header": [
+      "期初数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "K6": {
+   "审定表 K6-1": {
+    "上年审定数": {
+     "prev": [
+      "K6",
+      "审定表 K6-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K6 持有待售资产和负债.xlsx",
+     "cell": "E9",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息(国企）": {
+    "上年账面价值_国企": {
+     "prev": [
+      "K6",
+      "附注披露信息(国企）",
+      "期末账面价值_国企"
+     ],
+     "template": "wp_templates/K/K6 持有待售资产和负债.xlsx",
+     "cell": "G19",
+     "header": [
+      "期初数",
+      "账面价值"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "上年账面价值_上市": {
+     "prev": [
+      "K6",
+      "附注披露信息（上市公司）",
+      "期末账面价值_上市"
+     ],
+     "template": "wp_templates/K/K6 持有待售资产和负债.xlsx",
+     "cell": "G16",
+     "header": [
+      "上年年末数",
+      "账面价值"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": false,
+     "action": "write",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "K7": {
+   "审定表K7-1": {
+    "上年审定数": {
+     "prev": [
+      "K7",
+      "审定表K7-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K7 递延收益.xlsx",
+     "cell": "F10",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "上年账面价值_上市": {
+     "prev": [
+      "K7",
+      "附注披露信息（上市公司）",
+      "期末账面价值_上市"
+     ],
+     "template": "wp_templates/K/K7 递延收益.xlsx",
+     "cell": "B11",
+     "header": [
+      "期初余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国有企业）": {
+    "上年账面价值_国企": {
+     "prev": [
+      "K7",
+      "附注披露信息（国有企业）",
+      "期末账面价值_国企"
+     ],
+     "template": "wp_templates/K/K7 递延收益.xlsx",
+     "cell": "B11",
+     "header": [
+      "期初余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "K8": {
+   "实质性分析K8-4": {
+    "上年发生额": {
+     "prev": [
+      "K8",
+      "审定表K8-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K8 销售费用.xlsx",
+     "cell": "E21",
+     "header": [
+      "上年同期"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    },
+    "本年期初": {
+     "prev": [
+      "K8",
+      "实质性分析K8-4",
+      "本年发生额"
+     ],
+     "template": "wp_templates/K/K8 销售费用.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "与「上年发生额」落同一格（上年同期合计）而取数参数不同；费用类没有「本年期初」口径"
+    }
+   },
+   "审定表K8-1": {
+    "上年审定数": {
+     "prev": [
+      "K8",
+      "审定表K8-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K8 销售费用.xlsx",
+     "cell": "E17",
+     "header": [
+      "上期数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    },
+    "期初余额": {
+     "prev": [
+      "K8",
+      "审定表K8-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K8 销售费用.xlsx",
+     "cell": "B17",
+     "header": [
+      "上期数",
+      "未审数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "销售费用_上期_上市": {
+     "prev": [
+      "K8",
+      "审定表K8-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K8 销售费用.xlsx",
+     "cell": "C17",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "销售费用_上期_国企": {
+     "prev": [
+      "K8",
+      "审定表K8-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K8 销售费用.xlsx",
+     "cell": "C17",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "K9": {
+   "审定表K9-1": {
+    "上年审定数": {
+     "prev": [
+      "K9",
+      "审定表K9-1",
+      "审定数"
+     ],
+     "template": "wp_templates/K/K9 管理费用.xlsx",
+     "cell": "E25",
+     "header": [
+      "上期数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    },
+    "期初余额": {
+     "prev": [
+      "K9",
+      "审定表K9-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K9 管理费用.xlsx",
+     "cell": "B25",
+     "header": [
+      "上期数",
+      "未审数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "管理费用_上期_上市": {
+     "prev": [
+      "K9",
+      "审定表K9-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K9 管理费用.xlsx",
+     "cell": "C25",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企）": {
+    "管理费用_上期_国企": {
+     "prev": [
+      "K9",
+      "审定表K9-1",
+      "未审数"
+     ],
+     "template": "wp_templates/K/K9 管理费用.xlsx",
+     "cell": "C25",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "L1": {
+   "审定表L1-1": {
+    "上年审定数": {
+     "prev": [
+      "L1",
+      "审定表L1-1",
+      "审定数"
+     ],
+     "template": "wp_templates/L/L1 短期借款.xlsx",
+     "cell": "E11",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "L2": {
+   "审定表L2-1": {
+    "上年审定数": {
+     "prev": [
+      "L2",
+      "审定表L2-1",
+      "审定数"
+     ],
+     "template": "wp_templates/L/L2 应付利息.xlsx",
+     "cell": "E14",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "L3": {
+   "审定表L3-1": {
+    "上年审定数": {
+     "prev": [
+      "L3",
+      "审定表L3-1",
+      "审定数"
+     ],
+     "template": "wp_templates/L/L3 长期借款.xlsx",
+     "cell": "E11",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "明细表L3-2": {
+    "上年审定数": {
+     "prev": [
+      "L3",
+      "明细表L3-2",
+      "审定数"
+     ],
+     "template": "wp_templates/L/L3 长期借款.xlsx",
+     "cell": "R22",
+     "header": [
+      "审定数",
+      "期初余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "L4": {
+   "审定表L4-1": {
+    "上年审定数": {
+     "prev": [
+      "L4",
+      "审定表L4-1",
+      "审定数"
+     ],
+     "template": "wp_templates/L/L4 应付债券.xlsx",
+     "cell": "E18",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "L5": {
+   "审定表L5-1": {
+    "上年审定数": {
+     "prev": [
+      "L5",
+      "审定表L5-1",
+      "审定数"
+     ],
+     "template": "wp_templates/L/L5 长期应付款.xlsx",
+     "cell": "E11",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "原值小计",
+     "reason": ""
+    }
+   }
+  },
+  "L6": {
+   "审定表L6-1": {
+    "上年审定数": {
+     "prev": [
+      "L6",
+      "审定表L6-1",
+      "审定数"
+     ],
+     "template": "wp_templates/L/L6 专项应付款.xlsx",
+     "cell": "E17",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "L7": {
+   "审定表L7-1": {
+    "上年审定数": {
+     "prev": [
+      "L7",
+      "审定表L7-1",
+      "审定数"
+     ],
+     "template": "wp_templates/L/L7 其他非流动负债.xlsx",
+     "cell": "E12",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "L8": {
+   "审定表L8-1": {
+    "上年审定数": {
+     "prev": [
+      "L8",
+      "审定表L8-1",
+      "审定数"
+     ],
+     "template": "wp_templates/L/L8 财务费用.xlsx",
+     "cell": "E18",
+     "header": [
+      "上期数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "M1": {
+   "审定表M1-1": {
+    "上年审定数": {
+     "prev": [
+      "M1",
+      "审定表M1-1",
+      "审定数"
+     ],
+     "template": "wp_templates/M/M1 应付股利（利润）.xlsx",
+     "cell": "E13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "M10": {
+   "审定表M10-1": {
+    "上年审定数": {
+     "prev": [
+      "M10",
+      "审定表M10-1",
+      "审定数"
+     ],
+     "template": "wp_templates/M/M10 其他权益工具.xlsx",
+     "cell": "E22",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "其他权益工具合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "M2": {
+   "审定表M2-1": {
+    "上年审定数": {
+     "prev": [
+      "M2",
+      "审定表M2-1",
+      "审定数"
+     ],
+     "template": "wp_templates/M/M2 实收资本（股本）.xlsx",
+     "cell": "E17",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "M3": {
+   "审定表M3-1": {
+    "上年审定数": {
+     "prev": [
+      "M3",
+      "审定表M3-1",
+      "审定数"
+     ],
+     "template": "wp_templates/M/M3 库存股.xlsx",
+     "cell": "E17",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "M4": {
+   "审定表M4-1": {
+    "上年审定数": {
+     "prev": [
+      "M4",
+      "审定表M4-1",
+      "审定数"
+     ],
+     "template": "wp_templates/M/M4 资本公积.xlsx",
+     "cell": "E10",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "明细表M4-2": {
+    "其他资本公积_审定期初": {
+     "prev": [
+      "M4",
+      "明细表M4-2",
+      "其他资本公积_审定数"
+     ],
+     "template": "wp_templates/M/M4 资本公积.xlsx",
+     "cell": "L15",
+     "header": [
+      "审定数",
+      "期初数"
+     ],
+     "row_label": "二、其他资本公积",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "审定数 / 期初数列的「二、其他资本公积」行"
+    },
+    "资本溢价_审定期初": {
+     "prev": [
+      "M4",
+      "明细表M4-2",
+      "资本溢价_审定数"
+     ],
+     "template": "wp_templates/M/M4 资本公积.xlsx",
+     "cell": "L10",
+     "header": [
+      "审定数",
+      "期初数"
+     ],
+     "row_label": "一、资本（股本）溢价",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "审定数 / 期初数列的「一、资本（股本）溢价」行"
+    }
+   }
+  },
+  "M5": {
+   "审定表M5-1": {
+    "上年审定数": {
+     "prev": [
+      "M5",
+      "审定表M5-1",
+      "审定数"
+     ],
+     "template": "wp_templates/M/M5 盈余公积.xlsx",
+     "cell": "E11",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "M6": {
+   "审定表M6-1": {
+    "上年审定数": {
+     "prev": [
+      "M6",
+      "审定表M6-1",
+      "审定数"
+     ],
+     "template": "wp_templates/M/M6 未分配利润.xlsx",
+     "cell": "I10",
+     "header": [
+      "上期数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "明细表M6-2": {
+    "上年年末余额_审定数": {
+     "prev": [
+      "M6",
+      "明细表M6-2",
+      "年末余额_审定数"
+     ],
+     "template": "wp_templates/M/M6 未分配利润.xlsx",
+     "cell": "E10",
+     "header": [
+      "本期数",
+      "审定数"
+     ],
+     "row_label": "一、上年年末余额",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "manual",
+     "reason": "本期数 / 审定数列的「一、上年年末余额」行（上年语义在行标签）"
+    },
+    "本年年初余额_审定数": {
+     "prev": [
+      "M6",
+      "明细表M6-2",
+      "年末余额_审定数"
+     ],
+     "template": "wp_templates/M/M6 未分配利润.xlsx",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "manual",
+     "reason": "本年年初余额 = 上年年末余额 + 会计政策变更 + 前期差错更正，三参取的是上年年末余额，不对应本格；上年年末余额已由「上年年末余额_审定数」格核对"
+    }
+   }
+  },
+  "M7": {
+   "审定表M7-1": {
+    "上年审定数": {
+     "prev": [
+      "M7",
+      "审定表M7-1",
+      "审定数"
+     ],
+     "template": "wp_templates/M/M7 专项储备.xlsx",
+     "cell": "E13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "M8": {
+   "审定表M8-1": {
+    "上年审定数": {
+     "prev": [
+      "M8",
+      "审定表M8-1",
+      "审定数"
+     ],
+     "template": "wp_templates/M/M8 一般风险准备.xlsx",
+     "cell": "E13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "M9": {
+   "审定表M9-1": {
+    "上年审定数": {
+     "prev": [
+      "M9",
+      "审定表M9-1",
+      "审定数"
+     ],
+     "template": "wp_templates/M/M9 其他综合收益.xlsx",
+     "cell": "E10",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "N1": {
+   "审定表N1-1": {
+    "上年审定数": {
+     "prev": [
+      "N1",
+      "审定表N1-1",
+      "审定数"
+     ],
+     "template": "",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "模板无该表",
+     "reason": "系统模板里没有该表（N1 递延所得税资产.xlsx）"
+    }
+   }
+  },
+  "N2": {
+   "应交税费审定表N2-1": {
+    "上年审定数": {
+     "prev": [
+      "N2",
+      "应交税费审定表N2-1",
+      "审定数"
+     ],
+     "template": "wp_templates/N/N2 应交税费.xlsx",
+     "cell": "E22",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "上年年末余额": {
+     "prev": [
+      "N2",
+      "附注披露信息（上市公司）",
+      "期末余额"
+     ],
+     "template": "wp_templates/N/N2 应交税费.xlsx",
+     "cell": "C23",
+     "header": [
+      "上年年末余额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "N3": {
+   "明细表N3-2": {
+    "明细表N3-2_上年审定数": {
+     "prev": [
+      "N3",
+      "明细表N3-2",
+      "审定数"
+     ],
+     "template": "",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "模板无该表",
+     "reason": "系统模板里没有该表（N3 递延所得税负债.xlsx）"
+    }
+   },
+   "递延所得税负债审定表N3-1": {
+    "审定表N3-1_上年审定数": {
+     "prev": [
+      "N3",
+      "递延所得税负债审定表N3-1",
+      "审定数"
+     ],
+     "template": "wp_templates/N/N3 递延所得税负债.xlsx",
+     "cell": "E13",
+     "header": [
+      "期初数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   }
+  },
+  "N4": {
+   "明细表N4-2": {
+    "明细表N4-2_上年审定数": {
+     "prev": [
+      "N4",
+      "明细表N4-2",
+      "审定数"
+     ],
+     "template": "",
+     "cell": null,
+     "header": [],
+     "row_label": "",
+     "cell_is_formula": false,
+     "action": "none",
+     "rule": "模板无该表",
+     "reason": "系统模板里没有该表（N4 税金及附加.xlsx）"
+    }
+   },
+   "税金及附加审定表N4-1": {
+    "审定表N4-1_上年审定数": {
+     "prev": [
+      "N4",
+      "税金及附加审定表N4-1",
+      "审定数"
+     ],
+     "template": "wp_templates/N/N4 税金及附加.xlsx",
+     "cell": "E16",
+     "header": [
+      "上年数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "上期发生额": {
+     "prev": [
+      "N4",
+      "附注披露信息（上市公司）",
+      "本期发生额"
+     ],
+     "template": "wp_templates/N/N4 税金及附加.xlsx",
+     "cell": "C17",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  },
+  "N5": {
+   "所得税费用审定表N5-1": {
+    "审定表N5-1_上年审定数": {
+     "prev": [
+      "N5",
+      "所得税费用审定表N5-1",
+      "审定数"
+     ],
+     "template": "wp_templates/N/N5 所得税费用.xlsx",
+     "cell": "E9",
+     "header": [
+      "上期数",
+      "审定数"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "差异数核对行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（上市公司）": {
+    "上期发生额_上市": {
+     "prev": [
+      "N5",
+      "附注披露信息（上市公司）",
+      "本期发生额"
+     ],
+     "template": "wp_templates/N/N5 所得税费用.xlsx",
+     "cell": "D11",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   },
+   "附注披露信息（国企": {
+    "上期发生额_国企": {
+     "prev": [
+      "N5",
+      "附注披露信息（国企",
+      "本期发生额"
+     ],
+     "template": "wp_templates/N/N5 所得税费用.xlsx",
+     "cell": "D11",
+     "header": [
+      "上期发生额"
+     ],
+     "row_label": "合计",
+     "cell_is_formula": true,
+     "action": "verify",
+     "rule": "首个合计行",
+     "reason": ""
+    }
+   }
+  }
+ }
+}
