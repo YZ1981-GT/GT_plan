@@ -6,7 +6,9 @@
 from __future__ import annotations
 
 import re
+import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi import FastAPI
@@ -23,6 +25,17 @@ _EDIT_DIALOG = _REPO / "audit-platform" / "frontend" / "src" / "components" / "f
 
 #: 每个域的合成条目数（顺序即不按域过滤时的返回顺序）
 _COUNTS = {"report": 3, "tb": 2, "note": 4, "wp": 0, "aux": 1}
+
+#: 搜索端点按项目只读权限放行（R4.1）：项目须为 UUID；本文件只测载荷，门禁走真实 assert_project_permission 的管理员分支
+_PID = "5a1d0c3e-7b2f-4e61-9c84-2f0d6b9a1e01"
+_ADMIN = SimpleNamespace(id=uuid.uuid4(), role=SimpleNamespace(value="admin"))
+
+
+class _NoDbSession:
+    """业务层已换成合成条目、不读库；门禁设置 RLS 上下文时按 SQLite 方言跳过（不需要真实会话）。"""
+
+    def get_bind(self):
+        return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
 
 
 def _isolate_singleton(monkeypatch) -> None:
@@ -54,17 +67,17 @@ def client(monkeypatch):
     app.include_router(router_module.router)
 
     async def _db():
-        yield None
+        yield _NoDbSession()
 
     app.dependency_overrides[get_db] = _db
-    app.dependency_overrides[get_current_user] = lambda: object()
+    app.dependency_overrides[get_current_user] = lambda: _ADMIN
     with TestClient(app) as c:
         c.calls = calls
         yield c
 
 
 def _get(client, **params):
-    return client.get("/api/address-registry", params={"project_id": "p1", "year": 2025, **params})
+    return client.get("/api/address-registry", params={"project_id": _PID, "year": 2025, **params})
 
 
 def test_limit_upper_bound_is_50000():

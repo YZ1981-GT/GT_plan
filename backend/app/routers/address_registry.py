@@ -9,15 +9,21 @@ GET  /api/address-registry/resolve  — 解析单个URI
 POST /api/address-registry/validate — 校验公式引用有效性
 POST /api/address-registry/jump     — 获取跳转路由
 POST /api/address-registry/invalidate — 失效缓存
+
+鉴权（spec formula-fetch-followup-defect-closure R4.1）：读项目数据的端点校验项目只读权限（查询参数的走
+``require_project_access``，请求体的在函数首句 ``assert_project_permission``）；清空全部项目缓存只许管理员。
+``jump`` / ``parse`` 只做字符串换算、不读库，保持仅登录。原先全部只校验登录 ⇒ 任意登录用户可按任意 project_id
+读出试算表科目、报表行、附注章节、底稿单元格目录。
 """
 import asyncio
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.offloop_json import encode_object_with_chunked_array, preencoded_json_response
-from app.deps import get_current_user
+from app.deps import assert_project_permission, get_current_user, require_project_access
 from app.services.address_registry import (
     ADDRESS_DOMAIN_ORDER, ADDRESS_REGISTRY_MAX_LIMIT,
     AddressEntry, address_registry, parse_uri, formula_ref_to_uri,
@@ -25,6 +31,14 @@ from app.services.address_registry import (
 )
 
 router = APIRouter(prefix="/api/address-registry", tags=["地址坐标-公式编辑选址(V1)"])
+
+
+def _body_project_id(body: dict) -> UUID:
+    """请求体里的项目：必填且须为 UUID（与查询参数版同口径，非法即 422）。"""
+    try:
+        return UUID(str(body.get("project_id") or ""))
+    except ValueError:
+        raise HTTPException(status_code=422, detail="project_id 必填且须为 UUID") from None
 
 
 @router.get("")
@@ -37,7 +51,7 @@ async def search_addresses(
     # 超过上限直接 422（不静默截断成上限）；前端整库加载取的就是这个上限
     limit: int = Query(100, ge=1, le=ADDRESS_REGISTRY_MAX_LIMIT),
     db: AsyncSession = Depends(get_db),
-    _user=Depends(get_current_user),
+    _user=Depends(require_project_access("readonly")),
 ):
     """搜索可引用地址（支持按域单独加载，减少首次加载量）。
 
@@ -89,7 +103,7 @@ async def get_stats(
     year: int = Query(0),
     template_type: str = Query('soe'),
     db: AsyncSession = Depends(get_db),
-    _user=Depends(get_current_user),
+    _user=Depends(require_project_access("readonly")),
 ):
     """获取注册表统计"""
     return await address_registry.get_stats(db, project_id, year, template_type)
@@ -102,7 +116,7 @@ async def resolve_uri(
     year: int = Query(0),
     template_type: str = Query('soe'),
     db: AsyncSession = Depends(get_db),
-    _user=Depends(get_current_user),
+    _user=Depends(require_project_access("readonly")),
 ):
     """解析单个URI为地址详情"""
     entry = await address_registry.resolve(db, project_id, year, uri, template_type)
@@ -123,9 +137,10 @@ async def resolve_uri(
 async def validate_formula(
     body: dict,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     """校验公式中引用的地址是否有效"""
+    await assert_project_permission(db, current_user, _body_project_id(body), "readonly")
     formula = body.get('formula', '')
     project_id = body.get('project_id', '')
     year = body.get('year', 0)
@@ -170,7 +185,8 @@ async def get_jump_route(
 @router.post("/invalidate")
 async def invalidate_cache(
     body: dict,
-    _user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     """精准失效地址缓存（L1 内存 + L2 Redis 同步删除）
 
@@ -179,15 +195,16 @@ async def invalidate_cache(
     - year 可选：指定年度
     - domain 可选：指定域(report/tb/note/wp/aux)
     - template_type 可选：指定模板类型(soe/listed)
-    - all 可选：true时清空全部缓存
+    - all 可选：true时清空全部缓存（只许管理员）
     """
     if body.get('all'):
+        if current_user.role.value != 'admin':
+            raise HTTPException(status_code=403, detail="清空全部项目的地址缓存只许管理员")
         await address_registry.invalidate_all_async()
         return {'ok': True, 'scope': 'all'}
 
+    await assert_project_permission(db, current_user, _body_project_id(body), "readonly")
     project_id = body.get('project_id', '')
-    if not project_id:
-        return {'ok': False, 'error': 'project_id required'}
 
     await address_registry.invalidate_async(
         project_id,

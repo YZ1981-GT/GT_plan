@@ -167,7 +167,7 @@ class McpToolContext:
     host_decision: AccessDecision
     resolver: ResourceAccessResolver
     principal: Any
-    #: 项目权威审计年度（``projects.audit_year``）；未设置时为 None
+    #: 项目审计年度（``resolve_project_year``：``audit_year`` → 审计期末年份）；都没有时为 None
     year: int | None = None
 
     @property
@@ -191,7 +191,7 @@ async def build_tool_context(
     Raises:
         McpToolError: 主体不存在 / 已停用 ⇒ ``access_denied``（不返回空数据伪装无结果）。
     """
-    from app.models.core import Project, User
+    from app.models.core import User
 
     user = (
         await db.execute(
@@ -206,11 +206,10 @@ async def build_tool_context(
             ERR_ACCESS_DENIED, "调用主体不存在或已停用，拒绝取数"
         )
 
-    year = (
-        await db.execute(
-            sa.select(Project.audit_year).where(Project.id == token_payload.project_id)
-        )
-    ).scalar_one_or_none()
+    # 审计年度单一真源：audit_year → 审计期末年份（原先只读 audit_year，未填时试算表 / 附注工具按年度 0 取数恒空）
+    from app.services.sampling_registry_service import resolve_project_year
+
+    year = await resolve_project_year(db, token_payload.project_id)
 
     return McpToolContext(
         db=db,
@@ -721,12 +720,17 @@ async def tool_addr_lookup(
 async def _search_address_ids(
     ctx: McpToolContext, query: str, domain: str, limit: int
 ) -> list[str]:
-    """用平台既有 ``address_registry.search`` 取候选 addr_id（不含权限）。"""
+    """用平台既有 ``address_registry.search`` 取候选 addr_id（不含权限）。
+
+    按项目的审计年度与附注口径取（原先写死年度 0 / ``soe``，试算表域恒空，spec formula-fetch-followup-defect-closure R4.4）。
+    """
     try:
         from app.services.address_registry import address_registry
+        from app.services.ai_chat.address_mention import project_address_scope
 
+        year, template_type = await project_address_scope(ctx.db, ctx.project_id)
         entries = await address_registry.search(
-            ctx.db, str(ctx.project_id), 0, query, domain, "soe", limit
+            ctx.db, str(ctx.project_id), year, query, domain, template_type, limit
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("addr_lookup 候选检索失败: %s", exc)

@@ -32,6 +32,7 @@ vi.mock('@/composables/usePermissionMatrix', () => ({
     allowedOperations: computed(() => new Set()), canRole: () => true,
   }),
 }))
+vi.mock('@/stores/roleContext', () => ({ useRoleContextStore: () => ({ canEditInProject: true }) }))
 vi.mock('@/services/workpaperApi', () => ({
   listWorkpapers: vi.fn().mockResolvedValue([]),
   getWpIndex: vi.fn().mockResolvedValue([]),

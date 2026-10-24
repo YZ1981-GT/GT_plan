@@ -313,3 +313,32 @@ R1.5 的附注模板绑定未重生成（理由见 §10.3 第 19 条）。
   改为与底稿清单同一判定 `is_template_applicable`，删掉 `a_only`（模板与角色两处，已无读取方），旧用例「B / C 类都没有 QR / EQCR 模板」按参考标准改写。
   🔴 复核面板端点的业务分类由前端查询参数传入（缺省 C），前端 `WorkpaperReviewPanel` 当前无挂载点；是否改为服务端按项目读取需另定（未改）。
 - R9：补端点级「被引用 ⇒ 400、模板仍在」用例。
+
+### 10.7 R4 鉴权（2026-10-24）
+
+- **地址库（R4.1）**：搜索 / 统计 / 解析挂 `require_project_access("readonly")`；校验 / 失效缓存的项目在请求体里，函数首句
+  `assert_project_permission(..., "readonly")`，请求体项目缺失 / 空 / 非 UUID 一律 422（原先校验照常跑、失效缓存返回 `ok=false` 的 200）；
+  `all=true` 清空全部项目缓存只许管理员（编辑级成员 403，两种失效都不发生）。`jump` / `parse` 只做字符串换算、不读库，保持仅登录，
+  在本维登记 `_BODY_IDENTITY_BY_DESIGN`（可伪证：在本维、仅登录档、不挂会话依赖、不引用查询）。前端两处调用本就只在有项目时发请求、不传 `all`。
+  端点测试 `test_address_registry_authz.py` 走权限世界（真实成员行、生产门禁与生产注册，只 override 当前用户与会话）：只读 / 复核 / 编辑级成员与
+  非成员管理员放行且业务桩拿到请求里的项目、非成员 403、未登录 401、非 UUID 422；两个旧测试（上限 / 工作线程编码）改为管理员身份 + UUID 项目。
+- **AI 对话的地址查找（R4.4）**：新增只读 `address_mention.project_address_scope`（年度经单一真源 `resolve_project_year`：`audit_year` → 审计期末年份，
+  都没有为 0、不猜今年；口径读项目基本信息、非 soe / listed 按 soe，与前端 `normalizeTemplateType` 同口径；不经 `DisclosureEngine`，它会回填快照并 flush）。
+  `mcp_tools._search_address_ids` 与 `_load_address_entry` 改用它；后者另把「排序后的前 500 条」改为全部地址（报表域在前、占满 500 条，
+  试算表 / 附注 / 底稿 / 辅助余额地址原先一律找不到）。MCP 工具上下文年度也改走 `resolve_project_year`（原只读 `audit_year`，未填时
+  试算表 / 附注工具按年度 0 取数恒空）。
+- **生成底稿 / 新建自定义底稿 / 模板清单（R4.2 / R4.3）**：后端门禁由并发 spec `procedure-trim-generation-delegation-chain` 任务 6 在同两个文件里实现
+  （工作树已有 `require_project_access("edit")` × 4、批量预览 `readonly`、模板清单 `readonly`，混在该 spec 的保留范围改动里，**尚未入库**），本 spec 不改这两个文件。
+  前端入口本 spec 改：底稿管理页「生成底稿」「批量自定义底稿」按 `useRoleContextStore().canEditInProject` 且项目未归档显示（与 `GtRefreshScopeDialog` 同口径），
+  守卫 `workpaperListCreateGate.spec.ts`；两个既有挂载测试补项目角色上下文的 mock。单条新建自定义底稿（`commonApi.createCustomWorkpaper`）现无界面调用方。
+  待并发 spec 入库后补端点测试（含复核级 403、编辑级放行）与路径维基线下调。
+- **基线（R4.5）**：本维（项目在请求体 / 查询参数）现算 93 → 87，常量下调；地址库五个端点钉进 `_FIXED_ENDPOINTS`。原变异只删函数体里的门禁语句，
+  门禁在签名里的（`Depends(require_project_access(...))`）打不到，扩为同时把签名里的项目级依赖换成仅登录。路径维现算 200（本提交树），未动。
+- **变异**：MA1~MA7（搜索 / 统计 / 解析退回仅登录、校验 / 失效缓存不判项目、清空全部不限管理员、请求体项目不校验格式、门禁降为 review 级）、
+  MM1~MM6（MCP 检索 / mention 写死年度 0 与 soe、只看前 500 条、上下文年度只读 audit_year、口径不归一、取不到年度猜今年）、
+  MB1 / MB2（守卫：搜索退回仅登录、`jump` 改为读库）全部打红后逐字节恢复；`WorkpaperList.vue` 注入类型错误被单区域 vue-tsc 报出。
+- **范围外（登记，未改）**：
+  1. 会写 stale 标记却只校验登录的三个端点：地址库 v2 `notify-cell-change`（前后端零调用方，`year` 缺省写死 2025）、联动总线 `POST /impact`、
+     `GET /impact-by-addr` —— 任意登录用户可给任意项目打过期标记。跨联动总线域，需逐个评估调用方后另定。
+  2. 审计年度解析另有两份重复实现（`routers/audit_check._resolve_project_year`、`routers/wp_formula._resolve_project_year`），本 spec 只复用单一真源、未合并。
+  3. `mention_service._search_address` 传写死的 `soe`，只取 tb / aux 两域（构建不看口径，只影响缓存键），无行为影响。

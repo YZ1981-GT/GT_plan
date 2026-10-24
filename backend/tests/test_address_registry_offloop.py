@@ -16,7 +16,9 @@ from __future__ import annotations
 import asyncio
 import enum
 import json
+import uuid
 from dataclasses import asdict
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -115,6 +117,18 @@ def _entries(n: int, label: str = "条目") -> list[svc.AddressEntry]:
     ]
 
 
+#: 搜索端点按项目只读权限放行（R4.1）：项目须为 UUID；本文件只测编码 / 压缩，门禁走真实 assert_project_permission 的管理员分支
+_PID = "5a1d0c3e-7b2f-4e61-9c84-2f0d6b9a1e01"
+_ADMIN = SimpleNamespace(id=uuid.uuid4(), role=SimpleNamespace(value="admin"))
+
+
+class _NoDbSession:
+    """业务层已换成合成条目、不读库；门禁设置 RLS 上下文时按 SQLite 方言跳过（不需要真实会话）。"""
+
+    def get_bind(self):
+        return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+
+
 class _Passthrough(BaseHTTPMiddleware):
     """生产栈里 GZip 与 ResponseWrapper 之间还有 Observability（BaseHTTPMiddleware）：它把响应改成流式
     （数据段 more_body=True + 末尾空段）。测试栈缺这一层时 gzip 只见到整段响应，测不到生产形状。"""
@@ -140,17 +154,17 @@ def make_client(monkeypatch):
         app.include_router(router_module.router)
 
         async def _db():
-            yield None
+            yield _NoDbSession()
 
         app.dependency_overrides[get_db] = _db
-        app.dependency_overrides[get_current_user] = lambda: object()
+        app.dependency_overrides[get_current_user] = lambda: _ADMIN
         return TestClient(app)
 
     return factory
 
 
 def _search(client: TestClient, **params):
-    return client.get("/api/address-registry", params={"project_id": "p1", "year": 2025, **params})
+    return client.get("/api/address-registry", params={"project_id": _PID, "year": 2025, **params})
 
 
 def test_payload_unchanged_and_wrapped_once_without_leaking_the_marker(make_client):

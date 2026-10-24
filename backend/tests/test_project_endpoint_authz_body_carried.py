@@ -72,6 +72,12 @@ _EXTRA_PROJECT_TOKENS: dict[str, tuple[tuple[str, str, tuple[str, ...]], ...]] =
         ("routers/formula_import_export.py", "_assert_context_project", ("assert_project_permission",)),),
 }
 
+#: 刻意保持仅登录、不计入欠账的端点 → 理由（可伪证：``test_identity_by_design_endpoints_do_not_touch_data``）
+_BODY_IDENTITY_BY_DESIGN: dict[str, str] = {
+    # spec formula-fetch-followup-defect-closure R4.1：只把地址换算成前端路由，请求体的项目只拼进路由字符串
+    "address_registry.py::get_jump_route": "只做字符串换算、不读库",
+}
+
 _BODY_PROJECT_TOKENS = _PROJECT_LEVEL_TOKENS + tuple(_EXTRA_PROJECT_TOKENS)
 
 #: 本 spec 修过的端点（回归钉子：必须在本维且是项目级）
@@ -82,6 +88,12 @@ _FIXED_ENDPOINTS = frozenset({
     "draft_refresh.py::one_click_draft_refresh",
     "refresh_scopes.py::list_refresh_scopes",
     "row_name_alignment_router.py::batch_refresh",
+    # spec formula-fetch-followup-defect-closure R4.1：地址库读项目数据的五个端点（只读级）
+    "address_registry.py::search_addresses",
+    "address_registry.py::get_stats",
+    "address_registry.py::resolve_uri",
+    "address_registry.py::validate_formula",
+    "address_registry.py::invalidate_cache",
 })
 
 #: 不用会话令牌、自带签名校验的端点 → 必须调到的校验依赖（可伪证：``test_body_self_auth_endpoints_really_verify``）
@@ -107,7 +119,9 @@ _BODY_KNOWN_GAPS: frozenset[str] = frozenset({
 #: 补额外项目级标识（误判 21 个）、修本 spec 六个端点、扫描口径补 dict 请求体（+5）后现算 93。
 #: 其中与公式链路相邻、建议另立 spec 收口的：联动总线 stale 标记两个写端点（POST /impact、GET /impact-by-addr 都会
 #: 写 stale）与地址库 v2 notify-cell-change（同样写 stale）、地址库六个读端点、底稿字段覆盖值两个端点。
-_BODY_IDENTITY_ONLY_BASELINE = 93
+#: 2026-10-24 spec formula-fetch-followup-defect-closure R4.1 修地址库五个读端点（jump 只拼路由、登记进
+#: _BODY_IDENTITY_BY_DESIGN 不计欠账）后现算 87。
+_BODY_IDENTITY_ONLY_BASELINE = 87
 
 
 def _rooted_at_param(expr: ast.AST, params: set[str]) -> bool:
@@ -331,20 +345,29 @@ def test_scanner_self_check():
                    "s.py::via_query": "project", "s.py::via_helper": "project"}, got
 
 
+def _calls_project_token(tree: ast.AST) -> bool:
+    return any(isinstance(c, ast.Call) and _matches(
+        {c.func.id if isinstance(c.func, ast.Name) else getattr(c.func, "attr", "")}, _BODY_PROJECT_TOKENS)
+        for c in ast.walk(tree))
+
+
 class _StripProjectGates(ast.NodeTransformer):
-    """变异：删掉指定端点函数体里调用项目级标识的语句（模拟「鉴权被摘掉」）。"""
+    """变异：删掉指定端点函数体里调用项目级标识的语句，签名里的项目级依赖（``Depends(require_project_access(...))``）
+    换成仅登录（模拟「鉴权被摘掉」；查询参数带项目的端点门禁在签名里，只删函数体打不到）。"""
 
     def __init__(self, fn: str) -> None:
         self.fn, self.removed = fn, 0
 
     def _strip(self, node):
         if node.name == self.fn:
-            kept = [s for s in node.body if not any(
-                isinstance(c, ast.Call) and _matches(
-                    {c.func.id if isinstance(c.func, ast.Name) else getattr(c.func, "attr", "")}, _BODY_PROJECT_TOKENS)
-                for c in ast.walk(s))]
+            kept = [s for s in node.body if not _calls_project_token(s)]
             self.removed += len(node.body) - len(kept)
             node.body = kept or [ast.Pass()]
+            for defaults in (node.args.defaults, node.args.kw_defaults):
+                for i, default in enumerate(defaults):
+                    if default is not None and _calls_project_token(default):
+                        defaults[i] = ast.parse("Depends(get_current_user)", mode="eval").body
+                        self.removed += 1
         return node
 
     visit_FunctionDef = visit_AsyncFunctionDef = _strip
@@ -360,7 +383,7 @@ def test_fixed_endpoint_stays_project_level_and_mutation_is_caught(key: str):
     rel, fn = key.split("::", 1)
     stripper = _StripProjectGates(fn)
     mutated = ast.unparse(stripper.visit(ast.parse((_ROUTERS / rel).read_text(encoding="utf-8-sig"))))
-    assert stripper.removed >= 1, f"{key} 函数体里找不到项目级判定语句（变异没打到）"
+    assert stripper.removed >= 1, f"{key} 函数体 / 签名里找不到项目级判定（变异没打到）"
     after = {k: tier for k, _, tier in _scan_source(rel, mutated)}
     assert after.get(key) in {"identity", "none"}, f"摘掉 {key} 的项目级判定后扫描器仍判 {after.get(key)}"
 
@@ -392,8 +415,22 @@ def test_body_self_auth_endpoints_really_verify():
         assert any(isinstance(n, ast.Raise) for n in ast.walk(verifier_node)), f"{verifier} 里没有 raise —— 校验退化为放行"
 
 
+def test_identity_by_design_endpoints_do_not_touch_data():
+    """刻意仅登录的端点必须仍在本维、是仅登录档，且不碰数据：不挂会话依赖、不引用 ORM 会话 / 查询。"""
+    found = {k: tier for k, _, tier in _scan()}
+    for key in _BODY_IDENTITY_BY_DESIGN:
+        assert found.get(key) == "identity", f"{key} 不在本维或档位变了（{found.get(key)}），请同步豁免"
+        rel, fn = key.split("::", 1)
+        node = _function(ast.parse((_ROUTERS / rel).read_text(encoding="utf-8-sig")), fn)
+        names = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)} | \
+            {n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)}
+        params = {a.arg for a in [*node.args.args, *node.args.kwonlyargs]}
+        touched = sorted((names & {"get_db", "AsyncSession", "execute", "select", "text"}) | (params & {"db", "session"}))
+        assert not touched, f"{key} 登记为不读库，实际引用了 {touched}"
+
+
 def test_body_identity_only_do_not_grow():
-    n = sum(1 for *_, tier in _scan() if tier == "identity")
+    n = sum(1 for key, _, tier in _scan() if tier == "identity" and key not in _BODY_IDENTITY_BY_DESIGN)
     assert n <= _BODY_IDENTITY_ONLY_BASELINE, (
         f"本维「仅登录不校项目」从 {_BODY_IDENTITY_ONLY_BASELINE} 增至 {n} —— 项目在请求体 / 查询参数里的端点"
         "请在函数体首句直调 assert_project_permission")

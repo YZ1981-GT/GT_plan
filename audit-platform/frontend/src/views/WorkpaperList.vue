@@ -44,7 +44,7 @@
                 ⚡ 刷新全部公式
               </el-button>
             </el-tooltip>
-            <el-tooltip content="选择模板集 → 配置裁剪范围 → 批量创建本项目底稿" placement="bottom">
+            <el-tooltip v-if="canCreateWp" content="选择模板集 → 配置裁剪范围 → 批量创建本项目底稿" placement="bottom">
               <el-button type="success" size="small" @click="onGenerateWorkpapers" :loading="generateLoading">
                 ⬇️ 生成底稿
               </el-button>
@@ -102,7 +102,7 @@
               <el-tooltip content="从其他项目复制底稿模板配置" placement="bottom">
                 <el-button size="small" @click="showTemplateCopy = true">📋 模板复制</el-button>
               </el-tooltip>
-              <el-tooltip content="粘贴清单或上传 Excel，一次创建多份自定义底稿" placement="bottom">
+              <el-tooltip v-if="canCreateWp" content="粘贴清单或上传 Excel，一次创建多份自定义底稿" placement="bottom">
                 <el-button size="small" @click="showCustomBatch = true">➕ 批量自定义底稿</el-button>
               </el-tooltip>
               <el-tooltip content="将选中底稿批量委派给项目组成员" placement="bottom">
@@ -270,6 +270,7 @@ import { resolveAuditYearFromProject, resolveEffectiveAuditYear } from '@/utils/
 import { useAuthStore } from '@/stores/auth'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useProjectStore } from '@/stores/project'
+import { useRoleContextStore } from '@/stores/roleContext'
 import { useDictStore } from '@/stores/dict'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { ArrowDown } from '@element-plus/icons-vue'
@@ -346,6 +347,10 @@ const canManageWp = computed(() => {
   const role = authStore.user?.role
   return role ? MANAGE_ROLES.has(role) : false
 })
+// 生成底稿 / 新建自定义底稿的后端门禁是本项目编辑权限（归档项目 423）：没有就不显示入口，不给点了必被拒的按钮
+// （spec formula-fetch-followup-defect-closure R4.2；与 GtRefreshScopeDialog 同一口径）
+const roleContext = useRoleContextStore()
+const canCreateWp = computed(() => roleContext.canEditInProject && projectStore.projectStatus !== 'archived')
 
 // ─── 导入导出下拉命令分派 ─────────────────────────────────────────────────────
 function onImportExportCommand(command: string) {

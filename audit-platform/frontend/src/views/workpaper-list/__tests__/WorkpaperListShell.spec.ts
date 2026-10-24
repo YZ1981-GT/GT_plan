@@ -64,6 +64,9 @@ vi.mock('@/composables/usePermissionMatrix', () => ({
   }),
 }))
 
+// ─── Mock 项目角色上下文（生成底稿入口按本项目编辑权限显示，见 workpaperListCreateGate.spec） ───
+vi.mock('@/stores/roleContext', () => ({ useRoleContextStore: () => ({ canEditInProject: true }) }))
+
 // ─── Mock services ───────────────────────────────────────────────────────────
 vi.mock('@/services/workpaperApi', () => ({
   listWorkpapers: vi.fn().mockResolvedValue([]),
