@@ -230,6 +230,20 @@ _SECOND_BATCH: list[tuple[list[str], list[str], list[str], str]] = [
 for _codes, _old, _new, _why in _SECOND_BATCH:
     _add_family(_codes, "account_codes", _old, _new, _why)
 
+# ── 2026-10-24 第三批（全表探针：映射码 ⊆ 四表口径单一来源；spec formula-fetch-followup-defect-closure R1.6）──
+#: 真库 account_chart 现查（standard 侧 6 个项目一致）：1503 可供出售金融资产（旧准则）/ 1506 其他债权投资 /
+#: 1507 其他权益工具投资 / 1901 待处理财产损溢 / 1701 无形资产。
+_THIRD_BATCH: list[tuple[list[str], list[str], list[str], str]] = [
+    (["G6", "G6-1", "G6-2", "G6-3", "G6-4", "G6-5", "G6-6"], ["1503"], ["1506"],
+     "1503 是旧准则可供出售金融资产；其他债权投资 1506（g_cycle_specs G6，真库 6 个项目）"),
+    (["G8", "G8-1", "G8-2", "G8-3", "G8-4", "G8-5", "G8-6"], ["1503"], ["1507"],
+     "1503 是旧准则可供出售金融资产（G6 / G8 共用一个码会互相触发）；其他权益工具投资 1507（g_cycle_specs G8，真库 6 个项目）"),
+    (["K2", "K2-1", "K2-2", "K2-3", "K2-4"], ["1701"], ["1901"],
+     "1701 是 I1 无形资产；其他流动资产没有独立标准码，报表 BS-014 取 1901 待处理财产损溢（k_cycle_specs K2 兜底 1901）"),
+]
+for _codes, _old, _new, _why in _THIRD_BATCH:
+    _add_family(_codes, "account_codes", _old, _new, _why)
+
 
 def _load() -> dict[str, Any]:
     return json.loads(MAPPING_PATH.read_text(encoding="utf-8"))

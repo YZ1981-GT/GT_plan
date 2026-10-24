@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chain_execution import ChainExecution
 from app.services.prerequisite_checker import PrerequisiteChecker
+from app.services.wp_generation_matching import match_workpapers, tb_account_flags
 
 logger = logging.getLogger(__name__)
 
@@ -526,23 +527,8 @@ class ChainOrchestrator:
                 pass
             tb_accounts = set()
 
-        # 4. Determine cycle-specific flags from TB accounts
-        prefix_to_flag = {
-            "1001": "has_cash", "1002": "has_cash", "1012": "has_cash",
-            "1122": "has_revenue", "6001": "has_revenue",
-            "1401": "has_inventory", "1402": "has_inventory", "1403": "has_inventory",
-            "1511": "has_investment", "1101": "has_investment",
-            "1601": "has_fixed_assets", "1602": "has_fixed_assets",
-            "1604": "has_construction",
-            "1701": "has_intangibles", "1702": "has_intangibles",
-            "5401": "has_rd", "6604": "has_rd",
-            "2001": "has_debt", "2501": "has_debt",
-            "1631": "has_lease", "2802": "has_lease",
-        }
-        for acc in tb_accounts:
-            flag = prefix_to_flag.get(acc)
-            if flag:
-                project_flags[flag] = True
+        # 4. Determine cycle-specific flags from TB accounts（码表与改正说明见 wp_generation_matching.TB_ACCOUNT_FLAGS）
+        project_flags.update(tb_account_flags(tb_accounts))
         # Related parties default True for SOE (regulatory requirement)
         project_flags.setdefault("has_related_parties", template_type == "soe")
         # Has policy change: assume False unless tracked elsewhere
@@ -557,41 +543,8 @@ class ChainOrchestrator:
         project_flags["has_digital_currency"] = "1502" in tb_accounts
         # Strategy: Subtables (D2-2/E1-1) collapse to primary (D2/E1).
         # Each primary becomes ONE workpaper file with multiple sheets (auto-merged from sibling files).
-        matched_primary: set[str] = set()  # 主编码集合（实际生成的 wp_index）
-        matched_subtable_info: dict[str, list[str]] = {}  # primary → [subtables matched]
-        matched_details: list[dict] = []
-
-        for m in mappings:
-            wp_code = m.get("wp_code", "")
-            if not wp_code:
-                continue
-
-            # Determine primary code (collapse D2-2 → D2)
-            primary_code = wp_code.split("-")[0] if "-" in wp_code else wp_code
-            is_subtable = wp_code != primary_code
-
-            # Case A: Account-based (D-N cycles, has account_codes)
-            account_codes = m.get("account_codes", [])
-            if account_codes and any(acc in tb_accounts for acc in account_codes):
-                matched_primary.add(primary_code)
-                if is_subtable:
-                    matched_subtable_info.setdefault(primary_code, []).append(wp_code)
-                continue
-
-            # Case B: Audit-stage based (A/B/C/S cycles)
-            trigger = m.get("trigger")
-            if trigger == "must_have":
-                matched_primary.add(primary_code)
-                if is_subtable:
-                    matched_subtable_info.setdefault(primary_code, []).append(wp_code)
-                continue
-            if trigger == "conditional":
-                applies_when = m.get("applies_when")
-                if applies_when and project_flags.get(applies_when):
-                    matched_primary.add(primary_code)
-                    if is_subtable:
-                        matched_subtable_info.setdefault(primary_code, []).append(wp_code)
-                continue
+        # 主编码集合（实际生成的 wp_index）+ primary → [subtables matched]；规则见 wp_generation_matching.match_workpapers
+        matched_primary, matched_subtable_info = match_workpapers(mappings, tb_accounts, project_flags)
 
         if not matched_primary:
             return {"created": 0, "skipped_reason": "无匹配的底稿模板"}

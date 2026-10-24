@@ -80,33 +80,14 @@ CORRECTED_CODES: dict[str, tuple[str, ...]] = {
 
 
 def _single_source_codes(wp_code: str) -> tuple[str, ...] | None:
-    """该底稿在四表口径单一来源里声明的全部科目（原值 / 备抵 / 附加槽）；None = 没有声明。"""
-    from app.services.four_table.e_cycle_specs import E1_MONETARY_FUND_SPEC
-    from app.services.four_table.j_cycle_account_scope import j_semantic_spec_of
-    from app.services.four_table.k_cycle_specs import K_CYCLE_SPECS
+    """该底稿在四表口径单一来源里声明的全部科目（原值 / 备抵 / 附加槽）；None = 没有声明。
 
-    if wp_code in K_CYCLE_SPECS:
-        k = K_CYCLE_SPECS[wp_code]
-        return tuple(dict.fromkeys(
-            [c for c in (k.fallback_standard,) if c] + list(k.fallback_provision) + list(k.extra_standard_codes)
-        ))
-    if wp_code == "E1":
-        spec = E1_MONETARY_FUND_SPEC
-    elif wp_code[:1] == "J":
-        spec = j_semantic_spec_of(wp_code)
-    else:
-        spec = None
-        for module, name in (("d_cycle_specs", "D_CYCLE_SPECS"), ("f_cycle_specs", "F_CYCLE_SPECS"),
-                             ("g_cycle_specs", "G_CYCLE_SPECS"), ("h_cycle_specs", "H_CYCLE_SPECS"),
-                             ("i_cycle_specs", "I_CYCLE_SPECS"), ("l_cycle_specs", "L_CYCLE_SPECS"),
-                             ("m_cycle_specs", "M_CYCLE_SPECS"), ("n_cycle_specs", "N_CYCLE_SPECS")):
-            specs = getattr(importlib.import_module(f"app.services.four_table.{module}"), name)
-            if wp_code in specs:
-                spec = specs[wp_code]
-                break
-    if spec is None:
-        return None
-    return tuple(dict.fromkeys(c for slot in spec.slots for c in slot.fallback_standard_codes))
+    取数入口统一为 ``four_table.declared_codes``（映射表守卫 ``test_wp_account_mapping_single_source`` 同用），
+    两个守卫对同一底稿不会得出不同结论。
+    """
+    from app.services.four_table.declared_codes import declared_codes
+
+    return declared_codes(wp_code)
 
 
 def _extra_codes(wp_code: str) -> tuple[str, ...]:

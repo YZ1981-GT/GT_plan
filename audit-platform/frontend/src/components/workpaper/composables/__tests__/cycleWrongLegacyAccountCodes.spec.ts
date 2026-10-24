@@ -378,6 +378,7 @@ const BRING_IN_ALLOWLIST: Array<{ wp: string; code: string; reason: string; regi
   { wp: 'L5', code: '2702', reason: '未确认融资费用（备抵科目）；映射表只列原值 2701' },
   { wp: 'G1', code: '1501', reason: '映射为 1101；G 循环 1501 拆分待决', registered: true },
   { wp: 'G4', code: '1501', reason: '映射为 1504；1501 / 1504 新旧准则科目待决', registered: true },
+  { wp: 'G8', code: '1503', reason: '映射为 1507（2026-10-24 第三批）；G 循环旧准则码 1503 待决，与 G1 / G4 的 1501 同批定', registered: true },
   { wp: 'D5', code: '1124', reason: '应收款项融资无标准独立码、映射表为空；D 循环另有会话在改', registered: true },
 ]
 
