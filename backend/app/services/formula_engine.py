@@ -998,15 +998,20 @@ def _handle_note(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Deci
 
 
 def _handle_wp(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """WP('wp_code','column') — 底稿数据取值（列名或单元格地址 B5）"""
+    """WP('wp_code','column') — 底稿数据取值（列名或单元格地址 B5）；三参见下"""
     str_args = _extract_string_args(args, ctx, trace)
     wp_code = str_args[0] if str_args else ''
-    col_name = str_args[1] if len(str_args) > 1 else ctx.default_column
     wp_data = ctx.wp_data.get(wp_code, {})
+    if len(str_args) > 2:  # WP('底稿','表','锚点')：预载层 _load_wp 按「表!锚点」存值；取不到报错不代 0（原先读成列名「表」恒 0）
+        key = f"{str_args[1].strip()}!{str_args[2].strip()}"
+        if key not in wp_data:
+            raise FormulaColumnError(f"WP('{wp_code}','{str_args[1]}','{str_args[2]}')：锚点未对齐或底稿未录入，取不到数")
+        trace.append(f"WP('{wp_code}','{key}') = {wp_data[key]}")
+        return wp_data[key]
+    col_name = str_args[1] if len(str_args) > 1 else ctx.default_column
     col = (col_name or "").strip()
     if re.match(r"^[A-Z]+\d+$", col, re.IGNORECASE):
-        cell_up = col.upper()
-        val = wp_data.get(cell_up, wp_data.get(col_name, Decimal("0")))
+        val = wp_data.get(col.upper(), wp_data.get(col_name, Decimal("0")))
     else:
         val = wp_data.get(col_name, Decimal("0"))
     trace.append(f"WP('{wp_code}','{col_name}') = {val}")
@@ -1040,30 +1045,30 @@ _REGISTRY.register("IF", _handle_if, arity=3, description="条件判断", syntax
 
 # ── 底稿预填充函数（L1 handler 从 ctx 新字段取值） ──
 # spec: formula-execution-path-convergence Phase 1 · Task 7
-# preloader 已按 key 格式批量查好 DB 数据并填入 FormulaContext 的扩展字段。
+# preloader 已按 key 格式批量查好 DB 数据并填入 FormulaContext 的扩展字段；序时账三个函数的键预载层没取
+# （方向 / 期间 / 金额条件无法识别、写法不对、本求值路径不取序时账）⇒ 报错不代 0（formula-fetch-followup 6.5）。
 
 
 def _handle_ledger(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """LEDGER('科目','方向','范围') — 序时账取数。"""
+    """LEDGER('科目','方向','范围') — 序时账发生额；方向只认 debit / credit / 借 / 贷。"""
     str_args = _extract_string_args(args, ctx, trace)
-    code = str_args[0] if str_args else ""
-    direction = str_args[1] if len(str_args) > 1 else "debit"
-    period = str_args[2] if len(str_args) > 2 else "全年"
+    code, direction, period = (str_args + ["", "debit", "全年"][len(str_args):])[:3]
     key = f"{code}:{direction}:{period}"
-    val = ctx.ledger_data.get(key, Decimal("0"))
+    if key not in ctx.ledger_data:
+        raise FormulaColumnError(f"LEDGER('{code}','{direction}','{period}')：未取数（方向 / 期间无法识别，或本路径不取序时账）")
+    val = ctx.ledger_data[key]
     trace.append(f"LEDGER('{code}','{direction}','{period}') = {val}")
     return val
 
 
 def _handle_ledger_detail(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """LEDGER_DETAIL('科目','月份','阈值') — 序时账明细，返回行数。"""
+    """LEDGER_DETAIL('科目','月份','金额条件') — 符合条件的序时账笔数（明细行在 ``ctx.ledger_detail_data``）。"""
     str_args = _extract_string_args(args, ctx, trace)
-    code = str_args[0] if str_args else ""
-    period = str_args[1] if len(str_args) > 1 else "全年"
-    amount_filter = str_args[2] if len(str_args) > 2 else "*"
+    code, period, amount_filter = (str_args + ["", "全年", "*"][len(str_args):])[:3]
     key = f"{code}:{period}:{amount_filter}"
-    rows = ctx.ledger_detail_data.get(key, [])
-    val = Decimal(str(len(rows)))
+    if key not in ctx.ledger_detail_data:
+        raise FormulaColumnError(f"LEDGER_DETAIL('{code}','{period}','{amount_filter}')：未取数（期间 / 金额条件无法识别、明细超过上限，或本路径不取序时账）")
+    val = Decimal(len(ctx.ledger_detail_data[key]))
     trace.append(f"LEDGER_DETAIL('{code}','{period}','{amount_filter}') = {val}")
     return val
 
@@ -1083,20 +1088,19 @@ def _handle_tb_aux(args: list[Any], ctx: FormulaContext, trace: list[str]) -> De
 def _handle_count_ledger(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
     """COUNT_LEDGER('科目','范围') — 序时账笔数。"""
     str_args = _extract_string_args(args, ctx, trace)
-    code = str_args[0] if str_args else ""
-    period = str_args[1] if len(str_args) > 1 else "全年"
+    code, period = (str_args + ["", "全年"][len(str_args):])[:2]
     key = f"{code}:{period}"
-    val = Decimal(str(ctx.ledger_count_data.get(key, 0)))
+    if key not in ctx.ledger_count_data:
+        raise FormulaColumnError(f"COUNT_LEDGER('{code}','{period}')：未取数（期间无法识别，或本路径不取序时账）")
+    val = Decimal(ctx.ledger_count_data[key])
     trace.append(f"COUNT_LEDGER('{code}','{period}') = {val}")
     return val
-
-
 
 
 _REGISTRY.register("LEDGER", _handle_ledger, arity=3, description="序时账取数", syntax="LEDGER('科目','方向','范围')", category="底稿取数")
 _REGISTRY.register("LEDGER_DETAIL", _handle_ledger_detail, arity=3, description="序时账明细筛选", syntax="LEDGER_DETAIL('科目','月份','阈值')", category="底稿取数")
 _REGISTRY.register("TB_AUX", _handle_tb_aux, arity=3, description="辅助维度汇总", syntax="TB_AUX('科目','维度','列名')", category="底稿取数")
-_REGISTRY.register("COUNT_LEDGER", _handle_count_ledger, arity=3, description="序时账笔数统计", syntax="COUNT_LEDGER('科目','方向','范围')", category="底稿取数")
+_REGISTRY.register("COUNT_LEDGER", _handle_count_ledger, arity=2, description="序时账笔数统计", syntax="COUNT_LEDGER('科目','范围')", category="底稿取数")
 _REGISTRY.register("PLACEHOLDER", lambda a, c, t: Decimal("0"), arity=0, description="预留占位", syntax="PLACEHOLDER()", category="底稿取数")
 
 
@@ -1284,7 +1288,7 @@ def _execute_ast(formula: str, ctx: FormulaContext) -> FormulaResult:
         # 列名未注册（配置错）—— 必须与「求值崩溃」区分，且**禁**静默回退期末余额。
         # 捕获位置在兜底 `except Exception` **之前**，否则会被归成「AST 求值失败」。
         result.errors.append(str(e))
-        logger.warning("TB column unregistered: %s (formula=%s)", e, formula)
+        logger.warning("Formula fetch error (column / data not available): %s (formula=%s)", e, formula)
     except Exception as e:
         result.errors.append(f"AST 求值失败: {e}")
         logger.warning("AST eval error: %s (formula=%s)", e, formula)

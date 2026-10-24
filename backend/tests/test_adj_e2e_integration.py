@@ -229,8 +229,9 @@ class TestAdjE2EIntegration:
 
     @pytest.mark.asyncio
     async def test_formula_resolver_returns_value(self, e2e_db):
-        """ADJ() 公式 resolver 对已 approved 分录返回非零值。"""
-        from app.services.prefill_engine import _resolve_adj_formula
+        """ADJ() 公式对已 approved 分录返回非零值（经现行入口 resolve_extended_formula，内部「预载 → L1」；
+        原对象 prefill_engine._resolve_adj_formula 已随 2638b32fd 删除，formula-fetch-followup 6.5 改写）。"""
+        from app.services.prefill_engine import resolve_extended_formula
 
         async with e2e_db() as db:
             await _seed_adj(
@@ -240,9 +241,7 @@ class TestAdjE2EIntegration:
                 credit=Decimal("0"),
             )
 
-            result = await _resolve_adj_formula(
-                db, _PROJECT_ID, _YEAR, ["1122", "aje_net"]
-            )
+            result = await resolve_extended_formula(db, _PROJECT_ID, _YEAR, "ADJ", "'1122','aje_net'")
 
             assert result is not None
             assert result == Decimal("300"), f"期望 300，得到 {result}"
@@ -549,37 +548,35 @@ class TestPrefillActiveFilterArity:
     20+ 处）全部传 `__table__`，故本守卫的正确口径有充分对照。
     """
 
-    def test_prefill_engine_passes_table_not_orm_class(self):
-        """prefill_engine 内不得出现 `get_active_filter(db, TbXxx, ...)` 形态。"""
-        import re
+    #: 序时账 / 辅助维度取数在哪：2638b32fd 删旧 resolver 后由统一预载层承担（prefill_engine 已无此类调用）
+    _FILES = ("prefill_engine.py", "formula_preloader.py")
+
+    @classmethod
+    def _calls(cls) -> dict[str, list[str]]:
+        """AST：每个文件里 ``get_active_filter(db, X, ...)`` 的第二参写法（注释 / docstring 不算）。"""
+        import ast
         from pathlib import Path
 
-        fp = Path(__file__).resolve().parents[1] / "app" / "services" / "prefill_engine.py"
-        text = fp.read_text(encoding="utf-8")
+        out: dict[str, list[str]] = {}
+        for name in cls._FILES:
+            fp = Path(__file__).resolve().parents[1] / "app" / "services" / name
+            for node in ast.walk(ast.parse(fp.read_text(encoding="utf-8"))):
+                if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "get_active_filter" and len(node.args) > 1:
+                    out.setdefault(name, []).append(ast.unparse(node.args[1]))
+        return out
 
-        # 命中「第二参是 ORM 类名（无 .__table__）」的调用
-        offenders = re.findall(
-            r"get_active_filter\(\s*db,\s*(Tb\w+|TrialBalance)\s*,", text
-        )
-        assert not offenders, (
-            f"prefill_engine 有 {len(offenders)} 处 get_active_filter 传 ORM 类"
-            f"（必须传 .__table__，否则 AttributeError）: {sorted(set(offenders))}"
-        )
+    def test_prefill_engine_passes_table_not_orm_class(self):
+        """取数路径内不得出现 `get_active_filter(db, TbXxx, ...)` 形态（必须传 `.__table__`）。"""
+        offenders = {f: [a for a in args if not a.endswith(".__table__")] for f, args in self._calls().items()}
+        offenders = {f: a for f, a in offenders.items() if a}
+        assert not offenders, f"get_active_filter 传了 ORM 类（必须传 .__table__，否则 AttributeError）：{offenders}"
 
     def test_prefill_engine_has_table_calls(self):
-        """P12 非空转：确认文件里确实有 get_active_filter 调用（否则上一断言恒绿）。"""
-        import re
-        from pathlib import Path
-
-        fp = Path(__file__).resolve().parents[1] / "app" / "services" / "prefill_engine.py"
-        text = fp.read_text(encoding="utf-8")
-
-        correct = re.findall(r"get_active_filter\(\s*db,\s*\w+\.__table__\s*,", text)
-        assert len(correct) >= 5, (
-            f"prefill_engine 中 `.__table__` 形态的调用只有 {len(correct)} 处，"
-            "现算基线为 5 处（LEDGER/AUX/LEDGER_DETAIL/COUNT_LEDGER/TB_AUX）"
-            "—— 少于此数说明调用被删或改回 ORM 类写法"
-        )
+        """P12 非空转：预载层四个序时账 / 辅助维度取数分支都在（LEDGER / COUNT_LEDGER / LEDGER_DETAIL / TB_AUX），
+        否则上一断言恒绿。原判据数 prefill_engine 里的 5 处，那 5 处已随 2638b32fd 删除（formula-fetch-followup 6.5 改写）。"""
+        calls = self._calls().get("formula_preloader.py", [])
+        assert calls.count("TbLedger.__table__") >= 3 and "TbAuxBalance.__table__" in calls, (
+            f"预载层 `.__table__` 形态的 get_active_filter 调用：{calls}（应含 TbLedger ×3 + TbAuxBalance）")
 
     def test_scanner_detects_orm_class_form(self):
         """P12 双向变异：扫描器对已知坏形态必须命中。"""

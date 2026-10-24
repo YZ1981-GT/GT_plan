@@ -16,6 +16,10 @@ REPORT 时读本年度报表本期金额。``gaps`` 收集取数缺口，供严�
 PREV（spec formula-fetch-and-wp-generation-defect-closure R2）：两参 / ``PREV(TB(…))`` 读上年试算表，三参（上年同底稿）
 逐个预先求值进 ``prev_wp_data``、缺数原因进 ``prev_wp_missing``（L1 据此报错、不按 0）；两者的上年来源都是
 ``prior_year_context``（同项目上年 → 上年项目）。
+
+三参 WP 与序时账（spec formula-fetch-followup-defect-closure 6.5）：三参 ``WP('底稿','表','锚点')`` 按「表!锚点」存值
+（原先只按锚点存、L1 按第二参「表」取 ⇒ 已对齐的锚点也恒为 0）；LEDGER / COUNT_LEDGER / LEDGER_DETAIL 的方向、期间、
+金额条件无法识别时不取数（原先按贷方 / 全年 / 不过滤取，给的是错数），L1 对没取的键报错。
 """
 from __future__ import annotations
 
@@ -56,8 +60,11 @@ _ADJ_RE = re.compile(r"ADJ\(\s*'([^']+)'")
 _REPORT_REF_RE = re.compile(r"(?<![A-Za-z0-9_])(?:ROW|SUM_ROW|REPORT)\s*\(")
 _WP_RE = re.compile(r"WP\(\s*'([^']+)'\s*,\s*'([^']+)'(?:\s*,\s*'([^']+)')?\s*\)")
 _NOTE_RE = re.compile(r"NOTE\(\s*'([^']+)'\s*,\s*'([^']+)'(?:\s*,\s*'([^']+)')?\s*\)")
-_LEDGER_RE = re.compile(r"(?:COUNT_)?LEDGER\(\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)")
-_LEDGER_DETAIL_RE = re.compile(r"LEDGER_DETAIL\(\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)")
+#: LEDGER('科目','方向'[,'范围'])；前面紧挨字母 / 下划线的（COUNT_LEDGER）不算
+_LEDGER_RE = re.compile(r"(?<![A-Za-z0-9_])LEDGER\(\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)")
+#: COUNT_LEDGER('科目'[,'范围'])：原先混在 LEDGER 里扫，第二参被当成方向、期间恒按全年 ⇒ 非全年的笔数恒取不到
+_COUNT_LEDGER_RE = re.compile(r"COUNT_LEDGER\(\s*'([^']+)'\s*(?:,\s*'([^']+)'\s*)?\)")
+_LEDGER_DETAIL_RE = re.compile(r"LEDGER_DETAIL\(\s*'([^']+)'\s*(?:,\s*'([^']+)'\s*)?(?:,\s*'([^']+)'\s*)?\)")
 _TB_AUX_RE = re.compile(r"TB_AUX\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)")
 
 
@@ -73,6 +80,7 @@ def _scan_refs(formulas: list[str]) -> dict[str, set]:
         "prev_codes": set(),        # PREV 两参 / PREV(TB(…)) 的科目（上年试算表）
         "prev_wp_refs": set(),      # PREV 三参 (底稿, 表, 字段)（上年同底稿取数）
         "ledger_specs": set(),       # (account, direction, period)
+        "ledger_count_specs": set(),   # (account, period)
         "ledger_detail_specs": set(),  # (account, period, amount_filter)
         "tb_aux_specs": set(),       # (account, aux_type, column)
     }
@@ -96,6 +104,8 @@ def _scan_refs(formulas: list[str]) -> dict[str, set]:
             refs["prev_wp_refs"].add((m.group(1).strip(), m.group(2).strip(), m.group(3).strip()))
         for m in _LEDGER_RE.finditer(t):
             refs["ledger_specs"].add((m.group(1), m.group(2), m.group(3) or "全年"))
+        for m in _COUNT_LEDGER_RE.finditer(t):
+            refs["ledger_count_specs"].add((m.group(1), m.group(2) or "全年"))
         for m in _LEDGER_DETAIL_RE.finditer(t):
             refs["ledger_detail_specs"].add((m.group(1), m.group(2) or "全年", m.group(3) or "*"))
         for m in _TB_AUX_RE.finditer(t):
@@ -244,24 +254,65 @@ async def _load_report_rows(db: AsyncSession, project_id: uuid.UUID, year: int,
     return {code: Decimal(str(current)) for code, (current, _prior) in rows.items() if current is not None}
 
 
+#: 序时账方向：只认这两组写法（原先其余一律按贷方取，`LEDGER('1403','期末数量')` 得到的是贷方发生额）
+_DEBIT_WORDS = frozenset({"debit", "借"})
+_CREDIT_WORDS = frozenset({"credit", "贷"})
+#: LEDGER_DETAIL 明细行上限：超过就不取（L1 按行数给值，截断后的行数是错数）
+LEDGER_DETAIL_LIMIT = 200
+_AMOUNT_FILTER_RE = re.compile(r"^(>=|<=|>|<|==|=)\s*(-?\d+(?:\.\d+)?)$")
+
+
+def _period_clause(column: Any, period: str) -> tuple[bool, Any]:
+    """期间 →（能识别, 条件）：全年无条件；「3月」「1-6月」「7~12月」「3」；无法识别 / 月份越界 ⇒ (False, None)。
+
+    原先无法识别的期间不加条件、按全年取（错数）。"""
+    from app.services.prefill_engine import _parse_period_range
+
+    start, end = _parse_period_range(period)
+    if start is None or end is None or not 1 <= start <= end <= 12:
+        return False, None
+    return True, (None if (start, end) == (1, 12) else column.between(start, end))
+
+
+def _amount_clause(table: Any, amount_filter: str) -> Any:
+    """金额条件 → 条件（借方或贷方任一侧成立即命中，与原 prefill 实现同口径）；``*`` / 空 ⇒ None；无法识别 ⇒ False。"""
+    text = (amount_filter or "").strip()
+    if text in ("", "*"):
+        return None
+    m = _AMOUNT_FILTER_RE.match(text)
+    if m is None:
+        return False
+    op, threshold = ("==" if m.group(1) == "=" else m.group(1)), Decimal(m.group(2))
+    compare = {">=": lambda c: c >= threshold, "<=": lambda c: c <= threshold, ">": lambda c: c > threshold,
+               "<": lambda c: c < threshold, "==": lambda c: c == threshold}[op]
+    return sa.or_(compare(table.debit_amount), compare(table.credit_amount))
+
+
+def _account_clause(column: Any, code: str) -> Any:
+    """科目：含 ``%`` 按 LIKE（与原 COUNT_LEDGER / LEDGER_DETAIL 实现同口径），否则精确匹配。"""
+    return column.like(code) if "%" in code else column == code
+
+
 async def _load_ledger(db: AsyncSession, project_id: uuid.UUID, year: int,
                        specs: set[tuple]) -> dict[str, Decimal]:
-    """从 tb_ledger 批量取发生额。key = "{code}:{direction}:{period}"。"""
+    """从 tb_ledger 批量取发生额。key = "{code}:{direction}:{period}"；方向 / 期间无法识别的不取（L1 报错）。"""
     if not specs:
         return {}
     from app.models.audit_platform_models import TbLedger
     from app.services.dataset_query import get_active_filter
-    from app.services.prefill_engine import _parse_period_range
 
     active_filter = await get_active_filter(db, TbLedger.__table__, project_id, year)
     out: dict[str, Decimal] = {}
-    for code, direction, period in specs:
-        col = TbLedger.debit_amount if direction.lower() in ("debit", "借") else TbLedger.credit_amount
-        q = sa.select(sa.func.coalesce(sa.func.sum(col), 0)).where(
-            active_filter, TbLedger.account_code == code)
-        start_p, end_p = _parse_period_range(period)
-        if start_p is not None and end_p is not None and (start_p, end_p) != (1, 12):
-            q = q.where(TbLedger.accounting_period.between(start_p, end_p))
+    for code, direction, period in sorted(specs):
+        word = direction.strip().lower()
+        col = TbLedger.debit_amount if word in _DEBIT_WORDS else TbLedger.credit_amount if word in _CREDIT_WORDS else None
+        ok, clause = _period_clause(TbLedger.accounting_period, period)
+        if col is None or not ok:
+            logger.warning("preloader: LEDGER('%s','%s','%s') 方向或期间无法识别，不取数", code, direction, period)
+            continue
+        q = sa.select(sa.func.coalesce(sa.func.sum(col), 0)).where(active_filter, TbLedger.account_code == code)
+        if clause is not None:
+            q = q.where(clause)
         val = (await db.execute(q)).scalar()
         out[f"{code}:{direction}:{period}"] = _safe_decimal(val)
     return out
@@ -269,25 +320,68 @@ async def _load_ledger(db: AsyncSession, project_id: uuid.UUID, year: int,
 
 async def _load_ledger_count(db: AsyncSession, project_id: uuid.UUID, year: int,
                              specs: set[tuple]) -> dict[str, int]:
-    """从 tb_ledger 取笔数。key = "{code}:{period}"。"""
+    """从 tb_ledger 取笔数。key = "{code}:{period}"（``COUNT_LEDGER('科目','范围')``）；期间无法识别的不取。"""
     if not specs:
         return {}
     from app.models.audit_platform_models import TbLedger
     from app.services.dataset_query import get_active_filter
-    from app.services.prefill_engine import _parse_period_range
 
     active_filter = await get_active_filter(db, TbLedger.__table__, project_id, year)
     out: dict[str, int] = {}
-    # Deduplicate: ledger_specs has (code, direction, period), extract (code, period)
-    code_periods = {(code, period) for code, _d, period in specs}
-    for code, period in code_periods:
+    for code, period in sorted(specs):
+        ok, clause = _period_clause(TbLedger.accounting_period, period)
+        if not ok:
+            logger.warning("preloader: COUNT_LEDGER('%s','%s') 期间无法识别，不取数", code, period)
+            continue
         q = sa.select(sa.func.count()).select_from(TbLedger).where(
-            active_filter, TbLedger.account_code == code)
-        start_p, end_p = _parse_period_range(period)
-        if start_p is not None and end_p is not None and (start_p, end_p) != (1, 12):
-            q = q.where(TbLedger.accounting_period.between(start_p, end_p))
+            active_filter, _account_clause(TbLedger.account_code, code))
+        if clause is not None:
+            q = q.where(clause)
         val = (await db.execute(q)).scalar()
         out[f"{code}:{period}"] = int(val or 0)
+    return out
+
+
+async def _load_ledger_detail(db: AsyncSession, project_id: uuid.UUID, year: int,
+                              specs: set[tuple]) -> dict[str, list[dict[str, Any]]]:
+    """LEDGER_DETAIL 明细行。key = "{code}:{period}:{amount_filter}" → 按凭证日期 / 凭证号排序的明细。
+
+    L1 按行数给值（spec formula-execution-path-convergence R2.2）；原先预载层从不取这份数据 ⇒ 恒为 0 笔。
+    期间 / 金额条件无法识别、符合条件超过 :data:`LEDGER_DETAIL_LIMIT` 行 ⇒ 不存这个键（L1 报错，不给截断后的行数）。
+    """
+    if not specs:
+        return {}
+    from app.models.audit_platform_models import TbLedger
+    from app.services.dataset_query import get_active_filter
+
+    active_filter = await get_active_filter(db, TbLedger.__table__, project_id, year)
+    out: dict[str, list[dict[str, Any]]] = {}
+    for code, period, amount_filter in sorted(specs):
+        ok, period_cond = _period_clause(TbLedger.accounting_period, period)
+        amount_cond = _amount_clause(TbLedger, amount_filter)
+        if not ok or amount_cond is False:
+            logger.warning("preloader: LEDGER_DETAIL('%s','%s','%s') 期间或金额条件无法识别，不取数",
+                           code, period, amount_filter)
+            continue
+        q = sa.select(TbLedger.voucher_date, TbLedger.voucher_no, TbLedger.summary, TbLedger.debit_amount,
+                      TbLedger.credit_amount, TbLedger.counterpart_account, TbLedger.account_code,
+                      TbLedger.account_name).where(active_filter, _account_clause(TbLedger.account_code, code))
+        for cond in (period_cond, amount_cond):
+            if cond is not None:
+                q = q.where(cond)
+        q = q.order_by(TbLedger.voucher_date.asc(), TbLedger.voucher_no.asc()).limit(LEDGER_DETAIL_LIMIT + 1)
+        rows = (await db.execute(q)).all()
+        if len(rows) > LEDGER_DETAIL_LIMIT:
+            logger.warning("preloader: LEDGER_DETAIL('%s','%s','%s') 符合条件超过 %d 行，不取数",
+                           code, period, amount_filter, LEDGER_DETAIL_LIMIT)
+            continue
+        out[f"{code}:{period}:{amount_filter}"] = [{
+            "voucher_date": r.voucher_date.isoformat() if r.voucher_date else None,
+            "voucher_no": r.voucher_no, "summary": r.summary or "",
+            "debit_amount": str(_safe_decimal(r.debit_amount)), "credit_amount": str(_safe_decimal(r.credit_amount)),
+            "counterpart_account": r.counterpart_account or "", "account_code": r.account_code,
+            "account_name": r.account_name or "",
+        } for r in rows]
     return out
 
 
@@ -340,8 +434,9 @@ async def _load_wp(db: AsyncSession, project_id: uuid.UUID, year: int,
         except Exception:  # noqa: BLE001 —— fail-soft，但不得静默
             logger.warning("preloader: WP 取值失败 WP('%s','%s','%s')", wp_code, sheet, cell, exc_info=True)
             continue
-        if res.value is not None:
-            out.setdefault(wp_code, {})[cell or sheet] = _safe_decimal(res.value)
+        if res.value is not None:  # 三参按「表!锚点」存（L1 _handle_wp 同一写法取）；两参按列名
+            key = f"{sheet.strip()}!{cell.strip()}" if len(ref_tuple) > 2 else (cell or sheet)
+            out.setdefault(wp_code, {})[key] = _safe_decimal(res.value)
     return out
 
 
@@ -517,7 +612,8 @@ async def preload(
     wp_data = await _load_wp(db, project_id, year, refs["wp_refs"])
     note_data = await _load_note(db, project_id, year, refs["note_refs"], template_type)
     ledger_data = await _load_ledger(db, project_id, year, refs["ledger_specs"])
-    ledger_count = await _load_ledger_count(db, project_id, year, refs["ledger_specs"])
+    ledger_count = await _load_ledger_count(db, project_id, year, refs["ledger_count_specs"])
+    ledger_detail = await _load_ledger_detail(db, project_id, year, refs["ledger_detail_specs"])
     tb_aux_data = await _load_tb_aux(db, project_id, year, refs["tb_aux_specs"])
 
     prior_tb_data, prev_wp_data, prev_wp_missing = await _load_prev(db, project_id, year, refs, gaps,
@@ -534,7 +630,7 @@ async def preload(
         aux_data=aux_data,
         adj_data=adj_data,
         ledger_data=ledger_data,
-        ledger_detail_data={},  # Phase 2 实装 LEDGER_DETAIL 明细查询
+        ledger_detail_data=ledger_detail,
         ledger_count_data=ledger_count,
         tb_aux_data=tb_aux_data,
     )

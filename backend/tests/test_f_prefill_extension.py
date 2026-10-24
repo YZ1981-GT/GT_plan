@@ -109,21 +109,35 @@ def test_all_cells_have_formula_and_description(prefill_data):
 
 
 def test_f22_master_sheet_uses_aux_or_tb(prefill_data):
-    """ADR-F2 铁律：F2-2 明细汇总表（中间 sheet）必须使用 =TB / =AUX / =LEDGER 直接取数
+    """ADR-F2 的本意：F2-2 明细汇总表是 F2-1 审定表（487 个跨表公式）的数据源，不得形成循环引用。
 
-    F2-2 是 F2-1 审定表 487 cross_sheet 公式的数据源；
-    禁止在 F2-2 用 =WP（避免循环引用）。
+    原判据「F2-2 一律不许用 =WP」已被 5783c4ffe（存货四表库科目映射结构性修复，``fix_f2_prefill_presets.py``
+    「删 31 条写死映射改区间 + WP 联动」）有意推翻：F2-2 各存货类别的期初 / 期末余额改由 F2-3 起的分类明细表合计联动
+    （分类由明细表本身承载、不猜科目码），本用例自那时起红（formula-fetch-followup-defect-closure 6.5 改写）。
+    现断言真正要防的：F2-2 的 WP 不指向自己与下游 F2-1，且映射表里的 WP 联动没有绕回 F2-2 的环。
     """
-    f_entries = _f_entries(prefill_data)
-    f22 = [m for m in f_entries if "明细汇总表F2-2" in m.get("sheet", "")]
-    assert f22, "F2-2 明细汇总表 prefill mapping not found"
-    forbidden_in_master = {"WP"}
-    bad = []
-    for m in f22:
+    import re
+
+    wp_call = re.compile(r"WP\(\s*'([^']+)'\s*,\s*'([^']+)'")
+    edges: dict[tuple[str, str], set[tuple[str, str]]] = {}
+    for m in prefill_data["mappings"]:
+        node = (m["wp_code"], m.get("sheet", "").strip())
         for cell in m.get("cells", []):
-            if cell.get("formula_type") in forbidden_in_master:
-                bad.append((m["sheet"], cell.get("cell_ref"), cell.get("formula_type")))
-    assert not bad, f"F2-2 中间 sheet 不应用 =WP（违反 ADR-F2）: {bad}"
+            for code, sheet in wp_call.findall(str(cell.get("formula") or "")):
+                edges.setdefault(node, set()).add((code, sheet.strip()))
+    f22 = [n for n in edges if n[0] == "F2" and "明细汇总表F2-2" in n[1]]
+    assert f22, "F2-2 明细汇总表没有 WP 联动（若改回直接取数，本用例应改回原判据）"
+    targets = edges[f22[0]]
+    bad = sorted(t for t in targets if re.search(r"F2-[12](?!\d)", t[1]))  # F2-10 ~ F2-13 是分类明细表，不算
+    assert not bad, f"F2-2 的 WP 指向自己或下游审定表 F2-1（循环引用）：{bad}"
+    # 从 F2-2 出发沿 WP 联动走，不得回到 F2-2
+    seen, stack = set(), list(targets)
+    while stack:
+        node = stack.pop()
+        assert node != f22[0], "映射表 WP 联动从 F2-2 出发又回到 F2-2（循环引用）"
+        if node not in seen:
+            seen.add(node)
+            stack.extend(edges.get(node, ()))
 
 
 def test_valuation_sheets_use_ledger_detail(prefill_data):

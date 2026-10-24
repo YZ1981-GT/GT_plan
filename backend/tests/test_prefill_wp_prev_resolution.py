@@ -170,6 +170,8 @@ class _Snapshot:
     probe_year: int = 0
     d_wp_count: int = 0
     wp_results: dict[tuple[str, str, str], object] = field(default_factory=dict)
+    #: 同一 probe 经「预载 + L1」求值：(ok, 值, 错误)
+    wp_l1_results: dict[tuple[str, str, str], tuple[bool, object, list]] = field(default_factory=dict)
     #: 三参 PREV：(值, 原因)
     prev_results: dict[tuple[str, str, str], tuple[object, str]] = field(default_factory=dict)
     #: 上年数据来源：(项目, 原因)
@@ -200,7 +202,8 @@ _PROBE_PROJECT_SQL = """
 
 
 async def _probe(db, snap: _Snapshot) -> None:
-    from app.services.formula_preloader import _load_wp
+    from app.services.formula_engine import execute
+    from app.services.formula_preloader import _load_wp, preload
     from app.services.prefill_anchor_map import ANCHOR_MAP, read_anchor_value
     from app.services.prev_wp_field import PriorWpFieldResolver
     from app.services.sampling_registry_service import resolve_project_year
@@ -213,8 +216,12 @@ async def _probe(db, snap: _Snapshot) -> None:
     snap.probe_project_id, snap.d_wp_count = prow[0], int(prow[1] or 0)
     pid = UUID(snap.probe_project_id)
     snap.probe_year = int(await resolve_project_year(db, pid) or 0)  # 取不到年度不猜今年（原写 COALESCE(…, 2025)）
-    for args in _WP_PROBES:
-        snap.wp_results[args] = (await _load_wp(db, pid, snap.probe_year, {args})).get(args[0], {}).get(args[2])
+    for args in _WP_PROBES:  # 三参按「表!锚点」存（L1 _handle_wp 同一写法取）
+        loaded = await _load_wp(db, pid, snap.probe_year, {args})
+        snap.wp_results[args] = loaded.get(args[0], {}).get(f"{args[1]}!{args[2]}")
+        formula = "WP('{}','{}','{}')".format(*args)
+        result = execute(formula, await preload(db, pid, snap.probe_year, [formula]))
+        snap.wp_l1_results[args] = (result.ok, result.value, list(result.errors))
     snap.short_wp_result = (await _load_wp(db, pid, snap.probe_year, {("D1", "审定表D1-1")})).get("D1")
     resolver = PriorWpFieldResolver(db, pid, snap.probe_year)
     source = await resolver.source()
@@ -347,6 +354,19 @@ class TestResolverCharacterization:
             f"全部已对齐锚点都取不到数（探针项目 {snap.probe_project_id}）：{aligned}\n"
             "排查：verify_prefill_wp_prev_live.py 看六态分布；全 NO_ITEM = 未编制（换项目，不改断言）；"
             "ERROR = 取值层 SQL 有缺陷（曾把 checklist_responses.wp_id 写成 workpaper_id）。")
+
+    def test_three_arg_wp_through_l1_equals_anchor_value(self, snap: _Snapshot) -> None:
+        """预填路径「预载 + L1」求值三参 WP = 锚点读到的值；锚点取不到 ⇒ L1 报错（不代 0）。
+
+        原先 L1 只取两个实参、把第二参（表名）当列名取，而预载层按锚点存值 ⇒ 已对齐、已录入的锚点也恒为 0、ok=True
+        （formula-fetch-followup-defect-closure 6.5）。"""
+        assert snap.wp_l1_results, "WP probe 一条都没经 L1 求值，断言空转"
+        for args, (ok, value, errors) in snap.wp_l1_results.items():
+            loaded = snap.wp_results[args]
+            if loaded is None:
+                assert not ok and errors, f"{args} 锚点取不到，L1 却给了值 {value!r}"
+            else:
+                assert ok and value == loaded, f"{args}：L1 求值 {value!r} ≠ 锚点值 {loaded!r}（{errors}）"
 
     def test_unaligned_wp_anchors_stay_none(self, snap: _Snapshot) -> None:
         """待对齐锚点（前端派生列，不落库）必须仍为空：在后端复刻前端派生公式即双真源。"""

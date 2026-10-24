@@ -13,8 +13,10 @@ spec: formula-management-runtime-closure Task 17
 
 1. ``_REGISTRY`` 函数键集（Property 21）—— 少一个函数意味着某类公式全部失效；
    多一个意味着有人在没走 spec 的情况下扩了 DSL。
-2. ``prefill_engine._FORMULA_RESOLVERS`` 键集（Property 21）—— 与上同理，
-   且它是 **另一套**寻址空间（memory 已记 ``WP`` 在两个引擎各有一份实现）。
+2. 原 ``prefill_engine._FORMULA_RESOLVERS`` 的 9 个函数（Property 21）—— 预填收敛到「预载 + L1」后
+   （formula-execution-path-convergence）这 9 个全部并入 ``_REGISTRY``，``_FORMULA_RESOLVERS`` 随 ``2638b32fd`` 删除；
+   现钉「原 prefill 寻址空间的函数一个不少地在 L1 里」（formula-fetch-followup-defect-closure 6.5 改写，
+   此前本组 4 例自收敛起一直红：基线仍是收敛前的 14 键）。
 3. ``COLUMN_ALIASES`` 的**原 8 键映射目标逐字不变**（Property 22）——
    新增键可以有（本 spec 就加了 6 个），但既有 8 键的目标一旦改动就是数字级回归。
 
@@ -22,8 +24,8 @@ spec: formula-management-runtime-closure Task 17
 - 基线用 ``frozenset`` / ``dict`` 字面量**显式写死**，不从被测模块反向派生
   （从被测模块派生等于自证，改了也不会红）。
 - 每条都配**反向自检**，证明断言不是空转。
-- ``_REGISTRY`` 实测 **14 键**（spec tasks.md 写的 15 是记载偏差，已在 Notes 更正）；
-  HEAD 版与工作树版逐个比对确认本 spec 未增删函数。
+- ``_REGISTRY`` 2026-08-07 实测 **14 键**（spec tasks.md 写的 15 是记载偏差，已在 Notes 更正）；
+  预填并入 L1 后为 **20 键**（2026-10-24 现读，见下方基线常量的说明）。
 """
 from __future__ import annotations
 
@@ -36,17 +38,22 @@ import pytest
 
 #: ``formula_engine._REGISTRY`` 的函数键集。
 #:
-#: 🔴 实测 **14 个**（2026-08-07，HEAD 与工作树一致）。
-#: spec tasks.md 写「15 个」属记载偏差 —— 按 15 写断言会立刻假红，
-#: 而假红的正确处置是核实真值而不是往 registry 里塞一个函数。
+#: 🔴 2026-08-07 实测 14 个；formula-execution-path-convergence Phase 1 Task 7 把预填的 6 个函数并入 L1
+#: （ADJ 归「取数」，LEDGER / LEDGER_DETAIL / TB_AUX / COUNT_LEDGER / PLACEHOLDER 归「底稿取数」）而本基线未同步 ——
+#: 2026-10-24 现读注册语句逐个核对为 20 个（与 ``formula_settings/test_unified_registry`` 的 20 一致）。
 BASELINE_REGISTRY_FUNCTIONS = frozenset(
     {
         "ABS",
+        "ADJ",
         "AUX",
+        "COUNT_LEDGER",
         "IF",
+        "LEDGER",
+        "LEDGER_DETAIL",
         "MAX",
         "MIN",
         "NOTE",
+        "PLACEHOLDER",
         "PREV",
         "REPORT",
         "ROUND",
@@ -54,14 +61,14 @@ BASELINE_REGISTRY_FUNCTIONS = frozenset(
         "SUM_ROW",
         "SUM_TB",
         "TB",
+        "TB_AUX",
         "WP",
     }
 )
 
-#: ``prefill_engine`` 的 resolver 键集（**另一套**寻址空间，与上表刻意不同）。
+#: 原 ``prefill_engine._FORMULA_RESOLVERS`` 的键集（收敛前的另一套寻址空间；现应全部在 L1 注册表里）。
 #:
-#: 两侧共有 ``AUX`` / ``NOTE`` / ``PREV`` / ``WP`` 四个名字，
-#: 但 ``WP`` 的两份实现语义不同（见 ``formula_wp_semantics.py`` 的登记）。
+#: ``WP`` 收敛后两条取数路径的数据来源仍不同（见 ``formula_wp_semantics.py`` 的登记）。
 BASELINE_PREFILL_RESOLVERS = frozenset(
     {
         "ADJ",
@@ -139,7 +146,7 @@ def _builtin_function_names() -> frozenset[str]:
 
 
 class TestRegistryUnchanged:
-    """``_REGISTRY`` 与 ``_FORMULA_RESOLVERS`` 键集逐字不变。"""
+    """``_REGISTRY`` 键集逐字不变；原 prefill 寻址空间的函数全部并入 L1。"""
 
     def test_formula_engine_registry_keys(self):
         actual = _builtin_function_names()
@@ -192,9 +199,9 @@ class TestRegistryUnchanged:
             f"内置函数 {mislabeled} 的 category 被写成 '{CUSTOM_CATEGORY}' —— "
             "它们会从内置基线里消失，本守卫将永久空转"
         )
-        # 且内置函数的 category 取值域必须落在既有四类里
+        # 且内置函数的 category 取值域必须落在既有五类里（「底稿取数」= 并入 L1 的原预填函数）
         cats = {by_name[n] for n in BASELINE_REGISTRY_FUNCTIONS}
-        assert cats <= {"取数", "引用", "数学", "逻辑"}, f"内置 category 取值域变化：{cats}"
+        assert cats <= {"取数", "引用", "数学", "逻辑", "底稿取数"}, f"内置 category 取值域变化：{cats}"
 
     def test_registry_three_views_agree(self):
         """``_handlers`` / ``known_function_names`` / ``list_all`` 三视图一致。
@@ -211,28 +218,17 @@ class TestRegistryUnchanged:
         assert known == listed == handlers
 
     def test_prefill_engine_resolver_keys(self):
-        from app.services.prefill_engine import _FORMULA_RESOLVERS
-
-        actual = frozenset(_FORMULA_RESOLVERS.keys())
-        assert actual == BASELINE_PREFILL_RESOLVERS, (
-            "prefill_engine._FORMULA_RESOLVERS 键集变化："
-            f"missing={sorted(BASELINE_PREFILL_RESOLVERS - actual)} "
-            f"extra={sorted(actual - BASELINE_PREFILL_RESOLVERS)}"
-        )
-
-    def test_two_engines_share_only_four_names(self):
-        """两套寻址空间的交集恰为四个名字（防「统一成一套」的误重构）。
-
-        ``WP`` 在两侧实现语义不同（两参 vs 三参，见 ``formula_wp_semantics.py``），
-        故交集变大/变小都要先读那份登记。
-        """
+        """原 prefill 寻址空间的 9 个函数一个不少地在 L1 注册表里且有 handler（预填只剩这一个求值内核）。"""
         from app.services.formula_engine import _REGISTRY
-        from app.services.prefill_engine import _FORMULA_RESOLVERS
 
-        shared = frozenset(_REGISTRY.known_function_names()) & frozenset(
-            _FORMULA_RESOLVERS.keys()
-        )
-        assert shared == frozenset({"AUX", "NOTE", "PREV", "WP"})
+        missing = sorted(n for n in BASELINE_PREFILL_RESOLVERS if not callable(_REGISTRY.get(n)))
+        assert not missing, f"原 prefill 函数在 L1 里没有 handler：{missing} —— 预填里这类公式会被当成未注册函数拦截"
+
+    def test_prefill_resolver_table_is_gone(self):
+        """``_FORMULA_RESOLVERS`` 已删除：哪天有人恢复一套旁路解析器，「两套寻址空间」的登记与本基线都要重审。"""
+        from app.services import prefill_engine
+
+        assert not hasattr(prefill_engine, "_FORMULA_RESOLVERS")
 
     def test_selfcheck_baseline_not_derived_from_module(self):
         """反向自检：基线常量是写死的字面量，不是从模块反向派生。

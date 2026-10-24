@@ -111,6 +111,16 @@ async def _seed(db: AsyncSession) -> None:
 # ─── 欠账 1：需求 2.3 底稿域 prefill 路径 ───────────────────────────────────
 
 
+async def _prefill_adj(db_session) -> Decimal | None:
+    """底稿预填路径的 ADJ：``resolve_extended_formula``（用户公式预览）与 ``prefill_workpaper_real`` 同一预载口径。
+
+    formula-fetch-followup-defect-closure 6.5：原对象 ``prefill_engine._resolve_adj_formula`` 自 formula-execution-path-
+    convergence 起已无调用方、``2638b32fd`` 删除（本组 4 例因此红）；现经现行入口按值断言。"""
+    from app.services.prefill_engine import resolve_extended_formula
+
+    return await resolve_extended_formula(db_session, _PID, _YEAR, "ADJ", f"'{_CODE}','aje_net'")
+
+
 @pytest.mark.asyncio
 async def test_req23_prefill_adj_uses_workpaper_inclusive_caliber(db_session):
     """🔴 需求 2.3：底稿 prefill 的 `ADJ()` 口径 = 矩阵第 2 行（**不排除** origin）。
@@ -118,9 +128,7 @@ async def test_req23_prefill_adj_uses_workpaper_inclusive_caliber(db_session):
     值必须是 manual + workpaper = 13000。若得 10000 说明它被改成了
     第 4 行口径 —— 那违反「底稿域行为零变化」。
     """
-    from app.services.prefill_engine import _resolve_adj_formula
-
-    v = await _resolve_adj_formula(db_session, _PID, _YEAR, [_CODE, "aje_net"])
+    v = await _prefill_adj(db_session)
     assert v == _MANUAL + _WORKPAPER, (
         f"prefill 的 ADJ 得 {v}，期望 {_MANUAL + _WORKPAPER}（含 workpaper 来源）"
         f" —— 若为 {_MANUAL} 则口径被改成了排除 workpaper，违反需求 2.3"
@@ -154,9 +162,8 @@ async def test_two_calibers_differ_by_exactly_the_workpaper_entry(db_session):
     from app.services.formula_management.adjudication_writeback import (
         AdjudicationWritebackService,
     )
-    from app.services.prefill_engine import _resolve_adj_formula
 
-    wp_inclusive = await _resolve_adj_formula(db_session, _PID, _YEAR, [_CODE, "aje_net"])
+    wp_inclusive = await _prefill_adj(db_session)
     ctx = await AdjudicationWritebackService(db_session).build_context(_PID, _YEAR)
     wp_exclusive = execute(f"ADJ('{_CODE}','aje_net')", ctx).value
 
@@ -165,26 +172,38 @@ async def test_two_calibers_differ_by_exactly_the_workpaper_entry(db_session):
     )
 
 
-def test_prefill_adj_resolver_is_still_registered():
-    """prefill 的 ADJ 解析器必须仍在注册表里（需求 2.3「路径不动」）。"""
-    from app.services.prefill_engine import (
-        _FORMULA_RESOLVERS,
-        _resolve_adj_formula,
-    )
+def test_prefill_adj_paths_pass_workpaper_inclusive_caliber():
+    """需求 2.3「路径不动」：底稿预填的两个入口调预载层时都显式传 ``adj_exclude_origins=frozenset()``（AST 判定），
+    且 L1 的 ADJ 仍由 ``_handle_adj`` 求值（原判据「``_FORMULA_RESOLVERS['ADJ']`` 是 prefill 解析器」随 2638b32fd 失效）。"""
+    import ast
+    from pathlib import Path
 
-    assert _FORMULA_RESOLVERS.get("ADJ") is _resolve_adj_formula, (
-        "prefill 的 ADJ 解析器被替换/摘除 —— 违反需求 2.3"
-    )
+    from app.services.formula_engine import _REGISTRY, _handle_adj
+
+    assert _REGISTRY.get("ADJ") is _handle_adj, "L1 的 ADJ 被替换/摘除"
+    tree = ast.parse(Path(inspect.getsourcefile(_handle_adj)).with_name("prefill_engine.py").read_text(encoding="utf-8"))
+    callers: dict[str, list[str]] = {}
+    for fn in (n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef)):
+        for call in (c for c in ast.walk(fn) if isinstance(c, ast.Call) and getattr(c.func, "id", None) == "preload"):
+            kw = {k.arg: k.value for k in call.keywords}
+            value = kw.get("adj_exclude_origins")
+            ok = (isinstance(value, ast.Call) and getattr(value.func, "id", None) == "frozenset" and not value.args)
+            callers.setdefault(fn.name, []).append("frozenset()" if ok else ast.unparse(value) if value else "缺省")
+    assert set(callers) >= {"resolve_extended_formula", "prefill_workpaper_real"}, f"预填入口调预载层的位置变了：{callers}"
+    wrong = {k: v for k, v in callers.items() if any(x != "frozenset()" for x in v)}
+    assert not wrong, f"底稿预填口径不是「不排除 origin」：{wrong}"
 
 
 def test_prefill_adj_documents_the_dual_implementation():
-    """两套实现的存在必须写在 prefill 侧（否则读者只看到一半）。"""
-    from app.services.prefill_engine import _resolve_adj_formula
+    """两套口径的存在必须写在预填侧（否则读者只看到一半）：入口 docstring 与预载层模块说明都写明。"""
+    from app.services import formula_preloader
+    from app.services.prefill_engine import resolve_extended_formula
 
-    doc = _resolve_adj_formula.__doc__ or ""
-    assert "两套实现" in doc, "prefill 的 ADJ 未说明存在第二套实现"
-    assert "_handle_adj" in doc, "未指向 formula_engine 侧的实现"
-    assert "需求 2.3" in doc, "未说明为何本函数不得改口径"
+    doc = resolve_extended_formula.__doc__ or ""
+    assert "口径矩阵第 2 行" in doc and "第 4 行" in doc, "预填入口未说明两套 ADJ 口径"
+    assert "AdjudicationWritebackService" in doc, "未指向排除底稿来源的那一套"
+    module_doc = formula_preloader.__doc__ or ""
+    assert "底稿路径（不排 origin）" in module_doc and "报表路径（排 workpaper）" in module_doc
 
 
 # ─── 欠账 2：PRELOADED_COLUMN_KEYS 不再是死常量 ─────────────────────────────

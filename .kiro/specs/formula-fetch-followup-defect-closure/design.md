@@ -430,3 +430,44 @@ R1.5 的附注模板绑定未重生成（理由见 §10.3 第 19 条）。
   4. `routers/wp_prefill_preview.py` 两处项目无审计期末时 `year = 2025`；`four_table/occurrence_by_standard_code` 查询失败时 `db.rollback()`
      回滚整个事务（调用方未提交的改动一起丢），`_fetch_code_mapping` 用 `CAST(:pid AS uuid)` + `str(uuid)`（SQLite 上恒查不到）。
   5. 前端 251 处拿不到审计年度时用今年：另立 spec `audit-year-calendar-fallback-ratchet`（见任务 8）。
+
+### 10.10 6.5 同根陈旧测试改写与改写中发现的取数缺陷（2026-10-24）
+
+- **背景**：`2638b32fd` 删掉 `prefill_engine` 的旧解析器（`_FORMULA_RESOLVERS` / `_resolve_*_formula` / `_resolve_tb_aux`），它们自
+  formula-execution-path-convergence（`a8cbb1b45`）起就没有调用方，预填改走「预载 `formula_preloader` → L1 `formula_engine`」。以这些函数为对象的
+  10 个测试文件随之收集即错（3 个）或部分红（7 个共 30 例），一直没人处理。按现行路径重测时发现收敛时漏掉的 4 个取数缺陷，都是「给了错数或 0、且 ok」：
+  1. **三参 WP 恒为 0**：`_load_wp` 按锚点存值，L1 `_handle_wp` 只取两个实参、把第二参（表名）当列名取 ⇒ 重新预填（`prefill_workpaper_real`）与
+     用户公式预览里的三参 WP 即使锚点已对齐、底稿已录入也是 0；同一底稿两张表的同名锚点（D4 主营 / 其他业务收入明细表「全年收入合计」、
+     D6 两张明细表「期末合计」）在同一批预载里还会互相覆盖。改：两侧都按「表!锚点」存取，三参取不到报错不代 0。真库只读核对：已对齐锚点经
+     「预载 + L1」的值与直接读锚点逐条相等。报表 / 自定义公式路径（`WPExecutor` 预载）从不取三参，原先恒 0，现在报错；真库 `report_config` 与
+     `wp_formula` 里三参 WP 均为 0 条。
+  2. **LEDGER_DETAIL 恒为 0 笔**：收敛 spec 的 R1.2 / R2.2 写的是「从 `ledger_detail_data` 取明细、L1 按行数给值」，但预载层从不取明细
+     （`ledger_detail_data={}` 写死，「Phase 2 实装」没做）⇒ 映射表 56 格恒 0。改：新增 `_load_ledger_detail`（口径同原实现：科目精确匹配或含 `%`
+     按 LIKE，金额条件对借方或贷方任一侧成立即命中，按凭证日期 / 凭证号排序）；符合条件超过 200 行就不取（L1 按行数给值，截断后的行数是错数）。
+  3. **COUNT_LEDGER 期间被忽略**：它混在 LEDGER 里扫描，第二参（期间）被当成方向、期间恒按全年 ⇒ 非全年的笔数取不到（恒 0）。注册表写成三参
+     「科目, 方向, 范围」、前端语法校验也按三参收，与原设计（E1 spec：`COUNT_LEDGER('科目','日期范围')`）和 L1 handler 都不符。改：单独扫描
+     （科目, 范围），注册表与前端改为 1~2 参。
+  4. **方向 / 期间 / 金额条件写错给错数**：方向不认识按贷方取（映射表 F2 盘点 / 监盘 9 格 `LEDGER('1403','期末数量' | '期末金额')` 拿到的是贷方发生额），
+     期间不认识（如「上半年」「13月」）不加条件或按 13 月查，金额条件不认识就不过滤。改：不认识就不取，L1 对没取的键报错。
+- **L1 语义变化**：序时账三个函数的键预载层没取 ⇒ 报错（原先返回 0 且 ok）。生产上只有预载路径求值这三个函数（底稿可编辑公式保存即拒、报表不用）。
+  收敛 spec 的两个用例按新语义改（`test_formula_preloader::test_ledger_missing_key`、`test_execution_path_parity::test_known_function_not_blocked`）；
+  `test_formula_preloader::test_count_ledger` 原先钉住的正是缺陷 3 的扫描写法，一并改。
+- **改写口径**：一律在真 SQLite 落数据、经现行入口（`resolve_extended_formula` / `preload` + `execute`）按值断言；原 mock DB 用例（返回什么断言什么）删除。
+  `formula_wp_semantics.py` 的登记改为现状：预填路径 `_load_wp`、L1 `_handle_wp`、报表 / 自定义公式路径 `WPExecutor.execute` 三处，三条差异照旧登记。
+  `test_formula_runtime_zero_regression` 的注册表基线 14 → 20（收敛时并入的 6 个函数一直没同步）。`test_adj_formula_resolution` 的冒烟改为
+  「注册表里每个取数函数，预载层都扫得到、取得到」（新增函数未登记取数口径即红），原冒烟只防 ImportError，发现不了缺陷 2。
+- **不同根的一条**：`test_f_prefill_extension::test_f22_master_sheet_uses_aux_or_tb` 是 `5783c4ffe` 有意把 F2-2 明细汇总表改为联动分类明细表
+  （原判据「F2-2 不许用 WP」被推翻），改为断言它真正要防的循环引用（不指向自己与下游 F2-1、映射表 WP 联动无环）。
+- **顺带**：删掉 `2638b32fd` 留在 `prefill_engine` 的死代码（6 个无引用的正则、`_parse_period_range` 里 return 之后不可达的重复代码、无用 import）；
+  L1 取数报错的日志文案由「TB column unregistered」改为通用说法（PREV / WP / 序时账也走这条）。
+- **测试 / 变异 / 回归**：改写的 10 个文件 + 两个收敛用例文件全过；变异 MR65a~MR65p（后端 16 条：L1 三参退回按表名取 / 预载按锚点存 / 三参取不到给 0 /
+  预载不取明细 / 明细未取给 0 笔 / 金额条件、期间、方向不认识退回旧行为 / COUNT_LEDGER 期间按全年 / LEDGER 未取给 0 / 超上限照截断 / 科目不支持 LIKE /
+  登记表指回已删函数 / 预填入口不写两套口径 / 重新预填改排除底稿来源 / COUNT_LEDGER 混回 LEDGER 扫描）与 MR65q（前端 COUNT_LEDGER 退回 3 参）全部打红后
+  逐字节恢复。回归：引用预载层 / L1 / 预填入口 / 登记模块的 360 个测试文件与 `988c6809b` 干净检出逐条对比，新增失败 0、消除 30（另 3 个原收集即错的文件
+  现在全过）；双方其余 182 例失败相同（预存）。前端 `formulaSyntaxParser.spec.ts` 43 例过。
+- **范围外（登记，未改）**：
+  1. `LEDGER('1403','期末数量' | '期末金额')` 9 格：序时账有数量列（`debit_qty` / `credit_qty`），但「期末数量 / 期末金额」是余额不是发生额，
+     取数口径需另定（现在报错不取）。
+  2. J1 月度分析表 21 格 `LEDGER_DETAIL('2211','月度分析表J1-4','1月','期末余额')`：四参写法，要的是月末余额而不是明细笔数（现在报错不取）。
+     其余 35 格三参 LEDGER_DETAIL（截止测试「期末大额收入明细」等）现在写入的是符合条件的笔数；若模板要的是明细清单，需要「把明细写进表格区域」的能力。
+  3. 两参 WP 取不到返回 0（与「值确实为 0」不可区分）、预填与报表两条路径的数据来源不同：照旧登记在 `formula_wp_semantics`。

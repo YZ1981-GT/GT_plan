@@ -77,7 +77,8 @@ const FUNCTION_ARITY: Record<string, [number, number]> = {
   LEDGER: [3, 3],
   LEDGER_DETAIL: [3, 3],
   TB_AUX: [3, 3],
-  COUNT_LEDGER: [3, 3],
+  // COUNT_LEDGER('科目'[,'范围'])：与后端 _REGISTRY 一致（原写成 3 参「科目, 方向, 范围」，后端按第二参取期间，3 参恒取不到）
+  COUNT_LEDGER: [1, 2],
   PLACEHOLDER: [0, 0],
   ABS: [1, 1],
   ROUND: [2, 2],
@@ -334,7 +335,7 @@ export function knownFunctions(): Array<{ name: string; minArgs: number; maxArgs
     { name: 'LEDGER', minArgs: 3, maxArgs: 3, description: "序时账取数 LEDGER('科目','方向','范围')" },
     { name: 'LEDGER_DETAIL', minArgs: 3, maxArgs: 3, description: "序时账明细 LEDGER_DETAIL('科目','月份','阈值')" },
     { name: 'TB_AUX', minArgs: 3, maxArgs: 3, description: "辅助维度汇总 TB_AUX('科目','维度','列名')" },
-    { name: 'COUNT_LEDGER', minArgs: 3, maxArgs: 3, description: "序时账笔数 COUNT_LEDGER('科目','方向','范围')" },
+    { name: 'COUNT_LEDGER', minArgs: 1, maxArgs: 2, description: "序时账笔数 COUNT_LEDGER('科目','范围')" },
     { name: 'PLACEHOLDER', minArgs: 0, maxArgs: 0, description: "预留占位 PLACEHOLDER()" },
     { name: 'ABS', minArgs: 1, maxArgs: 1, description: "绝对值 ABS(值)" },
     { name: 'ROUND', minArgs: 2, maxArgs: 2, description: "四舍五入 ROUND(值, 位数)" },

@@ -92,10 +92,14 @@ class TestFormulaBlockedDetection:
     """三条路径的 blocked 检测一致（都走 L1 的 _is_blocked_formula）。"""
 
     def test_known_function_not_blocked(self):
-        ctx = _ctx()
+        # LEDGER 带上预载数据：预载层没取的序时账键报错不代 0（formula-fetch-followup 6.5），与「是否拦截」无关
+        ctx = _ctx(ledger_data={"1001:借:全年": Decimal("1")})
         for fn in ["TB('1001','期末余额')", "ROW('BS-001')", "LEDGER('1001','借','全年')",
                     "ABS(1)", "PLACEHOLDER()"]:
-            assert execute(fn, ctx).ok, f"{fn} should not be blocked"
+            result = execute(fn, ctx)
+            assert not result.blocked and result.ok, f"{fn} should not be blocked"
+        unloaded = execute("LEDGER('9999','借','全年')", _ctx())
+        assert not unloaded.blocked and not unloaded.ok, "未预载的序时账键应报错（不是拦截，也不是 0）"
 
     def test_unknown_function_blocked(self):
         ctx = _ctx()

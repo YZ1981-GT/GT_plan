@@ -1,245 +1,133 @@
-"""H 循环 =LEDGER 公式支持验证
+"""H 循环 =LEDGER 公式（H1-12 折旧测算表 =LEDGER('1602','credit','X月')）。
 
-Task 2.25: 验证 prefill_engine 对 H1-12 折旧测算表 =LEDGER('1602','credit','X月') 公式的支持。
-
-覆盖：
-- _FORMULA_RE 识别 H 循环 LEDGER 公式
-- _parse_period_range 处理 H1-12 月度/半年/全年期间格式
-- _resolve_ledger_formula 正确构建 SQL 查询（使用 _parse_period_range + accounting_period 整数比较）
-- resolve_extended_formula 统一入口对 LEDGER 类型的路由
+formula-fetch-followup-defect-closure 6.5 改写：原文件 import ``_FORMULA_RE`` / ``_FORMULA_RESOLVERS`` /
+``_resolve_ledger_formula``（``2638b32fd`` 删除 / 改延迟构建）整文件收集即错；原取数用例全是 mock DB（返回什么断言什么，
+测不到 SQL 条件）。现按现行路径：识别 = ``_get_formula_re()``；取数 = ``resolve_extended_formula``（用户公式预览，
+内部「预载 → L1」）在真 SQLite 序时账上求值：逐月 / 半年 / 全年 / 借贷方向 / 已删除行 / 其他项目与年度隔离按值断言；
+方向或期间写错 ⇒ 取不到（原先方向不认识按贷方取、期间不认识按全年取，给的是错数）。
 
 Validates: Requirements H-F10
 """
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.services.prefill_engine import (
-    _FORMULA_RE,
-    _FORMULA_RESOLVERS,
-    _parse_args,
-    _parse_period_range,
-    _resolve_ledger_formula,
-    resolve_extended_formula,
-)
+from app.models.base import Base
+from app.services.prefill_engine import _get_formula_re, _parse_args, _parse_period_range, resolve_extended_formula
+
+_PID = uuid.UUID("cccc1602-0000-4000-8000-000000000001")
+_OTHER_PID = uuid.UUID("cccc1602-0000-4000-8000-000000000002")
+_YEAR = 2025
+
+
+@pytest_asyncio.fixture
+async def db() -> AsyncSession:
+    """1602 累计折旧逐月贷方 m×1000（6 月另有借方 777）；1601 3 月借方 500000、4 月 1000；
+    干扰行：已删除、其他项目、上一年度各一条 6 月 1602 贷方。"""
+    from app.models.audit_platform_models import TbLedger
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as s:
+        def row(pid, year, month, code, debit, credit, no, deleted=False):
+            s.add(TbLedger(project_id=pid, year=year, company_code="001", voucher_date=date(year, month, 15),
+                           voucher_no=no, account_code=code, account_name="", accounting_period=month,
+                           debit_amount=Decimal(debit), credit_amount=Decimal(credit), is_deleted=deleted))
+
+        for m in range(1, 13):
+            row(_PID, _YEAR, m, "1602", "0", str(m * 1000), f"记-{m:02d}")
+        row(_PID, _YEAR, 6, "1602", "777", "0", "记-06-借")
+        row(_PID, _YEAR, 3, "1601", "500000", "0", "记-03-原值")
+        row(_PID, _YEAR, 4, "1601", "1000", "0", "记-04-原值")
+        row(_PID, _YEAR, 6, "1602", "0", "99999", "记-06-删", deleted=True)
+        row(_OTHER_PID, _YEAR, 6, "1602", "0", "55555", "记-06-他项目")
+        row(_PID, _YEAR - 1, 6, "1602", "0", "44444", "记-06-上年")
+        await s.commit()
+        yield s
+    await engine.dispose()
+
+
+async def _ledger(db: AsyncSession, raw_args: str):
+    return await resolve_extended_formula(db, _PID, _YEAR, "LEDGER", raw_args)
 
 
 # ---------------------------------------------------------------------------
-# 1. _FORMULA_RE 识别 H 循环 LEDGER 公式
+# 1. 公式识别与参数解析（解析层）
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "formula,expected_type,expected_args",
+    "formula,expected_args",
     [
-        ("=LEDGER('1602','credit','1月')", "LEDGER", "'1602','credit','1月'"),
-        ("=LEDGER('1602','credit','6月')", "LEDGER", "'1602','credit','6月'"),
-        ("=LEDGER('1602','credit','12月')", "LEDGER", "'1602','credit','12月'"),
-        ("=LEDGER('1602','credit','全年')", "LEDGER", "'1602','credit','全年'"),
-        ("=LEDGER('1602','credit','1-6月')", "LEDGER", "'1602','credit','1-6月'"),
-        ("=LEDGER('1602','credit','7-12月')", "LEDGER", "'1602','credit','7-12月'"),
-        ("=LEDGER('1601','debit','3月')", "LEDGER", "'1601','debit','3月'"),
+        ("=LEDGER('1602','credit','1月')", "'1602','credit','1月'"),
+        ("=LEDGER('1602','credit','12月')", "'1602','credit','12月'"),
+        ("=LEDGER('1602','credit','全年')", "'1602','credit','全年'"),
+        ("=LEDGER('1602','credit','1-6月')", "'1602','credit','1-6月'"),
+        ("=LEDGER('1601','debit','3月')", "'1601','debit','3月'"),
     ],
 )
-def test_formula_re_recognizes_h_cycle_ledger(formula, expected_type, expected_args):
-    """H 循环 LEDGER 公式被 _FORMULA_RE 正确识别"""
-    m = _FORMULA_RE.search(formula)
-    assert m is not None, f"_FORMULA_RE 未识别 {formula}"
-    assert m.group(1).upper() == expected_type
+def test_formula_re_recognizes_h_cycle_ledger(formula, expected_args):
+    m = _get_formula_re().search(formula)
+    assert m is not None, f"公式正则未识别 {formula}"
+    assert m.group(1).upper() == "LEDGER"
     assert m.group(2).strip() == expected_args
-
-
-# ---------------------------------------------------------------------------
-# 2. _parse_period_range 处理 H1-12 月度期间格式
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     "period,expected",
-    [
-        # H1-12 单月抽样
-        ("1月", (1, 1)),
-        ("2月", (2, 2)),
-        ("3月", (3, 3)),
-        ("6月", (6, 6)),
-        ("9月", (9, 9)),
-        ("12月", (12, 12)),
-        # H1-12 半年合计
-        ("1-6月", (1, 6)),
-        ("7-12月", (7, 12)),
-        # H1-12 全年合计
-        ("全年", (1, 12)),
-    ],
+    [("1月", (1, 1)), ("6月", (6, 6)), ("12月", (12, 12)), ("1-6月", (1, 6)), ("7-12月", (7, 12)), ("全年", (1, 12))],
 )
 def test_parse_period_range_h_cycle_formats(period, expected):
-    """H1-12 折旧测算表使用的期间格式全部正确解析"""
     assert _parse_period_range(period) == expected
 
 
+def test_parse_args_h_cycle_ledger():
+    assert _parse_args("'1602','credit','1-6月'") == ["1602", "credit", "1-6月"]
+
+
 # ---------------------------------------------------------------------------
-# 3. _parse_args 正确解析 H 循环 LEDGER 公式参数
+# 2. 真库取数：期间 / 方向 / 隔离
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "raw_args,expected",
     [
-        ("'1602','credit','1月'", ["1602", "credit", "1月"]),
-        ("'1602','credit','全年'", ["1602", "credit", "全年"]),
-        ("'1602','credit','1-6月'", ["1602", "credit", "1-6月"]),
-        ("'1601','debit','12月'", ["1601", "debit", "12月"]),
+        ("'1602','credit','6月'", Decimal("6000")),       # 单月；已删除 / 他项目 / 上年的 6 月行不计入
+        ("'1602','credit','1-6月'", Decimal("21000")),    # 半年
+        ("'1602','credit','7-12月'", Decimal("57000")),
+        ("'1602','credit','全年'", Decimal("78000")),     # 全年不加期间条件
+        ("'1602','credit'", Decimal("78000")),             # 两参：期间缺省全年
+        ("'1602','debit','6月'", Decimal("777")),         # 方向：同月借方另算
+        ("'1601','debit','3月'", Decimal("500000")),
+        ("'1601','借','3-4月'", Decimal("501000")),       # 中文方向
+        ("'1602','贷','12月'", Decimal("12000")),
+        ("'9999','credit','全年'", Decimal("0")),         # 科目没有发生额：合法的 0
     ],
 )
-def test_parse_args_h_cycle_ledger(raw_args, expected):
-    """H 循环 LEDGER 公式参数正确解析为 3 元素列表"""
-    args = _parse_args(raw_args)
-    assert args == expected
-
-
-# ---------------------------------------------------------------------------
-# 4. _resolve_ledger_formula 正确处理 H 循环账户 (mock DB)
-# ---------------------------------------------------------------------------
-
-import sqlalchemy as sa
+async def test_ledger_values_on_real_rows(db, raw_args, expected):
+    assert await _ledger(db, raw_args) == expected
 
 
 @pytest.mark.asyncio
-async def test_resolve_ledger_formula_h_cycle_monthly():
-    """=LEDGER('1602','credit','6月') → 查询 accounting_period BETWEEN 6 AND 6"""
-    mock_db = AsyncMock()
-    mock_result = MagicMock()
-    mock_result.scalar.return_value = Decimal("15000.00")
-    mock_db.execute.return_value = mock_result
-
-    project_id = uuid.uuid4()
-    year = 2025
-
-    mock_filter = AsyncMock(return_value=sa.literal(True))
-    with patch("app.services.dataset_query.get_active_filter", mock_filter):
-        result = await _resolve_ledger_formula(
-            mock_db, project_id, year, ["1602", "credit", "6月"]
-        )
-
-    assert result == Decimal("15000.00")
-    assert mock_db.execute.called
-
-
-@pytest.mark.asyncio
-async def test_resolve_ledger_formula_h_cycle_full_year():
-    """=LEDGER('1602','credit','全年') → 不加 period 过滤（全年）"""
-    mock_db = AsyncMock()
-    mock_result = MagicMock()
-    mock_result.scalar.return_value = Decimal("180000.00")
-    mock_db.execute.return_value = mock_result
-
-    project_id = uuid.uuid4()
-    year = 2025
-
-    mock_filter = AsyncMock(return_value=sa.literal(True))
-    with patch("app.services.dataset_query.get_active_filter", mock_filter):
-        result = await _resolve_ledger_formula(
-            mock_db, project_id, year, ["1602", "credit", "全年"]
-        )
-
-    assert result == Decimal("180000.00")
-
-
-@pytest.mark.asyncio
-async def test_resolve_ledger_formula_h_cycle_half_year():
-    """=LEDGER('1602','credit','1-6月') → 查询 accounting_period BETWEEN 1 AND 6"""
-    mock_db = AsyncMock()
-    mock_result = MagicMock()
-    mock_result.scalar.return_value = Decimal("90000.00")
-    mock_db.execute.return_value = mock_result
-
-    project_id = uuid.uuid4()
-    year = 2025
-
-    mock_filter = AsyncMock(return_value=sa.literal(True))
-    with patch("app.services.dataset_query.get_active_filter", mock_filter):
-        result = await _resolve_ledger_formula(
-            mock_db, project_id, year, ["1602", "credit", "1-6月"]
-        )
-
-    assert result == Decimal("90000.00")
-
-
-@pytest.mark.asyncio
-async def test_resolve_ledger_formula_insufficient_args():
-    """参数不足 3 个时返回 None"""
-    mock_db = AsyncMock()
-    result = await _resolve_ledger_formula(mock_db, uuid.uuid4(), 2025, ["1602", "credit"])
-    assert result is None
-
-    result = await _resolve_ledger_formula(mock_db, uuid.uuid4(), 2025, ["1602"])
-    assert result is None
-
-    result = await _resolve_ledger_formula(mock_db, uuid.uuid4(), 2025, [])
-    assert result is None
-
-
-# ---------------------------------------------------------------------------
-# 5. LEDGER resolver 注册验证
-# ---------------------------------------------------------------------------
-
-
-def test_ledger_resolver_registered():
-    """LEDGER 类型已注册到 _FORMULA_RESOLVERS 且可调用"""
-    assert "LEDGER" in _FORMULA_RESOLVERS
-    assert callable(_FORMULA_RESOLVERS["LEDGER"])
-
-
-def test_ledger_detail_resolver_registered():
-    """LEDGER_DETAIL 类型已注册到 _FORMULA_RESOLVERS 且可调用"""
-    assert "LEDGER_DETAIL" in _FORMULA_RESOLVERS
-    assert callable(_FORMULA_RESOLVERS["LEDGER_DETAIL"])
-
-
-# ---------------------------------------------------------------------------
-# 6. resolve_extended_formula 统一入口路由 LEDGER
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_resolve_extended_formula_routes_ledger():
-    """resolve_extended_formula 对 LEDGER 类型正确路由到 _resolve_ledger_formula"""
-    mock_db = AsyncMock()
-    mock_result = MagicMock()
-    mock_result.scalar.return_value = Decimal("25000.00")
-    mock_db.execute.return_value = mock_result
-
-    project_id = uuid.uuid4()
-    year = 2025
-
-    mock_filter = AsyncMock(return_value=sa.literal(True))
-    with patch("app.services.dataset_query.get_active_filter", mock_filter):
-        result = await resolve_extended_formula(
-            mock_db, project_id, year, "LEDGER", "'1602','credit','9月'"
-        )
-
-    assert result == Decimal("25000.00")
-
-
-@pytest.mark.asyncio
-async def test_resolve_extended_formula_ledger_direction_debit():
-    """=LEDGER('1601','debit','3月') → 取借方发生额"""
-    mock_db = AsyncMock()
-    mock_result = MagicMock()
-    mock_result.scalar.return_value = Decimal("500000.00")
-    mock_db.execute.return_value = mock_result
-
-    project_id = uuid.uuid4()
-    year = 2025
-
-    mock_filter = AsyncMock(return_value=sa.literal(True))
-    with patch("app.services.dataset_query.get_active_filter", mock_filter):
-        result = await resolve_extended_formula(
-            mock_db, project_id, year, "LEDGER", "'1601','debit','3月'"
-        )
-
-    assert result == Decimal("500000.00")
+@pytest.mark.parametrize(
+    "raw_args",
+    [
+        "'1602','期末数量','全年'",   # 方向不认识：原先按贷方取（得 78000），映射表 F2 盘点表有 9 格这样写
+        "'1602','credit','13月'",     # 月份越界：原先按 13 月查（得 0）
+        "'1602','credit','上半年'",   # 期间不认识：原先不加条件按全年取（得 78000）
+        "'1602'",                     # 少参：L1 默认借方全年，预载层不扫一参写法
+    ],
+)
+async def test_unrecognized_direction_or_period_is_not_a_number(db, raw_args):
+    """方向 / 期间写错 ⇒ 取不到（None），不给按贷方 / 全年 / 0 凑出来的数。"""
+    assert await _ledger(db, raw_args) is None

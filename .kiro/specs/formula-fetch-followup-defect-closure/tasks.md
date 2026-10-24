@@ -125,10 +125,16 @@
 - [x] 6.4 改写 `test_prefill_wp_prev_resolution.py`、`four_table/test_k_cycle_preset_closure.py`（R3）
   - 证据：前者 1037 → 523 行 28 例、后者 33 例全过；变异 MR3a~MR3h 8 条全部打红；`prefill_anchor_map.OUT_OF_SCOPE_CHANGES['prev_year_dimension']` 改为现行说法
   - 回归：引用改动模块的 186 个测试文件与基线 `3c8fe7726` 逐条对比，新增失败 0、消除 18（双方其余 93 例相同，预存）
-- [ ] 6.5 同根陈旧测试（`2638b32fd` 删 `_FORMULA_RESOLVERS` / `_resolve_*_formula` / `_resolve_tb_aux` 后整文件或部分红）按现行预载层 + L1 改写：
+- [x] 6.5 同根陈旧测试（`2638b32fd` 删 `_FORMULA_RESOLVERS` / `_resolve_*_formula` / `_resolve_tb_aux` 后整文件或部分红）按现行预载层 + L1 改写：
   `test_e1_formula_types` / `test_h_ledger_formula` / `test_k_prefill_ledger_detail`（收集即错）、`test_adj_formula_resolution` /
   `test_adj_domain_caliber_boundaries` / `test_adj_e2e_integration` / `test_f_prefill_extension` / `test_formula_runtime_zero_regression` /
   `test_formula_wp_semantics` / `test_user_formulas_override`；改写中发现的取数缺陷逐条复现后修或登记待拍板
+  - 证据：10 个文件按真 SQLite + 现行入口改写全过；改写中复现并修 4 个取数缺陷（三参 WP 恒 0 与同名锚点互相覆盖、LEDGER_DETAIL 恒 0 笔、
+    COUNT_LEDGER 期间被忽略、方向 / 期间 / 金额条件写错给错数），见 design §10.10；真库对齐锚点「预载 + L1」与直接读锚点逐条相等
+  - 变异 MR65a~MR65q 17 条（后端 16 + 前端 1）全部打红；回归 360 个测试文件对比 `988c6809b` 新增失败 0、消除 30
+  - 偏离：`test_f_prefill_extension` 不同根（`5783c4ffe` 有意改为 WP 联动），按其防循环引用的本意改写；L1 序时账三函数「未预载」由返回 0 改为报错，
+    收敛 spec 的两个用例随之改
+  - 待拍板：F2 盘点 9 格「期末数量 / 期末金额」的取数口径、J1 月度分析 21 格四参写法、LEDGER_DETAIL 写笔数还是写明细清单（design §10.10 范围外）
 - [ ] 6.6 `report_engine.evaluate_formula_result` 的 `enable_prev` 死分支；运行时改写已跟踪文件的测试（`tests/_snapshots/workpaper_route_task1_baseline.json`、归档证据）
 
 ## 7. 回归与交付（R10）

@@ -35,12 +35,15 @@ class TestScanRefs:
         assert ("1001", "借", "全年") in refs["ledger_specs"]
 
     def test_count_ledger(self):
-        refs = _scan_refs(["COUNT_LEDGER('1001','借','全年')"])
-        assert ("1001", "借", "全年") in refs["ledger_specs"]
+        """COUNT_LEDGER('科目','范围') 单独扫成（科目, 范围）。原先混进 LEDGER 扫：第二参被当成方向、
+        期间恒按全年 ⇒ 非全年的笔数恒取不到（formula-fetch-followup 6.5 改）。"""
+        refs = _scan_refs(["COUNT_LEDGER('1001','1-3月')", "COUNT_LEDGER('1002')"])
+        assert refs["ledger_count_specs"] == {("1001", "1-3月"), ("1002", "全年")}
+        assert refs["ledger_specs"] == set()
 
     def test_ledger_detail(self):
-        refs = _scan_refs(["LEDGER_DETAIL('6001','12月','>=100000')"])
-        assert ("6001", "12月", ">=100000") in refs["ledger_detail_specs"]
+        refs = _scan_refs(["LEDGER_DETAIL('6001','12月','>=100000')", "LEDGER_DETAIL('6002')"])
+        assert refs["ledger_detail_specs"] == {("6001", "12月", ">=100000"), ("6002", "全年", "*")}
 
     def test_wp(self):
         refs = _scan_refs(["WP('D1','审定表D1-1','合计')"])
@@ -82,10 +85,10 @@ class TestL1HandlersWithContext:
         assert result.ok
 
     def test_ledger_missing_key(self):
-        ctx = FormulaContext()
-        result = execute("LEDGER('9999','借','全年')", ctx)
-        assert result.value == Decimal("0")
-        assert result.ok
+        """预载层没取的键报错、不代 0（原先返 0 且 ok，与「本期确实没有发生额」分不清；formula-fetch-followup 6.5 改）。"""
+        result = execute("LEDGER('9999','借','全年')", FormulaContext())
+        assert not result.ok
+        assert "LEDGER('9999','借','全年')：未取数" in result.errors[0]
 
     def test_ledger_detail_handler(self):
         ctx = FormulaContext(ledger_detail_data={

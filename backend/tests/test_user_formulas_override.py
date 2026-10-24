@@ -24,8 +24,8 @@ from app.routers.wp_user_formulas import (
     BatchUserFormulasRequest,
     ValidateFormulaRequest,
     _CELL_KEY_RE,
-    _SUPPORTED_TYPES,
     _parse_formula_or_raise,
+    _supported,
 )
 from fastapi import HTTPException
 
@@ -62,13 +62,16 @@ def test_cell_key_regex_rejects_invalid_keys():
 
 
 def test_supported_types_includes_all_10():
-    """_SUPPORTED_TYPES 包含 10 种公式类型"""
+    """支持的公式类型包含 10 种。
+
+    formula-fetch-followup-defect-closure 6.5：``_SUPPORTED_TYPES`` 自 2638b32fd 起改为由 ``_REGISTRY`` 延迟派生
+    （模块级初值 ``None``，经 ``_supported()`` 取），原用例直接读模块变量 ⇒ ``TypeError: 'NoneType' object is not iterable``。"""
     expected = {
         "TB", "SUM_TB", "WP", "LEDGER", "AUX",
         "PREV", "ADJ", "NOTE", "LEDGER_DETAIL", "COUNT_LEDGER",
     }
-    assert expected.issubset(_SUPPORTED_TYPES), \
-        f"缺失: {expected - _SUPPORTED_TYPES}"
+    supported = _supported()
+    assert expected.issubset(supported), f"缺失: {expected - supported}"
 
 
 # ---------------------------------------------------------------------------

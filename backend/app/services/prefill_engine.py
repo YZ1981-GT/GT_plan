@@ -23,7 +23,6 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workpaper_models import WorkingPaper
-from app.services.prefill_anchor_map import read_anchor_value, resolve_anchor
 
 _logger = logging.getLogger(__name__)
 
@@ -44,17 +43,6 @@ def _get_formula_re() -> re.Pattern:
         pattern = "|".join(re.escape(n) for n in names)
         _FORMULA_RE = re.compile(rf"=({pattern})\s*\(([^)]*)\)", re.IGNORECASE)
     return _FORMULA_RE
-
-# ---------------------------------------------------------------------------
-# 扩展公式正则（D4：6 种新公式类型）
-# ---------------------------------------------------------------------------
-
-_WP_FORMULA_RE = re.compile(r"WP\('([^']+)',\s*'([^']+)',\s*'([^']+)'\)")
-_LEDGER_FORMULA_RE = re.compile(r"LEDGER\('([^']+)',\s*'([^']+)',\s*'([^']+)'\)")
-_AUX_FORMULA_RE = re.compile(r"AUX\('([^']+)',\s*'([^']+)',\s*'([^']+)',\s*'([^']+)'\)")
-_PREV_FORMULA_RE = re.compile(r"PREV\('([^']+)',\s*'([^']+)',\s*'([^']+)'\)")
-_ADJ_FORMULA_RE = re.compile(r"ADJ\('([^']+)',\s*'([^']+)'\)")
-_NOTE_FORMULA_RE = re.compile(r"NOTE\('([^']+)',\s*'([^']+)',\s*'([^']+)'\)")
 
 
 class FormulaCell:
@@ -159,28 +147,18 @@ def _parse_period_range(period: str) -> tuple[int | None, int | None]:
 # ---------------------------------------------------------------------------
 # 统一入口（兼容保留；内部走 preload → L1）
 # ---------------------------------------------------------------------------
-    if not period or period in ("全年", "all", "*"):
-        return 1, 12
-    s = str(period).strip().replace("月", "")
-    if "-" in s or "~" in s:
-        sep = "-" if "-" in s else "~"
-        parts = [p.strip() for p in s.split(sep)]
-        try:
-            return int(parts[0]), int(parts[1])
-        except (ValueError, IndexError):
-            return None, None
-    try:
-        m = int(s)
-        return m, m
-    except ValueError:
-        return None, None
+
+
 async def resolve_extended_formula(
     db: AsyncSession, project_id: UUID, year: int,
     formula_type: str, raw_args: str,
 ) -> Decimal | None:
-    """统一入口：解析并执行扩展公式（兼容保留；内部改走 preload → L1）。
+    """统一入口：解析并执行扩展公式（兼容保留；内部改走 preload → L1）。取不到数 / 公式被拦截 ⇒ ``None``。
 
-    spec: formula-execution-path-convergence Phase 2 · Task 10
+    spec: formula-execution-path-convergence Phase 2 · Task 10。调用方：用户公式预览（``wp_user_formulas``）。
+
+    ADJ 口径与 ``prefill_workpaper_real`` 相同：``adj_exclude_origins=frozenset()``（不排除底稿来源的分录，口径矩阵第 2 行）；
+    试算平衡表 / 报表 / 审定表回写排除底稿来源（第 4 行，``AdjudicationWritebackService``）—— 两套口径并存是刻意的。
     """
     ft = formula_type.upper()
     args = _parse_args(raw_args)

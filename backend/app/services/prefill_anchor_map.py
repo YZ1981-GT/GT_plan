@@ -343,8 +343,10 @@ WP_IMPLEMENTATION_PATHS: dict[str, str] = {
         "（原 prefill_engine._resolve_wp_formula，2638b32fd 删 resolver 后由统一预载层接手）"
     ),
     "formula_engine._handle_wp": (
-        "读 ctx.wp_data（调用方预载的 dict），**第三参被静默忽略** ⇒ 与上者是两套独立"
-        "寻址空间。二者语义不同，不得合并；改动任一侧都不会让另一侧打红，故此处显式登记。"
+        "两参 WP(wp_code, 列名 / 单元格) 读 ctx.wp_data[wp_code][列名]（报表 / 自定义公式路径由 WPExecutor 从 "
+        "parsed_data 预载，与上者不是同一容器，不得合并）；三参读 _load_wp 按「表!锚点」存的值，取不到报错不代 0。"
+        "原先第三参被静默忽略、把第二参「表」当列名取 ⇒ 预填 / 用户公式预览里已对齐的锚点也恒为 0"
+        "（spec formula-fetch-followup-defect-closure 6.5 修，test_formula_wp_semantics 端到端钉住两侧同一写法）。"
     ),
 }
 

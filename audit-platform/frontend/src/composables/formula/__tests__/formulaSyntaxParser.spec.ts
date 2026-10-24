@@ -287,8 +287,11 @@ describe('底稿专用函数识别（unified-formula-registry P1-T4）', () => {
     expect(validate("TB_AUX('1121')").valid).toBe(false)
   })
 
-  it('COUNT_LEDGER 被识别且参数校验 = 3', () => {
-    expect(validate("COUNT_LEDGER('1001','借','全年')").valid).toBe(true)
+  it('COUNT_LEDGER 被识别且参数 = 科目[, 范围]（与后端注册表一致）', () => {
+    expect(validate("COUNT_LEDGER('1001','1-3月')").valid).toBe(true)
+    expect(validate("COUNT_LEDGER('1001')").valid).toBe(true)
+    // 原先按「科目, 方向, 范围」收 3 参：后端按第二参取期间，3 参写法恒取不到
+    expect(validate("COUNT_LEDGER('1001','借','全年')").valid).toBe(false)
   })
 
   it('PLACEHOLDER 被识别且参数 = 0', () => {
