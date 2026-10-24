@@ -105,6 +105,16 @@ describe('附注 §五、13 / §八、14 模板结构', () => {
     }
   })
 
+  it('同步列头与模板 headers 逐位一致（国企 R7「期末账面价值 / 年初账面价值」，R8.4 批 9b-1）', () => {
+    // helper P5 只比标签列；数据列名单比这里（seed 与同步须同形）
+    const pairs = [[listedSection, buildK2ListedColumns()], [soeSection, buildK2SoeColumns()]] as const
+    for (const [section, cols] of pairs) {
+      for (const t of section.tables ?? []) {
+        expect((cols[String(t.name)] ?? []).map(c => c.label), String(t.name)).toEqual(t.headers)
+      }
+    }
+  })
+
   it('无 header_label 假数据行', () => {
     for (const section of [listedSection, soeSection]) {
       for (const t of section.tables ?? []) {

@@ -152,9 +152,11 @@ export function buildK3ListedColumns(): Record<string, ColumnDef[]> {
 export function buildK3SoeColumns(): Record<string, ColumnDef[]> {
   const T = K3_SOE_SUBTABLE
   return {
-    [T.summary]: twoPeriod('类别', '期初余额'),
+    // 标签列逐字 = 源 xlsx「附注披露信息(国企)」R6「项目」（R8.4 批 9b-1 单体模板按底稿披露表）
+    [T.summary]: twoPeriod('项目', '期初余额'),
     [T.interest]: twoPeriod('项目', '期初余额'),
-    [T.interestOverdue]: overdueInterest('债权单位'),
+    // 标签列 = L2 底稿国企披露表 R17「借款单位」（L2 / K3 推同一张表，两边一致）
+    [T.interestOverdue]: overdueInterest('借款单位'),
     [T.dividend]: twoPeriod('项目', '期初余额'),
     [T.byNature]: twoPeriod('项目', '期初余额'),
     [T.agingOver1y]: agingOver1y('债权单位名称', '期末余额', '未偿还原因'),

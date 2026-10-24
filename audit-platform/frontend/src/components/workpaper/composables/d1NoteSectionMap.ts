@@ -200,18 +200,21 @@ const CLASS_COLUMNS_SOE: ColumnDef[] = [
   { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT, group: G_PROVISION },
   { key: 'book_value', label: '账面价值', format: AMT },
 ]
-/** 单项计提明细（上市双期拆两张表、国企只期末）→ 单级表头。 */
-function individualColumns(basisLabel: string): ColumnDef[] {
+/**
+ * 单项计提明细。上市双期拆两张表、期间在表名里 → 单级表头；国企只期末、表名不带期间，
+ * 按源模板 B27:E27「期末数」父表头写两级（R8.4 批 9b-1：单体模板表头按底稿披露表）。
+ */
+function individualColumns(basisLabel: string, group?: string): ColumnDef[] {
   return [
-    { key: 'label', label: '名称', is_label: true, flat: true },
-    { key: 'balance', label: '账面余额', format: AMT },
-    { key: 'provision', label: '坏账准备', format: AMT },
-    { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT },
-    { key: 'basis', label: basisLabel, format: TXT },
+    { key: 'label', label: '名称', is_label: true, ...(group ? {} : { flat: true }) },
+    { key: 'balance', label: '账面余额', format: AMT, ...(group ? { group } : {}) },
+    { key: 'provision', label: '坏账准备', format: AMT, ...(group ? { group } : {}) },
+    { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT, ...(group ? { group } : {}) },
+    { key: 'basis', label: basisLabel, format: TXT, ...(group ? { group } : {}) },
   ]
 }
 const INDIVIDUAL_COLUMNS_LISTED: ColumnDef[] = individualColumns('计提依据')
-const INDIVIDUAL_COLUMNS_SOE: ColumnDef[] = individualColumns('计提理由')
+const INDIVIDUAL_COLUMNS_SOE: ColumnDef[] = individualColumns('计提理由', G_END_SOE)
 /** 上市组合计提项目：一张表双期并列（源模板 B77:D77 / E77:G77 合并）。 */
 const PORTFOLIO_COLUMNS_LISTED: ColumnDef[] = [
   { key: 'label', label: '名称', is_label: true },
@@ -222,11 +225,12 @@ const PORTFOLIO_COLUMNS_LISTED: ColumnDef[] = [
   { key: 'prior_provision', label: '坏账准备', format: AMT, group: G_PRIOR_LISTED },
   { key: 'prior_loss_rate', label: '预期信用损失率(%)', format: PCT, group: G_PRIOR_LISTED },
 ]
+/** 国企按组合计提：只期末、表名不带期间，按源模板 B34:D34「期末数」父表头写两级。 */
 const PORTFOLIO_COLUMNS_SOE: ColumnDef[] = [
-  { key: 'label', label: '名称', is_label: true, flat: true },
-  { key: 'balance', label: '账面余额', format: AMT },
-  { key: 'provision', label: '坏账准备', format: AMT },
-  { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT },
+  { key: 'label', label: '名称', is_label: true },
+  { key: 'balance', label: '账面余额', format: AMT, group: G_END_SOE },
+  { key: 'provision', label: '坏账准备', format: AMT, group: G_END_SOE },
+  { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT, group: G_END_SOE },
 ]
 const MOVEMENT_COLUMNS_LISTED: ColumnDef[] = [
   { key: 'label', label: '项目', is_label: true, flat: true },

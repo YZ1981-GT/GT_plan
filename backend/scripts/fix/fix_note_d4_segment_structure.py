@@ -112,8 +112,12 @@ def repo_root() -> Path:
 
 
 def expected_columns(label_header: str) -> list[dict]:
+    # 🔴 标签列不打 `flat`：`note_sub_table_projector._extract_column_groups` 见任一列 `flat` 即返回 `[]`
+    # （显式单级）、丢掉全部 `group` ⇒ 四个类别父表头不渲染。数据列带 `group` 时标签列是 rowspan=2 的独立列，
+    # 不会被前缀推断出父表头。与前端 `buildD4TransposeColumns`、`fix_note_d4_revenue_structure.py` 一致
+    # （consol-note-header-library-and-node-reaggregate R8.4 批 9b-1 改；原写 flat，两个脚本互相打架）。
     cols: list[dict] = [
-        {"key": "label", "label": label_header, "is_label": True, "flat": True}
+        {"key": "label", "label": label_header, "is_label": True}
     ]
     for key, label in DEFAULT_CATEGORIES:
         cols.append(

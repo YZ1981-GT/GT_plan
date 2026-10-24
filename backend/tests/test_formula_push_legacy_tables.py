@@ -51,6 +51,7 @@ def _note(*tables: dict) -> dict:
     (["借款类别", "余额", "利率区间", "余额", "利率区间"],
      [{"group": "期末余额", "start": 1, "span": 2}, {"group": "期初余额", "start": 3, "span": 2}],
      ["end_amount", "_col1", "prior_amount", "_col3"]),
+    (["项目", "期末账面价值", "年初账面价值"], None, ["end_amount", "prior_amount"]),  # 底稿 K2 国企披露表的写法
 ])
 def test_legacy_value_keys_follow_headers(headers, groups, expected):
     keys, note = nw.legacy_value_keys(_table(headers, groups=groups))

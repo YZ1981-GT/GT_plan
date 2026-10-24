@@ -687,20 +687,13 @@ def check_soe_slug_free_of_share_payment(chapter: dict, kids: list[dict]) -> lis
 #:
 #: 归属：`d4-…` / 营业收入披露侧（本 spec 范围外）。母公司侧忠实镜像。
 #:
+#: 2026-10-24 已修（consol-note-header-library-and-node-reaggregate R8.4 批 9b-1，单体模板按底稿披露表）：
+#: 五、62 / 八、64 第 4 张标签列的 `flat` 摘掉（与 `fix_note_d4_revenue_structure.py`、前端
+#: `buildD4TransposeColumns` 一致），母公司侧同构表随改 ⇒ 原两条登记按本条约定移除。字典留着：
+#: 上游再出现同类缺陷时在此登记（登记项由 `test_upstream_conflict_registry_still_reproduces` 双向锁死）。
+#:
 #: 键 = `_parent_tables` 的定位标识；值 = (合并章章节号, 表名, 依据)。
-UPSTREAM_MERGED_COLUMN_CONFLICTS: dict[tuple[str, str], tuple[str, str, str]] = {
-    ("listed/营业收入与营业成本", "营业收入、营业成本按分解信息"): (
-        "五、62",
-        "营业收入、营业成本按分解信息",
-        "合并章该表标签列带 flat: True 而其余 8 列带 group ⇒ 两级表头被 "
-        "_extract_column_groups 静默降级成单级。母公司侧按需求 4.1 忠实镜像。",
-    ),
-    ("soe/营业收入与营业成本", "营业收入分解信息"): (
-        "八、64",
-        "营业收入分解信息",
-        "同 listed 侧：合并章该表标签列带 flat: True 而其余 8 列带 group。",
-    ),
-}
+UPSTREAM_MERGED_COLUMN_CONFLICTS: dict[tuple[str, str], tuple[str, str, str]] = {}
 
 
 def check_columns_present(
@@ -1022,10 +1015,12 @@ class TestColumnsTarget:
         )
 
     def test_upstream_exemption_only_covers_flat_group_conflict(self) -> None:
-        """反向自检：豁免只放行 flat/group 并存，不得放行其他任何违规。"""
+        """反向自检：豁免只放行 flat/group 并存，不得放行其他任何违规。
+
+        用本例自带的登记（上游登记 ``UPSTREAM_MERGED_COLUMN_CONFLICTS`` 2026-10-24 起为空，自检不能依赖它）。"""
         ident = "listed/营业收入与营业成本"
         name = "营业收入、营业成本按分解信息"
-        exempt = UPSTREAM_MERGED_COLUMN_CONFLICTS
+        exempt = {(ident, name): ("五、62", name, "自检用登记")}
 
         # 1. 登记项 + 仅 flat/group 并存 → 放行
         ok = [(ident, {

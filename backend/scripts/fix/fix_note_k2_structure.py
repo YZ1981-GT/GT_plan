@@ -22,8 +22,8 @@ md 重建产物修正为可用结构 —— 消除「段落文本当表名」「
   两版都只有一张三列明细表（项目 / 期末 / 期初），数据引 ``'明细表K2-2'!A11~A14,A17``；
   上市蓝字「（金额较大的其他流动资产，应说明其内容、性质）」，
   国企蓝字「（根据性质选择披露方式）」。
-- ``note_template_{listed,soe}.json``（交付物权威）：列名与固定行名以此为准
-  —— 上市 ``期末余额 / 上年年末余额``、国企 ``期末余额 / 期初余额``。
+- ``note_template_{listed,soe}.json``（交付物权威）：固定行名以此为准；列名上市 ``期末余额 / 上年年末余额``，
+  国企 2026-10-24 起按底稿 ``期末账面价值 / 年初账面价值``（R8.4 批 9b-1「单体都按底稿披露表格式」）。
 - ``backend/data/note_check_preset_formulas.json`` F13-1 / F13-1a / F13-2：
   只对①明细表设勾稽 → 表②③是**条件性披露表**（源 xlsx 无，附注模版有）。
 
@@ -119,7 +119,9 @@ def _flat3(label_head: str, c1_key: str, c1_head: str, c2_key: str, c2_head: str
 
 
 LISTED_MAIN_PATCH = _flat3("项目", "end_amount", "期末余额", "prior_amount", "上年年末余额")
-SOE_MAIN_PATCH = _flat3("项目", "end_amount", "期末余额", "prior_amount", "期初余额")
+# 国企列名按底稿 K2 国企第 7 行「期末账面价值 / 年初账面价值」（consol-note-header-library-and-node-reaggregate
+# R8.4 批 9b-1 单体按底稿披露表；原按附注模板写「期末余额 / 期初余额」）
+SOE_MAIN_PATCH = _flat3("项目", "end_amount", "期末账面价值", "prior_amount", "年初账面价值")
 LISTED_CARBON_PATCH = _flat3("项目", "current_amount", "本期发生额", "prior_amount", "上期发生额")
 
 LISTED_CONTRACT_COST_PATCH = {

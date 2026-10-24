@@ -309,11 +309,32 @@ def test_listed_movement_two_level_matches_xlsx(listed: dict, xlsx_cells: dict) 
     ]
 
 
-def test_soe_movement_stays_flat(soe: dict, xlsx_cells: dict) -> None:
-    """国企侧源 xlsx 是一行表头（阶段名+释义同格）→ 必须保持单级，不得被误加分组。"""
+def test_soe_movement_two_level_from_one_cell(soe: dict, xlsx_cells: dict) -> None:
+    """国企侧源 xlsx 第 63 行是一行表头、一格里先写阶段名再写 ECL 释义（B63 = 第一阶段未来12个月预期信用损失）。
+
+    2026-10-24 consol-note-header-library-and-node-reaggregate R8.4 批 9b-1（单体按底稿披露表）起按两层落：阶段名
+    作分组、释义作列名 —— 与上市同表、G2 国企同表（两行表头）、四版 Word 一致；原「必须单级」的锁定随之撤销
+    （守卫 test_note_template_workpaper_alignment 对一格两段只认这种读法，见 ``_joined``）。"""
     cells = xlsx_cells[SHEET_SOE]
     assert cells["B63"] == "第一阶段未来12个月预期信用损失"
-    assert "B64" not in cells or cells.get("B64") != "未来12个月预期信用损失"
+    assert "B64" not in cells or cells.get("B64") != "未来12个月预期信用损失"  # 源仍是一行，不是两行
+    stage_cells = [cells["B63"], cells["C63"], cells["D63"]]
+    parents = [s[:4] for s in stage_cells]
+    leaves = [s[4:] for s in stage_cells]
+    assert parents == ["第一阶段", "第二阶段", "第三阶段"]
+
+    tbl = next(t for t in soe["tables"] if t["name"] == "其他应收款项坏账准备计提情况")
+    assert tbl["headers"] == [cells["A63"], *leaves, cells["E63"]]
+    assert [g["group"] for g in tbl["_column_groups"]] == parents
+    covered = {i for g in tbl["_column_groups"] for i in range(g["start"], g["start"] + g["span"])}
+    assert covered == {1, 2, 3}
+    assert not any(c.get("flat") for c in tbl["columns"]), "两层表不得打 flat（会让分组失效）"
+    assert [c["key"] for c in tbl["columns"]] == ["label", "第一阶段", "第二阶段", "第三阶段", "合计"]
+
+
+def test_soe_flat_tables_declare_flat(soe: dict) -> None:
+    """其余没有分组的表须在标签列显式 flat、不留 _column_groups。"""
+    assert SOE_FLAT_TABLES, "国企 八、9 应有单级表"
     for name in SOE_FLAT_TABLES:
         tbl = next(t for t in soe["tables"] if t["name"] == name)
         assert tbl["columns"][0].get("flat") is True, f"{name} 标签列须打 flat"

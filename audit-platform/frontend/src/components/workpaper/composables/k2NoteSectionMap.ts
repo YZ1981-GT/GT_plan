@@ -159,13 +159,13 @@ export function buildK2ListedColumns(categories?: readonly string[]): Record<str
   }
 }
 
-/** 国企单表列头（末列是「期初余额」，与上市的「上年年末余额」不同，故独立声明） */
+/** 国企单表列头（源 xlsx「附注披露信息（国企）」R7「期末账面价值 / 年初账面价值」，与上市不同，故独立声明） */
 export function buildK2SoeColumns(): Record<string, ColumnDef[]> {
   return {
     [K2_SOE_SUBTABLE.main]: defineColumns([
       { key: 'label', label: '项目', is_label: true, flat: true },
-      { key: 'end_amount', label: '期末余额', format: 'amount', align: 'right' },
-      { key: 'prior_amount', label: '期初余额', format: 'amount', align: 'right' },
+      { key: 'end_amount', label: '期末账面价值', format: 'amount', align: 'right' },
+      { key: 'prior_amount', label: '年初账面价值', format: 'amount', align: 'right' },
     ]),
   }
 }

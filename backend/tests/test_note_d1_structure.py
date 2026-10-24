@@ -189,6 +189,9 @@ def _table(variant: str, name: str) -> dict:
         ("listed", "组合计提项目：银行承兑汇票", ["期末余额", "上年年末余额"]),
         ("listed", "组合计提项目：商业承兑汇票", ["期末余额", "上年年末余额"]),
         ("soe", "本期计提、收回或转回的应收票据坏账准备情况", ["本期变动情况"]),
+        # R8.4 批 9b-1 单体按底稿披露表：源模板 B27:E27 / B34:D34「期末数」盖住数据列（表名不带期间）
+        ("soe", "按单项计提坏账准备的应收票据", ["期末数"]),
+        ("soe", "按组合计提坏账准备的应收票据", ["期末数"]),
     ],
 )
 def test_two_level_header_groups(variant: str, name: str, want_groups: list[str]) -> None:

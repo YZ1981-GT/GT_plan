@@ -398,14 +398,18 @@ def _class_columns_soe() -> list[dict[str, Any]]:
     )
 
 
-def _individual_columns(basis_label: str) -> list[dict[str, Any]]:
-    return _flat_columns([
-        ("label", "名称", None),
+def _individual_columns(basis_label: str, group: str | None = None) -> list[dict[str, Any]]:
+    """单项计提明细。上市按期间拆表（期间在表名里）→ 单级；国企一张表无期间后缀，源模板 B27:E27「期末数」
+    盖住四个数据列 → 两层（consol-note-header-library-and-node-reaggregate R8.4 批 9b-1 单体按底稿披露表）。"""
+    specs = [
         ("balance", "账面余额", AMOUNT),
         ("provision", "坏账准备", AMOUNT),
         ("loss_rate", "预期信用损失率(%)", PERCENT),
         ("basis", basis_label, TEXT),
-    ])
+    ]
+    if group is None:
+        return _flat_columns([("label", "名称", None), *specs])
+    return _grouped_columns(("label", "名称"), [(k, lbl, fmt, group) for k, lbl, fmt in specs])
 
 
 def _portfolio_columns_listed() -> list[dict[str, Any]]:
@@ -526,13 +530,13 @@ def _build_soe_plan() -> list[dict[str, Any]]:
             "按单项计提坏账准备", "按组合计提坏账准备",
         ]), f"按坏账准备计提方法分类披露应收票据（{G_PRIOR_SOE}），与期末数表同构。"
             + _G_CLASS_TAIL),
-        _rule(S["individual_end"], _individual_columns("计提理由"),
+        _rule(S["individual_end"], _individual_columns("计提理由", G_END_SOE),
               _blanks_then_total(3), _G_INDIVIDUAL_TAIL),
-        _rule(S["portfolio"], _flat_columns([
-            ("label", "名称", None),
-            ("balance", "账面余额", AMOUNT),
-            ("provision", "坏账准备", AMOUNT),
-            ("loss_rate", "预期信用损失率(%)", PERCENT),
+        # 源模板 B34:D34「期末数」盖住三个数据列 → 两层（R8.4 批 9b-1 单体按底稿披露表）
+        _rule(S["portfolio"], _grouped_columns(("label", "名称"), [
+            ("balance", "账面余额", AMOUNT, G_END_SOE),
+            ("provision", "坏账准备", AMOUNT, G_END_SOE),
+            ("loss_rate", "预期信用损失率(%)", PERCENT, G_END_SOE),
         ]), [
             _subtotal("商业承兑汇票小计："), _data(),
             _subtotal("银行承兑汇票小计："), _data(),

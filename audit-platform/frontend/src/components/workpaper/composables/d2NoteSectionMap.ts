@@ -214,13 +214,15 @@ const CLASS_COLUMNS_SOE_PRIOR: ColumnDef[] = [
   { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT, group: '坏账准备' },
   { key: 'carrying_value', label: '账面价值', format: AMT },
 ]
-// 单项计提明细：源模板 r51~r63（双期各一张 5 列表，合计行「计提依据」为 /）
+// 单项计提明细：源模板 r51~r63（双期各一张 5 列表，合计行「计提依据」为 /）。
+// 期末一张两层表头：源模板 B51:E51「期末余额」盖住四个数据列（附注模板 五、5 同表 R8.4 批 9b-1 按底稿改）；
+// 续表名带「上年年末余额」，单层。
 const INDIVIDUAL_COLUMNS_LISTED_END: ColumnDef[] = [
   { key: 'label', label: '名 称', is_label: true },
-  { key: 'book_amount', label: '账面余额', format: AMT },
-  { key: 'provision', label: '坏账准备', format: AMT },
-  { key: 'loss_rate', label: '预期信用损失率（%）', format: PCT },
-  { key: 'basis', label: '计提依据', format: TXT },
+  { key: 'book_amount', label: '账面余额', format: AMT, group: '期末余额' },
+  { key: 'provision', label: '坏账准备', format: AMT, group: '期末余额' },
+  { key: 'loss_rate', label: '预期信用损失率（%）', format: PCT, group: '期末余额' },
+  { key: 'basis', label: '计提依据', format: TXT, group: '期末余额' },
 ]
 const INDIVIDUAL_COLUMNS_LISTED_PRIOR: ColumnDef[] = [
   { key: 'label', label: '名 称', is_label: true },

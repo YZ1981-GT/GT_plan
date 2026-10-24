@@ -101,14 +101,36 @@ const stageColumns = (rateHeader: string): ColumnDef[] => flat([
 ])
 
 /**
- * 三阶段变动表列头 —— **国企侧单级 5 列**。
+ * 三阶段变动表列头 —— **国企侧「账面余额变动」单级 5 列**。
  *
- * 源 xlsx 国企 `A63:E63`（坏账准备计提情况）/ `A77:E77`（账面余额变动）是**一行表头**，
- * 阶段名与 ECL 释义写在同一格里（`B63 = 第一阶段未来12个月预期信用损失`）→ 确为 `flat`。
+ * 源 xlsx 国企 `A77:E77` 是一行表头，阶段名与 ECL 释义写在同一格里；该表已移到母公司章，
+ * 不在 §八、9（附注模板未按底稿改，仍单级）。
  */
 const stageMovementColumns = (labelHeader: string): ColumnDef[] => flat([
   lbl(labelHeader), amt('第一阶段'), amt('第二阶段'), amt('第三阶段'), amt('合计'),
 ])
+
+/**
+ * 三阶段变动表列头 —— **国企侧「其他应收款项坏账准备计提情况」两级混合分组**（与上市侧同一落法）。
+ *
+ * 源 xlsx 国企 `A63:E63` 一格里先写阶段名、再写 ECL 释义（`B63 = 第一阶段未来12个月预期信用损失`），
+ * 附注模板按底稿披露表改为两层：阶段名作 `group`、释义作列名（释义用国企底稿原字，全角括号）——
+ * 与 G2 国企同表（两行表头）、四版 Word 一致（consol-note-header-library-and-node-reaggregate R8.4 批 9b-1）。
+ * `key` 保持既有中文数据键。
+ */
+const SOE_STAGE_ECL_DESC = {
+  s1: '未来12个月预期信用损失',
+  s2: '整个存续期预期信用损失（未发生信用减值）',
+  s3: '整个存续期预期信用损失（已发生信用减值）',
+} as const
+
+const soeStageMovementColumns = (labelHeader: string): ColumnDef[] => [
+  lbl(labelHeader),
+  amtG('第一阶段', SOE_STAGE_ECL_DESC.s1, '第一阶段'),
+  amtG('第二阶段', SOE_STAGE_ECL_DESC.s2, '第二阶段'),
+  amtG('第三阶段', SOE_STAGE_ECL_DESC.s3, '第三阶段'),
+  amt('合计'),
+]
 
 /**
  * 三阶段变动表列头 —— **上市侧两级混合分组**。
@@ -241,7 +263,7 @@ export const K1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
     txtG('期初计提比例(%)', '计提比例(%)', '期初数'),
     amtG('期初坏账准备', '坏账准备', '期初数'),
   ],
-  [K1_SOE_SUBTABLE.eclMovement]: stageMovementColumns('坏账准备'),
+  [K1_SOE_SUBTABLE.eclMovement]: soeStageMovementColumns('坏账准备'),
   [K1_SOE_SUBTABLE.balanceMovement]: stageMovementColumns('账面余额'),
   [K1_SOE_SUBTABLE.reversal]: flat([
     lbl('债务人名称'),

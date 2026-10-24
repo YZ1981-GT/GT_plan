@@ -136,19 +136,6 @@ _STAGE_ROWS = [
     total_row("合计"),
 ]
 
-#: 三阶段变动表列 —— **国企侧**单级 5 列。
-#: 源 xlsx 国企 `A63:E63` / `A77:E77` 是**一行表头**，阶段释义与阶段名写在同一格里
-#: （`B63 = 第一阶段未来12个月预期信用损失`），故国企侧确为 `flat`。
-def _movement_cols(label_header: str) -> list[dict[str, Any]]:
-    return _cols([
-        ("label", label_header, None),
-        ("第一阶段", "第一阶段", AMOUNT),
-        ("第二阶段", "第二阶段", AMOUNT),
-        ("第三阶段", "第三阶段", AMOUNT),
-        ("合计", "合计", AMOUNT),
-    ])
-
-
 #: 三阶段变动表列 —— **上市侧**两级混合分组。
 #:
 #: 🔴 源 xlsx 上市 `A91:E92` 是**两行表头**（`A91:A92` 与 `E91:E92` 纵向合并 = rowspan=2；
@@ -170,6 +157,27 @@ def _listed_movement_cols(label_header: str) -> list[dict[str, Any]]:
             ("第一阶段", _STAGE1_ECL_DESC, AMOUNT, "第一阶段"),
             ("第二阶段", _STAGE2_ECL_DESC, AMOUNT, "第二阶段"),
             ("第三阶段", _STAGE3_ECL_DESC, AMOUNT, "第三阶段"),
+            ("合计", "合计", AMOUNT, None),
+        ],
+    )
+
+
+#: 三阶段变动表列 —— **国企侧**，与上市侧同一种混合分组（阶段名作 group、ECL 释义作叶子列名，释义用国企底稿原字）。
+#: 源 xlsx 国企 G2「坏账准备计提情况」`A23:E24` 是两行表头（B23 阶段名 / B24 释义）；K1 `A63:E63` 是一行，阶段名
+#: 接着释义写在一格里（`B63 = 第一阶段未来12个月预期信用损失`）。原按后者打 `flat`、列名只留阶段名；
+#: consol-note-header-library-and-node-reaggregate R8.4 批 9b-1（单体按底稿披露表）两张都改两层「阶段名 / 释义」
+#: （守卫 test_note_template_workpaper_alignment 对一格里的两段两种读法都认）。
+_SOE_STAGE2_ECL_DESC = "整个存续期预期信用损失（未发生信用减值）"
+_SOE_STAGE3_ECL_DESC = "整个存续期预期信用损失（已发生信用减值）"
+
+
+def _movement_cols(label_header: str) -> list[dict[str, Any]]:
+    return grouped_columns(
+        ("label", label_header),
+        [
+            ("第一阶段", _STAGE1_ECL_DESC, AMOUNT, "第一阶段"),
+            ("第二阶段", _SOE_STAGE2_ECL_DESC, AMOUNT, "第二阶段"),
+            ("第三阶段", _SOE_STAGE3_ECL_DESC, AMOUNT, "第三阶段"),
             ("合计", "合计", AMOUNT, None),
         ],
     )
@@ -255,9 +263,10 @@ K1_LISTED_PLAN: list[dict[str, Any]] = [
     ),
     rule(
         "重要的账龄超过1年的应收股利",
+        # 末列列名按底稿 G3 上市第 25 行（R8.4 批 9b-1）；key 沿用既有数据键
         _cols([("label", "项目（或被投资单位）", None), ("期末余额", "期末余额", AMOUNT),
                ("账龄", "账龄", TEXT), ("未收回的原因", "未收回的原因", TEXT),
-               ("是否发生减值及其判断依据", "是否发生减值及其判断依据", TEXT)]),
+               ("是否发生减值及其判断依据", "是否发生减值及其原因", TEXT)]),
         blanks_then_total(3),
         KEEP,
     ),
@@ -462,10 +471,11 @@ K1_SOE_PLAN: list[dict[str, Any]] = [
     rule("坏账准备计提情况", _movement_cols("坏账准备"), list(_ECL_MOVEMENT_ROWS_SOE), KEEP),
     rule(
         "应收股利",
+        # 末列列名按底稿 G3 国企第 8 行（R8.4 批 9b-1）；key 沿用既有数据键
         _cols([("label", "项目", None), ("期末余额", "期末余额", AMOUNT),
                ("期初余额", "期初余额", AMOUNT),
                ("未收回的原因", "未收回的原因", TEXT),
-               ("是否发生减值及其判断依据", "是否发生减值及其判断依据", TEXT)]),
+               ("是否发生减值及其判断依据", "相关款项是否发生减值", TEXT)]),
         [data_row("账龄一年以内的应收股利"), data_row("其中：（1）"), data_row("（2）"),
          data_row(), data_row("账龄一年以上的应收股利"), data_row("其中：（1）"),
          data_row("（2）"), data_row(), subtotal_row("小计："),

@@ -124,7 +124,8 @@ def test_headers_are_three_columns(listed: dict[str, Any], soe: dict[str, Any]) 
     assert by_listed[T_MAIN]["headers"] == ["项目", "期末余额", "上年年末余额"]
     assert by_listed[T_CONTRACT_COST]["headers"] == ["项目", "佣金支出", "合计"]
     assert by_listed[T_CARBON]["headers"] == ["项目", "本期发生额", "上期发生额"]
-    assert _by_name(soe)[T_MAIN]["headers"] == ["项目", "期末余额", "期初余额"]
+    # 国企按底稿 K2 国企第 7 行（R8.4 批 9b-1 单体按底稿披露表）
+    assert _by_name(soe)[T_MAIN]["headers"] == ["项目", "期末账面价值", "年初账面价值"]
 
 
 def test_every_table_declares_flat_and_has_no_column_groups(

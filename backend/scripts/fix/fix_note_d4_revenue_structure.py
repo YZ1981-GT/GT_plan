@@ -83,12 +83,21 @@ _TWO_PERIOD_SUBS = [
 ]
 
 
-def _two_period_cols(label_key: str, label_text: str) -> list[dict]:
+#: 上市（3）按地区：源模板 B37:E37 子列写「主营业务收入 / 主营业务成本」（其余各表与国企（3）都是「收入 / 成本」），
+#: 与前端 ``d4DisclosureModel.LEAF_LABELS.region_listed`` 同字（consol-note-header-library-and-node-reaggregate
+#: R8.4 批 9b-1 单体按底稿披露表；key 不变）
+_TWO_PERIOD_SUBS_REGION_LISTED = [
+    ("revenue", "主营业务收入", AMOUNT),
+    ("cost", "主营业务成本", AMOUNT),
+]
+
+
+def _two_period_cols(label_key: str, label_text: str, subs: list | None = None) -> list[dict]:
     """（1）（2）（3）（8）的标准 5 列两级定义。"""
     return two_period_columns(
         label=(label_key, label_text),
         groups=("本期发生额", "上期发生额"),
-        subs=_TWO_PERIOD_SUBS,
+        subs=subs or _TWO_PERIOD_SUBS,
     )
 
 
@@ -282,7 +291,7 @@ def _listed_plan() -> list[dict]:
         # （3）按地区划分
         rule(
             T_REGION,
-            _two_period_cols("label", "主要经营地区"),
+            _two_period_cols("label", "主要经营地区", _TWO_PERIOD_SUBS_REGION_LISTED),
             None,
             _GUIDANCE_REGION,
         ),

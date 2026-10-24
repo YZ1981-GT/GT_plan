@@ -183,6 +183,8 @@ def _table(variant: str, name: str) -> dict:
         ("soe", "组合计提项目：应收中央企业客户", ["期末数", "期初数"]),
         ("soe", "采用余额百分比或其他组合方法计提坏账准备的应收账款", ["期末数", "期初数"]),
         ("soe", "（3）本期计提、收回或转回的坏账准备情况", ["本期变动金额"]),
+        # R8.4 批 9b-1 单体按底稿披露表：源模板 B51:E51「期末余额」盖住四个数据列（续表名带期间，仍单层）
+        ("listed", "按单项计提坏账准备的应收账款", ["期末余额"]),
     ],
 )
 def test_two_level_header_groups(variant: str, name: str, want_groups: list[str]) -> None:

@@ -104,6 +104,16 @@ const SOE_GROUPS = SOE_SPLIT.groups
 const listedAllColumns = buildG7ListedColumns() as Record<string, unknown[]>
 const soeAllColumns = buildG7SoeColumns() as Record<string, unknown[]>
 
+/** 国企模板暂缺的子表（helper `tablesPending`：模板补表后该条打红，删条目）。 */
+const SOE_TABLES_PENDING: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  '八、18': {
+    '②对合营企业或联营企业发生超额亏损的分担额':
+      '单体模板 八、18 原第 8 张表名写成本表、内容却是「结构化主体获得收益及转移资产情况」，R8.4 批 9b-1 按底稿' +
+      '改正表名；单体模板本就没有超额亏损表，批 9b-2 按底稿补表（consol-note-header-library-and-node-reaggregate ' +
+      'design §17.5）',
+  },
+}
+
 // ─── 共享 helper P1~P6（对**全部章节**跑，不再只跑主章节）────────────────────
 
 runDisclosureSubtableContract({
@@ -120,6 +130,7 @@ runDisclosureSubtableContract({
       section: g.section,
       subtables: g.subtables,
       columns: pickColumns(soeAllColumns, g.subtables) as any,
+      tablesPending: SOE_TABLES_PENDING[g.section],
     })),
   ],
 })

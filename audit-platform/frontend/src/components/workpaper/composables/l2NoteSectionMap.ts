@@ -50,10 +50,10 @@ export function buildL2ListedInterestColumns(): ColumnDef[] {
   ])
 }
 
-/** Listed 逾期利息列 */
+/** Listed 逾期利息列（标签列名逐字 = 源 xlsx R17「借款单位」，与单体模板 五、42 同；R8.4 批 9b-1） */
 export function buildL2ListedOverdueColumns(): ColumnDef[] {
   return defineColumns([
-    { key: 'label', label: '项目', is_label: true, flat: true },
+    { key: 'label', label: '借款单位', is_label: true, flat: true },
     { key: 'overdue_amount', label: '逾期金额', format: 'amount', align: 'right' },
     { key: 'overdue_reason', label: '逾期原因', format: 'text' },
   ])
@@ -68,10 +68,10 @@ export function buildL2SoeInterestColumns(): ColumnDef[] {
   ])
 }
 
-/** Soe 逾期利息列 */
+/** Soe 逾期利息列（标签列名逐字 = 源 xlsx「附注披露（国企）信息」R17「借款单位」，与单体模板 八、42 同；R8.4 批 9b-1） */
 export function buildL2SoeOverdueColumns(): ColumnDef[] {
   return defineColumns([
-    { key: 'label', label: '项目', is_label: true, flat: true },
+    { key: 'label', label: '借款单位', is_label: true, flat: true },
     { key: 'overdue_amount', label: '逾期金额', format: 'amount', align: 'right' },
     { key: 'overdue_reason', label: '逾期原因', format: 'text' },
   ])

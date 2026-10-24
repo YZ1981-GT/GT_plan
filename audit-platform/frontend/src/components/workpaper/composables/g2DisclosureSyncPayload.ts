@@ -46,11 +46,13 @@ const G2_COLUMNS: Record<string, ColumnDef[]> = {
     { key: 'overdue_reason', label: '逾期原因' },
     { key: 'impairment_basis', label: '是否发生减值及判断依据' },
   ],
+  // 两层表头：阶段名作分组、ECL 释义作列名（底稿 G2 国企第 23~24 行原字；附注模板 八、9 同表
+  // consol-note-header-library-and-node-reaggregate R8.4 批 9b-1 按底稿改，同步列头须与模板 headers 一致）
   坏账准备计提情况: [
     { key: 'label', label: '坏账准备', is_label: true },
-    { key: 'stage1', label: '第一阶段', format: 'amount' },
-    { key: 'stage2', label: '第二阶段', format: 'amount' },
-    { key: 'stage3', label: '第三阶段', format: 'amount' },
+    { key: 'stage1', label: '未来12个月预期信用损失', group: '第一阶段', format: 'amount' },
+    { key: 'stage2', label: '整个存续期预期信用损失（未发生信用减值）', group: '第二阶段', format: 'amount' },
+    { key: 'stage3', label: '整个存续期预期信用损失（已发生信用减值）', group: '第三阶段', format: 'amount' },
     { key: 'total', label: '合计', format: 'amount' },
   ],
 }

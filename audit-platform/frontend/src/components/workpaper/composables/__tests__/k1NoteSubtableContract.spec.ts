@@ -24,6 +24,7 @@ import {
 } from '../k1DisclosureSyncPayload'
 import { emptyK1ListedPayload, emptyK1SoePayload } from '../k1DisclosureModel'
 import type { ColumnDef } from '../disclosureColumnDefs'
+import { deriveColumnGroups, templateTable } from './_disclosureSubtableContract.helper'
 
 interface NoteTable { name?: string; headers?: string[]; guidance?: string; _column_groups?: unknown }
 interface NoteSection { section_number?: string; tables?: NoteTable[]; text_sections?: string[] }
@@ -83,18 +84,36 @@ describe('附注 §五、8 / §八、9 结构要求', () => {
         '单项计提坏账准备的其他应收款项',
         '账龄组合',
         '采用余额百分比法或其他组合方法计提坏账准备的其他应收款项',
+        // 🔴 2026-10-24 R8.4 批 9b-1：源 xlsx A63:E63 一格里「阶段名 + 释义」，附注模板按底稿改为两层
+        // （阶段名作分组、释义作列名，与上市同表、G2 国企同表、四版 Word 一致），原「单级」反向锁死随之撤销
+        K1_SOE_SUBTABLE.eclMovement,
       ].includes(String(t.name))),
     ]
-    expect(needGroups).toHaveLength(7)
+    expect(needGroups).toHaveLength(8)
     for (const t of needGroups) {
       expect(Array.isArray(t._column_groups), `${t.name} 缺 _column_groups`).toBe(true)
     }
   })
 
+  it('国企三阶段变动表同步列头 / 分组与附注模板同表逐位一致（阶段名作分组、释义作列名）', () => {
+    // 下面「同步 columns 与模板 headers 逐位同形」逐表比到第一张不一致的表即停（上市侧有同义写法的既有差异），
+    // 到不了这张表 ⇒ 单独比：seed（模板）与同步（这里）须同形
+    const name = K1_SOE_SUBTABLE.eclMovement
+    const tbl = templateTable('soe', K1_NOTE_SECTION.soe, name)
+    expect(tbl, `模板缺表 ${name}`).toBeDefined()
+    const cols = K1_SOE_COLUMNS[name]
+    expect(cols.map((c) => c.label)).toEqual(tbl!.headers)
+    expect(deriveColumnGroups(cols)).toEqual(tbl!._column_groups ?? null)
+    expect(deriveColumnGroups(cols)).toEqual([
+      { group: '第一阶段', start: 1, span: 1 },
+      { group: '第二阶段', start: 2, span: 1 },
+      { group: '第三阶段', start: 3, span: 1 },
+    ])
+  })
+
   it('源模板单级的表必须显式 flat 且无 _column_groups（反向锁死，防被误加两级）', () => {
     const flatTables = [
       K1_SOE_SUBTABLE.aging,          // 源 xlsx A6:C15 = 账 龄 / 期末数 / 期初数
-      K1_SOE_SUBTABLE.eclMovement,    // 源 xlsx A63:E63 一行表头（阶段名+释义同格）
       K1_SOE_SUBTABLE.balanceMovement,
     ]
     for (const name of flatTables) {

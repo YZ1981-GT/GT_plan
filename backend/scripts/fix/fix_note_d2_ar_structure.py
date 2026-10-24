@@ -205,6 +205,17 @@ INDIVIDUAL_COLUMNS_LISTED = flat_columns([
     ("loss_rate", "预期信用损失率（%）", PCT),
     ("basis", "计提依据", TXT),
 ])
+# 期末一张：源模板 B51:E51「期末余额」盖住四个数据列 → 两层（consol-note-header-library-and-node-reaggregate
+# R8.4 批 9b-1 单体按底稿披露表）；续表名带「上年年末余额」，仍单层（上面这组）
+INDIVIDUAL_COLUMNS_LISTED_END = grouped_columns(
+    ("label", "名 称"),
+    [
+        ("book_amount", "账面余额", AMT, "期末余额"),
+        ("provision", "坏账准备", AMT, "期末余额"),
+        ("loss_rate", "预期信用损失率（%）", PCT, "期末余额"),
+        ("basis", "计提依据", TXT, "期末余额"),
+    ],
+)
 INDIVIDUAL_COLUMNS_SOE = flat_columns([
     ("label", "债务人名称", None),
     ("end_amount", "账面余额", AMT),
@@ -346,7 +357,7 @@ def _build_listed_plan() -> list[dict[str, Any]]:
         rule("按账龄披露", AGING_COLUMNS_LISTED, None, _G_AGING),
         rule("按坏账计提方法分类披露", CLASS_COLUMNS_LISTED, None, _G_CLASS),
         rule("按坏账计提方法分类披露（续：上年年末余额）", CLASS_COLUMNS_LISTED, None, _G_CLASS),
-        rule("按单项计提坏账准备的应收账款", INDIVIDUAL_COLUMNS_LISTED, None, _G_INDIVIDUAL),
+        rule("按单项计提坏账准备的应收账款", INDIVIDUAL_COLUMNS_LISTED_END, None, _G_INDIVIDUAL),
         rule("按单项计提坏账准备的应收账款（续：上年年末余额）", INDIVIDUAL_COLUMNS_LISTED, None, _G_INDIVIDUAL),
         # 组合计提分表：模板里已实例化 5 张（按项目实际组合动态生成），列定义同构
         rule("组合计提项目：应收中央企业客户", PORTFOLIO_COLUMNS_LISTED, None, _G_PORTFOLIO),

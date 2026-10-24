@@ -301,11 +301,13 @@ PLAN: list[dict[str, Any]] = [
         "variant": "soe",
         "section": "八、42",
         "tables": [
-            {"name": "其他应付款", "columns": _two_period("类别", "期末余额", "期初余额"), "guidance": _G["k3_main"]},
+            # 标签列头按底稿（consol-note-header-library-and-node-reaggregate R8.4 批 9b-1）：K3 国企第 6 行「项目」、
+            # L2 国企第 17 行「借款单位」（原「类别」/「债权单位」）
+            {"name": "其他应付款", "columns": _two_period("项目", "期末余额", "期初余额"), "guidance": _G["k3_main"]},
             {"name": "应付利息", "columns": _two_period("项目", "期末余额", "期初余额"), "guidance": _G["k3_interest"]},
             {
                 "name": "重要的已逾期未支付的利息情况",
-                "columns": [_label_col("债权单位"), _amt("overdue_amount", "逾期金额"), _txt("overdue_reason", "逾期原因")],
+                "columns": [_label_col("借款单位"), _amt("overdue_amount", "逾期金额"), _txt("overdue_reason", "逾期原因")],
                 "guidance": _G["k3_interest_overdue"],
             },
             {"name": "应付股利", "columns": _two_period("项目", "期末余额", "期初余额"), "guidance": _G["k3_dividend"]},

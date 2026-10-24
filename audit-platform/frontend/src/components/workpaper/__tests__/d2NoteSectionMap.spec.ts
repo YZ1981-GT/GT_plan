@@ -10,6 +10,7 @@ import {
   buildD2NoteTexts,
   type D2DisclosureSnapshot,
 } from '../composables/d2NoteSectionMap'
+import { deriveColumnGroups, templateTable } from '../composables/__tests__/_disclosureSubtableContract.helper'
 
 function snap(overrides: Partial<D2DisclosureSnapshot> = {}): D2DisclosureSnapshot {
   return {
@@ -273,6 +274,20 @@ describe('d2NoteSectionMap', () => {
     const prior = p.sub_table_data[D2_TABLE_NAMES.listed.individualPrior] as any[]
     expect(prior[0]).toMatchObject({ label: 'A公司', book_amount: 200, provision: 20 })
     expect(prior[2]).toMatchObject({ book_amount: 400, provision: 40 })
+  })
+
+  it('上市单项计提两张表列头与附注模板同表逐位一致（期末表「期末余额」两层、续表单层）', () => {
+    // 底稿 B51:E51「期末余额」盖住四个数据列；续表名带期间。seed（模板）与同步（这里）须同形
+    const p = buildD2SyncPayload('listed', 'wp-1', null, snap())
+    for (const key of [D2_TABLE_NAMES.listed.individualEnd, D2_TABLE_NAMES.listed.individualPrior]) {
+      const tbl = templateTable('listed', D2_NOTE_SECTION.listed, key)
+      expect(tbl, `模板缺表 ${key}`).toBeDefined()
+      expect(p.columns[key].map((c) => c.label), key).toEqual(tbl!.headers)
+      expect(deriveColumnGroups(p.columns[key]), key).toEqual(tbl!._column_groups ?? null)
+    }
+    expect(deriveColumnGroups(p.columns[D2_TABLE_NAMES.listed.individualEnd])).toEqual([
+      { group: '期末余额', start: 1, span: 4 },
+    ])
   })
 
   it('Property 2 期末表与续表列 key 序列等长且 label 逐字相同', () => {

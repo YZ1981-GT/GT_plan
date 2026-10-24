@@ -54,7 +54,7 @@ export interface ContractColumnDef {
   format?: string
 }
 
-interface NoteTable {
+export interface NoteTable {
   name?: string
   headers?: string[]
   columns?: ContractColumnDef[]
@@ -84,6 +84,11 @@ export interface VariantContractSpec {
    * 每条必须写理由，随模板补齐逐个移出。
    */
   columnsPending?: Readonly<Record<string, string>>
+  /**
+   * 模板暂缺的子表名（模板结构尚未补齐时）：P1 对它们改为断言「模板确实仍缺」。
+   * 每条必须写理由；模板补齐后该断言打红，必须移出。
+   */
+  tablesPending?: Readonly<Record<string, string>>
 }
 
 export interface DisclosureContractOptions {
@@ -158,12 +163,24 @@ export function runDisclosureSubtableContract(opts: DisclosureContractOptions): 
       const sec = findSection(v.variant, v.section)
       const names = new Set((sec?.tables ?? []).map((t) => t.name))
       const entries = Object.entries(v.subtables)
+      const tablesPending = v.tablesPending ?? {}
 
       it(`P1 ${v.variant} 声明了子表（防空映射空转）`, () => {
         expect(entries.length).toBeGreaterThan(0)
       })
 
-      it.each(entries)(
+      if (Object.keys(tablesPending).length > 0) {
+        it(`P1 ${v.variant} tablesPending 有理由、是本章节子表、模板确实仍缺（补齐即移出）`, () => {
+          const bad = Object.entries(tablesPending).flatMap(([name, why]) => [
+            ...(String(why ?? '').trim() ? [] : [`${name}：缺理由`]),
+            ...(entries.some(([, n]) => n === name) ? [] : [`${name}：不是 ${v.section} 的运行时子表`]),
+            ...(names.has(name) ? [`${name}：模板已有，从 tablesPending 移出`] : []),
+          ])
+          expect(bad).toEqual([])
+        })
+      }
+
+      it.each(entries.filter(([, name]) => !(name in tablesPending)))(
         `P1 ${v.variant} %s → 「%s」存在于 ${v.section}`,
         (_key, name) => {
           expect(
@@ -262,6 +279,34 @@ export function runDisclosureSubtableContract(opts: DisclosureContractOptions): 
       })
     }
   })
+}
+
+/** 模板里某章节的某张表（各循环 spec 逐列比对用；与契约读同一份模板、同一份缓存）。 */
+export function templateTable(
+  variant: DisclosureVariantKey,
+  section: string,
+  name: string,
+): NoteTable | undefined {
+  return findSection(variant, section)?.tables?.find((t) => t.name === name)
+}
+
+/**
+ * 由 `columns` 的 `group` 连续段推出模板 `_column_groups`（与后端 `_extract_column_groups` 单级分支、
+ * 修订脚本 `derive_column_groups` 同算法：`start` 按含标签列的下标计）；没有分组为 `null`（模板不写该键）。
+ */
+export function deriveColumnGroups(
+  defs: readonly ContractColumnDef[],
+): Array<{ group: string; start: number; span: number }> | null {
+  const out: Array<{ group: string; start: number; span: number }> = []
+  defs.slice(1).forEach((d, i) => {
+    const idx = i + 1
+    const g = d.group
+    if (!g) return
+    const last = out[out.length - 1]
+    if (last && last.group === g && last.start + last.span === idx) last.span += 1
+    else out.push({ group: g, start: idx, span: 1 })
+  })
+  return out.length > 0 ? out : null
 }
 
 /** 供各循环 spec 复用：断言载荷不适用变体时返回 null（P5 of design） */

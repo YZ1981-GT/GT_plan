@@ -20,6 +20,7 @@ import {
   buildL2ListedColumns,
   buildL2SoeColumns,
 } from '../l2NoteSectionMap'
+import { templateTable } from './_disclosureSubtableContract.helper'
 
 /** 底稿侧 useL2Disclosure 的真实行标签（半角斜杠 + 「其他」，逐字复刻） */
 const WORKPAPER_LABELS = [
@@ -195,6 +196,18 @@ describe('列定义契约', () => {
     expect(listed.map((c) => c.key)).toEqual(['label', 'end_amount', 'prior_amount'])
     const soe = buildL2SoeColumns()[L2_SOE_SUBTABLE.interest]
     expect(soe.map((c) => c.key)).toEqual(['label', 'end_amount', 'prior_amount'])
+  })
+
+  it('两版逾期表列头与附注模板同表逐位一致（标签列「借款单位」= 底稿 R17，R8.4 批 9b-1）', () => {
+    // 应付利息表「期末数 / 上年年末数」与模板「期末余额 / 上年年末余额」同义不同字，按 R8.4 不改，这里不比
+    for (const [variant, cols, name] of [
+      ['listed', buildL2ListedColumns(), L2_LISTED_SUBTABLE.overdue],
+      ['soe', buildL2SoeColumns(), L2_SOE_SUBTABLE.overdue],
+    ] as const) {
+      const tbl = templateTable(variant, L2_NOTE_SECTION[variant], name)
+      expect(tbl, `${variant} 模板缺表 ${name}`).toBeDefined()
+      expect(cols[name].map((c) => c.label), `${variant} ${name}`).toEqual(tbl!.headers)
+    }
   })
 
   it('逾期表列 key 为 label/overdue_amount/overdue_reason', () => {

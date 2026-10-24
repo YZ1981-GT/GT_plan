@@ -12,6 +12,8 @@ import {
   buildG3ListedSyncPayloads,
   buildG3SoeSyncPayloads,
 } from '../g3DisclosureSyncPayload'
+import { G2_NOTE_SECTION } from '../g2NoteSectionMap'
+import { deriveColumnGroups, templateTable } from './_disclosureSubtableContract.helper'
 
 function g2Snap(): G2SoeSyncSnapshot {
   return {
@@ -28,7 +30,10 @@ describe('G2 disclosure columns', () => {
     expect(p.columns).toBeDefined()
     expect(p.columns!['应收利息分类'][0]).toMatchObject({ key: 'label', label: '项目', is_label: true })
     expect(p.columns!['重要逾期利息'][0]).toMatchObject({ key: 'borrower', label: '借款单位', is_label: true })
-    expect(p.columns!['坏账准备计提情况'].find(c => c.key === 'stage3')?.label).toBe('第三阶段')
+    // 两层表头（附注模板 八、9 按底稿 G2 国企第 23~24 行，R8.4 批 9b-1）：阶段名作分组、释义作列名
+    expect(p.columns!['坏账准备计提情况'].find(c => c.key === 'stage3')).toMatchObject({
+      label: '整个存续期预期信用损失（已发生信用减值）', group: '第三阶段',
+    })
     // 每个非元数据子表都有列头
     for (const k of Object.keys(p.sub_table_data)) {
       if (k.startsWith('_')) continue
@@ -39,6 +44,15 @@ describe('G2 disclosure columns', () => {
   it('listed 同结构带 columns', () => {
     const p = buildG2ListedSyncPayloads('wp', ['listed_standalone'], g2Snap())[0]
     expect(p.columns!['应收利息分类']).toBeDefined()
+  })
+
+  it('soe 坏账准备计提情况列头与附注模板同表逐位一致（列名 == headers、分组段 == _column_groups）', () => {
+    // seed 路径用模板 headers / _column_groups，同步路径用这里的 columns：两边不一致同一张表会前后显示不同表头
+    const cols = buildG2SoeSyncPayloads('wp', ['soe_standalone'], g2Snap())[0].columns!['坏账准备计提情况']
+    const tbl = templateTable('soe', G2_NOTE_SECTION.soe, '坏账准备计提情况')
+    expect(tbl, '模板缺表').toBeDefined()
+    expect(cols.map((c) => c.label)).toEqual(tbl!.headers)
+    expect(deriveColumnGroups(cols)).toEqual(tbl!._column_groups ?? null)
   })
 })
 

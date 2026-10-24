@@ -730,8 +730,8 @@
         "consol_seq": 73,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
-        "match_type": "table_title",
-        "standalone_table_name": "（如果母公司为投资性主体，无需披露下列财务信息。）"
+        "match_type": "chapter",
+        "standalone_table_name": null
       },
       {
         "consol_section_id": "五-18-4",
@@ -740,8 +740,8 @@
         "consol_seq": 74,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
-        "match_type": "continuation",
-        "standalone_table_name": "续：重要合营企业本期及上期经营成果"
+        "match_type": "chapter",
+        "standalone_table_name": null
       },
       {
         "consol_section_id": "五-18-5",
@@ -750,8 +750,8 @@
         "consol_seq": 75,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
-        "match_type": "table_title",
-        "standalone_table_name": "（如果母公司为投资性主体，无需披露下列财务信息。）"
+        "match_type": "chapter",
+        "standalone_table_name": null
       },
       {
         "consol_section_id": "五-18-6",
@@ -760,8 +760,8 @@
         "consol_seq": 76,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
-        "match_type": "continuation",
-        "standalone_table_name": "续：重要合营企业本期及上期经营成果"
+        "match_type": "chapter",
+        "standalone_table_name": null
       },
       {
         "consol_section_id": "五-18-7",
@@ -780,8 +780,8 @@
         "consol_seq": 78,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
-        "match_type": "table_title",
-        "standalone_table_name": "②对合营企业或联营企业发生超额亏损的分担额"
+        "match_type": "chapter",
+        "standalone_table_name": null
       },
       {
         "consol_section_id": "五-18-9",
@@ -791,7 +791,7 @@
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
         "match_type": "structure",
-        "standalone_table_name": "不重要合营企业和联营企业的汇总信息"
+        "standalone_table_name": "结构化主体权益的账面价值和最大损失敞口"
       },
       {
         "consol_section_id": "五-18-10",
@@ -801,7 +801,7 @@
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
         "match_type": "structure",
-        "standalone_table_name": "②对合营企业或联营企业发生超额亏损的分担额"
+        "standalone_table_name": "结构化主体获得收益及转移资产情况"
       },
       {
         "consol_section_id": "五-19-1",
@@ -4642,8 +4642,8 @@
         "consol_seq": 147,
         "standalone_note_section": "五、23",
         "standalone_section_title": "在建工程",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "table_title",
+        "standalone_table_name": "工程物资"
       },
       {
         "consol_section_id": "五-24-1",

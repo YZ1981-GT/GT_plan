@@ -265,7 +265,10 @@ class TestNoteTemplateAlignment:
         t = self._table(variant)
         cols = t.get("columns") or []
         assert cols[0]["key"] == "label"
-        assert cols[0].get("flat") is True, "标签列须显式 flat（否则被推断出父表头）"
+        # 两级表头不得打 flat：`_extract_column_groups` 见任一列 flat 即判单级、丢掉全部 group（四个类别父表头
+        # 不渲染）；数据列带 group 时标签列是 rowspan=2 的独立列，不会被推断出父表头。与前端
+        # buildD4TransposeColumns 一致（R8.4 批 9b-1 改；原断言 flat is True）。
+        assert not any(c.get("flat") for c in cols), "两级表头不得打 flat（分组会失效）"
         for c in cols[1:]:
             assert re.fullmatch(r"cat_\d+_(revenue|cost)", c["key"]), (
                 f"{variant}: 列 key {c['key']!r} 不是 `cat_N_{{revenue|cost}}` 形态"
