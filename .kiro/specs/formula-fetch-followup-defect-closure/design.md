@@ -198,6 +198,26 @@
 14. **L7 发布用报表行 BS-071 当科目码**：`tb_audited_writer.publish_rows` 只按 `standard_account_code` 精确匹配，BS-071 永远找不到行 ⇒ 跳过并记日志，
     而发布端点按载荷行数回「已发布 1 个科目」（假成功）。同根问题是全平台的：事件处理器跳过某科目时，端点仍报成功。
     L7 是否应像 K4 那样「无科目即禁用发布」需拍板。
+15. **账套识别规则 JSON 从未加载**：`ledger_import/identifier._RULES_FILE = parents[4] / "data" / ...` 落在仓库根 `data/`（文件在 `backend/data/`），
+    `reload_rules` 读不到就静默用内置默认（日志 debug 级）。而该 JSON（v2.1）已比内置旧：`column_aliases` 缺 `aux_dimensions`、`aux_type` 多一个「核算类型」，
+    且 `_rebuild_aliases` 是整表替换 ⇒ 直接改路径会让辅助核算维度列识别退化。需先定：同步 JSON 后改路径，还是删 JSON、内置为唯一来源
+    （`tests/ledger_import/test_balance_annual_semantics.py` 文件头把该 JSON 列为真源之一，与实际不符）。守卫 `test_data_file_paths_resolve.py` 已登记。
+16. **BS-010 存货区间 `SUM_TB('1401~1499')` 含非存货科目**：1481 / 1482 持有待售资产（有独立报表行）、1471 合同取得成本（列示于其他流动资产 /
+    其他非流动资产）都在区间内；`f2_extraction.category_rules` 也把合同取得成本归入存货的合同成本类。改报表公式与归类规则需拍板（与第 1 条同批）。
+17. **底稿一致性检查把备抵科目按正数相加**：`consistency_check_service.update_workpaper_consistency` 对映射码的试算表审定数直接求和（H1 = 原值 + 累计折旧 +
+    减值准备）。当前真库只有 1 张底稿（B22A）带 `parsed_data.audited_amount`，影响面为 0；接入前需按单一来源的账面价值口径取数。
+18. `WpMappingService.recommend_workpapers` 合并报表追加项写死 `B12 集团审计计划`（映射表 B12 是「与相关人员访谈程序及记录」，集团审计是 B30 / A3）；
+    前端 `getWpRecommendations` 无调用方。
+19. **映射表 `note_section` 与附注模板绑定生成**（R1.5 的 `note_template_bindings.json` 因此未重生成，需拍板）：
+    - `note_section` 是旧的上市口径编号且多族共用：五、19 同时挂 J1 应付职工薪酬 / G8 其他权益工具投资 / H8 使用权资产，五、34 挂 H9 租赁负债 / I6 研发费用，
+      五、12 挂 G4 / H3 / I1……而现行上市模板五、12 是一年内到期的非流动资产、五、14 是债权投资、五、34 是交易性金融负债。与 `report_row` 同类，单值字段表达不了。
+    - 生成器 `scripts/generate_note_template_bindings.py` 把同一章节号下所有条目的科目并集发给该节**每一个**数据行（存货节「原材料 / 在产品 / 库存商品」
+      各行都按整个存货族求和）。
+    - 隔离实验（同模板、同生成器，只换映射表：基线 `88b5d2cca` vs 现状）：映射改动影响 5 节 289 格（五、14 1503→1506 150 格、五、9 存货族 +13 码 100 格、
+      五、34 2802→2601+2651 20 格、五、12 1703B→1703 10 格、五、19 9 格）；模板陈旧另有 34 增 8 删（国企八、14 / 31 / 53 …），与映射无关。
+      五、34 交易性金融负债、五、12 一年内到期的非流动资产原先挂的是不存在的码（取 0），重生成后会把租赁负债、无形资产减值准备真实取进来 —— 比不重生成更坏。
+    - 真库 disclosure_notes 目前全是国企口径（八、xx），映射表没有八、编号，国企附注绑定不取映射码，现网影响为 0。
+    - 建议：`note_section` 按准则分列并对齐四版 Word 模板（或生成时按科目名与模板章节名关联），生成器按行级科目绑定；在此之前不重生成。
 
 ### 10.4 R1.4 科目码单一来源（含触类旁通，2026-10-24）
 
@@ -250,3 +270,35 @@
   注入 `const x: number = 'x'` 报 TS2322（变异证明）。
 - 回归：前端相关 115 个测试文件 2306 通过；失败 15 例全部来自 4 个 HEAD 同样失败的文件（`j2NoteSubtableContract` 2、`k1FormulaPushHost` 3、
   `k1NoteSubtableContract` 8、`k4NoteSectionMap` 2，附注子表契约 / 保存键集合，属其他会话）。后端 M 相关集合失败 117 例与 HEAD 逐条一致。
+
+### 10.5 R1.6 映射表守卫与读取方（2026-10-24）
+
+**映射表**（第三 / 四批，勘误文档同名节）：G6 1503→1506、G8 1503→1507、K2 1701→1901；F2 子条目按条目名逐条对科目名
+（原材料 / 在途物资改正，在产品 / 库存商品 / 委托加工物资 / 工程施工 / 开发产品置空，跌价准备 1461+1471→1416+1461，合同履约成本 1411→1472），
+F2 族级条目列全区间族 19 码；E0-4 借款发函 → 2001+2501、E0-5 应付票据发函 → 2201。修正脚本改为按（底稿, 字段）串修正链，`--check` 183 项。
+
+**守卫** `test_wp_account_mapping_single_source.py`（与推送 binding 守卫共用 `four_table/declared_codes.py`，避免两份判据分叉）：
+码形态 / 静态存在 / 真库 `account_chart` 存在（现 104 个码全在）/ 族级 ⊆ 声明 ∪ 双族码（偏差逐码登记：D4 6051、F5 6402、I6 1704、F2 区间族）/
+声明为空 ⇒ 映射为空（D5 / I5 / K4 / L7 / M8）/ 声明的原值码必在映射 / 函证族只许同循环声明码（E0 跨循环 3 码登记且须由登记的族声明）/
+条目名含平台标准一级科目名 ⇒ 码必须相交（M 循环与 L8-5 / I2-4 登记）/ 修正脚本各批全部生效；植入错码自检 11 例。
+
+**读取方**：
+- 全链路生成底稿：开关码表与映射匹配拆为 `wp_generation_matching.py`（纯函数），has_lease / has_rd 改正（§10.4 之后的提交 `12ece3df4`），
+  `test_wp_generation_matching.py` 26 组「科目 → 生成的底稿」字面量期望。
+- 调整到达通知、底稿一键刷新：原先各自读 json 且静默失效（路径落在 `app/data/`、把 `{"mappings": [...]}` 当列表），改经 `wp_mapping_service`
+  （`workpapers_for_account_codes` / `audit_sheet_account_codes`）；`test_wp_account_mapping_readers.py`（真 SQLite 通知 3 例 + 真库只读一键刷新 1 例）。
+- 触类旁通：`test_data_file_paths_resolve.py` 把 `backend/app` 里能静态求值的数据文件路径（174 处）逐个算出来看文件在不在，3 处故意可缺并登记
+  （其中账套识别规则见 §10.3 第 15 条）。
+- 本 spec 早先提交留下的陈旧测试一并改正：`test_note_direct_integration`（D5 归无科目组、F2 不再逐码出行）、`test_note_direct_binding`（F2 区间族）。
+
+**派生物（R1.5）**：
+- 前端挂凭推荐表 `views/ledger/accountToWpMapping.ts`：补生成器 `scripts/gen/gen_account_to_wp_ts.py`（`--check` / `--write`，幂等）。原表是手写的，
+  头注释指向的生成器从未存在。重生成 98 → 104 行：删 17 行错码（D5 1124、F2 1412、G6 1503、H6 1606B、K2 1701、H8 1901、K4 2261、J2 2611、J3 2711、
+  H9 2802、M3~M10 错位一格），增 23 行（G6 1506、H8 1641 / 1651、H9 2601 / 2651、J2 2705、K2 1901、M 循环正确码、F2 区间族），改名 8 行
+  （D6 1141 原标「其他应收款」实为合同资产、D7 2205 原标「其他应付款」实为合同负债等）。守卫：表 = 生成器按当前映射的输出 + 字面量抽样；
+  M 循环名码配对守卫补 `{ prefix, wpCode, wpName }` 写法（原先只认 code / name 键，所以这张表的 M 段错位没被抓到）。
+- `formula_push_coverage.json` 重生成：只变 F2 的 `account_prefixes`（6 → 19）。
+- `note_template_bindings.json`：做了隔离实验但**未重生成**（§10.3 第 19 条），待拍板。
+
+**偏离**：设计稿写「读取方行为变化逐个钉住」，实施时发现两处读取方根本没读到映射（不是「行为变化」而是「从未生效」），按缺陷修正并单独钉住；
+R1.5 的附注模板绑定未重生成（理由见 §10.3 第 19 条）。

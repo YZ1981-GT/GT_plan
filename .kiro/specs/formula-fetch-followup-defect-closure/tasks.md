@@ -38,8 +38,13 @@
 
 ## 3. 映射表（R1）
 
-- [ ] 3.1 全表探针：映射码 vs 标准科目表 / 真库科目表 / 口径单一来源；`report_row` vs `report_config` 行名（R1.1~R1.3）
-- [ ] 3.2 修正脚本扩展（J2 / J3 / L7 / M3~M10 / K4 / D5 及探针新发现）+ 勘误文档；`--apply` 后 `--check` 通过（R1.1~R1.3）
+- [x] 3.1 全表探针：映射码 vs 标准科目表 / 真库科目表 / 口径单一来源；`report_row` vs `report_config` 行名（R1.1~R1.3）
+  - 证据：探针固化为守卫 `test_wp_account_mapping_single_source.py`（码形态 / 静态存在 / 真库 `account_chart` 104 码全在 / 族级 ⊆ 单一来源 /
+    函证族 / 条目名对科目名 / 修正脚本生效，植入错码自检 11 例）；`report_row` 只核对与登记（勘误文档第二批末段，99 条有值只 18 条对得上）
+- [x] 3.2 修正脚本扩展（J2 / J3 / L7 / M3~M10 / K4 / D5 及探针新发现）+ 勘误文档；`--apply` 后 `--check` 通过（R1.1~R1.3）
+  - 证据：`fix_wp_account_mapping_wrong_codes.py` 第二~四批（M / J / L / K4 / D5 / H6~H9 / I1 / I5 / F2-55~58；G6 / G8 / K2；F2 子条目 / E0-4 / E0-5），
+    改为修正链（同一条目多批改正、链外值拒绝覆盖），`--check` 183 项幂等；`scripts/validate_seed_files.py` 7/7；勘误文档第二~四批
+  - 探针新发现并修：调整到达通知、底稿一键刷新两个读取方从未读到映射（design §10.5）；登记未修：§10.3 第 15~18 条
 - [x] 3.3 4xxx 写死码统一（前端 M 组合函数 / 后端 M 服务与路由 / phase5 / equity_method），逐处现读用途（R1.4）
   - 证据：前端 `mCycleAccountScope` 单一来源 + `mCycleAccountCodes` / `mCycleAccountRuntime` / `gCycleOciAccount` 守卫；后端
     `test_m_cycle_account_single_source.py` 41 例；变异前端 22 条、后端 12 条全部打红；M 相关后端失败集与 HEAD 逐条一致（117 例）
@@ -47,8 +52,19 @@
     新守卫 `cycleWrongLegacyAccountCodes.spec.ts` 51 例（零容忍组 + G1 / I2 / I5 / I6 棘轮 + 带入码 ⊆ 映射 + 运行态）；变异 FB1~FB29 全部打红；
     单区域 vue-tsc 与 HEAD 对比新增 0、消除 1（K4 宿主 / 审定表 tbData 形状不符 TS2739），注入 TS2322 被报出
   - 未改并登记：design §10.3 第 6~14 条（报表 OCI 公式 3102、I 循环旧码、G 循环 1501、K1-4 宽口径、L7 发布假成功等）
-- [ ] 3.4 派生物：补 `gen_account_to_wp_ts.py`（`--check`）并重生成前端映射；重生成 `note_template_bindings.json` / 覆盖率并解释 diff（R1.5）
-- [ ] 3.5 守卫 `test_wp_account_mapping_single_source.py` + 读取方行为变化钉住（R1.6）
+- [x] 3.4 派生物：补 `gen_account_to_wp_ts.py`（`--check`）并重生成前端映射；重生成 `note_template_bindings.json` / 覆盖率并解释 diff（R1.5）
+  - 证据：生成器 `scripts/gen/gen_account_to_wp_ts.py`，`accountToWpMapping.ts` 98 → 104 行（删 17 / 增 23 / 改名 8，逐条见 design §10.5）；
+    守卫「表 = 生成器输出」+ 字面量抽样（`test_wp_account_mapping_single_source.py`）、M 名码配对守卫补 prefix / wpName 写法；
+    `formula_push_coverage.json` 只变 F2 `account_prefixes`（`--check` 通过）
+  - 偏离：附注模板绑定做了隔离实验（映射改动 5 节 289 格、模板陈旧 42 格），因映射表 `note_section` 编号陈旧且多族共用，重生成会让两节由取 0 变成取错科目，
+    未提交，拆为 3.6 待拍板（design §10.3 第 19 条）
+- [ ] 3.6 附注模板绑定按新映射重生成 —— 待拍板：先定 `note_section` 按准则分列 / 按科目名关联，再改生成器按行级绑定（design §10.3 第 19 条）
+- [x] 3.5 守卫 `test_wp_account_mapping_single_source.py` + 读取方行为变化钉住（R1.6）
+  - 证据：守卫见 3.1；读取方 `test_wp_generation_matching.py`（26 组科目 → 生成底稿 + 开关码 + AST 判编排器不另写码表）、
+    `test_wp_account_mapping_readers.py`（按科目找底稿 / 一键刷新取数科目 / 真 SQLite 调整到达通知 3 例 / 真库只读一键刷新）、
+    `test_data_file_paths_resolve.py`（174 处数据文件路径静态求值，3 处登记）；陈旧测试 `test_note_direct_integration` / `test_note_direct_binding` 改正
+  - 变异：MW1~MW7（提交 `12ece3df4`）、MS1~MS12 + MS11b（映射退回旧码 / 判据失效 / 修正链 / 子科目兜底 / 通知与一键刷新退回旧实现 /
+    登记失效）全部打红后逐字节恢复
 
 ## 4. 鉴权（R4）
 

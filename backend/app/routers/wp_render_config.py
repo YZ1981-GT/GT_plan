@@ -300,6 +300,18 @@ class RenderConfigResponse(BaseModel):
 # ─── B-Index 自动生成辅助 ─────────────────────────────────────────────────
 
 
+def audit_sheet_account_codes(wp_code: str) -> list[str]:
+    """一键刷新取数用的科目：映射表该底稿条目的科目（经 WpMappingService，与其余读取方同一份缓存）。
+
+    🔴 原先自己读 json 后按列表遍历 ``{"mappings": [...]}``（遍历到的是键名字符串）⇒ 异常被吞、恒「未找到科目映射」，
+    只有一条写死的 D1 → 1121 兜底能用（spec formula-fetch-followup R1.6）。
+    """
+    from app.services.wp_mapping_service import WpMappingService
+
+    entry = WpMappingService().find_by_wp_code(wp_code) or {}
+    return list(entry.get("account_codes") or [])
+
+
 @router.post("/{wp_id}/audit-sheet-refresh")
 async def refresh_audit_sheet_from_ledger(
     wp_id: UUID,
@@ -349,28 +361,9 @@ async def refresh_audit_sheet_from_ledger(
     if not project_year:
         return {"rows": [], "message": "项目未设置审计期间，无法取数"}
 
-    # 确定科目编码（从 wp_account_mapping 或直接根据 wp_code）
-    import json
-    from pathlib import Path as _Path
-
-    mapping_file = _Path(__file__).resolve().parent.parent.parent / "data" / "wp_account_mapping.json"
-    account_codes: list[str] = []
-    try:
-        with open(mapping_file, "r", encoding="utf-8") as f:
-            mappings = json.load(f)
-        for m in mappings:
-            if m.get("wp_code") == wp_code:
-                account_codes = m.get("account_codes", [])
-                break
-    except Exception as e:
-        logger.warning("加载 wp_account_mapping 失败 wp_code=%s: %s", wp_code, e)
-
+    account_codes = audit_sheet_account_codes(wp_code)
     if not account_codes:
-        # D1 系列默认 1121（应收票据）
-        if wp_code.startswith("D1"):
-            account_codes = ["1121"]
-        else:
-            return {"rows": [], "message": f"未找到 {wp_code} 的科目映射"}
+        return {"rows": [], "message": f"未找到 {wp_code} 的科目映射"}
 
     # 从辅助余额表查询按客户/辅助核算维度的余额
     try:

@@ -4,6 +4,8 @@ spec: formula-push-note-rollout-batch-d · Task 7
 spec: formula-fetch-and-wp-generation-defect-closure R1 —— L7 其他非流动负债 / M8 一般风险准备没有标准科目
 （口径单一来源不给兜底码；原映射表写的 2801 是 K5 预计负债、4301 是专项储备，推的是别的科目的数）：
 两者改为「无科目」声明，不取试算表、不推附注主表，规则清单里也不得有它们的取数规则。
+spec: formula-fetch-followup-defect-closure R6.2 —— D5 应收款项融资同样没有标准科目（全库无 1124），归入无科目组；
+R6.1 —— F2 存货附注改按 BS-010 区间、按名归类写合计行（不再逐码出行），格式校验见 test_formula_push_f2_note_book_value。
 """
 from __future__ import annotations
 
@@ -19,7 +21,6 @@ from app.services.formula_push.rules import load_rules
 # ── 目标清单（现算自 wp_account_mapping，57 个批 D 科目） ─────────────────
 
 _TARGET_CODES = [
-    "D5",
     "F1", "F2", "F3", "F4",
     # G1~G10, H1~H10, I1~I5 已迁移到 BalanceAdjudicationBinding（批 C 审定表族）
     "G11", "G12", "G13", "G14",
@@ -31,7 +32,7 @@ _TARGET_CODES = [
     "N1", "N2", "N4", "N5",
 ]
 #: 没有标准科目的批 D 科目（R1）：binding 照常注册（底稿 / 附注页面仍能识别），但不取数、不推送
-_NO_ACCOUNT_CODES = ["L7", "M8"]
+_NO_ACCOUNT_CODES = ["D5", "L7", "M8"]
 
 # 规则清单（默认 binding_specs 自动获取）
 _RULES = {r.rule_id: r for r in load_rules()}
@@ -95,8 +96,7 @@ _REPRESENTATIVE_CODES = [
     ("K8", True),
     ("G11", True),
     ("N5", True),
-    # 多科目
-    ("F2", False),
+    # 多科目（F2 已改按区间取数、只写合计行，不在此列）
     ("D4", True),  # D4 有两个科目码 6001+6051，损益类
 ]
 

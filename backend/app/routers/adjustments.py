@@ -74,52 +74,25 @@ async def _notify_affected_wp_assignees(
 
     best-effort：任何异常静默跳过不阻断。
     """
-    import json
-    from pathlib import Path
+    import re
+
     from app.models.workpaper_models import WorkingPaper, WpIndex
     from app.services.notification_service import NotificationService
+    from app.services.wp_mapping_service import workpapers_for_account_codes
 
-    # 1. 加载科目→wp_code 映射（复用 procedure_trim_account_map + wp_account_mapping）
-    code_to_wp: dict[str, str] = {}
-    try:
-        trim_map_path = Path(__file__).resolve().parent.parent / "data" / "procedure_trim_account_map.json"
-        if trim_map_path.exists():
-            raw = json.loads(trim_map_path.read_text(encoding="utf-8"))
-            for wp_code, codes in raw.get("map", {}).items():
-                for c in codes:
-                    code_to_wp.setdefault(c, wp_code)
-        # 补充 wp_account_mapping
-        mapping_path = Path(__file__).resolve().parent.parent / "data" / "wp_account_mapping.json"
-        if mapping_path.exists():
-            mapping_data = json.loads(mapping_path.read_text(encoding="utf-8"))
-            for entry in (mapping_data.get("mappings") or mapping_data if isinstance(mapping_data, list) else []):
-                wp_code = entry.get("wp_code", "")
-                for c in (entry.get("account_codes") or []):
-                    code_to_wp.setdefault(c, wp_code)
-    except Exception:
-        return  # 映射文件缺失则跳过
+    # 1~2. 分录科目 → 关联底稿（映射表是唯一来源）。🔴 原先自己拼路径读 app/data/ 下的两个 json（文件不在那里），
+    #      且把 {"mappings": [...]} 按列表取 ⇒ 映射恒空，从未通知过任何人（spec formula-fetch-followup R1.6）。
+    affected_wp_codes = set(workpapers_for_account_codes(
+        [li.standard_account_code or "" for li in data.line_items], include_parent=True,
+    ))
+    # 去掉源底稿自己那一族（如 K9 同步不提示 K9 / K9-1 / K9A）
+    def _family(code: str) -> str:
+        m = re.match(r"^([A-Z]\d+)", code)
+        return m.group(1) if m else code
 
-    # 2. 从 line_items 科目码反查受影响的 wp_code（排除源底稿自己）
     source_wp_code = (data.source_wp_code or "").upper()
-    affected_wp_codes: set[str] = set()
-    for li in data.line_items:
-        code = (li.standard_account_code or "").strip()
-        if not code:
-            continue
-        # 精确匹配
-        if code in code_to_wp:
-            affected_wp_codes.add(code_to_wp[code])
-        else:
-            # 前缀匹配（1122→D2 if mapping has 1122）
-            for mapped_code, wp in code_to_wp.items():
-                if code.startswith(mapped_code) or mapped_code.startswith(code):
-                    affected_wp_codes.add(wp)
-                    break
-
-    # 去掉源底稿自己（如 K9 同步不提示 K9 自己）
-    source_base = source_wp_code.split("-")[0] if source_wp_code else ""
-    affected_wp_codes.discard(source_base)
-    affected_wp_codes.discard(source_wp_code)
+    if source_wp_code:
+        affected_wp_codes = {w for w in affected_wp_codes if _family(w) != _family(source_wp_code)}
     if not affected_wp_codes:
         return
 

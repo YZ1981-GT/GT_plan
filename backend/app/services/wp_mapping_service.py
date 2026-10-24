@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterable
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
@@ -38,6 +39,28 @@ def _load_mappings() -> list[dict]:
     except Exception as e:
         logger.warning("load wp_account_mapping failed: %s", e)
         return []
+
+
+def workpapers_for_account_codes(codes: Iterable[str], *, include_parent: bool = False) -> list[str]:
+    """科目码 → 映射表里列了该码的底稿编码（主编码与子表编码都在内，去重排序）。
+
+    ``include_parent``：某码在映射表里没有条目时，再找「映射码是它的前缀」的条目（试算表子科目 ``1122.01`` 归到 ``1122``）。
+    读取方一律经这里或 :class:`WpMappingService`，不要各自拼路径读 json（拼错路径 / 把 ``{"mappings": [...]}``
+    当列表遍历都会被 ``except`` 吞掉，读取方从此静默失效）。
+    """
+    by_code: dict[str, set[str]] = {}
+    for m in _load_mappings():
+        for c in m.get("account_codes") or []:
+            by_code.setdefault(c, set()).add(m["wp_code"])
+    out: set[str] = set()
+    for code in (str(c).strip() for c in codes):
+        if not code:
+            continue
+        hits = by_code.get(code)
+        if hits is None and include_parent:
+            hits = set().union(*(wps for mapped, wps in by_code.items() if code.startswith(mapped))) or None
+        out |= hits or set()
+    return sorted(out)
 
 
 class WpMappingService:

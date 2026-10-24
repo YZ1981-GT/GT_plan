@@ -244,6 +244,41 @@ _THIRD_BATCH: list[tuple[list[str], list[str], list[str], str]] = [
 for _codes, _old, _new, _why in _THIRD_BATCH:
     _add_family(_codes, "account_codes", _old, _new, _why)
 
+# ── 2026-10-24 第四批（条目名 vs 科目名逐条核对；同 spec R1.6）──
+#: 真库 account_chart 现查：存货科目并存两套标准科目表变体（`f2_extraction.category_rules` 文件头），
+#: 1405 库存商品 / 自制半成品、1406 发出商品 / 库存商品、1408 委托加工物资 / 商品进销差价、1411 周转材料 / 委托加工物资
+#: 在两套里含义互换 ⇒ 只写在所有变体里含义唯一的码：1402 在途物资、1403 原材料、1416 / 1461 存货跌价准备（变体 A / B）、
+#: 1472 合同履约成本；1471 在平台标准科目表（6 个项目）是合同取得成本（仅 1 个客户科目表叫存货跌价准备）。
+#: 族级条目（主条目 / 审定 / 分类 / 变动）列全族：1401~1499 里两套变体都是存货的码（含 1471 / 1472，
+#: `category_rules` 把合同取得成本 / 合同履约成本归入存货的合同成本类）。
+_F2_FAMILY = [
+    "1401", "1402", "1403", "1404", "1405", "1406", "1407", "1408", "1409", "1411",
+    "1416", "1421", "1431", "1441", "1451", "1452", "1461", "1471", "1472",
+]
+_FOURTH_BATCH: list[tuple[list[str], list[str], list[str], str]] = [
+    (["E0-4"], ["1002"], ["2001", "2501"],
+     "借款发函记录表：函证的是银行借款，短期借款 2001 / 长期借款 2501（与 L0 筹资循环函证同码）"),
+    (["E0-5"], ["1002"], ["2201"], "应付银行承兑汇票发函记录表：应付票据 2201（f_cycle_specs F3）"),
+    (["F2", "F2-1"], ["1401", "1402", "1403", "1405", "1408", "1461"], _F2_FAMILY,
+     "存货按区间取数（BS-010 = SUM_TB('1401~1499')）：两套变体的存货科目全部列出（原先缺 1406 库存商品 / 1416 跌价准备等，"
+     "变体 A 项目的这些行关联不到 F2）；不含 1481 / 1482 持有待售资产"),
+    (["F2-2", "F2-3"], ["1401", "1402", "1403", "1405"], _F2_FAMILY, "存货分类明细 / 增减变动覆盖全部存货类别，同主条目"),
+    (["F2-4"], ["1401"], ["1403"], "原材料 1403（1401 是材料采购）"),
+    (["F2-5"], ["1402"], [], "1402 是在途物资；在产品没有存货类独立科目（是生产成本余额，4001 / 5001 在各套科目表里另有含义）"),
+    (["F2-6"], ["1403"], [],
+     "1403 是原材料；库存商品在两套变体里分别是 1405 / 1406，这两个码在另一套里是自制半成品 / 发出商品 ⇒ 静态码表达不了"),
+    (["F2-7"], ["1404"], ["1402"], "在途物资 1402（1404 是材料成本差异）"),
+    (["F2-8"], ["1408"], [],
+     "委托加工物资在两套变体里分别是 1408 / 1411，这两个码在另一套里是商品进销差价 / 周转材料 ⇒ 静态码表达不了"),
+    (["F2-9"], ["1405"], [], "1405 是库存商品 / 自制半成品；工程施工在平台标准科目表是 4401（客户科目表里是其他权益工具）⇒ 宁缺勿造"),
+    (["F2-10"], ["1405"], [], "1405 是库存商品 / 自制半成品；开发产品没有标准独立码"),
+    (["F2-11", "F2-12", "F2-47", "F2-48", "F2-49"], ["1461", "1471"], ["1416", "1461"],
+     "存货跌价准备 1416 / 1461（两套变体）；1471 在平台标准科目表是合同取得成本"),
+    (["F2-55", "F2-56", "F2-57", "F2-58"], ["1411"], ["1472"], "合同履约成本 1472（1411 是周转材料 / 委托加工物资）"),
+]
+for _codes, _old, _new, _why in _FOURTH_BATCH:
+    _add_family(_codes, "account_codes", _old, _new, _why)
+
 
 def _load() -> dict[str, Any]:
     return json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
@@ -257,26 +292,44 @@ def _find_entries(doc: dict[str, Any], wp_code: str) -> list[dict[str, Any]]:
     ]
 
 
+def _chains() -> dict[tuple[str, str], list[tuple[Any, Any, str]]]:
+    """按 (底稿, 字段) 把各批修正串成链（批次顺序即登记顺序）。
+
+    同一条目可能被后一批再次改正（F2-55~58：第二批 1411+1412 → 1411，第四批 1411 → 1472），
+    链上相邻两步必须首尾相接（前一步的新值 = 后一步的原值），否则是登记错误。
+    """
+    chains: dict[tuple[str, str], list[tuple[Any, Any, str]]] = {}
+    for wp, field, old, new, why in FIXES:
+        chain = chains.setdefault((wp, field), [])
+        if chain and chain[-1][1] != old:
+            raise ValueError(f"{wp}.{field} 修正链断开：上一步改成 {chain[-1][1]!r}，这一步的原值写的是 {old!r}")
+        chain.append((old, new, why))
+    return chains
+
+
 def plan(doc: dict[str, Any]) -> tuple[list[str], list[str], list[str]]:
-    """返回 (待改, 已是新值/幂等跳过, 异常)。"""
+    """返回 (待改, 已是最终值/幂等跳过, 异常)。现值必须在修正链上（原值或某一步的新值），否则拒绝覆盖。"""
     todo: list[str] = []
     done: list[str] = []
     bad: list[str] = []
 
-    for wp, field, old, new, why in FIXES:
+    for (wp, field), chain in _chains().items():
         entries = _find_entries(doc, wp)
         if len(entries) != 1:
             bad.append(f"{wp}: 期望恰 1 条，实得 {len(entries)} 条 —— 人工确认后再改")
             continue
         cur = entries[0].get(field)
-        if cur == new:
-            done.append(f"{wp}.{field} 已是 {new!r}（幂等跳过）")
-        elif cur == old:
-            todo.append(f"{wp}.{field}: {old!r} → {new!r}    ∵ {why}")
+        final = chain[-1][1]
+        values = [chain[0][0], *(new for _old, new, _why in chain)]
+        if cur == final:
+            done.append(f"{wp}.{field} 已是 {final!r}（幂等跳过）")
+        elif cur in values:
+            why = "；".join(w for _o, _n, w in chain[values.index(cur):])
+            todo.append(f"{wp}.{field}: {cur!r} → {final!r}    ∵ {why}")
         else:
-            # 🔴 既不是期望原值也不是新值 ⇒ 有人改过，绝不盲目覆盖
+            # 🔴 不在修正链上 ⇒ 有人改过，绝不盲目覆盖
             bad.append(
-                f"{wp}.{field} 现值 {cur!r} 既非期望原值 {old!r} 也非目标 {new!r}"
+                f"{wp}.{field} 现值 {cur!r} 不在修正链上（{values!r}）"
                 " —— 可能已被他处改动，本脚本拒绝覆盖，请人工裁决"
             )
     return todo, done, bad
@@ -284,19 +337,21 @@ def plan(doc: dict[str, Any]) -> tuple[list[str], list[str], list[str]]:
 
 def apply_fixes(doc: dict[str, Any]) -> list[str]:
     changed: list[str] = []
-    for wp, field, old, new, _why in FIXES:
+    for (wp, field), chain in _chains().items():
         entries = _find_entries(doc, wp)
         if len(entries) != 1:
             continue
         e = entries[0]
-        if e.get(field) == old:
+        final = chain[-1][1]
+        values = [chain[0][0], *(new for _old, new, _why in chain)]
+        if e.get(field) != final and e.get(field) in values:
             before_name = e.get("account_name")
             before_wp_name = e.get("wp_name")
-            e[field] = new
+            e[field] = list(final) if isinstance(final, list) else final
             # 🔴 只动目标字段：名称本来就是对的，改它会让语义漂移
             assert e.get("account_name") == before_name, "account_name 被误改"
             assert e.get("wp_name") == before_wp_name, "wp_name 被误改"
-            changed.append(f"{wp}.{field} = {new!r}")
+            changed.append(f"{wp}.{field} = {final!r}")
     return changed
 
 

@@ -42,10 +42,16 @@ class TestNoteDirectFactory:
         assert "6601" in binding.account_prefixes
 
     def test_multi_account_codes(self):
-        """F2 存货有 6 个科目码。"""
+        """F2 存货：映射表列 BS-010 区间里两套标准科目表变体都是存货的码（2026-10-24 第四批；原先 6 个，缺 1406 / 1416 等）。
+
+        取数走区间 + 按名归类（``_book_value_range``），这些码只用于登记 / 校验。
+        """
         binding = note_direct_for("F2")
-        assert len(binding.account_prefixes) == 6
-        assert "1401" in binding.account_prefixes
+        assert binding.account_prefixes == (
+            "1401", "1402", "1403", "1404", "1405", "1406", "1407", "1408", "1409", "1411",
+            "1416", "1421", "1431", "1441", "1451", "1452", "1461", "1471", "1472",
+        )
+        assert binding._book_value_range == ("1401", "1499")
 
     def test_unknown_code_raises(self):
         with pytest.raises(KeyError, match="不存在"):

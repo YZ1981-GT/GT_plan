@@ -90,7 +90,8 @@
       "cycle": "E",
       "wp_name": "借款发函记录表",
       "account_codes": [
-        "1002"
+        "2001",
+        "2501"
       ],
       "account_name": "借款发函",
       "report_row": null,
@@ -101,7 +102,7 @@
       "cycle": "E",
       "wp_name": "应付银行承兑汇票发函记录表",
       "account_codes": [
-        "1002"
+        "2201"
       ],
       "account_name": "应付票据发函",
       "report_row": null,
@@ -534,9 +535,22 @@
         "1401",
         "1402",
         "1403",
+        "1404",
         "1405",
+        "1406",
+        "1407",
         "1408",
-        "1461"
+        "1409",
+        "1411",
+        "1416",
+        "1421",
+        "1431",
+        "1441",
+        "1451",
+        "1452",
+        "1461",
+        "1471",
+        "1472"
       ],
       "account_name": "存货",
       "report_row": "BS-008",
@@ -1488,9 +1502,22 @@
         "1401",
         "1402",
         "1403",
+        "1404",
         "1405",
+        "1406",
+        "1407",
         "1408",
-        "1461"
+        "1409",
+        "1411",
+        "1416",
+        "1421",
+        "1431",
+        "1441",
+        "1451",
+        "1452",
+        "1461",
+        "1471",
+        "1472"
       ],
       "account_name": "存货审定",
       "report_row": null,
@@ -1504,7 +1531,22 @@
         "1401",
         "1402",
         "1403",
-        "1405"
+        "1404",
+        "1405",
+        "1406",
+        "1407",
+        "1408",
+        "1409",
+        "1411",
+        "1416",
+        "1421",
+        "1431",
+        "1441",
+        "1451",
+        "1452",
+        "1461",
+        "1471",
+        "1472"
       ],
       "account_name": "存货分类明细",
       "report_row": null,
@@ -1518,7 +1560,22 @@
         "1401",
         "1402",
         "1403",
-        "1405"
+        "1404",
+        "1405",
+        "1406",
+        "1407",
+        "1408",
+        "1409",
+        "1411",
+        "1416",
+        "1421",
+        "1431",
+        "1441",
+        "1451",
+        "1452",
+        "1461",
+        "1471",
+        "1472"
       ],
       "account_name": "存货增减变动",
       "report_row": null,
@@ -1529,7 +1586,7 @@
       "cycle": "F",
       "wp_name": "原材料明细",
       "account_codes": [
-        "1401"
+        "1403"
       ],
       "account_name": "原材料明细",
       "report_row": null,
@@ -1539,9 +1596,7 @@
       "wp_code": "F2-5",
       "cycle": "F",
       "wp_name": "在产品明细",
-      "account_codes": [
-        "1402"
-      ],
+      "account_codes": [],
       "account_name": "在产品明细",
       "report_row": null,
       "note_section": null
@@ -1550,9 +1605,7 @@
       "wp_code": "F2-6",
       "cycle": "F",
       "wp_name": "库存商品明细",
-      "account_codes": [
-        "1403"
-      ],
+      "account_codes": [],
       "account_name": "库存商品明细",
       "report_row": null,
       "note_section": null
@@ -1562,7 +1615,7 @@
       "cycle": "F",
       "wp_name": "在途物资明细",
       "account_codes": [
-        "1404"
+        "1402"
       ],
       "account_name": "在途物资明细",
       "report_row": null,
@@ -1572,9 +1625,7 @@
       "wp_code": "F2-8",
       "cycle": "F",
       "wp_name": "委托加工物资明细",
-      "account_codes": [
-        "1408"
-      ],
+      "account_codes": [],
       "account_name": "委托加工物资明细",
       "report_row": null,
       "note_section": null
@@ -1583,9 +1634,7 @@
       "wp_code": "F2-9",
       "cycle": "F",
       "wp_name": "工程施工明细",
-      "account_codes": [
-        "1405"
-      ],
+      "account_codes": [],
       "account_name": "工程施工明细",
       "report_row": null,
       "note_section": null
@@ -1594,9 +1643,7 @@
       "wp_code": "F2-10",
       "cycle": "F",
       "wp_name": "开发产品明细",
-      "account_codes": [
-        "1405"
-      ],
+      "account_codes": [],
       "account_name": "开发产品明细",
       "report_row": null,
       "note_section": null
@@ -1606,8 +1653,8 @@
       "cycle": "F",
       "wp_name": "跌价准备明细",
       "account_codes": [
-        "1461",
-        "1471"
+        "1416",
+        "1461"
       ],
       "account_name": "跌价准备明细",
       "report_row": null,
@@ -1618,8 +1665,8 @@
       "cycle": "F",
       "wp_name": "跌价准备变动",
       "account_codes": [
-        "1461",
-        "1471"
+        "1416",
+        "1461"
       ],
       "account_name": "跌价准备变动",
       "report_row": null,
@@ -1966,8 +2013,8 @@
       "cycle": "F",
       "wp_name": "跌价准备测试（一）",
       "account_codes": [
-        "1461",
-        "1471"
+        "1416",
+        "1461"
       ],
       "account_name": "跌价测试一",
       "report_row": null,
@@ -1978,8 +2025,8 @@
       "cycle": "F",
       "wp_name": "跌价准备测试（二）",
       "account_codes": [
-        "1461",
-        "1471"
+        "1416",
+        "1461"
       ],
       "account_name": "跌价测试二",
       "report_row": null,
@@ -1990,8 +2037,8 @@
       "cycle": "F",
       "wp_name": "跌价准备测试（三）",
       "account_codes": [
-        "1461",
-        "1471"
+        "1416",
+        "1461"
       ],
       "account_name": "跌价测试三",
       "report_row": null,
@@ -2015,7 +2062,7 @@
       "cycle": "F",
       "wp_name": "合同履约成本（一）",
       "account_codes": [
-        "1411"
+        "1472"
       ],
       "account_name": "合同履约成本一",
       "report_row": null,
@@ -2026,7 +2073,7 @@
       "cycle": "F",
       "wp_name": "合同履约成本（二）",
       "account_codes": [
-        "1411"
+        "1472"
       ],
       "account_name": "合同履约成本二",
       "report_row": null,
@@ -2037,7 +2084,7 @@
       "cycle": "F",
       "wp_name": "合同履约成本（三）",
       "account_codes": [
-        "1411"
+        "1472"
       ],
       "account_name": "合同履约成本三",
       "report_row": null,
@@ -2048,7 +2095,7 @@
       "cycle": "F",
       "wp_name": "合同履约成本（四）",
       "account_codes": [
-        "1411"
+        "1472"
       ],
       "account_name": "合同履约成本四",
       "report_row": null,

@@ -195,6 +195,12 @@ const PAIR_RES: Array<{ re: RegExp; codeFirst: boolean }> = [
       + `(?:code|accountCode|account_code)${Q}?\\s*:\\s*${Q}(\\d{4})${Q}`, 'g'),
     codeFirst: false,
   },
+  // 挂凭推荐表（views/ledger/accountToWpMapping.ts）：{ prefix, wpCode, wpName }
+  {
+    re: new RegExp(`prefix${Q}?\\s*:\\s*${Q}(\\d{4})${Q}\\s*,\\s*wpCode${Q}?\\s*:\\s*${Q}[A-Z]\\d+${Q}\\s*,\\s*`
+      + `wpName${Q}?\\s*:\\s*${Q}(${NAMES})`, 'g'),
+    codeFirst: true,
+  },
 ]
 
 function pairMismatches(text: string): string[] {
@@ -216,12 +222,14 @@ describe('全前端「科目名 ↔ 码」配对一致（文案 / 注释 / 手�
   const files = walk(FRONTEND_SRC, (p) => /\.(ts|vue|md)$/.test(p) && !/[\\/]node_modules[\\/]/.test(p))
     .filter((p) => resolve(p) !== resolve(__filename))
 
-  it('反向自检：扫描器能抓到四种写法的错配', () => {
+  it('反向自检：扫描器能抓到各种写法的错配（含挂凭推荐表的 prefix / wpName）', () => {
     expect(pairMismatches('科目：4002 库存股')).toHaveLength(1)
     expect(pairMismatches('其他综合收益（4103）')).toHaveLength(1)
     expect(pairMismatches("{ code: '4104', name: '其他综合收益' }")).toHaveLength(1)
     expect(pairMismatches("accountName: '盈余公积',\n  accountCode: '3101',")).toHaveLength(1)
     expect(pairMismatches('4104 一般风险准备')).toHaveLength(1)
+    expect(pairMismatches("{ prefix: '4002', wpCode: 'M3', wpName: '库存股', cycle: 'M' }")).toHaveLength(1)
+    expect(pairMismatches("{ prefix: '4201', wpCode: 'M3', wpName: '库存股', cycle: 'M' }")).toEqual([])
     expect(pairMismatches('库存股(4201) / 4003 其他综合收益 / 1503 其他权益工具投资')).toEqual([])
   })
 
