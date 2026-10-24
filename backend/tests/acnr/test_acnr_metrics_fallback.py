@@ -150,8 +150,9 @@ class TestFullResolveMetricsIntegration:
         """Req-12.2: 非 wp 域委托 V1 → metrics 记录 fallback 事件。"""
         from app.services.acnr.resolver import full_resolve
 
-        # TB 域输入 → 委托 V1
-        result = await full_resolve(uri="tb://1001")
+        # TB 域输入 → 委托 V1（只建身份口径：不带项目时默认口径答「无法确认」、不算一次命中的委托，
+        # spec formula-fetch-followup-defect-closure R5.1）
+        result = await full_resolve(uri="tb://1001", verify_existence=False)
 
         metrics = get_acnr_metrics().get_aggregated_metrics()
         # 应有至少一条 resolve 记录

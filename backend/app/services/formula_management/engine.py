@@ -138,6 +138,12 @@ class ResolveRefResult:
     fail_open: bool = False
     error: Optional[str] = None
 
+    @property
+    def dangling(self) -> bool:
+        """明确不存在：未命中，且不是基础设施降级（fail-open）、也不是缺项目上下文「无法确认」
+        （非底稿域引用没有项目时 ACNR 不再一律判存在，spec formula-fetch-followup-defect-closure R5.1）。"""
+        return not self.found and not self.fail_open and self.error != "project_context_required"
+
 
 async def resolve_ref(
     *,
@@ -145,6 +151,8 @@ async def resolve_ref(
     addr_id: str | None = None,
     project_id: str | None = None,
     db: AsyncSession | None = None,
+    verify_existence: bool = True,
+    _memo: dict | None = None,
 ) -> ResolveRefResult:
     """封装 ACNR ``full_resolve``（Req 11）。
 
@@ -167,6 +175,8 @@ async def resolve_ref(
             addr_id=addr_id,
             project_id=project_id,
             db=db,
+            verify_existence=verify_existence,
+            _instance_memo=_memo,  # 请求级缓存：逐个解析很多引用时复用同一判定器
         )
         return ResolveRefResult(
             found=bool(rr.found),
@@ -230,6 +240,7 @@ async def _resolve_formula_refs(
                 addr_id=addr_id,
                 project_id=project_id,
                 db=db,
+                verify_existence=False,  # 只建立引用身份（R5.1：显式声明不校验存在性）
             )
         )
     return resolved

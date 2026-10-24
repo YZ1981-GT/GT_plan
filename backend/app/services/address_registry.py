@@ -1286,25 +1286,20 @@ class AddressRegistryService:
     async def validate_formula_refs(self, db, project_id: str, year: int,
                                     formula: str,
                                     template_type: str = 'soe') -> list[dict]:
-        """校验公式中所有引用的地址是否有效"""
-        # 按需加载涉及的域
+        """校验公式中所有引用的地址是否有效。
+
+        试算表 / 报表 / 附注三域按 ``formula_ref_check``（与求值同口径：试算表按前缀、报表限本项目适用准则、附注按本年度
+        附注结构，未生成时按模板）判定；底稿 / 辅助余额沿用地址目录（spec formula-fetch-followup-defect-closure R5.2）。
+        原先三域也查地址目录：试算表只认精确码、报表登记全部准则的行、附注只登记模板「合计」行。
+        """
+        from app.services.formula_ref_check import CHECKED_FUNCS, FormulaRefChecker
+
+        # 按需加载涉及的域（只剩底稿 / 辅助余额查地址目录）
         needed_domains: set[str] = set()
-        for fn_name in _FORMULA_PATTERNS:
-            if fn_name in ('TB', 'SUM_TB', 'PREV'):
-                if fn_name in formula:
-                    needed_domains.add('tb')
-            elif fn_name in ('ROW', 'SUM_ROW', 'REPORT'):
-                if fn_name in formula:
-                    needed_domains.add('report')
-            elif fn_name == 'NOTE':
-                if 'NOTE(' in formula:
-                    needed_domains.add('note')
-            elif fn_name == 'WP':
-                if 'WP(' in formula:
-                    needed_domains.add('wp')
-            elif fn_name == 'AUX':
-                if 'AUX(' in formula:
-                    needed_domains.add('aux')
+        if 'WP(' in formula:
+            needed_domains.add('wp')
+        if 'AUX(' in formula:
+            needed_domains.add('aux')
 
         uri_set: set[str] = set()
         #: 辅助余额按（科目, 维度, 列）登记的科目是明细码（如 1122.01）；AUX 求值按科目前缀合计，
@@ -1323,6 +1318,7 @@ class AddressRegistryService:
             return any(src.startswith(parts['source']) and dim == parts['path'] and col == parts['cell']
                        for src, dim, col in aux_keys)
 
+        checker: FormulaRefChecker | None = None
         issues = []
         for fn_name, pattern in _FORMULA_PATTERNS.items():
             for m in pattern.finditer(formula):
@@ -1331,6 +1327,17 @@ class AddressRegistryService:
                 if fn_name == 'PREV' and uri and uri.startswith('wp://'):
                     # 三参 PREV 是上年同底稿取数：按本底稿该字段的现行取数定义在上年数据上重算（prev_wp_field），
                     # 不是本年目录里的地址；没有定义 / 取不到由求值写明原因（R2.2：保存不拒收）
+                    continue
+                if fn_name in CHECKED_FUNCS:
+                    checker = checker or FormulaRefChecker(db, project_id, year, template_type)
+                    verdict = await checker.check(ref_text)
+                    if verdict is not None and not verdict.exists:
+                        issues.append({
+                            'ref': ref_text,
+                            'uri': uri,
+                            'status': 'not_found',
+                            'message': verdict.reason,
+                        })
                     continue
                 if uri and uri not in uri_set and not (fn_name == 'AUX' and _aux_prefix_registered(uri)):
                     issues.append({

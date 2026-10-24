@@ -55,7 +55,11 @@ def _make_fake_resolve(registry: dict[str, str]):
         index_ref: str | None = None,
         project_id: str | None = None,
         db=None,
+        verify_existence: bool = True,
     ) -> ResolveResult:
+        # 追溯只建立 canonical 身份：寻址层必须显式声明不校验非底稿域存在性
+        # （spec formula-fetch-followup-defect-closure R5.1；否则无项目时一律判「无法确认」）
+        assert verify_existence is False, "addressing_service 应以 verify_existence=False 调 full_resolve"
         raw = uri or formula_ref or addr_id or index_ref
         canonical = registry.get(raw)
         if canonical is not None:

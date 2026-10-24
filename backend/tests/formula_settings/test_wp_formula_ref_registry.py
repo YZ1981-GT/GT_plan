@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.models.audit_platform_models import TbAuxBalance
-from app.models.report_models import FinancialReportType, ReportConfig
+from app.models.report_models import DisclosureNote, FinancialReportType, ReportConfig
 from app.services import address_registry as ar
 
 from ._env import add_project, make_db
@@ -50,7 +50,8 @@ async def test_save_validation_accepts_bs_row_note_and_aux_type_refs(monkeypatch
     svc = ar.AddressRegistryService()
     monkeypatch.setattr(svc, "_redis_get", AsyncMock(return_value=None))
     monkeypatch.setattr(svc, "_redis_set", AsyncMock())
-    async with make_db(extra_models=(TbAuxBalance,)) as factory, factory() as db:
+    # 附注引用按本年度附注结构判定、未生成时按模板（spec formula-fetch-followup-defect-closure R5.2）⇒ 要有附注表
+    async with make_db(extra_models=(TbAuxBalance, DisclosureNote)) as factory, factory() as db:
         pid = await add_project(db, "地址库")
         db.add_all([
             ReportConfig(report_type=FinancialReportType.balance_sheet, row_code="BS-002", row_name="货币资金",

@@ -317,12 +317,17 @@ class TestL3RuntimeMatch:
 
 
 class TestNonWpDomainDelegation:
-    """Step 7: 非 wp 域（tb/report/note/aux）→ 委托 V1 (R5.7)。"""
+    """Step 7: 非 wp 域（tb/report/note/aux）→ 委托 V1 (R5.7) 做写法换算。
+
+    spec formula-fetch-followup-defect-closure R5.1：换算之后还要核单引用与存在性；本类测的是换算（引用身份），
+    故以只建身份的调用方口径（``verify_existence=False``）调用；默认口径见 ``test_default_without_project_is_unconfirmed``
+    与 ``tests/test_formula_ref_check.py``。
+    """
 
     @pytest.mark.asyncio
     async def test_tb_uri_delegates_to_v1(self):
         """tb:// URI → 委托 V1 返回统一契约。"""
-        result = await full_resolve(uri="tb://1001#审定数")
+        result = await full_resolve(uri="tb://1001#审定数", verify_existence=False)
 
         assert result.found is True
         assert result.entry_type == "tb"
@@ -332,7 +337,7 @@ class TestNonWpDomainDelegation:
     @pytest.mark.asyncio
     async def test_tb_formula_ref_delegates_to_v1(self):
         """TB('1001','审定数') → 委托 V1。"""
-        result = await full_resolve(formula_ref="TB('1001','审定数')")
+        result = await full_resolve(formula_ref="TB('1001','审定数')", verify_existence=False)
 
         assert result.found is True
         assert result.source_layer == "V1"
@@ -340,7 +345,7 @@ class TestNonWpDomainDelegation:
     @pytest.mark.asyncio
     async def test_note_uri_delegates_to_v1(self):
         """note:// URI → 委托 V1。"""
-        result = await full_resolve(uri="note://五、3/应收账款#合计.期末")
+        result = await full_resolve(uri="note://五、3/应收账款#合计.期末", verify_existence=False)
 
         assert result.found is True
         assert result.entry_type == "note"
@@ -349,7 +354,7 @@ class TestNonWpDomainDelegation:
     @pytest.mark.asyncio
     async def test_report_uri_delegates_to_v1(self):
         """report:// URI → 委托 V1。"""
-        result = await full_resolve(uri="report://BS/BS-002#期末")
+        result = await full_resolve(uri="report://BS/BS-002#期末", verify_existence=False)
 
         assert result.found is True
         assert result.entry_type == "report"
@@ -358,7 +363,7 @@ class TestNonWpDomainDelegation:
     @pytest.mark.asyncio
     async def test_tb_index_ref_delegates_to_v1(self):
         """TB:1001 索引命名空间 → 委托 V1 (R11.2)。"""
-        result = await full_resolve(index_ref="TB:1001")
+        result = await full_resolve(index_ref="TB:1001", verify_existence=False)
 
         assert result.found is True
         assert result.source_layer == "V1"
@@ -368,10 +373,22 @@ class TestNonWpDomainDelegation:
     @pytest.mark.asyncio
     async def test_note_index_ref_delegates_to_v1(self):
         """Note:五、3 索引命名空间 → 委托 V1。"""
-        result = await full_resolve(index_ref="Note:五、3")
+        result = await full_resolve(index_ref="Note:五、3", verify_existence=False)
 
         assert result.found is True
         assert result.source_layer == "V1"
+
+    @pytest.mark.asyncio
+    async def test_default_without_project_is_unconfirmed(self):
+        """默认口径（校验存在性）缺项目上下文 ⇒ 无法确认（found=False），不再一律判存在。"""
+        for kwargs in ({"uri": "tb://1001#审定数"}, {"formula_ref": "TB('1001','审定数')"}, {"index_ref": "Note:五、3"}):
+            result = await full_resolve(**kwargs)
+            assert (result.found, result.error, result.verified) == (False, "project_context_required", False), kwargs
+
+    @pytest.mark.asyncio
+    async def test_identity_mode_marks_unverified(self):
+        result = await full_resolve(formula_ref="TB('1001','审定数')", verify_existence=False)
+        assert result.found is True and result.verified is False
 
     @pytest.mark.asyncio
     async def test_external_module_index_ref_not_resolved(self):

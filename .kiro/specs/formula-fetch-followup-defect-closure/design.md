@@ -342,3 +342,41 @@ R1.5 的附注模板绑定未重生成（理由见 §10.3 第 19 条）。
      `GET /impact-by-addr` —— 任意登录用户可给任意项目打过期标记。跨联动总线域，需逐个评估调用方后另定。
   2. 审计年度解析另有两份重复实现（`routers/audit_check._resolve_project_year`、`routers/wp_formula._resolve_project_year`），本 spec 只复用单一真源、未合并。
   3. `mention_service._search_address` 传写死的 `soe`，只取 tb / aux 两域（构建不看口径，只影响缓存键），无行为影响。
+
+### 10.8 R5 引用校验（2026-10-24）
+
+- **判定模块（R5.2）** `services/formula_ref_check.py`：试算表按前缀 + 已注册列名（本年度）；报表按本项目适用准则的有效配置
+  （`ReportConfigService.resolve_applicable_standard` + `load_effective_report_configs`，含项目层）；附注按本年度附注结构
+  （`formula_ref_preload.note_locate`，与严格求值同一套匹配，只看结构不要求有值），本年度一节都没有时按附注模板
+  （模板合计行写 `row_type=total`、附注写 `is_total`，两种都认）；项目编号无效一律判不存在。`validate_formula_refs` 的三域改调它，
+  底稿 / 辅助余额仍查地址目录。`note_locate` 是从 `_note_cell` 抽出的定位部分，`_note_cell` 行为不变。
+- **ACNR（R5.1）**：`full_resolve` 增 `verify_existence`（默认真）与结果字段 `verified` / `reason`；核对放 `acnr/non_wp_verification.py`：
+  复合表达式 ⇒ `not_single_reference`；缺项目 ⇒ `project_context_required`；有项目按数据 ⇒ `ref_not_found` + 原因；章节级索引
+  （`Note:五、3`）只看章节；读库在保存点里；`_instance_memo` 请求级复用同一判定器（报表生成对每个 ROW 引用都解析，配置只读一次）。
+  只建身份的调用方显式 `verify_existence=False`：附注执行器 `_resolve_cross_refs_via_acnr`、公式管理执行 `_resolve_formula_refs`、
+  高级查询寻址与跨表追溯。`ResolveRefResult.dangling`：缺项目的「无法确认」不算悬空（全局预设导入 / 新增不拦）。
+  GET `/api/acnr/resolve` 增可选 `project_id`（先校验项目访问权）—— 前端 `resolveIndex` 一直在传，后端原先没有这个参数、静默忽略。
+- **附注（R5.3）**：保存 `PUT …/formulas` 先逐条 `validate_refs_via_acnr`，悬空 422、不写库，每条带单元格 `target`；执行器 NOTE 按
+  `_note_cell` 取行 / 列（含两参、参数间空格），原先一律取最后一个合计行、「期末」= 第一列；`_load_cross_table_data` 改存每节
+  `table_data` 并排除已删除附注（原先没排除）。
+- **触类旁通**：执行器 TB 只认精确码（一级科目只有下级行时恒 0）→ 前缀合计；TB / REPORT / WP 参数间有空格整条取不到 → 允许空格
+  （与保存前校验写法一致）。公式导入 / 新增预设的逐条校验原先把整条表达式当一个引用（`_formula_ref_from_expr`）：以 TB 开头的取第一个
+  引用判存在，以 `ABS(` / 括号开头的整条判悬空 → 拆成单个引用逐个校验（`_individual_refs`）；前端预设编辑弹窗的 refs 同样拆开
+  （原先把 JSON 串化的引用项整条送去解析，必判悬空）。
+- **前端（R5.4）**：`addressRegistry.validate` 只有整条公式是单个 WP 引用（`SINGLE_WP_REF`）才用 ACNR 命中短路，其余走带项目的数据校验；
+  `useAcnr.resolveFormula` / `resolveUri` 带项目（缓存键含项目）；store `resolve` 带当前绑定项目；`GtFormulaEditDialog`（预设库，不在项目里）
+  把 `project_context_required` 当无法确认、不拦，其余未命中照常拦。
+- **测试**：`test_formula_ref_check.py`（判定口径 23 例、原因文案、模板兜底、三域路由、ACNR 单引用 / 复合 / 缺项目 / 只建身份 / 请求级缓存、
+  `dangling` 口径、导入逐个引用、只建身份调用方、执行器 NOTE / TB、已删除附注）、`test_note_formula_save_ref_check.py`（真路由：悬空 422 不写库、
+  有效则保存）；前端 `addressRegistry.validateRefScope.spec.ts`、`useAcnr_resolve_project.spec.ts`、`GtFormulaEditDialog.spec.ts` 补 3 组。
+  陈旧测试按新口径改写：ACNR 委托类改以只建身份口径调用并补「默认缺项目 = 无法确认」、查询构造器写法闭包同、附注 DSL 两个夹具改
+  `note_tables`、寻址 PBT 的替身断言 `verify_existence=False`、校验 PBT 的试算表改按科目存在性、底稿公式保存校验补附注表。
+- **回归**：涉及的 102 个测试文件与本提交基线（`9eb504a5e` 干净检出）逐条对比新增失败 0（双方同为 20 failed + 8 errors，均为预存）。
+- **历史大文件**：`acnr/resolver.py`（HEAD 1073 行）、`note_formula_generator.py`（HEAD 1489 行）此前未登记白名单、任何改动都被门禁拒，
+  登记基线（resolver 只 +13 行，逻辑放新模块；生成器净 −6）。
+- **偏离**：422 用与报表 / 底稿公式保存相同的 `FORMULA_DANGLING_REFS`（设计稿写 `FORMULA_REF_NOT_FOUND`，全仓无此码、前端无处理）；
+  报表生成的 `dangling_row_ref` 告警原先恒为空（V1 换算即判存在），现在按本项目适用准则真实判定。
+- **范围外（登记，未改）**：
+  1. 两参 `PREV('科目','列')` 不在 ACNR 非底稿域识别里（`_detect_non_wp_domain` 无 `PREV(`），走底稿路径必未命中；前端保存前校验已不经 ACNR
+     走非 WP 引用，影响面只剩直接调 ACNR 的外部调用方。
+  2. 附注公式保存 422 的提示只显示「公式含悬空引用，拒绝保存」（`handleApiError` 只取 `detail.message`），不列引用；前端先校验时已列明。

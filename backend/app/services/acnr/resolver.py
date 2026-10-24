@@ -205,6 +205,10 @@ class ResolveResult:
     candidates: Optional[list[dict]] = None
     # 内部元数据
     source_layer: Optional[str] = None  # "L1_cell" / "L1_sheet" / "L2" / "L3" / "V1"
+    #: 非底稿域：True = 按项目数据核过存在；False = 只做了写法换算（调用方声明只建身份，或缺项目上下文）
+    verified: Optional[bool] = None
+    #: 判不存在时的原因（与求值缺数同一说法）
+    reason: Optional[str] = None
 
 
 def _detect_non_wp_domain(
@@ -325,6 +329,7 @@ async def full_resolve(
     explicit_wp_id: str | None = None,
     db: AsyncSession | None = None,
     _instance_memo: dict | None = None,
+    verify_existence: bool = True,
 ) -> ResolveResult:
     """统一 resolve 决策树入口 — 四库唯一解析方法（R5.1）。
 
@@ -346,6 +351,9 @@ async def full_resolve(
             由 resolve-batch 端点创建并传入各次 full_resolve，
             单次请求结束后自动丢弃（request-scoped）。
             disambiguation 结果不缓存。
+        verify_existence: 非底稿域（试算表 / 报表 / 附注 / 辅助余额）是否按项目数据判存在（默认是）。不是单个完整引用
+            ⇒ ``not_single_reference``；缺项目上下文 ⇒ ``project_context_required``（都 ``found=False``）。只为建立引用身份的
+            内部调用方显式传 False，结果 ``verified=False`` 如实标注（spec formula-fetch-followup-defect-closure R5.1）。
 
     Returns:
         ResolveResult — 统一响应契约
@@ -395,6 +403,11 @@ async def full_resolve(
     non_wp_domain = _detect_non_wp_domain(uri, formula_ref, index_ref)
     if non_wp_domain:
         result = _delegate_v1(uri, formula_ref, index_ref, non_wp_domain)
+        if result.found:  # 写法换算成功后再核单引用与存在性（R5.1，见 non_wp_verification）
+            from app.services.acnr.non_wp_verification import verify_non_wp
+
+            result = await verify_non_wp(result, formula_ref=formula_ref, project_id=project_id, db=db,
+                                         verify_existence=verify_existence, memo=_instance_memo)
         # Req-12.1: 记录 fallback 指标
         _latency = (_time.perf_counter() - _t0) * 1000
         _result_str = "fallback" if result.found else "miss"

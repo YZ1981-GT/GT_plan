@@ -328,10 +328,16 @@ def _note_column(headers: list, column: str) -> tuple[int | None, str]:
     return None, f"没有「{wanted}」列（表头：{'、'.join(h for h in data_headers if h) or '无'}）"
 
 
-def _note_cell(table_data: Any, section: str, label: str, column: str) -> tuple[Decimal | None, str]:
+def note_locate(table_data: Any, section: str, label: str, column: str, *,
+                require_values: bool = True) -> tuple[dict | None, int | None, list, str]:
+    """按章节的表格 / 行 / 列定位附注单元格 → ``(行, 数据列下标, 表头, 原因)``；定位不到时原因非空。
+
+    严格求值（``_note_cell``）、引用校验（``formula_ref_check``）与附注公式执行器共用这一套匹配。
+    ``require_values=False`` 只看结构（附注模板的行没有 ``values``），不要求数据列数与表头一致。
+    """
     main, others = _note_tables(table_data)
     if main is None and not others:
-        return None, f"附注 {section} 没有表格"
+        return None, None, [], f"附注 {section} 没有表格"
     main_rows = _note_rows(main, label) if main is not None else []
     if main_rows:
         hits = [(main, main_rows)]
@@ -339,20 +345,29 @@ def _note_cell(table_data: Any, section: str, label: str, column: str) -> tuple[
         hits = [(t, rows) for t in others if (rows := _note_rows(t, label))]
         if len(hits) > 1:
             names = "、".join(str(t.get("name") or "未命名") for t, _ in hits)
-            return None, f"附注 {section} 有多张表格都有「{label}」行（{names}）"
+            return None, None, [], f"附注 {section} 有多张表格都有「{label}」行（{names}）"
     if not hits:
-        return None, f"附注 {section} 没有「{label}」行"
+        return None, None, [], f"附注 {section} 没有「{label}」行"
     table, rows = hits[0]
     if len(rows) > 1:
-        return None, f"附注 {section}「{label}」行出现多次"
+        return None, None, [], f"附注 {section}「{label}」行出现多次"
     headers = table.get("headers") if isinstance(table.get("headers"), list) else []
     values = rows[0].get("values")
-    if not isinstance(values, list) or not headers or len(values) != len(headers) - 1:
-        return None, f"附注 {section} 表头与数据列数不一致，无法按列名定位"
+    if require_values and (not isinstance(values, list) or not headers or len(values) != len(headers) - 1):
+        return None, None, headers, f"附注 {section} 表头与数据列数不一致，无法按列名定位"
+    if not headers:
+        return None, None, headers, f"附注 {section} 表格没有表头，无法按列名定位"
     idx, reason = _note_column(headers, column)
     if idx is None:
-        return None, f"附注 {section} {reason}"
-    value = _to_decimal(values[idx])
+        return None, None, headers, f"附注 {section} {reason}"
+    return rows[0], idx, headers, ""
+
+
+def _note_cell(table_data: Any, section: str, label: str, column: str) -> tuple[Decimal | None, str]:
+    row, idx, headers, reason = note_locate(table_data, section, label, column)
+    if row is None or idx is None:
+        return None, reason
+    value = _to_decimal(row["values"][idx])
     if value is None:
         return None, f"附注 {section}「{label}」行「{headers[idx + 1]}」列为空或不是数值"
     return value, ""

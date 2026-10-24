@@ -19,6 +19,9 @@
     3. ``_formula_ref_to_addr_id`` 对这些 TB ref 返回 None（记录：TB 走 V1 委托而非 WP 解析器），
        畸形 WP ref 同样返回 None（解析器不过宽）。
     4. 非可定位表（working_paper 等）产出全 None（不产畸形 ref）。
+
+本文件测的是写法闭包（能否解析成统一契约），故以只建身份的口径调用（``verify_existence=False``）；
+按项目数据判存在是另一件事（spec formula-fetch-followup-defect-closure R5.1，见 ``tests/test_formula_ref_check.py``）。
 """
 
 from __future__ import annotations
@@ -92,7 +95,7 @@ async def test_query_builder_refs_resolve_under_grammar_v1(table, rows):
     refs = _derive_formula_refs(table, rows)
     assert refs and all(r is not None for r in refs)
     for ref in refs:
-        result = await full_resolve(formula_ref=ref)
+        result = await full_resolve(formula_ref=ref, verify_existence=False)
         assert result.found is True, f"grammar_v1 未能解析 query_builder ref: {ref!r}"
         # V1 委托产出统一契约：tb 域 URI + 非空 addr_id
         assert result.addr_id, f"{ref!r} 解析结果缺 addr_id"
@@ -102,7 +105,7 @@ async def test_query_builder_refs_resolve_under_grammar_v1(table, rows):
 async def test_query_builder_ref_both_column_variants_resolve():
     """两种列名（审定数 / 期末）都仅作 URI #cell 段透传，解析恒成立。"""
     for ref in ("TB('1001','审定数')", "TB('1001','期末')"):
-        result = await full_resolve(formula_ref=ref)
+        result = await full_resolve(formula_ref=ref, verify_existence=False)
         assert result.found is True, f"{ref!r} 未解析"
 
 

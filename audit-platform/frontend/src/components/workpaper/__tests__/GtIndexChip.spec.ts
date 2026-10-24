@@ -337,6 +337,17 @@ describe('GtIndexChip — 灰态兜底', () => {
     expect(tooltip.attributes('data-content')).toBe('底稿不存在')
   })
 
+  it('非底稿引用按项目数据判不存在：tooltip 显示后端原因，不说成「底稿不存在」（R5.1）', async () => {
+    const reason = '本年度（2025）试算表没有科目 1122 及其下级科目'
+    mockAcnrResolve.mockResolvedValue({ found: false, error: 'ref_not_found', reason })
+    const wrapper = mount(GtIndexChip, {
+      props: { value: 'TB:1122', validate: true },
+      global: globalConfig,
+    })
+    await flushPromises()
+    expect(wrapper.find('.el-tooltip-stub').attributes('data-content')).toBe(reason)
+  })
+
   it('灰态 chip 点击不触发导航', async () => {
     mockAcnrResolve.mockResolvedValue({ found: false })
     const wrapper = mount(GtIndexChip, {

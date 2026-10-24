@@ -230,7 +230,8 @@ class AddressingService:
 
         try:
             result = await asyncio.wait_for(
-                full_resolve(project_id=project_id, db=db, **kwargs),
+                # 追溯只建立 canonical 身份，不校验非底稿域的存在性（R5.1 显式声明）
+                full_resolve(project_id=project_id, db=db, verify_existence=False, **kwargs),
                 timeout=timeout_s,
             )
         except asyncio.TimeoutError:

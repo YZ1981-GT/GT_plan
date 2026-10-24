@@ -69,6 +69,9 @@ class AcnrResolveResponse(BaseModel):
     error: Optional[str] = None
     candidates: Optional[list] = None
     source_layer: Optional[str] = None
+    #: 非底稿域是否按项目数据核过存在（R5.1）；``reason`` = 判不存在 / 无法确认的原因
+    verified: Optional[bool] = None
+    reason: Optional[str] = None
 
 router = APIRouter(prefix="/api/acnr", tags=["ACNR-地址坐标名称注册中心"])
 
@@ -265,22 +268,36 @@ async def acnr_resolve_get(
     formula_ref: str | None = Query(None, description="公式引用，如 WP('D2','明细表D2-2','E100')"),
     addr_id: str | None = Query(None, description="addr_id，如 D2/D2-2/E100"),
     index_ref: str | None = Query(None, description="索引语法，如 cell:D2-2!E100"),
+    project_id: str | None = Query(None, description="项目 UUID：非底稿域引用按该项目数据判定是否存在"),
     _user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """兼容旧 GET 接口 — 内部也调 full_resolve（无 project_id/wp_id 时等价纯 L1）。
 
     Req-1.4: catalog.resolve() 降为内部 L1 helper，不再作为公共端点唯一出口。
+    ``project_id``（spec formula-fetch-followup-defect-closure R5.1）：试算表 / 报表 / 附注 / 辅助余额引用按该项目数据判定；
+    不带时这些引用返回 ``project_context_required``（原先只做写法换算即判存在）。带项目先校验项目访问权（同 POST）。
     """
+    if project_id:
+        try:
+            await check_project_access(_user, project_id, db)
+        except HTTPException:
+            from app.services.acnr.metrics import get_acnr_metrics
+            get_acnr_metrics().record_auth_reject(project_id=project_id)
+            raise
     result = await full_resolve(
         uri=uri,
         formula_ref=formula_ref,
         addr_id=addr_id,
         index_ref=index_ref,
+        project_id=project_id,
         db=db,
     )
 
     response = asdict(result)
+    if not project_id:  # 不带项目时不返回项目级数据（同 POST，Req-3.4）
+        response.pop("wp_id", None)
+        response.pop("jump_route", None)
     return {k: v for k, v in response.items() if v is not None}
 
 

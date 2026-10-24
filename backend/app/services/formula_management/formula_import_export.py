@@ -254,6 +254,32 @@ def _normalize_ref_item(ref: Any) -> tuple[str | None, str | None]:
     return None, None
 
 
+def _individual_refs(refs: list[Any]) -> list[tuple[str | None, str | None]]:
+    """引用项 → 逐个完整引用 ``(formula_ref, addr_id)``（去重保序）。
+
+    引用项可能是整条表达式：refs 留空时 ``_formula_ref_from_expr`` 把整条公式当一项，用户也可能把表达式填进 refs 列。
+    ACNR 对复合表达式答「不是单个引用」（spec formula-fetch-followup-defect-closure R5.1；原先取第一个引用判存在，
+    以 ``ABS(`` / 括号开头的又整条判悬空），故按函数写法拆成单个引用逐个校验；被别的引用包住的（``SUM_TB`` 里的 ``TB``）
+    不重复校验；认不出任何引用的项原样交给 ACNR 判定。
+    """
+    from app.services.formula_grammar import RELAXED_FORMULA_PATTERNS
+
+    out: list[tuple[str | None, str | None]] = []
+    for ref in refs:
+        formula_ref, addr_id = _normalize_ref_item(ref)
+        text = (formula_ref or "").strip()
+        spans = {(m.start(), m.end()) for p in RELAXED_FORMULA_PATTERNS.values() for m in p.finditer(text)}
+        outer = sorted(s for s in spans if not any(o != s and o[0] <= s[0] and s[1] <= o[1] for o in spans))
+        if not text or not outer or outer == [(0, len(text))]:
+            items = [(formula_ref, addr_id)]
+        else:
+            items = [(text[start:end], None) for start, end in outer]
+        for item in items:
+            if (item[0] or item[1]) and item not in out:
+                out.append(item)
+    return out
+
+
 def _read_header_row(ws) -> tuple[int, dict[str, int]] | None:
     """在公式 sheet 中定位表头行，返回 (header_row_index, {列头: 列下标})。"""
     for r_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=5, values_only=True), start=1):
@@ -356,20 +382,17 @@ async def parse_import_rows(
             # refs 留空时从表达式自动提取
             refs = _formula_ref_from_expr(expression)
 
-        # 逐条引用经 ACNR full_resolve 校验
+        # 逐个引用经 ACNR full_resolve 校验（整条表达式先拆成单个引用）
         dangling: list[str] = []
-        for ref in refs:
-            formula_ref, addr_id = _normalize_ref_item(ref)
-            if not formula_ref and not addr_id:
-                continue
+        for formula_ref, addr_id in _individual_refs(refs):
             rr = await resolve_ref(
                 formula_ref=formula_ref,
                 addr_id=addr_id,
                 project_id=project_id,
                 db=db,
             )
-            # fail-open（基础设施故障）不视为悬空，不跳过（Req 11.3）
-            if not rr.found and not rr.fail_open:
+            # fail-open（基础设施故障）、没有项目上下文无法确认的不视为悬空，不跳过（Req 11.3 / R5.1）
+            if rr.dangling:
                 dangling.append(formula_ref or addr_id or "")
 
         if dangling:
@@ -421,17 +444,14 @@ async def validate_single_formula_refs(
         normalized = _formula_ref_from_expr(expression)
 
     dangling: list[str] = []
-    for ref in normalized:
-        formula_ref, addr_id = _normalize_ref_item(ref)
-        if not formula_ref and not addr_id:
-            continue
+    for formula_ref, addr_id in _individual_refs(normalized):
         rr = await resolve_ref(
             formula_ref=formula_ref,
             addr_id=addr_id,
             project_id=project_id,
             db=db,
         )
-        if not rr.found and not rr.fail_open:
+        if rr.dangling:
             dangling.append(formula_ref or addr_id or "")
     return normalized, dangling
 

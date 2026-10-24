@@ -427,7 +427,8 @@ async def _resolve_cross_refs_via_acnr(
     for token in tokens:
         # resolve_ref 自身 fail-open（内部已捕获异常返回降级结果），此处再兜底一层。
         try:
-            rr = await resolve_ref(formula_ref=token, project_id=pid, db=db)
+            # 只建立引用身份，不校验存在性（取数走 cross_data；R5.1 显式声明）
+            rr = await resolve_ref(formula_ref=token, project_id=pid, db=db, verify_existence=False)
         except Exception:  # noqa: BLE001 — 对齐 fail-open：解析器故障不阻断执行
             continue
         if getattr(rr, "found", False) and getattr(rr, "addr_id", None):
@@ -683,7 +684,7 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
     Returns: {
         "report": {"BS-002": {"current": 1000, "prior": 900}, ...},
         "tb": {"1001": {"audited": 500, "unadjusted": 480, "opening": 450}, ...},
-        "notes": {"五、3": {"total_closing": 1200, "total_opening": 1100}, ...},
+        "note_tables": {"五、3": <disclosure_notes.table_data>, ...},  # NOTE 按章节 / 行 / 列取数
         "wp": {"E1": {"审定表E1!B5": 50.0, "审定表E1!C5": 40.0}, ...},
         "prior": {"货币资金": {"closing": 1234.56, "opening": 1100.0}, ...},  # Sprint 1.5 D4 新增
         "aging": {"应收账款": {"1年以内": 100.0, "1-2年": 50.0, ...}, ...},  # Sprint 1.5 D4 新增
@@ -696,7 +697,7 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
     cross_data: dict[str, Any] = {
         "report": {},
         "tb": {},
-        "notes": {},
+        "note_tables": {},
         "wp": {},
         "prior": {},   # Sprint 1.5 Task 1.5.2: 上年附注期末/期初值（按 account_name 索引）
         "aging": {},   # Sprint 1.5 Task 1.5.2: 账龄分桶（按 account_name 索引）
@@ -769,25 +770,20 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
     except Exception:
         pass
 
-    # 加载其他附注合计值
+    # 加载本年度附注表格：NOTE 引用按章节 / 行 / 列取数（与严格求值同一套匹配，spec formula-fetch-followup-defect-closure
+    # R5.3）。原先只存每节最后一个合计行的前两列（「期末」= 第一列、「期初」= 第二列），引用明细行或第三列都取错数；
+    # 也没排除已删除的附注（同章节的删除行可能盖掉现行行）
     try:
         result = await db.execute(
-            sa.select(DisclosureNote).where(
+            sa.select(DisclosureNote.note_section, DisclosureNote.table_data).where(
                 DisclosureNote.project_id == project_id,
                 DisclosureNote.year == year,
+                DisclosureNote.is_deleted == sa.false(),
             )
         )
-        for note in result.scalars().all():
-            if note.table_data and isinstance(note.table_data, dict):
-                rows = note.table_data.get("rows") or []
-                # 取最后一个合计行的第一列数值作为 total
-                total_rows = [r for r in rows if r.get("is_total")]
-                if total_rows:
-                    values = total_rows[-1].get("values") or []
-                    cross_data["notes"][note.note_section] = {
-                        "total_closing": float(values[0]) if values and values[0] else 0,
-                        "total_opening": float(values[1]) if len(values) > 1 and values[1] else 0,
-                    }
+        for section, table_data in result.all():
+            if section and isinstance(table_data, dict):
+                cross_data["note_tables"][section] = table_data
     except Exception:
         pass
 
@@ -1004,8 +1000,8 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
             return 0.0
         return float(val)
 
-    # WP('wp_code','sheet','cell_ref')
-    m = re.fullmatch(r"\s*WP\('([^']+)','([^']*)','([^']+)'\)\s*", s)
+    # WP('wp_code','sheet','cell_ref')（参数间可有空格：与保存前校验的写法一致）
+    m = re.fullmatch(r"\s*WP\(\s*'([^']+)'\s*,\s*'([^']*)'\s*,\s*'([^']+)'\s*\)\s*", s)
     if m:
         wp_code = m.group(1)
         sheet = m.group(2)
@@ -1021,22 +1017,21 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
             return float(wp_data[cell_ref])
         return None
 
-    # NOTE('section','*','period')
-    m = re.fullmatch(r"\s*NOTE\('([^']+)','([^']*)','([^']+)'\)\s*", s)
+    # NOTE('章节','行'[,'列'])：按章节 / 行 / 列取数，与严格求值同一套匹配（含两参、参数间空格；spec
+    # formula-fetch-followup-defect-closure R5.3）。原先忽略行名一律取最后一个合计行、「期末」取第一列。取不到 ⇒ None
+    from app.services.formula_ref_preload import NOTE_RE, _note_cell
+
+    m = NOTE_RE.fullmatch(s)
     if m:
-        section = m.group(1)
-        period = m.group(3)
-        note_data = cross_data.get("notes", {}).get(section)
-        if note_data is None:
+        section = m.group(1).strip()
+        table_data = cross_data.get("note_tables", {}).get(section)
+        if table_data is None:
             return None
-        if "期末" in period:
-            return float(note_data.get("total_closing", 0))
-        if "期初" in period:
-            return float(note_data.get("total_opening", 0))
-        return None
+        value, _reason = _note_cell(table_data, section, m.group(2), m.group(3) or "")
+        return float(value) if value is not None else None
 
     # REPORT('row_code','period')
-    m = re.fullmatch(r"\s*REPORT\('([^']+)','([^']+)'\)\s*", s)
+    m = re.fullmatch(r"\s*REPORT\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)\s*", s)
     if m:
         row_code = m.group(1)
         period = m.group(2)
@@ -1049,11 +1044,12 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
             return float(report_data.get("prior", 0))
         return None
 
-    # TB('account_code','column')
-    m = re.fullmatch(r"\s*TB\('([^']+)','([^']+)'\)\s*", s)
+    # TB('account_code','column')：科目按前缀合计（与报表 / 预载同口径、与保存前校验一致；原先只认精确码，
+    # 一级科目码在试算表里只有下级行时恒取 0）
+    m = re.fullmatch(r"\s*TB\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)\s*", s)
     if m:
-        account_code = m.group(1)
-        column = m.group(2)
+        account_code = m.group(1).strip()
+        column = m.group(2).strip()
         # 列名识别（先做白名单：只接受预期列）
         col_key: str | None = None
         if "审定" in column or column == "audited":
@@ -1067,11 +1063,9 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> float |
             col_key = "audited"
         else:
             return None
-        tb_data = cross_data.get("tb", {}).get(account_code)
-        if tb_data is None:
-            # 列名合法但 account 不存在 → 默认 0
-            return 0.0
-        return float(tb_data.get(col_key, 0))
+        hits = [v for code, v in cross_data.get("tb", {}).items() if code and code.startswith(account_code)]
+        # 列名合法但该科目及其下级都不存在 → 0
+        return float(sum(float(v.get(col_key, 0) or 0) for v in hits))
 
     return None
 

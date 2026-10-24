@@ -1521,6 +1521,23 @@ async def list_note_formulas(
     return await note_formula_service.list_with_versions(db, project_id, year, note_section)
 
 
+async def _dangling_note_formula_refs(db: AsyncSession, project_id: UUID, year: int, formulas: list) -> list[dict]:
+    """逐条校验附注公式的跨表引用 → 悬空清单（每条带所在单元格 ``target``）；表内引用（cell / SUM）不在校验范围。"""
+    from app.services.acnr.formula_validation import validate_refs_via_acnr
+    from app.services.formula_ref_check import project_ref_scope
+
+    items = [(item, str(item.get("formula") or "").strip()) for item in formulas if isinstance(item, dict)]
+    items = [(item, expr) for item, expr in items if expr]
+    if not items:  # 清空公式集不用查库
+        return []
+    _, template_type = await project_ref_scope(db, project_id)
+    out: list[dict] = []
+    for item, expr in items:
+        for issue in await validate_refs_via_acnr(db, str(project_id), year, expr, template_type):
+            out.append({**issue, "target": item.get("target")})
+    return out
+
+
 @router.put("/{project_id}/{year}/{note_section}/formulas")
 async def upsert_note_formulas(
     project_id: UUID,
@@ -1545,6 +1562,14 @@ async def upsert_note_formulas(
     formulas = body.get("formulas")
     if not isinstance(formulas, list):
         raise HTTPException(status_code=400, detail="formulas 必须是列表")
+
+    # 跨表引用保存前校验（与报表 / 底稿公式保存同一 helper、同一 422 契约；spec formula-fetch-followup-defect-closure R5.3）。
+    # 原先附注公式保存不校验，悬空引用照常入库，执行时取不到数也不报
+    issues = await _dangling_note_formula_refs(db, project_id, year, formulas)
+    if issues:
+        raise HTTPException(status_code=422, detail={
+            "error_code": "FORMULA_DANGLING_REFS", "message": "公式含悬空引用，拒绝保存", "issues": issues,
+        })
 
     try:
         result = await note_settings.save_section(db, project_id, year, note_section, formulas,

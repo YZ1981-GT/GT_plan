@@ -369,7 +369,7 @@ class AdjudicationWritebackService:
                 project_id=str(project_id),
                 db=self.db,
             )
-            if not rr.found and not rr.fail_open:
+            if rr.dangling:
                 dangling.append(formula_ref or addr_id or "<unknown>")
         return dangling
 

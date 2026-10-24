@@ -286,23 +286,11 @@ async def project_address_scope(db: AsyncSession, project_id: UUID) -> tuple[int
     """地址目录按项目取数的（审计年度, 附注口径）（spec formula-fetch-followup-defect-closure R4.4）。
 
     原先写死年度 0 与 ``soe`` ⇒ 试算表域按 ``year == 0`` 查不到任何科目、上市口径项目的附注地址按国企模板给出。
-    年度经单一真源 ``resolve_project_year``（``audit_year`` → 审计期末年份），都没有时为 0（地址目录的「无年度」，
-    不猜今年）；口径读项目基本信息的 ``template_type``，非 soe / listed 按 soe（与前端 ``normalizeTemplateType`` 同口径）。
-    只读：不经 ``DisclosureEngine._get_active_template_type``（它会回填自定义模板快照并 flush）。
+    实现见 ``formula_ref_check.project_ref_scope``（引用校验 / ACNR 解析同一份）。
     """
-    import sqlalchemy as sa
+    from app.services.formula_ref_check import project_ref_scope
 
-    from app.models.core import Project
-    from app.services.disclosure_engine import _extract_basic_info
-    from app.services.note_section_catalog import normalize_template_type
-    from app.services.sampling_registry_service import resolve_project_year
-
-    year = await resolve_project_year(db, project_id)
-    wizard_state = (
-        await db.execute(sa.select(Project.wizard_state).where(Project.id == project_id))
-    ).scalar_one_or_none()
-    template_type = _extract_basic_info(wizard_state if isinstance(wizard_state, dict) else None).get("template_type")
-    return int(year or 0), normalize_template_type(template_type if isinstance(template_type, str) else None)
+    return await project_ref_scope(db, project_id)
 
 
 async def _load_address_entry(

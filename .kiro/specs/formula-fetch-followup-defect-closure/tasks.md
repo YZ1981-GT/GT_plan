@@ -93,10 +93,20 @@
 
 ## 5. 引用校验（R5）
 
-- [ ] 5.1 `formula_ref_check` 模块（TB 前缀 / 报表按准则 / 附注按结构，模板兜底）+ `validate_formula_refs` 改调（R5.2）
-- [ ] 5.2 `full_resolve` 非底稿域：单引用判定、有项目按数据、无项目返回无法确认；身份类调用方显式不校验；GET 加项目参数（R5.1）
-- [ ] 5.3 附注公式保存服务端校验（422 列明原因）；附注执行器 NOTE 按行 / 列取数（R5.3）
-- [ ] 5.4 前端：`addressRegistry.validate` 只对单个 WP 引用短路、解析带项目上下文、按 `found` 拦截的调用方改正；vitest（R5.4）
+- [x] 5.1 `formula_ref_check` 模块（TB 前缀 / 报表按准则 / 附注按结构，模板兜底）+ `validate_formula_refs` 改调（R5.2）
+  - 证据：`test_formula_ref_check.py` 判定口径 23 例（期望写死）+ 原因文案 + 模板兜底（含只剩已删除章节）+ 三域路由；
+    变异 MR1~MR9 全部打红（MR6 首轮存活：已删除章节在第二层取数时也被过滤，补「原因 = 没有章节」与「只剩已删除也按模板」后打红）
+- [x] 5.2 `full_resolve` 非底稿域：单引用判定、有项目按数据、无项目返回无法确认；身份类调用方显式不校验；GET 加项目参数（R5.1）
+  - 证据：核对放新模块 `acnr/non_wp_verification.py`，请求级复用判定器；只建身份的 4 类调用方显式 `verify_existence=False`；
+    `ResolveRefResult.dangling` 不把「无法确认」算悬空；公式导入 / 新增预设逐个引用校验（原整条表达式当一个引用）；GET 带项目先鉴权；
+    变异 MR10~MR14、MR20~MR23 打红（MR10 首轮存活：有项目时第二道检查兜住，补「复合 + 无项目」用例后打红）；陈旧测试 8 个文件按新口径改写
+- [x] 5.3 附注公式保存服务端校验（422 列明原因）；附注执行器 NOTE 按行 / 列取数（R5.3）
+  - 证据：`test_note_formula_save_ref_check.py`（真路由：悬空 422 + 每条带单元格 + 不写库；有效则保存）；执行器 NOTE 按行列、TB 按前缀、
+    参数间空格、排除已删除附注；变异 MR15~MR19 打红。偏离：错误码沿用 `FORMULA_DANGLING_REFS`（与报表 / 底稿公式保存同契约）
+- [x] 5.4 前端：`addressRegistry.validate` 只对单个 WP 引用短路、解析带项目上下文、按 `found` 拦截的调用方改正；vitest（R5.4）
+  - 证据：`addressRegistry.validateRefScope.spec.ts`、`useAcnr_resolve_project.spec.ts`、`GtFormulaEditDialog.spec.ts` 补 3 组、
+    `GtIndexChip.spec.ts` 补 1 例（非底稿引用不存在时显示后端原因）；变异 MF1~MF7 打红（红在预期断言上）；单区域 vue-tsc 见 7.1
+  - 回归：涉及的 102 个后端测试文件与基线 `9eb504a5e` 逐条对比新增失败 0；前端相关 7 文件 58 passed
 
 ## 6. 三参 PREV 定位表与陈旧测试（R2 / R3）
 

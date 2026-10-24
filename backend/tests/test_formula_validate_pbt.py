@@ -9,11 +9,13 @@ from unittest.mock import AsyncMock, patch
 
 from hypothesis import given, settings, strategies as st
 
+from app.services import formula_ref_check as frc
 from app.services.address_registry import (
     AddressEntry,
     AddressRegistryService,
     formula_ref_to_uri,
 )
+from app.services.formula_engine import COLUMN_ALIASES
 
 _FORMULA_PATTERNS = re.compile(
     r"WP\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)|"
@@ -42,8 +44,10 @@ wp_refs_st = st.lists(
     max_size=4,
     unique=True,
 )
+#: 试算表引用按本年试算表科目（前缀）+ 已注册列名判定（spec formula-fetch-followup-defect-closure R5.2，``formula_ref_check``），
+#: 不再查地址目录：列名取注册表里的，科目只在「试算表有没有」上区分
 tb_refs_st = st.lists(
-    st.from_regex(r"TB\('\d{4}','[^']+'\)", fullmatch=True),
+    st.tuples(st.from_regex(r"\d{4}", fullmatch=True), st.sampled_from(sorted(COLUMN_ALIASES))),
     min_size=0,
     max_size=2,
     unique=True,
@@ -52,10 +56,11 @@ tb_refs_st = st.lists(
 
 @settings(max_examples=5)
 @given(wp_refs=wp_refs_st, tb_refs=tb_refs_st)
-def test_p6_validate_refs_matches_dangling(wp_refs: list[str], tb_refs: list[str]):
-    formula = " + ".join(wp_refs + tb_refs) or "1"
+def test_p6_validate_refs_matches_dangling(wp_refs: list[str], tb_refs: list[tuple[str, str]]):
+    tb_texts = [f"TB('{code}','{column}')" for code, column in tb_refs]
+    formula = " + ".join(wp_refs + tb_texts) or "1"
     known_wp = {r for r in wp_refs[: max(0, len(wp_refs) - 1)]}
-    known_tb = {r for r in tb_refs[: max(0, len(tb_refs) - 1)]}
+    known_codes = {code for code, _ in tb_refs[: max(0, len(tb_refs) - 1)]}
 
     wp_entries = []
     for ref in known_wp:
@@ -74,41 +79,24 @@ def test_p6_validate_refs_matches_dangling(wp_refs: list[str], tb_refs: list[str
                     wp_code=m.group(1) if m else "",
                 )
             )
-    tb_entries = []
-    for ref in known_tb:
-        uri = formula_ref_to_uri(ref)
-        if uri:
-            tb_entries.append(
-                AddressEntry(
-                    uri=uri,
-                    domain="tb",
-                    source="1001",
-                    path="",
-                    cell="期末",
-                    label=ref,
-                    formula_ref=ref,
-                )
-            )
-
     svc = AddressRegistryService()
     pid = str(uuid.uuid4())
 
     async def _mock_domain(db, project_id, year, template_type, domain):
         if domain == "wp":
             return wp_entries
-        if domain == "tb":
-            return tb_entries
         return []
 
     async def _inner():
-        with patch.object(svc, "_get_domain", side_effect=_mock_domain):
-            with patch.object(svc, "_redis_get", new_callable=AsyncMock, return_value=None):
-                with patch.object(svc, "_redis_set", new_callable=AsyncMock):
-                    return await svc.validate_formula_refs(db=None, project_id=pid, year=2025, formula=formula)
+        with patch.object(svc, "_get_domain", side_effect=_mock_domain), \
+                patch.object(svc, "_redis_get", new_callable=AsyncMock, return_value=None), \
+                patch.object(svc, "_redis_set", new_callable=AsyncMock), \
+                patch.object(frc.FormulaRefChecker, "_load_tb_codes", new=AsyncMock(return_value=sorted(known_codes))):
+            return await svc.validate_formula_refs(db=None, project_id=pid, year=2025, formula=formula)
 
     issues = _run(_inner())
     issue_refs = {i["ref"] for i in issues if i.get("status") == "not_found"}
-    all_refs = _extract_refs(formula)
-    known = known_wp | known_tb
-    expected_bad = {r for r in all_refs if r not in known}
+    assert _extract_refs(formula) == set(wp_refs) | set(tb_texts)
+    expected_bad = {r for r in wp_refs if r not in known_wp} | {
+        f"TB('{code}','{column}')" for code, column in tb_refs if code not in known_codes}
     assert issue_refs == expected_bad

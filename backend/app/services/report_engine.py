@@ -1367,6 +1367,8 @@ class ReportEngine:
                     formula_ref=cache_key,
                     project_id=project_id,
                     db=self.db,
+                    # 同一次生成里复用同一个引用判定器（报表配置只读一次）
+                    _memo=cache.setdefault("__acnr_memo__", {}),
                 )
                 cache[cache_key] = resolved
             row_refs_meta.append({
@@ -1374,8 +1376,9 @@ class ReportEngine:
                 "addr_id": resolved.addr_id,
                 "found": resolved.found,
             })
-            # 仅当 full_resolve 明确 miss（非基础设施 fail-open）时记为悬空
-            if not resolved.found and not resolved.fail_open:
+            # 仅当 full_resolve 明确 miss（非基础设施 fail-open、非缺项目上下文）时记为悬空；
+            # 行次是否存在按本项目适用准则的有效报表配置判定（R5.1，原先 V1 换算即判存在、这里恒为空）
+            if resolved.dangling:
                 dangling_refs.append(rc)
         return row_refs_meta, dangling_refs
 

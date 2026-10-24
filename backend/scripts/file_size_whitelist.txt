@@ -1589,3 +1589,12 @@ backend/app/services/chain_orchestrator.py  924
 #     2026-10-24 formula-fetch-followup-defect-closure R1.4：K2 / K4 / K5 段把真源已声明的错码（1231 / 2245 / 2701）
 #     展示给用户，逐条改文案（行数不变）。拆分方向：按底稿编码拆成 K1~K13 各自的目录模块，入口只做合并（同 wp_surfaced_formulas）。
 backend/app/routers/wp_surfaced_k.py  1225
+#   acnr/resolver.py —— 历史大文件（HEAD 已 1073 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-24 formula-fetch-followup-defect-closure R5.1：只加 verify_existence 参数与 verified / reason 两个结果字段（+13），
+#     非底稿域的单引用 / 存在性核对放新模块 acnr/non_wp_verification.py。拆分方向：L1 / L2 / L3 各层解析与 resolve_instance 各自成模块。
+backend/app/services/acnr/resolver.py  1086
+#   note_formula_generator.py —— 历史大文件（HEAD 已 1489 行且未登记）。
+#     2026-10-24 formula-fetch-followup-defect-closure R5.3：NOTE 按章节 / 行 / 列取数、TB 按前缀合计（净 −6）。
+#     拆分方向：公式生成（generate_*）、执行（execute_note_formulas + _exec_*）、跨表取数（_load_cross_table_data +
+#     _resolve_single_cross_ref）三块各自成模块。
+backend/app/services/note_formula_generator.py  1483

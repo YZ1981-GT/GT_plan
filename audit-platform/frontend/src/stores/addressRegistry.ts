@@ -33,6 +33,9 @@ import {
  */
 export const ADDRESS_REGISTRY_FULL_LOAD_LIMIT = 50000
 
+/** 整条公式就是单个 WP 引用（两参 / 三参）：只有它可以用 ACNR 命中直接判有效（validate） */
+export const SINGLE_WP_REF = /^\s*WP\(\s*'[^']*'\s*(?:,\s*'[^']*'\s*){1,2}\)\s*$/
+
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
 export interface AddressEntry {
@@ -334,8 +337,9 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
   // ─── 解析单个 URI ───
   async function resolve(uri: string): Promise<ResolveResult> {
     // R16.1: 先走 ACNR /api/acnr/resolve；miss/error 回退 legacy /api/address-registry/resolve
+    // 带当前绑定的项目：非底稿域按项目数据判存在（不带时后端只能答「无法确认」）
     try {
-      const acnrRes = await _acnr.resolveUri(uri)
+      const acnrRes = await _acnr.resolveUri(uri, _projectId.value || undefined)
       if (acnrRes && acnrRes.found) {
         return _mapAcnrResolveToResult(uri, acnrRes)
       }
@@ -363,17 +367,18 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
 
   // ─── 校验公式引用有效性 ───
   async function validate(formula: string): Promise<ValidateResult> {
-    // R16.2: 先走 ACNR-backed 校验（resolveFormula，与后端 Req 9 同源）；
-    // ACNR 明确命中（found=true）→ 直接判定有效；
-    // 未命中 / 复合表达式 / 非 WP 域 / infra 失败 → fail-open 回退 legacy 权威多引用校验。
-    // （前端无法安全拆分复合公式，故非命中一律交由 legacy，避免误报悬空引用。）
-    try {
-      const r = await _acnr.resolveFormula(formula)
-      if (r && r.found) {
-        return { valid: true, issues: [], formula }
+    // R16.2: 只有「整条公式就是单个 WP 引用」才用 ACNR 命中短路（底稿目录是 ACNR 的权威域）；
+    // 其余一律走带项目上下文的数据校验 —— 原先 ACNR 对试算表 / 报表 / 附注引用只做写法换算即 found=true、
+    // 复合表达式取第一个引用也判命中，悬空引用被它短路放行（spec formula-fetch-followup-defect-closure R5.4）。
+    if (SINGLE_WP_REF.test(formula)) {
+      try {
+        const r = await _acnr.resolveFormula(formula, _projectId.value || undefined)
+        if (r && r.found) {
+          return { valid: true, issues: [], formula }
+        }
+      } catch (e) {
+        console.warn('[addressRegistry] ACNR validate 异常，回退 legacy(fail-open)', e)
       }
-    } catch (e) {
-      console.warn('[addressRegistry] ACNR validate 异常，回退 legacy(fail-open)', e)
     }
 
     // legacy 回退

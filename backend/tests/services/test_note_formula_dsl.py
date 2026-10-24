@@ -35,7 +35,9 @@ def _sample_cross_data_with_prior_aging() -> dict:
         "tb": {
             "1001": {"audited": 50.0, "unadjusted": 48.0, "opening": 40.0},
         },
-        "notes": {"五、3": {"total_closing": 1200.0, "total_opening": 1100.0}},
+        # NOTE 按章节 / 行 / 列取数（spec formula-fetch-followup-defect-closure R5.3；原「合计前两列」结构已删）
+        "note_tables": {"五、3": {"headers": ["项目", "期末余额", "期初余额"], "rows": [
+            {"label": "合计", "values": [1200.0, 1100.0], "is_total": True}]}},
         "wp": {"E1": {"审定表E1!B5": 50.0}},
         "prior": {
             "货币资金": {"closing": 1234.56, "opening": 1100.00},

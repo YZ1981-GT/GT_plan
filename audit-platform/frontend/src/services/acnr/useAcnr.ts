@@ -84,8 +84,12 @@ export interface AcnrResolveResult {
   uri?: string
   jump_route?: string
   wp_id?: string
-  // miss/ambiguous
+  // miss/ambiguous；非底稿域另有 not_single_reference / project_context_required / ref_not_found
   error?: string
+  /** 非底稿域：是否按项目数据核过存在（R5.1） */
+  verified?: boolean
+  /** 判不存在 / 无法确认的原因 */
+  reason?: string
   candidates?: Array<{
     addr_id: string
     display_label: string
@@ -515,18 +519,21 @@ export function useAcnr(projectId?: string) {
    *
    * @param formulaRef - 公式引用，如 WP('D2','明细表D2-2','E100')
    */
-  async function resolveFormula(formulaRef: string): Promise<AcnrResolveResult> {
+  async function resolveFormula(formulaRef: string, projectIdArg?: string): Promise<AcnrResolveResult> {
     if (!formulaRef || !formulaRef.trim()) {
       return { found: false, error: 'empty_formula' }
     }
+    // 试算表 / 报表 / 附注 / 辅助余额引用按项目数据判定是否存在；不带项目时后端答「无法确认」
+    // （error=project_context_required），不再一律判存在（spec formula-fetch-followup-defect-closure R5.4）
+    const pid = projectIdArg ?? projectId
     // Req-20: resolve 缓存 (epoch 变则已由 invalidateModuleCache 清空)
-    const cacheKey = `resolve:${JSON.stringify({ formula_ref: formulaRef })}`
+    const cacheKey = `resolve:${JSON.stringify({ formula_ref: formulaRef, project_id: pid })}`
     const cached = _resolveCacheGet(cacheKey)
     if (cached) return cached
 
     try {
       const { data } = await http.get(ACNR_PATHS.resolve, {
-        params: { formula_ref: formulaRef },
+        params: { formula_ref: formulaRef, ...(pid ? { project_id: pid } : {}) },
       })
       const result = data as AcnrResolveResult
       _resolveCacheSet(cacheKey, result)
@@ -541,18 +548,19 @@ export function useAcnr(projectId?: string) {
    * URI 解析
    * @param uri - 五域 URI，如 wp://D2/明细表D2-2#E100
    */
-  async function resolveUri(uri: string): Promise<AcnrResolveResult> {
+  async function resolveUri(uri: string, projectIdArg?: string): Promise<AcnrResolveResult> {
     if (!uri || !isValidUri(uri)) {
       return { found: false, error: 'invalid_uri' }
     }
-    // Req-20: resolve 缓存
-    const cacheKey = `resolve:${JSON.stringify({ uri })}`
+    const pid = projectIdArg ?? projectId
+    // Req-20: resolve 缓存（按项目分开：非底稿域按项目数据判存在）
+    const cacheKey = `resolve:${JSON.stringify({ uri, project_id: pid })}`
     const cached = _resolveCacheGet(cacheKey)
     if (cached) return cached
 
     try {
       const { data } = await http.get(ACNR_PATHS.resolve, {
-        params: { uri },
+        params: { uri, ...(pid ? { project_id: pid } : {}) },
       })
       const result = data as AcnrResolveResult
       _resolveCacheSet(cacheKey, result)
@@ -629,8 +637,8 @@ export function useAcnr(projectId?: string) {
     project_id?: string
   }): Promise<AcnrResolveResult> {
     if (params.index_ref) return resolveIndex(params.index_ref, params.project_id)
-    if (params.uri) return resolveUri(params.uri)
-    if (params.formula_ref) return resolveFormula(params.formula_ref)
+    if (params.uri) return resolveUri(params.uri, params.project_id)
+    if (params.formula_ref) return resolveFormula(params.formula_ref, params.project_id)
     if (params.addr_id) return resolveAddr(params.addr_id)
     return { found: false, error: 'empty_resolve_params' }
   }

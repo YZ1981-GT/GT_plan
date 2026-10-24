@@ -203,7 +203,8 @@ const tooltipContent = computed(() => {
   }
 
   if (resolveStatus.value === 'not_exists') {
-    return '底稿不存在'
+    // 试算表 / 附注等非底稿引用按项目数据判不存在时后端给出原因（R5.1），照实显示，不说成「底稿不存在」
+    return acnrResult.value?.reason || '底稿不存在'
   }
 
   if (resolveStatus.value === 'trimmed') {

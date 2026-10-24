@@ -229,6 +229,7 @@ def _sync_resolve(
                 formula_ref=formula_ref,
                 uri=uri,
                 project_id=project_id,
+                verify_existence=False,  # 追溯只建立身份（R5.1 显式声明不校验存在性）
             )
         )
     except Exception as exc:

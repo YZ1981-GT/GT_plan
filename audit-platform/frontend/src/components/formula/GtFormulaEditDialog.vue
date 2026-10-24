@@ -413,7 +413,13 @@ const REF_RE = new RegExp(`\\b(?:${REF_FN})\\([^)]*\\)`, 'g')
 
 function collectRefs(): string[] {
   const found = new Set<string>()
-  for (const r of refs.value) if (r) found.add(r)
+  // 预设的 refs 可能存的是整条表达式：拆成单个引用逐个校验（后端对复合表达式答「不是单个引用」，R5.4）
+  for (const r of refs.value) {
+    if (!r) continue
+    const parts = r.match(REF_RE)
+    if (parts && parts.length) for (const p of parts) found.add(p.trim())
+    else found.add(r)
+  }
   const matches = (form.expression || '').match(REF_RE)
   if (matches) for (const m of matches) found.add(m.trim())
   return [...found]
@@ -430,7 +436,9 @@ async function onSubmit() {
     const dangling: string[] = []
     for (const r of allRefs) {
       const res = await acnr.resolveFormula(r)
-      if (!res.found) dangling.push(r)
+      // 本弹窗编辑的是预设库（不在某个项目里）：试算表 / 报表 / 附注 / 辅助余额引用后端答「需要项目上下文才能确认」，
+      // 是无法确认而不是不存在，不拦截；底稿引用、写法不全、复合写法照常拦（spec formula-fetch-followup-defect-closure R5.4）
+      if (!res.found && res.error !== 'project_context_required') dangling.push(r)
     }
     if (dangling.length) {
       ElMessage.error(`存在悬空引用，无法保存：${dangling.join('、')}`)

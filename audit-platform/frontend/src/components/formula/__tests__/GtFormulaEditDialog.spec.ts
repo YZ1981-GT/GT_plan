@@ -255,6 +255,58 @@ describe('GtFormulaEditDialog — 三类型统一编辑弹窗（Req 8.1/8.2/8.3/
     wrapper.unmount()
   })
 
+  // ── 4b. 预设库不在某个项目里：后端答「需要项目上下文才能确认」= 无法确认，不是悬空（R5.4） ──
+  it('非底稿域引用 project_context_required → 不拦截，照常 emit save', async () => {
+    mockResolveFormula.mockResolvedValue({ found: false, error: 'project_context_required' })
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    await setType(wrapper, 'auto_calc')
+    ;(wrapper.vm as any).form.target_cell = 'BS-027·期末'
+    ;(wrapper.vm as any).form.expression = "TB('1001','审定数')"
+    await nextTick()
+
+    await (wrapper.vm as any).onSubmit()
+    await flushPromises()
+
+    expect(mockMsgError).not.toHaveBeenCalled()
+    expect(wrapper.emitted('save')).toBeTruthy()
+    wrapper.unmount()
+  })
+
+  it('预设 refs 存的是整条表达式（含 JSON 串化的引用项）：拆成单个引用逐个校验', async () => {
+    const wrapper = mountDialog({
+      initial: {
+        formula_type: 'auto_calc', target_cell: 'BS-027·期末', expression: "TB('1001','期末余额')-TB('1231','期末余额')",
+        refs: [JSON.stringify({ formula_ref: "TB('1001','期末余额')-TB('1231','期末余额')", acnr_status: 'migrated' })],
+      },
+    })
+    await openDialog(wrapper)
+    await (wrapper.vm as any).onSubmit()
+    await flushPromises()
+
+    const asked = mockResolveFormula.mock.calls.map((c) => c[0])
+    expect(new Set(asked)).toEqual(new Set(["TB('1001','期末余额')", "TB('1231','期末余额')"]))
+    expect(wrapper.emitted('save')).toBeTruthy()
+    wrapper.unmount()
+  })
+
+  it.each(['ref_not_found', 'not_single_reference', undefined])('其余未命中（%s）照常拦截', async (error) => {
+    mockResolveFormula.mockResolvedValue({ found: false, error })
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    await setType(wrapper, 'auto_calc')
+    ;(wrapper.vm as any).form.target_cell = 'BS-027·期末'
+    ;(wrapper.vm as any).form.expression = "TB('9999','审定数')"
+    await nextTick()
+
+    await (wrapper.vm as any).onSubmit()
+    await flushPromises()
+
+    expect(mockMsgError).toHaveBeenCalled()
+    expect(wrapper.emitted('save')).toBeFalsy()
+    wrapper.unmount()
+  })
+
   it('引用全部有效（found=true）→ emit save 携带规范化载荷并关闭弹窗', async () => {
     mockResolveFormula.mockResolvedValue({ found: true })
     const wrapper = mountDialog()
