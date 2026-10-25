@@ -74,3 +74,10 @@ D 循环已有 5 个 canary（D1/D3/D5/D6/D7）全部 `bidirectional_verified`�
 2. WHEN OO 写受管格 THEN 必须先按 sheet 名精确切到 `主营业务收入明细表D4-2` 并在证据里记录 `activeSheet` 实测值
 3. WHEN 写入目标列 THEN 必须选**文本列**（A 列 `product`）而非 12 个数值月列，避免类型不匹配掩盖真实回写
 4. WHEN e2e 失败 THEN 证据 JSON 必须保留足以定位的现场（cs_error / store_mirrored / marker_visible 逐条 + `oo_cell_edit_probe`），不得只留一个断言失败
+
+
+### Requirement 6 — 统一治理与里程碑
+1. C0模板/identity、C1sync、C2formula、C3linkage、C4逐表验收必须分别有证据。
+2. durable ack不等于applied；不同字段自动合并，同字段冲突不得Excel优先或最后写胜出。
+3. 公式定义使用wp_id key，preset_version不是业务target identity；缺失/损坏/stale/blocked分态，schema白名单禁eval和外链。
+4. 只门控本spec相关平台产物，不等待全平台77项。

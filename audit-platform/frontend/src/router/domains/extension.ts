@@ -16,6 +16,14 @@ export const extensionRoutes: RouteRecordRaw[] = [
           component: () => import('@/views/extension/CustomTemplateEditor.vue'),
         },
 {
+          // 与 ':id/edit' 的先后顺序无关：vue-router 4 按路径特异性打分匹配，
+          // 静态段优先于动态段（变异实测两种顺序均解析到本路由）。
+          // spec: custom-workpaper-template-ingestion-and-sync-closure Task 12
+          path: 'extension/custom-templates/ingest',
+          name: 'CustomIngestionWizard',
+          component: () => import('@/views/extension/CustomIngestionWizard.vue'),
+        },
+{
           path: 'extension/custom-templates/:id/edit',
           name: 'CustomTemplateEdit',
           component: () => import('@/views/extension/CustomTemplateEditor.vue'),

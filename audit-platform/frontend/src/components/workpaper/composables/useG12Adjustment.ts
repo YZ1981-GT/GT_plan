@@ -724,6 +724,10 @@ export function useG12Adjustment(opts: {
 
     const pushed = await pushToAdjustmentModule()
 
+    // EventBus 通知审定表/披露刷新（与其余循环对齐）
+
+    eventBus.emit('adjustment:created', { wpCode: 'G12', accountCode: G12_ACCOUNT_CODE, timestamp: Date.now() })
+
     return { ok: true, pushed }
 
   }

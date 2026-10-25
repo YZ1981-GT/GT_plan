@@ -18,6 +18,7 @@ import {
   type ComputedRef,
 } from 'vue'
 import { ElMessage } from 'element-plus'
+import { eventBus } from '@/utils/eventBus'
 import { parseNum } from '@/composables/useG6MainFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import {
@@ -438,6 +439,9 @@ export function useG6MainAdjustment(options: UseG6MainAdjustmentOptions) {
         },
       }),
     )
+
+    // EventBus 通知审定表/披露刷新（与其余循环对齐）
+    eventBus.emit('adjustment:created', { wpCode: 'G6', accountCode: G6_ACCOUNT_CODE, timestamp: Date.now() })
 
     ElMessage.success(
       `已保存回写：成本 ${nets.costNet.toFixed(2)} / 利息 ${nets.interestNet.toFixed(2)} / 减值 ${nets.impairmentNet.toFixed(2)}`,

@@ -4,6 +4,7 @@
  * 比照 useD4Adjustment
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { eventBus } from '@/utils/eventBus'
 import { parseNum, calcSubtotal, isDebitCreditBalanced } from './useF3FormulaEngine'
 import type { ChecklistResponse } from './useF3FormData'
 import type { UseF3BaseOptions } from './useF3Adjudication'
@@ -136,6 +137,10 @@ export function useF3Adjustment(options: UseF3BaseOptions) {
   function flushSave(): void {
     const item = allResponses.value.get(STORAGE_KEY)
     if (item) window.dispatchEvent(new CustomEvent('f3:save-items', { detail: { items: [item] } }))
+    // EventBus 通知审定表/披露刷新（与其余循环对齐）；仅借贷平衡时发布
+    if (isBalanced.value) {
+      eventBus.emit('adjustment:created', { wpCode: 'F3', timestamp: Date.now() })
+    }
   }
 
   onBeforeUnmount(() => {

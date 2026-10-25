@@ -8,6 +8,7 @@
  *  与 F5-1 审定、F5-4 调整分录相互印证。
  */
 import { computed, ref, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { eventBus } from '@/utils/eventBus'
 import { parseNum, calcSubtotal } from './useF5CosOfFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 
@@ -208,6 +209,8 @@ export function useF5MajorAdjustment(options: UseF5MajorAdjustmentOptions) {
     ].filter(Boolean)
     if (items.length) {
       window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items } }))
+      // EventBus 通知审定表/披露刷新（与其余循环对齐）
+      eventBus.emit('adjustment:created', { wpCode: 'F5', timestamp: Date.now() })
     }
   }
 

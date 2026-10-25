@@ -674,8 +674,9 @@
     },
     {
       "adjudication": {
-        "domain": null,
-        "status": "unadjudicated"
+        "domain": "dedicated_router",
+        "status": "adjudicated",
+        "version_domain_note": "`_load_context` in `backend/app/routers/d2_sync_router.py` (writer_resolver), helper for the D2-specific sync endpoints. Lane: Part of the legacy D2 dedicated sync router that bypasses the unified coordinator (gap 4 in total-control §2.4.4). Measured: reaches the workpaper/template file through `<ad_hoc_path_construction>`; builds the path from the literals `storage`, `onlyoffice`; owns its own transaction boundary (commit on `db`). Shape: it never reaches the canonical `resolve_wp_file`, which is why it is also counted in `non_canonical_resolver_only`. This entire router is scheduled for physical deletion under DEC-08 once `HOST-CONSUMES-UNIFIED-PATH` reaches `ONLYOFFICE_VERIFIED`. No test file resolves a call site to it, so it is also one of the `writer_without_characterization_test` rows."
       },
       "canonical_resolver": null,
       "characterization_tests": [],
@@ -729,8 +730,9 @@
     },
     {
       "adjudication": {
-        "domain": null,
-        "status": "unadjudicated"
+        "domain": "checklist_response_store",
+        "status": "adjudicated",
+        "version_domain_note": "`_write_narratives` in `backend/app/routers/d2_sync_router.py` (writer), helper for D2 push-to-excel. Lane: Its business content lands in `checklist_responses`, the second content authority Requirement 9.11 names: no `working_paper` row is touched. Measured: raw SQL mutates `checklist_responses.remark`; owns its own transaction boundary (commit on `db`). Shape: the transaction boundary lives here; total-control §2.4.4 gap 5 flags the separate commit window between this and `_write_store_rows`. This entire router is scheduled for physical deletion under DEC-08. No test file resolves a call site to it, so it is also one of the `writer_without_characterization_test` rows."
       },
       "canonical_resolver": null,
       "characterization_tests": [],
@@ -786,8 +788,9 @@
     },
     {
       "adjudication": {
-        "domain": null,
-        "status": "unadjudicated"
+        "domain": "checklist_response_store",
+        "status": "adjudicated",
+        "version_domain_note": "`_write_store_rows` in `backend/app/routers/d2_sync_router.py` (writer), helper for D2 push-to-excel. Lane: Its business content lands in `checklist_responses.remark` as a JSON-serialized row array (total-control §2.4.4 gap 3: 'item_id=D2-detail-rows'). Measured: raw SQL mutates `checklist_responses.remark`; owns its own transaction boundary (commit on `db`). Shape: one statement moves the entire detail table; total-control gap 5 flags the separate commit window between this and `_write_narratives`. This entire router is scheduled for physical deletion under DEC-08. No test file resolves a call site to it, so it is also one of the `writer_without_characterization_test` rows."
       },
       "canonical_resolver": null,
       "characterization_tests": [],
@@ -845,8 +848,9 @@
     },
     {
       "adjudication": {
-        "domain": null,
-        "status": "unadjudicated"
+        "domain": "dedicated_router",
+        "status": "adjudicated",
+        "version_domain_note": "`d2_pull_from_excel` in `backend/app/routers/d2_sync_router.py` (writer_resolver), the D2 pull-from-Excel endpoint. Lane: Part of the legacy D2 dedicated sync router. Measured: reaches the workpaper/template file through `<ad_hoc_path_construction>`; builds the path from the literals `storage`, `onlyoffice`; delegates the content write to `_write_store_rows` and `_write_narratives`. Shape: it never reaches the canonical `resolve_wp_file`, which is why it is also counted in `non_canonical_resolver_only`. This entire router is scheduled for physical deletion under DEC-08. No test file resolves a call site to it, so it is also one of the `writer_without_characterization_test` rows."
       },
       "canonical_resolver": null,
       "characterization_tests": [],
@@ -877,7 +881,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 563,
+      "line": 573,
       "module": "app.routers.d2_sync_router",
       "qualname": "d2_pull_from_excel",
       "resolver_identities": [],
@@ -4640,12 +4644,7 @@
       "content_stores_written": [],
       "delegates_to_content_writer": [],
       "facts": {
-        "ad_hoc_paths": [
-          {
-            "line": 141,
-            "literal": "wp_templates"
-          }
-        ],
+        "ad_hoc_paths": [],
         "after_save_calls": [],
         "artifact_write_targets": [],
         "artifact_writes": [],
@@ -4653,7 +4652,9 @@
         "content_fields_written": [],
         "flush_receivers": [],
         "representation_candidate_calls": [],
-        "resolver_calls": [],
+        "resolver_calls": [
+          "find_template_file_any"
+        ],
         "revision_bump_calls": [],
         "side_effects": [],
         "sql_update_columns": [],
@@ -4664,11 +4665,11 @@
       },
       "is_async": false,
       "kind": "resolver",
-      "line": 134,
+      "line": 275,
       "module": "app.routers.wp_guidance_chat",
       "qualname": "_resolve_template_path",
       "resolver_identities": [
-        "<ad_hoc_path_construction>"
+        "find_template_file_any"
       ],
       "source_path": "backend/app/routers/wp_guidance_chat.py",
       "verdicts": {
@@ -4695,7 +4696,9 @@
         "version_domain_note": "`get_workpaper_guidance` in `backend/app/routers/wp_guidance_chat.py` (resolver), no other inventory row delegates to it, so it is an entry point of its own. Lane: Resolves a template/render path for a read-only consumer (render config, guidance chat, program-table data, docx conversion, account package). It reaches the file through the template finder or its own path composition, never through `resolve_wp_file`. Measured: reaches the workpaper/template file through `_resolve_template_path`. Shape: it never reaches the canonical `resolve_wp_file`, which is why it is also counted in `non_canonical_resolver_only`. Same convergence obligation as the rest of the resolver lane: one canonical entry for the workpaper file and one for the template library. Until then every one of these rows is a place where a renamed or relocated file silently changes what the reader sees. No test file resolves a call site to it, so it is also one of the `writer_without_characterization_test` rows."
       },
       "canonical_resolver": null,
-      "characterization_tests": [],
+      "characterization_tests": [
+        "backend/tests/test_wp_guidance_router.py"
+      ],
       "content_stores_written": [],
       "delegates_to_content_writer": [],
       "facts": {
@@ -4720,7 +4723,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 57,
+      "line": 78,
       "module": "app.routers.wp_guidance_chat",
       "qualname": "get_workpaper_guidance",
       "resolver_identities": [
@@ -4731,7 +4734,7 @@
         "artifact_snapshot_only": false,
         "bypasses_unified_commit": false,
         "delegates_content_write": false,
-        "has_characterization_test": false,
+        "has_characterization_test": true,
         "keeps_legacy_write_path_beside_unified_commit": false,
         "multi_resolver": false,
         "non_canonical_resolver_only": true,
@@ -4770,7 +4773,7 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          480
+          489
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -4778,7 +4781,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 395,
+      "line": 404,
       "module": "app.routers.wp_guidance_chat",
       "qualname": "workpaper_ai_chat",
       "resolver_identities": [
@@ -5074,7 +5077,7 @@
           "working_paper.parsed_data"
         ],
         "swallowed_exception_lines": [
-          408
+          429
         ],
         "unified_commit_calls": [
           "build_html_content_mutation_service"
@@ -5088,7 +5091,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 129,
+      "line": 130,
       "module": "app.routers.wp_html_save",
       "qualname": "save_html_data",
       "resolver_identities": [],
@@ -7057,7 +7060,9 @@
         "version_domain_note": "`_get_render_config_impl` in `backend/app/routers/wp_render_config.py` (resolver), no other inventory row delegates to it, so it is an entry point of its own. Lane: Resolves a template/render path for a read-only consumer (render config, guidance chat, program-table data, docx conversion, account package). It reaches the file through the template finder or its own path composition, never through `resolve_wp_file`. Measured: reaches the workpaper/template file through `_resolve_template_path`. Shape: it never reaches the canonical `resolve_wp_file`, which is why it is also counted in `non_canonical_resolver_only`; 21 except handler(s) swallow without re-raising, so a failed write can still look successful to the caller. Same convergence obligation as the rest of the resolver lane: one canonical entry for the workpaper file and one for the template library. Until then every one of these rows is a place where a renamed or relocated file silently changes what the reader sees. No test file resolves a call site to it, so it is also one of the `writer_without_characterization_test` rows."
       },
       "canonical_resolver": null,
-      "characterization_tests": [],
+      "characterization_tests": [
+        "backend/tests/test_render_config_pipeline_characterization.py"
+      ],
       "content_stores_written": [],
       "delegates_to_content_writer": [],
       "facts": {
@@ -7115,7 +7120,7 @@
         "artifact_snapshot_only": false,
         "bypasses_unified_commit": false,
         "delegates_content_write": false,
-        "has_characterization_test": false,
+        "has_characterization_test": true,
         "keeps_legacy_write_path_beside_unified_commit": false,
         "multi_resolver": false,
         "non_canonical_resolver_only": true,
@@ -8540,7 +8545,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 921,
+      "line": 933,
       "module": "app.routers.wp_render_strategies._d3_import_export",
       "qualname": "_persist_d3_1_rows",
       "resolver_identities": [],
@@ -8596,7 +8601,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 831,
+      "line": 843,
       "module": "app.routers.wp_render_strategies._d3_import_export",
       "qualname": "_upsert_response",
       "resolver_identities": [],
@@ -8625,7 +8630,9 @@
         "version_domain_note": "`d3_import_aux_balance` in `backend/app/routers/wp_render_strategies/_d3_import_export.py` (writer), no other inventory row delegates to it, so it is an entry point of its own. Lane: Its business content lands in `checklist_responses`, the second content authority Requirement 9.11 names: no `working_paper` row is touched, so nothing about this write is visible to any `working_paper` version consumer. Measured: raw SQL mutates `checklist_responses.remark`; owns its own transaction boundary (commit on `db`). Shape: it upserts the `remark` column, the cell-text carrier of this store, so every saved cell is a business content application; 1 except handler(s) swallow without re-raising, so a failed write can still look successful to the caller. This is the lane Task 20's evidence flagged as declared-but-empty (97 rows). Migrating it is not an adapter tweak: `ContentMutationService` commits `working_paper` content, so the unified protocol first has to own a `checklist_responses` content scope -- until it does, every one of these rows is a business application with no revision at all. That work is Task 74's second half and is deliberately not done in this pass. No test file resolves a call site to it, so it is also one of the `writer_without_characterization_test` rows."
       },
       "canonical_resolver": null,
-      "characterization_tests": [],
+      "characterization_tests": [
+        "backend/tests/four_table/test_four_table_entry_guards.py"
+      ],
       "content_stores_written": [
         "checklist_responses"
       ],
@@ -8648,7 +8655,7 @@
           "checklist_responses.remark"
         ],
         "swallowed_exception_lines": [
-          511
+          517
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -8665,7 +8672,7 @@
         "artifact_snapshot_only": false,
         "bypasses_unified_commit": true,
         "delegates_content_write": false,
-        "has_characterization_test": false,
+        "has_characterization_test": true,
         "keeps_legacy_write_path_beside_unified_commit": false,
         "multi_resolver": false,
         "non_canonical_resolver_only": false,
@@ -8828,7 +8835,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 684,
+      "line": 683,
       "module": "app.routers.wp_render_strategies._d5_import_export",
       "qualname": "_persist_d5_1_rows",
       "resolver_identities": [],
@@ -8884,7 +8891,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 610,
+      "line": 609,
       "module": "app.routers.wp_render_strategies._d5_import_export",
       "qualname": "_upsert_d5_response",
       "resolver_identities": [],
@@ -8936,7 +8943,7 @@
           "checklist_responses.remark"
         ],
         "swallowed_exception_lines": [
-          394
+          388
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -9054,7 +9061,7 @@
           "checklist_responses.remark"
         ],
         "swallowed_exception_lines": [
-          405
+          426
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -9284,7 +9291,7 @@
           "checklist_responses.remark"
         ],
         "swallowed_exception_lines": [
-          644
+          641
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -11747,7 +11754,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 837,
+      "line": 838,
       "module": "app.routers.wp_render_strategies._k1_import_export",
       "qualname": "_k1_1_import_handler",
       "resolver_identities": [],
@@ -11801,7 +11808,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 557,
+      "line": 558,
       "module": "app.routers.wp_render_strategies._k1_import_export",
       "qualname": "_k1_6_import_handler",
       "resolver_identities": [],
@@ -11860,7 +11867,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 301,
+      "line": 302,
       "module": "app.routers.wp_render_strategies._k1_import_export",
       "qualname": "_upsert_remark_text",
       "resolver_identities": [],
@@ -15423,6 +15430,67 @@
         "writes_unified_content_revision": false
       },
       "writer_id": "app.services.formula_runtime.adapters.workpaper::WorkpaperMutationAdapter.restore_many"
+    },
+    {
+      "adjudication": {
+        "domain": "template_provisioning",
+        "status": "adjudicated",
+        "version_domain_note": "`load_template_source_facts` in `backend/app/services/guidance_runtime_facts.py` (resolver), read-only parser of template source facts for guidance runtime. Lane: A read-side member of the template provisioning lane -- it resolves template files through its own path construction to extract structural facts for guidance display. Measured: reaches the workpaper/template file through `<ad_hoc_path_construction>`; builds the path from the literals `wp_templates`. Shape: it never reaches the canonical `resolve_wp_file`, which is why it is also counted in `non_canonical_resolver_only`; 1 except handler(s) swallow without re-raising, so a failed parse can still look successful to the caller. Nothing to commit (read-only), but the same resolver split obligation applies: template resolution should use one canonical entry point. No test file resolves a call site to it, so it is also one of the `writer_without_characterization_test` rows."
+      },
+      "canonical_resolver": null,
+      "characterization_tests": [],
+      "content_stores_written": [],
+      "delegates_to_content_writer": [],
+      "facts": {
+        "ad_hoc_paths": [
+          {
+            "line": 272,
+            "literal": "wp_templates"
+          }
+        ],
+        "after_save_calls": [],
+        "artifact_write_targets": [],
+        "artifact_writes": [],
+        "commit_receivers": [],
+        "content_fields_written": [],
+        "flush_receivers": [],
+        "representation_candidate_calls": [],
+        "resolver_calls": [],
+        "revision_bump_calls": [],
+        "side_effects": [],
+        "sql_update_columns": [],
+        "swallowed_exception_lines": [
+          279
+        ],
+        "unified_commit_calls": [],
+        "version_fields_read": [],
+        "version_fields_written": []
+      },
+      "is_async": false,
+      "kind": "resolver",
+      "line": 262,
+      "module": "app.services.guidance_runtime_facts",
+      "qualname": "load_template_source_facts",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/guidance_runtime_facts.py",
+      "verdicts": {
+        "artifact_snapshot_only": false,
+        "bypasses_unified_commit": false,
+        "delegates_content_write": false,
+        "has_characterization_test": false,
+        "keeps_legacy_write_path_beside_unified_commit": false,
+        "multi_resolver": false,
+        "non_canonical_resolver_only": true,
+        "owns_direct_commit": false,
+        "swallows_exceptions": true,
+        "uses_save_orchestrator": false,
+        "writes_business_content": false,
+        "writes_legacy_version_field": false,
+        "writes_unified_content_revision": false
+      },
+      "writer_id": "app.services.guidance_runtime_facts::load_template_source_facts"
     },
     {
       "adjudication": {
@@ -20070,8 +20138,8 @@
       "writer_id": "app.services.wp_xlsx_export_service::_sync_export_workpaper_xlsx"
     }
   ],
-  "inventory_digest": "1401597ee82ef6e085ff5b9115f143402e875ba1aaa7723b8c95bf14be35c956",
-  "overlay_digest": "4af30ef5b606d7366233b5327b14d5d52aa589604d14a7db4c94afcaeb0bd833",
+  "inventory_digest": "13ace16e509497785cfce3092de1910b35f2b790a02818e53301c514947e65e3",
+  "overlay_digest": "67da1701226e7f0ab3ef26c403cc04891c88495e9ce5154f637112b71726beeb",
   "representation_upgrade_lane": [
     {
       "candidate_calls": [
@@ -20225,7 +20293,7 @@
     }
   ],
   "schema_version": 1,
-  "source_digest": "dd5e2de54dbbaa4bad5817976a4ddf979d1e31fc2ba99145f6f45b4e5ceeed81",
+  "source_digest": "5e1912cf102e07d8cc67e5228d862f54cfc0c97d51b2904b200cb4e1884271bc",
   "stats": {
     "artifact_snapshot_only_count": 1,
     "by_content_store": {
@@ -20234,9 +20302,9 @@
       "working_paper": 71
     },
     "by_domain": {
-      "checklist_response_store": 125,
+      "checklist_response_store": 127,
       "custom": 5,
-      "dedicated_router": 71,
+      "dedicated_router": 73,
       "export_storage_resolver": 62,
       "f2_word_sync": 6,
       "history_restore": 3,
@@ -20245,14 +20313,13 @@
       "orchestrator_side_effect": 2,
       "read_only_evaluation": 2,
       "rollback": 2,
-      "template_provisioning": 18,
-      "unadjudicated": 4,
+      "template_provisioning": 19,
       "unified_commit_substrate": 1,
       "upload_import": 5,
       "wopi": 6
     },
     "by_kind": {
-      "resolver": 56,
+      "resolver": 57,
       "writer": 250,
       "writer_resolver": 25
     },
@@ -20261,25 +20328,25 @@
     "keeps_legacy_write_path_beside_unified_commit_count": 0,
     "legacy_version_field_writer_count": 5,
     "multi_resolver_count": 4,
-    "non_canonical_resolver_only_count": 73,
-    "resolver_count": 81,
+    "non_canonical_resolver_only_count": 74,
+    "resolver_count": 82,
     "retired_by_domain": {
       "custom": 1,
       "export_storage_resolver": 1,
       "orchestrator_side_effect": 1
     },
     "retired_writer_count": 3,
-    "row_count": 331,
+    "row_count": 332,
     "save_orchestrator_writer_count": 4,
     "swallowing_writer_count": 115,
-    "unadjudicated_count": 4,
-    "unadjudicated_writer_count": 3,
+    "unadjudicated_count": 0,
+    "unadjudicated_writer_count": 0,
     "version_field_write_histogram": {
       "file_version": 5,
       "parsed_data.schema_version": 1
     },
     "writer_count": 275,
-    "writer_without_characterization_test_count": 211,
+    "writer_without_characterization_test_count": 210,
     "writes_unified_content_revision_count": 1
   },
   "unified_commit_markers": [

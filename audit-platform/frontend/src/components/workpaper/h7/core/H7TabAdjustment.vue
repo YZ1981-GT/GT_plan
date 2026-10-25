@@ -167,7 +167,7 @@ const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => 
 
 const localResponses = ref<Map<string, any>>(new Map(props.allResponses ?? []))
 const allResponsesRef = computed(() => localResponses.value)
-const { getString, getNum } = useH7Adjustment(allResponsesRef as any, {
+const { getString, getNum, notifyAdjustmentSaved } = useH7Adjustment(allResponsesRef as any, {
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
 })
@@ -240,7 +240,11 @@ async function persist(itemId: string, value: any) {
   } catch { ElMessage.error('保存失败，请稍后重试') }
 }
 
-function onUpdate() { void persist('H7-3-rows', rows.value) }
+function onUpdate() {
+  void persist('H7-3-rows', rows.value)
+  // EventBus 通知审定表/披露刷新（与其余循环对齐）；仅借贷平衡时发布
+  if (isBalanced.value) notifyAdjustmentSaved()
+}
 
 async function handleAddEntry() {
   try {
