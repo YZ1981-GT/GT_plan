@@ -1,7 +1,7 @@
 /**
- * 会话内编辑的 dirty 必须「粘住」，直到强制保存被受理 / CS 回 no_changes / 会话结束。
+ * 会话内编辑的 dirty 必须「粘住」，直到强制保存被受理 / CS 回 no_changes（且改动已送达）/ 会话结束。
  *
- * spec: d2-skeleton-slot-reuse-and-writeback-speed · R4
+ * spec: d2-skeleton-slot-reuse-and-writeback-speed · R4；oo-return-to-form-dead-end-and-save-speed · R1.2 / R1.3
  *
  * 真栈实测（重药安徽 D2-2，2026-10-23）：OnlyOffice 每次编辑后约 1 秒内就发
  * `onDocumentStateChange` true→false（false 只表示「改动已发给文档服务」）。旧实现照单全收，
@@ -18,7 +18,8 @@ import { WorkpaperSyncContractError } from '../workpaperSyncDto'
 const UUID = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
 const DIGEST = (n: number) => String(n).repeat(2).padEnd(64, 'abc123def0'.repeat(7)).slice(0, 64)
 
-function makeBridge(overrides: Record<string, unknown> = {}) {
+// 送达等待上限压到 20 ms：「只有 true 没有 false」的用例要等满上限（spec oo-return-to-form-dead-end-and-save-speed R1.2）。
+function makeBridge(overrides: Record<string, unknown> = {}, deliveryWaitMs = 20) {
   const api = {
     createPendingMutation: vi.fn(async () => ({
       pendingMutationToken: 'tok-1',
@@ -85,6 +86,7 @@ function makeBridge(overrides: Record<string, unknown> = {}) {
     api: api as unknown as WorkpaperSyncApiSurface,
     storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
     installBeforeUnload: false,
+    deliveryWaitMs,
   })
   return { bridge, api }
 }
@@ -132,45 +134,51 @@ describe('会话内编辑的 dirty 粘住', () => {
     expect(h.bridge.dirty.value, '保存请求之后又改过').toBe(true)
   })
 
-  it('CS 回 no_changes ⇒ 清零（权威地没有可存的）；其它无回调结局保持未保存', async () => {
-    const noChanges = makeBridge({
-      requestForcesave: vi.fn(async () => ({
-        forcesaveRequestId: UUID(29),
-        operationId: UUID(30),
-        requestSequence: 7,
-        state: 'accepted' as const,
-        pollAfterMs: 800,
-        replayed: false,
-        dispatchError: null,
-        callbackExpected: false,
-        csOutcome: 'no_changes',
-        csError: 4,
-      })),
-    })
-    await toOoEditing(noChanges)
-    noChanges.bridge.notifyDirty(true)
-    await noChanges.bridge.switchToHtml()
-    expect(noChanges.bridge.state.value).toBe('forcesave_frozen')
-    expect(noChanges.bridge.dirty.value).toBe(false)
+  const terminal = (csOutcome: string, csError: number) =>
+    vi.fn(async () => ({
+      forcesaveRequestId: UUID(29),
+      operationId: UUID(30),
+      requestSequence: 7,
+      state: 'accepted' as const,
+      pollAfterMs: 800,
+      replayed: false,
+      dispatchError: null,
+      callbackExpected: false,
+      csOutcome,
+      csError,
+    }))
 
-    const offline = makeBridge({
-      requestForcesave: vi.fn(async () => ({
-        forcesaveRequestId: UUID(29),
-        operationId: UUID(30),
-        requestSequence: 7,
-        state: 'accepted' as const,
-        pollAfterMs: 800,
-        replayed: false,
-        dispatchError: null,
-        callbackExpected: false,
-        csOutcome: 'doc_not_online',
-        csError: 1,
-      })),
-    })
-    await toOoEditing(offline)
-    offline.bridge.notifyDirty(true)
-    await offline.bridge.switchToHtml()
-    expect(offline.bridge.state.value).toBe('forcesave_frozen')
-    expect(offline.bridge.dirty.value, '会话不在线 ≠ 没有改动').toBe(true)
+  // 🔴 判据改过（spec oo-return-to-form-dead-end-and-save-speed R1.2 / R1.3）：原先「CS 回 no_changes ⇒
+  // 清零、留在冻结态」。现在 no_changes 只有在改动已确认送达文档服务（最近一次为 false）时才可信：
+  // 可信 ⇒ 按契约放行离开（清零、回表单）；不可信 ⇒ 改动可能还在路上，冻结且保持未保存。
+  it('CS 回 no_changes 且改动已送达 ⇒ 清零并放行回表单（恰一次 leave）', async () => {
+    const h = makeBridge({ requestForcesave: terminal('no_changes', 4) })
+    await toOoEditing(h)
+    h.bridge.notifyDirty(true)
+    h.bridge.notifyDirty(false)
+    await h.bridge.switchToHtml()
+    expect(h.bridge.state.value).toBe('html_idle')
+    expect(h.bridge.dirty.value).toBe(false)
+    expect(h.api.leaveRoom).toHaveBeenCalledTimes(1)
+  })
+
+  it('CS 回 no_changes 但改动未送达（只有 true）⇒ 冻结、保持未保存、零次 leave', async () => {
+    const h = makeBridge({ requestForcesave: terminal('no_changes', 4) })
+    await toOoEditing(h)
+    h.bridge.notifyDirty(true)
+    await h.bridge.switchToHtml()
+    expect(h.bridge.state.value).toBe('forcesave_frozen')
+    expect(h.bridge.dirty.value, '改动可能还在发往文档服务的路上').toBe(true)
+    expect(h.api.leaveRoom).not.toHaveBeenCalled()
+  })
+
+  it('其它无回调结局（会话不在线）保持未保存', async () => {
+    const h = makeBridge({ requestForcesave: terminal('doc_not_online', 1) })
+    await toOoEditing(h)
+    h.bridge.notifyDirty(true)
+    h.bridge.notifyDirty(false)
+    await h.bridge.switchToHtml()
+    expect(h.bridge.state.value).toBe('forcesave_frozen')
+    expect(h.bridge.dirty.value, '会话不在线 ≠ 没有改动').toBe(true)
   })
 })

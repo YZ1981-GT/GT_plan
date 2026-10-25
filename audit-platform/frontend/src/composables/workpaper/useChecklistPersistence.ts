@@ -6,6 +6,10 @@
  */
 import { getCurrentScope, onScopeDispose, reactive, ref, type Ref } from 'vue'
 import { api } from '@/services/apiProxy'
+import {
+  BACKGROUND_MERGE_WRITE_REFUSED_MESSAGE,
+  isBackgroundMerging,
+} from '@/components/workpaper/sync/backgroundMergeRegistry'
 import { persistenceMetrics } from './usePersistenceMetrics'
 
 export interface ChecklistResponse {
@@ -167,6 +171,14 @@ export function useChecklistPersistence(
     if (!wpId.value) {
       const error = new Error('缺少 wpId，无法保存 checklist response')
       setState(itemId, { status: 'error', lastError: error.message })
+      throw error
+    }
+    if (isBackgroundMerging(wpId.value)) {
+      // 在线编辑的改动正在后台合并（spec oo-return-to-form-dead-end-and-save-speed R4.4）：落地后表单按
+      // 结果重载，此刻写进去要么被覆盖、要么盖掉合并结果 ⇒ 拒写并丢弃（表单已只读，正常走不到这里）。
+      const error = new Error(BACKGROUND_MERGE_WRITE_REFUSED_MESSAGE)
+      setState(itemId, { status: 'error', serverVersion: stateOf(itemId).serverVersion, lastError: error.message })
+      pending.delete(itemId)
       throw error
     }
 

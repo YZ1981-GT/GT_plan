@@ -120,16 +120,22 @@ BASELINE_EXTRACT_CACHE: "BoundedLruCache[str, object]" = BoundedLruCache(maxsize
 #: 键 = f"{substrate_sha256}:{sheet_part}:{table_key}:{extra_parts_joined}"。
 BEFORE_DIGEST_CACHE: "BoundedLruCache[str, object]" = BoundedLruCache(maxsize=128)
 
+#: R3 P9（spec oo-return-to-form-dead-end-and-save-speed）：`ExcelSyncAdapter.extract` 读已发布
+#: 形态 / 物化反读时的整簿提取结果。键与值见 `published_extract_cache`。
+PUBLISHED_EXTRACT_CACHE: "BoundedLruCache[str, object]" = BoundedLruCache(maxsize=16)
+
 
 def clear_all_parse_caches() -> None:
     """清空全部解析缓存（测试隔离/运维用）。"""
     BASELINE_EXTRACT_CACHE.clear()
     BEFORE_DIGEST_CACHE.clear()
+    PUBLISHED_EXTRACT_CACHE.clear()
 
 
 __all__ = [
     "BoundedLruCache",
     "BASELINE_EXTRACT_CACHE",
     "BEFORE_DIGEST_CACHE",
+    "PUBLISHED_EXTRACT_CACHE",
     "clear_all_parse_caches",
 ]

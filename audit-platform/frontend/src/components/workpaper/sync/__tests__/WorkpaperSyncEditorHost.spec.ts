@@ -27,8 +27,10 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
 
 import WorkpaperSyncEditorHost from '../WorkpaperSyncEditorHost.vue'
+import { FORCESAVE_NO_CHANGES_LEFT_NOTICE } from '../bridgeForcesaveFlow'
 import {
   WP_SYNC_DOCS_API_SCRIPT_PATH,
   WP_SYNC_HOST_ADDED_CONFIG_KEYS,
@@ -907,9 +909,26 @@ describe('暴露的 API 与七个事件各有真实触发路径', () => {
     ])
   })
 
-  it('点击保存按钮走同一条路径（按钮不是装饰）', async () => {
+  // 🔴 判据改过（spec oo-return-to-form-dead-end-and-save-speed R1.1）：原先断言「不论改没改，点按钮
+  // 都发强制保存」。会话内没编辑时那必然换来返回码 4 → 冻结 + 遮罩、人被关在编辑器里（和平药房 D2
+  // room g12 实测）。现在按钮按会话内有无编辑分流：没编辑 ⇒ clean close；编辑过 ⇒ 与 forceSave() 同一条路。
+  it('点击保存按钮：会话内没编辑 ⇒ clean close（恰一次 leave、零次强制保存）', async () => {
+    const leaveRoom = vi.fn(async () => ({ participant_id: UUID(22), state: 'left', replayed: false }))
+    const h = harness({ leaveRoom })
+    const { wrapper } = await openEditor(h)
+    await saveButton(wrapper).trigger('click')
+    await flushPromises()
+    expect(h.api.requestForcesave).not.toHaveBeenCalled()
+    expect(leaveRoom).toHaveBeenCalledTimes(1)
+    expect(wrapper.emitted('saveRequested')).toBeUndefined()
+    expect(h.bridge.state.value).toBe('html_idle')
+  })
+
+  it('点击保存按钮：编辑过（true → false）⇒ 走 forceSave() 同一条路径（按钮不是装饰）', async () => {
     const h = harness()
     const { wrapper } = await openEditor(h)
+    lastEditor().events.onDocumentStateChange({ data: true })
+    lastEditor().events.onDocumentStateChange({ data: false })
     await saveButton(wrapper).trigger('click')
     await flushPromises()
     expect(h.api.requestForcesave).toHaveBeenCalledTimes(1)
@@ -942,6 +961,11 @@ describe('暴露的 API 与七个事件各有真实触发路径', () => {
     const h = harness()
     const { wrapper, descriptor } = await openEditor(h)
     await hostApi(wrapper).forceSave()
+    await flushPromises()
+    // 🔴 2026-10-25（spec oo-return-to-form-dead-end-and-save-speed R4）起，宿主发起的保存在文件耐久后
+    //    转后台合并、回表单，宿主不再等到终态。这里保存受理后再改一笔 ⇒ 人留在编辑器里、走原路径，
+    //    本条判据（两个事件由真实状态推进触发）不变；转后台那条见 backgroundMerge.spec.ts。
+    lastEditor().events.onDocumentStateChange({ data: true })
     await flushPromises()
 
     h.bridge.ingestOperationSnapshot(
@@ -1507,34 +1531,52 @@ describe('forcesave 之后宿主自行推进 operation 直到落地', () => {
     expect(status(wrapper).text).toContain('等待 OnlyOffice 回传文件')
   })
 
-  it('后端说 callback_expected=false（no_changes）时不进等待态，而是给出人话原因', async () => {
-    // 后端 `request_forcesave` 对 CS 的 `no_changes`(cs_error=4) 已就地终结 request+shell
-    // 并回传 `callback_expected=false`，源码注释写的就是「避免前端无限等 status 6」。
-    // 修复前前端不解析这三个字段 ⇒ 照样进 waiting_application 干等不会来的 callback，
-    // 「进 OO 什么都没改直接点保存」必然永久转圈。
-    const h = harness({
-      requestForcesave: vi.fn(async () => ({
-        forcesaveRequestId: UUID(29),
-        operationId: UUID(30),
-        requestSequence: 7,
-        state: 'accepted' as const,
-        pollAfterMs: 800,
-        replayed: false,
-        dispatchError: null,
-        csError: 4,
-        csOutcome: 'no_changes',
-        callbackExpected: false,
-      })),
-    })
+  const terminalAccepted = (csError: number, csOutcome: string) =>
+    vi.fn(async () => ({
+      forcesaveRequestId: UUID(29),
+      operationId: UUID(30),
+      requestSequence: 7,
+      state: 'accepted' as const,
+      pollAfterMs: 800,
+      replayed: false,
+      dispatchError: null,
+      csError,
+      csOutcome,
+      callbackExpected: false,
+    }))
+
+  // 后端 `request_forcesave` 对 CS 的 `no_changes`(cs_error=4) 已就地终结 request+shell
+  // 并回传 `callback_expected=false`，源码注释写的就是「避免前端无限等 status 6」。
+  // 修复前前端不解析这三个字段 ⇒ 照样进 waiting_application 干等不会来的 callback。
+  // 🔴 判据改过（spec oo-return-to-form-dead-end-and-save-speed R1.3）：原先断言落 `forcesave_frozen`
+  // 并提示「没有检测到改动」—— 人被留在遮罩下的编辑器里，再点一次又是 4（和平药房 D2 两条 cs_error=4）。
+  // 契约对 4 写的是「直接放行离开」；改动已确认送达时现在就放行回表单，给一句普通提示。
+  it('后端说 callback_expected=false（no_changes）且改动已送达 ⇒ 不进等待态，放行回表单并提示', async () => {
+    const info = vi.spyOn(ElMessage, 'info').mockImplementation(() => ({ close: () => {} }) as never)
+    const h = harness({ requestForcesave: terminalAccepted(4, 'no_changes') })
     const { wrapper } = await openEditor(h)
     await hostApi(wrapper).forceSave()
     await flushPromises()
 
     expect(h.bridge.state.value).not.toBe('waiting_application')
+    expect(h.bridge.state.value).toBe('html_idle')
+    expect(h.api.getOperation, '不会有 callback 时不该去轮询').not.toHaveBeenCalled()
+    expect(wrapper.emitted('saveRequested'), '没有回传可等，不得宣称已发起保存').toBeUndefined()
+    expect(info).toHaveBeenCalledWith(FORCESAVE_NO_CHANGES_LEFT_NOTICE)
+  })
+
+  it('后端说 callback_expected=false（doc_not_online）⇒ 不进等待态，冻结并给出人话原因与出口', async () => {
+    const h = harness({ requestForcesave: terminalAccepted(1, 'doc_not_online') })
+    const { wrapper } = await openEditor(h)
+    await hostApi(wrapper).forceSave()
+    await flushPromises()
+
     expect(h.bridge.state.value).toBe('forcesave_frozen')
     expect(h.api.getOperation, '不会有 callback 时不该去轮询').not.toHaveBeenCalled()
-    // 文案必须说清「没改动」，不能是笼统的「未被受理」——用户要知道下一步怎么做。
-    expect(status(wrapper).text).toContain('没有检测到改动')
+    // 文案必须说清原因与下一步（会话不在线 ≠ 没有改动），且那个出口此刻真的渲染着。
+    expect(status(wrapper).text).toContain('编辑会话已不在线')
+    expect(status(wrapper).text).toContain('退出在线编辑')
+    expect(wrapper.find('[data-testid="wp-sync-host-exit"]').exists()).toBe(true)
   })
 })
 

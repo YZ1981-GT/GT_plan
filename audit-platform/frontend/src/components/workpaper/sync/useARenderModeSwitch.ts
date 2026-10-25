@@ -43,6 +43,7 @@ import {
 } from './useWorkpaperSyncBridge'
 import { capabilityForEntry } from './workpaperSyncCapability'
 import { fetchOnlyOfficeHealthy } from './onlyOfficeHealth'
+import { isLeaveKeptRefusal } from './bridgeLeave'
 
 /** 双模式取值域 —— 与 A 各宿主既有 `el-segmented` 的 value 形态一致（不是 'onlyoffice'）。 */
 export type ARenderMode = 'html' | 'docx'
@@ -255,9 +256,12 @@ export function useARenderModeSwitch(options: UseARenderModeSwitchOptions): UseA
           type: 'danger',
         }
       }
-    } catch {
-      // 错误已记入 `lastError`；这里补一条人能看懂的提示，不静默。
-      lastNotice.value = { text: '保存回写失败，改动仍在在线编辑侧，请重试', type: 'danger' }
+    } catch (error) {
+      // 错误已记入 `lastError`；这里补一条人能看懂的提示，不静默。用户在编辑器的提示里选择继续编辑
+      // （spec oo-return-to-form-dead-end-and-save-speed R1.6）不是失败，不报。
+      if (!isLeaveKeptRefusal(error)) {
+        lastNotice.value = { text: '保存回写失败，改动仍在在线编辑侧，请重试', type: 'danger' }
+      }
     } finally {
       syncSwitching.value = false
       if (options.afterLeaveOo) await options.afterLeaveOo()

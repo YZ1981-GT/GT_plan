@@ -44,6 +44,7 @@
       </div>
 
       <template v-else>
+      <WorkpaperBackgroundMergeBanner :wp-id="wpId" />
       <el-alert
         v-if="schemaFallbackBanner"
         type="info"
@@ -60,7 +61,7 @@
       <GtWpPreparationHeader
         v-if="showWorkpaperPreparationHeader"
         :wp-id="wpId"
-        :readonly="readonly"
+        :readonly="effectiveReadonly"
         :index-no-override="activeSheetIndexNo"
       />
 
@@ -144,7 +145,7 @@
                走 F-SHELL compatibility outlet slot，位于「导入」右侧；只读态禁用。 -->
           <el-button
             size="small"
-            :disabled="!runtimeProjectId || !runtimeWpCode || loading || readonly"
+            :disabled="!runtimeProjectId || !runtimeWpCode || loading || effectiveReadonly"
             :loading="alignmentRefreshing"
             @click="onOpenRefreshSourceDialog"
           >
@@ -153,7 +154,7 @@
           <!-- 批量刷新（batch-refresh-workpaper-data spec Task 4） -->
           <el-button
             size="small"
-            :disabled="!runtimeProjectId || loading || readonly"
+            :disabled="!runtimeProjectId || loading || effectiveReadonly"
             @click="batchRefreshVisible = true"
           >
             📋 批量刷新
@@ -195,7 +196,7 @@
         :sheet-name="activeSheetName"
         :schema="activeSheetSchema"
         :html-data="activeSheetHtmlData"
-        :readonly="readonly"
+        :readonly="effectiveReadonly"
         :wp-code="renderConfig?.wp_code ?? ''"
         v-bind="extraComponentProps"
         @save="onSave"
@@ -223,7 +224,7 @@
         :sheet-name="isWholeExcelTab ? wholeWorkbookSheetName : activeSheetName"
         :project-id="renderConfig?.project_id ?? ''"
         :whole-workbook="isWholeExcelTab"
-        :readonly="readonly"
+        :readonly="effectiveReadonly"
         @fallback="onOnlyOfficeFallback"
       />
 
@@ -326,7 +327,7 @@
       :project-id="runtimeProjectId ?? ''"
       :current-wp-code="runtimeWpCode ?? ''"
       :current-sheets="batchRefreshSheets"
-      :readonly="readonly"
+      :readonly="effectiveReadonly"
       @done="reload"
     />
 
@@ -336,7 +337,7 @@
       :wp-id="wpId"
       :project-id="renderConfig?.project_id ?? runtimeProjectId ?? ''"
       :wp-code="renderConfig?.wp_code ?? ''"
-      :can-edit="!readonly"
+      :can-edit="!effectiveReadonly"
     />
   </div>
 </template>
@@ -391,6 +392,8 @@ import { useProjectStore } from '@/stores/project'
 import { subscribeInvalidation } from '@/services/acnr'
 import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
 import { useWorkpaperScaffold } from '@/components/workpaper/composables/useWorkpaperScaffold'
+import WorkpaperBackgroundMergeBanner from '@/components/workpaper/sync/WorkpaperBackgroundMergeBanner.vue'
+import { isBackgroundMerging } from '@/components/workpaper/sync/backgroundMergeRegistry'
 
 // ─── Types ───
 export interface SavePayload {
@@ -414,6 +417,8 @@ const props = defineProps<{
   initialCell?: string
   readonly?: boolean
 }>()
+// 在线编辑的改动在后台合并期间整张底稿只读（spec oo-return-to-form-dead-end-and-save-speed R4.4）
+const effectiveReadonly = computed(() => !!props.readonly || isBackgroundMerging(props.wpId))
 
 const formulaCapabilityContext = inject(FORMULA_MANAGER_CAPABILITY_CONTEXT, null)
 const formulaViewAllowed = computed(
@@ -899,7 +904,7 @@ const runtime = useWorkpaperScaffold({
   projectId: runtimeProjectId,
   wpCode: runtimeWpCode,
   year: preparationYear,
-  readonly: toRef(props, 'readonly'),
+  readonly: effectiveReadonly,
   onJumpToSection: onChildNavigateSheet,
   reloadFn: reload,
   contextReady: runtimeContextReady,

@@ -676,6 +676,39 @@ export async function driveTo(
       )
       return h
     }
+    case 'merging_in_background': {
+      // 文件已耐久、宿主点了「保存并回到表单」后转后台（R4）；桥自己的追踪器第一读一直不回。
+      const h = harness({ getOperation: vi.fn(() => pending()) })
+      await openToWaitingApplication(h)
+      h.bridge.ingestOperationSnapshot(
+        snapshot({ state: 'merging', shape: 'primary', applicationId: UUID(50) }),
+      )
+      h.bridge.continueInBackground()
+      await flushPromises()
+      return h
+    }
+    case 'background_merge_failed': {
+      // 同上转后台，桥的追踪器读到冲突 ⇒ 后台合并没落地。
+      const h = harness({
+        getOperation: vi.fn(async () =>
+          snapshot({
+            state: 'conflict',
+            shape: 'primary',
+            applicationId: UUID(50),
+            conflictCount: 4,
+            durableAt: '2026-08-16T00:00:10Z',
+            terminal: true,
+          }),
+        ),
+      })
+      await openToWaitingApplication(h)
+      h.bridge.ingestOperationSnapshot(
+        snapshot({ state: 'merging', shape: 'primary', applicationId: UUID(50) }),
+      )
+      h.bridge.continueInBackground()
+      await flushPromises()
+      return h
+    }
     case 'close_authorization_stale': {
       const h = harness()
       await openToEditing(h)

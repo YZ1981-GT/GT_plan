@@ -2340,6 +2340,7 @@ declare module 'vue' {
     WorkpaperAssignmentMatrix: typeof import('./components/workpaper/WorkpaperAssignmentMatrix.vue')['default']
     WorkpaperAttachmentsDrawer: typeof import('./components/workpaper/WorkpaperAttachmentsDrawer.vue')['default']
     WorkpaperAuditNav: typeof import('./components/workpaper/WorkpaperAuditNav.vue')['default']
+    WorkpaperBackgroundMergeBanner: typeof import('./components/workpaper/sync/WorkpaperBackgroundMergeBanner.vue')['default']
     WorkpaperDependencyGraph: typeof import('./components/workpaper/WorkpaperDependencyGraph.vue')['default']
     WorkpaperHtmlTable: typeof import('./components/workpaper/WorkpaperHtmlTable.vue')['default']
     WorkpaperKanban: typeof import('./components/workpaper/WorkpaperKanban.vue')['default']

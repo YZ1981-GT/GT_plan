@@ -668,6 +668,8 @@ async def _isolated_pilot_attach(
 
 async def _attach_pilot_adapters(
     svc: "_SyncServices | _RegistrationWarmupContext",
+    *,
+    entry_scope: "tuple[str, Any] | None" = None,
 ) -> tuple[str, ...]:
     """Task 40 起的**生产接线点**：把已 finalize 的 pilot entry 接进 registry。
 
@@ -677,6 +679,9 @@ async def _attach_pilot_adapters(
 
     🔴 **不吞异常**：接线失败必须让端点以可诊断错误码收场，而不是退回"registry 零注册"
     的表象 —— 后者会把「pilot 接线坏了」伪装成「这个 entry 还没做 adapter」。
+
+    ``entry_scope=(entry_id, wp_id)``：缓存冷时只为本请求的 entry 做准备、不进全局冷建锁（见
+    ``entry_scoped_registration``；spec oo-return-to-form-dead-end-and-save-speed R2）。
     """
     # Task 41 起：每个 pilot 各自一份 contract/bundle/candidate，接线也各自一条 ——
     # 复用另一个 pilot 的 attach 就等于复用它的契约（任务正文明令禁止）。
@@ -712,6 +717,16 @@ async def _attach_pilot_adapters(
     cached = _REGISTRATION_CACHE.get(fingerprint)
     if cached is not None:
         return _replay_cached_registrations(svc, cached)
+    # 请求随后按目标底稿现绑、只用本 entry ⇒ 不排在 36~42 s 的整套冷建后面（重载后第一个保存回调实测
+    # 51 s）。目标底稿还没有 representation 时绑定要回落到 entry 级注册 ⇒ 照旧整套建。
+    if entry_scope is not None:
+        from app.services.workpaper_sync.entry_scoped_registration import prepare_entry_only
+
+        entry_id, wp_id = entry_scope
+        if await prepare_entry_only(
+            session=svc.session, registry=svc.registry, entry_id=entry_id, wp_id=wp_id
+        ):
+            return ()
 
     # 🔴 冷路径串行化：并发首请求不得各跑一遍 30s 注册（见 _REGISTRATION_BUILD_LOCK）。
     async with _registration_build_lock():
@@ -725,14 +740,14 @@ async def _attach_pilot_adapters(
         #    5000+ 个前端文件与全部路由（现场实测连续 7.9s 不让出循环 ⇒ 这段时间整个后端不响应）。
         #    放在锁内：并发首请求若先拿到锁，同样不会在循环上首算。首算失败不在这里报 —— 原调用点
         #    会以原错误 fail closed（见 `warm_source_fact_caches` docstring）。
-        from app.services.workpaper_sync.entry_source_facts import warm_source_fact_caches
         from app.services.workpaper_sync.registration_template_warmup import (
             provider_modules_for,
             supplied_entry_ids,
+            warm_source_facts_once,
             warm_template_structure_hashes,
         )
 
-        await asyncio.to_thread(warm_source_fact_caches)
+        await asyncio.to_thread(warm_source_facts_once)  # 与按 entry 准备共用一次首算（单飞）
         # 同理（spec writeback-followup-issue-closure P4）：各 attach 在循环上算模板结构 hash
         # （整册解析，冷注册 36 份合计 15~19 s）。先在工作线程按同一组 provider 算好进内容寻址记忆。
         await asyncio.to_thread(
@@ -869,7 +884,7 @@ async def _registration(svc: _SyncServices, scope: GuardedScope):
     # 清册 / tombstone / 动态列绑定都随 representation 走），直接用它 ⇒ 同一 entry 上只有
     # 第一家企业能用双向回写（重药安徽实测「丢失 729 个 row identity」——那是和平药房的行）。
     try:
-        await _attach_pilot_adapters(svc)
+        await _attach_pilot_adapters(svc, entry_scope=(scope.entry_id, scope.wp_id))
         return await bind_registration_to_target(
             session=svc.session,
             registry=svc.registry,
@@ -3023,9 +3038,10 @@ async def _apply_durable_incoming(db: AsyncSession, *, outcome: Any, attempt: in
     #
     # 注册阶段与绑定一起放进下面的 try：incoming 已 durable，注册 / 重放抛的域异常同样只能
     # 留在 operation 上等用户 retry（本函数 docstring「失败不上抛」），不得冒成 500 让 OO 丢件。
+    # 缓存冷时（重载 / 首版发布之后）只为本 application 的 (entry, 底稿) 准备，不等整套冷建（R2）。
     warm = _RegistrationWarmupContext(session=db, registry=registry)
     try:
-        await _attach_pilot_adapters(warm)
+        await _attach_pilot_adapters(warm, entry_scope=(str(app_row.entry_id), app_row.wp_id))
 
         # 🔴 R14：apply 用的 adapter 必须绑在**本 application 所在底稿**的 current
         # representation 上（三方 extract 的 base/current/incoming 都按它的行身份清册比对），

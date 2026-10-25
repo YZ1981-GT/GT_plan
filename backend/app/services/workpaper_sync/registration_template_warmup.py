@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import threading
 from typing import Any, Iterable
 
 import sqlalchemy as sa
@@ -25,10 +26,37 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "PILOT_PROVIDER_MODULES",
+    "entry_provider_module",
     "provider_modules_for",
     "supplied_entry_ids",
+    "warm_source_facts_once",
     "warm_template_structure_hashes",
 ]
+
+#: 源码事实首算单飞（spec oo-return-to-form-dead-end-and-save-speed R2）。冷建与按 entry 准备都在工作
+#: 线程里预热同一组 ``lru_cache``，而 ``lru_cache`` 不合并并发首算 ⇒ 重载后启动预热与第一个保存回调
+#: 各扫一遍前端源码（各约 7 s、互相抢 CPU）。持锁的那一个算完，后来者全部命中缓存。
+_SOURCE_FACTS_LOCK = threading.Lock()
+
+
+def warm_source_facts_once() -> tuple[str, ...]:
+    """``entry_source_facts.warm_source_fact_caches`` 的单飞包装（供 ``asyncio.to_thread``）。"""
+    from app.services.workpaper_sync import entry_source_facts
+
+    with _SOURCE_FACTS_LOCK:
+        return entry_source_facts.warm_source_fact_caches()
+
+
+def entry_provider_module(registry: Any, entry_id: str) -> str | None:
+    """该 entry 自己的 provider 模块（注册计划里登记的那一个）；不在计划里 / 已判不可注册 ⇒ None。"""
+    try:
+        plan = registry.registration_plan
+    except Exception:  # noqa: BLE001 - 测试 registry 没有绑定计划
+        return None
+    for item in plan:
+        if item.entry_id == entry_id and item.blocked_reason is None and item.provider_module:
+            return str(item.provider_module)
+    return None
 
 #: 四条显式 pilot attach（`wp_sync_router._isolated_pilot_attach` 逐条调用的同一组模块）。
 PILOT_PROVIDER_MODULES: tuple[str, ...] = (

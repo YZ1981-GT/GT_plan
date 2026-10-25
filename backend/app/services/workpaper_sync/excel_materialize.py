@@ -4377,21 +4377,39 @@ def _plan_materialize_step(
     intended_formulas: Mapping[str, str] | None,
     limits: SyncLimits,
     retain_identity_inventory: bool,
+    substrate_views: Any = None,
 ) -> MaterializePlanStep:
     """`materialize_projection` 的第 4~6 步（读 substrate identity → 裁决策略 → 算计划）。
 
     **唯一实现**：单趟路径与逐趟路径都走它，避免「两条路径各算一份计划」那种最难查的漂移。
+
+    `substrate_views`：OO→HTML 三方提取里同一份 incoming 的逐 binding 结果
+    （`incoming_view_reuse.IncomingViews`）；内容 / 形态 / binding / 定义 / limits 全部相同
+    才用，否则照常提取。
     """
-    substrate_view = extract_projection(
-        artifact=substrate,
-        definitions=definitions,
-        binding=binding,
-        substrate_role=substrate_role,
-        artifact_kind=substrate_kind,
-        artifact_state=substrate_state,
-        limits=limits,
-        retain_identity_inventory=retain_identity_inventory,
+    substrate_view = (
+        None
+        if substrate_views is None
+        else substrate_views.view_for(
+            source_bytes=source_bytes,
+            binding=binding,
+            shape=(substrate_role, substrate_kind, substrate_state),
+            definitions=definitions,
+            limits=limits,
+            retain_identity_inventory=retain_identity_inventory,
+        )
     )
+    if substrate_view is None:
+        substrate_view = extract_projection(
+            artifact=substrate,
+            definitions=definitions,
+            binding=binding,
+            substrate_role=substrate_role,
+            artifact_kind=substrate_kind,
+            artifact_state=substrate_state,
+            limits=limits,
+            retain_identity_inventory=retain_identity_inventory,
+        )
     entries = _read_entries(source_bytes)
     # 同一份 substrate 字节：entries + runtime binding 共用一次 zip 打开，不再
     # `ZipFile(substrate)` 二次读盘（Wave 2 / Requirement 1.4）。
@@ -4471,6 +4489,7 @@ def materialize_projection(
     limits: SyncLimits | None = None,
     retain_identity_inventory: bool = True,
     compute_structure_hash: bool = True,
+    substrate_views: Any = None,
 ) -> ExcelMaterializeOutcome:
     """把 projection 写进 substrate 的**副本**，产出 staged 文件。
 
@@ -4511,6 +4530,7 @@ def materialize_projection(
         intended_formulas=intended_formulas,
         limits=lim,
         retain_identity_inventory=retain_identity_inventory,
+        substrate_views=substrate_views,
     )
     substrate_view = step.substrate_view
     strategy = step.strategy
@@ -4762,6 +4782,7 @@ def materialize_projection_single_pass(
     substrate_state: ArtifactState | str,
     capability: ExcelWriteCapability | None = None,
     limits: SyncLimits | None = None,
+    substrate_views: Any = None,
 ) -> SinglePassMaterializeOutcome:
     """多 binding 底稿的**单趟**物化：全部计划只解析一次 substrate，全部写入合成一趟。
 
@@ -4827,6 +4848,7 @@ def materialize_projection_single_pass(
             intended_formulas=None,
             limits=lim,
             retain_identity_inventory=(binding.table_key == primary_table_key),
+            substrate_views=substrate_views,
         )
         if step.strategy.strategy is ExcelWriteStrategy.openpyxl_roundtrip:
             raise SinglePassDeclined(

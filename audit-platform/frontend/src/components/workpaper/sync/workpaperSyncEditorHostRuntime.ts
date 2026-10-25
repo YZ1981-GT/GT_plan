@@ -41,9 +41,11 @@ export const WP_SYNC_DOCS_API_SCRIPT_PATH = '/web-apps/apps/api/documents/api.js
  */
 export const WP_SYNC_HOST_ADDED_CONFIG_KEYS = ['width', 'height', 'events'] as const
 
-/** DocsAPI 的最小形态（宿主只用到 `DocEditor` 构造与实例的 `destroyEditor`）。 */
+/** DocsAPI 的最小形态（宿主只用到 `DocEditor` 构造与实例的 `destroyEditor` / `requestClose`）。 */
 export interface WorkpaperSyncDocEditorInstance {
   destroyEditor?: () => void
+  /** 离开前让编辑器自己检查未保存内容（R1.6，见 `editorLeaveConfirm.ts`）。 */
+  requestClose?: () => void
 }
 
 export interface WorkpaperSyncDocsApi {
@@ -71,6 +73,8 @@ export interface WorkpaperSyncDocEditorEvents {
   onError: (event: unknown) => void
   onRequestRefreshFile: () => void
   onOutdatedVersion: () => void
+  /** `requestClose()` 的答复：编辑器没有未保存内容、或用户在它的提示里选了「确定」（R1.6）。 */
+  onRequestClose?: () => void
 }
 
 /** 宿主侧失败的中文文案。桥的状态文案在 `WP_BRIDGE_STATE_TEXT`，两者不重叠。 */

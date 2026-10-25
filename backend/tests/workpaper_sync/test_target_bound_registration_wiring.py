@@ -20,6 +20,7 @@ import sys
 import textwrap
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Final
 
 import pytest
@@ -357,24 +358,33 @@ class TestCallbackApplyUsesTheRegistrationCache:
 
 
 class _AppRowSession:
-    """`_apply_durable_incoming` 第一条查询（application 行）的替身。"""
+    """`_apply_durable_incoming` 的查询替身：application 行 + 目标底稿 current representation。
 
-    def __init__(self, app_row: Any) -> None:
+    后者给按 entry 准备（spec oo-return-to-form-dead-end-and-save-speed R2）用：有 representation ⇒
+    缓存冷也不整套建。
+    """
+
+    def __init__(self, app_row: Any, representation: Any = None) -> None:
         self.app_row = app_row
+        self.representation = representation
 
     async def execute(self, statement: Any) -> Any:
-        row = self.app_row
+        row, representation = self.app_row, self.representation
 
         class _One:
             def scalar_one_or_none(self) -> Any:
                 return row
 
+            def scalars(self) -> Any:
+                return SimpleNamespace(first=lambda: representation)
+
         return _One()
 
 
-async def _run_callback_registration(monkeypatch: pytest.MonkeyPatch, *, cache_hit: bool) -> dict[str, Any]:
+async def _run_callback_registration(
+    monkeypatch: pytest.MonkeyPatch, *, cache_hit: bool, representation: Any = None
+) -> dict[str, Any]:
     """真跑 `_apply_durable_incoming` 的注册段：在绑定处截停，观察冷建有没有发生。"""
-    from types import SimpleNamespace
 
     from app.routers import wp_sync_router as SR
 
@@ -433,7 +443,7 @@ async def _run_callback_registration(monkeypatch: pytest.MonkeyPatch, *, cache_h
     wp_id = uuid.uuid4()
     app_row = SimpleNamespace(entry_id=ENTRY, wp_id=wp_id)
     await SR._apply_durable_incoming(
-        _AppRowSession(app_row),
+        _AppRowSession(app_row, representation),
         outcome=SimpleNamespace(application_id=uuid.uuid4(), operation_id=uuid.uuid4()),
     )
     return {"calls": calls, "wp_id": wp_id}
@@ -449,6 +459,15 @@ async def test_callback_apply_skips_the_cold_build_on_a_cache_hit(monkeypatch) -
 
 @pytest.mark.asyncio
 async def test_callback_apply_still_cold_builds_on_a_cache_miss(monkeypatch) -> None:
+    """目标底稿还没有 representation：绑定会回落到 entry 级注册 ⇒ 缓存冷时仍须整套建。"""
     got = await _run_callback_registration(monkeypatch, cache_hit=False)
     # 模板结构 hash 在 attach 之前先在工作线程算（spec writeback-followup-issue-closure P4）
     assert got["calls"] == ["warm", "simple", "d2", "h1", "g7", "manifest", f"bind:{got['wp_id']}"], got
+
+
+@pytest.mark.asyncio
+async def test_callback_apply_skips_the_cold_build_when_the_workpaper_has_a_representation(monkeypatch) -> None:
+    """🔴 判据改过（spec oo-return-to-form-dead-end-and-save-speed R2）：原先缓存冷即整套建。保存回调的
+    底稿必有 current representation，apply 只按它现绑 ⇒ 不再排在 36~42 s 的整套冷建后面。"""
+    got = await _run_callback_registration(monkeypatch, cache_hit=False, representation=uuid.uuid4())
+    assert got["calls"] == [f"bind:{got['wp_id']}"], got

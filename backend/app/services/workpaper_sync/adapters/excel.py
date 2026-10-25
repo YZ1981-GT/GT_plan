@@ -67,6 +67,8 @@ from app.services.workpaper_sync.excel_materialize import (
     ExcelWriteCapability,
     materialize_projection,
 )
+from app.services.workpaper_sync.incoming_view_reuse import take_incoming_views
+from app.services.workpaper_sync.published_extract_cache import begin_extract
 from app.services.workpaper_sync.limits import SyncLimits, load_limits
 from app.services.workpaper_sync.models import ArtifactKind, ArtifactState
 
@@ -415,6 +417,7 @@ class ExcelSyncAdapter:
                 _neutralize_fn(g7_sanitized)
                 substrate_for_write = g7_sanitized
 
+            views = take_incoming_views(self, substrate, substrate_for_write, reinjected=repaired)  # R3 P8
             bindings = self._all_bindings()
             role = (
                 SubstrateRole.incoming if incoming_ns else self.substrate_role
@@ -433,6 +436,7 @@ class ExcelSyncAdapter:
                     substrate_state=state,
                     capability=self.capability,
                     limits=self._limits,
+                    substrate_views=views,
                 ).result
                 from app.services.workpaper_sync.phase5_transposed_sheet import materialize_file as _transposed_materialize_file
                 from app.services.workpaper_sync.transposed_registry import resolve_transposed_specs
@@ -491,6 +495,7 @@ class ExcelSyncAdapter:
                 role=role,
                 kind=kind,
                 state=state,
+                substrate_views=views,
             )
             if single_pass is not None:
                 return single_pass
@@ -534,6 +539,7 @@ class ExcelSyncAdapter:
                         # 🔴 ROI-2：非终趟 structure_hash 必被丢弃（下方只取
                         #    last_result.structure_hash）⇒ 跳过整簿指纹重算（每趟省 ~1.4s）。
                         compute_structure_hash=is_last,
+                        substrate_views=views,  # 后续趟读中间产物：内容不同，自然不命中
                     ).result
                     field_count += int(step.managed_field_count)
                     if step.workbook_row_change is not None:
@@ -604,6 +610,7 @@ class ExcelSyncAdapter:
         role: SubstrateRole,
         kind: ArtifactKind,
         state: ArtifactState,
+        substrate_views: Any = None,
     ) -> "MaterializeResult | None":
         """尝试单趟物化；不适用返回 `None`（调用方回落逐趟链式路径）。
 
@@ -637,6 +644,7 @@ class ExcelSyncAdapter:
                 substrate_state=state,
                 capability=self.capability,
                 limits=self._limits,
+                substrate_views=substrate_views,
             )
         except SinglePassDeclined as exc:
             # 🔴 仍然**不在这里** emit metrics：metrics 是注册制契约（`METRICS_BY_NAME` +
@@ -719,17 +727,16 @@ class ExcelSyncAdapter:
         """
         self._assert_same_contract(contract, where="extract")
         role, kind, state = self._substrate_shape_of(artifact)
-        published = role is SubstrateRole.published_representation
-        # published 不套 baseline ⇒ 不先算；读的正是冻结 base 文件时，主 binding 的结果与
-        # `derive_baseline_from_representation` 入参逐项相同，直接填缓存（spec save-path R3）。
-        baseline, baseline_formulas = (None, None) if published else self._baseline_pair()
-        seed_baseline = (
-            published
-            and not retired_row_identities
-            and self.baseline_representation is not None
-            and "pair" not in self._baseline
-            and artifact.resolve() == self.baseline_representation.resolve()
+        # R3 P9 / P8（published_extract_cache）：已发布形态 / 物化反读命中跨请求缓存即返回；incoming 的
+        # 逐 binding 结果登记给随后的物化计划；读冻结 base 时用主 binding 结果填 `_baseline["pair"]`。
+        cached, remember = begin_extract(
+            self, artifact=artifact, contract=contract, shape=(role, kind, state), retired=retired_row_identities
         )
+        if cached is not None:
+            return cached
+        published = role is SubstrateRole.published_representation
+        # published 不套 baseline ⇒ 不先算（spec save-path R3）。
+        baseline, baseline_formulas = (None, None) if published else self._baseline_pair()
         parts: list[Projection] = []
         # 🔴 多 binding 底稿（D4-营业收入实测 39 个 binding）每个 binding 都要读同一个
         # artifact 的两个视图（data_only True/False）⇒ 78 次全簿 openpyxl 解析、cProfile
@@ -754,14 +761,13 @@ class ExcelSyncAdapter:
                     retain_identity_inventory=primary,
                     retired_row_identities=retired_row_identities if primary else (),
                 )
-                if seed_baseline and primary:
-                    self._baseline["pair"] = (outcome.projection, dict(outcome.formula_inventory))
+                remember(binding, primary, outcome)
                 parts.append(outcome.projection)
             from app.services.workpaper_sync.phase5_transposed_sheet import extract_file as _transposed_extract_file
             from app.services.workpaper_sync.transposed_registry import resolve_transposed_specs
             for spec in resolve_transposed_specs(contract):
                 parts.append(_transposed_extract_file(artifact, contract, spec=spec))
-        return self._merge_projections(parts)
+        return remember.finish(self._merge_projections(parts))
 
     def _substrate_shape_of(
         self, artifact: Path

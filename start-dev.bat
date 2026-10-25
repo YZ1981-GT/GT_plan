@@ -84,7 +84,15 @@ REM     backend/run_uvicorn.py -> main(windows_expand_args=False)
 REM Guard: backend/tests/test_run_uvicorn_argv_glob_guard.py
 REM Do NOT "fix" this by deleting tmp_* files; *.json would trip it next.
 echo [2/5] Starting backend on :%BACKEND_PORT% ...
-start "%BACKEND_TITLE%" /min cmd /k "title %BACKEND_TITLE% && cd /d "%BACKEND_DIR%" && "%PY%" run_uvicorn.py app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload --reload-dir app --reload-delay 2.0 --reload-exclude "*.pyc" --reload-exclude "__pycache__" --reload-exclude ".hypothesis" --reload-exclude "*.json" --reload-exclude "tmp_*" --log-level warning"
+REM GT_BACKEND_NO_RELOAD=1 starts the backend WITHOUT --reload (default unchanged).
+REM Use it for online-edit acceptance and timing: every hot reload throws away the
+REM in-process registration / parse caches, so the next OnlyOffice save pays the
+REM cold cost again (measured 51s callback right after a reload).
+REM Usage: in a cmd window run  set GT_BACKEND_NO_RELOAD=1  then run start-dev.bat
+set "BACKEND_RELOAD_ARGS=--reload --reload-dir app --reload-delay 2.0 --reload-exclude "*.pyc" --reload-exclude "__pycache__" --reload-exclude ".hypothesis" --reload-exclude "*.json" --reload-exclude "tmp_*""
+if "%GT_BACKEND_NO_RELOAD%"=="1" set "BACKEND_RELOAD_ARGS="
+if "%GT_BACKEND_NO_RELOAD%"=="1" echo       Hot reload OFF ^(GT_BACKEND_NO_RELOAD=1^): restart to pick up code changes.
+start "%BACKEND_TITLE%" /min cmd /k "title %BACKEND_TITLE% && cd /d "%BACKEND_DIR%" && "%PY%" run_uvicorn.py app.main:app --host 0.0.0.0 --port %BACKEND_PORT% %BACKEND_RELOAD_ARGS% --log-level warning"
 
 REM --- [3/5] wait for backend ---------------------------------
 REM 60s not 30s: MigrationRunner runs every V*.sql on boot (153+ files)

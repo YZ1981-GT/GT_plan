@@ -98,11 +98,11 @@ afterEach(() => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 1. 24 个可观测状态逐一可辨
+// 1. 可观测状态逐一可辨（2026-10-25 起 26 个）
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('每个可观测桥状态各渲染一份互不相同的中文状态', () => {
-  it('24 个状态的 data-state / 头条文案 / 基调 / 等待语义四项同时正确，阶段标签两两不同', async () => {
+  it('全部可观测状态的 data-state / 头条文案 / 基调 / 等待语义四项同时正确，阶段标签两两不同', async () => {
     const stages = new Map<string, string>()
     // 驱动路径本身就带 sticky error 的状态：桥的 error 优先规则要求头条是失败原因，
     // 而不是状态文案。这两个是**真实行为**，不是判据的例外 —— 因此期望值按
@@ -140,9 +140,11 @@ describe('每个可观测桥状态各渲染一份互不相同的中文状态', (
       wrapper.unmount()
       LIVE.pop()
     }
-    expect(stages.size).toBe(24)
-    // 阶段标签是 DOM 上真正渲染出来的那一行；两两不同 ⇒ 24 个状态在界面上可辨
-    expect(new Set(stages.values()).size).toBe(24)
+    // 计数按状态域现算（2026-10-25 后台合并两态加入后为 26；写死 24 会让新状态一加就红在计数上，
+    // 而不是红在「它渲染得对不对」上）。
+    expect(stages.size).toBe(OBSERVABLE_BRIDGE_STATES.length)
+    // 阶段标签是 DOM 上真正渲染出来的那一行；两两不同 ⇒ 每个可观测状态在界面上可辨
+    expect(new Set(stages.values()).size).toBe(OBSERVABLE_BRIDGE_STATES.length)
     for (const [state, stage] of stages) {
       expect(stage, state).not.toContain('保存成功')
       expect(stage, state).not.toContain('同步成功')

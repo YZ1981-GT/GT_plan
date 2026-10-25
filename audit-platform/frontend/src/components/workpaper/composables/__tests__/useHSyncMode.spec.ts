@@ -67,6 +67,8 @@ vi.mock('../../sync/workpaperSyncCapability', () => ({
 
 import { useHSyncMode, H_ONLINE_EDIT_LABEL } from '../useHSyncMode'
 import { __resetOoHealthCacheForTests } from '../../sync/onlyOfficeHealth'
+import { BRIDGE_LEAVE_KEPT_CODE } from '../../sync/bridgeLeave'
+import { WorkpaperSyncContractError } from '../../sync/workpaperSyncDto'
 import { H_MANAGED_SHEETS, H_OO_WIRED_ROWS_CODES } from '../../sync/hManagedSheets'
 
 /** canary 的真实短码/entry —— 从受管清单取，不在测试里另写字面量。 */
@@ -266,6 +268,21 @@ describe('useHSyncMode', () => {
     const scope = effectScope()
     const m = scope.run(() => makeMode())!
     expect(m.sheetKey.value).toBe(CANARY.sheetKey)
+    scope.stop()
+  })
+
+  // spec oo-return-to-form-dead-end-and-save-speed R1.6：单元格输入中时编辑器弹自己的确认，用户选继续编辑
+  // ⇒ 桥以 KEPT 码拒绝 clean close。那是用户的选择，不是回写失败。
+  it('⑧ 用户在编辑器的提示里选择继续编辑 ⇒ 不报「保存回写失败」；其它拒绝照报', async () => {
+    const scope = effectScope()
+    const m = scope.run(() => makeMode())!
+    enterOo('oo_editing', false, true)
+    leaveWithoutSaving.mockRejectedValueOnce(new WorkpaperSyncContractError(BRIDGE_LEAVE_KEPT_CODE, 'kept'))
+    await m.switchMode('html')
+    expect(m.lastNotice.value).toBeNull()
+    leaveWithoutSaving.mockRejectedValueOnce(new WorkpaperSyncContractError('bridge_clean_close_while_in_flight', 'x'))
+    await m.switchMode('html')
+    expect(m.lastNotice.value?.type).toBe('danger')
     scope.stop()
   })
 })

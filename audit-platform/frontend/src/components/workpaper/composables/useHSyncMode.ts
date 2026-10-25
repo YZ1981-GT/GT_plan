@@ -42,6 +42,7 @@ import {
 import { capabilityForEntry } from '../sync/workpaperSyncCapability'
 import { fetchOnlyOfficeHealthy } from '../sync/onlyOfficeHealth'
 import { hManagedSheetOf, isHOoWiredRowsSheet, type HManagedSheet } from '../sync/hManagedSheets'
+import { isLeaveKeptRefusal } from '../sync/bridgeLeave'
 
 /**
  * 受管判定 —— 三个条件同时成立才算「本宿主此刻可切 OO」：
@@ -272,9 +273,12 @@ export function useHSyncMode(options: UseHSyncModeOptions) {
           type: 'danger',
         }
       }
-    } catch {
-      // 同上：错误已记入 `lastError`；这里补一条人能看懂的提示，不静默。
-      lastNotice.value = { text: '保存回写失败，改动仍在 Excel 侧，请重试', type: 'danger' }
+    } catch (error) {
+      // 同上：错误已记入 `lastError`；这里补一条人能看懂的提示，不静默。用户在编辑器的提示里选择
+      // 继续编辑（spec oo-return-to-form-dead-end-and-save-speed R1.6）不是失败，不报。
+      if (!isLeaveKeptRefusal(error)) {
+        lastNotice.value = { text: '保存回写失败，改动仍在 Excel 侧，请重试', type: 'danger' }
+      }
     } finally {
       syncSwitching.value = false
     }

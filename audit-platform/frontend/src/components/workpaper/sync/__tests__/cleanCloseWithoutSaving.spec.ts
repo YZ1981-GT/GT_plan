@@ -54,7 +54,10 @@ describe('clean close：状态机边', () => {
     expect(WP_BRIDGE_EVENTS).toContain('clean_close_completed')
   })
 
-  it('只有 oo_editing 接受它 —— 保存进行中的状态不得被 clean close 抄近路', () => {
+  // 2026-10-24 起冻结态 `forcesave_frozen` 也接受它（没有东西在飞，未改动离开不丢任何东西；
+  // spec oo-return-to-form-dead-end-and-save-speed R1.4）。下列保存进行中的状态仍一律拒绝；
+  // 「接受它的状态恰为 oo_editing + forcesave_frozen」由 ooReturnToFormDeadEnd.spec.ts 穷举钉住。
+  it('保存进行中的状态不接受它（oo_editing / 冻结态之外）—— 不得被 clean close 抄近路', () => {
     for (const state of [
       'forcesave_requesting',
       'forcesave_accepted',

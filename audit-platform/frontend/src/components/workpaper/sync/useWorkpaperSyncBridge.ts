@@ -39,6 +39,7 @@ import {
   WP_BRIDGE_STATE_TEXT,
   auditBridgeMachine,
   bridgeStateForOperation,
+  canTransition,
   transitionBridgeState,
   type WorkpaperSyncBridgeEvent,
   type WorkpaperSyncBridgeMode,
@@ -78,6 +79,18 @@ import {
   createSwitchTimer,
   type WorkpaperSyncSwitchTimings,
 } from './bridgeSwitchTimings'
+import {
+  WP_BRIDGE_BACKGROUND_MERGE_STATES,
+  WP_BRIDGE_FORCESAVE_READY_STATES,
+  WP_BRIDGE_IN_FLIGHT_STATES,
+} from './bridgeStateSets'
+import { createBackgroundMerge } from './bridgeBackgroundMerge'
+import {
+  FORCESAVE_DELIVERY_WAIT_MS,
+  createDeliveryTracker,
+  routeForcesaveAccepted,
+} from './bridgeForcesaveFlow'
+import { BRIDGE_LEAVE_KEPT_CODE, createBridgeExit, createLeaveConfirmerSlot } from './bridgeLeave'
 
 // 「失败归一」住伴生模块；这里 re-export，宿主 / 抽屉 / 测试的 import 路径不变。
 export {
@@ -93,58 +106,15 @@ function refuse(code: string, message: string): never {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 2. in-flight / 离开阻断
+// 2. in-flight / 离开阻断 / 退出（状态集合住伴生模块，见 bridgeStateSets.ts）
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * AC 4.8 的阻断集：这些状态下关闭/刷新/路由离开必须提示用户。
- *
- * 🔴 `applied` **在**集合里：结构化回写已完成但 HTML 还没按 result revision 重载，
- * 此刻离开会让用户下次看到旧 revision 并以为回写丢了（Property 14）。
- * `oo_editing` **不在**集合里 —— 它靠 `dirty` 单独判定，否则打开编辑器就永远走不掉。
- */
-export const WP_BRIDGE_IN_FLIGHT_STATES: readonly WorkpaperSyncBridgeState[] = [
-  'flushing',
-  'committing',
-  'materializing',
-  'oo_loading',
-  'descriptor_mounted',
-  'confirming_descriptor',
-  'forcesave_requesting',
-  'forcesave_frozen',
-  'forcesave_accepted',
-  'waiting_application',
-  'incoming_durable',
-  'application_bound',
-  'merging',
-  'rematerializing',
-  'conflict',
-  'refresh_required',
-  'applied',
-  'recovery_claiming',
-]
-
-/**
- * 可以（重新）发强制保存命令的状态集合。
- *
- * 🔴 `forcesave_frozen` 必须在内，否则「允许重试」只是说法：转换表里
- * `forcesave_frozen --forcesave_started--> forcesave_requesting` 本来就在（design
- * §retryOperation「重试只重发命令，不重新冻结 request」），状态提示也写着「请重新发送
- * 强制保存命令」，但 `canForcesave` 只认 `oo_editing` ⇒ 宿主的保存按钮
- * `:disabled="!canForcesave"` 永久灰掉、`switchToHtml()` 的首道门也直接 refuse。
- *
- * 2026-09-22 真栈实测的死角：用户进 OO 什么都没改就点保存 → Command Service 返
- * `no_changes` → `callback_expected=false` → `forcesave_frozen`，界面显示「文档没有
- * 检测到改动……请在编辑器内先点一下单元格外的空白处让改动生效，**再重新保存**」，而那个
- * 按钮已经灰了；同时 room 开着、结构化视图的切换入口也是禁用的 ⇒ 用户被关在 OO 里无路可走。
- *
- * `forcesaveUnlocked` 仍是硬前提（在 `canForcesave` 里与本集合取合），没拿到
- * confirm-descriptor 成功响应之前一律不放行。
- */
-export const WP_BRIDGE_FORCESAVE_READY_STATES: readonly WorkpaperSyncBridgeState[] = [
-  'oo_editing',
-  'forcesave_frozen',
-]
+export {
+  WP_BRIDGE_EXIT_STATES,
+  WP_BRIDGE_FORCESAVE_READY_STATES,
+  WP_BRIDGE_IN_FLIGHT_STATES,
+  WP_BRIDGE_UNMASKED_STATES,
+} from './bridgeStateSets'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 3. 选项
@@ -193,6 +163,8 @@ export interface WorkpaperSyncBridgeOptions {
   } | null
   /** 默认 true；测试或无 window 环境可关。 */
   readonly installBeforeUnload?: boolean
+  /** 强制保存前等改动送达文档服务的上限（毫秒），默认 `FORCESAVE_DELIVERY_WAIT_MS`。 */
+  readonly deliveryWaitMs?: number
 }
 
 /** 桥用到的 API 面（`typeof syncApi` 的子集，显式列出便于注入 stub）。 */
@@ -321,12 +293,41 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
   const switchTimings = ref<WorkpaperSyncSwitchTimings>(EMPTY_SWITCH_TIMINGS)
   /** 服务端判过「非 store 型」的 entry：本桥实例内不再尝试服务端直取（少一次必败请求）。 */
   const serverStoreUnsupported = new Set<string>()
+  /** OO 改动是否已送达文档服务（R1.2，`onDocumentStateChange` 原始值）。 */
+  const delivery = createDeliveryTracker()
+  /** 最近一次强制保存的非错误结局（宿主据此给「已回到表单」提示）；新会话清空。 */
+  const lastForcesaveOutcome = ref<'no_changes_left' | null>(null)
+  /** 宿主登记的离开前确认（R1.6，见 `bridgeLeave.ts`）。 */
+  const leaveConfirmer = createLeaveConfirmerSlot()
 
   function scope(): WorkpaperSyncEntryScope {
     return {
       projectId: options.projectId.value,
       wpId: options.wpId.value,
       entryId: options.entryId.value,
+    }
+  }
+
+  /**
+   * 尽力释放这条 participant lease（`leaveRoom`）。回表单的四条路共用：clean close / 无改动放行 /
+   * applied 后重载 / 退出在线编辑。
+   *
+   * 显式送出真实 `dirty` 而不是写死 `false`：服务端那道 dirty 门与本地同源（AC 4.4），传常量等于
+   * 让服务端永远收不到会触发它的输入。失败**不阻断**、也不记 `lastError`：它是 lease 释放而非内容
+   * 操作，失败只是退回按 `expires_at` 自然过期（判据「网络整体不可用时仍能回表单」锁住）。
+   */
+  async function bestEffortLeave(): Promise<void> {
+    const current = descriptor.value
+    if (current === null) return
+    try {
+      leaveCallCount.value += 1
+      await api.leaveRoom(scope(), {
+        roomId: current.roomId,
+        participantId: current.participantId,
+        dirty: dirty.value,
+      })
+    } catch {
+      // 见上。
     }
   }
 
@@ -382,6 +383,8 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     operation.value = null
     canonicalApplicationId.value = null
     applicationEffectiveSequence.value = null
+    lastForcesaveOutcome.value = null
+    delivery.reset()
   }
 
   /**
@@ -432,6 +435,9 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
         'bridge_mode_not_supported',
         `capability=${capabilityOf()} 不支持 OnlyOffice 模式 —— 模式开关不得打开它`,
       )
+    }
+    if (WP_BRIDGE_BACKGROUND_MERGE_STATES.includes(state.value)) {
+      refuse('bridge_background_merge_in_progress', `${WP_BRIDGE_STATE_TEXT[state.value]}，请等合并完成或在表单顶部提示里处理后再进入在线编辑`)
     }
     return attemptSwitchToOnlyOffice(true)
   }
@@ -716,6 +722,14 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     }
     beginAttempt()
     apply('forcesave_started')
+    // R1.2：先等编辑器把改动送到文档服务 —— 返回码 4 只有在这之后才可信（bridgeForcesaveFlow）。
+    const delivered = await delivery.waitDelivered(
+      options.deliveryWaitMs ?? FORCESAVE_DELIVERY_WAIT_MS,
+    )
+    if (state.value !== 'forcesave_requesting') {
+      // 等送达期间会话已被别的事件推走（编辑器出错 / 失权 / 被重置）⇒ 不再出站。
+      refuse('bridge_forcesave_superseded', `保存前编辑器状态已变为「${WP_BRIDGE_STATE_TEXT[state.value]}」，本次没有发出保存命令`)
+    }
     let accepted
     try {
       forcesaveCallCount.value += 1
@@ -729,82 +743,32 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     }
     requestedOperationId.value = accepted.operationId
     pollAfterMs.value = accepted.pollAfterMs
-    if (accepted.dispatchError !== null) {
-      // request 已冻结、shell 已建，但 Command Service 未受理 ⇒ 保持 OO 并允许重试
-      // （AC 4.4）。这一步**不是** error：request 是真的冻结了，文案必须区分。
+    // 202 的四种去向（命令未受理 / 无改动放行 / 无改动但未送达 / 其它无回调终态）见伴生模块。
+    // 🔴 后端说「不会再有 callback」时**不得**进 `waiting_application`（2026-09-22 永久转圈）。
+    const route = routeForcesaveAccepted(accepted, { delivered })
+    if (route.kind === 'leave_no_changes') return leaveAfterNoChanges()
+    if (route.kind === 'frozen') {
       apply('forcesave_dispatch_failed')
-      lastError.value = describeBridgeFailure('forcesave_dispatch', {
-        response: {
-          status: 502,
-          data: {
-            detail: { error_code: accepted.dispatchError, message: '强制保存命令未被受理' },
-          },
-        },
-      })
-      return
-    }
-    // 🔴 2026-09-22：后端明确说「这次不会再有 callback」时**不得**进 `waiting_application`。
-    //
-    // `request_forcesave` 对 CS 的 `terminal_without_callback`（`no_changes` /
-    // `doc_not_online` / `configuration_error` / `implementation_defect`）已经
-    // `terminate_without_callback` 就地终结 request+shell，并在 202 里回传
-    // `callback_expected=false`。此前前端不读这个字段，于是照样 `shell_tracking_started`
-    // → `waiting_application` 干等一个后端已经宣告不会来的 callback。最常见触发路径是
-    // **用户进 OO 什么都没改就点保存**（CS 返 `no_changes`），真栈实测永久转圈。
-    //
-    // 落到 `forcesave_frozen`（`forcesave_dispatch_failed` 的目标态）而不是 `error`：
-    // request 确实冻结成功了、OO 会话仍然健康、用户改点东西再存就能成 —— 这正是
-    // `forcesave_frozen` 的语义（保持 OO、允许重试）。具体原因走 `lastError`，
-    // 它在 `feedback` 里优先级最高，用户看到的是人话而不是笼统的「未被受理」。
-    if (accepted.callbackExpected === false) {
-      if (accepted.csOutcome === 'no_changes') dirty.value = false // CS 权威：无可存改动
-      apply('forcesave_dispatch_failed')
-      lastError.value = describeBridgeFailure('forcesave_dispatch', {
-        response: {
-          status: 409,
-          data: {
-            detail: {
-              error_code: `forcesave_${accepted.csOutcome ?? 'terminal_without_callback'}`,
-              message: forcesaveTerminalMessage(accepted.csOutcome, accepted.csError),
-            },
-          },
-        },
-      })
+      lastError.value = route.error
       return
     }
     apply('forcesave_command_accepted')
     dirty.value = false // 命令已受理：回传快照含此前全部编辑；之后再改由 notifyDirty 置真
     apply('shell_tracking_started', { requestedOperationId: accepted.operationId })
-    // 🔴 到此**刻意**结束：桥是被动的，不自己发定时器/不自己订 SSE。
-    //    推进 `waiting_application` 的责任在宿主（`WorkpaperSyncEditorHost.vue` 用
-    //    `WorkpaperSyncOperationTracker` 喂 `ingestOperationSnapshot`）——它持有组件
-    //    生命周期，能保证定时器随卸载停掉。
-    //
-    //    这条分工不是洁癖：桥若自己轮询，`switchToHtml()` 就会多打一次 operation GET，
-    //    而本 spec 的独立回归（T69-I27「整趟端点多重集恰为三项」等 10 条）正是按
-    //    「桥只在被调用时发请求」建立的判据 —— 桥自轮询会把那批判据全部打红，
-    //    等于用改判据来迁就实现。2026-09-22 первый版把 tracker 放进桥，实测打红 10 条后
-    //    移到宿主，判据零改动。
-    //
-    //    🔴 曾经的缺陷正是「两边都没接」：宿主没接 tracker、桥也不轮询，于是保存后 UI
-    //    永远停在「已发送强制保存，等待 OnlyOffice 回传文件」，而服务端早已 applied
-    //    （真栈证据：`operation.state=applied` / `application.state=applied`，
-    //    而 `host_status` 一直是那句等待文案）。
+    // 🔴 到此**刻意**结束：桥是被动的，推进 `waiting_application` 的是宿主的
+    //    `WorkpaperSyncOperationTracker`（随组件卸载停掉）。桥自轮询会打红「桥只在被调用时
+    //    发请求」那批独立回归（T69-I27 等，2026-09-22 实测 10 条）。后台合并阶段例外，见 R4。
   }
 
-  /** `terminal_without_callback` 的人话文案（按 CS 语义分型，不压成一句）。 */
-  function forcesaveTerminalMessage(outcome: string | null, code: number | null): string {
-    const suffix = code === null ? '' : `（Command Service 返回码 ${code}）`
-    switch (outcome) {
-      case 'no_changes':
-        return `文档没有检测到改动，本次无需保存${suffix}。若确实改过，请在编辑器内先点一下单元格外的空白处让改动生效，再重新保存。`
-      case 'doc_not_online':
-        return `编辑会话已不在线，无法保存${suffix}。请退出在线编辑后重新进入，再保存。`
-      case 'configuration_error':
-        return `OnlyOffice 服务配置异常，保存命令无法执行${suffix}。请联系管理员检查 OnlyOffice 配置。`
-      default:
-        return `强制保存已终结且不会有回传${suffix}：${outcome ?? '未知原因'}。`
-    }
+  /** 返回码 4 且改动已确认送达：按契约「直接放行离开」（R1.3）—— 与 clean close 同一套收尾。 */
+  async function leaveAfterNoChanges(): Promise<void> {
+    dirty.value = false
+    await bestEffortLeave()
+    apply('forcesave_no_changes')
+    lastForcesaveOutcome.value = 'no_changes_left'
+    descriptor.value = null
+    confirmation.value = null
+    delivery.reset()
   }
 
   /**
@@ -908,25 +872,18 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     // 🔴 R13b（2026-10-11 真栈实测）：回写已落地、人已回到表单 ⇒ 释放这条 participant lease
     // （与 clean close 同一个端点）。此前这里只清本地 descriptor，服务端 participant 一直
     // `active` 到 4 小时后的 `expires_at`：重药安徽 room f01c6e40 在 applied + 回表单之后
-    // 仍挂着一个「在线编辑者」。失败**不阻断**回表单 —— 与 `leaveWithoutSaving()` 同一条
-    // 纪律：它是 lease 释放而非内容操作，失败只是退回自然过期。
-    const current = descriptor.value
-    if (current) {
-      try {
-        leaveCallCount.value += 1
-        await api.leaveRoom(scope(), {
-          roomId: current.roomId,
-          participantId: current.participantId,
-          // 显式送出真实 dirty（同 leaveWithoutSaving）：落地后又改过 ⇒ 服务端 dirty 门拒绝释放。
-          dirty: dirty.value,
-        })
-      } catch {
-        // 见上：lease 退回按 expires_at 自然过期，不记 lastError。
-      }
-    }
+    // 仍挂着一个「在线编辑者」。失败**不阻断**回表单（见 `bestEffortLeave`）；落地后又改过 ⇒
+    // 真实 dirty 让服务端 dirty 门拒绝释放。
+    await finishOnlineEditSession()
+  }
+
+  /** 在线编辑会话收尾：尽力释放 lease、清本地身份（applied 后重载 / 后台合并落地或关提示共用）。 */
+  async function finishOnlineEditSession(): Promise<void> {
+    await bestEffortLeave()
     descriptor.value = null
     confirmation.value = null
     dirty.value = false
+    delivery.reset()
   }
 
   // ── 4.4 duplicate 也走同一条：requested id 授权 → 服务端 canonicalize
@@ -1421,6 +1378,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
   }
 
   function destroy(): void {
+    backgroundMerge.dispose()
     if (beforeUnloadInstalled.value && typeof window !== 'undefined') {
       window.removeEventListener('beforeunload', handleBeforeUnload)
       beforeUnloadInstalled.value = false
@@ -1458,11 +1416,9 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
    * （spec `oo-single-pass-materialize-and-room-leave` Requirement 4.5 的切换点）。
    * 判据面因此从「零请求」变成「**恰一次 leave、零次 forcesave、零次 close-intent**」。
    */
-  async function leaveWithoutSaving(): Promise<void> {
-    if (mode.value !== 'oo') return
+  function assertCleanCloseAllowed(): void {
     // 🔴 **一道门**：`canLeave` 已含 dirty 与 in-flight 两种阻断（`leaveBlockReason` 是这两条
-    // 理由的单源）。首版在它前面另写了一次 `if (dirty)`，变异检验实测那是冗余（去掉照样绿）。
-    // 两个 error_code 仍可分辨，前端据此决定提示「先保存」还是「稍等」。
+    // 理由的单源）。两个 error_code 仍可分辨，前端据此决定提示「先保存」还是「稍等」。
     if (!canLeave.value) {
       refuse(
         dirty.value
@@ -1471,33 +1427,37 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
         `${leaveBlockReason.value} —— clean close 不得丢弃编辑或打断进行中的同步`,
       )
     }
-    const current = descriptor.value
-    if (current) {
-      try {
-        leaveCallCount.value += 1
-        await api.leaveRoom(scope(), {
-          roomId: current.roomId,
-          participantId: current.participantId,
-          // 走到这里 `canLeave` 必为真 ⇒ `dirty` 必为假。仍然**显式**把它送出去，而不是
-          // 写死 `false`：服务端那道 dirty 门与本地这道同源（AC 4.4），传一个常量等于
-          // 让服务端永远收不到会触发它的输入，那道门就变成了死代码。
-          dirty: dirty.value,
-        })
-      } catch {
-        // 🔴 leave 失败**不阻断**返回表单，也不记 `lastError`。
-        //
-        // 它是一次 lease 释放，不是内容操作：失败的唯一后果是这条 lease 退回到端点存在
-        // 之前的形态 —— 按 `expires_at` 自然过期。拿它去挡用户返回结构化视图，会把一个
-        // 「什么都没改」的常态路径变成红字（那正是本 spec Requirement 4 的起因形态）。
-        // 判据 `网络整体不可用时仍能回表单` 两头锁住这一条。
-      }
+    // 🔴 先判边再发请求（2026-10-24）：`error` 不在 in-flight 集合里 ⇒ 原先在 error 态会先把
+    // leave 发出去、再在 `apply` 上因非法转换抛错 —— 人留在 OO、lease 却已释放的半态。
+    // 这些状态的出口是带确认的 `exitOnlineEdit()`。
+    if (!canTransition(state.value, 'clean_close_completed')) {
+      refuse(
+        'bridge_clean_close_illegal_state',
+        `state=${state.value} 不接受 clean close —— 请走「退出在线编辑」`,
+      )
     }
+  }
+
+  async function leaveWithoutSaving(): Promise<void> {
+    if (mode.value !== 'oo') return
+    assertCleanCloseAllowed()
+    // R1.6：单元格还在输入时让编辑器自己确认（宿主登记，见 `bridgeLeave.ts`）。用户选继续编辑 ⇒ 留下；
+    // 要等答复时，等待期间状态可能已变（又编辑了 / 出错），再判一次门再发 leave。
+    const allowed = leaveConfirmer.allows()
+    if (typeof allowed !== 'boolean') {
+      if (!(await allowed)) refuse(BRIDGE_LEAVE_KEPT_CODE, '编辑器里还有未确认的输入，用户选择继续编辑')
+      assertCleanCloseAllowed()
+    } else if (!allowed) {
+      refuse(BRIDGE_LEAVE_KEPT_CODE, '编辑器里还有未确认的输入，用户选择继续编辑')
+    }
+    await bestEffortLeave() // 走到这里 `canLeave` 必为真 ⇒ 送出的 dirty 必为假
     apply('clean_close_completed')
     descriptor.value = null
     confirmation.value = null
     requestedOperationId.value = null
     pendingMutationToken.value = null
     dirty.value = false
+    delivery.reset()
   }
 
   function reset(): void {
@@ -1512,11 +1472,40 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     canonicalApplicationId.value = null
     applicationEffectiveSequence.value = null
     dirty.value = false
+    delivery.reset()
   }
 
-  /** OO `onDocumentStateChange`：只认 true。OO 的 false 只表示「已发给文档服务」（编辑后约 1 秒即翻转），照收会让
-   *  回表单走 clean close 丢编辑；清零只在命令受理 / CS `no_changes` / 会话结束（spec d2-skeleton-slot-reuse-and-writeback-speed R4）。 */
+  // 「退出在线编辑」（R1.5）：可用条件与收尾见 `bridgeLeave.ts`。
+  const { canExit, exitOnlineEdit } = createBridgeExit({
+    mode,
+    state,
+    bestEffortLeave,
+    reloadHtml: (revision) => options.reloadHtml(revision),
+    reset,
+    refuse,
+  })
+
+  // 「先回表单、后台合并」（R4）：文件耐久后宿主调 `continueInBackground()`；后台阶段追踪归桥。
+  const backgroundMerge = createBackgroundMerge({
+    wpId: () => options.wpId.value,
+    scope,
+    operationId: () => requestedOperationId.value,
+    pollAfterMs: () => pollAfterMs.value,
+    state: () => state.value,
+    apply,
+    fetchSnapshot: fetchOperationSnapshot,
+    observe: (snapshot) => { operation.value = snapshot },
+    retry: retryOperation,
+    reloadHtml: (revision) => options.reloadHtml(revision),
+    finishSession: finishOnlineEditSession,
+  })
+  if (getCurrentInstance()) onBeforeUnmount(() => backgroundMerge.dispose())
+
+  /** OO `onDocumentStateChange`：dirty 只认 true。OO 的 false 只表示「已发给文档服务」（编辑后约 1 秒即翻转），照收会让
+   *  回表单走 clean close 丢编辑；清零只在命令受理 / CS `no_changes` 放行 / 会话结束（spec d2-skeleton-slot-reuse-and-writeback-speed R4）。
+   *  原始值另记给强制保存前的送达等待（spec oo-return-to-form-dead-end-and-save-speed R1.2）。 */
   function notifyDirty(next: boolean): void {
+    delivery.note(next)
     if (next === true) dirty.value = true
   }
 
@@ -1585,6 +1574,13 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     canLeave,
     leaveBlockReason,
     leaveWithoutSaving,
+    /** 宿主登记离开前确认（R1.6）；返回注销函数。 */
+    setLeaveConfirmer: leaveConfirmer.set,
+    canExit,
+    exitOnlineEdit,
+    /** 文件已耐久后先回表单、合并在后台跑完（R4）；只在宿主「保存并回到表单」后调用。 */
+    continueInBackground: backgroundMerge.continueInBackground,
+    lastForcesaveOutcome: readonly(lastForcesaveOutcome),
     feedback,
     modeStorageKey,
     beforeUnloadInstalled: readonly(beforeUnloadInstalled),

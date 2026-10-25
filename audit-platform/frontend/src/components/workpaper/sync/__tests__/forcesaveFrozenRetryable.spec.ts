@@ -20,7 +20,7 @@ import {
   WP_BRIDGE_FORCESAVE_READY_STATES,
   WP_BRIDGE_IN_FLIGHT_STATES,
 } from '../useWorkpaperSyncBridge'
-import { transitionBridgeState } from '../workpaperSyncBridgeMachine'
+import { WP_BRIDGE_STATE_MODE, transitionBridgeState } from '../workpaperSyncBridgeMachine'
 import { WP_SYNC_ACTION_HINT } from '../workpaperSyncPresentation'
 
 describe('forcesave_frozen 可重试', () => {
@@ -40,13 +40,17 @@ describe('forcesave_frozen 可重试', () => {
     }
   })
 
+  // 🔴 判据改过（spec oo-return-to-form-dead-end-and-save-speed R1.4）：原先用「在 in-flight 集合里或是
+  // oo_editing」间接证明「属于 OO 侧」。冻结态已移出 in-flight 集合（它没有东西在飞，留在里面会让
+  // 「结构化视图」被静默拒绝）⇒ 改为直接查状态机声明的 mode。
   it('集合只含 mode=oo 的状态（HTML 侧不得出现强制保存入口）', () => {
     for (const state of WP_BRIDGE_FORCESAVE_READY_STATES) {
-      expect(
-        WP_BRIDGE_IN_FLIGHT_STATES.includes(state) || state === 'oo_editing',
-        `${state} 既不在 in-flight 集合也不是 oo_editing —— 状态归属存疑`,
-      ).toBe(true)
+      expect(WP_BRIDGE_STATE_MODE[state], `${state} 不是 mode=oo 的状态 —— 状态归属存疑`).toBe('oo')
     }
+  })
+
+  it('冻结态没有东西在飞 ⇒ 不在 in-flight 集合（离开不被「同步进行中」挡住）', () => {
+    expect(WP_BRIDGE_IN_FLIGHT_STATES).not.toContain('forcesave_frozen')
   })
 
   it('凡是提示用户「重新发送强制保存」的状态，都必须在 ready 集合里', () => {

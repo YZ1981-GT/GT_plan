@@ -141,3 +141,11 @@ socket 未必立即释放，所以必须显式等端口空闲。
 `test_start_dev_bat_ascii_guard.py` 的 dry-run 打桩正则容忍任意 powershell
 开关，并断言打桩后不残留可执行的 powershell / taskkill / start —— 旧正则漏掉
 带 `-NonInteractive` 的 3 处调用，dry-run 会真按标签杀掉正在运行的开发服务器。
+
+## 七、后端热重载开关 `GT_BACKEND_NO_RELOAD`（2026-10-25）
+
+默认照旧带 `--reload`。在 cmd 里先 `set GT_BACKEND_NO_RELOAD=1` 再运行 start-dev.bat，后端就不带任何 `--reload*` 参数启动（其余参数逐字相同），窗口里多一行 `Hot reload OFF` 提示；改了后端代码要重新运行 start-dev.bat 才生效。
+
+用途：在线编辑验收与计时。每次热重载都会丢掉进程内的注册缓存与解析缓存，紧接着的那次 OnlyOffice 保存要重付冷成本（2026-10-24 实测重载后第一个保存回调 51 s）；多会话共用开发环境时，别的会话改代码会频繁触发重载。
+
+守卫：`backend/tests/test_start_dev_backend_reload_switch.py`（从 bat 原样取出开关与启动行，cmd 里两种模式各展开一次比对）。

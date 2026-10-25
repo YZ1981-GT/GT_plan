@@ -43,6 +43,17 @@
       >
         {{ feedback.message }}
       </div>
+      <!-- 退出在线编辑：卡在「等用户动作」的状态时的出口（spec oo-return-to-form-dead-end-and-save-speed R1.5）。
+           放在状态条一行（遮罩之外），遮罩盖住编辑区时也点得到。 -->
+      <button
+        v-if="canExit"
+        type="button"
+        class="wp-sync-editor-host__exit-btn"
+        data-testid="wp-sync-host-exit"
+        @click="onExitClick"
+      >
+        退出在线编辑
+      </button>
       <!-- 全屏切换：与 GtOnlyOfficeSheet 同款交互（原生 Fullscreen API + ESC 退出） -->
       <button
         v-if="editorLive"
@@ -127,7 +138,7 @@
         自己弹的对话框（版本过期、连接异常等）必须点得到。确认中 / 失败态仍整块拦截。
       -->
       <div
-        v-if="!editing"
+        v-if="masked"
         class="wp-sync-editor-host__mask"
         :class="{ 'wp-sync-editor-host__mask--passthrough': maskPassthrough }"
         :data-passthrough="maskPassthrough ? 'true' : 'false'"
@@ -142,8 +153,13 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { describeBridgeFailure, type WorkpaperSyncBridge, type WorkpaperSyncBridgeError } from './useWorkpaperSyncBridge'
+import { WP_BRIDGE_BACKGROUND_MERGE_SOURCE_STATES, WP_BRIDGE_UNMASKED_STATES } from './bridgeStateSets'
+import { FORCESAVE_NO_CHANGES_LEFT_NOTICE } from './bridgeForcesaveFlow'
+import { isLeaveKeptRefusal } from './bridgeLeave'
+import { LEAVE_EDITOR_PROMPT_NOTICE, createEditorLeaveConfirm } from './editorLeaveConfirm'
 import { WorkpaperSyncOperationTracker } from './workpaperSyncOperationTracker'
 import WorkpaperSyncContentRefreshBanner from './WorkpaperSyncContentRefreshBanner.vue'
 import type { WorkpaperContentRefresh } from './workpaperSyncContentRefresh'
@@ -257,6 +273,37 @@ let editorInstance: WorkpaperSyncDocEditorInstance | null = null
 let mountedKey: string | null = null
 let mountSeq = 0
 
+// ── 离开前让编辑器检查正在输入的单元格（R1.6；实测与分流见 `editorLeaveConfirm.ts`）
+const leaveConfirm = createEditorLeaveConfirm({
+  editor: () => editorInstance,
+  askDiscard: () =>
+    ElMessageBox.confirm(
+      '编辑器没有答复关闭请求，可能还有正在输入、尚未确认的单元格。直接回到表单会放弃这些输入；'
+        + '要保留请先在编辑器里按回车确认，再点「保存并回到表单模式」。',
+      '回到表单',
+      { type: 'warning', confirmButtonText: '放弃输入并回到表单', cancelButtonText: '继续编辑' },
+    ).then(
+      () => true,
+      () => false,
+    ),
+  dismissAsk: () => ElMessageBox.close(),
+  onEditorPrompt: () => {
+    ElMessage.warning({ message: LEAVE_EDITOR_PROMPT_NOTICE, duration: 6000 })
+  },
+  onLateClose: () => {
+    void onForceSaveClick()
+  },
+})
+// 🔴 可选调用：部分页面测试 mock 的桥不带这个方法（真实桥一定有）。
+watch(
+  () => props.bridge,
+  (bridge, _old, onCleanup) => {
+    const off = bridge.setLeaveConfirmer?.(() => leaveConfirm.confirm())
+    onCleanup(() => off?.())
+  },
+  { immediate: true },
+)
+
 // ── 全屏切换（与 GtOnlyOfficeSheet 同款：浏览器原生 Fullscreen API + CSS fixed 兜底）
 const rootEl = ref<HTMLElement | null>(null)
 const isFullscreen = ref(false)
@@ -317,6 +364,9 @@ const activeDescriptor = computed<WorkpaperSyncEditorLaunchDescriptor | null>(
 
 const feedback = computed(() => props.bridge.feedback.value)
 const editing = computed(() => props.bridge.state.value === 'oo_editing')
+/** 遮罩：可编辑态（含冻结态，R1.4）之外一律盖住编辑区。 */
+const masked = computed(() => !WP_BRIDGE_UNMASKED_STATES.includes(props.bridge.state.value))
+const canExit = computed(() => props.bridge.canExit.value)
 /** 遮罩只在「等文档就绪」时放行点击（文档尚不可编辑，挡住的只会是文档服务器自己的对话框）。 */
 const maskPassthrough = computed(() => props.bridge.state.value === 'descriptor_mounted')
 const canForcesave = computed(() => props.bridge.canForcesave.value)
@@ -421,6 +471,7 @@ function failHost(stage: string, error: unknown, reportToBridge: boolean): void 
 function destroyEditor(): void {
   const instance = editorInstance
   editorInstance = null
+  leaveConfirm.reset()
   mountedKey = null
   if (instance === null) return
   try {
@@ -465,6 +516,9 @@ async function mountEditor(descriptor: WorkpaperSyncEditorLaunchDescriptor): Pro
       },
       onOutdatedVersion: () => {
         onDocumentOutdated(seq)
+      },
+      onRequestClose: () => {
+        if (seq === mountSeq) leaveConfirm.handleRequestClose()
       },
     })
   } catch (error) {
@@ -624,6 +678,24 @@ watch(
   },
 )
 
+// 「先回表单、后台合并」（R4）：用户点了「保存并回到表单模式」、文件已在服务端耐久、之后没再编辑 ⇒
+// 不再盖着遮罩等合并落地，关编辑器回到只读表单；之后的追踪交给桥（宿主随模式切换卸载）。
+// 落地太快、第一份快照就是 applied 的，仍走上面的原路径。
+watch(
+  () => props.bridge.state.value,
+  (next) => {
+    if (!returnToFormPending || props.bridge.dirty.value) return
+    if (!(WP_BRIDGE_BACKGROUND_MERGE_SOURCE_STATES as readonly string[]).includes(next)) return
+    returnToFormPending = false
+    stopOperationTracking()
+    try {
+      props.bridge.continueInBackground?.()
+    } catch (error) {
+      failHost('background_merge', error, false)
+    }
+  },
+)
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 「保存并回到表单模式」的后半句（R13c，2026-10-11 真栈实测）
 //
@@ -673,10 +745,49 @@ function scheduleReturnToForm(): void {
 // ── 用户动作
 
 async function onForceSaveClick(): Promise<void> {
+  // 🔴 会话内没有编辑 ⇒ 直接离开（恰一次 leave、零次强制保存），与各宿主「结构化视图」开关同一条路。
+  // 以前按钮一律发强制保存：未改动必然 Command Service 返回码 4 → 冻结 + 遮罩、人被关在编辑器里
+  // （spec oo-return-to-form-dead-end-and-save-speed R1.1，和平药房 D2 room g12 实测）。
+  if (!props.bridge.dirty.value && props.bridge.canLeave.value) {
+    hostError.value = null
+    try {
+      await props.bridge.leaveWithoutSaving()
+    } catch (error) {
+      // 用户选择继续编辑（编辑器的提示 / 平台的确认）不是失败。
+      if (!isLeaveKeptRefusal(error)) failHost('clean_close', error, false)
+    }
+    return
+  }
   try {
     await forceSave()
   } catch {
     // 已经在 `forceSave()` 里记成 hostError 并 emit 过；点击处理器不再抛。
+  }
+}
+
+/** 退出在线编辑（R1.5）：有改动或冲突未合并时先确认，说明退出后不会回写。 */
+async function onExitClick(): Promise<void> {
+  const conflicted = props.bridge.state.value === 'conflict'
+  if (props.bridge.dirty.value || conflicted) {
+    try {
+      await ElMessageBox.confirm(
+        conflicted
+          ? '本次在线编辑的改动与表单内容冲突、尚未合并，退出后这些改动不会回写到表单。确定退出？'
+          : '在线编辑里还有改动没有保存到表单，退出后这些改动不会回写。确定退出？',
+        '退出在线编辑',
+        { type: 'warning', confirmButtonText: '退出', cancelButtonText: '继续编辑' },
+      )
+    } catch {
+      return // 用户选择继续编辑
+    }
+  }
+  stopOperationTracking()
+  cancelReturnToForm()
+  hostError.value = null
+  try {
+    await props.bridge.exitOnlineEdit()
+  } catch (error) {
+    failHost('exit_online_edit', error, false)
   }
 }
 
@@ -720,6 +831,11 @@ async function forceSave(): Promise<{ operationId: string }> {
     failHost('forcesave', error, false)
     throw error
   }
+  // 返回码 4 且改动已送达：桥已按契约放行离开回到表单（R1.3）。不是错误，给一句普通提示。
+  if (props.bridge.lastForcesaveOutcome.value === 'no_changes_left') {
+    ElMessage.info(FORCESAVE_NO_CHANGES_LEFT_NOTICE)
+    return { operationId: props.bridge.requestedOperationId.value ?? '' }
+  }
   const operationId = props.bridge.requestedOperationId.value
   if (operationId === null) {
     const refusal = hostRefusal('editor_host_forcesave_without_operation')
@@ -743,8 +859,9 @@ async function forceSave(): Promise<{ operationId: string }> {
 // 「桥只在被调用时发请求」那批独立回归判据全部打红），而 `WorkpaperSyncOperationTracker`
 // 在生产代码里零调用方。
 //
-// 放在宿主而不是桥：宿主持有组件生命周期，能保证定时器随卸载停掉。本文件因此是
-// 全仓**唯一**的 tracker 生产实例化点。
+// 放在宿主而不是桥：宿主持有组件生命周期，能保证定时器随卸载停掉。生产实例化点只有两处：
+// 这里（编辑器开着时），以及 `bridgeBackgroundMerge.ts`（文件耐久后宿主把追踪交给桥、
+// 宿主随回表单卸载；仍是被调用后才发请求，桥卸载时停掉）。
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 追踪窗口上限：超过即 fail-visible（spec Task 34「不得无限等待」）。 */
@@ -895,6 +1012,24 @@ defineExpose({ forceSave, getSyncState })
 .wp-sync-editor-host__fullscreen-btn:hover {
   color: #4b2d77;
   border-color: #d8b8ee;
+}
+
+/* 退出在线编辑：与全屏按钮同尺寸，靠右（吸收状态条的剩余空间）。 */
+.wp-sync-editor-host__exit-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #4b2d77;
+  background: #fff;
+  border: 1px solid #d8b8ee;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.wp-sync-editor-host__exit-btn:hover {
+  background: #f7f0fc;
 }
 
 .wp-sync-editor-host__status--error {

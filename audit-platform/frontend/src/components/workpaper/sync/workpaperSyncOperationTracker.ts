@@ -257,6 +257,9 @@ export class WorkpaperSyncOperationTracker {
       throw error
     }
     this.consecutiveFailures = 0
+    // 🔴 读在飞时调用方已 stop()（如文件耐久后宿主把追踪交给桥，spec oo-return-to-form-dead-end-and-save-speed
+    //    R4）⇒ 迟到的结果不再投递：调用方已不认这条追踪，照投会把旧快照推进已经换了阶段的状态机。
+    if (this.stopped) return
     this.deliver(snapshot)
   }
 

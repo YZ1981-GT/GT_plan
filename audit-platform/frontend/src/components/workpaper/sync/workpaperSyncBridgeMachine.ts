@@ -65,6 +65,8 @@ function refuse(code: string, message: string): never {
  * | `application_bound` | 快照 shape=primary | 与 `merging` 不同：已绑 application 但引擎尚未开工 |
  * | `duplicate` | 快照 shape=duplicate | terminal，且必须同时显示 requested→canonical |
  * | `close_authorization_stale` | close leader 失权 | AC 4.10 要求先显示它与 successor 进展，再决定 recovery |
+ * | `merging_in_background` | 文件已耐久后用户回到表单 | 编辑器已关、表单只读等结果；与 `merging`（人还在编辑器里）不是一回事 |
+ * | `background_merge_failed` | 后台合并没落地 | 人在表单里看横幅原因与出口，不是编辑器里的 `error` |
  */
 export const WP_BRIDGE_STATES = [
   // ── HTML 侧（mode=html）
@@ -90,6 +92,9 @@ export const WP_BRIDGE_STATES = [
   'conflict',
   'refresh_required',
   'applied',
+  // ── 后台合并（mode=html；spec oo-return-to-form-dead-end-and-save-speed R4）
+  'merging_in_background',
+  'background_merge_failed',
   // ── close 仲裁（mode=oo）
   'close_authorization_stale',
   'close_recovery_required',
@@ -189,8 +194,23 @@ export const WP_BRIDGE_EVENTS = [
    * 不推 barrier、不改 room 状态、不旋转 generation（AC 4.1 / Property P7）。
    * leave 请求**失败也不阻断**本转换（失败只是退回「等 lease 过期」那个旧形态，
    * 拿它挡住用户返回表单会重新制造本 spec 起因的那种红字）。
+   *
+   * 2026-10-24 起 `forcesave_frozen` 也接受它（spec oo-return-to-form-dead-end-and-save-speed
+   * R1.4）：冻结态 request 已终结或从未出站，未改动时离开不丢任何东西。
    */
   'clean_close_completed',
+  /**
+   * 强制保存回「无改动」且改动已确认送达文档服务：按契约「直接放行离开」
+   * （`onlyoffice_callback_state_contract.json` error 4；R1.3）。leave 与 clean close 同一端点。
+   */
+  'forcesave_no_changes',
+  /**
+   * 文件已在服务端耐久（`incoming_durable` 及之后）、用户要回表单：先关编辑器回到只读表单，
+   * 合并在服务端照常进行，由桥自己追踪到落地（R4）。也是失败后「重试 / 刷新状态」的回边。
+   */
+  'background_merge_started',
+  /** 后台合并没落地（冲突 / 出错 / 失权 / 等超时 / 表单刷新失败）：表单解除只读，横幅给原因。 */
+  'background_merge_failed',
   'recovery_case_observed',
   'recovery_claim_started',
   'recovery_claim_failed',
@@ -241,6 +261,8 @@ export const WP_BRIDGE_STATE_MODE: Readonly<
   conflict: 'oo',
   refresh_required: 'oo',
   applied: 'oo',
+  merging_in_background: 'html',
+  background_merge_failed: 'html',
   close_authorization_stale: 'oo',
   close_recovery_required: 'oo',
   recovery_pending: 'inherit',
@@ -284,6 +306,8 @@ export const WP_BRIDGE_STATE_TEXT: Readonly<
   conflict: '发生冲突，需逐项裁决',
   refresh_required: '服务器已合并，需重载编辑器确认新基线',
   applied: '结构化回写完成',
+  merging_in_background: '正在合并在线编辑的改动，表单暂时只读',
+  background_merge_failed: '在线编辑的改动没有合并进表单',
   close_authorization_stale: '关闭发起人已失去资格，正在等待接任者完成保存',
   close_recovery_required: '无合法接任者，需重新授权后从恢复流程继续',
   recovery_pending: '存在待认领的恢复项，尚未创建回写任务',
@@ -363,12 +387,17 @@ const DETERMINISTIC_EDGES: Readonly<Record<WorkpaperSyncBridgeState, EdgeMap>> =
     forcesave_requesting: {
       forcesave_dispatch_failed: 'forcesave_frozen',
       forcesave_command_accepted: 'forcesave_accepted',
+      // 返回码 4 且改动已送达：契约放行离开（R1.3）。
+      forcesave_no_changes: 'html_idle',
       close_authorization_lost: 'close_authorization_stale',
       sync_failed: 'error',
     },
     forcesave_frozen: {
       // 重试只重发命令，不重新冻结 request（design §retryOperation）。
       forcesave_started: 'forcesave_requesting',
+      // 冻结态没有东西在飞：未改动静默离开 / 用户确认后退出（R1.4 / R1.5）。
+      clean_close_completed: 'html_idle',
+      reset: 'html_idle',
       close_authorization_lost: 'close_authorization_stale',
       sync_failed: 'error',
     },
@@ -378,14 +407,17 @@ const DETERMINISTIC_EDGES: Readonly<Record<WorkpaperSyncBridgeState, EdgeMap>> =
       sync_failed: 'error',
     },
     waiting_application: {
+      // 文件还没到服务端：不得关编辑器回表单（R4 只从耐久之后开始）。
       close_authorization_lost: 'close_authorization_stale',
       sync_failed: 'error',
     },
     incoming_durable: {
+      background_merge_started: 'merging_in_background',
       close_authorization_lost: 'close_authorization_stale',
       sync_failed: 'error',
     },
     application_bound: {
+      background_merge_started: 'merging_in_background',
       close_authorization_lost: 'close_authorization_stale',
       sync_failed: 'error',
     },
@@ -393,22 +425,27 @@ const DETERMINISTIC_EDGES: Readonly<Record<WorkpaperSyncBridgeState, EdgeMap>> =
       reset: 'html_idle',
     },
     merging: {
+      background_merge_started: 'merging_in_background',
       close_authorization_lost: 'close_authorization_stale',
       sync_failed: 'error',
     },
     rematerializing: {
       // refresh-required 后销毁旧 generation，用新 descriptor 重新 mount + confirm。
       descriptor_accepted: 'oo_loading',
+      background_merge_started: 'merging_in_background',
       close_authorization_lost: 'close_authorization_stale',
       sync_failed: 'error',
     },
     conflict: {
       conflict_resolution_submitted: 'merging',
+      // 裁决面板生产零挂载 ⇒ 用户确认后退出是当前唯一出口（R1.5）。
+      reset: 'html_idle',
       close_authorization_lost: 'close_authorization_stale',
       sync_failed: 'error',
     },
     refresh_required: {
       descriptor_received: 'rematerializing',
+      reset: 'html_idle',
       close_authorization_lost: 'close_authorization_stale',
       close_no_successor: 'close_recovery_required',
       sync_failed: 'error',
@@ -417,9 +454,21 @@ const DETERMINISTIC_EDGES: Readonly<Record<WorkpaperSyncBridgeState, EdgeMap>> =
       reload_completed: 'html_idle',
       sync_failed: 'error',
     },
+    // ── R4：两态都**不收** `flush_started` ⇒ 合并没落地前进不了在线编辑。
+    merging_in_background: {
+      // 落地后表单已按结果 revision 重载、lease 已释放。
+      reload_completed: 'html_idle',
+      background_merge_failed: 'background_merge_failed',
+    },
+    background_merge_failed: {
+      // 重试回写 / 刷新状态 ⇒ 回到后台合并；关闭提示 ⇒ 回表单。
+      background_merge_started: 'merging_in_background',
+      reset: 'html_idle',
+    },
     close_authorization_stale: {
       close_successor_applied: 'applied',
       close_no_successor: 'close_recovery_required',
+      reset: 'html_idle',
       sync_failed: 'error',
     },
     close_recovery_required: {
@@ -428,6 +477,8 @@ const DETERMINISTIC_EDGES: Readonly<Record<WorkpaperSyncBridgeState, EdgeMap>> =
     recovery_pending: {
       recovery_claim_started: 'recovery_claiming',
       recovery_download_only_terminated: 'recovery_download_only',
+      // 恢复认领面板生产零挂载 ⇒ 退出（R1.5）。
+      reset: 'html_idle',
       sync_failed: 'error',
     },
     recovery_claiming: {
@@ -776,6 +827,20 @@ export function transitionBridgeState(
     mode: pinned === 'inherit' ? fromMode : pinned,
     terminal: (WP_BRIDGE_TERMINAL_STATES as readonly string[]).includes(to),
   }
+}
+
+/**
+ * 确定性事件在该状态下是否合法（不抛、不转换）。调用方据此「先判边再发请求」——
+ * 例如 clean close 不得先把 leave 发出去、再在转换上抛错（spec
+ * oo-return-to-form-dead-end-and-save-speed R1.5）。`operation_observed` /
+ * `recovery_claim_succeeded` 的目标取决于上下文，不经本函数判定。
+ */
+export function canTransition(
+  from: WorkpaperSyncBridgeState,
+  event: WorkpaperSyncBridgeEvent,
+): boolean {
+  if (event === 'operation_observed' || event === 'recovery_claim_succeeded') return false
+  return DETERMINISTIC_EDGES[from]?.[event] !== undefined
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

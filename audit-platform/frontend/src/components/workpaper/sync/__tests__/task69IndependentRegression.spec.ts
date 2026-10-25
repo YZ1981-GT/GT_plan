@@ -2010,6 +2010,10 @@ describe('[T69-SB3] DOM/network 顺序与五条立即失败判据（独立回归
     const exposed = main.wrapper.vm as unknown as { forceSave: () => Promise<unknown> }
     await exposed.forceSave()
     expect(main.bridge.state.value).toBe('waiting_application')
+    // 2026-10-25（spec oo-return-to-form-dead-end-and-save-speed R4）起，宿主发起的保存在文件耐久后转后台
+    // 合并、回表单；保存受理后再改一笔 ⇒ 人留在编辑器里，terminal 仍由宿主按真实状态推进触发。
+    main.fireStateChange(true)
+    await nextTick()
 
     respond('get_operation', () =>
       operationWire({ state: 'waiting_application', durable_at: '2026-09-01T00:01:00Z' }),

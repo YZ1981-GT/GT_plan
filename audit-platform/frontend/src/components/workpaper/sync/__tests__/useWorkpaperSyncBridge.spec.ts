@@ -1315,14 +1315,22 @@ describe('beforeunload / route leave 阻断 dirty 与 in-flight', () => {
   })
 
   it('in-flight 集合覆盖全部「还在动」的状态，且不含 oo_editing/html_idle/终态', () => {
+    // 🔴 2026-10-24 `forcesave_frozen` 移出 in-flight（spec oo-return-to-form-dead-end-and-save-speed
+    //    R1.4）：冻结态的 request 已终结或从未出站，没有东西在飞；放在集合里正是「未改动也离不开、
+    //    同步中…常亮、关页弹确认」那条死路（和平药房 D2 room g12）。有没有未保存的编辑由 dirty 判。
+    // 🔴 2026-10-25 新增后台合并两态（同 spec R4）也不在 in-flight：编辑器已关、文件已在服务端耐久，
+    //    合并照常完成，关页不丢改动；放进集合会让「先回表单」又被关页确认和「同步中…」拦住。
     const settled = WP_BRIDGE_STATES.filter((s) => !WP_BRIDGE_IN_FLIGHT_STATES.includes(s))
     expect([...settled].sort()).toEqual(
       [
+        'background_merge_failed',
         'close_authorization_stale',
         'close_recovery_required',
         'duplicate',
         'error',
+        'forcesave_frozen',
         'html_idle',
+        'merging_in_background',
         'oo_editing',
         'recovery_download_only',
         'recovery_pending',
