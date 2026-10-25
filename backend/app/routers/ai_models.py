@@ -549,19 +549,32 @@ def _local_unavailable(model: AIModelConfig, failure: ModelValidationFailure | N
 async def _local_unavailable_warning(
     db: AsyncSession, model: AIModelConfig, failure: ModelValidationFailure | None
 ) -> str | None:
-    """本机不可用仍启用时的提示：按有没有可兜底的服务器模型如实说明后果。"""
+    """本机或企业预设不可用仍启用时的提示：按有没有可兜底的模型如实说明后果。"""
     if failure is None:
         return None
-    head = f"本机模型当前不可用（{failure.message}），已启用"
+    deployment = deployment_of(model)
+    is_local = deployment == AIDeployment.local.value
+    is_preset = model.preset_key is not None
+
+    if is_local:
+        head = f"本机模型当前不可用（{failure.message}），已启用"
+    elif is_preset:
+        head = f"企业预设当前不可达（{failure.message}），已启用；连上公司网络后自动生效"
+    else:
+        head = f"模型当前不可用（{failure.message}），已启用"
+
     if model.model_type == AIModelType.embedding:
-        return f"{head}；向量模型不跨模型兜底，本机恢复前向量检索不可用"
+        return f"{head}；向量模型不跨模型兜底，恢复前向量检索不可用"
     with db.no_autoflush:
-        has_server = await AIService.route_slot_taken(
-            db, model_type=model.model_type, deployment="server",
+        has_fallback = await AIService.route_slot_taken(
+            db, model_type=model.model_type,
+            deployment="local" if not is_local else "server",
             ocr_capability=model.ocr_capability, exclude_id=model.id,
         )
-    if has_server:
-        return f"{head}；调用时会自动使用已启用的服务器模型兜底"
+    if has_fallback:
+        return f"{head}；调用时会自动使用另一候选兜底"
+    if is_preset:
+        return f"{head}；该类型尚无其他候选，连上公司网络前 AI 调用会失败"
     return f"{head}；该类型尚未启用服务器模型，本机恢复前调用会失败"
 
 

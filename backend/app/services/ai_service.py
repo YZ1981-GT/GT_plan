@@ -197,7 +197,14 @@ class AIService:
         if not await self._validate_model(model):
             failure = self.last_validation_error
             local = deployment == AIDeployment.local.value
-            if not (local and failure is not None and failure.kind == "unavailable"):
+            is_preset = model.preset_key is not None
+            # 本机模型 / 企业预设模型仅因「当前不可达」时仍允许启用
+            can_skip = (
+                failure is not None
+                and failure.kind == "unavailable"
+                and (local or is_preset)
+            )
+            if not can_skip:
                 return False
             self.last_validation_warning = failure
             self.last_validation_error = None

@@ -111,6 +111,84 @@ KNOWN_CHECKSUM_DRIFTS: tuple[KnownChecksumDrift, ...] = (
         "应用后注释中版本号从 200 改为 201（R200 改为 R201）；SQL 语句体不变。"
         "project_user_level_backfill 表（7 列）经逐列核验在 public 存在，回填 CTE 幂等。无需补迁移。",
     ),
+    # ── 2026-10-25 本地拉取后新增的 11 条 checksum 漂移 ──────────────
+    KnownChecksumDrift(
+        "005",
+        "4c3b449f79b731e05b0d5a956d6f45974e58bd0c13254f3767c6b7ccb42a5a72",
+        "1f090aa8e4b386f8fed4d1a0aadb7d997d8c3d7f4d6dd6afa4a4d83ebb907d97",
+        "V005__enable_rls.sql 应用后被编辑；RLS 策略在真库已生效（health/startup 无 RLS 异常），"
+        "效果由 V178 修补（repair_v005）。无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "006",
+        "5d8bc687d6955c41991a8c6e6fa2e779dbaf57ab3adacc0fa00117753062a826",
+        "e208aa45e2fd7711e28da2198c1d84761c5d9043a4af2879b53c733fdd3e7924",
+        "V006__eqcr_snapshots.sql 应用后被编辑；eqcr_snapshots 表在真库存在且可查。无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "010",
+        "75b4426d7af3aa6329f7aa27c0df2c3e8d23fec96a297f17afdcb56052ea53f7",
+        "14a8718657cfb215d5532f0cf61be2f7f8ad1f91d6a4e4c93b60ea2de8adbea4",
+        "V010__work_hour_entries.sql 应用后被编辑；work_hour_entries 表在真库存在且可查。无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "016",
+        "1b8bd5a05e34057a30282e5b0d48c0d5cb5ba0c10f1129172432d157c5ca4aed",
+        "d7ad301fcb44bcfffa59274533df28e3bca34b8d064cf5cc953d46aebdeeb69c",
+        "V016__add_kb_document_version.sql 应用后被编辑；knowledge_documents 表含版本列，在真库存在。"
+        "无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "017",
+        "4eaa3d8d8c33f7fd57d2afa48ceb5326cc58b4d6e47f280ebcb0af8ab965aed3",
+        "fb46b27d6ab7f2e37c1c67c0a7969dbd3360b94e4684cd426aa0b8301caba3b6",
+        "V017__fix_schema_drift.sql 应用后被编辑；schema 修补内容（ALTER/ADD COLUMN）在真库已存在。"
+        "无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "019",
+        "72eadeb331edeab7e9738d64984cfb74a0e657f9d37f357c61e65a41c5a2d1f6",
+        "ee63dd219d63ceadb782949e7cd67a6ffc74e5c9c705b15db63d20f33d6ad495",
+        "V019__add_note_section_id_columns.sql 应用后被编辑；disclosure_notes 的 section_id 列在真库存在。"
+        "无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "051",
+        "48054d52f39a257c013aec7b9966bf7c45b122fa32378c943c3a37101ef36fcf",
+        "5fac975524e9fddf96e47c869cce17a976ea2f24cdac23179b5b9c56e882a9f1",
+        "V051__fix_schema_drift_orm_extra.sql 应用后被编辑；ORM 对齐修补内容在真库已生效。"
+        "无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "057",
+        "d345271b6d5e092e835f10863d244962976836fc33012c268ce9dce1ba686dd4",
+        "bf087518cfe47ac97adbd1e990b0022b50dcfbeb3a817fa2e83586c1c01f1b79",
+        "V057__editing_locks.sql 应用后被编辑；editing_locks 表在真库存在且可查。无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "178",
+        "5a544282c1314395638ef47d8b021ca7412e3c69f01a3ec2b8962c37eae6ab99",
+        "4384501c68be36e24208ef3d7e3850233200506ded9cfc05ce993502c5aca4e2",
+        "应用时为 V178__repair_v005_admin_query_all_reports.sql，后被替换为"
+        " V178__consol_worksheet_runtime_cas_and_formula_binding.sql：原 repair 内容（RLS 策略修补）"
+        "与替换后的 consol_worksheet 相关对象均已在真库生效。无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "179",
+        "2b11af3830502c80976021eb6a50370fa0854ea551eb11b3f699ebc6009ffbf2",
+        "a409a2fe4519fe6f1e273fdc79697c35175d2b4ed41af75d8778615243c45f4b",
+        "应用时为 V179__repair_v019_disclosure_notes_constraint_and_indexes.sql，后被替换为"
+        " V179__report_config_adjustment_formula.sql：原 disclosure_notes 修补与替换后的"
+        " report_config 调整列均已在真库生效。无需补迁移。",
+    ),
+    KnownChecksumDrift(
+        "180",
+        "52add1c191649fb5fa1ebd9eeff034687541ae871b539ef1c69405b532bcb809",
+        "aef632fae5926a558f8e40709df985d506cd0fac2167039b3bbac15abe166e23",
+        "应用时为 V180__deliverable_trio_attempt_and_snapshot.sql，后被替换为"
+        " V180__share_change_events.sql：原 trio attempt/snapshot 相关对象由后续迁移补建；"
+        "share_change_events 表已在真库生效。无需补迁移。",
+    ),
 )
 
 

@@ -188,6 +188,13 @@ class WordExportTaskVersion(Base):
     # base_version_no + oo_doc_key 让回调能识别「编辑期间已有刷新/再生成」；仍保存用户编辑但显式标陈旧底版。
     base_version_no: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     oo_doc_key: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    # trio snapshot 关联与文件完整性校验（V205 ALTER varchar→uuid）
+    snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    file_sha256: Mapped[str | None] = mapped_column(
+        "file_sha256", String(64), nullable=True
+    )
     # 附注交叉引用显示编号等文档级上下文；OO 保存版本继承底版，供文字回填重放。
     render_context: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # V143（deliverable-lineage-wiring-and-writeback-closure Wave 4 / 需求 10.2、10.8）
@@ -321,6 +328,7 @@ class ExportJob(Base):
     snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True
     )
+    readiness: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     kind: Mapped[str | None] = mapped_column(String(50), nullable=True)
     year: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     trio_total: Mapped[int] = mapped_column(
@@ -370,7 +378,7 @@ class ExportJobItem(Base):
     version_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True
     )
-    file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     file_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     attempt_count: Mapped[int] = mapped_column(
@@ -448,10 +456,10 @@ class ExportJobAttempt(Base):
     snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True
     )
-    error_type: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    error_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     error_message: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
-    diagnostic_detail: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
-    file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    diagnostic_detail: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    file_path: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     file_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     version_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -460,6 +468,7 @@ class ExportJobAttempt(Base):
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True
     )
+    # DB 历史列 trigger 已由 V205 删除，ORM 使用 trigger_source
     trigger_source: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
     __table_args__ = (

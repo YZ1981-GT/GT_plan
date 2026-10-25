@@ -429,3 +429,43 @@ class ConsolQueryTemplate(Base, SoftDeleteMixin, TimestampMixin):
     filters: Mapped[dict | None] = mapped_column(JSONB, server_default="{}", nullable=True)
     transpose: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
     aggregation_mode: Mapped[str] = mapped_column(String(20), server_default="self", nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# 合并附注模板推送日志（历史迁移建表，raw SQL 写入，ORM 只声明以消除 db_extra 漂移）
+# ---------------------------------------------------------------------------
+
+
+class ConsolNoteTemplatePushLog(Base):
+    """合并附注模板推送日志 —— 仅 ORM 映射，写入走 raw SQL。"""
+
+    __tablename__ = "consol_note_template_push_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    consol_project_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    section_id: Mapped[str] = mapped_column(Text, nullable=False)
+    template_version_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    pushed_by: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    pushed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
+    )
+    entity_count: Mapped[int] = mapped_column(
+        Integer, server_default=text("0"), nullable=False
+    )
+    success_count: Mapped[int] = mapped_column(
+        Integer, server_default=text("0"), nullable=False
+    )
+    failure_count: Mapped[int] = mapped_column(
+        Integer, server_default=text("0"), nullable=False
+    )
+    failures: Mapped[dict | None] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb"), nullable=True
+    )
