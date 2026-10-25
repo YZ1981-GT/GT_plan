@@ -189,6 +189,14 @@ def pytest_collection_modifyitems(config, items):
             pass
 
 
+def pytest_configure(config):
+    """登记「用例不得改写已跟踪文件」守卫（详见 tests/_tracked_write_guard.py）。"""
+    from tests import _tracked_write_guard as _guard
+
+    if not config.pluginmanager.is_registered(_guard):
+        config.pluginmanager.register(_guard, _guard.PLUGIN_NAME)
+
+
 def pytest_collection_finish(session):
     """收集阶段若有模块（直接或经辅助模块）触发了 gevent 猴子补丁，在跑任何用例之前就报错。
 

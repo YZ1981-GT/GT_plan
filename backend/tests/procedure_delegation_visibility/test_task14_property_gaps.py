@@ -60,6 +60,7 @@ from app.services.wp_visibility.wp_bound_gate import (
     BindingAdapters,
     resolve_wp_binding_and_access,
 )
+from tests._test_artifacts import artifact_dir
 
 from ._factories import (
     IS_PG,
@@ -611,7 +612,10 @@ def test_zzz_pbt_coverage_report_and_valid_example_counts():
     for i in range(1, 21):
         assert f"P{i}" in PROPERTY_MATRIX, f"design property P{i} 未登记覆盖来源"
 
-    report_path = ev.EVIDENCE_DIR / "artifacts" / "task14" / "valid_example_counts.json"
+    # 不写回归档 evidence（manifest 钉了 sha256 的历史证据；formula-fetch-followup 6.6）。
+    report_path = (
+        artifact_dir("procedure-delegation-visibility-isolation", "task14") / "valid_example_counts.json"
+    )
     payload = write_report(report_path)
     assert payload["profile"] == ("correctness" if is_correctness() else payload["profile"])
 

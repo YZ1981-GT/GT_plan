@@ -1,11 +1,12 @@
 """表间审核 PREV/AUX 扩展测试（spec: formula-management-deep-optimization · R4）。
 
 验证：
-1. evaluate_formula_result 默认行为不变（PREV/AUX 硬置 0）
-2. enable_prev=True 时 PREV 取真实数据
-3. enable_aux=True 时 AUX 取真实数据
-4. cross_check_rules._evaluate 使用 CENTRAL_BATCH 检查
-5. 预置规则文件可加载
+1. evaluate_formula_result 对 PREV / AUX 置 0（报表域）；表间审核先经 ``_substitute_strict`` 严格代入
+2. 原 ``enable_prev`` / ``enable_aux`` 两个开关已删除（formula-fetch-followup-defect-closure 6.6）：唯一调用方传 False，
+   打开时 PREV 只认同项目上年、AUX 从不存在的 ``app.models.four_table_models`` 导入（恒失败被吞）—— 本文件原写
+   「enable_prev=True 时 PREV 取真实数据」等两条，但从没有用例测过打开的分支
+3. cross_check_rules._evaluate 使用 CENTRAL_BATCH 检查
+4. 预置规则文件可加载
 """
 from __future__ import annotations
 
@@ -22,7 +23,7 @@ class TestEvaluateFormulaPrevDefault:
 
     @pytest.mark.asyncio
     async def test_prev_returns_zero_by_default(self):
-        """enable_prev=False（默认）时 PREV 替换为 0。"""
+        """报表域 PREV 替换为 0。"""
         from app.services.report_engine import evaluate_formula_result
 
         resolver = MagicMock()
@@ -39,7 +40,7 @@ class TestEvaluateFormulaPrevDefault:
 
     @pytest.mark.asyncio
     async def test_aux_returns_zero_by_default(self):
-        """enable_aux=False（默认）时 AUX 替换为 0。"""
+        """报表域 AUX 替换为 0。"""
         from app.services.report_engine import evaluate_formula_result
 
         resolver = MagicMock()
@@ -55,11 +56,24 @@ class TestEvaluateFormulaPrevDefault:
 
 
 class TestSignatureBackwardCompat:
-    """新参数不破坏现有调用方。"""
+    """签名：TB 正常取数；半成品开关不再存在。"""
+
+    def test_half_built_switches_are_gone(self):
+        """``enable_prev`` / ``enable_aux`` 已删除，report_engine 不再从不存在的模块导入（AST，注释不算）。"""
+        import ast
+        import inspect
+
+        from app.services import report_engine
+
+        params = inspect.signature(report_engine.evaluate_formula_result).parameters
+        assert "enable_prev" not in params and "enable_aux" not in params
+        tree = ast.parse(inspect.getsource(report_engine))
+        modules = {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)}
+        assert "app.models.four_table_models" not in modules, "report_engine 又从不存在的 four_table_models 导入"
 
     @pytest.mark.asyncio
     async def test_old_signature_still_works(self):
-        """不传 enable_prev/enable_aux 时行为与改动前一致。"""
+        """不传额外参数时 TB 正常取数。"""
         from app.services.report_engine import evaluate_formula_result
 
         resolver = MagicMock()
@@ -73,6 +87,43 @@ class TestSignatureBackwardCompat:
         )
         # TB 正常取数
         assert result.value == Decimal("500")
+
+
+class TestCrossCheckStrictCrossRefs:
+    """表间审核对 WP / NOTE 严格取数：取不到如实记为不通过，不按 0 去比（``strict_context=True``）。
+
+    报表域对取不到的 WP / NOTE 按 0 求值；表间审核若也按 0，左右两边都缺数时「0 = 0」恒通过。
+    """
+
+    @staticmethod
+    def _resolver():
+        from types import SimpleNamespace
+        from uuid import uuid4
+
+        async def _zero(*_a, **_k):
+            return Decimal("0")
+
+        return SimpleNamespace(db=None, project_id=uuid4(), year=2025, resolve_tb=_zero, resolve_sum=_zero)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("executor", "expression", "label"),
+        [
+            ("NOTEExecutor", "NOTE('五、1','期末余额') - 0", "NOTE('五、1', '期末余额')"),
+            ("WPExecutor", "WP('E1','审定数') - 0", "WP('E1', '审定数')"),
+        ],
+    )
+    async def test_unavailable_cross_ref_is_not_compared_as_zero(self, monkeypatch, executor, expression, label):
+        from app.services import formula_engine
+        from app.services.formula_settings.cross_check_rules import _evaluate
+
+        async def _none(*_a, **_k):
+            return None
+
+        monkeypatch.setattr(getattr(formula_engine, executor), "execute", staticmethod(_none))
+        value, reason = await _evaluate(expression, self._resolver(), {})
+        assert value is None, f"取不到的 {label} 被当成 0 参与比较：{value}"
+        assert label in reason and "无可用上下文数据" in reason, reason
 
 
 class TestCrossCheckUsesCorrectExecutor:

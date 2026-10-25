@@ -42,6 +42,7 @@ from app.services.wp_visibility.wp_bound_gate import (
     resolve_wp_binding_and_access,
 )
 from app.services.wp_visibility.workpaper_list_query import WorkpaperListQueryService
+from tests._test_artifacts import artifact_dir
 
 from ._factories import (
     IS_PG,
@@ -63,12 +64,9 @@ pytestmark = [
 _BA = BindingAdapters()
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_ARTIFACT_DIR = (
-    _REPO_ROOT
-    / ".kiro" / "specs" / "_archive" / "06-engineering-governance"
-    / "visibility-isolation-go-live-hardening"
-    / "evidence" / "artifacts" / "task6"
-)
+# 🔴 不写回归档 evidence（visibility-isolation-go-live-hardening 已归档，manifest 钉了 sha256）：
+# 浏览器 lane 结果文件在不在决定写哪份摘要，换台机器跑就改写历史证据（formula-fetch-followup 6.6）。
+_ARTIFACT_DIR = artifact_dir("visibility-isolation-go-live-hardening", "task6")
 _PLAYWRIGHT_RESULTS = (
     _REPO_ROOT / "audit-platform" / "frontend" / "test-results" / "task6-role-acceptance-results.json"
 )

@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import uuid
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -17,6 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import assert_project_permission, get_current_user
+
+if TYPE_CHECKING:
+    from app.services.formula_engine import FormulaContext
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +59,7 @@ async def debug_formula(
     判 readonly —— 调试会按该项目实时取数并原样回显（试算表、报表、附注、底稿），
     非成员必须 403 且不触达任何数据（spec formula-governance-coverage-closure R1.1）。
     """
-    from app.services.formula_engine import FormulaContext, execute
+    from app.services.formula_engine import execute
 
     try:
         project_id = uuid.UUID(body.project_id)
@@ -64,9 +67,11 @@ async def debug_formula(
         return FormulaDebugResponse(errors=["无效的项目 ID"], state="error")
     await assert_project_permission(db, _user, project_id, "readonly")
 
-    # ── 构造 FormulaContext ──
+    # ── 构造 FormulaContext（自动取数时按该公式预载；取数缺口进 warnings） ──
+    gaps: list[str] = []
     try:
-        ctx = await _build_context(db, project_id, body.year, body.scope, body.custom_context)
+        ctx = await _build_context(db, project_id, body.year, body.scope, body.custom_context,
+                                   formula=body.formula, gaps=gaps)
     except Exception as exc:
         logger.warning("调试上下文构造失败: %s", exc)
         return FormulaDebugResponse(
@@ -94,7 +99,7 @@ async def debug_formula(
         state=result.state,
         trace=result.trace,
         errors=result.errors,
-        warnings=result.warnings,
+        warnings=[*result.warnings, *gaps],
         context_summary=summary,
     )
 
@@ -105,10 +110,18 @@ async def _build_context(
     year: int,
     scope: str,
     custom_context: dict[str, Any] | None,
+    formula: str = "",
+    gaps: list[str] | None = None,
 ) -> "FormulaContext":
     """构造调试用 FormulaContext。
 
-    优先用 custom_context（用户指定的测试数据），否则从项目实时取数。
+    优先用 custom_context（用户指定的测试数据）；否则按待调试公式走统一预载层（``formula_preloader.preload``）取该项目
+    实时数据，与预填 / 报表求值同一套取数（试算表前缀聚合、调整额、辅助核算、底稿锚点、附注、上年、序时账、报表行）。
+    调整额口径按作用域：报表 / 附注排除底稿来源（报表路径），底稿 / 明细不排除（底稿路径）。取数缺口写进 ``gaps``。
+
+    原实现自拼上下文：从不存在的 ``app.models.four_table_models`` / ``app.models.disclosure_models`` 导入（被 except
+    吞掉，试算表与附注恒空），列名也不对（试算表没有 ``account_code``），调整额 / 底稿 / 上年 / 辅助核算一律不取 ——
+    调试结果与真实求值对不上（spec formula-fetch-followup-defect-closure 6.6）。
     """
     from app.services.formula_engine import FormulaContext
 
@@ -119,80 +132,13 @@ async def _build_context(
         rows = {k: Decimal(str(v)) for k, v in (custom_context.get("row_cache") or {}).items()}
         return FormulaContext(tb_data=tb, row_cache=rows)
 
-    # 自动取数：从项目的试算表 + 报表行加载数据快照
-    tb_data: dict[str, dict[str, Decimal]] = {}
-    row_cache: dict[str, Decimal] = {}
+    from app.services.formula_preloader import preload
+    from app.services.formula_ref_check import project_ref_scope
 
-    try:
-        import sqlalchemy as sa
-        from app.models.four_table_models import TrialBalance
-
-        tb_rows = (await db.execute(
-            sa.select(
-                TrialBalance.account_code,
-                TrialBalance.unadjusted_amount,
-                TrialBalance.audited_amount,
-            ).where(
-                TrialBalance.project_id == project_id,
-                TrialBalance.year == year,
-                TrialBalance.is_deleted == sa.false(),
-            )
-        )).all()
-        for row in tb_rows:
-            code = row.account_code or ""
-            ua = Decimal(str(row.unadjusted_amount or 0))
-            aa = Decimal(str(row.audited_amount or 0))
-            tb_data[code] = {"未审数": ua, "审定数": aa, "期末余额": aa}
-    except Exception:
-        logger.warning("调试：试算表取数失败", exc_info=True)
-
-    try:
-        import sqlalchemy as sa
-        from app.models.report_models import FinancialReport
-
-        report_rows = (await db.execute(
-            sa.select(
-                FinancialReport.row_code,
-                FinancialReport.current_period_amount,
-            ).where(
-                FinancialReport.project_id == project_id,
-                FinancialReport.year == year,
-                FinancialReport.is_deleted == sa.false(),
-            )
-        )).all()
-        for row in report_rows:
-            if row.row_code:
-                row_cache[row.row_code] = Decimal(str(row.current_period_amount or 0))
-    except Exception:
-        logger.warning("调试：报表行取数失败", exc_info=True)
-
-    # P1-5: 按 scope 预载 NOTE/WP 数据
-    note_data: dict[str, dict[str, Decimal]] = {}
-    wp_data: dict[str, dict[str, Decimal]] = {}
-
-    if scope in ("note", "report"):
-        try:
-            import sqlalchemy as sa
-            # 预载附注表格数据（从 disclosure_notes 取各章节合计值）
-            from app.models.disclosure_models import DisclosureNote
-            note_rows = (await db.execute(
-                sa.select(
-                    DisclosureNote.section_number,
-                    DisclosureNote.total_amount,
-                ).where(
-                    DisclosureNote.project_id == project_id,
-                    DisclosureNote.year == year,
-                    DisclosureNote.is_deleted == sa.false(),
-                )
-            )).all()
-            for row in note_rows:
-                sec = row.section_number or ""
-                if sec:
-                    note_data[sec] = {"合计": Decimal(str(row.total_amount or 0))}
-        except Exception:
-            logger.warning("调试：附注取数失败（模型可能不存在）", exc_info=True)
-
-    return FormulaContext(tb_data=tb_data, row_cache=row_cache, note_data=note_data, wp_data=wp_data)
+    _year, template_type = await project_ref_scope(db, project_id)
+    exclude = frozenset({"workpaper"}) if scope in ("report", "note") else frozenset()
+    return await preload(db, project_id, year, [formula], adj_exclude_origins=exclude,
+                         template_type=template_type, gaps=gaps)
 
 
 def _context_summary(ctx: Any) -> dict[str, Any]:

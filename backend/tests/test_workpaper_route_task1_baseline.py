@@ -32,6 +32,7 @@ WRONG-TEST.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -800,24 +801,52 @@ def _build_snapshot() -> dict[str, Any]:
     }
 
 
-def test_baseline_snapshot_can_be_regenerated() -> None:
-    """The baseline snapshot is regenerable and self-describing.
+def _snapshot_text(snapshot: dict[str, Any]) -> str:
+    return json.dumps(snapshot, ensure_ascii=False, indent=2, sort_keys=True)
 
-    Writes (or verifies) the JSON snapshot at `_snapshots/workpaper_route_task1_baseline.json`.
-    This snapshot is what a fresh checkout reproduces; the test asserts
-    every key is present so downstream tasks have a stable reference
-    point.
+
+def _write_snapshot(snapshot: dict[str, Any], committed: dict[str, Any] | None) -> None:
+    """``GT_UPDATE_SNAPSHOTS=1`` 时重写快照；除时间戳外没变就沿用旧时间戳（重写无 diff）。"""
+    if committed is not None:
+        def _body(d: dict[str, Any]) -> dict[str, Any]:
+            return {k: v for k, v in d.items() if k != "generated_at_epoch"}
+
+        if _body(json.loads(_snapshot_text(snapshot))) == _body(committed):
+            snapshot = {**snapshot, "generated_at_epoch": committed.get("generated_at_epoch")}
+    BASELINE_SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    BASELINE_SNAPSHOT_PATH.write_text(_snapshot_text(snapshot), encoding="utf-8")
+
+
+def test_baseline_snapshot_can_be_regenerated() -> None:
+    """The baseline snapshot is regenerable and self-describing — verified without writing.
+
+    `_snapshots/workpaper_route_task1_baseline.json` is the Task 1 red-baseline freeze.
+    Later tasks digest that red baseline, so the live scan is *expected* to differ from
+    the committed values; only the key set is a contract.
+
+    formula-fetch-followup-defect-closure 6.6: this test used to rewrite the tracked
+    snapshot on every run (with a fresh ``generated_at_epoch``), leaving a diff behind
+    each time. Now the live scan is round-tripped through JSON in memory, the committed
+    snapshot must exist with the full key set, and its bytes must be untouched by the run.
+    Rewriting it is an explicit opt-in: ``GT_UPDATE_SNAPSHOTS=1``.
 
     **Validates: Requirements 13.1**
     """
+    before = BASELINE_SNAPSHOT_PATH.read_bytes() if BASELINE_SNAPSHOT_PATH.exists() else None
+    committed = json.loads(before.decode("utf-8")) if before is not None else None
     snapshot = _build_snapshot()
-    BASELINE_SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    BASELINE_SNAPSHOT_PATH.write_text(
-        json.dumps(snapshot, ensure_ascii=False, indent=2, sort_keys=True),
-        encoding="utf-8",
-    )
-    # Round-trip: parse it back and assert the key set is stable.
-    loaded = json.loads(BASELINE_SNAPSHOT_PATH.read_text(encoding="utf-8"))
+    if os.environ.get("GT_UPDATE_SNAPSHOTS") == "1":
+        _write_snapshot(snapshot, committed)
+        committed = json.loads(BASELINE_SNAPSHOT_PATH.read_text(encoding="utf-8"))
+    else:
+        assert committed is not None, (
+            f"committed baseline snapshot missing: {BASELINE_SNAPSHOT_PATH} "
+            "(regenerate with GT_UPDATE_SNAPSHOTS=1)"
+        )
+        after = BASELINE_SNAPSHOT_PATH.read_bytes()
+        assert after == before, "the snapshot test must not rewrite the tracked snapshot"
+    # Round-trip: the live scan is JSON-serialisable and keeps the key set.
+    loaded = json.loads(_snapshot_text(snapshot))
     required_keys = {
         "nodekey_payloads",
         "workpaper_route_el_dialogs",
@@ -833,6 +862,9 @@ def test_baseline_snapshot_can_be_regenerated() -> None:
     }
     assert required_keys.issubset(loaded.keys()), (
         f"baseline snapshot missing required keys: {required_keys - loaded.keys()}"
+    )
+    assert required_keys.issubset(committed.keys()), (
+        f"committed baseline snapshot missing required keys: {required_keys - committed.keys()}"
     )
 
 

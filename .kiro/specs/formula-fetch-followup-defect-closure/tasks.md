@@ -135,7 +135,14 @@
   - 偏离：`test_f_prefill_extension` 不同根（`5783c4ffe` 有意改为 WP 联动），按其防循环引用的本意改写；L1 序时账三函数「未预载」由返回 0 改为报错，
     收敛 spec 的两个用例随之改
   - 待拍板：F2 盘点 9 格「期末数量 / 期末金额」的取数口径、J1 月度分析 21 格四参写法、LEDGER_DETAIL 写笔数还是写明细清单（design §10.10 范围外）
-- [ ] 6.6 `report_engine.evaluate_formula_result` 的 `enable_prev` 死分支；运行时改写已跟踪文件的测试（`tests/_snapshots/workpaper_route_task1_baseline.json`、归档证据）
+- [x] 6.6 `report_engine.evaluate_formula_result` 的 `enable_prev` 死分支；运行时改写已跟踪文件的测试（`tests/_snapshots/workpaper_route_task1_baseline.json`、归档证据）
+  - 证据：删 `enable_prev` / `enable_aux` 与两段从不运行的取数（其一从不存在的 `four_table_models` 导入）；公式调试上下文改走统一预载
+    （原从不存在的模块导入、试算表恒空），真 SQLite 按值断言 + 端点级缺口进 `warnings`；lazy import 守卫不再豁免 `except Exception`
+    （新暴露 11 条：3 条随删除消失、8 条冻结）；表间审核严格取数补用例。干净检出跑 142 + 190 个候选测试文件找改写已跟踪文件的用例：
+    快照用例与 4 处归档证据（task14 / 15 / 17 / go-live task6，task5 已 skip 同改）全部改为不写仓库；新增守卫 `tests/_tracked_write_guard.py`
+    （root conftest 登记，本进程改写已跟踪文件不还原 ⇒ 点名并置退出码 1；同批 213 例交替开关各跑 2 次，耗时差在噪声内）
+  - 同根顺带：两条随本节失效的源码锚点守卫改按行为 / AST 判；`_FALLBACK_KNOWN_FUNCS` 补齐漏同步的 5 个函数（预存红转绿）
+  - 变异 MR66a~MR66j、MG1~MG10、MS1~MS5 全部打红在预期断言上；回归见 design §10.11
 
 ## 7. 回归与交付（R10）
 
@@ -145,5 +152,7 @@
 
 ## 8. 年度兜底（另立 spec）
 
-- [ ] 8.1 另立 spec `audit-year-calendar-fallback-ratchet`（三件套），先加只许减少的守卫：前端拿不到审计年度时用今年的写法（251 处）；
+- [x] 8.1 另立 spec `audit-year-calendar-fallback-ratchet`（三件套），先加只许减少的守卫：前端拿不到审计年度时用今年的写法（251 处）；
   后端同类（`wp_prefill_preview.py` 两处 `year = 2025`）一并登记
+  - 证据：三件套已建；守卫即该 spec 任务 1：前端 vitest 按文件冻结 340 处 / 288 个文件（兜底写法 251 处，与原记一致；另含初值 / 实参等 89 处）、
+    后端 AST pytest 冻结 130 处 / 72 个文件（含 `wp_prefill_preview.py` 两处）；变异 MY1~MY9 / MB1~MB7 全部打红。逐处判定与收口在该 spec 任务 2~7

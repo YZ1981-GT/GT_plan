@@ -22,7 +22,6 @@ Design: "Integration and coverage" / "permission commit 后 publish 前崩溃恢
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -52,6 +51,7 @@ from app.services.wp_visibility.wp_bound_gate import (
     RateLimitDecision,
     resolve_wp_binding_and_access,
 )
+from tests._test_artifacts import artifact_dir
 
 from ._factories import (
     IS_PG,
@@ -836,11 +836,10 @@ class TestCrashBeforePublishNoStaleAllow:
 #
 # 仅在 EXPLAIN 实证证明计划改善时才新增索引；本 run 记录 before-plan 与结论。
 # ═══════════════════════════════════════════════════════════════════════════
+# 不写回归档 evidence：EXPLAIN (ANALYZE, BUFFERS) 每次的耗时 / 缓冲数都不同，而归档 manifest
+# 钉了 explain_plans.txt 的 sha256（formula-fetch-followup-defect-closure 6.6）。
 _ARTIFACT = (
-    Path(__file__).resolve().parents[3]
-    / ".kiro" / "specs" / "_archive" / "06-engineering-governance"
-    / "procedure-delegation-visibility-isolation"
-    / "evidence" / "artifacts" / "task15" / "explain_plans.txt"
+    artifact_dir("procedure-delegation-visibility-isolation", "task15") / "explain_plans.txt"
 )
 
 

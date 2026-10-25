@@ -59,11 +59,19 @@ _FLAG_GATED_PLACEHOLDERS: frozenset[tuple[str, str, str]] = frozenset({
 #   权威确认，该表走裸 SQL）⇒ 需新建模型或改裸 SQL
 # - TbAccount / TbAdjustment：全仓无定义，同模块无相近名
 # - save_formula_batch：同上
-# - populate_parsed_data：✅ 已修（2026-10-22，spec formula-governance-coverage-closure R5 走查撞上：
-#   generate-from-codes 对任何调用都在此 ImportError 500）—— 改用 `ensure_parsed_data_placeholder`
-#   （与准则转换生成路径同一兜底），已从基线删除；端点守卫 `test_generate_from_codes_endpoint.py`。
-# - static_sheet_payload_for_adjudication ×3：✅ 已实现（2026-10-07），已从基线删除。
+# - populate_parsed_data（2026-10-22）/ static_sheet_payload_for_adjudication ×3（2026-10-07）：✅ 已修，已从基线删除。
+# - 末 8 条（2026-10-24，formula-fetch-followup 6.6）：包在 ``try / except Exception`` 里、原先被豁免扫描；该段业务代码
+#   每次执行都在 import 处失败、只留一条日志。目标不存在（6 条）或在别的模块且取的列待核（D4 / 时间线 2 条）。
 _KNOWN_UNRESOLVED_BASELINE: frozenset[tuple[str, str, str]] = frozenset({
+    ("app/routers/wp_formula.py", "app.routers.wp_render_strategies._e1_monetary_fund", "_build_four_table_prefill"),
+    ("app/routers/wp_render_strategies/_d4_operating_revenue.py", "app.models.audit_platform_models", "FinancialReport"),
+    ("app/services/ai_chat/startup_health.py", "app.services.ai_chat.audit", "audit_event"),
+    ("app/services/evidence_governance/unified_graph_builder.py", "app.services.workpaper_trace_stale_integration",
+     "get_registry_edges"),
+    ("app/services/formula_timeline_service.py", "app.models.audit_platform_models", "Project"),
+    ("app/services/issue_ticket_service.py", "app.services.notification_service", "notification_service"),
+    ("app/services/role_workbench_facade.py", "app.models.collaboration_models", "PBCItem"),
+    ("app/services/wp_scripts/registry.py", "app.services.tsj_prompt_service", "get_review_points"),
     ("app/routers/adjustments.py", "app.models.audit_platform_models", "ChecklistResponse"),
     ("app/routers/import_templates.py", "app.services.cell_formula_evaluator", "save_formula_batch"),
     ("app/services/contract_analysis_service.py", "app.models.audit_platform_models", "TbAccount"),
@@ -135,10 +143,13 @@ def _guarded_import_linenos(tree: ast.AST) -> set[int]:
 
     两类：
     1. `if TYPE_CHECKING:` 块内 —— 运行时不执行，只供类型标注
-    2. `try: ... except ImportError/Exception:` 块内 —— 有 fallback 兜底
+    2. `try: ... except ImportError / ModuleNotFoundError:` 块内 —— 有意的可选导入（有 fallback）
 
     🔴 不排除这两类会产生大批误报（复盘教训：第一版扫描器因此把
     「有 fallback 的可选依赖」也算成缺陷）。
+    🔴 ``except Exception`` / 裸 ``except`` 不算可选导入（formula-fetch-followup 6.6）：它包住的是整段业务代码，
+    import 写错 = 整段每次都失败、只剩一条日志 —— 原先一并豁免，藏了 11 处（如 report_engine / formula_debug
+    从不存在的 ``app.models.four_table_models`` 导入）。
     """
     guarded: set[int] = set()
     for n in ast.walk(tree):
@@ -153,10 +164,9 @@ def _guarded_import_linenos(tree: ast.AST) -> set[int]:
                         guarded.add(s.lineno)
         if isinstance(n, ast.Try):
             catches_import = any(
-                h.type is None
-                or (isinstance(h.type, ast.Name) and h.type.id in ("ImportError", "Exception"))
+                (isinstance(h.type, ast.Name) and h.type.id in ("ImportError", "ModuleNotFoundError"))
                 or (isinstance(h.type, ast.Tuple) and any(
-                    isinstance(e, ast.Name) and e.id in ("ImportError", "Exception")
+                    isinstance(e, ast.Name) and e.id in ("ImportError", "ModuleNotFoundError")
                     for e in h.type.elts))
                 for h in n.handlers
             )
@@ -623,6 +633,7 @@ class TestLazyImportResolvability:
             "    except ImportError:\n"
             "        Ghost3 = None\n"
             "    from app.models.nonexistent_mod import Ghost4\n"
+            "    try:\n        from app.models.nonexistent_mod import Ghost5\n    except Exception:\n        pass\n"
             "    return Ghost3, Ghost4\n"
         )
         tree = ast.parse(sample)
@@ -631,8 +642,9 @@ class TestLazyImportResolvability:
         # Ghost2（TYPE_CHECKING，第 6 行）与 Ghost3（try，第 8 行）应被标为受保护
         assert 6 in guarded, "函数体内 TYPE_CHECKING 块未被排除"
         assert 8 in guarded, "try/except ImportError 块未被排除"
-        # Ghost4（第 11 行，裸 lazy import）不应被排除
+        # Ghost4（第 11 行，裸 lazy import）与 Ghost5（第 13 行，except Exception 包住的业务代码）不应被排除
         assert 11 not in guarded, "裸 lazy import 被误排除 ⇒ 守卫会漏检"
+        assert 13 not in guarded, "except Exception 包住的 import 被当成可选导入豁免 ⇒ 写错的路径永远只剩一条日志"
 
     def test_scanner_detects_injected_bad_import(self, tmp_path):
         """P12 双向变异：扫描器对已知坏样本必须命中。

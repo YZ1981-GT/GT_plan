@@ -77,6 +77,7 @@ from app.services.wp_visibility.wp_bound_gate import (
     resolve_wp_binding_and_access,
 )
 from app.services.wp_visibility.workpaper_list_query import WorkpaperListQueryService
+from tests._test_artifacts import artifact_dir
 
 from tests.procedure_delegation_visibility._factories import (
     IS_PG,
@@ -130,14 +131,9 @@ TARGET_ERROR_ALLOW = 0
 RATE_WINDOW_S = 1.0
 THRESHOLD_HEADROOM = 2.0
 
-# 证据 artifact 目录（本 spec 独立 evidence，Task 5）
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_ARTIFACT_DIR = (
-    _REPO_ROOT
-    / ".kiro" / "specs" / "_archive" / "06-engineering-governance"
-    / "visibility-isolation-go-live-hardening"
-    / "evidence" / "artifacts" / "task5"
-)
+# 证据 artifact 落点：tests/_test_artifacts.artifact_dir()。🔴 不写回归档 evidence（spec 已归档，
+# manifest 钉了 sha256；写入用例虽已 skip，取消 skip 也不得改写历史证据 —— formula-fetch-followup 6.6）。
+_ARTIFACT_DIR = artifact_dir("visibility-isolation-go-live-hardening", "task5")
 
 # 跨测试累积结果（zzz 写 artifact 时读取）
 _RESULTS: dict = {}

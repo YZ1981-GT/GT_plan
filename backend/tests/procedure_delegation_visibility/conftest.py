@@ -3,17 +3,19 @@
 
 Task 14：在收集本目录时幂等注册 smoke/correctness/fast Hypothesis profile（隔离运行时兜底，
 backend/tests/conftest.py 亦注册），并在 session 结束时把每 property 有效样例计数 + P1–P20
-覆盖矩阵报告落地到 ``evidence/artifacts/task14/valid_example_counts.json``。
+覆盖矩阵报告写到 ``tests/_test_artifacts.artifact_dir()`` 下。
+
+🔴 不写回归档 evidence（formula-fetch-followup-defect-closure 6.6）：spec 已归档，
+``evidence/artifacts/task14/`` 是 manifest 钉了 sha256 的历史证据，每跑一次都按本次样例数改写它。
 """
 from __future__ import annotations
-
-from pathlib import Path
 
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.core.config import settings as app_settings
+from tests._test_artifacts import artifact_dir
 
 from . import _pbt_profiles as _pbt
 
@@ -22,13 +24,8 @@ _pbt.register_profiles()
 
 _IS_PG = app_settings.DATABASE_URL.startswith("postgresql")
 
-# spec 目录内相对路径（供 evidence manifest 使用 spec-relative artifact）。
-_REPO_ROOT = Path(__file__).resolve().parents[3]
 _REPORT_ABS = (
-    _REPO_ROOT
-    / ".kiro" / "specs" / "_archive" / "06-engineering-governance"
-    / "procedure-delegation-visibility-isolation"
-    / "evidence" / "artifacts" / "task14" / "valid_example_counts.json"
+    artifact_dir("procedure-delegation-visibility-isolation", "task14") / "valid_example_counts.json"
 )
 
 

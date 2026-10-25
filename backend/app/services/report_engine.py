@@ -826,8 +826,6 @@ async def evaluate_formula_result(
     row_cache: dict[str, Decimal] | None = None,
     adj_data: dict[str, dict[str, Decimal]] | None = None,
     strict_context: bool = False,
-    enable_prev: bool = False,
-    enable_aux: bool = False,
 ) -> FormulaResult:
     """L2 编排层：预载数据 → 构建 FormulaContext → 委托 L1 内核 execute → 返回 Decimal。
 
@@ -871,73 +869,12 @@ async def evaluate_formula_result(
         val = await resolver.resolve_tb(account_code, col)
         expression = expression.replace(match.group(0), str(val), 1)
 
-    # PREV/AUX — 报表域默认置 0；表间审核路径传 enable_prev/aux=True 时预载真实数据
-    # spec: formula-management-deep-optimization · R4
-    prior_tb_data: dict[str, dict[str, Decimal]] = {}
-    aux_data: dict[str, dict[str, Decimal]] = {}
-
-    if enable_prev and hasattr(resolver, 'db') and hasattr(resolver, 'project_id') and hasattr(resolver, 'year'):
-        _prev_refs = list(_PREV_PATTERN.finditer(formula))
-        if _prev_refs:
-            try:
-                prior_year = resolver.year - 1
-                for match in _prev_refs:
-                    code = match.group(1)
-                    if code not in prior_tb_data:
-                        prior_tb_data[code] = {}
-                    # P0-1 修复：与 resolve_tb 同口径用 like 前缀聚合，而非精确单科目
-                    _prev_rows = await resolver.db.execute(
-                        sa.select(TrialBalance).where(
-                            TrialBalance.project_id == resolver.project_id,
-                            TrialBalance.year == prior_year,
-                            TrialBalance.standard_account_code.like(f"{code}%"),
-                            TrialBalance.is_deleted == sa.false(),
-                        )
-                    )
-                    _total = Decimal("0")
-                    for _pr in _prev_rows.scalars().all():
-                        _total += Decimal(str(_pr.audited_amount or 0))
-                    prior_tb_data[code]["期末余额"] = _total
-            except Exception:
-                logger.warning("PREV 预载失败", exc_info=True)
-    else:
-        for match in _PREV_PATTERN.finditer(formula):
+    # PREV / AUX —— 报表域置 0；表间审核另走严格代入（cross_check_rules._substitute_strict，取不到即报原因）。
+    # 原有 enable_prev / enable_aux 两个开关已删除（spec formula-fetch-followup-defect-closure 6.6）：唯一调用方传
+    # False；打开时 PREV 只认同项目上年、AUX 从不存在的 app.models.four_table_models 导入（恒失败、被 except 吞掉）。
+    for pattern in (_PREV_PATTERN, _AUX_PATTERN):
+        for match in pattern.finditer(formula):
             expression = expression.replace(match.group(0), "0", 1)
-
-    if enable_aux and hasattr(resolver, 'db') and hasattr(resolver, 'project_id') and hasattr(resolver, 'year'):
-        _aux_refs = list(_AUX_PATTERN.finditer(formula))
-        if _aux_refs:
-            try:
-                from app.models.four_table_models import TbAuxBalance
-                for match in _aux_refs:
-                    code = match.group(1)
-                    # P0-2 修复：aux_type 做 key（与 _handle_aux 的 dimension 参数对齐），
-                    # SUM(closing_balance) 按 aux_type 分组（非单行 aux_name）
-                    if code not in aux_data:
-                        aux_data[code] = {}
-                    _aux_rows = await resolver.db.execute(
-                        sa.select(
-                            TbAuxBalance.aux_type,
-                            sa.func.sum(TbAuxBalance.closing_balance).label("total"),
-                        ).where(
-                            TbAuxBalance.project_id == resolver.project_id,
-                            TbAuxBalance.year == resolver.year,
-                            TbAuxBalance.account_code == code,
-                            TbAuxBalance.is_deleted == sa.false(),
-                        ).group_by(TbAuxBalance.aux_type)
-                    )
-                    for _arow in _aux_rows.all():
-                        _atype = _arow[0] or ''
-                        _atotal = Decimal(str(_arow[1] or 0))
-                        aux_data[code][_atype] = _atotal
-            except Exception:
-                logger.warning("AUX 预载失败", exc_info=True)
-            except Exception:
-                logger.warning("AUX 预载失败", exc_info=True)
-    else:
-        for pattern in [_AUX_PATTERN]:
-            for match in pattern.finditer(formula):
-                expression = expression.replace(match.group(0), "0", 1)
 
     # ── WP/NOTE 跨引用预载（spec: formula-push-user-custom-cross-module T7）──
     # 不再硬替换为 0，而是预载数据到 FormulaContext，让 L1 handler 求值。
@@ -1001,11 +938,9 @@ async def evaluate_formula_result(
     ctx = FormulaContext(
         tb_data={},
         row_cache={k: Decimal(str(v)) for k, v in row_values.items()},
-        prior_tb_data=prior_tb_data,
         adj_data=adj_data or {},
         wp_data=wp_data,
         note_data=note_data,
-        aux_data=aux_data,
     )
 
     # Step 3: 委托 L1 内核求值（expression 中只剩 ROW/SUM_ROW/REPORT + 算术 + 内置函数）

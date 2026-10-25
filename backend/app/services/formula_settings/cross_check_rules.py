@@ -136,7 +136,7 @@ async def _evaluate(expression: str, resolver: Any, row_cache: dict[str, Decimal
     except FormulaSupportViolation:
         return None, "含报表路径不支持的函数"
     # 严格取数（spec formula-governance-coverage-closure R7a）：PREV / AUX 先按值代入、取不到即报原因。
-    # report_engine 的 PREV / AUX 预载只会置 0，不经它（enable_prev / enable_aux 关）。
+    # report_engine 对 PREV / AUX 只会置 0，所以必须先在这里代入（代入后表达式里已没有 PREV / AUX）。
     try:
         text, missing = await _substitute_strict(text, resolver)
     except Exception as exc:  # noqa: BLE001 —— 取数失败如实记为不通过
@@ -144,10 +144,7 @@ async def _evaluate(expression: str, resolver: Any, row_cache: dict[str, Decimal
     if missing:
         return None, "；".join(missing)[:200]
     try:
-        result = await evaluate_formula_result(
-            text, resolver=resolver, row_cache=row_cache,
-            strict_context=True, enable_prev=False, enable_aux=False,
-        )
+        result = await evaluate_formula_result(text, resolver=resolver, row_cache=row_cache, strict_context=True)
     except Exception as exc:  # noqa: BLE001 —— 取不到数如实记为不通过
         return None, str(exc)[:200]
     if not result.ok:

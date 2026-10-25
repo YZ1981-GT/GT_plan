@@ -86,6 +86,8 @@ _FALLBACK_KNOWN_FUNCS: frozenset[str] = frozenset(
         "TB", "SUM_TB", "ROW", "SUM_ROW", "REPORT", "NOTE", "WP", "PREV", "AUX",
         "ADJ",  # 2026-09-28 注册（tb-adjustment-column-formula-closure Phase 1）
         "IF", "ABS", "ROUND", "MAX", "MIN",
+        # unified-formula-registry（45a216848）登记进内核时漏同步的 5 个（formula-fetch-followup-defect-closure 6.6 补）
+        "TB_AUX", "LEDGER", "COUNT_LEDGER", "LEDGER_DETAIL", "PLACEHOLDER",
     }
 )
 
@@ -95,16 +97,21 @@ _FUNC_HEAD_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 
 @lru_cache(maxsize=1)
 def _known_acnr_funcs() -> frozenset[str]:
-    """ACNR/L1 内核已注册函数集（单一真源，fail-open 兜底）。"""
+    """有 ACNR grammar_v1 等价的函数集 = L1 内核已注册函数（单一真源，fail-open 兜底）扣除待迁移白名单。
+
+    🔴 「内核能执行」≠「有 grammar_v1 等价」：序时账三函数与 ``PLACEHOLDER`` 由 unified-formula-registry（45a216848）
+    登记进内核后，这里原样返回内核函数集 ⇒ 它们被判 migrated，与白名单、Req 24.3（模板库把 Ledger 标为待迁移）
+    及两条用例矛盾（formula-fetch-followup-defect-closure 6.6 修）。函数要转为 migrated，从白名单删掉即可。
+    """
     try:
         from app.services.formula_engine import _REGISTRY
 
         names = {n.upper() for n in _REGISTRY.known_function_names()}
         if names:
-            return frozenset(names)
+            return frozenset(names) - PENDING_FUNCTION_ALLOWLIST
     except Exception as exc:  # noqa: BLE001 — 内核不可用不阻断归一化
         logger.warning("formula_engine 注册函数集不可用，回退静态兜底: %s", exc)
-    return _FALLBACK_KNOWN_FUNCS
+    return _FALLBACK_KNOWN_FUNCS - PENDING_FUNCTION_ALLOWLIST
 
 
 @dataclass

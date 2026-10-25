@@ -471,3 +471,49 @@ R1.5 的附注模板绑定未重生成（理由见 §10.3 第 19 条）。
   2. J1 月度分析表 21 格 `LEDGER_DETAIL('2211','月度分析表J1-4','1月','期末余额')`：四参写法，要的是月末余额而不是明细笔数（现在报错不取）。
      其余 35 格三参 LEDGER_DETAIL（截止测试「期末大额收入明细」等）现在写入的是符合条件的笔数；若模板要的是明细清单，需要「把明细写进表格区域」的能力。
   3. 两参 WP 取不到返回 0（与「值确实为 0」不可区分）、预填与报表两条路径的数据来源不同：照旧登记在 `formula_wp_semantics`。
+
+### 10.11 6.6 报表求值半成品开关 / 公式调试上下文 / 改写已跟踪文件的测试（2026-10-25）
+
+- **报表求值半成品开关**：`report_engine.evaluate_formula_result` 删 `enable_prev` / `enable_aux`。唯一调用方（表间审核）传 False；
+  打开时 PREV 只认同项目上年、AUX 从不存在的 `app.models.four_table_models` 导入（恒失败、被 except 吞掉），从没有用例测过打开的分支。
+  PREV / AUX 在报表域照旧置 0（合成一个循环），表间审核照旧先经 `_substitute_strict` 严格代入。表间审核传的 `strict_context=True`
+  此前没有用例：补「NOTE / WP 取不到如实记为不通过、不按 0 去比」（否则左右两边都缺数时 0 = 0 恒通过）。
+- **公式调试上下文**：`routers/formula_debug._build_context` 原自拼上下文 —— 从不存在的 `four_table_models` / `disclosure_models` 导入
+  （被 except 吞掉，试算表与附注恒空）、试算表列名写成不存在的 `account_code`、调整额 / 底稿 / 上年 / 辅助核算 / 序时账一律不取 ⇒
+  调试结果与真实求值对不上。改为按待调试公式走统一预载 `formula_preloader.preload`：调整额口径按作用域（报表 / 附注排除底稿来源，
+  底稿 / 明细不排除）、口径由 `formula_ref_check.project_ref_scope` 取；取数缺口（如本年度报表未生成）随响应的 `warnings` 返回。
+  原用例用 mock DB 只断言「返回的是 dict」，改为真 SQLite 落数据按值断言（TB 100、报表调整额 20、底稿调整额 50），另补端点级用例
+  （权限世界真发请求，缺口进 `warnings`）。
+- **lazy import 守卫**：`_guarded_import_linenos` 原把 `try / except Exception` 里的 import 当「可选导入」豁免 ⇒ 写错路径只剩一条
+  warning 日志（`formula_debug` 两条即此）。改为只豁免 `except ImportError / ModuleNotFoundError`；新暴露 11 条，3 条随本节删除代码消失，
+  8 条冻结进 `_KNOWN_UNRESOLVED_BASELINE`（各需按功能核实后修，现在修等于第一次运行从没跑过的代码）：`wp_formula._build_four_table_prefill`、
+  `_d4_operating_revenue` 的 `FinancialReport`、`ai_chat/startup_health` 的 `audit_event`、`unified_graph_builder` 的 `get_registry_edges`、
+  `formula_timeline_service` 的 `Project`、`issue_ticket_service` 的 `notification_service`、`role_workbench_facade` 的 `PBCItem`、
+  `wp_scripts/registry` 的 `get_review_points`。自检加「`except Exception` 包住的 import 不豁免」。
+- **改写已跟踪文件的测试**：干净检出跑 142 + 190 个候选测试文件（静态扫「写文件 + 仓库路径」；第二批排除往真库提交数据的 7 个 PG 文件，
+  静态核对过它们只写临时目录或写完即还原），跑完 `git status` 只有第一批找到两组：
+  1. `test_workpaper_route_task1_baseline::test_baseline_snapshot_can_be_regenerated` 每跑一次无条件重写 `tests/_snapshots/…json`（带
+     `generated_at_epoch`）。快照是 workpaper-page-formula-toolbar-closure 任务 1 的红基线冻结（现扫与它本就不等，没有代码读它）⇒ 改为内存往返 +
+     核对已提交快照的键集、断言运行前后字节不变；只在 `GT_UPDATE_SNAPSHOTS=1` 时重写，且除时间戳外没变就沿用旧时间戳。
+  2. 归档 spec 的 evidence（manifest 钉了 sha256）：procedure-delegation-visibility-isolation 的 task14（session 收尾写样例数）、task15
+     （EXPLAIN ANALYZE 实测耗时）、task17（容量报告 / 冻结阈值 / p95），visibility-isolation-go-live-hardening 的 task5（已 skip）、task6
+     （浏览器结果文件在不在决定写哪份摘要）⇒ 统一改写到 `tests/_test_artifacts.artifact_dir()`（`GT_TEST_ARTIFACT_DIR` 或系统临时目录）。
+  守卫 `tests/_tracked_write_guard.py`（root conftest 登记）：`sys.addaudithook` 记本进程对已跟踪文件的写（写方式 `open`、`os.rename` /
+  `os.replace` 两端、`os.remove`、`os.truncate`、Windows 上 `shutil.copy2` 走的 `_winapi.CopyFile2`），首次写之前记原摘要；每个用例
+  （含 teardown）后重算，已还原放过（变异测试写完即恢复），没还原的到会话结束再核一次，仍不一致 ⇒ 列出文件与首次写入的用例、退出码置 1。
+  不覆盖子进程里的写；`GT_UPDATE_SNAPSHOTS=1` 放行。自测在临时 git 仓库里起子进程 pytest 按真实退出码判（改写不还原 / 原子替换 /
+  copy2 / 删除 ⇒ 红并点名；写完还原、写未跟踪文件 ⇒ 绿；conftest 的 `pytest_sessionfinish` 里写的也能抓到）。开销：同批 213 例
+  交替开 / 关各跑 2 次，开 59.4 / 53.9 秒、关 62.0 / 70.5 秒（机器同时在跑别的测试，差异在噪声内）。
+- **同根顺带**：两条源码锚点守卫随本节改动失效 —— `test_function_support_matrix::test_report_path_source_still_zeros_prev_aux` 以注释
+  「报表域默认置 0」为锚点（注释改写即红、取数改了反而不一定红），改为按行为判（PREV / AUX 经报表路径求值为 0）；
+  `test_adj_formula_function::test_adj_not_in_report_engine_zero_substitution_list` 查的是兼容入口 `evaluate_formula` 的源码（拆分后恒找不到列表，
+  预存红），改为查求值主体、按 AST 认列表 / 元组。`preset_acnr_migration._FALLBACK_KNOWN_FUNCS`（内核注册表的手抄副本，内核导入失败时兜底）
+  漏同步 `TB_AUX / LEDGER / COUNT_LEDGER / LEDGER_DETAIL / PLACEHOLDER`（unified-formula-registry 登记进内核时没跟上），补齐。
+- **变异**：MR66a~MR66j（调试上下文不取数 / 调整额口径不分作用域两向 / 缺口不进 warnings / 加回 `enable_prev` / 表间审核不严格取数 /
+  `except Exception` 又算受保护 / 兜底函数集漏同步 / 报表路径 PREV 改成真取数 / ADJ 加进置 0 列表）、MG1~MG10（守卫各环节失效）、
+  MS1~MS5（快照与三处归档证据改回写仓库）全部打红在预期断言上，跑完逐字节恢复。
+- **范围外（登记，未改）**：
+  1. `routers/wp_prefill_preview.py` 的「预览」端点注释写「不写入」，实际调用会写底稿的 `prefill_workpaper_real`（预览即应用）；
+     年度兜底 2025 已进 `audit-year-calendar-fallback-ratchet` 的基线。
+  2. `formula_grammar.FORMULA_FUNCTION_NAMES` 无引用方，内容停在 14 个函数（不含 ADJ / 序时账 / TB_AUX）。
+  3. 守卫不覆盖子进程：用 `subprocess` 跑生成器 `--write` 的测试仍可能改写已跟踪文件（本轮扫描未见）。

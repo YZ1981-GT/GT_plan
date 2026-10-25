@@ -62,6 +62,7 @@ from app.services.wp_visibility.wp_bound_gate import (
     resolve_wp_binding_and_access,
 )
 from app.services.wp_visibility.workpaper_list_query import WorkpaperListQueryService
+from tests._test_artifacts import artifact_dir
 
 from ._factories import (
     IS_PG,
@@ -120,14 +121,10 @@ TARGET_ERROR_ALLOW = 0
 RATE_WINDOW_S = 1.0
 THRESHOLD_HEADROOM = 2.0
 
-# 证据 artifact 目录（spec 内相对；本文件写 spec-relative 供 manifest 引用）
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_ARTIFACT_DIR = (
-    _REPO_ROOT
-    / ".kiro" / "specs" / "_archive" / "06-engineering-governance"
-    / "procedure-delegation-visibility-isolation"
-    / "evidence" / "artifacts" / "task17"
-)
+# 证据 artifact 落点：tests/_test_artifacts.artifact_dir()。🔴 不写回归档 evidence —— 容量报告 /
+# 冻结 profile / 验收结果每跑一次计时都不同，而归档 manifest 钉了这些文件的 sha256
+# （formula-fetch-followup-defect-closure 6.6）。
+_ARTIFACT_DIR = artifact_dir("procedure-delegation-visibility-isolation", "task17")
 
 # 跨测试累积结果（zzz 写 artifact 时读取）
 _RESULTS: dict = {}

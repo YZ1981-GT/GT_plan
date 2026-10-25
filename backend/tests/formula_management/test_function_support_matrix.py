@@ -121,17 +121,33 @@ def test_unknown_function_fail_closed():
 
 
 def test_report_path_source_still_zeros_prev_aux():
-    """锚点守卫：report_engine 源码仍把 PREV/AUX 硬替换成 "0"。
+    """锚点守卫：报表路径（``report_engine.evaluate_formula_result``）仍把 PREV/AUX 求值为 0。
 
-    若该替换被移除（PREV/AUX 在 report 路径真支持了），矩阵须同步改 report_path=True；
-    此断言打红即提示矩阵与源码漂移（memory 铁律：坐标漂移不报错、只静默打错位置）。
+    若 PREV/AUX 在 report 路径真取数了，矩阵须同步改 report_path=True；
+    此断言打红即提示矩阵与实现漂移（memory 铁律：坐标漂移不报错、只静默打错位置）。
+
+    原以注释「报表域默认置 0」为锚点：formula-fetch-followup-defect-closure 6.6 删掉 ``enable_prev`` /
+    ``enable_aux`` 两个半成品开关、改写注释后锚点失效（取数并没变）。改为按行为判定 —— 注释怎么写都不影响，
+    真改了取数才红。
     """
+    import asyncio
+    from decimal import Decimal
+
     import app.services.report_engine as re_mod
 
     src = Path(re_mod.__file__).read_text(encoding="utf-8")
     assert "_PREV_PATTERN" in src and "_AUX_PATTERN" in src, "report_engine 不再引用 PREV/AUX 正则"
-    # 报表域置 0 的注释锚点
-    assert "报表域默认置 0" in src, "report_engine PREV/AUX 置 0 逻辑可能已变 —— 矩阵须复核"
+
+    class _Resolver:  # 试算表取数恒 100：PREV/AUX 若改成真取数，结果就不再是 1
+        async def resolve_tb(self, *_args):
+            return Decimal("100")
+
+        async def resolve_sum(self, *_args):
+            return Decimal("100")
+
+    for ref in ("PREV('1001','期末余额')", "AUX('1122','客户','期末余额')"):
+        result = asyncio.run(re_mod.evaluate_formula_result(f"{ref} + 1", resolver=_Resolver()))
+        assert result.value == Decimal("1"), f"report 路径对 {ref} 不再置 0（得 {result.value}）—— 矩阵须复核"
 
 
 def test_wp_evaluator_support_is_backed_by_wiring():

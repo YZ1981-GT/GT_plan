@@ -448,13 +448,24 @@ def test_adj_not_in_report_engine_zero_substitution_list():
     ADJ 走 `ctx.adj_data`（由 L2 经 `adj_net_batch` 填充），
     若被加进置 0 列表则报表域调整额恒 0，且**不报错**、无 trace 线索。
     """
+    import ast
+    import textwrap
+
     from app.services import report_engine as _re_mod
 
-    src = inspect.getsource(_re_mod.evaluate_formula)
-    # 定位置 0 的那段：形如 `for pattern in [_NOTE_PATTERN, _WP_PATTERN, _AUX_PATTERN]:`
-    zero_block = re.search(r"for pattern in \[([^\]]+)\]", src)
-    assert zero_block, "未找到 report_engine 的置 0 pattern 列表（结构变了，需复核本守卫）"
-    listed = zero_block.group(1)
+    # 求值主体在 evaluate_formula_result（evaluate_formula 只是返回 Decimal 的兼容入口；原先查兼容入口的源码，
+    # 拆分后恒找不到列表 —— formula-fetch-followup-defect-closure 6.6 改为查主体、按 AST 认列表 / 元组两种写法）
+    src = inspect.getsource(_re_mod.evaluate_formula_result)
+    zero_loops: list[list[str]] = []
+    for node in ast.walk(ast.parse(textwrap.dedent(src))):
+        if not (isinstance(node, ast.For) and isinstance(node.iter, (ast.List, ast.Tuple))):
+            continue
+        names = [e.id for e in node.iter.elts if isinstance(e, ast.Name)]
+        body = ast.unparse(node)
+        if names and all(n.endswith("_PATTERN") for n in names) and ".replace(" in body and "'0'" in body:
+            zero_loops.append(names)
+    assert zero_loops, "未找到 report_engine 的置 0 pattern 列表（结构变了，需复核本守卫）"
+    listed = [name for loop in zero_loops for name in loop]
     assert "_ADJ_PATTERN" not in listed and "ADJ_PATTERN" not in listed, (
         f"ADJ 被加进了 report_engine 的置 0 列表 ⇒ 报表域调整额会恒 0：{listed}"
     )
@@ -532,8 +543,8 @@ def test_fallback_known_funcs_matches_registry():
 def test_adj_is_not_in_pending_allowlist():
     """ADJ 已注册 ⇒ 不得留在「无 ACNR 等价、待迁移」白名单里。
 
-    留着会让 `test_p22_pending_allowlist_functions_are_pending` 与实际状态矛盾
-    （`normalize_ref` 按 `_known_acnr_funcs()` = `_REGISTRY` 判，已返 migrated）。
+    `normalize_ref` 按 `_known_acnr_funcs()`（内核注册表扣除白名单）判：留着会把有 grammar_v1 等价的
+    ADJ 预设判成待迁移（`test_adj_normalizes_to_migrated` 同时打红）。
     """
     from app.services.formula_management.preset_acnr_migration import (
         PENDING_FUNCTION_ALLOWLIST,
