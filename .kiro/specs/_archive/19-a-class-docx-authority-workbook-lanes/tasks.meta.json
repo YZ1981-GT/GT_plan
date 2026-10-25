@@ -1,0 +1,45 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "12. 归档欠账登记（5 份 / 6 条）": [
+      {
+        "executionId": "12dd29f0-32c9-4e19-b04d-a4d36fab38d4",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791088531695
+      }
+    ],
+    "6. `a115` 934 行巨表性能路径": [
+      {
+        "executionId": "12dd29f0-32c9-4e19-b04d-a4d36fab38d4",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791088552608
+      }
+    ],
+    "7. 占位符与册名脏形态守卫（记录型，不改模板）": [
+      {
+        "executionId": "12dd29f0-32c9-4e19-b04d-a4d36fab38d4",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791088560138
+      }
+    ],
+    "10. mode 载体收敛（15 条形态 1 → 形态 2）": [
+      {
+        "executionId": "12dd29f0-32c9-4e19-b04d-a4d36fab38d4",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791088567155
+      }
+    ],
+    "13. 交付前自检": [
+      {
+        "executionId": "12dd29f0-32c9-4e19-b04d-a4d36fab38d4",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791088577773
+      },
+      {
+        "executionId": "12dd29f0-32c9-4e19-b04d-a4d36fab38d4",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791088807228
+      }
+    ]
+  }
+}

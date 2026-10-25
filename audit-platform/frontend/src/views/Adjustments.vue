@@ -385,12 +385,22 @@
         />
       </template>
       <template #extra-columns>
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="操作" width="320" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="openEditDialog(row)"
               :disabled="!canEdit || row.origin === 'workpaper' || row.review_status === ADJUSTMENT_STATUS.APPROVED || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW"
               :title="!canEdit ? '项目已归档，无法编辑' : (row.origin === 'workpaper' ? '该分录来源于底稿，请在来源底稿中修改后重新同步（此处编辑会在下次同步时被覆盖）' : '')">
               编辑
+            </el-button>
+            <!-- chain-closure-phase3: 复核通过（草稿/待复核可操作） -->
+            <el-button v-if="canReview && (row.review_status === ADJUSTMENT_STATUS.DRAFT || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW)"
+              size="small" type="success" plain @click="singleReview(row, 'approved')">
+              通过
+            </el-button>
+            <!-- chain-closure-phase3: 撤回复核（仅已通过可操作） -->
+            <el-button v-if="canReview && row.review_status === ADJUSTMENT_STATUS.APPROVED"
+              size="small" type="info" plain @click="singleRevoke(row)">
+              撤回
             </el-button>
             <el-button size="small" type="primary" plain @click="openCollabDialog(row)"
               title="转派给项目成员补充明细并确认（多人协作）">
@@ -432,11 +442,12 @@
       />
     </div>
 
-    <!-- 批量复核操作 -->
-    <div class="gt-adj-batch-actions" v-if="selectedRows.length > 0">
+    <!-- 批量复核操作（chain-closure-phase3: 按 adjustment:review 权限显示） -->
+    <div class="gt-adj-batch-actions" v-if="selectedRows.length > 0 && canReview">
       <span>已选 {{ selectedRows.length }} 条</span>
       <el-button type="success" size="small" @click="batchReview('approved')">批量批准</el-button>
       <el-button type="warning" size="small" @click="showRejectDialog = true">批量驳回</el-button>
+      <el-button type="info" size="small" @click="showRevokeDialog = true">撤回复核</el-button>
     </div>
 
     <!-- 批量模式浮动提交栏 -->
@@ -504,6 +515,18 @@
 
     <!-- 新建/编辑分录弹窗 -->
     <el-dialog append-to-body v-model="formDialogVisible" :title="isEditing ? '编辑分录' : '新建分录'" width="800px" destroy-on-close>
+
+    <!-- 撤回复核弹窗（chain-closure-phase3 需求 3.1） -->
+    <el-dialog append-to-body v-model="showRevokeDialog" title="撤回复核" width="520px">
+      <p style="margin-bottom: 12px; color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm)">
+        撤回复核后，分录将回到草稿状态，下游试算表、报表与附注将随之回退。
+      </p>
+      <el-input v-model="revokeReason" type="textarea" :rows="3" placeholder="撤回原因（可选）" />
+      <template #footer>
+        <el-button @click="showRevokeDialog = false">取消</el-button>
+        <el-button type="primary" @click="onBatchRevoke">确认撤回</el-button>
+      </template>
+    </el-dialog>
       <el-form ref="adjFormRef" :model="form" :rules="adjFormRules" label-width="90px">
         <el-form-item label="类型" prop="adjustment_type" v-if="!isEditing">
           <el-radio-group v-model="form.adjustment_type">
@@ -663,7 +686,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowDown, Reading } from '@element-plus/icons-vue'
@@ -671,7 +694,7 @@ import AdjustmentsHandbookDialog from '@/views/adjustments/AdjustmentsHandbookDi
 import { confirmDelete, confirmConvert, confirmDangerous } from '@/utils/confirm'
 import {
   listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment,
-  reviewAdjustment, getAdjustmentSummary, getAccountDropdown, getProjectAuditYear,
+  reviewAdjustment, revokeAdjustmentReview, getAdjustmentSummary, getAccountDropdown, getProjectAuditYear,
   batchCommitAdjustments,
   convertAjeToMisstatement,
   getCollaborationInbox,
@@ -689,6 +712,7 @@ import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import { operationHistory } from '@/utils/operationHistory'
 import { useAutoSave } from '@/composables/useAutoSave'
+import { useProjectRole } from '@/composables/useProjectRole'
 import { usePasteImport } from '@/composables/usePasteImport'
 import { parseApiError } from '@/composables/useApiError'
 import { useEditMode } from '@/composables/useEditMode'
@@ -709,6 +733,8 @@ import { useImpactPreview } from '@/composables/useImpactPreview'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useStaleRefresh } from '@/composables/useStaleRefresh'
+import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
+import { eventBus } from '@/utils/eventBus'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
 import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
 import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
@@ -727,6 +753,10 @@ const router = useRouter()
 const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
 const { canEdit, onContextChange } = useAuditContext()
 const { isEditing: isPageEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
+
+// chain-closure-phase3: 复核权限门控
+const { projectCan } = useProjectRole(computed(() => projectId.value || ''))
+const canReview = computed(() => projectCan('adjustment:review'))
 
 /** GtEditableTable 列配置 (P2-8: 摘要列 show-overflow-tooltip; P2-13: 科目下拉带余额) */
 const adjColumns: GtColumn[] = [
@@ -767,6 +797,24 @@ const adjStaleRefresh = useStaleRefresh(projectId, {
   mode: 'auto',
   onRefresh: () => { fetchEntries(); fetchSummary(); refreshCollabInbox() },
 })
+
+// ─── SSE → mitt 桥接：broadcast_raw 事件经 SSE 到达，转发到 mitt 供 useStaleRefresh 消费 ──
+const _sseSubs: ProjectEventSubscription[] = []
+const SSE_BRIDGE_EVENTS = ['adjustment:review-changed', 'adjustment:sync-arrived'] as const
+function _setupSseBridge(pid: string) {
+  _teardownSseBridge()
+  if (!pid) return
+  for (const evt of SSE_BRIDGE_EVENTS) {
+    _sseSubs.push(subscribeProjectEvent(pid, evt, (data) => {
+      eventBus.emit(evt as any, { ...(data as Record<string, unknown> || {}), projectId: pid })
+    }))
+  }
+}
+function _teardownSseBridge() {
+  for (const s of _sseSubs.splice(0)) s.close()
+}
+watch(projectId, (pid) => _setupSseBridge(pid || ''), { immediate: true })
+onBeforeUnmount(_teardownSseBridge)
 
 // 跨模块冲突调解（spec global-refinement-v3 Task 7.5）
 const conflictPanelVisible = ref(false)
@@ -981,6 +1029,9 @@ const rejectMode = ref<'unified' | 'individual'>('unified')
 const individualReasons = ref<Record<string, string>>({})
 const accountOptions = ref<AccountOption[]>([])
 
+// chain-closure-phase3: 撤回复核弹窗状态
+const showRevokeDialog = ref(false)
+const revokeReason = ref('')
 // ─── 协作接力对话框（adjustment-collaboration-and-propagation） ───────────────
 const collabDialogVisible = ref(false)
 const collabRow = ref<any>(null)
@@ -1420,10 +1471,14 @@ async function onConvertToMisstatement(row: any) {
 }
 
 async function batchReview(status: string) {
-  const eligible = selectedRows.value.filter(r => r.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW)
+  // chain-closure-phase3: 复核通过/驳回可作用于草稿与待复核（需求 3.4）
+  const eligible = selectedRows.value.filter(r =>
+    r.review_status === ADJUSTMENT_STATUS.DRAFT
+    || r.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW
+  )
   const skipped = selectedRows.value.length - eligible.length
   if (skipped > 0) {
-    ElMessage.warning(`已跳过 ${skipped} 条非待复核状态的分录`)
+    ElMessage.warning(`已跳过 ${skipped} 条不可操作的分录（仅草稿与待复核可批准/驳回）`)
   }
   const rows = eligible
   if (!rows.length) {
@@ -1451,6 +1506,47 @@ async function batchReview(status: string) {
   individualReasons.value = {}
   rejectMode.value = 'unified'
   selectedRows.value = []
+  fetchEntries()
+  fetchSummary()
+}
+
+/** chain-closure-phase3: 撤回复核（approved→draft，需求 3.1） */
+async function onBatchRevoke() {
+  const eligible = selectedRows.value.filter(r => r.review_status === ADJUSTMENT_STATUS.APPROVED)
+  const skipped = selectedRows.value.length - eligible.length
+  if (skipped > 0) {
+    ElMessage.warning(`已跳过 ${skipped} 条非已通过状态的分录（仅已通过可撤回）`)
+  }
+  if (!eligible.length) {
+    ElMessage.warning('没有可撤回的分录')
+    showRevokeDialog.value = false
+    return
+  }
+  for (const row of eligible) {
+    await revokeAdjustmentReview(projectId.value, row.entry_group_id, {
+      reason: revokeReason.value || undefined,
+    })
+  }
+  ElMessage.success(`已撤回 ${eligible.length} 条分录的复核`)
+  showRevokeDialog.value = false
+  revokeReason.value = ''
+  selectedRows.value = []
+  fetchEntries()
+  fetchSummary()
+}
+
+/** chain-closure-phase3: 单条复核通过/驳回 */
+async function singleReview(row: any, status: 'approved' | 'rejected') {
+  await reviewAdjustment(projectId.value, row.entry_group_id, { status })
+  ElMessage.success(status === 'approved' ? '已通过' : '已驳回')
+  fetchEntries()
+  fetchSummary()
+}
+
+/** chain-closure-phase3: 单条撤回复核 */
+async function singleRevoke(row: any) {
+  await revokeAdjustmentReview(projectId.value, row.entry_group_id, {})
+  ElMessage.success('已撤回复核')
   fetchEntries()
   fetchSummary()
 }

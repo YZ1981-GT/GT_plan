@@ -1,0 +1,636 @@
+{
+  "contract_id": "a51.cashflow_audit",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name"
+  ],
+  "instrumentation_definition_sha256": "df0f31e6cad20ec6ad9517ff87f7d556bd5a989e80c4dfd35f8a3115b55d389c",
+  "note": "A5-1 现金流量表审计——扁平键值对型契约（非行表型）。5 张受管 sheet 全固定行、0 个动态行表 ⇒ 受管区走 workbook-scope definedName 锚点（region_kind=static），不建 Excel Table / UUID 列（归档 spec workpaper-sync-static-cell-sheet-writeback 的 DEC-3）。审定表公式列 G 和勾稽核对公式列 B 标为 protected，回写不覆盖。A 类底稿无 TB 发布门（AC-3 空分母裁定）。",
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "A5-1-1列示于现金流量表的现金及现金等价物",
+      "locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_A511"
+      },
+      "region_boundary_locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_A511",
+        "range": "$D$8:$H$15",
+        "region_kind": "static"
+      },
+      "sheet_key": "a511-audit",
+      "tables": [
+        {
+          "anchor": "A7",
+          "fields": [
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 8,
+                "static_row": 8
+              },
+              "column_key": "row1_unadjusted",
+              "json_pointer": "/a51-audit-1.unadjusted",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!D8",
+              "stable_field_key": "a51-audit-1.unadjusted",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 8,
+                "static_row": 8
+              },
+              "column_key": "row1_adjustment",
+              "json_pointer": "/a51-audit-1.adjustment",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!E8",
+              "stable_field_key": "a51-audit-1.adjustment",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 8,
+                "static_row": 8
+              },
+              "column_key": "row1_explanation",
+              "json_pointer": "/a51-audit-1.explanation",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!F8",
+              "stable_field_key": "a51-audit-1.explanation",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 8,
+                "static_row": 8
+              },
+              "column_key": "row1_remark",
+              "json_pointer": "/a51-audit-1.remark",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!H8",
+              "stable_field_key": "a51-audit-1.remark",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 9,
+                "static_row": 9
+              },
+              "column_key": "row2_unadjusted",
+              "json_pointer": "/a51-audit-2.unadjusted",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!D9",
+              "stable_field_key": "a51-audit-2.unadjusted",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 9,
+                "static_row": 9
+              },
+              "column_key": "row2_adjustment",
+              "json_pointer": "/a51-audit-2.adjustment",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!E9",
+              "stable_field_key": "a51-audit-2.adjustment",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 9,
+                "static_row": 9
+              },
+              "column_key": "row2_explanation",
+              "json_pointer": "/a51-audit-2.explanation",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!F9",
+              "stable_field_key": "a51-audit-2.explanation",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 9,
+                "static_row": 9
+              },
+              "column_key": "row2_remark",
+              "json_pointer": "/a51-audit-2.remark",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!H9",
+              "stable_field_key": "a51-audit-2.remark",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 10,
+                "static_row": 10
+              },
+              "column_key": "row3_unadjusted",
+              "json_pointer": "/a51-audit-3.unadjusted",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!D10",
+              "stable_field_key": "a51-audit-3.unadjusted",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 10,
+                "static_row": 10
+              },
+              "column_key": "row3_adjustment",
+              "json_pointer": "/a51-audit-3.adjustment",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!E10",
+              "stable_field_key": "a51-audit-3.adjustment",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 10,
+                "static_row": 10
+              },
+              "column_key": "row3_explanation",
+              "json_pointer": "/a51-audit-3.explanation",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!F10",
+              "stable_field_key": "a51-audit-3.explanation",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 10,
+                "static_row": 10
+              },
+              "column_key": "row3_remark",
+              "json_pointer": "/a51-audit-3.remark",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!H10",
+              "stable_field_key": "a51-audit-3.remark",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 11,
+                "static_row": 11
+              },
+              "column_key": "row4_unadjusted",
+              "json_pointer": "/a51-audit-4.unadjusted",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!D11",
+              "stable_field_key": "a51-audit-4.unadjusted",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 11,
+                "static_row": 11
+              },
+              "column_key": "row4_adjustment",
+              "json_pointer": "/a51-audit-4.adjustment",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!E11",
+              "stable_field_key": "a51-audit-4.adjustment",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 11,
+                "static_row": 11
+              },
+              "column_key": "row4_explanation",
+              "json_pointer": "/a51-audit-4.explanation",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!F11",
+              "stable_field_key": "a51-audit-4.explanation",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 11,
+                "static_row": 11
+              },
+              "column_key": "row4_remark",
+              "json_pointer": "/a51-audit-4.remark",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!H11",
+              "stable_field_key": "a51-audit-4.remark",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 12,
+                "static_row": 12
+              },
+              "column_key": "row5_unadjusted",
+              "json_pointer": "/a51-audit-5.unadjusted",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!D12",
+              "stable_field_key": "a51-audit-5.unadjusted",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 12,
+                "static_row": 12
+              },
+              "column_key": "row5_adjustment",
+              "json_pointer": "/a51-audit-5.adjustment",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!E12",
+              "stable_field_key": "a51-audit-5.adjustment",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 12,
+                "static_row": 12
+              },
+              "column_key": "row5_explanation",
+              "json_pointer": "/a51-audit-5.explanation",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!F12",
+              "stable_field_key": "a51-audit-5.explanation",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 12,
+                "static_row": 12
+              },
+              "column_key": "row5_remark",
+              "json_pointer": "/a51-audit-5.remark",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!H12",
+              "stable_field_key": "a51-audit-5.remark",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 14,
+                "static_row": 14
+              },
+              "column_key": "row7_unadjusted",
+              "json_pointer": "/a51-audit-7.unadjusted",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!D14",
+              "stable_field_key": "a51-audit-7.unadjusted",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 14,
+                "static_row": 14
+              },
+              "column_key": "row7_adjustment",
+              "json_pointer": "/a51-audit-7.adjustment",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!E14",
+              "stable_field_key": "a51-audit-7.adjustment",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 14,
+                "static_row": 14
+              },
+              "column_key": "row7_explanation",
+              "json_pointer": "/a51-audit-7.explanation",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!F14",
+              "stable_field_key": "a51-audit-7.explanation",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 14,
+                "static_row": 14
+              },
+              "column_key": "row7_remark",
+              "json_pointer": "/a51-audit-7.remark",
+              "mode": "editable",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!H14",
+              "stable_field_key": "a51-audit-7.remark",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 8,
+                "static_row": 8
+              },
+              "column_key": "audit_formula_g8",
+              "json_pointer": "/a51-audit-formula-g8",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!G8",
+              "stable_field_key": "a51-audit-formula-g8",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 9,
+                "static_row": 9
+              },
+              "column_key": "audit_formula_g9",
+              "json_pointer": "/a51-audit-formula-g9",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!G9",
+              "stable_field_key": "a51-audit-formula-g9",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 10,
+                "static_row": 10
+              },
+              "column_key": "audit_formula_g10",
+              "json_pointer": "/a51-audit-formula-g10",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!G10",
+              "stable_field_key": "a51-audit-formula-g10",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 11,
+                "static_row": 11
+              },
+              "column_key": "audit_formula_g11",
+              "json_pointer": "/a51-audit-formula-g11",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!G11",
+              "stable_field_key": "a51-audit-formula-g11",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 12,
+                "static_row": 12
+              },
+              "column_key": "audit_formula_g12",
+              "json_pointer": "/a51-audit-formula-g12",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!G12",
+              "stable_field_key": "a51-audit-formula-g12",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 13,
+                "static_row": 13
+              },
+              "column_key": "audit_formula_g13",
+              "json_pointer": "/a51-audit-formula-g13",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!G13",
+              "stable_field_key": "a51-audit-formula-g13",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 14,
+                "static_row": 14
+              },
+              "column_key": "audit_formula_g14",
+              "json_pointer": "/a51-audit-formula-g14",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!G14",
+              "stable_field_key": "a51-audit-formula-g14",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 15,
+                "static_row": 15
+              },
+              "column_key": "audit_formula_g15",
+              "json_pointer": "/a51-audit-formula-g15",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-1列示于现金流量表的现金及现金等价物!G15",
+              "stable_field_key": "a51-audit-formula-g15",
+              "value_type": "amount"
+            }
+          ],
+          "formula_mask": [
+            "G8",
+            "G9",
+            "G10",
+            "G11",
+            "G12",
+            "G13",
+            "G14",
+            "G15"
+          ],
+          "has_dynamic_rows": false,
+          "header_rows": 1,
+          "table_key": "a51_audit_table"
+        }
+      ],
+      "template_id": "A511"
+    },
+    {
+      "excel_name": "A5-1-3相关报表勾稽关系核对",
+      "locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_A513"
+      },
+      "region_boundary_locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_A513",
+        "range": "$B$18:$B$56",
+        "region_kind": "static"
+      },
+      "sheet_key": "a513-reconcile",
+      "tables": [
+        {
+          "anchor": "A6",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 18,
+                "static_row": 18
+              },
+              "column_key": "reconcile_formula_b18",
+              "json_pointer": "/a51-reconcile-formula-b18",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-3相关报表勾稽关系核对!B18",
+              "stable_field_key": "a51-reconcile-formula-b18",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 20,
+                "static_row": 20
+              },
+              "column_key": "reconcile_formula_b20",
+              "json_pointer": "/a51-reconcile-formula-b20",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-3相关报表勾稽关系核对!B20",
+              "stable_field_key": "a51-reconcile-formula-b20",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 34,
+                "static_row": 34
+              },
+              "column_key": "reconcile_formula_b34",
+              "json_pointer": "/a51-reconcile-formula-b34",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-3相关报表勾稽关系核对!B34",
+              "stable_field_key": "a51-reconcile-formula-b34",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 36,
+                "static_row": 36
+              },
+              "column_key": "reconcile_formula_b36",
+              "json_pointer": "/a51-reconcile-formula-b36",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-3相关报表勾稽关系核对!B36",
+              "stable_field_key": "a51-reconcile-formula-b36",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 50,
+                "static_row": 50
+              },
+              "column_key": "reconcile_formula_b50",
+              "json_pointer": "/a51-reconcile-formula-b50",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-3相关报表勾稽关系核对!B50",
+              "stable_field_key": "a51-reconcile-formula-b50",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 52,
+                "static_row": 52
+              },
+              "column_key": "reconcile_formula_b52",
+              "json_pointer": "/a51-reconcile-formula-b52",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-3相关报表勾稽关系核对!B52",
+              "stable_field_key": "a51-reconcile-formula-b52",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 56,
+                "static_row": 56
+              },
+              "column_key": "reconcile_formula_b56",
+              "json_pointer": "/a51-reconcile-formula-b56",
+              "mode": "formula",
+              "row_scoped": false,
+              "source_ref": "A5-1-3相关报表勾稽关系核对!B56",
+              "stable_field_key": "a51-reconcile-formula-b56",
+              "value_type": "amount"
+            }
+          ],
+          "formula_mask": [
+            "B18",
+            "B20",
+            "B34",
+            "B36",
+            "B50",
+            "B52",
+            "B56"
+          ],
+          "has_dynamic_rows": false,
+          "header_rows": 1,
+          "table_key": "a51_reconcile_table"
+        }
+      ],
+      "template_id": "A513"
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "d28ada7fc7a848e55a70d0b342a698045241b81d3397e9924a1a7d6f16744fa4",
+    "relative_path": "A/A5-1 现金流量表审计.xlsx",
+    "template_sha256": "9999f5b6511c5230e52732c10bf2eef86ee1238b9e0678e498ed2fffda9f503d"
+  },
+  "template_definition_sha256": "834e4e4d135bb32f25de992958c0020ef9a2835f0e40ab07293e1eb011677af8"
+}

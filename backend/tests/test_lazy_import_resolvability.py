@@ -17,7 +17,10 @@ from __future__ import annotations
 
 import ast
 import importlib
+import subprocess
 from pathlib import Path
+
+import pytest
 
 _BACKEND = Path(__file__).resolve().parents[1]
 _APP = _BACKEND / "app"
@@ -34,19 +37,10 @@ _APP = _BACKEND / "app"
 # 🔴 一旦某个 flag 翻成 True 而目标模块仍不存在 → 它会从这里"掉进"分类二并打红，
 #    这正是我们要的行为（守卫 test_flag_gated_entries_are_really_gated 钉死）。
 _FLAG_GATED_PLACEHOLDERS: frozenset[tuple[str, str, str]] = frozenset({
-    ("app/services/workpaper_sync/phase5_f3_notes_payable.py", "app.services.workpaper_sync", "phase5_f3_01_adjudication"),
-    ("app/services/workpaper_sync/phase5_f3_notes_payable.py", "app.services.workpaper_sync", "phase5_f3_02_detail"),
-    ("app/services/workpaper_sync/phase5_f3_notes_payable.py", "app.services.workpaper_sync", "phase5_f3_04_interest"),
-    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_01_adjudication"),
-    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_02_detail"),
-    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_05_long_outstanding"),
-    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_07_unrecorded"),
-    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_08_voucher_check"),
-    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_09_supplier_financing"),
-    ("app/services/workpaper_sync/phase5_f5_cost_of_sales.py", "app.services.workpaper_sync", "phase5_f5_02_monthly_detail"),
-    ("app/services/workpaper_sync/phase5_f5_cost_of_sales.py", "app.services.workpaper_sync", "phase5_f5_03_other_cost"),
-    ("app/services/workpaper_sync/phase5_f5_cost_of_sales.py", "app.services.workpaper_sync", "phase5_f5_05_comparison"),
-    ("app/services/workpaper_sync/phase5_f5_cost_of_sales.py", "app.services.workpaper_sync", "phase5_f5_07_cost_rollforward"),
+    # ── F 循环：flag 仍 False 且模块不存在的条目（2026-10-07 现算精简）────
+    # 🔴 f3_01_adjudication / f3_04_interest / f4_01_adjudication / f4_09_supplier_financing
+    #    flag 已翻 True 但模块仍不存在 ⇒ 移入 _KNOWN_UNRESOLVED_BASELINE。
+    # 🔴 其余 9 条 flag 已翻 True 且模块已存在 ⇒ 直接删除（非 zombie）。
 })
 
 # ---------------------------------------------------------------------------
@@ -62,9 +56,7 @@ _FLAG_GATED_PLACEHOLDERS: frozenset[tuple[str, str, str]] = frozenset({
 #   权威确认，该表走裸 SQL）⇒ 需新建模型或改裸 SQL
 # - TbAccount / TbAdjustment：全仓无定义，同模块无相近名
 # - save_formula_batch / populate_parsed_data：同上
-# - static_sheet_payload_for_adjudication ×3：**flag=True 会真执行**，
-#   `phase5_adjudication_sheet` 只导出 4 个类 + col_index，无此函数。
-#   属正在进行的 workpaper-sync-* spec 工作区，交该 spec 处置。
+# - static_sheet_payload_for_adjudication ×3：✅ 已实现（2026-10-07），已从基线删除。
 _KNOWN_UNRESOLVED_BASELINE: frozenset[tuple[str, str, str]] = frozenset({
     ("app/routers/adjustments.py", "app.models.audit_platform_models", "ChecklistResponse"),
     ("app/routers/import_templates.py", "app.services.cell_formula_evaluator", "save_formula_batch"),
@@ -73,14 +65,64 @@ _KNOWN_UNRESOLVED_BASELINE: frozenset[tuple[str, str, str]] = frozenset({
     ("app/services/contract_analysis_service.py", "app.models.audit_platform_models", "TbAdjustment"),
     ("app/services/m8_general_risk_reserve_service.py", "app.models.audit_platform_models", "ChecklistResponse"),
     ("app/services/s_estimate_import_export_service.py", "app.models.audit_platform_models", "ChecklistResponse"),
-    # flag=True，会真执行 —— 属 workpaper-sync-* spec 工作区
-    ("app/services/workpaper_sync/phase5_d5_expansion.py", "app.services.workpaper_sync.phase5_adjudication_sheet", "static_sheet_payload_for_adjudication"),
-    ("app/services/workpaper_sync/phase5_d6_expansion.py", "app.services.workpaper_sync.phase5_adjudication_sheet", "static_sheet_payload_for_adjudication"),
-    ("app/services/workpaper_sync/phase5_d7_expansion.py", "app.services.workpaper_sync.phase5_adjudication_sheet", "static_sheet_payload_for_adjudication"),
+    # ── F 循环：flag=True 但模块不存在（从 _FLAG_GATED_PLACEHOLDERS 移入，2026-10-07）
+    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_01_adjudication"),
+    ("app/services/workpaper_sync/phase5_f4_accounts_payable.py", "app.services.workpaper_sync", "phase5_f4_09_supplier_financing"),
 })
 
-# 守卫允许的全集 = 未实现占位 ∪ 待修工单
-_ALLOWED_UNRESOLVED = _FLAG_GATED_PLACEHOLDERS | _KNOWN_UNRESOLVED_BASELINE
+# ---------------------------------------------------------------------------
+# 分类三：**检出相关** —— 工作树上可解析、纯 HEAD 检出上不可解析
+# ---------------------------------------------------------------------------
+# spec: d1-sync-row-table-engine-and-d1-coverage · X5-g（2026-09-28 接 CI 时建立）
+#
+# ═══ 为什么需要第三类 ═══
+#
+# 本守卫此前**从未在 CI 里跑过**（两个 workflow 引用它 0 次），只在开发者工作树上跑。
+# 接进 CI 时在 `git worktree add --detach HEAD` 的干净检出上实测，报「新增 7 处」：
+#
+#   app/routers/tb_sync.py                     : EventPayload / EventType
+#   app/services/independence_signing_service.py: ProjectAssignment
+#   app/services/workpaper_sync/phase5_d3_expansion.py: phase5_d3_04_analysis /
+#       _05_long_term / _06_related_party / _07_voucher_check
+#
+# 这 7 条在工作树上**全部可解析**：前 3 条的符号定义在 `audit_platform_models.py` 的
+# **未提交**改动里；后 4 条的目标子模块文件本身**未入库**（`??` 状态）。
+# 也就是：**import 侧已提交、定义侧没提交** —— 别 lane 的入库节奏问题。
+#
+# ⇒ 它们在两种检出上的表现**恰好相反**：
+#      工作树 → 可解析 ⇒ 若放进 `_ALLOWED_UNRESOLVED` 会被「禁僵尸」判为已修好；
+#      HEAD   → 不可解析 ⇒ 不放进去 CI 就红。
+#    单张清单表达不了，必须单独成类并**豁免僵尸检查**。
+#
+# ═══ 豁免不是永久的（两条反向断言把它钉住）═══
+#
+#   1. `test_checkout_dependent_entries_are_really_unresolved_on_head`
+#      —— 每条在 **HEAD 版**代码里必须**真的**取不到那个 name（按 `git show` 静态判定，
+#         不依赖当前检出）。定义侧一入库，本条立刻要求移除登记。
+#   2. `test_checkout_dependent_sources_are_committed`
+#      —— import 侧文件必须**已提交**。若 import 侧自己都没入库，这条 import 在 HEAD 上
+#         根本不存在，登记毫无意义（纯噪音）。
+#
+# 🔴 与「分类二（待修工单）」的区别是决定性的：分类二在**任何**检出上都是真缺陷
+#    （运行时必抛 ImportError）；分类三只是检出不完整的投影，代码本身没问题。
+#    混在一起会让「修好了没」这个问题失去答案。
+_CHECKOUT_DEPENDENT_UNRESOLVED: frozenset[tuple[str, str, str]] = frozenset({
+    # 归属 lane：tb_sync / 事件契约（符号定义在 audit_platform_models.py 未提交改动里）
+    ("app/routers/tb_sync.py", "app.models.audit_platform_models", "EventPayload"),
+    ("app/routers/tb_sync.py", "app.models.audit_platform_models", "EventType"),
+    # 归属 lane：独立性签字（同上）
+    (
+        "app/services/independence_signing_service.py",
+        "app.models.audit_platform_models",
+        "ProjectAssignment",
+    ),
+    # 🔴 d3 的 4 条已入库（2026-10-07 现算），已删除。
+})
+
+# 守卫允许的全集 = 未实现占位 ∪ 待修工单 ∪ 检出相关
+_ALLOWED_UNRESOLVED = (
+    _FLAG_GATED_PLACEHOLDERS | _KNOWN_UNRESOLVED_BASELINE | _CHECKOUT_DEPENDENT_UNRESOLVED
+)
 
 
 def _guarded_import_linenos(tree: ast.AST) -> set[int]:
@@ -159,6 +201,66 @@ def _collect_function_scoped_app_imports() -> list[tuple[str, int, str, str]]:
     return found
 
 
+def _is_tracked(repo_rel: str) -> bool:
+    """该路径是否已纳入版本控制（仓库根相对路径，posix 分隔）。"""
+    return subprocess.run(
+        ["git", "ls-files", "--error-unmatch", "--", repo_rel],
+        cwd=str(_BACKEND.parent), capture_output=True,
+    ).returncode == 0
+
+
+def _head_bytes(repo_rel: str) -> bytes | None:
+    proc = subprocess.run(
+        ["git", "show", f"HEAD:{repo_rel}"],
+        cwd=str(_BACKEND.parent), capture_output=True,
+    )
+    return None if proc.returncode != 0 else proc.stdout
+
+
+def _resolvable_on_head(mod: str, name: str) -> bool | None:
+    """在 **HEAD 版**代码里 `from {mod} import {name}` 能不能取到。
+
+    静态判定，不 import、不依赖当前检出 —— 这样工作树与 CI 得到同一个结论
+    （分类三的条目在两种检出上表现相反，只有脱离当前检出才能给出稳定判据）。
+
+    Returns:
+        True  取得到；False 取不到；None 无法判定（HEAD 里连 mod 都没有）。
+    """
+    mod_path = mod.replace(".", "/")
+    # ① name 是子模块：`backend/<mod>/<name>.py`
+    if _head_bytes(f"backend/{mod_path}/{name}.py") is not None:
+        return True
+    # ② name 是包：`backend/<mod>/<name>/__init__.py`
+    if _head_bytes(f"backend/{mod_path}/{name}/__init__.py") is not None:
+        return True
+    # ③ name 是符号：在 HEAD 版 `<mod>.py` 或 `<mod>/__init__.py` 的顶层能找到定义/导入
+    for candidate in (f"backend/{mod_path}.py", f"backend/{mod_path}/__init__.py"):
+        raw = _head_bytes(candidate)
+        if raw is None:
+            continue
+        try:
+            tree = ast.parse(raw.decode("utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            return None
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                if node.name == name:
+                    return True
+            elif isinstance(node, ast.Assign):
+                for tgt in node.targets:
+                    if isinstance(tgt, ast.Name) and tgt.id == name:
+                        return True
+            elif isinstance(node, ast.AnnAssign):
+                if isinstance(node.target, ast.Name) and node.target.id == name:
+                    return True
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                for alias in node.names:
+                    if (alias.asname or alias.name.split(".")[0]) == name:
+                        return True
+        return False
+    return None
+
+
 def _scan_unresolved() -> set[tuple[str, str, str]]:
     """扫出全部不可解析项，返回 {(文件, 模块, 导入名)} 去重集合（不含行号）。"""
     entries = _collect_function_scoped_app_imports()
@@ -210,14 +312,74 @@ class TestLazyImportResolvability:
 
         修完一条就必须移除，否则清单会永久掩盖已恢复的健康区域，
         使守卫对该文件重新劣化时不再打红。
+
+        🔴 两处豁免（2026-09-28 接 CI 时补，都配了独立的反向断言，见下文）：
+
+        * `_CHECKOUT_DEPENDENT_UNRESOLVED` —— 它在工作树上**本来就**可解析，
+          按本条判据必然被算成僵尸。它的有效性由
+          `test_checkout_dependent_entries_are_really_unresolved_on_head` 守（按 HEAD
+          版代码静态判定），不由本条守。
+        * **源文件不在当前检出** —— 扫不到的 import 当然不在 `unresolved` 里，但那不叫
+          「修好了」。实测：`phase5_d{5,6,7}_expansion.py` 在纯 HEAD 检出上不存在
+          （`??` 未入库），旧口径于是报 3 条僵尸、要求删掉 3 条**仍然有效**的工单。
+          与 Gate 5 的 `absent_known_gaps`、Gate 6 的 `BASIS_FROM_UNCOMMITTED` 同型。
         """
         unresolved = _scan_unresolved()
-        zombies = sorted(_ALLOWED_UNRESOLVED - unresolved)
+        candidates = _ALLOWED_UNRESOLVED - unresolved - _CHECKOUT_DEPENDENT_UNRESOLVED
+
+        zombies: list[tuple[str, str, str]] = []
+        absent_source: list[tuple[str, str, str]] = []
+        for item in sorted(candidates):
+            if (_BACKEND / item[0]).exists():
+                zombies.append(item)
+            else:
+                absent_source.append(item)
 
         assert not zombies, (
             f"清单中 {len(zombies)} 条已不再是缺陷（已修复或代码已删），"
             "请从 _KNOWN_UNRESOLVED_BASELINE / _FLAG_GATED_PLACEHOLDERS 移除：\n"
             + "\n".join(f"  {f}: from {m} import {n}" for f, m, n in zombies)
+            + (
+                "\n（另有 %d 条源文件不在本检出，已按「不完整检出」豁免，不计入僵尸）"
+                % len(absent_source)
+                if absent_source
+                else ""
+            )
+        )
+
+    def test_checkout_dependent_entries_are_really_unresolved_on_head(self):
+        """分类三的有效前提：每条在 **HEAD 版**代码里真的取不到那个 name。
+
+        🔴 按 `git show HEAD:<path>` 静态判定，**不依赖当前检出** —— 这样工作树与 CI
+        得到同一个结论。定义侧一入库，本条立刻要求移除登记，豁免不会变成永久遮羞布。
+        """
+        if not _CHECKOUT_DEPENDENT_UNRESOLVED:
+            pytest.skip("分类三为空 —— 无需校验")
+        stale: list[tuple[str, str, str, str]] = []
+        for rel_path, mod, name in sorted(_CHECKOUT_DEPENDENT_UNRESOLVED):
+            verdict = _resolvable_on_head(mod, name)
+            if verdict is True:
+                stale.append((rel_path, mod, name, "HEAD 版已能取到"))
+        assert not stale, (
+            f"分类三有 {len(stale)} 条在 HEAD 版代码里已经可解析 —— 定义侧已入库，"
+            "请从 _CHECKOUT_DEPENDENT_UNRESOLVED 移除（棘轮只许变短）：\n"
+            + "\n".join(f"  {f}: from {m} import {n} —— {why}" for f, m, n, why in stale)
+        )
+
+    def test_checkout_dependent_sources_are_committed(self):
+        """分类三的 import 侧文件必须**已提交**。
+
+        若 import 侧自己都没入库，这条 import 在 HEAD 上根本不存在，登记纯噪音。
+        """
+        if not _CHECKOUT_DEPENDENT_UNRESOLVED:
+            pytest.skip("分类三为空 —— 无需校验")
+        uncommitted = [
+            rel for rel, _m, _n in sorted(_CHECKOUT_DEPENDENT_UNRESOLVED)
+            if not _is_tracked(f"backend/{rel}")
+        ]
+        assert not uncommitted, (
+            "分类三里这些 import 侧文件未纳入版本控制 ⇒ HEAD 上不存在该 import，"
+            f"登记无意义，请移除：\n" + "\n".join(f"  {r}" for r in sorted(set(uncommitted)))
         )
 
     def test_flag_gated_entries_are_really_gated(self):

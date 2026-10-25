@@ -21,7 +21,7 @@
 import { ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { type DecisionTreeState, createEmptyState } from './useDeviationDecisionTree'
+import { type DecisionTreeState, createEmptyState, evaluateDecisionTree } from './useDeviationDecisionTree'
 import { eventBus } from '@/utils/eventBus'
 import { CYCLE_CONFIG } from '@/components/workpaper/composables/useCControlTest'
 
@@ -297,6 +297,9 @@ export function useCControlTestData(
         else if (k === 2) dev.step2 = val as DecisionTreeState['step2']
         else if (k === 3) dev.step3 = val as DecisionTreeState['step3']
         else if (k === 4) dev.step4 = val as DecisionTreeState['step4']
+        // 🔴 CC-65：step5 是布尔字段，落库时序列化为 'true'/'false' 字符串，读回时还原为 boolean。
+        // 键缺失（旧数据未落 step5）时保持 createEmptyState 的默认 false。
+        else if (k === 5) dev.step5 = val === 'true'
         else if (k === 6) dev.step6 = val as DecisionTreeState['step6']
         continue
       }
@@ -463,6 +466,17 @@ export function useCControlTestData(
       items.push({ item_id: `C${n}-dev-${m}-step2`, conclusion: dev.step2 || null, remark: null })
       items.push({ item_id: `C${n}-dev-${m}-step3`, conclusion: dev.step3 || null, remark: null })
       items.push({ item_id: `C${n}-dev-${m}-step4`, conclusion: dev.step4 || null, remark: null })
+      // 🔴 CC-65 修复：step5 是布尔推导字段（=evaluateDecisionTree.goToA14），
+      // 此前序列化跳过 step5 导致真库只见 5 步，回读时用户「显式否」与「未填」不可区分。
+      // 现显式落库 step5 的推导值（'true'/'false' 字符串），使 6 步全部持久化。
+      // step5 由前序步骤推导，不作为用户可选项，但落库后可区分 undefined（键缺失=旧数据）
+      // 与 false（显式推导为不进 A14）。
+      const step5Derived = evaluateDecisionTree(dev).goToA14
+      items.push({
+        item_id: `C${n}-dev-${m}-step5`,
+        conclusion: step5Derived ? 'true' : 'false',
+        remark: null,
+      })
       items.push({ item_id: `C${n}-dev-${m}-step6`, conclusion: dev.step6 || null, remark: null })
 
       // exceptionDesc (文本字段，存 remark)

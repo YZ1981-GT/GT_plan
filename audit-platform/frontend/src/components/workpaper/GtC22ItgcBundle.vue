@@ -177,6 +177,37 @@ const matrixDisplayRows = computed<MatrixDisplayRow[]>(() =>
 // ─── 页签结构 ───
 const active = ref('matrix')
 
+// ─── 双模式切换（spec c22-itgc-no-switch-and-domain-code-sheet-lane 阶段 2）───
+// BP-10 补开关：采用 {label, value} 分离形态，禁引入中文标签直接作 mode 值。
+// mode 值取 'structured' 与 canary 侧 GtCControlTest 的 'online-edit' 保持一致（CC-41 第四体系）。
+type C22RenderMode = 'structured' | 'online-edit'
+
+const renderMode = ref<C22RenderMode>('structured')
+
+const modeOptions = computed(() => [
+  { label: '结构化视图', value: 'structured' as const },
+  { label: '在线编辑', value: 'online-edit' as const },
+])
+
+/** 模式切换工具栏仅在 C21 / C21-1 独立底稿 tab 上显示（两处 OO 挂点所在位置） */
+const showModeToolbar = computed(() => {
+  const s = activeSection.value
+  return s === 'C21' || s === 'C21-1'
+})
+
+/**
+ * 各 section 的默认 mode —— 🔴 必须保持改造前的默认呈现，禁把开关变成 UX 回归。
+ *
+ * - `C21`：**只有独立册文档**，无结构化视图（改造前进该 tab 直接显示 OO）
+ *   ⇒ 默认 `'online-edit'`；切到 `'structured'` 诚实显示「开发中」占位。
+ * - `C21-1`：**本来就有结构化视图**（`GtC21FindingsSummary` 缺陷联动汇总）+ 独立册文档
+ *   ⇒ 默认 `'structured'`（保持改造前行为），`'online-edit'` 打开 C21-1 册。
+ * - 其余 section 无 OO 挂点，mode 不参与渲染，取 `'structured'` 兜底。
+ */
+function defaultModeForSection(section: SectionKey): C22RenderMode {
+  return section === 'C21' ? 'online-edit' : 'structured'
+}
+
 /** 可见页签：matrix + 子页（itgc-sheet/itgc-aux） + C21/C21-1（wp_id 存在才显示） */
 const visibleTabs = computed<TabDef[]>(() =>
   sheetTabs.value.filter((t) => {
@@ -245,6 +276,8 @@ const activeSection = computed<SectionKey>({
     return tab.group as ItgcGroupKey
   },
   set(section: SectionKey) {
+    // 切换 section 时重置为该 section 的默认 mode（避免 OO 模式残留 + 保持原默认呈现）
+    renderMode.value = defaultModeForSection(section)
     if (section === 'matrix') { active.value = 'matrix'; return }
     if (section === 'C21' || section === 'C21-1') { active.value = section; return }
     // 大类：保持已在组内的 active，否则跳首个子页
@@ -390,6 +423,9 @@ function activateSheet(v: string | null | undefined): void {
   if (!id) return
   if (visibleTabs.value.some((t) => t.id === id)) {
     active.value = id
+    // 🔴 路由/props 直接进入某 tab 时也须设对默认 mode（否则 C21 会停在 structured
+    //    占位符上 —— 与 activeSection setter 走同一函数，两条入口不漂移）。
+    renderMode.value = defaultModeForSection(activeSection.value)
   }
 }
 watch(() => props.sheetName, (v) => activateSheet(v))
@@ -670,8 +706,27 @@ onMounted(async () => {
     </div>
 
     <!-- ═══ C21-1 IT 发现汇总（交互式，缺陷联动汇总，Task 5.1） ═══ -->
+    <!-- BP-10 补开关：C21-1 本来就有结构化视图（缺陷联动汇总）+ 独立册文档 ⇒ 真双模式。
+         🔴 默认 'structured'（保持改造前行为），切 'online-edit' 打开 C21-1 册。 -->
     <div v-else-if="activeSection === 'C21-1'" class="c22-section c22-section--doc">
+      <div v-if="showModeToolbar" class="c22-mode-bar">
+        <el-segmented v-model="renderMode" :options="modeOptions" size="small" />
+      </div>
+
+      <!-- 在线编辑：C21-1 独立册（sheet 名走 ooSheetName，见 CC-63） -->
+      <GtOnlyOfficeSheet
+        v-if="renderMode === 'online-edit' && activeDocTab && subWpId(activeDocTab)"
+        :key="activeDocTab.id"
+        :wp-id="subWpId(activeDocTab)"
+        :project-id="projectIdRef"
+        :sheet-name="activeDocTab.ooSheetName || ''"
+        :readonly="isReadonly"
+        style="height: calc(100vh - 260px)"
+      />
+
+      <!-- 结构化视图：缺陷联动汇总（默认） -->
       <GtC21FindingsSummary
+        v-else
         :wp-id="wpId"
         :project-id="projectIdRef"
         :defects="defects"
@@ -681,16 +736,35 @@ onMounted(async () => {
     </div>
 
     <!-- ═══ C21 独立底稿（IT 专业成员，OnlyOffice；详见 Task 5.2） ═══ -->
+    <!-- BP-10 补开关：C21 **只有独立册文档**、无结构化视图 ⇒ 默认 'online-edit'
+         （保持改造前「进 tab 直接显示文档」的行为），切 'structured' 显示开发中占位。 -->
     <div v-else class="c22-section c22-section--doc">
+      <div v-if="showModeToolbar" class="c22-mode-bar">
+        <el-segmented v-model="renderMode" :options="modeOptions" size="small" />
+      </div>
+
+      <!-- 在线编辑模式（OO 挂点，须被 mode 门控） -->
+      <!-- 🔴 CC-63 修复：传册内真实 sheet 名（ooSheetName），而非 wpCode。
+           C21/C21-1 册内 sheet 名与 wpCode 脱钩（见 useC22BundleState TabDef.ooSheetName 注释）。
+           按原始字面量传入，禁 strip / 归一化。旧数据无 ooSheetName 时兜底为空（由 OO 侧取默认 sheet）。 -->
       <GtOnlyOfficeSheet
-        v-if="activeDocTab && subWpId(activeDocTab)"
+        v-if="renderMode === 'online-edit' && activeDocTab && subWpId(activeDocTab)"
         :key="activeDocTab.id"
         :wp-id="subWpId(activeDocTab)"
         :project-id="projectIdRef"
-        :sheet-name="activeDocTab.wpCode || ''"
+        :sheet-name="activeDocTab.ooSheetName || ''"
         :readonly="isReadonly"
-        style="height: calc(100vh - 220px)"
+        style="height: calc(100vh - 260px)"
       />
+
+      <!-- 结构化视图（C21 无结构化视图，诚实标 developing；非默认模式） -->
+      <template v-else-if="renderMode === 'structured'">
+        <div v-if="activeDocTab && subWpId(activeDocTab)" class="c22-structured-placeholder">
+          <el-empty description="C21 结构化视图开发中，请切换到「在线编辑」查看文档" />
+        </div>
+        <div v-else class="c22-empty-sub">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
+      </template>
+
       <div v-else class="c22-empty-sub">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
     </div>
   </div>
@@ -727,6 +801,22 @@ onMounted(async () => {
 /* section 容器 */
 .c22-section {
   min-height: 200px;
+}
+
+/* 模式切换工具栏（BP-10 补开关） */
+.c22-mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 0;
+}
+
+.c22-structured-placeholder {
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .c22-tab-label {

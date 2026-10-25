@@ -18,7 +18,7 @@ JSONValue = dict | list | str | int | float | bool | None
 class CanonicalFormulaTarget:
     """公式引用/目标的规范身份。"""
 
-    domain: Literal["workpaper", "adjudication", "report", "note"]
+    domain: Literal["workpaper", "adjudication", "report", "note", "consol_worksheet"]
     project_id: UUID
     year: int
     addr_id: str

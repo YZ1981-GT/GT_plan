@@ -19,10 +19,13 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.services.knowledge_index_service import KnowledgeIndexService
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +139,54 @@ class ReferenceDocService:
         return docs
 
     @staticmethod
+    async def search_knowledge_base(
+        project_id: UUID,
+        *,
+        keywords: list[str] | None = None,
+        category: str | None = None,
+        max_docs: int = 3,
+        db: AsyncSession | None = None,
+        user: Any | None = None,
+    ) -> list[dict[str, Any]]:
+        """结构化知识库检索：``[{source_id, document_name, folder_path, content, score, retrieval}]``。
+
+        走检索内核 ``semantic_search(scope=knowledge_doc)``：文档正文词法层始终执行（索引缺席
+        也能检索到刚上传的文档），向量层可用时合并。``user`` 为空 ⇒ project 模式无用户判定
+        （public + 当前项目组，private 永不）。``category`` 只作排序加分，不做硬过滤。
+        无关键词 ⇒ 空查询「列表模式」（按更新时间取最近文档）。
+
+        失败返回 ``[]`` 并记 WARNING —— **不再**降级到无权限过滤的 ILIKE
+        （spec knowledge-base-retrieval-and-authz-closure design §十 C4：旧兜底可读他人私有文档）。
+        """
+        if db is None:
+            return []
+        query_text = " ".join(str(k).strip() for k in (keywords or []) if k and str(k).strip())
+        try:
+            results = await KnowledgeIndexService(db).semantic_search(
+                project_id,
+                query_text,
+                top_k=max_docs,
+                scope="knowledge_doc",
+                user=user,
+                category=category,
+            )
+        except Exception as exc:  # noqa: BLE001 - 参照加载失败不阻断生成
+            logger.warning("知识库参照检索失败（返回空）：%s: %s", type(exc).__name__, exc)
+            return []
+        return [
+            {
+                "source_id": r.get("source_id"),
+                "document_name": r.get("document_name"),
+                "folder_path": r.get("folder_path"),
+                "content": r.get("content") or "",
+                "score": r.get("score", 0.0),
+                "retrieval": r.get("retrieval"),
+            }
+            for r in results
+            if r.get("source_type") == "knowledge_doc"
+        ]
+
+    @staticmethod
     async def load_from_knowledge_base(
         project_id: UUID,
         category: str = "notes",
@@ -143,84 +194,22 @@ class ReferenceDocService:
         max_docs: int = 3,
         db: AsyncSession | None = None,
     ) -> list[str]:
-        """从知识库加载参照文档
+        """从知识库加载参照文档（供 ``context_documents`` 注入 LLM 的字符串形态）。
 
-        主路径：semantic_search(scope=knowledge_doc) 向量语义检索
-        降级路径：ilike 朴素匹配（semantic_search 返回空或异常时）
+        签名保持不变（``test_method_signature_unchanged`` 钉死）；实现委托
+        :meth:`search_knowledge_base`，每条格式为 ``【知识库 - 文档名】\\n正文前 2000 字``。
         """
-
-        if not db:
-            return []
-
-        # ── 主路径：semantic_search 向量语义检索 ──
-        if keywords:
-            try:
-                from app.services.knowledge_index_service import KnowledgeIndexService
-
-                query_text = " ".join(keywords)
-                svc = KnowledgeIndexService(db)
-                results = await svc.semantic_search(
-                    project_id, query_text, top_k=max_docs, scope="knowledge_doc"
-                )
-                if results:
-                    # 查询文档名称（source_id → name）
-                    from app.models.knowledge_models import KnowledgeDocument
-                    import sqlalchemy as _sa
-
-                    source_ids = [r["source_id"] for r in results]
-                    name_result = await db.execute(
-                        _sa.select(
-                            _sa.cast(KnowledgeDocument.id, _sa.String),
-                            KnowledgeDocument.name,
-                        ).where(
-                            _sa.cast(KnowledgeDocument.id, _sa.String).in_(source_ids)
-                        )
-                    )
-                    id_to_name = {str(row[0]): row[1] for row in name_result.all()}
-
-                    return [
-                        f"【知识库 - {id_to_name.get(r['source_id'], r['source_id'])}】\n"
-                        f"{(r.get('content') or '')[:2000]}"
-                        for r in results
-                    ]
-            except Exception as e:
-                logger.debug(f"semantic_search 检索失败，降级 ilike: {e}")
-
-        # ── 降级路径：ilike 朴素匹配 ──
-        try:
-            from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
-            import sqlalchemy as _sa
-
-            query = (
-                _sa.select(KnowledgeDocument.name, KnowledgeDocument.content_text)
-                .join(KnowledgeFolder, KnowledgeDocument.folder_id == KnowledgeFolder.id)
-                .where(
-                    KnowledgeDocument.is_deleted == _sa.false(),
-                    KnowledgeDocument.content_text.isnot(None),
-                    KnowledgeFolder.is_deleted == _sa.false(),
-                )
-            )
-            # 按分类过滤
-            if category:
-                query = query.where(KnowledgeFolder.category == category)
-            # 按关键词过滤（文档名或内容包含关键词）
-            if keywords:
-                keyword_filters = []
-                for kw in keywords:
-                    keyword_filters.append(KnowledgeDocument.name.ilike(f"%{kw}%"))
-                    keyword_filters.append(KnowledgeDocument.content_text.ilike(f"%{kw}%"))
-                query = query.where(_sa.or_(*keyword_filters))
-
-            query = query.limit(max_docs)
-            result = await db.execute(query)
-            rows = result.all()
-
-            if rows:
-                return [f"【知识库 - {name}】\n{(text or '')[:2000]}" for name, text in rows]
-        except Exception as e:
-            logger.debug(f"知识库 ilike 检索失败: {e}")
-
-        return []
+        docs = await ReferenceDocService.search_knowledge_base(
+            project_id,
+            keywords=keywords,
+            category=category,
+            max_docs=max_docs,
+            db=db,
+        )
+        return [
+            f"【知识库 - {d.get('document_name') or d.get('source_id')}】\n{(d.get('content') or '')[:2000]}"
+            for d in docs
+        ]
 
     @staticmethod
     async def load_context(

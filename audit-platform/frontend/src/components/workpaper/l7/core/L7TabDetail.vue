@@ -280,6 +280,7 @@ import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useL7FormData } from '../../composables/useL7FormData'
 import { useL7Detail, type L7DetailRow, L7_DETAIL_SEGMENTS } from '../../composables/useL7Detail'
+import { newRowIdentity } from '../../composables/shared/rowIdentity'
 import { useL7ImportExport } from '../../composables/useL7ImportExport'
 import { useL7CrossSheet } from '../../composables/useL7CrossSheet'
 
@@ -473,11 +474,15 @@ function _restoreRowsFromResponses() {
           try { fullData = JSON.parse(fullDataResp.remark) } catch { /* ignore */ }
         }
         if (fullData.length > 0) {
-          detailRows.value = fullData
+          // 行身份统一走稳定 rowId（已有 rowId 优先，不重铸；兼容旧 full-data 用过的 key 字段）
+          detailRows.value = fullData.map((raw: any) => ({
+            ...raw,
+            rowId: raw.rowId || raw.key || newRowIdentity('l72det'),
+          }))
         } else {
-          detailRows.value = savedRows.map((r: any) => ({
-            key: r.key || `l7-detail-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            itemName: r.itemName || '',
+          detailRows.value = savedRows.map((raw: any) => ({
+            rowId: raw.rowId || raw.key || newRowIdentity('l72det'),
+            itemName: raw.itemName || '',
             beginUnadjusted: 0, beginAje: 0, beginRje: 0, beginAudited: 0,
             ajeIncrease: 0, rjeIncrease: 0,
             endAjeIncrease: 0, endRjeDecrease: 0, endAjeDecrease: 0, endRjeIncrease: 0,

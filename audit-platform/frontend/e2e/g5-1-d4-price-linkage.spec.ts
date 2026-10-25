@@ -21,7 +21,8 @@ import { fileURLToPath } from 'node:url'
 const RUN = process.env.RUN_FULL_E2E === '1'
 const PROJECT_ID = process.env.TEST_PROJECT_ID || '0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49'
 const WP_ID = process.env.TEST_WP_ID || 'b3ab3c46-828f-4f48-950e-aee9bbdc923f'
-const BASE = process.env.E2E_BASE_URL || 'http://127.0.0.1:3030'
+// 🔴 默认值用 `localhost` 不用 `127.0.0.1`：Vite 只监听 IPv6（见 playwright.config.ts 注释）。
+const BASE = process.env.E2E_BASE_URL || 'http://localhost:3030'
 const EVIDENCE_DIR = resolve(
   dirname(fileURLToPath(import.meta.url)),
   '../../../.kiro/specs/d4-price-analysis-writeback-linkage/evidence/g5-1-d4-price-linkage',

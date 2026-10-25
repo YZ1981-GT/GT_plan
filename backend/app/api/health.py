@@ -73,8 +73,8 @@ async def health_check(
 
     # 状态判定
     #
-    # degraded 只看「critical 漂移」（orm_extra / enum_mismatch — 会导致业务接口
-    # 运行时 500 / 插入失败）+ 迁移失败。INFO 级 db_extra（DB 历史残留表/列，
+    # degraded 只看「critical 漂移」（schema_drift_detector.CRITICAL_DRIFT_TYPES —— 会导致
+    # 业务接口运行时 500 / 插入失败，或已应用迁移的编辑静默丢失）+ 迁移失败。INFO 级 db_extra（DB 历史残留表/列，
     # 如 deleted_at 软删列、raw SQL 建的表）和 WARN 级 type_mismatch 仅作可观测
     # 暴露，不翻 degraded banner——否则共库残留噪音会让 health 永远 degraded。
     # 与 main.py 启动 self-check 的 critical_count 口径一致。
@@ -138,16 +138,14 @@ async def _query_migration_status() -> dict:
 async def _query_schema_drift() -> dict:
     """查询 schema_drift_log。
 
-    ``critical_count`` 仅统计 orm_extra / enum_mismatch（会导致运行时 500 /
-    插入失败的高优漂移），用于 health degraded 判定；``count`` 是总数（含 INFO
-    级 db_extra），仅作可观测展示。
+    ``critical_count`` 只统计 ``CRITICAL_DRIFT_TYPES``（单一真源：orm_extra / enum_mismatch /
+    checksum_drift —— 会导致运行时 500 / 插入失败、或已应用迁移的编辑静默丢失），用于 health
+    degraded 判定；``count`` 是总数（含 INFO 级 db_extra），仅作可观测展示。
     """
     from app.core.database import engine
-    from app.core.schema_drift_detector import SchemaDriftDetector
+    from app.core.schema_drift_detector import SchemaDriftDetector, count_critical
     items = await SchemaDriftDetector.query_drift(engine)
-    critical_count = sum(
-        1 for it in items if it.drift_type in ("orm_extra", "enum_mismatch")
-    )
+    critical_count = count_critical(items)
     return {
         "count": len(items),
         "critical_count": critical_count,

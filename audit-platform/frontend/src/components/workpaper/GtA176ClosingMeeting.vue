@@ -18,9 +18,10 @@
         :options="modeOptions"
         size="small"
       />
+      <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a176-closing-meeting" />
       <div class="gt-a176__toolbar-right">
         <el-button
-          v-if="mode === '结构化视图' && !props.readonly"
+          v-if="mode === 'html' && !props.readonly"
           size="small"
           type="primary"
           :loading="prefillLoading"
@@ -41,7 +42,7 @@
     </div>
 
     <!-- Structured View -->
-    <div v-if="mode === '结构化视图'" class="gt-a176__content">
+    <div v-if="mode === 'html'" class="gt-a176__content">
       <el-skeleton v-if="loading" :rows="10" animated />
 
       <template v-else>
@@ -126,19 +127,15 @@
     </div>
 
     <!-- Online Edit Mode (OnlyOffice) -->
-    <GtOnlyOfficeSheet
-      v-else
-      :wp-id="props.wpId"
-      sheet-name="A17-6"
-      :project-id="props.projectId"
-      class="gt-a176__oo"
-      @fallback="handleOOFallback"
-    />
+    <template v-else>
+      <WorkpaperSyncEditorHost v-if="syncOoDescriptor" :descriptor="syncOoDescriptor" :bridge="syncBridge" class="a176closingmeeting__oo" />
+      <div v-else style="display:flex;align-items:center;justify-content:center;height:400px;color:#909399">正在打开同步编辑器…</div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { ref, computed, toRef, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import {
@@ -167,6 +164,13 @@ const GtOnlyOfficeSheet = defineAsyncComponent(
   () => import('./GtOnlyOfficeSheet.vue'),
 )
 
+import { useWorkpaperSyncBridge } from './sync/useWorkpaperSyncBridge'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+
+const WorkpaperSyncEditorHost = defineAsyncComponent(() => import('./sync/WorkpaperSyncEditorHost.vue'))
 defineOptions({ name: 'GtA176ClosingMeeting' })
 
 const props = withDefaults(defineProps<{
@@ -176,8 +180,8 @@ const props = withDefaults(defineProps<{
 }>(), { projectId: '', readonly: false })
 
 // ─── Mode Switch ───
-const mode = ref('结构化视图')
-const modeOptions = ref(['结构化视图', '在线编辑'])
+const mode = ref<'html' | 'docx'>('html')
+const modeOptions = ref([{ label: '结构化视图', value: 'html' }, { label: '在线编辑', value: 'docx' }])
 
 // ─── Composable ───
 const wpIdRef = ref(props.wpId)
@@ -196,13 +200,13 @@ const {
 // ─── Dual-mode bidirectional sync ───
 watch(mode, async (newMode, oldMode) => {
   if (!props.wpId) return
-  if (oldMode === '结构化视图' && newMode === '在线编辑') {
+  if (oldMode === 'html' && newMode === 'docx') {
     // 结构化 → OO：先flush保存，再生成docx
     await flushPendingSaves()
     try {
       await api.post(`/api/workpapers/${props.wpId}/a176/generate-docx`, {}, { _silent: true } as any)
     } catch { /* OO will load existing file */ }
-  } else if (oldMode === '在线编辑' && newMode === '结构化视图') {
+  } else if (oldMode === 'docx' && newMode === 'html') {
     // OO → 结构化：从docx同步回DB
     try {
       await api.post(`/api/workpapers/${props.wpId}/a176/sync-from-docx`, {}, { _silent: true } as any)
@@ -294,9 +298,9 @@ async function checkOOHealth() {
     const http = (await import('@/utils/http')).default
     const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
     const healthy = res?.data?.data?.healthy ?? res?.data?.healthy
-    if (!healthy) modeOptions.value = ['结构化视图']
+    if (!healthy) modeOptions.value = [{ label: '结构化视图', value: 'html' }]
   } catch {
-    modeOptions.value = ['结构化视图']
+    modeOptions.value = [{ label: '结构化视图', value: 'html' }]
   }
 }
 
@@ -305,6 +309,33 @@ function handleOOFallback() {
 }
 
 // ─── Lifecycle ───
+
+// ─── sync bridge（替代 legacy mode + GtOnlyOfficeSheet）───
+const _ENTRY_ID = 'xlsx/gt-a176-closing-meeting'
+const _SHEET_KEY = 'a176closingmeeting-managed'
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(_ENTRY_ID),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(_SHEET_KEY),
+  capability: capabilityForEntry(_ENTRY_ID),
+  flushHtml: async () => {
+    if (typeof flushPendingSave === 'function') flushPendingSave()
+    else if (typeof flushPendingSaves === 'function') flushPendingSaves()
+    // 🔴 降级保护：本 entry 的 capability 仍是 single_onlyoffice（后端无 per-entry
+    //    adapter）⇒ readStoreProjection 会 404。捕获后返回空投影，让 OO 走「无投影」
+    //    路径（与改线前 legacy 行为等价）。capability 升 bidirectional 后自动失效。
+    try {
+      const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: _ENTRY_ID })
+      return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: _SHEET_KEY }
+    } catch {
+      return { expectedRevision: 0, projection: null, sheetKey: _SHEET_KEY }
+    }
+  },
+  reloadHtml: async () => { if (typeof loadData === 'function') await loadData(props.wpId); else if (typeof refreshData === 'function') await refreshData(props.wpId) },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+
 onMounted(() => { checkOOHealth(); loadData(props.wpId); loadAgendaStale() })
 onBeforeUnmount(() => { flushPendingSaves() })
 

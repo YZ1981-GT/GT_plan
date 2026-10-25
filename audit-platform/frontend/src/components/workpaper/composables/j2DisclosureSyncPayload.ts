@@ -360,8 +360,8 @@ export function buildJ2NetAssetPayload(snapshot: J2NetAssetSnapshot) {
     }
   }
 
-  // 合计行
-  const total = rows.reduce(
+  // 合计行（显式标注累加器类型：rows 是 Record<string, unknown>[]，不标注时 acc 推断为 unknown，类型检查报 TS18046）
+  const total = rows.reduce<{ begin: number; increase: number; decrease: number; end: number }>(
     (acc, r) => ({
       begin: acc.begin + (r.begin as number),
       increase: acc.increase + (r.increase as number),
@@ -382,4 +382,48 @@ export function buildJ2NetAssetPayload(snapshot: J2NetAssetSnapshot) {
     sub_table_data,
     _sub_table_columns: { [J2_NET_ASSET_SUBTABLE]: netAssetColumns() },
   }
+}
+
+// ── 端点契约适配 ────────────────────────────────────────────────────────────
+
+export interface J2SyncRequest {
+  wp_id: string
+  sheet_name: string
+  section_id: string
+  current_standard: string
+  year?: number
+  sub_table_data: Record<string, unknown>
+  columns: Record<string, ColumnDef[]>
+}
+
+type J2BuiltPayload =
+  | ReturnType<typeof buildJ2ListedSyncPayload>
+  | ReturnType<typeof buildJ2SoeSyncPayload>
+  | ReturnType<typeof buildJ2NetAssetPayload>
+
+/**
+ * 构建器产物 → `POST …/disclosure-notes/sync-from-workpaper` 请求体（`SyncFromWorkpaperRequest`）。
+ *
+ * 🔴 构建器用的是历史字段名（`note_section` / `_sub_table_columns` / 顶层 `_removed_table_keys`），
+ *    而端点契约是 `section_id` / `columns` / `sub_table_data._removed_table_keys`，且必填 `wp_id` 与
+ *    `current_standard`。旧组件把构建器产物直接展开进请求体 ⇒ 422（三个必填缺失），`columns` 与待删表名被
+ *    pydantic 静默丢弃 ⇒ J2 附注从未同步成功过。只做字段映射，不改任何数据值。
+ */
+export function toJ2SyncRequest(
+  built: J2BuiltPayload,
+  ctx: { wpId: string; currentStandard: string; year?: number | null },
+): J2SyncRequest {
+  const removed = (built as { _removed_table_keys?: readonly string[] })._removed_table_keys
+  const sub = { ...(built.sub_table_data as Record<string, unknown>) }
+  if (removed && removed.length) sub._removed_table_keys = [...removed]
+  const req: J2SyncRequest = {
+    wp_id: ctx.wpId,
+    sheet_name: built.sheet_name,
+    section_id: built.note_section,
+    current_standard: ctx.currentStandard,
+    sub_table_data: sub,
+    columns: built._sub_table_columns,
+  }
+  if (typeof ctx.year === 'number' && Number.isFinite(ctx.year)) req.year = ctx.year
+  return req
 }

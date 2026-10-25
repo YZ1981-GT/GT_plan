@@ -345,12 +345,12 @@ class Settings(BaseSettings):
 
     # --- disclosure-note-formula-and-report-sync ---
     # 附注表内公式求值（resolve_formula sum/aging/report）+ 报表→附注金额真同步的灰度开关。
-    # 默认 False = 零回归：resolve_formula 保持返 None（stub 行为）、sync_report_to_notes
+    # 默认 True = 开启附注公式求值和 binding 取数路径。
+    # 置 False 可回退零回归：resolve_formula 保持返 None（stub 行为）、sync_report_to_notes
     # 保持仅清 is_stale（当前可观察行为），不产生新副作用、逐字节等价当前链路。
-    # 置 True 才启用 NoteFormulaEvaluator 表内求值 + ReportNoteLinkage 报表→附注真同步。
     # 任一环求值/同步异常一律 fail-open（返 None / 跳过计 skipped），不阻塞附注生成或报表流程。
     # 注：附注校验 preset 加载/解析修复（Wave4）是纯 bug 修复，不受本开关约束。
-    DISCLOSURE_NOTE_FORMULA_ENABLED: bool = False
+    DISCLOSURE_NOTE_FORMULA_ENABLED: bool = True
     # 附注校验 findings 严格度开关（Wave4 修 preset 路径后，soe 760 / listed 187 条规则从
     # "恒 0 findings" 变为全量运行 → 有数据章节会瞬间涌现大量 warning，冲击审计师）。
     # 默认 False = 宽松缓冲：validate_all 只逐条返回 error 级 findings（合计不平等硬性），

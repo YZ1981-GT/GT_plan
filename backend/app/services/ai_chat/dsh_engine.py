@@ -192,7 +192,9 @@ class DshProcessManager:
         from app.core.config import settings
 
         server_path = mcp_server_path or _resolve_mcp_server_path()
-        base_url = api_base_url or f"http://localhost:{getattr(settings, 'PORT', 9980)}"
+        # 127.0.0.1 而非 localhost：后端只监听 IPv4，而 MCP server 每次工具调用都新建 httpx.Client；
+        # Windows 上 localhost 先试 ::1，每次建连多等约 2s（spec startup-prewarm-event-loop-unblocking 4.1）。
+        base_url = api_base_url or f"http://127.0.0.1:{getattr(settings, 'PORT', 9980)}"
 
         # 构造受限环境——只注入必要变量，不从父进程全量继承
         env = _build_mcp_env(

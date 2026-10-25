@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { authApi, notificationApi } from '@/services/collaborationApi'
+import { ref } from 'vue'
+import { notificationApi } from '@/services/collaborationApi'
 import { eventBus } from '@/utils/eventBus'
 import {
   isProcedureTaskSseEvent,
@@ -8,10 +8,10 @@ import {
 } from '@/composables/useProcedureTaskSse'
 
 export const useCollaborationStore = defineStore('collaboration', () => {
-  // Auth state — 统一使用 'token' 键名（与 auth.ts 一致）
-  const user = ref<any>(null)
-  const accessToken = ref<string | null>(localStorage.getItem('token'))
-  const isAuthenticated = computed(() => !!accessToken.value)
+  // 认证状态唯一真源是 stores/auth.ts（token 存 sessionStorage）。
+  // 本 store 旧有的 user/accessToken/login/fetchMe/logout 会把 token 写回 localStorage、
+  // 与 auth store 双写，且全仓零调用方（2026-09-29 grep 实证：消费方只用通知字段）——已删除，
+  // 防止被误用后把 token 重新落到 localStorage（守卫：authTokenSingleSource.spec.ts）。
 
   // Notifications
   const notifications = ref<any[]>([])
@@ -19,30 +19,6 @@ export const useCollaborationStore = defineStore('collaboration', () => {
 
   // SSE 通知事件订阅状态
   let sseSubscribed = false
-
-  async function login(username: string, password: string) {
-    const { data } = await authApi.login(username, password)
-    accessToken.value = data.access_token
-    localStorage.setItem('token', data.access_token)
-    localStorage.setItem('refreshToken', data.refresh_token)
-    await fetchMe()
-    return data
-  }
-
-  async function fetchMe() {
-    try {
-      const { data } = await authApi.me()
-      user.value = data
-    } catch { /* silent */ }
-  }
-
-  async function logout() {
-    try { await authApi.logout() } catch { /* silent */ }
-    accessToken.value = null
-    user.value = null
-    localStorage.removeItem('token')
-    localStorage.removeItem('refreshToken')
-  }
 
   async function fetchNotifications() {
     try {
@@ -92,9 +68,7 @@ export const useCollaborationStore = defineStore('collaboration', () => {
   }
 
   return {
-    user, accessToken, isAuthenticated,
     notifications, unreadCount,
-    login, fetchMe, logout,
     fetchNotifications, markNotificationRead,
     subscribeSSENotifications, refreshUnreadCount,
   }

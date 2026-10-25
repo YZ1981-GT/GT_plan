@@ -88,6 +88,12 @@ class SnapshotWriter:
         opened_at: datetime,
         module: str = "workpaper",
         project_id: str | None = None,
+        *,
+        note_record_id: str | None = None,
+        note_section_id: str | None = None,
+        note_year: int | None = None,
+        note_node_key: str | None = _mod._UNSET,
+        note_project_id: str | None = None,
     ) -> dict:
         """单事务写 cell 到对应模块。
 
@@ -125,7 +131,12 @@ class SnapshotWriter:
             )
         elif module == "note":
             return await self._write_note_cell(
-                db, user, wp_id, sheet_name, cell_ref, new_value, opened_at
+                db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
+                note_record_id=note_record_id,
+                note_section_id=note_section_id,
+                note_year=note_year,
+                note_node_key=note_node_key,
+                note_project_id=note_project_id,
             )
         elif module == "adj":
             return await self._write_adj_cell(
@@ -431,11 +442,22 @@ class SnapshotWriter:
         cell_ref: str,
         new_value: Any,
         opened_at: datetime,
+        *,
+        note_record_id: str | None = None,
+        note_section_id: str | None = None,
+        note_year: int | None = None,
+        note_node_key: str | None = _mod._UNSET,
+        note_project_id: str | None = None,
     ) -> dict:
         """写回 consol_note_data.data JSONB（委托 snapshot_writer_modules）。"""
         return await _mod.write_note_cell(
             db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
             check_lock=self._check_optimistic_lock,
+            note_record_id=note_record_id,
+            note_section_id=note_section_id,
+            note_year=note_year,
+            note_node_key=note_node_key,
+            note_project_id=note_project_id,
         )
     async def _write_adj_cell(
         self,

@@ -344,7 +344,7 @@
     <el-dialog v-model="samplingVisible" title="抽凭引擎 — 开发支出(1717) 工时检查" width="90%" top="5vh" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="samplingVisible && props.wpId && props.projectId"
-        account-code="1717"
+        :account-code="samplingAccountCode"
         phase="final"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
@@ -390,6 +390,18 @@ import {
   runWorkpaperOcr,
   writeSheetCompletionMarker,
 } from '../../composables/i2EnhancementHelpers'
+
+/**
+ * 科目码单一真源。原硬编码 `"1717"` —— 该码在 `account_chart` 与 `tb_balance`
+ * 全库零命中（真源文件头亦明写「不是 1717（全库不存在）」），抽凭据此查库
+ * 必然得到空总体；本底稿是「开发支出」（wp_index 实证），report_config 的
+ * BS-035(上市)/BS-046(国企) 对应 `1704`。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.4
+ */
+import { i2GrossQueryCodes } from '@/components/workpaper/composables/i2AccountScope'
+
+/** 抽凭科目码（真源，无 tbSourceCodes prop => 走兜底 1704；逗号拼接供引擎 split） */
+const samplingAccountCode = i2GrossQueryCodes().join(',')
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),

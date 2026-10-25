@@ -273,8 +273,8 @@
           "J1-8-post-period"
         ],
         "own_transport_key_sources": [
-          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L324",
-          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L467"
+          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L335",
+          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L478"
         ]
       }
     ]
@@ -448,7 +448,7 @@
           "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L250",
           "audit-platform/frontend/src/components/workpaper/j1/core/J1TabDisclosureListed.vue#L292",
           "audit-platform/frontend/src/components/workpaper/j1/core/J1TabDisclosureSoe.vue#L271",
-          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L469",
+          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L480",
           "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabNonMonetaryCheck.vue#L259",
           "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabSeveranceCheck.vue#L319"
         ],
@@ -645,6 +645,38 @@
       "path": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
       "lines": 65,
       "statement_position_consumers": 29,
+      "statement_position_consumer_sites": [
+        "audit-platform/frontend/src/components/workpaper/GtB22AControlMatrix.vue#L52",
+        "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue#L29",
+        "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L32",
+        "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L24",
+        "audit-platform/frontend/src/components/workpaper/GtB50RiskAssessment.vue#L30",
+        "audit-platform/frontend/src/components/workpaper/__tests__/b22bControlMatrix.spec.ts#L40",
+        "audit-platform/frontend/src/components/workpaper/__tests__/useB22BControlMatrix.spec.ts#L32",
+        "audit-platform/frontend/src/components/workpaper/composables/__tests__/useWorkpaperEntryDualMode.spec.ts#L2",
+        "audit-platform/frontend/src/components/workpaper/composables/useD1EntryDualMode.ts#L6",
+        "audit-platform/frontend/src/components/workpaper/composables/useD3EntryDualMode.ts#L6",
+        "audit-platform/frontend/src/components/workpaper/composables/useD4EntryDualMode.ts#L6",
+        "audit-platform/frontend/src/components/workpaper/composables/useD5EntryDualMode.ts#L6",
+        "audit-platform/frontend/src/components/workpaper/composables/useD6EntryDualMode.ts#L6",
+        "audit-platform/frontend/src/components/workpaper/composables/useD7EntryDualMode.ts#L6",
+        "audit-platform/frontend/src/components/workpaper/composables/useG2DualMode.ts#L9",
+        "audit-platform/frontend/src/components/workpaper/composables/useJ2EntryDualMode.ts#L7",
+        "audit-platform/frontend/src/components/workpaper/composables/useJ3EntryDualMode.ts#L7",
+        "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts#L8",
+        "audit-platform/frontend/src/components/workpaper/composables/useM1EntryDualMode.ts#L8",
+        "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts#L8",
+        "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts#L8",
+        "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts#L8",
+        "audit-platform/frontend/src/components/workpaper/composables/useM5EntryDualMode.ts#L8",
+        "audit-platform/frontend/src/components/workpaper/composables/useM6EntryDualMode.ts#L8",
+        "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts#L8",
+        "audit-platform/frontend/src/components/workpaper/composables/useM8EntryDualMode.ts#L8",
+        "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts#L8",
+        "audit-platform/frontend/src/components/workpaper/composables/useN2DualMode.ts#L2",
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L110"
+      ],
+      "statement_position_consumer_sites_provenance": "additive（2026-09-30）：在本 slice 末次提交 edfbd0612 上按守卫同一窄口径现算得 29 条，与上方 statement_position_consumers 及 preserved_because 的文字枚举逐项相符。守卫据此把期望值算成「声明 29 − 已删的**任一**已声明消费方」——原先只扣「已删的 J 贡献」，他 lane 删掉 useM9EntryDualMode.ts 就会把 J 侧守卫打红。禁在测试里用 git 现算盘点期内容：CI 是浅克隆，git show <旧commit> 必失败。",
       "pseudo_string_edges": 5,
       "pseudo_string_edge_file": "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts",
       "j_cycle_contribution": 3,
@@ -866,7 +898,7 @@
         "owner_module": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue",
         "owner_constant": "ITEM_ID",
         "owner_constant_value": "J1-8-voucher-check",
-        "owner_constant_source": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L324",
+        "owner_constant_source": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L335",
         "declaration_kind": "component_local_constant_plus_one_inline_literal",
         "derivation": "一个常量 + 一个内联字面量（#L467 'J1-8-post-period'）",
         "keys": [
@@ -877,7 +909,7 @@
         "identity_field": null,
         "identity_field_note": "凭证抽查行与期后事项行都不带独立身份字段（整表 JSON 数组按位置存），但**没有跨表引用**这些行 ⇒ 不构成 forbidden_identity_kinds 意义上的缺陷；登记在此以免后来者以为漏查。",
         "persisted_via": "组件自己的 http.put（JD-3 的第二写路径）",
-        "persist_site": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L469",
+        "persist_site": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L480",
         "consumed_by": [
           "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L65"
         ],
@@ -1384,7 +1416,7 @@
         "row_identity": {
           "kind": "positional_array_order_no_identity_field",
           "identity_field": null,
-          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L464",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L475",
           "why_not_a_forbidden_kind": "整表 JSON 数组按位置存且**没有任何跨表引用**这些行（无 ref_index chip、无附注同步、无 TB 回写）⇒ 位置即语义、不存在「身份串行」的后果。写下来是为了让判据分得开：把它算成 forbidden 会逼出一个没有实际风险的假缺陷；不写下来则后来者会以为漏查。"
         }
       },
@@ -1398,7 +1430,7 @@
         "row_identity": {
           "kind": "positional_array_order_no_identity_field",
           "identity_field": null,
-          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L467",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L478",
           "why_not_a_forbidden_kind": "同 J1-8-voucher-check。"
         }
       }
@@ -1622,7 +1654,7 @@
         "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L213",
         "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjudication.vue#L283",
         "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L95",
-        "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L469"
+        "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L480"
       ]
     },
     {

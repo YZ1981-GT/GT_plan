@@ -25,6 +25,7 @@
 import { computed, ref, onScopeDispose, type ComputedRef, type Ref } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
+import { resolveWorkpaperByCode } from '@/services/resolveWorkpaperByCode'
 import { calcDeferredTaxExpense } from './useN5IncomeTaxEngine'
 import { calcEffectiveTaxRate } from './useN5FormulaEngine'
 import type { ChecklistResponse } from './useN5FormData'
@@ -335,7 +336,7 @@ export function useN5CrossSheet(
    * - I2开发支出 → rdFromI6I2.capitalized
    * - A利润表会计利润 → profitFromIncomeStatement.accountingProfit
    *
-   * 通过 wp-index/by-code 查找目标底稿wpId，再读取其 checklist_responses。
+   * 通过唯一 wp_id 出口 `resolveWorkpaperByCode`（原 wp-index/by-code 后端无此路由、恒 404）查找目标底稿wpId，再读取其 checklist_responses。
    * 失败不阻塞：黄色提示对应底稿未编制。
    */
   async function fetchCrossWorkpaperData(): Promise<void> {
@@ -356,11 +357,7 @@ export function useN5CrossSheet(
   /** 拉取N1递延所得税资产数据 */
   async function _fetchN1Data(pid: string): Promise<void> {
     try {
-      const wpData: any = await api.get(
-        `/api/projects/${pid}/wp-index/by-code/N1`,
-        { _silent: true } as any,
-      )
-      const wpId = wpData?.working_paper_id || wpData?.wp_id || wpData?.id
+      const wpId = (await resolveWorkpaperByCode(pid, 'N1'))?.wpId
       if (!wpId) return
 
       const res = await api.get(
@@ -387,11 +384,7 @@ export function useN5CrossSheet(
   /** 拉取N3递延所得税负债数据 */
   async function _fetchN3Data(pid: string): Promise<void> {
     try {
-      const wpData: any = await api.get(
-        `/api/projects/${pid}/wp-index/by-code/N3`,
-        { _silent: true } as any,
-      )
-      const wpId = wpData?.working_paper_id || wpData?.wp_id || wpData?.id
+      const wpId = (await resolveWorkpaperByCode(pid, 'N3'))?.wpId
       if (!wpId) return
 
       const res = await api.get(
@@ -419,11 +412,7 @@ export function useN5CrossSheet(
   /** 拉取I6研发费用数据（费用化研发费用） */
   async function _fetchI6Data(pid: string): Promise<void> {
     try {
-      const wpData: any = await api.get(
-        `/api/projects/${pid}/wp-index/by-code/I6`,
-        { _silent: true } as any,
-      )
-      const wpId = wpData?.working_paper_id || wpData?.wp_id || wpData?.id
+      const wpId = (await resolveWorkpaperByCode(pid, 'I6'))?.wpId
       if (!wpId) return
 
       const res = await api.get(
@@ -447,11 +436,7 @@ export function useN5CrossSheet(
   /** 拉取I2开发支出数据（资本化研发费用） */
   async function _fetchI2Data(pid: string): Promise<void> {
     try {
-      const wpData: any = await api.get(
-        `/api/projects/${pid}/wp-index/by-code/I2`,
-        { _silent: true } as any,
-      )
-      const wpId = wpData?.working_paper_id || wpData?.wp_id || wpData?.id
+      const wpId = (await resolveWorkpaperByCode(pid, 'I2'))?.wpId
       if (!wpId) return
 
       const res = await api.get(
@@ -476,11 +461,7 @@ export function useN5CrossSheet(
   async function _fetchProfitData(pid: string): Promise<void> {
     try {
       // A类利润表编码为 "A" 或利润表底稿
-      const wpData: any = await api.get(
-        `/api/projects/${pid}/wp-index/by-code/A`,
-        { _silent: true } as any,
-      )
-      const wpId = wpData?.working_paper_id || wpData?.wp_id || wpData?.id
+      const wpId = (await resolveWorkpaperByCode(pid, 'A'))?.wpId
       if (!wpId) return
 
       const res = await api.get(

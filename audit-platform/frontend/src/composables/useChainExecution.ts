@@ -16,6 +16,7 @@ import { api } from '@/services/apiProxy'
 import { chainWorkflow } from '@/services/apiPaths'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
+import { createSSE, type SSEConnection } from '@/utils/sse'
 
 export type StepKey = 'recalc_tb' | 'generate_workpapers' | 'generate_reports' | 'generate_notes'
 export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
@@ -53,8 +54,8 @@ export function useChainExecution(projectId: Ref<string>) {
   const executionStatus = ref<string>('')
   const conflictMessage = ref('')
 
-  // SSE 相关
-  let eventSource: EventSource | null = null
+  // SSE 相关（createSSE = fetch 流，自带 Authorization；原生 EventSource 不能带头，见 subscribeProgress）
+  let eventSource: SSEConnection | null = null
 
   function buildInitialSteps(): StepState[] {
     return STEP_ORDER.map(key => ({
@@ -133,33 +134,28 @@ export function useChainExecution(projectId: Ref<string>) {
       eventSource = null
     }
 
-    const url = chainWorkflow.progress(projectId.value, execId)
-    // 获取 token 用于 SSE 认证（通过 query param）
-    const token = sessionStorage.getItem('token') || localStorage.getItem('token') || ''
-    const sseUrl = `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`
+    // 🔴 旧实现：原生 EventSource + `?token=` 查询参数。该端点只认 Bearer 头（`get_current_user`，
+    //    `?token=` 实测 401）⇒ 进度流从未连上；且后端按 `event: step_started` 等**具名事件**推送、载荷不带
+    //    type，EventSource.onmessage 只收无名事件 ⇒ 即便连上也收不到。createSSE = fetch 流（带 Authorization），
+    //    按事件名分派；用事件名补齐 type（终止事件 chain_completed 靠它识别）。
+    const conn = createSSE(chainWorkflow.progress(projectId.value, execId), { maxRetries: 0 })
+    eventSource = conn
 
-    eventSource = new EventSource(sseUrl)
+    conn.onMessage((data, event) => {
+      if (!data || typeof data !== 'object') return
+      handleSSEEvent(event ? { ...(data as Record<string, unknown>), type: event } : data)
+    })
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        handleSSEEvent(data)
-      } catch {
-        // 忽略解析错误
-      }
-    }
-
-    eventSource.onerror = () => {
-      // SSE 连接断开，标记执行完成（可能已完成或网络问题）
-      if (eventSource) {
-        eventSource.close()
-        eventSource = null
-      }
+    conn.onError(() => {
+      // SSE 连接断开（可能已完成或网络问题）
+      if (eventSource !== conn) return
+      conn.close()
+      eventSource = null
       // 如果还在执行中，延迟检查最终状态
       if (executing.value) {
         setTimeout(() => checkFinalStatus(execId), 2000)
       }
-    }
+    })
   }
 
   /** 处理 SSE 事件 */

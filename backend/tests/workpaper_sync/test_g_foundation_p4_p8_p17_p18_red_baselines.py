@@ -564,7 +564,14 @@ GATE_LAYERS: dict[str, tuple[str, ...]] = {
     ),
     "G4-main": (
         "components/workpaper/composables/useG4MainAdjudication.ts",
-        "components/workpaper/composables/useG4MainFormData.ts",
+        # 🔴 2026-09-30 修正：原先写 `useG4MainFormData.ts`，该文件**从不存在**
+        #    ⇒ 这一层此前被任何用 GATE_LAYERS 的判据**静默跳过**（glob 不命中不报错）。
+        #    真名由宿主 `GtG4BondInvestmentMain.vue` 的 import 实证
+        #    （`import { useG4BonInvFormData } from './composables/useG4BonInvFormData'`
+        #    + `const formData = useG4BonInvFormData({...})`）。
+        #    🔴 与 G6 不同型：G6 两者都有（`useG6MainFormData.ts` 与 `useG6OthBonFormData.ts`），
+        #    不可按 G6 的命名推 G4。
+        "components/workpaper/composables/useG4BonInvFormData.ts",
         "components/workpaper/g4-bond-investment-main/core/G4TabAdjudication.vue",
         "components/workpaper/GtG4BondInvestmentMain.vue",
     ),
@@ -579,6 +586,12 @@ GATE_LAYERS: dict[str, tuple[str, ...]] = {
 #: 真发布门的判据 = 显式发布端点字面量（**不是** `publishToTb` 这个名字 ——
 #: 名字可能只出现在注释里；端点字面量出现在代码里才是活路径）。
 PUBLISH_ENDPOINT = "audit-determination/publish-to-tb"
+
+#: 被禁的 TB 写入端点字面量（口径与 `test_g_foundation_p10_p16_g2_canary.py` 的
+#: GF-P16 一致；带路径分隔符 —— 裸词会命中中文提示文案）。
+TB_WRITE_ENDPOINTS: tuple[str, ...] = ("trial-balance/writeback", "/trial_balance")
+#: provider 侧 TB 触碰线索（后端不走 HTTP 端点，故另加符号名形态）。
+TB_SYMBOL_HINTS: tuple[str, ...] = ("trial_balance", "TrialBalance", "tb_balance")
 
 
 def _find_composable(name: str) -> Path:
@@ -641,26 +654,118 @@ class TestGfP18TbPublishGateGap:
                 "请把它从 GATE_GAP_FAMILIES 移到 GATE_CONNECTED_FAMILIES 并更新 evidence"
             )
 
-    def test_gap_families_are_blocked_from_being_managed(self) -> None:
-        """🔴 需求 6.2 的本地硬门：两家真缺口在裁决落地前**不得受管**。
+    def test_managing_gap_families_introduces_no_second_tb_write_path(self) -> None:
+        """🔴 需求 6.2：两家真缺口受管后**不得引入第二条 TB 写入路径**。
 
-        判据形态 = 「它们不得出现在已交付 provider 的 `STORE_MERGE_REGISTRY` 里」。
-        G4-main / G6-main 一旦注册 adapter 而 TB 门仍缺 ⇒ 打红。
+        ## 2026-09-30 判据改写 + 书面裁决（原判据给的第二条出路）
+
+        **原判据形态是代理指标**：「它们不得出现在 `STORE_MERGE_REGISTRY` 里」。它用
+        「是否受管」代理「是否引入第二条 TB 写入路径」，并在被代理项成立时给两条出路：
+        ①补显式发布门（属 `tb-writeback-explicit-publish-gate` 作业面，不在本 spec）
+        ②**在 evidence 里给出「受管不引入第二条 TB 写入路径」的书面裁决**。
+
+        🔴 **该代理判据此前已长期为红**（`g4.bond_main` / `g6.other_bond_main` 早已在
+        `STORE_MERGE_REGISTRY` 内，而两族仍在 `GATE_GAP_FAMILIES`），与 2026-09-30 的
+        manifest capability 翻转**无关**（本判据不读 manifest，两个输入都是静态的）。
+        但翻转确实让风险**由潜伏变为活的**（capability 开了，adapter 真能注册），
+        所以必须在此给出裁决而不是继续挂着。
+
+        **书面裁决（走出路②），依据为现算事实**：
+          - `phase5_g4_bond_investment.py` / `phase5_g6_other_bond.py` 两个 provider 对
+            trial_balance **零引用** —— `trial_balance` / `TrialBalance` / `tb_balance`
+            三种书写形态各 **0** 次，禁用端点 `trial-balance/writeback` 与 `/trial_balance`
+            均不出现；
+          - 两族前端各 12 个文件（宿主 + FormData + Adjudication + 子目录全量）
+            **无任何**禁用 TB 写入端点；
+          - 对照组 G1（`GATE_CONNECTED_FAMILIES`）在 `G1TabAdjudication.vue` 命中发布门
+            ⇒ **扫描口径有效，上面的零不是空转**。
+        ⇒ 受管只接通 OO↔HTML store 投影，**不触碰 trial_balance**，故不构成第二条写入路径。
+
+        **仍然存在的真实缺口**（不被本裁决覆盖、另有判据守）：两族**完全没有**显式发布门
+        ⇒ 审定数没有任何 TB 通路。该缺口由同类 `test_gate_gap_families_have_no_publish_gate`
+        （参数化那条）与 `test_g6_main_gate_removal_without_replacement_is_registered` 守住，
+        补门后那两条会打红并提示移出 `GATE_GAP_FAMILIES`。
+
+        ⇒ 本判据因此从代理指标换成**被保护的真属性本身**，并保留反向锁：
+        只要缺口族的代码里出现禁用 TB 写入端点，立刻红。
         """
         from app.services.workpaper_sync.store_item_registry import (  # type: ignore
             STORE_MERGE_REGISTRY,
         )
 
         gated_adapters = {"G4-main": "g4.bond_main", "G6-main": "g6.other_bond_main"}
-        violations = [
-            f"{fam} 的 adapter {aid!r} 已注册，但其 TB 显式发布门仍缺"
-            for fam, aid in gated_adapters.items()
+        managed = {
+            fam: aid for fam, aid in gated_adapters.items()
             if fam in GATE_GAP_FAMILIES and aid in STORE_MERGE_REGISTRY
-        ]
+        }
+        # 分母自证：本裁决的前提是「它们确实已受管」。若哪天不再受管，前提变了须重裁。
+        assert managed == gated_adapters, (
+            f"缺口族的受管状态变了（现算 {managed}）⇒ 本书面裁决的前提不再成立，须重裁"
+        )
+
+        providers = {
+            "G4-main": _BACKEND / "app/services/workpaper_sync/phase5_g4_bond_investment.py",
+            "G6-main": _BACKEND / "app/services/workpaper_sync/phase5_g6_other_bond.py",
+        }
+
+        violations: list[str] = []
+        scanned = 0
+        for fam in gated_adapters:
+            prov = providers[fam]
+            assert prov.is_file(), f"{fam} 的 provider 不存在：{prov} ⇒ 裁决无对象"
+            code = self._code_only(prov.read_text(encoding="utf-8"))
+            scanned += 1
+            for pat in (*TB_SYMBOL_HINTS, *TB_WRITE_ENDPOINTS):
+                if pat in code:
+                    violations.append(f"{fam} provider 出现 TB 写入线索 {pat!r}")
+            # 🔴 前端探测面复用本文件既有的 `GATE_LAYERS`（与同族判据同口径），
+            #    不自造 glob —— 两套 glob 会悄悄分叉。
+            layers = GATE_LAYERS.get(fam)
+            assert layers, f"GATE_LAYERS 里没有 {fam} ⇒ 探测面未声明，拒绝判「无违规」"
+            # 🔴 分母自证不用拍脑袋阈值，而是「声明的每个字面路径都必须解析到真实文件」：
+            #    声明了却不存在的层 = 任何用 GATE_LAYERS 的判据都**从未扫过它**（静默脱管）。
+            literals = [g for g in layers if "*" not in g]
+            missing = [g for g in literals if not (FRONTEND / g).is_file()]
+            assert not missing, (
+                f"{fam} 的 GATE_LAYERS 声明了不存在的文件：{missing} ⇒ 该层从未被任何"
+                "用 GATE_LAYERS 的判据扫到（静默脱管）；请修正声明或补回文件"
+            )
+            files = [p for g in layers for p in FRONTEND.glob(g) if p.is_file()]
+            assert len(files) >= len(literals), (
+                f"{fam} 解析到 {len(files)} 个文件 < 声明的 {len(literals)} 个字面路径"
+            )
+            scanned += len(files)
+            for p in files:
+                fe_code = self._code_only(p.read_text(encoding="utf-8"))
+                for ep in TB_WRITE_ENDPOINTS:
+                    if ep in fe_code:
+                        violations.append(f"{fam} {p.name} 出现禁用端点 {ep!r}")
+
+        # 分母 = 2 个 provider + 两族 GATE_LAYERS 解析出的全部文件（现算，不写死）
+        expected = len(gated_adapters) + sum(
+            len([p for g in GATE_LAYERS[fam] for p in FRONTEND.glob(g) if p.is_file()])
+            for fam in gated_adapters
+        )
+        assert scanned == expected, f"扫描计数 {scanned} 与现算探测面 {expected} 不等"
         assert not violations, (
             "\n".join(violations)
-            + "\n⇒ 先补显式发布门（属 tb-writeback-explicit-publish-gate 作业面），"
-            "或在本 spec 的 evidence 里给出「受管不引入第二条 TB 写入路径」的书面裁决"
+            + "\n⇒ 缺口族引入了第二条 TB 写入路径，书面裁决作废：须先补显式发布门"
+            "（`tb-writeback-explicit-publish-gate` 作业面）再谈受管"
+        )
+
+        # 🔴 口径有效性自证（否则上面的「无违规」可能只是扫描器坏了）：
+        #    对照组 G1 必须能被同一套口径命中显式发布门。
+        g1_files = [
+            FRONTEND / "components/workpaper/composables/useG1Adjudication.ts",
+            *FRONTEND.glob("components/workpaper/g1-trading-financial-assets/**/*.vue"),
+        ]
+        g1_hit = [
+            p.name for p in g1_files
+            if p.is_file() and PUBLISH_ENDPOINT in self._code_only(p.read_text(encoding="utf-8"))
+        ]
+        assert g1_hit, (
+            "对照组 G1 没被命中显式发布门 ⇒ 本判据的扫描口径失效，"
+            "上面的「缺口族无 TB 写入线索」不可采信"
         )
 
     def test_g6_main_gate_removal_without_replacement_is_registered(self) -> None:

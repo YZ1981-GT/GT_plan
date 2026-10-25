@@ -414,10 +414,11 @@ async def s_transaction_disclosure_notify(
     try:
         from app.services.event_bus import event_bus
 
-        await event_bus.broadcast_raw(
-            project_id=project_id,
-            event_type="disclosure:note-text-updated",
-            data={
+        event_bus.broadcast_raw(
+            "disclosure:note-text-updated",
+            extra={
+                "project_id": str(project_id),
+                "year": year,
                 "wp_id": wp_id,
                 "wp_code": code,
                 "section": request.section,

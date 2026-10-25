@@ -1,0 +1,325 @@
+{
+  "contract_id": "c2.control_test_summary",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "63d96619de4240988e647ec44691ed20ee478e44e06d2bf8101b6dcd963506b2",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "canary_scope": {
+      "declared_workbook": "C/C2 销售循环控制测试.xlsx",
+      "homogeneous_main_books": 14,
+      "note": "🔴 CC-61：一 componentType 覆盖 28 个 wp_code。本契约声明 C2 册为 canary 权威样本；C3~C15 的 13 本主册已实证与 C2 六项指标逐值一致（公式格 12 / 裸 IF 0 / definedName 0-0 / 超列 0 / max_col 18 / 表头逐字同）。",
+      "wp_code_count": 28,
+      "wp_codes_deviation": [
+        "C2-2",
+        "C3-2",
+        "C4-2",
+        "C5-2",
+        "C6-2",
+        "C7-2",
+        "C8-2",
+        "C9-2",
+        "C10-2",
+        "C11-2",
+        "C12-2",
+        "C13-2",
+        "C14-2",
+        "C15-2"
+      ],
+      "wp_codes_main": [
+        "C2",
+        "C3",
+        "C4",
+        "C5",
+        "C6",
+        "C7",
+        "C8",
+        "C9",
+        "C10",
+        "C11",
+        "C12",
+        "C13",
+        "C14",
+        "C15"
+      ]
+    },
+    "data_area_zero_formula": true,
+    "entry_id": "xlsx/gt-c-control-test",
+    "formula_mask_empty_reason": "数据区 r7~r21 零公式（全册 6 个公式全在 r3/r4 页眉跨 sheet 引用）",
+    "html_store": {
+      "conclusion_slot_fields": [
+        "assertion",
+        "attribute",
+        "frequency",
+        "hasDeviation",
+        "relatedRisk",
+        "sampleSize",
+        "testMethod"
+      ],
+      "item_id_pattern": "C{n}-sum-{m}-{field}",
+      "note": "🔴 **C 域 store 形态与 D~N 根本不同**：D4/J1 把整表存成一个 item_id 的 remark JSON 数组，C 是**每个字段一行** checklist_responses（`C{n}-sum-{m}-{field}`，15 字段/行 ⇒ 15 行/控制点）⇒ build_store_projection 要按 item_id 分组重建行，不是 json.loads 一个数组。🔴 **槽位 `m` 不是声明的行身份**（见 reviewed_basis 末段）。🔴 **一 entry 覆盖 28 个 wp_code / 14 本同构主册**（CC-61）：契约只能声明一本册，本 canary 声明 C2 册为权威样本，C3~C15 已实证六项指标与 C2 逐值一致，按同一 sheet_payload 扩；14 本 `-2` 偏差册另有 definedName 232/broken 181 污染（外部依赖 36）。",
+      "row_identity_key": "controlId",
+      "shape": "per_field_scalar_rows",
+      "storage_slot_key": "m（1-based，provider 内部，不进契约）",
+      "table": "checklist_responses"
+    },
+    "mapping_digest": "ecccc0d8e64329c3693469115180c79976a72c0a5df7162bac8611180ed5ed29",
+    "merged_in_data_area": 0,
+    "pilot_class": "phase5_c_control_test_summary",
+    "reviewed_basis": "openpyxl 逐格实测 C/C2 销售循环控制测试.xlsx 的 `C2控制测试汇总表`（r1/r2 标题 merged A1:O1 / A2:O2 · r3/r4 页眉 6 个跨 sheet 引用公式 · r5 是「下拉选择」提示行**非表头非数据** · **r6 表头 15 列 A~O** 逐字为 子流程/控制编号/控制名称/详细控制描述/受影响的交易、账户余额和披露/认定/控制属性/控制频率/与控制相关的风险/测试方法/范围（样本量）/是否识别出偏差/整改期间（如有）/识别出的缺陷/索引号 · **数据区 r7~r21 共 15 行**（模板内全空，待填底稿）· **r22 = `提示1：与控制相关的风险`** 是静态说明区首行 ⇒ footer 边界 · 🔴 **数据区零公式**（全册 6 个公式全在 r3/r4 页眉）⇒ formula_mask 为空 · max_column=15(O) 且 last_value_col=15 ⇒ UUID 放 **P** · 无 Excel Table · ws.protection.sheet=False ⇒ locked 惰性 · 数据区无 merged（merged 全在标题与 r23+ 提示区）) + 前端 `useCControlTestData.ts` 按值 grep（`SummaryRow` 15 字段与 15 列一一对应；序列化 `C{n}-sum-{m}-{field}`，枚举类 6 字段 + sampleSize 存 conclusion 槽、其余存 remark 槽) + 🔴 **行身份改口径**（序列化处 `const m = i + 1` 是数组下标，而引擎 `FORBIDDEN_ROW_IDENTITY_KINDS` 明令禁 `index`/`ordinal`/`position`/`array_index` ⇒ 声明的行身份取 **B 列控制编号 `controlId`** 业务键，`m` 降级为 provider 内部存储槽不进契约；merge 时按 controlId 定位目标行回写其当前槽)",
+    "sheet_protection_enabled": false
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "C2控制测试汇总表",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "c2-summary-managed",
+      "tables": [
+        {
+          "anchor": "A6",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "sub_process",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!A6",
+              "header_text": "子流程",
+              "json_pointer": "/rows/{row_uuid}/subProcess",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!A7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/sub_process",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "control_id",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!B6",
+              "header_text": "控制编号",
+              "json_pointer": "/rows/{row_uuid}/controlId",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!B7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/control_id",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "control_name",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!C6",
+              "header_text": "控制名称",
+              "json_pointer": "/rows/{row_uuid}/controlName",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!C7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/control_name",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "description",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!D6",
+              "header_text": "详细控制描述",
+              "json_pointer": "/rows/{row_uuid}/description",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!D7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/description",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "affected_items",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!E6",
+              "header_text": "受影响的交易、账户余额和披露",
+              "json_pointer": "/rows/{row_uuid}/affectedItems",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!E7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/affected_items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "assertion",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!F6",
+              "header_text": "认定",
+              "json_pointer": "/rows/{row_uuid}/assertion",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!F7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/assertion",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "attribute",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!G6",
+              "header_text": "控制属性",
+              "json_pointer": "/rows/{row_uuid}/attribute",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!G7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/attribute",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "frequency",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!H6",
+              "header_text": "控制频率",
+              "json_pointer": "/rows/{row_uuid}/frequency",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!H7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/frequency",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "related_risk",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!I6",
+              "header_text": "与控制相关的风险",
+              "json_pointer": "/rows/{row_uuid}/relatedRisk",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!I7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/related_risk",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "test_method",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!J6",
+              "header_text": "测试方法",
+              "json_pointer": "/rows/{row_uuid}/testMethod",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!J7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/test_method",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "sample_size",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!K6",
+              "header_text": "范围（样本量）",
+              "json_pointer": "/rows/{row_uuid}/sampleSize",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!K7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/sample_size",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "has_deviation",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!L6",
+              "header_text": "是否识别出偏差",
+              "json_pointer": "/rows/{row_uuid}/hasDeviation",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!L7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/has_deviation",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "remediation",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!M6",
+              "header_text": "整改期间（如有）",
+              "json_pointer": "/rows/{row_uuid}/remediation",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!M7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/remediation",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "defect",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!N6",
+              "header_text": "识别出的缺陷",
+              "json_pointer": "/rows/{row_uuid}/defect",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!N7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/defect",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!C2控制测试汇总表!O6",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/indexRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!C2控制测试汇总表!O7",
+              "stable_field_key": "c_control_test_summary_rows/{row_uuid}/index_ref",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "提示1：与控制相关的风险",
+            "search_column": "A"
+          },
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/controlId",
+            "kind": "field"
+          },
+          "table_key": "c_control_test_summary_rows",
+          "uuid_col": "P"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "11fa82c4504b757afa61986b0510fb3de9ed2f046cc5b7a055045a780e7e3947",
+    "relative_path": "C/C2 销售循环控制测试.xlsx",
+    "template_sha256": "1f3035e9f78b1561cd1a418249d4ccc5a7aea77d7bf074bc7b1ac235328aaa41"
+  },
+  "template_definition_sha256": "a76d69d66e19b3bc9bbdaef4a88a83ef9ee53e38192526c8d804a851eba45c2a"
+}

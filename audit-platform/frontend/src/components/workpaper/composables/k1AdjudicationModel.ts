@@ -14,7 +14,6 @@
  */
 import { PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
 import { DEFAULT_K2_AGING_BUCKETS } from './k1PolicyCrossHelpers'
-import { newRowIdentity } from './shared/rowIdentity'
 
 export type K1AdjBlockKind = 'portfolio' | 'aging' | 'nature'
 
@@ -52,7 +51,7 @@ export function buildK1AgingRowDefs(
   const segs = segments && segments.length ? segments : K1_DEFAULT_AGING_SEGMENTS
   return [
     ...segs.map((seg, i) => ({
-      rowKey: newRowIdentity('a'),
+      rowKey: `a${i}`,
       label: seg.label,
       syncKey: seg.key,
     })),

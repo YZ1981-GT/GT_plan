@@ -7,16 +7,16 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "db3a4c87338f1ffcf9fbee8983cd62554ed7a289d040c7fb7cf24ccd058b94a9",
+  "instrumentation_definition_sha256": "859b8454e0489a9fd2d7d59588a444d044843d2f192c79c174fdfcc11f0a0561",
   "review": {
     "authority_root": "backend/wp_templates",
     "carrier": {
       "force_component_type": "i2-development-expenditure",
-      "gate_layer": "host_tab",
+      "gate_layer": "composable",
       "host_checklist_get_hits": 0,
       "mounts": 2,
       "read": "host_inline_render_config_refetch",
-      "tb_publish_gate": "i2/core/I2TabAdjudication.vue#L384",
+      "tb_publish_gate": "composables/useI2Adjudication.ts#publishToTb",
       "write": "host_inline",
       "write_client": "http"
     },
@@ -75,8 +75,8 @@
     },
     "frozen_key": true,
     "frozen_reason": "lane 1 的 useI1AdditionCheck.ts#L250-251 跨 entry 读它（remark 优先 / conclusion 兜底）；i2ConsistencyModel.ts#L213 的前缀映射 'I2-2-': ['I2-2-rows'] 也依赖它 ⇒ 改键名会同时打断跨 lane 消费边与一致性检查前缀表。",
-    "gate_layer": "host_tab",
-    "gate_layer_note": "全 I 唯一发布门不在 composable：useI2Adjudication.ts 里 publishToTb 0 命中，门在 I2TabAdjudication.vue#L384 自建 ⇒ 判据按 composable 找门会让本条假红。「I 循环 6/6 全有发布门」是 entry 维度成立的结论。",
+    "gate_layer": "composable",
+    "gate_layer_note": "✅ 2026-10-01 已从 I2TabAdjudication.vue 自建收敛到 useI2Adjudication.ts#publishToTb；宿主只绑定按钮，端点/二次确认/互斥锁语义不变。",
     "html_store": {
       "item_ids": [
         "I2-2-rows"
@@ -104,7 +104,7 @@
     "secondary_ui_gate": false,
     "secondary_ui_gate_note": "全 I 唯一缺二级门控：宿主 isOoAvailable 与「仅结构化视图」tag 命中均 0 ⇒ OO 探测失败时切换按钮照样显示。判据写「全 slice 都有二级门控」会在本条上静默恒真。",
     "store_only_fields": [],
-    "tb_publish_gate": "i2/core/I2TabAdjudication.vue#L384",
+    "tb_publish_gate": "composables/useI2Adjudication.ts#publishToTb",
     "template_cell_lock_facts": {
       "note": "ws.protection.sheet=False ⇒ locked 标志惰性。契约 mode 一律按「该格逐行有没有真公式」判，merge._protection 只看契约 mode + formula_mask。",
       "sheet_protection_enabled": false
@@ -384,9 +384,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "c7cf2ac6989c5b771905c5fb3c7bb6c5acd78c431e6120121b50512446caa781",
+    "normalized_structure_hash": "7a5e0b619d459043867628c6f1b7f3dc1c6ca5abb5a626bbcf55f13bb1e40658",
     "relative_path": "I/I2 开发支出.xlsx",
-    "template_sha256": "a93c298b1f4adfe28532ba899a9e44904459534c703158a5b4e6d92ca4d67178"
+    "template_sha256": "90e7199909bdb70a21b071b0b69c90d2bb3dbe16f77be049ceaa2d21260dd3ef"
   },
-  "template_definition_sha256": "70bad0f2af8107d54d34836091a79923c5141bf84e7b67bb3cec960fbb08fbd7"
+  "template_definition_sha256": "64cdb0fc2fed0411949ff4fa335a4330a68329d76a3efeccfa0bf9063c2fead3"
 }

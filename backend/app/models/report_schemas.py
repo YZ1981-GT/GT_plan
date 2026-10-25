@@ -119,6 +119,9 @@ class ReportConfigRow(BaseModel):
     formula_category: str | None = None
     formula_description: str | None = None
     formula_source: str | None = None
+    # V179: 调整列净额公式
+    aje_formula: str | None = None
+    rje_formula: str | None = None
     applicable_standard: str
     is_total_row: bool = False
     parent_row_code: str | None = None

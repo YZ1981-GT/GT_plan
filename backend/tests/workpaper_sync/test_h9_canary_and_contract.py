@@ -474,11 +474,31 @@ class TestH9ProviderWiring:
         assert M.contract_file_path().exists()
         M.assert_contract_file_matches_source()
 
-    def test_manifest_capability_is_still_single_onlyoffice(self) -> None:
-        """HC-1：capability 只能由 `register_from_manifest()` 迁移，禁手改 manifest。"""
-        assert M.manifest_capability_enabled() is False
-        with pytest.raises(M.EntrySelectionError, match="capability"):
-            M.assert_manifest_capability_enabled()
+    def test_manifest_capability_gate_is_now_open(self) -> None:
+        """🔴 **2026-10-01 判据翻面**（原名 `..._is_still_single_onlyoffice`）。
+
+        原断言是「`manifest_capability_enabled()` 必须为 False 且
+        `assert_manifest_capability_enabled()` 必须抛」—— 那是「正向门必须关着」的形态。
+        H9 连同全 H 九条已按六项前置把 capability 翻为 `bidirectional`
+        （commit `33e2a049b`，审计见 foundation spec 文末），继续要求 False 就是要求成果
+        不许存在。
+
+        原 docstring 说「capability 只能由 `register_from_manifest()` 迁移，禁手改 manifest」
+        —— 这句话本身是**对实现的误解**，现读可证：`register_from_manifest()` 读 manifest
+        capability 来决定能不能注册（`assert_manifest_capability_enabled()` 在 provider 的
+        `attach_*` 入口），**不写** manifest。capability 的唯一写入路径是 overlay override
+        经 `generate_workpaper_sync_manifest.py --apply` 生成 —— 而那条路径自带
+        `approved_source_digest` 门（改 mount 清册要先复核 diff），并不是「手改」。
+
+        翻面后断言「门开着」，并保留反向意义：门被关回去（overlay override 掉了 / 有人把
+        capability 改回 single_onlyoffice）本条会红。
+        """
+        assert M.manifest_capability_enabled() is True, (
+            "H9 的 manifest capability 门又关上了 —— 查 overlay 里 "
+            "GtH9LeaseLiabilities.vue 那条 override 是否还在，以及 manifest 是否重算过"
+        )
+        # 门开着时这个断言器必须**不抛**（翻面前它是必抛）
+        M.assert_manifest_capability_enabled()
 
     def test_template_bytes_are_frozen(self) -> None:
         data = M.read_authoritative_template()

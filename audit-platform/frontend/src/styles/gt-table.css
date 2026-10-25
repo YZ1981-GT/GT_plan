@@ -29,10 +29,33 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   3. 表头 white-space: nowrap（防止表头文字折行）
+   3. 列宽自适应的收尾：内容到达列宽上限后折行，中文词不从中间断开
+   ─────────────────────────────────────────────────────────────
+   列宽本身由 useAutoColumnWidth 按真实内容测算，不用 element-plus 的
+   `table-layout="auto"`：上游 issue #19737 未修（fixed 列带 width 会错位），
+   且 el-table-v2 不是 <table> 元素压根不支持。
+
+   这里只补官方默认缺的一件事 —— element-plus 原生
+   `.el-table .cell { white-space:normal; overflow-wrap:break-word }`
+   已经会折行，但断行点是任意字符，中文词会被从中间劈开。改用
+   keep-all 让中文按词折；无空格超长串（URL/长编号）由 break-word 兜底。
+
+   不动的两处：
+   - 数值列（is-right）：保持 nowrap，见 global.css 的 Arial Narrow 段。
+     金额「-18,241,563.19」折成两行不可读。
+   - show-overflow-tooltip 的列：官方给 `.cell.el-tooltip` 加了 nowrap，
+     用 :not() 让行，尊重组件显式选择的省略号 + tooltip 方案。
    ═══════════════════════════════════════════════════════════════ */
 .el-table thead th .cell {
-  white-space: nowrap;
+  white-space: normal;
+  word-break: keep-all;
+  line-height: 1.4;
+}
+
+.el-table td.el-table__cell:not(.is-right) .cell:not(.el-tooltip) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-height: 1.5; /* 官方固定 23px，折行后偏挤 */
 }
 
 /* ═══════════════════════════════════════════════════════════════

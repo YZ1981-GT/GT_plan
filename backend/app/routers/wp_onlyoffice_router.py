@@ -914,7 +914,13 @@ async def get_whole_excel_grid(
 
     sheet_names = [n for n in all_names if not _should_skip_historical_sheet(n)]
     if not sheet_names:
-        sheet_names = all_names
+        # 🔴 MC-24 fail-closed：过滤后为空说明所有 sheet 都是历史遗留，
+        # 抛错并指出首个被过滤掉的 sheet 名，不回落全集（原 fail-open 会静默暴露历史 sheet）。
+        first_skipped = next((n for n in all_names if _should_skip_historical_sheet(n)), all_names[0] if all_names else "?")
+        raise HTTPException(
+            status_code=404,
+            detail=f"底稿所有 sheet 均为历史遗留（首个: {first_skipped!r}），无可用业务 sheet"
+        )
 
     # 默认跳过「底稿目录」，优先展示业务 sheet
     preferred = sheet

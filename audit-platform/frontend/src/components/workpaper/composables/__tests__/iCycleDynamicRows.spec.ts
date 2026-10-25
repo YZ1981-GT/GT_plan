@@ -52,12 +52,25 @@ const LAYERS = ['cost', 'amort', 'impair', 'carrying'] as const
 // ═══════════════════════════════════════════════════════════════════
 
 describe('Property 21 — I1 国企动态可扩类别（四层同步）', () => {
-  it('默认类别 = 源模板固定 12 类，且四层齐备', () => {
+  it('默认类别 = 单一真源 i1CategoryScope 的 11 类（BP-7 收敛），且四层齐备', () => {
     const layers = createDefaultI1SoeLayers()
     expect(layers.map((l) => l.layer)).toEqual([...LAYERS])
     const cats = resolveI1SoeCategories(layers)
     expect(cats).toHaveLength(I1_SOE_CATEGORIES.length)
-    expect(cats).toHaveLength(12)
+    expect(cats).toHaveLength(11)
+    // 🔴 BP-7 收敛：与单一真源 `i1CategoryScope.ts#I1_DEFAULT_CATEGORIES` 有序等值（soe 短 key）
+    expect(cats.map((c) => c.key)).toEqual([
+      'land', 'housing', 'patent', 'knowhow', 'trademark', 'copyright',
+      'franchise', 'software', 'mining', 'data', 'other',
+    ])
+    // 软件在第 8 位（源模板 `底稿目录!A16`），label 不再带「其中：」前缀
+    expect(cats[7]).toMatchObject({ key: 'software', label: '软件' })
+    // 住房使用权（非房屋）/ 特许经营权（非特许权）/ 矿产权（采矿+探矿合并）
+    expect(cats.find((c) => c.key === 'housing')!.label).toBe('住房使用权')
+    expect(cats.find((c) => c.key === 'franchise')!.label).toBe('特许经营权')
+    expect(cats.find((c) => c.key === 'mining')!.label).toBe('矿产权')
+    // 收敛后不再有 exploration（探矿权已并入 mining）
+    expect(cats.find((c) => c.key === 'exploration')).toBeUndefined()
     // 默认类别全部不带 soe_custom_ 前缀（稳定常量键）
     expect(cats.every((c) => !/^soe_custom_/.test(c.key))).toBe(true)
     // other 不可删，其余可删
@@ -79,10 +92,10 @@ describe('Property 21 — I1 国企动态可扩类别（四层同步）', () => 
     }
     expect(res!.layers).toHaveLength(4)
 
-    // 派生类别序列把它排在默认 12 类之后
+    // 派生类别序列把它排在默认 11 类之后
     const cats = resolveI1SoeCategories(res!.layers)
-    expect(cats).toHaveLength(13)
-    expect(cats[12]).toMatchObject({ key: 'soe_custom_1', label: '碳排放权', removable: true })
+    expect(cats).toHaveLength(12)
+    expect(cats[11]).toMatchObject({ key: 'soe_custom_1', label: '碳排放权', removable: true })
   })
 
   it('自定义类别进入 flatten（推附注）与账面价值联动', () => {
@@ -123,7 +136,7 @@ describe('Property 21 — I1 国企动态可扩类别（四层同步）', () => 
     for (const block of removed!) {
       expect(block.categories.find((c) => c.key === 'soe_custom_1')).toBeFalsy()
     }
-    expect(resolveI1SoeCategories(removed!)).toHaveLength(12)
+    expect(resolveI1SoeCategories(removed!)).toHaveLength(11)
   })
 
   it('i1SoeCategoryLabel：默认类别取常量，自定义取数据里的 label', () => {

@@ -1549,18 +1549,24 @@ class NoteWordExporter:
         if not headers_raw or not rows:
             return
 
-        # 空 header 列裁剪 + 记录有效列索引
-        valid_indices = [i for i, h in enumerate(headers_raw) if h and str(h).strip()]
+        # CP-02 修复：有多级表头（_column_groups / multi_header）时空标题是合并结构占位，
+        # 不能裁掉——否则上市六列变两列、金额叶子全丢。只在无分组的扁平表中裁废占位列。
+        column_groups = table_data.get("_column_groups")
+        has_multi_header = isinstance(column_groups, list) and len(column_groups) > 0
+        has_raw_multi = isinstance(table_data.get("multi_header"), list) and len(table_data.get("multi_header", [])) > 0
+
+        if has_multi_header or has_raw_multi:
+            # 多级表头：保留全部列，空标题是合并子表头占位
+            valid_indices = list(range(len(headers_raw)))
+        else:
+            # 扁平表头：裁掉真正空白的废占位列（v2 模板治理前的兼容）
+            valid_indices = [i for i, h in enumerate(headers_raw) if h and str(h).strip()]
         if not valid_indices:
             return
         headers = [headers_raw[i] for i in valid_indices]
 
         num_cols = len(headers)
         num_rows = len(rows) + 1  # +1 for header row
-
-        # 检测是否有两级分组表头（_column_groups）
-        column_groups = table_data.get("_column_groups")
-        has_multi_header = isinstance(column_groups, list) and len(column_groups) > 0
 
         if has_multi_header:
             num_rows = len(rows) + 2  # +2 for two header rows

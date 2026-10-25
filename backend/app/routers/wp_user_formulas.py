@@ -349,6 +349,13 @@ async def update_user_formulas(
     parsed_data = dict(wp.parsed_data or {})
     user_formulas: dict[str, dict] = dict(parsed_data.get("user_formulas") or {})
 
+    # ── 独占键说明（spec: formula-push-user-custom-cross-module T6 复盘修正）──
+    # 公式推送引擎写 checklist_responses（键=item_id 如 E1-adj-tb-amount-ending），
+    # 用户自定义公式写 wp_formula 表（键=sheet_name+target_cell 如 E1-1+B5），
+    # 两者写不同存储、键命名空间零交集 ⇒ 后端拦截无法匹配且无实际保护意义。
+    # 守护完全由前端 FormulaManagerDialog 的 isOwnedKey 置灰承担（row.row_code
+    # 在底稿域是 item_id 格式，匹配正确）。
+
     # 加载预设公式映射用于 original_preset 备份(从 prefill_formula_mapping.json)
     preset_lookup: dict[str, str] = {}
     try:

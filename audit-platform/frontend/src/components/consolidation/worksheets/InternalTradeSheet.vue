@@ -115,6 +115,7 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
 import GtEditableTable, { type GtColumn } from '@/components/common/GtEditableTable.vue'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
+import { restoreTradeRows, tradePreviewLines } from '../composables/elimSourceGroups'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface TradeRow {
@@ -123,10 +124,15 @@ interface TradeRow {
   unrealizedProfit: number|null; inventoryRatio: number|null
 }
 
-const props = defineProps<{ companies: CompanyCol[] }>()
+const props = defineProps<{
+  companies: CompanyCol[]
+  /** 已保存的行（切回本表 / 刷新页面后恢复；不传 = 空表） */
+  initialRows?: TradeRow[] | null
+}>()
 const emitTrade = defineEmits<{
   (e: 'save', data: TradeRow[]): void
-  (e: 'entries-changed', entries: any[]): void
+  /** 行数据变化：父组件据此生成「合并抵消分录明细表」的待生成分组（与本表预览同一计算） */
+  (e: 'rows-changed', rows: TradeRow[]): void
   (e: 'open-formula', key: string): void
 }>()
 
@@ -143,7 +149,8 @@ const allCompanyOptions = computed(() => [
 ])
 const tradeTypes = ['商品销售', '提供劳务', '资产转让', '资金往来', '管理费分摊', '其他']
 
-const rows = ref<TradeRow[]>([mkEmpty(), mkEmpty(), mkEmpty()])
+const restored = restoreTradeRows(props.initialRows)
+const rows = ref<TradeRow[]>(restored.length ? restored : [mkEmpty(), mkEmpty(), mkEmpty()])
 
 function mkEmpty(): TradeRow {
   return {
@@ -168,30 +175,12 @@ const columns: GtColumn[] = [
   { prop: '_eliminateProfit', label: '应抵消利润', width: 110, align: 'right', editable: false },
 ]
 
-// ── 抵消分录自动生成 ──────────────────────────────────────────────────────────
-const generatedEntries = computed(() => {
-  const entries: any[] = []
-  let totalRevenue = 0, totalCost = 0, totalUnrealized = 0
-  for (const row of rows.value) {
-    if (!row.sellerCompany || !row.buyerCompany) continue
-    totalRevenue = Number(decSub(String(totalRevenue + n(row.sellerAmount)), '0')); totalCost = Number(decSub(String(totalCost + n(row.buyerAmount)), '0'))
-    totalUnrealized = Number(decSub(String(totalUnrealized + Number(decDiv(decMul(String(n(row.unrealizedProfit)), String(n(row.inventoryRatio))), '100'))), '0'))
-  }
-  if (totalRevenue > 0 || totalCost > 0) {
-    const amount = Math.min(totalRevenue, totalCost)
-    entries.push({ direction: '借', subject: '营业收入', amount, desc: '内部交易收入抵消' })
-    entries.push({ direction: '贷', subject: '营业成本', amount, desc: '内部交易成本抵消' })
-  }
-  if (totalUnrealized > 0) {
-    entries.push({ direction: '借', subject: '营业成本', amount: totalUnrealized, desc: '未实现内部利润抵消' })
-    entries.push({ direction: '贷', subject: '存货', amount: totalUnrealized, desc: '存货中未实现利润' })
-  }
-  return entries
-})
+// ── 抵消分录（预览）──────────────────────────────────────────────────────────
+// 与「合并抵消分录明细表」的待生成分组同一计算（elimSourceGroups，Decimal）：收入成本抵销取两者较小值，
+// 未实现利润 = Σ 未实现利润 × 存货留存率%。生成草稿分录在明细表里做。
+const generatedEntries = computed(() => tradePreviewLines(rows.value))
 
-watch(generatedEntries, (entries) => {
-  emitTrade('entries-changed', entries.map(e => ({ ...e, source: '内部交易' })))
-}, { immediate: true })
+watch(rows, (v) => emitTrade('rows-changed', v), { deep: true, immediate: true })
 
 // ── Excel 导入导出 ────────────────────────────────────────────────────────────
 const { exportTemplate: _exportTemplate, exportData: _exportData, onFileSelected: _onFileSelected } = useExcelIO()

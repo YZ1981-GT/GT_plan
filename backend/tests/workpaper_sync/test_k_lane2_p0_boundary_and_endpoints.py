@@ -513,12 +513,27 @@ class TestKBP8LineCountCaliber:
     （单源探针 + 统一键迁移 + BP-6 边界 why-not 说明）。
     """
 
-    #: 收敛前基线（design.md 登记值）
+    #: 收敛前基线（design.md 登记值）—— 🔴 这组是**真实测得**的，现已不可复测
+    #: （文件已改），但与 slice / design 的登记逐值相符，作冻结基线留档。
     BEFORE = {8: 189, 9: 182, 11: 154, 12: 158, 13: 158}
-    #: 收敛后现算
-    EXPECTED = {8: 260, 9: 252, 11: 224, 12: 230, 13: 230}
+    #: 🔴 收敛后现算 —— 见下方 docstring 勘误说明。
+    EXPECTED = {8: 274, 9: 260, 11: 236, 12: 244, 13: 244}
 
     def test_line_counts_after_convergence(self) -> None:
+        """🔴 勘误：本条原先写的是**实施前的预测值**，不是测量值。
+
+        首版写 `{8: 260, 9: 252, 11: 224, 12: 230, 13: 230}` 并描述为「收敛后现算」。
+        但那组数字写在 Task 4~5 落地**之前** —— 当时 5 个文件都还是 `BEFORE` 的行数，
+        不可能测出它。收敛实施完成后现算得 `EXPECTED`（净增 85/78/82/86/86），与预测
+        差 8~14 行。
+
+        换数字遵方法论铁律 ㉖：新值必须用同一口径测出并写明口径 ——
+        `len(text.split("\\n"))`（KB-P8），由 `line_count()` 单一出口计算，
+        与 foundation p4 的 `TestLineCountCaliber.AFTER` 同源（两处必须一致，见下）。
+
+        🔴 绝对行数是**快照**不是性质，只用于「有人悄悄大改这些文件时打红」。
+        性质判据是另外两条：两口径差恒为 1 + 净增量同量级。
+        """
         total = 0
         for n, exp in self.EXPECTED.items():
             actual = line_count(dual_mode_path(n))
@@ -526,15 +541,41 @@ class TestKBP8LineCountCaliber:
                 f"useK{n}DualMode.ts: 期望 {exp} 行，实得 {actual}"
             )
             total += actual
-        assert total == 1196, f"合计期望 1196，实得 {total}"
+        assert total == 1258, f"合计期望 1258，实得 {total}"
+
+    def test_the_two_specs_quote_the_same_snapshot(self) -> None:
+        """🔴 同一快照在两份 spec 的守卫里各写了一遍 ⇒ 必须逐值锁死。
+
+        foundation p4 管 BP-6 全集 6 条、本 lane 管其中 5 条。只改一处会留下
+        「两个真源各说一套」的漂移面 —— 这条就是那道锁。
+        """
+        from tests.workpaper_sync.test_k_foundation_p4_endpoints_and_carriers import (
+            TestLineCountCaliber,
+        )
+
+        for n, exp in self.EXPECTED.items():
+            assert TestLineCountCaliber.AFTER[n] == exp, (
+                f"K{n}: foundation 记 {TestLineCountCaliber.AFTER[n]}，本 lane 记 {exp}"
+            )
+        for n, before in self.BEFORE.items():
+            assert TestLineCountCaliber.BEFORE[n] == before, (
+                f"K{n} 收敛前基线两处不一致"
+            )
+        # canary K10 只在 foundation 侧有分母（本 lane 不含它）
+        assert CANARY_INDEX not in self.EXPECTED
+        assert CANARY_INDEX in TestLineCountCaliber.AFTER
 
     def test_growth_is_uniform_across_five(self) -> None:
         """🔴 5 个净增量接近（同一套改动，不是随手加注释）。"""
         deltas = {
             n: self.EXPECTED[n] - self.BEFORE[n] for n in self.EXPECTED
         }
-        assert all(65 <= d <= 80 for d in deltas.values()), (
+        assert all(75 <= d <= 95 for d in deltas.values()), (
             f"净增量离散：{deltas} ⇒ 改动不一致须复核"
+        )
+        assert max(deltas.values()) - min(deltas.values()) <= 10, (
+            f"净增量带宽 {max(deltas.values()) - min(deltas.values())} > 10"
+            " ⇒ 五者改动不同型"
         )
 
     def test_splitlines_is_exactly_five_less(self) -> None:

@@ -102,15 +102,36 @@ EXPECTED: dict[str, int] = {
     #:   逐数对平：公式 126,565 +168 −6 = 126,727 ✅；external 3,883 −6 = 3,877 ✅；
     #:   sheet / three_d / no_target 三类**一分未动** ✅。8 个变动量全部落到两个具名 commit
     #:   的两份具名模板上，**零残差** ⇒ 是语料真变了，不是识别口径漂了。
-    "corpus_sheet_refs": 144904,
-    "corpus_external_refs": 3877,
+    #:
+    #: **④ 语料本体变动（2026-09-29，重复文件删除）**
+    #:
+    #:   `wp_templates/D/D4收入底稿.xlsx`（**无空格**）与 ③① 里加入的
+    #:   `D4 收入底稿.xlsx`（**带空格**）是**同一份底稿的重复文件** —— 用户核实后删掉了
+    #:   无空格那份，保留的是**被净化过**的版本（外部链接部件已丢弃）。
+    #:
+    #:   于是 ③① 那一笔「+1 份模板」被回退，而**不是**回到 ③ 之前的数：留下的是净化版，
+    #:   与被删的那份计数不同。逐项现算（本文件的判据自身就是量具）：
+    #:     * 模板 352 → **351**（下界随之回落）
+    #:     * definedName `builtin_self_scope` 2513 → **2461**、`user_self_scope` 273 → **267**；
+    #:       `builtin_cross_sheet` / `user_cross_sheet` / `global_scope` /
+    #:       `target_not_in_workbook` 四项**一分未动** ⇒ 只少了那一册的自限定名，
+    #:       不是分类能力退化（能力退化会表现为类别之间搬家）。
+    #:   其余量见各键旁的现算注释。
+    #: 🔴 2026-09-29 −22：删掉的那份 D4 自带 22 处 `kind=sheet` 限定引用（见上方 ④）。
+    #: 留下的净化版**无任何**限定引用，所以这一项回落而不是持平。
+    "corpus_sheet_refs": 144882,
+    #: 🔴 2026-09-29 −270：删掉的那份 D4 自带 270 处外部工作簿引用（见上方 ④）。
+    #: 这与 Property 28 基线里那一册 `external_sites` 265→0 同源 —— 两个口径的分母不同
+    #: （此处按**引用处数**、那里按**站点数**），方向与量级一致。
+    "corpus_external_refs": 3607,
     "corpus_three_d_refs": 0,
     "corpus_no_target_refs": 179,
     #: 🔴 这两个是**随语料合法增长**的量，用下界而不是等式（其余 ref 分类量仍用等式 ——
     #: 它们是识别能力的信号，任何变化都必须像上面 ①②③ 那样逐条归因后才准动）。
     #: 等式写法的后果：每入库一份模板就打一次假红，而假红掩盖的正是扫描器↔改写器对账。
     "min_corpus_formulas": 126727,
-    "min_corpus_templates": 352,
+    #: 🔴 2026-09-29 回落 352 → 351：D4 重复文件被删（见上方 ④）。
+    "min_corpus_templates": 351,
     #: chart 有真实样本（8 个部件 / `C24 会计分录 - 细节测试.xlsx`）；pivot 全库为 0。
     "corpus_chart_parts": 8,
     "corpus_pivot_parts": 0,
@@ -118,10 +139,12 @@ EXPECTED: dict[str, int] = {
     #: `TestDefinedNameClassification.test_defined_name_five_way_classification`。
     #: 🔴 2026-09-14 `d3b3d80d9` 加入 `D/D4 收入底稿.xlsx` ⇒ 前两项各 +48 / +6（该册单份
     #: 实测贡献，逐份归因确认其余四项 +0）。见上方 ③。
+    #: 🔴 2026-09-29 删掉重复的 `D/D4收入底稿.xlsx`（无空格）⇒ 前两项 −52 / −6，
+    #: 其余四项**一分未动**。见上方 ④。
     "defined_name_classes": {
-        "builtin_self_scope": 2513,
+        "builtin_self_scope": 2461,
         "builtin_cross_sheet": 0,
-        "user_self_scope": 273,
+        "user_self_scope": 267,
         "user_cross_sheet": 4,
         "global_scope": 197,
         "target_not_in_workbook": 6,

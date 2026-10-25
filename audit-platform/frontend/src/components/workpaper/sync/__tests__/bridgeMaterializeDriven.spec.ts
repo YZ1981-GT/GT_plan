@@ -100,12 +100,54 @@ function listVue(dir: string, prefix = ''): string[] {
  * （`d4/composables/useD4SyncMode.ts`）扫不到 ⇒ 33 个真驱动被误报成空壳（本判据首次
  * 改递归时就是这么假红的）。
  */
+function exportedNames(src: string): string[] {
+  const names: string[] = []
+  for (const m of src.matchAll(/export\s+(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/g)) {
+    names.push(m[1])
+  }
+  for (const m of src.matchAll(/export\s+const\s+([A-Za-z_$][\w$]*)\s*=/g)) {
+    names.push(m[1])
+  }
+  return names
+}
+
 function drivingWrappers(): Set<string> {
-  const out = new Set<string>()
+  // 🔴 必须按**导出的符号名**索引，不是文件 stem：`kAdjustmentSync.ts` 导出的是
+  // `useKAdjustmentSync`，宿主调用的也是 `useKAdjustmentSync(`。首版按文件 stem（`kAdjustmentSync`）
+  // 收集，而宿主调的 `useKAdjustmentSync(` 匹配不上 `\bkAdjustmentSync\s*\(`（前面是 `use`，无
+  // 词边界）⇒ 六张 K 表被误报空壳。useHSyncMode/useD4SyncMode 恰好 stem==导出名才没暴露这个 bug。
+  type Mod = { src: string; exports: string[] }
+  const mods: Mod[] = []
   for (const file of listTs(WP)) {
     const stem = file.replace(/\\/g, '/').split('/').pop()!.replace(/\.ts$/, '')
     if (stem === DEFINER) continue
-    if (DRIVE_RE.test(stripComments(read(file)))) out.add(stem)
+    const src = stripComments(read(file))
+    // 若文件没有显式导出名，退回文件 stem（兼容 default-export 式 composable）。
+    const exports = exportedNames(src)
+    mods.push({ src, exports: exports.length ? exports : [stem] })
+  }
+  // 先收直接调用 bridge 的模块（其全部导出名入集），再做固定点闭包：
+  // K wrapper(useKAdjustmentSync) → useD4SyncMode → bridge。只扫一层会把真实委派误报为空壳；
+  // 只凭 import 名也不够，必须在模块体里有调用表达式 `name(`。
+  const out = new Set<string>()
+  for (const mod of mods) {
+    if (DRIVE_RE.test(mod.src)) mod.exports.forEach((n) => out.add(n))
+  }
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const mod of mods) {
+      if (mod.exports.every((n) => out.has(n))) continue
+      const delegates = [...out].some((w) => new RegExp(`\\b${w}\\s*\\(`).test(mod.src))
+      if (delegates) {
+        mod.exports.forEach((n) => {
+          if (!out.has(n)) {
+            out.add(n)
+            changed = true
+          }
+        })
+      }
+    }
   }
   return out
 }
@@ -153,58 +195,31 @@ function bridgeBuiltNotDriven(): string[] {
 /**
  * 🔴 append-only 欠账清单，**不是豁免名单**（修好必须删，见文件头）。
  *
- * 现存 14 个 A 循环宿主（纯本地 mode ref，连包装都没有）。
+ * 🔴 2026-10-01 现算：清单已**清空**。两类欠账在当前分支都归零 ——
+ *   · G 循环 13 宿主已于 2026-09-27 接 `sync/useGRenderModeSwitch`；
+ *   · 原登记的 A 循环宿主（A91/A101/… 共 14~17 个）在当前分支**根本不挂
+ *     `WorkpaperSyncEditorHost` 也不建 `useWorkpaperSyncBridge`**：它们走的是**另一条**
+ *     legacy 单 OO 路径 `GtOnlyOfficeSheet`（`<GtOnlyOfficeSheet v-else sheet-name="A9-1">`），
+ *     不在本扫描器的两个入口（EditorHost 挂载 / bridge 建立）之内。
  *
- * 原先还有 13 个 G 循环宿主，已于 2026-09-27 全部接 `sync/useGRenderModeSwitch`
- * （受管 sheet 经桥的四分支协议、非受管委派 legacy），逐个从本清单删除。
+ * ⇒ 原基线是对着「A 宿主曾挂 EditorHost」的旧状态写的，与当前分支的 `GtOnlyOfficeSheet`
+ *   形态不符，属 append-only 清单滞后。按「清单已修好项必须删」的既有纪律清空。
+ *   🔴 这**不**代表 A 循环的 legacy 单 OO 已接真桥 —— 那是 A 轮 spec 的范围（`GtOnlyOfficeSheet`
+ *   不受本「EditorHost 必须被驱动」判据覆盖），本判据对它没有发言权，故不登记。
+ *
+ * 清单清空后判据仍**双向锁死**：任何宿主只要**挂了 EditorHost / 建了 bridge** 却不驱动，
+ * `extra` 立刻非空打红（下面「扫描器自检」证明扫描面非空，排除空集假绿）。
  */
-const KNOWN_HOLLOW: readonly string[] = Object.freeze([
-  // ── A 循环：连包装都没有，`const mode = ref('结构化视图')` + v-model ──
-  'GtA101GovernanceCommunication.vue',
-  'GtA111SubsequentEventsInquiry.vue',
-  'GtA121LegalConfirmation.vue',
-  'GtA171AuditSummary.vue',
-  'GtA1721Kam.vue',
-  'GtA1731ConsultationExecution.vue',
-  'GtA173ConsultationRecord.vue',
-  'GtA174DisagreementRecord.vue',
-  'GtA176ClosingMeeting.vue',
-  'GtA177IndependenceDeclaration.vue',
-  'GtA182RegulatoryCommunication.vue',
-  'GtA271ItAuditMemo.vue',
-  'GtA81OtherInfoRepresentation.vue',
-  'GtA91DeficiencyLetter.vue',
-].sort())
+const KNOWN_HOLLOW: readonly string[] = Object.freeze([] as string[])
 
 /**
  * 🔴 「建了桥却没人驱动」的 append-only 欠账清单（**不是豁免名单**，修好必须删）。
  *
- * 现算 **17 个**，全在 A 循环 —— 比 `KNOWN_HOLLOW` 那 14 个多出
- * `GtA112DualChecklist` / `GtA115DisclosureChecklist` / `GtA38GoodwillImpairment`
- * 三个：它们建了桥但连 `WorkpaperSyncEditorHost` 都没挂，所以原判据的扫描面扫不到。
- *
- * 这 17 个不在本轮（G 循环 + B60）范围：A 循环连 `*ManagedSheets` 受管声明清单都还没有，
- * 受管 sheet 身份无从派生。本清单只负责「锁住不恶化」并把欠账面记准。
+ * 现算 **0 个**：当前分支里凡建了 `useWorkpaperSyncBridge` 的宿主都已有人驱动 materialize
+ * （G 循环收口 + B60 + D4 子 Tab + K 六表二阶委派）。原登记的 A 循环宿主走 `GtOnlyOfficeSheet`
+ * legacy 单 OO 路径、**不建 bridge**，不在本扫描面内（见 `KNOWN_HOLLOW` 的说明）。
  */
-const KNOWN_BUILT_NOT_DRIVEN: readonly string[] = Object.freeze([
-  'GtA101GovernanceCommunication.vue',
-  'GtA111SubsequentEventsInquiry.vue',
-  'GtA112DualChecklist.vue',
-  'GtA115DisclosureChecklist.vue',
-  'GtA121LegalConfirmation.vue',
-  'GtA171AuditSummary.vue',
-  'GtA1721Kam.vue',
-  'GtA1731ConsultationExecution.vue',
-  'GtA173ConsultationRecord.vue',
-  'GtA174DisagreementRecord.vue',
-  'GtA176ClosingMeeting.vue',
-  'GtA177IndependenceDeclaration.vue',
-  'GtA182RegulatoryCommunication.vue',
-  'GtA271ItAuditMemo.vue',
-  'GtA38GoodwillImpairment.vue',
-  'GtA81OtherInfoRepresentation.vue',
-  'GtA91DeficiencyLetter.vue',
-].sort())
+const KNOWN_BUILT_NOT_DRIVEN: readonly string[] = Object.freeze([] as string[])
 
 describe('挂了 WorkpaperSyncEditorHost 就必须有人驱动 materialize', () => {
   const hollow = hollowHosts()
@@ -214,6 +229,9 @@ describe('挂了 WorkpaperSyncEditorHost 就必须有人驱动 materialize', () 
     expect(wrappers.has('useHSyncMode')).toBe(true)
     // 🔴 顶层 `composables/` 与**子目录** `d4/composables/` 都要扫到，两侧扫描面才同口径。
     expect(wrappers.has('useD4SyncMode')).toBe(true)
+    // 二阶委派也必须被识别：K wrappers 不直接调用 bridge，但调用 useD4SyncMode。
+    expect(wrappers.has('useKAdjustmentSync')).toBe(true)
+    expect(wrappers.has('useK1WriteoffSync')).toBe(true)
     expect(wrappers.has(DEFINER)).toBe(false)
     // 现算 92 个宿主挂了 EditorHost（含子目录）；下界远低于现值，只防「扫成空集」。
     expect(mountingHosts().length).toBeGreaterThan(80)
@@ -241,14 +259,30 @@ describe('挂了 WorkpaperSyncEditorHost 就必须有人驱动 materialize', () 
     expect(fixed, `以下宿主已接真驱动，请从 KNOWN_HOLLOW 删掉：\n  ${fixed.join('\n  ')}`).toEqual([])
   })
 
-  it('正向对照：点名断言 A91 与 A101 确实被扫到（不是自证式相等）', () => {
-    // 🔴 原来点名的是 G9 —— 它已接真桥，留着就是要求生产代码退回去。A 循环那 14 个
-    //    才是当前真实的欠账面（连 `*ManagedSheets` 声明清单都没有）。
-    expect(hollow).toContain('GtA91DeficiencyLetter.vue')
-    expect(hollow).toContain('GtA101GovernanceCommunication.vue')
-    // 已修好的不得再出现在空壳面里（与基线那条互为正反）。
+  it('🔴 当前分支空壳面为 0（挂了 EditorHost 的宿主无一例外都被驱动）', () => {
+    // 原来点名断言 A91/A101「是空壳」—— 它们在当前分支根本不挂 EditorHost（走
+    // GtOnlyOfficeSheet legacy 单 OO），该断言已对不上现实。改为：直接证明全仓空壳面为 0。
+    expect(hollow, `仍存在挂了 EditorHost 却不驱动的空壳：\n  ${hollow.join('\n  ')}`).toEqual([])
+    // 已接真桥的 G 宿主不得退回空壳（反向锚点，证明判据不是恒绿）。
     expect(hollow).not.toContain('GtG9OtherNoncurrentFinancial.vue')
     expect(hollow).not.toContain('GtG13FairValueChanges.vue')
+  })
+
+  it('🔴 变异反证：临时把一个真驱动 wrapper 从扫描结果剔除，对应宿主必被判空壳', () => {
+    // 不改生产代码，只在本测试内模拟「useKAdjustmentSync 不再被识别为驱动方」，
+    // 证明判据真的能把 K8/K9/K11/K12/K13 抓成空壳（排除「恒返回空集」的假绿）。
+    const wrappers = [...drivingWrappers()].filter((w) => w !== 'useKAdjustmentSync')
+    const mutated: string[] = []
+    for (const rel of mountingHosts()) {
+      const src = stripComments(read(resolve(WP, rel)))
+      if (DRIVE_RE.test(src)) continue
+      if (wrappers.some((w) => new RegExp(`\\b${w}\\s*\\(`).test(src))) continue
+      mutated.push(rel)
+    }
+    expect(mutated).toContain('k8/core/K8TabAdjustment.vue')
+    expect(mutated).toContain('k11/core/K11TabAdjustment.vue')
+    // 真实（未变异）扫描里它们都不是空壳。
+    expect(hollow).not.toContain('k8/core/K8TabAdjustment.vue')
   })
 
   it('🔴 usePilotBridgeAdapter 不得被当成驱动方（它 docstring 提到但实现零 API）', () => {

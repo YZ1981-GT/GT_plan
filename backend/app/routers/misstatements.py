@@ -239,7 +239,7 @@ async def get_misstatement_related_workpapers(
 
     简化实现：从错报记录读 standard_account_code，调 workpaper_query helper。
     """
-    from app.models.misstatement_models import UnadjustedMisstatement
+    from app.models.audit_platform_models import UnadjustedMisstatement
     from app.services.workpaper_query import find_workpapers_by_account_codes
 
     stmt = select(UnadjustedMisstatement).where(

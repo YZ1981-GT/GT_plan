@@ -141,8 +141,8 @@ _FIELD_SPECS_F247: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] =
     ("price_pre",      "K", "editable", "amount", "pricePreContract", "估计售价（无合同）", ""),
     ("price_contract", "L", "editable", "amount", "priceContract",  "合同价格", ""),
     ("unit_price",     "M", "editable", "amount", "unitPrice",      "确定单位售价", ""),
-    ("selling_rate",   "N", "editable", "amount", "sellingExpenseRate", "销售费用率", ""),  # 🔴 FC-10
-    ("tax_rate",       "O", "editable", "amount", "taxRate",         "税率",      ""),     # 🔴 FC-10
+    ("selling_rate",   "N", "editable", "percent_points", "sellingExpenseRate", "销售费用率", ""),  # FC-10: ÷100 materialize / ×100 merge
+    ("tax_rate",       "O", "editable", "percent_points", "taxRate",         "税率",      ""),     # FC-10: 同上
     ("qty_total",      "P", "editable", "amount", "qtyTotal",       "数量合计", ""),
     ("nrv",            "Q", "formula",  "amount", "nrv",            "可变现净值", ""),
     ("selling_exp",    "T", "formula",  "amount", "sellingExpense", "估计销售费用", ""),

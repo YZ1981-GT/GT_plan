@@ -2,10 +2,11 @@
 解析附注模板 md 文件，提取 '财务报表主要项目注释' 下的所有表格，
 每个表格作为独立节点（用表格上方最近的标题作为名称），生成 JSON 种子数据。
 
-用法: python -m scripts.seed_consol_note_sections [--standard soe|listed] [--dry-run]
+用法: python -m scripts.seed_consol_note_sections [--standard soe|listed] [--dry-run] [--check]
 """
 import argparse
 import json
+import sys
 import uuid
 from pathlib import Path
 
@@ -57,6 +58,40 @@ def merge_multi_headers(header_rows: list[list[str]]) -> list[str]:
         merged.append("/".join(parts) if parts else f"列{ci + 1}")
     
     return merged
+
+
+def multi_header_to_column_groups(
+    multi_header: list[list[str]] | None,
+) -> list[dict] | None:
+    """从 multi_header 推导 _column_groups（与单体附注模板同格式）。
+
+    算法：第一行的非空连续区间 = 一个分组（空字符串表示被同组合并）。
+    第一列（标签列）跳过。包含 span=1 的分组（与单体附注模板一致）。
+    无 multi_header 或只有一行 ⇒ 返回 None。
+
+    >>> multi_header_to_column_groups([
+    ...     ["账  龄", "期末数", "", "期初数", ""],
+    ...     ["", "账面余额", "坏账准备", "账面余额", "坏账准备"],
+    ... ])
+    [{'group': '期末数', 'start': 1, 'span': 2}, {'group': '期初数', 'start': 3, 'span': 2}]
+    """
+    if not multi_header or len(multi_header) < 2:
+        return None
+    row0 = multi_header[0]
+    groups: list[dict] = []
+    i = 1  # 跳过标签列（col 0）
+    while i < len(row0):
+        text = (row0[i] or "").strip()
+        if text:
+            # 找这个分组的 span：后续连续空格归本组
+            span = 1
+            while i + span < len(row0) and not (row0[i + span] or "").strip():
+                span += 1
+            groups.append({"group": text, "start": i, "span": span})
+            i += span
+        else:
+            i += 1
+    return groups if groups else None
 
 
 def parse_note_template(md_path: Path) -> list[dict]:
@@ -191,7 +226,9 @@ def build_tree_json(tables: list[dict], standard: str) -> list[dict]:
         for ti, t in enumerate(group_tables):
             global_seq += 1
             section_id = f"五-{parent_seq}-{ti + 1}"
-            result.append({
+            mh = t.get("multi_header")
+            cg = multi_header_to_column_groups(mh)
+            entry: dict = {
                 "id": str(uuid.uuid4()),
                 "standard": standard,
                 "section_id": section_id,
@@ -201,16 +238,46 @@ def build_tree_json(tables: list[dict], standard: str) -> list[dict]:
                 "seq": global_seq,
                 "headers": t["headers"],
                 "rows": t["rows"],
-                "multi_header": t.get("multi_header"),
-            })
+                "multi_header": mh,
+            }
+            if cg is not None:
+                entry["_column_groups"] = cg
+            result.append(entry)
 
     return result
+
+
+def _strip_ids(data: list[dict]) -> list[dict]:
+    """去掉每个表的 id（uuid 每次重新生成），用于 --check 比较。"""
+    return [{k: v for k, v in d.items() if k != "id"} for d in data]
+
+
+def _check_column_groups_consistency(json_path: Path) -> tuple[bool, str]:
+    """不依赖 md 源的幂等校验：磁盘 JSON 中每张表的 _column_groups 是否与从 multi_header 推导的一致。"""
+    if not json_path.exists():
+        return False, f"文件不存在: {json_path}"
+    data = json.loads(json_path.read_text(encoding="utf-8"))
+    errors: list[str] = []
+    for t in data:
+        mh = t.get("multi_header")
+        expected = multi_header_to_column_groups(mh)
+        actual = t.get("_column_groups")
+        if expected != actual:
+            errors.append(
+                f"  {t.get('section_id', '?')} {t.get('title', '?')}: "
+                f"expected={expected}, actual={actual}"
+            )
+    if errors:
+        return False, f"{json_path.name} 有 {len(errors)} 张表 _column_groups 不一致:\n" + "\n".join(errors)
+    return True, f"{json_path.name} _column_groups 一致（{len(data)} 张表）"
 
 
 def main():
     parser = argparse.ArgumentParser(description="解析附注模板并生成种子数据")
     parser.add_argument("--standard", choices=["soe", "listed", "both"], default="both")
     parser.add_argument("--dry-run", action="store_true", help="只生成 JSON 不入库")
+    parser.add_argument("--check", action="store_true",
+                        help="幂等校验：有 md 源时全量比较，无 md 源时只校验 _column_groups 一致性")
     args = parser.parse_args()
 
     standards = ["soe", "listed"] if args.standard == "both" else [args.standard]
@@ -219,8 +286,19 @@ def main():
         "listed": ROOT / "附注模版" / "上市报表附注.md",
     }
 
+    check_failed = False
     for std in standards:
+        out_path = ROOT / "data" / f"consol_note_sections_{std}.json"
         md_path = md_files[std]
+
+        if args.check and not md_path.exists():
+            # 无 md 源：只校验 _column_groups 一致性（CI 可用）
+            ok, msg = _check_column_groups_consistency(out_path)
+            print(f"\n{std}（无 md 源，仅校验 _column_groups）: {'✅' if ok else '❌'} {msg}")
+            if not ok:
+                check_failed = True
+            continue
+
         if not md_path.exists():
             print(f"文件不存在: {md_path}")
             continue
@@ -231,14 +309,32 @@ def main():
 
         seed_data = build_tree_json(tables, std)
 
-        # 统计父章节数
+        # 统计
         parents = set(t["parent_section"] for t in seed_data)
+        multi_count = sum(1 for t in seed_data if t.get("multi_header"))
+        cg_count = sum(1 for t in seed_data if t.get("_column_groups"))
         print(f"  {len(parents)} 个父章节，{len(seed_data)} 个表格节点")
+        print(f"  multi_header 非 null: {multi_count}，_column_groups 非 null: {cg_count}")
 
-        out_path = ROOT / "backend" / "data" / f"consol_note_sections_{std}.json"
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps(seed_data, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"  已导出到 {out_path}")
+        if args.check:
+            # 有 md 源：全量比较（去掉 id）
+            if not out_path.exists():
+                print(f"  ❌ 文件不存在: {out_path}")
+                check_failed = True
+                continue
+            existing = json.loads(out_path.read_text(encoding="utf-8"))
+            if _strip_ids(existing) == _strip_ids(seed_data):
+                print(f"  ✅ {out_path.name} 与重生成一致")
+            else:
+                print(f"  ❌ {out_path.name} 与重生成不一致，请运行不带 --check 重新生成")
+                check_failed = True
+        else:
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(json.dumps(seed_data, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(f"  已导出到 {out_path}")
+
+    if args.check and check_failed:
+        sys.exit(2)
 
 
 if __name__ == "__main__":

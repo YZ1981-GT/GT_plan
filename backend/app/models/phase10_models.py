@@ -143,15 +143,32 @@ class CellAnnotation(Base):
 
 class ConsolSnapshot(Base):
     __tablename__ = "consol_snapshots"
+    __table_args__ = (
+        Index(
+            "idx_consol_snapshots_project_year_created",
+            "project_id",
+            "year",
+            sa.desc("created_at"),
+        ),
+    )
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"), nullable=False)
     year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     snapshot_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
     trigger_reason: Mapped[str] = mapped_column(String(30), nullable=False)
     diff_summary: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
 
 
 # ── 打卡签到 ──────────────────────────────────────────────

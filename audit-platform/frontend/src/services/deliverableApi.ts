@@ -1,6 +1,5 @@
 import { api } from '@/services/apiProxy'
-import { deliverables } from '@/services/apiPaths/report'
-import { wordExports } from '@/services/apiPaths/report'
+import { deliverables, wordExports, trioDeliverables } from '@/services/apiPaths/report'
 
 export interface DeliverableItem {
   task_id: string
@@ -397,4 +396,124 @@ export async function fetchSectionStates(projectId: string, taskId: string) {
   return api.get<{ sections: DeliverableSectionStateItem[] }>(
     `/api/projects/${projectId}/deliverables/${taskId}/section-states`,
   )
+}
+
+
+// ─── 三件套正式出具：重试与尝试历史（chain-closure-phase4-deliverable-center-trio Task 11） ──
+
+/** 三件套步骤键（后端 TRIO_STEPS 固定顺序） */
+export type TrioStepKey = 'financial_report' | 'disclosure_notes' | 'audit_report'
+
+/** 三件套步骤中文名映射 */
+export const TRIO_STEP_LABEL: Record<TrioStepKey, string> = {
+  financial_report: '审定财务报表',
+  disclosure_notes: '报表附注',
+  audit_report: '审计报告正文',
+}
+
+/** 三件套单次尝试记录（append-only） */
+export interface TrioJobAttempt {
+  id: string
+  job_id: string
+  item_id: string
+  attempt_no: number
+  status: 'running' | 'succeeded' | 'failed'
+  started_at: string | null
+  finished_at: string | null
+  snapshot_id: string | null
+  error_type: string | null
+  error_message: string | null
+  diagnostic_detail: string | null
+  file_path: string | null
+  file_size: number | null
+  file_sha256: string | null
+  version_id: string | null
+  created_by: string | null
+}
+
+/** 三件套 job item（带状态投影） */
+export interface TrioJobItem {
+  id: string
+  job_id: string
+  step_key: TrioStepKey
+  sequence: number
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'blocked' | 'skipped'
+  attempt_count: number
+  last_attempt_id: string | null
+  error_message: string | null
+  snapshot_id: string | null
+  finished_at: string | null
+}
+
+/** 三件套 job（顶层聚合） */
+export interface TrioJob {
+  id: string
+  project_id: string
+  year: number
+  kind: 'deliverable_trio'
+  status: 'queued' | 'running' | 'succeeded' | 'partial' | 'failed' | 'blocked'
+  snapshot_id: string | null
+  trio_total: number
+  trio_succeeded: number
+  created_by: string | null
+  created_at: string | null
+  started_at: string | null
+  finished_at: string | null
+  items: TrioJobItem[]
+}
+
+/** 重试三件套失败项 */
+export async function retryTrioJob(
+  projectId: string,
+  jobId: string,
+): Promise<TrioJob> {
+  return api.post<TrioJob>(trioDeliverables.retry(projectId, jobId), {})
+}
+
+/** 获取三件套 item 的所有尝试记录 */
+export async function getTrioItemAttempts(
+  projectId: string,
+  itemId: string,
+): Promise<TrioJobAttempt[]> {
+  return api.get<TrioJobAttempt[]>(trioDeliverables.itemAttempts(projectId, itemId))
+}
+
+/** 查询三件套就绪状态 */
+export async function checkTrioReadiness(
+  projectId: string,
+  year: number,
+): Promise<Record<string, unknown>> {
+  return api.get(trioDeliverables.readiness(projectId), { params: { year } })
+}
+
+/** 创建三件套出具任务 */
+export async function createTrioJob(
+  projectId: string,
+  year: number,
+): Promise<TrioJob> {
+  return api.post<TrioJob>(trioDeliverables.create(projectId), { year })
+}
+
+/** 查询三件套 job 详情 */
+export async function getTrioJob(
+  projectId: string,
+  jobId: string,
+): Promise<TrioJob> {
+  return api.get<TrioJob>(trioDeliverables.jobDetail(projectId, jobId))
+}
+
+/** 获取三件套 item 下载链接（用于 window.open 或 <a> 标签） */
+export function downloadTrioItemUrl(
+  projectId: string,
+  itemId: string,
+): string {
+  return trioDeliverables.itemDownload(projectId, itemId)
+}
+
+/** 查询三件套出具历史 */
+export async function getTrioHistory(
+  projectId: string,
+  year: number,
+): Promise<TrioJob[]> {
+  return api.get<TrioJob[]>(trioDeliverables.history(projectId), { params: { year } })
 }

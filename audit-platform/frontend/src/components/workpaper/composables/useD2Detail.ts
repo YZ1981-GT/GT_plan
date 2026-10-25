@@ -23,6 +23,7 @@
  */
 import { ref, computed, watch, inject, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getAuthHeaders } from '@/utils/authToken'
 import {
   parseNum,
   getAuditedAmount,
@@ -614,8 +615,7 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
     const postYear = start.getFullYear() // 期后回款通常发生在基准日次年
 
     try {
-      const token = sessionStorage.getItem('token') || ''
-      const authHeaders = { Authorization: `Bearer ${token}` }
+      const authHeaders = getAuthHeaders()
       const url = `/api/projects/${pid}/ledger/entries/1122?year=${postYear}`
         + `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}&limit=1000`
       const resp = await fetch(url, { headers: authHeaders })

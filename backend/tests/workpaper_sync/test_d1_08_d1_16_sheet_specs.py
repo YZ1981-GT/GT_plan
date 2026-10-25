@@ -60,11 +60,27 @@ class TestD108DiscountSpec:
     def test_store_key_matches_frontend(self) -> None:
         assert D108.SPEC_D108_DISCOUNT.store_item_id == "D1-endorse-discount-rows"
 
-    def test_formula_mask_covers_footer_sum_columns(self) -> None:
-        mask = D108.SPEC_D108_DISCOUNT.formula_mask
-        assert len(mask) == 4  # E/F/L/M
+    def test_formula_mask_is_empty_because_data_region_has_no_formula(self) -> None:
+        """🔴 2026-09-28 改判：本判据原名 `test_formula_mask_covers_footer_sum_columns`，
+        断言 mask **应当**覆盖 E/F/L/M —— 那是把缺陷钉成了断言。
+
+        `formula_mask` 现算为 `{col}{first_data_row}:{col}{last_data_row}`（需求 1.2），
+        覆盖的是**数据区**、**覆盖不到 footer 行**。本 sheet 数据区逐格实测零公式，
+        公式只在 footer R22 的 SUM ⇒ 把 footer 列填进 `formula_columns` 对保护 footer
+        毫无作用，只会让 E/F/L/M 四列的整个数据区被 `merge._protection` 判
+        `read_only_masked_cell`，OO 侧改这些金额格永远写不回 store
+        （与 D4-1 修前同型，需求 1.5 在后端不可达）。
+
+        footer 的 SUM 公式由模板自带、materialize 不覆盖公式格、由 OO 重算 ⇒ 不需要 mask。
+        公式文本作为实测证据保留在 `FOOTER_SUM_TEMPLATES_DISCOUNT` 里。
+        """
+        assert D108.SPEC_D108_DISCOUNT.formula_mask == ()
+        assert D108.SPEC_D108_DISCOUNT.formula_columns == ()
+        assert set(D108.FOOTER_SUM_TEMPLATES_DISCOUNT) == {"E", "F", "L", "M"}
+        # 反面钉子：这四列在 field_specs 里必须仍是 editable（它们是用户录入的金额）。
+        by_col = {r[1]: r[2] for r in D108.SPEC_D108_DISCOUNT.field_specs}
         for col in ("E", "F", "L", "M"):
-            assert any(col in m for m in mask), f"formula_mask 应覆盖 {col} 列"
+            assert by_col[col] == "editable", f"{col} 应为 editable（数据区无公式）"
 
     def test_footer_marker_codepoints(self) -> None:
         assert D108.FOOTER_MARKER_D108 == "合计"
@@ -100,10 +116,13 @@ class TestD108TransferSpec:
     def test_store_key_matches_frontend(self) -> None:
         assert D108.SPEC_D108_TRANSFER.store_item_id == "D1-endorse-transfer-rows"
 
-    def test_formula_mask_covers_footer_sum_columns(self) -> None:
-        mask = D108.SPEC_D108_TRANSFER.formula_mask
-        assert len(mask) == 1  # E only
-        assert "E" in mask[0]
+    def test_formula_mask_is_empty_because_data_region_has_no_formula(self) -> None:
+        """改判理由同 `TestD108DiscountSpec` 的同名判据（2026-09-28）。"""
+        assert D108.SPEC_D108_TRANSFER.formula_mask == ()
+        assert D108.SPEC_D108_TRANSFER.formula_columns == ()
+        assert set(D108.FOOTER_SUM_TEMPLATES_TRANSFER) == {"E"}
+        by_col = {r[1]: r[2] for r in D108.SPEC_D108_TRANSFER.field_specs}
+        assert by_col["E"] == "editable"
 
     def test_shared_sheet_key(self) -> None:
         """同 sheet 双区必须共享 sheet_key（同 D1-4 先例）。"""
@@ -150,11 +169,14 @@ class TestD116ReversalSpec:
     def test_store_key_matches_frontend(self) -> None:
         assert D116.SPEC_D116_REVERSAL.store_item_id == "D1-writeoff-reversal-rows"
 
-    def test_formula_mask_covers_footer_sum_columns(self) -> None:
-        mask = D116.SPEC_D116_REVERSAL.formula_mask
-        assert len(mask) == 2  # E/F
+    def test_formula_mask_is_empty_because_data_region_has_no_formula(self) -> None:
+        """改判理由同 `TestD108DiscountSpec` 的同名判据（2026-09-28）。"""
+        assert D116.SPEC_D116_REVERSAL.formula_mask == ()
+        assert D116.SPEC_D116_REVERSAL.formula_columns == ()
+        assert set(D116.FOOTER_SUM_TEMPLATES_REVERSAL) == {"E", "F"}
+        by_col = {r[1]: r[2] for r in D116.SPEC_D116_REVERSAL.field_specs}
         for col in ("E", "F"):
-            assert any(col in m for m in mask)
+            assert by_col[col] == "editable"
 
     def test_row_identity_key_is_id_not_rowId(self) -> None:
         """D1-16 前端用 `id` 而非 `rowId`——声明必须照前端逐字匹配。"""
@@ -178,10 +200,13 @@ class TestD116WriteoffSpec:
     def test_store_key_matches_frontend(self) -> None:
         assert D116.SPEC_D116_WRITEOFF.store_item_id == "D1-writeoff-writeoff-rows"
 
-    def test_formula_mask_covers_footer_sum_columns(self) -> None:
-        mask = D116.SPEC_D116_WRITEOFF.formula_mask
-        assert len(mask) == 1  # C only
-        assert "C" in mask[0]
+    def test_formula_mask_is_empty_because_data_region_has_no_formula(self) -> None:
+        """改判理由同 `TestD108DiscountSpec` 的同名判据（2026-09-28）。"""
+        assert D116.SPEC_D116_WRITEOFF.formula_mask == ()
+        assert D116.SPEC_D116_WRITEOFF.formula_columns == ()
+        assert set(D116.FOOTER_SUM_TEMPLATES_WRITEOFF) == {"C"}
+        by_col = {r[1]: r[2] for r in D116.SPEC_D116_WRITEOFF.field_specs}
+        assert by_col["C"] == "editable"
 
     def test_shared_sheet_key(self) -> None:
         assert D116.SPEC_D116_REVERSAL.sheet_key == D116.SPEC_D116_WRITEOFF.sheet_key
@@ -206,8 +231,14 @@ class TestExpansionGrayScaleZeroRegression:
         assert len(specs) == 18  # D1-3 + 11 expansion sheets (some dual-region)
 
     def test_store_item_ids_count_with_all_on(self) -> None:
+        # 🔴 期望值按静态第三区开关派生，不写死：T7 裁决 A（2026-09-28）把
+        #    `_INCLUDE_D104_NOTETYPE_STATIC` 翻 False，store item 从 18 掉到 17。
+        #    写死 18 会让本条在撤回态假红；写死 17 则会在开关翻回时假绿。
+        #    开关状态本身的权威断言在 `test_d104_static_region_excluded.py`。
+        expected = 18 if D1E._INCLUDE_D104_NOTETYPE_STATIC else 17
         items = D1E.all_store_item_ids()
-        assert len(items) == 18
+        assert len(items) == expected, items
+        assert len(items) == len(set(items)), f"store item 重复：{items}"
 
 
 class TestExpansionWithD108D116On:

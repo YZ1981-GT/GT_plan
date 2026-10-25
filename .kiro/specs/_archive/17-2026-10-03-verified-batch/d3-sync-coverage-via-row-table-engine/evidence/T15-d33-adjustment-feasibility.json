@@ -1,0 +1,42 @@
+{
+  "measured_at": "2026-09-26",
+  "spec": "d3-sync-coverage-via-row-table-engine",
+  "task": "15 — D3-3 调整分录汇总表可行性核",
+  "decision": "single_html",
+  "verdict": "D3-3「调整分录汇总表」判为 single_html，不做 OO 单元格双向回写。与 D4-4 同型同判。",
+  "authority": {
+    "template_path": "backend/wp_templates/D/D3 预收账款.xlsx",
+    "method": "openpyxl 直读真实 tab 名与几何 + grep 按值实测",
+    "real_tab_name": "调整分录汇总表D3-3",
+    "geometry": "23r × 10c（A1:J23）；6 公式（主列 A2 D2 F2）；无 Excel Table",
+    "store_item_id": "D3-aje-rows",
+    "store_kind": "rows（JSON 数组行对象）"
+  },
+  "feasibility_gate": {
+    "gate_1_row_identity_column": {
+      "result": "FAIL",
+      "evidence": "模板全表无 GTROW/_GT UUID 隐藏列（openpyxl 扫 A-J 共 10 列均为业务列）；行身份仅前端 useD3Adjustment 在 JSON store 里用 rowId UUID（非模板列）——不满足「有行身份列」门"
+    },
+    "gate_2_no_sync_chain_conflict": {
+      "result": "FAIL",
+      "evidence": "D3-aje-rows 已被 useAdjustmentCentralSync 占用（D3TabAdjustment.vue 3 处连接：wpCode='D3' / itemId='D3-aje-rows' / buildLineItems+buildMeta）→ 后端 AdjustmentSyncService 中央登记；OO 回写会绕过该链路的借贷平衡校验并破坏 A13/试算表联动"
+    },
+    "overall": "两条门均 FAIL ⇒ 不可做单元格双向"
+  },
+  "why_single_html": [
+    "① 无行身份列：模板 23r×10c 无 GTROW/_GT UUID 隐藏列；行身份仅存在于前端 JSON store 的 rowId 字段（非模板列），OO 侧无法稳定定位行——缺锚即无法回写。",
+    "② 已有专用同步链占用 hub store：D3-aje-rows 由 useD3Adjustment（双列借贷 + isBalanced 平衡校验）拥有，并喂 3 个下游——useD3CrossSheet.adjustmentRows（→审定表 D3-1 AJE/RJE 累加）、useAdjustmentCentralSync→后端 AdjustmentSyncService（source_ref {wp_id}:D3-aje-rows，wp_code D3）→ A13/试算表联动。OO 单元格覆盖 D3-aje-rows 会绕过借贷平衡校验并可能破坏 A13 联动。",
+    "③ 借贷平衡不变式仅 HTML 侧强制：Excel 模板不校验 debit===credit（6 公式均为底稿目录引用类，无平衡校验公式），OO 侧编辑可轻易产生不平衡分录。",
+    "④ 动态插入带：前端 addRow 在 JSON 数组追加行，无固定 GTROW seed；模板数据区为空模板带。"
+  ],
+  "cross_cycle_note": "六张调整分录汇总表全部同型（D1-5 D1-entry-rows / D2-4 D2-entry-rows / D3-3 D3-aje-rows / D4-4 D4-4-rows 已判 / D5-3 D5-3-rows / D6-4 D6-4-rows / D7-3 D7-3-rows），各自宿主均接 useAdjustmentCentralSync。建议统一裁决另立 d-cycle-adjustment-sheets-single-html-adjudication spec，不逐循环重复核。",
+  "property_11_no_code_changed": true,
+  "downstream_consumers": {
+    "D3-aje-rows": [
+      "useD3Adjustment.ts（写入方：addRow/removeRow/updateCell → saveBatch）",
+      "useD3CrossSheet.ts:319（读取方：adjustmentRows computed → adjustmentTotals）",
+      "D3TabAdjustment.vue:185-198（useAdjustmentCentralSync 3 处连接：syncToCentral/refreshStatus/buildLineItems）",
+      "D3TabIndex.vue:67（完成度判定：hasJsonRows(m, 'D3-aje-rows')）"
+    ]
+  }
+}

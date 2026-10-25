@@ -1062,7 +1062,8 @@ class NoteSaveResponseBody(BaseModel):
     """笔记转存响应。"""
 
     document_id: str
-    folder_id: str
+    #: 幂等重放且文档已被删除时为 None（前端只凭 doc_id 深链）
+    folder_id: str | None = None
     name: str
     replayed: bool = False
     jump_route: str = ""

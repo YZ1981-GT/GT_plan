@@ -5,8 +5,26 @@
     </div>
 
     <template v-else>
+      <!-- 公式推送：后台已按四表 / 试算表 / 调整分录更新本底稿（不静默替换未保存的编辑） -->
+      <el-alert
+        v-if="pushNotice"
+        type="info"
+        :closable="true"
+        show-icon
+        style="margin-bottom: 8px"
+        :title="`后台已按公式推送更新 ${pushNotice.count} 项数据`"
+        @close="pushNotice = null"
+      >
+        <template #default>
+          <span>当前页面仍显示打开时的数据；载入后被更新的项目以最新数据为准。</span>
+          <el-button size="small" type="primary" link :loading="pushReloading" @click="reloadPushedItems">
+            载入最新数据
+          </el-button>
+        </template>
+      </el-alert>
+
       <!-- 目录页(currentSheet==='K1')不显示 AI复核/双模式工具栏（无复核对象+不需双模式） -->
-      <div v-if="isHtmlSheet && currentSheet !== 'K1'" class="k1-header-toolbar">
+      <div v-if="isHtmlSheet && currentSheet !== 'K1' && !isSyncManagedSheet" class="k1-header-toolbar">
         <el-segmented
           v-if="dualMode.isOoAvailable.value"
           :model-value="dualMode.currentMode.value"
@@ -20,7 +38,7 @@
 
       <!-- OnlyOffice 模式 -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-if="isHtmlSheet && !isSyncManagedSheet && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -29,7 +47,7 @@
       />
 
       <!-- HTML 结构化视图 -->
-      <template v-else-if="dualMode.currentMode.value === 'html'">
+      <template v-else-if="isSyncManagedSheet || dualMode.currentMode.value === 'html'">
         <!-- 底稿目录 -->
         <K1TabIndex
           v-if="currentSheet === 'K1'"
@@ -253,6 +271,8 @@ import http from '@/utils/http'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
+import { k1PushNotice, k1PushedRows, type K1PushNotice } from './composables/k1FormulaPushNotice'
+import { subscribeProjectEvent } from '@/services/sse/projectEventStream'
 import { autoSeedK1DetailFromAux } from './composables/useK1DetailAutoSeed'
 import {
   WorkpaperRuntimeContextKey,
@@ -374,6 +394,39 @@ const persistence = useChecklistPersistence({ wpId: wpIdRef, projectId: projectI
 const allResponses = persistence.responses
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 
+// ─── 公式推送提示条（SSE formula.pushed）────────────────────────────────────
+const pushNotice = ref<K1PushNotice | null>(null)
+const pushReloading = ref(false)
+
+/** 只替换后台本次推送改过的条目，避免静默覆盖用户尚未保存的其它编辑。 */
+async function reloadPushedItems(): Promise<void> {
+  const notice = pushNotice.value
+  if (!notice || !props.wpId) return
+  pushReloading.value = true
+  try {
+    const response: any = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const rows = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : []
+    for (const row of k1PushedRows(rows, notice.itemIds)) {
+      allResponses.value.set(row.item_id, {
+        item_id: row.item_id,
+        conclusion: row.conclusion ?? null,
+        remark: row.remark ?? null,
+      })
+    }
+    pushNotice.value = null
+  } catch (error) {
+    console.warn('[GtK1OtherReceivables] 载入公式推送结果失败:', error)
+  } finally {
+    pushReloading.value = false
+  }
+}
+
+const _pushSub = subscribeProjectEvent(props.projectId, 'formula.pushed', (data) => {
+  const notice = k1PushNotice(data, props.wpId)
+  if (notice) pushNotice.value = notice
+})
+
+
 // K1-2「从余额表导入」手动入口成功后由此重载 allResponses，级联刷新明细 → 审定表 → 披露
 // （Requirement 4.6）。与既有 D/F/G/N 宿主的 reloadWorkpaperData 契约一致。
 provide('reloadWorkpaperData', () => persistence.load())
@@ -427,9 +480,15 @@ const dualMode = (() => {
    */
   function loadPersistedMode(): void {
     try {
+        // 🔴 capability 传 `'bidirectional'`：表达的是「本宿主的视图开关两侧都能开」
+        //    （结构化视图 = 本地渲染 / OO = 在线编辑），与 entry 的写回 capability
+        //    （`single_onlyoffice`）不是一回事。传后者会让 migrate 把存量 'html' 偏好
+        //    回落成 'oo' 并落盘 ⇒ 老用户下次打开被强推进 OO。
+        //    🔴 曾误传 `'dual'`（不在封闭域里）⇒ migrate 抛 mode_capability_unknown，
+        //    被外层 catch 吞掉，连带下面读统一键那两行从未执行 ⇒ 偏好恢复整体失效。
       migrateWorkpaperSyncMode(
         { entryId: K1_ENTRY_ID, wpId: props.wpId, sheetKey: currentSheet.value || undefined },
-        'dual',
+        'bidirectional',
       )
       const stored = fromStoredMode(localStorage.getItem(modeKey()))
       if (stored) currentMode.value = stored
@@ -466,6 +525,9 @@ const dualMode = (() => {
 
 /** 当前 sheet 是否为 HTML 可渲染（有匹配子组件） */
 const isHtmlSheet = computed(() => currentSheet.value !== '')
+
+/** K1-9 已注册真双向 adapter：宿主 legacy OO 切换让位给 Tab 内 sync bridge。 */
+const isSyncManagedSheet = computed(() => currentSheet.value === 'K1-9')
 
 /**
  * 从 sheetName 提取编码 (K1/K1A/K1-1~K1-12/附注)
@@ -598,7 +660,10 @@ async function selfLoad(): Promise<void> {
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
-onBeforeUnmount(() => { void persistence.flush().catch(() => undefined) })
+onBeforeUnmount(() => {
+  _pushSub.close()
+  void persistence.flush().catch(() => undefined)
+})
 
 onMounted(() => {
   void selfLoad()

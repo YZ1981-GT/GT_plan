@@ -1,0 +1,253 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. lane3 归属守卫": [
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045233521
+      },
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045243700
+      },
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791046010411
+      }
+    ],
+    "2. 运行时 sheet 名解析建模": [
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045233574
+      },
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791046019716
+      },
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791046090730
+      },
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791046096468
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791046482739
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791046687694
+      }
+    ],
+    "3. 变体轴显式化（契约须带 variant 维度）": [
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045233613
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791046696025
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791047083711
+      }
+    ],
+    "4. a177 门控与归档欠账": [
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045233682
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791047098494
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791047468015
+      }
+    ],
+    "5. 论证并补 segmented + mode 门控（须在 foundation 任务 5 之后）": [
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045233720
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791047473944
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791048050062
+      }
+    ],
+    "6. 回改 foundation 基线（跨 spec 联动）": [
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045233760
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791048054737
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791048270256
+      }
+    ],
+    "7. 实证并更正 BP-6 归因": [
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045233798
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791048275444
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791048647187
+      }
+    ],
+    "8. BP-6 两步修复（顺序不可颠倒）": [
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045233845
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791048652453
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791049851592
+      }
+    ],
+    "9. a38 的 Property 22 缺陷收口": [
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045233883
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791049856712
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791050180394
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791050184773
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791050455444
+      }
+    ],
+    "10. `A3-3` 册缺陷台账（记录型，不改模板）": [
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045233958
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791050460526
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791050711236
+      }
+    ],
+    "11. BP-7 notice 接入 3 个宿主（须在 foundation 任务 14 之后）": [
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045233996
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791050716896
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791050947416
+      }
+    ],
+    "12. 交付前自检": [
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045234038
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791050953167
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791051144551
+      }
+    ],
+    "13.* 平台级与业务依赖欠账": [
+      {
+        "executionId": "f19028a6-40ba-4c8a-9692-a1c06e20c998",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791045234076
+      },
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791051151346
+      }
+    ],
+    "13.* 平台级与业务依赖欠账（登记型：欠账正确登记 + 可解部分已解）": [
+      {
+        "executionId": "fa36e836-919f-44c4-8263-c01ce17d2a49",
+        "chatSessionId": "sess_a372f6be-8cc8-42d2-b4a3-17737843941f",
+        "timestamp": 1791051481399
+      }
+    ]
+  }
+}

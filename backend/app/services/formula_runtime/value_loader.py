@@ -369,6 +369,163 @@ class NoteDomainReader:
         return results
 
 
+# ─── ConsolWorksheetDomainReader ─────────────────────────────────────────────
+
+
+class ConsolWorksheetDomainReader:
+    """合并工作底稿 JSON 数据批量读取。
+
+    按 (project_id, year) 批量查询 consol_worksheet_data，在内存中
+    按 sheet_key → row_identity → cell_identity 定位值。
+
+    locator 约定：
+      - sheet_key: 表键（如 'info', 'equity_inv', 'share_change_1'）
+      - row_identity: 行定位（JSON 对象的 key 或数组下标字符串）
+      - cell_identity: 列/字段名
+    """
+
+    def __init__(self, db: Any, batch_size: int = 500) -> None:
+        self._db = db
+        self._batch_size = batch_size
+
+    async def read_batch(
+        self,
+        targets: list[CanonicalFormulaTarget],
+    ) -> dict[str, Decimal | str | None]:
+        if not targets:
+            return {}
+
+        import json
+
+        import sqlalchemy as sa
+
+        results: dict[str, Decimal | str | None] = {}
+
+        # 按 (project_id, year) 分组，一次查询加载该组所有 sheet
+        grouped: dict[tuple[UUID, int], list[CanonicalFormulaTarget]] = {}
+        for t in targets:
+            key = (t.project_id, t.year)
+            grouped.setdefault(key, []).append(t)
+
+        for (pid, yr), group in grouped.items():
+            # 收集所有需要的 sheet_key
+            sheet_keys = list({t.locator.get("sheet_key", "") for t in group if t.locator.get("sheet_key")})
+            if not sheet_keys:
+                continue
+
+            # 批量加载该 project/year 下的相关 sheet 数据
+            sheets_data: dict[str, Any] = {}
+            try:
+                from app.models.consol_worksheet_data_models import ConsolWorksheetData
+
+                for i in range(0, len(sheet_keys), self._batch_size):
+                    batch_keys = sheet_keys[i: i + self._batch_size]
+                    stmt = (
+                        sa.select(ConsolWorksheetData.sheet_key, ConsolWorksheetData.data)
+                        .where(
+                            ConsolWorksheetData.project_id == pid,
+                            ConsolWorksheetData.year == yr,
+                            ConsolWorksheetData.sheet_key.in_(batch_keys),
+                        )
+                    )
+                    rows = (await self._db.execute(stmt)).all()
+                    for row in rows:
+                        raw = row.data
+                        if isinstance(raw, str):
+                            try:
+                                raw = json.loads(raw)
+                            except (json.JSONDecodeError, TypeError):
+                                continue
+                        if isinstance(raw, (dict, list)):
+                            sheets_data[row.sheet_key] = raw
+            except Exception:
+                logger.exception(
+                    "consol_worksheet 域批量加载失败（project=%s year=%s，%d 个 sheet 记 miss）",
+                    pid, yr, len(sheet_keys),
+                )
+                continue
+
+            # 从已加载的 JSON 中按 locator 定位值
+            for target in group:
+                sheet_key = target.locator.get("sheet_key", "")
+                row_identity = target.locator.get("row_identity", "")
+                cell_identity = target.locator.get("cell_identity", "")
+
+                if not sheet_key or sheet_key not in sheets_data:
+                    continue  # miss — loader 会标记
+
+                data = sheets_data[sheet_key]
+                value = self._extract_value(data, row_identity, cell_identity)
+                if value is not None:
+                    try:
+                        results[target.addr_id] = Decimal(str(value))
+                    except Exception:
+                        results[target.addr_id] = str(value) if value is not None else None
+
+        return results
+
+    @staticmethod
+    def _extract_value(data: Any, row_identity: str, cell_identity: str) -> Any:
+        """从 JSON 数据中按行/列身份提取值。
+
+        支持两种形态：
+        - 对象行（dict）：data 是 dict，row_identity 作为外层 key 或 data["rows"] 中某行的标识
+        - 二维数组：data["rows"] 是 list，row_identity 是数组下标字符串
+        """
+        if not isinstance(data, dict):
+            return None
+
+        # 1. 尝试 data[row_identity][cell_identity] — 直接嵌套 dict
+        if row_identity in data:
+            row_data = data[row_identity]
+            if isinstance(row_data, dict) and cell_identity in row_data:
+                return row_data[cell_identity]
+
+        # 2. 尝试 data["rows"] 结构
+        rows = data.get("rows")
+        if rows is None:
+            # 整个 data 没有 rows 键，尝试 cell_identity 作为顶层键
+            if cell_identity in data:
+                return data[cell_identity]
+            return None
+
+        # 2a. rows 是 list — row_identity 是数组下标
+        if isinstance(rows, list):
+            try:
+                idx = int(row_identity)
+                if 0 <= idx < len(rows):
+                    row = rows[idx]
+                    if isinstance(row, dict) and cell_identity in row:
+                        return row[cell_identity]
+            except (ValueError, TypeError):
+                # row_identity 不是整数，遍历查找匹配键
+                for row in rows:
+                    if isinstance(row, dict):
+                        # 行里可能有标识字段（company_code, item_id 等）
+                        row_id = (
+                            row.get("_id")
+                            or row.get("company_code")
+                            or row.get("item_id")
+                            or ""
+                        )
+                        if str(row_id) == row_identity and cell_identity in row:
+                            return row[cell_identity]
+            return None
+
+        # 2b. rows 是 dict — row_identity 作 key
+        if isinstance(rows, dict):
+            row_data = rows.get(row_identity)
+            if isinstance(row_data, dict) and cell_identity in row_data:
+                return row_data[cell_identity]
+            # rows 的子结构可能是 list
+            if isinstance(row_data, list):
+                for item in row_data:
+                    if isinstance(item, dict) and cell_identity in item:
+                        return item[cell_identity]
+
+        return None
+
+
 # ─── FormulaValueLoader ──────────────────────────────────────────────────────
 
 
@@ -408,6 +565,7 @@ class FormulaValueLoader:
                     "workpaper": WorkpaperDomainReader(db),
                     "report": ReportDomainReader(db),
                     "note": NoteDomainReader(db),
+                    "consol_worksheet": ConsolWorksheetDomainReader(db),
                 }
 
     async def load_many(

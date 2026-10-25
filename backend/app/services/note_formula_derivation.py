@@ -230,7 +230,9 @@ def _binding_rows(table_binding: Any) -> dict[str, Any]:
 
 def _cell_binding(binding_rows: dict[str, Any], label: str, semantic: str) -> Any:
     """按 label + semantic 取既有 cell binding（与 ``_resolve_cell_binding`` 同口径）."""
-    row = binding_rows.get(label)
+    from app.services.disclosure_engine import _get_binding_row
+
+    row = _get_binding_row(binding_rows, label)
     if not isinstance(row, dict):
         return None
     cells = row.get("binding")

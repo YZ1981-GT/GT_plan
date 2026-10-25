@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "cbe70d959b6d8b70c54771b61c406196b9b4e1c8d6f00fa812f5e9989dfdef97",
+  "instrumentation_definition_sha256": "61398fbae162ecc42500ade1f39897954786bb04f2e8e3d0fc56da94fca4aaa9",
   "review": {
     "authority_root": "backend/wp_templates",
     "carrier": {
@@ -515,7 +515,7 @@
   "template": {
     "normalized_structure_hash": "71b583cfa669b39eb083660ce3a1320c798c9ef70f9ce6932d0dcc1803d8b238",
     "relative_path": "H/H5 油气资产.xlsx",
-    "template_sha256": "6dcc109bee6310352a6601d8daa388da21ce16e07fa1fd68c1072d3a302b1905"
+    "template_sha256": "4fc5ec55eba9418d5651398da617fa666f0b0719799cf1e802f52c55a62e5612"
   },
-  "template_definition_sha256": "b9862f6e0febcb73522d0ea693e063919b1043edc680e38eadcbcc4cfed4c309"
+  "template_definition_sha256": "96a279d3741eab356553fd4e045b0aa19327a2a15d0b5d5f2421cc520899c9af"
 }

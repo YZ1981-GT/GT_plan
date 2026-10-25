@@ -58,25 +58,27 @@ async def get_group_tree(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    """集团架构全局森林树形。
+    """集团架构全局森林树形（consol-tree-three-code-autobuild 需求 8）。
 
-    与 consol_worksheet 的 GET /tree?project_id=X（单合并项目内部树）不同：
-    本端点是全局森林——所有项目按 ultimate_company_code 分组成多棵树，无单一 root。
+    与 consol_worksheet 的 GET /tree?project_id=X（单合并项目内部树）不同：本端点是全局森林，
+    以企业为节点（同代码同年度的合并与单户项目合为一个节点），按（最终控制方, 年度）分树。
+
+    只返回当前用户可见的项目：admin/partner 全部可见，其余角色仅自己参与的项目（需求 8.3）。
 
     静态路径 /tree 必须在通配 /{project_id}（project_wizard.py）之前解析。
     注册顺序由 router_registry/system.py §2 保证（batch_project_router 先于
     project_wizard_router 注册）。
 
     Args:
-        year: 年度过滤（按 audit_period_end 年份），不传则不过滤
-        scope: report_scope 过滤（如 'consolidated'），不传或 'all' 则全部项目
+        year: 审计年度（平台统一解析：年度列 → 期末日 → 期初日 → 向导 → 项目名后缀），不传则各年度分别成树
+        scope: 报表类型筛选（consolidated / standalone），不传或 'all' 则全部项目
 
     Returns:
         {"trees": [...], "independents": [...]}
     """
     effective_scope = None if scope in (None, "", "all") else scope
     return await consol_tree_service.build_tree_by_codes(
-        db, year=year, scope=effective_scope
+        db, year=year, scope=effective_scope, user=current_user
     )
 
 

@@ -1,0 +1,1 @@
+✅ golden digest 零回归：161 个 digest 逐个不变（覆盖 25 家，零跳过）

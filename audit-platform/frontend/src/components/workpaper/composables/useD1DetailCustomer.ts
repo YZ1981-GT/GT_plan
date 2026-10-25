@@ -28,6 +28,7 @@
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
+import { getAuthHeaders } from '@/utils/authToken'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import {
   parseNum,
@@ -518,10 +519,9 @@ export function useD1DetailCustomer(options: UseD1DetailCustomerOptions) {
     const postYear = start.getFullYear()
 
     try {
-      const token = sessionStorage.getItem('token') || ''
       const url = `/api/projects/${pid}/ledger/entries/1121?year=${postYear}`
         + `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}&limit=1000`
-      const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const resp = await fetch(url, { headers: getAuthHeaders() })
       if (!resp.ok) {
         ElMessage.info(`期后（${postYear}年）序时账无数据或未导入`)
         return empty

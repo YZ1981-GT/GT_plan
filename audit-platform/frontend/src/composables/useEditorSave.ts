@@ -37,8 +37,6 @@ export interface UseEditorSaveOptions {
   hasPrefillMapping: Ref<boolean>
   autoSave: WorkpaperAutoSaveAPI
   initUniver?: () => Promise<void>
-  loadedFromXlsx?: Ref<boolean>
-  fileOpenedAt?: Ref<number>
   loading?: Ref<boolean>
   showStaleImpactPanel?: Ref<boolean>
 }
@@ -59,34 +57,10 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
       if (!workbook) throw new Error('无法获取工作簿数据')
       const snapshot = workbook.getSnapshot()
 
-      // xlsx 回写（仅从 xlsx 模板加载时）
-      if (opts.loadedFromXlsx?.value) {
-        try {
-          let xlsxBlob: Blob | null = null
-          if (typeof api.exportXLSXBySnapshotAsync === 'function') {
-            xlsxBlob = await api.exportXLSXBySnapshotAsync(snapshot)
-          } else if (typeof api.exportWorkbookToXLSX === 'function') {
-            xlsxBlob = await api.exportWorkbookToXLSX()
-          }
-          if (xlsxBlob && xlsxBlob.size > 0) {
-            const formData = new FormData()
-            formData.append('file', xlsxBlob, `${opts.wpId.value}.xlsx`)
-            await fetch(
-              `/api/projects/${opts.projectId.value}/workpapers/${opts.wpId.value}/template-file/upload-xlsx`,
-              {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
-                  'X-File-Opened-At': String(opts.fileOpenedAt?.value ?? 0),
-                },
-                body: formData,
-              },
-            )
-          }
-        } catch (e) {
-          logger.warn('xlsx export failed (non-blocking):', e)
-        }
-      }
+      // 🔴 保存只走 univerSave（snapshot + 版本冲突检测）。原有的「导出 xlsx 覆盖服务端底稿原文件」
+      //    回写已删除（spec knowledge-base-retrieval-and-authz-closure 收尾，用户裁定删除而非启用）：
+      //    它自 token 迁到 sessionStorage 起恒 401 从未生效；若修好鉴权，每次保存都会用 Univer 的
+      //    有损导出覆盖原模板文件（公式 / 样式 / 数据验证丢失且无法回滚）。后端端点一并删除。
 
       // 调用完整保存 API（含版本冲突检测）
       const data = await httpApi.post(

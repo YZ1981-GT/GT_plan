@@ -104,6 +104,11 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import AccrualTable from './AccrualTable.vue'
 import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
 import http from '@/utils/http'
+import {
+  bindShortTermTemplateIds,
+  roundHalfAwayFromZero2,
+  shortTermTemplateRowId,
+} from './j1AccrualRowIdentity'
 
 const props = defineProps<{
   wpId: string
@@ -126,8 +131,9 @@ export interface AccrualRow {
 }
 
 function recalcRow(r: AccrualRow): AccrualRow {
-  const estimated = r.baseAmount * r.rate
-  const diff = r.actual - estimated
+  // 🔴 与模板公式同口径：G=ROUND(D*F,2) / I=G-H（原先 estimated 不舍入，HTML 与 OO 两侧显示值会差分位）
+  const estimated = roundHalfAwayFromZero2(r.baseAmount * r.rate)
+  const diff = roundHalfAwayFromZero2(r.actual - estimated)
   return { ...r, estimated, diff }
 }
 
@@ -158,14 +164,21 @@ const POST_EMPLOYMENT_DEFAULTS = [
   { label: '其中：1.xxx', indent: 1 }, { label: '2.其他', indent: 1 },
 ]
 
-function createRows(defaults: Array<{ label: string; indent: number }>): AccrualRow[] {
+// 🔴 短期薪酬区行身份 = 模板行身份 `GTROW-J16S-*`（原因见 j1AccrualRowIdentity.ts 文件头）
+function createRows(
+  defaults: Array<{ label: string; indent: number }>,
+  idOf: (i: number) => string,
+): AccrualRow[] {
   return defaults.map((d, i) => recalcRow({
-    id: `acr-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`,
+    id: idOf(i),
     label: d.label, indent: d.indent,
     baseName: '', baseAmount: 0, baseIndex: '', rate: 0,
     estimated: 0, actual: 0, diff: 0, diffReason: '', conclusion: '',
   }))
 }
+
+// 离职后福利区不受管（不进契约），保持原随机身份
+const randomAccrualId = (i: number) => `acr-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`
 
 // ─── State ──────────────────────────────────────────────────────────────
 const KEYS = { shortTerm: 'J1-6-short-term', postEmployment: 'J1-6-post-employment', questions: 'J1-6-questions', conclusion: 'J1-6-conclusion' }
@@ -179,10 +192,15 @@ function loadSection(section: 'shortTerm' | 'postEmployment'): AccrualRow[] {
   if (raw) {
     try {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed.map((r: any) => recalcRow(r))
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const rows = parsed.map((r: any) => recalcRow(r))
+        return section === 'shortTerm' ? bindShortTermTemplateIds(rows, SHORT_TERM_DEFAULTS.length) : rows
+      }
     } catch {}
   }
-  return createRows(section === 'shortTerm' ? SHORT_TERM_DEFAULTS : POST_EMPLOYMENT_DEFAULTS)
+  return section === 'shortTerm'
+    ? createRows(SHORT_TERM_DEFAULTS, shortTermTemplateRowId)
+    : createRows(POST_EMPLOYMENT_DEFAULTS, randomAccrualId)
 }
 
 function updateCell(section: 'shortTerm' | 'postEmployment', rowId: string, field: string, value: any) {

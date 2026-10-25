@@ -29,7 +29,7 @@ class WpPermissionService:
         project_id: uuid.UUID,
     ) -> bool:
         """项目级权限：用户是否为项目组成员"""
-        from app.models.project_models import ProjectAssignment
+        from app.models.staff_models import ProjectAssignment
         stmt = select(ProjectAssignment).where(
             and_(
                 ProjectAssignment.project_id == project_id,
@@ -52,7 +52,7 @@ class WpPermissionService:
         if not await self.check_project_access(user_id=user_id, project_id=project_id):
             return False
         # 循环级：partner/manager/qc 可访问所有循环，auditor 只能访问分配的
-        from app.models.project_models import ProjectAssignment
+        from app.models.staff_models import ProjectAssignment
         stmt = select(ProjectAssignment).where(
             and_(
                 ProjectAssignment.project_id == project_id,
@@ -82,7 +82,7 @@ class WpPermissionService:
         if not await self.check_project_access(user_id=user_id, project_id=project_id):
             return False
         # partner/manager 可访问所有底稿
-        from app.models.project_models import ProjectAssignment
+        from app.models.staff_models import ProjectAssignment
         stmt = select(ProjectAssignment).where(
             and_(
                 ProjectAssignment.project_id == project_id,

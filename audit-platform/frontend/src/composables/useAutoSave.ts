@@ -17,24 +17,63 @@
  * @module composables/useAutoSave
  * @see R3.8
  */
-import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount, isRef, toValue, type Ref, type MaybeRefOrGetter } from 'vue'
 import { ElMessageBox } from 'element-plus'
+
+export interface DraftContext {
+  project_id: string
+  year: number
+  section: string
+}
 
 export interface UseAutoSaveOptions {
   /** 自动保存间隔（毫秒），默认 30000（30秒） */
   interval?: number
   /** 是否启用自动保存，默认 true；可传入 Ref<boolean> 动态控制 */
   enabled?: Ref<boolean> | boolean
+  /** 动态草稿上下文；提供后会写入 envelope 并在恢复时严格校验 */
+  context?: Ref<DraftContext | null | undefined> | DraftContext | null
+}
+
+/** 为附注草稿构造稳定的、不会与其他项目/年度/章节冲突的 key。 */
+export function buildDisclosureDraftKey(context: DraftContext): string {
+  const projectId = String(context.project_id || '').trim()
+  const year = Number(context.year) || 0
+  const section = String(context.section || '').trim()
+  if (!projectId || !year || !section) return 'global'
+  return `disclosure_${encodeURIComponent(projectId)}_${year}_${encodeURIComponent(section)}`
+}
+
+type AutoSaveKey = MaybeRefOrGetter<string>
+type DraftContextSource = UseAutoSaveOptions['context']
+
+function readContext(source: DraftContextSource): DraftContext | null {
+  const value = source && isRef(source) ? source.value : source
+  if (!value) return null
+  const projectId = String(value.project_id || '').trim()
+  const year = Number(value.year) || 0
+  const section = String(value.section || '').trim()
+  if (!projectId || !year || !section) return null
+  return { project_id: projectId, year, section }
+}
+
+function sameContext(left: DraftContext | null, right: DraftContext | null): boolean {
+  return !!left && !!right
+    && left.project_id === right.project_id
+    && left.year === right.year
+    && left.section === right.section
 }
 
 export function useAutoSave<T = any>(
-  key: string,
+  key: AutoSaveKey,
   getData: () => T | null | undefined,
   setData: (data: T) => void,
   options?: UseAutoSaveOptions,
 ) {
   const interval = options?.interval ?? 30000
   const enabledRef = options?.enabled
+  const contextSource = options?.context
+  const hasContext = contextSource !== undefined
   const hasDraft = ref(false)
   let timer: ReturnType<typeof setInterval> | null = null
 
@@ -45,24 +84,57 @@ export function useAutoSave<T = any>(
     return enabledRef.value
   }
 
-  /** 构建完整的 sessionStorage key
-   *
-   * 调用方应在 key 中自行包含 projectId（如 `adjustment_form_${projectId}`），
-   * 以防止多项目间草稿互相覆盖。此处不再内部读 store，避免挂载时 projectId 为空
-   * 导致 key 变成 `autosave_global_xxx` 的边界情况。
-   */
-  function storageKey(): string {
-    return `autosave_${key}`
+  /** 读取当前 key；支持字符串、Ref 和 getter，避免定时器捕获旧上下文。 */
+  function currentKey(): string {
+    const resolved = toValue(key)
+    return typeof resolved === 'string' ? resolved : String(resolved ?? '')
+  }
+
+  function currentContext(): DraftContext | null {
+    return hasContext ? readContext(contextSource) : null
+  }
+
+  function isSameSnapshot(keySnapshot: string, contextSnapshot: DraftContext | null): boolean {
+    if (keySnapshot !== currentKey()) return false
+    return !hasContext || sameContext(contextSnapshot, currentContext())
+  }
+
+  /** 构建完整的 sessionStorage key */
+  function storageKey(keySnapshot = currentKey()): string {
+    return `autosave_${keySnapshot}`
+  }
+
+  /** 读取并校验当前草稿；动态上下文必须与 envelope 严格一致。 */
+  function readDraft(keySnapshot = currentKey(), contextSnapshot = currentContext()): any | null {
+    try {
+      const raw = sessionStorage.getItem(storageKey(keySnapshot))
+      if (!raw) return null
+      const payload = JSON.parse(raw)
+      if (payload?.data == null) return null
+      if (hasContext) {
+        const payloadContext = readContext(payload.context as DraftContext | null | undefined)
+        if (!sameContext(payloadContext, contextSnapshot)) return null
+      }
+      return payload
+    } catch {
+      return null
+    }
   }
 
   /** 手动保存草稿到 sessionStorage */
   function saveDraft(): boolean {
     try {
+      const context = currentContext()
+      if (hasContext && !context) return false
       const data = getData()
       if (data == null) return false
-      const payload = {
+      const payload: Record<string, unknown> = {
         data,
         savedAt: Date.now(),
+      }
+      if (hasContext) {
+        payload.context = context
+        payload.version = 1
       }
       sessionStorage.setItem(storageKey(), JSON.stringify(payload))
       hasDraft.value = true
@@ -73,46 +145,33 @@ export function useAutoSave<T = any>(
   }
 
   /** 从 sessionStorage 恢复草稿 */
-  function restoreDraft(): boolean {
+  function restoreDraft(keySnapshot = currentKey(), contextSnapshot = currentContext()): boolean {
+    const payload = readDraft(keySnapshot, contextSnapshot)
+    if (!payload) return false
     try {
-      const raw = sessionStorage.getItem(storageKey())
-      if (!raw) return false
-      const payload = JSON.parse(raw)
-      if (payload?.data != null) {
-        setData(payload.data)
-        return true
-      }
-      return false
+      setData(payload.data)
+      return true
     } catch {
       return false
     }
   }
 
   /** 清除草稿（保存成功后调用） */
-  function clearDraft() {
-    sessionStorage.removeItem(storageKey())
+  function clearDraft(keySnapshot = currentKey()) {
+    sessionStorage.removeItem(storageKey(keySnapshot))
     hasDraft.value = false
   }
 
   /** 检查是否存在草稿 */
-  function checkDraft(): boolean {
-    try {
-      const raw = sessionStorage.getItem(storageKey())
-      if (!raw) return false
-      const payload = JSON.parse(raw)
-      return payload?.data != null
-    } catch {
-      return false
-    }
+  function checkDraft(keySnapshot = currentKey(), contextSnapshot = currentContext()): boolean {
+    return readDraft(keySnapshot, contextSnapshot) != null
   }
 
   /** 获取草稿保存时间的可读字符串 */
-  function getDraftTime(): string {
+  function getDraftTime(keySnapshot = currentKey(), contextSnapshot = currentContext()): string {
+    const payload = readDraft(keySnapshot, contextSnapshot)
+    if (!payload?.savedAt) return ''
     try {
-      const raw = sessionStorage.getItem(storageKey())
-      if (!raw) return ''
-      const payload = JSON.parse(raw)
-      if (!payload?.savedAt) return ''
       return new Date(payload.savedAt).toLocaleString('zh-CN')
     } catch {
       return ''
@@ -137,11 +196,13 @@ export function useAutoSave<T = any>(
     }
   }
 
-  // 挂载时：检查草稿并提示恢复，然后启动定时器
+  // 挂载时：捕获草稿所在上下文；确认框等待期间切换 key/context 时不再恢复或删除旧草稿
   onMounted(async () => {
-    if (checkDraft()) {
+    const keySnapshot = currentKey()
+    const contextSnapshot = currentContext()
+    if (checkDraft(keySnapshot, contextSnapshot)) {
       hasDraft.value = true
-      const draftTime = getDraftTime()
+      const draftTime = getDraftTime(keySnapshot, contextSnapshot)
       const timeHint = draftTime ? `（保存于 ${draftTime}）` : ''
       try {
         await ElMessageBox.confirm(
@@ -153,10 +214,14 @@ export function useAutoSave<T = any>(
             type: 'info',
           },
         )
-        restoreDraft()
+        if (isSameSnapshot(keySnapshot, contextSnapshot)) {
+          restoreDraft(keySnapshot, contextSnapshot)
+        }
       } catch {
-        // 用户选择放弃草稿
-        clearDraft()
+        // 用户选择放弃草稿；上下文变化时保留旧草稿，避免误删新章节或旧节点数据。
+        if (isSameSnapshot(keySnapshot, contextSnapshot)) {
+          clearDraft(keySnapshot)
+        }
       }
     }
     startTimer()

@@ -96,8 +96,10 @@ ADAPTER_ID: Final[str] = "i5.other_noncurrent_assets_detail"
 WP_CODES: Final[frozenset[str]] = frozenset({"I5O"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "I/I5 其他非流动资产.xlsx"
+#: 🔴 2026-10-01 净化（`sanitize_i_cycle_template_external_links.py`，过 OOXML 门）后现算；
+#: 净化前 `7e8ec9c22580e05daf7803362f1ab83ca39d452a56c009833b05d6f6a1393860`（slice 冻结值，append-only 保留；`.preclean.bak` 即其字节）。
 TEMPLATE_SHA256: Final[str] = (
-    "7e8ec9c22580e05daf7803362f1ab83ca39d452a56c009833b05d6f6a1393860"
+    "dacd18184ef82195b489d014ac2dc7a4dc5edb9df5306d85f7ceb433be56068f"
 )
 
 STORE_ITEM_ID: Final[str] = _i502.STORE_ITEM_ID_I502
@@ -539,3 +541,74 @@ async def resolve_published_frozen_definitions(
     return await HC.resolve_published_frozen_definitions(
         IDENTITY, session=session, representation=representation, contract=contract
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ── 五环发布面（委托 HC，2026-10-01）
+#
+# 🔴 硬前置：`projection_provisioning.load_projection_supply()` 只认
+#    `publish_pilot_definitions` + `PILOT_WP_CODES`；`projection_first_publication`
+#    另要 `instrumentation_spec()`（单数 = 主表）与 `build_store_projection`。
+#    实现全在 `phase5_h_cycle_common`，这里只写薄委托（与 J1 / L1 同形，不复制逻辑）。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def instrumentation_spec() -> ExcelInstrumentationSpec:
+    return HC.primary_instrumentation_spec(IDENTITY, managed_row_table_specs())
+
+
+def build_store_projection(
+    payload: Any,
+    *,
+    contract: SyncContract,
+    limits: Any | None = None,
+    store_item_id: str | None = None,
+) -> Any:
+    """🔴 `payload` 必须是首位位置参数（golden digest 门按此调用）。"""
+    return HC.build_store_projection_for(
+        IDENTITY,
+        managed_row_table_specs(),
+        payload,
+        contract=contract,
+        limits=limits,
+        store_item_id=store_item_id,
+    )
+
+
+def merge_projection_into_store_rows(
+    *, projection: Any, base_rows: list, store_item_id: str | None = None
+) -> Any:
+    return HC.merge_projection_into_store_rows_for(
+        IDENTITY,
+        managed_row_table_specs(),
+        projection=projection,
+        base_rows=base_rows,
+        store_item_id=store_item_id,
+    )
+
+
+def iter_store_rows(payload: Any, *, store_item_id: str | None = None) -> Any:
+    return HC.iter_store_rows_for(
+        IDENTITY, managed_row_table_specs(), payload, store_item_id=store_item_id
+    )
+
+
+async def publish_definitions(publisher: Any) -> HC.HEntryDefinitions:
+    return await HC.publish_h_entry_definitions(
+        IDENTITY,
+        managed_row_table_specs(),
+        publisher=publisher,
+        contract_payload_builder=build_contract_payload,
+    )
+
+
+publish_pilot_definitions = publish_definitions
+
+#: 首版发布 binding 装配读的两个 provider 常量（与 J1 / L1 同名）。🔴 必须有：
+#: `ExcelInstrumentationSpec` 的字段名是 `uuid_col`，而 `projection_first_publication`
+#: 按 `spec.uuid_column or provider.UUID_COL` 取 ⇒ 缺这个常量时 UUID 列解析为 None，
+#: 首版发布炸在 `excel_entry_identity_inventory_invalid`（I6 实测）。
+#: 多受管表（I5）时 `ROWS_TABLE_KEY` 指向主表，其余由 sibling binding 覆盖。
+UUID_COL: Final[str] = instrumentation_spec().uuid_col
+ROWS_TABLE_KEY: Final[str] = managed_row_table_specs()[0].table_key
+PILOT_WP_CODES = WP_CODES

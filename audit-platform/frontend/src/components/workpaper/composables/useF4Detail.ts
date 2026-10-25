@@ -10,6 +10,7 @@
  */
 import { ref, computed, watch, inject, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
+import { getAuthHeaders } from '@/utils/authToken'
 import {
   parseNum,
   calcCreditBalance,
@@ -606,8 +607,7 @@ export function useF4Detail(options: UseF4DetailOptions) {
     const postYear = start.getFullYear()
 
     try {
-      const token = sessionStorage.getItem('token') || ''
-      const authHeaders = { Authorization: `Bearer ${token}` }
+      const authHeaders = getAuthHeaders()
       // 2202借方发生=付款(减少应付)
       const url = `/api/projects/${pid}/ledger/entries/2202?year=${postYear}`
         + `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}&limit=2000`

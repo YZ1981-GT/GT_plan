@@ -438,3 +438,32 @@ async def attach_pilot_adapters(
         session=session,
         contract_payload_builder=build_contract_payload,
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# provisioning 白名单接口（approved bundle 发布侧）
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 🔴 这两个名字是**硬前置**，不是装饰：
+# `fix_task76_provision_projection_definitions.py` 经
+# `projection_provisioning.load_projection_supply()` **只认** `publish_pilot_definitions`
+# 与 `PILOT_WP_CODES`，缺任一即抛 `ProviderModuleNotAllowedError: provider 是空壳`，
+# 且该脚本连 `--check`（只读）都 fail closed 在第一个缺口上 ⇒ 缺这两行，本 entry 永远
+# 拿不到 approved bundle，`register_from_manifest()` 也就永远注册不上。
+#
+# 实现在 `phase5_h_cycle_common.publish_definitions_for`（九条共用一份，逐行对照
+# `phase5_entry_orchestration.publish_definitions`）。`specs` 必须与
+# `build_contract_payload` 同源 —— 两者都用 `managed_row_table_specs()`。
+
+
+async def publish_pilot_definitions(publisher: Any) -> HC.HDefinitions:
+    """发布本 entry 的四段 definition + approved bundle。"""
+    return await HC.publish_definitions_for(
+        IDENTITY,
+        managed_row_table_specs(),
+        publisher=publisher,
+        contract_payload_builder=build_contract_payload,
+    )
+
+
+PILOT_WP_CODES = WP_CODES

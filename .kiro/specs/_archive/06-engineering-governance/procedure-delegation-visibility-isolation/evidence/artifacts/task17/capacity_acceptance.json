@@ -1,6 +1,6 @@
 {
   "denials_observed": {
-    "not_delegated": 858
+    "not_delegated": 215
   },
   "error_allow": 0,
   "error_allow_pass": true,
@@ -9,9 +9,9 @@
   "error_rate_pass": true,
   "error_rate_target": 0.01,
   "gate_p95_pass": true,
-  "gate_p95_seconds": 0.187488,
+  "gate_p95_seconds": 0.072902,
   "gate_p95_target_seconds": 1.0,
   "list_p95_pass": true,
-  "list_p95_seconds": 0.246537,
+  "list_p95_seconds": 0.107261,
   "list_p95_target_seconds": 2.0
 }

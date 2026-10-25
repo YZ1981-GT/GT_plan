@@ -611,7 +611,8 @@ const crossSheetDiff = computed(() => {
   // M3-2 明细表合计从 allResponses 取
   let detailTotal = 0
   for (const [key, resp] of formData.allResponses.value) {
-    if (key.startsWith('M3-M3-2-row-') && key.endsWith('-data') && resp.remark) {
+    // BP-10 迁移兼容
+    if (key.startsWith('M3-M3-2-') && key.endsWith('-data') && resp.remark) {
       try {
         const row = JSON.parse(resp.remark)
         // 期末金额 = 期初 + 回购 - 注销（在useM3Detail中计算，这里近似重算）
@@ -633,7 +634,8 @@ async function handlePullFromDetail() {
   await formData.loadData()
   const detailRows: Array<{ batchName: string; beginAmount: number; repurchaseAmount: number; cancelAmount: number }> = []
   for (const [key, resp] of formData.allResponses.value) {
-    if (key.startsWith('M3-M3-2-row-') && key.endsWith('-data') && resp.remark) {
+    // BP-10 迁移兼容
+    if (key.startsWith('M3-M3-2-') && key.endsWith('-data') && resp.remark) {
       try {
         const row = JSON.parse(resp.remark)
         detailRows.push({
@@ -792,7 +794,8 @@ onUnmounted(() => {
 
 function _restoreRows(): M3AdjudicationRow[] {
   const restored: M3AdjudicationRow[] = []
-  const prefix = 'M3-M3-1-row-'
+  // BP-10 迁移兼容：匹配旧 row-N 格式和新熵键格式
+  const prefix = 'M3-M3-1-'
   for (const [key, resp] of formData.allResponses.value.entries()) {
     if (key.startsWith(prefix) && key.endsWith('-data') && resp.remark) {
       try {

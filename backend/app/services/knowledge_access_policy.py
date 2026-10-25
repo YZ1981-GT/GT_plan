@@ -25,6 +25,7 @@ Design: "Components and Interfaces → 1. ResourceAccessResolver"（"知识库�
 
 from __future__ import annotations
 
+import enum
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -33,6 +34,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.base import UserRole
 from app.models.core import ProjectUser
 from app.models.knowledge_models import (
     KnowledgeAccessLevel,
@@ -46,8 +48,26 @@ __all__ = [
     "KnowledgeAccessSubject",
     "KnowledgeResource",
     "KnowledgeAccessPolicy",
+    "KnowledgeRetrievalMode",
+    "KnowledgeWritePolicy",
     "ANONYMOUS_SUBJECT",
+    "effective_resource",
 ]
+
+
+class KnowledgeRetrievalMode(str, enum.Enum):
+    """检索模式（spec knowledge-base-retrieval-and-authz-closure Requirement 3）。
+
+    - ``browse``：知识库页面搜索 —— 当前用户**可读**即可见（含其所属项目组的文档）。
+    - ``project``：项目内 RAG —— 可读 ∩ 当前项目范围（project_group 须包含当前项目）。
+      无用户（后台/系统调用）时只看 public 与当前项目组，private 永不可见。
+    - ``global_``：无项目的受限全局知识 RAG —— 可读且非 project_group
+      （没有项目上下文时不注入任何项目组资料）。
+    """
+
+    browse = "browse"
+    project = "project"
+    global_ = "global"
 
 
 def _coerce_uuid(value: Any) -> UUID | None:
@@ -152,6 +172,19 @@ class KnowledgeResource:
         )
 
 
+def effective_resource(
+    document: KnowledgeResource, folder: KnowledgeResource | None
+) -> KnowledgeResource | None:
+    """文档的**生效**权限三元组：文档级别非空取文档，否则完整继承文件夹。
+
+    继承但父文件夹未知 → ``None``（调用方必须按不可见处理，fail-closed）。
+    与 :meth:`KnowledgeAccessPolicy.can_read_document` 的继承语义逐字一致。
+    """
+    if document.access_level is not None:
+        return document
+    return folder
+
+
 class KnowledgeAccessPolicy:
     """知识库可见性/创建权唯一判定面（纯函数 + 一个 subject 解析器）。"""
 
@@ -169,14 +202,19 @@ class KnowledgeAccessPolicy:
         if user_id is None:
             return ANONYMOUS_SUBJECT
         try:
-            rows = (
-                await db.execute(
-                    sa.select(ProjectUser.project_id).where(
-                        ProjectUser.user_id == user_id,
-                        ProjectUser.is_deleted == sa.false(),
+            # 🔴 SAVEPOINT：PostgreSQL 语句失败会让整个事务 aborted，只 try/except 的话
+            #    「fail-closed 返回空集」是假的 —— 调用方下一条语句照样 InFailedSQLTransaction
+            #    （2026-09-29 真库守卫 test_knowledge_doc_search_pg 抓到）。SAVEPOINT 让失败只回滚
+            #    这一条查询，返回的空集主体才真的可用。
+            async with db.begin_nested():
+                rows = (
+                    await db.execute(
+                        sa.select(ProjectUser.project_id).where(
+                            ProjectUser.user_id == user_id,
+                            ProjectUser.is_deleted == sa.false(),
+                        )
                     )
-                )
-            ).scalars().all()
+                ).scalars().all()
         except Exception as exc:  # noqa: BLE001 — 成员关系查询失败 → 空集（fail-closed）
             logger.warning("知识库 subject 解析失败 user=%s: %s", user_id, exc)
             return KnowledgeAccessSubject(user_id=user_id, project_ids=frozenset())
@@ -233,6 +271,65 @@ class KnowledgeAccessPolicy:
                 return False  # 继承但父级未知 → fail-closed
             return KnowledgeAccessPolicy.can_read(subject, folder)
         return KnowledgeAccessPolicy.can_read(subject, document)
+
+    # ------------------------------------------------------------------
+    # 检索可见性（spec knowledge-base-retrieval-and-authz-closure Req 3）
+    # ------------------------------------------------------------------
+    @staticmethod
+    def can_retrieve(
+        mode: KnowledgeRetrievalMode | str,
+        subject: KnowledgeAccessSubject | None,
+        project_id: UUID | str | None,
+        document: KnowledgeResource,
+        folder: KnowledgeResource | None,
+    ) -> bool:
+        """检索（RAG / 搜索）场景下该文档是否可以返回。
+
+        判定表（``eff`` = 生效三元组，``P`` = 当前项目）：
+
+        ========  ======  =====================================================
+        模式      主体    条件
+        ========  ======  =====================================================
+        project   有用户  可读 ∧ (eff.level ≠ project_group ∨ P ∈ eff.project_ids)
+        project   无用户  eff.level = public ∨ (project_group ∧ P ∈ eff.project_ids)
+        global    有用户  可读 ∧ eff.level ≠ project_group
+        browse    有用户  可读
+        ========  ======  =====================================================
+
+        非法组合（browse/global 无用户、project 无项目）是**编程错误**，抛 ``ValueError``
+        —— 静默放行或静默拒绝都会让调用方误以为「知识库里没东西」。
+        """
+        mode = KnowledgeRetrievalMode(mode)
+        pid = _coerce_uuid(project_id)
+        if mode is KnowledgeRetrievalMode.project:
+            if pid is None:
+                raise ValueError("project 检索模式必须提供有效的 project_id")
+        elif subject is None:
+            raise ValueError(f"{mode.value} 检索模式必须提供用户主体")
+
+        eff = effective_resource(document, folder)
+        if eff is None or eff.access_level is None:
+            return False  # 继承链断裂 / 级别缺失 → fail-closed
+        level = eff.access_level
+
+        if subject is None:
+            # project 模式 · 无用户（后台/系统调用）：只按项目可见性，private 永不
+            if level == KnowledgeAccessLevel.public:
+                return True
+            if level == KnowledgeAccessLevel.project_group:
+                return pid in eff.project_ids
+            return False
+
+        if not KnowledgeAccessPolicy.can_read_document(subject, document, folder):
+            return False
+        if mode is KnowledgeRetrievalMode.browse:
+            return True
+        if mode is KnowledgeRetrievalMode.global_:
+            return level != KnowledgeAccessLevel.project_group
+        # project · 有用户：项目组资料只在它所属的项目里被引用（不跨客户注入）
+        if level == KnowledgeAccessLevel.project_group:
+            return pid in eff.project_ids
+        return True
 
     # ------------------------------------------------------------------
     # 写判定（知识资产创建）
@@ -332,3 +429,60 @@ class KnowledgeAccessPolicy:
         if row[3] is not None or row[4] is not None or row[5] is not None:
             folder = KnowledgeResource.of_row(row[3], row[4], row[5])
         return document, folder
+
+
+class KnowledgeWritePolicy:
+    """知识资产**写/管理**判定（spec knowledge-base-retrieval-and-authz-closure Req 6）。
+
+    与上面的可见性判定分开：可见性角色无关（admin 不绕过）；写动作才引入系统角色，
+    且只作为**上界**——readonly 一律不可写，admin 只在「资源本就可见」的前提下获得管理权。
+
+    - 创建（新建文件夹 / 上传 / 新建文档）：角色允许写 ∧ 对目标文件夹有创建权。
+    - 管理（删除 / 重命名 / 移动）：资源可见 ∧ 角色允许写 ∧（创建者本人 ∨ 系统管理员）。
+      文档的所有者是**文档自己的** ``created_by``，不继承文件夹；系统文件夹（预设、项目
+      文件夹）``created_by`` 为空 ⇒ 只有管理员能管理。
+    """
+
+    #: 允许写知识资产的系统角色（白名单：未知角色 fail-closed）
+    _WRITE_ROLES: frozenset[str] = frozenset(
+        r.value for r in UserRole if r is not UserRole.readonly
+    )
+
+    @staticmethod
+    def _role_value(role: Any) -> str | None:
+        value = getattr(role, "value", role)
+        return str(value) if value is not None else None
+
+    @classmethod
+    def role_allows_write(cls, role: Any) -> bool:
+        return cls._role_value(role) in cls._WRITE_ROLES
+
+    @classmethod
+    def is_admin(cls, role: Any) -> bool:
+        return cls._role_value(role) == UserRole.admin.value
+
+    @classmethod
+    def can_create(
+        cls, subject: KnowledgeAccessSubject, folder: KnowledgeResource, role: Any
+    ) -> bool:
+        return cls.role_allows_write(role) and KnowledgeAccessPolicy.can_create_in_folder(
+            subject, folder
+        )
+
+    @classmethod
+    def can_manage(
+        cls,
+        subject: KnowledgeAccessSubject,
+        *,
+        visible: bool,
+        owner_id: Any,
+        role: Any,
+    ) -> bool:
+        if not visible or subject.user_id is None:
+            return False
+        if not cls.role_allows_write(role):
+            return False
+        if cls.is_admin(role):
+            return True
+        owner = _coerce_uuid(owner_id)
+        return owner is not None and owner == subject.user_id

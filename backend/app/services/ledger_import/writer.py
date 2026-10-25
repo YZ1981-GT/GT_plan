@@ -499,6 +499,8 @@ async def bulk_insert_staged(
         实际插入行数
     """
     import uuid as _uuid
+
+    import sqlalchemy as sa
     from sqlalchemy import insert
 
     if not rows:

@@ -71,11 +71,10 @@ def mapping_digest_payload_d413() -> dict[str, Any]:
     ``mapping_digest_payload_d45`` 做法）。"""
     from pathlib import Path
 
-    evidence = (
-        Path(__file__).resolve().parents[4]
-        / ".kiro/specs/d-cycle-sheet-bidirectional-expansion/evidence"
-        / "T10-d413-erp-check-field-mapping.json"
-    )
+    _spec_root = Path(__file__).resolve().parents[4] / ".kiro/specs"
+    evidence = _spec_root / "d-cycle-sheet-bidirectional-expansion" / "evidence" / "T10-d413-erp-check-field-mapping.json"
+    if not evidence.exists():
+        evidence = _spec_root / "_archive/17-2026-10-03-verified-batch/d-cycle-sheet-bidirectional-expansion/evidence/T10-d413-erp-check-field-mapping.json"
     raw = json.loads(evidence.read_text(encoding="utf-8"))
     return raw["digest_payload"]
 

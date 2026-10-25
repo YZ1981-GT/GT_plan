@@ -2,7 +2,8 @@
  * useEditorUniver 单测 — workpaper-editor-shrink-phase2, Task 7.3
  *
  * 验证：
- *  - 核心返回值结构（univerAPI, loading, loadingHint, loadErrorState, loadErrorMessage, dirty, loadedFromXlsx, fileOpenedAt, initUniver, dispose）
+ *  - 核心返回值结构（univerAPI, loading, loadingHint, loadErrorState, loadErrorMessage, dirty, initUniver, dispose）
+ *    —— loadedFromXlsx / fileOpenedAt 随休眠的 xlsx 覆盖回写一并删除（2026-09-29）
  *  - initUniver 主要行为：调用 createUniver，完成后 loading=false
  *
  * Requirements: 12.2
@@ -92,8 +93,9 @@ describe('useEditorUniver — 核心返回值结构', () => {
     expect(isRef(result.loadErrorState)).toBe(true)
     expect(isRef(result.loadErrorMessage)).toBe(true)
     expect(isRef(result.dirty)).toBe(true)
-    expect(isRef(result.loadedFromXlsx)).toBe(true)
-    expect(isRef(result.fileOpenedAt)).toBe(true)
+    // 已删除的 xlsx 回写状态不得再暴露（否则调用方会以为回写还在）
+    expect('loadedFromXlsx' in result).toBe(false)
+    expect('fileOpenedAt' in result).toBe(false)
 
     // 初始值
     expect(result.univerAPI.value).toBe(null)
@@ -102,8 +104,6 @@ describe('useEditorUniver — 核心返回值结构', () => {
     expect(result.loadErrorState.value).toBe(null)
     expect(result.loadErrorMessage.value).toBe('')
     expect(result.dirty.value).toBe(false)
-    expect(result.loadedFromXlsx.value).toBe(false)
-    expect(result.fileOpenedAt.value).toBe(0)
 
     // 函数
     expect(typeof result.initUniver).toBe('function')

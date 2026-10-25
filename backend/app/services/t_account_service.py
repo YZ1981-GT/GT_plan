@@ -39,8 +39,15 @@ class TAccountService:
 
     async def add_entry(
         self, db: AsyncSession, t_account_id: UUID, data: dict[str, Any],
+        *, project_id: UUID | None = None,
     ) -> dict:
-        """添加分录（debit/credit）"""
+        """添加分录（debit/credit）。
+
+        🔴 ``project_id`` 传入时**先校验账户归属再写**（2026-09-28 补）：
+        这是写路径，原实现直接按 `t_account_id` 插分录、完全不校验归属
+        ⇒ 任何登录用户可往**他人项目**的 T 型账户塞分录（篡改他人审计数据），
+        比读泄露更严重。归属不符抛 ``ValueError``（router 转 404，不透露存在性）。
+        """
         entry_type = data.get("entry_type", "debit")
         if entry_type not in ("debit", "credit"):
             raise ValueError("entry_type 必须为 debit 或 credit")
@@ -48,6 +55,17 @@ class TAccountService:
         amount = Decimal(str(data.get("amount", 0)))
         if amount <= 0:
             raise ValueError("金额必须大于0")
+
+        if project_id is not None:
+            owner = await db.execute(
+                sa.select(TAccount.id).where(
+                    TAccount.id == t_account_id,
+                    TAccount.project_id == project_id,
+                    TAccount.is_deleted == sa.false(),
+                )
+            )
+            if owner.scalar_one_or_none() is None:
+                raise ValueError("T型账户不存在")
 
         entry = TAccountEntry(
             t_account_id=t_account_id,
@@ -66,11 +84,27 @@ class TAccountService:
             "description": entry.description,
         }
 
-    async def get_t_account(self, db: AsyncSession, t_account_id: UUID) -> dict | None:
-        """获取T型账户详情（含所有分录和计算结果）"""
-        result = await db.execute(
-            sa.select(TAccount).where(TAccount.id == t_account_id, TAccount.is_deleted == sa.false())
+    async def get_t_account(
+        self, db: AsyncSession, t_account_id: UUID,
+        *, project_id: UUID | None = None,
+    ) -> dict | None:
+        """获取T型账户详情（含所有分录和计算结果）。
+
+        🔴 ``project_id`` 是**归属过滤**（2026-09-28 补）：本表不在 RLS 覆盖范围内
+        （`V005__enable_rls.sql` 只保护 working_paper / adjustments / tb_balance /
+        review_records 四张表，真实 PG 现查 217 张带 project_id 的表里仅 3 张受保护），
+        service 层若不按 project_id 过滤，则「路径上的 project_id」纯属装饰 ——
+        任何登录用户传任意 `t_account_id` 即可读他人项目的 T 型账户（IDOR）。
+
+        传 ``None`` 保持旧行为（仅供既有内部调用与单测过渡），
+        **所有 router 路径必须传**，由 `test_t_account_project_isolation` 守卫。
+        """
+        stmt = sa.select(TAccount).where(
+            TAccount.id == t_account_id, TAccount.is_deleted == sa.false()
         )
+        if project_id is not None:
+            stmt = stmt.where(TAccount.project_id == project_id)
+        result = await db.execute(stmt)
         account = result.scalar_one_or_none()
         if not account:
             return None
@@ -107,9 +141,11 @@ class TAccountService:
             items.append(self._account_to_dict(acc, entries, dt, ct))
         return items
 
-    async def calculate_net_change(self, db: AsyncSession, t_account_id: UUID) -> dict:
-        """计算净变动"""
-        detail = await self.get_t_account(db, t_account_id)
+    async def calculate_net_change(
+        self, db: AsyncSession, t_account_id: UUID, *, project_id: UUID | None = None,
+    ) -> dict:
+        """计算净变动（``project_id`` 透传做归属过滤，见 `get_t_account`）"""
+        detail = await self.get_t_account(db, t_account_id, project_id=project_id)
         if not detail:
             raise ValueError("T型账户不存在")
 
@@ -127,9 +163,10 @@ class TAccountService:
     async def reconcile_with_balance_sheet(
         self, db: AsyncSession, t_account_id: UUID,
         bs_opening: Decimal, bs_closing: Decimal,
+        *, project_id: UUID | None = None,
     ) -> dict:
-        """与资产负债表勾稽"""
-        detail = await self.get_t_account(db, t_account_id)
+        """与资产负债表勾稽（``project_id`` 透传做归属过滤）"""
+        detail = await self.get_t_account(db, t_account_id, project_id=project_id)
         if not detail:
             raise ValueError("T型账户不存在")
 
@@ -149,9 +186,11 @@ class TAccountService:
             "message": "勾稽一致" if is_reconciled else f"差异 {float(diff):.2f}，请检查",
         }
 
-    async def integrate_to_cfs(self, db: AsyncSession, t_account_id: UUID) -> dict:
-        """集成到现金流量表（返回可用于CFS工作底稿的调整数据）"""
-        detail = await self.get_t_account(db, t_account_id)
+    async def integrate_to_cfs(
+        self, db: AsyncSession, t_account_id: UUID, *, project_id: UUID | None = None,
+    ) -> dict:
+        """集成到现金流量表（``project_id`` 透传做归属过滤）"""
+        detail = await self.get_t_account(db, t_account_id, project_id=project_id)
         if not detail:
             raise ValueError("T型账户不存在")
 

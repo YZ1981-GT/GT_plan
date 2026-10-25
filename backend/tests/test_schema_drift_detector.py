@@ -292,3 +292,157 @@ class TestRunDriftCheckWithTimeout:
              patch.object(SchemaDriftDetector, "write_log", new=noop_write):
             items = await run_drift_check_with_timeout(sqlite_engine)
             assert items == sample_items
+
+
+# ---------------------------------------------------------------------------
+# spec migration-integrity-and-enum-drift-closure（Requirement 3 / 4）
+# ---------------------------------------------------------------------------
+
+import ast  # noqa: E402
+import typing  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from app.core.migration_drift_ledger import KNOWN_CHECKSUM_DRIFTS  # noqa: E402
+from app.core.migration_runner import ChecksumDrift, MigrationRunner  # noqa: E402
+from app.core.schema_drift_detector import CRITICAL_DRIFT_TYPES, DriftType, count_critical  # noqa: E402
+
+_APP = Path(__file__).resolve().parents[1] / "app"
+
+
+def _orm_table_names() -> frozenset[str]:
+    SchemaDriftDetector._import_all_models()
+    from app.models.base import Base
+
+    return frozenset(Base.metadata.tables)
+
+
+class TestSuppressionsOnlyTouchDbExtra:
+    """三张过滤名单只描述「DB 有、ORM 无」的对象；ORM 表上的发现一律不得被它们吞掉。"""
+
+    def test_orm_tables_are_never_suppressed(self, sqlite_engine):
+        det = SchemaDriftDetector(sqlite_engine)
+        orm = _orm_table_names()
+        assert "notifications" in orm and det._is_external_tenant_table("notifications"), (
+            "回归锚点：外部租户前缀 notification 命中 ORM 表 notifications（此前其漂移被静默吞掉）"
+        )
+        for drift_type in ("orm_extra", "type_mismatch", "enum_mismatch"):
+            items = [DriftItem(t, "c", drift_type, "x") for t in sorted(orm)]
+            assert det._apply_suppressions(items, orm) == items, drift_type
+            # 列级 allowlist 描述的是「DB 多出、ORM 不映射」的列；其中有的后来被 ORM 映射了
+            # （working_paper.content_revision），这些列上的 critical 发现同样不得被吞
+            listed = [DriftItem(t, c, drift_type, "x") for t, c in sorted(det.KNOWN_COLUMN_ALLOWLIST)]
+            assert det._apply_suppressions(listed, orm) == listed, drift_type
+        # db_extra 出现在 ORM 表上（DB 多出的列）也不因外部租户前缀而被吞
+        extra = [DriftItem("notifications", "legacy_col", "db_extra", "x")]
+        assert det._apply_suppressions(extra, orm) == extra
+
+    def test_db_extra_filters_still_apply(self, sqlite_engine):
+        det = SchemaDriftDetector(sqlite_engine)
+        orm = _orm_table_names()
+        dropped = [
+            DriftItem("qrtz_triggers", None, "db_extra", "metabase"),
+            DriftItem("schema_version", None, "db_extra", "system"),
+            DriftItem("working_paper", "content_revision", "db_extra", "raw sql column"),
+        ]
+        assert "qrtz_triggers" not in orm
+        assert det._apply_suppressions(dropped, orm) == []
+
+
+class TestChecksumDriftScan:
+    async def test_only_unexplained_drift_is_reported(self, sqlite_engine):
+        known = KNOWN_CHECKSUM_DRIFTS[0]
+        live = [
+            ChecksumDrift(known.version, f"V{known.version}__x.sql", known.stored, known.current),
+            ChecksumDrift("999", "V999__edited.sql", "a" * 64, "b" * 64),
+        ]
+        with patch.object(MigrationRunner, "detect_checksum_drift", new=AsyncMock(return_value=live)):
+            items = await SchemaDriftDetector(sqlite_engine)._diff_checksums()
+        assert [(i.table, i.column, i.drift_type) for i in items] == [("V999", None, "checksum_drift")]
+        assert "V999__edited.sql" in items[0].detail
+        assert count_critical(items) == 1
+
+    async def test_scan_failure_is_visible_not_silent(self, sqlite_engine):
+        with patch.object(MigrationRunner, "detect_checksum_drift",
+                          new=AsyncMock(side_effect=RuntimeError("duplicate version 171"))):
+            items = await SchemaDriftDetector(sqlite_engine)._diff_checksums()
+        assert [(i.table, i.drift_type) for i in items] == [("(checksum_scan)", "checksum_drift")]
+        assert "duplicate version 171" in items[0].detail
+
+    async def test_enum_scan_failure_is_visible_not_silent(self, sqlite_engine):
+        # SQLite 没有 information_schema ⇒ 目录查询失败，必须报成一条可见的 critical 项而不是「无漂移」
+        items = await SchemaDriftDetector(sqlite_engine)._diff_enums()
+        assert [(i.table, i.drift_type) for i in items] == [("(enum_scan)", "enum_mismatch")]
+        assert count_critical(items) == 1
+
+
+def _string_constants(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return {n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str)}
+
+
+def _referenced_names(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    names |= {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+    for n in ast.walk(tree):
+        if isinstance(n, ast.ImportFrom):
+            names |= {a.name for a in n.names}
+    return names
+
+
+class TestCriticalTypesSingleSource:
+    def test_critical_set(self):
+        assert CRITICAL_DRIFT_TYPES == {"orm_extra", "enum_mismatch", "checksum_drift"}
+        assert CRITICAL_DRIFT_TYPES <= set(typing.get_args(DriftType))
+
+    @pytest.mark.parametrize("rel", ["api/health.py", "core/startup_registry.py"])
+    def test_consumers_use_the_single_source(self, rel):
+        """AST 判定（注释 / docstring 不参与）：不再手写类型字面量，改用 count_critical。"""
+        path = _APP / rel
+        assert "count_critical" in _referenced_names(path)
+        assert not (_string_constants(path) & set(typing.get_args(DriftType))), (
+            f"{rel} 仍手写漂移类型字面量；critical 集合只允许引用 CRITICAL_DRIFT_TYPES / count_critical"
+        )
+
+    @pytest.mark.xfail(strict=True, reason=(
+        "已知残留：main._run_schema_drift_check 与 startup_registry 同体，main.py 有并发会话未提交改动，"
+        "本 spec 不触碰（design §七）。修掉后本用例 XPASS ⇒ strict 失败，届时删除 xfail 标记"))
+    def test_main_startup_check_uses_the_single_source(self):
+        path = _APP / "main.py"
+        assert not (_string_constants(path) & {"orm_extra", "enum_mismatch"})
+
+    async def test_health_counts_checksum_drift_as_critical(self):
+        from app.api.health import _query_schema_drift
+
+        stored = [
+            DriftItem("V128", None, "checksum_drift", "edited"),
+            DriftItem("legacy_t", None, "db_extra", "info"),
+        ]
+        with patch.object(SchemaDriftDetector, "query_drift", new=AsyncMock(return_value=stored)):
+            info = await _query_schema_drift()
+        assert (info["count"], info["critical_count"]) == (2, 1)
+
+
+class TestScanWiring:
+    async def test_scan_wires_all_sources(self):
+        """scan() 必须真的汇入五类来源，且 ORM 表（notifications）上的发现不被外部租户前缀吞掉。"""
+        from types import SimpleNamespace
+
+        det = SchemaDriftDetector(SimpleNamespace(dialect=SimpleNamespace(name="postgresql")))
+        orm = {"notifications": {"id": {"type": "UUID", "nullable": False},
+                                 "title": {"type": "VARCHAR", "nullable": True}}}
+        db = {"notifications": {"id": {"type": "UUID", "nullable": False}},
+              "qrtz_triggers": {"x": {"type": "TEXT", "nullable": True}}}
+        enum_item = DriftItem("notifications", "kind", "enum_mismatch", "e")
+        checksum_item = DriftItem("V999", None, "checksum_drift", "c")
+        with patch.object(SchemaDriftDetector, "_collect_orm_tables", return_value=orm), \
+             patch.object(SchemaDriftDetector, "_collect_db_tables", new=AsyncMock(return_value=db)), \
+             patch.object(SchemaDriftDetector, "_diff_enums", new=AsyncMock(return_value=[enum_item])), \
+             patch.object(SchemaDriftDetector, "_diff_checksums", new=AsyncMock(return_value=[checksum_item])):
+            items = await det.scan()
+        assert {(i.table, i.column, i.drift_type) for i in items} == {
+            ("notifications", "title", "orm_extra"),
+            ("notifications", "kind", "enum_mismatch"),
+            ("V999", None, "checksum_drift"),
+        }
+        assert count_critical(items) == 3

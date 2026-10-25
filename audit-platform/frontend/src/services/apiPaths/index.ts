@@ -14,7 +14,7 @@ export {
 } from './accounting'
 
 export {
-  reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections,
+  reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections, consolNoteFormulas,
   cfsWorksheet, disclosureNotes, auditReport, exportTask, reportFormatTemplates,
   reportReview, noteLocks, noteGroupTemplate, noteCustomSections,
   consolidation, consolWorksheetData,
@@ -36,7 +36,7 @@ export {
 // 公式管理域（spec formula-management-runtime-closure Task 14）
 export {
   wpFormula, wpUserFormula, projectFormula, formulaScope,
-  formulaPresets, reportConfigFormula, draftRefresh, noteFormula, formulaApi,
+  formulaPresets, reportConfigFormula, draftRefresh, noteFormula, formulaPush, formulaApi,
 } from './formula'
 
 export {
@@ -64,7 +64,7 @@ import {
   ledgerImportValidationRules, tAccounts, formula, formulaAuditLog, dataValidation, fineChecks, auditChecks,
 } from './accounting'
 import {
-  reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections,
+  reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections, consolNoteFormulas,
   cfsWorksheet, disclosureNotes, auditReport, exportTask, reportFormatTemplates,
   reportReview, noteLocks, noteGroupTemplate, noteCustomSections,
   consolidation, consolWorksheetData,
@@ -95,7 +95,7 @@ import {
 
 export const API = {
   projects, trialBalance, adjustments, materiality, misstatements,
-  reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections,
+  reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections, consolNoteFormulas,
   cfsWorksheet, disclosureNotes, auditReport, exportTask,
   workpaperSummary, events, consolidation, consolWorksheetData,
   workpapers, wpReviews, wpMapping, wpAI, wpFineRules, wpManuals,

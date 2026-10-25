@@ -62,8 +62,6 @@ describe('UniverEditorCore — custom nav 与 locate 汇入同一 sheet-switch',
       loadErrorState: ref(null),
       loadErrorMessage: ref(''),
       dirty: ref(false),
-      loadedFromXlsx: ref(true),
-      fileOpenedAt: ref(Date.now()),
       initUniver,
       dispose,
     } as any)

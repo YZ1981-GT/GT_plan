@@ -49,6 +49,9 @@ from app.services.workpaper_sync.excel_instrumentation import (
 )
 from app.services.workpaper_sync.models import SyncDomainError
 from app.services.workpaper_sync.sheet_geometry import col_index
+from app.services.workpaper_sync.models import AuthorityModel
+from app.services.workpaper_sync.definitions import DefinitionKind
+from app.services.workpaper_sync.definitions import BundleSlot
 
 
 class EntrySelectionError(SyncDomainError):
@@ -76,7 +79,7 @@ EXPECTED_PROFILE_ID: Final[str] = (
 )
 TEMPLATE_RELATIVE_PATH: Final[str] = "F/F1 预付账款.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "f30055cbebc7daedec6d073e983e7ada5375c3edf50b49880c7aa571846510dd"
+    "68b0e9e9d1ea33adbefc10fe8a445b3b6e78dc50d89e080adbf906bdea5dbc7f"
 )
 
 #: canary store item（F1-6 关联方，裁决 F1-H1）
@@ -457,10 +460,10 @@ def _spec_of_store_item(store_item_id: str) -> Any:
 
 
 def build_store_projection(
-    store_item_id: str,
     payload: str | bytes | Sequence[Any],
     *,
     contract: SyncContract,
+    store_item_id: str = STORE_ITEM_ID,
     limits: Any | None = None,
 ) -> Any:
     from app.services.workpaper_sync.phase5_row_table_sheet import (
@@ -690,3 +693,133 @@ async def attach_pilot_adapters(
         contract=contract,
     )
     return (ADAPTER_ID,)
+
+AUTHORITY_MODEL: Final[AuthorityModel] = AuthorityModel.projection_contract
+
+
+def authority_model_payload() -> dict[str, Any]:
+    return {
+        "schema_version": "authority-model-definition:v1",
+        "entry_id": ENTRY_ID,
+        "authority_model": AUTHORITY_MODEL.value,
+        "content_authority": "structured_projection",
+        "merge_model": "stable_field_three_way",
+        "pilot_class": "phase5",
+        "reason": (
+            f"{ENTRY_ID}：结构化 Tab（HTML store）与 OnlyOffice 共写同一份权威模板，"
+            "投影契约是唯一权威 —— 与 D1~D7 / E1 / F3~F5 同型"
+        ),
+    }
+
+
+@dataclass(frozen=True)
+class Phase5Definitions:
+    """发布结果（与 F3/F4/F5/H 系各家同形）。"""
+    authority_model_definition_id: Any
+    authority_model_definition_sha256: str
+    template_definition_id: Any
+    template_definition_sha256: str
+    instrumentation_definition_id: Any
+    instrumentation_definition_sha256: str
+    contract_definition_id: Any
+    contract_definition_sha256: str
+    bundle_id: Any
+    bundle_sha256: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "entry_id": ENTRY_ID,
+            "adapter_id": ADAPTER_ID,
+            "authority_model": AUTHORITY_MODEL.value,
+            "authority_model_definition_id": str(self.authority_model_definition_id),
+            "authority_model_definition_sha256": self.authority_model_definition_sha256,
+            "template_definition_id": str(self.template_definition_id),
+            "template_definition_sha256": self.template_definition_sha256,
+            "instrumentation_definition_id": str(self.instrumentation_definition_id),
+            "instrumentation_definition_sha256": self.instrumentation_definition_sha256,
+            "contract_definition_id": str(self.contract_definition_id),
+            "contract_definition_sha256": self.contract_definition_sha256,
+            "definition_bundle_id": str(self.bundle_id),
+            "definition_bundle_sha256": self.bundle_sha256,
+        }
+
+
+async def publish_definitions(publisher: Any) -> Phase5Definitions:
+    """发布五个 definition + bundle（照 F3/D3 范式）。"""
+    contract = assert_contract_file_matches_source()
+    authority = await publisher.publish_definition(
+        kind=DefinitionKind.authority_model,
+        payload=authority_model_payload(),
+        logical_id=f"{ADAPTER_ID}.authority-model",
+        semantic_version="1.0.0",
+    )
+    template_payload = template_definition_payload()
+    template = await publisher.publish_definition(
+        kind=DefinitionKind.template,
+        payload=template_payload,
+        logical_id=f"{ADAPTER_ID}.template",
+        semantic_version="1.0.0",
+        blob_bytes=read_authoritative_template(),
+        structure_hash=template_payload["normalized_structure_hash"],
+    )
+    instrumentation = await publisher.publish_definition(
+        kind=DefinitionKind.instrumentation,
+        payload=instrumentation_definition_payload(),
+        logical_id=f"{ADAPTER_ID}.instrumentation",
+        semantic_version="1.0.0",
+    )
+    contract_definition = await publisher.publish_definition(
+        kind=DefinitionKind.contract,
+        payload=dict(contract.canonical_payload),
+        logical_id=ADAPTER_ID,
+        semantic_version=contract.semantic_version,
+    )
+    if template.sha256 != contract.template_definition_sha256:
+        from app.services.workpaper_sync.adapters.registry import RegistrationError
+        raise RegistrationError(
+            f"已发布 template digest {template.sha256} 与契约声明 "
+            f"{contract.template_definition_sha256} 不一致 —— 单向引用断裂"
+        )
+    if instrumentation.sha256 != contract.instrumentation_definition_sha256:
+        from app.services.workpaper_sync.adapters.registry import RegistrationError
+        raise RegistrationError(
+            f"已发布 instrumentation digest {instrumentation.sha256} 与契约声明 "
+            f"{contract.instrumentation_definition_sha256} 不一致 —— 单向引用断裂"
+        )
+    bundle = await publisher.publish_bundle(
+        authority_model_definition_id=authority.definition_id,
+        authority_model=AUTHORITY_MODEL,
+        authority_model_definition_sha256=authority.sha256,
+        slots={
+            BundleSlot.template: {
+                "type": "definition",
+                "ref": f"definition:{template.definition_id}",
+                "digest": template.sha256,
+            },
+            BundleSlot.instrumentation: {
+                "type": "definition",
+                "ref": f"definition:{instrumentation.definition_id}",
+                "digest": instrumentation.sha256,
+            },
+            BundleSlot.contract: {
+                "type": "definition",
+                "ref": f"definition:{contract_definition.definition_id}",
+                "digest": contract_definition.sha256,
+            },
+        },
+    )
+    return Phase5Definitions(
+        authority_model_definition_id=authority.definition_id,
+        authority_model_definition_sha256=authority.sha256,
+        template_definition_id=template.definition_id,
+        template_definition_sha256=template.sha256,
+        instrumentation_definition_id=instrumentation.definition_id,
+        instrumentation_definition_sha256=instrumentation.sha256,
+        contract_definition_id=contract_definition.definition_id,
+        contract_definition_sha256=contract_definition.sha256,
+        bundle_id=bundle.bundle_id,
+        bundle_sha256=bundle.canonical_sha256,
+    )
+
+
+publish_pilot_definitions = publish_definitions

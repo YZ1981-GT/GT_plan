@@ -1,5 +1,22 @@
 <template>
   <div class="k8-tab-adjustment">
+    <!-- ═══ K8-3 真双向：结构化视图 ↔ 在线编辑（平台 sync bridge，非裸 GtOnlyOfficeSheet）═══ -->
+    <div class="k-sync-bar">
+      <el-segmented v-model="kEditorMode" :options="kModeOptions" size="small" />
+      <el-tag size="small" :type="kSyncStateTag.type">{{ kSyncStateTag.text }}</el-tag>
+    </div>
+    <template v-if="kEditorMode === K_ONLINE_EDIT_LABEL">
+      <div class="k-oo-container">
+        <WorkpaperSyncEditorHost
+          v-if="kSyncDescriptor"
+          ref="kSyncHostRef"
+          :descriptor="kSyncDescriptor"
+          :bridge="kSyncBridge"
+        />
+        <div v-else class="k-oo-loading">正在打开 K8-3 同步编辑器…</div>
+      </div>
+    </template>
+    <template v-else>
     <!-- ═══ Section标题 + 保存回写 + 复核 ═══ -->
     <div class="section-header">
       <h3>K8-3 调整分录汇总</h3>
@@ -137,6 +154,7 @@
         <li>保存后自动发布 adjustment:created 事件联动A13，并同步 K8-1 审定表账项/重分类调整</li>
       </ul>
     </details>
+    </template>
   </div>
 </template>
 
@@ -154,12 +172,15 @@
  * - 双向同步K8-1审定表
  * - 动态行增删（ElMessageBox.prompt确认）
  */
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useKAdjustmentSync, K_ONLINE_EDIT_LABEL } from '../../composables/kAdjustmentSync'
 import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import type { Ref } from 'vue'
+import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -216,7 +237,6 @@ function legacyTypeToCategory(t: string): AdjCategory {
 }
 
 const entries = ref<AdjustmentEntry[]>([])
-let nextId = 1
 
 // ═══ 计算属性：借贷平衡 ═══
 const totalDebits = computed(() => entries.value.reduce((sum, e) => sum + (e.debitAmount || 0), 0))
@@ -255,7 +275,8 @@ function loadFromResponses(): void {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (Array.isArray(parsed)) {
       entries.value = parsed.map((e: any, idx: number) => ({
-        id: e.id || `entry-${++nextId}`,
+        ...e,
+        id: e.id || newRowIdentity('entry'),
         seq: idx + 1,
         // 兼容旧数据：无 category 时从 entryType 迁移
         category: (e.category as AdjCategory) || legacyTypeToCategory(e.entryType || 'AJE'),
@@ -268,7 +289,6 @@ function loadFromResponses(): void {
         indexRef: e.indexRef || '',
         remark: e.remark || '',
       }))
-      nextId = entries.value.length + 1
     }
   } catch { /* ignore parse error */ }
 }
@@ -283,7 +303,7 @@ async function handleAddEntry(): Promise<void> {
     })
     if (value?.trim()) {
       entries.value.push({
-        id: `entry-${++nextId}`,
+        id: newRowIdentity('entry'),
         seq: entries.value.length + 1,
         category: '账项调整',
         summary: value.trim(),
@@ -394,9 +414,31 @@ function fmtAmt(v: number | null | undefined): string {
 function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
   return categoryToBucket(row.category) === 'rje' ? 'rje-row' : ''
 }
+// ─── K8-3 真双向接桥（spec: k-cycle 三份 · 后端 phase5_k8_*，sheet_key=k803-managed）───
+// 🔴 sheetKey 走具名常量：跨语言契约守卫按常量声明反查后端 sheet_key 是否漂移。
+const K8_3_SHEET_KEY = 'k803-managed'
+const ITEM = `${ITEM_PREFIX}-entries`
+const {
+  syncBridge: kSyncBridge, descriptor: kSyncDescriptor, editorMode: kEditorMode,
+  modeOptions: kModeOptions, syncStateTag: kSyncStateTag, syncHostRef: kSyncHostRef,
+} = useKAdjustmentSync({
+  entryId: 'xlsx/gt-k8-selling-expenses',
+  sheetKey: K8_3_SHEET_KEY,
+  itemId: ITEM,
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+  isReadonly: computed(() => !!props.isReadonly),
+  snapshotRows: () => JSON.parse(JSON.stringify(entries.value)),
+  onReloaded: (remark: string | null) => { props.allResponses.set(ITEM, { item_id: ITEM, conclusion: null, remark }); loadFromResponses() },
+})
+void kSyncHostRef
+
 </script>
 
 <style scoped>
+.k-sync-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.k-oo-container { min-height: 600px; height: calc(100vh - 280px); }
+.k-oo-loading { padding: 24px; color: #909399; }
 .k8-tab-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .section-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }

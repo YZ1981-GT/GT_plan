@@ -20,6 +20,7 @@ import { ElMessage } from 'element-plus'
 import { parseNum } from './useK9FormulaEngine'
 import { isCrossPeriod } from './useK9CutoffEngine'
 import { deriveConclusion as canonicalDeriveConclusion } from './cutoffCanonical'
+import { newRowIdentity } from './shared/rowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -148,7 +149,7 @@ export function useK9Cutoff(params: UseK9CutoffParams) {
     const isCross = isCrossPeriod(sourceDate, bookDate, end)
 
     return {
-      rowKey: raw.rowKey ?? `row-${idx}`,
+      rowKey: raw.rowKey ?? newRowIdentity('row'),
       index: idx + 1,
       voucherNo: raw.voucherNo ?? '',
       bookDate, summary: raw.summary ?? '',

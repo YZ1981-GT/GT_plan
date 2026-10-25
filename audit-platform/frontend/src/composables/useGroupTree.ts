@@ -22,6 +22,7 @@
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { api } from '@/services/apiProxy'
+import { isRequestCancelled } from '@/utils/http'
 
 // ─── 类型定义（与后端 consol_tree_service.to_dict_v2 输出对齐，camelCase）─────────
 
@@ -43,12 +44,35 @@ export interface TreeNode {
   isCycleBreak: boolean // 循环引用被打断
   hasNoCompanyCode: boolean // company_code 为空
   // Phase 2 持股/合并方式可视化（Task 14.1）——无数据时为 null（优雅降级）
-  shareholding?: number | null // 持股比例（如 100.00）
-  consolMethod?: string | null // 合并方式（ConsolMethod 枚举值：full/equity/proportional）
+  /** 持股比例（如 100.00）；后端 companies 富集失败时为 null。 */
+  shareholding?: number | null
+  /** 合并方式（ConsolMethod 枚举值：full/equity/proportional）。 */
+  consolMethod?: string | null
+  // 后端森林/批量预览的稳定键：树是（控制方、年度）分组，企业节点是（企业代码、年度）。旧 id 保留给兼容调用方。
+  /** 企业实体稳定键：同企业不同年度不得在 el-tree 中碰撞。 */
+  nodeKey?: string
+  /** 后端森林树的 stable key（ultimateCode@year）。 */
+  forestKey?: string
+  /** 与上级关系：subsidiary=子公司，branch=分公司。 */
+  relation?: string | null
+  /** 后端诊断 flags（保留旧 boolean 的同时消费新模型）。 */
+  flags?: string[]
+  /** 经哪些中间企业间接挂靠。 */
+  via?: Array<{ companyCode: string; companyName: string }>
+  /** 所属审计年度。 */
+  year?: number | null
+  /** 同企业同年度的合并/单户项目。 */
+  projects?: Array<{ id: string; reportScope: string; status?: string | null; duplicate?: boolean }>
+  consolidatedProjectId?: string | null
+  standaloneProjectId?: string | null
 }
 
 /** 集团树（一棵树 = 一个 ultimate_company_code 分组） */
 export interface GroupTree {
+  /** 后端森林 stable key，例如 G@2025。 */
+  key?: string
+  /** 本树审计年度。 */
+  year?: number | null
   ultimateCode: string
   ultimateName: string
   rootProjectId: string | null // consolidated 根项目 ID（可能不存在）
@@ -222,6 +246,35 @@ export function countConsolMethods(nodes: TreeNode[]): ConsolMethodCounts {
   return counts
 }
 
+function normalizeTreeNode(node: TreeNode, year: number | null, forestKey?: string): TreeNode {
+  const nodeYear = node.year ?? year
+  const nodeKey = node.nodeKey || (node.companyCode ? `${node.companyCode}@${nodeYear ?? ''}` : node.id)
+  return {
+    ...node,
+    nodeKey,
+    forestKey,
+    year: nodeYear,
+    children: (node.children || []).map((child) => normalizeTreeNode(child, nodeYear, forestKey)),
+  }
+}
+
+function normalizeForestResponse(data: GroupTreeResponse): GroupTreeResponse {
+  const trees = (data?.trees || []).map((tree) => {
+    const forestKey = tree.key || `${tree.ultimateCode}@${tree.year ?? ''}`
+    const treeYear = tree.year ?? null
+    return {
+      ...tree,
+      key: forestKey,
+      children: (tree.children || []).map((node) => normalizeTreeNode(node, treeYear, forestKey)),
+    }
+  })
+  return {
+    ...data,
+    trees,
+    independents: (data?.independents || []).map((node) => normalizeTreeNode(node, node.year ?? null)),
+  }
+}
+
 // ─── composable ────────────────────────────────────────────────────────────
 
 export function useGroupTree(year?: Ref<number | null>) {
@@ -276,10 +329,14 @@ export function useGroupTree(year?: Ref<number | null>) {
       if (y != null) params.year = y
       if (scope && scope !== 'all') params.scope = scope
 
-      const data = await api.get<GroupTreeResponse>(TREE_ENDPOINT, { params })
-      trees.value = Array.isArray(data?.trees) ? data.trees : []
-      independents.value = Array.isArray(data?.independents) ? data.independents : []
+      const data = await api.get<GroupTreeResponse>(TREE_ENDPOINT, { params, _dedupe: false } as any)
+      const normalized = normalizeForestResponse(data || { trees: [], independents: [] })
+      trees.value = normalized.trees
+      independents.value = normalized.independents
     } catch (e: any) {
+      // GET 去重导致的 cancel（axios abort）不是真正的失败——静默忽略，
+      // 后发的请求会带回正确数据。只对非 cancel 错误设置 error 状态。
+      if (isRequestCancelled(e)) return
       error.value = e?.message || '加载集团架构树失败'
       trees.value = []
       independents.value = []

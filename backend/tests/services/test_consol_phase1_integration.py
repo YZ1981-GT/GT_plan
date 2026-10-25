@@ -97,30 +97,47 @@ async def test_eh4_no_identifiers_passes():
 
 @pytest.mark.asyncio
 async def test_q4_elimination_approved_triggers_both_recalcs():
-    """ELIMINATION_APPROVED handler → recalc_full(worksheet) + recalculate_trial 均被调用。"""
+    """ELIMINATION_APPROVED handler → 合并推送 → recalc_full(worksheet) + recalculate_trial 均被调用。
+
+    spec consol-elimination-single-source-push 起 handler 经推送服务（差额表 → 试算 → 报表 → 附注标记），
+    推送编排真跑（真 SQLite 会话），只把两步重算换成探针，验证两步都被调且推送运行落库为成功。
+    """
+    import sqlalchemy as sa
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+    import tests.conftest  # noqa: F401  注册全部模型
+    from app.models.base import Base
+    from app.models.consol_push_models import ConsolPushRun
+    from app.models.core import Project
     from app.services import consol_elimination_recalc_handler as h
 
-    pid = uuid.uuid4()
-    event = MagicMock(project_id=pid, year=2025)
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        pid = uuid.uuid4()
+        async with factory() as db:
+            db.add(Project(id=pid, name="集团_2025", client_name="集团", company_code="G",
+                           report_scope="consolidated", audit_year=2025))
+            await db.commit()
 
-    fake_db = MagicMock()
-    fake_db.commit = AsyncMock()
-    fake_db.rollback = AsyncMock()
+        event = MagicMock(project_id=pid, year=2025)
+        with patch("app.core.database.async_session", factory), \
+             patch("app.services.consol_worksheet_engine.recalc_full",
+                   new=AsyncMock(return_value={"node_count": 3, "account_count": 0, "orphan_entries": []})) as m_ws, \
+             patch("app.services.consol_trial_service.recalculate_trial", new=AsyncMock(return_value=[])) as m_tr:
+            await h.handle_elimination_approved(event)
 
-    class _FakeSessionCtx:
-        async def __aenter__(self):
-            return fake_db
-        async def __aexit__(self, *a):
-            return False
-
-    with patch("app.core.database.async_session", return_value=_FakeSessionCtx()), \
-         patch("app.services.consol_worksheet_engine.recalc_full", new=AsyncMock()) as m_ws, \
-         patch("app.services.consol_trial_service.recalculate_trial", new=AsyncMock()) as m_tr:
-        await h.handle_elimination_approved(event)
-
-    m_ws.assert_awaited_once()
-    m_tr.assert_awaited_once()
-    fake_db.commit.assert_awaited()
+        m_ws.assert_awaited_once()
+        m_tr.assert_awaited_once()
+        assert m_ws.await_args.args[1:] == (pid, 2025) and m_tr.await_args.args[1:] == (pid, 2025)
+        async with factory() as db:
+            run = (await db.execute(sa.select(ConsolPushRun))).scalar_one()
+        assert (run.trigger_source, run.status) == ("elimination_approved", "succeeded")
+        assert [s["step"] for s in run.steps] == ["worksheet", "trial", "report", "notes"]
+    finally:
+        await engine.dispose()
 
 
 @pytest.mark.asyncio

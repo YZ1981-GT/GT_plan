@@ -11,7 +11,7 @@ stdio-only MCP server for DSH Agent，全部数据经平台受权 REST API 获�
   - 不接受 Agent 自定义 shell command
 
 环境变量：
-  AUDIT_API_BASE   平台 REST 基地址（如 http://localhost:9980）
+  AUDIT_API_BASE   平台 REST 基地址（如 http://127.0.0.1:9980）
   MCP_TOKEN        scoped token（绑定 user/project/run/scope/exp）
 
 每个工具仅调用 POST {AUDIT_API_BASE}/api/ai-chat/mcp/tools/call
@@ -41,7 +41,9 @@ logger = logging.getLogger(__name__)
 # 配置
 # ---------------------------------------------------------------------------
 
-AUDIT_API_BASE: str = os.environ.get("AUDIT_API_BASE", "http://localhost:9980")
+# 127.0.0.1 而非 localhost：平台后端只监听 IPv4，且下面每次工具调用都新建 httpx.Client ——
+# Windows 上 localhost 先试 ::1，每次建连多等约 2s。
+AUDIT_API_BASE: str = os.environ.get("AUDIT_API_BASE", "http://127.0.0.1:9980")
 MCP_TOKEN: str = os.environ.get("MCP_TOKEN", "")
 
 #: 工具清单（与后端 MCP_READONLY_TOOLS 必须完全一致）

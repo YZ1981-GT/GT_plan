@@ -73,6 +73,8 @@ export function useEditingLock(options: EditingLockOptions) {
       locked.value = true
       isMine.value = res?.acquired ?? true
       lockedBy.value = res?.locked_by_name ?? null
+      // 记下**实际持有**的 id —— release / heartbeat 一律按它发（见 release 注释）
+      if (isMine.value) heldId.value = id
     } catch (e: any) {
       if (e?.response?.status === 409 || e?.status === 409) {
         locked.value = true
@@ -83,19 +85,39 @@ export function useEditingLock(options: EditingLockOptions) {
     }
   }
 
+  /**
+   * 释放 / 续期**实际持有**的那把锁。
+   *
+   * 🔴 一律按 `heldId` 发，禁止读 `options.resourceId.value`（2026-09-28 真机实测）：
+   *
+   * `resourceId` 通常是 `computed(() => route.params.wpId)`。切底稿时 Vue Router
+   * **先**更新路由参数、**后**卸载旧组件 ⇒ `onUnmounted` 里的 `release()` 读到的
+   * 已经是**新** id。实测网络日志（K8 → L4）：
+   *     DELETE /api/editing-locks/workpaper/{L4} => 404   ← 本该是 {K8}
+   *     POST   /api/editing-locks/workpaper/{L4} => 200
+   * 后果不只是 console 噪音：**K8 的锁从未被释放**，要等心跳超时，
+   * 期间他人打开 K8 会看到「正在被 admin 编辑」。
+   *
+   * 🔴 首版只给 `watch` 传了 oldId 就以为修好了 —— 真机仍复现，因为该路径根本不是
+   * `watch`（组件被卸载重建，watch 不触发）。**只有「按持有的 id 释放」才覆盖全部
+   * 三条路径**（watch / onUnmounted / beforeunload）—— 你只能释放你持有的东西。
+   */
+  const heldId = ref<string | null>(null)
+
   async function release() {
-    const id = options.resourceId.value
+    const id = heldId.value
     if (!id || !isMine.value) return
 
     try {
       await api.delete(`/api/editing-locks/${resourceType}/${id}`)
     } catch { /* ignore */ }
+    heldId.value = null
     locked.value = false
     isMine.value = false
   }
 
   async function heartbeat() {
-    const id = options.resourceId.value
+    const id = heldId.value
     if (!id || !isMine.value) return
 
     try {
@@ -113,6 +135,7 @@ export function useEditingLock(options: EditingLockOptions) {
       locked.value = true
       isMine.value = true
       lockedBy.value = null
+      heldId.value = id
       return res
     } catch { /* ignore */ }
   }
@@ -173,6 +196,7 @@ export function useEditingLock(options: EditingLockOptions) {
 
   // 资源 ID 变化时重新获取锁
   watch(options.resourceId, async (newId, oldId) => {
+    // release() 按 heldId 发，此刻 heldId 仍是旧 id ⇒ 无需也不应传参（见 release 注释）
     if (oldId && isMine.value) await release()
     stopHeartbeat()
     if (newId) {

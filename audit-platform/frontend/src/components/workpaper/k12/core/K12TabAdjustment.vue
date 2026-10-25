@@ -1,5 +1,22 @@
 <template>
   <div class="k12-tab-adjustment">
+    <!-- ═══ K12-3 真双向：结构化视图 ↔ 在线编辑（平台 sync bridge，非裸 GtOnlyOfficeSheet）═══ -->
+    <div class="k-sync-bar">
+      <el-segmented v-model="kEditorMode" :options="kModeOptions" size="small" />
+      <el-tag size="small" :type="kSyncStateTag.type">{{ kSyncStateTag.text }}</el-tag>
+    </div>
+    <template v-if="kEditorMode === K_ONLINE_EDIT_LABEL">
+      <div class="k-oo-container">
+        <WorkpaperSyncEditorHost
+          v-if="kSyncDescriptor"
+          ref="kSyncHostRef"
+          :descriptor="kSyncDescriptor"
+          :bridge="kSyncBridge"
+        />
+        <div v-else class="k-oo-loading">正在打开 K12-3 同步编辑器…</div>
+      </div>
+    </template>
+    <template v-else>
     <!-- ═══ 标题 + AJE/RJE切换 + 按钮 ═══ -->
     <div class="section-header">
       <div class="section-header-left">
@@ -240,6 +257,7 @@
         <li>与日常活动无关的利得计入6301营业外收入；与日常活动相关的利得计入6117其他收益(K10)</li>
       </ul>
     </details>
+    </template>
   </div>
 </template>
 
@@ -264,11 +282,13 @@
  *   Backend: _on_adjustment_created handler picks up K12-3 entries (regex ^[D-N]\d+-3$ matches K12-3)
  *   Disclosure refresh: INDIRECT via K12-1 recalc → writebackTB → substantive:adjudicated
  */
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useKAdjustmentSync, K_ONLINE_EDIT_LABEL } from '../../composables/kAdjustmentSync'
 import { computed, onMounted, ref, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK12FormData } from '../../composables/useK12FormData'
-import { useK12Adjustment } from '../../composables/useK12Adjustment'
+import { useK12Adjustment, K12_ADJ_ROWS_KEY } from '../../composables/useK12Adjustment'
 import { generateK12AiText } from '../../composables/useK12AiText'
 import { eventBus } from '@/utils/eventBus'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
@@ -437,9 +457,31 @@ onMounted(async () => {
   adjustment.restoreEntries()
   refreshStatus()
 })
+// ─── K12-3 真双向接桥（spec: k-cycle 三份 · 后端 phase5_k12_*，sheet_key=k1203-managed）───
+// 🔴 sheetKey 走具名常量：跨语言契约守卫按常量声明反查后端 sheet_key 是否漂移。
+const K12_3_SHEET_KEY = 'k1203-managed'
+const ITEM = K12_ADJ_ROWS_KEY
+const {
+  syncBridge: kSyncBridge, descriptor: kSyncDescriptor, editorMode: kEditorMode,
+  modeOptions: kModeOptions, syncStateTag: kSyncStateTag, syncHostRef: kSyncHostRef,
+} = useKAdjustmentSync({
+  entryId: 'xlsx/gt-k12-non-operating-income',
+  sheetKey: K12_3_SHEET_KEY,
+  itemId: ITEM,
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+  isReadonly: computed(() => !!props.isReadonly),
+  snapshotRows: () => JSON.parse(JSON.stringify(adjustment.entries.value)),
+  onReloaded: (remark: string | null) => { formData.allResponses.value.set(ITEM, { item_id: ITEM, conclusion: null, remark } as any); adjustment.entries.value = []; adjustment.restoreEntries() },
+})
+void kSyncHostRef
+
 </script>
 
 <style scoped>
+.k-sync-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.k-oo-container { min-height: 600px; height: calc(100vh - 280px); }
+.k-oo-loading { padding: 24px; color: #909399; }
 .k12-tab-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header {

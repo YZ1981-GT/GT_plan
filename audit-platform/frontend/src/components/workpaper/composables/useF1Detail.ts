@@ -6,7 +6,7 @@
  *
  * 职责：
  * - DetailRow（3-period: agingPrior / agingCurrent / agingAudited）
- * - 行内公式：H=E+F+G, O=H+M-N, Q=O+P, X=Q+V+W
+ * - 行内公式：H=E+F+G, O=E+M-N, Q=O+P, X=O+V+W（按权威 F1-2 模板）
  * - 合计 / 核对 / 账龄占比 / 账龄逻辑校验
  * - 动态账龄配置（useAgingConfig + migrateD3F1Keys）
  */
@@ -45,13 +45,13 @@ export interface DetailRow {
   agingPrior: AgingData      // I~L: 期初审定账龄
   debit: number              // M: 借方发生
   credit: number             // N: 贷方发生
-  endBalance: number         // O: =H+M-N
+  endBalance: number         // O: =E+M-N（权威模板）
   entityReclass: number      // P: 被审计单位重分类调整
   endUnadjusted: number      // Q: =O+P
   agingCurrent: AgingData    // R~U: 期末未审账龄
   endAje: number             // V: 账项调整
   endRje: number             // W: 重分类调整
-  endAudited: number         // X: =Q+V+W
+  endAudited: number         // X: =O+V+W（权威模板）
   agingAudited: AgingData    // Y~AB: 期末审定账龄
   isConfirmed: string        // AC: 是否函证
   postPeriodSettlement: number // AD: 期后回款

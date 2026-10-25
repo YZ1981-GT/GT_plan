@@ -153,6 +153,27 @@ export const noteFormula = {
     `/api/disclosure-notes/${projectId}/${year}/${noteSection}/apply-formulas`,
 } as const
 
+// ─── 公式推送（chain-closure-phase2-formula-push-engine；backend/app/routers/formula_push.py） ──
+
+const pushBase = (projectId: string) => `/api/projects/${projectId}/formula-push`
+
+export const formulaPush = {
+  /** GET `?wp_code=` — 推送规则清单（只读） */
+  rules: (projectId: string) => `${pushBase(projectId)}/rules`,
+  /** GET — 后端 binding 接入清单（请求失败时前端按空清单处理） */
+  bindings: (projectId: string) => `${pushBase(projectId)}/bindings`,
+  /** POST `{year, dry_run}` — 立即推送（dry_run 试跑，事务回滚） */
+  run: (projectId: string) => `${pushBase(projectId)}/run`,
+  /** GET `?year=` — 最近一次运行 + 状态计数 */
+  latest: (projectId: string) => `${pushBase(projectId)}/latest`,
+  /** GET `?year=&state=` — 目标级状态（当前值 / 公式值 / 差异） */
+  states: (projectId: string) => `${pushBase(projectId)}/states`,
+  /** POST `{year, addr_ids}` — 采用公式值 */
+  adopt: (projectId: string) => `${pushBase(projectId)}/states/adopt`,
+  /** POST `{year, addr_ids, locked}` — 锁定 / 解锁 */
+  lock: (projectId: string) => `${pushBase(projectId)}/states/lock`,
+} as const
+
 /** 公式域聚合（便于 `import { formulaApi } from '@/services/apiPaths/formula'`） */
 export const formulaApi = {
   wpFormula,
@@ -163,4 +184,5 @@ export const formulaApi = {
   reportConfigFormula,
   draftRefresh,
   noteFormula,
+  formulaPush,
 } as const

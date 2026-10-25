@@ -1,0 +1,70 @@
+{
+  "measured_at": "2026-09-26",
+  "spec": "d3-sync-coverage-via-row-table-engine",
+  "task": "15 — D3-3 单元格双向可行性核 + 裁决",
+  "decision": "single_html",
+  "verdict": "D3-3「预收账款调整分录汇总」判为 single_html，不做行表引擎单元格双向回写；与已判 single_html 的 D4-4 一致。",
+  "authority": {
+    "template_path": "backend/wp_templates/D/D3 预收账款.xlsx",
+    "template_sha256": "33165493b95e0ae10f576e31ae72a37b5a07796db9714f389ccb95af4ba21ef1",
+    "method": "openpyxl 直读真实 tab 名与几何（唯一权威，非 prefill/note 脚本里的旧名）；模板哨兵与 phase5_d3_prepaid_receipts.TEMPLATE_SHA256 一致",
+    "real_tab_name": "调整分录汇总表D3-3",
+    "geometry": "A1:J23；标题区 A1-A2（合并 A1:J1 / A2:J2）；页眉/索引区 A3-A4 + I3/J3/I4（6 处底稿目录引用公式）；表头行 5（10 字段键列 A-J）；数据区 6-20（空模板带，零内容零公式）；行21 使用提示（合并 A21:J21）；行22-23 空",
+    "header_A_to_J": [
+      "调整事项说明",
+      "类别（报表调整/账项调整/其他）",
+      "报表项目",
+      "科目名称",
+      "附注项目",
+      "……",
+      "借方调整金额",
+      "贷方调整金额",
+      "索引",
+      "备注"
+    ],
+    "formula_cells": [
+      "A3==底稿目录!A2",
+      "D3==底稿目录!A4",
+      "F3==底稿目录!A5",
+      "A4==底稿目录!A3",
+      "D4==底稿目录!A6",
+      "F4==底稿目录!A7"
+    ],
+    "formula_count": 6,
+    "formula_note": "6 处公式全部是页眉/索引区（行3-4）对『底稿目录』sheet 的引用，无一落在数据行区间 6-20；即数据区无任何合计/平衡校验公式。",
+    "identity_column_scan": "全表 A1:J23 扫 GTROW/_GT/UUID/rowId 字样 = NONE；候选空列 K/L/M/N 在数据行 6-22 全空。无行身份列。",
+    "merged_cells": ["A1:J1", "A2:J2", "A21:J21"]
+  },
+  "why_single_html": [
+    "① 无行身份列：openpyxl 全表扫 A-J（含候选空列 K/L/M/N）无 GTROW/_GT/UUID/rowId 列——单元格双向回写按行 UUID 定位，缺锚即无法稳定回写。前端 store `D3-aje-rows` 的行 id（`row-<uuid>`）由 `useD3Adjustment.generateRowId()` 在浏览器侧生成，模板侧无对应列。",
+    "② 已有专用集中登记同步链，OO 回写会争同一 store：`D3-aje-rows` 由 `useD3Adjustment`（双列借贷 + `checkBalance` 精确相等平衡校验）拥有，并喂两个下游——`useD3CrossSheet.adjustmentRows`（读 `D3-aje-rows` 解析 AJE/RJE 联动）与 `useAdjustmentCentralSync`→后端 `AdjustmentSyncService.sync_from_workpaper`（`source_ref={wp_id}:D3-aje-rows`，wpCode `D3`，幂等 by source_ref、approved 锁定）。OO 单元格覆盖 `D3-aje-rows` 会绕过借贷平衡门并可能与中央登记记录去同步。",
+    "③ 借贷平衡不变式双层强制、但 Excel 模板零校验：HTML 侧 `useD3Adjustment` 的 `debitTotal/creditTotal/isBalanced/balanceDiff` computed 现算，宿主 `D3TabAdjustment.vue`『同步到集中登记』按钮以 `!isBalanced` 为 disabled 门；后端 `AdjustmentSyncService.sync_from_workpaper` 第 1 步再校验 `total_debit != total_credit` 抛 `UNBALANCED`。Excel 模板数据区 6-20 零公式零内容 ⇒ OO 侧编辑可轻易产生不平衡分录、且不经这两道门。",
+    "④ 空白待填表格、无固定数据行样例：数据区 6-20 是空模板带（行5 是表头、行21 是使用提示『本底稿适用于调整分录较多的项目……项目组可根据实际选择是否使用』）；列 F『……』为排版占位（非 store 字段）。是中央登记 hub 表，不是网格明细。"
+  ],
+  "consistency_check": {
+    "store_key": "D3-aje-rows",
+    "writer": "audit-platform/frontend/src/components/workpaper/composables/useD3Adjustment.ts:48 (ITEM_ID_ROWS) → persistRows 写入 checklist_responses.remark",
+    "readers": [
+      "audit-platform/frontend/src/components/workpaper/composables/useD3CrossSheet.ts:319 (adjustmentRows computed)",
+      "audit-platform/frontend/src/components/workpaper/d3/D3TabIndex.vue:67 (case 'D3-3' hasJsonRows(m, 'D3-aje-rows'))",
+      "audit-platform/frontend/src/components/workpaper/d3/D3TabAdjustment.vue:190 (itemId: 'D3-aje-rows' → useAdjustmentCentralSync)",
+      "backend/app/routers/wp_render_strategies/_d3_import_export.py:155 (_SHEET_ITEM_ID['D3-3']='D3-aje-rows')"
+    ],
+    "verdict": "键逐字一致，读写方齐全（有写入方）——不存在 D6/D7 那种『读无写入方聚合键、目录完成度恒未填』的 bug。"
+  },
+  "central_sync_wiring_points": {
+    "D3TabAdjustment.vue": "1 条 import（`from '../composables/useAdjustmentCentralSync'`）+ 1 处 `useAdjustmentCentralSync({...})` 调用 + 1 处 `refreshStatus()` 调用；裸字符串出现 3 次（import 行同时写符号名与模块路径，故按接线点数而非字符出现数断言，参照 D1-5 判据教训）。"
+  },
+  "expansion_spec_red_line": "design 继承上游四条纪律 + F4：诚实边界（不是每张 sheet 都双向）+ 可行性核硬门（有行身份列 + 无专用同步链冲突）+ D4-4 已判 single_html 的判据适用于全部调整分录汇总表 —— 调整分录汇总属已有专用集中登记同步链的 hub 表，归 single_html 侧。",
+  "not_registered_in_managed_contract": {
+    "assertion": "D3-3 未接成行表 provider：不存在 phase5_d3_03 模块 / SPEC_D303；`D3-aje-rows` 不在 phase5_d3_expansion.all_store_item_ids()；`调整分录汇总表D3-3` 不在 phase5_d3_expansion.all_managed_sheet_names()；无 RowTableSheetSpec/AdjudicationSheetSpec 声明 managed_sheet='调整分录汇总表D3-3'。",
+    "guard_test": "backend/tests/workpaper_sync/test_d3_03_single_html_adjudication.py（Property 11 守卫 + 变异必红）"
+  },
+  "six_adjustment_summary_sheets_same_shape": {
+    "sheets": ["D1-5", "D2-4", "D3-3", "D4-4(已判 single_html)", "D5-3", "D6-4", "D7-3"],
+    "common": "宿主均接 useAdjustmentCentralSync（经后端 AdjustmentSyncService 中央登记）；模板均为十列表头空白待填、无行身份列、借贷平衡 HTML+后端双门。",
+    "recommendation": "六张统一裁决 single_html 建议另立 spec；本任务只产 D3-3 的核与证，不越界处理其它五张。"
+  },
+  "property_11": "核阶段不改任何生产代码（上游诚实边界红线）；变异改了 provider（给 D3-3 加 SPEC_D303/把 D3-aje-rows 塞进受管契约）⇒ 守卫判据必红。见 test_d3_03_single_html_adjudication.py::TestMutationRegisteringD303WouldGoRed。",
+  "no_code_changed": true
+}

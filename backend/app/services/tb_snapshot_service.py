@@ -195,10 +195,17 @@ class TbSnapshotService:
         current_detail = [
             {
                 "standard_account_code": r.standard_account_code,
+                "account_name": r.account_name,
+                "account_category": r.account_category.value if r.account_category else None,
+                "company_code": r.company_code,
                 "unadjusted_amount": str(r.unadjusted_amount) if r.unadjusted_amount else None,
                 "aje_adjustment": str(r.aje_adjustment) if r.aje_adjustment else None,
                 "rje_adjustment": str(r.rje_adjustment) if r.rje_adjustment else None,
+                "wp_adjustment": str(r.wp_adjustment) if r.wp_adjustment else None,
+                "wp_publish_base": str(r.wp_publish_base) if r.wp_publish_base else None,
+                "wp_published_at": r.wp_published_at.isoformat() if r.wp_published_at else None,
                 "audited_amount": str(r.audited_amount) if r.audited_amount else None,
+                "opening_balance": str(r.opening_balance) if r.opening_balance else None,
             }
             for r in current_rows
         ]
@@ -221,14 +228,41 @@ class TbSnapshotService:
         )
 
         for row_data in target_details:
+            # wp_published_at 可能是 ISO 字符串（来自快照 JSON）
+            wp_published_at_val = row_data.get("wp_published_at")
+            if wp_published_at_val and isinstance(wp_published_at_val, str):
+                from datetime import datetime as _dt
+                try:
+                    wp_published_at_val = _dt.fromisoformat(wp_published_at_val)
+                except (ValueError, TypeError):
+                    wp_published_at_val = None
+
+            # account_category 可能是枚举字符串（来自快照 JSON）
+            from app.models.audit_platform_models import AccountCategory
+            cat_raw = row_data.get("account_category")
+            if cat_raw and isinstance(cat_raw, str):
+                try:
+                    cat_raw = AccountCategory(cat_raw)
+                except (ValueError, KeyError):
+                    cat_raw = AccountCategory.asset
+            elif not cat_raw:
+                cat_raw = AccountCategory.asset
+
             tb_row = TrialBalance(
                 project_id=pid,
                 year=year,
+                company_code=row_data.get("company_code", "001"),
                 standard_account_code=row_data.get("standard_account_code"),
+                account_name=row_data.get("account_name"),
+                account_category=cat_raw,
                 unadjusted_amount=row_data.get("unadjusted_amount"),
                 aje_adjustment=row_data.get("aje_adjustment"),
                 rje_adjustment=row_data.get("rje_adjustment"),
+                wp_adjustment=row_data.get("wp_adjustment"),
+                wp_publish_base=row_data.get("wp_publish_base"),
+                wp_published_at=wp_published_at_val,
                 audited_amount=row_data.get("audited_amount"),
+                opening_balance=row_data.get("opening_balance"),
             )
             db.add(tb_row)
 

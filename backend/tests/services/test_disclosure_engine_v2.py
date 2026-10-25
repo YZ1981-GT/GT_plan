@@ -34,7 +34,12 @@ from app.services.note_source_resolvers import (
 
 def _make_engine() -> DisclosureEngine:
     db = MagicMock()
-    db.execute = AsyncMock()
+    # db.execute 返回的 result mock 必须让 .scalar_one_or_none() 返回 None（普通值），
+    # 否则 AsyncMock 链式调用返回 coroutine → AttributeError。
+    _result_mock = MagicMock()
+    _result_mock.scalar_one_or_none.return_value = None
+    _result_mock.scalars.return_value.all.return_value = []
+    db.execute = AsyncMock(return_value=_result_mock)
     db.flush = AsyncMock()
     db.rollback = AsyncMock()
     db.commit = AsyncMock()
@@ -606,8 +611,8 @@ def test_loader_handles_bindings_not_dict(monkeypatch, tmp_path):
 
 
 def test_seven_sources_have_resolvers():
-    """8 个 source 都有 resolver 函数（含 wp_data，Sprint A.2.4 新增）."""
-    assert len(VALID_SOURCES) == 8
+    """9 个 source 都有 resolver 函数（含 consol_aggregation，Sprint B.0 新增）."""
+    assert len(VALID_SOURCES) == 9
     for src in VALID_SOURCES:
         assert src in SOURCE_RESOLVERS
         assert callable(SOURCE_RESOLVERS[src])

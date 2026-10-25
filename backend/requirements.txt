@@ -51,6 +51,9 @@ sqlfluff
 prometheus_client==0.25.0
 markitdown[all]==0.1.6  # 多格式文档→Markdown（知识库 RAG 输入，本地纯 Python 无远端）
 pyzipper==0.3.6  # AES-256 encrypted ZIP for password-protected bulk export
+pypdf==6.13.0  # 知识库 PDF 抽取最后兜底（knowledge_folders._extract_text_with_ocr）
+# 🔴 此前只是 mineru 的传递依赖（mineru 要求 pypdf>=5.6.0），代码却 import 未声明的 PyPDF2，
+#    宽 try 把 ModuleNotFoundError 吞掉 ⇒ 兜底静默恒返回 None。显式声明，mineru 换依赖也不会再次静默失效。
 psycopg2-binary==2.9.11  # 同步驱动：scripts/seed/init_tables.py 把 URL 的 +asyncpg
 # 换成 +psycopg2 后用同步 create_engine 建表（create_all）。
 # 🔴 静态 import 扫描抓不到它 —— SQLAlchemy 是**按方言动态 import** 驱动的

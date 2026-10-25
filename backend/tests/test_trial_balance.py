@@ -414,6 +414,70 @@ async def test_recalc_adjustments(db_session: AsyncSession, seeded_db):
     assert tb_map["6001"].aje_adjustment == Decimal("500")
 
 
+@pytest.mark.asyncio
+async def test_recalc_unadjusted_preserves_workpaper_adjustment(
+    db_session: AsyncSession, seeded_db
+):
+    """重导入未审数时保留已发布的底稿调整分量。"""
+    pid = seeded_db
+    svc = TrialBalanceService(db_session)
+    await svc.recalc_unadjusted(pid, 2025)
+
+    row = (await svc.get_trial_balance(pid, 2025))[0]
+    row.wp_adjustment = Decimal("250")
+    row.audited_amount = row.unadjusted_amount + Decimal("250")
+    await db_session.flush()
+
+    # 模拟重新导入余额表：未审数应更新，但底稿发布分量不能被清零。
+    await svc.recalc_unadjusted(pid, 2025)
+    await db_session.commit()
+
+    refreshed = {
+        item.standard_account_code: item
+        for item in await svc.get_trial_balance(pid, 2025)
+    }[row.standard_account_code]
+    assert refreshed.unadjusted_amount == Decimal("12000")
+    assert refreshed.wp_adjustment == Decimal("250")
+    assert refreshed.audited_amount == Decimal("12250")
+
+
+@pytest.mark.asyncio
+async def test_recalc_audited_and_consistency_use_four_components(
+    db_session: AsyncSession, seeded_db
+):
+    """审定数重算和一致性校验都使用四项公式。"""
+    pid = seeded_db
+    svc = TrialBalanceService(db_session)
+    await svc.recalc_unadjusted(pid, 2025)
+
+    row = (await svc.get_trial_balance(pid, 2025))[0]
+    row.rje_adjustment = Decimal("10")
+    row.aje_adjustment = Decimal("-20")
+    row.wp_adjustment = Decimal("30")
+    row.audited_amount = Decimal("0")
+    await db_session.flush()
+
+    await svc.recalc_audited(pid, 2025, account_codes=[row.standard_account_code])
+    await db_session.commit()
+
+    refreshed = {
+        item.standard_account_code: item
+        for item in await svc.get_trial_balance(pid, 2025)
+    }[row.standard_account_code]
+    expected = Decimal("12020.00")
+    assert refreshed.audited_amount == expected
+    assert await svc.check_consistency(pid, 2025) == []
+
+    refreshed.audited_amount = Decimal("12000")
+    await db_session.commit()
+    issues = await svc.check_consistency(pid, 2025)
+    assert len(issues) == 1
+    assert issues[0]["type"] == "audited_formula"
+    assert issues[0]["account_code"] == row.standard_account_code
+    assert Decimal(issues[0]["expected"]) == expected
+    assert Decimal(issues[0]["actual"]) == Decimal("12000")
+
+
 # ===== 审定数重算 =====
 
 @pytest.mark.asyncio
@@ -532,7 +596,12 @@ async def test_full_recalc(db_session: AsyncSession, seeded_db):
     assert len(rows) >= 3
     for r in rows:
         unadj = r.unadjusted_amount or Decimal("0")
-        assert r.audited_amount == unadj + r.rje_adjustment + r.aje_adjustment
+        assert r.audited_amount == (
+            unadj
+            + (r.rje_adjustment or Decimal("0"))
+            + (r.aje_adjustment or Decimal("0"))
+            + (r.wp_adjustment or Decimal("0"))
+        )
 
 
 # ===== 一致性校验 =====

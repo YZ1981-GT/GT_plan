@@ -26,7 +26,8 @@ _IS_PG = app_settings.DATABASE_URL.startswith("postgresql")
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _REPORT_ABS = (
     _REPO_ROOT
-    / ".kiro" / "specs" / "procedure-delegation-visibility-isolation"
+    / ".kiro" / "specs" / "_archive" / "06-engineering-governance"
+    / "procedure-delegation-visibility-isolation"
     / "evidence" / "artifacts" / "task14" / "valid_example_counts.json"
 )
 

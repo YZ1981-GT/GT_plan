@@ -128,7 +128,31 @@ def is_all_ok(result: dict, strict: bool = False) -> bool:
     return base
 
 
+def _make_stdout_unicode_safe() -> None:
+    """🔴 让本脚本的报表在 Windows GBK 控制台也能打印，否则它**会崩在自己的输出上**。
+
+    实测（2026-09-29）：`python check_git_sync_state.py --for-push` 在 Windows 默认 GBK
+    stdout 下抛 `UnicodeEncodeError: 'gbk' codec can't encode character '\\u274c'`（❌）
+    —— 崩在 `print(format_report(result))`，**在输出任何结论之前**。后果：
+
+    * pre-push 的 `single` 模式把这个崩溃的非零退出当成「6 维核查有项不达标」并只警告
+      ⇒ 长期显示一条与 git 状态**无关**的假警告；
+    * `multi` 模式对同一个崩溃 `exit 1` ⇒ **硬阻断每一次 push**，而原因与 git 状态无关。
+
+    ⇒ 用 `errors="replace"` 重配 stdout/stderr：宁可把个别字符降级成 `?`，
+    也不能让「核查脚本」死在自己的表情符号上。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):
+                pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _make_stdout_unicode_safe()
     parser = argparse.ArgumentParser(description="6 维 git 同步状态核查")
     parser.add_argument("--for-push", action="store_true", help="严格模式（pre-push hook 用）")
     parser.add_argument("--report", action="store_true", help="markdown 报表（默认）")

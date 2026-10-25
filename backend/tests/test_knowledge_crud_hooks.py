@@ -29,16 +29,46 @@ def mock_db():
     db.flush = AsyncMock()
     db.execute = AsyncMock()
     db.add = MagicMock()
+    # begin_nested() 返回异步上下文管理器（SAVEPOINT）；__aexit__ 必须返回 False，
+    # 否则 MagicMock 默认的真值返回会**吞掉**块内异常，失败路径测试就空转了。
+    savepoint = MagicMock()
+    savepoint.__aenter__ = AsyncMock(return_value=None)
+    savepoint.__aexit__ = AsyncMock(return_value=False)
+    db.begin_nested = MagicMock(return_value=savepoint)
     return db
 
 
 # ---------------------------------------------------------------------------
 # Unit tests for _trigger_index_update
+#
+# 钩子使用**独立会话**（spec knowledge-base-retrieval-and-authz-closure Req 1.5）：
+# 索引写路径在当前环境必然失败，用请求会话执行会毒化同一请求里后续的读写。
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture
+def index_session():
+    """替换 ``app.core.database.async_session``，返回钩子内部拿到的独立会话。"""
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+
+    class _Factory:
+        def __call__(self):
+            return self
+
+        async def __aenter__(self):
+            return session
+
+        async def __aexit__(self, *exc):
+            return False
+
+    with patch("app.core.database.async_session", _Factory()):
+        yield session
+
+
 @pytest.mark.asyncio
-async def test_trigger_index_update_calls_incremental_update(mock_db):
+async def test_trigger_index_update_calls_incremental_update(index_session):
     """Upload/create with content_text and project_ids triggers incremental_update."""
     from app.routers.knowledge_folders import _trigger_index_update
 
@@ -52,8 +82,10 @@ async def test_trigger_index_update_calls_incremental_update(mock_db):
         mock_instance = AsyncMock()
         MockSvc.return_value = mock_instance
 
-        await _trigger_index_update(mock_db, project_ids, doc_id, content)
+        await _trigger_index_update(project_ids, doc_id, content)
 
+        # 服务构造在**独立会话**上，而不是请求会话
+        MockSvc.assert_called_once_with(index_session)
         # Should be called once per project_id
         assert mock_instance.incremental_update.call_count == 2
         for i, pid in enumerate(project_ids):
@@ -65,7 +97,7 @@ async def test_trigger_index_update_calls_incremental_update(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_trigger_index_update_skips_when_no_content(mock_db):
+async def test_trigger_index_update_skips_when_no_content(index_session):
     """No content_text → no indexing call."""
     from app.routers.knowledge_folders import _trigger_index_update
 
@@ -75,16 +107,16 @@ async def test_trigger_index_update_skips_when_no_content(mock_db):
     with patch(
         "app.services.knowledge_index_service.KnowledgeIndexService"
     ) as MockSvc:
-        await _trigger_index_update(mock_db, project_ids, doc_id, None)
+        await _trigger_index_update(project_ids, doc_id, None)
         MockSvc.assert_not_called()
 
-        await _trigger_index_update(mock_db, project_ids, doc_id, "")
+        await _trigger_index_update(project_ids, doc_id, "")
         # Empty string is falsy, should not call
         MockSvc.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_trigger_index_update_skips_when_no_project_ids(mock_db):
+async def test_trigger_index_update_skips_when_no_project_ids(index_session):
     """No project_ids → no indexing call."""
     from app.routers.knowledge_folders import _trigger_index_update
 
@@ -94,16 +126,16 @@ async def test_trigger_index_update_skips_when_no_project_ids(mock_db):
     with patch(
         "app.services.knowledge_index_service.KnowledgeIndexService"
     ) as MockSvc:
-        await _trigger_index_update(mock_db, None, doc_id, content)
+        await _trigger_index_update(None, doc_id, content)
         MockSvc.assert_not_called()
 
-        await _trigger_index_update(mock_db, [], doc_id, content)
+        await _trigger_index_update([], doc_id, content)
         MockSvc.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_trigger_index_update_non_blocking_on_failure(mock_db):
-    """incremental_update failure doesn't raise — just logs."""
+async def test_trigger_index_update_non_blocking_on_failure(index_session):
+    """incremental_update failure doesn't raise — just logs, and rolls back its own session."""
     from app.routers.knowledge_folders import _trigger_index_update
 
     doc_id = uuid.uuid4()
@@ -118,7 +150,10 @@ async def test_trigger_index_update_non_blocking_on_failure(mock_db):
         MockSvc.return_value = mock_instance
 
         # Should NOT raise
-        await _trigger_index_update(mock_db, project_ids, doc_id, content)
+        await _trigger_index_update(project_ids, doc_id, content)
+
+    # 失败回滚的是钩子自己的独立会话（请求会话不受影响）
+    index_session.rollback.assert_awaited()
 
 
 # ---------------------------------------------------------------------------
@@ -135,9 +170,10 @@ async def test_trigger_index_delete_soft_deletes_entries(mock_db):
 
     await _trigger_index_delete(mock_db, doc_id)
 
-    # Should have called db.execute with an UPDATE statement
+    # UPDATE 必须在 SAVEPOINT 内执行（失败只回滚钩子，不毒化调用方事务）；
+    # 事务语义本身由真库测试 test_knowledge_delete_hook_isolation_pg.py 守卫。
+    mock_db.begin_nested.assert_called_once()
     mock_db.execute.assert_called_once()
-    mock_db.flush.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -173,13 +209,17 @@ async def test_create_document_endpoint_triggers_hook():
         project_ids=project_ids,
     )
 
-    mock_db = AsyncMock()
+    from tests._kb_mock_session import attach_retrieval_session_shape
+
+    mock_db = attach_retrieval_session_shape(AsyncMock())
     mock_db.commit = AsyncMock()
     mock_db.flush = AsyncMock()
     mock_db.add = MagicMock()
 
     mock_user = MagicMock()
     mock_user.id = uuid.uuid4()
+    # 写动作按系统角色设上界（readonly / 未知角色 fail-closed 403）
+    mock_user.role = "auditor"
 
     mock_doc = MagicMock()
     mock_doc.id = uuid.uuid4()
@@ -212,9 +252,9 @@ async def test_create_document_endpoint_triggers_hook():
         # Verify commit was called
         mock_db.commit.assert_called_once()
 
-        # Verify hook was called with correct args
+        # Verify hook was called with correct args（钩子自建独立会话，不再接收请求会话）
         mock_hook.assert_called_once_with(
-            mock_db, project_ids, mock_doc.id, content
+            project_ids, mock_doc.id, content
         )
 
         assert result["id"] == str(mock_doc.id)
@@ -227,11 +267,22 @@ async def test_delete_document_endpoint_triggers_hook():
 
     doc_id = uuid.uuid4()
 
-    mock_db = AsyncMock()
-    mock_db.commit = AsyncMock()
+    from app.models.knowledge_models import KnowledgeAccessLevel
+    from tests._kb_mock_session import attach_retrieval_session_shape
 
     mock_user = MagicMock()
     mock_user.id = uuid.uuid4()
+    mock_user.role = "auditor"
+
+    # 资源级授权（spec knowledge-base-retrieval-and-authz-closure 6.2）：先取判权三元组 ——
+    # 公开文件夹里、由当前用户创建的文档 → 可读且可管理。走真实 policy，只桩掉取数。
+    subject_result = MagicMock()
+    subject_result.scalars.return_value.all.return_value = []
+    doc_perm_result = MagicMock()
+    doc_perm_result.first.return_value = (None, None, mock_user.id, KnowledgeAccessLevel.public, None, None)
+    mock_db = attach_retrieval_session_shape(AsyncMock())
+    mock_db.commit = AsyncMock()
+    mock_db.execute = AsyncMock(side_effect=[subject_result, doc_perm_result])
 
     with patch(
         "app.routers.knowledge_folders.KnowledgeDocumentService"

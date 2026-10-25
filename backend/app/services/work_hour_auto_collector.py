@@ -115,7 +115,7 @@ class WorkHourAutoCollector:
     ) -> list[dict]:
         """从 workpaper_extraction_log 采集抽凭/截止测试"""
         try:
-            from app.models.workpaper_models import WorkpaperExtractionLog
+            from app.models.audit_platform_models import WorkpaperExtractionLog
         except ImportError:
             return []
 

@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "abec5f5500f9217cec30bea7ead375f488c820c986d28e1d0764c40c39086aa0",
+  "instrumentation_definition_sha256": "88c1975fb5c27b9abaa7bc33f8ff668cfefb640fe4c88971f9fb2e5f42678dfb",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-g4-bond-investment-main",
@@ -135,7 +135,7 @@
           ],
           "footer_anchor": {
             "carries_total_formula": false,
-            "marker": "三、审计说明",
+            "marker": "三、审计说明：",
             "search_column": "A"
           },
           "formula_mask": [],
@@ -151,9 +151,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "285ce84b188d7d68b7afb532e15ebd0820df8e4dc24963acac11595a7a0d871e",
+    "normalized_structure_hash": "b6e0c9f90092449dfa4b9abac7d2c4aabd700e1a29ea75810f60769aacc23c5b",
     "relative_path": "G/G4 债权投资.xlsx",
-    "template_sha256": "da3a3480d37a4b958245abbe6895ed17a1504937bd49d4596aa41fe05a7be0bf"
+    "template_sha256": "df73c58aa3ec6b7d0c85053c24e1bc045fce62cebe83655a4276e5b7d5a4e58a"
   },
-  "template_definition_sha256": "2a8cb1f054d2652253e8a0d6f25b66abb0e16a259ac16cd3d9decb01a14b26ae"
+  "template_definition_sha256": "24d2823cf7f98dacbd653aaa7aa09c7ef22a653cb757ad2c09ba23bd6aa31d7a"
 }

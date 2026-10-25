@@ -131,7 +131,10 @@ class DraftRefreshOrchestrator:
         """
         # #3: project-level advisory lock 防止并发刷新互相覆盖
         lock_key = int.from_bytes(project_id.bytes[:8], "big") & 0x7FFFFFFFFFFFFFFF
-        await self.db.execute(sa.text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
+        # SQLite 测试 dialect 没有 pg_advisory_xact_lock，跳过（单进程测试隔离即可）
+        bind = self.db.get_bind()
+        if bind is None or bind.dialect.name != "sqlite":
+            await self.db.execute(sa.text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
         # ── ① 校验 scopes ⊆ 动态发现集合（Req 20 共用口径；未知键忽略并 warning）──
         discovered = await RefreshScopeDiscovery(self.db).discover(
             project_id=project_id, year=year
@@ -253,7 +256,27 @@ class DraftRefreshOrchestrator:
         # Build page_keys based on scope type
         page_keys: list[str] = []
         if scope == "report":
-            page_keys.append("report:*")
+            # spec chain-closure-phase1 R2：原实现写死 `page_keys.append("report:*")`，
+            # 而预设库的 report 域键是**具体**的（report:balance_sheet /
+            # income_statement / cash_flow_statement / equity_statement /
+            # cash_flow_supplement / impairment_provision / cross_check），
+            # `"report:*" in preset_index` 实测恒 False ⇒ 该 scope preset_count 恒 0，
+            # 锁死 343 条报表域预设公式。
+            # 改为从预设库实际键派生（不写死报表类型清单：预设库增删类型时自动跟随，
+            # 也避免按 FinancialReportType 枚举派生而漏掉 cross_check / impairment_provision）。
+            try:
+                from app.services.formula_management.preset_library import (
+                    build_preset_index,
+                )
+
+                page_keys.extend(
+                    sorted(k for k in build_preset_index() if k.startswith("report:"))
+                )
+            except Exception as exc:  # noqa: BLE001 — 预设库不可用不阻断刷新
+                logger.warning(
+                    "report scope 预设键派生失败，本次不套报表预设: %s: %s",
+                    type(exc).__name__, exc,
+                )
         elif scope == "note":
             # Derive page_keys from mutation targets
             note_sections: set[str] = set()

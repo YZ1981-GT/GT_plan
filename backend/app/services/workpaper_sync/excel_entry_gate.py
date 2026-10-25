@@ -690,8 +690,37 @@ def assert_identity_inventory_usable(
 
     逐条对应 Requirement 6.15 的四种形态（空 UUID / 重复 UUID / identity 列被删 /
     非法结构编辑）与 6.17 后半句（隐藏元数据表必须被业务枚举排除）。
+
+    🔴 **静态形态分派臂**（spec workpaper-sync-pure-static-lane…，Requirement 6.6）：
+    纯静态 entry 的清册是 `published_identity_observer.StaticIdentityInventory`，它
+    结构上没有 Excel Table / UUID 列 —— 下面四条行表判据（`table_present` /
+    `table_ref` / `resolved_sheet_by == "table_sheet"` / `uuid_column_hidden`）对它
+    **恒假**。给它伪造这些值就是 DEC-3 明禁的「注退化动态表当载体」，所以这里走
+    分派而不是放宽：静态臂只断言它**真的观测到**的那几项。
+
+    判别用显式命名的 `is_static_region_inventory` 而不是 `hasattr` 猜类型；
+    **局部按属性判别**而不是 import 那个类 —— `published_identity_observer` 反向
+    import 本模块（`parse_identity_inventory` 等），module 级 import 会成环。
     """
     where = f"entry {entry_id}"
+    if bool(getattr(inventory, "is_static_region_inventory", False)):
+        if not inventory.defined_names:
+            raise IdentityInventoryError(
+                f"{where}: 静态受管区一个 workbook-scope definedName 都没反读到 —— "
+                "静态区的唯一区域锚点缺失（等价于动态区丢了 Excel Table）"
+            )
+        if not inventory.hidden_sheet_present or not inventory.hidden_sheet_is_hidden:
+            raise IdentityInventoryError(
+                f"{where}: 隐藏 metadata sheet 反读失败（present="
+                f"{inventory.hidden_sheet_present} is_hidden="
+                f"{inventory.hidden_sheet_is_hidden}）—— 静态 entry 的 runtime binding "
+                "载体也在它上面"
+            )
+        if not inventory.excluded_from_business_enumeration:
+            raise IdentityInventoryError(
+                f"{where}: 隐藏 metadata sheet 未被业务 sheet 枚举排除（Requirement 6.17）"
+            )
+        return
     if not inventory.hidden_sheet_present or not inventory.hidden_sheet_is_hidden:
         raise IdentityInventoryError(
             f"{where}: 隐藏 metadata sheet 反读失败（present="

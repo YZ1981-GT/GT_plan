@@ -15,6 +15,7 @@
  * Item IDs: "K8-5-row-{idx}-{field}" / "K8-8-row-{idx}-{field}"
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { newRowIdentity } from './shared/rowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -159,7 +160,7 @@ export function useK8Checks(params: UseK8ChecksParams) {
     const amountMatched = Math.abs(contractAmount - paidAmount) <= AMOUNT_TOLERANCE
 
     return {
-      rowKey: raw.rowKey ?? `contract-${idx}`,
+      rowKey: raw.rowKey ?? newRowIdentity('contract'),
       index: idx + 1,
       contractName: raw.contractName ?? '',
       contractType: raw.contractType ?? '',
@@ -177,7 +178,7 @@ export function useK8Checks(params: UseK8ChecksParams) {
 
   function _normalizeSellingRow(raw: any, idx: number): K8SellingCheckRow {
     return {
-      rowKey: raw.rowKey ?? `selling-${idx}`,
+      rowKey: raw.rowKey ?? newRowIdentity('selling'),
       index: idx + 1,
       checkItem: raw.checkItem ?? '',
       description: raw.description ?? '',
@@ -190,7 +191,7 @@ export function useK8Checks(params: UseK8ChecksParams) {
 
   function _buildDefaultSellingRows(): K8SellingCheckRow[] {
     return DEFAULT_SELLING_CHECKS.map((item, idx) => ({
-      rowKey: `selling-${idx}`,
+      rowKey: newRowIdentity('selling'),
       index: idx + 1,
       checkItem: item.checkItem,
       description: item.description,

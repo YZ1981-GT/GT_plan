@@ -23,6 +23,7 @@
  */
 import { defineComponent, h, markRaw, onUnmounted, ref } from 'vue'
 import { ElButton, ElPopover, ElTag } from 'element-plus'
+import { isRequestCancelled } from '@/utils/http'
 import { listReviews, type ReviewComment } from '@/services/workpaperApi'
 import { listIssues, type IssueTicket } from '@/services/governanceApi'
 
@@ -79,6 +80,7 @@ export function useWorkpaperReviewMarkers(opts: UseWorkpaperReviewMarkersOptions
         (r) => !!r.cell_reference && r.cell_reference.trim().length > 0,
       )
     } catch (e: any) {
+      if (isRequestCancelled(e)) return
       state.reviews = []
       loadError.value = e?.message || 'listReviews failed'
       return

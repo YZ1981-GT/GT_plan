@@ -794,7 +794,7 @@ class NoteOfflineExportService:
         try:
             from sqlalchemy import select as sa_select
 
-            from app.models.models import Project
+            from app.models.core import Project
 
             result = await self.db.execute(
                 sa_select(Project.name).where(Project.id == project_id)

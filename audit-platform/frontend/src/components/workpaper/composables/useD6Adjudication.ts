@@ -31,6 +31,11 @@ import {
   calcChangeAmount,
   calcChangeRate,
 } from './useD6FormulaEngine'
+// 🔴 逐格四态覆盖状态机（spec d567-sync-coverage Task 20）——与 D5/D7 **共用同一份**实现。
+import {
+  resolvePerCellDerivedState,
+  type DerivedCellState,
+} from './shared/dynamicAdjudicationRows'
 import type { ChecklistResponse } from './useD6FormData'
 import type useD6CrossSheet from './useD6CrossSheet'
 
@@ -56,6 +61,17 @@ export interface AdjudicationRow {
   rowType: 'dynamic' | 'subtotal' | 'deduction' | 'block_total' | 'tb' | 'diff'
   /** 该行由四表库审定表预填（adjudication_prefill）自动取数，本会话内标注（Tier B / R2.1）。 */
   isFourTableSeed?: boolean
+  /**
+   * 逐格覆盖态（spec d567-sync-coverage Task 20）：仅 block1/block2 的**派生格**
+   * （`priorUnadjusted` / `currentUnadjusted`，来源 cross_sheet 聚合）在 S2/S4 时有条目。
+   *
+   * 🔴 block3（净值）**不需要**：它是 `block1 − block2` 的纯公式区（`isEditable: false`），
+   *    消费的已是 block1/block2 的**显示值**，覆盖会自动透传，无需第二套状态机。
+   */
+  cellOverrides?: Record<
+    string,
+    { state: DerivedCellState; stored: number; snap: number; derived: number }
+  >
 }
 
 /**
@@ -153,6 +169,66 @@ function getStrFromResponse(map: Map<string, ChecklistResponse>, itemId: string)
   return map.get(itemId)?.remark ?? ''
 }
 
+// ─── 逐格四态（per-cell）键与解析 ────────────────────────────────────────────
+
+/** 走四态状态机的两个区块（block3 是纯公式区，不参与）。 */
+export type D6AggBlockKey = 'block1' | 'block2'
+
+/** 两列派生字段（prior/current 的未审数都来自 cross_sheet 聚合）。 */
+const DERIVED_FIELDS = ['priorUnadjusted', 'currentUnadjusted'] as const
+
+function d6ItemId(blockKey: string, rowKey: string, field: string): string {
+  return `D6-1-adj-${blockKey}-${rowKey}-${field}`
+}
+
+/** 派生快照键（照 D1/D3/D5/D7 同款 `{itemId}-snap`）。 */
+function d6SnapId(blockKey: string, rowKey: string, field: string): string {
+  return `${d6ItemId(blockKey, rowKey, field)}-snap`
+}
+
+/**
+ * 读某键的数值；空串/缺键/非数 → `null`。
+ *
+ * 🔴 **不能用 `getNumFromResponse`**（缺键返回 0）：`snap` 必须区分「没有快照」(null) 与
+ *    「快照是 0」(0)，否则 `resolvePerCellDerivedState` 的降级分支永不触发。
+ * 🔴 也**不能用 `map.has()`**（改造前的做法）：`has` 对空串 remark 也为 true
+ *    ⇒ 一个空格就能永久掐断上游取数。
+ */
+function readCellOrNull(map: Map<string, ChecklistResponse>, itemId: string): number | null {
+  const raw = map.get(itemId)?.remark
+  if (raw == null || String(raw).trim() === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+/** 解析某派生格的四态（读侧与写侧共用同一入口）。 */
+function resolveD6Cell(
+  map: Map<string, ChecklistResponse>,
+  blockKey: string,
+  rowKey: string,
+  field: string,
+  derived: number,
+) {
+  return resolvePerCellDerivedState(
+    readCellOrNull(map, d6ItemId(blockKey, rowKey, field)),
+    readCellOrNull(map, d6SnapId(blockKey, rowKey, field)),
+    derived,
+  )
+}
+
+/** 把两列的解析结果收成 `cellOverrides`（仅 S2/S4 留条目；全 S1/S3 返 undefined）。 */
+function collectOverrides(
+  entries: Array<[string, ReturnType<typeof resolvePerCellDerivedState>]>,
+): AdjudicationRow['cellOverrides'] | undefined {
+  const out: NonNullable<AdjudicationRow['cellOverrides']> = {}
+  for (const [field, r] of entries) {
+    if (r.state === 'S2' || r.state === 'S4') {
+      out[field] = { state: r.state, stored: r.stored ?? 0, snap: r.snap ?? 0, derived: r.derived }
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 /** 构建完整行对象（含公式计算） */
 function buildRow(params: {
   rowKey: string
@@ -168,6 +244,7 @@ function buildRow(params: {
   isEditable: boolean
   isDeduction: boolean
   rowType: AdjudicationRow['rowType']
+  cellOverrides?: AdjudicationRow['cellOverrides']
 }): AdjudicationRow {
   const priorAudited = calcAuditedAmount(params.priorUnadjusted, params.priorAje, params.priorRje)
   const currentAudited = calcAuditedAmount(params.currentUnadjusted, params.currentAje, params.currentRje)
@@ -192,6 +269,8 @@ function buildRow(params: {
     isEditable: params.isEditable,
     isDeduction: params.isDeduction,
     rowType: params.rowType,
+    // 🔴 本函数逐字段枚举返回（不 spread params），新增字段必须显式列出，否则静默丢失。
+    ...(params.cellOverrides ? { cellOverrides: params.cellOverrides } : {}),
   }
 }
 
@@ -479,6 +558,40 @@ export function useD6Adjudication(options: UseD6AdjudicationOptions) {
     })
   }
 
+  /**
+   * 聚合派生行的两列未审数走四态状态机（block1/block2 共用）。
+   *
+   * 🔴 **替代原 `hasManualCurrent = map.has(`${prefix}-currentUnadjusted`)`**，那套写法三重缺陷：
+   *   ① `map.has` 对**空串** remark 也为 true ⇒ 一个空格就永久掐断上游取数；
+   *   ② 只看 `-currentUnadjusted` 一个键，却同时决定 `priorUnadjusted` 取不取派生值
+   *      ⇒ 期末一有录入，期初也被切走；
+   *   ③ 与同步器**根本不兼容**：同步器要把派生值落进 stored，落完 `map.has` 即为 true
+   *      ⇒ 上游取数被自己永久关掉。
+   */
+  function _applyDerivedCells(
+    blockKey: D6AggBlockKey,
+    rowKey: string,
+    row: AdjudicationRow,
+    agg: { prior: number; current: number },
+  ): AdjudicationRow {
+    const map = allResponses.value
+    const priorCell = resolveD6Cell(map, blockKey, rowKey, 'priorUnadjusted', agg.prior)
+    const currentCell = resolveD6Cell(map, blockKey, rowKey, 'currentUnadjusted', agg.current)
+    return buildRow({
+      ...row,
+      priorUnadjusted: priorCell.display,
+      currentUnadjusted: currentCell.display,
+      isFromCrossSheet: true,
+      isEditable: true,
+      isDeduction: false,
+      rowType: 'dynamic',
+      cellOverrides: collectOverrides([
+        ['priorUnadjusted', priorCell],
+        ['currentUnadjusted', currentCell],
+      ]),
+    })
+  }
+
   // ─── Block1: 合同资产原值 ──────────────────────────────────────────────────
 
   function _buildBlock1(): AdjudicationBlock {
@@ -496,30 +609,9 @@ export function useD6Adjudication(options: UseD6AdjudicationOptions) {
 
     const dynamicRows: AdjudicationRow[] = mergedKeys.map(key => {
       const row = _buildDynamicRow('block1', key, key, !!origAgg[key])
-      // Override with crossSheet aggregation values if available (期初审定/期末审定)
-      if (origAgg[key]) {
-        const map = allResponses.value
-        const prefix = `D6-1-adj-block1-${key}`
-        // Only override currentUnadjusted from crossSheet if no manual override
-        const hasManualCurrent = map.has(`${prefix}-currentUnadjusted`)
-        if (!hasManualCurrent) {
-          return buildRow({
-            ...row,
-            priorUnadjusted: origAgg[key].prior,
-            currentUnadjusted: origAgg[key].current,
-            priorAje: row.priorAje,
-            priorRje: row.priorRje,
-            currentAje: row.currentAje,
-            currentRje: row.currentRje,
-            reasonAnalysis: row.reasonAnalysis,
-            isFromCrossSheet: true,
-            isEditable: true,
-            isDeduction: false,
-            rowType: 'dynamic',
-          })
-        }
-      }
-      return row
+      // 有聚合来源 ⇒ 两列未审数是派生格，走四态状态机；无来源 ⇒ 纯手工行，原样返回。
+      if (!origAgg[key]) return row
+      return _applyDerivedCells('block1', key, row, origAgg[key])
     })
 
     // 标注四表库自动取数行（本会话内 seed 的 block1 行）
@@ -556,28 +648,8 @@ export function useD6Adjudication(options: UseD6AdjudicationOptions) {
 
     const dynamicRows: AdjudicationRow[] = mergedKeys.map(key => {
       const row = _buildDynamicRow('block2', key, key, !!impAgg[key])
-      if (impAgg[key]) {
-        const map = allResponses.value
-        const prefix = `D6-1-adj-block2-${key}`
-        const hasManualCurrent = map.has(`${prefix}-currentUnadjusted`)
-        if (!hasManualCurrent) {
-          return buildRow({
-            ...row,
-            priorUnadjusted: impAgg[key].prior,
-            currentUnadjusted: impAgg[key].current,
-            priorAje: row.priorAje,
-            priorRje: row.priorRje,
-            currentAje: row.currentAje,
-            currentRje: row.currentRje,
-            reasonAnalysis: row.reasonAnalysis,
-            isFromCrossSheet: true,
-            isEditable: true,
-            isDeduction: false,
-            rowType: 'dynamic',
-          })
-        }
-      }
-      return row
+      if (!impAgg[key]) return row
+      return _applyDerivedCells('block2', key, row, impAgg[key])
     })
 
     const subtotalRow = _buildSubtotalRow(dynamicRows, config.subtotalLabel)
@@ -711,6 +783,68 @@ export function useD6Adjudication(options: UseD6AdjudicationOptions) {
     return crossSheet.netValueValidation.value
   })
 
+  // ─── 派生格逐格落库 + snap 维护（四态状态机，Task 20）───────────────────────
+  //
+  // 🔴 上游「13 条纯函数判据全绿但生产坏掉」的教训：S4 可达性完全取决于 snap 怎么维护。
+  //    只写**未被覆盖**的格（S1/S3）；S2/S4 跳过 ⇒ 冻结 snap 在覆盖发生时的派生值。
+
+  /** D6 的全部派生格（block1/block2 各自聚合的行 × 两列）。block3 是纯公式区，不在此列。 */
+  function _derivedCells(): Array<{
+    blockKey: D6AggBlockKey; rowKey: string; field: string; derived: number
+  }> {
+    const out: Array<{ blockKey: D6AggBlockKey; rowKey: string; field: string; derived: number }> = []
+    const sources: Array<[D6AggBlockKey, Record<string, { prior: number; current: number }>]> = [
+      ['block1', crossSheet.originalValueAggregation.value],
+      ['block2', crossSheet.impairmentAggregation.value],
+    ]
+    for (const [blockKey, agg] of sources) {
+      for (const [rowKey, v] of Object.entries(agg)) {
+        out.push({ blockKey, rowKey, field: 'priorUnadjusted', derived: v.prior })
+        out.push({ blockKey, rowKey, field: 'currentUnadjusted', derived: v.current })
+      }
+    }
+    return out
+  }
+
+  /** 幂等写一格（值未变则不写）。 */
+  function _writeCellIfChanged(itemId: string, value: number): void {
+    const cur = allResponses.value.get(itemId)?.remark
+    const next = String(value)
+    if (cur === next) return
+    const map = allResponses.value
+    const existing = map.get(itemId)
+    map.set(itemId, { item_id: itemId, conclusion: existing?.conclusion ?? null, remark: next })
+    allResponses.value = new Map(map)
+    debouncedSave(itemId, { remark: next })
+  }
+
+  /** 派生格同步进 store（幂等）：仅未覆盖格（S1/S3）写 stored + snap。 */
+  function syncDerivedCellsIntoStore(): void {
+    for (const { blockKey, rowKey, field, derived } of _derivedCells()) {
+      // 🔴 覆盖判定必须走与读侧同一个 `resolveD6Cell`（内含 snap===null 降级），不可手写第二份。
+      const { state } = resolveD6Cell(allResponses.value, blockKey, rowKey, field, derived)
+      if (state === 'S2' || state === 'S4') continue // 冻结 snap，不跟随上游
+      _writeCellIfChanged(d6SnapId(blockKey, rowKey, field), derived)
+      _writeCellIfChanged(d6ItemId(blockKey, rowKey, field), derived)
+    }
+  }
+
+  watch(
+    () => _derivedCells().map(c => `${c.blockKey}/${c.rowKey}/${c.field}=${c.derived}`).join('|'),
+    () => { syncDerivedCellsIntoStore() },
+    { immediate: true },
+  )
+
+  /** 恢复取数：把某派生格从覆盖态（S2/S4）退回 S1。只影响被点那一格，**当场**写对。 */
+  function restoreDerivedValue(blockKey: string, rowKey: string, field: string): void {
+    const cell = _derivedCells().find(
+      c => c.blockKey === blockKey && c.rowKey === rowKey && c.field === field,
+    )
+    if (!cell) return
+    _writeCellIfChanged(d6ItemId(blockKey, rowKey, field), cell.derived)
+    _writeCellIfChanged(d6SnapId(blockKey, rowKey, field), cell.derived)
+  }
+
   // ─── updateCell ────────────────────────────────────────────────────────────
 
   function updateCell(blockKey: string, rowKey: string, field: string, value: number | string): void {
@@ -772,6 +906,12 @@ export function useD6Adjudication(options: UseD6AdjudicationOptions) {
     for (const field of fieldsToClean) {
       map.delete(`D6-1-adj-${blockKey}-${rowKey}-${field}`)
     }
+    // 🔴 派生快照键必须一起删（Task 20）：只删 stored 不删 snap 会留下孤儿快照 ——
+    //    同名类别日后重现时 `stored=null, snap=旧值, derived=新值` ⇒ 判 S4 ⇒ 显示 0
+    //    且被错标「已人工覆盖」。删行是 rowKey 级动作，两个键同生共死。
+    for (const field of DERIVED_FIELDS) {
+      map.delete(d6SnapId(blockKey, rowKey, field))
+    }
     allResponses.value = new Map(map)
   }
 
@@ -830,6 +970,10 @@ export function useD6Adjudication(options: UseD6AdjudicationOptions) {
     removeDynamicRow,
     publishAdjudicated,
     onAdjustmentCreated,
+    // 逐格覆盖：恢复取数（把派生格从 S2/S4 退回 S1）
+    restoreDerivedValue,
+    // Internal (for testing)
+    _syncDerivedCellsIntoStore: syncDerivedCellsIntoStore,
   }
 }
 

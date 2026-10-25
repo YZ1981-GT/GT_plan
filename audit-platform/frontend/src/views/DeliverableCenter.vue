@@ -18,6 +18,24 @@
       @regenerate="onRegenerateTrio"
     />
 
+    <!-- 三件套 job 失败项重试入口（phase4 需求 5.6, 6.3, 6.5） -->
+    <TrioRetryButton
+      v-if="trioJob && trioJob.status !== 'succeeded' && trioJob.status !== 'queued'"
+      :job="trioJob"
+      :project-id="projectId"
+      :can-retry="trioCanRetry"
+      :snapshot-valid="trioSnapshotValid"
+      @retried="onTrioRetried"
+    />
+
+    <!-- 三件套失败项尝试历史（phase4 需求 5.4, 6.5） -->
+    <TrioAttemptHistory
+      v-if="trioSelectedItemId"
+      :project-id="projectId"
+      :item-id="trioSelectedItemId"
+      ref="trioAttemptHistoryRef"
+    />
+
     <DeliverableToolbar
       v-model:doc-type="filterDocType"
       v-model:status="filterStatus"
@@ -219,6 +237,8 @@ import { FolderOpened, Reading } from '@element-plus/icons-vue'
 import { downloadFile } from '@/utils/http'
 import ApprovalPanel from '@/components/deliverable/ApprovalPanel.vue'
 import CompletenessBanner from '@/components/deliverable/CompletenessBanner.vue'
+import TrioRetryButton from '@/components/deliverable/TrioRetryButton.vue'
+import TrioAttemptHistory from '@/components/deliverable/TrioAttemptHistory.vue'
 import OnlyOfficeEditor from '@/components/deliverable/OnlyOfficeEditor.vue'
 import DeliverableToolbar from '@/components/deliverable/DeliverableToolbar.vue'
 import DeliverableGroupList from '@/components/deliverable/DeliverableGroupList.vue'
@@ -249,9 +269,12 @@ import {
   rejectDeliverable,
   submitApproval,
   deleteDeliverable,
+  getTrioHistory,
+  checkTrioReadiness,
   type DeliverableItem,
   type DeliverableVersion,
   type OptionalSection,
+  type TrioJob,
 } from '@/services/deliverableApi'
 import {
   checkGenerateReady,
@@ -346,6 +369,64 @@ const confirmReportLoading = ref(false)
 
 // 生成入口前置数据就绪状态（需求 21.4 / Property 37）
 const readiness = ref<DataReadiness>({ trialBalanceReady: false, reportsReady: false })
+
+// ── 三件套 job 重试状态（phase4 需求 5.6, 6.3, 6.5）──
+const trioJob = ref<TrioJob | null>(null)
+const trioCanRetry = ref(false)
+const trioSnapshotValid = ref(true)
+const trioSelectedItemId = ref<string | null>(null)
+const trioAttemptHistoryRef = ref<InstanceType<typeof TrioAttemptHistory> | null>(null)
+
+/** P1 fix: 页面加载时拉取最近的 trio job 状态 */
+async function loadTrioState() {
+  try {
+    const jobs = await getTrioHistory(projectId.value, year.value)
+    // 取最近一个非 succeeded 的 job（需要重试入口的）
+    const active = jobs.find(j => j.status !== 'succeeded')
+    if (active) {
+      trioJob.value = active
+      trioSelectedItemId.value = active.items?.find(i => i.status === 'failed')?.id ?? null
+    } else {
+      trioJob.value = null
+    }
+  } catch {
+    // trio 历史不可用不阻断页面
+  }
+
+  // 刷新快照有效性
+  try {
+    const readinessData = await checkTrioReadiness(projectId.value, year.value)
+    trioSnapshotValid.value = (readinessData as any)?.status !== 'blocked'
+  } catch {
+    trioSnapshotValid.value = true // 查不到默认有效
+  }
+
+  // 根据用户角色判定重试权限
+  const role = projectStore.roleInProject
+  trioCanRetry.value = !role || ['admin', 'manager', 'partner', 'owner'].includes(role)
+}
+
+/** 重试成功回调：更新 job 状态并继续轮询 */
+async function onTrioRetried(updatedJob: TrioJob) {
+  trioJob.value = updatedJob
+  // 如果仍在运行，继续轮询
+  if (updatedJob.status === 'running') {
+    const TERMINAL = ['succeeded', 'partial', 'failed', 'blocked']
+    let attempts = 0
+    while (attempts < 60) {
+      await new Promise(r => setTimeout(r, 2000))
+      try {
+        const j = await fetchExportJob(projectId.value, updatedJob.id)
+        // 映射 ExportJobResult 到 TrioJob 简化类型
+        trioJob.value = { ...updatedJob, status: j.status as TrioJob['status'] }
+        if (TERMINAL.includes(j.status)) break
+      } catch { break }
+      attempts++
+    }
+  }
+  await loadList()
+  trioAttemptHistoryRef.value?.reload()
+}
 
 /**
  * 三类生成入口统一前置检查（需求 21.4/21.7）。
@@ -795,7 +876,10 @@ async function runArchive() {
   }
 }
 
-onMounted(loadList)
+onMounted(() => {
+  loadList()
+  loadTrioState()
+})
 </script>
 
 <style scoped>

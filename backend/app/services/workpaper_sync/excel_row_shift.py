@@ -1005,14 +1005,38 @@ def _rewrite_formula_refs(
                 else:
                     new_head = _piece(head)
                     new_tail = _piece(tail)
-                    # 扩张只作用于「位移后末行恰等于 extend_end_at」的区间：
+                    # 扩张只作用于「**输入侧**末行恰等于 extend_end_at」的区间：
                     # 追加到受管区末尾时区间末行恰好是 `insert_at - 1`，普通位移
                     # 规则碰不到它，不扩张合计就漏算新行（Requirement 4.4 / 4.6）。
                     # 中间插入时末行 >= insert_at，普通规则已带到位，不得再扩一次。
+                    #
+                    # 🔴 判据与算术都用 **remap 前**的末行，不能用 `new_tail`（remap 后）。
+                    #
+                    #    正向（`remap=plan.shift`，`extend_end_at=insert_at-1`）两者巧合相等
+                    #    —— `shift` 对 `< insert_at` 的行是恒等映射，所以旧实现在正向上没错。
+                    #    逆向（`remap=plan.unshift`，`extend_end_at=insert_at-1+count`）就不然：
+                    #    `unshift` 会把末行往回挪，于是「本来只是被普通位移带走的区间」
+                    #    也可能在 remap 后恰好等于 `extend_end_at` ⇒ 误判成扩张、又减一次。
+                    #
+                    #    实测（D1-11 关联方检查表，`insert_at=13 count=1`）：footer 公式
+                    #    before `SUM(C11:C13)`，插行后 after `SUM(C11:C14)`（R13 落在区间内，
+                    #    属**纯位移**不是扩张）。逆向归一化时 `unshift(14)=13` 恰等于
+                    #    `13-1+1=13` ⇒ 旧实现再减 1 得 `SUM(C11:C12)` ≠ before ⇒
+                    #    `managed_sheet_unmanaged_cells` 判漂移，D1 整册门永远过不去。
+                    #    改用 remap 前的 14 ≠ 13 ⇒ 不扩张，只按普通位移还原成
+                    #    `SUM(C11:C13)` ✅。
+                    #
+                    #    K11 原始场景（`insert_at=26 count=2`，after 末行 27）在新口径下
+                    #    仍然命中：remap 前 27 == `26-1+2` ⇒ 还原成 `27-2=25` ✅，与旧实现
+                    #    同值（那里 `unshift(27)=27`，因为 27 落在新行区间内）。
+                    #    两个场景互相甄别，判据见
+                    #    `test_multi_trip_row_shift_normalisation.py`。
                     if extend_end_at is not None and extend_by:
-                        tail_row = _row_of(new_tail.replace("$", ""))
-                        if tail_row == extend_end_at:
-                            new_tail = _piece(new_tail, force_row=tail_row + extend_by)
+                        source_tail_row = _row_of(tail.replace("$", ""))
+                        if source_tail_row == extend_end_at:
+                            new_tail = _piece(
+                                new_tail, force_row=source_tail_row + extend_by
+                            )
                     out.append(f"{new_head}:{new_tail}")
                 index = bare.end()
                 continue

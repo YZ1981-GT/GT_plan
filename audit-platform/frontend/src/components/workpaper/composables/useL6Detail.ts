@@ -26,13 +26,16 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { calcDetailEndBalance, calcSubtotal } from './useL6FormulaEngine'
+import { newRowIdentity } from './shared/rowIdentity'
 import type { useL6FormData } from './useL6FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** L6-2 明细表行数据（33列） */
 export interface L6DetailRow {
-  /** 行唯一标识（多区段共享） */
+  /** 稳定行身份（契约 rows 行身份键；newRowIdentity('l62det') 铸，已有不重铸） */
+  rowId: string
+  /** 行唯一标识（el-table :row-key 兼容旧 payload，保留） */
   key: string
   /** 序号 */
   seq: number
@@ -213,10 +216,11 @@ export function useL6Detail(
         },
       )
 
-      const key = `l6-detail-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const rowId = newRowIdentity('l62det')
       const newSeq = detailRows.value.length + 1
       const newRow: L6DetailRow = {
-        key,
+        rowId,
+        key: rowId,
         seq: newSeq,
         project: project?.trim() || '',
         fundSource: '',

@@ -1,0 +1,60 @@
+{
+  "task": 17,
+  "feasibility_targets": ["F4-4", "F4-3"],
+  "production_code_changes": "none",
+
+  "f4_3_adjustment": {
+    "sheet": "调整分录汇总F4-3",
+    "store_item_id": "F4-3-rows",
+    "composable": "F4TabAdjustment.vue (inline SFC, no extracted composable)",
+    "central_sync": {
+      "composable": "useAdjustmentCentralSync",
+      "mount_point": "F4TabAdjustment.vue:97-111",
+      "wp_code": "F4"
+    },
+    "writers": 1,
+    "writer_detail": "F4TabAdjustment.vue inline persist(), debounce 2s, f4:save-items event",
+    "import_export": "_f4_import_export.py, item_id='F4-3-rows', 8 columns",
+    "geometry": "dynamic rows × 8 columns (seq/entryNo/accountCode/accountName/debitAmount/creditAmount/summary/remark)",
+    "formulas": "3 computed aggregates (totalDebit/totalCredit/isBalanced)",
+    "cross_sheet_refs": "none",
+    "verdict": "single_html",
+    "verdict_reason": "FC-6 默认 single_html。hub 模式（useAdjustmentCentralSync），与 D1-5 ~ F3-3 共十张调整分录汇总同型。",
+    "fc_ref": "FC-6",
+    "prior_art": ["D1-5", "D2-4", "D3-3", "D4-4", "D5-3", "D6-4", "D7-3", "E1-5", "F1-3", "F3-3"]
+  },
+
+  "f4_4_analysis": {
+    "sheet": "应付账款实质性分析程序F4-4",
+    "store_keys": {
+      "F4-4-turnover": "StoredTurnover dict (inputs × 9 + remarks per row)",
+      "F4-4-creditor-overrides": "CreditorReasonOverride[] (用户覆写前十名债权人发生原因)",
+      "F4-4-turnover-note": "plain text",
+      "F4-4-creditor-note": "plain text",
+      "F4-4-conclusion": "plain text",
+      "F4-4-note": "legacy compat (read-only fallback)"
+    },
+    "composable": "useF4SubstantiveAnalysis",
+    "central_sync": "none (not an adjustment hub)",
+    "writers": 1,
+    "writer_detail": "useF4SubstantiveAnalysis persistTurnover/persistOverrides, debounce 1.2s, f4:save-items",
+    "cross_sheet_reads": {
+      "F4-2-rows": "extractF4TopCreditors (前十名债权人从明细表聚合) + aggregateF4Detail (审定表汇总)",
+      "F4-1-adj-nature-rows": "adjudicationTotals (期初/期末审定合计)"
+    },
+    "geometry": {
+      "turnover_zone": "9 fixed rows × 4 columns (item/currentAmount/priorAmount/remark), 5 editable + 4 formula rows",
+      "creditor_zone": "dynamic ≤10 rows × 7 columns, derived from F4-2, only 'reason' column editable"
+    },
+    "formula_count": "~15 front-end computed (turnover rate, payment days, industry diff, change rate/amount)",
+    "verdict": "html_only",
+    "verdict_reason": "两个区块形态完全不同：①付款期区是 dict 包 + 9 固定行（非动态行数组），无法映射到 RowTableSheetSpec；②前十名区不是独立存储而是从 F4-2 动态聚合后只开放 reason 覆写列。两区跨 sheet 读取 F4-2/F4-1 数据，整体复杂度属 HTML-only。与 D 循环的 static_region 候选同型但未到位（F4-H5 裁决）。",
+    "blocking_factors": [
+      "dict 包结构（非行数组）⇒ RowTableSheetSpec 不适用",
+      "前十名区权威数据在 F4-2（派生只读 + 局部覆写）⇒ 双源风险",
+      "跨 sheet 读取 F4-2/F4-1 ⇒ 声明时序依赖"
+    ]
+  },
+
+  "evidence_date": "2026-10-07"
+}

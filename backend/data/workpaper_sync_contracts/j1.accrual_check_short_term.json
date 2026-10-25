@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "9facbb3d854b3db20ca9efbc01dca356071acc32448aafc353f8ce3040bc7e10",
+  "instrumentation_definition_sha256": "aaedfdecc54da08d3a9849ce024bc27b973c590a8663c481595d9c2891aa1772",
   "review": {
     "authority_root": "backend/wp_templates",
     "bare_if_note": "🔴 整册 **224**（`审定表J1-1 ` 56 / `与同行业对比分析表J1-5` 60 / `月度分析表J1-4` 16 等），但**本 canary sheet 为 0** —— 中性化是 per-file（整册就地改写 substrate 副本）⇒ 即使受管表干净也必须挂。",
@@ -153,29 +153,18 @@
       "source_declarations_files": 4
     },
     "rd5_diff_facts": {
-      "content_mismatch_count": 10,
-      "diff_classes": {
-        "indent_prefix": {
-          "count": 9,
-          "detail": "模板带 **3 个全角空格 `\\u3000`**（如 `\\u3000\\u3000\\u30002．奖金`）/ impl 无前缀（靠 `indent: 1` 字段表达）"
-        },
-        "newline_in_cell": {
-          "count": 1,
-          "detail": "🔴 模板 `八、辞退福利\\n（因解除劳动关系给予的补偿）` **含换行符** / impl 写成一行 `八、辞退福利（因解除劳动关系给予的补偿）`"
-        },
-        "separator_fullwidth_vs_halfwidth": {
-          "count": 9,
-          "detail": "模板**全角 `．`**（U+FF0E）/ impl **半角 `.`**"
-        }
-      },
-      "fix_blocked_by": "business_confirmation",
-      "fix_blocked_note": "改哪一侧是业务判断（模板是审计准则产物 / impl 是用户可见文案）⇒ 本轮只登记差异清单，**不**把错标签固化进契约 —— `header_text` 取**模板原字节**。",
-      "forbidden_shortcut": "🔴 **禁标点归一化** —— `NFKC` 会同时洗掉 RD-2 的 5 处与本条的 9 处 ⇒ 逐格**字节**比对。",
-      "impl_constant": "j1/inspection/J1TabAccrualCheck.vue#SHORT_TERM_DEFAULTS",
-      "impl_count": 19,
-      "row_count_match": true,
-      "source_count": 19,
-      "source_ref": "计提情况检查表J1-6!A17:A35"
+      "assertion": "前端骨架 JSON 的 labels 必须与模板 A17:A35 逐项逐字节相等；禁 NFKC/strip/换行折叠。",
+      "authority": "template_original_bytes",
+      "content_mismatch_count": 0,
+      "frontend_source": "j1/inspection/j1AccrualSkeleton.json",
+      "preserved_forms": [
+        "fullwidth_dot",
+        "three_ideographic_spaces",
+        "embedded_newline"
+      ],
+      "row_count": 19,
+      "source_ref": "计提情况检查表J1-6!A17:A35",
+      "status": "resolved"
     },
     "retired_sheets_all_hidden": true,
     "retired_sheets_count": 7,
@@ -386,9 +375,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "0cac27b803bafe2939e2cc0a06e894f3260ba515f89f95ef97c054fc36969faa",
+    "normalized_structure_hash": "9fc205eafdfed85d5e55e01acd9b6e81bbdc5723c8420cf72bbd2957e790c95e",
     "relative_path": "J/J1 应付职工薪酬.xlsx",
-    "template_sha256": "a6100d91202f4d066dc39fb00e3016ea87794489bb75d308fec2733e92ca6061"
+    "template_sha256": "6830eda60b73a7f14adc336e9a9e3610deee6ce5c24b983e78fab822cfb4c8ce"
   },
-  "template_definition_sha256": "e20e9660504408396ffba2097c4e48fab34268d261fd1a3fee598fc60225aea9"
+  "template_definition_sha256": "7c03146eb0ccc1c12810eb174215978e4e704e085f674173104da62e8089d5fc"
 }

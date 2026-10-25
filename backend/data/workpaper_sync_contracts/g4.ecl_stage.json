@@ -1,0 +1,283 @@
+{
+  "contract_id": "g4.ecl_stage",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "957e741129081e066bc3befbac3af1d7f79a490c83e470d357d9550219a0f034",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-g4-bond-investment-ecl",
+    "html_store": {
+      "item_ids": [
+        "G4-9-rows"
+      ],
+      "note": "G4-9 ECL 三阶段划分：转置形态（一列=一投资、一行=一评估维度），payload dual_write；16384 列表 UUID 放第 12 列 L（有效内容列 +1）。",
+      "payload_column": "remark",
+      "payload_column_mode": "dual_write",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_bond_investment_ecl"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "债权投资三阶段划分G4-9",
+      "locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_G409"
+      },
+      "sheet_key": "g409-managed",
+      "tables": [
+        {
+          "anchor": "G9",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A9:B9",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/investName",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G9:J9",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/investname",
+              "transposed_row": 9,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A10:B10",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/internalPriceIndicator",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G10:J10",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/internalpriceindicator",
+              "transposed_row": 10,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A11:B11",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/rateOrTermChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G11:J11",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/rateortermchange",
+              "transposed_row": 11,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A12:B12",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/externalMarketIndicator",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G12:J12",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/externalmarketindicator",
+              "transposed_row": 12,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A13:B13",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/creditRatingChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G13:J13",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/creditratingchange",
+              "transposed_row": 13,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A14:B14",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/issuerBizFinanceChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G14:J14",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/issuerbizfinancechange",
+              "transposed_row": 14,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A15:B15",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/issuerOperatingResult",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G15:J15",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/issueroperatingresult",
+              "transposed_row": 15,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A16:B16",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/issuerRegulatoryChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G16:J16",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/issuerregulatorychange",
+              "transposed_row": 16,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A17:B17",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/otherInstrumentCreditChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G17:J17",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/otherinstrumentcreditchange",
+              "transposed_row": 17,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A18:B18",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/guaranteeCreditChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G18:J18",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/guaranteecreditchange",
+              "transposed_row": 18,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A19:B19",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/repaymentMechanismChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G19:J19",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/repaymentmechanismchange",
+              "transposed_row": 19,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A20:B20",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/contractTermChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G20:J20",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/contracttermchange",
+              "transposed_row": 20,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A21:B21",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/overduePerformanceChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G21:J21",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/overdueperformancechange",
+              "transposed_row": 21,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A22:B22",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/creditMgmtMethodChange",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G22:J22",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/creditmgmtmethodchange",
+              "transposed_row": 22,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!债权投资三阶段划分G4-9!A23:B23",
+              "instances": "many",
+              "json_pointer": "/rows/{row_uuid}/fields/overdueInfo",
+              "mode": "editable",
+              "source_ref": "源xlsx!债权投资三阶段划分G4-9!G23:J23",
+              "stable_field_key": "bond_ecl_stage_transposed/{row_uuid}/overdueinfo",
+              "transposed_row": 23,
+              "value_type": "text"
+            }
+          ],
+          "header_rows": 1,
+          "layout": "customer_columns",
+          "protected_regions": {
+            "footer_rows": [
+              24,
+              24
+            ],
+            "label_columns": "A:B",
+            "static_prompt": "A53:XFD1048576"
+          },
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "bond_ecl_stage_transposed",
+          "transposed_columns": {
+            "identity": "id",
+            "identity_prefix": "GT-G4ECL-",
+            "identity_row": 9,
+            "source_ref": "源xlsx!债权投资三阶段划分G4-9!G9:J9"
+          }
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "b6e0c9f90092449dfa4b9abac7d2c4aabd700e1a29ea75810f60769aacc23c5b",
+    "relative_path": "G/G4 债权投资.xlsx",
+    "template_sha256": "df73c58aa3ec6b7d0c85053c24e1bc045fce62cebe83655a4276e5b7d5a4e58a"
+  },
+  "template_definition_sha256": "7db7416a8d8543400a0b38591b025818a4e7ab24ec08303da7c8455f114da8c0"
+}

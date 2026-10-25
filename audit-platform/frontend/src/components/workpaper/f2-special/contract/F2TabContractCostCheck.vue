@@ -83,10 +83,30 @@
       </div>
     </div>
 
-    <el-collapse v-if="wpId && projectId && !isReadonly" class="sampling-collapse">
-      <el-collapse-item title="⚡ 自动抽凭（科目 1410 合同履约成本）" name="sampling">
+    <!--
+      🔴 抽凭科目降级（spec R2）：原写死 `account-code="1410"`，但该码与准则标准码
+      `1341` 在 account_chart/tb_balance **全库零命中**，且无任何科目名含「合同履约成本」
+      ⇒ 这些项目确实无此业务。解析不出科目时不渲染抽凭面板，改为明确提示，
+      而不是拿查不到的码去抽空（见 f2ContractCostAccountScope.ts 文件头实证表）。
+    -->
+    <el-alert
+      v-if="wpId && projectId && !isReadonly && samplingGate.isAccountAbsent.value"
+      type="info"
+      :closable="false"
+      show-icon
+      class="sampling-absent-alert"
+      :title="samplingGate.disabledReason.value"
+    />
+    <el-collapse
+      v-else-if="wpId && projectId && !isReadonly"
+      class="sampling-collapse"
+    >
+      <el-collapse-item
+        :title="`⚡ 自动抽凭（科目 ${samplingGate.accountCode.value} ${F2_CONTRACT_COST_ACCOUNT_NAME}）`"
+        name="sampling"
+      >
         <GtVoucherSamplingEngine
-          account-code="1410"
+          :account-code="samplingGate.accountCode.value"
           phase="final"
           default-method="random"
           :workpaper-id="wpId"
@@ -408,6 +428,12 @@ import F2ContractCostCheckDialog from './F2ContractCostCheckDialog.vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+// 科目码单一真源（宁缺勿造）+ 空科目降级门
+import {
+  F2_CONTRACT_COST_ACCOUNT_NAME,
+  f2ContractCostQueryCodes,
+} from '../../composables/f2ContractCostAccountScope'
+import { useSamplingAccountGate } from '../../composables/useSamplingAccountGate'
 
 const props = defineProps<{
   wpId?: string
@@ -420,6 +446,17 @@ const props = defineProps<{
 const chk = useF2ContractCostCheck({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+/**
+ * 抽凭科目门（宁缺勿造）。本组件无 `tbSourceCodes` prop ⇒
+ * `f2ContractCostQueryCodes()` 返空数组 ⇒ 门判 `absent` ⇒ 模板改渲染提示而非抽凭面板。
+ * spec: voucher-sampling-account-scope-and-attach-closure R2.1 / R2.2
+ */
+const samplingGate = useSamplingAccountGate({
+  codes: () => f2ContractCostQueryCodes(),
+  accountLabel: F2_CONTRACT_COST_ACCOUNT_NAME,
+  isReadonly: () => props.isReadonly,
 })
 
 const objectives = F2_56_OBJECTIVES
@@ -568,6 +605,7 @@ function fmtPct(v: number): string {
 .params-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #606266; }
 .params-grid label.wide { min-width: 160px; }
 .params-grid label.full { flex: 1 1 100%; }
+.sampling-absent-alert { margin: 8px 0 12px; }
 .sampling-collapse { margin-bottom: 10px; }
 .warn { color: #e6a23c; font-weight: 600; }
 .stat-text { font-size: 12px; color: #606266; }

@@ -23,15 +23,26 @@ import { computed, ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { calcSubtotal } from './useK12FormulaEngine'
 import type { useK12FormData } from './useK12FormData'
+import { newRowIdentity } from './shared/rowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** 调整分录类型 */
 export type K12AdjustmentType = 'AJE' | 'RJE'
 
-/** 调整分录行 */
+/**
+ * 调整分录行
+ *
+ * 🔴 `id` 是稳定行身份（K 循环真双向，后端 `phase5_k12_non_operating_income` 的
+ *    `row_identity_key="id"`）。原形态**没有任何身份字段**，靠数组下标删改 ——
+ *    OO 侧插/删一行回到 HTML 就会把备注挂到别的行上。旧载荷加载时 grandfather 铸一次。
+ *    `category`/`reportItem`/`noteItem`/`placeholder` 是模板 B/C/E/F 列，HTML 未出列，
+ *    但必须随行保留，否则 OO 侧填的那几格在下次 HTML 保存时被静默擦掉。
+ */
 export interface K12AdjustmentEntry {
-  /** 序号 */
+  /** 稳定行身份 */
+  id: string
+  /** 序号（展示用，family_d，不是身份） */
   index: number
   /** AJE or RJE */
   type: K12AdjustmentType
@@ -49,6 +60,14 @@ export interface K12AdjustmentEntry {
   refIndex: string
   /** 备注 */
   remark: string
+  /** 模板 B 列 类别（HTML 未出列，随行保留） */
+  category?: string
+  /** 模板 C 列 报表项目 */
+  reportItem?: string
+  /** 模板 E 列 附注项目 */
+  noteItem?: string
+  /** 模板 F 列「……」占位列 */
+  placeholder?: string
 }
 
 /** 借贷平衡状态 */
@@ -173,6 +192,7 @@ export function useK12Adjustment(formData: ReturnType<typeof useK12FormData>) {
   function addEntry(type?: K12AdjustmentType): void {
     const t = type || activeType.value
     const newEntry: K12AdjustmentEntry = {
+      id: newRowIdentity('entry'),
       index: entries.value.length + 1,
       type: t,
       description: '',
@@ -293,6 +313,10 @@ export function useK12Adjustment(formData: ReturnType<typeof useK12FormData>) {
   function _normalizeEntry(r: any, i: number): K12AdjustmentEntry {
     const rawType = String(r?.type ?? '').toUpperCase()
     return {
+      // 🔴 先展开原行：保留模板 B/C/E/F 列字段（OO 侧可填），再覆盖归一后的已知字段。
+      ...(r && typeof r === 'object' ? r : {}),
+      // grandfather：已落库 id 优先，缺失（旧载荷 / 导入）才铸新身份。
+      id: typeof r?.id === 'string' && r.id ? r.id : newRowIdentity('entry'),
       index: Number(r?.index) || i + 1,
       type: (rawType === 'RJE' ? 'RJE' : 'AJE') as K12AdjustmentType,
       description: String(r?.description ?? ''),
@@ -332,6 +356,7 @@ export function useK12Adjustment(formData: ReturnType<typeof useK12FormData>) {
       if (!typeVal) continue // 跳过无效条目
 
       entries.value.push({
+        id: newRowIdentity('entry'),
         index: i,
         type: (typeVal === 'RJE' ? 'RJE' : 'AJE') as K12AdjustmentType,
         description: getVal(`${prefix}${i}-desc`),

@@ -128,6 +128,32 @@ _MODE_DEFAULT_EDIT_RE: Final[re.Pattern[str]] = re.compile(
     r"""props\.mode\s*\|\|\s*['"]edit['"]"""
 )
 
+#: 组内多组件时 entry 的主组件优先级 —— legacy 先于同步载体。
+#:
+#: 🔴 放在这里（而不是只放生成器里）的理由：`check_workpaper_sync_closure.py`、task73
+#: 交叉规则等多个消费方都从 manifest 的 `entries[].mounts[]` 取挂点，那里本来就含多组件。
+#: 优先级必须**一处定义、处处相同**，否则不同消费方会对同一 entry 得出不同的组件级事实。
+#: 顺序的目的是**零 churn**：既挂 legacy 又挂同步载体的 entry，其派生结果与引入同步载体
+#: 之前逐字相同。spec: sync-editor-host-discovery-contract-closure · Requirement 3.3
+COMPONENT_PRECEDENCE: Final[tuple[str, ...]] = (
+    "GtOnlyOfficeSheet",
+    "OnlyOfficeWordDialog",
+    "WorkpaperWordEditor",
+    "WorkpaperSyncEditorHost",
+)
+
+#: 同步载体（`WorkpaperSyncEditorHost`）：既无 readonly prop 也无 mode prop，
+#: 可编辑性由桥的状态机门控。锚点取**状态字面量**而不是组件名 —— 按组件名特判
+#: 等于把「这一个文件例外」写死，按状态机锚点则任何同构载体都能被正确识别。
+_BRIDGE_GATED_EDIT_RE: Final[re.Pattern[str]] = re.compile(
+    r"""bridge\.state\.value\s*===\s*['"]oo_editing['"]"""
+)
+
+#: 同上的 room 侧锚点：room/docKey 来自服务端签发的 descriptor。
+#: 两个字段都取到才算证据成立（只有 roomId 可能是别的用途）。
+_DESCRIPTOR_ROOM_RE: Final[re.Pattern[str]] = re.compile(r"descriptor\.roomId")
+_DESCRIPTOR_DOC_KEY_RE: Final[re.Pattern[str]] = re.compile(r"descriptor\.docKey")
+
 #: 客户端本地 doc_key 兜底：只在**doc_key 赋值行**上判定。
 #: 🔴 不能对整文件搜 `Date.now()` —— `GtOnlyOfficeSheet.vue` 用它生成容器 DOM id
 #: （L129），与 doc_key 无关；整文件搜会把 181 条 xlsx entry 全判成 per-client（假事实）。
@@ -157,6 +183,17 @@ FACT_WP_SCOPED_DOC_KEY: Final[str] = "server_doc_key_scoped_to_wp_without_user_c
 FACT_CLIENT_LOCAL_DOC_KEY: Final[str] = "client_local_doc_key_fallback"
 FACT_ENDPOINT_WITHOUT_ROUTE: Final[str] = "frontend_endpoint_without_backend_route"
 FACT_PER_USER_DOC_KEY: Final[str] = "server_doc_key_includes_user_component"
+#: `WorkpaperSyncEditorHost` 这类同步载体：**没有** readonly / mode prop，
+#: 可编辑性由同步桥的状态机门控（`bridge.state.value === 'oo_editing'`，
+#: 而该状态只能由服务端 confirm-descriptor 成功后产生）。
+#: 它本身就是编辑器、没有只读形态 ⇒ editable；门控的是**何时**可编辑，不是**是否**可编辑。
+#: spec: sync-editor-host-discovery-contract-closure · Requirement 2
+FACT_BRIDGE_GATED_EDITABLE: Final[str] = "sync_bridge_state_machine_gates_editing"
+#: 同上一条的 room 侧：该载体**刻意不请求 config**（其文件头边界 ①「不请求 config：
+#: 整个组件不 import 任何 HTTP 面」），room/docKey 全部来自服务端签发的 descriptor
+#: （`descriptor.roomId` / `descriptor.docKey`）⇒ room 身份由服务端决定，比客户端
+#: 自行拼 doc_key **更强**，不是「缺少证据」。
+FACT_ROOM_FROM_SERVER_DESCRIPTOR: Final[str] = "room_identity_from_server_issued_descriptor"
 
 #: room service 接线态。Task 21 的 room service 接线后由生成器自动翻转，
 #: manifest digest 随之变化 ⇒ 全部 evidence 自动 stale（design 的 stale policy）。
@@ -240,6 +277,21 @@ class FrontendReferenceIndex:
         return tuple(sorted(hits))
 
 
+def _import_memo_key(importer: Path, spec: str) -> tuple[str, str] | None:
+    """:func:`_resolve_import` 的输入等价类（``None`` = 非本地说明符，解析结果恒为 ``None``）。
+
+    解析只取决于「种类 + 拼接后的路径」：别名 ``@/x`` 不经 ``resolve()``，相对 ``./x`` 先
+    ``resolve()`` —— 两类可能落到不同文件，所以种类进键；相对说明符的拼接路径含 importer 目录
+    （``./Foo.vue`` 在两个目录里是两个文件）。扫描期间文件系统不变 ⇒ 同键必同结果。
+    刻意**不做** ``normpath`` 折叠 ``..``：那是纯词法操作，遇到符号链接会与 ``resolve()`` 不一致。
+    """
+    if spec.startswith("@/"):
+        return ("alias", str(_FRONTEND_SRC / spec[2:]))
+    if spec.startswith("."):
+        return ("relative", str(importer.parent / spec))
+    return None
+
+
 @lru_cache(maxsize=1)
 def frontend_reference_index() -> FrontendReferenceIndex:
     if not _FRONTEND_SRC.is_dir():
@@ -247,6 +299,9 @@ def frontend_reference_index() -> FrontendReferenceIndex:
     imports: dict[str, set[str]] = {}
     tags: dict[str, set[str]] = {}
     scanned = 0
+    # spec startup-prewarm-event-loop-unblocking Requirement 3：现场 19397 条 import 只有 7397 个不同的
+    # 拼接路径，逐条 `resolve()` + `is_file()` + `_relative()` 占首算的一大半。同键只解析一次。
+    resolved: dict[tuple[str, str], str | None] = {}
     for dirpath, dirnames, filenames in os.walk(_FRONTEND_SRC):
         dirnames[:] = [name for name in dirnames if name.lower() not in _EXCLUDED_SEGMENTS]
         directory = Path(dirpath)
@@ -258,9 +313,16 @@ def frontend_reference_index() -> FrontendReferenceIndex:
             relative = _relative(path)
             text = path.read_text(encoding="utf-8", errors="replace")
             for match in _IMPORT_RE.finditer(text):
-                target = _resolve_import(path, match.group(1))
-                if target is not None:
-                    imports.setdefault(_relative(target), set()).add(relative)
+                spec = match.group(1)
+                key = _import_memo_key(path, spec)
+                if key is None:
+                    continue
+                if key not in resolved:
+                    target = _resolve_import(path, spec)
+                    resolved[key] = None if target is None else _relative(target)
+                target_relative = resolved[key]
+                if target_relative is not None:
+                    imports.setdefault(target_relative, set()).add(relative)
             for match in _TAG_RE.finditer(text):
                 tags.setdefault(match.group(1), set()).add(relative)
     if scanned == 0:
@@ -600,10 +662,19 @@ def component_source_facts(component: str, canonical_file: str) -> ComponentSour
         readonly_default = "absent"
         refs.append(f"{canonical_file}#L{text.count(chr(10), 0, mode_match.start()) + 1}")
         editable_by_default = True
+    elif _BRIDGE_GATED_EDIT_RE.search(text) is not None:
+        # 同步载体：没有 readonly / mode prop，可编辑性由桥的状态机门控。
+        # 它本身就是编辑器、没有只读形态 ⇒ editable；门控的是**何时**可编辑。
+        gate_match = _BRIDGE_GATED_EDIT_RE.search(text)
+        assert gate_match is not None
+        readonly_default = "bridge_gated"
+        refs.append(f"{canonical_file}#L{text.count(chr(10), 0, gate_match.start()) + 1}")
+        editable_by_default = True
     else:
         raise EntrySourceFactError(
             f"{canonical_file} 既没有 readonly prop 默认值、也没有 `props.mode || 'edit'` "
-            "默认可编辑证据 —— 无法确定该组件默认是否可编辑（fail closed，不猜）"
+            "默认可编辑证据，也不是桥门控形态（`bridge.state.value === 'oo_editing'`）"
+            " —— 无法确定该组件默认是否可编辑（fail closed，不猜）"
         )
     endpoints = _endpoint_facts(canonical_file)
     client_local = _client_local_doc_key(canonical_file)
@@ -684,17 +755,51 @@ def host_source_facts(
     host_path: str,
     document_type: str,
     mounts: Sequence[Mapping[str, Any]],
+    primary_component: str | None = None,
 ) -> HostSourceFacts:
     if not mounts:
         raise EntrySourceFactError(f"entry {entry_id}: 无挂载点事实，无法推导 profile")
     components = {str(mount.get("component") or "") for mount in mounts}
-    if len(components) != 1 or not next(iter(components)):
-        raise EntrySourceFactError(f"entry {entry_id}: 挂载组件不唯一: {sorted(components)}")
-    component = next(iter(components))
-    canonical_files = {str(mount.get("canonicalComponentFile") or "") for mount in mounts}
+    if not all(components):
+        raise EntrySourceFactError(f"entry {entry_id}: 挂载点缺 component: {sorted(components)}")
+    if primary_component is None:
+        # 🔴 组内多组件时按**平台级 reviewed 优先级**取主组件，而不是抛错。
+        #
+        # 首版写的是「不传就要求组内单组件，否则抛错」，想法是「让调用方显式表态」。
+        # 实测那是**破坏性**的：`check_workpaper_sync_closure.py` 与 task73 的交叉规则
+        # 都从 manifest 的 `entries[].mounts[]` 取挂点，而那里现在本来就含多组件
+        # （迁移中间态：宿主同时挂 legacy 与同步载体）⇒ 5 条既有判据当场炸。
+        # 优先级本身是确定的、文档化的平台事实（legacy 先于同步载体，为零 churn），
+        # 下沉到这里当默认值不引入歧义，也免得每个调用方都要重复表态。
+        # spec: sync-editor-host-discovery-contract-closure · Requirement 3.3
+        ranked = [c for c in COMPONENT_PRECEDENCE if c in components]
+        unknown = sorted(components - set(COMPONENT_PRECEDENCE))
+        if unknown:
+            raise EntrySourceFactError(
+                f"entry {entry_id}: 未登记的挂载组件 {unknown} —— "
+                "请在 COMPONENT_PRECEDENCE 里给它一个 reviewed 位置"
+            )
+        component = ranked[0]
+    else:
+        if primary_component not in components:
+            raise EntrySourceFactError(
+                f"entry {entry_id}: primary_component={primary_component!r} 不在挂载组件 "
+                f"{sorted(components)} 之中"
+            )
+        component = primary_component
+    # 🔴 组件级事实（canonical 文件 / readonly 绑定 / 端点 / 挂载基数）一律只按**主组件**的
+    # 挂点算，不混入其它组件的挂点。两条理由：
+    #   ① `readonly` 是 legacy 组件的 prop，同步载体根本没有这个 prop，混进来会污染绑定判定；
+    #   ② 这保证「既挂 legacy 又挂同步载体」的 entry 其派生 profile 与改动前**逐字相同**
+    #      （零 churn）—— 同步载体的存在由 manifest 的 `mount_components` /
+    #      `sync_editor_host_mounted` 两个字段单独记录，不靠污染派生结果来表达。
+    # spec: sync-editor-host-discovery-contract-closure · Requirement 3.3
+    primary_mounts = [m for m in mounts if str(m.get("component") or "") == component]
+    canonical_files = {str(mount.get("canonicalComponentFile") or "") for mount in primary_mounts}
     if len(canonical_files) != 1 or not next(iter(canonical_files)):
         raise EntrySourceFactError(f"entry {entry_id}: canonical 组件文件不唯一")
     canonical_file = next(iter(canonical_files))
+    mounts = primary_mounts
     binding, refs = _readonly_binding_of(mounts, host_path)
     component_facts = component_source_facts(component, canonical_file)
     host_endpoints = _endpoint_facts(host_path)
@@ -766,6 +871,11 @@ def derive_editability(host: HostSourceFacts, component: ComponentSourceFacts) -
         return Editability.readonly, FACT_COMPONENT_DEFAULT_READONLY
     if host.readonly_binding in {"runtime_expression", "literal_false"}:
         return Editability.editable, FACT_HOST_RUNTIME_READONLY
+    if component.readonly_default == "bridge_gated":
+        # 🔴 单独一条 fact code 而不是复用 `component_readonly_prop_defaults_editable`：
+        # 后者的语义是「组件的 readonly prop 默认可编辑」，而本载体**根本没有** readonly prop。
+        # 混用会让 manifest 里记下一个事实上不存在的证据链。
+        return Editability.editable, FACT_BRIDGE_GATED_EDITABLE
     if component.editable_by_default:
         return Editability.editable, FACT_COMPONENT_DEFAULT_EDITABLE
     return Editability.readonly, FACT_COMPONENT_DEFAULT_READONLY
@@ -791,8 +901,27 @@ def derive_room_model(
     if not host.host_reachable:
         return RoomModel.none, FACT_NO_ROOM_FOR_UNREACHABLE, (), ()
     if not host.endpoints:
+        # 同步载体（`WorkpaperSyncEditorHost`）**刻意不请求 config** —— 它的文件头边界 ①
+        # 写明「不请求 config：整个组件不 import 任何 HTTP 面」，room/docKey 全部来自
+        # 服务端签发的 descriptor。这不是「缺少证据」，而是**比客户端自拼 doc_key 更强**
+        # 的证据：room 身份由服务端决定，天然 wp 维度共享、无用户成分。
+        # spec: sync-editor-host-discovery-contract-closure · Requirement 2
+        canonical = _read_source(host.canonical_file)
+        if (
+            _DESCRIPTOR_ROOM_RE.search(canonical) is not None
+            and _DESCRIPTOR_DOC_KEY_RE.search(canonical) is not None
+        ):
+            line = canonical.count(chr(10), 0, _DESCRIPTOR_ROOM_RE.search(canonical).start()) + 1  # type: ignore[union-attr]
+            return (
+                RoomModel.shared,
+                FACT_ROOM_FROM_SERVER_DESCRIPTOR,
+                (f"{host.canonical_file}#L{line}",),
+                (),
+            )
         raise EntrySourceFactError(
-            f"entry {host.entry_id}: 宿主与 canonical 组件都没有 OO config 端点字面量 —— "
+            f"entry {host.entry_id}: 宿主与 canonical 组件都没有 OO config 端点字面量，"
+            "且 canonical 组件也不是「room 来自服务端 descriptor」形态"
+            "（需同时出现 `descriptor.roomId` 与 `descriptor.docKey`）—— "
             "无法确定 room 身份来源（fail closed，不猜 shared）"
         )
     providers = doc_key_providers()
@@ -1049,6 +1178,37 @@ def observe_room_facts(entry: Mapping[str, Any]) -> RoomFacts:
     )
 
 
+#: 进程级源码事实缓存的建立顺序（`warm_source_fact_caches` 按此逐个调用）。
+_WARMABLE_SOURCE_FACTS: Final[tuple[str, ...]] = (
+    "frontend_reference_index",
+    "room_service_wiring",
+    "doc_key_providers",
+    "_legacy_baseline",
+    "_assert_comment_stripping",
+)
+
+
+def warm_source_fact_caches() -> tuple[str, ...]:
+    """在**调用线程**里把进程级源码事实缓存建好；返回建不起来的那几项的名字。
+
+    spec startup-prewarm-event-loop-unblocking Requirement 1：这些事实只依赖仓库源码（进程内不变），
+    首算却要扫 5000+ 个前端文件、全部路由与后端源码（现场实测 7s+，其中入边索引 6.8s）。冷注册在
+    事件循环上首算时，整个后端在这段时间里不响应任何请求。调用方用 ``asyncio.to_thread`` 把首算
+    挪到工作线程，之后事件循环上的调用全部命中 ``lru_cache``，**判据一字未改**。
+
+    🔴 失败**不在这里抛**：``lru_cache`` 不缓存异常，原调用点会重算并以原错误、原位置 fail closed
+    （例如打包环境里没有前端源码时的 ``EntrySourceFactError``）。这里吞掉只是为了不让预热把失败
+    提前、换一个调用栈报出来。
+    """
+    failed: list[str] = []
+    for name in _WARMABLE_SOURCE_FACTS:
+        try:
+            globals()[name]()
+        except Exception:  # noqa: BLE001 - 见 docstring：原调用点会以原错误重现
+            failed.append(name)
+    return tuple(failed)
+
+
 def clear_source_fact_caches() -> None:
     """清空全部源码事实缓存（守卫改写临时源码后必须调用）。"""
     frontend_reference_index.cache_clear()
@@ -1081,6 +1241,7 @@ __all__ = [
     "HostSourceFacts",
     "DerivedEntryProfile",
     "frontend_reference_index",
+    "warm_source_fact_caches",
     "doc_key_providers",
     "room_service_wiring",
     "component_source_facts",

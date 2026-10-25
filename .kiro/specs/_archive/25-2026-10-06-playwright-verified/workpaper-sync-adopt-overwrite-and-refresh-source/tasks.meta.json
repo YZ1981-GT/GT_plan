@@ -1,0 +1,335 @@
+{
+  "pbtResults": {
+    "3.6 属性测试：非法载荷一律 fail visible": {
+      "status": "passed",
+      "lastRunTimestamp": 1790654530484
+    },
+    "4.3 属性测试：声明侧行集等式": {
+      "status": "passed",
+      "lastRunTimestamp": 1790655829890
+    },
+    "4.5 属性测试：幽灵行门语义不变且被如实登记": {
+      "status": "passed",
+      "lastRunTimestamp": 1790657068803
+    },
+    "4.6 属性测试：不可枚举形态载荷不被改动且被登记": {
+      "status": "passed",
+      "lastRunTimestamp": 1790658577649
+    },
+    "3.2 属性测试：Overwrite_Plan 内部自洽": {
+      "status": "passed",
+      "lastRunTimestamp": 1790665604510
+    },
+    "3.3 属性测试：plan_digest 顺序无关且内容敏感": {
+      "status": "passed",
+      "lastRunTimestamp": 1790665617573
+    }
+  },
+  "executionHistory": {
+    "1.1 复算 design「§ Overview」的八项现算值并回填 spec": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252461
+      },
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638286518
+      },
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790640443185
+      }
+    ],
+    "1.2 普查每个 store item 的行枚举器可用性，产出两张显式清单": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252496
+      },
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638296943
+      },
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790640453886
+      }
+    ],
+    "2. 真库判别 `changed_item_count` 报 0 的成因": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252522
+      },
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638297737
+      },
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790640454974
+      }
+    ],
+    "3.1 数据模型与稳定摘要": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252544
+      },
+      {
+        "executionId": "ec1bd4a7-3ac5-4b79-a159-48d2a44006f3",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790641493957
+      },
+      {
+        "executionId": "ec1bd4a7-3ac5-4b79-a159-48d2a44006f3",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790642846207
+      }
+    ],
+    "3.4 `RowReader` 适配层": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252576
+      },
+      {
+        "executionId": "ec1bd4a7-3ac5-4b79-a159-48d2a44006f3",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790642860811
+      },
+      {
+        "executionId": "ec1bd4a7-3ac5-4b79-a159-48d2a44006f3",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790645641138
+      }
+    ],
+    "4.1 `prune_undeclared_rows`：按声明身份集 + 分区剪枝": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252610
+      }
+    ],
+    "4.2 `compute_overwrite_plan`：聚合逐 item delta 与两侧行数": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252635
+      }
+    ],
+    "5. Checkpoint — 纯函数层全绿": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252657
+      },
+      {
+        "executionId": "a1904a41-a244-4c73-8e15-f1749e33b75d",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790666031947
+      },
+      {
+        "executionId": "a1904a41-a244-4c73-8e15-f1749e33b75d",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790666038072
+      }
+    ],
+    "6.1 `dry_run` 改为返回完整 Overwrite_Plan": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252679
+      }
+    ],
+    "6.2 `plan_digest` 校验与新 domain 错误类": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252700
+      }
+    ],
+    "6.3 删除侧应用 + 提交前复读比对": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252723
+      }
+    ],
+    "6.4 `changed_item_count` 改由 plan 供出": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252744
+      }
+    ],
+    "6.5 回滚快照与审计 details 扩展": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252764
+      }
+    ],
+    "7.1 源码锁与基线双条件": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252785
+      }
+    ],
+    "7.3 OO 既有引用面回归": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252809
+      }
+    ],
+    "7.4 反向判据：路由清单守卫不应变化": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252836
+      }
+    ],
+    "8.1 五个状态码分支各一例": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252866
+      }
+    ],
+    "8.2 `plan_digest` 不符 ⇒ 409": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252886
+      }
+    ],
+    "8.3 测试注入形态的自我约束": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252906
+      }
+    ],
+    "8.4 原子性注入测试": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252931
+      }
+    ],
+    "8.5 真库对账：dry_run 摘要 == 实际落库变更": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252953
+      }
+    ],
+    "9. Checkpoint — 后端全链路全绿": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252976
+      }
+    ],
+    "10.1 组件骨架与三项内容": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638252997
+      }
+    ],
+    "10.2 破坏性二次确认与请求体": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638253018
+      }
+    ],
+    "10.3 禁用态与说明项": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638253040
+      }
+    ],
+    "10.4 成功后的重载与提示": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638253064
+      }
+    ],
+    "11. 前端：接线 `GtWpRenderer.vue`": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638253088
+      }
+    ],
+    "12.3 中文文案守卫": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638253110
+      }
+    ],
+    "13. 真实链路实测（Playwright）": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638253130
+      }
+    ],
+    "14.1 探针清理": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638253152
+      }
+    ],
+    "14.2 判据引用闭合性自查": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638253190
+      }
+    ],
+    "14.3 更新 `.kiro/specs/INDEX.md` 的完成度与本轮教训": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638253212
+      }
+    ],
+    "15. Final checkpoint — Ensure all tests pass": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790638253237
+      }
+    ],
+    "1. 现算基线复算与行枚举器可用性普查": [
+      {
+        "executionId": "3c258966-3c01-45c4-b28e-f555f25ced84",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790640453922
+      }
+    ],
+    "3. 新建计划纯函数模块 `adopt_overwrite_plan.py`": [
+      {
+        "executionId": "ec1bd4a7-3ac5-4b79-a159-48d2a44006f3",
+        "chatSessionId": "sess_b8debd25-d158-4973-b50b-ac5a4145d852",
+        "timestamp": 1790645641176
+      }
+    ]
+  }
+}

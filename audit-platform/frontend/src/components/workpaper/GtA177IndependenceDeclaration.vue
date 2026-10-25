@@ -8,6 +8,7 @@
     <!-- Toolbar -->
     <div class="gt-a177__toolbar">
       <el-segmented v-model="mode" :options="modeOptions" size="small" @change="handleModeChange" />
+      <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a177-independence-declaration" />
       <span class="gt-a177__save-status">
         <template v-if="saveStatus === 'saving'"><el-icon class="is-loading"><Loading /></el-icon> 保存中...</template>
         <template v-else-if="saveStatus === 'saved' && lastSavedAt">✓ 已保存</template>
@@ -248,14 +249,17 @@
     <!-- Online Edit Mode -->
     <div v-else class="gt-a177__oo-mode">
       <div v-if="ooGenerating" class="gt-a177__oo-loading"><el-icon class="is-loading" :size="24"><Loading /></el-icon><span>正在生成 Word 文档...</span></div>
-      <GtOnlyOfficeSheet v-else-if="ooReady" :wp-id="props.wpId" :sheet-name="variant === 'team' ? 'A17-7' : 'A17-7A'" class="gt-a177__oo" />
+      <template v-else-if="ooReady">
+        <WorkpaperSyncEditorHost v-if="syncOoDescriptor" :descriptor="syncOoDescriptor" :bridge="syncBridge" />
+        <div v-else style="display:flex;align-items:center;justify-content:center;height:400px;color:#909399">正在打开同步编辑器…</div>
+      </template>
       <div v-else class="gt-a177__oo-error"><el-alert type="warning" :closable="false" show-icon><template #title>Word 文档生成失败</template><span>{{ ooError || '请重试或切回结构化视图' }}</span></el-alert></div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { ref, computed, toRef, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { Loading, Delete } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import {
@@ -267,8 +271,14 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/services/apiProxy'
 
-const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
+import { useWorkpaperSyncBridge } from './sync/useWorkpaperSyncBridge'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+
+const WorkpaperSyncEditorHost = defineAsyncComponent(() => import('./sync/WorkpaperSyncEditorHost.vue'))
 defineOptions({ name: 'GtA177IndependenceDeclaration' })
 
 const props = withDefaults(defineProps<{
@@ -476,6 +486,33 @@ async function checkOOHealth() {
 }
 
 // ─── Lifecycle ───
+
+// ─── sync bridge（替代 legacy mode + GtOnlyOfficeSheet）───
+const _ENTRY_ID = 'xlsx/gt-a177-independence-declaration'
+const _SHEET_KEY = 'a177independencedeclaration-managed'
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(_ENTRY_ID),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(_SHEET_KEY),
+  capability: capabilityForEntry(_ENTRY_ID),
+  flushHtml: async () => {
+    if (typeof flushPendingSave === 'function') flushPendingSave()
+    else if (typeof flushPendingSaves === 'function') flushPendingSaves()
+    // 🔴 降级保护：本 entry 的 capability 仍是 single_onlyoffice（后端无 per-entry
+    //    adapter）⇒ readStoreProjection 会 404。捕获后返回空投影，让 OO 走「无投影」
+    //    路径（与改线前 legacy 行为等价）。capability 升 bidirectional 后自动失效。
+    try {
+      const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: _ENTRY_ID })
+      return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: _SHEET_KEY }
+    } catch {
+      return { expectedRevision: 0, projection: null, sheetKey: _SHEET_KEY }
+    }
+  },
+  reloadHtml: async () => { if (typeof loadData === 'function') await loadData(props.wpId); else if (typeof refreshData === 'function') await refreshData(props.wpId) },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+
 onMounted(() => {
   loadData(props.wpId)
   checkOOHealth()

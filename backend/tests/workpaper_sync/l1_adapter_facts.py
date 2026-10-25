@@ -90,6 +90,55 @@ L1_ADJ_REAL_FIELDS: frozenset[str] = frozenset(
     }
 )
 
+#: 🔴 2026-10-01 追加读数：本地 PG **出现非整库的数据回退**（如实登记，成因未查明）。
+#:
+#: 现象（现算）：`projects` 139 / `working_paper` 997 / `trial_balance` 730 仍在
+#: ⇒ 不是重建库；但 `working_paper_sync_entry_state` / `content_version` / `representation`
+#: 三表在本轮动手前**全为 0**（09-28 登记 12 / 267 / 274），`checklist_responses` 只剩 42 行、
+#: `item_id ~ '^L[0-9]'` **0 行**，而 `definition_artifact` 仍有 36 行（9 entry × 4）。
+#: ⇒ 有人（或某个测试夹具）对这几张表做过清理。PG 容器自 2026-05-10 起未重建、卷未换。
+#: 🔴 **不推断成因**（测试 TRUNCATE / 并发会话手工清理 / 恢复备份都可能），只登记现象。
+#:
+#: 本条读数之后的三表值，是本 spec task 7b 在空表上**首发 L1** 的结果（1 / 1 / 1）；
+#: L 域载荷是 `backend/scripts/e2e/seed_l_cycle_canary_rows.py --apply` 复现的夹具行
+#: （`wp_ref='l-cycle-canary-e2e'`）。L2 比 09-28 少 1 行：那一行是 LC-22 的 G8 污染样本，
+#: 夹具**刻意不造**（造出来就是伪造缺陷证据），见该脚本 docstring。
+MEASURED_SUPPLY_2026_10_01: dict[str, Any] = {
+    "measured_at": "2026-10-01",
+    "row_counts": {
+        "working_paper_sync_entry_state": 1,
+        "working_paper_content_version": 1,
+        "working_paper_content_representation": 1,
+    },
+    "entry_state_entry_ids": ("xlsx/gt-l1-short-term-loans",),
+    "regressed_from": "2026-09-28",
+    "regression_cause": "unknown_partial_table_cleanup",
+}
+
+MEASURED_L_PAYLOAD_2026_10_01: dict[str, dict[str, int]] = {
+    "L0": {"rows": 1, "remark_nonblank": 1, "conclusion_nonblank": 0},
+    "L1": {"rows": 33, "remark_nonblank": 33, "conclusion_nonblank": 0},
+    "L2": {"rows": 7, "remark_nonblank": 7, "conclusion_nonblank": 0},
+    "L3": {"rows": 11, "remark_nonblank": 7, "conclusion_nonblank": 0},
+    "L4": {"rows": 6, "remark_nonblank": 6, "conclusion_nonblank": 0},
+    "L5": {"rows": 7, "remark_nonblank": 7, "conclusion_nonblank": 0},
+    "L6": {"rows": 5, "remark_nonblank": 5, "conclusion_nonblank": 0},
+    "L7": {"rows": 5, "remark_nonblank": 5, "conclusion_nonblank": 0},
+    "L8": {"rows": 5, "remark_nonblank": 5, "conclusion_nonblank": 0},
+}
+
+#: 读数时间线（append-only）。守卫一律与**最新**一条比；历史条目只作审计轨迹。
+SUPPLY_READINGS: tuple[dict[str, Any], ...] = (
+    MEASURED_SUPPLY_2026_09_28,
+    MEASURED_SUPPLY_2026_10_01,
+)
+L_PAYLOAD_READINGS: tuple[dict[str, dict[str, int]], ...] = (
+    MEASURED_L_PAYLOAD_2026_09_28,
+    MEASURED_L_PAYLOAD_2026_10_01,
+)
+LATEST_SUPPLY: dict[str, Any] = SUPPLY_READINGS[-1]
+LATEST_L_PAYLOAD: dict[str, dict[str, int]] = L_PAYLOAD_READINGS[-1]
+
 #: candidate contract 声明的字段名 —— 真库命中 0，是 LR-P5 的反例集合。
 CANDIDATE_PHANTOM_FIELDS: tuple[str, ...] = (
     "beginUnadjusted",

@@ -27,6 +27,7 @@ import {
   calcSubtotal,
 } from './useK9FormulaEngine'
 import { K9_FEE_NATURES } from './k9FeeNatures'
+import { newRowIdentity } from './shared/rowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -344,7 +345,7 @@ export function useK9Adjudication(params: UseK9AdjudicationParams) {
     const newRows = prefill.value.map((p, i) => {
       const old = existing.find(r => r.projectName === p.name) || existing[i]
       return _normalizeRow({
-        rowKey: old?.rowKey ?? `pf-${i}`,
+        rowKey: old?.rowKey ?? newRowIdentity('pf'),
         projectName: p.name,
         unadjustedDebit: p.unadjustedDebit,
         unadjustedCredit: p.unadjustedCredit,

@@ -117,15 +117,19 @@ describe('B22B 控制矩阵 — P2 12 列完整', () => {
       const m = useB22BControlMatrix(ref('wp-1'), ref('proj-1'))
       m.addRow()
       const row = m.rows.value[0]
-      expect(Object.keys(row).sort()).toEqual([...EXPECTED_FIELDS].sort())
+      // 业务字段恰 12 列不多不少；rowId 是身份字段（BC-53 改造新增），不计入列集合
+      const businessKeys = Object.keys(row).filter((k) => k !== 'rowId').sort()
+      expect(businessKeys).toEqual([...EXPECTED_FIELDS].sort())
       for (const f of EXPECTED_FIELDS) {
         expect(f in row).toBe(true)
       }
+      // 身份字段必须存在（否则 roundtrip 按位置配对 ⇒ 错位）
+      expect(typeof (row as any).rowId).toBe('string')
     })
     scope.stop()
   })
 
-  it('持久化列集合恒等于 12 列 + 行数（PUT payload = count + 12 字段/行）', async () => {
+  it('持久化为行数组：12 列齐全 + 每行带稳定身份（BC-53 改造后形态）', async () => {
     const scope = effectScope()
     await scope.run(async () => {
       const m = useB22BControlMatrix(ref('wp-1'), ref('proj-1'))
@@ -136,16 +140,51 @@ describe('B22B 控制矩阵 — P2 12 列完整', () => {
       const payload = mockPut.mock.calls[mockPut.mock.calls.length - 1][1]
       const ids: string[] = payload.items.map((i: any) => i.item_id)
 
-      // 行数标记
+      // 🔴 改造后落库是「整表一条行数组」，不再按下标展开 12×N 条单字段键
+      expect(ids).toContain('B22B-rows')
+      // count 键保留但降级为校验值
       expect(ids).toContain('B22B-row-count')
-      // 恰好 12 个字段（第 0 行）
+
+      const rowsItem = payload.items.find((i: any) => i.item_id === 'B22B-rows')
+      const parsed = JSON.parse(rowsItem.remark)
+      expect(Array.isArray(parsed)).toBe(true)
+      expect(parsed).toHaveLength(1)
+
+      // 12 列业务字段逐个在行对象里
       for (const f of EXPECTED_FIELDS) {
-        expect(ids).toContain(`B22B-row-0-${f}`)
+        expect(parsed[0]).toHaveProperty(f)
       }
-      const rowFieldIds = ids.filter((id) => id.startsWith('B22B-row-0-'))
-      expect(rowFieldIds).toHaveLength(12)
-      // 1 行 → 1 count + 12 字段 = 13 条
-      expect(payload.items).toHaveLength(13)
+      // 行身份存在且非位置化
+      expect(typeof parsed[0].rowId).toBe('string')
+      expect(parsed[0].rowId.length).toBeGreaterThan(0)
+
+      // count 值 == 实际行数
+      const countItem = payload.items.find((i: any) => i.item_id === 'B22B-row-count')
+      expect(countItem.remark).toBe('1')
+    })
+    scope.stop()
+  })
+
+  it('🔴 删中间行：剩余行身份与内容保持绑定', async () => {
+    const scope = effectScope()
+    await scope.run(async () => {
+      const m = useB22BControlMatrix(ref('wp-1'), ref('proj-1'))
+      m.addRow({ controlName: '甲' })
+      m.addRow({ controlName: '乙' })
+      m.addRow({ controlName: '丙' })
+      await flushPromises()
+
+      const idsBefore = m.rows.value.map((r: any) => r.rowId)
+      m.removeRow(1)
+      await flushPromises()
+
+      expect(m.rows.value).toHaveLength(2)
+      // 身份保持：删掉的是中间那个，首尾两行身份不变
+      expect(m.rows.value.map((r: any) => r.rowId)).toEqual([
+        idsBefore[0], idsBefore[2],
+      ])
+      // 内容跟着身份走，没有"值搬家"
+      expect(m.rows.value.map((r: any) => r.controlName)).toEqual(['甲', '丙'])
     })
     scope.stop()
   })

@@ -75,15 +75,12 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async logout() {
-      try {
-        await authHttp.post('/api/auth/logout', {
-          refresh_token: this.refreshToken,
-        }, {
-          headers: { Authorization: `Bearer ${this.token}` },
-        })
-      } catch {
-        // ignore logout errors
-      }
+      // 🔴 先同步清空本地会话，再通知后端。http.ts 在「刷新失败 / 刷新后仍 401」时调用本方法**不 await**、
+      //    随即 `window.location.href = '/login'`：旧实现把清理放在 await 登出请求之后，页面卸载时请求被中断、
+      //    清理永不执行 ⇒ 新页面仍读到旧 token（isAuthenticated 为真）⇒ 路由守卫把 /login 重定向回首页 ⇒
+      //    401 ⇒ 再登出再跳转……无限整页重载（2026-09-30 实测 137 轮，每轮 12 个 401）。
+      const refreshToken = this.refreshToken
+      const accessToken = this.token
       this.token = null
       this.refreshToken = null
       this.user = null
@@ -92,17 +89,33 @@ export const useAuthStore = defineStore('auth', {
       sessionStorage.removeItem('user')
       // Task 10: 清理 AI 聊天敏感缓存
       clearOnLogout()
+      try {
+        await authHttp.post('/api/auth/logout', {
+          refresh_token: refreshToken,
+        }, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+      } catch {
+        // 服务端登出失败不影响本地已登出（refresh_token 到期自然失效）
+      }
     },
 
     async refreshAccessToken() {
       const { data } = await authHttp.post('/api/auth/refresh', {
         refresh_token: this.refreshToken,
       })
-      const payload = data
+      // 🔴 与 login 同样解信封：后端 ResponseWrapperMiddleware 把响应包成 {code, message, data}，而 authHttp
+      //    不经 http.ts 拦截器、不会自动解包。旧实现直接读 `data.access_token` 恒为 undefined ⇒ 把字符串
+      //    "undefined" 存成 token、丢掉后端已轮换出的新 refresh_token（旧的已被拉黑）⇒ 令牌刷新从未成功过。
+      const payload = data?.data ?? data
+      const accessToken = payload?.access_token
+      if (typeof accessToken !== 'string' || !accessToken) {
+        throw new Error('刷新令牌响应缺少 access_token')
+      }
       // Token Rotation: 后端每次刷新都签发新的 refresh_token
-      this.token = payload.access_token
+      this.token = accessToken
       this.refreshToken = payload.refresh_token ?? this.refreshToken
-      sessionStorage.setItem('token', this.token!)
+      sessionStorage.setItem('token', accessToken)
       sessionStorage.setItem('refreshToken', this.refreshToken!)
     },
 

@@ -863,6 +863,9 @@ class TestRouterShape:
         suffixes = [
             ("POST", "/pending-mutations"),
             ("GET", "/store-projection"),
+            # spec workpaper-sync-managed-row-convergence Requirement 2 追加：
+            # 反向收敛（以已发布 substrate 覆盖 store），打破 materialize 500 死锁。
+            ("POST", "/adopt-substrate"),
             ("POST", "/materialize"),
             ("POST", f"/rooms/{room}/confirm-descriptor"),
             ("POST", f"/rooms/{room}/forcesave"),
@@ -1037,13 +1040,15 @@ class TestGuardIsTheFirstAwaitInEveryHandler:
                 "authorization-before-resource/cache 要求 guard 先跑完"
             )
             checked += 1
-        # `+4` = `_REQUIRED_ENDPOINTS` 之外的四个端点：
+        # `+5` = `_REQUIRED_ENDPOINTS` 之外的五个端点：
         # `GET …/recovery-cases/{case_id}/download`（Task 28）、
         # `POST …/operations/{operation_id}/retry`（Task 28）、
         # `GET …/recovery-cases/{case_id}/timeline`（Task 29 追加）、
         # `POST …/rooms/{room_id}/participants/{participant_id}/leave`
-        # （spec oo-single-pass-materialize-and-room-leave Requirement 4 追加）。
-        assert checked == len(_REQUIRED_ENDPOINTS) + 4, (
+        # （spec oo-single-pass-materialize-and-room-leave Requirement 4 追加）、
+        # `POST …/adopt-substrate`
+        # （spec workpaper-sync-managed-row-convergence Requirement 2 追加）。
+        assert checked == len(_REQUIRED_ENDPOINTS) + 5, (
             f"只核对了 {checked} 个 handler —— 端点数变化时本判据的分母必须同步"
         )
 

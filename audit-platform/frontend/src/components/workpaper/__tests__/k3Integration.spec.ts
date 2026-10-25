@@ -162,7 +162,11 @@ describe('K3 Integration — Task 6.3: 抽凭 + OCR + GtIndexChip + 双模式', 
     // Has GtVoucherSamplingEngine（defineAsyncComponent 懒加载，或静态 import）+ dialog
     expect(rpSource).toContain('GtVoucherSamplingEngine')
     expect(rpSource).toContain('showSamplingDialog')
-    expect(rpSource).toContain('account-code="2241"')
+    // 科目口径收敛到 k3AccountScope（2241 + 下级），不再写死字面量
+    expect(rpSource).toContain(':account-code="samplingAccountCode"')
+    expect(rpSource).toContain('k3QueryCodes()')
+    // 标题里的插值必须是绑定属性（静态属性会把 `${...}` 原样显示）
+    expect(rpSource).not.toMatch(/\stitle="[^"]*\$\{/)
     expect(rpSource).toContain('phase="final"')
     // Has OCR with /d4/contract-ocr endpoint
     expect(rpSource).toContain("'/api/d4/contract-ocr'")
@@ -184,7 +188,9 @@ describe('K3 Integration — Task 6.3: 抽凭 + OCR + GtIndexChip + 双模式', 
     // 抽凭引擎已接入（defineAsyncComponent 懒加载，或静态 import）
     expect(loSource).toContain('GtVoucherSamplingEngine')
     expect(loSource).toContain('showSamplingDialog')
-    expect(loSource).toContain('account-code="2241"')
+    expect(loSource).toContain(':account-code="samplingAccountCode"')
+    expect(loSource).toContain('k3QueryCodes()')
+    expect(loSource).not.toMatch(/\stitle="[^"]*\$\{/)
     expect(loSource).toContain('onSampleFilled')
     // 抽凭引擎必填 props（phase/year/workpaper-id）已补全
     expect(loSource).toContain('phase="final"')
@@ -217,7 +223,17 @@ describe('K3 Integration — Task 6.3: 抽凭 + OCR + GtIndexChip + 双模式', 
     expect(mainSource).toContain('dualMode.currentMode')
     expect(mainSource).toContain("'html' | 'onlyoffice'")
     expect(mainSource).toContain('GtOnlyOfficeSheet')
-    expect(mainSource).toContain('/workpapers/onlyoffice/health')
+
+    // 🔴 原判据是 `toContain('/workpapers/onlyoffice/health')` —— 它钉的是「宿主自己打
+    //    健康端点」这个**已被判为缺陷**的形态。K 循环 lane 1 Task 7（spec
+    //    k1-k7-inlined-iife-hosts-and-orphan-cleanup）把 13 个宿主/composable 各自抄
+    //    一遍的健康探测收敛到平台唯一实现 `sync/onlyOfficeHealth.ts`（端点 / 字段 /
+    //    15s TTL 缓存 / 并发去重四合一），宿主里自然不再出现裸端点字面量。
+    //    继续按旧形态断言 = 要求把缺陷改回来 ⇒ 改为钉**收敛后的形态**（更强：
+    //    既要求走单源探针，又禁止裸端点回流）。
+    expect(mainSource).toContain('fetchOnlyOfficeHealthy')
+    expect(mainSource).toContain("from './sync/onlyOfficeHealth'")
+    expect(mainSource).not.toContain('/workpapers/onlyoffice/health')
   })
 })
 

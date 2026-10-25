@@ -49,12 +49,12 @@ export const recycleBin = {
 } as const
 
 // ─── 知识库 ─────────────────────────────────────────────────────────────────
+// 🔴 2026-09-30 删除 search / category / upload / doc 四个路径（spec
+// knowledge-upload-robustness-and-consumer-wiring R7.2）：后端**从未有过**这些路由，
+// 附注 / 审计报告编辑器的「📚 知识库」选择器因此恒空。知识库读写一律走下方 `knowledgeLibrary`。
+// 守卫：backend/tests/test_frontend_knowledge_paths_exist.py（前端每个知识库路径都须命中后端路由）。
 
 export const knowledge = {
-  category: (cat: string) => `/api/knowledge/${cat}`,
-  upload: (cat: string) => `/api/knowledge/${cat}/upload`,
-  doc: (cat: string, docId: string) => `/api/knowledge/${cat}/${docId}`,
-  search: '/api/knowledge/search',
   libraries: '/api/knowledge/libraries',
 } as const
 
@@ -66,12 +66,15 @@ export const knowledgeLibrary = {
   folders: '/api/knowledge-library/folders',
   folderDocuments: (folderId: string) => `/api/knowledge-library/folders/${folderId}/documents`,
   folderUpload: (folderId: string) => `/api/knowledge-library/folders/${folderId}/upload`,
+  initPresets: '/api/knowledge-library/init-presets',
   folderRename: (folderId: string) => `/api/knowledge-library/folders/${folderId}/rename`,
   folderDelete: (folderId: string) => `/api/knowledge-library/folders/${folderId}`,
   documentDetail: (docId: string) => `/api/knowledge-library/documents/${docId}`,
   documentDownload: (docId: string) => `/api/knowledge-library/documents/${docId}/download`,
   documentPreview: (docId: string) => `/api/knowledge-library/documents/${docId}/preview`,
   documentMove: (docId: string) => `/api/knowledge-library/documents/${docId}/move`,
+  /** 上传到项目知识文件夹（「{项目名}（项目资料）/ A17-3 咨询附件」，项目组可见） */
+  projectUpload: (projectId: string) => `/api/knowledge-library/projects/${projectId}/upload`,
 } as const
 
 // ─── 看板 ───────────────────────────────────────────────────────────────────

@@ -30,6 +30,20 @@
  * - D1-1 坏账行 ← D1-4 **按票据种类小计**（`B12='坏账准备明细表D1-4'!B23`、`F12=!K23`）
  */
 
+import {
+  CELL_VALUE_TOLERANCE,
+  deserializeRows,
+  displayValueForCellState,
+  readRaw,
+  readRowFieldWithFallback,
+  resolveCellState,
+  rowsItemId,
+  serializeRows,
+  type DerivedCellState,
+  type DynamicAdjRow,
+  type DynamicRowsSpec,
+} from './shared/dynamicAdjudicationRows'
+
 /** `checklist_responses` 行的最小读取形状（与各 composable 的 ChecklistResponse 兼容）。 */
 export interface D1AnchorResponse {
   item_id?: string
@@ -284,6 +298,457 @@ export function readD1AnchorReason(map: D1ResponseMap, section: D1AdjSection, sl
   return String(readAnchor(map, d1AdjAnchor(section, slug, 'reason')) || '')
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 行数组形态（Task 32：per-cell 锚点 → 行数组，**双读单写**）
+//
+// 🔴 关键实测（2026-09-28）：D1 现有 per-cell 键形态与共享模块
+//    `shared/dynamicAdjudicationRows` 的 per-field 键形态**天然逐字一致** ——
+//      `d1AdjAnchor(section, slug, field)`            → `D1-adj-{section}-{slug}-{field}`
+//      `rowFieldItemId(SPEC, d1AdjRowKey(s, g), f)`   → `D1-adj-{section}-{slug}-{field}`
+//    因为 `d1AdjRowKey(section, slug) === '{section}-{slug}'`、`prefix === 'D1-adj'`。
+//    ⇒ 迁移是**接入共享模块**，不是另造一套键（需求 6.4 明令不得在 D1 侧另写一套）。
+//    判据 `d1AdjRowsFallback.spec.ts` 把这条等价性钉死。
+//
+// 🔴 为什么必须双读（需求 6.1/6.2「迁移不归零」）：既有项目的金额只落在 per-cell item，
+//    行对象里没有金额键。行对象值一旦存在即为权威（它也是 OO 回写的落点），
+//    未补齐的行回落 per-cell；反过来 per-cell 优先会让 OO 改的值被旧值永久盖住。
+//
+// 🔴 `readRowFieldWithFallback` 要求**有带 rowId 的行对象**才会回落（`if (!rid) return 0`）
+//    ⇒ 行数组为空时必须先按 `readD1Categories` 造占位行，否则回落路径走不到、金额归零。
+//    这正是本模块 `d1AdjPlaceholderRow()` 的职责。
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** 审定表金额字段（per-cell 键后缀 ↔ `D1PeriodAmounts` 的 camelCase 键）。 */
+export const D1_ADJ_VALUE_FIELD_MAP = {
+  'prior-unadj': 'priorUnadjusted',
+  'prior-aje': 'priorAje',
+  'prior-rje': 'priorRje',
+  'current-unadj': 'currentUnadjusted',
+  'current-aje': 'currentAje',
+  'current-rje': 'currentRje',
+} as const satisfies Record<string, keyof D1PeriodAmounts>
+
+/** 迁移判定用的金额字段集（任一非零即认为该历史行「有数据」，必须保留）。 */
+export const D1_ADJ_VALUE_FIELDS: readonly string[] = Object.keys(D1_ADJ_VALUE_FIELD_MAP)
+
+/**
+ * D1 审定表的动态行规格。
+ *
+ * `legacyRows: []` —— D1 的行不是写死的固定清单：分类由 `readD1Categories` 从 D1-2 动态推出
+ * （银承/商承恒在前，其余按 D1-2 顺序追加）⇒ 迁移源是 categories 而不是静态 legacy 清单，
+ * 故不走 `migrateLegacyFixedRows`，而由 `d1AdjPlaceholderRow` 逐分类造占位行驱动回落。
+ */
+export const D1_ADJ_ROWS_SPEC: DynamicRowsSpec = {
+  prefix: 'D1-adj',
+  legacyRows: [],
+  valueFields: D1_ADJ_VALUE_FIELDS,
+}
+
+/** 行数组 store 键（`D1-adj-rows`，与 D4-1 的 `D4-1-rows` 同范式）。 */
+export const D1_ADJ_ROWS_KEY: string = rowsItemId(D1_ADJ_ROWS_SPEC)
+
+/** 读行数组（缺键/坏 JSON 均返回 `[]`，与共享模块口径一致）。 */
+export function readD1AdjRows(map: D1ResponseMap): DynamicAdjRow[] {
+  return deserializeRows(readRaw(map as Map<string, unknown>, D1_ADJ_ROWS_KEY))
+}
+
+/**
+ * 某区块某分类的占位行 —— 只带 `rowId`/`label`，用于驱动 per-cell 回落。
+ *
+ * `source: 'legacy'` 如实反映「这行的值可能还只在旧 per-cell 键里」；
+ * 一旦行对象补齐金额（写侧切换后），同一 rowId 的真实行会取代它。
+ */
+export function d1AdjPlaceholderRow(
+  section: D1AdjSection,
+  slug: string,
+  label = '',
+): DynamicAdjRow {
+  return { rowId: d1AdjRowKey(section, slug), label, source: 'legacy' }
+}
+
+/**
+ * 双读某区块某分类的金额：**行对象优先、缺则回落 per-cell 锚点**（Task 32）。
+ *
+ * 与 :func:`readD1AnchorAmounts` 的关系：后者是纯 per-cell 读取（迁移前的唯一路径），
+ * 本函数在行数组不存在/该行无金额键时**逐字退化为它的结果**（判据钉住这条等价性）
+ * ⇒ 接入本函数是零行为变化的升级，不是新语义。
+ */
+export function readD1AdjRowAmounts(
+  map: D1ResponseMap,
+  section: D1AdjSection,
+  slug: string,
+  rows?: readonly DynamicAdjRow[],
+): D1PeriodAmounts {
+  const rowId = d1AdjRowKey(section, slug)
+  const list = rows ?? readD1AdjRows(map)
+  const row = list.find((r) => r.rowId === rowId) ?? d1AdjPlaceholderRow(section, slug)
+  const responses = map as Map<string, unknown>
+  const read = (field: string): number =>
+    readRowFieldWithFallback(row, responses, D1_ADJ_ROWS_SPEC, field)
+  return d1WithAudited({
+    priorUnadjusted: read('prior-unadj'),
+    priorAje: read('prior-aje'),
+    priorRje: read('prior-rje'),
+    currentUnadjusted: read('current-unadj'),
+    currentAje: read('current-aje'),
+    currentRje: read('current-rje'),
+  })
+}
+
+/** 可手工编辑的两个区块（净值恒为公式，不落库）。 */
+export const D1_ADJ_EDITABLE_SECTIONS: readonly D1AdjSection[] = ['gross', 'bd']
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 逐格四态覆盖状态机（Task 33）—— 修 cross-sheet 无条件盖掉手工值的静默丢数据
+//
+// 🔴 修前的行为：`const g = fromCat ?? 手工值` —— D1-2 一有行，手工录入的值就**既不显示
+//    也改不了**（配合 `buildRow` 的 `isEditable = … && !isFromCrossSheet`）。审计师录进去的
+//    数字凭空消失且无任何提示。与 D4-1 修前同型。
+//
+// 🔴 四态复用 `shared/dynamicAdjudicationRows` 的 `resolveCellState` /
+//    `displayValueForCellState`（需求 6.4 明令不得在 D1 侧另写一套）。三个量：
+//      stored  = 行对象/per-cell 里该格当前值（双读）
+//      snap    = 行对象 derivedSnapshot[field]（最近一次由派生写入 store 的值）
+//      derived = 当前现算 cross-sheet 值（D1-2 原值 / D1-4 按票据种类小计）
+//    覆盖判定是 `stored ≠ snap`（**不是** `stored ≠ derived`）—— 后者会在上游一变时把所有
+//    纯派生格误判成人工覆盖。
+//
+// 🔴 snap 只能挂在**行对象**上（per-cell 是纯文本 remark，装不下）⇒ 本节依赖 Task 32 的
+//    写侧已切到行数组。这也是 tasks 依赖图「33 依赖 32」的确切理由。
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** 某行某格的四态解析结果。 */
+export interface D1AdjCellResolution {
+  state: DerivedCellState
+  /** 应当显示的值（S1/S3 跟随 derived；S2/S4 用 stored 覆盖值）。 */
+  display: number
+  stored: number
+  snap: number | null
+  derived: number
+}
+
+/** snap 读取：行对象 `derivedSnapshot[field]`（无则 `null` = 从未由派生写入过）。 */
+export function readD1AdjSnap(
+  map: D1ResponseMap,
+  rowId: string,
+  field: string,
+  rows?: readonly DynamicAdjRow[],
+): number | null {
+  const list = rows ?? readD1AdjRows(map)
+  const raw = list.find((r) => r.rowId === rowId)?.derivedSnapshot?.[field]
+  if (raw == null) return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+/** 逐格解析四态（单格）。 */
+export function resolveD1AdjCell(
+  map: D1ResponseMap,
+  rowId: string,
+  field: string,
+  derived: number,
+  rows?: readonly DynamicAdjRow[],
+): D1AdjCellResolution {
+  const list = rows ?? readD1AdjRows(map)
+  const row =
+    list.find((r) => r.rowId === rowId)
+    ?? ({ rowId, label: '', source: 'legacy' } as DynamicAdjRow)
+  const stored = readRowFieldWithFallback(
+    row,
+    map as Map<string, unknown>,
+    D1_ADJ_ROWS_SPEC,
+    field,
+  )
+  const snap = readD1AdjSnap(map, rowId, field, list)
+
+  // 🔴🔴 `snap === null`（从未由派生写入过 —— 迁移前的行，或同步器还没跑过一轮）必须**先降级**，
+  //    不能直接丢给 `resolveCellState`：
+  //      `resolveCellState(0, null, 100)` 会算出 `overridden = (0 ≠ null) = true` ⇒ S4
+  //      ⇒ `displayValueForCellState('S4', 0, 100)` 取 stored ⇒ **上游值 100 被显示成 0**。
+  //    这是实测踩到的回归（`useD1DisclosureDerived.spec.ts` 的 `endBalance` 期望 140 实得 0）。
+  //
+  //    降级依据：per-cell 形态下 `readNum` 对缺键返回 0 ⇒ **「没录入」与「录入了 0」不可区分**
+  //    （形态的固有信息损失，不是判定逻辑的缺陷）。故按 stored 是否非零二分：
+  //      * stored 非零 ⇒ 迁移前就存在手工值 ⇒ 判 **S2**（已覆盖、上游未变），显示 stored
+  //        —— 这正是「cross-sheet 不再无条件盖掉手工值」要修的那一半；
+  //      * stored 为零 ⇒ 无手工录入 ⇒ 判 **S1**（纯派生），显示 derived，与修前行为一致。
+  //    同步器跑过一轮后 snap 不再为 null，四态即完整（含 S3/S4 的「上游已变」维度）。
+  if (snap === null) {
+    const overridden = Math.abs(stored) > CELL_VALUE_TOLERANCE
+    return {
+      state: overridden ? 'S2' : 'S1',
+      display: overridden ? stored : derived,
+      stored,
+      snap,
+      derived,
+    }
+  }
+
+  const state = resolveCellState(stored, snap, derived)
+  return {
+    state,
+    display: n(displayValueForCellState(state, stored, derived)),
+    stored,
+    snap,
+    derived,
+  }
+}
+
+/** 一行 6 个金额格的四态（field → 态）。 */
+export type D1AdjRowCellStates = Partial<Record<string, DerivedCellState>>
+
+/**
+ * 把 cross-sheet 派生值与手工值按**逐格四态**合成该行应显示的金额。
+ *
+ * 🔴 这取代了修前的整行 `fromCat ?? 手工值`：覆盖是**逐格**的 —— 审计师可能只改了「账项调整」
+ *    一列而其余列跟随上游，整行二选一必然丢掉其中一侧。
+ */
+export function mergeD1AdjRowByCellState(
+  map: D1ResponseMap,
+  section: D1AdjSection,
+  slug: string,
+  derived: D1PeriodAmounts,
+  rows?: readonly DynamicAdjRow[],
+): { amounts: D1PeriodAmounts; states: D1AdjRowCellStates } {
+  const rowId = d1AdjRowKey(section, slug)
+  const list = rows ?? readD1AdjRows(map)
+  const states: D1AdjRowCellStates = {}
+  const picked: Record<string, number> = {}
+  for (const [field, camel] of Object.entries(D1_ADJ_VALUE_FIELD_MAP)) {
+    const r = resolveD1AdjCell(map, rowId, field, n(derived[camel]), list)
+    states[field] = r.state
+    picked[camel] = r.display
+  }
+  return {
+    amounts: d1WithAudited({
+      priorUnadjusted: picked.priorUnadjusted,
+      priorAje: picked.priorAje,
+      priorRje: picked.priorRje,
+      currentUnadjusted: picked.currentUnadjusted,
+      currentAje: picked.currentAje,
+      currentRje: picked.currentRje,
+    }),
+    states,
+  }
+}
+
+/**
+ * 同步器：把 cross-sheet 派生值物化进行对象（`stored` + `derivedSnapshot`）。
+ *
+ * 返回新的行数组序列化串；**无任何变化时返回 `null`**（幂等，调用方据此跳过写库）。
+ *
+ * 🔴 **只写未被覆盖的格**（`state === 'S1' || state === 'S3'`）—— 已被人工覆盖的格
+ * （S2/S4）保持 stored 不动，只把 snap 推到当前 derived，这样「上游已变」这一维度能
+ * 继续被认出来。若无条件写 stored，就等于用派生值冲掉审计师的覆盖值（即修前的缺陷）。
+ *
+ * 🔴🔴 **本函数写进 snap 的必须是 `derived`，绝不能是「显示值」**。tasks.md 明文记着
+ * D4 的事故：同步器把显示值当派生值写回 snap ⇒ S2 下显示值就是 stored ⇒ 写完 snap==stored
+ * ⇒ 下一次 `resolveCellState` 判成未覆盖 ⇒ **覆盖标记自我擦除**，而 13 条纯函数判据全绿。
+ * 判据 `d1AdjCellStateMachine.spec.ts` 里有一条**真跑本函数**的断言钉住它。
+ */
+export function syncD1DerivedIntoRows(
+  map: D1ResponseMap,
+  categories: readonly D1Category[],
+  derivedBySection: Partial<Record<D1AdjSection, Record<string, D1PeriodAmounts>>>,
+): string | null {
+  const existing = readD1AdjRows(map)
+  const byId = new Map(existing.map((r) => [r.rowId, { ...r }]))
+  let dirty = false
+
+  for (const section of D1_ADJ_EDITABLE_SECTIONS) {
+    const bySlug = derivedBySection[section]
+    if (!bySlug) continue
+    for (const c of categories) {
+      const derived = bySlug[c.slug]
+      if (!derived) continue
+      const rowId = d1AdjRowKey(section, c.slug)
+      const row =
+        byId.get(rowId)
+        ?? ({ rowId, label: c.label || c.slug, source: 'tb' } as DynamicAdjRow)
+      const snapshot: Record<string, number | null> = { ...(row.derivedSnapshot ?? {}) }
+      for (const [field, camel] of Object.entries(D1_ADJ_VALUE_FIELD_MAP)) {
+        const d = n(derived[camel])
+        const r = resolveD1AdjCell(map, rowId, field, d, existing)
+        // snap 恒推到当前 derived（S2/S4 也推 —— 这才能让"上游已变"被认出来）。
+        // 🔴 写的是 derived，不是 r.display。
+        if (snapshot[field] !== d) {
+          snapshot[field] = d
+          dirty = true
+        }
+        // stored 只在未被覆盖时跟随（S1/S3）。
+        if (r.state === 'S1' || r.state === 'S3') {
+          if ((row as Record<string, unknown>)[field] !== d) {
+            ;(row as Record<string, unknown>)[field] = d
+            dirty = true
+          }
+        }
+      }
+      row.derivedSnapshot = snapshot
+      if (!row.source) row.source = 'tb'
+      byId.set(rowId, row)
+    }
+  }
+
+  if (!dirty) return null
+  const rows = [...byId.values()]
+  return serializeRows(rows, {
+    spec: D1_ADJ_ROWS_SPEC,
+    reader: {
+      readField: (rowId, field) => {
+        const r = byId.get(rowId)
+        const direct = r ? (r as Record<string, unknown>)[field] : undefined
+        if (direct != null && Number.isFinite(Number(direct))) return Number(direct)
+        return readRowFieldWithFallback(
+          r ?? { rowId, label: '', source: 'legacy' },
+          map as Map<string, unknown>,
+          D1_ADJ_ROWS_SPEC,
+          field,
+        )
+      },
+      readDerivedSnapshot: (rowId) => byId.get(rowId)?.derivedSnapshot ?? null,
+    },
+  })
+}
+
+/**
+ * 恢复取数（把某格从覆盖态退回 S1 纯派生）：`stored ← derived`、`snap ← derived`。
+ *
+ * 返回新的行数组序列化串。🔴 **当场写对**，不靠下一次同步自愈 —— 否则此刻若发生
+ * flushSave / 切 OO，库里留的还是覆盖值（D4 判据 P15 的原文要求）。
+ */
+export function restoreD1AdjDerivedValue(
+  map: D1ResponseMap,
+  categories: readonly D1Category[],
+  rowId: string,
+  field: string,
+  derived: number,
+): string {
+  const existing = readD1AdjRows(map)
+  const byId = new Map(existing.map((r) => [r.rowId, { ...r }]))
+  const row =
+    byId.get(rowId) ?? ({ rowId, label: '', source: 'tb' } as DynamicAdjRow)
+  ;(row as Record<string, unknown>)[field] = derived
+  row.derivedSnapshot = { ...(row.derivedSnapshot ?? {}), [field]: derived }
+  byId.set(rowId, row)
+  const merged = new Map(byId)
+  // 复用写侧的整清单口径（categories ∪ 已有行），避免两处行清单规则漂移。
+  const base = serializeD1AdjRows(map, categories)
+  for (const r of deserializeRows(base)) {
+    if (!merged.has(r.rowId)) merged.set(r.rowId, r)
+  }
+  return serializeRows([...merged.values()], {
+    spec: D1_ADJ_ROWS_SPEC,
+    reader: {
+      readField: (rid, f) => {
+        const r = merged.get(rid)
+        const direct = r ? (r as Record<string, unknown>)[f] : undefined
+        if (direct != null && Number.isFinite(Number(direct))) return Number(direct)
+        return readRowFieldWithFallback(
+          r ?? { rowId: rid, label: '', source: 'legacy' },
+          map as Map<string, unknown>,
+          D1_ADJ_ROWS_SPEC,
+          f,
+        )
+      },
+      readDerivedSnapshot: (rid) => merged.get(rid)?.derivedSnapshot ?? null,
+    },
+  })
+}
+
+/**
+ * 双读单格当前值（行对象优先、缺则回落 per-cell）。
+ *
+ * 给调用方（如「应用调整分录」的累加基数）用，使它们**无需直连**
+ * `shared/dynamicAdjudicationRows` —— 键与回落规则一律收敛在本模块
+ * （与 `d1AdjAnchor` 的单源纪律同理，守卫 `d1AnchorSingleSource.spec.ts`）。
+ */
+export function readD1AdjCellValue(
+  map: D1ResponseMap,
+  rowId: string,
+  field: string,
+): number {
+  const row =
+    readD1AdjRows(map).find((r) => r.rowId === rowId)
+    ?? ({ rowId, label: '', source: 'legacy' } as DynamicAdjRow)
+  return readRowFieldWithFallback(row, map as Map<string, unknown>, D1_ADJ_ROWS_SPEC, field)
+}
+
+/**
+ * 写侧单写（Task 32）：把某格改动落成**行数组**的序列化串。
+ *
+ * 返回值直接写进 `D1-adj-rows` 这一个 item ⇒ 写侧只写新形态；旧 per-cell 键**只读不写**、
+ * 原样留在库里（物理删除归后续 spec，回滚只需把读侧优先级调回 per-cell）。
+ *
+ * 🔴 **一次写入包含全部可编辑行，不是只写被改的那一行**：`serializeRows` 产出的是整个
+ * 行数组，只塞一行会让其余行从行数组里消失、退回 per-cell 回落 ⇒ 每次编辑都在两种形态
+ * 之间抖动。整清单幂等写入是唯一稳定形态（也与 D4-1 的写法一致）。
+ *
+ * 🔴 **未被改动的格用双读取当前值** ⇒ 第一次编辑该行时，它原本只在 per-cell 里的旧值会
+ * 被一并固化进行对象（迁移在编辑时自然完成，不需要一次性批量迁移脚本，也不会归零）。
+ *
+ * 🔴 **`reason`（原因分析，文本）不随行落库**：共享模块 `serializeRows` 只序列化
+ * `spec.valueFields`（数字）与结构键（`rowId`/`label`/`source`/`derivedSnapshot`），
+ * 文本字段会被丢弃 ⇒ reason 仍走 per-cell 锚点。这是共享模块的形态边界，
+ * 不是本次迁移的遗漏；把它塞进行对象需要先扩共享模块（归后续 spec）。
+ */
+export function serializeD1AdjRows(
+  map: D1ResponseMap,
+  categories: readonly D1Category[],
+  edit?: { rowId: string; field: string; value: number },
+): string {
+  const existing = readD1AdjRows(map)
+  const byId = new Map(existing.map((r) => [r.rowId, r]))
+  const responses = map as Map<string, unknown>
+
+  const rows: DynamicAdjRow[] = []
+  const emitted = new Set<string>()
+  for (const section of D1_ADJ_EDITABLE_SECTIONS) {
+    for (const c of categories) {
+      const rowId = d1AdjRowKey(section, c.slug)
+      if (emitted.has(rowId)) continue
+      emitted.add(rowId)
+      const prev = byId.get(rowId)
+      rows.push({
+        rowId,
+        label: prev?.label || c.label || c.slug,
+        source: prev?.source ?? 'legacy',
+        ...(prev?.derivedSnapshot ? { derivedSnapshot: prev.derivedSnapshot } : {}),
+      })
+    }
+  }
+
+  // 🔴 被编辑的行若不在 categories 派生出的清单里（分类刚被从 D1-2 删掉、或 rowKey 来自
+  //    `resolveRowKeyFromAccount` 这类按科目映射的入口），**必须补进来**——否则 rows 里没有
+  //    它，本次编辑连同该行既有金额会被静默丢弃。已有行（byId）同理：不能因为 categories
+  //    暂时读不到就把库里的行抹掉。
+  for (const rowId of [
+    ...(edit && !emitted.has(edit.rowId) ? [edit.rowId] : []),
+    ...[...byId.keys()].filter((id) => !emitted.has(id)),
+  ]) {
+    if (emitted.has(rowId)) continue
+    emitted.add(rowId)
+    const prev = byId.get(rowId)
+    rows.push({
+      rowId,
+      label: prev?.label ?? '',
+      source: prev?.source ?? 'legacy',
+      ...(prev?.derivedSnapshot ? { derivedSnapshot: prev.derivedSnapshot } : {}),
+    })
+  }
+
+  return serializeRows(rows, {
+    spec: D1_ADJ_ROWS_SPEC,
+    reader: {
+      readField: (rowId, field) => {
+        if (edit && rowId === edit.rowId && field === edit.field) return edit.value
+        const row = byId.get(rowId) ?? { rowId, label: '', source: 'legacy' as const }
+        return readRowFieldWithFallback(row, responses, D1_ADJ_ROWS_SPEC, field)
+      },
+      readDerivedSnapshot: (rowId) => byId.get(rowId)?.derivedSnapshot ?? null,
+    },
+  })
+}
+
 /**
  * 从 D1-2 读实际票据种类（固定的银承/商承恒排在前，其余按 D1-2 顺序追加）。
  *
@@ -494,6 +959,12 @@ export interface D1AdjudicationTotals {
   grossFromCrossSheet: Record<string, boolean>
   /** 坏账行是否来自 D1-4 按票据种类小计（逐 slug）。 */
   provisionFromCrossSheet: Record<string, boolean>
+  /**
+   * 逐格四态（Task 33）：`{slug: {field: 'S1'|'S2'|'S3'|'S4'}}`，只对有 cross-sheet 派生值的
+   * 行有条目（无上游 ⇒ 纯手工、无"覆盖"概念）。UI 据此显示「已人工覆盖」标记与「恢复取数」。
+   */
+  grossCellStates: Record<string, D1AdjRowCellStates>
+  provisionCellStates: Record<string, D1AdjRowCellStates>
   /** 是否存在任何非零金额（披露表据此决定主表是否只读）。 */
   hasData: boolean
 }
@@ -503,28 +974,58 @@ export interface D1AdjudicationTotals {
  * D1-11 关联方全部消费本函数，保证「界面上看到的」== 「推给附注的」== 「跨表用的」。
  *
  * 取数优先级（逐分类逐列）：
- *   原值：D1-2 明细（cross-sheet）> 审定表手工锚点
- *   坏账：D1-4 按票据种类小计（cross-sheet）> 审定表手工锚点
+ *   原值：D1-2 明细（cross-sheet）> 审定表手工值
+ *   坏账：D1-4 按票据种类小计（cross-sheet）> 审定表手工值
  *   净值：恒 = 原值 − 坏账（不可手工）
+ *
+ * 🔴 「审定表手工值」自 Task 32 起走 :func:`readD1AdjRowAmounts`（**行对象优先、缺则回落
+ *    per-cell 锚点**），取代原来的纯 per-cell `readD1AnchorAmounts`。行数组不存在时两者
+ *    逐字等价 ⇒ 这是零行为变化的升级（判据 `d1AdjRowsFallback.spec.ts` 钉住等价性）。
+ *
+ * 🔴 **cross-sheet 仍在无条件覆盖手工值**（`fromCat ?? 手工`）—— 这是已登记的静默丢数据
+ *    缺陷，修它需要逐格四态状态机（Task 33），而四态的第三个量 `snap`
+ *    （`derivedSnapshot`）**只能由行对象承载**，per-cell 纯文本 remark 装不下 ⇒
+ *    必须等写侧切换到行数组之后。本函数此处不擅自改覆盖语义（改一半会让两种口径并存）。
  */
 export function readD1AdjudicationTotals(map: D1ResponseMap): D1AdjudicationTotals {
   const categories = readD1Categories(map)
   const catAmounts = readD1CategoryAmounts(map)
   const bdAmounts = readD1BadDebtByNoteType(map)
+  // 行数组只读一次，逐分类复用（避免 N 次 JSON.parse）。
+  const adjRows = readD1AdjRows(map)
 
   const gross: Record<string, D1PeriodAmounts> = {}
   const provision: Record<string, D1PeriodAmounts> = {}
   const net: Record<string, D1PeriodAmounts> = {}
   const grossFromCrossSheet: Record<string, boolean> = {}
   const provisionFromCrossSheet: Record<string, boolean> = {}
+  const grossCellStates: Record<string, D1AdjRowCellStates> = {}
+  const provisionCellStates: Record<string, D1AdjRowCellStates> = {}
 
   for (const c of categories) {
+    // 🔴 Task 33：有上游派生值时走**逐格四态**（不再整行 `fromCat ?? 手工`）——
+    //    覆盖是逐格的，审计师可能只改了「账项调整」一列而其余列跟随上游，
+    //    整行二选一必然丢掉其中一侧。无上游时是纯手工，无"覆盖"概念。
     const fromCat = catAmounts[c.slug]
-    const g = fromCat ?? readD1AnchorAmounts(map, 'gross', c.slug)
+    let g: D1PeriodAmounts
+    if (fromCat) {
+      const merged = mergeD1AdjRowByCellState(map, 'gross', c.slug, fromCat, adjRows)
+      g = merged.amounts
+      grossCellStates[c.slug] = merged.states
+    } else {
+      g = readD1AdjRowAmounts(map, 'gross', c.slug, adjRows)
+    }
     grossFromCrossSheet[c.slug] = Boolean(fromCat)
 
     const fromBd = bdAmounts[c.slug]
-    const p = fromBd ?? readD1AnchorAmounts(map, 'bd', c.slug)
+    let p: D1PeriodAmounts
+    if (fromBd) {
+      const merged = mergeD1AdjRowByCellState(map, 'bd', c.slug, fromBd, adjRows)
+      p = merged.amounts
+      provisionCellStates[c.slug] = merged.states
+    } else {
+      p = readD1AdjRowAmounts(map, 'bd', c.slug, adjRows)
+    }
     provisionFromCrossSheet[c.slug] = Boolean(fromBd)
 
     gross[c.slug] = g
@@ -553,6 +1054,8 @@ export function readD1AdjudicationTotals(map: D1ResponseMap): D1AdjudicationTota
     netTotal,
     grossFromCrossSheet,
     provisionFromCrossSheet,
+    grossCellStates,
+    provisionCellStates,
     hasData,
   }
 }

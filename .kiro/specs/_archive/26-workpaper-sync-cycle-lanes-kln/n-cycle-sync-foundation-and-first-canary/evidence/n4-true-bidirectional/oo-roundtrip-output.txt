@@ -1,0 +1,12 @@
+[0] wp=4e5fdd29 project=14fb8c10 真库 N4-2-detail-rows 分母=0 行（0=如实空分母，往返用合成 2 行）
+[①] attach=('n4.taxes_and_surcharges',)
+[②] generation=1 substrate=000000001-8a4c6cd49a7a.xlsx
+[③] projection values=16 rows=2
+[④] materialize size=47503
+[⑤] OO resave OK size=50650 percent=100
+[⑥] extract values=54 · G1 等值门 OK
+[⑦] N4-2-detail-rows 往返：我的 2 行逐字段相等（rowKey 稳定） + 8 条预印具名行保留（['消费税', '城市维护建设税', '教育费附加', '资源税', '房产税', '土地使用税', '车船使用税', '印花税']）；无错配身份
+[⑧a] OO 重存后受管行 [19, 20] 的 E/I/K 6 格全部仍是公式
+[⑧b] 税金及附加审定表N4-1 R7~R15×A..M 117 格：OO 引擎改写 0 格；materialize 只中性化裸 IF 18 格 ['K10', 'K11', 'K12', 'K13', 'K14', 'K15', 'K7', 'K8', 'K9', 'M10', 'M11', 'M12', 'M13', 'M14', 'M15', 'M7', 'M8', 'M9']（GC-2 挂载的 OO 崩溃中性化，预期）
+[⑨] N4-2-detail-rows 0 行快照 digest 不变（脚本不写库）
+✅ N4 真 OO 引擎往返全绿（HTML→OO→HTML）

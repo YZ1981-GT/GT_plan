@@ -33,6 +33,8 @@
             size="small"
             @change="dualMode.switchMode"
           />
+          <!-- BP-7 MC-12: 未接入双向回写的 notice -->
+          <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-m7-special-reserve" />
         </div>
 
         <!-- 结构化视图（HTML sheet 分支） -->
@@ -140,6 +142,7 @@ import { ref, computed, inject, onMounted, onBeforeUnmount, provide, toRef, defi
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useM7EntryDualMode } from './composables/useM7EntryDualMode'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
@@ -312,7 +315,8 @@ onBeforeUnmount(() => {
 
 .mode-toggle-bar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 8px;
 }
 </style>

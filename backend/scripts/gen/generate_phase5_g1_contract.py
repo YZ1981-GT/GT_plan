@@ -56,10 +56,10 @@ def main() -> int:
                 if f.cell is not None:
                     by_mode.setdefault(f.mode.value, []).append(f.cell.column)
             ident = table.row_identity
+            ident_str = f"identity={ident.kind.value} pointer={ident.json_pointer}" if ident else "identity=none"
             print(
                 f"[table] {table.table_key}: header_rows={table.header_rows} "
-                f"anchor={table.anchor} identity={ident.kind.value} "
-                f"pointer={ident.json_pointer}"
+                f"anchor={table.anchor} {ident_str}"
             )
             print(f"         mask={list(table.formula_mask)}")
             print(

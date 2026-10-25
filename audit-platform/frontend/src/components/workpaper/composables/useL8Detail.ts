@@ -22,6 +22,15 @@
  */
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import { newRowIdentity } from './shared/rowIdentity'
+import {
+  L82_SKELETON_ITEMS,
+  L82_DERIVED_ROW_SOURCES,
+  l82TemplateRowId,
+  isL82TemplateRowId,
+  isL82DerivedRowKey,
+  rowsForStore,
+} from '../l8/core/l8DetailRowIdentity'
 import {
   calcAuditedAmount,
   calcSubtotal,
@@ -91,21 +100,79 @@ export const L8_DETAIL_SEGMENTS = [
   },
 ] as const
 
-/** 默认费用明细行（对齐L8-1审定表结构） */
-export const L8_DETAIL_DEFAULT_ITEMS = [
-  '利息费用总额',
-  '减：利息资本化',
-  '利息费用',
-  '减：利息收入',
-  '利息净支出',
-  '未确认融资费用',
-  '减：未实现融资收益',
-  '承兑汇票贴息',
-  '汇兑损失',
-  '减：汇兑收益',
-  '减：汇兑损益资本化',
-  '手续费及其他',
-]
+/**
+ * 默认费用明细行（对齐 L8-1 审定表结构 + 模板 L8-2 的 13 行骨架）。
+ * 🔴 方案 D：身份真源收敛到 `l8/core/l8DetailRowIdentity.ts` 的 13 行骨架（含「汇兑净损失」R20，
+ * 旧 12 项缺这一项）；每个骨架行用模板身份 GTROW-L82-NNNN 认领对应槽位。
+ */
+export const L8_DETAIL_DEFAULT_ITEMS: readonly string[] = L82_SKELETON_ITEMS
+
+/** 构造一行空的 L8-2 明细行（给定 key 与项目名）。 */
+export function makeEmptyL8Row(key: string, itemName: string): L8DetailRow {
+  return {
+    key,
+    itemName,
+    monthly: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    periodUnadjusted: 0,
+    aje: 0,
+    rje: 0,
+    periodAudited: 0,
+    ratio: 0,
+    crossRef: '',
+    priorUnadjusted: 0,
+    priorAje: 0,
+    priorRje: 0,
+    priorAudited: 0,
+  }
+}
+
+/**
+ * 构造 13 行默认骨架行，每行用模板身份 GTROW-L82-NNNN 认领对应槽位（按位置，顺序稳定）。
+ * 用户 addRow 新增的行走 newRowIdentity('l82det')，与骨架身份命名空间分离。
+ */
+export function createL8DefaultRows(): L8DetailRow[] {
+  return L82_SKELETON_ITEMS.map((name, i) => makeEmptyL8Row(l82TemplateRowId(i), name))
+}
+
+/**
+ * 从 store 载荷（方案 D1：只含 10 输入骨架行 + 用户新增行，无派生行）复原**完整 13 行 + 用户行**
+ * 的显示用数组：
+ *   - 以 `createL8DefaultRows()` 的 13 行骨架为底板（含 3 派生行占位，其值由 computedRows 跨行算）；
+ *   - 把 store 里的输入骨架行按 GTROW key 覆盖到对应槽位（保留用户填的 monthly/aje/… 数据）；
+ *   - 兼容历史：store 行缺 key 或是旧自铸身份时，按**位置**认领输入槽位（跳过派生槽位）；
+ *   - store 里的用户新增行（l82det-*，或既非骨架也非派生的）追加到末尾。
+ * 返回新数组，不改入参。
+ */
+export function restoreL8RowsForDisplay(stored: L8DetailRow[]): L8DetailRow[] {
+  const skeleton = createL8DefaultRows() // 13 行，GTROW 身份（含 3 派生占位）
+  const byKey = new Map(skeleton.map(r => [r.key, r]))
+  const inputSlotKeys = skeleton.filter(r => !isL82DerivedRowKey(r.key)).map(r => r.key)
+  const userRows: L8DetailRow[] = []
+
+  // 🔴 新格式（store 已含 GTROW 输入行）与历史格式（纯自铸身份）分流：
+  //   有任一 GTROW 身份 ⇒ 新格式，非模板行一律当用户新增行；
+  //   无 GTROW 身份 ⇒ 历史迁移，非模板行按位置认领输入槽位。
+  const hasTemplateIds = stored.some(r => typeof r?.key === 'string' && isL82TemplateRowId(r.key))
+  let nextInputSlot = 0
+  for (const raw of stored) {
+    const row = { ...raw } as L8DetailRow
+    if (typeof row.key === 'string' && isL82TemplateRowId(row.key) && byKey.has(row.key)) {
+      // 输入骨架槽位覆盖（派生行本不该在 store；若混入也不覆盖派生占位）
+      if (!isL82DerivedRowKey(row.key)) byKey.set(row.key, { ...row })
+      continue
+    }
+    if (!hasTemplateIds && nextInputSlot < inputSlotKeys.length) {
+      // 历史迁移：按剩余输入槽位顺序认领
+      const slotKey = inputSlotKeys[nextInputSlot++]
+      byKey.set(slotKey, { ...row, key: slotKey })
+    } else {
+      // 用户新增行（新格式）或历史槽位认领满后的溢出行
+      userRows.push({ ...row, key: (typeof row.key === 'string' && row.key) ? row.key : newRowIdentity('l82det') })
+    }
+  }
+  // 按骨架顺序 + 末尾用户行
+  return [...skeleton.map(r => byKey.get(r.key)!), ...userRows]
+}
 
 /** 变动率异常阈值（20%） */
 const CHANGE_RATE_THRESHOLD = 20
@@ -136,8 +203,28 @@ export function useL8Detail(
 
   /** 各行公式列自动计算 */
   const computedRows: ComputedRef<L8DetailRow[]> = computed(() => {
+    // 🔴 方案 D1：派生行（利息费用/利息净支出/汇兑净损失）的月度金额按模板跨行减法由上方科目算出
+    //   （只读显示，不持久化）。先按下标把派生行的 monthly 覆盖为跨行结果，再走统一公式列计算。
+    const base = detailRows.value
+    const derivedMonthly = (sources: ReadonlyArray<readonly [number, 1 | -1]>): number[] => {
+      const out = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      for (const [srcIdx, sign] of sources) {
+        const src = base[srcIdx]
+        if (!src) continue
+        for (let m = 0; m < 12; m++) out[m] += sign * (Number(src.monthly?.[m]) || 0)
+      }
+      return out
+    }
+    const resolved = base.map((row, idx) => {
+      const sources = L82_DERIVED_ROW_SOURCES[idx]
+      if (sources && isL82DerivedRowKey(row.key)) {
+        return { ...row, monthly: derivedMonthly(sources) as L8DetailRow['monthly'] }
+      }
+      return row
+    })
+
     // 先计算各行审定数以确定合计行审定值（用于占比计算）
-    const rowsWithFormulas = detailRows.value.map(row => {
+    const rowsWithFormulas = resolved.map(row => {
       // N=SUM(B:M) 本期未审合计
       const periodUnadjusted = calcSubtotal(row.monthly as unknown as number[])
       // Q=N+O+P 本期审定
@@ -214,7 +301,7 @@ export function useL8Detail(
         },
       )
 
-      const key = `l8-detail-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const key = newRowIdentity('l82det')
       const newRow: L8DetailRow = {
         key,
         itemName: itemName?.trim() || '',
@@ -256,6 +343,8 @@ export function useL8Detail(
   function updateMonthly(rowIndex: number, monthIndex: number, value: number): void {
     if (rowIndex < 0 || rowIndex >= detailRows.value.length) return
     if (monthIndex < 0 || monthIndex > 11) return
+    // 🔴 方案 D1：派生行月度金额是模板跨行计算的只读值，不接受直接编辑（UI 已禁用，这里兜底）。
+    if (isL82DerivedRowKey(detailRows.value[rowIndex].key)) return
     detailRows.value[rowIndex].monthly[monthIndex] = value
     _triggerSave(rowIndex)
   }
@@ -291,8 +380,10 @@ export function useL8Detail(
       remark: String(totalPeriodAudited.value),
     })
     // 🔴 修复：保存完整行到 L8-2-full-data（组件 _restoreRows 读此键；此前从不写 → 刷新数据全丢）
+    // 🔴 方案 D1：只存 10 输入骨架行 + 用户新增行；3 个派生行（模板计算只读）不进 store，
+    //   真 OO 往返时不在 projection ⇒ 模板跨行公式幸存。
     debouncedSave('L8-2-full-data', {
-      remark: JSON.stringify(detailRows.value),
+      remark: JSON.stringify(rowsForStore(detailRows.value)),
     })
   }
 

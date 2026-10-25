@@ -15,6 +15,7 @@
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
         <el-tag v-if="isF1SyncManagedSheet && syncBusy" size="small" type="info">同步中…</el-tag>
+        <el-tag v-if="f1SyncManagedDisabledReason" size="small" type="warning">{{ f1SyncManagedDisabledReason }}</el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-f1-prepayment" />
       </div>
 
@@ -199,6 +200,7 @@
  * 科目覆盖：1123 预付账款（借方科目/资产类）
  */
 import { ref, computed, onMounted, provide, inject, toRef, defineAsyncComponent } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useF1FormData } from './composables/useF1FormData'
 import { useF1CrossSheet } from './composables/useF1CrossSheet'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
@@ -227,6 +229,7 @@ import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWo
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import { managedSheetsForEntry } from './sync/workpaperSyncManagedSheets.generated'
 
 const props = defineProps<{
   wpId: string
@@ -397,18 +400,29 @@ const dualMode = useF1DualMode({
 // ── F1 canary sync bridge（spec: f1-sync-coverage-and-first-canary · Task 10）──────
 // 受管 sheet 集合从 provider 受管清单派生，不前端硬编码（需求 1.6）。
 const F1_SYNC_ENTRY_ID = 'xlsx/gt-f1-prepayment'
-/** 受管 sheet 编码 → syncBridge 的 sheet_key 映射（canary 只有 F1-6）。 */
-const F1_SHEET_KEY_BY_CODE: Record<string, string> = {
-  'F1-6': 'f16-managed',
-}
+/** 受管 sheet 编码 → syncBridge 的 sheet_key 映射，键和值都来自契约生成物。 */
+const F1_MANAGED_SHEET_BY_CODE: ReadonlyMap<string, string> = new Map(
+  managedSheetsForEntry(F1_SYNC_ENTRY_ID).flatMap((sheet) => {
+    const match = sheet.excelName.match(/(F1A|F1-\d+)/i)
+    return match ? [[match[1].toUpperCase(), sheet.sheetKey] as const] : []
+  }),
+)
+/** F1-2 的 nested 账龄只有三年段与当前契约口径兼容。 */
+const isF1AgingSyncCompatible = computed(
+  () => currentSheet.value !== 'F1-2' || agingScope.preset.value === 'THREE_YEAR',
+)
+const f1SyncManagedDisabledReason = computed(() => {
+  if (currentSheet.value !== 'F1-2' || isF1AgingSyncCompatible.value) return ''
+  return `F1-2 当前账龄口径为${agingScope.preset.value}，受管双向同步仅支持三年段，已保留非受管模式`
+})
 /** 当前 sheet 是否走 syncBridge 真双向路径。 */
 const isF1SyncManagedSheet = computed(() =>
-  currentSheet.value != null && currentSheet.value in F1_SHEET_KEY_BY_CODE,
+  isF1AgingSyncCompatible.value && F1_MANAGED_SHEET_BY_CODE.has(currentSheet.value),
 )
 const syncSwitching = ref(false)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(F1_SYNC_ENTRY_ID)
-const syncSheetKey = computed(() => F1_SHEET_KEY_BY_CODE[currentSheet.value] || 'f16-managed')
+const syncSheetKey = computed(() => F1_MANAGED_SHEET_BY_CODE.get(currentSheet.value) ?? '')
 const syncBridge = useWorkpaperSyncBridge({
   entryId: syncEntryId,
   wpId: toRef(props, 'wpId'),
@@ -416,9 +430,8 @@ const syncBridge = useWorkpaperSyncBridge({
   sheetKey: syncSheetKey,
   capability: capabilityForEntry(F1_SYNC_ENTRY_ID),
   flushHtml: async () => {
-    // 🔴 修复缺陷①：原写 `flushPendingSave()` 裸调（useF1FormData 未导出该函数）⇒ ReferenceError。
-    // 现经 formData 前缀调用（useF1FormData 已补导出）。
-    formData.flushPendingSave()
+    // 先等待所有 debounce / 即时写入落库，再读取最新 projection，避免旧快照覆盖刚保存的 HTML 编辑。
+    await formData.flushPendingSave()
     const snap = await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,
@@ -432,7 +445,17 @@ const syncBridge = useWorkpaperSyncBridge({
       sheetKey: syncSheetKey.value,
     }
   },
-  reloadHtml: async (_minimumRevision: number) => {
+  reloadHtml: async (minimumRevision: number) => {
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: F1_SYNC_ENTRY_ID,
+    })
+    if (snap.expectedRevision < minimumRevision) {
+      throw new Error(
+        `HTML 数据版本 ${snap.expectedRevision} 低于 OnlyOffice 已应用版本 ${minimumRevision}`,
+      )
+    }
     await formData.loadAll()
   },
 })
@@ -475,7 +498,7 @@ async function switchRenderMode(target: F1RenderMode): Promise<void> {
     } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
       await syncEditorHostRef.value.forceSave()
     } else {
-      syncBridge.persistMode('html')
+      ElMessage.warning('在线编辑存在未保存修改，当前未满足强制保存条件，仍保持在线编辑模式')
     }
   } catch { /* 保持 OO */ } finally { syncSwitching2.value = false }
 }

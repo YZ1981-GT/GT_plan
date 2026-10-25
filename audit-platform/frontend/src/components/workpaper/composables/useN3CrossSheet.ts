@@ -55,11 +55,17 @@ export interface DeferredTaxChangeResult {
 /** EventBus 'deferred-tax:liability-updated' 载荷 */
 export interface DeferredTaxLiabilityUpdatedPayload {
   wpCode: string
+  /** 账户编码（EventBus 统一契约） */
+  accountCode: string
+  /** 期末审定余额（EventBus 统一契约） */
+  auditedAmount: number
   /** 期末审定余额 */
   endBalance: number
   /** 期初余额 */
   beginBalance: number
-  /** 本期变动额（期末-期初） */
+  /** 本期变动额（EventBus 统一字段） */
+  periodChange: number
+  /** 本期变动额（期末-期初，历史兼容字段） */
   change: number
   timestamp: number
 }
@@ -235,8 +241,11 @@ export function useN3CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
 
     const payload: DeferredTaxLiabilityUpdatedPayload = {
       wpCode: 'N3',
+      accountCode: '2901',
+      auditedAmount: endBalance,
       endBalance,
       beginBalance,
+      periodChange: change,
       change,
       timestamp: Date.now(),
     }

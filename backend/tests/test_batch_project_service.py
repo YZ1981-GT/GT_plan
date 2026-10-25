@@ -316,18 +316,23 @@ async def test_generate_template_structure():
 
 @pytest.mark.asyncio
 async def test_generate_template_group_columns_and_rules():
-    """Template 数据 header 含集团架构两列，说明事项含两字段填写规则，数据表含示例行。"""
+    """Template 数据 header 含集团架构三列，说明事项含填写规则，数据表含示例行。
+
+    口径变更（consol-tree-three-code-autobuild 需求 1/2）：末尾追加第 10 列「与上级关系(relation)」，
+    原两列位置不变（第 8/9 列），故旧断言 ``headers[-2]/[-1]`` 改为按列名定位。
+    """
     from openpyxl import load_workbook
 
     output = await generate_template()
     wb = load_workbook(BytesIO(output.getvalue()))
 
-    # Req 6.1: 数据 header 末尾追加两列
+    # Req 6.1: 数据 header 第 8~10 列为集团架构（新列只追加在末尾）
     ws_data = wb["数据"]
     headers = [cell.value for cell in ws_data[1]]
-    assert headers[-2] == "上级企业代码(parent)"
-    assert headers[-1] == "最终控制方代码(ultimate)"
-    assert len(headers) == 9
+    assert headers[7] == "上级企业代码(parent)"
+    assert headers[8] == "最终控制方代码(ultimate)"
+    assert headers[9] == "与上级关系(relation)"
+    assert len(headers) == 10
 
     # Req 6.2: 说明事项 sheet 含两字段填写规则 + 18 位 USCC 格式要求
     ws_notes = wb["说明事项"]
@@ -343,18 +348,47 @@ async def test_generate_template_group_columns_and_rules():
     # 字段为选填
     assert "选填" in notes_text
 
-    # Req 6.3: 数据表提供示例数据行展示集团层级（最终控制方→上级→子公司）
+    # 与上级关系：选项与生效条件写进说明
+    assert "与上级关系(relation)" in notes_text
+    assert "子公司（独立法人，合并时抵销）" in notes_text
+    assert "分公司（非独立法人，并入母公司汇总）" in notes_text
+
+    # Req 6.3: 数据表提供示例数据行展示集团层级（最终控制方→上级→子公司/分公司）
     data_rows = list(ws_data.iter_rows(min_row=2, values_only=True))
-    # 至少一行示例，且每行宽度与 header 一致（9 列）
+    # 至少一行示例，且每行宽度与 header 一致（10 列）
     assert len(data_rows) >= 1
     for r in data_rows:
-        assert len(r) == 9
+        assert len(r) == 10
     # 示例行中存在自引用最终控制方（顶层）与子公司指向上级的层级关系
-    ultimate_codes = {r[8] for r in data_rows}
     parent_codes = {r[7] for r in data_rows if r[7]}
     company_codes = {r[1] for r in data_rows}
     # 子公司的上级代码应指向同批次中某企业的企业代码（构成层级）
     assert parent_codes & company_codes
+    # 关系列：有上级才填，取值只有子公司/分公司，且两种都有示例
+    for r in data_rows:
+        assert (r[9] or "") in ("", "子公司", "分公司")
+        assert bool(r[7]) == bool(r[9]), f"有上级 ⇔ 有关系：{r}"
+    assert {r[9] for r in data_rows if r[9]} == {"子公司", "分公司"}
+    # 每个示例代码都是合法 USCC（示例本身不能教错格式）
+    for r in data_rows:
+        for code in (r[1], r[7], r[8]):
+            if code:
+                assert validate_uscc(code)[0], code
+
+
+@pytest.mark.asyncio
+async def test_generate_template_relation_dropdown():
+    """第 10 列带下拉（子公司/分公司，允许留空），覆盖到最大导入行数。"""
+    from openpyxl import load_workbook
+
+    output = await generate_template()
+    ws = load_workbook(BytesIO(output.getvalue()))["数据"]
+    dvs = [dv for dv in ws.data_validations.dataValidation if dv.type == "list"]
+    assert len(dvs) == 1
+    dv = dvs[0]
+    assert dv.formula1 == '"子公司,分公司"'
+    assert dv.allow_blank is True
+    assert str(dv.sqref) == "J2:J501"
 
 
 # ===========================================================================
@@ -368,9 +402,10 @@ _USCC_PARENT = make_valid_uscc("91110000200000000")
 _USCC_CHILD = make_valid_uscc("91110000300000000")
 
 
-def _row(client, code, short, year, parent="", ultimate=""):
-    """构造 9 列数据行（与 _TEMPLATE_COLUMNS 对齐）。"""
-    return [client, code, short, year, "年报审计", "企业会计准则", "单户", parent, ultimate]
+def _row(client, code, short, year, parent="", ultimate="", relation=None):
+    """构造数据行：默认 9 列（旧模板形态，第 10 列缺省），给 relation 时为 10 列。"""
+    base = [client, code, short, year, "年报审计", "企业会计准则", "单户", parent, ultimate]
+    return base if relation is None else base + [relation]
 
 
 async def _count_projects(db) -> int:
@@ -593,10 +628,12 @@ async def test_parse_and_import_intra_batch_parent_link(engine):
         parent_proj = await _get_project_by_code(db, _USCC_PARENT)
         child_proj = await _get_project_by_code(db, _USCC_CHILD)
         assert parent_proj is not None and child_proj is not None
-        # child.parent_project_id 指向 parent（同批次互引）
-        assert child_proj.parent_project_id == parent_proj.id
-        # parent.parent_project_id 指向 ultimate 根
         ultimate_proj = await _get_project_by_code(db, _USCC_ULTIMATE)
+        # 口径变更（consol-tree-three-code-autobuild ADR-CTREE-001）：parent_project_id 是派生值
+        # =「直接消费它的合并项目」。中间控股是单户项目、没有合并项目 ⇒ 子公司与中间控股都由
+        # 集团合并项目消费；原断言 child → 中间控股单户项目 属旧的「按上级代码找任意项目」口径。
+        assert child_proj.parent_company_code == _USCC_PARENT, "集团关系（三码）原样落库"
+        assert child_proj.parent_project_id == ultimate_proj.id
         assert parent_proj.parent_project_id == ultimate_proj.id
 
 
@@ -661,6 +698,173 @@ async def test_parse_and_import_no_duplicate_consolidated_root(engine):
             )
         )
         assert res.scalar_one() == 1
+
+
+# ===========================================================================
+# 与上级关系列（consol-tree-three-code-autobuild 任务 3.5，需求 1.3~1.5 / 2.3 / 属性 P12）
+# ===========================================================================
+
+_USCC_BRANCH = make_valid_uscc("91110000400000000")
+
+
+@pytest.mark.asyncio
+async def test_parse_and_import_relation_column(engine):
+    """第 10 列中文取值落库为内部值；留空按名称默认；无上级时关系恒空。"""
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    rows = [
+        _row("示例控股有限公司", _USCC_PARENT, "控股", 2025, "", "", ""),
+        # 名称像分公司、手选子公司 ⇒ 以手选为准
+        _row("示例控股有限公司临港店", _USCC_CHILD, "临港店", 2025, _USCC_PARENT, "", "子公司"),
+        # 留空 ⇒ 按名称默认分公司
+        _row("示例控股有限公司上海分公司", _USCC_BRANCH, "上海分公司", 2025, _USCC_PARENT, "", ""),
+        # 无上级却填了关系 ⇒ 关系置空（不是错误）
+        _row("独立公司", _USCC_ULTIMATE, "独立", 2025, "", "", "分公司"),
+    ]
+    async with factory() as db:
+        result = await parse_and_import(_make_import_excel(rows), db)
+        assert result.success_count == 4, result.failures
+
+    async with factory() as db:
+        assert (await _get_project_by_code(db, _USCC_CHILD)).relation_to_parent == "subsidiary"
+        assert (await _get_project_by_code(db, _USCC_BRANCH)).relation_to_parent == "branch"
+        assert (await _get_project_by_code(db, _USCC_PARENT)).relation_to_parent is None
+        assert (await _get_project_by_code(db, _USCC_ULTIMATE)).relation_to_parent is None
+
+
+@pytest.mark.asyncio
+async def test_validate_batch_relation_invalid_is_error(db_session):
+    """关系非法值 ⇒ 行级中文错误（预校验与导入同一解析函数）。"""
+    rows = [_row("公司甲", _USCC_CHILD, "甲", 2025, _USCC_PARENT, "", "联营企业")]
+    resp = await validate_batch(_make_import_excel(rows), db_session)
+    assert resp.valid is False
+    by_row = {e.row_number: e.errors for e in resp.errors}
+    assert "与上级关系无效：联营企业（只能填 子公司 或 分公司）" in by_row[2]
+
+
+@pytest.mark.asyncio
+async def test_validate_batch_self_parent_is_warning_not_error(db_session):
+    """需求 1.5：上级=本企业是提示不是错误（批量没有交互确认，预校验即确认环节）。"""
+    rows = [
+        _row("公司乙", _USCC_BRANCH, "乙", 2025, _USCC_BRANCH, "", "子公司"),
+        _row("集团", _USCC_ULTIMATE, "集团", 2025, _USCC_ULTIMATE, _USCC_ULTIMATE, ""),
+        _row("子公司", _USCC_CHILD, "子公司", 2025, _USCC_ULTIMATE, _USCC_ULTIMATE, ""),
+    ]
+    resp = await validate_batch(_make_import_excel(rows), db_session)
+    assert resp.valid is True, resp.errors
+    assert resp.errors == []
+    hints = {w.row_number: w.messages for w in resp.warnings}
+    assert hints == {
+        2: ["上级企业代码与本企业代码相同，将按「本企业就是上级企业」处理（集团顶层企业，不另建上级节点）"],
+        3: ["三个代码相同，将按「本企业即为最终控制方（集团总部或母公司）」处理"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_parse_and_import_accepts_self_parent_as_top(engine):
+    """上级=本企业照常导入：代码原样落库、关系置空、不把自己链成自己的上级。"""
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    rows = [_row("公司乙", _USCC_BRANCH, "乙", 2025, _USCC_BRANCH, "", "分公司")]
+    async with factory() as db:
+        result = await parse_and_import(_make_import_excel(rows), db)
+        assert result.success_count == 1, result.failures
+    async with factory() as db:
+        p = await _get_project_by_code(db, _USCC_BRANCH)
+        assert p.parent_company_code == _USCC_BRANCH
+        assert p.relation_to_parent is None
+        assert p.parent_project_id is None
+
+
+async def _group_snapshot(db) -> list[tuple]:
+    from sqlalchemy import select as _select
+    from app.models.core import Project
+
+    res = await db.execute(_select(Project).where(Project.is_deleted == False))  # noqa: E712
+    return sorted(
+        (p.company_code, p.report_scope, p.parent_company_code, p.ultimate_company_code,
+         p.relation_to_parent)
+        for p in res.scalars().all()
+    )
+
+
+@pytest.mark.asyncio
+async def test_property_p12_legacy_nine_columns_equal_blank_relation():
+    """P12：旧 9 列模板与新模板空关系列导入结果一致（同一批数据分两库各导一次）。"""
+    from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
+
+    SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
+
+    base_rows = [
+        ("示例集团有限公司", _USCC_ULTIMATE, "集团", "", _USCC_ULTIMATE),
+        ("示例控股有限公司", _USCC_PARENT, "控股", _USCC_ULTIMATE, _USCC_ULTIMATE),
+        ("示例控股有限公司临港店", _USCC_BRANCH, "临港店", _USCC_PARENT, _USCC_ULTIMATE),
+        ("示例子公司有限公司", _USCC_CHILD, "子公司", _USCC_PARENT, _USCC_ULTIMATE),
+    ]
+
+    async def _import(file_bytes: bytes) -> list[tuple]:
+        """每次导入用独立内存库，保证两次结果互不影响。"""
+        eng = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+        async with eng.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        factory = async_sessionmaker(eng, class_=AsyncSession, expire_on_commit=False)
+        try:
+            async with factory() as db:
+                result = await parse_and_import(file_bytes, db)
+                assert result.fail_count == 0, result.failures
+            async with factory() as db:
+                return await _group_snapshot(db)
+        finally:
+            await eng.dispose()
+
+    # 旧文件：表头只有 9 列、数据行也只有 9 列（真实旧模板形态，不是新表头 + 短行）
+    legacy_wb = Workbook()
+    ws = legacy_wb.active
+    ws.title = "数据"
+    ws.append(_TEMPLATE_COLUMNS[:9])
+    for name, code, short, parent, ultimate in base_rows:
+        ws.append(_row(name, code, short, 2025, parent, ultimate))
+    buf = BytesIO()
+    legacy_wb.save(buf)
+
+    legacy = await _import(buf.getvalue())
+    blank = await _import(_make_import_excel(
+        [_row(n, c, s, 2025, p, u, "") for n, c, s, p, u in base_rows]
+    ))
+    assert legacy == blank
+    # 且两者都按名称补了默认关系（临港店 ⇒ 分公司，其余有上级 ⇒ 子公司）
+    rel = {row[0]: row[4] for row in legacy if row[1] == "standalone"}
+    assert rel[_USCC_BRANCH] == "branch"
+    assert rel[_USCC_CHILD] == "subsidiary"
+    assert rel[_USCC_PARENT] == "subsidiary"
+    assert rel[_USCC_ULTIMATE] is None
+
+
+@pytest.mark.asyncio
+async def test_export_projects_relation_column(engine):
+    """导出第 10 列为中文关系；无上级为空；导出文件可原样再导入（列对齐）。"""
+    from openpyxl import load_workbook
+    from sqlalchemy import select as _select
+    from app.models.core import Project
+
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    rows = [
+        _row("示例控股有限公司", _USCC_PARENT, "控股", 2025, "", "", ""),
+        _row("示例控股有限公司上海分公司", _USCC_BRANCH, "上海分公司", 2025, _USCC_PARENT, "", ""),
+        _row("示例子公司有限公司", _USCC_CHILD, "子公司", 2025, _USCC_PARENT, "", "子公司"),
+    ]
+    async with factory() as db:
+        assert (await parse_and_import(_make_import_excel(rows), db)).success_count == 3
+
+    async with factory() as db:
+        ids = [p.id for p in (await db.execute(_select(Project))).scalars().all()]
+        output = await export_projects(ids, db)
+
+    ws = load_workbook(BytesIO(output.getvalue()))["数据"]
+    header = [c.value for c in ws[1]]
+    assert header == _TEMPLATE_COLUMNS
+    exported = {r[1]: r for r in ws.iter_rows(min_row=2, values_only=True)}
+    assert exported[_USCC_BRANCH][9] == "分公司"
+    assert exported[_USCC_CHILD][9] == "子公司"
+    assert exported[_USCC_PARENT][9] in (None, "")
 
 
 # ===========================================================================

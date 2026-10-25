@@ -46,6 +46,28 @@ import {
 const mockGetReport = vi.mocked(getReport)
 const mockHttpGet = vi.mocked(http.get)
 
+/**
+ * 🔴 2026-09-28 修：一次 `loadCrossCheckData()` 会发**两次** `http.get` ——
+ * 先 `/api/address-registry`（ACNR store，Req 16 facade），再
+ * `/api/projects/{id}/formula/report-cross-check`（logic_check 主路径）。
+ *
+ * 原实现用 `mockResolvedValueOnce` / `mockRejectedValueOnce` ⇒ 被**第一次**
+ * （address-registry）吃掉，cross-check 那次拿到 `undefined` ⇒ 恒降级 fallback，
+ * 于是「在线路径 source=backend」的属性恒不成立，本文件两条 PBT 一直红。
+ *
+ * 改为**按 URL 分派**：`Once` 队列对调用顺序敏感，上游一旦增删任何一次
+ * `http.get` 就会错位（本轮正是这么坏的）。
+ */
+function mockCrossCheckResponse(value: unknown) {
+  mockHttpGet.mockImplementation(((url: string) => {
+    if (String(url).includes('formula/report-cross-check')) {
+      return value instanceof Error ? Promise.reject(value) : Promise.resolve(value as any)
+    }
+    // 其余 URL（含 /api/address-registry）一律 resolve undefined，等价"无数据"
+    return Promise.resolve(undefined as any)
+  }) as any)
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function createOptions() {
@@ -170,7 +192,7 @@ describe('useReportCrossCheck — P32: 收编（backend）与降级（fallback�
         mockGetReport
           .mockResolvedValueOnce(bsRows as any)
           .mockResolvedValueOnce(isRows as any)
-        mockHttpGet.mockRejectedValueOnce(new Error('backend unavailable'))
+        mockCrossCheckResponse(new Error('backend unavailable'))
 
         const c1 = useReportCrossCheck(createOptions())
         await c1.loadCrossCheckData()
@@ -188,7 +210,7 @@ describe('useReportCrossCheck — P32: 收编（backend）与降级（fallback�
         mockGetReport
           .mockResolvedValueOnce(bsRows as any)
           .mockResolvedValueOnce(isRows as any)
-        mockHttpGet.mockResolvedValueOnce({ data: buildFaithfulBackendPayload(fallback) } as any)
+        mockCrossCheckResponse({ data: buildFaithfulBackendPayload(fallback) })
 
         const c2 = useReportCrossCheck(createOptions())
         await c2.loadCrossCheckData()
@@ -222,7 +244,7 @@ describe('useReportCrossCheck — P32: 收编（backend）与降级（fallback�
         mockGetReport
           .mockResolvedValueOnce(bsRows as any)
           .mockResolvedValueOnce(isRows as any)
-        mockHttpGet.mockRejectedValueOnce(new Error('backend unavailable'))
+        mockCrossCheckResponse(new Error('backend unavailable'))
         const cBase = useReportCrossCheck(createOptions())
         await cBase.loadCrossCheckData()
         const pure = cBase.crossCheckResults.value
@@ -233,7 +255,7 @@ describe('useReportCrossCheck — P32: 收编（backend）与降级（fallback�
         mockGetReport
           .mockResolvedValueOnce(bsRows as any)
           .mockResolvedValueOnce(isRows as any)
-        mockHttpGet.mockResolvedValueOnce({ data: buildFaithfulBackendPayload(pure) } as any)
+        mockCrossCheckResponse({ data: buildFaithfulBackendPayload(pure) })
         const cOnline = useReportCrossCheck(createOptions())
         await cOnline.loadCrossCheckData()
         const online = cOnline.crossCheckResults.value

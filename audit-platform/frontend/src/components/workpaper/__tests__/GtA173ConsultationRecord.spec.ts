@@ -188,6 +188,41 @@ describe('GtA173ConsultationRecord.vue', () => {
     })
   })
 
+  // ─── 相关文件上传结果如实告知（spec knowledge-upload-robustness-and-consumer-wiring R4.3） ───
+  // 回调由 el-upload 在真实请求结束后触发；这里直接驱动它的 on-success / on-error，
+  // 断言提示里带的是后端给出的原因，而不是一律「已存入知识库」/「请重试」。
+
+  describe('相关文件上传结果', () => {
+    async function uploadProps() {
+      const wrapper = await mountComponent({ projectId: 'p-1' })
+      const upload = wrapper.findComponent({ name: 'ElUpload' })
+      expect(upload.exists()).toBe(true)
+      return { wrapper, props: upload.props() as any }
+    }
+
+    it('后端逐文件容错返回 failed：提示后端原因，不当成成功、不加文件标签', async () => {
+      const { ElMessage } = await import('element-plus')
+      const { wrapper, props } = await uploadProps()
+      props.onSuccess(
+        { code: 200, data: { uploaded: 0, files: [], failed: [{ filename: '合同.docx', reason: '文件内容含无法存储的字符' }] } },
+        { name: '合同.docx' },
+      )
+      expect(ElMessage.warning).toHaveBeenCalledWith('合同.docx 未能存入知识库：文件内容含无法存储的字符')
+      expect(wrapper.find('.gt-a173__doc-hint').exists()).toBe(false)
+    })
+
+    it('HTTP 失败：从响应体 message / detail 取中文原因', async () => {
+      const { ElMessage } = await import('element-plus')
+      const { props } = await uploadProps()
+      props.onError(new Error(JSON.stringify({ code: 413, message: '请求体过大，上限 850MB' })), { name: '大文件.pdf' })
+      expect(ElMessage.warning).toHaveBeenLastCalledWith('大文件.pdf 上传失败：请求体过大，上限 850MB')
+      props.onError(new Error(JSON.stringify({ detail: '你没有向该文件夹添加资料的权限' })), { name: 'a.pdf' })
+      expect(ElMessage.warning).toHaveBeenLastCalledWith('a.pdf 上传失败：你没有向该文件夹添加资料的权限')
+      props.onError(new Error('<html>502 Bad Gateway</html>'), { name: 'b.pdf' })
+      expect(ElMessage.warning).toHaveBeenLastCalledWith('b.pdf 上传失败，请重试')
+    })
+  })
+
   // ─── Property 3: auto-fill verification (PBT) ───
 
   describe('Property 3: 元信息自动填充', () => {

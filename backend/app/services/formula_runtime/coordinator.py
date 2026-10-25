@@ -62,6 +62,7 @@ _SCOPE_DOMAIN_MAP: dict[str, str] = {
     "workpaper": "workpaper",
     "adjudication": "adjudication",
     "note": "note",
+    "consol_worksheet": "consol_worksheet",
 }
 
 #: `scope_failures[].kind` 的「本项目无公式定义」取值（单一真源）。
@@ -391,6 +392,9 @@ class FormulaRuntimeCoordinator:
             elif domain == "note":
                 from app.services.formula_runtime.adapters.note import NoteMutationAdapter
                 return NoteMutationAdapter(self._session)
+            elif domain == "consol_worksheet":
+                from app.services.formula_runtime.adapters.consol_worksheet import ConsolWorksheetMutationAdapter
+                return ConsolWorksheetMutationAdapter(self._session)
         except Exception as exc:
             logger.warning("Could not load adapter for domain=%s: %s", domain, exc)
         return None

@@ -10,6 +10,7 @@ import { SEND_LIST_SPECS } from './sendListSpec'
 import { useSendListData } from './useSendListData'
 import SendListTable from './SendListTable.vue'
 import SendListPrefillPanel from './SendListPrefillPanel.vue'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   htmlData: any
@@ -85,14 +86,15 @@ async function _callAi(section: string, existingContent: string, onSuccess: (t: 
   if (!props.wpId) return
   loadingRef.value = true
   try {
-    const { default: axios } = await import('axios')
-    const res = await axios.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+    // 🔴 经 apiProxy（http.ts 拦截器附 Authorization）：旧实现用 axios 默认实例 ⇒ 恒 401「AI 生成失败」
+    const res: any = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section,
       prompt: '',
       context: { sheet: spec.sheetName, rows_count: String(rows.value.length) },
       existingContent,
     })
-    const text = (res.data?.data ?? res.data)?.content
+    // 端点自身返回 {code, data:{content}}，中间件不重复包装 ⇒ 拦截器解一层后仍可能是 {content} 或其外层
+    const text = (res?.data ?? res)?.content
     if (text) {
       onSuccess(text)
       handleSave()

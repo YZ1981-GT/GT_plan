@@ -17,6 +17,8 @@ import {
 } from '../composables/useE1BankFlowReconcile'
 import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import { useE1ImportExport } from '../composables/useE1ImportExport'
+// 科目码单一真源（禁组件内字面量）
+import { E1_FALLBACK_STANDARD } from '../composables/e1AccountScope'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import type { SampledVoucher, FillMode } from '../composables/useSamplingAlgorithms'
 import E1StatementOcrConfirmDialog, {
@@ -131,6 +133,17 @@ const lastOcrHint = computed(() => {
 
 const samplingVisible = ref(false)
 const samplingPhase = ref<'final' | 'preliminary'>('final')
+
+/**
+ * 抽凭科目码，取自真源 `e1AccountScope`（原硬编码 `"1002"`）。
+ *
+ * 🔴 本表是**银行流水核对**，业务上只针对银行存款 ⇒ 取真源的单值
+ * `E1_FALLBACK_STANDARD`（= `1002`），**不**用 `e1QueryCodes()` 全集
+ * （那会把库存现金/其他货币资金也抽进来，与本表语义不符）。
+ * 取值与改造前一致 ⇒ 运行时行为不变，仅消除字面量。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.5
+ */
+const samplingAccountCode = E1_FALLBACK_STANDARD
 const year = computed(() => {
   const bs = props.bsDate || ''
   if (bs.length >= 4) {
@@ -1131,7 +1144,7 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
       />
       <GtVoucherSamplingEngine
         v-if="samplingVisible"
-        account-code="1002"
+        :account-code="samplingAccountCode"
         :phase="samplingPhase"
         default-method="random"
         :workpaper-id="wpId"

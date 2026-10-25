@@ -6,7 +6,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Index, Integer, String, UniqueConstraint
+from sqlalchemy import BigInteger, Index, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -23,7 +23,10 @@ class ConsolWorksheetData(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     sheet_key: Mapped[str] = mapped_column(String(100), nullable=False)
-    data: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
+    data: Mapped[dict | list] = mapped_column(JSONB, nullable=False, server_default="{}")
+    version: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, server_default="0"
+    )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
     created_by: Mapped[uuid.UUID | None] = mapped_column(nullable=True)

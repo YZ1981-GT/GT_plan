@@ -152,9 +152,9 @@ class TestTask37BatchExportZip:
             )
 
     def test_c1_is_program_console(self):
-        """C1 企业层面控制测试应为 a-program-console。"""
+        """C1 企业层面控制测试应为 c1-entity-level-control。"""
         assert "C1" in _WP_CODE_OVERRIDE
-        assert _WP_CODE_OVERRIDE["C1"] == "a-program-console"
+        assert _WP_CODE_OVERRIDE["C1"] == "c1-entity-level-control"
 
     def test_all_c_class_have_component_type(self, c_class_entries):
         """所有 C 类 wp_code 在 _WP_CODE_OVERRIDE 中都有 componentType 映射。"""

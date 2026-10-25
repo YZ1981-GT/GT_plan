@@ -263,7 +263,6 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import type { K5TbData } from '../../composables/useK5FormData'
 import type { Ref } from 'vue'
-import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const props = defineProps<{
   wpId: string
@@ -421,7 +420,7 @@ async function syncFromSpecialSheets(): Promise<void> {
     const item = props.allResponses.get(crossKey)
     const val = Number(item?.remark ?? 0) || 0
     if (val > 0) {
-      updates.push({ label, rowKey: newRowIdentity('r'), value: val })
+      updates.push({ label, rowKey: `r${i}`, value: val })
     }
   }
 

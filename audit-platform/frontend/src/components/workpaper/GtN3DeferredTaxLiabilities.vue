@@ -187,7 +187,13 @@ async function checkOoHealth(): Promise<void> {
 }
 
 function onModeChange(val: string | number | boolean): void {
-  if (val === 'onlyoffice' && !ooHealthy.value) return
+  if (val === 'onlyoffice' && !ooHealthy.value) {
+    // 🔴 NC-13 修复静默失败：显式反馈不可用原因 + 已回落 HTML
+    import('element-plus').then(({ ElMessage }) => {
+      ElMessage.warning('OnlyOffice 服务不可用，已回落到结构化视图')
+    })
+    return
+  }
   renderMode.value = val as 'html' | 'onlyoffice'
   if (val === 'html') {
     selfLoad()

@@ -183,6 +183,65 @@ class TestScanProductionSchemas:
         assert d2a["sheet_type"] == "procedure"
 
 
+class TestPathAnchoring:
+    """路径锚定：扫描结果不得依赖进程 cwd（2026-09-28 真缺陷回归守卫）."""
+
+    def test_schema_root_is_absolute_and_exists(self):
+        from scripts.check.check_wp_semantic_schema import REGISTRY_PATH, SCHEMA_ROOT
+
+        assert SCHEMA_ROOT.is_absolute(), f"SCHEMA_ROOT 必须绝对路径: {SCHEMA_ROOT}"
+        assert SCHEMA_ROOT.is_dir(), f"SCHEMA_ROOT 不存在: {SCHEMA_ROOT}"
+        assert REGISTRY_PATH.is_file(), f"registry 不存在: {REGISTRY_PATH}"
+
+    @pytest.mark.parametrize("cwd_key", ["repo_root", "backend", "tmp"])
+    def test_scan_counts_identical_from_any_cwd(self, cwd_key, tmp_path, monkeypatch):
+        """同一仓库状态下，从任意目录启动扫描到的条数必须一致。
+
+        旧实现从 `backend/` 启动会解析成 `backend/backend/data/...` ⇒ 0 条。
+        """
+        backend_dir = Path(__file__).resolve().parents[2]
+        targets = {
+            "repo_root": backend_dir.parent,
+            "backend": backend_dir,
+            "tmp": tmp_path,
+        }
+        monkeypatch.chdir(targets[cwd_key])
+
+        _, schema_summaries = scan_production_schemas()
+        _, registry_summaries = scan_registry()
+
+        assert len(schema_summaries) > 0
+        assert len(registry_summaries) > 0
+        assert "D2A.yaml" in [s["file"] for s in schema_summaries]
+
+    def test_missing_schema_root_is_error_not_silent_warning(self, tmp_path, monkeypatch):
+        """变异证明：真源缺失时必须报 error，不能只 warning 静默放行。"""
+        import scripts.check.check_wp_semantic_schema as mod
+
+        monkeypatch.setattr(mod, "SCHEMA_ROOT", tmp_path / "nope")
+        monkeypatch.setattr(mod, "REGISTRY_PATH", tmp_path / "nope" / "registry.json")
+
+        report = mod.run_check(strict=False)
+
+        assert report["status"] == "fail"
+        assert report["error_count"] >= 2
+        checks = {e["check"] for e in report["errors"]}
+        assert {"schema_root_missing", "registry_missing"} <= checks
+
+    def test_empty_schema_root_is_error(self, tmp_path, monkeypatch):
+        """变异证明：目录存在但一个 YAML 都没有，也必须打红。"""
+        import scripts.check.check_wp_semantic_schema as mod
+
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        monkeypatch.setattr(mod, "SCHEMA_ROOT", empty)
+
+        issues, summaries = mod.scan_production_schemas()
+
+        assert summaries == []
+        assert any(i["check"] == "schema_root_empty" and i["level"] == "error" for i in issues)
+
+
 class TestScanRegistry:
     """验证注册表扫描."""
 

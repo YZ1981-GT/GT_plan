@@ -13,6 +13,21 @@
         <el-tag size="small" :type="hSync.syncStateTag.value.type">
           {{ hSync.syncStateTag.value.text }}
         </el-tag>
+        <!--
+          🔴 未同步草稿必须**用户可见**（spec h2-h6-h10 Task 5 ③）：H10 是全 H 唯一有第三处
+          客户端数据存储的底稿。在此之前落了草稿只有一条一闪而过的 ElMessage，之后用户
+          完全不知道「屏幕上看到的值还没进库」——刷新/换机器就没了。计数由
+          `useH10FormData` 现算暴露，宿主只读不写（宿主一处存储 API 都不碰）。
+        -->
+        <el-tooltip
+          v-if="formData.pendingDraftCount.value > 0"
+          content="这些改动还没写进底稿库，仍只存在本机浏览器里；网络恢复后会自动重试同步"
+          placement="top"
+        >
+          <el-tag size="small" type="warning" data-testid="h10-pending-draft-count">
+            有 {{ formData.pendingDraftCount.value }} 条未同步草稿
+          </el-tag>
+        </el-tooltip>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h10-asset-disposal-income" />
       </div>
 
@@ -169,7 +184,7 @@
  * GtH10AssetDisposalIncome — H10 资产处置损益主入口
  * 科目 6115 损益类；EventBus: disposal:completed(H6) / substantive:adjudicated(6115)
  */
-import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject} from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject} from 'vue'
 import { useH10FormData } from './composables/useH10FormData'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 import { readStoreProjection } from './sync/workpaperSyncApi'
@@ -285,6 +300,20 @@ const hSync = useHSyncMode({
   },
   reloadHtml: async () => { await formData.loadAll() },
 })
+
+/**
+ * adapter 回写窗口 ⇒ 挂起本地草稿（spec `h2-h6-h10-pilot-cross-reference-lanes` Task 5 ②）。
+ *
+ * 🔴 窗口定义取**并集**「桥 busy」∪「当前在 OO 模式」，不是只取 busy：`applied` 之后
+ * `reloadHtml` 还没跑完时 busy 已可能落下，而那段时间 store 恰好是 adapter 刚写的新值 ——
+ * 此刻落草稿，下次 `restoreDrafts()` 就会把回写前的旧值盖回去。宁可窗口取宽一点：
+ * 代价只是这段时间 PUT 失败要用户重填，而取窄的代价是**静默回滚 Excel 侧的编辑**。
+ */
+watch(
+  () => hSync.busy.value || hSync.renderMode.value === 'onlyoffice',
+  (inWindow) => { formData.setDraftsSuspended(inWindow) },
+  { immediate: true },
+)
 
 /** 模板 `ref="syncEditorHostRef"` 的落点 —— 直接复用桥里的 ref。 */
 const syncEditorHostRef = hSync.syncHostRef

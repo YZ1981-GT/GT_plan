@@ -69,6 +69,7 @@ from app.services.workpaper_sync.excel_instrumentation import (
     ExcelInstrumentationSpec,
 )
 from app.services.workpaper_sync.models import AuthorityModel, SyncDomainError
+from dataclasses import dataclass
 
 __all__ = [
     "ENTRY_ID",
@@ -723,15 +724,23 @@ def manifest_capability_enabled(*, manifest: Mapping[str, Any] | None = None) ->
 
 
 def attach_pilot_adapters(
-    registry: Any, *, manifest: Mapping[str, Any] | None = None
+    registry: Any,
+    *,
+    session: Any = None,
+    manifest: Mapping[str, Any] | None = None,
 ) -> tuple[Any, ...]:
     """按 manifest capability 门决定是否注册 adapter。
+
+    ``session`` 是 manifest registry 的统一 provider 协议参数；E1 当前 capability
+    关闭时不需要访问数据库，但仍显式接收该参数，避免它在整批注册中以旧签名触发
+    ``TypeError``。返回值保持同步 tuple，registry 同时支持同步和异步 provider。
 
     🔴 **capability 未放行就返回空元组**，不抛异常也不放宽判据 ——
     `register_from_manifest()` 的编排需要「本 entry 暂不可注册」是一个**可继续**的结果，
     而不是让整条注册链崩掉。欠账由 `RegistryReport.contract_files_without_adapter`
     持续可见地报出来。
     """
+    del registry, session
     if not manifest_capability_enabled(manifest=manifest):
         return ()
     assert_entry_selectable(manifest=manifest)
@@ -744,19 +753,12 @@ def attach_pilot_adapters(
     )
 
 
-async def publish_definitions(publisher: Any) -> dict[str, Any]:
-    """按 `authority_model → template → instrumentation → contract` 发布本 entry 的身份。
+async def publish_definitions(publisher: Any) -> Phase5Definitions:
+    """按 `authority_model → template → instrumentation → contract → bundle` 发布本 entry 的身份。
 
-    🔴 与 D1/D3/D5/D6/D7 同一编排口径（顺序、payload 校验、DAG 前置由 publisher 负责，
-    本函数只编排、不复制判据）。authority model 独立先发布 —— 它是 bundle 的必填 child，
-    而 `PUBLISH_DAG` 只管 template / instrumentation / contract。
-
-    🔴 `logical_id` 一律写成 f-string `f"{ADAPTER_ID}.<kind>"`：
-    `projection_lane_registry.assert_authority_logical_suffix_matches_providers()`
-    用 **AST** 取该 f-string 的字面部分并要求恰等于 `.authority-model`，
-    写成字符串拼接或常量会让那条双向锁失效。
+    🔴 与 D1/D3/D5/D6/D7 同一编排口径。2026-10-03 修正：补 bundle 发布 + 返回 Phase5Definitions。
     """
-    from app.services.workpaper_sync.definitions import DefinitionKind
+    from app.services.workpaper_sync.definitions import BundleSlot, DefinitionKind
 
     contract = assert_contract_file_matches_source()
     template_payload = template_definition_payload()
@@ -783,16 +785,56 @@ async def publish_definitions(publisher: Any) -> dict[str, Any]:
     )
     contract_def = await publisher.publish_definition(
         kind=DefinitionKind.contract,
-        payload=contract.canonical_payload,
-        logical_id=f"{ADAPTER_ID}.contract",
-        semantic_version="1.0.0",
+        payload=dict(contract.canonical_payload),
+        logical_id=ADAPTER_ID,
+        semantic_version=contract.semantic_version,
     )
-    return {
-        "authority_model": authority,
-        "template": template,
-        "instrumentation": instrumentation,
-        "contract": contract_def,
-    }
+    if template.sha256 != contract.template_definition_sha256:
+        from app.services.workpaper_sync.adapters.registry import RegistrationError
+        raise RegistrationError(
+            f"已发布 template digest {template.sha256} 与契约声明 "
+            f"{contract.template_definition_sha256} 不一致 —— 单向引用断裂"
+        )
+    if instrumentation.sha256 != contract.instrumentation_definition_sha256:
+        from app.services.workpaper_sync.adapters.registry import RegistrationError
+        raise RegistrationError(
+            f"已发布 instrumentation digest {instrumentation.sha256} 与契约声明 "
+            f"{contract.instrumentation_definition_sha256} 不一致 —— 单向引用断裂"
+        )
+    bundle = await publisher.publish_bundle(
+        authority_model_definition_id=authority.definition_id,
+        authority_model=AUTHORITY_MODEL,
+        authority_model_definition_sha256=authority.sha256,
+        slots={
+            BundleSlot.template: {
+                "type": "definition",
+                "ref": f"definition:{template.definition_id}",
+                "digest": template.sha256,
+            },
+            BundleSlot.instrumentation: {
+                "type": "definition",
+                "ref": f"definition:{instrumentation.definition_id}",
+                "digest": instrumentation.sha256,
+            },
+            BundleSlot.contract: {
+                "type": "definition",
+                "ref": f"definition:{contract_def.definition_id}",
+                "digest": contract_def.sha256,
+            },
+        },
+    )
+    return Phase5Definitions(
+        authority_model_definition_id=authority.definition_id,
+        authority_model_definition_sha256=authority.sha256,
+        template_definition_id=template.definition_id,
+        template_definition_sha256=template.sha256,
+        instrumentation_definition_id=instrumentation.definition_id,
+        instrumentation_definition_sha256=instrumentation.sha256,
+        contract_definition_id=contract_def.definition_id,
+        contract_definition_sha256=contract_def.sha256,
+        bundle_id=bundle.bundle_id,
+        bundle_sha256=bundle.canonical_sha256,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -853,3 +895,37 @@ async def resolve_published_frozen_definitions(
             f"{contract.canonical_sha256} 不一致"
         )
     return observation
+
+@dataclass(frozen=True)
+class Phase5Definitions:
+    """发布结果（与 F3/F4/F5/H 系各家同形）。"""
+    authority_model_definition_id: Any
+    authority_model_definition_sha256: str
+    template_definition_id: Any
+    template_definition_sha256: str
+    instrumentation_definition_id: Any
+    instrumentation_definition_sha256: str
+    contract_definition_id: Any
+    contract_definition_sha256: str
+    bundle_id: Any
+    bundle_sha256: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "entry_id": ENTRY_ID,
+            "adapter_id": ADAPTER_ID,
+            "authority_model": AUTHORITY_MODEL.value,
+            "authority_model_definition_id": str(self.authority_model_definition_id),
+            "authority_model_definition_sha256": self.authority_model_definition_sha256,
+            "template_definition_id": str(self.template_definition_id),
+            "template_definition_sha256": self.template_definition_sha256,
+            "instrumentation_definition_id": str(self.instrumentation_definition_id),
+            "instrumentation_definition_sha256": self.instrumentation_definition_sha256,
+            "contract_definition_id": str(self.contract_definition_id),
+            "contract_definition_sha256": self.contract_definition_sha256,
+            "definition_bundle_id": str(self.bundle_id),
+            "definition_bundle_sha256": self.bundle_sha256,
+        }
+
+
+publish_pilot_definitions = publish_definitions

@@ -37,19 +37,15 @@
       </div>
     </div>
 
-    <!-- ═══ 方法论上下文 ═══ -->
+    <!-- ═══ 当前权威模型：自动附加税 + 手工税种 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>城建税及附加逐月测算公式：</strong>
-        ④本期应交 = ②计税依据(增值税+消费税) × ③适用税率；
-        ⑥差异 = ④本期应交 - ⑤实际缴纳；
-        ⑧同比变动额 = ④本期应交 - ⑦上年同期；
-        ⑨同比变动率 = ⑧÷⑦。
-        月销售额≤10万免征教育费附加和地方教育附加(城建税不免)。
+        <strong>测算口径：</strong>城建税、教育费附加、地方教育附加按
+        “增值税应交额 + 消费税”乘适用税率自动计算；其他税种按计税依据、税率或直接录入金额测算。
+        测算额与账面计提数的差异用于审计核对。
       </div>
     </div>
 
-    <!-- ═══ 配置工具栏 ═══ -->
     <div class="calc-toolbar">
       <div class="toolbar-section">
         <span class="toolbar-label">城建税地区：</span>
@@ -60,218 +56,85 @@
         />
       </div>
       <div class="toolbar-section">
-        <el-button size="small" type="warning" plain @click="handleImportFromN26">
-          从N2-6带入
-        </el-button>
-        <el-tag v-if="otherTaxCalc.exemptMonths.value > 0" type="success" effect="plain" size="small">
-          免征{{ otherTaxCalc.exemptMonths.value }}个月
-        </el-tag>
-        <el-tooltip content="月销售额≤10万免征教育费附加和地方教育附加" placement="top">
-          <span class="toolbar-hint">免征阈值: 10万/月</span>
-        </el-tooltip>
+        <el-button size="small" type="warning" plain @click="handleImportFromN26">从N2-6带入</el-button>
+        <el-button v-if="!isReadonly" size="small" type="primary" plain @click="handleAddManualRow">新增税种</el-button>
+        <span class="toolbar-hint">计税依据：增值税 {{ fmtAmount(otherTaxCalc.vatPayable.value) }} + 消费税 {{ fmtAmount(otherTaxCalc.consumptionTaxAmount.value) }}</span>
       </div>
     </div>
 
-    <!-- ═══ 月度数据表 (12月 + 4季度小计 + 年度合计) ═══ -->
-    <el-table
-      :data="tableData"
-      border
-      size="small"
-      style="width: 100%"
-      :row-class-name="getRowClassName"
-      max-height="560"
-    >
-      <!-- 月份/期间 -->
-      <el-table-column prop="label" label="月份/期间" width="100" fixed />
-
-      <!-- 计税依据 -->
-      <el-table-column label="计税依据" width="130" align="right">
-        <template #header>
-          <el-tooltip content="= 增值税应交(N2-6) + 消费税" placement="top">
-            <span class="formula-col-header">计税依据</span>
-          </el-tooltip>
-        </template>
+    <el-table :data="otherTaxCalc.allCalcRows.value" row-key="key" border size="small" style="width: 100%" max-height="560">
+      <el-table-column prop="taxType" label="税种" min-width="140" fixed>
         <template #default="{ row }">
-          <span class="auto-calc-cell">{{ fmtAmount(row.taxBase) }}</span>
+          <el-tag v-if="row.kind === 'auto'" size="small" type="success">自动</el-tag>
+          <span style="margin-left:6px">{{ row.taxType }}</span>
         </template>
       </el-table-column>
-
-      <!-- 消费税(可编辑) -->
-      <el-table-column label="消费税" width="120" align="right">
+      <el-table-column prop="taxItem" label="应税项目" min-width="180">
         <template #default="{ row }">
-          <el-input-number
-            v-if="row.type === 'month'"
-            :model-value="row.consumptionTax"
-            :disabled="isReadonly"
-            :controls="false"
-            :precision="2"
-            size="small"
-            style="width: 100%"
-            @change="(v: number) => handleMonthFieldChange(row.month, 'consumption-tax', v)"
-          />
-          <span v-else class="auto-calc-cell">{{ fmtAmount(row.consumptionTax) }}</span>
+          <el-input v-if="!isReadonly && row.kind === 'manual'" :model-value="row.taxItem" size="small"
+            @change="(v: string) => handleManualUpdate(row, 'taxItem', v)" />
+          <span v-else>{{ row.taxItem || '—' }}</span>
         </template>
       </el-table-column>
-
-      <!-- 城建税 -->
-      <el-table-column label="城建税" width="120" align="right">
-        <template #header>
-          <el-tooltip :content="`= 计税依据 × ${fmtPercent(otherTaxCalc.urbanRate.value)}`" placement="top">
-            <span class="formula-col-header">城建税</span>
-          </el-tooltip>
-        </template>
+      <el-table-column prop="taxBase" label="计税依据" min-width="120" align="right">
         <template #default="{ row }">
-          <span class="auto-calc-cell">{{ fmtAmount(row.urbanTax) }}</span>
+          <el-input-number v-if="!isReadonly && row.kind === 'manual'" :model-value="row.taxBase" :controls="false" :precision="2" size="small"
+            @change="(v: number) => handleManualUpdate(row, 'taxBase', v ?? 0)" />
+          <span v-else>{{ fmtAmount(row.taxBase) }}</span>
         </template>
       </el-table-column>
-
-      <!-- 教育费附加 -->
-      <el-table-column label="教育费附加" width="120" align="right">
-        <template #header>
-          <el-tooltip content="= 计税依据 × 3% (月销售额≤10万免征)" placement="top">
-            <span class="formula-col-header">教育费附加</span>
-          </el-tooltip>
-        </template>
+      <el-table-column prop="rate" label="税率" width="100" align="right">
         <template #default="{ row }">
-          <span class="auto-calc-cell">
-            {{ fmtAmount(row.educationTax) }}
-            <el-tag v-if="row.isExempt" type="success" size="small" effect="plain" style="margin-left:4px">免</el-tag>
-          </span>
+          <el-input-number v-if="!isReadonly && row.kind === 'manual'" :model-value="row.rate * 100" :controls="false" :precision="2" size="small"
+            @change="(v: number) => handleManualUpdate(row, 'rate', (v ?? 0) / 100)" />
+          <span v-else>{{ fmtPercent(row.rate) }}</span>
         </template>
       </el-table-column>
-
-      <!-- 地方教育附加 -->
-      <el-table-column label="地方教育附加" width="130" align="right">
-        <template #header>
-          <el-tooltip content="= 计税依据 × 2% (月销售额≤10万免征)" placement="top">
-            <span class="formula-col-header">地方教育附加</span>
-          </el-tooltip>
-        </template>
+      <el-table-column prop="computed" label="测算额" min-width="120" align="right">
         <template #default="{ row }">
-          <span class="auto-calc-cell">
-            {{ fmtAmount(row.localEducationTax) }}
-            <el-tag v-if="row.isExempt" type="success" size="small" effect="plain" style="margin-left:4px">免</el-tag>
-          </span>
+          <el-input-number v-if="!isReadonly && row.kind === 'manual'" :model-value="row.computed" :controls="false" :precision="2" size="small"
+            @change="(v: number) => handleManualUpdate(row, 'amountManual', v ?? 0)" />
+          <span v-else class="auto-calc-cell">{{ fmtAmount(row.computed) }}</span>
         </template>
       </el-table-column>
-
-      <!-- 小计 -->
-      <el-table-column label="小计" width="120" align="right">
-        <template #header>
-          <el-tooltip content="= 城建税 + 教育费附加 + 地方教育附加" placement="top">
-            <span class="formula-col-header">小计</span>
-          </el-tooltip>
-        </template>
+      <el-table-column prop="bookAccrued" label="账面计提数" min-width="120" align="right">
         <template #default="{ row }">
-          <span class="auto-calc-cell total-cell">{{ fmtAmount(row.totalSurtax) }}</span>
+          <el-input-number v-if="!isReadonly" :model-value="row.bookAccrued" :controls="false" :precision="2" size="small"
+            @change="(v: number) => handleBookAccrual(row, v ?? 0)" />
+          <span v-else>{{ fmtAmount(row.bookAccrued) }}</span>
         </template>
       </el-table-column>
-
-      <!-- 实际缴纳(可编辑) -->
-      <el-table-column label="实际缴纳" width="120" align="right">
+      <el-table-column prop="diff" label="差异" min-width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
-            v-if="row.type === 'month'"
-            :model-value="row.actualPayment"
-            :disabled="isReadonly"
-            :controls="false"
-            :precision="2"
-            size="small"
-            style="width: 100%"
-            @change="(v: number) => handleMonthFieldChange(row.month, 'actual-payment', v)"
-          />
-          <span v-else class="auto-calc-cell">{{ fmtAmount(row.actualPayment) }}</span>
+          <span :class="row.diff !== 0 ? 'diff-nonzero' : ''">{{ fmtAmount(row.diff) }}</span>
         </template>
       </el-table-column>
-
-      <!-- 差异 -->
-      <el-table-column label="差异" width="120" align="right">
-        <template #header>
-          <el-tooltip content="= 小计 - 实际缴纳" placement="top">
-            <span class="formula-col-header">差异</span>
-          </el-tooltip>
-        </template>
+      <el-table-column prop="remark" label="备注" min-width="160">
         <template #default="{ row }">
-          <span :class="['auto-calc-cell', row.difference !== 0 ? 'diff-nonzero' : '']">
-            {{ fmtAmount(row.difference) }}
-          </span>
+          <el-input v-if="!isReadonly && row.kind === 'manual'" :model-value="row.remark" size="small"
+            @change="(v: string) => handleManualUpdate(row, 'remark', v)" />
+          <span v-else>{{ row.remark || '—' }}</span>
         </template>
       </el-table-column>
-
-      <!-- 上年同期(可编辑) -->
-      <el-table-column label="上年同期" width="120" align="right">
+      <el-table-column v-if="!isReadonly" label="操作" width="70" align="center">
         <template #default="{ row }">
-          <el-input-number
-            v-if="row.type === 'month'"
-            :model-value="row.priorYearAmount"
-            :disabled="isReadonly"
-            :controls="false"
-            :precision="2"
-            size="small"
-            style="width: 100%"
-            @change="(v: number) => handleMonthFieldChange(row.month, 'prior-year', v)"
-          />
-          <span v-else class="auto-calc-cell">{{ fmtAmount(row.priorYearAmount) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 同比变动额 -->
-      <el-table-column label="同比变动额" width="120" align="right">
-        <template #header>
-          <el-tooltip content="= 本期应交 - 上年同期" placement="top">
-            <span class="formula-col-header">同比变动额</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <span class="auto-calc-cell">{{ fmtAmount(row.yoyChange) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 同比变动率 -->
-      <el-table-column label="同比变动率" width="110" align="center">
-        <template #header>
-          <el-tooltip content="= 同比变动额 ÷ 上年同期 (>30%高亮)" placement="top">
-            <span class="formula-col-header">同比变动率</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <span :class="['auto-calc-cell', isVarianceHigh(row) ? 'variance-high' : '']">
-            {{ fmtPercent(row.yoyChangeRate) }}
-          </span>
-          <el-tooltip v-if="isVarianceHigh(row)" content="同比变动超过30%，请关注" placement="top">
-            <el-icon class="variance-icon"><WarningFilled /></el-icon>
-          </el-tooltip>
+          <el-button v-if="canRemoveManualRow(row)" type="danger" link size="small" @click="handleRemoveManualRow(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- ═══ 测算结果汇总卡片 ═══ -->
     <el-card shadow="never" class="result-card">
       <template #header>
         <div class="card-header">
           <span>测算结果汇总</span>
-          <el-button type="primary" size="small" :disabled="isReadonly" @click="handleSyncToN21">
-            同步至N2-1
-          </el-button>
+          <el-button type="primary" size="small" :disabled="isReadonly" @click="handleSyncToN21">同步至N2-1</el-button>
         </div>
       </template>
       <div class="result-grid">
-        <div class="result-item">
-          <span class="result-label">城建税年合计</span>
-          <span class="result-value">{{ fmtAmount(otherTaxCalc.annualSummary.value.urbanTax) }}</span>
-        </div>
-        <div class="result-item">
-          <span class="result-label">教育费附加年合计</span>
-          <span class="result-value">{{ fmtAmount(otherTaxCalc.annualSummary.value.educationTax) }}</span>
-        </div>
-        <div class="result-item">
-          <span class="result-label">地方教育附加年合计</span>
-          <span class="result-value">{{ fmtAmount(otherTaxCalc.annualSummary.value.localEducationTax) }}</span>
-        </div>
-        <div class="result-item result-item--total">
-          <span class="result-label">总合计</span>
-          <span class="result-value">{{ fmtAmount(otherTaxCalc.annualSummary.value.totalSurtax) }}</span>
-        </div>
+        <div class="result-item"><span class="result-label">城建税</span><span class="result-value">{{ fmtAmount(otherTaxCalc.annualSummary.value.urbanTax) }}</span></div>
+        <div class="result-item"><span class="result-label">教育费附加</span><span class="result-value">{{ fmtAmount(otherTaxCalc.annualSummary.value.educationTax) }}</span></div>
+        <div class="result-item"><span class="result-label">地方教育附加</span><span class="result-value">{{ fmtAmount(otherTaxCalc.annualSummary.value.localEducationTax) }}</span></div>
+        <div class="result-item result-item--total"><span class="result-label">全部税种测算合计</span><span class="result-value">{{ fmtAmount(otherTaxCalc.annualSummary.value.total) }}</span></div>
       </div>
     </el-card>
 
@@ -335,16 +198,15 @@
  * N2TabOtherTaxCalc — N2-8 应交其他税费测算表 (完全重写)
  *
  * 对照源xlsx模板 26行×9列, 11公式
- * 12月行 + Q1~Q4季度小计 + 年度合计
- * 三税种: 城建税/教育费附加/地方教育附加
+ * 当前权威模型：3 个自动附加税行 + 稳定身份手工税种行
+ * 旧月度/季度 API 已移除，页面按 useN2OtherTaxCalc.allCalcRows 渲染
  */
 import { ref, computed, inject, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick, ChatDotSquare, WarningFilled } from '@element-plus/icons-vue'
+import { MagicStick, ChatDotSquare } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import { eventBus } from '@/utils/eventBus'
 import { useN2FormData } from '../../composables/useN2FormData'
-import { useN2OtherTaxCalc, type UrbanAreaType, VARIANCE_THRESHOLD } from '../../composables/useN2OtherTaxCalc'
+import { useN2OtherTaxCalc, type UrbanAreaType, type CalcRow } from '../../composables/useN2OtherTaxCalc'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -390,98 +252,7 @@ const urbanAreaOptions = [
   { label: '其他 1%', value: '其他' },
 ]
 
-// ─── Table Data (merged: 12 months + 4 quarters + 1 annual) ─────────────────
-
-interface TableRow {
-  type: 'month' | 'quarter' | 'annual'
-  month: number
-  label: string
-  taxBase: number
-  consumptionTax: number
-  urbanTax: number
-  educationTax: number
-  localEducationTax: number
-  totalSurtax: number
-  actualPayment: number
-  difference: number
-  priorYearAmount: number
-  yoyChange: number
-  yoyChangeRate: number
-  isExempt: boolean
-}
-
-const tableData = computed<TableRow[]>(() => {
-  const rows: TableRow[] = []
-  const monthly = otherTaxCalc.monthlyRows.value
-  const quarters = otherTaxCalc.quarterSummaries.value
-
-  // Interleave: Jan Feb Mar → Q1 → Apr May Jun → Q2 → ...
-  for (let qi = 0; qi < 4; qi++) {
-    const startMonth = qi * 3
-    // 3 monthly rows
-    for (let i = 0; i < 3; i++) {
-      const m = monthly[startMonth + i]
-      rows.push({
-        type: 'month',
-        month: m.month,
-        label: m.label,
-        taxBase: m.taxBase,
-        consumptionTax: m.consumptionTax,
-        urbanTax: m.urbanTax,
-        educationTax: m.educationTax,
-        localEducationTax: m.localEducationTax,
-        totalSurtax: m.totalSurtax,
-        actualPayment: m.actualPayment,
-        difference: m.difference,
-        priorYearAmount: m.priorYearAmount,
-        yoyChange: m.yoyChange,
-        yoyChangeRate: m.yoyChangeRate,
-        isExempt: m.isExempt,
-      })
-    }
-    // Quarter subtotal
-    const q = quarters[qi]
-    rows.push({
-      type: 'quarter',
-      month: 0,
-      label: q.label,
-      taxBase: q.taxBase,
-      consumptionTax: 0,
-      urbanTax: q.urbanTax,
-      educationTax: q.educationTax,
-      localEducationTax: q.localEducationTax,
-      totalSurtax: q.totalSurtax,
-      actualPayment: q.actualPayment,
-      difference: q.difference,
-      priorYearAmount: q.priorYearAmount,
-      yoyChange: 0,
-      yoyChangeRate: 0,
-      isExempt: false,
-    })
-  }
-
-  // Annual total row
-  const a = otherTaxCalc.annualSummary.value
-  rows.push({
-    type: 'annual',
-    month: 0,
-    label: '年度合计',
-    taxBase: a.taxBase,
-    consumptionTax: 0,
-    urbanTax: a.urbanTax,
-    educationTax: a.educationTax,
-    localEducationTax: a.localEducationTax,
-    totalSurtax: a.totalSurtax,
-    actualPayment: a.actualPayment,
-    difference: a.difference,
-    priorYearAmount: a.priorYearAmount,
-    yoyChange: a.yoyChange,
-    yoyChangeRate: a.yoyChangeRate,
-    isExempt: false,
-  })
-
-  return rows
-})
+// 当前权威行模型由 useN2OtherTaxCalc.allCalcRows 提供（3 自动行 + 稳定身份手工行）
 
 // ─── Format ──────────────────────────────────────────────────────────────────
 
@@ -495,26 +266,35 @@ function fmtPercent(val: number): string {
   return (val * 100).toFixed(1) + '%'
 }
 
-// ─── Row styling ─────────────────────────────────────────────────────────────
-
-function getRowClassName({ row }: { row: TableRow }): string {
-  if (row.type === 'quarter') return 'quarter-subtotal-row'
-  if (row.type === 'annual') return 'annual-total-row'
-  return ''
-}
-
-function isVarianceHigh(row: TableRow): boolean {
-  return row.type === 'month' && row.priorYearAmount !== 0 && Math.abs(row.yoyChangeRate) > VARIANCE_THRESHOLD
-}
-
-// ─── Handlers ────────────────────────────────────────────────────────────────
-
+// ─── Handlers（当前权威行模型） ─────────────────────────────────────────────
 function handleUrbanAreaChange(val: string | number) {
   otherTaxCalc.setUrbanAreaType(val as UrbanAreaType)
 }
 
-function handleMonthFieldChange(month: number, field: string, val: number) {
-  otherTaxCalc.setMonthlyData(month, field, val ?? 0)
+async function handleManualUpdate(row: CalcRow, field: string, value: any) {
+  if (row.kind !== 'manual') return
+  await otherTaxCalc.updateManualRow(row.key, field as any, value)
+}
+
+async function handleBookAccrual(row: CalcRow, value: number) {
+  await otherTaxCalc.setBookAccrual(row.taxType, value)
+}
+
+async function handleAddManualRow() {
+  await otherTaxCalc.addManualRow()
+  ElMessage.success('已新增税种行')
+}
+
+const DEFAULT_MANUAL_KEYS = new Set([
+  'row-消费税', 'row-资源税', 'row-城镇土地使用税', 'row-车船税',
+])
+function canRemoveManualRow(row: CalcRow): boolean {
+  return row.kind === 'manual' && !DEFAULT_MANUAL_KEYS.has(row.key)
+}
+
+async function handleRemoveManualRow(row: CalcRow) {
+  await otherTaxCalc.removeManualRow(row.key)
+  ElMessage.success('已删除税种行')
 }
 
 function handleImportFromN26() {
@@ -524,15 +304,7 @@ function handleImportFromN26() {
 
 async function handleSyncToN21() {
   await otherTaxCalc.syncToAdjudication()
-  // Emit tax-accrual:updated for N4 linkage
-  eventBus.emit('tax-accrual:updated', {
-    wpCode: 'N2',
-    source: 'N2-8',
-    urbanTax: otherTaxCalc.annualSummary.value.urbanTax,
-    educationTax: otherTaxCalc.annualSummary.value.educationTax,
-    localEducationTax: otherTaxCalc.annualSummary.value.localEducationTax,
-    total: otherTaxCalc.annualSummary.value.totalSurtax,
-  })
+  // syncToAdjudication 已按 EventBus 契约发布 tax-accrual:updated；页面不重复投递第二种载荷。
   scheduleAutoSnapshot?.()
   ElMessage.success('已同步至N2-1审定表')
 }
@@ -556,7 +328,6 @@ function handleAiAssist() {
         localEducationTax: String(otherTaxCalc.annualSummary.value.localEducationTax),
         total: String(otherTaxCalc.annualSummary.value.totalSurtax),
         urbanAreaType: otherTaxCalc.urbanAreaType.value,
-        exemptMonths: String(otherTaxCalc.exemptMonths.value),
       },
     }).catch(() => {})
   })
@@ -573,7 +344,7 @@ function handleAiConclusion() {
       prompt: '请生成城建税及附加测算审计结论',
       context: {
         total: String(otherTaxCalc.annualSummary.value.totalSurtax),
-        difference: String(otherTaxCalc.annualSummary.value.difference),
+        differenceRows: String(otherTaxCalc.diffRows.value.length),
       },
     }).catch(() => {})
   })

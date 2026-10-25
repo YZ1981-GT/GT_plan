@@ -33,16 +33,18 @@ MUTATIONS: list[tuple[str, Path, str, str]] = [
         "            return _replay_cached_registrations(svc, cached)\n",
     ),
     (
+        # 2026-09-30：重查之后插入了源码事实预热（spec startup-prewarm-event-loop-unblocking），
+        # 锚点改为「重查 + 预热注释首行」。
         "拿锁后不重查缓存（串行但不省成本）",
         ROUTER,
         "        cached = _REGISTRATION_CACHE.get(fingerprint)\n"
         "        if cached is not None:\n"
         "            return _replay_cached_registrations(svc, cached)\n\n"
-        "        explicit = (",
+        "        # 🔴 源码事实首算挪到工作线程",
         "        cached = None  # MUTATED: 不重查\n"
         "        if cached is not None:\n"
         "            return _replay_cached_registrations(svc, cached)\n\n"
-        "        explicit = (",
+        "        # 🔴 源码事实首算挪到工作线程",
     ),
     (
         "预热不走请求路径（自己拼一遍）",

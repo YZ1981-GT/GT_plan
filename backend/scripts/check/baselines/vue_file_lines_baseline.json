@@ -46,7 +46,6 @@
     "audit-platform/frontend/src/views/Misstatements.vue": 693,
     "audit-platform/frontend/src/components/template-library/NoteTemplateTab.vue": 682,
     "audit-platform/frontend/src/components/gate/GateReadinessPanel.vue": 680,
-    "audit-platform/frontend/src/components/DocAiChatPanel.vue": 671,
     "audit-platform/frontend/src/components/ai/KnowledgeBasePanel.vue": 671,
     "audit-platform/frontend/src/components/workpaper/WorkpaperAuditNav.vue": 652,
     "audit-platform/frontend/src/components/trial-balance/ReportLineMappingDialog.vue": 634,

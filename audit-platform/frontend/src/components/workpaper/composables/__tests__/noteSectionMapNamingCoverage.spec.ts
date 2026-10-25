@@ -37,10 +37,55 @@ const REGISTRY_EXEMPT: Record<string, string> = {}
 
 /**
  * 允许「文件名不匹配 `{code}NoteSectionMap.ts`」的共享映射件。
- * 每条须说明由哪些薄壳代表。
+ *
+ * 🔴 两类语义必须区分（2026-09-28 补）：
+ *   `inRegistry: true`  —— 该章节**确实进** registry，由若干薄壳代表（M 循环形态）；
+ *   `inRegistry: false` —— 该章节**故意不进** registry，因为它是「一个章节多个 owner」
+ *                          的跨循环共享分段表，而 registry 是 section→wp 的 **1:1**
+ *                          反查表（附注侧「打开同步底稿」用），多 owner 进去必歧义。
+ *
+ * 原实现只有 reason 字符串、不区分两类，于是 allowlist 只是「名字清单」——
+ * 谁都能靠加一行让守卫变绿。现在每条都是**可伪证的声明**：下面
+ * 「allowlist 的 inRegistry 声明必须与 registry 实际情况一致」那条会逐条验。
  */
-const SHARED_MAP_FILES: Record<string, string> = {
-  'mEquityChangeNoteSectionMap.ts': 'M4/M5/M7 共享标准变动表映射；由 m4/m5/m7NoteSectionMap.ts 三个薄壳代表进 registry',
+interface SharedMapDecl {
+  reason: string
+  /** 该文件的章节号是否应出现在 registry 中 */
+  inRegistry: boolean
+}
+
+const SHARED_MAP_FILES: Record<string, SharedMapDecl> = {
+  'mEquityChangeNoteSectionMap.ts': {
+    reason:
+      'M4/M5/M7 共享标准变动表映射；由 m4/m5/m7NoteSectionMap.ts 三个薄壳代表进 registry',
+    inRegistry: true,
+  },
+  // 以下两条：源文件自身已写明「不匹配 WP_CODE_RE 是故意的」，但长期漏登 allowlist
+  // ⇒ 本守卫自 2026-09-28 起一直红，而它与注册表漂移门禁同属 CI job
+  // `note-section-map-naming`，红成常态后整个 job 失去意义（spec
+  // disclosure-payload-authority-source design §十四）。
+  'e1FxNoteSectionMap.ts': {
+    reason:
+      'E1 外币货币性项目（五、73 / 八、92）是跨循环共享分段表，段 owner 含 E1/D2/K/L；'
+      + '一个章节多 owner 不入 1:1 反查 registry。文件名大写 F 天然不被 WP_CODE_RE 命中。'
+      + '后端佐证：backend/tests/four_table/test_note_e1_structure.py 明载「registry 仍不含外币章节」',
+    inRegistry: false,
+  },
+  'restrictedAssetsNoteSectionMap.ts': {
+    reason:
+      '受限资产（五、32 / 八、93）是八循环共享分段表，段 owner 含 E1/D1/D2/D5/F2/H1/H2/I1；'
+      + '源文件头已明载「文件名不匹配 WP_CODE_RE 是故意的 —— 共享表一个章节有多个 owner，'
+      + '不该进 section→wp 的 1:1 反查 registry」。spec restricted-assets-note-row-scope-rollout R3.1~3.6',
+    inRegistry: false,
+  },
+}
+
+/** 从映射文件里抽 `listed: '…'` / `soe: '…'` 章节号字面量（与生成器同口径） */
+function sectionsOf(file: string): string[] {
+  const src = readFileSync(resolve(COMPOSABLES_DIR, file), 'utf-8')
+  return [...src.matchAll(/\b(?:listed|soe)\s*:\s*'([^']+)'/g)]
+    .map((m) => m[1])
+    .filter((s) => /^[一二三四五六七八九十]+、\d+/.test(s))
 }
 
 interface RegistryEntry {
@@ -106,15 +151,47 @@ describe('附注映射命名覆盖', () => {
       undeclared,
       `以下映射文件名不被生成器 glob 命中且未登记：${undeclared.join(' / ')}`,
     ).toHaveLength(0)
-    for (const [file, reason] of Object.entries(SHARED_MAP_FILES)) {
-      expect(reason.length, `${file} 的 allowlist 理由过短`).toBeGreaterThan(10)
+    for (const [file, decl] of Object.entries(SHARED_MAP_FILES)) {
+      expect(decl.reason.length, `${file} 的 allowlist 理由过短`).toBeGreaterThan(10)
     }
+  })
+
+  it('allowlist 的 inRegistry 声明必须与 registry 实际情况一致（防 allowlist 变垃圾桶）', () => {
+    // 每条 allowlist 都是可伪证声明：声明「故意不进 registry」就必须真的不在，
+    // 声明「由薄壳代表进 registry」就必须真的能在 registry 里找到其章节号。
+    const registrySections = new Set(
+      registry.flatMap((e) => [e.listed, e.soe].filter((s): s is string => Boolean(s))),
+    )
+    const violations: string[] = []
+    for (const [file, decl] of Object.entries(SHARED_MAP_FILES)) {
+      const sections = sectionsOf(file)
+      expect(
+        sections.length,
+        `${file} 未抽到任何章节号字面量 ⇒ 本条判据空转（口径失效或文件已改形态）`,
+      ).toBeGreaterThan(0)
+      const present = sections.filter((s) => registrySections.has(s))
+      if (decl.inRegistry && present.length === 0) {
+        violations.push(
+          `${file} 声明 inRegistry=true 但其章节 ${sections.join('/')} 全不在 registry ⇒ `
+            + '要么薄壳缺失/章节号写成标识符引用，要么该声明本身写错',
+        )
+      }
+      if (!decl.inRegistry && present.length > 0) {
+        violations.push(
+          `${file} 声明 inRegistry=false（故意不进 registry）但章节 ${present.join('/')} `
+            + '实际在 registry 里 ⇒ 多 owner 章节进了 1:1 反查表，附注侧「打开同步底稿」会跳错底稿',
+        )
+      }
+    }
+    expect(violations, violations.join('\n')).toHaveLength(0)
   })
 
   it('allowlist 不得残留已修好的条目（否则守卫形同虚设）', () => {
     const stale = Object.keys(REGISTRY_EXEMPT).filter((code) => registryCodes.has(code))
     expect(stale, `以下循环已进 registry，请从 REGISTRY_EXEMPT 移出：${stale.join(' / ')}`).toHaveLength(0)
-    const staleShared = Object.keys(SHARED_MAP_FILES).filter((f) => !unmatchedMapFiles.includes(f))
+    const staleShared = Object.keys(SHARED_MAP_FILES).filter(
+      (f) => !unmatchedMapFiles.includes(f),
+    )
     expect(
       staleShared,
       `以下文件已不存在或已改名，请从 SHARED_MAP_FILES 移出：${staleShared.join(' / ')}`,

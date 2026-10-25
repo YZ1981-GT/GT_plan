@@ -5,7 +5,7 @@ spec: d1-sync-row-table-engine-and-d1-coverage · Task 27 · Requirements 5.1 / 
 
 ═══ 几何（openpyxl 直读实测，2026-09-26）═══
 
-| 区 | 标题 | 表头 | 数据行 | footer | 公式列 | store 键 | UUID 列 |
+| 区 | 标题 | 表头 | 数据行 | footer | **footer** 公式列（数据区零公式） | store 键 | UUID 列 |
 |---|---|---|---|---|---|---|---|
 | 贴现 | R11（一） | R12-13（两级，合并） | R14-R21 (8行) | R22 `合计` | E/F/L/M SUM | `D1-endorse-discount-rows` | Q |
 | 背书 | R23（二） | R24-25（两级，合并） | R26-R33 (8行) | R34 `合计` | E SUM | `D1-endorse-transfer-rows` | R |
@@ -19,7 +19,9 @@ spec: d1-sync-row-table-engine-and-d1-coverage · Task 27 · Requirements 5.1 / 
 `endorsedTo`/`endorsedDate`/`description` 各用各的字段名，不冲突），但 store 是分开的
 两个键，materialize 按各自的 field_specs 独立处理。
 
-🔴 数据区内零公式（全 editable），公式只在 footer 的 SUM。
+🔴 数据区内零公式（全 editable），公式只在 footer 的 SUM ⇒ **`formula_columns` 恒空**
+   （2026-09-28 修正：首版把 footer SUM 列填进了 formula_columns，导致这 5 列的整个数据区
+   被 mask 判只读、OO 改动写不回 store。详见下方常量处的长注释）。
 🔴 两区 `row_identity_key = "rowId"`（与 D1-3/D1-4 相同，非 D1-16 的 `"id"`）。
 """
 from __future__ import annotations
@@ -96,15 +98,36 @@ _FIELD_SPECS_TRANSFER: Final[tuple[tuple[str, str, str, str, str, str, str], ...
     ("index_ref", "P", "editable", "text", "indexRef", "索引号", ""),
 )
 
-#: footer SUM 公式列（只在 footer 行，数据区内无公式 ⇒ formula_columns 仅供 formula_mask）。
-_FORMULA_COLUMNS_DISCOUNT: Final[tuple[str, ...]] = ("E", "F", "L", "M")
-_FORMULA_TEMPLATES_DISCOUNT: Final[dict[str, str]] = {
-    "E": "=SUM(E14:E{r})", "F": "=SUM(F14:F{r})",
-    "L": "=SUM(L14:L{r})", "M": "=SUM(M14:M{r})",
-}
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔴 2026-09-28 修正：footer SUM 列**不得**进 `formula_columns`
+#
+# `RowTableSheetSpec.formula_mask` 现算为 `{col}{first_data_row}:{col}{last_data_row}` ——
+# 它覆盖的是**数据区**，覆盖不到 footer 行。把只在 footer 出现的 SUM 列填进
+# `formula_columns` 对保护 footer **毫无作用**，只会让这些列的整个数据区被
+# `merge._protection` 判 `read_only_masked_cell` ⇒ OO 侧改这些金额格永远写不回 store
+# （与 D4-1 修前同型，需求 1.5「OO 改动 SHALL 生效」在后端不可达）。
+#
+# 本 sheet 两区**数据区逐格实测零公式**（见模块 docstring 与
+# `_d1fix_formula_probe` 实测：data_cols=[]、footer_cols=['E','F','L','M'] / ['E']）
+# ⇒ `formula_columns` 恒空、`formula_templates` 恒空。
+#
+# footer 的 SUM 公式文本作为**实测证据**留在下面的公开常量里（materialize 不覆盖公式格、
+# 由 OO 重算，故它不需要进 spec）。判据 `test_d1_footer_sum_templates_match_template`
+# 按 codepoint 校验它与模板一致，证据不丢。
+# ═══════════════════════════════════════════════════════════════════════════
 
-_FORMULA_COLUMNS_TRANSFER: Final[tuple[str, ...]] = ("E",)
-_FORMULA_TEMPLATES_TRANSFER: Final[dict[str, str]] = {"E": "=SUM(E26:E{r})"}
+_FORMULA_COLUMNS_DISCOUNT: Final[tuple[str, ...]] = ()
+_FORMULA_TEMPLATES_DISCOUNT: Final[dict[str, str]] = {}
+
+_FORMULA_COLUMNS_TRANSFER: Final[tuple[str, ...]] = ()
+_FORMULA_TEMPLATES_TRANSFER: Final[dict[str, str]] = {}
+
+#: footer 行 SUM 公式（`{last}` = 该区 last_data_row）。纯实测证据，不进 spec。
+FOOTER_SUM_TEMPLATES_DISCOUNT: Final[dict[str, str]] = {
+    "E": "=SUM(E14:E{last})", "F": "=SUM(F14:F{last})",
+    "L": "=SUM(L14:L{last})", "M": "=SUM(M14:M{last})",
+}
+FOOTER_SUM_TEMPLATES_TRANSFER: Final[dict[str, str]] = {"E": "=SUM(E26:E{last})"}
 
 
 SPEC_D108_DISCOUNT: Final[RowTableSheetSpec] = RowTableSheetSpec(
@@ -128,6 +151,31 @@ SPEC_D108_DISCOUNT: Final[RowTableSheetSpec] = RowTableSheetSpec(
     formula_templates=_FORMULA_TEMPLATES_DISCOUNT,
     footer_marker=FOOTER_MARKER_D108,
     error_label="D1-8 贴现明细",
+    # ═══ 🔴 canary：全平台**第一张**开启「删物理行」的表 ═══════════════════
+    #
+    # spec: workpaper-sync-row-deletion-multi-region-propagation（契约逐表 opt-in / CS-21）
+    # 用户 2026-09-30 明确授权开表。
+    #
+    # 语义变化：store 已不认领的受管行，此前是「只清 editable 字面值格、物理行留着」，
+    # 现在是**物理删除该行**并联动全工作簿的位移（兄弟表 ref 收缩 / definedName /
+    # 跨 sheet 公式 / 裸引用 / 结构块）。**不可逆**。
+    #
+    # 为什么选这张（开表准入体检 `check_row_deletion_readiness.py` 现算）：
+    #   * 受管数据区 14..21 共 8 行，`--count 1` 与 `--count 3` 均 **8/8 可删、0 锁死**
+    #     ⇒ 没有跨 sheet 单格引用指着这些行，门面不会 fail-closed；
+    #   * 本 sheet 是**双区**（贴现 14..21 / 背书 26..33，`SPEC_D108_TRANSFER`）
+    #     ⇒ 删行会真实触发「兄弟 Table ref 收缩」这条 G2 症状链的第一环，
+    #     而不是在一个退化的单区表上验一个空壳；
+    #   * CS-21 的两个前提本就齐备：`row_identity_key="rowId"` + `delete_policy=tombstone`。
+    #
+    # 🔴 兄弟区 `SPEC_D108_TRANSFER` **刻意不开**：一次只开一张，且保留同 sheet 的
+    #    `clear` 对照 —— 判据可以在同一张 sheet 上同时观测「开了的区删行」与
+    #    「没开的区逐字节不变」，这比在两张不同 sheet 上比对强。
+    #
+    # 🔴 体检工具量的是**原始模板**。插桩后的工作簿引用面更大（多出 `_GT_SYNC` 等载体），
+    #    故真实链路验收另走 `test_row_deletion_convergence_dispatch` 的
+    #    `TestRealChainDispatchFlipsWithTheContract`（在插桩字节上跑）。
+    row_convergence="delete",
 )
 
 SPEC_D108_TRANSFER: Final[RowTableSheetSpec] = RowTableSheetSpec(

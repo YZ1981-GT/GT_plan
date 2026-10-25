@@ -1,0 +1,41 @@
+{
+  "measured_at": "2026-09-26",
+  "spec": "d567-sync-coverage-via-row-table-engine",
+  "task": "21 — D5-3/D6-4/D7-3 调整分录汇总表可行性核 + D6-7 形态核",
+  "adjustment_sheets": {
+    "D5-3": {
+      "decision": "single_html",
+      "store_item_id": "D5-3-rows",
+      "write_composable": "useD5Adjustment.ts",
+      "central_sync": "useAdjustmentCentralSync（经后端 AdjustmentSyncService）",
+      "gate_1_row_identity": "FAIL — 模板无 GTROW/UUID 隐藏列",
+      "gate_2_no_sync_conflict": "FAIL — D5-3-rows 已被 useAdjustmentCentralSync 占用"
+    },
+    "D6-4": {
+      "decision": "single_html",
+      "store_item_id": "D6-4-rows",
+      "write_composable": "useD6Adjustment.ts",
+      "central_sync": "useAdjustmentCentralSync（经后端 AdjustmentSyncService）",
+      "gate_1_row_identity": "FAIL",
+      "gate_2_no_sync_conflict": "FAIL"
+    },
+    "D7-3": {
+      "decision": "single_html",
+      "store_item_id": "D7-3-rows",
+      "write_composable": "useD7Adjustment.ts",
+      "central_sync": "useAdjustmentCentralSync（经后端 AdjustmentSyncService）",
+      "gate_1_row_identity": "FAIL",
+      "gate_2_no_sync_conflict": "FAIL"
+    }
+  },
+  "d6_7_policy_check": {
+    "sheet_name": "合同资产减值准备会计政策检查D6-7",
+    "geometry": "58r × 18c / 仅 7 公式",
+    "first_candidate": "static_region（大表但无动态行、几乎无公式，与 D4-13 同型）",
+    "second_candidate": "paragraph_block_bidirectional（D4-5 范式）",
+    "third_candidate": "single_html",
+    "decision": "待裁决（本 spec 只产形态核证据，不改代码）"
+  },
+  "cross_cycle_note": "七张调整分录汇总表全部同型（D1-5/D2-4/D3-3/D4-4已判/D5-3/D6-4/D7-3），建议统一裁决另立 d-cycle-adjustment-sheets-single-html-adjudication spec",
+  "property_14_no_code_changed": true
+}

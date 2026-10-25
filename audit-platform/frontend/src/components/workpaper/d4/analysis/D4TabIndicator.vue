@@ -22,6 +22,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  htmlData?: any
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -112,11 +113,17 @@ function loadIndicators() {
   if (resp?.remark) {
     try { const p = JSON.parse(resp.remark); if (Array.isArray(p) && p.length) { indicators.value = p; return } } catch {}
   }
-  indicators.value = DEFAULT_INDICATORS.map(d => ({
-    key: d.key, name: d.name, formula: d.formula, source: d.source,
-    current: 0, prior: 0, diff1: null, analysis1: '',
-    industryAvg: null, diff2: null, analysis2: '',
-  }))
+  // 无持久化数据 → 用 DEFAULT_INDICATORS 初始化，并从 indicator_prefill 预填（Req 8.1）
+  const prefill = props.htmlData?.indicator_prefill ?? {}
+  indicators.value = DEFAULT_INDICATORS.map(d => {
+    const p = prefill[d.key]
+    return {
+      key: d.key, name: d.name, formula: d.formula, source: d.source,
+      current: p?.current ?? 0, prior: p?.prior ?? 0,
+      diff1: null, analysis1: '',
+      industryAvg: null, diff2: null, analysis2: '',
+    }
+  })
 }
 watch(() => props.allResponses.get('D4-6-indicators-v2')?.remark, () => loadIndicators(), { immediate: true })
 

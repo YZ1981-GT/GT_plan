@@ -19,6 +19,7 @@ export const adjustments = {
   create: (pid: string) => `/api/projects/${pid}/adjustments`,
   detail: (pid: string, groupId: string) => `/api/projects/${pid}/adjustments/${groupId}`,
   review: (pid: string, groupId: string) => `/api/projects/${pid}/adjustments/${groupId}/review`,
+  revokeReview: (pid: string, groupId: string) => `/api/projects/${pid}/adjustments/${groupId}/revoke-review`,
   batchCommit: (pid: string) => `/api/projects/${pid}/adjustments/batch-commit`,
   summary: (pid: string) => `/api/projects/${pid}/adjustments/summary`,
   accountDropdown: (pid: string) => `/api/projects/${pid}/adjustments/account-dropdown`,

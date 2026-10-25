@@ -85,7 +85,8 @@ const NOTE_KEY = 'D1-sampling-note'
 const CONCLUSION_KEY = 'D1-sampling-conclusion'
 
 /** VouchingRow 数值字段 */
-const VOUCHING_NUMERIC_FIELDS: Array<keyof VouchingRow> = ['amount', 'seq']
+// 🔴 2026-09-28 补 `creditAmount`（Excel H 贷方金额）—— 与 `amount`（G 借方金额）成对。
+const VOUCHING_NUMERIC_FIELDS: Array<keyof VouchingRow> = ['amount', 'creditAmount', 'seq']
 
 /** VouchingRow 字符串字段 */
 const VOUCHING_STRING_FIELDS: Array<keyof VouchingRow> = [
@@ -102,6 +103,15 @@ const VOUCHING_STRING_FIELDS: Array<keyof VouchingRow> = [
   'ocrStatus',
   'remark',
   'indexRef',
+  // 🔴 2026-09-28 补 6 个（源模板 17 列，此前前端只覆盖 10 列）。
+  //    这张表同时是**持久化白名单** —— 不列进来的字段 `serializeVouchingRow` 不会落库，
+  //    落不了库就等于同步层 `json_pointer` 指空、materialize 把该 Excel 列写空。
+  'voucherDate',
+  'counterDetail',
+  'supportDoc',
+  'check4',
+  'check5',
+  'isAbnormal',
 ]
 
 /** select 类字段（立即保存） */
@@ -145,6 +155,14 @@ export function emptyVouchingRow(seq: number): VouchingRow {
     ocrStatus: 'none',
     remark: '',
     indexRef: '',
+    // 🔴 2026-09-28 补 7 个（源模板 17 列）
+    voucherDate: '',
+    counterDetail: '',
+    creditAmount: 0,
+    supportDoc: '',
+    check4: '',
+    check5: '',
+    isAbnormal: '',
   }
 }
 

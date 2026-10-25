@@ -1,0 +1,279 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "0. 前置依赖核查（**判定用 `git show HEAD:` 不读工作树**）": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353444545
+      },
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353455267
+      },
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353731593
+      }
+    ],
+    "1. 六张 sheet **形态判定** + 几何实测填参 + 下游消费方 grep 补全": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353444609
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790371943284
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790373057313
+      }
+    ],
+    "2. Property 1 零回归基线：D3-2 与其余 7 contract 的 golden digest": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353444659
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790373071447
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790374488289
+      }
+    ],
+    "3. Property 2 红判据：`store_item_id` 必须逐字等于按值 grep 实测值": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353444699
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790373083969
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790374489548
+      }
+    ],
+    "4. Property 3 / 4 红判据：D3-4 与 D3-7 是双区": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353444732
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790373093683
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790374490648
+      }
+    ],
+    "5. 性能基线 + `adapter_registered` 现状登记": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353444774
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790373102419
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790374491624
+      }
+    ],
+    "6. `phase5_d3_06_related_party.py` 声明 + 灰度开关": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353444822
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790374506709
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790375232276
+      }
+    ],
+    "7. D3-6 接入验收": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353444861
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790375240885
+      }
+    ],
+    "8. `phase5_d3_04_analysis.py` 声明**两个** spec": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353444897
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790377393416
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790380075496
+      }
+    ],
+    "9. `phase5_d3_05_long_term.py` 声明（单区）": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353444936
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790380085035
+      }
+    ],
+    "10. 阶段 2 验收（双区位移链在 D3 验通）": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353444975
+      },
+      {
+        "executionId": "e0921930-fd26-461a-8300-c99bbd0bb46f",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790380585800
+      },
+      {
+        "executionId": "850b8204-2f71-4bed-93e0-aa5afe3b5e27",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790412874551
+      }
+    ],
+    "11. `phase5_d3_07_voucher_check.py` 声明**两个** spec": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353445029
+      },
+      {
+        "executionId": "850b8204-2f71-4bed-93e0-aa5afe3b5e27",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790412879552
+      },
+      {
+        "executionId": "850b8204-2f71-4bed-93e0-aa5afe3b5e27",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790412885562
+      }
+    ],
+    "12. D3-7 接入验收": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353445075
+      },
+      {
+        "executionId": "850b8204-2f71-4bed-93e0-aa5afe3b5e27",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790412889571
+      },
+      {
+        "executionId": "850b8204-2f71-4bed-93e0-aa5afe3b5e27",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790412893572
+      }
+    ],
+    "13. `phase5_d3_01_adjudication.py` 声明（`AdjudicationSheetSpec`）": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353445136
+      },
+      {
+        "executionId": "850b8204-2f71-4bed-93e0-aa5afe3b5e27",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790412979956
+      },
+      {
+        "executionId": "850b8204-2f71-4bed-93e0-aa5afe3b5e27",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790413541373
+      }
+    ],
+    "14. D3-1 四态覆盖状态机 + 覆盖 UI": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353445176
+      },
+      {
+        "executionId": "850b8204-2f71-4bed-93e0-aa5afe3b5e27",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790413569953
+      },
+      {
+        "executionId": "850b8204-2f71-4bed-93e0-aa5afe3b5e27",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790415202250
+      }
+    ],
+    "15. D3-3 可行性核 + 裁决（**不改生产代码**）": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353445213
+      },
+      {
+        "executionId": "850b8204-2f71-4bed-93e0-aa5afe3b5e27",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790415219528
+      },
+      {
+        "executionId": "850b8204-2f71-4bed-93e0-aa5afe3b5e27",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790415666877
+      }
+    ],
+    "16.* 前端接线 + 变异检验 + 真栈 + 证据": [
+      {
+        "executionId": "6b0dfd92-b21a-43b6-84e0-79a36d85fe26",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790353445251
+      },
+      {
+        "executionId": "850b8204-2f71-4bed-93e0-aa5afe3b5e27",
+        "chatSessionId": "sess_56f822da-04c6-4081-bc48-67b253894cd3",
+        "timestamp": 1790415675406
+      }
+    ]
+  }
+}

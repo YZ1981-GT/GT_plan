@@ -30,6 +30,8 @@ from app.core.redis import get_redis
 from app.services.dataset_query import get_active_filter
 from app.services.ledger_penetration_service import LedgerPenetrationService
 
+from ._voucher_date import parse_iso_date
+
 router = APIRouter(prefix="/api/projects/{project_id}/ledger", tags=["ledger-penetration"])
 
 
@@ -164,12 +166,20 @@ async def get_voucher_entries(
     project_id: UUID,
     voucher_no: str,
     year: int = Query(...),
+    month: int | None = Query(None, ge=1, le=12, description="凭证月份（1~12）；粗粒度，同月内仍可能多张同号凭证"),
+    voucher_date: str | None = Query(None, description="凭证日期 YYYY-MM-DD；与凭证号组合唯一定位一张凭证（推荐）"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """凭证分录明细（按凭证号穿透）"""
+    """凭证分录明细（按凭证号穿透）
+
+    ⚠️ voucher_no 在真实数据中不唯一（实测 8 个项目里 7 个跨月/跨日重复），
+    建议同时传 voucher_date 以精确定位单张凭证。
+    """
     svc = _svc(db, None)
-    return await svc.get_voucher_entries(project_id, year, voucher_no)
+    return await svc.get_voucher_entries(
+        project_id, year, voucher_no, month=month, voucher_date=voucher_date,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +191,9 @@ from pydantic import BaseModel as _BaseModel  # noqa: E402
 class _SampleVoucherRequest(_BaseModel):
     year: int
     voucher_no: str
+    # V166：凭证日期。🔴 voucher_no 单独不唯一（实测单号最多对应 83 个日期），
+    # 传入后与 voucher_no 组合唯一定位一张凭证，也是回拉分录时的消歧依据。
+    voucher_date: str | None = None
     account_code: str | None = None
     sampling_record_id: UUID | None = None
     working_paper_id: UUID | None = None
@@ -195,38 +208,80 @@ async def sample_voucher(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """抽中本凭证：记录到抽样凭证清单（抽凭联动）。
+    """抽中本凭证 / 挂凭到底稿：记录到抽样凭证清单（抽凭联动）。
 
-    同项目+年度+凭证号去重（已抽则更新，未抽则新增，含软删恢复）。
+    去重范围 = 项目 + 年度 + 凭证号 + **凭证日期** + **目标底稿**（V166）。
+
+    🔴 V166 前的去重键只有 (project, year, voucher_no)，与 V140 的 DB 唯一索引一致 ——
+    那是「抽中本凭证」（不指定底稿）唯一存在时的合理设计。但「挂凭到底稿」入口引入后，
+    同一张凭证业务上完全可能既属 D2 应收账款检查、又属 E1 货币资金检查；旧键会命中
+    同一行并**覆盖 working_paper_id** ⇒ 先挂 D2 再挂 E1，D2 静默失去这张凭证。
+    现按底稿分别成行，配套索引已放宽（见 V166）。
+
+    🔴 同时修掉 `scalar_one_or_none()` 的 500：抽凭引擎登记（batch_id 非空）允许同一
+    (project, year, voucher_no) 存在多行，旧查询不带 batch/底稿过滤却要求「至多一行」
+    ⇒ 该凭证被抽凭引擎登记过之后，再手工挂凭必抛 MultipleResultsFound。
+    现在只在**手工侧**（batch_id IS NULL）按完整去重键查，且确定性排序取一行。
     """
     import sqlalchemy as sa
     from app.models.workpaper_models import SampledVoucher
 
-    # 查是否已存在（含软删）
-    existing = await db.execute(
-        sa.select(SampledVoucher).where(
-            SampledVoucher.project_id == project_id,
-            SampledVoucher.year == body.year,
-            SampledVoucher.voucher_no == body.voucher_no,
-        )
+    voucher_date = parse_iso_date(body.voucher_date)
+
+    # 查手工侧是否已存在同一「凭证(号+日) × 底稿」的记录（含软删，用于复活）。
+    # 🔴 必须限定 batch_id IS NULL：抽凭引擎批次行不属手工侧，不得被此处复用/改写。
+    conds = [
+        SampledVoucher.project_id == project_id,
+        SampledVoucher.year == body.year,
+        SampledVoucher.voucher_no == body.voucher_no,
+        SampledVoucher.batch_id.is_(None),
+    ]
+    # NULL 需用 IS NULL 比较（`== None` 在 SQL 里恒为 NULL ⇒ 永不命中，会退化成每次新增）
+    conds.append(
+        SampledVoucher.voucher_date.is_(None)
+        if voucher_date is None
+        else SampledVoucher.voucher_date == voucher_date
     )
-    row = existing.scalar_one_or_none()
+    conds.append(
+        SampledVoucher.working_paper_id.is_(None)
+        if body.working_paper_id is None
+        else SampledVoucher.working_paper_id == body.working_paper_id
+    )
+
+    existing = await db.execute(
+        sa.select(SampledVoucher)
+        .where(*conds)
+        # 确定性取一行：存量若因历史索引遗留多行，取最近一条复活而非 500。
+        .order_by(SampledVoucher.sampled_at.desc().nullslast(), SampledVoucher.id)
+        .limit(1)
+    )
+    row = existing.scalars().first()
     if row is not None:
-        # 已存在 → 复活/更新
+        # 已存在 → 复活/更新（同一凭证同一底稿重复挂 = 幂等）
         row.is_deleted = False
         row.account_code = body.account_code or row.account_code
         row.sampling_record_id = body.sampling_record_id or row.sampling_record_id
-        row.working_paper_id = body.working_paper_id or row.working_paper_id
+        # 日期只补不改：命中行的 voucher_date 已等于本次入参（在去重键里），
+        # 唯一可补的情形是历史行为 NULL 而本次带了日期。
+        if row.voucher_date is None and voucher_date is not None:
+            row.voucher_date = voucher_date
         if body.note:
             row.note = body.note
         row.sampled_by = current_user.id
         await db.commit()
-        return {"id": str(row.id), "voucher_no": row.voucher_no, "status": "updated"}
+        return {
+            "id": str(row.id),
+            "voucher_no": row.voucher_no,
+            "voucher_date": row.voucher_date.isoformat() if row.voucher_date else None,
+            "working_paper_id": str(row.working_paper_id) if row.working_paper_id else None,
+            "status": "updated",
+        }
 
     new_row = SampledVoucher(
         project_id=project_id,
         year=body.year,
         voucher_no=body.voucher_no,
+        voucher_date=voucher_date,
         account_code=body.account_code,
         sampling_record_id=body.sampling_record_id,
         working_paper_id=body.working_paper_id,
@@ -236,7 +291,13 @@ async def sample_voucher(
     db.add(new_row)
     await db.commit()
     await db.refresh(new_row)
-    return {"id": str(new_row.id), "voucher_no": new_row.voucher_no, "status": "created"}
+    return {
+        "id": str(new_row.id),
+        "voucher_no": new_row.voucher_no,
+        "voucher_date": new_row.voucher_date.isoformat() if new_row.voucher_date else None,
+        "working_paper_id": str(new_row.working_paper_id) if new_row.working_paper_id else None,
+        "status": "created",
+    }
 
 
 @router.get("/sampled-vouchers")
@@ -246,6 +307,11 @@ async def list_sampled_vouchers(
     working_paper_id: UUID | None = Query(
         None, description="按目标底稿过滤（挂凭到底稿联动，底稿凭证检查拉取自己挂入的凭证）"
     ),
+    manual_only: bool = Query(
+        False,
+        description="只取手工挂凭（batch_id IS NULL），排除抽凭引擎批次登记；"
+                    "底稿「从序时账挂入导入」应传 true 以免来源标签失真",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
@@ -253,6 +319,9 @@ async def list_sampled_vouchers(
 
     可选 ``working_paper_id`` 过滤：底稿的凭证检查表据此只拉取「挂凭到底稿」挂到
     自己的凭证（与序时账手工挂凭联动）。
+
+    可选 ``manual_only``：本表同时承载手工挂凭与抽凭引擎批次登记（后者 batch_id 非空），
+    传 true 只取手工侧。每行额外返回 ``source``（manual / sampling_engine）便于前端区分。
     """
     import sqlalchemy as sa
     from app.models.workpaper_models import SampledVoucher
@@ -264,6 +333,11 @@ async def list_sampled_vouchers(
     ]
     if working_paper_id is not None:
         conds.append(SampledVoucher.working_paper_id == working_paper_id)
+    # V166：区分来源。手工挂凭（batch_id IS NULL）与抽凭引擎批次登记共用本表，
+    # 底稿「从序时账挂入导入」只该拿手工挂的那批 —— 否则会把引擎批次的凭证
+    # 也标成「序时账手工挂入」，来源标签失真。
+    if manual_only:
+        conds.append(SampledVoucher.batch_id.is_(None))
 
     result = await db.execute(
         sa.select(SampledVoucher).where(*conds).order_by(SampledVoucher.sampled_at.desc())
@@ -274,9 +348,13 @@ async def list_sampled_vouchers(
             {
                 "id": str(r.id),
                 "voucher_no": r.voucher_no,
+                # V166：回拉分录的消歧依据。None = 历史行未记日期，调用方需退化为按年匹配。
+                "voucher_date": r.voucher_date.isoformat() if r.voucher_date else None,
                 "account_code": r.account_code,
                 "sampling_record_id": str(r.sampling_record_id) if r.sampling_record_id else None,
                 "working_paper_id": str(r.working_paper_id) if r.working_paper_id else None,
+                "batch_id": str(r.batch_id) if r.batch_id else None,
+                "source": "sampling_engine" if r.batch_id else "manual",
                 "note": r.note,
                 "sampled_at": r.sampled_at.isoformat() if r.sampled_at else None,
             }

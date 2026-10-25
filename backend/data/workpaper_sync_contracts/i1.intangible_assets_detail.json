@@ -89,6 +89,8 @@
       "shape": "json_array_of_row_objects",
       "table": "checklist_responses"
     },
+    "legacy_positional_id_pattern": "^(cgu|bv|imp|perf|ap|tc-i18)-\\d+$",
+    "legacy_positional_ids_grandfathered": true,
     "max_column": 56,
     "oo_flags": {
       "el_segmented_total": 3,
@@ -99,6 +101,7 @@
     },
     "oo_flags_note": "🔴 `el_segmented` 共 **3** 个 —— 其中 `#L171` 是 **Tab 内部分段控件**不是模式切换器 ⇒ IC-16 门控判据 SHALL **按 toolbar class `i1-header-toolbar` 定位区块**再判，全文件 grep `el-segmented` 会误判成有第二个模式切换器。",
     "pilot_class": "phase5_intangible_assets_detail",
+    "positional_identity_fix_status": "fixed_out_of_sheet",
     "positional_identity_note": "🔴 全 I 8 处位置化 site 里 **I1 占 1 处**：`i1DisclosureEnhance.ts#L241` `tc-i18-${r.rowId || i}`（族 B 下标兜底，在**披露增强层**）。本 sheet 的行身份是 `useI1Detail.ts` 的 rowId（族 A 安全生成）⇒ 本契约 sites 为空，但那 1 处的修复归 lane 1 的 Task 5。",
     "positional_identity_sites": [],
     "regions": [
@@ -138,23 +141,24 @@
       "🔴 `附注披露信息（上市公司）` / `附注披露信息（国有企业）` **多「信息」二字**（其余 5 册是 `附注披露（…）`）⇒ 统一模式匹配在 I1 上失配"
     ],
     "soe_classification": {
-      "diff_count": 5,
-      "diffs": [
-        "条数 12 ↔ 11",
-        "`软件` 位次：impl 第 1 条（label 带「其中：」）↔ 源第 8 条",
-        "`房屋使用权`（impl） ↔ `住房使用权`（源）",
-        "`特许权`/`采矿权`（impl） ↔ `特许经营权`/`矿产权`（源）",
-        "impl 多出 `探矿权`（源模板无）"
+      "backward_compat": "mapToI1SoeCategoryKey 的 采矿/探矿/矿权 分支统一归 mining；真库 I1-soe% 0 行，无 key 迁移丢数据风险。",
+      "business_backlog_ref": "evidence/classification-decision-and-business-checklist-2026-10-01.md B-1（探矿/采矿是否需对矿业客户分列，低风险、默认合并）",
+      "diffs_fixed": [
+        "条数 12 → 11",
+        "`软件`：impl 第 1 条（label 带「其中：」）→ 源第 8 条、label「软件」",
+        "`房屋使用权` → `住房使用权`",
+        "`特许权` → `特许经营权`",
+        "`采矿权`+`探矿权`（2 条）→ `矿产权`（1 条，exploration 并入 mining，与 I1_LEGACY_KEY_MAP 既有口径一致）"
       ],
-      "fix_blocked_by": "business_confirmation",
-      "fix_blocked_note": "国企附注该用哪套分类名是**会计披露口径问题不是代码问题**；且改常量会同时改附注列头（涉已归档的附注同步 spec）⇒ 本轮只登记不改。",
       "impl_constant": "composables/i1SoeDisclosureModel.ts#I1_SOE_CATEGORIES",
-      "impl_count": 12,
-      "second_source_check": "🔴 第二真源 `note_template_soe.json` 里 `采矿权`/`探矿权`/`房屋使用权` 命中 **0** ⇒ **两个真源都不支持 impl 的写法**。",
+      "impl_count": 11,
+      "resolution": "I1_SOE_CATEGORIES 收敛为派生自单一真源 i1CategoryScope（原 12 条独立写死已移除）",
+      "second_source_ref": "backend/data/note_template_soe.json",
+      "single_source_ref": "composables/i1CategoryScope.ts#I1_DEFAULT_CATEGORIES",
       "source_real_count": 11,
       "source_ref": "附注披露信息（国有企业）!A9:A19",
-      "status": "defect_registered_not_fixed",
-      "verdict": "MISMATCH"
+      "status": "resolved",
+      "verdict": "ALIGNED_TO_SINGLE_SOURCE"
     },
     "store_only_fields": [
       "acquisitionDate",

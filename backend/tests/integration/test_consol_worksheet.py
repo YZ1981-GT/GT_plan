@@ -84,49 +84,37 @@ async def test_consol_recalc_endpoint(pg_client):
 
 @pytest.mark.asyncio
 async def test_consol_worksheet_engine_pure_logic():
-    """纯内存计算逻辑验证（不需要数据库）"""
-    from app.services.consol_worksheet_engine import _calc_node_batch, ZERO
-    from app.services.consol_tree_service import TreeNode
+    """纯内存计算逻辑验证（不需要数据库）。
 
-    # 构建简单树：根 → 子A + 子B
-    root_id = uuid.uuid4()
-    child_a_id = uuid.uuid4()
-    child_b_id = uuid.uuid4()
+    口径变更（spec consol-tree-three-code-autobuild 任务 7.6）：旧版 ``_calc_node_batch`` 已删除，
+    计算口径收敛到 ``consol_calc_basis``；树改由三码推导（合并 / 合并差额 / 母公司三节点）。
+    """
+    from app.services.consol_calc_basis import TbRow, build_calc_basis, worksheet_rows
+    from app.services.consol_group_tree import ProjectRecord, derive_group_tree
 
-    child_a = TreeNode(
-        project_id=child_a_id, company_code="A",
-        company_name="子公司A", parent_company_code="ROOT",
-        ultimate_company_code="ROOT", consol_level=2,
-    )
-    child_b = TreeNode(
-        project_id=child_b_id, company_code="B",
-        company_name="子公司B", parent_company_code="ROOT",
-        ultimate_company_code="ROOT", consol_level=2,
-    )
-    root = TreeNode(
-        project_id=root_id, company_code="ROOT",
-        company_name="集团", parent_company_code=None,
-        ultimate_company_code="ROOT", consol_level=1,
-        children=[child_a, child_b],
-    )
+    def rec(code, scope, parent=None):
+        return ProjectRecord(
+            id=uuid.uuid4(), company_code=code, client_name=f"企业{code}", report_scope=scope,
+            audit_year=2025, parent_company_code=parent, relation_to_parent="subsidiary" if parent else None,
+        )
 
-    # 模拟数据
-    account_codes = {"1001", "2001"}
-    tb_map = {
-        (child_a_id, "1001"): Decimal("100"),
-        (child_a_id, "2001"): Decimal("50"),
-        (child_b_id, "1001"): Decimal("200"),
-        (child_b_id, "2001"): Decimal("80"),
-    }
-    ws_map = {}  # 无已有 worksheet
-    elim_map = {}  # 无抵消分录
+    root = rec("ROOT", "consolidated")
+    a, b = rec("A", "standalone", "ROOT"), rec("B", "standalone", "ROOT")
+    tree = derive_group_tree([root, a, b], root, 2025).root
 
-    results = []
-    node_amounts = _calc_node_batch(root, account_codes, tb_map, ws_map, elim_map, results)
+    tb = [
+        TbRow(a.id, "1001", "货币资金", None, Decimal("100")),
+        TbRow(a.id, "2001", "短期借款", None, Decimal("50")),
+        TbRow(b.id, "1001", "货币资金", None, Decimal("200")),
+        TbRow(b.id, "2001", "短期借款", None, Decimal("80")),
+    ]
+    rows = worksheet_rows(build_calc_basis(tree, 2025, tb, []))
+    by_key = {(k, acct): v for k, acct, v in rows}
 
-    # 验证根节点合并数 = 子A + 子B
-    assert node_amounts["1001"] == Decimal("300")  # 100 + 200
-    assert node_amounts["2001"] == Decimal("130")  # 50 + 80
+    # 根节点合并数 = 子A + 子B（母公司没有单户项目 ⇒ 母公司数据节点计 0）
+    assert by_key[("ROOT:consol", "1001")].consolidated_amount == Decimal("300")
+    assert by_key[("ROOT:consol", "2001")].consolidated_amount == Decimal("130")
+    assert by_key[("ROOT:parent", "1001")].consolidated_amount == Decimal("0")
 
-    # 验证结果行数 = 3 节点 × 2 科目 = 6
-    assert len(results) == 6
+    # 结果行数 = 5 节点（合并、合并差额、母公司、A、B）× 2 科目
+    assert len(rows) == 10

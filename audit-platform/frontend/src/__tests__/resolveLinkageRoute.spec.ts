@@ -56,12 +56,22 @@ describe('resolveLinkageRoute', () => {
     expect(result).toBe(`/projects/${PROJECT_ID}/workpapers/${uuid}`)
   })
 
-  it('resolves workpaper wp_code via API', async () => {
-    mockGet.mockResolvedValueOnce({ working_paper_id: 'resolved-wp-id' })
+  it('resolves workpaper wp_code via the platform wp-id-by-code endpoint', async () => {
+    // 🔴 原端点 `/api/projects/{pid}/wp-index/by-code/{code}` 后端不存在（恒 404）
+    mockGet.mockResolvedValueOnce({ wp_id: 'resolved-wp-id' })
     const contract = makeContract({ target_type: 'workpaper', target_id: 'D1' })
     const result = await resolveLinkageRoute(contract, PROJECT_ID)
-    expect(mockGet).toHaveBeenCalledWith(`/api/projects/${PROJECT_ID}/wp-index/by-code/D1`)
+    expect(mockGet).toHaveBeenCalledWith(
+      '/api/custom-query/wp-id-by-code',
+      expect.objectContaining({ params: { project_id: PROJECT_ID, wp_code: 'D1' } }),
+    )
     expect(result).toBe(`/projects/${PROJECT_ID}/workpapers/resolved-wp-id`)
+  })
+
+  it('returns null when the response carries no wp_id', async () => {
+    mockGet.mockResolvedValueOnce({})
+    const contract = makeContract({ target_type: 'workpaper', target_id: 'Z9' })
+    expect(await resolveLinkageRoute(contract, PROJECT_ID)).toBeNull()
   })
 
   it('returns null when wp_code API fails', async () => {

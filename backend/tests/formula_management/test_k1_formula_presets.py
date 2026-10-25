@@ -12,10 +12,12 @@ import pytest
 from app.services.formula_engine import validate_formula
 from app.services.formula_management.preset_library import convert_prefill_presets
 
-#: `ADJ()` 未注册进 `formula_engine._REGISTRY`（prefill 引擎词汇表 vs 校验引擎词汇表
-#: 两套并存的既有平台缺口，K1-1 早已用 ADJ() 且非本 spec 引入）——按 prefill 词汇表
-#: 放行，`validate_formula` 层面豁免这两条，并配反向自检防豁免范围被悄悄扩大。
-_KNOWN_ADJ_EXEMPT = {"AJE调整", "RJE调整"}
+# 🔴 原 `_KNOWN_ADJ_EXEMPT = {"AJE调整", "RJE调整"}` 已删
+# （spec tb-adjustment-column-formula-closure Phase 1 Task 1.6）。
+#
+# 它曾把「校验引擎不认 ADJ()」这个平台缺口固化成预期行为：断言这两条预设
+# **必须** `validate_formula` 失败。`ADJ` 注册进 `_REGISTRY` 后该断言自己变红 ——
+# 那正是豁免为假绿的证明。现改为正向断言，见 `test_adj_presets_pass_validation`。
 
 
 @pytest.fixture(scope="module")
@@ -123,13 +125,29 @@ def test_k1_new_blocks_pass_validate_formula(k1_entries):
         assert errs == [], f"{e.target_cell}: {errs}"
 
 
-def test_adj_exemption_is_narrow_and_documented(k1_entries):
-    """反向自检：`ADJ()` 豁免只限定在 `_KNOWN_ADJ_EXEMPT` 两条，不得悄悄扩大范围。"""
-    failing = {
-        e.target_cell for e in k1_entries
-        if validate_formula(e.expression) and "ADJ(" in e.expression
-    }
-    assert failing == _KNOWN_ADJ_EXEMPT, failing
+def test_adj_presets_pass_validation(k1_entries):
+    """`ADJ()` 预设必须**通过** `validate_formula`（正向断言，P9）。
+
+    spec: tb-adjustment-column-formula-closure Phase 1 Task 1.6
+
+    🔴 本测试的前身是 `test_adj_exemption_is_narrow_and_documented` ——
+    它断言这两条**必须失败**，靠 `_KNOWN_ADJ_EXEMPT = {"AJE调整","RJE调整"}`
+    把"校验引擎不认 ADJ()"这个平台缺口固化成了预期行为。那个豁免的注释
+    自称「prefill 引擎词汇表 vs 校验引擎词汇表两套并存的既有平台缺口」，
+    留着即假绿：任何人看测试全绿都会以为 ADJ() 是能用的。
+
+    `ADJ` 现已注册进 `formula_engine._REGISTRY`（Task 1.3），
+    `validate_formula` 的已知函数集派生于该注册表 ⇒ 自动放行，无需第二份白名单。
+
+    豁免删除后该常量在全仓引用数为 0，由
+    `test_adj_formula_function.test_p9_exemption_constant_is_gone` 钉死。
+    """
+    adj_entries = [e for e in k1_entries if "ADJ(" in e.expression]
+    assert adj_entries, "K1 预设应含 ADJ() 条目（豁免删除后仍须有被验对象）"
+    for e in adj_entries:
+        assert validate_formula(e.expression) == [], (
+            f"{e.target_cell} 的 ADJ() 预设未通过校验：{validate_formula(e.expression)}"
+        )
 
 
 def test_guard_detects_regression_on_dedup_collision():

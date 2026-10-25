@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "2a9b9ca023a9b3e8e308e4182ab3788b6de74416de0342ec7870e0c50b8d12ec",
+  "instrumentation_definition_sha256": "7f40be9e35e43c956067182f36df90d10e577d2eb10c553d8e5dfb9fb49221cb",
   "review": {
     "authority_root": "backend/wp_templates",
     "carrier": {
@@ -22,21 +22,26 @@
       "write_client": "http"
     },
     "classification": {
-      "fix_blocked_by": "business_confirmation",
-      "impl_constant": "CATEGORY_OPTIONS",
-      "impl_count": 6,
-      "note": "这三条是否属长期待摊费用的合法分类是会计判断，不是代码问题 ⇒ 本轮只交付判据 + 登记。",
-      "source_empty_cells": "A9/A10 空 + A12:A22 全空",
-      "source_real_count": 1,
-      "source_real_label": "使用权资产改良及维护支出",
-      "source_ref": "明细表I4-2!A11",
-      "status": "defect_registered_not_fixed",
-      "unsourced_tail": [
+      "authority_impl_ref": "useI4Detail.ts#I4_2_TAX_NOTES",
+      "authority_refs": [
+        "《企业所得税法》第十三条（租入固定资产改建支出 / 固定资产大修理支出 / 其他规定支出）",
+        "《企业所得税法实施条例》第六十八条（大修理支出认定与摊销年限）",
+        "会计实务：开办费为筹建期费用的长期待摊科目"
+      ],
+      "impl_authoritative_tail": [
         "租入固定资产改良支出",
         "固定资产大修理支出",
         "开办费"
       ],
-      "verdict": "PREFIX_MATCH_WITH_UNSOURCED_TAIL"
+      "impl_constant": "CATEGORY_OPTIONS",
+      "impl_count": 6,
+      "resolution_note": "模板不完整（A11 仅 1 条），impl 的税尾 3 条有税法条文依据 ⇒ 保留 impl 并登记依据。业务方如需增补常用分类见 evidence/classification-decision-and-business-checklist-2026-10-01.md B-2。",
+      "source_empty_cells": "A9/A10 空 + A12:A22 全空",
+      "source_real_count": 1,
+      "source_real_label": "使用权资产改良及维护支出",
+      "source_ref": "明细表I4-2!A11",
+      "status": "resolved",
+      "verdict": "IMPL_AUTHORITATIVE_TEMPLATE_INCOMPLETE"
     },
     "defined_name_baseline": 476,
     "defined_name_baseline_note": "🔴 **476 个**（全 I 最多；I5 334、其余四册全 0，合计 810）。判据 SHALL 用「登记基线 + 断言不增长」口径，**不得**照抄 H 循环 HC-14 的「断言全 0」—— 那在 I1/I2/I3/I6 上恒真悄悄通过，**只有 I4/I5 会打红**。🔴 **不删这 476 个**：它们是模板公式的命名引用，删了会让 max_column 内的公式整片失效；只声明「同步时不新增、不改写」。",
@@ -419,9 +424,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "9c0aff93d7b7be6da3b7f753d87a70392db7768d6b640b503c964939cab36b91",
+    "normalized_structure_hash": "7a4f1fee4d8d198152358c38a29a856e65acb40b12bff5cb9db17cb398b433db",
     "relative_path": "I/I4 长期待摊费用.xlsx",
-    "template_sha256": "8bfb85884705e47121589227d3212f3e406cab9b4ea6e0736d53b951c65eb8f8"
+    "template_sha256": "94a5baab24adb2990678e9d1cf7a91f75f83ce34ebed7cf725634009dad81a8b"
   },
-  "template_definition_sha256": "b11d3d0de293accabd6d8f4d2ca11037a41fe85ce9889ffd3b94e8d6b7dfcef1"
+  "template_definition_sha256": "99acb56388d8447a5ebd9655bcfe6668c1cb1c3811d795551b87e6b8e629ec72"
 }

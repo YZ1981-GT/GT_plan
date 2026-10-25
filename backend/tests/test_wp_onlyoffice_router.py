@@ -67,6 +67,12 @@ def _empty_result():
     return result
 
 
+def _scalar_result(value):
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = value
+    return result
+
+
 def _db_execute(*ordered):
     """按顺序返回给定结果，其后一律返回 `_empty_result()`。
 
@@ -121,11 +127,10 @@ async def app_client(tmp_storage):
         yield MagicMock()
 
     from app.core.database import get_db
-    from app.deps import require_project_access
+    from app.deps import get_current_user
 
     app.dependency_overrides[get_db] = _fake_db
-    # Override the dependency factory
-    app.dependency_overrides[require_project_access("readonly")] = lambda: fake_user
+    app.dependency_overrides[get_current_user] = lambda: fake_user
 
     yield app, fake_user, tmp_storage
 
@@ -375,7 +380,7 @@ class TestOnlyOfficeConfigEndpoint:
 
         fake_db = AsyncMock()
         fake_db.execute = AsyncMock(
-            side_effect=_db_execute(fake_wp_result, fake_proj_result)
+            side_effect=_db_execute(_scalar_result(project_id), fake_wp_result, fake_proj_result)
         )
 
         # Mock acquire_session 返回 False（席位满）
@@ -459,7 +464,7 @@ class TestOnlyOfficeConfigEndpoint:
 
         fake_db = AsyncMock()
         fake_db.execute = AsyncMock(
-            side_effect=_db_execute(fake_wp_result, fake_proj_result)
+            side_effect=_db_execute(_scalar_result(project_id), fake_wp_result, fake_proj_result)
         )
 
         # Mock acquire_session — should NOT be called
@@ -540,7 +545,7 @@ class TestOnlyOfficeConfigEndpoint:
 
         fake_db = AsyncMock()
         fake_db.execute = AsyncMock(
-            side_effect=_db_execute(fake_wp_result, fake_proj_result)
+            side_effect=_db_execute(_scalar_result(project_id), fake_wp_result, fake_proj_result)
         )
 
         # Mock acquire_session 返回 True（席位充足）
@@ -621,7 +626,7 @@ class TestOnlyOfficeConfigEndpoint:
 
         fake_db = AsyncMock()
         fake_db.execute = AsyncMock(
-            side_effect=_db_execute(fake_wp_result, fake_proj_result)
+            side_effect=_db_execute(_scalar_result(project_id), fake_wp_result, fake_proj_result)
         )
 
         with patch("app.services.onlyoffice_session_limiter.acquire_session", new_callable=AsyncMock) as mock_acquire:

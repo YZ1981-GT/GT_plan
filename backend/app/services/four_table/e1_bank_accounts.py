@@ -172,13 +172,15 @@ async def fetch_e1_bank_accounts(
     year: int,
     *,
     account_prefixes: Sequence[str],
+    strict: bool = False,
 ) -> list[BankAccountRow]:
     """从 `tb_aux_balance` 取银行账户级明细。
 
     - 查询一律经 `await get_active_filter(...)`（**禁裸写 `is_deleted == False`**）
     - 按 `(account_code, 解析出的账号)` 聚合求和
     - 金额 `COALESCE(...,0)`
-    - fail-open：异常返 `[]` + warning + rollback（不让取数失败打断整个 render）
+    - fail-open：异常返 `[]` + warning + rollback（不让取数失败打断整个 render）；
+      ``strict=True`` 时异常原样上抛（写入方用，失败不得伪装成「无账户数据」）
 
     `account_prefixes` 为空时直接返 `[]`（不查库）—— 槽全 `found=False` 时的正常路径。
     """
@@ -192,7 +194,7 @@ async def fetch_e1_bank_accounts(
 
         # 🔴 必须 await —— 见模块 docstring 约束 1
         active = await get_active_filter(
-            db, TbAuxBalance.__table__, project_id, year
+            db, TbAuxBalance.__table__, project_id, year, strict=strict
         )
 
         code_pred = sa.or_(
@@ -221,6 +223,8 @@ async def fetch_e1_bank_accounts(
         )
         rows = (await db.execute(stmt)).all()
     except Exception as exc:  # noqa: BLE001 - fail-open
+        if strict:
+            raise
         logger.warning(
             "E1 账户级取数失败（project=%s year=%s prefixes=%s）：%s",
             project_id,

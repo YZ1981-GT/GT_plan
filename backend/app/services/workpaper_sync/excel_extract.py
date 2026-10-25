@@ -96,7 +96,16 @@ import zipfile
 from dataclasses import dataclass, field as dataclass_field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Final, Iterable, Iterator, Mapping, Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Final,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+    Union,
+)
 from xml.etree import ElementTree as ET
 
 from openpyxl.utils import column_index_from_string, get_column_letter
@@ -168,6 +177,11 @@ from app.services.workpaper_sync.excel_row_shift import (
     unextend_total_formula_chain,
 )
 from app.services.workpaper_sync.limits import SyncLimits, load_limits
+
+if TYPE_CHECKING:  # pragma: no cover - 仅类型；运行期 import 会成环
+    # `excel_workbook_row_change` 反向 import 本模块（`_scan_row_identities` 等），
+    # 所以删行载体只能做**前向引用**，不能在模块顶层真 import。
+    from app.services.workpaper_sync.excel_workbook_row_change import RowDeletionShift
 from app.services.workpaper_sync.merge import (
     ContractIndex,
     StructuralAnomaly,
@@ -1457,6 +1471,108 @@ class UnmanagedRegionDigest:
         )
 
 
+def deleted_row_coordinates(
+    artifact: Path, *, sheet_part: str, deleted_rows: Sequence[int]
+) -> frozenset[str]:
+    """被删行上的**全部**格坐标（删行**前**口径）。
+
+    spec: workpaper-sync-row-deletion-multi-region-propagation（design 勘误节 E.3 第①类）
+
+    ═══ 为什么需要它：`unshift` 表达不了「这些格不存在了」═══
+
+    删物理行会把那一行上的格**整体删掉**，包括**未管理**列上的格。而
+    :func:`_managed_sheet_cell_digest` 的归一化（`row_shift`）只给 **after** 侧、
+    且只做行号映射 ⇒ before 侧仍逐格喂那些已经不存在的格 ⇒ 两侧项数与内容都不等
+    ⇒ `adapter_unmanaged_region_drift`。
+
+    实测（K11、删 r=20）：`managed_sheet_unmanaged_cells` 的覆盖数 297 → 290，
+    消失的 7 个是 `A20`/`B20`/`D20`/`E20`/`F20`/`G20`/`I20`（其中 5 个还带跨 sheet 公式）。
+    design「§ 七条欠账逐条」A6 原文只说「未管理的格**行号变了**」，没有描述这一类。
+
+    ═══ 处置：并进 `extra_managed_coords`（两侧对称排除）═══
+
+    `verify_unmanaged_regions` 把 `extra_managed_coords` 传给 **before 与 after 两侧**
+    （现读两处调用都传）⇒ 把被删行的坐标并进受管集合，两侧就都不再逐格比它们。
+    这不是「只对 after 归一化」的例外（Requirement 6.3 说的是**归一化**），
+    而是受管集合的**定义**：那些行本来就是受管数据行，它们非受管列上的格是
+    「删一整个受管行」的附带结果。
+
+    Args:
+        artifact: **删行前**的 artifact（坐标口径必须与 `deleted_rows` 一致）。
+        sheet_part: 受管 sheet 的 zip part。
+        deleted_rows: 被删行号（删行前口径）。
+
+    Returns:
+        `{"A20", "B20", …}`。`deleted_rows` 为空时返回空集合。
+    """
+    rows = {int(r) for r in deleted_rows}
+    if not rows:
+        return frozenset()
+    out: set[str] = set()
+    with zipfile.ZipFile(artifact) as zf, zf.open(sheet_part, "r") as src:
+        for _event, element in ET.iterparse(src, events=("end",)):
+            if not element.tag.endswith("}c") and element.tag != "c":
+                continue
+            ref = element.attrib.get("r", "")
+            found = _CELL_COORD_RE.match(ref) if ref else None
+            if found is not None and int(found.group("row")) in rows:
+                out.add(ref)
+            element.clear()
+    return frozenset(out)
+
+
+def collapsed_total_formula_coordinates(
+    artifact: Path, *, sheet_part: str, total_formula_rows: Sequence[int]
+) -> frozenset[str]:
+    """契约声明「携带合计公式」的行上、**带公式**的格坐标（删行前口径）。
+
+    spec: workpaper-sync-row-deletion-multi-region-propagation（design 勘误节 E.6）
+
+    ═══ 🔴 为什么删行侧的合计区间收缩**无法**用行号逆映射还原 ═══
+
+    删行让合计区间**端点塌陷**：受管区 14..21、合计 `SUM(F14:F21)`，删第 21 行后正确产物是
+    `SUM(F14:F20)`。归一化要把它还原成 `SUM(F14:F21)`，而 `unshift` 是**存活行之间的双射**
+    —— 塌陷后的端点 20 的前像就是 20（行 20 自己存活），不是 21。给 `extend_end_at` 做一次
+    末行修正能救回末行，但删**区首行**时同样的问题落在**首行**上
+    （`shift_range_start(14)` 保持 14，而 `unshift(14)` 给 15），而
+    `_rewrite_formula_refs` **没有** `extend_start_at` 钩子，且 Requirement 10.1 禁止改它。
+
+    ⇒ Requirement 6.4 的「按声明还原该收缩」**不可能**由行号逆映射实现（这是双射性质，
+    不是实现缺陷）。诚实的落法是：把这些**契约声明的**合计格从逐格比对里两侧对称排除，
+    收缩的正确性改由 **A7 的 footer 两门**直接检查
+    （`assert_footer_formula_covers_managed_rows` 用删行后的受管末行求值）——
+    那是比 digest 等价**更强**的判据：它检查「区间是否恰好覆盖受管行」，
+    而 digest 只检查「文本是否能还原成改前样子」。
+
+    ⚠ 只排除**带公式**的格：同一行上的标签/数值格照旧逐格比对（它们的行号由 `unshift`
+    正常归一化），所以「用户偷偷改了合计行的文字」仍然会被发现。
+
+    Args:
+        artifact: **删行前**的 artifact。
+        sheet_part: 受管 sheet 的 zip part。
+        total_formula_rows: 契约声明携带合计公式的行号（删行前口径）。
+    """
+    rows = {int(r) for r in total_formula_rows}
+    if not rows:
+        return frozenset()
+    out: set[str] = set()
+    with zipfile.ZipFile(artifact) as zf, zf.open(sheet_part, "r") as src:
+        for _event, element in ET.iterparse(src, events=("end",)):
+            if not element.tag.endswith("}c") and element.tag != "c":
+                continue
+            ref = element.attrib.get("r", "")
+            found = _CELL_COORD_RE.match(ref) if ref else None
+            if found is not None and int(found.group("row")) in rows:
+                has_formula = any(
+                    child.tag.rsplit("}", 1)[-1] == "f" and (child.text or "").strip()
+                    for child in element
+                )
+                if has_formula:
+                    out.add(ref)
+            element.clear()
+    return frozenset(out)
+
+
 def _managed_coordinates(
     *,
     contract: SyncContract,
@@ -1691,9 +1807,22 @@ def _xml_unescape(text: str) -> str:
 _CELL_COORD_RE: Final[re.Pattern[str]] = re.compile(r"^(?P<col>[A-Z]{1,3})(?P<row>\d+)$")
 
 
+#: 行变更的**位移载体**——三者鸭子兼容（`shift` / `unshift` / `inserted_rows` / `count`）。
+#:
+#: * :class:`RowShiftPlan`     —— 单趟插行；
+#: * :class:`CompositeRowShift` —— 同一 sheet 多趟插行的累积；
+#: * `RowDeletionShift`        —— 删行（spec workpaper-sync-row-deletion-…-propagation）。
+#:
+#: 🔴 写成别名而不是在 7 处各列三个类型：漏改一处就会让删行载体在**那一处**被静态
+#: 类型判非法，而运行期照样能跑 ⇒ 「注解与实现不符」这类最难发现的缺陷。
+#: 🔴 `RowDeletionShift` 用**字符串**前向引用：`excel_workbook_row_change` 反向 import
+#: 本模块的 `_scan_row_identities` 等会成环，不能在模块顶层真 import 它。
+RowChangeCarrier = Union[RowShiftPlan, CompositeRowShift, "RowDeletionShift"]
+
+
 def _is_total_row(
     normalised_ref: str,
-    row_shift: RowShiftPlan | CompositeRowShift,
+    row_shift: RowChangeCarrier,
     total_rows: frozenset[int],
 ) -> bool:
     """该格（**已归一化**的坐标）是否落在契约声明「携带合计公式」的行上。
@@ -1709,7 +1838,7 @@ def _is_total_row(
 def _normalise_cell_ref(
     ref: str,
     *,
-    row_shift: RowShiftPlan | CompositeRowShift,
+    row_shift: RowChangeCarrier,
     inserted: frozenset[int] | range,
 ) -> str:
     """after 侧格坐标 → before 侧口径。新插入行返回空串（= 调用方跳过它）。"""
@@ -1722,8 +1851,63 @@ def _normalise_cell_ref(
     return f"{found.group('col')}{row_shift.unshift(row)}"
 
 
+COLLAPSED_ENDPOINT_SENTINEL: Final[str] = "«gt-collapsed-endpoint»"
+"""区间端点落在被删行上时，两侧结构 digest 里都替换成它（对称排除）。
+
+spec: workpaper-sync-row-deletion-multi-region-propagation（design 勘误节 E.6）
+
+🔴 这是**数学事实**不是实现欠账：删行的前向映射在区间端点上是
+`shift_range_end`（`row - |{d ≤ row}|`），它把「被删的端点」与「它上面那个存活行」
+**映到同一个值**（D={21}：`21 → 20` 且 `20 → 20`）⇒ 前向非单射 ⇒ **不存在逆映射**，
+`unshift` 或任何别的行号重映射都还原不回去。
+
+所以对这一小类项目只能做**两侧对称排除**：排除集
+:func:`deletion_collapse_rows` 完全由声明（被删行集合）导出，before / after 两侧
+拿到的是**同一个集合**，因此排除是对称的 —— 不会出现「一侧排除一侧不排除」的假绿口子。
+补偿控制是 apply 侧 A8 真的把它改对了（`test_row_deletion_apply_propagation.py`
+逐值断言收缩后的 `sqref`），以及 A7 的 footer 两门。
+"""
+
+
+def deletion_collapse_rows(row_shift: RowChangeCarrier) -> frozenset[int]:
+    """删行载体的「端点塌陷邻域」；插行载体恒返回空集。
+
+    = 被删行集合 D ∪ D 的前向像 `{shift_range_end(d) for d in D}`。
+
+    🔴 为什么要取**并集**而不只取 D（before 侧）或只取像（after 侧）：
+    只取 D 时，before 侧的 `A14:A20`（20 ∉ D）会被保留，而它的 after 像
+    `shift_range_end(20) = 20` 落在像集合里被排除 ⇒ **一侧排一侧不排 ⇒ 判漂移（假红）**。
+    取并集后集合只由载体导出、两侧逐值相同 ⇒ 对称性由构造保证。
+    """
+    deleted = getattr(row_shift, "deleted_rows", None)
+    if not deleted:
+        return frozenset()
+    rows = set(deleted)
+    rows.update(row_shift.shift_range_end(row) for row in deleted)
+    return frozenset(rows)
+
+
+def _referenced_rows(value: str) -> frozenset[int]:
+    """`value` 里被 A1 解析器认作行号的全部行。
+
+    🔴 不自己写第二个 A1 正则 —— 直接借 :func:`remap_a1_rows` 走一遍，用一个
+    「只记录、不改动」的 remap 探针收集它**实际问过哪些行**。口径与真正改写时逐字一致。
+    """
+    seen: set[int] = set()
+
+    def _probe(row: int) -> int:
+        seen.add(row)
+        return row
+
+    remap_a1_rows(value, remap=_probe)
+    return frozenset(seen)
+
+
 def _normalise_structure_element(
-    element: Any, *, row_shift: RowShiftPlan | CompositeRowShift
+    element: Any,
+    *,
+    row_shift: RowChangeCarrier | None = None,
+    collapse_rows: frozenset[int] = frozenset(),
 ) -> None:
     """把一个结构块元素（含后代）里携带行号的属性/文本**就地**归一化回位移前口径。
 
@@ -1733,23 +1917,49 @@ def _normalise_structure_element(
     「哪些属性/文本携带行号」不在本模块手写第二份 —— 三张表由
     `excel_row_shift.ROW_BEARING_STRUCTURES` **派生**，且该模块 import 期自检
     「每一项恰好落进一个归一化桶」。加新结构时不做决定就会打红。
-    """
 
-    def _remap(row: int) -> int:
-        return row_shift.unshift(row)
+    删行载体上另有一条：端点落进 :func:`deletion_collapse_rows` 的值**不可逆**，
+    两侧一起替换成 :data:`COLLAPSED_ENDPOINT_SENTINEL`（对称排除，见其 docstring）。
+
+    Args:
+        row_shift: 位移载体；`None` = 只做塌陷排除、不做行号归一化（**before 侧**就是
+            这么调的 —— before 侧不能 `unshift`（Requirement 6.3 只许归一化 after），
+            但排除必须两侧对称，所以它只收 `collapse_rows`）。
+        collapse_rows: 额外的塌陷邻域；给了 `row_shift` 时与其自身导出的邻域取并集。
+    """
+    if row_shift is not None:
+        collapse_rows = collapse_rows | deletion_collapse_rows(row_shift)
+        _unshift = row_shift.unshift
+
+        def _remap(row: int) -> int:
+            return _unshift(row)
+
+    else:
+
+        def _remap(row: int) -> int:
+            return row
+
+    def _normalise_a1(value: str) -> str:
+        if collapse_rows and (_referenced_rows(value) & collapse_rows):
+            return COLLAPSED_ENDPOINT_SENTINEL
+        return remap_a1_rows(value, remap=_remap)
 
     for node in element.iter():
         tag = node.tag.rsplit("}", 1)[-1]
         for name in STRUCTURE_ROW_BEARING_ATTRS.get(tag, ()):
             value = node.attrib.get(name)
             if value:
-                node.attrib[name] = remap_a1_rows(value, remap=_remap)
+                node.attrib[name] = _normalise_a1(value)
         for name in STRUCTURE_BARE_ROW_ATTRS.get(tag, ()):
             value = node.attrib.get(name)
             if value and value.isdigit():
-                node.attrib[name] = str(_remap(int(value)))
+                row = int(value)
+                if row in collapse_rows:
+                    node.attrib[name] = COLLAPSED_ENDPOINT_SENTINEL
+                else:
+                    node.attrib[name] = str(_remap(row))
         if tag in STRUCTURE_ROW_BEARING_TEXT_TAGS and node.text:
-            node.text = remap_a1_rows(node.text, remap=_remap)
+            node.text = _normalise_a1(node.text)
 
 
 def _managed_sheet_cell_digest(
@@ -1757,7 +1967,7 @@ def _managed_sheet_cell_digest(
     part: str,
     *,
     managed: frozenset[str],
-    row_shift: RowShiftPlan | CompositeRowShift | None = None,
+    row_shift: RowChangeCarrier | None = None,
     total_formula_rows: Sequence[int] = (),
 ) -> tuple[str, int]:
     """受管 sheet 上**非受管**单元格的 digest（流式 iterparse，逐格喂 hash）。
@@ -1840,12 +2050,16 @@ def _sheet_structure_digest(
     zf: zipfile.ZipFile,
     part: str,
     *,
-    row_shift: RowShiftPlan | CompositeRowShift | None = None,
+    row_shift: RowChangeCarrier | None = None,
+    collapse_rows: frozenset[int] = frozenset(),
 ) -> tuple[str, int]:
     """受管 sheet 的结构块（merge / cols / 数据验证 / 条件格式 / 保护 / …）digest。
 
     `row_shift` 非空时，结构块里携带行号的属性与元素文本先按 `plan.unshift` 归一化再
-    序列化（Requirement 6.2）。`None` 时行为逐字节不变。
+    序列化（Requirement 6.2）。两者都空时行为逐字节不变。
+
+    `collapse_rows` 用于 **before 侧**的对称排除：删行时端点塌陷不可逆
+    （见 :data:`COLLAPSED_ENDPOINT_SENTINEL`），before 侧不做行号归一化、只做排除。
     """
     digest = hashlib.sha256()
     found = 0
@@ -1853,8 +2067,10 @@ def _sheet_structure_digest(
         for event, element in ET.iterparse(src, events=("end",)):
             tag = element.tag.rsplit("}", 1)[-1]
             if tag in _SHEET_STRUCTURE_BLOCKS:
-                if row_shift is not None:
-                    _normalise_structure_element(element, row_shift=row_shift)
+                if row_shift is not None or collapse_rows:
+                    _normalise_structure_element(
+                        element, row_shift=row_shift, collapse_rows=collapse_rows
+                    )
                 digest.update(tag.encode("utf-8"))
                 digest.update(ET.tostring(element, encoding="utf-8"))
                 found += 1
@@ -1971,11 +2187,12 @@ def unmanaged_region_digest(
     scan: RowIdentityScan | None = None,
     limits: SyncLimits | None = None,
     shared_strings_limit: int | None = None,
-    row_shift: RowShiftPlan | CompositeRowShift | None = None,
+    row_shift: RowChangeCarrier | None = None,
     total_formula_rows: Sequence[int] = (),
     propagation: Any | None = None,
     extra_managed_sheet_parts: frozenset[str] | set[str] = frozenset(),
     extra_managed_coords: frozenset[str] | set[str] = frozenset(),
+    structure_collapse_rows: frozenset[int] = frozenset(),
 ) -> UnmanagedRegionDigest:
     """算一份 artifact 的未管理区域 digest（供 rematerialize 前后比对）。
 
@@ -1985,6 +2202,17 @@ def unmanaged_region_digest(
     `row_shift` 非空时对受管 sheet 的两个 aspect 做 **shift-aware 归一化**
     （逐格坐标 + 结构块里的行号）。它只能给 **after 侧**：before 侧本来就是位移前口径，
     两侧都归一化等于什么都没归一化。
+
+    🔴 **删行载体（`RowDeletionShift`）也走这个入参**（鸭子兼容 `unshift` / `inserted_rows`），
+    但它**只能表达行号映射**，表达不了「被删行上的格整体消失」。那一类必须用
+    :func:`deleted_row_coordinates` 算出坐标并并进 ``extra_managed_coords``
+    （两侧对称排除）—— 见该函数 docstring 与 design 勘误节 E.3 第①类。
+
+    🔴 删行侧还有**第②类表达不了的**：区间端点恰好落在被删行上时前向映射非单射
+    （`shift_range_end` 把被删端点与其上一存活行映到同一值）⇒ 不存在逆映射。
+    单元格公式那一类用 `extra_managed_coords` 排除（两侧都传）；结构块那一类用
+    `structure_collapse_rows` 排除（before 侧传它、after 侧由 `row_shift` 自己导出）。
+    见 :data:`COLLAPSED_ENDPOINT_SENTINEL` 与 design 勘误节 E.6。
 
     `propagation`（`WorkbookRowChangePlan`）非空时对 **`other_sheet_parts`** 桶里被
     传播触及的 part 做 **propagation-aware 归一化**：按计划**声明**的条目逐条逆替换回
@@ -2028,7 +2256,10 @@ def unmanaged_region_digest(
         coverage["managed_sheet_unmanaged_cells"] = cell_count
 
         struct_digest, struct_count = _sheet_structure_digest(
-            zf, region.sheet_part, row_shift=row_shift
+            zf,
+            region.sheet_part,
+            row_shift=row_shift,
+            collapse_rows=structure_collapse_rows,
         )
         aspects["managed_sheet_structure"] = struct_digest
         coverage["managed_sheet_structure"] = struct_count
@@ -2102,7 +2333,7 @@ def verify_unmanaged_regions(
     binding: ExcelIdentityBinding,
     scan: RowIdentityScan | None = None,
     limits: SyncLimits | None = None,
-    row_shift: RowShiftPlan | CompositeRowShift | None = None,
+    row_shift: RowChangeCarrier | None = None,
     total_formula_rows: Sequence[int] = (),
     propagation: Any | None = None,
     extra_managed_sheet_parts: frozenset[str] | set[str] = frozenset(),
@@ -2140,6 +2371,10 @@ def verify_unmanaged_regions(
     # extra_managed_coords 必须进缓存键：同 sheet 兄弟区并集变了就不能复用旧 digest，
     # 否则会把「兄弟受管格」误当成未管理（或反过来）而放行/误杀。
     extra_coords_key = ",".join(sorted(str(c) for c in extra_managed_coords))
+    # 🔴 塌陷邻域也必须进缓存键：它会改变 before 侧的结构 digest（把不可逆的端点值换成
+    # 哨兵）。不进键就会拿「另一组被删行算出来的 before digest」跟本次 after 比 ——
+    # 那是**跨声明串味**，既可能假绿也可能假红。这条与 extra_managed_coords 同理。
+    structure_collapse_rows = deletion_collapse_rows(row_shift) if row_shift else frozenset()
     before_key = "|".join(
         (
             before_sha,
@@ -2148,6 +2383,7 @@ def verify_unmanaged_regions(
             str(binding.table_key),
             ",".join(sorted(str(p) for p in extra_managed_sheet_parts)),
             extra_coords_key,
+            ",".join(str(r) for r in sorted(structure_collapse_rows)),
         )
     )
     base = BEFORE_DIGEST_CACHE.get(before_key)
@@ -2161,6 +2397,8 @@ def verify_unmanaged_regions(
             limits=lim,
             extra_managed_sheet_parts=extra_managed_sheet_parts,
             extra_managed_coords=extra_managed_coords,
+            # before 侧**不做**行号归一化（Requirement 6.3），只做对称排除。
+            structure_collapse_rows=structure_collapse_rows,
         )
         BEFORE_DIGEST_CACHE.put(before_key, base)
     target = unmanaged_region_digest(

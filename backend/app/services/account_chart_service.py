@@ -249,6 +249,11 @@ def _load_standard_chart_entries() -> list[dict]:
     return _STANDARD_CHART_ENTRIES
 
 
+def standard_chart_entries() -> list[dict]:
+    """标准科目表条目（``code`` / ``name`` / ``category`` …）的只读副本。"""
+    return [dict(e) for e in _load_standard_chart_entries()]
+
+
 def resolve_standard_account_by_name(
     account_name: str,
     *,

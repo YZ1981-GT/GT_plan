@@ -253,18 +253,27 @@ def _golden_providers():
     return PROVIDERS
 
 
-# D3 父模块（phase5_d3_prepaid_receipts）当前处于「契约已扩 d34/d35/d36 但父 provider 只暴露
-# 单数 instrumentation_spec（d32）」的**并发会话未提交**中间态 —— 与 D2 止血前同类。它是
-# single_onlyoffice（非 bidirectional），attach 返回空不 422，故不在本轮修复范围；本判据把它
-# 显式标为已知 misaligned（诚实登记，不代改并发会话的文件），其余 provider 必须对齐。
+# 已知 misaligned 的 provider 豁免名单。
 #
-# 🔴 d1.notes_receivable_detail 同为并发会话中间态（2026-09-26 观测）：契约已扩 11 张 sheet
-#   （d12/d14/d17/d18/d19/d110~d116-managed）但父 provider `phase5_d1_notes_receivable` 的
-#   instrumentation 受管 sheet 集合尚未跟上（`provider_managed_sheet_keys` 只出 d13）。工作树
-#   有该会话未提交改动（phase5_d1_expansion / phase5_d1_notes_receivable / d1 契约 / overlay），
-#   不代改。通用守卫**正确**点名这个真实漂移；本判据据实登记为 known-misaligned，
-#   待 D1 那条会话补齐 instrumentation_specs 后从本集合移除。
-_KNOWN_MISALIGNED = {"d3.prepaid_receipts_detail", "d1.notes_receivable_detail"}
+# 🔴 **现在是空的，且禁止回填**。曾经有两条，都已被兑现并移除（2026-09-28）：
+#
+#   * `d1.notes_receivable_detail` —— 原登记（2026-09-26 观测）：契约已扩 11 张 sheet
+#     但父 provider `phase5_d1_notes_receivable` 的 instrumentation 受管 sheet 集合只出
+#     d13，原文写明「待 D1 那条会话补齐 `instrumentation_specs` 后从本集合移除」。
+#     该补齐已完成：entry 模块补出复数 `instrumentation_specs()` 薄转发（18 组），
+#     并把 `instrumentation_definition_payload` 改走
+#     `build_instrumentation_payload_for_sheets`。这条豁免随之失效。
+#     🔴 顺带证实：那个「只出 d13」的漂移不只是登记问题 —— 它同时是 D1 整册
+#     representation 发布长期抛 `ContractDriftError` 的**根因**
+#     （staged substrate 里 18 张声明表只注出 1 张）。详见
+#     `test_d1_instrumentation_specs_forwarder.py` 与 `test_d1_full_book_gate_open_pg.py`。
+#
+#   * `d3.prepaid_receipts_detail` —— 原登记：契约已扩 d34/d35/d36 但父 provider 只暴露
+#     单数 `instrumentation_spec`（d32）。现算已对齐（通用守卫不再抛），豁免同样失效。
+#
+# 名单为空时 `test_known_misaligned_has_no_stale_entries` 仍然有意义：它禁止
+# 「把新漂移塞进名单当已知问题」这条退路 —— 加进来就必须证明它真的 misaligned。
+_KNOWN_MISALIGNED: set[str] = set()
 
 
 @pytest.mark.parametrize("row", _golden_providers(), ids=lambda r: r[0])
@@ -282,6 +291,41 @@ def test_generic_alignment_guard_covers_every_provider(row) -> None:
     else:
         # 对齐即返回 None；不对齐会抛并报差集（本轮修复要求这些全对齐）。
         F.assert_provider_specs_align_with_contract(mod, contract)
+
+
+def test_known_misaligned_has_no_stale_entries() -> None:
+    """豁免名单的**反向断言**：名单里每一条都必须真的 misaligned。
+
+    🔴 这是「豁免名单必配反向断言」这条纪律的落地：没有它，名单会变成
+    「把红转绿」的万能出口 —— 缺陷修好之后豁免仍在，下一个人无从知道它已过期。
+    本仓库刚被这条抓了两次（d1 与 d3 都已对齐却仍在名单里）。
+
+    名单为空时本条自然通过（空循环），但它守的是**往里加**的动作。
+    """
+    import importlib
+
+    rows = {row[0]: row for row in _golden_providers()}
+    stale: list[str] = []
+    for adapter_id in sorted(_KNOWN_MISALIGNED):
+        row = rows.get(adapter_id)
+        assert row is not None, (
+            f"豁免名单里的 {adapter_id!r} 不在 golden digest 登记中 —— 名单已与真源脱钩"
+        )
+        _label, module_name, adapter_const, _hp, _pl = row
+        mod = importlib.import_module(f"app.services.workpaper_sync.{module_name}")
+        contract = parse_contract(
+            mod.build_contract_payload(), adapter_id=getattr(mod, adapter_const)
+        )
+        try:
+            F.assert_provider_specs_align_with_contract(mod, contract)
+        except SyncDomainError:
+            continue  # 确实 misaligned，豁免成立
+        stale.append(adapter_id)
+
+    assert not stale, (
+        f"豁免名单有 {len(stale)} 条**失效条目**（现已对齐却仍被豁免）：{stale} —— "
+        f"请把它们从 `_KNOWN_MISALIGNED` 移除，并在注释里写明是什么改动让它对齐的"
+    )
 
 
 def test_alignment_guard_reports_exact_diff_on_missing_spec() -> None:

@@ -42,6 +42,228 @@ PRESET_CATEGORIES = [
     {"category": "notes", "name": "笔记库"},
 ]
 
+#: 与 ``KnowledgeFolder.name`` 列宽一致（String(200)），超长在 PG 端是 500 而非可读错误
+FOLDER_NAME_MAX_LEN = 200
+
+#: 纯文本类扩展名：正文由 :func:`decode_text_bytes` 按真实编码解码，不走 anydoc / MarkItDown
+#: （2026-09-30 实测 anydoc 把 GBK 编码的 CSV 按 Latin-1 解读，正文全成乱码；中文 Windows
+#: 下 Excel 另存的 CSV 默认就是 GBK）
+PLAIN_TEXT_EXTENSIONS: frozenset[str] = frozenset({".txt", ".md", ".csv"})
+
+#: 正文截断上限（与抽取链 anydoc / MarkItDown / pypdf 口径一致）
+CONTENT_TEXT_MAX_CHARS = 50_000
+
+
+#: 判为 UTF-16 至少需要的 0 字节数（绝对下限）
+_UTF16_MIN_ZERO_BYTES = 4
+
+
+def _utf16_byte_order(sample: bytes) -> str | None:
+    """无 BOM 时按 NUL 字节分布猜 UTF-16 字节序。
+
+    UTF-16 里每个 ASCII 字符（换行、数字、字母）都带一个 0 字节，且全部落在同一奇偶位；
+    UTF-8 / GBK 文本本身不含 0 字节。要求「一侧 ≥10% 且 ≥4 个、另一侧 ≤2%」。
+
+    🔴 绝对下限不能省：只按比例判时，19 字节的「前半段\\x00后半段」（UTF-8，一个 NUL）
+    恰好让一侧占 1/9 ≥ 10%，被误判成 UTF-16 解出乱码（2026-09-30 真库守卫抓到；
+    同一句多带 4 个 ASCII 字符的纯函数样本比例不够，侥幸没暴露）。
+    """
+    half = len(sample) // 2
+    if half < 2:
+        return None
+    even = sample[0::2].count(0)
+    odd = sample[1::2].count(0)
+    need = max(_UTF16_MIN_ZERO_BYTES, 0.1 * half)
+    if odd >= need and even <= 0.02 * half:
+        return "utf-16-le"
+    if even >= need and odd <= 0.02 * half:
+        return "utf-16-be"
+    return None
+
+
+def decode_text_bytes(content: bytes) -> str:
+    """纯文本按真实编码解码（spec knowledge-upload-robustness-and-consumer-wiring R3）。
+
+    顺序：BOM（UTF-8 / UTF-16）→ 无 BOM 的 UTF-16（NUL 分布）→ 严格 UTF-8 → GB18030 →
+    UTF-8 替换解码。GB18030 是 GBK 的超集，覆盖中文 Windows「记事本 / Excel 另存」的默认编码。
+
+    旧实现一律 ``decode('utf-8', errors='ignore')``：GBK 文本静默变成乱码（上传「成功」
+    但 AI 永远检索不到），UTF-16 文本留下大量 NUL 让写库失败。NUL 由 ORM 层统一剔除，
+    本函数不重复处理。
+    """
+    if not content:
+        return ""
+    if content.startswith(b"\xef\xbb\xbf"):
+        return content[3:].decode("utf-8", errors="replace")
+    if content.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return content.decode("utf-16", errors="replace")
+    order = _utf16_byte_order(content[:4096])
+    if order:
+        return content.decode(order, errors="replace")
+    try:
+        return content.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+    lossy = content.decode("utf-8", errors="replace")
+    # 严格 UTF-8 失败后在「有坏字节的 UTF-8」与 GBK 之间裁决：看合法多字节字符与替换符之比。
+    #   · 被截断 / 零星损坏的 UTF-8：合法多字节字符远多于替换符 → 保留 UTF-8
+    #   · GBK：按 UTF-8 读几乎每个汉字都变替换符，合法多字节字符寥寥 → 改用 GB18030
+    # 不按「替换符占全文比例」判：大半是 ASCII 的 GBK 文件（数字 + 几个中文表头）比例很低，
+    # 会被误留在 UTF-8，恰好把仅有的中文变成乱码。
+    bad = lossy.count("\ufffd")
+    good = sum(1 for ch in lossy if ord(ch) > 0x7F) - bad
+    if good >= 4 * bad:
+        return lossy
+    try:
+        return content.decode("gb18030")
+    except UnicodeDecodeError:
+        return lossy
+
+#: 项目知识文件夹的子槽位（spec knowledge-base-retrieval-and-authz-closure 5.8 / design §六）
+PROJECT_FOLDER_SLOTS: dict[str, str] = {
+    "ai_notes": "AI 对话笔记",
+    "consultation": "A17-3 咨询附件",
+}
+
+
+def _project_root_key(project_id: UUID) -> str:
+    return f"project:{project_id}"
+
+
+def _project_slot_key(project_id: UUID, slot: str) -> str:
+    return f"project:{project_id}:{slot}"
+
+
+async def _find_system_folder(db: AsyncSession, system_key: str) -> KnowledgeFolder | None:
+    """按 ``system_key`` 取未删除的系统文件夹（部分唯一索引保证至多一行）。"""
+    return (
+        await db.execute(
+            sa.select(KnowledgeFolder).where(
+                KnowledgeFolder.system_key == system_key,
+                KnowledgeFolder.is_deleted == sa.false(),
+            )
+        )
+    ).scalar_one_or_none()
+
+
+async def _ensure_system_folder(
+    db: AsyncSession,
+    *,
+    system_key: str,
+    name: str,
+    parent_id: UUID | None,
+    project_id: UUID,
+) -> KnowledgeFolder:
+    """按 ``system_key`` 定位或创建系统文件夹（并发安全，不回滚调用方事务）。
+
+    - 先查未删除同键；
+    - 无则在 **SAVEPOINT** 内插入并 flush；并发下撞部分唯一索引 → 只回滚该 SAVEPOINT，
+      再重查拿到对方建好的那一份。🔴 不得 ``db.rollback()``：那会连调用方已 flush 的写
+      （如 AI 笔记的幂等收据）一起回滚（旧 note_service 即此缺陷）。
+    - 系统文件夹 ``created_by`` 为空 ⇒ 按管理权规则只有管理员能改名 / 删除。
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    existing = await _find_system_folder(db, system_key)
+    if existing is not None:
+        return existing
+    folder = KnowledgeFolder(
+        id=uuid.uuid4(),
+        name=name[:FOLDER_NAME_MAX_LEN],
+        parent_id=parent_id,
+        system_key=system_key,
+        access_level=KnowledgeAccessLevel.project_group,
+        project_ids=[str(project_id)],
+        created_by=None,
+    )
+    try:
+        async with db.begin_nested():
+            db.add(folder)
+            await db.flush()
+    except IntegrityError:
+        # 失败的对象已随 SAVEPOINT 回滚被逐出会话；重查拿到并发方建好的那一份
+        existing = await _find_system_folder(db, system_key)
+        if existing is None:
+            raise
+        return existing
+    return folder
+
+
+async def ensure_project_folder(
+    db: AsyncSession, project_id: UUID, slot: str
+) -> KnowledgeFolder:
+    """项目知识文件夹（单一真源）：``{项目名}（项目资料）/ {槽位名}``，均为该项目的项目组可见。
+
+    AI 笔记转存（``slot="ai_notes"``）与 A17-3 咨询附件上传（``slot="consultation"``）共用。
+    只 flush 不 commit（调用方统一提交）。项目不存在 → ``ValueError``。
+    """
+    if slot not in PROJECT_FOLDER_SLOTS:
+        raise ValueError(f"未知的项目知识文件夹槽位：{slot}")
+    from app.models.core import Project
+
+    project_name = (
+        await db.execute(sa.select(Project.name).where(Project.id == project_id))
+    ).scalar_one_or_none()
+    if project_name is None:
+        raise ValueError(f"项目不存在：{project_id}")
+    root = await _ensure_system_folder(
+        db,
+        system_key=_project_root_key(project_id),
+        name=f"{project_name}（项目资料）",
+        parent_id=None,
+        project_id=project_id,
+    )
+    return await _ensure_system_folder(
+        db,
+        system_key=_project_slot_key(project_id, slot),
+        name=PROJECT_FOLDER_SLOTS[slot],
+        parent_id=root.id,
+        project_id=project_id,
+    )
+
+
+def normalize_folder_create_input(
+    name: str,
+    access_level: str,
+    project_ids: list[str] | None,
+) -> tuple[str, KnowledgeAccessLevel, list[str] | None]:
+    """校验并规范化「新建文件夹」入参，返回 ``(name, access_level, project_ids)``。
+
+    不变量：``project_group`` 必须带至少一个合法项目 ID。
+    否则 ``KnowledgeAccessPolicy.can_read`` 对任何人（**含创建者本人**）都判不可见 ——
+    文件夹一创建就从目录树里消失，后续上传也被写权限门拒绝，用户只看到「建了却找不到/传不上」。
+
+    非法项目 ID 直接拒绝而不是静默丢弃（静默丢弃会把「选错了」伪装成「建成功了」）。
+
+    Raises:
+        ValueError: 名称为空/超长、权限级别不支持、项目 ID 非法、项目组未指定项目。
+    """
+    # 先剔 NUL 再判空：PG 不能存 \x00，只含 NUL 的名称也不应被当成「有内容」
+    clean_name = (name or "").replace("\x00", "").strip()
+    if not clean_name:
+        raise ValueError("文件夹名称不能为空")
+    if len(clean_name) > FOLDER_NAME_MAX_LEN:
+        raise ValueError(f"文件夹名称不能超过 {FOLDER_NAME_MAX_LEN} 个字符")
+
+    try:
+        level = KnowledgeAccessLevel(access_level)
+    except ValueError:
+        raise ValueError(f"不支持的权限级别：{access_level}") from None
+
+    normalized: list[str] = []
+    for raw in project_ids or []:
+        try:
+            pid = str(UUID(str(raw)))
+        except (ValueError, TypeError, AttributeError):
+            raise ValueError(f"项目 ID 格式不合法：{raw}") from None
+        if pid not in normalized:
+            normalized.append(pid)
+
+    if level == KnowledgeAccessLevel.project_group and not normalized:
+        raise ValueError("项目组权限的文件夹必须至少指定一个项目")
+
+    return clean_name, level, (normalized or None)
+
 
 class KnowledgeFolderService:
     """知识库文件夹管理"""
@@ -82,13 +304,20 @@ class KnowledgeFolderService:
         project_ids: list[str] | None = None,
         created_by: UUID | None = None,
     ) -> KnowledgeFolder:
-        """创建文件夹"""
+        """创建文件夹
+
+        入参先经 :func:`normalize_folder_create_input` 校验（非法入参抛 ``ValueError``，
+        router 映射为 422），保证不会建出「谁都看不见」的文件夹。
+        """
+        clean_name, level, normalized_ids = normalize_folder_create_input(
+            name, access_level, project_ids
+        )
         folder = KnowledgeFolder(
             id=uuid.uuid4(),
-            name=name,
+            name=clean_name,
             parent_id=parent_id,
-            access_level=KnowledgeAccessLevel(access_level),
-            project_ids=project_ids,
+            access_level=level,
+            project_ids=normalized_ids,
             created_by=created_by,
         )
         self.db.add(folder)
@@ -118,32 +347,53 @@ class KnowledgeFolderService:
         folders = list(result.scalars().all())
         return KnowledgeAccessPolicy.filter_folders(subject, folders)
 
-    async def get_folder_tree(self, subject: KnowledgeAccessSubject) -> list[dict]:
-        """获取完整文件夹树（递归；每层都经同一 policy 过滤）"""
+    async def get_folder_tree(
+        self, subject: KnowledgeAccessSubject, *, role: object = None
+    ) -> list[dict]:
+        """获取完整文件夹树（递归；每层都经同一 policy 过滤）。
+
+        每个节点附 ``can_manage``（改名 / 删除）与 ``can_create``（上传 / 新建子文件夹），
+        由 ``KnowledgeWritePolicy`` 按当前用户角色判定；``doc_count`` 只计当前用户可读的文档
+        （旧实现计全部未删除文档 ⇒ 他人私有文档的数量被泄露）。
+        """
         top_folders = await self.list_folders(subject, parent_id=None)
         tree = []
         for folder in top_folders:
-            node = await self._build_tree_node(folder, subject)
+            node = await self._build_tree_node(folder, subject, role)
             tree.append(node)
         return tree
 
     async def _build_tree_node(
-        self, folder: KnowledgeFolder, subject: KnowledgeAccessSubject
+        self, folder: KnowledgeFolder, subject: KnowledgeAccessSubject, role: object = None
     ) -> dict:
         """递归构建树节点"""
+        from app.services.knowledge_access_policy import KnowledgeResource, KnowledgeWritePolicy
+
         children = await self.list_folders(subject, parent_id=folder.id)
         child_nodes = []
         for child in children:
-            child_nodes.append(await self._build_tree_node(child, subject))
+            child_nodes.append(await self._build_tree_node(child, subject, role))
 
-        # 统计文档数
-        doc_count_q = await self.db.execute(
-            sa.select(sa.func.count()).select_from(KnowledgeDocument).where(
-                KnowledgeDocument.folder_id == folder.id,
-                KnowledgeDocument.is_deleted == sa.false(),
+        folder_res = KnowledgeResource.of_folder(folder)
+        rows = (
+            await self.db.execute(
+                sa.select(
+                    KnowledgeDocument.access_level,
+                    KnowledgeDocument.project_ids,
+                    KnowledgeDocument.created_by,
+                ).where(
+                    KnowledgeDocument.folder_id == folder.id,
+                    KnowledgeDocument.is_deleted == sa.false(),
+                )
+            )
+        ).all()
+        doc_count = sum(
+            1
+            for access, pids, owner in rows
+            if KnowledgeAccessPolicy.can_read_document(
+                subject, KnowledgeResource.of_row(access, pids, owner), folder_res
             )
         )
-        doc_count = doc_count_q.scalar() or 0
 
         return {
             "id": str(folder.id),
@@ -152,6 +402,11 @@ class KnowledgeFolderService:
             "access_level": folder.access_level.value,
             "project_ids": folder.project_ids,
             "doc_count": doc_count,
+            "is_system": bool(folder.system_key),
+            "can_manage": KnowledgeWritePolicy.can_manage(
+                subject, visible=True, owner_id=folder.created_by, role=role
+            ),
+            "can_create": KnowledgeWritePolicy.can_create(subject, folder_res, role),
             "children": child_nodes,
         }
 

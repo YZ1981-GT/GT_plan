@@ -85,6 +85,8 @@
 .gt-prior-year-val { color: var(--gt-color-text-placeholder); font-style: italic; font-size: var(--gt-font-size-xs); }
 .gt-formula-mismatch { color: var(--gt-color-coral) !important; font-weight: 700; text-decoration: underline wavy #FF5149; }
 .gt-cell-auto-fill { background-color: var(--gt-bg-info); border-radius: 2px; padding: 1px 4px; }
+.gt-cell-resolve-failed { background-color: #FFF3E0; border: 1px dashed #FF9800; border-radius: 2px; padding: 1px 3px; }
+.gt-cell-resolve-failed::after { content: '⚠'; font-size: 10px; margin-left: 2px; color: #FF9800; }
 .gt-cell-validation-error { border: 1.5px solid var(--gt-color-coral); border-radius: 3px; padding: 1px 3px; }
 .gt-de-main :deep(.el-table td .gt-amt) { font-family: 'Arial Narrow', Arial, monospace; white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* ── 校验错误标记 ── */
@@ -172,6 +174,8 @@
 .gt-de-tab-label { display: inline-block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
 .gt-de-tab-label--empty { opacity: 0.55; }
 .gt-de-tab-empty-tag { display: inline-block; margin-left: 4px; font-size: 10px; line-height: 14px; padding: 0 4px; border-radius: 3px; background: var(--el-fill-color-lighter, #f0f0f0); color: var(--el-text-color-secondary, #909399); vertical-align: middle; }
+/* ── 单表场景表名标题 ── */
+.gt-de-single-table-title { font-size: 13px; font-weight: 500; color: var(--el-text-color-primary); margin: 4px 0 6px; padding: 2px 0; text-align: center; }
 /* ── 空表提示 ── */
 .gt-de-empty-table-hint { margin-bottom: 12px; }
 .gt-de-empty-table-hint .el-alert { background: var(--el-fill-color-lighter, #f8f8fa); border: 1px dashed var(--el-border-color-lighter, #e0e0e0); }

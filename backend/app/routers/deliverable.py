@@ -15,7 +15,7 @@ from app.core.database import async_session, get_db
 import sqlalchemy as sa
 from app.deps import get_current_user
 from app.models.core import User
-from app.models.phase13_models import WordExportDocType, WordExportStatus
+from app.models.phase13_models import WordExportDocType, WordExportStatus, ExportJobItem
 from app.models.phase13_schemas import (
     CompletenessResponse,
     DeliverableApprovalRejectRequest,
@@ -900,6 +900,430 @@ async def check_completeness(
         trio_majority_tb_hash=result.trio_majority_tb_hash,
         trio_ambiguous=result.trio_ambiguous,
         warnings=result.warnings,
+    )
+
+
+@router.get("/trio/readiness")
+async def check_trio_readiness(
+    project_id: UUID,
+    year: int = Query(..., description="审计年度"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """交付中心三件套 readiness 检查。
+
+    需求 1.1 / 1.6：返回硬闸门、软警告、trio 步骤状态和快照摘要。
+    只读操作，项目成员即可调用。
+    """
+    await _guard_action(db, current_user, project_id, DeliverableAction.list)
+    from app.services.deliverable_readiness_service import DeliverableReadinessService
+
+    svc = DeliverableReadinessService()
+    result = await svc.check(db, project_id, year, include_file_checks=True)
+    return DeliverableReadinessService.result_to_dict(result)
+
+
+# ── Phase4 Task 7：trio job/item/attempt 查询与 running 恢复 ─────
+@router.get("/trio/jobs/{job_id}")
+async def get_trio_job(
+    project_id: UUID,
+    job_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取三件套 job 详情（含 items + 最新 attempt）。
+
+    需求 4.3 / 4.4：只读项目权限。
+    """
+    await _guard_action(db, current_user, project_id, DeliverableAction.list)
+    from app.services.export_job_service import ExportJobService
+
+    svc = ExportJobService(db)
+    result = await svc.get_job_with_items(job_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="导出任务不存在")
+    if result["project_id"] != str(project_id):
+        raise HTTPException(status_code=403, detail="任务不属于该项目")
+    return result
+
+
+@router.get("/trio/items/{item_id}/attempts")
+async def get_trio_item_attempts(
+    project_id: UUID,
+    item_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取某 item 的全部 attempt 历史。
+
+    需求 5.4：保留原始失败原因，按 attempt_no 排序。
+    """
+    await _guard_action(db, current_user, project_id, DeliverableAction.list)
+    from app.services.export_job_service import ExportJobService
+
+    # 校验 item 属于当前项目的 job
+    item_result = await db.execute(
+        sa.select(ExportJobItem).where(ExportJobItem.id == item_id)
+    )
+    item = item_result.scalar_one_or_none()
+    if item is None:
+        raise HTTPException(status_code=404, detail="明细项不存在")
+
+    from app.models.phase13_models import ExportJob
+    job_result = await db.execute(
+        sa.select(ExportJob).where(ExportJob.id == item.job_id)
+    )
+    job = job_result.scalar_one_or_none()
+    if job is None or job.project_id != project_id:
+        raise HTTPException(status_code=403, detail="明细项不属于该项目")
+
+    svc = ExportJobService(db)
+    attempts = await svc.get_item_attempts(item_id)
+    return {"item_id": str(item_id), "attempts": attempts}
+
+
+@router.get("/trio/history")
+async def get_trio_history(
+    project_id: UUID,
+    year: int = Query(..., description="审计年度"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取项目/年度维度的全部三件套 job 历史。
+
+    需求 4.4 / 5.6：只读项目权限，按创建时间倒序。
+    """
+    await _guard_action(db, current_user, project_id, DeliverableAction.list)
+    from app.services.export_job_service import ExportJobService
+
+    svc = ExportJobService(db)
+    history = await svc.get_job_history(project_id, year)
+    return {"project_id": str(project_id), "year": year, "jobs": history}
+
+
+@router.post("/trio/jobs/{job_id}/recover")
+async def recover_stale_running(
+    project_id: UUID,
+    job_id: UUID,
+    timeout_minutes: int = Query(30, ge=1, le=1440, description="超时阈值（分钟）"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """恢复中断/超时的 running 状态（fail-closed）。
+
+    需求 4.6：项目编辑权限。stale running → failed。
+    """
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
+    from app.services.export_job_service import ExportJobService
+
+    # 校验 job 属于当前项目
+    svc = ExportJobService(db)
+    job = await svc.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="导出任务不存在")
+    if job.project_id != project_id:
+        raise HTTPException(status_code=403, detail="任务不属于该项目")
+
+    result = await svc.recover_stale_running(job_id, timeout_minutes)
+    await db.commit()
+    return result
+
+
+# ── Phase4 Task 9：三件套创建 / 重试 / 下载端点与权限 ───────────────
+
+@router.post("/trio")
+async def create_trio_job(
+    project_id: UUID,
+    year: int = Query(..., description="审计年度"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """一键出具三件套 — 创建 deliverable_trio job。
+
+    需求 2.1 / 5.1：项目编辑/交付权限。
+    1. 重新检查 readiness；blocked 返回 409 不创建 job。
+    2. 建立不可变 snapshot。
+    3. 创建 job（kind=deliverable_trio），调用 executor.run_trio()。
+    4. router 统一 commit。
+    """
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
+
+    from app.models.phase13_models import DeliverableSnapshot, ExportJobStatus
+    from app.services.deliverable_readiness_service import DeliverableReadinessService
+    from app.services.export_job_service import ExportJobService
+    from app.services.full_deliverables_executor import FullDeliverablesExecutor
+
+    # 1. readiness 检查
+    readiness_svc = DeliverableReadinessService()
+    readiness = await readiness_svc.check(db, project_id, year, include_file_checks=True)
+    if readiness.status == "blocked":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "交付前检查未通过，无法出具三件套",
+                "blockers": [
+                    {"code": b.code, "message": b.message}
+                    for b in readiness.hard_blockers
+                ],
+            },
+        )
+
+    # 2. 创建 snapshot
+    snapshot = DeliverableSnapshot(
+        project_id=project_id,
+        year=year,
+        digest=readiness.snapshot.get("digest", ""),
+        payload=readiness.sources,
+    )
+    db.add(snapshot)
+    await db.flush()
+
+    # 3. 创建 job
+    job_svc = ExportJobService(db)
+    job = await job_svc.create_job(
+        project_id=project_id,
+        job_type="deliverable_trio",
+        payload={"year": year, "snapshot_digest": snapshot.digest},
+        user_id=current_user.id,
+        total=3,
+    )
+    job.kind = "deliverable_trio"
+    job.year = year
+    job.snapshot_id = snapshot.id
+    job.status = ExportJobStatus.running.value
+    await db.flush()
+
+    # 4. executor 编排
+    executor = FullDeliverablesExecutor(db)
+
+    class _ProductionStepRunner:
+        """生产步骤执行回调 — 调用 executor 的实际步骤方法。"""
+        def __init__(self, exec_: FullDeliverablesExecutor, pid: UUID, yr: int,
+                     uid: UUID):
+            self._exec = exec_
+            self._project_id = pid
+            self._year = yr
+            self._user_id = uid
+
+        async def run_step(self, step_key: str, snapshot_id: UUID) -> UUID | None:
+            if step_key == "financial_report":
+                return await self._exec._run_financial_reports(
+                    self._project_id, self._year, self._user_id
+                )
+            elif step_key == "disclosure_notes":
+                return await self._exec._run_disclosure_notes(
+                    self._project_id, self._year, self._user_id
+                )
+            elif step_key == "audit_report":
+                task_id, _warning, _opt = await self._exec._run_report_body(
+                    self._project_id, self._year, self._user_id,
+                    {"year": self._year},
+                )
+                return task_id
+            raise ValueError(f"未知步骤: {step_key}")
+
+    runner = _ProductionStepRunner(executor, project_id, year, current_user.id)
+    result = await executor.run_trio(
+        job=job,
+        snapshot_id=snapshot.id,
+        step_runner=runner,
+    )
+
+    await db.commit()
+    return {
+        "job_id": str(result.job_id),
+        "status": result.status,
+        "trio_succeeded": result.done,
+        "trio_total": 3,
+        "outcomes": [
+            {
+                "step": o.step,
+                "succeeded": o.succeeded,
+                "error_message": o.error_message,
+            }
+            for o in result.outcomes
+        ],
+    }
+
+
+@router.post("/trio/jobs/{job_id}/retry")
+async def retry_trio_job(
+    project_id: UUID,
+    job_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """重试三件套失败步骤 — 真实调用 executor 步骤入口。
+
+    需求 5.1–5.5：项目编辑/交付权限。
+    校验 job 属于请求项目且快照仍有效。
+    """
+    await _guard_action(db, current_user, project_id, DeliverableAction.export)
+
+    from app.services.deliverable_readiness_service import DeliverableReadinessService
+    from app.services.export_job_service import ExportJobService, SnapshotConflictError
+    from app.services.full_deliverables_executor import FullDeliverablesExecutor
+
+    job_svc = ExportJobService(db)
+    job = await job_svc.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="导出任务不存在")
+    if job.project_id != project_id:
+        raise HTTPException(status_code=403, detail="任务不属于该项目")
+
+    # 获取当前 readiness snapshot digest 用于一致性校验
+    readiness_svc = DeliverableReadinessService()
+    readiness = await readiness_svc.check(
+        db, project_id, job.year or 2024, include_file_checks=False,
+    )
+    current_digest = readiness.snapshot.get("digest")
+
+    executor = FullDeliverablesExecutor(db)
+
+    class _RetryStepRunner:
+        """重试步骤执行回调。"""
+        def __init__(self, exec_: FullDeliverablesExecutor, pid: UUID, yr: int,
+                     uid: UUID):
+            self._exec = exec_
+            self._project_id = pid
+            self._year = yr
+            self._user_id = uid
+
+        async def run_step(self, step_key: str, snapshot_id: UUID) -> UUID | None:
+            if step_key == "financial_report":
+                return await self._exec._run_financial_reports(
+                    self._project_id, self._year, self._user_id
+                )
+            elif step_key == "disclosure_notes":
+                return await self._exec._run_disclosure_notes(
+                    self._project_id, self._year, self._user_id
+                )
+            elif step_key == "audit_report":
+                task_id, _warning, _opt = await self._exec._run_report_body(
+                    self._project_id, self._year, self._user_id,
+                    {"year": self._year},
+                )
+                return task_id
+            raise ValueError(f"未知步骤: {step_key}")
+
+    runner = _RetryStepRunner(executor, project_id, job.year or 2024, current_user.id)
+
+    try:
+        result = await job_svc.retry_failed_trio(
+            job_id,
+            step_runner=runner,
+            current_snapshot_digest=current_digest,
+        )
+    except SnapshotConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": str(exc),
+                "job_digest": exc.job_digest,
+                "current_digest": exc.current_digest,
+            },
+        )
+
+    await db.commit()
+    return result
+
+
+@router.get("/trio/items/{item_id}/download")
+async def download_trio_item(
+    project_id: UUID,
+    item_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """下载三件套单项文件 — 下载前校验物理文件和 hash。
+
+    需求 3.5：只读项目权限。返回文件前验证存在/可读/指纹一致。
+    """
+    await _guard_action(db, current_user, project_id, DeliverableAction.list)
+
+    from app.models.phase13_models import ExportJob
+    from app.services.file_fingerprint_service import (
+        FileFingerprintError,
+        verify_file_fingerprint,
+    )
+
+    # 校验 item 属于当前项目的 job
+    item_result = await db.execute(
+        sa.select(ExportJobItem).where(ExportJobItem.id == item_id)
+    )
+    item = item_result.scalar_one_or_none()
+    if item is None:
+        raise HTTPException(status_code=404, detail="明细项不存在")
+
+    job_result = await db.execute(
+        sa.select(ExportJob).where(ExportJob.id == item.job_id)
+    )
+    job = job_result.scalar_one_or_none()
+    if job is None or job.project_id != project_id:
+        raise HTTPException(status_code=403, detail="明细项不属于该项目")
+
+    if item.status != "succeeded":
+        raise HTTPException(status_code=400, detail="该项未成功，无法下载")
+
+    if not item.file_path:
+        # P0 fallback: 如果 file_path 为空但有 word_export_task_id，尝试从任务链恢复
+        if item.word_export_task_id:
+            from app.models.phase13_models import WordExportTask, WordExportTaskVersion
+            wet_result = await db.execute(
+                sa.select(WordExportTask).where(
+                    WordExportTask.id == item.word_export_task_id,
+                )
+            )
+            wet = wet_result.scalar_one_or_none()
+            if wet and wet.file_path:
+                item.file_path = wet.file_path
+                item.file_size = wet.file_size
+                # 取最新 version hash
+                ver_result = await db.execute(
+                    sa.select(WordExportTaskVersion)
+                    .where(
+                        WordExportTaskVersion.word_export_task_id == item.word_export_task_id,
+                    )
+                    .order_by(WordExportTaskVersion.version_no.desc())
+                    .limit(1)
+                )
+                ver = ver_result.scalar_one_or_none()
+                if ver:
+                    item.file_sha256 = ver.file_hash
+                    item.version_id = ver.id
+                await db.flush()
+                await db.commit()
+
+        if not item.file_path:
+            raise HTTPException(status_code=400, detail="文件未落盘，无法下载")
+
+    # 下载前指纹校验
+    try:
+        verify_file_fingerprint(
+            file_path=item.file_path,
+            expected_size=item.file_size,
+            expected_sha256=item.file_sha256,
+        )
+    except FileFingerprintError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=f"文件校验失败: {exc}",
+        )
+
+    file_path = Path(item.file_path)
+    step_names = {
+        "financial_report": "审定财务报表",
+        "disclosure_notes": "报表附注",
+        "audit_report": "审计报告正文",
+    }
+    display_name = step_names.get(item.step_key or "", item.step_key or "交付件")
+    suffix = file_path.suffix or ".bin"
+    filename = f"{display_name}{suffix}"
+
+    return FileResponse(
+        path=str(file_path),
+        filename=filename,
+        media_type="application/octet-stream",
     )
 
 

@@ -15,7 +15,9 @@ componentType `d4-operating-revenue` → `GtD4OperatingRevenue.vue`，后端 `_d
 
 ## 联动
 
-- **TB**：render 输出 6001 / 6051 上下文；**`useD4FormData` 中未见 `trial-balance/writeback` 调用**（其余 D1/D3/D5/D6/D7 都有）→ 是否设计如此待核实（见 perspective 的 todo）
+- **TB**：render 输出 6001 / 6051 上下文；回写走**显式发布门** —— `useD4Adjudication.publishAdjudicated`
+  二次确认 → `POST /api/workpapers/{wpId}/audit-determination/publish-to-tb`（2026-09-28 已核实；
+  `useD4FormData` 里的 `trial-balance/writeback` 字面量全是已移除旧代码的注释，详见 concern §2）
 - **序时账取数**：后端 resolver `d4_ledger_monthly_by_product`（`tb_ledger` 6001 按 `account_name` × 月汇总贷方净额）→ D4-2「从序时账导入」
 - **审定 → 明细 → 分析**：D4-2 产品×12 月是录入源，D4-1 审定表与各分析表从它派生
 - **截止双向**：正向（记账→原始凭证）+ 反向（原始凭证→记账），跨期 → AJE + `a13:push-misstatement`

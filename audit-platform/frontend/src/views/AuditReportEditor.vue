@@ -14,7 +14,8 @@
             <el-button v-if="report" size="small" @click="onStatusChange('review')" :disabled="isLocked" round>提交复核</el-button>
             <el-button v-if="report" size="small" @click="onStatusChange('final')" :disabled="isLocked" round>定稿</el-button>
             <el-button size="small" @click="onExportWord" :loading="exportingWord" round>导出 Word</el-button>
-            <el-button size="small" @click="onPickKnowledge" round title="选择知识库文档作为参考上下文">📚 知识库</el-button>
+            <!-- 开发中：本页没有 AI 生成动作消费参考文档（spec knowledge-upload-robustness-and-consumer-wiring R6.6） -->
+            <el-button size="small" @click="onKnowledgeDeveloping" round title="审计报告的 AI 参考文档功能开发中">📚 知识库（开发中）</el-button>
           </template>
         </GtToolbar>
       </template>
@@ -96,10 +97,6 @@
           </div>
           <div class="gt-ar-edit-hint" v-else-if="report.status === REPORT_STATUS.EQCR_APPROVED" style="background: var(--gt-color-wheat-light); color: var(--gt-color-wheat);">
             🔒 EQCR 已锁定审计意见，如需修改请联系独立复核合伙人解锁
-          </div>
-          <div v-if="knowledgeContextText" class="gt-ar-edit-hint" style="background: var(--gt-color-success-light); color: var(--gt-color-success); margin-bottom: 8px;">
-            📎 已加载 {{ knowledgeDocCount }} 篇知识库参考文档
-            <el-button size="small" link @click="clearKnowledgeContext" style="margin-left: 8px; color: var(--gt-color-success);">清除</el-button>
           </div>
           <el-input v-model="sectionContent" type="textarea" :rows="20"
             :disabled="isLocked" placeholder="段落内容"
@@ -193,9 +190,6 @@
       :confirm-loading="confirmLoading"
       @confirm="onOptConfirm"
     />
-
-    <!-- 知识库文档选择弹窗 [R3.7] -->
-    <KnowledgePickerDialog v-model:visible="knowledgePickerVisible" />
   </div>
 </template>
 
@@ -212,10 +206,8 @@ import {
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import { fmtAmount } from '@/utils/formatters'
 import { useDictStore } from '@/stores/dict'
-import { useKnowledge, knowledgePickerVisible } from '@/composables/useKnowledge'
 import { useEditMode } from '@/composables/useEditMode'
 import { confirmLeave } from '@/utils/confirm'
-import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue'
 import OptionalSectionDialog from '@/components/deliverable/OptionalSectionDialog.vue'
 import {
   previewReportBody,
@@ -313,23 +305,13 @@ async function refreshReadiness() {
   }
 }
 
-// ── 知识库上下文 [R3.7] ──
-const { pickDocuments, buildContext } = useKnowledge()
-const knowledgeContextText = ref('')
-const knowledgeDocCount = ref(0)
-
-async function onPickKnowledge() {
-  const docs = await pickDocuments({ title: '选择参考文档（审计报告编辑时使用）', maxSelect: 5 })
-  if (docs.length) {
-    knowledgeContextText.value = await buildContext(docs)
-    knowledgeDocCount.value = docs.length
-    ElMessage.success(`已加载 ${docs.length} 篇参考文档`)
-  }
-}
-
-function clearKnowledgeContext() {
-  knowledgeContextText.value = ''
-  knowledgeDocCount.value = 0
+// ── 知识库参考文档 [R3.7]：开发中 ──
+// 旧实现让用户选文档后显示「📎 已加载 N 篇知识库参考文档」，但本页生成 / 保存 / 导出
+// 没有任何一处把它交给 AI —— 只是一个没有效果的状态（且检索调的是不存在的端点，恒搜不到）。
+// 在接上 AI 生成动作之前如实标为开发中（spec knowledge-upload-robustness-and-consumer-wiring R6.6）。
+// 需要参考知识库写文字时，附注编辑器的「📚 知识库」已接到续写 / 改写。
+function onKnowledgeDeveloping() {
+  ElMessage.info('审计报告的 AI 参考文档功能开发中：目前报告正文生成不引用知识库。附注编辑器的「📚 知识库」已可用于 AI 续写 / 改写。')
 }
 
 const sectionNames = computed(() => {

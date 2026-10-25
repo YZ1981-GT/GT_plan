@@ -35,6 +35,34 @@ import { useReportCrossCheck, computeCrossCheckResults, type CrossCheckItem } fr
 const mockGetReport = vi.mocked(getReport)
 const mockHttpGet = vi.mocked(http.get)
 
+/**
+ * 🔴 2026-09-28 修：`http.get` 在本 composable 的一次 `loadCrossCheckData()` 里会被调
+ * **两次** —— 先 `/api/address-registry`（ACNR store，Req 16 facade），再
+ * `/api/projects/{id}/formula/report-cross-check`（logic_check 主路径，Req 23.1）。
+ *
+ * 原测试用 `mockResolvedValueOnce(payload)` ⇒ 该 payload 被**第一次**（address-registry）
+ * 吃掉，真正的 cross-check 调用拿到 `undefined` ⇒ 映射为空 ⇒ `fetchBackendCrossCheck`
+ * 抛错 ⇒ 恒降级 `fallback`。本文件 4 条「主路径 = backend」的断言因此一直红。
+ *
+ * 用**按 URL 分派**而不是再补一个 `Once`：`Once` 队列对调用顺序敏感，
+ * 上游一旦新增/调整任何一次 `http.get`（本轮正是这么坏的）就又会错位。
+ */
+function mockHttpByUrl(routes: Record<string, unknown>, fallbackValue: unknown = undefined) {
+  mockHttpGet.mockImplementation(((url: string) => {
+    for (const [frag, value] of Object.entries(routes)) {
+      if (String(url).includes(frag)) {
+        return value instanceof Error ? Promise.reject(value) : Promise.resolve(value as any)
+      }
+    }
+    return Promise.resolve(fallbackValue as any)
+  }) as any)
+}
+
+/** cross-check 端点的响应（其余 URL 一律 resolve undefined，等价于"无数据"） */
+function mockCrossCheckResponse(value: unknown) {
+  mockHttpByUrl({ 'formula/report-cross-check': value })
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function createOptions() {
@@ -435,7 +463,7 @@ describe('useReportCrossCheck — backend logic_check main path (Req 23.1)', () 
       ],
       last_computed_at: '2025-01-01T00:00:00+00:00',
     }
-    mockHttpGet.mockResolvedValueOnce({ data: payload } as any)
+    mockCrossCheckResponse({ data: payload })
 
     const options = createOptions()
     const { loadCrossCheckData, crossCheckResults, crossCheckSource } = useReportCrossCheck(options)
@@ -474,7 +502,7 @@ describe('useReportCrossCheck — degrade to pure function when backend unavaila
       .mockResolvedValueOnce(makeBalancedBsRows() as any)
       .mockResolvedValueOnce(makeBalancedIsRows() as any)
     // 模拟后端不可用（网络错/5xx/超时）
-    mockHttpGet.mockRejectedValueOnce(new Error('Network Error'))
+    mockCrossCheckResponse(new Error('Network Error'))
 
     const options = createOptions()
     const { loadCrossCheckData, crossCheckResults, crossCheckData, crossCheckSource } =
@@ -493,7 +521,7 @@ describe('useReportCrossCheck — degrade to pure function when backend unavaila
     mockGetReport
       .mockResolvedValueOnce(makeBalancedBsRows() as any)
       .mockResolvedValueOnce(makeBalancedIsRows() as any)
-    mockHttpGet.mockResolvedValueOnce({ data: { results: [], issue_list: [] } } as any)
+    mockCrossCheckResponse({ data: { results: [], issue_list: [] } })
 
     const options = createOptions()
     const { loadCrossCheckData, crossCheckResults, crossCheckSource } = useReportCrossCheck(options)
@@ -525,7 +553,7 @@ describe('useReportCrossCheck — online vs fallback per-check consistency (Req 
     mockGetReport
       .mockResolvedValueOnce(bsRows as any)
       .mockResolvedValueOnce(isRows as any)
-    mockHttpGet.mockRejectedValueOnce(new Error('backend down'))
+    mockCrossCheckResponse(new Error('backend down'))
     const c1 = useReportCrossCheck(createOptions())
     await c1.loadCrossCheckData()
     const fallback = c1.crossCheckResults.value
@@ -535,7 +563,7 @@ describe('useReportCrossCheck — online vs fallback per-check consistency (Req 
     mockGetReport
       .mockResolvedValueOnce(bsRows as any)
       .mockResolvedValueOnce(isRows as any)
-    mockHttpGet.mockResolvedValueOnce({ data: buildBackendPayloadFrom(fallback) } as any)
+    mockCrossCheckResponse({ data: buildBackendPayloadFrom(fallback) })
     const c2 = useReportCrossCheck(createOptions())
     await c2.loadCrossCheckData()
     const online = c2.crossCheckResults.value

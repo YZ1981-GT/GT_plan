@@ -256,6 +256,243 @@
           "uuid_col": "N"
         }
       ]
+    },
+    {
+      "excel_name": "审定表G14-1",
+      "footer": {
+        "diff_row": 18,
+        "marker": "合计",
+        "tb_row": 17,
+        "total_row": 16
+      },
+      "formula_mask": [
+        "D18",
+        "G18"
+      ],
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "g141-managed",
+      "tables": [
+        {
+          "anchor": "A7",
+          "cell_mask": [
+            "B10",
+            "B11",
+            "B12",
+            "B13",
+            "B14",
+            "B15",
+            "B16",
+            "B7",
+            "B8",
+            "B9",
+            "C10",
+            "C11",
+            "C12",
+            "C13",
+            "C14",
+            "C15",
+            "C16",
+            "C7",
+            "C8",
+            "C9",
+            "D10",
+            "D11",
+            "D12",
+            "D13",
+            "D14",
+            "D15",
+            "D16",
+            "D7",
+            "D8",
+            "D9",
+            "E16",
+            "F16",
+            "G10",
+            "G11",
+            "G12",
+            "G13",
+            "G14",
+            "G15",
+            "G16",
+            "G7",
+            "G8",
+            "G9",
+            "H10",
+            "H11",
+            "H12",
+            "H13",
+            "H14",
+            "H15",
+            "H16",
+            "H7",
+            "H8",
+            "H9",
+            "I10",
+            "I11",
+            "I12",
+            "I13",
+            "I14",
+            "I15",
+            "I16",
+            "I7",
+            "I8",
+            "I9"
+          ],
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 7
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表G14-1!A5",
+              "header_text": "项目",
+              "json_pointer": "/main/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G14-1!A7",
+              "stable_field_key": "g141_adj_main/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 7
+              },
+              "column_key": "prior_unadjusted",
+              "group_source_ref": "源xlsx!审定表G14-1!B5",
+              "header_source_ref": "源xlsx!审定表G14-1!B5",
+              "header_text": "未审数",
+              "json_pointer": "/main/priorUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G14-1!B7",
+              "stable_field_key": "g141_adj_main/prior_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 7
+              },
+              "column_key": "prior_aje",
+              "group_source_ref": "源xlsx!审定表G14-1!B5",
+              "header_source_ref": "源xlsx!审定表G14-1!C5",
+              "header_text": "审计调整数",
+              "json_pointer": "/main/priorAje",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G14-1!C7",
+              "stable_field_key": "g141_adj_main/prior_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 7
+              },
+              "column_key": "prior_audited",
+              "group_source_ref": "源xlsx!审定表G14-1!B5",
+              "header_source_ref": "源xlsx!审定表G14-1!D5",
+              "header_text": "审定数",
+              "json_pointer": "/main/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G14-1!D7",
+              "stable_field_key": "g141_adj_main/prior_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 7
+              },
+              "column_key": "current_unadjusted",
+              "group_source_ref": "源xlsx!审定表G14-1!E5",
+              "header_source_ref": "源xlsx!审定表G14-1!E5",
+              "header_text": "未审数",
+              "json_pointer": "/main/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G14-1!E7",
+              "stable_field_key": "g141_adj_main/current_unadjusted",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 7
+              },
+              "column_key": "current_aje",
+              "group_source_ref": "源xlsx!审定表G14-1!E5",
+              "header_source_ref": "源xlsx!审定表G14-1!F5",
+              "header_text": "审计调整数",
+              "json_pointer": "/main/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表G14-1!F7",
+              "stable_field_key": "g141_adj_main/current_aje",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 7
+              },
+              "column_key": "current_audited",
+              "group_source_ref": "源xlsx!审定表G14-1!E5",
+              "header_source_ref": "源xlsx!审定表G14-1!G5",
+              "header_text": "审定数",
+              "json_pointer": "/main/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G14-1!G7",
+              "stable_field_key": "g141_adj_main/current_audited",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 7
+              },
+              "column_key": "change_amount",
+              "group_source_ref": "源xlsx!审定表G14-1!H5",
+              "header_source_ref": "源xlsx!审定表G14-1!H5",
+              "header_text": "增减变动额",
+              "json_pointer": "/main/changeAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G14-1!H7",
+              "stable_field_key": "g141_adj_main/change_amount",
+              "store_item_id": "",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 7
+              },
+              "column_key": "change_rate",
+              "group_source_ref": "源xlsx!审定表G14-1!H5",
+              "header_source_ref": "源xlsx!审定表G14-1!I5",
+              "header_text": "增减变动率",
+              "json_pointer": "/main/changeRate",
+              "mode": "formula",
+              "source_ref": "源xlsx!审定表G14-1!I7",
+              "stable_field_key": "g141_adj_main/change_rate",
+              "store_item_id": "",
+              "value_type": "ratio"
+            }
+          ],
+          "first_data_row": 7,
+          "footer_row": 16,
+          "header_rows": 2,
+          "last_data_row": 15,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_main_rows"
+        }
+      ]
     }
   ],
   "template": {

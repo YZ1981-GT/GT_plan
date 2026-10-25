@@ -154,6 +154,44 @@ export interface I3PerformanceRow {
 const ITEM_PREFIX_LISTED = 'I3-disc-listed'
 const ITEM_PREFIX_SOE = 'I3-disc-soe'
 
+// ─── 行身份（spec i1-i3-disclosure-positional-identity-… · ID-1） ─────────────
+//
+// 🔴 行身份**不得**由数组下标派生：原 `cgu-${i}` / `bv-${r.rowId || i}` 等写法在
+// 删中间一行再重新取数时，会让后续行「继承」前一行的 id ⇒ 双向回写把 A 行内容写进 B 行。
+//
+// 两条规则：
+//   ① 新行一律 `_stableRowId(prefix)`（时间戳 + 随机，**签名里没有下标参数**）；
+//   ② 重新取数（覆盖式重建）时先按**业务值**（CGU 名 / 被投资单位）复用已落库的旧 id ——
+//      这同时就是 grandfather：历史 `cgu-3` 这类旧格式 id 只要业务值还在就原值保留，
+//      不会被重写成新格式（改它 = 换身份 = 与 OO 侧历史行对不上）。
+
+/** 新格式行 id：`{prefix}-{Date.now(36)}-{random(36)×6}`。 */
+export function _stableRowId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+/** 旧格式（位置化）行 id —— 只读识别，写入路径不再产生。 */
+export const LEGACY_POSITIONAL_ROW_ID_RE = /^(cgu|bv|imp|perf|ap|tc-i18)-\d+$/
+
+/**
+ * 按业务值复用既有行 id。同名出现多次时按出现次序逐个消费（第 k 个同名行复用旧集合里
+ * 第 k 个同名行的 id），旧集合里没有的才新生成。
+ */
+export function _rowIdReuser<T extends { rowId?: string }>(
+  existing: readonly T[],
+  valueOf: (row: T) => string,
+): (value: string, prefix: string) => string {
+  const pool = new Map<string, string[]>()
+  for (const row of existing) {
+    const value = String(valueOf(row) ?? '').trim()
+    if (!value || !row.rowId) continue
+    const queue = pool.get(value)
+    if (queue) queue.push(row.rowId)
+    else pool.set(value, [row.rowId])
+  }
+  return (value, prefix) => pool.get(String(value ?? '').trim())?.shift() ?? _stableRowId(prefix)
+}
+
 /** 上市公司版本子节（41×8） */
 export const LISTED_SECTIONS: I3DisclosureSection[] = [
   { key: 'goodwill_book_value', title: '(1) 商誉账面价值', hasTable: true, hasDynamicRows: false, hasNoteText: false },
@@ -432,14 +470,20 @@ export function useI3Disclosure(
       return Number.isFinite(x) ? x : 0
     }
 
+    // 🔴 覆盖式重建之前先取旧行身份池：上游无 rowId 时按被投资单位 / CGU 名复用（ID-1 族 A′/B）
+    const reuseBv = _rowIdReuser(bookValueRows.value, (r) => r.investee)
+    const reuseImp = _rowIdReuser(impairmentRows.value, (r) => r.investee)
+    const reuseCgu = _rowIdReuser(sectionRows.value.cgu_allocation || [], (r) => r.name)
+
     bookValueRows.value = detail.map((r, i) => {
       const begin = n(r.costOpening ?? r.goodwillOriginal)
       const increase = n(r.costIncrease)
       const decrease = n(r.costDecrease)
       const method = String(r.costIncreaseMethod || r.mergerType || '')
+      const investee = String(r.investee || `项目${i + 1}`)
       const row: I3DisclosureMatrixRow = {
-        rowId: `bv-${r.rowId || i}`,
-        investee: String(r.investee || `项目${i + 1}`),
+        rowId: r.rowId ? `bv-${r.rowId}` : reuseBv(investee, 'bv'),
+        investee,
         beginBalance: begin,
         increase,
         decrease,
@@ -459,9 +503,10 @@ export function useI3Disclosure(
       const begin = n(r.impOpening ?? r.accImpairmentBegin)
       const increase = n(r.impIncrease ?? r.currentImpairment)
       const decrease = n(r.impDecrease)
+      const investee = String(r.investee || `项目${i + 1}`)
       const row: I3DisclosureMatrixRow = {
-        rowId: `imp-${r.rowId || i}`,
-        investee: String(r.investee || `项目${i + 1}`),
+        rowId: r.rowId ? `imp-${r.rowId}` : reuseImp(investee, 'imp'),
+        investee,
         beginBalance: begin,
         increase,
         decrease,
@@ -484,8 +529,8 @@ export function useI3Disclosure(
       const amt = n(r.goodwillNetValue ?? (n(r.costAudited || r.goodwillOriginal) - n(r.impAudited || r.accImpairmentEnd)))
       byCgu.set(cgu, (byCgu.get(cgu) || 0) + amt)
     }
-    sectionRows.value.cgu_allocation = Array.from(byCgu.entries()).map(([name, amount], i) => ({
-      rowId: `cgu-${i}`,
+    sectionRows.value.cgu_allocation = Array.from(byCgu.entries()).map(([name, amount]) => ({
+      rowId: reuseCgu(name, 'cgu'),
       name,
       amount,
       description: '自 I3-2 明细按 CGU 汇总',
@@ -500,7 +545,8 @@ export function useI3Disclosure(
     if (variant.value === 'listed' && performanceRows.value.length === 0) {
       performanceRows.value = detail
         .map((r, i) => ({
-          rowId: `perf-${r.rowId || i}`,
+          // performanceRows 此刻为空（见外层条件）⇒ 无旧身份可复用，上游无 rowId 即新生成
+          rowId: r.rowId ? `perf-${r.rowId}` : _stableRowId('perf'),
           name: String(r.investee || `项目${i + 1}`),
           commitmentStatus: '',
           impairmentAmount: Number(r.impIncrease ?? r.currentImpairment) || 0,
@@ -662,7 +708,7 @@ export function useI3Disclosure(
       if (!name || name.includes('合计') || existing.has(name)) continue
       const imp = impairmentRows.value.find((x) => x.investee === name)
       performanceRows.value.push({
-        rowId: `perf-${Date.now()}-${added}`,
+        rowId: _stableRowId('perf'),
         name,
         commitmentStatus: '',
         impairmentAmount: Number(imp?.increase) || 0,
@@ -722,7 +768,7 @@ export function useI3Disclosure(
       const label = (cgu.name || '').trim()
       if (!label || existing.has(label)) continue
       assumptionParamRows.value.push({
-        rowId: `ap-${Date.now()}-${added}`,
+        rowId: _stableRowId('ap'),
         label,
         grossMargin: '',
         growthRate: '',

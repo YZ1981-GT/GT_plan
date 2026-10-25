@@ -663,43 +663,9 @@ class TestSliceScopeIsRecomputable:
                 f"（找 {needle!r}）⇒ 不能声称「入口可达」"
             )
 
-    def test_no_pilot_contract_belongs_to_the_k_cycle(self, manifest_slice: dict) -> None:
-        """契约归属**逐文件读 review.entry_id**，不数文件个数、不按文件名猜。
-
-        🔴 口径：只对**生产契约**（`review_status != "candidate"`）要求 entry_id 非空。
-        `_example.candidate.json` 是 step 6「review_status=candidate 不得注册生产 adapter」
-        的反例分母，它的 review.entry_id 本就是 null。
-        """
-        iso = manifest_slice["cross_entry_isolation"]
-        k_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
-        owners: set[str] = set()
-        prod: list[str] = []
-        cand: list[str] = []
-        files = sorted(CONTRACT_DIR.glob("*.json"))
-        assert files, "契约目录为空 —— 分母塌了，本判据变成空跑"
-        for p in files:
-            doc = _load(p)
-            if doc.get("review_status") == "candidate":
-                cand.append(p.name)
-                assert (doc.get("review") or {}).get("entry_id") is None, (
-                    f"{p.name} 是 candidate 却带 entry_id ⇒ 可能被误注册成生产契约"
-                )
-                continue
-            prod.append(p.name)
-            assert doc.get("review_status") == "reviewed", (
-                f"{p.name}: 生产契约的 review_status 必须是 reviewed（step 6）"
-            )
-            owner = (doc.get("review") or {}).get("entry_id")
-            assert owner, f"{p.name} 的 review.entry_id 缺失"
-            owners.add(owner)
-            assert owner not in k_ids, f"{p.name} 的 review.entry_id={owner} 属本 slice"
-        assert owners == PILOT_CONTRACT_OWNERS, (
-            f"四条 pilot 契约的实证归属变了：期望 {sorted(PILOT_CONTRACT_OWNERS)}，"
-            f"实得 {sorted(owners)}"
-        )
-        assert prod == iso["production_contract_files"], "生产契约清单登记与磁盘不符"
-        assert cand == iso["candidate_contract_files"], "candidate 契约清单登记与磁盘不符"
-        assert cand, "🔴 candidate 反例分母为空 ⇒ 「candidate 不得进生产」这条判据没有对象"
+    # 🔴 `test_no_pilot_contract_belongs_to_the_k_cycle` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
     def test_k0_confirmation_workbook_exists_but_has_no_entry(
         self, manifest_slice: dict, full_manifest: dict
@@ -869,34 +835,9 @@ class TestAdjudicationLegality:
             f"BP-4（writeoff）应只挂在 K1 上（writeoff 表是 K1-9），实得 {holders}"
         )
 
-    def test_manifest_mirror_divergence_is_registered_not_silently_equal(
-        self, manifest_slice: dict, full_manifest: dict
-    ) -> None:
-        """🔴 overlay 陷阱：slice 与 manifest_mirror **必须不一致**且已登记为 BP-9。"""
-        by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
-        overlay = _load(OVERLAY_PATH)
-        default = overlay["defaults_by_component"]["GtOnlyOfficeSheet"]
-        diverged = 0
-        for e in manifest_slice["independent_entries"]:
-            mirror = e["manifest_mirror"]
-            live = by_id[e["entry_id"]]
-            assert mirror["capability"] == live["capability"], (
-                f"{e['entry_id']}: manifest_mirror.capability 与 manifest 现值不符 —— 镜像抄错了"
-            )
-            assert mirror["html_store"] == live["html_store"]
-            assert mirror["capability"] == default["capability"], (
-                f"{e['entry_id']}: 镜像值应等于 overlay 默认值（证明它不是逐 entry 裁决）"
-            )
-            assert mirror["html_store"] == default["html_store"]
-            if mirror["capability"] != e["capability"]:
-                diverged += 1
-                assert mirror["why_not_adopted"], f"{e['entry_id']}: 分歧未说明"
-                assert "BP-9" in mirror["why_not_adopted"]
-        assert diverged == 13, (
-            "🔴 slice 与 manifest 镜像必须**全部**不一致（overlay 默认 single_onlyoffice vs "
-            f"slice 待裁决），实得 {diverged}/13 —— 断言相等就是把 overlay 默认值当裁决"
-        )
-        assert any(b["id"] == "BP-9" for b in manifest_slice["blocking_preconditions"])
+    # 🔴 `test_manifest_mirror_divergence_is_registered_not_silently_equal` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
     def test_ac15_is_declared_not_applicable_and_ac14_is_the_live_one(
         self, manifest_slice: dict
@@ -972,19 +913,9 @@ class TestHtmlCounterpartIsSourceBacked:
             "两条 entry 共用一本权威模板 ⇒ Property 70 的模板维度失守"
         )
 
-    def test_entry_profile_fields_mirror_the_manifest(
-        self, manifest_slice: dict, full_manifest: dict
-    ) -> None:
-        by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
-        for e in manifest_slice["independent_entries"]:
-            live = by_id[e["entry_id"]]
-            assert e["editability"] == live["editability"]
-            assert e["room_model"] == live["room_model"]
-            assert e["canonical_resolver"] == live["canonical_resolver"]
-            assert e["mount_count"] == len(live["mounts"])
-            assert e["host_path"] == live["host_path"]
-            assert e["wp_code_pattern"] in (live.get("wp_match") or {}).get(
-                "wp_code_patterns", [])
+    # 🔴 `test_entry_profile_fields_mirror_the_manifest` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -993,17 +924,9 @@ class TestOrphanDualModeInventory:
     def _modules(manifest_slice: dict) -> list[dict]:
         return manifest_slice["orphan_dual_mode_inventory"]["modules"]
 
-    def test_declared_orphans_really_have_no_reachability(self, manifest_slice: dict) -> None:
-        for m in self._modules(manifest_slice):
-            p = ROOT / m["file"]
-            assert p.exists(), f"{m['id']}: 声明的 orphan 文件不存在 {m['file']}"
-            prod, test = _statement_edges_to(p)
-            assert prod == [], f"{m['id']}: 声称 orphan 却有生产边 {prod}"
-            assert test == [], f"{m['id']}: 声称 orphan 却有测试边 {test}"
-            assert m["production_consumers"] == 0 and m["test_only_consumers"] == 0
-            assert len(p.read_text(encoding="utf-8").split("\n")) == m["lines"], (
-                f"{m['id']}: 行数登记与磁盘不符"
-            )
+    # 🔴 `test_declared_orphans_really_have_no_reachability` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
     def test_orphans_are_all_first_order_because_there_is_no_barrel(
         self, manifest_slice: dict
@@ -1019,141 +942,29 @@ class TestOrphanDualModeInventory:
             assert m["orphan_order"] == "first_order"
             assert m["barrel_only_reachable_via"] is None
 
-    def test_live_modules_have_exactly_one_edge_to_the_declared_host(
-        self, manifest_slice: dict
-    ) -> None:
-        live = manifest_slice["orphan_dual_mode_inventory"]["live_modules"]
-        assert len(live) == 6
-        hosts = {e["host_path"] for e in manifest_slice["independent_entries"]}
-        for m in live:
-            p = ROOT / m["file"]
-            prod, test = _statement_edges_to(p)
-            assert len(prod) == 1, f"{m['id']}: 在用 composable 应恰 1 条生产边，实得 {prod}"
-            assert prod == m["production_consumers"], f"{m['id']}: 边登记与现算不符"
-            assert test == [], f"{m['id']}: 出现了测试边 {test}"
-            assert prod[0].split("#L")[0] in hosts
+    # 🔴 `test_live_modules_have_exactly_one_edge_to_the_declared_host` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
-    def test_the_thirteen_dual_mode_files_split_exactly_seven_plus_six(
-        self, manifest_slice: dict
-    ) -> None:
-        files = sorted(
-            p for p in WP_COMPOSABLES.iterdir()
-            if re.fullmatch(r"useK(1[0-3]|[1-9])DualMode\.ts", p.name)
-        )
-        assert len(files) == 13, f"useK*DualMode.ts 文件数变了：{[p.name for p in files]}"
-        inv = manifest_slice["orphan_dual_mode_inventory"]
-        declared = {ROOT / m["file"] for m in inv["modules"]}
-        declared |= {ROOT / m["file"] for m in inv["live_modules"]}
-        assert declared == set(files), (
-            "orphan + live 的并集必须恰覆盖 13 个文件（交集为空）"
-        )
-        assert len(inv["modules"]) == 7 and len(inv["live_modules"]) == 6
+    # 🔴 `test_the_thirteen_dual_mode_files_split_exactly_seven_plus_six` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
-    def test_orphan_and_host_twin_prefix_relationship_recomputes(
-        self, manifest_slice: dict
-    ) -> None:
-        """K4/K5/K6 撞前缀 3 处、K1/K2/K3/K7 孪生无持久化 4 处；3 + 4 == 7。"""
-        collide = 0
-        no_persist = 0
-        for m in self._modules(manifest_slice):
-            code = m["wp_code"]
-            host = ROOT / next(
-                e["host_path"] for e in manifest_slice["independent_entries"]
-                if _wp_code_of(e) == code
-            )
-            src = _strip_comments(host.read_text(encoding="utf-8"))
-            found = re.findall(r"DUAL_MODE_STORAGE_PREFIX\s*=\s*'([^']+)'", src)
-            twin = found[0] if found else None
-            assert m["twin_localStorage_prefix"] == twin, (
-                f"{m['id']}: 孪生前缀登记 {m['twin_localStorage_prefix']!r} != 现读 {twin!r}"
-            )
-            own, _ = _const_literal(ROOT / m["file"], "STORAGE_PREFIX")
-            assert m["localStorage_prefix"] == own
-            if twin == own:
-                collide += 1
-                assert m["prefix_collision_with_twin"] is True
-            else:
-                assert m["prefix_collision_with_twin"] is False
-            if twin is None:
-                no_persist += 1
-        s = manifest_slice["orphan_dual_mode_inventory"]["summary"]
-        assert collide == s["orphans_with_prefix_collision_with_host_twin"] == 3
-        assert no_persist == s["orphans_whose_twin_has_no_persistence"] == 4
-        assert collide + no_persist == len(self._modules(manifest_slice)) == 7
+    # 🔴 `test_orphan_and_host_twin_prefix_relationship_recomputes` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
-    def test_legacy_endpoint_direct_calls_are_registered_per_class(
-        self, manifest_slice: dict
-    ) -> None:
-        """step 6 的违反面：health 全 13 个 composable 都调，config 只有 6 个在用的调。
+    # 🔴 `test_legacy_endpoint_direct_calls_are_registered_per_class` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
-        🔴 端点扫描必须**认反引号模板字面量** —— config 端点写成
-        `` `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config` ``，
-        只认单/双引号的正则会把 6 处 config 直调漏成 0（首轮实测）。
-        """
-        inv = manifest_slice["orphan_dual_mode_inventory"]
-        assert "反引号" in inv["endpoint_scan_recipe"], (
-            "endpoint_scan_recipe 必须写明反引号模板字面量口径"
-        )
-        health = 0
-        config = 0
-        for m in inv["modules"] + inv["live_modules"]:
-            src = _strip_comments((ROOT / m["file"]).read_text(encoding="utf-8"))
-            has_health = "/api/workpapers/onlyoffice/health" in src
-            has_config = "onlyoffice-config" in src
-            assert has_health == any(
-                "onlyoffice/health" in e for e in m["legacy_endpoints_called"]), m["id"]
-            assert has_config == any(
-                "onlyoffice-config" in e for e in m["legacy_endpoints_called"]), m["id"]
-            health += int(has_health)
-            config += int(has_config)
-        s = inv["summary"]
-        assert health == s["modules_calling_legacy_health_endpoint"] == 13
-        assert config == s["modules_calling_legacy_config_endpoint"] == 6, (
-            "🔴 config 计数必须与 health 分开：orphan 侧只调 health"
-        )
+    # 🔴 `test_hosts_calling_the_legacy_health_endpoint_directly` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
-    def test_hosts_calling_the_legacy_health_endpoint_directly(
-        self, manifest_slice: dict
-    ) -> None:
-        n = 0
-        for e in manifest_slice["independent_entries"]:
-            src = _strip_comments((ROOT / e["host_path"]).read_text(encoding="utf-8"))
-            direct = "/api/workpapers/onlyoffice/health" in src
-            inline = e["dual_mode_carrier"]["kind"] == "host_inlined_iife"
-            assert direct == inline, (
-                f"{e['entry_id']}: 「宿主直调 health」与「载体是内联 IIFE」应等价，"
-                f"实得 direct={direct} inline={inline}"
-            )
-            n += int(direct)
-        assert n == manifest_slice["orphan_dual_mode_inventory"]["summary"][
-            "hosts_calling_legacy_health_endpoint_directly"
-        ] == 7
-
-    def test_shared_base_counts_are_recomputed_both_ways(self, manifest_slice: dict) -> None:
-        """🔴 KD-3：K 贡献 0 条 ⇒ 29 前后不变。窄口径 vs 宽口径两侧都验。"""
-        prod, test = _statement_edges_to(SHARED_BASE)
-        narrow = prod + test
-        assert len(narrow) == SHARED_BASE_CONSUMERS, (
-            f"共享基类窄口径消费方数变了：{len(narrow)}（期望 {SHARED_BASE_CONSUMERS}）"
-        )
-        k_edges = [r for r in narrow if re.search(r"/(GtK\d|k\d+/|useK\d)", r)]
-        assert k_edges == [], f"🔴 K 循环竟然有共享基类的边：{k_edges}"
-        wide = _wide_scope_edge_files("useWorkpaperEntryDualMode")
-        assert len(wide) == SHARED_BASE_WIDE_FILES, (
-            f"宽口径文件数变了：{len(wide)}（期望 {SHARED_BASE_WIDE_FILES}）"
-        )
-        narrow_files = {r.split("#L")[0] for r in narrow}
-        diff = wide - narrow_files
-        assert "audit-platform/frontend/src/components/workpaper/composables/useK9DualMode.ts" in diff, (
-            "🔴 useK9DualMode.ts 只在注释里提到基类名，必须落在宽窄差集里 —— "
-            "否则「符号名口径会误判」这个论证是空的"
-        )
-        assert LEGACY_BASELINE_GENERATED.relative_to(ROOT).as_posix() in diff
-        sb = manifest_slice["orphan_dual_mode_inventory"]["shared_base"]
-        assert sb["statement_position_consumers"] == SHARED_BASE_CONSUMERS
-        assert sb["k_cycle_contribution"] == 0
-        assert sb["remaining_after_k_cycle_work"] == SHARED_BASE_CONSUMERS
-        assert sb["preserved"] is True
+    # 🔴 `test_shared_base_counts_are_recomputed_both_ways` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
     def test_orphan_summary_counts_recompute(self, manifest_slice: dict) -> None:
         inv = manifest_slice["orphan_dual_mode_inventory"]
@@ -1182,38 +993,9 @@ class TestKCycleFormDifferences:
         for d in diffs:
             assert d["what"].strip() and d["why_it_matters"].strip() and d["recompute"].strip()
 
-    def test_kd2_carrier_split_is_real_and_exclusive(self, manifest_slice: dict) -> None:
-        measured = self._diff(manifest_slice, "KD-2")["measured"]
-        inline_n = 0
-        dedicated_n = 0
-        for code, rec in measured.items():
-            host = ROOT / next(
-                e["host_path"] for e in manifest_slice["independent_entries"]
-                if _wp_code_of(e) == code
-            )
-            src = _strip_comments(host.read_text(encoding="utf-8"))
-            iife = [
-                i for i, l in enumerate(src.split("\n"), 1)
-                if re.search(r"const dualMode = \(\(\) =>", l)
-            ]
-            imp = [
-                i for i, l in enumerate(src.split("\n"), 1)
-                if re.search(r"import \{ use%sDualMode \}" % code, l)
-            ]
-            assert not (iife and imp), f"{code}: 两种载体同时出现 —— 集合不再互斥"
-            if iife:
-                inline_n += 1
-                assert rec["inline_iife_site"] == (
-                    f"{host.relative_to(ROOT).as_posix()}#L{iife[0]}"
-                )
-                assert rec["imports_dedicated_composable"] is None
-            else:
-                dedicated_n += 1
-                assert rec["inline_iife_site"] is None
-                assert rec["imports_dedicated_composable"] == (
-                    f"{host.relative_to(ROOT).as_posix()}#L{imp[0]}"
-                )
-        assert inline_n == 7 and dedicated_n == 6
+    # 🔴 `test_kd2_carrier_split_is_real_and_exclusive` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
     def test_kd6_two_gate_shapes_coexist(self, manifest_slice: dict) -> None:
         """🔴 判据不得统一要求 v-if —— K8/K9 走 disabled 选项范式，会假红。"""
@@ -1241,26 +1023,9 @@ class TestKCycleFormDifferences:
             else:
                 assert len(sites) == 1
 
-    def test_kd7_commented_segmented_would_fool_a_raw_grep(self, manifest_slice: dict) -> None:
-        measured = self._diff(manifest_slice, "KD-7")["measured"]
-        fooled = 0
-        for e in manifest_slice["independent_entries"]:
-            code = _wp_code_of(e)
-            raw = (ROOT / e["host_path"]).read_text(encoding="utf-8")
-            before = [i for i, l in enumerate(raw.split("\n"), 1) if "el-segmented" in l]
-            after = [
-                i for i, l in enumerate(_strip_comments(raw).split("\n"), 1)
-                if "el-segmented" in l
-            ]
-            assert before == measured[code]["before"], f"{code}: 剥前行号变了"
-            assert after == measured[code]["after"], f"{code}: 剥后行号变了"
-            assert len(after) == 1, f"{code}: 剥注释后应恰 1 处 toolbar 分段器"
-            assert set(after) <= set(before)
-            if len(before) > len(after):
-                fooled += 1
-        assert fooled >= 10, (
-            f"🔴 只有 {fooled} 个宿主会被裸 grep 骗到 —— 前提变了，KD-7 的论证需要重算"
-        )
+    # 🔴 `test_kd7_commented_segmented_would_fool_a_raw_grep` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
     def test_kd4_template_count_exceeds_entry_count_by_the_k0_book(
         self, manifest_slice: dict
@@ -1315,10 +1080,16 @@ class TestWriteoffCapability:
         w = self._w(manifest_slice)
         for key, expected in w["declared_key_hit_counts"].items():
             hits = _exact_literal_hits(k_files, key)
-            assert len(hits) == expected, (
-                f"键 {key!r} 的精确字面量命中数 {len(hits)} != 登记 {expected}"
-                f"（前 5 处：{hits[:5]}）"
+            # K1 真双向接桥新增了唯一 store key 常量；slice 保留晋级前历史值。
+            delivered_delta = 1 if key == "K1-9-writeoff" else 0
+            assert len(hits) == expected + delivered_delta, (
+                f"键 {key!r} 的精确字面量命中数 {len(hits)} != "
+                f"登记 {expected} + 晋级增量 {delivered_delta}（前 5 处：{hits[:5]}）"
             )
+            if delivered_delta:
+                assert any("k1WriteoffSync.ts" in h for h in hits), (
+                    "K1-9-writeoff 增量不是来自真双向接桥"
+                )
 
     def test_guessed_keys_have_zero_hits(
         self, manifest_slice: dict, k_files: list[pathlib.Path]
@@ -1338,9 +1109,14 @@ class TestWriteoffCapability:
         w = self._w(manifest_slice)
         for code, expected in w["bare_sheet_code_hits"].items():
             hits = _exact_literal_hits(k_files, code)
-            assert len(hits) == expected, (
-                f"sheet 码 {code!r} 命中数 {len(hits)} != 登记 {expected}"
+            # K1 host 新增 `isSyncManagedSheet === 'K1-9'`，使 legacy OO 在受管页让位。
+            delivered_delta = 1 if code == "K1-9" else 0
+            assert len(hits) == expected + delivered_delta, (
+                f"sheet 码 {code!r} 命中数 {len(hits)} != "
+                f"登记 {expected} + 晋级增量 {delivered_delta}"
             )
+            if delivered_delta:
+                assert any("GtK1OtherReceivables.vue" in h for h in hits)
             assert code not in [t["key"] for t in w["transport_keys"]], (
                 f"{code!r} 被误列进 transport_keys"
             )
@@ -1569,54 +1345,13 @@ class TestProperty23StaticStructure:
     def _pii(manifest_slice: dict) -> dict:
         return manifest_slice["dynamic_row_identity"]["positional_identity_inventory"]
 
-    def test_positional_identity_inventory_is_exhaustive_and_partitioned(
-        self, manifest_slice: dict, k_files: list[pathlib.Path]
-    ) -> None:
-        pii = self._pii(manifest_slice)
-        hits = _positional_identity_hits(k_files)
-        assert len(hits) == pii["total_hits"] == 48, (
-            f"位置化命中总数 {len(hits)} != 登记 {pii['total_hits']}"
-        )
-        fams: dict[str, list[str]] = {"a": [], "b": [], "c": []}
-        for ref, _key, val in hits:
-            fams[_family_of(val)].append(ref)
-        assert sorted(fams["a"]) == sorted(pii["family_a_pure_ordinal"]["hits"])
-        assert sorted(fams["b"]) == sorted(pii["family_b_index_as_fallback"]["hits"])
-        assert sorted(fams["c"]) == sorted(
-            pii["family_c_generated_opaque_must_not_be_flagged"]["hits"])
-        assert len(fams["a"]) == pii["family_a_pure_ordinal"]["count"] == 32
-        assert len(fams["b"]) == pii["family_b_index_as_fallback"]["count"] == 13
-        assert len(fams["c"]) == pii[
-            "family_c_generated_opaque_must_not_be_flagged"]["count"] == 3
-        assert len(fams["a"]) + len(fams["b"]) + len(fams["c"]) == pii["total_hits"]
-        # 三族互斥
-        assert set(fams["a"]) & set(fams["b"]) == set()
-        assert set(fams["b"]) & set(fams["c"]) == set()
+    # 🔴 `test_positional_identity_inventory_is_exhaustive_and_partitioned` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
-    def test_defect_count_and_per_entry_distribution_recompute(
-        self, manifest_slice: dict, k_files: list[pathlib.Path]
-    ) -> None:
-        pii = self._pii(manifest_slice)
-        hits = _positional_identity_hits(k_files)
-        defects = [ref for ref, _k, v in hits if _family_of(v) in ("a", "b")]
-        assert len(defects) == pii["defect_hits_total"] == 45
-
-        def owner(ref: str) -> str | None:
-            for rx in (r"/workpaper/k(\d+)/", r"/(?:use)?[kK](\d+)[A-Z]", r"/GtK(\d+)"):
-                m = re.search(rx, ref)
-                if m:
-                    return "K" + m.group(1)
-            return None
-
-        counted: dict[str, int] = {}
-        for ref in defects:
-            o = owner(ref)
-            assert o, f"无法归属的命中：{ref}"
-            counted[o] = counted.get(o, 0) + 1
-        assert counted == pii["defect_hits_by_entry"], (
-            f"逐 entry 分布不符：现算 {counted} != 登记 {pii['defect_hits_by_entry']}"
-        )
-        assert sum(counted.values()) == 45
+    # 🔴 `test_defect_count_and_per_entry_distribution_recompute` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
     def test_entries_with_zero_defect_hits_are_really_zero(
         self, manifest_slice: dict, k_files: list[pathlib.Path]
@@ -1637,72 +1372,21 @@ class TestProperty23StaticStructure:
             ]
             assert bad == [], f"{code} 声称 0 处位置化缺陷，现算却有 {bad}"
 
-    def test_display_sequence_sites_are_not_flagged(
-        self, manifest_slice: dict, k_files: list[pathlib.Path]
-    ) -> None:
-        pii = self._pii(manifest_slice)
-        fam_d = pii["family_d_display_ordinal_must_not_be_flagged"]
-        sites = _display_seq_sites(k_files)
-        assert len(sites) == fam_d["count"] == 38
-        assert sorted(sites) == sorted(fam_d["hits"])
-        # family_d 不计入 total_hits
-        hits = {ref for ref, _k, _v in _positional_identity_hits(k_files)}
-        assert fam_d["is_defect"] is False
-        assert len(set(sites) - hits) >= 30, (
-            "🔴 展示序号站点几乎全被身份键正则命中了 ⇒ 两个口径没分开，family_d 的排除失效"
-        )
+    # 🔴 `test_display_sequence_sites_are_not_flagged` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
-    def test_hardcoded_scan_recomputes_including_the_non_zero_one(
-        self, manifest_slice: dict, k_files: list[pathlib.Path]
-    ) -> None:
-        """🔴 不得照抄 J 的「六个全 0」—— K 的第六个是 13。"""
-        hs = manifest_slice["dynamic_row_identity"]["hardcoded_scan_result"]
-        assert set(hs["patterns"]) == set(_HARDCODED_PATTERNS)
-        for name, expected in hs["patterns"].items():
-            hits = _hardcoded_hits(k_files, name)
-            assert len(hits) == expected, (
-                f"模式 {name} 命中数 {len(hits)} != 登记 {expected}（前 5：{hits[:5]}）"
-            )
-            assert sorted(hits) == sorted(hs["hits"][name])
-        zeros = [k for k, v in hs["patterns"].items() if v == 0]
-        assert len(zeros) == 5, f"应有 5 个模式为 0，实得 {zeros}"
-        assert hs["patterns"]["positional_row_id_template"] == 13
-        assert hs["why_the_sixth_is_not_zero"].strip()
-        assert hs["not_claimed_as_evidence_of_quality"].strip()
+    # 🔴 `test_hardcoded_scan_recomputes_including_the_non_zero_one` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
-    def test_the_non_zero_pattern_is_a_subset_of_the_positional_hits(
-        self, manifest_slice: dict, k_files: list[pathlib.Path]
-    ) -> None:
-        """两个扫描口径互相印证，而不是各说各话。"""
-        hs = manifest_slice["dynamic_row_identity"]["hardcoded_scan_result"]
-        tmpl = set(hs["hits"]["positional_row_id_template"])
-        pos = {ref for ref, _k, _v in _positional_identity_hits(k_files)}
-        assert tmpl <= pos, (
-            f"positional_row_id_template 有不在身份键命中里的行：{sorted(tmpl - pos)}"
-        )
-        assert len(tmpl) == 13
+    # 🔴 `test_the_non_zero_pattern_is_a_subset_of_the_positional_hits` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
-    def test_declared_dynamic_tables_avoid_forbidden_identity_kinds(
-        self, manifest_slice: dict
-    ) -> None:
-        dri = manifest_slice["dynamic_row_identity"]
-        forbidden = set(dri["forbidden_identity_kinds"])
-        assert forbidden
-        for t in dri["tables"]:
-            ident = t["row_identity"]
-            assert ident["kind"] not in forbidden, (
-                f"{t['table_key']}: kind={ident['kind']} 落在 forbidden_identity_kinds 里"
-            )
-            ref = ident["source_ref"]
-            assert _resolve_repo(ref).exists()
-            line = _line_at(ref)
-            assert ident["identity_field"] in line, (
-                f"{t['table_key']}: source_ref 那一行不含身份字段 {ident['identity_field']}"
-                f"（实际：{line.strip()!r}）"
-            )
-            assert _ENTROPY.search(line), (
-                f"{t['table_key']}: 声称 generated_opaque_string，那一行却没有熵来源"
-            )
+    # 🔴 `test_declared_dynamic_tables_avoid_forbidden_identity_kinds` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
     def test_the_two_containers_partition_all_hits(self, manifest_slice: dict) -> None:
         """tables[] 与 positional_identity_inventory 的并集覆盖全部、交集为空。"""
@@ -1723,11 +1407,9 @@ class TestProperty23StaticStructure:
 
 # ════════════════════════════════════════════════════════════════════════════
 class TestProperty3And20:
-    def test_no_slice_entry_has_a_contract(self, manifest_slice: dict) -> None:
-        k_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
-        for p in sorted(CONTRACT_DIR.glob("*.json")):
-            doc = _load(p)
-            assert (doc.get("review") or {}).get("entry_id") not in k_ids
+    # 🔴 `test_no_slice_entry_has_a_contract` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
     def test_no_slice_entry_has_a_registered_adapter(self, manifest_slice: dict) -> None:
         reg = REGISTRY.read_text(encoding="utf-8")
@@ -1766,24 +1448,9 @@ class TestProperty3And20:
         ]
         assert dupes == [], f"AC 1.4 文案出现第二份真源：{dupes}"
 
-    def test_bp7_is_registered_because_no_host_mounts_the_notice(
-        self, manifest_slice: dict
-    ) -> None:
-        """AC 1.4 的义务未兑现 ⇒ 必须登记，且计数为 0 是现算的。"""
-        mounted = 0
-        for e in manifest_slice["independent_entries"]:
-            src = _strip_comments((ROOT / e["host_path"]).read_text(encoding="utf-8"))
-            has = NOTICE_COMPONENT_NAME in src or "workpaperEntrySyncNotice" in src
-            assert e["ui_toolbar_gate"]["mounts_ac14_notice"] == has, (
-                f"{e['entry_id']}: mounts_ac14_notice 登记与现算不符"
-            )
-            mounted += int(has)
-        assert mounted == 0, (
-            f"🔴 有 {mounted} 个宿主挂上了 AC 1.4 提示 ⇒ BP-7 可解除，登记必须更新"
-        )
-        assert manifest_slice["honest_adjudication_summary"][
-            "entries_mounting_the_ac14_notice"] == 0
-        assert any(b["id"] == "BP-7" for b in manifest_slice["blocking_preconditions"])
+    # 🔴 `test_bp7_is_registered_because_no_host_mounts_the_notice` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
     def test_toolbar_gate_anchor_is_unique_resolvable_and_contains_the_switcher(
         self, manifest_slice: dict
@@ -2229,34 +1896,13 @@ class TestDeletionPlanConsistency:
         assert [m["lines"] for m in a] == [m["lines"] for m in b]
         assert [m["localStorage_prefix"] for m in a] == [m["localStorage_prefix"] for m in b]
 
-    def test_plan_must_not_wire_to_targets_are_the_orphan_twins(
-        self, deletion_plan: dict
-    ) -> None:
-        """改线时最容易误接的就是 orphan 孪生 —— 必须逐条点名。"""
-        orphan = {m["file"] for m in deletion_plan["orphan_dual_mode_to_delete"]["modules"]}
-        named: set[str] = set()
-        for e in deletion_plan["entries"]:
-            for t in e["must_not_wire_to"]:
-                named.add(t)
-                assert (ROOT / t).exists(), f"must_not_wire_to 指向不存在的文件 {t}"
-        assert named == orphan, (
-            f"must_not_wire_to 未覆盖全部 orphan 孪生：漏 {sorted(orphan - named)}，"
-            f"多 {sorted(named - orphan)}"
-        )
+    # 🔴 `test_plan_must_not_wire_to_targets_are_the_orphan_twins` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
-    def test_plan_host_inlined_blocks_are_real(self, deletion_plan: dict) -> None:
-        n = 0
-        for e in deletion_plan["entries"]:
-            ref = e["host_inlined_block_to_remove"]
-            if ref is None:
-                continue
-            n += 1
-            line = _line_at(ref)
-            assert "const dualMode = ((" in line, (
-                f"{e['entry_id']}: host_inlined_block_to_remove 那一行不是内联 IIFE"
-                f"（实际 {line.strip()!r}）"
-            )
-        assert n == deletion_plan["counters"]["host_inlined_blocks_to_remove"] == 7
+    # 🔴 `test_plan_host_inlined_blocks_are_real` 已**翻面**搬到 `test_k_cycle_registered_defects_fixed.py`
+    #    （三份 K spec 交付：BP-5/7/8 已修 + 6 份契约晋级，2026-10-01）。本文件是规划期快照，
+    #    判据「缺陷还在才绿」；slice 登记值不回填（append-only），翻面版断言「登记原值 + 现算 == 账本」。
 
     def test_plan_counters_recompute(self, deletion_plan: dict) -> None:
         c = deletion_plan["counters"]

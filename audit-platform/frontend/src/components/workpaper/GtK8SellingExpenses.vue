@@ -5,13 +5,17 @@
     </div>
 
     <template v-else>
-      <div v-if="isHtmlSheet && currentSheet !== 'K8'" class="k8-header-toolbar">
+      <div v-if="isHtmlSheet && currentSheet !== 'K8' && !isSyncManagedSheet" class="k8-header-toolbar">
         <el-segmented
           :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions.value"
           size="small"
           @change="dualMode.onModeChange"
         />
+        <!-- BP-7 / AC 1.4：能力诚实披露。文案真源在 sync/workpaperEntrySyncNotice.ts，
+             宿主里**不得**内联任何提示中文；已注册 bidirectional 的 entry
+             由组件自己返 null 不渲染 ⇒ 无需本地 v-if。 -->
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-k8-selling-expenses" />
         <!-- OnlyOffice 拉取状态（对齐 D4「拉取成功才可以」）：就绪/检测中/不可用 -->
         <el-tag
           v-if="dualMode.healthStatus.value === 'ready'"
@@ -44,7 +48,7 @@
 
       <!-- OnlyOffice 模式 -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-if="isHtmlSheet && !isSyncManagedSheet && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -54,7 +58,7 @@
       />
 
       <!-- HTML 结构化视图 -->
-      <template v-else-if="dualMode.currentMode.value === 'html'">
+      <template v-else-if="isSyncManagedSheet || dualMode.currentMode.value === 'html'">
         <!-- 底稿目录 -->
         <K8TabIndex
           v-if="currentSheet === 'K8'"
@@ -248,6 +252,7 @@ const K8TabSellingCheck = defineAsyncComponent(() => import('./k8/inspection/K8T
 
 // ─── 双模式 composable ──────────────────────────────────────────────────────
 import { useK8DualMode } from './composables/useK8DualMode'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 const props = defineProps<{
   wpId: string
@@ -294,6 +299,12 @@ const dualMode = useK8DualMode({
 
 /** 当前 sheet 是否为 HTML 可渲染（有匹配子组件） */
 const isHtmlSheet = computed(() => currentSheet.value !== '')
+
+/**
+ * `K8-3` 调整分录汇总已接平台真双向桥（Tab 内自带「结构化视图 / 在线编辑」切换，
+ * 后端 `phase5_k8_*`）⇒ 本宿主的 legacy 单向 OO 切换在这张 sheet 上让位，避免两套切换器同屏。
+ */
+const isSyncManagedSheet = computed(() => currentSheet.value === 'K8-3')
 
 /**
  * 从 sheetName 提取编码 (K8/K8A/K8-1~K8-8/附注)

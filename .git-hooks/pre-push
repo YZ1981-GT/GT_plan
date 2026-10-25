@@ -58,5 +58,24 @@ else
         echo "[pre-push] ⚠️ 6 维核查有项不达标（single 模式仅警告）"
 fi
 
+# 4. 暂存树/HEAD 自洽（2026-09-28 新增，spec d1-sync-row-table-engine-and-d1-coverage X5-i）
+#
+# 🔴 守的是「工作树绿 ≠ 提交后绿」这一类：digest 基线随某轮提交入库了，而对应的 6 个
+#    provider 改动留在工作树 ⇒ 工作树上 golden digest 门 exit 0（两边都是新的），
+#    HEAD 上 exit 1（基线新、代码旧）。pre-commit 的各门都读工作树，永远绿；CI 要等
+#    push 之后 —— 而那 6 个 provider 从没进过任何 commit，CI 从来没机会看到它们。
+#
+# push 前暂存区通常已清空（index == HEAD），所以这一步实质是在验「即将推送的代码自洽」。
+# 用 `git checkout-index` 把 index 物化到临时目录后跑门，约 35~40 秒；push 频率低，可接受。
+echo "[pre-push] 执行暂存树自洽检查（物化 index 后跑零回归门，约 40s）..."
+if ! "$PYTHON" backend/scripts/check/check_staged_tree_self_consistency.py; then
+    echo ""
+    echo "[pre-push] ❌ 暂存树自洽检查失败 —— 推上去别人会拉到一棵跑不通的树"
+    echo "          常见成因：基线/生成物已入库而对应实现没入库（或反之）"
+    echo "          排查：python backend/scripts/check/check_staged_tree_self_consistency.py --keep"
+    echo "          紧急救急：git push --no-verify"
+    exit 1
+fi
+
 echo "[pre-push] ✅ 全部通过"
 exit 0

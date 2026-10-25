@@ -47,7 +47,9 @@ _NEW_SHEETS = (SHEET_LT, SHEET_DISC_LISTED, SHEET_DISC_SOE)
 #: 已存在于平台但**未注册进 `formula_engine._REGISTRY`** 的 prefill 专属词汇。
 #: 它们是改造前的既有条目，不属本 spec 范围 → 语法校验时豁免。
 #: 反向自检：若某天被注册了，本豁免必须移除（见 `test_prefill_only_vocab_still_unregistered`）。
-_PREFILL_ONLY_FUNCS = ("ADJ", "TB_SUM")
+#: 🔴 `ADJ` 已于 2026-09-28 注册（spec tb-adjustment-column-formula-closure
+#: Phase 1 Task 1.3）⇒ 按该自检的指示移除。
+_PREFILL_ONLY_FUNCS = ("TB_SUM",)
 
 
 def _f1_blocks() -> list[dict]:

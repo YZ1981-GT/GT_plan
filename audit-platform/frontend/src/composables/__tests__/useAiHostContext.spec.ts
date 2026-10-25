@@ -12,7 +12,7 @@
  *
  * 判据说明：本文件测的是 adapter 的**行为输出**（返回值形状与取值），
  * 不检查"源码里是否出现某个符号"。宿主页面的接线由
- * `src/components/__tests__/DocAiChatPanel.host.spec.ts` 用真实 mount + 模板形态判据守卫。
+ * `src/components/ai/__tests__/PlatformAiChatPanel.host.spec.ts` 用真实 mount + 模板形态判据守卫。
  */
 
 import { describe, expect, it } from 'vitest'

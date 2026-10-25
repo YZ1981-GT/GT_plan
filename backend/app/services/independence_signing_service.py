@@ -82,7 +82,7 @@ class IndependenceSigningService:
 
         # SSE 通知签署进度更新
         try:
-            from app.core.event_bus import event_bus
+            from app.services.event_bus import event_bus
             event_bus.broadcast_raw(
                 "signing_progress_updated",
                 {"project_id": str(project_id), "template_code": template_code, "user_id": str(user_id)},
@@ -147,7 +147,7 @@ class IndependenceSigningService:
 
     async def _get_project_members(self, project_id: UUID) -> list[UUID]:
         """获取项目所有成员 user_id"""
-        from app.models.audit_platform_models import ProjectAssignment
+        from app.models.staff_models import ProjectAssignment
         stmt = sa.select(ProjectAssignment.staff_id).where(
             ProjectAssignment.project_id == project_id,
         )
@@ -156,7 +156,7 @@ class IndependenceSigningService:
 
     async def _get_committee_members(self, project_id: UUID) -> list[UUID]:
         """获取专委会委员（quality_reviewer + eqcr 角色）"""
-        from app.models.audit_platform_models import ProjectAssignment
+        from app.models.staff_models import ProjectAssignment
         stmt = sa.select(ProjectAssignment.staff_id).where(
             ProjectAssignment.project_id == project_id,
             ProjectAssignment.role.in_(["quality_reviewer", "eqcr"]),

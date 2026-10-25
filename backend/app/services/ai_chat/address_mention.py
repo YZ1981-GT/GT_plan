@@ -254,7 +254,7 @@ async def check_address_stale(
 
     try:
         import sqlalchemy as sa
-        from app.models.knowledge_models import KnowledgeIndex
+        from app.models.ai_models import KnowledgeIndex
 
         # 查询索引中该地址条目是否标记为 stale
         result = await db.execute(
@@ -325,7 +325,7 @@ async def _get_address_version(
     """
     try:
         import sqlalchemy as sa
-        from app.models.knowledge_models import KnowledgeIndex
+        from app.models.ai_models import KnowledgeIndex
 
         result = await db.execute(
             sa.select(KnowledgeIndex.doc_version)

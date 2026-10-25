@@ -125,9 +125,9 @@
     ]
   },
   "summary": {
-    "entry_total": 2349,
-    "http_total": 2334,
-    "http_wp_bound": 841,
+    "entry_total": 2348,
+    "http_total": 2333,
+    "http_wp_bound": 840,
     "http_non_wp_bound": 1493,
     "worker_total": 15,
     "by_family": {
@@ -152,7 +152,7 @@
       "procedure_task": 16,
       "render_config": 1,
       "review": 17,
-      "save": 151,
+      "save": 150,
       "snapshot": 1,
       "status": 1,
       "version": 7
@@ -161,7 +161,7 @@
       "deferred_editor": 5,
       "editor_security.validate_editor_token(editor_read)": 1,
       "editor_security.verify_callback_preconditions + resolve_wp_binding_and_access(editor.file_write)": 1,
-      "gated": 744,
+      "gated": 743,
       "migrated": 15,
       "native_authz": 64,
       "not_applicable": 1515,
@@ -175,7 +175,7 @@
       "bulk": 12,
       "callback": 3,
       "comment": 4,
-      "create": 699,
+      "create": 698,
       "dead_letter": 1,
       "delete": 76,
       "download": 6,
@@ -21332,23 +21332,6 @@
       "entrypoint": "app.routers.wp_template_xlsx:convert_xlsx_to_json",
       "callable": "convert_xlsx_to_json",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/template-file/to-json",
-      "method": "POST",
-      "family": "save",
-      "action": "create",
-      "wp_bound": true,
-      "binding": "wp_id",
-      "gate": "gated",
-      "matrix": "workpaper.dedicated_subroute/dedicated_write",
-      "test_ids": [
-        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
-      ],
-      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
-    },
-    {
-      "kind": "http",
-      "entrypoint": "app.routers.wp_template_files:upload_xlsx_file",
-      "callable": "upload_xlsx_file",
-      "route": "/api/projects/{project_id}/workpapers/{wp_id}/template-file/upload-xlsx",
       "method": "POST",
       "family": "save",
       "action": "create",

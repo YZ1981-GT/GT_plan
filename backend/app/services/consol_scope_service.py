@@ -52,6 +52,7 @@ async def get_scope_item(db: AsyncSession, scope_id: UUID, project_id: UUID) -> 
         sa.select(ConsolScope).where(
             ConsolScope.id == scope_id,
             ConsolScope.project_id == project_id,
+            ConsolScope.is_deleted.is_(False),
         )
     )
     return result.scalar_one_or_none()
@@ -70,7 +71,10 @@ async def create_scope_item(db: AsyncSession, project_id: UUID, data: ConsolScop
     if existing:
         raise ValueError(f"合并范围项已存在: {data.year}/{data.company_code}")
 
-    scope = ConsolScope(project_id=project_id, **data.model_dump())
+    scope = ConsolScope(
+        project_id=project_id,
+        **data.model_dump(exclude={"project_id"}),
+    )
     db.add(scope)
     await db.commit()
     await db.refresh(scope)
@@ -123,7 +127,10 @@ async def batch_update_scope(
                 setattr(existing, key, value)
             results.append(existing)
         else:
-            scope = ConsolScope(project_id=project_id, **item.model_dump())
+            scope = ConsolScope(
+                project_id=project_id,
+                **item.model_dump(exclude={"project_id"}),
+            )
             db.add(scope)
             results.append(scope)
 

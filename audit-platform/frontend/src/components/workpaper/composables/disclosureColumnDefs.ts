@@ -66,7 +66,46 @@ export interface ProjectedTable {
   columns: ColumnDef[]
   rows: Array<{ label: unknown; values: unknown[]; is_total: boolean }>
   _source_sub_table_key: string
+  /**
+   * 投影行 → `sub_table_data[key]` 归一后（含可扩位行）的真实行下标，与 `rows` 等长。
+   * 仅供前端编辑反写定位；保存只发送 raw `table_data`，本字段不会落库。
+   */
+  _source_row_indexes: number[]
+  /** 投影标签与单元格到 raw 的不序列化坐标（仅前端 sidecar）。 */
+  _sourceLabelRefs?: Array<{ tableIndex: number; rowIndex: number; sourceSubTableKey?: string } | null>
+  _sourceCellRefs?: Array<Array<{
+    row: { tableIndex: number; rowIndex: number; sourceSubTableKey?: string }
+    column: { tableIndex: number; valueIndex: number; key?: string; sourceSubTableKey?: string }
+  } | null>>
+  _sourceColumnRefs?: Array<{ tableIndex: number; valueIndex: number; key?: string; sourceSubTableKey?: string }>
+  _sourceTableKeys?: string[]
+  _sourceTableIndexes?: number[]
+  _sourceRowRefs?: Array<Array<{ tableIndex: number; rowIndex: number; sourceSubTableKey?: string } | null>>
   _needs_columns?: boolean
+}
+
+/**
+ * workpaper 来源章节的「导出关闭」子表名清单键。
+ *
+ * 该来源的 `_tables` 是读时投影、不落库，表级 `export_enabled` 存不住 ⇒ 改存在
+ * `table_data` 顶层（同步只改 `sub_table_data` / `_sub_table_columns` / 元数据，不碰本键）。
+ * 🔴 与后端 `note_sub_table_projector.EXPORT_DISABLED_SUB_TABLES_KEY` 同名，禁止漂移。
+ */
+export const EXPORT_DISABLED_SUB_TABLES_KEY = '_export_disabled_sub_tables'
+
+/** 读取导出关闭清单；非数组一律视为空（不猜）。 */
+export function readExportDisabledSubTables(tableData: Record<string, any> | null | undefined): Set<string> {
+  const raw = tableData && typeof tableData === 'object' ? tableData[EXPORT_DISABLED_SUB_TABLES_KEY] : null
+  return new Set(Array.isArray(raw) ? raw.filter((k: unknown): k is string => typeof k === 'string') : [])
+}
+
+/**
+ * 源模板留的「可扩位」行（`row_type === 'expandable'`）零可见内容，投影不产出该行。
+ * 🔴 与后端 `note_expandable_markers.is_zero_visible_row` 同规则 —— 两端过滤不一致时，
+ * 前端显示行下标与后端 `_tables` 行下标会错一位，编辑会写到下一行。
+ */
+function isZeroVisibleRow(row: any): boolean {
+  return !!row && typeof row === 'object' && String(row.row_type ?? '') === 'expandable'
 }
 
 function isMetaKey(key: string): boolean {
@@ -125,6 +164,7 @@ export function projectSubTablesClient(tableData: Record<string, any> | null | u
     ? tableData._sub_table_columns as SubTableColumns
     : {}
 
+  const exportDisabled = readExportDisabledSubTables(tableData)
   const tables: ProjectedTable[] = []
   for (const key of keys) { // 保持键序（P6）
     if (isMetaKey(key)) continue
@@ -135,6 +175,28 @@ export function projectSubTablesClient(tableData: Record<string, any> | null | u
     const defs: ColumnDef[] = Array.isArray(defsRaw)
       ? defsRaw.filter(d => d && typeof d.key === 'string' && d.key.length > 0)
       : []
+    // 归一后行序 = 后端 normalize_sub_table_data 的行序（非对象行被丢弃）；
+    // 记下可见行在其中的下标，编辑反写按它定位，不按显示下标猜。
+    const visible: Array<{ row: any; index: number }> = []
+    rawRows.forEach((r: any, index: number) => {
+      if (r && typeof r === 'object' && !isZeroVisibleRow(r)) visible.push({ row: r, index })
+    })
+    const sourceRowIndexes = visible.map(v => v.index)
+    const makeSourceRefs = (valueDefs: ColumnDef[]) => ({
+      _sourceRowRefs: visible.map(({ index }) => [{ tableIndex: 0, rowIndex: index, sourceSubTableKey: key }]),
+      _sourceLabelRefs: visible.map(({ index }) => ({ tableIndex: 0, rowIndex: index, sourceSubTableKey: key })),
+      _sourceColumnRefs: valueDefs.map((def, valueIndex) => ({
+        tableIndex: 0,
+        valueIndex,
+        key: def.key,
+        sourceSubTableKey: key,
+      })),
+      _sourceCellRefs: visible.map(({ index }) => valueDefs.map((def, valueIndex) => ({
+        row: { tableIndex: 0, rowIndex: index, sourceSubTableKey: key },
+        column: { tableIndex: 0, valueIndex, key: def.key, sourceSubTableKey: key },
+      }))),
+    })
+    const exportFlag = exportDisabled.has(key) ? { export_enabled: false as const } : {}
 
     if (defs.length === 0) {
       // P8 / 降级：无列头 → 不用英文字段键当 header
@@ -143,11 +205,12 @@ export function projectSubTablesClient(tableData: Record<string, any> | null | u
         name: key,
         headers: hasLabel ? ['项目'] : [],
         columns: [],
-        rows: rawRows
-          .filter((r: any) => r && typeof r === 'object')
-          .map((r: any) => ({ label: r.label ?? '', values: [], is_total: !!r.is_total })),
+        rows: visible.map(({ row: r }) => ({ label: r.label ?? '', values: [], is_total: !!r.is_total })),
         _source_sub_table_key: key,
+        _source_row_indexes: sourceRowIndexes,
+        ...makeSourceRefs([]),
         _needs_columns: true,
+        ...exportFlag,
       })
       continue
     }
@@ -156,27 +219,27 @@ export function projectSubTablesClient(tableData: Record<string, any> | null | u
     const labelKey = labelDef?.key
     const valueDefs = defs.filter(d => d !== labelDef)
     const headers = [String(labelDef?.label ?? ''), ...valueDefs.map(d => String(d.label ?? ''))]
-    // 逆投影：位置化 values 行还原为业务键行，再走统一取键逻辑
-    const rows = rawRows
-      .filter((r: any) => r && typeof r === 'object')
-      .map((r: any) => inverseProjectRow(r, labelDef, valueDefs))
 
     tables.push({
       name: key,
       headers,
       columns: defs,
-      rows: rows
-        .map((r: any) => {
-          let labelVal = labelKey ? (r[labelKey] ?? '') : ''
-          // 兜底：标签列键值缺失时回退通用 label（合计/小计行常用 label 而非业务键）
-          if ((labelVal === '' || labelVal == null) && labelKey !== 'label') labelVal = r.label ?? labelVal
-          return {
-            label: labelVal,
-            values: valueDefs.map(d => r[d.key] ?? null), // 缺字段→null(P3)，额外字段忽略(P4)
-            is_total: !!r.is_total, // P5
-          }
-        }),
+      rows: visible.map(({ row: raw }) => {
+        // 逆投影：位置化 values 行还原为业务键行，再走统一取键逻辑
+        const r = inverseProjectRow(raw, labelDef, valueDefs)
+        let labelVal = labelKey ? (r[labelKey] ?? '') : ''
+        // 兜底：标签列键值缺失时回退通用 label（合计/小计行常用 label 而非业务键）
+        if ((labelVal === '' || labelVal == null) && labelKey !== 'label') labelVal = r.label ?? labelVal
+        return {
+          label: labelVal,
+          values: valueDefs.map(d => r[d.key] ?? null), // 缺字段→null(P3)，额外字段忽略(P4)
+          is_total: !!r.is_total, // P5
+        }
+      }),
       _source_sub_table_key: key,
+      _source_row_indexes: sourceRowIndexes,
+      ...makeSourceRefs(valueDefs),
+      ...exportFlag,
     })
   }
   return tables

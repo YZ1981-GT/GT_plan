@@ -45,8 +45,8 @@ interface NavRow {
 /** J3 各 sheet → navigation_rows（content=完整 sheet 名，供 includes 匹配）。 */
 const NAV_ROWS: NavRow[] = [
   { content: '股份支付实质性程序表 J3A', index_ref: 'J3A', component_type: 'a-program-console', progressKeys: [] },
-  { content: '股份支付情况表J3-1', index_ref: 'J3-1', component_type: 'd-form-table', progressKeys: ['J3-detail', 'J3-1'] },
-  { content: '股份支付检查表J3-2', index_ref: 'J3-2', component_type: 'd-form-table', progressKeys: ['J3-check', 'J3-2'] },
+  { content: '股份支付情况表J3-1', index_ref: 'J3-1', component_type: 'd-form-table', progressKeys: ['J3-1-'] },
+  { content: '股份支付检查表J3-2', index_ref: 'J3-2', component_type: 'd-form-table', progressKeys: ['J3-2-'] },
 ]
 
 function rowStatus(row: NavRow): string {

@@ -40,12 +40,19 @@ async def db_session() -> AsyncSession:
 
 
 def _make_basic_info(**overrides) -> BasicInfoSchema:
-    """构造 BasicInfoSchema 测试数据。"""
+    """构造 BasicInfoSchema 测试数据。
+
+    company_code / short_name 自 project-creation-enhancement（2026-06-05）起为必填，
+    本 helper 原先未提供 ⇒ 本文件 17 条用例在 HEAD 上全部因构造失败而红（预存失败，
+    consol-tree-three-code-autobuild 任务 3.7 补齐；代码为合法 18 位 USCC）。
+    """
     defaults = {
         "client_name": "测试客户",
         "audit_year": 2024,
         "project_type": "annual",
         "accounting_standard": "enterprise",
+        "company_code": "91110000710931130E",
+        "short_name": "测试客户",
     }
     defaults.update(overrides)
     return BasicInfoSchema(**defaults)

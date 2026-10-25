@@ -56,6 +56,11 @@ from app.models.core import User
 from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.cross_ref_service import cross_ref_service
 from app.services.project_audit_year import fetch_project_audit_year
+from app.services.tb_audited_writer import (
+    build_publish_token,
+    canonical_publish_token_amount,
+    load_current_audited_amounts,
+)
 from app.services.workpaper_sync.content_mutation import (
     HtmlOnlyCommitPlan,
     HtmlOnlyEntryHasRepresentationError,
@@ -634,6 +639,39 @@ class PublishToTbResponse(BaseModel):
     message: str
 
 
+def _canonical_token_amount(value: Any) -> str | None:
+    """保留旧私有导入契约，实际规范化由统一写入服务提供。"""
+    return canonical_publish_token_amount(value)
+
+
+def _build_publish_token(
+    *,
+    project_id: UUID,
+    year: int,
+    wp_code: str,
+    rows: list[dict[str, Any]],
+    current_audited_amounts: dict[str, list[Any]],
+) -> str:
+    """保留路由测试和调用方使用的私有入口，实际算法集中在统一写入服务。"""
+    return build_publish_token(
+        project_id=project_id,
+        year=year,
+        wp_code=wp_code,
+        rows=rows,
+        current_audited_amounts=current_audited_amounts,
+    )
+
+
+async def _load_current_audited_amounts(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    account_codes: list[str],
+) -> dict[str, list[Any]]:
+    """保留路由私有入口，实际目标状态查询集中在统一写入服务。"""
+    return await load_current_audited_amounts(db, project_id, year, account_codes)
+
+
 @router.post("/{wp_id}/audit-determination/publish-to-tb", response_model=PublishToTbResponse)
 async def publish_determination_to_tb(
     wp_id: UUID,
@@ -726,10 +764,23 @@ async def publish_determination_to_tb(
     if not year:
         raise HTTPException(400, "项目未设置审计年度，无法定位 trial_balance")
 
-    # ④ 幂等 token：缺省用 project/year/wp_code + 内容摘要合成（同一批数据重复点击共用 token）
-    token = body.publish_token or (
-        f"{project_id}:{year}:{det_code}:{abs(hash(str(sorted((r['account_code'], r['audited_amount']) for r in writeback_rows))))}"
-    )
+    # ④ 幂等 token：显式传入时原样透传；否则绑定规范化发布行和发布前目标状态。
+    if body.publish_token:
+        token = body.publish_token
+    else:
+        current_audited_amounts = await _load_current_audited_amounts(
+            db,
+            project_id,
+            year,
+            [row["account_code"] for row in writeback_rows],
+        )
+        token = _build_publish_token(
+            project_id=project_id,
+            year=year,
+            wp_code=det_code,
+            rows=writeback_rows,
+            current_audited_amounts=current_audited_amounts,
+        )
 
     # ⑤ 发布**带确认信号**的 WORKPAPER_SAVED → handler 回写 TB（服务端再校验发布者权限 + 幂等）
     await event_bus.publish(EventPayload(

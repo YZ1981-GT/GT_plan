@@ -156,6 +156,13 @@ class WritebackTarget:
     wp_code: str | None = None
     sheet_name: str | None = None
     cell_ref: str | None = None
+    project_id: str | None = None
+    # 附注模块的记录定位与归属元组；writer 会在行锁后逐项复验。
+    note_record_id: str | None = None
+    note_section_id: str | None = None
+    note_year: int | None = None
+    # _UNSET 表示旧的直接调用未提供字段；显式 None 表示 legacy NULL 行。
+    note_node_key: str | None = field(default=_UNSET)
     old_value: Any = field(default=_UNSET)
 
 

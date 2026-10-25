@@ -28,6 +28,7 @@ export function useLedgerNavigation() {
   const drillAccountCode = ref('')
   const drillAccountName = ref('')
   const drillVoucherNo = ref('')
+  const drillVoucherDate = ref('')
 
   function navigateTo(index: number) {
     if (index < 0 || index >= breadcrumbs.value.length) return
@@ -49,11 +50,21 @@ export function useLedgerNavigation() {
 
   function drillToVoucher(row: any) {
     drillVoucherNo.value = row.voucher_no || row.voucher_number || ''
+    // 🔴 凭证号不唯一（真实库实测跨月/跨日重复），(voucher_date, voucher_no)
+    // 才唯一对应一张凭证，故带上日期；月份作为无日期时的兜底粒度。
+    const raw = String(row.voucher_date || '')
+    const vDate = raw ? (raw.length >= 10 ? raw.slice(0, 10) : raw) : ''
+    const voucherDate = /^\d{4}-\d{2}-\d{2}$/.test(vDate) ? vDate : ''
+    drillVoucherDate.value = voucherDate
+    const m = voucherDate ? Number(voucherDate.slice(5, 7)) : null
+    const month = (m && m >= 1 && m <= 12) ? m : null
     currentLevel.value = 'voucher'
     breadcrumbs.value.push({
-      label: `凭证 ${drillVoucherNo.value}`,
+      label: voucherDate
+        ? `凭证 ${drillVoucherNo.value}（${voucherDate}）`
+        : `凭证 ${drillVoucherNo.value}`,
       level: 'voucher',
-      params: { voucher_no: drillVoucherNo.value },
+      params: { voucher_no: drillVoucherNo.value, voucher_date: voucherDate, month },
     })
   }
 
@@ -106,6 +117,7 @@ export function useLedgerNavigation() {
     drillAccountCode,
     drillAccountName,
     drillVoucherNo,
+    drillVoucherDate,
     navigateTo,
     drillToLedger,
     drillToVoucher,

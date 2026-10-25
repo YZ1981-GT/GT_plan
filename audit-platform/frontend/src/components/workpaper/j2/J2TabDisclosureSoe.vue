@@ -22,7 +22,8 @@ import WpFourTableSourcePanel from '../shared/WpFourTableSourcePanel.vue'
 import J2DisclosureConsistencyPanel from './J2DisclosureConsistencyPanel.vue'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { J2_NOTE_SECTION, J2_DISCLOSURE_SHEET_NAME } from '../composables/j2NoteSectionMap'
-import { buildJ2SoeSyncPayload } from '../composables/j2DisclosureSyncPayload'
+import { buildJ2SoeSyncPayload, toJ2SyncRequest } from '../composables/j2DisclosureSyncPayload'
+import { api } from '@/services/apiProxy'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { buildJ2SoeConsistency, type J2SoeConsistencyInput } from '../composables/j2DisclosureConsistency'
@@ -479,7 +480,8 @@ onMounted(load)
 watch(() => props.allResponses, load, { deep: false })
 
 // ── 同步到附注 ──────────────────────────────────────────────────────────────
-const { projectId: ctxProjectId, auditYear } = useAuditContext()
+// 🔴 useAuditContext 返回的是 `year` 而非 `auditYear`（见 J2TabDisclosureListed 同处说明）
+const { projectId: ctxProjectId, year: auditYear } = useAuditContext()
 const { scheduleAutoSync } = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
 
 async function syncToDisclosureNotes() {
@@ -506,12 +508,11 @@ async function syncToDisclosureNotes() {
     summaryEndFn: (r) => n(r.begin) + n(r.increase) - n(r.decrease),
   })
   try {
-    const { default: axios } = await import('axios')
-    await axios.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, {
-      project_id: props.projectId,
-      year: auditYear.value,
-      ...payload,
-    })
+    // 🔴 经 apiProxy（http.ts 拦截器附 Authorization）+ 端点契约形状，见 J2TabDisclosureListed 同处说明
+    await api.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      toJ2SyncRequest(payload, { wpId: props.wpId, currentStandard: 'soe_standalone', year: auditYear.value }),
+    )
   } catch { /* 失败静默 */ }
 }
 

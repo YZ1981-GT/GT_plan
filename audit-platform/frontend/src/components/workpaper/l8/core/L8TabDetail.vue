@@ -82,7 +82,8 @@
       <el-table-column type="index" label="#" width="50" align="center" fixed />
       <el-table-column prop="itemName" label="费用项目" min-width="160" fixed>
         <template #default="{ row, $index }">
-          <el-input v-if="!isReadonly" :model-value="row.itemName" size="small" @change="(val: string) => handleUpdate($index, 'itemName', val)" />
+          <!-- 模板骨架行（含派生行）科目名固定只读；只有用户新增行可改名。 -->
+          <el-input v-if="!isReadonly && !isL82TemplateRowId(row.key)" :model-value="row.itemName" size="small" @change="(val: string) => handleUpdate($index, 'itemName', val)" />
           <span v-else>{{ row.itemName || '—' }}</span>
         </template>
       </el-table-column>
@@ -107,14 +108,19 @@
             align="right"
           >
             <template #default="{ row, $index }">
+              <!-- 🔴 方案 D：跨行派生行（R11/R13/R20）的月度格是模板预置跨行减法公式，只读显示；
+                   其余骨架行与用户新增行可编辑。 -->
               <el-input-number
-                v-if="!isReadonly"
+                v-if="!isReadonly && !isL82DerivedRowKey(row.key)"
                 :model-value="row.monthly[m - 1]"
                 :controls="false"
                 size="small"
                 style="width: 100%"
                 @change="(val: number | undefined) => handleMonthlyUpdate($index, m - 1, val ?? 0)"
               />
+              <el-tooltip v-else-if="!isReadonly" content="派生行月度金额由上方科目跨行计算（模板公式），不可直接编辑" placement="top">
+                <span class="formula-value">{{ fmtAmount(row.monthly[m - 1]) }}</span>
+              </el-tooltip>
               <span v-else>{{ fmtAmount(row.monthly[m - 1]) }}</span>
             </template>
           </el-table-column>
@@ -203,14 +209,17 @@
         </el-table-column>
       </template>
 
-      <!-- 操作列 -->
+      <!-- 操作列：模板骨架行（含派生行）是固定科目结构，不可删；只有用户新增行可删。 -->
       <el-table-column v-if="!isReadonly" label="操作" width="70" align="center" fixed="right">
-        <template #default="{ $index }">
-          <el-popconfirm title="确认删除该项目？" @confirm="handleRemoveRow($index)">
+        <template #default="{ row, $index }">
+          <el-popconfirm v-if="!isL82TemplateRowId(row.key)" title="确认删除该项目？" @confirm="handleRemoveRow($index)">
             <template #reference>
               <el-button type="danger" text size="small">删除</el-button>
             </template>
           </el-popconfirm>
+          <el-tooltip v-else content="模板固定科目行，不可删除" placement="top">
+            <el-button type="info" text size="small" disabled>—</el-button>
+          </el-tooltip>
         </template>
       </el-table-column>
     </el-table>
@@ -282,10 +291,12 @@ import { useL8FormData } from '../../composables/useL8FormData'
 import {
   useL8Detail,
   L8_DETAIL_SEGMENTS,
-  L8_DETAIL_DEFAULT_ITEMS,
+  createL8DefaultRows,
+  restoreL8RowsForDisplay,
   type L8DetailRow,
   type L8DetailSegment,
 } from '../../composables/useL8Detail'
+import { isL82DerivedRowKey, isL82TemplateRowId } from './l8DetailRowIdentity'
 import { useL8ImportExport } from '../../composables/useL8ImportExport'
 
 const props = defineProps<{
@@ -307,23 +318,9 @@ const formData = useL8FormData({
   projectId: computed(() => props.projectId),
 })
 
-const detailRows = ref<L8DetailRow[]>(
-  L8_DETAIL_DEFAULT_ITEMS.map((name, i) => ({
-    key: `l8-detail-default-${i}`,
-    itemName: name,
-    monthly: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] as [number, number, number, number, number, number, number, number, number, number, number, number],
-    periodUnadjusted: 0,
-    aje: 0,
-    rje: 0,
-    periodAudited: 0,
-    ratio: 0,
-    crossRef: '',
-    priorUnadjusted: 0,
-    priorAje: 0,
-    priorRje: 0,
-    priorAudited: 0,
-  }))
-)
+// 🔴 方案 D：13 行默认骨架行用模板身份 GTROW-L82-NNNN 认领槽位（含「汇兑净损失」R20）；
+// 用户 addRow 新增行自铸 l82det-*。身份真源 l8/core/l8DetailRowIdentity.ts。
+const detailRows = ref<L8DetailRow[]>(createL8DefaultRows())
 
 const {
   activeSegment,
@@ -496,7 +493,10 @@ function _restoreRows() {
     try {
       const parsed = JSON.parse(fullData.remark)
       if (Array.isArray(parsed) && parsed.length > 0) {
-        detailRows.value = parsed
+        // 🔴 方案 D1：store 只含 10 输入骨架行 + 用户新增行（无派生行）。复原时以 13 行骨架为底板，
+        //   把 store 输入行按 GTROW 槽位覆盖、派生行占位保留（值由 computedRows 跨行算）、用户行追加。
+        //   兼容历史自铸身份（按位置认领输入槽位）。
+        detailRows.value = restoreL8RowsForDisplay(parsed as L8DetailRow[])
       }
     } catch { /* keep defaults */ }
   }

@@ -213,21 +213,20 @@ class TestGfP20ZeroRegressionIsComputedNotHardcoded:
 #: 并发会话的未跟踪新文件，属 `f1-sync-coverage-and-first-canary` 作业面，
 #: 改它会与在飞工作冲突），但也**不接受一个红着的门当基线** ⇒ 逐 provider 核可算性，
 #: 把 F1 的失败登记为具名例外。F1 修好后本判据会打红，提示把登记移除。
-KNOWN_PRE_EXISTING_BLOCKERS: dict[str, tuple[str, str]] = {
-    "f1": (
-        "f1-sync-coverage-and-first-canary",
-        "契约 table payload 是手写形态（缺 anchor / header_rows / "
-        "row_identity.json_pointer），`parse_contract` 抛 "
-        "「table anchor 必须是 A1 单元格，实得 None」⇒ 该 entry 的 "
-        "`assert_contract_file_matches_source()` 从未能通过。"
-        "并发会话已在 registry.py 的 F3 条目注释里独立记录过同一根因，"
-        "并把 F3/F4/F5 改成走框架层 `spec_to_contract_sheet_payload`，但没回头修 F1。"
-        "另：F1 的 `build_store_projection(store_item_id, payload, *, contract)` 是"
-        "**两位置参**形态，与本门 `mod.build_store_projection(rows, contract=...)` 的"
-        "调用不兼容（`TypeError: missing 1 required positional argument: 'payload'`）——"
-        "即便契约修好，签名也要一起改成单位置参（照 E1）。",
-    ),
-}
+#:
+#: 🔴 **2026-09-30：f1 登记已按其自身指引移除（现算确认已修好，三项独立证据）**
+#:   ① 本门逐 provider 现算，f1 的 digest **可算**（原先抛异常被登记为例外）；
+#:   ② `backend/scripts/check/_sync_provider_golden_digest.json` 里 f1 条目有完整真实
+#:      digest（contract_payload / sheet_digests / store_projection / instrumentation 四项非 null），
+#:      `check_sync_provider_golden_digest.py` 现算 **零跳过**；
+#:   ③ `build_store_projection(store_item_id, payload, *, contract, limits)` 的**两位置参**
+#:      形态**仍然存在**（24 家里唯一），但门已改为**按参数 kind 分派**而不是按名字判断
+#:      ⇒ 签名不必改，兼容性问题在门侧解决。原登记文案「签名也要一起改成单位置参（照 E1）」
+#:      这句**已不再成立**，不要照它去改 f1 的签名。
+#:   ⇒ 因为是门侧修好而非契约侧，**无需** `--update` 重建 baseline（f1 本就在基线内）。
+#: 名单现为空。空名单下 `test_blocker_registry_entries_have_owner_and_substantive_reason`
+#: 会变成恒真式，故该判据已补空分母声明（见其内）。
+KNOWN_PRE_EXISTING_BLOCKERS: dict[str, tuple[str, str]] = {}
 
 
 class TestGfP20PerProviderDigestComputable:
@@ -273,13 +272,26 @@ class TestGfP20PerProviderDigestComputable:
         assert "g2" in computed, "G2 的 digest 算不出来"
 
     def test_blocker_registry_entries_have_owner_and_substantive_reason(self) -> None:
-        """登记项必须有归属 spec + 实质根因（防「暂不处理」式空话登记）。"""
-        thin = [
-            (label, len(reason))
-            for label, (owner, reason) in KNOWN_PRE_EXISTING_BLOCKERS.items()
-            if not owner or len(reason) < 60
-        ]
-        assert not thin, f"登记理由过短或无归属: {thin}"
+        """登记项必须有归属 spec + 实质根因（防「暂不处理」式空话登记）。
+
+        🔴 **空分母声明（2026-09-30）**：f1 移除后名单为空，下面的推导式会得空列表
+        ⇒ 本判据对「名单里有没有空话登记」**暂时没有区分力**（恒真）。如实声明而不是
+        假装它还在把关。配一条变异自证：拿一条人为的空话登记跑同一套口径，必须被判出来，
+        证明口径本身没坏 —— 这样等真有人往名单里加东西时，这条判据是可用的。
+        """
+        def _thin(reg: dict[str, tuple[str, str]]) -> list[tuple[str, int]]:
+            return [
+                (label, len(reason))
+                for label, (owner, reason) in reg.items()
+                if not owner or len(reason) < 60
+            ]
+
+        assert not _thin(KNOWN_PRE_EXISTING_BLOCKERS), (
+            f"登记理由过短或无归属: {_thin(KNOWN_PRE_EXISTING_BLOCKERS)}"
+        )
+        # 变异自证：口径对「空话登记」必须命中（否则名单非空时也是假绿）
+        assert _thin({"x": ("", "太短")}) == [("x", 2)], "口径失效：空话登记未被判出"
+        assert _thin({"y": ("owner", "x" * 60)}) == [], "口径过严：合规登记被误判"
 
     def test_baseline_lacks_g2_until_blocker_cleared(self) -> None:
         """现状锚点：baseline 已含 g2（`g-cycle-single-region-detail-lanes` Task 15 更新快照时

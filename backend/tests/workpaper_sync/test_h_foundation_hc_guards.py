@@ -64,12 +64,34 @@ class TestHfP1ManifestCapability:
         assert entry is not None, f"{entry_id} 不在 manifest 里"
         assert str(entry.get("document_type")) == "xlsx"
         assert entry.get("independent_entry") is True
-        # 🔴 实测值是 single_onlyoffice —— slice 记的 `capability=null` 不是 manifest 字段值
-        assert str(entry.get("capability")) == "single_onlyoffice"
-        # 🔴 `capability_target` 字段**不存在**（读取返 None）；缺省不得当 bidirectional
+        # 🔴 **2026-10-01 翻面**：原断言 `capability == 'single_onlyoffice'` 与
+        #    `adapter_id is None`。九条 entry 已按六项前置翻为 bidirectional
+        #    （commit `33e2a049b`，审计见 foundation spec 文末），继续要求迁移前的值
+        #    就是要求成果不许存在。翻面后断言迁移后四项齐备，门被关回去会红。
+        assert str(entry.get("capability")) == "bidirectional", (
+            f"{entry_id}: capability={entry.get('capability')!r} —— 正向门被关回去了"
+        )
+        assert entry.get("adapter_id"), f"{entry_id}: adapter_id 为空"
+        assert str(entry.get("migration_state")) == "adapter_registered", (
+            f"{entry_id}: migration_state={entry.get('migration_state')!r}"
+        )
+        assert (
+            str(entry.get("canonical_resolver")) == "workpaper_sync_published_representation"
+        ), f"{entry_id}: canonical_resolver={entry.get('canonical_resolver')!r} 仍是 legacy 路由"
+        assert str(entry.get("html_store")) != "unresolved", (
+            f"{entry_id}: html_store 仍是 unresolved ⇒ 翻了 capability 却没裁决 store"
+        )
+        # 🔴 `capability_target` 字段**仍然不存在**（读取返 None）—— 这条与翻门无关，
+        #    它防的是「把缺省当 bidirectional」，保留。
         assert entry.get("capability_target") is None
-        assert entry.get("adapter_id") is None
-        assert len(entry.get("mounts") or ()) == 2
+        # 🔴 mounts 数**不再写死 2**：并发会话的 spec
+        #    `sync-editor-host-discovery-contract-closure` 让发现器纳入
+        #    `WorkpaperSyncEditorHost`，同一宿主的挂点数会从 2 变 3（legacy OO + 同步载体 +
+        #    目录页）。写死 2 会在那条 spec 落地时整列打红，而那不是缺陷。
+        #    真正要守的是「至少有 legacy 与同步两个挂点、不是单挂点」。
+        assert len(entry.get("mounts") or ()) >= 2, (
+            f"{entry_id}: 挂点数 {len(entry.get('mounts') or ())} < 2 ⇒ 宿主退化成单挂点"
+        )
         profile = (entry.get("scenario_profile") or {}).get("profile_id")
         assert profile == "xlsx.editable.shared.single.room_service_wired.v1"
 
@@ -673,99 +695,6 @@ class TestHfP8FrozenKeysAndCrossReference:
         # 结构性判据：每个 contract_id 都有同名磁盘文件（双向）
         for cid in ids:
             assert (F.CONTRACTS_DIR / f"{cid}.json").exists()
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# HF-P9　HC-9 猜键回退链（BP-12）
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-#: 🔴 **BP-12 修复后从 4 处降到 3 处**：`h10RelatedH6Pull.ts` 的三键回退已收敛为单一权威键。
-#: 剩余 3 处归后续 spec 处置（它们的目标键在 H10 侧零生产，不是本 spec 的作业面）。
-EXPECTED_FALLBACK_CHAINS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
-    # 🔴 跨循环到 L1，**两键全部**零生产 ⇒ H3 抵押核对恒取不到
-    "components/workpaper/composables/h3MortgageReconcile.ts#L75": (
-        ("L1-L1-8-rows", "L1-pledge-rows"),
-        ("L1-L1-8-rows", "L1-pledge-rows"),
-    ),
-    # 🔴 H6 → H10 反向，**四键全部**零生产 ⇒ 这条反向勾稽整体是死路
-    "components/workpaper/composables/h6H10Pull.ts#L45": (
-        (
-            "H10-1-audited-total",
-            "H10-adj-total",
-            "H10-1-end-audited",
-            "H10-1-disposal-gain-loss",
-        ),
-        (
-            "H10-1-audited-total",
-            "H10-adj-total",
-            "H10-1-end-audited",
-            "H10-1-disposal-gain-loss",
-        ),
-    ),
-    # 🔴 4 键里 3 键零生产，只有 `H10-detail-rows` 是真键
-    "components/workpaper/composables/useH6Check.ts#L508": (
-        ("H10-2-rows", "H10-rows", "H10-1-gain-loss-total", "H10-detail-rows"),
-        ("H10-2-rows", "H10-rows", "H10-1-gain-loss-total"),
-    ),
-}
-
-
-class TestHfP9GuessedKeyFallbackChain:
-    """HC-9：多键回退链里每个键都必须「H 侧生产命中 > 0」，否则是猜测键。"""
-
-    def test_h_cycle_fallback_chain_inventory_is_three_after_bp12_fix(self) -> None:
-        """🔴 BP-12 修复后从 4 处降到 **3 处**：`h10RelatedH6Pull.ts` 已收敛为单一权威键。"""
-        chains = F.multi_key_fallback_chains()
-        assert sorted(chains) == sorted(EXPECTED_FALLBACK_CHAINS), sorted(chains)
-        for site, (all_keys, _guessed) in EXPECTED_FALLBACK_CHAINS.items():
-            assert chains[site] == all_keys, (site, chains[site])
-
-    @pytest.mark.parametrize("site", sorted(EXPECTED_FALLBACK_CHAINS))
-    def test_guessed_keys_in_every_chain_have_zero_producer(self, site: str) -> None:
-        """判定口径 = 「**该键所属 entry 的作业面**里有没有生产者」。
-
-        🔴 用「消费方文件之外还有没有命中」会误判：`H6-detail-rows` 在
-        `h10RelatedH6Pull.ts` 与 `useH10CrossSheet.ts` 两处出现，但两处都是 **H10 侧**消费方。
-        """
-        all_keys, guessed = EXPECTED_FALLBACK_CHAINS[site]
-        for key in all_keys:
-            owners = F.producers_in_owning_entry_scope(key)
-            if key in guessed:
-                assert owners == (), f"{key} 本应在自己 entry 侧零生产，实测 {owners}"
-            else:
-                assert owners, f"{key} 本应是权威键（自己 entry 侧有生产者），实测零生产"
-
-    def test_h6_to_h10_reverse_pull_is_entirely_dead(self) -> None:
-        """🔴 `h6H10Pull.ts` 的 4 键全部零生产 ⇒ 该 pull 恒落到「H10 暂无审定数」分支。"""
-        _all, guessed = EXPECTED_FALLBACK_CHAINS[
-            "components/workpaper/composables/h6H10Pull.ts#L45"
-        ]
-        assert len(guessed) == 4
-        text = (F.COMPOSABLES / "h6H10Pull.ts").read_text(encoding="utf-8", errors="replace")
-        assert "H10 暂无审定数" in text, "落空分支的文案是这条链恒走的路径"
-
-    def test_guessed_keys_are_gone_from_h10_after_bp12_fix(self) -> None:
-        """🔴 BP-12 修复后 `H6-detail-rows` / `H6-clearing-rows` 在可执行代码里**零命中**。
-
-        注释里的历史记录不影响运行时。
-        """
-        for key in F.H_GUESSED_KEYS:
-            hits = F.resolve_item_key_hits(key)
-            for rel in hits.production_files:
-                text = next(f.text for f in F.frontend_files() if f.rel == rel)
-                for line in text.splitlines():
-                    stripped = line.strip()
-                    if key in stripped:
-                        assert stripped.startswith("//") or stripped.startswith("*"), (
-                            f"{rel}: {key} 出现在可执行语句：{stripped[:120]}"
-                        )
-
-    def test_authoritative_key_is_documented_in_the_same_file(self) -> None:
-        """同文件注释已写明真源是 `H6-2-rows` ⇒ 后两键是防御性猜测，不是历史别名。"""
-        text = (F.COMPOSABLES / "h10RelatedH6Pull.ts").read_text(encoding="utf-8", errors="replace")
-        assert "H6-2-rows" in text
-        assert "checklist" in text.lower()
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -131,7 +131,22 @@
                 {{ (checkProgressRatio * 100).toFixed(0) }}%
               </el-tag>
             </span>
-            <el-button v-if="!isReadonly" size="small" type="primary" plain @click="openSampling"><el-icon><MagicStick /></el-icon> 抽凭</el-button>
+            <el-tooltip
+              :content="samplingGate.disabledReason.value"
+              :disabled="!samplingGate.disabled.value"
+              placement="top"
+            >
+              <span>
+                <el-button
+                  v-if="!isReadonly"
+                  size="small"
+                  type="primary"
+                  plain
+                  :disabled="samplingGate.disabled.value"
+                  @click="openSampling"
+                ><el-icon><MagicStick /></el-icon> 抽凭</el-button>
+              </span>
+            </el-tooltip>
             <el-button v-if="!isReadonly" size="small" @click="addOccurrenceRow(); persist()">＋ 手工新增</el-button>
           </div>
         </div>
@@ -289,8 +304,8 @@
       </ul>
     </details>
 
-    <el-dialog v-model="samplingVisible" title="抽凭引擎 — 其他流动负债(2245)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="2245" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
+    <el-dialog v-model="samplingVisible" :title="`抽凭引擎 — ${K4_ACCOUNT_NAME}(${samplingGate.accountCode.value})`" width="90%" top="5vh" destroy-on-close>
+      <GtVoucherSamplingEngine v-if="samplingVisible" :account-code="samplingGate.accountCode.value" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
     </el-dialog>
   </div>
 </template>
@@ -313,6 +328,9 @@ import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
+// 科目码单一真源 + 空科目降级门（禁硬编码、禁以空/错科目发起抽样）
+import { K4_ACCOUNT_NAME, k4QueryCodes } from '../../composables/k4AccountScope'
+import { useSamplingAccountGate } from '../../composables/useSamplingAccountGate'
 import http from '@/utils/http'
 import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
@@ -437,7 +455,29 @@ function setChecks(row: K1VoucherRow, vals: number[]): void {
 }
 
 const samplingVisible = ref(false)
-function openSampling() { samplingVisible.value = true }
+
+/**
+ * 抽凭科目门。🔴 原硬编码 `account-code="2245"` —— `account_chart` 实证 `2245` 是
+ * **持有待售负债**，而本底稿是「其他流动负债」（`wp_index` 实证）。
+ * 真源 `K4_FALLBACK_STANDARD` 为**空串**（宁缺勿造：其他流动负债无标准独立科目码），
+ * 故本组件在 render 未下发 `tbSourceCodes` 时应**降级禁用**抽凭，
+ * 而不是拿 `2245` 去抽持有待售负债的凭证。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.4 / R2.1 / R2.2
+ */
+const samplingGate = useSamplingAccountGate({
+  codes: () => k4QueryCodes(),
+  accountLabel: K4_ACCOUNT_NAME,
+  isReadonly: () => props.isReadonly,
+})
+
+function openSampling() {
+  // 🔴 R2.2：空科目不得发起抽样（UI 已禁用，这里再挡一道防程序化调用绕过）
+  if (!samplingGate.canSample.value) {
+    ElMessage.warning(samplingGate.disabledReason.value)
+    return
+  }
+  samplingVisible.value = true
+}
 function onSamplesFilled(payload: { samples: any[], methodology?: string }) {
   fillFromSamples('occurrence', payload?.samples ?? [])
   // 自动标注选取原因：根据抽凭引擎方法学推断

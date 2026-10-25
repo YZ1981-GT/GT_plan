@@ -694,24 +694,52 @@ class TestAdjudicationLegality:
 
         🔴 判据是「必须不一致且该不一致已登记」，而不是「必须相等」—— 后者会把 overlay
         默认值当成裁决结论。
+
+        🔴 **2026-10-01 翻面前三条断言**：原来拿 `manifest_mirror` 与 **live** manifest
+        比相等 —— 那在「迁移还没发生」的规划期是对的，但本轮九条 entry 的 capability 已
+        翻 `bidirectional`、`html_store` 已裁决、`legacy_reasons` 已清空，继续要求相等
+        等于要求迁移不许发生。mirror 是**规划期冻结快照**（slice 为 append-only 上游输入，
+        本仓铁律「历史档案不回填修改」），所以改为：
+          · mirror 侧断言它仍是规划期那三个值（`single_onlyoffice` / `unresolved` /
+            非空 legacy_reasons）—— 快照被人改过会红；
+          · live 侧断言它已前进到迁移后的值 —— 门被关回去会红；
+          · BP-9 的那条「mirror ≠ slice 目标态」登记原样保留。
         """
         by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
         for entry in manifest_slice["independent_entries"]:
             src = by_id[entry["entry_id"]]
             mirror = entry["manifest_mirror"]
-            assert mirror["capability"] == src["capability"], (
-                f"{entry['entry_id']}: manifest_mirror.capability 与 source manifest 不符"
+            # ── 规划期快照侧（冻结）────────────────────────────────────────
+            assert mirror["capability"] == "single_onlyoffice", (
+                f"{entry['entry_id']}: manifest_mirror.capability={mirror['capability']!r} "
+                "—— 规划期快照被改动了"
             )
-            assert mirror["html_store"] == src["html_store"], (
-                f"{entry['entry_id']}: manifest_mirror.html_store 与 source manifest 不符"
+            assert mirror["html_store"] == "unresolved", (
+                f"{entry['entry_id']}: manifest_mirror.html_store={mirror['html_store']!r} "
+                "—— 规划期快照被改动了"
             )
+            assert mirror["legacy_reasons"], (
+                f"{entry['entry_id']}: 规划期快照的 legacy_reasons 为空 ⇒ 快照被改动了"
+            )
+            # ── live 侧（已迁移）──────────────────────────────────────────
+            assert src["capability"] == "bidirectional", (
+                f"{entry['entry_id']}: live manifest capability={src['capability']!r} "
+                "⇒ 正向门被关回去了（overlay override 掉了？）"
+            )
+            assert src["html_store"] != "unresolved", (
+                f"{entry['entry_id']}: live manifest html_store 仍是 unresolved"
+            )
+            assert src["evidence"]["legacy_reasons"] == [], (
+                f"{entry['entry_id']}: live manifest 仍带 legacy_reasons="
+                f"{src['evidence']['legacy_reasons']!r} ⇒ evidence_patch 没生效"
+            )
+            # ── BP-9 登记（原样）──────────────────────────────────────────
             assert mirror["capability"] != entry["capability"], (
                 f"{entry['entry_id']}: mirror 与 slice 的 capability 相等 ⇒ BP-9 的前提消失"
             )
             assert "BP-9" in str(mirror["divergence_from_slice"]), (
                 f"{entry['entry_id']}: 不一致未指向 BP-9"
             )
-            assert mirror["legacy_reasons"] == src["evidence"]["legacy_reasons"]
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1966,14 +1994,28 @@ class TestAc14HonestModeVisibility:
         `WORKPAPER_SYNC_MANIFEST.filter(...).map(...)` 现算之后正则恒 `None`，于是报
         「找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 声明」—— 把「形态变了」误报成
         「东西没了」。解析逻辑收敛到 `entry_sync_notice_source`（一份），仍 fail closed。
+
+        🔴 **2026-10-01 换对账对象**：`registered_entry_ids()` 是从**生成的** manifest
+        投影现算的（`WORKPAPER_SYNC_MANIFEST.filter(...)`），本轮九条 entry 翻门后它们
+        自然进了这个集合；而 slice 的 `adapter_id` 是规划期冻结快照、恒 None
+        ⇒ 拿它当对账另一侧，双向锁会变成「要求迁移不许发生」。
+        改为与 **live manifest** 的 `adapter_id` 对账（同一事实的两个投影：后端 JSON 与
+        前端 TS），slice 侧只保留「快照仍是 None」这条冻结断言。
         """
         registered = set(registered_entry_ids())
         assert registered, "已注册集合为空 ⇒ 「已注册 ⇒ 不挂通知」分支没有真实分母"
         assert all("/" in rid for rid in registered), f"集合里有不像 entry_id 的项：{registered}"
+        live = {e["entry_id"]: e for e in _load(FULL_MANIFEST_PATH)["entries"]}
         for entry in manifest_slice["independent_entries"]:
-            has_adapter = entry["adapter_id"] is not None
-            assert (entry["entry_id"] in registered) == has_adapter, (
-                f"{entry['entry_id']}: 通知真源的已注册集合与 slice 的 adapter_id 双口径"
+            eid = entry["entry_id"]
+            assert entry["adapter_id"] is None, (
+                f"{eid}: slice 的 adapter_id 被改动了 —— 它是规划期冻结快照"
+            )
+            has_adapter = live[eid]["adapter_id"] is not None
+            assert (eid in registered) == has_adapter, (
+                f"{eid}: 前端已注册集合（{eid in registered}）与 live manifest 的 "
+                f"adapter_id（{live[eid]['adapter_id']!r}）双口径 ⇒ 两个投影脱钩，"
+                "多半是只重算了一侧"
             )
 
     def test_hosts_do_not_claim_bidirectional_writeback(self, manifest_slice: dict) -> None:

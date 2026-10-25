@@ -216,17 +216,17 @@ def assert_entry_selectable(
 #: canary：F4-6 关联方及交易检查表（裁决 F4-H1）
 _INCLUDE_F406: Final[bool] = True
 #: F4-5 长期挂账检查表（第二张，数据区零公式）
-_INCLUDE_F405: Final[bool] = False
+_INCLUDE_F405: Final[bool] = True
 #: F4-8 应付账款检查表（双区，兄弟 Table ref 首验）
-_INCLUDE_F408: Final[bool] = False
+_INCLUDE_F408: Final[bool] = True
 #: F4-7 未入账检查表（**五区**，含除零公式列 G=365/(E/F)）
-_INCLUDE_F407: Final[bool] = False
+_INCLUDE_F407: Final[bool] = True
 #: F4-2 明细表（两级表头 + nested 账龄 ×2；仅 THREE_YEAR 启用）
-_INCLUDE_F402: Final[bool] = False
+_INCLUDE_F402: Final[bool] = True
 #: F4-9 供应商融资检查表（分组表，容量裁决后限额受管）
 _INCLUDE_F409: Final[bool] = False
-#: F4-1 审定表两区（性质区 + 账龄区；取数口径依赖 F1 spec 的三家统一裁决）
-_INCLUDE_F401: Final[bool] = False
+#: F4-1 审定表三区（性质区 + 账龄种子区 + 账龄空槽区；2026-10-07 完成）
+_INCLUDE_F401: Final[bool] = True
 
 
 def managed_row_table_specs() -> tuple[Any, ...]:
@@ -267,7 +267,7 @@ def managed_row_table_specs() -> tuple[Any, ...]:
     if _INCLUDE_F401:
         from app.services.workpaper_sync import phase5_f4_01_adjudication as _f401
 
-        specs.extend((_f401.SPEC_F401_NATURE, _f401.SPEC_F401_AGING))
+        specs.extend((_f401.SPEC_F401_NATURE, _f401.SPEC_F401_AGING_SEED, _f401.SPEC_F401_AGING_SLOT))
     return tuple(specs)
 
 
@@ -303,6 +303,25 @@ def _spec_of_store_item(store_item_id: str) -> Any:
         f"当前受管: {list(all_store_item_ids())}"
     )
 
+
+#: 🔴 判定为 HTML-only 的区（裁决 FC-6 / F4-H4 / F4-P10）—— 登记以证明"不是漏声明"。
+#: 判据断言这些键**不在** `all_store_item_ids()`。
+HTML_ONLY_STORE_KEYS: Final[tuple[tuple[str, str], ...]] = (
+    (
+        "F4-3-rows",
+        "调整分录汇总 hub，接 useAdjustmentCentralSync ⇒ single_html（FC-6）",
+    ),
+    (
+        "F4-4-turnover",
+        "实质性分析付款期区：dict 包 + 9 固定行（非行数组），RowTableSheetSpec 不适用；"
+        "前十名区从 F4-2 动态聚合 ⇒ html_only（裁决 F4-P10）",
+    ),
+    (
+        "F4-9-rows",
+        "供应商融资分组表：数据区中间有小计行 + groupId 动态分组键 + 合计行三小计相加 ⇒ "
+        "html_only（裁决 F4-H4，需引擎层扩展支持分组表）",
+    ),
+)
 
 #: 🔴 零写入读键（读方有、全仓无写方 ⇒ 恒 undefined 的兼容回退）。
 #: 登记而不误接（需求 2.4 / Property 18）—— 它们不得出现在 `all_store_item_ids()`。
@@ -367,8 +386,11 @@ def instrumentation_definition_payload() -> dict[str, Any]:
 
 def authority_model_payload() -> dict[str, Any]:
     return {
+        "schema_version": "authority-model-definition:v1",
         "entry_id": ENTRY_ID,
         "authority_model": AUTHORITY_MODEL.value,
+        "content_authority": "structured_projection",
+        "merge_model": "stable_field_three_way",
         "pilot_class": PHASE5_WAVE,
         "reason": (
             "F4 应付账款：结构化 Tab（HTML store）与 OnlyOffice 共写同一份权威模板，"

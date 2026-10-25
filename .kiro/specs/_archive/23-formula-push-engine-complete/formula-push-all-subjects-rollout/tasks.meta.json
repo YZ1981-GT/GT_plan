@@ -1,0 +1,39 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "22. `TierAAnchorBinding` 族 binding + 锚点规则生成": [
+      {
+        "executionId": "252fc41c-3d58-41f4-9c13-53b046f365db",
+        "chatSessionId": "sess_7d30e00d-21dc-4d84-8c98-4dcb11f66465",
+        "timestamp": 1791189811730
+      },
+      {
+        "executionId": "252fc41c-3d58-41f4-9c13-53b046f365db",
+        "chatSessionId": "sess_7d30e00d-21dc-4d84-8c98-4dcb11f66465",
+        "timestamp": 1791189824784
+      },
+      {
+        "executionId": "252fc41c-3d58-41f4-9c13-53b046f365db",
+        "chatSessionId": "sess_7d30e00d-21dc-4d84-8c98-4dcb11f66465",
+        "timestamp": 1791191117535
+      }
+    ],
+    "23. canary 选定与 L4 验收": [
+      {
+        "executionId": "252fc41c-3d58-41f4-9c13-53b046f365db",
+        "chatSessionId": "sess_7d30e00d-21dc-4d84-8c98-4dcb11f66465",
+        "timestamp": 1791189811791
+      },
+      {
+        "executionId": "252fc41c-3d58-41f4-9c13-53b046f365db",
+        "chatSessionId": "sess_7d30e00d-21dc-4d84-8c98-4dcb11f66465",
+        "timestamp": 1791191133677
+      },
+      {
+        "executionId": "252fc41c-3d58-41f4-9c13-53b046f365db",
+        "chatSessionId": "sess_7d30e00d-21dc-4d84-8c98-4dcb11f66465",
+        "timestamp": 1791191502426
+      }
+    ]
+  }
+}

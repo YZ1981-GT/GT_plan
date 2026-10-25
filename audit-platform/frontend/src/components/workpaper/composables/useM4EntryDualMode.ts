@@ -15,7 +15,8 @@ export type M4RenderMode = WorkpaperRenderMode
  */
 const M4_SHEET_MAP: Record<string, string> = {
   index: '底稿目录',
-  procedure: '资本公积实质性程序表M4A',
+  // 🔴 MC-23 修正：真名含中间空格，禁 strip（MC-10）
+  procedure: '资本公积实质性程序表 M4A',
   'M4-1': '审定表M4-1',
   'M4-2': '明细表M4-2',
   'M4-3': '调整分录汇总M4-3',

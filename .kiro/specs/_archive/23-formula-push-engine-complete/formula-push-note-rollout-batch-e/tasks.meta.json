@@ -1,0 +1,272 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. D1 附注规则声明": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102463
+      },
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257115098
+      },
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257619561
+      }
+    ],
+    "2. D1 binding `note_rows` 实现": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102496
+      },
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257624476
+      },
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791258321298
+      }
+    ],
+    "3. D1 附注推送 SQLite 真 ORM": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102523
+      },
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791258325896
+      },
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791258655167
+      }
+    ],
+    "4. D1 骨架构建 + 缺表跳过": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102547
+      },
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791258660502
+      },
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791258936001
+      }
+    ],
+    "5. D2~D7 逐科目现读 + 规则": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102568
+      },
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791258941694
+      },
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791259354702
+      }
+    ],
+    "6. K1~K9 / K11 / K13 附注规则": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102602
+      },
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791259360113
+      },
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791260046202
+      }
+    ],
+    "7. G 循环附注（G1~G14）": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102639
+      },
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791260062102
+      },
+      {
+        "executionId": "5e9d9026-8987-48bc-a64c-97671fdb4700",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791269755904
+      }
+    ],
+    "8. H 循环附注（H1~H10）": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102669
+      },
+      {
+        "executionId": "ab0923d7-fac4-4339-9267-b96ea3f60e95",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791263911521
+      },
+      {
+        "executionId": "ab0923d7-fac4-4339-9267-b96ea3f60e95",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791264239702
+      }
+    ],
+    "9. I 循环（I1~I6）+ J1": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102695
+      },
+      {
+        "executionId": "ab0923d7-fac4-4339-9267-b96ea3f60e95",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791264247193
+      },
+      {
+        "executionId": "ab0923d7-fac4-4339-9267-b96ea3f60e95",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791264558929
+      }
+    ],
+    "10. L 循环（L1~L7）": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102722
+      },
+      {
+        "executionId": "ab0923d7-fac4-4339-9267-b96ea3f60e95",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791264567302
+      },
+      {
+        "executionId": "ab0923d7-fac4-4339-9267-b96ea3f60e95",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791264903888
+      }
+    ],
+    "11. M 循环 + N 循环（N1~N5）+ F 循环（F1~F2）": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102747
+      },
+      {
+        "executionId": "ab0923d7-fac4-4339-9267-b96ea3f60e95",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791264909523
+      },
+      {
+        "executionId": "ab0923d7-fac4-4339-9267-b96ea3f60e95",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791265279442
+      }
+    ],
+    "12. 全套回归 + 清册 `has_note_rules` 更新": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102771
+      },
+      {
+        "executionId": "ab0923d7-fac4-4339-9267-b96ea3f60e95",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791265288690
+      }
+    ],
+    "13. 附注同步指纹验证": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102795
+      },
+      {
+        "executionId": "5e9d9026-8987-48bc-a64c-97671fdb4700",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791269764605
+      },
+      {
+        "executionId": "5e9d9026-8987-48bc-a64c-97671fdb4700",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791270030486
+      }
+    ],
+    "14. 附注 stale 与报表联动": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102838
+      },
+      {
+        "executionId": "5e9d9026-8987-48bc-a64c-97671fdb4700",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791270039341
+      },
+      {
+        "executionId": "5e9d9026-8987-48bc-a64c-97671fdb4700",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791270545399
+      }
+    ],
+    "15. 多科目附注推送不互相覆盖": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102883
+      },
+      {
+        "executionId": "5e9d9026-8987-48bc-a64c-97671fdb4700",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791270554881
+      },
+      {
+        "executionId": "5e9d9026-8987-48bc-a64c-97671fdb4700",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791271042214
+      }
+    ],
+    "16. 推送与前端同步的竞争保护": [
+      {
+        "executionId": "2938e641-b2f8-46ef-acb7-1579f7623e8b",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791257102909
+      },
+      {
+        "executionId": "5e9d9026-8987-48bc-a64c-97671fdb4700",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791271052236
+      },
+      {
+        "executionId": "5e9d9026-8987-48bc-a64c-97671fdb4700",
+        "chatSessionId": "sess_510d27d8-52ce-41eb-a697-32c47a631f21",
+        "timestamp": 1791271255186
+      }
+    ]
+  }
+}

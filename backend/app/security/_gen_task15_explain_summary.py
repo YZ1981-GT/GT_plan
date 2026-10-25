@@ -31,7 +31,8 @@ _THIS = Path(__file__).resolve()
 _REPO_ROOT = _THIS.parents[3]
 _SUMMARY_PATH = (
     _REPO_ROOT
-    / ".kiro" / "specs" / "procedure-delegation-visibility-isolation"
+    / ".kiro" / "specs" / "_archive" / "06-engineering-governance"
+    / "procedure-delegation-visibility-isolation"
     / "evidence" / "artifacts" / "task15" / "task15_explain_summary.json"
 )
 

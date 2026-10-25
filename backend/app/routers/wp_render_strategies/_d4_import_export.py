@@ -53,7 +53,7 @@ def _parse_wp_uuid(wp_id: str) -> UUID:
 _ROW_LIMIT = 500
 
 _SUPPORTED_SHEETS: set[str] = {
-    "D4-1", "D4-2", "D4-3", "D4-4", "D4-6", "D4-7", "D4-8", "D4-9", "D4-10", "D4-11", "D4-12",
+    "D4-1", "D4-2", "D4-3", "D4-4", "D4-6", "D4-7", "D4-7-monthly", "D4-8", "D4-9", "D4-10", "D4-11", "D4-12",
     "D4-13", "D4-14", "D4-15", "D4-16", "D4-17", "D4-18", "D4-19",
     # D4-20 主 sheet 是死配置（前端只用 provision/current/post 三子表，从不导入导出裸 D4-20）→ 删（DEC-1）
     "D4-20-provision", "D4-20-current", "D4-20-post",
@@ -87,7 +87,14 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     "D4-7": [
         "产品名称", "本期数量", "本期平均单价", "本期主营业务收入", "本期结构比",
         "本期单位成本", "本期主营业务成本", "本期毛利", "本期毛利率",
-        "上期主营业务收入", "上期主营业务成本", "上期毛利率", "变动比例", "备注",
+        "上期数量", "上期主营业务收入", "上期主营业务成本", "上期毛利率", "变动比例", "备注",
+    ],
+    "D4-7-monthly": [
+        "1月收入", "2月收入", "3月收入", "4月收入", "5月收入", "6月收入",
+        "7月收入", "8月收入", "9月收入", "10月收入", "11月收入", "12月收入",
+        "1月成本", "2月成本", "3月成本", "4月成本", "5月成本", "6月成本",
+        "7月成本", "8月成本", "9月成本", "10月成本", "11月成本", "12月成本",
+        "上期收入合计", "上期成本合计",
     ],
     "D4-8": [
         "产品名称", "月份", "本期销量", "本期平均单价", "本期收入金额",
@@ -110,8 +117,14 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "销售订单", "订单日期", "定价表单价", "同期市场价格",
         "差异原因分析", "市场价格来源", "备注",
     ],
+    # D4-4 列序对齐源模板 `营业收入调整分录汇总D4-4`（A1:J23，表头 R5）的 A~J 十列：
+    #   A 调整事项说明→摘要 / B 类别→分类 / C 报表项目 / D 科目名称→会计科目 / E 附注项目 /
+    #   F ……→补充说明 / G 借方调整金额→借方 / H 贷方调整金额→贷方 / I 索引→索引号 / J 备注
+    # 🔴 原先只有 8 列，漏了 F(placeholder) 与 J(remark) —— 前端 `D4AdjustmentRow` 这两个字段
+    #    有值时导出不带出、导入静默丢弃（前端 safeParseRows 对缺键兜底空串，故不报错只丢数据）。
     "D4-4": [
-        "摘要", "分类", "报表项目", "会计科目", "附注项目", "借方", "贷方", "索引号",
+        "摘要", "分类", "报表项目", "会计科目", "附注项目", "补充说明",
+        "借方", "贷方", "索引号", "备注",
     ],
     "D4-12": [
         "索引号", "合同名称", "客户名称", "合同金额", "合同日期",
@@ -566,6 +579,8 @@ async def d4_export_data(
         item_id = "D4-6-indicators-v2"
     elif sheet == "D4-7":
         item_id = "D4-7-products"
+    elif sheet == "D4-7-monthly":
+        item_id = "D4-7-monthly"
     elif sheet == "D4-8":
         item_id = "D4-8-products"
     elif sheet == "D4-9":
@@ -698,6 +713,9 @@ async def d4_export_data(
             elif sheet == "D4-33" and isinstance(parsed, dict):
                 rows_data = []  # D4-33 由循环后专属分支从 parsed 展开
                 _d4_33_store = parsed
+            # D4-7-monthly stores single object {revenue:[12], cost:[12], priorRevenue, priorCost}
+            elif sheet == "D4-7-monthly" and isinstance(parsed, dict):
+                rows_data = [parsed]  # 包装为单行 list，导出循环统一处理
             elif isinstance(parsed, list):
                 rows_data = parsed
             else:
@@ -783,16 +801,7 @@ async def d4_export_data(
                 data_row.get("remark", ""),
             ]
         elif sheet == "D4-4":
-            row_values = [
-                data_row.get("description", ""),
-                data_row.get("category", ""),
-                data_row.get("reportItem", ""),
-                data_row.get("accountName", ""),
-                data_row.get("noteItem", ""),
-                _safe_float(data_row.get("debitAmount")),
-                _safe_float(data_row.get("creditAmount")),
-                data_row.get("indexRef", ""),
-            ]
+            row_values = _export_d4_4_row(data_row)
         elif sheet == "D4-6":
             current = _safe_float(data_row.get("current"))
             prior = _safe_float(data_row.get("prior"))
@@ -829,11 +838,25 @@ async def d4_export_data(
                 cur_cost,
                 cur_profit,
                 cur_margin,
+                prior_qty,
                 prior_revenue,
                 prior_cost,
                 prior_margin,
                 (cur_margin - prior_margin),
                 data_row.get("remark", ""),
+            ]
+        elif sheet == "D4-7-monthly":
+            revenue = data_row.get("revenue", [0] * 12)
+            cost = data_row.get("cost", [0] * 12)
+            if not isinstance(revenue, list) or len(revenue) != 12:
+                revenue = [0] * 12
+            if not isinstance(cost, list) or len(cost) != 12:
+                cost = [0] * 12
+            row_values = [
+                *[_safe_float(v) for v in revenue],
+                *[_safe_float(v) for v in cost],
+                _safe_float(data_row.get("priorRevenue", 0)),
+                _safe_float(data_row.get("priorCost", 0)),
             ]
         elif sheet == "D4-8":
             # D4-8 special: data_row is a product with months[12]/priorMonths[12]
@@ -1301,6 +1324,8 @@ async def d4_import_data(
             row_dict = _parse_d4_6_row(row, actual_headers)
         elif sheet == "D4-7":
             row_dict = _parse_d4_7_row(row, actual_headers)
+        elif sheet == "D4-7-monthly":
+            row_dict = _parse_d4_7_monthly_row(row, actual_headers)
         elif sheet == "D4-8":
             row_dict = _parse_d4_8_row(row, actual_headers)
         elif sheet == "D4-9":
@@ -1411,6 +1436,8 @@ async def d4_import_data(
         item_id = "D4-6-indicators-v2"
     elif sheet == "D4-7":
         item_id = "D4-7-products"
+    elif sheet == "D4-7-monthly":
+        item_id = "D4-7-monthly"
     elif sheet == "D4-8":
         item_id = "D4-8-products"
     elif sheet == "D4-9":
@@ -1564,6 +1591,12 @@ async def d4_import_data(
         current = _region_from_import("本期", current)
         prior = _region_from_import("上期", prior)
         remark_json = json.dumps({"current": current, "prior": prior}, ensure_ascii=False)
+    elif sheet == "D4-7-monthly":
+        # D4-7-monthly store 是单对象（非数组）：导入只取第一行的 revenue/cost/priorRevenue/priorCost
+        if rows_data:
+            remark_json = json.dumps(rows_data[0], ensure_ascii=False)
+        else:
+            remark_json = json.dumps({"revenue": [0] * 12, "cost": [0] * 12, "priorRevenue": 0, "priorCost": 0}, ensure_ascii=False)
     else:
         # D4-11 等：store 即为行数组
         remark_json = json.dumps(rows_data, ensure_ascii=False)
@@ -1832,6 +1865,26 @@ def _parse_d4_3_row(row: tuple, actual_headers: list[str], expected_headers: lis
     }
 
 
+def _export_d4_4_row(data: dict) -> list:
+    """D4AdjustmentRow → D4-4 列头顺序（10 列，逐位对齐 _SHEET_HEADERS["D4-4"]）。
+
+    与 `_parse_d4_4_row` 构成往返对：前端 10 个业务字段全部带出，缺一即导出丢列、
+    用户改后再导入时该列内容被静默丢弃（rowId 不参与导出，导入侧新生成）。
+    """
+    return [
+        _safe_str(data.get("description")),
+        _safe_str(data.get("category")),
+        _safe_str(data.get("reportItem")),
+        _safe_str(data.get("accountName")),
+        _safe_str(data.get("noteItem")),
+        _safe_str(data.get("placeholder")),
+        _safe_float(data.get("debitAmount")),
+        _safe_float(data.get("creditAmount")),
+        _safe_str(data.get("indexRef")),
+        _safe_str(data.get("remark")),
+    ]
+
+
 def _parse_d4_4_row(row: tuple, actual_headers: list[str], expected_headers: list[str]) -> dict:
     """解析D4-4调整分录行"""
     from uuid import uuid4
@@ -1845,6 +1898,8 @@ def _parse_d4_4_row(row: tuple, actual_headers: list[str], expected_headers: lis
         except ValueError:
             return None
 
+    # 键集必须覆盖前端 `D4AdjustmentRow` 的全部 10 个业务字段（rowId 由导入侧新生成）：
+    # 缺任一键 → 前端 safeParseRows 兜底成空串 ⇒ 用户在该列填的内容被静默丢弃。
     return {
         "rowId": str(uuid4()),
         "description": _safe_str(_col_val("摘要")),
@@ -1852,9 +1907,11 @@ def _parse_d4_4_row(row: tuple, actual_headers: list[str], expected_headers: lis
         "reportItem": _safe_str(_col_val("报表项目")),
         "accountName": _safe_str(_col_val("会计科目")),
         "noteItem": _safe_str(_col_val("附注项目")),
+        "placeholder": _safe_str(_col_val("补充说明")),
         "debitAmount": _safe_float(_col_val("借方")),
         "creditAmount": _safe_float(_col_val("贷方")),
         "indexRef": _safe_str(_col_val("索引号")),
+        "remark": _safe_str(_col_val("备注")),
     }
 
 
@@ -2577,10 +2634,32 @@ def _parse_d4_7_row(row: tuple, actual_headers: list[str]) -> dict:
         "curQty": _safe_float(_col_val("本期数量")),
         "curRevenue": _safe_float(_col_val("本期主营业务收入")),
         "curCost": _safe_float(_col_val("本期主营业务成本")),
-        "priorQty": 0,  # 上期数量不在简化导入列中，默认0
+        "priorQty": _safe_float(_col_val("上期数量")),
         "priorRevenue": _safe_float(_col_val("上期主营业务收入")),
         "priorCost": _safe_float(_col_val("上期主营业务成本")),
         "remark": _safe_str(_col_val("备注")),
+    }
+
+
+def _parse_d4_7_monthly_row(row: tuple, actual_headers: list[str]) -> dict:
+    """解析D4-7月度毛利分析行（26列：12月收入+12月成本+上期收入合计+上期成本合计）"""
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    months_cn = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
+    revenue = [_safe_float(_col_val(f"{m}收入")) for m in months_cn]
+    cost = [_safe_float(_col_val(f"{m}成本")) for m in months_cn]
+    return {
+        "revenue": revenue,
+        "cost": cost,
+        "priorRevenue": _safe_float(_col_val("上期收入合计")),
+        "priorCost": _safe_float(_col_val("上期成本合计")),
     }
 
 
@@ -2725,6 +2804,21 @@ _SHEET_GUIDANCE: dict[str, list[str]] = {
         "",
         "五、数据来源",
         "从D4-2主营明细按产品汇总，或从ERP系统产品利润表导出。",
+    ],
+    "D4-7-monthly": [
+        "D4-7 月度毛利分析 编制说明",
+        "",
+        "一、本表目的",
+        "按月列示主营业务收入和成本，分析月度毛利率波动趋势。",
+        "",
+        "二、填写要求",
+        "1. 「1月收入~12月收入」：填写各月主营业务收入金额。",
+        "2. 「1月成本~12月成本」：填写各月主营业务成本金额。",
+        "3. 「上期收入合计」「上期成本合计」：填写上年度合计数供对比。",
+        "",
+        "三、说明",
+        "毛利 = 收入 - 成本；毛利率 = 毛利 / 收入；变动比例由前端自动计算。",
+        "本表只有一行数据（全公司合计），导入时取第一行。",
     ],
     "D4-4": [
         "D4-4 营业收入调整分录汇总表 编制说明",

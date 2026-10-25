@@ -404,6 +404,39 @@ async def test_fallback_path_same_caliber(db_session: AsyncSession):
     )
 
 
+@pytest.mark.asyncio
+async def test_summary_paths_preserve_workpaper_adjustment(db_session: AsyncSession):
+    """主路径和 fallback 路径都把底稿发布分量带入审定数。"""
+    from app.models.audit_platform_models import TrialBalance
+
+    for code, amount in ((_REV, Decimal("1200")), (_EXP, Decimal("-300"))):
+        row = (await db_session.execute(
+            __import__("sqlalchemy").select(TrialBalance).where(
+                TrialBalance.standard_account_code == code
+            )
+        )).scalar_one()
+        row.wp_adjustment = amount
+        row.audited_amount = row.unadjusted_amount + amount
+    await db_session.flush()
+
+    main = (await _summary(db_session))
+    assert _d(main[_REV_LINE]["wp_adjustment"]) == Decimal("1200")
+    assert _d(main[_REV_LINE]["audited"]) == Decimal("101200")
+    assert _d(main[_EXP_LINE]["wp_adjustment"]) == Decimal("-300")
+    assert _d(main[_EXP_LINE]["audited"]) == Decimal("19700")
+
+    import sqlalchemy as sa
+    from app.models.report_models import ReportConfig
+
+    await db_session.execute(sa.delete(ReportConfig))
+    await db_session.flush()
+    fallback = await _summary(db_session)
+    assert _d(fallback[_REV_LINE]["wp_adjustment"]) == Decimal("1200")
+    assert _d(fallback[_REV_LINE]["audited"]) == Decimal("101200")
+    assert _d(fallback[_EXP_LINE]["wp_adjustment"]) == Decimal("-300")
+    assert _d(fallback[_EXP_LINE]["audited"]) == Decimal("19700")
+
+
 # ───────────────────────────────────────────────────────────────────────────
 # 🔴 B7 — 相邻缺陷：公式路径只支持 3 个列名，其余 11 个恒 0
 #

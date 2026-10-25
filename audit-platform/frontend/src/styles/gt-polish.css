@@ -128,18 +128,17 @@
    2. 表格精修 — 更精致的行间距和对齐
    ═══════════════════════════════════════════════════════════════ */
 
-/* 表头更精致 */
+/* 表头更精致（padding 紧凑，中文表头不 uppercase） */
 .el-table th.el-table__cell {
-  padding: 10px 14px !important;
+  padding: 6px 8px !important;
   font-size: 12px !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.8px !important;
+  letter-spacing: 0.3px !important;
   color: var(--gt-color-primary-dark) !important;
 }
 
-/* 数据行间距加宽：审计场景长时间阅读更舒适 */
+/* 数据行紧凑：配合 13px 字号，padding 缩小让列宽留给内容 */
 .el-table td.el-table__cell {
-  padding: 10px 14px !important;
+  padding: 6px 8px !important;
 }
 
 /* 选中行 — 浅蓝而非深色 */

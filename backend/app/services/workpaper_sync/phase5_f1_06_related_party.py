@@ -45,7 +45,7 @@ ROW_IDENTITY_STORE_KEY_F106: Final[str] = "rowId"
 
 HEADER_ROW_F106: Final[int] = 6
 FIRST_DATA_ROW_F106: Final[int] = 7
-LAST_DATA_ROW_F106: Final[int] = 9
+LAST_DATA_ROW_F106: Final[int] = 8
 FOOTER_ROW_F106: Final[int] = 10
 FOOTER_MARKER_F106: Final[str] = "合计"
 UUID_COL_F106: Final[str] = "N"

@@ -310,9 +310,15 @@ const dualMode = (() => {
    */
   function loadPersistedMode(): void {
     try {
+        // 🔴 capability 传 `'bidirectional'`：表达的是「本宿主的视图开关两侧都能开」
+        //    （结构化视图 = 本地渲染 / OO = 在线编辑），与 entry 的写回 capability
+        //    （`single_onlyoffice`）不是一回事。传后者会让 migrate 把存量 'html' 偏好
+        //    回落成 'oo' 并落盘 ⇒ 老用户下次打开被强推进 OO。
+        //    🔴 曾误传 `'bidirectional'`（不在封闭域里）⇒ migrate 抛 mode_capability_unknown，
+        //    被外层 catch 吞掉，连带下面读统一键那两行从未执行 ⇒ 偏好恢复整体失效。
       migrateWorkpaperSyncMode(
         { entryId: K4_ENTRY_ID, wpId: props.wpId, sheetKey: currentSheet.value || undefined },
-        'dual',
+        'bidirectional',
       )
       const stored = fromStoredMode(localStorage.getItem(modeKey()))
       if (stored) currentMode.value = stored

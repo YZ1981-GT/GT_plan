@@ -57,7 +57,7 @@ _FORMULA_TEMPLATES_F225: Final[dict[str, str]] = {
 
 SPEC_F225_EXIST: Final[RowTableSheetSpec] = RowTableSheetSpec(
     managed_sheet="抽盘结果汇总表F2-25",
-    sheet_key="f225-exist",
+    sheet_key="f225-managed",
     table_key="stocktake_sample_exist_rows",
     template_id="F225E",
     table_name="GT_F225_EXIST_ROWS",
@@ -80,11 +80,11 @@ SPEC_F225_EXIST: Final[RowTableSheetSpec] = RowTableSheetSpec(
 
 SPEC_F225_FLOOR: Final[RowTableSheetSpec] = RowTableSheetSpec(
     managed_sheet="抽盘结果汇总表F2-25",
-    sheet_key="f225-floor",
+    sheet_key="f225-managed",
     table_key="stocktake_sample_floor_rows",
     template_id="F225F",
     table_name="GT_F225_FLOOR_ROWS",
-    uuid_col="Q",
+    uuid_col="R",
     first_data_row=31,
     last_data_row=41,
     footer_row=42,
@@ -142,11 +142,11 @@ _FORMULA_TEMPLATES_F226: Final[dict[str, str]] = {
 
 SPEC_F226_BEFORE: Final[RowTableSheetSpec] = RowTableSheetSpec(
     managed_sheet="盘点倒轧表F2-26",
-    sheet_key="f226-before",
+    sheet_key="f226-managed",
     table_key="stocktake_rollforward_before_rows",
     template_id="F226B",
     table_name="GT_F226_BEFORE_ROWS",
-    uuid_col="P",
+    uuid_col="Q",
     first_data_row=17,
     last_data_row=23,
     footer_row=24,
@@ -165,7 +165,7 @@ SPEC_F226_BEFORE: Final[RowTableSheetSpec] = RowTableSheetSpec(
 
 SPEC_F226_AFTER: Final[RowTableSheetSpec] = RowTableSheetSpec(
     managed_sheet="盘点倒轧表F2-26",
-    sheet_key="f226-after",
+    sheet_key="f226-managed",
     table_key="stocktake_rollforward_after_rows",
     template_id="F226A",
     table_name="GT_F226_AFTER_ROWS",

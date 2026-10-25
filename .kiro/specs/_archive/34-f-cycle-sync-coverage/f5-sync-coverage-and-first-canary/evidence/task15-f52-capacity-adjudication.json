@@ -1,0 +1,69 @@
+{
+  "task": 15,
+  "sheet": "主营业务成本月度明细表F5-2",
+  "store_item_id": "F5-2-monthly-rows",
+
+  "template_geometry": {
+    "sheet_name": "主营业务成本月度明细表F5-2",
+    "header_group_row": 9,
+    "header_leaf_row": 10,
+    "first_data_row": 11,
+    "last_data_row": 22,
+    "data_row_count": 12,
+    "footer_row": 23,
+    "footer_label": "合计",
+    "footer_formula": "N23=SUM(N11:N22)"
+  },
+
+  "f51_main_zone_slots": {
+    "description": "F5-1 主营区 R8-R17 的 10 行模板公式逐行引 F5-2",
+    "first_ref": "A8='主营业务成本月度明细表F5-2'!A11",
+    "last_ref": "A17='主营业务成本月度明细表F5-2'!A20",
+    "slot_count": 10,
+    "sum_row": "R18=SUM(B8:B17)",
+    "sum_covers": "前 10 行（A11~A20）",
+    "uncovered_rows": "A21~A22（第 11~12 行品种不进 F5-1 主营区汇总）"
+  },
+
+  "frontend_capacity": {
+    "composable": "useF5MonthlyDetail.ts",
+    "storage_key": "F5-2-monthly-rows",
+    "row_identity": "id",
+    "add_row": "addRow() 无上限",
+    "remove_row": "removeRow(id) 至少保留 1 行",
+    "default_rows": 6
+  },
+
+  "three_layer_mismatch": {
+    "layer_1_template": "12 行（R11-R22）",
+    "layer_2_f51_slots": "10 槽（R8-R17）",
+    "layer_3_frontend": "无限制",
+    "consequence": "品种数 > 10 时，第 11~12 行品种的值写入 F5-2 但不进 F5-1 主营区汇总 ⇒ 审定数静默少计"
+  },
+
+  "adjudication": {
+    "verdict": "品种数 ≤ 10 受管，> 10 整表降级 legacy + 中文提示",
+    "capacity_constant": "F5_2_MAX_MANAGED_ROWS = 10",
+    "downgrade_message": "品种数超出 F5-1 审定表主营区的 10 个槽位，F5-1 的小计行将漏算超出部分。请在 HTML 模式下编辑。",
+    "implementation": "provider 层 managed_row_table_specs() 在运行时不检查数据量（声明是静态的），容量门控在宿主接桥层（GtF5CostOfSales.vue 的 isF5SyncManagedSheet computed）实现",
+    "must_not_do": [
+      "不得改模板 F5-1 主营区的 SUM 区间（R18=SUM(B8:B17)）",
+      "不得改模板 F5-2 的行数（last_data_row=22 是模板几何事实）",
+      "不得在后端 service 自动截断超限行（数据完整性优先于受管覆盖率）"
+    ]
+  },
+
+  "p18_test_plan": {
+    "test_class": "TestProperty18CapacityRedBaseline",
+    "existing_tests": [
+      "test_main_zone_is_ten_rows",
+      "test_f52_data_zone_is_twelve_rows",
+      "test_main_zone_sumproduct_only_references_first_ten",
+      "test_main_zone_not_in_managed_store_items",
+      "test_capacity_mismatch_documented"
+    ],
+    "note": "P18 五条已在 Task 4 落地并通过。容量常量 F5_2_MAX_MANAGED_ROWS 在 F5-2 声明文件（Task 16）中定义。"
+  },
+
+  "evidence_date": "2026-10-07"
+}

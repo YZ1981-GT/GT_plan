@@ -21,6 +21,15 @@ import { eventBus } from '@/utils/eventBus'
 import { calcNetAdjustment } from './useN5TaxAdjustmentEngine'
 import { calcSubtotal, parseNum } from './useN5FormulaEngine'
 import type { ChecklistResponse } from './useN5FormData'
+import {
+  withStableRowKeys,
+  generatedRowKey,
+  removeRowByKey,
+  semanticRowKey,
+  updateRowByKey,
+  type StableRowKey,
+} from './shared/stableRowIdentity'
+import { payloadJson } from './shared/checklistPayload'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -29,7 +38,12 @@ export type TaxAdjustmentCategory = '收入类' | '扣除类' | '资产类' | '�
 
 /** 纳税调整明细行 */
 export interface N5TaxAdjustmentRow {
-  /** 行序号 */
+  /**
+   * 稳定行身份（随行落库）。🔴 BP-8：原先无身份字段、按数组下标增删改，删中间一行后
+   * 后续行的 basis / 金额整体左移串到别的调整项上。spec: n2-n5-json-table-identity Task 4
+   */
+  rowKey: StableRowKey
+  /** 行序号（**仅展示**，每次按位置重算，不是身份） */
   index: number
   /** 项目编码（对应纳税申报表行号） */
   code: string
@@ -96,15 +110,14 @@ export function useN5TaxAdjustment(options: UseN5TaxAdjustmentOptions) {
 
   const rows: ComputedRef<N5TaxAdjustmentRow[]> = computed(() => {
     const itemId = 'N5-5-adjustment-rows'
-    const resp = allResponses.value.get(itemId)
-    let raw: any[] = []
-    if (resp?.conclusion) {
-      try { raw = JSON.parse(resp.conclusion) } catch { raw = [] }
-    }
+    const parsed = payloadJson(itemId, allResponses.value.get(itemId))
+    const raw: any[] = Array.isArray(parsed) ? parsed : []
 
     if (raw.length === 0) return _getDefaultRows()
 
-    return raw.map((r: any, i: number) => ({
+    // 身份：已落库 > 申报表项目编码 > 项目名称（确定性派生，computed 重算不漂移）
+    return withStableRowKeys(raw, (r: any) => r?.code || r?.label).map(({ raw: r, rowKey }: { raw: any; rowKey: StableRowKey }, i: number) => ({
+      rowKey,
       index: i + 1,
       code: r.code || '',
       label: r.label || `项目${i + 1}`,
@@ -182,15 +195,13 @@ export function useN5TaxAdjustment(options: UseN5TaxAdjustmentOptions) {
    * 更新指定行的可编辑字段
    */
   async function updateRow(
-    rowIndex: number,
+    rowKey: StableRowKey,
     field: keyof Pick<N5TaxAdjustmentRow, 'bookAmount' | 'taxAmount' | 'addBack' | 'deduct' | 'basis' | 'label'>,
     value: number | string,
   ): Promise<void> {
-    const currentRows = rows.value.map(r => ({ ...r }))
-    if (rowIndex >= 0 && rowIndex < currentRows.length) {
-      ;(currentRows[rowIndex] as any)[field] = value
-      await _saveRows(currentRows)
-    }
+    const before = rows.value
+    if (!before.some(r => r.rowKey === rowKey)) return
+    await _saveRows(updateRowByKey(before, rowKey, r => ({ ...r, [field]: value })))
   }
 
   /**
@@ -198,7 +209,10 @@ export function useN5TaxAdjustment(options: UseN5TaxAdjustmentOptions) {
    */
   async function addRow(row: Partial<N5TaxAdjustmentRow>): Promise<void> {
     const currentRows = rows.value.map(r => ({ ...r }))
+    const semantic = semanticRowKey(row.code)
     currentRows.push({
+      // 编码未被占用才用语义键，否则熵键（同编码第二行不得共用身份）
+      rowKey: semantic && !currentRows.some(r => r.rowKey === semantic) ? semantic : generatedRowKey(),
       index: currentRows.length + 1,
       code: row.code || '',
       label: row.label || '新增调整项',
@@ -217,9 +231,10 @@ export function useN5TaxAdjustment(options: UseN5TaxAdjustmentOptions) {
   /**
    * 删除指定行（仅非固定行）
    */
-  async function removeRow(rowIndex: number): Promise<void> {
-    const currentRows = rows.value.filter((r, i) => i !== rowIndex || r.isFixed)
-    await _saveRows(currentRows)
+  async function removeRow(rowKey: StableRowKey): Promise<void> {
+    const target = rows.value.find(r => r.rowKey === rowKey)
+    if (!target || target.isFixed) return
+    await _saveRows(removeRowByKey(rows.value, rowKey))
   }
 
   // ─── 7. 同步调增/调减合计到N5-4 ──────────────────────────────────────────
@@ -277,6 +292,7 @@ export function useN5TaxAdjustment(options: UseN5TaxAdjustmentOptions) {
       { label: '其他', category: '其他', code: 'A190000' },
     ]
     return defaults.map((d, i) => ({
+      rowKey: semanticRowKey(d.code),
       index: i + 1,
       code: d.code,
       label: d.label,

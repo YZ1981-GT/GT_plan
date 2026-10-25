@@ -210,70 +210,95 @@ class TestContextBuilderBuild:
         assert len(ctx.citations) == 2
         assert ctx.token_estimate > 0
 
-    @pytest.mark.asyncio
-    async def test_build_with_extra_scopes(self):
-        """build() 支持 extra_scopes 额外知识范围"""
-        db = _mock_db()
+    @staticmethod
+    def _extra_scope_db(doc_id: UUID):
+        """db.execute 调用顺序：正文 → 纵深过滤（文档判权三元组）→ 主体成员关系 → 项目摘要。
 
+        extra_scopes 本身不再发 SQL：它经检索内核 ``semantic_search(restrict_to=...)`` 取数
+        （spec knowledge-base-retrieval-and-authz-closure 5.4）。
+        """
         from app.models.knowledge_models import KnowledgeAccessLevel
 
-        # Mock 1: _get_doc_content (workpaper query - empty)
+        db = _mock_db()
         empty_result = MagicMock()
         empty_result.first.return_value = None
-
-        # Mock 2: KnowledgeAccessPolicy.resolve_subject（项目成员关系；本 builder 内只查一次）
-        user_projects_result = MagicMock()
-        user_projects_result.scalars.return_value.all.return_value = []
-
-        # Mock 3: load_folder_permission（只取判权三元组：public 文件夹）
-        folder_result = MagicMock()
-        folder_result.first.return_value = (KnowledgeAccessLevel.public, None, None)
-
-        # Mock 4: docs query (with permission fields)
-        doc_id = uuid4()
-        folder_doc_row = (doc_id, "参考文档.pdf", "额外参考内容", None, None, None)
-        docs_result = MagicMock()
-        docs_result.all.return_value = [folder_doc_row]
-
-        # Mock 5: doc permissions query (for _filter_hits_by_permission)
         doc_perm_result = MagicMock()
         doc_perm_result.all.return_value = [
             (doc_id, None, None, None, KnowledgeAccessLevel.public, None, None),
         ]
-
-        # Mock 6: _get_project_summary
+        user_projects_result = MagicMock()
+        user_projects_result.scalars.return_value.all.return_value = []
         project_row = MagicMock()
         project_row.__iter__ = lambda self: iter(("项目A", "客户A", None, None))
         project_result = MagicMock()
         project_result.first.return_value = project_row
-
         db.execute = AsyncMock(side_effect=[
-            empty_result,           # 1: _get_doc_content
-            user_projects_result,   # 2: resolve_subject（project 成员关系，缓存复用）
-            folder_result,          # 3: load_folder_permission
-            docs_result,            # 4: docs query
-            doc_perm_result,        # 5: doc permissions (filter)
-            project_result,         # 6: _get_project_summary
+            empty_result,          # 1: _get_doc_content
+            doc_perm_result,       # 2: _filter_hits_by_permission 取判权三元组
+            user_projects_result,  # 3: resolve_subject（成员关系，缓存复用）
+            project_result,        # 4: _get_project_summary
         ])
+        return db
 
-        builder = ContextBuilder(db)
+    @pytest.mark.asyncio
+    async def test_build_with_extra_scopes(self):
+        """extra_scopes → 同一检索内核 + restrict_to（含子树），命中进入上下文且带文档名。"""
+        doc_id = uuid4()
+        folder_id = uuid4()
+        builder = ContextBuilder(self._extra_scope_db(doc_id))
+        scoped_hit = {
+            "source_type": "knowledge_doc", "source_id": str(doc_id), "content": "额外参考内容",
+            "score": 0.8, "chunk_index": 0, "document_name": "参考文档.pdf", "doc_version": 3,
+        }
 
-        with patch.object(
-            builder._knowledge_svc,
-            "semantic_search",
-            new_callable=AsyncMock,
-            return_value=[],
-        ):
+        async def fake_search(**kwargs):
+            return [scoped_hit] if kwargs.get("restrict_to") else []
+
+        with patch.object(builder._knowledge_svc, "semantic_search", side_effect=fake_search) as spy:
             ctx = await builder.build(
                 host=_host("workpaper"),
                 query="测试查询",
                 user=FAKE_USER,
-                extra_scopes=[str(uuid4())],
+                extra_scopes=[str(folder_id), "不是UUID"],
             )
 
-        # extra_scopes 应产生额外 hits
+        scoped_calls = [c.kwargs for c in spy.await_args_list if c.kwargs.get("restrict_to")]
+        assert len(scoped_calls) == 1, "相关性命中时不应再走列表模式兜底"
+        assert scoped_calls[0]["restrict_to"] == [folder_id]
+        assert scoped_calls[0]["scope"] == "knowledge_doc"
+        assert scoped_calls[0]["user"] is FAKE_USER
         assert isinstance(ctx, ChatContext)
-        assert len(ctx.knowledge_hits) >= 1
+        assert [h.source_id for h in ctx.knowledge_hits] == [str(doc_id)]
+        assert ctx.knowledge_hits[0].source_name == "参考文档.pdf"
+        # 版本信息在预算截断后仍保留（旧实现逐字段重建 SearchHit 时丢失）
+        assert ctx.citations[0].doc_version == 3
+
+    @pytest.mark.asyncio
+    async def test_extra_scopes_fall_back_to_recent_documents_in_scope(self):
+        """范围内无相关命中 → 退回该范围最近文档（空查询列表模式），保证点名范围进入上下文。"""
+        doc_id = uuid4()
+        folder_id = uuid4()
+        builder = ContextBuilder(self._extra_scope_db(doc_id))
+        listed_hit = {
+            "source_type": "knowledge_doc", "source_id": str(doc_id), "content": "范围内文档",
+            "score": 0.0, "chunk_index": 0, "document_name": "范围文档.md",
+        }
+
+        async def fake_search(**kwargs):
+            if kwargs.get("restrict_to") and kwargs["query"] == "":
+                return [listed_hit]
+            return []
+
+        with patch.object(builder._knowledge_svc, "semantic_search", side_effect=fake_search) as spy:
+            ctx = await builder.build(
+                host=_host("workpaper"), query="毫不相关的提问", user=FAKE_USER,
+                extra_scopes=[str(folder_id)],
+            )
+
+        queries = [c.kwargs["query"] for c in spy.await_args_list if c.kwargs.get("restrict_to")]
+        assert queries == ["毫不相关的提问", ""]
+        assert [h.source_id for h in ctx.knowledge_hits] == [str(doc_id)]
+        assert ctx.knowledge_hits[0].score == 0.5  # extra_scope 默认中等相关性
 
 
 # ---------------------------------------------------------------------------
@@ -1147,3 +1172,50 @@ class TestPermissionD2Property:
             assert _can_read(
                 KnowledgeAccessLevel.project_group, [str(uuid4())], None
             ) is False
+
+
+# ---------------------------------------------------------------------------
+# 受限全局知识模式（spec knowledge-base-retrieval-and-authz-closure 5.4）
+# ---------------------------------------------------------------------------
+
+
+class TestGlobalKnowledgeRetrieval:
+    @pytest.mark.asyncio
+    async def test_global_host_searches_global_knowledge_with_user(self):
+        """全局宿主：走 search_global_knowledge（非项目组可读文档），不走项目级检索。
+
+        旧实现在 project_id 为空时**完全不检索**，全局 AI 对话永远拿不到任何知识。
+        """
+        doc_id = uuid4()
+        db = _mock_db()
+        from app.models.knowledge_models import KnowledgeAccessLevel
+
+        perm = MagicMock()
+        perm.all.return_value = [(doc_id, KnowledgeAccessLevel.public, None, None, KnowledgeAccessLevel.public, None, None)]
+        members = MagicMock()
+        members.scalars.return_value.all.return_value = []
+        db.execute = AsyncMock(side_effect=[perm, members])
+        builder = ContextBuilder(db)
+        hit = {"source_type": "knowledge_doc", "source_id": str(doc_id), "content": "抽样风险",
+               "score": 0.7, "chunk_index": 0, "document_name": "审计抽样指引.md"}
+
+        with patch.object(builder._knowledge_svc, "semantic_search", new_callable=AsyncMock) as project_search, \
+                patch.object(builder._knowledge_svc, "search_global_knowledge",
+                             new_callable=AsyncMock, return_value=[hit]) as global_search:
+            ctx = await builder.build(host=_host("global_knowledge"), query="什么是审计抽样", user=FAKE_USER)
+
+        project_search.assert_not_awaited()
+        global_search.assert_awaited_once()
+        assert global_search.await_args.kwargs["user"] is FAKE_USER
+        assert [h.source_name for h in ctx.knowledge_hits] == ["审计抽样指引.md"]
+        assert ctx.project_summary == ""
+
+    @pytest.mark.asyncio
+    async def test_kernel_failure_yields_empty_hits_not_exception(self):
+        builder = ContextBuilder(_mock_db())
+        with patch.object(builder._knowledge_svc, "semantic_search",
+                          new_callable=AsyncMock, side_effect=RuntimeError("boom")):
+            hits = await builder._search_related_knowledge(
+                project_id=FAKE_PROJECT_ID, query="x", user=FAKE_USER
+            )
+        assert hits == []

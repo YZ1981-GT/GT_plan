@@ -501,6 +501,7 @@ async def d3_import_aux_balance(
             "priorUnadjusted": entry.opening,
             "agingPrior": dict(aging_skeleton["agingPrior"]),
             "agingAudited": dict(aging_skeleton["agingAudited"]),
+            "source_kind": "aux_balance_import",
         })
 
     # 写入（merge模式：保留已有行、追加新客户）

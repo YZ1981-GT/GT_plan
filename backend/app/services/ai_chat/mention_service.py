@@ -30,6 +30,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.ai_chat.access import ResourceAccessResolver
+from app.services.ai_chat.note_service import knowledge_jump_route
 from app.services.ai_chat.contracts import (
     REPORT_HOST_IDS,
     AccessDecision,
@@ -581,7 +582,8 @@ class MentionSearchService:
                 id=str(r.id),
                 label=r.name or "",
                 sublabel="知识文档",
-                jump_route=f"/knowledge/docs/{r.id}",
+                # 前端真实深链（旧 /knowledge/docs/{id} 无对应路由，点击恒 404）
+                jump_route=knowledge_jump_route(doc_id=r.id, folder_id=r.folder_id),
             )
             for r in rows
             if r.id is not None
@@ -619,7 +621,7 @@ class MentionSearchService:
                 id=str(r.id),
                 label=r.name or "",
                 sublabel="知识文件夹",
-                jump_route=f"/knowledge/folders/{r.id}",
+                jump_route=knowledge_jump_route(folder_id=r.id),
             )
             for r in rows
             if r.id is not None

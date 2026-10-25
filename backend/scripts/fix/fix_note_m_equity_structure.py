@@ -371,24 +371,105 @@ LABELS = {
 }
 
 
+def _soe_m8_section_exists() -> bool:
+    """`note_template_soe.json` 里是否已有 `八、94` 章（只读，供 dry-run 报文用）。"""
+    import json as _json
+
+    doc = _json.loads(SOE.read_text(encoding="utf-8"))
+    return any(
+        (s.get("section_number") or "").replace(" ", "") == "八、94"
+        for s in doc.get("sections") or []
+    )
+
+
+#: `八、94` 的 slug 尾段（父章 slug 由运行时解析后拼接，见 `_ensure_soe_m8_section`）
+_M8_SLUG_TAIL = "yi-ban-feng-xian-zhun-bei"
+#: 平台既有 slug 长度上限（与 fix_note_parent_company_chapter.SLUG_MAX_LEN 同口径）
+_SLUG_MAX_LEN = 95
+
+
 def _ensure_soe_m8_section() -> None:
-    """若 note_template_soe.json 里尚无 `八、94` 章节，在正确位置插入空骨架。"""
+    """保证 note_template_soe.json 有一个**挂对了父章**的 `八、94 一般风险准备`。
+
+    🔴 2026-09-30 修三处硬编码错值。原实现把三个字段写死，与真实同级节全部不符：
+
+    ====================  ==========================================  ==============
+    字段                  `八、93`（同级真值）                          原写死值
+    ====================  ==========================================  ==============
+    `parent_section_id`   `chapter-08-cai-wu-bao-biao-zhu-yao-...`     少了 `zhu-yao-`
+    `section_id` 前缀     同上（父 slug + 尾段）                        同上，前缀错
+    `sort_order`          892（紧接 891 递增）                          **594**
+    ====================  ==========================================  ==============
+
+    后果：① `parent_section_id` 指向**不存在**的 section_id ⇒ 全模板唯一一条悬空引用
+    （其余 93 个同级节都挂在正确 slug 上），按父章聚合的下游会漏掉这一节；
+    ② `sort_order=594` 把它排到第 8 章中段而不是 `八、93` 之后。
+
+    ⇒ 一律**从现有数据推导**，不再写死：父章按 `section_number == '八'` + `level == 1`
+    现场解析，`sort_order`/`sort_index` 取 `八、93` 的值 +1。本会话正好踩到 slug 漂移
+    （并发 lane 改写了模板），写死 slug 的做法本身就是复发源。
+
+    另：本函数**幂等且自愈** —— `八、94` 已存在但三个字段不对时就地纠正
+    （否则上一版写出的错值会永远留在模板里，因为原实现「已存在就 return」）。
+    """
     import json as _json
 
     doc = _json.loads(SOE.read_text(encoding="utf-8"))
     secs = doc["sections"]
-    for s in secs:
-        if (s.get("section_number") or "").replace(" ", "") == "八、94":
-            return  # 已存在
 
-    # 找 八、93 的位置，在其后插入
+    # 父章现场解析 —— 找不到就硬失败，绝不写出悬空引用
+    parent = next(
+        (
+            s
+            for s in secs
+            if s.get("level") == 1 and (s.get("section_number") or "").strip() == "八"
+        ),
+        None,
+    )
+    if parent is None or not parent.get("section_id"):
+        raise RuntimeError(
+            "note_template_soe.json 里找不到 level-1 的「八」章 ⇒ 无法确定 八、94 的父节，"
+            "拒绝插入（写死 slug 会造出悬空 parent_section_id）"
+        )
+    parent_id = str(parent["section_id"])
+    want_sid = f"{parent_id}-{_M8_SLUG_TAIL}"[:_SLUG_MAX_LEN].rstrip("-")
+
+    prev = next(
+        (s for s in secs if (s.get("section_number") or "").replace(" ", "") == "八、93"),
+        None,
+    )
+    want_order = int(prev.get("sort_order") or 0) + 1 if prev else 893
+    want_index = int(prev.get("sort_index") or 0) + 1 if prev else 93
+
+    existing = next(
+        (s for s in secs if (s.get("section_number") or "").replace(" ", "") == "八、94"),
+        None,
+    )
+    if existing is not None:
+        # 幂等自愈：只纠正挂载/排序三字段，不碰 tables/rows（那是 run_section 的职责）
+        fixes: list[str] = []
+        for key, want in (
+            ("parent_section_id", parent_id),
+            ("section_id", want_sid),
+            ("sort_order", want_order),
+        ):
+            if existing.get(key) != want:
+                fixes.append(f"{key}: {existing.get(key)!r} → {want!r}")
+                existing[key] = want
+        if fixes:
+            SOE.write_text(
+                _json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+            for line in fixes:
+                print(f"  ~ 章节 八、94 挂载纠正 {line}")
+        return
+
     insert_idx = len(secs)
     for i, s in enumerate(secs):
         if (s.get("section_number") or "").replace(" ", "") == "八、93":
             insert_idx = i + 1
             break
 
-    # 参照邻近章节的字段结构
     new_section = {
         "section_number": "八、94",
         "section_title": "一般风险准备",
@@ -399,11 +480,11 @@ def _ensure_soe_m8_section() -> None:
         "check_presets": [],
         "wide_table_presets": [],
         "scope": "both",
-        "sort_order": 594,
-        "section_id": "chapter-08-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-ban-feng-xian-zhun-bei",
+        "sort_order": want_order,
+        "section_id": want_sid,
         "level": 2,
-        "parent_section_id": "chapter-08-cai-wu-bao-biao-xiang-mu-zhu-shi",
-        "sort_index": 93,
+        "parent_section_id": parent_id,
+        "sort_index": want_index,
         "auto_numbering": True,
         "lock_number": False,
     }
@@ -413,12 +494,28 @@ def _ensure_soe_m8_section() -> None:
 
 
 def _run(key: str, dry_run: bool, check: bool):
+    """单章修订。
+
+    🔴 **`--dry-run` 必须一个字节都不写**（2026-09-30 修）。这里原先有**两处**写盘只判了
+    `not check`，因此在 `--dry-run` 下照样执行：`_ensure_soe_m8_section()`（新建 `八、94`
+    整章）与下面的 `header_label` 假行删除。`build_cli` 的帮助文本写的是「只打印变更，
+    不写文件」，实测按这个预期跑一次 `--dry-run`，`note_template_soe.json` 就被改了 ——
+    干跑本来是「决定要不要改」之前的安全动作，它写盘等于把这个安全保证反过来用。
+
+    改为两处都 `not check and not dry_run`；干跑时打印「将会做什么」而不是去做。
+    """
     import json as _json
     from scripts.fix._note_structure_kit import find_section
 
-    # 新建章节前置（仅对 soe-m8-94 生效，且非 check 模式）
-    if key == "soe-m8-94" and not check:
-        _ensure_soe_m8_section()
+    writable = not check and not dry_run
+
+    # 新建章节前置（仅对 soe-m8-94 生效；check / dry-run 都不写）
+    if key == "soe-m8-94":
+        if writable:
+            _ensure_soe_m8_section()
+        elif dry_run and not _soe_m8_section_exists():
+            print("  [dry-run] 将新建章节 八、94 一般风险准备（本模式不写盘，"
+                  "故其表结构 diff 需 --apply 后才能展开）")
 
     section_number, path, plan = SECTIONS[key]
 
@@ -435,7 +532,12 @@ def _run(key: str, dry_run: bool, check: bool):
                     tbl["rows"] = new_rows
                     modified = True
             if modified:
-                path.write_text(_json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                if writable:
+                    path.write_text(
+                        _json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+                    )
+                elif dry_run:
+                    print("  [dry-run] 将删除该章的 header_label 假行（本模式不写盘）")
 
     expected = EXPECTED[key]
     text = TEXT_OVERRIDES.get(key)

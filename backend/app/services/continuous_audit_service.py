@@ -48,11 +48,17 @@ class ContinuousAuditService:
         if not prior:
             raise ValueError("上年项目不存在")
 
-        # 推算当年年度
+        # 推算当年年度（平台统一年度解析优先；缺失时退回向导数据，最后才用当前年）
+        from app.services.project_audit_year import resolve_project_audit_year
+
         ws = prior.wizard_state or {}
         basic_info = ws.get("steps", {}).get("basic_info", {}).get("data", {})
-        prior_year = basic_info.get("audit_year", datetime.now(timezone.utc).year)
-        new_year = prior_year + 1
+        prior_year = (
+            resolve_project_audit_year(prior)
+            or basic_info.get("audit_year")
+            or datetime.now(timezone.utc).year
+        )
+        new_year = int(prior_year) + 1
         inherited_template_type = basic_info.get("template_type") or prior.template_type
         inherited_report_scope = basic_info.get("report_scope") or prior.report_scope
         inherited_company_code = basic_info.get("company_code") or prior.company_code
@@ -60,6 +66,28 @@ class ContinuousAuditService:
         inherited_parent_company_code = basic_info.get("parent_company_code") or prior.parent_company_code
         inherited_ultimate_company_name = basic_info.get("ultimate_company_name") or prior.ultimate_company_name
         inherited_ultimate_company_code = basic_info.get("ultimate_company_code") or prior.ultimate_company_code
+        # consol-tree-three-code-autobuild 需求 7.4：继承与上级关系（上级代码为空则无关系；
+        # 上年缺关系的历史数据按企业名称补默认，保持「有上级 ⇔ 有关系」不变式）
+        from app.services.group_relation import resolve_relation
+
+        inherited_relation_to_parent = resolve_relation(
+            basic_info.get("relation_to_parent") or prior.relation_to_parent,
+            inherited_parent_company_code,
+            prior.client_name,
+            inherited_company_code,
+        )
+
+        # 物化年度写入后唯一索引生效：同企业同年度同口径已有项目 ⇒ 400 而不是 IntegrityError 500
+        if inherited_company_code:
+            from app.services.uniqueness_checker import check_uniqueness
+
+            is_unique, uniqueness_error = await check_uniqueness(
+                inherited_company_code, new_year, inherited_report_scope or "standalone", db
+            )
+            if not is_unique:
+                raise ValueError(
+                    f"{new_year} 年度{uniqueness_error or '已存在该单位该年度的项目'}，不能重复创建"
+                )
 
         # 2. 创建新项目
         new_project = Project(
@@ -72,15 +100,24 @@ class ContinuousAuditService:
             company_code=inherited_company_code,
             template_type=inherited_template_type,
             report_scope=inherited_report_scope,
+            # 物化年度列必须写：唯一索引 (company_code, audit_year, report_scope) 与
+            # 企业树按年度分组都依赖它（原实现漏写 ⇒ 新项目游离于唯一性与集团树之外）
+            audit_year=new_year,
             parent_company_name=inherited_parent_company_name,
             parent_company_code=inherited_parent_company_code,
+            relation_to_parent=inherited_relation_to_parent,
             ultimate_company_name=inherited_ultimate_company_name,
             ultimate_company_code=inherited_ultimate_company_code,
-            parent_project_id=prior.parent_project_id,
+            # parent_project_id 是派生值（ADR-CTREE-001），不复制上年值 —— 上年值指向
+            # 上年度的合并项目，由 group_links.sync_group_links 按新年度重算。
             consol_level=prior.consol_level,
         )
         db.add(new_project)
         await db.flush()
+        # 需求 7.2 / 7.4：新年度的派生链接按三码重算（不串用上年链接）
+        from app.services.group_links import sync_group_links
+
+        await sync_group_links(db, new_year)
 
         # 设置 prior_year_project_id（通过 raw SQL 因为 ORM 模型可能还没有这个字段）
         await db.execute(
@@ -88,9 +125,16 @@ class ContinuousAuditService:
             {"prior_id": str(prior_project_id), "new_id": str(new_project.id)},
         )
 
-        # 复制 wizard_state（更新年度）
-        new_basic_info = {**basic_info, "audit_year": new_year}
-        new_ws = {**ws}
+        # 复制 wizard_state（更新年度 + 集团关系）。必须深拷贝：浅拷贝时 steps 字典与上年
+        # 项目共享，给新项目写年度会把上年项目内存里的 wizard_state 一起改掉。
+        import copy as _copy
+
+        new_basic_info = {
+            **basic_info,
+            "audit_year": new_year,
+            "relation_to_parent": inherited_relation_to_parent,
+        }
+        new_ws = _copy.deepcopy(ws)
         if "steps" in new_ws and "basic_info" in new_ws["steps"]:
             new_ws["steps"]["basic_info"]["data"] = new_basic_info
         new_project.wizard_state = new_ws
@@ -108,15 +152,16 @@ class ContinuousAuditService:
             mappings = result.scalars().all()
             count = 0
             for m in mappings:
+                # 字段名以 ORM 为准（原实现用 client_account_code / confidence 等不存在的属性，
+                # 上年只要有一条映射就 AttributeError ⇒ 整个接口 500；
+                # consol-tree-three-code-autobuild 任务 3.6 真库回滚探针复现）
                 new_m = AccountMapping(
                     project_id=new_project.id,
-                    client_account_code=m.client_account_code,
-                    client_account_name=m.client_account_name,
+                    original_account_code=m.original_account_code,
+                    original_account_name=m.original_account_name,
                     standard_account_code=m.standard_account_code,
-                    standard_account_name=m.standard_account_name,
                     mapping_type=m.mapping_type,
-                    confidence=m.confidence,
-                    is_confirmed=m.is_confirmed,
+                    created_by=m.created_by,
                 )
                 db.add(new_m)
                 count += 1
@@ -145,10 +190,12 @@ class ContinuousAuditService:
                 count += 1
             items_copied["team_assignments"] = count
 
-        # 5. 试算表审定数 → 当年期初
+        # 5. 试算表审定数 → 当年期初（只取上年度的行：其他年度的行改写成 new_year 会撞
+        #    唯一索引 (project_id, year, company_code, standard_account_code)）
         result = await db.execute(
             sa.select(TrialBalance).where(
                 TrialBalance.project_id == prior_project_id,
+                TrialBalance.year == int(prior_year),
                 TrialBalance.is_deleted == sa.false(),
             )
         )
@@ -229,20 +276,43 @@ class ContinuousAuditService:
             mis_count += 1
         items_copied["misstatements_carried"] = mis_count
 
-        # 8. 复制 note_wp_mapping / procedure_instances / note_trim_schemes
-        # 使用 raw SQL 因为这些表可能在不同 Phase 定义
-        for table_name in ["note_wp_mapping", "procedure_instances", "note_trim_schemes"]:
-            try:
-                count_result = await db.execute(sa.text(
-                    f"INSERT INTO {table_name} (id, project_id, "
-                    f"SELECT gen_random_uuid(), :new_pid, "
-                    f"FROM {table_name} WHERE project_id = :old_pid"
-                ))
-            except Exception:
-                # 表可能不存在或结构不同，跳过
-                logger.warning("跳过 %s 结转（表可能不存在）", table_name)
-                items_copied[table_name] = 0
-                continue
+        # 8. 附注裁剪方案结转（可选项：放在 SAVEPOINT 里，失败只回滚本步，不毒化主事务）
+        #
+        # 原实现对 note_wp_mapping / procedure_instances / note_trim_schemes 执行一条语法残缺的
+        # INSERT…SELECT（缺右括号与列清单，且未传参），每次必失败。PG 上事务内任一语句失败即
+        # 中止整个事务，try/except 吞掉异常后路由照常 commit —— PG 对已中止事务的 COMMIT
+        # 等于 ROLLBACK ⇒ 新项目与前 7 步复制的数据全部静默丢失，接口却返回 200 和新项目 id。
+        # 现改为：
+        # - note_trim_schemes：按 ORM 逐行复制（字段简单、无跨年外键）；
+        # - procedure_instances：不结转 —— 行内 parent_id 指向上年实例、wp_id 指向上年底稿、
+        #   status/execution_status 是上年执行结果，整行照抄会造出跨年引用，需单独设计重映射
+        #   （登记在 spec consol-tree-three-code-autobuild design §十二 范围外事项）；
+        # - note_wp_mapping：真库无此表，删除。
+        from app.models.note_trim_models import NoteTrimScheme
+
+        try:
+            async with db.begin_nested():
+                result = await db.execute(
+                    sa.select(NoteTrimScheme).where(
+                        NoteTrimScheme.project_id == prior_project_id,
+                        NoteTrimScheme.is_deleted == sa.false(),
+                    )
+                )
+                trim_count = 0
+                for scheme in result.scalars().all():
+                    db.add(NoteTrimScheme(
+                        project_id=new_project.id,
+                        template_type=scheme.template_type,
+                        scheme_name=scheme.scheme_name,
+                        trim_data=_copy.deepcopy(scheme.trim_data),
+                        created_by=scheme.created_by,
+                    ))
+                    trim_count += 1
+                await db.flush()
+            items_copied["note_trim_schemes"] = trim_count
+        except Exception:  # noqa: BLE001 — 可选结转失败不应让整个建下年项目失败
+            logger.warning("附注裁剪方案结转失败（已回滚本步，主流程继续）", exc_info=True)
+            items_copied["note_trim_schemes"] = 0
 
         await db.flush()
 

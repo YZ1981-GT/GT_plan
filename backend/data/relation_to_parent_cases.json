@@ -1,0 +1,40 @@
+{
+  "_doc": "与上级关系判定用例（spec consol-tree-three-code-autobuild 需求 1.5 / 2.2 / 属性 P11）。前端 src/utils/groupRelation.ts 与后端 app/services/group_relation.py 的测试逐条跑本文件，两端结论必须完全一致。cases：按企业名称的默认关系，real=true 的名称取自真库 2026-09-29 活跃项目。self_reference_cases：上级代码等于本企业代码时的含义（effective_parent=有效上级代码，null=没有另外的上级；kind=top 本企业就是上级企业 / ultimate 三码相同即最终控制方 / null 不是自引用）。",
+  "cases": [
+    {"name": "重药控股安徽有限公司", "expected": "subsidiary", "real": true},
+    {"name": "重庆和平药房连锁有限责任公司", "expected": "subsidiary", "real": true},
+    {"name": "重庆医药集团医疗器械有限公司", "expected": "subsidiary", "real": true},
+    {"name": "重庆医药集团和平物流有限公司", "expected": "subsidiary", "real": true},
+    {"name": "重庆医药集团四川物流有限公司", "expected": "subsidiary", "real": true},
+    {"name": "重庆医药集团宜宾医药有限公司新健康大药房临港店", "expected": "branch", "real": true},
+    {"name": "陕西华氏医药有限公司", "expected": "subsidiary", "real": true},
+    {"name": "某某科技股份有限公司", "expected": "subsidiary"},
+    {"name": "某某集团有限公司上海分公司", "expected": "branch"},
+    {"name": "某某集团有限公司上海分公司（筹）", "expected": "branch"},
+    {"name": "某某银行股份有限公司重庆分行", "expected": "branch"},
+    {"name": "某某银行股份有限公司渝北支行", "expected": "branch"},
+    {"name": "某某有限公司北京办事处", "expected": "branch"},
+    {"name": "某某有限公司第一分厂", "expected": "branch"},
+    {"name": "某某有限公司华东营业部", "expected": "branch"},
+    {"name": "某某有限公司解放碑门店", "expected": "branch"},
+    {"name": "某某会计师事务所（特殊普通合伙）重庆分所", "expected": "branch"},
+    {"name": "某某药店", "expected": "branch"},
+    {"name": "某某投资有限公司（有限合伙）", "expected": "subsidiary"},
+    {"name": "某某咨询有限公司 ", "expected": "subsidiary"},
+    {"name": "某某分公司管理有限公司", "expected": "subsidiary"},
+    {"name": "某某商店有限公司", "expected": "subsidiary"},
+    {"name": "  ", "expected": "subsidiary"},
+    {"name": "", "expected": "subsidiary"}
+  ],
+  "self_reference_cases": [
+    {"label": "三码相同 ⇒ 本企业即最终控制方", "own": "91110000300000000G", "parent": "91110000300000000G", "ultimate": "91110000300000000G", "effective_parent": null, "kind": "ultimate"},
+    {"label": "上级=本企业、控制方为空 ⇒ 本企业就是上级企业", "own": "91110000300000000G", "parent": "91110000300000000G", "ultimate": "", "effective_parent": null, "kind": "top"},
+    {"label": "上级=本企业、控制方是别家 ⇒ 仍是顶层企业", "own": "91110000300000000G", "parent": "91110000300000000G", "ultimate": "91110000100000000R", "effective_parent": null, "kind": "top"},
+    {"label": "前后空白不影响判定", "own": "91110000300000000G", "parent": " 91110000300000000G ", "ultimate": "91110000300000000G ", "effective_parent": null, "kind": "ultimate"},
+    {"label": "控制方=本企业但上级是别家 ⇒ 不是自引用，上级照常有效", "own": "91110000300000000G", "parent": "911100002000000005", "ultimate": "91110000300000000G", "effective_parent": "911100002000000005", "kind": null},
+    {"label": "上级留空、控制方=本企业 ⇒ 常规集团顶层写法，不算自引用", "own": "91110000300000000G", "parent": "", "ultimate": "91110000300000000G", "effective_parent": null, "kind": null},
+    {"label": "普通下级", "own": "91110000300000000G", "parent": "911100002000000005", "ultimate": "91110000100000000R", "effective_parent": "911100002000000005", "kind": null},
+    {"label": "本企业代码缺失时上级照常有效", "own": "", "parent": "911100002000000005", "ultimate": "", "effective_parent": "911100002000000005", "kind": null},
+    {"label": "全空", "own": "91110000300000000G", "parent": null, "ultimate": null, "effective_parent": null, "kind": null}
+  ]
+}

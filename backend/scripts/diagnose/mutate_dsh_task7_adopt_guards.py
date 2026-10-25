@@ -57,14 +57,18 @@ GUARD_FILES: dict[str, str] = {
     "test_disclosure_note_ai_fill_endpoint.py": "Task 7 扩展（草稿消息签发 + P11 收紧）",
     "useDocAiChat.spec.ts": "Task 7 改写采纳用例（服务端 ID / 幂等键 / 无正文）",
     "useDocAiChat.d4.spec.ts": "Task 7 改写 D4 PBT（占位 ID 拒绝 + 无正文）",
-    "DocAiChatPanel.spec.ts": "Task 7 扩展（占位 ID 不 emit adopt）",
     "NoteAiFillDialog.spec.ts": "Task 7 扩展（无 message_id 时采纳禁用）",
+    # 2026-09-29：原「DocAiChatPanel.spec.ts（占位 ID 不 emit adopt）」随旧组件一并删除
+    # （spec knowledge-base-retrieval-and-authz-closure Task 11；组件自 dsh Task 9 起无生产引用）。
+    # 占位 ID 拒绝的判据仍由 useDocAiChat.spec / useDocAiChat.d4.spec 覆盖（M27 的 want/wants）。
 }
 
 #: 冻结基线（本会话实测 2026-08-22，来源 = 本脚本 ``--run`` 打印的基线行）：
 #:   后端 5 个守卫文件合并跑 = 55 passed
 #:   前端 4 个守卫文件合并跑 = 40 passed
 #: 改这两个数必须同时说明来源。
+#: 🔴 2026-09-29 前端守卫减为 3 个（删 DocAiChatPanel.spec.ts），40 未重跑冻结；
+#:    `run_cli` 基线不符只 WARN，首次运行以其打印的基线行为准并回填这里。
 BASELINE_BE_PASSED = 55
 BASELINE_FE_PASSED = 40
 
@@ -87,7 +91,6 @@ BE_PYTEST_ARGS = [
 FE_FILTERS = [
     "src/composables/__tests__/useDocAiChat.spec.ts",
     "src/composables/__tests__/useDocAiChat.d4.spec.ts",
-    "src/components/__tests__/DocAiChatPanel.spec.ts",
     "src/components/disclosure/__tests__/NoteAiFillDialog.spec.ts",
 ]
 
@@ -536,10 +539,8 @@ MUTATIONS: list[Mut] = [
         anchor="    if (!isServerMessageId(messageId)) {",
         new="    if (false) {",
         want="adoptContent 对本地占位 ID 直接拒绝",
-        wants=(
-            "本地占位 ID 一律在发请求前被拒",
-            "采纳：本地占位 ID 不 emit adopt",
-        ),
+        # 「采纳：本地占位 ID 不 emit adopt」随 DocAiChatPanel.spec.ts 删除（2026-09-29）
+        wants=("本地占位 ID 一律在发请求前被拒",),
         why=(
             "不再识别本地占位 ID（`ai_…` / `hist_N`）⇒ 前端把注定 422/404 的请求发出去，"
             "用户只看到「采纳失败请稍后重试」这种无从下手的提示，而真正的原因"

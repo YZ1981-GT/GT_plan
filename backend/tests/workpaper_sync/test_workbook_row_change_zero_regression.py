@@ -79,14 +79,49 @@ os.environ.setdefault("DB_DISABLE_SSL", "True")
 import generate_workbook_row_change_zero_regression_baseline as G  # noqa: E402
 from app.services.workpaper_sync import excel_row_shift as RS  # noqa: E402
 
-#: design.md「分母断言」表的 Wave 0 复算值。改这里必须同时改 design.md，两侧锁死。
+#: design.md「分母断言」表的复算值。改这里必须同时改 design.md，两侧锁死。
+#:
+#: 🔴 **2026-09-29 更新（D4 重复文件删除）**：
+#: `wp_templates/D/D4收入底稿.xlsx`（无空格）与 `D4 收入底稿.xlsx`（带空格）是**同一份
+#: 底稿的重复文件**。用户核实后删掉了无空格那份，保留的是**被净化过**的版本（外部链接
+#: 部件已丢弃 ⇒ 该模板 `external_sites` 265→0、`formulas` 438→168）。
+#: 基线里那一条已做**手术式**改名（键换名 + 记录换成现算值 + 分母按 `per_template`
+#: **重算**而非手填），因此下面这组值与基线内部自洽这件事由构造保证。
+#:
+#: ⚠ 与上游 `excel-workbook-wide-row-change-propagation/design.md` 的「分母断言」表
+#: 存在**两处已知不一致**，且**在本次改动之前就已存在**：
+#:   * `xlsx_total` —— design.md 记 **352**（当时两份 D4 并存），本表记 351。
+#:     重复文件删除后 351 才是真值；
+#:   * `external_sites` —— design.md 记 **2902**，本表记 2643（净化后的 D4 少了 265 处）。
+#: 不在本 spec 里改上游 design.md（跨 spec 回填另立工单）；此处**如实登记**该差异，
+#: 而不是把它抹平成「两侧一致」。
 EXPECTED_DENOMINATORS: dict[str, int] = {
     "xlsx_total": 351,
-    "templates_with_cross_sheet": 182,
-    "cross_sheet_sites": 144154,
-    "cross_sheet_formulas": 72825,
+    "templates_with_cross_sheet": 181,
+    "cross_sheet_sites": 144149,
+    "cross_sheet_formulas": 72820,
     "three_d_sites": 0,
-    "external_sites": 2908,
+    "external_sites": 2643,
+}
+
+#: 属**别 lane**、已登记的语料漂移：这些模板的**内容**被其它会话/提交改过，
+#: 与 `_rewrite_formula_refs` 的行为无关。
+#:
+#: 🔴 为什么**不**整册 `--apply` 吸收它们（沿用 `d3-sync-coverage-via-row-table-engine`
+#: 证据文档已立的先例）：
+#:   * `M/M10 其他权益工具.xlsx` 在工作树里还是**未提交**状态 —— 把在飞改动冻进基线，
+#:     等那个会话收敛或回滚后基线又对不上；
+#:   * `L/L5` / `L/L6` 来自上游提交 `3036967ea`(2026-09-27)，属 L 循环 lane；
+#:   * 整册重生成会把这些别 lane 的漂移**一并吸收** ⇒ 掩盖它们，而那正是这份基线
+#:     要防的事。
+#:
+#: ⚠ 本清单是**可伪证**的：`test_registered_corpus_drift_has_no_stale_entries` 断言
+#: 每一项**现在真的在漂**。哪条 lane 收敛了（或模板回滚了），该项当场打红，要求删掉它。
+REGISTERED_CORPUS_DRIFT: dict[str, str] = {
+    "D/D7 合同负债.xlsx": "模板净化 lane（`1a0b55651`）：公式 206→200",
+    "L/L5 长期应付款.xlsx": "L 循环 lane（`3036967ea` 2026-09-27）：公式 386→667",
+    "L/L6 专项应付款.xlsx": "L 循环 lane（`3036967ea` 2026-09-27）：公式 249→348",
+    "M/M10 其他权益工具.xlsx": "并发会话**未提交**改动（`git status` 为 `M`）：公式 165→279",
 }
 
 #: 全库为 0、只能用合成用例的类。
@@ -116,15 +151,91 @@ def current() -> dict[str, Any]:
 def test_behaviour_matches_frozen_baseline(
     current: dict[str, Any], stored: dict[str, Any]
 ) -> None:
-    """🔴 `_rewrite_formula_refs` 的行为与冻结基线逐字相同。"""
+    """🔴 `_rewrite_formula_refs` 的行为与冻结基线逐字相同。
+
+    🔴 差异按来源**分区**（2026-09-29）：`REGISTERED_CORPUS_DRIFT` 里那几份模板的
+    **内容**被别的 lane 改过，那不是改写器的行为变化。分区后残留必须为空。
+
+    这不是「加豁免蒙绿」：
+    * 清单逐项**可伪证**（下一条判据断言每项现在真的在漂，收敛了就打红要求删除）；
+    * `denominators` 那一行被放行，但另有一条判据把**排除登记模板之后**的分母逐键对齐 ——
+      于是「别处的分母也变了」照旧打红；
+    * 其余 346 份模板仍是逐值相等的硬断言。
+    """
     problems = G.diff_baseline(current, stored)
-    assert not problems, (
-        f"`_rewrite_formula_refs` 行为已偏离冻结基线（{len(problems)} 处差异）。\n"
+    registered = [
+        line
+        for line in problems
+        if line.startswith("denominators ")
+        or any(name in line for name in REGISTERED_CORPUS_DRIFT)
+    ]
+    residual = [line for line in problems if line not in registered]
+    assert not residual, (
+        f"`_rewrite_formula_refs` 行为已偏离冻结基线（{len(residual)} 处**未登记**差异，"
+        f"另有 {len(registered)} 处属已登记的别 lane 语料漂移）。\n"
         "若这是 Task 27（Requirement 10 修 fill-down）导致的**有意**变更：\n"
         "  1. 确认差异全部落在 `filldown` 情景且都是跨 sheet 相对引用；\n"
         "  2. `insert_ctx` / `insert_no_ctx` 不得变；\n"
         "  3. 再跑 --apply 重新冻结并在 commit 里写明理由。\n"
-        "否则这是真回归。\n差异（前 20）：\n  " + "\n  ".join(problems[:20])
+        "若是别的 lane 改了模板：补进 `REGISTERED_CORPUS_DRIFT` 并写明归因。\n"
+        "否则这是真回归。\n未登记差异（前 20）：\n  " + "\n  ".join(residual[:20])
+    )
+
+
+def test_registered_corpus_drift_has_no_stale_entries(
+    current: dict[str, Any], stored: dict[str, Any]
+) -> None:
+    """🔴 `REGISTERED_CORPUS_DRIFT` 每一项**现在真的在漂** —— 豁免须可伪证。
+
+    某条 lane 收敛（或模板回滚）之后，那一项就成了一条谁也不知道还管不管用的豁免。
+    本条让它当场打红，要求删掉。
+    """
+    s_t, c_t = stored["per_template"], current["per_template"]
+    stale = [
+        name
+        for name in REGISTERED_CORPUS_DRIFT
+        if name in s_t and name in c_t and s_t[name] == c_t[name]
+    ]
+    assert not stale, (
+        f"这些登记项已经不漂了：{stale} —— 请从 `REGISTERED_CORPUS_DRIFT` 删掉它们"
+        "（并确认 `test_behaviour_matches_frozen_baseline` 仍绿）"
+    )
+    missing = [name for name in REGISTERED_CORPUS_DRIFT if name not in c_t or name not in s_t]
+    assert not missing, (
+        f"登记项在基线或现算里不存在：{missing} —— 模板被删/改名了，登记要跟着改"
+    )
+
+
+def test_denominators_excluding_registered_drift_still_match(
+    current: dict[str, Any], stored: dict[str, Any]
+) -> None:
+    """🔴 把登记模板**排除**之后，分母逐键仍然相等。
+
+    这是上一条放行 `denominators` 那一行的补偿控制：若别处的分母也变了（那才是真回归），
+    本条会打红。没有它，`denominators` 就成了一个把任何聚合变化都吞掉的口子。
+    """
+    fields = (
+        "formulas",
+        "cross_sheet_formulas",
+        "cross_sheet_sites",
+        "external_sites",
+        "three_d_sites",
+    )
+
+    def _totals(per: dict[str, Any]) -> dict[str, int]:
+        rows = [r for name, r in per.items() if name not in REGISTERED_CORPUS_DRIFT]
+        out = {f: sum(int(r[f]) for r in rows) for f in fields}
+        out["templates"] = len(rows)
+        out["templates_with_cross_sheet"] = sum(
+            1 for r in rows if int(r["cross_sheet_sites"]) > 0
+        )
+        return out
+
+    got = _totals(current["per_template"])
+    want = _totals(stored["per_template"])
+    assert got["templates"] > 300, f"排除后只剩 {got['templates']} 份 ⇒ 判据被缩到无意义"
+    assert got == want, (
+        f"排除登记模板之后分母仍不相等 ⇒ 别处也变了（真回归）：现算 {got} / 基线 {want}"
     )
 
 
@@ -513,3 +624,218 @@ def test_digest_is_order_sensitive() -> None:
 
     a = [("S", 0, "=A7", "=A8", 1), ("S", 1, "=B7", "=B8", 1)]
     assert roll(a) != roll(list(reversed(a))), "digest 不是顺序敏感的"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Property 28 冻结基线看门狗
+# （spec workpaper-sync-row-deletion-multi-region-propagation，Task 19）
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 🔴 为什么本 spec 要给**别人的**冻结基线加看门狗：
+#
+# 本 spec 的约束之一是「不改 Property 28 冻结基线的被观测对象」。而删行侧要做的事
+# （区间端点按方向塌陷）最自然的实现就是去 `_rewrite_formula_refs` 里加一个删行分支 ——
+# 一旦那么做，这份基线的语义就变了，而它是插行侧**逐字节零回归**的全部依据。
+#
+# 「不改」如果只写在 requirements 里，就只是一句承诺。下面这组判据把它变成会打红的事实：
+# 基线文件本身、三个被观测符号的源码、以及情景清单，逐个冻结 sha256。
+#
+# 🔴 判据故意用 **sha256 of source** 而不是「函数还在」或「行数没变」：
+#    前者对**任何**改动敏感（包括只加一个 `if`），后两者对语义改动几乎无感。
+
+#: 交付时现算（探针 `_bdelp_p28_freeze.py`）。
+#:
+#: 🔴 若这里打红且改动是**有意**的：改这里的期望值，并在提交说明里**逐处论证**每一个
+#: diff 的合法性 —— 那份基线保护的是插行侧全库 351 份模板的逐字节行为，
+#: 「顺手重生成」等于把那层保护静默移除。
+#: 🔴 **禁止**在实施中顺手跑生成器的 `--apply`（tasks 19.2 的执行纪律）。
+FROZEN_P28_SHA: dict[str, str] = {
+    # 2026-09-29 更新：D4 重复文件删除后做了**手术式**改名（见 EXPECTED_DENOMINATORS 注释）。
+    # 前值 421e7bf84591da6f960f3ef864bcd9017356c58ad7c682095468aac7ef3a0ffc。
+    # 🔴 改动只涉一个 per_template 键与 5 个由记录重算的分母；三个被观测符号的源码 sha
+    #    **逐字未变**（下面三条判据现场证明）⇒ 改写器行为没变，这是本次改名合法的依据。
+    "baseline_file": "fbe72a9eb8bd8d854aa76d7afb132a509065e0080856a05865683454d817313b",
+    "_rewrite_formula_refs": (
+        "00330a210600959fc3f184dad8fe88d50633e303ae0a44329eab8a0b4b315cc1"
+    ),
+    "translate_formula_rows": (
+        "8aeee2f8031f7c01c026b5a8c976eaa2a10bba46c15a7949fa5c06f8de9b1a1e"
+    ),
+    "_scenario_kwargs": (
+        "ce3578d8d9f3540bf05d379af9da1262fca5e36aaf83dcf5cbf4085a7960fdb6"
+    ),
+    "SCENARIOS": "0e8a67233aa76f2181acc87360a4ad480e17989ccedc0fd8050d09b479726f2c",
+}
+
+#: 三个情景 —— 全是**插行**侧的。删行有自己的载体与自己的基线
+#: （`data/clear_path_byte_baseline.json`），不得混进这里。
+EXPECTED_SCENARIOS: tuple[str, ...] = ("insert_ctx", "insert_no_ctx", "filldown")
+
+
+def _source_sha(obj: Any) -> str:
+    import hashlib
+
+    return hashlib.sha256(
+        textwrap.dedent(inspect.getsource(obj)).encode("utf-8")
+    ).hexdigest()
+
+
+class TestProperty28BaselineWatchdog:
+    """**Validates: Requirements 10.1, 10.2, 10.3, 10.4, 10.5**
+
+    spec: workpaper-sync-row-deletion-multi-region-propagation
+    """
+
+    def test_baseline_file_sha_is_frozen(self) -> None:
+        """🔴 基线文件本身的 sha256（Requirements 10.3 / 10.4）。"""
+        import hashlib
+
+        assert G.BASELINE_PATH.is_file(), G.BASELINE_PATH
+        got = hashlib.sha256(G.BASELINE_PATH.read_bytes()).hexdigest()
+        assert got == FROZEN_P28_SHA["baseline_file"], (
+            f"Property 28 的基线文件被改了：现算 {got} / 冻结 "
+            f"{FROZEN_P28_SHA['baseline_file']}。\n"
+            "🔴 若是**有意**重生成：改 `FROZEN_P28_SHA['baseline_file']` 的期望值，"
+            "并在提交说明里逐处论证每一个 diff 的合法性 —— 这份基线是插行侧全库 351 份"
+            "模板逐字节零回归的全部依据。\n"
+            "若不是有意的：有人跑了生成器的 `--apply`，请回滚。"
+        )
+
+    @pytest.mark.parametrize(
+        ("name", "obj_path"),
+        [
+            ("_rewrite_formula_refs", "RS._rewrite_formula_refs"),
+            ("translate_formula_rows", "RS.translate_formula_rows"),
+            ("_scenario_kwargs", "G._scenario_kwargs"),
+        ],
+    )
+    def test_observed_symbol_source_is_frozen(self, name: str, obj_path: str) -> None:
+        """🔴 被观测对象的**源码**逐字冻结（Requirements 10.1 / 10.2 / 10.5）。
+
+        本 spec 明确不改它们：删行侧的端点方向感知走的是
+        `excel_materialize.remap_bare_a1_for_deletion`（把上下文放进 `remap` 自己），
+        以及 `excel_workbook_row_change._range_aware_remap` —— 两者都是**实参**层面的，
+        改写器一个字都不动。
+        """
+        module, attr = obj_path.split(".", 1)
+        obj = getattr({"RS": RS, "G": G}[module], attr)
+        got = _source_sha(obj)
+        assert got == FROZEN_P28_SHA[name], (
+            f"`{name}` 的源码变了：现算 {got} / 冻结 {FROZEN_P28_SHA[name]}。\n"
+            "🔴 本 spec 的约束之一就是**不改**它（Requirement 10.1）。若实施中发现必须改："
+            "停下按范围变更处理 —— 先按 Property 28 守卫 docstring 记载的七条机械核验"
+            "逐条取证，再显式重新冻结，并在提交说明里论证每一处 diff 的合法性。"
+        )
+
+    def test_scenarios_is_still_the_insert_only_triple(self) -> None:
+        """🔴 情景清单仍是三元组，且**不含**删行情景（Requirement 10.2）。
+
+        往这里加一个删行情景，看起来是「顺手扩大覆盖」，实际是把插行侧的冻结基线
+        与删行侧的新行为绑在一起 —— 此后任何一侧改动都要重生成，那层保护就废了。
+        """
+        import hashlib
+
+        assert tuple(G.SCENARIOS) == EXPECTED_SCENARIOS, (
+            f"SCENARIOS 变了：{tuple(G.SCENARIOS)} —— 删行有自己的基线"
+            "（`data/clear_path_byte_baseline.json`），不得混进这里"
+        )
+        assert len(G.SCENARIOS) == 3
+        got = hashlib.sha256(repr(tuple(G.SCENARIOS)).encode("utf-8")).hexdigest()
+        assert got == FROZEN_P28_SHA["SCENARIOS"], got
+        assert not any(
+            token in str(G.SCENARIOS).lower() for token in ("delete", "shrink", "remove")
+        ), G.SCENARIOS
+
+    def test_deletion_side_passes_its_remap_as_an_argument(self) -> None:
+        """🔴 AST：删行侧的反向映射通过**实参**传入，不是改写器的内部常量。
+
+        这是「不改被观测对象」得以成立的机制：改写器只认 `remap` 这个入参，
+        方向语义放在调用方构造的函数里。若哪天有人把 `deleted_rows` 之类的名字写进
+        改写器内部，上面的源码 sha 会先打红；本条从**另一侧**钉住同一件事 ——
+        调用方必须真的在传 `remap`。
+        """
+        import ast
+
+        from app.services.workpaper_sync import excel_materialize as M
+        from app.services.workpaper_sync import excel_workbook_row_change as N1
+
+        for owner, func in (
+            ("excel_materialize.remap_bare_a1_for_deletion", M.remap_bare_a1_for_deletion),
+            ("excel_workbook_row_change._range_aware_remap", N1._range_aware_remap),
+        ):
+            src = textwrap.dedent(inspect.getsource(func))
+            tree = ast.parse(src)
+            # 该函数里（或它的返回值里）必须出现 `remap=` 关键字实参，或它本身就是 remap 工厂
+            has_remap_kwarg = any(
+                kw.arg == "remap"
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+                for kw in node.keywords
+            )
+            returns_callable = any(
+                isinstance(node, ast.FunctionDef) for node in ast.walk(tree)
+            ) or any(isinstance(node, ast.Lambda) for node in ast.walk(tree))
+            assert has_remap_kwarg or returns_callable, (
+                f"{owner} 既没传 `remap=` 也不产出可调用 ⇒ 方向语义可能被塞进改写器内部"
+            )
+
+        # 反面：改写器里不得出现删行侧的名字
+        rewriter_src = textwrap.dedent(inspect.getsource(RS._rewrite_formula_refs))
+        rewriter_tree = ast.parse(rewriter_src)
+        forbidden = {"deleted_rows", "RowDeletionShift", "shift_range_end", "shift_range_start"}
+        names = {
+            node.id if isinstance(node, ast.Name) else node.attr
+            for node in ast.walk(rewriter_tree)
+            if isinstance(node, (ast.Name, ast.Attribute))
+        }
+        leaked = sorted(forbidden & names)
+        assert not leaked, (
+            f"`_rewrite_formula_refs` 里出现了删行侧的名字 {leaked} ⇒ "
+            "被观测对象已被改动（Requirement 10.1）"
+        )
+
+    def test_template_set_matches_the_corpus_exactly(
+        self, stored: dict[str, Any], current: dict[str, Any]
+    ) -> None:
+        """🔴 基线的模板**集合**与语料逐项一致（不是只比数量）。
+
+        D4 重复文件删除之后两侧应完全对齐。集合层面对齐是「per_template 只是值变了」
+        与「有模板被删/改名而基线没跟上」这两类的分界 —— 后者用数量比对看不出来
+        （一删一增时总数不变，本次 D4 就正是如此：351 → 351）。
+
+        🔴 字段路径是 **`per_template`**。首版我按名字猜成了 `templates`，
+        于是两个集合都读成空、差集恒空 ⇒ 判据恒绿而当时基线真的有 17 处差异
+        （工作区铁律：slice/结构字段路径必须现算验证，不可凭字段名推）。
+        """
+        assert "per_template" in stored and "per_template" in current, (
+            f"基线结构变了，顶层键实测：{sorted(stored)}"
+        )
+        s_names, c_names = set(stored["per_template"]), set(current["per_template"])
+        assert s_names, "基线的 per_template 是空的 ⇒ 判据空转"
+        appeared = sorted(c_names - s_names)
+        vanished = sorted(s_names - c_names)
+        assert not appeared and not vanished, (
+            f"基线与语料的模板集合不一致 —— 语料新增 {appeared} / 基线独有 {vanished}。\n"
+            "模板被删或改名时，基线必须跟着改（改名 = 换键 + 记录换成现算值 + 分母"
+            "按 per_template 重算），而不是整册 `--apply` 把别 lane 的漂移一并吸收。"
+        )
+
+    def test_the_watchdog_would_notice_a_changed_symbol(self) -> None:
+        """🔴 变异反证（扫描器层）：sha 口径对**任何**源码改动敏感。
+
+        没有这条，`_source_sha` 若因为某种原因恒返回同一个值（例如把 `getsource`
+        换成了 `getdoc`），上面那些断言就全是恒真的。
+        """
+
+        def _probe_a() -> int:
+            return 1
+
+        def _probe_b() -> int:
+            return 1 + 0  # 语义相同、文本不同
+
+        assert _source_sha(_probe_a) != _source_sha(_probe_b), (
+            "两个文本不同的函数算出同一个 sha ⇒ `_source_sha` 失效，看门狗恒真"
+        )
+        assert _source_sha(RS._rewrite_formula_refs) == _source_sha(
+            RS._rewrite_formula_refs
+        ), "同一个对象两次算出不同 sha ⇒ 口径不稳定，看门狗会变成永红门禁"

@@ -365,6 +365,13 @@ class TestStructuralZero6HardcodedPatterns:
             for i, line in enumerate(src.split("\n"), 1):
                 for m in _IDENTITY_KEY.finditer(line):
                     val = m.group(2).strip()
+                    # 🔴 固定槽位持久化键是扫描器误报（见 facts 层登记），不计入命中
+                    from tests.workpaper_sync.k_foundation_facts import (
+                        is_fixed_slot_exempt,
+                    )
+
+                    if is_fixed_slot_exempt(p, val):
+                        continue
                     if _POS_TOKEN.search(val) or _POS_INTERP.search(val):
                         hits.append(f"{p.relative_to(ROOT).as_posix()}#L{i}")
         expected = sum(bp8_expected_family().values())

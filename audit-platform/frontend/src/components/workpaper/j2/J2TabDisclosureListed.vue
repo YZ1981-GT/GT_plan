@@ -19,7 +19,8 @@ import WpFourTableSourcePanel from '../shared/WpFourTableSourcePanel.vue'
 import J2DisclosureConsistencyPanel from './J2DisclosureConsistencyPanel.vue'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { J2_NOTE_SECTION, J2_DISCLOSURE_SHEET_NAME } from '../composables/j2NoteSectionMap'
-import { buildJ2ListedSyncPayload, buildJ2NetAssetPayload } from '../composables/j2DisclosureSyncPayload'
+import { buildJ2ListedSyncPayload, buildJ2NetAssetPayload, toJ2SyncRequest } from '../composables/j2DisclosureSyncPayload'
+import { api } from '@/services/apiProxy'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { buildJ2ListedConsistency, type J2ListedConsistencyInput } from '../composables/j2DisclosureConsistency'
@@ -264,7 +265,9 @@ onMounted(load)
 watch(() => props.allResponses, load, { deep: false })
 
 // ── 同步到附注 ──────────────────────────────────────────────────────────────
-const { projectId: ctxProjectId, auditYear } = useAuditContext()
+// 🔴 useAuditContext 返回的是 `year` 而非 `auditYear`：旧写法解构出 undefined，`auditYear.value` 在发请求前就抛
+//    TypeError、被下方 catch {} 静默吞掉 ⇒ J2 附注同步连网络请求都没发出过（2026-09-30 Playwright 实测）
+const { projectId: ctxProjectId, year: auditYear } = useAuditContext()
 const { scheduleAutoSync } = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
 
 async function syncToDisclosureNotes() {
@@ -283,12 +286,12 @@ async function syncToDisclosureNotes() {
     noteSens: noteSens.value,
   })
   try {
-    const { default: axios } = await import('axios')
-    await axios.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, {
-      project_id: props.projectId,
-      year: auditYear.value,
-      ...payload,
-    })
+    // 🔴 经 apiProxy（http.ts 拦截器附 Authorization）+ 端点契约形状（wp_id / section_id / current_standard）：
+    //    旧实现用 axios 默认实例 ⇒ 恒 401，且载荷缺这三个必填字段 ⇒ 即便带鉴权也 422，J2 附注从未同步成功过
+    await api.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      toJ2SyncRequest(payload, { wpId: props.wpId, currentStandard: 'listed_standalone', year: auditYear.value }),
+    )
 
     // 净负债表期末为负 = 净资产 → 额外推送 五、17
     const netEndRow = netRows.find(r => r.key === 'end')
@@ -301,11 +304,10 @@ async function syncToDisclosureNotes() {
           end: n(netEndRow.cur),
         },
       })
-      await axios.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, {
-        project_id: props.projectId,
-        year: auditYear.value,
-        ...netAssetPayload,
-      })
+      await api.post(
+        `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+        toJ2SyncRequest(netAssetPayload, { wpId: props.wpId, currentStandard: 'listed_standalone', year: auditYear.value }),
+      )
     }
   } catch { /* 失败静默 */ }
 }

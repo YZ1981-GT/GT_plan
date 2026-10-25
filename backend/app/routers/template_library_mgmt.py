@@ -995,11 +995,8 @@ async def seed_all(
     success_count = sum(1 for r in results if r.get("status") == "loaded")
     failed_count = sum(1 for r in results if r.get("status") == "failed")
 
-    # Publish PREFILL_MAPPING_CHANGED event after seed completes
+    # 预填映射 / 模板元数据种子加载后失效反向索引
     try:
-        from app.models.audit_platform_schemas import EventPayload, EventType
-        from app.services.event_bus import event_bus
-
         changed_wp_codes = []
         for r in results:
             if r.get("status") == "loaded" and r.get("seed_name") in (
@@ -1008,11 +1005,14 @@ async def seed_all(
                 changed_wp_codes.append(r.get("seed_name", ""))
 
         if changed_wp_codes:
-            await event_bus.publish(EventPayload(
-                event_type=EventType.PREFILL_MAPPING_CHANGED,
-                project_id=current_user.id,
-                extra={"changed_wp_codes": changed_wp_codes},
-            ))
+            # 🔴 修复前发 PREFILL_MAPPING_CHANGED 且 project_id=current_user.id：
+            #    种子是全局配置（prefill_formula_mapping.json / 模板元数据），没有项目维度；
+            #    下游 stale_engine 按「用户 id」当项目去标 stale、年份猜 2025 —— 对任何真实
+            #    项目都不产生作用，只是制造一个指向不存在项目的伪事件。
+            #    该事件唯一有意义的副作用是失效反向索引（按 JSON 文件构建，全局），
+            #    直接调用即可；项目级 stale 由项目侧重新渲染/预填时按 mtime 自然感知。
+            from app.services.formula_reverse_index import invalidate_reverse_index
+            invalidate_reverse_index()
     except Exception:
         pass  # Never block main operation
 

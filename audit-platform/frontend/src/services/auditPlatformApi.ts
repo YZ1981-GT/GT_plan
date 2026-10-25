@@ -44,11 +44,14 @@ export interface TrialBalanceRow {
   unadjusted_amount: string | null
   rje_adjustment: string
   aje_adjustment: string
+  wp_adjustment: string | null
   audited_amount: string | null
   opening_balance: string | null
   exceeds_materiality: boolean
   below_trivial: boolean
   updated_at?: string | null
+  wp_publish_base: string | null
+  wp_published_at: string | null
 }
 
 export async function getTrialBalance(projectId: string, year: number, companyCode?: string): Promise<TrialBalanceRow[]> {
@@ -251,6 +254,14 @@ export async function reviewAdjustment(projectId: string, groupId: string, body:
   status: string; reason?: string
 }) {
   const { data } = await http.post(P_adj.review(projectId, groupId), body)
+  return data
+}
+
+/** 撤回复核（approved→draft）（chain-closure-phase3-push-rollout 需求 3.1） */
+export async function revokeAdjustmentReview(projectId: string, groupId: string, body: {
+  reason?: string
+}) {
+  const { data } = await http.post(P_adj.revokeReview(projectId, groupId), body)
   return data
 }
 

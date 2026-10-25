@@ -263,14 +263,15 @@ export function useM5Adjudication(
    * - publish 'substantive:adjudicated'
    */
   async function saveAdjudication(): Promise<void> {
-    const items = computedRows.value.map((row, i) => {
-      const n = i + 1
+    const items = computedRows.value.map((row) => {
+      // BP-10 去位置化：用 row.key（熵键）替代 ${k}（位置下标）
+      const k = row.key
       return [
-        { itemId: `M5-1-row-${n}-name`, data: { remark: row.itemName } },
-        { itemId: `M5-1-row-${n}-block`, data: { remark: row.block } },
-        { itemId: `M5-1-row-${n}-category`, data: { remark: row.category } },
-        { itemId: `M5-1-row-${n}-audited`, data: { remark: String(row.audited) } },
-        { itemId: `M5-1-row-${n}-endBalance`, data: { remark: String(row.endBalance) } },
+        { itemId: `M5-1-${k}-name`, data: { remark: row.itemName } },
+        { itemId: `M5-1-${k}-block`, data: { remark: row.block } },
+        { itemId: `M5-1-${k}-category`, data: { remark: row.category } },
+        { itemId: `M5-1-${k}-audited`, data: { remark: String(row.audited) } },
+        { itemId: `M5-1-${k}-endBalance`, data: { remark: String(row.endBalance) } },
       ]
     }).flat()
 
@@ -390,8 +391,9 @@ export function useM5Adjudication(
   function _triggerSave(rowIndex: number): void {
     const row = rows.value[rowIndex]
     if (!row) return
-    const n = rowIndex + 1
-    debouncedSave(`M5-1-row-${n}-data`, {
+    // BP-10 去位置化
+    const k = row.key
+    debouncedSave(`M5-1-${k}-data`, {
       remark: JSON.stringify({
         key: row.key,
         itemName: row.itemName,

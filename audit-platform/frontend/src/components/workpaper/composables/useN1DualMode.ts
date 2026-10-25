@@ -14,7 +14,9 @@
  * - 状态持久化（localStorage 按 wpId 记忆用户偏好）
  */
 import { ref, computed, onMounted, type Ref } from 'vue'
-import http from '@/utils/http'
+import { ElMessage } from 'element-plus'
+import { fetchOnlyOfficeHealthy } from '../sync/onlyOfficeHealth'
+import { prefetchOnlyOfficeSheetConfig } from '../sync/onlyOfficeSheetConfig'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -46,8 +48,6 @@ export interface UseN1DualModeOptions {
 /** localStorage key prefix（按 wpId 存储） */
 const STORAGE_KEY_PREFIX = 'n1-dual-mode'
 
-/** OO 健康检查端点 */
-const OO_HEALTH_ENDPOINT = '/api/workpapers/onlyoffice/health'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -106,19 +106,12 @@ export function useN1DualMode(options: UseN1DualModeOptions) {
    * 检查 OnlyOffice 服务是否可用
    * 双层.data兼容: ResponseWrapperMiddleware 信封 {code,message,data:{healthy:true}}
    */
-  async function checkOOHealth(): Promise<boolean> {
+  async function checkOOHealth(forceRefresh = false): Promise<boolean> {
     ooChecking.value = true
     try {
-      const response = await http.get(OO_HEALTH_ENDPOINT)
-      // 双层.data兼容
-      const healthy = (response as any).data?.data?.healthy
-        ?? (response as any).data?.healthy
-        ?? false
-      isOOHealthy.value = Boolean(healthy)
+      // 统一能力层（TTL 缓存 + 并发去重，唯一端点/字段口径）—— lane2 Task 7
+      isOOHealthy.value = await fetchOnlyOfficeHealthy(forceRefresh)
       return isOOHealthy.value
-    } catch {
-      isOOHealthy.value = false
-      return false
     } finally {
       ooChecking.value = false
     }
@@ -142,26 +135,22 @@ export function useN1DualMode(options: UseN1DualModeOptions) {
     if (newMode === 'matrix' && !matrixSupported.value) return
 
     if (newMode === 'onlyoffice') {
-      // OO 不可用时不允许切换到 onlyoffice
-      if (!isOOHealthy.value) return
+      // 用户已经点了 ⇒ 强刷一次，避免被过期边界的旧值挡住真实点击
+      if (!isOOHealthy.value && !(await checkOOHealth(true))) {
+        ElMessage.warning('OnlyOffice 服务当前不可用，已保持结构化视图')
+        return
+      }
       if (sheetName) {
         fetchingConfig.value = true
         try {
-          const res: any = await http.get(
-            `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sheetName)}/onlyoffice-config`,
-            { _silent: true } as any,
-          )
-          const cfg = res?.data?.data ?? res?.data
-          if (!cfg) {
-            ooConfigReady.value = false
-            return // 拉取失败 → 保持结构化视图
-          }
-          ooConfigReady.value = true
-        } catch {
-          ooConfigReady.value = false
-          return
+          // 配置预拉收敛到平台能力层（lane2 Task 6，原为 N 域唯一的 onlyoffice-config 直调）
+          ooConfigReady.value = await prefetchOnlyOfficeSheetConfig(wpId.value, sheetName)
         } finally {
           fetchingConfig.value = false
+        }
+        if (!ooConfigReady.value) {
+          ElMessage.warning('OnlyOffice 文档配置拉取失败，已保持结构化视图')
+          return // 拉取失败 → 保持结构化视图
         }
       }
     }

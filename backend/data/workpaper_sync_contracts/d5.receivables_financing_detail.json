@@ -326,6 +326,268 @@
           "table_key": "receivables_financing_detail_rows"
         }
       ]
+    },
+    {
+      "excel_name": "应收款项融资公允价值测算表D5-4",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d54-managed",
+      "tables": [
+        {
+          "anchor": "A11",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "category",
+              "header_source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!A11",
+              "header_text": "类别",
+              "json_pointer": "/rows/{row_uuid}/category",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!A12",
+              "stable_field_key": "fair_value_rows/{row_uuid}/category",
+              "store_item_id": "D5-4-rows",
+              "value_type": "enum"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!B11",
+              "header_text": "明细项目",
+              "json_pointer": "/rows/{row_uuid}/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!B12",
+              "stable_field_key": "fair_value_rows/{row_uuid}/item_name",
+              "store_item_id": "D5-4-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "bill_no",
+              "header_source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!C11",
+              "header_text": "票据号",
+              "json_pointer": "/rows/{row_uuid}/billNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!C12",
+              "stable_field_key": "fair_value_rows/{row_uuid}/bill_no",
+              "store_item_id": "D5-4-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "face_value",
+              "header_source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!D11",
+              "header_text": "票面金额",
+              "json_pointer": "/rows/{row_uuid}/faceValue",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!D12",
+              "stable_field_key": "fair_value_rows/{row_uuid}/face_value",
+              "store_item_id": "D5-4-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "measurement_date",
+              "header_source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!E11",
+              "header_text": "计量日",
+              "json_pointer": "/rows/{row_uuid}/measurementDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!E12",
+              "stable_field_key": "fair_value_rows/{row_uuid}/measurement_date",
+              "store_item_id": "D5-4-rows",
+              "value_type": "date"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "maturity_date",
+              "header_source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!F11",
+              "header_text": "到期日",
+              "json_pointer": "/rows/{row_uuid}/maturityDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!F12",
+              "stable_field_key": "fair_value_rows/{row_uuid}/maturity_date",
+              "store_item_id": "D5-4-rows",
+              "value_type": "date"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "remaining_days",
+              "header_source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!G11",
+              "header_text": "剩余天数",
+              "json_pointer": "/rows/{row_uuid}/remainingDays",
+              "mode": "formula",
+              "source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!G12",
+              "stable_field_key": "fair_value_rows/{row_uuid}/remaining_days",
+              "store_item_id": "D5-4-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "discount_rate",
+              "header_source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!H11",
+              "header_text": "市场贴现利率",
+              "json_pointer": "/rows/{row_uuid}/discountRate",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!H12",
+              "stable_field_key": "fair_value_rows/{row_uuid}/discount_rate",
+              "store_item_id": "D5-4-rows",
+              "value_type": "ratio"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "discount_interest",
+              "header_source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!I11",
+              "header_text": "贴现利息",
+              "json_pointer": "/rows/{row_uuid}/discountInterest",
+              "mode": "formula",
+              "source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!I12",
+              "stable_field_key": "fair_value_rows/{row_uuid}/discount_interest",
+              "store_item_id": "D5-4-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "discount_amount",
+              "header_source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!J11",
+              "header_text": "贴现金额",
+              "json_pointer": "/rows/{row_uuid}/discountAmount",
+              "mode": "formula",
+              "source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!J12",
+              "stable_field_key": "fair_value_rows/{row_uuid}/discount_amount",
+              "store_item_id": "D5-4-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "fair_value",
+              "header_source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!K11",
+              "header_text": "期末公允价值",
+              "json_pointer": "/rows/{row_uuid}/fairValue",
+              "mode": "formula",
+              "source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!K12",
+              "stable_field_key": "fair_value_rows/{row_uuid}/fair_value",
+              "store_item_id": "D5-4-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "fv_hierarchy",
+              "header_source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!L11",
+              "header_text": "公允价值层次",
+              "json_pointer": "/rows/{row_uuid}/fvHierarchy",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!L12",
+              "stable_field_key": "fair_value_rows/{row_uuid}/fv_hierarchy",
+              "store_item_id": "D5-4-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!M11",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资公允价值测算表D5-4!M12",
+              "stable_field_key": "fair_value_rows/{row_uuid}/remark",
+              "store_item_id": "D5-4-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "G12:G16",
+            "I12:I16",
+            "J12:J16",
+            "K12:K16"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "fair_value_rows"
+        }
+      ]
+    },
+    {
+      "excel_name": "审定表D5",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d51-managed",
+      "tables": [
+        {
+          "anchor": "A5",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 7
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!审定表D5!A5",
+              "header_text": "项目",
+              "json_pointer": "/main/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!审定表D5!A7",
+              "stable_field_key": "d5_adj_main/item_name",
+              "store_item_id": "",
+              "value_type": "text"
+            }
+          ],
+          "first_data_row": 7,
+          "footer_row": 9,
+          "header_rows": 2,
+          "last_data_row": 8,
+          "row_mode": "fixed_rows",
+          "table_key": "adj_main_rows"
+        }
+      ]
     }
   ],
   "template": {

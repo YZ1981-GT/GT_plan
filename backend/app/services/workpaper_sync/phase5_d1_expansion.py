@@ -54,7 +54,31 @@ _INCLUDE_D102_CATEGORY: Final[bool] = True
 _INCLUDE_D104_BAD_DEBT: Final[bool] = True
 
 #: 批次 1 第二张的第三区：D1-4 票据种类小计（static_region，绝对坐标直写、绕开位移链）。
-_INCLUDE_D104_NOTETYPE_STATIC: Final[bool] = True
+#:
+#: 🔴🔴 **2026-09-28 裁决 A：撤回（关闭）—— 与 D4 `phase5_d4_policy_check_sheet` 相同处置。**
+#:
+#: 该区在 footer R22 **之下**。把它放进契约（`True`）会换来「OO 侧可编辑第三区 12 格」，
+#: 代价是**两个动态区（individual R13-16 / portfolio R18-21）一旦需要插行就被引擎
+#: fail-closed 拒绝**（`RowSetDivergenceError[contract_static_row_below_insertion]`：
+#: 插行会把绝对坐标的静态格整体推下去，而 extract 仍按死行号反读 ⇒ 静默取空）。
+#: 纯计算实证（tasks.md T 节 / `test_d104_static_region_blocks_row_insertion.py`）：
+#: 同一 substrate + 同一载荷，18-table 契约算得出 `RowShiftPlan`、19-table 契约就抛拒绝。
+#:
+#: 权衡不对称，故撤回：
+#:   * 第三区的**业务价值不依赖这条 OO 回写通路** —— D1-1 坏账区块的取数
+#:     `readD1BadDebtByNoteType` **只从 HTML store（allResponses）读**，`useD1BadDebt` 的
+#:     load/serialize/save 三条路径全走 checklist_responses，与契约里这张 static table 无关；
+#:     真库该键的载荷（1 行 323B）是 HTML 侧产物，不是 materialize 产物。
+#:   * 保留它会砍掉「个别认定客户 > 4 个时新增行」这项合法审计能力（B 方案，不可接受）。
+#:   * D4 在**结构完全相同**的情形（信用/说明/结论在 footer 之下）已选「不入契约、HTML-only、
+#:     待 marker-relative content 字段落地后再扩」⇒ 跟随 D4 = 平台一致 + 有明确重启点。
+#:
+#: **代价可逆**：`False` 让整条静态通路（`static_region_table_payloads` /
+#: `_static_sheet_declarations` / `all_store_item_ids` 的 notetype 分支 / 投影·回写清单）
+#: **同源空转**（all-off = 与现状等价，本文件的设计保证），代码与 spec 声明全部留着；
+#: marker-relative content 字段落地后翻回 `True` 即恢复（C 方案，属框架层更上游排期）。
+#: 详见 tasks.md T7/T 节；失效条目反向检查见 `test_d104_static_region_excluded.py`。
+_INCLUDE_D104_NOTETYPE_STATIC: Final[bool] = False
 
 #: 批次 2 第一张：D1-8 贴现明细（双区：贴现 R14-21 + 背书 R26-33）。
 _INCLUDE_D108_ENDORSEMENT: Final[bool] = True
@@ -141,6 +165,25 @@ def _static_sheet_declarations() -> tuple[dict[str, Any], ...]:
             },
         },
     )
+
+
+def static_region_table_payloads() -> tuple[tuple[str, dict[str, Any]], ...]:
+    """静态受管区的契约 table payload 清单：`((sheet_key, table_payload), ...)`。
+
+    🔴 与 `managed_row_table_specs()` 并列的第二条通路 —— 后者只翻**动态**（`excel_table`）
+    spec，静态 spec 的 `row_identity_key` 为空、行表引擎会拒它
+    （`store_row_identity()` 抛 `RowTableStorePayloadError`），故静态区的契约 table
+    由各自模块的专用函数给出（同 D4-13 / D4-33）。
+
+    受同一个灰度开关 `_INCLUDE_D104_NOTETYPE_STATIC` 控制，与
+    `_static_sheet_declarations()`（instrumentation 侧）**同源同开关**
+    —— 两边不一致会出现「注了 definedName 但契约里没这张表」或反之。
+    """
+    if not _INCLUDE_D104_NOTETYPE_STATIC:
+        return ()
+    from app.services.workpaper_sync import phase5_d1_04_bad_debt as _d104
+
+    return ((_d104.SPEC_D104_NOTETYPE.sheet_key, _d104.notetype_static_table_payload()),)
 
 
 def managed_row_table_specs() -> tuple[Any, ...]:

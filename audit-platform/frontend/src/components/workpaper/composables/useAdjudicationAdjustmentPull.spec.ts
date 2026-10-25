@@ -15,7 +15,10 @@ import {
 } from './useAdjudicationAdjustmentPull'
 
 describe('useAdjudicationAdjustmentPull.load', () => {
-  beforeEach(() => listAdjustmentsMock.mockReset())
+  // 花括号体：表达式体会把 spy 返回给 vitest，被当作 teardown 在每条用例后多调一次（隐藏的额外调用）
+  beforeEach(() => {
+    listAdjustmentsMock.mockReset()
+  })
 
   it('按科目前缀过滤 + 损益贷方净额=贷-借 + 分录组类型', async () => {
     listAdjustmentsMock.mockResolvedValue({

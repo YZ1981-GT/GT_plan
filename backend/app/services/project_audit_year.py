@@ -105,3 +105,27 @@ async def fetch_project_audit_year(
     if not row or row[0] is None:
         return None
     return _valid_year(row[0])
+
+
+async def fetch_project_audit_year_standalone(project_id: UUID | str) -> int | None:
+    """同 :func:`fetch_project_audit_year`，但自开短会话 —— 供没有 db 句柄的调用方用。
+
+    典型调用方是 EventBus 派发口的年度补齐（见 ``event_bus._backfill_year``）：
+    发布方忘传 ``year`` 时按项目审计年度补上，而不是让 N 个订阅者各自
+    ``payload.year or 2025``（对 2024 项目是错年份）或 ``if not year: return``（静默跳过）。
+
+    走 ORM + :func:`resolve_project_audit_year`（5 级兜底，且方言无关）而不是
+    ``PROJECT_AUDIT_YEAR_SQL``：后者含 PG 专用 ``EXTRACT(...)::int``，在 SQLite 上直接
+    语法错误 → 被下面的 except 吞成 None，补齐就静默失效了。
+
+    失败一律返回 ``None``（调用方据此走可见降级），绝不抛。
+    """
+    try:
+        from app.core.database import async_session
+
+        pid = project_id if isinstance(project_id, UUID) else UUID(str(project_id))
+        async with async_session() as db:
+            project = await db.get(Project, pid)
+            return resolve_project_audit_year(project) if project is not None else None
+    except Exception:  # noqa: BLE001 — 查不到年度不能反过来打断事件派发
+        return None

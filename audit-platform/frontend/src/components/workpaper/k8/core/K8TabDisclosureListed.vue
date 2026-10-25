@@ -121,6 +121,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK8SyncPayload } from '../../composables/k8NoteSectionMap'
 import type { Ref } from 'vue'
+import { newRowIdentity } from '../../composables/shared/rowIdentity'
 
 const K8_ACCOUNT_CODE = '6601'
 const ABNORMAL_THRESHOLD = 0.3 // 30% 波动阈值
@@ -185,7 +186,7 @@ const DEFAULT_PROJECTS = [
 
 function initDefaultRows(): void {
   disclosureRows.value = DEFAULT_PROJECTS.map((name, idx) => ({
-    id: `row-${idx}`,
+    id: newRowIdentity('row'),
     project: name,
     currentAmount: 0,
     priorAmount: 0,
@@ -211,7 +212,7 @@ function buildRowsFromK81(): DisclosureRow[] | null {
   const names = Object.keys(map)
   if (!names.length) return null
   return names.map((name, idx) => ({
-    id: `k81-${idx}`,
+    id: newRowIdentity('k81'),
     project: name,
     currentAmount: Number(map[name].audited ?? 0),
     priorAmount: Number(map[name].prior ?? 0),
@@ -255,12 +256,11 @@ function applyAutoFill(): void {
     }
   }
   // 2) 追加 K8-1 有、披露表尚无的费用项目（动态项目对齐）
-  let idx = disclosureRows.value.length
   for (const name of names) {
     if (!existing.has(name)) {
       const src = (data as any)[name]
       disclosureRows.value.push({
-        id: `k81-${idx++}`,
+        id: newRowIdentity('k81'),
         project: name,
         currentAmount: Number(src.audited ?? 0),
         priorAmount: Number(src.prior ?? 0),

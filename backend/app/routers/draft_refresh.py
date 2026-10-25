@@ -54,7 +54,16 @@ router = APIRouter(
 )
 
 # 合伙人角色（全局一键刷新专属门禁，Req 1.1）。复用 deps.require_role，不新增并行角色判断。
-PARTNER_ROLES = ["partner", "signing_partner"]
+#
+# spec chain-closure-phase1 R1：原值 ["partner", "signing_partner"] 在真实环境**无人可达** ——
+#   ① `UserRole` 枚举实有 admin/partner/manager/auditor/qc/eqcr/readonly，
+#      **没有 signing_partner** ⇒ 该条目永不匹配任何用户（白名单一半是死值）；
+#   ② 真库 61 个活跃用户只有 auditor(53) + admin(8)，**零个 partner**；
+#   ③ `deps.require_role` 严格比对 `role.value`，admin 无后门 ⇒ admin 实测 HTTP 403。
+# 三条叠加使「全局一键刷新」这个自动化总入口从未被触发过。补 admin（超管语义正确、
+# 配置级可逆）；**刻意不放开 auditor/readonly** —— 全局刷新会批量改写全项目
+# 底稿/报表/附注初稿，审计助理不应有此权限（测试 test_auditor_stays_denied 钉死）。
+PARTNER_ROLES = ["partner", "signing_partner", "admin"]
 
 
 @router.post("/draft-refresh", response_model=DraftRefreshResponse)

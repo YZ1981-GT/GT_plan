@@ -173,12 +173,12 @@
     </div>
 
     <!-- ═══ 抽凭引擎 Dialog ═══ -->
-    <el-dialog v-model="showSamplingDialog" title="⚡ 抽凭引擎（科目 6601 销售费用-合同检查）" width="720px" :close-on-click-modal="false" destroy-on-close>
+    <el-dialog v-model="showSamplingDialog" :title="`⚡ 抽凭引擎（科目 ${samplingAccountCode} 销售费用-合同检查）`" width="720px" :close-on-click-modal="false" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && props.wpId && props.projectId"
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
-        account-code="6601"
+        :account-code="samplingAccountCode"
         phase="final"
         :year="currentYear"
         @filled="handleVoucherFilled"
@@ -240,6 +240,17 @@ import { useK8ContractAmortization, type K8AmortRow } from '@/components/workpap
 import { useK8AiGenerate } from '@/components/workpaper/composables/useK8AiGenerate'
 import http from '@/utils/http'
 import type { Ref } from 'vue'
+
+/**
+ * 抽凭科目码取自单一真源 `k8AccountScope`（K8 销售费用）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { k8QueryCodes } from '../../composables/k8AccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = k8QueryCodes().join(',')
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),
@@ -407,7 +418,7 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
     const formData = new FormData()
     formData.append('file', file)
     ElMessage.info('正在OCR识别...')
-    const res = await http.post('/api/d4/contract-ocr', formData, {
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     const ocrText = res.data?.data?.text || res.data?.text || ''

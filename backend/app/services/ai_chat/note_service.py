@@ -16,9 +16,9 @@ Design: "Components and Interfaces → 8. 项目笔记转存"
 2. claim_action_receipt 抢占幂等收据
 3. 定位/创建目标文件夹（"AI 对话笔记" 项目级文件夹，单一真源）
 4. 从数据库读取 completed assistant 正文（服务端权威来源，不信任客户端正文）
-5. 写入 KnowledgeDocument（复用 knowledge_folder_service.create_document）
+5. 写入 KnowledgeDocument（复用 KnowledgeDocumentService.create_document）
 6. settle_action_receipt 成功/失败
-7. 触发知识索引更新
+7. 检索：笔记落库即可被文档正文词法检索召回（spec knowledge-base-retrieval-and-authz-closure 方案 A）
 """
 
 from __future__ import annotations
@@ -33,12 +33,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.ai_models import (
     AIChatActionReceipt,
     AIChatMessage,
+    AIChatSession,
     ActionReceiptStatus,
     ActionReceiptType,
     ChatMessageStatus,
     ChatRole,
 )
-from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
+from app.models.knowledge_models import KnowledgeFolder
 from app.services.ai_chat.access import ResourceAccessResolver
 from app.services.ai_chat.contracts import (
     AccessDecision,
@@ -51,6 +52,7 @@ from app.services.ai_chat.persistence import (
     content_hash,
     settle_action_receipt,
 )
+from app.services.knowledge_folder_service import PROJECT_FOLDER_SLOTS
 
 logger = logging.getLogger(__name__)
 
@@ -58,16 +60,27 @@ __all__ = [
     "NoteSaveRequest",
     "NoteSaveResult",
     "NoteSaveFailed",
+    "knowledge_jump_route",
     "save_note",
 ]
+
+
+def knowledge_jump_route(*, doc_id: Any = None, folder_id: Any = None) -> str:
+    """知识库页面深链（单一真源；mention_service 同用）：``/knowledge?folder_id=…&doc_id=…``。"""
+    params = []
+    if folder_id:
+        params.append(f"folder_id={folder_id}")
+    if doc_id:
+        params.append(f"doc_id={doc_id}")
+    return "/knowledge" + (("?" + "&".join(params)) if params else "")
 
 
 # ---------------------------------------------------------------------------
 # 数据模型
 # ---------------------------------------------------------------------------
 
-#: AI 笔记文件夹的标准名称（单一真源，Req 8.4）
-AI_NOTES_FOLDER_NAME = "AI 对话笔记"
+#: AI 笔记文件夹的标准名称（单一真源在 knowledge_folder_service.PROJECT_FOLDER_SLOTS，Req 8.4）
+AI_NOTES_FOLDER_NAME = PROJECT_FOLDER_SLOTS["ai_notes"]
 
 
 class NoteSaveFailed(Exception):
@@ -103,7 +116,7 @@ class NoteSaveResult:
         self,
         *,
         document_id: UUID,
-        folder_id: UUID,
+        folder_id: UUID | None,
         name: str,
         replayed: bool = False,
     ) -> None:
@@ -115,10 +128,13 @@ class NoteSaveResult:
     def as_dict(self) -> dict[str, Any]:
         return {
             "document_id": str(self.document_id),
-            "folder_id": str(self.folder_id),
+            # 重放时文档已被删除 → None（不再用 document ID 冒充 folder_id）
+            "folder_id": str(self.folder_id) if self.folder_id else None,
             "name": self.name,
             "replayed": self.replayed,
-            "jump_route": f"/knowledge/docs/{self.document_id}",
+            # 前端真实路由（KnowledgeBase.vue 读 ?folder_id / ?doc_id 深链）；
+            # 旧值 /knowledge/docs/{id} 前端没有该路由，点击恒 404。
+            "jump_route": knowledge_jump_route(doc_id=self.document_id, folder_id=self.folder_id),
         }
 
 
@@ -186,7 +202,7 @@ async def save_note(
             # 已成功，直接返回同一文档（Req 8.8：重复点击复用同一 idempotency key）
             return NoteSaveResult(
                 document_id=receipt.result_resource_id,
-                folder_id=_folder_id_from_receipt(receipt),
+                folder_id=await _replayed_folder_id(db, receipt),
                 name=name,
                 replayed=True,
             )
@@ -214,15 +230,15 @@ async def save_note(
         # ⑤ 定位/创建目标文件夹（单一真源规则，Req 8.4）
         folder = await _ensure_notes_folder(db, project_id, actor_id)
 
-        # ⑥ 写入 KnowledgeDocument
-        from app.services.knowledge_folder_service import KnowledgeFolderService
+        # ⑥ 写入 KnowledgeDocument（文档服务；旧代码调用 KnowledgeFolderService.create_document
+        #    —— 该方法不存在，转存恒失败）
+        from app.services.knowledge_folder_service import KnowledgeDocumentService
 
-        folder_svc = KnowledgeFolderService(db)
-        doc = await folder_svc.create_document(
+        doc = await KnowledgeDocumentService(db).create_document(
             folder_id=folder.id,
             name=name,
             content_text=note_content,
-            file_type="markdown",
+            file_type="md",
             file_size=len(note_content.encode("utf-8")),
             tags=["ai-note", "auto-generated"],
             access_level="project_group",
@@ -238,23 +254,9 @@ async def save_note(
             result_resource_id=doc.id,
         )
 
-        # ⑧ 触发知识索引更新（异步，不阻断返回）
-        try:
-            from app.services.knowledge_index_service import KnowledgeIndexService
-
-            idx_svc = KnowledgeIndexService(db)
-            await idx_svc.incremental_update(
-                project_id=project_id,
-                source_id=str(doc.id),
-                content=note_content[:2000],
-                source_type="knowledge_document",
-                metadata={"doc_id": str(doc.id), "name": name},
-            )
-        except Exception as idx_exc:
-            # 索引更新失败不影响转存成功（索引会在下次 build 时追上）
-            logger.warning(
-                "笔记 %s 索引更新失败（不阻断）: %s", doc.id, idx_exc
-            )
+        # ⑧ 不再在此调用 incremental_update：旧调用传了不存在的 source_type
+        #    "knowledge_document" 与不存在的 metadata 参数（恒失败），且在请求会话里执行会
+        #    毒化事务。笔记一经落库即可被文档正文词法检索召回（spec 方案 A），无需索引。
 
         return NoteSaveResult(
             document_id=doc.id,
@@ -305,45 +307,56 @@ async def _load_messages(
     Req 8.1/8.3：只接收 message IDs，正文从数据库读（服务端权威来源）。
     只有 completed + assistant 角色的消息可被转存。
     """
+    # 🔴 旧实现 ``.join(sa.text("ai_chat_session"), sa.text(...))`` 在 SQLAlchemy 2.0 下直接抛
+    #    AttributeError（TextClause 不是可 join 的 selectable）⇒ 转存在读消息这一步就恒失败，
+    #    被外层 except 吞成 internal_error（spec knowledge-base-retrieval-and-authz-closure 5.9，
+    #    真库测试 test_ai_note_capture_pg 抓到）。改为 ORM join，经会话属主确认 actor 身份。
     rows = (
         await db.execute(
             sa.select(AIChatMessage)
-            .join(
-                # 通过 session 关联确认 actor 身份
-                sa.text("ai_chat_session"),
-                sa.text("ai_chat_session.id = ai_chat_message.session_id"),
-            )
+            .join(AIChatSession, AIChatSession.id == AIChatMessage.session_id)
             .where(
                 AIChatMessage.id.in_(message_ids),
                 AIChatMessage.session_id == session_id,
                 AIChatMessage.role == ChatRole.assistant.value,
                 AIChatMessage.status == ChatMessageStatus.completed.value,
-                sa.text("ai_chat_session.user_id = :actor_id"),
+                AIChatSession.user_id == actor_id,
             )
-            .params(actor_id=actor_id)
-            .order_by(AIChatMessage.created_at.asc())
+            .order_by(AIChatMessage.created_at.asc(), AIChatMessage.seq.asc())
         )
     ).scalars().all()
     return list(rows)
 
 
+def _citation_label(cite: Any) -> str:
+    """引用展示名：持久化负载的键是 ``source_name``（native_engine._citation_payloads）；
+    ``label`` 为旧格式兼容；都没有时退回来源 ID。"""
+    if not isinstance(cite, dict):
+        return str(cite)
+    return str(cite.get("source_name") or cite.get("label") or cite.get("source_id") or "").strip()
+
+
 def _assemble_note_content(messages: list[AIChatMessage], title: str) -> str:
-    """将多条消息拼接为笔记正文（Markdown 格式）。"""
+    """将多条消息拼接为笔记正文（Markdown 格式）。
+
+    🔴 正文列是 ``AIChatMessage.message_text``：旧实现读不存在的 ``content`` / ``text``
+    属性，``getattr`` 默认值把缺陷吞成空串 ⇒ 每篇笔记只有标题（spec
+    knowledge-base-retrieval-and-authz-closure 5.9）。
+    """
     parts = [f"# {title}\n"]
     for i, msg in enumerate(messages, 1):
-        text = getattr(msg, "content", "") or getattr(msg, "text", "") or ""
+        text = msg.message_text or ""
         if len(messages) > 1:
             parts.append(f"\n## 回复 {i}\n")
         parts.append(text.strip())
 
         # 附加 citations
         citations = getattr(msg, "referenced_sources", None)
-        if citations:
-            parts.append("\n\n---\n**参考来源：**")
-            if isinstance(citations, list):
-                for cite in citations[:10]:
-                    label = cite.get("label", "") if isinstance(cite, dict) else str(cite)
-                    parts.append(f"- {label}")
+        if isinstance(citations, list) and citations:
+            labels = [label for label in (_citation_label(c) for c in citations[:10]) if label]
+            if labels:
+                parts.append("\n\n---\n**参考来源：**")
+                parts.extend(f"- {label}" for label in labels)
 
     return "\n".join(parts)
 
@@ -353,67 +366,38 @@ async def _ensure_notes_folder(
     project_id: UUID,
     actor_id: UUID,
 ) -> KnowledgeFolder:
-    """定位或创建 "AI 对话笔记" 文件夹（Req 8.4 单一真源规则）。
+    """定位或创建项目的 "AI 对话笔记" 文件夹（Req 8.4 单一真源规则）。
 
-    使用数据库查询确认存在性，不使用仅"先查后建"的方式：
-    并发时依赖数据库唯一约束（project_id + name 在同级下唯一）。
+    委托 ``knowledge_folder_service.ensure_project_folder``：按 ``system_key``（V170 部分唯一
+    索引）定位，SAVEPOINT 内建、冲突重查，不回滚调用方事务。
+
+    旧实现三处致命缺陷（spec knowledge-base-retrieval-and-authz-closure 5.9）：按不存在的
+    ``KnowledgeFolder.project_id`` 查询与构造（恒 AttributeError / TypeError）；冲突时
+    ``db.rollback()`` 把已 claim 的幂等收据一起回滚；按名称定位会被同名用户文件夹劫持。
+    ``actor_id`` 保留在签名里只为调用方不变：系统文件夹不归任何个人所有。
     """
-    # 先查
-    existing = (
+    from app.services.knowledge_folder_service import ensure_project_folder
+
+    del actor_id  # 系统文件夹 created_by 恒为空（仅管理员可管理）
+    return await ensure_project_folder(db, project_id, "ai_notes")
+
+
+async def _replayed_folder_id(db: AsyncSession, receipt: AIChatActionReceipt) -> UUID | None:
+    """幂等重放时取文档**真实**所在文件夹。
+
+    旧实现直接返回 document ID 充当 folder_id；jump_route 带上 folder_id 后，
+    重放响应会深链到一个不存在的文件夹。文档已不在（被删）时返回 None，
+    前端只凭 doc_id 深链（找不到时给「不存在或无权访问」提示）。
+    """
+    from app.models.knowledge_models import KnowledgeDocument
+
+    if receipt.result_resource_id is None:
+        return None
+    return (
         await db.execute(
-            sa.select(KnowledgeFolder).where(
-                KnowledgeFolder.project_id == project_id,
-                KnowledgeFolder.name == AI_NOTES_FOLDER_NAME,
-                KnowledgeFolder.parent_id.is_(None),  # 顶级文件夹
-                KnowledgeFolder.is_deleted == sa.false(),
+            sa.select(KnowledgeDocument.folder_id).where(
+                KnowledgeDocument.id == receipt.result_resource_id,
+                KnowledgeDocument.is_deleted == sa.false(),
             )
         )
     ).scalar_one_or_none()
-
-    if existing is not None:
-        return existing
-
-    # 创建（并发安全：若有唯一约束，冲突后重查）
-    import uuid as uuid_mod
-
-    from app.models.knowledge_models import KnowledgeAccessLevel
-
-    folder = KnowledgeFolder(
-        id=uuid_mod.uuid4(),
-        project_id=project_id,
-        name=AI_NOTES_FOLDER_NAME,
-        parent_id=None,
-        access_level=KnowledgeAccessLevel.project_group,
-        project_ids=[str(project_id)],
-        created_by=actor_id,
-    )
-    db.add(folder)
-    try:
-        await db.flush()
-    except Exception:
-        # 并发冲突：重查
-        await db.rollback()
-        existing = (
-            await db.execute(
-                sa.select(KnowledgeFolder).where(
-                    KnowledgeFolder.project_id == project_id,
-                    KnowledgeFolder.name == AI_NOTES_FOLDER_NAME,
-                    KnowledgeFolder.parent_id.is_(None),
-                    KnowledgeFolder.is_deleted == sa.false(),
-                )
-            )
-        ).scalar_one_or_none()
-        if existing:
-            return existing
-        raise
-
-    return folder
-
-
-def _folder_id_from_receipt(receipt: AIChatActionReceipt) -> UUID:
-    """从已成功的收据推断 folder_id（用于 replayed 响应）。
-
-    简化处理：replayed 场景下 folder_id 不影响前端跳转（jump_route 用 doc_id）。
-    """
-    # result_resource_id 是 document ID，前端通过 jump_route 跳转
-    return receipt.result_resource_id or receipt.id

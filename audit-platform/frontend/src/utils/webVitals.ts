@@ -8,6 +8,7 @@
  */
 
 import { ElNotification } from 'element-plus'
+import { getAuthHeaders } from '@/utils/authToken'
 
 export interface WebVitalMetric {
   name: string
@@ -43,9 +44,7 @@ function reportMetric(metric: WebVitalMetric) {
 
   // 尝试上报后端，失败降级 console.log
   try {
-    const token = localStorage.getItem('token')
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (token) headers['Authorization'] = `Bearer ${token}`
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', ...getAuthHeaders() }
 
     fetch('/api/admin/performance-metrics', {
       method: 'POST',

@@ -41,7 +41,7 @@ class WpAiChatRequest(BaseModel):
     """底稿 AI 对话请求"""
 
     query: str = Field(..., min_length=1, max_length=2000, description="用户提问")
-    project_id: str = Field(..., description="项目 ID")
+    project_id: str = Field(..., min_length=1, description="项目 ID（须与底稿所属项目一致）")
     year: int | None = Field(None, description="审计年度")
     wp_code: str | None = Field(None, description="底稿编码")
     wp_name: str | None = Field(None, description="底稿名称")
@@ -445,6 +445,12 @@ async def workpaper_ai_chat(
 
     if wp_row is None:
         raise HTTPException(status_code=404, detail="底稿不存在")
+
+    # 🔴 项目以底稿**自身**所属项目为准（spec knowledge-base-retrieval-and-authz-closure 5.3）：
+    # router 级 dedicated_wp_gate 只证明当前用户能访问该底稿；若照用客户端传来的 project_id，
+    # 就能把任意项目的客户名称 / 审计期间注入提示词、并以该项目范围做知识检索。
+    if wp_row.project_id != project_uuid:
+        raise HTTPException(status_code=422, detail="project_id 与底稿所属项目不一致")
 
     wp_code = request.wp_code or wp_row.wp_code
     wp_name = request.wp_name or wp_row.wp_name or ""

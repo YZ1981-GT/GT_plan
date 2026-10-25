@@ -37,9 +37,9 @@
       >
         <el-table-column type="selection" width="40" :selectable="canSelect" />
         <el-table-column prop="name" label="文档名称" min-width="200" show-overflow-tooltip />
-        <el-table-column label="分类" width="100" align="center">
+        <el-table-column label="位置" width="120" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-tag size="small" type="info">{{ row.category || row.folder_name || '—' }}</el-tag>
+            <span class="gt-kp-snippet">{{ row.folder_path || row.folder_name || '—' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="类型" width="60" align="center">
@@ -131,8 +131,7 @@ async function onSearch() {
   searched.value = true
   selectedDocs.value = []
   try {
-    const category = knowledgePickerOptions.value?.category
-    docList.value = await doSearch(keyword.value, category, currentContext.value)
+    docList.value = await doSearch(keyword.value, currentContext.value)
   } finally {
     searching.value = false
   }

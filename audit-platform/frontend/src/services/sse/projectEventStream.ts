@@ -57,7 +57,13 @@ function _fanout(
   // 快照迭代：handler 内若增删订阅不影响本轮；每 handler 异常隔离（R2.4）
   for (const h of Array.from(set)) {
     try {
-      h(data, eventName)
+      const result: unknown = h(data, eventName)
+      // async handler 返回 Promise：catch 防 unhandled rejection（R2.4 扩展）
+      if (result && typeof (result as any).catch === 'function') {
+        ;(result as Promise<unknown>).catch((e) => {
+          console.warn(`[projectEventStream] async handler error for "${eventName}"`, e)
+        })
+      }
     } catch (e) {
       console.warn(`[projectEventStream] handler error for "${eventName}"`, e)
     }

@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "8635eaeb6a489b99cdd541718cbe6cb6fd6b982499d7be228a02943474a98572",
+  "instrumentation_definition_sha256": "868f045f9ce18da18a58e449089d4d86eb9744587d7faa42803359c0a72b04cf",
   "review": {
     "authority_root": "backend/wp_templates",
     "carrier": {
@@ -962,9 +962,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "ec73d52b8f62ca399cf0d6da77003f15016807aee5af5c10ea711d6fe071934a",
+    "normalized_structure_hash": "ad8b578375360b55a8c3ecb454448ac36f6b6f12c1a1512d4e8bf801d9922de6",
     "relative_path": "H/H3 投资性房地产.xlsx",
-    "template_sha256": "6526c9fc186230fa659369a8efa91f2824799f02fc4cfbba8707c40cdbf13038"
+    "template_sha256": "ca856caebfc5b09b3ad9fbe3980ccf8e5c46260da9ba1a0ecd8acdb44498bc89"
   },
-  "template_definition_sha256": "436195adb3ea8e97ca86490a0bb00a9a92014cf1ef726fba0bdf9d5d240adf48"
+  "template_definition_sha256": "90ff75ab7dc97e5641313e7947a3761acd3404c2f0966a54f64e3b92ebc68144"
 }

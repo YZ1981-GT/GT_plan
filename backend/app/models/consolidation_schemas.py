@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .consolidation_models import (
     CompetenceRating,
@@ -166,9 +166,23 @@ class EliminationEntryBase(BaseModel):
     lines: list[EliminationEntryLine]
 
 
+def _related_codes_as_list(value: Any) -> list[str] | None:
+    """库里 ``related_company_codes`` 是 JSON：历史数据可能是 dict（取值）——统一成企业代码列表。"""
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        value = list(value.values())
+    if isinstance(value, (list, tuple)):
+        return [str(v) for v in value if isinstance(v, str) and v]
+    return None
+
+
 class EliminationEntryCreate(EliminationEntryBase):
     project_id: UUID
     related_company_codes: list[str] | None = None
+    # 归属的差额节点（spec consol-tree-three-code-autobuild 需求 6.1）：空 = 本合并项目的「合并差额」；
+    # 非空 = 该企业代码的「母分差额」（须由本合并项目承载，否则 400 并说明应到哪个合并项目录入）
+    branch_entity_code: str | None = Field(default=None, max_length=50)
 
 
 class EliminationEntryUpdate(BaseModel):
@@ -176,6 +190,8 @@ class EliminationEntryUpdate(BaseModel):
     description: str | None = None
     lines: list[EliminationEntryLine] | None = None
     related_company_codes: list[str] | None = None
+    # 显式传 null / 空串 = 改回「合并差额」；不传 = 不改
+    branch_entity_code: str | None = Field(default=None, max_length=50)
 
 
 class EliminationEntryResponse(EliminationEntryBase):
@@ -185,6 +201,11 @@ class EliminationEntryResponse(EliminationEntryBase):
     entry_group_id: UUID
     debit_amount: Decimal = Field(default=Decimal("0"))
     credit_amount: Decimal = Field(default=Decimal("0"))
+    related_company_codes: list[str] | None = None
+    branch_entity_code: str | None = None
+    # V172：来源（None=手工；ws_* 由合并工作底稿生成；legacy_sheet 旧版明细表转入）与来源键
+    origin: str | None = None
+    origin_key: str | None = None
     is_continuous: bool
     prior_year_entry_id: UUID | None = None
     review_status: ReviewStatusEnum
@@ -196,10 +217,22 @@ class EliminationEntryResponse(EliminationEntryBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_validator("related_company_codes", mode="before")
+    @classmethod
+    def _normalize_related(cls, value: Any) -> list[str] | None:
+        return _related_codes_as_list(value)
+
+    @field_validator("lines", mode="before")
+    @classmethod
+    def _lines_or_empty(cls, value: Any) -> Any:
+        # 旧数据只有表头（lines 为空）：响应给空列表而不是校验失败
+        return value if isinstance(value, list) else []
+
 
 class EliminationReviewAction(BaseModel):
-    """抵消分录复核操作"""
-    action: Literal["approve", "reject"]
+    """抵消分录复核操作：submit 提交审批（草稿/已驳回 → 待审批）、approve 审批、reject 驳回、
+    revoke 撤销审批（已审批 → 草稿；合并项目或其上层合并项目锁定时拒绝，spec consol-elimination-single-source-push 需求 8.2）。"""
+    action: Literal["submit", "approve", "reject", "revoke"]
     rejection_reason: str | None = None
 
 
@@ -209,6 +242,63 @@ class EliminationSummary(BaseModel):
     count: int
     total_debit: Decimal
     total_credit: Decimal
+
+
+# 合并工作底稿自动生成草稿分录（spec consol-elimination-single-source-push 需求 2，design §9.1）
+WorksheetOrigin = Literal["ws_equity_sim", "ws_internal_arap", "ws_internal_trade"]
+
+
+class WorksheetSourceLine(BaseModel):
+    """来源分组的一行：科目名称 + 明细 + 借贷 + 金额（工作底稿按名称记录，编码由后端映射）。
+
+    方向与金额不在这里拒收：认不出的方向 / 金额由生成接口逐组给原因（该组不生成），不让一行坏数据挡住整次请求。
+    """
+    subject: str = Field(default="", max_length=200)
+    detail: str | None = Field(default=None, max_length=200)
+    direction: str = Field(default="", max_length=10)   # 借 / 贷（也认 debit / credit）
+    amount: Decimal | None = None
+
+
+class WorksheetSourceGroup(BaseModel):
+    """一个来源分组 ⇒ 一笔草稿分录；``origin_key`` 在来源内确定且稳定（重复生成按它更新同一笔草稿）。"""
+    origin: WorksheetOrigin
+    origin_key: str = Field(..., min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
+    # 不传 ⇒ 已有草稿沿用其类型（审计师可能改过），新建取来源默认类型
+    entry_type: EliminationEntryType | None = None
+    lines: list[WorksheetSourceLine] = Field(default_factory=list, max_length=500)
+    related_company_codes: list[str] = Field(default_factory=list, max_length=200)
+
+
+class GenerateFromWorksheetRequest(BaseModel):
+    year: int
+    # 本次请求负责的来源：这些来源里本次没有出现的来源键 ⇒ 其草稿软删。
+    # 不传 = 分组里出现过的来源（某张表本次一组都没算出时，须显式列出它才会清理旧草稿）
+    origins: list[WorksheetOrigin] | None = None
+    groups: list[WorksheetSourceGroup] = Field(default_factory=list, max_length=2000)
+    # 只预演：返回映射结果与将要发生的变化，不写库（明细表「待生成」预览用）
+    dry_run: bool = False
+
+
+class LegacySheetConvertRequest(BaseModel):
+    """旧版明细表自定义行转为草稿分录（需求 1.6）。旧版行没有分录类型：不传按「其他调整」转入，审批前确认。"""
+    year: int
+    entry_type: EliminationEntryType | None = None
+
+
+# 合并附注单元格公式（spec consol-elimination-single-source-push 需求 6.1 / 7.2）
+class ConsolNoteFormulaCreate(BaseModel):
+    template_type: Literal["soe", "listed"]
+    section_id: str = Field(..., min_length=1, max_length=64)
+    row_index: int = Field(..., ge=0, le=999)
+    col_index: int = Field(..., ge=1, le=99)   # 第 0 列是项目名
+    formula: str = Field(..., min_length=1, max_length=2000)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class ConsolNoteFormulaUpdate(BaseModel):
+    formula: str | None = Field(default=None, min_length=1, max_length=2000)
+    description: str | None = Field(default=None, max_length=500)
 
 
 # ========== 5. 内部交易 ==========
@@ -575,6 +665,10 @@ class ConsolReportRow(BaseModel):
     prior_period_amount: Decimal | str | None = Decimal("0")
     formula_used: str | None = None
     source_accounts: dict | list | None = None
+    # V173：金额留空时的原因（公式取数超出合并口径 / 引用了留空行）；有值的行为 None
+    blank_reason: str | None = None
+    # 推送后下游数据（子企业试算表）已变化 ⇒ 该行待重新推送
+    is_stale: bool = False
 
 
 class ConsolWorkpaperResult(BaseModel):
@@ -596,10 +690,14 @@ class BalanceCheckResult(BaseModel):
 
 
 class ConsolReportGenerateRequest(BaseModel):
-    """合并报表生成请求"""
+    """合并报表生成请求。
+
+    ``applicable_standard`` 可选：``soe_consolidated`` / ``listed_consolidated`` 照用；不传或其他值
+    （含旧前端传的 ``CAS``）按项目模板类型解析，响应里给出实际口径（spec consol-elimination-single-source-push §4.4）。
+    """
     project_id: UUID
     year: int
-    applicable_standard: Literal["CAS", "IFRS"] = "CAS"
+    applicable_standard: str | None = None
 
 
 class ConsolNotesGenerateRequest(BaseModel):

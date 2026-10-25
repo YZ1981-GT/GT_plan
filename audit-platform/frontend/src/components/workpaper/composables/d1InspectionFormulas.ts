@@ -26,6 +26,14 @@ export interface InventoryCountRow {
   receiveDate: string           // I: 收到日期
   endorseDate: string           // J: 背书/贴现日
   endorsee: string              // K: 被背书人/贴现行
+  // 🔴 2026-09-28 补：源模板 `应收票据监盘D1-10` **Excel K 列 = 付款人名称**
+  //    （openpyxl 现读 R13 表头；同步层 `phase5_d1_10_inventory._FIELD_SPECS_D110` 声明
+  //     `("payer","K","editable","text","payer","付款人名称","")`）。
+  //    此前前端无此字段 ⇒ 该列 HTML 侧填不了，且 materialize 会把它写空
+  //    （`_render_number/inline_text` 对缺键值 `None` 落 `""`）。
+  //    📌 本 interface 注释里的列字母是**前端旧顺序**、与 Excel 列不一致（如 amount 标 F
+  //       而 Excel 在 H），属既存文档不一致，已登记不在本次范围内修。
+  payer: string                 // Excel K: 付款人名称
   noteStatus: string            // L: 票据状态
   hasDifference: string         // M: 是否存在差异（是/否）
   differenceReason: string      // N: 差异原因
@@ -82,16 +90,31 @@ export interface VouchingRow {
   noteNo: string                // 票据号码
   drawer: string                // 出票人
   acceptor: string              // 承兑人
-  amount: number                // 金额
+  amount: number                // Excel G: 借方金额
   maturityDate: string          // 到期日
-  existenceCheck: string        // 存在性验证（已核实/未核实/不适用）
-  accuracyCheck: string         // 准确性验证（金额一致/金额不一致/不适用）
-  appropriatenessCheck: string  // 记录恰当性（恰当/不恰当/不适用）
+  existenceCheck: string        // Excel J 核对内容1：存在性验证（已核实/未核实/不适用）
+  accuracyCheck: string         // Excel K 核对内容2：准确性验证（金额一致/金额不一致/不适用）
+  appropriatenessCheck: string  // Excel L 核对内容3：记录恰当性（恰当/不恰当/不适用）
   attachmentId: string          // 附件ID（OCR上传后回传）
   attachmentName: string        // 附件名称
   ocrStatus: string             // OCR状态（none/processing/done/failed）
-  remark: string                // 备注
-  indexRef: string              // 索引号
+  remark: string                // Excel Q: 备注说明
+  indexRef: string              // Excel O: 索引号
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 🔴 2026-09-28 补 7 个字段：源模板 `应收票据检查表D1-13` 有 17 列，
+  //    而此前前端只覆盖 10 列 ⇒ 下列 7 列 HTML 侧填不了，
+  //    且每次 materialize 会把它们写空/写 0（缺键值 `None` ⇒ `""` / `"0"`），
+  //    擦掉审计师直接在 OO 侧填的内容。
+  //    列字母与表头取自 openpyxl 现读 R14/R15 + 同步层 `_FIELD_SPECS_VOUCHING`。
+  // ═══════════════════════════════════════════════════════════════════════
+  voucherDate: string           // Excel B: 记账凭证-日期
+  counterDetail: string         // Excel F: 对方明细科目
+  creditAmount: number          // Excel H: 贷方金额（借方金额是 `amount`/G 列）
+  supportDoc: string            // Excel I: 支持性文件
+  check4: string                // Excel M: 核对内容4
+  check5: string                // Excel N: 核对内容5
+  isAbnormal: string            // Excel P: 是否异常（是/否）
 }
 
 /** D1-13 例外汇总行 */

@@ -143,6 +143,9 @@ class ReportConfig(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    # V179: 调整列公式（净额），有值时以公式为准，无值退回"从未审数公式反解科目码"路径
+    aje_formula: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rje_formula: Mapped[str | None] = mapped_column(Text, nullable=True)
     # D spec report-config-baseline / V040: 主模板更新→克隆项目标脏
     is_stale: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
@@ -235,6 +238,8 @@ class FinancialReport(Base):
     indent_level: Mapped[int] = mapped_column(sa.Integer, server_default=text("0"), nullable=False)
     is_total_row: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
     is_stale: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
+    # V173：留空原因（合并报表公式取数超出口径时金额为 NULL 并写明原因；有值的行为 NULL）
+    blank_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )

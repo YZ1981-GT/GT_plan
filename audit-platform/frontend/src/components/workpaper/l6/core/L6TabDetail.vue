@@ -332,6 +332,7 @@ import { computed, inject, onMounted, ref, reactive } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { useL6FormData } from '../../composables/useL6FormData'
 import { useL6Detail, type L6DetailRow, L6_DETAIL_SEGMENTS } from '../../composables/useL6Detail'
+import { newRowIdentity } from '../../composables/shared/rowIdentity'
 import { useL6ImportExport } from '../../composables/useL6ImportExport'
 import { useL6CrossSheet } from '../../composables/useL6CrossSheet'
 
@@ -529,7 +530,8 @@ function restoreRowsFromResponses() {
       const savedRows = JSON.parse(rowsResp.remark)
       if (Array.isArray(savedRows) && savedRows.length > 0) {
         detailRows.value = savedRows.map((r: any, i: number) => ({
-          key: r.key || `l6-detail-restored-${i}`,
+          rowId: r.rowId || r.key || newRowIdentity('l62det'),
+          key: r.key || r.rowId || `l6-detail-restored-${i}`,
           seq: i + 1,
           project: r.project || '',
           fundSource: r.fundSource || '',

@@ -606,7 +606,7 @@
     >
       <GtVoucherSamplingEngine
         v-if="samplingVisible && props.wpId && props.projectId"
-        account-code="1711"
+        :account-code="samplingAccountCode"
         phase="final"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
@@ -631,6 +631,17 @@ import {
   isAbnormalFlag,
   hasFailedCheck,
 } from '../../composables/useI3TargetedCheck'
+
+/**
+ * 抽凭科目码取自单一真源 `i3AccountScope`（I3 商誉）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { i3GrossQueryCodes } from '../../composables/i3AccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = i3GrossQueryCodes().join(',')
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),

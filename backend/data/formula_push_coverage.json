@@ -1,0 +1,1412 @@
+{
+  "version": 2,
+  "registered_codes": [
+    "D1",
+    "D2",
+    "D3",
+    "D4",
+    "D5",
+    "D6",
+    "D7",
+    "E1",
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "G1",
+    "G10",
+    "G11",
+    "G12",
+    "G13",
+    "G14",
+    "G2",
+    "G3",
+    "G4",
+    "G5",
+    "G6",
+    "G7",
+    "G8",
+    "G9",
+    "H1",
+    "H10",
+    "H2",
+    "H3",
+    "H4",
+    "H5",
+    "H6",
+    "H7",
+    "H8",
+    "H9",
+    "I1",
+    "I2",
+    "I3",
+    "I4",
+    "I5",
+    "I6",
+    "J1",
+    "J2",
+    "K1",
+    "K10",
+    "K11",
+    "K12",
+    "K13",
+    "K2",
+    "K3",
+    "K4",
+    "K5",
+    "K6",
+    "K7",
+    "K8",
+    "K9",
+    "L1",
+    "L2",
+    "L3",
+    "L4",
+    "L5",
+    "L6",
+    "L7",
+    "L8",
+    "M1",
+    "M10",
+    "M2",
+    "M3",
+    "M4",
+    "M5",
+    "M6",
+    "M7",
+    "M8",
+    "M9",
+    "N1",
+    "N2",
+    "N3",
+    "N4",
+    "N5"
+  ],
+  "entries": [
+    {
+      "wp_code": "D1",
+      "level": "L3",
+      "account_prefixes": [
+        "1121",
+        "1231-01"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "D2",
+      "level": "L3",
+      "account_prefixes": [
+        "1122",
+        "1231-02"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "D3",
+      "level": "L3",
+      "account_prefixes": [
+        "2203"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "D4",
+      "level": "L3",
+      "account_prefixes": [
+        "6001",
+        "6051"
+      ],
+      "rule_count": 3,
+      "owned_key_count": 2,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "D5",
+      "level": "L3",
+      "account_prefixes": [
+        "1124"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "D6",
+      "level": "L3",
+      "account_prefixes": [
+        "1141"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "D7",
+      "level": "L3",
+      "account_prefixes": [
+        "2205"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "E1",
+      "level": "L3",
+      "account_prefixes": [
+        "1001",
+        "1002",
+        "1012"
+      ],
+      "rule_count": 30,
+      "owned_key_count": 27,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "F1",
+      "level": "L3",
+      "account_prefixes": [
+        "1123"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "F2",
+      "level": "L3",
+      "account_prefixes": [
+        "1401",
+        "1402",
+        "1403",
+        "1405",
+        "1408",
+        "1461"
+      ],
+      "rule_count": 7,
+      "owned_key_count": 6,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "F3",
+      "level": "L3",
+      "account_prefixes": [
+        "2201"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "F4",
+      "level": "L3",
+      "account_prefixes": [
+        "2202"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "F5",
+      "level": "L3",
+      "account_prefixes": [
+        "6401",
+        "6402"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G1",
+      "level": "L3",
+      "account_prefixes": [
+        "1101"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G10",
+      "level": "L3",
+      "account_prefixes": [
+        "2101"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G11",
+      "level": "L3",
+      "account_prefixes": [
+        "6111"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G12",
+      "level": "L3",
+      "account_prefixes": [
+        "6103"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G13",
+      "level": "L3",
+      "account_prefixes": [
+        "6101"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G14",
+      "level": "L3",
+      "account_prefixes": [
+        "6702"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G2",
+      "level": "L3",
+      "account_prefixes": [
+        "1132"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G3",
+      "level": "L3",
+      "account_prefixes": [
+        "1131"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G4",
+      "level": "L3",
+      "account_prefixes": [
+        "1504"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G5",
+      "level": "L3",
+      "account_prefixes": [
+        "1531"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G6",
+      "level": "L3",
+      "account_prefixes": [
+        "1503"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G7",
+      "level": "L3",
+      "account_prefixes": [
+        "1511"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G8",
+      "level": "L3",
+      "account_prefixes": [
+        "1503"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "G9",
+      "level": "L3",
+      "account_prefixes": [
+        "1519"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "H1",
+      "level": "L3",
+      "account_prefixes": [
+        "1601",
+        "1602",
+        "1603"
+      ],
+      "rule_count": 3,
+      "owned_key_count": 2,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "H10",
+      "level": "L3",
+      "account_prefixes": [
+        "6115"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "H2",
+      "level": "L3",
+      "account_prefixes": [
+        "1604"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "H3",
+      "level": "L3",
+      "account_prefixes": [
+        "1521"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "H4",
+      "level": "L3",
+      "account_prefixes": [
+        "1605"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "H5",
+      "level": "L3",
+      "account_prefixes": [
+        "1631"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "H6",
+      "level": "L3",
+      "account_prefixes": [
+        "1606B"
+      ],
+      "rule_count": 3,
+      "owned_key_count": 3,
+      "has_note_rules": false
+    },
+    {
+      "wp_code": "H7",
+      "level": "L3",
+      "account_prefixes": [
+        "1621"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "H8",
+      "level": "L3",
+      "account_prefixes": [
+        "1901"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "H9",
+      "level": "L3",
+      "account_prefixes": [
+        "2802"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "I1",
+      "level": "L3",
+      "account_prefixes": [
+        "1701",
+        "1702",
+        "1703B"
+      ],
+      "rule_count": 6,
+      "owned_key_count": 5,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "I2",
+      "level": "L3",
+      "account_prefixes": [
+        "1704"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "I3",
+      "level": "L3",
+      "account_prefixes": [
+        "1711"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "I4",
+      "level": "L3",
+      "account_prefixes": [
+        "1801"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "I5",
+      "level": "L3",
+      "account_prefixes": [
+        "1901"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "I6",
+      "level": "L3",
+      "account_prefixes": [
+        "6602"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "J1",
+      "level": "L3",
+      "account_prefixes": [
+        "2211"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "J2",
+      "level": "L3",
+      "account_prefixes": [
+        "2611"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K1",
+      "level": "L3",
+      "account_prefixes": [
+        "1221",
+        "1231"
+      ],
+      "rule_count": 12,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K10",
+      "level": "L3",
+      "account_prefixes": [
+        "6117"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K11",
+      "level": "L3",
+      "account_prefixes": [
+        "6701"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K12",
+      "level": "L3",
+      "account_prefixes": [
+        "6301"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K13",
+      "level": "L3",
+      "account_prefixes": [
+        "6711"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K2",
+      "level": "L3",
+      "account_prefixes": [
+        "1901"
+      ],
+      "rule_count": 5,
+      "owned_key_count": 4,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K3",
+      "level": "L3",
+      "account_prefixes": [
+        "2241"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K4",
+      "level": "L3",
+      "account_prefixes": [
+        "2261"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K5",
+      "level": "L3",
+      "account_prefixes": [
+        "2801"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K6",
+      "level": "L3",
+      "account_prefixes": [
+        "1481",
+        "2245"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K7",
+      "level": "L3",
+      "account_prefixes": [
+        "2401"
+      ],
+      "rule_count": 4,
+      "owned_key_count": 3,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K8",
+      "level": "L3",
+      "account_prefixes": [
+        "6601"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "K9",
+      "level": "L3",
+      "account_prefixes": [
+        "6602"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L1",
+      "level": "L3",
+      "account_prefixes": [
+        "2001"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L2",
+      "level": "L3",
+      "account_prefixes": [
+        "2231"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L3",
+      "level": "L3",
+      "account_prefixes": [
+        "2501"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L4",
+      "level": "L3",
+      "account_prefixes": [
+        "2502"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L5",
+      "level": "L3",
+      "account_prefixes": [
+        "2701"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L6",
+      "level": "L3",
+      "account_prefixes": [
+        "2711"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L7",
+      "level": "L3",
+      "account_prefixes": [
+        "2801"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "L8",
+      "level": "L3",
+      "account_prefixes": [
+        "6603"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M1",
+      "level": "L3",
+      "account_prefixes": [
+        "2232"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M10",
+      "level": "L3",
+      "account_prefixes": [
+        "4501"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M2",
+      "level": "L3",
+      "account_prefixes": [
+        "4001"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M3",
+      "level": "L3",
+      "account_prefixes": [
+        "4002"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M4",
+      "level": "L3",
+      "account_prefixes": [
+        "4101"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M5",
+      "level": "L3",
+      "account_prefixes": [
+        "4103"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M6",
+      "level": "L3",
+      "account_prefixes": [
+        "4104"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M7",
+      "level": "L3",
+      "account_prefixes": [
+        "4201"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M8",
+      "level": "L3",
+      "account_prefixes": [
+        "4301"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "M9",
+      "level": "L3",
+      "account_prefixes": [
+        "4401"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "N1",
+      "level": "L3",
+      "account_prefixes": [
+        "1811"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "N2",
+      "level": "L3",
+      "account_prefixes": [
+        "2221"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "N3",
+      "level": "L3",
+      "account_prefixes": [
+        "2901"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "N4",
+      "level": "L3",
+      "account_prefixes": [
+        "6403"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    },
+    {
+      "wp_code": "N5",
+      "level": "L3",
+      "account_prefixes": [
+        "6801"
+      ],
+      "rule_count": 2,
+      "owned_key_count": 1,
+      "has_note_rules": true
+    }
+  ],
+  "not_applicable": [
+    {
+      "wp_code": "A1",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A10",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A11",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A12",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A13",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A14",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A15",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A16",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A17",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A18",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A2",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A21",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A22",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A23",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A24",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A25",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A26",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A27",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A28",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A3",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A30",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A31",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A4",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A5",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A6",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A7",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A8",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "A9",
+      "reason": "A 循环（报表/调整/沟通类）：文档型底稿，无科目余额取数需求",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B1",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B10",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B11",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B12",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B13",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B15",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B18",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B19",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B2",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B23",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B3",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B30",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B40",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B5",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B50",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B51",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B52",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "B60",
+      "reason": "B 循环（计划/控制了解）：审计计划与风险评估类底稿，无数值计算",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C1",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C10",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C11",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C12",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C13",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C14",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C15",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C2",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C21",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C22",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C23",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C24",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C25",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C26",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C3",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C4",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C5",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C6",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C7",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C8",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "C9",
+      "reason": "C 循环（控制测试）：控制测试检查表/评价表，纯流程类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "D0",
+      "reason": "函证中心底稿（应收函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "1121",
+        "1122"
+      ]
+    },
+    {
+      "wp_code": "E0",
+      "reason": "函证中心底稿（银行函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "1002"
+      ]
+    },
+    {
+      "wp_code": "F0",
+      "reason": "函证中心底稿（委外加工函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "1401"
+      ]
+    },
+    {
+      "wp_code": "G0",
+      "reason": "函证中心底稿（证券/股权函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "1101",
+        "1511"
+      ]
+    },
+    {
+      "wp_code": "H0",
+      "reason": "函证中心底稿（固定资产循环函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "1601"
+      ]
+    },
+    {
+      "wp_code": "J3",
+      "reason": "有科目码（2711），后续可接入候选",
+      "account_codes": [
+        "2711"
+      ]
+    },
+    {
+      "wp_code": "K0",
+      "reason": "函证中心底稿（其他应收/应付函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "1221",
+        "2241"
+      ]
+    },
+    {
+      "wp_code": "L0",
+      "reason": "函证中心底稿（借款函证），数据来自询证程序结果而非试算表公式推送",
+      "account_codes": [
+        "2001",
+        "2501"
+      ]
+    },
+    {
+      "wp_code": "S1",
+      "reason": "S 循环专项考虑（违反法规行为的考虑），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S10",
+      "reason": "S 循环专项考虑（环境事项考虑），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S11",
+      "reason": "S 循环专项考虑（利用服务机构），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S12",
+      "reason": "S 循环专项考虑（利用专家工作），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S13",
+      "reason": "S 循环专项考虑（利用管理层专家），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S14",
+      "reason": "S 循环专项考虑（会计估计和相关披露），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S15",
+      "reason": "S 循环专项考虑（每股收益和净资产收益率），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S16",
+      "reason": "S 循环专项考虑（套期活动），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S17",
+      "reason": "S 循环专项考虑（非经常性损益），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S2",
+      "reason": "S 循环专项考虑（首次接受委托期初余额），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S20",
+      "reason": "S 循环专项考虑（营业收入扣除情况核查），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S21",
+      "reason": "S 循环专项考虑（数据资产），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S3",
+      "reason": "S 循环专项考虑（会计政策变更/前期差错/估计变更），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S32",
+      "reason": "S 循环专项考虑（S32），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S35",
+      "reason": "S 循环专项考虑（S35），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S4",
+      "reason": "S 循环专项考虑（非货币性资产交换），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S5",
+      "reason": "S 循环专项考虑（债务重组），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S6",
+      "reason": "S 循环专项考虑（大股东资金占用/违规担保），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S8",
+      "reason": "S 循环专项考虑（租赁），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    },
+    {
+      "wp_code": "S9",
+      "reason": "S 循环专项考虑（电子商务考虑），无科目码关联，文档/分析类底稿",
+      "account_codes": []
+    }
+  ]
+}

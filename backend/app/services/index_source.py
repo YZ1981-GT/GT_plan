@@ -194,21 +194,29 @@ class KnowledgeDocSource:
         3. 文档级 access_level 覆盖文件夹级（public 直接可见，project_group 检查 doc.project_ids）
         4. 只取有 content_text 且未删除的文档
         """
-        from sqlalchemy import or_, cast
-        from sqlalchemy.dialects.postgresql import JSONB as PG_JSONB
+        import sqlalchemy as sa
+        from sqlalchemy.orm import aliased
+
+        from app.services.knowledge_access_policy import (
+            KnowledgeAccessPolicy,
+            KnowledgeResource,
+            KnowledgeRetrievalMode,
+        )
 
         texts: list[tuple] = []
+        successor = aliased(KnowledgeDocument)
 
-        # 查询所有未删除且有内容的知识文档（join folder 获取权限信息）
+        # 未删除、有内容、所在文件夹未删除、且是版本链最新版的知识文档（join folder 取判权三元组）
         result = await self._db.execute(
             select(
                 KnowledgeDocument.id,
-                KnowledgeDocument.name,
                 KnowledgeDocument.content_text,
                 KnowledgeDocument.access_level,
                 KnowledgeDocument.project_ids,
+                KnowledgeDocument.created_by,
                 KnowledgeFolder.access_level.label("folder_access_level"),
                 KnowledgeFolder.project_ids.label("folder_project_ids"),
+                KnowledgeFolder.created_by.label("folder_created_by"),
             )
             .join(KnowledgeFolder, KnowledgeDocument.folder_id == KnowledgeFolder.id)
             .where(
@@ -216,60 +224,30 @@ class KnowledgeDocSource:
                 KnowledgeFolder.is_deleted == False,  # noqa: E712
                 KnowledgeDocument.content_text.isnot(None),
                 KnowledgeDocument.content_text != "",
+                ~sa.exists().where(
+                    successor.previous_version_id == KnowledgeDocument.id,
+                    successor.is_deleted == sa.false(),
+                ),
             )
         )
 
-        project_id_str = str(project_id)
-
         for row in result.all():
-            doc_id, doc_name, content_text, doc_access, doc_proj_ids, folder_access, folder_proj_ids = row
-
-            # 判断该文档对当前 project_id 是否可见
-            if not self._is_accessible(
-                project_id_str, doc_access, doc_proj_ids, folder_access, folder_proj_ids
+            # 可见性唯一走单一判定面：project 模式、无用户（索引按项目分区建，不含私有文档）
+            if not KnowledgeAccessPolicy.can_retrieve(
+                KnowledgeRetrievalMode.project,
+                None,
+                project_id,
+                KnowledgeResource.of_row(row.access_level, row.project_ids, row.created_by),
+                KnowledgeResource.of_row(
+                    row.folder_access_level, row.folder_project_ids, row.folder_created_by
+                ),
             ):
                 continue
 
             texts.append((
                 KnowledgeSourceType.knowledge_doc,
-                doc_id,
-                content_text,
+                row.id,
+                row.content_text,
             ))
 
         return texts
-
-    @staticmethod
-    def _is_accessible(
-        project_id_str: str,
-        doc_access_level,
-        doc_project_ids: list | None,
-        folder_access_level,
-        folder_project_ids: list | None,
-    ) -> bool:
-        """判断文档对指定项目是否可见。
-
-        优先使用文档级权限，None 时继承文件夹级。
-        """
-        # 确定生效的 access_level 和 project_ids
-        if doc_access_level is not None:
-            effective_access = doc_access_level
-            effective_proj_ids = doc_project_ids
-        else:
-            effective_access = folder_access_level
-            effective_proj_ids = folder_project_ids
-
-        # 转为字符串比较（枚举 .value）
-        access_str = effective_access.value if hasattr(effective_access, "value") else str(effective_access)
-
-        if access_str == "public":
-            return True
-        elif access_str == "project_group":
-            if not effective_proj_ids:
-                return False
-            # project_ids 是 JSONB list，元素可能是 str 或 UUID
-            return project_id_str in [str(pid) for pid in effective_proj_ids]
-        elif access_str == "private":
-            # private 文档不对项目级索引开放（需用户级权限，由 Task 4 scope+user 处理）
-            return False
-        else:
-            return False

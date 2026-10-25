@@ -58,42 +58,9 @@ _SRC = _BACKEND / "app" / "services" / "workpaper_sync"
 #:    每条都注明归属 lane，便于 lane 收口时一并清掉。
 _KNOWN_MISSING: frozenset[tuple[str, str, str]] = frozenset(
     {
-        # ── 审定表 payload 生成器：`AdjudicationSheetSpec` 数据类**存在**，
-        #    但把它变成契约 sheet payload 的那个函数从未落地 ⇒ 审定表族真正的前置门。
-        #    （并发会话 commit `ad7941e02` 记的是「AdjudicationSheetSpec 未落地」，
-        #     实测该数据类在 `f1ec1c67d` 就已引入、在 `ad7941e02` 与 HEAD 都存在 ——
-        #     缺的是 payload 生成器与 store 投影/merge 引擎，不是类型本身。）
-        #    归属：`g-cycle-adjudication-sheets-coverage` / 审定表引擎 spec
-        (
-            "phase5_d5_expansion.py",
-            "phase5_adjudication_sheet",
-            "static_sheet_payload_for_adjudication",
-        ),
-        (
-            "phase5_d6_expansion.py",
-            "phase5_adjudication_sheet",
-            "static_sheet_payload_for_adjudication",
-        ),
-        (
-            "phase5_d7_expansion.py",
-            "phase5_adjudication_sheet",
-            "static_sheet_payload_for_adjudication",
-        ),
-        # ── F 循环：lane 在 entry 模块里按灰度开关延迟 import per-sheet 子模块，
-        #    而那些子模块文件尚未交付。归属：f3/f4/f5 lane spec。
-        ("phase5_f3_notes_payable.py", _PKG, "phase5_f3_02_detail"),
-        ("phase5_f3_notes_payable.py", _PKG, "phase5_f3_04_interest"),
-        ("phase5_f3_notes_payable.py", _PKG, "phase5_f3_01_adjudication"),
-        ("phase5_f4_accounts_payable.py", _PKG, "phase5_f4_05_long_outstanding"),
-        ("phase5_f4_accounts_payable.py", _PKG, "phase5_f4_08_voucher_check"),
-        ("phase5_f4_accounts_payable.py", _PKG, "phase5_f4_07_unrecorded"),
-        ("phase5_f4_accounts_payable.py", _PKG, "phase5_f4_02_detail"),
+        # ── F 循环：尚未交付的 2 个子模块。归属：f4 lane spec。
         ("phase5_f4_accounts_payable.py", _PKG, "phase5_f4_09_supplier_financing"),
         ("phase5_f4_accounts_payable.py", _PKG, "phase5_f4_01_adjudication"),
-        ("phase5_f5_cost_of_sales.py", _PKG, "phase5_f5_05_comparison"),
-        ("phase5_f5_cost_of_sales.py", _PKG, "phase5_f5_03_other_cost"),
-        ("phase5_f5_cost_of_sales.py", _PKG, "phase5_f5_02_monthly_detail"),
-        ("phase5_f5_cost_of_sales.py", _PKG, "phase5_f5_07_cost_rollforward"),
     }
 )
 
@@ -201,16 +168,14 @@ def test_baseline_entries_are_still_really_missing(scanned: set) -> None:
 
 
 def test_scan_really_detects_the_known_defects(scanned: set) -> None:
-    """🔴 正向对照：扫描器必须**真的**命中那三条审定表 payload 生成器缺失。
+    """🔴 正向对照：扫描器必须**真的**命中 `_KNOWN_MISSING` 里的每一条。
 
     不是「基线与现算相等」那种自证 —— 这里直接点名断言，扫描器若坏成空集会当场红。
     """
-    for src in ("phase5_d5_expansion.py", "phase5_d6_expansion.py", "phase5_d7_expansion.py"):
-        assert (
-            src,
-            "phase5_adjudication_sheet",
-            "static_sheet_payload_for_adjudication",
-        ) in scanned, f"{src} 的 payload 生成器缺失未被扫到 —— 扫描器失效"
+    for entry in _KNOWN_MISSING:
+        assert entry in scanned, (
+            f"{entry[0]} 的 {entry[2]} 缺失未被扫到 —— 扫描器失效"
+        )
 
 
 def test_dropping_a_baseline_entry_would_red(scanned: set) -> None:
@@ -269,9 +234,10 @@ def test_adjudication_sheet_spec_type_itself_does_exist() -> None:
     ]
     assert declared, "6 个审定表声明实例一个都不在了 —— 前置门事实已变，须重新核查"
 
-    # 🔴 引擎缺口现算断言：没有任何生产模块导出「消费 AdjudicationSheetSpec 的投影函数」。
-    #    修好之后这条会打红，届时把它翻面成「引擎已就位」。
-    assert not hasattr(A, "static_sheet_payload_for_adjudication"), (
-        "payload 生成器已落地 —— 请同时从 `_KNOWN_MISSING` 删掉那 3 条，"
-        "并把本断言翻面成「引擎已就位」"
+    # 🔴 引擎已就位断言：`static_sheet_payload_for_adjudication` 已实现。
+    #    旧断言（`not hasattr`）在 2026-10-07 翻面——函数已落地，
+    #    同步从 `_KNOWN_MISSING` 删掉了 3 条，本断言钉住「已落地不回退」。
+    assert hasattr(A, "static_sheet_payload_for_adjudication"), (
+        "payload 生成器消失了 —— 请恢复 `static_sheet_payload_for_adjudication` "
+        "并同步恢复 `_KNOWN_MISSING` 的 3 条"
     )

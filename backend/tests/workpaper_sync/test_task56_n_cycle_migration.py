@@ -500,7 +500,19 @@ class TestGuardSelfChecks:
         """两族扫描器必须真的分得开，否则「两族」是同一族写两遍。"""
         render = _render_key_hits(_n_cycle_files())
         persist = _persist_key_hits(_n_cycle_files())
-        assert render and persist, (render, persist)
+        # 某族被 N 系列 spec 收口到 0 是允许的 —— 但必须**全部**由登记的改线文件解释，
+        # 否则就是扫描器坏了（空跑）。
+        inv = None
+        for fam, hits, key in (("render", render, "render_key_family"),
+                               ("persist", persist, "persistence_key_family")):
+            if hits:
+                continue
+            if inv is None:
+                inv = json.loads(SLICE_PATH.read_text(encoding="utf-8"))[
+                    "dynamic_row_identity"]["positional_identity_inventory"]
+            declared = [h["site"] for h in inv[key]]
+            assert declared and all(_is_post_slice_edited(s) for s in declared), (
+                f"{fam} 族现算 0 但 slice 声明的站点不全在改线登记里 ⇒ 扫描器空跑", declared)
         assert not ({h["site"] for h in render} & {h["site"] for h in persist}), (
             "两族站点集合相交 ⇒ 扫描器没分开"
         )
@@ -598,6 +610,39 @@ _ARRAY_ADDRESSING = {
 }
 
 
+def _post_slice_facts() -> ModuleType:
+    """N 系列 spec 的 slice 冻结后改线登记（`n_cycle_facts.POST_SLICE_EDITED_FILES` 等）。
+
+    🔴 本守卫锁 2026-08-16 的现状；N foundation / lane2 / lane3 按 spec 改了代码之后，
+    「slice 值 == 代码现算」的逐值相等判据必然打红。处置：**未登记的文件仍逐值相等**，
+    已登记的文件改为单调 / 结构断言。新改 N 域文件不登记 ⇒ 这里照样红。
+    """
+    import sys
+
+    name = "_task56_n_cycle_facts"
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(
+        name, pathlib.Path(__file__).with_name("n_cycle_facts.py"))
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    # 🔴 @dataclass 解析注解时要从 sys.modules 取模块；exec 前不注册会 AttributeError
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _is_post_slice_edited(site: str) -> bool:
+    return site.split("#")[0] in _post_slice_facts().POST_SLICE_EDITED_FILES
+
+
+def _split_by_edited(sites: list[str]) -> tuple[list[str], list[str]]:
+    """(未改线文件的站点, 已改线文件的站点)"""
+    keep = sorted(s for s in sites if not _is_post_slice_edited(s))
+    edited = sorted(s for s in sites if _is_post_slice_edited(s))
+    return keep, edited
+
+
 def _array_addressing_counts(files: list[pathlib.Path]) -> dict[str, int]:
     out: dict[str, int] = {}
     for name, pat in _ARRAY_ADDRESSING.items():
@@ -691,7 +736,11 @@ class TestSliceScopeIsRecomputable:
         n_index = [it for it in idx["files"]
                    if str(it.get("relative_path", "")).replace("\\", "/").startswith("N/")]
         assert {it["wp_code"] for it in n_index} == set(N_CODES), n_index
-        on_disk = {p.name for p in N_TEMPLATE_DIR.iterdir() if not p.name.startswith("~$")}
+        # 🔴 排除 OOXML 净化负例备份 `*.preclean.bak`（Task 7a 产物，非模板册）。
+        on_disk = {
+            p.name for p in N_TEMPLATE_DIR.iterdir()
+            if not p.name.startswith("~$") and not p.name.endswith(".preclean.bak")
+        }
         assert {it["filename"] for it in n_index} == on_disk
 
     def test_parent_duplicate_children_recompute_and_the_section_is_present(
@@ -800,25 +849,65 @@ class TestSliceScopeIsRecomputable:
         for p in sorted(CONTRACT_DIR.glob("*.json")):
             owners[p.name] = (_load(p).get("review") or {}).get("entry_id")
         assert owners, "契约目录为空 ⇒ 这条判据是空跑"
-        reviewed = {k: v for k, v in owners.items() if k != CANDIDATE_CONTRACT_FILE}
-        assert set(reviewed.values()) == PILOT_CONTRACT_OWNERS, reviewed
+        reviewed = {
+            k: v for k, v in owners.items()
+            if _load(CONTRACT_DIR / k).get("review_status") == "reviewed"
+        }
+        # slice 冻结时只有四份 pilot；之后其他循环持续发布 contract。正确不变量是：
+        # ① 四份 pilot 仍全在（反向分母）② 当前 N slice 仍一份没有，而不是「目录永远恰 4 份」。
+        assert PILOT_CONTRACT_OWNERS <= set(reviewed.values()), reviewed
         assert owners[CANDIDATE_CONTRACT_FILE] is None, (
             "candidate 契约的 review.entry_id 应为 null（反例分母，不得要求非空）"
         )
         assert _load(CONTRACT_DIR / CANDIDATE_CONTRACT_FILE)["review_status"] == "candidate"
-        assert not (set(owners.values()) & ids)
+        # 🔴 N4 canary 已交付 reviewed 生产契约（spec n-cycle-sync-foundation-and-first-canary）
+        #    ⇒ 其 review.entry_id 落在本 slice 的 ids 里是**真改线的信号**，不是违规。
+        #    仅豁免 N4（n_cycle_facts.DELIVERED_CONTRACT_ADAPTER_IDS），其余 N entry 仍一份不许有。
+        _facts = _post_slice_facts()
+        _n4_contract_owners = {
+            k for k, v in owners.items()
+            if _load(CONTRACT_DIR / k).get("contract_id") in _facts.DELIVERED_CONTRACT_ADAPTER_IDS
+        }
+        _non_n4_owner_entry_ids = {
+            v for k, v in owners.items() if k not in _n4_contract_owners
+        }
+        assert not (_non_n4_owner_entry_ids & ids), (
+            "除 N4 canary 外，仍有 N slice entry 的契约归属 ⇒ 违规"
+        )
         assert manifest_slice["slice_scope"]["excluded_pilot_entry_count"] == 0
+        # slice 冻结时点 pilot_contract_published==0（描述 2026-08-16 的 slice 态，非当前库态）。
         assert manifest_slice["honest_adjudication_summary"]["pilot_contract_published"] == 0
 
     def test_no_n_adapter_is_registered(self, manifest_slice: dict) -> None:
-        """**Validates: Requirements 1.4, 12.1** —— Property 3 的否定方向之一。"""
+        """**Validates: Requirements 1.4, 12.1** —— Property 3 的否定方向之一。
+
+        🔴 N4 canary 已真注册 adapter（spec n-cycle-sync-foundation-and-first-canary）：
+        registry 交付台账里有 `xlsx/gt-n4-...` 字面量、manifest 里 N4 已 bidirectional。
+        仅豁免 N4，其余 N entry（N1/N2/N3/N5）仍必须零注册、零 bidirectional。
+        """
+        _facts = _post_slice_facts()
         registry = _cached_text(REGISTRY)
-        assert not re.search(r"xlsx/gt-n\d", registry), "registry 里出现了 N adapter"
+        # 除 N4 外，registry 不得出现任何 N adapter 字面量。
+        other_n_hits = [
+            m.group(0) for m in re.finditer(r"xlsx/gt-n\d[\w-]*", registry)
+            if m.group(0) not in _facts.REGISTERED_ADAPTER_ENTRY_IDS
+        ]
+        assert not other_n_hits, f"registry 里出现了非 N4 的 N adapter：{other_n_hits}"
         for entry in manifest_slice["independent_entries"]:
-            assert entry["adapter_id"] is None
-        # 反向：registry 里**确实**有 pilot adapter ⇒ 判据非空跑
-        assert any(owner in registry for owner in PILOT_CONTRACT_OWNERS), (
-            "registry 里一个 pilot adapter 都找不到 ⇒ 这条判据是空跑"
+            if entry["entry_id"] in _facts.REGISTERED_ADAPTER_ENTRY_IDS:
+                continue  # N4 已注册，adapter_id 非空是真改线
+            assert entry["adapter_id"] is None, entry["entry_id"]
+        # 反向：全量 manifest 里确实已有非 N 的 bidirectional entry ⇒ 「其余 N 仍未注册」不是空跑。
+        manifest_entries = _load(FULL_MANIFEST).get("entries", [])
+        bidirectional = [e for e in manifest_entries if e.get("capability") == "bidirectional"]
+        assert bidirectional, "全量 manifest 无任何 bidirectional entry ⇒ 反向分母为空"
+        # 🔴 其余 N entry 仍不得 bidirectional（N4 已豁免）。
+        n_bidi = {
+            e["entry_id"] for e in bidirectional
+            if str(e.get("entry_id", "")).startswith("xlsx/gt-n")
+        }
+        assert n_bidi == set(_facts.REGISTERED_ADAPTER_ENTRY_IDS), (
+            f"N 域 bidirectional 集合 {n_bidi} 与登记 {set(_facts.REGISTERED_ADAPTER_ENTRY_IDS)} 不符"
         )
 
 
@@ -943,15 +1032,28 @@ class TestAdjudicationLegality:
         bp_ids = {b["id"] for b in manifest_slice["blocking_preconditions"]}
         assert "BP-9" in bp_ids
         src = {e["entry_id"]: e for e in full_manifest["entries"]}
+        _facts = _post_slice_facts()
         for e in manifest_slice["independent_entries"]:
             mirror = e["manifest_mirror"]
             upstream = src[e["entry_id"]]
-            assert mirror["capability"] == upstream["capability"] == "single_onlyoffice"
-            assert mirror["html_store"] == upstream["html_store"] == "unresolved"
+            # mirror 是 slice 冻结快照（2026-08-16），恒为 single_onlyoffice / unresolved。
+            assert mirror["capability"] == "single_onlyoffice"
+            assert mirror["html_store"] == "unresolved"
             assert e["capability"] != mirror["capability"], (
                 f"{e['entry_id']} 的 slice 裁决与 mirror 相同 ⇒ 分歧判据失效"
             )
             assert "BP-9" in mirror["why_not_adopted"]
+            if e["entry_id"] in _facts.MANIFEST_FLIPPED_ENTRIES:
+                # 🔴 N4 canary 已真改线：live manifest 的 upstream 已翻 bidirectional，
+                #    与 slice mirror 产生**真实分歧**（这正是真双向的信号，不是违规）。
+                assert upstream["capability"] == "bidirectional", (
+                    f"{e['entry_id']} 已登记为翻转 entry，但 live manifest 仍是 "
+                    f"{upstream['capability']} ⇒ 翻转未落实"
+                )
+            else:
+                # 其余 N entry：live manifest 仍与 slice mirror 一致（未改线）。
+                assert upstream["capability"] == "single_onlyoffice", e["entry_id"]
+                assert upstream["html_store"] == "unresolved", e["entry_id"]
 
     def test_ac15_is_declared_not_applicable_and_ac14_is_the_live_one(
         self, manifest_slice: dict
@@ -994,7 +1096,13 @@ class TestAdjudicationLegality:
         prod, _ = _statement_edges_to(AC14_NOTICE_VUE)
         assert len(prod) >= 20, f"提示组件生产消费方只有 {len(prod)} 个 ⇒ 平台侧判据可疑"
         gate = manifest_slice["mode_switch_resolution"]["ac14_notice_single_source"]
-        assert gate["production_consumers"] == len(prod), (gate["production_consumers"], len(prod))
+        # gate 是 2026-08-16 快照；平台消费方只许增长，不拿旧计数卡住后续循环接线。
+        assert len(prod) >= gate["production_consumers"], (gate["production_consumers"], len(prod))
+        # N 本轮新增的挂载必须逐 entry 在真实边里出现（不是靠别域增长掩盖）。
+        facts = _post_slice_facts()
+        for eid in facts.NOTICE_MOUNTED_ENTRIES:
+            host = next(e["host"] for e in manifest_slice["independent_entries"] if e["entry_id"] == eid)
+            assert any(host in ref for ref in prod), (eid, host)
         # 🔴 迁移推进后已注册 adapter 集合非空(d2 等)⇒ 该字段随真实态记 False(不再是迁移前的空)。
         assert gate["registered_entry_ids_is_empty"] is False
 
@@ -1007,7 +1115,10 @@ class TestAdjudicationLegality:
             if "GtEntrySyncCapabilityNotice" in _strip_comments(
                 _cached_text(ROOT / e["host_path"]))
         ]
-        assert mounted == [], f"有 N 宿主挂了提示组件 {mounted} ⇒ BP-7 该解除了"
+        # slice 时点 0 挂载；之后的接线必须在 n_cycle_facts.NOTICE_MOUNTED_ENTRIES 登记
+        assert sorted(mounted) == sorted(_post_slice_facts().NOTICE_MOUNTED_ENTRIES), (
+            f"现挂提示组件的 N 宿主 {mounted} 与登记不一致"
+        )
         assert manifest_slice["mode_switch_resolution"]["counters"][
             "entries_mounting_the_ac14_notice"] == 0
         bp7 = next(b for b in manifest_slice["blocking_preconditions"] if b["id"] == "BP-7")
@@ -1186,18 +1297,31 @@ class TestHtmlCounterpartIsSourceBacked:
     def test_template_ref_resolves_and_digests_recompute(self, manifest_slice: dict) -> None:
         """**Validates: Requirements 6.10, 12.8**"""
         idx = {it["filename"]: it for it in _load(TEMPLATE_INDEX)["files"]}
+        _facts = _post_slice_facts()
         for e in manifest_slice["independent_entries"]:
             ref = e["template_ref"]
             path = N_TEMPLATE_DIR / ref["workbook"]
             assert path.is_file(), path
             raw = path.read_bytes()
-            assert len(raw) == ref["size"], (ref["workbook"], len(raw), ref["size"])
-            assert hashlib.sha256(raw).hexdigest() == ref["sha256"], ref["workbook"]
-            names = _sheet_names(path)
-            assert len(names) == ref["sheet_count"]
-            counts = _formula_counts(path)
-            assert sum(counts.values()) == ref["formula_cells"], ref["workbook"]
-            assert len([1 for v in counts.values() if v]) == ref["sheets_with_formula"]
+            # 🔴 N4 canary 的权威模板已 OOXML 净化（Task 7a：删 2 外链部件 + 中性化隐藏
+            #    「原底稿」册的 5 个外部引用公式）⇒ 字节/sha/公式格数相对 slice 冻结值**有意变更**，
+            #    受管 sheet 税金及附加明细表N4-2 逐格 0 diff。仅 N4 用净化后现算值比对，其余 N 册
+            #    仍逐值等于 slice 冻结 template_ref。
+            if ref["workbook"] in _facts.SANITIZED_TEMPLATE_WORKBOOKS:
+                sf = _facts.N4_SANITIZED_TEMPLATE_FACTS
+                assert len(raw) == sf["size"], (ref["workbook"], len(raw), sf["size"])
+                assert hashlib.sha256(raw).hexdigest() == sf["sha256"], ref["workbook"]
+                assert len(_sheet_names(path)) == sf["sheet_count"]
+                counts = _formula_counts(path)
+                assert sum(counts.values()) == sf["formula_cells"], ref["workbook"]
+                assert len([1 for v in counts.values() if v]) == sf["sheets_with_formula"]
+            else:
+                assert len(raw) == ref["size"], (ref["workbook"], len(raw), ref["size"])
+                assert hashlib.sha256(raw).hexdigest() == ref["sha256"], ref["workbook"]
+                assert len(_sheet_names(path)) == ref["sheet_count"]
+                counts = _formula_counts(path)
+                assert sum(counts.values()) == ref["formula_cells"], ref["workbook"]
+                assert len([1 for v in counts.values() if v]) == ref["sheets_with_formula"]
             assert ref["in_runtime_index"] is True
             assert idx[ref["workbook"]]["wp_code"] == ref["index_wp_code"]
 
@@ -1253,6 +1377,14 @@ class TestTransportKeyResolution:
         tk = manifest_slice["transport_key_resolution"]
         d = next(x for x in tk["declarations"] if x.get("keys_are_runtime_derived"))
         owner = _cached_text(ROOT / d["owner_module"])
+        if _is_post_slice_edited(d["owner_module"]):
+            # lane2 T8：派生改为模板行 key（A7~A13），位置化模板串必须消失；展开数仍 == 类目数
+            bare = _strip_comments(owner)
+            assert "${ITEM_PREFIX}-${index}" not in bare.replace(" ", ""), "位置化写入键仍在"
+            mapping = re.search(r"N1_ADJUDICATION_TEMPLATE_ROW[^=]*=\s*\{(.*?)\}", bare, re.S)
+            assert mapping, "模板行映射常量缺失"
+            assert len(re.findall(r":\s*'A\d+'", mapping.group(1))) == len(d["key_expansion"])
+            return
         assert "${ITEM_PREFIX}-${index}" in owner.replace(" ", ""), (
             "模板串在 owner 模块里找不到 ⇒ 声明的派生方式不成立"
         )
@@ -1291,28 +1423,44 @@ class TestTransportKeyResolution:
             _rel(p) for p in _n_cycle_files()
             if key in _strip_comments(_cached_text(p))
         ]
-        assert hits == [_rel(module)], (key, hits)
-        prod, _ = _statement_edges_to(module)
-        assert prod == [], f"{d['second_declaration_module']} 竟有生产边 {prod} ⇒ 它不再是 orphan"
-        assert key in _line_at(d["second_declaration_source"])
+        if d["second_declaration_module"] in _post_slice_facts().DELETED_ORPHANS:
+            # AC 1.7 已删 orphan ⇒ 伪造键必须随之从 N 域彻底消失
+            assert not module.exists(), module
+            assert hits == [], (key, hits)
+        else:
+            assert hits == [_rel(module)], (key, hits)
+            prod, _ = _statement_edges_to(module)
+            assert prod == [], f"{d['second_declaration_module']} 竟有生产边 {prod} ⇒ 它不再是 orphan"
+            assert key in _line_at(d["second_declaration_source"])
         # 反向：V1 的键**确实**在生产里被写
         v1_key = next(k for k in d["keys"] if k == "N4-1-rows")
         v1_hits = [_rel(p) for p in _n_cycle_files()
                    if v1_key in _strip_comments(_cached_text(p))]
-        assert len(v1_hits) >= 2, (v1_key, v1_hits)
+        # 删 V2 后字面量命中少 1（V2 自己引过它）；owner 模块用的是派生形态
+        # `${ITEM_PREFIX}-rows`（ITEM_PREFIX='N4-1'），故两者合起来必须仍 ≥ 2 处真实使用
+        owner = _strip_comments(_cached_text(WP_COMPOSABLES / "useN4Adjudication.ts"))
+        derived = "ITEM_PREFIX = 'N4-1'" in owner and "${ITEM_PREFIX}-rows" in owner
+        assert len(v1_hits) + int(derived) >= 2, (v1_key, v1_hits, derived)
 
     def test_n5_foreign_namespace_reads_are_read_only(self, manifest_slice: dict) -> None:
         """**Validates: Requirements 12.12** —— Property 70 的 N 特有一条，两侧都验。"""
         tk = manifest_slice["transport_key_resolution"]
         d = next(x for x in tk["declarations"] if x.get("foreign_namespaces_read"))
         assert d["foreign_namespaces_verdict"] == "READ_ONLY_NOT_A_NAMESPACE_VIOLATION"
-        for item in d["foreign_namespaces_read"]:
-            line = _line_at(item["site"])
-            assert item["key"] in line, item
-            assert "item_id ===" in line, f"{item['site']} 不是只读比对形态：{line!r}"
-        # 写侧：N5 的写键全部以 N5- 开头
         module = ROOT / d["owner_module"].replace("useN5FormData.ts", "useN5CrossSheet.ts")
         body = _strip_comments(_cached_text(module))
+        for item in d["foreign_namespaces_read"]:
+            if _is_post_slice_edited(_rel(module)):
+                # 跨底稿解析改线使旧行号锚点漂移；改验「键仍在 GET responses.find 只读侧」
+                pos = body.find(item["key"])
+                assert pos >= 0, item
+                window = body[max(0, pos - 160):pos + len(item["key"]) + 80]
+                assert "responses.find" in window and "item_id" in window, (item, window)
+            else:
+                line = _line_at(item["site"])
+                assert item["key"] in line, item
+                assert "item_id ===" in line, f"{item['site']} 不是只读比对形态：{line!r}"
+        # 写侧：N5 的写键全部以 N5- 开头
         written = sorted(set(re.findall(r"""_persistCrossData\(\s*['"]([^'"]+)['"]""", body)))
         assert written, "N5 的跨表写键现算为空 ⇒ 判据空跑"
         for key in written:
@@ -1393,20 +1541,39 @@ class TestProperty23DynamicRowIdentity:
         """
         tables = {t["table_key"]: t for t in manifest_slice["dynamic_row_identity"]["tables"]}
         n1 = tables["n1_adjudication_rows"]["row_identity"]
-        assert "ITEM_PREFIX" in _line_at(n1["persistence_source_ref"])
-        assert "${ITEM_PREFIX}-${index}" in _line_at(n1["persistence_source_ref"]).replace(" ", "")
-        assert "${ITEM_PREFIX}-${i}" in _line_at(n1["index_binding_source_ref"]).replace(" ", "")
-        assert "N1_ADJUDICATION_CATEGORIES" in _line_at(n1["source_ref"])
+        if _is_post_slice_edited(n1["persistence_source_ref"]):
+            body = _strip_comments(_cached_text(_path_of(n1["persistence_source_ref"])))
+            assert "${ITEM_PREFIX}-${index}" not in body.replace(" ", ""), "N1-1 仍按下标写"
+            assert "${ITEM_PREFIX}-${i}" not in body.replace(" ", ""), "N1-1 仍按下标读"
+            assert "n1AdjudicationItemId(category)" in body
+        else:
+            assert "ITEM_PREFIX" in _line_at(n1["persistence_source_ref"])
+            assert "${ITEM_PREFIX}-${index}" in _line_at(n1["persistence_source_ref"]).replace(" ", "")
+            assert "${ITEM_PREFIX}-${i}" in _line_at(n1["index_binding_source_ref"]).replace(" ", "")
+            assert "N1_ADJUDICATION_CATEGORIES" in _line_at(n1["source_ref"])
 
         n2 = tables["n2_manual_tax_rows"]["row_identity"]
-        assert "manual-${idx}" in _line_at(n2["source_ref"]).replace(" ", "")
-        assert "updateManualRow" in _line_at(n2["index_binding_source_ref"])
-        assert "MANUAL_ROWS_ITEM_ID" in _line_at(n2["persistence_source_ref"])
+        if _is_post_slice_edited(n2["source_ref"]):
+            # lane3 T4 已收口：位置化渲染键与按下标写都必须消失，身份随行落库
+            body = _strip_comments(_cached_text(_path_of(n2["source_ref"])))
+            assert "manual-${idx}" not in body.replace(" ", ""), "N2-8 位置化渲染键仍在"
+            assert re.search(r"function updateManualRow\(rowKey", body), "N2-8 仍按下标改行"
+            assert "rowKey" in body
+        else:
+            assert "manual-${idx}" in _line_at(n2["source_ref"]).replace(" ", "")
+            assert "updateManualRow" in _line_at(n2["index_binding_source_ref"])
+            assert "MANUAL_ROWS_ITEM_ID" in _line_at(n2["persistence_source_ref"])
 
         n5 = tables["n5_tax_adjustment_rows"]["row_identity"]
-        assert "index: i + 1" in _line_at(n5["source_ref"])
-        assert "rowIndex" in _line_at(n5["index_binding_source_ref"])
-        assert "rowIndex" in _line_at(n5["removal_source_ref"])
+        if _is_post_slice_edited(n5["source_ref"]):
+            body = _strip_comments(_cached_text(_path_of(n5["source_ref"])))
+            assert re.search(r"function removeRow\(rowKey", body), "N5-5 仍按下标删行"
+            assert re.search(r"function updateRow\(\s*rowKey", body), "N5-5 仍按下标改行"
+            assert "rowIndex" not in body, "N5-5 残留 rowIndex 寻址"
+        else:
+            assert "index: i + 1" in _line_at(n5["source_ref"])
+            assert "rowIndex" in _line_at(n5["index_binding_source_ref"])
+            assert "rowIndex" in _line_at(n5["removal_source_ref"])
 
     def test_clean_tables_really_address_rows_by_stable_id(self, manifest_slice: dict) -> None:
         """**Validates: Requirements 6.5**
@@ -1455,15 +1622,22 @@ class TestProperty23DynamicRowIdentity:
         files = _n_cycle_files()
         inv = manifest_slice["dynamic_row_identity"]["positional_identity_inventory"]
 
+        # 缺陷族：未改线文件逐值相等；已改线文件只许减少（BP-8 收口方向）
         render_sites = [h["site"] for h in _render_key_hits(files)]
         declared_render = [h["site"] for h in inv["render_key_family"]]
         assert len(declared_render) == len(set(declared_render))
-        assert sorted(declared_render) == sorted(render_sites), (declared_render, render_sites)
+        d_keep, d_edit = _split_by_edited(declared_render)
+        c_keep, c_edit = _split_by_edited(render_sites)
+        assert d_keep == c_keep, (d_keep, c_keep)
+        assert len(c_edit) <= len(d_edit), (d_edit, c_edit)
 
         persist_sites = [h["site"] for h in _persist_key_hits(files)]
         declared_persist = [h["site"] for h in inv["persistence_key_family"]]
         assert len(declared_persist) == len(set(declared_persist))
-        assert sorted(declared_persist) == sorted(persist_sites), (declared_persist, persist_sites)
+        d_keep, d_edit = _split_by_edited(declared_persist)
+        c_keep, c_edit = _split_by_edited(persist_sites)
+        assert d_keep == c_keep, (d_keep, c_keep)
+        assert len(c_edit) <= len(d_edit), (d_edit, c_edit)
 
         seq = _display_seq_sites(files)
         assert sorted(inv["display_sequence_family"]) == seq
@@ -1472,16 +1646,36 @@ class TestProperty23DynamicRowIdentity:
         entropy = [h["site"] for h in _entropy_key_sites(files)]
         declared_entropy = [h["site"] for h in inv["generated_opaque_family"]]
         assert len(declared_entropy) == len(set(declared_entropy))
-        assert sorted(declared_entropy) == sorted(entropy), (declared_entropy, entropy)
+        # 未改线文件逐值相等；已改线文件（熵键生成移入 shared/stableRowIdentity.ts）只许减少
+        d_keep, d_edit = _split_by_edited(declared_entropy)
+        c_keep, c_edit = _split_by_edited(entropy)
+        assert d_keep == c_keep, (d_keep, c_keep)
+        assert len(c_edit) <= len(d_edit), (d_edit, c_edit)
 
     def test_array_addressing_family_counts_recompute(self, manifest_slice: dict) -> None:
         """**Validates: Requirements 6.5** —— N 的系统性形态（48 处）逐族等值。"""
         inv = manifest_slice["dynamic_row_identity"]["positional_identity_inventory"]
-        computed = _array_addressing_counts(_n_cycle_files())
+        files = _n_cycle_files()
+        computed = _array_addressing_counts(files)
         declared = inv["array_addressing_family_counts"]
         assert set(declared) == set(computed), (sorted(declared), sorted(computed))
-        assert declared == computed, (declared, computed)
-        assert inv["counters"]["array_addressing_sites"] == sum(computed.values())
+        assert inv["counters"]["array_addressing_sites"] == sum(declared.values())
+        # 🔴 N foundation Task 16：按下标寻址只许**单调下降**（改造成按身份寻址），
+        #    且下降量必须全部来自已登记的改线文件 —— 未登记文件的计数仍逐值相等。
+        untouched = [p for p in files
+                     if p.relative_to(ROOT).as_posix()
+                     not in _post_slice_facts().POST_SLICE_EDITED_FILES]
+        edited = [p for p in files if p not in untouched]
+        frozen = _post_slice_facts().ARRAY_ADDRESSING_EDITED_FILES_AT_SLICE
+        assert set(frozen) == set(declared), (sorted(frozen), sorted(declared))
+        now_untouched = _array_addressing_counts(untouched)
+        now_edited = _array_addressing_counts(edited)
+        for k in declared:
+            # 未改线文件：逐值相等（漂移照样打红）
+            assert now_untouched[k] == declared[k] - frozen[k], (
+                k, declared[k], frozen[k], now_untouched[k])
+            # 已改线文件：只许单调下降
+            assert now_edited[k] <= frozen[k], (k, frozen[k], now_edited[k])
         assert all(v > 0 for v in computed.values()), computed
 
     def test_identity_counters_recompute(self, manifest_slice: dict) -> None:
@@ -1490,10 +1684,23 @@ class TestProperty23DynamicRowIdentity:
         sec = manifest_slice["dynamic_row_identity"]
         inv = sec["positional_identity_inventory"]
         c = inv["counters"]
-        assert c["render_key_hits"] == len(_render_key_hits(files))
-        assert c["persistence_key_hits"] == len(_persist_key_hits(files))
+        # 缺陷族计数：只许下降，且下降全部来自已登记改线文件
+        for counter, hits in (("render_key_hits", _render_key_hits(files)),
+                              ("persistence_key_hits", _persist_key_hits(files))):
+            keep, _ = _split_by_edited([h["site"] for h in hits])
+            assert len(hits) <= c[counter], (counter, c[counter], len(hits))
+            declared_family = inv["render_key_family" if counter == "render_key_hits"
+                                  else "persistence_key_family"]
+            d_keep, _ = _split_by_edited([h["site"] for h in declared_family])
+            assert len(keep) == len(d_keep), (counter, d_keep, keep)
         assert c["display_sequence_sites"] == len(_display_seq_sites(files))
-        assert c["generated_opaque_sites"] == len(_entropy_key_sites(files))
+        # 熵键族：已改线文件的站点已移入 shared/stableRowIdentity.ts（只许减少），其余逐值相等
+        declared_entropy = [h["site"] for h in inv["generated_opaque_family"]]
+        assert c["generated_opaque_sites"] == len(declared_entropy)
+        d_keep, d_edit = _split_by_edited(declared_entropy)
+        c_keep, c_edit = _split_by_edited([h["site"] for h in _entropy_key_sites(files)])
+        assert len(c_keep) == len(d_keep), (d_keep, c_keep)
+        assert len(c_edit) <= len(d_edit), (d_edit, c_edit)
         assert c["defect_hits_total"] == c["render_key_hits"] + c["persistence_key_hits"]
         assert c["tables_total"] == len(sec["tables"])
         assert c["tables_with_defect"] == len(
@@ -1506,7 +1713,7 @@ class TestProperty23DynamicRowIdentity:
             len(manifest_slice["independent_entries"]) - len(defect_entries))
         files_with = {h["site"].split("#")[0] for h in _render_key_hits(files)} | {
             h["site"].split("#")[0] for h in _persist_key_hits(files)}
-        assert c["files_with_positional_identity_defect"] == len(files_with)
+        assert len(files_with) <= c["files_with_positional_identity_defect"], files_with
 
     def test_hardcoded_scan_is_all_zero_and_non_vacuous(self, manifest_slice: dict) -> None:
         """**Validates: Requirements 6.4, 6.5**
@@ -1579,7 +1786,11 @@ class TestNCycleFormDifferences:
             else:
                 assert imports and not inline, (e["entry_id"], imports, inline)
                 assert (ROOT / carrier["module"]).is_file()
-                assert "useN" in _line_at(carrier["import_site"])
+                if _is_post_slice_edited(e["host_path"]):
+                    # 宿主改线后冻结行号会漂移；改验真实 import 语义
+                    assert re.search(rf"import\s*\{{[^}}]*useN\dDualMode", body), e["entry_id"]
+                else:
+                    assert "useN" in _line_at(carrier["import_site"])
         assert list(WP_COMPOSABLES.glob("useN*EntryDualMode.ts")) == [], (
             "N 域出现了 M 式 `*EntryDualMode.ts` ⇒ ND-2 的形态判断要重做"
         )
@@ -1594,13 +1805,27 @@ class TestNCycleFormDifferences:
         """
         ms = manifest_slice["mode_switch_resolution"]
         inert = sorted(eid for eid, v in ms["per_entry_verdict"].items() if v == "inert")
+        redeemed = _post_slice_facts().REDEEMED_SWITCH_ENTRIES
+        # 🔴 登记兑现的只能是 slice 判 inert 的那几条（防把别的 entry 塞进来逃避判据）
+        assert redeemed <= set(inert), (sorted(redeemed), inert)
+        still_inert = sorted(set(inert) - redeemed)
         computed: list[str] = []
         for e in manifest_slice["independent_entries"]:
             body = _strip_comments(_cached_text(ROOT / e["host_path"]))
             if re.search(r"onModeChange\s*:\s*\(\)\s*=>\s*\{\s*\}", body):
                 computed.append(e["entry_id"])
-        assert sorted(computed) == inert, (sorted(computed), inert)
+        assert sorted(computed) == still_inert, (sorted(computed), still_inert)
+        # 已兑现的必须真兑现：空实现消失 + currentMode 有真实赋值
+        for e in manifest_slice["independent_entries"]:
+            if e["entry_id"] not in redeemed:
+                continue
+            body = _strip_comments(_cached_text(ROOT / e["host_path"]))
+            assert re.search(r"currentMode\.value\s*=(?!=)", body), (
+                f"{e['entry_id']} 登记为已兑现，但 currentMode 无任何赋值 ⇒ 仍是 inert"
+            )
         for ev in ms["inert_evidence"]:
+            if ev["entry_id"] in redeemed:
+                continue
             assert re.search(r"onModeChange\s*:\s*\(\)\s*=>\s*\{\s*\}",
                              _line_at(ev["noop_callback_site"])), ev
             assert "const dualMode" in _line_at(ev["inline_carrier_site"]), ev
@@ -1633,12 +1858,21 @@ class TestNCycleFormDifferences:
                      if "/api/workpapers/onlyoffice/health" in line]
             if lines:
                 hits[e["entry_id"]] = lines
-        assert list(hits) == ["xlsx/gt-n3-deferred-tax-liabilities"], hits
-        assert hits["xlsx/gt-n3-deferred-tax-liabilities"] == [180], hits
+        converged = _post_slice_facts().HEALTH_CONVERGED_HOSTS
+        declared = {"xlsx/gt-n3-deferred-tax-liabilities"}
+        assert converged <= declared, "只许收敛 slice 登记过直调的宿主"
+        assert set(hits) == declared - converged, hits
+        if "xlsx/gt-n3-deferred-tax-liabilities" in hits:
+            assert hits["xlsx/gt-n3-deferred-tax-liabilities"] == [180], hits
+        for eid in converged:
+            host = next(e for e in manifest_slice["independent_entries"] if e["entry_id"] == eid)
+            assert "fetchOnlyOfficeHealthy" in _strip_comments(
+                _cached_text(ROOT / host["host_path"])), f"{eid} 登记为已收敛却未接能力层"
+        counted = len(hits) + len(converged)
         assert manifest_slice["orphan_dual_mode_inventory"]["counters"][
-            "hosts_calling_legacy_health_endpoint_directly"] == len(hits)
+            "hosts_calling_legacy_health_endpoint_directly"] == counted
         nd4 = next(d for d in manifest_slice["n_cycle_form_differences"] if d["id"] == "ND-4")
-        assert nd4["value"] == len(hits)
+        assert nd4["value"] == counted
 
     def test_nd6_dirty_sheet_name_literals_recompute(self, manifest_slice: dict) -> None:
         """**Validates: Requirements 6.10**"""
@@ -1708,14 +1942,23 @@ class TestOrphanInventory:
         declared = [m["file"] for m in inv["modules"]] + [
             m["file"] for m in inv["orphan_non_dual_mode_modules"]]
         assert len(declared) == len(set(declared)), declared
+        deleted = _post_slice_facts().DELETED_ORPHANS
+        # 🔴 只许删 slice 判为 orphan 的模块（防把 live 模块登记成「已删」逃避判据）
+        assert set(deleted) <= set(declared), sorted(set(deleted) - set(declared))
         computed: list[str] = []
         for module in _n_composables():
             prod, _ = _statement_edges_to(module)
             if not prod:
                 computed.append(_rel(module))
-        assert sorted(declared) == sorted(computed), (sorted(declared), sorted(computed))
+        created = set(_post_slice_facts().SECOND_ORDER_ORPHANS_CREATED)
+        assert not (created & set(declared)), "二阶 orphan 登记不得与 slice 已声明的重叠"
+        remaining = sorted((set(declared) - set(deleted)) | created)
+        assert remaining == sorted(computed), (remaining, sorted(computed))
         for m in inv["modules"] + inv["orphan_non_dual_mode_modules"]:
             path = ROOT / m["file"]
+            if m["file"] in deleted:
+                assert not path.exists(), f"{m['file']} 登记为已删却仍在磁盘上"
+                continue
             assert path.is_file(), m["file"]
             assert m["lines"] == len(_cached_text(path).splitlines()), m["file"]
             assert m.get("production_consumers") in (0, [])
@@ -1730,10 +1973,15 @@ class TestOrphanInventory:
         inv = manifest_slice["orphan_dual_mode_inventory"]
         for m in inv["live_modules"]:
             prod, _ = _statement_edges_to(ROOT / m["file"])
-            assert sorted(m["production_consumers"]) == prod, (m["file"],
-                                                               m["production_consumers"], prod)
+            def _edge_key(ref: str) -> str:
+                path = ref.split("#", 1)[0]
+                return path if _is_post_slice_edited(path) else ref
+            assert sorted(_edge_key(r) for r in m["production_consumers"]) == sorted(
+                _edge_key(r) for r in prod
+            ), (m["file"], m["production_consumers"], prod)
             assert len(prod) > 0
-            assert m["lines"] == len(_cached_text(ROOT / m["file"]).splitlines())
+            if not _is_post_slice_edited(m["file"]):  # 改线文件行数漂移是预期的
+                assert m["lines"] == len(_cached_text(ROOT / m["file"]).splitlines())
 
     def test_orphans_are_all_first_order_because_there_is_no_barrel(
         self, manifest_slice: dict
@@ -1751,13 +1999,14 @@ class TestOrphanInventory:
     ) -> None:
         """**Validates: Requirements 1.7**"""
         inv = manifest_slice["orphan_dual_mode_inventory"]
+        deleted = set(_post_slice_facts().DELETED_ORPHANS)
         on_disk = sorted(_rel(p) for p in WP_COMPOSABLES.glob("useN*DualMode.ts"))
         orphan = sorted(m["file"] for m in inv["modules"])
         live = sorted(m["file"] for m in inv["live_modules"])
         assert not (set(orphan) & set(live))
-        assert sorted(orphan + live) == on_disk, (sorted(orphan + live), on_disk)
+        assert sorted(set(orphan + live) - deleted) == on_disk, (sorted(orphan + live), on_disk)
         c = inv["counters"]
-        assert c["dual_mode_module_files_total"] == len(on_disk)
+        assert c["dual_mode_module_files_total"] == len(on_disk) + len(deleted & set(orphan))
         assert c["orphan_dual_mode_modules"] == len(orphan)
         assert c["live_dual_mode_modules"] == len(live)
 
@@ -1789,6 +2038,9 @@ class TestOrphanInventory:
         """
         inv = manifest_slice["orphan_dual_mode_inventory"]
         for m in inv["modules"]:
+            if m["file"] in _post_slice_facts().DELETED_ORPHANS:
+                assert not (ROOT / m["file"]).exists(), m["file"]
+                continue
             body = _strip_comments(_cached_text(ROOT / m["file"]))
             assert m["localStorage_key"] in body, m["file"]
             assert m["storage_key_is_wp_scoped"] is False
@@ -1810,17 +2062,29 @@ class TestOrphanInventory:
         """**Validates: Requirements 12.4**"""
         inv = manifest_slice["orphan_dual_mode_inventory"]
         c = inv["counters"]
+        facts = _post_slice_facts()
         orphan_health = [m["file"] for m in inv["modules"]
-                         if "/api/workpapers/onlyoffice/health"
+                         if m["file"] not in facts.DELETED_ORPHANS
+                         and "/api/workpapers/onlyoffice/health"
                          in _strip_comments(_cached_text(ROOT / m["file"]))]
-        assert c["orphan_modules_calling_legacy_health_endpoint"] == len(orphan_health)
+        assert c["orphan_modules_calling_legacy_health_endpoint"] == (
+            len(orphan_health) + facts.DELETED_ORPHANS_CALLING_LEGACY_HEALTH)
         live_health = [m["file"] for m in inv["live_modules"]
                        if "/api/workpapers/onlyoffice/health"
                        in _strip_comments(_cached_text(ROOT / m["file"]))]
-        assert c["live_modules_calling_legacy_health_endpoint"] == len(live_health)
+        assert c["live_modules_calling_legacy_health_endpoint"] == (
+            len(live_health) + facts.LIVE_MODULES_HEALTH_CONVERGED)
         config = [m["file"] for m in inv["modules"] + inv["live_modules"]
-                  if "onlyoffice-config" in _strip_comments(_cached_text(ROOT / m["file"]))]
-        assert c["dual_mode_modules_calling_legacy_config_endpoint"] == len(config)
+                  if (ROOT / m["file"]).exists()
+                  and "onlyoffice-config" in _strip_comments(_cached_text(ROOT / m["file"]))]
+        assert c["dual_mode_modules_calling_legacy_config_endpoint"] == (
+            len(config) + facts.LIVE_MODULES_CONFIG_CONVERGED)
+        # 收敛去向：平台能力层（N 域外唯一实现），不是被删掉了事
+        for rel, lit in (("audit-platform/frontend/src/components/workpaper/sync/onlyOfficeHealth.ts",
+                          "/api/workpapers/onlyoffice/health"),
+                         ("audit-platform/frontend/src/components/workpaper/sync/onlyOfficeSheetConfig.ts",
+                          "onlyoffice-config")):
+            assert lit in _strip_comments(_cached_text(ROOT / rel)), rel
 
     def test_shared_base_edges_recompute_and_are_not_copied_from_m(
         self, manifest_slice: dict
@@ -1831,17 +2095,15 @@ class TestOrphanInventory:
         """
         sb = manifest_slice["orphan_dual_mode_inventory"]["shared_base_preserved"]
         prod, test = _statement_edges_to(SHARED_BASE)
-        assert sb["statement_production_consumers"] == len(prod), (
-            sb["statement_production_consumers"], len(prod))
-        assert sb["statement_test_consumers"] == len(test), (
-            sb["statement_test_consumers"], len(test))
-        assert sb["statement_consumers_total"] == len(prod) + len(test)
+        facts = _post_slice_facts()
+        # slice 的 26 是冻结快照，现算基线集中在 n_cycle_facts；不得照抄 M 的 29。
+        assert len(prod) == facts.SHARED_BASE_PRODUCTION_EDGES, len(prod)
+        assert len(test) == facts.SHARED_BASE_TEST_EDGES, len(test)
+        assert len(prod) != 29, "把 M 轮旧值抄进 N 轮了"
         n_edges = [r for r in prod if re.search(r"useN\d|GtN\d", r)]
-        assert sorted(sb["n_cycle_consumer_sites"]) == sorted(n_edges), (
-            sb["n_cycle_consumer_sites"], n_edges)
-        assert sb["n_cycle_consumers"] == len(n_edges)
-        assert sb["consumers_after_rewiring"] == len(prod) - len(n_edges)
-        assert sb["consumers_after_rewiring"] > 0, "判据不得写成「删完剩 0」"
+        assert len(n_edges) == facts.SHARED_BASE_N_EDGES, n_edges
+        assert any("useN2DualMode.ts" in r for r in n_edges)
+        assert len(prod) - len(n_edges) > 0, "判据不得写成「删完剩 0」"
         assert "不得照抄" in sb["recompute_note"]
 
     def test_orphan_counters_recompute(self, manifest_slice: dict) -> None:
@@ -2084,10 +2346,17 @@ class TestSheetGranularityAndRouter:
         """**Validates: Requirements 12.4** —— BP-10 的前提：N1/N3 未采用共享路由。"""
         audit = manifest_slice["sheet_granularity_and_router_audit"]
         shared, inline = [], []
+        adopted = _post_slice_facts().ROUTER_ADOPTED_ENTRIES
         for e in manifest_slice["independent_entries"]:
             sg = e["sheet_granularity"]
             body = _strip_comments(_cached_text(ROOT / e["host_path"]))
             uses_shared = bool(re.search(r"SheetRouting", body))
+            if e["entry_id"] in adopted:
+                # lane2 T2：slice 时点为内联正则，现已改用共享路由（只许兑现 slice 判 inline 的）
+                assert sg["router_kind"] != "shared_cycle_sheet_router", e["entry_id"]
+                assert uses_shared, f"{e['entry_id']} 登记为已采用共享路由，宿主却没用"
+                inline.append(e["entry_id"])
+                continue
             if sg["router_kind"] == "shared_cycle_sheet_router":
                 assert uses_shared, e["entry_id"]
                 assert (ROOT / sg["router_module"]).is_file()
@@ -2106,6 +2375,11 @@ class TestSheetGranularityAndRouter:
     def test_n1_host_runs_the_code_regex_before_the_disclosure_check(self) -> None:
         """**Validates: Requirements 12.4** —— BP-10 的正面判据（形态在源码里真存在）。"""
         body = _strip_comments(_cached_text(WP_COMPONENTS / "GtN1DeferredTaxAssets.vue"))
+        if "xlsx/gt-n1-deferred-tax-assets" in _post_slice_facts().ROUTER_ADOPTED_ENTRIES:
+            # BP-10 已解除：宿主不得再有内联 wp_code 正则，判定走共享路由（披露前置）
+            assert "N1-[1-5]" not in body, "N1 宿主仍有内联 wp_code 正则"
+            assert "normalizeN1SheetName" in body
+            return
         lines = body.split("\n")
         code_line = next(i for i, l in enumerate(lines, 1) if "N1-[1-5]" in l)
         disclosure_line = next(i for i, l in enumerate(lines, 1) if "上市公司" in l)
@@ -2165,9 +2439,14 @@ class TestModeSwitchResolution:
             assert gate["anchor_absent_because"] is None
             body = _strip_comments(_cached_text(ROOT / e["host_path"])).split("\n")
             computed = [i for i, l in enumerate(body, 1) if "<el-segmented" in l]
-            assert gate["segmented_sites_in_gate"] == computed, (e["entry_id"], computed)
             oo = [i for i, l in enumerate(body, 1) if "<GtOnlyOfficeSheet" in l]
-            assert gate["oo_mount_sites"] == oo, (e["entry_id"], gate["oo_mount_sites"], oo)
+            if _is_post_slice_edited(e["host_path"]):
+                # 已改线宿主：行号漂移是预期的，改验**结构**（站点个数不变）
+                assert len(computed) == len(gate["segmented_sites_in_gate"]), e["entry_id"]
+                assert len(oo) == len(gate["oo_mount_sites"]), (e["entry_id"], oo)
+            else:
+                assert gate["segmented_sites_in_gate"] == computed, (e["entry_id"], computed)
+                assert gate["oo_mount_sites"] == oo, (e["entry_id"], gate["oo_mount_sites"], oo)
             assert e["mount_count"] == len(oo), (e["entry_id"], e["mount_count"], len(oo))
 
     def test_switch_counters_recompute(self, manifest_slice: dict) -> None:
@@ -2357,9 +2636,22 @@ class TestProperty70CrossEntryIsolation:
         for token in ("belongs_to_entry", "review.entry_id", "candidate", "registry",
                       "template_ref", "item_id"):
             assert token in joined, token
-        assert set(ce["production_contract_files"]) == {
-            p.name for p in CONTRACT_DIR.glob("*.json") if p.name != CANDIDATE_CONTRACT_FILE}
-        assert ce["candidate_contract_files"] == [CANDIDATE_CONTRACT_FILE]
+        current_files = {p.name for p in CONTRACT_DIR.glob("*.json")}
+        # slice 是冻结快照：当时的生产/candidate 契约必须仍存在；后续循环新增契约允许增长。
+        assert set(ce["production_contract_files"]) <= current_files
+        assert set(ce["candidate_contract_files"]) <= current_files
+        # 当前目录逐文件读 review.entry_id，除 N4 canary 外不得有任何 N entry（核心隔离不变量）。
+        # 🔴 N4 已交付 reviewed 生产契约（真改线），其 review.entry_id ∈ n_ids 是合法的；
+        #    仅豁免 N4（n_cycle_facts.DELIVERED_CONTRACT_ADAPTER_IDS），其余 N 仍零归属。
+        _facts = _post_slice_facts()
+        n_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
+        current_owners = {
+            (_load(p).get("review") or {}).get("entry_id")
+            for p in CONTRACT_DIR.glob("*.json")
+            if _load(p).get("contract_id") not in _facts.DELIVERED_CONTRACT_ADAPTER_IDS
+        }
+        assert not (current_owners & n_ids), current_owners & n_ids
+        assert CANDIDATE_CONTRACT_FILE in ce["candidate_contract_files"]
 
     def test_template_owner_mapping_is_a_bijection(self, manifest_slice: dict) -> None:
         """**Validates: Requirements 12.12** —— SR-8。"""
@@ -2369,7 +2661,11 @@ class TestProperty70CrossEntryIsolation:
         assert None not in owners
         assert len(set(owners)) == len(owners) == len(ids)
         assert set(owners) == ids
-        on_disk = {p.name for p in N_TEMPLATE_DIR.iterdir() if not p.name.startswith("~$")}
+        # 🔴 排除 OOXML 净化负例备份 `*.preclean.bak`（Task 7a 产物，门负例，非模板册）。
+        on_disk = {
+            p.name for p in N_TEMPLATE_DIR.iterdir()
+            if not p.name.startswith("~$") and not p.name.endswith(".preclean.bak")
+        }
         assert {f["name"] for f in files} == on_disk
         assert [p.name for p in N_TEMPLATE_DIR.iterdir() if p.name.startswith("~$")] == []
         assert manifest_slice["authoritative_templates"]["reference_copy_status"] == (
@@ -2434,7 +2730,9 @@ class TestDeletionPlanConsistency:
         assert not (orphan & other) and not (orphan & live) and not (other & live)
         assert not ((orphan | other | live) & hosts)
         on_disk = {_rel(p) for p in WP_COMPOSABLES.glob("useN*DualMode.ts")}
-        assert orphan | live == on_disk, (sorted(orphan | live), sorted(on_disk))
+        deleted = set(_post_slice_facts().DELETED_ORPHANS)
+        assert deleted <= orphan | other, "已删登记只许出现在 plan 的 orphan 类里"
+        assert (orphan | live) - deleted == on_disk, (sorted(orphan | live), sorted(on_disk))
         inline_hosts = {
             e["host_path"] for e in manifest_slice["independent_entries"]
             if e["dual_mode_carrier"]["kind"].startswith("host_inline")}

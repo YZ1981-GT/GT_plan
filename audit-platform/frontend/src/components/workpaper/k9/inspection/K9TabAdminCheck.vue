@@ -253,7 +253,7 @@
     </details>
 
     <el-dialog v-model="samplingVisible" title="抽凭引擎 — 管理费用(6602)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="6602" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
+      <GtVoucherSamplingEngine v-if="samplingVisible" :account-code="samplingAccountCode" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
     </el-dialog>
   </div>
 </template>
@@ -271,6 +271,17 @@ import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
 import { generateK9AiText } from '../../composables/useK9AiText'
+
+/**
+ * 抽凭科目码取自单一真源 `k9AccountScope`（K9 管理费用）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { k9QueryCodes } from '../../composables/k9AccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = k9QueryCodes().join(',')
 
 /** K9 管理费用凭证检查 5 项核对（第⑤项为「费用分类正确」，非 K1「债务人核对」） */
 const K9_CHECK_LABELS = [

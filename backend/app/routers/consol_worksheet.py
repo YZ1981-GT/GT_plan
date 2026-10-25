@@ -3,7 +3,13 @@
 prefix=/api/consolidation/worksheet
 
 端点：
-- GET  /tree                    企业树
+- GET  /tree                    企业树（含合并方式识别、诊断、年度）
+- GET  /accounts                差额录入可选科目
+- GET  /node-amounts            节点按科目归一后的金额（实时求值）
+- GET  /report-trial            合并试算平衡表页（按报表行次五列净额，读时计算）
+- GET  /report-breakdown        报表差额表（汇总节点的子节点各一列 + 合计）
+- GET  /drill/entries           报表行 → 分录明细（已审批、贡献之和 = 该行该列）
+- GET  /drill/individual        报表行 → 各数据节点个别数
 - POST /recalc                  全量重算差额表
 - GET  /aggregate               节点汇总查询
 - GET  /drill/companies         穿透到企业构成
@@ -78,13 +84,165 @@ async def get_tree(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """返回完整企业树 JSON"""
-    from app.services.consol_tree_service import build_tree, to_dict
+    """企业树 + 合并方式识别 + 诊断 + 年度（consol-tree-three-code-autobuild 需求 3 / 4.4 / 9.4）。
 
-    tree = await build_tree(db, project_id)
-    if not tree:
-        return {"tree": None, "message": "未找到项目或无子项目"}
-    return {"tree": to_dict(tree)}
+    ``tree`` 节点保留旧字段并含 ``node_key/role/kind/display_name/relation/host_project_id/flags``；
+    ``diagnostics`` 含企业树推导诊断与未归属的已审批分录。项目不存在时 ``tree`` 为空并给出说明。
+    """
+    from app.services.consol_tree_service import build_tree_view
+
+    view = await build_tree_view(db, project_id)
+    if view is None:
+        return {
+            "tree": None, "mode": None, "mode_label": None, "diagnostics": [], "year": None,
+            "message": "项目不存在或已删除",
+        }
+    return view
+
+
+@router.get("/accounts")
+async def get_accounts(
+    project_id: UUID = Query(...),
+    year: int | None = Query(None, description="年度；不传取本项目审计年度"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """差额录入可选科目（需求 9.3）：本树数据叶子试算表科目 ∪ 本树分录明细行科目。
+
+    每个科目带名称、类别、自然方向（借方性质 / 贷方性质，与金额归一同一判定）与来源。
+    """
+    from app.services.consol_calc_basis import load_account_options
+    from app.services.consol_group_tree import build_group_tree
+
+    result = await build_group_tree(db, project_id)
+    if result is None or result.root is None:
+        raise HTTPException(status_code=404, detail="项目不存在或已删除")
+    effective_year = year if year is not None else result.year
+    if effective_year is None:
+        return {"year": None, "accounts": []}
+    return {"year": effective_year, "accounts": await load_account_options(db, result.root, effective_year)}
+
+
+@router.get("/node-amounts")
+async def get_node_amounts(
+    project_id: UUID = Query(...),
+    node_key: str = Query(..., description="节点键：{企业代码}:{角色}"),
+    year: int | None = Query(None, description="年度；不传取本项目审计年度"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """某节点按科目归一后的金额（需求 9.3）：实时按计算口径求值，与重算写入差额表的数一致，不写库。"""
+    from app.services.consol_calc_basis import NodeNotFoundError, load_node_amounts
+
+    try:
+        payload = await load_node_amounts(db, project_id, node_key, year)
+    except NodeNotFoundError:
+        raise HTTPException(status_code=404, detail=f"企业树中没有节点 {node_key}") from None
+    if payload is None:
+        raise HTTPException(status_code=404, detail="项目不存在或已删除")
+    return payload
+
+
+async def _view_context(db: AsyncSession, project_id: UUID, year: int | None):
+    from app.services.consol_report_view_service import load_view_context
+
+    ctx = await load_view_context(db, project_id, year)
+    if ctx is None:
+        raise HTTPException(status_code=404, detail="项目不存在、不是合并项目，或无法确定审计年度")
+    return ctx
+
+
+def _view_error(err) -> HTTPException:
+    return HTTPException(status_code=getattr(err, "status", 404), detail=str(err))
+
+
+@router.get("/report-trial")
+async def get_report_trial(
+    project_id: UUID = Query(...),
+    report_type: str = Query("balance_sheet", description="报表类型"),
+    node_key: str | None = Query(None, description="汇总节点；不传取根合并节点"),
+    year: int | None = Query(None, description="年度；不传取本项目审计年度"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """合并试算平衡表页（spec consol-elimination-single-source-push §五）：按报表行次的五列净额。
+
+    审定汇总 / 权益抵销 / 往来交易抵销 / 报表调整 / 合并审定数，均为按科目自然方向归一后的净额；
+    与合并报表、报表差额表同一个求值函数，读时计算不写库。
+    """
+    from app.services.consol_report_view_service import ViewError, trial_view
+
+    ctx = await _view_context(db, project_id, year)
+    try:
+        view = await trial_view(ctx.basis, ctx.rows, report_type=report_type, node_key=node_key)
+    except ViewError as e:
+        raise _view_error(e) from e
+    return {"year": ctx.year, "applicable_standard": ctx.standard, **view}
+
+
+@router.get("/report-breakdown")
+async def get_report_breakdown(
+    project_id: UUID = Query(...),
+    report_type: str = Query("balance_sheet", description="报表类型"),
+    node_key: str | None = Query(None, description="汇总节点；不传取根合并节点"),
+    year: int | None = Query(None, description="年度；不传取本项目审计年度"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """报表差额表（§六）：列 = 汇总节点的直接子节点（数据 / 差额 / 下级汇总），合计 = 该节点合并数。"""
+    from app.services.consol_report_view_service import ViewError, aggregate_nodes, breakdown_view
+
+    ctx = await _view_context(db, project_id, year)
+    try:
+        view = await breakdown_view(ctx.basis, ctx.rows, report_type=report_type, node_key=node_key)
+    except ViewError as e:
+        raise _view_error(e) from e
+    return {
+        "year": ctx.year, "applicable_standard": ctx.standard,
+        "aggregate_nodes": aggregate_nodes(ctx.basis.tree), **view,
+    }
+
+
+@router.get("/drill/entries")
+async def drill_entries(
+    project_id: UUID = Query(...),
+    row_code: str = Query(..., description="报表行次"),
+    measure: str = Query(..., description="elim_equity / elim_trade / adjustment / consolidated"),
+    node_key: str | None = Query(None, description="汇总节点；不传取根合并节点"),
+    year: int | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """报表行 → 分录明细（§五 穿透）：只计已审批、已归属到该节点子树的分录；贡献之和 = 该行该列。"""
+    from app.services.consol_report_view_service import ViewError, load_entry_drill
+
+    ctx = await _view_context(db, project_id, year)
+    try:
+        return {"year": ctx.year, **await load_entry_drill(
+            db, ctx, row_code=row_code, measure=measure, node_key=node_key,
+        )}
+    except ViewError as e:
+        raise _view_error(e) from e
+
+
+@router.get("/drill/individual")
+async def drill_individual(
+    project_id: UUID = Query(...),
+    row_code: str = Query(..., description="报表行次"),
+    node_key: str | None = Query(None, description="汇总节点；不传取根合并节点"),
+    year: int | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """报表行 → 各数据节点个别数（§五 审定汇总列穿透）：子树内每个数据叶子对该行的求值。"""
+    from app.services.consol_report_view_service import ViewError, load_individual_drill
+
+    ctx = await _view_context(db, project_id, year)
+    try:
+        rows = await load_individual_drill(ctx, row_code=row_code, node_key=node_key)
+    except ViewError as e:
+        raise _view_error(e) from e
+    return {"year": ctx.year, "row_code": row_code, "rows": rows}
 
 
 @router.post("/recalc")

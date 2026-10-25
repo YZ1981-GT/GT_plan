@@ -8,14 +8,13 @@ spec: `i2-i4-i5-carrier-and-structure-exceptions` · Task 17 / 18
 | 维度 | I2 | 其余 5 条 |
 |---|---|---|
 | 二级 UI 门控 | 🔴 **无**（`isOoAvailable` 与「仅结构化视图」tag 命中均 0） | 各有 2 / 1 |
-| TB 发布门层级 | 🔴 **`host_tab`**（`I2TabAdjudication.vue#L384` 自建） | `composable` |
+| TB 发布门层级 | ✅ **`composable`**（2026-10-01 从 `I2TabAdjudication.vue` 收敛到 `useI2Adjudication.ts#publishToTb`） | `composable` |
 | 第二写路径 | 🔴 **有**（`useI2FormData.ts#L185` 的 `api.put`） | 无 |
 
 三条含义：
 
-1. 🔴 「I 循环 6/6 全有 TB 发布门」是 **entry 维度**成立的结论。判据若写成
-   「composable 里必须有 `publishToTb`」，**I2 会假红** —— `useI2Adjudication.ts` 里
-   那个符号 **0 命中**。判据必须按 entry 维度找门并记录 `gate_layer`。
+1. ✅ 2026-10-01 已收敛：I2 的 `publishToTb` 从 host `.vue` 搬到 `useI2Adjudication.ts`，
+   六条 I entry 统一由 composable 承担「二次确认 → save → 唯一 publish-to-tb 端点」。
 2. 🔴 缺二级门控意味着 OO 探测失败时切换按钮**照样显示** ⇒ 违反 AC 1.5。
    判据若写「全 slice 都有二级门控」会在 I2 上**静默恒真**（找不到就跳过），恰好漏掉最严重那条。
 3. 🔴 **第二写路径是活代码不是死代码**：`useI2FormData.ts`（501 行）import 生产消费现算 **4**
@@ -84,8 +83,10 @@ ADAPTER_ID: Final[str] = "i2.development_expenditure_detail"
 WP_CODES: Final[frozenset[str]] = frozenset({"I2D"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "I/I2 开发支出.xlsx"
+#: 🔴 2026-10-01 净化（`sanitize_i_cycle_template_external_links.py`，过 OOXML 门）后现算；
+#: 净化前 `a93c298b1f4adfe28532ba899a9e44904459534c703158a5b4e6d92ca4d67178`（slice 冻结值，append-only 保留；`.preclean.bak` 即其字节）。
 TEMPLATE_SHA256: Final[str] = (
-    "a93c298b1f4adfe28532ba899a9e44904459534c703158a5b4e6d92ca4d67178"
+    "90e7199909bdb70a21b071b0b69c90d2bb3dbe16f77be049ceaa2d21260dd3ef"
 )
 
 STORE_ITEM_ID: Final[str] = _i202.STORE_ITEM_ID_I202
@@ -95,8 +96,8 @@ ROW_IDENTITY_STORE_KEY: Final[str] = _i202.ROW_IDENTITY_STORE_KEY_I202
 PAYLOAD_COLUMN: Final[str] = "remark"
 PAYLOAD_COLUMN_MODE: Final[str] = "remark_only"
 
-#: 🔴 I2 的门在 `.vue` 自建，不在 composable（全 I 唯一）。
-TB_PUBLISH_GATE: Final[str] = "i2/core/I2TabAdjudication.vue#L384"
+#: ✅ 2026-10-01 收敛到 composable（宿主只绑定按钮）。
+TB_PUBLISH_GATE: Final[str] = "composables/useI2Adjudication.ts#publishToTb"
 
 EntrySelectionError = HC.HEntrySelectionError
 StorePayloadError = HC.HStorePayloadError
@@ -117,11 +118,10 @@ _EXTRA_REVIEW: Final[dict[str, Any]] = {
         "全 I 唯一缺二级门控：宿主 isOoAvailable 与「仅结构化视图」tag 命中均 0 ⇒ "
         "OO 探测失败时切换按钮照样显示。判据写「全 slice 都有二级门控」会在本条上静默恒真。"
     ),
-    "gate_layer": "host_tab",
+    "gate_layer": "composable",
     "gate_layer_note": (
-        "全 I 唯一发布门不在 composable：useI2Adjudication.ts 里 publishToTb 0 命中，"
-        "门在 I2TabAdjudication.vue#L384 自建 ⇒ 判据按 composable 找门会让本条假红。"
-        "「I 循环 6/6 全有发布门」是 entry 维度成立的结论。"
+        "✅ 2026-10-01 已从 I2TabAdjudication.vue 自建收敛到 "
+        "useI2Adjudication.ts#publishToTb；宿主只绑定按钮，端点/二次确认/互斥锁语义不变。"
     ),
     # 🔴 IE-1：第二写路径是活代码
     "second_write_path": "composables/useI2FormData.ts#L185",
@@ -138,7 +138,7 @@ _EXTRA_REVIEW: Final[dict[str, Any]] = {
         "read": "host_inline_render_config_refetch",
         "force_component_type": "i2-development-expenditure",
         "tb_publish_gate": TB_PUBLISH_GATE,
-        "gate_layer": "host_tab",
+        "gate_layer": "composable",
         "mounts": 2,
         "host_checklist_get_hits": 0,
     },
@@ -449,3 +449,74 @@ async def resolve_published_frozen_definitions(
     return await HC.resolve_published_frozen_definitions(
         IDENTITY, session=session, representation=representation, contract=contract
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ── 五环发布面（委托 HC，2026-10-01）
+#
+# 🔴 硬前置：`projection_provisioning.load_projection_supply()` 只认
+#    `publish_pilot_definitions` + `PILOT_WP_CODES`；`projection_first_publication`
+#    另要 `instrumentation_spec()`（单数 = 主表）与 `build_store_projection`。
+#    实现全在 `phase5_h_cycle_common`，这里只写薄委托（与 J1 / L1 同形，不复制逻辑）。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def instrumentation_spec() -> ExcelInstrumentationSpec:
+    return HC.primary_instrumentation_spec(IDENTITY, managed_row_table_specs())
+
+
+def build_store_projection(
+    payload: Any,
+    *,
+    contract: SyncContract,
+    limits: Any | None = None,
+    store_item_id: str | None = None,
+) -> Any:
+    """🔴 `payload` 必须是首位位置参数（golden digest 门按此调用）。"""
+    return HC.build_store_projection_for(
+        IDENTITY,
+        managed_row_table_specs(),
+        payload,
+        contract=contract,
+        limits=limits,
+        store_item_id=store_item_id,
+    )
+
+
+def merge_projection_into_store_rows(
+    *, projection: Any, base_rows: list, store_item_id: str | None = None
+) -> Any:
+    return HC.merge_projection_into_store_rows_for(
+        IDENTITY,
+        managed_row_table_specs(),
+        projection=projection,
+        base_rows=base_rows,
+        store_item_id=store_item_id,
+    )
+
+
+def iter_store_rows(payload: Any, *, store_item_id: str | None = None) -> Any:
+    return HC.iter_store_rows_for(
+        IDENTITY, managed_row_table_specs(), payload, store_item_id=store_item_id
+    )
+
+
+async def publish_definitions(publisher: Any) -> HC.HEntryDefinitions:
+    return await HC.publish_h_entry_definitions(
+        IDENTITY,
+        managed_row_table_specs(),
+        publisher=publisher,
+        contract_payload_builder=build_contract_payload,
+    )
+
+
+publish_pilot_definitions = publish_definitions
+
+#: 首版发布 binding 装配读的两个 provider 常量（与 J1 / L1 同名）。🔴 必须有：
+#: `ExcelInstrumentationSpec` 的字段名是 `uuid_col`，而 `projection_first_publication`
+#: 按 `spec.uuid_column or provider.UUID_COL` 取 ⇒ 缺这个常量时 UUID 列解析为 None，
+#: 首版发布炸在 `excel_entry_identity_inventory_invalid`（I6 实测）。
+#: 多受管表（I5）时 `ROWS_TABLE_KEY` 指向主表，其余由 sibling binding 覆盖。
+UUID_COL: Final[str] = instrumentation_spec().uuid_col
+ROWS_TABLE_KEY: Final[str] = managed_row_table_specs()[0].table_key
+PILOT_WP_CODES = WP_CODES

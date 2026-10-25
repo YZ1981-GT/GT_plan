@@ -4,6 +4,7 @@
  * 对齐 D2 importPostPaymentFromLedger 范式：科目改为 1221，窗口自 bs_date 起 N 个月。
  */
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getAuthHeaders } from '@/utils/authToken'
 
 export interface K1PostPaymentTargetRow {
   id: string
@@ -80,12 +81,11 @@ export async function fetchK1PostPaymentFromLedger(opts: {
   const postYear = start.getFullYear()
 
   try {
-    const token = sessionStorage.getItem('token') || ''
     const url =
       `/api/projects/${opts.projectId}/ledger/entries/1221?year=${postYear}` +
       `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}&limit=1000`
     const resp = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getAuthHeaders(),
     })
     if (!resp.ok) {
       ElMessage.info(`期后（${postYear}年）序时账无数据或未导入`)

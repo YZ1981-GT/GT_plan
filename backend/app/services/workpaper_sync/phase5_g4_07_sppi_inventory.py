@@ -42,7 +42,7 @@ ROW_IDENTITY_STORE_KEY_G407: Final[str] = "id"
 
 HEADER_ROW_G407: Final[int] = 13
 FOOTER_ROW_G407: Final[int] = 23
-FOOTER_MARKER_G407: Final[str] = "三、审计说明"
+FOOTER_MARKER_G407: Final[str] = "三、审计说明："
 
 #: 零公式列
 FORMULA_COLUMNS_G407: Final[tuple[str, ...]] = ()

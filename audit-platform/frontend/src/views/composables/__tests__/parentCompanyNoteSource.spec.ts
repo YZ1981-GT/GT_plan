@@ -109,6 +109,22 @@ describe('三态判定', () => {
     expect(view.scopeLabel).toBe('单体（母公司）')
   })
 
+  it('母公司汇总增量字段可见，不再把本部+分公司误称为单体', () => {
+    const view = readParentCompanySource({
+      [PARENT_SOURCE_META_KEY]: {
+        source_project_name: '甲公司（母公司）', source_company_code: 'G',
+        source_scope: 'parent_aggregate', source_node_key: 'G:parent', includes_branches: true,
+      },
+    })
+    expect(view).toMatchObject({
+      state: 'resolved', scopeLabel: '母公司汇总（本部＋分公司）',
+      sourceNodeKey: 'G:parent', includesBranches: true,
+    })
+    const text = parentCompanySourceSummary(view)
+    expect(text).toContain('母公司汇总节点「G:parent」')
+    expect(text).toContain('未审数与期初数为本部加分公司，不含母分差额')
+  })
+
   it('表级 parent_project_missing → missing（缺失优先于 meta）', () => {
     const view = readParentCompanySource({
       [PARENT_PROJECT_MISSING_KEY]: true,
@@ -155,6 +171,7 @@ describe('三态判定', () => {
 describe('口径标签中文化', () => {
   it('已知口径译成中文', () => {
     expect(parentScopeLabel('standalone')).toBe('单体（母公司）')
+    expect(parentScopeLabel('parent_aggregate')).toBe('母公司汇总（本部＋分公司）')
     expect(parentScopeLabel('consolidated')).toBe('合并')
   })
 

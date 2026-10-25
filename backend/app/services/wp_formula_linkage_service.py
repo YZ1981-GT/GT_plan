@@ -55,12 +55,16 @@ def expression_references_cell(
     wp_code: str,
     cell_or_col: str,
 ) -> bool:
-    """表达式是否引用指定底稿单元格/列。"""
+    """表达式是否引用指定底稿单元格/列。
+
+    当 cell_or_col 为空时，只要表达式引用了该 wp_code 就算命中（底稿级传播）。
+    """
     target_cell = (cell_or_col or "").strip().upper()
     code = (wp_code or "").strip()
     for ref_code, ref_arg in extract_wp_refs(expression):
-        if ref_code == code and ref_arg.strip().upper() == target_cell:
-            return True
+        if ref_code == code:
+            if not target_cell or ref_arg.strip().upper() == target_cell:
+                return True
     return False
 
 

@@ -56,8 +56,22 @@ async def auto_match(
     """自动匹配并直接保存映射结果。
 
     已映射的科目不会被覆盖，返回完整匹配详情供用户确认。
+
+    手动触发同样回写 active 数据集的 ``validation_summary.auto_map``：否则入库时自动映射
+    失败留下的红色提示，在用户点「重新映射」修好之后仍然挂着（状态只写不清）。
     """
-    return await mapping_service.auto_match(project_id, db, year=body.year if body else None)
+    result = await mapping_service.auto_match(project_id, db, year=body.year if body else None)
+    try:
+        from app.services.event_handlers._impl import record_auto_map_outcome
+
+        await record_auto_map_outcome(
+            project_id, body.year if body else None, result=result, error=None,
+        )
+    except Exception:  # noqa: BLE001 — 状态回写失败不影响映射本身（已提交）
+        import logging
+
+        logging.getLogger(__name__).warning("auto-match 结果回写数据集失败", exc_info=True)
+    return result
 
 
 @router.get(

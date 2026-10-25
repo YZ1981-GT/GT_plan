@@ -90,6 +90,10 @@ const STRING_FIELDS: Array<keyof InventoryCountRow> = [
   'receiveDate',
   'endorseDate',
   'endorsee',
+  // 🔴 2026-09-28 补（Excel K 付款人名称）。本表同时是**持久化白名单** ——
+  //    不列进来 `serializeRow` 不落库，同步层 `json_pointer` 就指空、
+  //    materialize 会把 Excel K 列写空。
+  'payer',
   'noteStatus',
   'hasDifference',
   'differenceReason',
@@ -132,6 +136,7 @@ export function emptyInventoryCountRow(): InventoryCountRow {
     receiveDate: '',
     endorseDate: '',
     endorsee: '',
+    payer: '',              // 🔴 2026-09-28 补（Excel K 付款人名称）
     noteStatus: '',
     hasDifference: '',
     differenceReason: '',

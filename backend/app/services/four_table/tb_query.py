@@ -40,6 +40,8 @@ async def fetch_tb_subtree(
     project_id,
     year,
     prefixes,
+    *,
+    strict: bool = False,
 ) -> list[LeafRow]:
     """按前缀集取 `tb_balance` 的**整棵子树**（含父行），active 数据集。
 
@@ -52,8 +54,11 @@ async def fetch_tb_subtree(
         project_id / year: 项目与审计年度。
         prefixes: 原始码宽前缀集（区间规格请先过 `sql_prefixes_for_specs`）。
 
+        strict: 为 True 时异常原样上抛（不吞、不 rollback）。供**写入方**（公式推送引擎）使用 ——
+            fail-open 的 ``[]`` 与「本项目无该科目」不可区分，写入方据此推送会把真实值刷成 0。
+
     Returns:
-        `LeafRow` 列表（含父行）；任何异常返回 ``[]`` 并 rollback（fail-open）。
+        `LeafRow` 列表（含父行）；strict=False 时任何异常返回 ``[]`` 并 rollback（fail-open）。
     """
     ps = _normalize_prefixes(prefixes)
     if not ps:
@@ -61,7 +66,7 @@ async def fetch_tb_subtree(
     try:
         # 🔴 全签名 4 参 + await —— 单参调用会 TypeError 并被下方 except 吞成空结果
         active_filter = await get_active_filter(
-            db, TbBalance.__table__, project_id, year or 0
+            db, TbBalance.__table__, project_id, year or 0, strict=strict
         )
         prefix_filter = sa.or_(*[TbBalance.account_code.like(f"{p}%") for p in ps])
         result = await db.execute(
@@ -79,6 +84,8 @@ async def fetch_tb_subtree(
         )
         return to_leaf_rows(result.fetchall())
     except Exception as e:  # noqa: BLE001 — fail-open，取数失败不阻断 render
+        if strict:
+            raise
         logger.warning("四表取数: tb_balance 查询失败 prefixes=%s: %s", ps, e)
         try:
             await db.rollback()

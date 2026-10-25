@@ -44,6 +44,7 @@ from tests.workpaper_sync.k_foundation_facts import (  # noqa: E402
     FRONTEND,
     K_HOSTS,
     K_INDEXES,
+    WP_COMPONENTS,
     cached_text,
     dual_mode_path,
     host_path,
@@ -665,3 +666,128 @@ class TestKFP39LocalStorageClassification:
         """🔴 已收敛集合 == **全 13 条**（两 lane 各交付自己那半）。"""
         assert set(self.CONVERGED_ENTRIES) == set(K_INDEXES)
         assert set(BP6_INDEXES) | set(BP5_INDEXES) == set(K_INDEXES)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 🔴 跨 lane 回归守卫：`migrateWorkpaperSyncMode` 的 capability 必须在封闭域内
+# ════════════════════════════════════════════════════════════════════════════
+class TestMigrateCapabilityArgumentIsInTheClosedDomain:
+    """🔴 K 域所有 `migrateWorkpaperSyncMode(...)` 的第二参必须是合法 capability。
+
+    ═══ 为什么要有这条（它抓到过一个真缺陷）═══
+
+    lane 1 Task 7 的 7 个宿主一度传 `'dual'`，而 `WorkpaperSyncCapability` 的封闭域
+    只有 `bidirectional` / `single_html` / `single_onlyoffice` / `unreachable`。
+    `migrateWorkpaperSyncMode` 开头就是
+
+        const supported = CAPABILITY_MODES[capability]
+        if (!supported) refuse('mode_capability_unknown', ...)
+
+    ⇒ 调用必抛。而调用点整段裹在 `try { ... } catch { /* ignore */ }` 里，异常被吞，
+    **连带其后「读统一键 → 恢复 currentMode」那两行从未执行** ⇒ K1~K7 的模式偏好恢复
+    整体失效（切到在线编辑、刷新、又回结构化视图），且零报错、零日志。
+
+    🔴 它本来是个 **TS 类型错误**，没被拦住的原因是本仓库前端全量 `vue-tsc` 在
+    4GB/8GB 堆下均 OOM（方法论铁律 ㉔）—— 「类型系统会兜住」在这个仓库里不成立，
+    所以同类约束必须有一条跑得动的守卫。
+
+    🔴 判据只认**字面量**实参：传变量就无法静态判定，那种写法在本域现算为 0，
+    一旦出现本判据会点名要求显式裁决（而不是默默放过）。
+    """
+
+    #: 封闭域 —— 真源是 `sync/workpaperSyncManifest.generated.ts` 的类型声明，
+    #: 下面 `test_closed_domain_matches_the_generated_type` 两侧对账，禁手工漂移。
+    CLOSED_DOMAIN = ("bidirectional", "single_html", "single_onlyoffice", "unreachable")
+
+    _CALL_RX = re.compile(
+        r"migrateWorkpaperSyncMode\s*\(\s*(?P<scope>\{[^{}]*\}|[\w.]+)\s*,\s*"
+        r"(?P<cap>'[^']*'|\"[^\"]*\"|[\w.]+)\s*,?",
+        re.S,
+    )
+
+    def _calls(self) -> list[tuple[str, str]]:
+        """返回 [(文件名, capability 实参原文)]。"""
+        out: list[tuple[str, str]] = []
+        for p in k_domain_files():
+            src = strip_comments(cached_text(p))
+            for m in self._CALL_RX.finditer(src):
+                out.append((p.name, m.group("cap").strip()))
+        return out
+
+    def test_closed_domain_matches_the_generated_type(self) -> None:
+        """🔴 两侧都验：封闭域与生成的 TS 类型逐值一致（名单不许自己漂）。"""
+        decl = cached_text(
+            WP_COMPONENTS / "sync" / "workpaperSyncManifest.generated.ts"
+        )
+        m = re.search(
+            r"export type WorkpaperSyncCapability\s*=\s*((?:\s*\|\s*'[a-z_]+')+)", decl
+        )
+        assert m is not None, "找不到 WorkpaperSyncCapability 类型声明 ⇒ 真源变了"
+        declared = tuple(re.findall(r"'([a-z_]+)'", m.group(1)))
+        assert declared == self.CLOSED_DOMAIN, (
+            f"TS 声明 {declared} 与判据常量 {self.CLOSED_DOMAIN} 不一致"
+        )
+
+    def test_denominator_is_non_empty(self) -> None:
+        """🔴 非空分母：判据有真实对象（13 条 entry 各 1 处调用）。"""
+        calls = self._calls()
+        assert len(calls) == 13, (
+            f"K 域 migrateWorkpaperSyncMode 调用期望 13 处，实得 {len(calls)}："
+            f"{sorted(calls)}"
+        )
+        assert len({f for f, _c in calls}) == 13, "13 处调用应分布在 13 个载体文件里"
+
+    def test_every_call_passes_a_literal_from_the_closed_domain(self) -> None:
+        """🔴 每一处实参都是封闭域里的字面量。"""
+        bad: list[tuple[str, str]] = []
+        for fname, cap in self._calls():
+            if not (cap.startswith(("'", '"')) and cap[1:-1] in self.CLOSED_DOMAIN):
+                bad.append((fname, cap))
+        assert bad == [], (
+            f"capability 实参不在封闭域内（会抛 mode_capability_unknown 并被 catch 吞掉）："
+            f"{bad}"
+        )
+
+    def test_the_scanner_really_catches_the_historical_defect(self) -> None:
+        """🔴 变异反证：把 `'bidirectional'` 换成历史上的 `'dual'`，判据必须打红。
+
+        没有这一条，上面那条可能因为正则压根没匹配上而恒绿（方法论铁律 ㉖ 的
+        「守卫写完必须逐处变异」）。这里不改磁盘 —— 直接喂一段构造源文本给同一个
+        正则，验证它既能认出合法值、也能认出非法值。
+        """
+        good = (
+            "      migrateWorkpaperSyncMode(\n"
+            "        { entryId: K4_ENTRY_ID, wpId: props.wpId, sheetKey: x },\n"
+            "        'bidirectional',\n"
+            "      )\n"
+        )
+        bad = good.replace("'bidirectional'", "'dual'")
+        gm = self._CALL_RX.search(good)
+        bm = self._CALL_RX.search(bad)
+        assert gm is not None and bm is not None, "正则认不出调用形态 ⇒ 判据恒绿"
+        assert gm.group("cap") == "'bidirectional'"
+        assert bm.group("cap") == "'dual'"
+        assert gm.group("cap")[1:-1] in self.CLOSED_DOMAIN
+        assert bm.group("cap")[1:-1] not in self.CLOSED_DOMAIN, (
+            "`'dual'` 竟在封闭域里 ⇒ 历史缺陷无法被本判据捕获"
+        )
+
+    def test_the_swallowing_catch_is_still_there(self) -> None:
+        """🔴 根因的另一半：调用被 `catch` 包着 ⇒ 传错值不会有任何可见症状。
+
+        不要求去掉这个 catch（迁移失败确实不该挡住首屏），但必须如实登记它的存在 ——
+        它正是「传错 capability 零报错」的放大器。一旦有人把它改成会冒泡的形态，
+        本条会打红，提醒重新评估上面那条静态判据还有没有必要。
+        """
+        wrapped = 0
+        for p in k_domain_files():
+            src = strip_comments(cached_text(p))
+            for m in self._CALL_RX.finditer(src):
+                head = src[max(0, m.start() - 400) : m.start()]
+                tail = src[m.end() : m.end() + 400]
+                if "try {" in head and "catch" in tail:
+                    wrapped += 1
+        assert wrapped == 13, (
+            f"被 try/catch 包住的调用 {wrapped} 处（期望 13）⇒ 吞异常的形态变了，"
+            "静态判据的必要性须重新评估"
+        )

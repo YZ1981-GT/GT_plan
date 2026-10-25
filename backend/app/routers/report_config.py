@@ -152,15 +152,31 @@ async def update_report_config(
         await db.commit()
 
         # Publish FORMULA_CONFIG_CHANGED event if formula changed
+        # 🔴 修复前 project_id 传的是 current_user.id（「row has no project_id」的兜底），
+        #    下游 stale_engine 于是按一个**用户 id** 去标 stale、年份再猜 2025 ——
+        #    全局模板行的编辑对任何真实项目都不起作用，对项目克隆行也标错对象。
+        #    正解：只有项目克隆行（applicable_standard='project:{uuid}'）才有项目可标；
+        #    全局模板行的传播由 REPORT_CONFIG_MASTER_UPDATED（report-config-baseline）负责，
+        #    不在这里冒充项目事件。
         try:
             new_formula = row.formula if row else None
+            std = (row.applicable_standard or "") if row else ""
             if old_formula != new_formula:
+                # 反向索引（「谁引用了该单元格」面板）按 report_config 全表构建，与项目无关：
+                # 模板行 / 克隆行改公式都要失效。原先靠 handler 顺带失效（且因 project_id
+                # 是用户 id 才恰好每次都跑到）；事件只对克隆行发布后必须在此直接失效，
+                # 否则模板行编辑后面板显示过时引用关系。
+                from app.services.formula_reverse_index import invalidate_reverse_index
+                invalidate_reverse_index()
+            if old_formula != new_formula and std.startswith("project:"):
+                from uuid import UUID as _UUID
+
                 from app.models.audit_platform_schemas import EventPayload, EventType
                 from app.services.event_bus import event_bus
 
                 await event_bus.publish(EventPayload(
                     event_type=EventType.FORMULA_CONFIG_CHANGED,
-                    project_id=current_user.id,  # Use user id as fallback; row has no project_id
+                    project_id=_UUID(std.removeprefix("project:")),
                     extra={
                         "row_code": row.row_code if row else "",
                         "old_formula": old_formula,
@@ -272,170 +288,43 @@ async def fill_formulas(
     }
 
 
-@router.post("/batch-update")
-async def batch_update_report_config(
-    body: dict,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """批量更新报表行的金额（从试算平衡表审定数回填）"""
-    import sqlalchemy as sa
-
-    project_id = body.get("project_id")
-    report_type_str = body.get("report_type", "balance_sheet")
-    applicable_standard = body.get("applicable_standard", "soe_consolidated")
-    updates = body.get("updates", [])
-
-    if not project_id or not updates:
-        return {"updated": 0, "message": "无数据"}
-
-    try:
-        report_type = FinancialReportType(report_type_str)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"无效的报表类型: {report_type_str}")
-
-    updated = 0
-    for upd in updates:
-        row_code = upd.get("row_code")
-        amount = upd.get("current_period_amount")
-        if not row_code or amount is None:
-            continue
-
-        result = await db.execute(
-            sa.select(ReportConfig).where(
-                ReportConfig.report_type == report_type,
-                ReportConfig.applicable_standard == applicable_standard,
-                ReportConfig.row_code == row_code,
-                ReportConfig.is_deleted == sa.false(),
-            )
-        )
-        row = result.scalar_one_or_none()
-        if row:
-            row.current_period_amount = float(amount)
-            updated += 1
-
-    if updated:
-        await db.commit()
-
-    return {"updated": updated, "message": f"已更新 {updated} 行"}
-
-
 @router.post("/drill-down")
 async def report_drill_down(
     body: dict,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """汇总穿透：查询各子企业在指定报表行次的实际金额
+    """汇总穿透：合并报表某行由企业树各节点怎样构成（spec consol-elimination-single-source-push 需求 9.3）。
 
-    请求体:
-      project_id: 项目ID
-      year: 年度
-      report_type: 报表类型 (balance_sheet/income_statement/cash_flow_statement)
-      row_code: 行次编码
-      col_field: 列字段 (current_period_amount/prior_period_amount)
-      company_codes: 子企业代码列表（可选，不传则查所有）
+    与报表差额表同一求值（``consol_report_view_service.child_contributions``）：``rows`` = 所选汇总节点
+    （默认根合并节点）的直接子节点，``leaf_rows`` = 子树全部末级节点；线性行两层之和都 = 合并数。
+    不再读 ``consol_worksheet_data['info']``、不再按持股比例估算。项目在请求体里 ⇒ 函数体内做项目级鉴权。
+
+    请求体：``project_id``、``year``（可选，默认项目审计年度）、``report_type``、``row_code``、``node_key``（可选）。
     """
-    import json
-    from sqlalchemy import text as sa_text
+    from app.deps import assert_project_permission
+    from app.services.consol_report_view_service import ViewError, child_contributions, load_view_context
 
-    project_id = body.get("project_id")
+    try:
+        project_id = UUID(str(body.get("project_id") or ""))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="缺少或无效的 project_id") from exc
+    row_code = str(body.get("row_code") or "").strip()
+    if not row_code:
+        raise HTTPException(status_code=400, detail="缺少 row_code")
+    await assert_project_permission(db, current_user, project_id, "readonly")
     year_val = body.get("year")
-    report_type = body.get("report_type", "balance_sheet")
-    row_code = body.get("row_code", "")
-    col_field = body.get("col_field", "current_period_amount")
-    company_codes = body.get("company_codes", [])
-
-    if not project_id or not row_code:
-        return {"rows": [], "message": "缺少 project_id 或 row_code"}
-
-    # 1. 从 consol_worksheet_data 获取基本信息表（企业列表）
-    result = await db.execute(
-        sa_text("""
-            SELECT data FROM consol_worksheet_data
-            WHERE project_id = :pid AND year = :y AND sheet_key = 'info'
-        """),
-        {"pid": project_id, "y": year_val},
-    )
-    info_row = result.fetchone()
-    companies = []
-    if info_row and isinstance(info_row[0], dict):
-        companies = info_row[0].get("rows", [])
-    if not companies:
-        return {"rows": [], "message": "未找到基本信息表数据"}
-
-    # 2. 从各子企业的试算平衡表数据中提取指定行次的金额
-    rows = []
-    for comp in companies:
-        code = comp.get("company_code", "")
-        name = comp.get("company_name", "")
-        if company_codes and code not in company_codes:
-            continue
-
-        # 查找该企业的试算平衡表数据
-        tb_key = f"consol_tb_{report_type}_closing"
-        tb_result = await db.execute(
-            sa_text("""
-                SELECT data FROM consol_worksheet_data
-                WHERE project_id = :pid AND year = :y AND sheet_key = :sk
-            """),
-            {"pid": project_id, "y": year_val, "sk": tb_key},
+    ctx = await load_view_context(db, project_id, int(year_val) if year_val else None)
+    if ctx is None:
+        raise HTTPException(status_code=404, detail="不是合并报表项目或没有审计年度，无法穿透")
+    try:
+        result = await child_contributions(
+            ctx.basis, ctx.rows, report_type=str(body.get("report_type") or "balance_sheet"),
+            row_code=row_code, node_key=body.get("node_key") or None,
         )
-        tb_row = tb_result.fetchone()
-        amount = None
-        source = "无数据"
-
-        if tb_row and isinstance(tb_row[0], dict):
-            tb_rows = tb_row[0].get("rows", [])
-            for tr in tb_rows:
-                if tr.get("row_code") == row_code:
-                    # 优先取审定数（audited），其次取汇总数（summary）
-                    amount = tr.get("audited") or tr.get("summary")
-                    source = "试算平衡表"
-                    break
-
-        # 如果试算表没有，尝试从 report_config 取
-        if amount is None:
-            try:
-                rc_result = await db.execute(
-                    sa_text("""
-                        SELECT current_period_amount, prior_period_amount
-                        FROM report_config
-                        WHERE row_code = :rc AND report_type = :rt
-                          AND is_deleted = false
-                        LIMIT 1
-                    """),
-                    {"rc": row_code, "rt": report_type},
-                )
-                rc_row = rc_result.fetchone()
-                if rc_row:
-                    amount = float(rc_row[0]) if col_field == "current_period_amount" and rc_row[0] else (
-                        float(rc_row[1]) if rc_row[1] else None
-                    )
-                    source = "报表配置"
-            except Exception:
-                pass
-
-        ratio_val = comp.get("non_common_ratio") or comp.get("common_ratio") or 0
-        rows.append({
-            "company_code": code,
-            "company_name": name,
-            "amount": amount,
-            "ratio": ratio_val,
-            "source": source,
-            "holding_type": comp.get("holding_type", "直接"),
-            "parent_name": comp.get("indirect_holder", "母公司"),
-        })
-
-    # 计算占比
-    total = sum(r["amount"] or 0 for r in rows)
-    for r in rows:
-        if total and r["amount"]:
-            r["pct"] = round((r["amount"] / abs(total)) * 100, 2)
-        else:
-            r["pct"] = 0
-
-    return {"rows": rows, "total": total, "row_code": row_code, "col_field": col_field}
+    except ViewError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+    return {"year": ctx.year, "applicable_standard": ctx.standard, **result}
 
 
 @router.post("/execute-formula")
@@ -692,6 +581,7 @@ async def execute_formulas_batch(
 # ─────────────────────────────────────────────────────────────────────────────
 
 from pydantic import BaseModel as _TbBaseModel  # noqa: E402
+from sqlalchemy import select  # noqa: E402 — 🔴 此前漏 import：两个端点每次调用都 NameError
 from app.models.core import Project as _TbProject  # noqa: E402
 
 

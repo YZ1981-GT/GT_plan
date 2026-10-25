@@ -625,6 +625,7 @@ async def d7_import_aux_balance(
             "priorUnadjusted": entry.opening,
             "agingPrior": dict(aging_skeleton["agingPrior"]),
             "agingAudited": dict(aging_skeleton["agingAudited"]),
+            "source_kind": "aux_balance_import",
         })
 
     # Merge模式：保留已有行，追加新客户

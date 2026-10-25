@@ -1430,12 +1430,12 @@ def _imported_and_called(module: object) -> tuple[set[str], set[str]]:
 
 
 #: 「无冲突发布分支」的源码锚点。G4-0d 引入 room apply 锁后这条分支被拆成
-#: `_apply_settled`（决策 + 取锁）+ `_apply_settled_locked`（锁内 commit），于是只看
-#: `_apply_settled` 的形态判据会**空转**：`merge.merged` / `BusinessMutation` /
-#: `CONFLICT_RESOLUTION` 全都搬到了后者，前者查不到 ⇒ 「发布分支不得直接读
-#: merge.merged」这类判据在拆分后恒真（假绿），而另两条直接 ValueError/AssertionError。
-#: 因此判据锚点取**两段源码之和**：拆成几段都不影响，只要这条分支整体上仍然合规。
-_SETTLED_BRANCH_METHODS: tuple[str, ...] = ("_apply_settled", "_apply_settled_locked")
+#: `_apply_settled`（决策 + 取锁）+ `_prepare_and_stage`（锁外 CPU 重段）+
+#: `_apply_committed`（锁内 commit），于是只看 `_apply_settled` 的形态判据会**空转**。
+#: 因此判据锚点取**三段源码之和**：拆成几段都不影响，只要这条分支整体上仍然合规。
+#: ROI-6 锁收窄把 `_apply_settled_locked` 进一步拆成 `_prepare_and_stage` +
+#: `_apply_committed`，但判据覆盖面不变（每段都真的存在才拼树）。
+_SETTLED_BRANCH_METHODS: tuple[str, ...] = ("_apply_settled", "_prepare_and_stage", "_apply_committed")
 
 
 def _settled_branch_ast() -> ast.Module:

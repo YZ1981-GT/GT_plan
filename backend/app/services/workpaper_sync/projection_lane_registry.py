@@ -1049,6 +1049,8 @@ _PROVIDERS_WITHOUT_PUBLISH_ORCHESTRATION: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_i6_research_development_expense",
         # ── J 循环（spec: j-cycle-sync-foundation-and-first-canary）卡 BP-2~BP-4 ─
         "app.services.workpaper_sync.phase5_j1_employee_compensation",
+        "app.services.workpaper_sync.phase5_j2_defined_benefit",
+        "app.services.workpaper_sync.phase5_j3_share_based_payment",
         # ── G/H 循环并发会话新增（2026-09-27 补漏）卡 BP-1~BP-3 ──────────────
         "app.services.workpaper_sync.phase5_g1_trading_financial_assets",
         "app.services.workpaper_sync.phase5_g12_net_hedge_gains",

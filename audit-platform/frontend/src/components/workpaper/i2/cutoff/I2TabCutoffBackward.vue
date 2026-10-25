@@ -203,7 +203,7 @@
 
     <GtCutoffAutoSampling
       v-if="showCutoffPanel"
-      account-code="1717"
+      :account-code="samplingAccountCode"
       cutoff-direction="pre_cutoff"
       :default-conditions="cutoffPanelDefaults"
       :workpaper-id="wpId"
@@ -219,7 +219,7 @@
         v-if="showSamplingDialog"
         :project-id="projectId"
         :workpaper-id="wpId"
-        account-code="1717"
+        :account-code="samplingAccountCode"
         phase="final"
         :year="currentYear"
         @filled="handleVoucherFilled"
@@ -274,6 +274,18 @@ import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../.
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+
+/**
+ * 科目码单一真源。原硬编码 `"1717"` —— 该码在 `account_chart` 与 `tb_balance`
+ * 全库零命中（真源文件头亦明写「不是 1717（全库不存在）」），抽凭据此查库
+ * 必然得到空总体；本底稿是「开发支出」（wp_index 实证），report_config 的
+ * BS-035(上市)/BS-046(国企) 对应 `1704`。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.4
+ */
+import { i2GrossQueryCodes } from '@/components/workpaper/composables/i2AccountScope'
+
+/** 抽凭科目码（真源，无 tbSourceCodes prop => 走兜底 1704；逗号拼接供引擎 split） */
+const samplingAccountCode = i2GrossQueryCodes().join(',')
 
 // 🔴 金额展示走 displayPrefs 单一真源（千分符 / 2 位小数 / 单位「元」/ showZero 偏好）。
 //    必须 setup **顶层** inject —— 写进函数体会静默失效（平台铁律）。

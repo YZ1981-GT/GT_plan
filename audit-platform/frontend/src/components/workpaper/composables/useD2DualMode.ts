@@ -14,6 +14,7 @@
  * Requirements: 17.1-17.5
  */
 import { ref, onMounted, type Ref } from 'vue'
+import { getAuthHeaders } from '@/utils/authToken'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -87,8 +88,10 @@ export function useD2DualMode(options: UseD2DualModeOptions) {
       // 获取 OO 配置
       try {
         const sheetName = getSheetNameFromCode(currentSheet.value)
+        // 🔴 原生 fetch 不经 http.ts 拦截器 ⇒ 必须自带鉴权头（否则恒 401，被下方 catch 成「OO 不可用」）
         const response = await fetch(
-          `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sheetName)}/onlyoffice-config`
+          `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sheetName)}/onlyoffice-config`,
+          { headers: getAuthHeaders() },
         )
         if (response.ok) {
           const result = await response.json()

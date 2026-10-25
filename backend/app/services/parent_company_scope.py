@@ -50,6 +50,8 @@ _load_parent_row_index()`` 原实现把两者混为一谈（按上级公司代�
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,6 +62,8 @@ from app.services.note_section_catalog import normalize_report_scope
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "ParentCompanyContext",
+    "resolve_parent_company_context",
     "resolve_parent_standalone_project",
     "resolve_consolidated_sibling",
     "is_parent_company_project",
@@ -174,6 +178,55 @@ async def resolve_parent_standalone_project(
             consol_project.id,
         )
     return parent_project
+
+
+@dataclass(frozen=True)
+class ParentCompanyContext:
+    """母公司交付口径上下文。
+
+    ``standalone_project`` 仍由唯一 helper 定位；``parent_node`` 是企业树中精确的
+    ``{根企业代码}:parent`` 节点。只有该节点自身为 aggregate 才表示**根母公司有直属
+    分公司**；不得用整棵树的 ``mode``，否则会把「子公司有分公司」误判成母公司有分公司。
+    """
+
+    standalone_project: Project | None
+    parent_node_key: str | None = None
+    has_branches: bool = False
+    tree: Any | None = None
+    parent_node: Any | None = None
+
+
+async def resolve_parent_company_context(
+    db: AsyncSession,
+    consol_project: Project,
+    *,
+    standalone_project: Project | None = None,
+) -> ParentCompanyContext:
+    """定位母公司 standalone 兄弟并判断根母公司是否有直属分公司。
+
+    先委托 :func:`resolve_parent_standalone_project`，不重写三元组查询；只有来源项目
+    已定位后才构建三码企业树。无分公司时返回 ``has_branches=False``，调用方必须原样
+    走旧 standalone 路径（P13）。
+    """
+    standalone = standalone_project or await resolve_parent_standalone_project(db, consol_project)
+    if standalone is None:
+        return ParentCompanyContext(None)
+
+    from app.services.consol_group_tree import KIND_AGGREGATE, ROLE_PARENT, node_key
+    from app.services.consol_tree_service import build_tree, find_node_by_key
+
+    tree = await build_tree(db, consol_project.id)
+    if tree is None:
+        return ParentCompanyContext(standalone)
+    key = node_key(tree.company_code, ROLE_PARENT)
+    parent = find_node_by_key(tree, key)
+    return ParentCompanyContext(
+        standalone_project=standalone,
+        parent_node_key=key if parent is not None else None,
+        has_branches=bool(parent is not None and parent.kind == KIND_AGGREGATE),
+        tree=tree,
+        parent_node=parent,
+    )
 
 
 async def resolve_consolidated_sibling(

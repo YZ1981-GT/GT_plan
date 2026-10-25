@@ -33,6 +33,23 @@ export function classifyApiError(e: any): ApiErrorCategory {
 }
 
 /**
+ * 后端错误详情 → 可展示文本（取不到返回空串，由调用方给兜底文案）。
+ *
+ * 🔴 两种形态都要认：业务 `HTTPException("中文原因")` 经 `http.ts` 的
+ * `normaliseErrorEnvelope` 归一后 `detail` 是**字符串**；只有 dict 形态才有 `.message`。
+ * 旧实现只读 `detail?.message` ⇒ 所有字符串 detail 的 409/422/503 都被兜底文案吞掉
+ * （2026-09-29 实测：知识库「项目组须包含你参与的项目」422 只显示「请求参数有误」）。
+ * FastAPI 字段校验 422 的 `detail` 是数组（英文字段错误）→ 仍走兜底文案。
+ */
+function detailText(detail: any): string {
+  if (typeof detail === 'string') return detail.trim()
+  if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+    return String(detail.message || detail.msg || detail.error || '').trim()
+  }
+  return ''
+}
+
+/**
  * 统一 API 错误处理
  * @param e - catch 到的错误对象
  * @param context - 操作上下文描述（如"保存底稿"、"加载项目"）
@@ -64,7 +81,7 @@ export function handleApiError(e: any, context: string): void {
 
   // 409 — 冲突（版本冲突/重复操作）
   if (status === 409) {
-    const msg = detail?.message || detail?.error || '数据冲突，请刷新后重试'
+    const msg = detailText(detail) || '数据冲突，请刷新后重试'
     ElNotification({ title: '操作冲突', message: msg, type: 'warning', duration: 6000 })
     return
   }
@@ -86,7 +103,7 @@ export function handleApiError(e: any, context: string): void {
       ElMessage.warning(`${context}：存在未调解的跨模块冲突，请先调解后再操作`)
       return
     }
-    const msg = detail?.message || '请求参数有误，请检查输入'
+    const msg = detailText(detail) || '请求参数有误，请检查输入'
     ElMessage.warning(`${context}：${msg}`)
     return
   }
@@ -95,7 +112,7 @@ export function handleApiError(e: any, context: string): void {
   if (status === 503) {
     ElNotification({
       title: `${context}：服务降级`,
-      message: detail?.message || '服务暂时不可用，请稍后重试',
+      message: detailText(detail) || '服务暂时不可用，请稍后重试',
       type: 'warning',
       duration: 8000,
     })
@@ -104,7 +121,7 @@ export function handleApiError(e: any, context: string): void {
 
   // 400 — 请求错误（含后端 detail）
   if (status === 400) {
-    const msg = typeof detail === 'string' ? detail : detail?.message || '请求参数错误'
+    const msg = detailText(detail) || '请求参数错误'
     ElMessage.warning(`${context}：${msg}`)
     return
   }

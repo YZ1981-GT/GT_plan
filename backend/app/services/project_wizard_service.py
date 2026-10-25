@@ -19,6 +19,7 @@ from app.models.audit_platform_schemas import (
     WizardState,
     WizardStep,
     WizardStepData,
+    WizardStepSaveResponse,
 )
 from app.services.note_template_service import NoteTemplateService
 from app.services.uscc_validator import validate_uscc
@@ -97,12 +98,12 @@ def _sync_basic_info_to_project(project: Project, data: BasicInfoSchema) -> None
     if data.company_subtype:
         project.company_subtype = data.company_subtype.strip().lower()
     project.report_scope = data.report_scope
-    # 合并类型仅在合并报表项目下有意义；单户报表清空避免误导
-    project.consolidation_type = (
-        data.consolidation_type if data.report_scope == "consolidated" else None
-    )
+    # 集团架构（consol-tree-three-code-autobuild）：调用前已经 group_links.prepare_group_fields
+    # 规范化（空串归 None、USCC 校验、关系补默认）。consolidation_type 自 V167 起不再写入 ——
+    # 合并方式由下级企业的与上级关系自动识别。
     project.parent_company_name = data.parent_company_name
     project.parent_company_code = data.parent_company_code
+    project.relation_to_parent = data.relation_to_parent
     project.ultimate_company_name = data.ultimate_company_name
     project.ultimate_company_code = data.ultimate_company_code
 
@@ -193,17 +194,26 @@ async def _backfill_locked_custom_template_snapshot(project: Project, db: AsyncS
 
 
 async def create_project(
-    data: BasicInfoSchema, db: AsyncSession, *, auto_commit: bool = True
+    data: BasicInfoSchema,
+    db: AsyncSession,
+    *,
+    auto_commit: bool = True,
+    propagate_group: bool = True,
+    sync_links: bool = True,
 ) -> Project:
     """创建项目记录，状态=created，初始化 wizard_state JSONB。
 
     Validates: Requirements 1.2, 1.3
-    校验链：short_name 非空 → company_code 非空 → USCC 格式 → 唯一性
+    校验链：short_name 非空 → company_code 非空 → USCC 格式 → 唯一性 → 集团架构字段
 
     Args:
         data: 基本信息 Schema
         db: 数据库会话
         auto_commit: 是否自动 commit。批量导入传 False 由调用方统一 commit。
+        propagate_group: 是否把本次集团关系外推到同企业另一口径项目（需求 1.8）。
+            批量导入自动建的合并根传 False（只继承不外推，design §七）。
+        sync_links: 建项后是否按三码重算本年度派生链接（需求 7.2）。批量导入传 False，
+            整批结束后按年度各算一次。
     """
     # --- 校验链 ---
     # 1. short_name 非空
@@ -230,12 +240,25 @@ async def create_project(
     if not is_unique:
         raise HTTPException(status_code=409, detail=uniqueness_error)
 
+    # --- 集团架构字段：规范化 + 继承同企业另一口径项目 + 补默认（需求 1/2）---
+    from app.services.group_links import prepare_group_fields
+
+    notices = await prepare_group_fields(
+        db, data, project_id=None, report_scope=report_scope, inherit=True
+    )
+
     # --- 创建项目 ---
     data, custom_template_snapshot = _normalize_basic_info(data)
     project = Project(status=ProjectStatus.created)
     _sync_basic_info_to_project(project, data)
     db.add(project)
     await db.flush()  # 获取 project.id
+    if propagate_group:
+        from app.services.group_links import propagate_to_counterpart
+
+        notices += await propagate_to_counterpart(db, project)
+    # 非持久化属性：随响应返回给前端提示，不入库
+    project._group_notices = notices  # type: ignore[attr-defined]
 
     # 初始化 wizard_state，并将 basic_info 步骤数据写入
     basic_info_data = data.model_dump(mode="json")
@@ -254,6 +277,11 @@ async def create_project(
         completed=False,
     )
     project.wizard_state = state.model_dump(mode="json")
+
+    if sync_links:
+        from app.services.group_links import sync_group_links
+
+        await sync_group_links(db, audit_year)
 
     if auto_commit:
         await db.commit()
@@ -287,7 +315,7 @@ async def update_step(
     step: WizardStep,
     data: dict,
     db: AsyncSession,
-) -> WizardState:
+) -> WizardStepSaveResponse:
     """更新指定步骤数据，持久化到 projects.wizard_state JSONB。
 
     Validates: Requirements 1.3, 1.4, 1.5
@@ -320,16 +348,46 @@ async def update_step(
 
     # 更新步骤数据
     step_data = data
+    notices: list[str] = []
     if step == WizardStep.basic_info:
+        from pydantic import ValidationError
+
+        from app.services.group_links import (
+            prepare_group_fields,
+            propagate_to_counterpart,
+        )
+
         existing_basic_info = state.steps.get(WizardStep.basic_info.value)
+        previous_year = project.audit_year
+        try:
+            parsed = BasicInfoSchema.model_validate(data)
+        except ValidationError as exc:
+            # 端点收的是 dict，schema 校验失败须转 422（否则落成 500）
+            fields = sorted({str(e["loc"][0]) for e in exc.errors() if e.get("loc")})
+            raise HTTPException(
+                status_code=422,
+                detail=f"基本信息字段缺失或格式错误：{'、'.join(fields) or '未知字段'}",
+            ) from exc
+        notices = await prepare_group_fields(
+            db, parsed, project_id=project.id,
+            report_scope=parsed.report_scope or DEFAULT_REPORT_SCOPE, inherit=False,
+            previous_parent_code=project.parent_company_code,
+            previous_ultimate_code=project.ultimate_company_code,
+        )
         basic_info, custom_template_snapshot = _normalize_basic_info(
-            BasicInfoSchema.model_validate(data),
+            parsed,
             existing_basic_info.data if existing_basic_info is not None else None,
         )
         step_data = basic_info.model_dump(mode="json")
         if custom_template_snapshot is not None:
             step_data["custom_template_snapshot"] = custom_template_snapshot
         _sync_basic_info_to_project(project, basic_info)
+        notices += await propagate_to_counterpart(db, project)
+        # 需求 7.2：保存基本信息后重算派生链接；改了审计年度时新旧两个年度都要算
+        from app.services.group_links import sync_group_links
+
+        for year in sorted({y for y in (previous_year, project.audit_year) if y}):
+            await sync_group_links(db, year)
 
     state.steps[step.value] = WizardStepData(
         step=step,
@@ -342,7 +400,8 @@ async def update_step(
     project.wizard_state = state.model_dump(mode="json")
     await db.commit()
     await db.refresh(project)
-    return _parse_wizard_state(project)
+    saved = _parse_wizard_state(project)
+    return WizardStepSaveResponse(**saved.model_dump(), notices=notices)
 
 
 # ---------------------------------------------------------------------------

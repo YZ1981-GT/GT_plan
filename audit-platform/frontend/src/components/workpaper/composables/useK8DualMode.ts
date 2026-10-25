@@ -2,22 +2,76 @@
  * useK8DualMode — K8 销售费用 HTML ↔ OnlyOffice 双模式切换
  *
  * Spec: .kiro/specs/k8-selling-expenses/ | Task: 3.3
+ * 收敛: .kiro/specs/k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub
+ *       Task 4（health 单源探针）· Task 5（localStorage 统一键）· KB-P5/P9/P10
  *
  * 对齐 D4 七月十日 + K9 孪生模块「拉取成功才可以」范式：
- * - 健康检查用 `http.get`（带鉴权头 + _silent），不用裸 fetch（修 401→OO 永不可用）。
  * - 🔴 切到 OnlyOffice 前**预拉该 sheet 的 onlyoffice-config**，config 非空（拉取成功）
  *   才真正进入 OO 模式；失败回退结构化视图（对齐 useK9DualMode/useF2DualMode）。
  * - 🔴 `onOoLoadFailed`：GtOnlyOfficeSheet 文档渲染/45s 就绪失败 @fallback 时回退 HTML+
  *   标记不可用，避免「拉取成功」标签与实际错误页不一致。
  * - 「在线编辑」选项常显但 `disabled:!isOoAvailable`；切换前 autoSave；切回 reloadAll。
- * - localStorage 持久化 (per wpId)。
+ *
+ * ═══ 为什么 health 不再自己打端点（BP-6 第一半，已收口）═══
+ *
+ * 原实现自己 `http.get('/api/workpapers/onlyoffice/health')` 并自己解信封。平台上这段
+ * 逻辑曾被抄过 20 份（7 宿主 + 13 composable），2026-09-21 那批 bug 就是抄歪的产物：
+ * 误用 `/api/onlyoffice/health`（404）、误读 `status === 'healthy'`（真字段是
+ * `data.healthy`）⇒ 在线编辑永久锁死。且各自抄的版本**都没有 TTL 缓存**，切一张底稿
+ * 打一次探针，正是「切页面不丝滑」的老根因。
+ *
+ * ⇒ 现在一律走 `sync/onlyOfficeHealth.ts` 的 `fetchOnlyOfficeHealthy()`：端点 / 字段 /
+ *   15s 模块级 TTL 缓存 / 并发去重四合一，全平台唯一实现。
+ *
+ * ═══ 🔴 为什么 `onlyoffice-config` 直调**保留**（BP-6 第二半，卡外部依赖）═══
+ *
+ * 它本该改走 sync bridge 的 `materialize` / `flushHtml`。但 K 循环现状是：
+ * `backend/app/services/workpaper_sync/adapters/registry.py` 对 `gt-k*-` **零命中**
+ * ⇒ 13 条 entry 一个 adapter 都没注册（`missing_adapter`）。此时调 bridge 的 flushHtml
+ * 会抛 `StoreProjectionNotBackedError` —— 把一个能用的 OO 预检换成一个必然失败的调用，
+ * 是把功能做坏而不是做好。
+ *
+ * ⇒ 直调**有意保留**，等 BP-1（approved authority model）+ BP-2（instrumentation
+ *   candidate）落地、K 的 adapter 注册后一并切换。这不是漏做；判据与登记在
+ *   `test_k_lane2_p0_boundary_and_endpoints.py::TestConfigDirectCallIsExternallyBlocked`。
+ *
+ * ═══ localStorage：从 `k8-dual-mode:` 收敛到统一键 ═══
+ *
+ * 旧键形态 `k8-dual-mode:{wpId}`（见下方 legacy 说明），只按 wpId 分段 ⇒ 同一份底稿的
+ * 不同 sheet 共用一个偏好。统一键 `workpaper-sync-mode:{entryId}:{wpId}:{sheetKey}`
+ * 三段全带，由 `workpaperSyncModeKey()` 唯一生成；存量旧键由
+ * `migrateWorkpaperSyncMode()` 按**键形态**扫描后读一次即归一并删除（幂等）。
  */
 import { ref, computed, onMounted, type Ref } from 'vue'
 import http from '@/utils/http'
+import { fetchOnlyOfficeHealthy } from '../sync/onlyOfficeHealth'
+import {
+  migrateWorkpaperSyncMode,
+  workpaperSyncModeKey,
+  type WorkpaperSyncStoredMode,
+} from '../sync/workpaperSyncModeStorage'
 
 export type K8RenderMode = 'html' | 'onlyoffice'
 
-const STORAGE_PREFIX = 'k8-dual-mode:'
+/** K8 的 entry_id —— 统一模式键的第一段。 */
+const K8_ENTRY_ID = 'xlsx/gt-k8-selling-expenses'
+
+/**
+ * 本模块模式值 ↔ 统一真源值域（`'html' | 'oo'`）的双向映射。
+ *
+ * 🔴 落盘值只许是 `'html' | 'oo'`。本模块对外 API 用的是 `'onlyoffice'` 拼写
+ * （宿主 template 与 `GtOnlyOfficeSheet` 的 v-if 都依赖它），两者**不是一个值域** ——
+ * 直接把 `'onlyoffice'` 落盘会让统一键里混进第三种拼写，下次换个模块读就读不懂。
+ */
+function toStoredMode(mode: K8RenderMode): WorkpaperSyncStoredMode {
+  return mode === 'onlyoffice' ? 'oo' : 'html'
+}
+
+function fromStoredMode(stored: string | null): K8RenderMode | null {
+  if (stored === 'oo') return 'onlyoffice'
+  if (stored === 'html') return 'html'
+  return null
+}
 
 export interface UseK8DualModeOptions {
   wpId: Ref<string>
@@ -56,29 +110,57 @@ export function useK8DualMode(options: UseK8DualModeOptions) {
     return isOoAvailable.value ? 'ready' : 'unavailable'
   })
 
+  /** 统一模式键（三段全需；sheetKey 缺省由生成器补 `default`）。 */
+  function modeKey(): string {
+    return workpaperSyncModeKey({
+      entryId: K8_ENTRY_ID,
+      wpId: wpId.value,
+      sheetKey: sheetName?.value || undefined,
+    })
+  }
+
+  /**
+   * 迁移旧键 + 读回模式。
+   *
+   * 🔴 迁移传 `'bidirectional'` 而**不是** entry 的 manifest capability
+   * （`single_onlyoffice`）：这里要表达的是「本宿主的视图开关两侧都能开」——
+   * 结构化视图是本地渲染、OO 是在线编辑，与「写回方向有没有 adapter 支撑」无关。
+   * 传 `single_onlyoffice` 会让 `migrate` 把存量 `'html'` 偏好**回落成 `'oo'`**
+   * 并落盘，等于每个老用户下次打开都被强推进 OO —— 那是数据迁移造成的行为变更，
+   * 不是用户的选择。
+   *
+   * 🔴 同理**不用** `persistWorkpaperSyncMode()`：它按 capability 校验，
+   * `single_onlyoffice` 下写 `'html'` 直接抛 `mode_not_supported_by_capability`。
+   */
   function loadPersistedMode(): void {
     try {
-      const saved = localStorage.getItem(STORAGE_PREFIX + wpId.value)
-      if (saved === 'html' || saved === 'onlyoffice') currentMode.value = saved
+      migrateWorkpaperSyncMode(
+        { entryId: K8_ENTRY_ID, wpId: wpId.value, sheetKey: sheetName?.value || undefined },
+        'bidirectional',
+      )
+    } catch { /* 迁移失败不该挡住首屏 */ }
+    try {
+      const stored = fromStoredMode(localStorage.getItem(modeKey()))
+      if (stored) currentMode.value = stored
     } catch { /* ignore */ }
   }
 
   function persistMode(mode: K8RenderMode): void {
     try {
-      localStorage.setItem(STORAGE_PREFIX + wpId.value, mode)
+      localStorage.setItem(modeKey(), toStoredMode(mode))
     } catch { /* ignore */ }
   }
 
   /**
-   * OO 健康检查 — GET /api/workpapers/onlyoffice/health（http.get 带 auth）
-   * 信封双层兼容: res.data?.data?.healthy 或 res.data?.healthy 或 res.healthy
+   * OO 健康检查 —— 走平台唯一探针（带 15s TTL 缓存 + 并发去重）。
+   *
+   * `forceRefresh`：用户**已经点了**「在线编辑」时传 `true`。此时不能信一个可能刚好
+   * 卡在过期边界的旧值挡住这次真实点击（D4 的竞态兜底）。
    */
-  async function checkOoHealth(): Promise<boolean> {
+  async function checkOoHealth(forceRefresh = false): Promise<boolean> {
     checking.value = true
     try {
-      const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-      const healthy = res.data?.data?.healthy ?? res.data?.healthy ?? (res as any)?.healthy ?? false
-      isOoAvailable.value = !!healthy
+      isOoAvailable.value = await fetchOnlyOfficeHealthy(forceRefresh)
       return isOoAvailable.value
     } catch {
       isOoAvailable.value = false
@@ -96,7 +178,10 @@ export function useK8DualMode(options: UseK8DualModeOptions) {
    */
   async function switchMode(target: K8RenderMode): Promise<void> {
     if (target === currentMode.value) return
-    if (target === 'onlyoffice' && !isOoAvailable.value) return
+    // 🔴 点击期用 forceRefresh 重探一次：缓存可能刚好过期在点击那一瞬。
+    if (target === 'onlyoffice' && !isOoAvailable.value) {
+      if (!(await checkOoHealth(true))) return
+    }
 
     if (autoSave) {
       try { await autoSave() } catch { /* best effort */ }

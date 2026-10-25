@@ -46,16 +46,20 @@ REPO = Path(__file__).resolve().parents[3]
 FRONTEND = REPO / "audit-platform" / "frontend"
 
 #: 本 Task 创建的守卫文件全集（覆盖面分母）。
+#: 2026-09-29 迁移：宿主接线守卫原挂旧组件 ``DocAiChatPanel.vue``，该组件自 Task 9 起无生产引用、
+#: 已由 spec knowledge-base-retrieval-and-authz-closure Task 11 删除；守卫意图逐条迁到
+#: ``PlatformAiChatPanel.host.spec.ts``（真实 mount 统一内核面板，不 mock composable）。
 GUARD_FILES: dict[str, str] = {
     "test_task2_host_context.py": "Task 2 新建（Property 2/5 + Req 3.6 后端）",
     "useAiHostContext.spec.ts": "Task 2 新建（六宿主 adapter 行为）",
-    "DocAiChatPanel.host.spec.ts": "Task 2 新建（宿主接线：真实 DOM + 模板形态）",
+    "PlatformAiChatPanel.host.spec.ts": "Task 2 新建 → 2026-09-29 迁移（宿主接线：真实 DOM + 模板形态）",
 }
 
 #: 冻结基线（本会话实测）。改这两个数必须同时说明来源。
 #: 后端 = backend/tests/dsh_agent_panel 全量（含并发 Task 1/Task 3 的守卫）。
 BASELINE_BE_PASSED = 66
-#: 前端 = 四个 AI 面板相关 spec（含 Task 2 新建两个 + 存量两个）。
+#: 前端 = FE_FILTERS 命中的 spec。🔴 2026-09-29 迁移后未重跑本脚本冻结新值（旧值 65 含已删的
+#: 旧组件 spec）；`run_cli` 基线不符只 WARN，首次运行以其打印的基线行为准并回填这里。
 BASELINE_FE_PASSED = 65
 
 BE_PYTEST_ARGS = [
@@ -67,14 +71,15 @@ BE_PYTEST_ARGS = [
     "no:randomly",
 ]
 
-FE_FILTERS = ["useAiHostContext", "DocAiChatPanel"]
+FE_FILTERS = ["useAiHostContext", "PlatformAiChatPanel.host"]
 
 HOST_CTX = "backend/app/services/ai_chat/host_context.py"
 BUILDER = "backend/app/services/doc_ai_context_builder.py"
 ROUTE = "backend/app/routers/doc_ai_chat.py"
 ACCESS = "backend/app/services/ai_chat/access.py"
 FE_ADAPTER = "audit-platform/frontend/src/composables/useAiHostContext.ts"
-FE_CHAT = "audit-platform/frontend/src/composables/useDocAiChat.ts"
+#: 统一内核面板的 composable（旧 useDocAiChat 只剩 NoteAiFillDialog 的采纳调用，不承载对话发送）
+FE_CHAT = "audit-platform/frontend/src/composables/usePlatformAiChat.ts"
 FE_REPORT = "audit-platform/frontend/src/views/ReportView.vue"
 
 MUTATIONS: list[Mut] = [
@@ -201,10 +206,12 @@ MUTATIONS: list[Mut] = [
         side="be",
         path=BUILDER,
         kind="replace",
-        anchor="        if project_id is not None:",
-        scope="        raw_results: list[dict] = []",
-        offset=1,
-        new="        if True:  # MUTATED: 无项目绑定也做项目级语义检索",
+        # 2026-09-29：spec knowledge-base-retrieval-and-authz-closure 5.4 把「有项目走项目级检索、
+        # 否则走全局」收进 _kernel_search（原 raw_results 初始化行已删除），锚点随之迁到该方法内。
+        anchor="            if project_id is not None:",
+        scope='        """统一走检索内核；失败返回空（上下文构建不因知识检索失败而中断）。"""',
+        offset=2,
+        new="            if True:  # MUTATED: 无项目绑定也做项目级语义检索",
         want="test_global_mode_skips_project_scoped_retrieval",
         why=(
             "受限全局知识模式下仍发起项目级语义检索（project_id=None 传进索引）⇒ "
@@ -373,8 +380,11 @@ MUTATIONS: list[Mut] = [
         side="fe",
         path=FE_CHAT,
         kind="replace",
-        # 带 `{` 的形态只在 sendMessage 出现（fetchHistory / adoptContent 是单行 return）。
+        # usePlatformAiChat 里带 `{` 的形态出现两次（sendMessage / adoptContent）⇒ 用
+        # sendMessage 签名相对定位（2026-09-29 迁移前锚在已删组件链路的 useDocAiChat.ts）。
         anchor="    if (!hostAvailable.value || !host) {",
+        scope="  async function sendMessage(query?: string, extras: ChatRunExtras = {}): Promise<void> {",
+        offset=5,
         new="    if (false) {  // MUTATED: 宿主不可用也照发请求",
         want="宿主上下文的真实 DOM 与网络行为",
         why=(

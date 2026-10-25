@@ -164,11 +164,18 @@ def test_sheets_exist_in_source_template(n1_blocks):
 # ─── 表达式可解析 ────────────────────────────────────────────────────────────
 
 
-# `prefill_formula_mapping` 用的是 **prefill 引擎**的词汇表，比 report 公式引擎多几个函数。
-# `ADJ()` 由 `prefill_engine._resolve_adj_formula` 实现，未注册进 `formula_engine._REGISTRY`
-# → `validate_formula` 会把它报成「未知函数」。这是既有形态（N1-1 的 AJE/RJE 调整预设一直如此），
-# 不是本 spec 引入的，故按 prefill 词汇表放行。
-_PREFILL_ONLY_FUNCS = {"ADJ"}
+# `prefill_formula_mapping` 用的是 **prefill 引擎**的词汇表，曾比 report 公式引擎多几个函数。
+#
+# 🔴 **本集合已清空**（2026-09-28，spec tb-adjustment-column-formula-closure
+# Phase 1 Task 1.3/1.7）：唯一成员 `ADJ` 已注册进 `formula_engine._REGISTRY`，
+# `validate_formula` 不再把它报成「未知函数」⇒ 豁免不再需要。
+#
+# 保留空集合（而非删掉整个机制）的理由：`test_all_formulas_parse` 的豁免过滤
+# 仍是正确结构 —— 将来若再出现「prefill 有而 report 引擎没有」的函数，
+# 往这里加一个成员即可，无需重建过滤逻辑。
+# 空集合下 `test_prefill_only_func_allowlist_is_still_needed` 会退化成恒真，
+# 故该测试已改为**正向断言 ADJ 确实已注册**，见其 docstring。
+_PREFILL_ONLY_FUNCS: set[str] = set()
 _UNKNOWN_FUNC_RE = re.compile(r"未知函数:\s*([A-Z_]+)\(\)")
 
 
@@ -196,13 +203,26 @@ def test_all_formulas_parse(n1_blocks):
 
 
 def test_prefill_only_func_allowlist_is_still_needed():
-    """反向自检：若 ADJ 某天注册进 formula_engine，本豁免应被移除（防豁免长期挂着）。"""
+    """豁免清单不得残留**已注册**函数，且 `ADJ` 必须确实已注册。
+
+    前半段是原语义（防豁免长期挂着）：清单 ∩ 已注册 == ∅。
+    2026-09-28 该断言因 ADJ 注册而打红，清单据此清空 —— 这正是它设计的作用。
+
+    🔴 后半段是**新增的正向断言**：清单空了以后前半段会退化成恒真（空转），
+    故补「ADJ 确实在 `_REGISTRY` 里」。若谁把 ADJ 的注册删掉，
+    本测试会打红而不是静静变绿。
+    spec: tb-adjustment-column-formula-closure Phase 1 Task 1.3
+    """
     from app.services.formula_engine import _REGISTRY
 
     known = set(_REGISTRY.known_function_names())
     stale = _PREFILL_ONLY_FUNCS & known
     assert stale == set(), (
         f"{stale} 已注册进 formula_engine → 请从 _PREFILL_ONLY_FUNCS 移除该豁免"
+    )
+    assert "ADJ" in known, (
+        "ADJ 不在 _REGISTRY 中 —— 豁免清单已按「ADJ 已注册」清空，"
+        "若注册被撤销必须同步恢复豁免，否则 N1 的 ADJ 预设会被报未知函数"
     )
 
 

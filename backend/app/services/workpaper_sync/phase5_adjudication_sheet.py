@@ -37,6 +37,7 @@ __all__ = [
     "AdjudicationValueSource",
     "AdjudicationSection",
     "AdjudicationSheetSpec",
+    "static_sheet_payload_for_adjudication",
 ]
 
 
@@ -225,3 +226,144 @@ class AdjudicationSheetSpec:
                 f"{self.managed_sheet}: 受管数据格落进了 formula mask：{sorted(bad, key=lambda c: (col_index(''.join(ch for ch in c if ch.isalpha())), c))} "
                 "—— 审计师在 OO 里改了会写不回且无提示（D4-1 踩过的 fail-closed 缺陷）"
             )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  契约 payload 生成
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def static_sheet_payload_for_adjudication(
+    spec: AdjudicationSheetSpec,
+) -> dict:
+    """把一个 `AdjudicationSheetSpec` 翻成契约 sheets[] 条目（per-cell 固定行）。
+
+    与行表侧 `spec_to_contract_sheet_payload` 同构（都进 `build_contract_payload()["sheets"]`），
+    但适配审定表三处差异：
+      1. **逐格 `cell_mask`** 替代列向 `formula_mask`；
+      2. **多 section** → 多个 `tables[]` 条目；
+      3. **per-cell 锚点 / fixed_rows** → 无 `row_identity`，field 用固定行号定位。
+
+    🔴 **框架层纪律**：本函数零 wp_code 分支（与模块其余代码同一纪律）。各循环的几何差异
+       全由传入的 spec 实例携带。
+
+    :param spec: 各循环 sheet 层实例化的 `AdjudicationSheetSpec`
+    :returns: 契约 `sheets[]` 数组中的一个元素（`{sheet_key, excel_name, locator, tables}`）
+
+    调用方示例（D5/D6/D7）::
+
+        from phase5_adjudication_sheet import static_sheet_payload_for_adjudication
+        from phase5_d5_01_adjudication import SPEC_D501
+        payload = static_sheet_payload_for_adjudication(SPEC_D501)
+    """
+    from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
+
+    header_row = spec.header_rows[0] if spec.header_rows else (
+        spec.sections[0].title_row if spec.sections else 1
+    )
+
+    # stable_field_key 前缀：从 sheet_key 取（如 "d51-managed" → "d51_adj"）。
+    # 这与 D567 共用模块的 key_prefix 手动传参等效，但自动推导消除漂移面。
+    key_prefix = spec.sheet_key.split("-")[0] + "_adj"
+
+    tables: list[dict] = []
+    for s in spec.sections:
+        # ── 逐 section 构建 table payload ──────────────────────────────────
+        fields: list[dict] = []
+
+        # 从 spec.field_specs 构建字段声明（如果有的话）
+        if spec.field_specs:
+            for col_key, col, mode, vtype, json_key, hdr_text, group_cell in spec.field_specs:
+                fld: dict = {
+                    "stable_field_key": f"{key_prefix}_{s.section_key}/{col_key}",
+                    "json_pointer": f"/{s.section_key}/{json_key}",
+                    "column_key": col_key,
+                    "cell": {"column": col, "row_from": s.first_data_row},
+                    "mode": mode,
+                    "value_type": vtype,
+                    "source_ref": f"源xlsx!{spec.managed_sheet}!{col}{s.first_data_row}",
+                    "header_source_ref": f"源xlsx!{spec.managed_sheet}!{col}{header_row}",
+                    "store_item_id": spec.store_item_id or "",
+                    "header_text": hdr_text,
+                }
+                if group_cell:
+                    fld["group_source_ref"] = f"源xlsx!{spec.managed_sheet}!{group_cell}"
+                fields.append(fld)
+        else:
+            # 无 field_specs 时至少给一个 item_name 锚点（契约解析器要求每 table ≥1 field）
+            fields.append({
+                "stable_field_key": f"{key_prefix}_{s.section_key}/item_name",
+                "json_pointer": f"/{s.section_key}/itemName",
+                "column_key": "item_name",
+                "cell": {"column": "A", "row_from": s.first_data_row},
+                "mode": "editable",
+                "value_type": "text",
+                "source_ref": f"源xlsx!{spec.managed_sheet}!A{s.first_data_row}",
+                "header_source_ref": f"源xlsx!{spec.managed_sheet}!A{header_row}",
+                "store_item_id": "",
+                "header_text": "项目",
+            })
+
+        table_payload: dict = {
+            "table_key": s.table_key,
+            "anchor": f"A{s.title_row}",
+            "header_rows": len(spec.header_rows) if spec.header_rows else 2,
+            "first_data_row": s.first_data_row,
+            "last_data_row": s.last_data_row,
+            "footer_row": s.subtotal_row,
+            "row_mode": spec.row_mode.value,
+            "fields": fields,
+        }
+
+        # cell_mask 按 section 行范围过滤（只留属于本 section 的格）
+        section_rows = set(range(s.first_data_row, s.last_data_row + 1))
+        section_rows.add(s.subtotal_row)
+        section_mask = [
+            c for c in spec.cell_mask
+            if _cell_row(c) in section_rows
+        ]
+        if section_mask:
+            table_payload["cell_mask"] = section_mask
+
+        tables.append(table_payload)
+
+    # footer 三行（合计/TB/差异）—— 作为 sheet 级声明而非 table 级
+    footer: dict = {}
+    if spec.total_row is not None:
+        footer["total_row"] = spec.total_row
+    if spec.tb_row is not None:
+        footer["tb_row"] = spec.tb_row
+    if spec.diff_row is not None:
+        footer["diff_row"] = spec.diff_row
+    if spec.footer_marker:
+        footer["marker"] = spec.footer_marker
+
+    result: dict = {
+        "sheet_key": spec.sheet_key,
+        "excel_name": spec.managed_sheet,
+        "locator": {"anchor": TABLE_SHEET_ANCHOR},
+        "tables": tables,
+    }
+
+    # sheet 级 cell_mask：不属于任何 section 的格（footer 行等）
+    section_all_rows: set[int] = set()
+    for s in spec.sections:
+        section_all_rows.update(range(s.first_data_row, s.last_data_row + 1))
+        section_all_rows.add(s.subtotal_row)
+    sheet_level_mask = [
+        c for c in spec.cell_mask
+        if _cell_row(c) not in section_all_rows
+    ]
+    if sheet_level_mask:
+        result["formula_mask"] = sheet_level_mask
+
+    if footer:
+        result["footer"] = footer
+
+    return result
+
+
+def _cell_row(cell_ref: str) -> int:
+    """从 A1 形态的格引用提取行号（如 "B12" → 12）。"""
+    digits = "".join(c for c in cell_ref if c.isdigit())
+    return int(digits) if digits else 0

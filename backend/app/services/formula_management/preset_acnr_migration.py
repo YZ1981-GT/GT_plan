@@ -55,8 +55,15 @@ LEGACY_ALIAS_MAP: dict[str, str] = {
 #    N1「税会差异汇总」/ E1 数字货币两条（准则解释15号「可增设」项，无一级标准科目）/
 #    N3 递延负债本期变动 / H0-1 两条（九品种口径，真源
 #    `four_table/h0_book_amounts` 按项目科目表语义定位）。
+# 🔴 `ADJ` 已于 2026-09-28 移出本白名单
+#    （spec tb-adjustment-column-formula-closure Phase 1 Task 1.3/1.7）：
+#    它已注册进 `formula_engine._REGISTRY`（`ADJ('科目','aje_net|rje_net')`，
+#    L1 纯同步 handler，取 `FormulaContext.adj_data`）⇒ grammar_v1 等价就是它自己，
+#    `normalize_ref` 据 `_known_acnr_funcs()` 判为 migrated。
+#    留在白名单会让 `test_p22_pending_allowlist_functions_are_pending` 与
+#    实际状态矛盾（该测试正是为捕捉这种矛盾而存在）。
 PENDING_FUNCTION_ALLOWLIST: frozenset[str] = frozenset(
-    {"ADJ", "LEDGER", "LEDGER_DETAIL", "COUNT_LEDGER", "PLACEHOLDER"}
+    {"LEDGER", "LEDGER_DETAIL", "COUNT_LEDGER", "PLACEHOLDER"}
 )
 
 # 归一化状态
@@ -69,9 +76,15 @@ REASON_NO_FUNCTION = "no_function_call"  # 裸坐标 / 硬编码旧格式
 REASON_UNMAPPED = "unmapped_function"  # 已知别名之外、无 ACNR 等价的函数（待迁移）
 
 # 静态兜底函数集（formula_engine 不可用时 fail-open，与 L1 内核当前注册保持一致）
+#
+# 🔴 **这份清单是 `_REGISTRY` 的手抄副本，必须同步**。不同步的后果很隐蔽：
+# 只在 `formula_engine` import 失败的 fail-open 路径上，新注册函数会被判
+# `unmapped_function` → pending，而正常路径判 migrated ⇒ 同一条公式两种状态。
+# 一致性由 `test_adj_formula_function.test_fallback_known_funcs_matches_registry` 钉住。
 _FALLBACK_KNOWN_FUNCS: frozenset[str] = frozenset(
     {
         "TB", "SUM_TB", "ROW", "SUM_ROW", "REPORT", "NOTE", "WP", "PREV", "AUX",
+        "ADJ",  # 2026-09-28 注册（tb-adjustment-column-formula-closure Phase 1）
         "IF", "ABS", "ROUND", "MAX", "MIN",
     }
 )

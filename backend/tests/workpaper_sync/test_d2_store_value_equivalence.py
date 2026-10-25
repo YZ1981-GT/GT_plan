@@ -198,11 +198,27 @@ def test_merge_appends_rows_that_only_exist_on_the_excel_side() -> None:
 
 
 def _oo_to_html_tree():
+    # 🔴 锚点随执行层迁移（spec workpaper-sync-managed-row-convergence Task 3）：
+    # merge 绑定+调用的逻辑已从 oo_to_html 抽到会话无关模块 store_mirror（OO callback 与
+    # adopt-substrate 共用，避免第二真源）。判据意图不变（merge 函数被绑成可调用值且真被调用），
+    # 只把扫描目标改为逻辑真身 store_mirror。转发是否存在由 _oo_forwards_to_store_mirror 另守。
     import ast
     import pathlib
 
-    source = pathlib.Path(B.__file__).with_name("oo_to_html.py").read_bytes().decode("utf-8")
+    source = (
+        pathlib.Path(B.__file__).with_name("store_mirror.py").read_bytes().decode("utf-8")
+    )
     return ast.parse(source)
+
+
+def _oo_forwards_to_store_mirror() -> bool:
+    """OO callback 落地路径确有薄转发到 store_mirror（防转发被误删致 §9.6 静默回归）。"""
+    import pathlib
+
+    oo_src = (
+        pathlib.Path(B.__file__).with_name("oo_to_html.py").read_bytes().decode("utf-8")
+    )
+    return "mirror_projection_into_store" in oo_src
 
 
 def test_unified_oo_to_html_really_wires_the_merge_function() -> None:
@@ -260,6 +276,11 @@ def test_unified_oo_to_html_really_wires_the_merge_function() -> None:
     }
     assert bound_names & invoked, (
         f"merge 函数被绑到 {sorted(bound_names)} 但没有任何一个被调用 —— 绑了没人用等于死代码"
+    )
+    # 逻辑虽搬到 store_mirror，OO callback 落地路径仍必须转发过去，否则 §9.6 静默回归。
+    assert _oo_forwards_to_store_mirror(), (
+        "oo_to_html 不再转发到 store_mirror.mirror_projection_into_store —— "
+        "OO 编辑落地将不再镜像 checklist store"
     )
 
 

@@ -207,7 +207,7 @@
 
     <GtCutoffAutoSampling
       v-if="showCutoffPanel"
-      account-code="6602"
+      :account-code="samplingAccountCode"
       cutoff-direction="post_cutoff"
       :default-conditions="cutoffPanelDefaults"
       :workpaper-id="wpId"
@@ -223,7 +223,7 @@
         v-if="showSamplingDialog"
         :project-id="projectId"
         :workpaper-id="wpId"
-        account-code="6602"
+        :account-code="samplingAccountCode"
         phase="final"
         :year="currentYear"
         @filled="handleVoucherFilled"
@@ -279,6 +279,19 @@ import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../.
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+
+/**
+ * 科目码单一真源。原硬编码 `"6602"` —— `account_chart` 实证 `6602` 是
+ * **管理费用**（K9 循环的科目），而本底稿是「研发费用」（wp_index 实证）。
+ * 真源 `6604` 在 account_chart 中 7 条有 6 条为「研发费用」（另 1 条为某项目
+ * 自定义的「勘探费用」；科目**定义**权威源是 account_chart，不是单个项目账套的
+ * tb_balance 用法）。抽 6602 会把管理费用凭证当研发费用样本回填。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.4
+ */
+import { i6GrossQueryCodes } from '@/components/workpaper/composables/i6AccountScope'
+
+/** 抽凭科目码（真源，无 tbSourceCodes prop => 走兜底 6604；逗号拼接供引擎 split） */
+const samplingAccountCode = i6GrossQueryCodes().join(',')
 
 // 🔴 金额展示走 displayPrefs 单一真源（千分符 / 2 位小数 / 单位「元」/ showZero 偏好）。
 //    必须 setup **顶层** inject —— 写进函数体会静默失效（平台铁律）。

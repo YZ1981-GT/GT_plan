@@ -33,7 +33,8 @@ async def sync_from_workpaper(
     """以底稿审定数覆盖试算表，触发级联更新"""
     import sqlalchemy as sa
     from app.models.workpaper_models import WorkingPaper
-    from app.models.audit_platform_models import TrialBalance, EventPayload, EventType
+    from app.models.audit_platform_models import TrialBalance
+    from app.models.audit_platform_schemas import EventPayload, EventType
     from app.services.event_bus import event_bus
 
     # 获取底稿 parsed_data

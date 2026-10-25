@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "923c8a0cab875d9ac70a93a6cc1d0c6c510a70e221230c42a45e1de1a492308f",
+  "instrumentation_definition_sha256": "aa6fec6ea9b75f087af4d268f57f1566e487980541e11bf1284f5e4e8bce263d",
   "review": {
     "authority_root": "backend/wp_templates",
     "carrier": {
@@ -143,6 +143,8 @@
       }
     ],
     "known_template_quirks_note": "🔴 **两处缺陷两种处置**：①`AA23:AD23` 四格引错区间 ⇒ `overlay_fixed`（FC-5 第 **5** 个例外；减值准备区审定数四列合计恒 0，是真金额错误）②`I14` 缺公式 ⇒ `registered_not_fixed`（首行漏公式；前端 costEnding 本就重算并落库，merge 时由 formula_columns 重新写入 ⇒ 不影响回写正确性，但须登记）。**不得混写** —— 把②也标 overlay_fixed 会开一个不必要的覆盖层例外。",
+    "legacy_positional_id_pattern": "^(cgu|bv|imp|perf|ap|tc-i18)-\\d+$",
+    "legacy_positional_ids_grandfathered": true,
     "max_column": 30,
     "mounts_note": "🔴 **4 个挂载点（全 I 唯一 ≠2）**⇒ `force_component_type` 判据 SHALL 覆盖**全部 4 个**；变异「只验 1 个」SHALL 打红 —— 这是「分母为空的重言式」的**反面**：分母是 4 却只验 1，同样是假绿。",
     "oo_flags": {
@@ -153,7 +155,9 @@
     },
     "oo_flags_note": "`legacyOO`=**6** 是全 I 最多（对应 mount=4）。断言注册 adapter 后 legacyOO 分支**不再被走到**，但**不删代码**（删它会牵动 OO 不可用时的降级路径）。",
     "pilot_class": "phase5_goodwill_detail",
+    "positional_identity_fix_status": "fixed_out_of_sheet",
     "positional_identity_note": "🔴 全 I 8 处位置化 site 里 **I3 占 7**，但全在 `useI3Disclosure.ts`（族 A′ #L488 `cgu-${i}` 1 + 族 B #L441/#L463/#L503 3 + 族 D #L665/#L725 2）与 `i3/impairment/I3TabRecoverableTest.vue#L686`（族 B 1）—— **披露层 / 减值测试层**。本 sheet（明细表I3-2）的行身份是 `useI3Detail.ts` 的 rowId（`row-${Date.now()}-${random}` 族 A 安全生成）⇒ 本契约 sites 为空，🔴 但**不得**据此推断「I3 无位置化问题」—— 那 7 处的修复归 lane 1 的 Task 3~9。",
+    "positional_identity_persist_chain": "useI3Disclosure pullFromDetailRows → _persistSection('cgu_allocation') → options.onSave(`${prefix}-cgu_allocation-rows`) → GtI3Goodwill.vue http.put；键 I3-disc-{listed|soe}-cgu_allocation-rows（修复未改键名）",
     "positional_identity_sites": [],
     "reviewed_basis": "openpyxl 逐格实测 I/I3 商誉.xlsx 的 `明细表I3-2`（🔴 **四级**表头 R10/R11/R12/R13 ⇒ header_rows=**4**（平台上界，H9 那轮从 3 扩来，结清 Task 42 的 UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE 欠账）/ 数据 R14-22 九行 / footer R23 🔴 **三形态混行**（14 格纯 SUM E·G·J·K·L·R..Z + **5 格套用行公式** I23=SUM(D23:E23)-G23 · M23=D23+J23 · N23=E23+K23 · O23=G23+L23 · P23=M23+N23-O23 + **4 格引错区间** AA23:AD23）/ 公式列 11 个 I·M·N·O·P·Q·W·AA·AB·AC·AD（Q 是镜像 =A{r}；AB/AC 是**三项相加**口径）/ 🔴 **B/C 两列数据区全空** / 有效内容列 30 == max_column 30（无空列间隙）⇒ UUID 放 AE / 133 公式 / merged 47 / definedName 0 / 裸 IF 63 / 无 Excel Table / ws.protection.sheet=False ⇒ locked 全惰性） + 🔴 **两处模板真实缺陷逐格实证**：①`AA23:AD23` 四格 =SUM(<列>27:<列>30) 应为 =SUM(<列>14:<列>22)（R27-29 是编制说明文本行 B27='编制说明：'、R30 超 max_row(29)）⇒ 减值准备区审定数四列合计恒 0，同行左侧 S23..Z23 全部正确 ⇒ 复制粘贴错误 ⇒ **overlay_fixed** ②**本轮新发现** `I14` 是 None 而 I15..I18 逐行都有 =SUM(Dx:Ex)-Gx ⇒ 数据区首行漏公式 ⇒ **registered_not_fixed**（前端 costEnding 本就重算落库，merge 时由 formula_columns 重写） + 前端 `useI3Detail.ts` 按值 grep（ITEM_ID_ROWS='I3-2-rows' / 身份 rowId 族 A 安全生成 / 🔴 removeRow(rowIndex: number) 属**下标族** / I3DetailRow 的核心 12 字段 + Section 2/3 的 30+ 字段属后置 sheet） + 宿主 `GtI3Goodwill.vue` 按值 grep（🔴 **mount=4 全 I 唯一**、legacyOO=6 全 I 最多、checklist GET=0） + 真库现算（checklist_responses.item_id='I3-2-rows' **无行** ⇒ roundtrip 只能合成载荷）",
     "row_delete_api": {
@@ -462,7 +466,7 @@
   "template": {
     "normalized_structure_hash": "30d8ec32aab6a3a9bac8dc3a23fabfaffb4d44bbf856d7d273e0c2219ace4589",
     "relative_path": "I/I3 商誉.xlsx",
-    "template_sha256": "96cd6d6cb70698ce90087269aa3f5c3f70a7d80955bd2985904099c3d9257366"
+    "template_sha256": "99512b340ccb79bf884d9f3362010f302bd8aaf45be0f3b082c99899f5253085"
   },
-  "template_definition_sha256": "0deae32a8b60963af8012f2ae9ad57e65ae4a997dd9c9ef2c47ff64cb6dd9d3f"
+  "template_definition_sha256": "60fb5dbe87ad4c73fa7805069c041ce83add30b2140abc75fc76adf30da5f9b4"
 }

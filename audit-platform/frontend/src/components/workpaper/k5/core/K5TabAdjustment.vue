@@ -233,8 +233,11 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
+// 🔴 科目码走单一真源，原硬编码 '2701'（长期应付款）—— 预计负债是 '2801'。
+//    本文件的 AJE/RJE 会回写 K5-1 并推送 A13 错报，错科目会把调整分录记到 L5 长期应付款上。
+import { K5_ACCOUNT_NAME, K5_FALLBACK_STANDARD } from '../../composables/k5AccountScope'
 
-const K5_ACCOUNT_CODE = '2701'
+const K5_ACCOUNT_CODE = K5_FALLBACK_STANDARD
 
 const props = defineProps<{
   wpId: string
@@ -454,9 +457,9 @@ async function acceptSuggestedAje(): Promise<void> {
         id: `entry-${_nextId++}`,
         seq: entries.value.length + 1,
         entryType: (s.entryType as 'AJE' | 'RJE') || 'AJE',
-        accountCode: s.creditAccountCode || '2701',
-        accountName: s.creditAccountName || '预计负债',
-        summary: s.summary || '补提预计负债',
+        accountCode: s.creditAccountCode || K5_ACCOUNT_CODE,
+        accountName: s.creditAccountName || K5_ACCOUNT_NAME,
+        summary: s.summary || `补提${K5_ACCOUNT_NAME}`,
         debit: 0,
         credit: amt,
         indexRef: 'K5-6',

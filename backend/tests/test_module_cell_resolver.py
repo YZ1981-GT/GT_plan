@@ -410,22 +410,18 @@ class TestModuleCellResolverE2E:
         """Note module returns correct data from mocked DB"""
         from unittest.mock import AsyncMock, MagicMock
 
-        mock_row = MagicMock()
-        mock_row.__getitem__ = lambda self, idx: {
-            0: {
-                "rows": [
-                    {"code": "1001", "name": "现金", "year_end": 100, "year_begin": 90, "formula": None},
-                ]
-            }
-        }[idx]
-
+        # ORM select() + scalar_one_or_none() → 直接返回 data dict
         mock_result = MagicMock()
-        mock_result.first.return_value = mock_row
+        mock_result.scalar_one_or_none.return_value = {
+            "rows": [
+                {"code": "1001", "name": "现金", "year_end": 100, "year_begin": 90, "formula": None},
+            ]
+        }
 
         db = AsyncMock()
         db.execute = AsyncMock(return_value=mock_result)
 
-        result = await resolver.resolve(db, "note:五-1-1|A2:E2", "proj-1", 2025)
+        result = await resolver.resolve(db, "note:五-1-1|A2:E2", "00000000000000000000000000000001", 2025)
         assert result["module"] == "note"
         assert result["total"] == 5
         assert result["rows"][0]["value"] == "1001"
@@ -485,3 +481,355 @@ class TestModuleCellResolverE2E:
         assert result["rows"][6]["value"] == 1200.0
         for item in result["rows"]:
             assert item["module"] == "tb"
+
+
+# ─── Task 3.2: _query_note_cells node_key 过滤真 SQLite 集成测试 ──────────
+
+import uuid
+import pytest_asyncio
+from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+# SQLite 不认 JSONB，映射为 JSON
+SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON  # type: ignore[attr-defined]
+
+from app.models.base import Base  # noqa: E402
+from app.models.consol_note_data_models import ConsolNoteData  # noqa: E402
+
+_node_test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+_NOTE_TABLE = ConsolNoteData.__table__
+
+# 固定测试常量
+_PID = uuid.uuid4()
+_PID_OTHER = uuid.uuid4()  # 另一个项目，用于跨项目隔离
+_PID_STR = _PID.hex  # SQLite 存 UUID 为 32 位 hex（无连字符）；raw text() SQL 须匹配
+_PID_OTHER_STR = _PID_OTHER.hex
+_Y = 2025
+_SEC = "五-1-1"
+_NK_ROOT = "G:consol"
+_NK_CHILD = "A:subsidiary"
+
+
+@pytest_asyncio.fixture
+async def note_db():
+    """为 node_key 过滤测试创建真 SQLite 会话并种入多行。"""
+    async with _node_test_engine.begin() as conn:
+        await conn.run_sync(lambda c: Base.metadata.drop_all(c, tables=[_NOTE_TABLE]))
+        await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=[_NOTE_TABLE]))
+    factory = async_sessionmaker(_node_test_engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
+        # 1) legacy NULL 行
+        session.add(ConsolNoteData(
+            id=uuid.uuid4(), project_id=_PID, year=_Y, section_id=_SEC,
+            node_key=None,
+            data={"rows": [{"code": "L1", "name": "legacy", "year_end": 100, "year_begin": 90}]},
+        ))
+        # 2) 根合并节点行
+        session.add(ConsolNoteData(
+            id=uuid.uuid4(), project_id=_PID, year=_Y, section_id=_SEC,
+            node_key=_NK_ROOT,
+            data={"rows": [{"code": "R1", "name": "root_consol", "year_end": 200, "year_begin": 180}]},
+        ))
+        # 3) 子公司节点行
+        session.add(ConsolNoteData(
+            id=uuid.uuid4(), project_id=_PID, year=_Y, section_id=_SEC,
+            node_key=_NK_CHILD,
+            data={"rows": [{"code": "C1", "name": "child_a", "year_end": 50, "year_begin": 40}]},
+        ))
+        # 4) 另一个项目的 legacy 行（跨项目隔离用）
+        session.add(ConsolNoteData(
+            id=uuid.uuid4(), project_id=_PID_OTHER, year=_Y, section_id=_SEC,
+            node_key=None,
+            data={"rows": [{"code": "X1", "name": "other_project", "year_end": 999, "year_begin": 888}]},
+        ))
+        await session.commit()
+        yield session
+
+
+from app.services.custom_query.module_cell_resolver import _query_note_cells  # noqa: E402
+
+
+class TestQueryNoteCellsNodeKeyFiltering:
+    """真 SQLite/ORM 测试：_query_note_cells 的 node_key 过滤行为。
+
+    验证设计 §五.1 与 ADR-CNSC-004：
+    - 有 node_key → 精确匹配该键
+    - 无 node_key → 只查 NULL legacy 行
+    - 不套用根节点 legacy fallback
+    - 不同节点同 section 返回各自数据
+    - 按 id 稳定排序
+    - 不跨项目
+    Validates: Requirements 3.1~3.2; Design §五, P6
+    """
+
+    @pytest.mark.asyncio
+    async def test_node_key_present_returns_exact_node(self, note_db):
+        """有 node_key 时只返回该节点的数据。"""
+        cells = await _query_note_cells(
+            note_db, _PID_STR, _Y, _SEC, "A2:C2",
+            node_key=_NK_ROOT,
+        )
+        assert len(cells) == 3
+        # A2=code, B2=name, C2=year_end
+        assert cells[0]["value"] == "R1"
+        assert cells[1]["value"] == "root_consol"
+        assert cells[2]["value"] == 200
+
+    @pytest.mark.asyncio
+    async def test_node_key_absent_returns_only_null(self, note_db):
+        """无 node_key 时只返回 legacy NULL 行。"""
+        cells = await _query_note_cells(
+            note_db, _PID_STR, _Y, _SEC, "A2:C2",
+            node_key=None,
+        )
+        assert len(cells) == 3
+        assert cells[0]["value"] == "L1"
+        assert cells[1]["value"] == "legacy"
+        assert cells[2]["value"] == 100
+
+    @pytest.mark.asyncio
+    async def test_child_node_returns_own_data(self, note_db):
+        """子公司节点只返回自己的数据，不泄漏根或 legacy。"""
+        cells = await _query_note_cells(
+            note_db, _PID_STR, _Y, _SEC, "A2:C2",
+            node_key=_NK_CHILD,
+        )
+        assert len(cells) == 3
+        assert cells[0]["value"] == "C1"
+        assert cells[1]["value"] == "child_a"
+        assert cells[2]["value"] == 50
+
+    @pytest.mark.asyncio
+    async def test_two_nodes_same_section_different_data(self, note_db):
+        """两个节点对同一 section 返回不同 year_end。"""
+        root_cells = await _query_note_cells(
+            note_db, _PID_STR, _Y, _SEC, "C2",
+            node_key=_NK_ROOT,
+        )
+        child_cells = await _query_note_cells(
+            note_db, _PID_STR, _Y, _SEC, "C2",
+            node_key=_NK_CHILD,
+        )
+        assert root_cells[0]["value"] == 200
+        assert child_cells[0]["value"] == 50
+        assert root_cells[0]["value"] != child_cells[0]["value"]
+
+    @pytest.mark.asyncio
+    async def test_no_root_legacy_fallback(self, note_db):
+        """ADR-CNSC-004：即使节点行不存在，custom query 也不回退到 NULL legacy 行。"""
+        nonexistent_key = "Z:consol"
+        cells = await _query_note_cells(
+            note_db, _PID_STR, _Y, _SEC, "A2:C2",
+            node_key=nonexistent_key,
+        )
+        # 不存在该 node_key 的行 → 空结果，不回退到 legacy
+        assert cells == []
+
+    @pytest.mark.asyncio
+    async def test_cross_project_isolation(self, note_db):
+        """不返回另一个项目的 legacy 行。"""
+        cells = await _query_note_cells(
+            note_db, _PID_STR, _Y, _SEC, "A2",
+            node_key=None,
+        )
+        # 只有 _PID 的 legacy 行
+        assert len(cells) == 1
+        assert cells[0]["value"] == "L1"
+        # 不会返回 _PID_OTHER 的 X1
+
+    @pytest.mark.asyncio
+    async def test_empty_project_returns_nothing(self, note_db):
+        """project_id 为空或 year 为空时返回空。"""
+        cells = await _query_note_cells(note_db, "", _Y, _SEC, "A2")
+        assert cells == []
+
+        cells = await _query_note_cells(note_db, _PID_STR, None, _SEC, "A2")
+        assert cells == []
+
+
+class TestResolverNodeKeyViaFilters:
+    """通过 ModuleCellResolver.resolve(filters=...) 验证 node_key 传递到 _query_note_cells。
+
+    Validates: Requirements 3.1; Design §五.1
+    """
+
+    @pytest.fixture
+    def resolver(self):
+        return ModuleCellResolver()
+
+    @pytest.mark.asyncio
+    async def test_resolve_note_with_node_key_filter(self, resolver, note_db):
+        """resolve() 将 filters.node_key 传到附注取数器。"""
+        result = await resolver.resolve(
+            note_db, f"note:{_SEC}|A2:C2", _PID_STR, _Y,
+            filters={"node_key": _NK_CHILD},
+        )
+        assert result["module"] == "note"
+        assert result["total"] == 3
+        assert result["rows"][0]["value"] == "C1"
+        assert result["rows"][1]["value"] == "child_a"
+
+    @pytest.mark.asyncio
+    async def test_resolve_note_without_filter_uses_null(self, resolver, note_db):
+        """无 filters 时走 legacy NULL 路径。"""
+        result = await resolver.resolve(
+            note_db, f"note:{_SEC}|A2", _PID_STR, _Y,
+        )
+        assert result["total"] == 1
+        assert result["rows"][0]["value"] == "L1"
+
+    @pytest.mark.asyncio
+    async def test_resolve_note_empty_filters_uses_null(self, resolver, note_db):
+        """filters={} 无 node_key 时走 legacy NULL 路径。"""
+        result = await resolver.resolve(
+            note_db, f"note:{_SEC}|B2", _PID_STR, _Y,
+            filters={},
+        )
+        assert result["total"] == 1
+        assert result["rows"][0]["value"] == "legacy"
+
+
+# ─── Task 3.2 补充测试：跨年度/跨章节隔离 + 二维数组行 + 稳定排序 ──────────
+
+_Y_OTHER = 2024  # 另一审计年度
+_SEC_OTHER = "五-2-1"  # 另一章节
+
+
+@pytest_asyncio.fixture
+async def note_db_extended():
+    """扩展 fixture：在 note_db 基础上增加跨年度、跨章节和数组格式行。"""
+    async with _node_test_engine.begin() as conn:
+        await conn.run_sync(lambda c: Base.metadata.drop_all(c, tables=[_NOTE_TABLE]))
+        await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=[_NOTE_TABLE]))
+    factory = async_sessionmaker(_node_test_engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
+        # 1) 根节点 _Y + _SEC
+        session.add(ConsolNoteData(
+            id=uuid.uuid4(), project_id=_PID, year=_Y, section_id=_SEC,
+            node_key=_NK_ROOT,
+            data={"rows": [{"code": "R1", "name": "root_y_sec", "year_end": 200, "year_begin": 180}]},
+        ))
+        # 2) 根节点 _Y_OTHER + _SEC（同项目、不同年度）
+        session.add(ConsolNoteData(
+            id=uuid.uuid4(), project_id=_PID, year=_Y_OTHER, section_id=_SEC,
+            node_key=_NK_ROOT,
+            data={"rows": [{"code": "R_OLD", "name": "root_old_year", "year_end": 150, "year_begin": 130}]},
+        ))
+        # 3) 根节点 _Y + _SEC_OTHER（同项目同年度、不同章节）
+        session.add(ConsolNoteData(
+            id=uuid.uuid4(), project_id=_PID, year=_Y, section_id=_SEC_OTHER,
+            node_key=_NK_ROOT,
+            data={"rows": [{"code": "R_S2", "name": "root_other_sec", "year_end": 300, "year_begin": 280}]},
+        ))
+        # 4) legacy NULL + _Y + _SEC
+        session.add(ConsolNoteData(
+            id=uuid.uuid4(), project_id=_PID, year=_Y, section_id=_SEC,
+            node_key=None,
+            data={"rows": [{"code": "L1", "name": "legacy", "year_end": 100, "year_begin": 90}]},
+        ))
+        # 5) 二维数组格式行（子节点）
+        session.add(ConsolNoteData(
+            id=uuid.uuid4(), project_id=_PID, year=_Y, section_id=_SEC,
+            node_key=_NK_CHILD,
+            data={"rows": [["ARR1", "array_child", 55, 45, "=SUM(C2:D2)"]]},
+        ))
+        await session.commit()
+        yield session
+
+
+class TestQueryNoteCellsCrossIsolation:
+    """跨年度和跨章节隔离测试。
+
+    验证设计 §五.1：``note:{section}|{range}`` 查询同时限定项目、有效年度、section 和节点。
+    Validates: Requirements 3.1; Design §五, P6
+    """
+
+    @pytest.mark.asyncio
+    async def test_cross_year_isolation(self, note_db_extended):
+        """同项目、同节点、不同年度 → 只返回请求年度的数据。"""
+        cells_2025 = await _query_note_cells(
+            note_db_extended, _PID_STR, _Y, _SEC, "A2",
+            node_key=_NK_ROOT,
+        )
+        cells_2024 = await _query_note_cells(
+            note_db_extended, _PID_STR, _Y_OTHER, _SEC, "A2",
+            node_key=_NK_ROOT,
+        )
+        assert len(cells_2025) == 1
+        assert cells_2025[0]["value"] == "R1"
+        assert len(cells_2024) == 1
+        assert cells_2024[0]["value"] == "R_OLD"
+
+    @pytest.mark.asyncio
+    async def test_cross_section_isolation(self, note_db_extended):
+        """同项目、同年度、同节点、不同章节 → 只返回请求章节的数据。"""
+        cells_sec1 = await _query_note_cells(
+            note_db_extended, _PID_STR, _Y, _SEC, "A2",
+            node_key=_NK_ROOT,
+        )
+        cells_sec2 = await _query_note_cells(
+            note_db_extended, _PID_STR, _Y, _SEC_OTHER, "A2",
+            node_key=_NK_ROOT,
+        )
+        assert len(cells_sec1) == 1
+        assert cells_sec1[0]["value"] == "R1"
+        assert len(cells_sec2) == 1
+        assert cells_sec2[0]["value"] == "R_S2"
+
+    @pytest.mark.asyncio
+    async def test_nonexistent_year_returns_empty(self, note_db_extended):
+        """请求不存在的年度 → 空结果。"""
+        cells = await _query_note_cells(
+            note_db_extended, _PID_STR, 9999, _SEC, "A2",
+            node_key=_NK_ROOT,
+        )
+        assert cells == []
+
+    @pytest.mark.asyncio
+    async def test_nonexistent_section_returns_empty(self, note_db_extended):
+        """请求不存在的章节 → 空结果。"""
+        cells = await _query_note_cells(
+            note_db_extended, _PID_STR, _Y, "不存在的章节", "A2",
+            node_key=_NK_ROOT,
+        )
+        assert cells == []
+
+    @pytest.mark.asyncio
+    async def test_array_format_rows(self, note_db_extended):
+        """二维数组格式行被正确解析为虚拟 sheet。"""
+        cells = await _query_note_cells(
+            note_db_extended, _PID_STR, _Y, _SEC, "A2:E2",
+            node_key=_NK_CHILD,
+        )
+        assert len(cells) == 5
+        assert cells[0]["value"] == "ARR1"         # code
+        assert cells[1]["value"] == "array_child"   # name
+        assert cells[2]["value"] == 55              # year_end
+        assert cells[3]["value"] == 45              # year_begin
+        assert cells[4]["value"] == "=SUM(C2:D2)"  # formula
+
+    @pytest.mark.asyncio
+    async def test_invalid_uuid_project_returns_empty(self, note_db_extended):
+        """非法 UUID 格式的 project_id → 空结果，不抛异常。"""
+        cells = await _query_note_cells(
+            note_db_extended, "not-a-valid-uuid", _Y, _SEC, "A2",
+            node_key=_NK_ROOT,
+        )
+        assert cells == []
+
+    @pytest.mark.asyncio
+    async def test_null_and_node_same_section_do_not_mix(self, note_db_extended):
+        """同项目/年度/章节下 NULL 行和节点行互不干扰。"""
+        legacy = await _query_note_cells(
+            note_db_extended, _PID_STR, _Y, _SEC, "C2",
+            node_key=None,
+        )
+        node = await _query_note_cells(
+            note_db_extended, _PID_STR, _Y, _SEC, "C2",
+            node_key=_NK_ROOT,
+        )
+        assert len(legacy) == 1
+        assert legacy[0]["value"] == 100  # legacy year_end
+        assert len(node) == 1
+        assert node[0]["value"] == 200    # root year_end
+        assert legacy[0]["value"] != node[0]["value"]

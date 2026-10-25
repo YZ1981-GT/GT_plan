@@ -344,12 +344,12 @@
     </details>
 
     <!-- 抽凭引擎 dialog -->
-    <el-dialog v-model="showSamplingDialog" title="⚡ 抽凭引擎（科目 1604 在建工程-增加）" width="720px" :close-on-click-modal="false" destroy-on-close>
+    <el-dialog v-model="showSamplingDialog" title="⚡ 抽凭引擎（科目 ${samplingAccountCode} 在建工程-增加）" width="720px" :close-on-click-modal="false" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && props.wpId && props.projectId"
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
-        account-code="1604"
+        :account-code="samplingAccountCode"
         phase="final"
         :year="samplingYear"
         @filled="onSampleFilled"
@@ -375,6 +375,17 @@ import http from '@/utils/http'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+
+/**
+ * 抽凭科目码取自单一真源 `hCycleAccountScope`（H2 在建工程）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { h2Scope } from '../../composables/hCycleAccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = h2Scope.grossCode()
 
 const props = defineProps<{
   wpId: string

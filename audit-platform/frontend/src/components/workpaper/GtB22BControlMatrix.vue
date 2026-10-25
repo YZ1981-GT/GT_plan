@@ -27,6 +27,10 @@ import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 import GtReviewTrigger from './GtReviewTrigger.vue'
 import GtWpVersionTrail from './version-trail/GtWpVersionTrail.vue'
 import { useWorkpaperEntryDualMode } from './composables/useWorkpaperEntryDualMode'
+// B22B 真双向改线（spec: b-class-shared-base-carrier-lanes Task 2）
+import { useB22BSyncMode, B22B_CM_ENTRY_ID } from './composables/useB22BSyncMode'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 
@@ -72,15 +76,37 @@ const dualMode = useWorkpaperEntryDualMode({
   reloadAllResponses: async () => { await loadAll() },
   resolveOoSheetName: () => props.wpCode || 'B22B',
 })
+
+// B22B 真双向（spec: b-class-shared-base-carrier-lanes）
+const b22bSync = useB22BSyncMode({
+  entryId: B22B_CM_ENTRY_ID,
+  sheetKey: 'b22b-cm-managed',
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  isReadonly,
+  flushHtml: async () => ({ expectedRevision: 0, projection: null, sheetKey: 'b22b-cm-managed' }),
+  reloadHtml: async () => { await loadAll() },
+})
+
+const isSyncEnabled = computed(() => b22bSync.descriptor.value !== null)
 const renderMode = computed({
-  get: () => dualMode.mode.value,
-  set: (v: string) => { void dualMode.switchMode(v as 'html' | 'onlyoffice') },
+  get: () => {
+    if (isSyncEnabled.value) return b22bSync.syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html'
+    return dualMode.mode.value
+  },
+  set: (v: string) => {
+    if (isSyncEnabled.value) void b22bSync.switchMode(v === 'onlyoffice' ? '在线编辑' : '结构化视图')
+    else void dualMode.switchMode(v as 'html' | 'onlyoffice')
+  },
 })
 const renderModeOptions = computed(() => [
   { label: '结构化视图', value: 'html' as const },
-  { label: '在线编辑(OnlyOffice)', value: 'onlyoffice' as const, disabled: !dualMode.ooAvailable.value },
+  { label: '在线编辑', value: 'onlyoffice' as const, disabled: isSyncEnabled.value ? b22bSync.busy.value || isReadonly.value : !dualMode.ooAvailable.value },
 ])
-function onOoFallback(): void { void dualMode.switchMode('html') }
+function onOoFallback(): void {
+  if (isSyncEnabled.value) void b22bSync.switchMode('结构化视图')
+  else void dualMode.switchMode('html')
+}
 
 const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef as any)
 provide('getThreadDot', getThreadDot)

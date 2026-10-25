@@ -15,7 +15,7 @@
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
       />
-      <!-- 程序表 M9A（复用 GtAProgramConsole） -->
+      <!-- 程序表 M9A（复用 GtAProgramConsole，不参与双模式） -->
       <GtAProgramConsole
         v-else-if="currentSheet === 'procedure'"
         :wp-id="props.wpId"
@@ -24,61 +24,77 @@
         :html-data="{ programs: [], schema: { columns: [], rows: [] } }"
         :readonly="isReadonly"
       />
-      <!-- M9-1 审定表（权益类贷方！期末=期初+贷方-借方，双大类：不可/可重分类） -->
-      <M9TabAdjudication
-        v-else-if="currentSheet === 'M9-1'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        @navigate="handleNavigate"
-      />
-      <!-- M9-2 明细表（OCI分项+税后净额，30列区段Tab） -->
-      <M9TabDetail
-        v-else-if="currentSheet === 'M9-2'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        @navigate="handleNavigate"
-      />
-      <!-- M9-3 调整分录汇总（借贷平衡） -->
-      <M9TabAdjustment
-        v-else-if="currentSheet === 'M9-3'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        @navigate="handleNavigate"
-      />
-      <!-- M9-4 OCI核对表（多来源核对：G8公允变动+J2重计量+外币折算，13公式） -->
-      <M9TabOciReconcile
-        v-else-if="currentSheet === 'M9-4'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        @navigate="handleNavigate"
-      />
-      <!-- 附注披露信息（上市公司） -->
-      <M9TabDisclosureListed
-        v-else-if="currentSheet === 'disclosure-listed'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        @navigate="handleNavigate"
-      />
-      <!-- 附注披露信息（国有企业，67×21，20公式） -->
-      <M9TabDisclosureSoe
-        v-else-if="currentSheet === 'disclosure-soe'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        @navigate="handleNavigate"
-      />
-      <!-- OnlyOffice fallback: 未迁移 sheet / 参考辅助 -->
-      <GtOnlyOfficeSheet
-        v-else
-        :wp-id="props.wpId"
-        :sheet-name="props.sheetName"
-        style="height: 100%; min-height: 600px"
-      />
+      <!-- 其余 sheet：结构化 / OnlyOffice 双模式切换 -->
+      <template v-else>
+        <div class="mode-toggle-bar">
+          <el-segmented
+            :model-value="renderMode"
+            :options="renderModeOptions"
+            size="small"
+            @change="(v: any) => { renderMode = v }"
+          />
+          <GtEntrySyncCapabilityNotice :entry-id="M9_SYNC_ENTRY_ID" />
+        </div>
+
+        <div v-if="renderMode === 'onlyoffice' && isM9SyncedSheet" class="oo-container">
+          <WorkpaperSyncEditorHost
+            ref="syncEditorHostRef"
+            :descriptor="syncOoDescriptor"
+            :bridge="syncBridge"
+          />
+        </div>
+
+        <template v-else>
+          <M9TabAdjudication
+            v-if="currentSheet === 'M9-1'"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :is-readonly="isReadonly"
+            @navigate="handleNavigate"
+          />
+          <M9TabDetail
+            v-else-if="currentSheet === 'M9-2'"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :is-readonly="isReadonly"
+            @navigate="handleNavigate"
+          />
+          <M9TabAdjustment
+            v-else-if="currentSheet === 'M9-3'"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :is-readonly="isReadonly"
+            @navigate="handleNavigate"
+          />
+          <M9TabOciReconcile
+            v-else-if="currentSheet === 'M9-4'"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :is-readonly="isReadonly"
+            @navigate="handleNavigate"
+          />
+          <M9TabDisclosureListed
+            v-else-if="currentSheet === 'disclosure-listed'"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :is-readonly="isReadonly"
+            @navigate="handleNavigate"
+          />
+          <M9TabDisclosureSoe
+            v-else-if="currentSheet === 'disclosure-soe'"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :is-readonly="isReadonly"
+            @navigate="handleNavigate"
+          />
+          <GtOnlyOfficeSheet
+            v-else
+            :wp-id="props.wpId"
+            :sheet-name="props.sheetName"
+            style="height: 100%; min-height: 600px"
+          />
+        </template>
+      </template>
     </template>
 
   </div>
@@ -107,6 +123,11 @@
 import { ref, computed, inject, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
@@ -196,7 +217,63 @@ const currentSheet = computed(() => {
   return name
 })
 
-// ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI/displayPrefs + 挂真实 Host） ───
+// ─── sync bridge（HTML ↔ OnlyOffice 真双向，参照 D2 统一路径） ──────────────
+// M9 原来无模式切换，从零引入。后端 contract 仅 1 个受管 sheet：明细表M9-2 → m901-managed。
+
+const M9_SYNC_ENTRY_ID = 'xlsx/gt-m9-other-comprehensive-income'
+const M9_MANAGED_SHEET_KEYS: Record<string, string> = { 'M9-2': 'm901-managed' }
+
+const isM9SyncedSheet = computed(() => currentSheet.value in M9_MANAGED_SHEET_KEYS)
+const syncEntryId = ref(M9_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => M9_MANAGED_SHEET_KEYS[currentSheet.value] ?? 'm901-managed')
+const syncSwitching = ref(false)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(syncEntryId.value),
+  flushHtml: async () => {
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: syncEntryId.value })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: syncSheetKey.value }
+  },
+  reloadHtml: async (_minimumRevision: number) => { await selfLoad() },
+})
+
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+type M9RenderMode = 'html' | 'onlyoffice'
+
+const renderMode = computed({
+  get: (): M9RenderMode => (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html'),
+  set: (v: M9RenderMode) => { void switchRenderMode(v) },
+})
+
+const renderModeOptions = computed(() => [
+  { label: '结构化视图', value: 'html' as const },
+  { label: '在线编辑', value: 'onlyoffice' as const, disabled: !isM9SyncedSheet.value || isReadonly.value },
+])
+
+async function switchRenderMode(target: M9RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isM9SyncedSheet.value) return
+    syncSwitching.value = true
+    try { await syncBridge.switchToOnlyOffice() } catch { /* lastError 已由桥写入 */ } finally { syncSwitching.value = false }
+    return
+  }
+  if (syncBridge.mode.value !== 'oo') { syncBridge.persistMode('html'); return }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') { await syncBridge.reloadAfterApplied() }
+    else if (syncBridge.mode.value === 'oo' && !syncBridge.dirty.value) { await syncBridge.leaveWithoutSaving() }
+    else if (syncBridge.canForcesave.value && syncEditorHostRef.value) { await syncEditorHostRef.value.forceSave() }
+    else { syncBridge.persistMode('html') }
+  } catch { /* 保持 OO */ } finally { syncSwitching.value = false }
+}
+
+// ─── Runtime Boundary ────────────────────────────────────────────────────────
 // 复核对话与版本历史由 Runtime Boundary 统一 provide('openReviewDialog') + version 承载，
 // 本主入口不再本地 new GtReviewDialog / useWorkpaperVersionToolbar（避免重复 provider/Host）。
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
@@ -251,5 +328,17 @@ onBeforeUnmount(() => {
 
 .loading-container {
   padding: 24px;
+}
+
+.mode-toggle-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.oo-container {
+  height: 80vh;
+  min-height: 600px;
 }
 </style>

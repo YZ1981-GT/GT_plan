@@ -20,6 +20,7 @@
  * Item IDs: "K12-4-check-{idx}-{field}"
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { newRowIdentity } from './shared/rowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -132,7 +133,7 @@ export function useK12Check(params: UseK12CheckParams) {
 
   function _normalizeRow(raw: any, idx: number): K12CheckRow {
     return {
-      rowKey: raw.rowKey ?? `check-${idx}`,
+      rowKey: raw.rowKey ?? newRowIdentity('check'),
       index: idx + 1,
       checkItem: raw.checkItem ?? '',
       description: raw.description ?? '',
@@ -147,7 +148,7 @@ export function useK12Check(params: UseK12CheckParams) {
 
   function _buildDefaultRows(): K12CheckRow[] {
     return DEFAULT_CHECK_ITEMS.map((item, idx) => ({
-      rowKey: `check-${idx}`,
+      rowKey: newRowIdentity('check'),
       index: idx + 1,
       checkItem: item.checkItem,
       description: item.description,

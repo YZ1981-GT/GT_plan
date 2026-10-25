@@ -97,13 +97,21 @@ _FIELD_SPECS_SPECIFIC: Final[tuple[tuple[str, str, str, str, str, str, str], ...
     ("remark", "Q", "editable", "text", "reason", "备注说明", ""),
 )
 
-_FORMULA_COLUMNS_VOUCHING: Final[tuple[str, ...]] = ("G", "H")
-_FORMULA_TEMPLATES_VOUCHING: Final[dict[str, str]] = {
-    "G": "=SUM(G16:G{r})", "H": "=SUM(H16:H{r})",
-}
+# 🔴 2026-09-28 修正：footer SUM 列不进 `formula_columns`（数据区逐格实测零公式）。
+#    `formula_mask` 现算为 `{col}{first_data_row}:{col}{last_data_row}`，覆盖不到 footer；
+#    填进去只会让 G/H（借方/贷方金额）与 G（抽样金额）的整个数据区被
+#    `merge._protection` 判 `read_only_masked_cell`，OO 侧抽凭录入写不回 store。
+_FORMULA_COLUMNS_VOUCHING: Final[tuple[str, ...]] = ()
+_FORMULA_TEMPLATES_VOUCHING: Final[dict[str, str]] = {}
 
-_FORMULA_COLUMNS_SPECIFIC: Final[tuple[str, ...]] = ("G",)
-_FORMULA_TEMPLATES_SPECIFIC: Final[dict[str, str]] = {"G": "=SUM(G37:G{r})"}
+_FORMULA_COLUMNS_SPECIFIC: Final[tuple[str, ...]] = ()
+_FORMULA_TEMPLATES_SPECIFIC: Final[dict[str, str]] = {}
+
+#: footer 行 SUM 公式（`{last}` = 该区 last_data_row）。纯实测证据，不进 spec。
+FOOTER_SUM_TEMPLATES_VOUCHING: Final[dict[str, str]] = {
+    "G": "=SUM(G16:G{last})", "H": "=SUM(H16:H{last})",
+}
+FOOTER_SUM_TEMPLATES_SPECIFIC: Final[dict[str, str]] = {"G": "=SUM(G37:G{last})"}
 
 
 SPEC_D113_VOUCHING: Final[RowTableSheetSpec] = RowTableSheetSpec(

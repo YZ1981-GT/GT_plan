@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.services.formula_runtime.adapters.workpaper import (
+    RAW_CELL,
     OwnershipViolation,
     VersionConflict,
     WorkpaperMutationAdapter,
@@ -65,15 +66,20 @@ CREATE TABLE IF NOT EXISTS working_paper (
 );
 
 CREATE TABLE IF NOT EXISTS checklist_responses (
-    id TEXT PRIMARY KEY,
+    -- 🔴 约束逐项对齐真库（V085 + V161）：id / project_id NOT NULL、content_version。
+    --    改造前本表 project_id 可空、id 无 NOT NULL ⇒ 适配器 UPSERT 漏写 project_id
+    --    在这里全绿，而真 PG 上新行与冲突行两种情况都抛 NotNullViolation（假绿）。
+    id TEXT PRIMARY KEY NOT NULL,
+    project_id TEXT NOT NULL,
     wp_id TEXT NOT NULL,
     item_id TEXT NOT NULL,
     conclusion TEXT,
     remark TEXT,
     wp_ref TEXT,
     updated_by TEXT,
-    updated_at TEXT,
-    project_id TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    content_version INTEGER NOT NULL DEFAULT 1,
     UNIQUE(wp_id, item_id)
 );
 """
@@ -177,6 +183,38 @@ class TestCellReadWrite:
         result = _cell_write('{"data": {}}', "data.val", 99)
         assert json.loads(result) == {"data": {"val": 99}}
 
+    def test_raw_cell_reads_and_writes_text_verbatim(self):
+        """`@raw`：底稿前端存纯文本数字 / 行 JSON，不能再过一层 json.dumps。"""
+        assert _cell_read("376.73", RAW_CELL) == "376.73"
+        assert _cell_read("multi", RAW_CELL) == "multi"  # 非 JSON 文本也原样
+        assert _cell_read(None, RAW_CELL) is None
+        assert _cell_write('{"x": 1}', RAW_CELL, "376.73") == "376.73"
+        assert _cell_write("12", RAW_CELL, '[{"id":"a"}]') == '[{"id":"a"}]'
+        assert _cell_write("12", RAW_CELL, None) == ""
+        with pytest.raises(TypeError):
+            _cell_write("12", RAW_CELL, 376.73)
+        # 对照：`.` 仍是 JSON 语义（字符串会被再编码）
+        assert _cell_write(None, ".", "376.73") == '"376.73"'
+
+
+@pytest.mark.asyncio
+async def test_raw_cell_apply_stores_exact_text():
+    session, engine = await _create_test_session()
+    try:
+        await _seed_project_and_wp(session, PROJECT_A, WP_A)
+        adapter = WorkpaperMutationAdapter(session)
+        target = _make_target(item_id="E1-adj-tb-amount-ending", cell=RAW_CELL)
+        await adapter.apply_many([FormulaMutation(
+            target=target, before_value=None, after_value="376.73", expected_version="__none__",
+        )])
+        remark = (await session.execute(text(
+            "SELECT remark FROM checklist_responses WHERE item_id = 'E1-adj-tb-amount-ending'"
+        ))).scalar_one()
+        assert remark == "376.73"
+    finally:
+        await session.close()
+        await engine.dispose()
+
 
 class TestVersionFromTimestamp:
     def test_none(self):
@@ -266,11 +304,12 @@ async def test_version_conflict_detection():
         # Simulate external edit: insert a row with different timestamp
         await session.execute(
             text(
-                "INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at) "
-                "VALUES (:id, :wp_id, :item_id, :remark, :updated_at)"
+                "INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at) "
+                "VALUES (:id, :project_id, :wp_id, :item_id, :remark, :updated_at)"
             ),
             {
                 "id": str(uuid.uuid4()),
+                "project_id": str(PROJECT_A),
                 "wp_id": str(WP_A),
                 "item_id": "test-item",
                 "remark": '"external_edit"',
@@ -520,11 +559,12 @@ def test_pbt_version_conflict(after_value, item_id):
             await session.execute(
                 text(
                     "INSERT OR REPLACE INTO checklist_responses "
-                    "(id, wp_id, item_id, remark, updated_at) "
-                    "VALUES (:id, :wp_id, :item_id, :remark, :updated_at)"
+                    "(id, project_id, wp_id, item_id, remark, updated_at) "
+                    "VALUES (:id, :project_id, :wp_id, :item_id, :remark, :updated_at)"
                 ),
                 {
                     "id": str(uuid.uuid4()),
+                    "project_id": str(PROJECT_A),
                     "wp_id": str(WP_A),
                     "item_id": item_id,
                     "remark": '"conflict"',

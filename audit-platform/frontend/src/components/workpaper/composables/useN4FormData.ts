@@ -406,6 +406,8 @@ export function useN4FormData(opts: {
       eventBus.emit('expense:taxes-surcharges-updated', {
         accountCode: ACCOUNT_CODE_6403,
         auditedAmount,
+        amount: auditedAmount,
+        details: [],
         wpCode: 'N4',
         timestamp: Date.now(),
       })

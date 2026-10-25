@@ -12,7 +12,8 @@
     "wp_data",
     "formula",
     "prior_year_note",
-    "manual"
+    "manual",
+    "consol_aggregation"
   ],
   "valid_modes": [
     "auto",
@@ -1617,6 +1618,25 @@
         },
         {
           "table_index": 2,
+          "table_name": "（2）按坏账准备计提方法分类披露应收账款（续：期初数）",
+          "header_normalize": [
+            {
+              "text": "类别",
+              "semantic": "row_label"
+            },
+            {
+              "text": "期初数",
+              "semantic": "opening_balance"
+            }
+          ],
+          "rows": {
+            "合计": {
+              "row_type": "total"
+            }
+          }
+        },
+        {
+          "table_index": 3,
           "table_name": "期末单项计提坏账准备的应收账款",
           "header_normalize": [
             {
@@ -1653,7 +1673,7 @@
           }
         },
         {
-          "table_index": 3,
+          "table_index": 4,
           "table_name": "组合计提项目：应收中央企业客户",
           "header_normalize": [
             {
@@ -1782,7 +1802,7 @@
           }
         },
         {
-          "table_index": 4,
+          "table_index": 5,
           "table_name": "组合计提项目：应收海外企业客户",
           "header_normalize": [
             {
@@ -1911,7 +1931,7 @@
           }
         },
         {
-          "table_index": 5,
+          "table_index": 6,
           "table_name": "采用余额百分比或其他组合方法计提坏账准备的应收账款",
           "header_normalize": [
             {
@@ -1943,7 +1963,7 @@
           }
         },
         {
-          "table_index": 6,
+          "table_index": 7,
           "table_name": "（3）本期计提、收回或转回的坏账准备情况",
           "header_normalize": [
             {
@@ -2051,7 +2071,7 @@
           }
         },
         {
-          "table_index": 7,
+          "table_index": 8,
           "table_name": "收回或转回的坏账准备",
           "header_normalize": [
             {
@@ -2080,7 +2100,7 @@
           }
         },
         {
-          "table_index": 8,
+          "table_index": 9,
           "table_name": "（4）本期实际核销的应收账款",
           "header_normalize": [
             {
@@ -2117,7 +2137,7 @@
           }
         },
         {
-          "table_index": 9,
+          "table_index": 10,
           "table_name": "（5）按欠款方归集的期末余额前五名的应收账款",
           "header_normalize": [
             {
@@ -2146,7 +2166,7 @@
           }
         },
         {
-          "table_index": 10,
+          "table_index": 11,
           "table_name": "（6）由金融资产转移而终止确认的应收账款",
           "header_normalize": [
             {
@@ -2167,6 +2187,28 @@
               "row_type": "total",
               "formula": "sum(detail)",
               "mode": "auto"
+            }
+          }
+        },
+        {
+          "table_index": 12,
+          "table_name": "（7）应收账款转移继续涉入形成的资产、负债的金额",
+          "header_normalize": [
+            {
+              "text": "项目",
+              "semantic": "row_label"
+            },
+            {
+              "text": "期末金额",
+              "semantic": "closing_amount"
+            }
+          ],
+          "rows": {
+            "资产小计": {
+              "row_type": "total"
+            },
+            "负债小计": {
+              "row_type": "total"
             }
           }
         }
@@ -24474,7 +24516,7 @@
       "tables": [
         {
           "table_index": 0,
-          "table_name": "应收账款",
+          "table_name": "（1）按账龄披露应收账款",
           "header_normalize": [
             {
               "text": "账龄",
@@ -24585,7 +24627,7 @@
         },
         {
           "table_index": 1,
-          "table_name": "应收账款（表2）",
+          "table_name": "（2）按坏账准备计提方法分类披露应收账款",
           "header_normalize": [
             {
               "text": "类别",
@@ -24707,7 +24749,26 @@
         },
         {
           "table_index": 2,
-          "table_name": "应收账款（表3）",
+          "table_name": "（2）按坏账准备计提方法分类披露应收账款（续：期初数）",
+          "header_normalize": [
+            {
+              "text": "类别",
+              "semantic": "row_label"
+            },
+            {
+              "text": "期初数",
+              "semantic": "opening_balance"
+            }
+          ],
+          "rows": {
+            "合计": {
+              "row_type": "total"
+            }
+          }
+        },
+        {
+          "table_index": 3,
+          "table_name": "期末单项计提坏账准备的应收账款",
           "header_normalize": [
             {
               "text": "债务人名称",
@@ -24743,121 +24804,8 @@
           }
         },
         {
-          "table_index": 3,
-          "table_name": "应收账款（表4）",
-          "header_normalize": [
-            {
-              "text": "账龄",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "期末数",
-              "semantic": "closing_balance"
-            },
-            {
-              "text": "期初数",
-              "semantic": "opening_balance"
-            }
-          ],
-          "rows": {
-            "1年以内（含1年）": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "opening_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "1至2年": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "opening_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "2至3年": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "opening_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "3年以上": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "opening_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "合计": {
-              "row_type": "total",
-              "formula": "sum(detail)",
-              "mode": "auto",
-              "derived_sum": {
-                "derived_by": "sum_total",
-                "member_row_numbers": [
-                  1,
-                  2,
-                  3,
-                  4,
-                  5,
-                  6
-                ],
-                "derived_note": "合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）"
-              }
-            }
-          }
-        },
-        {
           "table_index": 4,
-          "table_name": "应收账款（表5）",
+          "table_name": "组合计提项目：应收中央企业客户",
           "header_normalize": [
             {
               "text": "账龄",
@@ -24970,7 +24918,120 @@
         },
         {
           "table_index": 5,
-          "table_name": "应收账款（表6）",
+          "table_name": "组合计提项目：应收海外企业客户",
+          "header_normalize": [
+            {
+              "text": "账龄",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "期末数",
+              "semantic": "closing_balance"
+            },
+            {
+              "text": "期初数",
+              "semantic": "opening_balance"
+            }
+          ],
+          "rows": {
+            "1年以内（含1年）": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "1至2年": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "2至3年": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "3年以上": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "合计": {
+              "row_type": "total",
+              "formula": "sum(detail)",
+              "mode": "auto",
+              "derived_sum": {
+                "derived_by": "sum_total",
+                "member_row_numbers": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "derived_note": "合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）"
+              }
+            }
+          }
+        },
+        {
+          "table_index": 6,
+          "table_name": "采用余额百分比或其他组合方法计提坏账准备的应收账款",
           "header_normalize": [
             {
               "text": "组合名称",
@@ -25001,8 +25062,8 @@
           }
         },
         {
-          "table_index": 6,
-          "table_name": "应收账款（表7）",
+          "table_index": 7,
+          "table_name": "（3）本期计提、收回或转回的坏账准备情况",
           "header_normalize": [
             {
               "text": "类别",
@@ -25097,8 +25158,8 @@
           }
         },
         {
-          "table_index": 7,
-          "table_name": "应收账款（表8）",
+          "table_index": 8,
+          "table_name": "收回或转回的坏账准备",
           "header_normalize": [
             {
               "text": "债务人名称",
@@ -25126,8 +25187,8 @@
           }
         },
         {
-          "table_index": 8,
-          "table_name": "应收账款（表9）",
+          "table_index": 9,
+          "table_name": "（4）本期实际核销的应收账款",
           "header_normalize": [
             {
               "text": "债务人名称",
@@ -25163,8 +25224,8 @@
           }
         },
         {
-          "table_index": 9,
-          "table_name": "应收账款（表10）",
+          "table_index": 10,
+          "table_name": "（5）按欠款方归集的期末余额前五名的应收账款",
           "header_normalize": [
             {
               "text": "债务人名称",
@@ -25192,8 +25253,8 @@
           }
         },
         {
-          "table_index": 10,
-          "table_name": "应收账款（表11）",
+          "table_index": 11,
+          "table_name": "（6）由金融资产转移而终止确认的应收账款",
           "header_normalize": [
             {
               "text": "债务人名称",
@@ -25213,6 +25274,28 @@
               "row_type": "total",
               "formula": "sum(detail)",
               "mode": "auto"
+            }
+          }
+        },
+        {
+          "table_index": 12,
+          "table_name": "（7）应收账款转移继续涉入形成的资产、负债的金额",
+          "header_normalize": [
+            {
+              "text": "项目",
+              "semantic": "row_label"
+            },
+            {
+              "text": "期末金额",
+              "semantic": "closing_amount"
+            }
+          ],
+          "rows": {
+            "资产小计": {
+              "row_type": "total"
+            },
+            "负债小计": {
+              "row_type": "total"
             }
           }
         }
@@ -37811,7 +37894,7 @@
         },
         {
           "table_index": 2,
-          "table_name": "续：",
+          "table_name": "按坏账计提方法分类披露（续：上年年末余额）",
           "header_normalize": [
             {
               "text": "类别",
@@ -37949,7 +38032,7 @@
         },
         {
           "table_index": 4,
-          "table_name": "续：",
+          "table_name": "按单项计提坏账准备的应收账款（续：上年年末余额）",
           "header_normalize": [
             {
               "text": "名称",
@@ -38735,7 +38818,7 @@
         },
         {
           "table_index": 14,
-          "table_name": "单位名称",
+          "table_name": "按欠款方归集的应收账款和合同资产期末余额前五名单位情况",
           "header_normalize": [
             {
               "text": "单位名称",
@@ -38767,6 +38850,60 @@
               "row_type": "total",
               "formula": "sum(detail)",
               "mode": "auto"
+            }
+          }
+        },
+        {
+          "table_index": 15,
+          "table_name": "因金融资产转移而终止确认的应收账款情况",
+          "header_normalize": [
+            {
+              "text": "项目",
+              "semantic": "row_label"
+            },
+            {
+              "text": "转移方式",
+              "semantic": "transfer_method"
+            },
+            {
+              "text": "终止确认金额",
+              "semantic": "derecognition_amount"
+            },
+            {
+              "text": "与终止确认相关的利得或损失",
+              "semantic": "gain_or_loss"
+            }
+          ],
+          "rows": {
+            "合计": {
+              "row_type": "total"
+            }
+          }
+        },
+        {
+          "table_index": 16,
+          "table_name": "转移应收账款且继续涉入形成的资产、负债的金额",
+          "header_normalize": [
+            {
+              "text": "项目",
+              "semantic": "row_label"
+            },
+            {
+              "text": "资产转移方式",
+              "semantic": "transfer_method"
+            },
+            {
+              "text": "继续涉入形成的资产金额",
+              "semantic": "continued_asset"
+            },
+            {
+              "text": "继续涉入形成的负债金额",
+              "semantic": "continued_liability"
+            }
+          ],
+          "rows": {
+            "合计": {
+              "row_type": "total"
             }
           }
         }
@@ -61749,7 +61886,7 @@
       "tables": [
         {
           "table_index": 0,
-          "table_name": "账  龄",
+          "table_name": "按账龄披露",
           "header_normalize": [
             {
               "text": "账龄",
@@ -61942,7 +62079,7 @@
         },
         {
           "table_index": 1,
-          "table_name": "类  别",
+          "table_name": "按坏账计提方法分类披露",
           "header_normalize": [
             {
               "text": "类别",
@@ -62047,7 +62184,7 @@
         },
         {
           "table_index": 2,
-          "table_name": "类  别",
+          "table_name": "按坏账计提方法分类披露（续：上年年末余额）",
           "header_normalize": [
             {
               "text": "类别",
@@ -62152,7 +62289,7 @@
         },
         {
           "table_index": 3,
-          "table_name": "名  称",
+          "table_name": "按单项计提坏账准备的应收账款",
           "header_normalize": [
             {
               "text": "名称",
@@ -62180,7 +62317,7 @@
         },
         {
           "table_index": 4,
-          "table_name": "名  称",
+          "table_name": "按单项计提坏账准备的应收账款（续：上年年末余额）",
           "header_normalize": [
             {
               "text": "名称",
@@ -62208,7 +62345,7 @@
         },
         {
           "table_index": 5,
-          "table_name": "",
+          "table_name": "组合计提项目：应收中央企业客户",
           "header_normalize": [
             {
               "text": "期末余额",
@@ -62315,7 +62452,7 @@
         },
         {
           "table_index": 6,
-          "table_name": "",
+          "table_name": "组合计提项目：应收地方国有企业客户",
           "header_normalize": [
             {
               "text": "期末金额",
@@ -62422,7 +62559,7 @@
         },
         {
           "table_index": 7,
-          "table_name": "",
+          "table_name": "组合计提项目：应收海外企业客户",
           "header_normalize": [
             {
               "text": "期末余额",
@@ -62529,7 +62666,7 @@
         },
         {
           "table_index": 8,
-          "table_name": "",
+          "table_name": "组合计提项目：组合4",
           "header_normalize": [
             {
               "text": "期末余额",
@@ -62636,7 +62773,7 @@
         },
         {
           "table_index": 9,
-          "table_name": "",
+          "table_name": "组合计提项目：组合5",
           "header_normalize": [
             {
               "text": "期末余额",
@@ -62743,7 +62880,7 @@
         },
         {
           "table_index": 10,
-          "table_name": "",
+          "table_name": "本期计提、收回或转回的坏账准备情况",
           "header_normalize": [
             {
               "text": "坏账准备金额",
@@ -62776,7 +62913,7 @@
         },
         {
           "table_index": 11,
-          "table_name": "单位名称",
+          "table_name": "转回或收回金额重要的坏账准备",
           "header_normalize": [
             {
               "text": "单位名称",
@@ -62835,7 +62972,7 @@
         },
         {
           "table_index": 12,
-          "table_name": "项  目",
+          "table_name": "本期实际核销的应收账款情况",
           "header_normalize": [
             {
               "text": "项目",
@@ -62863,7 +63000,7 @@
         },
         {
           "table_index": 13,
-          "table_name": "单位名称",
+          "table_name": "重要的应收账款核销情况（逐项披露）",
           "header_normalize": [
             {
               "text": "单位名称",
@@ -62900,7 +63037,7 @@
         },
         {
           "table_index": 14,
-          "table_name": "单位名称",
+          "table_name": "按欠款方归集的应收账款和合同资产期末余额前五名单位情况",
           "header_normalize": [
             {
               "text": "单位名称",
@@ -62932,6 +63069,60 @@
               "row_type": "total",
               "formula": "sum(detail)",
               "mode": "auto"
+            }
+          }
+        },
+        {
+          "table_index": 15,
+          "table_name": "因金融资产转移而终止确认的应收账款情况",
+          "header_normalize": [
+            {
+              "text": "项目",
+              "semantic": "row_label"
+            },
+            {
+              "text": "转移方式",
+              "semantic": "transfer_method"
+            },
+            {
+              "text": "终止确认金额",
+              "semantic": "derecognition_amount"
+            },
+            {
+              "text": "与终止确认相关的利得或损失",
+              "semantic": "gain_or_loss"
+            }
+          ],
+          "rows": {
+            "合计": {
+              "row_type": "total"
+            }
+          }
+        },
+        {
+          "table_index": 16,
+          "table_name": "转移应收账款且继续涉入形成的资产、负债的金额",
+          "header_normalize": [
+            {
+              "text": "项目",
+              "semantic": "row_label"
+            },
+            {
+              "text": "资产转移方式",
+              "semantic": "transfer_method"
+            },
+            {
+              "text": "继续涉入形成的资产金额",
+              "semantic": "continued_asset"
+            },
+            {
+              "text": "继续涉入形成的负债金额",
+              "semantic": "continued_liability"
+            }
+          ],
+          "rows": {
+            "合计": {
+              "row_type": "total"
             }
           }
         }

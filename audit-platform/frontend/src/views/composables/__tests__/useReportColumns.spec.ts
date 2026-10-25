@@ -254,23 +254,79 @@ describe('useReportColumns — impRowClassName', () => {
   })
 })
 
+/**
+ * 🔴 2026-09-28 修：`getNoteSection` 的语义已从「查静态 `_ROW_NOTE_SECTION_MAP`」
+ * 改为「查 `noteSequenceMap`」—— 后者**只收录出现在 `rows` 里且有金额的行**
+ * （零额行不编附注序号）。
+ *
+ * 原测试用 `createOptions()` 的空 `rows` 去断言 `getNoteSection('BS-002') === '五、1'`
+ * ⇒ 恒得 null，这两条一直红。这是**测试没跟上实现**，不是实现缺陷：
+ * 报表页只给有金额的行标附注序号，空 rows 自然无任何映射。
+ *
+ * 故这里显式喂入带金额的行。同时保留「零额行不编号」这条正向语义断言，
+ * 否则改回静态映射也能让本组变绿（判据会失去区分力）。
+ */
 describe('useReportColumns — getNoteSection', () => {
-  const options = createOptions()
-  const { getNoteSection } = useReportColumns(options)
+  function withRows(rows: Array<Partial<ReportRow>>) {
+    const options = {
+      isConsolidated: computed(() => false),
+      activeTab: ref('balance_sheet'),
+      rows: ref(rows as ReportRow[]),
+    }
+    return useReportColumns(options)
+  }
 
-  it('returns mapped section for known row code BS-002', () => {
+  it('returns mapped section for known row code BS-002（该行须在 rows 内且有金额）', () => {
+    const { getNoteSection } = withRows([
+      { row_code: 'BS-002', current_period_amount: '1000', prior_period_amount: '900' },
+    ])
     expect(getNoteSection('BS-002')).toBe('五、1')
   })
 
-  it('returns mapped section for known row code IS-001', () => {
-    expect(getNoteSection('IS-001')).toBe('五、29')
+  // 🔴 期望值由 '五、29' 更正为 '五、62'：映射真源 `_ROW_NOTE_SECTION_MAP` 里
+  // `'IS-001': '五、62'`（营业收入，与营业成本 IS-002 合并同一章节）。
+  // 旧期望 29 是过时值，实现是对的 —— 本条同时是「测试期望必须对着真源核，
+  // 不能凭记忆写」的样本。
+  it('returns mapped section for known row code IS-001（同上）', () => {
+    const { getNoteSection } = withRows([
+      { row_code: 'IS-001', current_period_amount: '5000', prior_period_amount: '4000' },
+    ])
+    expect(getNoteSection('IS-001')).toBe('五、62')
+  })
+
+  it('IS-001 与 IS-002 共用同一章节（营业收入/成本合并披露）', () => {
+    const { getNoteSection } = withRows([
+      { row_code: 'IS-001', current_period_amount: '5000' },
+      { row_code: 'IS-002', current_period_amount: '3000' },
+    ])
+    expect(getNoteSection('IS-002')).toBe(getNoteSection('IS-001'))
+  })
+
+  it('🔴 零额行不编附注序号 ⇒ 即便 row_code 已知也返回 null（动态编号语义）', () => {
+    const { getNoteSection } = withRows([
+      { row_code: 'BS-002', current_period_amount: '0', prior_period_amount: '0' },
+    ])
+    expect(getNoteSection('BS-002')).toBeNull()
+  })
+
+  it('行不在 rows 内 ⇒ 返回 null（不再回落静态映射）', () => {
+    const { getNoteSection } = withRows([
+      { row_code: 'IS-001', current_period_amount: '5000' },
+    ])
+    expect(getNoteSection('BS-002')).toBeNull()
   })
 
   it('returns null for unknown row code', () => {
+    const { getNoteSection } = withRows([
+      { row_code: 'BS-002', current_period_amount: '1000' },
+    ])
     expect(getNoteSection('UNKNOWN-999')).toBeNull()
   })
 
   it('returns null for empty string', () => {
+    const { getNoteSection } = withRows([
+      { row_code: 'BS-002', current_period_amount: '1000' },
+    ])
     expect(getNoteSection('')).toBeNull()
   })
 })
@@ -280,9 +336,19 @@ describe('useReportColumns — goToNote', () => {
     mockPush.mockClear()
   })
 
+  // 同 getNoteSection：goToNote 依赖动态编号，行必须在 rows 内且有金额（见上方说明）
+  function withRows(rows: Array<Partial<ReportRow>>) {
+    return useReportColumns({
+      isConsolidated: computed(() => false),
+      activeTab: ref('balance_sheet'),
+      rows: ref(rows as ReportRow[]),
+    })
+  }
+
   it('navigates to disclosure-notes with section query for known row code', () => {
-    const options = createOptions()
-    const { goToNote } = useReportColumns(options)
+    const { goToNote } = withRows([
+      { row_code: 'BS-002', current_period_amount: '1000', prior_period_amount: '900' },
+    ])
     goToNote('BS-002')
     expect(mockPush).toHaveBeenCalledWith({
       path: '/projects/test-project-id/disclosure-notes',
@@ -291,9 +357,18 @@ describe('useReportColumns — goToNote', () => {
   })
 
   it('does not navigate for unknown row code', () => {
-    const options = createOptions()
-    const { goToNote } = useReportColumns(options)
+    const { goToNote } = withRows([
+      { row_code: 'BS-002', current_period_amount: '1000' },
+    ])
     goToNote('UNKNOWN-999')
+    expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  it('🔴 零额行不跳转（无附注序号 ⇒ 无 section ⇒ 不 push）', () => {
+    const { goToNote } = withRows([
+      { row_code: 'BS-002', current_period_amount: '0', prior_period_amount: '0' },
+    ])
+    goToNote('BS-002')
     expect(mockPush).not.toHaveBeenCalled()
   })
 })

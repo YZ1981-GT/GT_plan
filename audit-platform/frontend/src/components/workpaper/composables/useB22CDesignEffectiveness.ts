@@ -15,6 +15,7 @@
 import { ref, computed, onScopeDispose, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { newRowIdentity } from './shared/rowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,15 @@ export function normalizeSeverity(v: unknown): DeficiencySeverity {
 
 /** 单条缺陷条目 */
 export interface DeficiencyEntry {
+  /**
+   * 稳定行身份（BC-53 改造）。
+   *
+   * 🔴 改造前落库形态是 `B22C-{blockKey}-def-{序号}-{field}`（1-based），行身份=位置：
+   *    删中间条目后后续条目的 item_id 整体前移 ⇒ ① OO↔HTML 按行身份配对必错位；
+   *    ② severity 存在 conclusion 列、desc 存在 remark 列，两列分属不同 item_id，
+   *    位置漂移会让「某条缺陷的描述」与「它的严重程度」配错。
+   */
+  rowId: string
   /** 缺陷描述 */
   desc: string
   /** 是否「控制缺陷」 */
@@ -208,6 +218,13 @@ export function useB22CDesignEffectiveness(wpId: Ref<string>, projectId: Ref<str
           item_id: `B22C-${key}-def-${n}-desc`,
           conclusion: null,
           remark: d.desc || null,
+          wp_ref: null,
+        })
+        // 行身份（BC-53）：与业务字段同 item_id 组落库，使「位置」不再是身份
+        items.push({
+          item_id: `B22C-${key}-def-${n}-rowid`,
+          conclusion: null,
+          remark: d.rowId || null,
           wp_ref: null,
         })
         items.push({
@@ -360,7 +377,17 @@ export function useB22CDesignEffectiveness(wpId: Ref<string>, projectId: Ref<str
         // 严重程度（权威）：存于 conclusion；有 severity 时 isSignificant 由其派生，保证口径一致
         const severity = normalizeSeverity(getField(`B22C-${key}-def-${n}-severity`).conclusion)
         if (severity !== null) sig = severityIsSignificant(severity)
-        defs.push({ desc, isControlDeficiency: cd, isSignificant: sig, severity, judgment })
+        // 行身份：已落库则原样保留（存量身份稳定，不重铸 —— 平台 grandfather 口径）；
+        // 缺失则补**确定性** legacy 串（含原序号），使多会话迁移产出一致。
+        const storedRowId = getField(`B22C-${key}-def-${n}-rowid`).remark || ''
+        defs.push({
+          rowId: storedRowId.trim() || `B22C-${key}-def-legacy-${n}`,
+          desc,
+          isControlDeficiency: cd,
+          isSignificant: sig,
+          severity,
+          judgment,
+        })
       }
       b.deficiencies = defs
       const secSig = getField(`B22C-${key}-section-significant`).conclusion
@@ -519,6 +546,7 @@ export function useB22CDesignEffectiveness(wpId: Ref<string>, projectId: Ref<str
       if (exists) continue
 
       block.deficiencies.push({
+        rowId: newRowIdentity(`B22C-${block.key}-def`),
         desc: u.desc,
         isControlDeficiency: true,
         isSignificant,
@@ -563,6 +591,7 @@ export function useB22CDesignEffectiveness(wpId: Ref<string>, projectId: Ref<str
     const block = blockState.value[blockKey]
     if (!block) return
     block.deficiencies.push({
+      rowId: newRowIdentity(`B22C-${blockKey}-def`),
       desc: '',
       isControlDeficiency: true,
       isSignificant: false,

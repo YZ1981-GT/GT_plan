@@ -1,0 +1,76 @@
+{
+  "task": 20,
+  "feasibility_targets": ["F5-4", "F5-6"],
+  "production_code_changes": "none",
+
+  "f5_4_adjustment": {
+    "sheet": "调整分录汇总F5-4",
+    "store_item_id": "F5-4-rows",
+    "composable": "F5TabAdjustment.vue (inline SFC, no extracted composable)",
+    "central_sync": {
+      "composable": "useAdjustmentCentralSync",
+      "mount_point": "F5TabAdjustment.vue:282-296",
+      "wp_code": "F5"
+    },
+    "writers": 1,
+    "writer_detail": "F5TabAdjustment.vue inline persist(), debounce 2s, f5:save-items event",
+    "import_export": "_f5_import_export.py, item_id='F5-4-rows'",
+    "geometry": "dynamic rows × 11 columns (seq/entryType/date/summary/accountCode/accountName/debitAmount/creditAmount/preparer/remark + 操作)",
+    "formulas": "3 computed aggregates (totalDebit/totalCredit/isBalanced)",
+    "cross_sheet_refs": "none",
+    "verdict": "single_html",
+    "verdict_reason": "FC-6 默认 single_html。hub 模式（useAdjustmentCentralSync），与 D1-5 ~ F4-3 共十一张调整分录汇总同型。已在 phase5_f5 的 HTML_ONLY_STORE_KEYS 中登记：\"调整分录汇总 hub，接 useAdjustmentCentralSync ⇒ single_html（FC-6）\"。",
+    "fc_ref": "FC-6",
+    "prior_art": ["D1-5", "D2-4", "D3-3", "D4-4", "D5-3", "D6-4", "D7-3", "E1-5", "F1-3", "F3-3", "F4-3"],
+    "already_registered_in_provider": true,
+    "provider_constant": "HTML_ONLY_STORE_KEYS[1] = ('F5-4-rows', '...FC-6...')"
+  },
+
+  "f5_6_quantity_recon": {
+    "sheet": "销售数量与结转成本数量核对明细表F5-6",
+    "store_keys": {
+      "F5-6-quantity-recon-plants": "StoredPlant[] (新格式，嵌套三层)",
+      "F5-6-quantity-recon-rows": "legacy flat format (read-only fallback)",
+      "F5-6-rows": "legacy IE key (read-only fallback)",
+      "F5-6-audit-note": "plain text",
+      "F5-6-audit-conclusion": "plain text"
+    },
+    "composable": "useF5QuantityRecon (520 lines)",
+    "central_sync": "none",
+    "writers": 1,
+    "writer_detail": "useF5QuantityRecon persist (含 OCR applyOcrOutbound 入口), debounce 1.2s",
+    "import_export": "_f5_import_export.py, item_id='F5-6-quantity-recon-plants', 24-col wide table",
+    "cross_sheet_refs": "none (self-contained)",
+    "geometry": {
+      "structure": "nested 3-layer: plant → product → 12 months × 3 series (sales/cost/diff)",
+      "default_scale": "2 plants × 4 products = 8 product rows",
+      "input_cells_per_product": 24,
+      "formula_cells_per_product": 42,
+      "total_formula_cells": 244,
+      "formula_types": [
+        "per-product total (Σ12 months) × 3 series",
+        "per-product diff (sales - cost) × 13 values",
+        "per-plant sumSeries (Σ products) × 3 series × 13",
+        "grandTotal sumSeries (Σ plants) × 3 series × 13"
+      ]
+    },
+    "verdict": "html_only (后置另立 spec)",
+    "verdict_reason": "嵌套三层 StoredPlant/StoredProduct 结构无法映射为受管平坦行表格（RowTableSheetSpec 只支持一层）；244 个公式格全在前端 computed 嵌套聚合中；OCR 回填额外增加复杂度。已在 phase5_f5 的 HTML_ONLY_STORE_KEYS 中登记为后置。",
+    "blocking_factors": [
+      "三层嵌套结构（plant→product→months）⇒ RowTableSheetSpec 不适用",
+      "244 公式格全在前端 computed 嵌套聚合（非模板公式）",
+      "维度键 F5-6-quantity-recon-plants 的行数随分厂数/产品数动态变化",
+      "OCR applyOcrOutbound 按月份写入特定格"
+    ],
+    "already_registered_in_provider": true,
+    "provider_constant": "HTML_ONLY_STORE_KEYS[2] = ('F5-6-quantity-recon-rows', '...后置另立 spec...')"
+  },
+
+  "p23_legacy_explicit_registration": {
+    "description": "F5-4 / F5-6 / F5-1 主营区在 slice 中显式登记为 legacy 假双向（不静默遗漏）。",
+    "html_only_keys_in_provider": ["F5-1-adj-main-rows", "F5-4-rows", "F5-6-quantity-recon-rows"],
+    "test_coverage": "test_f5_canary_and_contract.py::TestProperty17And24Registrations::test_f54_hub_and_f56_are_html_only"
+  },
+
+  "evidence_date": "2026-10-07"
+}

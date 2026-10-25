@@ -1396,7 +1396,7 @@
    "template_ref": {
     "workbook": "M10 其他权益工具.xlsx",
     "root": "backend/wp_templates/M",
-    "sha256": "c804b879770c07c261d903917a7d6ae43af8047d2a6c40d707c08673ca489eea",
+    "sha256": "1047d8edffb5369b83a2b16d2c80fe7b5ae530179a7de80b1005f318eab22499",
     "sheet_count": 11,
     "in_runtime_index": true,
     "formula_cells": 279,
@@ -1529,8 +1529,8 @@
    },
    {
     "name": "M10 其他权益工具.xlsx",
-    "size": 139234,
-    "sha256": "c804b879770c07c261d903917a7d6ae43af8047d2a6c40d707c08673ca489eea",
+    "size": 115677,
+    "sha256": "1047d8edffb5369b83a2b16d2c80fe7b5ae530179a7de80b1005f318eab22499",
     "sheet_count": 11,
     "belongs_to_entry": "xlsx/gt-m10-other-equity-instruments",
     "in_runtime_index": true

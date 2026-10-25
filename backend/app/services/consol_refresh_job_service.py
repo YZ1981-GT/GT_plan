@@ -64,6 +64,7 @@ class RefreshJob:
     status: str = STATUS_QUEUED
     current_step: str | None = None
     steps_completed: list[str] = field(default_factory=list)
+    steps_skipped: list[str] = field(default_factory=list)
     total_steps: int = TOTAL_STEPS
     errors: list[dict] = field(default_factory=list)
     result: dict | None = None
@@ -162,10 +163,12 @@ async def run_refresh_job(job_id: str, project_id: str, year: int) -> None:
             }
         job.status = STATUS_COMPLETED
         job.steps_completed = list(result.steps_completed)
+        job.steps_skipped = list(result.steps_skipped)
         job.errors = list(result.errors)
         job.result = {
             "nodes_refreshed": result.nodes_refreshed,
             "steps_completed": list(result.steps_completed),
+            "steps_skipped": list(result.steps_skipped),
             "errors": list(result.errors),
             "duration_ms": result.duration_ms,
             "reconciliation": recon,
@@ -180,6 +183,7 @@ async def run_refresh_job(job_id: str, project_id: str, year: int) -> None:
                 "status": STATUS_COMPLETED,
                 "nodes_refreshed": result.nodes_refreshed,
                 "steps_completed": list(result.steps_completed),
+                "steps_skipped": list(result.steps_skipped),
                 "errors": list(result.errors),
                 "duration_ms": result.duration_ms,
             },

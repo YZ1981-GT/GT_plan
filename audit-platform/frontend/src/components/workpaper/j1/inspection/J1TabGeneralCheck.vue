@@ -274,7 +274,7 @@
 
     <!-- 抽凭引擎 -->
     <el-dialog v-model="samplingVisible" title="抽凭引擎 — 应付职工薪酬(2211)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="2211" :phase="samplingPhase" :workpaper-id="props.wpId" :project-id="props.projectId" :year="yearNum" @filled="onSamplesFilled" />
+      <GtVoucherSamplingEngine v-if="samplingVisible" :account-code="samplingAccountCode" :phase="samplingPhase" :workpaper-id="props.wpId" :project-id="props.projectId" :year="yearNum" @filled="onSamplesFilled" />
     </el-dialog>
   </div>
 </template>
@@ -294,6 +294,17 @@ import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1Vou
 import { useJ1VoucherOcr } from '@/composables/workpaper/j1/useJ1VoucherOcr'
 import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
 import J1VoucherCard from './J1VoucherCard.vue'
+
+/**
+ * 抽凭科目码取自单一真源 `jAccountScope`（J1 应付职工薪酬）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { j1GrossQueryCodes } from '../../composables/jAccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = j1GrossQueryCodes().join(',')
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('../../GtOnlyOfficeSheet.vue'))

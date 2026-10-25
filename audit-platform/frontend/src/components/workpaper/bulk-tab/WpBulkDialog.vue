@@ -107,8 +107,9 @@
         <!-- 循环多选 -->
         <el-form-item label="选择审计循环" required>
           <el-checkbox
-            :model-value="selectedCycles.length === availableCycles.length"
-            :indeterminate="selectedCycles.length > 0 && selectedCycles.length < availableCycles.length"
+            :model-value="supportedCycles.length > 0 && selectedCycles.length === supportedCycles.length"
+            :indeterminate="selectedCycles.length > 0 && selectedCycles.length < supportedCycles.length"
+            :disabled="supportedCycles.length === 0"
             @change="toggleSelectAll"
             style="margin-bottom: 8px;"
           >
@@ -120,10 +121,16 @@
               :key="cycle.code"
               :label="cycle.code"
               :value="cycle.code"
+              :disabled="!cycle.supported"
+              :title="cycle.supported ? '' : cycle.unsupportedReason"
             >
-              {{ cycle.code }} - {{ cycle.name }}
+              {{ cycle.code }} {{ cycle.name }}
             </el-checkbox>
           </el-checkbox-group>
+          <!-- 不可选循环的原因：置灰而不隐藏，否则用户不知道它们为什么不在列表里 -->
+          <div v-if="unsupportedNote.length" class="cycle-unsupported-note">
+            <div v-for="(note, i) in unsupportedNote" :key="i">{{ note }}</div>
+          </div>
         </el-form-item>
 
         <!-- 冲突策略（仅导入时显示） -->
@@ -168,7 +175,12 @@
         </el-form-item>
 
         <!-- 密码保护（导出时显示） -->
-        <el-form-item v-if="currentAction !== 'import-data'" label="密码保护（可选）">
+        <el-form-item
+          v-if="currentAction !== 'import-data'"
+          data-testid="bulk-password-item"
+          label="密码保护（可选）"
+          :error="passwordError || undefined"
+        >
           <el-input
             v-model="exportPassword"
             type="password"
@@ -177,6 +189,8 @@
             clearable
             style="max-width: 300px;"
           />
+          <!-- 规则常驻提示；违规时上方 :error 显示原因，执行按钮同时置灰（Req 8.4） -->
+          <div v-if="!passwordError" class="password-rule-hint">{{ PASSWORD_RULE_TEXT }}</div>
         </el-form-item>
 
         <!-- 文件上传（仅导入时显示） -->
@@ -366,10 +380,23 @@ async function loadScenarios(): Promise<void> {
     if (!Array.isArray(list) || list.length === 0) {
       throw new Error('后端未返回场景列表')
     }
+    // 循环清单与场景同源同步（Req 8.5）。缺失一律显式报错 —— **不退回写死列表**，
+    // 理由与场景文案相同：硬写的列表与 catalog 漂移后没有任何编译期或运行期信号。
+    const cycleList = payload?.cycles
+    if (!Array.isArray(cycleList) || cycleList.length === 0) {
+      throw new Error('后端未返回循环清单')
+    }
     scenarios.value = list as BulkScenario[]
+    availableCycles.value = cycleList as BulkCycleOption[]
+    // 默认只勾选可用循环：置灰的循环默认勾上等于把「导出来什么都没有」变成默认行为
+    selectedCycles.value = (cycleList as BulkCycleOption[])
+      .filter(c => c.supported)
+      .map(c => c.code)
     isArchived.value = !!payload?.isArchived
   } catch (err: any) {
     scenarios.value = []
+    availableCycles.value = []
+    selectedCycles.value = []
     scenarioLoadError.value =
       `无法读取导入导出场景说明：${err?.message ?? err}。` +
       '请稍后重试；若持续失败请联系管理员（场景说明由后端统一维护）。'
@@ -411,21 +438,41 @@ function selectScenario(sc: BulkScenario): void {
 }
 
 // ─── 配置选项 ───
-const availableCycles = [
-  { code: 'D', name: 'D 销售循环' },
-  { code: 'E', name: 'E 货币资金' },
-  { code: 'F', name: 'F 采购存货' },
-  { code: 'G', name: 'G 投资循环' },
-  { code: 'H', name: 'H 固定资产' },
-  { code: 'I', name: 'I 无形资产' },
-  { code: 'J', name: 'J 职工薪酬' },
-  { code: 'K', name: 'K 其他循环' },
-  { code: 'L', name: 'L 债务循环' },
-  { code: 'M', name: 'M 权益循环' },
-  { code: 'N', name: 'N 税项循环' },
-]
+/**
+ * 循环清单 —— **全部字段来自后端** `GET .../bulk-tab/scenarios` 的 `cycles`
+ * （真源 `scenario_registry.cycle_options_for_ui()`）。
+ *
+ * 🔴 改造前这里写死 D~N 十一项且默认全选，而 ACNR catalog 里 E、J 一张可导入导出的
+ * Tab 都没有 ⇒ 用户勾上去、导出「成功」、包里没有它们的任何文件，也没有任何解释。
+ * 真栈实测就卡在这里。写死列表还有第二个问题：catalog 以后新增循环时前端不会跟着变。
+ */
+interface BulkCycleOption {
+  code: string
+  name: string
+  supported: boolean
+  unsupportedReason: string
+}
 
-const selectedCycles = ref<string[]>(availableCycles.map(c => c.code))
+const availableCycles = ref<BulkCycleOption[]>([])
+
+/** 可勾选的循环（catalog 里至少有一张启用导入导出的 Tab） */
+const supportedCycles = computed(() => availableCycles.value.filter(c => c.supported))
+
+/** 不可勾选的循环 —— 置灰并在下方说明原因，而不是让它们从列表里消失 */
+const unsupportedCycles = computed(() => availableCycles.value.filter(c => !c.supported))
+
+/** 不支持原因分组文案：「E 货币资金、J 薪酬：……」 */
+const unsupportedNote = computed(() => {
+  const groups = new Map<string, string[]>()
+  for (const c of unsupportedCycles.value) {
+    const list = groups.get(c.unsupportedReason) ?? []
+    list.push(`${c.code} ${c.name}`.trim())
+    groups.set(c.unsupportedReason, list)
+  }
+  return [...groups.entries()].map(([reason, names]) => `${names.join('、')}：${reason}`)
+})
+
+const selectedCycles = ref<string[]>([])
 const conflictStrategy = ref<ConflictStrategy>('overwrite')
 const dryRun = ref(true)
 const onlyWithData = ref(true)
@@ -470,16 +517,50 @@ const executeButtonLabel = computed(() => {
   return `开始${actionLabel.value}`
 })
 
+/**
+ * 导出密码允许的字符 —— 与后端 `bulk_export_service` 的
+ * `PASSWORD_MAX_LENGTH` / `_PASSWORD_ALLOWED_RE` **逐值一致**，
+ * 守卫 `test_bulk_export_usability.py` 读本文件源码与后端常量交叉比对。
+ *
+ * 后端是权威（它会返回 422），前端只是体验预检 —— 让用户在点按钮之前就知道问题，
+ * 而不是等 5 分钟导出跑完才收到错误。
+ */
+const PASSWORD_MAX_LENGTH = 128
+/**
+ * **不允许**的字符（否定字符类）。写成否定形式而不是 `^[\x21-\x7E]+$` 的理由见后端同名常量：
+ * Python 的 `$` 还会匹配末尾换行之前，两端用同一个否定字符类才能语义严格一致。
+ */
+const PASSWORD_FORBIDDEN_RE = /[^\x21-\x7E]/
+
+/** 密码规则常驻提示（合法时显示），与错误提示共用一份措辞 */
+const PASSWORD_RULE_TEXT = `只能使用英文字母、数字和英文符号（不含空格），长度 1–${PASSWORD_MAX_LENGTH} 位；留空则不加密`
+
+/** 密码校验结果：空串 = 合法（含「留空不加密」这一合法态） */
+const passwordError = computed(() => {
+  const value = exportPassword.value
+  if (!value) return ''
+  if (value.length > PASSWORD_MAX_LENGTH) {
+    return `密码过长（${value.length} 位），${PASSWORD_RULE_TEXT}`
+  }
+  if (PASSWORD_FORBIDDEN_RE.test(value)) {
+    return `密码含不支持的字符，${PASSWORD_RULE_TEXT}。中文、全角字符与空格在不同解压软件下会被算成不同的密码，即使输入正确也可能打不开压缩包`
+  }
+  return ''
+})
+
 const canExecute = computed(() => {
   if (selectedCycles.value.length === 0) return false
   if (currentAction.value === 'import-data' && !uploadFile.value) return false
+  // 导出密码违规 ⇒ 按钮不可用（Req 8.4）；导入不涉及密码
+  if (currentAction.value !== 'import-data' && passwordError.value) return false
   return true
 })
 
 // ─── 方法 ───
 function toggleSelectAll(checked: boolean | string | number) {
   if (checked) {
-    selectedCycles.value = availableCycles.map(c => c.code)
+    // 只作用于可用循环：全选不应把置灰的循环也勾上
+    selectedCycles.value = supportedCycles.value.map(c => c.code)
   } else {
     selectedCycles.value = []
   }
@@ -508,8 +589,9 @@ function handleFileChange(file: UploadFile) {
     ).then((res: any) => {
       const data = res?.data ?? res
       if (data?.cycles?.length) {
+        // 只保留**可用**循环：ZIP 里可能带着后来被停用的循环，勾上它只会导出空结果
         selectedCycles.value = data.cycles.filter(
-          (c: string) => availableCycles.some(ac => ac.code === c)
+          (c: string) => supportedCycles.value.some(ac => ac.code === c)
         )
         ElMessage.success(`已从 ZIP 识别 ${data.file_count} 张底稿，循环: ${selectedCycles.value.join(', ')}`)
       }
@@ -531,7 +613,8 @@ async function handleExecute() {
   try {
     switch (currentAction.value) {
       case 'export-templates': {
-        await exportTemplates(selectedCycles.value)
+        // 模板导出同样显示密码框 → 必须透传，否则「设了密码却拿到明文 ZIP」
+        await exportTemplates(selectedCycles.value, exportPassword.value || undefined)
         emit('exported')
         break
       }
@@ -608,6 +691,23 @@ watch(
 </script>
 
 <style scoped>
+/* 不可选循环的原因说明（置灰的循环为什么不能勾） */
+.cycle-unsupported-note {
+  width: 100%;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+}
+
+/* 密码规则常驻提示（违规时由 el-form-item 的 :error 接管） */
+.password-rule-hint {
+  width: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
 .bulk-desc {
   color: var(--el-text-color-secondary);
   margin-bottom: 16px;

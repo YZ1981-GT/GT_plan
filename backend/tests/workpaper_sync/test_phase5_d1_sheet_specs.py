@@ -75,9 +75,19 @@ class TestD104BadDebtThreeRegions:
         assert SPEC_D104_PORTFOLIO.uuid_col == "P"
 
     def test_three_regions_use_distinct_store_item_ids(self) -> None:
+        """🔴 三键统一 `D1-bd-` 前缀（2026-09-28 修正第三键漏前缀的错名）。
+
+        前端真源 `d1AdjudicationModel.D1_BD_NOTETYPE_KEY` / 后端 `prefill_anchor_map` /
+        `d_cycle_extraction.presets` 三处一致，真库载荷亦在 `D1-bd-notetype-rows`。
+        """
         ids = {s.store_item_id for s in SPECS_D104}
         assert len(ids) == 3
-        assert ids == {"D1-bd-individual-rows", "D1-bd-portfolio-rows", "D1-notetype-rows"}
+        assert ids == {
+            "D1-bd-individual-rows",
+            "D1-bd-portfolio-rows",
+            "D1-bd-notetype-rows",
+        }
+        assert all(i.startswith("D1-bd-") for i in ids), f"三区键须同前缀：{sorted(ids)}"
 
     def test_three_regions_row_ranges_do_not_overlap(self) -> None:
         ranges = [(s.first_data_row, s.last_data_row) for s in SPECS_D104]

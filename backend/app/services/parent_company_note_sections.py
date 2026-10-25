@@ -52,7 +52,11 @@ from app.services.note_section_catalog import (
     normalize_report_scope,
     normalize_template_type,
 )
-from app.services.parent_company_scope import resolve_parent_standalone_project
+from app.services.parent_company_scope import (
+    ParentCompanyContext,
+    resolve_parent_company_context,
+    resolve_parent_standalone_project,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +194,9 @@ class ParentScopeCache:
     is_consolidated: bool
     source: ParentCompanySource
     resolution_failed: bool = False
+    has_branches: bool = False
+    parent_node_key: str | None = None
+    parent_context: ParentCompanyContext | None = None
 
     def matches(self, project_id: UUID, year: int) -> bool:
         """该缓存是否适用于给定 ``(project_id, year)``。"""
@@ -285,8 +292,37 @@ async def resolve_parent_scope_for_notes(
     if normalize_report_scope(project.report_scope) != "consolidated":
         return ParentScopeCache(project_id, year, False, missing)
 
-    source = await resolve_parent_company_source(db, project)
-    return ParentScopeCache(project_id, year, True, source)
+    try:
+        context = await resolve_parent_company_context(db, project)
+    except Exception as err:  # pragma: no cover - defensive：树/定位失败必须留空，不能回落合并数
+        logger.warning(
+            "母公司口径解析：定位 standalone 或构建企业树失败 project=%s：%s；母公司章取数留空",
+            project_id,
+            err,
+        )
+        return ParentScopeCache(
+            project_id, year, True, missing, resolution_failed=True
+        )
+    parent = context.standalone_project
+    source = (
+        ParentCompanySource(
+            project_id=parent.id,
+            project_name=getattr(parent, "name", None),
+            company_code=getattr(parent, "company_code", None),
+            missing=False,
+        )
+        if parent is not None
+        else missing
+    )
+    return ParentScopeCache(
+        project_id,
+        year,
+        True,
+        source,
+        has_branches=context.has_branches,
+        parent_node_key=context.parent_node_key,
+        parent_context=context,
+    )
 
 
 def parent_source_payload(source: ParentCompanySource) -> dict[str, Any]:
@@ -309,5 +345,12 @@ def parent_source_payload(source: ParentCompanySource) -> dict[str, Any]:
 
 
 def build_parent_source_meta(scope: ParentScopeCache) -> dict[str, Any]:
-    """从 ``ParentScopeCache`` 构造溯源载荷（``parent_source_payload`` 的薄壳）。"""
-    return parent_source_payload(scope.source)
+    """从 ``ParentScopeCache`` 构造溯源载荷；有分公司时只增量标明母公司汇总节点。"""
+    payload = parent_source_payload(scope.source)
+    if scope.has_branches:
+        payload.update({
+            "source_scope": "parent_aggregate",
+            "source_node_key": scope.parent_node_key,
+            "includes_branches": True,
+        })
+    return payload

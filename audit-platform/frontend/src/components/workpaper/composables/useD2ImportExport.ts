@@ -15,6 +15,7 @@
  */
 import { ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { getAuthHeaders } from '@/utils/authToken'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -84,7 +85,8 @@ export function useD2ImportExport(options: UseD2ImportExportOptions) {
         `/api/workpapers/${wpId.value}/d2/export-template?sheet=${encodeURIComponent(sheet)}`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          // 🔴 原生 fetch 不经 http.ts 拦截器 ⇒ 必须自带鉴权头（否则恒 401「导出模板失败」）
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         }
       )
       if (!response.ok) {
@@ -113,7 +115,7 @@ export function useD2ImportExport(options: UseD2ImportExportOptions) {
         `/api/workpapers/${wpId.value}/d2/export-data?sheet=${encodeURIComponent(sheet)}`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         }
       )
       if (!response.ok) {
@@ -148,6 +150,8 @@ export function useD2ImportExport(options: UseD2ImportExportOptions) {
         `/api/workpapers/${wpId.value}/d2/import-data?sheet=${encodeURIComponent(sheet)}`,
         {
           method: 'POST',
+          // 不设 Content-Type：让浏览器自带 multipart boundary
+          headers: getAuthHeaders(),
           body: formData,
         }
       )

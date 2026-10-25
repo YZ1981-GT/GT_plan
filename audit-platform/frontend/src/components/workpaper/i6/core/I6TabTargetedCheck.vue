@@ -710,7 +710,7 @@
     >
       <GtVoucherSamplingEngine
         v-if="samplingVisible && props.wpId && props.projectId"
-        account-code="6602"
+        :account-code="samplingAccountCode"
         phase="final"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
@@ -737,6 +737,19 @@ import {
   hasFailedCheck,
 } from '../../composables/useI6TargetedCheck'
 import type { I2LinkageStatus } from '../../composables/useI6CrossSheet'
+
+/**
+ * 科目码单一真源。原硬编码 `"6602"` —— `account_chart` 实证 `6602` 是
+ * **管理费用**（K9 循环的科目），而本底稿是「研发费用」（wp_index 实证）。
+ * 真源 `6604` 在 account_chart 中 7 条有 6 条为「研发费用」（另 1 条为某项目
+ * 自定义的「勘探费用」；科目**定义**权威源是 account_chart，不是单个项目账套的
+ * tb_balance 用法）。抽 6602 会把管理费用凭证当研发费用样本回填。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.4
+ */
+import { i6GrossQueryCodes } from '@/components/workpaper/composables/i6AccountScope'
+
+/** 抽凭科目码（真源，无 tbSourceCodes prop => 走兜底 6604；逗号拼接供引擎 split） */
+const samplingAccountCode = i6GrossQueryCodes().join(',')
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),

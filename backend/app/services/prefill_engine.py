@@ -267,6 +267,20 @@ async def _resolve_adj_formula(
     include_statuses 使用默认值（仅 approved，ADR-ADJ-003）。
 
     v2 符号约定：adj_net 内部已按 direction_resolver 归一（贷方类取反）。
+
+    🔴 **`ADJ` 有两套实现，口径刻意不同，别看到一处就以为是全部**
+    （spec tb-adjustment-column-formula-closure Phase 1 Task 1.12）：
+
+    | 实现 | 位置 | origin 过滤 | 服务对象 |
+    |------|------|------------|---------|
+    | 本函数 | `prefill_engine._FORMULA_RESOLVERS["ADJ"]` | **不排除**（矩阵第 2 行） | 底稿 prefill 预设 |
+    | `_handle_adj` | `formula_engine._REGISTRY["ADJ"]` | 由 L2 喂的 `adj_data` 决定 | 试算平衡表/报表/审定表（第 4 行，**排除 workpaper**） |
+
+    两者都走 `adjustment_amount_source`（单一取数真源），差异只在过滤参数。
+    `FormulaEngine.execute`（底稿用户自定义公式）刻意用**第 2 行**口径与本函数对齐 ——
+    同一张底稿里 prefill 的 ADJ 与用户公式的 ADJ 必须给出同一个数。
+
+    本函数**不得**改成第 4 行口径：需求 2.3 要求底稿域行为零变化。
     """
     if len(args) < 2:
         return None

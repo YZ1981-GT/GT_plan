@@ -15,6 +15,16 @@
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, Tab3State } from './useB50FormData'
+import { newRowIdentity } from './shared/rowIdentity'
+import {
+  B50_ACCOUNTS_ITEM_ID,
+  b50CellItemId,
+  b50PlanItemId,
+  b50RowItemId,
+  parseAccountRefs,
+  readWithLegacyFallback,
+  serializeAccountRefs,
+} from './b50RowIdentity'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,6 +53,18 @@ export type ScopeCategory = '' | 'scot' | 'amount_only' | 'other'
 export interface AccountRow {
   index: number
   name: string
+  /**
+   * 稳定行身份（BC-48 label-as-key 修复，渲染侧）。
+   *
+   * 🔴 现状登记（诚实说明改造边界）：
+   *   - **渲染 key** 原用 `row.name`（4 处），两个同名科目会让 Vue 复用错 DOM ⇒
+   *     本字段修掉这一层，`:key` 一律改绑 `rowKey`。
+   *   - **持久化键**仍以科目名为身份（`B50-T3-cycle-{name}` 等，全表数十处），
+   *     属 BC-48「label 作 identity」反模式。当前**无重命名入口**（只能增删），
+   *     故身份不会漂移、暂不构成运行时错配；接真双向前必须连同存储层一起改，
+   *     否则 OO 侧改科目名会让整行数据孤立。该项作为已知欠账登记，不在本轮范围。
+   */
+  rowKey: string
   cells: Record<Assertion, MatrixCell>
   isPreset: boolean
   /** 相关业务循环（D~N 字母代号，用于路由到对应循环程序表） */
@@ -179,7 +201,10 @@ function createAccountRow(index: number, name: string, isPreset: boolean): Accou
     cells[assertion] = createEmptyCell(name, assertion)
   }
   return {
-    index, name, cells, isPreset,
+    index, name,
+    // 渲染身份：每行一个唯一值，同名科目也不会撞（`row.name` 会撞）
+    rowKey: newRowIdentity('B50-acct'),
+    cells, isPreset,
     cycle: null, plannedReliance: null, substantiveOnlySufficient: null, approach: null,
     balance: null, category: '', isEstimate: '',
   }
@@ -193,8 +218,14 @@ function layerToSuffix(layer: RiskLayer): string {
   }
 }
 
+/**
+ * 单元格 item_id。
+ *
+ * 🔴 `account` 参数语义已从「科目名」改为「行身份（rowKey）」（BC-48）。
+ *    写入一律传 rowKey；读取路径走 `readWithLegacyFallback` 双路兼容存量。
+ */
 function cellItemId(account: string, assertion: Assertion, suffix: string): string {
-  return `B50-T3-matrix-${account}-${assertion}-${suffix}`
+  return b50CellItemId(account, assertion, suffix)
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -203,48 +234,64 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
   const accounts = ref<AccountRow[]>([])
   const filterLevel = ref<RiskLevel | null>(null)
 
+  /**
+   * 科目名 → 行身份（BC-48 写入侧统一入口）。
+   *
+   * 组件层的 setter 一律按科目名调用（`setCellRisk('应收账款', …)`），
+   * 本函数把它解析为该行的 `rowKey` 后再拼键 ⇒ 落库身份与位置/名字解耦。
+   *
+   * 🔴 解析失败（行不在内存里）时退回科目名：宁可写成存量形态，
+   *    也不能写出一个空身份键（`B50-T3-cycle-` 这种会污染全表）。
+   */
+  function identityOf(accountName: string): string {
+    const row = accounts.value.find((r) => r.name === accountName)
+    return row?.rowKey || accountName
+  }
+
   // ─── Initialize from tab3Data ──────────────────────────────────────────
 
   function initializeFromData(): void {
     const items = tab3Data.value.items
-    // Parse account names from B50-T3-accounts JSON
-    const accountsItem = items.get('B50-T3-accounts')
-    let accountNames: string[] = []
+    // 科目清单：兼容 legacy 纯名字数组 与 新的 {rowKey,name} 形态（BC-48）
+    const accountsItem = items.get(B50_ACCOUNTS_ITEM_ID)
+    let refs = parseAccountRefs(accountsItem?.remark)
 
-    if (accountsItem?.remark) {
-      try {
-        const parsed = JSON.parse(accountsItem.remark)
-        if (Array.isArray(parsed)) {
-          accountNames = parsed.filter((n): n is string => typeof n === 'string' && n.trim() !== '')
-        }
-      } catch {
-        // fallback to preset
-      }
-    }
-
-    // Ensure preset accounts are always included
+    // 预置科目恒在（缺失则前插）
     for (const preset of PRESET_ACCOUNTS) {
-      if (!accountNames.includes(preset.name)) {
-        accountNames.unshift(preset.name)
+      if (!refs.some((r) => r.name === preset.name)) {
+        refs.unshift({ rowKey: '', name: preset.name })
       }
     }
 
-    // If no accounts at all, use preset defaults
-    if (accountNames.length === 0) {
-      accountNames = PRESET_ACCOUNTS.map(p => p.name)
+    // 全空 → 用预置默认
+    if (refs.length === 0) {
+      refs = PRESET_ACCOUNTS.map((p) => ({ rowKey: '', name: p.name }))
     }
 
     // Build account rows
-    const rows: AccountRow[] = accountNames.map((name, idx) => {
+    const rows: AccountRow[] = refs.map((ref, idx) => {
+      const name = ref.name
       const isPreset = PRESET_ACCOUNTS.some(p => p.name === name)
       const row = createAccountRow(idx, name, isPreset)
+      // 清单里已有身份则沿用（跨会话稳定）；legacy 无身份时用 createAccountRow
+      // 刚铸的那个，并在本次任一落库时随清单写回。
+      if (ref.rowKey) row.rowKey = ref.rowKey
+      // 存量数据的键以科目名为身份 ⇒ 读取时双路回落（见 readWithLegacyFallback）
+      const rk = row.rowKey
 
-      // Populate cells from stored data
+      // Populate cells from stored data（双路：新键优先、回落科目名键）
       for (const assertion of ASSERTIONS) {
-        const irItem = items.get(cellItemId(name, assertion, 'IR'))
-        const crItem = items.get(cellItemId(name, assertion, 'CR'))
-        const rmmItem = items.get(cellItemId(name, assertion, 'RMM'))
-        const srItem = items.get(cellItemId(name, assertion, 'SR'))
+        const readCell = (suffix: string) =>
+          readWithLegacyFallback(
+            items.get.bind(items),
+            (id) => b50CellItemId(id, assertion, suffix),
+            rk,
+            name,
+          )
+        const irItem = readCell('IR')
+        const crItem = readCell('CR')
+        const rmmItem = readCell('RMM')
+        const srItem = readCell('SR')
 
         if (irItem?.conclusion) {
           row.cells[assertion].inherentRisk = irItem.conclusion as RiskLevel
@@ -271,25 +318,32 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
         }
       }
 
+      // ─── 行级读取：一律双路（新键 rowKey 优先，回落存量的科目名键）───────
+      const get = items.get.bind(items)
+      const readRow = (field: Parameters<typeof b50RowItemId>[0]) =>
+        readWithLegacyFallback(get, (id) => b50RowItemId(field, id), rk, name)
+      const readPlan = (field: string) =>
+        readWithLegacyFallback(get, (id) => b50PlanItemId(id, field), rk, name)
+
       // 业务循环 + 应对方案（行级）
-      const cycleItem = items.get(`B50-T3-cycle-${name}`)
+      const cycleItem = readRow('cycle')
       if (cycleItem?.conclusion) row.cycle = cycleItem.conclusion
-      const relianceItem = items.get(`B50-T3-plan-${name}-reliance`)
+      const relianceItem = readPlan('reliance')
       if (relianceItem?.conclusion) row.plannedReliance = relianceItem.conclusion as ControlReliance
-      const subOnlyItem = items.get(`B50-T3-plan-${name}-subonly`)
+      const subOnlyItem = readPlan('subonly')
       if (subOnlyItem?.conclusion) row.substantiveOnlySufficient = subOnlyItem.conclusion
-      const approachItem = items.get(`B50-T3-plan-${name}-approach`)
+      const approachItem = readPlan('approach')
       if (approachItem?.conclusion) row.approach = approachItem.conclusion as AuditApproach
 
       // 审计范围列（余额/类别/会计估计，源 B50-3）
-      const balItem = items.get(`B50-T3-balance-${name}`)
+      const balItem = readRow('balance')
       if (balItem?.remark != null && balItem.remark !== '') {
         const n = Number(balItem.remark)
         if (!Number.isNaN(n)) row.balance = n
       }
-      const catItem = items.get(`B50-T3-category-${name}`)
+      const catItem = readRow('category')
       if (catItem?.conclusion) row.category = catItem.conclusion as ScopeCategory
-      const estItem = items.get(`B50-T3-estimate-${name}`)
+      const estItem = readRow('estimate')
       if (estItem?.conclusion) row.isEstimate = estItem.conclusion
 
       return row
@@ -333,20 +387,23 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
       // 余额仅在提供且为有效数字时带入（新行本就空，等同"空值才填"）
       if (it.balance != null && !Number.isNaN(Number(it.balance))) {
         row.balance = Number(it.balance)
-        batch.push({ item_id: `B50-T3-balance-${name}`, conclusion: null, remark: String(row.balance), wp_ref: null })
+        batch.push({ item_id: b50RowItemId('balance', identityOf(name)), conclusion: null, remark: String(row.balance), wp_ref: null })
       }
       accounts.value.push(row)
       if (it.cycle) {
-        batch.push({ item_id: `B50-T3-cycle-${name}`, conclusion: it.cycle, remark: null, wp_ref: null })
+        batch.push({ item_id: b50RowItemId('cycle', identityOf(name)), conclusion: it.cycle, remark: null, wp_ref: null })
       }
       added += 1
     }
     if (added) {
       accounts.value.forEach((r, i) => { r.index = i })
       batch.push({
-        item_id: 'B50-T3-accounts',
+        item_id: B50_ACCOUNTS_ITEM_ID,
         conclusion: null,
-        remark: JSON.stringify(accounts.value.map(a => a.name)),
+        // BC-48：清单写 {rowKey,name} 配对，使行身份跨会话可还原
+        remark: serializeAccountRefs(
+          accounts.value.map(a => ({ rowKey: a.rowKey, name: a.name })),
+        ),
         wp_ref: null,
       })
       saveImmediate(batch)
@@ -369,11 +426,13 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
   }
 
   function persistAccountList(): void {
-    const names = accounts.value.map(a => a.name)
     const item: ChecklistItem = {
-      item_id: 'B50-T3-accounts',
+      item_id: B50_ACCOUNTS_ITEM_ID,
       conclusion: null,
-      remark: JSON.stringify(names),
+      // BC-48：写 {rowKey,name} 配对（读侧兼容 legacy 纯名字数组）
+      remark: serializeAccountRefs(
+        accounts.value.map(a => ({ rowKey: a.rowKey, name: a.name })),
+      ),
       wp_ref: null,
     }
     saveImmediate([item])
@@ -391,7 +450,7 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
       else if (row.name === '管理层凌驾控制') def = 'pervasive'
       if (def) {
         row.cycle = def
-        batch.push({ item_id: `B50-T3-cycle-${row.name}`, conclusion: def, remark: null, wp_ref: null })
+        batch.push({ item_id: b50RowItemId('cycle', row.rowKey || row.name), conclusion: def, remark: null, wp_ref: null })
       }
     }
     if (batch.length) saveImmediate(batch)
@@ -402,7 +461,7 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
     if (!row) return
     row.cycle = cycleCode
     saveImmediate([{
-      item_id: `B50-T3-cycle-${account}`,
+      item_id: b50RowItemId('cycle', identityOf(account)),
       conclusion: cycleCode || null,
       remark: null,
       wp_ref: null,
@@ -420,7 +479,7 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
     else if (field === 'subonly') row.substantiveOnlySufficient = value || null
     else if (field === 'approach') row.approach = (value as AuditApproach) || null
     saveImmediate([{
-      item_id: `B50-T3-plan-${account}-${field}`,
+      item_id: b50PlanItemId(identityOf(account), field),
       conclusion: value || null,
       remark: null,
       wp_ref: null,
@@ -440,7 +499,7 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
       const n = value === '' || value == null ? null : Number(value)
       row.balance = n != null && !Number.isNaN(n) ? n : null
       saveImmediate([{
-        item_id: `B50-T3-balance-${account}`,
+        item_id: b50RowItemId('balance', identityOf(account)),
         conclusion: null,
         remark: row.balance != null ? String(row.balance) : null,
         wp_ref: null,
@@ -448,7 +507,7 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
     } else if (field === 'category') {
       row.category = (value as ScopeCategory) || ''
       saveImmediate([{
-        item_id: `B50-T3-category-${account}`,
+        item_id: b50RowItemId('category', identityOf(account)),
         conclusion: (value as string) || null,
         remark: null,
         wp_ref: null,
@@ -456,7 +515,7 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
     } else if (field === 'estimate') {
       row.isEstimate = (value as string) || ''
       saveImmediate([{
-        item_id: `B50-T3-estimate-${account}`,
+        item_id: b50RowItemId('estimate', identityOf(account)),
         conclusion: (value as string) || null,
         remark: null,
         wp_ref: null,
@@ -485,31 +544,31 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
     if (patch.balance !== undefined) {
       const n = patch.balance == null || Number.isNaN(Number(patch.balance)) ? null : Number(patch.balance)
       row.balance = n
-      batch.push({ item_id: `B50-T3-balance-${account}`, conclusion: null, remark: n != null ? String(n) : null, wp_ref: null })
+      batch.push({ item_id: b50RowItemId('balance', identityOf(account)), conclusion: null, remark: n != null ? String(n) : null, wp_ref: null })
     }
     if (patch.category !== undefined) {
       row.category = patch.category
-      batch.push({ item_id: `B50-T3-category-${account}`, conclusion: patch.category || null, remark: null, wp_ref: null })
+      batch.push({ item_id: b50RowItemId('category', identityOf(account)), conclusion: patch.category || null, remark: null, wp_ref: null })
     }
     if (patch.estimate !== undefined) {
       row.isEstimate = patch.estimate
-      batch.push({ item_id: `B50-T3-estimate-${account}`, conclusion: patch.estimate || null, remark: null, wp_ref: null })
+      batch.push({ item_id: b50RowItemId('estimate', identityOf(account)), conclusion: patch.estimate || null, remark: null, wp_ref: null })
     }
     if (patch.cycle !== undefined) {
       row.cycle = patch.cycle
-      batch.push({ item_id: `B50-T3-cycle-${account}`, conclusion: patch.cycle || null, remark: null, wp_ref: null })
+      batch.push({ item_id: b50RowItemId('cycle', identityOf(account)), conclusion: patch.cycle || null, remark: null, wp_ref: null })
     }
     if (patch.reliance !== undefined) {
       row.plannedReliance = patch.reliance
-      batch.push({ item_id: `B50-T3-plan-${account}-reliance`, conclusion: patch.reliance || null, remark: null, wp_ref: null })
+      batch.push({ item_id: b50PlanItemId(identityOf(account), 'reliance'), conclusion: patch.reliance || null, remark: null, wp_ref: null })
     }
     if (patch.subonly !== undefined) {
       row.substantiveOnlySufficient = patch.subonly
-      batch.push({ item_id: `B50-T3-plan-${account}-subonly`, conclusion: patch.subonly || null, remark: null, wp_ref: null })
+      batch.push({ item_id: b50PlanItemId(identityOf(account), 'subonly'), conclusion: patch.subonly || null, remark: null, wp_ref: null })
     }
     if (patch.approach !== undefined) {
       row.approach = patch.approach
-      batch.push({ item_id: `B50-T3-plan-${account}-approach`, conclusion: patch.approach || null, remark: null, wp_ref: null })
+      batch.push({ item_id: b50PlanItemId(identityOf(account), 'approach'), conclusion: patch.approach || null, remark: null, wp_ref: null })
     }
     if (patch.cells) {
       for (const a of ASSERTIONS) {
@@ -578,7 +637,7 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
     // Persist
     const suffix = layerToSuffix(layer)
     const item: ChecklistItem = {
-      item_id: cellItemId(account, assertion, suffix),
+      item_id: cellItemId(identityOf(account), assertion, suffix),
       conclusion: level,
       remark: layer === 'combined' ? cell.remark : null,
       wp_ref: null,
@@ -602,7 +661,7 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
     cell.isSpecialRisk = !cell.isSpecialRisk
 
     const item: ChecklistItem = {
-      item_id: cellItemId(account, assertion, 'SR'),
+      item_id: cellItemId(identityOf(account), assertion, 'SR'),
       conclusion: cell.isSpecialRisk ? 'Y' : null,
       remark: null,
       wp_ref: null,

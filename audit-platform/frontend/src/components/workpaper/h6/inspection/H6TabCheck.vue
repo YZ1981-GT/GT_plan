@@ -762,7 +762,7 @@
     >
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && props.wpId && props.projectId"
-        account-code="1606"
+        :account-code="samplingAccountCode"
         phase="final"
         default-method="mus"
         :workpaper-id="props.wpId"
@@ -790,6 +790,17 @@ import {
 } from '../../composables/useH6Check'
 import { useH6ImportExport } from '../../composables/useH6ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+
+/**
+ * 抽凭科目码取自单一真源 `hCycleAccountScope`（H6 固定资产清理）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { h6Scope } from '../../composables/hCycleAccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = h6Scope.grossCode()
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),

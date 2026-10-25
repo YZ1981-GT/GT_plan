@@ -98,6 +98,9 @@ import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { formulaAuditLog } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 
 interface HistoryEntry {
   id: string
@@ -159,7 +162,23 @@ async function loadHistory() {
   }
 }
 
+/**
+ * 可回滚的角色（与后端 `rollback_formula` 的
+ * `require_role(["admin", "partner", "manager"])` **逐值对齐**）。
+ *
+ * 🔴 2026-09-28：后端该端点原先**零鉴权**（任何人可改全局 `report_config` 公式），
+ * 补 `require_role` 后成了权限收紧。前端若不同步门控，无权角色仍能看到按钮、
+ * 点了必 403 —— 「能点但必失败」是坏体验，也让用户以为系统坏了。
+ * 两侧任一改动都必须同步另一侧，守卫 `formulaHistoryRollbackGate.spec.ts`。
+ */
+const ROLLBACK_ROLES = ['admin', 'partner', 'signing_partner', 'manager'] as const
+
+const canRollbackByRole = computed(() =>
+  (ROLLBACK_ROLES as readonly string[]).includes(authStore.user?.role || ''),
+)
+
 function canRollback(entry: HistoryEntry): boolean {
+  if (!canRollbackByRole.value) return false
   return (entry.action === 'update' || entry.action === 'delete') && !!entry.old_formula
 }
 

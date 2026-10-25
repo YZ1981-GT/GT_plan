@@ -14,20 +14,33 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import Any
+import weakref
+from typing import Any, Iterable
 from uuid import UUID
 
 import numpy as np
 from sqlalchemy import select, update, func
+from sqlalchemy import text as sa_text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 import logging
 
 from app.models.ai_models import KnowledgeIndex, KnowledgeSourceType
-from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
+from app.models.knowledge_models import KnowledgeDocument
 from app.services.ai_service import AIService
 from app.services.index_source import IndexSource, BusinessDataSource, KnowledgeDocSource
+from app.services.knowledge_access_policy import (
+    KnowledgeAccessPolicy,
+    KnowledgeAccessSubject,
+    KnowledgeRetrievalMode,
+)
+from app.services.knowledge_doc_search import (
+    DocSearchRequest,
+    KnowledgeDocSearch,
+    escape_like,
+)
 from app.services.vector_store import get_vector_store, PgTextStore
 
 logger = logging.getLogger(__name__)
@@ -144,10 +157,75 @@ def _chunk_text(text: str, chunk_size: int = _CHUNK_SIZE) -> list[str]:
     return chunks
 
 
+# ─── 检索辅助（spec knowledge-base-retrieval-and-authz-closure）────────────────
+
+_SEARCH_SCOPES = frozenset({"project_data", "knowledge_doc", "all"})
+
+#: 引擎 → ``knowledge_index.embedding_vec`` 是否存在（进程级缓存；弱引用不阻止引擎回收）
+_PGVECTOR_COLUMN_CACHE: "weakref.WeakKeyDictionary[Any, bool]" = weakref.WeakKeyDictionary()
+
+
+def _scope_conditions(scope: str) -> list[Any]:
+    if scope == "project_data":
+        return [KnowledgeIndex.source_type != KnowledgeSourceType.knowledge_doc]
+    if scope == "knowledge_doc":
+        return [KnowledgeIndex.source_type == KnowledgeSourceType.knowledge_doc]
+    return []
+
+
+def _chunk_hit(chunk: Any, score: float, retrieval: str) -> dict[str, Any]:
+    """索引分块 → 统一结果 dict（向量 / BM25 / ILIKE 共用）。"""
+    st = chunk.source_type
+    return {
+        "source_type": st.value if hasattr(st, "value") else str(st),
+        "source_id": str(chunk.source_id),
+        "content": chunk.content_text,
+        "score": round(float(score), 4),
+        "chunk_index": chunk.chunk_index,
+        "doc_version": getattr(chunk, "doc_version", None),
+        "is_stale": getattr(chunk, "is_stale", False),
+        "retrieval": retrieval,
+    }
+
+
+def _coerce_uuid_tuple(values: Iterable[Any]) -> tuple[UUID, ...]:
+    out: list[UUID] = []
+    for v in values or ():
+        try:
+            u = v if isinstance(v, UUID) else UUID(str(v))
+        except (ValueError, TypeError, AttributeError):
+            continue
+        if u not in out:
+            out.append(u)
+    return tuple(out)
+
+
+def _merge_hits(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """同 (source_type, source_id, chunk_index) 去重保留高分；保持首次出现的相对顺序。"""
+    best: dict[tuple, dict[str, Any]] = {}
+    order: list[tuple] = []
+    for r in results:
+        key = (r.get("source_type"), str(r.get("source_id")), r.get("chunk_index"))
+        prev = best.get(key)
+        if prev is None:
+            best[key] = r
+            order.append(key)
+        elif float(r.get("score") or 0.0) > float(prev.get("score") or 0.0):
+            best[key] = r
+    return [best[k] for k in order]
+
+
+def _hit_sort_key(r: dict[str, Any]) -> float:
+    """按分数降序；Python 排序稳定，同分保持来源内部顺序（词法层同分按更新时间）。"""
+    return -float(r.get("score") or 0.0)
+
+
 class KnowledgeIndexService:
     def __init__(self, db: AsyncSession):
         self._db = db
         self._ai_svc = AIService(db)
+        # 文档正文词法检索（方案 A 权威层）；测试可替换
+        self._doc_search = KnowledgeDocSearch(db)
 
     # -------------------------------------------------------------------------
     # Helper methods
@@ -370,6 +448,10 @@ class KnowledgeIndexService:
 
         await self._db.commit()
 
+    # -------------------------------------------------------------------------
+    # 检索（spec knowledge-base-retrieval-and-authz-closure Req 1 / 3 / 4）
+    # -------------------------------------------------------------------------
+
     async def semantic_search(
         self,
         project_id: UUID,
@@ -381,55 +463,82 @@ class KnowledgeIndexService:
         wp_code: str | None = None,
         account_code: str | None = None,
         audit_area: str | None = None,
+        restrict_to: Iterable[Any] | None = None,
+        category: str | None = None,
     ) -> list[dict[str, Any]]:
-        """
-        Semantic search using embedding + cosine similarity.
-        Returns top_k results with scores.
+        """项目内知识检索主入口：向量（可选加速）+ 文档正文词法（权威）+ 业务数据兜底。
 
         Args:
-            project_id: 项目 ID
-            query: 查询文本
-            top_k: 返回结果数量
-            scope: 检索范围 ("project_data" | "knowledge_doc" | "cross_year" | "all")
-            user: 可选用户对象，提供时按权限过滤 knowledge_doc 结果
-            wp_code: 可选底稿编码，用于上下文相关性加权
-            account_code: 可选科目编码，用于上下文相关性加权
-            audit_area: 可选审计领域，用于上下文相关性加权
+            project_id: 当前项目（检索可见性按 project 模式与之求交）
+            query: 查询文本；空查询跳过向量检索，知识文档走「按更新时间列表」模式
+            top_k: 返回条数
+            scope: ``project_data`` / ``knowledge_doc`` / ``all``（``cross_year`` 视为 all）
+            user: 当前用户；None = 后台/系统调用 → 只返回 public 与当前项目组文档
+            wp_code / account_code / audit_area: 上下文相关性加权（V119）
+            restrict_to: 文档 ID 与文件夹 ID（含子树）的并集，在截断 top_k **之前**生效
+            category: 预设分类，该分类子树内文档排序加分（不做硬过滤）
 
-        默认值保证现有调用方（ai_chat_service）零改动。
-        向量召回失败时降级 ilike（双保险不崩）。
+        流程：
+          ① 向量召回（embedding 与 pgvector 均可用时）；knowledge_doc 命中经单一判定面过滤
+          ② 文档正文词法检索 —— scope 含 knowledge_doc 时**始终**执行（索引缺席也成立）
+          ③ 向量不可用时，业务数据（project_data）沿用 BM25 / ILIKE 兜底
+          合并去重 → 上下文加权 → 排序截断 → 附 document_name / folder_path
+
+        每条结果带 ``retrieval``（vector / lexical / bm25 / ilike）。每条读 ``knowledge_index``
+        的语句都在 SAVEPOINT 内执行：失败只回滚它自己，**不会**毒化调用方会话（Req 1）。
+
+        🔴 契约反转（design §十 C1）：``user=None`` 时 knowledge_doc 结果不再「不过滤」。
         """
-        # scope=cross_year 委托给 search_cross_year（需 prior_project_id，此处降级为 all）
         if scope == "cross_year":
-            # cross_year 需要 prior_project_id，单独调 search_cross_year；
-            # 此处作为 fallback 按 all 处理
+            # cross_year 需要 prior_project_id（见 search_cross_year），此处按 all 处理
             scope = "all"
+        if scope not in _SEARCH_SCOPES:
+            raise ValueError(f"不支持的检索范围：{scope}")
+        text_query = (query or "").strip()
+        restrict = tuple(restrict_to or ())
+        subject = await self._resolve_subject(user)
 
-        try:
-            results = await self._vector_search(project_id, query, top_k, scope)
-            # TODO: hybrid retrieval 预留接口——_vector_search 成功时可选融合 bm25 分数
-            # 当 embed 恢复后，可在此融合向量分数 + BM25 分数实现 hybrid retrieval
-        except Exception as e:
-            logger.warning(f"向量召回失败，降级检索: {e}")
-            from app.core.config import settings as app_settings
+        vector_hits: list[dict[str, Any]] = []
+        vector_ok = False
+        if text_query:
+            try:
+                vector_hits = await self._vector_search(project_id, text_query, top_k, scope)
+                vector_ok = True
+            except Exception as exc:  # noqa: BLE001 - 向量层是可选加速，失败即降级
+                logger.warning(
+                    "向量召回不可用，改用文档词法检索：%s: %s", type(exc).__name__, exc
+                )
 
-            if app_settings.RETRIEVAL_BM25_FALLBACK_ENABLED:
-                results = await self._bm25_fallback(project_id, query, top_k, scope)
-            else:
-                results = await self._ilike_fallback(project_id, query, top_k, scope)
+        results: list[dict[str, Any]] = []
+        if vector_hits:
+            results.extend(
+                await self._filter_by_permission(
+                    vector_hits, user, project_id=project_id, subject=subject, restrict_to=restrict
+                )
+            )
+        if scope in ("knowledge_doc", "all"):
+            results.extend(
+                await self._lexical_doc_hits(
+                    DocSearchRequest(
+                        query=text_query,
+                        mode=KnowledgeRetrievalMode.project,
+                        subject=subject,
+                        project_id=project_id,
+                        top_k=top_k,
+                        restrict_to=_coerce_uuid_tuple(restrict),
+                        category=category,
+                    )
+                )
+            )
+        if not vector_ok and text_query and scope in ("project_data", "all"):
+            results.extend(await self._index_lexical_fallback(project_id, text_query, top_k))
 
+        results = _merge_hits(results)
         # V119: 上下文相关性加权
         if wp_code or account_code or audit_area:
             results = _apply_context_boost(results, wp_code, account_code, audit_area)
-
-        # 权限过滤：当 user 提供时，过滤 knowledge_doc 结果
-        if user is not None:
-            results = await self._filter_by_permission(results, user)
-
-        # V119: 结果增强 — 附加 document_name + folder_path
-        results = await self._enrich_results(results)
-
-        return results
+        results.sort(key=_hit_sort_key)
+        return await self._enrich_results(results[:top_k])
 
     async def semantic_search_strict(
         self,
@@ -440,24 +549,15 @@ class KnowledgeIndexService:
         scope: str = "all",
         user: Any | None = None,
     ) -> list[dict[str, Any]]:
-        """**严格**语义检索 — 只走 embedding，失败即抛，绝不 BM25/ILIKE 伪降级。
+        """**严格**语义检索 — 只走 embedding，失败即抛，绝不 BM25/ILIKE/词法伪降级。
 
-        与 :meth:`semantic_search` 的唯一区别是**没有词法兜底**：
-        ``semantic_search`` 在向量召回失败时会静默切到 BM25 或 ILIKE，把
-        "语义检索服务坏了"表现成"搜到了几条弱相关结果"或"什么都没搜到"。
-        对 DSH Agent / MCP 这类**机器消费方**这是不可接受的 —— Agent 无法据此
-        判断该不该重试，也无法向审计师如实说明检索没生效
-        （dsh-agent-panel-integration Req 6.6 / Property 16）。
-
-        Args:
-            project_id: 项目 ID
-            query: 查询文本
-            top_k: 返回结果数
-            scope: ``"project_data"`` / ``"knowledge_doc"`` / ``"all"``
-            user: 提供时按权限过滤 knowledge_doc 结果（与 ``semantic_search`` 同一过滤器）
+        与 :meth:`semantic_search` 的区别是**没有任何词法兜底**：``semantic_search`` 在向量
+        召回失败时照样返回词法结果，把「语义检索服务坏了」表现成「搜到了几条结果」。对 DSH
+        Agent / MCP 这类**机器消费方**这是不可接受的 —— Agent 无法据此判断该不该重试，也无法
+        向审计师如实说明检索没生效（dsh-agent-panel-integration Req 6.6 / Property 16）。
 
         Returns:
-            命中列表；**空列表 = 真的没有匹配**（不是服务不可用）。
+            命中列表；**空列表 = 真的没有匹配**（不是服务不可用）。命中同样经单一判定面过滤。
 
         Raises:
             EmbeddingUnavailableError: embedding 服务不可用 / 向量召回失败。
@@ -480,9 +580,136 @@ class KnowledgeIndexService:
                 f"语义检索不可用：{type(exc).__name__}"
             ) from exc
 
-        if user is not None:
-            results = await self._filter_by_permission(results, user)
+        results = await self._filter_by_permission(results, user, project_id=project_id)
         return await self._enrich_results(results)
+
+    async def search_global_knowledge(
+        self,
+        query: str,
+        *,
+        user: Any,
+        top_k: int = 10,
+        restrict_to: Iterable[Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """无项目上下文的受限全局知识检索（global 模式，仅文档词法）。
+
+        只返回当前用户可读、且**非** project_group 的文档 —— 没有项目上下文时不注入任何
+        项目组资料（Req 3.4）；也不查向量索引（索引按项目分区，无项目即无分区可查）。
+        """
+        if user is None:
+            raise ValueError("全局知识检索必须提供当前用户")
+        subject = await self._resolve_subject(user)
+        hits = await self._lexical_doc_hits(
+            DocSearchRequest(
+                query=(query or "").strip(),
+                mode=KnowledgeRetrievalMode.global_,
+                subject=subject,
+                project_id=None,
+                top_k=top_k,
+                restrict_to=_coerce_uuid_tuple(restrict_to or ()),
+            )
+        )
+        hits.sort(key=_hit_sort_key)
+        return await self._enrich_results(hits[:top_k])
+
+    async def load_documents(
+        self,
+        doc_ids: Iterable[Any],
+        *,
+        user: Any | None,
+        project_id: UUID,
+    ) -> list[dict[str, Any]]:
+        """按 ID 读取检索可见的知识文档全文（project 模式；显式点名的旧版本同样可读）。
+
+        用于「用户在界面上选定了哪几篇作参考」的场景（A17-1 等）：客户端传来的 ID **不可信**，
+        每一篇都要过单一判定面；不可见 / 已删除的静默跳过（不暴露存在性）。保持入参顺序。
+        """
+        ids = _coerce_uuid_tuple(doc_ids)
+        if not ids:
+            return []
+        subject = await self._resolve_subject(user)
+        try:
+            async with self._db.begin_nested():
+                visible = await self._doc_search.visible_documents(
+                    ids,
+                    mode=KnowledgeRetrievalMode.project,
+                    subject=subject,
+                    project_id=project_id,
+                    allow_superseded=ids,
+                )
+                contents = await self._doc_search.load_contents(list(visible))
+        except Exception as exc:  # noqa: BLE001 - fail-closed：读不到就当没有
+            logger.warning("按 ID 读取知识文档失败（返回空）：%s: %s", type(exc).__name__, exc)
+            return []
+        out: list[dict[str, Any]] = []
+        for doc_id in ids:
+            meta = visible.get(doc_id)
+            if meta is None:
+                continue
+            out.append({
+                "source_type": "knowledge_doc",
+                "source_id": str(doc_id),
+                "document_name": meta.name,
+                "folder_id": str(meta.folder_id),
+                "doc_version": meta.version,
+                "content": contents.get(doc_id, ""),
+            })
+        return out
+
+    # -------------------------------------------------------------------------
+    # 检索内部实现
+    # -------------------------------------------------------------------------
+
+    async def _resolve_subject(self, user: Any | None) -> KnowledgeAccessSubject | None:
+        """user → 判定主体；None 保持 None（project 模式的「无用户」语义）。
+
+        成员关系查询包在 SAVEPOINT 里：解析失败只把项目集合判空（fail-closed），不毒化会话。
+        """
+        if user is None:
+            return None
+        try:
+            async with self._db.begin_nested():
+                return await KnowledgeAccessPolicy.resolve_subject(self._db, user)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("知识检索主体解析失败（按无项目成员处理）：%s: %s", type(exc).__name__, exc)
+            raw = getattr(user, "id", None)
+            try:
+                uid = raw if isinstance(raw, UUID) else (UUID(str(raw)) if raw else None)
+            except (ValueError, TypeError):
+                uid = None
+            return KnowledgeAccessSubject(user_id=uid, project_ids=frozenset())
+
+    async def _pgvector_column_available(self) -> bool:
+        """``knowledge_index.embedding_vec`` 是否真实存在（按引擎进程级缓存）。
+
+        V119 在 pgvector 扩展缺失时跳过该列（真库即如此）。用 information_schema 确定性探测，
+        而不是「先执行、失败再猜」：后者在事务里失败一次就会毒化会话（Req 1.3）。
+        探测本身失败不缓存，下次重试。
+        """
+        try:
+            bind = self._db.get_bind()
+            engine = getattr(bind, "engine", bind)
+            if getattr(getattr(engine, "dialect", None), "name", None) != "postgresql":
+                return False
+            cached = _PGVECTOR_COLUMN_CACHE.get(engine)
+            if cached is not None:
+                return cached
+            async with self._db.begin_nested():
+                row = (
+                    await self._db.execute(
+                        sa_text(
+                            "SELECT 1 FROM information_schema.columns "
+                            "WHERE table_name = 'knowledge_index' AND column_name = 'embedding_vec' "
+                            "AND table_schema = ANY (current_schemas(false)) LIMIT 1"
+                        )
+                    )
+                ).first()
+            available = row is not None
+            _PGVECTOR_COLUMN_CACHE[engine] = available
+            return available
+        except Exception as exc:  # noqa: BLE001 - 探测失败 → 本次按不可用处理
+            logger.warning("pgvector 列探测失败（本次按不可用处理）：%s: %s", type(exc).__name__, exc)
+            return False
 
     async def _vector_search(
         self,
@@ -491,97 +718,97 @@ class KnowledgeIndexService:
         top_k: int,
         scope: str,
     ) -> list[dict[str, Any]]:
-        """向量召回核心逻辑 — 使用 pgvector cosine distance operator。
-        
-        V119: 优先使用 embedding_vec (pgvector vector(1024)) 列进行 ANN 搜索,
-        同时搜索项目文档 + 全局公共文档 (GLOBAL_KB_PROJECT_ID)。
-        pgvector 不可用时抛异常，由调用方捕获降级到 BM25。
+        """向量召回核心逻辑。embedding 不可用时抛异常，由调用方降级。
+
+        V119：``embedding_vec``（pgvector）存在时走余弦距离 ANN；否则（真库现状）走
+        ``embedding_vector`` 文本列的内存计算。同时检索项目文档与全局公共文档哨兵分区。
+        两条 SQL 均在 SAVEPOINT 内执行，且非 pgvector 查询不 SELECT ``embedding_vec``。
         """
         from app.services.indexing_pipeline import GLOBAL_KB_PROJECT_ID
 
-        # Encode query
         query_embedding = await self._ai_svc.embedding(query)
         query_vec = np.array(query_embedding)
         query_list = query_vec.tolist()
 
-        # 同时搜索项目文档 + 全局公共文档
         project_ids = [project_id, GLOBAL_KB_PROJECT_ID]
         if project_id == GLOBAL_KB_PROJECT_ID:
             project_ids = [GLOBAL_KB_PROJECT_ID]
 
-        # Build scope filter conditions
         conditions = [
             KnowledgeIndex.project_id.in_(project_ids),
             KnowledgeIndex.is_deleted == False,  # noqa: E712
         ]
-        if scope == "project_data":
-            conditions.append(
-                KnowledgeIndex.source_type != KnowledgeSourceType.knowledge_doc
-            )
-        elif scope == "knowledge_doc":
-            conditions.append(
-                KnowledgeIndex.source_type == KnowledgeSourceType.knowledge_doc
-            )
+        conditions.extend(_scope_conditions(scope))
 
-        # 尝试 pgvector cosine distance (1 - cosine_similarity)
-        try:
-            stmt = (
-                select(
-                    KnowledgeIndex,
-                    (1 - KnowledgeIndex.embedding_vec.cosine_distance(query_list)).label("score"),
+        if await self._pgvector_column_available():
+            try:
+                async with self._db.begin_nested():
+                    distance = KnowledgeIndex.embedding_vec.cosine_distance(query_list)
+                    rows = (
+                        await self._db.execute(
+                            select(KnowledgeIndex, (1 - distance).label("score"))
+                            .options(defer(KnowledgeIndex.embedding_vec))
+                            .where(*conditions)
+                            .order_by(distance)
+                            .limit(top_k)
+                        )
+                    ).all()
+                return [_chunk_hit(chunk, float(score), "vector") for chunk, score in rows]
+            except Exception as pgvec_err:  # noqa: BLE001 - 退到内存计算
+                logger.warning("pgvector 检索失败，改用内存向量计算：%s", pgvec_err)
+
+        async with self._db.begin_nested():
+            chunks = (
+                await self._db.execute(
+                    select(KnowledgeIndex)
+                    .options(defer(KnowledgeIndex.embedding_vec))
+                    .where(*conditions)
                 )
-                .where(*conditions)
-                .order_by(KnowledgeIndex.embedding_vec.cosine_distance(query_list))
-                .limit(top_k)
-            )
-            result = await self._db.execute(stmt)
-            rows = result.all()
+            ).scalars().all()
 
-            return [
-                {
-                    "source_type": chunk.source_type.value,
-                    "source_id": str(chunk.source_id),
-                    "content": chunk.content_text,
-                    "score": round(float(score), 4),
-                    "chunk_index": chunk.chunk_index,
-                    "doc_version": chunk.doc_version,
-                    "is_stale": chunk.is_stale,
-                }
-                for chunk, score in rows
-            ]
-        except Exception as pgvec_err:
-            # pgvector 不可用 (列为 NULL 或扩展未安装) → 回退到内存暴力搜索
-            logger.warning(f"pgvector search failed, falling back to in-memory: {pgvec_err}")
+        scored = []
+        for chunk in chunks:
+            if not chunk.embedding_vector:
+                continue
+            chunk_vec = self._str_to_vector(chunk.embedding_vector)
+            scored.append((self._cosine_similarity(query_vec, chunk_vec), chunk))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [_chunk_hit(chunk, score, "vector") for score, chunk in scored[:top_k]]
 
-            # Legacy in-memory fallback (TEXT embedding_vector column)
-            result = await self._db.execute(
-                select(KnowledgeIndex).where(*conditions)
-            )
-            chunks = result.scalars().all()
+    async def _lexical_doc_hits(self, req: DocSearchRequest) -> list[dict[str, Any]]:
+        """文档正文词法检索（权威层）→ 统一结果 dict。失败 fail-closed 返回空（不外抛、不毒化会话）。"""
+        try:
+            async with self._db.begin_nested():
+                hits = await self._doc_search.search(req)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("知识文档词法检索失败（本次无文档命中）：%s: %s", type(exc).__name__, exc)
+            return []
+        return [
+            {
+                "source_type": KnowledgeSourceType.knowledge_doc.value,
+                "source_id": str(h.meta.doc_id),
+                "content": h.snippet,
+                "score": h.score,
+                "chunk_index": h.chunk_index,
+                "doc_version": h.meta.version,
+                "is_stale": False,
+                "retrieval": "lexical",
+                "document_name": h.meta.name,
+                "folder_id": str(h.meta.folder_id),
+                "matched_terms": list(h.matched_terms),
+            }
+            for h in hits
+        ]
 
-            scored = []
-            for chunk in chunks:
-                if not chunk.embedding_vector:
-                    continue
-                chunk_vec = self._str_to_vector(chunk.embedding_vector)
-                score = self._cosine_similarity(query_vec, chunk_vec)
-                scored.append((score, chunk))
+    async def _index_lexical_fallback(
+        self, project_id: UUID, query: str, top_k: int
+    ) -> list[dict[str, Any]]:
+        """向量不可用时的**业务数据**兜底（知识文档已由词法层覆盖，这里只查 project_data 分块）。"""
+        from app.core.config import settings as app_settings
 
-            scored.sort(key=lambda x: x[0], reverse=True)
-            top_results = scored[:top_k]
-
-            return [
-                {
-                    "source_type": chunk.source_type.value,
-                    "source_id": str(chunk.source_id),
-                    "content": chunk.content_text,
-                    "score": round(score, 4),
-                    "chunk_index": chunk.chunk_index,
-                    "doc_version": chunk.doc_version,
-                    "is_stale": chunk.is_stale,
-                }
-                for score, chunk in top_results
-            ]
+        if app_settings.RETRIEVAL_BM25_FALLBACK_ENABLED:
+            return await self._bm25_fallback(project_id, query, top_k, "project_data")
+        return await self._ilike_fallback(project_id, query, top_k, "project_data")
 
     async def _bm25_fallback(
         self,
@@ -590,14 +817,9 @@ class KnowledgeIndexService:
         top_k: int,
         scope: str,
     ) -> list[dict[str, Any]]:
-        """向量召回失败时的 BM25 词法检索（bm25s，纯 Python）。
+        """BM25 词法检索索引分块（bm25s，纯 Python）；bm25s 缺失或建索引失败降级 ILIKE。
 
-        中文分词用 _zh_tokenize 模块（jieba + 审计领域词典）。
-        bm25s 未安装或索引构建异常时降级 _ilike_fallback。
-        返回与 _ilike_fallback 相同的 dict 结构（score 用 BM25 归一化分数，非 0.0）。
-
-        带模块级缓存：key=(project_id, scope)，value=(bm25_index, chunks_list, build_time)。
-        TTL 60s 或 incremental_update 调用时失效。避免每次查询重建索引。
+        带模块级缓存：key=(project_id, scope)，TTL 60s 或 incremental_update 时失效。
         """
         try:
             import bm25s
@@ -605,51 +827,42 @@ class KnowledgeIndexService:
             logger.warning("bm25s 未安装，降级 ilike")
             return await self._ilike_fallback(project_id, query, top_k, scope)
 
-        from app.services._zh_tokenize import zh_tokenize
+        from app.services._zh_tokenize import zh_tokenize, zh_tokenize_batch
 
         query_tokens = zh_tokenize(query)
         if not query_tokens:
             return await self._ilike_fallback(project_id, query, top_k, scope)
 
-        # 缓存检查：(project_id, scope) → (retriever, chunks, build_time)
         cache_key = (str(project_id), scope)
         now = time.time()
         cached = _BM25_CACHE.get(cache_key)
-
         if cached is not None:
             retriever, chunks, build_time = cached
             if (now - build_time) < _BM25_CACHE_TTL:
-                # 缓存有效，直接检索
                 return self._bm25_retrieve(retriever, chunks, query_tokens, top_k)
-            else:
-                # TTL 过期，移除缓存
-                del _BM25_CACHE[cache_key]
+            del _BM25_CACHE[cache_key]
 
-        # 缓存 miss 或过期：从 DB 加载候选文档，构建索引
         conditions = [
             KnowledgeIndex.project_id == project_id,
-            KnowledgeIndex.is_deleted == False,
+            KnowledgeIndex.is_deleted == False,  # noqa: E712
+            *_scope_conditions(scope),
         ]
-        if scope == "project_data":
-            conditions.append(
-                KnowledgeIndex.source_type != KnowledgeSourceType.knowledge_doc
-            )
-        elif scope == "knowledge_doc":
-            conditions.append(
-                KnowledgeIndex.source_type == KnowledgeSourceType.knowledge_doc
-            )
-
-        result = await self._db.execute(select(KnowledgeIndex).where(*conditions))
-        chunks = result.scalars().all()
+        try:
+            async with self._db.begin_nested():
+                chunks = (
+                    await self._db.execute(
+                        select(KnowledgeIndex)
+                        .options(defer(KnowledgeIndex.embedding_vec))
+                        .where(*conditions)
+                    )
+                ).scalars().all()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("BM25 候选加载失败（本次无业务数据命中）：%s: %s", type(exc).__name__, exc)
+            return []
         if not chunks:
             return []
 
-        # 分词 + 构建索引
-        from app.services._zh_tokenize import zh_tokenize_batch
-
-        corpus_texts = [c.content_text or "" for c in chunks]
-        corpus_tokens = zh_tokenize_batch(corpus_texts)
-
+        corpus_tokens = zh_tokenize_batch([c.content_text or "" for c in chunks])
         try:
             retriever = bm25s.BM25()
             retriever.index(corpus_tokens)
@@ -657,9 +870,7 @@ class KnowledgeIndexService:
             logger.warning("BM25 索引构建失败，降级 ilike: %s", exc)
             return await self._ilike_fallback(project_id, query, top_k, scope)
 
-        # 存入缓存
         _BM25_CACHE[cache_key] = (retriever, chunks, now)
-
         return self._bm25_retrieve(retriever, chunks, query_tokens, top_k)
 
     @staticmethod
@@ -669,10 +880,7 @@ class KnowledgeIndexService:
         query_tokens: list[str],
         top_k: int,
     ) -> list[dict[str, Any]]:
-        """从已构建的 BM25 索引中检索 top_k 结果。
-
-        提取为静态方法，缓存命中和新建索引后共用。
-        """
+        """从已构建的 BM25 索引中检索 top_k 结果（缓存命中与新建索引共用）。"""
         try:
             k = min(top_k, len(chunks))
             indices, scores = retriever.retrieve([query_tokens], k=k)
@@ -681,25 +889,14 @@ class KnowledgeIndexService:
         except Exception:
             return []
 
-        # 归一化分数：除以最大分数（max > 0 时）
         max_score = max(score_list) if score_list else 0.0
-
         out: list[dict[str, Any]] = []
         for rank, idx in enumerate(idx_list):
             if idx < 0 or idx >= len(chunks):
                 continue
-            chunk = chunks[int(idx)]
             raw_score = float(score_list[rank]) if rank < len(score_list) else 0.0
-            normalized_score = (raw_score / max_score) if max_score > 0 else 0.0
-            out.append({
-                "source_type": chunk.source_type.value,
-                "source_id": str(chunk.source_id),
-                "content": chunk.content_text,
-                "score": round(normalized_score, 4),
-                "chunk_index": chunk.chunk_index,
-                "doc_version": getattr(chunk, "doc_version", None),
-                "is_stale": getattr(chunk, "is_stale", False),
-            })
+            normalized = (raw_score / max_score) if max_score > 0 else 0.0
+            out.append(_chunk_hit(chunks[int(idx)], normalized, "bm25"))
         return out[:top_k]
 
     async def _ilike_fallback(
@@ -709,201 +906,139 @@ class KnowledgeIndexService:
         top_k: int,
         scope: str,
     ) -> list[dict[str, Any]]:
-        """向量召回失败时的 ilike 降级搜索（双保险）。
-
-        搜索 KnowledgeIndex.content_text 字段，按 scope 过滤。
-        """
+        """ILIKE 子串匹配索引分块（最后兜底）。失败返回空，不外抛。"""
+        pattern = f"%{escape_like(query)}%"
         conditions = [
             KnowledgeIndex.project_id == project_id,
-            KnowledgeIndex.is_deleted == False,
-            KnowledgeIndex.content_text.ilike(f"%{query}%"),
+            KnowledgeIndex.is_deleted == False,  # noqa: E712
+            KnowledgeIndex.content_text.ilike(pattern, escape="\\"),
+            *_scope_conditions(scope),
         ]
-        if scope == "project_data":
-            conditions.append(
-                KnowledgeIndex.source_type != KnowledgeSourceType.knowledge_doc
-            )
-        elif scope == "knowledge_doc":
-            conditions.append(
-                KnowledgeIndex.source_type == KnowledgeSourceType.knowledge_doc
-            )
-
-        result = await self._db.execute(
-            select(KnowledgeIndex).where(*conditions).limit(top_k)
-        )
-        chunks = result.scalars().all()
-
-        return [
-            {
-                "source_type": chunk.source_type.value,
-                "source_id": str(chunk.source_id),
-                "content": chunk.content_text,
-                "score": 0.0,  # ilike 无相似度分数
-                "chunk_index": chunk.chunk_index,
-                "doc_version": chunk.doc_version,
-                "is_stale": chunk.is_stale,
-            }
-            for chunk in chunks
-        ]
+        try:
+            async with self._db.begin_nested():
+                chunks = (
+                    await self._db.execute(
+                        select(KnowledgeIndex)
+                        .options(defer(KnowledgeIndex.embedding_vec))
+                        .where(*conditions)
+                        .limit(top_k)
+                    )
+                ).scalars().all()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("ILIKE 兜底失败（本次无业务数据命中）：%s: %s", type(exc).__name__, exc)
+            return []
+        return [_chunk_hit(chunk, 0.0, "ilike") for chunk in chunks]
 
     async def _filter_by_permission(
         self,
         results: list[dict[str, Any]],
-        user: Any,
+        user: Any | None,
+        *,
+        project_id: UUID | None = None,
+        subject: KnowledgeAccessSubject | None = None,
+        restrict_to: Iterable[Any] = (),
     ) -> list[dict[str, Any]]:
-        """按用户权限过滤 knowledge_doc 类型的结果。
+        """knowledge_doc 命中（通常来自向量层）按**单一判定面**过滤（Req 3.7）。
 
-        非 knowledge_doc 类型不过滤（业务数据按项目权限已隔离）。
-        knowledge_doc 结果需检查用户对 KnowledgeDocument 的访问权限：
-        - public: 所有用户可见
-        - project_group: 用户所属项目在 project_ids 中
-        - private: 仅创建者可见
+        起点是 ``knowledge_documents``（不是 ``knowledge_index``）：已删除、所在文件夹已删除、
+        被新版本取代（restrict_to 点名者除外）、不在 restrict_to 范围内的一律剔除。
+        ``user=None`` → project 模式无用户判定（public + 当前项目组，private 永不）。
+        非 knowledge_doc 结果原样保留（业务数据按项目分区，由路由层项目权限隔离）。
+        判定失败 fail-closed：丢弃全部文档命中，只保留业务数据。
         """
         if not results:
             return results
-
-        # 分离 knowledge_doc 和非 knowledge_doc 结果
-        non_doc_results = [r for r in results if r["source_type"] != "knowledge_doc"]
-        doc_results = [r for r in results if r["source_type"] == "knowledge_doc"]
-
+        doc_results = [r for r in results if r.get("source_type") == KnowledgeSourceType.knowledge_doc.value]
+        other = [r for r in results if r.get("source_type") != KnowledgeSourceType.knowledge_doc.value]
         if not doc_results:
             return results
+        if project_id is None:
+            logger.warning("知识文档命中缺少 project_id，无法做项目范围判定 → 全部丢弃（fail-closed）")
+            return other
+        if subject is None and user is not None:
+            subject = await self._resolve_subject(user)
+        restrict = _coerce_uuid_tuple(restrict_to)
+        try:
+            async with self._db.begin_nested():
+                explicit_docs, folder_scope = await self._doc_search.resolve_restriction(restrict)
+                visible = await self._doc_search.visible_documents(
+                    [r.get("source_id") for r in doc_results],
+                    mode=KnowledgeRetrievalMode.project,
+                    subject=subject,
+                    project_id=project_id,
+                    allow_superseded=explicit_docs,
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("知识文档权限判定失败（丢弃全部文档命中）：%s: %s", type(exc).__name__, exc)
+            return other
 
-        # 获取用户 ID
-        user_id = getattr(user, "id", None)
-        user_id_str = str(user_id) if user_id else None
-
-        # 批量查询这些 source_id 对应的 KnowledgeDocument 权限信息
-        source_ids = [UUID(r["source_id"]) for r in doc_results]
-        doc_query = (
-            select(
-                KnowledgeIndex.source_id,
-                KnowledgeDocument.access_level,
-                KnowledgeDocument.project_ids,
-                KnowledgeDocument.created_by,
-                KnowledgeFolder.access_level.label("folder_access_level"),
-                KnowledgeFolder.project_ids.label("folder_project_ids"),
-            )
-            .join(
-                KnowledgeDocument,
-                KnowledgeIndex.source_id == KnowledgeDocument.id,
-            )
-            .join(
-                KnowledgeFolder,
-                KnowledgeDocument.folder_id == KnowledgeFolder.id,
-            )
-            .where(
-                KnowledgeIndex.source_id.in_(source_ids),
-                KnowledgeDocument.is_deleted == False,
-            )
-        )
-        perm_result = await self._db.execute(doc_query)
-        perm_rows = perm_result.all()
-
-        # 构建 source_id -> 权限信息映射
-        accessible_source_ids: set[str] = set()
-        for row in perm_rows:
-            source_id_val, doc_access, doc_proj_ids, created_by, folder_access, folder_proj_ids = row
-            if self._user_can_access_doc(
-                user_id_str, created_by, doc_access, doc_proj_ids, folder_access, folder_proj_ids
-            ):
-                accessible_source_ids.add(str(source_id_val))
-
-        # 过滤 doc_results
-        filtered_doc_results = [
-            r for r in doc_results if r["source_id"] in accessible_source_ids
-        ]
-
-        return non_doc_results + filtered_doc_results
+        allowed: list[dict[str, Any]] = []
+        for r in doc_results:
+            try:
+                doc_id = UUID(str(r.get("source_id")))
+            except (ValueError, TypeError):
+                continue
+            meta = visible.get(doc_id)
+            if meta is None:
+                continue
+            if restrict and doc_id not in explicit_docs and meta.folder_id not in folder_scope:
+                continue
+            r.setdefault("document_name", meta.name)
+            r.setdefault("folder_id", str(meta.folder_id))
+            if r.get("doc_version") is None:
+                r["doc_version"] = meta.version
+            allowed.append(r)
+        return other + allowed
 
     async def _enrich_results(self, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """V119: 为搜索结果附加 document_name + folder_path 用于引用显示。"""
+        """为 knowledge_doc 结果附加 document_name / folder_id / folder_path / folder_ancestor_ids。
+
+        ``folder_path`` 为 ``/根/…/当前`` 完整路径（旧实现只有文件夹名）。非文档结果补 None。
+        调用前结果已经过判定面（本方法不做可见性判断，只补展示元数据）。
+        """
         if not results:
             return results
-
-        # 收集所有 knowledge_doc 类型的 source_ids
-        doc_source_ids = [
-            UUID(r["source_id"]) for r in results
-            if r.get("source_type") == "knowledge_doc"
-        ]
-        if not doc_source_ids:
-            # 非 knowledge_doc 不需要 enrichment
-            for r in results:
-                r.setdefault("document_name", None)
-                r.setdefault("folder_path", None)
-            return results
-
-        # 批量查 document_name + folder_path
-        from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
+        doc_rows = [r for r in results if r.get("source_type") == KnowledgeSourceType.knowledge_doc.value]
+        missing = [r for r in doc_rows if not r.get("document_name") or not r.get("folder_id")]
         try:
-            enrich_query = (
-                select(
-                    KnowledgeDocument.id,
-                    KnowledgeDocument.name,
-                    KnowledgeFolder.name.label("folder_name"),
+            async with self._db.begin_nested():
+                if missing:
+                    ids = _coerce_uuid_tuple(r.get("source_id") for r in missing)
+                    rows = (
+                        await self._db.execute(
+                            select(KnowledgeDocument.id, KnowledgeDocument.name, KnowledgeDocument.folder_id)
+                            .where(KnowledgeDocument.id.in_(list(ids)))
+                        )
+                    ).all() if ids else []
+                    by_id = {str(i): (n, f) for i, n, f in rows}
+                    for r in missing:
+                        name, folder = by_id.get(str(r.get("source_id")), (None, None))
+                        r.setdefault("document_name", name)
+                        if folder is not None and not r.get("folder_id"):
+                            r["folder_id"] = str(folder)
+                paths = await self._doc_search.folder_paths(
+                    r.get("folder_id") for r in doc_rows if r.get("folder_id")
                 )
-                .join(KnowledgeFolder, KnowledgeDocument.folder_id == KnowledgeFolder.id)
-                .where(KnowledgeDocument.id.in_(doc_source_ids))
-            )
-            enrich_result = await self._db.execute(enrich_query)
-            enrich_map: dict[str, tuple[str, str]] = {}
-            for doc_id, doc_name, folder_name in enrich_result.all():
-                enrich_map[str(doc_id)] = (doc_name, folder_name)
-        except Exception:
-            enrich_map = {}
+        except Exception as exc:  # noqa: BLE001 - 展示元数据缺失不影响检索结果本身
+            logger.warning("知识检索结果补充展示信息失败：%s: %s", type(exc).__name__, exc)
+            paths = {}
 
-        # 附加到每个结果
         for r in results:
-            if r.get("source_type") == "knowledge_doc":
-                info = enrich_map.get(r["source_id"])
-                r["document_name"] = info[0] if info else None
-                r["folder_path"] = info[1] if info else None
-            else:
+            if r.get("source_type") != KnowledgeSourceType.knowledge_doc.value:
                 r.setdefault("document_name", None)
+                r.setdefault("folder_id", None)
                 r.setdefault("folder_path", None)
-
+                r.setdefault("folder_ancestor_ids", [])
+                continue
+            r.setdefault("document_name", None)
+            fp = None
+            try:
+                fp = paths.get(UUID(str(r.get("folder_id")))) if r.get("folder_id") else None
+            except (ValueError, TypeError):
+                fp = None
+            r["folder_path"] = fp.path if fp else None
+            r["folder_ancestor_ids"] = [str(x) for x in fp.ancestor_ids] if fp else []
         return results
-
-    @staticmethod
-    def _user_can_access_doc(
-        user_id_str: str | None,
-        created_by: UUID | None,
-        doc_access_level,
-        doc_project_ids: list | None,
-        folder_access_level,
-        folder_project_ids: list | None,
-    ) -> bool:
-        """判断用户是否有权访问该知识文档。
-
-        权限继承模型：文档级 > 文件夹级。
-        - public: 所有用户可见
-        - project_group: 用户所属项目在 project_ids 中（简化：检查 user 关联项目）
-        - private: 仅创建者可见
-        """
-        # 确定生效的 access_level
-        if doc_access_level is not None:
-            effective_access = doc_access_level
-            effective_proj_ids = doc_project_ids
-        else:
-            effective_access = folder_access_level
-            effective_proj_ids = folder_project_ids
-
-        access_str = effective_access.value if hasattr(effective_access, "value") else str(effective_access)
-
-        if access_str == "public":
-            return True
-        elif access_str == "private":
-            # 仅创建者可见
-            if not user_id_str or not created_by:
-                return False
-            return user_id_str == str(created_by)
-        elif access_str == "project_group":
-            # project_group: 用户需在 project_ids 列表中有关联
-            # 简化实现：如果 project_ids 非空则允许（实际应检查用户项目关联）
-            # 但由于 semantic_search 已按 project_id 过滤，project_group 文档
-            # 只要 project_id 在列表中即可见（已由向量索引阶段保证）
-            return True
-        else:
-            return False
 
     async def search_cross_year(
         self,
@@ -1001,17 +1136,19 @@ class KnowledgeIndexService:
         Returns:
             True 如果存在 stale 索引且无 fresh 索引
         """
-        result = await self._db.execute(
-            select(
-                func.count().filter(KnowledgeIndex.is_stale == True),  # noqa: E712
-                func.count().filter(KnowledgeIndex.is_stale == False),  # noqa: E712
+        # SAVEPOINT：读失败只回滚自身，异常照常上抛但调用方会话保持可用（Req 1.1）
+        async with self._db.begin_nested():
+            result = await self._db.execute(
+                select(
+                    func.count().filter(KnowledgeIndex.is_stale == True),  # noqa: E712
+                    func.count().filter(KnowledgeIndex.is_stale == False),  # noqa: E712
+                )
+                .where(
+                    KnowledgeIndex.source_id == source_id,
+                    KnowledgeIndex.is_deleted == False,  # noqa: E712
+                )
             )
-            .where(
-                KnowledgeIndex.source_id == source_id,
-                KnowledgeIndex.is_deleted == False,  # noqa: E712
-            )
-        )
-        row = result.one_or_none()
+            row = result.one_or_none()
         if not row:
             return False
         stale_count, fresh_count = row
@@ -1141,20 +1278,23 @@ class KnowledgeIndexService:
 
     async def get_index_status(self, project_id: UUID) -> dict[str, Any]:
         """Get index status statistics for a project."""
-        result = await self._db.execute(
-            select(
-                KnowledgeIndex.source_type,
-                func.count(KnowledgeIndex.id).label("count"),
+        # SAVEPOINT：读失败只回滚自身，异常照常上抛但调用方会话保持可用（Req 1.1）
+        async with self._db.begin_nested():
+            result = await self._db.execute(
+                select(
+                    KnowledgeIndex.source_type,
+                    func.count(KnowledgeIndex.id).label("count"),
+                )
+                .where(
+                    KnowledgeIndex.project_id == project_id,
+                    KnowledgeIndex.is_deleted == False,
+                )
+                .group_by(KnowledgeIndex.source_type)
             )
-            .where(
-                KnowledgeIndex.project_id == project_id,
-                KnowledgeIndex.is_deleted == False,
-            )
-            .group_by(KnowledgeIndex.source_type)
-        )
+            rows = result.all()
         by_type: dict[str, int] = {}
         total = 0
-        for row in result.all():
+        for row in rows:
             key = row.source_type.value
             by_type[key] = row.count
             total += row.count

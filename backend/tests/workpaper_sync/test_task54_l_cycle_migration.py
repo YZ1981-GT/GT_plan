@@ -1169,8 +1169,40 @@ class TestLCycleFormDifferences:
                 none_.append(code)
             assert not has_own, f"{code}: 宿主不应直接 import per-entry dual-mode（实测 {specs}）"
         assert sorted(shared) == sorted(REDEEMABLE_CODES), f"共享载体组现算 {shared}"
-        assert sorted(child) == sorted(INERT_CODES), f"子 Tab 组现算 {child}"
-        assert sorted(none_) == sorted(NO_CARRIER_CODES), f"无载体组现算 {none_}"
+
+        # ── inert 四条的分组随「删除计划是否已执行」而变（2026-09-28 修正）──────
+        #
+        # 🔴 原断言写死 `child == INERT_CODES`，于是**删除计划一执行本条必红**：
+        #    `useL5DualMode.ts`~`useL8DualMode.ts` 已被删（工作树实测），子 Tab 不再 import
+        #    它们 ⇒ 现算 `child == []`、四条落进 `none_`。
+        #    而删这四个 carrier 正是本 slice 自己的 `deletion_plan.inert_switch_blocks_to_remove`
+        #    所声明的动作（下方 `test_..._deletion_plan...` 还在断言它）
+        #    ⇒ 红的是判据没跟上、不是生产回归（另已 grep 确认**无残留 import**，只剩 3 处文档注释）。
+        #
+        #    改法不是把期望值换成 `[]`（那会在删除被回滚时静默放过），而是**按 carrier 文件
+        #    是否还在**现算当前处于哪个阶段，两阶段各自仍是严格等式 —— 信息量不减。
+        carriers_alive = [
+            c for c in INERT_CODES
+            if (ROOT / "audit-platform/frontend/src/components/workpaper/composables"
+                / f"use{c}DualMode.ts").exists()
+        ]
+        if carriers_alive:
+            assert sorted(carriers_alive) == sorted(INERT_CODES), (
+                f"inert carrier 只剩一部分：{carriers_alive} —— 删除计划执行到一半，"
+                "要么删完要么回滚，不得半删（半删时子 Tab 分组会横跨两态、无法归因）"
+            )
+            assert sorted(child) == sorted(INERT_CODES), f"子 Tab 组现算 {child}"
+            assert sorted(none_) == sorted(NO_CARRIER_CODES), f"无载体组现算 {none_}"
+        else:
+            # 删除计划已执行：四条 inert entry 不再有任何 dual-mode 载体
+            assert child == [], (
+                f"carrier 文件已全删，但子 Tab 仍 import per-entry dual-mode：{child} "
+                "⇒ 有残留 import，前端会构建失败"
+            )
+            assert sorted(none_) == sorted(tuple(NO_CARRIER_CODES) + INERT_CODES), (
+                f"无载体组现算 {none_}（删除后应为 L3/L4 + L5~L8 共 6 条）"
+            )
+
         assert len(shared) + len(child) + len(none_) == len(L_CODES)
         assert not (set(shared) & set(child)) and not (set(child) & set(none_))
 

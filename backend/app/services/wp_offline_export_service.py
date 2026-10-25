@@ -501,7 +501,7 @@ class WpOfflineExportService:
             return {}
         try:
             from sqlalchemy import select as sa_select
-            from app.models.models import ProjectWorkpaper
+            from app.models.workpaper_models import WorkingPaper as ProjectWorkpaper
 
             result = await self.db.execute(
                 sa_select(ProjectWorkpaper).where(ProjectWorkpaper.id == wp_id)
@@ -549,7 +549,7 @@ class WpOfflineExportService:
             return ""
         try:
             from sqlalchemy import select as sa_select
-            from app.models.models import Project
+            from app.models.core import Project
 
             result = await self.db.execute(
                 sa_select(Project.name).where(Project.id == project_id)

@@ -77,6 +77,225 @@ _ROWS: tuple[dict[str, Any], ...] = (
             "wp_count_with_payload": 0,
         },
     },
+    {
+        "entry_id": "xlsx/gt-l4-bonds-payable",
+        "contract_id": "l4.bonds_payable",
+        "wp_codes": ["L4"],
+        "resolvable_for_provisioning": True,
+        "matcher_domain_conflict": None,
+        "basis": {
+            "heuristic_is_wrong_because": (
+                "manifest 从宿主 Vue 文件名 CamelCase 抽出的 L4B 经 wp_template_finder "
+                "单册与 sheet 级解析均零命中（GtL4BondsPayable → L4B 是幻影码）"
+            ),
+            "heuristic_would_say": ["L4B"],
+            "managed_excel_name": "划分为金融负债的其他金融工具明细表L4-3",
+            "template_relative_path": "L/L4 应付债券.xlsx",
+            "wp_index_evidence": (
+                "2026-10-01 现算：wp_code=L4 有 3 份未删除底稿且 file_path 非空"
+                "（`storage/projects/005a6f2d…/workpapers/L/L4.xlsx` 等）；受管 sheet 是整册 "
+                "16 sheet 工作簿里的一张，不是独立文件 ⇒ 目标码取持有整册文件的 `L4`。"
+                "判据用 `COALESCE(file_path,'') <> ''`（L1 裁决记过的空串陷阱）。"
+            ),
+        },
+        "store_payload_evidence": {
+            "max_payload_bytes": 0,
+            "measured_at": "2026-10-01",
+            "store_item_id": "L4-3-rows",
+            "why_null": (
+                "`L4-3-rows` 是本 spec 新建的键，全库 0 行；旧位置化键 `L4-3-row-*` 亦 0 行 "
+                "⇒ 零迁移负担。真库 L4 现有 6 行均为 `l-cycle-canary-e2e` 夹具"
+                "（L4-adj-1-* / L4-chk-conclusion / L4-3-note），不属受管表。"
+            ),
+            "wp_code_with_payload": None,
+            "wp_count_with_payload": 0,
+        },
+    },
+    {
+        "entry_id": "xlsx/gt-l3-long-term-loans",
+        "contract_id": "l3.long_term_loans",
+        "wp_codes": ["L3"],
+        "resolvable_for_provisioning": True,
+        "matcher_domain_conflict": None,
+        "basis": {
+            "heuristic_is_wrong_because": "manifest 幻影码 L3L 经 wp_template_finder 单册与 sheet 级均零命中",
+            "heuristic_would_say": ["L3L"],
+            "managed_excel_name": "长期借款检查表L3-9",
+            "template_relative_path": "L/L3 长期借款.xlsx",
+            "wp_index_evidence": (
+                "2026-10-01 现算 wp_code=L3 有 4 份未删除底稿，最早目标 wp=33cfc857；"
+                "无 L3-* 子码 working paper，受管 L3-9 是整册内 sheet ⇒ 目标码取 L3。"
+            ),
+        },
+        "store_payload_evidence": {
+            "max_payload_bytes": 0,
+            "measured_at": "2026-10-01",
+            "store_item_id": "L3-L3-9-voucher-rows",
+            "why_null": (
+                "本 item 真库 0 行；现有 11 条 L3 行 11/11 均为 `l-cycle-canary-e2e` 夹具，"
+                "且键属于 adj/blank/note，不属受管表 ⇒ 零迁移负担。"
+            ),
+            "wp_code_with_payload": None,
+            "wp_count_with_payload": 0,
+        },
+    },
+    {
+        "entry_id": "xlsx/gt-l2-interest-payable",
+        "contract_id": "l2.interest_payable",
+        "wp_codes": ["L2"],
+        "resolvable_for_provisioning": True,
+        "matcher_domain_conflict": None,
+        "basis": {
+            "heuristic_is_wrong_because": "manifest 幻影码 L2I 经 wp_template_finder 单册与 sheet 级均零命中",
+            "heuristic_would_say": ["L2I"],
+            "managed_excel_name": "应付利息检查表L2-4",
+            "template_relative_path": "L/L2 应付利息.xlsx",
+            "wp_index_evidence": (
+                "受管 L2-4 是整册 8 sheet 工作簿里的一张，不是独立文件 ⇒ 目标码取持有整册的 L2；"
+                "判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。"
+            ),
+        },
+        "store_payload_evidence": {
+            "max_payload_bytes": 0,
+            "measured_at": "2026-10-01",
+            "store_item_id": "L2-L2-4-voucher-rows",
+            "why_null": (
+                "本 item 真库 0 行；现有 L2 行均为 `l-cycle-canary-e2e` 夹具（adj/note），"
+                "不属受管表 ⇒ 零迁移负担。"
+            ),
+            "wp_code_with_payload": None,
+            "wp_count_with_payload": 0,
+        },
+    },
+    {
+        "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
+        "contract_id": "l7.other_noncurrent_liabilities",
+        "wp_codes": ["L7"],
+        "resolvable_for_provisioning": True,
+        "matcher_domain_conflict": None,
+        "basis": {
+            "heuristic_is_wrong_because": "manifest 幻影码 L7O 经 wp_template_finder 单册与 sheet 级均零命中（GtL7OtherNoncurrentLiabilities → L7O 是幻影码）",
+            "heuristic_would_say": ["L7O"],
+            "managed_excel_name": "明细表L7-2",
+            "template_relative_path": "L/L7 其他非流动负债.xlsx",
+            "wp_index_evidence": (
+                "受管 明细表L7-2 是整册 8 sheet 工作簿里的一张（L7 整册唯一的数据录入源，"
+                "审定表 L7-1 / 两张附注 / 检查表 L7-4 全部跨 sheet 引用它），不是独立文件 ⇒ "
+                "目标码取持有整册文件的 L7；判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。"
+            ),
+        },
+        "store_payload_evidence": {
+            "max_payload_bytes": 0,
+            "measured_at": "2026-10-01",
+            "store_item_id": "L7-L7-2-full-data",
+            "why_null": (
+                "本 item 真库 `L7-L7-2-%` 现算 0 行（明细表从未录入，空表单是合法业务事实）；"
+                "旧 full-data 用过的 key 字段已收敛到稳定 rowId（newRowIdentity('l72det')），"
+                "零迁移负担。真库 L7 载荷仅 5 行 `l-cycle-canary-e2e` 夹具（L7-adj-* / "
+                "L7-chk-conclusion），键属 审定表L7-1 相关，不属受管表 L7-2。"
+            ),
+            "wp_code_with_payload": None,
+            "wp_count_with_payload": 0,
+        },
+    },
+    {
+        "entry_id": "xlsx/gt-l6-special-payables",
+        "contract_id": "l6.special_payables",
+        "wp_codes": ["L6"],
+        "resolvable_for_provisioning": True,
+        "matcher_domain_conflict": None,
+        "basis": {
+            "heuristic_is_wrong_because": "manifest 幻影码 L6S 经 wp_template_finder 单册与 sheet 级均零命中（GtL6SpecialPayables → L6S 是幻影码）",
+            "heuristic_would_say": ["L6S"],
+            "managed_excel_name": "明细表L6-2",
+            "template_relative_path": "L/L6 专项应付款.xlsx",
+            "wp_index_evidence": (
+                "受管 明细表L6-2 是整册 9 sheet 工作簿里的一张（L6 整册唯一的数据录入源，"
+                "审定表 L6-1 / 两张附注 / 检查表 L6-4 全部跨 sheet 引用它），不是独立文件 ⇒ "
+                "目标码取持有整册文件（科目 2711 专项应付款）的 L6；判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。"
+            ),
+        },
+        "store_payload_evidence": {
+            "max_payload_bytes": 0,
+            "measured_at": "2026-10-01",
+            "store_item_id": "L6-L6-2-rows",
+            "why_null": (
+                "本 item 真库 `L6-L6-2-%` 现算 0 行（明细表从未录入，空表单是合法业务事实）；"
+                "旧 L6-L6-2-rows 用过的 key 字段已收敛到稳定 rowId（newRowIdentity('l62det')），"
+                "零迁移负担。真库 L6 载荷仅 5 行 `l-cycle-canary-e2e` 夹具（L6-adj-* / "
+                "L6-chk-conclusion），键属 审定表L6-1 相关，不属受管表 L6-2。"
+            ),
+            "wp_code_with_payload": None,
+            "wp_count_with_payload": 0,
+        },
+    },
+    {
+        "entry_id": "xlsx/gt-l8-financial-expenses",
+        "contract_id": "l8.financial_expenses",
+        "wp_codes": ["L8"],
+        "resolvable_for_provisioning": True,
+        "matcher_domain_conflict": None,
+        "basis": {
+            "heuristic_is_wrong_because": "manifest 幻影码 L8F 经 wp_template_finder 单册与 sheet 级均零命中（GtL8FinancialExpenses → L8F 是幻影码）",
+            "heuristic_would_say": ["L8F"],
+            "managed_excel_name": "明细表L8-2",
+            "template_relative_path": "L/L8 财务费用.xlsx",
+            "wp_index_evidence": (
+                "受管 明细表L8-2 是整册 10 sheet 工作簿里的一张（L8 整册唯一的数据录入源，"
+                "审定表 L8-1 / 两张附注 / 检查表 L8-6 全部跨 sheet 引用它），不是独立文件 ⇒ "
+                "目标码取持有整册文件（科目 6603 财务费用，损益类）的 L8；判据用 "
+                "`COALESCE(file_path,'') <> ''`（L1 空串陷阱）。🔴 wp_codes 用整册底稿码 L8"
+                "（不是科目码 6603，照 L1~L7 一律用底稿码）。"
+            ),
+        },
+        "store_payload_evidence": {
+            "max_payload_bytes": 0,
+            "measured_at": "2026-10-01",
+            "store_item_id": "L8-2-full-data",
+            "why_null": (
+                "本 item 真库 `L8-2-%` 现算 0 行（明细表从未录入，空表单是合法业务事实）；"
+                "身份字段 key 已收敛到稳定 rowId（newRowIdentity('l82det')，已有不重铸），"
+                "旧位置化键 `L8-2-row-%` 亦 0 行 ⇒ 零迁移负担。真库 L8 载荷仅 5 行 "
+                "`l-cycle-canary-e2e` 夹具（L8-adj-* / L8-chk-conclusion），键属 审定表L8-1 "
+                "相关，不属受管表 L8-2。"
+            ),
+            "wp_code_with_payload": None,
+            "wp_count_with_payload": 0,
+        },
+    },
+    {
+        "entry_id": "xlsx/gt-l5-long-term-payables",
+        "contract_id": "l5.long_term_payables",
+        "wp_codes": ["L5"],
+        "resolvable_for_provisioning": True,
+        "matcher_domain_conflict": None,
+        "basis": {
+            "heuristic_is_wrong_because": "manifest 幻影码 L5L 经 wp_template_finder 单册与 sheet 级均零命中（GtL5LongTermPayables → L5L 是幻影码）",
+            "heuristic_would_say": ["L5L"],
+            "managed_excel_name": "明细表L5-2",
+            "template_relative_path": "L/L5 长期应付款.xlsx",
+            "wp_index_evidence": (
+                "受管 明细表L5-2 是整册 12 sheet 工作簿里的一张（科目 2701 长期应付款），"
+                "审定表 L5-1 / 两张附注 / L5-3~L5-7 全部跨 sheet 引用它，不是独立文件 ⇒ "
+                "目标码取持有整册文件的 L5；判据用 `COALESCE(file_path,'') <> ''`（L1 空串陷阱）。"
+                "🔴 wp_codes 用整册底稿码 L5（不是科目码 2701，照 L1~L8 一律用底稿码）。"
+            ),
+        },
+        "store_payload_evidence": {
+            "max_payload_bytes": 0,
+            "measured_at": "2026-10-01",
+            "store_item_id": "L5-L5-2-rows",
+            "why_null": (
+                "本 item 真库 `L5-L5-2-rows` 现算 0 行（三区同键，明细表从未录入，空表单是"
+                "合法业务事实）；身份字段 key 已收敛到稳定 rowId（newRowIdentity('l52det')，"
+                "已有不重铸、历史行补铸 + section 落默认区）⇒ 零迁移负担。真库 L5 载荷仅 "
+                "`L5-adj-*` / `L5-*-note` / `L5-chk-conclusion` 等夹具行，属 审定表L5-1 / L5-4 "
+                "相关，不属受管表 L5-2。"
+            ),
+            "wp_code_with_payload": None,
+            "wp_count_with_payload": 0,
+        },
+    },
 )
 
 

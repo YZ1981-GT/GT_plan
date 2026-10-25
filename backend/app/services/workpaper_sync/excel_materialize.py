@@ -122,6 +122,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import logging
 import os
 import re
 import zipfile
@@ -131,7 +132,7 @@ from decimal import Decimal
 from enum import Enum
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Final, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Final, Mapping, Sequence, Union
 
 from openpyxl.utils import column_index_from_string
 
@@ -145,6 +146,13 @@ from app.services.workpaper_sync.adapters.base import (
 from app.services.workpaper_sync.contracts import (
     FieldMode,
     FieldSpec,
+    # spec workpaper-sync-managed-row-convergence：
+    #   * PROTECTED_MODES —— 收敛的清空分支要跳过受保护格（公式/auto_source 本就被
+    #     roundtrip 豁免，清它只会毁模板）
+    #   * is_template_skeleton_identity —— 模板骨架行不得当 stale 删除，与 roundtrip
+    #     豁免共用同一真源
+    PROTECTED_MODES,
+    is_template_skeleton_identity,
     SyncContract,
     TableSpec,
     ValueType,
@@ -172,11 +180,29 @@ from app.services.workpaper_sync.excel_row_shift import (
     shift_sheet_rows,
 )
 from app.services.workpaper_sync.excel_workbook_row_change import (
+    RowDeletionShift,
+    plan_workbook_row_change_for_delete,
     plan_workbook_row_change_for_insert,
+    # spec workpaper-sync-managed-row-convergence：受管行收敛的删行分支。
+    # 🔴 该能力由 spec excel-workbook-wide-row-change-propagation 建成且测试全绿，
+    #    但此前**生产零消费方**（本模块原先只 import insert 那一支）——本行是它的首个
+    #    生产接线点，闭合「能力已建 ≠ 接线完整」这个平台反复出现的缺口形态。
+    shrink_sheet_rows,
 )
 from app.services.workpaper_sync.limits import SyncLimits, load_limits
 from app.services.workpaper_sync.merge import ValueNormalizationError, normalize_value
+
+#: 位移载体协议：插行 `RowShiftPlan`、删行 `RowDeletionShift`，两者**鸭子兼容**
+#: （`shift` / `unshift` / `count` / `insert_at`）。
+#:
+#: 🔴 消费侧一律按**协议（鸭子）**判、不按 `isinstance`：判方向用
+#: `getattr(carrier, "deleted_rows", None)`。这个别名只为类型标注存在，
+#: 运行期不做类型分派。与 `excel_extract.RowChangeCarrier` 同一处理。
+RowChangeCarrier = Union[RowShiftPlan, RowDeletionShift]
 from app.services.workpaper_sync.models import ArtifactKind, ArtifactState, SyncDomainError
+
+#: 降级/异常的可观测出口。本包既有约定（14 处 `logging.getLogger(__name__)`）。
+logger = logging.getLogger(__name__)
 
 __all__ = [
     # 异常
@@ -671,6 +697,22 @@ class CellWriteKind(str, Enum):
     boolean_literal = "boolean_literal"
     #: 整格取代成内联字符串（`t="inlineStr"` + `<is><t>`；刻意不动 sharedStrings）。
     inline_text = "inline_text"
+    #: **整格清空**：只留 `<c r=".." s=".."/>`，无 `t`、无 `<v>`、无 `<is>`（保留样式）。
+    #:
+    #: 🔴 「清空」与「写空文本」在 OOXML 里是**两种不同的格**，混用会静默失败：
+    #:    `inline_text` 对 `None` 与 `""` 都渲染成 `<is><t xml:space="preserve"></t></is>`
+    #:    —— 一个**存在且值为空串**的格。extract 反读它得到 `""`（`xml:space="preserve"`
+    #:    明确保留空串），于是 **cell 仍算有值** ⇒ 仍产出该字段的 key ⇒ roundtrip 判 `extra`。
+    #:
+    #:    这正是受管行收敛（6.8b）实测踩到的形态：清空 D4-1 R22 的 7 个字段后，6 个
+    #:    amount 字段的 extra 消失了（`_render_number("")` 恰好落成 `<v></v>` 空数值节点，
+    #:    openpyxl 读回 `None`），而 text 的 `label` **一个都没少** ⇒ 500 从 7 个 extra
+    #:    降到 1 个就是卡在这里。amount 能工作是巧合而非设计（`<v></v>` 不是干净形态），
+    #:    所以收敛对**所有** value_type 统一走本 kind，消除 text/number 的行为分叉。
+    #:
+    #:    先例同型：`boolean_literal` 对 `None` 也刻意落 `<c r=".."/>` 真空格而不是
+    #:    `<v>0</v>`（后者把「未填」变成「填了 false」）。
+    blank = "blank"
     #: **只**改缓存值，`<f>` 逐字保留（受保护公式格）。
     cached_value_only = "cached_value_only"
     #: 隐藏 UUID 列的 row identity 字面量。
@@ -738,6 +780,33 @@ class MaterializePlan:
     #: ⚠ 类型写成 `Any` 而不是 `WorkbookRowChangePlan`：N1 反向 import 本模块的
     #: `_write_entries` 会成环。运行时类型由 `assert_workbook_plan_consistent` 校验。
     workbook_row_change: Any | None = None
+
+    #: 受管行收敛（spec workpaper-sync-managed-row-convergence）：substrate 上 store 已不
+    #: 认领的受管行。**两者互斥**，由 6.8b 按「删后受管区还剩几行有身份数据行」分流：
+    #:   * `stale_deleted` —— 剩 ≥1 行 ⇒ 删物理行（行号为**位移前**口径，降序删）
+    #:   * `stale_cleared` —— 剩 0 行 ⇒ 只清 editable 字面值格（物理行与身份载体保留）
+    #: 为空表示本次无收敛（store 未声明该 table，或两侧行集本就一致）。
+    stale_deleted: tuple[int, ...] = ()
+    stale_cleared: tuple[int, ...] = ()
+    # ── 删行侧的位移声明（spec workpaper-sync-row-deletion-multi-region-propagation）──
+    #: 本次删行的**位移载体**（`RowDeletionShift`）。`None` = 本次不删物理行。
+    #:
+    #: 🔴 **不复用 `workbook_row_change` 一个字段装两种声明**：`_apply_workbook_propagation`
+    #: 与 `assert_shifted_footer_gates` 需要按 kind 分流（insert 走 `row_shift`、
+    #: delete 走 `row_deletion`），共用一个字段就得在每个消费点做 `isinstance` 判断 ——
+    #: 那是把 kind 信息从类型里挤到调用点，每个漏判的点都是一处静默错向。
+    #:
+    #: ⚠ 类型写 `Any` 与 `workbook_row_change` 同理（反向 import 会成环）。
+    row_deletion: Any | None = None
+    #: 本次删行要在**引用侧** sheet 与 `xl/workbook.xml` 上做的传播声明
+    #: （`RowDeletionChangeSet`）。`None` = 零传播路径（产物与不产声明时逐字节相同）。
+    deletion_change: Any | None = None
+    #: 收敛被**降级**回清空分支的原因（可读文案）。空串 = 没降级。
+    #:
+    #: 🔴 必须可观测（进 `as_dict()`）：否则「删行功能上线了但在双向变更的 entry 上
+    #: 从来没跑过」会成为一个看不见的空转 —— 那正是本平台反复踩的
+    #: 「能力已建 ≠ 接线完整」的另一面（Requirement 9.2 / 9.6）。
+    stale_clear_reason: str = ""
     #: 多 sheet：本次 materialize 的契约 ``sheet_key``（如 ``d42-managed``）。
     #: ``_refresh_gt_sync_runtime_binding`` 只重冻结本 sheet 的 ``GT_FOOTER_ROW_{TID}``，
     #: 避免 sibling 的 footer 键被主 sheet 插行误移位。
@@ -781,6 +850,16 @@ class MaterializePlan:
                 None
                 if self.workbook_row_change is None
                 else self.workbook_row_change.as_dict()
+            ),
+            # ── 收敛两分支 + 删行声明（Requirement 9.2 / 9.6：降级必须可读）──
+            "stale_deleted": list(self.stale_deleted),
+            "stale_cleared": list(self.stale_cleared),
+            "stale_clear_reason": self.stale_clear_reason,
+            "row_deletion": (
+                None if self.row_deletion is None else self.row_deletion.as_dict()
+            ),
+            "deletion_change": (
+                None if self.deletion_change is None else self.deletion_change.as_dict()
             ),
             "dynamic_column_columns": {
                 table: dict(sorted(mapping.items()))
@@ -912,6 +991,11 @@ def build_sheet_cell_index(xml: str) -> SheetCellIndex:
 def _cell_xml(*, coord: str, style: str, write: CellWrite) -> str:
     """按写入形态渲染一格。**恒带回原样式 `s=`**（AC 3.5：样式必须保留）。"""
     style_attr = f' s="{style}"' if style else ""
+    if write.kind is CellWriteKind.blank:
+        # 整格清空：无 `t`、无 `<v>`、无 `<is>`，**只保留样式**（AC 3.5）。
+        # 不能退回 `inline_text` 写空串 —— 那是个「存在且值为空串」的格，extract 反读
+        # 仍算有值 ⇒ 仍产 key（见 CellWriteKind.blank 注释的实测记录）。
+        return f'<c r="{coord}"{style_attr}/>'
     if write.kind is CellWriteKind.inline_text:
         text = _xml_escape("" if write.value is None else str(write.value))
         return (
@@ -1272,7 +1356,7 @@ def assert_footer_anchor_stable(
     sheet_part: str,
     contract: SyncContract,
     runtime_binding: Mapping[str, str],
-    row_shift: RowShiftPlan | None = None,
+    row_shift: RowChangeCarrier | None = None,
     table_key: str | None = None,
     table_name: str | None = None,
     search_from_row: int = 0,
@@ -1397,13 +1481,25 @@ def assert_footer_anchor_stable(
         )
     frozen_row = int(raw_frozen)
     expected = row_shift.shift(frozen_row)
+    if expected is None:
+        # 删行载体：footer 落在被删行上 ⇒ 受管区的 footer 自己被删了，那不是位移问题。
+        raise FooterAnchorDriftError(
+            f"footer 冻结行 {frozen_row} 落在本次声明的被删行集合 "
+            f"{sorted(getattr(row_shift, 'deleted_rows', ()))} 里 —— footer 行不是数据行，"
+            "删到它说明被删行集合越出了受管区（Requirement 7.3）"
+        )
     if observed != expected:
+        deleted_rows = getattr(row_shift, "deleted_rows", None)
+        how = (
+            f"删 {row_shift.count} 行（最上被删行 {min(deleted_rows)}）"
+            if deleted_rows
+            else f"插入点 {row_shift.insert_at}，插 {row_shift.count} 行"
+        )
         raise FooterAnchorDriftError(
             f"footer marker {anchor.marker!r} 实测在第 {observed} 行，"
             f"representation 冻结的 GT_FOOTER_ROW={frozen_row}，"
-            f"本次声明的预期位移 +{expected - frozen_row} 行"
-            f"（插入点 {row_shift.insert_at}，插 {row_shift.count} 行）"
-            f"⇒ 预期落在第 {expected} 行 —— 三者不一致即 footer 有**声明之外**的下移。"
+            f"本次声明的预期位移 {expected - frozen_row:+d} 行（{how}）"
+            f"⇒ 预期落在第 {expected} 行 —— 三者不一致即 footer 有**声明之外**的移动。"
             "写入侧 fail closed：Task 37 的 extract 仍按契约 static_row 反读，"
             "跟着 marker 写会造成「写在新行、反读旧行」的静默错值"
         )
@@ -1473,7 +1569,7 @@ def assert_footer_formula_covers_managed_rows(
     sheet_part: str,
     footer_row: int,
     region: ManagedRegion,
-    row_shift: RowShiftPlan | None = None,
+    row_shift: RowChangeCarrier | None = None,
     carries_total_formula: bool = False,
 ) -> tuple[str, ...]:
     """footer 合计公式的区间必须覆盖当前受管行区间（design §Materialize 第 7 条）。
@@ -1496,6 +1592,10 @@ def assert_footer_formula_covers_managed_rows(
     * `row_shift` 非空时用**位移后**的受管区末行（`region.last_row + count`）求值
       （Requirement 7.4）。合计区间已按 Requirement 4.4 扩张 ⇒ 通过；未扩张 ⇒ 仍报
       :class:`FooterFormulaRangeError`（Requirement 7.5）。
+    * 🔴 **删行载体**（`RowDeletionShift`，spec workpaper-sync-row-deletion-…）：末行由
+      `shift_range_end(region.last_row)` 求出（符号相反，照插行公式算会每次都假红），
+      并**多一条上界**——区间终点仍停在删行前的受管末行 ⇒ A5 没收缩 ⇒ 抛。上界故意只
+      认「恰等于老末行」这一形态，因为「合计区间是受管区超集」在真实模板里存在（H1）。
     * `carries_total_formula` 为真但该 footer 行**一处公式都没有** ⇒ fail closed
       （Requirement 5.4）：契约声明「这一行有合计公式」而模板上没有，说明两者已经对不上，
       此时静默通过会让「扩张分支永远不执行」变成一个看不见的空转 —— 真实误用形态就是
@@ -1514,9 +1614,18 @@ def assert_footer_formula_covers_managed_rows(
     row_match = re.search(_ROW_RE_TPL.format(row=footer_row), xml, re.S)
     # 🔴 位移后的受管区末行由**声明**位移量派生，不从 diff 观测 —— 观测值等于让被检查
     #    对象自己声明自己合法。
-    effective_last_row = (
-        region.last_row + row_shift.count if row_shift is not None else region.last_row
-    )
+    #
+    # 🔴 删行侧符号相反：`region.last_row + count` 会算出**比删行前还大**的末行，
+    #    于是任何合计区间都「漏算」⇒ 每次删行都假红。删行侧用载体自己的区间终点公式
+    #    `shift_range_end`（= `last_row - |{d ≤ last_row}|`，被删行都在区内 ⇒ 恒 `-count`），
+    #    而不是在这里写 `- count`：区间终点的塌陷方向是载体的性质，散在调用点写就会漂。
+    deleting = row_shift is not None and getattr(row_shift, "deleted_rows", None)
+    if row_shift is None:
+        effective_last_row = region.last_row
+    elif deleting:
+        effective_last_row = row_shift.shift_range_end(region.last_row)
+    else:
+        effective_last_row = region.last_row + row_shift.count
     if row_match is None:
         raise FooterFormulaRangeError(
             f"footer 行 {footer_row} 在 sheet XML 里不存在 —— 合计行缺失，无法证明合计覆盖"
@@ -1531,13 +1640,30 @@ def assert_footer_formula_covers_managed_rows(
         checked.append(coord)
         for span in _RANGE_IN_FORMULA_RE.finditer(view.formula_text):
             first, last = int(span.group("r1")), int(span.group("r2"))
-            if first > region.first_row or last >= effective_last_row:
+            if first > region.first_row:
+                continue
+            # 🔴 删行侧独有的**上界**：区间终点原本恰是受管末行、删行后却还停在老末行
+            #    ⇒ A5 一处没收缩。此时合计把**已经上移到那一行的 footer 自己**算了进去
+            #    （design A5 点名的错值）。
+            #
+            #    判据故意收窄到「终点恰等于删行**前**的受管末行」而不是「终点 > 新末行」：
+            #    合计区间是受管区**超集**的形态真实存在（H1 模板 `SUM(I13:I27)` 而受管区
+            #    到 26，已在 `pilot_h1_grouped_dynamic` 里登记）⇒ 宽口径会把它判成假红。
+            if deleting and last == region.last_row and effective_last_row != region.last_row:
+                raise FooterFormulaRangeError(
+                    f"footer 格 {coord} 的公式 {view.formula_text!r} 区间终点仍在第 {last} 行，"
+                    f"而本次声明删了 {row_shift.count} 行、受管末行已上移到第 "
+                    f"{effective_last_row} 行 —— 区间没跟着收缩，合计会把上移到第 {last} 行的"
+                    "footer 自己算进去（A5 未执行或未覆盖到本格）"
+                )
+            if last >= effective_last_row:
                 continue
             raise FooterFormulaRangeError(
                 f"footer 格 {coord} 的公式 {view.formula_text!r} 区间只到第 {last} 行，"
                 f"而受管行区间已到第 {effective_last_row} 行"
                 + (
-                    f"（含本次声明的 +{row_shift.count} 行插入）"
+                    f"（含本次声明的 {'-' if deleting else '+'}{row_shift.count} 行"
+                    f"{'删除' if deleting else '插入'}）"
                     if row_shift is not None
                     else ""
                 )
@@ -1679,6 +1805,54 @@ def plan_managed_writes(
 
     wanted = tuple(projection.row_keys.get(dynamic_table.table_key, ()))
     orphan = [identity for identity in wanted if identity not in row_of_identity]
+
+    # ── 6.2b 受管行收敛：substrate 有物理行、而 store 已不认领的行 ──────────
+    #
+    # ═══ 为什么必须有这一步（spec workpaper-sync-managed-row-convergence）═══
+    #
+    # 6.2 的 `orphan` 只有**一个方向**：store 声明了、substrate 没物理行 ⇒ 插行。
+    # 反方向（substrate 有物理行、store 已不声明）此前**无人处理** ⇒ 那些行永久留在
+    # substrate，被 extract 反读出来，而 intended 里没有它们 ⇒ roundtrip 判 `extra` ⇒
+    # `roundtrip_projection_mismatch` 恒 500，且孤儿只增不减（D4-2 实测累积出同一份业务
+    # 数据的 **3 个副本**）。这就是「materialize 只插不删」的病根所在。
+    #
+    # ═══ 判据：与 overlay 严格对偶（不是新协议）═══
+    #
+    # `overlay_store_on_baseline_projection` 在**读**方向的规则是：
+    #   store 声明了该 table → store 的行集为权威（丢弃 baseline 旧行）；
+    #   store 没声明该 table → 保留 baseline 原样。
+    # 本步是它在**写**方向的同一条规则：
+    #   store 声明了该 table → 收敛 substrate 上 store 未列出的受管行；
+    #   store 没声明该 table → **一律不碰**。
+    # 两侧同规则才自洽（读方向丢掉的，写方向真的清掉）；而「没声明就不碰」保证本步永远
+    # 是「少做」而非「多做」 —— 判据收窄的最坏后果是不收敛（回到 500），不会误删。
+    #
+    # 🔴 `table_key not in projection.row_keys` 与 `row_keys[table_key] == ()` 必须可分辨：
+    #    前者是「store 没声明这张表」（不碰），后者是「store 声明了且为空」（该清空整表）。
+    #    用 `in` 判断而不是 `get(...)` 取空值，正是为了不把两者混成一个。
+    # 🔴 **模板预置骨架行不是 stale**（实测回归教训，Property 23/66）：
+    #    instrumentation 为模板的每个受管行预生成 `GTROW-{template}-{row:04d}` 身份
+    #    （`excel_instrumentation.row_uuid()`），它与运行期 mint 的 `GTROW-MINTED-` 前缀
+    #    **刻意不同域**，正是为了「运行期新分配」与「模板预生成」可分辨
+    #    （`excel_extract.MINTED_ROW_IDENTITY_PREFIX` 的 docstring）。
+    #    这些骨架行「不在 store 的 row_keys 里」是**常态** —— store 只声明有业务数据的行，
+    #    不代表用户删了行。首版判据漏了这个区分，把 `GTROW-D41MAIN-0009` 等骨架行判成
+    #    stale 删掉 ⇒ `IdentityRetentionError: OO 往返后丢失 3 个 row identity`
+    #    （test_d4_1_materialize_extract_realchain 4 红）。
+    #
+    #    判据 `contracts.is_template_skeleton_identity` 与 instrumentation 的生成规则同源，
+    #    且与 roundtrip 豁免（`content_mutation._assert_roundtrip_equivalent`）**共用同一个**
+    #    真源 —— 两处各写一份正则就是第二真源（症状分别是「误删模板行」与「误报 extra」，
+    #    相距很远，漂移时极难归因）。
+    stale_rows: dict[int, str] = {}
+    if dynamic_table.table_key in projection.row_keys:
+        wanted_set = set(wanted)
+        stale_rows = {
+            row: identity
+            for row, identity in sorted(physical.items())
+            if identity not in wanted_set
+            and not is_template_skeleton_identity(identity)
+        }
 
     row_shift: RowShiftPlan | None = None
     total_formula_rows: tuple[int, ...] = ()
@@ -1900,6 +2074,139 @@ def plan_managed_writes(
             )
         )
 
+    # ── 6.8b 收敛动作：清空 stale 行的 editable 业务格（**不删物理行**）────────
+    #
+    # 🔴 清空必须保留**身份载体列**与**公式格**：
+    #    清身份列 ⇒ 反读时该行 uuid 为空 ⇒ `_scan_row_identities` 按 tombstone 策略
+    #    重新 mint 一个新身份 ⇒ 新身份不在 intended ⇒ 又一轮 `extra`（实测踩过）；
+    #    清公式格 ⇒ 毁模板公式，且公式字段本就被 roundtrip 的 `PROTECTED_MODES` 豁免，
+    #    不构成 extra，没有清它的必要。
+    #
+    # 另一条同源约束（实测于 D4-31）：该 entry 的受管区**就是一行**
+    # （`table_ref='A5:K5'`）。任何把受管区行数减到 0 的动作都会让下一次 `extract` 抛
+    # `IdentityCarrierMissingError`（「Table ref 覆盖的行区间内一个 row identity 都没
+    # 反读到」，Requirement 6.15/6.20 的 fail-closed）—— 清空方案天然不触碰行数，
+    # 这条边界自动满足。
+    stale_cleared: tuple[int, ...] = ()
+    stale_deleted: tuple[int, ...] = ()
+    stale_clear_reason = ""
+    row_deletion: Any | None = None
+    deletion_change: Any | None = None
+
+    # ═══ 6.8b 分流判定树（spec workpaper-sync-row-deletion-multi-region-propagation
+    #     design § 删与插共存 4.2）═══
+    #
+    #     stale_rows 非空？
+    #     ├─ 否 → 两个分支都空（现状）
+    #     └─ 是 → 删后受管区剩余有身份数据行 <= 0 ？
+    #             ├─ 是 → stale_cleared（容量归零；保住 IdentityCarrierMissingError 的结构前提）
+    #             └─ 否 → 契约 row_convergence == delete ？
+    #                     ├─ 否 → stale_cleared（**默认**，逐字节零回归）
+    #                     └─ 是 → orphan 非空（删与插共存）？
+    #                             ├─ 是 → stale_cleared ＋ 可观测降级原因
+    #                             └─ 否 → stale_deleted（真正走删行）
+    #
+    # 🔴 顺序不可换：容量归零必须在契约门控**之前**判。反过来的话，一张已开启 delete 的
+    #    表在「store 把整表清空」时会真的把受管区删空 ⇒ 下一次 extract 抛
+    #    `IdentityCarrierMissingError`（Table ref 覆盖区间内一个 row identity 都没有）。
+    #    那是个只在「全删」这一种输入上出现的 500，极难复现。
+    #
+    # 🔴 **不**在删行前口径重算 `insert_at`（Requirement 9.3）：共存时直接降级，
+    #    不去把插入点往下挪。挪的那条路要求「删后重算插入点」，是独立能力，
+    #    在这里凑会得到一个没有判据覆盖的行号。
+    remaining_after_delete = len(physical) - len(stale_rows)
+    if stale_rows:
+        if remaining_after_delete <= 0:
+            stale_clear_reason = (
+                f"capacity_would_reach_zero: 受管区现有 {len(physical)} 个有身份物理行，"
+                f"本次 stale {len(stale_rows)} 行 ⇒ 删完剩 {remaining_after_delete} 行，"
+                "Table ref 覆盖区间内会一个 row identity 都不剩"
+            )
+        elif not dynamic_table.deletes_physical_rows:
+            # 默认路径：契约没开启删行。**不写 reason** —— 这不是「降级」而是常态，
+            # 写了反而让真正的降级在日志里淹没（Requirement 9.2 要的是降级可观测）。
+            pass
+        elif orphan:
+            stale_clear_reason = (
+                f"delete_with_insert_coexist: 本次同时有 {len(stale_rows)} 个 stale 行与 "
+                f"{len(orphan)} 个 orphan 身份。插入点按删行**前**行号算，先插后删会被重编号、"
+                "先删后插则插入点也要下移 ⇒ 共存下删行不安全，本次降级为清空"
+                "（Requirement 9.1 / 9.2）"
+            )
+        else:
+            row_deletion, deletion_change, stale_deleted = _plan_row_deletion(
+                stale_rows=stale_rows,
+                contract=contract,
+                region=region,
+                substrate_entries=substrate_entries,
+            )
+            # 🔴 删行侧**同样**需要这两个值，且不能沿用插行分支的（那一支此时必然没跑过，
+            #    因为共存已在上面降级掉了 ⇒ 两者仍是初值 `()` / `""`）：
+            #    * `total_formula_rows` —— A5 的合计区间收缩门控（Requirement 5.5：未声明
+            #      即不改那条公式），不设的话「删受管末行」时合计区间不收缩，
+            #      而 A7 的上界判据会在写盘前把它拦成 `FooterFormulaRangeError`；
+            #    * `table_part` —— `_shrink_managed_table_ref` 的目标；不设则本表 ref
+            #      不收缩，apply 期抛 `[convergence_table_ref_not_shrunk]`。
+            #    两条都是 fail-closed（不会产出坏字节），但症状离真因很远，故在此显式接上。
+            total_formula_rows, table_part = _resolve_total_rows_and_table_part(
+                contract=contract,
+                region=region,
+                substrate_entries=substrate_entries,
+                runtime_binding=runtime_binding,
+                reject=lambda code, detail: RowSetDivergenceError(
+                    f"[{code}] 本次要删的受管行 {list(stale_deleted[:3])}"
+                    f"（共 {len(stale_deleted)} 行）不可安全执行：{detail}"
+                ),
+            )
+
+    if stale_rows and not stale_deleted:
+        # ═══ 为什么统一走「清空」而不删物理行（G2 裁决，实测驱动）═══
+        #
+        # 删物理行会牵动**一整套行号位移联动**，插行路径为此积累了专门处理：
+        #   * `_shift_sibling_table_refs` —— 同 sheet 兄弟 Table 的 ref 位移
+        #     （D4-1 是 main R8~R22 / other R25~R36 双区，删 main 区一行就动 other 区）
+        #   * footer anchor 与 `GT_FOOTER_ROW` 重冻结、合计公式区间扩张
+        #   * `_apply_workbook_propagation` —— definedName 与**引用侧 sheet** 的跨表公式行号
+        # 删行要**全部对称实现**才安全。实测代价：只补了自己的 Table ref 收缩（未补兄弟 ref）
+        # 就导致 other 区出现 uuid 空行 ⇒ 反读时 `_scan_row_identities` 按 tombstone 策略
+        # 给它**重新 mint** `GTROW-MINTED-*` ⇒ 新身份不在 intended ⇒ 又一轮 `extra`。
+        #
+        # 而「清空业务格」**不动行号** ⇒ 一次性消除整类位移副作用（兄弟 ref / footer /
+        # definedName / 跨 sheet 公式全都不受影响），且足以达成目的：实测 substrate 上
+        # 「有身份但业务格全空」的 130 行中，**0 行**进 extracted ⇒ 清空即消除 extra。
+        #
+        # 代价（已知并接受）：substrate 留下空行，行数不精确跟随 store。这不影响正确性 ——
+        # 行数不够时 6.2 的动态插行会补（`_plan_row_shift` 生产在用），空行也会被复用。
+        #
+        # 🔴 `stale_deleted` 与 apply 期的删行执行**保留但不启用**（`shrink_sheet_rows` /
+        #    `_shrink_managed_table_ref` 仍在），留给后续独立 spec 补齐多区位移联动后再开。
+        for row in sorted(stale_rows):
+            for spec in dynamic_table.fields:
+                if spec.cell is None or spec.cell.row_from != "row_identity":
+                    continue
+                if spec.mode in PROTECTED_MODES:
+                    continue  # 公式/auto_source：保留（且本就被 roundtrip 豁免）
+                column = _resolve_column(
+                    spec, table=dynamic_table, region=region, binding=binding
+                )
+                writes.append(
+                    CellWrite(
+                        coord=f"{column}{row}",
+                        # 🔴 必须是 `blank`（整格清空），**不是** `_write_kind_for(spec)` +
+                        #    空串。后者对 text 字段渲染成 `<is><t xml:space="preserve"></t>
+                        #    </is>` —— 一个「存在且值为空串」的格，extract 反读仍算有值 ⇒
+                        #    仍产 key ⇒ extra 消不掉。实测：收敛 D4-1 R22 后 6 个 amount
+                        #    字段的 extra 消失（`<v></v>` 恰好被读回 None）而 text 的
+                        #    `label` 一个不少，500 就卡在这一个字段上。
+                        kind=CellWriteKind.blank,
+                        value=None,
+                        stable_field_key=None,
+                        row_key=stale_rows[row],
+                        mode=spec.mode,
+                    )
+                )
+        stale_cleared = tuple(sorted(stale_rows))
+
     # ── 6.9 工作簿级传播声明（spec excel-workbook-wide-row-change-propagation）──
     #
     # 🔴 排在这里（计划期最后、写盘之前）而不是 apply 期：声明必须**先于**任何字节写入
@@ -1920,7 +2227,7 @@ def plan_managed_writes(
             region_last_row=region.last_row,
         )
 
-    return MaterializePlan(
+    _plan = MaterializePlan(
         sheet_part=region.sheet_part,
         sheet_name=region.sheet_name,
         writes=tuple(writes),
@@ -1933,7 +2240,151 @@ def plan_managed_writes(
         workbook_row_change=workbook_row_change,
         managed_sheet_key=_sheet_key_for_table(contract, binding.table_key),
         managed_table_name=binding.table_name,
+        stale_deleted=stale_deleted,
+        stale_cleared=stale_cleared,
+        stale_clear_reason=stale_clear_reason,
+        row_deletion=row_deletion,
+        deletion_change=deletion_change,
     )
+    # ── 降级原因必须有**外部**消费方（复盘补，Requirement 9.2 / 9.6）────────────
+    #
+    # 🔴 复盘现算：`stale_clear_reason` 全仓 6 处引用**全在本模块自己**
+    #    （字段定义 / as_dict / 三处赋值 / 一处传参）⇒ 生产**零外部消费方**。
+    #    这个字段的存在理由恰恰是「降级必须可观测」（见字段 docstring），而
+    #    「只写进一个没人读的 dataclass 字段」与不写没有区别 —— 用户看到的是
+    #    「行删不掉但没人说为什么」，排查要从 materialize 计划期倒推。
+    #
+    # 这里发一条 WARNING 就是那个外部消费方：ops 能在日志里直接看到降级发生。
+    # 刻意**不**加字段到 `MaterializeResult` / `ContentCommitReceipt` ——
+    # 那两个是跨 adapter 的域契约，为一条可观测信息扩契约不划算（构造点与
+    # 测试替身都要跟着改），而可观测性用日志是本包既有约定（14 处 getLogger）。
+    if stale_clear_reason:
+        logger.warning(
+            "受管行收敛降级为「只清值」：table=%s sheet=%s stale=%d 行 原因=%s",
+            binding.table_key,
+            _sheet_key_for_table(contract, binding.table_key),
+            len(stale_cleared),
+            stale_clear_reason,
+        )
+    return _plan
+
+
+def _resolve_total_rows_and_table_part(
+    *,
+    contract: SyncContract,
+    region: ManagedRegion,
+    substrate_entries: Mapping[str, bytes],
+    runtime_binding: Mapping[str, str],
+    reject: Any,
+) -> tuple[tuple[int, ...], str]:
+    """本区的「携带合计公式的行」与受管 Table 的 part —— **插行与删行共用**。
+
+    spec: workpaper-sync-row-deletion-multi-region-propagation（Task 17.1）
+
+    🔴 抽出来是因为删行侧也需要这两个值（`total_formula_rows` 给 A5 的合计收缩门控、
+    `table_part` 给 `_shrink_managed_table_ref`），而它们的推导有两处**极易写错**的细节，
+    各在插行侧踩过一次：
+
+    * anchor 与冻结 footer 行号都必须绑定**本次的那张表**（`region.table_key` /
+      `region.table_name`），不得取「跨全部 sheet 的第一张 footer 表」——
+      combined 契约里那恒是 primary sheet，于是给 sibling 区算出来的是 primary 的行号；
+    * 取的是**冻结声明**而不是现场搜 marker：从 substrate 观测的行号会把
+      「footer 已经被人挪过」当成合法。
+
+    抄第二份的症状是「删行侧合计不收缩 / Table ref 不收缩」，而那两条各自的 fail-closed
+    会在很远的地方报出来。
+
+    `reject` 由调用方传入，使两侧各自保留自己的 `error_code` 前缀与上下文文案
+    （插行侧的消息里带 orphan 清单，删行侧带被删行清单）。
+    """
+    region_sheet_key = _sheet_key_for_table(contract, region.table_key)
+    anchor = next(
+        (
+            table.footer_anchor
+            for sheet in contract.sheets
+            for table in sheet.tables
+            if table.table_key == region.table_key and table.footer_anchor is not None
+        ),
+        None,
+    )
+    total_formula_rows: tuple[int, ...] = ()
+    if anchor is not None and anchor.carries_total_formula:
+        frozen = _resolve_frozen_footer_row(
+            runtime_binding,
+            sheet_key=region_sheet_key,
+            table_name=region.table_name,
+        )
+        raw = str(frozen or "").strip()
+        if not raw.isdigit():
+            raise reject(
+                "excel_row_shift_plan_range_invalid",
+                "契约声明 footer 携带合计公式，但 runtime binding 的 "
+                f"GT_FOOTER_ROW（sheet_key={region_sheet_key!r}）={raw!r} 不是行号 —— "
+                "无从确定该扩张哪一行的区间",
+            )
+        total_formula_rows = (int(raw),)
+
+    table_part = _managed_table_part(substrate_entries, table_name=region.table_name)
+    if not table_part:
+        raise reject(
+            "excel_row_shift_table_part_missing",
+            f"受管 Excel Table {region.table_name!r} 的 part 在 zip 里定位不到"
+            f"（实测 {sorted(n for n in substrate_entries if n.startswith('xl/tables/'))}）—— "
+            "插行后 Table ref 无从增长，新行会落在受管区域之外并被静默丢弃",
+        )
+    return total_formula_rows, table_part
+
+
+def _plan_row_deletion(
+    *,
+    stale_rows: Mapping[int, str],
+    contract: SyncContract,
+    region: ManagedRegion,
+    substrate_entries: Mapping[str, bytes],
+) -> tuple[Any, Any, tuple[int, ...]]:
+    """产出删行的**两份声明**（Requirement 1.11 / Property 4）。
+
+    spec: workpaper-sync-row-deletion-multi-region-propagation（Task 17.1）
+
+    🔴 两份声明必须**同时**产出，缺一不可：
+    * `row_deletion`（`RowDeletionShift`）—— 行号位移载体，A1/A2/A5/A6/A7 都消费它；
+    * `deletion_change`（`RowDeletionChangeSet`）—— 工作簿级引用的逐条改写声明（A3/A4）。
+
+    只有前者 ⇒ definedName 与跨 sheet 公式不会被改写，产物里它们仍指向旧行号
+    （多指一行或少指一行，取决于删的位置）；只有后者 ⇒ 物理行根本没删。
+    apply 期对「少一份」有纵深防御断言，这里是正源。
+
+    `deletion_change` 允许为 `None`：整本工作簿对本表**一处引用都没有**是合法形态
+    （门面在返回 `None` 之前已把三道 fail-closed 跑完）。
+    """
+    deleted = tuple(sorted(stale_rows))
+
+    def _reject(code: str, detail: str) -> RowSetDivergenceError:
+        return RowSetDivergenceError(
+            f"[{code}] 本次要删的受管行 {list(deleted[:3])}（共 {len(deleted)} 行）"
+            f"不可安全执行：{detail}"
+        )
+
+    row_deletion = RowDeletionShift(
+        deleted_rows=deleted,
+        region_first_row=region.first_row,
+        region_last_row=region.last_row,
+    )
+    deletion_change = plan_workbook_row_change_for_delete(
+        substrate_entries,
+        managed_sheet_name=region.sheet_name,
+        managed_sheet_part=region.sheet_part,
+        deleted_rows=deleted,
+        region_first_row=region.first_row,
+        region_last_row=region.last_row,
+        # 🔴 留痕键取**行身份**（Requirement 1.9 / Property 6）：被删行必须能被审计追回，
+        #    而 `stale_rows` 的值就是该行在 substrate 上的 row identity。
+        row_uuids=dict(stale_rows),
+    )
+    # `_reject` 目前只被下面这条前提用到；保留它是为了让后续新增的拒绝理由有统一文案。
+    if not deleted:
+        raise _reject("convergence_delete_empty", "被删行集合为空")
+    return row_deletion, deletion_change, deleted
 
 
 def _plan_static_writes(
@@ -2189,44 +2640,13 @@ def _plan_row_shift(
     #    真实 D4-29 编辑触发（sheet_key=d4-29-managed），combined projection 里 D4-22/D4-23
     #    各有 12 个 orphan 行要插，此路径每次必炸。修复 = 用 `region.table_key` 定位本表的
     #    footer_anchor + 用 `_resolve_frozen_footer_row(sheet_key=...)` 取本表冻结行号。
-    region_sheet_key = _sheet_key_for_table(contract, region.table_key)
-    region_table_name = region.table_name
-    anchor = next(
-        (
-            table.footer_anchor
-            for sheet in contract.sheets
-            for table in sheet.tables
-            if table.table_key == region.table_key and table.footer_anchor is not None
-        ),
-        None,
+    total_formula_rows, table_part = _resolve_total_rows_and_table_part(
+        contract=contract,
+        region=region,
+        substrate_entries=substrate_entries,
+        runtime_binding=runtime_binding,
+        reject=_reject,
     )
-    total_formula_rows: tuple[int, ...] = ()
-    if anchor is not None and anchor.carries_total_formula:
-        frozen = _resolve_frozen_footer_row(
-            runtime_binding,
-            sheet_key=region_sheet_key,
-            table_name=region_table_name,
-        )
-        raw = str(frozen or "").strip()
-        if not raw.isdigit():
-            raise _reject(
-                "excel_row_shift_plan_range_invalid",
-                "契约声明 footer 携带合计公式，但 runtime binding 的 "
-                f"GT_FOOTER_ROW（sheet_key={region_sheet_key!r}）={raw!r} 不是行号 —— "
-                "无从确定该扩张哪一行的区间",
-            )
-        # 🔴 取**冻结声明**而不是现场搜 marker：扩张的目标行必须是声明值，
-        #    从 substrate 观测出来的行号会把「footer 已被人挪过」当成合法。
-        total_formula_rows = (int(raw),)
-
-    table_part = _managed_table_part(substrate_entries, table_name=region.table_name)
-    if not table_part:
-        raise _reject(
-            "excel_row_shift_table_part_missing",
-            f"受管 Excel Table {region.table_name!r} 的 part 在 zip 里定位不到"
-            f"（实测 {sorted(n for n in substrate_entries if n.startswith('xl/tables/'))}）—— "
-            "插行后 Table ref 无从增长，新行会落在受管区域之外并被静默丢弃",
-        )
 
     # 🔴 **干跑**一次纯函数位移来验证可安全执行。产物丢弃 —— 真正的位移在
     #    `apply_plan_zip` 里发生（Property 9：计划期失败 ⇒ 零产物）。
@@ -2339,6 +2759,83 @@ def apply_plan_zip_with_report(
         )
     xml = entries[plan.sheet_part].decode("utf-8")
 
+    # ── 阶段 0：受管行收敛的**删行**分支（spec workpaper-sync-managed-row-convergence）──
+    #
+    # 🔴 排在位移（阶段 1）**之前**，理由与「位移先于写格」同型：`plan.row_shift` 的
+    #    `insert_at` 是按 `plan_managed_writes` 看到的**删行前**行号算的吗？不是 ——
+    #    计划期的 `physical` / `row_of_identity` 都取自未删的 substrate，而 6.8b 只登记
+    #    `stale_deleted`（行号也是删行前口径）。两者叠加时若先插后删，插入点会被删行
+    #    重新编号 ⇒ 静默错位。先删后插则：删行按降序逐个执行（高行号先删，低行号不受
+    #    影响），删完再按位移计划插 —— 但**插入点也需要按已删行数下移**。
+    #
+    #    ⚠ 因此本版**只支持「删行」与「插行」互斥出现**：两者同时非空时 fail-closed，
+    #    不静默算一个可能错位的插入点。实测 D4 的收敛场景里 stale 与 orphan 不共存
+    #    （store 要么在收缩要么在扩张），互斥假设成立；将来真遇到共存再按「删后重算
+    #    insert_at」实现，那需要一条独立判据而不是在这里凑。
+    if plan.stale_deleted and plan.row_shift is not None:
+        raise RowSetDivergenceError(
+            f"[convergence_delete_with_insert_unsupported] 本次计划同时要求删 "
+            f"{len(plan.stale_deleted)} 行（{list(plan.stale_deleted[:3])}）与插 "
+            f"{plan.row_shift.count} 行 —— 两者叠加会让插入点按删行前的行号算而错位；"
+            "当前实现拒绝这种组合（不静默凑一个可能错位的 insert_at）"
+        )
+    if plan.stale_deleted:
+        # ── 纵深防御：删行计划必须**同时**携带两份声明（Requirement 1.11）────────
+        #
+        # 🔴 计划期（6.8b）保证两者与 `stale_deleted` 同时产出；走到这里少一份说明计划期
+        #    与 apply 口径漂移了。不抛的后果是「删了物理行但没做位移联动」——
+        #    正是 G2 实测那条症状链（兄弟区空 UUID → 重新 mint → extra → 500）。
+        if plan.row_deletion is None:
+            raise RowSetDivergenceError(
+                f"[convergence_delete_without_shift_carrier] 计划要删 "
+                f"{len(plan.stale_deleted)} 行（{list(plan.stale_deleted[:3])}）却没有"
+                "位移载体 `row_deletion` —— 多区位移联动无从执行，不得只删行不联动"
+            )
+        declared = tuple(plan.row_deletion.deleted_rows)
+        if declared != tuple(sorted(plan.stale_deleted)):
+            raise RowSetDivergenceError(
+                f"[convergence_delete_carrier_mismatch] 位移载体声明删 {list(declared)}，"
+                f"而计划的 stale_deleted 是 {sorted(plan.stale_deleted)} —— "
+                "两份口径不一致时任何一侧的位移算术都会错，不得取其一"
+            )
+        # 按**降序**逐行删：先删高行号，低行号不受影响 ⇒ 无需在循环里重算行号。
+        # （`shrink_sheet_rows` 每次删一个连续段；这里按单行降序调用是最保守的形态 ——
+        #   连续段合并只是少几次调用，不改变结果，不值得为它引入区间合并的出错面。）
+        for row in sorted(plan.stale_deleted, reverse=True):
+            xml, _ = shrink_sheet_rows(xml, delete_at=row, count=1)
+        # ── A5：受管 sheet **自己**的裸引用平移（含合计区间收缩）───────────
+        #
+        # 🔴 排在 `shrink_sheet_rows` 之后、Table ref 收缩之前：坐标属性已是删行后口径
+        #    （本函数内部按 `unshift` 归一化回删行前再与契约行号比较），而公式文本此刻
+        #    还是原样 —— 两相正交，但顺序固定下来便于判据锚定。
+        xml, _bare_changed = _shift_managed_sheet_bare_refs(xml, plan=plan)
+        # ── A8：受管 sheet 上**携带行号的结构块**平移（mergeCell / sqref / brk / …）──
+        #
+        # 🔴 spec 七条欠账之外的第八条，但 Requirement 6.2（`managed_sheet_structure`
+        #    等价）要求它。不做的产物后果是合并单元格与数据验证**继续指向旧行**：
+        #    用户看到「合并块错位一行」「下拉框落在错误的行上」。
+        xml, _struct_changed = _shift_managed_sheet_structures(xml, plan=plan)
+        # ── A1：Table ref 对称**收缩**（本表 + 同 sheet 兄弟表）─────────────
+        # 不缩的话 ref 仍覆盖已删掉的行区间，反读时 `resolve_managed_region` 按旧区间
+        # 找身份 ⇒ 尾部出现「空 UUID 行」，与 `IdentityCarrierMissingError` 同源。
+        # 兄弟表的收缩在 `_shrink_managed_table_ref` 末尾对称调用（G2 症状链第一环）。
+        entries = _shrink_managed_table_ref(
+            entries, plan=plan, removed=len(plan.stale_deleted)
+        )
+        # ── A3/A4：引用侧 sheet 与 definedNames 的工作簿级传播（按声明逐条改）──
+        #
+        # 🔴 顺序与插行侧同理：排在写格**之前**，写格产生的新字节不进传播的输入，
+        #    于是声明与实测的对账口径仍是「计划期冻结的那份」。
+        entries = _apply_workbook_propagation(entries, plan=plan)
+        # ── A2：隐藏 `_GT_SYNC` 的 runtime binding 重冻结（删行侧）───────────
+        #
+        # 🔴 不做的后果是**时间错位**的故障：这一次删行成功、**下一次** materialize 在
+        #    计划期撞 `FooterAnchorDriftError`（可见侧 marker = 冻结值 − 删行数，而
+        #    计划期要求两者严格相等）。与插行侧同相位（Table ref 已收缩、footer 已上移）。
+        entries = _refresh_gt_sync_runtime_binding(
+            entries, plan=plan, source_bytes=source_bytes
+        )
+
     report: ShiftReport | None = None
     if plan.row_shift is not None:
         # 阶段 1：位移 + 合计扩张（纯函数，同输入恒得同输出）
@@ -2372,6 +2869,337 @@ def apply_plan_zip_with_report(
     return _write_entries(entries), report
 
 
+def remap_bare_a1_for_deletion(text: str, *, shift: Any, what: str) -> str:
+    """把一段文本里的**裸** A1 行号按删行载体改写（端点方向感知）。
+
+    spec: workpaper-sync-row-deletion-multi-region-propagation（A5 / A8 共用）
+
+    ═══ 为什么不是直接 `remap_a1_rows(text, remap=shift.shift)` ═══
+
+    区间**起点与终点塌陷方向相反**（见 `RowDeletionShift.shift_range_end` 的推导），
+    而 `_rewrite_formula_refs` 对一段文本只收一个 `remap`。所以本函数：
+
+    1. 用 `classify_bare_row_roles`（走 `remap_a1_rows` 的记录型 remap，与执行口径恒等）
+       分出这段文本里哪些裸行号是区间起点、哪些是终点；
+    2. 基础 `remap` 用**起点**口径（`shift_range_start`）；
+    3. 对**落在被删行上的区间终点**再用 `extend_end_at`/`extend_by` 做一次精确修正
+       （修正量恒为 `-1`，因为 `|{d<=t}| - |{d<t}| == 1` 当 `t ∈ D`）。
+
+    🔴 三种分不清角色的形态一律 **fail-closed**（不得挑一个静默改写）：
+    角色未知 / 同时是起点与终点 / 一段文本里有 ≥2 个被删的终点
+    （`extend_end_at` 一次只接受一个）。
+
+    Args:
+        what: 出错时点名用（坐标或 `tag@attr`），让归因不必翻代码。
+    """
+    from app.services.workpaper_sync.excel_row_shift import _rewrite_formula_refs
+    from app.services.workpaper_sync.excel_workbook_row_change import (
+        classify_bare_row_roles,
+    )
+
+    if not text.strip():
+        return text
+    deleted = set(shift.deleted_rows)
+    rows, heads, tails = classify_bare_row_roles(text)
+    at_risk = rows & deleted
+    override_at: int | None = None
+    if at_risk:
+        unclassified = at_risk - heads - tails
+        if unclassified:
+            # 🔴 归因要准：`classify_bare_row_roles` 对**区间**恒同时产出起点与终点，
+            #    所以「既不是起点也不是终点」⇔ 它是个**裸单格**引用。单格引用指向被删行
+            #    就是悬空（Excel 里是 `#REF!`），不是「角色分不清」。
+            #    首版把这一类报成 role_unknown，实测在 D3-4 上打出来（`B16` 的
+            #    `B11-B13-B14-B15-B16` 删 r=15）—— 看着像分类器不够聪明，其实是那一行
+            #    **本来就不该删**。正确的拦点在计划期 `find_bare_dangling_rows`；
+            #    走到这里说明调用方绕过了门面，所以这条错误要把拦点名字说出来。
+            raise RowSetDivergenceError(
+                f"[convergence_bare_ref_dangling_single_cell] {what} 的 {text!r} 里裸"
+                f"**单格**引用 {sorted(unclassified)} 指向被删行 ⇒ 删完即 #REF!。"
+                "这一行不可删；计划期的 `find_bare_dangling_rows` 就是拦它的 —— "
+                "走到 apply 说明绕过了 `plan_workbook_row_change_for_delete` 门面"
+            )
+        ambiguous = at_risk & heads & tails
+        if ambiguous:
+            raise RowSetDivergenceError(
+                f"[convergence_bare_ref_role_ambiguous] {what} 的 {text!r} 里裸行号 "
+                f"{sorted(ambiguous)} 同时是某区间的起点与另一区间的终点 —— "
+                "一个 remap 表达不了两个方向，不得挑一个"
+            )
+        deleted_tails = sorted(at_risk & tails)
+        if len(deleted_tails) > 1:
+            raise RowSetDivergenceError(
+                f"[convergence_bare_ref_multi_tail] {what} 的 {text!r} 有 "
+                f"{len(deleted_tails)} 个落在被删行上的区间终点 {deleted_tails} —— "
+                "改写器一次只接受一个终点修正，不得只修其中一个"
+                "（另一个会静默多覆盖一行）"
+            )
+        if deleted_tails:
+            override_at = deleted_tails[0]
+    if override_at is None:
+        new_text, _hits = _rewrite_formula_refs(text, remap=shift.shift_range_start)
+        return new_text
+    new_text, _hits = _rewrite_formula_refs(
+        text,
+        remap=shift.shift_range_start,
+        extend_end_at=override_at,
+        # 终点方向修正：两个公式在被删行上恰差 1。
+        extend_by=shift.shift_range_end(override_at) - override_at,
+    )
+    return new_text
+
+
+STRUCTURE_ATTRS_OWNED_BY_SHRINK: Final[frozenset[tuple[str, str]]] = frozenset(
+    {("dimension", "ref")}
+)
+"""A8 **必须跳过**的 `(tag, attr)` —— 它们的属主是 `shrink_sheet_rows`，不是 A8。
+
+spec: workpaper-sync-row-deletion-multi-region-propagation（design 勘误节 E.7）
+
+🔴 实测踩过：`dimension@ref` 同时出现在
+:data:`excel_row_shift.STRUCTURE_ROW_BEARING_ATTRS`（因为它确实携带行号，verifier 要
+归一化它）**和** `shrink_sheet_rows` 的改写范围里。A8 照着派生表无脑遍历 ⇒ 同一个属性
+被**收缩两次**：D1-8 `A1:AD38` 先被 `shrink_sheet_rows` 改成 `A1:AD37`（正确），再被
+A8 改成 `A1:AD36`（错），verify 侧 `unshift` 只能还原一次 ⇒ `managed_sheet_structure`
+判漂移，而真实后果是 `<dimension>` 比实际行数少一行。
+
+所以「派生表是单一真源」这句话要补一个限定：它是**「哪些属性携带行号」**的单一真源，
+不是**「谁负责改它」**的。后者需要本表显式登记。
+判据：`test_row_deletion_verify_normalisation.py::TestStructureAttrOwnership`
+（正向证明 `shrink_sheet_rows` 真的改它 + 反向证明 A8 真的不碰它）。
+"""
+
+
+def _shift_managed_sheet_structures(xml: str, *, plan: MaterializePlan) -> tuple[str, int]:
+    """A8：受管 sheet 上**携带行号的结构块**随删行平移。
+
+    spec: workpaper-sync-row-deletion-multi-region-propagation（design 勘误节 E.7）
+
+    ═══ 🔴 这是 spec 七条欠账之外的**第八条**，但 Requirement 6.2 要求它 ═══
+
+    `shrink_sheet_rows` 只改 `<row r=>` / `<c r=>` / `<dimension>`；插行侧的
+    `shift_sheet_rows` 另有阶段 C/D 处理 `mergeCell@ref` / `dataValidation@sqref` /
+    `conditionalFormatting@sqref` / `hyperlink@ref` / `autoFilter@ref` / `brk@id` /
+    `formula1|formula2|sqref` 文本 —— 删行侧**一个都没有**。
+
+    实测（D1-8，删 r=16 或 r=21）：`mergeCells` 的 `N24:N25` 与 `dataValidations` 的
+    `sqref="A14:A21 A26:A33"` 逐字未变 ⇒ `verify_unmanaged_regions` 的
+    `managed_sheet_structure` 当场判漂移（Requirement 6.2 过不去）。
+    产物侧的真实后果是合并单元格与数据验证**继续指向旧行**：
+    用户看到的是「合并块错位一行」「下拉框落在错误的行上」。
+
+    ═══ 单一真源 ═══
+
+    「哪些 tag 的哪个属性/文本携带行号」不在本模块手写第二份 —— 用
+    `excel_row_shift` 从 :data:`ROW_BEARING_STRUCTURES` **派生**的三张表
+    （`STRUCTURE_ROW_BEARING_ATTRS` / `STRUCTURE_BARE_ROW_ATTRS` /
+    `STRUCTURE_ROW_BEARING_TEXT_TAGS`），**与 verifier 的归一化用的是同一批表**。
+    加新结构时只要清单里加一项，两侧同时生效。
+
+    🔴 但派生表只是**「哪些属性携带行号」**的真源，不是**「谁负责改它」**的 ——
+    属主另有一方的项登记在 :data:`STRUCTURE_ATTRS_OWNED_BY_SHRINK`，本函数跳过它们，
+    否则同一属性被收缩两次（实测 `dimension@ref` 正是如此）。
+
+    Returns:
+        `(新 XML, 改动处数)`
+    """
+    from app.services.workpaper_sync.excel_row_shift import (
+        STRUCTURE_BARE_ROW_ATTRS,
+        STRUCTURE_ROW_BEARING_ATTRS,
+        STRUCTURE_ROW_BEARING_TEXT_TAGS,
+    )
+
+    shift = plan.row_deletion
+    assert shift is not None, "调用方保证"
+    changed = 0
+
+    def _one_range(value: str, *, what: str) -> str:
+        """`sqref` 可含多个空格分隔的区间 ⇒ 逐区间改写（与插行侧 `_shift_sqref` 同纪律）。
+
+        🔴 必须逐段：整串喂进去时一段的终点修正会作用到另一段上。
+        """
+        parts = [p for p in value.split() if p]
+        if len(parts) <= 1:
+            return remap_bare_a1_for_deletion(value, shift=shift, what=what)
+        return " ".join(
+            remap_bare_a1_for_deletion(part, shift=shift, what=what) for part in parts
+        )
+
+    # ── ① 属性里是 A1 引用的项（mergeCell@ref / dataValidation@sqref / …）────
+    for tag, attrs in STRUCTURE_ROW_BEARING_ATTRS.items():
+        for attr in attrs:
+            if (tag, attr) in STRUCTURE_ATTRS_OWNED_BY_SHRINK:
+                continue
+            pattern = re.compile(
+                rf"(<(?:\w+:)?{re.escape(tag)}\b[^>]*?\b{re.escape(attr)}=\")([^\"]*)(\")"
+            )
+
+            def _sub(match: re.Match[str], _tag: str = tag, _attr: str = attr) -> str:
+                nonlocal changed
+                value = match.group(2)
+                if not value:
+                    return match.group(0)
+                new_value = _one_range(value, what=f"{_tag}@{_attr}")
+                if new_value == value:
+                    return match.group(0)
+                changed += 1
+                return f"{match.group(1)}{new_value}{match.group(3)}"
+
+            xml = pattern.sub(_sub, xml)
+
+    # ── ② 属性里是**裸行号整数**的项（brk@id）────────────────────────────
+    for tag, attrs in STRUCTURE_BARE_ROW_ATTRS.items():
+        for attr in attrs:
+            pattern = re.compile(
+                rf"(<(?:\w+:)?{re.escape(tag)}\b[^>]*?\b{re.escape(attr)}=\")(\d+)(\")"
+            )
+
+            def _sub_bare(match: re.Match[str], _tag: str = tag, _attr: str = attr) -> str:
+                nonlocal changed
+                row = int(match.group(2))
+                # `brk@id` 是**分页位置**（单个行号），按存活行语义映射；
+                # 落在被删行上时塌到上一存活行（分页点不该凭空下移）。
+                new_row = shift.shift(row)
+                if new_row is None:
+                    new_row = shift.shift_range_end(row)
+                if new_row == row:
+                    return match.group(0)
+                changed += 1
+                return f"{match.group(1)}{new_row}{match.group(3)}"
+
+            xml = pattern.sub(_sub_bare, xml)
+
+    # ── ③ 元素**文本**是 A1 区间的项（formula1 / formula2 / xm:sqref）──────
+    for tag in sorted(STRUCTURE_ROW_BEARING_TEXT_TAGS):
+        # 🔴 允许命名空间前缀：`<xm:sqref>` 是 x14 扩展的常见形态；不带前缀的正则会把
+        #    `<xm:sqref>` 的尾巴匹配成 `<sqref>` 并把文本当属性吞掉（插行侧实测踩过）。
+        pattern = re.compile(
+            rf"(<(?:\w+:)?{re.escape(tag)}(?:\s[^>]*)?>)(.*?)(</(?:\w+:)?{re.escape(tag)}>)",
+            re.S,
+        )
+
+        def _sub_text(match: re.Match[str], _tag: str = tag) -> str:
+            nonlocal changed
+            body = match.group(2)
+            if not body.strip():
+                return match.group(0)
+            new_body = _one_range(body, what=f"{_tag}@text")
+            if new_body == body:
+                return match.group(0)
+            changed += 1
+            return f"{match.group(1)}{new_body}{match.group(3)}"
+
+        xml = pattern.sub(_sub_text, xml)
+
+    return xml, changed
+
+
+def _shift_managed_sheet_bare_refs(xml: str, *, plan: MaterializePlan) -> tuple[str, int]:
+    """A5：受管 sheet **自己**的裸引用随删行平移（含合计区间收缩）。
+
+    spec: workpaper-sync-row-deletion-multi-region-propagation（Requirement 5）
+
+    ═══ 为什么这一条是真欠账（Task 1.2 已实测）═══
+
+    `shrink_sheet_rows` 只 `re.sub` 了 `<row r=>` / `<c r=>` 两个属性与 `<dimension>`，
+    公式文本**一个字不动**；而 `propagate_reference_side` 是 `qualified_only=True`
+    ⇒ 裸 `SUM(B7:B25)` 无人处理。实测：删 r=20 后合计公式与注入的 `B22*2` 都逐字不变，
+    而坐标属性确实上移 ⇒ 判据非空转。
+
+    不做的后果（design A5）：D4-1 main 区 R8~R22、footer 在 R23、合计是裸 `SUM(B8:B22)`。
+    删 R22 后物理区变 R8~R21、footer 上移到 R22，而公式仍是 `B8:B22`
+    ⇒ **合计把 footer 自己算进去** ⇒ Excel 循环引用；即便不报循环也是静默多算一行。
+
+    ═══ 三条实现纪律 ═══
+
+    1. **走 `excel_row_shift._rewrite_formula_refs` 这一个改写器**（`remap_a1_rows` 的同一入口），
+       不新写行号改写器；**不复用 `shift_sheet_rows`** —— 上游明文「那个函数的语义是造新行
+       + 下移，共用会让两边的边界条件互相干扰」。
+    2. **区间首尾方向相反** ⇒ 基础 `remap` 用起点口径（`shift_range_start`），
+       对**落在被删行上的区间终点**再用 `extend_end_at`/`extend_by` 做一次精确修正。
+       修正量恒为 `-1`（`|{d<=t}| - |{d<t}| == 1` 当 `t ∈ D`）。
+       现算语料：受管 sheet 上裸区间 **633** 处、末行落在受管区内 **576** 处、
+       末行恰等于受管区末行 **377** 处（其中 **376** 在 footer 行）⇒ 这条修正是主路径，
+       不是边角。
+    3. **Requirement 5.5**：受管区**下方**的行（footer）若契约未声明 `carries_total_formula`
+       （即不在 `plan.total_formula_rows` 里），它的公式**一个字都不改** —— 与插行侧
+       「未声明即不扩张、让 `assert_footer_formula_covers_managed_rows` 去拦」对称。
+
+    🔴 调用点在 `shrink_sheet_rows` **之后**（Task 12.1），所以 `<c r=>` 已是删行后行号
+    ⇒ 与契约行号（删行**前**口径）比较前必须 `unshift` 回去。
+
+    Returns:
+        `(新 XML, 被改写的公式条数)`
+    """
+    from app.services.workpaper_sync.excel_workbook_row_change import (
+        classify_bare_row_roles,
+    )
+
+    shift = plan.row_deletion
+    assert shift is not None, "调用方保证"
+    region_last = int(shift.region_last_row)
+    total_rows = {int(r) for r in plan.total_formula_rows}
+    changed = 0
+
+    def _rewrite_text(text: str, *, coord: str, below_region: bool) -> str:
+        nonlocal changed
+        if not text.strip():
+            return text
+        _rows, _heads, tails = classify_bare_row_roles(text)
+        # ── Requirement 5.5 的门控，**按公式**而不是按格 ──────────────────────
+        #
+        # 🔴 首版把门控写成「受管区下方的行 ∧ 未声明 ⇒ 整格不改」，太宽了：同一 sheet 上
+        #    **兄弟区**的数据行与 footer 也全在本区下方，于是它们一条都不平移
+        #    ⇒ 实测 D1-8 删 r=16 后兄弟区 footer `SUM(E26:E33)` 逐字未变（应为
+        #    `SUM(E25:E32)`），verify 的 `managed_sheet_unmanaged_cells` 当场判漂移。
+        #
+        # 正确口径：Requirement 5.5 保护的是「**本区的**合计区间」——
+        # 判据是「该公式含一个裸区间、其末行恰等于本区末行」。别的公式照常平移
+        # （Requirement 5.1：受管 sheet 内指向被删行之下的裸引用都要平移）。
+        if below_region and region_last in tails and region_last not in total_rows:
+            return text
+        new_text = remap_bare_a1_for_deletion(
+            text, shift=shift, what=f"受管 sheet 的 {coord} 公式"
+        )
+        if new_text != text:
+            changed += 1
+        return new_text
+
+    def _one_cell(match: re.Match[str]) -> str:
+        attrs = match.group("attrs") or ""
+        body = match.group("body")
+        if body is None or "<f" not in body:
+            return match.group(0)
+        coord_match = re.search(r'\br="(?P<coord>[A-Z]+)(?P<row>\d+)"', attrs)
+        if coord_match is None:
+            return match.group(0)
+        # `<c r=>` 已是删行**后**行号 ⇒ 归一化回删行前口径再与契约比较。
+        row_before = shift.unshift(int(coord_match.group("row")))
+        coord = f"{coord_match.group('coord')}{coord_match.group('row')}"
+        below_region = row_before > region_last
+        gated = below_region and row_before not in total_rows
+        new_body = re.sub(
+            r"<f\b[^>]*>(?P<text>.*?)</f>",
+            lambda m: m.group(0).replace(
+                m.group("text"),
+                _rewrite_text(m.group("text"), coord=coord, below_region=gated),
+            )
+            if (m.group("text") or "").strip()
+            else m.group(0),
+            body,
+            flags=re.S,
+        )
+        if new_body == body:
+            return match.group(0)
+        return f"<c{attrs}>{new_body}</c>"
+
+    from app.services.workpaper_sync.excel_workbook_row_change import (
+        _CELL_WITH_BODY_RE,
+    )
+
+    return _CELL_WITH_BODY_RE.sub(_one_cell, xml), changed
+
+
 def _apply_workbook_propagation(
     entries: dict[str, bytes], *, plan: MaterializePlan
 ) -> dict[str, bytes]:
@@ -2382,9 +3210,25 @@ def _apply_workbook_propagation(
     而 `verify_unmanaged_regions` 的归一化只认 plan 那一份 ⇒ 任何不一致都会表现为
     「验证判漂移」而真因是「apply 没按声明做」。
 
-    `plan.workbook_row_change is None` 时逐字节不动（零传播路径）。
+    两个声明字段都为 `None` 时逐字节不动（零传播路径）。
+
+    ═══ 删行侧（A3/A4）═══
+
+    删行的声明放在 `plan.deletion_change`（`RowDeletionChangeSet`），与插行的
+    `plan.workbook_row_change` **分开两个字段** —— 共用一个字段就得在每个消费点做
+    `isinstance` 判断，那是把 kind 信息从类型里挤到调用点。
+
+    🔴 本函数的**替换算法逐字未变**（含 `&apos;` 四候选形态与单次扫描）：删行只是把
+    另一份声明喂进来。两种声明都只暴露 `.propagations`，下游一行都不必改。
     """
     change = plan.workbook_row_change
+    if change is not None and plan.deletion_change is not None:
+        raise RowSetDivergenceError(
+            "[convergence_two_propagation_declarations] 同时存在插行与删行两份传播声明 —— "
+            "6.8b 的分流保证两者互斥，走到这里说明计划期与 apply 口径漂移了"
+        )
+    if change is None:
+        change = plan.deletion_change
     if change is None:
         return entries
     from app.services.workpaper_sync.excel_workbook_row_change import (
@@ -2422,18 +3266,61 @@ def _apply_workbook_propagation(
         def _apos(s: str) -> str:
             return s.replace("'", "&apos;")
 
+        # 🔴 **单次扫描、同时替换**，不是逐对 `text.replace()` 串行改。
+        #
+        #    串行改有一个会双重位移的真缺陷：位移计划里同一 part 常同时含
+        #    **相邻行**的两条声明（D1-4 实测 `B23→B24` 与 `B24→B25` 并存，
+        #    B/C/K/L 四列各一对）。串行时 `B23→B24` 先执行，文本里**新产生**一个
+        #    `B24`，紧接着 `B24→B25` 就把原有的和新产生的**一起**改掉 ⇒ 每对多命中
+        #    1 次，8 条声明实际改了 12 处，最后以 `PropagationDriftError`
+        #    「声明 8 处实际改了 12 处」报出来 —— 报错本身是对的（它拦住了坏写盘），
+        #    但归因会被带向「artifact 在两相之间被动过」，而真因是本函数的替换顺序。
+        #
+        #    单次扫描下替换产物不再参与匹配：`B23` → `B24`（不再被重扫）、
+        #    原有 `B24` → `B25`，applied == declared == 8。
+        #
+        #    候选形态的选取仍**基于替换前的原文**（`text.count`），与串行版一致；
+        #    正则候选按长度降序排列，保持「长的先匹配」（`!A2` ⊂ `!A25`）这条既有语义
+        #    —— `re` 的交替是最左优先、同位置按候选顺序，故降序排列即等价。
+        import re as _re
+
+        # 🔴 候选还要含**数字字符引用（NCR）编码的 sheet 名**：某些 Excel 保存路径把公式里
+        #    的 CJK sheet 名序列化成 `&#26126;&#32454;&#34920;`（如 L6 的 附注国企/检查表L6-4，
+        #    `'明细表L6-2'!P20-SUM(...)`），而计划期 `ref_before` 由解码后的 XML 得到裸中文
+        #    `'明细表L6-2'!P20`。前四种候选（含 `&apos;`）都只覆盖单引号转义，不覆盖 NCR ⇒
+        #    裸中文的 `count()` 在 NCR 序列化的 sheet.xml 里恒为 0 → 误报 PropagationDriftError
+        #    （L6 附注国企 sheet5 P20/Q20/R20/S20 四条真栈）。补 NCR 候选即对齐该序列化形态。
+        #    NCR 只编码非 ASCII 字符（与 openpyxl/Excel 写法一致），ASCII（引号/列标/行号/`!`）不动。
+        def _ncr(s: str) -> str:
+            return "".join(ch if ord(ch) < 128 else f"&#{ord(ch)};" for ch in s)
+
+        replacements: dict[str, str] = {}
         for before, after in sorted(pairs, key=lambda kv: len(kv[0]), reverse=True):
             for cand_before, cand_after in (
                 (_apos(_escape(before)), _apos(_escape(after))),
                 (_escape(before), _escape(after)),
                 (_apos(before), _apos(after)),
                 (before, after),
+                # NCR 形态（CJK sheet 名被编码成 &#N;）；与上面单引号/转义候选正交。
+                (_apos(_ncr(before)), _apos(_ncr(after))),
+                (_ncr(before), _ncr(after)),
             ):
-                hits = text.count(cand_before)
-                if hits:
-                    text = text.replace(cand_before, cand_after)
-                    applied += hits
+                if text.count(cand_before):
+                    # 同一 cand_before 被两条声明共用时保留首个映射（与串行版
+                    # 「第一条替换掉之后第二条就找不到了」的可见结果一致）。
+                    replacements.setdefault(cand_before, cand_after)
                     break
+        if replacements:
+            ordered = sorted(replacements, key=len, reverse=True)
+            pattern = _re.compile("|".join(_re.escape(k) for k in ordered))
+            counter = {"n": 0}
+
+            def _swap(match: _re.Match[str]) -> str:
+                counter["n"] += 1
+                return replacements[match.group(0)]
+
+            text = pattern.sub(_swap, text)
+            applied += counter["n"]
         declared = len(part_entries)
         if applied != declared:
             raise PropagationDriftError(
@@ -2467,8 +3354,20 @@ def assert_shifted_footer_gates(
       位移阶段被扩张，没声明时计划期第六类拒绝理由早就拦住了。
 
     🔴 调用点放在 `os.replace` **之前**：判据不过即零产物（Property 9）。
+
+    ═══ 删行分支（spec workpaper-sync-row-deletion-multi-region-propagation A7）═══
+
+    门原为 `if plan.row_shift is None: return None` ⇒ **删行后一相都不复核**。
+    A2（runtime binding 重冻结）与 A5（裸引用平移）里任何一处算错，都要等到**下一次**
+    materialize 才以别的症状冒出来（计划期 `assert_footer_anchor_stable` 的
+    `FooterAnchorDriftError`），归因要跨两次物化 —— 上游正是为此把这一相立成独立的
+    第二相，该论点在删行侧同样成立、只是符号相反。
+
+    改为「**两个位移载体都空**才 return」。两个判据函数都按载体鸭子分流，算术在各自
+    函数里（不在这里写 if，写两遍就会漂）。
     """
-    if plan.row_shift is None:
+    carrier = plan.row_shift if plan.row_shift is not None else plan.row_deletion
+    if carrier is None:
         return None
     entries = _read_entries(staged_bytes)
     footer_row = assert_footer_anchor_stable(
@@ -2476,7 +3375,7 @@ def assert_shifted_footer_gates(
         sheet_part=plan.sheet_part,
         contract=contract,
         runtime_binding=runtime_binding,
-        row_shift=plan.row_shift,
+        row_shift=carrier,
         table_key=region.table_key,
         # 同 sheet 双区：apply 后复核同样按 region 的物理 table_name 取本区冻结 footer，
         # 可见侧 marker 从本区数据首行起搜（位移不改 first_row）。
@@ -2499,7 +3398,7 @@ def assert_shifted_footer_gates(
         sheet_part=plan.sheet_part,
         footer_row=footer_row,
         region=region,
-        row_shift=plan.row_shift,
+        row_shift=carrier,
         carries_total_formula=bool(anchor and anchor.carries_total_formula),
     )
     return footer_row
@@ -2534,6 +3433,55 @@ def _sheet_table_parts(entries: Mapping[str, bytes], *, sheet_part: str) -> tupl
         )
         out.append(part.lstrip("/"))
     return tuple(out)
+
+
+#: Excel Table 的 `ref="A7:W25"` 形态 —— **四个** ref 改写器共用这一个。
+#:
+#: 🔴 收敛成常量的理由不是「少打几个字」：`_shift_sibling_table_refs` /
+#: `_grow_managed_table_ref` / `_shrink_managed_table_ref` / `_shrink_sibling_table_refs`
+#: 四处必须看到**同一批** `ref`。各写一份字面量时，任何一处的形态收窄（比如把
+#: `[A-Z]{1,3}` 写成 `[A-Z]{1,2}`）只会让**那一处**漏掉宽表，而症状落在很远的地方
+#: （反读时尾部空 UUID 行 → 重新 mint → `extra`），归因极难。
+_TABLE_REF_RE: Final[re.Pattern[str]] = re.compile(
+    r'(?P<prefix>\bref=")(?P<ref>[A-Z]{1,3}\d+:[A-Z]{1,3}\d+)"'
+)
+
+
+def _rewrite_table_ref_rows(
+    xml: str, *, remap_head: Callable[[int], int], remap_tail: Callable[[int], int]
+) -> tuple[str, int]:
+    """把 XML 里每个 Table `ref` 的首尾**行**分量按两个 remap 改写。
+
+    只改行分量、列跨度逐字保留（`assert_identity_inventory_retained` 只锁列跨度，
+    「行区间随插删行变化属合法」；`_classify_parts` 又把 `xl/tables/**` 整类排除）。
+
+    首尾各给一个 remap 而不是一个：插行侧本 binding 的末行边界是 `>= insert_at - 1`
+    （追加插行要把新行包进来），而首行是 `shift.shift`；删行侧的兄弟表首尾都走同一个
+    `remap(row)`。两个入参让这些差异留在**调用方**，改写循环只有一份。
+
+    Returns:
+        `(新 XML, 改动的 ref 处数)`
+    """
+    changed = 0
+
+    def _one(match: re.Match[str]) -> str:
+        nonlocal changed
+        head, tail = match.group("ref").split(":", 1)
+        head_col = re.sub(r"\d", "", head)
+        tail_col = re.sub(r"\d", "", tail)
+        head_row = int(re.sub(r"\D", "", head) or 0)
+        tail_row = int(re.sub(r"\D", "", tail) or 0)
+        new_head_row = remap_head(head_row)
+        new_tail_row = remap_tail(tail_row)
+        if (new_head_row, new_tail_row) == (head_row, tail_row):
+            return match.group(0)
+        changed += 1
+        return (
+            f'{match.group("prefix")}{head_col}{new_head_row}:'
+            f'{tail_col}{new_tail_row}"'
+        )
+
+    return _TABLE_REF_RE.sub(_one, xml), changed
 
 
 def _shift_sibling_table_refs(
@@ -2571,27 +3519,8 @@ def _shift_sibling_table_refs(
     total = 0
     for part in siblings:
         xml = entries[part].decode("utf-8")
-        changed = 0
-
-        def _one(match: re.Match[str]) -> str:
-            nonlocal changed
-            head, tail = match.group("ref").split(":", 1)
-            head_col = re.sub(r"\d", "", head)
-            tail_col = re.sub(r"\d", "", tail)
-            head_row = int(re.sub(r"\D", "", head) or 0)
-            tail_row = int(re.sub(r"\D", "", tail) or 0)
-            new_head_row = shift.shift(head_row)
-            new_tail_row = shift.shift(tail_row)
-            if (new_head_row, new_tail_row) == (head_row, tail_row):
-                return match.group(0)
-            changed += 1
-            return (
-                f'{match.group("prefix")}{head_col}{new_head_row}:'
-                f'{tail_col}{new_tail_row}"'
-            )
-
-        xml_new = re.sub(
-            r'(?P<prefix>\bref=")(?P<ref>[A-Z]{1,3}\d+:[A-Z]{1,3}\d+)"', _one, xml
+        xml_new, changed = _rewrite_table_ref_rows(
+            xml, remap_head=shift.shift, remap_tail=shift.shift
         )
         if changed:
             entries[part] = xml_new.encode("utf-8")
@@ -2626,16 +3555,8 @@ def _grow_managed_table_ref(
             "插行后 Table ref 无从增长，新行会落在受管区域之外并被静默丢弃"
         )
     xml = entries[part].decode("utf-8")
-    changed = 0
 
-    def _one(match: re.Match[str]) -> str:
-        nonlocal changed
-        head, tail = match.group("ref").split(":", 1)
-        head_col, head_row = re.sub(r"\d", "", head), int(re.sub(r"\D", "", head) or 0)
-        tail_col, tail_row = re.sub(r"\d", "", tail), int(re.sub(r"\D", "", tail) or 0)
-
-        # 首行：落在插入点及其之下 ⇒ 整体下移（`plan.shift` 自带这个边界）。
-        new_head_row = shift.shift(head_row)
+    def _grow_tail(tail_row: int) -> int:
         # 末行：两种形态**同一个算式**，判据是 `tail_row >= insert_at - 1`
         #   ① `tail_row >= insert_at`      → 末行被推下去 ⇒ +count（位移）
         #   ② `tail_row == insert_at - 1`  → **追加插行**：新行紧贴 Table 末行之后，
@@ -2643,19 +3564,11 @@ def _grow_managed_table_ref(
         # 🔴 首版写成 `if tail_row < insert_at: 不动`，把形态 ② 判成了「不动」——
         #    而追加插行**恰好**总是形态 ②（`insert_at = 最后一个数据行 + 1`），
         #    于是每一次真实插行都撞「ref 一处都没长」。
-        new_tail_row = (
-            tail_row + shift.count if tail_row >= shift.insert_at - 1 else tail_row
-        )
-        if (new_head_row, new_tail_row) == (head_row, tail_row):
-            return match.group(0)
-        changed += 1
-        return (
-            f'{match.group("prefix")}{head_col}{new_head_row}:'
-            f'{tail_col}{new_tail_row}"'
-        )
+        return tail_row + shift.count if tail_row >= shift.insert_at - 1 else tail_row
 
-    xml_new = re.sub(
-        r'(?P<prefix>\bref=")(?P<ref>[A-Z]{1,3}\d+:[A-Z]{1,3}\d+)"', _one, xml
+    # 首行：落在插入点及其之下 ⇒ 整体下移（`plan.shift` 自带这个边界）。
+    xml_new, changed = _rewrite_table_ref_rows(
+        xml, remap_head=shift.shift, remap_tail=_grow_tail
     )
     if not changed:
         raise RowSetDivergenceError(
@@ -2670,6 +3583,139 @@ def _grow_managed_table_ref(
         entries, plan=plan, own_part=part
     )
     return entries
+
+
+def _shrink_managed_table_ref(
+    entries: dict[str, bytes], *, plan: MaterializePlan, removed: int
+) -> dict[str, bytes]:
+    """受管 Excel Table 的 `ref` 末行按已删行数**收缩**（`_grow_managed_table_ref` 的对称件）。
+
+    spec: workpaper-sync-managed-row-convergence（Requirement 4 更正 6 AC 8）
+
+    ═══ 为什么必须收缩 ═══
+
+    `shrink_sheet_rows` 只删 sheet 里的 `<row>`，**不动** `xl/tables/*.xml` 的 `ref`。
+    不收缩的后果与「把受管区删空」同源：ref 仍声明着已经不存在的行区间 ⇒ 反读时
+    `resolve_managed_region` 按旧区间找身份 ⇒ 尾部出现空 UUID 行 ⇒
+    `IdentityCarrierMissingError`（「Table ref 覆盖的行区间内一个 row identity 都没反读到」
+    的邻近形态，实测于 D4-31）。
+
+    与 grow 的差异刻意只有一处：末行 `-removed` 而不是 `+count`。首行**一律不动** ——
+    删的都是受管区内的数据行（判据保证 stale ⊆ 受管区内的物理身份行），首行是表头/区首
+    锚点，删数据行不该动它。
+
+    🔴 只改**行**分量、列跨度逐字保留（与 grow 同：`assert_identity_inventory_retained`
+    只锁列跨度，「行区间随插删行变化属合法」；`_classify_parts` 把 `xl/tables/**` 整类
+    排除，故这不是未管理区域漂移）。
+    """
+    if removed <= 0:
+        return entries
+    part = plan.table_part
+    if not part or part not in entries:
+        raise RowSetDivergenceError(
+            f"[convergence_table_part_missing] 计划里的 Table part {part!r} 不在 zip 里 —— "
+            "删行后 Table ref 无从收缩，ref 会继续覆盖已删区间并在反读时判身份缺失"
+        )
+    xml = entries[part].decode("utf-8")
+    head_rows = [
+        int(re.sub(r"\D", "", m.group("ref").split(":", 1)[0]) or 0)
+        for m in _TABLE_REF_RE.finditer(xml)
+    ]
+
+    def _shrink_tail(tail_row: int) -> int:
+        new_tail_row = tail_row - removed
+        # 🔴 收缩不得把 ref 缩成「末行 < 首行」：那等于把受管区删空，而 6.8b 的分级判定
+        #    本应已经拦住这种情形（剩 0 行走清空分支）。走到这里说明判定与实际删除量
+        #    不一致 ⇒ fail closed，不写出一个坏 ref。
+        floor = min(head_rows) if head_rows else 1
+        if new_tail_row < floor:
+            raise RowSetDivergenceError(
+                f"[convergence_table_ref_underflow] 收缩 {removed} 行会让 Table ref "
+                f"的末行 {new_tail_row} 落到首行 {floor} 之上 —— "
+                "受管区被删空，6.8b 的容量分级本应改走清空分支"
+            )
+        return new_tail_row
+
+    # 首行**一律不动** —— 删的都是受管区内的数据行（判据保证 stale ⊆ 受管区内的物理
+    # 身份行），首行是表头/区首锚点，删数据行不该动它。
+    xml_new, changed = _rewrite_table_ref_rows(
+        xml, remap_head=lambda row: row, remap_tail=_shrink_tail
+    )
+    if not changed:
+        raise RowSetDivergenceError(
+            f"[convergence_table_ref_not_shrunk] Table part {part} 的 ref 一处都没缩"
+            f"（已删 {removed} 行，实测 ref: "
+            f"{re.findall(r'ref=\"[^\"]+\"', xml)[:3]}）—— ref 会继续覆盖已删区间，"
+            "反读时判身份缺失"
+        )
+    entries[part] = xml_new.encode("utf-8")
+    # 🔴 A1：同 sheet **兄弟** Table 的 `ref` 也必须收缩（本表之外那些）。
+    #    不收缩的后果是 G2 实测那条症状链的第一环 —— 完整根因见
+    #    :func:`_shrink_sibling_table_refs`。
+    entries, _sibling_changes = _shrink_sibling_table_refs(
+        entries, plan=plan, own_part=part
+    )
+    return entries
+
+
+def _shrink_sibling_table_refs(
+    entries: dict[str, bytes], *, plan: MaterializePlan, own_part: str
+) -> tuple[dict[str, bytes], int]:
+    """把**同 sheet 其它** Excel Table 的 `ref` 按删行收缩（`_shift_sibling_table_refs` 的对称件）。
+
+    spec: workpaper-sync-row-deletion-multi-region-propagation（Requirement 2 / A1）
+
+    ═══ 为什么必须做（G2 实测症状链的第一环）═══
+
+    D4-1 审定表同 sheet 两个受管区：main `GT_D41_MAIN_ROWS` / other `GT_D41_OTHER_ROWS`。
+    删 main 区一行 ⇒ 物理上 other 区整体**上移**一行，而 other 的 `ref` 逐字不动
+    ⇒ `resolve_managed_region` 按旧 `ref` 算出的 `region.row_span` **头部少一行、尾部多一行**
+    ⇒ `excel_extract` 在多出来的那一行读到空 UUID
+    ⇒ `_scan_row_identities` 按 `delete_policy=tombstone`（B11：139/153 个 table 都是它）
+       走 `assign_new_id` ⇒ `mint_row_identity` 产 `GTROW-MINTED-*`
+    ⇒ 新身份不在 `intended` ⇒ **又一轮 `extra`** ⇒ `roundtrip_projection_mismatch` 500。
+
+    ═══ 🔴 与本表的两处刻意差异 ═══
+
+    1. **首尾都要动。** 本表（:func:`_shrink_managed_table_ref`）首行一律不动，因为删的是
+       它自己区内的数据行、首行是区首锚点；兄弟表整块在删除点**下方**，首尾都要上移。
+       判据用**统一的** `remap(row)`，不写两个 if —— 写两个 if 就会出现「首行用 A 边界、
+       末行用 B 边界」这类只在某种布局下才暴露的错位。
+    2. **一处都没缩时不抛。** 兄弟表完全位于被删行**上方**时零改动是正确行为
+       （与 `_shift_sibling_table_refs` 同纪律，也与本表的 `table_ref_not_shrunk` 相反 ——
+       那里 0 处改动确实是缺陷，因为删的行就在它区内）。
+
+    走 :func:`_sheet_table_parts`（worksheet rels）取同 sheet 的 Table 清单，
+    **不**扫 `xl/tables/*` 猜归属：Table part 里没有所属 sheet 的信息。
+    """
+    shift = plan.row_deletion
+    assert shift is not None, "调用方保证"
+    siblings = [
+        p
+        for p in _sheet_table_parts(entries, sheet_part=plan.sheet_part)
+        if p != own_part and p in entries
+    ]
+
+    def _remap(row: int) -> int:
+        """统一的兄弟表行映射：区间端点语义（被删行塌到相邻存活行）。
+
+        兄弟区整块在删除点之外，端点落在被删行上意味着「删的行跨进了兄弟区」——
+        那是 6.8b 的 stale ⊆ 本区受管行这条前提被破坏。用端点语义而不是 `shift`
+        （会返回 `None`）让这种情形退化成一个**保守**的行号而不是崩在这里；
+        真正的拦截在计划期（`RowDeletionShift` 构造时的区内校验）。
+        """
+        return shift.shift_range_start(row)
+
+    total = 0
+    for part in siblings:
+        xml = entries[part].decode("utf-8")
+        xml_new, changed = _rewrite_table_ref_rows(
+            xml, remap_head=_remap, remap_tail=_remap
+        )
+        if changed:
+            entries[part] = xml_new.encode("utf-8")
+            total += changed
+    return entries, total
 
 
 def _gt_sync_sheet_part(entries: dict[str, bytes], source_bytes: bytes) -> str:
@@ -2725,12 +3771,31 @@ def _refresh_gt_sync_runtime_binding(
     🔴 只改**受位移影响**的键，其余键逐字保留 —— 那些是 instrumentation 阶段的
     模板事实（`GT_TEMPLATE_SHA256` 等），插行不该动它们。
 
-    🔴 `plan.row_shift is None` 时调用方不会进来（与 `_grow_managed_table_ref` 同相）。
+    🔴 两个位移载体都为空时调用方不会进来（与 `_grow_managed_table_ref` 同相）。
+
+    ═══ 删行侧（spec workpaper-sync-row-deletion-multi-region-propagation / A2）═══
+
+    本函数原为 **insert-only**（首行取 `plan.row_shift` 并断言非空）。删行时那 7 个被重写的
+    键一个都不动 ⇒ **下一次** materialize 在计划期就撞 `assert_footer_anchor_stable` 的
+    `FooterAnchorDriftError`（可见侧 marker 实测 = 冻结值 − 删行数，而 `row_shift is None`
+    分支要求两者严格相等）。症状是「删行这次成功了、下次点在线编辑起 500」——
+    时间差让根因极难归位，这是 A2 必须与 A1 同批落地的理由。
+
+    修法是**抽位移载体协议**：insert 传 `RowShiftPlan`、delete 传 `RowDeletionShift`，
+    两者鸭子兼容。🔴 insert 分支的算术**逐字未变**（零回归按定义成立）。
+    `same_sheet_tids` 的推导**原样复用**下面那一段（worksheet rels → 兄弟 Table
+    `displayName` → `GT_MANAGED_TABLES`/`GT_TEMPLATE_IDS` 平行清册）—— 抄第二份就会把
+    那一段踩过的「把『同 sheet 兄弟』和『不同 sheet』混成一类」这个坑复制过来。
 
     Spec: published-representation-production-path-and-lane-adjudication
+          + workpaper-sync-row-deletion-multi-region-propagation
     """
-    shift = plan.row_shift
+    # ── 位移载体二选一（两者互斥，由 6.8b 的分流保证）──────────────────────
+    shift = plan.row_shift if plan.row_shift is not None else plan.row_deletion
     assert shift is not None, "调用方保证"
+    #: True = 删行载体。判据用**成员存在性**而不是 `isinstance`：`excel_row_shift` 反向
+    #: import 本模块会成环，而 `RowDeletionShift` 的 `deleted_rows` 是它独有的成员。
+    deleting = getattr(shift, "deleted_rows", None) is not None
 
     from app.services.workpaper_sync.excel_instrumentation import _gt_sync_sheet_xml
 
@@ -2808,42 +3873,91 @@ def _refresh_gt_sync_runtime_binding(
         if sib_tid:
             same_sheet_tids.add(sib_tid)
 
+    def _row_after(row: int, *, what: str) -> int:
+        """单个**行号**键的重冻结值。insert 与 delete 共用这一个出口。
+
+        🔴 删行侧要处理 `shift(row) is None`（该行被删了）。`_GT_SYNC` 里的行号键指的都是
+        受管区末行 / footer 行，它们**不该**落在被删行上（stale ⊆ 受管区内的数据行、
+        footer 在区外）。真落上了说明计划期的区间声明与实际删除量不一致 ⇒ fail-closed，
+        不把一个塌陷后的行号冻结下来（那会在下一次 materialize 变成 footer 漂移）。
+        """
+        if not deleting:
+            return shift.shift(row)  # type: ignore[return-value]
+        got = shift.shift(row)
+        if got is None:
+            raise RowSetDivergenceError(
+                f"[excel_row_shift_binding_row_deleted] runtime binding 的 {what}={row} "
+                f"落在被删行 {list(shift.deleted_rows)} 上 —— 受管区结构坐标不该指向被删行，"
+                "不得把塌陷后的行号冻结进 representation"
+            )
+        return got
+
+    # ── 本趟是不是 primary sheet ──────────────────────────────────────────
+    #
+    # `GT_ROW_UUID_LAST_ROW` / `GT_MANAGED_RANGE` / `GT_MANAGED_TABLE_REF` / `GT_FOOTER_ROW`
+    # 这四个键是 **workbook 全局**的，值取自 instrumentation 的 **primary** sheet
+    # （实测 D1 册：`GT_MANAGED_TABLE=GT_D13_ROWS` / `GT_MANAGED_RANGE=A11:O20` /
+    #  `GT_ROW_UUID_LAST_ROW=20` 全是 D1-3 那张表的坐标，其余 sheet 走
+    #  `GT_FOOTER_ROW_{TID}` 平行清册）。
+    #
+    # 🔴 **删行侧必须按 primary 门控这三个键**，插行侧的无条件重写在删行侧不安全：
+    #    插行时 primary 的行号更小（`tail_row >= insert_at - 1` 恒不成立）⇒ 算术碰不到它；
+    #    删行时方向相反 —— D1-8 删它自己的首数据行 14 会让 `shift_range_end(20)` 变 19，
+    #    把 **D1-3** 的受管区末行凭空缩掉一行。那会在下一次物化 D1-3 时表现为
+    #    footer/区间漂移，而现场看起来完全与 D1-8 无关。
+    #
+    # ⚠ 插行分支**逐字不变**（零回归按定义成立）；插行侧的同款无条件重写属**既有**形态，
+    #   本 spec 不改它（改了会动插行的冻结字节），只在此登记：见判据
+    #   `test_insert_side_global_keys_stay_unconditional`。
+    _first_tid_key = next((k for k, _ in pairs if k.startswith("GT_FOOTER_ROW_")), None)
+    is_primary_trip = (
+        managed_tid is None
+        or _first_tid_key is None
+        or _first_tid_key == f"GT_FOOTER_ROW_{managed_tid}"
+    )
+
     new_pairs: list[tuple[str, str]] = []
     seen: set[str] = set()
     for key, value in pairs:
         seen.add(key)
         if key == "GT_ROW_UUID_LAST_ROW":
-            # 末行同样适用「追加插行紧贴末行之后 ⇒ 必须包进来」的边界（见
-            # `_grow_managed_table_ref` 的同名算式），与 Table ref 增长保持同源。
-            new_value = str(old_last_row + shift.count if old_last_row >= shift.insert_at - 1 else old_last_row)
+            if deleting and not is_primary_trip:
+                new_value = value
+            elif deleting:
+                # UUID 区间末行是**区间端点** ⇒ 走端点语义（被删行塌到上一存活行）。
+                # 不能走 `_row_after`：删受管末行恰好是最常见的收敛形态
+                # （用户从 HTML 表尾部删行），那时 `shift` 返回 `None`。
+                new_value = str(shift.shift_range_end(old_last_row))
+            else:
+                # 末行同样适用「追加插行紧贴末行之后 ⇒ 必须包进来」的边界（见
+                # `_grow_managed_table_ref` 的同名算式），与 Table ref 增长保持同源。
+                new_value = str(old_last_row + shift.count if old_last_row >= shift.insert_at - 1 else old_last_row)
         elif key == "GT_FOOTER_ROW" and old_footer_row is not None:
             # 主键跟 instrumentation 的 primary sheet；仅本趟是 primary 时才移位。
-            first_tid_key = next(
-                (k for k, _ in pairs if k.startswith("GT_FOOTER_ROW_")),
-                None,
-            )
-            if managed_tid is None or first_tid_key is None:
-                new_value = str(shift.shift(old_footer_row))
-            elif first_tid_key == f"GT_FOOTER_ROW_{managed_tid}":
-                new_value = str(shift.shift(old_footer_row))
+            # （判定已上提为 `is_primary_trip`，两侧共用同一条口径。）
+            if is_primary_trip:
+                new_value = str(_row_after(old_footer_row, what=key))
             else:
                 new_value = value
         elif key.startswith("GT_FOOTER_ROW_") and managed_tid is not None:
             # 只重冻结**本 sheet**（含同 sheet 兄弟区）的 per-template footer 键
             # —— D42 插行不得动 D43（不同 sheet），但 D41MAIN 插行必须动 D41OTHER（同 sheet）。
-            # 各键实际移不移由 `shift.shift` 按它自己的行号与插入点的关系决定：
-            # 插入点上方的兄弟 footer 原样返回，下方的 +count。
+            # 各键实际移不移由载体按它自己的行号与变更点的关系决定：
+            # 插入点上方的兄弟 footer 原样返回，下方的 +count；删行侧同理给负向。
             if key.removeprefix("GT_FOOTER_ROW_") in same_sheet_tids:
                 old_keyed = _to_int(value, what=key, required=False)
                 new_value = (
-                    str(shift.shift(old_keyed)) if old_keyed is not None else value
+                    str(_row_after(old_keyed, what=key))
+                    if old_keyed is not None
+                    else value
                 )
             else:
                 new_value = value
-        elif key == "GT_MANAGED_RANGE":
-            new_value = _grow_range_string(value, shift) if value else value
-        elif key == "GT_MANAGED_TABLE_REF":
-            new_value = _grow_range_string(value, shift) if value else value
+        elif key in ("GT_MANAGED_RANGE", "GT_MANAGED_TABLE_REF"):
+            if deleting and not is_primary_trip:
+                new_value = value
+            else:
+                new_value = _remap_range_string(value, shift) if value else value
         else:
             new_value = value
         new_pairs.append((key, new_value))
@@ -2863,19 +3977,46 @@ def _refresh_gt_sync_runtime_binding(
         total_inserted = int(last_shift.split("|")[-1]) if last_shift else 0
     except ValueError:
         total_inserted = 0
-    total_inserted += shift.count
+    # 🔴 删行侧 `count` 取**负**：累计位移必须可回落，否则「插 3 行又删 3 行」会被记成
+    #    累计 +6，而模板升级重放会按那个假累计量把行数放大一倍。
+    signed_count = -shift.count if deleting else shift.count
+    total_inserted += signed_count
 
-    fingerprint = _structure_fingerprint(
-        last_row=old_last_row + (
+    # ── 结构指纹 ────────────────────────────────────────────────────────────
+    #
+    # 🔴 **插行分支逐字未变**（含它原有的一处不自洽：非 primary 趟上面把 `GT_FOOTER_ROW`
+    #    保留旧值，而这里按位移算 —— 那是既有形态，改它会动插行的冻结字节，本 spec 不碰，
+    #    只登记，见判据 `test_insert_side_fingerprint_arithmetic_is_untouched`）。
+    #
+    # 🔴 **删行分支喂的是重冻结后的那两个值**，与上面的 primary 门控同源：
+    #    另算一遍会让「非 primary 趟保留旧键值、指纹却按位移算」这种不自洽在删行侧复现，
+    #    而删行侧的方向使它**数值可达**（插行侧靠行号大小巧合碰不到）。
+    if deleting:
+        _frozen = dict(new_pairs)
+        fp_last_row = int(str(_frozen.get("GT_ROW_UUID_LAST_ROW") or "0") or 0)
+        fp_footer_row = (
+            int(str(_frozen.get("GT_FOOTER_ROW") or "0") or 0)
+            if old_footer_row is not None
+            else 0
+        )
+    else:
+        fp_last_row = old_last_row + (
             shift.count if old_last_row >= shift.insert_at - 1 else 0
-        ),
-        footer_row=shift.shift(old_footer_row) if old_footer_row is not None else 0,
+        )
+        fp_footer_row = (
+            shift.shift(old_footer_row) if old_footer_row is not None else 0
+        )
+    fingerprint = _structure_fingerprint(
+        last_row=fp_last_row,
+        footer_row=fp_footer_row,
         uuid_col=uuid_col,
         table_ref=table_ref,
     )
 
+    # `GT_LAST_SHIFT` 的形态逐字不变（`{变更点}|{行数}|{累计}`），只是删行侧行数为负。
+    change_at = min(shift.deleted_rows) if deleting else shift.insert_at
     for extra in (
-        ("GT_LAST_SHIFT", f"{shift.insert_at}|{shift.count}|{total_inserted}"),
+        ("GT_LAST_SHIFT", f"{change_at}|{signed_count}|{total_inserted}"),
         ("GT_STRUCTURE_FINGERPRINT", fingerprint),
     ):
         if extra[0] in seen:
@@ -2910,6 +4051,44 @@ def _to_int(raw: str | None, *, what: str, required: bool = True) -> int | None:
             " —— 位移算术需要整数值"
         )
     return int(text)
+
+
+def _remap_range_string(raw: str, shift: Any) -> str:
+    """`A13:AM24` 形态 → 按位移载体的方向改写首尾**行**分量。
+
+    ═══ 为什么是**一个**函数按方向分流，不是两份 ═══
+
+    抄第二份（`_shrink_range_string`）会让「首行边界」这条规则有两个真源。而这条规则恰好
+    是插行侧踩过坑的地方（`tail_row >= insert_at - 1` 的追加插行形态），复制过去就把坑
+    也复制了。分流点只有一处：`deleted_rows` 是否存在。
+
+    * **insert** —— 算术**逐字未变**（见下面原 docstring）；
+    * **delete** —— 首行走 `shift_range_start`、末行走 `shift_range_end`
+      （两者塌陷方向相反，见 `RowDeletionShift.shift_range_end` 的推导）。
+    """
+    import re as _re
+
+    m = _re.match(
+        r"^(?P<hc>[A-Z]{1,3})(?P<hr>\d+):(?P<tc>[A-Z]{1,3})(?P<tr>\d+)$", raw.strip()
+    )
+    if m is None:
+        raise RowSetDivergenceError(
+            f"[excel_row_shift_range_invalid] runtime binding 的受管区 {raw!r} 不是 A1 区间"
+            " —— 无从按行变更改写"
+        )
+    head_row = int(m.group("hr"))
+    tail_row = int(m.group("tr"))
+    if getattr(shift, "deleted_rows", None) is not None:
+        new_head = shift.shift_range_start(head_row)
+        new_tail = shift.shift_range_end(tail_row)
+        if new_tail < new_head:
+            raise RowSetDivergenceError(
+                f"[excel_row_shift_range_underflow] 删行让受管区 {raw!r} 缩成 "
+                f"{new_head}..{new_tail}（末行在首行之上）—— 受管区被删空，"
+                "6.8b 的容量分级本应改走清空分支"
+            )
+        return f"{m.group('hc')}{new_head}:{m.group('tc')}{new_tail}"
+    return _grow_range_string(raw, shift)
 
 
 def _grow_range_string(raw: str, shift: "RowShiftPlan") -> str:
@@ -3137,9 +4316,14 @@ def _apply_step_to_bytes(
     位移门刻意在返回前跑：调用方尚未落盘，门不过就零产物（Property 9 的文件侧）。
     """
     staged, shift_report = apply_plan_zip_with_report(source_bytes, step.plan)
-    if step.plan.row_shift is not None:
+    if step.plan.row_shift is not None or step.plan.row_deletion is not None:
         # 🔴 apply 后的**位移后**相：这才是 Requirement 7.1「实测 == 冻结 + 预期位移」与
         #    7.4「用位移后区间求值」真正成立的地方。
+        #
+        # 🔴 删行载体也要进来（spec workpaper-sync-row-deletion-… A7）：原来只看
+        #    `row_shift` ⇒ 删行后一相都不复核，A2/A5 算错要等下一次物化才冒出来。
+        #    这里与 `assert_shifted_footer_gates` 内部的门**必须同时**放开 —— 只改一处的
+        #    话另一处照旧 return None，看起来接线了其实空转。
         assert_shifted_footer_gates(
             staged_bytes=staged,
             plan=step.plan,

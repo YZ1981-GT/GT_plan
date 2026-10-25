@@ -86,62 +86,162 @@ export interface G7LinkagePreview {
   stale_sheets?: string[]
 }
 
-/** 加载某张表的数据 */
+export interface PriorYearWorksheetResult {
+  found: boolean
+  source_year?: number
+  source_key?: string
+  content: Record<string, any>
+  message?: string
+  updated_at?: string | null
+}
+
+export type WorksheetLoadStatus = 'loaded' | 'empty' | 'error'
+
+export interface WorksheetLoadResult<T extends Record<string, any> = Record<string, any>> {
+  status: WorksheetLoadStatus
+  data: T
+  /** 各表当前版本号映射（sheet_key → version），用于后续 CAS 保存。 */
+  versions: Record<string, number>
+  errorMessage?: string
+}
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function errorMessage(error: any, fallback: string): string {
+  const detail = error?.response?.data?.detail ?? error?.response?.data?.message
+  if (typeof detail === 'string' && detail.trim()) return detail
+  if (detail && typeof detail === 'object' && typeof detail.message === 'string') return detail.message
+  if (typeof error?.message === 'string' && error.message.trim()) return error.message
+  return fallback
+}
+
+function loadError<T extends Record<string, any>>(message: string): WorksheetLoadResult<T> {
+  return { status: 'error', data: {} as T, versions: {}, errorMessage: message }
+}
+
+/** 加载某张表的数据；成功空表与 HTTP/解析错误保持可区分。 */
 export async function loadWorksheetData(
   projectId: string, year: number, sheetKey: string
-): Promise<Record<string, any>> {
+): Promise<WorksheetLoadResult> {
   try {
-    const { data } = await http.get(
-      P.get(projectId, year, sheetKey),
-      { validateStatus: (s: number) => s < 600 }
-    )
-    return data?.content || {}
-  } catch {
-    return {}
+    const response = await http.get(P.get(projectId, year, sheetKey))
+    const payload = response.data
+    if (!isRecord(payload) || !isRecord(payload.content)) {
+      return loadError('工作底稿响应格式无法识别')
+    }
+    const content = payload.content
+    const version = typeof payload.version === 'number' ? payload.version : 0
+    return {
+      status: Object.keys(content).length ? 'loaded' : 'empty',
+      data: content,
+      versions: { [sheetKey]: version },
+    }
+  } catch (error) {
+    return loadError(errorMessage(error, '工作底稿加载失败'))
   }
 }
 
-/** 保存某张表的数据 */
+/** 工作底稿版本冲突错误（后端 409 worksheet_version_conflict）。 */
+export class WorksheetVersionConflictError extends Error {
+  readonly code = 'worksheet_version_conflict' as const
+  readonly expectedVersion: number | null
+  readonly actualVersion: number | null
+
+  constructor(expectedVersion: number | null, actualVersion: number | null, message?: string) {
+    super(message || '工作底稿已被其他操作修改，请重新加载后再保存')
+    this.name = 'WorksheetVersionConflictError'
+    this.expectedVersion = expectedVersion
+    this.actualVersion = actualVersion
+  }
+}
+
+export interface WorksheetSaveResult {
+  ok: boolean
+  version: number
+}
+
+/**
+ * 保存某张表的数据；返回保存后的新版本号。
+ *
+ * - `expectedVersion` 传入时启用 CAS：后端校验当前版本 == expectedVersion，
+ *   不匹配返回 409（抛 WorksheetVersionConflictError）。
+ * - `expectedVersion` 省略时走兼容 upsert（首次创建或无版本保护覆盖）。
+ */
 export async function saveWorksheetData(
-  projectId: string, year: number, sheetKey: string, sheetData: Record<string, any>
-): Promise<boolean> {
+  projectId: string,
+  year: number,
+  sheetKey: string,
+  sheetData: Record<string, any>,
+  expectedVersion?: number,
+): Promise<WorksheetSaveResult> {
+  const body: Record<string, any> = { sheet_key: sheetKey, data: sheetData }
+  if (expectedVersion !== undefined) {
+    body.expected_version = expectedVersion
+  }
   try {
-    const resp = await http.put(
-      P.get(projectId, year, sheetKey),
-      { sheet_key: sheetKey, data: sheetData },
-      { validateStatus: (s: number) => s < 600 }
-    )
-    return resp.status >= 200 && resp.status < 300
-  } catch {
-    return false
+    const response = await http.put(P.get(projectId, year, sheetKey), body)
+    if (typeof response.status === 'number' && (response.status < 200 || response.status >= 300)) {
+      throw new Error(`工作底稿保存失败（HTTP ${response.status}）`)
+    }
+    const version = typeof response.data?.version === 'number' ? response.data.version : 0
+    return { ok: true, version }
+  } catch (err: any) {
+    const status = err?.response?.status
+    const detail = err?.response?.data?.detail
+    if (status === 409 && detail?.code === 'worksheet_version_conflict') {
+      throw new WorksheetVersionConflictError(
+        detail.expected_version ?? null,
+        detail.actual_version ?? null,
+        detail.message,
+      )
+    }
+    throw err
   }
 }
 
-/** 批量加载项目所有表的数据 */
+/** 批量加载项目所有表的数据；成功零行返回 empty，异常返回 error。 */
 export async function loadAllWorksheetData(
   projectId: string, year: number
-): Promise<Record<string, Record<string, any>>> {
+): Promise<WorksheetLoadResult<Record<string, Record<string, any>>>> {
   try {
-    const resp = await http.get(
-      P.listAll(projectId, year),
-      { validateStatus: (s: number) => s < 600 }
-    )
-    // resp.data 可能是数组（直接返回）或 { content: 数组 }（被拦截器解包）
-    let items = resp.data
-    if (items && !Array.isArray(items) && Array.isArray(items.content)) {
-      items = items.content
-    }
-    if (!Array.isArray(items)) items = []
+    const response = await http.get(P.listAll(projectId, year))
+    // resp.data 可能是数组（直接返回）或 { content: 数组 }（统一信封已解包前的兼容形状）
+    const payload = response.data
+    const items = Array.isArray(payload)
+      ? payload
+      : isRecord(payload) && Array.isArray(payload.content)
+        ? payload.content
+        : null
+    if (!items) return loadError('工作底稿批量响应格式无法识别')
+
     const result: Record<string, Record<string, any>> = {}
+    const versions: Record<string, number> = {}
     for (const item of items) {
-      if (item?.sheet_key && item?.content) {
-        result[item.sheet_key] = item.content
+      if (!isRecord(item) || typeof item.sheet_key !== 'string' || !isRecord(item.content)) {
+        return loadError('工作底稿批量响应包含无法解析的表数据')
       }
+      result[item.sheet_key] = item.content
+      versions[item.sheet_key] = typeof item.version === 'number' ? item.version : 0
     }
-    return result
-  } catch {
-    return {}
+    const hasContent = Object.values(result).some((content) => Object.keys(content).length > 0)
+    return { status: hasContent ? 'loaded' : 'empty', data: result, versions }
+  } catch (error) {
+    return loadError(errorMessage(error, '工作底稿批量加载失败'))
   }
+}
+
+export async function loadPriorYearWorksheetData(
+  projectId: string, year: number, sheetKey: string,
+): Promise<PriorYearWorksheetResult> {
+  const { data } = await http.get(
+    `/api/consol-worksheet-data/${projectId}/${year}/prior-year/${sheetKey}`,
+  )
+  if (!isRecord(data) || typeof data.found !== 'boolean' || !isRecord(data.content)) {
+    throw new Error('上年工作底稿响应格式无法识别')
+  }
+  return data as PriorYearWorksheetResult
 }
 
 /** 预览 G7 到合并工作底稿的字段映射，不产生写入。 */

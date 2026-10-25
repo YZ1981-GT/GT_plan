@@ -21,7 +21,6 @@ export const projects = {
     get: (id: string) => `/api/projects/${id}/consistency-check`,
   },
   subsequentEvents: (id: string) => `/api/projects/${id}/subsequent-events`,
-  knowledge: (id: string) => `/api/projects/${id}/knowledge`,
   workHours: (id: string) => `/api/projects/${id}/work-hours`,
   assignments: (id: string) => `/api/projects/${id}/assignments`,
   myAssignments: '/api/projects/my/assignments',

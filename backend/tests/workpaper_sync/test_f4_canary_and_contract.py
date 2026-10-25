@@ -61,23 +61,17 @@ def _resolution(codes) -> F4.TemplateResolutionFacts:
 
 
 class TestProperty1MigrationState:
-    def test_current_state_is_legacy(self, manifest_entry) -> None:
-        assert manifest_entry.get("migration_state") == "legacy_fake_bidirectional"
+    def test_current_state_is_adapter_registered(self, manifest_entry) -> None:
+        """翻转后：manifest migration_state 已是 adapter_registered。"""
+        assert manifest_entry.get("migration_state") == "adapter_registered"
 
-    @pytest.mark.xfail(
-        reason="🔴 现状必红：published representation 缺供给（BP-61-1），Task 8 就绪后转绿",
-        strict=True,
-    )
     def test_becomes_adapter_registered(self, manifest_entry) -> None:
         assert manifest_entry.get("migration_state") == "adapter_registered"
 
-    def test_legacy_reasons_are_the_three_known_ones(self, manifest_entry) -> None:
+    def test_legacy_reasons_cleared_after_flip(self, manifest_entry) -> None:
+        """翻转后 legacy_reasons 应为空。"""
         reasons = set((manifest_entry.get("evidence") or {}).get("legacy_reasons") or [])
-        assert reasons == {
-            "template_only_open",
-            "no_durable_forcesave_ack",
-            "missing_adapter",
-        }
+        assert reasons == set()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -161,7 +155,19 @@ class TestProperty2PhantomCodeCollision:
 class TestProperty3StoreItemIdPrimaryKey:
     def test_canary_store_item_id_exact(self) -> None:
         assert F406.STORE_ITEM_ID_F406 == "F4-6-rows"
-        assert F4.all_store_item_ids() == ("F4-6-rows",)
+        items = F4.all_store_item_ids()
+        assert "F4-6-rows" in items
+        assert "F4-5-rows" in items
+        assert "F4-8-debit-rows" in items
+        assert "F4-8-credit-rows" in items
+        # F4-7 五区
+        assert "F4-7-payment-window-rows" in items
+        assert "F4-7-estimated-inbound-rows" in items
+        assert "F4-7-unprocessed-invoice-rows" in items
+        assert "F4-7-subsequent-payment-rows" in items
+        assert "F4-7-subsequent-increase-rows" in items
+        assert "F4-2-rows" in items
+        assert len(items) == 10
 
     @pytest.mark.parametrize(
         "alias",
@@ -325,3 +331,123 @@ class TestContractAndSelection:
 
         cols = [col_index(s[1]) for s in managed_field_specs(F406.SPEC_F406)]
         assert cols == sorted(cols)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# F4-P17：零回归基线（golden digest 现算）
+# spec: f4-sync-coverage-and-first-canary · Task 5
+# Validates: 7.4
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestProperty17GoldenDigestBaseline:
+    """F4 纳入 golden digest 门后，既有 provider 的 digest 不变。
+
+    🔴 真正的逐字节比对在 `check_sync_provider_golden_digest.py` 的 `_compare` 中完成。
+    测试层验证：F4 已在 PROVIDERS 中登记、三段 digest 可算出且格式正确。
+    """
+
+    def test_f4_is_in_golden_providers(self) -> None:
+        """F4 已登记到 golden digest PROVIDERS 中。"""
+        import importlib
+        mod = importlib.import_module("scripts.check.check_sync_provider_golden_digest")
+        labels = {p[0] for p in mod.PROVIDERS}
+        assert "f4" in labels, "F4 应已纳入 golden digest PROVIDERS"
+
+    def test_contract_payload_digest_is_valid_hex(self) -> None:
+        """F4 的 contract payload 能现算出合法 sha256 hex。"""
+        import hashlib, json
+        payload = F4.build_contract_payload()
+        text = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        assert len(digest) == 64 and all(c in "0123456789abcdef" for c in digest)
+
+    def test_instrumentation_digest_is_valid_hex(self) -> None:
+        """F4 的 instrumentation specs 能现算出合法 sha256 hex。"""
+        import hashlib, json
+        specs = F4.instrumentation_specs()
+        assert len(specs) >= 1, "至少 1 条 instrumentation spec（canary F4-6）"
+        canonical = [
+            {f: getattr(s, f) for f in (
+                "entry_id", "template_id", "template_relative_path", "managed_sheet",
+                "sheet_key", "table_key", "first_data_row", "last_data_row", "footer_row",
+                "header_row", "managed_last_col", "uuid_col", "table_name",
+            ) if hasattr(s, f)}
+            for s in specs
+        ]
+        text = json.dumps(canonical, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        assert len(digest) == 64
+
+    def test_projection_digest_is_valid_hex(self) -> None:
+        """F4 的 store projection 能用合成载荷现算出合法 sha256 hex。"""
+        import hashlib, json
+        payload = F4.build_contract_payload()
+        contract = parse_contract(payload, adapter_id=F4.ADAPTER_ID)
+        from app.services.workpaper_sync.phase5_row_table_sheet import managed_field_specs as mfs
+        row_specs = F4.managed_row_table_specs()
+        spec = next(s for s in row_specs if s.store_item_id == F4.STORE_ITEM_ID)
+        fields = mfs(spec)
+        rows = []
+        for i in range(2):
+            row = {spec.row_identity_key: f"synthetic-{i}"}
+            for fs in fields:
+                vt, jp = fs[3], fs[4]
+                val = (i + 1) * 100 if vt in ("amount", "integer") else f"v{i}"
+                parts = str(jp).split("/")
+                cursor = row
+                for seg in parts[:-1]:
+                    nxt = cursor.get(seg)
+                    if not isinstance(nxt, dict):
+                        nxt = {}
+                        cursor[seg] = nxt
+                    cursor = nxt
+                cursor[parts[-1]] = val
+            rows.append(row)
+        projection = F4.build_store_projection(rows, contract=contract)
+        assert projection.contract_id == F4.ADAPTER_ID
+        keys = list(projection.stable_keys())
+        assert len(keys) > 0, "投影应有非空 stable_keys"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# F4-P11：行身份 custom-${index} 修复守卫（BP-7 同型）
+# spec: f4-sync-coverage-and-first-canary · Task 19（部分）
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestProperty11RowIdentityNoOrdinal:
+    """F4-1 审定表的 migrateF4AdjRows 不含旧的下标派生 `custom-${index}`。
+
+    修复前：`custom-${index}`（index 是 map 下标）⇒ 位置派生身份。
+    修复后：`custom-${crypto.randomUUID()}`（稳定 UUID）。
+    """
+
+    _COMPOSABLE_PATH = (
+        Path(__file__).resolve().parents[3]
+        / "audit-platform"
+        / "frontend"
+        / "src"
+        / "components"
+        / "workpaper"
+        / "composables"
+        / "useF4Adjudication.ts"
+    )
+
+    def test_no_ordinal_custom_pattern_in_source(self) -> None:
+        """活代码不含 `custom-${index}` 模板字符串（下标派生）。"""
+        import re
+        text = self._COMPOSABLE_PATH.read_text(encoding="utf-8")
+        stripped = re.sub(r"/\*[\s\S]*?\*/", "", text)
+        stripped = re.sub(r"//[^\n]*", "", stripped)
+        hits = re.findall(r"`custom-\$\{index\}`", stripped)
+        assert not hits, (
+            f"useF4Adjudication.ts 活代码含旧下标模板字符串 {hits}"
+        )
+
+    def test_custom_uses_random_uuid(self) -> None:
+        """兜底键用 crypto.randomUUID()（稳定 UUID）。"""
+        text = self._COMPOSABLE_PATH.read_text(encoding="utf-8")
+        assert "crypto.randomUUID()" in text, (
+            "useF4Adjudication.ts 应含 crypto.randomUUID() 兜底"
+        )

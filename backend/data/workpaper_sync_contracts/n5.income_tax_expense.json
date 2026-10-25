@@ -1,0 +1,157 @@
+{
+  "contract_id": "n5.income_tax_expense",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "5b12b5640d2c04d6ae102d977c5b2a242fd75d9e62eb4c233a81c5d5253539e0",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "derived_readonly_sheet": {
+      "excel_name": "所得税费用审定表N5-1",
+      "reason": "r7~r15 全公式（SUMIF 引用明细表N5-2 + 加总 + 裸 IF 变动率），一格不写"
+    },
+    "entry_id": "xlsx/gt-n5-income-tax-expense",
+    "html_store": {
+      "html_only_keys": [],
+      "item_id": "N5-2-rows",
+      "note": "N5-2 明细表存成 N5-2-rows 的 conclusion（JSON 数组）。",
+      "row_identity_key": "id",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "n_cycle_income_tax_expense",
+    "reviewed_basis": "openpyxl 逐格实测 N5 所得税费用.xlsx 的 所得税费用明细表N5-2：单级表头 R8，6列 A-F，数据区 R9-R20（12行），零逐行公式列（B10=B9*25%是单格特殊公式不是行模板）。R21 合计 SUM。审定表 N5-1 全公式。"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "所得税费用明细表N5-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "n52-managed",
+      "tables": [
+        {
+          "anchor": "A8",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!所得税费用明细表N5-2!A8",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!所得税费用明细表N5-2!A9",
+              "stable_field_key": "income_tax_expense_detail_rows/{row_uuid}/item_name",
+              "store_item_id": "N5-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_amount",
+              "header_source_ref": "源xlsx!所得税费用明细表N5-2!B8",
+              "header_text": "本期数",
+              "json_pointer": "/rows/{row_uuid}/currentAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!所得税费用明细表N5-2!B9",
+              "stable_field_key": "income_tax_expense_detail_rows/{row_uuid}/current_amount",
+              "store_item_id": "N5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_index",
+              "header_source_ref": "源xlsx!所得税费用明细表N5-2!C8",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/currentIndex",
+              "mode": "editable",
+              "source_ref": "源xlsx!所得税费用明细表N5-2!C9",
+              "stable_field_key": "income_tax_expense_detail_rows/{row_uuid}/current_index",
+              "store_item_id": "N5-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_amount",
+              "header_source_ref": "源xlsx!所得税费用明细表N5-2!D8",
+              "header_text": "上期数",
+              "json_pointer": "/rows/{row_uuid}/priorAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!所得税费用明细表N5-2!D9",
+              "stable_field_key": "income_tax_expense_detail_rows/{row_uuid}/prior_amount",
+              "store_item_id": "N5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_index",
+              "header_source_ref": "源xlsx!所得税费用明细表N5-2!E8",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/priorIndex",
+              "mode": "editable",
+              "source_ref": "源xlsx!所得税费用明细表N5-2!E9",
+              "stable_field_key": "income_tax_expense_detail_rows/{row_uuid}/prior_index",
+              "store_item_id": "N5-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!所得税费用明细表N5-2!F8",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!所得税费用明细表N5-2!F9",
+              "stable_field_key": "income_tax_expense_detail_rows/{row_uuid}/remark",
+              "store_item_id": "N5-2-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "所得税费用审定数",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "income_tax_expense_detail_rows",
+          "uuid_col": "G"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "21a948f0f53a78e785dbd65013e893201b3d07e7efe371edb1365d5f70edc533",
+    "relative_path": "N/N5 所得税费用.xlsx",
+    "template_sha256": "d5dd5b29ac649dbbd2959496bcdad4c984f0210996bdaba2407072758c4e89b3"
+  },
+  "template_definition_sha256": "547e046a2831b41d208c46fd491c77b917ef276606331dd5c067a9bdcc136f1b"
+}

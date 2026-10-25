@@ -119,6 +119,13 @@
           <el-input v-model="row.varianceReason" :disabled="isReadonly" size="small" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" placeholder="差异原因" @blur="save(row.rowId, 'varianceReason', row.varianceReason)" />
         </template>
       </el-table-column>
+      <!-- 抽凭留痕：号+日期同列显示。凭证号跨日重复，只显示号无法回溯是哪一张 -->
+      <el-table-column label="凭证号" width="120">
+        <template #default="{ row }">
+          <el-input v-model="row.voucherRef" :disabled="isReadonly" size="small" placeholder="凭证号" @blur="save(row.rowId, 'voucherRef', row.voucherRef)" />
+          <div v-if="row.voucherDate" class="voucher-date-hint">{{ row.voucherDate }}</div>
+        </template>
+      </el-table-column>
       <el-table-column label="确认" width="72" align="center">
         <template #default="{ row }">
           <el-tag v-if="row.recognition === 'recognize'" type="danger" size="small">确认</el-tag>
@@ -156,10 +163,10 @@
     </div>
 
     <!-- 抽凭引擎 Dialog -->
-    <el-dialog v-model="showSamplingDialog" title="⚡ 抽凭引擎（科目 2701 预计负债-诉讼）" width="720px" :close-on-click-modal="false" destroy-on-close>
+    <el-dialog v-model="showSamplingDialog" :title="`⚡ 抽凭引擎（科目 ${samplingAccountCode} ${K5_ACCOUNT_NAME}-诉讼）`" width="720px" :close-on-click-modal="false" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && props.wpId && props.projectId"
-        account-code="2701"
+        :account-code="samplingAccountCode"
         phase="final"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
@@ -245,6 +252,14 @@ import { ref, toRef, computed, defineAsyncComponent, onMounted } from 'vue'
 import { Plus, Delete, MagicStick, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK5Litigation } from '../../composables/useK5Litigation'
+// 🔴 科目码走单一真源 k5AccountScope，禁硬编码。
+//    本文件原写 account-code="2701" —— `2701` 在全部项目中一律是**长期应付款**
+//    （L5 循环，带 .01 应付融资租赁款 等四个子科目），预计负债是 `2801`
+//    （真实库 6 个项目一致、report_config BS-068/BS-094 亦为 TB('2801')）。
+//    抽错科目 ⇒ 抽回来的凭证与未决诉讼毫无关系，回填进底稿即错误样本。
+//    平台在修 K5TabAdjudication 时已确立该真源（注释原文「禁硬编码 2701 防污染
+//    L5 长期应付款」），但当时只改了那一个文件，本处属同类未清。
+import { K5_ACCOUNT_NAME, K5_FALLBACK_STANDARD } from '../../composables/k5AccountScope'
 import http from '@/utils/http'
 import type { Ref } from 'vue'
 
@@ -269,6 +284,13 @@ const emit = defineEmits<{
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
 
 const samplingYear = computed(() => props.year ?? new Date().getFullYear())
+
+/**
+ * 抽凭科目码。本组件无 `tbSourceCodes` prop（不接 render 解析结果），
+ * 故取真源的兜底标准码 `2801` 预计负债；若将来宿主下传 tbSourceCodes，
+ * 应改用 `k5QueryCodes(props.tbSourceCodes)` 以优先使用运行态解析值。
+ */
+const samplingAccountCode = K5_FALLBACK_STANDARD
 
 const {
   litigationRows,
@@ -446,7 +468,7 @@ async function suggestAjeFromVariance(): Promise<void> {
   const amt = totalVariance.value
   try {
     await ElMessageBox.confirm(
-      `检测到未决诉讼应确认但未计提差异合计 ${fmtNum(amt)} 元。\n\n建议生成调整分录：\n  借：营业外支出 6711  ${fmtNum(amt)}\n  贷：预计负债 2701  ${fmtNum(amt)}\n\n是否推送至 K5-3 调整分录汇总？`,
+      `检测到未决诉讼应确认但未计提差异合计 ${fmtNum(amt)} 元。\n\n建议生成调整分录：\n  借：营业外支出 6711  ${fmtNum(amt)}\n  贷：${K5_ACCOUNT_NAME} ${K5_FALLBACK_STANDARD}  ${fmtNum(amt)}\n\n是否推送至 K5-3 调整分录汇总？`,
       '建议补提预计负债',
       { confirmButtonText: '推送至K5-3', cancelButtonText: '取消', type: 'warning' }
     )
@@ -458,8 +480,10 @@ async function suggestAjeFromVariance(): Promise<void> {
         summary: `补提未决诉讼预计负债（差异 ${fmtNum(amt)}）`,
         debitAccountCode: '6711',
         debitAccountName: '营业外支出',
-        creditAccountCode: '2701',
-        creditAccountName: '预计负债',
+        // 🔴 原写 '2701'（长期应付款）却标名「预计负债」—— 码名矛盾，且该 AJE 会推给
+        //    K5-3 汇总并进 A13 错报，错科目会把调整分录记到 L5 长期应付款上。
+        creditAccountCode: K5_FALLBACK_STANDARD,
+        creditAccountName: K5_ACCOUNT_NAME,
         amount: amt,
       }),
     })
@@ -469,13 +493,78 @@ async function suggestAjeFromVariance(): Promise<void> {
   }
 }
 
-function onSampleFilled(payload: any) {
+/**
+ * 抽凭引擎回填 → 未决诉讼检查行。
+ *
+ * 🔴 修复前本函数只弹一条 `ElMessage.success('抽凭样本已填入 N 笔')`，samples **连 ref
+ * 都没进**，整批丢弃 —— 提示说「已填入」但表里一行没加、库里一个字没写，是最坏的一类
+ * 静默失败（用户以为留痕了）。该缺陷曾被守卫
+ * `samplingHostMethodologyCoverage.spec.ts` 登记成期望基线而非阻断，故长期不报红。
+ *
+ * 现走 composable 既有 `addRow(caseName)` + `updateCell` 通路（与 E1/D4 同款），
+ * 每笔样本落一行并由 `_persist()` 写入 `checklist_responses` 的 `K5-6-rows`。
+ */
+async function onSampleFilled(payload: any) {
   showSamplingDialog.value = false
-  const samples = payload?.samples ?? []
-  if (samples.length > 0) {
-    ElMessage.success(`抽凭样本已填入 ${samples.length} 笔`)
-  } else {
+  const samples = Array.isArray(payload?.samples) ? payload.samples : []
+  if (samples.length === 0) {
     ElMessage.info('未获取到样本数据')
+    return
+  }
+
+  /** 行的凭证身份：号+日期。🔴 只用号会把同号跨日的不同凭证误判为重复。 */
+  const identityOf = (no: unknown, date: unknown) =>
+    `${String(no ?? '').trim()}@${String(date ?? '').trim()}`
+
+  const existing = new Set(
+    litigationRows.value.map((r: any) => identityOf(r.voucherRef, r.voucherDate)),
+  )
+
+  let added = 0
+  let skipped = 0
+  for (const s of samples) {
+    const voucherNo = String(s?.voucherNo ?? '').trim()
+    const voucherDate = String(s?.voucherDate ?? '').trim().slice(0, 10)
+    const identity = identityOf(voucherNo, voucherDate)
+    if (voucherNo && existing.has(identity)) {
+      skipped += 1
+      continue
+    }
+
+    // 案件名称取摘要（诉讼类凭证摘要通常含案由）；缺失时用凭证号占位，由审计师改写
+    const caseName = String(s?.summary ?? '').trim() || (voucherNo ? `抽凭 ${voucherNo}` : '抽凭样本')
+    // 传 caseName → addRow 不弹 prompt；返回 null 表示未建行，必须跳过（不可假设成功）
+    const row = await addRow(caseName)
+    if (!row) continue
+
+    // 涉案金额：取借贷绝对值较大者作为金额线索（诉讼赔付方向因案而异）
+    const amount = Math.max(
+      Math.abs(Number(s?.debitAmount) || 0),
+      Math.abs(Number(s?.creditAmount) || 0),
+    )
+
+    updateCell(row.rowId, 'voucherRef', voucherNo)
+    updateCell(row.rowId, 'voucherDate', voucherDate)
+    if (amount > 0) updateCell(row.rowId, 'amount', amount)
+    // 败诉可能性/预计损失属专业判断（CAS13 三级），不由抽凭代填 —— 留空待审计师
+    // 结合律师意见填写，备注里明确写出这一待办，避免误以为已评估完毕。
+    const noteParts = ['抽凭引擎回填，待结合律师意见判断败诉可能性']
+    if (s?.accountName) noteParts.push(`科目：${s.accountName}`)
+    if (s?.abnormal) noteParts.push('引擎标记异常，待核查')
+    updateCell(row.rowId, 'remark', noteParts.join('；'))
+
+    existing.add(identity)
+    added += 1
+  }
+
+  if (added > 0) {
+    ElMessage.success(
+      skipped > 0
+        ? `已回填 ${added} 笔诉讼检查行（${skipped} 笔重复已跳过），请补充律师意见与败诉可能性`
+        : `已回填 ${added} 笔诉讼检查行，请补充律师意见与败诉可能性`,
+    )
+  } else {
+    ElMessage.info(`未新增（${skipped} 笔重复已跳过）`)
   }
 }
 
@@ -495,6 +584,7 @@ onMounted(() => { loadNote() })
 .header-actions { display: flex; gap: 8px; }
 .methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 .cross-check-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); }
+.voucher-date-hint { font-size: 11px; color: #909399; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .formula-cell { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #303133; }
 .formula-underline { border-bottom: 1px dashed #909399; cursor: help; }
 .diff-warn { color: #e6a23c; font-weight: 600; }

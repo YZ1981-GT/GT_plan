@@ -1,6 +1,6 @@
 {
   "_source": "生成自前端 *NoteSectionMap.ts（唯一真源），勿手工编辑；重生成：python backend/scripts/gen_note_wp_sync_registry.py --write",
-  "generated_at": "2026-08-02T13:39:21.018645+00:00",
+  "generated_at": "2026-09-28T07:20:12.956290+00:00",
   "entries": [
     {
       "wp_code": "D1",
@@ -483,6 +483,14 @@
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/l1NoteSectionMap.ts"
     },
     {
+      "wp_code": "L2",
+      "listed": "五、42",
+      "soe": "八、42",
+      "sheet_listed": "附注披露（上市公司）信息",
+      "sheet_soe": "附注披露（国企）信息",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/l2NoteSectionMap.ts"
+    },
+    {
       "wp_code": "L3",
       "listed": "五、45",
       "soe": "八、49",
@@ -491,12 +499,28 @@
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/l3NoteSectionMap.ts"
     },
     {
+      "wp_code": "L4",
+      "listed": "五、46",
+      "soe": "八、50",
+      "sheet_listed": "附注披露信息核对（上市公司）",
+      "sheet_soe": "附注披露信息核对（国企）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/l4NoteSectionMap.ts"
+    },
+    {
       "wp_code": "L5",
       "listed": "五、48",
       "soe": "八、53",
       "sheet_listed": "附注披露信息（上市公司）",
       "sheet_soe": "附注披露信息（国企）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/l5NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "L6",
+      "listed": "五、40",
+      "soe": "八、40",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/l6NoteSectionMap.ts"
     },
     {
       "wp_code": "L7",
@@ -609,6 +633,14 @@
       "sheet_listed": "附注披露信息（上市公司）",
       "sheet_soe": "附注披露信息（国企）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/n2NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "N3",
+      "listed": "五、22",
+      "soe": "八、22",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/n3NoteSectionMap.ts"
     },
     {
       "wp_code": "N4",

@@ -1,0 +1,25 @@
+{
+  "templateId": "J16S",
+  "firstRow": 17,
+  "rows": [
+    { "label": "一、工资、奖金、津贴和补贴", "indent": 0 },
+    { "label": "其中：1．工资", "indent": 1 },
+    { "label": "　　　2．奖金", "indent": 1 },
+    { "label": "　　　3．津贴", "indent": 1 },
+    { "label": "　　　4．补贴", "indent": 1 },
+    { "label": "二、职工福利费", "indent": 0 },
+    { "label": "三、社会保险费", "indent": 0 },
+    { "label": "其中：1．医疗保险费", "indent": 1 },
+    { "label": "　　　2．年金缴费", "indent": 1 },
+    { "label": "　　　3．工伤保险费", "indent": 1 },
+    { "label": "　　　4．生育保险费", "indent": 1 },
+    { "label": "四、住房公积金", "indent": 0 },
+    { "label": "五、工会经费", "indent": 0 },
+    { "label": "六、职工教育经费", "indent": 0 },
+    { "label": "七、非货币性福利", "indent": 0 },
+    { "label": "八、辞退福利\n（因解除劳动关系给予的补偿）", "indent": 0 },
+    { "label": "九、职工奖励及福利基金（外资）", "indent": 0 },
+    { "label": "十、以现金结算的股份支付", "indent": 0 },
+    { "label": "十一、其他", "indent": 0 }
+  ]
+}

@@ -13,6 +13,7 @@
  * 科目：2501 长期借款（贷方/负债类）
  */
 import { ref, computed, watch, type Ref } from 'vue'
+import { newRowIdentity } from './shared/rowIdentity'
 import type { ChecklistResponse } from './useL3FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -54,7 +55,8 @@ export interface UseL3VoucherCheckOptions {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const ITEM_ROWS = 'L3-L3-9-voucher-rows'
+export const L3_VOUCHER_ROWS_ITEM_ID = 'L3-L3-9-voucher-rows'
+const ITEM_ROWS = L3_VOUCHER_ROWS_ITEM_ID
 const ITEM_CRITERIA = 'L3-L3-9-criteria'
 const ITEM_NOTE = 'L3-L3-9-note'
 const ITEM_CONCLUSION = 'L3-L3-9-conclusion'
@@ -70,9 +72,7 @@ export const L3_CHECK_LABELS = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function genRowId(): string {
-  return `l3vc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-}
+// 行身份统一走平台共享铸号器（已有 rowId 优先，不重铸）。
 
 function parseNum(v: any): number {
   if (v == null) return 0
@@ -82,7 +82,7 @@ function parseNum(v: any): number {
 
 function normalizeRow(raw: any): L3VoucherCheckRow {
   return {
-    rowId: raw.rowId || genRowId(),
+    rowId: raw.rowId || newRowIdentity('l39vc'),
     date: raw.date || '',
     voucherNo: raw.voucherNo || '',
     businessContent: raw.businessContent || '',

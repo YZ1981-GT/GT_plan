@@ -237,8 +237,12 @@ export function draftTitleRowsFromI18(rows: any[]): Array<{ rowId: string; name:
   if (!Array.isArray(rows)) return []
   return rows
     .filter((r) => r.hasCertificate === 'N' || r.hasTitleEvidence === 'N' || r.certificateComplete === 'N')
-    .map((r, i) => ({
-      rowId: `tc-i18-${r.rowId || i}`,
+    .map((r) => ({
+      // 🔴 上游无 rowId 时不得回落到 filter 后的下标（ID-1 族 B）：本函数只在
+      // titleCertRows 为空时调用一次并随即落库，新生成的 id 此后即是该行身份。
+      rowId: r.rowId
+        ? `tc-i18-${r.rowId}`
+        : `tc-i18-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       name: String(r.name || ''),
       bookValue: num(r.netBookValue ?? r.bookValue),
       reason: String(r.noCertReason || r.remark || ''),

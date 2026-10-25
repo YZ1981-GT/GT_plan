@@ -44,7 +44,8 @@ async def check_subsidiary_completeness(
           "can_refresh": True,             # 恒为 True（T5：不阻断刷新）
         }
     """
-    from app.services.consol_tree_service import build_tree, get_descendants
+    from app.services.consol_calc_basis import data_leaves, entity_kinds
+    from app.services.consol_tree_service import build_tree
 
     try:
         tree = await build_tree(db, parent_project_id)
@@ -67,14 +68,25 @@ async def check_subsidiary_completeness(
             "can_refresh": True,
         }
 
-    leaves = [n for n in get_descendants(tree)]  # 所有后代（子公司）
+    # 口径变更（spec consol-tree-three-code-autobuild 任务 7.5，有意）：校验对象从「根的全部后代」
+    # 改为企业树的**数据叶子**（母公司/本部、分公司、子公司）—— 差额与汇总节点没有自己的试算表与附注，
+    # 母公司本体数据也进合并，同样要校验。没有单户项目的叶子直接给出提示（金额按 0 计）。
+    leaves = data_leaves(tree)
+    kinds = entity_kinds(tree)
     total = len(leaves)
+    missing = [n for n in leaves if n.project_id is None]
+    present = [n for n in leaves if n.project_id is not None]
+    missing_warnings = [
+        f"{_leaf_label(n, kinds)} 没有本年度单户项目，合并时金额按 0 计" for n in missing
+    ]
 
     try:
         result = await asyncio.wait_for(
-            _check_all(db, leaves, year), timeout=timeout
+            _check_all(db, present, year, kinds), timeout=timeout
         )
         warnings, checked = result
+        warnings = missing_warnings + warnings
+        checked += len(missing)
         completed = True
     except asyncio.TimeoutError:
         # EH5：超时降级 — 返回部分结果 + 提示，不阻断
@@ -95,17 +107,30 @@ async def check_subsidiary_completeness(
     }
 
 
-async def _check_all(db: AsyncSession, leaves: list, year: int) -> tuple[list[str], int]:
-    """逐子公司检查 TB 审定数 + 附注生成状态，返回 (warnings, checked_count)."""
+_KIND_PREFIX = {"branch": "分公司", "subsidiary": "子公司"}
+
+
+def _leaf_label(leaf, kinds: dict[str, str]) -> str:
+    """提示里的节点称呼：母公司数据节点的展示名已带「（母公司）/（本部）」，子公司、分公司加类型前缀。"""
+    name = getattr(leaf, "display_name", None) or leaf.company_name or leaf.company_code
+    prefix = _KIND_PREFIX.get(kinds.get(leaf.company_code, "subsidiary"))
+    return f"{prefix} {name}" if prefix else name
+
+
+async def _check_all(
+    db: AsyncSession, leaves: list, year: int, kinds: dict[str, str] | None = None,
+) -> tuple[list[str], int]:
+    """逐数据叶子检查 TB 审定数 + 附注生成状态，返回 (warnings, checked_count)."""
+    kinds = kinds or {}
     warnings: list[str] = []
     checked = 0
     for leaf in leaves:
         checked += 1
-        name = leaf.company_name or leaf.company_code
+        label = _leaf_label(leaf, kinds)
         if not await _has_audited_tb(db, leaf.project_id, year):
-            warnings.append(f"子公司 {name} 无审定试算数据，合并结果可能不准确")
+            warnings.append(f"{label} 无审定试算数据，合并结果可能不准确")
         if not await _has_notes(db, leaf.project_id, year):
-            warnings.append(f"子公司 {name} 未生成附注")
+            warnings.append(f"{label} 未生成附注")
     return warnings, checked
 
 

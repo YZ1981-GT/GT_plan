@@ -45,7 +45,12 @@ export const D4_SHEET_LABEL_MAP: Record<string, string> = {
   'D4-35': '其他业务收入检查表D4-35',
   'D4-36': '其他业务收入截止性测试D4-36',
   'D4-附注上市': '附注披露信息（上市公司）',
-  'D4-附注国企': '附注披露信息（国有企业）',
+  // 🔴 真名是「（国企）」而非「（国有企业）」—— openpyxl 实测三本权威册
+  //    （D4 收入底稿.xlsx / D4-1至D4-4 …xlsx / D4收入底稿.xlsx）逐字一致。
+  //    此前写成「（国有企业）」，靠 resolveD4SheetLabel 里 includes('国企')||includes('国有')
+  //    的兜底才命中真 sheet ⇒ 错名长期不可见（同 M 轮 MC-23「fallback 掩盖错名」型）。
+  //    对账守卫见 backend/tests/test_d4_sheet_labels_match_workbook.py。
+  'D4-附注国企': '附注披露信息（国企）',
 }
 
 /** 程序表索引号 → sheet_label */

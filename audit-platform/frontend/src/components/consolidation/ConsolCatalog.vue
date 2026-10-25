@@ -35,7 +35,7 @@
           @node-click="onNoteClick">
           <template #default="{ data }">
             <span class="cc-tree-node">
-              <span class="cc-tree-node-label">{{ data.label }}</span>
+              <span class="cc-tree-node-label" :style="data.is_continuation ? { color: 'var(--gt-color-text-tertiary)', fontSize: 'var(--gt-font-size-xs)' } : {}">{{ data.label }}</span>
               <el-tag v-if="data.children_count" size="small" type="success" style="margin-left:4px;font-size: var(--gt-font-size-xs)">{{ data.children_count }}家</el-tag>
               <el-tag v-if="data.is_consol_only" size="small" type="warning" style="margin-left:4px;font-size: var(--gt-font-size-xs)">仅合并</el-tag>
               <el-tag v-if="data.is_stale" size="small" type="danger" style="margin-left:2px;font-size: var(--gt-font-size-xs)">待汇总</el-tag>
@@ -101,20 +101,9 @@ const CONSOL_REPORT_FALLBACK = [
 const reportTreeDynamic = ref<any[]>([])
 
 async function loadReportTree() {
-  try {
-    const { data } = await api.get('/api/report-config/types', {
-      params: { scope: 'consolidated' },
-    })
-    if (Array.isArray(data) && data.length) {
-      reportTreeDynamic.value = data.map((r: any) => ({
-        key: r.report_type || r.type,
-        label: r.label || r.report_type,
-        icon: '',
-        type: r.report_type || r.type,
-      }))
-      return
-    }
-  } catch { /* 降级 */ }
+  // 🔴 修复：/api/report-config/types 端点不存在（请求被 /{config_id} 路由捕获 → UUID 校验 422）。
+  // 合并报表 6 种类型是固定的，直接使用 CONSOL_REPORT_FALLBACK。
+  // 后端日后若实现动态报表类型端点，在此处恢复 API 调用。
   reportTreeDynamic.value = []
 }
 
@@ -142,10 +131,11 @@ async function loadData() {
       table_count: g.table_count,
       children: (g.children || []).map((c: any) => ({
         key: c.section_id,
-        label: c.title,
+        label: c.continuation_of ? `  ↳ ${c.title}` : c.title,
         section_id: c.section_id,
         title: c.title,
         table_count: 1,
+        is_continuation: !!c.continuation_of,
       })),
     }))
   } catch { noteTree.value = [] }

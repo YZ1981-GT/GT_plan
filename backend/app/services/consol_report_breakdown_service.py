@@ -7,7 +7,8 @@ ConsolBreakdownDialog(source=report) 穿透展示（UI 留 Phase 3，后端 Phas
 数据契约（mirror Phase 0 consol_trial provenance / 附注穿透 notes/consol-breakdown）：
     {
       "account_code": str,
-      "by_company": [{company_code, company_name, amount, ratio}],
+      "by_company": [{company_code, company_name, amount, ratio,
+                      node_key?, role?, entity_kind?, display_name?, source_project_id?}],
       "elimination": str,        # consol_trial.consol_elimination
       "consolidated": str,       # consol_trial.consol_amount
       "individual_sum": str,     # consol_trial.individual_sum（has_breakdown=true 时）
@@ -105,14 +106,18 @@ async def get_report_consol_breakdown(
         ratio = (
             str((amount / total).quantize(_RATIO_QUANT)) if total != 0 else "0"
         )
-        augmented.append(
-            {
-                "company_code": c.get("company_code"),
-                "company_name": c.get("company_name"),
-                "amount": str(amount),
-                "ratio": ratio,
-            }
-        )
+        row = {
+            "company_code": c.get("company_code"),
+            "company_name": c.get("company_name"),
+            "amount": str(amount),
+            "ratio": ratio,
+        }
+        # 三码树溯源（spec consol-tree-three-code-autobuild 需求 5.9）：来自哪个节点（本部/分公司/子公司），
+        # 以及可跳转的单户项目；旧数据没有这些键时不输出，保持旧契约
+        for key in ("node_key", "role", "entity_kind", "display_name", "source_project_id"):
+            if c.get(key) is not None:
+                row[key] = c.get(key)
+        augmented.append(row)
 
     return {
         "account_code": account_code,

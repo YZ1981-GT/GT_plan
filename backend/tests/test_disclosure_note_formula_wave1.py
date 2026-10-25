@@ -343,8 +343,10 @@ class TestPriorYearValue:
 
 class TestFlagOffZeroRegression:
     @pytest.mark.asyncio
-    async def test_resolve_formula_none_when_disabled(self):
-        # 默认 DISCLOSURE_NOTE_FORMULA_ENABLED=False
+    async def test_resolve_formula_none_when_disabled(self, monkeypatch):
+        # 显式关闭 DISCLOSURE_NOTE_FORMULA_ENABLED
+        from app.core import config
+        monkeypatch.setattr(config.settings, "DISCLOSURE_NOTE_FORMULA_ENABLED", False, raising=False)
         assert (
             await resolve_formula({"source": "sum", "cells": ["R1C1"]},
                                   {"cell_values": {"R1C1": 5.0}})
@@ -362,7 +364,9 @@ class TestFlagOffZeroRegression:
         )
 
     @pytest.mark.asyncio
-    async def test_prior_value_none_when_disabled(self):
+    async def test_prior_value_none_when_disabled(self, monkeypatch):
+        from app.core import config
+        monkeypatch.setattr(config.settings, "DISCLOSURE_NOTE_FORMULA_ENABLED", False, raising=False)
         table = {"rows": [{"values": [1.0]}]}
         ctx = {"_prior_notes_cache": {"S": {"text": None, "table": table}}}
         # value 模式关闭 → None（即使有 table）

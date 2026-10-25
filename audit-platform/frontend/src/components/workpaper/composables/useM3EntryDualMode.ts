@@ -15,7 +15,8 @@ export type M3RenderMode = WorkpaperRenderMode
  */
 const M3_SHEET_MAP: Record<string, string> = {
   index: '底稿目录',
-  procedure: '库存股实质性程序表M3A',
+  // 🔴 MC-23 修正：真名含前导空格 + 中间空格，禁 strip（MC-10）
+  procedure: ' 库存股实质性程序表 M3A',
   'M3-1': '审定表M3-1',
   'disclosure-listed': '附注披露信息（上市公司）',
   'M3-2': '明细表M3-2',

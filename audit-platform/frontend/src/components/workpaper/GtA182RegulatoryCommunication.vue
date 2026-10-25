@@ -12,6 +12,7 @@
   <div class="gt-a182">
     <div class="gt-a182__toolbar">
       <el-segmented v-model="mode" :options="modeOptions" size="small" />
+      <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a182-regulatory-communication" />
       <div class="gt-a182__toolbar-right">
         <el-tooltip content="AI辅助（即将上线）" placement="top">
           <el-button size="small" disabled>
@@ -26,7 +27,7 @@
       </div>
     </div>
 
-    <div v-if="mode === '结构化视图'" class="gt-a182__content">
+    <div v-if="mode === 'html'" class="gt-a182__content">
       <el-skeleton v-if="loading" :rows="8" animated />
       <template v-else>
         <!-- 区块1: 收件人 -->
@@ -182,23 +183,32 @@
       </template>
     </div>
 
-    <GtOnlyOfficeSheet v-else :wp-id="props.wpId" sheet-name="A18-2" class="gt-a182__oo" />
+    <template v-else>
+      <WorkpaperSyncEditorHost v-if="syncOoDescriptor" :descriptor="syncOoDescriptor" :bridge="syncBridge" class="a182regulatorycommunication__oo" />
+      <div v-else style="display:flex;align-items:center;justify-content:center;height:400px;color:#909399">正在打开同步编辑器…</div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { ref, computed, toRef, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { Loading, MagicStick } from '@element-plus/icons-vue'
 import { useA182RegulatoryCommunication } from './composables/useA182RegulatoryCommunication'
 
-const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
+import { useWorkpaperSyncBridge } from './sync/useWorkpaperSyncBridge'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+
+const WorkpaperSyncEditorHost = defineAsyncComponent(() => import('./sync/WorkpaperSyncEditorHost.vue'))
 defineOptions({ name: 'GtA182RegulatoryCommunication' })
 
-const props = withDefaults(defineProps<{ wpId: string; readonly?: boolean }>(), { readonly: false })
+const props = withDefaults(defineProps<{ wpId: string; readonly?: boolean ; projectId?: string }>(), { readonly: false })
 
-const mode = ref('结构化视图')
-const modeOptions = ['结构化视图', '在线编辑']
+const mode = ref<'html' | 'docx'>('html')
+const modeOptions = [{ label: '结构化视图', value: 'html' }, { label: '在线编辑', value: 'docx' }]
 const introCollapse = ref<string[]>([])
 const guidanceCollapse = ref<string[]>([])
 
@@ -207,6 +217,33 @@ const {
   loading, recipient, matters, issuance, projectContext,
   saveStatus, lastSavedAt, loadData, updateRecipient, updateMatter, updateIssuance, flushPendingSaves,
 } = useA182RegulatoryCommunication(wpIdRef)
+
+
+// ─── sync bridge（替代 legacy mode + GtOnlyOfficeSheet）───
+const _ENTRY_ID = 'xlsx/gt-a182-regulatory-communication'
+const _SHEET_KEY = 'a182regulatorycommunication-managed'
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(_ENTRY_ID),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(_SHEET_KEY),
+  capability: capabilityForEntry(_ENTRY_ID),
+  flushHtml: async () => {
+    if (typeof flushPendingSave === 'function') flushPendingSave()
+    else if (typeof flushPendingSaves === 'function') flushPendingSaves()
+    // 🔴 降级保护：本 entry 的 capability 仍是 single_onlyoffice（后端无 per-entry
+    //    adapter）⇒ readStoreProjection 会 404。捕获后返回空投影，让 OO 走「无投影」
+    //    路径（与改线前 legacy 行为等价）。capability 升 bidirectional 后自动失效。
+    try {
+      const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: _ENTRY_ID })
+      return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: _SHEET_KEY }
+    } catch {
+      return { expectedRevision: 0, projection: null, sheetKey: _SHEET_KEY }
+    }
+  },
+  reloadHtml: async () => { if (typeof loadData === 'function') await loadData(props.wpId); else if (typeof refreshData === 'function') await refreshData(props.wpId) },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 
 onMounted(() => { loadData(props.wpId) })
 onBeforeUnmount(() => { flushPendingSaves() })

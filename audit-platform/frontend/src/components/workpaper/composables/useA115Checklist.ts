@@ -17,6 +17,7 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { isRequestCancelled } from '@/utils/http'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -142,6 +143,7 @@ export function useA115Checklist(wpId: Ref<string>, readonly: Ref<boolean>) {
         crossRefMap.value = { ...CROSS_REFERENCE_MAP, ...htmlData.cross_reference_map }
       }
     } catch (e: any) {
+      if (isRequestCancelled(e)) return
       error.value = e?.message || '数据加载失败'
     } finally {
       loading.value = false

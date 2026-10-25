@@ -143,14 +143,16 @@ class TestProperty12GrayServicePerProject:
 
     @pytest.mark.asyncio
     async def test_exception_fail_open_returns_false(self):
-        """异常 fail-open → False（绝不误开）。"""
+        """全局 False + DB 异常 → fail-open → False（绝不误开）。"""
         from app.services.note_formula_gray_service import is_note_formula_enabled
 
         db = AsyncMock()
         db.execute.side_effect = RuntimeError("DB connection lost")
         pid = uuid.uuid4()
 
-        result = await is_note_formula_enabled(db, pid)
+        with patch(_SETTINGS_PATCH_TARGET) as mock_s:
+            mock_s.DISCLOSURE_NOTE_FORMULA_ENABLED = False
+            result = await is_note_formula_enabled(db, pid)
 
         assert result is False
 
@@ -273,7 +275,7 @@ class TestProperty13ReadinessFormulaStatus:
 
     @pytest.mark.asyncio
     async def test_formula_enabled_fail_open_returns_false_in_readiness(self):
-        """is_note_formula_enabled 异常时 summary.formula_enabled = False（fail-open）。"""
+        """全局 False + DB 异常时 summary.formula_enabled = False（fail-open）。"""
         from app.services.note_readiness_service import build_readiness
 
         db = AsyncMock()
@@ -298,7 +300,9 @@ class TestProperty13ReadinessFormulaStatus:
 
         db.execute.side_effect = _execute_side_effect
 
-        result = await build_readiness(db, pid, 2025)
+        with patch(_SETTINGS_PATCH_TARGET) as mock_s:
+            mock_s.DISCLOSURE_NOTE_FORMULA_ENABLED = False
+            result = await build_readiness(db, pid, 2025)
         assert result["summary"]["formula_enabled"] is False
 
     @h_settings(max_examples=5)

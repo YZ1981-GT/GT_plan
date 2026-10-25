@@ -31,6 +31,7 @@ class ConsistencyCheckService:
             self._check_report_vs_notes,
             self._check_tb_vs_workpaper,
             self._check_notes_vs_workpaper,
+            self._check_adjustment_snapshot_vs_realtime,
         ]:
             try:
                 checks.append(await check_fn(project_id, year))
@@ -154,6 +155,111 @@ class ConsistencyCheckService:
             "total_items": 0,
             "passed_items": 0,
             "failed_items": [],
+        }
+
+    async def _check_adjustment_snapshot_vs_realtime(
+        self, project_id: UUID, year: int
+    ) -> dict:
+        """校验6: 调整额**持久化快照** vs **实时汇总**（需求 3.3）。
+
+        spec: tb-adjustment-column-formula-closure Phase 1 Task 1.11
+
+        两个口径：
+        - 快照 = ``trial_balance.aje_adjustment`` / ``rje_adjustment``
+          （由 ``recalc_adjustments`` 落列，是 ``TB(code,'AJE调整')`` 在报表域读到的值）
+        - 实时 = ``adjustment_amount_source.adj_net_batch``
+          （按当前 approved 分录现算，是 ``ADJ(code,'aje_net')`` 读到的值）
+
+        🔴 **本检查不做自动 recalc**（需求 3.3 明确不承诺）。它只让不一致
+        **可被发现** —— 改造前两个口径的差异是完全静默的：界面显示快照值（可能
+        全 0），而公式引擎按实时值算，没有任何地方报告二者不等。
+
+        真库现状就是这个形态：持久化列全 0 而实时值非 0。本检查必须能发现它，
+        由 ``test_adj_snapshot_drift_signal`` 用真数据钉住。
+
+        口径与试算平衡表调整列一致（口径矩阵第 4 行）：仅 approved + 排除 workpaper。
+        """
+        from app.models.audit_platform_models import TrialBalance
+        from app.services.adjustment_amount_source import (
+            DEFAULT_INCLUDE_STATUSES,
+            adj_net_batch,
+        )
+
+        tb_q = sa.select(
+            TrialBalance.standard_account_code,
+            TrialBalance.account_name,
+            TrialBalance.aje_adjustment,
+            TrialBalance.rje_adjustment,
+        ).where(
+            TrialBalance.project_id == project_id,
+            TrialBalance.year == year,
+            TrialBalance.is_deleted == sa.false(),
+        )
+        tb_rows = (await self.db.execute(tb_q)).all()
+        if not tb_rows:
+            return {
+                "check_name": "调整额快照→实时",
+                "passed": True,
+                "total_items": 0,
+                "passed_items": 0,
+                "failed_items": [],
+            }
+
+        # 快照按科目聚合（同一科目可能多 company_code 行）
+        snapshot: dict[str, dict[str, Decimal]] = {}
+        names: dict[str, str] = {}
+        for r in tb_rows:
+            code = r.standard_account_code
+            if not code:
+                continue
+            bucket = snapshot.setdefault(
+                code, {"aje": Decimal("0"), "rje": Decimal("0")}
+            )
+            bucket["aje"] += r.aje_adjustment or Decimal("0")
+            bucket["rje"] += r.rje_adjustment or Decimal("0")
+            names.setdefault(code, r.account_name or "")
+
+        realtime = await adj_net_batch(
+            self.db,
+            project_id=project_id,
+            year=year,
+            account_codes=set(snapshot.keys()),
+            include_statuses=DEFAULT_INCLUDE_STATUSES,
+            exclude_origins=frozenset({"workpaper"}),
+        )
+
+        # 容差与既有各层一致（0.01），避免 Decimal 尾差刷告警
+        tolerance = Decimal("0.01")
+        failed: list[dict] = []
+        for code, snap in sorted(snapshot.items()):
+            live = realtime.get(code, {})
+            for kind, snap_key in (("aje", "aje_net"), ("rje", "rje_net")):
+                snap_val = snap[kind]
+                live_val = live.get(snap_key, Decimal("0"))
+                if abs(snap_val - live_val) > tolerance:
+                    failed.append({
+                        "entity_type": "account",
+                        "entity_id": code,
+                        "message": (
+                            f"{names.get(code, code)} 的{kind.upper()}调整："
+                            f"试算表持久化列 {snap_val} 与实时汇总 {live_val} 不一致"
+                            f"（差额 {snap_val - live_val}）。"
+                            f"重算调整额后可消除；本检查不自动重算。"
+                        ),
+                    })
+
+        total = len(snapshot) * 2  # 每科目两类调整
+        if failed:
+            logger.warning(
+                "调整额快照与实时汇总不一致：project=%s year=%s 不一致项=%d/%d",
+                project_id, year, len(failed), total,
+            )
+        return {
+            "check_name": "调整额快照→实时",
+            "passed": not failed,
+            "total_items": total,
+            "passed_items": total - len(failed),
+            "failed_items": failed[:20],
         }
 
     async def get_tb_wp_consistency(self, project_id: UUID, year: int) -> list[dict]:

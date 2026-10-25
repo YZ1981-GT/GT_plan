@@ -337,7 +337,7 @@ async def list_bulk_scenarios(
         归档后调阅不了就违背了归档的意义（`test_archive_gating.py` 钉死了
         导出侧不得加状态过滤）。
     """
-    from app.services.bulk_tab.scenario_registry import scenarios_for_ui
+    from app.services.bulk_tab.scenario_registry import cycle_options_for_ui, scenarios_for_ui  # noqa: E501 —— 同行导入：本文件行号被 writer 清册钉扎（bulk_import L662 等），不得增行
 
     project = await db.get(Project, project_id)
     if project is None:
@@ -365,7 +365,7 @@ async def list_bulk_scenarios(
     return {
         "projectStatus": project_status,
         "isArchived": is_archived,
-        "scenarios": scenarios,
+        "scenarios": scenarios, "cycles": cycle_options_for_ui(),  # 同行：见上方导入处的行号约束（Req 8.5）
     }
 
 

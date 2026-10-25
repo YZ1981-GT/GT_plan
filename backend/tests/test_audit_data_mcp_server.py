@@ -551,8 +551,8 @@ class TestServerStructure:
         url_in_code = re.findall(r'["\']https?://[^"\']+["\']', source)
 
         for url_str in url_in_code:
-            # 允许默认值 http://localhost:9980（AUDIT_API_BASE 的默认）
-            if "localhost:9980" in url_str or "test:9980" in url_str:
+            # 允许默认值 http://127.0.0.1:9980（AUDIT_API_BASE 的默认；后端只监听 IPv4，不用 localhost）
+            if "127.0.0.1:9980" in url_str or "test:9980" in url_str:
                 continue
             # 文档字符串中的 URL 可以存在
             # 实际代码中不应有其他 URL

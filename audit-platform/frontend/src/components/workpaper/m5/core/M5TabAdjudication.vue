@@ -8,13 +8,6 @@
     />
     <!-- ═══ 标题 + DualMode + AI/复核 ═══ -->
     <div class="section-header">
-      <div class="section-header-left">
-        <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
-        <h3 class="section-title">M5-1 盈余公积审定表</h3>
-        <el-tag type="success" effect="dark" size="small" class="equity-badge">
-          权益类·贷方余额
-        </el-tag>
-      </div>
       <div class="section-header-right">
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" :disabled="isReadonly" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon> 带入调整
@@ -541,7 +534,8 @@ onUnmounted(() => {
 function _restoreRows(): M5AdjudicationRow[] {
   const restored: M5AdjudicationRow[] = []
   for (const [key, resp] of formData.allResponses.value.entries()) {
-    if (key.startsWith('M5-1-row-') && key.endsWith('-data') && resp.remark) {
+    // BP-10 迁移兼容：匹配旧 row-N 格式和新熵键格式
+    if (key.startsWith('M5-1-') && key.endsWith('-data') && resp.remark) {
       try {
         const d = JSON.parse(resp.remark)
         restored.push({

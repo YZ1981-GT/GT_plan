@@ -25,7 +25,7 @@ from app.core.bulk_operations import BulkRequest, bulk_execute
 from app.core.database import get_db
 from app.core.field_selection import parse_fields, BLOCKED_FIELDS
 from app.core.pagination import PaginationParams
-from app.deps import get_current_user, check_consol_lock, require_project_access, require_operation, get_user_scope_cycles
+from app.deps import get_current_user, check_consol_lock, require_project_access, require_project_permission, require_operation, get_user_scope_cycles
 from app.models.core import User
 from app.models.audit_platform_models import (
     Adjustment,
@@ -412,11 +412,14 @@ async def sync_from_workpaper(
         await db.commit()
         # P0-1: 同步成功后 SSE 广播，让大厅在线用户实时感知新分录到达
         try:
-            from app.core.event_bus import event_bus
+            from app.services.event_bus import event_bus
             event_bus.broadcast_raw(
-                f"projects:{project_id}",
                 "adjustment:sync-arrived",
-                {"project_id": str(project_id), "source_wp_code": data.source_wp_code or "", "adjustment_no": result.adjustment_no},
+                extra={
+                    "project_id": str(project_id),
+                    "source_wp_code": data.source_wp_code or "",
+                    "adjustment_no": result.adjustment_no,
+                },
             )
         except Exception:
             pass  # best-effort，不阻断响应
@@ -782,7 +785,7 @@ async def review_adjustment(
     entry_group_id: UUID,
     change: ReviewStatusChange,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_project_access("review")),
+    user=Depends(require_project_permission("adjustment:review")),
 ):
     """变更复核状态（需复核权限）"""
     svc = AdjustmentService(db)
@@ -808,6 +811,10 @@ async def review_adjustment(
                     year=affected.get("year"),
                     account_codes=affected.get("account_codes") or [],
                     entry_group_id=entry_group_id,
+                    extra={
+                        "operator_id": str(user.id),
+                        "operator_name": getattr(user, "username", ""),
+                    },
                 ))
             except Exception as e:
                 import logging
@@ -817,15 +824,74 @@ async def review_adjustment(
 
         # P0-4: 复核状态变更后 SSE 广播，让底稿侧实时回流 + 大厅其他用户感知
         try:
-            from app.core.event_bus import event_bus
+            from app.services.event_bus import event_bus
             event_bus.broadcast_raw(
-                f"projects:{project_id}",
                 "adjustment:review-changed",
-                {"project_id": str(project_id), "entry_group_id": str(entry_group_id), "new_status": change.status},
+                extra={
+                    "project_id": str(project_id),
+                    "year": affected.get("year"),
+                    "entry_group_id": str(entry_group_id),
+                    "new_status": change.status,
+                },
             )
         except Exception:
             pass  # best-effort
         return {"message": "状态变更成功"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{entry_group_id}/revoke-review")
+async def revoke_adjustment_review(
+    project_id: UUID,
+    entry_group_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_permission("adjustment:review")),
+):
+    """撤回复核通过的调整分录，回到草稿并触发下游回退。"""
+    svc = AdjustmentService(db)
+    try:
+        affected = await svc.change_review_status(
+            project_id,
+            entry_group_id,
+            ReviewStatusChange(status=ReviewStatus.draft),
+            user.id,
+            allow_approved_revoke=True,
+        )
+        await db.commit()
+
+        try:
+            from app.models.audit_platform_schemas import EventPayload, EventType
+            from app.services.event_bus import event_bus
+
+            await event_bus.publish(EventPayload(
+                event_type=EventType.ADJUSTMENT_REVIEW_REVOKED,
+                project_id=project_id,
+                year=affected.get("year"),
+                account_codes=affected.get("account_codes") or [],
+                entry_group_id=entry_group_id,
+                extra={
+                    "operator_id": str(user.id),
+                    "operator_name": getattr(user, "username", ""),
+                },
+            ))
+        except Exception as e:
+            logger.warning("[adj-review-revoked] 事件发布失败（撤回已落库）: %s", e)
+
+        try:
+            from app.services.event_bus import event_bus
+            event_bus.broadcast_raw(
+                "adjustment:review-changed",
+                extra={
+                    "project_id": str(project_id),
+                    "year": affected.get("year"),
+                    "entry_group_id": str(entry_group_id),
+                    "new_status": ReviewStatus.draft.value,
+                },
+            )
+        except Exception:
+            pass  # best-effort
+        return {"message": "已撤回复核，调整分录恢复为草稿"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

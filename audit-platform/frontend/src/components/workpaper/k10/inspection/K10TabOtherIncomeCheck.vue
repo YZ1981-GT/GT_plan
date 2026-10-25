@@ -298,7 +298,7 @@
         v-if="voucherDialogVisible && props.wpId && props.projectId"
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
-        account-code="6117"
+        :account-code="samplingAccountCode"
         phase="final"
         :year="currentYear"
         @filled="handleSampleFilled"
@@ -328,6 +328,15 @@ import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Tickets, Download } from '@element-plus/icons-vue'
 import { useK10Checks, deriveOverallStatus, type CheckStatus } from '../../composables/useK10Checks'
+/**
+ * 科目码单一真源（原硬编码 `"6117"`）。
+ *
+ * 🔴 取值不变（真源 `K10_FALLBACK_STANDARD` 亦为 `6117` 其他收益）⇒ 运行时行为不变。
+ * 改接真源的理由：`wp_account_mapping.json` 的 K10 条目是 `6301`（营业外收入，**错**），
+ * 若后人"照 json 修正"就会把本处改坏；接真源后该风险被消除。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.5/R5.4
+ */
+import { K10_FALLBACK_STANDARD } from '../../composables/k10AccountScope'
 import { parseNum, calcSubtotal } from '../../composables/useK10FormulaEngine'
 import { api } from '@/services/apiProxy'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
@@ -336,6 +345,9 @@ const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue')
 )
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
+
+/** 抽凭科目码（真源，本组件无 tbSourceCodes prop ⇒ 取兜底标准码） */
+const samplingAccountCode = K10_FALLBACK_STANDARD
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

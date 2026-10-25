@@ -6,6 +6,8 @@ Phase 9 Task 9.21: 附注从底稿提数 + 手动编辑锁定
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -75,8 +77,41 @@ def _build_default_wp_mapping() -> dict[str, str]:
     return dict(_LEGACY_DEFAULT_WP_MAPPING)
 
 
-# 默认附注-底稿映射（章节编号 → 底稿编号），派生自权威 registry
 DEFAULT_WP_MAPPING = _build_default_wp_mapping()
+
+
+def _iter_formula_rows(table_data: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    """按唯一真实容器遍历附注行，避免多表首表镜像被重复处理。
+
+    workpaper/workpaper_html 的 ``sub_table_data`` 是可写真源；``_tables`` 只是
+    读时投影，因此只要该字段存在就不读取投影。其它来源优先读取嵌套 ``_tables``，
+    只有没有嵌套表时才兼容 legacy 顶层 ``rows``。
+    """
+    source = table_data.get("_source")
+    if source in {"workpaper", "workpaper_html"} and "sub_table_data" in table_data:
+        sub_tables = table_data.get("sub_table_data")
+        if isinstance(sub_tables, dict):
+            for key, value in sub_tables.items():
+                if str(key).startswith("_"):
+                    continue
+                rows = value.get("rows") if isinstance(value, dict) else value
+                if isinstance(rows, list):
+                    yield from (row for row in rows if isinstance(row, dict))
+        return
+
+    tables = table_data.get("_tables")
+    if isinstance(tables, list) and tables:
+        for table in tables:
+            if not isinstance(table, dict):
+                continue
+            rows = table.get("rows")
+            if isinstance(rows, list):
+                yield from (row for row in rows if isinstance(row, dict))
+        return
+
+    rows = table_data.get("rows")
+    if isinstance(rows, list):
+        yield from (row for row in rows if isinstance(row, dict))
 
 
 class NoteWpMappingService:
@@ -233,17 +268,23 @@ class NoteWpMappingService:
             return 0
 
         td = note.table_data
-        rows = td.get("rows", [])
         cleared = 0
 
-        for row in rows:
-            values = row.get("values") or row.get("cells") or []
-            cell_modes = row.get("_cell_modes") or {}
+        for row in _iter_formula_rows(td):
+            values = row.get("values")
+            if not isinstance(values, list):
+                values = row.get("cells")
+            if not isinstance(values, list):
+                # 业务键 raw 行没有位置化 values；它可能仍保留按列索引的模式
+                # sidecar，模式键本身就是唯一可证明的列集合，不猜业务字段顺序。
+                values = []
+            cell_modes = row.get("_cell_modes")
+            cell_modes = cell_modes if isinstance(cell_modes, dict) else {}
 
-            for i in range(len(values)):
-                key = str(i)
-                current_mode = cell_modes.get(key, "auto")
-                if current_mode == "auto":
+            keys = {str(key) for key in cell_modes}
+            keys.update(str(i) for i in range(len(values)))
+            for key in keys:
+                if cell_modes.get(key, "auto") == "auto":
                     cell_modes[key] = "manual"
                     cleared += 1
 
@@ -273,11 +314,11 @@ class NoteWpMappingService:
             return 0
 
         td = note.table_data
-        rows = td.get("rows", [])
         restored = 0
 
-        for row in rows:
-            cell_modes = row.get("_cell_modes") or {}
+        for row in _iter_formula_rows(td):
+            cell_modes = row.get("_cell_modes")
+            cell_modes = cell_modes if isinstance(cell_modes, dict) else {}
             for key, mode in list(cell_modes.items()):
                 if mode == "manual":
                     cell_modes[key] = "auto"

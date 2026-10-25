@@ -15,6 +15,7 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { getAuthHeaders } from '@/utils/authToken'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -195,8 +196,7 @@ export function useWordTemplateStructured(
     await flushPendingSaves()
     try {
       const url = `/api/projects/${projectId.value}/wp-templates/${wpCode.value}/prefilled-download?include_responses=true`
-      const token = sessionStorage.getItem('token') || localStorage.getItem('token') || ''
-      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await fetch(url, { headers: getAuthHeaders() })
       if (!r.ok) throw new Error('导出失败')
       const blob = await r.blob()
       const obj = URL.createObjectURL(blob)
@@ -214,8 +214,7 @@ export function useWordTemplateStructured(
   async function exportTemplate(): Promise<void> {
     try {
       const url = `/api/projects/${projectId.value}/wp-templates/${wpCode.value}/prefilled-download?include_guidance=true`
-      const token = sessionStorage.getItem('token') || localStorage.getItem('token') || ''
-      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const r = await fetch(url, { headers: getAuthHeaders() })
       if (!r.ok) throw new Error('导出模板失败')
       const blob = await r.blob()
       const obj = URL.createObjectURL(blob)

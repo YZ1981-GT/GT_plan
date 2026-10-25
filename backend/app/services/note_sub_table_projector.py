@@ -25,8 +25,11 @@ from app.services.note_expandable_markers import (
 
 logger = logging.getLogger(__name__)
 
-# ``_source`` 视为"底稿同步来源"的标识（投影权威来源，Req6.1）
+#: workpaper 来源章节的导出关闭清单，持久化在 raw table_data 顶层。
+EXPORT_DISABLED_SUB_TABLES_KEY = "_export_disabled_sub_tables"
 _WORKPAPER_SOURCES = ("workpaper", "workpaper_html")
+
+
 
 #: 源模板留的「可扩位」行 —— 附注模板里形如 ``……`` / ``可无限量添加行`` 的行。
 #: 它标记的是「此处可增行」这个**位置**，本身没有披露内容 ⇒ 投影与 Word 导出
@@ -170,6 +173,12 @@ def project_sub_tables(table_data: Any) -> list[dict] | None:
     # 避免整表被静默跳过（附注与 Word 导出同时丢表）。
     sub = normalize_sub_table_data(sub, cols_map)
 
+    disabled_sub_tables = table_data.get(EXPORT_DISABLED_SUB_TABLES_KEY)
+    disabled_keys = {
+        item for item in disabled_sub_tables
+        if isinstance(item, str)
+    } if isinstance(disabled_sub_tables, list) else set()
+
     tables: list[dict] = []
     for key, rows in sub.items():  # 保持 sub_table_data 键插入序（Property 6）
         if _is_meta_key(key):
@@ -192,12 +201,18 @@ def project_sub_tables(table_data: Any) -> list[dict] | None:
                 for r in rows
                 if isinstance(r, dict) and not is_zero_visible_row(r)
             ]
+            source_row_indexes = [
+                index for index, row in enumerate(rows)
+                if isinstance(row, dict) and not is_zero_visible_row(row)
+            ]
             tables.append({
                 "name": key,
                 "headers": ["项目"] if has_label else [],
                 "columns": [],
                 "rows": projected_rows,
                 "_source_sub_table_key": key,
+                "_source_row_indexes": source_row_indexes,
+                **({"export_enabled": False} if key in disabled_keys else {}),
                 "_needs_columns": True,  # 前端据此提示"待配置列头"
             })
             continue
@@ -237,12 +252,18 @@ def project_sub_tables(table_data: Any) -> list[dict] | None:
                 "is_total": bool(r.get("is_total", False)),  # Property 5
             })
 
+        source_row_indexes = [
+            index for index, row in enumerate(rows)
+            if isinstance(row, dict) and not is_zero_visible_row(row)
+        ]
         tables.append({
             "name": key,
             "headers": headers,
             "columns": defs,
             "rows": projected_rows,
             "_source_sub_table_key": key,
+            "_source_row_indexes": source_row_indexes,
+            **({"export_enabled": False} if key in disabled_keys else {}),
             "_column_groups": col_groups,
         })
 

@@ -340,7 +340,7 @@
 
     <el-dialog
       v-model="showSamplingDialog"
-      title="抽凭引擎 - 科目1131应收股利（期后收回）"
+      title="抽凭引擎 - 科目 ${samplingAccountCode}应收股利（期后收回）"
       width="860px"
       destroy-on-close
       append-to-body
@@ -355,7 +355,7 @@
       />
       <SamplingEngine
         v-if="showSamplingDialog && samplingYear != null"
-        account-code="1131"
+        :account-code="samplingAccountCode"
         phase="final"
         default-method="random"
         :workpaper-id="wpId"
@@ -399,6 +399,17 @@ import type { CalcCheckRow, CalcCheckColumn, SubsequentColumn, SubsequentRow } f
 import type { G3ImportableSheet } from '../composables/useG3ImportExport'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 import type { SampledVoucher } from '../composables/useSamplingAlgorithms'
+
+/**
+ * 抽凭科目码取自单一真源 `gCycleAccountScope`（G3 应收股利）。
+ * 原为模板内字面量；接真源后科目口径与该循环的取数/回写共用同一定义，
+ * 避免各处独立硬编码而漂移。本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2
+ */
+import { gCycleScope } from '../composables/gCycleAccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = gCycleScope('G3')?.queryCodes().join(',') ?? ''
 
 const SamplingEngine = defineAsyncComponent(
   () => import('../voucher-sampling/GtVoucherSamplingEngine.vue'),

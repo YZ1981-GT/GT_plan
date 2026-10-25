@@ -21,6 +21,40 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
   const renderMeta = ref<Record<string, any>>({})
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
+  /**
+   * ② adapter 回写窗口门（spec `h2-h6-h10-pilot-cross-reference-lanes` Task 5 ②）。
+   *
+   * 🔴 为什么必须有：草稿是 H10 独有的**第三处**数据存储。OO→HTML 回写期间 store 正在被
+   * adapter 覆写，此刻若 PUT 失败又把旧值写成本地草稿，`restoreDrafts()` 下次回灌就会把
+   * **回写前的旧值**盖回 store —— 表现是「在 Excel 里改的东西过一会自己变回去了」，
+   * 而且没有任何报错。窗口内改为**不落草稿 + 明说没保住**（宁可让用户重填，不可静默回滚）。
+   */
+  const draftsSuspended = ref(false)
+  function setDraftsSuspended(v: boolean): void {
+    draftsSuspended.value = !!v
+  }
+
+  /**
+   * ③ 未同步草稿条数（spec 同上 Task 5 ③）。
+   *
+   * 🔴 现算而非计数器累加：草稿可能被别的标签页 / 上一个会话留下，累加器看不到它们。
+   */
+  const pendingDraftCount = ref(0)
+  function refreshPendingDraftCount(): void {
+    if (!opts.wpId.value) {
+      pendingDraftCount.value = 0
+      return
+    }
+    const prefix = `${DRAFT_PREFIX}:${opts.wpId.value}:`
+    let n = 0
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        if (localStorage.key(i)?.startsWith(prefix)) n += 1
+      }
+    } catch { /* 存储不可用时按 0 计，不阻塞业务 */ }
+    pendingDraftCount.value = n
+  }
+
   function restoreDrafts(): void {
     if (!opts.wpId.value) return
     for (let i = 0; i < localStorage.length; i++) {
@@ -36,6 +70,7 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
         }
       } catch { /* ignore corrupt draft */ }
     }
+    refreshPendingDraftCount()
   }
 
   async function loadResponses() {
@@ -96,14 +131,24 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
         try {
           localStorage.removeItem(draftKey(opts.wpId.value, itemId))
         } catch { /* ignore */ }
+        refreshPendingDraftCount()
         return
       } catch {
         if (i < retries - 1) await new Promise((r) => setTimeout(r, 500 * 2 ** i))
       }
     }
+    // 🔴 ② adapter 回写窗口内**不落草稿**：此刻 store 正被 adapter 覆写，落草稿会在
+    //    下次 restoreDrafts 时把回写前的旧值盖回去（静默回滚）。宁可明说没保住。
+    if (draftsSuspended.value) {
+      ElMessage.error(
+        `H10 数据未能保存（${itemId}）：Excel 回写正在进行，为避免覆盖回写结果未暂存本地，请稍后重填`,
+      )
+      return
+    }
     try {
       localStorage.setItem(draftKey(opts.wpId.value, itemId), JSON.stringify(updated))
       ElMessage.warning(`H10 数据暂存本地（${itemId}），网络恢复后将自动同步`)
+      refreshPendingDraftCount()
     } catch { /* ignore */ }
   }
 
@@ -245,6 +290,10 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     allResponses,
     renderMeta,
     accountCode: H10_ACCOUNT_CODE,
+    draftsSuspended,
+    setDraftsSuspended,
+    pendingDraftCount,
+    refreshPendingDraftCount,
     loadAll,
     getSheet,
     saveImmediate,

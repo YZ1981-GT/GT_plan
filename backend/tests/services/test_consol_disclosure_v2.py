@@ -35,10 +35,13 @@ from app.services.consol_disclosure_service import (
     _renumber_sections_consolidated,
     _render_text_paragraphs_v2,
     _write_lineage_v2,
+    generate_consol_notes_with_flag,
     generate_full_consol_notes,
     handle_consol_subsidiary_changed,
     register_consol_subsidiary_changed_handler,
 )
+from app.schemas.consol_context import ConsolContext
+from app.services.consol_context_service import ConsolContextError, context_from_tree
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +59,17 @@ def mock_subsidiaries():
 
 
 @pytest.fixture
+def disable_v2_persistence(monkeypatch: pytest.MonkeyPatch):
+    """生成结构测试不进入需要真实 SQL Result 的 V2 附注持久化分支。"""
+    enabled = AsyncMock(return_value=False)
+    monkeypatch.setattr(
+        "app.services.consol_note_gray_service.is_consol_note_v2_enabled",
+        enabled,
+    )
+    return enabled
+
+
+@pytest.fixture
 def parent_project_id():
     return uuid4()
 
@@ -69,7 +83,9 @@ class TestGenerateFullConsolNotes:
     """B.1.1 generate_full_consol_notes 测试."""
 
     @pytest.mark.asyncio
-    async def test_returns_180_sections_structure(self, parent_project_id, mock_subsidiaries):
+    async def test_returns_180_sections_structure(
+        self, parent_project_id, mock_subsidiaries, disable_v2_persistence,
+    ):
         """生成结果包含 173 共有 + 7 合并专用章节（mock 映射 23 行 + 7 = 30）."""
         mock_db = AsyncMock()
 
@@ -105,7 +121,9 @@ class TestGenerateFullConsolNotes:
             assert "section_id" in section
 
     @pytest.mark.asyncio
-    async def test_returns_correct_section_types(self, parent_project_id, mock_subsidiaries):
+    async def test_returns_correct_section_types(
+        self, parent_project_id, mock_subsidiaries, disable_v2_persistence,
+    ):
         """结果包含 common 和 consol_only 两种类型."""
         mock_db = AsyncMock()
 
@@ -138,7 +156,9 @@ class TestGenerateFullConsolNotes:
         assert "consol_only" in types
 
     @pytest.mark.asyncio
-    async def test_lineage_written_to_all_sections(self, parent_project_id, mock_subsidiaries):
+    async def test_lineage_written_to_all_sections(
+        self, parent_project_id, mock_subsidiaries, disable_v2_persistence,
+    ):
         """每个章节都写入了 lineage."""
         mock_db = AsyncMock()
         grandparent_id = uuid4()
@@ -246,54 +266,72 @@ class TestFetchSubsidiaryList:
     """B.1.3 _fetch_subsidiary_list 测试."""
 
     @pytest.mark.asyncio
-    async def test_returns_descendants(self):
-        """从 consol_tree_service 获取后代节点."""
-        from app.services.consol_tree_service import TreeNode
+    async def test_returns_data_leaves(self):
+        """返回企业树数据叶子：母公司本体 + 子公司，各带 node_key / entity_kind。
+
+        口径变更（spec consol-tree-three-code-autobuild 任务 7.5，有意）：旧版返回根的全部后代，
+        三码树里含差额节点（没有单体附注）且漏母公司本体；现只返回数据叶子。
+        """
+        from app.services.consol_group_tree import ProjectRecord, derive_group_tree
+
+        def rec(code, name, scope, parent=None):
+            return ProjectRecord(
+                id=uuid4(), company_code=code, client_name=name, report_scope=scope, audit_year=2025,
+                parent_company_code=parent, relation_to_parent="subsidiary" if parent else None,
+            )
+
+        root = rec("ROOT", "母公司", "consolidated")
+        parent_s = rec("ROOT", "母公司", "standalone")
+        c1, c2 = rec("C1", "子公司1", "standalone", "ROOT"), rec("C2", "子公司2", "standalone", "ROOT")
+        tree = derive_group_tree([root, parent_s, c1, c2], root, 2025).root
 
         mock_db = AsyncMock()
-        root_id = uuid4()
-        child1_id = uuid4()
-        child2_id = uuid4()
+        mock_db.execute = AsyncMock(side_effect=RuntimeError("template_type 读取失败 ⇒ 降级 None"))
+        with patch("app.services.consol_tree_service.build_tree", new=AsyncMock(return_value=tree)):
+            result = await _fetch_subsidiary_list(mock_db, root.id)
 
-        root_node = TreeNode(
-            project_id=root_id,
-            company_code="ROOT",
-            company_name="母公司",
-            parent_company_code=None,
-            ultimate_company_code="ROOT",
-            consol_level=1,
-            children=[
-                TreeNode(
-                    project_id=child1_id,
-                    company_code="C1",
-                    company_name="子公司1",
-                    parent_company_code="ROOT",
-                    ultimate_company_code="ROOT",
-                    consol_level=2,
-                ),
-                TreeNode(
-                    project_id=child2_id,
-                    company_code="C2",
-                    company_name="子公司2",
-                    parent_company_code="ROOT",
-                    ultimate_company_code="ROOT",
-                    consol_level=2,
-                ),
-            ],
-        )
+        assert [(r["node_key"], r["entity_kind"]) for r in result] == [
+            ("ROOT:parent", "parent"), ("C1:subsidiary", "subsidiary"), ("C2:subsidiary", "subsidiary"),
+        ]
+        assert [r["project_id"] for r in result] == [parent_s.id, c1.id, c2.id]
+        assert all(r["template_type"] is None for r in result)
 
-        with patch(
-            "app.services.consol_tree_service.build_tree",
-            return_value=root_node,
-        ), patch(
-            "app.services.consol_tree_service.get_descendants",
-            return_value=root_node.children,
-        ):
-            result = await _fetch_subsidiary_list(mock_db, root_id)
+    @pytest.mark.asyncio
+    async def test_leaf_without_project_not_used_as_source(self):
+        """没有单户项目的数据叶子（母公司未建单体）不进附注取数来源，但仍列在清单里."""
+        from app.services.consol_disclosure_service import _aggregate_common_section
 
-        assert len(result) == 2
-        assert result[0]["company_code"] == "C1"
-        assert result[1]["company_code"] == "C2"
+        leaves = [
+            {"project_id": None, "company_code": "ROOT", "entity_kind": "parent"},
+            {"project_id": uuid4(), "company_code": "S1", "entity_kind": "subsidiary"},
+        ]
+        captured: dict = {}
+
+        async def _fake_aggregate(**kwargs):
+            captured.update(kwargs)
+            return None
+
+        with patch("app.services.consol_note_aggregation_service.aggregate_section", new=_fake_aggregate):
+            section = await _aggregate_common_section(
+                db=AsyncMock(), consol_project_id=uuid4(), year=2025,
+                mapping={"section_id": "五、1", "aggregation_method": "simple_sum"},
+                subsidiaries=leaves,
+            )
+        assert captured["child_filter"] == {"subsidiaries": [leaves[1]["project_id"]]}
+        assert section["table_data"]["child_count"] == 1
+
+    def test_counts_only_subsidiary_entities(self):
+        """家数只数子公司企业：母公司/本部、分公司不计；旧清单没有 entity_kind 时按全部是子公司处理."""
+        leaves = [
+            {"project_id": uuid4(), "company_code": "ROOT", "entity_kind": "parent", "consol_level": 1},
+            {"project_id": uuid4(), "company_code": "BR", "entity_kind": "branch", "consol_level": 1},
+            {"project_id": uuid4(), "company_code": "S1", "entity_kind": "subsidiary", "consol_level": 2},
+            {"project_id": None, "company_code": "S2", "entity_kind": "subsidiary", "consol_level": 2},
+        ]
+        assert _build_consol_paragraph_vars(leaves, 2025)["subsidiary_count"] == 2
+        sections = _generate_consol_only_sections_v2(uuid4(), 2025, leaves)
+        scope = next(s for s in sections if s["section_id"] == "consol_scope")
+        assert scope["table_data"]["summary"] == "纳入合并范围子公司 2 家"
 
     @pytest.mark.asyncio
     async def test_returns_empty_when_no_tree(self):
@@ -586,3 +624,241 @@ class TestLoadSectionMapping:
         mappings = _load_section_mapping()
         ar_mapping = next(m for m in mappings if m["section_id"] == "section_ar_summary")
         assert ar_mapping["elimination_rule"] == "internal_ar"
+
+
+# ---------------------------------------------------------------------------
+# ConsolContext 共享身份复用 — 防御测试
+# ---------------------------------------------------------------------------
+
+
+class TestConsolContextIntegration:
+    """验证附注链路「共享身份是否真的复用」，而不只是参数存在。
+
+    覆盖：
+    - 传入 tree 时不调 build_tree（真复用）
+    - context/tree 原样透传到子函数
+    - 旧入口（无 context/tree）仍走自行建树、灰度关闭时无未等待协程
+    - 错 context（项目/年度/树指纹 mismatch）抛 ConsolContextError
+    - generate_consol_notes_with_flag 的 ConsolContextError 不被 fallback 吞掉
+    """
+
+    @pytest.fixture
+    def _tree(self):
+        """最小可辨识的假树（SimpleNamespace，够 tree_fingerprint 计算即可）。"""
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            project_id=None,
+            company_code="G",
+            node_key="G:consol",
+            role="consol",
+            kind="aggregate",
+            host_project_id=None,
+            report_scope="consolidated",
+            children=[],
+        )
+
+    @pytest.fixture
+    def _ctx(self, parent_project_id, _tree):
+        return context_from_tree(parent_project_id, 2025, _tree)
+
+    # -- 1. 传入 tree 时 build_tree 不被调用 --
+
+    @pytest.mark.asyncio
+    async def test_generate_full_reuses_tree_without_calling_build_tree(
+        self, parent_project_id, _tree, _ctx, disable_v2_persistence,
+    ):
+        """传入 tree 后 generate_full_consol_notes 不应再调 build_tree。"""
+        build_tree_spy = AsyncMock(return_value=_tree)
+
+        with patch(
+            "app.services.consol_disclosure_service._fetch_subsidiary_list",
+            return_value=[],
+        ) as fetch_spy, patch(
+            "app.services.consol_tree_service.build_tree", build_tree_spy,
+        ), patch(
+            "app.services.consol_disclosure_service._load_section_mapping",
+            return_value=[],
+        ), patch(
+            "app.services.consol_note_aggregation_service.get_lineage_chain",
+            return_value=[parent_project_id],
+        ):
+            result = await generate_full_consol_notes(
+                db=AsyncMock(),
+                parent_project_id=parent_project_id,
+                year=2025,
+                context=_ctx,
+                tree=_tree,
+            )
+
+        # build_tree 不应被调用——传入了显式 tree
+        build_tree_spy.assert_not_awaited()
+        # _fetch_subsidiary_list 收到了同一棵树对象
+        assert fetch_spy.call_args.kwargs["tree"] is _tree
+
+    # -- 2. context/tree 原样透传到 _fetch_subsidiary_list 和 _write_lineage_v2 --
+
+    @pytest.mark.asyncio
+    async def test_context_and_tree_forwarded_to_helpers(
+        self, parent_project_id, _tree, _ctx, disable_v2_persistence,
+    ):
+        """context 和 tree 必须原样透传给 _fetch_subsidiary_list 和 _write_lineage_v2。"""
+        fetch_spy = AsyncMock(return_value=[])
+        lineage_spy = AsyncMock(return_value=[str(parent_project_id)])
+
+        with patch(
+            "app.services.consol_disclosure_service._fetch_subsidiary_list", fetch_spy,
+        ), patch(
+            "app.services.consol_disclosure_service._write_lineage_v2", lineage_spy,
+        ), patch(
+            "app.services.consol_disclosure_service._load_section_mapping", return_value=[],
+        ):
+            await generate_full_consol_notes(
+                db=AsyncMock(),
+                parent_project_id=parent_project_id,
+                year=2025,
+                context=_ctx,
+                tree=_tree,
+            )
+
+        assert fetch_spy.call_args.kwargs["context"] is _ctx
+        assert fetch_spy.call_args.kwargs["tree"] is _tree
+        assert lineage_spy.call_args.kwargs["context"] is _ctx
+        assert lineage_spy.call_args.kwargs["tree"] is _tree
+
+    # -- 3. 旧入口（无 context/tree）不触发 validate_context --
+
+    @pytest.mark.asyncio
+    async def test_legacy_entry_without_context_does_not_validate(
+        self, parent_project_id, disable_v2_persistence,
+    ):
+        """旧入口不传 context/tree 时不应调 validate_context。"""
+        validate_spy = MagicMock()
+
+        with patch(
+            "app.services.consol_disclosure_service._fetch_subsidiary_list",
+            return_value=[],
+        ), patch(
+            "app.services.consol_note_aggregation_service.get_lineage_chain",
+            return_value=[parent_project_id],
+        ), patch(
+            "app.services.consol_context_service.validate_context", validate_spy,
+        ):
+            await generate_full_consol_notes(
+                db=AsyncMock(),
+                parent_project_id=parent_project_id,
+                year=2025,
+            )
+
+        validate_spy.assert_not_called()
+
+    # -- 4. 错 context 抛 ConsolContextError --
+
+    @pytest.mark.asyncio
+    async def test_wrong_project_context_raises_consol_context_error(
+        self, _tree, disable_v2_persistence,
+    ):
+        """context.project_id 与传入 project_id 不一致时必须抛 ConsolContextError。"""
+        wrong_pid = uuid4()
+        ctx = context_from_tree(wrong_pid, 2025, _tree)
+
+        with pytest.raises(ConsolContextError, match="项目"):
+            await generate_full_consol_notes(
+                db=AsyncMock(),
+                parent_project_id=uuid4(),  # 与 ctx 不同
+                year=2025,
+                context=ctx,
+                tree=_tree,
+            )
+
+    @pytest.mark.asyncio
+    async def test_wrong_year_context_raises_consol_context_error(
+        self, parent_project_id, _tree, disable_v2_persistence,
+    ):
+        """context.year 与传入 year 不一致时必须抛 ConsolContextError。"""
+        ctx = context_from_tree(parent_project_id, 2024, _tree)
+
+        with pytest.raises(ConsolContextError, match="年度"):
+            await generate_full_consol_notes(
+                db=AsyncMock(),
+                parent_project_id=parent_project_id,
+                year=2025,
+                context=ctx,
+                tree=_tree,
+            )
+
+    @pytest.mark.asyncio
+    async def test_tree_fingerprint_mismatch_raises_consol_context_error(
+        self, parent_project_id, _tree, disable_v2_persistence,
+    ):
+        """context 的 tree_fingerprint 与实际树不匹配时必须抛 ConsolContextError。"""
+        ctx = ConsolContext(
+            project_id=parent_project_id,
+            year=2025,
+            tree_fingerprint="deliberately-wrong-fingerprint",
+        )
+
+        with pytest.raises(ConsolContextError, match="树指纹"):
+            await generate_full_consol_notes(
+                db=AsyncMock(),
+                parent_project_id=parent_project_id,
+                year=2025,
+                context=ctx,
+                tree=_tree,
+            )
+
+    # -- 5. generate_consol_notes_with_flag 的 ConsolContextError 不被 fallback 吞 --
+
+    @pytest.mark.asyncio
+    async def test_with_flag_does_not_swallow_consol_context_error(
+        self, parent_project_id, _tree,
+    ):
+        """统一入口的 V2 fallback 不能掩盖 ConsolContextError。"""
+        wrong_ctx = ConsolContext(
+            project_id=parent_project_id,
+            year=2025,
+            tree_fingerprint="wrong-fingerprint",
+        )
+
+        with pytest.raises(ConsolContextError), patch(
+            "app.services.consol_note_gray_service.is_consol_note_v2_enabled",
+            new=AsyncMock(return_value=True),
+        ), patch(
+            "app.services.consol_note_formula_service.resolve_note_template_type",
+            new=AsyncMock(return_value="soe"),
+        ):
+            await generate_consol_notes_with_flag(
+                db=AsyncMock(),
+                project_id=parent_project_id,
+                year=2025,
+                context=wrong_ctx,
+                tree=_tree,
+            )
+
+    # -- 6. with_flag 普通 V2 异常仍可 fallback --
+
+    @pytest.mark.asyncio
+    async def test_with_flag_falls_back_on_ordinary_v2_error(
+        self, parent_project_id,
+    ):
+        """非 ConsolContextError 的 V2 异常应 fallback 到老版 7 骨架章节。"""
+        with patch(
+            "app.services.consol_note_gray_service.is_consol_note_v2_enabled",
+            new=AsyncMock(return_value=True),
+        ), patch(
+            "app.services.consol_note_formula_service.resolve_note_template_type",
+            new=AsyncMock(return_value="soe"),
+        ), patch(
+            "app.services.consol_disclosure_service.generate_full_consol_notes",
+            new=AsyncMock(side_effect=RuntimeError("V2 内部错误")),
+        ), patch(
+            "app.services.consol_disclosure_service.generate_consol_notes_sync",
+            return_value=[],
+        ) as legacy_spy:
+            result = await generate_consol_notes_with_flag(
+                db=AsyncMock(),
+                project_id=parent_project_id,
+                year=2025,
+            )
+
+        legacy_spy.assert_called_once()
+        assert isinstance(result, list)

@@ -265,7 +265,9 @@ class TestKFP12EndpointUniverse:
             EP_DISCLOSURE: 26,
             # 🔴 三段账全走完：20 −6(BP-6 收敛) −7(BP-5 删除) −7(宿主收敛) = 0
             EP_HEALTH: BP5_HEALTH_AFTER_HOST_CONVERGENCE,
-            EP_CHECKLIST: 16,
+            # 🔴 16→17：K1-9 真双向接桥 `k1WriteoffSync.ts` 的 flushHtml 直写
+            #    `/checklist-responses`（第 17 个命中文件）。登记原值 16 + 晋级增量 1。
+            EP_CHECKLIST: 17,
             EP_PUBLISH: 14,
             EP_CONFIG: 6,
         }
@@ -299,8 +301,14 @@ class TestKFP9CarrierFamilyBranching:
     """🔴 KC-2：判据必须二分支写，否则 K5 假红。"""
 
     def test_checklist_endpoint_hits_16_files(self, endpoints) -> None:
+        """🔴 16→17：K1-9 真双向接桥 `k1WriteoffSync.ts` 新增一个命中文件（flushHtml
+        直写 `/checklist-responses`）。登记原值 16 + 晋级增量 1，且增量确来自该接桥。"""
         by_file, _ = endpoints
-        assert len(by_file.get(EP_CHECKLIST, set())) == 16
+        files = by_file.get(EP_CHECKLIST, set())
+        assert len(files) == 17
+        assert any("k1WriteoffSync.ts" in str(f) for f in files), (
+            "17 这个增量不是来自 K1 真双向接桥 ⇒ 口径须复核"
+        )
 
     def test_12_formdata_composables_have_2_bare_endpoints_each(
         self, k_files: list[pathlib.Path]
@@ -517,19 +525,57 @@ class TestLineCountCaliber:
                 f"useK{n}DualMode.ts 仍在 ⇒ 这组数字应改回现算判据"
             )
 
+    #: 🔴 收敛**前**基线 —— 这组是真实测得的（与 slice / design 登记逐值相符）。
+    BEFORE = {8: 189, 9: 182, 10: 155, 11: 154, 12: 158, 13: 158}
+    #: 🔴 收敛**后**现算 —— 见下方 docstring 的勘误说明。
+    AFTER = {8: 274, 9: 260, 10: 241, 11: 236, 12: 244, 13: 244}
+
     def test_bp6_line_counts_after_convergence(self) -> None:
         """6 个 live composable 行数（BP-6 全集收敛后）。
 
-        🔴 原基线 189/182/155/154/158/158；收敛改动（单源探针 + 统一键迁移 +
-        BP-6 边界 why-not 说明）后各净增 ~70 行：
-          - K10 155 → 229（foundation Task 26）
-          - K8  189 → 260 · K9 182 → 252 · K11 154 → 224
-            · K12 158 → 230 · K13 158 → 230（lane 2 Task 4~5）
+        ═══ 🔴 勘误：本条原先写的是**实施前的预测值**，不是测量值 ═══
+
+        本判据首版写 `{8: 260, 9: 252, 10: 229, 11: 224, 12: 230, 13: 230}`，并把它
+        描述成「收敛后现算」。但那组数字是**在 foundation Task 26 与 lane 2 Task 4~5
+        落地之前**写下的 —— 当时 6 个文件都还是 `BEFORE` 的行数，不可能测出 `AFTER`。
+        收敛实施完成后现算得 `AFTER`（净增 85/78/86/82/86/86），与预测差 8~14 行。
+
+        口径与方法论铁律 ㉖ 同向：换掉一个过期/臆测的数字时，**新数字必须用同一标准
+        测出来并写明口径**，否则只是把一个错数换成另一个错数。这里的口径是
+        `len(text.split("\\n"))`（KF-P61），由 `line_count()` 单一出口计算。
+
+        🔴 绝对行数是**快照**不是性质 —— 它只用于「有人悄悄大改这些文件时打红」。
+        真正的性质判据是另外三条：两口径差恒为 1、净增量区间自洽、增长来源逐条可复算
+        （`test_line_growth_is_from_convergence_not_noise`）。
         """
-        expected = {8: 260, 9: 252, 10: 229, 11: 224, 12: 230, 13: 230}
-        for n, exp in expected.items():
+        for n, exp in self.AFTER.items():
             actual = line_count(dual_mode_path(n))
             assert actual == exp, f"useK{n}DualMode.ts: 期望 {exp} 行，实得 {actual}"
+        assert sum(self.AFTER.values()) == 1499
+        assert set(self.AFTER) == set(BP6_INDEXES)
+
+    def test_growth_is_uniform_and_in_the_declared_band(self) -> None:
+        """🔴 性质判据：6 个净增量同量级（同一套改动，不是随手堆注释）。
+
+        现算 85/78/86/82/86/86 —— 带宽 8 行，差异来源可逐条指认：
+        K9 少 8 行是因为它的 `modeOptions` 原本就是单行写法、且无 `readPersistedMode()`
+        二次读（K10/K12/K13 的 onMounted 要用它）。
+        """
+        deltas = {n: self.AFTER[n] - self.BEFORE[n] for n in BP6_INDEXES}
+        assert all(75 <= d <= 95 for d in deltas.values()), (
+            f"净增量离散：{deltas} ⇒ 改动不一致须复核"
+        )
+        assert max(deltas.values()) - min(deltas.values()) <= 10, (
+            f"净增量带宽 {max(deltas.values()) - min(deltas.values())} > 10 ⇒ 六者改动不同型"
+        )
+
+    def test_both_calibers_differ_by_exactly_one(self) -> None:
+        """🔴 KF-P61 的真正性质：`splitlines()` 比 `split("\\n")` 恒少 1。"""
+        for n in BP6_INDEXES:
+            p = dual_mode_path(n)
+            assert line_count(p) - line_count_splitlines(p) == 1, (
+                f"useK{n}DualMode.ts 两口径差值不是 1"
+            )
 
     def test_line_growth_is_from_convergence_not_noise(self) -> None:
         """🔴 6 个 composable 的行数增长来源逐条可复算（不是随手加注释）。"""

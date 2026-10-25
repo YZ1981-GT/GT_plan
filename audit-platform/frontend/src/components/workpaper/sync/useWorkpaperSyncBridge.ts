@@ -24,7 +24,16 @@
  * endpoint」。两处冲突时取 AC：本模块的 `flushHtml` 只交回**要提交的 projection 与
  * expected revision**，pending mutation 与 materialize 都由桥调用。
  */
-import { computed, getCurrentInstance, onBeforeUnmount, readonly, ref, type Ref } from 'vue'
+import {
+  computed,
+  getCurrentInstance,
+  onBeforeUnmount,
+  readonly,
+  ref,
+  unref,
+  type ComputedRef,
+  type Ref,
+} from 'vue'
 
 import {
   WP_BRIDGE_STATE_TEXT,
@@ -309,8 +318,22 @@ export interface WorkpaperSyncBridgeOptions {
   readonly entryId: Ref<string>
   readonly wpId: Ref<string>
   readonly projectId: Ref<string>
-  readonly sheetKey?: Ref<string>
-  readonly capability: WorkpaperSyncCapability
+  /**
+   * 当前受管区键。**接受 `ComputedRef`** —— 宿主的受管 sheet 集合从 provider 派生后，
+   * 这个值必须随 `currentSheet` 走（spec d567-sync-coverage Property 15）。
+   */
+  readonly sheetKey?: Ref<string> | ComputedRef<string>
+  /**
+   * 该 entry 的同步能力。
+   *
+   * 🔴 **允许传 `Ref`/`ComputedRef`**（Property 15 的「capability 读 Ref」）：`entryId` 本身
+   *    就是 `Ref`，若 capability 只在 setup 时快照一次，entryId 变了能力判定不跟着变 ——
+   *    两个应当同源的量一个响应式一个不响应式，是潜在的不一致源。传值仍然合法（向后兼容）。
+   */
+  readonly capability:
+    | WorkpaperSyncCapability
+    | Ref<WorkpaperSyncCapability>
+    | ComputedRef<WorkpaperSyncCapability>
   /** 宿主的 flush 钩子：只交回 projection 与 expected revision，不打端点。 */
   readonly flushHtml: () => Promise<WorkpaperSyncFlushResult>
   /** 宿主的重载钩子：**必须**加载到不低于 `minimumRevision` 的内容（Property 14）。 */
@@ -443,6 +466,18 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     }
   }
 
+  /**
+   * 该 entry 的同步能力 —— **唯一读取入口**（Property 15）。
+   *
+   * 🔴 `options.capability` 允许是值也允许是 `Ref`/`ComputedRef`（见 options 注释）。
+   *    全部读取都必须过这里 `unref`，否则一处忘了解包就会拿到 Ref 对象本身 ——
+   *    它是 truthy，`supportedModesForCapability(RefObject)` 不会报错、只会静默
+   *    返回空集合 ⇒ OO 模式被永久拒绝且无任何报错。这类静默失效必须靠单一入口消除。
+   */
+  function capabilityOf(): WorkpaperSyncCapability {
+    return unref(options.capability)
+  }
+
   function sheetKey(): string {
     return options.sheetKey?.value?.trim() || 'default'
   }
@@ -509,10 +544,10 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
    * `descriptor` 才创建 DocEditor，创建完调 `notifyEditorMounted()`。
    */
   async function switchToOnlyOffice(): Promise<WorkpaperSyncEditorLaunchDescriptor> {
-    if (!supportedModesForCapability(options.capability).includes('oo')) {
+    if (!supportedModesForCapability(capabilityOf()).includes('oo')) {
       refuse(
         'bridge_mode_not_supported',
-        `capability=${options.capability} 不支持 OnlyOffice 模式 —— 模式开关不得打开它`,
+        `capability=${capabilityOf()} 不支持 OnlyOffice 模式 —— 模式开关不得打开它`,
       )
     }
     beginAttempt()
@@ -1289,7 +1324,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
   function migrateMode(): WorkpaperSyncModeMigration {
     const result = migrateWorkpaperSyncMode(
       { entryId: options.entryId.value, wpId: options.wpId.value, sheetKey: sheetKey() },
-      options.capability,
+      capabilityOf(),
       { storage: options.storage },
     )
     migration.value = result
@@ -1299,7 +1334,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
   function persistMode(target: WorkpaperSyncBridgeMode): boolean {
     return persistWorkpaperSyncMode(
       { entryId: options.entryId.value, wpId: options.wpId.value, sheetKey: sheetKey() },
-      options.capability,
+      capabilityOf(),
       target,
       { storage: options.storage },
     )
@@ -1489,7 +1524,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     state: readonly(state),
     mode: readonly(mode),
     dirty: readonly(dirty),
-    capability: options.capability,
+    capability: capabilityOf(),
     descriptor: readonly(descriptor),
     confirmation: readonly(confirmation),
     operation: readonly(operation),

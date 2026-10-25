@@ -188,3 +188,61 @@ def test_corrupt_zip_is_not_silently_turned_into_an_empty_fingerprint() -> None:
         zf.writestr("random.txt", "not a workbook")
     with pytest.raises(FingerprintError):
         structure_fingerprint(buf.getvalue())
+
+
+# ═══ 5. 并发：命中路径与另一线程的写入/淘汰互斥（已知缺陷，钉住） ═══
+
+
+@pytest.mark.xfail(strict=True, raises=KeyError, reason=(
+    "已知缺陷（2026-09-30 spec startup-prewarm-event-loop-unblocking 实施中发现，HEAD 即存在）：缓存无锁。"
+    "修复必须改本模块，而本模块被 backend/data/onlyoffice_excel_instrumentation_gate.json 按 sha256 钉死"
+    "（运行时 fail closed；改一个字节即判 Task 5 真实 OO 9.4 探针裁决 stale，须重跑探针再刷新 digest）。"
+    "实测：仅加一把锁就让 dev 后端 11:06–12:07 的冷注册全部失败。修掉后本用例 XPASS ⇒ strict 失败，届时删除标记"))
+def test_eviction_by_another_thread_cannot_split_lookup_and_touch(monkeypatch) -> None:
+    """🔴 「get → move_to_end」与另一线程的「写入 → 淘汰」必须互斥。
+
+    本函数被多个线程并发调用：materialize 的 CPU 段在工作线程、冷注册的整簿观测（原在事件循环线程，
+    现在工作线程 —— 线程身份变了，并发度没变：事件循环线程本来也与工作线程并发）。无锁时，读线程取到
+    缓存项之后、move_to_end 之前，另一线程写入新项并把它淘汰 ⇒ move_to_end 抛 KeyError ⇒ 观测失败。
+    生产上需要缓存满（>16 份不同字节）且 GIL 恰好在两步之间切换，概率低但真实存在。
+
+    确定性复现：在读线程的 get() 里起一个写线程，最多等它 0.5s。有锁时写线程被挡在锁外（等待超时，
+    读线程照常完成）；无锁时写线程在这 0.5s 内完成写入 + 淘汰，读线程随后的 move_to_end 必抛 KeyError。
+    """
+    import copy as _copy
+    import threading
+    from collections import OrderedDict
+
+    hot = _workbook_bytes(a1="hot")
+    cold = _workbook_bytes(a1="cold")
+    precomputed = {hot: MOD._structure_fingerprint_uncached(hot), cold: MOD._structure_fingerprint_uncached(cold)}
+    monkeypatch.setattr(MOD, "_structure_fingerprint_uncached", lambda data: _copy.deepcopy(precomputed[data]))
+    monkeypatch.setattr(MOD, "_FINGERPRINT_CACHE_MAX", 1)
+
+    writers: list[threading.Thread] = []
+
+    class _EvictDuringLookup(OrderedDict):
+        armed = False
+
+        def get(self, key, default=None):  # type: ignore[override]
+            value = super().get(key, default)
+            if self.armed and value is not None:
+                self.armed = False
+                writer = threading.Thread(target=structure_fingerprint, args=(cold,), daemon=True)
+                writer.start()
+                writer.join(timeout=0.5)
+                writers.append(writer)
+            return value
+
+    cache = _EvictDuringLookup()
+    monkeypatch.setattr(MOD, "_FINGERPRINT_CACHE", cache)
+    structure_fingerprint(hot)  # 入缓存（未命中，不触发）
+    cache.armed = True
+
+    got = structure_fingerprint(hot)  # 命中：get 里另一线程试图写入 cold 并淘汰 hot
+
+    assert got.part_digests == precomputed[hot].part_digests
+    assert writers, "夹具失效：命中路径没有触发并发写入"
+    writers[0].join(timeout=5)
+    assert not writers[0].is_alive(), "写线程没有结束（锁未释放？）"
+    assert list(cache) == [MOD._sha256(cold)], "写入 + 淘汰没有在读线程之后正常完成"

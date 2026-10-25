@@ -16,6 +16,13 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import WpAmountInput from '@/components/workpaper/shared/WpAmountInput.vue'
+// D4-4 双向回写（spec d4-4-adjustment-summary-bidirectional-writeback）：统一走
+// useD4SyncMode（dedicated sync sheet，sheetKey=d44-managed，同 entry
+// gt-d4-operating-revenue；后端 phase5_d4_adjustment_sheet 作为 sibling sheet 并入
+// phase5_d4_revenue_detail，adapter d4.revenue_detail）——单区动态行表，参照 D4-19/D4-21。
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 
 const props = defineProps<{
   wpId: string
@@ -45,11 +52,45 @@ const {
   updateCell,
   publishAdjustment,
   pushToA13,
+  flushPendingSave,
 } = useD4Adjustment({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+})
+
+// ─── D4-4 双模式 sync bridge（统一走 useD4SyncMode，见其文件头注释） ───────
+//
+// 🔴 sheetKey 必须走**具名常量**而非内联字面量：跨语言契约守卫靠正则抓这个常量声明
+//    反查后端 sheet_key 是否漂移，内联字面量会让该守卫失明。
+// 🔴 宿主 GtD4OperatingRevenue 须把 'D4-4' 登记进 isD4DedicatedSyncSheet，**且**
+//    d4Constants.ts 的 D4_LEGACY_OO_BLOCKED_SHEETS 须移除 'D4-4' —— 两处缺一即坏：
+//    只加 dedicated 不摘名单 ⇒ isLegacyOoBlocked 让 renderMode 恒 'html'、切换器恒
+//    disabled，新桥点不进；只摘名单不加 dedicated ⇒ 掉回 legacy 单向通道。
+const D4_4_SHEET_KEY = 'd44-managed'
+const {
+  syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions,
+  busy: syncBusy, syncStateTag, syncHostRef,
+} = useD4SyncMode({
+  sheetKey: D4_4_SHEET_KEY,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+  views: ['表格视图'],
+  flushHtml: async () => {
+    // 🔴 先 flush 待存：debounceSave 是 2000ms，不 flush 会把用户最后一次编辑丢在 timer 里
+    //    （读到旧 store ⇒ materialize 按旧值写 xlsx ⇒ 表现为"刚填的值在 OO 里不见了"）。
+    flushPendingSave()
+    const snap = await readStoreProjection({
+      projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: D4_4_SHEET_KEY,
+    }
+  },
 })
 
 // ─── 导入导出 ─────────────────────────────────────────────────────────
@@ -188,13 +229,24 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
+        <!-- 表格视图 / 在线编辑 切换（D4-4 双向回写接桥） -->
+        <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
+        <el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">
+          {{ syncStateTag.text }}
+        </el-tag>
+        <el-divider direction="vertical" />
         <el-tooltip placement="top" :show-after="300">
           <template #content>
             本表与调整分录模块双向联动。<br/>
             此处新增的分录会自动同步至调整分录模块(科目6001/6051)，<br/>
             调整分录模块中涉及营业收入科目的分录也会自动回写至此表。
           </template>
-          <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
+          <el-button
+            size="small"
+            type="primary"
+            :disabled="isReadonly || syncBusy || editorMode === '在线编辑'"
+            @click="addRow"
+          >
             + 新增调整分录
           </el-button>
         </el-tooltip>
@@ -238,6 +290,8 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
       </div>
     </div>
 
+    <!-- ═══ 非 OO 内容区（表格视图）═══ -->
+    <template v-if="editorMode !== '在线编辑'">
     <!-- 借贷平衡指示 -->
     <div class="balance-indicator">
       <span class="balance-item">
@@ -337,7 +391,34 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         </template>
       </el-table-column>
 
-      <!-- 6. 借方金额 -->
+      <!--
+        6. 补充说明（模板 F 列「……」；受管字段 `placeholder`）
+
+        🔴 这一列此前**缺失**，是 2026-09-28 实测出的「五层不一致」的唯一缺口：
+           模板有 F 列 ✓ / `D4AdjustmentRow` 有字段 ✓ / `safeParseRows` 解析 ✓ /
+           导入导出 ✓ / **UI 无** ✗。
+           不补的后果不是"少一列"：F 列在模板里真实存在 ⇒ OO 侧可编辑 ⇒ 用户改完回写进
+           store，但切回结构化视图**看不见** ⇒ 表现为「改动丢了」（实为存了但不可见），
+           比不回写更难排查。
+
+        ⚠️ 下面 el-input 的 `placeholder="补充说明"` 是**占位文本属性**，
+           与 `row.placeholder` / `updateCell(..., 'placeholder', ...)` 的**字段**同名
+           但完全无关（本文件另有 6 处同名占位属性）。
+      -->
+      <el-table-column label="补充说明" min-width="140">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.placeholder"
+            size="small"
+            placeholder="补充说明"
+            @change="(v: string) => updateCell(row.rowId, 'placeholder', v)"
+          />
+          <span v-else>{{ row.placeholder || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <!-- 7. 借方金额 -->
       <el-table-column label="借方" width="120" align="right">
         <template #default="{ row }">
           <WpAmountInput
@@ -351,7 +432,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         </template>
       </el-table-column>
 
-      <!-- 7. 贷方金额 -->
+      <!-- 8. 贷方金额 -->
       <el-table-column label="贷方" width="120" align="right">
         <template #default="{ row }">
           <WpAmountInput
@@ -365,7 +446,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         </template>
       </el-table-column>
 
-      <!-- 8. 索引号 -->
+      <!-- 9. 索引号 -->
       <el-table-column label="索引号" width="80">
         <template #default="{ row }">
           <el-input
@@ -375,6 +456,20 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
             @change="(v: string) => updateCell(row.rowId, 'indexRef', v)"
           />
           <span v-else>{{ row.indexRef || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <!-- 10. 备注（模板 J 列；受管字段 `remark`）—— 与「补充说明」同因补齐，见上方说明 -->
+      <el-table-column label="备注" min-width="140">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.remark"
+            size="small"
+            placeholder="备注"
+            @change="(v: string) => updateCell(row.rowId, 'remark', v)"
+          />
+          <span v-else>{{ row.remark || '-' }}</span>
         </template>
       </el-table-column>
 
@@ -446,12 +541,41 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         />
       </div>
     </el-card>
+    </template>
+
+    <!-- ═══ 在线编辑：平台 sync bridge（非裸 GtOnlyOfficeSheet）═══ -->
+    <template v-if="editorMode === '在线编辑'">
+      <div class="oo-container">
+        <WorkpaperSyncEditorHost
+          v-if="syncOoDescriptor"
+          ref="syncHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+        <div v-else class="oo-loading">正在打开 D4-4 同步编辑器…</div>
+      </div>
+    </template>
   </div>
 </template>
 
 <style scoped>
 .d4-tab-adjustment {
   padding: 12px;
+}
+/* OO 容器必须有确定高度：iframe 无内在高度，不给就塌成 0 高（看起来像"没打开"）。 */
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 280px);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.oo-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #909399;
+  font-size: var(--wp-font-size, 13px);
 }
 .d4-tab-adjustment :deep(.el-table) {
   --el-table-font-size: var(--wp-font-size, 13px);

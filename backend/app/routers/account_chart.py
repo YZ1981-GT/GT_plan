@@ -441,6 +441,10 @@ async def batch_update_accounts(
     current_user: User = Depends(require_project_access("edit")),
 ) -> dict:
     """批量更新客户科目（名称、借贷方向）"""
+    # 🔴 此前漏 import select：端点每次调用都 NameError → 500，且 ACCOUNT_MAPPING_CHANGED
+    #    在异常之后从未发出过（断点 3 同源：该事件也不传 year，由 EventBus 派发口补齐）。
+    from sqlalchemy import select
+
     from app.models.audit_platform_models import AccountChart, AccountSource, AccountDirection
 
     updated = 0

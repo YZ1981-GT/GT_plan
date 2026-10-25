@@ -737,21 +737,24 @@ def test_dual_path_downgrade_returns_blob_on_platform_failure():
                 await session.commit()
                 svc = DeliverableService(session)
                 task = await svc.create_task(project_id, "audit_report", "soe", user_id)
-                # 不提供任何文件内容 → 触发平台写入失败分支
-                result = await svc.render_and_store(
-                    task.id,
-                    docx_bytes=None,
-                    docx_path=None,
-                    user_id=user_id,
-                    selected_sections=["opinion"],
-                )
-                # 降级标志置位
-                assert result.platform_persist_failed is True
-                # blob 信息仍可用（download_url 仍生成），且版本记录仍创建留存
-                assert result.download_url is not None
-                assert result.version is not None
+                # 不提供任何文件内容 → 触发 FilePersistError
+                # Phase4 Task 4: render_and_store 现在是 fail-closed，
+                # 文件落盘失败时抛异常而非返回 platform_persist_failed=True
+                from app.services.file_fingerprint_service import FilePersistError
+                with pytest.raises(FilePersistError, match="无文件内容"):
+                    await svc.render_and_store(
+                        task.id,
+                        docx_bytes=None,
+                        docx_path=None,
+                        user_id=user_id,
+                        selected_sections=["opinion"],
+                    )
+                # fail-closed: 失败后不应创建新版本
                 chain = await svc.get_version_chain(task.id)
-                assert any(v.id == result.version.id for v in chain)
+                # create_task 创建了 v1 占位版本，render_and_store 失败不应新增
+                assert len(chain) == 1, (
+                    f"失败后不应有新版本，但发现 {len(chain)} 个版本"
+                )
         finally:
             await engine.dispose()
 

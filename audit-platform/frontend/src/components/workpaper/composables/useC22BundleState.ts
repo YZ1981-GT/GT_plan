@@ -60,6 +60,14 @@ export interface TabDef {
   sheet?: string
   /** 独立底稿编码（C21 / C21-1） */
   wpCode?: string
+  /**
+   * 🔴 CC-63 修复：独立底稿（C21/C21-1）册内真实 sheet 名。
+   * OO 挂点须传真实 sheet 名而非 wpCode——因为册内 sheet 名与册名/wpCode 脱钩：
+   *   - C21 册：sheet 名 = 'C21 具有信息技术专业技能的项目组成员'（wpCode 'C21' 是其前缀，不等）
+   *   - C21-1 册：sheet 名 = 'IT 审计发现汇总表'（与 wpCode 'C21-1' 完全脱钩）
+   * 按原始字面量匹配，禁 strip、禁全角半角归一化。
+   */
+  ooSheetName?: string
   /** 主矩阵行引用（C 列控制编号所在行；多控制子页取首行） */
   matrixRow?: number
   /** 多控制子页额外引用的控制描述行（D 列） */
@@ -183,8 +191,8 @@ export const C22_BUNDLE_TABS: readonly TabDef[] = Object.freeze([
   { id: 'NS-6.2', label: 'NS-6.2', group: '新系统', kind: 'itgc-sheet', sheet: 'NS-6.2', matrixRow: 45 },
 
   // ── 独立底稿 ──
-  { id: 'C21', label: 'C21 IT专业成员', group: 'IT团队', kind: 'c21', wpCode: 'C21' },
-  { id: 'C21-1', label: 'C21-1 IT发现汇总', group: '发现汇总', kind: 'c21-1', wpCode: 'C21-1' },
+  { id: 'C21', label: 'C21 IT专业成员', group: 'IT团队', kind: 'c21', wpCode: 'C21', ooSheetName: 'C21 具有信息技术专业技能的项目组成员' },
+  { id: 'C21-1', label: 'C21-1 IT发现汇总', group: '发现汇总', kind: 'c21-1', wpCode: 'C21-1', ooSheetName: 'IT 审计发现汇总表' },
 ])
 
 /** 4 大 IT 控制类别（分组页签用；不含 matrix / 独立底稿） */

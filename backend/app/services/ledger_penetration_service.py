@@ -379,10 +379,29 @@ class LedgerPenetrationService:
 
     async def get_voucher_entries(
         self, project_id: UUID, year: int, voucher_no: str,
+        *,
+        month: int | None = None,
+        voucher_date: str | None = None,
     ) -> list[dict]:
-        """第三层：凭证分录明细（按凭证号穿透）"""
+        """第三层：凭证分录明细（按凭证号穿透）
+
+        🔴 voucher_no 单独并不唯一。真实库实测（8 个项目）：7 个项目的凭证号
+        跨月甚至跨日重复，单个号最多对应 83 个不同日期。唯一定位一张凭证的键是
+        ``(voucher_date, voucher_no)`` —— 该粒度下借贷 100% 平衡（29162/29162），
+        证明其恰好对应一张完整凭证。
+
+        Args:
+            month: 月份过滤（1~12）。粗粒度，同月内仍可能有多张同号凭证。
+            voucher_date: 凭证日期（YYYY-MM-DD）。与 voucher_no 组合唯一定位
+                          一张凭证，是推荐的精确过滤方式。
+        """
         tbl = TbLedger.__table__
         active_filter = await get_active_filter(self.db, tbl, project_id, year)
+        conditions = [active_filter, tbl.c.voucher_no == voucher_no]
+        if voucher_date:
+            conditions.append(tbl.c.voucher_date == voucher_date)
+        elif month is not None:
+            conditions.append(sa.extract("month", tbl.c.voucher_date) == month)
         stmt = (
             sa.select(
                 tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
@@ -391,7 +410,7 @@ class LedgerPenetrationService:
                 tbl.c.summary,
                 tbl.c.raw_extra,
             )
-            .where(active_filter, tbl.c.voucher_no == voucher_no)
+            .where(*conditions)
             .order_by(tbl.c.account_code)
         )
         result = await self.db.execute(stmt)

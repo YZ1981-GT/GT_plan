@@ -63,7 +63,11 @@ async def _resolve_event_year(
     db: AsyncSession,
     year: int | None = None,
 ) -> int | None:
-    """优先使用显式 year，缺失时再从 ledger_datasets 推断最新 active 年度。"""
+    """年度解析：显式 year → 最新 active 数据集年度 → 项目审计年度。
+
+    第三级是 2026-09-29 补的：此前无 active 数据集（手工建账 / 仅导入过旧引擎数据）时
+    返回 None，MAPPING_CHANGED 于是不带年度，试算表重算 handler 静默跳过。
+    """
     if year is not None:
         return year
 
@@ -74,7 +78,15 @@ async def _resolve_event_year(
             LedgerDataset.status == DatasetStatus.active,
         ).order_by(LedgerDataset.year.desc()).limit(1)
     )
-    return year_result.scalar_one_or_none()
+    ds_year = year_result.scalar_one_or_none()
+    if ds_year is not None:
+        return ds_year
+
+    from app.models.core import Project
+    from app.services.project_audit_year import resolve_project_audit_year
+
+    project = await db.get(Project, project_id)
+    return resolve_project_audit_year(project) if project is not None else None
 
 
 async def _publish_mapping_changed(
@@ -198,9 +210,20 @@ async def _generate_client_accounts_from_balance(
     import uuid as _uuid
     from app.models.audit_platform_models import AccountCategory
 
+    # 🔴 原为 `year or 2025`：「一键映射」按钮不传 year 时，2024 项目按 2025 查余额表
+    #    → 查不到任何科目 → 客户科目表生成 0 行 → auto_match 静默产出 0 条映射 → 试算表全空。
+    #    改为与 MAPPING_CHANGED 同一套解析（active 数据集 → 项目审计年度），解析不到不猜年份。
+    year = await _resolve_event_year(project_id, db, year)
+    if year is None:
+        logger.warning(
+            "_generate_client_accounts_from_balance: 项目 %s 无可用年度，跳过客户科目生成",
+            project_id,
+        )
+        return 0
+
     # 获取 active dataset 的余额表科目
     tbl = TbBalance.__table__
-    active_filter = await get_active_filter(db, tbl, project_id, year or 2025)
+    active_filter = await get_active_filter(db, tbl, project_id, year)
 
     result = await db.execute(
         select(
@@ -217,7 +240,7 @@ async def _generate_client_accounts_from_balance(
         return 0
 
     # 获取 active dataset_id
-    dataset_id = await DatasetService.get_active_dataset_id(db, project_id, year or 2025)
+    dataset_id = await DatasetService.get_active_dataset_id(db, project_id, year)
 
     # 类别/方向判定复用 account_chart_service 的权威实现（编码+名称双保险），
     # 不再本地纯编码推断（避免 4001 生产成本/4101 制造费用被误判 equity）。

@@ -672,7 +672,11 @@ const HOST_WIRING_ALLOWLIST: Allowlist = Object.freeze({
   'I5TabTargetedCheck.vue': {
     persist: '本 spec 范围外：固定 item key 持久化随 voucher-check-shared-layer 一并接',
     bar: '本 spec 范围外：方法学 bar 随 voucher-check-shared-layer 统一挂到抽凭区',
-    fields: '分层判据缺 科目编码；未渲染方法学 bar 故层2「科目来源」不满足；接 bar 即自动满足，归 voucher-check-shared-layer 一并接',
+    // 🔴 `fields` 豁免已于 2026-09-28 删除：原因「分层判据缺 科目编码」已不成立 ——
+    //    spec voucher-sampling-account-scope-and-attach-closure 阶段 4 把本宿主的
+    //    抽凭科目从硬编码 `1911`（account_chart/tb_balance 全库零命中）改为接
+    //    `i5AccountScope` + `useSamplingAccountGate`，科目编码字段随之齐备。
+    //    本守卫的「只减不增」正是靠它抓到这次可收紧的机会。
   },
   'I6TabTargetedCheck.vue': {
     methodology: '本 spec Task 19~21 未列入该宿主；methodology 消费归 voucher-check-shared-layer',
@@ -1183,15 +1187,54 @@ describe('Property 16 分层判据：层 1 全体强制 + 层 2 按行模型语�
     }
   })
 
-  it('🔴 层 1 确实抓到真实缺陷：存在样本一条都不进底稿的宿主', () => {
+  /**
+   * 🔴 由「登记基线」改为「阻断」（2026-09-28）。
+   *
+   * 改之前这里写的是 `expect(tier1Violations).toContain('K5TabLitigationCheck.vue')`
+   * —— 把「K5 的 onSampleFilled 只弹 toast、样本整批丢弃」这个真实缺陷**冻结成了期望值**。
+   * 后果：缺陷存在时测试绿、缺陷修好后测试反而红，守卫方向被钉反，CI 永远不会因为
+   * 「又出现一个丢弃样本的宿主」而报警（原注释也写明「修好后应把它从下面的期望里删掉」）。
+   *
+   * K5 已修好（走 addRow + updateCell 落 checklist_responses），现改为：
+   * 任何宿主都不允许丢弃凭证号 —— 新增此类缺陷即打红。
+   */
+  it('🔴 层 1 阻断：不允许任何宿主把抽凭样本的凭证号丢弃', () => {
     const tier1Violations = HOSTS.filter((h) => {
       if (isThinShellDelegate(h.src) || usesSharedRowMapper(h.src)) return false
       return missingFieldsLayered(rowModelKind(h.file), fieldSources(h), h.src)
         .includes('凭证号')
     }).map((h) => h.file)
-    // 实测 K5TabLitigationCheck 的 onSampleFilled 只弹一条 success，样本整批丢弃。
-    // 这条断言的意义 = 证明层 1 不是空转；修好后应把它从下面的期望里删掉。
-    expect(tier1Violations).toContain('K5TabLitigationCheck.vue')
+
+    expect(
+      tier1Violations,
+      `以下宿主的 @filled 处理函数未把凭证号写入任何行字段（样本回填后丢失）：\n` +
+        `  ${tier1Violations.join('\n  ')}\n` +
+        '修法参考 K5TabLitigationCheck.vue：走 composable 的 addRow + updateCell，' +
+        '由 _persist 落 checklist_responses；只弹 ElMessage 不算回填。',
+    ).toEqual([])
+  })
+
+  it('🔴 反向自检：层 1 判据不是空转（构造一个只弹 toast 的宿主必须被抓到）', () => {
+    // 与上一条配对：上面断言「现在没有违规」，这里证明「真有违规时能抓到」，
+    // 否则 toEqual([]) 可能只是因为判据恒空而假绿。
+    const toastOnlyHost = {
+      file: 'FakeToastOnlyTab.vue',
+      src: [
+        '<template><GtVoucherSamplingEngine @filled="onSampleFilled" /></template>',
+        '<script setup lang="ts">',
+        'function onSampleFilled(payload: any) {',
+        '  const samples = payload?.samples ?? []',
+        '  ElMessage.success(`抽凭样本已填入 ${samples.length} 笔`)',
+        '}',
+        '</script>',
+      ].join('\n'),
+    }
+    expect(isThinShellDelegate(toastOnlyHost.src)).toBe(false)
+    expect(usesSharedRowMapper(toastOnlyHost.src)).toBe(false)
+    expect(
+      missingFieldsLayered('voucher-detail', fieldSources(toastOnlyHost as never), toastOnlyHost.src),
+      '只弹 toast 的宿主未被判为缺凭证号 ⇒ 层 1 判据失去区分力，上一条 toEqual([]) 是假绿',
+    ).toContain('凭证号')
   })
 })
 

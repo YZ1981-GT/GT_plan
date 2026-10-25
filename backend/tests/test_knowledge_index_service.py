@@ -13,11 +13,15 @@ from uuid import uuid4
 
 from app.services.knowledge_index_service import KnowledgeIndexService, _chunk_text
 from app.models.ai_models import KnowledgeSourceType
+from tests._kb_mock_session import attach_retrieval_session_shape
 
 
 @pytest.fixture
 def mock_db_session():
-    """Mock AsyncSession that never hits the real database."""
+    """Mock AsyncSession that never hits the real database.
+
+    带 SAVEPOINT / get_bind 形状（检索内核的读语句都在 begin_nested 内执行）。
+    """
     session = AsyncMock()
     session.execute = AsyncMock()
     session.commit = AsyncMock()
@@ -25,7 +29,7 @@ def mock_db_session():
     session.refresh = AsyncMock()
     session.add = MagicMock()
     session.flush = AsyncMock()
-    return session
+    return attach_retrieval_session_shape(session)
 
 
 class TestKnowledgeIndexServiceBuildIndex:
@@ -184,9 +188,12 @@ class TestKnowledgeIndexServiceSemanticSearch:
 
         mock_db_session.execute = AsyncMock(return_value=mock_result)
 
+        # 文档词法层单独由 test_knowledge_doc_search_pg 在真库验证；这里只看向量层
         with patch.object(
             service._ai_svc, "embedding", new_callable=AsyncMock
-        ) as mock_embed:
+        ) as mock_embed, patch.object(
+            service._doc_search, "search", new_callable=AsyncMock, return_value=[]
+        ):
             mock_embed.return_value = [0.8] + [0.1] * 767
 
             results = await service.semantic_search(
@@ -199,6 +206,9 @@ class TestKnowledgeIndexServiceSemanticSearch:
         assert "score" in results[0]
         assert "source_type" in results[0]
         assert "content" in results[0]
+        # 未装 pgvector（dialect≠postgresql）→ 走 embedding_vector 文本列的内存计算
+        assert results[0]["retrieval"] == "vector"
+        assert results[0]["source_type"] == "trial_balance"
 
     @pytest.mark.asyncio
     async def test_semantic_search_empty_results(self, mock_db_session):
@@ -214,7 +224,9 @@ class TestKnowledgeIndexServiceSemanticSearch:
 
         with patch.object(
             service._ai_svc, "embedding", new_callable=AsyncMock
-        ) as mock_embed:
+        ) as mock_embed, patch.object(
+            service._doc_search, "search", new_callable=AsyncMock, return_value=[]
+        ):
             mock_embed.return_value = [0.1] * 768
 
             results = await service.semantic_search(
@@ -462,3 +474,34 @@ class TestKnowledgeIndexServiceVectorHelpers:
         result = KnowledgeIndexService._cosine_similarity(v1, v2)
 
         assert abs(result - (-1.0)) < 0.0001
+
+
+class TestSemanticSearchStrictStaysSemanticOnly:
+    """P14（spec knowledge-base-retrieval-and-authz-closure Req 4.8 / dsh Property 16）：
+    严格检索在 embedding 不可用时必须抛 typed error，**不得**走文档词法层伪降级。"""
+
+    @pytest.mark.asyncio
+    async def test_strict_raises_and_never_touches_lexical_layer(self, mock_db_session):
+        from app.services.ai_chat.address_index_source import EmbeddingUnavailableError
+
+        service = KnowledgeIndexService(mock_db_session)
+        with patch.object(
+            service._ai_svc, "embedding", new_callable=AsyncMock, side_effect=RuntimeError("down")
+        ), patch.object(
+            service._doc_search, "search", new_callable=AsyncMock, return_value=[]
+        ) as mock_lexical:
+            with pytest.raises(EmbeddingUnavailableError):
+                await service.semantic_search_strict(uuid4(), "应收账款", top_k=5)
+        mock_lexical.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_non_strict_uses_lexical_layer_when_vector_down(self, mock_db_session):
+        """对照：非严格版在同样条件下确实走词法层（证明上一条不是因为词法层根本没接）。"""
+        service = KnowledgeIndexService(mock_db_session)
+        with patch.object(
+            service._ai_svc, "embedding", new_callable=AsyncMock, side_effect=RuntimeError("down")
+        ), patch.object(
+            service._doc_search, "search", new_callable=AsyncMock, return_value=[]
+        ) as mock_lexical:
+            await service.semantic_search(uuid4(), "应收账款", top_k=5, scope="knowledge_doc")
+        mock_lexical.assert_awaited_once()

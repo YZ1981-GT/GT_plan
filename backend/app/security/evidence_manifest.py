@@ -22,7 +22,7 @@ from typing import Any, Iterable, Mapping
 
 _THIS = Path(__file__).resolve()
 _REPO_ROOT = _THIS.parents[3]
-SPEC_DIR = _REPO_ROOT / ".kiro" / "specs" / "procedure-delegation-visibility-isolation"
+SPEC_DIR = _REPO_ROOT / ".kiro" / "specs" / "_archive" / "06-engineering-governance" / "procedure-delegation-visibility-isolation"
 EVIDENCE_DIR = SPEC_DIR / "evidence"
 MANIFEST_PATH = EVIDENCE_DIR / "manifest.json"
 SCHEMA_PATH = EVIDENCE_DIR / "manifest.schema.json"

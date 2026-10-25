@@ -86,11 +86,17 @@ from __future__ import annotations
 import logging
 import re
 import uuid
+from decimal import Decimal, InvalidOperation
 
 from app.core.database import async_session as async_session_factory
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.services.event_bus import event_bus
 from app.services.procedure_table_auto_service import invalidate_auto_cache
+from app.services.tb_audited_writer import (
+    build_publish_token,
+    load_current_audited_amounts,
+    publish_rows,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -459,17 +465,9 @@ async def _on_d_audit_determination_saved(payload: EventPayload) -> None:
         return
 
     confirmed_by = extra.get("confirmed_by")  # 发布确认者（服务端可校验权限）
-    # 幂等键：优先用调用方给的 publish_token；缺省则由 wp/project/year/version 合成，
-    # 使"同一确认重复投递"共用同一 token（重复投递不产生重复效果）。
-    publish_token = extra.get("publish_token") or (
-        f"{project_id}:{year}:{wp_code}:{extra.get('target_version', '')}"
-    )
 
     async with async_session_factory() as session:
         try:
-            from decimal import Decimal
-            from sqlalchemy import update as _update
-            from app.models.audit_platform_models import TrialBalance
             import sqlalchemy as sa
 
             # ① 服务端校验发布者权限（confirmed_by 须具 WORKPAPER_WRITE；缺 confirmed_by 视为不可验证 → 拒）。
@@ -479,6 +477,36 @@ async def _on_d_audit_determination_saved(payload: EventPayload) -> None:
                     wp_code[0] if wp_code else "?", confirmed_by, project_id,
                 )
                 return
+
+            # 幂等键：显式 token 原样透传；缺省时绑定项目、年度、底稿、发布行和发布前目标状态。
+            if extra.get("publish_token"):
+                publish_token = str(extra["publish_token"])
+            else:
+                try:
+                    current_audited_amounts = await load_current_audited_amounts(
+                        session,
+                        project_id,
+                        year,
+                        [
+                            str(row.get("account_code") or row.get("standard_account_code") or "")
+                            for row in rows
+                        ],
+                    )
+                    publish_token = build_publish_token(
+                        project_id=project_id,
+                        year=year,
+                        wp_code=wp_code,
+                        rows=rows,
+                        current_audited_amounts=current_audited_amounts,
+                    )
+                except (InvalidOperation, TypeError, ValueError) as exc:
+                    logger.warning(
+                        "[%s→TB] 发布 token 无法构造，整批拒绝 project=%s: %s",
+                        wp_code[0] if wp_code else "?",
+                        project_id,
+                        exc,
+                    )
+                    return
 
             # ② 耐久幂等 ack：同一 publish_token 只生效一次。ON CONFLICT DO NOTHING →
             #    rowcount==0 表示此确认已应用过，直接跳过（不重复回写 TB、不重复级联）。
@@ -508,51 +536,54 @@ async def _on_d_audit_determination_saved(payload: EventPayload) -> None:
                 )
                 return
 
-            updated_count = 0
-            for row in rows:
-                account_code = row.get("account_code") or row.get("standard_account_code")
-                audited = row.get("audited_amount")
-                if account_code and audited is not None:
-                    try:
-                        audited_val = Decimal(str(audited))
-                    except Exception:
-                        continue
+            try:
+                publish_report = await publish_rows(
+                    session,
+                    project_id,
+                    year,
+                    rows,
+                    source=f"d_audit_determination:{wp_code}",
+                )
+            except (InvalidOperation, TypeError, ValueError) as exc:
+                logger.warning(
+                    "[%s→TB] 发布载荷含非法金额，整批回滚 project=%s: %s",
+                    wp_code[0] if wp_code else "?", project_id, exc,
+                )
+                raise
 
-                    stmt = (
-                        _update(TrialBalance)
-                        .where(
-                            TrialBalance.project_id == project_id,
-                            TrialBalance.year == year,
-                            TrialBalance.standard_account_code == account_code,
-                        )
-                        .values(audited_amount=audited_val)
+            if publish_report.skipped:
+                for skipped in publish_report.skipped:
+                    logger.warning(
+                        "[%s→TB] 科目 %s 未发布：%s",
+                        wp_code[0] if wp_code else "?",
+                        skipped.account_code,
+                        skipped.reason,
                     )
-                    result = await session.execute(stmt)
-                    if result.rowcount > 0:
-                        updated_count += 1
 
             # 回填本次实际更新数到 ack（审计用）
             await session.execute(
                 sa.text(
                     "UPDATE tb_publish_ack SET accounts_updated = :n WHERE publish_token = :token"
                 ),
-                {"n": updated_count, "token": publish_token},
+                {"n": publish_report.updated_count, "token": publish_token},
             )
 
             await session.commit()
-            if updated_count:
-                logger.info("[%s→TB] Published audited_amount for %d accounts from %s project=%s year=%s by=%s",
-                            wp_code[0], updated_count, wp_code, project_id, year, confirmed_by)
+            if publish_report.updated_count:
+                logger.info(
+                    "[%s→TB] Published audited_amount for %d accounts from %s project=%s year=%s by=%s",
+                    wp_code[0], publish_report.updated_count, wp_code, project_id, year, confirmed_by,
+                )
                 await event_bus.publish_immediate(EventPayload(
                     event_type=EventType.TRIAL_BALANCE_UPDATED,
                     project_id=project_id,
                     year=year,
-                    account_codes=payload.account_codes,
+                    account_codes=publish_report.updated_account_codes,
                     extra={"source": f"d_audit_determination:{wp_code}", "publish_token": publish_token},
                 ))
         except Exception:
             await session.rollback()
-            logger.warning("[%s→TB] Failed to write back audited_amount for %s project=%s",
+            logger.warning("[%s→TB] Failed to publish audited_amount for %s project=%s",
                            wp_code[0] if wp_code else "?", wp_code, project_id, exc_info=True)
 
 
@@ -646,3 +677,59 @@ def register_cycle_linkage_handlers() -> None:
     logger.debug(
         "Cycle linkage handlers registered (C/F/D~N + confirmation + disclosure stale)"
     )
+
+    # WP() 跨底稿引用 stale 传播（spec: formula-push-user-custom-cross-module T10）
+    # 底稿保存 → 扫描 wp_formula 中引用该底稿的用户公式 → 标引用方 stale
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_workpaper_saved_wp_formula_stale)
+    logger.debug("WP() cross-workpaper stale propagation handler registered")
+
+
+async def _on_workpaper_saved_wp_formula_stale(payload: EventPayload) -> None:
+    """WORKPAPER_SAVED → 扫描 wp_formula 中 WP() 引用该底稿的公式 → 标引用方 stale。
+
+    spec: formula-push-user-custom-cross-module Task 10（跨科目依赖）。
+
+    当底稿 D2 保存后，如果 K1 的用户公式里有 WP('D2','审定数')，
+    则标记 K1 的 working_paper.prefill_stale=true + 公式 lifecycle_state='stale'。
+    """
+    extra = payload.extra or {}
+    wp_code = extra.get("wp_code")
+    project_id = payload.project_id
+    year = payload.year or 0
+
+    if not wp_code or not project_id:
+        return
+
+    try:
+        from app.services.wp_formula_linkage_service import propagate_custom_wp_cell_change
+        from app.core.database import async_session as async_session_factory
+
+        async with async_session_factory() as db:
+            result = await propagate_custom_wp_cell_change(
+                db,
+                project_id=_to_uuid(project_id),
+                year=year,
+                wp_code=str(wp_code),
+                sheet_name="",  # 底稿级传播（不限 sheet）
+                cell_ref="",    # 底稿级传播（不限单元格）
+            )
+            await db.commit()
+            dynamic_count = result.get("dynamic_marked", 0)
+            if dynamic_count:
+                logger.info(
+                    "[wp_formula_stale] WORKPAPER_SAVED(%s) → %d 个引用方标记 stale",
+                    wp_code, dynamic_count,
+                )
+    except Exception:
+        logger.warning(
+            "[wp_formula_stale] propagate failed for wp_code=%s project=%s",
+            wp_code, project_id, exc_info=True,
+        )
+
+
+def _to_uuid(value: Any) -> "uuid.UUID":
+    """字符串或 UUID → UUID。"""
+    import uuid as _uuid
+    if isinstance(value, _uuid.UUID):
+        return value
+    return _uuid.UUID(str(value))

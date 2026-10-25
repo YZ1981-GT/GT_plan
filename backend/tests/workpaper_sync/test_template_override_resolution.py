@@ -560,10 +560,12 @@ _KNOWN_MISSING_FROM_DISK: frozenset[str] = frozenset({
     "A\\A17-7A审计项目团队成员独立性声明书（适用于中国及国际审计准则）-专业技术委员会审核委员适用.doc",
 })
 
-#: 索引 `size_kb` 与磁盘的一致/漂移份数 —— 既有状态登记，见
-#: `test_index_size_drift_is_registered_not_growing` 的说明。
-_INDEX_SIZE_CONSISTENT = 451
-_INDEX_SIZE_DRIFTED = 23
+#: 两张具名登记表抽到伴生数据模块（宿主在 HEAD 就已 889 行、超行数门上限）。
+#: 为什么是具名清单而不是标量计数、以及逐份归因，全在那边的模块 docstring 里。
+from tests.workpaper_sync._template_index_drift_registry import (  # noqa: E402
+    INDEX_SIZE_DRIFTED_FILES as _INDEX_SIZE_DRIFTED_FILES,
+    KNOWN_DIRTY_AUTHORITATIVE_PATHS as _KNOWN_DIRTY_AUTHORITATIVE_PATHS,
+)
 
 
 def _snapshot_authoritative() -> dict[str, tuple[int, str]]:
@@ -635,14 +637,39 @@ class TestProperty3AuthoritativeFrozen:
             else:
                 consistent += 1
 
-        assert consistent == _INDEX_SIZE_CONSISTENT, (
-            f"size_kb 一致份数 {consistent} != 登记的 {_INDEX_SIZE_CONSISTENT}"
+        # 🔴 **逐份具名对账**，不是两个标量计数（2026-09-28 改）。
+        #
+        #    旧实现锁 `一致份数 == 451 && 漂移份数 == 23` 两个标量。问题不是「不够严」，
+        #    而是**激励反了**：任何 lane 改一份权威模板都会让它翻红，而修红最省事的做法
+        #    就是把两个数字改成现算值 —— 那会把**别人**的漂移一起静默吸收，
+        #    下一个人再也看不出哪些是新增的。本仓库反复在批的正是这种「重设基线吞漂移」。
+        #
+        #    改成具名清单后：新增一份漂移会被**点名**（不是只让计数 +1），
+        #    索引被重算也会被点名（清单里的条目消失 = 失效条目），两个方向都可归因。
+        drifted_names = {line.split(":", 1)[0] for line in drifted}
+        unexpected = sorted(drifted_names - _INDEX_SIZE_DRIFTED_FILES)
+        stale_entries = sorted(_INDEX_SIZE_DRIFTED_FILES - drifted_names)
+        assert not unexpected, (
+            f"{len(unexpected)} 份权威模板**新出现** size_kb 漂移，未登记：\n"
+            + "\n".join(f"  {n}" for n in unexpected)
+            + "\n\n处置：若是你改的模板 ⇒ 同步 `_index.json` 里那一条的 `size_kb`"
+            "（只改你那一条，别重算整份索引）；"
+            "\n若是别人改的 ⇒ 把它加进 `_INDEX_SIZE_DRIFTED_FILES` 并注明归因，"
+            "**不要**顺手改动别人的索引条目。"
         )
-        assert len(drifted) == _INDEX_SIZE_DRIFTED, (
-            f"size_kb 漂移份数 {len(drifted)} != 登记的 {_INDEX_SIZE_DRIFTED}。\n"
-            + "\n".join(drifted[:20])
-            + "\n\n漂移**变多** ⇒ 有人改了权威模板（查是谁、是否合法）；"
-            "\n漂移**变少** ⇒ 有人重算了索引（把登记数字同步下来）。"
+        assert not stale_entries, (
+            f"`_INDEX_SIZE_DRIFTED_FILES` 有 {len(stale_entries)} 条**失效条目**"
+            f"（索引已与磁盘一致，不再漂移）：\n"
+            + "\n".join(f"  {n}" for n in stale_entries)
+            + "\n\n请把它们从清单里移除 —— 留着会让下一个人以为这些还在漂。"
+        )
+        # 一致份数仍然断言，但基准由「总数 - 具名漂移数」**现算**，不再是写死的 451。
+        assert consistent == len(_load_index_entries()) - len(
+            _KNOWN_MISSING_FROM_DISK
+        ) - len(drifted_names), (
+            f"一致 {consistent} + 漂移 {len(drifted_names)} + 缺失 "
+            f"{len(_KNOWN_MISSING_FROM_DISK)} != 索引条目 {len(_load_index_entries())}"
+            " —— 三类没有划分完整，说明分类逻辑漏了某种情形"
         )
 
     def test_full_override_write_leaves_authoritative_untouched(
@@ -717,6 +744,8 @@ class TestProperty3AuthoritativeFrozen:
 # 没人会因为多改了一处而想起来跑它们，所以每条都必须能独立打红。
 
 
+
+
 class TestTask24ScopeBoundary:
     def test_authoritative_directory_has_no_uncommitted_changes(self):
         """Requirement 7.1：本 spec 不改 `backend/wp_templates/` 任何字节。
@@ -735,8 +764,36 @@ class TestTask24ScopeBoundary:
         if proc.returncode != 0:
             pytest.skip(f"git 不可用：{proc.stderr[:200]}")
         dirty = [ln for ln in proc.stdout.splitlines() if ln.strip()]
-        assert not dirty, (
-            "权威模板目录在工作树里被改动了：\n" + "\n".join(dirty[:20])
+
+        # 🔴 2026-09-28：从「工作树必须全干净」改成**具名登记 + 反向断言**。
+        #
+        #    本条的本意是「**本 spec** 不改权威模板」，但它读的是**整个工作树** ⇒
+        #    任何并发 lane 改一份模板都会让它红，而红的时候看不出是谁改的，
+        #    最省事的修法就是把断言删掉或放宽 —— 那就把这条判据废掉了。
+        #
+        #    改法：把「已知的、有归因的」条目具名登记，其余仍 fail-closed。
+        #    新增未登记的改动仍会被点名（本条的原始价值不减），而清单本身由
+        #    下面的反向断言防腐（条目消失 = 该 lane 已提交/回滚 ⇒ 必须移除登记）。
+        def _path_of(status_line: str) -> str:
+            # `git status --porcelain` 行形如 ` M "带空格的路径"` / ` D 路径`
+            raw = status_line[3:].strip()
+            return raw[1:-1] if raw.startswith('"') and raw.endswith('"') else raw
+
+        paths = {_path_of(ln) for ln in dirty}
+        unexpected = sorted(paths - _KNOWN_DIRTY_AUTHORITATIVE_PATHS)
+        stale = sorted(_KNOWN_DIRTY_AUTHORITATIVE_PATHS - paths)
+        assert not unexpected, (
+            f"权威模板目录有 {len(unexpected)} 处**未登记**的未提交改动：\n"
+            + "\n".join(f"  {p}" for p in unexpected)
+            + "\n\n处置：若是你改的 ⇒ 提交它（并同步 `_index.json` 里对应那一条的"
+            " `size_kb`）；若是别的 lane 的 ⇒ 加进"
+            " `_KNOWN_DIRTY_AUTHORITATIVE_PATHS` 并注明归因，**不要**代改别人的文件。"
+        )
+        assert not stale, (
+            f"`_KNOWN_DIRTY_AUTHORITATIVE_PATHS` 有 {len(stale)} 条**失效条目**"
+            f"（那些改动已提交或已回滚）：\n"
+            + "\n".join(f"  {p}" for p in stale)
+            + "\n\n请移除 —— 留着等于永久豁免这些路径，本条就再也拦不住它们了。"
         )
 
     #: 前端禁止参与模板落盘的 xlsx 解析库（npm 包名）。

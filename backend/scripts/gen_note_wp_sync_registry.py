@@ -15,7 +15,26 @@ committed 供后端只读消费；前端 map 变更后重跑本脚本即可。
 用法
 ----
     python backend/scripts/gen_note_wp_sync_registry.py            # 打印摘要
-    python backend/scripts/gen_note_wp_sync_registry.py --write    # 写入 JSON
+    python backend/scripts/gen_note_wp_sync_registry.py --write    # 写入 JSON（幂等）
+    python backend/scripts/gen_note_wp_sync_registry.py --check    # 只校验漂移，exit 2
+
+🔴 输出必须幂等（2026-09-28 修，spec disclosure-payload-authority-source §十四）
+------------------------------------------------------------------------------
+原实现每次 ``--write`` 都写 ``generated_at = datetime.now()``，于是
+``.github/workflows/governance-checks.yml`` 的 ``note-section-map-naming`` job
+最后一步::
+
+    python backend/scripts/gen_note_wp_sync_registry.py --write
+    git diff --exit-code backend/data/note_workpaper_sync_registry.json
+
+**永远失败** —— 时间戳必然变化，diff 必然非空。该 job 无 ``continue-on-error``、
+无 ``if:``，即每次 push 到 ``work/**`` 与每个 PR 都在红，红成常态后没人再看
+⇒ 门禁形同不存在。实测后果：committed 注册表停在 76 entries 而前端真源已 78
+（缺 L2 应付利息、L4 应付债券），长期无人发现。
+
+修法 = **让输出确定性**：``entries`` 与 ``_source`` 未变时**保留原 generated_at**。
+语义上更准（该字段变成「entries 上次真正变化的时间」），且让那条 CI 门禁按作者
+本意生效。另加 ``--check``：只读校验、漂移时 exit 2，CI 无需可写工作树。
 """
 from __future__ import annotations
 
@@ -212,29 +231,85 @@ def build_entries() -> list[dict]:
     return entries
 
 
+SOURCE_NOTE = (
+    "生成自前端 *NoteSectionMap.ts（唯一真源），勿手工编辑；"
+    "重生成：python backend/scripts/gen_note_wp_sync_registry.py --write"
+)
+
+
+def _serialize(payload: dict) -> str:
+    """唯一序列化口径 —— 写文件与对比必须同参，否则「无 diff」判据不成立。"""
+    return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+
+
+def build_payload() -> dict:
+    """构造完整 payload。
+
+    ``generated_at`` 的取值规则（幂等核心）：committed 文件已存在且其
+    ``entries`` + ``_source`` 与本次生成结果**逐值相等**时，**沿用**原时间戳；
+    否则打新时间戳。⇒ 内容不变则输出字节不变，``git diff --exit-code`` 可用。
+    """
+    entries = build_entries()
+    generated_at = datetime.now(timezone.utc).isoformat()
+    if OUT_PATH.exists():
+        try:
+            old = json.loads(OUT_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            old = None
+        if (
+            isinstance(old, dict)
+            and old.get("entries") == entries
+            and old.get("_source") == SOURCE_NOTE
+            and isinstance(old.get("generated_at"), str)
+        ):
+            generated_at = old["generated_at"]
+    return {"_source": SOURCE_NOTE, "generated_at": generated_at, "entries": entries}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--write", action="store_true", help="写入 JSON")
+    ap.add_argument("--write", action="store_true", help="写入 JSON（内容不变则不动文件）")
+    ap.add_argument(
+        "--check",
+        action="store_true",
+        help="只校验 committed 是否与前端真源一致，漂移时 exit 2（不写文件）",
+    )
     args = ap.parse_args()
 
-    entries = build_entries()
-    payload = {
-        "_source": (
-            "生成自前端 *NoteSectionMap.ts（唯一真源），勿手工编辑；"
-            "重生成：python backend/scripts/gen_note_wp_sync_registry.py --write"
-        ),
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "entries": entries,
-    }
+    payload = build_payload()
+    entries = payload["entries"]
     print(f"[OK] entries={len(entries)}")
     missing_sheet = [e["wp_code"] for e in entries if not (e["sheet_listed"] or e["sheet_soe"])]
     if missing_sheet:
         print(f"[WARN] no sheet name extracted (not fabricated): {missing_sheet}")
-    if args.write:
-        OUT_PATH.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+
+    fresh_blob = _serialize(payload)
+
+    if args.check:
+        if not OUT_PATH.exists():
+            print(f"[FAIL] {OUT_PATH} 不存在 ⇒ 请先跑 --write")
+            return 2
+        if OUT_PATH.read_text(encoding="utf-8") == fresh_blob:
+            print("[OK] 注册表与前端真源一致（无漂移）")
+            return 0
+        old = json.loads(OUT_PATH.read_text(encoding="utf-8"))
+        fresh_codes = {e["wp_code"] for e in entries}
+        old_codes = {e["wp_code"] for e in old.get("entries", [])}
+        print(
+            "[FAIL] 注册表漂移：\n"
+            f"  entries 数: 真源 {len(entries)} vs committed {len(old.get('entries', []))}\n"
+            f"  仅在真源中: {sorted(fresh_codes - old_codes)}\n"
+            f"  仅在 committed 中: {sorted(old_codes - fresh_codes)}\n"
+            "  修复：python backend/scripts/gen_note_wp_sync_registry.py --write"
         )
-        print(f"[OK] written {OUT_PATH}")
+        return 2
+
+    if args.write:
+        if OUT_PATH.exists() and OUT_PATH.read_text(encoding="utf-8") == fresh_blob:
+            print(f"[OK] unchanged {OUT_PATH}（内容一致，未触碰文件）")
+        else:
+            OUT_PATH.write_text(fresh_blob, encoding="utf-8")
+            print(f"[OK] written {OUT_PATH}")
     return 0
 
 

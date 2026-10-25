@@ -76,7 +76,7 @@
           <div class="batch-import-preview__label">集团架构预览</div>
           <div
             v-for="(group, gi) in validateResult.tree_preview"
-            :key="gi"
+            :key="group.key || `${group.ultimateCode}@${group.year || ''}`"
             class="batch-import-tree-group"
           >
             <div class="batch-import-tree-group__header">
@@ -86,14 +86,19 @@
             <el-tree
               :data="group.children || []"
               :props="treeProps"
-              node-key="id"
+              :node-key="'nodeKey'"
               default-expand-all
               class="batch-import-tree"
             >
               <template #default="{ data }">
                 <span class="batch-import-node">
-                  <span class="batch-import-node__name">{{ data.companyName || data.label || '—' }}</span>
+                <span class="batch-import-node__name">{{ data.companyName || data.label || '—' }}</span>
                   <span class="batch-import-node__code">{{ data.companyCode || '—' }}</span>
+                  <el-tag v-if="data.relation" size="small" effect="plain">{{ data.relation === 'branch' ? '分公司' : '子公司' }}</el-tag>
+                  <el-tag v-if="data.year" size="small" effect="plain">{{ data.year }}年度</el-tag>
+                  <el-tag v-if="data.consolidatedProjectId" type="primary" size="small" effect="plain">合并</el-tag>
+                  <el-tag v-if="data.standaloneProjectId" type="success" size="small" effect="plain">单户</el-tag>
+                  <el-tag v-if="data.via?.length" size="small" type="info" effect="plain">经 {{ formatVia(data.via) }} 间接持有</el-tag>
                   <el-tag v-if="data.isDetached" type="warning" size="small" effect="plain" round>脱挂</el-tag>
                   <el-tag v-if="data.isCycleBreak" type="danger" size="small" effect="plain" round>循环引用</el-tag>
                   <el-tag v-if="data.hasNoCompanyCode" type="info" size="small" effect="plain" round>缺代码</el-tag>
@@ -101,6 +106,17 @@
               </template>
             </el-tree>
           </div>
+        </div>
+
+        <!-- 非致命预校验提示：不阻断确认导入，但逐行展示关系/三码自相同等提醒 -->
+        <div v-if="validateResult.warnings?.length" class="batch-import-preview">
+          <div class="batch-import-preview__label batch-import-preview__label--warning">预校验提示</div>
+          <el-table :data="validateResult.warnings" size="small" border max-height="180">
+            <el-table-column prop="row_number" label="行号" width="80" align="center" />
+            <el-table-column label="提示原因" min-width="320">
+              <template #default="{ row }">{{ row.messages.join('；') }}</template>
+            </el-table-column>
+          </el-table>
         </div>
 
         <!-- 错误明细表 -->
@@ -201,21 +217,36 @@ interface BatchImportResult {
 /** 预校验树形预览节点（与后端 consol_tree_service.to_dict_v2 camelCase 对齐） */
 interface PreviewTreeNode {
   id: string
+  nodeKey?: string
   label: string
   companyCode: string | null
   companyName: string | null
+  relation?: 'subsidiary' | 'branch' | string | null
+  year?: number | null
+  projects?: Array<{ id: string; reportScope: string; status?: string | null; duplicate?: boolean }>
+  consolidatedProjectId?: string | null
+  standaloneProjectId?: string | null
+  via?: Array<{ companyCode: string; companyName: string }>
+  flags?: string[]
   isDetached?: boolean
   isCycleBreak?: boolean
   hasNoCompanyCode?: boolean
   children?: PreviewTreeNode[]
 }
 
-/** 预校验树形分组（一棵集团树） */
+/** 集团树形分组（一棵集团树） */
 interface PreviewGroupTree {
+  key?: string
+  year?: number | null
   ultimateCode: string | null
   ultimateName: string | null
   rootProjectId: string | null
   children: PreviewTreeNode[]
+}
+
+interface BatchWarning {
+  row_number: number
+  messages: string[]
 }
 
 interface BatchValidateResponse {
@@ -223,6 +254,7 @@ interface BatchValidateResponse {
   total_rows: number
   tree_preview: PreviewGroupTree[]
   errors: BatchImportFailure[]
+  warnings?: BatchWarning[]
 }
 
 defineProps<{
@@ -243,6 +275,11 @@ const validateResult = ref<BatchValidateResponse | null>(null)
 const importResult = ref<BatchImportResult | null>(null)
 
 const treeProps = { label: 'label', children: 'children' }
+
+/** 仅当预校验已执行且通过（无错误）时才可确认导入 */
+function formatVia(via: Array<{ companyCode: string; companyName: string }>): string {
+  return via.map((item) => item.companyName).join('、')
+}
 
 /** 仅当预校验已执行且通过（无错误）时才可确认导入 */
 const canImport = computed(() => validateResult.value?.valid === true)

@@ -148,9 +148,9 @@
 
     <!-- 抽凭引擎 -->
     <el-collapse v-if="showSampling && props.wpId && props.projectId && !isReadonly" class="sampling-collapse">
-      <el-collapse-item title="⚡ 自动抽凭（科目 1501 债权投资）" name="sampling">
+      <el-collapse-item title="⚡ 自动抽凭（科目 ${samplingAccountCode} 债权投资）" name="sampling">
         <GtVoucherSamplingEngine
-          account-code="1501"
+          :account-code="samplingAccountCode"
           phase="final"
           default-method="random"
           :workpaper-id="props.wpId"
@@ -654,6 +654,17 @@ import {
   parseCanonicalArray,
   parseCanonicalJson,
 } from '../../composables/g4StorageContract'
+
+/**
+ * 抽凭科目码取自单一真源 `gCycleAccountScope`（G4 债权投资（🔴 原 1501 是持有至到期投资，属错码））。
+ * 原为模板内字面量；接真源后科目口径与该循环的取数/回写共用同一定义，
+ * 避免各处独立硬编码而漂移。本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2
+ */
+import { gCycleScope } from '../../composables/gCycleAccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = gCycleScope('G4')?.queryCodes().join(',') ?? ''
 
 const props = defineProps<{
   htmlData: Record<string, any> | null

@@ -457,11 +457,40 @@ def _real_payload_phases(items: dict[str, str]) -> dict[str, Any]:  # noqa: C901
     }
 
     # ── 不覆盖其他 item ────────────────────────────────────────────────
+    #
+    # 🔴 2026-09-28 修正「泄漏」的口径。
+    #    原式是「同底稿的别的 item 只要出现在契约文本里就算泄漏」，于是 D2 扩容 lane
+    #    把自己的受管区（`D2-bd-aging-rows` / `D2-bd-individual-rows`）接进契约后本条必红
+    #    —— 实测那两个键在 HEAD 的 `d2.receivable_detail.json` 里出现 14 次，是**正常交付**。
+    #    把「契约在长大」误报成「本 pilot 覆盖了别人」，与判据要抓的东西相反。
+    #
+    #    正确口径：契约里合法出现的 item 恰是它**自己声明**为 `store_item_id` 的那些；
+    #    真泄漏 = 出现在文本里但**不在声明集合内**（例如被误写进某段 note/description）。
+    #    另外记下 `declared_in_contract` 供判据断言「这个区分是真的、不是空集恒真」。
     contract_blob = json.dumps(contract.canonical_payload, ensure_ascii=False)
+    #    🔴 声明集合必须从 **canonical_payload** 取，不能从 `contract.all_fields()` 取：
+    #       实测 `FieldSpec` **没有** `store_item_id` 字段（`contracts.py` 里通篇不读它）
+    #       ⇒ `getattr(f, "store_item_id", None)` 对每个 field 都返回 None、声明集恒空，
+    #       本判据会退回成原来那个「凡出现即泄漏」。契约 JSON 里 per-field 的
+    #       `store_item_id` 是**解析器丢弃的声明元数据**（本轮实测登记）。
+    declared_items = {
+        str(field["store_item_id"])
+        for sheet in contract.canonical_payload.get("sheets", [])
+        for table in sheet.get("tables", [])
+        for field in table.get("fields", [])
+        if field.get("store_item_id")
+    }
     snap["other_items"] = {
         "count": len(items) - 1,
+        "declared_in_contract": sorted(
+            item for item in items if item != P.STORE_ITEM_ID and item in declared_items
+        ),
         "leaked_into_contract": sorted(
-            item for item in items if item != P.STORE_ITEM_ID and item in contract_blob
+            item
+            for item in items
+            if item != P.STORE_ITEM_ID
+            and item in contract_blob
+            and item not in declared_items
         ),
         "merged_key_prefixes": sorted({key.split("/")[0] for key in outcome.merged.values}),
         "merged_row_keys_are_payload_rows": set(
@@ -1285,7 +1314,15 @@ def test_no_other_store_item_is_touched(real: dict[str, Any]) -> None:
     assert other["count"] == real["item_count"] - 1, (
         "「其他 item」数必须恰好是总数减本 item —— 对不上说明分流口径漂了"
     )
+    # 🔴 泄漏 = 出现在契约文本里但**契约自己没声明**为 store_item_id（见快照处注释）。
+    #    D2 扩容 lane 把自己的受管区接进契约是正常交付，不算泄漏。
     assert other["leaked_into_contract"] == [], other["leaked_into_contract"]
+    # 🔴 非空对照：必须真有「别的 item 被契约合法声明」这一类，否则上一条退化成空集恒真
+    #    （现算 D2-bd-aging-rows / D2-bd-individual-rows 两条）。
+    assert other["declared_in_contract"], (
+        "契约没声明任何别的 store item ⇒ 上一条的「排除声明集」没有分母，"
+        "退回成了原来那个「凡出现即泄漏」的恒真/恒假判据"
+    )
     assert other["merged_key_prefixes"] == ["receivable_detail_rows"]
     assert other["merged_row_keys_are_payload_rows"] is True
 

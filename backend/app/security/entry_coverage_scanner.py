@@ -48,9 +48,8 @@ _NOT_APPLICABLE = "not_applicable"
 # gate/matrix/test_ids invariants below.
 BASELINE_MIGRATION_HEAD = "V112"
 FEATURE_APPLIED_MIGRATION = "V115"
-ACCEPTED_MIGRATION_HEADS: frozenset[str] = frozenset(
-    {BASELINE_MIGRATION_HEAD, FEATURE_APPLIED_MIGRATION}
-)
+# 校验 migration_head >= 基线版本（而非白名单），新增迁移不会打红
+_MINIMUM_MIGRATION_VERSION = 112
 
 # Entry families derived from Requirement 8.5-8.16.
 ENTRY_FAMILIES: tuple[str, ...] = (
@@ -550,11 +549,16 @@ def validate_ledger(ledger: dict[str, Any]) -> list[str]:
                         f"(fake-pass): {e.get('entrypoint')}"
                     )
     head = ledger.get("migration_head")
-    if head not in ACCEPTED_MIGRATION_HEADS:
+    # 只要 migration_head >= 基线版本即可（新增迁移不应打红）
+    head_ver = 0
+    if head and head.startswith("V"):
+        m = re.match(r"V(\d+)", head)
+        if m:
+            head_ver = int(m.group(1))
+    if head_ver < _MINIMUM_MIGRATION_VERSION:
         problems.append(
-            "migration_head expected one of "
-            f"{sorted(ACCEPTED_MIGRATION_HEADS)} (V112 baseline / V115 feature-applied), "
-            f"got {head}"
+            f"migration_head expected >= V{_MINIMUM_MIGRATION_VERSION:03d} "
+            f"(baseline), got {head}"
         )
     return problems
 

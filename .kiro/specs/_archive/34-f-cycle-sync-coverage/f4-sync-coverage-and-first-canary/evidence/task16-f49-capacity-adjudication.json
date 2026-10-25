@@ -1,0 +1,63 @@
+{
+  "task": 16,
+  "sheet": "供应商融资检查表F4-9",
+  "store_item_id": "F4-9-rows",
+  "production_code_changes": "none",
+
+  "template_geometry": {
+    "sheet_name": "供应商融资检查表F4-9",
+    "max_row": 33,
+    "max_col": 16,
+    "header_row": 11,
+    "header_labels": ["供应商名称", "承诺付款方", "融资单号", "资金提供方（金融机构）", "状态",
+                      "融资金额", "供应商签收日期", "放款日期", "转让日期", "承诺还款日期",
+                      "实际还款日期", "本期采购金额", "差异", "借款余额"],
+    "groups": [
+      {"group": 1, "data_rows": "R12-R15", "row_count": 4, "subtotal_row": "R16", "subtotal_formula": "F16=SUM(F12:F15)"},
+      {"group": 2, "data_rows": "R17-R20", "row_count": 4, "subtotal_row": "R21", "subtotal_formula": "F21=SUM(F17:F20)"},
+      {"group": 3, "data_rows": "R22-R25", "row_count": 4, "subtotal_row": "R26", "subtotal_formula": "F26=SUM(F22:F25)"}
+    ],
+    "total_row": "R27",
+    "total_formula": "F27=F26+F21+F16 (三小计相加非SUM区间)",
+    "formula_columns_in_data_area": [],
+    "formula_columns_in_subtotal": ["M (差异=F-L)"],
+    "formula_columns_in_total": ["F", "L", "M", "N"]
+  },
+
+  "frontend_capacity": {
+    "composable": "useF4SupplierFinancing.ts",
+    "storage_key": "F4-9-rows",
+    "group_identity": "groupId (前缀 grp-，同组联动 supplierName)",
+    "row_identity": "rowId (前缀 f4sf-)",
+    "max_groups": "无限制（addSupplierGroup 无上限）",
+    "max_rows_per_group": "无限制（addRowInGroup 无上限）",
+    "legacy_keys": ["F4-9-factoring-rows", "F4-9-note-rows", "F4-9-supply-rows",
+                    "F4-9-factoring", "F4-9-note", "F4-9-supply", "F4-9-supplychain"]
+  },
+
+  "capacity_mismatch": {
+    "template_slots": "3 groups × 4 rows = 12 data rows",
+    "frontend_limit": "unlimited groups × unlimited rows",
+    "consequence": "供应商数 > 3 或单供应商融资笔数 > 4 时，超出模板槽位的数据无法写入 OO 侧；小计行 SUM 区间固定（F16=SUM(F12:F15)），不随扩行位移",
+    "total_formula_issue": "R27=F26+F21+F16 是三小计相加（非 SUM 区间）⇒ 增减组数时合计行不自动适配"
+  },
+
+  "blocking_factors": [
+    "数据区中间有小计行（R16/R21/R26）⇒ RowTableSheetSpec 的 first_data_row~last_data_row 连续区间不适用",
+    "三组小计行的 SUM 区间是固定的（SUM(F12:F15)），不随组内扩行位移",
+    "合计行是三小计相加（F26+F21+F16），不是数据区 SUM ⇒ 增减组数时合计行公式不自动适配",
+    "groupId 是展示层分组键（前端同组联动 supplierName），不是引擎层的 row_section_field（section 是固定枚举，group 是动态生成）",
+    "前端 syncFromDetail() 从 F4-2 动态同步供应商候选，超出 3 组时无法映射到模板固定槽位"
+  ],
+
+  "verdict": "html_only（分组表形态需引擎层扩展，当前 RowTableSheetSpec 不支持）",
+  "verdict_reason": "模板 3 组 × 4 行的固定结构与前端无限制的分组表之间存在结构性不匹配。RowTableSheetSpec 假设 first_data_row~last_data_row 是连续区间（中间无小计行），而 F4-9 的三组之间各有小计行隔开。groupId 是动态生成的分组键（非固定枚举），不适合 row_section_field（G9 先例的 section 是固定三值枚举）。容量限额内受管需要引擎层扩展支持「组级小计行跳过 + 动态组身份」，不是声明层能解决的。",
+  "follow_up": "另立 spec 处理分组表受管形态（需引擎层 GroupedTableSheetSpec 或类似扩展）",
+
+  "p9_capacity_test": {
+    "description": "F4-P9 判据：供应商数 ≤ 3 且每组 ≤ 4 行时模板够用；超限时整表降级 legacy + 中文提示",
+    "status": "html_only 裁决后该判据不适用（整表保持 legacy），登记在 provider HTML_ONLY_STORE_KEYS"
+  },
+
+  "evidence_date": "2026-10-07"
+}

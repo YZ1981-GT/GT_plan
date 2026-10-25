@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -266,9 +267,34 @@ class TestRepositoryAndCli:
         assert guard.main(["--strict", "--root", str(tmp_path), "--baseline", str(baseline)]) == 0
 
     def test_constants_track_landed_v105(self):
+        """常量必须**跟随磁盘上真实落地的迁移**，不手抄版本号。
+
+        🔴 2026-09-28 修：原断言写死 `NEXT_MIGRATION_FILENAME == "V105__..."` /
+        `CURRENT_MIGRATION_VERSION == 105`。迁移头已推进到 V112（守卫源码注释自己
+        写着「Current head advances to 112」），于是这条恒红 —— 是**判据手抄数字后
+        过期**，不是常量错。改成从磁盘现算：常量指向的文件必须真存在、版本号必须由
+        文件名解析得出、且不得回退到 V105 之前。这样再推进到 V113 也不会误红，
+        但「常量与磁盘脱钩」会立刻打红。
+        """
+        migrations = Path(__file__).resolve().parents[2] / "migrations"
+
+        # V105 是已落地的 canonical feature migration，必须一直在盘上
         assert guard.CANONICAL_V105_FILENAME == "V105__procedure_row_tasks.sql"
-        assert guard.NEXT_MIGRATION_FILENAME == "V105__procedure_row_tasks.sql"
-        assert guard.CURRENT_MIGRATION_VERSION == 105
+        assert (migrations / guard.CANONICAL_V105_FILENAME).is_file(), (
+            f"canonical V105 迁移不在盘上: {guard.CANONICAL_V105_FILENAME}"
+        )
+
+        # 当前头部迁移：常量指向的文件必须存在，版本号必须与文件名一致
+        head = guard.NEXT_MIGRATION_FILENAME
+        assert (migrations / head).is_file(), f"头部迁移不在盘上: {head}"
+        parsed = re.fullmatch(r"V(\d+)__.+\.sql", head)
+        assert parsed, f"头部迁移文件名不合 V<num>__*.sql 形态: {head}"
+        assert guard.CURRENT_MIGRATION_VERSION == int(parsed.group(1)), (
+            f"CURRENT_MIGRATION_VERSION={guard.CURRENT_MIGRATION_VERSION} 与 "
+            f"NEXT_MIGRATION_FILENAME={head} 解析出的版本不符"
+        )
+        # 已落地的 V105 不可回退
+        assert guard.CURRENT_MIGRATION_VERSION >= 105
 
     def test_current_repository_baseline_is_exact(self):
         root = Path(__file__).resolve().parents[3]
@@ -278,3 +304,83 @@ class TestRepositoryAndCli:
         )
         assert errors == []
         assert guard.compare_with_baseline(findings, entries, ceiling) == []
+
+
+class TestCanonicalRouteLocation:
+    """canonical「我的程序任务」路由的落点判据（2026-09-28 路由域拆分回归守卫）."""
+
+    _CANONICAL_ROUTE = (
+        "export const dashboardRoutes = [\n"
+        "  {\n"
+        "    path: 'my-procedures',\n"
+        "    name: 'MyProcedureTasks',\n"
+        "    component: () => import('@/views/MyProcedureTasks.vue'),\n"
+        "  },\n"
+        "]\n"
+    )
+
+    def test_router_source_predicate_covers_index_and_domains(self):
+        base = "audit-platform/frontend/src/router"
+        assert guard._is_router_source(f"{base}/index.ts")
+        assert guard._is_router_source(f"{base}/domains/dashboard.ts")
+        assert guard._is_router_source(f"{base}/domains/projects.ts")
+        # 非路由真源：不得被当成 canonical 落点
+        assert not guard._is_router_source(f"{base}/domains/nested/deep.ts")
+        assert not guard._is_router_source(f"{base}/guards/authGuard.ts")
+        assert not guard._is_router_source("audit-platform/frontend/src/views/Foo.ts")
+
+    def test_canonical_route_in_domain_file_is_not_debt(self, tmp_path):
+        """变异证明（正面）：canonical 路由落在 domains/*.ts 不得被报成并行页面。
+
+        这正是长期红的形态 —— 路由本体从 index.ts 搬到 domains/dashboard.ts。
+        """
+        write(
+            tmp_path,
+            "audit-platform/frontend/src/router/domains/dashboard.ts",
+            self._CANONICAL_ROUTE,
+        )
+        findings = guard.scan_repository(tmp_path)
+        assert guard.RULE_PARALLEL_TASK_PAGE not in rules(findings), findings
+
+    def test_canonical_route_outside_router_source_is_debt(self, tmp_path):
+        """变异证明（反面）：同一条路由放在非路由真源文件里仍必须报债务。"""
+        write(
+            tmp_path,
+            "audit-platform/frontend/src/views/rogueRoutes.ts",
+            self._CANONICAL_ROUTE,
+        )
+        findings = guard.scan_repository(tmp_path)
+        assert guard.RULE_PARALLEL_TASK_PAGE in rules(findings)
+
+    def test_canonical_route_registered_twice_across_domains_is_debt(self, tmp_path):
+        """变异证明：双注册（两个分域文件各一份）必须报出第二处。
+
+        原 `canonical_seen > 1` 是文件内计数，拆分后两文件各只见 1 次 ⇒ 会静默放行。
+        """
+        write(
+            tmp_path,
+            "audit-platform/frontend/src/router/domains/dashboard.ts",
+            self._CANONICAL_ROUTE,
+        )
+        write(
+            tmp_path,
+            "audit-platform/frontend/src/router/domains/projects.ts",
+            self._CANONICAL_ROUTE.replace("dashboardRoutes", "projectsRoutes"),
+        )
+        findings = guard.scan_repository(tmp_path)
+        dupes = [
+            f for f in findings
+            if f.rule == guard.RULE_PARALLEL_TASK_PAGE
+            and "duplicate-canonical" in f.symbol
+        ]
+        assert len(dupes) == 1, findings
+        assert dupes[0].path.endswith("domains/projects.ts")
+
+    def test_real_repository_has_exactly_one_canonical_route(self):
+        """真源回归：全仓 canonical 路由恰好一处（现算，禁写死文件名）。"""
+        root = Path(__file__).resolve().parents[3]
+        dupes = [
+            f for f in guard._scan_duplicate_canonical_routes(root)
+            if "duplicate-canonical" in f.symbol
+        ]
+        assert dupes == [], f"canonical 路由被重复注册: {dupes}"

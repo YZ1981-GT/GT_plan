@@ -95,7 +95,7 @@
     <!-- 抽凭引擎 -->
     <el-dialog v-model="samplingVisible" title="H5-8 减少检查 — 抽凭引擎" width="85%" destroy-on-close>
       <GtVoucherSamplingEngine
-        account-code="1631"
+        :account-code="samplingAccountCode"
         phase="final"
         :workpaper-id="wpId"
         :project-id="projectId"
@@ -133,6 +133,8 @@ import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH5DisposalCheck } from '../../composables/useH5DisposalCheck'
 import { useH5FormData } from '../../composables/useH5FormData'
+// 科目码单一真源（禁组件内字面量）
+import { h5Scope } from '../../composables/hCycleAccountScope'
 import { useAuditContext } from '@/composables/useAuditContext'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'
@@ -141,6 +143,13 @@ import type { SamplingMethodologySnapshot } from '../../composables/shared/sampl
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean; year?: number }>()
+
+/**
+ * 抽凭科目码（真源 `h5Scope`，原硬编码 `"1631"`）。取值不变 ⇒ 运行时行为不变。
+ * 理由同 `H5TabAdditionCheck`：json 的 H5 值 `1606` 是错的，接真源可免误伤。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.5/R5.4
+ */
+const samplingAccountCode = h5Scope.grossCode()
 const emit = defineEmits<{ 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)

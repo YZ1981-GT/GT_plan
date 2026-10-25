@@ -29,6 +29,23 @@ from app.services.ledger_import.direction_resolver import resolve_account_direct
 logger = logging.getLogger(__name__)
 
 
+def _log_missing_year(handler: str, payload: EventPayload) -> None:
+    """试算表重算 handler 拿到 year=None 时的可见降级。
+
+    EventBus 派发口已按项目审计年度补齐 year；走到这里 = 项目查不到年度，
+    重算无法定位年度 ⇒ 跳过并记 stale-degraded（原为只打一行 warning，
+    用户侧无从得知试算表没有被重算）。
+    """
+    from app.services.stale_degraded_logger import log_stale_degraded
+
+    log_stale_degraded(
+        source=f"TrialBalanceService.{handler}:{payload.event_type.value}",
+        target=f"trial_balance:project={payload.project_id}",
+        error="事件缺 year 且项目无审计年度可补，试算表未重算",
+        context={"project_id": str(payload.project_id), "account_codes": payload.account_codes},
+    )
+
+
 class TrialBalanceService:
     """试算表计算引擎"""
 
@@ -296,7 +313,12 @@ class TrialBalanceService:
                 row.opening_balance = opening
                 if name:
                     row.account_name = name
-                row.audited_amount = closing + row.rje_adjustment + row.aje_adjustment
+                row.audited_amount = (
+                    closing
+                    + (row.rje_adjustment or Decimal("0"))
+                    + (row.aje_adjustment or Decimal("0"))
+                    + (row.wp_adjustment or Decimal("0"))
+                )
             else:
                 new_rows.append(TrialBalance(
                     project_id=project_id,
@@ -309,6 +331,7 @@ class TrialBalanceService:
                     opening_balance=opening,
                     rje_adjustment=Decimal("0"),
                     aje_adjustment=Decimal("0"),
+                    wp_adjustment=Decimal("0"),
                     audited_amount=closing,
                 ))
 
@@ -427,11 +450,11 @@ class TrialBalanceService:
         company_code: str = "001",
         account_codes: list[str] | None = None,
     ) -> None:
-        """audited = unadjusted + rje + aje
+        """audited = unadjusted + rje + aje + wp_adjustment
 
-        v2 约定下 unadjusted/rje/aje 均已按科目自然方向归一为正数口径
-        （rje/aje 在 recalc_adjustments 中已按方向归一），故直接相加即得审定数，
-        无需在此再按方向取反。
+        v2 约定下四个分量均已按科目自然方向归一为正数口径或其净额，
+        故直接相加即得审定数。底稿调整是显式发布产生的第四个分量，
+        不能在未审数或调整分录重算时被清除。
         """
         q = sa.select(TrialBalance).where(
             TrialBalance.project_id == project_id,
@@ -445,7 +468,12 @@ class TrialBalanceService:
         result = await self.db.execute(q)
         for row in result.scalars().all():
             unadj = row.unadjusted_amount or Decimal("0")
-            row.audited_amount = unadj + row.rje_adjustment + row.aje_adjustment
+            row.audited_amount = (
+                unadj
+                + (row.rje_adjustment or Decimal("0"))
+                + (row.aje_adjustment or Decimal("0"))
+                + (row.wp_adjustment or Decimal("0"))
+            )
 
         await self.db.flush()
 
@@ -487,7 +515,12 @@ class TrialBalanceService:
 
         for row in rows:
             unadj = row.unadjusted_amount or Decimal("0")
-            expected_audited = unadj + row.rje_adjustment + row.aje_adjustment
+            expected_audited = (
+                unadj
+                + (row.rje_adjustment or Decimal("0"))
+                + (row.aje_adjustment or Decimal("0"))
+                + (row.wp_adjustment or Decimal("0"))
+            )
             if row.audited_amount != expected_audited:
                 issues.append({
                     "type": "audited_formula",
@@ -562,7 +595,11 @@ class TrialBalanceService:
         applicable_standard = f"{template_type}_{report_scope}"
 
         rc_q = (
-            sa.select(rc.c.row_code, rc.c.row_name, rc.c.indent_level, rc.c.is_total_row, rc.c.formula)
+            sa.select(
+                rc.c.row_code, rc.c.row_name, rc.c.indent_level,
+                rc.c.is_total_row, rc.c.formula,
+                rc.c.aje_formula, rc.c.rje_formula,
+            )
             .where(
                 rc.c.report_type == report_type,
                 rc.c.applicable_standard == applicable_standard,
@@ -629,11 +666,13 @@ class TrialBalanceService:
 
         # 3. 从 trial_balance 汇总未审数
         unadj_map: dict[str, Decimal] = {}
+        wp_adjustment_map: dict[str, Decimal] = {}
         if all_account_codes:
             tb_q = (
                 sa.select(
                     tb.c.standard_account_code,
                     sa.func.coalesce(sa.func.sum(tb.c.unadjusted_amount), 0).label("unadj"),
+                    sa.func.coalesce(sa.func.sum(tb.c.wp_adjustment), 0).label("wp_adjustment"),
                 )
                 .where(
                     tb.c.project_id == project_id,
@@ -651,6 +690,7 @@ class TrialBalanceService:
                 # 报表行次的方向由 ReportLineMapping 的归属（资产侧/负债侧）+ account_category 决定，
                 # 而非靠金额符号判断 —— 移除旧约定下的"二次翻转"。
                 unadj_map[r.standard_account_code] = Decimal(str(r.unadj))
+                wp_adjustment_map[r.standard_account_code] = Decimal(str(r.wp_adjustment))
 
         # 4. 从 adjustments 汇总 AJE/RJE
         #
@@ -725,6 +765,30 @@ class TrialBalanceService:
             adj_lookup=_adj,
         )
 
+        # ── 辅助：用调整列公式求值（Phase 2 核心） ──
+        def _eval_adj_formula(
+            adj_formula: str | None,
+            ctx: FormulaContext,
+        ) -> Decimal | None:
+            """若行配置了调整列公式则返回求值结果（净额），否则 None 表示走默认路径。
+
+            spec: tb-adjustment-column-formula-closure Phase 2 Task 2.6
+            需求 4.2: 未配置时**完全退回**现有路径（零回归）
+            需求 4.3: 配置后以公式为准
+            """
+            if not adj_formula or not adj_formula.strip():
+                return None
+            try:
+                result = fe_execute(adj_formula, ctx)
+                return result.value
+            except Exception:
+                # fail-open：公式求值失败不应阻断整行，退回默认路径
+                import logging as _log
+                _log.getLogger(__name__).warning(
+                    "调整列公式求值失败: %s，退回默认路径", adj_formula, exc_info=True
+                )
+                return None
+
         result_rows = []
         row_values: dict[str, Decimal | float] = {}
 
@@ -732,64 +796,106 @@ class TrialBalanceService:
             row_code = rc_row.row_code
             formula = rc_row.formula
             is_total = rc_row.is_total_row or False
+            # V179: 调整列公式（净额），有值时以公式为准，无值退回默认科目码反解
+            aje_formula = getattr(rc_row, "aje_formula", None)
+            rje_formula = getattr(rc_row, "rje_formula", None)
 
             if formula:
                 # 有公式：用统一公式引擎执行（L1 内核，ctx 由上方 L2 预载）
                 # row_cache 每行都在变（ROW/SUM_ROW 引用已算出的行），故每次新建
-                # FormulaContext 但复用同一份 tb_data（只读，不拷贝）。
+                # FormulaContext 但复用同一份 tb_data / adj_data（只读，不拷贝）。
+                #
+                # `adj_data` 直接就是 `adj_net_batch` 的返回值（键名逐一对应
+                # `ADJ()` 的第二参归一结果 + `_net` 后缀），**禁**在此做键名转换。
+                # spec: tb-adjustment-column-formula-closure Phase 1 Task 1.8
                 _ctx = FormulaContext(
                     tb_data=formula_ctx_base,
                     row_cache={k: Decimal(str(v)) for k, v in row_values.items()},
+                    adj_data=adj_data,
                 )
                 unadj = fe_execute(formula, _ctx).value
-                # 公式涉及的科目的调整也要汇总
-                aje_dr = Decimal("0")
-                aje_cr = Decimal("0")
-                rcl_dr = Decimal("0")
-                rcl_cr = Decimal("0")
-                # 归一净额（供审定数）——与展示用的 dr/cr 是两个口径，见 ADR-ADJ-005
-                aje_net = Decimal("0")
-                rcl_net = Decimal("0")
-                formula_codes = get_formula_account_codes(formula)
-                for code in formula_codes:
-                    if code.startswith("__range__"):
-                        # 范围编码：遍历匹配
-                        range_str = code.replace("__range__", "")
-                        parts = range_str.split("~")
-                        if len(parts) == 2:
-                            for ac in list(all_account_codes):
-                                if parts[0] <= ac <= parts[1]:
-                                    aje_dr += _adj(ac, "aje_dr")
-                                    aje_cr += _adj(ac, "aje_cr")
-                                    rcl_dr += _adj(ac, "rje_dr")
-                                    rcl_cr += _adj(ac, "rje_cr")
-                                    aje_net += _adj(ac, "aje_net")
-                                    rcl_net += _adj(ac, "rje_net")
-                    else:
-                        aje_dr += _adj(code, "aje_dr")
-                        aje_cr += _adj(code, "aje_cr")
-                        rcl_dr += _adj(code, "rje_dr")
-                        rcl_cr += _adj(code, "rje_cr")
-                        aje_net += _adj(code, "aje_net")
-                        rcl_net += _adj(code, "rje_net")
+                # ── V179 Phase 2：调整列公式优先 ──
+                # 有 aje_formula/rje_formula 时以公式为准（需求 4.3），返回净额；
+                # 无值时**完全退回**现有科目码反解路径（需求 4.2 零回归）。
+                _aje_formula_val = _eval_adj_formula(aje_formula, _ctx)
+                _rje_formula_val = _eval_adj_formula(rje_formula, _ctx)
+
+                if _aje_formula_val is not None or _rje_formula_val is not None:
+                    # 至少一列配了公式——以公式净额为准
+                    aje_net = _aje_formula_val if _aje_formula_val is not None else Decimal("0")
+                    rcl_net = _rje_formula_val if _rje_formula_val is not None else Decimal("0")
+                    # 展示列：净额 > 0 进借方列，< 0 进贷方列（绝对值）
+                    aje_dr = max(aje_net, Decimal("0"))
+                    aje_cr = abs(min(aje_net, Decimal("0")))
+                    rcl_dr = max(rcl_net, Decimal("0"))
+                    rcl_cr = abs(min(rcl_net, Decimal("0")))
+                    # wp_adjustment 仍走默认汇总（与调整列公式正交）
+                    wp_adjustment = Decimal("0")
+                    formula_codes = get_formula_account_codes(formula)
+                    for code in formula_codes:
+                        if code.startswith("__range__"):
+                            range_str = code.replace("__range__", "")
+                            parts = range_str.split("~")
+                            if len(parts) == 2:
+                                for ac in list(all_account_codes):
+                                    if parts[0] <= ac <= parts[1]:
+                                        wp_adjustment += wp_adjustment_map.get(ac, Decimal("0"))
+                        else:
+                            wp_adjustment += wp_adjustment_map.get(code, Decimal("0"))
+                else:
+                    # 未配调整列公式——完全退回现有科目码反解路径（零回归）
+                    aje_dr = Decimal("0")
+                    aje_cr = Decimal("0")
+                    rcl_dr = Decimal("0")
+                    rcl_cr = Decimal("0")
+                    wp_adjustment = Decimal("0")
+                    aje_net = Decimal("0")
+                    rcl_net = Decimal("0")
+                    formula_codes = get_formula_account_codes(formula)
+                    for code in formula_codes:
+                        if code.startswith("__range__"):
+                            # 范围编码：遍历匹配
+                            range_str = code.replace("__range__", "")
+                            parts = range_str.split("~")
+                            if len(parts) == 2:
+                                for ac in list(all_account_codes):
+                                    if parts[0] <= ac <= parts[1]:
+                                        aje_dr += _adj(ac, "aje_dr")
+                                        aje_cr += _adj(ac, "aje_cr")
+                                        rcl_dr += _adj(ac, "rje_dr")
+                                        rcl_cr += _adj(ac, "rje_cr")
+                                        aje_net += _adj(ac, "aje_net")
+                                        rcl_net += _adj(ac, "rje_net")
+                                        wp_adjustment += wp_adjustment_map.get(ac, Decimal("0"))
+                        else:
+                            aje_dr += _adj(code, "aje_dr")
+                            aje_cr += _adj(code, "aje_cr")
+                            rcl_dr += _adj(code, "rje_dr")
+                            rcl_cr += _adj(code, "rje_cr")
+                            aje_net += _adj(code, "aje_net")
+                            rcl_net += _adj(code, "rje_net")
+                            wp_adjustment += wp_adjustment_map.get(code, Decimal("0"))
                 # 🔴 B4 修正：审定数用**归一后**净额相加，不用原始 dr-cr。
                 # 改造前写的是 `unadj + aje_dr - aje_cr + rcl_dr - rcl_cr`，对贷方正常类
                 # （负债/权益/收入）方向反掉 —— 同文件 recalc_adjustments L405-416 的注释
                 # 明确警告过这一点并已据此归一，本处是其未修的孪生体。
                 # Property 1 实测：等价性边界恰为科目方向（借方类等价、贷方类符号相反）。
-                audited = unadj + aje_net + rcl_net
+                audited = unadj + aje_net + rcl_net + wp_adjustment
 
                 # 合计行公式结果为 0 时 fallback 到向前汇总（seed 公式可能范围不完整）
                 if is_total and unadj == 0:
                     fb_unadj = Decimal("0")
+                    fb_wp_adjustment = Decimal("0")
                     fb_audited = Decimal("0")
                     for prev_row in result_rows[::-1]:
                         if prev_row.get("is_category") or prev_row.get("is_total"):
                             break
                         fb_unadj += Decimal(str(prev_row.get("unadjusted") or 0))
+                        fb_wp_adjustment += Decimal(str(prev_row.get("wp_adjustment") or 0))
                         fb_audited += Decimal(str(prev_row.get("audited") or 0))
                     if fb_unadj != 0:
                         unadj = fb_unadj
+                        wp_adjustment = fb_wp_adjustment
                         audited = fb_audited
 
             elif is_total:
@@ -799,6 +905,7 @@ class TrialBalanceService:
                 total_aje_cr = Decimal("0")
                 total_rcl_dr = Decimal("0")
                 total_rcl_cr = Decimal("0")
+                total_wp_adjustment = Decimal("0")
                 total_audited = Decimal("0")
                 for prev_row in result_rows[::-1]:
                     if prev_row.get("is_category") or prev_row.get("is_total"):
@@ -808,12 +915,14 @@ class TrialBalanceService:
                     total_aje_cr += Decimal(str(prev_row.get("aje_cr") or 0))
                     total_rcl_dr += Decimal(str(prev_row.get("rcl_dr") or 0))
                     total_rcl_cr += Decimal(str(prev_row.get("rcl_cr") or 0))
+                    total_wp_adjustment += Decimal(str(prev_row.get("wp_adjustment") or 0))
                     total_audited += Decimal(str(prev_row.get("audited") or 0))
                 unadj = total_unadj
                 aje_dr = total_aje_dr
                 aje_cr = total_aje_cr
                 rcl_dr = total_rcl_dr
                 rcl_cr = total_rcl_cr
+                wp_adjustment = total_wp_adjustment
                 audited = total_audited
             else:
                 # 无公式非合计：用映射关系填充（按 account_sign 加减，备抵科目为减项）
@@ -822,40 +931,69 @@ class TrialBalanceService:
                     account_sign.get(ac, Decimal("1")) * unadj_map.get(ac, Decimal("0"))
                     for ac in accounts
                 )
-                # account_sign 是**映射维度**的加减号（备抵科目为减项），
-                # 与 adj_net 内部的**科目方向**符号归一是两个正交维度，两者都要应用。
-                aje_dr = sum(
-                    (account_sign.get(ac, Decimal("1")) * _adj(ac, "aje_dr")
-                     for ac in accounts),
-                    Decimal("0"),
+
+                # ── V179 Phase 2：调整列公式优先（同分支 A 的逻辑） ──
+                _ctx_c = FormulaContext(
+                    tb_data=formula_ctx_base,
+                    row_cache={k: Decimal(str(v)) for k, v in row_values.items()},
+                    adj_data=adj_data,
                 )
-                aje_cr = sum(
-                    (account_sign.get(ac, Decimal("1")) * _adj(ac, "aje_cr")
-                     for ac in accounts),
-                    Decimal("0"),
-                )
-                rcl_dr = sum(
-                    (account_sign.get(ac, Decimal("1")) * _adj(ac, "rje_dr")
-                     for ac in accounts),
-                    Decimal("0"),
-                )
-                rcl_cr = sum(
-                    (account_sign.get(ac, Decimal("1")) * _adj(ac, "rje_cr")
-                     for ac in accounts),
-                    Decimal("0"),
-                )
-                aje_net = sum(
-                    (account_sign.get(ac, Decimal("1")) * _adj(ac, "aje_net")
-                     for ac in accounts),
-                    Decimal("0"),
-                )
-                rcl_net = sum(
-                    (account_sign.get(ac, Decimal("1")) * _adj(ac, "rje_net")
-                     for ac in accounts),
-                    Decimal("0"),
-                )
+                _aje_formula_val_c = _eval_adj_formula(aje_formula, _ctx_c)
+                _rje_formula_val_c = _eval_adj_formula(rje_formula, _ctx_c)
+
+                if _aje_formula_val_c is not None or _rje_formula_val_c is not None:
+                    aje_net = _aje_formula_val_c if _aje_formula_val_c is not None else Decimal("0")
+                    rcl_net = _rje_formula_val_c if _rje_formula_val_c is not None else Decimal("0")
+                    aje_dr = max(aje_net, Decimal("0"))
+                    aje_cr = abs(min(aje_net, Decimal("0")))
+                    rcl_dr = max(rcl_net, Decimal("0"))
+                    rcl_cr = abs(min(rcl_net, Decimal("0")))
+                    wp_adjustment = sum(
+                        (account_sign.get(ac, Decimal("1")) * wp_adjustment_map.get(ac, Decimal("0"))
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                else:
+                    # 未配调整列公式——完全退回现有映射路径（零回归）
+                    # account_sign 是**映射维度**的加减号（备抵科目为减项），
+                    # 与 adj_net 内部的**科目方向**符号归一是两个正交维度，两者都要应用。
+                    aje_dr = sum(
+                        (account_sign.get(ac, Decimal("1")) * _adj(ac, "aje_dr")
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                    aje_cr = sum(
+                        (account_sign.get(ac, Decimal("1")) * _adj(ac, "aje_cr")
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                    rcl_dr = sum(
+                        (account_sign.get(ac, Decimal("1")) * _adj(ac, "rje_dr")
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                    rcl_cr = sum(
+                        (account_sign.get(ac, Decimal("1")) * _adj(ac, "rje_cr")
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                    aje_net = sum(
+                        (account_sign.get(ac, Decimal("1")) * _adj(ac, "aje_net")
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                    rcl_net = sum(
+                        (account_sign.get(ac, Decimal("1")) * _adj(ac, "rje_net")
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
+                    wp_adjustment = sum(
+                        (account_sign.get(ac, Decimal("1")) * wp_adjustment_map.get(ac, Decimal("0"))
+                         for ac in accounts),
+                        Decimal("0"),
+                    )
                 # 🔴 B4 修正：同上，审定数用归一净额
-                audited = unadj + aje_net + rcl_net
+                audited = unadj + aje_net + rcl_net + wp_adjustment
 
             row_values[row_code] = float(unadj)
 
@@ -870,6 +1008,7 @@ class TrialBalanceService:
                 "aje_cr": float(aje_cr) if aje_cr != 0 else None,
                 "rcl_dr": float(rcl_dr) if rcl_dr != 0 else None,
                 "rcl_cr": float(rcl_cr) if rcl_cr != 0 else None,
+                "wp_adjustment": float(wp_adjustment) if wp_adjustment != 0 else None,
                 "audited": float(audited) if audited != 0 else None,
             })
 
@@ -914,11 +1053,13 @@ class TrialBalanceService:
         all_account_codes = list({r.standard_account_code for r in rl_rows if r.standard_account_code})
 
         unadj_map: dict[str, Decimal] = {}
+        wp_adjustment_map: dict[str, Decimal] = {}
         if all_account_codes:
             tb_q = (
                 sa.select(
                     tb.c.standard_account_code,
                     sa.func.coalesce(sa.func.sum(tb.c.unadjusted_amount), 0).label("unadj"),
+                    sa.func.coalesce(sa.func.sum(tb.c.wp_adjustment), 0).label("wp_adjustment"),
                 )
                 .where(
                     tb.c.project_id == project_id,
@@ -934,6 +1075,7 @@ class TrialBalanceService:
                 # v2 约定（category_natural_positive）：unadjusted_amount 已是自然正数，
                 # 无需按符号取反补偿 —— 与主路径 get_summary_with_adjustments 保持一致。
                 unadj_map[r.standard_account_code] = Decimal(str(r.unadj))
+                wp_adjustment_map[r.standard_account_code] = Decimal(str(r.wp_adjustment))
 
         # spec tb-adjustment-column-formula-closure Phase 0 Task 0.8：
         # 本 fallback 路径与主路径 get_summary_with_adjustments 是同型缺陷
@@ -993,7 +1135,11 @@ class TrialBalanceService:
             # 🔴 B4 修正：审定数用归一净额（同主路径），不用原始 dr-cr
             aje_net = sum((_adj(ac, "aje_net") for ac in accounts), Decimal("0"))
             rcl_net = sum((_adj(ac, "rje_net") for ac in accounts), Decimal("0"))
-            audited = unadj + aje_net + rcl_net
+            wp_adjustment = sum(
+                (wp_adjustment_map.get(ac, Decimal("0")) for ac in accounts),
+                Decimal("0"),
+            )
+            audited = unadj + aje_net + rcl_net + wp_adjustment
 
             result_rows.append({
                 "row_code": row_code,
@@ -1006,6 +1152,7 @@ class TrialBalanceService:
                 "aje_cr": float(aje_cr) if aje_cr != 0 else None,
                 "rcl_dr": float(rcl_dr) if rcl_dr != 0 else None,
                 "rcl_cr": float(rcl_cr) if rcl_cr != 0 else None,
+                "wp_adjustment": float(wp_adjustment) if wp_adjustment != 0 else None,
                 "audited": float(audited) if audited != 0 else None,
             })
 
@@ -1026,7 +1173,7 @@ class TrialBalanceService:
         account_codes = payload.account_codes
         year = payload.year
         if not year:
-            logger.warning("on_adjustment_changed: missing year, skipping")
+            _log_missing_year("on_adjustment_changed", payload)
             return
 
         await self.recalc_adjustments(
@@ -1049,7 +1196,7 @@ class TrialBalanceService:
         account_codes = payload.account_codes
         year = payload.year
         if not year:
-            logger.warning("on_mapping_changed: missing year, skipping")
+            _log_missing_year("on_mapping_changed", payload)
             return
 
         await self.recalc_unadjusted(
@@ -1071,7 +1218,7 @@ class TrialBalanceService:
         )
         year = payload.year
         if not year:
-            logger.warning("on_data_imported: missing year, skipping")
+            _log_missing_year("on_data_imported", payload)
             return
 
         await self.full_recalc(payload.project_id, year)
@@ -1088,7 +1235,7 @@ class TrialBalanceService:
         )
         year = payload.year
         if not year:
-            logger.warning("on_import_rolled_back: missing year, skipping")
+            _log_missing_year("on_import_rolled_back", payload)
             return
 
         await self.full_recalc(payload.project_id, year)

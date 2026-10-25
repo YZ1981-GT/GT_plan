@@ -1,0 +1,74 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "4. E1-P2 / E1-P3 红判据：键名实证 + `binding_kind` 三元组（含**自省变异**）": [
+      {
+        "executionId": "15e0c0b1-5f9c-479d-8002-fe626d983ea3",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791091436288
+      },
+      {
+        "executionId": "15e0c0b1-5f9c-479d-8002-fe626d983ea3",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791091449875
+      },
+      {
+        "executionId": "15e0c0b1-5f9c-479d-8002-fe626d983ea3",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791091657329
+      }
+    ],
+    "5. E1-P8 红判据：公式管理双模式一致性 + E1-P12 零回归基线": [
+      {
+        "executionId": "15e0c0b1-5f9c-479d-8002-fe626d983ea3",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791091436333
+      },
+      {
+        "executionId": "15e0c0b1-5f9c-479d-8002-fe626d983ea3",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791091664090
+      },
+      {
+        "executionId": "15e0c0b1-5f9c-479d-8002-fe626d983ea3",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791091965075
+      }
+    ],
+    "11. canary 验收：§9.6 三谓词 + DB 三谓词": [
+      {
+        "executionId": "15e0c0b1-5f9c-479d-8002-fe626d983ea3",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791091436382
+      }
+    ],
+    "12. **批量 e2e 骨架：fixture + seed 脚本**（复盘新增，照搬 D4 lane 范式）": [
+      {
+        "executionId": "15e0c0b1-5f9c-479d-8002-fe626d983ea3",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791091436427
+      }
+    ],
+    "19. E1-3 按裁决结果声明 + 验收": [
+      {
+        "executionId": "15e0c0b1-5f9c-479d-8002-fe626d983ea3",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791091436467
+      }
+    ],
+    "20. `phase5_e1_01_adjudication.py` 声明 + 四态覆盖状态机 + **TB 发布门守卫**": [
+      {
+        "executionId": "15e0c0b1-5f9c-479d-8002-fe626d983ea3",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791091436503
+      }
+    ],
+    "22.* 变异检验 + 真栈 + 证据登记": [
+      {
+        "executionId": "15e0c0b1-5f9c-479d-8002-fe626d983ea3",
+        "chatSessionId": "sess_88dd3894-fe83-4346-a634-c327fac61b82",
+        "timestamp": 1791091436545
+      }
+    ]
+  }
+}

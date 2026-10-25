@@ -118,8 +118,9 @@ async def get_reconciliation(
 ):
     """B2 单一事实源对账：worksheet 根节点 consolidated_amount vs consol_trial.consol_amount。
 
-    观测手段（不阻断）：diff 超容差返回 is_reconciled=false + diffs 清单，接口仍 200。
-    diff ≠ 缺陷（抵销归集维度差异是已知设计性不一致，见 ADR-CONSOL-001 / §5.4）。
+    不阻断：diff 超容差返回 is_reconciled=false + diffs 清单，接口仍 200。
+    两条路径同源（spec consol-tree-three-code-autobuild P8），超容差差异即缺陷 ——
+    多为只重算了其中一条路径，先全量重算差额表与合并试算再对账。
     """
     result = await reconcile_worksheet_vs_trial(
         db, project_id, year, tolerance=Decimal(str(tolerance))

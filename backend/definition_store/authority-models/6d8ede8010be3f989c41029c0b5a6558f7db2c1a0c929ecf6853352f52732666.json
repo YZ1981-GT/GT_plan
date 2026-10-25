@@ -1,0 +1,1 @@
+{"authority_model":"projection_contract","content_authority":"structured_projection","entry_id":"xlsx/gt-n5-income-tax-expense","merge_model":"stable_field_three_way","pilot_class":"n_cycle_income_tax_expense","required_slots":["template","instrumentation","contract"],"schema_version":"authority-model-definition:v1"}

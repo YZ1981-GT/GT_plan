@@ -811,7 +811,7 @@
       <p v-if="samplingPreset.hintText" class="sampling-preset-hint">{{ samplingPreset.hintText }}</p>
       <GtVoucherSamplingEngine
         v-if="samplingVisible && props.wpId && props.projectId"
-        account-code="1801"
+        :account-code="samplingAccountCode"
         phase="final"
         :default-method="samplingPreset.defaultMethod"
         :workpaper-id="props.wpId"
@@ -843,6 +843,17 @@ import {
   hasFailedCheck,
   parseI44PolicySnapshot,
 } from '../../composables/useI4TargetedCheck'
+
+/**
+ * 抽凭科目码取自单一真源 `i4AccountScope`（I4 长期待摊费用）。原为模板内字面量；
+ * 接真源后与该循环的取数/回写共用同一科目定义，避免各处硬编码漂移。
+ * 本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2/R1.5
+ */
+import { i4GrossQueryCodes } from '../../composables/i4AccountScope'
+
+/** 抽凭 account-code（逗号拼接，引擎侧会 split(',')） */
+const samplingAccountCode = i4GrossQueryCodes().join(',')
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),

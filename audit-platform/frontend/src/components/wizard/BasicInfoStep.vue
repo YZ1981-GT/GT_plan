@@ -127,21 +127,13 @@
           </el-form-item>
 
           <el-form-item label="报表类型" prop="report_scope">
-            <el-radio-group v-model="form.report_scope" @change="onReportScopeChange">
+            <el-radio-group v-model="form.report_scope">
               <el-radio-button value="standalone">单户报表</el-radio-button>
               <el-radio-button value="consolidated">合并报表</el-radio-button>
             </el-radio-group>
           </el-form-item>
-
-          <el-form-item v-if="form.report_scope === 'consolidated'" label="合并类型" prop="consolidation_type">
-            <el-radio-group v-model="form.consolidation_type">
-              <el-radio-button value="subsidiary">母子合并</el-radio-button>
-              <el-radio-button value="branch">总分汇总</el-radio-button>
-            </el-radio-group>
-            <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 4px; line-height: 1.4">
-              母子合并：独立法人子公司，含内部交易/投资抵销；总分汇总：非独立法人分支机构，直接加总无抵销
-            </div>
-          </el-form-item>
+          <!-- 「合并类型」单选已移除（consol-tree-three-code-autobuild 需求 1.7 / 4）：
+               合并方式按下级企业的与上级关系自动识别，子公司与分公司可以并存。 -->
         </div>
 
         <!-- 右栏：项目团队 + 预算合同 + 集团架构 -->
@@ -178,26 +170,52 @@
             />
           </el-form-item>
 
-          <!-- 合并报表：集团架构 -->
-          <template v-if="form.report_scope === 'consolidated'">
-            <div class="gt-form-section-title" style="margin-top: 20px">集团架构（三码体系）</div>
+          <!-- 集团架构：所有项目都填写（需求 1.1）。合并企业树由各项目的这组字段自动推导 -->
+          <div class="gt-form-section-title gt-group-section" style="margin-top: 20px" data-testid="group-section">
+            集团架构
+          </div>
 
-            <el-form-item label="上级企业">
-              <el-input v-model="form.parent_company_name" placeholder="直接控股的上级企业名称" />
-            </el-form-item>
+          <el-form-item label="上级企业" prop="parent_company_name">
+            <el-input v-model="form.parent_company_name" placeholder="直接上级企业名称（没有上级留空）" />
+          </el-form-item>
 
-            <el-form-item label="上级代码">
-              <el-input v-model="form.parent_company_code" placeholder="上级企业信用代码" maxlength="18" />
-            </el-form-item>
+          <el-form-item label="上级代码" prop="parent_company_code">
+            <el-input
+              v-model="form.parent_company_code"
+              placeholder="直接上级的统一社会信用代码"
+              maxlength="18"
+              data-testid="parent-code-input"
+            />
+            <div v-if="selfKindHint" class="gt-self-ref-hint" data-testid="self-ref-hint">{{ selfKindHint }}</div>
+          </el-form-item>
 
-            <el-form-item label="最终控制方">
-              <el-input v-model="form.ultimate_company_name" placeholder="最终控制方企业名称" />
-            </el-form-item>
+          <el-form-item label="与上级关系" prop="relation_to_parent">
+            <el-select
+              v-model="form.relation_to_parent"
+              :disabled="!hasEffectiveParent"
+              :placeholder="relationPlaceholder"
+              style="width: 100%"
+              data-testid="relation-select"
+              @change="onRelationChange"
+            >
+              <el-option
+                v-for="opt in RELATION_OPTIONS"
+                :key="opt.value"
+                :value="opt.value"
+                :label="`${opt.label}（${opt.hint}）`"
+              />
+            </el-select>
+          </el-form-item>
 
-            <el-form-item label="控制方代码">
-              <el-input v-model="form.ultimate_company_code" placeholder="最终控制方信用代码" maxlength="18" />
-            </el-form-item>
-          </template>
+          <el-form-item label="最终控制方" prop="ultimate_company_name">
+            <el-input v-model="form.ultimate_company_name" placeholder="最终控制方企业名称" />
+          </el-form-item>
+
+          <el-form-item label="控制方代码" prop="ultimate_company_code">
+            <el-input v-model="form.ultimate_company_code" placeholder="最终控制方的统一社会信用代码" maxlength="18" />
+          </el-form-item>
+
+          <div class="gt-group-hint" data-testid="group-hint">合并项目的下级企业按各项目的上级代码自动识别：子公司进入合并，分公司并入母公司汇总，无需在合并模块再次挂接。</div>
 
           <el-alert
             v-if="form.report_scope === 'consolidated'"
@@ -206,7 +224,7 @@
             show-icon
             style="margin-top: 12px"
           >
-            合并报表项目将自动创建差额表。子公司清单请在「合并项目」模块中配置。
+            合并项目会自动生成「合并」「合并差额」「母公司」三个节点；抵销与调整分录记在合并差额节点。
           </el-alert>
         </div>
       </div>
@@ -226,11 +244,20 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { fetchTemplateRecommendation, type TemplateRecommendation } from '@/services/commonApi'
 import { useWizardStore, type BasicInfo } from '@/stores/wizard'
 import { validateUSCC } from '@/utils/uscc_validator'
+import {
+  RELATION_OPTIONS,
+  SELF_REFERENCE_CONFIRM,
+  effectiveParentCode,
+  inferRelationFromName,
+  selfReferenceKind,
+  type GroupRelation,
+} from '@/utils/groupRelation'
 import BusinessCategoryFlowChart from '@/components/project/BusinessCategoryFlowChart.vue'
 
 const router = useRouter()
@@ -328,9 +355,9 @@ const form = reactive<BasicInfo>({
   custom_template_name: '',
   custom_template_version: '',
   report_scope: 'standalone',
-  consolidation_type: 'subsidiary',
   parent_company_name: '',
   parent_company_code: '',
+  relation_to_parent: '',
   ultimate_company_name: '',
   ultimate_company_code: '',
   signing_partner_id: null,
@@ -338,6 +365,98 @@ const form = reactive<BasicInfo>({
   budget_hours: null,
   contract_amount: null,
 })
+
+// ─── 集团架构：与上级关系联动（需求 1.3 / 1.5 / 2.3 / 2.4）──────────────────────
+// 没有有效上级（上级代码为空，或就是本企业代码）⇒ 下拉置灰且值为空；
+// 有有效上级 ⇒ 必填，默认按企业名称推断并随名称变化；
+// 用户手动选过（或已保存过）的值优先，之后改名称、清空再填上级代码都不再覆盖。
+const hasEffectiveParent = computed(
+  () => effectiveParentCode(form.company_code, form.parent_company_code) !== null,
+)
+/** 上级代码 = 本企业代码时的含义：'top' 本企业就是上级企业 / 'ultimate' 三码相同即最终控制方 */
+const selfKind = computed(
+  () => selfReferenceKind(form.company_code, form.parent_company_code, form.ultimate_company_code),
+)
+const selfKindHint = computed(() => {
+  if (selfKind.value === 'ultimate') return '三个代码相同：本企业即为最终控制方（集团总部或母公司）'
+  if (selfKind.value === 'top') return '与本企业代码相同：表示本企业就是上级企业（集团顶层），无需选择与上级关系'
+  return ''
+})
+const relationPlaceholder = computed(() => {
+  if (hasEffectiveParent.value) return '请选择与上级关系'
+  return selfKind.value ? '本企业就是上级企业，无需选择' : '先填写上级代码'
+})
+const manualRelation = ref<GroupRelation | ''>('')
+
+function onRelationChange(value: GroupRelation | '' | undefined) {
+  manualRelation.value = value || ''
+}
+
+function syncRelationDefault() {
+  if (!hasEffectiveParent.value) {
+    form.relation_to_parent = ''
+    return
+  }
+  form.relation_to_parent = manualRelation.value || inferRelationFromName(form.client_name)
+}
+
+watch(() => [form.parent_company_code, form.client_name, form.company_code], syncRelationDefault)
+
+// 需求 1.5：上级代码 = 本企业代码不拒绝，保存前请用户确认；同一组代码确认过（或回填自已保存数据）不再问
+const confirmedSelfKey = ref('')
+
+function groupCodeKey(): string {
+  return [form.company_code, form.parent_company_code, form.ultimate_company_code]
+    .map((code) => (code || '').trim())
+    .join('|')
+}
+
+async function confirmSelfReference(): Promise<boolean> {
+  const kind = selfKind.value
+  if (!kind) return true
+  const key = groupCodeKey()
+  if (key === confirmedSelfKey.value) return true
+  try {
+    await ElMessageBox.confirm(SELF_REFERENCE_CONFIRM[kind], '请确认集团关系', {
+      confirmButtonText: kind === 'ultimate' ? '确认，本企业即最终控制方' : '确认，本企业就是上级企业',
+      cancelButtonText: '返回修改',
+      type: 'warning',
+    })
+  } catch {
+    return false
+  }
+  confirmedSelfKey.value = key
+  return true
+}
+
+/** 回填已保存数据：旧数据可能带已停用的 consolidation_type，丢弃；已保存的关系视为手选 */
+function applySaved(saved: Partial<BasicInfo> & Record<string, unknown>) {
+  const rest: Record<string, unknown> = { ...saved }
+  delete rest.consolidation_type
+  Object.assign(form, rest)
+  for (const key of ['parent_company_name', 'parent_company_code', 'relation_to_parent',
+    'ultimate_company_name', 'ultimate_company_code'] as const) {
+    if (form[key] == null) form[key] = ''
+  }
+  const savedRelation = form.relation_to_parent
+  manualRelation.value = savedRelation === 'subsidiary' || savedRelation === 'branch' ? savedRelation : ''
+  // 已保存的「上级=本企业」当时已确认过（或经批量预校验提示），回填后再保存不重复询问
+  confirmedSelfKey.value = selfKind.value ? groupCodeKey() : ''
+  if (saved.audit_year) {
+    auditYearDate.value = String(saved.audit_year)
+  }
+}
+
+/** 选填的统一社会信用代码校验（前后端同一规则，需求 1.4） */
+function optionalUsccValidator(_rule: unknown, value: string, callback: (err?: Error) => void) {
+  const code = (value || '').trim()
+  if (!code) {
+    callback()
+    return
+  }
+  const result = validateUSCC(code)
+  callback(result.valid ? undefined : new Error(result.message))
+}
 
 const rules: FormRules = {
   client_name: [{ required: true, message: '请输入客户名称', trigger: 'blur' }],
@@ -375,6 +494,19 @@ const rules: FormRules = {
     trigger: 'change',
   }],
   report_scope: [{ required: true, message: '请选择报表类型', trigger: 'change' }],
+  // 上级代码可以等于本企业代码（需求 1.5：本企业就是上级企业，保存前弹确认），这里只校验格式
+  parent_company_code: [{ validator: optionalUsccValidator, trigger: ['blur', 'change'] }],
+  relation_to_parent: [{
+    validator: (_rule, value: string, callback) => {
+      if (hasEffectiveParent.value && !value) {
+        callback(new Error('请选择与上级关系'))
+        return
+      }
+      callback()
+    },
+    trigger: 'change',
+  }],
+  ultimate_company_code: [{ validator: optionalUsccValidator, trigger: ['blur', 'change'] }],
 }
 
 function customTemplateLabel(item: { id: string; name: string; version?: string }) {
@@ -424,10 +556,6 @@ function onYearChange(val: string) {
   form.audit_year = val ? parseInt(val, 10) : null
 }
 
-function onReportScopeChange(_val: string | number | boolean | undefined) {
-  // 切换到合并报表时无需额外操作
-}
-
 watch(() => form.template_type, async (val) => {
   if (val === 'custom') {
     await loadCustomTemplates()
@@ -440,12 +568,9 @@ watch(() => form.template_type, async (val) => {
 })
 
 onMounted(async () => {
-  const saved = wizardStore.stepData.basic_info as unknown as BasicInfo | undefined
+  const saved = wizardStore.stepData.basic_info as unknown as (BasicInfo & Record<string, unknown>) | undefined
   if (saved) {
-    Object.assign(form, saved)
-    if (saved.audit_year) {
-      auditYearDate.value = String(saved.audit_year)
-    }
+    applySaved(saved)
   }
   if (form.template_type === 'custom') {
     await loadCustomTemplates()
@@ -460,10 +585,7 @@ onMounted(async () => {
 // 兜底：store 异步加载完成后填充表单（解决组件挂载时 store 还在 loading 的时序问题）
 watch(() => wizardStore.stepData.basic_info, (newVal) => {
   if (newVal && !form.client_name) {
-    Object.assign(form, newVal as any)
-    if ((newVal as any).audit_year) {
-      auditYearDate.value = String((newVal as any).audit_year)
-    }
+    applySaved(newVal as Partial<BasicInfo> & Record<string, unknown>)
   }
 }, { immediate: false })
 
@@ -471,10 +593,13 @@ async function validate(): Promise<BasicInfo | null> {
   if (!formRef.value) return null
   try {
     await formRef.value.validate()
-    return { ...form }
   } catch {
     return null
   }
+  // 用户取消确认 ⇒ 停留在表单，不保存
+  if (!(await confirmSelfReference())) return null
+  // 没有有效上级时关系必须为空（后端同样强制，这里保证提交值自洽）
+  return { ...form, relation_to_parent: hasEffectiveParent.value ? form.relation_to_parent : '' }
 }
 
 defineExpose({ validate, formRef })
@@ -552,4 +677,24 @@ defineExpose({ validate, formRef })
 
 /* 业务类型参考链接 */
 .gt-category-ref-link { margin-left: 8px; font-size: 12px; }
+
+/* 上级代码 = 本企业代码时的说明 */
+.gt-self-ref-hint {
+  width: 100%;
+  margin-top: 4px;
+  font-size: var(--gt-font-size-xs);
+  line-height: 1.4;
+  color: var(--gt-color-warning, #e6a23c);
+}
+
+/* 集团架构说明 */
+.gt-group-hint {
+  margin: -4px 0 0 120px;
+  font-size: var(--gt-font-size-xs);
+  line-height: 1.5;
+  color: var(--gt-color-text-tertiary);
+}
+@media (max-width: 768px) {
+  .gt-group-hint { margin-left: 0; }
+}
 </style>

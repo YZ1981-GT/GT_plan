@@ -278,6 +278,56 @@ def validate_import_mode(
     )
 
 
+#: 循环不支持导入导出时给用户看的原因（Req 8.5）—— **文案单一真源**。
+#:
+#: 三个消费方共用：场景端点下发给对话框（置灰提示）、零 Tab 拦截的错误汇总、README 的
+#: 「未纳入的循环」段。写死在任一处都会在改文案时漏掉另外两处。
+UNSUPPORTED_CYCLE_REASON = "该循环暂未接入批量导入导出（平台尚未为其登记可导入导出的表格）"
+
+
+def cycle_options_for_ui() -> list[dict[str, object]]:
+    """产出对话框的循环清单（Req 8.5）：哪些能勾、不能勾的为什么。
+
+    改造前对话框写死 D~N 十一个循环且默认全选，而 catalog 里 E、J 一张可导入导出的 Tab
+    都没有 —— 用户勾上去、导出成功、包里没有它们的任何文件，也没有任何解释。
+
+    候选集取两者并集：
+      · ``dashboard_aggregator_service.CYCLES``（D~N）—— 让「平台有这个循环但导入导出没接」
+        这件事**可见**（只列 catalog 有的，E / J 会直接消失，用户仍不知道为什么）；
+      · ``manifest_builder.supported_cycles()`` —— catalog 以后新增循环时自动出现，
+        不必再改前端。
+
+    Returns:
+        每项 ``{code, name, supported, unsupportedReason}``；``unsupportedReason``
+        在 ``supported`` 为真时是空串。按循环代码升序。
+
+    Raises:
+        CatalogLoadError: catalog 不可用时由 ``supported_cycles()`` 原样透出
+            （``app.services.acnr.catalog`` 的异常类型，**不在本函数里转译**）——
+            有意不兜底：静默返回「全部不支持」会让整个对话框变灰，用户以为功能被下线；
+            返回「全部支持」又会让导出全部落空。
+    """
+    from app.services.bulk_tab.manifest_builder import supported_cycles
+    from app.services.dashboard_aggregator_service import CYCLES, CYCLE_NAMES
+
+    enabled = set(supported_cycles())
+    candidates = sorted(set(CYCLES) | enabled)
+
+    out: list[dict[str, object]] = []
+    for code in candidates:
+        is_supported = code in enabled
+        out.append(
+            {
+                "code": code,
+                # 驾驶舱同一份中文名；对话框原来自己拼「D - D 销售循环」，编码重复且与驾驶舱不一致
+                "name": CYCLE_NAMES.get(code, code),
+                "supported": is_supported,
+                "unsupportedReason": "" if is_supported else UNSUPPORTED_CYCLE_REASON,
+            }
+        )
+    return out
+
+
 def importable_scenario_keys() -> tuple[str, ...]:
     """可回传的场景键（有 `import_endpoint` 的）。"""
     return tuple(s.key for s in SCENARIOS if s.import_endpoint)
@@ -296,12 +346,14 @@ def all_endpoints() -> set[str]:
 
 __all__ = [
     "SCENARIOS",
+    "UNSUPPORTED_CYCLE_REASON",
     "BulkMode",
     "Direction",
     "ModeMismatch",
     "ScenarioKey",
     "ScenarioSpec",
     "all_endpoints",
+    "cycle_options_for_ui",
     "get_scenario",
     "importable_scenario_keys",
     "scenarios_for_ui",

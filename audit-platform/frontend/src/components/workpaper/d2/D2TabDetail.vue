@@ -9,6 +9,8 @@ import { useD2Detail, type DetailRow } from '../composables/useD2Detail'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import { useVirtualTable, type VirtualColumn } from '@/composables/useVirtualTable'
+import { useAutoColumnWidth } from '@/composables/useAutoColumnWidth'
+import { useContainerWidth } from '@/composables/useContainerWidth'
 import type { AgingBand } from '@/composables/useAgingConfig'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
@@ -65,7 +67,9 @@ const {
 })
 
 const browseMode = ref(true)
-const tableWidth = ref(1200)
+/** 速览表容器：宽度实测，替代原先写死的 1200（窄屏溢出、宽屏右侧留白） */
+const tableWrapRef = ref<HTMLElement | null>(null)
+const { width: tableWidth } = useContainerWidth(tableWrapRef, { fallback: 1200 })
 const editPageSize = 50
 const editCurrentPage = ref(1)
 const pagedRows = computed(() => {
@@ -74,30 +78,72 @@ const pagedRows = computed(() => {
   return filteredRows.value.slice(start, start + editPageSize)
 })
 
+/**
+ * 速览（el-table-v2）列宽按真实内容测算。
+ *
+ * 为什么必须算而不能写死：el-table-v2 的
+ * `.el-table-v2:not(.is-dynamic) .el-table-v2__cell-text` 是
+ * `white-space:nowrap + text-overflow:ellipsis`，列宽给不够就直接截断成
+ * 「安徽省毕嘉医药有…」。改走 is-dynamic 动态行高能折行，但每行要实测高度，
+ * 1000+ 行的虚拟滚动会明显掉帧，所以这里靠「列宽给足」解决。
+ * 客户名称给到 260（全称基本装得下），仍超长的由 title 悬浮兜住。
+ */
+const AUTO_COLS = [
+  { field: 'seq', header: '序号', type: 'text' as const, minWidth: 56, maxWidth: 56, noGrow: true },
+  { field: 'customerName', header: '客户名称', type: 'text' as const, minWidth: 120, maxWidth: 260 },
+  { field: 'companyCode', header: '公司代码', type: 'text' as const, maxWidth: 120 },
+  { field: 'relationType', header: '关联方类型', type: 'text' as const, maxWidth: 130 },
+  { field: 'priorAudited', header: '期初审定' },
+  { field: 'currentUnadjusted', header: '期末未审' },
+  { field: 'currentAudited', header: '期末审定' },
+  { field: 'creditRiskClassification', header: '信用风险组合', type: 'text' as const, maxWidth: 140 },
+  { field: 'isConfirmation', header: '函证', type: 'text' as const, minWidth: 56, maxWidth: 70, noGrow: true },
+]
+
+const { colWidth: autoW, totalWidth: autoTotalWidth } = useAutoColumnWidth({
+  rows: filteredRows,
+  columns: AUTO_COLS,
+  formatter: (v) => displayPrefs.fmtAmount(Number(v) || 0),
+  containerWidth: tableWidth,
+})
+
 const virtualColumns = computed<VirtualColumn[]>(() => {
   const fmt = (v: unknown) => displayPrefs.fmtAmount(Number(v) || 0)
-  const numCol = (key: keyof DetailRow, title: string, w = 110): VirtualColumn => ({
+  const numCol = (key: keyof DetailRow, title: string): VirtualColumn => ({
     key: String(key),
     dataKey: String(key),
     title,
-    width: w,
+    width: autoW(String(key)),
     align: 'right',
-    cellRenderer: ({ cellData }) => h('span', {}, fmt(cellData)),
+    cellRenderer: ({ cellData }) => h('span', { class: 'gt-amt' }, fmt(cellData)),
   })
   return [
-    { key: 'seq', dataKey: 'seq', title: '序号', width: 60, align: 'center' },
-    { key: 'customerName', dataKey: 'customerName', title: '客户名称', width: 160 },
-    { key: 'companyCode', dataKey: 'companyCode', title: '公司代码', width: 90 },
-    { key: 'relationType', dataKey: 'relationType', title: '关联方类型', width: 120 },
-    numCol('priorAudited', '期初审定', 110),
-    numCol('currentUnadjusted', '期末未审', 110),
-    numCol('currentAudited', '期末审定', 110),
-    { key: 'creditRiskClassification', dataKey: 'creditRiskClassification', title: '信用风险组合', width: 130 },
+    { key: 'seq', dataKey: 'seq', title: '序号', width: autoW('seq'), align: 'center' },
+    {
+      key: 'customerName',
+      dataKey: 'customerName',
+      title: '客户名称',
+      width: autoW('customerName'),
+      // 超出 maxWidth 的全称靠原生 title 兜住，避免只看到省略号
+      cellRenderer: ({ cellData }) =>
+        h('span', { title: cellData ? String(cellData) : undefined }, cellData ?? '-'),
+    },
+    { key: 'companyCode', dataKey: 'companyCode', title: '公司代码', width: autoW('companyCode') },
+    { key: 'relationType', dataKey: 'relationType', title: '关联方类型', width: autoW('relationType') },
+    numCol('priorAudited', '期初审定'),
+    numCol('currentUnadjusted', '期末未审'),
+    numCol('currentAudited', '期末审定'),
+    {
+      key: 'creditRiskClassification',
+      dataKey: 'creditRiskClassification',
+      title: '信用风险组合',
+      width: autoW('creditRiskClassification'),
+    },
     {
       key: 'isConfirmation',
       dataKey: 'isConfirmation',
       title: '函证',
-      width: 60,
+      width: autoW('isConfirmation'),
       align: 'center',
       cellRenderer: ({ cellData }) => h('span', {}, cellData ? '是' : '-'),
     },
@@ -253,18 +299,26 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       </el-button>
     </div>
 
-    <el-table-v2
+    <!-- 速览表：容器宽度实测（ref），列宽按内容测算并铺满容器。
+         v-if 必须留在这层 div 上 —— 下面的 el-table 靠 v-else 接力，
+         若把 v-if 写在内层 el-table-v2 上会切断相邻关系导致模板编译失败。 -->
+    <div
       v-if="useVirtualScroll && browseMode"
-      :columns="virtualColumns"
-      :data="filteredRows"
-      :width="tableWidth"
-      :height="560"
-      :row-height="36"
-      :header-height="40"
-      :row-event-handlers="rowEventHandlers"
-      fixed
-      class="virtual-table"
-    />
+      ref="tableWrapRef"
+      class="virtual-table-wrap"
+    >
+      <el-table-v2
+        :columns="virtualColumns"
+        :data="filteredRows"
+        :width="autoTotalWidth"
+        :height="560"
+        :row-height="36"
+        :header-height="40"
+        :row-event-handlers="rowEventHandlers"
+        fixed
+        class="virtual-table"
+      />
+    </div>
 
     <!-- 主表（编辑模式或 ≤30 行） -->
     <el-table
@@ -282,7 +336,10 @@ function handleEdit(row: DetailRow, field: string, value: any) {
           {{ $index + 1 }}<GtReviewDot row-prefix="D2-detail" :row-key="row.rowId" />
         </template>
       </el-table-column>
-      <el-table-column prop="customerName" label="客户名称" width="160" fixed>
+      <!-- 文本列统一用 min-width：el-table 只让 min-width 列参与剩余空间分配，
+           写死 width 会锁死列宽，内容再长也不给（客户全称就被挤成省略号）。
+           不用 table-layout="auto"：上游 issue #19737 未修，叠加 fixed 列会错位。 -->
+      <el-table-column prop="customerName" label="客户名称" min-width="180" fixed>
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
@@ -290,10 +347,10 @@ function handleEdit(row: DetailRow, field: string, value: any) {
             size="small"
             @update:model-value="(v: string) => handleEdit(row, 'customerName', v)"
           />
-          <span v-else>{{ row.customerName }}</span>
+          <span v-else :title="row.customerName || undefined">{{ row.customerName }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="公司代码" width="90" fixed>
+      <el-table-column label="公司代码" min-width="96" fixed>
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
@@ -306,7 +363,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       </el-table-column>
 
       <!-- 关联方类型 -->
-      <el-table-column label="关联方类型" width="130">
+      <el-table-column label="关联方类型" min-width="120">
         <template #default="{ row }">
           <el-select
             v-if="!isReadonly"
@@ -321,16 +378,16 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       </el-table-column>
 
       <!-- 期初 -->
-      <el-table-column label="期初未审" width="110" align="right">
+      <el-table-column label="期初未审" min-width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorUnadjusted) }}</template>
       </el-table-column>
-      <el-table-column label="期初AJE" width="100" align="right">
+      <el-table-column label="期初AJE" min-width="100" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorAje) }}</template>
       </el-table-column>
-      <el-table-column label="期初RJE" width="100" align="right">
+      <el-table-column label="期初RJE" min-width="100" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorRje) }}</template>
       </el-table-column>
-      <el-table-column label="期初审定" width="110" align="right">
+      <el-table-column label="期初审定" min-width="110" align="right">
         <template #default="{ row }">
           <span style="font-weight: 600">{{ displayPrefs.fmtAmount(row.priorAudited) }}</span>
         </template>
@@ -338,44 +395,44 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 
       <!-- 期初审定账龄 -->
       <el-table-column label="期初审定账龄" align="center">
-        <el-table-column v-for="band in bands" :key="'p-' + band.key" :label="band.label" width="95" align="right">
+        <el-table-column v-for="band in bands" :key="'p-' + band.key" :label="band.label" min-width="95" align="right">
           <template #default="{ row }">{{ displayPrefs.fmtAmount(row.agingPrior?.[band.key] ?? 0) }}</template>
         </el-table-column>
       </el-table-column>
 
       <!-- 本期发生 -->
-      <el-table-column label="借方发生" width="110" align="right">
+      <el-table-column label="借方发生" min-width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.debitOccurrence) }}</template>
       </el-table-column>
-      <el-table-column label="贷方发生" width="110" align="right">
+      <el-table-column label="贷方发生" min-width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.creditOccurrence) }}</template>
       </el-table-column>
-      <el-table-column label="期末余额" width="110" align="right">
+      <el-table-column label="期末余额" min-width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.endBalance) }}</template>
       </el-table-column>
-      <el-table-column label="重分类" width="100" align="right">
+      <el-table-column label="重分类" min-width="100" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.reclassification) }}</template>
       </el-table-column>
 
       <!-- 期末未审 -->
-      <el-table-column label="期末未审" width="110" align="right">
+      <el-table-column label="期末未审" min-width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.currentUnadjusted) }}</template>
       </el-table-column>
 
       <!-- 期末未审账龄 -->
       <el-table-column label="期末未审账龄" align="center">
-        <el-table-column v-for="band in bands" :key="'c-' + band.key" :label="band.label" width="95" align="right">
+        <el-table-column v-for="band in bands" :key="'c-' + band.key" :label="band.label" min-width="95" align="right">
           <template #default="{ row }">{{ displayPrefs.fmtAmount(row.agingCurrent?.[band.key] ?? 0) }}</template>
         </el-table-column>
       </el-table-column>
 
-      <el-table-column label="期末AJE" width="100" align="right">
+      <el-table-column label="期末AJE" min-width="100" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.currentAje) }}</template>
       </el-table-column>
-      <el-table-column label="期末RJE" width="100" align="right">
+      <el-table-column label="期末RJE" min-width="100" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.currentRje) }}</template>
       </el-table-column>
-      <el-table-column label="期末审定" width="110" align="right">
+      <el-table-column label="期末审定" min-width="110" align="right">
         <template #default="{ row }">
           <span style="font-weight: 600">{{ displayPrefs.fmtAmount(row.currentAudited) }}</span>
         </template>
@@ -383,7 +440,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 
       <!-- 期末审定账龄 -->
       <el-table-column label="期末审定账龄" align="center">
-        <el-table-column v-for="band in bands" :key="'a-' + band.key" :label="band.label" width="95" align="right">
+        <el-table-column v-for="band in bands" :key="'a-' + band.key" :label="band.label" min-width="95" align="right">
           <template #default="{ row }">
             <el-input-number
               v-if="!isReadonly"
@@ -399,7 +456,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       </el-table-column>
 
       <!-- 信用风险组合方式 -->
-      <el-table-column label="信用风险组合方式" width="160">
+      <el-table-column label="信用风险组合方式" min-width="160">
         <template #default="{ row }">
           <el-select
             v-if="!isReadonly"
@@ -413,7 +470,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
         </template>
       </el-table-column>
 
-      <el-table-column label="组合名称" width="110">
+      <el-table-column label="组合名称" min-width="110">
         <template #default="{ row }">{{ row.groupName || '-' }}</template>
       </el-table-column>
       <el-table-column label="函证" width="60" align="center">
@@ -429,7 +486,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       </el-table-column>
 
       <!-- 期后回款（可编辑 / 一键取数） -->
-      <el-table-column label="期后回款" width="130" align="right">
+      <el-table-column label="期后回款" min-width="130" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly"
@@ -523,7 +580,11 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 .toolbar-right { display: flex; align-items: center; }
 .virtual-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .virtual-hint { margin-bottom: 0; flex: 1; }
+/* 宽度由 ResizeObserver 实测，这里只提供测量基准（100%）与溢出兜底 */
+.virtual-table-wrap { width: 100%; overflow-x: auto; }
 .virtual-table { margin-bottom: 8px; }
+/* 速览表金额列：与 el-table 侧一致的 Arial Narrow 等宽数字 */
+.virtual-table :deep(.gt-amt) { font-variant-numeric: tabular-nums; }
 .edit-pagination { margin: 8px 0; display: flex; justify-content: center; }
 :deep(.related-party-row) { background-color: #fff7e6 !important; }
 .aging-input { width: 100%; }

@@ -1472,7 +1472,9 @@ watch(saving, (isSaving, wasSaving) => {
               <div class="matrix-header-col matrix-actions-col">操作</div>
 
               <!-- 数据行 -->
-              <template v-for="(row, rowIdx) in accounts" :key="row.name">
+              <!-- 🔴 :key 用 rowKey 而非 row.name：同名科目用 name 作 key 会让
+                   Vue 复用错 DOM（BC-48 label-as-key） -->
+              <template v-for="(row, rowIdx) in accounts" :key="row.rowKey">
                 <div
                   class="matrix-row-header"
                   :class="{ 'incomplete-row': incompleteAccounts.includes(row.name) }"
@@ -1496,7 +1498,7 @@ watch(saving, (isSaving, wasSaving) => {
                 </div>
                 <div
                   v-for="a in ASSERTIONS"
-                  :key="`${row.name}-${a}`"
+                  :key="`${row.rowKey}-${a}`"
                   class="matrix-cell"
                   :class="{ 'cell-hidden': isCellHidden(row.name, a), 'cell-special': row.cells[a].isSpecialRisk }"
                   :style="getCellStyle(row.name, a)"
@@ -1789,7 +1791,7 @@ watch(saving, (isSaving, wasSaving) => {
             <h4>风险分布</h4>
             <div class="stats-section">
               <strong>按科目:</strong>
-              <div v-for="row in accounts" :key="row.name" class="stats-row">
+              <div v-for="row in accounts" :key="row.rowKey" class="stats-row">
                 <span class="stats-label">{{ row.name }}:</span>
                 <span :style="{ color: RISK_COLOR_MAP.H.text }">H{{ ASSERTIONS.filter(a => row.cells[a].combinedRisk === 'H').length }}</span>
                 <span :style="{ color: RISK_COLOR_MAP.M.text }">M{{ ASSERTIONS.filter(a => row.cells[a].combinedRisk === 'M').length }}</span>

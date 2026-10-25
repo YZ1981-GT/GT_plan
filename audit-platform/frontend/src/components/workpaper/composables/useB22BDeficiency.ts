@@ -234,6 +234,43 @@ export function useB22BDeficiency(
     // These are items where conclusion = '设计无效' or '未实施'
     const deficiencies: DeficiencyItem[] = []
 
+    // ═══ 形态① 行数组（BC-53 改造后的 B22A 形态）═════════════════════════
+    //
+    // 🔴 B22A 行存储已改为「整组行一条 JSON 数组」（`B22A-T{tab}-rows`）。
+    //    只认下面的 legacy `-conclusion` 键会读到 **0 条缺陷** ⇒ 缺陷汇总静默失效。
+    for (const r of b22aResponses) {
+      const mRows = r.item_id.match(/^B22A-T(\d)-rows$/)
+      const mRowsIT = r.item_id.match(/^B22A-T(\d)-IT-(\w+)-rows$/)
+      if (!mRows && !mRowsIT) continue
+
+      const tab = parseInt((mRows ? mRows[1] : mRowsIT![1]), 10) as 1 | 2 | 3 | 4 | 5
+      const subPanel = (mRowsIT ? mRowsIT[2] : null) as any
+      let rows: any[]
+      try {
+        const parsed = JSON.parse(r.remark || '[]')
+        rows = Array.isArray(parsed) ? parsed : []
+      } catch {
+        continue
+      }
+
+      rows.forEach((raw, i) => {
+        if (!raw || typeof raw !== 'object') return
+        const concl = raw.conclusion
+        if (concl !== '设计无效' && concl !== '未实施') return
+        deficiencies.push({
+          tab,
+          subPanel,
+          // index 用显示序号（1-based）；行身份本体是 raw.rowId，
+          // 但 DeficiencyItem.source 的既有契约是 index，保持不变以免破坏下游去重
+          index: Number(raw.seq) || i + 1,
+          controlPoint: String(raw.point ?? ''),
+          deficiencyType: concl as '设计无效' | '未实施',
+          elementName: getElementName(tab, subPanel),
+        })
+      })
+    }
+
+    // ═══ 形态② legacy 下标键（未迁移项目的兜底）═══════════════════════════
     for (const r of b22aResponses) {
       if (!r.item_id.includes('-conclusion')) continue
       if (r.conclusion !== '设计无效' && r.conclusion !== '未实施') continue

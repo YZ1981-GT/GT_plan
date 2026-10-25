@@ -39,7 +39,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -455,7 +455,10 @@ async def _build_disclosure_tree(template_type: str) -> list[dict]:
 
 
 def _load_disclosure_sections(template_type: str) -> list[dict]:
-    """读 backend/data/consol_note_sections_{template_type}.json（带模块级缓存）"""
+    """读 backend/data/consol_note_sections_{template_type}.json（带模块级缓存）。
+
+    自动将 multi_header 转换为 _column_groups。
+    """
     if template_type in _DISCLOSURE_CACHE:
         return _DISCLOSURE_CACHE[template_type]
     data_path = Path(__file__).resolve().parent.parent.parent / "data" / f"consol_note_sections_{template_type}.json"
@@ -465,7 +468,26 @@ def _load_disclosure_sections(template_type: str) -> list[dict]:
     try:
         with data_path.open("r", encoding="utf-8") as f:
             sections = json.load(f)
-        _DISCLOSURE_CACHE[template_type] = sections if isinstance(sections, list) else []
+        sections = sections if isinstance(sections, list) else []
+        # 补齐 _column_groups + columns + _row_types
+        from app.services.consol_note_formula_service import (
+            multi_header_to_column_groups,
+            _ensure_columns,
+            _ensure_row_types,
+        )
+
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            if not section.get("_column_groups"):
+                mh = section.get("multi_header")
+                if mh:
+                    groups = multi_header_to_column_groups(mh)
+                    if groups:
+                        section["_column_groups"] = groups
+            _ensure_columns(section)
+            _ensure_row_types(section)
+        _DISCLOSURE_CACHE[template_type] = sections
     except Exception:
         _DISCLOSURE_CACHE[template_type] = []
     return _DISCLOSURE_CACHE[template_type]
@@ -1439,62 +1461,77 @@ def _flatten_disclosure_note_rows(
 async def _query_disclosure(db, pid, year, filters, limit):
     """附注数据查询。
 
-    真源优先级修正：**单体附注 ``disclosure_notes`` 优先**（附注模块的真实数据），
-    无命中才回退合并附注 ``consol_note_data``（合并模块另一套存储）。
-    历史实现只查 consol_note_data，导致单体附注（生产主体数据）查不到。
+    无 node_key 的兼容查询优先读取单体 ``disclosure_notes``，再读取合并附注 legacy NULL 行。
+    节点查询不消费缺少节点身份的单体/legacy 数据，只返回精确 node_key 的合并附注行。
     """
     section_id = str(filters.get("section_id", "") or "").strip()
+    node_key = filters.get("node_key")
 
     # ── 第 1 真源：单体附注 disclosure_notes ─────────────────────────────
-    try:
-        if section_id:
-            note_res = await db.execute(
-                text(
-                    "SELECT note_section, section_title, source_template::text, table_data "
-                    "FROM disclosure_notes WHERE project_id = :pid AND year = :y "
-                    "AND is_deleted = false AND note_section = :sid"
-                ),
-                {"pid": pid, "y": year, "sid": section_id},
-            )
-        else:
-            note_res = await db.execute(
-                text(
-                    "SELECT note_section, section_title, source_template::text, table_data "
-                    "FROM disclosure_notes WHERE project_id = :pid AND year = :y "
-                    "AND is_deleted = false AND table_data IS NOT NULL "
-                    "ORDER BY sort_order NULLS LAST, note_section LIMIT :lim"
-                ),
-                {"pid": pid, "y": year, "lim": _effective_limit(limit)},
-            )
-        note_flat: list[dict] = []
-        note_cols: list[str] = []
-        for r in note_res.fetchall():
-            rows_part, cols_part = _flatten_disclosure_note_rows(
-                r[0] or "", r[1] or "", r[2], r[3],
-            )
-            if cols_part and not note_cols:
-                note_cols = cols_part
-            note_flat.extend(rows_part)
-        if note_flat:
-            return {
-                "rows": note_flat[:limit],
-                "columns": note_cols or ["note_section", "section_title", "table_name"],
-                "total": len(note_flat),
-            }
-    except Exception as err:  # fail-open：单体附注查询异常 → 回退合并附注
-        logger.warning("query disclosure_notes failed, fallback to consol: %s", err)
+    # disclosure_notes 没有 node_key 列。节点级查询不得将项目级单体附注误当成合并节点数据。
+    if node_key is None:
+        try:
+            if section_id:
+                note_res = await db.execute(
+                    text(
+                        "SELECT note_section, section_title, source_template::text, table_data "
+                        "FROM disclosure_notes WHERE project_id = :pid AND year = :y "
+                        "AND is_deleted = false AND note_section = :sid"
+                    ),
+                    {"pid": pid, "y": year, "sid": section_id},
+                )
+            else:
+                note_res = await db.execute(
+                    text(
+                        "SELECT note_section, section_title, source_template::text, table_data "
+                        "FROM disclosure_notes WHERE project_id = :pid AND year = :y "
+                        "AND is_deleted = false AND table_data IS NOT NULL "
+                        "ORDER BY sort_order NULLS LAST, note_section LIMIT :lim"
+                    ),
+                    {"pid": pid, "y": year, "lim": _effective_limit(limit)},
+                )
+            note_flat: list[dict] = []
+            note_cols: list[str] = []
+            for r in note_res.fetchall():
+                rows_part, cols_part = _flatten_disclosure_note_rows(
+                    r[0] or "", r[1] or "", r[2], r[3],
+                )
+                if cols_part and not note_cols:
+                    note_cols = cols_part
+                note_flat.extend(rows_part)
+            if note_flat:
+                return {
+                    "rows": note_flat[:limit],
+                    "columns": note_cols or ["note_section", "section_title", "table_name"],
+                    "total": len(note_flat),
+                }
+        except Exception as err:  # noqa: BLE001 - 缺表/无数据时继续合并附注兼容读取
+            logger.warning("query disclosure_notes failed, fallback to consol: %s", err)
 
     # ── 第 2 真源（回退）：合并附注 consol_note_data ─────────────────────
+    # 使用 ORM UUID 类型匹配，避免 SQLite/PG UUID 参数格式差异；稳定按主键排序。
+    from app.models.consol_note_data_models import ConsolNoteData
+
+    try:
+        from uuid import UUID
+        project_uuid = pid if isinstance(pid, UUID) else UUID(str(pid))
+    except (ValueError, TypeError, AttributeError):
+        return {"rows": [], "columns": ["section_id"], "total": 0}
+
+    stmt = select(ConsolNoteData.section_id, ConsolNoteData.data).where(
+        ConsolNoteData.project_id == project_uuid,
+        ConsolNoteData.year == year,
+    )
     if section_id:
-        result = await db.execute(
-            text("SELECT section_id, data FROM consol_note_data WHERE project_id = :pid AND year = :y AND section_id = :sid"),
-            {"pid": pid, "y": year, "sid": section_id},
-        )
+        stmt = stmt.where(ConsolNoteData.section_id == section_id)
+    # 节点请求精确匹配；旧请求只读 legacy NULL，绝不混入其它节点行。
+    if node_key is None:
+        stmt = stmt.where(ConsolNoteData.node_key.is_(None))
     else:
-        result = await db.execute(
-            text("SELECT section_id, data FROM consol_note_data WHERE project_id = :pid AND year = :y LIMIT :lim"),
-            {"pid": pid, "y": year, "lim": _effective_limit(limit)},
-        )
+        stmt = stmt.where(ConsolNoteData.node_key == node_key)
+    stmt = stmt.order_by(ConsolNoteData.id).limit(_effective_limit(limit))
+    result = await db.execute(stmt)
+
     # 将附注数据展平为表格行（每个章节的每行数据变成一条记录）
     flat_rows = []
     all_headers: list[str] = []
@@ -2570,6 +2607,41 @@ class CellWritebackRequest(BaseModel):
     new_value: Any = None
     module: Literal["workpaper", "report", "note", "adj", "tb"] = "workpaper"
 
+    # ── 附注归属字段（module="note" 时必填）──────────────────────────────
+    # 设计 §五.2：writeback schema 显式带归属元组，不得把 record id 视作权限边界。
+    note_record_id: str | None = None        # consol_note_data.id（附注记录主键）
+    note_section_id: str | None = None       # consol_note_data.section_id
+    note_year: int | None = None             # consol_note_data.year（有效审计年度）
+    note_node_key: str | None = None         # consol_note_data.node_key（None = legacy NULL 行）
+    note_row: int | None = None              # 目标行索引（0-based data rows）
+    note_column: str | None = None           # 目标列名（e.g. "year_end", "name"）
+
+    @model_validator(mode="after")
+    def _validate_note_ownership_fields(self) -> "CellWritebackRequest":
+        """module='note' 时必须携带完整归属字段。
+
+        需求 3.3：记录 ID 对应行的全部归属字段须与请求逐项相等，否则拒绝。
+        """
+        if self.module != "note":
+            return self
+        missing = []
+        if not self.note_record_id:
+            missing.append("note_record_id")
+        if not self.note_section_id:
+            missing.append("note_section_id")
+        if self.note_year is None:
+            missing.append("note_year")
+        if self.note_row is None:
+            missing.append("note_row")
+        if not self.note_column:
+            missing.append("note_column")
+        # note_node_key 为 None 表示 legacy NULL 行，是合法的
+        if missing:
+            raise ValueError(
+                f"module='note' 时以下归属字段必填: {', '.join(missing)}"
+            )
+        return self
+
 
 @router.post("/cell-writeback")
 async def cell_writeback(
@@ -2593,6 +2665,10 @@ async def cell_writeback(
         WritebackResolveUnavailable,
         WritebackTargetUnresolvable,
         snapshot_writer,
+    )
+    from app.services.custom_query.snapshot_writer_modules import (
+        NoteOwnershipMismatch,
+        NoteRecordNotFound,
     )
 
     # 解析 X-File-Opened-At header
@@ -2656,6 +2732,12 @@ async def cell_writeback(
             opened_at=opened_at,
             module=body.module,
             project_id=body.project_id,
+            # ── 附注归属字段（Task 3.4：FOR UPDATE + 逐项校验）──────────
+            note_record_id=body.note_record_id,
+            note_section_id=body.note_section_id,
+            note_year=body.note_year,
+            note_node_key=body.note_node_key,
+            note_project_id=body.project_id if body.module == "note" else None,
         )
         await db.commit()
     except WritebackConflict as e:
@@ -2699,6 +2781,18 @@ async def cell_writeback(
     except ValueError as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    except NoteOwnershipMismatch as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=403,
+            detail={"error_code": "NOTE_OWNERSHIP_MISMATCH", "message": str(e)},
+        )
+    except NoteRecordNotFound as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=404,
+            detail={"error_code": "NOTE_RECORD_NOT_FOUND", "message": str(e)},
+        )
 
     # Task 16 / Requirement 13.1 / Property 52：snapshot_writer 在事务内只把
     # WORKPAPER_SAVED 写成耐久 outbox 行，事件必须在 content commit 之后才发布。

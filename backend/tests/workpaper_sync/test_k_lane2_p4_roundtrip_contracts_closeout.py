@@ -73,6 +73,13 @@ CONTRACT_IDS = {
     13: "k13.non_operating_expense_adjustment",
 }
 CANARY_CONTRACT_ID = "k10.other_income_adjustment"
+#: 🔴 2026-10-01 草案已被 reviewed 生产契约取代（K8/K9/K11/K12/K13 已真双向发布）。
+#:    草案本体作为 Task 18/22「草案阶段」的交付证据归档在 spec evidence 目录，本文件的
+#:    草案判据改读归档（历史事实不变）；生产契约的判据见 `test_k_cycle_reviewed_contracts.py`。
+DRAFT_ARCHIVE_DIR = (
+    ROOT / ".kiro" / "specs" / "k8-k9-k11-k12-k13-dedicated-composable-and-cross-cycle-hub"
+    / "evidence" / "superseded-candidate-contracts"
+)
 
 #: 行身份形态分型（现算锚点）
 FIELD_IDENTITY_ENTRIES = (8, 9, 11)
@@ -115,7 +122,7 @@ def k_files() -> list[pathlib.Path]:
 def contracts() -> dict[int, dict]:
     out: dict[int, dict] = {}
     for n, cid in CONTRACT_IDS.items():
-        p = CONTRACT_DIR / f"{cid}.candidate.json"
+        p = DRAFT_ARCHIVE_DIR / f"{cid}.candidate.json"
         assert p.exists(), f"契约草案不存在：{p}"
         out[n] = json.loads(p.read_text(encoding="utf-8"))
     return out
@@ -123,7 +130,7 @@ def contracts() -> dict[int, dict]:
 
 @pytest.fixture(scope="module")
 def canary_contract() -> dict:
-    p = CONTRACT_DIR / f"{CANARY_CONTRACT_ID}.candidate.json"
+    p = DRAFT_ARCHIVE_DIR / f"{CANARY_CONTRACT_ID}.candidate.json"
     assert p.exists(), f"canary 契约不存在：{p}"
     return json.loads(p.read_text(encoding="utf-8"))
 
@@ -306,17 +313,21 @@ class TestKBP43ContractDraftsAreCandidateOnly:
         assert "BP-1" in why and "BP-2" in why
         assert "[ ]*" in why
 
-    def test_no_lane2_contract_claims_an_entry(
+    def test_lane2_entries_are_claimed_only_by_their_reviewed_contracts(
         self, contracts: dict[int, dict]
     ) -> None:
-        """两侧都验：全仓契约里没有一条把 entry_id 指向本 lane 的 5 条 entry。"""
-        targets = {contracts[n]["review"]["draft_target_entry_id"] for n in LANE2}
+        """🔴 晋级后：本 lane 5 条 entry 恰由各自 reviewed 契约声明（草案阶段判据已翻面）。"""
+        targets = {contracts[n]["review"]["draft_target_entry_id"]: n for n in LANE2}
+        claimed: dict[str, str] = {}
         for p in CONTRACT_DIR.glob("*.json"):
             doc = json.loads(p.read_text(encoding="utf-8"))
             eid = (doc.get("review") or {}).get("entry_id")
-            assert eid not in targets, (
-                f"{p.name} 的 entry_id 指向本 lane 的 {eid} ⇒ 越界发了生产契约"
-            )
+            if eid in targets:
+                assert doc.get("review_status") == "reviewed", f"{p.name} 非 reviewed"
+                claimed[eid] = p.name
+        assert claimed == {
+            eid: f"{CONTRACT_IDS[n]}.json" for eid, n in targets.items()
+        }, claimed
 
     @pytest.mark.parametrize("n", LANE2)
     def test_nine_fields_map_the_ten_column_sheet(
@@ -686,7 +697,7 @@ class TestKBP44PropertyNumberingIsClean:
         self, contracts: dict[int, dict]
     ) -> None:
         for n, cid in CONTRACT_IDS.items():
-            raw = (CONTRACT_DIR / f"{cid}.candidate.json").read_text(
+            raw = (DRAFT_ARCHIVE_DIR / f"{cid}.candidate.json").read_text(
                 encoding="utf-8"
             )
             assert "\ufffd" not in raw, f"K{n} 契约含 U+FFFD"

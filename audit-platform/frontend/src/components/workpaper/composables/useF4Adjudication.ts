@@ -227,7 +227,7 @@ export function migrateF4AdjRows(
     '3plus': '3yearplus',
   }
   const migrated = parsed.map((raw: any, index) => {
-    const key = aliases[String(raw?.rowKey ?? '')] ?? String(raw?.rowKey ?? defaults[index]?.rowKey ?? `custom-${index}`)
+    const key = aliases[String(raw?.rowKey ?? '')] ?? String(raw?.rowKey ?? defaults[index]?.rowKey ?? `custom-${crypto.randomUUID()}`)
     const openingUnadjusted = parseNum(raw?.openingUnadjusted)
     const openingAje = parseNum(raw?.openingAje)
     const openingRje = parseNum(raw?.openingRje)

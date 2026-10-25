@@ -6,35 +6,23 @@
     },
     {
       "file": "src\\components\\workpaper\\GtH1FixedAssets.vue",
-      "line": 621
-    },
-    {
-      "file": "src\\components\\workpaper\\GtH2ConstructionInProgress.vue",
-      "line": 526
+      "line": 696
     },
     {
       "file": "src\\components\\workpaper\\GtH6AssetDisposalClearing.vue",
-      "line": 249
+      "line": 273
     },
     {
       "file": "src\\components\\workpaper\\GtH6AssetDisposalClearing.vue",
-      "line": 279
+      "line": 303
     },
     {
       "file": "src\\components\\workpaper\\GtH7BiologicalAssets.vue",
-      "line": 602
-    },
-    {
-      "file": "src\\components\\workpaper\\GtH8RightOfUseAssets.vue",
-      "line": 632
-    },
-    {
-      "file": "src\\components\\workpaper\\GtH9LeaseLiabilities.vue",
-      "line": 397
+      "line": 678
     },
     {
       "file": "src\\components\\workpaper\\GtK11AssetImpairmentLoss.vue",
-      "line": 282
+      "line": 293
     },
     {
       "file": "src\\components\\workpaper\\s12-cpa-expert\\GtS12CpaExpert.vue",
@@ -129,7 +117,7 @@
     },
     {
       "file": "src\\services\\apiPaths\\accounting.ts",
-      "line": 160,
+      "line": 161,
       "pattern": "batchUpdate"
     },
     {
@@ -178,13 +166,8 @@
       "pattern": "batchUpdate"
     },
     {
-      "file": "src\\services\\apiPaths\\report.ts",
-      "line": 33,
-      "pattern": "batchUpdate"
-    },
-    {
       "file": "src\\services\\consolidationApi.ts",
-      "line": 240,
+      "line": 763,
       "pattern": "batchUpdate"
     },
     {
@@ -219,22 +202,17 @@
     },
     {
       "file": "src\\components\\formula\\FormulaManagerDialog.vue",
-      "line": 2854,
-      "pattern": "batchUpdate"
-    },
-    {
-      "file": "src\\components\\formula\\FormulaManagerDialog.vue",
-      "line": 3648,
+      "line": 3790,
       "pattern": "wpUserFormula\\."
     },
     {
       "file": "src\\components\\formula\\FormulaManagerDialog.vue",
-      "line": 3687,
+      "line": 3829,
       "pattern": "wpUserFormula\\."
     },
     {
       "file": "src\\components\\formula\\FormulaManagerDialog.vue",
-      "line": 3710,
+      "line": 3852,
       "pattern": "wpUserFormula\\."
     },
     {
@@ -455,19 +433,23 @@
       },
       {
         "file": "src\\components\\workpaper\\confirmation\\e0-send-list\\GtE0SendListE03.vue",
-        "line": 68
+        "line": 69
       },
       {
         "file": "src\\components\\workpaper\\confirmation\\e0-send-list\\GtE0SendListE03.vue",
-        "line": 102
+        "line": 89
       },
       {
         "file": "src\\components\\workpaper\\confirmation\\e0-send-list\\GtE0SendListE03.vue",
-        "line": 153
+        "line": 104
       },
       {
         "file": "src\\components\\workpaper\\confirmation\\e0-send-list\\GtE0SendListE03.vue",
-        "line": 176
+        "line": 155
+      },
+      {
+        "file": "src\\components\\workpaper\\confirmation\\e0-send-list\\GtE0SendListE03.vue",
+        "line": 178
       },
       {
         "file": "src\\components\\workpaper\\confirmation\\E0SummaryLowerZone.vue",
@@ -591,11 +573,11 @@
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabAdjudication.vue",
-        "line": 211
+        "line": 214
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabAdjudication.vue",
-        "line": 223
+        "line": 226
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabAdjustment.vue",
@@ -607,15 +589,15 @@
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabBadDebt.vue",
-        "line": 257
+        "line": 247
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabBadDebt.vue",
-        "line": 702
+        "line": 696
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabBadDebt.vue",
-        "line": 726
+        "line": 720
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabBusinessMode.vue",
@@ -703,11 +685,11 @@
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabInventoryCount.vue",
-        "line": 694
+        "line": 714
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabInventoryCount.vue",
-        "line": 726
+        "line": 746
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabMemoReconciliation.vue",
@@ -763,35 +745,35 @@
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabSamplingVouching.vue",
-        "line": 296
+        "line": 310
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabSamplingVouching.vue",
-        "line": 570
+        "line": 584
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabSamplingVouching.vue",
-        "line": 1069
+        "line": 1187
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabSamplingVouching.vue",
-        "line": 1094
+        "line": 1212
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabWriteoffCheck.vue",
-        "line": 158
+        "line": 178
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabWriteoffCheck.vue",
-        "line": 355
+        "line": 375
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabWriteoffCheck.vue",
-        "line": 860
+        "line": 880
       },
       {
         "file": "src\\components\\workpaper\\d1\\D1TabWriteoffCheck.vue",
-        "line": 889
+        "line": 909
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2DerecognitionOverview.vue",
@@ -839,19 +821,19 @@
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabAdjudication.vue",
-        "line": 429
+        "line": 431
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabAdjudication.vue",
-        "line": 429
+        "line": 431
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabAdjudication.vue",
-        "line": 624
+        "line": 633
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabAdjudication.vue",
-        "line": 641
+        "line": 650
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabAnalysis.vue",
@@ -899,11 +881,11 @@
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabDetail.vue",
-        "line": 184
+        "line": 230
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabDetail.vue",
-        "line": 483
+        "line": 540
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabEcl.vue",
@@ -947,31 +929,31 @@
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 120
+        "line": 131
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 194
+        "line": 205
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 199
+        "line": 210
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 200
+        "line": 211
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 434
+        "line": 445
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 443
+        "line": 454
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabVoucherCheck.vue",
-        "line": 477
+        "line": 488
       },
       {
         "file": "src\\components\\workpaper\\d2\\D2TabWriteoffCheck.vue",
@@ -1071,39 +1053,39 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerPrice.vue",
-        "line": 173
+        "line": 254
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerPrice.vue",
-        "line": 179
+        "line": 260
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerPrice.vue",
-        "line": 189
+        "line": 270
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerPrice.vue",
-        "line": 191
+        "line": 272
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerPrice.vue",
-        "line": 201
+        "line": 282
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerPrice.vue",
-        "line": 203
+        "line": 284
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerPrice.vue",
-        "line": 271
+        "line": 368
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerPrice.vue",
-        "line": 389
+        "line": 502
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerPrice.vue",
-        "line": 400
+        "line": 513
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
@@ -1111,27 +1093,11 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
-        "line": 168
+        "line": 221
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
-        "line": 174
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
-        "line": 184
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
-        "line": 186
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
-        "line": 196
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
-        "line": 198
+        "line": 227
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
@@ -1139,11 +1105,27 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
-        "line": 348
+        "line": 239
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
-        "line": 361
+        "line": 249
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
+        "line": 251
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
+        "line": 302
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
+        "line": 404
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabCustomerStructure.vue",
+        "line": 417
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
@@ -1151,27 +1133,15 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 144
+        "line": 160
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 170
+        "line": 186
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 172
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 185
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 187
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 199
+        "line": 188
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
@@ -1179,19 +1149,31 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 205
+        "line": 203
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 312
+        "line": 215
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 427
+        "line": 217
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
-        "line": 442
+        "line": 221
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
+        "line": 338
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
+        "line": 435
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabIndicator.vue",
+        "line": 450
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
@@ -1199,31 +1181,11 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 272
+        "line": 304
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 298
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 300
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 312
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 314
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 326
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 328
+        "line": 330
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
@@ -1231,15 +1193,35 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 392
+        "line": 344
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 637
+        "line": 346
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
-        "line": 654
+        "line": 358
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
+        "line": 360
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
+        "line": 364
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
+        "line": 434
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
+        "line": 666
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabMarginMonthly.vue",
+        "line": 683
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
@@ -1247,147 +1229,147 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
+        "line": 295
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
+        "line": 321
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
+        "line": 323
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
+        "line": 340
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
+        "line": 342
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
+        "line": 353
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
+        "line": 355
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
+        "line": 359
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
+        "line": 452
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
+        "line": 733
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
+        "line": 749
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
+        "line": 182
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
+        "line": 188
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
+        "line": 198
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
+        "line": 200
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
+        "line": 209
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
+        "line": 211
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
         "line": 285
       },
       {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
-        "line": 311
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
-        "line": 313
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
-        "line": 330
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
-        "line": 332
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
-        "line": 343
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
-        "line": 345
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
-        "line": 349
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
-        "line": 404
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
-        "line": 698
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductMargin.vue",
-        "line": 714
+        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
+        "line": 380
       },
       {
         "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
-        "line": 152
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
-        "line": 158
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
-        "line": 168
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
-        "line": 170
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
-        "line": 179
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
-        "line": 181
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
-        "line": 246
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
-        "line": 350
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\analysis\\D4TabProductPrice.vue",
-        "line": 361
+        "line": 391
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjudication.vue",
-        "line": 181
+        "line": 254
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjudication.vue",
-        "line": 206
+        "line": 279
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjudication.vue",
-        "line": 208
+        "line": 281
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjudication.vue",
-        "line": 222
+        "line": 295
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjudication.vue",
-        "line": 224
+        "line": 297
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjudication.vue",
-        "line": 228
+        "line": 301
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjudication.vue",
-        "line": 531
+        "line": 646
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjudication.vue",
-        "line": 551
+        "line": 666
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjustment.vue",
-        "line": 116
+        "line": 164
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjustment.vue",
-        "line": 144
+        "line": 192
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjustment.vue",
-        "line": 146
+        "line": 194
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjustment.vue",
-        "line": 157
+        "line": 205
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjustment.vue",
-        "line": 159
+        "line": 207
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjustment.vue",
-        "line": 163
+        "line": 211
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjustment.vue",
-        "line": 430
+        "line": 513
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabAdjustment.vue",
-        "line": 449
+        "line": 532
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabDisclosureListed.vue",
@@ -1439,27 +1421,11 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabOtherRevenue.vue",
-        "line": 329
+        "line": 315
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabRevenueDetail.vue",
-        "line": 136
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\core\\D4TabRevenueDetail.vue",
-        "line": 164
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\core\\D4TabRevenueDetail.vue",
-        "line": 166
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\core\\D4TabRevenueDetail.vue",
-        "line": 177
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\core\\D4TabRevenueDetail.vue",
-        "line": 179
+        "line": 155
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabRevenueDetail.vue",
@@ -1467,199 +1433,215 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\core\\D4TabRevenueDetail.vue",
-        "line": 475
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\core\\D4TabRevenueDetail.vue",
-        "line": 494
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
-        "line": 8
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
-        "line": 121
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
-        "line": 123
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
-        "line": 137
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
-        "line": 139
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
-        "line": 143
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
-        "line": 266
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
-        "line": 418
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
-        "line": 421
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabContract.vue",
-        "line": 209
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabContract.vue",
-        "line": 214
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabContract.vue",
-        "line": 220
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabContract.vue",
-        "line": 324
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabContract.vue",
-        "line": 396
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
-        "line": 8
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
-        "line": 179
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
-        "line": 227
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
-        "line": 229
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
-        "line": 238
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
-        "line": 240
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
-        "line": 242
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
-        "line": 417
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
-        "line": 418
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
-        "line": 8
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
-        "line": 179
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
-        "line": 227
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
-        "line": 229
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
-        "line": 238
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
-        "line": 240
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
-        "line": 242
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
-        "line": 417
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
-        "line": 418
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
-        "line": 8
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
-        "line": 174
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
-        "line": 176
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
         "line": 185
       },
       {
-        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
-        "line": 187
+        "file": "src\\components\\workpaper\\d4\\core\\D4TabRevenueDetail.vue",
+        "line": 196
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\core\\D4TabRevenueDetail.vue",
+        "line": 198
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\core\\D4TabRevenueDetail.vue",
+        "line": 202
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\core\\D4TabRevenueDetail.vue",
+        "line": 490
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\core\\D4TabRevenueDetail.vue",
+        "line": 509
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
+        "line": 8
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
+        "line": 140
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
+        "line": 142
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
+        "line": 156
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
+        "line": 158
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
+        "line": 162
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
+        "line": 281
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
+        "line": 433
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
+        "line": 436
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabContract.vue",
+        "line": 234
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabContract.vue",
+        "line": 239
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabContract.vue",
+        "line": 245
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabContract.vue",
+        "line": 344
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabContract.vue",
+        "line": 416
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
+        "line": 8
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
+        "line": 184
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
+        "line": 275
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
+        "line": 277
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
+        "line": 286
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
+        "line": 288
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
+        "line": 290
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
+        "line": 460
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
+        "line": 461
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
+        "line": 8
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
+        "line": 184
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
+        "line": 280
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
+        "line": 282
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
+        "line": 291
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
+        "line": 293
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
+        "line": 295
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
+        "line": 465
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
+        "line": 466
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
-        "line": 189
+        "line": 8
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
-        "line": 348
+        "line": 224
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
-        "line": 349
+        "line": 226
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
+        "line": 235
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
+        "line": 237
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
+        "line": 239
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
+        "line": 393
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
+        "line": 394
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabErpCheck.vue",
-        "line": 120
+        "line": 129
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabErpCheck.vue",
-        "line": 126
+        "line": 135
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabErpCheck.vue",
-        "line": 157
+        "line": 166
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabErpCheck.vue",
-        "line": 163
+        "line": 172
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabErpCheck.vue",
-        "line": 167
+        "line": 176
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabErpCheck.vue",
-        "line": 247
+        "line": 254
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabErpCheck.vue",
-        "line": 262
+        "line": 269
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabExport.vue",
@@ -1667,63 +1649,63 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabExport.vue",
-        "line": 193
+        "line": 224
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabExport.vue",
-        "line": 195
+        "line": 226
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabExport.vue",
-        "line": 205
+        "line": 236
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabExport.vue",
-        "line": 207
+        "line": 238
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabExport.vue",
-        "line": 210
+        "line": 241
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabExport.vue",
-        "line": 382
+        "line": 407
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabExport.vue",
-        "line": 383
+        "line": 408
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 353
+        "line": 370
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 359
+        "line": 376
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 384
+        "line": 401
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 390
+        "line": 407
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 394
+        "line": 411
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 540
+        "line": 552
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 637
+        "line": 649
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-        "line": 641
+        "line": 653
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
@@ -1731,159 +1713,159 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
-        "line": 264
+        "line": 312
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
-        "line": 266
+        "line": 314
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
-        "line": 275
+        "line": 323
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
-        "line": 277
+        "line": 325
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
-        "line": 279
+        "line": 327
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
-        "line": 296
+        "line": 344
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
-        "line": 301
+        "line": 349
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
-        "line": 392
+        "line": 419
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
-        "line": 449
+        "line": 476
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
-        "line": 458
+        "line": 485
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
-        "line": 666
+        "line": 693
       },
       {
         "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
-        "line": 667
+        "line": 694
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerChecklist.vue",
-        "line": 61
+        "line": 73
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerChecklist.vue",
-        "line": 64
+        "line": 83
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerChecklist.vue",
-        "line": 64
+        "line": 96
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerChecklist.vue",
-        "line": 65
+        "line": 98
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerChecklist.vue",
-        "line": 65
+        "line": 110
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerChecklist.vue",
-        "line": 123
+        "line": 112
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerChecklist.vue",
-        "line": 123
+        "line": 209
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerChecklist.vue",
+        "line": 210
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerDetail.vue",
-        "line": 43
+        "line": 74
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerDetail.vue",
-        "line": 46
+        "line": 77
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerDetail.vue",
-        "line": 46
+        "line": 77
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerDetail.vue",
-        "line": 47
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerDetail.vue",
-        "line": 47
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerDetail.vue",
-        "line": 135
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerDetail.vue",
-        "line": 135
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
-        "line": 57
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
-        "line": 60
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
-        "line": 60
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
-        "line": 61
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
-        "line": 61
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
-        "line": 94
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
-        "line": 94
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabFundFlow.vue",
-        "line": 8
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabFundFlow.vue",
         "line": 78
       },
       {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabFundFlow.vue",
-        "line": 80
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerDetail.vue",
+        "line": 78
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerDetail.vue",
+        "line": 192
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabCustomerDetail.vue",
+        "line": 192
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
+        "line": 73
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
+        "line": 83
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
+        "line": 96
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
+        "line": 98
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
+        "line": 110
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
+        "line": 112
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
+        "line": 200
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabDealer.vue",
+        "line": 201
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabFundFlow.vue",
-        "line": 80
+        "line": 8
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabFundFlow.vue",
-        "line": 81
+        "line": 133
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabFundFlow.vue",
-        "line": 81
+        "line": 135
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabFundFlow.vue",
+        "line": 135
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabFundFlow.vue",
@@ -1892,6 +1874,14 @@
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabFundFlow.vue",
         "line": 136
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabFundFlow.vue",
+        "line": 224
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabFundFlow.vue",
+        "line": 224
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInterviewDetail.vue",
@@ -1899,43 +1889,43 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInterviewDetail.vue",
-        "line": 101
+        "line": 153
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInterviewDetail.vue",
-        "line": 103
+        "line": 155
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInterviewDetail.vue",
-        "line": 180
+        "line": 236
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInterviewSummary.vue",
-        "line": 107
+        "line": 144
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInterviewSummary.vue",
-        "line": 109
+        "line": 146
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInterviewSummary.vue",
-        "line": 109
+        "line": 146
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInterviewSummary.vue",
-        "line": 110
+        "line": 147
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInterviewSummary.vue",
-        "line": 110
+        "line": 147
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInterviewSummary.vue",
-        "line": 169
+        "line": 242
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInterviewSummary.vue",
-        "line": 169
+        "line": 242
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
@@ -1943,103 +1933,107 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
-        "line": 73
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
-        "line": 92
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
-        "line": 94
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
-        "line": 114
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
-        "line": 116
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
-        "line": 277
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
-        "line": 280
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
-        "line": 8
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
         "line": 91
       },
       {
-        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
-        "line": 111
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
+        "line": 110
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
+        "line": 112
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
+        "line": 132
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
+        "line": 134
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
+        "line": 290
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInvoiceCompare.vue",
+        "line": 293
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
-        "line": 113
+        "line": 8
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
-        "line": 133
+        "line": 106
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
-        "line": 135
+        "line": 126
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
-        "line": 192
+        "line": 128
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
-        "line": 202
+        "line": 148
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
-        "line": 205
+        "line": 150
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
-        "line": 404
+        "line": 213
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
-        "line": 407
+        "line": 223
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
+        "line": 226
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
+        "line": 414
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabIpoIndicator.vue",
+        "line": 417
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabOverseas.vue",
-        "line": 59
+        "line": 78
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabOverseas.vue",
-        "line": 61
+        "line": 88
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabOverseas.vue",
-        "line": 61
+        "line": 101
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabOverseas.vue",
-        "line": 62
+        "line": 103
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabOverseas.vue",
-        "line": 62
+        "line": 115
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabOverseas.vue",
-        "line": 104
+        "line": 117
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabOverseas.vue",
-        "line": 104
+        "line": 215
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabOverseas.vue",
+        "line": 216
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabThirdParty.vue",
@@ -2047,43 +2041,43 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabThirdParty.vue",
-        "line": 125
+        "line": 151
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabThirdParty.vue",
-        "line": 136
+        "line": 162
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabThirdParty.vue",
-        "line": 138
+        "line": 164
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabThirdParty.vue",
-        "line": 148
+        "line": 174
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabThirdParty.vue",
-        "line": 150
+        "line": 176
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabThirdParty.vue",
-        "line": 227
+        "line": 254
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabThirdParty.vue",
-        "line": 227
+        "line": 254
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabUndisclosedRp.vue",
-        "line": 85
+        "line": 64
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabUndisclosedRp.vue",
-        "line": 88
+        "line": 74
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabUndisclosedRp.vue",
-        "line": 88
+        "line": 87
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabUndisclosedRp.vue",
@@ -2091,127 +2085,131 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabUndisclosedRp.vue",
-        "line": 89
+        "line": 101
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabUndisclosedRp.vue",
-        "line": 165
+        "line": 103
       },
       {
         "file": "src\\components\\workpaper\\d4\\ipo\\D4TabUndisclosedRp.vue",
-        "line": 165
+        "line": 204
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\ipo\\D4TabUndisclosedRp.vue",
+        "line": 205
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
-        "line": 95
+        "line": 129
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
+        "line": 131
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
+        "line": 131
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
+        "line": 132
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
+        "line": 132
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
+        "line": 246
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
+        "line": 246
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
         "line": 97
       },
       {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
-        "line": 97
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
-        "line": 98
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
-        "line": 98
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
-        "line": 171
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
-        "line": 171
-      },
-      {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
-        "line": 65
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
-        "line": 67
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
-        "line": 67
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
-        "line": 68
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
-        "line": 68
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
-        "line": 199
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
-        "line": 199
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
-        "line": 96
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
-        "line": 98
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
-        "line": 98
-      },
-      {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
         "line": 99
       },
       {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
         "line": 99
       },
       {
-        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
-        "line": 201
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
+        "line": 100
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
+        "line": 100
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
+        "line": 261
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
+        "line": 261
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
-        "line": 201
+        "line": 119
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
+        "line": 121
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
+        "line": 121
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
+        "line": 122
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
+        "line": 122
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
+        "line": 264
+      },
+      {
+        "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
+        "line": 264
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 112
+        "line": 152
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 114
+        "line": 154
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 114
+        "line": 154
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 115
+        "line": 155
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 115
+        "line": 155
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 203
+        "line": 292
       },
       {
         "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
-        "line": 203
+        "line": 292
       },
       {
         "file": "src\\components\\workpaper\\d4\\policy\\D4TabPolicyCheck.vue",
@@ -2219,35 +2217,35 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\policy\\D4TabPolicyCheck.vue",
-        "line": 189
+        "line": 130
       },
       {
         "file": "src\\components\\workpaper\\d4\\policy\\D4TabPolicyCheck.vue",
-        "line": 215
+        "line": 156
       },
       {
         "file": "src\\components\\workpaper\\d4\\policy\\D4TabPolicyCheck.vue",
-        "line": 220
+        "line": 161
       },
       {
         "file": "src\\components\\workpaper\\d4\\policy\\D4TabPolicyCheck.vue",
-        "line": 239
+        "line": 180
       },
       {
         "file": "src\\components\\workpaper\\d4\\policy\\D4TabPolicyCheck.vue",
-        "line": 244
+        "line": 185
       },
       {
         "file": "src\\components\\workpaper\\d4\\policy\\D4TabPolicyCheck.vue",
-        "line": 250
+        "line": 191
       },
       {
         "file": "src\\components\\workpaper\\d4\\policy\\D4TabPolicyCheck.vue",
-        "line": 406
+        "line": 347
       },
       {
         "file": "src\\components\\workpaper\\d4\\policy\\D4TabPolicyCheck.vue",
-        "line": 446
+        "line": 387
       },
       {
         "file": "src\\components\\workpaper\\d4\\related\\D4TabRelatedPrice.vue",
@@ -2255,47 +2253,47 @@
       },
       {
         "file": "src\\components\\workpaper\\d4\\related\\D4TabRelatedPrice.vue",
-        "line": 109
+        "line": 129
       },
       {
         "file": "src\\components\\workpaper\\d4\\related\\D4TabRelatedPrice.vue",
-        "line": 128
+        "line": 148
       },
       {
         "file": "src\\components\\workpaper\\d4\\related\\D4TabRelatedPrice.vue",
-        "line": 130
+        "line": 150
       },
       {
         "file": "src\\components\\workpaper\\d4\\related\\D4TabRelatedPrice.vue",
-        "line": 152
+        "line": 172
       },
       {
         "file": "src\\components\\workpaper\\d4\\related\\D4TabRelatedPrice.vue",
-        "line": 154
+        "line": 174
       },
       {
         "file": "src\\components\\workpaper\\d4\\related\\D4TabRelatedPrice.vue",
-        "line": 244
+        "line": 259
       },
       {
         "file": "src\\components\\workpaper\\d4\\related\\D4TabRelatedPrice.vue",
-        "line": 373
+        "line": 388
       },
       {
         "file": "src\\components\\workpaper\\d4\\related\\D4TabRelatedPrice.vue",
-        "line": 376
+        "line": 391
       },
       {
         "file": "src\\components\\workpaper\\d5\\D5TabAdjudication.vue",
-        "line": 194
+        "line": 201
       },
       {
         "file": "src\\components\\workpaper\\d5\\D5TabAdjudication.vue",
-        "line": 214
+        "line": 221
       },
       {
         "file": "src\\components\\workpaper\\d5\\D5TabAdjudication.vue",
-        "line": 353
+        "line": 363
       },
       {
         "file": "src\\components\\workpaper\\d5\\D5TabDetail.vue",
@@ -2307,7 +2305,7 @@
       },
       {
         "file": "src\\components\\workpaper\\d5\\D5TabDetail.vue",
-        "line": 692
+        "line": 703
       },
       {
         "file": "src\\components\\workpaper\\d5\\D5TabDisclosure.vue",
@@ -2323,23 +2321,23 @@
       },
       {
         "file": "src\\components\\workpaper\\d6\\D6TabAdjudication.vue",
-        "line": 273
+        "line": 289
       },
       {
         "file": "src\\components\\workpaper\\d6\\D6TabAdjudication.vue",
-        "line": 294
+        "line": 310
       },
       {
         "file": "src\\components\\workpaper\\d6\\D6TabAdjudication.vue",
-        "line": 315
+        "line": 331
       },
       {
         "file": "src\\components\\workpaper\\d6\\D6TabAdjudication.vue",
-        "line": 335
+        "line": 351
       },
       {
         "file": "src\\components\\workpaper\\d6\\D6TabAdjudication.vue",
-        "line": 451
+        "line": 470
       },
       {
         "file": "src\\components\\workpaper\\d6\\D6TabAdjustment.vue",
@@ -2451,19 +2449,19 @@
       },
       {
         "file": "src\\components\\workpaper\\d7\\D7TabAdjudication.vue",
-        "line": 249
+        "line": 277
       },
       {
         "file": "src\\components\\workpaper\\d7\\D7TabAdjudication.vue",
-        "line": 269
+        "line": 297
       },
       {
         "file": "src\\components\\workpaper\\d7\\D7TabAdjudication.vue",
-        "line": 289
+        "line": 317
       },
       {
         "file": "src\\components\\workpaper\\d7\\D7TabAdjudication.vue",
-        "line": 401
+        "line": 432
       },
       {
         "file": "src\\components\\workpaper\\d7\\D7TabAnalysis.vue",
@@ -2563,11 +2561,11 @@
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabAdjudication.vue",
-        "line": 478
+        "line": 491
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabAdjudication.vue",
-        "line": 515
+        "line": 528
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabAdjustment.vue",
@@ -2623,19 +2621,19 @@
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabBankFlowReconcile.vue",
-        "line": 306
+        "line": 319
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabBankFlowReconcile.vue",
-        "line": 322
+        "line": 335
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabBankFlowReconcile.vue",
-        "line": 1066
+        "line": 1079
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabBankFlowReconcile.vue",
-        "line": 1090
+        "line": 1103
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabCashCount.vue",
@@ -2755,23 +2753,23 @@
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabDisclosure.vue",
-        "line": 1025
+        "line": 974
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabDisclosure.vue",
-        "line": 1033
+        "line": 982
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabDisclosure.vue",
-        "line": 1099
+        "line": 1048
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabDisclosure.vue",
-        "line": 1788
+        "line": 1738
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabDisclosure.vue",
-        "line": 1806
+        "line": 1756
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabInterestAnalysis.vue",
@@ -2819,15 +2817,15 @@
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabLargeCheck.vue",
-        "line": 277
+        "line": 317
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabLargeCheck.vue",
-        "line": 292
+        "line": 332
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabLargeCheck.vue",
-        "line": 304
+        "line": 344
       },
       {
         "file": "src\\components\\workpaper\\e1\\E1TabReconciliation.vue",
@@ -2859,27 +2857,27 @@
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabAdjudication.vue",
-        "line": 216
+        "line": 222
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabAdjudication.vue",
-        "line": 239
+        "line": 245
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabAdjudication.vue",
-        "line": 452
+        "line": 460
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabAdjudication.vue",
-        "line": 463
-      },
-      {
-        "file": "src\\components\\workpaper\\f1\\F1TabComprehensiveCheck.vue",
-        "line": 985
+        "line": 471
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabComprehensiveCheck.vue",
         "line": 996
+      },
+      {
+        "file": "src\\components\\workpaper\\f1\\F1TabComprehensiveCheck.vue",
+        "line": 1007
       },
       {
         "file": "src\\components\\workpaper\\f1\\F1TabDisclosureListed.vue",
@@ -3031,11 +3029,11 @@
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabAdjudication.vue",
-        "line": 249
+        "line": 250
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabAdjudication.vue",
-        "line": 259
+        "line": 260
       },
       {
         "file": "src\\components\\workpaper\\f2\\core\\F2TabDetailSummary.vue",
@@ -3503,15 +3501,15 @@
       },
       {
         "file": "src\\components\\workpaper\\f2-special\\contract\\F2TabContractCostCheck.vue",
-        "line": 368
+        "line": 388
       },
       {
         "file": "src\\components\\workpaper\\f2-special\\contract\\F2TabContractCostCheck.vue",
-        "line": 506
+        "line": 543
       },
       {
         "file": "src\\components\\workpaper\\f2-special\\contract\\F2TabContractCostCheck.vue",
-        "line": 507
+        "line": 544
       },
       {
         "file": "src\\components\\workpaper\\f2-special\\contract\\F2TabContractCostDetail.vue",
@@ -3695,15 +3693,15 @@
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3TabAdjudication.vue",
-        "line": 139
+        "line": 140
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3TabAdjudication.vue",
-        "line": 139
+        "line": 140
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3TabAdjudication.vue",
-        "line": 416
+        "line": 417
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3TabDetail.vue",
@@ -3767,19 +3765,19 @@
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3TabVoucherCheck.vue",
-        "line": 130
+        "line": 141
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3TabVoucherCheck.vue",
-        "line": 138
+        "line": 149
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3TabVoucherCheck.vue",
-        "line": 270
+        "line": 281
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3TabVoucherCheck.vue",
-        "line": 305
+        "line": 316
       },
       {
         "file": "src\\components\\workpaper\\f3-notes-payable\\F3VoucherCheckDialog.vue",
@@ -3799,23 +3797,23 @@
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabAdjudication.vue",
-        "line": 186
+        "line": 187
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabAdjudication.vue",
-        "line": 196
+        "line": 197
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabAdjudication.vue",
-        "line": 206
+        "line": 207
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabAdjudication.vue",
-        "line": 376
+        "line": 377
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabAdjudication.vue",
-        "line": 410
+        "line": 411
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabDetail.vue",
@@ -3939,19 +3937,19 @@
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabVoucherCheck.vue",
-        "line": 163
-      },
-      {
-        "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabVoucherCheck.vue",
         "line": 174
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabVoucherCheck.vue",
-        "line": 327
+        "line": 185
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabVoucherCheck.vue",
-        "line": 351
+        "line": 338
+      },
+      {
+        "file": "src\\components\\workpaper\\f4-accounts-payable\\F4TabVoucherCheck.vue",
+        "line": 362
       },
       {
         "file": "src\\components\\workpaper\\f4-accounts-payable\\F4VoucherCheckDialog.vue",
@@ -4027,11 +4025,11 @@
       },
       {
         "file": "src\\components\\workpaper\\f5-cost-of-sales\\F5TabMajorAdjustment.vue",
-        "line": 380
+        "line": 391
       },
       {
         "file": "src\\components\\workpaper\\f5-cost-of-sales\\F5TabMajorAdjustment.vue",
-        "line": 391
+        "line": 402
       },
       {
         "file": "src\\components\\workpaper\\f5-cost-of-sales\\F5TabMonthlyDetail.vue",
@@ -4179,7 +4177,7 @@
       },
       {
         "file": "src\\components\\workpaper\\g4-bond-investment-ecl\\voucher\\G4TabVoucherCheck.vue",
-        "line": 979
+        "line": 990
       },
       {
         "file": "src\\components\\workpaper\\g4-bond-investment-main\\core\\G4TabDisclosureListed.vue",
@@ -4543,15 +4541,15 @@
       },
       {
         "file": "src\\components\\workpaper\\GtA111SubsequentEventsInquiry.vue",
-        "line": 145
+        "line": 146
       },
       {
         "file": "src\\components\\workpaper\\GtA171AuditSummary.vue",
-        "line": 180
+        "line": 181
       },
       {
         "file": "src\\components\\workpaper\\GtA171AuditSummary.vue",
-        "line": 637
+        "line": 641
       },
       {
         "file": "src\\components\\workpaper\\GtA171Chapter15.vue",
@@ -4595,27 +4593,31 @@
       },
       {
         "file": "src\\components\\workpaper\\GtA1721Kam.vue",
-        "line": 464
+        "line": 474
       },
       {
         "file": "src\\components\\workpaper\\GtA1721Kam.vue",
-        "line": 493
+        "line": 503
       },
       {
         "file": "src\\components\\workpaper\\GtA1731ConsultationExecution.vue",
-        "line": 371
+        "line": 375
       },
       {
         "file": "src\\components\\workpaper\\GtA173ConsultationRecord.vue",
-        "line": 199
+        "line": 201
       },
       {
         "file": "src\\components\\workpaper\\GtA173ConsultationRecord.vue",
-        "line": 444
+        "line": 413
+      },
+      {
+        "file": "src\\components\\workpaper\\GtA173ConsultationRecord.vue",
+        "line": 471
       },
       {
         "file": "src\\components\\workpaper\\GtA174DisagreementRecord.vue",
-        "line": 296
+        "line": 300
       },
       {
         "file": "src\\components\\workpaper\\GtA176ClosingMeeting.vue",
@@ -4623,7 +4625,7 @@
       },
       {
         "file": "src\\components\\workpaper\\GtA176ClosingMeeting.vue",
-        "line": 285
+        "line": 289
       },
       {
         "file": "src\\components\\workpaper\\GtA177IndependenceDeclaration.vue",
@@ -4643,11 +4645,11 @@
       },
       {
         "file": "src\\components\\workpaper\\GtA182RegulatoryCommunication.vue",
-        "line": 16
+        "line": 17
       },
       {
         "file": "src\\components\\workpaper\\GtA91DeficiencyLetter.vue",
-        "line": 247
+        "line": 248
       },
       {
         "file": "src\\components\\workpaper\\GtB14DueDiligenceReport.vue",
@@ -4687,23 +4689,23 @@
       },
       {
         "file": "src\\components\\workpaper\\GtB1Evaluation.vue",
-        "line": 279
+        "line": 301
       },
       {
         "file": "src\\components\\workpaper\\GtB1Evaluation.vue",
-        "line": 305
+        "line": 327
       },
       {
         "file": "src\\components\\workpaper\\GtB1Evaluation.vue",
-        "line": 319
+        "line": 341
       },
       {
         "file": "src\\components\\workpaper\\GtB1Evaluation.vue",
-        "line": 339
+        "line": 361
       },
       {
         "file": "src\\components\\workpaper\\GtB1Evaluation.vue",
-        "line": 362
+        "line": 384
       },
       {
         "file": "src\\components\\workpaper\\GtB1KaaCheck.vue",
@@ -4711,11 +4713,11 @@
       },
       {
         "file": "src\\components\\workpaper\\GtB1KaaCheck.vue",
-        "line": 225
+        "line": 242
       },
       {
         "file": "src\\components\\workpaper\\GtB1KaaCheck.vue",
-        "line": 258
+        "line": 275
       },
       {
         "file": "src\\components\\workpaper\\GtB1RiskAssessment.vue",
@@ -4727,11 +4729,11 @@
       },
       {
         "file": "src\\components\\workpaper\\GtB1RiskAssessment.vue",
-        "line": 437
+        "line": 454
       },
       {
         "file": "src\\components\\workpaper\\GtB1RiskAssessment.vue",
-        "line": 469
+        "line": 486
       },
       {
         "file": "src\\components\\workpaper\\GtB212Evaluation.vue",
@@ -4747,35 +4749,35 @@
       },
       {
         "file": "src\\components\\workpaper\\GtB22AControlMatrix.vue",
-        "line": 370
+        "line": 374
       },
       {
         "file": "src\\components\\workpaper\\GtB22AControlMatrix.vue",
-        "line": 395
+        "line": 399
       },
       {
         "file": "src\\components\\workpaper\\GtB22AControlMatrix.vue",
-        "line": 1510
+        "line": 1571
       },
       {
         "file": "src\\components\\workpaper\\GtB22AControlMatrix.vue",
-        "line": 1719
+        "line": 1780
       },
       {
         "file": "src\\components\\workpaper\\GtB22BControlMatrix.vue",
-        "line": 174
+        "line": 200
       },
       {
         "file": "src\\components\\workpaper\\GtB22BDeficiencyEvaluation.vue",
-        "line": 244
+        "line": 269
       },
       {
         "file": "src\\components\\workpaper\\GtB22BDeficiencyEvaluation.vue",
-        "line": 272
+        "line": 297
       },
       {
         "file": "src\\components\\workpaper\\GtB22BDeficiencyEvaluation.vue",
-        "line": 739
+        "line": 764
       },
       {
         "file": "src\\components\\workpaper\\GtB23ProcessControl.vue",
@@ -4899,35 +4901,35 @@
       },
       {
         "file": "src\\components\\workpaper\\GtCControlTest.vue",
-        "line": 231
+        "line": 243
       },
       {
         "file": "src\\components\\workpaper\\GtCControlTest.vue",
-        "line": 465
+        "line": 477
       },
       {
         "file": "src\\components\\workpaper\\GtCControlTest.vue",
-        "line": 623
+        "line": 641
       },
       {
         "file": "src\\components\\workpaper\\GtCControlTest.vue",
-        "line": 627
+        "line": 645
       },
       {
         "file": "src\\components\\workpaper\\GtCControlTest.vue",
-        "line": 661
+        "line": 679
       },
       {
         "file": "src\\components\\workpaper\\GtCControlTest.vue",
-        "line": 671
+        "line": 689
       },
       {
         "file": "src\\components\\workpaper\\GtCControlTest.vue",
-        "line": 1101
+        "line": 1227
       },
       {
         "file": "src\\components\\workpaper\\GtCControlTest.vue",
-        "line": 1154
+        "line": 1280
       },
       {
         "file": "src\\components\\workpaper\\GtDForm\\GtDFormParagraph.vue",
@@ -4971,7 +4973,7 @@
       },
       {
         "file": "src\\components\\workpaper\\GtK1OtherReceivables.vue",
-        "line": 8
+        "line": 26
       },
       {
         "file": "src\\components\\workpaper\\GtKamWorkpaper.vue",
@@ -5003,7 +5005,7 @@
       },
       {
         "file": "src\\components\\workpaper\\h1\\core\\H1TabAdjudication.vue",
-        "line": 1017
+        "line": 1003
       },
       {
         "file": "src\\components\\workpaper\\h1\\core\\H1TabAnalysis.vue",
@@ -5027,7 +5029,7 @@
       },
       {
         "file": "src\\components\\workpaper\\h1\\inspection\\H1TabDisposalCheck.vue",
-        "line": 747
+        "line": 758
       },
       {
         "file": "src\\components\\workpaper\\h1\\inspection\\H1TabPolicyCheck.vue",
@@ -5291,7 +5293,7 @@
       },
       {
         "file": "src\\components\\workpaper\\j1\\core\\J1TabAdjudication.vue",
-        "line": 510
+        "line": 521
       },
       {
         "file": "src\\components\\workpaper\\j1\\core\\J1TabAdjustment.vue",
@@ -5383,19 +5385,19 @@
       },
       {
         "file": "src\\components\\workpaper\\j1\\inspection\\J1TabAccrualCheck.vue",
-        "line": 339
+        "line": 357
       },
       {
         "file": "src\\components\\workpaper\\j1\\inspection\\J1TabAccrualCheck.vue",
-        "line": 340
+        "line": 358
       },
       {
         "file": "src\\components\\workpaper\\j1\\inspection\\J1TabAccrualCheck.vue",
-        "line": 352
+        "line": 370
       },
       {
         "file": "src\\components\\workpaper\\j1\\inspection\\J1TabAccrualCheck.vue",
-        "line": 353
+        "line": 371
       },
       {
         "file": "src\\components\\workpaper\\j1\\inspection\\J1TabAllocationCheck.vue",
@@ -5419,7 +5421,7 @@
       },
       {
         "file": "src\\components\\workpaper\\j1\\inspection\\J1TabGeneralCheck.vue",
-        "line": 589
+        "line": 600
       },
       {
         "file": "src\\components\\workpaper\\j1\\inspection\\J1TabNonMonetaryCheck.vue",
@@ -5515,19 +5517,19 @@
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabAdjustment.vue",
-        "line": 127
+        "line": 142
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabAdjustment.vue",
-        "line": 144
+        "line": 159
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabAdjustment.vue",
-        "line": 289
+        "line": 304
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabAdjustment.vue",
-        "line": 298
+        "line": 313
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDetail.vue",
@@ -5555,83 +5557,83 @@
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureListed.vue",
-        "line": 218
+        "line": 219
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureListed.vue",
-        "line": 243
+        "line": 244
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureListed.vue",
-        "line": 381
+        "line": 383
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureListed.vue",
+        "line": 452
+      },
+      {
+        "file": "src\\components\\workpaper\\j2\\J2TabDisclosureListed.vue",
+        "line": 533
+      },
+      {
+        "file": "src\\components\\workpaper\\j2\\J2TabDisclosureSoe.vue",
+        "line": 423
+      },
+      {
+        "file": "src\\components\\workpaper\\j2\\J2TabDisclosureSoe.vue",
         "line": 450
       },
       {
-        "file": "src\\components\\workpaper\\j2\\J2TabDisclosureListed.vue",
-        "line": 531
+        "file": "src\\components\\workpaper\\j2\\J2TabDisclosureSoe.vue",
+        "line": 595
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureSoe.vue",
-        "line": 422
+        "line": 665
       },
       {
         "file": "src\\components\\workpaper\\j2\\J2TabDisclosureSoe.vue",
-        "line": 449
-      },
-      {
-        "file": "src\\components\\workpaper\\j2\\J2TabDisclosureSoe.vue",
-        "line": 594
-      },
-      {
-        "file": "src\\components\\workpaper\\j2\\J2TabDisclosureSoe.vue",
-        "line": 664
-      },
-      {
-        "file": "src\\components\\workpaper\\j2\\J2TabDisclosureSoe.vue",
-        "line": 767
+        "line": 768
       },
       {
         "file": "src\\components\\workpaper\\j3\\core\\J3TabCheck.vue",
-        "line": 123
+        "line": 128
       },
       {
         "file": "src\\components\\workpaper\\j3\\core\\J3TabCheck.vue",
-        "line": 317
+        "line": 322
       },
       {
         "file": "src\\components\\workpaper\\j3\\core\\J3TabCheck.vue",
-        "line": 326
+        "line": 331
       },
       {
         "file": "src\\components\\workpaper\\j3\\core\\J3TabCheck.vue",
-        "line": 329
+        "line": 334
       },
       {
         "file": "src\\components\\workpaper\\j3\\core\\J3TabDetail.vue",
-        "line": 168
+        "line": 175
       },
       {
         "file": "src\\components\\workpaper\\j3\\core\\J3TabDetail.vue",
-        "line": 217
+        "line": 224
       },
       {
         "file": "src\\components\\workpaper\\j3\\core\\J3TabDetail.vue",
-        "line": 226
+        "line": 233
       },
       {
         "file": "src\\components\\workpaper\\j3\\core\\J3TabDetail.vue",
-        "line": 373
+        "line": 380
       },
       {
         "file": "src\\components\\workpaper\\j3\\core\\J3TabDetail.vue",
-        "line": 381
+        "line": 388
       },
       {
         "file": "src\\components\\workpaper\\j3\\core\\J3TabDetail.vue",
-        "line": 384
+        "line": 391
       },
       {
         "file": "src\\components\\workpaper\\j3\\core\\J3TabIpoFocus.vue",
@@ -5647,11 +5649,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k1\\core\\K1TabAdjudication.vue",
-        "line": 780
+        "line": 795
       },
       {
         "file": "src\\components\\workpaper\\k1\\core\\K1TabAdjudication.vue",
-        "line": 780
+        "line": 795
       },
       {
         "file": "src\\components\\workpaper\\k1\\core\\K1TabDetail.vue",
@@ -5735,15 +5737,15 @@
       },
       {
         "file": "src\\components\\workpaper\\k1\\inspection\\K1TabReceivableCheck.vue",
-        "line": 894
+        "line": 905
       },
       {
         "file": "src\\components\\workpaper\\k1\\inspection\\K1TabWriteoffCheck.vue",
-        "line": 314
+        "line": 330
       },
       {
         "file": "src\\components\\workpaper\\k1\\inspection\\K1TabWriteoffCheck.vue",
-        "line": 556
+        "line": 591
       },
       {
         "file": "src\\components\\workpaper\\k10\\core\\K10TabAdjudication.vue",
@@ -5755,23 +5757,23 @@
       },
       {
         "file": "src\\components\\workpaper\\k10\\core\\K10TabAdjudication.vue",
-        "line": 514
+        "line": 517
       },
       {
         "file": "src\\components\\workpaper\\k10\\core\\K10TabAdjudication.vue",
-        "line": 553
+        "line": 556
       },
       {
         "file": "src\\components\\workpaper\\k10\\core\\K10TabAdjudication.vue",
-        "line": 555
+        "line": 558
       },
       {
         "file": "src\\components\\workpaper\\k10\\core\\K10TabAdjudication.vue",
-        "line": 566
+        "line": 569
       },
       {
         "file": "src\\components\\workpaper\\k10\\core\\K10TabAdjudication.vue",
-        "line": 568
+        "line": 571
       },
       {
         "file": "src\\components\\workpaper\\k10\\core\\K10TabAdjustment.vue",
@@ -5879,11 +5881,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k10\\inspection\\K10TabOtherIncomeCheck.vue",
-        "line": 547
+        "line": 559
       },
       {
         "file": "src\\components\\workpaper\\k10\\inspection\\K10TabOtherIncomeCheck.vue",
-        "line": 549
+        "line": 561
       },
       {
         "file": "src\\components\\workpaper\\k10\\inspection\\K10TabReceivableGrant.vue",
@@ -5931,7 +5933,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k11\\core\\K11TabDisclosureListed.vue",
-        "line": 404
+        "line": 405
       },
       {
         "file": "src\\components\\workpaper\\k11\\core\\K11TabDisclosureSoe.vue",
@@ -5951,7 +5953,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k11\\core\\K11TabDisclosureSoe.vue",
-        "line": 401
+        "line": 402
       },
       {
         "file": "src\\components\\workpaper\\k12\\core\\K12TabAdjudication.vue",
@@ -5967,11 +5969,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k12\\core\\K12TabAdjudication.vue",
-        "line": 591
+        "line": 607
       },
       {
         "file": "src\\components\\workpaper\\k12\\core\\K12TabAdjustment.vue",
-        "line": 20
+        "line": 37
       },
       {
         "file": "src\\components\\workpaper\\k12\\core\\K12TabDetail.vue",
@@ -6027,7 +6029,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k12\\core\\K12TabNonOperatingCheck.vue",
-        "line": 544
+        "line": 556
       },
       {
         "file": "src\\components\\workpaper\\k13\\core\\K13TabAdjudication.vue",
@@ -6043,15 +6045,15 @@
       },
       {
         "file": "src\\components\\workpaper\\k13\\core\\K13TabAdjudication.vue",
-        "line": 536
+        "line": 552
       },
       {
         "file": "src\\components\\workpaper\\k13\\core\\K13TabAdjustment.vue",
-        "line": 30
+        "line": 47
       },
       {
         "file": "src\\components\\workpaper\\k13\\core\\K13TabAdjustment.vue",
-        "line": 457
+        "line": 477
       },
       {
         "file": "src\\components\\workpaper\\k13\\core\\K13TabDetail.vue",
@@ -6103,7 +6105,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k13\\core\\K13TabNonOperatingCheck.vue",
-        "line": 624
+        "line": 635
       },
       {
         "file": "src\\components\\workpaper\\k2\\amortization\\K2TabAmortization.vue",
@@ -6155,7 +6157,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k2\\core\\K2TabAdjudication.vue",
-        "line": 696
+        "line": 729
       },
       {
         "file": "src\\components\\workpaper\\k2\\core\\K2TabDetail.vue",
@@ -6331,11 +6333,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabAdjudication.vue",
-        "line": 429
+        "line": 443
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabAdjudication.vue",
-        "line": 453
+        "line": 467
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabAdjustment.vue",
@@ -6359,15 +6361,15 @@
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabCheck.vue",
-        "line": 309
+        "line": 324
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabCheck.vue",
-        "line": 486
+        "line": 526
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabCheck.vue",
-        "line": 517
+        "line": 557
       },
       {
         "file": "src\\components\\workpaper\\k4\\core\\K4TabDetail.vue",
@@ -6447,19 +6449,19 @@
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureListed.vue",
-        "line": 393
+        "line": 397
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureListed.vue",
-        "line": 432
+        "line": 436
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureListed.vue",
-        "line": 433
+        "line": 437
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureListed.vue",
-        "line": 438
+        "line": 442
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureSoe.vue",
@@ -6471,19 +6473,19 @@
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureSoe.vue",
-        "line": 419
+        "line": 424
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureSoe.vue",
-        "line": 463
-      },
-      {
-        "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureSoe.vue",
-        "line": 464
+        "line": 468
       },
       {
         "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureSoe.vue",
         "line": 469
+      },
+      {
+        "file": "src\\components\\workpaper\\k5\\core\\K5TabDisclosureSoe.vue",
+        "line": 474
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabAdjudication.vue",
@@ -6499,7 +6501,7 @@
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabAdjudication.vue",
-        "line": 543
+        "line": 557
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabDetail.vue",
@@ -6535,11 +6537,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabDisclosureListed.vue",
-        "line": 527
+        "line": 528
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabDisclosureListed.vue",
-        "line": 554
+        "line": 555
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabDisclosureSoe.vue",
@@ -6555,11 +6557,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabDisclosureSoe.vue",
-        "line": 484
+        "line": 485
       },
       {
         "file": "src\\components\\workpaper\\k6\\core\\K6TabDisclosureSoe.vue",
-        "line": 510
+        "line": 511
       },
       {
         "file": "src\\components\\workpaper\\k6\\impairment\\K6TabGroupImpairment.vue",
@@ -6671,15 +6673,15 @@
       },
       {
         "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureListed.vue",
-        "line": 402
-      },
-      {
-        "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureListed.vue",
         "line": 403
       },
       {
         "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureListed.vue",
-        "line": 408
+        "line": 404
+      },
+      {
+        "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureListed.vue",
+        "line": 409
       },
       {
         "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureSoe.vue",
@@ -6695,15 +6697,15 @@
       },
       {
         "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureSoe.vue",
-        "line": 680
-      },
-      {
-        "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureSoe.vue",
         "line": 681
       },
       {
         "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureSoe.vue",
-        "line": 686
+        "line": 682
+      },
+      {
+        "file": "src\\components\\workpaper\\k7\\core\\K7TabDisclosureSoe.vue",
+        "line": 687
       },
       {
         "file": "src\\components\\workpaper\\k7\\inspection\\K7TabDeferredCheck.vue",
@@ -6851,11 +6853,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k8\\cutoff\\K8TabCutoffS2V.vue",
-        "line": 246
+        "line": 257
       },
       {
         "file": "src\\components\\workpaper\\k8\\cutoff\\K8TabCutoffS2V.vue",
-        "line": 263
+        "line": 274
       },
       {
         "file": "src\\components\\workpaper\\k8\\cutoff\\K8TabCutoffV2S.vue",
@@ -6871,11 +6873,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k8\\cutoff\\K8TabCutoffV2S.vue",
-        "line": 247
+        "line": 258
       },
       {
         "file": "src\\components\\workpaper\\k8\\cutoff\\K8TabCutoffV2S.vue",
-        "line": 264
+        "line": 275
       },
       {
         "file": "src\\components\\workpaper\\k8\\inspection\\K8TabContractCheck.vue",
@@ -6887,11 +6889,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k8\\inspection\\K8TabContractCheck.vue",
-        "line": 287
+        "line": 298
       },
       {
         "file": "src\\components\\workpaper\\k8\\inspection\\K8TabContractCheck.vue",
-        "line": 303
+        "line": 314
       },
       {
         "file": "src\\components\\workpaper\\k8\\inspection\\K8TabSellingCheck.vue",
@@ -6927,11 +6929,11 @@
       },
       {
         "file": "src\\components\\workpaper\\k9\\core\\K9TabAdjustment.vue",
-        "line": 24
+        "line": 41
       },
       {
         "file": "src\\components\\workpaper\\k9\\core\\K9TabAdjustment.vue",
-        "line": 449
+        "line": 469
       },
       {
         "file": "src\\components\\workpaper\\k9\\core\\K9TabDisclosureListed.vue",
@@ -6995,15 +6997,15 @@
       },
       {
         "file": "src\\components\\workpaper\\l1\\core\\L1TabAdjudication.vue",
-        "line": 207
+        "line": 216
       },
       {
         "file": "src\\components\\workpaper\\l1\\core\\L1TabAdjudication.vue",
-        "line": 224
+        "line": 233
       },
       {
         "file": "src\\components\\workpaper\\l1\\core\\L1TabAdjudication.vue",
-        "line": 349
+        "line": 364
       },
       {
         "file": "src\\components\\workpaper\\l1\\core\\L1TabDetail.vue",
@@ -7131,19 +7133,19 @@
       },
       {
         "file": "src\\components\\workpaper\\l2\\core\\L2TabAdjudication.vue",
-        "line": 492
+        "line": 485
       },
       {
         "file": "src\\components\\workpaper\\l2\\core\\L2TabAdjudication.vue",
-        "line": 522
+        "line": 515
       },
       {
         "file": "src\\components\\workpaper\\l2\\core\\L2TabAdjudication.vue",
-        "line": 524
+        "line": 517
       },
       {
         "file": "src\\components\\workpaper\\l2\\core\\L2TabAdjudication.vue",
-        "line": 527
+        "line": 520
       },
       {
         "file": "src\\components\\workpaper\\l2\\core\\L2TabAdjustment.vue",
@@ -7235,15 +7237,15 @@
       },
       {
         "file": "src\\components\\workpaper\\l3\\core\\L3TabAdjudication.vue",
-        "line": 367
+        "line": 361
       },
       {
         "file": "src\\components\\workpaper\\l3\\core\\L3TabAdjudication.vue",
-        "line": 369
+        "line": 363
       },
       {
         "file": "src\\components\\workpaper\\l3\\core\\L3TabAdjudication.vue",
-        "line": 372
+        "line": 366
       },
       {
         "file": "src\\components\\workpaper\\l3\\core\\L3TabDetail.vue",
@@ -7343,15 +7345,15 @@
       },
       {
         "file": "src\\components\\workpaper\\l4\\classification\\L4TabFinLiabOther.vue",
-        "line": 147
+        "line": 148
       },
       {
         "file": "src\\components\\workpaper\\l4\\core\\L4TabAdjudication.vue",
-        "line": 193
+        "line": 202
       },
       {
         "file": "src\\components\\workpaper\\l4\\core\\L4TabAdjudication.vue",
-        "line": 364
+        "line": 379
       },
       {
         "file": "src\\components\\workpaper\\l4\\core\\L4TabAdjustment.vue",
@@ -7443,11 +7445,11 @@
       },
       {
         "file": "src\\components\\workpaper\\l5\\core\\L5TabAdjudication.vue",
-        "line": 158
+        "line": 168
       },
       {
         "file": "src\\components\\workpaper\\l5\\core\\L5TabAdjudication.vue",
-        "line": 379
+        "line": 397
       },
       {
         "file": "src\\components\\workpaper\\l5\\core\\L5TabAdjustment.vue",
@@ -7503,15 +7505,15 @@
       },
       {
         "file": "src\\components\\workpaper\\l6\\core\\L6TabAdjudication.vue",
-        "line": 30
+        "line": 26
       },
       {
         "file": "src\\components\\workpaper\\l6\\core\\L6TabAdjudication.vue",
-        "line": 278
+        "line": 283
       },
       {
         "file": "src\\components\\workpaper\\l6\\core\\L6TabAdjudication.vue",
-        "line": 332
+        "line": 337
       },
       {
         "file": "src\\components\\workpaper\\l6\\core\\L6TabAdjustment.vue",
@@ -7567,11 +7569,11 @@
       },
       {
         "file": "src\\components\\workpaper\\l7\\core\\L7TabAdjudication.vue",
-        "line": 20
+        "line": 16
       },
       {
         "file": "src\\components\\workpaper\\l7\\core\\L7TabAdjudication.vue",
-        "line": 258
+        "line": 263
       },
       {
         "file": "src\\components\\workpaper\\l7\\core\\L7TabAdjustment.vue",
@@ -7615,11 +7617,11 @@
       },
       {
         "file": "src\\components\\workpaper\\l8\\core\\L8TabAdjudication.vue",
-        "line": 21
+        "line": 17
       },
       {
         "file": "src\\components\\workpaper\\l8\\core\\L8TabAdjudication.vue",
-        "line": 215
+        "line": 211
       },
       {
         "file": "src\\components\\workpaper\\l8\\core\\L8TabAdjustment.vue",
@@ -7631,7 +7633,7 @@
       },
       {
         "file": "src\\components\\workpaper\\l8\\core\\L8TabDetail.vue",
-        "line": 245
+        "line": 254
       },
       {
         "file": "src\\components\\workpaper\\l8\\core\\L8TabDisclosureListed.vue",
@@ -7731,15 +7733,15 @@
       },
       {
         "file": "src\\components\\workpaper\\m1\\core\\M1TabAdjudication.vue",
-        "line": 272
+        "line": 281
       },
       {
         "file": "src\\components\\workpaper\\m1\\core\\M1TabAdjudication.vue",
-        "line": 325
+        "line": 334
       },
       {
         "file": "src\\components\\workpaper\\m1\\core\\M1TabAdjudication.vue",
-        "line": 563
+        "line": 581
       },
       {
         "file": "src\\components\\workpaper\\m1\\core\\M1TabAdjustment.vue",
@@ -7803,7 +7805,7 @@
       },
       {
         "file": "src\\components\\workpaper\\m1\\inspection\\M1TabDividendCheck.vue",
-        "line": 501
+        "line": 512
       },
       {
         "file": "src\\components\\workpaper\\m10\\core\\M10TabAdjudication.vue",
@@ -7811,11 +7813,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m10\\core\\M10TabAdjudication.vue",
-        "line": 406
+        "line": 415
       },
       {
         "file": "src\\components\\workpaper\\m10\\core\\M10TabAdjudication.vue",
-        "line": 668
+        "line": 686
       },
       {
         "file": "src\\components\\workpaper\\m10\\core\\M10TabAdjustment.vue",
@@ -7915,15 +7917,15 @@
       },
       {
         "file": "src\\components\\workpaper\\m2\\core\\M2TabAdjudication.vue",
-        "line": 364
+        "line": 373
       },
       {
         "file": "src\\components\\workpaper\\m2\\core\\M2TabAdjudication.vue",
-        "line": 426
+        "line": 435
       },
       {
         "file": "src\\components\\workpaper\\m2\\core\\M2TabAdjudication.vue",
-        "line": 702
+        "line": 720
       },
       {
         "file": "src\\components\\workpaper\\m2\\core\\M2TabAdjustment.vue",
@@ -7991,7 +7993,7 @@
       },
       {
         "file": "src\\components\\workpaper\\m2\\inspection\\M2TabCapitalCheck.vue",
-        "line": 405
+        "line": 416
       },
       {
         "file": "src\\components\\workpaper\\m3\\calc\\M3TabFxInvest.vue",
@@ -8011,19 +8013,19 @@
       },
       {
         "file": "src\\components\\workpaper\\m3\\core\\M3TabAdjudication.vue",
-        "line": 270
+        "line": 279
       },
       {
         "file": "src\\components\\workpaper\\m3\\core\\M3TabAdjudication.vue",
-        "line": 290
+        "line": 299
       },
       {
         "file": "src\\components\\workpaper\\m3\\core\\M3TabAdjudication.vue",
-        "line": 345
+        "line": 354
       },
       {
         "file": "src\\components\\workpaper\\m3\\core\\M3TabAdjudication.vue",
-        "line": 727
+        "line": 747
       },
       {
         "file": "src\\components\\workpaper\\m3\\core\\M3TabAdjustment.vue",
@@ -8079,15 +8081,15 @@
       },
       {
         "file": "src\\components\\workpaper\\m4\\core\\M4TabAdjudication.vue",
-        "line": 465
+        "line": 474
       },
       {
         "file": "src\\components\\workpaper\\m4\\core\\M4TabAdjudication.vue",
-        "line": 521
+        "line": 530
       },
       {
         "file": "src\\components\\workpaper\\m4\\core\\M4TabAdjudication.vue",
-        "line": 816
+        "line": 834
       },
       {
         "file": "src\\components\\workpaper\\m4\\core\\M4TabAdjustment.vue",
@@ -8187,11 +8189,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m5\\core\\M5TabAdjudication.vue",
-        "line": 290
+        "line": 299
       },
       {
         "file": "src\\components\\workpaper\\m5\\core\\M5TabAdjudication.vue",
-        "line": 501
+        "line": 516
       },
       {
         "file": "src\\components\\workpaper\\m5\\core\\M5TabAdjustment.vue",
@@ -8279,11 +8281,11 @@
       },
       {
         "file": "src\\components\\workpaper\\m6\\core\\M6TabAdjudication.vue",
-        "line": 298
+        "line": 307
       },
       {
         "file": "src\\components\\workpaper\\m6\\core\\M6TabAdjudication.vue",
-        "line": 508
+        "line": 524
       },
       {
         "file": "src\\components\\workpaper\\m6\\core\\M6TabAdjustment.vue",
@@ -8375,19 +8377,19 @@
       },
       {
         "file": "src\\components\\workpaper\\m7\\core\\M7TabAdjudication.vue",
-        "line": 250
+        "line": 259
       },
       {
         "file": "src\\components\\workpaper\\m7\\core\\M7TabAdjudication.vue",
-        "line": 308
+        "line": 317
       },
       {
         "file": "src\\components\\workpaper\\m7\\core\\M7TabAdjudication.vue",
-        "line": 564
+        "line": 582
       },
       {
         "file": "src\\components\\workpaper\\m7\\core\\M7TabAdjudication.vue",
-        "line": 566
+        "line": 584
       },
       {
         "file": "src\\components\\workpaper\\m7\\core\\M7TabAdjustment.vue",
@@ -8491,15 +8493,15 @@
       },
       {
         "file": "src\\components\\workpaper\\m8\\core\\M8TabAdjudication.vue",
-        "line": 259
+        "line": 268
       },
       {
         "file": "src\\components\\workpaper\\m8\\core\\M8TabAdjudication.vue",
-        "line": 321
+        "line": 330
       },
       {
         "file": "src\\components\\workpaper\\m8\\core\\M8TabAdjudication.vue",
-        "line": 545
+        "line": 561
       },
       {
         "file": "src\\components\\workpaper\\m8\\core\\M8TabAdjustment.vue",
@@ -8551,15 +8553,15 @@
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabAdjudication.vue",
-        "line": 485
+        "line": 494
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabAdjudication.vue",
-        "line": 548
+        "line": 557
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabAdjudication.vue",
-        "line": 783
+        "line": 801
       },
       {
         "file": "src\\components\\workpaper\\m9\\core\\M9TabAdjustment.vue",
@@ -8675,11 +8677,11 @@
       },
       {
         "file": "src\\components\\workpaper\\n1\\calc\\N1TabLossCheck.vue",
-        "line": 620
+        "line": 625
       },
       {
         "file": "src\\components\\workpaper\\n1\\calc\\N1TabLossCheck.vue",
-        "line": 644
+        "line": 649
       },
       {
         "file": "src\\components\\workpaper\\n1\\core\\N1TabAdjudication.vue",
@@ -8691,11 +8693,11 @@
       },
       {
         "file": "src\\components\\workpaper\\n1\\core\\N1TabAdjudication.vue",
-        "line": 657
+        "line": 651
       },
       {
         "file": "src\\components\\workpaper\\n1\\core\\N1TabAdjudication.vue",
-        "line": 660
+        "line": 654
       },
       {
         "file": "src\\components\\workpaper\\n1\\core\\N1TabAdjustment.vue",
@@ -8795,11 +8797,11 @@
       },
       {
         "file": "src\\components\\workpaper\\n2\\core\\N2TabAdjudication.vue",
-        "line": 602
+        "line": 598
       },
       {
         "file": "src\\components\\workpaper\\n2\\core\\N2TabAdjudication.vue",
-        "line": 624
+        "line": 620
       },
       {
         "file": "src\\components\\workpaper\\n2\\core\\N2TabAdjustment.vue",
@@ -8875,11 +8877,11 @@
       },
       {
         "file": "src\\components\\workpaper\\n2\\inspection\\N2TabTaxCheck.vue",
-        "line": 452
+        "line": 463
       },
       {
         "file": "src\\components\\workpaper\\n2\\inspection\\N2TabTaxCheck.vue",
-        "line": 474
+        "line": 485
       },
       {
         "file": "src\\components\\workpaper\\n3\\core\\N3TabAdjudication.vue",
@@ -8891,7 +8893,7 @@
       },
       {
         "file": "src\\components\\workpaper\\n3\\core\\N3TabAdjudication.vue",
-        "line": 742
+        "line": 737
       },
       {
         "file": "src\\components\\workpaper\\n3\\core\\N3TabAdjustment.vue",
@@ -8923,7 +8925,7 @@
       },
       {
         "file": "src\\components\\workpaper\\n4\\core\\N4TabAdjudication.vue",
-        "line": 561
+        "line": 556
       },
       {
         "file": "src\\components\\workpaper\\n4\\core\\N4TabAdjustment.vue",
@@ -9035,27 +9037,27 @@
       },
       {
         "file": "src\\components\\workpaper\\review\\GtWpAiReviewToolbar.vue",
-        "line": 14
+        "line": 16
       },
       {
         "file": "src\\components\\workpaper\\review\\GtWpAiReviewToolbar.vue",
-        "line": 20
+        "line": 22
       },
       {
         "file": "src\\components\\workpaper\\review\\GtWpAiReviewToolbar.vue",
-        "line": 23
+        "line": 30
       },
       {
         "file": "src\\components\\workpaper\\review\\GtWpAiReviewToolbar.vue",
-        "line": 29
+        "line": 36
       },
       {
         "file": "src\\components\\workpaper\\review\\GtWpAiReviewToolbar.vue",
-        "line": 49
+        "line": 56
       },
       {
         "file": "src\\components\\workpaper\\review\\GtWpAiReviewToolbar.vue",
-        "line": 64
+        "line": 72
       },
       {
         "file": "src\\components\\workpaper\\s-checklist\\S10AdjudicationSheet.vue",
@@ -9749,19 +9751,19 @@
       },
       {
         "file": "src\\components\\workpaper\\GtB22AControlMatrix.vue",
-        "line": 1870
+        "line": 1931
       },
       {
         "file": "src\\components\\workpaper\\GtB22BDeficiencyEvaluation.vue",
-        "line": 1100
+        "line": 1125
       },
       {
         "file": "src\\components\\workpaper\\GtB22CDesignEffectiveness.vue",
-        "line": 675
+        "line": 698
       },
       {
         "file": "src\\components\\workpaper\\GtB50RiskAssessment.vue",
-        "line": 1988
+        "line": 1990
       },
       {
         "file": "src\\components\\workpaper\\GtBadDebtSheet.vue",
@@ -9777,7 +9779,7 @@
       },
       {
         "file": "src\\components\\workpaper\\GtCControlTest.vue",
-        "line": 1439
+        "line": 1565
       }
     ]
   },
@@ -9792,12 +9794,12 @@
       ],
       "hits": [
         {
-          "file": "src\\views\\DisclosureEditor.vue",
-          "line": 2244
+          "file": "src\\views\\composables\\useNoteValidationMarks.ts",
+          "line": 87
         },
         {
           "file": "src\\views\\DisclosureEditor.vue",
-          "line": 3364
+          "line": 2109
         }
       ]
     },
@@ -9892,7 +9894,7 @@
     {
       "file": "src\\components\\consolidation\\worksheets\\EliminationSheet.vue",
       "kind": "emit_or_bind",
-      "line": 9
+      "line": 16
     },
     {
       "file": "src\\components\\consolidation\\worksheets\\EquitySimSheet.vue",
@@ -9952,7 +9954,7 @@
     {
       "file": "src\\components\\workpaper\\GtAuditSheet.vue",
       "kind": "emit_or_bind",
-      "line": 599
+      "line": 638
     },
     {
       "file": "src\\components\\workpaper\\GtCNoteTable.vue",
@@ -9966,17 +9968,32 @@
     "components/workpaper/GtWpToolbar.vue"
   ],
   "gc0_contract_version_expected": "1.0",
-  "generated_at_epoch": 1789277568,
+  "generated_at_epoch": 1791027815,
   "nodekey_payloads": [
     {
       "file": "src\\components\\consolidation\\worksheets\\ConsolWorksheetTabs.vue",
-      "line": 1472,
-      "nodeKey_literal": "sheetKey"
+      "line": 1348,
+      "nodeKey_literal": "`consol_${sheetKey"
     },
     {
-      "file": "src\\views\\ConsolidationIndex.vue",
-      "line": 737,
-      "nodeKey_literal": "'consolidation'"
+      "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCheck.vue",
+      "line": 173,
+      "nodeKey_literal": "'wp_d4_35'"
+    },
+    {
+      "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherContract.vue",
+      "line": 140,
+      "nodeKey_literal": "'wp_d4_34'"
+    },
+    {
+      "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherCutoff.vue",
+      "line": 171,
+      "nodeKey_literal": "'wp_d4_36'"
+    },
+    {
+      "file": "src\\components\\workpaper\\d4\\other\\D4TabOtherMargin.vue",
+      "line": 36,
+      "nodeKey_literal": "'wp_d4_33'"
     }
   ],
   "out_of_scope_domain_files": [
@@ -10149,11 +10166,11 @@
     },
     {
       "file": "src\\components\\workpaper\\d1\\D1TabSamplingVouching.vue",
-      "line": 688
+      "line": 702
     },
     {
       "file": "src\\components\\workpaper\\d1\\D1TabWriteoffCheck.vue",
-      "line": 918
+      "line": 938
     },
     {
       "file": "src\\components\\workpaper\\d2\\D2DerecognitionWizard.vue",
@@ -10181,39 +10198,43 @@
     },
     {
       "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCompleteness.vue",
-      "line": 462
+      "line": 477
     },
     {
       "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffBackward.vue",
-      "line": 444
+      "line": 487
     },
     {
       "file": "src\\components\\workpaper\\d4\\inspection\\D4TabCutoffForward.vue",
-      "line": 444
+      "line": 492
     },
     {
       "file": "src\\components\\workpaper\\d4\\inspection\\D4TabDiscount.vue",
-      "line": 378
+      "line": 423
     },
     {
       "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-      "line": 720
+      "line": 732
     },
     {
       "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-      "line": 735
+      "line": 747
     },
     {
       "file": "src\\components\\workpaper\\d4\\inspection\\D4TabOccurrence.vue",
-      "line": 755
+      "line": 767
     },
     {
       "file": "src\\components\\workpaper\\d4\\inspection\\D4TabReturn.vue",
-      "line": 696
+      "line": 723
+    },
+    {
+      "file": "src\\components\\workpaper\\d4\\ipo\\D4IpoFindingWriteback.vue",
+      "line": 162
     },
     {
       "file": "src\\components\\workpaper\\d4\\ipo\\D4TabInterviewDetail.vue",
-      "line": 331
+      "line": 385
     },
     {
       "file": "src\\components\\workpaper\\d5\\D5PreparationHandbookDialog.vue",
@@ -10297,7 +10318,7 @@
     },
     {
       "file": "src\\components\\workpaper\\e1\\E1TabBankFlowReconcile.vue",
-      "line": 1118
+      "line": 1131
     },
     {
       "file": "src\\components\\workpaper\\e1\\E1TabCutoffTest.vue",
@@ -10305,7 +10326,7 @@
     },
     {
       "file": "src\\components\\workpaper\\e1\\E1TabLargeCheck.vue",
-      "line": 465
+      "line": 505
     },
     {
       "file": "src\\components\\workpaper\\ECLCalcDialog.vue",
@@ -10693,7 +10714,7 @@
     },
     {
       "file": "src\\components\\workpaper\\GtA3ConsolidationConsole.vue",
-      "line": 93
+      "line": 113
     },
     {
       "file": "src\\components\\workpaper\\GtAProgramConsole.vue",
@@ -10717,7 +10738,7 @@
     },
     {
       "file": "src\\components\\workpaper\\GtAuditSheet.vue",
-      "line": 405
+      "line": 415
     },
     {
       "file": "src\\components\\workpaper\\GtB14DueDiligenceReport.vue",
@@ -10737,19 +10758,19 @@
     },
     {
       "file": "src\\components\\workpaper\\GtB22AControlMatrix.vue",
-      "line": 1762
+      "line": 1823
     },
     {
       "file": "src\\components\\workpaper\\GtB22AControlMatrix.vue",
-      "line": 1788
+      "line": 1849
     },
     {
       "file": "src\\components\\workpaper\\GtB22BDeficiencyEvaluation.vue",
-      "line": 789
+      "line": 814
     },
     {
       "file": "src\\components\\workpaper\\GtB22BDeficiencyEvaluation.vue",
-      "line": 799
+      "line": 824
     },
     {
       "file": "src\\components\\workpaper\\GtB30GroupAudit.vue",
@@ -10769,15 +10790,15 @@
     },
     {
       "file": "src\\components\\workpaper\\GtB50RiskAssessment.vue",
-      "line": 1733
+      "line": 1735
     },
     {
       "file": "src\\components\\workpaper\\GtB50RiskAssessment.vue",
-      "line": 1928
+      "line": 1930
     },
     {
       "file": "src\\components\\workpaper\\GtB50RiskAssessment.vue",
-      "line": 1947
+      "line": 1949
     },
     {
       "file": "src\\components\\workpaper\\GtC1EntityControl.vue",
@@ -10809,15 +10830,15 @@
     },
     {
       "file": "src\\components\\workpaper\\GtCControlTest.vue",
-      "line": 215
+      "line": 227
     },
     {
       "file": "src\\components\\workpaper\\GtCControlTest.vue",
-      "line": 359
+      "line": 371
     },
     {
       "file": "src\\components\\workpaper\\GtCControlTest.vue",
-      "line": 417
+      "line": 429
     },
     {
       "file": "src\\components\\workpaper\\GtChecklistTable.vue",
@@ -10917,7 +10938,7 @@
     },
     {
       "file": "src\\components\\workpaper\\h3\\core\\H3TabAdjudicationCost.vue",
-      "line": 73
+      "line": 83
     },
     {
       "file": "src\\components\\workpaper\\h3\\core\\H3TabAdjudicationFair.vue",
@@ -11193,7 +11214,7 @@
     },
     {
       "file": "src\\components\\workpaper\\k4\\core\\K4TabCheck.vue",
-      "line": 292
+      "line": 307
     },
     {
       "file": "src\\components\\workpaper\\k4\\K4PreparationHandbookDialog.vue",
@@ -11201,7 +11222,7 @@
     },
     {
       "file": "src\\components\\workpaper\\k5\\contingency\\K5TabLitigationCheck.vue",
-      "line": 159
+      "line": 166
     },
     {
       "file": "src\\components\\workpaper\\k5\\contingency\\K5TabProvisionCheck.vue",
@@ -11401,7 +11422,7 @@
     },
     {
       "file": "src\\components\\workpaper\\review\\GtWpAiReviewToolbar.vue",
-      "line": 27
+      "line": 34
     },
     {
       "file": "src\\components\\workpaper\\SamplingPanel.vue",
@@ -11410,6 +11431,14 @@
     {
       "file": "src\\components\\workpaper\\SamplingPanel.vue",
       "line": 151
+    },
+    {
+      "file": "src\\components\\workpaper\\shared\\BatchRefreshDialog.vue",
+      "line": 138
+    },
+    {
+      "file": "src\\components\\workpaper\\shared\\RefreshSourceDialog.vue",
+      "line": 18
     },
     {
       "file": "src\\components\\workpaper\\SharePaymentDialog.vue",

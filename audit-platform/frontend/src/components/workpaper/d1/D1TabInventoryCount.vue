@@ -478,6 +478,26 @@ const GUIDANCE_TEXTS = [
             </template>
           </el-table-column>
 
+          <!--
+            🔴 2026-09-28 补 Excel K 列「付款人名称」。
+            源模板 `应收票据监盘D1-10` 共 15 列（openpyxl 现读 R13 表头），Excel K 是付款人名称；
+            此前前端无此字段 ⇒ 该列 HTML 侧填不了，且每次 materialize 会把它写空
+            （缺键值 None ⇒ ""），擦掉审计师在 OO 侧填的内容。
+            📌 本文件其余列注释的字母是**前端旧顺序**、与 Excel 列不一致（如「F: 金额」
+               而 Excel 在 H），属既存文档不一致，已登记不在本次范围内修。
+          -->
+          <el-table-column label="付款人" min-width="100">
+            <template #default="{ row }: { row: InventoryCountRow }">
+              <el-input
+                :model-value="row.payer"
+                size="small"
+                placeholder="付款人名称"
+                :disabled="isReadonly"
+                @change="(v: string) => updateRow(row.id, 'payer', v || '')"
+              />
+            </template>
+          </el-table-column>
+
           <!-- K: 被背书人 -->
           <el-table-column label="被背书人" min-width="100">
             <template #default="{ row }: { row: InventoryCountRow }">

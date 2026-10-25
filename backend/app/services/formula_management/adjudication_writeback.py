@@ -140,7 +140,43 @@ class AdjudicationWritebackService:
         occurrence = await fetch_occurrence_by_standard_code(self.db, project_id, year)
         merge_occurrence_into_tb_data(tb_data, occurrence)
 
-        return FormulaContext(tb_data=tb_data)
+        # ── 调整额实时汇总（供 `ADJ()` 函数）──
+        #
+        # spec: tb-adjustment-column-formula-closure Phase 1 Task 1.8
+        #
+        # 🔴 与上面 `tb_data` 的 `AJE调整`/`RJE调整` 是**两个口径**，刻意并存：
+        #   - `tb_data["AJE调整"]`  ← `trial_balance.aje_adjustment`（持久化快照）
+        #   - `adj_data["aje_net"]` ← `adj_net_batch`（按当前 approved 分录实时汇总）
+        # 两者不等即说明快照过期（需求 3.3 要暴露的信号），**禁**在此"对齐"它们 ——
+        # 那会把差异掩盖掉，正是本 spec 要消除的那类掩盖。
+        #
+        # fail-open：调整额取数失败不阻断回写主流程（与上面 occurrence 同策略），
+        # 失败时 `ADJ()` 返 0 —— 与"该科目无调整"同形，故必须留 warning。
+        adj_data: dict[str, dict[str, Decimal]] = {}
+        try:
+            from app.services.adjustment_amount_source import (
+                DEFAULT_INCLUDE_STATUSES,
+                adj_net_batch,
+            )
+
+            adj_data = await adj_net_batch(
+                self.db,
+                project_id=project_id,
+                year=year,
+                account_codes=set(tb_data.keys()),
+                include_statuses=DEFAULT_INCLUDE_STATUSES,
+                exclude_origins=frozenset({"workpaper"}),
+            )
+        except Exception:
+            logger.warning(
+                "审定表回写：调整额实时汇总失败（project=%s year=%s），"
+                "ADJ() 将返 0",
+                project_id,
+                year,
+                exc_info=True,
+            )
+
+        return FormulaContext(tb_data=tb_data, adj_data=adj_data)
 
     # ─── 单条公式回写 ────────────────────────────────────────────────────────
     async def writeback_formula(

@@ -14,6 +14,9 @@
           size="small"
           @change="procedureDualMode.onModeChange"
         />
+        <!-- BP-7 / AC 1.4：能力诚实披露。文案真源在 sync/workpaperEntrySyncNotice.ts，
+             已注册 bidirectional 的 entry 自动返 null 不渲染 ⇒ 无需本地条件。 -->
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-l2-interest-payable" />
         <el-tag v-if="!procedureDualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
@@ -134,6 +137,7 @@ const L2TabInterestCheck = defineAsyncComponent(() => import('./l2/inspection/L2
 
 // Shared
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

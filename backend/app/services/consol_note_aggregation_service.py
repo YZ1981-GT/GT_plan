@@ -262,20 +262,28 @@ def _calculate_elimination_from_rules(elimination_rules: list[dict]) -> Decimal:
 
 
 async def _get_child_projects(consol_project_id: UUID, child_filter: dict, db: Any = None) -> list[dict]:
-    """获取合并项目的子公司列表."""
+    """合并附注的取数来源：企业树全部**有单体项目的数据叶子**（母公司/本部、分公司、子公司）。
+
+    口径变更（spec consol-tree-three-code-autobuild 任务 7.5，有意）：旧实现取根的全部后代节点，
+    三码树里差额节点、汇总节点没有自己的单体附注（``project_id`` 为空），而母公司本体数据是根下的
+    「母公司 / 本部」数据节点 —— 现只取数据叶子，与合并试算个别数同一集合。
+    """
     if child_filter.get("subsidiaries"):
         return [{"project_id": UUID(sid) if isinstance(sid, str) else sid}
                 for sid in child_filter["subsidiaries"]]
     if db is None:
         return []
     try:
-        from app.services.consol_tree_service import build_tree, get_descendants
+        from app.services.consol_calc_basis import data_leaves
+        from app.services.consol_tree_service import build_tree
         tree = await build_tree(db, consol_project_id)
         if tree is None:
             return []
-        descendants = get_descendants(tree)
-        return [{"project_id": n.project_id, "company_name": n.company_name,
-                 "company_code": n.company_code} for n in descendants]
+        return [
+            {"project_id": n.project_id, "company_name": n.company_name,
+             "company_code": n.company_code, "node_key": n.node_key, "role": n.role}
+            for n in data_leaves(tree) if n.project_id is not None
+        ]
     except Exception as err:
         logger.warning("Failed to get child projects: %s", err)
         return []

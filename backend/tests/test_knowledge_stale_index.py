@@ -20,6 +20,7 @@ from app.services.ai_content_gate import (
     validate_citations_freshness,
 )
 from app.services.knowledge_index_service import KnowledgeIndexService
+from tests._kb_mock_session import make_retrieval_session
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +99,7 @@ class TestMarkIndexStale:
     @pytest.mark.asyncio
     async def test_mark_stale_updates_rows(self):
         """mark_index_stale 应将匹配的 chunk 标记为 stale。"""
-        mock_db = AsyncMock()
+        mock_db = make_retrieval_session()
         mock_result = MagicMock()
         mock_result.rowcount = 3
         mock_db.execute = AsyncMock(return_value=mock_result)
@@ -112,7 +113,7 @@ class TestMarkIndexStale:
     @pytest.mark.asyncio
     async def test_mark_stale_no_existing_chunks(self):
         """无匹配 chunk 时 mark_index_stale 返回 0。"""
-        mock_db = AsyncMock()
+        mock_db = make_retrieval_session()
         mock_result = MagicMock()
         mock_result.rowcount = 0
         mock_db.execute = AsyncMock(return_value=mock_result)
@@ -134,7 +135,7 @@ class TestClearIndexStale:
     @pytest.mark.asyncio
     async def test_clear_stale_updates_rows(self):
         """clear_index_stale 应清除匹配 chunk 的 stale 标记。"""
-        mock_db = AsyncMock()
+        mock_db = make_retrieval_session()
         mock_result = MagicMock()
         mock_result.rowcount = 5
         mock_db.execute = AsyncMock(return_value=mock_result)
@@ -213,7 +214,7 @@ class TestIsSourceStale:
     @pytest.mark.asyncio
     async def test_source_with_only_stale_chunks_is_stale(self):
         """所有 chunk 都 stale 时返回 True。"""
-        mock_db = AsyncMock()
+        mock_db = make_retrieval_session()
         # stale_count=3, fresh_count=0
         mock_result = MagicMock()
         mock_result.one_or_none.return_value = (3, 0)
@@ -225,7 +226,7 @@ class TestIsSourceStale:
     @pytest.mark.asyncio
     async def test_source_with_fresh_chunks_not_stale(self):
         """存在 fresh chunk 时返回 False。"""
-        mock_db = AsyncMock()
+        mock_db = make_retrieval_session()
         mock_result = MagicMock()
         mock_result.one_or_none.return_value = (2, 5)
         mock_db.execute = AsyncMock(return_value=mock_result)
@@ -236,7 +237,7 @@ class TestIsSourceStale:
     @pytest.mark.asyncio
     async def test_source_with_no_chunks_not_stale(self):
         """无 chunk 时返回 False。"""
-        mock_db = AsyncMock()
+        mock_db = make_retrieval_session()
         mock_result = MagicMock()
         mock_result.one_or_none.return_value = None
         mock_db.execute = AsyncMock(return_value=mock_result)

@@ -35,6 +35,7 @@
             size="default"
           />
         </el-tooltip>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-a115-disclosure-checklist" />
 
         <el-input
           v-model="searchQuery"
@@ -361,7 +362,7 @@
  * - HTML 模式：左 SectionNav + 右 ChecklistBody
  * - DOCX 模式：GtOnlyOfficeSheet
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick, toRef } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick, toRef, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import { Search, Loading, WarningFilled } from '@element-plus/icons-vue'
 import GtOnlyOfficeSheet from '@/components/workpaper/GtOnlyOfficeSheet.vue'
@@ -372,6 +373,13 @@ import { api } from '@/services/apiProxy'
 
 // ─── Component Options ──────────────────────────────────────────────────────
 
+import { useWorkpaperSyncBridge } from './sync/useWorkpaperSyncBridge'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+
+const WorkpaperSyncEditorHost = defineAsyncComponent(() => import('./sync/WorkpaperSyncEditorHost.vue'))
 defineOptions({ name: 'GtA115DisclosureChecklist' })
 
 // ─── Props ──────────────────────────────────────────────────────────────────
@@ -379,7 +387,7 @@ defineOptions({ name: 'GtA115DisclosureChecklist' })
 const props = withDefaults(defineProps<{
   wpId: string
   readonly?: boolean
-}>(), {
+; projectId?: string }>(), {
   readonly: false,
 })
 
@@ -594,6 +602,33 @@ function onOnlyofficeFallback() {
 }
 
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
+
+
+// ─── sync bridge（替代 legacy mode + GtOnlyOfficeSheet）───
+const _ENTRY_ID = 'xlsx/gt-a115-disclosure-checklist'
+const _SHEET_KEY = 'a115disclosurechecklist-managed'
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(_ENTRY_ID),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(_SHEET_KEY),
+  capability: capabilityForEntry(_ENTRY_ID),
+  flushHtml: async () => {
+    if (typeof flushPendingSave === 'function') flushPendingSave()
+    else if (typeof flushPendingSaves === 'function') flushPendingSaves()
+    // 🔴 降级保护：本 entry 的 capability 仍是 single_onlyoffice（后端无 per-entry
+    //    adapter）⇒ readStoreProjection 会 404。捕获后返回空投影，让 OO 走「无投影」
+    //    路径（与改线前 legacy 行为等价）。capability 升 bidirectional 后自动失效。
+    try {
+      const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: _ENTRY_ID })
+      return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: _SHEET_KEY }
+    } catch {
+      return { expectedRevision: 0, projection: null, sheetKey: _SHEET_KEY }
+    }
+  },
+  reloadHtml: async () => { if (typeof loadData === 'function') await loadData(props.wpId); else if (typeof refreshData === 'function') await refreshData(props.wpId) },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 
 onMounted(async () => {
   await loadData()

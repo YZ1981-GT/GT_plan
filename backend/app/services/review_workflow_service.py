@@ -152,7 +152,7 @@ class ReviewWorkflowService:
         # P1-4: 提交后推送 SSE 通知下一级复核人
         if submit:
             try:
-                from app.core.event_bus import event_bus
+                from app.services.event_bus import event_bus
                 from app.models.audit_platform_schemas import EventPayload, EventType
                 event_bus.broadcast_raw(
                     "review_submitted",

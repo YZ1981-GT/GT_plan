@@ -40,8 +40,11 @@ from tests.workpaper_sync.l1_adapter_facts import (  # noqa: E402
     MANAGED_FORMULA_COLUMNS,
     MANAGED_FORMULA_SHAPES,
     MANAGED_GEOMETRY,
+    LATEST_L_PAYLOAD,
+    LATEST_SUPPLY,
     MEASURED_L_PAYLOAD_2026_09_28,
     MEASURED_SUPPLY_2026_09_28,
+    SUPPLY_READINGS,
     _count_bare_if,
     _entry,
     _is_formula,
@@ -76,7 +79,9 @@ class TestBP611PremiseInvalidated:
             "FROM working_paper_content_representation"
         )
         live = {k: n for k, n in rows}
-        reg = MEASURED_SUPPLY_2026_09_28["row_counts"]
+        # 🔴 与**最新**登记读数比（append-only 时间线，见 l1_adapter_facts.SUPPLY_READINGS）。
+        # 回退时不放宽判据，而是按本断言的提示追加新读数条目并写明原因 —— 2026-10-01 即此。
+        reg = LATEST_SUPPLY["row_counts"]
         assert live["entry_state"] >= reg["working_paper_sync_entry_state"], (
             f"entry_state 行数 {live['entry_state']} < 登记 "
             f"{reg['working_paper_sync_entry_state']} ⇒ 登记读数须追加新条目说明回退原因"
@@ -84,16 +89,50 @@ class TestBP611PremiseInvalidated:
         assert live["content_version"] >= reg["working_paper_content_version"]
         assert live["representation"] >= reg["working_paper_content_representation"]
 
-    def test_entry_state_covers_at_least_eleven_entries(self) -> None:
-        """LR-P1：真正推翻「一个都注册不上」的是 entry 覆盖面，不是行数。"""
+    def test_every_regression_in_the_timeline_is_explained(self) -> None:
+        """读数时间线里任一次下降，都必须带 `regressed_from` + `regression_cause`。
+
+        没有这条，「追加一条更小的读数」就成了让守卫变绿的后门。
+        """
+        for prev, cur in zip(SUPPLY_READINGS, SUPPLY_READINGS[1:]):
+            dropped = [
+                k for k, v in cur["row_counts"].items() if v < prev["row_counts"][k]
+            ]
+            if not dropped:
+                continue
+            assert cur.get("regressed_from") == prev["measured_at"], (
+                f"{cur['measured_at']} 读数在 {dropped} 上回退却未声明 regressed_from"
+            )
+            assert cur.get("regression_cause"), (
+                f"{cur['measured_at']} 读数回退却未写 regression_cause"
+            )
+
+    def test_entry_state_covers_registered_entries(self) -> None:
+        """LR-P1：最新登记过的 entry 必须仍在真库（覆盖面只许增长）。"""
         rows = _query(
             "SELECT DISTINCT entry_id FROM working_paper_sync_entry_state ORDER BY entry_id"
         )
         live = {r[0] for r in rows}
-        registered = set(MEASURED_SUPPLY_2026_09_28["entry_state_entry_ids"])
-        assert len(live) >= 11, f"entry 覆盖数 {len(live)} < 11 ⇒ 前提复核结论失真"
-        missing = registered - live
+        missing = set(LATEST_SUPPLY["entry_state_entry_ids"]) - live
         assert not missing, f"登记过的 entry 在真库消失：{sorted(missing)}"
+        assert L1_ENTRY_ID in live, "本 spec task 7b 首发的 L1 representation 不在 entry_state"
+
+    def test_bp611_verdict_follows_the_readings(self) -> None:
+        """LR-P2：09-28 读数判「已解除」，10-01 本地回退后同一裁决函数判「未解除」。
+
+        🔴 这正是「解除理由是 entry 覆盖面」的价值：数据一回退，结论跟着翻，不会假绿。
+        平台层的「BP-61-1 已解除」结论来自 09-28 的 11 entry 实证，不受本地库回退影响；
+        但**本地**已不能复现它，故如实标注。
+        """
+        first, latest = SUPPLY_READINGS[0], LATEST_SUPPLY
+        assert _bp611_released(
+            row_total=sum(first["row_counts"].values()),
+            entry_coverage=len(first["entry_state_entry_ids"]),
+        ) is True
+        assert _bp611_released(
+            row_total=sum(latest["row_counts"].values()),
+            entry_coverage=len(latest["entry_state_entry_ids"]),
+        ) is False
 
     def test_release_verdict_is_driven_by_entry_coverage_not_row_counts(self) -> None:
         """LR-P2：变异 —— 行数非空但 entry 覆盖为 0 时，结论必须翻回「仍阻塞」。
@@ -116,7 +155,22 @@ class TestBP611PremiseInvalidated:
             "'xlsx/gt-d6-contract-assets','xlsx/gt-d7-contract-liabilities')"
         )
         have_rep = {r[0] for r in rows}
-        assert len(have_rep) == 4, f"D3/D5/D6/D7 应都有 representation，实得 {sorted(have_rep)}"
+        # 期望集合取自最新读数（10-01 本地回退后 D3/D5/D6/D7 均不在库）；
+        # 只许「最新读数里有的」仍在，不许凭空要求已登记消失的行回来。
+        expected = {
+            e for e in LATEST_SUPPLY["entry_state_entry_ids"]
+            if e in {
+                "xlsx/gt-d3-prepaid-accounts", "xlsx/gt-d5-receivables-financing",
+                "xlsx/gt-d6-contract-assets", "xlsx/gt-d7-contract-liabilities",
+            }
+        }
+        assert expected <= have_rep, f"D3/D5/D6/D7 中应在库的 {sorted(expected)}，实得 {sorted(have_rep)}"
+        # 结论的 manifest 侧不依赖库：四条在 manifest 仍是 legacy（治理动作尚未执行）
+        for entry_id in (
+            "xlsx/gt-d3-prepaid-accounts", "xlsx/gt-d5-receivables-financing",
+            "xlsx/gt-d6-contract-assets", "xlsx/gt-d7-contract-liabilities",
+        ):
+            assert _entry(entry_id).get("migration_state") == "legacy_fake_bidirectional"
         for entry_id in sorted(have_rep):
             state = _entry(entry_id).get("migration_state")
             assert state == "legacy_fake_bidirectional", (
@@ -169,7 +223,7 @@ class TestLDomainRealPayload:
         self, live: dict[str, dict[str, int]]
     ) -> None:
         """LR-P3：登记读数与真库双向一致（只允许增长，减少必须显式说明）。"""
-        for cyc, reg in MEASURED_L_PAYLOAD_2026_09_28.items():
+        for cyc, reg in LATEST_L_PAYLOAD.items():
             assert cyc in live, f"登记过的 {cyc} 在真库消失"
             assert live[cyc]["rows"] >= reg["rows"], (
                 f"{cyc} 行数 {live[cyc]['rows']} < 登记 {reg['rows']}"

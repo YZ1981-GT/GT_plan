@@ -372,6 +372,7 @@ async def d5_import_aux_balance(
             "category": "应收账款",
             "itemName": entry.aux_name,
             "priorUnadjusted": entry.opening,
+            "source_kind": "aux_balance_import",
         })
 
     # 写入（merge模式：保留已有行、追加新客户）

@@ -340,6 +340,9 @@ PILOT_ADAPTER_ID: Final[str] = "d2.receivable_detail"
 #: matcher 的 wp_code 集合 —— 取自本 entry 的 `wp_match.wp_code_patterns`。
 PILOT_WP_CODES: Final[frozenset[str]] = frozenset({"D2A"})
 
+#: 冻结的 scenario profile（与 D3/D5/D6/D7 同值，standard 24 conditions）。
+EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
+
 #: `backend/wp_templates/` 下的权威模板（🔴 `D2-4` 与 `应收账款` 之间是两个空格）。
 TEMPLATE_RELATIVE_PATH: Final[str] = (
     "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx"
@@ -835,6 +838,21 @@ def assert_dynamic_family_is_unreachable_for_xlsx_entries(
     return {"dynamic": tuple(dynamic), "xlsx_dynamic": (), "total": len(entries)}
 
 
+# ─── 上游欠账登记 ───────────────────────────────────────────────────────────
+
+UPSTREAM_DEBT_DYNAMIC_FAMILY_GATED_ON_MOUNT_CARDINALITY: Final[str] = (
+    "Task 41 欠账（本任务首次登记）："
+    "`evidence.derive_for_manifest_entry` 只在 "
+    '`scenario_profile.mount_cardinality == "dynamic"` 时追加 DYNAMIC_SCENARIOS，而该'
+    "字段量的是**前端宿主挂载基数**（v-for 挂几个 OO 编辑器），不是「受管表有没有动态"
+    "行」。实测全 manifest 186 条里只有 1 条为 dynamic 且是 docx ⇒ "
+    "`dynamic_row_add_delete_reorder_copy`（AC 6.9）对**任何 xlsx entry** 都进不了"
+    " required set，包括本 D2 pilot。"
+    "修法需要把 contract 的 row_identity 声明喂进 required-set 推导"
+    "（即「有 row_identity ⇒ 动态族可达」），但那是 evidence 引擎的改动。"
+)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 4. instrumentation spec 与 definition payloads
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1039,8 +1057,16 @@ def build_contract_payload() -> dict[str, Any]:
         "review_status": "reviewed",
         "document_type": "xlsx",
         "template_definition_sha256": canonical_digest(template_payload),
+        # 🔴 2026-10-03：与 orchestrator 的 publish_definitions 保持一致——用单数路径
+        # （orchestrator 的 instrumentation_definition_payload 走 build_instrumentation_payload
+        # 而非 build_instrumentation_payload_for_sheets），否则发布的 digest 与契约声明不一致。
         "instrumentation_definition_sha256": canonical_digest(
-            instrumentation_definition_payload()
+            build_instrumentation_payload(
+                spec=instrumentation_spec(),
+                template_definition_sha256=canonical_digest(template_payload),
+                template_sha256=TEMPLATE_SHA256,
+                gate=excel_carrier_gate(),
+            )
         ),
         "template": {
             "relative_path": TEMPLATE_RELATIVE_PATH,
@@ -1332,446 +1358,59 @@ def build_combined_store_projection(
 # 7. 发布（顺序由 Task 12 的 publisher 强制）
 # ═══════════════════════════════════════════════════════════════════════════
 
-
-@dataclass(frozen=True)
-class PilotDefinitions:
-    """本 pilot 一次完整发布的四个 definition + 一个 non-null bundle。"""
-
-    authority_model_definition_id: uuid.UUID
-    authority_model_definition_sha256: str
-    template_definition_id: uuid.UUID
-    template_definition_sha256: str
-    instrumentation_definition_id: uuid.UUID
-    instrumentation_definition_sha256: str
-    contract_definition_id: uuid.UUID
-    contract_definition_sha256: str
-    bundle_id: uuid.UUID
-    bundle_sha256: str
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "entry_id": PILOT_ENTRY_ID,
-            "adapter_id": PILOT_ADAPTER_ID,
-            "authority_model": AUTHORITY_MODEL.value,
-            "authority_model_definition_id": str(self.authority_model_definition_id),
-            "authority_model_definition_sha256": self.authority_model_definition_sha256,
-            "template_definition_id": str(self.template_definition_id),
-            "template_definition_sha256": self.template_definition_sha256,
-            "instrumentation_definition_id": str(self.instrumentation_definition_id),
-            "instrumentation_definition_sha256": self.instrumentation_definition_sha256,
-            "contract_definition_id": str(self.contract_definition_id),
-            "contract_definition_sha256": self.contract_definition_sha256,
-            "definition_bundle_id": str(self.bundle_id),
-            "definition_bundle_sha256": self.bundle_sha256,
-        }
-
-
-async def publish_pilot_definitions(publisher: Any) -> PilotDefinitions:
-    """按 `template → instrumentation → contract → bundle` 发布本 entry 自己的身份。
-
-    :param publisher: Task 12 的
-        :class:`~app.services.workpaper_sync.definitions.DefinitionPublisher`。
-        顺序、payload 校验、DAG 前置与 bundle slot 规范化全部由它负责 —— 本函数只
-        编排，不复制判据。
-
-    🔴 authority model 独立先发布：它是 bundle 的必填 child，而 `PUBLISH_DAG` 只管
-    template/instrumentation/contract 三段。
-    """
-    contract = assert_contract_file_matches_source()
-
-    authority = await publisher.publish_definition(
-        kind=DefinitionKind.authority_model,
-        payload=authority_model_payload(),
-        logical_id=f"{PILOT_ADAPTER_ID}.authority-model",
-        semantic_version="1.0.0",
-    )
-    template_payload = template_definition_payload()
-    template = await publisher.publish_definition(
-        kind=DefinitionKind.template,
-        payload=template_payload,
-        logical_id=f"{PILOT_ADAPTER_ID}.template",
-        semantic_version="1.0.0",
-        blob_bytes=read_authoritative_template(),
-        structure_hash=template_payload["normalized_structure_hash"],
-    )
-    instrumentation = await publisher.publish_definition(
-        kind=DefinitionKind.instrumentation,
-        payload=instrumentation_definition_payload(),
-        logical_id=f"{PILOT_ADAPTER_ID}.instrumentation",
-        semantic_version="1.0.0",
-    )
-    contract_definition = await publisher.publish_definition(
-        kind=DefinitionKind.contract,
-        payload=dict(contract.canonical_payload),
-        logical_id=PILOT_ADAPTER_ID,
-        semantic_version=contract.semantic_version,
-    )
-    if template.sha256 != contract.template_definition_sha256:
-        raise PilotSelectionError(
-            f"已发布 template definition digest {template.sha256} 与契约声明的 "
-            f"{contract.template_definition_sha256} 不一致 —— 单向引用断裂"
-        )
-    if instrumentation.sha256 != contract.instrumentation_definition_sha256:
-        raise PilotSelectionError(
-            f"已发布 instrumentation definition digest {instrumentation.sha256} 与契约声明的 "
-            f"{contract.instrumentation_definition_sha256} 不一致 —— 单向引用断裂"
-        )
-
-    bundle = await publisher.publish_bundle(
-        authority_model_definition_id=authority.definition_id,
-        authority_model=AUTHORITY_MODEL,
-        authority_model_definition_sha256=authority.sha256,
-        slots={
-            BundleSlot.template: {
-                "type": "definition",
-                "ref": f"definition:{template.definition_id}",
-                "digest": template.sha256,
-            },
-            BundleSlot.instrumentation: {
-                "type": "definition",
-                "ref": f"definition:{instrumentation.definition_id}",
-                "digest": instrumentation.sha256,
-            },
-            BundleSlot.contract: {
-                "type": "definition",
-                "ref": f"definition:{contract_definition.definition_id}",
-                "digest": contract_definition.sha256,
-            },
-        },
-    )
-    return PilotDefinitions(
-        authority_model_definition_id=authority.definition_id,
-        authority_model_definition_sha256=authority.sha256,
-        template_definition_id=template.definition_id,
-        template_definition_sha256=template.sha256,
-        instrumentation_definition_id=instrumentation.definition_id,
-        instrumentation_definition_sha256=instrumentation.sha256,
-        contract_definition_id=contract_definition.definition_id,
-        contract_definition_sha256=contract_definition.sha256,
-        bundle_id=bundle.bundle_id,
-        bundle_sha256=bundle.canonical_sha256,
-    )
-
-
 # ═══════════════════════════════════════════════════════════════════════════
-# 8. adapter 注册与宿主接线
+# 7. 共享发布编排（Task 18 声明化：D2 的 pilot_ 前缀版）
 # ═══════════════════════════════════════════════════════════════════════════
 
-
-def build_pilot_matcher() -> EntryMatcher:
-    """本 entry 的匹配域（精确 wp_code 集合，不用 glob）。"""
-    return EntryMatcher(document_type="xlsx", wp_codes=PILOT_WP_CODES)
-
-
-def build_pilot_registration(
-    *,
-    adapter: Any,
-    bundle: Any,
-    descriptor: DescriptorFacts,
-    room: RoomFacts,
-    contract: SyncContract | None = None,
-) -> AdapterRegistration:
-    """组一条注册记录。
-
-    `declared_capability` 恒为 `bidirectional`：manifest 侧的 capability 也必须是
-    `bidirectional`（overlay 裁决后），两侧不一致时 `registry.register()` 会打红 ——
-    这条不能靠这里"填对"。
-    """
-    return AdapterRegistration(
-        adapter=adapter,
-        entry_id=PILOT_ENTRY_ID,
-        matcher=build_pilot_matcher(),
-        bundle=bundle,
-        descriptor=descriptor,
-        room=room,
-        declared_capability=Capability.bidirectional,
-        contract=contract if contract is not None else load_pilot_contract(),
-    )
-
-
-def register_pilot_adapter(
-    registry: WorkpaperSyncAdapterRegistry,
-    *,
-    adapter: Any,
-    bundle: Any,
-    descriptor: DescriptorFacts,
-    room: RoomFacts,
-    contract: SyncContract | None = None,
-) -> AdapterRegistration:
-    """把本 pilot 注册进 registry（全部准入判据由 `registry.register()` 执行）。"""
-    registration = build_pilot_registration(
-        adapter=adapter, bundle=bundle, descriptor=descriptor, room=room, contract=contract
-    )
-    registry.register(registration)
-    return registration
-
-
-#: 🔴 **登记的上游缺口 ②（本任务新发现）**：AC 6.9 自己的场景对 xlsx entry 结构性不可达。
-#:
-#: 由 :func:`assert_dynamic_family_is_unreachable_for_xlsx_entries` 把它变成可打红的
-#: 实测事实；缺口一旦被上游修掉，那个函数会抛错，提醒撤销本条登记。
-UPSTREAM_DEBT_DYNAMIC_FAMILY_GATED_ON_MOUNT_CARDINALITY: Final[str] = (
-    "Task 41 欠账：`evidence.derive_for_manifest_entry` 只在 "
-    "`scenario_profile.mount_cardinality == \"dynamic\"` 时追加 DYNAMIC_SCENARIOS，而该"
-    "字段量的是**前端宿主挂载基数**（v-for 挂几个 OO 编辑器），不是「受管表有没有动态"
-    "行」。实测全 manifest 只有 1 条 entry 为 dynamic 且是 docx ⇒ AC 6.9 自己的场景 "
-    "`dynamic_row_add_delete_reorder_copy`（生产落点 excel_extract.extract_projection）"
-    "对**任何 xlsx entry** 都进不了 required set，包括 AC 6.9/6.12 点名的 D2 与 Tasks "
-    "42/43 的 H1/G7。修法需要把 contract 的 row_identity 声明喂进 required-set 推导"
-    "（会改动 H1/G7 的 required digest），属设计级变更。owner 建议归 evidence 推导侧"
-    "（Task 39 后续）；在此之前 Property 27 落在 merge 家族两条场景上，用真实 1260 行"
-    "载荷跑 delete/update oracle"
+from app.services.workpaper_sync.phase5_entry_orchestration import (  # noqa: E402
+    Phase5EntryConfig,
+    build_orchestration,
 )
 
+_orch = build_orchestration(Phase5EntryConfig(
+    phase5_wave=PILOT_CLASS,
+    entry_id=PILOT_ENTRY_ID,
+    adapter_id=PILOT_ADAPTER_ID,
+    wp_codes=PILOT_WP_CODES,
+    expected_profile_id=EXPECTED_PROFILE_ID,
+    template_relative_path=TEMPLATE_RELATIVE_PATH,
+    template_sha256=TEMPLATE_SHA256,
+    managed_sheet=MANAGED_SHEET,
+    template_id=TEMPLATE_ID,
+    sheet_key=SHEET_KEY,
+    rows_table_key=ROWS_TABLE_KEY,
+    first_data_row=FIRST_DATA_ROW,
+    last_data_row=LAST_DATA_ROW,
+    footer_row=FOOTER_ROW,
+    managed_last_col=MANAGED_LAST_COL,
+    uuid_col=UUID_COL,
+    table_name=TABLE_NAME,
+    authority_model=AUTHORITY_MODEL,
+    footer_marker=FOOTER_MARKER,
+    store_item_id=STORE_ITEM_ID,
+    error_code_prefix="sync_pilot_d2",
+    build_contract_payload_fn=build_contract_payload,
+))
 
-#: ✅ **原「上游缺口 ③」已由 BP-22 修掉，登记随之删除**（2026-09-05）。
-#:
-#: 原缺口：`value_type=boolean` 的 Excel 格端到端不自洽 —— `_write_kind_for` 把它归
-#: `CellWriteKind.number_literal` ⇒ 落盘 `<c r="AK13"><v>1</v></c>`（无 `t="b"`）⇒
-#: extract 用 openpyxl 读回 **int 1** ⇒ `merge.normalize_value(1, boolean)` 明令拒绝折叠
-#: ⇒ **每一行**该字段一条 `type_normalization_failure`。本 entry 的首版发布因此卡在
-#: `roundtrip_verified`（`ValueNormalizationError … 实得 0`）。
-#:
-#: 修法取当时登记的第一条：`excel_materialize` 新增 `CellWriteKind.boolean_literal`，
-#: 落 OOXML **真布尔格** `t="b"` + `<v>1|0</v>`，`None` 落空格（不是 `<v>0</v>` ——
-#: 后者把「未填」变成「填了 false」，对「是否函证」是实质性语义错误）。
-#:
-#: **没有**取第二条（让 `normalize_value` 折叠 0/1）：那条拒绝是对的，折叠会让
-#: 「整数 1 被当成 true」这类真实类型错误静默通过。也**没有**改 `value_type`：
-#: `is_confirmation` 的类型真源是前端 `useD2Detail.DetailRow.isConfirmation: boolean`，
-#: 改成 `text`/`enum` 就得自造 bool→「是/否」映射（Requirement 6.1 禁止无来源自造字段）。
-#:
-#: 现由守卫 `TestBooleanCellRoundTripsThroughARealOoxmlBooleanCell` 钉住修复后的形态，
-#: 其中一条用 `hasattr` 断言本常量**已真删**（字符串判据会被本段说明满足）。
+# ── 导出工厂产出的名字（用 D2 的 pilot_ 命名，裁决 6：pilot 前缀保留为别名）──
+PilotDefinitions = _orch.Phase5Definitions
+TemplateResolutionFacts = _orch.TemplateResolutionFacts
 
+# 🔴 保留 pilot_ 作主名字（Task 18 裁决 6），Phase5 版作别名（工厂用的名字）
+publish_pilot_definitions = _orch.publish_definitions
+attach_pilot_adapters = _orch.attach_adapters
+build_pilot_matcher = _orch.build_matcher
+build_pilot_registration = _orch.build_registration
+register_pilot_adapter = _orch.register_adapter
+resolve_published_frozen_definitions = _orch.resolve_published_frozen_definitions
+manifest_capability_enabled = _orch.manifest_capability_enabled
+assert_manifest_capability_enabled = _orch.assert_manifest_capability_enabled
+load_pilot_contract = _orch.load_contract_from_disk
+assert_contract_file_matches_source = _orch.assert_contract_file_matches_source
+contract_file_path = _orch.contract_file_path
 
-async def resolve_published_frozen_definitions(
-    *, session: Any, representation: Any, contract: SyncContract
-) -> Any:
-    """从已 published representation **现读** :class:`FrozenEntryDefinitions`。
-
-    ═══ Task 75 交付：原先这里 `raise` ═══
-
-    Task 41 交付时这里按「缺公共观测器」的欠账登记 fail closed —— 缺的是
-    「published representation artifact → FrozenEntryDefinitions」的公共观测器
-    （`ExcelEntryDefinitionLoader.load()` 的四个运行时实测入参当时只有 finalize 时刻的
-    candidate evidence 一个来源）。Task 75 把那个观测器建成了
-    :mod:`app.services.workpaper_sync.published_identity_observer`，本函数改为**调它**，
-    那条欠账登记随之删除（本模块现在一个字都不再提它）。
-
-    唯一实现在
-    :func:`~app.services.workpaper_sync.published_identity_observer.observe_published_frozen_definitions`
-    —— 四个 pilot 共用同一个观测器，本函数**不复制**它的任何一步判据（复制一份的后果不是
-    「更安全」，而是任一侧被短路都不改变行为 ⇒ 变异判 GREEN）。
-
-    `contract` 入参在这里被**消费**而不是摆设：观测器按 representation 上**冻结的**
-    `adapter_id` 独立加载磁盘契约，本函数随后把它与本模块 source-locked 的那一份逐 digest
-    比对。两侧来源不同（一边是冻结 representation → 磁盘契约，一边是本模块现算 payload），
-    因此这是跨来源比对而不是自我比对。
-
-    失败一律上抛（观测器的 `PublishedIdentityObserverError` 子类带 error_code + stage +
-    bundle/authority identity + typed child inventory + correlation id）。**绝不**返回
-    `None` 或空 identity：返回 `None` 会让上游把「观测失败」表现成「这个 entry 没有身份」，
-    而后者会一路静默走到「注册一个没有 identity binding 的 adapter」—— 本 spec 最贵的一类
-    缺陷（fail-open 掩盖接线错误）。
-    """
-    from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
-    from app.services.workpaper_sync.published_identity_observer import (
-        observe_published_frozen_definitions,
-    )
-    from app.services.workpaper_sync.resolution import CanonicalResolutionService
-
-    observation = await observe_published_frozen_definitions(
-        session=session,
-        resolution=CanonicalResolutionService(
-            # 🔴 BP-29：根是 `_BACKEND_ROOT`（= `backend/`）而非 `storage_root()`
-        #    —— `relative_path` 自带 `storage/` 前缀，用后者拼出双层路径，读写
-        #    错层则 adapter 组装必抛。实测分布 142 : 4，详见分工书 §17.3。
-        session, CanonicalArtifactRepository(_BACKEND_ROOT)
-        ),
-        representation=representation,
-        correlation_id=f"{PILOT_ADAPTER_ID}@{getattr(representation, 'id', None)}",
-    )
-    if observation.definitions.contract.canonical_sha256 != contract.canonical_sha256:
-        raise PilotSelectionError(
-            f"entry {PILOT_ENTRY_ID}: 观测器按 representation 冻结的 adapter_id 读出的契约 "
-            f"digest {observation.definitions.contract.canonical_sha256} 与本模块 "
-            f"source-locked 的 "
-            f"{contract.canonical_sha256} 不一致 —— 冻结身份与生产契约脱钩，"
-            "不得按其中任一侧继续组装 adapter"
-        )
-    return observation
-
-
-async def attach_pilot_adapters(
-    registry: WorkpaperSyncAdapterRegistry, *, session: Any
-) -> tuple[str, ...]:
-    """**生产接线点**：把已 published representation 的本 pilot entry 接进 registry。
-
-    调用方是 `wp_sync_router`（`_attach_pilot_adapters` 与 `_apply_durable_incoming`）。
-    返回本次成功注册的 adapter_id 元组。顺序不可交换，且没有任何 `except: pass`：
-
-    1. manifest capability 必须**已启用**。没启用就返回空元组并且**一次库都不读** ——
-       这不是吞异常，而是"这个 entry 今天还不是双向 pilot"这一事实的忠实表达
-       （见下方注释里 Task 28 实测的教训）。**今天恒走这一条**。
-    2. `entry_state` 必须已有 **published** representation（Task 36 finalize 之后才有）。
-       没有同样返回空元组：注册一个没有 published representation 的 adapter 会让
-       `_registration` 把 candidate 当成可打开的底稿（AC 6.19 明令禁止）。
-    3. representation 必须绑定 approved bundle；bundle 快照由
-       `CanonicalResolutionService.load_bundle_snapshot` 按 frozen FK 读出。
-    4. descriptor/room 事实由 `entry_source_facts` 的**实测**观察器给出，不从 manifest
-       读回 —— 两侧都读 manifest 时 RG-16/17 退化成自我比对（假绿第③源）。
-    5. adapter 组装：由 :func:`resolve_published_frozen_definitions` 现读冻结身份（Task 75 起是真实现，那条欠账登记已删）。
-    """
-    if PILOT_ADAPTER_ID in {reg.adapter_id for reg in registry.registrations()}:
-        return ()
-    if not manifest_capability_enabled():
-        # 🔴 「capability 还没启用」与「还没 finalize」是**同一类事实**：这个 entry 今天不是
-        #    双向 pilot，不注册 adapter 就是对它的忠实表达，因此 return 而**不是** raise。
-        #
-        #    首轮实测（Task 28 的路由守卫 8 例打红）：它的 fixture 用的 `ENTRY` 正是本 pilot
-        #    冻结的 `xlsx/gt-d2-accounts-receivable`，于是这里一抛就让 `_registration` /
-        #    `_apply_durable_incoming` 对**所有** entry 都 500 —— 一个尚未启用的 pilot 把
-        #    整条 sync 路由拖下水。
-        #
-        #    判据没有被放宽：`assert_manifest_capability_enabled()` 仍是顺序门（守卫直接调
-        #    它、变异 M33 仍打红），本 entry 在 registry 里依旧没有 adapter ⇒ `_registration`
-        #    以 422 `adapter_not_ready` 收场（fail visible），契约孤儿仍在
-        #    `RegistryReport.contract_files_without_adapter` 里可见。
-        return ()
-
-    import sqlalchemy as sa
-
-    from app.models.workpaper_sync_models import (
-        WorkpaperContentRepresentation,
-    )
-    from app.services.workpaper_sync.projection_target_resolution import (
-        resolve_visible_current_representation_id,
-    )
-    from app.services.workpaper_sync import entry_source_facts as facts
-    from app.services.workpaper_sync.adapters.excel import build_excel_adapter
-    from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
-    from app.services.workpaper_sync.resolution import CanonicalResolutionService
-
-    # 🔴 BP-27：按 entry 取 current representation 必须**同时**满足「底稿可见」与
-    #    「多实例下确定」。`entry_state` 主键是 `(wp_id, entry_id)` ⇒ 同一 entry 在多个
-    #    底稿实例上有状态是合法设计；此前四个 pilot 各写一份只按 entry_id 过滤、无
-    #    ORDER BY、不看项目软删除的 `.first()`，H1 实测同时命中两行（一条在活项目
-    #    `c71b7c54`、一条在已删项目 `f663b18c`）⇒ adapter 可能绑到前端 404 的那份。
-    #    可见性口径的唯一真源是 `projection_target_resolution.TARGET_VISIBILITY_SQL`。
-    representation_id = await resolve_visible_current_representation_id(
-        session, entry_id=PILOT_ENTRY_ID
-    )
-    if representation_id is None:
-        return ()
-    representation = (
-        await session.execute(
-            sa.select(WorkpaperContentRepresentation).where(
-                WorkpaperContentRepresentation.id == representation_id
-            )
-        )
-    ).scalar_one_or_none()
-    if representation is None or representation.definition_bundle_id is None:
-        return ()
-
-    resolution = CanonicalResolutionService(
-        # 🔴 BP-29：根是 `_BACKEND_ROOT`（= `backend/`）而非 `storage_root()`
-        #    —— `relative_path` 自带 `storage/` 前缀，用后者拼出双层路径，读写
-        #    错层则 adapter 组装必抛。实测分布 142 : 4，详见分工书 §17.3。
-        session, CanonicalArtifactRepository(_BACKEND_ROOT)
-    )
-    bundle = await resolution.load_bundle_snapshot(representation.definition_bundle_id)
-    contract = assert_contract_file_matches_source()
-    entry = manifest_entries_by_id(load_entry_manifest())[PILOT_ENTRY_ID]
-    descriptor = facts.observe_descriptor_facts(entry)
-    if descriptor is None:
-        raise PilotSelectionError(
-            f"entry {PILOT_ENTRY_ID} 的宿主实测不可达（产不出 descriptor 事实）—— "
-            "不可达入口不得注册 adapter（Requirement 1.7）"
-        )
-    observation = await resolve_published_frozen_definitions(
-        session=session, representation=representation, contract=contract
-    )
-    definitions = observation.definitions
-
-    # 🔴 Requirement 3.4：开关打开时 D2-3/D2-1 各自需要 sibling binding（框架层
-    #    `attach_sibling_bindings` 与 publish 侧共享对齐规则）。开关全关时只有 d22 一张
-    #    受管 sheet，sibling_bindings 为空元组（与改造前行为一致）。
-    import app.services.workpaper_sync.pilot_d2_large_json as _self
-    from app.services.workpaper_sync.phase5_row_table_sheet import (
-        attach_sibling_bindings,
-    )
-    sibling_bindings = attach_sibling_bindings(
-        provider=_self,
-        primary=observation.identity_binding,
-        contract=contract,
-        dynamic_bindings=observation.identity_binding.dynamic_column_columns,
-    ) if len(instrumentation_specs()) > 1 else ()
-
-    register_pilot_adapter(
-        registry,
-        adapter=build_excel_adapter(
-            definitions=definitions,
-            # 🔴 BP-17：`FrozenEntryDefinitions` **没有** `identity_binding` 字段，
-            #    原先这里写 `definitions.identity_binding` ⇒ 观测器一返回就 AttributeError。
-            #    binding 由 Task 75 的观测器与 definitions 一起产出（同一份冻结 instrumentation
-            #    + 同一份物理列跨度派生），因此两者不可能互相脱钩。
-            binding=observation.identity_binding,
-            sibling_bindings=sibling_bindings,
-            direction="html_to_oo",
-        ),
-        bundle=bundle,
-        descriptor=descriptor,
-        room=facts.observe_room_facts(entry),
-        contract=contract,
-    )
-    return (PILOT_ADAPTER_ID,)
-
-
-def manifest_capability_enabled(*, manifest: Mapping[str, Any] | None = None) -> bool:
-    """capability 是否已启用（接线路径的「今天不是我的回合」分支用它做真值判定）。
-
-    🔴 实现**委派**给 :func:`assert_manifest_capability_enabled`，只把它的异常翻成布尔：
-    两处各写一套判据会让「接线路径放行、顺序门仍红」这种不一致悄悄发生。`except` 只捕获
-    :class:`PilotSelectionError` 这一个窄类型 —— 宽 `except Exception` 会把 manifest 读不出来
-    之类的真故障也吞成「未启用」（本 spec 最贵的 fail-open 形态）。
-    """
-    try:
-        assert_manifest_capability_enabled(manifest=manifest)
-    except PilotSelectionError:
-        return False
-    return True
-
-
-def assert_manifest_capability_enabled(
-    *, manifest: Mapping[str, Any] | None = None
-) -> None:
-    """manifest 侧 capability/adapter_id 必须已启用（overlay 裁决 + 重生成之后）。
-
-    🔴 **今天必然抛**：任务正文的顺序是「仅在 Task 36 将其 non-current candidate
-    finalize 为 published representation 后**才**启用 adapter/宿主」。finalize 被
-    **供给**挡住（Task 75 已交付公共观测器；approved bundle / published representation
-    两表实测 0 行，生产侧 provisioner 是 Task 76 的交付）⇒ 提前把 overlay 的
-    capability 改成 `bidirectional` 就是**跳过顺序**：manifest 会宣称双向可用，而
-    registry 里一个 adapter 都没有，`_registration` 只会给 422。
-    """
-    entry = manifest_entries_by_id(
-        manifest if manifest is not None else load_entry_manifest()
-    )[PILOT_ENTRY_ID]
-    capability = capability_of(entry)
-    if capability is not Capability.bidirectional:
-        raise PilotSelectionError(
-            f"entry {PILOT_ENTRY_ID} 的 manifest capability={capability.value} —— "
-            "注册 bidirectional adapter 前必须先由 reviewed overlay 裁决为 bidirectional "
-            "并重生成 manifest（RG-18 会以 FakeBidirectionalError 拒绝伪双向）"
-        )
-    if str(entry.get("adapter_id") or "") != PILOT_ADAPTER_ID:
-        raise PilotSelectionError(
-            f"entry {PILOT_ENTRY_ID} 的 manifest adapter_id={entry.get('adapter_id')!r} "
-            f"与本 pilot 的 {PILOT_ADAPTER_ID!r} 不符"
-        )
-
-
-def _unused_instrumentation_error_guard() -> type[InstrumentationError]:
-    """保留 `InstrumentationError` 的显式引用（它是本模块 payload 构建的失败类型）。"""
-    return InstrumentationError
+# 模板/选型仍保留本地实现（D2 有额外的 assert_dynamic_family / render_schema 等特有逻辑），
+# 工厂版作兼容别名
+# excel_carrier_gate / authoritative_template_path / read_authoritative_template 已在本文件定义
+# instrumentation_spec / template_definition_payload / instrumentation_definition_payload / authority_model_payload 已在本文件定义
+# assert_pilot_entry_selectable / assert_no_implicit_template_fallback 已在本文件定义

@@ -65,7 +65,8 @@ _BA = BindingAdapters()
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _ARTIFACT_DIR = (
     _REPO_ROOT
-    / ".kiro" / "specs" / "visibility-isolation-go-live-hardening"
+    / ".kiro" / "specs" / "_archive" / "06-engineering-governance"
+    / "visibility-isolation-go-live-hardening"
     / "evidence" / "artifacts" / "task6"
 )
 _PLAYWRIGHT_RESULTS = (

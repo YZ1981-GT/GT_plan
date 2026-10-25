@@ -78,6 +78,12 @@ class BulkManifest:
     cycles: list[str] = field(default_factory=list)
     files: list[ManifestFileEntry] = field(default_factory=list)
     skipped: list[ManifestSkippedEntry] = field(default_factory=list)
+    #: 所选循环中 catalog 里没有任何启用导入导出的 Tab 的那些（Req 8.5）。
+    #:
+    #: 与 ``skipped`` 的区别：``skipped`` 是**逐 sheet** 的（该 sheet 存在但这次没导出），
+    #: 本字段是**逐循环**的（该循环压根没有可导入导出的 sheet，一张都不会出现在 files/skipped 里）。
+    #: 不记这一项时，用户勾了 E / J 却什么都没拿到，界面与 README 里都看不到任何解释。
+    unsupported_cycles: list[str] = field(default_factory=list)
 
     def exportable(self) -> list[ManifestFileEntry]:
         """返回可导出的 file entries（wp_id 非空）。"""
@@ -94,6 +100,8 @@ class BulkManifest:
             "platform_version": self.platform_version,
             "mode": self.mode,
             "cycles": self.cycles,
+            # 导入侧只读 files / cycles / mode，多一个键无影响（Req 8.5）
+            "unsupported_cycles": self.unsupported_cycles,
             "files": [
                 {
                     "addr_id": f.addr_id,
@@ -227,7 +235,7 @@ async def build_manifest(
     from app.services.acnr.catalog import list_sheets
 
     # 确定要处理的循环列表
-    effective_cycles = cycles if cycles else _get_all_cycles()
+    effective_cycles = cycles if cycles else supported_cycles()
 
     manifest = BulkManifest(
         schema_version="1.0",
@@ -241,6 +249,39 @@ async def build_manifest(
     )
 
     for cycle_code in effective_cycles:
+        # ─── 先读 catalog：该循环有没有启用导入导出的 Tab（Req 8.5）───
+        # 放在两次 DB 查询之前：catalog 为空说明这个循环压根不支持导入导出，
+        # 再去查 list_export_sheets / list_import_export 只会拿到空列表。
+        # 本就要读这份 catalog（下面构建 catalog_by_addr_id 用同一份），零额外读取。
+        try:
+            _cycle_sheets = list_sheets(cycle=cycle_code, import_export_only=True)
+        except CatalogLoadError as e:
+            logger.error(
+                "ACNR catalog 不可用(catalog): cycle=%s error=%s",
+                cycle_code,
+                e,
+            )
+            raise AcnrCatalogUnavailableError(
+                f"ACNR catalog 不可用，无法生成 bulk manifest（cycle={cycle_code}）",
+                cause=e,
+            ) from e
+
+        if not _cycle_sheets:
+            # 该循环一张可导入导出的 Tab 都没有 ⇒ 逐循环登记，不进 skipped
+            logger.info(
+                "bulk_manifest: cycle=%s 无启用导入导出的 Tab，记入 unsupported_cycles",
+                cycle_code,
+            )
+            manifest.unsupported_cycles.append(cycle_code)
+            continue
+
+        # 构建 catalog 元数据映射 (取 sheet_name/origin)
+        catalog_by_addr_id: dict[str, dict[str, Any]] = {}
+        for sheet in _cycle_sheets:
+            aid = sheet.get("addr_id", "")
+            if aid:
+                catalog_by_addr_id[aid] = sheet
+
         # ─── 获取可导出条目（已拓扑排序, wp_id 非空） ───────────────
         try:
             export_entries = await list_export_sheets(
@@ -274,24 +315,6 @@ async def build_manifest(
             logger.error(
                 "ACNR catalog 不可用(全量): project=%s cycle=%s error=%s",
                 project_id,
-                cycle_code,
-                e,
-            )
-            raise AcnrCatalogUnavailableError(
-                f"ACNR catalog 不可用，无法生成 bulk manifest（cycle={cycle_code}）",
-                cause=e,
-            ) from e
-
-        # 构建 catalog 元数据映射 (取 sheet_name/origin)
-        catalog_by_addr_id: dict[str, dict[str, Any]] = {}
-        try:
-            for sheet in list_sheets(cycle=cycle_code, import_export_only=True):
-                aid = sheet.get("addr_id", "")
-                if aid:
-                    catalog_by_addr_id[aid] = sheet
-        except CatalogLoadError as e:
-            logger.error(
-                "ACNR catalog 不可用(catalog): cycle=%s error=%s",
                 cycle_code,
                 e,
             )
@@ -367,8 +390,15 @@ async def build_manifest(
 # ---------------------------------------------------------------------------
 
 
-def _get_all_cycles() -> list[str]:
-    """从 ACNR catalog 获取所有含 I/E 的循环列表。"""
+def supported_cycles() -> list[str]:
+    """从 ACNR catalog 取「至少有一张 Tab 启用导入导出」的循环列表（升序）。
+
+    既是 ``build_manifest(cycles=None)`` 的默认范围，也是对话框判定「哪些循环可勾选」
+    的权威依据（``scenario_registry.cycle_options_for_ui`` 调用本函数）——
+    两处同一真源，避免前端写死一份列表后与 catalog 漂移（Req 8.5）。
+
+    公开名（原 ``_get_all_cycles``）：它现在有 bulk 编排之外的消费方。
+    """
     from app.services.acnr.catalog import list_sheets
 
     all_ie_sheets = list_sheets(import_export_only=True)

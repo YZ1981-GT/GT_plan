@@ -350,6 +350,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Download, Document, Upload } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import { getAuthHeaders } from '@/utils/authToken'
 import OnlyOfficeWordDialog from './OnlyOfficeWordDialog.vue'
 import GtWordTemplateStructuredView from './GtWordTemplateStructuredView.vue'
 import { useWordTemplateStructured } from './composables/useWordTemplateStructured'
@@ -486,10 +487,9 @@ async function onImportData() {
   try {
     const formData = new FormData()
     formData.append('file', importFile.value)
-    const token = sessionStorage.getItem('token') || localStorage.getItem('token') || ''
     const r = await fetch(`/api/workpapers/${props.wpId}/import-structured`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getAuthHeaders(),
       body: formData,
     })
     if (!r.ok) {
@@ -699,10 +699,8 @@ const supplementSignStatusType = computed(() => {
   return 'info'
 })
 
-const uploadHeaders = computed(() => {
-  const token = sessionStorage.getItem('token') || localStorage.getItem('token') || ''
-  return { Authorization: `Bearer ${token}` }
-})
+// computed 依赖 auth store 的响应式 token：刷新 token 后上传头随之更新
+const uploadHeaders = computed(() => getAuthHeaders())
 
 // ─── Export filename helper (Task 7.2 / Property 12) ───
 function buildExportFilename(): string {
@@ -1080,8 +1078,7 @@ async function downloadTemplate(target: 'main' | 'supplement') {
   const version = target === 'supplement' ? SUPPLEMENT_CODE : (isA16Mode.value ? selectedVersion.value : wpCode.value)
   try {
     const url = `/api/projects/${projectId.value}/wp-templates/${version}/prefilled-download`
-    const token = sessionStorage.getItem('token') || localStorage.getItem('token') || ''
-    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    const r = await fetch(url, { headers: getAuthHeaders() })
     if (!r.ok) throw new Error('下载失败')
     const blob = await r.blob()
     const obj = URL.createObjectURL(blob)
@@ -1100,8 +1097,7 @@ async function onExportDocx() {
   try {
     const version = isA16Mode.value ? selectedVersion.value : wpCode.value
     const url = `/api/projects/${projectId.value}/wp-templates/${version}/prefilled-download`
-    const token = sessionStorage.getItem('token') || localStorage.getItem('token') || ''
-    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    const r = await fetch(url, { headers: getAuthHeaders() })
     if (!r.ok) throw new Error('导出失败')
     const blob = await r.blob()
     const obj = URL.createObjectURL(blob)

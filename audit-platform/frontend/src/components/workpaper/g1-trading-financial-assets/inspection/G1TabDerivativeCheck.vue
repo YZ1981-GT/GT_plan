@@ -238,9 +238,9 @@
     </div>
 
     <el-collapse v-if="wpId && projectId && !isReadonly" class="sampling-collapse">
-      <el-collapse-item title="⚡ 自动抽凭（科目 1501，与 G1-13 同源引擎）" name="sampling">
+      <el-collapse-item :title="`⚡ 自动抽凭（科目 ${samplingAccountCode}，与 G1-13 同源引擎）`" name="sampling">
         <GtVoucherSamplingEngine
-          account-code="1501"
+          :account-code="samplingAccountCode"
           phase="final"
           default-method="random"
           :workpaper-id="wpId"
@@ -427,6 +427,15 @@ import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEng
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+/**
+ * 科目码单一真源。🔴 原硬编码 `"1501"`（持有至到期投资，G4 循环的科目）。
+ *
+ * 本表是**衍生金融工具**检查 ⇒ 取 `g1DerivativeCode()`（`BS-004 衍生金融资产 = TB('1102')`），
+ * 而不是主表的 `1101` 交易性金融资产 —— 两者是 report_config 里的两个不同报表行，
+ * 真源为此专门导出了 `g1DerivativeCode()`。
+ * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.4
+ */
+import { g1DerivativeCode } from '../../composables/g1AccountScope'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -439,6 +448,10 @@ const props = defineProps<{
 const emit = defineEmits<{ imported: [] }>()
 const wpId = computed(() => props.wpId ?? '')
 const projectId = computed(() => props.projectId ?? '')
+
+/** 抽凭科目码：衍生金融资产 1102（真源，非主表的 1101、更非原硬编码的 1501） */
+const samplingAccountCode = g1DerivativeCode()
+
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
 const dc = useG1DerivativeCheck({
