@@ -770,6 +770,12 @@ const props = withDefaults(defineProps<{
   noteSectionTitle?: string
   /** 模板类型（soe / listed / custom）：与调用页保持一致，避免上市版页面加载国企版预设。 */
   templateType?: string
+  /**
+   * 试算表域：调用页当前正在查看的报表类型（如 `income_statement`）。
+   * 当 `scope='tb'` 且此值非空时，弹窗定位到「报表 > 利润表」等对应报表节点，
+   * 而非默认的「科目明细」节点。值域与 treeData 报表域 key 后缀一致。
+   */
+  initialReportType?: string
 }>(), {
   scope: 'report',
 })
@@ -1023,6 +1029,25 @@ const fmTreeRef = ref<any>(null)
 const expandedKeys = ref<string[]>([])
 const selectedNodeKey = ref('report_balance_sheet')
 const selectedPath = ref('报表 > 资产负债表')
+
+/**
+ * 节点 key → 报表类型（`balance_sheet` 等），非报表类节点返回 ''。
+ *
+ * 🔴 报表域 `report_{rt}` 与试算平衡表域 `tb_summary_{rt}` 共用同一套 report_config
+ * 行次 —— 试算平衡表就是「按报表行次汇总的试算视图」，行次定义同源、公式同源，
+ * 只是列口径不同（未审/调整/审定 vs 报表数）。两者都必须解析到同一个 rt，否则
+ * 试算平衡表侧的节点会被所有 `startsWith('report_')` 判断漏掉 ⇒ 右侧空表、
+ * 保存/应用/导入全部静默失效。
+ */
+function reportTypeOfNode(nodeKey: string): string {
+  if (nodeKey.startsWith('tb_summary_')) return nodeKey.slice('tb_summary_'.length)
+  if (nodeKey.startsWith('report_')) return nodeKey.slice('report_'.length)
+  return ''
+}
+
+/** 当前选中节点对应的报表类型（空串 = 当前不是报表类节点）。 */
+const activeReportType = computed(() => reportTypeOfNode(selectedNodeKey.value))
+
 /** 归一化调用页模板类型：仅 soe / listed 两版预设，custom 等按国企版兜底。 */
 function normalizeTemplateType(t?: string): 'soe' | 'listed' {
   return t === 'listed' ? 'listed' : 'soe'
@@ -1331,6 +1356,17 @@ const REPORT_SUBTYPE_LABELS_FALLBACK: Record<string, string> = {
   cash_flow_supplement: '现金流附表',
   impairment_provision: '资产减值准备表',
 }
+/**
+ * 试算平衡表视图支持的报表类型，与 `TrialBalance.vue` 的 `tbSummaryTypes` 严格对齐。
+ * 试算表页只按这 4 张表做试算汇总（无权益变动表/资产减值准备表），多列会得到空节点。
+ */
+const TB_SUMMARY_REPORT_TYPES = [
+  'balance_sheet',
+  'income_statement',
+  'cash_flow_statement',
+  'cash_flow_supplement',
+] as const
+
 const reportTypes = ref<Array<{ type: string; label: string; count: number }>>(
   Object.entries(REPORT_SUBTYPE_LABELS_FALLBACK).map(([type, label]) => ({ type, label, count: 0 }))
 )
@@ -1435,10 +1471,21 @@ const treeData = computed(() => {
   const acnrDrivenTree: any[] = []
 
   // 1. 试算平衡表域
+  // 「试算平衡表」按报表类型分子节点，与试算表页的 4 个 tab 一一对应 —— 否则从
+  // 利润表 tab 点公式管理只能落到一个笼统的父节点（旧实现恒按资产负债表取数），
+  // 用户看到的是别张表的行次。
   acnrDrivenTree.push({
     key: 'trial_balance', label: DOMAIN_TREE_META.tb.label, icon: DOMAIN_TREE_META.tb.icon, children: [
       { key: 'tb_detail', label: '科目明细', icon: '' },
-      { key: 'tb_summary', label: '试算平衡表', icon: '' },
+      {
+        key: 'tb_summary', label: '试算平衡表', icon: '',
+        children: TB_SUMMARY_REPORT_TYPES.map((rt) => ({
+          key: `tb_summary_${rt}`,
+          label: REPORT_SUBTYPE_LABELS_FALLBACK[rt] || rt,
+          icon: '',
+          count: countFormulas(rt),
+        })),
+      },
     ],
   })
 
@@ -1903,16 +1950,13 @@ async function loadRowsForNode(nodeKey: string) {
     return
   }
   if (nodeKey === 'tb_summary') {
-    // 加载资产负债表的 report_config 作为试算平衡表行次
-    nodeKey = 'report_balance_sheet'
-  }
-  if (nodeKey === 'tb_summary') {
-    // 加载资产负债表的 report_config 作为试算平衡表行次
+    // 「试算平衡表」父节点（无具体报表类型）→ 按资产负债表兜底，与旧行为一致
     nodeKey = 'report_balance_sheet'
   }
 
-  if (nodeKey.startsWith('report_')) {
-    const reportType = nodeKey.replace('report_', '')
+  // 报表域 `report_{rt}` 与试算平衡表域 `tb_summary_{rt}` 同源取数（见 reportTypeOfNode）
+  const reportType = reportTypeOfNode(nodeKey)
+  if (reportType) {
     const cacheKey = `${fmTemplateType.value}_${reportType}`
     if (allRowsMap.value[cacheKey]) {
       allRowsMap.value[reportType] = allRowsMap.value[cacheKey]
@@ -2021,7 +2065,7 @@ async function applyConsolWorksheetTarget() {
 }
 
 // 初始加载当前报表的数据
-watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () => props.year, () => props.sheetName], async ([v]) => {
+watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () => props.year, () => props.sheetName, () => props.initialReportType], async ([v]) => {
   ++dialogSession
   ++wpRequest
   wpFormulaLoading.value = false
@@ -2113,16 +2157,35 @@ watch([visible, () => props.wpId, () => props.wpCode, () => props.projectId, () 
     // 加载表间审核规则（项目级动态）
     loadCrossCheckItems()
     if (props.scope === 'tb') {
-      // 试算表页打开 → 定位「科目明细」节点，用 TB() 预设 + 覆盖/自定义（props.rows 提供科目来源）。
-      // props.rows 是试算表行（standard_account_code/account_name），不是报表行次（无 row_code），
-      // 故不能走下方报表启发式（否则被误判为 report_balance_sheet 而公式列全空、树也定位不到）。
-      selectedNodeKey.value = 'tb_detail'
-      selectedPath.value = '试算平衡表 > 科目明细'
-      await loadTbDetailFormulas()
-      await nextTick()
-      expandedKeys.value = [...new Set([...expandedKeys.value, 'trial_balance'])]
-      await nextTick()
-      try { fmTreeRef.value?.setCurrentKey('tb_detail') } catch { /* ignore */ }
+      // 试算表页打开 → 根据调用页当前视图定位：
+      //   - 有 initialReportType（用户在试算平衡表的某个报表 tab，如利润表）
+      //     → 定位「试算平衡表 > {该报表}」
+      //   - 无 initialReportType（用户在科目明细视图）→ 定位「试算平衡表 > 科目明细」
+      if (props.initialReportType && REPORT_SUBTYPE_LABELS_FALLBACK[props.initialReportType]) {
+        // 🔴 落到「试算平衡表 > {报表}」而非「报表 > {报表}」：调用页是试算平衡表视图
+        // （未审/调整/审定列口径），不是报表域的正式报表。两者行次同源但域不同，
+        // 定位到报表域会让审计师以为自己在改报表。
+        const rt = props.initialReportType
+        const nodeKey = `tb_summary_${rt}`
+        selectedNodeKey.value = nodeKey
+        selectedPath.value = `试算平衡表 > ${REPORT_SUBTYPE_LABELS_FALLBACK[rt]}`
+        await loadRowsForNode(nodeKey)
+        await nextTick()
+        // 展开到叶子：trial_balance → tb_summary → tb_summary_{rt}
+        expandedKeys.value = [...new Set([...expandedKeys.value, 'trial_balance', 'tb_summary'])]
+        await nextTick()
+        try { fmTreeRef.value?.setCurrentKey(nodeKey) } catch { /* ignore */ }
+      } else {
+        // props.rows 是试算表行（standard_account_code/account_name），不是报表行次（无 row_code），
+        // 故不能走下方报表启发式（否则被误判为 report_balance_sheet 而公式列全空、树也定位不到）。
+        selectedNodeKey.value = 'tb_detail'
+        selectedPath.value = '试算平衡表 > 科目明细'
+        await loadTbDetailFormulas()
+        await nextTick()
+        expandedKeys.value = [...new Set([...expandedKeys.value, 'trial_balance'])]
+        await nextTick()
+        try { fmTreeRef.value?.setCurrentKey('tb_detail') } catch { /* ignore */ }
+      }
     } else if (props.scope === 'consol_worksheet') {
       // 合并工作底稿：项目级入口，按当前 worksheet 定位（无 wpId 不代表无当前页）
       await applyConsolWorksheetTarget()
@@ -2249,8 +2312,8 @@ const currentRows = computed(() => {
     return allRowsMap.value['balance_sheet'] || []
   }
 
-  if (selectedNodeKey.value.startsWith('report_')) {
-    const rt = selectedNodeKey.value.replace('report_', '')
+  if (activeReportType.value) {
+    const rt = activeReportType.value
     return allRowsMap.value[rt] || []
   }
   // 附注节点：显示该章节的预设公式
@@ -2717,8 +2780,8 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
       row.row_number = rows.length + 1
       rows.push(row)
 
-      if (selectedNodeKey.value.startsWith('report_')) {
-        const reportType = selectedNodeKey.value.replace('report_', '')
+      if (activeReportType.value) {
+        const reportType = activeReportType.value
         try {
           const saved = await api.post(P_rc.list, {
             report_type: reportType,
@@ -2844,9 +2907,9 @@ async function onApplyFormulas() {
     }
 
     // 如果是报表节点，将结果回写到 report_config
-    if (selectedNodeKey.value.startsWith('report_') && Object.keys(rowValues).length) {
+    if (activeReportType.value && Object.keys(rowValues).length) {
       try {
-        const reportType = selectedNodeKey.value.replace('report_', '')
+        const reportType = activeReportType.value
         const updates = Object.entries(rowValues).map(([code, val]) => ({
           row_code: code,
           current_period_amount: val,
@@ -2885,7 +2948,7 @@ function onFormulaFileImported() {
 async function onExportFormulaTemplate() {
   // 获取当前节点数据；如果没有（未选节点或节点无数据），导出通用空白模板
   const nodeKey = selectedNodeKey.value || ''
-  const currentRows = allRowsMap.value[nodeKey.replace('report_', '')] || []
+  const currentRows = allRowsMap.value[reportTypeOfNode(nodeKey) || nodeKey] || []
 
   // 如果当前节点有数据，导出该节点的公式
   // 如果没有数据，传空数组——exportFormulaTemplate 内部会生成通用模板骨架
@@ -2897,8 +2960,8 @@ async function onImportPresetFormulas() {
   loadingData.value = true
 
   // 报表类：从 report_config 加载
-  if (selectedNodeKey.value.startsWith('report_')) {
-    const reportType = selectedNodeKey.value.replace('report_', '')
+  if (activeReportType.value) {
+    const reportType = activeReportType.value
     try {
       const standard = `${fmTemplateType.value}_standalone`
       const data = await api.get(P_rc.list, {
@@ -3222,7 +3285,7 @@ async function onSaveAllFormulas() {
     for (const row of rows) {
       if (row._isNew && row.formula) {
         // 新增
-        const reportType = selectedNodeKey.value.replace('report_', '')
+        const reportType = activeReportType.value
         await api.post(P_rc.list, {
           report_type: reportType,
           // 与当前读取口径一致（项目级优先），避免新增行落到模板级影响其他项目
@@ -3310,8 +3373,8 @@ function isProjectStandard(standard?: string): boolean {
 
 /** 当前报表节点取自项目级还是模板级（主表头展示，让用户知道在改谁）。 */
 const activeReportLevelLabel = computed(() => {
-  if (!selectedNodeKey.value.startsWith('report_')) return ''
-  const std = reportStandardByType.value[selectedNodeKey.value.replace('report_', '')]
+  if (!activeReportType.value) return ''
+  const std = reportStandardByType.value[activeReportType.value]
   if (!std) return ''
   return isProjectStandard(std) ? '项目级' : '模板预设'
 })

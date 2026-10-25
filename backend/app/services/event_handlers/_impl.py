@@ -648,6 +648,7 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _mark_workpapers_stale_by_account)
     event_bus.subscribe(EventType.MAPPING_CHANGED, _mark_workpapers_stale_by_account)
     event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, _mark_workpapers_stale_by_account)
+    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _mark_workpapers_stale_by_account)  # 任务 3.7
 
     logger.debug("Phase 9 workpaper event handlers registered")
 
@@ -868,6 +869,7 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _notify_adjustment_event_sse)
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _notify_adjustment_event_sse)
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _notify_adjustment_event_sse)
+    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _notify_adjustment_event_sse)  # 任务 3.7
 
     logger.debug("Enterprise Linkage: adjustment SSE push handlers registered")
 
@@ -956,6 +958,7 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _mark_reports_stale_on_adjustment)
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _mark_reports_stale_on_adjustment)
     event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, _mark_reports_stale_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, _mark_reports_stale_on_adjustment)  # 任务 3.7
     logger.debug("Sprint 7 Task 7.2: stale cascade handlers registered")
 
     # ------------------------------------------------------------------
@@ -1516,11 +1519,23 @@ def register_event_handlers() -> None:
         )
 
     async def on_event_adjustment_approved(payload: EventPayload) -> None:
-        """ADJUSTMENT_BATCH_COMMITTED → 全部 DisclosureNote.is_stale=True (R2.1).
+        """ADJUSTMENT_APPROVED → 全部 DisclosureNote.is_stale=True.
 
-        语义：调整分录批量提交 — 试算表+报表已变化，附注下游视为陈旧。
-        实际订阅事件名：ADJUSTMENT_BATCH_COMMITTED（spec 设计名 ADJUSTMENT_APPROVED
-        在 EventType 中不存在，订阅最接近的语义事件）。
+        adj-formula-repair-and-approval-gate-wiring 任务 3.5:
+        改订阅 ADJUSTMENT_APPROVED（原错误订阅 ADJUSTMENT_BATCH_COMMITTED 名实不符）。
+        语义：调整分录审批通过 — 调整列+审定数已变化，附注下游视为陈旧。
+        """
+        await _mark_disclosure_notes_stale_for_project_year(
+            payload, source_event="ADJUSTMENT_APPROVED",
+        )
+
+    # adj-formula-repair-and-approval-gate-wiring 任务 3.6:
+    # 保留批量提交也标附注 stale 的行为（设计 §四.3），但用独立命名的 handler。
+    async def on_event_adjustment_batch_committed(payload: EventPayload) -> None:
+        """ADJUSTMENT_BATCH_COMMITTED → 全部 DisclosureNote.is_stale=True.
+
+        批量提交意味着一批草稿进入复核流程，附注编制者需要知道
+        「上游有在途变更」。行为保留、命名纠正（不再复用 approved 命名）。
         """
         await _mark_disclosure_notes_stale_for_project_year(
             payload, source_event="ADJUSTMENT_BATCH_COMMITTED",
@@ -1528,10 +1543,11 @@ def register_event_handlers() -> None:
 
     event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, on_event_ledger_activated)
     event_bus.subscribe(EventType.WORKPAPER_REVIEW_PASSED, on_event_workpaper_reviewed)
-    event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, on_event_adjustment_approved)
+    event_bus.subscribe(EventType.ADJUSTMENT_APPROVED, on_event_adjustment_approved)
+    event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, on_event_adjustment_batch_committed)
     logger.debug(
-        "Sprint 2 Task 2.5: 3 DisclosureNote stale event handlers registered "
-        "(LEDGER_DATASET_ACTIVATED / WORKPAPER_REVIEW_PASSED / ADJUSTMENT_BATCH_COMMITTED)"
+        "Sprint 2 Task 2.5 + adj-formula-repair: 4 DisclosureNote stale event handlers registered "
+        "(LEDGER_DATASET_ACTIVATED / WORKPAPER_REVIEW_PASSED / ADJUSTMENT_APPROVED / ADJUSTMENT_BATCH_COMMITTED)"
     )
 
     # ------------------------------------------------------------------

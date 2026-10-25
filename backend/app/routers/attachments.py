@@ -619,7 +619,7 @@ async def retry_ocr(
     )
 
     # 更新 OCR 状态为 pending
-    from app.models.phase10_models import Attachment as AttachmentModel
+    from app.models.attachment_models import Attachment as AttachmentModel
     result = await db.execute(
         sa.select(AttachmentModel).where(AttachmentModel.id == attachment_id)
     )
@@ -663,7 +663,7 @@ async def delete_attachment(
         action="attach_read", method="DELETE", entrypoint="attachment.delete",
     )
 
-    from app.models.phase10_models import Attachment as AttachmentModel
+    from app.models.attachment_models import Attachment as AttachmentModel
     result = await db.execute(
         sa.select(AttachmentModel).where(AttachmentModel.id == attachment_id)
     )
@@ -705,7 +705,7 @@ async def list_attachment_versions(
     )
 
     # 沿 previous_version_id 链回溯所有版本
-    from app.models.phase10_models import Attachment as AttachmentModel
+    from app.models.attachment_models import Attachment as AttachmentModel
     versions = []
     current_id = attachment_id
 
@@ -754,7 +754,7 @@ async def rollback_attachment_version(
         action="attach_read", method="POST", entrypoint="attachment.rollback",
     )
 
-    from app.models.phase10_models import Attachment as AttachmentModel
+    from app.models.attachment_models import Attachment as AttachmentModel
 
     # 找当前最新版本
     stmt = (

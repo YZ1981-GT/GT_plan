@@ -458,7 +458,7 @@ class OCRService:
 def _batch_recognize_sync(task_id: str, project_id: str, file_paths: list[str], user_id: str | None):
     """同步批量处理 — 在线程池中运行"""
     import asyncio
-    from app.core.database import async_session_maker
+    from app.core.database import async_session as async_session_maker
 
     async def _run():
         status = _task_status[task_id]

@@ -1131,9 +1131,11 @@
     <FormulaManagerDialog
       v-model="showFormulaManager"
       scope="tb"
+      :initial-report-type="tbViewMode === 'summary' ? tbSummaryType : undefined"
       :rows="rows"
       :project-id="projectId"
       :year="year"
+      :template-type="selectedTemplateType"
       @applied="fetchData"
     />
 

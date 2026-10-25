@@ -34,8 +34,10 @@ from app.models.audit_platform_models import (
     AccountMapping,
     AccountSource,
     Adjustment,
+    AdjustmentEntry,
     AdjustmentType,
     MappingType,
+    ReviewStatus,
     TbBalance,
     TrialBalance,
 )
@@ -45,6 +47,46 @@ _TEST_PROJECT_ID = uuid.UUID("519c0de0-0000-4000-8000-000000000abc")
 _TEST_YEAR = 2097
 _COMPANY = "001"
 _IS_PG = settings.DATABASE_URL.startswith("postgresql")
+
+
+async def _add_adj(
+    db,
+    *,
+    pid,
+    uid,
+    adj_type: AdjustmentType,
+    account_code: str,
+    account_name: str,
+    debit: Decimal,
+    credit: Decimal,
+    adjustment_no: str,
+) -> None:
+    """插入 Adjustment 主表 + AdjustmentEntry **明细行**（approved / manual）。
+
+    🔴 三个必要条件，缺一即调整列恒 0：
+      1. **建明细行** —— `recalc_adjustments` 按 ADR-ADJ-001 读
+         `adjustment_entries.standard_account_code` + JOIN，只写主表遗留冗余列取不到数
+      2. **显式 `approved`** —— `review_status` 的 server_default 是 `draft`，
+         而 ADR-ADJ-003 只纳入 approved
+      3. **origin 非 workpaper** —— ADR-ADJ-002 / V124 约定 TB 调整列排除该来源
+    """
+    adj_id = uuid.uuid4()
+    grp = uuid.uuid4()
+    db.add(Adjustment(
+        id=adj_id,
+        project_id=pid, year=_TEST_YEAR, company_code=_COMPANY,
+        adjustment_no=adjustment_no, adjustment_type=adj_type,
+        account_code=account_code, account_name=account_name,
+        debit_amount=debit, credit_amount=credit,
+        entry_group_id=grp, review_status=ReviewStatus.approved, origin="manual",
+        is_deleted=False, created_by=uid,
+    ))
+    db.add(AdjustmentEntry(
+        id=uuid.uuid4(), adjustment_id=adj_id, entry_group_id=grp, line_no=1,
+        standard_account_code=account_code, account_name=account_name,
+        debit_amount=debit, credit_amount=credit, is_deleted=False,
+    ))
+    await db.flush()
 
 
 @pytest_asyncio.fixture
@@ -67,6 +109,19 @@ async def pg_factory():
 
     async def _cleanup():
         async with factory() as db:
+            # 🔴 adjustment_entries 必须**先于** adjustments 删：它有
+            # `adjustment_entries_adjustment_id_fkey` 外键指向主表，反序会触发
+            # ForeignKeyViolationError。且该表**没有 project_id 列**，
+            # 只能按 adjustment_id 子查询关联删。
+            await db.execute(
+                sa.delete(AdjustmentEntry).where(
+                    AdjustmentEntry.adjustment_id.in_(
+                        sa.select(Adjustment.id).where(
+                            Adjustment.project_id == _TEST_PROJECT_ID
+                        )
+                    )
+                )
+            )
             for tbl in (TrialBalance, Adjustment, TbBalance, AccountMapping, AccountChart):
                 await db.execute(
                     sa.delete(tbl).where(tbl.project_id == _TEST_PROJECT_ID)
@@ -328,15 +383,12 @@ async def test_audited_liability_credit_increase_direction(pg_factory):
     async with factory() as db:
         svc = TrialBalanceService(db)
         await svc.recalc_unadjusted(pid, _TEST_YEAR, _COMPANY)
-        group_id = uuid.uuid4()
-        db.add(Adjustment(
-            project_id=pid, year=_TEST_YEAR, company_code=_COMPANY,
-            adjustment_no="AJE-LIAB-INC", adjustment_type=AdjustmentType.aje,
+        await _add_adj(
+            db, pid=pid, uid=uid, adj_type=AdjustmentType.aje,
             account_code="2202", account_name="应付账款",
-            debit_amount=Decimal("0"), credit_amount=Decimal("1000"),
-            entry_group_id=group_id, created_by=uid,
-        ))
-        await db.flush()
+            debit=Decimal("0"), credit=Decimal("1000"),
+            adjustment_no="AJE-LIAB-INC",
+        )
         await svc.recalc_adjustments(pid, _TEST_YEAR, _COMPANY)
         await svc.recalc_audited(pid, _TEST_YEAR, _COMPANY)
         await db.commit()
@@ -360,15 +412,12 @@ async def test_audited_revenue_credit_increase_direction(pg_factory):
     async with factory() as db:
         svc = TrialBalanceService(db)
         await svc.recalc_unadjusted(pid, _TEST_YEAR, _COMPANY)
-        group_id = uuid.uuid4()
-        db.add(Adjustment(
-            project_id=pid, year=_TEST_YEAR, company_code=_COMPANY,
-            adjustment_no="AJE-REV-INC", adjustment_type=AdjustmentType.aje,
+        await _add_adj(
+            db, pid=pid, uid=uid, adj_type=AdjustmentType.aje,
             account_code="6001", account_name="主营业务收入",
-            debit_amount=Decimal("0"), credit_amount=Decimal("500"),
-            entry_group_id=group_id, created_by=uid,
-        ))
-        await db.flush()
+            debit=Decimal("0"), credit=Decimal("500"),
+            adjustment_no="AJE-REV-INC",
+        )
         await svc.recalc_adjustments(pid, _TEST_YEAR, _COMPANY)
         await svc.recalc_audited(pid, _TEST_YEAR, _COMPANY)
         await db.commit()

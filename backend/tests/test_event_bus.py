@@ -343,24 +343,38 @@ class TestOnAdjustmentChanged:
         assert tb_map["1001"].aje_adjustment == Decimal("0")
         assert tb_map["1001"].audited_amount == Decimal("12000")
 
-        # 手动添加调整分录
+        # 手动添加调整分录（借 1001 / 贷 6001 一借一贷成对）
+        #
+        # 🔴 三个必要条件，缺一即调整列恒 0：
+        #   1. **建 AdjustmentEntry 明细行** —— `recalc_adjustments` 按 ADR-ADJ-001
+        #      读 `adjustment_entries.standard_account_code` + JOIN 主表；
+        #      只往主表塞 `account_code`/`debit_amount`/`credit_amount` 三个**遗留
+        #      冗余列**取不到数（真库实测该三列全库 0 非零，已废弃）
+        #   2. **显式 `approved`** —— `review_status` 的 server_default 是 `draft`，
+        #      而 ADR-ADJ-003 只纳入 approved
+        #   3. **origin 非 workpaper** —— ADR-ADJ-002 / V124 约定 TB 调整列排除该来源
         group_id = uuid.uuid4()
-        db_session.add_all([
-            Adjustment(
+        adj_specs = [
+            ("1001", "库存现金", Decimal("500"), Decimal("0")),
+            ("6001", "主营业务收入", Decimal("0"), Decimal("500")),
+        ]
+        for code, name, dr, cr in adj_specs:
+            adj_id = uuid.uuid4()
+            db_session.add(Adjustment(
+                id=adj_id,
                 project_id=pid, year=2025, company_code="001",
                 adjustment_no="AJE-001", adjustment_type=AdjustmentType.aje,
-                account_code="1001", account_name="库存现金",
-                debit_amount=Decimal("500"), credit_amount=Decimal("0"),
-                entry_group_id=group_id, created_by=FAKE_USER_ID,
-            ),
-            Adjustment(
-                project_id=pid, year=2025, company_code="001",
-                adjustment_no="AJE-001", adjustment_type=AdjustmentType.aje,
-                account_code="6001", account_name="主营业务收入",
-                debit_amount=Decimal("0"), credit_amount=Decimal("500"),
-                entry_group_id=group_id, created_by=FAKE_USER_ID,
-            ),
-        ])
+                account_code=code, account_name=name,
+                debit_amount=dr, credit_amount=cr,
+                entry_group_id=group_id,
+                review_status=ReviewStatus.approved, origin="manual",
+                is_deleted=False, created_by=FAKE_USER_ID,
+            ))
+            db_session.add(AdjustmentEntry(
+                id=uuid.uuid4(), adjustment_id=adj_id, entry_group_id=group_id,
+                line_no=1, standard_account_code=code, account_name=name,
+                debit_amount=dr, credit_amount=cr, is_deleted=False,
+            ))
         await db_session.flush()
 
         # 触发事件处理器

@@ -1050,3 +1050,36 @@ backend/tests/workpaper_sync/test_k_lane2_p2_positional_identity.py  1014
 #   test_k_lane2_p3 —— lane2 双变体+模板+写路径（KB-P33~P40，含 13 entry 真库载荷三分 + roundtrip
 #     + 5 条 contract 发布 + 复盘自检），单份 spec 最后的 closeout 文件不宜拆。
 backend/tests/workpaper_sync/test_k_lane2_p3_variants_template_writepaths.py  1059
+
+# -------------------------------------------------------------------------
+# spec: adj-formula-repair-and-approval-gate-wiring（ADJ 取数修复与确认门接线）
+#
+# 登记理由：以下 6 个文件**在本次改动前就已超 800 行**（实测 HEAD 版 855~2073 行），
+# 本次仅做定点修复，增量 +0 ~ +24 行（prefill_engine 反而 -12 行）。
+# 逐文件 HEAD→现在：adjustment_service 969→981 · _impl 2073→2089 ·
+# ocr_service_v2 855→855 · prefill_engine 1659→1647 · trial_balance 1047→1066 ·
+# routers/adjustments 1740→1764（以 split 计；下方 baseline 用本脚本 splitlines 口径）。
+# 拆分它们属独立重构工单（涉及 EventBus handler 注册顺序、prefill resolver 注册表、
+# TB 重算链等既有结构），不在本 bugfix spec 范围内。
+#
+# 🔴 格式铁律：本文件解析器要求每行**恰好 2 个空格分隔字段**（path + baseline），
+#    带行内 `# 注释` 会使 parts != 2 而整行被静默丢弃 —— 故说明只能写在独立注释行。
+# 🔴 baseline 口径 = check_file_size.count_lines 的 splitlines()，
+#    比 split(chr(10)) 恒少 1；填错会导致「已登记仍报超限」。
+# 🔴 baseline 均为当前真实行数，未预留膨胀空间（膨胀 >5% 仍打红）。
+# -------------------------------------------------------------------------
+# AJE/RJE 分录 CRUD + 状态机 + 错报转换
+backend/app/services/adjustment_service.py  980
+# 全平台 EventBus handler 注册中心
+backend/app/services/event_handlers/_impl.py  2088
+# OCR 流水线（本次仅修 1 处 lazy import 错名）
+backend/app/services/ocr_service_v2.py  854
+# prefill 公式 resolver 注册表 + 9 个 resolver
+backend/app/services/prefill_engine.py  1646
+# 试算表四列重算链
+backend/app/services/trial_balance_service.py  1065
+# 分录大厅全部端点
+backend/app/routers/adjustments.py  1763
+# 附件端点（本次仅修 4 处 Attachment lazy import 错路径；
+# HEAD 版 1701 行即已超限，工作树另有前序重构使其降至 821 行）
+backend/app/routers/attachments.py  821

@@ -1,0 +1,2134 @@
+{
+  "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+  "year": 2025,
+  "captured_for": "tb-adjustment-column-formula-closure Phase 0 Task 0.1",
+  "purpose": "改造前基线。Phase 0 收敛调整列口径到 adj_net 后会改变含 draft 分录项目的数字；此文件是区分『修正』与『回归』的唯一依据（tasks 0.10 据此产出 diff）。",
+  "reports": {
+    "balance_sheet": {
+      "row_count": 129,
+      "nonzero_adj_row_count": 0,
+      "nonzero_unadj_row_count": 42,
+      "nonzero_adj_rows": [],
+      "rows": [
+        {
+          "row_code": "BS-001",
+          "row_name": "流动资产：",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-002",
+          "row_name": "货币资金",
+          "unadjusted": "9182572.99",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "9182572.99"
+        },
+        {
+          "row_code": "BS-003",
+          "row_name": "交易性金融资产",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-004",
+          "row_name": "衍生金融资产",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-005",
+          "row_name": "应收票据",
+          "unadjusted": "19046910.15",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "19046910.15"
+        },
+        {
+          "row_code": "BS-006",
+          "row_name": "应收账款",
+          "unadjusted": "597623623.29",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "597623623.29"
+        },
+        {
+          "row_code": "BS-007",
+          "row_name": "应收款项融资",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-008",
+          "row_name": "预付款项",
+          "unadjusted": "13576792.21",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "13576792.21"
+        },
+        {
+          "row_code": "BS-009",
+          "row_name": "其他应收款",
+          "unadjusted": "289985715.67",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "289985715.67"
+        },
+        {
+          "row_code": "BS-010",
+          "row_name": "存货",
+          "unadjusted": "184519428.73",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "184519428.73"
+        },
+        {
+          "row_code": "BS-011",
+          "row_name": "合同资产",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-012",
+          "row_name": "持有待售资产",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-013",
+          "row_name": "一年内到期的非流动资产",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-014",
+          "row_name": "其他流动资产",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-015",
+          "row_name": "流动资产合计",
+          "unadjusted": "1113935043.04",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "1113935043.04"
+        },
+        {
+          "row_code": "BS-016",
+          "row_name": "其中：应收股利",
+          "unadjusted": "21000000.0",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "21000000.0"
+        },
+        {
+          "row_code": "BS-017",
+          "row_name": "△买入返售金融资产",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-018",
+          "row_name": "存货",
+          "unadjusted": "184519428.73",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "184519428.73"
+        },
+        {
+          "row_code": "BS-019",
+          "row_name": "其中：原材料",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-020",
+          "row_name": "非流动资产：",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-021",
+          "row_name": "债权投资",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-022",
+          "row_name": "其他债权投资",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-023",
+          "row_name": "长期应收款",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-024",
+          "row_name": "长期股权投资",
+          "unadjusted": "500000.0",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "500000.0"
+        },
+        {
+          "row_code": "BS-025",
+          "row_name": "其他权益工具投资",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-026",
+          "row_name": "其他非流动金融资产",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-027",
+          "row_name": "投资性房地产",
+          "unadjusted": "4615581.07",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "4615581.07"
+        },
+        {
+          "row_code": "BS-028",
+          "row_name": "固定资产",
+          "unadjusted": "23130861.79",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "23130861.79"
+        },
+        {
+          "row_code": "BS-029",
+          "row_name": "在建工程",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-030",
+          "row_name": "生产性生物资产",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-031",
+          "row_name": "使用权资产",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-032",
+          "row_name": "无形资产",
+          "unadjusted": "1789590.31",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "1789590.31"
+        },
+        {
+          "row_code": "BS-033",
+          "row_name": "开发支出",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-034",
+          "row_name": "商誉",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-035",
+          "row_name": "长期待摊费用",
+          "unadjusted": "83889.02",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "83889.02"
+        },
+        {
+          "row_code": "BS-036",
+          "row_name": "递延所得税资产",
+          "unadjusted": "8048699.8",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "8048699.8"
+        },
+        {
+          "row_code": "BS-037",
+          "row_name": "其他非流动资产",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-038",
+          "row_name": "非流动资产合计",
+          "unadjusted": "38168621.99",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "38168621.99"
+        },
+        {
+          "row_code": "BS-039",
+          "row_name": "资产总计",
+          "unadjusted": "1152103665.03",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "1152103665.03"
+        },
+        {
+          "row_code": "BS-040",
+          "row_name": "流动负债：",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-041",
+          "row_name": "短期借款",
+          "unadjusted": "236912472.13",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "236912472.13"
+        },
+        {
+          "row_code": "BS-042",
+          "row_name": "交易性金融负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-043",
+          "row_name": "衍生金融负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-044",
+          "row_name": "应付票据",
+          "unadjusted": "101893600.0",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "101893600.0"
+        },
+        {
+          "row_code": "BS-045",
+          "row_name": "应付账款",
+          "unadjusted": "254189472.38",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "254189472.38"
+        },
+        {
+          "row_code": "BS-046",
+          "row_name": "预收款项",
+          "unadjusted": "21183245.14",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "21183245.14"
+        },
+        {
+          "row_code": "BS-047",
+          "row_name": "合同负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-048",
+          "row_name": "应付职工薪酬",
+          "unadjusted": "12067280.12",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "12067280.12"
+        },
+        {
+          "row_code": "BS-049",
+          "row_name": "应交税费",
+          "unadjusted": "1270034.29",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "1270034.29"
+        },
+        {
+          "row_code": "BS-050",
+          "row_name": "其他应付款",
+          "unadjusted": "128698570.55",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "128698570.55"
+        },
+        {
+          "row_code": "BS-051",
+          "row_name": "持有待售负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-052",
+          "row_name": "一年内到期的非流动负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-053",
+          "row_name": "其他流动负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-054",
+          "row_name": "流动负债合计",
+          "unadjusted": "756214674.61",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "756214674.61"
+        },
+        {
+          "row_code": "BS-055",
+          "row_name": "短期借款",
+          "unadjusted": "236912472.13",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "236912472.13"
+        },
+        {
+          "row_code": "BS-056",
+          "row_name": "△向中央银行借款",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-057",
+          "row_name": "△拆入资金",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-058",
+          "row_name": "交易性金融负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-059",
+          "row_name": "衍生金融负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-060",
+          "row_name": "非流动负债：",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-061",
+          "row_name": "长期借款",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-062",
+          "row_name": "应付债券",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-063",
+          "row_name": "租赁负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-064",
+          "row_name": "长期应付款",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-065",
+          "row_name": "预计负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-066",
+          "row_name": "递延收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-067",
+          "row_name": "递延所得税负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-068",
+          "row_name": "其他非流动负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-069",
+          "row_name": "非流动负债合计",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-070",
+          "row_name": "负债合计",
+          "unadjusted": "756214674.61",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "756214674.61"
+        },
+        {
+          "row_code": "BS-071",
+          "row_name": "应付福利费",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-072",
+          "row_name": "#其中：职工奖励及福利基金",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-073",
+          "row_name": "应交税费",
+          "unadjusted": "1270034.29",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "1270034.29"
+        },
+        {
+          "row_code": "BS-074",
+          "row_name": "其中：应交税金",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-075",
+          "row_name": "其他应付款",
+          "unadjusted": "126962832.88",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "126962832.88"
+        },
+        {
+          "row_code": "BS-076",
+          "row_name": "其中：应付股利",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-077",
+          "row_name": "▲应付手续费及佣金",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-078",
+          "row_name": "▲应付分保账款",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-079",
+          "row_name": "持有待售负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-080",
+          "row_name": "所有者权益：",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-081",
+          "row_name": "实收资本（或股本）",
+          "unadjusted": "150000000.0",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "150000000.0"
+        },
+        {
+          "row_code": "BS-082",
+          "row_name": "其他权益工具",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-083",
+          "row_name": "资本公积",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-084",
+          "row_name": "减：库存股",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-085",
+          "row_name": "其他综合收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-086",
+          "row_name": "专项储备",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-087",
+          "row_name": "盈余公积",
+          "unadjusted": "35936721.82",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "35936721.82"
+        },
+        {
+          "row_code": "BS-088",
+          "row_name": "未分配利润",
+          "unadjusted": "212442513.14",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "212442513.14"
+        },
+        {
+          "row_code": "BS-089",
+          "row_name": "所有者权益合计",
+          "unadjusted": "398379234.96",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "398379234.96"
+        },
+        {
+          "row_code": "BS-090",
+          "row_name": "△分出再保险合同负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-091",
+          "row_name": "所有者权益合计",
+          "unadjusted": "398379234.96",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "398379234.96"
+        },
+        {
+          "row_code": "BS-092",
+          "row_name": "长期应付款",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-093",
+          "row_name": "长期应付职工薪酬",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-094",
+          "row_name": "预计负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-095",
+          "row_name": "递延收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-096",
+          "row_name": "递延所得税负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-097",
+          "row_name": "其他非流动负债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-098",
+          "row_name": "其中：特准储备基金",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-099",
+          "row_name": "负债和所有者权益总计",
+          "unadjusted": "1154593909.57",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "1154593909.57"
+        },
+        {
+          "row_code": "BS-100",
+          "row_name": "负债合计",
+          "unadjusted": "756214674.61",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "756214674.61"
+        },
+        {
+          "row_code": "BS-101",
+          "row_name": "所有者权益：",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-102",
+          "row_name": "实收资本",
+          "unadjusted": "150000000.0",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "150000000.0"
+        },
+        {
+          "row_code": "BS-103",
+          "row_name": "国家资本",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-104",
+          "row_name": "国有法人资本",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-105",
+          "row_name": "集体资本",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-106",
+          "row_name": "民营资本",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-107",
+          "row_name": "外商资本",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-108",
+          "row_name": "#减：已归还投资",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-109",
+          "row_name": "实收资本净额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-110",
+          "row_name": "其他权益工具",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-111",
+          "row_name": "其中：优先股",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-112",
+          "row_name": "永续债",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-113",
+          "row_name": "资本公积",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-114",
+          "row_name": "减：库存股",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-115",
+          "row_name": "其他综合收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-116",
+          "row_name": "其中：外币报表折算差额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-117",
+          "row_name": "专项储备",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-118",
+          "row_name": "盈余公积",
+          "unadjusted": "35936721.82",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "35936721.82"
+        },
+        {
+          "row_code": "BS-119",
+          "row_name": "其中：法定公积金",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-120",
+          "row_name": "任意公积金",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-121",
+          "row_name": "#储备基金",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-122",
+          "row_name": "#企业发展基金",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-123",
+          "row_name": "#利润归还投资",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-124",
+          "row_name": "△一般风险准备",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-125",
+          "row_name": "未分配利润",
+          "unadjusted": "212442513.14",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "212442513.14"
+        },
+        {
+          "row_code": "BS-126",
+          "row_name": "归属于母公司所有者权益合计",
+          "unadjusted": "398379234.96",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "398379234.96"
+        },
+        {
+          "row_code": "BS-127",
+          "row_name": "*少数股东权益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "BS-128",
+          "row_name": "所有者权益合计",
+          "unadjusted": "398379234.96",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "398379234.96"
+        },
+        {
+          "row_code": "BS-129",
+          "row_name": "负债和所有者权益总计",
+          "unadjusted": "1154593909.57",
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": "1154593909.57"
+        }
+      ]
+    },
+    "income_statement": {
+      "row_count": 78,
+      "nonzero_adj_row_count": 0,
+      "nonzero_unadj_row_count": 0,
+      "nonzero_adj_rows": [],
+      "rows": [
+        {
+          "row_code": "IS-001",
+          "row_name": "一、营业收入",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-002",
+          "row_name": "减：营业成本",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-003",
+          "row_name": "税金及附加",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-004",
+          "row_name": "销售费用",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-005",
+          "row_name": "管理费用",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-006",
+          "row_name": "研发费用",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-007",
+          "row_name": "财务费用",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-008",
+          "row_name": "其中：利息费用",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-009",
+          "row_name": "利息收入",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-010",
+          "row_name": "加：其他收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-011",
+          "row_name": "投资收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-012",
+          "row_name": "其中：对联营企业和合营企业的投资收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-013",
+          "row_name": "以摊余成本计量的金融资产终止确认收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-014",
+          "row_name": "净敞口套期收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-015",
+          "row_name": "公允价值变动收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-016",
+          "row_name": "信用减值损失",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-017",
+          "row_name": "资产减值损失",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-018",
+          "row_name": "资产处置收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-019",
+          "row_name": "二、营业利润",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-020",
+          "row_name": "加：营业外收入",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-021",
+          "row_name": "减：营业外支出",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-022",
+          "row_name": "三、利润总额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-023",
+          "row_name": "减：所得税费用",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-024",
+          "row_name": "四、净利润",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-025",
+          "row_name": "财务费用",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-026",
+          "row_name": "其中：利息费用",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-027",
+          "row_name": "利息收入",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-028",
+          "row_name": "汇兑净损失（净收益以“－”号填列）",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-029",
+          "row_name": "其他",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-030",
+          "row_name": "五、其他综合收益的税后净额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-031",
+          "row_name": "六、综合收益总额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-032",
+          "row_name": "其中：对联营企业和合营企业的投资收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-033",
+          "row_name": "以摊余成本计量的金融资产终止确认收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-034",
+          "row_name": "△汇兑收益（损失以“－”号填列）",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-035",
+          "row_name": "净敞口套期收益（损失以“－”号填列）",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-036",
+          "row_name": "公允价值变动收益（损失以“－”号填列）",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-037",
+          "row_name": "信用减值损失（损失以“－”号填列）",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-038",
+          "row_name": "资产减值损失（损失以“－”号填列）",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-039",
+          "row_name": "资产处置收益（损失以“－”号填列）",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-040",
+          "row_name": "三、营业利润（亏损以“－”号填列）",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-041",
+          "row_name": "加： 营业外收入",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-042",
+          "row_name": "其中：政府补助",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-043",
+          "row_name": "减： 营业外支出",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-044",
+          "row_name": "四、利润总额（亏损总额以“－”号填列）",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-045",
+          "row_name": "减： 所得税费用",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-046",
+          "row_name": "五、净利润（净亏损以“－”号填列）",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-047",
+          "row_name": "（一）按所有权归属分类",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-048",
+          "row_name": "1.归属于母公司所有者的净利润",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-049",
+          "row_name": "*2.少数股东损益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-050",
+          "row_name": "（二）按经营持续性分类",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-051",
+          "row_name": "1.持续经营净利润",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-052",
+          "row_name": "2.终止经营净利润",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-053",
+          "row_name": "六、其他综合收益的税后净额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-054",
+          "row_name": "归属于母公司所有者的其他综合收益的税后净额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-055",
+          "row_name": "（一）不能重分类进损益的其他综合收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-056",
+          "row_name": "1. 重新计量设定受益计划变动额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-057",
+          "row_name": "2. 权益法下不能转损益的其他综合收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-058",
+          "row_name": "3. 其他权益工具投资公允价值变动",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-059",
+          "row_name": "4. 企业自身信用风险公允价值变动",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-060",
+          "row_name": "△5. 不能转损益的保险合同金融变动",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-061",
+          "row_name": "6. 其他",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-062",
+          "row_name": "（二）将重分类进损益的其他综合收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-063",
+          "row_name": "1. 权益法下可转损益的其他综合收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-064",
+          "row_name": "2. 其他债权投资公允价值变动",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-065",
+          "row_name": "3. 金融资产重分类计入其他综合收益的金额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-066",
+          "row_name": "4. 其他债权投资信用减值准备",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-067",
+          "row_name": "5. 现金流量套期储备（现金流量套期损益的有效部分）",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-068",
+          "row_name": "6. 外币财务报表折算差额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-069",
+          "row_name": "△7. 可转损益的保险合同金融变动",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-070",
+          "row_name": "△8. 可转损益的分出再保险合同金融变动",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-071",
+          "row_name": "9. 其他",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-072",
+          "row_name": "*归属于少数股东的其他综合收益的税后净额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-073",
+          "row_name": "七、综合收益总额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-074",
+          "row_name": "归属于母公司所有者的综合收益总额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-075",
+          "row_name": "*归属于少数股东的综合收益总额",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-076",
+          "row_name": "八、每股收益：",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-077",
+          "row_name": "基本每股收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        },
+        {
+          "row_code": "IS-078",
+          "row_name": "稀释每股收益",
+          "unadjusted": null,
+          "aje_dr": null,
+          "aje_cr": null,
+          "rcl_dr": null,
+          "rcl_cr": null,
+          "audited": null
+        }
+      ]
+    },
+    "cash_flow_statement": {
+      "error": "DBAPIError: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.InvalidTextRepresentationError'>: invalid input value for enum report_type: \"cash_flow_statement\"\n[SQL: SELECT report_line_mapping.standard_account_code, report_line_mapping.report_line_code, report_line_mapping.report_line_na"
+    },
+    "cash_flow_supplement": {
+      "error": "DBAPIError: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.InvalidTextRepresentationError'>: invalid input value for enum report_type: \"cash_flow_supplement\"\n[SQL: SELECT report_line_mapping.standard_account_code, report_line_mapping.report_line_code, report_line_mapping.report_line_n"
+    }
+  },
+  "adjustment_liveness": {
+    "project_adjustments_by_deleted_status": [
+      {
+        "is_deleted": "True",
+        "st": "approved",
+        "n": "2"
+      },
+      {
+        "is_deleted": "True",
+        "st": "draft",
+        "n": "32"
+      }
+    ],
+    "global_live_adjustments": [
+      {
+        "live_total": "0"
+      }
+    ],
+    "global_tb_adjustment_columns": [
+      {
+        "tb_rows": "1386",
+        "aje_nz": "0",
+        "rje_nz": "0"
+      }
+    ],
+    "main_table_legacy_columns_nonzero": [
+      {
+        "total": "0",
+        "dr_nz": "0",
+        "cr_nz": "0",
+        "code_nn": "0"
+      }
+    ]
+  }
+}

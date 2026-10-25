@@ -183,7 +183,7 @@ async def on_acnr_invalidate(
     收到失效事件后标记地址坐标索引为 stale，下次 build_index 时重建。
     由 ``acnr.events.invalidate`` 的 handler 链调用（需注册）。
     """
-    from app.core.database import get_db_contextmanager
+    from app.core.database import async_session as get_db_contextmanager
 
     try:
         async with get_db_contextmanager() as db:

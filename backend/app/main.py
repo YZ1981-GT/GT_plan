@@ -431,6 +431,19 @@ def _register_phase_handlers() -> None:
             "[启动] 合并 stale handler 注册失败: %s", e
         )
 
+    # adj-formula-repair-and-approval-gate-wiring 任务 3.4:
+    # 调整分录审批 → TB 调整列 + 审定数重算
+    try:
+        from app.services.event_bus import event_bus
+        from app.services.adjustment_approved_recalc_handler import (
+            register_adjustment_approved_recalc_handler,
+        )
+        register_adjustment_approved_recalc_handler(event_bus)  # ADJUSTMENT_APPROVED → recalc adjustments + audited
+    except Exception as e:
+        _log.getLogger("audit_platform").warning(
+            "[启动] 调整分录审批 recalc handler 注册失败: %s", e
+        )
+
 
 async def _check_gin_index_status() -> None:
     """Startup check: detect if parsed_data GIN index is building → set global flag."""

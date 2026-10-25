@@ -451,6 +451,63 @@ approved 后软删除由既有 `ADJUSTMENT_DELETED` 覆盖。
 
 ---
 
+## §九补 实施后复盘增补（append-only，实测证据）
+
+### 补.1 「参数传递正确」≠「过滤生效」—— 守卫层级错位是本轮最严重缺陷
+
+原任务 0.1 的 `test_aje_and_rje_must_differ_with_data` 用 spy patch 验证
+「`_resolve_adj_formula` 把不同 `adj_type` 传给了 `adj_net`」。**实测**：注释掉
+`adj_net` 内的 `Adjustment.adjustment_type == normalized_type` 后该测试**仍绿**，
+只有复盘新加的真 DB 测试打红。
+
+同类缺口共 3 处，全部实测确认：
+
+| 过滤条件 | 删掉后的守卫反应（实测） |
+|---|---|
+| `adjustment_type` | 仅新测试红，原 spy 测试绿 |
+| `include_statuses` | **8 项全绿，零打红** |
+| `exclude_origins` | 零打红（任务 0.3 明确要求却漏做） |
+
+**固化**：凡「过滤/排除/归一」类实现，守卫必须落在**能观测到过滤后果的层级**
+（真 DB 落多类数据后比对结果），mock/spy 只能验证接线不能验证语义。
+每条过滤条件都要能通过「注释掉它 → 守卫打红」的变异检验。
+
+### 补.2 冒烟守卫的入参必须过被测函数的 arity 早退门
+
+原任务 0.2 对全部 resolver 统一传 3 个 args，而 `_resolve_aux_formula` 开头是
+`if len(args) < 4: return None` ⇒ **在执行到函数体内 import 之前就早退**。
+
+**后果（实测）**：`AUX` 与 `TB_AUX` 存在与 `ADJ` 完全同源的
+`from app.models.dataset_models import TbAuxBalance` ImportError
+（真实位置 `audit_platform_models`），被该守卫判绿数轮。
+`TB_AUX` 另有一层遗漏 —— 它在 registry 里值为 `None`，遍历直接 `continue` 跳过。
+
+**固化**：冒烟类守卫须为每个被测对象登记**足量入参**并断言
+「登记表覆盖全部被测对象」（新增对象未登记即红）；registry 里的 `None` 值成员
+必须有独立用例，不能只靠遍历。
+
+### 补.3 静态扫描三层误报，逐层排除后才是真结论
+
+全仓 lazy import 扫描（4374 条函数体内 `from app.* import`）的口径演进：
+
+| 口径 | 命中 | 问题 |
+|---|---|---|
+| 裸扫描 | 36 | 含 `if TYPE_CHECKING:` 与 `try/except ImportError` 包裹项 |
+| 排除受保护 import | 26 | 含 feature-flag 关闭的未实现占位 |
+| 按 `_INCLUDE_*` flag 字面值二分 | **13 真 + 13 占位** | 定性完成 |
+
+13 条真缺陷再分两型：**错名**（3 条 `app.core.database` 的
+`async_session_factory`/`async_session_maker`/`get_db_contextmanager`，
+真实导出是 `async_session` —— 与既有 `async_engine` 别名事故同源，已修）
+与**幽灵引用**（10 条目标名全仓任何模块都不存在，SQLAlchemy 注册表权威确认
+`checklist_responses` 表无 ORM 模型，修它需业务判断而非改路径）。
+
+**固化**：「结构性零/大批量命中」都要先做三层排除再下结论；
+存量超出当前 spec 范围时用「基线冻结 + 分类白名单 + 分类依据钉死断言」止血
+（flag 翻 True 而目标仍缺失 → 自动打红逼迫搬移），而非一次性全改或全忽略。
+
+---
+
 ## §十 交付前自查清单
 
 - [ ] 每条需求至少被某个 task 引用（判据引用闭合性，非仅编号连续）

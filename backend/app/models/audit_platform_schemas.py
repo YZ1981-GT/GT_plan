@@ -879,6 +879,11 @@ class EventType(str, enum.Enum):
     ADJUSTMENT_BATCH_COMMITTED = "adjustment.batch_committed"
     LINKAGE_CASCADE_DEGRADED = "linkage.cascade_degraded"
 
+    # adj-formula-repair-and-approval-gate-wiring 需求 4.1:
+    # 调整分录复核通过 → 下游重算/stale/SSE
+    # payload: {project_id, year, account_codes: [...], entry_group_id}
+    ADJUSTMENT_APPROVED = "adjustment.approved"
+
     # Sprint 10: 底稿深度优化事件
     WORKPAPER_AUDITED_CONFIRMED = "workpaper.audited_confirmed"
     WORKPAPER_PROCEDURE_COMPLETED = "workpaper.procedure_completed"
