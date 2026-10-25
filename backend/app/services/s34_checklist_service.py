@@ -8,13 +8,97 @@ Requirements: 3.2, 9.1, 12.1
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.b50_risk_reader import load_b50_risks
+
 logger = logging.getLogger(__name__)
+
+
+# P2.2 风险来源与四象限状态。风险只从 B50 checklist reader 读取；不查询或写入
+# 其他风险表或余额表。空的 B50 风险结果代表“没有可确认的数据”，而不是
+# “已确认没有风险”，因此必须保留 unknown 状态，避免无依据推荐或裁剪 S34。
+S34_RISK_INDICATORS = frozenset({"identified", "none", "unknown"})
+S34_APPLICABILITY_STATES = frozenset({
+    "applicable", "recommended", "not_applicable", "unknown",
+})
+_S34_FRAUD_ACCOUNTS = frozenset({"收入确认", "管理层凌驾控制"})
+
+
+def is_s34_related_risk(risk: Mapping[str, Any]) -> bool:
+    """判断一条 B50 风险是否足以触发 S34 风险导向提示。
+
+    P2.1 没有可供确认的旧风险表值域，因此不凭空
+    推导 D~N 到 S34 的映射。当前只接受两类有明确语义的 B50 结论：
+    * cycle 明确为 S/S34；
+    * B50 预置舞弊事项“收入确认”或“管理层凌驾控制”达到高风险或特别风险。
+    """
+    cycle = str(risk.get("cycle") or "").strip().upper()
+    if cycle == "S" or cycle.startswith("S34"):
+        return True
+
+    account = str(risk.get("account") or "").strip()
+    if account not in _S34_FRAUD_ACCOUNTS:
+        return False
+    level = str(risk.get("risk_level") or "").strip().upper()
+    return level == "H" or bool(risk.get("is_special_risk"))
+
+
+def build_s34_risk_indicator(
+    risks: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """把 B50 reader 结果转换为 S34 只读风险指示器。
+
+    ``risks=[]`` 在当前读取器契约中同时覆盖“B50 未编制/无 checklist 数据”，
+    所以返回 ``unknown``，绝不把空结果伪造成“无风险”。有数据但没有 S34
+    相关结论时才返回 ``none``。
+    """
+    risk_rows = list(risks)
+    if not risk_rows:
+        return {
+            "risk_indicator": "unknown",
+            "risk_data_available": False,
+            "risk_count": 0,
+            "risk_source": "b50_checklist",
+        }
+
+    related = [risk for risk in risk_rows if is_s34_related_risk(risk)]
+    return {
+        "risk_indicator": "identified" if related else "none",
+        "risk_data_available": True,
+        "risk_count": len(related),
+        "risk_source": "b50_checklist",
+    }
+
+
+def classify_s34_applicability(
+    risk_data_available: bool,
+    risk_present: bool,
+    workpaper_exists: bool,
+) -> str:
+    """按风险数据/风险存在/底稿存在三项输入返回 S34 四象限状态。
+
+    * 风险 + 无底稿 → ``recommended``；
+    * 风险或已有底稿 → ``applicable``；
+    * 已确认无风险且无底稿 → ``not_applicable``；
+    * 风险源无数据且无底稿 → ``unknown``（待确认、不可推荐）。
+    """
+    if not risk_data_available:
+        return "applicable" if workpaper_exists else "unknown"
+    if risk_present and not workpaper_exists:
+        return "recommended"
+    if risk_present or workpaper_exists:
+        return "applicable"
+    return "not_applicable"
+
+
+# 语义别名，便于 service/Overview 契约测试直接表达“四象限”意图。
+classify_s34_quadrant = classify_s34_applicability
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -295,8 +379,10 @@ async def get_s34_checklist(
     逻辑：
     1. 加载静态 S34_CHECKLIST_DATA（41 项 regRef 映射）
     2. 查询 wp_index 获取当前项目下 S34-* 底稿的 wp_id 与 status
-    3. 有 wp_id → applicable，无 → not_applicable
-    4. status 映射为 completed / in_progress / not_started
+    3. 从 B50 checklist 真源读取 S34 相关风险指示
+    4. 按风险数据、风险存在和底稿存在计算 applicable / recommended /
+       not_applicable / unknown 四象限
+    5. status 映射为 completed / in_progress / not_started
 
     Returns:
         list[S34ChecklistItem dict]
@@ -319,18 +405,33 @@ async def get_s34_checklist(
     for row in rows:
         wp_map[row[0]] = {"wp_id": str(row[1]), "status": row[2]}
 
+    # 风险只读 B50 checklist 真源。读取器内部已将查询/解析失败降级为空；这里
+    # 把空结果明确标为 unknown，而不是把它当成“无风险”。
+    try:
+        b50_risks = await load_b50_risks(db, project_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("S34 B50 风险读取失败 project=%s: %s", project_id, exc)
+        b50_risks = []
+    risk_state = build_s34_risk_indicator(b50_risks)
+    risk_present = risk_state["risk_indicator"] == "identified"
+
     # 组装结果
     checklist: list[dict[str, Any]] = []
     for item in S34_CHECKLIST_DATA:
         wp_code = item["wp_code"]
         wp_info = wp_map.get(wp_code)
+        workpaper_exists = wp_info is not None
 
-        if wp_info:
-            applicability = "applicable"
-            status = _wp_status_to_completion(wp_info["status"])
-        else:
-            applicability = "not_applicable"
-            status = "not_started"
+        applicability = classify_s34_applicability(
+            risk_data_available=risk_state["risk_data_available"],
+            risk_present=risk_present,
+            workpaper_exists=workpaper_exists,
+        )
+        status = (
+            _wp_status_to_completion(wp_info["status"])
+            if wp_info
+            else "not_started"
+        )
 
         checklist.append({
             "seq": item["seq"],
@@ -339,6 +440,9 @@ async def get_s34_checklist(
             "reg_ref": item["reg_ref"],
             "applicability": applicability,
             "status": status,
+            "risk_indicator": risk_state["risk_indicator"],
+            "risk_data_available": risk_state["risk_data_available"],
+            "risk_count": risk_state["risk_count"],
         })
 
     return checklist

@@ -331,6 +331,7 @@ onMounted(async () => {
               :wp-id="wpIdMap[tab.wpCode]"
               :sheet-name="`${tab.wpCode}程序表`"
               :readonly="props.readonly"
+              cycle-code="S34"
               @jump-to-workpaper="handleCrossRefClick"
             />
 

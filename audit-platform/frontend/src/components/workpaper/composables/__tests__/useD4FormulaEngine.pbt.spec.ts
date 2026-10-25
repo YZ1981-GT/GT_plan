@@ -18,6 +18,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
+import { isIpoProject, IPO_BIZ_KEYWORDS } from '@/utils/ipoProjectUtils'
 
 import {
   parseNum,
@@ -30,7 +31,6 @@ import {
   calcPriceDiffRate,
   isChangeRateExceeding,
   isSuspiciousFundFlow,
-  isIpoGroupVisible,
 } from '../useD4FormulaEngine'
 
 // ─── Property 1 PBT: 损益类审定数公式链 ────────────────────────────────────
@@ -258,20 +258,22 @@ describe('Feature: d4-operating-revenue, Property 13: IPO/舞弊组可见性控�
   /**
    * **Validates: Requirements 14.1, 26.7**
    *
-   * isIpoGroupVisible returns true iff businessCategory contains one of the
-   * keywords (case insensitive): 'ipo', 'listed', 'neeq', 'restructuring', 'fraud_risk'
+   * The core isIpoProject utility, when given D4's allowedCats, returns true
+   * iff businessCategory contains one of the D4 keywords (case insensitive).
    */
-  const IPO_KEYWORDS = ['ipo', 'listed', 'neeq', 'restructuring', 'fraud_risk'] as const
+  const D4_IPO_GROUP_CATS = [...IPO_BIZ_KEYWORDS, 'fraud_risk']
+  // Keep refinancing explicit in this PBT even though it currently comes from IPO_BIZ_KEYWORDS.
+  const D4_REFINANCING = 'refinancing'
 
-  it('returns true when businessCategory contains any IPO keyword', () => {
+  it('returns true when businessCategory contains any IPO/refinancing keyword', () => {
     fc.assert(
       fc.property(
-        fc.constantFrom(...IPO_KEYWORDS),
+        fc.constantFrom(...D4_IPO_GROUP_CATS, D4_REFINANCING),
         fc.string({ minLength: 0, maxLength: 10 }),
         fc.string({ minLength: 0, maxLength: 10 }),
         (keyword, prefix, suffix) => {
           const category = prefix + keyword + suffix
-          expect(isIpoGroupVisible(category)).toBe(true)
+          expect(isIpoProject(category, D4_IPO_GROUP_CATS)).toBe(true)
         },
       ),
       { numRuns: 100 },
@@ -281,9 +283,9 @@ describe('Feature: d4-operating-revenue, Property 13: IPO/舞弊组可见性控�
   it('returns true for uppercase keywords (case insensitive)', () => {
     fc.assert(
       fc.property(
-        fc.constantFrom(...IPO_KEYWORDS),
+        fc.constantFrom(...D4_IPO_GROUP_CATS),
         (keyword) => {
-          expect(isIpoGroupVisible(keyword.toUpperCase())).toBe(true)
+          expect(isIpoProject(keyword.toUpperCase(), D4_IPO_GROUP_CATS)).toBe(true)
         },
       ),
       { numRuns: 100 },
@@ -298,7 +300,7 @@ describe('Feature: d4-operating-revenue, Property 13: IPO/舞弊组可见性控�
 
     fc.assert(
       fc.property(nonMatchingArb, (category) => {
-        expect(isIpoGroupVisible(category)).toBe(false)
+        expect(isIpoProject(category, D4_IPO_GROUP_CATS)).toBe(false)
       }),
       { numRuns: 100 },
     )

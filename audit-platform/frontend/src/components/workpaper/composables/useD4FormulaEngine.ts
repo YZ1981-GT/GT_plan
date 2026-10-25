@@ -11,8 +11,6 @@
  * Requirements: 1.5, 2.3, 3.2, 4.2, 8.2, 11.3, 13.2, 14.1, 14.11, 25.1-25.4
  */
 
-import { isIpoProject, IPO_BIZ_KEYWORDS } from '@/utils/ipoProjectUtils'
-
 // ─── 数值解析 ─────────────────────────────────────────────────────────────────
 
 /**
@@ -260,23 +258,6 @@ export function isSuspiciousFundFlow(
   if (maxAmount === 0) return false
   const diffRatio = Math.abs(inAmount - outAmount) / maxAmount
   return diffRatio < threshold && daysDiff < 30
-}
-
-// ─── IPO/舞弊组可见性 ───────────────────────────────────────────────────────
-
-/** IPO组关键字（小写）——保留用于 D4 fraud_risk 扩展 */
-const IPO_KEYWORDS = ['ipo', 'listed', 'neeq', 'restructuring', 'fraud_risk'] as const
-
-/**
- * IPO/舞弊组可见性: business_category包含指定关键字(大小写不敏感)
- *
- * 关键字：'ipo' | 'listed' | 'neeq' | 'restructuring' | 'fraud_risk'
- * D4 一级Tab"IPO/舞弊"组的 v-if 条件。
- *
- * 委托至 @/utils/ipoProjectUtils.isIpoProject，附加 D4 特有的 fraud_risk 关键词。
- */
-export function isIpoGroupVisible(businessCategory: string): boolean {
-  return isIpoProject(businessCategory, [...IPO_BIZ_KEYWORDS, 'fraud_risk'])
 }
 
 // ─── 表间 WP 取数公式（预设 + 手工二次编辑） ───────────────────────────────

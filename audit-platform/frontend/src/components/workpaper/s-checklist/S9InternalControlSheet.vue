@@ -177,18 +177,26 @@
 import { ref, computed, inject, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { sChecklistItemIds, type SChecklistComponentType } from './sChecklistItemIds'
+import { loadSChecklistHtmlData } from './sChecklistRenderData'
 
 // ─── 组件导入 ────────────────────────────────────────────────────────────────
 
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+
+const COMPONENT_TYPE = 's9-internal-control' as const
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 const props = defineProps<{
   wpId: string
   projectId: string
-  isReadonly: boolean
+  readonly?: boolean
+  sheetName?: string
+  componentType?: SChecklistComponentType
+  htmlData?: Record<string, any> | null
 }>()
+const isReadonly = computed(() => props.readonly === true)
 
 // ─── 复核对话 inject ─────────────────────────────────────────────────────────
 
@@ -281,7 +289,7 @@ function handleAiConclusion() {
 // ─── 保存 ────────────────────────────────────────────────────────────────────
 
 async function handleSave() {
-  if (saving.value) return
+  if (isReadonly.value || saving.value) return
   saving.value = true
   try {
     const payload = {
@@ -296,7 +304,14 @@ async function handleSave() {
     }
     await http.put(
       `/api/workpapers/${props.wpId}/checklist-responses`,
-      { sheet_name: '内部控制调查表S9-2', data: payload }
+      {
+        project_id: props.projectId,
+        items: [{
+          item_id: sChecklistItemIds['s9-internal-control'],
+          conclusion: null,
+          remark: JSON.stringify(payload),
+        }],
+      }
     )
     isDirty.value = false
     ElMessage.success('内控调查表已保存')
@@ -311,15 +326,12 @@ async function handleSave() {
 
 async function loadData() {
   try {
-    const res = await http.get(
-      `/api/workpapers/${props.wpId}/render-config`,
-      { _silent: true } as any
-    )
-    const sheets = res?.data?.sheets || res?.sheets || []
-    const sheet = sheets.find((s: any) =>
-      s.sheet_name?.includes('内部控制调查表') || s.sheet_name?.includes('S9-2')
-    )
-    const htmlData = sheet?.html_data
+    const htmlData = await loadSChecklistHtmlData({
+      wpId: props.wpId,
+      htmlData: props.htmlData,
+      componentType: props.componentType ?? COMPONENT_TYPE,
+      sheetName: props.sheetName,
+    })
 
     if (htmlData?.checklist_rows?.length) {
       checklistRows.value = htmlData.checklist_rows.map((r: any, idx: number) => ({

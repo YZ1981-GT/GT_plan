@@ -1,0 +1,42 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "blocking",
+      "confidence": "confirmed",
+      "location": "report.md §1.2 总体封顶与准入说明、§2 修复前的受限试点边界、§11 未验证项",
+      "problem": "报告把当前成熟度定为‘早期受控试点级’，但其自身要求的冻结、隔离、人工复核、可回退和登录态写入 UAT 尚未被证明是已生效控制；§2 列出的限制仍是整改建议，不能作为当前准入条件。",
+      "evidence": "10-architecture.md §一、§八确认错误 Runtime 和 Draft Refresh 仍在生产路径；12-global-conflict-edit-template.md §7.2确认全局/模板无业务回滚 API；13-lineage-governance-tests.md §4.3及 report.md §11确认未做登录态写入 UAT、未调用 publish/apply/rollback/delete 写 API。",
+      "recommendation": "将 41/100 明确为结构/证据评分，并把风险调整后的当前成熟度降为‘集成原型级’；或者补出服务端已冻结错写路径、双项目隔离、登录态写入 UAT和可回退机制的证据后再保留‘早期受控试点级’。"
+    },
+    {
+      "id": "F-02",
+      "severity": "blocking",
+      "confidence": "likely",
+      "location": "report.md §1.2 第21项‘调试器与 push 专项可观测’",
+      "problem": "该项把普通调试器与 Formula Push 两个证据层不同的能力合并，并仅凭 push 的真实 run/state 计3分；普通最终值、tooltip、GraphPanel及调试展示仍只有局部挂载或零挂载证据。该1分正好决定总分41或40及对应成熟度档位。",
+      "evidence": "10-architecture.md §五支持 Formula Push 的L3运行证据；13-lineage-governance-tests.md §2.1~2.2、§4.2说明普通最终值无统一输入展开、tooltip真实宿主有限且未传计算时间、GraphPanel/TracePopover零生产挂载、FormulaDebugPanel缺直接展示证据。",
+      "recommendation": "拆分两个检查项并维持固定总分母，或按较弱子能力将组合项计2分；若坚持3分，补出普通调试器生产函数或真实用户展示的L3证据，并明确组合项的聚合规则。"
+    },
+    {
+      "id": "F-03",
+      "severity": "blocking",
+      "confidence": "confirmed",
+      "location": "report.md §6.1 P0标准、§6.3 P1-1与P1-2",
+      "problem": "报告将正常前置下确定性产生‘错误成功’定义为P0，但 UnifiedLineage 的少参调用和 timeline 的三条 schema 漂移路径都会确定性吞错并返回假空结果，却仍被列为P1，分级规则没有一致应用。",
+      "evidence": "13-lineage-governance-tests.md §2.3的生产签名与直接探针确认 UnifiedLineage 恒返回空；本轮窄查 backend/app/services/unified_lineage_service.py 确认三参调用四参函数并 broad catch；12-global-conflict-edit-template.md §8.3 C3确认 timeline 3/5源使用不存在字段且已有日志仍显示为空。",
+      "recommendation": "把P0定义收窄为影响业务数值、权威写入或安全隔离的确定性错误成功，并解释 lineage/timeline 为何属P1；或按现有宽定义将P1-1、P1-2升为P0，同步管理摘要、P0数量和近期交付。"
+    },
+    {
+      "id": "F-04",
+      "severity": "non_blocking",
+      "confidence": "confirmed",
+      "location": "指定证据 d:\\GT_plan\\.agents\\tasks\\formula-management-comprehensive-assessment-2026-10-25\\11-coverage-matrix.md；report.md §0.2、§4、§11",
+      "problem": "用户指定的独立覆盖矩阵证据文件不存在。报告已如实披露并将矩阵作为其余材料的交叉汇总，因此当前没有借缺失文件过度背书，但独立证据角度仍未交付。",
+      "evidence": "读取指定路径返回不存在；其余四份证据可读，report.md明确声明该缺口。",
+      "recommendation": "补交11-coverage-matrix.md，或正式删除该证据交付项并把报告§4改名为‘综合覆盖矩阵’；补齐前不得提升矩阵独有逐格结论的证据等级。"
+    }
+  ],
+  "reviewDoc": "d:\\GT_plan\\.agents\\tasks\\formula-management-comprehensive-assessment-2026-10-25\\review-doc.md"
+}

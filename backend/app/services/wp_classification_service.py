@@ -293,15 +293,14 @@ def _load_applicable_when() -> dict[str, dict]:
     # 聚合 bundle 父码：对子码按父前缀分组，取并集
     BUNDLE_PARENTS = {"S32", "S33", "S34", "S35"}
     for parent in BUNDLE_PARENTS:
-        if parent in result:
-            continue  # 父码已有声明则跳过
         children_aw = [
             m["applicable_when"]
             for m in data
             if m.get("wp_code", "").startswith(parent + "-") and m.get("applicable_when")
         ]
         if children_aw:
-            # 取所有子码 business_category 的并集（宽松策略：任一子码适用即父码适用）
+            # 取所有子码 business_category 的并集（宽松策略：任一子码适用即父码适用）。
+            # 即使未来父码误带声明，也以子码集合重建，保持 mapping 单一来源。
             all_cats: set[str] = set()
             for aw in children_aw:
                 all_cats.update(aw.get("business_category", []))

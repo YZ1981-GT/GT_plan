@@ -33,6 +33,15 @@ describe('isIpoProject', () => {
     expect(isIpoProject('annual')).toBe(false)
   })
 
+  it('supports D4 fraud_risk without changing base behavior', () => {
+    const d4AllowedCats = [...IPO_BIZ_KEYWORDS, 'fraud_risk']
+    expect(isIpoProject('fraud_risk_high', d4AllowedCats)).toBe(true)
+    expect(isIpoProject('normal', d4AllowedCats)).toBe(false)
+    expect(isIpoProject('', d4AllowedCats)).toBe(false)
+    expect(isIpoProject('refinancing')).toBe(true)
+    expect(isIpoProject('refinancing', ['fraud_risk'])).toBe(false)
+  })
+
   it('uses allowedCats override when provided', () => {
     // 自定义关键词列表覆盖默认
     expect(isIpoProject('fraud_risk_high', ['fraud_risk'])).toBe(true)

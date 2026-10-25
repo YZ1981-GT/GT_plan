@@ -42,6 +42,7 @@ _PATTERN_SCHEMA_MAP: list[tuple[re.Pattern, str]] = [
     # C 类通用 schema
     (re.compile(r"^C(\d{1,2})$"), "C-generic.yaml"),              # C2~C15
     (re.compile(r"^C(\d{1,2})-2$"), "C-deviation-generic.yaml"),  # C2-2~C15-2
+    (re.compile(r"^S33-(\d{1,2})$"), "S33-generic.yaml"),  # S33-1~S33-9
 ]
 
 
@@ -178,6 +179,8 @@ class WpRenderSchemaService:
                     elif schema_file == "C-generic.yaml" and 2 <= n <= 15:
                         valid = True
                     elif schema_file == "C-deviation-generic.yaml" and 2 <= n <= 15:
+                        valid = True
+                    elif schema_file == "S33-generic.yaml" and 1 <= n <= 9:
                         valid = True
                     if valid:
                         generic_path = _SCHEMA_DIR / schema_file

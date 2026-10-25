@@ -1,0 +1,69 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": "P1R-01",
+      "severity": "blocking",
+      "confidence": "confirmed（规则（2）文字与第 1/6/10 项冲突）/ likely（第 25 项）",
+      "location": "report.md §1.2 单项规则（1）（2）与第 1、6、10、18、25 项；联动 §0.4、§1.3、§2、§12",
+      "problem": "评分规则文字与逐项得分不自洽，用户点名复核的 40/100、2.0/5 不能按文复算。规则（2）“live 采用为 0 或无登录态写入型 UAT，最高 2 分”按字面会把全部 25 项封顶 2（§0.1、§11.4 自述全文无登录态写入 UAT），第 6、10 项却为 3；第 1 项依据栏写明“业务行全 0”仍计 3，而第 18 项对同一“六表为 0”事实计 2，未说明区别；第 25 项以已证实的假绿测试为正面依据计 2，与规则（1）“含假通过、与 P 级无关”冲突。",
+      "evidence": "report.md §1.2 规则（1）（2）原文与第 1、18、25 项依据栏；§0.1“当前没有任何能力达到 L4（未做登录态写入型 UAT）”；§11.4 第 2、4 条；13-lineage-governance-tests.md §2.3 第 4~5 条、§4.2（lineage 单测 patch 真实函数后全绿，生产 wrapper 恒返回空）；10-architecture.md §七（166+117 绿测未发现 18/18 错值、50/410 漂移）；12-global-conflict-edit-template.md §8.3 C3、§14（timeline 测试把异常→空当成功）；report.md P3-3 自认假绿。按自身规则最可辩护复算为 40−1−1=38（1.9/5），按规则（2）字面为 36（1.8/5），均仍属 21~40 档。",
+      "recommendation": "二选一：改写规则（2）为可执行文字（如“无 live 业务采用且无真实用户写入证据，最高 2 分”，并定义结构类检查项的“采用”），同时为第 1、25 项写明豁免理由；或按现行文字复评为 38/1.9（或 36/1.8），并同步 §0.4、§1.2 小计、§1.3 结论、§2、§12。成熟度“集成原型级”无需改动。"
+    },
+    {
+      "id": "P1R-02",
+      "severity": "non_blocking",
+      "confidence": "confirmed",
+      "location": "report.md §1.2 第 10 项、§2“当前最成熟能力”、§4.2 Formula Push 行",
+      "problem": "Formula Push 的运行证据被写成“3 次 succeeded run / 171 state 全在和平药房一个项目”。实际 3 次 run 中只有 1 次在和平药房且有写入，另 2 次在安徽骨科、0 写入、各跳过 78 项；与报告自身引用的证据矛盾。",
+      "evidence": "只读 SQL：formula_push_run 和平药房 2026-10-17 manual written 139/unchanged 28/kept 4/skipped 92；安徽骨科 2026-10-25 manual 与 TRIAL_BALANCE_UPDATED 各 written 0/skipped 78；formula_push_state 171 行全部属和平药房。10-architecture.md §五原文“安徽骨科 manual 与 TRIAL_BALANCE_UPDATED 各 0 write/78 skip，原因是底稿不存在”；11-coverage-matrix.md §三括注只对 171 行成立，T2 也提到 TRIAL_BALANCE_UPDATED 那次 run。",
+      "recommendation": "改正三处表述：L3 依据为 1 次写入 run（139 格）加 171 条 state；另一真实项目的手动与事件驱动推送因底稿不存在全部跳过，可作为“不外推”的佐证写入。第 10 项可维持 3 分。"
+    },
+    {
+      "id": "P1R-03",
+      "severity": "non_blocking",
+      "confidence": "confirmed",
+      "location": "report.md §5.6 verdict 行",
+      "problem": "§5.6 写“局部 L3、平台整体 L1——调试面板与 push 专项可见”，把只有挂载证据的调试面板与有真实运行数据的 push 并列于 L3，与第 21 项的拆分计分（push 3、调试面板 2）矛盾，是 F-02 混合定级的残留。",
+      "evidence": "report.md §1.2 第 21 项（调试面板“只有挂载、无用户运行证据”计 2）；§11.3 标题“只读源码窄查（未运行代码）”及第 4 条。",
+      "recommendation": "改为“push 专项 L3；调试面板 L2（同次求值为源码判定）；平台整体 L1”。"
+    },
+    {
+      "id": "P1R-04",
+      "severity": "non_blocking",
+      "confidence": "likely",
+      "location": "report.md §6.1 P0 ①、§6.2 P0-2、§6.3 P1-4、§9.1 R2",
+      "problem": "P1-4 中的 IF(1>0,1) 返回 0 且 ok、参数个数不符（MAX()、AUX('1122')、多余参数的 NOTE）静默返回 0 且 ok、ROUND(1.005,2)=1.00，字面上满足收窄后的 P0 ①“错误业务数值以成功状态返回”，与已归入 P0-2 的 L1 1/0、缺行同类；R2 验收已写入“少参非 ok”，P 级表却未说明这些为何留在 P1。",
+      "evidence": "p1-10-defect-verification.md P1-4 实测表；report.md P0-2 机制栏“L1 1/0、缺行返回 0 且 ok”与 R2 验收“未知、除零、缺引用、少参非 ok”；只读扫描 formula_push_rules.json 中 IF/ROUND 为 0、prefill_formula_mapping.json 仅一处说明文字提及 IF、报表公式只用 TB/SUM_ROW/ROW/SUM_TB，暴露面仅在用户自写公式，与定为 P0 的 P0-1“现网暴露 0 但正常前置可满足”同一情形。",
+      "recommendation": "把参数个数/少参并入 P0-2（与 R2 一致）；ROUND 舍入模式按 P0 ① 处理，或写明“舍入口径待 §10 拍板，拍板前列 P1”的理由。"
+    },
+    {
+      "id": "P1R-05",
+      "severity": "non_blocking",
+      "confidence": "likely",
+      "location": "report.md §6.6 待核项（settingsDomain、前缀聚合在推送上的表现）",
+      "problem": "两项待核可用只读证据收窄。settingsDomain 被描述为可能“错误写入权威定义、按 P0 定级”，但工具栏只把该域用于跳转全局页与模板保存/订阅对话框中可见、可改的“公式域”默认值（订阅前有预览），应用范围对话框的域由调用方显式传入，不存在静默改写报表域的路径。推送前缀聚合当前真库暴露为 0。",
+      "evidence": "FormulaSettingsToolbar.vue（domain 仅用于 openGlobalSettings query、FormulaTemplateSaveDialog/FormulaTemplateSubscribeDialog 的 default-domain）；两对话框均有“公式域”选择控件；FormulaManagerDialog.askApplyScope 只在报表保存链传 'report'，useTbDetailFormulas/useCrossCheckRules 各传本域。只读 SQL：未删项目中父子科目并存且金额非零的仅重庆医疗器械 2025 的 1231；推送规则 89 个 TB 科目码含 1231-01、1231-02，不含 1231。",
+      "recommendation": "settingsDomain 改登记为界面默认值问题（P3/P2），不再作为 P0 候选；推送前缀聚合一项补记“当前真库暴露 0、依赖数据的潜在缺陷”，继续待核。"
+    },
+    {
+      "id": "P1R-06",
+      "severity": "non_blocking",
+      "confidence": "confirmed",
+      "location": "report.md §6.3 P1-3、§6.4 P2-4",
+      "problem": "来源材料中有几项缺陷未进入任何 P 级条目：项目 edit 成员可经 POST /formula-audit-log/{project}/{year} 提交任意 old/new/result/trace（审计记录可被合法用户注入误导内容）；年度不进哈希载荷且 GET 忽略 year；模板公式域与适用范围可以不相容而后端不拒绝。",
+      "evidence": "13-lineage-governance-tests.md §3.5 第 6、7 条；12-global-conflict-edit-template.md §10.3 第 3 条；report.md P1-3 仅覆盖加锁与 verify 边界，P2-4 未列域/范围不相容。",
+      "recommendation": "前两条并入 P1-3 或另列 P1/P2，第三条并入 P2-4；若刻意排除，明确标为不在本轮范围。"
+    },
+    {
+      "id": "P1R-07",
+      "severity": "non_blocking",
+      "confidence": "confirmed",
+      "location": "report.md §0.2 [M] 合格标准②、§4.1",
+      "problem": "三处小偏差：合格标准②写“90 格每格有编号证据”，实际 18 个不适用格中 13 个无编号；§4.1 用“project_type='consolidated' 为 0”说明合并停在 L2，而 project_type 在真库只有 annual 与 NULL，report_scope='consolidated' 有 1 个（UAT 合成集团），与 P2-1“最多 84 单体”读起来矛盾；“15 个 L4 格全部在取数/推送/引用/来源展示一侧”漏了试算表事件刷新 T8。",
+      "evidence": "11-coverage-matrix.md §二矩阵与列汇总（15/72）；只读 SQL：未删项目 project_type 为 NULL 或 annual，report_scope='consolidated' 计 1；12-global-conflict-edit-template.md §6.1。",
+      "recommendation": "改为“72 个适用格均有编号证据”；合并项目统一按 report_scope 计数；L4 所在列补上“事件刷新”。"
+    }
+  ],
+  "reviewDoc": "d:\\GT_plan\\.agents\\tasks\\formula-management-comprehensive-assessment-2026-10-25\\p1-report-review-doc.md"
+}

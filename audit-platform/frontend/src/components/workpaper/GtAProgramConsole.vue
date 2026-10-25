@@ -305,6 +305,9 @@
             :a17_5-disabled-reason="a17_5DisabledReason"
             :review-chip-badge="reviewChipBadge"
             :chip-completion-key="chipCompletionKey"
+            :cycle-code="props.cycleCode"
+            :cycle-audit-year="cycleAuditYear"
+            :project-id="projectId"
             @chip-click="handleIndexChipClick"
           />
         </template>
@@ -658,6 +661,9 @@ import { useProgramOverrideTarget } from '@/composables/useProgramOverrideTarget
 import { normalizeAProgramRows } from '@/components/workpaper/composables/parseProgramSubSteps'
 import { INLINE_POPUP_WP_CODES } from '@/components/workpaper/wpPopupDocxConfigs'
 import { isReviewRoleRef } from '@/components/workpaper/reviewWpResolve'
+import type { CycleCode } from '@/components/workpaper/composables/cycleCrossRef'
+import { useProjectStore } from '@/stores/project'
+import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
 // procedure-delegation-notification / Task 14：task overlay 委派/执行/一级复核
 import ProcedureReviewPanel from '@/components/workpaper/ProcedureReviewPanel.vue'
 import {
@@ -750,6 +756,8 @@ const props = withDefaults(defineProps<{
   hideCategories?: boolean
   /** 循环底稿 *A 程序表（D4A 样式）：隐藏类别筛选/类别列/五项认定列 */
   cycleSheetMode?: boolean
+  /** S34/S35 bundle 才设置；用于外部 chip 只读审定额 hover */
+  cycleCode?: CycleCode
 }>(), {
   readonly: false,
   hideCategories: false,
@@ -788,6 +796,16 @@ const {
 const { adoptScope: adoptOverrideScope, ensureAuditYear, writeField: writeProgramField } = useProgramOverrideTarget({
   projectId, htmlData: () => props.htmlData, sheetName: () => props.sheetName,
 })
+
+const projectStore = useProjectStore()
+const cycleAuditYear = computed(() => resolveEffectiveAuditYear({
+  routeYear: route.query.year,
+  storeAuditYear: projectStore.auditYear,
+  storeYear: projectStore.year,
+  periodEnd: projectInfo.value?.audit_period_end,
+  periodStart: projectInfo.value?.audit_period_start,
+  projectName: projectInfo.value?.name ?? projectInfo.value?.client_name,
+}))
 
 // ─── 程序行加载 + 弹窗完成状态 + A16 推荐版本 + 导出（composable: useAProgramPopups）───
 const {

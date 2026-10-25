@@ -11,6 +11,7 @@ passlib[bcrypt]
 httpx
 python-multipart
 openpyxl
+xlrd==2.0.2  # legacy .xls reader used by the S17 classification dry-run
 PyYAML
 boto3
 

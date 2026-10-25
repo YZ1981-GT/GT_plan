@@ -13,8 +13,16 @@ import json
 from pathlib import Path
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
-from app.services.wp_generation_matching import TB_ACCOUNT_FLAGS, match_workpapers, tb_account_flags
+from app.services.wp_generation_matching import (
+    TB_ACCOUNT_FLAGS,
+    applicable_when_hit,
+    business_category_flags,
+    match_workpapers,
+    tb_account_flags,
+)
 
 _BACKEND = Path(__file__).resolve().parents[1]
 _MAPPING = json.loads((_BACKEND / "data" / "wp_account_mapping.json").read_text(encoding="utf-8"))["mappings"]
@@ -89,7 +97,7 @@ def test_orchestrator_uses_the_shared_rules():
     """生成底稿步骤必须调用本模块，不得在函数体里另写一份科目码表。"""
     fn = _function_node(ast.parse(_ORCHESTRATOR.read_text(encoding="utf-8")), "_step_generate_workpapers")
     called = {n.func.id for n in ast.walk(fn) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
-    assert {"match_workpapers", "tb_account_flags"} <= called
+    assert {"match_workpapers", "tb_account_flags", "business_category_flags"} <= called
     inline_code_keys = [
         k.value
         for d in ast.walk(fn)
@@ -106,3 +114,163 @@ def test_inline_table_check_would_catch_a_planted_table():
     fn = _function_node(ast.parse(planted), "_step_generate_workpapers")
     keys = [k.value for d in ast.walk(fn) if isinstance(d, ast.Dict) for k in d.keys if isinstance(k, ast.Constant)]
     assert keys == ["1631"]
+
+
+@pytest.mark.parametrize(
+    ("business_category", "template_type", "expected"),
+    [
+        (
+            " IPO ",
+            "soe",
+            {
+                "biz_ipo": True,
+                "biz_listed": False,
+                "biz_neeq": False,
+                "biz_refinancing": False,
+            },
+        ),
+        (
+            "C",
+            "listed",
+            {
+                "biz_ipo": False,
+                "biz_listed": True,
+                "biz_neeq": False,
+                "biz_refinancing": False,
+            },
+        ),
+        (
+            None,
+            None,
+            {
+                "biz_ipo": False,
+                "biz_listed": False,
+                "biz_neeq": False,
+                "biz_refinancing": False,
+            },
+        ),
+        (
+            "NEEQ refinancing",
+            "LISTED",
+            {
+                "biz_ipo": False,
+                "biz_listed": True,
+                "biz_neeq": True,
+                "biz_refinancing": True,
+            },
+        ),
+    ],
+)
+def test_business_category_flags_normalize_category_and_template(
+    business_category, template_type, expected
+):
+    """**Validates: Requirements 1.1**"""
+    assert business_category_flags(business_category, template_type) == expected
+
+
+def test_applicable_when_hit_uses_key_and_value_or_semantics():
+    """**Validates: Requirements 1.2**"""
+    applicable_when = {
+        "business_category": ["ipo", "listed"],
+        "industry": ["banking", "insurance"],
+    }
+    assert applicable_when_hit(
+        applicable_when,
+        {"biz_ipo": False, "biz_listed": True, "ind_banking": False},
+    )
+    assert applicable_when_hit(
+        applicable_when,
+        {"biz_ipo": False, "biz_listed": False, "ind_banking": True},
+    )
+    assert not applicable_when_hit(
+        applicable_when,
+        {"biz_ipo": False, "biz_listed": False, "ind_banking": False},
+    )
+
+
+def test_applicable_when_hit_key_filter_limits_only_declaration_keys():
+    """**Validates: Requirements 1.3**"""
+    applicable_when = {
+        "business_category": ["ipo"],
+        "industry": ["banking"],
+    }
+    flags = {"biz_ipo": False, "ind_banking": True}
+
+    assert not applicable_when_hit(applicable_when, flags, key_filter={"business_category"})
+    assert applicable_when_hit(applicable_when, flags, key_filter="industry")
+    assert not applicable_when_hit(applicable_when, flags, key_filter=())
+
+
+def test_applicable_when_hit_unknown_key_without_matching_flag_is_false():
+    """Unknown declaration keys must not become an unconditional match."""
+    assert not applicable_when_hit({"unknown": ["value"]}, {"biz_ipo": True})
+
+
+# **Validates: Requirements 1.1**
+@given(
+    category_tokens=st.lists(
+        st.sampled_from(["ipo", "listed", "neeq", "refinancing", "C"]),
+        unique=True,
+        max_size=5,
+    ),
+    template_type=st.one_of(st.none(), st.sampled_from(["soe", "listed", "LISTED", ""])),
+)
+def test_business_category_flags_property_has_exact_four_boolean_flags(
+    category_tokens, template_type
+):
+    """Every normalized input produces exactly the four documented flags."""
+    business_category = " / ".join(category_tokens)
+    result = business_category_flags(business_category, template_type)
+    normalized_category = business_category.strip().lower()
+    normalized_template = (template_type or "").strip().lower()
+
+    assert set(result) == {
+        "biz_ipo",
+        "biz_listed",
+        "biz_neeq",
+        "biz_refinancing",
+    }
+    assert result == {
+        "biz_ipo": "ipo" in normalized_category,
+        "biz_listed": "listed" in normalized_category or normalized_template == "listed",
+        "biz_neeq": "neeq" in normalized_category,
+        "biz_refinancing": "refinancing" in normalized_category,
+    }
+
+
+# **Validates: Requirements 1.2, 1.3**
+@given(
+    biz_ipo=st.booleans(),
+    biz_listed=st.booleans(),
+    ind_banking=st.booleans(),
+    key_filter=st.sampled_from(
+        [None, "business_category", "industry", ("business_category", "industry"), ()]
+    ),
+)
+def test_applicable_when_hit_property_preserves_or_and_key_filter(
+    biz_ipo, biz_listed, ind_banking, key_filter
+):
+    """A hit is exactly an OR over the selected declaration keys and values."""
+    applicable_when = {
+        "business_category": ["ipo", "listed"],
+        "industry": ["banking"],
+    }
+    flags = {
+        "biz_ipo": biz_ipo,
+        "biz_listed": biz_listed,
+        "ind_banking": ind_banking,
+    }
+    selected = (
+        {"business_category", "industry"}
+        if key_filter is None
+        else {key_filter}
+        if isinstance(key_filter, str)
+        else set(key_filter)
+    )
+    expected = (
+        "business_category" in selected
+        and (biz_ipo or biz_listed)
+    ) or (
+        "industry" in selected and ind_banking
+    )
+    assert applicable_when_hit(applicable_when, flags, key_filter=key_filter) is expected

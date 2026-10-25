@@ -4,6 +4,7 @@
 import { ref, computed, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { isIpoProject as isCoreIpoProject } from '@/utils/ipoProjectUtils'
 
 export interface ChecklistResponse {
   item_id: string
@@ -20,6 +21,19 @@ export interface ProjectContext {
 }
 
 export const IPO_CATEGORIES = ['IPO', '上市公司年审', '新三板', '重大资产重组'] as const
+
+/**
+ * F2 IPO 专项兼容判定。
+ *
+ * 第一层复用核心 business_category 判定；其余层保留 F2 历史兼容字段，
+ * 最后一层必须继续按中文 IPO_CATEGORIES 精确匹配，不能用统一关键词替代。
+ */
+export function isF2IpoProject(ctx: ProjectContext): boolean {
+  if (isCoreIpoProject(ctx.business_category ?? '')) return true
+  if (ctx.project_type === 'ipo') return true
+  if (ctx.template_type === 'listed') return true
+  return IPO_CATEGORIES.includes(ctx.business_category as typeof IPO_CATEGORIES[number])
+}
 
 export function isSpecialItemId(itemId: string): boolean {
   if (itemId === 'F2-55A' || itemId === 'F2-61A') return true
@@ -42,16 +56,10 @@ export function useF2SpecialFormData(options: { wpId: Ref<string>; projectId: Re
   const sheetCache = ref<Record<string, any>>({})
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-  // IPO 专项适用性：项目详情接口实际返回 project_type（annual/ipo/…）与
-  // template_type（listed/soe），business_category 仅作历史兼容兜底。
-  // 注意：本 computed 是 F2 的三级瀑布 wrapper（project_type→template_type→中文 IPO_CATEGORIES），
-  // 核心 IPO 判定统一来源在 @/utils/ipoProjectUtils.isIpoProject。
-  const isIpoProject = computed(() => {
-    const ctx = projectContext.value
-    if (ctx.project_type === 'ipo') return true
-    if (ctx.template_type === 'listed') return true
-    return IPO_CATEGORIES.includes(ctx.business_category as typeof IPO_CATEGORIES[number])
-  })
+  // IPO 专项适用性：核心 business_category 判定优先，随后保留 F2 历史兼容的
+  // project_type → template_type → 中文 IPO_CATEGORIES 三级瀑布。
+  // 对外仍返回 isIpoProject computed，供 GtF2InventorySpecial.vue 使用。
+  const isIpoProject = computed(() => isF2IpoProject(projectContext.value))
 
   async function loadResponses(): Promise<void> {
     if (!wpId.value) return

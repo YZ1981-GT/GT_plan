@@ -142,6 +142,14 @@
               >复核</el-button>
             </div>
           </div>
+          <el-alert
+            v-if="autoDataError"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="auto-data-error"
+            :title="`D4 营业收入审定数取数失败：${autoDataError}`"
+          />
           <el-table :data="summaryTableData" border class="s20-table" size="small">
             <el-table-column label="项目" prop="label" min-width="240" />
             <el-table-column label="本年度审定数（C列）" min-width="160" align="right">
@@ -521,6 +529,8 @@ const isReadonly = computed(() => !!props.readonly)
 
 /** 持久化数据快照（item_id → {conclusion, remark}）；由 selfLoad 合并 responses_snapshot 填充 */
 const allResponses = ref<Map<string, any>>(new Map())
+/** D4 resolver 失败时保留诊断，禁止把取数异常静默显示成 0 */
+const autoDataError = ref('')
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -899,14 +909,33 @@ function _hydrateFromResponses(): void {
   nextTick(() => { hydrating = false })
 }
 
+/** 将 render strategy 的 D4 resolver 结果投影到 S20 公式引擎。 */
+function _applyRevenueAutoData(source: any): void {
+  if (!source || typeof source !== 'object') return
+  if (source._error === true) {
+    autoDataError.value = String(
+      source._error_detail || source.summary || 'D4 营业收入审定数不可用',
+    )
+    return
+  }
+
+  const main = Number(source.main_revenue)
+  const other = Number(source.other_revenue)
+  if (Number.isFinite(main)) mainBusinessCurrent[0] = main
+  if (Number.isFinite(other)) otherBusinessCurrent[0] = other
+  autoDataError.value = ''
+}
+
 /**
  * 当 htmlData 为 null（bundle 内嵌场景），自行调 render-config 加载数据。
  * 合并 render 策略输出的 responses_snapshot（S20 render 实际输出键）到 allResponses，
- * 恢复本页可编辑状态（此前丢弃 → 刷新丢失，本次修复）。
+ * 同时消费同一策略返回的 D4 auto_data，恢复本页可编辑状态。
  */
 async function selfLoad() {
+  autoDataError.value = ''
   try {
     if (props.htmlData) {
+      _applyRevenueAutoData(props.htmlData.auto_data)
       const map = new Map<string, any>()
       _mergeResponses(map, props.htmlData.responses_snapshot)
       _mergeResponses(map, props.htmlData.allResponses)
@@ -918,6 +947,7 @@ async function selfLoad() {
       if (data?.sheets && Array.isArray(data.sheets)) {
         const map = new Map<string, any>()
         for (const sheet of data.sheets) {
+          _applyRevenueAutoData(sheet.html_data?.auto_data)
           _mergeResponses(map, sheet.html_data?.responses_snapshot)
           _mergeResponses(map, sheet.html_data?.allResponses)
           _mergeResponses(map, sheet.html_data?.checklist_responses)
@@ -927,6 +957,7 @@ async function selfLoad() {
     }
     if (allResponses.value.size > 0) _hydrateFromResponses()
   } catch (err) {
+    autoDataError.value = err instanceof Error ? err.message : String(err)
     console.warn('[GtS20RevenueDeduction] selfLoad failed:', err)
   }
 
@@ -1137,6 +1168,10 @@ onMounted(() => {
   font-size: 12px;
   color: #909399;
   white-space: nowrap;
+}
+
+.auto-data-error {
+  margin-bottom: 10px;
 }
 
 /* ─── 表格 ─── */

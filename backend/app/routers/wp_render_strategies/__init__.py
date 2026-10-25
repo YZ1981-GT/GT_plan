@@ -145,6 +145,7 @@ from ._s14_accounting_estimate import render as render_s14_accounting_estimate
 from ._s15_eps_roe import render as render_s15_eps_roe
 from ._s20_revenue_deduction import render as render_s20_revenue_deduction
 from ._s21_data_asset import render as render_s21_data_asset
+from ._s_checklist_sheets import render as render_s_checklist_sheets
 from ._j1_employee_compensation import render as render_j1_employee_compensation
 from ._j2_defined_benefit_plan import render as render_j2_defined_benefit_plan
 from ._j3_share_based_payment import render as render_j3_share_based_payment
@@ -308,6 +309,19 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "s15-eps-roe": render_s15_eps_roe,
     "s20-revenue-deduction": render_s20_revenue_deduction,
     "s21-data-asset": render_s21_data_asset,
+    # S1/S8/S9/S10/S17 checklist sheet 专属 payload（D3.1）
+    "s1-regulation-record": render_s_checklist_sheets,
+    "s8-adjudication": render_s_checklist_sheets,
+    "s9-adjudication": render_s_checklist_sheets,
+    "s9-internal-control": render_s_checklist_sheets,
+    "s9-legal-regulations": render_s_checklist_sheets,
+    "s9-program-description": render_s_checklist_sheets,
+    "s10-adjudication": render_s_checklist_sheets,
+    "s10-internal-control": render_s_checklist_sheets,
+    "s10-environmental-regulations": render_s_checklist_sheets,
+    "s17-nonrecurring-detail": render_s_checklist_sheets,
+    "s17-reconciliation": render_s_checklist_sheets,
+    "s17-tax-impact": render_s_checklist_sheets,
     "j1-employee-compensation": render_j1_employee_compensation,
     "j2-defined-benefit-plan": render_j2_defined_benefit_plan,
     "j3-share-based-payment": render_j3_share_based_payment,

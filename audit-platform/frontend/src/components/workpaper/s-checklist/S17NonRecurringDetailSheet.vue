@@ -19,29 +19,8 @@
               :options="viewOptions"
               size="small"
             />
-            <!-- 导入导出（动态行表格 Req 11.3） -->
-            <el-dropdown v-if="!isReadonly && activeView !== 'adjudication'" trigger="click" size="small">
-              <el-button size="small" :loading="isExporting || isImporting">
-                导入导出 ▾
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-                  <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-                  <el-dropdown-item>
-                    <el-upload
-                      :show-file-list="false"
-                      accept=".xlsx"
-                      :auto-upload="false"
-                      :disabled="isImporting"
-                      @change="handleImportChange"
-                    >
-                      <span>导入数据</span>
-                    </el-upload>
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+            <!-- 后端能力尚未提供：入口保留可见但不可用。 -->
+            <el-button size="small" disabled>导入导出（开发中）</el-button>
             <el-button
               v-if="!isReadonly"
               size="small"
@@ -301,12 +280,15 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
  * Spec: .kiro/specs/s-special-transaction-workpapers/ Task 5.3
  * Requirements: 8.2, 8.3
  */
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, inject, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { fmtAmount } from '@/utils/formatters'
+import { sChecklistItemIds, type SChecklistComponentType } from './sChecklistItemIds'
+import { loadSChecklistHtmlData } from './sChecklistRenderData'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import { useSSpecialImportExport } from '../composables/useSSpecialImportExport'
+
+const COMPONENT_TYPE = 's17-nonrecurring-detail' as const
 
 function fmt(val: number | null | undefined): string {
   return fmtAmount(val, 2)
@@ -315,8 +297,12 @@ function fmt(val: number | null | undefined): string {
 const props = defineProps<{
   wpId: string
   projectId: string
-  isReadonly: boolean
+  readonly?: boolean
+  sheetName?: string
+  componentType?: SChecklistComponentType
+  htmlData?: Record<string, any> | null
 }>()
+const isReadonly = computed(() => props.readonly === true)
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>(
   'openReviewDialog',
@@ -327,43 +313,31 @@ function handleOpenReview(sectionId: string, sectionLabel: string) {
   openReviewDialog(sectionId, sectionLabel)
 }
 
-// ─── 导入导出（Req 11.3） ────────────────────────────────────────────────────
-
-const wpIdRef = computed(() => props.wpId)
-const { isExporting, isImporting, exportTemplate, exportData, importData } =
-  useSSpecialImportExport({ wpId: wpIdRef })
-
-/** 当前活跃 sheet 对应的导入导出 sheet 名 */
-const activeImportSheet = computed(() =>
-  activeView.value === 'consolidated' ? 'S17-2' : 'S17-3'
-)
-
-function handleExportTemplate() {
-  exportTemplate(activeImportSheet.value)
-}
-
-function handleExportData() {
-  exportData(activeImportSheet.value)
-}
-
-async function handleImportChange(f: { raw?: File } | File) {
-  const file = f instanceof File ? f : (f.raw ?? null)
-  if (!file) return
-  const result = await importData(activeImportSheet.value, file)
-  if (result?.success) {
-    // 重新加载数据
-    loadData()
-  }
-}
-
 // ─── 视图切换 ────────────────────────────────────────────────────────────────
 
-const activeView = ref<'adjudication' | 'consolidated' | 'individual'>('adjudication')
 const viewOptions = [
   { label: '审定表S17-1', value: 'adjudication' },
   { label: '合并S17-2', value: 'consolidated' },
   { label: '个别S17-3', value: 'individual' },
-]
+] as const
+
+type S17View = (typeof viewOptions)[number]['value']
+
+/** render-config 提供的 canonical sheet_name → S17 detail view。 */
+const S17_VIEW_BY_SHEET_NAME: Record<string, S17View> = {
+  'S17-1': 'adjudication',
+  'S17-2': 'consolidated',
+  'S17-3': 'individual',
+  '审定表S17-1': 'adjudication',
+  '审核表（合并）S17-2': 'consolidated',
+  '审核表（个别报表）S17-3': 'individual',
+}
+
+function resolveS17View(sheetName?: string): S17View {
+  return S17_VIEW_BY_SHEET_NAME[sheetName || ''] ?? 'adjudication'
+}
+
+const activeView = ref<S17View>(resolveS17View(props.sheetName))
 
 const sheetTitle = computed(() => {
   if (activeView.value === 'adjudication') return '审定表 S17-1 — 非经常性损益汇总'
@@ -429,6 +403,7 @@ function cellClassName({ column }: any) {
 }
 
 function addDetailRow() {
+  if (isReadonly.value) return
   const target = activeView.value === 'consolidated' ? consolidatedRows : individualRows
   const idx = target.value.length
   target.value.push({
@@ -483,7 +458,7 @@ function handleAiConclusion() {
 // ─── 保存 ────────────────────────────────────────────────────────────────────
 
 async function handleSave() {
-  if (saving.value) return
+  if (isReadonly.value || saving.value) return
   saving.value = true
   try {
     const payload = {
@@ -494,7 +469,14 @@ async function handleSave() {
     }
     await http.put(
       `/api/workpapers/${props.wpId}/checklist-responses`,
-      { sheet_name: '审定表S17-1', data: payload }
+      {
+        project_id: props.projectId,
+        items: [{
+          item_id: sChecklistItemIds['s17-nonrecurring-detail'],
+          conclusion: null,
+          remark: JSON.stringify(payload),
+        }],
+      }
     )
     isDirty.value = false
     ElMessage.success('非经常性损益明细已保存')
@@ -509,15 +491,12 @@ async function handleSave() {
 
 async function loadData() {
   try {
-    const res = await http.get(
-      `/api/workpapers/${props.wpId}/render-config`,
-      { _silent: true } as any
-    )
-    const sheets = res?.data?.sheets || res?.sheets || []
-    const sheet = sheets.find((s: any) =>
-      s.sheet_name?.includes('审定表S17') || s.sheet_name?.includes('S17-1')
-    )
-    const htmlData = sheet?.html_data
+    const htmlData = await loadSChecklistHtmlData({
+      wpId: props.wpId,
+      htmlData: props.htmlData,
+      componentType: props.componentType ?? COMPONENT_TYPE,
+      sheetName: props.sheetName,
+    })
 
     if (htmlData?.adjudication_rows?.length) {
       adjudicationRows.value = htmlData.adjudication_rows
@@ -593,6 +572,14 @@ async function loadData() {
     }))
   }
 }
+
+watch(
+  () => [props.sheetName, props.componentType, props.htmlData],
+  () => {
+    activeView.value = resolveS17View(props.sheetName)
+    void loadData()
+  },
+)
 
 onMounted(() => { loadData() })
 </script>

@@ -165,7 +165,13 @@ def test_live_golden_outer_fields_equal_model_plus_declared_reserved_fields() ->
 
     # word-template 分支字段：真实样本未命中，但模型与前端 reserved 清单必须同时登记。
     model_only = root_model_fields - root_runtime_fields
-    assert model_only == {"permissions", "sign_status"}
+    assert model_only == {
+        "permissions",
+        "sign_status",
+        "business_category",
+        "applicable_when",
+        "not_applicable",
+    }
     frontend_src = DEFAULT_FRONTEND_PATH.read_text(encoding="utf-8")
     for field in sorted(model_only | {"guidance", "scope"}):
         assert f"  {field}: 'reserved'" in frontend_src, (

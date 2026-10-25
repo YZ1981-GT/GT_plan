@@ -1,0 +1,37 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": "MEDIUM-1",
+      "severity": "MEDIUM",
+      "title": "IPO 关键词集合与消费方迁移歧义",
+      "location": "design.md §1.4 / tasks.md Task 8",
+      "description": "统一 IPO_BIZ_KEYWORDS 与 D4 现有 IPO_KEYWORDS（含 fraud_risk 不含 refinancing）和 F2 多字段判定（project_type→template_type→中文 IPO_CATEGORIES）语义不等价，直接替换会引入行为回归。D4 丢失 fraud_risk 检测；F2 三级瀑布无法用单参数函数替代。",
+      "fix": "三选一：(A) 扩展工具函数签名为多字段 ctx 对象 + allowedCats；(B) 保持单参数但 Task 8 明确 D4 传 allowedCats 含 fraud_risk、F2 保留多字段 wrapper；(C) 排除 D4/F2 出本次消费方改造范围。"
+    },
+    {
+      "id": "NIT-1",
+      "severity": "NIT",
+      "title": "S34-3 缺失于公式引擎任务列表",
+      "location": "tasks.md Tasks 25-27",
+      "description": "findings 列出 12 个 hasSubTable 父码含 S34-3（子 sheet S34-3-1），但 Tasks 25-27 只列 10 个，缺 S34-3。AC-5 声称全部 12 张。",
+      "fix": "在 Task 25 中加入 S34-3。"
+    },
+    {
+      "id": "NIT-2",
+      "severity": "NIT",
+      "title": "S 段路由显式路由 vs e1a fallthrough 判据未说明",
+      "location": "design.md §1.6",
+      "description": "S12/S13/S14/S15/S20 获显式路由，S3/S4/S5/S6（同有专属组件）落 e1a，判据未解释。",
+      "fix": "在 §1.6 添加判据说明：路由仅为有独立程序表 sheet 的底稿分配专属 sheetKey。"
+    }
+  ],
+  "priorRoundFixStatus": {
+    "MEDIUM-1_S11S16_routing": "FIXED",
+    "MEDIUM-2_applicable_when_data_source": "FIXED",
+    "MEDIUM-3_dict_key_coverage": "FIXED",
+    "NIT-1_line_number": "FIXED",
+    "NIT-2_S17_11_S17_21": "FIXED"
+  },
+  "reviewDoc": "d:\\GT_plan\\.agents\\tasks\\s-cycle-investigation\\s-cycle-spec-review.md"
+}

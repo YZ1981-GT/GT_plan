@@ -23,8 +23,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.s34_checklist_service import (
     S34_CHECKLIST_DATA,
     _wp_status_to_completion,
+    build_s34_risk_indicator,
+    classify_s34_applicability,
     get_s34_checklist,
+    is_s34_related_risk,
 )
+import app.services.s34_checklist_service as s34_checklist_service
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -104,20 +108,27 @@ class TestWpStatusToCompletion:
 
 
 @pytest.mark.asyncio
-async def test_get_s34_checklist_all_not_applicable():
-    """db 返回空 → 全部 41 项 not_applicable, status=not_started."""
+async def test_get_s34_checklist_empty_b50_is_pending_not_recommended(monkeypatch):
+    """B50 无风险数据时显示待确认，不把空结果伪造成不适用或推荐。"""
     mock_db = AsyncMock(spec=AsyncSession)
     mock_result = MagicMock()
     mock_result.fetchall.return_value = []
     mock_db.execute = AsyncMock(return_value=mock_result)
+    monkeypatch.setattr(
+        s34_checklist_service,
+        "load_b50_risks",
+        AsyncMock(return_value=[]),
+    )
 
-    project_id = uuid4()
-    checklist = await get_s34_checklist(project_id, mock_db)
+    checklist = await get_s34_checklist(uuid4(), mock_db)
 
     assert len(checklist) == 41
     for item in checklist:
-        assert item["applicability"] == "not_applicable"
+        assert item["applicability"] == "unknown"
         assert item["status"] == "not_started"
+        assert item["risk_indicator"] == "unknown"
+        assert item["risk_data_available"] is False
+        assert item["risk_count"] == 0
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -126,8 +137,8 @@ async def test_get_s34_checklist_all_not_applicable():
 
 
 @pytest.mark.asyncio
-async def test_get_s34_checklist_some_applicable():
-    """db 返回部分 S34 wp_codes → 对应项 applicable + 状态正确映射."""
+async def test_get_s34_checklist_some_applicable(monkeypatch):
+    """有 B50 风险结论时，已有底稿为 applicable、缺底稿但有风险为 recommended。"""
     mock_db = AsyncMock(spec=AsyncSession)
 
     wp_id_1 = str(uuid4())
@@ -144,17 +155,29 @@ async def test_get_s34_checklist_some_applicable():
     mock_result = MagicMock()
     mock_result.fetchall.return_value = mock_rows
     mock_db.execute = AsyncMock(return_value=mock_result)
+    monkeypatch.setattr(
+        s34_checklist_service,
+        "load_b50_risks",
+        AsyncMock(return_value=[
+            {
+                "account": "收入确认",
+                "cycle": "D",
+                "risk_level": "H",
+                "is_special_risk": False,
+            },
+        ]),
+    )
 
-    project_id = uuid4()
-    checklist = await get_s34_checklist(project_id, mock_db)
+    checklist = await get_s34_checklist(uuid4(), mock_db)
 
     assert len(checklist) == 41
 
-    # 验证 applicable 项
+    # 验证四象限中的「风险 + 已有底稿」与「风险 + 无底稿」
     item_map = {item["wp_code"]: item for item in checklist}
 
     assert item_map["S34-1"]["applicability"] == "applicable"
     assert item_map["S34-1"]["status"] == "completed"
+    assert item_map["S34-1"]["risk_indicator"] == "identified"
 
     assert item_map["S34-5"]["applicability"] == "applicable"
     assert item_map["S34-5"]["status"] == "in_progress"
@@ -162,18 +185,104 @@ async def test_get_s34_checklist_some_applicable():
     assert item_map["S34-10"]["applicability"] == "applicable"
     assert item_map["S34-10"]["status"] == "not_started"
 
-    # 其余项保持 not_applicable
-    not_applicable_items = [
-        item for item in checklist
-        if item["wp_code"] not in {"S34-1", "S34-5", "S34-10"}
-    ]
-    for item in not_applicable_items:
-        assert item["applicability"] == "not_applicable"
-        assert item["status"] == "not_started"
+    assert item_map["S34-2"]["applicability"] == "recommended"
+    assert item_map["S34-2"]["status"] == "not_started"
+    assert item_map["S34-2"]["risk_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_get_s34_checklist_confirmed_unrelated_risk_is_not_applicable(monkeypatch):
+    """有已读取但与 S34 无关的 B50 风险，缺少底稿时才确认不适用。"""
+    mock_db = AsyncMock(spec=AsyncSession)
+    mock_result = MagicMock()
+    mock_result.fetchall.return_value = []
+    mock_db.execute = AsyncMock(return_value=mock_result)
+    monkeypatch.setattr(
+        s34_checklist_service,
+        "load_b50_risks",
+        AsyncMock(return_value=[{
+            "account": "应收账款",
+            "cycle": "D",
+            "risk_level": "H",
+            "is_special_risk": False,
+        }]),
+    )
+
+    checklist = await get_s34_checklist(uuid4(), mock_db)
+
+    assert {item["applicability"] for item in checklist} == {"not_applicable"}
+    assert {item["risk_indicator"] for item in checklist} == {"none"}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 6. router 注册
+# 6. P2.2 风险指示器与四象限
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestS34RiskIndicator:
+    """风险映射只接受 B50 真源中有明确 S34 语义的结论。"""
+
+    def test_empty_b50_result_is_unknown(self):
+        result = build_s34_risk_indicator([])
+        assert result == {
+            "risk_indicator": "unknown",
+            "risk_data_available": False,
+            "risk_count": 0,
+            "risk_source": "b50_checklist",
+        }
+
+    def test_high_fraud_preset_account_is_s34_related(self):
+        assert is_s34_related_risk({
+            "account": "收入确认",
+            "cycle": "D",
+            "risk_level": "H",
+            "is_special_risk": False,
+        }) is True
+        assert build_s34_risk_indicator([{
+            "account": "收入确认",
+            "cycle": "D",
+            "risk_level": "H",
+            "is_special_risk": False,
+        }])["risk_indicator"] == "identified"
+
+    def test_explicit_s_cycle_is_s34_related(self):
+        assert is_s34_related_risk({
+            "account": "其他事项",
+            "cycle": "S",
+            "risk_level": "M",
+            "is_special_risk": False,
+        }) is True
+
+    def test_unrelated_b50_risk_does_not_trigger_s34(self):
+        result = build_s34_risk_indicator([{
+            "account": "应收账款",
+            "cycle": "D",
+            "risk_level": "H",
+            "is_special_risk": False,
+        }])
+        assert result["risk_indicator"] == "none"
+        assert result["risk_data_available"] is True
+        assert result["risk_count"] == 0
+
+
+class TestS34ApplicabilityQuadrants:
+    @pytest.mark.parametrize("data,risk,workpaper,expected", [
+        (True, True, True, "applicable"),
+        (True, True, False, "recommended"),
+        (True, False, True, "applicable"),
+        (True, False, False, "not_applicable"),
+        # 空 B50 数据不是“无风险”：没有底稿时保持待确认，不得推荐。
+        (False, False, False, "unknown"),
+        (False, False, True, "applicable"),
+    ])
+    def test_four_quadrants_and_empty_source(
+        self, data, risk, workpaper, expected,
+    ):
+        assert classify_s34_applicability(data, risk, workpaper) == expected
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. router 注册
 # ═══════════════════════════════════════════════════════════════════════════════
 
 

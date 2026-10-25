@@ -11,6 +11,11 @@ import { shallowMount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import GtS34ChecklistOverview from './GtS34ChecklistOverview.vue'
 import type { S34ChecklistItem } from '../composables/useS34BundleState'
+import {
+  getS34ApplicabilityTag,
+  getS34RiskIndicatorTag,
+  mapApiChecklist,
+} from '../composables/useS34BundleState'
 
 // ─── Test data ───
 function makeChecklist(): S34ChecklistItem[] {
@@ -56,6 +61,7 @@ describe('GtS34ChecklistOverview — Task 6.2', () => {
           template: `<div class="el-table-column" :data-label="label" :class="className" />`,
         },
         'el-tag': true,
+        'el-input': true,
       },
     },
   })
@@ -102,6 +108,59 @@ describe('GtS34ChecklistOverview — Task 6.2', () => {
 
       const table = wrapper.findComponent({ name: 'ElTable' })
       expect(table.props('data')).toHaveLength(3)
+    })
+  })
+
+  describe('P2.2 风险指示器与四象限', () => {
+    it('空 B50 风险数据显示待确认且明确不可推荐', () => {
+      const wrapper = shallowMount(GtS34ChecklistOverview, mountOpts())
+      const summary = wrapper.find('[data-testid="s34-risk-summary"]')
+      expect(summary.text()).toContain('风险数据待确认')
+      expect(summary.text()).toContain('暂不推荐')
+    })
+
+    it('适用、推荐、不适用、待确认四种状态标签均有中文语义', () => {
+      expect(getS34ApplicabilityTag('applicable')).toEqual({ label: '适用', type: 'success' })
+      expect(getS34ApplicabilityTag('recommended')).toEqual({ label: '推荐', type: 'warning' })
+      expect(getS34ApplicabilityTag('not_applicable')).toEqual({ label: '不适用', type: 'info' })
+      expect(getS34ApplicabilityTag('unknown')).toEqual({ label: '待确认', type: 'warning' })
+    })
+
+    it('API 四象限和风险字段映射到 Overview 类型', () => {
+      const mapped = mapApiChecklist([
+        {
+          seq: 1,
+          wp_code: 'S34-1',
+          name: '收入核查',
+          reg_ref: { title: '收入核查' },
+          applicability: 'recommended',
+          status: 'not_started',
+          risk_indicator: 'identified',
+          risk_data_available: true,
+          risk_count: 1,
+        },
+        {
+          seq: 2,
+          wp_code: 'S34-2',
+          name: '待确认事项',
+          reg_ref: { title: '待确认事项' },
+          applicability: 'unknown',
+          status: 'not_started',
+          risk_indicator: 'unknown',
+          risk_data_available: false,
+          risk_count: 0,
+        },
+      ])
+      expect(mapped).toMatchObject([
+        { applicability: 'recommended', riskIndicator: 'identified', riskDataAvailable: true, riskCount: 1 },
+        { applicability: 'unknown', riskIndicator: 'unknown', riskDataAvailable: false, riskCount: 0 },
+      ])
+    })
+
+    it('风险指示器不把 unknown 显示成无风险', () => {
+      expect(getS34RiskIndicatorTag('unknown')).toEqual({ label: '待确认', type: 'warning' })
+      expect(getS34RiskIndicatorTag('identified').label).toBe('已识别')
+      expect(getS34RiskIndicatorTag('none').label).toBe('未识别')
     })
   })
 

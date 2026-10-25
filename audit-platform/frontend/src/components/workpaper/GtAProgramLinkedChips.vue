@@ -18,8 +18,11 @@
         v-if="a16RecommendedCode"
         class="gt-a-program-console__chip-wrap gt-a-program-console__chip-recommended"
       >
-        <GtIndexChip
+        <CycleAuditedAmountChip
           :value="a16RecommendedCode"
+          :cycle-code="cycleCode"
+          :project-id="projectId"
+          :year="cycleAuditYear"
           :validate="true"
           :prevent-navigate="inlinePopupWpCodes.has(a16RecommendedCode)"
           :disabled="isRowChipDisabled(row)"
@@ -52,8 +55,11 @@
           :key="'a16-other-' + idx"
           class="gt-a-program-console__chip-wrap"
         >
-          <GtIndexChip
+          <CycleAuditedAmountChip
             :value="reviewChipDisplayValue(ref)"
+            :cycle-code="cycleCode"
+            :project-id="projectId"
+            :year="cycleAuditYear"
             :validate="true"
             :prevent-navigate="inlinePopupWpCodes.has(reviewChipDisplayValue(ref))"
             :disabled="isRowChipDisabled(row) || isA17_5ChipDisabled(ref) || isReviewChipDisabled(ref)"
@@ -87,8 +93,11 @@
         :key="'a17-app-' + idx"
         class="gt-a-program-console__chip-wrap"
       >
-        <GtIndexChip
+        <CycleAuditedAmountChip
           :value="ref"
+          :cycle-code="cycleCode"
+          :project-id="projectId"
+          :year="cycleAuditYear"
           :validate="true"
           :prevent-navigate="inlinePopupWpCodes.has(ref)"
           :disabled="isRowChipDisabled(row)"
@@ -112,8 +121,11 @@
           :key="'a17-na-' + idx"
           class="gt-a-program-console__chip-wrap"
         >
-          <GtIndexChip
+          <CycleAuditedAmountChip
             :value="ref"
+            :cycle-code="cycleCode"
+            :project-id="projectId"
+            :year="cycleAuditYear"
             :validate="true"
             :prevent-navigate="true"
             :disabled="true"
@@ -134,8 +146,11 @@
         :key="idx"
         class="gt-a-program-console__chip-wrap"
       >
-        <GtIndexChip
+        <CycleAuditedAmountChip
           :value="reviewChipDisplayValue(ref)"
+          :cycle-code="cycleCode"
+          :project-id="projectId"
+          :year="cycleAuditYear"
           :validate="true"
           :prevent-navigate="inlinePopupWpCodes.has(reviewChipDisplayValue(ref))"
           :disabled="isRowChipDisabled(row) || isA17_5ChipDisabled(ref) || isReviewChipDisabled(ref)"
@@ -165,7 +180,8 @@
 </template>
 
 <script setup lang="ts">
-import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import CycleAuditedAmountChip from '@/components/workpaper/CycleAuditedAmountChip.vue'
+import type { CycleCode } from '@/components/workpaper/composables/cycleCrossRef'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
 
 /** chip 渲染所需的最小行字段（与父组件 ProgramRow 兼容） */
@@ -204,7 +220,12 @@ const props = defineProps<{
   a17_5Badge: (ref: string) => string
   a17_5DisabledReason?: (ref: string) => string
   reviewChipBadge: (ref: string) => string
-  chipCompletionKey: (ref: string) => string
+  /** 仅 S34/S35 传入；其他循环保持原有 GtIndexChip 行为 */
+  cycleCode?: CycleCode
+  /** S34/S35 外部 chip 查询使用的审计年度 */
+  cycleAuditYear?: number
+  /** 当前项目 ID，作为 auto-data resolver 路径参数 */
+  projectId?: string
 }>()
 
 function naReason(ref: string): string {

@@ -25,7 +25,40 @@ import { api } from '@/services/apiProxy'
 // ─── Types (exported for testability & cross-module reuse) ───
 
 export type CompletionStatus = 'completed' | 'in_progress' | 'not_started'
-export type Applicability = 'applicable' | 'not_applicable' | 'unknown'
+export type Applicability = 'applicable' | 'recommended' | 'not_applicable' | 'unknown'
+export type RiskIndicator = 'identified' | 'none' | 'unknown'
+
+export interface StatusTag {
+  label: string
+  type: string
+}
+
+/** Overview 使用的四象限/风险标签，保持中文展示与 API 枚举分离。 */
+export function getS34ApplicabilityTag(value?: Applicability): StatusTag {
+  switch (value) {
+    case 'applicable':
+      return { label: '适用', type: 'success' }
+    case 'recommended':
+      return { label: '推荐', type: 'warning' }
+    case 'not_applicable':
+      return { label: '不适用', type: 'info' }
+    case 'unknown':
+    default:
+      return { label: '待确认', type: 'warning' }
+  }
+}
+
+export function getS34RiskIndicatorTag(value?: RiskIndicator): StatusTag {
+  switch (value) {
+    case 'identified':
+      return { label: '已识别', type: 'warning' }
+    case 'none':
+      return { label: '未识别', type: 'success' }
+    case 'unknown':
+    default:
+      return { label: '待确认', type: 'warning' }
+  }
+}
 
 export interface RegRef {
   csrc?: string | null   // 证监会 发行类 4/5/9 号 条目
@@ -42,6 +75,10 @@ export interface S34ChecklistItem {
   regRef: RegRef
   applicability: Applicability
   status: CompletionStatus
+  /** B50 checklist 映射到 S34 的风险指示；旧 API 缺字段时安全降级为 unknown。 */
+  riskIndicator?: RiskIndicator
+  riskDataAvailable?: boolean
+  riskCount?: number
 }
 
 export interface ProgressSummary {
@@ -193,6 +230,9 @@ export function mapApiChecklist(
     reg_ref: { csrc?: string | null; sse?: string | null; szse?: string | null; bse?: string | null; title: string }
     applicability: string
     status: string
+    risk_indicator?: string | null
+    risk_data_available?: boolean
+    risk_count?: number | null
   }>,
 ): S34ChecklistItem[] {
   return apiItems.map(item => ({
@@ -206,8 +246,20 @@ export function mapApiChecklist(
       bse: item.reg_ref.bse ?? null,
       title: item.reg_ref.title,
     },
-    applicability: item.applicability as Applicability,
+    applicability: (
+      item.applicability === 'applicable' ||
+      item.applicability === 'recommended' ||
+      item.applicability === 'not_applicable' ||
+      item.applicability === 'unknown'
+    ) ? item.applicability : 'unknown',
     status: item.status as CompletionStatus,
+    riskIndicator: (
+      item.risk_indicator === 'identified' ||
+      item.risk_indicator === 'none' ||
+      item.risk_indicator === 'unknown'
+    ) ? item.risk_indicator : 'unknown',
+    riskDataAvailable: item.risk_data_available === true,
+    riskCount: Number.isFinite(item.risk_count) ? Number(item.risk_count) : 0,
   }))
 }
 

@@ -208,7 +208,11 @@ import { ref, computed, inject, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { fmtAmount } from '@/utils/formatters'
+import { sChecklistItemIds, type SChecklistComponentType } from './sChecklistItemIds'
+import { loadSChecklistHtmlData } from './sChecklistRenderData'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+
+const COMPONENT_TYPE = 's17-reconciliation' as const
 
 function fmt(val: number | null | undefined): string {
   return fmtAmount(val, 2)
@@ -217,8 +221,12 @@ function fmt(val: number | null | undefined): string {
 const props = defineProps<{
   wpId: string
   projectId: string
-  isReadonly: boolean
+  readonly?: boolean
+  sheetName?: string
+  componentType?: SChecklistComponentType
+  htmlData?: Record<string, any> | null
 }>()
+const isReadonly = computed(() => props.readonly === true)
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>(
   'openReviewDialog',
@@ -389,7 +397,7 @@ function handleAiConclusion() {
 // ─── 保存 ────────────────────────────────────────────────────────────────────
 
 async function handleSave() {
-  if (saving.value) return
+  if (isReadonly.value || saving.value) return
   saving.value = true
   try {
     const payload = {
@@ -408,7 +416,14 @@ async function handleSave() {
     }
     await http.put(
       `/api/workpapers/${props.wpId}/checklist-responses`,
-      { sheet_name: '与营业外收支等核对表S17-11', data: payload }
+      {
+        project_id: props.projectId,
+        items: [{
+          item_id: sChecklistItemIds['s17-reconciliation'],
+          conclusion: null,
+          remark: JSON.stringify(payload),
+        }],
+      }
     )
     isDirty.value = false
     ElMessage.success('核对表已保存')
@@ -423,15 +438,12 @@ async function handleSave() {
 
 async function loadData() {
   try {
-    const res = await http.get(
-      `/api/workpapers/${props.wpId}/render-config`,
-      { _silent: true } as any
-    )
-    const sheets = res?.data?.sheets || res?.sheets || []
-    const sheet = sheets.find((s: any) =>
-      s.sheet_name?.includes('S17-11') || s.sheet_name?.includes('营业外收支等核对')
-    )
-    const htmlData = sheet?.html_data
+    const htmlData = await loadSChecklistHtmlData({
+      wpId: props.wpId,
+      htmlData: props.htmlData,
+      componentType: props.componentType ?? COMPONENT_TYPE,
+      sheetName: props.sheetName,
+    })
 
     if (htmlData?.sections?.length) {
       reconciliationSections.value = htmlData.sections.map((s: any) => ({

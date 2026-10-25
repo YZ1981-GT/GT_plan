@@ -8,7 +8,92 @@ spec: .kiro/specs/formula-fetch-followup-defect-closure/ R1.6
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from typing import Any
+
+
+_KEY_FLAG_PREFIX: dict[str, str] = {
+    "business_category": "biz_",
+    "industry": "ind_",
+}
+
+
+def _normalize_text(value: object) -> str:
+    """将业务分类、模板类型和声明值归一化为可比较的小写文本。"""
+    if value is None:
+        return ""
+    return str(value).strip().lower()
+
+
+def business_category_flags(
+    business_category: str | None,
+    template_type: str | None,
+) -> dict[str, bool]:
+    """根据项目业务分类和模板类型生成适用性 flags。
+
+    业务分类可能为空或带大小写/外围空白；分类采用既有的关键字包含语义。
+    ``template_type='listed'`` 是独立的上市模板信号，因而即使业务分类为空或为
+    ``C``，也必须令 ``biz_listed`` 为真。
+    """
+    category = _normalize_text(business_category)
+    template = _normalize_text(template_type)
+    return {
+        "biz_ipo": "ipo" in category,
+        "biz_listed": "listed" in category or template == "listed",
+        "biz_neeq": "neeq" in category,
+        "biz_refinancing": "refinancing" in category,
+    }
+
+
+def applicable_when_hit(
+    applicable_when: Mapping[str, Any] | None,
+    flags: Mapping[str, bool] | None,
+    *,
+    key_filter: Iterable[str] | None = None,
+) -> bool:
+    """按 ``applicable_when`` 声明判断是否命中。
+
+    字典键之间、同一键的值之间都是 OR 关系。已知键映射到对应 flag 前缀
+    （``business_category`` → ``biz_``、``industry`` → ``ind_``）；未知键仍按
+    ``<key>_`` 约定查找，找不到对应 flag 时自然未命中。``key_filter`` 只限制
+    参与计算的声明键，不改变声明内的值 OR 语义。
+    """
+    if not isinstance(applicable_when, Mapping) or not isinstance(flags, Mapping):
+        return False
+
+    if key_filter is None:
+        selected_keys: set[str] | None = None
+    elif isinstance(key_filter, str):
+        selected_keys = {key_filter}
+    else:
+        selected_keys = set(key_filter)
+
+    if selected_keys is not None and not selected_keys:
+        return False
+
+    for key, raw_values in applicable_when.items():
+        if selected_keys is not None and key not in selected_keys:
+            continue
+
+        prefix = _KEY_FLAG_PREFIX.get(key, f"{key}_")
+        if raw_values is None:
+            continue
+        if isinstance(raw_values, str):
+            values = (raw_values,)
+        else:
+            try:
+                values = iter(raw_values)
+            except TypeError:
+                values = (raw_values,)
+
+        for value in values:
+            if value is None:
+                continue
+            suffix = _normalize_text(value)
+            if suffix and flags.get(f"{prefix}{suffix}", False):
+                return True
+
+    return False
 
 
 def _lease_codes() -> tuple[str, ...]:
@@ -50,6 +135,7 @@ def match_workpapers(
     - 有 ``account_codes`` 的条目（D~N）：试算表有其中任一标准码即命中（**精确等值**，
       ``1606B`` 这类试算表里不存在的写法永远命中不了，故映射码须与口径单一来源一致）；
     - 否则看 ``trigger``：``must_have`` 恒命中；``conditional`` 看 ``applies_when`` 开关。
+    - 有 ``applicable_when`` 的条目按共享 predicate 计算，字典键和值均为 OR。
     子表（D2-2 / E1-1）折叠到主编码（D2 / E1）。
     """
     matched_primary: set[str] = set()
@@ -70,16 +156,7 @@ def match_workpapers(
             applies_when = m.get("applies_when")
             hit = bool(applies_when and project_flags.get(applies_when))
         elif m.get("applicable_when"):
-            aw = m["applicable_when"]
-            # 各键之间 OR：business_category / industry 等，任一键命中即 hit
-            _KEY_FLAG_PREFIX = {"business_category": "biz_", "industry": "ind_"}
-            for key, values in aw.items():
-                prefix = _KEY_FLAG_PREFIX.get(key, f"{key}_")
-                if any(project_flags.get(f"{prefix}{v}") for v in values):
-                    hit = True
-                    break
-            else:
-                hit = False
+            hit = applicable_when_hit(m["applicable_when"], project_flags)
         else:
             hit = False
         if hit:
@@ -89,4 +166,10 @@ def match_workpapers(
     return matched_primary, matched_subtable_info
 
 
-__all__ = ["TB_ACCOUNT_FLAGS", "match_workpapers", "tb_account_flags"]
+__all__ = [
+    "TB_ACCOUNT_FLAGS",
+    "applicable_when_hit",
+    "business_category_flags",
+    "match_workpapers",
+    "tb_account_flags",
+]

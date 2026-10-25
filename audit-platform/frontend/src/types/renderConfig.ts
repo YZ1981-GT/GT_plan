@@ -57,7 +57,10 @@ export interface RenderConfigWire {
 
   /** 普通渲染分支字段；redirect 分支不下发。 */
   audit_year?: number | null
+  business_category?: string | null
   applicable_standards?: string[]
+  applicable_when?: Record<string, any> | null
+  not_applicable?: boolean
   fill_results?: Record<string, FillResultWire>
   guidance?: Record<string, any> | null
 
@@ -87,7 +90,10 @@ export const RENDER_CONFIG_FIELD_STATUS = {
   template_version: 'active',
   sheets: 'active',
   audit_year: 'active',
+  business_category: 'reserved',
   applicable_standards: 'active',
+  applicable_when: 'reserved',
+  not_applicable: 'active',
   fill_results: 'active',
   guidance: 'reserved',
   redirect: 'active',
