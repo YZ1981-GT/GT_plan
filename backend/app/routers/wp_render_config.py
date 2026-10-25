@@ -225,6 +225,19 @@ _ONLYOFFICE_HTML_WHITELIST: set[str] = {
     # S32/S33 纯前端聚合组件（无后端 renderer）：保留 componentType，禁止改写为 onlyoffice-sheet
     "s32-fraud-bundle",
     "s33-ann14-bundle",
+    # S1/S8/S9/S10/S17 s-checklist 孤儿组件（纯前端渲染，无后端 RENDERER_DISPATCH）
+    "s1-regulation-record",
+    "s8-adjudication",
+    "s9-adjudication",
+    "s9-internal-control",
+    "s9-legal-regulations",
+    "s9-program-description",
+    "s10-adjudication",
+    "s10-internal-control",
+    "s10-environmental-regulations",
+    "s17-nonrecurring-detail",
+    "s17-reconciliation",
+    "s17-tax-impact",
     # 🔴 自定义底稿（componentType=custom）：当前恒单 sheet 故 E 分支不触发，
     # 但一旦将来出现多 sheet，E 分支（要求 `_is_multi_sheet`）会把它静默改写成
     # "onlyoffice-sheet"，使前端专属组件 GtCustomWpEditor **永不渲染**。
