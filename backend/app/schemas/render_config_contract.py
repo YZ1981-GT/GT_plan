@@ -68,7 +68,10 @@ class RenderConfigResponse(_StrictWireModel):
 
     # 普通渲染分支；redirect 分支不设置这些字段。
     audit_year: int | None = None
+    business_category: str | None = None
     applicable_standards: list[str] = Field(default_factory=list)
+    applicable_when: dict[str, Any] | None = None
+    not_applicable: bool = False
     fill_results: dict[str, Any] = Field(default_factory=dict)
     guidance: dict[str, Any] | None = None
 

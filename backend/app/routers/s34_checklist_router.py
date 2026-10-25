@@ -46,13 +46,22 @@ class RegRef(BaseModel):
 
 
 class S34ChecklistItem(BaseModel):
-    """S34 核查事项清单条目"""
+    """S34 核查事项清单条目。"""
     seq: int = Field(description="序号")
     wp_code: str = Field(description="底稿编码 (S34-1 ~ S34-41)")
     name: str = Field(description="核查事项名称")
     reg_ref: RegRef = Field(description="法规溯源")
-    applicability: str = Field(description="适用性: applicable / not_applicable / unknown")
+    applicability: str = Field(
+        description="四象限状态: applicable / recommended / not_applicable / unknown",
+    )
     status: str = Field(description="完成状态: completed / in_progress / not_started")
+    risk_indicator: str = Field(
+        description="S34 风险指示: identified / none / unknown",
+    )
+    risk_data_available: bool = Field(
+        description="B50 checklist 是否有可确认的风险数据",
+    )
+    risk_count: int = Field(default=0, ge=0, description="已映射的 S34 相关风险数")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -68,7 +77,7 @@ async def get_project_s34_checklist(
 ) -> list[dict]:
     """返回 S34 核查事项清单 — 41 条专项底稿的法规溯源 + 适用性 + 完成状态.
 
-    适用性判断：wp_index 中存在该 wp_code 底稿 → applicable，否则 → not_applicable。
+    适用性判断：结合 B50 checklist 风险真源和项目内已有底稿形成四象限；B50 无数据时返回 unknown（待确认），不伪造风险或推荐。
     完成状态：基于 wp_index.status 映射（draft_complete/review_passed/archived → completed）。
 
     Requirements: 3.2, 9.1, 12.1

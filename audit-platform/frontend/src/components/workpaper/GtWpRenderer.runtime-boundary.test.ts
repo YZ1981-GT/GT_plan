@@ -141,7 +141,16 @@ describe('GtWpRenderer Runtime Boundary', () => {
           GtOnlyOfficeSheet: true,
           GtGridSheet: true,
           ElAlert: true,
-          ElResult: true,
+          ElResult: defineComponent({
+            name: 'ElResultStub',
+            props: { title: { type: String, default: '' } },
+            template:
+              '<div class="el-result-stub">' +
+              '<div class="el-result-stub__title">{{ title }}</div>' +
+              '<div class="el-result-stub__sub"><slot name="sub-title" /></div>' +
+              '<slot name="extra" />' +
+              '</div>',
+          }),
           ElButton: true,
           ElPopover: true,
           ElTabs: true,
@@ -352,4 +361,37 @@ describe('GtWpRenderer Runtime Boundary', () => {
     })
     wrapper.unmount()
   })
+  it.each(['s34-ipo-bundle', 'a-program-console'] as const)(
+    '仅消费顶层 not_applicable，%s 覆盖层支持 true/false/缺失三态',
+    async (componentType) => {
+      const sheet = { ...makeConfig().sheets[0], componentType }
+      const wrapper = mountRenderer()
+
+      renderConfig.value = makeConfig({
+        sheets: [sheet],
+        not_applicable: true,
+      })
+      await nextTick()
+      const overlay = wrapper.get('.gt-wp-renderer__not-applicable')
+      expect(overlay.exists()).toBe(true)
+      expect(overlay.get('.el-result-stub__title').text()).toBe('不适用')
+
+      // 旧的 applicable_when/business_category/project_context 路径即使冲突，也不再驱动覆盖层。
+      renderConfig.value = makeConfig({
+        sheets: [sheet],
+        applicable_when: { business_category: ['ipo'] },
+        business_category: 'C',
+        project_context: { business_category: 'C' },
+        not_applicable: false,
+      })
+      await nextTick()
+      expect(wrapper.find('.gt-wp-renderer__not-applicable').exists()).toBe(false)
+
+      renderConfig.value = makeConfig({ sheets: [sheet] })
+      await nextTick()
+      expect(wrapper.find('.gt-wp-renderer__not-applicable').exists()).toBe(false)
+
+      wrapper.unmount()
+    },
+  )
 })

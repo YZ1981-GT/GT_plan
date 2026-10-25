@@ -22,7 +22,7 @@ import sqlalchemy as sa
 
 from app.core.database import get_db
 from app.deps import get_current_user, require_wp_edit_permission
-from app.models.core import User
+from app.models.core import Project, User
 from app.models.workpaper_models import (
     WpCrossRef,
     WpIndex,
@@ -35,6 +35,10 @@ from app.services.wp_classification_service import (
     _WP_APPLICABLE_WHEN,
 )
 from app.services.wp_auto_fill_service import _resolve_auto_fill_values
+from app.services.wp_generation_matching import (
+    applicable_when_hit,
+    business_category_flags,
+)
 from app.services.wp_account_package_resolver import resolve_package_sheets
 from app.services.wp_render_schema_service import WpRenderSchemaService
 from app.services.wp_template_version_service import WpTemplateVersionService
@@ -43,6 +47,7 @@ from app.services.project_audit_year import (
     PROJECT_AUDIT_YEAR_BIZ_SQL,
     PROJECT_AUDIT_YEAR_SQL,
 )
+from app.schemas.render_config_contract import RenderConfigResponse
 
 # ─── 纯辅助函数/常量抽离到 helpers 模块（行为保持一致的重构）─────────────────
 # 这些名字 re-import 回本模块命名空间，故既有调用点无需改动。
@@ -84,6 +89,35 @@ _WHITESPACE_STRIP = str.maketrans("", "", " \u3000\t")
 def _normalize_punct(s: str) -> str:
     """折叠全角标点宽度+空白差异，用于 sheet 名称匹配回退。"""
     return s.translate(_PUNCT_NORM).translate(_WHITESPACE_STRIP)
+
+
+def _render_applicability(
+    wp_code: str,
+    business_category: str | None,
+    template_type: str | None,
+) -> tuple[dict | None, bool]:
+    """返回 render-config 顶层适用性声明和不适用判定。
+
+    当前 ``Project`` 没有 ``industry`` 字段，因此仅行业声明不能被当成
+    ``not_applicable``；否则缺少行业上下文会把本应可见的底稿误隐藏。业务分类
+    声明则严格复用生成链使用的共享 flags/predicate，并用 key_filter 明确只
+    评估当前 render-config 可提供的键。
+    """
+    applicable_when = _WP_APPLICABLE_WHEN.get(wp_code)
+    if not isinstance(applicable_when, dict) or not applicable_when:
+        return None, False
+
+    # 未有可用上下文的声明键保持可见（fail-open），不凭空判定不适用。
+    available_keys = {"business_category"}
+    if not set(applicable_when).issubset(available_keys):
+        return applicable_when, False
+
+    flags = business_category_flags(business_category, template_type)
+    return applicable_when, not applicable_when_hit(
+        applicable_when,
+        flags,
+        key_filter=available_keys,
+    )
 
 
 # ─── Singleton schema service (stateless + cache) ────────────────────────────
@@ -299,16 +333,6 @@ class SheetRenderConfig(BaseModel):
         data = super().model_dump(**kwargs)
         data["schema"] = data.pop("schema_", None)
         return data
-
-
-class RenderConfigResponse(BaseModel):
-    wp_id: str
-    wp_code: str
-    project_id: str
-    scope: str
-    is_real_workpaper: bool
-    template_version: str | None = None
-    sheets: list[dict]  # Use dict to allow custom 'schema' key
 
 
 # ─── B-Index 自动生成辅助 ─────────────────────────────────────────────────
@@ -539,7 +563,11 @@ async def export_template(
     )
 
 
-@router.get("/{wp_id}/render-config")
+@router.get(
+    "/{wp_id}/render-config",
+    response_model=RenderConfigResponse,
+    response_model_exclude_unset=True,
+)
 async def get_render_config(
     wp_id: UUID,
     sheet_name: str | None = Query(None, description="可选，仅返回单 sheet 数据"),
@@ -671,7 +699,7 @@ async def _get_render_config_impl(
                        for cr in (await db.execute(sa.select(WpCrossRef).where(
                            WpCrossRef.source_wp_id == wp_id, WpCrossRef.project_id == project_id
                        ))).scalars().all()]
-    _prog_year, _prog_biz = None, "C"
+    _prog_year, _prog_biz, _prog_template_type = None, "C", None
     try:
         pj = (await db.execute(
             PROJECT_AUDIT_YEAR_BIZ_SQL, {"pid": str(project_id)}
@@ -680,6 +708,16 @@ async def _get_render_config_impl(
             _prog_year, _prog_biz = pj[0], pj[1] or "C"
     except Exception as e:  # noqa: BLE001
         logger.warning("查询项目年度/业务类别失败 pid=%s: %s", project_id, e)
+    try:
+        _prog_template_type = (await db.execute(
+            sa.select(Project.template_type).where(Project.id == project_id)
+        )).scalar_one_or_none()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("查询项目模板类型失败 pid=%s: %s", project_id, e)
+
+    _applicable_when, _not_applicable = _render_applicability(
+        wp_code, _prog_biz, _prog_template_type
+    )
     _tpl = _resolve_template_path(working_paper, wp_code)
 
     # Per-sheet dispatch loop
@@ -1056,8 +1094,10 @@ async def _get_render_config_impl(
 
     response = {"wp_id": str(wp_id), "wp_code": wp_code, "project_id": str(project_id),
                 "scope": scope, "is_real_workpaper": is_real, "template_version": tpl_ver_str,
-                "audit_year": _prog_year, "applicable_standards": _standards,
-                "applicable_when": _WP_APPLICABLE_WHEN.get(wp_code),
+                "audit_year": _prog_year, "business_category": _prog_biz,
+                "applicable_standards": _standards,
+                "applicable_when": _applicable_when,
+                "not_applicable": _not_applicable,
                 "sheets": sheets, "fill_results": fill_results, "guidance": get_wp_guidance(wp_code)}
     if sign_status is not None:
         response["sign_status"] = sign_status

@@ -14,29 +14,8 @@
         <div class="section-header">
           <span>S1-1 对法律法规的考虑记录表</span>
           <div class="header-actions">
-            <!-- 导入导出（动态行表格 Req 11.3） -->
-            <el-dropdown v-if="!isReadonly" trigger="click" size="small">
-              <el-button size="small" :loading="isExporting || isImporting">
-                导入导出 ▾
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-                  <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-                  <el-dropdown-item>
-                    <el-upload
-                      :show-file-list="false"
-                      accept=".xlsx"
-                      :auto-upload="false"
-                      :disabled="isImporting"
-                      @change="handleImportChange"
-                    >
-                      <span>导入数据</span>
-                    </el-upload>
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+            <!-- 后端能力尚未提供：入口保留可见但不可用。 -->
+            <el-button size="small" disabled>导入导出（开发中）</el-button>
             <el-button
               v-if="!isReadonly"
               size="small"
@@ -243,13 +222,20 @@ import { ref, computed, inject, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import { useSSpecialImportExport } from '../composables/useSSpecialImportExport'
+import { sChecklistItemIds } from './sChecklistItemIds'
+import { loadSChecklistHtmlData } from './sChecklistRenderData'
+import type { SChecklistComponentType } from './sChecklistItemIds'
 
+const COMPONENT_TYPE = 's1-regulation-record' as const
 const props = defineProps<{
   wpId: string
   projectId: string
-  isReadonly: boolean
+  readonly?: boolean
+  sheetName?: string
+  componentType?: SChecklistComponentType
+  htmlData?: Record<string, any> | null
 }>()
+const isReadonly = computed(() => props.readonly === true)
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>(
   'openReviewDialog',
@@ -258,29 +244,6 @@ const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => vo
 
 function handleOpenReview(sectionId: string, sectionLabel: string) {
   openReviewDialog(sectionId, sectionLabel)
-}
-
-// ─── 导入导出（Req 11.3） ────────────────────────────────────────────────────
-
-const wpIdRef = computed(() => props.wpId)
-const { isExporting, isImporting, exportTemplate, exportData, importData } =
-  useSSpecialImportExport({ wpId: wpIdRef })
-
-function handleExportTemplate() {
-  exportTemplate('S1-1')
-}
-
-function handleExportData() {
-  exportData('S1-1')
-}
-
-async function handleImportChange(f: { raw?: File } | File) {
-  const file = f instanceof File ? f : (f.raw ?? null)
-  if (!file) return
-  const result = await importData('S1-1', file)
-  if (result?.success) {
-    loadData()
-  }
 }
 
 // ─── 数据模型 ────────────────────────────────────────────────────────────────
@@ -365,7 +328,7 @@ function handleAiConclusion() {
 // ─── 保存 ────────────────────────────────────────────────────────────────────
 
 async function handleSave() {
-  if (saving.value) return
+  if (isReadonly.value || saving.value) return
   saving.value = true
   try {
     const payload = {
@@ -384,7 +347,14 @@ async function handleSave() {
     }
     await http.put(
       `/api/workpapers/${props.wpId}/checklist-responses`,
-      { sheet_name: 'S1-1对法律法规的考虑记录表', data: payload }
+      {
+        project_id: props.projectId,
+        items: [{
+          item_id: sChecklistItemIds['s1-regulation-record'],
+          conclusion: null,
+          remark: JSON.stringify(payload),
+        }],
+      }
     )
     isDirty.value = false
     ElMessage.success('法律法规记录表已保存')
@@ -399,15 +369,12 @@ async function handleSave() {
 
 async function loadData() {
   try {
-    const res = await http.get(
-      `/api/workpapers/${props.wpId}/render-config`,
-      { _silent: true } as any
-    )
-    const sheets = res?.data?.sheets || res?.sheets || []
-    const sheet = sheets.find((s: any) =>
-      s.sheet_name?.includes('S1-1') || s.sheet_name?.includes('法律法规的考虑记录')
-    )
-    const htmlData = sheet?.html_data
+    const htmlData = await loadSChecklistHtmlData({
+      wpId: props.wpId,
+      htmlData: props.htmlData,
+      componentType: props.componentType ?? COMPONENT_TYPE,
+      sheetName: props.sheetName,
+    })
 
     if (htmlData?.regulation_rows?.length) {
       regulationRows.value = htmlData.regulation_rows.map((r: any, idx: number) => ({

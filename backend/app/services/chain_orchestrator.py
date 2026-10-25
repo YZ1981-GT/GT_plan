@@ -23,7 +23,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chain_execution import ChainExecution
 from app.services.prerequisite_checker import PrerequisiteChecker
-from app.services.wp_generation_matching import match_workpapers, tb_account_flags
+from app.services.wp_generation_matching import (
+    business_category_flags,
+    match_workpapers,
+    tb_account_flags,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -510,14 +514,12 @@ class ChainOrchestrator:
         if project_flags.get("it_team_executes"):
             project_flags["needs_it_audit"] = True
 
-        # business_category → biz_ flags for applicable_when matching (S32~S35 etc.)
-        biz_cat = str(business_category or "").lower()
-        project_flags.update({
-            "biz_ipo": "ipo" in biz_cat,
-            "biz_listed": "listed" in biz_cat or template_type == "listed",
-            "biz_neeq": "neeq" in biz_cat,
-            "biz_refinancing": "refinancing" in biz_cat,
-        })
+        # business_category → biz_ flags for applicable_when matching (S32~S35 etc.).
+        # Keep this in the shared predicate module so generation and render-config
+        # cannot drift on normalization or the listed-template rule.
+        project_flags.update(
+            business_category_flags(business_category, template_type)
+        )
 
 
         # 3. Query TB to get actual account codes

@@ -39,6 +39,48 @@ async def render(ctx: RenderContext) -> dict | None:
     wp_id = ctx.wp_id
     db = ctx.db
 
+    # S20 的营业收入不是组件内手填初值：通过统一 auto-data 调度器读取
+    # D4 resolver。外层 SAVEPOINT 兜住调度器/注册表级异常；resolver 自身
+    # 还会把两条 TB 查询放在内层 SAVEPOINT，确保 PG aborted 不污染后续渲染查询。
+    auto_data: dict = {
+        "summary": "S20暂无D4营业收入审定数",
+        "_error": True,
+        "_error_detail": "缺少审计年度，无法读取 D4 营业收入审定数",
+        "_error_source": "revenue_audited_for_s20",
+    }
+    try:
+        if ctx.year is not None:
+            from app.services.auto_data_resolvers import resolve_auto_data_source
+
+            async with db.begin_nested():
+                resolved = await resolve_auto_data_source(
+                    db,
+                    ctx.project_id,
+                    int(ctx.year),
+                    "revenue_audited_for_s20",
+                )
+            if resolved is None:
+                auto_data["_error_detail"] = (
+                    "未注册 auto_data_source: revenue_audited_for_s20"
+                )
+            else:
+                auto_data = resolved
+    except Exception as exc:  # noqa: BLE001 - 诊断保留且不阻断 S20 其余载荷
+        detail = f"{type(exc).__name__}: {exc}"
+        logger.warning(
+            "S20 D4 营业收入审定数取数失败 wp_id=%s project_id=%s: %s",
+            wp_id,
+            ctx.project_id,
+            detail,
+            exc_info=True,
+        )
+        auto_data = {
+            "summary": "⚠️ S20营业收入审定数获取失败",
+            "_error": True,
+            "_error_detail": detail,
+            "_error_source": "revenue_audited_for_s20",
+        }
+
     # ─── 从 checklist_responses 加载 S20-* 数据快照 ──────────────────────
     responses_snapshot: dict = {}
     try:
@@ -88,6 +130,8 @@ async def render(ctx: RenderContext) -> dict | None:
         "sheet_name": ctx.classification.sheet_name if ctx.classification else "",
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
+        "auto_data_source": "revenue_audited_for_s20",
+        "auto_data": auto_data,
         "sheets": S20_SHEETS,
         "component_type": "s20-revenue-deduction",
         "s20_metadata": {

@@ -1,5 +1,5 @@
 <template>
-  <div class="s9-program-desc">
+  <div class="s9-program-desc" :aria-readonly="isReadonly">
     <!-- ═══ 程序说明 — 电子商务考虑方法论 ═══ -->
     <el-card shadow="never" class="audit-section">
       <template #header>
@@ -56,11 +56,18 @@
  * Requirements: 7.1
  */
 
+import { computed } from 'vue'
+import type { SChecklistComponentType } from './sChecklistItemIds'
+
 const props = defineProps<{
   wpId: string
   projectId: string
-  isReadonly: boolean
+  readonly?: boolean
+  sheetName?: string
+  componentType?: SChecklistComponentType
+  htmlData?: Record<string, any> | null
 }>()
+const isReadonly = computed(() => props.readonly === true)
 </script>
 
 <style scoped>

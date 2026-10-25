@@ -1,0 +1,7 @@
+{
+  "task_id": "task-s-cycle-p0-impl",
+  "task_description": "Implement S-cycle workpaper spec P0 Tasks 1-19: applicable_when generation chain, frontend trimming + unified IPO utility, s-checklist orphan component wiring, and S-segment sidebar routing.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -284,7 +285,12 @@ async def _resolve_accounting_estimate_b51(db: AsyncSession, project_id: UUID, y
 
 
 @auto_resolver("cycle_audited_amounts")
-async def _resolve_cycle_audited_amounts(db: AsyncSession, project_id: UUID, year: int, **kw):
+async def _resolve_cycle_audited_amounts(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    **kwargs: Any,
+) -> dict[str, Any]:
     """S32~S35 专项核查：按大类汇总各循环审定金额（IPO/上市专项核查用）。
 
     数据来源: trial_balance 表（按 standard_account_code 首位分类汇总 audited_amount）

@@ -13,6 +13,11 @@ applicable_standards: [listed_standalone, listed_consolidated]
 # 整册专属组件：前端按 sheetName v-if 分发
 whole_workbook_dedicated: true
 
+auto_data_source:
+  - source: s6_related_party_summary
+    description: 从项目关联方登记和交易表读取 S6 关联方摘要
+    fields: [party_count, transaction_count, transaction_total]
+
 sheets:
   - sheet_name: 审定表S6-1
     internal_type: sheet-adjudication

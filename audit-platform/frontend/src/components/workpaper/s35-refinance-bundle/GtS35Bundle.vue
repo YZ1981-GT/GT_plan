@@ -252,6 +252,7 @@ onMounted(async () => {
               :wp-id="wpIdMap[tab.wpCode]"
               :sheet-name="`${tab.wpCode}程序表`"
               :readonly="props.readonly"
+              cycle-code="S35"
               @jump-to-workpaper="handleCrossRefClick"
             />
 
@@ -272,6 +273,7 @@ onMounted(async () => {
               :wp-id="wpIdMap[tab.wpCode]"
               :sheet-name="`${tab.wpCode}程序表`"
               :readonly="props.readonly"
+              cycle-code="S35"
               @jump-to-workpaper="handleCrossRefClick"
             />
           </template>

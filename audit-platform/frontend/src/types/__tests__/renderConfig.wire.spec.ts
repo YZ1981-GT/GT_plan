@@ -10,6 +10,8 @@ import {
 
 const EXPECTED_RESERVED = [
   'scope',
+  'business_category',
+  'applicable_when',
   'guidance',
   'sign_status',
   'permissions',
@@ -24,6 +26,7 @@ const EXPECTED_ACTIVE = [
   'sheets',
   'audit_year',
   'applicable_standards',
+  'not_applicable',
   'fill_results',
   'redirect',
   'delegated_module',

@@ -1,376 +1,268 @@
 # S 类底稿联动、裁剪与组件接线 — 设计
 
-## §0 现状 grep 确认
+> 本文件描述后续实施目标，不表示代码已修好。FEAT-001~003、已有 registry/override 改动和评审文档中的“已完成”均须重新按本设计验证；本次 spec 修订只改三件套。
 
-**G1 — Task 21 产物是否存在**
-归档 `_archive/10-A~S-workpaper-all-cycles-complete/s-cycle-workpapers/tasks.md` Task 21
-标 `[x]`「实现 evaluateApplicability」。全仓 grep `evaluateApplicability` → 活动代码 0 命中。
-`match_workpapers` 完整代码已读（85 行）：只有 `account_codes` / `trigger=must_have` /
-`trigger=conditional + applies_when(str)` 三条路径，无 `applicable_when` 分支。
-**结论：Task 21 假绿，产物从未实现。**
+## Overview
 
-**G2 — resolveProcedureSheetKey.ts 接入模式**
-位于 `src/utils/resolveProcedureSheetKey.ts`（107 行）。纯 if-chain 按
-`wpCode.toUpperCase().startsWith(prefix)` 路由。有 D/E/F/G/H/I/J/K/L/M/N 段路由，**无 S 段**。
-已有多位编号优先模式：G14/G13/G12/G11/G10 在 G1 之前、H10 在 H1 之前、M10 在 M1 之前、
-K13/K12/K11/K10 在 K1 之前。H10/K10/K12/K13 显式 fallback → `'e1a'`。
+本设计把 S 类底稿的适用性裁剪、真实渲染分发、组件保存、只读联动和风险展示收敛为可实施的 P0/P1/P2 方案。以下内容仍是目标设计与验收边界，不代表生产代码、测试代码或共享数据已经修好。
 
-**G3 — match_workpapers 中 applicable_when 与 applies_when**
-已读 `wp_generation_matching.py` 全文。`applies_when` 是 str（如 `"has_lease"`），
-`applicable_when` 是 dict（如 `{business_category: ["ipo","listed"]}`），**match_workpapers 不识别此字段**。
-映射表中 `applicable_when` 使用两类键：`business_category`（S32~S35/D4-22/F2-61~72）和
-`industry`（H5/H7/M8）。
+### §0 现状与收敛边界
 
-**G4 — chain_orchestrator 的 SELECT**
-不含 `Project.business_category`。但 `Project.business_category` 在 ORM 中存在（`core.py:82`，`String(10)`）。
+| 事实 | 当前证据 | 对本设计的影响 |
+|---|---|---|
+| `applicable_when` 已写入映射但生成/render-config 未形成共同判定 | `wp_generation_matching.py` 无 dict 分支；评审 D2 | 新增后端共享 `business_category_flags`/`applicable_when_hit`，两条链共用 |
+| 映射源在 `backend/data/wp_account_mapping.json` | P0 plan B | 禁止再写 `backend/app/data` 路径 |
+| render-config 顶层没有 `project_context` | P0 review | 后端计算顶层 `not_applicable`；GtWpRenderer 只读该布尔值 |
+| 12 个 S-checklist 类型只有前端/override 证据 | findings、D3 | 新建 `_s_checklist_sheets.py` 并注册 `RENDERER_DISPATCH` |
+| 9 个组件发送旧 `{sheet_name,data}`，真实合约要求 `items[]` | P0 plan D4 | 按 `BatchSaveRequest` 统一保存体并补 readonly/identity 测试 |
+| S17 `workpaper_sheet_classification` 为 0 行；模板是 `.xls` | P0 plan D6 | 只做模板驱动 dry-run，未批准不写共享库 |
+| 既有 S resolver 为 11 个 | spec review G7 | 新增 3 个后目标为 14 个，不把总 resolver 数误写成 10 |
+| S34 `hasSubTable` 父码共 12 个，包含 S34-3 | findings、spec review NIT-1 | 公式任务和验收均列出 S34-3 |
+| `Project.business_category` 为 `String(10)`，`refinancing` 为 11 字符 | P0 plan B/D2 | 加宽迁移或短 canonical code 必须由用户/环境先决策 |
 
-**G5 — s-checklist 组件清册**
-`s-checklist/index.ts` 导出 **12** 个组件（S1×1 + S8×1 + S9×4 + S10×3 + S17×3）。
-全仓 grep 非测试、非 `components.d.ts` 的 import → 0 命中。**12 个均为孤儿死代码。**
+#### §0.1 非目标与前置决策
 
-子码在 overrides 分两组：
-- **组 A（7 个在 overrides）**：S9-1/S9-2/S10-1/S10-2/S17-1/S17-2/S17-3，当前映射 `a-program-console`
-- **组 B（5 个不在 overrides）**：S1-1/S8-1/S9-3/S9-4/S10-3（内部 sheet 非独立 wp_code）
+- `/api/s-special/*` 当前不存在；S1/S17 导入导出入口标记“导入导出（开发中）”并禁用，不把端点实现列为完成条件。
+- S17 classification dry-run 的候选行从 `.xls` 模板实读；dry-run 及审批前均禁止写共享数据库。
+- 若选择加宽 `String(10)`，迁移另行批准并遵守运行时迁移规范；若选择 canonical code，须先给出持久化值与映射契约。两者未决时，`refinancing` 的真实 PG/render 验收阻塞，但内存 predicate 单测仍可覆盖 flag 语义。
+- S34 前端公式引擎是运行时计算层；`formula_settings` 是后端公式定义治理层，两者正交。`formula_push_rules.json` 当前 S 规则为 0，S 类不进入 formula-push 写回。
 
-⚠ S17-11/S17-21 在 overrides 中存在（映射 `a-program-console`），无对应 s-checklist 组件，保持不改。
+## Architecture
 
-**G6 — GtWpRenderer 架构与 applicable_when 数据来源**
-`GtWpRenderer.vue` 按 per-sheet componentType 查 `HTML_RENDERER_REGISTRY` 分发。
-14 个 S 类型已注册，**无 s1/s2/s8/s9/s10/s11/s16/s17**。
-GtWpRenderer 内**无 applicable_when 逻辑**。S32~S35 走 bundle 组件不经 GtAProgramConsole，
-故 `isNotApplicable` 对 bundle 不生效。→ 必须在 GtWpRenderer 层面新增拦截（§1.3.2）。
+架构遵循“声明一次、生成与渲染共用、前端只消费结果、只读联动不越过发布门”的边界：
 
-**关键：applicable_when 数据来源路径**（评审 MEDIUM-2 修正）
-`applicable_when` 定义在 `wp_account_mapping.json`，**不在** `wp_code_overrides.json`。
-`wp_render_config.py` 没有导入 `wp_account_mapping`（grep 零命中）。
-`_WP_CODE_OVERRIDE` 在 `wp_classification_service.py` 中加载，来源是 `wp_code_overrides.json`。
-→ 需在 `wp_classification_service.py` 新增 `_WP_APPLICABLE_WHEN` 字典（§1.3.2）。
+- **P0 适用性流**：从 `backend/data/wp_account_mapping.json` 读取声明，经共享 `business_category_flags`/`applicable_when_hit` 同时驱动生成链和 render-config；render-config 输出顶层 `not_applicable`，前端覆盖层只消费该结果。
+- **P1 联动流**：`linked_workpapers` 解析关联关系，14 个只读 resolver 按 render-schema/程序表绑定提供数据；S34 由 `useS34FormulaEngine.ts` 在前端本地计算子表结果，既不写目标底稿/TB，也不进入 `formula_push`。
+- **P2 风险流**：读取风险结论和 bundle tab 委派，按四象限生成 `recommended`/`applicable`/`not_applicable` 与负责人展示，缺 staff 时回退 username，保持只读。
 
-**G7 — 既有 S resolver 计数**
-已注册 **11** 个 S 相关 resolver：`_s_transaction.py` 6 个（s4~s10）+ `_tax_income.py` 4 个 +
-`_cycle.py` 1 个。
+具体接口、集合和保存体分别在后续 Components and Interfaces 与 Data Models 章节固定。
 
-**G8 — risk_assessments 字段**
-`collaboration_models.py:66-70`：`account_or_cycle` String(100) / `is_significant_risk` Boolean /
-`combined_risk` Enum(RiskLevel)。真库值域须实施时 SELECT DISTINCT 对照。
+### §1 P0 适用性与 IPO 判定
 
-**G9 — wp_index.assigned_to FK**
-`workpaper_models.py:227-229`：FK 指向 **users.id**。
-正确 JOIN：`wp_index.assigned_to → users.id → staff_members.user_id → staff_members.name`。
+#### §1.1 共享后端 predicate
 
-**G10 — per-sheet override 机制**
-`wp_render_config.py` 中（render-config 的 per-sheet 循环）：
-`_WP_CODE_OVERRIDE.get(f"{wp_code}-{cls.sheet_name}")` 是第三级 fallback。
-此机制已被 D0 函证 confirmation-* 精细组件使用。
-→ 组 B 通过添加 `"{parent_wp_code}-{sheet_tab_name}"` 键来路由。
+目标文件：`backend/app/services/wp_generation_matching.py`、`chain_orchestrator.py`、`wp_classification_service.py`、`wp_render_config.py`。
 
----
+1. 新增可复用 `business_category_flags(business_category, template_type)`：统一小写/空值，生成四个 `biz_` flag；`biz_listed = 'listed' in category or template_type == 'listed'`。生成链 SELECT 必须带 `Project.business_category`，并把 `template_type` 传给该函数；不要在两个调用方各写一份布尔表达式。
+2. 新增 `applicable_when_hit(applicable_when, flags, *, key_filter=None)`：字典键之间 OR、值之间 OR；`business_category → biz_`，`industry → ind_`，未知键只按约定前缀查找；`key_filter` 存在时只计算所选键。`match_workpapers` 的第四路径直接调用它。
+3. `_WP_APPLICABLE_WHEN` 从 `backend/data/wp_account_mapping.json` 加载。bundle 父码 S32/S33/S34/S35 若自身无声明，则对子码的 `business_category` 值取并集，形成父码声明；不得把 `wp_code_overrides.json` 当适用性来源。
+4. render-config 使用同一 `_WP_APPLICABLE_WHEN` 和 predicate。对有 `business_category` 限制的 wp_code，按当前项目分类与 `template_type` 计算 `not_applicable`；行业字段没有可用 `Project.industry` 时不凭空隐藏行业条目。响应顶层至少包含 `applicable_when` 与 `not_applicable`，后续 sheet payload 不改变这两个字段。
+5. 测试采用真实 mapping 文件加纯函数夹具：`('IPO','soe')` 命中 S32~S34、`('C','soe')` 不命中 S32~S35、`(None,'listed')` 命中 S32~S34；另测多键 OR、key filter、bundle 聚合。`refinancing` 的 PG 场景必须在 String(10) 决策后再验收。
 
-## §1 P0 裁剪执行链 + 孤儿接线
+#### §1.2 Render_Config 与 GtWpRenderer
 
-### §1.1 match_workpapers 增加 applicable_when 判定（R-P0-1，评审 MEDIUM-3 修复）
+render-config 负责业务适用性判定，前端不重新推导。`GtWpRenderer` 的唯一门控是：
 
-改动文件：`backend/app/services/wp_generation_matching.py`
-
-追加第四条路径，**遍历 dict 全部键**（评审要求不只实现 business_category）：
-
-```python
-elif m.get("applicable_when"):
-    aw = m["applicable_when"]
-    # 各键之间 OR：business_category / industry 等，任一键命中即 hit
-    _KEY_FLAG_PREFIX = {"business_category": "biz_", "industry": "ind_"}
-    for key, values in aw.items():
-        prefix = _KEY_FLAG_PREFIX.get(key, f"{key}_")
-        if any(project_flags.get(f"{prefix}{v}") for v in values):
-            hit = True
-            break
+```ts
+const isWpNotApplicable = computed(
+  () => renderConfig.value?.not_applicable === true,
+)
 ```
 
-影响面：`test_wp_account_mapping_single_source.py` 补 applicable_when 测试路径（hit + miss 各一例）。
+模板对 `s34-ipo-bundle` 和 `a-program-console` 都显示中文“不适用”覆盖层；false/缺失不显示。实现不得读取 `renderConfig.project_context`、sheet 内偶然存在的 `html_data.project_context`，也不得复制 `isIpoProject` 逻辑。`useAProgramData` 的旧 `consolidated` 分支保留；其兼容 dict 分支可以调用核心工具，但不改变 GtWpRenderer 的单一输入。
 
-### §1.2 chain_orchestrator 加载项目分类（R-P0-1）
+#### §1.3 IPO 方案 B
 
-改动文件：`backend/app/services/chain_orchestrator.py`
+前端核心工具固定为 `isIpoProject(businessCategory: string, allowedCats?: string[])`，默认 `IPO_BIZ_KEYWORDS = ['ipo','listed','neeq','restructuring','refinancing']`；空值返回 false，`allowedCats` 非空时只使用传入集合。
 
-SELECT 增加 `Project.business_category`。构建布尔 flag：
-```python
-biz_cat = str(proj_row.business_category or "").lower()
-project_flags.update({
-    "biz_ipo": "ipo" in biz_cat,
-    "biz_listed": "listed" in biz_cat or template_type == "listed",
-    "biz_neeq": "neeq" in biz_cat,
-    "biz_refinancing": "refinancing" in biz_cat,
-})
+- D4 导出 `D4_IPO_GROUP_CATS = [...IPO_BIZ_KEYWORDS, 'fraud_risk']`，消费方直接调用核心工具，保留 `fraud_risk`。
+- F2 导出 `isF2IpoProject(ctx)` wrapper：先用核心工具判断 `ctx.business_category`，再按 `project_type`、`template_type`、中文 `IPO_CATEGORIES` 逐级兼容；composable 对外仍可提供现有 computed 名称。
+- D4 不保留 `isIpoGroupVisible` 定义；前端判定定义来源只允许核心工具与 F2 wrapper。测试须同时覆盖 D4 的 fraud_risk、refinancing 和 F2 的中文值/三级顺序，并 grep 定义位置。后端 F2 的中文常量是协议兼容数据，不改变本条“前端定义来源”约束。
+
+## Components and Interfaces
+
+本节固定具体后端/前端文件、`RENDERER_DISPATCH`、组件保存接口、resolver 注册点及路由/模板验证边界；这些是实现接口，不表示当前已经接线。
+
+### §2 P0 S-checklist 后端接线与真实保存
+
+#### §2.1 12-type parity 与 backend dispatch
+
+12-type canonical set 为：
+
+`{s1-regulation-record, s8-adjudication, s9-adjudication, s9-internal-control, s9-legal-regulations, s9-program-description, s10-adjudication, s10-internal-control, s10-environmental-regulations, s17-nonrecurring-detail, s17-reconciliation, s17-tax-impact}`。
+
+新增 `backend/app/routers/wp_render_strategies/_s_checklist_sheets.py`，注册到 `RENDERER_DISPATCH`。策略维护 componentType→item identity：
+
+| componentType | payload source / item identity |
+|---|---|
+| s1-regulation-record | `S1-1-sheet-data` |
+| s8-adjudication | `S8-1-sheet-data` |
+| s9-adjudication | `S9-1-sheet-data` |
+| s9-internal-control | `S9-2-sheet-data` |
+| s9-legal-regulations / s9-program-description | 无保存 item，返回轻量专属 payload |
+| s10-adjudication | `S10-1-sheet-data` |
+| s10-internal-control | `S10-2-sheet-data` |
+| s10-environmental-regulations | 无保存 item，返回轻量专属 payload |
+| s17-nonrecurring-detail | 以 S17 detail view 的 item identity 载入，默认 `S17-1-sheet-data` |
+| s17-reconciliation | `S17-11-sheet-data` |
+| s17-tax-impact | `S17-21-sheet-data` |
+
+策略查询对应 `checklist_responses` 的 `remark`，合并 JSON payload，并返回 `component_type`、精确 `sheet_name` 和专属数据；无行返回轻量 payload；异常在隔离保存点内回滚并返回可诊断的轻量结果。策略任何分支都不返回 `cells`。render-config 的 componentType 命中 dispatch 后，不进入 `onlyoffice-sheet` 或 `noRendererGridFallback`。
+
+Parity gate 比对 4 份集合：overrides、frontend registry、backend valid/whitelist、`RENDERER_DISPATCH`；每个类型至少一条策略契约测试。前端 registry 不是 backend dispatch 的替代物。
+
+#### §2.2 S17 映射、组件保存和 readonly
+
+`wp_code_overrides.json` 的目标映射必须是：
+
+- `S17-1`、`S17-2`、`S17-3` → `s17-nonrecurring-detail`
+- `S17-11` → `s17-reconciliation`
+- `S17-21` → `s17-tax-impact`
+
+S17 detail 是一个 componentType，按 `sheetName` 在 S17-1/S17-2/S17-3 视图间切换；S17-11/S17-21 走各自独立类型。不要把 S17-11/S17-21 留在 `a-program-console`，也不要把 S17-2/S17-3 错接到 reconciliation/tax。
+
+九个可写组件统一使用：
+
+```ts
+{ project_id: props.projectId,
+  items: [{ item_id, conclusion: null, remark: JSON.stringify(payload) }] }
 ```
 
-`industry` 键的 flag 需从项目属性读取，`Project.industry` 字段实施时现读确认是否存在。
-如不存在则本次 industry 键路径 **只声明框架**（for 循环可遍历到 `ind_` 前缀但 flag 恒为空），
-不构成延迟风险（industry 条目通常先通过 `account_codes` 命中）。
-
-### §1.3 前端 applicable_when 全路径覆盖（R-P0-2，评审 MEDIUM-2 修复）
-
-#### §1.3.1 useAProgramData 扩展
-
-改动文件：`audit-platform/frontend/src/composables/useAProgramData.ts`
-
-`applicableWhen` ref 类型扩展为 `string | Record<string, string[]> | null`。
-`isNotApplicable` computed 增加 dict 分支调用 `isIpoProject`（§1.4）。
-
-#### §1.3.2 GtWpRenderer 层拦截 + applicable_when 数据加载
-
-**后端数据来源**（MEDIUM-2 修正）：
-
-在 `wp_classification_service.py` 新增 `_WP_APPLICABLE_WHEN` 字典，与 `_WP_CODE_OVERRIDE`
-并列。从 `wp_account_mapping.json` 预加载 `wp_code → applicable_when` 映射（仅非 None 条目，
-约 60 条）。热重载机制复用 `load_wp_code_overrides` 的 mtime 模式。
-
-```python
-# wp_classification_service.py 新增
-_WP_APPLICABLE_WHEN: dict[str, dict] = _load_applicable_when()
-
-def _load_applicable_when() -> dict[str, dict]:
-    """从 wp_account_mapping.json 加载 wp_code → applicable_when 映射（非 None 条目）。
-    🔴 bundle 父码聚合：S32/S33/S34/S35 父码自身 applicable_when=None，
-    但全部子码有相同 business_category 限制——须从子码向上聚合。
-    """
-    import json, re
-    from pathlib import Path
-    from collections import defaultdict
-    mapping_path = Path(__file__).parent.parent / "data" / "wp_account_mapping.json"
-    raw = json.loads(mapping_path.read_bytes())
-    data = raw["mappings"] if isinstance(raw, dict) else raw
-    result = {}
-    # 先加载所有非 None 条目
-    for m in data:
-        if m.get("applicable_when"):
-            result[m["wp_code"]] = m["applicable_when"]
-    # 聚合 bundle 父码：对 skip 子码按父前缀分组，取交集
-    BUNDLE_PARENTS = {"S32", "S33", "S34", "S35"}
-    for parent in BUNDLE_PARENTS:
-        if parent in result:
-            continue  # 父码已有声明则跳过
-        children_aw = [m["applicable_when"] for m in data
-                       if m.get("wp_code", "").startswith(parent + "-") and m.get("applicable_when")]
-        if children_aw:
-            # 取所有子码 business_category 的并集（宽松策略：任一子码适用即父码适用）
-            all_cats = set()
-            for aw in children_aw:
-                all_cats.update(aw.get("business_category", []))
-            if all_cats:
-                result[parent] = {"business_category": sorted(all_cats)}
-    return result
-```
-
-`wp_render_config.py` 的 render-config 端点从 `_WP_APPLICABLE_WHEN` 查 wp_code，
-附加 `applicable_when` 字段到响应体。
-
-**前端消费**：GtWpRenderer 新增 computed `isWpNotApplicable`：
-- 从 render-config 响应取 `applicable_when`（dict 或 null）
-- 比对项目 business_category，不匹配渲染覆盖层：
-```html
-<el-result v-if="isWpNotApplicable" icon="info" title="不适用">
-  <template #sub-title>当前项目类型不适用此底稿</template>
-</el-result>
-```
-
-影响面：`GtWpRenderer.spec.ts` 补 applicable_when 拦截测试。
-
-### §1.4 收敛 IPO 可见性（R-P0-3）
-
-新建：`audit-platform/frontend/src/utils/ipoProjectUtils.ts`
-
-```typescript
-export const IPO_BIZ_KEYWORDS = ['ipo', 'listed', 'neeq', 'restructuring', 'refinancing'] as const
-
-export function isIpoProject(businessCategory: string, allowedCats?: string[]): boolean {
-  const lower = businessCategory.toLowerCase()
-  if (allowedCats?.length) return allowedCats.some(cat => lower.includes(cat.toLowerCase()))
-  return IPO_BIZ_KEYWORDS.some(kw => lower.includes(kw))
-}
-```
-
-**消费方迁移策略**（评审 MEDIUM-1 修复——方案 B：保持签名单参数，D4/F2 保留各自 wrapper）：
-- `useAProgramData.ts` / GtWpRenderer：直接调 `isIpoProject(biz)`
-- `useD4FormulaEngine.ts`：删 `isIpoGroupVisible`，但 D4 的 `allowedCats` 须含 `'fraud_risk'`
-  以保持现有 fraud_risk 检测行为，即 `isIpoProject(biz, [...IPO_BIZ_KEYWORDS, 'fraud_risk'])`
-- `useF2SpecialFormData.ts`：F2 的三级瀑布（project_type→template_type→中文 IPO_CATEGORIES）
-  **保留为 wrapper 函数**（`isF2IpoProject(project)`），内部调 `isIpoProject` 作第一级判定，
-  三级瀑布作 fallback——不可用单参数替代多字段逻辑
-- 最终收敛到 `isIpoProject`(核心) + `isF2IpoProject`(F2 wrapper) ≤2 个来源
-
-### §1.5 s-checklist 孤儿组件接线（R-P0-4）
-
-**组 A — 7 个已在 overrides 的独立 wp_code**
-
-改动：`wp_code_overrides.json` componentType 从 `a-program-console` 改专属类型。
-
-| wp_code | 新 componentType | 对应组件 |
-|---------|-----------------|---------|
-| S9-1 | s9-adjudication | S9AdjudicationSheet |
-| S9-2 | s9-internal-control | S9InternalControlSheet |
-| S10-1 | s10-adjudication | S10AdjudicationSheet |
-| S10-2 | s10-internal-control | S10InternalControlSheet |
-| S17-1 | s17-nonrecurring-detail | S17NonRecurringDetailSheet |
-| S17-2 | s17-reconciliation | S17ReconciliationSheet |
-| S17-3 | s17-tax-impact | S17TaxImpactSheet |
+每个组件将 `readonly?: boolean` 归一为 `computed(() => props.readonly === true)`，所有写控件和保存函数使用该值。加载按 `componentType`/item identity 选择 render-config sheet，不再按 sheet 名 substring 猜测。S1 与 S17 的导入导出按钮显示“导入导出（开发中）”并 disabled；`useSSpecialImportExport` 不作为本 spec 的可用端点证据。
 
-⚠ S17-11、S17-21 在 overrides 中存在但无对应专属组件，保持 `a-program-console` 不改。
+#### §2.3 S17 classification dry-run
 
-**组 B — 5 个内部 sheet**
+当前 S17 为 0 行，原因包含 `.xls` 未被既有 `.xlsx` 扫描。实施时用能读取 `.xls` 的模板通路生成模板派生候选分类（计划约 8 行，最终以 dry-run 输出为准），输出 sheet、class code、来源和冲突；只写文件/报告，不执行 INSERT/UPDATE。用户批准后另行执行共享库写入；未批准则 S17 真实浏览器渲染保持阻塞，不能用空分类假装通过。
 
-在 `wp_code_overrides.json` 添加 sheet 级 override 键 `"{parent_wp_code}-{sheet_tab_name}"`。
-5 个 sheet_tab_name 须实施时 openpyxl 读模板确认精确值。
+### P1/P2 只读组件接口
 
-改动 2 — `htmlRendererRegistry.ts` 追加 12 个类型字面量。
-改动 3 — `registry/entries/specialized.ts` 追加 12 个 HtmlRendererEntry。
-改动 4 — 验证 s-checklist 组件字段绑定与当前模板一致。
+- 后端 `_s_linkage.py` 注册 3 个新增 resolver，与既有 11 个统一为 `async (db, project_id, year, **kwargs) -> dict`；每个 resolver 必须在 render-schema 或通用程序表取数路径存在绑定，且只读。
+- 前端接口包括 `GtWpRenderer.vue` 的顶层 overlay 门控、`useS34FormulaEngine.ts` 的 12 个 S34 parent 计算、`resolveProcedureSheetKey.ts` 的 S 侧边栏 namespace，以及 S-checklist 组件的 `componentType`/item identity 加载和 `BatchSaveRequest` 保存体。
+- 外部 chip 只读消费 `cycle_audited_amounts`；P2 bundle tab 只展示 `users → staff_members` 解析结果，不修改目标底稿、TB 或 assignment_service 粒度。
 
-影响面：`htmlRendererRegistry.spec.ts` / `GtWpRenderer.real-registry.contract.test.ts` 需覆盖新类型。
+### §3 P0 路由与模板验证
 
-### §1.6 S 段侧边栏路由（R-P0-5，评审 MEDIUM-1 修复）
+`resolveProcedureSheetKey` 在长前缀优先原则下增加 S20/S17/S15/S14/S13/S12/S10/S8/S1 的专属 key；S16、S11 显式返回 `e1a`，S2/S9/S21/S32/S34 走既定 `e1a`。该函数只为有独立程序表 sheet 的侧边栏状态提供 namespace；S3/S4/S5/S6 虽有顶层专属组件但没有该类独立状态源，不因组件存在而新增 route。路由单测覆盖 S 前缀与 D~N 回归，浏览器验证仅在后端 dispatch 可用后进行。
 
-改动文件：`src/utils/resolveProcedureSheetKey.ts`
+模板对账以实际文件格式分流：`.xlsx` 用 openpyxl，S17 `.xls` 用对应读取通路；记录 12 个类型的 sheet、列、item identity 和可写字段。S1/S8/S9/S10/S17 的参考/说明 sheet 只返回专属只读 payload，不强行变成可写表格。
 
-在 K 段之后、F 段之前追加 S 段。遵循既有模式（长前缀先于短前缀），**S16/S11 显式 fallback
-到 e1a 必须在 S15/S10 和 S1 之前**。
+## Data Models
 
-**路由判据**（评审 NIT-2 补充）：获得显式路由的底稿 = **有独立程序表 sheet 且有专属组件的**。
-S12/S13/S14/S15/S20 有专属程序表子组件需定向分发；S1/S10/S17 通过 §1.5 孤儿接线后
-同样需要路由到专属 sheetKey。S3/S4/S5/S6/S21 虽有专属顶层组件，但其程序表 sheet
-由顶层组件内部管理（GtWpRenderer 直接分发到 s3-policy-change 等），不需要
-resolveProcedureSheetKey 额外路由——此函数仅服务于程序表侧边栏数据源。
+本节把实现中需要稳定对齐的输入、响应和持久化契约集中列出；行为细节仍以 Architecture 与 Components and Interfaces 中的边界为准。
 
-```typescript
-// S 循环路由
-if (upper.startsWith('S20')) return 's20a'  // S20 营业收入扣除
-if (upper.startsWith('S17')) return 's17a'  // S17 非经常性损益
-if (upper.startsWith('S16')) return 'e1a'   // S16 套期活动，无专属程序表 fallback
-if (upper.startsWith('S15')) return 's15a'  // S15 每股收益/ROE
-if (upper.startsWith('S14')) return 's14a'  // S14 会计估计
-if (upper.startsWith('S13')) return 's13a'  // S13 利用管理层专家
-if (upper.startsWith('S12')) return 's12a'  // S12 利用专家
-if (upper.startsWith('S11')) return 'e1a'   // S11 利用服务机构，无专属程序表 fallback
-if (upper.startsWith('S10')) return 's10a'  // S10 环境事项
-if (upper.startsWith('S8')) return 's8a'    // S8 租赁（S8AdjudicationSheet 需侧边栏数据源）
-if (upper.startsWith('S1')) return 's1a'    // S1 违反法规行为
-// S2~S6/S9/S21 无专属程序表数据源，落默认 e1a
-// S32~S35 bundle 有自己的导航机制，不进此路由
-```
+### 适用性与 Render_Config 模型
 
-验证要点：S11 不被 `startsWith('S1')` 捕获；S16 不被 `startsWith('S1')` 捕获。
+- `business_category_flags(business_category, template_type)` 返回 `biz_ipo`、`biz_listed`、`biz_neeq`、`biz_refinancing` 四个布尔 flag；`template_type='listed'` 必须使 `biz_listed=true`。
+- `applicable_when` 是按支持键组织的字典，键和值均为 OR 语义；`business_category` 映射 `biz_`，`industry` 映射 `ind_`，可选 `key_filter` 限制参与计算。
+- `Render_Config` 顶层至少包含 `applicable_when` 与布尔 `not_applicable`；前端 overlay 只消费这个顶层布尔值，不依赖不存在的 `project_context`。
 
----
+### S-checklist、dispatch 与保存模型
 
-## §2 P1 关联联动
+- 12-type canonical set 为：`{s1-regulation-record, s8-adjudication, s9-adjudication, s9-internal-control, s9-legal-regulations, s9-program-description, s10-adjudication, s10-internal-control, s10-environmental-regulations, s17-nonrecurring-detail, s17-reconciliation, s17-tax-impact}`。
+- `RENDERER_DISPATCH` 返回专属 `component_type`、精确 `sheet_name`/item identity 和 payload；任何类型均不返回 `cells`，也不降级为 `onlyoffice-sheet` 或通用网格。
+- `BatchSaveRequest` 为 `{project_id, items[]}`，每个 item 含 `item_id`、`conclusion`、`remark`；旧 `{sheet_name,data}` 不是有效保存模型。
+- S17 mapping 固定为 `S17-1/S17-2/S17-3 → s17-nonrecurring-detail`、`S17-11 → s17-reconciliation`、`S17-21 → s17-tax-impact`。
 
-### §2.1 linked_workpapers 补齐（R-P1-1）
+### 联动、公式与风险模型
 
-改动：`backend/app/data/wp_account_mapping.json`
+- `linked_workpapers` 至少包含 S20→D4、S15→D4/M2、S17→K12/K13、S6→K1、S33-5→D4/F5；resolver 总数为既有 11 个加新增 3 个，共 14 个，统一返回 `dict` 且只读。
+- S34 formula engine 覆盖 12 个 parent：S34-2、S34-3、S34-4、S34-8、S34-9、S34-11、S34-16、S34-18、S34-20、S34-25、S34-30、S34-34；该运行时模型不并入 `formula_settings`，S 类不进入 `formula_push_rules.json`。
+- 风险展示使用“风险/底稿是否存在”的四象限，输出 `recommended`、`applicable` 或 `not_applicable`；负责人关系为 `users.id → staff_members.user_id → staff_members.name`，缺 staff 时回退 `users.username`。
 
-| S wp_code | linked_workpapers | 关联逻辑 |
-|-----------|------------------|---------|
-| S20 | `["D4"]` | 营收审定数依赖 |
-| S15 | `["D4", "M2"]` | 净利润/股本/净资产 |
-| S17 | `["K12", "K13"]` | 非经常性损益 = 营业外收支 |
-| S6 | `["K1"]` | 关联方资金占用指标 |
-| S33-5 | `["D4", "F5"]` | 收入毛利交叉检查 |
+### 持久化决策模型与禁止边界
 
-**消费方路径**（实施时须 grep `linked_workpapers` 现读确认）：
-D~N 循环的 linked_workpapers 由底稿面板的 `GtWpPreparationHeader` 或 `WorkpaperSidePanel`
-的"关联底稿"区域消费（展示为可点击 chip）。S 类底稿需走同一展示路径。如果消费组件按
-componentType 过滤只认 D~N，需扩展白名单。
+- `Project.business_category` 当前为 `String(10)`，`refinancing` 的 11 字符持久化方案只能在“批准加宽迁移”或“批准短 canonical code”二选一后确定；决策前不截断、不替换、不声称 PG/render 已验收。
+- `workpaper_sheet_classification` 当前 S17 为 0 行时，只能生成模板驱动 no-write dry-run；未获明确批准不得写共享数据库，浏览器写入只使用【测试】项目。
+- S 类只读取 resolver/本地公式，不绕过显式发布门写 `trial_balance`；`formula_settings` 定义治理与前端 runtime 计算保持正交。
 
-### §2.2 补缺 resolver（R-P1-2）
+### §4 P1 只读联动与 S34 公式
 
-新建：`backend/app/services/auto_data_resolvers/_s_linkage.py`
+#### §4.1 linked_workpapers 与 resolver
 
-三个 resolver 签名统一 `async (db, project_id, year, **kw)`，**只读不回写 TB**。
+在 `backend/data/wp_account_mapping.json` 补 S20→D4、S15→D4/M2、S17→K12/K13、S6→K1、S33-5→D4/F5；实施时 grep 现有消费方，若按 componentType 过滤则扩展白名单而不新造面板。
 
-- `s6_related_party_summary`：按标准码前缀 1221/1222/2202 查 tb_balance 关联方维度。
-  与已有 `s6_fund_occupation_data`（查大额净占用）区别明确。
-- `s33_5_revenue_cost_check`：读 D4 营收 + F5 成本审定数，算毛利率。
-- `s14_estimate_related_data`：读减值准备(1231/1471/1811)/公允价值变动(6101) tb 审定额。
+新增 `_s_linkage.py` 的 3 个 resolver，和既有 11 个一起以 `async (db, project_id, year, **kwargs) -> dict` 注册；分别读取关联方余额、D4/F5 收入成本、估计相关 TB 数据。注册后必须在 render-schema 或通用程序表取数路径有调用绑定，避免“注册成功但无人调用”。所有 resolver 只读。
 
-**render-schema 绑定**（实施时必做）：resolver 注册后，须在对应底稿的 render-schema YAML
-（`backend/data/.../wp_render_schema/` 下搜 S6/S33-5/S14）中补 `auto_data_source` 声明绑定到
-具体单元格。如果 S 类底稿走 `a-program-console` 通用渲染且无 render-schema，则需通过
-程序表中控台的通用取数机制注入（与 S4~S10 已有 resolver 同一路径）。
+#### §4.2 S34 formula engine
 
-### §2.3 S34 公式引擎完整化（R-P1-3）
+`useS34FormulaEngine.ts` 逐表覆盖 S34-2、S34-3、S34-4、S34-8、S34-9、S34-11、S34-16、S34-18、S34-20、S34-25、S34-30、S34-34，共 12 个 parent；具体公式列以模板对账为准，复用现有 ratio/sum/threshold factory。该前端 runtime 与 `formula_settings` 的定义治理正交；没有项目级覆盖需求时不迁入 `wp` 域。S 类继续保持 `formula_push_rules.json` 零规则，不接 `formula_push`。
 
-改动：`s34-ipo-bundle/useS34FormulaEngine.ts`
+#### §4.3 跨引用
 
-**边界声明**：S34 前端公式引擎是**运行时计算层**，与 `formula_settings`（后端公式定义管理层
-七域：report/tb_detail/cross_check/wp/note/consol_note/push）**正交**。S34 子表公式不纳入
-后端六域治理链（无按项目覆盖需求，硬编码前端工厂函数即可），但已通过
-`getS34FormulaDescriptors` 在公式管理弹窗展示元数据（addr_id/expression），与 Task 13.2
-试点接入一致。如未来有项目级覆盖 S34 公式的需求，再将定义迁入 `wp` 域。
+S34/S35 外部 chip 复用 `cycle_audited_amounts` 只读数据源，hover 展示审定/TB 值；内部 tab 仍可导航。任何展示路径不得写目标底稿或 TB。
 
-在 `S34_SHEET_FORMULA_DEFS` 中逐表补齐全部 12 张 hasSubTable 子表（每表具体公式列需实施时
-openpyxl 读模板确认）。12 张 = S34-2/S34-3/S34-4/S34-8/S34-9/S34-11/S34-16/S34-18/S34-20/
-S34-25/S34-30/S34-34（其中 S34-16 已有试点，只需验证）。
-复用 `createRatioFormula` / `createSumFormula` / `createThresholdFormula` 工厂函数。
+### §5 P2 风险与委派
 
-### §2.4 跨引用数值展示（R-P1-4）
+S34 checklist 先用 `SELECT DISTINCT account_or_cycle FROM risk_assessments LIMIT 50` 实读值域，再建立高舞弊/S 事项到 `recommended/applicable` 的映射。四象限为“风险+有底稿 applicable、风险+无底稿 recommended、无风险+有底稿 applicable、无风险+无底稿 not_applicable”。bundle tab 负责人沿 `wp_index.assigned_to → users.id → staff_members.user_id → staff_members.name` 读取，缺 staff 时显示 username，不改变 assignment_service 的循环级粒度。
 
-改动：`useS34CrossRef.ts` / `useS35CrossRef.ts`
+## Delivery Gates and Validation
 
-外部引用 chip 增加 hover 分支：调 `cycle_audited_amounts` 获取关联底稿审定额，
-`el-popover` 只读展示。不回写，不修改目标底稿。
+D1-D8 和验证风险是实现阶段的交付门，不是完成声明；本设计不勾选任何任务。
 
----
+### §6 D1-D8 收敛门与依赖
 
-## §3 P2 风险导向 + 委派
+D1-D8 是实施收敛标签，不是当前完成状态；任务清单全部保持 `[ ]`。
 
-### §3.1 风险映射查询（R-P2-1）
+| 门 | 交付与验收 | 依赖 |
+|---|---|---|
+| D1 overlay | GtWpRenderer 顶层 `not_applicable`，bundle/通用 true/false/缺失测试 | D2 |
+| D2 predicate/render-config | `business_category_flags`、`applicable_when_hit`、生成链/render-config 共用、顶层字段、OR/key-filter/IPO/普通/listed 测试 | §0.1 的 String(10) 决策；映射路径核对 |
+| D3 backend dispatch | `_s_checklist_sheets.py`、12 type parity、专属 payload、无 cells/onlyoffice、策略契约测试 | D5；模板/item audit |
+| D4 save/readonly | 9 个组件 `items[]`、readonly、componentType identity、S17 detail view、导入导出 disabled | D3；S17 runtime 浏览器另受 D6 阻塞 |
+| D5 S17 mapping | 五组 S17 override 精确值与映射测试 | 模板事实已读取 |
+| D6 classification dry-run | `.xls` 派生候选分类 no-write、冲突/来源报告、审批闸门 | D5；用户批准是外部决策 |
+| D7 D4/F2 | 核心工具、D4 fraud_risk、F2 三级 wrapper、8 个现有例/PBT/grep | 核心工具定义（与 D2 可并行） |
+| D8 类型与归因 | 单区域 `vue-tsc` + 注入 `number = string` mutation proof；记录 capability manifest 预存解析失败，既不修也不归因本 spec | D1/D3/D4/D7 前端改动 |
 
-改动：`backend/app/services/s34_checklist_service.py`
+D2 未完成时 D1 不得验收；D3 未完成时 D4 和 12-type 浏览器验收不得验收；D6 未获批准时只能保留 dry-run 阻塞项；D8 的 capability manifest failure 只写验证记录，不得通过增加 allowlist 或修改其他文件消除。
 
-新增 `_load_risk_indicators(db, project_id)`。`S_RISK_QUERY_MAP` 枚举值取自 B 循环
-`useB50RiskData` 前端选项枚举（权威来源），**实施时须 `SELECT DISTINCT account_or_cycle
-FROM risk_assessments LIMIT 50` 对照验证**。如真库值域不匹配据实调整。
+### §7 实施验证与风险
 
-### §3.2 清单适用性升级（R-P2-2）
+- 后端按真实 contract 测试 predicate、render-config、dispatch、S17 mapping；保存点隔离异常，不把异常吞掉当成功。
+- 前端按单区域 tsconfig 验证改动文件，并先注入可诊断类型错误证明检查器真的生效；全量 vue-tsc OOM 时如实记录。
+- Playwright 只在 start-dev 已启动且使用【测试】项目时运行；S17 分类未批准不得把“无 sheet”归因于组件已完成。
+- 预存 `test_component_capability_contract`/manifest generator 无法解析 `registry/index.ts` 的失败属于既有环境/基线问题，只记录复现证据，不修改 capability 产物、不归因给本 spec。
+- 所有任务完成前重新核对 requirements/design/tasks 三件套，禁止以 FEAT JSON、代码 diff 数量或单纯 registry 测试代替端到端证据。
 
-四象限：风险指向+底稿存在 → applicable / 风险+无底稿 → recommended / 无风险+有底稿 →
-applicable / 无风险+无底稿 → not_applicable。
+## Correctness Properties
 
-### §3.3 委派展示（R-P2-3）
+*属性是应在所有有效执行中成立的特征或行为，是把人类可读需求连接到可验证正确性保证的桥梁。*
 
-改动：4 个 bundle 组件。正确 JOIN 路径（G9 确认）：
-`wp_index.assigned_to → users.id → staff_members.user_id → staff_members.name`。
-无 staff_members 降级 `users.username`。仅 UI 展示不改 assignment_service 粒度。
+### Property 1: 业务分类 flag 归一化
 
----
+For any `business_category` and `template_type` pair, `business_category_flags` SHALL return exactly the four boolean flags `biz_ipo`、`biz_listed`、`biz_neeq`、`biz_refinancing`，并在 `template_type='listed'` 时令 `biz_listed=true`。
 
-## §4 不涉及数据库迁移
+**Validates: Requirements 1.1**
 
-全部改动是代码层修改。P2 读现有 risk_assessments 表。
+### Property 2: 适用性声明与过滤保持 OR 语义
 
-## §4.1 S 类与公式推送的关系
+For any valid `applicable_when` dictionary, flags, and optional `key_filter`, `applicable_when_hit` SHALL return true exactly when 任一参与键的任一值命中；提供过滤键时，未参与的键不得改变结果。
 
-S 类底稿不参与 `formula_push` 推送链（`formula_push_rules.json` 中 S 相关规则 = 0 条）。
-S 类审定额取数通过 `auto_data_resolvers` 的 resolver 完成（已有 S4~S10 六个 +
-`cycle_audited_amounts` 一个 = 7 个 resolver，本 spec 新增 3 个 = 10 个）。
-推送治理内核（formula-governance-coverage-closure R2）对 S 类无影响。
+**Validates: Requirements 1.2, 1.3**
 
-## §4.2 并发 spec 前置确认
+### Property 3: IPO 核心判定尊重允许集合
 
-`procedure-trim-generation-delegation-chain` spec（19/23）可能先于本 spec 入库并改动
-`chain_orchestrator.py`。实施 Task 2 前须现读确认 chain_orchestrator 的 SELECT 和
-project_flags 是否有变化,据实调整改动基线。
-另：`Project.business_category` 为 `String(10)`（`core.py:82`），而 `"refinancing"` 为
-11 字符——实施时须确认真库是否有长于 10 字符的值，如有则需迁移加宽此列。
+For any business-category string and any `allowedCats` value, `isIpoProject` SHALL return false for empty input and SHALL match only the default IPO keywords when `allowedCats` is absent, or only the supplied allowed set when it is present。
 
-## §5 评审意见回应
+**Validates: Requirements 3.1**
 
-| 编号 | 处置 | 说明 |
-|------|------|------|
-| R4-MEDIUM-1 | **已修复** | §1.4 采用方案 B：保持单参数核心函数，D4 传 allowedCats 含 fraud_risk，F2 保留三级瀑布 wrapper |
-| R4-NIT-1 | **已修复** | §2.3 + Tasks 25~27 补入 S34-3，12 张全部覆盖 |
-| R4-NIT-2 | **已修复** | §1.6 添加路由判据说明：仅为有独立程序表 sheet 需定向分发的底稿分配专属 sheetKey |
-| MEDIUM-1 | **已修复** | §1.6 在 S1 之前添加 S16→e1a 和 S11→e1a 的显式 fallback，遵循既有 H10/K12/K13 模式 |
-| MEDIUM-2 | **已修复** | §1.3.2 改为在 `wp_classification_service.py` 新增 `_WP_APPLICABLE_WHEN`（从 `wp_account_mapping.json` 加载），纠正「从 _WP_CODE_OVERRIDE 查」的错误前提 |
-| MEDIUM-3 | **已修复** | §1.1 改为遍历 dict 全部键（`_KEY_FLAG_PREFIX` 映射 business_category→biz_ / industry→ind_），不再只实现 business_category |
-| NIT-1 | **已修复** | §0 G10 不再写死行号，改为描述机制位置 |
-| NIT-2 | **已修复** | §1.5 组 A 表格下添加 S17-11/S17-21 保持不改的说明 |
+### Property 4: S34 公式计算保持定义不变量
+
+For any valid S34 subtable grid accepted by a supported parent, the extracted ratio/sum/threshold results SHALL equal the configured formula evaluation, and recalculating the same grid SHALL not introduce a second write or change the result。
+
+**Validates: Requirements 8.2**
+
+### Property 5: 风险与底稿状态形成唯一四象限
+
+For any combination of risk presence and workpaper presence, the P2 classifier SHALL return exactly one of `recommended`、`applicable`、`not_applicable` according to the documented four-quadrant rule。
+
+**Validates: Requirements 10.2**
+
+## Error Handling
+
+- 空值、大小写差异和未知适用性键由共享 predicate 安全处理；未知键不命中，不因缺少 `Project.industry` 而凭空隐藏行业底稿。
+- render-config 必须返回可判定的顶层 `not_applicable`；false 或缺失时前端不显示“不适用”覆盖层。渲染 payload 不得通过异常或缺少数据改写该字段。
+- S-checklist 无对应行时返回轻量专属 payload；读取/保存异常须在隔离保存点内回滚并返回可诊断结果，不得吞异常后报告保存成功；任何策略分支均不得返回 `cells`。
+- `readonly=true` 时组件不发送 batch-save；S1/S17 导入导出端点不存在时只显示并禁用“导入导出（开发中）”，不得发请求。
+- S17 classification 为 0 行时只能保留 no-write dry-run；未获批准不得写共享库。`String(10)` 的加宽迁移或短 canonical code 未决时，`refinancing` 的 PG/render 验收必须保持阻塞，不得截断或伪造通过。
+- P1 resolver、S34 公式和跨引用均为只读路径，不得通过异常兜底写入 `trial_balance`、`tb_balance` 或目标底稿；S 类不进入 `formula_push`。
+
+## Testing Strategy
+
+本设计阶段不修改生产代码或测试代码，以下是实施阶段的验证分层；任务仍保持未完成状态。
+
+- **纯函数单元与属性测试**：使用目标语言已有的 Hypothesis/等价属性测试库覆盖 Property 1~5；每个属性使用单个属性测试、至少 100 个 examples，并在测试注释中标注 `Feature: s-cycle-linkage-trimming-and-component-wiring, Property N`。属性测试只覆盖 flags、predicate、IPO 核心工具、公式纯计算和四象限分类，不把数据库/API/文件 I/O 随机化。
+- **后端契约/集成测试**：使用真实 mapping 文件和代表性 TestClient/PG 场景验证生成链与 render-config 共用 predicate、顶层字段、12-type parity、`RENDERER_DISPATCH` payload、无 `cells`/fallback、14 个 resolver、S17 mapping 与保存点隔离。S17 先验证 `.xls` dry-run 零写入，批准写入另用【测试】项目；`String(10)` 决策前不验收 refinancing PG 场景。
+- **前端单元与静态守卫**：覆盖 GtWpRenderer true/false/缺失三态、D4/F2 IPO 路径、9 个可写组件的 `items[]`/readonly/identity、S17 三视图映射和 procedure key；用 registry/override/backend dispatch 四集合 parity 及 grep/AST 守卫确认没有第三套 IPO 定义或旧保存体。单区域 `vue-tsc` 必须先用 `number = string` 变异证明检查器有效；全量检查若 OOM 如实记录。
+- **浏览器与真实运行时**：仅在 `start-dev.bat` 已启动、使用【测试】项目且前后端重启加载路由后做 Playwright；验证 render-config overlay、组件真实保存/只读、只读联动和风险负责人展示。S17 分类未批准时，浏览器只能记录阻塞，不得把无 sheet 当作完成。
+- **回归与证据**：实现前后重新核对 requirements/design/tasks 三件套、D1-D8 门和关键边界；不以 FEAT JSON、单纯 registry 通过、代码 diff 或任何 `[x]` 记录替代端到端证据，也不在本设计中声称已实现。

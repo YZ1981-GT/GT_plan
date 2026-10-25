@@ -1,0 +1,1567 @@
+{
+  "component_count": 12,
+  "component_types": [
+    "s1-regulation-record",
+    "s8-adjudication",
+    "s9-adjudication",
+    "s9-internal-control",
+    "s9-legal-regulations",
+    "s9-program-description",
+    "s10-adjudication",
+    "s10-internal-control",
+    "s10-environmental-regulations",
+    "s17-nonrecurring-detail",
+    "s17-reconciliation",
+    "s17-tax-impact"
+  ],
+  "entries": [
+    {
+      "component_type": "s1-regulation-record",
+      "format": "xlsx",
+      "reader": "openpyxl",
+      "sheets": [
+        {
+          "column_count_delta": 9,
+          "comparison": "freeform_template_vs_grid_component",
+          "differences": [
+            {
+              "accepted_template_labels": [
+                "序号"
+              ],
+              "field": "index",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "序号"
+            },
+            {
+              "accepted_template_labels": [
+                "法规类别"
+              ],
+              "field": "category",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "法规类别"
+            },
+            {
+              "accepted_template_labels": [
+                "法律法规名称",
+                "法规名称"
+              ],
+              "field": "lawName",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "法律法规名称"
+            },
+            {
+              "accepted_template_labels": [
+                "是否适用"
+              ],
+              "field": "applicable",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "是否适用"
+            },
+            {
+              "accepted_template_labels": [
+                "对财务报表的影响"
+              ],
+              "field": "impactAssessment",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "对财务报表的影响"
+            },
+            {
+              "accepted_template_labels": [
+                "不合规后果"
+              ],
+              "field": "consequence",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "不合规后果"
+            },
+            {
+              "accepted_template_labels": [
+                "已执行审计程序"
+              ],
+              "field": "auditProcedure",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "已执行审计程序"
+            },
+            {
+              "accepted_template_labels": [
+                "结论"
+              ],
+              "field": "conclusion",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "结论"
+            },
+            {
+              "accepted_template_labels": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "索引号"
+            }
+          ],
+          "dimensions": {
+            "columns": 10,
+            "rows": 95
+          },
+          "format": "xlsx",
+          "header_rows": [],
+          "matched_fields": [],
+          "reader": "openpyxl",
+          "sheet_name": "S1-1对法律法规的考虑记录表",
+          "status": "ok",
+          "template_columns": [],
+          "ui_columns": [
+            {
+              "aliases": [
+                "序号"
+              ],
+              "field": "index",
+              "label": "序号"
+            },
+            {
+              "aliases": [
+                "法规类别"
+              ],
+              "field": "category",
+              "label": "法规类别"
+            },
+            {
+              "aliases": [
+                "法律法规名称",
+                "法规名称"
+              ],
+              "field": "lawName",
+              "label": "法律法规名称"
+            },
+            {
+              "aliases": [
+                "是否适用"
+              ],
+              "field": "applicable",
+              "label": "是否适用"
+            },
+            {
+              "aliases": [
+                "对财务报表的影响"
+              ],
+              "field": "impactAssessment",
+              "label": "对财务报表的影响"
+            },
+            {
+              "aliases": [
+                "不合规后果"
+              ],
+              "field": "consequence",
+              "label": "不合规后果"
+            },
+            {
+              "aliases": [
+                "已执行审计程序"
+              ],
+              "field": "auditProcedure",
+              "label": "已执行审计程序"
+            },
+            {
+              "aliases": [
+                "结论"
+              ],
+              "field": "conclusion",
+              "label": "结论"
+            },
+            {
+              "aliases": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "label": "索引号"
+            }
+          ]
+        }
+      ],
+      "status": "ok",
+      "workbook": "backend/wp_templates/S/S1 对被审计单位违反法规行为的考虑2019.xlsx"
+    },
+    {
+      "component_type": "s8-adjudication",
+      "format": "xlsx",
+      "reader": "openpyxl",
+      "sheets": [
+        {
+          "column_count_delta": 7,
+          "comparison": "freeform_template_vs_grid_component",
+          "differences": [
+            {
+              "accepted_template_labels": [
+                "科目名称"
+              ],
+              "field": "accountName",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "科目名称"
+            },
+            {
+              "accepted_template_labels": [
+                "科目编码"
+              ],
+              "field": "accountCode",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "科目编码"
+            },
+            {
+              "accepted_template_labels": [
+                "未审数"
+              ],
+              "field": "unadjustedAmount",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "未审数"
+            },
+            {
+              "accepted_template_labels": [
+                "审计调整"
+              ],
+              "field": "adjustmentAmount",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "审计调整"
+            },
+            {
+              "accepted_template_labels": [
+                "审定数"
+              ],
+              "field": "auditedAmount",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "审定数"
+            },
+            {
+              "accepted_template_labels": [
+                "调整分录"
+              ],
+              "field": "ajeRef",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "调整分录"
+            },
+            {
+              "accepted_template_labels": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "索引号"
+            }
+          ],
+          "dimensions": {
+            "columns": 6,
+            "rows": 25
+          },
+          "format": "xlsx",
+          "header_rows": [],
+          "matched_fields": [],
+          "reader": "openpyxl",
+          "sheet_name": "审定表S8-1",
+          "status": "ok",
+          "template_columns": [],
+          "ui_columns": [
+            {
+              "aliases": [
+                "科目名称"
+              ],
+              "field": "accountName",
+              "label": "科目名称"
+            },
+            {
+              "aliases": [
+                "科目编码"
+              ],
+              "field": "accountCode",
+              "label": "科目编码"
+            },
+            {
+              "aliases": [
+                "未审数"
+              ],
+              "field": "unadjustedAmount",
+              "label": "未审数"
+            },
+            {
+              "aliases": [
+                "审计调整"
+              ],
+              "field": "adjustmentAmount",
+              "label": "审计调整"
+            },
+            {
+              "aliases": [
+                "审定数"
+              ],
+              "field": "auditedAmount",
+              "label": "审定数"
+            },
+            {
+              "aliases": [
+                "调整分录"
+              ],
+              "field": "ajeRef",
+              "label": "调整分录"
+            },
+            {
+              "aliases": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "label": "索引号"
+            }
+          ]
+        }
+      ],
+      "status": "ok",
+      "workbook": "backend/wp_templates/S/S8 租赁.xlsx"
+    },
+    {
+      "component_type": "s9-adjudication",
+      "format": "xlsx",
+      "reader": "openpyxl",
+      "sheets": [
+        {
+          "column_count_delta": 7,
+          "comparison": "freeform_template_vs_grid_component",
+          "differences": [
+            {
+              "accepted_template_labels": [
+                "科目名称"
+              ],
+              "field": "accountName",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "科目名称"
+            },
+            {
+              "accepted_template_labels": [
+                "科目编码"
+              ],
+              "field": "accountCode",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "科目编码"
+            },
+            {
+              "accepted_template_labels": [
+                "未审数"
+              ],
+              "field": "unadjustedAmount",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "未审数"
+            },
+            {
+              "accepted_template_labels": [
+                "审计调整"
+              ],
+              "field": "adjustmentAmount",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "审计调整"
+            },
+            {
+              "accepted_template_labels": [
+                "审定数"
+              ],
+              "field": "auditedAmount",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "审定数"
+            },
+            {
+              "accepted_template_labels": [
+                "调整分录"
+              ],
+              "field": "ajeRef",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "调整分录"
+            },
+            {
+              "accepted_template_labels": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "索引号"
+            }
+          ],
+          "dimensions": {
+            "columns": 7,
+            "rows": 25
+          },
+          "format": "xlsx",
+          "header_rows": [],
+          "matched_fields": [],
+          "reader": "openpyxl",
+          "sheet_name": "审定表S9-1",
+          "status": "ok",
+          "template_columns": [],
+          "ui_columns": [
+            {
+              "aliases": [
+                "科目名称"
+              ],
+              "field": "accountName",
+              "label": "科目名称"
+            },
+            {
+              "aliases": [
+                "科目编码"
+              ],
+              "field": "accountCode",
+              "label": "科目编码"
+            },
+            {
+              "aliases": [
+                "未审数"
+              ],
+              "field": "unadjustedAmount",
+              "label": "未审数"
+            },
+            {
+              "aliases": [
+                "审计调整"
+              ],
+              "field": "adjustmentAmount",
+              "label": "审计调整"
+            },
+            {
+              "aliases": [
+                "审定数"
+              ],
+              "field": "auditedAmount",
+              "label": "审定数"
+            },
+            {
+              "aliases": [
+                "调整分录"
+              ],
+              "field": "ajeRef",
+              "label": "调整分录"
+            },
+            {
+              "aliases": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "label": "索引号"
+            }
+          ]
+        }
+      ],
+      "status": "ok",
+      "workbook": "backend/wp_templates/S/S9 对电子商务的考虑.xlsx"
+    },
+    {
+      "component_type": "s9-internal-control",
+      "format": "xlsx",
+      "reader": "openpyxl",
+      "sheets": [
+        {
+          "column_count_delta": -2,
+          "comparison": "table_header",
+          "differences": [
+            {
+              "accepted_template_labels": [
+                "备注/审计证据",
+                "备注"
+              ],
+              "field": "evidence",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "备注/审计证据"
+            },
+            {
+              "accepted_template_labels": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "索引号"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "答案"
+            }
+          ],
+          "dimensions": {
+            "columns": 8,
+            "rows": 66
+          },
+          "format": "xlsx",
+          "header_rows": [
+            6,
+            7
+          ],
+          "matched_fields": [
+            {
+              "field": "controlItem",
+              "template_label": "调查问题"
+            },
+            {
+              "field": "rating",
+              "template_label": "是"
+            }
+          ],
+          "reader": "openpyxl",
+          "sheet_name": "内部控制调查表S9-2",
+          "status": "ok",
+          "template_columns": [
+            "调查问题",
+            "答案",
+            "是",
+            "弱",
+            "否",
+            "不适用"
+          ],
+          "ui_columns": [
+            {
+              "aliases": [
+                "控制活动/调查事项",
+                "调查问题"
+              ],
+              "field": "controlItem",
+              "label": "控制活动/调查事项"
+            },
+            {
+              "aliases": [
+                "是",
+                "弱",
+                "否",
+                "不适用"
+              ],
+              "field": "rating",
+              "label": "评价"
+            },
+            {
+              "aliases": [
+                "备注/审计证据",
+                "备注"
+              ],
+              "field": "evidence",
+              "label": "备注/审计证据"
+            },
+            {
+              "aliases": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "label": "索引号"
+            }
+          ]
+        }
+      ],
+      "status": "ok",
+      "workbook": "backend/wp_templates/S/S9 对电子商务的考虑.xlsx"
+    },
+    {
+      "component_type": "s9-legal-regulations",
+      "format": "xlsx",
+      "reader": "openpyxl",
+      "sheets": [
+        {
+          "column_count_delta": 0,
+          "comparison": "readonly_reference",
+          "differences": [],
+          "dimensions": {
+            "columns": 5,
+            "rows": 98
+          },
+          "format": "xlsx",
+          "header_rows": [],
+          "matched_fields": [],
+          "reader": "openpyxl",
+          "sheet_name": "电子商务法律法规",
+          "status": "ok",
+          "template_columns": [],
+          "ui_columns": []
+        }
+      ],
+      "status": "ok",
+      "workbook": "backend/wp_templates/S/S9 对电子商务的考虑.xlsx"
+    },
+    {
+      "component_type": "s9-program-description",
+      "format": "xlsx",
+      "reader": "openpyxl",
+      "sheets": [
+        {
+          "column_count_delta": 0,
+          "comparison": "readonly_reference",
+          "differences": [],
+          "dimensions": {
+            "columns": 9,
+            "rows": 69
+          },
+          "format": "xlsx",
+          "header_rows": [],
+          "matched_fields": [],
+          "reader": "openpyxl",
+          "sheet_name": "程序说明",
+          "status": "ok",
+          "template_columns": [],
+          "ui_columns": []
+        }
+      ],
+      "status": "ok",
+      "workbook": "backend/wp_templates/S/S9 对电子商务的考虑.xlsx"
+    },
+    {
+      "component_type": "s10-adjudication",
+      "format": "xlsx",
+      "reader": "openpyxl",
+      "sheets": [
+        {
+          "column_count_delta": 7,
+          "comparison": "freeform_template_vs_grid_component",
+          "differences": [
+            {
+              "accepted_template_labels": [
+                "科目名称"
+              ],
+              "field": "accountName",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "科目名称"
+            },
+            {
+              "accepted_template_labels": [
+                "科目编码"
+              ],
+              "field": "accountCode",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "科目编码"
+            },
+            {
+              "accepted_template_labels": [
+                "未审数"
+              ],
+              "field": "unadjustedAmount",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "未审数"
+            },
+            {
+              "accepted_template_labels": [
+                "审计调整"
+              ],
+              "field": "adjustmentAmount",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "审计调整"
+            },
+            {
+              "accepted_template_labels": [
+                "审定数"
+              ],
+              "field": "auditedAmount",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "审定数"
+            },
+            {
+              "accepted_template_labels": [
+                "调整分录"
+              ],
+              "field": "ajeRef",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "调整分录"
+            },
+            {
+              "accepted_template_labels": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "索引号"
+            }
+          ],
+          "dimensions": {
+            "columns": 6,
+            "rows": 25
+          },
+          "format": "xlsx",
+          "header_rows": [],
+          "matched_fields": [],
+          "reader": "openpyxl",
+          "sheet_name": "审定表S10-1",
+          "status": "ok",
+          "template_columns": [],
+          "ui_columns": [
+            {
+              "aliases": [
+                "科目名称"
+              ],
+              "field": "accountName",
+              "label": "科目名称"
+            },
+            {
+              "aliases": [
+                "科目编码"
+              ],
+              "field": "accountCode",
+              "label": "科目编码"
+            },
+            {
+              "aliases": [
+                "未审数"
+              ],
+              "field": "unadjustedAmount",
+              "label": "未审数"
+            },
+            {
+              "aliases": [
+                "审计调整"
+              ],
+              "field": "adjustmentAmount",
+              "label": "审计调整"
+            },
+            {
+              "aliases": [
+                "审定数"
+              ],
+              "field": "auditedAmount",
+              "label": "审定数"
+            },
+            {
+              "aliases": [
+                "调整分录"
+              ],
+              "field": "ajeRef",
+              "label": "调整分录"
+            },
+            {
+              "aliases": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "label": "索引号"
+            }
+          ]
+        }
+      ],
+      "status": "ok",
+      "workbook": "backend/wp_templates/S/S10 对环境事项的考虑.xlsx"
+    },
+    {
+      "component_type": "s10-internal-control",
+      "format": "xlsx",
+      "reader": "openpyxl",
+      "sheets": [
+        {
+          "column_count_delta": -2,
+          "comparison": "table_header",
+          "differences": [
+            {
+              "accepted_template_labels": [
+                "备注/审计证据",
+                "备注"
+              ],
+              "field": "evidence",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "备注/审计证据"
+            },
+            {
+              "accepted_template_labels": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "索引号"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "答案"
+            }
+          ],
+          "dimensions": {
+            "columns": 8,
+            "rows": 64
+          },
+          "format": "xlsx",
+          "header_rows": [
+            5,
+            6
+          ],
+          "matched_fields": [
+            {
+              "field": "controlItem",
+              "template_label": "调查问题"
+            },
+            {
+              "field": "rating",
+              "template_label": "是"
+            }
+          ],
+          "reader": "openpyxl",
+          "sheet_name": "附、内控调查表S10-2",
+          "status": "ok",
+          "template_columns": [
+            "调查问题",
+            "答案",
+            "是",
+            "弱",
+            "否",
+            "不适用"
+          ],
+          "ui_columns": [
+            {
+              "aliases": [
+                "控制活动/调查事项",
+                "调查问题"
+              ],
+              "field": "controlItem",
+              "label": "控制活动/调查事项"
+            },
+            {
+              "aliases": [
+                "是",
+                "弱",
+                "否",
+                "不适用"
+              ],
+              "field": "rating",
+              "label": "评价"
+            },
+            {
+              "aliases": [
+                "备注/审计证据",
+                "备注"
+              ],
+              "field": "evidence",
+              "label": "备注/审计证据"
+            },
+            {
+              "aliases": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "label": "索引号"
+            }
+          ]
+        }
+      ],
+      "status": "ok",
+      "workbook": "backend/wp_templates/S/S10 对环境事项的考虑.xlsx"
+    },
+    {
+      "component_type": "s10-environmental-regulations",
+      "format": "xlsx",
+      "reader": "openpyxl",
+      "sheets": [
+        {
+          "column_count_delta": 0,
+          "comparison": "readonly_reference",
+          "differences": [],
+          "dimensions": {
+            "columns": 1,
+            "rows": 152
+          },
+          "format": "xlsx",
+          "header_rows": [],
+          "matched_fields": [],
+          "reader": "openpyxl",
+          "sheet_name": "环境法规",
+          "status": "ok",
+          "template_columns": [],
+          "ui_columns": []
+        }
+      ],
+      "status": "ok",
+      "workbook": "backend/wp_templates/S/S10 对环境事项的考虑.xlsx"
+    },
+    {
+      "component_type": "s17-nonrecurring-detail",
+      "format": "xls",
+      "reader": "xlrd",
+      "sheets": [
+        {
+          "column_count_delta": -1,
+          "comparison": "table_header",
+          "differences": [
+            {
+              "accepted_template_labels": [
+                "所得税影响"
+              ],
+              "field": "taxImpact",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "所得税影响"
+            },
+            {
+              "accepted_template_labels": [
+                "税后净额"
+              ],
+              "field": "netAmount",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "税后净额"
+            },
+            {
+              "accepted_template_labels": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "索引号"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "说明"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "未审数"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "审计调整"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "审定数"
+            }
+          ],
+          "dimensions": {
+            "columns": 6,
+            "rows": 41
+          },
+          "format": "xls",
+          "header_rows": [
+            5,
+            6
+          ],
+          "matched_fields": [
+            {
+              "field": "itemName",
+              "template_label": "项目"
+            },
+            {
+              "field": "currentAmount",
+              "template_label": "本年度"
+            },
+            {
+              "field": "priorAmount",
+              "template_label": "上年度"
+            }
+          ],
+          "reader": "xlrd",
+          "sheet_name": "审定表S17-1",
+          "status": "ok",
+          "template_columns": [
+            "项目",
+            "本年度",
+            "上年度",
+            "说明",
+            "未审数",
+            "审计调整",
+            "审定数"
+          ],
+          "ui_columns": [
+            {
+              "aliases": [
+                "非经常性损益项目",
+                "项目",
+                "项  目"
+              ],
+              "field": "itemName",
+              "label": "非经常性损益项目"
+            },
+            {
+              "aliases": [
+                "本期金额",
+                "本年度"
+              ],
+              "field": "currentAmount",
+              "label": "本期金额"
+            },
+            {
+              "aliases": [
+                "上期金额",
+                "上年度"
+              ],
+              "field": "priorAmount",
+              "label": "上期金额"
+            },
+            {
+              "aliases": [
+                "所得税影响"
+              ],
+              "field": "taxImpact",
+              "label": "所得税影响"
+            },
+            {
+              "aliases": [
+                "税后净额"
+              ],
+              "field": "netAmount",
+              "label": "税后净额"
+            },
+            {
+              "aliases": [
+                "索引号"
+              ],
+              "field": "indexRef",
+              "label": "索引号"
+            }
+          ]
+        },
+        {
+          "column_count_delta": -1,
+          "comparison": "table_header",
+          "differences": [
+            {
+              "accepted_template_labels": [
+                "序号"
+              ],
+              "field": "index",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "序号"
+            },
+            {
+              "accepted_template_labels": [
+                "来源科目"
+              ],
+              "field": "source",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "来源科目"
+            },
+            {
+              "accepted_template_labels": [
+                "认定依据"
+              ],
+              "field": "basis",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "认定依据"
+            },
+            {
+              "accepted_template_labels": [
+                "勾稽"
+              ],
+              "field": "crossRef",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "勾稽"
+            },
+            {
+              "accepted_template_labels": [
+                "审核结果"
+              ],
+              "field": "auditResult",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "审核结果"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "母公司"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "子公司１"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "子公司２"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "…"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "合计"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "合并抵销"
+            }
+          ],
+          "dimensions": {
+            "columns": 8,
+            "rows": 42
+          },
+          "format": "xls",
+          "header_rows": [
+            5
+          ],
+          "matched_fields": [
+            {
+              "field": "itemName",
+              "template_label": "项目"
+            },
+            {
+              "field": "amount",
+              "template_label": "合并金额"
+            }
+          ],
+          "reader": "xlrd",
+          "sheet_name": "审核表（合并）S17-2",
+          "status": "ok",
+          "template_columns": [
+            "项目",
+            "母公司",
+            "子公司１",
+            "子公司２",
+            "…",
+            "合计",
+            "合并抵销",
+            "合并金额"
+          ],
+          "ui_columns": [
+            {
+              "aliases": [
+                "序号"
+              ],
+              "field": "index",
+              "label": "序号"
+            },
+            {
+              "aliases": [
+                "非经常性损益项目",
+                "项目",
+                "项  目"
+              ],
+              "field": "itemName",
+              "label": "非经常性损益项目"
+            },
+            {
+              "aliases": [
+                "金额",
+                "合并金额"
+              ],
+              "field": "amount",
+              "label": "金额"
+            },
+            {
+              "aliases": [
+                "来源科目"
+              ],
+              "field": "source",
+              "label": "来源科目"
+            },
+            {
+              "aliases": [
+                "认定依据"
+              ],
+              "field": "basis",
+              "label": "认定依据"
+            },
+            {
+              "aliases": [
+                "勾稽"
+              ],
+              "field": "crossRef",
+              "label": "勾稽"
+            },
+            {
+              "aliases": [
+                "审核结果"
+              ],
+              "field": "auditResult",
+              "label": "审核结果"
+            }
+          ]
+        },
+        {
+          "column_count_delta": 2,
+          "comparison": "table_header",
+          "differences": [
+            {
+              "accepted_template_labels": [
+                "序号"
+              ],
+              "field": "index",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "序号"
+            },
+            {
+              "accepted_template_labels": [
+                "来源科目"
+              ],
+              "field": "source",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "来源科目"
+            },
+            {
+              "accepted_template_labels": [
+                "审核结果"
+              ],
+              "field": "auditResult",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "审核结果"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "索引号"
+            }
+          ],
+          "dimensions": {
+            "columns": 6,
+            "rows": 33
+          },
+          "format": "xls",
+          "header_rows": [
+            5
+          ],
+          "matched_fields": [
+            {
+              "field": "itemName",
+              "template_label": "项  目"
+            },
+            {
+              "field": "amount",
+              "template_label": "金额"
+            },
+            {
+              "field": "basis",
+              "template_label": "计算说明"
+            }
+          ],
+          "reader": "xlrd",
+          "sheet_name": "审核表（个别报表）S17-3",
+          "status": "ok",
+          "template_columns": [
+            "项  目",
+            "金额",
+            "计算说明",
+            "索引号"
+          ],
+          "ui_columns": [
+            {
+              "aliases": [
+                "序号"
+              ],
+              "field": "index",
+              "label": "序号"
+            },
+            {
+              "aliases": [
+                "非经常性损益项目",
+                "项目",
+                "项  目"
+              ],
+              "field": "itemName",
+              "label": "非经常性损益项目"
+            },
+            {
+              "aliases": [
+                "金额"
+              ],
+              "field": "amount",
+              "label": "金额"
+            },
+            {
+              "aliases": [
+                "来源科目"
+              ],
+              "field": "source",
+              "label": "来源科目"
+            },
+            {
+              "aliases": [
+                "认定依据",
+                "计算说明"
+              ],
+              "field": "basis",
+              "label": "认定依据"
+            },
+            {
+              "aliases": [
+                "审核结果"
+              ],
+              "field": "auditResult",
+              "label": "审核结果"
+            }
+          ]
+        }
+      ],
+      "status": "ok",
+      "workbook": "backend/wp_templates/S/S17 非经常性损益.xls"
+    },
+    {
+      "component_type": "s17-reconciliation",
+      "format": "xls",
+      "reader": "xlrd",
+      "sheets": [
+        {
+          "column_count_delta": -2,
+          "comparison": "table_header",
+          "differences": [
+            {
+              "accepted_template_labels": [
+                "利润表金额"
+              ],
+              "field": "plAmount",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "利润表金额"
+            },
+            {
+              "accepted_template_labels": [
+                "经常性损益金额"
+              ],
+              "field": "recurringAmount",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "经常性损益金额"
+            },
+            {
+              "accepted_template_labels": [
+                "勾稽"
+              ],
+              "field": "crossRef",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "勾稽"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "金额"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "其他收益"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "投资收益"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "资产处置损益"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "营业外收支"
+            }
+          ],
+          "dimensions": {
+            "columns": 8,
+            "rows": 91
+          },
+          "format": "xls",
+          "header_rows": [
+            5,
+            6
+          ],
+          "matched_fields": [
+            {
+              "field": "itemName",
+              "template_label": "项目"
+            },
+            {
+              "field": "nrAmount",
+              "template_label": "非经常性损益"
+            },
+            {
+              "field": "difference",
+              "template_label": "差异"
+            },
+            {
+              "field": "note",
+              "template_label": "差异原因"
+            }
+          ],
+          "reader": "xlrd",
+          "sheet_name": "与营业外收支等核对表S17-11",
+          "status": "ok",
+          "template_columns": [
+            "项目",
+            "金额",
+            "差异原因",
+            "非经常性损益",
+            "其他收益",
+            "投资收益",
+            "资产处置损益",
+            "营业外收支",
+            "差异"
+          ],
+          "ui_columns": [
+            {
+              "aliases": [
+                "项目名称",
+                "项目"
+              ],
+              "field": "itemName",
+              "label": "项目名称"
+            },
+            {
+              "aliases": [
+                "利润表金额"
+              ],
+              "field": "plAmount",
+              "label": "利润表金额"
+            },
+            {
+              "aliases": [
+                "非经常性损益金额",
+                "非经常性损益"
+              ],
+              "field": "nrAmount",
+              "label": "非经常性损益金额"
+            },
+            {
+              "aliases": [
+                "经常性损益金额"
+              ],
+              "field": "recurringAmount",
+              "label": "经常性损益金额"
+            },
+            {
+              "aliases": [
+                "差异"
+              ],
+              "field": "difference",
+              "label": "差异"
+            },
+            {
+              "aliases": [
+                "说明",
+                "差异原因"
+              ],
+              "field": "note",
+              "label": "说明"
+            },
+            {
+              "aliases": [
+                "勾稽"
+              ],
+              "field": "crossRef",
+              "label": "勾稽"
+            }
+          ]
+        }
+      ],
+      "status": "ok",
+      "workbook": "backend/wp_templates/S/S17 非经常性损益.xls"
+    },
+    {
+      "component_type": "s17-tax-impact",
+      "format": "xls",
+      "reader": "xlrd",
+      "sheets": [
+        {
+          "column_count_delta": 2,
+          "comparison": "table_header",
+          "differences": [
+            {
+              "accepted_template_labels": [
+                "可抵扣"
+              ],
+              "field": "deductible",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "可抵扣"
+            },
+            {
+              "accepted_template_labels": [
+                "适用税率",
+                "税率"
+              ],
+              "field": "effectiveRate",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "适用税率"
+            },
+            {
+              "accepted_template_labels": [
+                "所得税影响",
+                "所得税费用"
+              ],
+              "field": "taxImpact",
+              "kind": "ui_field_missing_in_template_header",
+              "ui_label": "所得税影响"
+            },
+            {
+              "kind": "template_column_not_consumed_by_ui",
+              "template_label": "其中：非经常性损益"
+            }
+          ],
+          "dimensions": {
+            "columns": 7,
+            "rows": 20
+          },
+          "format": "xls",
+          "header_rows": [
+            5
+          ],
+          "matched_fields": [
+            {
+              "field": "itemName",
+              "template_label": "项目"
+            },
+            {
+              "field": "grossAmount",
+              "template_label": "金额"
+            },
+            {
+              "field": "netAmount",
+              "template_label": "扣非后"
+            },
+            {
+              "field": "auditNote",
+              "template_label": "说明"
+            }
+          ],
+          "reader": "xlrd",
+          "sheet_name": "非经常性损益项目的所得税影响S17-21",
+          "status": "ok",
+          "template_columns": [
+            "项目",
+            "金额",
+            "其中：非经常性损益",
+            "扣非后",
+            "说明"
+          ],
+          "ui_columns": [
+            {
+              "aliases": [
+                "非经常性损益项目",
+                "项目"
+              ],
+              "field": "itemName",
+              "label": "非经常性损益项目"
+            },
+            {
+              "aliases": [
+                "税前金额",
+                "金额"
+              ],
+              "field": "grossAmount",
+              "label": "税前金额"
+            },
+            {
+              "aliases": [
+                "可抵扣"
+              ],
+              "field": "deductible",
+              "label": "可抵扣"
+            },
+            {
+              "aliases": [
+                "适用税率",
+                "税率"
+              ],
+              "field": "effectiveRate",
+              "label": "适用税率"
+            },
+            {
+              "aliases": [
+                "所得税影响",
+                "所得税费用"
+              ],
+              "field": "taxImpact",
+              "label": "所得税影响"
+            },
+            {
+              "aliases": [
+                "税后净额",
+                "扣非后"
+              ],
+              "field": "netAmount",
+              "label": "税后净额"
+            },
+            {
+              "aliases": [
+                "审核说明",
+                "说明"
+              ],
+              "field": "auditNote",
+              "label": "审核说明"
+            }
+          ]
+        }
+      ],
+      "status": "ok",
+      "workbook": "backend/wp_templates/S/S17 非经常性损益.xls"
+    }
+  ],
+  "format_routing": {
+    ".xls": "xlrd",
+    ".xlsx": "openpyxl"
+  },
+  "purpose": "D4.4 S-checklist component/template field and column reconciliation",
+  "read_only": true,
+  "report_version": 1
+}

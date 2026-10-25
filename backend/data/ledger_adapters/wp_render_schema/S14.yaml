@@ -13,6 +13,11 @@ applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, list
 # 整册专属组件：前端按 sheetName v-if 分发
 whole_workbook_dedicated: true
 
+auto_data_source:
+  - source: s14_estimate_related_data
+    description: 从 B50 会计估计标记和当前年度试算表读取相关科目
+    fields: [estimate_accounts, items, total_audited]
+
 sheets:
   - sheet_name: S14程序表
     internal_type: sheet-program

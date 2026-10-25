@@ -10,12 +10,12 @@
  */
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD } from './d4AccountScope'
+import { isIpoProject, IPO_BIZ_KEYWORDS } from '@/utils/ipoProjectUtils'
 import {
   calcMonthlyTotal,
   calcAuditedWithAdj,
   calcSubtotal,
   calcProportion,
-  isIpoGroupVisible,
   parseNum,
 } from './useD4FormulaEngine'
 import type { ChecklistResponse, ProjectContext } from './useD4FormData'
@@ -270,9 +270,12 @@ export function useD4CrossSheet(options: UseD4CrossSheetOptions) {
 
   // ─── IPO组可见性 ──────────────────────────────────────────────────────
 
-  /** 根据 business_category 判断 IPO/舞弊组一级Tab可见性 */
+  /** 通过核心 IPO 工具并扩展 D4 专属 fraud_risk 判断一级 Tab 可见性 */
   const ipoGroupVisible: ComputedRef<boolean> = computed(() => {
-    return isIpoGroupVisible(projectContext.value.business_category || '')
+    return isIpoProject(
+      projectContext.value.business_category || '',
+      [...IPO_BIZ_KEYWORDS, 'fraud_risk'],
+    )
   })
 
   // ─── D4-2/D4-3 行结构 → D4-1 行同步 ──────────────────────────────────

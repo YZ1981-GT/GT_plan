@@ -14,7 +14,11 @@
  * Property 6: 法规溯源映射稳定性 — 无对应条目显示 em-dash 而非空白
  */
 import { ref, computed } from 'vue'
-import type { S34ChecklistItem, Applicability, CompletionStatus } from '../composables/useS34BundleState'
+import type { S34ChecklistItem, CompletionStatus, RiskIndicator } from '../composables/useS34BundleState'
+import {
+  getS34ApplicabilityTag,
+  getS34RiskIndicatorTag,
+} from '../composables/useS34BundleState'
 
 // ─── Props ───
 const props = withDefaults(defineProps<{
@@ -42,13 +46,38 @@ const filteredChecklist = computed(() => {
   return props.checklist.filter(item => item.applicability !== 'not_applicable')
 })
 
+/** 风险指示器汇总：B50 无数据时明确显示待确认，不能把空结果当作无风险。 */
+const riskSummary = computed(() => {
+  const indicators = props.checklist.map(item => item.riskIndicator ?? 'unknown' as RiskIndicator)
+  if (indicators.length === 0 || indicators.some(value => value === 'unknown')) {
+    return {
+      label: '风险数据待确认',
+      detail: '当前没有可确认的 B50 风险结论，暂不推荐新增 S34 底稿。',
+      type: 'warning',
+    }
+  }
+  if (indicators.some(value => value === 'identified')) {
+    return {
+      label: '已识别 S34 相关风险',
+      detail: '缺少对应底稿的事项标记为推荐，已有底稿标记为适用。',
+      type: 'warning',
+    }
+  }
+  return {
+    label: '未识别 S34 相关风险',
+    detail: '当前没有可推荐的新增 S34 底稿。',
+    type: 'success',
+  }
+})
+
 // ─── 整体完成进度统计 (Req 3.4, 10.2) ───
 const progressStats = computed(() => {
   const items = props.checklist
+  const trackedItems = items.filter(i => i.applicability !== 'not_applicable')
   return {
-    completed: items.filter(i => i.status === 'completed' && i.applicability === 'applicable').length,
-    inProgress: items.filter(i => i.status === 'in_progress' && i.applicability === 'applicable').length,
-    notStarted: items.filter(i => i.status === 'not_started' && i.applicability === 'applicable').length,
+    completed: trackedItems.filter(i => i.status === 'completed').length,
+    inProgress: trackedItems.filter(i => i.status === 'in_progress').length,
+    notStarted: trackedItems.filter(i => i.status === 'not_started').length,
     notApplicable: items.filter(i => i.applicability === 'not_applicable').length,
     total: items.length,
   }
@@ -95,19 +124,6 @@ function getColumnHighlightClass(col: string): string {
 
 // ─── Visual helpers ───
 
-/** 适用状态标签配置 */
-function getApplicabilityTag(val: Applicability): { label: string; type: string } {
-  switch (val) {
-    case 'applicable':
-      return { label: '适用', type: 'success' }
-    case 'not_applicable':
-      return { label: '不适用', type: 'info' }
-    case 'unknown':
-    default:
-      return { label: '待确认', type: 'warning' }
-  }
-}
-
 /** 完成状态标签配置 */
 function getStatusTag(val: CompletionStatus): { label: string; type: string } {
   switch (val) {
@@ -119,6 +135,11 @@ function getStatusTag(val: CompletionStatus): { label: string; type: string } {
     default:
       return { label: '未开始', type: 'info' }
   }
+}
+
+/** 风险指示器标签配置（旧 API 缺字段时安全显示待确认）。 */
+function getRiskTag(val?: RiskIndicator) {
+  return getS34RiskIndicatorTag(val)
 }
 
 /** 监管条目单元格内容：空值显示 em-dash（Property 6, Req 12.4） */
@@ -139,6 +160,16 @@ function handleNameClick(wpCode: string) {
       <el-checkbox v-model="showApplicableOnly" data-testid="s34-filter-applicable">
         仅显示适用
       </el-checkbox>
+    </div>
+
+    <!-- P2.2 风险指示器：空 B50 数据显示待确认/暂不推荐，不伪造无风险。 -->
+    <div
+      class="risk-summary"
+      :class="`risk-summary--${riskSummary.type}`"
+      data-testid="s34-risk-summary"
+    >
+      <strong>{{ riskSummary.label }}</strong>
+      <span>{{ riskSummary.detail }}</span>
     </div>
 
     <!-- 整体完成进度统计 (Req 3.4, 10.2) -->
@@ -246,6 +277,24 @@ function handleNameClick(wpCode: string) {
         </template>
       </el-table-column>
 
+      <!-- 风险指示 (P2.2) -->
+      <el-table-column
+        label="风险指示"
+        width="100"
+        align="center"
+        header-align="center"
+      >
+        <template #default="{ row }">
+          <el-tag
+            :type="getRiskTag(row.riskIndicator).type as any"
+            size="small"
+            disable-transitions
+          >
+            {{ getRiskTag(row.riskIndicator).label }}
+          </el-tag>
+        </template>
+      </el-table-column>
+
       <!-- 适用状态 + 不适用理由 (Req 9.2) -->
       <el-table-column
         label="适用状态"
@@ -255,12 +304,19 @@ function handleNameClick(wpCode: string) {
       >
         <template #default="{ row }">
           <el-tag
-            :type="getApplicabilityTag(row.applicability).type as any"
+            :type="getS34ApplicabilityTag(row.applicability).type as any"
             size="small"
             disable-transitions
           >
-            {{ getApplicabilityTag(row.applicability).label }}
+            {{ getS34ApplicabilityTag(row.applicability).label }}
           </el-tag>
+          <span
+            v-if="row.applicability === 'unknown'"
+            class="risk-pending-note"
+            data-testid="s34-risk-pending-note"
+          >
+            不可推荐
+          </span>
           <!-- 不适用理由输入 (Req 9.2, 11.4) -->
           <el-input
             v-if="row.applicability === 'not_applicable'"
@@ -308,6 +364,30 @@ function handleNameClick(wpCode: string) {
   gap: 12px;
   padding: 8px 4px;
   margin-bottom: 8px;
+}
+
+/* P2.2 风险指示器 */
+.risk-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  margin: 0 4px 8px;
+  border-left: 3px solid var(--gt-color-warning, #e6a23c);
+  background: #fffbe6;
+  font-size: var(--wp-font-size, 13px);
+}
+.risk-summary--success {
+  border-left-color: var(--gt-color-success, #67c23a);
+  background: #f0f9eb;
+}
+.risk-summary--warning strong { color: var(--gt-color-warning, #e6a23c); }
+.risk-summary--success strong { color: var(--gt-color-success, #67c23a); }
+.risk-pending-note {
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--gt-color-warning, #e6a23c);
+  font-size: 12px;
 }
 
 /* 铁律：表格字体 13px */

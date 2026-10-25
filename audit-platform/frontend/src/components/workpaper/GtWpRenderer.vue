@@ -43,7 +43,7 @@
         </el-result>
       </div>
 
-      <!-- applicable_when 裁剪：项目类型不匹配此底稿 -->
+      <!-- 后端适用性裁决：项目类型不匹配此底稿 -->
       <div v-else-if="isWpNotApplicable" class="gt-wp-renderer__not-applicable">
         <el-result icon="info" title="不适用">
           <template #sub-title>当前项目类型不适用此底稿</template>
@@ -204,6 +204,7 @@
         :schema="activeSheetSchema"
         :html-data="activeSheetHtmlData"
         :readonly="effectiveReadonly"
+        :component-type="effectiveRendererComponentType"
         :wp-code="renderConfig?.wp_code ?? ''"
         v-bind="extraComponentProps"
         @save="onSave"
@@ -401,7 +402,6 @@ import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
 import { useWorkpaperScaffold } from '@/components/workpaper/composables/useWorkpaperScaffold'
 import WorkpaperBackgroundMergeBanner from '@/components/workpaper/sync/WorkpaperBackgroundMergeBanner.vue'
 import { isBackgroundMerging } from '@/components/workpaper/sync/backgroundMergeRegistry'
-import { isIpoProject } from '@/utils/ipoProjectUtils'
 
 // ─── Types ───
 export interface SavePayload {
@@ -507,18 +507,10 @@ const redirectHint = computed(() => {
   if (mod === 'consolidation_hub') return '此底稿由合并模块承载，请前往合并模块查看。'
   return '此底稿由其他模块承载。'
 })
-// ─── applicable_when 裁剪覆盖层（S 类 IPO/上市/新三板/再融资等专项底稿） ───
-const isWpNotApplicable = computed<boolean>(() => {
-  const aw = renderConfig.value?.applicable_when
-  if (!aw || typeof aw !== 'object') return false
-  const cats = (aw as Record<string, string[]>).business_category
-  if (!cats?.length) return false
-  // 从项目上下文取 business_category（render-config 注入的 project_context 或 project API）
-  const projectBiz: string =
-    (renderConfig.value as any)?.project_context?.business_category ||
-    ''
-  return !isIpoProject(projectBiz, cats)
-})
+// ─── applicability overlay ───
+const isWpNotApplicable = computed<boolean>(() =>
+  renderConfig.value?.not_applicable === true,
+)
 
 function handleRedirectNavigation() {
   const targetPath = renderConfig.value?.target_path
@@ -914,9 +906,8 @@ const preparationYear = computed(() => {
 const runtimeProjectId = computed(() => renderConfig.value?.project_id ?? '')
 const runtimeWpCode = computed(() => renderConfig.value?.wp_code ?? '')
 const runtimeContextReady = computed(() => !loading.value && (!!renderConfig.value || !!error.value))
-// 适用准则：后端 wp_render_config Step 9.5 在响应顶层统一注入（逐 sheet 的
-// html_data.project_context 同值）。交给 scaffold provide，宿主经
-// useHostApplicableStandards 取用，不再各写一份取值链。
+// 适用准则：后端 wp_render_config 在响应顶层统一注入，交给 scaffold provide，
+// 宿主经 useHostApplicableStandards 取用，不再各写一份取值链。
 const runtimeApplicableStandards = computed<unknown>(
   () => renderConfig.value?.applicable_standards,
 )

@@ -153,10 +153,12 @@
  * Spec: .kiro/specs/s-special-transaction-workpapers/ Task 5.2
  * Requirements: 7.2, 7.3
  */
-import { ref, inject, onMounted } from 'vue'
+import { ref, computed, inject, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { fmtAmount } from '@/utils/formatters'
+import { sChecklistItemIds, type SChecklistComponentType } from './sChecklistItemIds'
+import { loadSChecklistHtmlData } from './sChecklistRenderData'
 
 // ─── 金额格式化 ──────────────────────────────────────────────────────────────
 
@@ -168,13 +170,19 @@ function fmt(val: number | null | undefined): string {
 
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 
+const COMPONENT_TYPE = 's10-adjudication' as const
+
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 const props = defineProps<{
   wpId: string
   projectId: string
-  isReadonly: boolean
+  readonly?: boolean
+  sheetName?: string
+  componentType?: SChecklistComponentType
+  htmlData?: Record<string, any> | null
 }>()
+const isReadonly = computed(() => props.readonly === true)
 
 const emit = defineEmits<{
   (e: 'save'): void
@@ -268,7 +276,7 @@ function handleAiConclusion() {
 // ─── 保存（含 TB 回写） ─────────────────────────────────────────────────────
 
 async function handleSave() {
-  if (saving.value) return
+  if (isReadonly.value || saving.value) return
   saving.value = true
   try {
     const payload = {
@@ -286,7 +294,14 @@ async function handleSave() {
     }
     await http.put(
       `/api/workpapers/${props.wpId}/checklist-responses`,
-      { sheet_name: '审定表S10-1', data: payload }
+      {
+        project_id: props.projectId,
+        items: [{
+          item_id: sChecklistItemIds['s10-adjudication'],
+          conclusion: null,
+          remark: JSON.stringify(payload),
+        }],
+      }
     )
     isDirty.value = false
     emit('save')
@@ -302,15 +317,12 @@ async function handleSave() {
 
 async function loadData() {
   try {
-    const res = await http.get(
-      `/api/workpapers/${props.wpId}/render-config`,
-      { _silent: true } as any
-    )
-    const sheets = res?.data?.sheets || res?.sheets || []
-    const sheet = sheets.find((s: any) =>
-      s.sheet_name?.includes('审定表S10') || s.sheet_name?.match(/S10-1/)
-    )
-    const htmlData = sheet?.html_data
+    const htmlData = await loadSChecklistHtmlData({
+      wpId: props.wpId,
+      htmlData: props.htmlData,
+      componentType: props.componentType ?? COMPONENT_TYPE,
+      sheetName: props.sheetName,
+    })
 
     if (htmlData?.adjudication_rows?.length) {
       adjudicationRows.value = htmlData.adjudication_rows.map((r: any, idx: number) => ({

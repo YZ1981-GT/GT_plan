@@ -21,8 +21,16 @@ import {
   createSumFormula,
   createRatioFormula,
   createThresholdFormula,
+  S34_HAS_SUBTABLE_PARENTS,
   S34_16_1_FORMULAS,
   S34_16_2_FORMULAS,
+  S34_20_1_FORMULAS,
+  S34_34_1_FORMULAS,
+  S34_34_2_FORMULAS,
+  getS34FormulaDefinitions,
+  getS34ParentFormulaDefinitions,
+  getS34SubTableDefinitions,
+  computeS34SubTableFormulas,
 } from './useS34FormulaEngine'
 
 // ─── 浮点容差 ───
@@ -96,13 +104,13 @@ describe('useS34FormulaEngine — 单元测试', () => {
       for (let i = 7; i <= 17; i++) {
         data[i] = { E: 100, F: 30, C: null }
       }
+      // C23 是模板要求人工填写的当期营业收入，不是 E19 的隐式引用。
+      data[22] = { E: null, F: null, C: 1100 }
       const result = computeFormulas(data, S34_16_1_FORMULAS)
       // E19 = 11 * 100 = 1100
       expect(result['18:E']).toBe(1100)
       // F19 = 11 * 30 = 330
       expect(result['18:F']).toBe(330)
-      // C23 = E19 = 1100
-      expect(result['22:C']).toBe(1100)
       // C24 = F19 = 330
       expect(result['23:C']).toBe(330)
       // C25 = C24/C23 = 330/1100 = 0.3
@@ -115,6 +123,7 @@ describe('useS34FormulaEngine — 单元测试', () => {
         F: 0,
         C: null,
       }))
+      data[22] = { E: null, F: null, C: 0 }
       const result = computeFormulas(data, S34_16_1_FORMULAS)
       expect(result['18:E']).toBe(0)
       expect(result['18:F']).toBe(0)
@@ -123,12 +132,12 @@ describe('useS34FormulaEngine — 单元测试', () => {
   })
 
   describe('getReadonlyCells / isFormulaCell', () => {
-    it('S34-16-1 有 5 个只读单元格', () => {
+    it('S34-16-1 按模板有 4 个只读计算单元格（C23 是输入）', () => {
       const cells = getReadonlyCells(S34_16_1_FORMULAS)
-      expect(cells.size).toBe(5)
+      expect(cells.size).toBe(4)
       expect(cells.has('18:E')).toBe(true)
       expect(cells.has('18:F')).toBe(true)
-      expect(cells.has('22:C')).toBe(true)
+      expect(cells.has('22:C')).toBe(false)
       expect(cells.has('23:C')).toBe(true)
       expect(cells.has('24:C')).toBe(true)
     })
@@ -163,6 +172,108 @@ describe('useS34FormulaEngine — 单元测试', () => {
       expect(formula.compute([{ E: 50 }])).toBe(0)
       expect(formula.compute([{ E: 100 }])).toBe(0) // > threshold, not >=
     })
+  })
+})
+
+describe('P1.4 — S34 12 个 hasSubTable 模板公式清册', () => {
+  const expectedParents = [
+    'S34-2', 'S34-3', 'S34-4', 'S34-8', 'S34-9', 'S34-11',
+    'S34-16', 'S34-18', 'S34-20', 'S34-25', 'S34-30', 'S34-34',
+  ]
+
+  it('父码清册精确为 12 个，且包含 S34-3', () => {
+    expect([...S34_HAS_SUBTABLE_PARENTS]).toEqual(expectedParents)
+    expect(S34_HAS_SUBTABLE_PARENTS).toHaveLength(12)
+    expect(S34_HAS_SUBTABLE_PARENTS).toContain('S34-3')
+  })
+
+  // 每个父码至少有一条独立契约测试；没有模板计算公式的结构化表也必须显式登记为空。
+  for (const parentCode of S34_HAS_SUBTABLE_PARENTS) {
+    it(`${parentCode} 有模板子表定义且 runtime 公式与清册一致`, () => {
+      const tables = getS34SubTableDefinitions(parentCode)
+      const parentFormulas = getS34ParentFormulaDefinitions(parentCode)
+      expect(tables.length).toBeGreaterThan(0)
+      expect(tables.every((table) => table.parentCode === parentCode)).toBe(true)
+      expect(parentFormulas).toEqual(tables.flatMap((table) => table.formulas))
+      expect(tables.every((table) =>
+        table.formulas.every((formula) => formula.readonly === true),
+      )).toBe(true)
+
+      const firstSheet = tables[0].sheetCode
+      const result = computeS34SubTableFormulas(
+        firstSheet,
+        Array.from({ length: 45 }, () => ({})),
+      )
+      expect(result).toBeDefined()
+      if (tables.some((table) => table.formulas.length > 0)) {
+        expect(Object.keys(result).length).toBeGreaterThan(0)
+      } else {
+        expect(parentFormulas).toHaveLength(0)
+      }
+    })
+  }
+
+  it('S34-16-2 按模板计算 G19 合计，并安全保留 #REF! 来源', () => {
+    const data: Record<string, number | null>[] = Array.from({ length: 27 }, () => ({
+      E: null,
+      G: null,
+    }))
+    for (let row = 7; row <= 17; row += 1) data[row].G = 10
+    data[22].E = 100
+    const result = computeS34SubTableFormulas('S34-16-2', data)
+    expect(result['18:G']).toBe(110)
+    expect(result['23:E']).toBeNull()
+    expect(result['24:E']).toBeNull()
+  })
+
+  it('S34-20-1 按模板计算外包占比和合计', () => {
+    const data: Record<string, number | null>[] = Array.from({ length: 43 }, () => ({}))
+    data[12] = { C: 100, G: 200 }
+    data[15] = { C: 25, E: 50 }
+    data[16] = { C: 25, E: 50 }
+    data[17] = { C: 50, E: 100 }
+    const result = computeS34SubTableFormulas('S34-20-1', data)
+    expect(result['15:D']).toBeCloseTo(0.25)
+    expect(result['15:F']).toBeCloseTo(0.25)
+    expect(result['18:D']).toBe(0)
+    expect(result['19:F']).toBe(0)
+    expect(result['20:C']).toBe(100)
+    expect(result['20:E']).toBe(200)
+  })
+
+  it('S34-34-1 按模板计算自然人客户占比与明细合计', () => {
+    const data: Record<string, number | null>[] = Array.from({ length: 26 }, () => ({}))
+    data[8] = { D: 100, N: 200 }
+    data[9] = { D: 1000, N: 2000 }
+    for (let row = 11; row <= 20; row += 1) {
+      data[row] = { G: 10, I: 20 }
+    }
+    const result = computeS34SubTableFormulas('S34-34-1', data)
+    expect(result['8:E']).toBeCloseTo(0.1)
+    expect(result['11:H']).toBeCloseTo(0.01)
+    expect(result['21:G']).toBe(100)
+    expect(result['21:H']).toBeCloseTo(0.1)
+    expect(result['21:J']).toBeCloseTo(0.1)
+  })
+
+  it('公式计算不修改输入网格，且 S34-34-2 与客户表共享同一模板公式语义', () => {
+    const data: Record<string, number | null>[] = Array.from({ length: 26 }, () => ({
+      D: 0,
+      N: 0,
+      G: 0,
+      I: 0,
+    }))
+    const before = JSON.stringify(data)
+    computeS34SubTableFormulas('S34-34-2', data)
+    expect(JSON.stringify(data)).toBe(before)
+    expect(S34_34_1_FORMULAS.map((cell) => cell.formula)).toEqual(
+      S34_34_2_FORMULAS.map((cell) => cell.formula),
+    )
+  })
+
+  it('结构化子表不凭空新增计算公式，S34-3-1 明确为空', () => {
+    expect(getS34FormulaDefinitions('S34-3-1')).toEqual([])
+    expect(getS34SubTableDefinitions('S34-3')[0]?.templateSheetName).toBe('S34-3-1股份支付核查')
   })
 })
 
@@ -248,8 +359,10 @@ describe('useS34FormulaEngine — PBT Property 8: 子表汇总公式确定性', 
           for (let i = 0; i < 11; i++) {
             data[7 + i] = { E: eAmounts[i], F: fAmounts[i], C: null }
           }
-          const result = computeFormulas(data, S34_16_1_FORMULAS)
           const eTotal = eAmounts.reduce((s, v) => s + v, 0)
+          // C23 是模板中的人工录入营业收入，测试以该次网格的总收入作为有效输入。
+          data[22] = { E: null, F: null, C: eTotal }
+          const result = computeFormulas(data, S34_16_1_FORMULAS)
           const fTotal = fAmounts.reduce((s, v) => s + v, 0)
           if (eTotal === 0) {
             expect(result['24:C']).toBeNull()
@@ -287,6 +400,11 @@ describe('useS34FormulaEngine — PBT Property 8: 子表汇总公式确定性', 
           }))
           for (let i = 0; i < 11; i++) {
             data[7 + i] = { E: amounts[i], F: amounts[i] * 0.3, C: null }
+          }
+          data[22] = {
+            E: null,
+            F: null,
+            C: amounts.reduce((s, v) => s + v, 0),
           }
           // 手工在公式行写入覆盖值（模拟用户尝试修改公式单元格）
           data[18] = { E: manualOverride, F: manualOverride, C: null }

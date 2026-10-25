@@ -1,12 +1,17 @@
 """损益汇总 / 税费 / S 类专项（收入/EPS/非经常性损益）域 resolvers。"""
 from __future__ import annotations
 
+import inspect
+import logging
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.auto_data_resolvers import auto_resolver
+
+logger = logging.getLogger(__name__)
 
 
 @auto_resolver("ledger_detail_for_account")
@@ -268,34 +273,69 @@ async def _resolve_income_tax(db: AsyncSession, project_id: UUID, year: int, **k
 
 
 @auto_resolver("revenue_audited_for_s20")
-async def _resolve_revenue_for_s20(db: AsyncSession, project_id: UUID, year: int, **kw):
+async def _resolve_revenue_for_s20(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    **kwargs: Any,
+) -> dict[str, Any]:
     """S20 营业收入扣除情况核查：读取营业收入审定金额。
 
     数据来源: trial_balance 表（6001 主营业务收入 + 6051 其他业务收入）
     返回结构: {"summary": str, "main_revenue": float, "other_revenue": float, "total_revenue": float}
+
+    两条只读查询放在同一个 SAVEPOINT 内：PG 任一条 SQL 失败时只回滚本次
+    resolver 的局部事务，调用方仍可继续读取 render-config；同时保留
+    ``_error_detail``，避免把数据库异常静默成 0。
     """
-    sql = sa.text("""
-        SELECT standard_account_code, audited_amount
-        FROM trial_balance
-        WHERE project_id = :pid AND year = :year
-              AND standard_account_code LIKE '6001%'
-              AND (is_deleted = false OR is_deleted IS NULL)
-    """)
-    result = await db.execute(sql, {"pid": str(project_id), "year": year})
-    rows = result.fetchall()
+    del kwargs  # 统一 resolver 协议保留行级参数；S20 没有额外过滤条件
+    try:
+        savepoint = db.begin_nested()
+        # AsyncSession.begin_nested() is synchronous and returns a transaction;
+        # this awaitable branch keeps the resolver contract usable by existing
+        # lightweight async test sessions without changing the production path.
+        if inspect.isawaitable(savepoint):
+            savepoint = await savepoint
+        async with savepoint:
+            sql = sa.text("""
+                SELECT standard_account_code, audited_amount
+                FROM trial_balance
+                WHERE project_id = :pid AND year = :year
+                      AND standard_account_code LIKE '6001%'
+                      AND (is_deleted = false OR is_deleted IS NULL)
+            """)
+            result = await db.execute(sql, {"pid": str(project_id), "year": year})
+            rows = result.fetchall()
 
-    total_revenue = sum(float(r[1] or 0) for r in rows)
+            total_revenue = sum(float(r[1] or 0) for r in rows)
 
-    # 其他业务收入
-    sql_other = sa.text("""
-        SELECT COALESCE(SUM(audited_amount), 0)
-        FROM trial_balance
-        WHERE project_id = :pid AND year = :year
-              AND standard_account_code LIKE '6051%'
-              AND (is_deleted = false OR is_deleted IS NULL)
-    """)
-    result_other = await db.execute(sql_other, {"pid": str(project_id), "year": year})
-    other_revenue = float(result_other.scalar() or 0)
+            # 其他业务收入
+            sql_other = sa.text("""
+                SELECT COALESCE(SUM(audited_amount), 0)
+                FROM trial_balance
+                WHERE project_id = :pid AND year = :year
+                      AND standard_account_code LIKE '6051%'
+                      AND (is_deleted = false OR is_deleted IS NULL)
+            """)
+            result_other = await db.execute(
+                sql_other, {"pid": str(project_id), "year": year}
+            )
+            other_revenue = float(result_other.scalar() or 0)
+    except Exception as exc:  # noqa: BLE001 - 返回可诊断的只读失败
+        detail = f"{type(exc).__name__}: {exc}"
+        logger.warning(
+            "revenue_audited_for_s20 查询失败 project=%s year=%s: %s",
+            project_id,
+            year,
+            detail,
+            exc_info=True,
+        )
+        return {
+            "summary": "⚠️ S20营业收入审定数获取失败",
+            "_error": True,
+            "_error_detail": detail,
+            "_error_source": "revenue_audited_for_s20",
+        }
 
     return {
         "summary": f"主营业务收入 {total_revenue:,.2f}，其他业务收入 {other_revenue:,.2f}",
@@ -306,7 +346,12 @@ async def _resolve_revenue_for_s20(db: AsyncSession, project_id: UUID, year: int
 
 
 @auto_resolver("eps_data_from_tb")
-async def _resolve_eps_data(db: AsyncSession, project_id: UUID, year: int, **kw):
+async def _resolve_eps_data(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    **kwargs: Any,
+) -> dict[str, Any]:
     """S15 每股收益：读取净利润和股本数据。
 
     数据来源: trial_balance 表（5xxx/6xxx 损益科目 + 4001 实收资本）
@@ -348,7 +393,12 @@ async def _resolve_eps_data(db: AsyncSession, project_id: UUID, year: int, **kw)
 
 
 @auto_resolver("s3_policy_change_data")
-async def _resolve_s3_policy_change(db: AsyncSession, project_id: UUID, year: int, **kw):
+async def _resolve_s3_policy_change(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    **kwargs: Any,
+) -> dict[str, Any]:
     """S3 会计政策变更：读取调整涉及的各科目期初/期末余额.
 
     数据来源: trial_balance 表（资产/负债/权益类科目 unadjusted_amount + audited_amount）
@@ -408,7 +458,12 @@ async def _resolve_s3_policy_change(db: AsyncSession, project_id: UUID, year: in
 
 
 @auto_resolver("non_recurring_items_from_tb")
-async def _resolve_non_recurring_items(db: AsyncSession, project_id: UUID, year: int, **kw):
+async def _resolve_non_recurring_items(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    **kwargs: Any,
+) -> dict[str, Any]:
     """S17 非经常性损益：读取营业外收支科目审定金额。
 
     数据来源: trial_balance 表（6301 营业外收入 / 6711 营业外支出）

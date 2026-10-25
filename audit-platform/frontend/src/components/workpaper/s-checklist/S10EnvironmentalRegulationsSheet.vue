@@ -1,5 +1,5 @@
 <template>
-  <div class="s10-environmental-regulations">
+  <div class="s10-environmental-regulations" :aria-readonly="isReadonly">
     <!-- ═══ 环境法规 — 方法论上下文（可折叠） ═══ -->
     <el-card shadow="never" class="audit-section">
       <template #header>
@@ -124,13 +124,18 @@
  * Spec: .kiro/specs/s-special-transaction-workpapers/ Task 5.2
  * Requirements: 7.2, 7.3
  */
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import type { SChecklistComponentType } from './sChecklistItemIds'
 
 const props = defineProps<{
   wpId: string
   projectId: string
-  isReadonly: boolean
+  readonly?: boolean
+  sheetName?: string
+  componentType?: SChecklistComponentType
+  htmlData?: Record<string, any> | null
 }>()
+const isReadonly = computed(() => props.readonly === true)
 
 // ─── 展开/折叠状态 ──────────────────────────────────────────────────────────
 

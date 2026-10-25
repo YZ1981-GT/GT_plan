@@ -1,6 +1,11 @@
 /**
  * resolveProcedureSheetKey — 按 wp_code 前缀路由程序状态数据源 sheetKey
  *
+ * Namespace contract: this resolver only selects a status namespace backed by an
+ * independent procedure-sheet. It is not a componentType router and does not
+ * create a namespace for S workpapers whose procedure sheet does not exist.
+ * Those S prefixes intentionally fall back to e1a.
+ *
  * spec workpaper-h-fixed-assets-cycle H-F13（Task 3.6）
  * 原始实现：F-F13 Task 3.7（E1/D/F 路由）
  * G-investment-cycle G-F12 Task 3.5: 加 G 循环路由 G1→g1a / G4→g4a / G7→g7a

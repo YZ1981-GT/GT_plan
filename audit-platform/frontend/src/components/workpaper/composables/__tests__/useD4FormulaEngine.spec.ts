@@ -4,6 +4,7 @@
  * 覆盖所有纯函数的核心逻辑和边界条件。
  */
 import { describe, it, expect } from 'vitest'
+import { isIpoProject, IPO_BIZ_KEYWORDS } from '@/utils/ipoProjectUtils'
 import {
   parseNum,
   calcAuditedAmount,
@@ -24,7 +25,6 @@ import {
   isCrossPeriodBackward,
   calcCrossPeriodDays,
   isSuspiciousFundFlow,
-  isIpoGroupVisible,
   D4_10_TOTAL_AMOUNT_PRESET,
   parseWpFormulaRef,
   resolveD42PeriodUnadjustedTotal,
@@ -363,43 +363,47 @@ describe('useD4FormulaEngine', () => {
     })
   })
 
-  // ─── isIpoGroupVisible ───────────────────────────────────────────────────
+  // ─── D4 IPO/舞弊组：核心工具 + allowedCats ────────────────────────────────
 
-  describe('isIpoGroupVisible', () => {
+  describe('D4 IPO/舞弊组可见性', () => {
+    const d4AllowedCats = [...IPO_BIZ_KEYWORDS, 'fraud_risk']
+
     it('returns true for ipo keyword', () => {
-      expect(isIpoGroupVisible('ipo')).toBe(true)
-      expect(isIpoGroupVisible('IPO审计')).toBe(true)
+      expect(isIpoProject('ipo', d4AllowedCats)).toBe(true)
+      expect(isIpoProject('IPO审计', d4AllowedCats)).toBe(true)
     })
 
     it('returns true for listed keyword', () => {
-      expect(isIpoGroupVisible('listed_company')).toBe(true)
+      expect(isIpoProject('listed_company', d4AllowedCats)).toBe(true)
     })
 
     it('returns true for neeq keyword', () => {
-      expect(isIpoGroupVisible('NEEQ')).toBe(true)
+      expect(isIpoProject('NEEQ', d4AllowedCats)).toBe(true)
     })
 
     it('returns true for restructuring keyword', () => {
-      expect(isIpoGroupVisible('major_restructuring')).toBe(true)
+      expect(isIpoProject('major_restructuring', d4AllowedCats)).toBe(true)
     })
 
-    it('returns true for fraud_risk keyword', () => {
-      expect(isIpoGroupVisible('fraud_risk_high')).toBe(true)
+    it('returns true for fraud_risk through allowedCats', () => {
+      expect(isIpoProject('fraud_risk_high', d4AllowedCats)).toBe(true)
     })
 
     it('returns false for normal business', () => {
-      expect(isIpoGroupVisible('normal')).toBe(false)
-      expect(isIpoGroupVisible('general_audit')).toBe(false)
+      expect(isIpoProject('normal', d4AllowedCats)).toBe(false)
+      expect(isIpoProject('general_audit', d4AllowedCats)).toBe(false)
     })
 
     it('is case insensitive', () => {
-      expect(isIpoGroupVisible('IPO')).toBe(true)
-      expect(isIpoGroupVisible('Listed')).toBe(true)
-      expect(isIpoGroupVisible('FRAUD_RISK')).toBe(true)
+      expect(isIpoProject('IPO', d4AllowedCats)).toBe(true)
+      expect(isIpoProject('Listed', d4AllowedCats)).toBe(true)
+      expect(isIpoProject('FRAUD_RISK', d4AllowedCats)).toBe(true)
+      // refinancing is part of the shared default keyword set used by D4.
+      expect(isIpoProject('REFINANCING', d4AllowedCats)).toBe(true)
     })
 
     it('handles empty string', () => {
-      expect(isIpoGroupVisible('')).toBe(false)
+      expect(isIpoProject('', d4AllowedCats)).toBe(false)
     })
   })
 

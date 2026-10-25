@@ -9,8 +9,26 @@
  * 3. 无专属路由的 S 码 fallback → e1a（S2/S9/S21/S32/S34 等）
  * 4. 小写 wp_code 标准化
  */
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import { resolveProcedureSheetKey } from '../resolveProcedureSheetKey'
+
+const TEST_DIR = dirname(fileURLToPath(import.meta.url))
+const RESOLVER_SOURCE = readFileSync(resolve(TEST_DIR, '../resolveProcedureSheetKey.ts'), 'utf8')
+const AUDIT_NAV_SOURCE = readFileSync(
+  resolve(TEST_DIR, '../../components/workpaper/WorkpaperAuditNav.vue'),
+  'utf8',
+)
+const PROCEDURE_STATUS_SOURCE = readFileSync(
+  resolve(TEST_DIR, '../../composables/useProcedureStatus.ts'),
+  'utf8',
+)
+const GENERIC_PROCEDURE_PANEL_SOURCE = readFileSync(
+  resolve(TEST_DIR, '../../components/workpaper/ProcedureControlPanel.vue'),
+  'utf8',
+)
 
 describe('resolveProcedureSheetKey - S 循环路由（§1.6 Task 17/18）', () => {
   // ─── 专属路由 ──────────────────────────────────────────────────────────────
@@ -61,8 +79,9 @@ describe('resolveProcedureSheetKey - S 循环路由（§1.6 Task 17/18）', () =
   })
 
   // ─── 显式 fallback（CRITICAL：不被 startsWith('S1') 误捕获）────────────────
-  it('S16 → e1a（套期活动，显式 fallback，不被 S1 前缀误匹配）', () => {
+  it('S16 系列底稿（S16 / S16-1）→ e1a（显式 fallback，不被 S1 前缀误捕获）', () => {
     expect(resolveProcedureSheetKey('S16')).toBe('e1a')
+    expect(resolveProcedureSheetKey('S16-1')).toBe('e1a')
   })
 
   it('S11 系列底稿（S11 / S11-1）→ e1a（利用服务机构，显式 fallback，不被 S1 前缀误匹配）', () => {
@@ -70,22 +89,11 @@ describe('resolveProcedureSheetKey - S 循环路由（§1.6 Task 17/18）', () =
     expect(resolveProcedureSheetKey('S11-1')).toBe('e1a')
   })
 
-  // ─── 无专属路由的 S 码 → 默认 e1a ─────────────────────────────────────────
-  it('S2 → e1a（无专属程序表数据源，默认 fallback）', () => {
-    expect(resolveProcedureSheetKey('S2')).toBe('e1a')
-  })
-
-  it('S9 → e1a（无专属程序表数据源，默认 fallback）', () => {
-    expect(resolveProcedureSheetKey('S9')).toBe('e1a')
-  })
-
-  it('S21 → e1a（无专属程序表数据源，默认 fallback）', () => {
-    expect(resolveProcedureSheetKey('S21')).toBe('e1a')
-  })
-
-  it('S32/S34 → e1a（bundle 码走默认 fallback）', () => {
-    expect(resolveProcedureSheetKey('S32')).toBe('e1a')
-    expect(resolveProcedureSheetKey('S34')).toBe('e1a')
+  // ─── 无独立程序表的 S 码 → 默认 e1a ───────────────────────────────────────
+  it.each([
+    'S2', 'S3', 'S4', 'S5', 'S6', 'S9', 'S21', 'S32', 'S33', 'S34', 'S35',
+  ])('%s → e1a（无独立程序表状态 namespace，默认 fallback）', (wpCode) => {
+    expect(resolveProcedureSheetKey(wpCode)).toBe('e1a')
   })
 
   // ─── 小写 wp_code 标准化 ──────────────────────────────────────────────────
@@ -96,5 +104,28 @@ describe('resolveProcedureSheetKey - S 循环路由（§1.6 Task 17/18）', () =
     expect(resolveProcedureSheetKey('s20')).toBe('s20a')
     expect(resolveProcedureSheetKey('s11')).toBe('e1a')
     expect(resolveProcedureSheetKey('s16')).toBe('e1a')
+  })
+})
+
+describe('resolveProcedureSheetKey - 独立程序表状态 namespace 合约', () => {
+  it('只由 WorkpaperAuditNav 将独立程序表 key 接入 procedure_status，不替代通用组件路由', () => {
+    expect(RESOLVER_SOURCE).toContain('independent procedure-sheet')
+    expect(AUDIT_NAV_SOURCE).toContain("import { resolveProcedureSheetKey } from '@/utils/resolveProcedureSheetKey'")
+    expect(AUDIT_NAV_SOURCE).toMatch(/const resolvedSheetKey = resolveProcedureSheetKey\(props\.wpCode\)/)
+    expect(AUDIT_NAV_SOURCE).toMatch(
+      /useProcedureStatus\(\s*props\.projectId,\s*props\.wpId,\s*resolvedSheetKey,\s*\)/,
+    )
+    expect(PROCEDURE_STATUS_SOURCE).toContain('parsed?.procedure_status?.[sheetKey]')
+    expect(PROCEDURE_STATUS_SOURCE).toMatch(/sheet_key:\s*sheetKey/)
+    expect(GENERIC_PROCEDURE_PANEL_SOURCE).not.toContain('resolveProcedureSheetKey')
+  })
+})
+
+describe('resolveProcedureSheetKey - D~N 回归补齐', () => {
+  it.each([
+    ['I3', 'i3a'],
+    ['I4', 'i4a'],
+  ] as const)('%s → %s（I 循环专属程序表分支）', (wpCode, expected) => {
+    expect(resolveProcedureSheetKey(wpCode)).toBe(expected)
   })
 })

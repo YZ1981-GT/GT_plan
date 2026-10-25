@@ -6,6 +6,13 @@
 wp_code_pattern: "S33-[1-9]"
 wp_name_template: "综合核查-{topic}"
 component_type: d-form-table
+
+auto_data_source:
+  - source: s33_5_revenue_cost_check
+    wp_code: S33-5
+    description: 从 D4/F5 只读取收入、成本和毛利率核查数据
+    fields: [revenue, cost, gross_margin_rate]
+
 applicable_when:
   business_category: [ipo, listed, neeq]
 

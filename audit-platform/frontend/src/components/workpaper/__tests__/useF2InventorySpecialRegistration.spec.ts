@@ -19,8 +19,10 @@ import {
   getRendererEntry,
 } from '../htmlRendererRegistry'
 
-// Inline to avoid pulling in useF2SpecialFormData's heavy dependencies (apiProxy etc.)
-const IPO_CATEGORIES = ['IPO', '上市公司年审', '新三板', '重大资产重组'] as const
+import {
+  IPO_CATEGORIES,
+  isF2IpoProject,
+} from '../composables/useF2SpecialFormData'
 
 describe('F2 存货特殊组 — 注册契约测试', () => {
   describe('htmlRendererRegistry 注册', () => {
@@ -125,8 +127,17 @@ describe('F2 存货特殊组 — 注册契约测试', () => {
       ['内部控制审计', false],
       ['', false],
     ] as const)('business_category="%s" → isIpo=%s', (category, expected) => {
-      const isIpo = (IPO_CATEGORIES as readonly string[]).includes(category)
-      expect(isIpo).toBe(expected)
+      expect(isF2IpoProject({ business_category: category })).toBe(expected)
+    })
+
+    it.each([
+      [{ business_category: '一般审计', project_type: 'ipo' }, true, 'project_type'],
+      [{ business_category: '一般审计', project_type: 'annual', template_type: 'listed' }, true, 'template_type'],
+      [{ business_category: '上市公司年审', project_type: 'annual', template_type: 'soe' }, true, '中文 IPO_CATEGORIES'],
+      [{ business_category: 'refinancing', project_type: 'annual', template_type: 'soe' }, true, '核心 business_category'],
+      [{ business_category: '一般审计', project_type: 'annual', template_type: 'soe' }, false, '普通项目'],
+    ] as const)('兼容 %s → %s（%s）', (ctx, expected) => {
+      expect(isF2IpoProject(ctx)).toBe(expected)
     })
   })
 })
