@@ -507,10 +507,6 @@ const redirectHint = computed(() => {
   if (mod === 'consolidation_hub') return '此底稿由合并模块承载，请前往合并模块查看。'
   return '此底稿由其他模块承载。'
 })
-function handleRedirectNavigation() {
-  const targetPath = renderConfig.value?.target_path
-  const projectId = renderConfig.value?.project_id
-
 // ─── applicable_when 裁剪覆盖层（S 类 IPO/上市/新三板/再融资等专项底稿） ───
 const isWpNotApplicable = computed<boolean>(() => {
   const aw = renderConfig.value?.applicable_when
@@ -523,6 +519,10 @@ const isWpNotApplicable = computed<boolean>(() => {
     ''
   return !isIpoProject(projectBiz, cats)
 })
+
+function handleRedirectNavigation() {
+  const targetPath = renderConfig.value?.target_path
+  const projectId = renderConfig.value?.project_id
   if (targetPath) {
     // target_path may already contain full route (e.g. /projects/{id}/confirmation)
     // or relative path (e.g. /materiality) needing project prefix
