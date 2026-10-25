@@ -134,3 +134,7 @@ def register_report_routers(app: FastAPI) -> None:
     # ═══ §103. formula-management-library：全局刷新范围动态发现（合伙人专属，Req 20） ═══
     from app.routers.refresh_scopes import router as refresh_scopes_router
     app.include_router(refresh_scopes_router, tags=["refresh-scopes"])
+
+    # ═══ §104. disclosure-payload-authority-source：披露同步覆盖率只读查询 ═══
+    from app.routers.disclosure_sync_coverage import router as disclosure_coverage_router
+    app.include_router(disclosure_coverage_router, tags=["disclosure-sync-coverage"])

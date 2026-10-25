@@ -68,7 +68,15 @@ async def list_sql_templates():
 
 
 @router.delete("/cache/{project_id}")
-async def clear_cache(project_id: UUID, redis=Depends(get_redis)):
+async def clear_cache(
+    project_id: UUID,
+    redis=Depends(get_redis),
+    # 🔴 2026-09-28 补鉴权：本 router 内唯一有**写副作用**的端点（清 redis 缓存），
+    # 原先任意调用方可清任意项目缓存。其余端点（dashboards / embed-url /
+    # sql-templates / drilldown-*）都是读静态配置或拼 URL，本次不动。
+    # `get_current_user` 本已 import（用于其他签名）但此处漏挂。
+    current_user: User = Depends(get_current_user),
+):
     """清除项目仪表板缓存"""
     svc = _svc(redis)
     count = await svc.invalidate_dashboard_cache(project_id)

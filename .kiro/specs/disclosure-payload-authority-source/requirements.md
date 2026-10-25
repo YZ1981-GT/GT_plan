@@ -156,8 +156,27 @@
 
 ### 验收标准
 
-1. THE 跨主体守卫 SHALL 保持有效：在国企项目上请求上市章节同步 SHALL 被拒绝
-   且**零写入**（`_guard_standard_matches_project` 须在任何写语句之前调用）。
+1. 🔴 **本条已勘误（2026-09-28 实施期发现）** —— 原文写「在国企项目上请求上市章节同步
+   SHALL 被拒绝且**零写入**」，**该表述与已裁决的设计冲突**。
+
+   现读 `standard_unification_service.detect_standard_conflict` 源码明载：
+
+   > 🔴 用户裁决（2026-08-16）：底稿不做准则门控，允许在国企项目编辑上市版披露
+   > （合并模块场景：集团国企，下属有上市子公司）。entity 冲突降级为 warning 放行，
+   > 不再 hard block。
+
+   探针穷举 **162** 组 `(project_entity × requested_standard)` 组合，
+   `detect_standard_conflict` **恒返回 None** ⇒ `_guard_standard_matches_project`
+   内的 `raise StandardMismatchError` 分支是**死代码**。
+
+   **修正后的验收标准**：跨主体同步 SHALL 被**放行**（符合 2026-08-16 裁决），
+   但 SHALL NOT 静默 —— 必须产出含 `cross-entity` 的 WARNING 日志，
+   使审计场景可事后追溯「谁在国企项目写了上市章节」。
+   同主体同步 SHALL NOT 产出该警告（防守卫恒绿）。
+
+   守卫：`test_disclosure_sync_invariants.py::TestCrossEntityGuard`
+   —— 含 `xfail(strict=True)` 钉住原始诉求，若实现改回 hard block 则 XPASS 报错，
+   强制回来更新本条（不会静默漂移）。
 2. THE 空载荷 SHALL NOT 清空既有子表（既有防护，须有守卫锁死）。
 3. THE `manual_override` 标记的目标字段 SHALL NOT 被联动写入覆盖。
 4. THE 年度解析 SHALL 以 `projects.audit_year` 为权威，SHALL NOT 用服务器当前自然年

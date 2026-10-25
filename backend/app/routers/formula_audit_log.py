@@ -19,8 +19,30 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import require_project_access, require_role
+from app.models.core import User
 
 router = APIRouter(prefix="/api/formula-audit-log", tags=["formula-audit-log"])
+
+# ─── 鉴权（2026-09-28 补，三个端点原先全裸）──────────────────────────────
+#
+# 🔴 修复前状态：三个端点只有 `Depends(get_db)`，路径带 `{project_id}` 却零鉴权：
+#   · GET  —— 任意调用方可读任意项目的公式变更史（含 old_formula / new_formula）
+#   · POST —— **未授权写审计哈希链**，且 `user_id` 写死全零（原注释自称
+#             「POST 端点无 current_user 上下文」）⇒ **审计留痕可伪造**，
+#             这对以留痕为生命线的审计平台是最严重的一类缺陷
+#   · POST /rollback —— **未授权 `UPDATE report_config SET formula`**，而
+#             `report_config` 是**全局**报表行模板表（无 project_id 列）
+#             ⇒ 任何人可篡改全平台报表公式
+#
+# 权限分档依据（对齐既有基准，不自造）：
+#   · 读 → `require_project_access("readonly")`（与 `disclosure_notes` 全部只读端点同级）
+#   · 写审计链 → `require_project_access("edit")`（写的是该项目的留痕）
+#   · 回滚全局公式 → `require_role([...])`：改的是**跨项目的全局配置**，
+#     项目级权限保护不了全局资源。对齐 `report_config.populate-formulas`
+#     （改全局公式，用 `require_role(["admin"])`）与平台「全局一键刷新 = 合伙人专属」
+#     的既有裁定，这里放到 admin / partner / manager 三档以保证日常可用。
+#     🔴 这是**权限收紧**：此前任何人（含未登录）可调，现需上述角色之一。
 
 
 class LogEntry(BaseModel):
@@ -48,6 +70,7 @@ async def get_audit_log(
     row_code: str = '',
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """查询公式变更历史 — 改查 audit_log_entries WHERE action_type='formula.changed'。
 
@@ -158,8 +181,15 @@ async def add_audit_log(
     project_id: str, year: int,
     body: LogEntry,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
-    """记录公式变更日志 — 委托 append_audit_log 写入哈希链。"""
+    """记录公式变更日志 — 委托 append_audit_log 写入哈希链。
+
+    🔴 `user_id` 必须是**真实操作人**：原实现写死
+    `00000000-0000-0000-0000-000000000000` 并注释「POST 端点无 current_user 上下文」
+    —— 那不是「没有上下文」，是**没挂鉴权依赖**。审计留痕写不出人等于没有留痕
+    （既无法追责也无法举证），故与鉴权一并修。
+    """
     from app.services.audit_log_helper import append_audit_log
 
     try:
@@ -168,7 +198,7 @@ async def add_audit_log(
         pid = None
 
     await append_audit_log(db, {
-        "user_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),  # POST 端点无 current_user 上下文
+        "user_id": current_user.id,
         "project_id": pid,
         "action": "formula.changed",
         "resource_type": "report_config",
@@ -194,6 +224,7 @@ async def rollback_formula(
     project_id: str, year: int,
     body: RollbackRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "partner", "manager"])),
 ):
     """一键回滚公式：将指定行次的公式写回 old_formula。
 
@@ -201,6 +232,12 @@ async def rollback_formula(
     1. 查 report_config 找到对应行
     2. 将 formula 写回 target_formula（old_formula）
     3. 记录一条 rollback 审计日志（统一走哈希链 formula.changed，不再写旧 formula_audit_log 表）
+
+    🔴 权限 = `require_role(["admin", "partner", "manager"])` 而非项目级权限：
+    本端点 `UPDATE` 的 `report_config` 是**全局**表（无 `project_id` 列，见下方 SQL 注释），
+    一次回滚影响**全平台所有项目**的该行公式 —— 项目级权限保护不了全局资源。
+    对齐 `report_config.populate-formulas`（同样改全局公式，用 `require_role(["admin"])`）。
+    路径里的 `project_id` 仅用于审计留痕归属，不构成隔离。
     """
     from app.services.audit_log_helper import append_audit_log
 
@@ -233,7 +270,8 @@ async def rollback_formula(
         pid = None
 
     await append_audit_log(db, {
-        "user_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
+        # 🔴 与 add_audit_log 同修：回滚全局公式必须记下真实操作人
+        "user_id": current_user.id,
         "project_id": pid,
         "action": "formula.changed",
         "resource_type": "report_config",
