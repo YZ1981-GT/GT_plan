@@ -438,6 +438,7 @@ class ChainOrchestrator:
                     Project.audit_type,
                     Project.is_large_soe,
                     Project.wizard_state,
+                    Project.business_category,
                 ).where(Project.id == project_id)
             )
             proj_row = proj_result.first()
@@ -448,6 +449,7 @@ class ChainOrchestrator:
             audit_type = (proj_row[4] if proj_row else None) or "financial"
             is_large_soe = bool(proj_row[5]) if proj_row else False
             wizard_state = (proj_row[6] if proj_row else None) or {}
+            business_category = (proj_row[7] if proj_row else None) or ""
         except Exception:
             try:
                 await db.rollback()
@@ -456,6 +458,7 @@ class ChainOrchestrator:
             template_type, report_scope = "soe", "standalone"
             scenario, has_foreign_currency = "normal", False
             audit_type, is_large_soe, wizard_state = "financial", False, {}
+            business_category = ""
 
         # Build project context flags for conditional triggers
         audit_type_l = str(audit_type or "").lower()
@@ -506,6 +509,15 @@ class ChainOrchestrator:
         # IT team execute implies needs_it_audit
         if project_flags.get("it_team_executes"):
             project_flags["needs_it_audit"] = True
+
+        # business_category → biz_ flags for applicable_when matching (S32~S35 etc.)
+        biz_cat = str(business_category or "").lower()
+        project_flags.update({
+            "biz_ipo": "ipo" in biz_cat,
+            "biz_listed": "listed" in biz_cat or template_type == "listed",
+            "biz_neeq": "neeq" in biz_cat,
+            "biz_refinancing": "refinancing" in biz_cat,
+        })
 
 
         # 3. Query TB to get actual account codes

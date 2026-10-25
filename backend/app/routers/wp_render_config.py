@@ -32,6 +32,7 @@ from app.services.wp_classification_service import (
     ClassificationNotFoundError,
     WpClassificationService,
     derive_component_type,
+    _WP_APPLICABLE_WHEN,
 )
 from app.services.wp_auto_fill_service import _resolve_auto_fill_values
 from app.services.wp_account_package_resolver import resolve_package_sheets
@@ -1043,6 +1044,7 @@ async def _get_render_config_impl(
     response = {"wp_id": str(wp_id), "wp_code": wp_code, "project_id": str(project_id),
                 "scope": scope, "is_real_workpaper": is_real, "template_version": tpl_ver_str,
                 "audit_year": _prog_year, "applicable_standards": _standards,
+                "applicable_when": _WP_APPLICABLE_WHEN.get(wp_code),
                 "sheets": sheets, "fill_results": fill_results, "guidance": get_wp_guidance(wp_code)}
     if sign_status is not None:
         response["sign_status"] = sign_status

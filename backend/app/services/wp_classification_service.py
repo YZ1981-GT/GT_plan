@@ -222,6 +222,19 @@ VALID_COMPONENT_TYPES: set[str] = {
     "i4-long-term-prepaid",
     "i5-other-noncurrent-assets",
     "i6-research-development-expense",
+    # S 循环 s-checklist 孤儿组件接线
+    "s1-regulation-record",
+    "s8-adjudication",
+    "s9-adjudication",
+    "s9-internal-control",
+    "s9-legal-regulations",
+    "s9-program-description",
+    "s10-adjudication",
+    "s10-internal-control",
+    "s10-environmental-regulations",
+    "s17-nonrecurring-detail",
+    "s17-reconciliation",
+    "s17-tax-impact",
     # J 循环专用组件（职工薪酬）
     "j1-employee-compensation",
     "j2-defined-benefit-plan",
@@ -253,6 +266,51 @@ _WP_CODE_OVERRIDE: dict[str, str] = load_wp_code_overrides()
 def refresh_wp_code_overrides() -> dict[str, str]:
     """触发 mtime 热重载（原地更新 _WP_CODE_OVERRIDE 指向的 dict）。"""
     return load_wp_code_overrides()
+
+
+# ─── applicable_when 映射（从 wp_account_mapping.json 预加载） ──────────────
+
+def _load_applicable_when() -> dict[str, dict]:
+    """从 wp_account_mapping.json 加载 wp_code → applicable_when 映射（非 None 条目）。
+
+    🔴 bundle 父码聚合：S32/S33/S34/S35 父码自身 applicable_when=None，
+    但全部子码有相同 business_category 限制——须从子码向上聚合。
+    """
+    import json
+    from pathlib import Path
+
+    mapping_path = Path(__file__).parent.parent.parent / "data" / "wp_account_mapping.json"
+    if not mapping_path.exists():
+        logger.warning("wp_account_mapping.json not found at %s", mapping_path)
+        return {}
+    raw = json.loads(mapping_path.read_bytes())
+    data = raw["mappings"] if isinstance(raw, dict) else raw
+    result: dict[str, dict] = {}
+    # 先加载所有非 None 条目
+    for m in data:
+        if m.get("applicable_when"):
+            result[m["wp_code"]] = m["applicable_when"]
+    # 聚合 bundle 父码：对子码按父前缀分组，取并集
+    BUNDLE_PARENTS = {"S32", "S33", "S34", "S35"}
+    for parent in BUNDLE_PARENTS:
+        if parent in result:
+            continue  # 父码已有声明则跳过
+        children_aw = [
+            m["applicable_when"]
+            for m in data
+            if m.get("wp_code", "").startswith(parent + "-") and m.get("applicable_when")
+        ]
+        if children_aw:
+            # 取所有子码 business_category 的并集（宽松策略：任一子码适用即父码适用）
+            all_cats: set[str] = set()
+            for aw in children_aw:
+                all_cats.update(aw.get("business_category", []))
+            if all_cats:
+                result[parent] = {"business_category": sorted(all_cats)}
+    return result
+
+
+_WP_APPLICABLE_WHEN: dict[str, dict] = _load_applicable_when()
 
 # ─── sheet 名级专用路由（优先于 class_code 派生） ────────────────────────────
 # 坏账准备明细表（D2-3 等）的 class_code 是共享的 "F-明细表"，无法靠 class_code

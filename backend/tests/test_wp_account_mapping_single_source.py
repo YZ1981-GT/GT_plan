@@ -375,3 +375,30 @@ def test_family_rule_catches_planted_codes(changes, expect):
 def test_name_rule_catches_planted_codes(changes, expect):
     found = name_code_violations(_planted(changes))
     assert any(v.startswith(expect) for v in found), found
+
+
+# ─── applicable_when 匹配路径 ─────────────────────────────────────────────
+
+
+from app.services.wp_generation_matching import match_workpapers
+
+
+def test_applicable_when_hit():
+    """applicable_when={business_category:['ipo']} + biz_ipo=True → matched"""
+    mappings = [{"wp_code": "S34", "applicable_when": {"business_category": ["ipo"]}}]
+    matched, _ = match_workpapers(mappings, set(), {"biz_ipo": True})
+    assert "S34" in matched
+
+
+def test_applicable_when_miss():
+    """applicable_when={business_category:['ipo']} + biz_ipo=False → not matched"""
+    mappings = [{"wp_code": "S34", "applicable_when": {"business_category": ["ipo"]}}]
+    matched, _ = match_workpapers(mappings, set(), {"biz_ipo": False})
+    assert "S34" not in matched
+
+
+def test_applicable_when_industry_key():
+    """applicable_when={industry:['banking']} + ind_banking=True → matched"""
+    mappings = [{"wp_code": "H5", "applicable_when": {"industry": ["banking"]}}]
+    matched, _ = match_workpapers(mappings, set(), {"ind_banking": True})
+    assert "H5" in matched

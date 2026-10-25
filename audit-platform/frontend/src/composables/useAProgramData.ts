@@ -14,12 +14,13 @@
 import { ref, computed, type Ref } from 'vue'
 import { api } from '@/services/apiProxy'
 import { useProjectStore } from '@/stores/project'
+import { isIpoProject } from '@/utils/ipoProjectUtils'
 
 export function useAProgramData(projectId: Ref<string>) {
   const projectStore = useProjectStore()
   const projectInfo = ref<Record<string, any>>({})
   // B30 等仅限合并审计的底稿：从 API 获取 applicable_when 标记
-  const applicableWhen = ref<string | null>(null)
+  const applicableWhen = ref<string | Record<string, string[]> | null>(null)
 
   /** 加载项目基本信息（含 business_category） */
   async function loadProjectInfo() {
@@ -32,9 +33,19 @@ export function useAProgramData(projectId: Ref<string>) {
 
   /** B30 等底稿 applicable_when="consolidated" 但项目为 standalone 时显示不适用覆盖 */
   const isNotApplicable = computed<boolean>(() => {
-    if (!applicableWhen.value) return false
-    if (applicableWhen.value === 'consolidated' && projectStore.auditScope !== 'consolidated') {
-      return true
+    const aw = applicableWhen.value
+    if (!aw) return false
+    // 字符串形式：如 "consolidated"
+    if (typeof aw === 'string') {
+      if (aw === 'consolidated' && projectStore.auditScope !== 'consolidated') {
+        return true
+      }
+      return false
+    }
+    // dict 形式：如 { business_category: ['ipo', 'listed'] }
+    if (typeof aw === 'object' && aw.business_category) {
+      const biz = projectInfo.value?.business_category || ''
+      return !isIpoProject(biz, aw.business_category)
     }
     return false
   })
