@@ -548,7 +548,8 @@ R1.5 的附注模板绑定未重生成（理由见 §10.3 第 19 条）。
   加的企业预设分支用了未导入的 `deployment_of` / `AIDeployment` ⇒ 只要验证失败就 NameError，启用 / 更新不可用的本机或企业预设模型恒 500。
   补两处导入 + `test_ai_models_unavailable_warning.py` 4 例（本机 / 企业预设 / 向量 / 无失败），变异 MA1 / MA2（各删一处导入）打红在预期用例上；
   合并树上本 spec 全部新测试、棘轮与该用例通过（后端 110 passed；前端相关目录 109 个文件只剩预存的 `parseIndexRef` 5 例）；
-  同口径 277 个文件的全量对比回归在合并树上推送时仍在运行（以 `58f7afb42` 为基线的结果见上一条：新增 0）。
+  同口径 277 个文件的全量对比回归（合并树 vs `01ed968ec` 干净检出，推送后跑完）：新增失败 0、消除 1（即上面 test_task55 锚点用例）；
+  双方其余失败逐条相同（968 / 967 failed + 355 errors，均为预存）；已跟踪文件守卫无报告。
 - **环境事故（登记）**：16:14 前后并发会话删除了本会话的 4 个临时 worktree（含已 lock 的两个），正在跑的合并树回归被中断；其中一个 worktree 里有
   指向主前端 `node_modules` 的联接，递归删除顺联接删掉了真目录的 `.bin`、`.vite` 与 22 个包（`@asamuzakjp/css-color` 至 `@element-plus/icons-vue`，
   到 `@esbuild` 因文件占用中止）⇒ 按 lockfile `npm install --prefer-offline` 恢复（新增 22、变更 44，`package-lock.json` 未变），前端开发服务与 vitest 复核可用。
