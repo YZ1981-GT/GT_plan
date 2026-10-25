@@ -21,8 +21,11 @@ describe('useG5BadDebtDetail movement', () => {
       closingAdjustment: 3,
     })
     expect(d.openingAudited).toBe(110)
-    expect(d.closingUnadjusted).toBe(124) // 110+20+5-8-2-1
-    expect(d.closingAudited).toBe(127)
+    // 原判据「期末未审 = 期初审定 110 + 20 + 5 − 8 − 2 − 1 = 124、期末审定 127」钉的是旧口径；
+    // 模板 G5-3 的 J = B + SUM(E:F) − SUM(G:I) 从期初未审起算，期初调整只进期初审定
+    // （spec oo-formula-recompute-not-tamper R4）⇒ 100 + 20 + 5 − 8 − 2 − 1 = 114、114 + 3 = 117
+    expect(d.closingUnadjusted).toBe(114)
+    expect(d.closingAudited).toBe(117)
   })
 
   it('旧 ECL 行迁移后期末审定对齐 adjustedProvision', () => {
@@ -113,7 +116,9 @@ describe('useG5BadDebtDetail movement', () => {
       },
     ])
     const bad = extractBadDebtForDisclosure(raw)
-    expect(bad.individualTotals.end.provision).toBe(65)
+    // 原判据期末准备 65 = 期初审定 60 + 计提 5（旧口径）；与 G5-3 表单 / 模板同口径改为
+    // 期初未审 50 + 计提 5 + 期末调整 0 = 55，期初准备仍取期初审定 60（spec oo-formula-recompute-not-tamper R4）
+    expect(bad.individualTotals.end.provision).toBe(55)
     expect(bad.individualTotals.prior.provision).toBe(60)
   })
 })

@@ -126,17 +126,21 @@ function normalizeRow(raw: any): DetailRow {
 }
 
 /**
- * 对单行重新计算公式链：
+ * 对单行重新计算公式链（与权威模板「应收款项融资明细表D5-2」逐列一致）：
  * F = C + D + E（期初审定 = 期初未审 + AJE + RJE）
- * J = F + H - I（期末余额 = 期初审定 + 本期增加 - 本期减少）
+ * J = C + H - I（期末余额 = 期初未审 + 本期增加 - 本期减少）
  * L = J + K（期末未审余额 = 期末余额 + 重分类）
- * O = L + M + N（期末审定余额 = 期末未审 + 账项调整 + 重分类调整）
+ * O = J + M + N（期末审定余额 = 期末余额 + 账项调整 + 重分类调整）
+ *
+ * 🔴 J 以期初未审起算、O 以期末余额起算（spec oo-formula-recompute-not-tamper R4，同 F1-2 裁决 F1-H3
+ * 「以模板为准」）：原先 J 用期初审定、O 用期末未审，有期初调整或被审计单位重分类的行在表单与
+ * OnlyOffice 之间会来回变值。
  */
 export function recalcRow(row: DetailRow): DetailRow {
   const F = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
-  const J = calcEndBalance(F, row.periodIncrease, row.periodDecrease)
+  const J = calcEndBalance(row.priorUnadjusted, row.periodIncrease, row.periodDecrease)
   const L = calcEndUnadjusted(J, row.entityReclass)
-  const O = calcEndAudited(L, row.endAje, row.endRje)
+  const O = calcEndAudited(J, row.endAje, row.endRje)
 
   return {
     ...row,

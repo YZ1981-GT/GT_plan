@@ -493,7 +493,8 @@ export function useD1MemoReconciliation(options: UseD1MemoReconciliationOptions)
         const currentRje = parseNum(r?.currentRje)
 
         const priorAudited = calcAuditedAmount(priorUnadjusted, priorAje, priorRje)
-        const currentUnadjusted = calcCurrentUnadjusted(priorAudited, currentIncrease, currentDecrease)
+        // 期末未审以期初未审起算（与 D1-2 recalcRow / 权威模板 H = B + F - G 同口径）
+        const currentUnadjusted = calcCurrentUnadjusted(priorUnadjusted, currentIncrease, currentDecrease)
         const currentAudited = calcAuditedAmount(currentUnadjusted, currentAje, currentRje)
 
         beginningBalance += priorAudited

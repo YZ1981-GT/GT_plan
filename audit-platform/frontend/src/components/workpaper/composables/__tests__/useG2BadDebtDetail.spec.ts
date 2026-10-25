@@ -66,10 +66,12 @@ describe('useG2BadDebtDetail — 滚动态公式', () => {
     const leaf = bd.dataRows.value.find((r) => r.id === 'ind-1')!
     // 期初审定 = 1100
     expect(leaf.openingAudited).toBe(1100)
-    // 期末未审 = 1100+200+50-30-20-10 = 1290
-    expect(leaf.closingUnadjusted).toBe(1290)
-    // 期末审定 = 1290+5 = 1295
-    expect(leaf.closingAudited).toBe(1295)
+    // 原判据「期末未审 = 期初审定 1100 + 200 + 50 − 30 − 20 − 10 = 1290、期末审定 1295」钉的是旧口径；
+    // 模板 G2-3 的 J = B + SUM(E:F) − SUM(G:I) 从期初未审起算（spec oo-formula-recompute-not-tamper R4）
+    // ⇒ 期末未审 = 1000 + 200 + 50 − 30 − 20 − 10 = 1190
+    expect(leaf.closingUnadjusted).toBe(1190)
+    // 期末审定 = 1190 + 5 = 1195
+    expect(leaf.closingAudited).toBe(1195)
   })
 
   it('默认含单项区 + 组合账龄段 + 合计', () => {

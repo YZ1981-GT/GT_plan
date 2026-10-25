@@ -93,14 +93,19 @@ describe('useD3Detail - Property-Based Tests', () => {
    *
    * For any 明细行输入值组合，以下公式链必须成立：
    * - 期初审定余额 H = E + F + G
-   * - 期末余额 O = H + N - M（贷方科目：期初审定+贷方-借方）
+   * - 期末余额 O = E + N - M（贷方科目：期初未审+贷方-借方）
    * - 期末未审余额 Q = O + P
    * - 期末审定数 T = Q + R + S
+   *
+   * 🔴 O 以期初未审 E 起算（原为期初审定 H）：权威模板「预收账款明细表D3-2」的
+   * O 列公式就是 E+N-M，表单与 OnlyOffice 两侧算法必须一致，否则在线编辑保存时
+   * 公式格被 OO 重算后的值与表单值不同（spec oo-formula-recompute-not-tamper R4，
+   * 先例 useF1Detail.recalcRowFormulas 的 O = E + M - N）。
    *
    * **Validates: Requirements 4.4, 10.3**
    */
   describe('Property 5: D3-2行公式链正确性', () => {
-    it('H=E+F+G; O=H+N-M; Q=O+P; T=Q+R+S', () => {
+    it('H=E+F+G; O=E+N-M; Q=O+P; T=Q+R+S', () => {
       fc.assert(
         fc.property(
           amountArb, // E: priorUnadjusted
@@ -130,7 +135,7 @@ describe('useD3Detail - Property-Based Tests', () => {
 
             // Assert formula chain
             const expectedH = calcPriorAudited(E, F, G)
-            const expectedO = calcEndBalance(expectedH, N, M)
+            const expectedO = calcEndBalance(E, N, M)
             const expectedQ = calcEndUnadjusted(expectedO, P)
             const expectedT = calcEndAudited(expectedQ, R, S)
 
@@ -138,9 +143,9 @@ describe('useD3Detail - Property-Based Tests', () => {
             expect(result.priorAudited).toBeCloseTo(expectedH, 4)
             expect(result.priorAudited).toBeCloseTo(E + F + G, 4)
 
-            // O = H + N - M (贷方科目)
+            // O = E + N - M (贷方科目，以期初未审起算，与模板 D3-2 的 O 列一致)
             expect(result.endBalance).toBeCloseTo(expectedO, 4)
-            expect(result.endBalance).toBeCloseTo(expectedH + N - M, 4)
+            expect(result.endBalance).toBeCloseTo(E + N - M, 4)
 
             // Q = O + P
             expect(result.endUnadjusted).toBeCloseTo(expectedQ, 4)

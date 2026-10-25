@@ -126,11 +126,14 @@ function createEmptyRow(seq: number, segments: AgingSegment[]): DetailRow {
 }
 
 /**
- * 行公式链自动计算
- * - priorAudited = priorUnadjusted + priorAje + priorRje
- * - endBalance = priorAudited + debitOccurrence - creditOccurrence
- * - currentUnadjusted = endBalance + reclassification
- * - currentAudited = currentUnadjusted + currentAje + currentRje
+ * 行公式链自动计算（与权威模板「明细表D2-2」逐列一致）
+ * - priorAudited = priorUnadjusted + priorAje + priorRje（H）
+ * - endBalance = priorUnadjusted + debitOccurrence - creditOccurrence（Q = E + O - P）
+ * - currentUnadjusted = endBalance + reclassification（S = Q + R）
+ * - currentAudited = currentUnadjusted + currentAje + currentRje（AB = S + Z + AA）
+ *
+ * 🔴 期末余额以**期初未审**起算（spec oo-formula-recompute-not-tamper R4）：原先用期初审定，
+ * 有期初调整的行在表单与 OnlyOffice 之间会来回变值（OO 按模板公式重算）。同 F1-2 裁决 F1-H3。
  */
 function recalcRow(row: DetailRow): DetailRow {
   row.priorAudited = getAuditedAmount(
@@ -138,7 +141,7 @@ function recalcRow(row: DetailRow): DetailRow {
     parseNum(row.priorAje),
     parseNum(row.priorRje)
   )
-  row.endBalance = row.priorAudited + parseNum(row.debitOccurrence) - parseNum(row.creditOccurrence)
+  row.endBalance = parseNum(row.priorUnadjusted) + parseNum(row.debitOccurrence) - parseNum(row.creditOccurrence)
   row.currentUnadjusted = row.endBalance + parseNum(row.reclassification)
   row.currentAudited = getAuditedAmount(
     row.currentUnadjusted,

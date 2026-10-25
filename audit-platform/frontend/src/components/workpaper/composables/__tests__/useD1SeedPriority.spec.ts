@@ -99,7 +99,8 @@ describe('useD1DetailCategory — seed 消费', () => {
 
     // 公式字段自动计算：priorAudited = prior + aje + rje
     expect(rows.value[0].priorAudited).toBe(5000000)
-    // currentUnadjusted = priorAudited + increase - decrease
+    // currentUnadjusted = priorUnadjusted + increase - decrease（模板 D1-2 的 H = B + F - G，
+    // spec oo-formula-recompute-not-tamper R4；本例期初调整为 0，两种口径同值）
     expect(rows.value[0].currentUnadjusted).toBeCloseTo(5000000 + 12460611.29 - 8000000, 2)
 
     // 小计行 = 各行之和

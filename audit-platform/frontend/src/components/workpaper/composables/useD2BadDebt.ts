@@ -8,7 +8,7 @@
  * - BadDebtRow 类型定义（category/14列数值字段）
  * - individualRows/agingRows/customerTypeRows reactive（三分类，从 D2-bd-*-rows JSON remark加载）
  * - totalRow computed（SUM全部行各金额列）
- * - 期末未审数自动计算（= 期初审定 + 计提 + 转入 - 收回 - 转回 - 核销）
+ * - 期末未审数自动计算（= 期初未审 + 计提 + 其他增加 - 转回 - 核销 - 其他减少，对齐模板 K 列）
  * - eclDifference computed（= 坏账合计 - ECL测试总额）
  * - eclWarning computed（差异≠0 → 黄色警告字符串）
  * - addSubRow(category) / removeSubRow(rowId) 动态行管理
@@ -46,7 +46,7 @@ export interface BadDebtRow {
   currentWriteOff: number     // 核销
   currentOtherDecrease: number // 其他减少（源模板J列）
   // 期末(4列)
-  currentUnadjusted: number   // = 期初审定+计提+其他增加-转回-核销-其他减少
+  currentUnadjusted: number   // = 期初未审+计提+其他增加-转回-核销-其他减少（模板 K = B + SUM(F:G) − SUM(H:J)）
   currentAje: number
   currentRje: number
   currentAudited: number      // = 期末未审+AJE+RJE
@@ -132,10 +132,12 @@ function createFixedRow(category: BadDebtRow['category']): BadDebtRow {
 }
 
 /**
- * 行公式自动计算：
+ * 行公式自动计算（对齐模板 D2-3：E = B + C + D、K = B + SUM(F:G) − SUM(H:J)、N = K + L + M）：
  * - priorAudited = priorUnadjusted + priorAje + priorRje
- * - currentUnadjusted = priorAudited + currentProvision + currentOtherIncrease
+ * - currentUnadjusted = priorUnadjusted + currentProvision + currentOtherIncrease
  *                       - currentReversal - currentWriteOff - currentOtherDecrease
+ *   期末未审从期初未审滚动，期初调整只进期初审定；从期初审定滚动会把上年审计调整算进「未审」，
+ *   且在线编辑时 OO 按模板重算，表单与 OO 来回改值（spec oo-formula-recompute-not-tamper R4）
  * - currentAudited = currentUnadjusted + currentAje + currentRje
  */
 function recalcRow(row: BadDebtRow): BadDebtRow {
@@ -145,7 +147,7 @@ function recalcRow(row: BadDebtRow): BadDebtRow {
     parseNum(row.priorRje)
   )
   row.currentUnadjusted =
-    row.priorAudited
+    parseNum(row.priorUnadjusted)
     + parseNum(row.currentProvision)
     + parseNum(row.currentOtherIncrease)
     - parseNum(row.currentReversal)

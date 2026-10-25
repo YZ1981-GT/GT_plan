@@ -51,7 +51,7 @@ export interface CustomerRow {
   priorAudited: number    // = prior + aje + rje (自动计算)
   currentIncrease: number
   currentDecrease: number
-  currentBalance: number  // = priorAudited + increase - decrease (自动计算)
+  currentBalance: number  // = priorUnadjusted + increase - decrease (自动计算；模板 J = D + H - I)
   reclassification: number
   currentUnadjusted: number  // = currentBalance + reclassification (自动计算)
   currentAje: number
@@ -79,10 +79,14 @@ const CONCLUSION_KEY = 'D1-cust-conclusion'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** 重算行内公式字段（对齐 Excel：期末余额为计算列，期末未审 = 期末余额 + 重分类） */
+/**
+ * 重算行内公式字段（对齐 Excel「原值明细表（按客户）D1-3」：期末余额 J = D + H - I，期末未审 = 期末余额 + 重分类）。
+ * 🔴 期末余额以**期初未审**起算（spec oo-formula-recompute-not-tamper R4）：原先用期初审定，
+ * 有期初调整的行在表单与 OnlyOffice 之间会来回变值。同 F1-2 裁决 F1-H3。
+ */
 function recalcRow(row: CustomerRow): CustomerRow {
   const priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
-  const currentBalance = priorAudited + row.currentIncrease - row.currentDecrease
+  const currentBalance = row.priorUnadjusted + row.currentIncrease - row.currentDecrease
   const currentUnadjusted = currentBalance + row.reclassification
   const currentAudited = calcAuditedAmount(currentUnadjusted, row.currentAje, row.currentRje)
   return {

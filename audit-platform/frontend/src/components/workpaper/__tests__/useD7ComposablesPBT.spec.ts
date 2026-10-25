@@ -30,9 +30,14 @@ describe('Property 10: D7-2行内公式链正确性', () => {
    * For any 明细行输入值组合 (priorUnadjusted, priorAje, priorRje,
    * creditAmount, debitAmount, entityReclass, endAje, endRje)，以下公式链必须成立：
    * - 期初审定 priorAudited = priorUnadjusted + priorAje + priorRje
-   * - 期末余额 endBalance = priorAudited + creditAmount - debitAmount（贷方科目）
+   * - 期末余额 endBalance = priorUnadjusted + creditAmount - debitAmount（贷方科目）
    * - 期末未审 endUnadjusted = endBalance + entityReclass
    * - 期末审定 endAudited = endUnadjusted + endAje + endRje
+   *
+   * 🔴 期末余额以期初未审起算（原为期初审定）：权威模板「明细表D7-2」的期末余额列公式
+   * 是 期初未审-借方+贷方，表单与 OnlyOffice 两侧算法必须一致，否则在线编辑保存时公式格
+   * 被 OO 重算后的值与表单值不同（spec oo-formula-recompute-not-tamper R4，先例
+   * useF1Detail.recalcRowFormulas 的 O = E + M - N）。
    *
    * **Validates: Requirements 5.4**
    */
@@ -61,8 +66,8 @@ describe('Property 10: D7-2行内公式链正确性', () => {
           const expectedPriorAudited = priorUnadjusted + priorAje + priorRje
           expect(Math.abs(result.priorAudited - expectedPriorAudited)).toBeLessThan(1e-6)
 
-          // Step 2: 期末余额 = 期初审定 + 贷方发生 - 借方发生（贷方科目）
-          const expectedEndBalance = expectedPriorAudited + creditAmount - debitAmount
+          // Step 2: 期末余额 = 期初未审 + 贷方发生 - 借方发生（贷方科目，与模板 D7-2 一致）
+          const expectedEndBalance = priorUnadjusted + creditAmount - debitAmount
           expect(Math.abs(result.endBalance - expectedEndBalance)).toBeLessThan(1e-6)
 
           // Step 3: 期末未审 = 期末余额 + 被审计单位重分类调整

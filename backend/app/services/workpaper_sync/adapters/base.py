@@ -36,7 +36,7 @@ Property 3 / 20 / 21 / 28
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, fields as dataclass_fields
+from dataclasses import dataclass, field as dataclass_field, fields as dataclass_fields
 from enum import Enum
 from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence, runtime_checkable
@@ -284,6 +284,12 @@ class Projection:
     document_type: str
     values: Mapping[str, FieldValue]
     row_keys: Mapping[str, tuple[str, ...]] = None  # type: ignore[assignment]
+    #: stable key → 公式签名（`formula_recompute_evidence`）。只有从 xlsx 读出的 projection 才带，
+    #: None = 来源不提供证据。它是「这份文件里这一格的公式长什么样」的观测，不是业务内容：
+    #: 不进 projection 摘要（`_projection_payload` 不读它）、不参与相等比较。
+    formula_signatures: Mapping[str, str] | None = dataclass_field(
+        default=None, compare=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         if self.row_keys is None:

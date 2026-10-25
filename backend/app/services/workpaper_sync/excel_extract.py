@@ -177,6 +177,7 @@ from app.services.workpaper_sync.excel_row_shift import (
     remap_a1_rows,
     unextend_total_formula_chain,
 )
+from app.services.workpaper_sync.formula_recompute_evidence import formula_signature
 from app.services.workpaper_sync.limits import SyncLimits, load_limits
 
 if TYPE_CHECKING:  # pragma: no cover - 仅类型；运行期 import 会成环
@@ -3043,6 +3044,7 @@ def extract_projection(
     budget = StreamingProjectionBudget(lim)
     values: dict[str, FieldValue] = {}
     formula_inventory: dict[str, str] = {}
+    formula_signatures: dict[str, str] = {}
     anomalies: list[StructuralAnomaly] = []
     findings: list[ProtectedCellFinding] = []
     chunk_count = 0
@@ -3068,6 +3070,7 @@ def extract_projection(
                 binding=binding,
                 values=values,
                 formula_inventory=formula_inventory,
+                formula_signatures=formula_signatures,
                 anomalies=anomalies,
                 findings=findings,
                 baseline=baseline,
@@ -3094,6 +3097,7 @@ def extract_projection(
                     binding=binding,
                     values=values,
                     formula_inventory=formula_inventory,
+                    formula_signatures=formula_signatures,
                     anomalies=anomalies,
                     findings=findings,
                     baseline=baseline,
@@ -3124,6 +3128,7 @@ def extract_projection(
         document_type=contract.document_type,
         values=values,
         row_keys={dynamic_table.table_key: identities},
+        formula_signatures=formula_signatures,
     )
     projection.assert_matches_contract(contract)
 
@@ -3252,6 +3257,7 @@ def _extract_static_projection(
     budget = StreamingProjectionBudget(limits)
     values: dict[str, FieldValue] = {}
     formula_inventory: dict[str, str] = {}
+    formula_signatures: dict[str, str] = {}
     anomalies: list[StructuralAnomaly] = []
     findings: list[ProtectedCellFinding] = []
     sidecar_writer = (
@@ -3272,6 +3278,7 @@ def _extract_static_projection(
                 binding=binding,
                 values=values,
                 formula_inventory=formula_inventory,
+                formula_signatures=formula_signatures,
                 anomalies=anomalies,
                 findings=findings,
                 baseline=baseline,
@@ -3295,6 +3302,7 @@ def _extract_static_projection(
         document_type=contract.document_type,
         values=values,
         row_keys={},  # 静态区无行域表
+        formula_signatures=formula_signatures,
     )
     projection.assert_matches_contract(contract)
 
@@ -3659,6 +3667,7 @@ def _collect_fields(
     binding: ExcelIdentityBinding,
     values: dict[str, FieldValue],
     formula_inventory: dict[str, str],
+    formula_signatures: dict[str, str] | None = None,
     anomalies: list[StructuralAnomaly],
     findings: list[ProtectedCellFinding],
     baseline: Projection | None,
@@ -3711,6 +3720,11 @@ def _collect_fields(
         observed_formula = formula_cells.get(coord)
         if observed_formula:
             formula_inventory[stable_key] = observed_formula
+            if formula_signatures is not None:
+                # 公式证据（spec oo-formula-recompute-not-tamper R2）：本行引用归一成 `{r}`。
+                formula_signatures[stable_key] = formula_signature(
+                    observed_formula, own_row=int(coord[len(column):])
+                )
 
         # 🔴 json：materialize 侧把 value 自身的 JSON 文本落到单元格（见
         #    excel_materialize._normalised_write_value 的对称说明）。extract 必须把这串文本

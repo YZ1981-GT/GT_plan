@@ -1,9 +1,10 @@
 /**
  * useG2Detail — G2-2 应收利息明细表
  *
- * 对齐纸质底稿滚动核对：
+ * 对齐模板 G2-2 滚动核对（E = C + D、H = C + F − G、J = H + I）：
  *   期初审定 = 期初余额 + 期初调整数
- *   期末余额 = 期初审定 + 借方发生 − 贷方发生
+ *   期末余额 = 期初余额 + 借方发生 − 贷方发生（从期初未审滚动，期初调整只进期初审定 ——
+ *             spec oo-formula-recompute-not-tamper R4）
  *   期末审定 = 期末余额 + 账项调整
  *
  * 账龄：期初/期末审定两期动态段（项目配置 + 表级 3年段/5年段枚举）
@@ -225,7 +226,8 @@ function safeParseRows(jsonStr: string | null | undefined, segs: AgingSegment[])
 
 function computeRow(stored: StoredDetailRow, segs: AgingSegment[]): InterestDetailRow {
   const openingAudited = calcAdjustedAmount(stored.openingUnadjusted, stored.openingAdjustment, 0)
-  const closingUnadjusted = calcDebitBalance(openingAudited, stored.debit, stored.credit)
+  // 模板 H = C + F − G：从期初未审（C）滚动，不是期初审定（E）
+  const closingUnadjusted = calcDebitBalance(stored.openingUnadjusted, stored.debit, stored.credit)
   const closingAudited = calcAdjustedAmount(closingUnadjusted, stored.closingAdjustment, 0)
   const accruedDays = calcAccruedDays(stored.accrualStart, stored.accrualEnd)
   const accruedInterest = calcInterest365(stored.faceValue, stored.couponRate, accruedDays)

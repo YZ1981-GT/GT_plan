@@ -1,4 +1,10 @@
-"""OO→HTML 的 store 镜像视图：把 merge 判为「本次清空」的可编辑行字段补成显式 null（R17）。
+"""OO→HTML 的 store 镜像视图（两层，都只给 store 镜像用、发布的 projection 不变）。
+
+1. :func:`store_view_with_cleared_fields`：把 merge 判为「本次清空」的可编辑行字段补成显式 null（R17）；
+2. :func:`store_view_with_recomputed_formulas`：把 merge 采纳的 OO 重算公式值放行进 store
+   （spec oo-formula-recompute-not-tamper R3，见该函数）。
+
+以下是第 1 层的说明。
 
 ═══ 修的是什么 ═══
 
@@ -38,12 +44,17 @@ from app.services.workpaper_sync.adapters.base import FieldValue, Projection
 from app.services.workpaper_sync.contracts import FieldMode, SyncContract
 from app.services.workpaper_sync.merge import (
     ContractIndex,
+    FieldVerdict,
     MergeInputError,
     MergeOutcome,
     UnknownStableKeyError,
 )
 
-__all__ = ["store_view_with_cleared_fields"]
+__all__ = [
+    "RecomputedFieldValue",
+    "store_view_with_cleared_fields",
+    "store_view_with_recomputed_formulas",
+]
 
 
 def store_view_with_cleared_fields(
@@ -88,3 +99,58 @@ def store_view_with_cleared_fields(
         row_keys=final.row_keys,
     )
     return view, tuple(sorted(added))
+
+
+class RecomputedFieldValue(FieldValue):
+    """被三方合并采纳的 OO 重算结果（公式字段）—— 只出现在 store 镜像视图里。
+
+    store 合并函数（22 个模块 27 处）一律按 `fv.is_protected` 跳过公式字段：那条规则的本意是「OO 侧的
+    公式缓存值不是权威值」。合并判 `took_recomputed` 时这一前提已经不成立 —— 公式完好、输入与合并
+    结果一致，OO 算出的就是公式结果。这里只把「受保护」换成假，mode 仍是 formula：按自身契约
+    过滤公式字段的 provider（如 B60 按 `MANAGED_FIELD_SPECS` 的 mode）照旧不写。
+    """
+
+    @property
+    def is_protected(self) -> bool:  # type: ignore[override]
+        return False
+
+
+def store_view_with_recomputed_formulas(
+    view: Projection, *, merge: MergeOutcome | None
+) -> tuple[Projection, tuple[str, ...]]:
+    """返回 `(交给 store 镜像的视图, 放行的键)`；无可放行时原样返回 `view`（spec R3.1）。
+
+    不放行就会出现真库探针看到的情形：D2 store 存着期末余额 / 期末未审 / 期末审定，OO 改了输入后
+    这三列在 store 里一直是旧值，D2-1 审定表按旧的期末未审 SUMIF、发布到试算表。
+    """
+    if merge is None:
+        return view, ()
+    keys = sorted(
+        key
+        for key, verdict in merge.verdicts.items()
+        if verdict is FieldVerdict.took_recomputed
+        and key in view.values
+        and view.values[key].mode is FieldMode.formula
+    )
+    if not keys:
+        return view, ()
+    values = dict(view.values)
+    for key in keys:
+        fv = values[key]
+        values[key] = RecomputedFieldValue(
+            stable_key=fv.stable_key,
+            value=fv.value,
+            value_type=fv.value_type,
+            mode=fv.mode,
+            row_key=fv.row_key,
+        )
+    return (
+        Projection(
+            contract_id=view.contract_id,
+            semantic_version=view.semantic_version,
+            document_type=view.document_type,
+            values=values,
+            row_keys=view.row_keys,
+        ),
+        tuple(keys),
+    )

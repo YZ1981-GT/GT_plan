@@ -130,15 +130,15 @@ function normalizeRow(raw: any, segments: AgingSegment[]): DetailRow {
 }
 
 /**
- * 对单行重新计算公式链：
+ * 对单行重新计算公式链（与权威模板「预收账款明细表D3-2」一致）：
  * H = E + F + G
- * O = H + N - M（贷方科目）
+ * O = E + N - M（贷方科目；🔴 以期初未审 E 起算，spec oo-formula-recompute-not-tamper R4，同 F1-H3）
  * Q = O + P
  * T = Q + R + S
  */
 export function recalcRowFormulas(row: DetailRow): DetailRow {
   const H = calcPriorAudited(row.priorUnadjusted, row.priorAdjustment, row.priorReclass)
-  const O = calcEndBalance(H, row.credit, row.debit)
+  const O = calcEndBalance(row.priorUnadjusted, row.credit, row.debit)
   const Q = calcEndUnadjusted(O, row.entityReclass)
   const T = calcEndAudited(Q, row.endAje, row.endRje)
 

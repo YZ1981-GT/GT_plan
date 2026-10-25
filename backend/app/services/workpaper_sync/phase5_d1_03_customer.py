@@ -15,9 +15,11 @@ spec: d1-sync-row-table-engine-and-d1-coverage · Task 15 · Requirements 2.1 / 
 A21 合计 footer、隐藏 UUID 列 P。G/J/L/O 四列逐行公式 `=D+E+F` / `=D+H-I` / `=J+K` /
 `=L+M+N`（openpyxl 逐格实测）⇒ mode=formula；其余 11 列模板内无公式故判 editable。
 
-🔴 J 列 xlsx 公式 `=D+H-I`（不含 E/F），前端 recalcRow 用 `priorAudited+inc-dec=G+H-I`，
-   数值语义等价但**公式文本以 xlsx 为准** ⇒ J 声明为 formula，materialize 不覆盖公式格、
-   由 OO 重算（D1-3 契约已立此纪律）。
+🔴 J 列 xlsx 公式 `=D+H-I`（不含 E/F）⇒ J 声明为 formula，materialize 不覆盖公式格、
+   由 OO 重算（D1-3 契约已立此纪律）。前端 recalcRow 原先用 `priorAudited+inc-dec=G+H-I`，
+   并非「数值语义等价」：有期初调整（E/F 非 0）的行两侧差 E+F，OO 重算后与表单来回变值；
+   spec oo-formula-recompute-not-tamper R4 已把前端改成 `D+H-I`。契约 `review.reviewed_basis`
+   里的同一句是冻结文本（与磁盘契约逐字相等），不随此处改。
 
 🔴 本模块**不重复** provider 的常量：几何数字从 `phase5_d1_notes_receivable` 的冻结常量引用，
    避免两处各写一份而漂移（那正是本 spec 要消除的漂移面）。

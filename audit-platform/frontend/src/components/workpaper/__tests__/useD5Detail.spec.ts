@@ -19,14 +19,20 @@ describe('useD5Detail - Property-Based Tests', () => {
    *
    * For any 明细行输入值组合 (C,D,E,H,I,K,M,N)，以下公式链必须成立：
    * - 期初审定 F = C + D + E
-   * - 期末余额 J = F + H - I
+   * - 期末余额 J = C + H - I
    * - 期末未审余额 L = J + K
-   * - 期末审定余额 O = L + M + N
+   * - 期末审定余额 O = J + M + N
+   *
+   * 🔴 J 以期初未审 C 起算（原为期初审定 F）、O 以期末余额 J 起算（原为期末未审 L）：
+   * 权威模板「应收款项融资明细表D5-2」的 J 列公式是 C+H-I、O 列是 J+N+M，表单与
+   * OnlyOffice 两侧算法必须一致，否则在线编辑保存时公式格被 OO 重算后的值与表单值不同
+   * （spec oo-formula-recompute-not-tamper R4，先例 useF1Detail.recalcRowFormulas 的
+   * O = E + M - N、X = O + V + W）。
    *
    * **Validates: Requirements 4.3**
    */
   describe('Property 10: D5-2行内公式链正确性', () => {
-    it('recalcRow produces F=C+D+E; J=F+H-I; L=J+K; O=L+M+N', () => {
+    it('recalcRow produces F=C+D+E; J=C+H-I; L=J+K; O=J+M+N', () => {
       fc.assert(
         fc.property(
           fc.float({ min: -1e9, max: 1e9, noNaN: true }), // C: priorUnadjusted
@@ -65,16 +71,16 @@ describe('useD5Detail - Property-Based Tests', () => {
             const expectedF = C + D + E
             expect(result.priorAudited).toBeCloseTo(expectedF, 5)
 
-            // J = F + H - I
-            const expectedJ = expectedF + H - I
+            // J = C + H - I（以期初未审起算，与模板 D5-2 的 J 列一致）
+            const expectedJ = C + H - I
             expect(result.endBalance).toBeCloseTo(expectedJ, 5)
 
             // L = J + K
             const expectedL = expectedJ + K
             expect(result.endUnadjusted).toBeCloseTo(expectedL, 5)
 
-            // O = L + M + N
-            const expectedO = expectedL + M + N
+            // O = J + M + N（取期末余额 J、不含被审计单位重分类 K，与模板 D5-2 的 O 列一致）
+            const expectedO = expectedJ + M + N
             expect(result.endAudited).toBeCloseTo(expectedO, 5)
           }
         ),

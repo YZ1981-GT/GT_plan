@@ -5,10 +5,11 @@
  *   (一) 坏账准备明细表 — 单项/组合/合计，期初·本期增减·期末（账面/调整/审定）
  *   (二) 三阶段转入转出 — Stage1/2/3 + 合计 + 与TB核查
  *
- * 公式：
+ * 公式（模板 K1-3：D = B + C、J = B + SUM(E:F) − SUM(G:I)、L = J + K）：
  *   期初审定 = 期初账面 + 期初调整
- *   期末账面 = 期初审定 + 计提 + 其他增加 − 转回 − 核销 − 其他减少
+ *   期末账面 = 期初账面 + 计提 + 其他增加 − 转回 − 核销 − 其他减少
  *   期末审定 = 期末账面 + 期末调整
+ *   期末账面从期初账面（未审）滚动，期初调整只进期初审定（spec oo-formula-recompute-not-tamper R4）。
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { parseNum } from './useD2FormulaEngine'
@@ -107,7 +108,7 @@ function round2(n: number): number {
 export function recalcK1BadDebtMainRow(row: K1BadDebtMainRow): K1BadDebtMainRow {
   row.priorAudited = round2(calcAuditedAmount(row.priorBook, row.priorAdj, 0))
   row.currentBook = round2(
-    row.priorAudited
+    parseNum(row.priorBook)
     + parseNum(row.currentProvision)
     + parseNum(row.currentOtherIncrease)
     - parseNum(row.currentReversal)

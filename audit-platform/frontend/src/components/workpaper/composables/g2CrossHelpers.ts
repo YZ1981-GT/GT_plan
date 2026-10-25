@@ -119,8 +119,9 @@ function computeClosing(r: any): { openingAudited: number; closingUnadjusted: nu
   const openingUnadjusted = parseNum(r.openingUnadjusted)
   const openingAdjustment = parseNum(r.openingAdjustment)
   const openingAudited = openingUnadjusted + openingAdjustment
+  // 与 G2-3 表单同一口径（模板 J = B + SUM(E:F) − SUM(G:I)：从期初未审滚动）
   const closingUnadjusted =
-    openingAudited +
+    openingUnadjusted +
     parseNum(r.provisionIncrease) +
     parseNum(r.otherIncrease) -
     parseNum(r.reversal) -

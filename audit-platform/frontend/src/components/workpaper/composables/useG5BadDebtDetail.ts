@@ -2,10 +2,11 @@
  * useG5BadDebtDetail — G5-3 坏账准备明细表（对齐致同 Excel 滚动态）
  *
  * 结构：按单项评估计提（动态「其中」行）+ 信用风险组合计提（动态组合行）+ 合计
- * 公式：
+ * 公式（模板 G5-3：D = B + C、J = B + SUM(E:F) − SUM(G:I)、L = J + K）：
  *   期初审定 = 期初未审 + 期初账项调整
- *   期末未审 = 期初审定 + 计提 + 其他增加 − 转回 − 转销 − 其他减少
+ *   期末未审 = 期初未审 + 计提 + 其他增加 − 转回 − 转销 − 其他减少
  *   期末审定 = 期末未审 + 期末账项调整
+ *   期末未审从期初未审滚动，期初调整只进期初审定（spec oo-formula-recompute-not-tamper R4）。
  *
  * 兼容旧版 ECL 双 Tab（closingBalance / adjustedProvision…）自动迁移。
  * ECL 测算仍在 G5-9/G5-10；本表聚焦坏账准备滚动与 G5-1 勾稽。
@@ -92,7 +93,7 @@ export function computeMovement(leaf: Pick<
     parseNum(leaf.openingUnadjusted) + parseNum(leaf.openingAdjustment),
   )
   const closingUnadjusted = round2(
-    openingAudited
+    parseNum(leaf.openingUnadjusted)
     + parseNum(leaf.provisionIncrease)
     + parseNum(leaf.otherIncrease)
     - parseNum(leaf.reversal)
@@ -155,7 +156,7 @@ function sumLeaves(leaves: G5BadDebtLeaf[]): G5BadDebtTotals {
   const closingAdjustment = round2(leaves.reduce((s, r) => s + parseNum(r.closingAdjustment), 0))
   const openingAudited = round2(openingUnadjusted + openingAdjustment)
   const closingUnadjusted = round2(
-    openingAudited + provisionIncrease + otherIncrease - reversal - writeOff - otherDecrease,
+    openingUnadjusted + provisionIncrease + otherIncrease - reversal - writeOff - otherDecrease,
   )
   const closingAudited = round2(closingUnadjusted + closingAdjustment)
   return {

@@ -20,7 +20,8 @@ Property 24 的篡改检测用精确比较，把「OO 重算了一遍」当成�
 
 * OO 会重算的受保护字段（公式字段 / formula mask 里的格）：金额按分取整后相等 ⇒ 不是篡改，
   保留 current、零冲突、无需重载客户端；
-* 真篡改（差一分及以上）仍是 protected 冲突；
+* 没有公式证据时差一分及以上仍是 protected 冲突（spec oo-formula-recompute-not-tamper 修订：
+  带公式证据时按 `test_merge_formula_recompute.py` 的判据区分重算与篡改）；
 * auto-source 字段 OO 不重算，保持精确比较；
 * 可编辑字段不走这条规则（OO 不重算它们，任何差异都是用户真改的）；
 * 非金额数值（rate / ratio / percent_points）不按两位取整，只吸收 float 的 15 位以外尾差。
@@ -199,7 +200,13 @@ def test_oo_recompute_tail_is_not_tamper(
 @pytest.mark.parametrize("leaf", ["end_balance", "masked_amount"])
 @pytest.mark.parametrize("tampered", [3511.07, 3511.05, "3511.07", 0.01])
 def test_one_cent_is_a_real_tamper(contract: C.SyncContract, leaf: str, tampered: Any) -> None:
-    """差一分就是改了：仍是 protected 冲突，current 不被覆盖。"""
+    """**没有公式证据时**差一分就按改了处理：仍是 protected 冲突，current 不被覆盖。
+
+    🔴 判据修订（spec oo-formula-recompute-not-tamper R1.4）：原判据是「差一分就是篡改」，
+    不分来源。修订后只在两侧 projection 不带公式签名时成立（本文件的 `_proj` 不带签名，
+    即 Word / 非 xlsx 来源的形态）；带签名且公式完好、输入一致时差一分也是重算结果、应采纳 ——
+    见 `test_merge_formula_recompute.py`。
+    """
     outcome, _ = _merge(contract, leaf, 3511.0600000000004, 3511.0600000000004, tampered)
     assert [r.kind for r in outcome.conflicts.records] == [CF.ConflictKind.protected]
     assert outcome.value_of(_key(leaf)) == CF.ValueEnvelope.of(3511.0600000000004)

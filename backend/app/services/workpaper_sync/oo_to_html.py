@@ -132,7 +132,10 @@ from app.services.workpaper_sync.adapters.base import (
     assert_substrate_usable,
 )
 from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
-from app.services.workpaper_sync.cleared_field_view import store_view_with_cleared_fields
+from app.services.workpaper_sync.cleared_field_view import (
+    store_view_with_cleared_fields,
+    store_view_with_recomputed_formulas,
+)
 from app.services.workpaper_sync.conflicts import (
     ConflictSet,
     ResolutionChoice,
@@ -2642,6 +2645,9 @@ class OoToHtmlCoordinator:
         store_view, _cleared = store_view_with_cleared_fields(
             merged, merge=state.merge, contract=state.contract
         )
+        # 采纳的 OO 重算公式值同样进 store（spec oo-formula-recompute-not-tamper R3），否则 D2-1 等
+        # 读 store 的下游一直拿旧的期末余额 / 期末未审 / 期末审定。
+        store_view, _recomputed = store_view_with_recomputed_formulas(store_view, merge=state.merge)
         await self._mirror_store_backed_if_needed(state, merged_projection=store_view)
 
         await self._assert_incoming_untouched(state)

@@ -166,14 +166,17 @@ function normalizeRow(raw: any): DetailRow {
 }
 
 /**
- * 对单行重新计算公式链（借方科目）：
- * col10 = col7 + col8 + col9（期初审定 = 期初未审 + AJE + RJE）
- * col17 = col10 + col15 - col16（期末未审 = 期初审定 + 借方发生 - 贷方发生）← 借方科目！
- * col20 = col17 + col18 + col19（期末审定 = 期末未审 + 账项调整 + 重分类调整）
+ * 对单行重新计算公式链（借方科目，与权威模板「明细表D6-2」一致）：
+ * J = G + H + I（期初审定 = 期初未审 + AJE + RJE）
+ * Q = G + O - P（期末未审 = 期初未审 + 借方发生 - 贷方发生）← 借方科目！
+ * T = Q + R + S（期末审定 = 期末未审 + 账项调整 + 重分类调整）
+ *
+ * 🔴 期末未审以**期初未审**起算（spec oo-formula-recompute-not-tamper R4，同 F1-H3）：原先用期初审定，
+ * 有期初调整的行在表单与 OnlyOffice 之间会来回变值。
  */
 export function recalcRow(row: DetailRow): DetailRow {
   const priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
-  const endUnadjusted = calcEndUnadjustedDebit(priorAudited, row.debitAmount, row.creditAmount)
+  const endUnadjusted = calcEndUnadjustedDebit(row.priorUnadjusted, row.debitAmount, row.creditAmount)
   const endAudited = calcEndAudited(endUnadjusted, row.endAje, row.endRje)
 
   return {
