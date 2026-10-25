@@ -291,3 +291,150 @@ describe('CustomQueryTab — 高级构建器禁用态 (R11.6)', () => {
     }
   })
 })
+
+// ════════════════════════════════════════════════════════════════════════════
+// 年度默认值 — 必须落在「有数据的那一年」
+//
+// 缺陷：年度输入框固定初始化为 `new Date().getFullYear()`（日历当年），而审计做的是
+// 上一年度报表。2026 年打开页面默认查 2026，四表里只有 2025 的数据 ⇒ 任何查询恒
+// 返回 0 行，且页面不提示原因，看起来像功能坏了。
+//
+// 真源 = 后端 `resolve_project_audit_year`（`GET /api/projects` 下发 `audit_year`）。
+// 判据用**行为**：让 mock 的项目列表带 audit_year，断言选中后 formCtx.year 跟随；
+// 并断言初始值不等于日历当年（否则等于把缺陷当基线锁死）。
+// ════════════════════════════════════════════════════════════════════════════
+describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
+  async function mountTabWithProjects(projects: any[]) {
+    apiMocks.get.mockImplementation((url: string) => {
+      if (String(url).includes('/api/projects')) return Promise.resolve(projects)
+      return Promise.resolve([])
+    })
+    const CustomQueryTab = (await import('@/components/template-library/CustomQueryTab.vue')).default
+    const wrapper = shallowMount(CustomQueryTab, {
+      global: {
+        directives: { loading: {} },
+        stubs: {
+          'el-dialog': { template: '<div class="el-dialog-stub" />' },
+          // 结果表格的 #default="{ row }" 在 shallowMount 下会以 undefined 作用域被
+          // 调用（未处理的 rejection 会污染其它用例），本组不关心表格渲染，直接桩掉。
+          'el-table': { template: '<div class="el-table-stub" />' },
+          'el-table-column': { template: '<div class="el-table-column-stub" />' },
+        },
+      },
+    })
+    await flushPromises()
+    return wrapper
+  }
+
+  it('初始年度不是日历当年（审计做上一年度，当年在四表里没有数据）', async () => {
+    const wrapper = await mountTabWithProjects([])
+    expect(wrapper.vm.formCtx.year).not.toBe(new Date().getFullYear())
+    expect(wrapper.vm.formCtx.year).toBe(new Date().getFullYear() - 1)
+  })
+
+  it('选中项目后年度跟随该项目的 audit_year', async () => {
+    const wrapper = await mountTabWithProjects([
+      { id: 'p-2025', name: '临港店_2025', audit_year: 2025, can_edit: true },
+      { id: 'p-2023', name: '旧项目_2023', audit_year: 2023, can_edit: true },
+    ])
+    wrapper.vm.onProjectChange('p-2025')
+    expect(wrapper.vm.formCtx.year).toBe(2025)
+    // 切到另一个年度不同的项目要跟着变，不能粘住上一个项目的年度
+    wrapper.vm.onProjectChange('p-2023')
+    expect(wrapper.vm.formCtx.year).toBe(2023)
+  })
+
+  it('项目没有 audit_year 时退回「当年 - 1」，不退回日历当年', async () => {
+    const wrapper = await mountTabWithProjects([
+      { id: 'p-null', name: '无年度项目', audit_year: null, can_edit: true },
+    ])
+    wrapper.vm.onProjectChange('p-null')
+    expect(wrapper.vm.formCtx.year).toBe(new Date().getFullYear() - 1)
+  })
+
+  it('列表加载完成时会把已选项目的年度对齐（模板恢复场景）', async () => {
+    const wrapper = await mountTabWithProjects([
+      { id: 'p-2024', name: '项目_2024', audit_year: 2024, can_edit: true },
+    ])
+    // 模拟「先由模板设好 project_id，再重新拉列表」
+    wrapper.vm.formCtx.project_id = 'p-2024'
+    await wrapper.vm.loadProjects()
+    await flushPromises()
+    expect(wrapper.vm.formCtx.year).toBe(2024)
+  })
+
+  it('0 行结果给出含年度的可诊断提示（不再静默空表）', async () => {
+    const wrapper = await mountTabWithProjects([
+      { id: 'p-2025', name: '临港店_2025', audit_year: 2025, can_edit: true },
+    ])
+    wrapper.vm.formCtx.project_id = 'p-2025'
+    wrapper.vm.formCtx.source = 'tb_detail'
+    wrapper.vm.onProjectChange('p-2025')
+    apiMocks.post.mockResolvedValue({ rows: [], columns: [], total: 0 })
+
+    await wrapper.vm.onExecute()
+    await flushPromises()
+
+    expect(wrapper.vm.emptyHint).toContain('2025')
+    expect(wrapper.vm.emptyHint).toContain('没有匹配数据')
+  })
+
+  it('有结果时清空空态提示（不能把上一次的 0 行提示粘住）', async () => {
+    const wrapper = await mountTabWithProjects([
+      { id: 'p-2025', name: '临港店_2025', audit_year: 2025, can_edit: true },
+    ])
+    wrapper.vm.formCtx.project_id = 'p-2025'
+    wrapper.vm.formCtx.source = 'tb_detail'
+    apiMocks.post.mockResolvedValue({ rows: [], columns: [], total: 0 })
+    await wrapper.vm.onExecute()
+    await flushPromises()
+    expect(wrapper.vm.emptyHint).not.toBe('')
+
+    apiMocks.post.mockResolvedValue({ rows: [{ a: 1 }], columns: ['a'], total: 1 })
+    await wrapper.vm.onExecute()
+    await flushPromises()
+    expect(wrapper.vm.emptyHint).toBe('')
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// 接线判据：项目下拉必须真的把 change 接到 onProjectChange
+//
+// 上一组只直调 onProjectChange —— 那只证明「函数对」，不证明「接线在」。模板里漏写
+// @change 时函数永远不会被触发，而单测全绿（Vue 不报错、类型检查也查不出）。
+// 故这里从下拉组件**发出** change 事件，走真实监听链。
+// ════════════════════════════════════════════════════════════════════════════
+describe('CustomQueryTab — 项目下拉的 change 接线', () => {
+  it('从项目下拉发出 change 后年度跟随（证明模板确实接了 onProjectChange）', async () => {
+    apiMocks.get.mockImplementation((url: string) => {
+      if (String(url).includes('/api/projects')) {
+        return Promise.resolve([
+          { id: 'p-2025', name: '临港店_2025', audit_year: 2025, can_edit: true },
+        ])
+      }
+      return Promise.resolve([])
+    })
+    const CustomQueryTab = (await import('@/components/template-library/CustomQueryTab.vue')).default
+    const wrapper = shallowMount(CustomQueryTab, {
+      global: {
+        directives: { loading: {} },
+        stubs: {
+          'el-dialog': { template: '<div class="el-dialog-stub" />' },
+          // 具名探针 stub：shallowMount 的匿名 stub 无法按组件名检索，
+          // 换成有 name 的 stub 才能从它 $emit 走真实监听链。
+          'el-select': { name: 'SelectProbe', template: '<div class="select-probe" />' },
+        },
+      },
+    })
+    await flushPromises()
+
+    const selects = wrapper.findAllComponents({ name: 'SelectProbe' })
+    expect(selects.length, '反向自检：没找到任何 el-select 探针，判据不可靠').toBeGreaterThan(0)
+
+    // 项目下拉是第一个 el-select（与模板顺序一致）
+    wrapper.vm.formCtx.year = 1999
+    selects[0].vm.$emit('change', 'p-2025')
+    await flushPromises()
+    expect(wrapper.vm.formCtx.year, '项目下拉的 change 未接到 onProjectChange').toBe(2025)
+  })
+})

@@ -50,13 +50,25 @@ class CustomQueryTemplate(Base):
     )
     # shared_project_ids: 显式分享的项目 id 列表（scope='personal' + 分享场景）
     # 与 V101 逐列对齐：UUID[] NOT NULL DEFAULT '{}'
+    # NOTE: 数组列需要两处适配，缺任一在 SQLite 测试方言下都会炸：
+    #   ① 方言变体 —— SQLite 无 ARRAY 类型，绑定 list 参数直接
+    #      `ProgrammingError: type 'list' is not supported`，故退化为 JSON；
+    #   ② Python 侧 `default=list` —— PG 数组字面量 `'{}'` 作为 server_default
+    #      在 SQLite 上被当普通字符串存入，读回时 ARRAY 的 item processor 会对
+    #      "{}" 逐字符调 `UUID()` → `badly formed hexadecimal UUID string`。
+    #      显式 default 使 INSERT 自带空列表，两种方言行为一致。
+    # PG 侧语义完全不变（仍是 UUID[] / TEXT[] + GIN 索引）。
     shared_project_ids: Mapped[list[uuid.UUID]] = mapped_column(
-        ARRAY(PG_UUID(as_uuid=True)),
+        ARRAY(PG_UUID(as_uuid=True)).with_variant(sa.JSON(), "sqlite"),
         nullable=False,
+        default=list,
         server_default=sa.text("'{}'"),
     )
     tags: Mapped[list[str]] = mapped_column(
-        ARRAY(sa.Text), nullable=False, server_default=sa.text("'{}'")
+        ARRAY(sa.Text).with_variant(sa.JSON(), "sqlite"),
+        nullable=False,
+        default=list,
+        server_default=sa.text("'{}'"),
     )
     use_count: Mapped[int] = mapped_column(
         sa.Integer, nullable=False, server_default=sa.text("0")

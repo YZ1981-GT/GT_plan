@@ -46,18 +46,24 @@
             </el-select>
           </el-form-item>
 
-          <!-- 字段勾选 -->
-          <el-form-item v-if="currentTable" label="返回字段（默认全部）">
+          <!-- 字段勾选：按业务/个人信息/技术三层分组，业务列在前 -->
+          <el-form-item v-if="currentTable" label="返回字段（默认业务字段）">
             <div class="gt-aqb-field-grid">
               <el-checkbox-group v-model="dsl.fields">
-                <el-checkbox
-                  v-for="f in currentTable.fields"
-                  :key="f"
-                  :label="f"
-                  :value="f"
-                  size="small"
-                >{{ f }}</el-checkbox>
+                <template v-for="grp in fieldGroups" :key="grp.label">
+                  <div class="gt-aqb-field-group-label">{{ grp.label }}</div>
+                  <el-checkbox
+                    v-for="f in grp.fields"
+                    :key="f"
+                    :label="f"
+                    :value="f"
+                    size="small"
+                  >{{ f }}</el-checkbox>
+                </template>
               </el-checkbox-group>
+            </div>
+            <div class="gt-aqb-field-hint">
+              不勾选时返回业务字段（{{ defaultFieldCount }} 个），不含 id / 时间戳等技术字段
             </div>
           </el-form-item>
 
@@ -254,7 +260,27 @@
         <div class="gt-aqb-section">
           <div class="gt-aqb-section-title">
             查询结果 <span v-if="result" class="gt-aqb-result-count">共 {{ result.total }} 行</span>
+            <span v-if="result?.scope" class="gt-aqb-scope-tag">
+              {{ result.scope.all_projects
+                ? '范围：全部项目'
+                : `范围：${result.scope.project_count} 个项目` }}
+            </span>
+            <el-checkbox
+              v-if="result && result.rows.length"
+              v-model="showTechnicalColumns"
+              size="small"
+              class="gt-aqb-tech-toggle"
+            >显示技术字段<template v-if="hiddenTechnicalCount > 0">（已隐藏 {{ hiddenTechnicalCount }} 列）</template></el-checkbox>
           </div>
+          <el-alert
+            v-for="w in result?.warnings || []"
+            :key="w"
+            :title="w"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="gt-aqb-warning"
+          />
           <el-table
             v-if="result && result.rows.length"
             :data="result.rows"
@@ -330,6 +356,11 @@ import api from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
 import { resolveColumnLabel } from '@/components/query/queryColumnLabels'
 import { sanitizeExportName } from '@/components/query/queryExport'
+import {
+  defaultFieldsOf,
+  filterVisibleColumns,
+  groupFieldsByTier,
+} from '@/components/query/queryFieldTiers'
 import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import {
@@ -342,7 +373,12 @@ import {
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
-interface TableMeta {
+interface TableMetaTiers {
+  default_fields?: string[]
+  technical_fields?: string[]
+  pii_fields?: string[]
+}
+interface TableMeta extends TableMetaTiers {
   name: string
   label: string
   fields: string[]
@@ -379,13 +415,19 @@ interface QueryResult {
   table: string
   sql: string
   formula_refs?: (string | null)[]
+  /** 本次生效的项目作用域（R2.2：跨项目查询要让用户知道自己在跨项目） */
+  scope?: { all_projects: boolean; project_count: number | null; unscoped_tables: string[] }
+  /** 非致命提示（全局配置表未按项目过滤、无项目分派等） */
+  warnings?: string[]
 }
 
 const schema = ref<Schema | null>(null)
 // ACNR 选字段：选中 cell 节点的 addr_id 列表（R2.4，作跨模块查询字段标识）
 const acnrFieldIds = ref<string[]>([])
 // schema 缓存（sessionStorage）
-const SCHEMA_CACHE_KEY = 'gt:query-builder:schema-v1'
+// schema 版本号随「下发列分层」升位：旧缓存不含 default_fields/technical_fields，
+// 沿用会让字段下拉退化为不分组、结果表也无从隐藏技术列。
+const SCHEMA_CACHE_KEY = 'gt:query-builder:schema-v2'
 const sqlPreview = ref<string>('')
 const result = ref<QueryResult | null>(null)
 
@@ -393,8 +435,22 @@ const result = ref<QueryResult | null>(null)
 const route = useRoute()
 const { drill } = useAcnrDrill(() => (route.params.projectId as string) || '')
 // 归一结果列为 QueryColumnMeta（含 addr_id/drillable）
-const resultColumns = computed<QueryColumnMeta[]>(() =>
+// ─── 列分层（R7.2 / R11.3）：真源在后端 table_whitelist，前端只分组不硬编码列名 ───
+const fieldGroups = computed(() => groupFieldsByTier(currentTable.value))
+const defaultFieldCount = computed(() => defaultFieldsOf(currentTable.value).length)
+const showTechnicalColumns = ref(false)
+const hiddenTechnicalCount = computed(() => {
+  if (showTechnicalColumns.value) return 0
+  return allResultColumns.value.length - resultColumns.value.length
+})
+
+const allResultColumns = computed<QueryColumnMeta[]>(() =>
   normalizeColumns(result.value?.columns).map(c => ({ ...c, title: resolveColumnLabel(c.key, c.title) })),
+)
+
+// 结果表默认隐藏技术列（数据仍完整返回，开关即可查看，无需重查）
+const resultColumns = computed<QueryColumnMeta[]>(() =>
+  filterVisibleColumns(allResultColumns.value, currentTable.value, showTechnicalColumns.value),
 )
 
 const loadingPreview = ref(false)
@@ -784,6 +840,34 @@ function copyFormulaRef(index: number) {
   font-size: 12px;
   flex: 1;
 }
+.gt-aqb-field-group-label {
+  width: 100%;
+  margin: 6px 0 2px;
+  font-size: 12px;
+  color: #909399;
+  font-weight: 600;
+}
+
+.gt-aqb-field-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.gt-aqb-scope-tag {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.gt-aqb-tech-toggle {
+  margin-left: auto;
+}
+
+.gt-aqb-warning {
+  margin-bottom: 8px;
+}
+
 .gt-aqb-result-count {
   font-size: 12px;
   color: #666;

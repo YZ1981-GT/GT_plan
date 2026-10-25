@@ -415,13 +415,12 @@ class TestProperty5WritePermissionEnforcement:
 
         **Validates: Requirements 2.5**
         """
-        # The endpoint-level permission check is in the router.
-        # At the service level, we verify that unsupported modules raise.
+        # 端点级权限校验在 router；服务层这里验证的是**模块分派存在**——
+        # 原判据是 `assert module in ("report", ...)`，而 module 正是从这同一个元组
+        # 参数化来的，等于断言自己的输入，恒真（writer 建了都没用到）。
         writer = SnapshotWriter()
-
-        # Verify that the writer routes to the correct module handler
-        # (this tests the routing, not permission — permission is at endpoint level)
-        assert module in ("report", "note", "adj", "tb")
+        handler = getattr(writer, f"_write_{module}_cell", None)
+        assert callable(handler), f"模块 {module} 没有对应的写回处理器"
 
     @pytest.mark.asyncio
     async def test_unsupported_module_raises(self):
@@ -721,7 +720,6 @@ class TestCellWritebackE2E:
         sheet_name = "审定表D2-1"
         parsed_data = _make_snapshot_with_cell(sheet_name, 6, 1, 12345.67)
         now = datetime.now(timezone.utc)
-        events_emitted = []
 
         async def mock_execute(stmt, params=None):
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
@@ -754,6 +752,11 @@ class TestCellWritebackE2E:
         assert result["success"] is True
         assert result["old_value"] == 12345.67
         assert result["updated_at"] is not None
+        # 本测试的名字与 docstring 都写着 emit event —— 原实现建了个 events_emitted 列表
+        # 却从不断言（捕获而不校验，等于没测）。事件由 orchestrator.after_save 发出，
+        # 它没被 await 就意味着下游 cross_ref / stale / SSE 全不触发。
+        mock_orch.assert_awaited_once()
+        assert "warnings" not in result, f"下游联动未触发：{result.get('warnings')}"
 
     @pytest.mark.asyncio
     async def test_conflict_flow(self):
@@ -935,7 +938,15 @@ class TestSnapshotWriterAcnrAddrId:
 
     @pytest.mark.asyncio
     async def test_write_carries_project_context(self):
-        """回写解析携带 project context（R15.4）。
+        """回写**身份解析**携带 project context（R15.4）。
+
+        判据落在 ``_resolve_writeback_identity``（→ ``AddressingService.resolve``）——
+        那才是吃 project_id + db 的那一层。
+
+        原判据断言的是「调用 ``_resolve_addr_id`` 时传了 project_id」，而 ``_resolve_addr_id``
+        只查 ACNR catalog（模板级索引，addr_id = {wp_code}/{sheet}/{cell}，与项目无关），
+        **接了那个参数却从不使用** —— 于是「传了」证明不了「按项目解析」，是假绿。
+        该参数已删除，判据改指真正生效的那条链。
 
         **Validates: Requirements 15.4**
         """
@@ -957,21 +968,15 @@ class TestSnapshotWriterAcnrAddrId:
         mock_db = AsyncMock()
         mock_db.execute = mock_execute
 
-        # 验证 _resolve_addr_id 被调用且带 project_id
         writer = SnapshotWriter()
-        resolve_calls = []
-        original_resolve = writer._resolve_addr_id
+        identity_calls: list[dict] = []
+        real_identity = writer._resolve_writeback_identity
 
-        def tracking_resolve(wp_code, sheet_name, cell_ref, project_id=None):
-            resolve_calls.append({
-                "wp_code": wp_code,
-                "sheet_name": sheet_name,
-                "cell_ref": cell_ref,
-                "project_id": project_id,
-            })
-            return None  # 模拟 miss
+        async def tracking_identity(**kwargs):
+            identity_calls.append(dict(kwargs))
+            return await real_identity(**kwargs)
 
-        writer._resolve_addr_id = tracking_resolve
+        writer._resolve_writeback_identity = tracking_identity
 
         with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop, \
                 patch(_RESOLVE_TARGET_PATH, new=_resolve_found_fake("D2/Sheet1/A1")):
@@ -988,12 +993,30 @@ class TestSnapshotWriterAcnrAddrId:
                 project_id=project_id,
             )
 
-        # R15.4: resolve 必须携带 project_id
-        assert len(resolve_calls) == 1
-        assert resolve_calls[0]["project_id"] == project_id
-        assert resolve_calls[0]["wp_code"] == "D2"
-        assert resolve_calls[0]["sheet_name"] == sheet_name
-        assert resolve_calls[0]["cell_ref"] == "A1"
+        # R15.4: 身份解析必须携带 project context（project_id + db 都要传下去）
+        assert len(identity_calls) == 1
+        assert identity_calls[0]["project_id"] == project_id
+        assert identity_calls[0]["db"] is mock_db
+        assert identity_calls[0]["wp_code"] == "D2"
+        assert identity_calls[0]["sheet_name"] == sheet_name
+        assert identity_calls[0]["cell_ref"] == "A1"
+
+    def test_catalog_enrichment_does_not_take_project_id(self):
+        """catalog 语义标签增强**不得**再收 project_id（收了不用就是假绿的温床）。
+
+        ACNR catalog 是模板级索引、与项目无关。若签名重新出现 project_id，就会再次出现
+        「测试断言传了、实现从不使用」的空判据。
+        """
+        import inspect
+
+        from app.services.custom_query import snapshot_writer_addr_id
+
+        for fn in (SnapshotWriter._resolve_addr_id, snapshot_writer_addr_id.resolve_addr_id):
+            params = set(inspect.signature(fn).parameters)
+            assert "project_id" not in params, (
+                f"{fn.__qualname__} 又收了 project_id —— catalog 与项目无关，"
+                "项目上下文属 AddressingService 那条链"
+            )
 
     @pytest.mark.asyncio
     async def test_target_unresolvable_aborts_writeback(self):
@@ -1128,7 +1151,6 @@ class TestSnapshotWriterAcnrAddrId:
                 wp_code="D2",
                 sheet_name="明细表D2-2",
                 cell_ref="E100",
-                project_id="test-project-id",
             )
 
         assert result is not None
@@ -1168,7 +1190,6 @@ class TestSnapshotWriterAcnrAddrId:
                 wp_code="D2",
                 sheet_name="明细表D2-2",
                 cell_ref="B7",
-                project_id="test-project-id",
             )
 
         assert result is not None

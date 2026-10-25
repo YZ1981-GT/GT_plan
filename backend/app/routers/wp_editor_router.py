@@ -335,7 +335,7 @@ async def update_sign_status(
     wp_id: UUID,
     body: SignStatusUpdateBody,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("member")),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """更新 word-template 底稿签署状态（通用化，支持所有 word-template wp_code）。
 

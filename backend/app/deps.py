@@ -210,7 +210,18 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
     - Redis 缓存权限查询结果（TTL=5min）
     - Redis 不可用时降级为直接查库
     - 权限不足返回 403
+
+    ``min_permission`` 必须是 :data:`PERMISSION_HIERARCHY` 的键，**在工厂调用期即校验**
+    （= 模块导入期，拼错直接启动失败）。
+
+    为什么必须 fail-closed：下面比较用的是 ``PERMISSION_HIERARCHY.get(min_permission, 0)``
+    —— 未登记的级别名会静默取到 **0**，于是 ``user_level < 0`` 恒为假，**任何项目成员
+    （含 readonly）都能通过**，门禁形同不存在。实测曾有 4 个写端点因此被降级：
+    ``disclosure_notes`` 的删除 / 状态更新 / 恢复三处写 ``"editor"``、
+    ``wp_editor_router`` 的签署状态更新写 ``"member"`` —— 两个名字都不在登记表里。
+    这类拼写错误不会有任何报错或日志，只有逐字符核对才发现，故改为导入期硬失败。
     """
+    _validate_permission_level(min_permission, caller="require_project_access")
     # PERM_CACHE_TTL 使用模块级常量（见下方），此处不重复定义
 
     async def dependency(
@@ -218,56 +229,84 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> User:
-        # 归档项目只读守卫（仅 non-readonly 权限触发）
-        await _check_project_not_archived(db, project_id, current_user, min_permission)
-
-        # admin 跳过项目权限检查（不设置 RLS context，admin 使用 bypass 函数）
-        if current_user.role.value == "admin":
-            # admin 仍设置 RLS context 以便普通查询正常工作
-            # 跨项目聚合查询使用 SECURITY DEFINER 函数绕过
-            await set_rls_context(db, project_id)
-            return current_user
-
-        # Try Redis cache first
-        cached_level = await _get_cached_permission(current_user.id, project_id)
-        if cached_level is not None:
-            user_level = PERMISSION_HIERARCHY.get(cached_level, 0)
-            required_level = PERMISSION_HIERARCHY.get(min_permission, 0)
-            if user_level < required_level:
-                raise HTTPException(status_code=403, detail="权限不足")
-            # 设置 RLS context（SET LOCAL 仅当前事务有效）
-            await set_rls_context(db, project_id)
-            return current_user
-
-        # 查询 project_users 表
-        result = await db.execute(
-            select(ProjectUser).where(
-                ProjectUser.project_id == project_id,
-                ProjectUser.user_id == current_user.id,
-                ProjectUser.is_deleted == False,  # noqa: E712
-            )
+        return await assert_project_permission(
+            db, current_user, project_id, min_permission
         )
-        project_user = result.scalar_one_or_none()
 
-        if project_user is None:
+    return dependency
+
+
+def _validate_permission_level(min_permission: str, *, caller: str) -> None:
+    """校验权限级别名已登记，未登记即抛 ValueError（fail-closed）。"""
+    if min_permission not in PERMISSION_HIERARCHY:
+        raise ValueError(
+            f"{caller} 收到未登记的权限级别 {min_permission!r}；"
+            f"合法值：{sorted(PERMISSION_HIERARCHY)}。"
+            "未登记的级别会被 PERMISSION_HIERARCHY.get(..., 0) 静默降级为 0，"
+            "使门禁对任何项目成员放行。"
+        )
+
+
+async def assert_project_permission(
+    db: AsyncSession,
+    current_user: User,
+    project_id: UUID,
+    min_permission: str = "readonly",
+) -> User:
+    """项目级权限校验的**可直调**版本（与 ``require_project_access`` 同一实现）。
+
+    ``require_project_access`` 是 FastAPI 依赖工厂，其内部依赖从**路径/查询参数**取
+    ``project_id`` —— 对「project_id 在请求体里」或「只给了 note_id、需先反查所属项目」
+    的端点用不上。那类端点必须在函数体首句显式调用本函数。
+
+    两条路径共用同一实现，避免出现第二份权限判定（判定分叉必然漂移）。
+    """
+    _validate_permission_level(min_permission, caller="assert_project_permission")
+
+    # 归档项目只读守卫（仅 non-readonly 权限触发）
+    await _check_project_not_archived(db, project_id, current_user, min_permission)
+
+    # admin 跳过项目权限检查（不设置 RLS context，admin 使用 bypass 函数）
+    if current_user.role.value == "admin":
+        # admin 仍设置 RLS context 以便普通查询正常工作
+        # 跨项目聚合查询使用 SECURITY DEFINER 函数绕过
+        await set_rls_context(db, project_id)
+        return current_user
+
+    required_level = PERMISSION_HIERARCHY[min_permission]
+
+    # Try Redis cache first
+    cached_level = await _get_cached_permission(current_user.id, project_id)
+    if cached_level is not None:
+        if PERMISSION_HIERARCHY.get(cached_level, 0) < required_level:
             raise HTTPException(status_code=403, detail="权限不足")
-
-        # Cache the permission level
-        level_value = project_user.permission_level.value
-        await _set_cached_permission(current_user.id, project_id, level_value)
-
-        # 比较权限层级
-        user_level = PERMISSION_HIERARCHY.get(level_value, 0)
-        required_level = PERMISSION_HIERARCHY.get(min_permission, 0)
-
-        if user_level < required_level:
-            raise HTTPException(status_code=403, detail="权限不足")
-
         # 设置 RLS context（SET LOCAL 仅当前事务有效）
         await set_rls_context(db, project_id)
         return current_user
 
-    return dependency
+    # 查询 project_users 表
+    result = await db.execute(
+        select(ProjectUser).where(
+            ProjectUser.project_id == project_id,
+            ProjectUser.user_id == current_user.id,
+            ProjectUser.is_deleted == False,  # noqa: E712
+        )
+    )
+    project_user = result.scalar_one_or_none()
+
+    if project_user is None:
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    # Cache the permission level
+    level_value = project_user.permission_level.value
+    await _set_cached_permission(current_user.id, project_id, level_value)
+
+    if PERMISSION_HIERARCHY.get(level_value, 0) < required_level:
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    # 设置 RLS context（SET LOCAL 仅当前事务有效）
+    await set_rls_context(db, project_id)
+    return current_user
 
 
 # ---------------------------------------------------------------------------

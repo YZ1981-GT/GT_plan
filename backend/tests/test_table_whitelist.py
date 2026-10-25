@@ -130,7 +130,10 @@ def test_enforce_not_sensitive():
 # enforce_join_registered
 # ─────────────────────────────────────────────────────────────────────────────
 def test_enforce_join_registered_valid_passes():
-    enforce_join_registered("trial_balance", "wp_index")
+    # 2026-08-23：原用 `trial_balance -> wp_index`，该登记已因笛卡尔积风险移除
+    # （ON 仅 project_id ↔ project_id，见 R6.1 / enforce_join_business_key）。
+    # 改用含业务键的 account_chart（standard_account_code ↔ account_code）。
+    enforce_join_registered("trial_balance", "account_chart")
 
 
 def test_enforce_join_registered_unregistered_rejects():
@@ -173,8 +176,8 @@ def test_enforce_aggregate_registered():
 # ─────────────────────────────────────────────────────────────────────────────
 def test_enforce_query_plan_all_valid_passes():
     enforce_query_plan(
-        tables=["trial_balance", "wp_index"],
-        joins=[("trial_balance", "wp_index")],
+        tables=["trial_balance", "account_chart"],
+        joins=[("trial_balance", "account_chart")],
         operators=["eq", "in"],
         aggregates=["sum", "count"],
     )

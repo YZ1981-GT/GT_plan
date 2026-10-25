@@ -24,28 +24,34 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Any, Literal
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
-from sqlalchemy import Column, and_, asc, desc, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import Select
-from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
-# ── 白名单单一真源（Task 6.2）：定义已收敛到 services/custom_query/table_whitelist ──
-# query_builder 从服务层单点导入，不再本地维护副本，保证 param_sql_builder /
-# QueryOrchestrator / 白名单构建器共用同一套白名单与强制门禁。
+# 白名单单一真源在 services/custom_query/table_whitelist；DSL→SQL 构建在
+# services/custom_query/builder_dsl（见下方 re-export 段）。router 只保留 HTTP 层。
+from app.services.custom_query.builder_scope import (
+    resolve_builder_scope,
+    scope_signature,
+)
+from app.services.custom_query.execution_guard import (
+    EXPORT_TIMEOUT_MS,
+    QUERY_TIMEOUT_MS,
+    cancellable_query,
+)
 from app.services.custom_query.table_whitelist import (
     AGGREGATE_WHITELIST,
     JOIN_WHITELIST,
     OPERATOR_WHITELIST,
+    PII_ALLOWED_ROLES,
     TABLE_WHITELIST,
+    visible_fields_for_role,
 )
 
 logger = logging.getLogger(__name__)
@@ -96,425 +102,26 @@ def require_query_builder_access(
 # ─────────────────────────────────────────────────────────────────────────────
 # Pydantic 模型 — DSL 严格校验
 # ─────────────────────────────────────────────────────────────────────────────
-class FilterCond(BaseModel):
-    field: str = Field(..., min_length=1, max_length=100)
-    op: str = Field(..., min_length=1, max_length=20)
-    # value 类型由后端按 op 解释（in/not_in 接受 list；is_null/is_not_null 忽略；between 接受 [lo, hi]）
-    value: Any | None = None
-
-
-class OrderBy(BaseModel):
-    field: str = Field(..., min_length=1, max_length=100)
-    direction: Literal["asc", "desc"] = "asc"
-
-
-class QueryDSL(BaseModel):
-    table: str = Field(..., min_length=1, max_length=64)
-    fields: list[str] = Field(default_factory=list)
-    filters: list[FilterCond] = Field(default_factory=list)
-    filter_logic: Literal["and", "or"] = "and"
-    group_by: list[str] = Field(default_factory=list)
-    aggregates: list[dict[str, str]] = Field(default_factory=list)
-    # aggregates 元素：{"func": "sum", "field": "audited_amount", "alias": "total"}
-    order_by: list[OrderBy] = Field(default_factory=list)
-    limit: int = Field(default=100, ge=1, le=1000)
-    offset: int = Field(default=0, ge=0)
-    # S-3 v2 新增：JOIN 关联（声明式白名单，不接受用户传 ON）
-    # joins 元素：{"table": "wp_index", "type": "inner"|"left"}
-    joins: list[dict[str, str]] = Field(default_factory=list)
-
-
 # ─────────────────────────────────────────────────────────────────────────────
-# 核心：DSL → SQLAlchemy core `select()`（白名单+绑定参数；无字符串拼接）
+# DSL 契约与 DSL → SQL 构建已抽到服务层 `services/custom_query/builder_dsl.py`
+# （pre-commit 行数门禁指引「优先拆分或抽伴生模块」；DSL→SQL 本就属服务层职责）。
+# 此处 re-export，保持 `from app.routers.query_builder import QueryDSL,
+# _build_select` 等既有导入与测试不变。
 # ─────────────────────────────────────────────────────────────────────────────
-def _resolve_table(table_name: str) -> dict[str, Any]:
-    if table_name not in TABLE_WHITELIST:
-        raise HTTPException(
-            status_code=400,
-            detail={"error_code": "TABLE_NOT_ALLOWED",
-                    "message": f"表 '{table_name}' 不在白名单中",
-                    "allowed_tables": sorted(TABLE_WHITELIST.keys())},
-        )
-    return TABLE_WHITELIST[table_name]
-
-
-def _resolve_column(table_meta: dict[str, Any], field: str) -> Column:
-    if field not in table_meta["fields"]:
-        raise HTTPException(
-            status_code=400,
-            detail={"error_code": "FIELD_NOT_ALLOWED",
-                    "message": f"字段 '{field}' 不在表 '{table_meta['label']}' 白名单中",
-                    "allowed_fields": list(table_meta["fields"])},
-        )
-    model = table_meta["model"]
-    col = getattr(model, field, None)
-    if col is None:
-        raise HTTPException(
-            status_code=400,
-            detail={"error_code": "FIELD_NOT_FOUND",
-                    "message": f"模型 {model.__name__} 不存在字段 '{field}'"},
-        )
-    return col
-
-
-def _resolve_field_ref(
-    base_table: str,
-    field: str,
-    join_tables: set[str],
-) -> Column:
-    """S-3 v2：解析字段引用，支持 ``table.field`` 双段语法
-
-    - ``audited_amount`` → 默认从 base_table 解析
-    - ``trial_balance.audited_amount`` → 从指定表解析
-    - 引用的表必须 ∈ (base_table ∪ join_tables)
-    """
-    if "." in field:
-        table_name, field_name = field.split(".", 1)
-        if table_name != base_table and table_name not in join_tables:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error_code": "FIELD_TABLE_NOT_JOINED",
-                    "message": f"字段引用 '{field}' 中的表 '{table_name}' 未在 joins 中声明",
-                    "joined_tables": sorted(join_tables | {base_table}),
-                },
-            )
-        meta = _resolve_table(table_name)
-        return _resolve_column(meta, field_name)
-    # 单段语法：从 base_table 解析
-    return _resolve_column(_resolve_table(base_table), field)
-
-
-def _coerce_value(col: Column, value: Any) -> Any:
-    """按列的 SQLAlchemy 类型把 user-supplied value 转为正确 Python 类型。
-
-    修复生产 bug：UUID 列绑定 str value 时 SQLAlchemy 会调 `value.hex` 抛
-    `AttributeError: 'str' object has no attribute 'hex'`。同理 Date/DateTime/
-    Decimal 列也需要从 ISO 字符串/数字 coerce。
-
-    支持类型：
-    - UUID（PG_UUID / sa.Uuid）
-    - Decimal / Numeric
-    - Date / DateTime（ISO 8601 字符串）
-    - Bool（接受 "true"/"false" 字符串）
-    - 其他类型保持原值
-    """
-    import datetime as _dt
-    import decimal as _dec
-    import uuid as _uuid
-
-    if value is None:
-        return None
-
-    # 取列的 Python type（通过 SQLAlchemy type 解析）
-    try:
-        col_type = col.type
-        py_type = col_type.python_type
-    except (NotImplementedError, AttributeError):
-        # Enum / 复合类型可能不支持 python_type，原值传回
-        return value
-
-    # 已是正确类型 → 直接返回
-    if isinstance(value, py_type):
-        return value
-
-    # UUID
-    if py_type is _uuid.UUID:
-        if isinstance(value, str):
-            try:
-                return _uuid.UUID(value)
-            except (ValueError, AttributeError) as e:
-                raise HTTPException(
-                    status_code=400,
-                    detail={
-                        "error_code": "INVALID_UUID",
-                        "message": f"无法解析为 UUID: {value!r} ({e})",
-                    },
-                )
-        return value
-
-    # Decimal
-    if py_type is _dec.Decimal:
-        try:
-            return _dec.Decimal(str(value))
-        except _dec.InvalidOperation:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error_code": "INVALID_DECIMAL",
-                    "message": f"无法解析为 Decimal: {value!r}",
-                },
-            )
-
-    # Date / DateTime
-    if py_type is _dt.date:
-        if isinstance(value, str):
-            try:
-                return _dt.date.fromisoformat(value)
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail={"error_code": "INVALID_DATE", "message": f"无法解析为 date: {value!r}"},
-                )
-        return value
-    if py_type is _dt.datetime:
-        if isinstance(value, str):
-            try:
-                return _dt.datetime.fromisoformat(value)
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail={
-                        "error_code": "INVALID_DATETIME",
-                        "message": f"无法解析为 datetime: {value!r}",
-                    },
-                )
-        return value
-
-    # Bool 字符串
-    if py_type is bool and isinstance(value, str):
-        lower = value.lower()
-        if lower in ("true", "1", "yes"):
-            return True
-        if lower in ("false", "0", "no"):
-            return False
-
-    # int 字符串
-    if py_type is int and isinstance(value, str):
-        try:
-            return int(value)
-        except ValueError:
-            return value  # 保持原值，让 SQLAlchemy 报更精确的错
-
-    # float 字符串
-    if py_type is float and isinstance(value, str):
-        try:
-            return float(value)
-        except ValueError:
-            return value
-
-    return value
-
-
-def _build_filter(col: Column, op: str, value: Any) -> ColumnElement:
-    if op not in OPERATOR_WHITELIST:
-        raise HTTPException(
-            status_code=400,
-            detail={"error_code": "OP_NOT_ALLOWED",
-                    "message": f"操作符 '{op}' 不在白名单中",
-                    "allowed_ops": sorted(OPERATOR_WHITELIST)},
-        )
-    # 类型 coerce：UUID/Decimal/Date/DateTime/Bool 自动从 str 转
-    if op in ("in", "not_in"):
-        if not isinstance(value, list) or not value:
-            raise HTTPException(
-                status_code=400,
-                detail={"error_code": "INVALID_IN_VALUE",
-                        "message": f"{op} 操作符要求 value 为非空数组"},
-            )
-        coerced_value: Any = [_coerce_value(col, v) for v in value]
-    elif op == "between":
-        if not isinstance(value, list) or len(value) != 2:
-            raise HTTPException(
-                status_code=400,
-                detail={"error_code": "INVALID_BETWEEN_VALUE",
-                        "message": "between 操作符要求 value 为 [lo, hi] 长度=2 数组"},
-            )
-        coerced_value = [_coerce_value(col, v) for v in value]
-    elif op in ("is_null", "is_not_null"):
-        coerced_value = None  # 忽略
-    elif op in ("like", "not_like"):
-        # LIKE 强制字符串语义，不 coerce
-        coerced_value = value
-    else:
-        coerced_value = _coerce_value(col, value)
-
-    if op == "eq":
-        return col == coerced_value
-    if op == "neq":
-        return col != coerced_value
-    if op == "gt":
-        return col > coerced_value
-    if op == "gte":
-        return col >= coerced_value
-    if op == "lt":
-        return col < coerced_value
-    if op == "lte":
-        return col <= coerced_value
-    if op == "like":
-        return col.like(f"%{coerced_value}%")
-    if op == "not_like":
-        return col.notlike(f"%{coerced_value}%")
-    if op == "in":
-        return col.in_(coerced_value)
-    if op == "not_in":
-        return col.notin_(coerced_value)
-    if op == "is_null":
-        return col.is_(None)
-    if op == "is_not_null":
-        return col.isnot(None)
-    if op == "between":
-        return col.between(coerced_value[0], coerced_value[1])
-    # 不会到此（OPERATOR_WHITELIST 已穷举）
-    raise HTTPException(
-        status_code=400,
-        detail={"error_code": "OP_NOT_IMPLEMENTED", "message": f"操作符 {op} 未实现"},
-    )
-
-
-def _build_select(dsl: QueryDSL) -> tuple[Select, list[str]]:
-    """根据 DSL 构造 `select()` 与列名列表。"""
-    table_meta = _resolve_table(dsl.table)
-    model = table_meta["model"]
-
-    # ── S-3 v2：解析 joins ──
-    join_specs: list[tuple[str, str, list[tuple[str, str]]]] = []  # (target_table, join_type, on_pairs)
-    join_tables: set[str] = set()
-    for j in dsl.joins:
-        target = j.get("table", "")
-        jtype = (j.get("type") or "inner").lower()
-        if jtype not in ("inner", "left"):
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error_code": "JOIN_TYPE_NOT_ALLOWED",
-                    "message": f"join type '{jtype}' 必须 ∈ {{inner, left}}",
-                },
-            )
-        # 校验 target 表存在 + 在 base_table 的 JOIN_WHITELIST 中
-        if target not in TABLE_WHITELIST:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error_code": "JOIN_TABLE_NOT_ALLOWED",
-                    "message": f"join 目标表 '{target}' 不在 TABLE_WHITELIST 中",
-                },
-            )
-        allowed_joins = JOIN_WHITELIST.get(dsl.table, {})
-        if target not in allowed_joins:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error_code": "JOIN_NOT_REGISTERED",
-                    "message": (
-                        f"表 '{dsl.table}' 与 '{target}' 之间没有预登记的 JOIN 关系"
-                    ),
-                    "available_joins_for_base": sorted(allowed_joins.keys()),
-                },
-            )
-        on_pairs = allowed_joins[target]["on"]
-        join_specs.append((target, jtype, on_pairs))
-        join_tables.add(target)
-
-    # ── 选择列 ──
-    select_cols: list[ColumnElement] = []
-    column_names: list[str] = []
-
-    if dsl.fields:
-        for f in dsl.fields:
-            col = _resolve_field_ref(dsl.table, f, join_tables)
-            select_cols.append(col)
-            column_names.append(f)
-    elif dsl.aggregates:
-        # 纯聚合查询：不要求 fields，但若有 group_by 则前端应同时把它放入 fields
-        pass
-    else:
-        # 无 fields 默认全字段（仅 base_table，避免 JOIN 后字段爆炸）
-        for f in table_meta["fields"]:
-            col = getattr(model, f, None)
-            if col is not None:
-                select_cols.append(col)
-                column_names.append(f)
-
-    # ── 聚合列 ──
-    aggregate_funcs = {
-        "count": func.count,
-        "sum": func.sum,
-        "avg": func.avg,
-        "min": func.min,
-        "max": func.max,
-    }
-    for agg in dsl.aggregates:
-        agg_func = agg.get("func", "").lower()
-        agg_field = agg.get("field", "")
-        agg_alias = agg.get("alias") or f"{agg_func}_{agg_field.replace('.', '_')}"
-        if agg_func not in AGGREGATE_WHITELIST:
-            raise HTTPException(
-                status_code=400,
-                detail={"error_code": "AGG_NOT_ALLOWED",
-                        "message": f"聚合函数 '{agg_func}' 不在白名单中",
-                        "allowed_aggs": sorted(AGGREGATE_WHITELIST)},
-            )
-        # count(*) 特例：field='*' 或为空时使用常量
-        if agg_func == "count" and (not agg_field or agg_field == "*"):
-            agg_col = func.count().label(agg_alias)
-        else:
-            target = _resolve_field_ref(dsl.table, agg_field, join_tables)
-            agg_col = aggregate_funcs[agg_func](target).label(agg_alias)
-        select_cols.append(agg_col)
-        column_names.append(agg_alias)
-
-    if not select_cols:
-        raise HTTPException(
-            status_code=400,
-            detail={"error_code": "EMPTY_SELECT",
-                    "message": "fields 与 aggregates 不能同时为空"},
-        )
-
-    stmt: Select = select(*select_cols)
-
-    # ── S-3 v2：应用 JOIN ──
-    for target_table, jtype, on_pairs in join_specs:
-        target_meta = _resolve_table(target_table)
-        target_model = target_meta["model"]
-        on_clauses = []
-        for left_col, right_col in on_pairs:
-            left = _resolve_column(table_meta, left_col)
-            right = _resolve_column(target_meta, right_col)
-            on_clauses.append(left == right)
-        on_expr = and_(*on_clauses) if len(on_clauses) > 1 else on_clauses[0]
-        if jtype == "left":
-            stmt = stmt.outerjoin(target_model, on_expr)
-        else:
-            stmt = stmt.join(target_model, on_expr)
-
-    # ── WHERE ──
-    where_clauses: list[ColumnElement] = []
-    for cond in dsl.filters:
-        col = _resolve_field_ref(dsl.table, cond.field, join_tables)
-        where_clauses.append(_build_filter(col, cond.op, cond.value))
-
-    if where_clauses:
-        if dsl.filter_logic == "or":
-            stmt = stmt.where(or_(*where_clauses))
-        else:
-            stmt = stmt.where(and_(*where_clauses))
-
-    # ── GROUP BY ──
-    for f in dsl.group_by:
-        col = _resolve_field_ref(dsl.table, f, join_tables)
-        stmt = stmt.group_by(col)
-
-    # ── ORDER BY ──
-    for ob in dsl.order_by:
-        col = _resolve_field_ref(dsl.table, ob.field, join_tables)
-        stmt = stmt.order_by(asc(col) if ob.direction == "asc" else desc(col))
-
-    # ── LIMIT / OFFSET ──
-    stmt = stmt.limit(min(dsl.limit, 1000)).offset(dsl.offset)
-
-    return stmt, column_names
-
-
-def _stmt_to_sql(stmt: Select) -> str:
-    """生成可读的 SQL 预览（保留绑定参数为命名占位）。"""
-    try:
-        compiled = stmt.compile(compile_kwargs={"literal_binds": False})
-        return str(compiled)
-    except Exception as exc:  # 兼容部分类型无法 inline 的情况
-        logger.debug("compile preview fallback: %s", exc)
-        return str(stmt)
-
+from app.services.custom_query.builder_dsl import (  # noqa: E402
+    FilterCond,
+    OrderBy,
+    QueryDSL,
+    _build_filter,
+    _build_select,
+    _coerce_value,
+    _excel_cell_value,
+    _resolve_column,
+    _resolve_field_ref,
+    _resolve_table,
+    _serialize_cell,
+    _stmt_to_sql,
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Endpoints
@@ -527,12 +134,21 @@ async def get_schema(
 
     S-3 v2：joins 字段列出当前表可关联的目标表 + 关联条件
     """
+    role = _get_role_value(current_user)
     return {
         "tables": [
             {
                 "name": name,
                 "label": meta["label"],
-                "fields": meta["fields"],
+                # 按角色隐去无权 PII 列（R7.4）；分三层下发使前端默认只展示业务列
+                # （R7.2），列名真源仍是本白名单、前端不复制第二份（R7.5）。
+                "fields": visible_fields_for_role(name, role),
+                "default_fields": meta.get("default_fields") or [],
+                "technical_fields": meta.get("technical_fields") or [],
+                # 角色判据复用 PII_ALLOWED_ROLES 单一真源，不在此内联第二份角色表
+                "pii_fields": (
+                    meta.get("pii_fields") or [] if role in PII_ALLOWED_ROLES else []
+                ),
                 "joins": [
                     {
                         "target_table": target,
@@ -556,15 +172,50 @@ async def get_schema(
 @router.post("/preview")
 async def preview_query(
     body: QueryDSL,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_query_builder_access),
 ):
-    """仅生成 SQL（不执行），用于前端"SQL 预览"。"""
-    stmt, column_names = _build_select(body)
+    """仅生成 SQL（不执行），用于前端"SQL 预览"。
+
+    预览也必须带上作用域约束 —— 否则用户看到的 SQL 与实际执行的 SQL 不一致，
+    「预览无 WHERE project_id」正是本次改造前实测到的现象。
+    """
+    warnings: list[str] = []
+    scope = await resolve_builder_scope(
+        user=current_user,
+        dsl_tables=[body.table, *(j.get("table", "") for j in body.joins)],
+        db=db,
+    )
+    stmt, column_names = _build_select(
+        body, scope=scope, role=_get_role_value(current_user), warnings=warnings
+    )
     return {
         "sql": _stmt_to_sql(stmt),
         "columns": column_names,
         "table": body.table,
+        "scope": scope.describe(),
+        "warnings": warnings,
     }
+
+
+async def _audit_query_rejection(
+    exc: HTTPException, *, user: User, table: str
+) -> None:
+    """把构建器侧的拒绝事件记成可区分审计（R5.5）。
+
+    只对已登记的 error_code 记录（超时 / 预算超限 / PII 越权）；其余 4xx 属参数
+    校验类噪声，不入审计。审计失败由 ``record_query_rejected`` 内部吞掉，
+    不会掩盖 ``exc`` 本身。
+    """
+    from app.services.custom_query.audit_helper import record_query_rejected
+
+    detail = exc.detail if isinstance(exc.detail, dict) else {}
+    await record_query_rejected(
+        user_id=user.id,
+        error_code=detail.get("error_code"),
+        source=f"builder:{table}",
+        details={"status_code": exc.status_code, "table": table},
+    )
 
 
 def _derive_formula_refs(table: str, rows: list[dict]) -> list[str | None]:
@@ -607,15 +258,31 @@ async def execute_query(
     current_user: User = Depends(require_query_builder_access),
 ):
     """执行查询，返回结构化结果。"""
-    stmt, column_names = _build_select(body)
+    warnings: list[str] = []
+    # ─── 项目作用域（R2）：解析先于 SQL 构建与缓存读取 ────────────────────
+    scope = await resolve_builder_scope(
+        user=current_user,
+        dsl_tables=[body.table, *(j.get("table", "") for j in body.joins)],
+        db=db,
+    )
+    try:
+        stmt, column_names = _build_select(
+            body, scope=scope, role=_get_role_value(current_user), warnings=warnings
+        )
+    except HTTPException as http_exc:
+        # 预算超限 / PII 越权发生在 SQL 构建期，也要留痕
+        await _audit_query_rejection(http_exc, user=current_user, table=body.table)
+        raise
 
     # ─── Redis 短 TTL 缓存（dashboard 卡片高频查询）────────────────────
     # 缓存发生在白名单安全校验之后（_build_select 已完成白名单验证）
     from app.services.query_cache import compute_cache_key, get_cached_result, set_cached_result
 
+    # 缓存键纳入作用域签名（R2.4）：改造前写死 "__query_builder__"，两个可访问
+    # 项目集合不同的用户对同一 DSL 会命中同一条缓存 = 跨作用域泄漏。
     cache_key = compute_cache_key(
         user_id=str(current_user.id),
-        project_id="__query_builder__",
+        project_id=f"__query_builder__:{scope_signature(scope)}",
         query_params=body.model_dump(),
     )
     cached = await get_cached_result(cache_key)
@@ -624,8 +291,13 @@ async def execute_query(
         return cached
 
     try:
-        result = await db.execute(stmt)
-        rows = result.fetchall()
+        async with cancellable_query(db, QUERY_TIMEOUT_MS):
+            result = await db.execute(stmt)
+            rows = result.fetchall()
+    except HTTPException as http_exc:
+        # 408 QUERY_TIMEOUT 等原样上抛，同时记一条可区分审计（R5.5）
+        await _audit_query_rejection(http_exc, user=current_user, table=body.table)
+        raise
     except SQLAlchemyError as exc:
         try:
             await db.rollback()
@@ -652,6 +324,10 @@ async def execute_query(
         "total": len(rows_serialized),
         "table": body.table,
         "sql": _stmt_to_sql(stmt),
+        # 明示本次生效的项目范围（R2.2）：admin/partner 不限项目时也要让用户知道
+        # 自己正在跨项目查询，而不是默认以为只看了当前项目。
+        "scope": scope.describe(),
+        "warnings": warnings,
         # P2-6: 自由查询结果反哺结构化引用——每行（若可定位）给出对应公式 ref，
         # 审计师可一键复制到公式编辑器，打通"探查→引用"链路。
         "formula_refs": _derive_formula_refs(body.table, rows_serialized),
@@ -665,6 +341,9 @@ async def execute_query(
 
 _EXPORT_FETCH_SIZE = 2000  # 每批从 DB 拉取的行数，避免全量加载
 
+# 导出行数硬上限复用 export_service 既有常量（R6.7：不在 router 层另写一套阈值）
+from app.services.custom_query.export_service import EXPORT_ROW_HARD_LIMIT  # noqa: E402
+
 
 @router.post("/export-excel")
 async def export_excel(
@@ -673,9 +352,19 @@ async def export_excel(
     current_user: User = Depends(require_query_builder_access),
 ):
     """执行查询并以流式/分页方式生成 Excel（write_only 模式避免全量内存峰值）。"""
-    stmt, column_names = _build_select(body)
+    scope = await resolve_builder_scope(
+        user=current_user,
+        dsl_tables=[body.table, *(j.get("table", "") for j in body.joins)],
+        db=db,
+    )
+    stmt, column_names = _build_select(
+        body, scope=scope, role=_get_role_value(current_user)
+    )
     try:
-        result = await db.execute(stmt)
+        async with cancellable_query(db, EXPORT_TIMEOUT_MS):
+            result = await db.execute(stmt)
+    except HTTPException:
+        raise
     except SQLAlchemyError as exc:
         try:
             await db.rollback()
@@ -709,13 +398,31 @@ async def export_excel(
     ws.append(header_cells)
 
     # 分页读取数据行并逐批写入（避免全量加载到内存）
+    # 行数硬上限（R6.6）：改造前 fetchmany 无上限，笛卡尔积 JOIN 下会把百万行全部
+    # 拉完。达上限时**在文件内显式标注**被截断 —— 静默产出不完整文件最危险，
+    # 审计师会把它当完整证据留档。
+    written = 0
+    truncated = False
     while True:
         batch = result.fetchmany(_EXPORT_FETCH_SIZE)
         if not batch:
             break
         for row in batch:
+            if written >= EXPORT_ROW_HARD_LIMIT:
+                truncated = True
+                break
             ws.append([_excel_cell_value(row[i] if i < len(row) else None)
                        for i in range(len(column_names))])
+            written += 1
+        if truncated:
+            break
+
+    if truncated:
+        ws.append([])
+        ws.append([
+            f"※ 结果已达导出上限 {EXPORT_ROW_HARD_LIMIT} 行并被截断，"
+            "本文件不是完整结果集；请补充筛选条件后重新导出"
+        ])
 
     output = io.BytesIO()
     wb.save(output)
@@ -730,47 +437,3 @@ async def export_excel(
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 序列化工具
-# ─────────────────────────────────────────────────────────────────────────────
-def _serialize_cell(v: Any) -> Any:
-    """将 SQL 行单元格序列化为 JSON 友好类型。"""
-    from datetime import date, datetime
-    from decimal import Decimal
-    from uuid import UUID
-    if v is None:
-        return None
-    if isinstance(v, Decimal):
-        return float(v)
-    if isinstance(v, datetime):
-        return v.isoformat()
-    if isinstance(v, date):
-        return v.isoformat()
-    if isinstance(v, UUID):
-        return str(v)
-    if hasattr(v, "value") and not isinstance(v, (str, int, float, bool)):
-        return v.value  # SQLAlchemy enum
-    return v
-
-
-def _excel_cell_value(v: Any) -> Any:
-    """Excel cell 接受 str/number/datetime；UUID/Decimal/枚举要转换。
-
-    openpyxl 不支持 timezone-aware datetime（会抛 TypeError），
-    PG ``timestamptz`` 字段会带 tzinfo，必须显式 strip。
-    """
-    from datetime import date, datetime
-    from decimal import Decimal
-    from uuid import UUID
-    if v is None:
-        return None
-    if isinstance(v, Decimal):
-        return float(v)
-    if isinstance(v, datetime):
-        # strip tzinfo（保持壁钟时间，符合用户本地化预期）
-        return v.replace(tzinfo=None) if v.tzinfo is not None else v
-    if isinstance(v, date):
-        return v
-    if isinstance(v, UUID):
-        return str(v)
-    if hasattr(v, "value") and not isinstance(v, (str, int, float, bool)):
-        return v.value
-    return v

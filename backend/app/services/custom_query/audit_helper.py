@@ -248,3 +248,75 @@ async def record_query_execution(
         project_id=project_id,
         details=details,
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 拒绝类审计（advanced-query-hardening-wiring-closure R5.5 / R12.3）
+# ─────────────────────────────────────────────────────────────────────────────
+#: 查询被时间预算掐断
+ACTION_QUERY_TIMEOUT = "custom_query.timeout"
+#: 查询因复杂度预算被拒（JOIN 条数 / 分组维度 / 聚合个数超限）
+ACTION_QUERY_BUDGET_DENIED = "custom_query.budget_denied"
+#: 查询因 PII 字段无权被拒
+ACTION_PII_DENIED = "custom_query.pii_denied"
+
+#: error_code → 审计动作名。归属拒绝由 ``OwnershipGuard._audit_denied`` 记
+#: ``advanced_query.ownership_denied``，不在此表内（避免同一事件记两条）。
+REJECTION_ACTION_BY_ERROR_CODE: dict[str, str] = {
+    "QUERY_TIMEOUT": ACTION_QUERY_TIMEOUT,
+    "COMPLEXITY_BUDGET_EXCEEDED": ACTION_QUERY_BUDGET_DENIED,
+    "PII_FIELD_FORBIDDEN": ACTION_PII_DENIED,
+}
+
+
+def resolve_rejection_action(error_code: str | None) -> str | None:
+    """把 error_code 映射为可区分的审计动作名；未登记的返回 None（不记审计）。
+
+    要求「可区分」而非统一记一条「查询失败」：超时、预算超限、PII 越权三者的
+    处置完全不同（前者要加筛选、中者要拆查询、后者要走权限申请），审计里混成
+    一个动作名等于没记。
+    """
+    if not error_code:
+        return None
+    return REJECTION_ACTION_BY_ERROR_CODE.get(str(error_code))
+
+
+async def record_query_rejected(
+    *,
+    user_id: UUID | str,
+    error_code: str | None,
+    source: str | None = None,
+    project_id: UUID | str | None = None,
+    details: dict[str, Any] | None = None,
+) -> bool:
+    """记录一条查询被拒审计（**不节流**）。
+
+    不节流的理由：这类事件本身就是异常信号，60s 窗口内的重复尝试恰恰是需要被看见
+    的模式（例如反复试探无权项目、反复提交超预算查询）。
+
+    审计写入失败**不得**掩盖原始错误响应 —— 故全程吞异常并只返回布尔结果，
+    调用方在 except 分支里调用它，原异常照常上抛（R5.5）。
+    """
+    action = resolve_rejection_action(error_code)
+    if action is None:
+        return False
+    payload: dict[str, Any] = {
+        "error_code": str(error_code),
+        "recorded_at": _utc_second_timestamp(),
+    }
+    if source:
+        payload["source"] = source
+    if details:
+        payload.update(details)
+    try:
+        return await _log_unthrottled(
+            user_id=user_id,
+            action=action,
+            object_type="custom_query",
+            object_id=None,
+            project_id=project_id,
+            details=payload,
+        )
+    except Exception as exc:  # noqa: BLE001 — 审计失败不掩盖原始错误
+        logger.warning("查询拒绝审计写入失败（非致命）: %s", exc)
+        return False

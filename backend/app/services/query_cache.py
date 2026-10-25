@@ -20,7 +20,11 @@ import json
 import logging
 import math
 from dataclasses import dataclass, field
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
+from enum import Enum
 from typing import Any
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +135,10 @@ async def set_cached_result(
 #: canonical payload 契约版本（design §4.2 CanonicalQueryIdentityPayload）
 _IDENTITY_CACHEABLE_WARNING = "CACHE_IDENTITY_UNSTABLE"
 
+#: 可安全 ``str()`` 化的类型白名单 —— 其 str 形态由值本身唯一决定，
+#: 不含内存地址等运行时变量，故可作为稳定缓存键的一部分。
+_STABLE_STR_TYPES = (datetime, date, time, timedelta, UUID, Decimal, Enum)
+
 
 @dataclass(frozen=True)
 class CanonicalQueryIdentity:
@@ -191,12 +199,21 @@ def _canonicalize(value: Any, *, path: str, issues: list[str]) -> Any:
     if isinstance(value, set):
         issues.append(f"{_IDENTITY_CACHEABLE_WARNING}: {path} 为 set（无确定顺序）")
         return None
-    # datetime / UUID / Decimal 等：转字符串即可稳定序列化
-    try:
+    # datetime / date / time / timedelta / UUID / Decimal / Enum：``str()`` 由值
+    # 本身唯一决定，可稳定序列化。
+    if isinstance(value, _STABLE_STR_TYPES):
         return str(value)
-    except Exception:  # noqa: BLE001
-        issues.append(f"{_IDENTITY_CACHEABLE_WARNING}: {path} 类型不可序列化({type(value).__name__})")
-        return None
+    # 其余未知类型一律判不可缓存（Req 3.5）。
+    #
+    # 改造前这里是无条件 ``try: return str(value)`` —— 裸 ``object()`` 的 str 形态是
+    # ``<object object at 0x7f...>``，**含内存地址**，同一逻辑查询每次运行会算出不同
+    # 缓存键；而 ``str()`` 不抛异常，于是 except 分支永不触发、identity 被判
+    # ``cacheable=True``。表现为缓存命中率异常低且键无限膨胀，而非可见的报错。
+    issues.append(
+        f"{_IDENTITY_CACHEABLE_WARNING}: {path} 类型不可稳定序列化"
+        f"({type(value).__name__})"
+    )
+    return None
 
 
 def _user_scope_signature(user_scope: dict[str, Any] | None) -> str:

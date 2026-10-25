@@ -23,6 +23,7 @@ from __future__ import annotations
 import datetime as _dt
 import decimal as _dec
 import uuid as _uuid
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import HTTPException
@@ -254,12 +255,19 @@ class ParamSQLBuilder:
         conditions: list[tuple[Column, str, Any]],
         *,
         logic: str = "and",
+        filter_builder: Callable[[Column, str, Any], ColumnElement] = build_filter,
     ) -> ColumnElement | None:
         """把多个 (列, 操作符, 值) 条件组合为单个参数化 ``WHERE`` 谓词。
 
         ``logic`` ∈ {"and", "or"}；无条件时返回 ``None``（调用方不追加 WHERE）。
+
+        ``filter_builder`` 允许调用方替换单条谓词的构造方式，默认即本模块的
+        ``build_filter``（PG 形态：``= ANY`` / ``!= ALL``）。白名单构建器
+        （``builder_dsl``）传入自己的方言中立版本 —— 它的端点测试在 SQLite 上
+        **真实执行**，而 SQLite 无 ``ANY`` 函数。组合逻辑（and / or / 单条直返 /
+        空集合返 ``None``）由本函数单点持有，避免调用方各写一份。
         """
-        clauses = [build_filter(col, op, val) for col, op, val in conditions]
+        clauses = [filter_builder(col, op, val) for col, op, val in conditions]
         if not clauses:
             return None
         if len(clauses) == 1:

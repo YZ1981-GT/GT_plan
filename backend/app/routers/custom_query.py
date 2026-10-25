@@ -44,14 +44,38 @@ from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, get_visible_project_ids
+from app.deps import get_current_user, get_visible_project_ids, require_project_access
 from app.models.core import Project, ProjectUser, User
 from app.models.custom_query_models import CustomQueryTemplate
+# 模板治理三件套在模块级 import：既是「唯一消费方」的落点，也使契约测试可对
+# router 命名空间做 monkeypatch（函数内 import 会绕过替身）。
+from app.services.custom_query.template_scope_adapter import (
+    NormalizedTemplateScope,
+    TemplateScopeAdapter,
+    TemplateScopeValidationError,
+)
+from app.services.custom_query.template_service import template_service
+from app.services.custom_query.pagination import (
+    FETCH_HARD_CAP,
+    MAX_LIMIT as PAGE_MAX_LIMIT,
+    MIN_LIMIT as PAGE_MIN_LIMIT,
+)
 from app.services.wp_template_registry import wp_template_registry_service
 
 router = APIRouter(prefix="/api/custom-query", tags=["custom-query"])
 
 logger = logging.getLogger(__name__)
+
+
+class SortSpec(BaseModel):
+    """单个排序项。
+
+    声明为模型而非裸 dict：非法方向能在 router 层即被 pydantic 拦成 422，
+    不必等进到编排器；同时前端拿到的错误定位到具体字段。
+    """
+
+    field: str = Field(..., min_length=1, max_length=100)
+    direction: Literal["asc", "desc"] = "asc"
 
 
 class QueryRequest(BaseModel):
@@ -60,15 +84,38 @@ class QueryRequest(BaseModel):
     source: str  # report | trial_balance | disclosure | adjustment | worksheet | workpaper | account_balance | ledger_entries | report_lines | workhours
     filters: dict = {}  # report_type, account_name, section_id, company_code, etc.
     columns: list[str] = []  # 要查询的列（空=全部）
-    limit: int = 500
-    offset: int = 0
+    # 分页边界与 pagination.MIN_LIMIT / MAX_LIMIT 保持一致（R4.6）。
+    # 改造前 limit 无约束、offset 声明后全文件零使用（14 个取数器只拼 LIMIT :lim），
+    # 前端却一直在传 offset ⇒ 业务视图从来没有第 2 页。
+    limit: int = Field(default=500, ge=PAGE_MIN_LIMIT, le=PAGE_MAX_LIMIT)
+    offset: int = Field(default=0, ge=0)
+    #: 排序项，由 StablePagination 消费。非法方向在此层即 422（R4.7）。
+    sort: list[SortSpec] = Field(default_factory=list)
+    #: 分组配置 {"dimensions": [...], "aggregates": [{"field","op","alias"}]}。
+    group: dict | None = None
+    #: 透视配置 {"row_dims","col_dims","value_field","agg","max_cols"}。
+    pivot: dict | None = None
+    #: ACNR 寻址目标（addr_id / uri / report:/note:/tb: 语法糖）。
+    #: 改造前该字段未被 pydantic 声明 ⇒ 前端发送后被静默丢弃、无 warning。
+    acnr_targets: list[str] = Field(default_factory=list)
 
 
 @router.get("/indicators")
 async def get_indicators(
     project_id: str | None = Query(default=None, description="项目 ID — 传入后报表/附注树会按项目模板类型动态生成"),
+    depth: int | None = Query(
+        default=None,
+        ge=1,
+        le=9,
+        description="1=仅返回骨架（重分支子节点留空并标 lazy），省略=全量（向后兼容）",
+    ),
+    branch: str | None = Query(
+        default=None,
+        description="按分支懒加载子节点（disclosure / workpaper），与 depth 配合使用",
+    ),
     response: Response = None,  # type: ignore[assignment]
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取可查询指标库（树形结构）
 
@@ -80,9 +127,36 @@ async def get_indicators(
       - 报表大类下展示项目模板类型（国企/上市）对应的具体报表
       - 附注大类下展示项目实际配置的章节（按 parent_section 分组成子大类）
     未传 project_id 时：报表/附注用通用降级树（仅显示报表类型，无国企/上市区分）
+
+    ─── 认证与归属校验（R1.1 / R1.2 / R1.3）───────────────────────────────
+    改造前本端点仅 ``Depends(get_db)``：未认证直连实测返回 200、约 700KB 响应，
+    泄露项目模板类型、合并范围全部子公司名单与底稿清单。归属校验必须**先于**
+    任何领域读取 —— ``_resolve_project_template_type`` / ``_build_consol_units_tree``
+    / ``_build_workpaper_tree`` 都以 project_id 直接查库，放在校验之后才有意义。
     """
+    if project_id:
+        from app.services.custom_query.ownership_guard import ownership_guard
+
+        await ownership_guard.assert_target_accessible(
+            user=current_user, project_id=project_id, db=db
+        )
+
     template_type = await _resolve_project_template_type(db, project_id)
     standard_label = _STANDARD_LABEL.get(template_type, "通用")
+
+    # ─── 分支懒加载（R12.2）：只构建被展开的那一支 ────────────────────────
+    # 🔴 用 isinstance 而非真值判断：本端点也被契约测试**直接调用**（不经 FastAPI
+    # 依赖注入），此时未传的参数保留的是 `Query(...)` 实例而不是 None ——
+    # `if branch:` 会恒为真。同理 depth 也必须按真实类型判断。
+    branch_key = branch if isinstance(branch, str) and branch else None
+    if branch_key:
+        return await _build_indicator_branch(branch_key, db, project_id, template_type)
+
+    # depth=1 → 骨架：重分支（附注 / 底稿）子节点留空并标 lazy。
+    # 实测全量树约 578KB / 3089 节点 / 2766 叶子、慢请求监控 3391ms，其中绝大部分
+    # 来自底稿树（全部 wp_code × 全部 sheet）与附注树（全部章节）。
+    # depth 省略时仍返回全量 —— 未改造的调用方行为不变（R12 为 opt-in）。
+    skeleton = isinstance(depth, int) and depth <= 1
 
     # ─── 报表树：项目模板类型决定大类标签 + 报表清单 ───────────────
     # 6 张报表：BS / IS / CFS / CFS-补充资料 / 权益变动 / 减值准备表
@@ -100,7 +174,7 @@ async def get_indicators(
         )
 
     # ─── 附注树：按 parent_section 分组成大类→明细两层 ─────────────
-    disclosure_children = await _build_disclosure_tree(template_type)
+    disclosure_children = [] if skeleton else await _build_disclosure_tree(template_type)
 
     # ─── 合并范围单位树（仅合并项目可见）────────────────────────
     consol_units_node = await _build_consol_units_tree(db, project_id)
@@ -129,6 +203,7 @@ async def get_indicators(
         "icon": "📝",
         "domain": "note",
         "children": disclosure_children,
+        "lazy": skeleton,
     })
     # 合并范围节点：仅合并项目（report_scope=consolidated 且至少 1 家纳入单位）展示
     if consol_units_node:
@@ -153,7 +228,8 @@ async def get_indicators(
     base_tree.append({
         "key": "workpaper", "label": "📋 底稿", "icon": "📋",
         "domain": "wp",
-        "children": await _build_workpaper_tree(db, project_id),
+        "children": [] if skeleton else await _build_workpaper_tree(db, project_id),
+        "lazy": skeleton,
     })
     base_tree.append({
         "key": "report_lines", "label": "📈 报表行次", "icon": "📈",
@@ -186,7 +262,33 @@ async def get_indicators(
 _STANDARD_LABEL = {"soe": "国企", "listed": "上市"}
 # indicators 树结构 schema 版本：树字段/叶子 key 形态有变更时升 1，前端用此值自动失效旧缓存
 # 历史演进：v1 扁平 → v2 项目级 → v3 6 报表 → v4 合并模块 → v5 底稿 3 层 → v6 sheet 全集 → v7 disabled → v8 sheet 辅助灰度 + ancestorKeys → v9 wp_template_registry DB
-_INDICATORS_SCHEMA_VERSION = 9
+# v10：节点新增 `lazy` 字段 + 支持 depth/branch 懒加载（R12），旧缓存需失效
+_INDICATORS_SCHEMA_VERSION = 10
+
+#: 支持按分支懒加载的大类 key → 子节点构建器名（见 _build_indicator_branch）
+LAZY_INDICATOR_BRANCHES: tuple[str, ...] = ("disclosure", "workpaper")
+
+
+async def _build_indicator_branch(
+    branch: str, db: AsyncSession, project_id: str | None, template_type: str
+) -> list[dict]:
+    """按分支返回子节点（R12.2）。
+
+    未登记的分支显式 400 而非返回空数组 —— 静默空会让前端展开后看到「没有内容」，
+    分不清是「真没有」还是「参数写错了」。
+    """
+    if branch == "disclosure":
+        return await _build_disclosure_tree(template_type)
+    if branch == "workpaper":
+        return await _build_workpaper_tree(db, project_id)
+    raise HTTPException(
+        status_code=400,
+        detail={
+            "error_code": "UNKNOWN_INDICATOR_BRANCH",
+            "message": f"未知指标树分支 '{branch}'",
+            "allowed": list(LAZY_INDICATOR_BRANCHES),
+        },
+    )
 _DISCLOSURE_CACHE: dict[str, list[dict]] = {}
 _WP_MAPPING_CACHE: list[dict] | None = None
 
@@ -816,12 +918,22 @@ async def wp_id_by_code(
     project_id: str = Query(..., description="项目 ID"),
     wp_code: str = Query(..., description="底稿编码（如 D2）"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """wp_code → working_paper.id 映射（供前端穿透跳转 WorkpaperEditor 用）"""
+    """wp_code → working_paper.id 映射（供前端穿透跳转 WorkpaperEditor 用）
+
+    改造前本端点无认证：匿名枚举 project_id 即可确认底稿存在性并取得 wp_id（R1.1）。
+    """
     try:
         proj_uuid = uuid.UUID(project_id)
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="invalid project_id")
+
+    from app.services.custom_query.ownership_guard import ownership_guard
+
+    await ownership_guard.assert_target_accessible(
+        user=current_user, project_id=str(proj_uuid), db=db
+    )
     row = (await db.execute(text("""
         SELECT w.id FROM working_paper w
         JOIN wp_index i ON w.wp_index_id = i.id
@@ -902,6 +1014,7 @@ async def wp_sheet_preview(
     wp_code: str = Query(..., description="底稿编码（如 D2）"),
     sheet_name: str | None = Query(None, description="目标 sheet 名称（缺省返回首个 sheet）"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """高级查询 sheet 选区器专用端点：返回 cellData 用于网格预览。
 
@@ -913,6 +1026,16 @@ async def wp_sheet_preview(
         proj_uuid = uuid.UUID(project_id)
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="invalid project_id")
+
+    # ─── 认证 + 归属校验（R1.1 / R1.2 / R1.4）─────────────────────────────
+    # 本端点直接返回底稿单元格值（含公式），改造前无任何认证 —— 实测未认证直连
+    # 返回 200。更严重的是下方降级分支会调 `init_workpaper_from_template`
+    # **写文件**，即无认证端点触发副作用；故守卫必须在此、先于一切读写。
+    from app.services.custom_query.ownership_guard import ownership_guard
+
+    await ownership_guard.assert_target_accessible(
+        user=current_user, project_id=str(proj_uuid), db=db
+    )
 
     # 1. wp_id + parsed_data 一次查询
     row = (await db.execute(text("""
@@ -976,112 +1099,87 @@ async def execute_query(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """执行自定义查询（关键路径自动写 audit_log）"""
+    """执行自定义查询 —— 经 ExecuteCompatibilityAdapter 的唯一执行路径。
+
+    改造前此处是 14 条内联 ``if/elif`` 直接分发取数器，`ExecuteCompatibilityAdapter`
+    与 `QueryOrchestrator` 因此被完整绕过（router 引用数 0）。现在：
+
+    - 归属校验、寻址、缓存、分组、透视、分页统一由编排器 step1~step8 负责；
+    - router 只保留 HTTP 层职责：降级响应头、缓存命中头、审计、错误映射；
+    - 异常分类明确 —— ``HTTPException`` 原样上抛保留状态码；其余回滚并转 500 带
+      correlation_id。改造前的 ``except Exception`` 把超时/中断/列不存在全吞成
+      ``200 {"rows": [], "error": ...}``，失败在前端表现为「查不到数据」。
+
+    _Requirements: 3.1, 3.2, 3.7, 5.1, 5.2, 5.3_
+    """
     # ─── GIN index degradation: add header when index is building ────────
     from app.services.gin_index_monitor import is_index_building
     if is_index_building():
         response.headers["X-Index-Status"] = "building"
 
-    # ─── OwnershipGuard 单点准入（BEFORE cache read）R9.1/R9.2/R9.5 ─────────
-    # 注册/查询路径统一经 OwnershipGuard 强制 project 归属校验（防 IDOR）；
-    # 不通过 → 403 FORBIDDEN_PROJECT 且不触达缓存/数据读写层。
-    from app.services.custom_query.ownership_guard import ownership_guard
-    await ownership_guard.assert_target_accessible(
-        user=current_user, project_id=body.project_id, db=db
+    from app.services.custom_query.audit_helper import record_query_rejected
+    from app.services.custom_query.business_fetchers import (
+        business_fetcher,
+        fetch_cap_warning,
+    )
+    from app.services.custom_query.execute_compatibility import (
+        ExecuteCompatibilityAdapter,
     )
 
     source = body.source
     pid = body.project_id
     year = body.year
     filters = body.filters
-    limit = min(body.limit, 2000)
 
-    # ─── Redis 短 TTL 缓存（dashboard 卡片高频查询）────────────────────
-    # 缓存发生在安全校验之后（不动白名单安全模型）
-    from app.services.query_cache import compute_cache_key, get_cached_result, set_cached_result
-
-    cache_key = compute_cache_key(
-        user_id=str(current_user.id),
-        project_id=pid,
-        query_params={"source": source, "year": year, "filters": filters, "limit": limit},
-    )
-    cached = await get_cached_result(cache_key)
-    if cached is not None:
-        response.headers["X-Cache"] = "HIT"
-        return cached
-
-    result: dict = {"rows": [], "columns": [], "total": 0}
+    adapter = ExecuteCompatibilityAdapter(business_fetcher=business_fetcher)
     try:
-        # ─── 跨模块 cell 级查询路由（Req 13）─────────────────────────────
-        # report:type|range / note:section|range / adj:type|range / tb:dim|range
-        from app.services.custom_query.module_cell_resolver import is_module_cell_source, module_cell_resolver
-        if is_module_cell_source(source):
-            result = await module_cell_resolver.resolve(db, source, pid, year)
-        # disclosure_note:section_id 形式（树叶子点击）→ 走 disclosure 并把 section_id 注入 filters
-        elif source.startswith("disclosure_note:"):
-            sid = source.split(":", 1)[1]
-            new_filters = {**filters, "section_id": sid}
-            result = await _query_disclosure(db, pid, year, new_filters, limit)
-        # consol_unit:{company_code}:{kind} 形式（合并单位树叶子点击）
-        elif source.startswith("consol_unit:"):
-            parts = source.split(":", 2)
-            if len(parts) == 3:
-                _, cc, kind = parts
-                new_filters = {**filters, "company_code": cc}
-                if kind == "account_balance":
-                    result = await _query_account_balance(db, pid, year, new_filters, limit)
-                elif kind == "ledger_entries":
-                    result = await _query_ledger_entries(db, pid, year, new_filters, limit)
-                elif kind == "tb_detail":
-                    result = await _query_trial_balance(db, pid, year, new_filters, limit)
-                elif kind == "adjustment":
-                    result = await _query_adjustments(db, pid, year, {**filters, "adjustment_type": "AJE"}, limit)
-                else:
-                    result = {"rows": [], "columns": [], "total": 0, "error": f"未知合并单位查询: {source}"}
-            else:
-                result = {"rows": [], "columns": [], "total": 0, "error": f"未知合并单位查询: {source}"}
-        # workpaper:{wp_code} 或 workpaper:{wp_code}|{sheet_name} 形式（底稿树叶子点击）
-        elif source.startswith("workpaper:"):
-            tail = source.split(":", 1)[1]
-            if "|" in tail:
-                wp_code, sheet_name = tail.split("|", 1)
-                result = await _query_workpaper(db, pid, year, {**filters, "wp_code": wp_code, "sheet_name": sheet_name}, limit)
-            else:
-                result = await _query_workpaper(db, pid, year, {**filters, "wp_code": tail}, limit)
-        elif source == 'report' or source.startswith('report_'):
-            result = await _query_report(db, pid, year, filters, limit)
-        elif source == 'trial_balance' or source == 'tb_detail':
-            result = await _query_trial_balance(db, pid, year, filters, limit)
-        elif source == 'tb_summary':
-            result = await _query_tb_summary(db, pid, year, filters, limit)
-        elif source == 'disclosure' or source == 'disclosure_note':
-            result = await _query_disclosure(db, pid, year, filters, limit)
-        elif source.startswith('adj_') or source == 'adjustment':
-            result = await _query_adjustments(db, pid, year, filters, limit)
-        elif source.startswith('ws_') or source == 'worksheet':
-            result = await _query_worksheet(db, pid, year, filters, limit)
-        elif source == 'workpaper':
-            result = await _query_workpaper(db, pid, year, filters, limit)
-        elif source == 'account_balance':
-            result = await _query_account_balance(db, pid, year, filters, limit)
-        elif source == 'ledger_entries':
-            result = await _query_ledger_entries(db, pid, year, filters, limit)
-        elif source == 'report_lines':
-            result = await _query_report_lines(db, pid, year, filters, limit)
-        elif source == 'workhours':
-            result = await _query_workhours(db, pid, year, filters, limit)
-        else:
-            result = {"rows": [], "columns": [], "total": 0, "error": f"未知数据源: {source}"}
-    except Exception as e:
-        # 失败时回滚事务（防止 asyncpg session 污染影响后续请求）
+        result = await adapter.execute(body, user=current_user, db=db)
+    except HTTPException as http_exc:
+        # 领域 4xx（FORBIDDEN_PROJECT / TARGET_UNRESOLVABLE / UNKNOWN_SOURCE /
+        # INVALID_SORT_FIELD …）原样上抛：不 rollback（编排链只读，无脏事务），
+        # 也不降级为 2xx。
+        # 超时 / 预算超限 / PII 越权额外记一条可区分审计（R5.5）——
+        # record_query_rejected 内部吞异常，审计失败不会掩盖这里的原始错误。
+        detail = http_exc.detail if isinstance(http_exc.detail, dict) else {}
+        await record_query_rejected(
+            user_id=current_user.id,
+            error_code=detail.get("error_code"),
+            source=source,
+            project_id=pid,
+            details={"status_code": http_exc.status_code},
+        )
+        raise
+    except Exception:
+        correlation_id = uuid.uuid4().hex
         try:
             await db.rollback()
         except Exception:
             pass
-        result = {"rows": [], "columns": [], "total": 0, "error": str(e)}
+        logger.exception(
+            "custom_query execute 失败 [correlation_id=%s source=%s project=%s]",
+            correlation_id, source, pid,
+        )
+        # 追踪号同时进响应头：异常响应体可能被网关/前端拦截改写，响应头是用户能
+        # 稳定复制给支持人员的那一份。
+        response.headers["X-Correlation-ID"] = correlation_id
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error_code": "INTERNAL_ERROR",
+                "message": "查询执行失败，请稍后重试；如持续失败请提供追踪号联系管理员",
+                "correlation_id": correlation_id,
+            },
+        )
 
-    # ─── 回写 Redis 缓存（仅成功结果，短 TTL）────────────────────────────
-    await set_cached_result(cache_key, result)
+    if result.get("cache_hit"):
+        response.headers["X-Cache"] = "HIT"
+
+    # 触达取数硬上限 → 明示 total 与后续分页可能不完整（R4.8）
+    cap_warning = fetch_cap_warning(len(result.get("rows") or []))
+    if cap_warning:
+        warnings = result.setdefault("warnings", [])
+        if isinstance(warnings, list):
+            warnings.append(cap_warning)
 
     # 审计日志（关键路径：底稿/合并/附注/调整 写日志，普通试算/报表/工时跳过避免噪声）
     # 查询执行按 60s 窗口节流为 1 条（advanced-query-module R14.4，audit_helper 单点接线）
@@ -1113,6 +1211,40 @@ async def execute_query(
     return result
 
 
+def _effective_limit(limit: int | None) -> int:
+    """取数器 SQL 实际使用的 LIMIT 值。
+
+    ``limit=None`` 表示**调用方不施加展示截断**（R4.8）：编排器要在取数之后才做
+    排序与切片，若取数层已按展示 ``limit`` 截断，``total`` 就恒等于截断行数、
+    前端无法判断是否还有下一页。
+
+    但 SQL 仍必须有硬上限 —— ``tb_ledger`` 实测约 697 万行，``LIMIT NULL``
+    一次查询即打满内存与连接。故 None 归一为 :data:`FETCH_HARD_CAP`，
+    ``total`` 在该上限内真实、触达上限时由 ``fetch_cap_warning`` 明示可能不完整。
+    """
+    if limit is None:
+        return FETCH_HARD_CAP
+    try:
+        value = int(limit)
+    except (TypeError, ValueError):
+        return FETCH_HARD_CAP
+    return max(1, min(value, FETCH_HARD_CAP))
+
+
+async def _legacy_business_fetcher(
+    req, resolved, db
+) -> tuple[list[dict], list]:
+    """编排器 ``business_fetcher`` 的 router 侧入口（R3.7 / R4.8）。
+
+    存在于 router 模块是为了让取数器 monkeypatch 与分派在同一命名空间生效；
+    实现委托 ``services.custom_query.business_fetchers.business_fetcher``，
+    不构成第二条分派路径。
+    """
+    from app.services.custom_query.business_fetchers import business_fetcher
+
+    return await business_fetcher(req, resolved, db)
+
+
 async def _query_report(db, pid, year, filters, limit):
     """报表数据查询：双源策略
 
@@ -1139,7 +1271,7 @@ async def _query_report(db, pid, year, filters, limit):
         ORDER BY row_number
         LIMIT :lim
     """
-    result = await db.execute(text(structure_sql), {"rt": report_type, "std": standard, "lim": limit})
+    result = await db.execute(text(structure_sql), {"rt": report_type, "std": standard, "lim": _effective_limit(limit)})
     structure_rows = result.fetchall()
 
     # 2) 项目金额（report_snapshot.data JSONB），仅传 pid + year 时可用
@@ -1199,7 +1331,7 @@ async def _query_trial_balance(db, pid, year, filters, limit):
         "unadjusted_amount, aje_adjustment, audited_amount "
         "FROM trial_balance WHERE project_id = :pid AND year = :y"
     )
-    params: dict = {"pid": pid, "y": year, "lim": limit}
+    params: dict = {"pid": pid, "y": year, "lim": _effective_limit(limit)}
     if filters.get("account_name"):
         query += " AND account_name LIKE :an"
         params["an"] = f"%{filters['account_name']}%"
@@ -1332,7 +1464,7 @@ async def _query_disclosure(db, pid, year, filters, limit):
                     "AND is_deleted = false AND table_data IS NOT NULL "
                     "ORDER BY sort_order NULLS LAST, note_section LIMIT :lim"
                 ),
-                {"pid": pid, "y": year, "lim": limit},
+                {"pid": pid, "y": year, "lim": _effective_limit(limit)},
             )
         note_flat: list[dict] = []
         note_cols: list[str] = []
@@ -1361,7 +1493,7 @@ async def _query_disclosure(db, pid, year, filters, limit):
     else:
         result = await db.execute(
             text("SELECT section_id, data FROM consol_note_data WHERE project_id = :pid AND year = :y LIMIT :lim"),
-            {"pid": pid, "y": year, "lim": limit},
+            {"pid": pid, "y": year, "lim": _effective_limit(limit)},
         )
     # 将附注数据展平为表格行（每个章节的每行数据变成一条记录）
     flat_rows = []
@@ -1393,7 +1525,7 @@ async def _query_adjustments(db, pid, year, filters, limit):
             "AND adjustment_type = :at AND is_deleted = false "
             "ORDER BY adjustment_no LIMIT :lim"
         ),
-        {"pid": pid, "y": year, "at": adj_type, "lim": limit},
+        {"pid": pid, "y": year, "at": adj_type, "lim": _effective_limit(limit)},
     )
     rows = [
         {
@@ -1454,7 +1586,7 @@ async def _query_workpaper(db, pid, year, filters, limit):
         LEFT JOIN wp_index wi ON wi.id = wp.wp_index_id
         WHERE wp.project_id = :pid AND wp.is_deleted = false
     """
-    params: dict = {"pid": pid, "lim": limit}
+    params: dict = {"pid": pid, "lim": _effective_limit(limit)}
     if filters.get("status"):
         sql += " AND wp.status = :st"
         params["st"] = filters["status"]
@@ -1765,7 +1897,7 @@ async def _query_account_balance(db, pid, year, filters, limit):
         FROM tb_balance
         WHERE project_id = :pid AND year = :y AND is_deleted = false
     """
-    params: dict = {"pid": pid, "y": year, "lim": limit}
+    params: dict = {"pid": pid, "y": year, "lim": _effective_limit(limit)}
     if filters.get("account_code"):
         sql += " AND account_code LIKE :ac"
         params["ac"] = f"{filters['account_code']}%"
@@ -1804,7 +1936,7 @@ async def _query_ledger_entries(db, pid, year, filters, limit):
         FROM tb_ledger
         WHERE project_id = :pid AND year = :y AND is_deleted = false
     """
-    params: dict = {"pid": pid, "y": year, "lim": limit}
+    params: dict = {"pid": pid, "y": year, "lim": _effective_limit(limit)}
     if filters.get("account_code"):
         sql += " AND account_code LIKE :ac"
         params["ac"] = f"{filters['account_code']}%"
@@ -1849,7 +1981,7 @@ async def _query_report_lines(db, pid, year, filters, limit):
         FROM report_config
         WHERE is_deleted = false
     """
-    params: dict = {"lim": limit}
+    params: dict = {"lim": _effective_limit(limit)}
     if filters.get("report_type"):
         sql += " AND report_type = :rt"
         params["rt"] = filters["report_type"]
@@ -1892,7 +2024,7 @@ async def _query_workhours(db, pid, year, filters, limit):
         FROM work_hours
         WHERE is_deleted = false
     """
-    params: dict = {"lim": limit}
+    params: dict = {"lim": _effective_limit(limit)}
     # 可选项目过滤（pid 可能为空字符串）
     if pid:
         sql += " AND project_id = :pid"
@@ -1943,7 +2075,9 @@ class TemplateCreateRequest(BaseModel):
     description: str | None = None
     data_source: str = Field(..., min_length=1, max_length=50)
     config: dict
-    scope: Literal["private", "global"] = "private"
+    # legacy `global` / `personal` 仍接受为输入，输出恒为 canonical（R8.1）
+    scope: Literal["private", "team", "project", "public", "global", "personal"] = "private"
+    shared_project_ids: list[str] = Field(default_factory=list)
 
 
 class TemplateUpdateRequest(BaseModel):
@@ -1951,7 +2085,14 @@ class TemplateUpdateRequest(BaseModel):
     description: str | None = None
     data_source: str | None = None
     config: dict | None = None
-    scope: Literal["private", "global"] | None = None
+    scope: Literal["private", "team", "project", "public", "global", "personal"] | None = None
+    shared_project_ids: list[str] | None = None
+
+
+class TemplateExecuteRequest(BaseModel):
+    """模板执行请求：只带目标项目，其余查询参数取自模板 config。"""
+
+    project_id: str
 
 
 class TemplateResponse(BaseModel):
@@ -1968,19 +2109,143 @@ class TemplateResponse(BaseModel):
 
 
 def _serialize_template(tpl: CustomQueryTemplate, current_user_id: uuid.UUID) -> dict:
+    # scope 经 TemplateScopeAdapter 归一后对外呈现：legacy `global` / `personal`
+    # 只作为**输入**接受，输出恒为 canonical（`public` / `private`），前端因此不必
+    # 各自维护一份别名表（R8.1）。
+    config = tpl.config or {}
+    normalized = TemplateScopeAdapter.normalize_record(
+        tpl.scope,
+        getattr(tpl, "shared_project_ids", None),
+        config_project_id=config.get("project_id") if isinstance(config, dict) else None,
+    )
+    owner_id = getattr(tpl, "creator_id", None) or tpl.created_by
     return {
         "id": str(tpl.id),
         "name": tpl.name,
         "description": tpl.description,
         "data_source": tpl.data_source,
-        "config": tpl.config or {},
-        "scope": tpl.scope,
+        "config": config,
+        "scope": normalized.scope,
+        "shared_project_ids": [str(pid) for pid in normalized.shared_project_ids],
         "created_by": str(tpl.created_by),
-        "is_owner": tpl.created_by == current_user_id,
+        "is_owner": owner_id == current_user_id,
         "created_at": tpl.created_at.isoformat() if tpl.created_at else None,
         "updated_at": tpl.updated_at.isoformat() if tpl.updated_at else None,
     }
 
+
+# ── 依赖可 patch 符号的授权 helper 留在本模块 ──────────────────────────────
+# 契约测试 monkeypatch 的是本模块命名空间里的 get_visible_project_ids /
+# require_project_access；helper 若搬到别的模块会读那边的全局名、替身失效。
+async def _assert_template_scope_edit(
+    normalized: "NormalizedTemplateScope",
+    *,
+    current_user: Any,
+    db: Any,
+) -> None:
+    """对分享目标**逐个**鉴权（R8.3）。
+
+    顺序按 UUID 文本升序（``TemplateScopeAdapter`` 已排序），使鉴权与落库顺序一致、
+    失败定位稳定。改造前分享列表整体不鉴权 —— 用户可把模板分享给无权项目。
+    """
+    for project_id in normalized.shared_project_ids:
+        dependency = require_project_access("edit")
+        # 传 UUID 原值而非字符串：依赖内部按 UUID 比对可访问集合，字符串会恒不命中。
+        await dependency(
+            project_id=project_id, current_user=current_user, db=db
+        )
+
+
+async def _assert_writeback_authorized(
+    *,
+    body: Any,
+    db: AsyncSession,
+    current_user: Any,
+    operation: str,
+) -> None:
+    """回写类端点的统一准入（R9.2 / R9.3 / R9.4）。
+
+    校验顺序固定，且每一步都必须在**触达 preview/snapshot 服务之前**完成：
+
+    1. 项目可见性 —— 不可见即 403，此时尚未查权限表（无权用户不该触发额外查询）；
+    2. 编辑权限 —— 只读成员 403（``readonly`` / ``view`` 等非 ``edit`` 级别）；
+    3. 逐目标项目归属 —— 多目标中任一不可访问即整体 403，**不产生部分写入**。
+
+    第 3 步是「全有或全无」的落点：改造前 cell-writeback 只校验请求体顶层的
+    project_id，targets 里携带的其它 project_id 从不校验。
+    """
+    project_uuid = uuid.UUID(str(body.project_id))
+
+    # ① 项目可见性
+    visible_ids = await get_visible_project_ids(current_user, db)
+    if project_uuid not in visible_ids:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error_code": "PROJECT_NOT_VISIBLE",
+                "message": "无权访问该项目数据",
+            },
+        )
+
+    # ② 编辑权限（admin / partner 免查）
+    role_value = getattr(getattr(current_user, "role", None), "value", None)
+    if role_value not in ("admin", "partner"):
+        pu_result = await db.execute(
+            select(ProjectUser).where(
+                ProjectUser.project_id == project_uuid,
+                ProjectUser.user_id == current_user.id,
+                ProjectUser.is_deleted == False,  # noqa: E712
+            )
+        )
+        member = pu_result.scalar_one_or_none()
+        level = getattr(getattr(member, "permission_level", None), "value", None)
+        if level != "edit":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error_code": "WRITEBACK_FORBIDDEN",
+                    "message": f"只读用户不可执行{operation}",
+                },
+            )
+
+    # ③ 逐目标项目归属（全有或全无）
+    from app.services.custom_query.ownership_guard import ownership_guard
+
+    seen: set[str] = set()
+    for target in body.targets or []:
+        target_pid = (
+            target.get("project_id")
+            if isinstance(target, dict)
+            else getattr(target, "project_id", None)
+        ) or str(body.project_id)
+        if target_pid in seen:
+            continue
+        seen.add(target_pid)
+        await ownership_guard.assert_target_accessible(
+            user=current_user, project_id=target_pid, db=db
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 已抽到伴生模块（pre-commit 行数门禁指引「优先拆分或抽伴生模块」）：
+#   · 回写预览/确认端点组 → routers/custom_query_writeback.py
+#   · 模板作用域治理 helper → services/custom_query/template_scope_guard.py
+# 此处 re-export，保持契约测试对 router_module.writeback_preview /
+# _normalize_template_scope 等的直调与 monkeypatch 不变。
+# ─────────────────────────────────────────────────────────────────────────────
+from app.routers.custom_query_writeback import (  # noqa: E402
+    WritebackConfirmRequest,
+    WritebackPreviewRequest,
+    WritebackTargetSpec,
+    _to_writeback_targets,
+    writeback_confirm,
+    writeback_preview,
+)
+from app.services.custom_query.template_scope_guard import (  # noqa: E402
+    _assert_template_visible,
+    _normalize_template_scope,
+    _template_owner_id,
+)
 
 @router.get("/templates")
 async def list_templates(
@@ -2015,17 +2280,34 @@ async def create_template(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """创建查询模板。"""
-    tpl = CustomQueryTemplate(
-        id=uuid.uuid4(),
+    """创建查询模板（R8.1~R8.4）。
+
+    分享目标在**任何写入之前**逐个鉴权，任一失败即 rollback 后 403 —— 保证不落库
+    部分结果。改造前 router 直接 `db.add` + `commit`，分享列不鉴权也不归一。
+    """
+    normalized = _normalize_template_scope(
+        body.scope, body.shared_project_ids, body.config
+    )
+    try:
+        await _assert_template_scope_edit(
+            normalized, current_user=current_user, db=db
+        )
+    except HTTPException:
+        # 写前回滚：本请求可能已在同一 session 里读过数据，显式回滚避免脏事务
+        # 影响后续请求（R8.4）。
+        await db.rollback()
+        raise
+
+    tpl = await template_service.save_template(
+        db=db,
+        creator_id=current_user.id,
         name=body.name,
+        scope=normalized.scope,
+        config=body.config,
         description=body.description,
         data_source=body.data_source,
-        config=body.config,
-        scope=body.scope,
-        created_by=current_user.id,
+        shared_project_ids=list(normalized.shared_project_ids),
     )
-    db.add(tpl)
     await db.commit()
     await db.refresh(tpl)
     return _serialize_template(tpl, current_user.id)
@@ -2066,9 +2348,29 @@ async def update_template(
     tpl = await db.get(CustomQueryTemplate, tpl_uuid)
     if not tpl:
         raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
-    user_role = getattr(current_user, "role", "")
-    if tpl.created_by != current_user.id and user_role != "admin":
+    await _assert_template_visible(tpl, current_user=current_user, db=db)
+    # 仅创建者可改 —— **admin 也不例外**（R8.5）。模板承载的是个人查询习惯与分享
+    # 意图，管理员改他人模板会让对方看到与自己意图不符的结果却无从察觉。
+    if _template_owner_id(tpl) != current_user.id:
         raise HTTPException(status_code=403, detail={"error_code": "ONLY_OWNER_CAN_UPDATE"})
+
+    if body.scope is not None or body.shared_project_ids is not None:
+        normalized = _normalize_template_scope(
+            body.scope if body.scope is not None else tpl.scope,
+            body.shared_project_ids
+            if body.shared_project_ids is not None
+            else getattr(tpl, "shared_project_ids", None),
+            body.config if body.config is not None else tpl.config,
+        )
+        try:
+            await _assert_template_scope_edit(
+                normalized, current_user=current_user, db=db
+            )
+        except HTTPException:
+            await db.rollback()
+            raise
+        tpl.scope = normalized.scope
+        tpl.shared_project_ids = list(normalized.shared_project_ids)
 
     if body.name is not None:
         tpl.name = body.name
@@ -2092,7 +2394,7 @@ async def delete_template(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """删除模板（仅创建者或 admin）。"""
+    """删除模板 —— **仅创建者**，admin 亦不可删他人模板（R8.5）。"""
     try:
         tpl_uuid = uuid.UUID(template_id)
     except (TypeError, ValueError):
@@ -2100,12 +2402,55 @@ async def delete_template(
     tpl = await db.get(CustomQueryTemplate, tpl_uuid)
     if not tpl:
         raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
-    user_role = getattr(current_user, "role", "")
-    if tpl.created_by != current_user.id and user_role != "admin":
-        raise HTTPException(status_code=403, detail={"error_code": "ONLY_OWNER_OR_ADMIN_CAN_DELETE"})
+    await _assert_template_visible(tpl, current_user=current_user, db=db)
+    if _template_owner_id(tpl) != current_user.id:
+        raise HTTPException(status_code=403, detail={"error_code": "ONLY_OWNER_CAN_DELETE"})
     await db.delete(tpl)
     await db.commit()
     return None
+
+
+@router.post("/templates/{template_id}/execute")
+async def execute_template(
+    template_id: str,
+    body: TemplateExecuteRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """执行模板 —— 复用 execute 主链路并对目标项目重新鉴权（R8.6）。
+
+    关键在于**不另走旁路**：模板只是一组查询参数，执行仍经 `execute_query` →
+    `ExecuteCompatibilityAdapter` → 编排器，因此归属校验、分页、审计与直接查询
+    完全一致。改造前根本没有此端点，模板「执行」由前端把 config 拼成 execute
+    请求体自行发起，服务端无从校验模板可见性。
+    """
+    try:
+        tpl_uuid = uuid.UUID(template_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail={"error_code": "INVALID_TEMPLATE_ID"})
+    tpl = await db.get(CustomQueryTemplate, tpl_uuid)
+    if not tpl:
+        raise HTTPException(status_code=404, detail={"error_code": "TEMPLATE_NOT_FOUND"})
+
+    # 模板可见即可执行（含 team/project 分享），判定复用 TemplateService
+    await template_service.assert_executable(tpl, user=current_user, db=db)
+
+    config = tpl.config if isinstance(tpl.config, dict) else {}
+    query_body = QueryRequest(
+        project_id=str(body.project_id),
+        year=int(config.get("year") or 0),
+        source=str(config.get("source") or tpl.data_source or ""),
+        filters=config.get("filters") or {},
+        columns=list(config.get("selected_columns") or config.get("columns") or []),
+        limit=int(config.get("page_size") or config.get("limit") or 500),
+        offset=int(config.get("offset") or 0),
+        sort=list(config.get("sort") or []),
+        group=config.get("group"),
+        pivot=config.get("pivot"),
+        acnr_targets=list(config.get("acnr_targets") or []),
+    )
+    return await execute_query(query_body, response, db, current_user)
 
 
 # ─── Batch Execute Endpoint (Req 1) ──────────────────────────────────────────
@@ -2378,12 +2723,18 @@ async def cell_writeback(
         except Exception as audit_e:
             logger.warning("audit_log for cell_writeback failed: %s", audit_e)
 
-    return {
+    response: dict = {
         "success": True,
         "updated_at": write_result.get("updated_at"),
         "addr_id": write_result.get("addr_id"),
         "column_metadata": write_result.get("column_metadata"),
     }
+    # 下游联动（file_version / prefill_stale / WORKPAPER_SAVED → cross_ref·stale·SSE）
+    # 未触发时必须透传给调用方 —— 数据写回了但联动没跑，静默返回 success 会让用户
+    # 以为一切正常，而其实别处的取数不会刷新。
+    if write_result.get("warnings"):
+        response["warnings"] = write_result["warnings"]
+    return response
 
 
 # ─── GIN Index Health Endpoint ───────────────────────────────────────────────
@@ -2440,9 +2791,8 @@ async def cross_sheet_trace(
     - 引用目标缺失标 missing=True 不阻塞其它分支
     - 敏感操作不参与审计节流（每次必记）
     """
-    from app.services.custom_query.cross_sheet_resolver import (
-        cross_sheet_resolver,
-        RefChainResponse,
+    from app.services.custom_query.cross_sheet_trace_orchestrator import (
+        cross_sheet_trace_orchestrator,
     )
 
     # ─── OwnershipGuard 单点准入（BEFORE 任何数据读取）R9.1/R9.2/R9.5 ─────────
@@ -2475,11 +2825,19 @@ async def cross_sheet_trace(
         except (json.JSONDecodeError, TypeError):
             parsed_data = {}
 
-    # 执行 BFS 追溯
-    trace_result = cross_sheet_resolver.resolve(
-        parsed_data=parsed_data,
-        sheet_name=sheet_name,
-        cell_ref=cell_ref,
+    # 执行溯源：同步纯 BFS + async ACNR addr_id 解析（经 orchestrator，R4.2/R4.4/R8.4）
+    #
+    # 为什么不能直接调 cross_sheet_resolver.resolve()：本端点是 async，调用时事件循环
+    # 正在运行，而同步 BFS 内部的 `_sync_resolve` 一探测到 running loop 就返回 None
+    # 降级 → 每个链节点的 addr_id 恒为 None，溯源结果无法跳转、审计日志也拿不到真
+    # addr_id。异步 IO 由 orchestrator 上浮：BFS 仍是同步纯函数，addr_id 经
+    # AddressingService 一次性并发解析后合并回链。
+    trace_result = await cross_sheet_trace_orchestrator.trace(
+        parsed_data,
+        sheet_name,
+        cell_ref,
+        project_id=project_id,
+        db=db,
         max_depth=max_depth,
     )
 
@@ -2488,11 +2846,10 @@ async def cross_sheet_trace(
     try:
         from app.services.custom_query.audit_helper import record_cross_sheet_trace
 
-        # 目标 addr_id 集合：根目标 + 溯源链节点（best-effort，本端点走同步 BFS 无 orchestrator addr_id）
+        # 目标 addr_id 集合：根目标 + 溯源链节点的**真** addr_id（经 orchestrator 解析）。
+        # 未能解析的节点（addr_id=None，优雅降级）退回 uri 形态占位，保证审计留痕完整。
         trace_addr_ids = [f"{wp_code}/{sheet_name}/{cell_ref}"]
-        trace_addr_ids.extend(
-            getattr(node, "uri", None) for node in trace_result.chain
-        )
+        trace_addr_ids.extend(node.addr_id or node.uri for node in trace_result.chain)
 
         await record_cross_sheet_trace(
             user_id=current_user.id,

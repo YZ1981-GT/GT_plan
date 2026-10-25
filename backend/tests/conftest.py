@@ -250,3 +250,46 @@ def test_all_models_registered():
         f"以下模型的 __tablename__ 未注册到 Base.metadata.tables:\n"
         + "\n".join(f"  {tbl} (定义于 {loc})" for tbl, loc in sorted(missing.items()))
     )
+
+
+# ─── 单例替身的 shadow 清理（跨文件污染防护）──────────────────────────────────
+# 背景（实测踩过）：多处测试用
+#   monkeypatch.setattr(ownership_guard, "assert_target_accessible", fake)
+# 或「读出原绑定方法 → finally 赋回实例」的方式给**单例实例**打替身。两种写法在恢复时
+# 都会往实例 ``__dict__`` 里留下一个同名属性（哪怕值就是原绑定方法）——
+# monkeypatch 的 undo 是 ``setattr(实例, name, 保存的绑定方法)``，不是删除。
+#
+# 该残留属性会**遮蔽类属性**，于是之后任何
+#   patch("app.routers.disclosure_notes.OwnershipGuard.assert_target_accessible")
+# （类级替身）都打不上 —— 越权用例静默变成「真去查库」。症状是「单跑某文件全绿、
+# 合跑时另一个文件里的 5 条 trace 用例莫名变红」，最难定位的一类假绿/假红。
+#
+# 逐处改成「patch 类」当然更正确，但那要求每个作者都记得；这里做一道兜底：每个测试
+# 结束后把这类单例上的实例级覆盖删掉，回落到类属性。
+# 配套结构守卫见 test_disclosure_notes_project_gate_contract.py
+# ::TestOwnershipGuardPatchabilityNotShadowed。
+_SINGLETON_SHADOW_TARGETS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "app.services.custom_query.ownership_guard",
+        "ownership_guard",
+        ("assert_target_accessible",),
+    ),
+)
+
+
+@pytest.fixture(autouse=True)
+def _drop_singleton_method_shadows():
+    """测试结束后清掉单例上的实例级方法覆盖（详见上方注释）。"""
+    yield
+    import importlib
+
+    for module_path, attr, methods in _SINGLETON_SHADOW_TARGETS:
+        try:
+            module = importlib.import_module(module_path)
+        except Exception:  # pragma: no cover - 模块不可导入时无需清理
+            continue
+        singleton = getattr(module, attr, None)
+        if singleton is None or not hasattr(singleton, "__dict__"):
+            continue
+        for method in methods:
+            singleton.__dict__.pop(method, None)
