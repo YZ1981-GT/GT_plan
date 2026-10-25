@@ -508,10 +508,17 @@ R1.5 的附注模板绑定未重生成（理由见 §10.3 第 19 条）。
   「报表域默认置 0」为锚点（注释改写即红、取数改了反而不一定红），改为按行为判（PREV / AUX 经报表路径求值为 0）；
   `test_adj_formula_function::test_adj_not_in_report_engine_zero_substitution_list` 查的是兼容入口 `evaluate_formula` 的源码（拆分后恒找不到列表，
   预存红），改为查求值主体、按 AST 认列表 / 元组。`preset_acnr_migration._FALLBACK_KNOWN_FUNCS`（内核注册表的手抄副本，内核导入失败时兜底）
-  漏同步 `TB_AUX / LEDGER / COUNT_LEDGER / LEDGER_DETAIL / PLACEHOLDER`（unified-formula-registry 登记进内核时没跟上），补齐。
-- **变异**：MR66a~MR66j（调试上下文不取数 / 调整额口径不分作用域两向 / 缺口不进 warnings / 加回 `enable_prev` / 表间审核不严格取数 /
-  `except Exception` 又算受保护 / 兜底函数集漏同步 / 报表路径 PREV 改成真取数 / ADJ 加进置 0 列表）、MG1~MG10（守卫各环节失效）、
+  漏同步 `TB_AUX / LEDGER / COUNT_LEDGER / LEDGER_DETAIL / PLACEHOLDER`（unified-formula-registry 登记进内核时没跟上），补齐；同一原因，
+  `_known_acnr_funcs` 原样返回内核函数集 ⇒ 序时账三函数与 `PLACEHOLDER` 登记进内核后被判「已迁移」（模板库公式页随之显示已迁移），
+  与待迁移白名单、Req 24.3（Ledger 标为待迁移）及两条用例矛盾（预存红）⇒ 改为扣除白名单（函数要转为已迁移，从白名单删掉即可）。
+- **变异**：MR66a~MR66k（调试上下文不取数 / 调整额口径不分作用域两向 / 缺口不进 warnings / 加回 `enable_prev` / 表间审核不严格取数 /
+  `except Exception` 又算受保护 / 兜底函数集漏同步 / 报表路径 PREV 改成真取数 / ADJ 加进置 0 列表 / 待迁移白名单不扣除）、MG1~MG10（守卫各环节失效）、
   MS1~MS5（快照与三处归档证据改回写仓库）全部打红在预期断言上，跑完逐字节恢复。
+- **回归**（提交树 `62d30208e` 干净检出 vs `bf7685b1d`）：引用改动模块的 66 个文件 + 两个归档证据测试目录：新增失败 0、消除 2；
+  引用 `preset_acnr_migration` / 新守卫的 17 个文件（与上一组重叠 2 个）：新增 0、消除 4（含上一组的 2 例）；第二批 190 个候选文件
+  （改动后含守卫）：新增 0。合计新增 0、消除 4。三轮跑完 `git status` 均干净、
+  守卫无报告。另一处首轮红 `procedure_trim::test_live_project_standard_states_both_exist`（读真库项目的准则设置状态）复跑两边均过，
+  属运行期间真库数据变化，与本节无关。前端两个棘轮 spec 8 passed。
 - **范围外（登记，未改）**：
   1. `routers/wp_prefill_preview.py` 的「预览」端点注释写「不写入」，实际调用会写底稿的 `prefill_workpaper_real`（预览即应用）；
      年度兜底 2025 已进 `audit-year-calendar-fallback-ratchet` 的基线。
