@@ -4,10 +4,14 @@ spec: d2-ar-disclosure-template-alignment — Task 7.3
 Source: `D2-1至D2-4 应收账款-审定表明细表（Leap-常规程序）.xlsx` / `附注披露信息(上市公司)`
 
 卡点目的：`scripts/fix/rebuild_note_from_md.py` 从 md 重建模板时会把多级表头压扁、
-把双期两张表并成一张。本文件在 CI 阶段拦住这种回退，提示重跑
-`scripts/fix/fix_note_ar_listed_structure.py`。
+把双期两张表并成一张。本文件在 CI 阶段拦住这种回退。
 
-Validates: Requirements 7.1~7.7；Property 8（脚本幂等）
+本节的修订脚本是 `scripts/fix/fix_note_d2_ar_structure.py`（列 / 表头 / 编制提示 / 表名，幂等与 `--check`
+由 `tests/test_note_d2_structure.py` 守）；原 `fix_note_ar_listed_structure.py` 已删除：它没有 `--check`、
+被 d2 脚本取代，写入时会把各表 `columns` 清空、把继续涉入表改回旧名（R8.4 批 9b-2）。本文件只守行骨架与
+说明文本这些 d2 脚本不写的内容。
+
+Validates: Requirements 7.1~7.7
 """
 
 from __future__ import annotations
@@ -21,7 +25,7 @@ import pytest
 _BACKEND = Path(__file__).resolve().parents[2]
 TEMPLATE_PATH = _BACKEND / "data" / "note_template_listed.json"
 SECTION_NUMBER = "五、5"
-_FIX_HINT = "请重跑 python scripts/fix/fix_note_ar_listed_structure.py"
+_FIX_HINT = "请重跑 python scripts/fix/fix_note_d2_ar_structure.py"
 
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
@@ -114,7 +118,8 @@ def test_derecognition_and_continuing_involvement_tables_exist(tables_by_name: d
     assert _labels(der["headers"]) == [
         "项  目", "转移方式", "终止确认金额", "与终止确认相关的利得或损失",
     ]
-    ci = tables_by_name.get("转移应收账款且继续涉入形成的资产、负债")
+    # 表名取底稿 R172 原字（带「的金额」），与前端 `D2_TABLE_NAMES.listed.continuedInvolvement` 同名
+    ci = tables_by_name.get("转移应收账款且继续涉入形成的资产、负债的金额")
     assert ci is not None, f"缺继续涉入表（源模板 r172）；{_FIX_HINT}"
     assert _labels(ci["headers"]) == [
         "项  目", "资产转移方式", "继续涉入形成的资产金额", "继续涉入形成的负债金额",
@@ -156,15 +161,3 @@ def test_text_sections_cover_derecognition_and_continuing_involvement(section: d
     assert "不附追索权的应收账款保理" in joined, f"缺说明 A 范式；{_FIX_HINT}"
     assert "附追索权的应收账款保理" in joined, f"缺说明 B 范式；{_FIX_HINT}"
     assert "继续涉入" in joined, f"缺继续涉入说明；{_FIX_HINT}"
-
-
-# ─── Property 8：修订脚本幂等 ────────────────────────────────────────────────
-
-def test_align_script_is_idempotent(section: dict) -> None:
-    from scripts.fix.fix_note_ar_listed_structure import align_section
-
-    once = align_section(section)
-    twice = align_section(once)
-    assert once == twice, "align_section 非幂等"
-    # 当前模板已是对齐态 → 再跑一次不产生任何变化
-    assert once == section, f"模板与脚本产物不一致；{_FIX_HINT}"

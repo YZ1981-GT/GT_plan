@@ -23,6 +23,7 @@ import {
   F1_SOE_AGING_GROUPS,
   F1_SOE_AMOUNT_LABEL,
   F1_SOE_COLUMNS,
+  F1_SOE_NOTE_AGING_LABELS,
   F1_SOE_PCT_LABEL,
   F1_SOE_SUBTABLE,
 } from '../f1DisclosureSyncPayload'
@@ -111,31 +112,31 @@ describe('附注 §五、7 / §八、7 结构要求', () => {
     }
   })
 
-  it('按账龄表为 5 列两级表头 + 7 行（各段 + 小计 + 减：减值准备 + 合计）', () => {
+  it('按账龄表两级表头 + 7 行（各段 + 小计 + 减：减值准备 + 合计）；国企每期多「坏账准备」列', () => {
     // 🔴 列头字面**引用常量**（源 xlsx 逐格实证，含空格）：写死字面量必再分叉
+    const L = F1_SOE_NOTE_AGING_LABELS
     const cases = [
       [
         listedSection, F1_LISTED_SUBTABLE.AGING,
         F1_LISTED_AGING_GROUPS.end, F1_LISTED_AGING_GROUPS.prior,
-        F1_LISTED_AMOUNT_LABEL, F1_LISTED_PCT_LABEL,
+        [F1_LISTED_AMOUNT_LABEL, F1_LISTED_PCT_LABEL], ['amount', 'pct'],
       ],
       [
+        // 底稿 F1 国企第 8~10 行三层表头压两层（R8.4 批 9b-2）
         soeSection, F1_SOE_SUBTABLE.AGING,
         F1_SOE_AGING_GROUPS.end, F1_SOE_AGING_GROUPS.prior,
-        F1_SOE_AMOUNT_LABEL, F1_SOE_PCT_LABEL,
+        [L.amount, L.pct, L.provision], ['amount', 'pct', 'provision'],
       ],
     ] as const
-    for (const [section, name, endGroup, priorGroup, amountLabel, pctLabel] of cases) {
+    for (const [section, name, endGroup, priorGroup, leaves, kinds] of cases) {
       const t = table(section, name)
-      expect(t.headers, name).toEqual([
-        F1_AGING_LABEL_COL, amountLabel, pctLabel, amountLabel, pctLabel,
-      ])
+      expect(t.headers, name).toEqual([F1_AGING_LABEL_COL, ...leaves, ...leaves])
       expect(t._column_groups, name).toEqual([
-        { group: endGroup, start: 1, span: 2 },
-        { group: priorGroup, start: 3, span: 2 },
+        { group: endGroup, start: 1, span: leaves.length },
+        { group: priorGroup, start: 1 + leaves.length, span: leaves.length },
       ])
       expect((t.columns ?? []).map((c) => c.key), name).toEqual([
-        'label', 'end_amount', 'end_pct', 'prior_amount', 'prior_pct',
+        'label', ...kinds.map((k) => `end_${k}`), ...kinds.map((k) => `prior_${k}`),
       ])
       const labels = (t.rows ?? []).map((r) => r.label)
       expect(labels.slice(-3), name).toEqual(['小计', '减：减值准备', '合计'])

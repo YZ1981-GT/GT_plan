@@ -62,7 +62,7 @@ describe('G7 disclosure EventBus payload shape', () => {
         accountCode: G7_ACCOUNT_CODE,
         section: 'soe',
         payloads,
-        text: '【七、子公司使用企业集 · 重大限制说明】\n存在资金转移限制。',
+        text: '【七、子公司使用企业集团资产和清偿企业集团债务的重大限制 · 重大限制说明】\n存在资金转移限制。',
       },
     }))
 

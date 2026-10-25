@@ -90,6 +90,31 @@ class TestResolveStandaloneSection:
         assert resolve_standalone_table_name("soe", "五-4-3") == "按坏账准备计提方法分类披露应收票据（续：期初数）"
         assert resolve_standalone_table_name("soe", "五-4-2") == "按坏账准备计提方法分类披露应收票据（期末数）"
 
+    def test_title_aliases_map_back_to_standalone_tables(self):
+        """合并表标题是 Word 提示句 / 另一种说法时按 ``_TITLE_ALIASES`` 认回单体表（2026-10-25 批 9b-2）。
+
+        上市「期末本公司已质押的应收票据」应收票据章取 五、4 底稿表、应收款项融资章仍取 五、6 同名表（按本合并章节取）。
+        """
+        assert resolve_standalone_section("listed", "五-4-2") == "五、4"
+        assert resolve_standalone_table_name("listed", "五-4-2") == "期末已质押的应收票据"
+        assert resolve_standalone_table_name("listed", "五-4-12") == "本期转回或收回金额重要的坏账准备"
+        assert resolve_standalone_section("listed", "五-6-3") == "五、6"
+        assert resolve_standalone_table_name("listed", "五-6-3") == "期末本公司已质押的应收票据"
+        assert resolve_standalone_table_name("listed", "五-22-5") == "未办妥产权证书的固定资产情况"
+        assert resolve_standalone_table_name("soe", "五-29-1") == "（1）商誉账面价值"
+
+    def test_committed_mapping_matches_generator(self):
+        """入库映射 == 生成器按现模板的产物（单体改表名 / 删表 / 补表后必须重跑生成器，否则合并取数按旧表名找不到表）。"""
+        import importlib.util
+
+        path = DATA_DIR.parent / "scripts" / "seed" / "gen_consol_standalone_note_mapping.py"
+        spec = importlib.util.spec_from_file_location("gen_consol_mapping_for_test", path)
+        gen = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gen)
+        committed = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))["mappings"]
+        for template_type in ("soe", "listed"):
+            assert gen.generate(template_type)[0] == committed[template_type], template_type
+
     def test_identical_candidates_are_not_guessed(self):
         """上市 五-9-4（合并表头错列）：单体按组合 / 按库龄组合两张表同构，不按次要特征硬选。"""
         assert resolve_standalone_table_name("listed", "五-9-4") is None

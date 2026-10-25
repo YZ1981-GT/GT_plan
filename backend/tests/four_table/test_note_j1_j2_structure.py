@@ -220,12 +220,16 @@ class TestJ1ListedDcPlanNumbering:
 
 
 class TestFixScriptsPassCheck:
-    """两个幂等脚本 --check 必须通过。"""
+    """两个幂等脚本 --check 必须通过。
+
+    J1 的修订脚本是 ``fix_note_j1_employee_comp_structure.py``：原 ``fix_note_j1_compensation_structure.py``
+    与它同管 五、40 / 八、40 而目标相反，已并入并删除（R8.4 批 9b-2，2026-10-25）。
+    """
 
     @pytest.mark.parametrize(
         "script",
         [
-            "scripts/fix/fix_note_j1_compensation_structure.py",
+            "scripts/fix/fix_note_j1_employee_comp_structure.py",
             "scripts/fix/fix_note_j2_dbp_structure.py",
         ],
     )

@@ -5,7 +5,7 @@
 - 12 个章节各恰 1 张表，表名为科目名（泄漏名 ``项  目`` 已清除）
 - 每张表带 ``columns``（显式 ``flat``）+ ``guidance``，无 ``_column_groups``
 - 无占位说明行（``可无限量添加行`` / ``......`` / ``……``）与 ``header_label`` 假行
-- K10 国企 4 列（末列「是否为政府补助」）、K12/K13 两版 4 列（末列非经常性损益）
+- K10 两版 3 列（国企按底稿删去「是否为政府补助」，R8.4 批 9b-2）、K12/K13 两版 4 列（末列非经常性损益）
 - 上市侧章节号 = 模板现存编号（原为 ``三、`` 章 md 重建截断值，2026-10-16 按 Word 改挂为 ``五、77`` 等）
 
 spec: .kiro/specs/k-cycle-disclosure-alignment/ Task 4.3
@@ -100,7 +100,7 @@ def test_column_counts_per_cycle() -> None:
     expected = {
         ("K8", "listed"): 3, ("K8", "soe"): 3,
         ("K9", "listed"): 3, ("K9", "soe"): 3,
-        ("K10", "listed"): 3, ("K10", "soe"): 4,
+        ("K10", "listed"): 3, ("K10", "soe"): 3,
         ("K11", "listed"): 3, ("K11", "soe"): 3,
         ("K12", "listed"): 4, ("K12", "soe"): 4,
         ("K13", "listed"): 4, ("K13", "soe"): 4,
@@ -114,9 +114,10 @@ def test_column_counts_per_cycle() -> None:
 
 
 def test_extra_column_labels() -> None:
+    # K10 国企按底稿 3 列（R8.4 批 9b-2 删去随 Word 多出的「是否为政府补助」），合计后结构行「其中：政府补助」保留
     k10_soe = _load("soe", "八、69")["tables"][0]
-    assert k10_soe["columns"][3]["label"] == "是否为政府补助"
-    assert k10_soe["columns"][3]["key"] == "is_gov_grant"
+    assert [c["key"] for c in k10_soe["columns"]] == ["label", "current_amount", "prior_amount"]
+    assert [r["label"] for r in k10_soe["rows"]][-1] == "其中：政府补助"
     for variant, section in (("listed", "五、79"), ("soe", "八、76")):
         tbl = _load(variant, section)["tables"][0]
         assert tbl["columns"][3]["label"] == "计入当期非经常性损益的金额"

@@ -291,7 +291,7 @@
   "variant": "listed_consolidated",
   "kind": "table_columns",
   "key": "五、22#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = h1-fixed-assets-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
@@ -309,25 +309,25 @@
   "variant": "listed_consolidated",
   "kind": "table_columns",
   "key": "五、26#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = i-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
   "kind": "table_columns",
   "key": "五、28#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = i-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
   "kind": "table_columns",
   "key": "五、28#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = i-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
   "kind": "table_columns",
   "key": "五、28#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = i-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
@@ -350,66 +350,6 @@
  {
   "variant": "listed_consolidated",
   "kind": "table_columns",
-  "key": "五、34#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = g-cycle-extraction-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、34#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = g-cycle-extraction-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、4#t10",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、4#t12",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、4#t13",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、4#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、4#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、4#t7",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、4#t8",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、4#t9",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
   "key": "五、5#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
@@ -424,18 +364,6 @@
   "kind": "table_columns",
   "key": "五、57#t1",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、6#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_columns",
-  "key": "五、6#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
@@ -614,20 +542,8 @@
  {
   "variant": "listed_consolidated",
   "kind": "table_count",
-  "key": "五、4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_count",
   "key": "五、5",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_count",
-  "key": "五、6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
@@ -717,7 +633,7 @@
   "variant": "listed_consolidated",
   "kind": "table_headers",
   "key": "五、28#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = i-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
@@ -740,6 +656,12 @@
  {
   "variant": "listed_consolidated",
   "kind": "table_headers",
+  "key": "五、4#t10",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "table_headers",
   "key": "五、4#t11",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
@@ -752,20 +674,50 @@
  {
   "variant": "listed_consolidated",
   "kind": "table_headers",
+  "key": "五、4#t5",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "table_headers",
+  "key": "五、4#t6",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "table_headers",
+  "key": "五、4#t7",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "table_headers",
+  "key": "五、40#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j1-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "table_headers",
+  "key": "五、40#t1",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j1-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "table_headers",
+  "key": "五、40#t2",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j1-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "table_headers",
   "key": "五、43#t3",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l3_l4_structure.py（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
   "kind": "table_headers",
-  "key": "五、45#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l3_l4_structure.py（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_headers",
   "key": "五、46#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l_cycle_structure_v2（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l3_l4_structure.py（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
@@ -789,19 +741,19 @@
   "variant": "listed_consolidated",
   "kind": "table_headers",
   "key": "五、49#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
   "kind": "table_headers",
   "key": "五、49#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
   "kind": "table_headers",
   "key": "五、49#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
@@ -866,7 +818,7 @@
  {
   "variant": "listed_consolidated",
   "kind": "table_headers",
-  "key": "五、6#t2",
+  "key": "五、6#t1",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
@@ -1047,7 +999,7 @@
   "variant": "listed_consolidated",
   "kind": "table_rows",
   "key": "五、26#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = i-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
@@ -1066,6 +1018,12 @@
   "kind": "table_rows",
   "key": "五、30#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = n1-deferred-tax-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "table_rows",
+  "key": "五、34#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = g-cycle-extraction-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
@@ -1094,12 +1052,6 @@
  {
   "variant": "listed_consolidated",
   "kind": "table_rows",
-  "key": "五、4#t12",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_rows",
   "key": "五、4#t4",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
@@ -1107,18 +1059,6 @@
   "variant": "listed_consolidated",
   "kind": "table_rows",
   "key": "五、4#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_rows",
-  "key": "五、4#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_rows",
-  "key": "五、4#t7",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
@@ -1136,6 +1076,18 @@
  {
   "variant": "listed_consolidated",
   "kind": "table_rows",
+  "key": "五、40#t2",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j1-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "table_rows",
+  "key": "五、45#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l3_l4_structure.py（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_consolidated",
+  "kind": "table_rows",
   "key": "五、48#t1",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l_cycle_structure（种子节 _aligned_by 标记）"
  },
@@ -1143,7 +1095,7 @@
   "variant": "listed_consolidated",
   "kind": "table_rows",
   "key": "五、49#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_consolidated",
@@ -1191,12 +1143,6 @@
   "variant": "listed_consolidated",
   "kind": "table_rows",
   "key": "五、6#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_consolidated",
-  "kind": "table_rows",
-  "key": "五、6#t2",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
@@ -1587,7 +1533,7 @@
   "variant": "listed_standalone",
   "kind": "table_columns",
   "key": "五、22#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = h1-fixed-assets-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
@@ -1605,25 +1551,25 @@
   "variant": "listed_standalone",
   "kind": "table_columns",
   "key": "五、26#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = i-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
   "kind": "table_columns",
   "key": "五、28#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = i-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
   "kind": "table_columns",
   "key": "五、28#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = i-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
   "kind": "table_columns",
   "key": "五、28#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = i-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
@@ -1646,66 +1592,6 @@
  {
   "variant": "listed_standalone",
   "kind": "table_columns",
-  "key": "五、34#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = g-cycle-extraction-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、34#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = g-cycle-extraction-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、4#t10",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、4#t12",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、4#t13",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、4#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、4#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、4#t7",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、4#t8",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、4#t9",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
   "key": "五、5#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
@@ -1720,18 +1606,6 @@
   "kind": "table_columns",
   "key": "五、57#t1",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、6#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_columns",
-  "key": "五、6#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
@@ -1910,20 +1784,8 @@
  {
   "variant": "listed_standalone",
   "kind": "table_count",
-  "key": "五、4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_count",
   "key": "五、5",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_count",
-  "key": "五、6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
@@ -1989,7 +1851,7 @@
   "variant": "listed_standalone",
   "kind": "table_headers",
   "key": "五、28#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = i-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
@@ -2012,6 +1874,12 @@
  {
   "variant": "listed_standalone",
   "kind": "table_headers",
+  "key": "五、4#t10",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_standalone",
+  "kind": "table_headers",
   "key": "五、4#t11",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
@@ -2024,20 +1892,50 @@
  {
   "variant": "listed_standalone",
   "kind": "table_headers",
+  "key": "五、4#t5",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_standalone",
+  "kind": "table_headers",
+  "key": "五、4#t6",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_standalone",
+  "kind": "table_headers",
+  "key": "五、4#t7",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_standalone",
+  "kind": "table_headers",
+  "key": "五、40#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j1-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_standalone",
+  "kind": "table_headers",
+  "key": "五、40#t1",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j1-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_standalone",
+  "kind": "table_headers",
+  "key": "五、40#t2",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j1-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_standalone",
+  "kind": "table_headers",
   "key": "五、43#t3",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l3_l4_structure.py（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
   "kind": "table_headers",
-  "key": "五、45#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l3_l4_structure.py（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_headers",
   "key": "五、46#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l_cycle_structure_v2（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l3_l4_structure.py（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
@@ -2061,19 +1959,19 @@
   "variant": "listed_standalone",
   "kind": "table_headers",
   "key": "五、49#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
   "kind": "table_headers",
   "key": "五、49#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
   "kind": "table_headers",
   "key": "五、49#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
@@ -2138,7 +2036,7 @@
  {
   "variant": "listed_standalone",
   "kind": "table_headers",
-  "key": "五、6#t2",
+  "key": "五、6#t1",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
@@ -2319,7 +2217,7 @@
   "variant": "listed_standalone",
   "kind": "table_rows",
   "key": "五、26#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = i-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
@@ -2338,6 +2236,12 @@
   "kind": "table_rows",
   "key": "五、30#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = n1-deferred-tax-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_standalone",
+  "kind": "table_rows",
+  "key": "五、34#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = g-cycle-extraction-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
@@ -2366,12 +2270,6 @@
  {
   "variant": "listed_standalone",
   "kind": "table_rows",
-  "key": "五、4#t12",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_rows",
   "key": "五、4#t4",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
@@ -2379,18 +2277,6 @@
   "variant": "listed_standalone",
   "kind": "table_rows",
   "key": "五、4#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_rows",
-  "key": "五、4#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_rows",
-  "key": "五、4#t7",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
@@ -2408,6 +2294,18 @@
  {
   "variant": "listed_standalone",
   "kind": "table_rows",
+  "key": "五、40#t2",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j1-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_standalone",
+  "kind": "table_rows",
+  "key": "五、45#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l3_l4_structure.py（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "listed_standalone",
+  "kind": "table_rows",
   "key": "五、48#t1",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l_cycle_structure（种子节 _aligned_by 标记）"
  },
@@ -2415,7 +2313,7 @@
   "variant": "listed_standalone",
   "kind": "table_rows",
   "key": "五、49#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = note-template-columns-and-legacy-snapshot-closure（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "listed_standalone",
@@ -2463,12 +2361,6 @@
   "variant": "listed_standalone",
   "kind": "table_rows",
   "key": "五、6#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "listed_standalone",
-  "kind": "table_rows",
-  "key": "五、6#t2",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
@@ -2618,18 +2510,6 @@
  {
   "variant": "soe_consolidated",
   "kind": "table_columns",
-  "key": "八、12#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_columns",
-  "key": "八、12#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_columns",
   "key": "八、18#t2",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
  },
@@ -2637,24 +2517,6 @@
   "variant": "soe_consolidated",
   "kind": "table_columns",
   "key": "八、18#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_columns",
-  "key": "八、18#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_columns",
-  "key": "八、18#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_columns",
-  "key": "八、18#t7",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
  },
  {
@@ -2684,49 +2546,7 @@
  {
   "variant": "soe_consolidated",
   "kind": "table_columns",
-  "key": "八、34#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = g-cycle-extraction-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_columns",
-  "key": "八、4#t11",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_columns",
-  "key": "八、4#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_columns",
-  "key": "八、4#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_columns",
-  "key": "八、4#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_columns",
   "key": "八、4#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_columns",
-  "key": "八、4#t7",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_columns",
-  "key": "八、4#t8",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
@@ -2745,49 +2565,55 @@
   "variant": "soe_consolidated",
   "kind": "table_columns",
   "key": "八、5#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_columns",
   "key": "八、5#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_columns",
   "key": "八、5#t10",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_columns",
   "key": "八、5#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_columns",
+  "key": "八、5#t4",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_columns",
+  "key": "八、5#t5",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_columns",
   "key": "八、5#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_columns",
-  "key": "八、5#t7",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_columns",
   "key": "八、5#t8",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_columns",
   "key": "八、5#t9",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
@@ -2805,25 +2631,43 @@
   "variant": "soe_consolidated",
   "kind": "table_columns",
   "key": "八、54#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_columns",
   "key": "八、54#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_columns",
   "key": "八、54#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_columns",
   "key": "八、54#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_columns",
+  "key": "八、55#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = k-cycle-disclosure-alignment/liability（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_columns",
+  "key": "八、69#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = k-cycle-disclosure-alignment/pl（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_columns",
+  "key": "八、7#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f1-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
@@ -2848,6 +2692,18 @@
   "kind": "table_columns",
   "key": "八、83#t2",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = 底稿 xlsx 派生表（节未经逐循环脚本单独对齐，表结构仍为底稿口径）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_columns",
+  "key": "八、9#t12",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_columns",
+  "key": "八、9#t13",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
@@ -2894,38 +2750,20 @@
  {
   "variant": "soe_consolidated",
   "kind": "table_count",
-  "key": "八、12",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_count",
-  "key": "八、18",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_count",
   "key": "八、31",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = n1-deferred-tax-disclosure-template-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_count",
-  "key": "八、4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_count",
   "key": "八、5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_count",
   "key": "八、54",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
@@ -3008,6 +2846,12 @@
  {
   "variant": "soe_consolidated",
   "kind": "table_headers",
+  "key": "八、18#t5",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_headers",
   "key": "八、27#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = i-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
@@ -3044,13 +2888,37 @@
  {
   "variant": "soe_consolidated",
   "kind": "table_headers",
-  "key": "八、4#t10",
+  "key": "八、4#t11",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_headers",
   "key": "八、4#t2",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_headers",
+  "key": "八、4#t3",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_headers",
+  "key": "八、4#t4",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_headers",
+  "key": "八、4#t7",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_headers",
+  "key": "八、4#t8",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
@@ -3081,19 +2949,13 @@
   "variant": "soe_consolidated",
   "kind": "table_headers",
   "key": "八、5#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_headers",
-  "key": "八、5#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_headers",
-  "key": "八、5#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "key": "八、5#t7",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
@@ -3111,19 +2973,19 @@
   "variant": "soe_consolidated",
   "kind": "table_headers",
   "key": "八、54#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_headers",
   "key": "八、54#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_headers",
   "key": "八、57#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l_cycle_structure_v2（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l_cycle_structure（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
@@ -3166,6 +3028,12 @@
   "kind": "table_headers",
   "key": "八、70#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = g-cycle-extraction-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_headers",
+  "key": "八、9#t14",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
@@ -3260,7 +3128,7 @@
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
-  "key": "八、12#t2",
+  "key": "八、12#t3",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
  },
  {
@@ -3285,30 +3153,6 @@
   "variant": "soe_consolidated",
   "kind": "table_rows",
   "key": "八、18#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_rows",
-  "key": "八、18#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_rows",
-  "key": "八、18#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_rows",
-  "key": "八、18#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_rows",
-  "key": "八、18#t7",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
  },
  {
@@ -3350,43 +3194,19 @@
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
+  "key": "八、34#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = g-cycle-extraction-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_rows",
   "key": "八、36#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f-cycle-disclosure-parity（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
-  "key": "八、4#t10",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_rows",
-  "key": "八、4#t11",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_rows",
-  "key": "八、4#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_rows",
   "key": "八、4#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_rows",
-  "key": "八、4#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_consolidated",
-  "kind": "table_rows",
-  "key": "八、4#t6",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
@@ -3410,80 +3230,92 @@
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
+  "key": "八、40#t1",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j1-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_rows",
   "key": "八、5#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
   "key": "八、5#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
   "key": "八、5#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
   "key": "八、5#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
   "key": "八、5#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
   "key": "八、5#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
   "key": "八、5#t7",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_rows",
+  "key": "八、5#t9",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
   "key": "八、54#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
   "key": "八、54#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
   "key": "八、54#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
   "key": "八、54#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
   "key": "八、54#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
   "kind": "table_rows",
   "key": "八、54#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
@@ -3502,6 +3334,12 @@
   "kind": "table_rows",
   "key": "八、75#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = h9-h10-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_consolidated",
+  "kind": "table_rows",
+  "key": "八、9#t12",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_consolidated",
@@ -3536,18 +3374,6 @@
  {
   "variant": "soe_standalone",
   "kind": "table_columns",
-  "key": "八、12#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_columns",
-  "key": "八、12#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_columns",
   "key": "八、18#t2",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
  },
@@ -3555,24 +3381,6 @@
   "variant": "soe_standalone",
   "kind": "table_columns",
   "key": "八、18#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_columns",
-  "key": "八、18#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_columns",
-  "key": "八、18#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_columns",
-  "key": "八、18#t7",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
  },
  {
@@ -3602,49 +3410,7 @@
  {
   "variant": "soe_standalone",
   "kind": "table_columns",
-  "key": "八、34#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = g-cycle-extraction-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_columns",
-  "key": "八、4#t11",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_columns",
-  "key": "八、4#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_columns",
-  "key": "八、4#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_columns",
-  "key": "八、4#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_columns",
   "key": "八、4#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_columns",
-  "key": "八、4#t7",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_columns",
-  "key": "八、4#t8",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
@@ -3663,49 +3429,55 @@
   "variant": "soe_standalone",
   "kind": "table_columns",
   "key": "八、5#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_columns",
   "key": "八、5#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_columns",
   "key": "八、5#t10",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_columns",
   "key": "八、5#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_columns",
+  "key": "八、5#t4",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_columns",
+  "key": "八、5#t5",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_columns",
   "key": "八、5#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_columns",
-  "key": "八、5#t7",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_columns",
   "key": "八、5#t8",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_columns",
   "key": "八、5#t9",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
@@ -3723,25 +3495,43 @@
   "variant": "soe_standalone",
   "kind": "table_columns",
   "key": "八、54#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_columns",
   "key": "八、54#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_columns",
   "key": "八、54#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_columns",
   "key": "八、54#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_columns",
+  "key": "八、55#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = k-cycle-disclosure-alignment/liability（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_columns",
+  "key": "八、69#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = k-cycle-disclosure-alignment/pl（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_columns",
+  "key": "八、7#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f1-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
@@ -3766,6 +3556,18 @@
   "kind": "table_columns",
   "key": "八、83#t2",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = 底稿 xlsx 派生表（节未经逐循环脚本单独对齐，表结构仍为底稿口径）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_columns",
+  "key": "八、9#t12",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_columns",
+  "key": "八、9#t13",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
@@ -3812,38 +3614,20 @@
  {
   "variant": "soe_standalone",
   "kind": "table_count",
-  "key": "八、12",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_count",
-  "key": "八、18",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_count",
   "key": "八、31",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = n1-deferred-tax-disclosure-template-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_count",
-  "key": "八、4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_count",
   "key": "八、5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_count",
   "key": "八、54",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
@@ -3873,6 +3657,12 @@
   "variant": "soe_standalone",
   "kind": "table_headers",
   "key": "八、18#t4",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_headers",
+  "key": "八、18#t5",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
  },
  {
@@ -3914,13 +3704,37 @@
  {
   "variant": "soe_standalone",
   "kind": "table_headers",
-  "key": "八、4#t10",
+  "key": "八、4#t11",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_headers",
   "key": "八、4#t2",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_headers",
+  "key": "八、4#t3",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_headers",
+  "key": "八、4#t4",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_headers",
+  "key": "八、4#t7",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_headers",
+  "key": "八、4#t8",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
@@ -3951,19 +3765,13 @@
   "variant": "soe_standalone",
   "kind": "table_headers",
   "key": "八、5#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_headers",
-  "key": "八、5#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_headers",
-  "key": "八、5#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "key": "八、5#t7",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
@@ -3981,19 +3789,19 @@
   "variant": "soe_standalone",
   "kind": "table_headers",
   "key": "八、54#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_headers",
   "key": "八、54#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_headers",
   "key": "八、57#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l_cycle_structure_v2（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_l_cycle_structure（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
@@ -4036,6 +3844,12 @@
   "kind": "table_headers",
   "key": "八、70#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = g-cycle-extraction-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_headers",
+  "key": "八、9#t14",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
@@ -4106,7 +3920,7 @@
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
-  "key": "八、12#t2",
+  "key": "八、12#t3",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
  },
  {
@@ -4131,30 +3945,6 @@
   "variant": "soe_standalone",
   "kind": "table_rows",
   "key": "八、18#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_rows",
-  "key": "八、18#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_rows",
-  "key": "八、18#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_rows",
-  "key": "八、18#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_rows",
-  "key": "八、18#t7",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_g7_soe_structure（种子节 _aligned_by 标记）"
  },
  {
@@ -4196,43 +3986,19 @@
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
+  "key": "八、34#t0",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = g-cycle-extraction-mapping-and-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_rows",
   "key": "八、36#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = f-cycle-disclosure-parity（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
-  "key": "八、4#t10",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_rows",
-  "key": "八、4#t11",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_rows",
-  "key": "八、4#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_rows",
   "key": "八、4#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_rows",
-  "key": "八、4#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
- },
- {
-  "variant": "soe_standalone",
-  "kind": "table_rows",
-  "key": "八、4#t6",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d1-notes-receivable-disclosure-alignment（种子节 _aligned_by 标记）"
  },
  {
@@ -4256,80 +4022,92 @@
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
+  "key": "八、40#t1",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j1-disclosure-template-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_rows",
   "key": "八、5#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
   "key": "八、5#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
   "key": "八、5#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
   "key": "八、5#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
   "key": "八、5#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
   "key": "八、5#t6",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
   "key": "八、5#t7",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d2-ar-disclosure-soe-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_rows",
+  "key": "八、5#t9",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = d-cycle-extraction-chain-completion（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
   "key": "八、54#t0",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
   "key": "八、54#t1",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
   "key": "八、54#t2",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
   "key": "八、54#t3",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
   "key": "八、54#t4",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
   "kind": "table_rows",
   "key": "八、54#t5",
-  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = j-cycle-four-table-extraction-and-disclosure-alignment（种子节 _aligned_by 标记）"
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = disclosure-sync-path-buildout-j2（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",
@@ -4348,6 +4126,12 @@
   "kind": "table_rows",
   "key": "八、75#t0",
   "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = h9-h10-remaining-disclosure-alignment（种子节 _aligned_by 标记）"
+ },
+ {
+  "variant": "soe_standalone",
+  "kind": "table_rows",
+  "key": "八、9#t12",
+  "reason": "表格以底稿 xlsx 为准，与四版 Word 刻意不一致（用户 2026-10-16 裁定）；消费方 = fix_note_k_complex_structure（种子节 _aligned_by 标记）"
  },
  {
   "variant": "soe_standalone",

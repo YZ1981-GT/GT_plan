@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any
 
 from app.services.formula_push.js_compat import js_json_number, read_number
+from app.services.note_table_header_library import column_keys, movement_kind, parse_segment, period_side
 
 logger = logging.getLogger(__name__)
 
@@ -278,23 +279,12 @@ _KNOWN_NON_WORKPAPER: frozenset[str] = frozenset({"template", "import", "migrati
 # 全部写进镜像、编辑器看不见；其中 43 张按位置会写错列（「期初余额 / 本期增加 / 本期减少 / 期末余额」把期末数写进
 # 期初列，「金额 / 比例」把期初数写进比例列）。spec disclosure-note-template-word-realignment Task 26。
 #
-# 表头去空白后**完全相等**才算（「期末折现率区间」「本期增加」不是期末 / 期初金额列）；词表取自两份种子与真库
-# 全部旧格式附注的表头。
-_END_HEADERS: frozenset[str] = frozenset({
-    "期末余额", "期末数", "期末", "期末金额", "期末账面价值", "期末公允价值", "期末余额（账面价值）",
-    "期末余额/本期发生额", "期末数/本期发生额", "本期发生额", "本期金额", "本期数", "本期",
-    "本年发生额", "本年金额", "本年数", "本年",
-})
-_PRIOR_HEADERS: frozenset[str] = frozenset({
-    "期初余额", "期初数", "期初", "期初金额", "期初账面价值", "期初公允价值", "期初余额（账面价值）",
-    "年初余额", "年初数", "年初金额", "年初账面价值", "上年年末余额", "上年年末数", "上年年末", "上年年末余额/上期发生额",
-    "期初数/上期发生额", "上期发生额", "上期金额", "上期数", "上期", "上年发生额", "上年金额", "上年数", "上年",
-})
-#: 列组（``_column_groups``：「期末数」组下分「金额 / 比例」等）里只认这两种金额列，且组内只能有一个
-#: （「账面余额 / 减值准备 / 账面价值」三列不知道推哪列 ⇒ 不猜，跳过并说明）
-_GROUP_AMOUNT_HEADERS: frozenset[str] = frozenset({"金额", "余额"})
-_LEGACY_FIELDS: tuple[tuple[str, frozenset[str], str], ...] = (
-    ("end_amount", _END_HEADERS, "期末"), ("prior_amount", _PRIOR_HEADERS, "期初"),
+# 认列走标题行库（spec consol-note-header-library-and-node-reaggregate R5.3，design §14.3）：逐列（期间, 计量, 类别）
+# 由 ``column_keys`` 给出 —— 分组表的期间来自 ``_column_groups``，表名带期间的整表按表名期间；不再各写一套期间词表。
+#: 列名自己写明期间的价值列（「期末账面价值」「期初余额（账面价值）」「期末公允价值」）也算该期的金额列。
+_VALUE_MEASURES: frozenset[str] = frozenset({"账面价值", "公允价值"})
+_LEGACY_FIELDS: tuple[tuple[str, str, str], ...] = (
+    ("end_amount", "current", "期末"), ("prior_amount", "previous", "期初"),
 )
 
 
@@ -302,19 +292,25 @@ def _norm_header(text: Any) -> str:
     return re.sub(r"<br\s*/?>|\s+", "", str(text or ""))
 
 
-def _group_amount_columns(table: Mapping[str, Any], headers: list[str], words: frozenset[str]) -> list[int]:
-    """组标签属于 ``words`` 的列组里的金额列（数据列下标；组的 ``start`` 按含标签列的表头下标计）。"""
-    hits: list[int] = []
-    for group in table.get("_column_groups") or []:
-        if not isinstance(group, dict) or _norm_header(group.get("group")) not in words:
+def _legacy_column(keys: Sequence[Any], side: str) -> int | None:
+    """某一期（本期一侧 / 上期一侧）唯一的金额列（数据列下标）；认不出唯一的返回 None。
+
+    算该期金额列的：整列是纯期间（「期末余额」「期末数 / 金额」「本期发生额」）；列名本身是纯期间、上面的分组只是
+    表的主题（「计划资产的公允价值 / 期末余额」）；列名自己写明期间的价值列（「期末账面价值」「期初余额（账面价值）」）。
+    分组给期间、列名是计量的（「期末数 / 账面余额 | 减值准备 | 账面价值」）不算：同一期几个计量不知道推哪列 ⇒ 不猜；
+    变动（本期增加 / 计提…）、比例、说明列都不算。
+    """
+    hits = []
+    for k in keys:
+        if k.kind != "amount" or period_side(k.period) != side or movement_kind(k) is not None:
             continue
-        try:
-            start, span = int(group.get("start")), int(group.get("span"))
-        except (TypeError, ValueError):
+        if not k.measure:
+            hits.append(k)
             continue
-        hits += [i for i in range(start - 1, start - 1 + span)
-                 if 0 <= i < len(headers) and headers[i] in _GROUP_AMOUNT_HEADERS]
-    return hits
+        leaf_period, leaf_measure = parse_segment(k.path[-1]) if k.path else (None, None)
+        if period_side(leaf_period) == side and (leaf_measure is None or leaf_measure in _VALUE_MEASURES):
+            hits.append(k)
+    return hits[0].index - 1 if len(hits) == 1 else None
 
 
 def legacy_value_keys(table: Mapping[str, Any]) -> tuple[list[str], str | None]:
@@ -324,35 +320,24 @@ def legacy_value_keys(table: Mapping[str, Any]) -> tuple[list[str], str | None]:
     数据列表头全空才沿用按位置（values[0]=期末、[1]=期初）—— 没有表头可认；有表头就按表头，认不出唯一的那列
     就不写（宁可跳过并说明，也不按位置猜）。
     """
-    headers = [_norm_header(h) for h in (table.get("headers") or [])][1:]
+    raw_headers = [_norm_header(h) for h in (table.get("headers") or [])]
+    headers = raw_headers[1:]
     if not any(headers):
         return ["end_amount", "prior_amount"], None
+    view = {"name": table.get("name"), "headers": raw_headers, "_column_groups": table.get("_column_groups")}
+    if view["_column_groups"] is None:
+        view.pop("_column_groups")  # 没登记分组：交给标题行库按 columns 推（与 column_keys 读模板同口径）
+        if isinstance(table.get("columns"), list):
+            view["columns"] = table["columns"]
+    col_keys = column_keys(view)[1:]
     keys = [f"_col{i}" for i in range(len(headers))]
     missing: list[str] = []
-    for field, words, label in _LEGACY_FIELDS:
-        hits = [i for i, h in enumerate(headers) if h in words] or _group_amount_columns(table, headers, words)
-        if len(hits) == 1:
-            keys[hits[0]] = field
+    for field, side, label in _LEGACY_FIELDS:
+        hit = _legacy_column(col_keys, side)
+        if hit is not None and keys[hit].startswith("_col"):
+            keys[hit] = field
         else:
             missing.append(label)
-
-    # 六列对称结构兜底：「账面余额|减值准备|账面价值|账面余额|减值准备|账面价值」
-    # 前三列=期末，后三列=期初。取每半段的「账面价值」列作为金额列。
-    if missing and len(headers) >= 4 and len(headers) % 2 == 0:
-        half = len(headers) // 2
-        front, back = headers[:half], headers[half:]
-        if front == back:  # 对称结构
-            # 优先取「账面价值」→ 「账面余额」→ 最后一列
-            _PREFER = ("账面价值", "账面余额")
-            end_idx = next((i for i, h in enumerate(front) if h in _PREFER), half - 1)
-            prior_idx = half + next((i for i, h in enumerate(back) if h in _PREFER), half - 1)
-            if "期末" in missing:
-                keys[end_idx] = "end_amount"
-                missing = [m for m in missing if m != "期末"]
-            if "期初" in missing:
-                keys[prior_idx] = "prior_amount"
-                missing = [m for m in missing if m != "期初"]
-
     note = None if not missing else (
         f"表头里找不到唯一的「{' / '.join(missing)}」金额列（{'、'.join(h for h in headers if h)}），不按位置猜")
     return keys, note

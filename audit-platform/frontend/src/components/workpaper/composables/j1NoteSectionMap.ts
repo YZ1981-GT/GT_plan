@@ -17,9 +17,12 @@
  *
  * 列头（Decision 2 已废止，2026-08-02 j-cycle-four-table spec Task 7+11）：
  *   原 Decision 2 "组件列头「上年年末数 / 期末数」不外溢到附注"——
- *   已推翻：附注模板 五、40 已按源模板改为上市口径（`上年年末数`/`期末数`），
+ *   已推翻：附注模板 五、40 按源模板用上市口径（`上年年末数`/`期末数`），
  *   同步列定义拆两版：`buildJ1ListedColumns()` / `buildJ1SoeColumns()`。
  *   key 不变（`期初余额`/`期末余额`=数据键），只有 label 按变体拆。
+ *   ⚠️ 当时载荷仍用国企口径推两版、模板也被另一个修订脚本改回，两处直到 2026-10-25 才一起按变体
+ *   落定（R8.4 批 9b-2：载荷 `buildJ1SyncPayload` 按 variant 取列；模板只剩
+ *   `fix_note_j1_employee_comp_structure.py` 一个修订脚本）。
  *
  * Spec: .kiro/specs/j1-disclosure-template-alignment/（前身 j1-disclosure-note-linkage）
  */
@@ -47,9 +50,6 @@ export const J1_SUB_TABLE_KEYS = {
   listed: { summary: '应付职工薪酬', shortTerm: '短期薪酬', postEmployment: '设定提存计划' },
   soe: { summary: '应付职工薪酬列示', shortTerm: '短期薪酬列示', postEmployment: '设定提存计划列示' },
 } as const
-
-/** 五列（两变体 headers 相同） */
-export const J1_NOTE_HEADERS = ['项目', '期初余额', '本期增加', '本期减少', '期末余额'] as const
 
 // ─── 列定义（供 columns 传参 + 投影器消费） ──────────────────────────────────
 //
@@ -84,12 +84,9 @@ export function buildJ1SoeColumns(): ColumnDef[] {
   ])
 }
 
-/**
- * @deprecated 兼容旧调用方 —— 返回国企口径（历史默认）。新代码按变体调用 `buildJ1ListedColumns()`
- * 或 `buildJ1SoeColumns()`。零入参可调满足 `disclosureColumnsCoverage` sweep。
- */
-export function j1MovementColumns(): ColumnDef[] {
-  return buildJ1SoeColumns()
+/** 按变体取列定义（三张表共用同一版）。 */
+export function j1ColumnsFor(variant: J1DisclosureVariant): ColumnDef[] {
+  return variant === 'listed' ? buildJ1ListedColumns() : buildJ1SoeColumns()
 }
 
 // ─── current_standard 解析 ───────────────────────────────────────────────────
@@ -259,7 +256,7 @@ export function buildJ1SyncPayload(args: {
 }): { section: string; body: Record<string, unknown> } {
   const { variant, wpId, year, snapshot, applicableStandards } = args
   const keys = J1_SUB_TABLE_KEYS[variant]
-  const cols = j1MovementColumns()
+  const cols = j1ColumnsFor(variant)
 
   const sub_table_data: Record<string, unknown> = {
     [keys.summary]: mapDisclosureRows(snapshot.summary, 'summary-total'),

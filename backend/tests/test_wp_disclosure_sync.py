@@ -499,7 +499,7 @@ async def test_sync_batch_happy_path():
         "items": [
             {
                 "sheet_name": "附注披露信息（国企）",
-                "section_id": "七、本期纳入合并报表",
+                "section_id": "七、本期纳入合并报表范围的子公司基本情况",
                 "sub_table_data": {"主表": [{"a": 1}]},
             },
             {

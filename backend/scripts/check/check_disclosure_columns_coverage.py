@@ -104,7 +104,7 @@ COLUMN_BUILDERS = (
     "buildL3SyncPayload",          # L3 长期借款（listed+soe）
     "buildF4ListedSyncPayload",    # F4 应付账款 listed（f4NoteSectionMap 4 组列头）
     "buildF4SoeSyncPayload",       # F4 应付账款 soe
-    "buildJ1SyncPayload",          # J1 应付职工薪酬（listed+soe，3 表共用 j1MovementColumns）
+    "buildJ1SyncPayload",          # J1 应付职工薪酬（listed+soe，3 表共用本版 j1ColumnsFor(variant)）
     "buildH4ListedSyncPayloads",   # H4 工程物资 listed（复用 H2 五、23 列头，按实际推送键取子集）
 )
 _BUILDER_RE = re.compile(r"build[A-Z]\w*Columns\b")

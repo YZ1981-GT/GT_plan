@@ -216,6 +216,13 @@ _ECL_MOVEMENT_ROWS_SOE = [
     total_row("期末余额"),
 ]
 
+#: 底稿 K1 国企第 77 行表下的填列说明（原文随表从母公司章带回，单一来源 = 本脚本）
+_G_BALANCE_MOVEMENT_SOE = (
+    "账面余额（非坏账准备）的三阶段变动。方向约定（源模板）：转入第二阶段＝第一阶段【负数】、第二阶段【正数】；"
+    "转入第三阶段＝第一、二阶段【负数】、第三阶段【正数】；转回第一阶段＝第一阶段【正数】、第二、三阶段【负数】。"
+    "勾稽：期末余额合计 = K1-1 其他应收款审定期末数。"
+)
+
 _BALANCE_MOVEMENT_ROWS_SOE = [
     data_row("期初余额"),
     data_row("期初余额在本期"),
@@ -558,8 +565,17 @@ K1_SOE_PLAN: list[dict[str, Any]] = [
         list(_ECL_MOVEMENT_ROWS_SOE),
         KEEP,
     ),
-    # "其他应收款项账面余额变动" 已从八、9 移到母公司章（十二、其他应收款），
-    # 不再在八、9 章节规则中要求。
+    # 底稿 K1 国企披露表第 77 行「其他应收款项账面余额变动如下：」—— 早先按四版 Word 把它挪到了母公司章、八、9
+    # 里删掉，而 K1 前端载荷一直往八、9 推这张表（成了孤儿子表）、八、9 的 text_sections 也还留着它的小标题。
+    # 单体按底稿披露表（用户 2026-10-24）⇒ 回到八、9；母公司章同构子节随 `fix_note_parent_company_chapter.py`
+    # 同步。表头与上一张同形：一格里先写阶段名再写释义 ⇒ 阶段名作分组、释义作列名（R8.4 批 9b-2）。
+    rule(
+        "其他应收款项账面余额变动",
+        _movement_cols("账面余额"),
+        list(_BALANCE_MOVEMENT_ROWS_SOE),
+        _G_BALANCE_MOVEMENT_SOE,
+        insert=True,
+    ),
     rule(
         "收回或转回的坏账准备",
         _cols([("label", "债务人名称", None),
@@ -871,6 +887,12 @@ SPECS: dict[str, dict[str, Any]] = {
         "section": "八、12",
         "plan": K6_SOE_PLAN,
         "expected": K6_SOE_EXPECTED,
+        # 底稿 K6 国企首表上方一段多行提示的末行（「4.应披露…。】」）被当成表名，与「持有待售资产」同构的重复表：
+        # 底稿只有一张、K6 前端载荷只推 4 张（R8.4 批 9b-2 删）
+        "drops": ["4.应披露与持有待售的非流动资产或处置组有关的其他综合收益累计金额。】"],
+        # 删表要与「摘掉当初为它加的 #### 前缀」成对：标题比表多一个会让 `disclosure_engine` 段落游标
+        # 多走一格、把后续提示段错配到别的表（H1 五、22 同型，实测打红守卫）。受损前它是普通正文段。
+        "untitle": ["4.应披露与持有待售的非流动资产或处置组有关的其他综合收益累计金额。】"],
     },
     "k6-soe-liab": {
         "label": "K6 持有待售负债 · 国企 八、43",
@@ -894,6 +916,7 @@ def _runner(key: str, dry_run: bool, check: bool) -> tuple[list[str], list[str],
         check=check,
         drops=spec.get("drops"),
         require_text_sections=spec.get("require_text_sections"),
+        untitle_text_sections=spec.get("untitle"),
     )
 
 

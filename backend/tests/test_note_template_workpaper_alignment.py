@@ -56,7 +56,8 @@ def test_multi_cell_hint_is_not_a_title_and_first_table_takes_section_title():
     sec = next(s for s in A.load_templates()["soe"]["sections"] if s["section_number"] == "八、12")
     res = A.pair_section("soe", "八、12", sec["tables"], W.section_entries()[("soe", "八、12")], sec["section_title"])
     assert ([0], 9) in [(p.tpl_idx, p.wp[0].header_rows[0]) for p in res.pairs]
-    assert 1 in res.tpl_only, "以提示末行为名的重复表不配对（批 9b-2 删）"
+    # 以提示末行为名的重复表批 9b-2 已删（`fix_note_k_complex_structure.py` k6-soe drops）；模板表全部配上底稿
+    assert not any("应披露" in str(t.get("name")) for t in sec["tables"]) and res.tpl_only == []
 
 
 def test_unmerged_group_name_covers_the_cells_to_its_right():
@@ -207,7 +208,11 @@ def test_row_labels_separate_same_named_tables(checked):
 
 #: 配上底稿表的模板表张数（2026-10-24 批 9b-1：407 张，38 张没有对应的底稿表）。只比配上的表，配对退化会让
 #: 守卫静默变绿 ⇒ 钉住；改模板 / 配对规则使它变化时核对多配上 / 少配上的是哪几张，再改这个数。
-_PAIRED_TEMPLATE_TABLES = 407
+#: 批 9b-2：国企 八、4 删重复表后续表单元 3 张 → 2 张（−1）；八、5 两个组合表拆期末 / 期初（+2）；八、9 补回
+#: 「其他应收款项账面余额变动」（+1，配 K1 国企第 77 行）；八、18 合营表两层后按底稿配对（原 3 张都配第 230 行，
+#: 现合营两张配第 229 行、联营两张配第 257 行），补「②对合营企业或联营企业发生超额亏损的分担额」配第 301 行（+2）⇒ 411；
+#: 上市 五、34「…2025年公允价值的变动情况…」原套主表五列、配不上，改按底稿四列后配 G10 上市第 26 行（+1）⇒ 412。
+_PAIRED_TEMPLATE_TABLES = 412
 
 
 def test_paired_template_tables_are_pinned(checked):

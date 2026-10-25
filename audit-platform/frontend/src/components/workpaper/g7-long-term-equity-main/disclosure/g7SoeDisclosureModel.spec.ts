@@ -43,12 +43,12 @@ describe('G7 SOE disclosure source model', () => {
 
     const payloads = buildG7SoeSyncPayloads(state)
     const sectionIds = payloads.map(payload => payload.noteSectionId)
-    expect(sectionIds).toContain('七、本期纳入合并报表')
-    expect(sectionIds).toContain('七、本期发生的同一控')
+    expect(sectionIds).toContain('七、本期纳入合并报表范围的子公司基本情况')
+    expect(sectionIds).toContain('七、本期发生的同一控制下企业合并情况')
     expect(sectionIds).toContain('八、18')
     expect(sectionIds).not.toContain('五、18')
 
-    const consolidationPayload = payloads.find(payload => payload.noteSectionId === '七、本期纳入合并报表')
+    const consolidationPayload = payloads.find(payload => payload.noteSectionId === '七、本期纳入合并报表范围的子公司基本情况')
     // 🔴 标签键为平台惯例 `label`（不是中文字面量 `项目`）。改造依据见
     // `buildG7SoeColumns()` 的注释：平台 266 个标签列定义里 241 个用 `'label'`，
     // 中文字面量当 key 违反禁硬编码。行对象标签键必须与标签列 `key` 逐字一致，

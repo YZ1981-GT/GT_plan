@@ -2,7 +2,7 @@
   "_meta": {
     "note": "派生投影，非真源。真源 = backend/wp_templates/G/G7 长期股权投资.xlsx；本文件由 backend/scripts/diagnose/diagnose_g7_column_alignment.py --emit-facts 生成，并由 backend/tests/four_table/test_g7_column_source_facts.py 钉死「与实时 openpyxl 读取逐字相等」。禁止手改。",
     "generated_from": "backend/wp_templates/G/G7 长期股权投资.xlsx",
-    "generated_at": "2026-08-12T15:01:30+00:00",
+    "generated_at": "2026-10-24T14:13:36+00:00",
     "source_sha256": "6bf9e2ebcdf50a1c4a32f8733353dd1de994e7dc483232ad43680043577c3335",
     "sheet_names": [
       "附注披露信息（上市公司）",
@@ -12,7 +12,7 @@
     "dynamic_group_rule": "值为空的横向合并 = 动态列占位（源模板留给审计师填被投资单位名），记作 '<DYNAMIC:c<锚列>>'。**按锚列区分身份**，否则相邻同名占位会被运行段压缩误并成一段（3 个跨 2 → 1 个跨 6）。消费方比对时对该占位只校验 (start, span) 不校验名字。",
     "index_key": "(variant, noteSectionId, tableName) 三元组",
     "label_header_kind_rule": "标签列表头语义三态，**一处登记两端消费**（后端 CORNER_TITLE_EXEMPTIONS 是唯一真源，前端读本字段不得另抄一份判定）：\n  * 'name'   = 源 xlsx 给了行标识列名（含纵向合并的单一名、以及真纵向拆分列名如 '结构化主体'+'类型'）⇒ `label_header` 可直接逐字比对；\n  * 'corner' = **转角标题**：标签列两行文字各自标注**表头行本身**（上行放公司名、下行放日期/期间），源 xlsx **未给行标识列名** ⇒ `label_header` 是拼接出的**幻影**，禁止用它比对；平台按数据行语义取`seed_label`（实测为「项目」）。\n  * 与 'name' 的区分靠**语义**（两者结构完全同形）⇒ 只能登记 + stale 检测，不可由结构判据自动判。",
-    "single_slot_exemption_rule": "源模板占位形态（单槽）豁免，**一处登记两端消费**（后端 SOURCE_PLACEHOLDER_SINGLE_SLOT 是唯一真源，前端读表级 `single_slot_exemption` 字段，不得另抄一份表名清单）：\n  这 4 张合营表源侧确有「空白跨 2 合并」暗示多个实体槽，但**同表另两组合并的叶子行全空** ⇒ 源模板自身只填了 1 槽，与联营表填满 3 槽不同构。\n  平台按**单槽 flat** 实现（标签列 + 2 个数据列，不声明 group）⇒ 运行时「无分组」与源侧「1 段动态占位跨 2」的差异是**已裁决豁免**，不是待修偏差。\n  🔴 消费方须豁免的维度 = `exempt_kinds`（仅 flat / group）；其余维度照常比对。\n  🔴 stale 检测在后端 `_sc_single_slot_still_single()`：源侧段数一旦不再是 1（源 xlsx 把叶子填满多槽）即打红，提醒**重新裁决**而非继续豁免。"
+    "single_slot_exemption_rule": "源模板占位形态（单槽）豁免，**一处登记两端消费**（后端 SOURCE_PLACEHOLDER_SINGLE_SLOT 是唯一真源，前端读表级 `single_slot_exemption` 字段，不得另抄一份表名清单）：\n  登记对象 = 源侧有动态占位合并、但源模板自身只填 1 槽、平台按**单槽 flat**实现（不声明 group）的表；运行时「无分组」与源侧「1 段动态占位」的差异是**已裁决豁免**，不是待修偏差。\n  🔴 2026-10-24 起登记为空：原 4 张合营表的父表头格是引用被投资单位名的公式（非空白占位），seed 与运行时均按 1 个实体槽两层实现。\n  🔴 消费方须豁免的维度 = `exempt_kinds`（仅 flat / group）；其余维度照常比对。\n  🔴 stale 检测在后端 `_sc_single_slot_still_single()`：源侧段数一旦不再是 1（源 xlsx 把叶子填满多槽）即打红，提醒**重新裁决**而非继续豁免。"
   },
   "listed": {
     "七、1": {
@@ -265,23 +265,7 @@
             "label": "上期发生额",
             "group": "<DYNAMIC:c2>"
           }
-        ],
-        "single_slot_exemption": {
-          "exempt_kinds": [
-            "flat",
-            "group"
-          ],
-          "source_ref": "A153:C154",
-          "source_text": "A153:A154='项  目'；B153:C153 空白合并；B154='本期发生额' C154='上期发生额'；D153:E153 与 F153:G153 亦为空白合并但 D154~G154 全空",
-          "basis": [
-            "源侧 D/E、F/G（soe 为 E/F、G/H）合并的叶子行为空 ⇒ 源模板只填了 1 个实体槽",
-            "seed 与运行时**两侧独立**都判 flat + 2 数据列（两个独立实现结论一致）",
-            "改成动态多实体属**结构性变更**，超出本 spec R1 明列的 6 张 A 类表",
-            "父表头是**实体名**、源 xlsx 留空 ⇒ 无从裁决，改了就是臆造（违「宁缺勿造」）"
-          ],
-          "platform_intent": "按单槽 flat 实现：标签列「项目」+ 本期发生额 / 上期发生额 两个数据列，不声明 group",
-          "expected_source_runs": 1
-        }
+        ]
       },
       "续：重要联营企业本期及上期经营成果": {
         "label_header": "项目",
@@ -347,23 +331,7 @@
             "label": "期初数",
             "group": "<DYNAMIC:c2>"
           }
-        ],
-        "single_slot_exemption": {
-          "exempt_kinds": [
-            "flat",
-            "group"
-          ],
-          "source_ref": "A132:C133",
-          "source_text": "A132:A133='项 目'；B132:C132 空白合并；B133='期末数' C133='期初数'；D132:E132 与 F132:G132 亦为空白合并但 D133~G133 全空",
-          "basis": [
-            "源侧 D/E、F/G（soe 为 E/F、G/H）合并的叶子行为空 ⇒ 源模板只填了 1 个实体槽",
-            "seed 与运行时**两侧独立**都判 flat + 2 数据列（两个独立实现结论一致）",
-            "改成动态多实体属**结构性变更**，超出本 spec R1 明列的 6 张 A 类表",
-            "父表头是**实体名**、源 xlsx 留空 ⇒ 无从裁决，改了就是臆造（违「宁缺勿造」）"
-          ],
-          "platform_intent": "按单槽 flat 实现：标签列「项目」+ 期末数 / 期初数 两个数据列，不声明 group",
-          "expected_source_runs": 1
-        }
+        ]
       },
       "重要的共同经营": {
         "label_header": "共同经营名称",
@@ -628,7 +596,7 @@
     }
   },
   "soe": {
-    "七、本期不再纳入合并": {
+    "七、本期不再纳入合并范围的原子公司": {
       "原子公司的基本情况": {
         "label_header": "序号",
         "label_header_parts": [
@@ -791,7 +759,7 @@
         }
       }
     },
-    "七、本期发生的同一控": {
+    "七、本期发生的同一控制下企业合并情况": {
       "本期发生的同一控制下企业合并情况": {
         "label_header": "公司名称",
         "label_header_parts": [
@@ -842,7 +810,7 @@
         ]
       }
     },
-    "七、本期发生的吸收合": {
+    "七、本期发生的吸收合并": {
       "本期发生的吸收合并": {
         "label_header": "吸收合并的类型",
         "label_header_parts": [
@@ -877,7 +845,7 @@
         ]
       }
     },
-    "七、本期发生的非同一": {
+    "七、本期发生的非同一控制下企业合并情况": {
       "本期发生的非同一控制下企业合并情况": {
         "label_header": "被购买方名称",
         "label_header_parts": [
@@ -944,7 +912,7 @@
         ]
       }
     },
-    "七、本期新纳入合并范": {
+    "七、本期新纳入合并范围的主体": {
       "本期新纳入合并范围的主体": {
         "label_header": "公司名称",
         "label_header_parts": [
@@ -971,7 +939,7 @@
         ]
       }
     },
-    "七、本期纳入合并报表": {
+    "七、本期纳入合并报表范围的子公司基本情况": {
       "本期纳入合并报表范围的子公司基本情况": {
         "label_header": "序号",
         "label_header_parts": [
@@ -1038,7 +1006,7 @@
         ]
       }
     },
-    "七、母公司在子公司的": {
+    "七、母公司在子公司的所有者权益份额发生变化的情况": {
       "母公司在子公司的所有者权益份额发生变化的情况": {
         "label_header": "项目",
         "label_header_parts": [
@@ -1069,7 +1037,7 @@
         ]
       }
     },
-    "七、母公司拥有被投资": {
+    "七、母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因": {
       "母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因": {
         "label_header": "序号",
         "label_header_parts": [
@@ -1116,7 +1084,7 @@
         ]
       }
     },
-    "七、母公司直接或通过": {
+    "七、母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的": {
       "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的原因": {
         "label_header": "序号",
         "label_header_parts": [
@@ -1163,7 +1131,7 @@
         ]
       }
     },
-    "七、重要非全资子公司": {
+    "七、重要非全资子公司情况": {
       "主要财务信息": {
         "label_header": "项目",
         "label_header_parts": [
@@ -1413,23 +1381,7 @@
             "label": "上期发生额",
             "group": "<DYNAMIC:c3>"
           }
-        ],
-        "single_slot_exemption": {
-          "exempt_kinds": [
-            "flat",
-            "group"
-          ],
-          "source_ref": "A243:D244",
-          "source_text": "A243:B244='项  目'（标签列跨 2 xlsx 列）；C243:D243 空白合并；C244='本期发生额' D244='上期发生额'；E243:F243 与 G243:H243 亦为空白合并但 E244~H244 全空",
-          "basis": [
-            "源侧 D/E、F/G（soe 为 E/F、G/H）合并的叶子行为空 ⇒ 源模板只填了 1 个实体槽",
-            "seed 与运行时**两侧独立**都判 flat + 2 数据列（两个独立实现结论一致）",
-            "改成动态多实体属**结构性变更**，超出本 spec R1 明列的 6 张 A 类表",
-            "父表头是**实体名**、源 xlsx 留空 ⇒ 无从裁决，改了就是臆造（违「宁缺勿造」）"
-          ],
-          "platform_intent": "按单槽 flat 实现：标签列「项目」+ 本期发生额 / 上期发生额 两个数据列，不声明 group",
-          "expected_source_runs": 1
-        }
+        ]
       },
       "续：重要联营企业本期及上期经营成果": {
         "label_header": "项目",
@@ -1495,23 +1447,7 @@
             "label": "期初数",
             "group": "<DYNAMIC:c3>"
           }
-        ],
-        "single_slot_exemption": {
-          "exempt_kinds": [
-            "flat",
-            "group"
-          ],
-          "source_ref": "A229:D230",
-          "source_text": "A229:B230='项 目'（标签列跨 2 xlsx 列）；C229:D229 空白合并；C230='期末数' D230='期初数'；E229:F229 与 G229:H229 亦为空白合并但 E230~H230 全空",
-          "basis": [
-            "源侧 D/E、F/G（soe 为 E/F、G/H）合并的叶子行为空 ⇒ 源模板只填了 1 个实体槽",
-            "seed 与运行时**两侧独立**都判 flat + 2 数据列（两个独立实现结论一致）",
-            "改成动态多实体属**结构性变更**，超出本 spec R1 明列的 6 张 A 类表",
-            "父表头是**实体名**、源 xlsx 留空 ⇒ 无从裁决，改了就是臆造（违「宁缺勿造」）"
-          ],
-          "platform_intent": "按单槽 flat 实现：标签列「项目」+ 期末数 / 期初数 两个数据列，不声明 group",
-          "expected_source_runs": 1
-        }
+        ]
       },
       "重要联营企业的主要财务信息": {
         "label_header": "项目",

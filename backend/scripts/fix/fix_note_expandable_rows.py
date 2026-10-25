@@ -142,13 +142,12 @@ def run_variant(variant: str, *, apply: bool) -> dict[str, Any]:
                 if verdict == "noop":
                     noop += 1
                     continue
-                # R10.2：母公司章一律排除（归 A spec）
-                if scope == PROBE.SCOPE_PARENT:
-                    skips.append(
-                        "[%s] %s #%d r%d 排除（母公司章 → A spec）：%r"
-                        % (variant, num, ti, ri, row.get("label"))
-                    )
-                    continue
+                # 🔴 原 R10.2「母公司章一律排除（归 A spec）」已撤（R8.4 批 9b-2，2026-10-25 用户裁决）：
+                #    「可无限插行」是「按实际清空、动态插行」的位置标记、不是真实行内容；母公司章在合并附注里
+                #    照样出具 ⇒ 语义与其余章节一致。A spec（`fix_note_parent_company_chapter.py`）只管母公司章的
+                #    表集合 / 列 / 表头 / 指引，**不写行的 row_type**，排除的结果是两边都不标、4 行 `…` 一直按
+                #    普通数据行渲染（长期股权投资（表3）两版各 2 行）。同构子节的表从合并章整表复制，本就带
+                #    expandable，不受影响。
                 if verdict == "skip":
                     skips.append(
                         "[%s] %s #%d %s r%d 跳过：label %r 是可扩位但 row_type=%r"

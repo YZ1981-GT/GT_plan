@@ -412,7 +412,7 @@ def test_text_sections_has_no_bare_table_name(variant: str) -> None:
 
 @pytest.mark.parametrize("variant", VARIANTS)
 def test_table_name_paragraphs_use_hash_prefix(variant: str) -> None:
-    """引用表名的段落一律 `#### ` 前缀（与 `fix_note_ar_soe_structure` 同范式）。"""
+    """引用表名的段落一律 `#### ` 前缀（`_note_structure_kit.titleize_text_sections` 同一范式）。"""
     section = _section(variant)
     names = {str(t.get("name", "")).strip() for t in (section.get("tables") or [])}
     offenders = [

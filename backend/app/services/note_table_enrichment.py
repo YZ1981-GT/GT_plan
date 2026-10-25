@@ -87,8 +87,10 @@ def _align_table_to_template(tbl: dict, tpl_tbl: dict) -> None:
     # 2. 回填 headers（模板列数 ≥ 数据列数时替换）
     tpl_col_count = len(tpl_headers)
     data_col_count = len(data_headers)
+    headers_replaced = False
     if tpl_col_count > 0 and tpl_col_count >= data_col_count:
         tbl["headers"] = list(tpl_headers)  # 拷贝
+        headers_replaced = True
         # 扩展 rows 中的 values 到模板列数
         tpl_value_count = tpl_col_count - 1  # headers[0] 是标签列
         _expand_rows_values(tbl, tpl_value_count)
@@ -96,8 +98,19 @@ def _align_table_to_template(tbl: dict, tpl_tbl: dict) -> None:
     # 3. 回填 multi_header / _column_groups
     if not tbl.get("multi_header") and tpl_tbl.get("multi_header"):
         tbl["multi_header"] = tpl_tbl["multi_header"]
-    if not tbl.get("_column_groups") and tpl_tbl.get("_column_groups"):
-        tbl["_column_groups"] = tpl_tbl["_column_groups"]
+    tpl_groups = tpl_tbl.get("_column_groups")
+    stale_groups = (
+        headers_replaced
+        and "_source_sub_table_key" not in tbl  # 底稿推送投影出来的表：分组随推送列定义，不归这里管
+        and bool(tbl.get("_column_groups"))
+        and tbl.get("_column_groups") != tpl_groups
+    )
+    if stale_groups:
+        # 模板生成的表换上了模板表头，分组也必须跟模板走：模板两层改一层后库内旧行还带旧分组 ⇒ 表头一层、
+        # 分组两层（L3 长期借款 R8.4 批 9b-2）。模板没有分组 ⇒ []（显式单级，与投影器 flat 同义，禁止按表头推断）
+        tbl["_column_groups"] = tpl_groups if tpl_groups else []
+    elif not tbl.get("_column_groups") and tpl_groups:
+        tbl["_column_groups"] = tpl_groups
 
     # 4. 回填 text_after_table（模板中表格后的参考文字）
     if not tbl.get("text_after_table") and tpl_tbl.get("text_after_table"):
@@ -154,13 +167,29 @@ def carry_template_table_names(
     if not tpl_tables:
         return
 
+    # 同名优先、位置兜底：表名已是模板表名的（底稿推送投影出来的表恒是）对齐到同名模板表。只按位置时，推送只带
+    # 一节的部分表、或表序与模板不同，第 i 张就会被改成模板第 i 张的名字并换上它的表头（首列同叫「项目」即通过交叉
+    # 校验）。名字对不上模板的旧表（泄漏名 / 空名）仍按位置回填（R8.4 批 9b-2）。
+    by_name: dict[str, list[int]] = {}
+    for j, tpl in enumerate(tpl_tables):
+        if isinstance(tpl, dict):
+            by_name.setdefault(str(tpl.get("name") or "").strip(), []).append(j)
+    assigned: dict[int, int] = {}
+    used: set[int] = set()
+    for i, tbl in enumerate(tables):  # 先认同名，再给剩下的按位置：否则前面的旧名表会抢走后面同名表的位置
+        name = str(tbl.get("name") or "").strip() if isinstance(tbl, dict) else ""
+        j = next((k for k in by_name.get(name, []) if k not in used), None) if name else None
+        if j is not None:
+            assigned[i] = j
+            used.add(j)
     for i, tbl in enumerate(tables):
-        if not isinstance(tbl, dict) or i >= len(tpl_tables):
-            continue
-        tpl_tbl = tpl_tables[i]
-        if not isinstance(tpl_tbl, dict):
-            continue
-        _align_table_to_template(tbl, tpl_tbl)
+        if isinstance(tbl, dict) and i not in assigned and i < len(tpl_tables) and i not in used:
+            assigned[i] = i
+            used.add(i)
+    for i, j in assigned.items():
+        tpl_tbl = tpl_tables[j]
+        if isinstance(tpl_tbl, dict):
+            _align_table_to_template(tables[i], tpl_tbl)
 
 
 # ─── dict 格式 rows 的 _row_types 推导 ──────────────────────────────────────

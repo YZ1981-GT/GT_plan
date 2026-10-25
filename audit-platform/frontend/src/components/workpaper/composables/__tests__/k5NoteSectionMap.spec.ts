@@ -22,9 +22,8 @@ import type { ColumnDef } from '../disclosureColumnDefs'
  *   `note_template_{listed,soe}.json` 五、50 / 八、55 + consol 五-50-1 / 五-55-1 +
  *   校验预设 F50-1/2/3（2 个数值列 + 合计行，无变动表）。
  *
- * 覆盖 T5 八族断言，重点是 **T4 变体列集差异**：上市 3 值列（末列 `形成原因`）/
- * 国企 2 值列（国企源 xlsx D6 有 `形成原因`，但附注模版 + note_template + consol
- * 三家都只有 3 列，形成原因降级为表下注文字 L3964）。
+ * 覆盖 T5 八族断言。两版都是 3 值列（末列 `形成原因`）：单体附注按底稿披露表格式（R8.4 批 9b-2，2026-10-24），
+ * 国企源 xlsx D6 就是 `形成原因`（原 3 列是随附注模版把形成原因降为表下注文字）；两版只差期初列名。
  */
 
 const SNAKE_CASE = /^[a-z_][a-z0-9_]*$/
@@ -75,15 +74,12 @@ describe('K5 预计负债披露 columns 契约', () => {
     expect(cols.map(c => c.label)).not.toContain('本期减少')
   })
 
-  it('国企：3 列，**不带**「形成原因」（源 xlsx D6 有但附注三源都只有 3 列）', () => {
+  it('国企：4 列（项目 / 期末余额 / 期初余额 / 形成原因），按底稿 K5 国企第 6 行', () => {
     const cols = buildK5SoeColumns()[K5_SUBTABLE.provision]
-    expect(cols.map(c => c.label)).toEqual(['项目', '期末余额', '期初余额'])
-    expect(cols.map(c => c.key)).toEqual(['label', 'end_amount', 'prior_amount'])
-    expect(cols).toHaveLength(3)
-    // 负向：照抄上市会多出第 3 值列 → `remark` 溢出（表面仍渲染 3 列，肉眼极难发现）
-    expect(cols.map(c => c.label)).not.toContain('形成原因')
-    expect(cols.map(c => c.key)).not.toContain('reason')
-    // 负向：底稿 UI 的「确认依据」「风险等级」是审计列，附注无落点
+    expect(cols.map(c => c.label)).toEqual(['项目', '期末余额', '期初余额', '形成原因'])
+    expect(cols.map(c => c.key)).toEqual(['label', 'end_amount', 'prior_amount', 'reason'])
+    expect(cols[3].format).toBe('text')
+    // 负向：本页「确认依据」是形成原因的取数来源，「风险等级」是审计列，都不成为附注列名
     expect(cols.map(c => c.label)).not.toContain('确认依据')
     expect(cols.map(c => c.label)).not.toContain('风险等级')
   })
@@ -152,13 +148,12 @@ describe('K5 预计负债披露 columns 契约', () => {
     expect(tableRows[tableRows.length - 1].values).toEqual([1500, 1200, ''])
   })
 
-  it('位置对齐（国企变体守卫）：行 values = [期末余额, 期初余额]，形成原因不得溢出', () => {
+  it('位置对齐（国企变体守卫）：行 values = [期末余额, 期初余额, 形成原因]', () => {
     const { sub_table_data } = payloadOf('soe')
     const tableRows = sub_table_data[K5_SUBTABLE.provision] as Array<{ label: string; values: unknown[] }>
     expect(tableRows[0].label).toBe('未决诉讼')
-    expect(tableRows[0].values).toEqual([1000, 800])
-    expect(tableRows[0].values).not.toContain('被诉侵权')
-    expect(tableRows[tableRows.length - 1].values).toEqual([1500, 1200])
+    expect(tableRows[0].values).toEqual([1000, 800, '被诉侵权'])
+    expect(tableRows[tableRows.length - 1].values).toEqual([1500, 1200, ''])
   })
 
   it('合计行：金额为明细行之和且带 is_total', () => {

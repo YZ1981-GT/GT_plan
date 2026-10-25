@@ -44,6 +44,8 @@ EXCLUDE_FILES = {
     DATA / "note_template_listed.json",
     Path(__file__).resolve(),
     ROOT / "backend" / "tests" / "test_note_section_code_aliases.py",
+    # 存量改编号用例：用真实种子别名（旧编号字面量）当输入，换成现行编号用例就失去意义
+    ROOT / "backend" / "tests" / "test_note_project_realign.py",
     # 这两份镜像四版 Word 模板里的 ##SECTION## / {{section:…}} 标记（标记仍是旧编号，四版 Word 不改）；
     # 交付导出按标记编号找不到附注时按 section_id 兜底（section_id 不变），改它反而对不上标记
     DATA / "audit_report_templates" / "section_code_index.json",
@@ -51,6 +53,8 @@ EXCLUDE_FILES = {
     # 真库快照（build_note_legacy_positional_pending.py 只读生成）：记的是库里现存编号，改了就是伪造快照；
     # 存量项目改编号后（spec Task 10~14）由生成脚本重跑
     DATA / "note_legacy_positional_pending.json",
+    # 同为真库快照（e2e/trim_e2e_baseline.py --capture 抓的附注行，--restore 原样写回）
+    DATA / "trim_e2e_baseline.json",
 }
 
 

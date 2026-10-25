@@ -6,9 +6,9 @@
  *   `附注披露信息（国企）`（**全角括号**）：两版都是「项目 / 本期发生额 / 上期发生额」，
  *   数据引 `'明细表K10-2'`。
  * - `note_template_listed.json` §五、68 / `note_template_soe.json` §八、69，
- *   表名两版同为「其他收益」。**国企侧是 4 列** —— 末列「是否为政府补助」，
- *   且行序为「明细行 … / 合计 / 其中：政府补助」（结构行排在合计之后）。
- *   旧常量两版都只声明 3 列 → 国企第 4 列列头丢失。
+ *   表名两版同为「其他收益」，两版都是 3 列（按底稿披露表格式，R8.4 批 9b-2，2026-10-24：国企原随 Word
+ *   多一列「是否为政府补助」，底稿 K10 国企第 7 行没有，已删）。国企行序为「明细行 … / 合计 / 其中：政府补助」
+ *   （结构行排在合计之后）；披露页的「是否为政府补助」点选仍决定哪些行计入「其中：政府补助」，只是不再推成附注列。
  *
  * account_code: 6117
  *
@@ -64,7 +64,6 @@ const SPEC_SOE: KPlColumnSpec = {
   labelHeader: '项目',
   currentLabel: '本期发生额',
   priorLabel: '上期发生额',
-  extra: { key: 'is_gov_grant', label: '是否为政府补助', format: 'text' },
 }
 
 export function buildK10ListedColumns(): Record<string, ColumnDef[]> {
@@ -79,7 +78,7 @@ export interface K10DisclosureRow {
   project: string
   currentAmount: number
   priorAmount: number
-  /** 国企第 4 列「是否为政府补助」（上市侧忽略） */
+  /** 国企「是否为政府补助」点选：只决定「其中：政府补助」的金额（调用方汇总后传 govGrantRow），不推成附注列 */
   isGovGrant?: string
 }
 
@@ -99,7 +98,6 @@ export function buildK10SyncPayload(
     project: r.project,
     currentAmount: r.currentAmount,
     priorAmount: r.priorAmount,
-    ...(variant === 'soe' ? { extraValue: r.isGovGrant ?? '' } : {}),
   }))
   const afterTotalRows: KPlRow[] =
     variant === 'soe'
@@ -107,7 +105,6 @@ export function buildK10SyncPayload(
           project: K10_SOE_STRUCTURAL_ROW,
           currentAmount: govGrantRow?.currentAmount ?? 0,
           priorAmount: govGrantRow?.priorAmount ?? 0,
-          extraValue: '是',
           isStructural: true,
         }]
       : []

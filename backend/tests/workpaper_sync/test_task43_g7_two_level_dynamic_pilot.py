@@ -150,8 +150,11 @@ EXPECTED_RECORD_FORMULA_CELLS = 30
 #: `g7_column_source_facts.json` 的三个计数（归档 spec 的成果，本任务现推复核）。
 EXPECTED_FACTS_TABLE_COUNT = 38
 EXPECTED_FACTS_TWO_LEVEL = 24
-EXPECTED_FACTS_EXEMPT = 4
-EXPECTED_FACTS_TWO_LEVEL_RENDERED = 20
+#: 🔴 2026-10-24 勘误：原登记 4 张合营表单槽豁免（⇒ 应渲染两级 20），其「父表头空白」前提不成立
+#:    （父表头格是引用被投资单位名的公式），登记已清空、seed 改两层（consol-note-header-library-and-
+#:    node-reaggregate R8.4 批 9b-2，见 `diagnose_g7_column_alignment.SOURCE_PLACEHOLDER_SINGLE_SLOT`）。
+EXPECTED_FACTS_EXEMPT = 0
+EXPECTED_FACTS_TWO_LEVEL_RENDERED = 24
 #: 同类候选数（`assess_pilot_classes()` 实测）。
 EXPECTED_G7_CANDIDATES = 3
 
@@ -1053,7 +1056,7 @@ class TestManagedSheetSelectionIsMeasured:
         assert facts["_meta"]["source_sha256"] == P.TEMPLATE_SHA256
 
     def test_seed_counts_reproduce_the_archived_spec_numbers(self) -> None:
-        """38 张表 / 24 两级 / 4 豁免 ⇒ 应渲染两级 20 张（`is_two_level` 不能直接当期望）。"""
+        """38 张表 / 24 两级 / 0 豁免 ⇒ 应渲染两级 24 张（归档时 4 豁免 ⇒ 20，2026-10-24 勘误清空）。"""
         facts = json.loads(
             (_REPO / P.COLUMN_SOURCE_FACTS_RELATIVE_PATH).read_text(encoding="utf-8")
         )
@@ -1070,12 +1073,31 @@ class TestManagedSheetSelectionIsMeasured:
             EXPECTED_FACTS_TWO_LEVEL_RENDERED,
         )
 
+    def test_rendered_expectation_subtracts_registered_exemptions(self) -> None:
+        """「应渲染两级」= 两级计数 - 豁免计数（`is_two_level` 不能直接当期望）。
+
+        真实登记表 2026-10-24 起为空，真实数据上「减去豁免」与「不减」结果相同 ⇒ 这条口径
+        只能在副本上验：给一张**不归本契约管**的两级表登记豁免，期望值必须少 1。
+        """
+        facts = json.loads(
+            (_REPO / P.COLUMN_SOURCE_FACTS_RELATIVE_PATH).read_text(encoding="utf-8")
+        )
+        victim = facts["listed"]["七、1"]["重要联营企业主要财务信息"]
+        assert victim["is_two_level"] is True
+        assert "single_slot_exemption" not in victim
+        victim["single_slot_exemption"] = {"exempt_kinds": ["flat", "group"]}
+        assert P.assert_managed_tables_are_not_exempted(facts=facts) == (
+            EXPECTED_FACTS_TWO_LEVEL,
+            EXPECTED_FACTS_EXEMPT + 1,
+            EXPECTED_FACTS_TWO_LEVEL_RENDERED - 1,
+        )
+
     def test_exemption_judgement_fails_closed_when_my_table_becomes_exempt(self) -> None:
         """反向自检：给本表打上豁免 ⇒ 必须打红（已裁决单槽 flat 的表不能当两级 pilot）。"""
         facts = json.loads(
             (_REPO / P.COLUMN_SOURCE_FACTS_RELATIVE_PATH).read_text(encoding="utf-8")
         )
-        facts["soe"]["七、重要非全资子公司"]["主要财务信息"]["single_slot_exemption"] = {
+        facts["soe"]["七、重要非全资子公司情况"]["主要财务信息"]["single_slot_exemption"] = {
             "exempt_kinds": ["flat", "group"]
         }
         with pytest.raises(P.PilotSelectionError, match="single_slot_exemption"):
@@ -1739,7 +1761,7 @@ class TestSecondEdgeSeed:
         facts = json.loads(
             (_REPO / P.COLUMN_SOURCE_FACTS_RELATIVE_PATH).read_text(encoding="utf-8")
         )
-        del facts["soe"]["七、重要非全资子公司"]["主要财务信息"]
+        del facts["soe"]["七、重要非全资子公司情况"]["主要财务信息"]
         with pytest.raises(P.PilotSelectionError, match="在 seed 侧没有登记项"):
             P.source_facts_for_managed_tables(facts=facts)
 

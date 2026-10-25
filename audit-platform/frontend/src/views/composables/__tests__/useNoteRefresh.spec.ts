@@ -57,7 +57,7 @@ describe('useNoteRefresh disclosure:note-text-updated', () => {
       projectId: 'p1',
       accountCode: '1511',
       section: 'soe',
-      payloads: [{ noteSectionId: '八、18' }, { noteSectionId: '七、本期纳入合并报表' }],
+      payloads: [{ noteSectionId: '八、18' }, { noteSectionId: '七、本期纳入合并报表范围的子公司基本情况' }],
     })
     await vi.advanceTimersByTimeAsync(500)
     expect(fetchDetail).toHaveBeenCalledWith('八、18')

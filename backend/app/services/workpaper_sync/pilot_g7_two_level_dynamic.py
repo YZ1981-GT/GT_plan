@@ -72,7 +72,8 @@ entry）上实测 **3 个**候选、`bidirectional` **0 个**：
   （已归档 spec `g7-column-alignment-and-extraction-closure` 的成果）只覆盖**两张披露
   sheet**：`backend/data/g7_column_source_facts.json` 的 `_meta.sheet_names` 实测恰为
   ``["附注披露信息（上市公司）", "附注披露信息（国企）"]``，共 **38** 张表、其中
-  `is_two_level` **24** 张、`single_slot_exemption` **4** 张 ⇒ 应渲染两级 **20** 张。
+  `is_two_level` **24** 张。归档时 `single_slot_exemption` 登记 4 张 ⇒ 应渲染两级 20 张；
+  2026-10-24 勘误清空该登记（4 张合营表父表头是引用企业名的公式、非空白占位）⇒ **24** 张。
 * 两张披露 sheet 里带动态列占位（facts 的 ``<DYNAMIC:cN>``）的表共 **9** 张。其中
   上市侧 5 张的数据格在源模板里**全是跨 sheet 公式**（`='被投资单位财务信息（合营、
   联营）G7-5'!E10` 一类）⇒ 契约里只能全部 `mode=formula`，**零 editable 字段**，而
@@ -172,8 +173,8 @@ Task 37/38 在 extractor / materializer 两侧都已 **fail closed**：契约声
    merge / 文本 / 公式 / 空值，作为一切期望值的推导源（本模块的每个 `source_ref` /
    `header_source_ref` / `group_source_ref` 都指向具体单元格）；
 2. **seed**（派生投影）—— `backend/data/g7_column_source_facts.json` 的
-   `soe["七、重要非全资子公司"]["主要财务信息"]` 与
-   `soe["七、本期不再纳入合并"]["原子公司的基本情况"]`：`is_two_level` / `level_count` /
+   `soe["七、重要非全资子公司情况"]["主要财务信息"]` 与
+   `soe["七、本期不再纳入合并范围的原子公司"]["原子公司的基本情况"]`：`is_two_level` / `level_count` /
    `label_xlsx_span` / `label_header` / `columns[].group` 逐项与本契约比对
    （:func:`source_facts_for_managed_tables`）；
 3. **运行时** —— 真实注入产物上跑 Task 37 的 `extract_projection`，比对 identity
@@ -186,8 +187,8 @@ Task 37/38 在 extractor / materializer 两侧都已 **fail closed**：契约声
    `TestFourthEdgeRenderLayer` 用「遍历 + 外层门控 + 内层嵌套」三要素判定，缺一即红。
 
 🔴 `is_two_level` 是**源侧物理结构**字段，不能直接当期望值：须剔除已登记的
-`single_slot_exemption` 才是「应渲染两级」的期望（24 → **20**）。本 pilot 的两张表都
-**不在**豁免表里（:func:`assert_managed_tables_are_not_exempted`）。
+`single_slot_exemption` 才是「应渲染两级」的期望（归档时 24 → 20；2026-10-24 登记清空后
+24 → 24）。本 pilot 的两张表都**不在**豁免表里（:func:`assert_managed_tables_are_not_exempted`）。
 
 ═══ 六、HTML store ═══
 
@@ -1075,8 +1076,8 @@ def source_facts_for_managed_tables(
         )
     soe = payload.get("soe") or {}
     wanted = {
-        MATRIX_TABLE_KEY: ("七、重要非全资子公司", "主要财务信息"),
-        RECORD_TABLE_KEY: ("七、本期不再纳入合并", "原子公司的基本情况"),
+        MATRIX_TABLE_KEY: ("七、重要非全资子公司情况", "主要财务信息"),
+        RECORD_TABLE_KEY: ("七、本期不再纳入合并范围的原子公司", "原子公司的基本情况"),
     }
     out: dict[str, Mapping[str, Any]] = {}
     for table_key, (section, table_name) in wanted.items():
@@ -1095,9 +1096,10 @@ def assert_managed_tables_are_not_exempted(
 ) -> tuple[int, int, int]:
     """本契约的两张表都不在 `single_slot_exemption` 登记里；顺带现推「应渲染两级」的期望。
 
-    🔴 `is_two_level` 是**源侧物理结构**字段，不能直接当期望值：它把「父行为空的占位合并」
-    也算两级。真期望 = `is_two_level 计数 - single_slot_exemption 计数`（归档 spec 实测
-    24 → 20）。任何 `_exemption` / `_adjudicated` 登记表都必须参与期望值推导。
+    🔴 `is_two_level` 是**源侧物理结构**字段，不能直接当期望值：它把「源模板只填 1 槽的
+    占位合并」也算两级。真期望 = `is_two_level 计数 - single_slot_exemption 计数`（归档 spec
+    实测 24 → 20；2026-10-24 登记清空后 24 → 24）。任何 `_exemption` / `_adjudicated` 登记表都
+    必须参与期望值推导。
 
     返回 `(两级计数, 豁免计数, 应渲染两级的期望计数)`。
     """

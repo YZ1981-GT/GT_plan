@@ -10,9 +10,13 @@
 - 6 张表 `columns` 曾全部缺失 → seed 路径被 `_infer_groups_from_headers` 按
   「本期增加 / 本期减少」共同前缀反猜出源模板**不存在**的「本期」父表头
 - 6 张表 `guidance` 曾全部缺失（附注 TAB 页签无编制提示）
-- listed 表2 曾残留 `……` 占位行（渲染成一行空披露数据）
+- listed 表2 的 `……` 曾以普通数据行落在模板（渲染成一行空披露数据）→ 现标 `expandable`
 - 两侧说明文本区几乎全缺（soe 只有 3 个 `###` 表标题 → 文本区 seed 恒空）
 - 前端子表名常量与模板 `tables[].name` 必须逐字一致（读 `.ts` 源码，防双真源漂移）
+
+2026-10-25（R8.4 批 9b-2）：列头 / 行名改按各自底稿披露表（上市「上年年末数 / 期末数」与带序号的
+「其中：」行、国企社保「其中」4 项）；原另一个修订脚本 ``fix_note_j1_compensation_structure.py`` 与本节
+修订脚本目标相反、互相覆盖，已并入后删除。
 
 spec: .kiro/specs/j1-disclosure-template-alignment/ Task 2.1
 """
@@ -44,11 +48,16 @@ EXPECTED_TABLES = {
     "soe": ["应付职工薪酬列示", "短期薪酬列示", "设定提存计划列示"],
 }
 
-MOVEMENT_HEADERS = ["项目", "期初余额", "本期增加", "本期减少", "期末余额"]
+#: 列头按各自底稿（上市源 R6 / R17 / R40，国企源 R8 / R16 / R31）；列 key 两版相同
+MOVEMENT_HEADERS = {
+    "listed": ["项目", "上年年末数", "本期增加", "本期减少", "期末数"],
+    "soe": ["项目", "期初余额", "本期增加", "本期减少", "期末余额"],
+}
+MOVEMENT_KEYS = ["项目", "期初余额", "本期增加", "本期减少", "期末余额"]
 
 VARIANTS = ("listed", "soe")
 
-_PLACEHOLDER_LABELS = {"……", "…", "..."}
+_EXPANDABLE_LABELS = {"……", "…", "..."}
 
 
 # ─────────────────────────── 载入 ───────────────────────────
@@ -110,11 +119,12 @@ def test_columns_present_and_flat(variant: str) -> None:
 
 @pytest.mark.parametrize("variant", VARIANTS)
 def test_headers_match_columns(variant: str) -> None:
-    """headers 与 columns 标签逐字一致，且都等于附注交付口径的 5 列。"""
+    """headers 与 columns 标签逐字一致，且都等于该版底稿的 5 列；列 key 两版相同。"""
     for tbl in _tables(variant):
         name = tbl.get("name")
-        assert tbl.get("headers") == MOVEMENT_HEADERS, f"{name} headers={tbl.get('headers')}"
-        assert [c.get("label") for c in tbl["columns"]] == MOVEMENT_HEADERS, name
+        assert tbl.get("headers") == MOVEMENT_HEADERS[variant], f"{name} headers={tbl.get('headers')}"
+        assert [c.get("label") for c in tbl["columns"]] == MOVEMENT_HEADERS[variant], name
+        assert [c.get("key") for c in tbl["columns"]] == MOVEMENT_KEYS, name
 
 
 @pytest.mark.parametrize("variant", VARIANTS)
@@ -130,16 +140,26 @@ def test_amount_columns_formatted(variant: str) -> None:
 
 @pytest.mark.parametrize("variant", VARIANTS)
 def test_no_placeholder_or_blank_rows(variant: str) -> None:
-    """无 `……` 占位行、无空 label 行、无压扁的 header_label 假数据行。"""
+    """`……` 只能是 expandable 可扩位（零可见内容）、无空 label 行、无压扁的 header_label 假数据行。"""
     for tbl in _tables(variant):
         name = tbl.get("name")
         for i, row in enumerate(tbl.get("rows") or []):
             label = str(row.get("label", "")).strip()
             assert row.get("row_type") != "header_label", f"{name}[{i}] 仍为 header_label"
             assert label, f"{name}[{i}] label 为空（交付物不应出现无名空行）"
-            assert label not in _PLACEHOLDER_LABELS, (
-                f"{name}[{i}] 是占位行「{label}」，语义应移入 guidance"
-            )
+            if label in _EXPANDABLE_LABELS:
+                assert row.get("row_type") == "expandable", (
+                    f"{name}[{i}]「{label}」是源模板可扩位，须标 expandable（否则渲染成一行空披露数据）"
+                )
+
+
+def test_listed_short_term_keeps_source_expandable_row() -> None:
+    """上市表2 源 R24 的「……」可扩位紧跟「3．生育保险费」（险种多于示例时在此增行）。"""
+    rows = _tables("listed")[1]["rows"]
+    labels = [r["label"] for r in rows]
+    i = labels.index("3．生育保险费")
+    assert (rows[i + 1]["label"], rows[i + 1]["row_type"]) == ("……", "expandable")
+    assert sum(1 for r in rows if r.get("row_type") == "expandable") == 1
 
 
 @pytest.mark.parametrize("variant", VARIANTS)
@@ -188,17 +208,29 @@ def test_guidance_present(variant: str) -> None:
 
 @pytest.mark.parametrize("variant", VARIANTS)
 def test_guidance_states_period_end_formula(variant: str) -> None:
-    """三张表都是变动表 → guidance 必须写明 期末 = 期初 + 增加 − 减少。"""
+    """三张表都是变动表 → guidance 必须写明 期末 = 期初 + 增加 − 减少（列名与本版表头一致）。"""
+    begin, end = MOVEMENT_HEADERS[variant][1], MOVEMENT_HEADERS[variant][4]
     for tbl in _tables(variant):
         guidance = str(tbl.get("guidance") or "")
-        assert "期末余额 = 期初余额 + 本期增加 − 本期减少" in guidance, tbl.get("name")
+        assert f"{end} = {begin} + 本期增加 − 本期减少" in guidance, tbl.get("name")
 
 
-def test_soe_short_term_guidance_explains_row_granularity() -> None:
-    """国企表2 的 3 项 vs 底稿 4 项差异必须写进 guidance（防下次复盘重复提议聚合）。"""
-    guidance = _tables("soe")[1]["guidance"]
-    assert "医疗保险费及生育保险费" in guidance
-    assert "不做聚合" in guidance
+def test_listed_post_employment_rows_keep_source_numbering() -> None:
+    """上市表3 的「其中：」行按底稿原字带序号（源 R42~R48）。"""
+    labels = [r["label"] for r in _tables("listed")[2]["rows"]]
+    assert labels == [
+        "离职后福利", "其中：1．基本养老保险费", "2．失业保险费", "3．企业年金缴费", "4．其他",
+        "其他长期职工福利（不适用的删除）", "其中：1．xxx", "2．其他", "合计",
+    ]
+
+
+def test_soe_short_term_insurance_follows_workpaper() -> None:
+    """国企表2 社保「其中」按底稿 4 项（源 R20~R23），guidance 不再写原模板的合并行。"""
+    labels = [r["label"] for r in _tables("soe")[1]["rows"]]
+    i = labels.index("社会保险费")
+    assert labels[i + 1:i + 5] == ["其中：医疗保险费", "工伤保险费", "生育保险费", "其他"]
+    assert "医疗保险费及生育保险费" not in labels
+    assert "医疗保险费及生育保险费" not in _tables("soe")[1]["guidance"]
 
 
 # ─────────────────────────── text_sections ───────────────────────────
@@ -266,16 +298,15 @@ def test_frontend_subtable_keys_match_template() -> None:
         )
 
 
-def test_frontend_movement_columns_match_template_headers() -> None:
-    """`j1MovementColumns()` 的 5 个 label 与模板 headers 逐字一致。"""
+@pytest.mark.parametrize(
+    "variant,builder", [("listed", "buildJ1ListedColumns"), ("soe", "buildJ1SoeColumns")],
+)
+def test_frontend_movement_columns_match_template_headers(variant: str, builder: str) -> None:
+    """前端两版列定义的 5 个 label / key 与该版模板 headers / 列 key 逐字一致。"""
     src = (COMPOSABLES / "j1NoteSectionMap.ts").read_text(encoding="utf-8")
-    # j1MovementColumns 可能委托给 buildJ1SoeColumns，两处都检查
-    body = re.search(r"export function j1MovementColumns\(\)[^{]*\{(.*?)\n\}", src, re.S)
-    assert body, "未找到 j1MovementColumns"
+    body = re.search(rf"export function {builder}\(\)[^{{]*\{{(.*?)\n\}}", src, re.S)
+    assert body, f"未找到 {builder}"
     labels = re.findall(r"label:\s*'([^']+)'", body.group(1))
-    if not labels:
-        # 委托调用：从 buildJ1SoeColumns 取
-        delegate = re.search(r"export function buildJ1SoeColumns\(\)[^{]*\{(.*?)\n\}", src, re.S)
-        assert delegate, "未找到 buildJ1SoeColumns"
-        labels = re.findall(r"label:\s*'([^']+)'", delegate.group(1))
-    assert labels == MOVEMENT_HEADERS, f"前端列头 {labels} ≠ 模板 {MOVEMENT_HEADERS}"
+    keys = re.findall(r"key:\s*'([^']+)'", body.group(1))
+    assert labels == MOVEMENT_HEADERS[variant], f"前端列头 {labels} ≠ 模板 {MOVEMENT_HEADERS[variant]}"
+    assert keys == MOVEMENT_KEYS, f"前端列 key {keys} ≠ 模板 {MOVEMENT_KEYS}"

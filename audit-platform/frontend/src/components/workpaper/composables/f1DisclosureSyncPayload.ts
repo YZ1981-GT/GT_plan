@@ -5,9 +5,9 @@
  * 的 `tables[].name` **逐字一致**（对齐脚本：`backend/scripts/fix/fix_note_prepayment_structure.py`）。
  *
  * 列结构裁决（三源互证，详见 spec design §二）：
- * - 按账龄表 = 5 列（账龄 + 期末{金额,比例} + 期初{金额,比例}）+ 7 行
- *   （各账龄段 + 小计 + 减：减值准备 + 合计）——附注模版与校验预设 F7-6/F7-7/F7-8 一致；
- *   国企底稿保留的逐账龄段「减值准备」列在此**聚合**为「减：减值准备」行。
+ * - 按账龄表 7 行（各账龄段 + 小计 + 减：减值准备 + 合计）——校验预设 F7-6/F7-7/F7-8 口径；
+ *   上市 5 列（账龄 + 期末{金额,比例} + 上年年末{金额,比例}）；国企按底稿 7 列，每期多一列逐账龄段「坏账准备」
+ *   （R8.4 批 9b-2，2026-10-24，见 F1_SOE_NOTE_AGING_LABELS），坏账准备合计仍落「减：减值准备」行。
  * - 上市「账龄超过1年的重要预付款项」无「账龄」「未结算的原因」列（F7-9 listed）。
  * - 上市「前五名」无「减值准备」列（F7-13 listed）；国企前五名第 4 列名为「减值准备」（F7-13 soe）。
  *
@@ -82,6 +82,16 @@ export const F1_SOE_AMOUNT_LABEL = '金 额'
 /** 比例列列头（上市源 C9 / 国企源 C10） */
 export const F1_LISTED_PCT_LABEL = '比例%'
 export const F1_SOE_PCT_LABEL = '比例（%）'
+/**
+ * 国企附注按账龄表的列头（R8.4 批 9b-2，2026-10-24）：底稿 F1 国企第 8~10 行是三层表头（期末数 / 期初数 →
+ * 账面余额{金 额, 比例（%）} + 坏账准备，源 B9 / D9 / B10 / C10），附注表头只有两层 ⇒ 期间作父表头、
+ * 「账面余额」与其子列合写（同上市 五、16「坏账准备计提情况」）。底稿 Tab 仍按三层显示（上面的常量）。
+ */
+export const F1_SOE_NOTE_AGING_LABELS = {
+  amount: '账面余额-金额',
+  pct: '账面余额-比例（%）',
+  provision: '坏账准备',
+} as const
 
 // ─── 列定义（键与 build*SubTableData 行键、note_template columns 逐字一致） ─────
 
@@ -129,29 +139,16 @@ export const F1_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
 export const F1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
   [F1_SOE_SUBTABLE.AGING]: [
     { key: 'label', label: F1_AGING_LABEL_COL, is_label: true },
+    { key: 'end_amount', label: F1_SOE_NOTE_AGING_LABELS.amount, group: F1_SOE_AGING_GROUPS.end, format: 'amount' },
+    { key: 'end_pct', label: F1_SOE_NOTE_AGING_LABELS.pct, group: F1_SOE_AGING_GROUPS.end, format: 'percent' },
+    { key: 'end_provision', label: F1_SOE_NOTE_AGING_LABELS.provision, group: F1_SOE_AGING_GROUPS.end, format: 'amount' },
+    { key: 'prior_amount', label: F1_SOE_NOTE_AGING_LABELS.amount, group: F1_SOE_AGING_GROUPS.prior, format: 'amount' },
+    { key: 'prior_pct', label: F1_SOE_NOTE_AGING_LABELS.pct, group: F1_SOE_AGING_GROUPS.prior, format: 'percent' },
     {
-      key: 'end_amount',
-      label: F1_SOE_AMOUNT_LABEL,
-      group: F1_SOE_AGING_GROUPS.end,
-      format: 'amount',
-    },
-    {
-      key: 'end_pct',
-      label: F1_SOE_PCT_LABEL,
-      group: F1_SOE_AGING_GROUPS.end,
-      format: 'percent',
-    },
-    {
-      key: 'prior_amount',
-      label: F1_SOE_AMOUNT_LABEL,
+      key: 'prior_provision',
+      label: F1_SOE_NOTE_AGING_LABELS.provision,
       group: F1_SOE_AGING_GROUPS.prior,
       format: 'amount',
-    },
-    {
-      key: 'prior_pct',
-      label: F1_SOE_PCT_LABEL,
-      group: F1_SOE_AGING_GROUPS.prior,
-      format: 'percent',
     },
   ],
   [F1_SOE_SUBTABLE.OVER1]: [
@@ -426,36 +423,45 @@ export function buildF1SoeSubTableData(
   snap: F1SoeSyncSnapshot,
 ): Record<string, unknown> {
   return {
-    // 底稿侧逐账龄段「减值准备」列 → 附注侧聚合为「减：减值准备」行（5 列 7 行）
+    // 7 列（每期 账面余额-金额 / 账面余额-比例 / 坏账准备，按底稿）× 7 行：逐账龄段坏账准备落「坏账准备」列，
+    // 其合计仍落「减：减值准备」行、合计行 = 小计 − 减值准备（F7-6/7/8 与报表勾稽口径不变）
     [F1_SOE_SUBTABLE.AGING]: [
       ...snap.agingRows.map((r) => ({
         label: r.label,
         end_amount: r.endAmount,
         end_pct: r.endPct,
+        end_provision: r.endBadDebt,
         prior_amount: r.priorAmount,
         prior_pct: r.priorPct,
+        prior_provision: r.priorBadDebt,
       })),
       {
         label: F1_AGING_SUBTOTAL_LABEL,
         end_amount: snap.agingTotal.endAmount,
         end_pct: snap.agingTotal.endPct,
+        end_provision: snap.agingTotal.endBadDebt,
         prior_amount: snap.agingTotal.priorAmount,
         prior_pct: snap.agingTotal.priorPct,
+        prior_provision: snap.agingTotal.priorBadDebt,
         is_total: true,
       },
       {
         label: F1_AGING_IMPAIRMENT_LABEL,
         end_amount: snap.agingTotal.endBadDebt,
         end_pct: null,
+        end_provision: null,
         prior_amount: snap.agingTotal.priorBadDebt,
         prior_pct: null,
+        prior_provision: null,
       },
       {
         label: snap.agingNet.label || F1_AGING_NET_LABEL,
         end_amount: snap.agingNet.endAmount,
         end_pct: null,
+        end_provision: null,
         prior_amount: snap.agingNet.priorAmount,
         prior_pct: null,
+        prior_provision: null,
         is_total: true,
       },
     ],

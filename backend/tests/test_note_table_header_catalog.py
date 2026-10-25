@@ -60,20 +60,25 @@ def test_header_rows_cover_every_column(catalog):
 
 def test_known_anomalies_are_listed(catalog):
     found = {(a["variant"], a["id"], a["kind"]) for a in catalog["anomalies"]}
-    assert ("soe_standalone", "八、9#16", "continuation_self_reference") in found
-    assert ("soe_standalone", "八、18#4", "continuation_self_reference") in found
+    # 2026-10-25 R8.4 批 9b-2：原登记的两处「续表指向自己」随表清单修正消失 —— 国企 八、9 补回「其他应收款项账面余额变动」后
+    # 继续涉入表在 #17、指向 #16 终止确认表（与 十二、其他应收款、上市 五、8 同一约定）；八、18 补「重要联营企业的主要财务信息」
+    # 后「续：重要联营企业…」(#5) 指向它（#4）。今后不许再有
+    assert not {a for a in found if a[2] == "continuation_self_reference"}
+    assert ("soe_standalone", "八、9#17", "continuation_index_not_continuation") in found
     # 合并种子多级表头按 Word 修复后（R6.3）：表头里没有数据行，标签列表头不盖数据列（原上市 五-9-4~7 等 11 处）
     header_defects = {a for a in found if a[2] in ("header_row_has_data", "label_header_spans_data_columns")}
     assert header_defects == set()
     xu = {a["id"] for a in catalog["anomalies"] if a["kind"] == "xu_word_not_continuation"}
-    assert "八、9#16" in xu  # 继续涉入
+    assert "八、9#17" in xu  # 继续涉入
     assert any(i.startswith("八、51#") for i in xu)  # 永续债
 
 
 def test_continuations(catalog):
     soe = _by_id(catalog, "soe_standalone")
-    assert soe["八、4#3"]["continuation"] == {"of": "八、4#2", "kind": "columns", "via": "base"}
-    assert "continuation" not in soe["八、9#16"]  # 继续涉入不是续表
+    # 2026-10-25 批 9b-2 删国企 八、4 重复的「按坏账准备计提方法分类披露应收票据」后，期初数续表在 #2、续 #1（期末数）
+    assert soe["八、4#2"]["continuation"] == {"of": "八、4#1", "kind": "columns", "via": "base"}
+    assert "continuation" not in soe["八、9#17"]  # 继续涉入不是续表（补回账面余额变动表后从 #16 移到 #17）
+    assert soe["八、18#5"]["continuation"] == {"of": "八、18#4", "kind": "rows", "via": "previous"}
     listed = _by_id(catalog, "listed_standalone")
     # 「应付债券（续）」续的是上一张「应付债券的增减变动」，不是同基名的「应付债券」汇总表
     assert listed["五、46#2"]["continuation"]["of"] == "五、46#1"
@@ -114,9 +119,13 @@ def test_mapping_agrees_with_runtime_choice(catalog, std):
 #:   「主营业务收入 / 主营业务成本」（合并是「收入 / 成本」，−4），五-23-5 / 五-23-6 单体在建工程两张表名改正后对上
 #:   （+2 / +2）；none 26→25。底稿合并单元格漏并的三张（国企 八、4 第 8 张「其他变动」、上市 五、15 第 4 / 5 张
 #:   「逾期本金」，白名单 exceptions）单体保留原分组，五-4-6 / 五-15-4 照旧逐列对上。
+#: 2026-10-25 R8.4 批 9b-2 单体表名按底稿复位（5914e315b 改成的 Word 提示段换回业务名）、删重复表、补表，映射生成器加
+#:   「合并表标题 ↔ 单体表名」对照（gen_consol_standalone_note_mapping._TITLE_ALIASES：合并 Word 提示句 / 「期末本公司…」
+#:   说法认回单体表）：国企 0.9306→0.9418、对上 617→631、none 14→11（五-18-8 超额亏损表补上；五-54-4 单体是三组列合表，
+#:   如实不对）；上市 0.9339→0.9375、对上 819→825、none 25→23。
 _RATCHET = {
-    "soe": {"coverage": 0.9306, "matched": 617, "none": 14},
-    "listed": {"coverage": 0.9339, "matched": 819, "none": 25},
+    "soe": {"coverage": 0.9418, "matched": 631, "none": 11},
+    "listed": {"coverage": 0.9375, "matched": 825, "none": 23},
 }
 
 

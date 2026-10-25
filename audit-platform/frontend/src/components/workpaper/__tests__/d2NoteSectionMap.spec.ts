@@ -4,6 +4,7 @@ import {
   D2_DISCLOSURE_SHEET_NAME,
   D2_TABLE_NAMES,
   D2_NOTE_TEXT_SECTIONS,
+  D2_SOE_PRIOR_SUFFIX,
   portfolioTableName,
   resolveD2CurrentStandard,
   buildD2SyncPayload,
@@ -190,14 +191,15 @@ describe('d2NoteSectionMap', () => {
     })
   })
 
-  it('国企单项计提明细列含坏账准备/账龄/预期信用损失率/计提理由', () => {
+  it('国企单项计提明细列含坏账准备/账龄/预期信用损失率，没有「计提理由」（底稿第 30 行没有这列）', () => {
     const p = buildD2SyncPayload('soe', 'wp-2', null, snap())
     expect(p.columns[D2_TABLE_NAMES.soe.individualEnd].map((c) => c.label)).toEqual([
-      '债务人名称', '账面余额', '坏账准备', '账龄', '预期信用损失率（%）', '计提理由',
+      '债务人名称', '账面余额', '坏账准备', '账龄', '预期信用损失率（%）',
     ])
     const rows = p.sub_table_data[D2_TABLE_NAMES.soe.individualEnd] as any[]
     expect(rows).toHaveLength(3) // 2 明细 + 合计
     expect(rows[2]).toMatchObject({ label: '合 计', end_amount: 500, provision: 50, is_total: true })
+    expect(rows.every((r) => !('basis' in r)), '数据行不带模板没有的列').toBe(true)
   })
 
   it('上市前五名合计列自动为应收账款+合同资产', () => {
@@ -344,7 +346,7 @@ describe('d2NoteSectionMap', () => {
 
   // ─── 国企源模板列头契约（spec d2-ar-disclosure-soe-alignment）───────────────
 
-  it('SOE P1/P2 组合分表 7 列，双期各（应收账款/比例（%）/坏账准备）（源模板 r36~r38）', () => {
+  it('SOE 组合分表按底稿期末 / 期初各一张（源模板 r36 / r47），各 4 列「账面余额{应收账款, 比例（%）} | 坏账准备」', () => {
     const p = buildD2SyncPayload('soe', 'wp-2', null, snap({
       portfolios: [{
         name: '应收中央企业客户',
@@ -354,21 +356,15 @@ describe('d2NoteSectionMap', () => {
         ],
       }],
     }))
-    const key = portfolioTableName('应收中央企业客户')
-    const cols = p.columns[key]
-    expect(cols.map((c) => c.label)).toEqual([
-      '账 龄', '应收账款', '比例（%）', '坏账准备', '应收账款', '比例（%）', '坏账准备',
-    ])
-    expect(cols.map((c) => c.group)).toEqual([
-      undefined, '期末数', '期末数', '期末数', '期初数', '期初数', '期初数',
-    ])
-    // Property 2 双期同构：期末与期初子列 label 序列相同
-    expect(cols.slice(1, 4).map((c) => c.label)).toEqual(cols.slice(4, 7).map((c) => c.label))
-    const rows = p.sub_table_data[key] as any[]
-    expect(rows[0]).toMatchObject({
-      label: '1年以内（含1年）',
-      end_amount: 600, end_ratio: 75, end_provision: 60,
-      prior_amount: 400, prior_ratio: 66.67, prior_provision: 40,
+    const endKey = portfolioTableName('应收中央企业客户')
+    const priorKey = `${endKey}${D2_SOE_PRIOR_SUFFIX}`
+    for (const key of [endKey, priorKey]) {
+      expect(p.columns[key].map((c) => c.label), key).toEqual(['账 龄', '应收账款', '比例（%）', '坏账准备'])
+      expect(p.columns[key].map((c) => c.group), key).toEqual([undefined, '账面余额', '账面余额', undefined])
+    }
+    expect(p.sub_table_data[endKey][0]).toEqual({ label: '1年以内（含1年）', end_amount: 600, end_ratio: 75, end_provision: 60 })
+    expect(p.sub_table_data[priorKey][0]).toEqual({
+      label: '1年以内（含1年）', prior_amount: 400, prior_ratio: 66.67, prior_provision: 40,
     })
   })
 

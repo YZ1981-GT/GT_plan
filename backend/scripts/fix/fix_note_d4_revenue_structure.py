@@ -11,7 +11,7 @@
 - （1）（2）（3）（8）= 5 列两级表头：`项目`(rowspan2) +
   `本期发生额{收入, 成本}` + `上期发生额{收入, 成本}`
 - （4）= 9 列列转置：空(rowspan3) + 动态类别列，每类别含 `{收入, 成本}` 两子列
-  → 用 `grouped_columns`，group 名 = 类别名
+  → 结构由 `fix_note_d4_segment_structure.py` 维护，本脚本只认表名
 - （6）= 4 列单级（flat）：`年 度` + 2 个年度列 + `合计`
 
 Task 3.1：补 columns
@@ -36,7 +36,6 @@ from _note_structure_kit import (  # noqa: E402
     build_cli,
     data_row,
     flat_columns,
-    grouped_columns,
     rule,
     run_section,
     total_row,
@@ -101,36 +100,19 @@ def _two_period_cols(label_key: str, label_text: str, subs: list | None = None) 
     )
 
 
-# ─── （4）分解信息：9 列列转置 ───
-# 源模板 B45:I45「本期发生额」+ 4 类别 ×{收入, 成本}
-# 当前模板 headers 上市=[项目, 本期发生额]  国企=[合同分类/报告分部, 本期发生额]
-# 列转置的类别是动态的（源模板默认：消费品/汽车/能源/其他）
-# 每个类别是一个 group，内含收入+成本两子列
-_DEFAULT_CATEGORIES = ("消费品", "汽车", "能源", "其他")
+# ─── （4）分解信息：表结构归 `fix_note_d4_segment_structure.py` ───
+# 列 / 表头 / 行 / 编制提示由分解信息脚本单独维护（列 key `cat_{1..4}_*` 与前端 `buildD4TransposeColumns` 同构）。
+# 本脚本只管这张表的名字（旧名「按商品转让时间划分」→ 两版正名）与它在本节里的位置，不写结构 —— 原先两个脚本
+# 各写一套列 key（`cat{0..3}_*` 对 `cat_{1..4}_*`）与编制提示，谁后跑谁赢、`--check` 总有一方报欠账
+# （consol-note-header-library-and-node-reaggregate R8.4 批 9b-2）。
 
 
-def _decompose_cols_listed() -> list[dict]:
-    """上市（4）表列定义：标签列 + 4 类别 × {收入, 成本} = 9 列。"""
-    specs: list[tuple[str, str, str | None, str | None]] = []
-    for i, cat in enumerate(_DEFAULT_CATEGORIES):
-        specs.append((f"cat{i}_revenue", "收入", AMOUNT, cat))
-        specs.append((f"cat{i}_cost", "成本", AMOUNT, cat))
-    return grouped_columns(
-        label=("label", "项目"),
-        specs=specs,
-    )
-
-
-def _decompose_cols_soe() -> list[dict]:
-    """国企（4）表列定义：标签列 + 4 类别 × {收入, 成本} = 9 列。"""
-    specs: list[tuple[str, str, str | None, str | None]] = []
-    for i, cat in enumerate(_DEFAULT_CATEGORIES):
-        specs.append((f"cat{i}_revenue", "收入", AMOUNT, cat))
-        specs.append((f"cat{i}_cost", "成本", AMOUNT, cat))
-    return grouped_columns(
-        label=("label", "合同分类/报告分部"),
-        specs=specs,
-    )
+def _name_only(name: str, aliases: list[str]) -> dict:
+    """只认表名、不写结构的计划项（`apply_plan` 对值为 None 的键不动）。"""
+    return {
+        "aliases": aliases + [name], "new_name": name,
+        "headers": None, "columns": None, "rows": None, "guidance": None, "insert": False,
+    }
 
 
 # ─── （6）剩余履约义务：4 列 flat ───
@@ -172,30 +154,6 @@ _GUIDANCE_SEGMENT = (
 )
 _GUIDANCE_REGION = (
     "按主要经营地区划分营业收入、营业成本（不适用的删除）。"
-)
-
-# （4）分解类别指引 —— 上市 R57-R62 / 国企 R50-R55
-_GUIDANCE_DECOMPOSE_LISTED = (
-    "在确定对收入进行分解的类别时，企业应当考虑其在下列情况下是如何列报和披露与收入有关的信息："
-    "①在财务报表之外披露的信息，例如，在企业的业绩公告、年报或向投资者报送的相关资料中披露的收入信息；"
-    "②管理层为评价经营分部的财务业绩所定期复核的信息；以及"
-    "③企业或企业的财务报表使用者在评价企业的财务业绩或作出资源分配决策时，"
-    "所使用的类似于上述①和②的信息类型的其他信息。"
-    "企业在对收入信息进行分解时，可以采用的类别包括但不限于：商品类型、经营地区、市场或客户类型、"
-    "合同类型（例如，固定造价合同、成本加成合同等）、商品转让的时间（例如，在某一时点转让或在某一时段内转让）、"
-    "合同期限（例如，长期合同、短期合同等）、销售渠道（例如，直接销售或通过经销商销售等）等。"
-    "④租赁收入需单独披露。"
-)
-_GUIDANCE_DECOMPOSE_SOE = (
-    "在确定对收入、成本进行分解的类别时，企业应当考虑其在下列情况下是如何列报和披露与收入有关的信息："
-    "①在财务报表之外披露的信息，例如，在企业的业绩公告、年报或向投资者报送的相关资料中披露的收入信息；"
-    "②管理层为评价经营分部的财务业绩所定期复核的信息；以及"
-    "③企业或企业的财务报表使用者在评价企业的财务业绩或作出资源分配决策时，"
-    "所使用的类似于上述①和②的信息类型的其他信息。"
-    "企业在对收入信息进行分解时，可以采用的类别包括但不限于：商品类型、经营地区、市场或客户类型、"
-    "合同类型（例如，固定造价合同、成本加成合同等）、商品转让的时间（例如，在某一时点转让或在某一时段内转让）、"
-    "合同期限（例如，长期合同、短期合同等）、销售渠道（例如，直接销售或通过经销商销售等）等。"
-    "④租赁收入需单独披露。"
 )
 
 # （6）剩余履约义务 —— 上市 R66+R71-R77 / 国企 R59+R64-R70
@@ -295,14 +253,8 @@ def _listed_plan() -> list[dict]:
             None,
             _GUIDANCE_REGION,
         ),
-        # （4）分解信息 —— 改名走 aliases + guidance 取源模板 R57-R62
-        rule(
-            T_DECOMPOSE_LISTED,
-            _decompose_cols_listed(),
-            None,  # rows 不动（header_label 由下方 _remove_header_labels 清理）
-            _GUIDANCE_DECOMPOSE_LISTED,
-            aliases=[T_DECOMPOSE_OLD],
-        ),
+        # （4）分解信息 —— 只改名（结构归 fix_note_d4_segment_structure.py）
+        _name_only(T_DECOMPOSE_LISTED, [T_DECOMPOSE_OLD]),
         # （6）剩余履约义务 —— 改名 + 年度列改审计年度派生 + guidance 取 R66+R71-R77
         rule(
             T_OBLIGATION,
@@ -345,14 +297,8 @@ def _soe_plan() -> list[dict]:
             None,
             _GUIDANCE_REGION,
         ),
-        # （4）分解信息 —— 改名走 aliases + guidance 取源模板 R50-R55
-        rule(
-            T_DECOMPOSE_SOE,
-            _decompose_cols_soe(),
-            None,
-            _GUIDANCE_DECOMPOSE_SOE,
-            aliases=[T_DECOMPOSE_OLD],
-        ),
+        # （4）分解信息 —— 只改名（结构归 fix_note_d4_segment_structure.py）
+        _name_only(T_DECOMPOSE_SOE, [T_DECOMPOSE_OLD]),
         # （6）剩余履约义务 —— 改名 + 年度列改审计年度派生 + guidance 取 R59+R64-R70
         rule(
             T_OBLIGATION,

@@ -289,14 +289,17 @@ class TestSoeScopeChangeSections:
 
     def test_sale_date_naming_not_disposal_date(self):
         """🔴 源模板逐字为「出售日」，模板 JSON 曾漂移写成「处置日」，本脚本已正名。"""
-        sec = _section(_SOE, "七、本期不再纳入合并")
+        sec = _section(_SOE, "七、本期不再纳入合并范围的原子公司")
         names = [t.get("name") for t in sec["tables"]]
         assert "本期出售的子公司出售日的经营成果" in names
         assert "本期出售的子公司处置日的经营成果" not in names
 
     def test_text_only_sections_have_required_text(self):
         """两个纯文本节（无表格）补了源模板要求的说明段。"""
-        for section_number in ("七、子公司使用企业集", "七、纳入合并财务报表"):
+        for section_number in (
+            "七、子公司使用企业集团资产和清偿企业集团债务的重大限制",
+            "七、纳入合并财务报表范围的结构化主体的相关信息",
+        ):
             sec = _section(_SOE, section_number)
             assert not sec.get("tables")
             assert sec.get("text_sections"), section_number

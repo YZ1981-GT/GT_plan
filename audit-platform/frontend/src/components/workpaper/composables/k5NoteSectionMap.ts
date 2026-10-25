@@ -12,10 +12,9 @@
  *     源 xlsx 的 `期末数`/`期初数` 按「附注是交付物」取附注模版的 `期末余额`/`上年年末余额|期初余额`。
  *   · 校验预设 F50-1/2/3：只有 2 个数值列 + 合计行，**无变动表** → 底稿 roll-forward 的
  *     `本期增加`/`本期减少` 不进附注列（只进 `_note_texts` 叙述）。
- *   · 🔴 变体列集不同（T4）：上市 4 列（末列 `形成原因`）／国企 3 列
- *     —— 国企源 xlsx D6 有 `形成原因`，但附注模版 + note_template + consol 三家都只有 3 列
- *     （形成原因降级为表下注文字 L3964）→ `values` 必须按变体分支，否则 `remark`
- *     会溢出到不存在的第 3 值列（表面仍渲染 3 列，肉眼极难发现）。
+ *   · 两版都是 4 列（末列 `形成原因`）：单体附注按底稿披露表格式（R8.4 批 9b-2，2026-10-24）。国企原为 3 列
+ *     （随附注模版把形成原因降为表下注文字），而国企源 xlsx D6 就是 `形成原因`（取明细表 K5-2「预计负债计提原因」）。
+ *     上市取披露页「变动说明」，国企取披露页「确认依据」（同一来源：每个预计负债项目的计提原因）。
  */
 import type { ColumnDef } from './disclosureColumnDefs'
 
@@ -42,17 +41,14 @@ export const K5_SUBTABLE = {
 
 // ─── 列定义 ──────────────────────────────────────────────────────────────────
 
-/** 预计负债表列头（上市 4 列含 `形成原因`；国企 3 列） */
+/** 预计负债表列头（两版 4 列含 `形成原因`，只有期初列名不同） */
 function buildProvisionColumns(variant: K5DisclosureVariant): ColumnDef[] {
-  const cols: ColumnDef[] = [
+  return [
     { key: 'label', label: '项目', is_label: true, flat: true },
     { key: 'end_amount', label: '期末余额', format: 'amount' },
     { key: 'prior_amount', label: variant === 'listed' ? '上年年末余额' : '期初余额', format: 'amount' },
+    { key: 'reason', label: '形成原因', format: 'text' },
   ]
-  if (variant === 'listed') {
-    cols.push({ key: 'reason', label: '形成原因', format: 'text' })
-  }
-  return cols
 }
 
 function buildK5Columns(variant: K5DisclosureVariant): Record<string, ColumnDef[]> {
@@ -78,7 +74,7 @@ export interface K5DisclosureRow {
   endAmount: number
   /** 上年年末余额 / 期初余额 */
   priorAmount: number
-  /** 形成原因（底稿「变动说明」`remark`）——**仅上市版有落点** */
+  /** 形成原因（上市取披露页「变动说明」`remark`，国企取「确认依据」`basis`） */
   reason?: string
 }
 
@@ -107,7 +103,7 @@ export function buildK5SyncPayload(
 ): K5SyncPayload {
   // values 必须与 buildProvisionColumns(variant) 的非标签列 **同序同长**
   const toValues = (endAmount: number, priorAmount: number, reason: string): Array<string | number> =>
-    variant === 'listed' ? [endAmount, priorAmount, reason] : [endAmount, priorAmount]
+    [endAmount, priorAmount, reason]
 
   const tableRows = [
     ...rows.map(r => ({

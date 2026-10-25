@@ -193,11 +193,39 @@ T7_COLUMNS = grouped_columns(
     ],
 )
 
+def _slot_matrix_columns(
+    slot: str,
+    names: list[str],
+    label_header: str,
+    current_label: str,
+    prior_label: str,
+) -> list[dict[str, Any]]:
+    """合营 / 联营企业矩阵动态列（每实体 current/prior 两子列，按实体名分组）。
+
+    与运行时 `buildG7SlotColumns(slot, names, sub)` 同规则派生，
+    子列 label 由调用方按**本表**源文传入（禁两表共用一套 label，源文不同）。
+    """
+    subs = [("current", current_label), ("prior", prior_label)]
+    return grouped_columns(
+        ("label", label_header),
+        [
+            (f"{slot}_{seq}_{sub_key}", sub_label, AMOUNT, name)
+            for seq, name in enumerate(names, start=1)
+            for sub_key, sub_label in subs
+        ],
+    )
+
+
 # T8 重要合营企业主要财务信息（源 A132:C151，18 行）
+# 🔴 两层：源 A132:A133 标签列跨两行，B132:C132 合并格是引用公式「='被投资单位财务信息（合营、联营）G7-5'!C8」
+# = 被投资单位名（合营企业1），下面一行「期末数 / 期初数」（D132:E132、F132:G132 是留给更多企业的空合并格）。
+# 原先按「父表头空白、只有 1 个实体槽」裁成单层（`SOURCE_PLACEHOLDER_SINGLE_SLOT`），而那一格不是空白、是企业名
+# 引用；运行时早已按实体槽两层推（`IMPORTANT_JV_SLOT`）⇒ seed 跟运行时与底稿
+# （consol-note-header-library-and-node-reaggregate R8.4 批 9b-2）。key = `{slot}_{seq}_{subKey}`。
+IMPORTANT_JV_SLOT = "important-jv"
+IMPORTANT_JV_DEFAULT_NAMES = ["合营企业1"]
 T8 = "重要合营企业主要财务信息"
-T8_COLUMNS = flat_columns([
-    ("label", "项 目", None), ("current", "期末数", AMOUNT), ("prior", "期初数", AMOUNT),
-])
+T8_COLUMNS = _slot_matrix_columns(IMPORTANT_JV_SLOT, IMPORTANT_JV_DEFAULT_NAMES, "项 目", "期末数", "期初数")
 T8_LABELS = [
     "流动资产", "其中：现金和现金等价物", "非流动资产", "资产合计", "流动负债", "非流动负债",
     "负债合计", "净资产", "  其中：少数股东权益", "归属于母公司的所有者权益",
@@ -207,9 +235,7 @@ T8_LABELS = [
 
 # T9 续：重要合营企业本期及上期经营成果（源 A153:C163，8 行）
 T9 = "续：重要合营企业本期及上期经营成果"
-T9_COLUMNS = flat_columns([
-    ("label", "项  目", None), ("current", "本期发生额", AMOUNT), ("prior", "上期发生额", AMOUNT),
-])
+T9_COLUMNS = _slot_matrix_columns(IMPORTANT_JV_SLOT, IMPORTANT_JV_DEFAULT_NAMES, "项  目", "本期发生额", "上期发生额")
 T9_LABELS = [
     "营业收入", "财务费用", "所得税费用", "净利润", "终止经营的净利润",
     "其他综合收益", "综合收益总额", "企业本期收到的来自合营企业的股利",
@@ -226,25 +252,9 @@ IMPORTANT_ASSOCIATE_SLOT = "important-associate"
 IMPORTANT_ASSOCIATE_DEFAULT_NAMES = ["联营企业1", "联营企业2", "联营企业3"]
 
 
-def _associate_matrix_columns(
-    label_header: str,
-    current_label: str,
-    prior_label: str,
-) -> list[dict[str, Any]]:
-    """联营企业矩阵动态列（每实体 current/prior 两子列，按实体名分组）。
-
-    与运行时 `buildG7SlotColumns(IMPORTANT_ASSOCIATE_SLOT, names, sub)` 同规则派生，
-    子列 label 由调用方按**本表**源文传入（禁两表共用一套 label，源文不同）。
-    """
-    subs = [("current", current_label), ("prior", prior_label)]
-    return grouped_columns(
-        ("label", label_header),
-        [
-            (f"{IMPORTANT_ASSOCIATE_SLOT}_{seq}_{sub_key}", sub_label, AMOUNT, name)
-            for seq, name in enumerate(IMPORTANT_ASSOCIATE_DEFAULT_NAMES, start=1)
-            for sub_key, sub_label in subs
-        ],
-    )
+def _associate_matrix_columns(label_header: str, current_label: str, prior_label: str) -> list[dict[str, Any]]:
+    return _slot_matrix_columns(IMPORTANT_ASSOCIATE_SLOT, IMPORTANT_ASSOCIATE_DEFAULT_NAMES,
+                                label_header, current_label, prior_label)
 
 
 T10_COLUMNS = _associate_matrix_columns("项 目", "期末数", "期初数")

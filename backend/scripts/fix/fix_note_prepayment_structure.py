@@ -27,10 +27,11 @@
 
 裁决要点：
 
-- 按账龄表 = **5 列**（账龄 + 期末{金额,比例} + 期初{金额,比例}）+ **7 行**
-  （各账龄段 + 小计 + 减：减值准备 + 合计）——附注模版与 F7-6/F7-7/F7-8 一致；
-  国企源 xlsx 的逐段「坏账准备」列留在**底稿侧**作审计明细，同步时聚合为
-  ``减：减值准备`` 行（信息不丢，两侧各守其源）。
+- 上市按账龄表 = **5 列**（账龄 + 期末{金额,比例} + 上年年末{金额,比例}），与底稿同；
+  国企按账龄表 = **7 列**：单体附注按底稿披露表格式（R8.4 批 9b-2，2026-10-24），每期
+  {账面余额-金额, 账面余额-比例（%）, 坏账准备}（底稿三层表头压成两层，见 ``_soe_aging_patch``）。
+  原国企也是 5 列、逐段「坏账准备」只留底稿侧。两版行都是 **7 行**（各账龄段 + 小计 +
+  减：减值准备 + 合计）——同步载荷与 F7-6/F7-7/F7-8 口径不变。
 - 上市第 2 张表**无**「账龄」「未结算的原因」列（F7-9/F7-10 listed 明确）。
 - 上市第 3 张表**无**「减值准备」列（F7-13 listed 明确）。
 - 国企第 3 张表第 4 列名为「减值准备」（附注模版 + F7-13 soe），非「坏账准备」。
@@ -146,6 +147,37 @@ def _aging_patch(
     }
 
 
+#: 国企按账龄表列头：底稿 F1 国企第 8~10 行是三层表头（期末数 / 期初数 → 账面余额{金 额, 比例（%）} + 坏账准备）。
+#: 附注表头只有两层（`_column_groups` 单级分组）⇒ 期间作父表头、「账面余额」与其子列合写「账面余额-金额」
+#: （同上市 五、16「坏账准备计提情况」的写法；对齐守卫按此认三层表）。R8.4 批 9b-2，2026-10-24
+SOE_AGING_AMOUNT_LABEL = "账面余额-金额"
+SOE_AGING_PCT_LABEL = "账面余额-比例（%）"
+SOE_AGING_PROVISION_LABEL = "坏账准备"
+
+
+def _soe_aging_patch() -> dict[str, Any]:
+    """国企按账龄表：账龄 + {账面余额-金额, 账面余额-比例（%）, 坏账准备} × 期末数 / 期初数（7 列两级表头）。
+
+    行不变（各账龄段 + 小计 + 减：减值准备 + 合计，F7-6/7/8 口径）：坏账准备列在各账龄段与小计行取底稿逐段
+    坏账准备（D / G 列），「减：减值准备」「合计」两行不填该列。
+    """
+    cols: list[dict[str, Any]] = [{"key": "label", "label": AGING_LABEL_COL, "is_label": True}]
+    for side, group in (("end", "期末数"), ("prior", "期初数")):
+        cols += [
+            {"key": f"{side}_amount", "label": SOE_AGING_AMOUNT_LABEL, "group": group, "format": "amount"},
+            {"key": f"{side}_pct", "label": SOE_AGING_PCT_LABEL, "group": group, "format": "percent"},
+            {"key": f"{side}_provision", "label": SOE_AGING_PROVISION_LABEL, "group": group, "format": "amount"},
+        ]
+    return {
+        "headers": [c["label"] for c in cols],
+        "columns": cols,
+        "_column_groups": [
+            {"group": "期末数", "start": 1, "span": 3},
+            {"group": "期初数", "start": 4, "span": 3},
+        ],
+    }
+
+
 LISTED_OVER1_PATCH = {
     "headers": ["债务人名称", "账面余额", "占预付款项合计的比例（%）", "减值准备"],
     "columns": [
@@ -219,7 +251,7 @@ LISTED_GUIDANCE = {
 SOE_GUIDANCE = {
     T_SOE_AGING: (
         "账龄段随项目账龄枚举自动适配（3年段 / 5年段 / 自定义），由 F1-2 明细表审定账龄聚合；"
-        "「减：减值准备」行取底稿逐账龄段减值准备之列合计。"
+        "「坏账准备」列取底稿逐账龄段坏账准备，「减：减值准备」行取其合计。"
         "勾稽：各账龄段之和 = 小计行（期末 / 期初各独立校验）；合计行 = 小计行 − 减：减值准备行；"
         "比例（%）= 该行金额 ÷ 小计行金额 × 100；合计行期末金额 = 资产负债表「预付款项」期末数。"
     ),
@@ -265,8 +297,8 @@ def _soe_plan() -> list[dict[str, Any]]:
     return [
         {
             "aliases": [T_SOE_AGING],
-            # 源 xlsx `B10=金 额`（**单**空格，与上市的双空格不同）
-            "patch": _aging_patch("期末数", "期初数", "金 额", "比例（%）"),
+            # 底稿三层表头：每期 账面余额（金额 / 比例）+ 坏账准备（见 _soe_aging_patch）
+            "patch": _soe_aging_patch(),
             "rows": "strip",
         },
         {

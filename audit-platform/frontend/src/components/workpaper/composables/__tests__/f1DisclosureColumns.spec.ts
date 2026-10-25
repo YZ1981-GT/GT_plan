@@ -7,6 +7,7 @@ import {
   F1_LISTED_SUBTABLE,
   F1_SOE_AGING_GROUPS,
   F1_SOE_AMOUNT_LABEL,
+  F1_SOE_NOTE_AGING_LABELS,
   F1_SOE_PCT_LABEL,
   F1_SOE_SUBTABLE,
   buildF1ListedSubTableData,
@@ -98,17 +99,38 @@ describe('F1 预付款项披露 columns 契约', () => {
     }
   })
 
-  it('国企：按账龄表收敛为 5 列两级表头（期末数 / 期初数）', () => {
+  it('国企：按账龄表按底稿 7 列两级表头（期末数 / 期初数 各 账面余额-金额 / 账面余额-比例 / 坏账准备）', () => {
     const payload = buildF1SyncPayload('soe', 'wp-f1', null, buildF1SoeSubTableData(soeSnap))
     const cols = payload!.columns![F1_SOE_SUBTABLE.AGING]
+    const L = F1_SOE_NOTE_AGING_LABELS
     expect(cols.map((c) => c.label)).toEqual([
-      F1_AGING_LABEL_COL, F1_SOE_AMOUNT_LABEL, F1_SOE_PCT_LABEL,
-      F1_SOE_AMOUNT_LABEL, F1_SOE_PCT_LABEL,
+      F1_AGING_LABEL_COL, L.amount, L.pct, L.provision, L.amount, L.pct, L.provision,
     ])
     expect(cols.map((c) => c.group ?? '')).toEqual([
-      '', F1_SOE_AGING_GROUPS.end, F1_SOE_AGING_GROUPS.end,
-      F1_SOE_AGING_GROUPS.prior, F1_SOE_AGING_GROUPS.prior,
+      '', ...Array(3).fill(F1_SOE_AGING_GROUPS.end), ...Array(3).fill(F1_SOE_AGING_GROUPS.prior),
     ])
+    // 底稿 Tab 仍是三层显示，附注列头与 Tab 的金额 / 比例列头不是同一常量
+    expect(L.amount).not.toBe(F1_SOE_AMOUNT_LABEL)
+    expect(L.pct).toContain(F1_SOE_PCT_LABEL)
+  })
+
+  it('国企：逐账龄段坏账准备落「坏账准备」列，合计仍落「减：减值准备」行', () => {
+    const snap: F1SoeSyncSnapshot = {
+      ...soeSnap,
+      agingRows: [
+        { label: '1年以内（含1年）', endAmount: 900, endPct: 90, endBadDebt: 9, priorAmount: 500, priorPct: 100, priorBadDebt: 5 },
+        { label: '1至2年', endAmount: 100, endPct: 10, endBadDebt: 1, priorAmount: 0, priorPct: 0, priorBadDebt: 0 },
+      ],
+      agingTotal: { label: '小计', endAmount: 1000, endPct: 100, endBadDebt: 10, priorAmount: 500, priorPct: 100, priorBadDebt: 5 },
+      agingNet: { label: '合计', endAmount: 990, priorAmount: 495 },
+    }
+    const rows = buildF1SoeSubTableData(snap)[F1_SOE_SUBTABLE.AGING] as Array<Record<string, unknown>>
+    expect(rows.map((r) => r.label)).toEqual(['1年以内（含1年）', '1至2年', '小计', '减：减值准备', '合计'])
+    expect(rows.slice(0, 2).map((r) => [r.end_provision, r.prior_provision])).toEqual([[9, 5], [1, 0]])
+    const [subtotal, impairment, net] = rows.slice(-3)
+    expect(subtotal).toMatchObject({ end_amount: 1000, end_provision: 10, prior_provision: 5, is_total: true })
+    expect(impairment).toMatchObject({ end_amount: 10, prior_amount: 5, end_provision: null, prior_provision: null })
+    expect(net).toMatchObject({ end_amount: 990, prior_amount: 495, end_provision: null, is_total: true })
   })
 
   it('国企：超1年大额表以债权单位为标签列，五列齐备', () => {

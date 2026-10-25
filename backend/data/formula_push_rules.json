@@ -6944,68 +6944,6 @@
       "description": "递延所得税负债附注主表（期末/期初），从试算表 2901 取审定数"
     },
     {
-      "rule_id": "E1.note.subtable_1",
-      "page_key": "workpaper:E1",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、1",
-          "soe": "八、1"
-        },
-        "table": "受限制的货币资金明细",
-        "rows": "e1_disclosure_main",
-        "fields": [
-          "end_amount",
-          "prior_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "e1_disclosure_main_rows",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 E1 的子表「受限制的货币资金明细」读取行数据，按 end_amount/prior_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "受限制的货币资金明细子表推送（五、1/八、1）end_amount/prior_amount；数据来源：披露表"
-    },
-    {
-      "rule_id": "D1.note.subtable_0",
-      "page_key": "workpaper:D1",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、4",
-          "soe": "八、4"
-        },
-        "table": "应收票据分类",
-        "rows": "d1_note_main",
-        "fields": [
-          "end_balance",
-          "end_provision",
-          "end_book_value",
-          "prior_balance",
-          "prior_provision",
-          "prior_book_value"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d1_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D1 的子表「应收票据分类」读取行数据，按 end_balance/end_provision/end_book_value/prior_balance/prior_provision/prior_book_value 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "应收票据分类子表推送（五、4/八、4）end_balance/end_provision/end_book_value/prior_balance/prior_provision/prior_book_value；数据来源：披露表"
-    },
-    {
       "rule_id": "D1.note.subtable_1",
       "page_key": "workpaper:D1",
       "stage": "note",
@@ -7024,50 +6962,22 @@
           "provision",
           "loss_rate",
           "book_value"
-        ]
+        ],
+        "table_by_template": {
+          "listed": "按坏账计提方法分类（期末余额）",
+          "soe": "按坏账准备计提方法分类披露应收票据（期末数）"
+        }
       },
       "source": {
         "kind": "derivation",
         "name": "d1_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D1 的子表「按坏账准备计提方法分类披露应收票据（期末数）」读取行数据，按 balance/ratio/provision/loss_rate/book_value 字段写入附注"
+        "formula_text": "数据来源：披露表 → 附注。从底稿 D1 的子表「按坏账计提方法分类（期末余额）」/「按坏账准备计提方法分类披露应收票据（期末数）」读取行数据，按 balance/ratio/provision/loss_rate/book_value 字段写入附注"
       },
       "triggers": [
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "按坏账准备计提方法分类披露应收票据（期末数）子表推送（五、4/八、4）balance/ratio/provision/loss_rate/book_value；数据来源：披露表"
-    },
-    {
-      "rule_id": "D1.note.subtable_2",
-      "page_key": "workpaper:D1",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、4",
-          "soe": "八、4"
-        },
-        "table": "按坏账准备计提方法分类披露应收票据",
-        "rows": "d1_note_main",
-        "fields": [
-          "balance",
-          "ratio",
-          "provision",
-          "loss_rate",
-          "book_value"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d1_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D1 的子表「按坏账准备计提方法分类披露应收票据」读取行数据，按 balance/ratio/provision/loss_rate/book_value 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "按坏账准备计提方法分类披露应收票据子表推送（五、4/八、4）balance/ratio/provision/loss_rate/book_value；数据来源：披露表"
+      "description": "按坏账计提方法分类（期末余额）」/「按坏账准备计提方法分类披露应收票据（期末数）子表推送（五、4/八、4）balance/ratio/provision/loss_rate/book_value；数据来源：披露表"
     },
     {
       "rule_id": "D1.note.subtable_3",
@@ -7077,7 +6987,6 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、4",
           "soe": "八、4"
         },
         "table": "按坏账准备计提方法分类披露应收票据（续：期初数）",
@@ -7099,37 +7008,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "按坏账准备计提方法分类披露应收票据（续：期初数）子表推送（五、4/八、4）balance/ratio/provision/loss_rate/book_value；数据来源：披露表"
-    },
-    {
-      "rule_id": "D1.note.subtable_4",
-      "page_key": "workpaper:D1",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、4",
-          "soe": "八、4"
-        },
-        "table": "按坏账准备计提方法分类披露应收票据（续）",
-        "rows": "d1_note_main",
-        "fields": [
-          "balance",
-          "provision",
-          "loss_rate"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d1_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D1 的子表「按坏账准备计提方法分类披露应收票据（续）」读取行数据，按 balance/provision/loss_rate 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "按坏账准备计提方法分类披露应收票据（续）子表推送（五、4/八、4）balance/provision/loss_rate；数据来源：披露表"
+      "description": "按坏账准备计提方法分类披露应收票据（续：期初数）子表推送（八、4）balance/ratio/provision/loss_rate/book_value；数据来源：披露表"
     },
     {
       "rule_id": "D1.note.subtable_5",
@@ -7139,7 +7018,6 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、4",
           "soe": "八、4"
         },
         "table": "按单项计提坏账准备的应收票据",
@@ -7159,7 +7037,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "按单项计提坏账准备的应收票据子表推送（五、4/八、4）balance/provision/loss_rate；数据来源：披露表"
+      "description": "按单项计提坏账准备的应收票据子表推送（八、4）balance/provision/loss_rate；数据来源：披露表"
     },
     {
       "rule_id": "D1.note.subtable_6",
@@ -7169,7 +7047,6 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、4",
           "soe": "八、4"
         },
         "table": "按组合计提坏账准备的应收票据",
@@ -7189,7 +7066,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "按组合计提坏账准备的应收票据子表推送（五、4/八、4）balance/provision/loss_rate；数据来源：披露表"
+      "description": "按组合计提坏账准备的应收票据子表推送（八、4）balance/provision/loss_rate；数据来源：披露表"
     },
     {
       "rule_id": "D1.note.subtable_7",
@@ -7199,7 +7076,6 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、4",
           "soe": "八、4"
         },
         "table": "本期计提、收回或转回的应收票据坏账准备情况",
@@ -7221,7 +7097,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "本期计提、收回或转回的应收票据坏账准备情况子表推送（五、4/八、4）prior_balance/provision/reversal/write_off/end_balance；数据来源：披露表"
+      "description": "本期计提、收回或转回的应收票据坏账准备情况子表推送（八、4）prior_balance/provision/reversal/write_off/end_balance；数据来源：披露表"
     },
     {
       "rule_id": "D1.note.subtable_8",
@@ -7231,7 +7107,6 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、4",
           "soe": "八、4"
         },
         "table": "本期转回或收回金额重要的应收票据坏账准备",
@@ -7250,7 +7125,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "本期转回或收回金额重要的应收票据坏账准备子表推送（五、4/八、4）amount/cumulative_provision；数据来源：披露表"
+      "description": "本期转回或收回金额重要的应收票据坏账准备子表推送（八、4）amount/cumulative_provision；数据来源：披露表"
     },
     {
       "rule_id": "D1.note.subtable_12",
@@ -7267,74 +7142,22 @@
         "rows": "d1_note_main",
         "fields": [
           "transfer_amount"
-        ]
+        ],
+        "table_by_template": {
+          "listed": "期末因出票人未履约而其转应收账款的票据",
+          "soe": "期末因出票人未履约而其转为应收账款的票据"
+        }
       },
       "source": {
         "kind": "derivation",
         "name": "d1_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D1 的子表「期末因出票人未履约而其转为应收账款的票据」读取行数据，按 transfer_amount 字段写入附注"
+        "formula_text": "数据来源：披露表 → 附注。从底稿 D1 的子表「期末因出票人未履约而其转应收账款的票据」/「期末因出票人未履约而其转为应收账款的票据」读取行数据，按 transfer_amount 字段写入附注"
       },
       "triggers": [
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "期末因出票人未履约而其转为应收账款的票据子表推送（五、4/八、4）transfer_amount；数据来源：披露表"
-    },
-    {
-      "rule_id": "D1.note.subtable_13",
-      "page_key": "workpaper:D1",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、4",
-          "soe": "八、4"
-        },
-        "table": "期末已背书或贴现且在资产负债表日尚未到期的应收票据",
-        "rows": "d1_note_main",
-        "fields": [
-          "transfer_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d1_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D1 的子表「期末已背书或贴现且在资产负债表日尚未到期的应收票据」读取行数据，按 transfer_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "期末已背书或贴现且在资产负债表日尚未到期的应收票据子表推送（五、4/八、4）transfer_amount；数据来源：披露表"
-    },
-    {
-      "rule_id": "D1.note.subtable_14",
-      "page_key": "workpaper:D1",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、4",
-          "soe": "八、4"
-        },
-        "table": "期末因出票人未履约而转为应收账款的票据",
-        "rows": "d1_note_main",
-        "fields": [
-          "amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d1_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D1 的子表「期末因出票人未履约而转为应收账款的票据」读取行数据，按 amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "期末因出票人未履约而转为应收账款的票据子表推送（五、4/八、4）amount；数据来源：披露表"
+      "description": "期末因出票人未履约而其转应收账款的票据」/「期末因出票人未履约而其转为应收账款的票据子表推送（五、4/八、4）transfer_amount；数据来源：披露表"
     },
     {
       "rule_id": "D1.note.subtable_15",
@@ -7344,7 +7167,6 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、4",
           "soe": "八、4"
         },
         "table": "本期实际核销的应收票据",
@@ -7362,7 +7184,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "本期实际核销的应收票据子表推送（五、4/八、4）amount；数据来源：披露表"
+      "description": "本期实际核销的应收票据子表推送（八、4）amount；数据来源：披露表"
     },
     {
       "rule_id": "D1.note.subtable_16",
@@ -7372,7 +7194,6 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、4",
           "soe": "八、4"
         },
         "table": "重要的应收票据核销情况",
@@ -7390,36 +7211,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "重要的应收票据核销情况子表推送（五、4/八、4）amount；数据来源：披露表"
-    },
-    {
-      "rule_id": "D2.note.subtable_0",
-      "page_key": "workpaper:D2",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、5",
-          "soe": "八、5"
-        },
-        "table": "（1）按账龄披露应收账款",
-        "rows": "d2_note_main",
-        "fields": [
-          "end_amount",
-          "prior_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「（1）按账龄披露应收账款」读取行数据，按 end_amount/prior_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "（1）按账龄披露应收账款子表推送（五、5/八、5）end_amount/prior_amount；数据来源：披露表"
+      "description": "重要的应收票据核销情况子表推送（八、4）amount；数据来源：披露表"
     },
     {
       "rule_id": "D2.note.subtable_1",
@@ -7435,23 +7227,27 @@
         "table": "（2）按坏账准备计提方法分类披露应收账款",
         "rows": "d2_note_main",
         "fields": [
-          "balance",
+          "book_amount",
           "ratio",
           "provision",
           "loss_rate",
-          "book_value"
-        ]
+          "carrying_value"
+        ],
+        "table_by_template": {
+          "listed": "按坏账计提方法分类披露",
+          "soe": "（2）按坏账准备计提方法分类披露应收账款"
+        }
       },
       "source": {
         "kind": "derivation",
         "name": "d2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「（2）按坏账准备计提方法分类披露应收账款」读取行数据，按 balance/ratio/provision/loss_rate/book_value 字段写入附注"
+        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「按坏账计提方法分类披露」/「（2）按坏账准备计提方法分类披露应收账款」读取行数据，按 book_amount/ratio/provision/loss_rate/carrying_value 字段写入附注"
       },
       "triggers": [
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "（2）按坏账准备计提方法分类披露应收账款子表推送（五、5/八、5）balance/ratio/provision/loss_rate/book_value；数据来源：披露表"
+      "description": "按坏账计提方法分类披露」/「（2）按坏账准备计提方法分类披露应收账款子表推送（五、5/八、5）book_amount/ratio/provision/loss_rate/carrying_value；数据来源：披露表"
     },
     {
       "rule_id": "D2.note.subtable_2",
@@ -7467,184 +7263,27 @@
         "table": "（2）按坏账准备计提方法分类披露应收账款（续：期初数）",
         "rows": "d2_note_main",
         "fields": [
-          "balance",
+          "book_amount",
           "ratio",
           "provision",
           "loss_rate",
-          "book_value"
-        ]
+          "carrying_value"
+        ],
+        "table_by_template": {
+          "listed": "按坏账计提方法分类披露（续：上年年末余额）",
+          "soe": "（2）按坏账准备计提方法分类披露应收账款（续：期初数）"
+        }
       },
       "source": {
         "kind": "derivation",
         "name": "d2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「（2）按坏账准备计提方法分类披露应收账款（续：期初数）」读取行数据，按 balance/ratio/provision/loss_rate/book_value 字段写入附注"
+        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「按坏账计提方法分类披露（续：上年年末余额）」/「（2）按坏账准备计提方法分类披露应收账款（续：期初数）」读取行数据，按 book_amount/ratio/provision/loss_rate/carrying_value 字段写入附注"
       },
       "triggers": [
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "（2）按坏账准备计提方法分类披露应收账款（续：期初数）子表推送（五、5/八、5）balance/ratio/provision/loss_rate/book_value；数据来源：披露表"
-    },
-    {
-      "rule_id": "D2.note.subtable_3",
-      "page_key": "workpaper:D2",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、5",
-          "soe": "八、5"
-        },
-        "table": "期末单项计提坏账准备的应收账款",
-        "rows": "d2_note_main",
-        "fields": [
-          "balance",
-          "provision",
-          "loss_rate"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「期末单项计提坏账准备的应收账款」读取行数据，按 balance/provision/loss_rate 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "期末单项计提坏账准备的应收账款子表推送（五、5/八、5）balance/provision/loss_rate；数据来源：披露表"
-    },
-    {
-      "rule_id": "D2.note.subtable_4",
-      "page_key": "workpaper:D2",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、5",
-          "soe": "八、5"
-        },
-        "table": "组合计提项目：应收中央企业客户",
-        "rows": "d2_note_main",
-        "fields": [
-          "end_balance",
-          "end_ratio",
-          "end_provision",
-          "prior_balance",
-          "prior_ratio",
-          "prior_provision"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「组合计提项目：应收中央企业客户」读取行数据，按 end_balance/end_ratio/end_provision/prior_balance/prior_ratio/prior_provision 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "组合计提项目：应收中央企业客户子表推送（五、5/八、5）end_balance/end_ratio/end_provision/prior_balance/prior_ratio/prior_provision；数据来源：披露表"
-    },
-    {
-      "rule_id": "D2.note.subtable_5",
-      "page_key": "workpaper:D2",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、5",
-          "soe": "八、5"
-        },
-        "table": "组合计提项目：应收海外企业客户",
-        "rows": "d2_note_main",
-        "fields": [
-          "end_balance",
-          "end_ratio",
-          "end_provision",
-          "prior_balance",
-          "prior_ratio",
-          "prior_provision"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「组合计提项目：应收海外企业客户」读取行数据，按 end_balance/end_ratio/end_provision/prior_balance/prior_ratio/prior_provision 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "组合计提项目：应收海外企业客户子表推送（五、5/八、5）end_balance/end_ratio/end_provision/prior_balance/prior_ratio/prior_provision；数据来源：披露表"
-    },
-    {
-      "rule_id": "D2.note.subtable_6",
-      "page_key": "workpaper:D2",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、5",
-          "soe": "八、5"
-        },
-        "table": "采用余额百分比或其他组合方法计提坏账准备的应收账款",
-        "rows": "d2_note_main",
-        "fields": [
-          "end_balance",
-          "end_ratio",
-          "end_provision",
-          "prior_balance",
-          "prior_ratio",
-          "prior_provision"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「采用余额百分比或其他组合方法计提坏账准备的应收账款」读取行数据，按 end_balance/end_ratio/end_provision/prior_balance/prior_ratio/prior_provision 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "采用余额百分比或其他组合方法计提坏账准备的应收账款子表推送（五、5/八、5）end_balance/end_ratio/end_provision/prior_balance/prior_ratio/prior_provision；数据来源：披露表"
-    },
-    {
-      "rule_id": "D2.note.subtable_7",
-      "page_key": "workpaper:D2",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、5",
-          "soe": "八、5"
-        },
-        "table": "（3）本期计提、收回或转回的坏账准备情况",
-        "rows": "d2_note_main",
-        "fields": [
-          "opening",
-          "provision_amount",
-          "reversal_amount",
-          "writeoff_amount",
-          "ending"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「（3）本期计提、收回或转回的坏账准备情况」读取行数据，按 opening/provision_amount/reversal_amount/writeoff_amount/ending 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "（3）本期计提、收回或转回的坏账准备情况子表推送（五、5/八、5）opening/provision_amount/reversal_amount/writeoff_amount/ending；数据来源：披露表"
+      "description": "按坏账计提方法分类披露（续：上年年末余额）」/「（2）按坏账准备计提方法分类披露应收账款（续：期初数）子表推送（五、5/八、5）book_amount/ratio/provision/loss_rate/carrying_value；数据来源：披露表"
     },
     {
       "rule_id": "D2.note.subtable_8",
@@ -7654,7 +7293,6 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、5",
           "soe": "八、5"
         },
         "table": "收回或转回的坏账准备",
@@ -7673,7 +7311,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "收回或转回的坏账准备子表推送（五、5/八、5）amount/cumulative_provision；数据来源：披露表"
+      "description": "收回或转回的坏账准备子表推送（八、5）amount/cumulative_provision；数据来源：披露表"
     },
     {
       "rule_id": "D2.note.subtable_9",
@@ -7683,7 +7321,6 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、5",
           "soe": "八、5"
         },
         "table": "（4）本期实际核销的应收账款",
@@ -7701,7 +7338,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "（4）本期实际核销的应收账款子表推送（五、5/八、5）amount；数据来源：披露表"
+      "description": "（4）本期实际核销的应收账款子表推送（八、5）amount；数据来源：披露表"
     },
     {
       "rule_id": "D2.note.subtable_10",
@@ -7711,13 +7348,12 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、5",
           "soe": "八、5"
         },
         "table": "（5）按欠款方归集的期末余额前五名的应收账款",
         "rows": "d2_note_main",
         "fields": [
-          "balance",
+          "ar_amount",
           "ratio",
           "provision"
         ]
@@ -7725,13 +7361,13 @@
       "source": {
         "kind": "derivation",
         "name": "d2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「（5）按欠款方归集的期末余额前五名的应收账款」读取行数据，按 balance/ratio/provision 字段写入附注"
+        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「（5）按欠款方归集的期末余额前五名的应收账款」读取行数据，按 ar_amount/ratio/provision 字段写入附注"
       },
       "triggers": [
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "（5）按欠款方归集的期末余额前五名的应收账款子表推送（五、5/八、5）balance/ratio/provision；数据来源：披露表"
+      "description": "（5）按欠款方归集的期末余额前五名的应收账款子表推送（八、5）ar_amount/ratio/provision；数据来源：披露表"
     },
     {
       "rule_id": "D2.note.subtable_11",
@@ -7741,7 +7377,6 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、5",
           "soe": "八、5"
         },
         "table": "（6）由金融资产转移而终止确认的应收账款",
@@ -7760,35 +7395,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "（6）由金融资产转移而终止确认的应收账款子表推送（五、5/八、5）amount/gain_loss；数据来源：披露表"
-    },
-    {
-      "rule_id": "D2.note.subtable_12",
-      "page_key": "workpaper:D2",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、5",
-          "soe": "八、5"
-        },
-        "table": "（7）应收账款转移继续涉入形成的资产、负债的金额",
-        "rows": "d2_note_main",
-        "fields": [
-          "end_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「（7）应收账款转移继续涉入形成的资产、负债的金额」读取行数据，按 end_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "（7）应收账款转移继续涉入形成的资产、负债的金额子表推送（五、5/八、5）end_amount；数据来源：披露表"
+      "description": "（6）由金融资产转移而终止确认的应收账款子表推送（八、5）amount/gain_loss；数据来源：披露表"
     },
     {
       "rule_id": "F1.note.subtable_0",
@@ -7846,34 +7453,6 @@
         "manual"
       ],
       "description": "账龄超过1年的大额预付款项子表推送（五、7/八、7）end_balance；数据来源：披露表"
-    },
-    {
-      "rule_id": "F1.note.subtable_2",
-      "page_key": "workpaper:F1",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、7",
-          "soe": "八、7"
-        },
-        "table": "按欠款方归集的期末余额前五名的预付款项",
-        "rows": "f1_note_main",
-        "fields": [
-          "end_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "f1_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 F1 的子表「按欠款方归集的期末余额前五名的预付款项」读取行数据，按 end_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "按欠款方归集的期末余额前五名的预付款项子表推送（五、7/八、7）end_amount；数据来源：披露表"
     },
     {
       "rule_id": "F2.note.subtable_1",
@@ -8020,78 +7599,22 @@
           "end_impairment",
           "prior_gross",
           "prior_impairment"
-        ]
+        ],
+        "table_by_template": {
+          "listed": "持有待售资产和持有待售负债",
+          "soe": "持有待售资产"
+        }
       },
       "source": {
         "kind": "derivation",
         "name": "k6_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 K6 的子表「持有待售资产」读取行数据，按 end_gross/end_impairment/prior_gross/prior_impairment 字段写入附注"
+        "formula_text": "数据来源：披露表 → 附注。从底稿 K6 的子表「持有待售资产和持有待售负债」/「持有待售资产」读取行数据，按 end_gross/end_impairment/prior_gross/prior_impairment 字段写入附注"
       },
       "triggers": [
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "持有待售资产子表推送（五、11/八、12）end_gross/end_impairment/prior_gross/prior_impairment；数据来源：披露表"
-    },
-    {
-      "rule_id": "K6.note.subtable_1",
-      "page_key": "workpaper:K6",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、11",
-          "soe": "八、12"
-        },
-        "table": "4.应披露与持有待售的非流动资产或处置组有关的其他综合收益累计金额。】",
-        "rows": "k6_note_main",
-        "fields": [
-          "end_gross",
-          "end_impairment",
-          "prior_gross",
-          "prior_impairment"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "k6_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 K6 的子表「4.应披露与持有待售的非流动资产或处置组有关的其他综合收益累计金额。】」读取行数据，按 end_gross/end_impairment/prior_gross/prior_impairment 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "4.应披露与持有待售的非流动资产或处置组有关的其他综合收益累计金额。】子表推送（五、11/八、12）end_gross/end_impairment/prior_gross/prior_impairment；数据来源：披露表"
-    },
-    {
-      "rule_id": "K6.note.subtable_2",
-      "page_key": "workpaper:K6",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、11",
-          "soe": "八、12"
-        },
-        "table": "持有待售资产减值准备",
-        "rows": "k6_note_main",
-        "fields": [
-          "prior_amount",
-          "end_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "k6_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 K6 的子表「持有待售资产减值准备」读取行数据，按 prior_amount/end_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "持有待售资产减值准备子表推送（五、11/八、12）prior_amount/end_amount；数据来源：披露表"
+      "description": "持有待售资产和持有待售负债」/「持有待售资产子表推送（五、11/八、12）end_gross/end_impairment/prior_gross/prior_impairment；数据来源：披露表"
     },
     {
       "rule_id": "G4.note.subtable_0",
@@ -8331,34 +7854,6 @@
       "description": "长期应收款按性质披露子表推送（五、16/八、17）end_gross/end_provision/end_net/prior_gross/prior_provision/prior_net；数据来源：披露表"
     },
     {
-      "rule_id": "G5.note.subtable_2",
-      "page_key": "workpaper:G5",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、16",
-          "soe": "八、17"
-        },
-        "table": "转移长期应收款且继续涉入形成的资产、负债的金额",
-        "rows": "g5_note_main",
-        "fields": [
-          "end_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "g5_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 G5 的子表「转移长期应收款且继续涉入形成的资产、负债的金额」读取行数据，按 end_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "转移长期应收款且继续涉入形成的资产、负债的金额子表推送（五、16/八、17）end_amount；数据来源：披露表"
-    },
-    {
       "rule_id": "G7.note.subtable_0",
       "page_key": "workpaper:G7",
       "stage": "note",
@@ -8366,7 +7861,6 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、18",
           "soe": "八、18"
         },
         "table": "长期股权投资分类",
@@ -8384,7 +7878,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "长期股权投资分类子表推送（五、18/八、18）opening；数据来源：披露表"
+      "description": "长期股权投资分类子表推送（八、18）opening；数据来源：披露表"
     },
     {
       "rule_id": "G7.note.subtable_1",
@@ -8394,7 +7888,6 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、18",
           "soe": "八、18"
         },
         "table": "长期股权投资明细",
@@ -8412,35 +7905,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "长期股权投资明细子表推送（五、18/八、18）opening；数据来源：披露表"
-    },
-    {
-      "rule_id": "G7.note.subtable_7",
-      "page_key": "workpaper:G7",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、18",
-          "soe": "八、18"
-        },
-        "table": "②对合营企业或联营企业发生超额亏损的分担额",
-        "rows": "g7_note_main",
-        "fields": [
-          "total"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "g7_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 G7 的子表「②对合营企业或联营企业发生超额亏损的分担额」读取行数据，按 total 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "②对合营企业或联营企业发生超额亏损的分担额子表推送（五、18/八、18）total；数据来源：披露表"
+      "description": "长期股权投资明细子表推送（八、18）opening；数据来源：披露表"
     },
     {
       "rule_id": "G8.note.subtable_0",
@@ -8639,90 +8104,6 @@
       "description": "短期借款分类子表推送（五、33/八、33）end_amount；数据来源：披露表"
     },
     {
-      "rule_id": "L1.note.subtable_1",
-      "page_key": "workpaper:L1",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、33",
-          "soe": "八、33"
-        },
-        "table": "已逾期未偿还的短期借款情况",
-        "rows": "l1_note_main",
-        "fields": [
-          "end_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "l1_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 L1 的子表「已逾期未偿还的短期借款情况」读取行数据，按 end_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "已逾期未偿还的短期借款情况子表推送（五、33/八、33）end_amount；数据来源：披露表"
-    },
-    {
-      "rule_id": "F4.note.subtable_1",
-      "page_key": "workpaper:F4",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、37",
-          "soe": "八、37"
-        },
-        "table": "账龄超过1 年的重要应付账款",
-        "rows": "f4_note_main",
-        "fields": [
-          "end_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "f4_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 F4 的子表「账龄超过1 年的重要应付账款」读取行数据，按 end_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "账龄超过1 年的重要应付账款子表推送（五、37/八、37）end_amount；数据来源：披露表"
-    },
-    {
-      "rule_id": "D3.note.subtable_1",
-      "page_key": "workpaper:D3",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、38",
-          "soe": "八、38"
-        },
-        "table": "账龄超过1年的重要预收账款",
-        "rows": "d3_note_main",
-        "fields": [
-          "end_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d3_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D3 的子表「账龄超过1年的重要预收账款」读取行数据，按 end_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "账龄超过1年的重要预收账款子表推送（五、38/八、38）end_amount；数据来源：披露表"
-    },
-    {
       "rule_id": "K3.note.subtable_4",
       "page_key": "workpaper:K3",
       "stage": "note",
@@ -8752,34 +8133,6 @@
       "description": "按款项性质列示子表推送（五、42/八、42）end_amount/prior_amount；数据来源：披露表"
     },
     {
-      "rule_id": "K3.note.subtable_5",
-      "page_key": "workpaper:K3",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、42",
-          "soe": "八、42"
-        },
-        "table": "账龄超过1年的重要其他应付款项",
-        "rows": "k3_note_main",
-        "fields": [
-          "end_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "k3_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 K3 的子表「账龄超过1年的重要其他应付款项」读取行数据，按 end_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "账龄超过1年的重要其他应付款项子表推送（五、42/八、42）end_amount；数据来源：披露表"
-    },
-    {
       "rule_id": "L4.note.subtable_1",
       "page_key": "workpaper:L4",
       "stage": "note",
@@ -8806,119 +8159,6 @@
         "manual"
       ],
       "description": "应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）子表推送（五、46/八、50）end_balance；数据来源：披露表"
-    },
-    {
-      "rule_id": "L5.note.subtable_1",
-      "page_key": "workpaper:L5",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、48",
-          "soe": "八、53"
-        },
-        "table": "①长期应付款项期末余额最大的前5 项",
-        "rows": "l5_note_main",
-        "fields": [
-          "end_amount",
-          "prior_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "l5_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 L5 的子表「①长期应付款项期末余额最大的前5 项」读取行数据，按 end_amount/prior_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "①长期应付款项期末余额最大的前5 项子表推送（五、48/八、53）end_amount/prior_amount；数据来源：披露表"
-    },
-    {
-      "rule_id": "L5.note.subtable_2",
-      "page_key": "workpaper:L5",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、48",
-          "soe": "八、53"
-        },
-        "table": "①专项应付款期末余额最大的前5 项",
-        "rows": "l5_note_main",
-        "fields": [
-          "end_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "l5_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 L5 的子表「①专项应付款期末余额最大的前5 项」读取行数据，按 end_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "①专项应付款期末余额最大的前5 项子表推送（五、48/八、53）end_amount；数据来源：披露表"
-    },
-    {
-      "rule_id": "J2.note.subtable_2",
-      "page_key": "workpaper:J2",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、49",
-          "soe": "八、54"
-        },
-        "table": "计划资产",
-        "rows": "j2_note_main",
-        "fields": [
-          "amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "j2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 J2 的子表「计划资产」读取行数据，按 amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "计划资产子表推送（五、49/八、54）amount；数据来源：披露表"
-    },
-    {
-      "rule_id": "K7.note.subtable_1",
-      "page_key": "workpaper:K7",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、51",
-          "soe": "八、56"
-        },
-        "table": "其中：递延收益-政府补助情况",
-        "rows": "k7_note_main",
-        "fields": [
-          "end_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "k7_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 K7 的子表「其中：递延收益-政府补助情况」读取行数据，按 end_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "其中：递延收益-政府补助情况子表推送（五、51/八、56）end_amount；数据来源：披露表"
     },
     {
       "rule_id": "D4.note.subtable_0",
@@ -9171,8 +8411,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、4",
-          "soe": "八、4"
+          "listed": "五、4"
         },
         "table": "按坏账计提方法分类（续：上年年末余额）",
         "rows": "d1_note_main",
@@ -9193,7 +8432,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "按坏账计提方法分类（续：上年年末余额）子表推送（五、4/八、4）balance/ratio/provision/loss_rate/book_value；数据来源：披露表"
+      "description": "按坏账计提方法分类（续：上年年末余额）子表推送（五、4）balance/ratio/provision/loss_rate/book_value；数据来源：披露表"
     },
     {
       "rule_id": "D1.note.subtable_10",
@@ -9203,8 +8442,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、4",
-          "soe": "八、4"
+          "listed": "五、4"
         },
         "table": "按单项计提坏账准备的应收票据（期末余额）",
         "rows": "d1_note_main",
@@ -9223,7 +8461,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "按单项计提坏账准备的应收票据（期末余额）子表推送（五、4/八、4）balance/provision/loss_rate；数据来源：披露表"
+      "description": "按单项计提坏账准备的应收票据（期末余额）子表推送（五、4）balance/provision/loss_rate；数据来源：披露表"
     },
     {
       "rule_id": "D1.note.subtable_11",
@@ -9233,8 +8471,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、4",
-          "soe": "八、4"
+          "listed": "五、4"
         },
         "table": "按单项计提坏账准备的应收票据（续：上年年末余额）",
         "rows": "d1_note_main",
@@ -9253,7 +8490,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "按单项计提坏账准备的应收票据（续：上年年末余额）子表推送（五、4/八、4）balance/provision/loss_rate；数据来源：披露表"
+      "description": "按单项计提坏账准备的应收票据（续：上年年末余额）子表推送（五、4）balance/provision/loss_rate；数据来源：披露表"
     },
     {
       "rule_id": "D1.note.subtable_17",
@@ -9263,8 +8500,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、4",
-          "soe": "八、4"
+          "listed": "五、4"
         },
         "table": "本期实际核销的应收票据情况",
         "rows": "d1_note_main",
@@ -9281,7 +8517,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "本期实际核销的应收票据情况子表推送（五、4/八、4）amount；数据来源：披露表"
+      "description": "本期实际核销的应收票据情况子表推送（五、4）amount；数据来源：披露表"
     },
     {
       "rule_id": "D1.note.subtable_18",
@@ -9291,8 +8527,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、4",
-          "soe": "八、4"
+          "listed": "五、4"
         },
         "table": "重要的应收票据核销情况（逐项披露）",
         "rows": "d1_note_main",
@@ -9309,7 +8544,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "重要的应收票据核销情况（逐项披露）子表推送（五、4/八、4）amount；数据来源：披露表"
+      "description": "重要的应收票据核销情况（逐项披露）子表推送（五、4）amount；数据来源：披露表"
     },
     {
       "rule_id": "D1.note.subtable_19",
@@ -9319,10 +8554,9 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、4",
-          "soe": "八、4"
+          "listed": "五、4"
         },
-        "table": "转回或收回金额重要的坏账准备",
+        "table": "本期转回或收回金额重要的坏账准备",
         "rows": "d1_note_main",
         "fields": [
           "amount"
@@ -9331,13 +8565,13 @@
       "source": {
         "kind": "derivation",
         "name": "d1_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D1 的子表「转回或收回金额重要的坏账准备」读取行数据，按 amount 字段写入附注"
+        "formula_text": "数据来源：披露表 → 附注。从底稿 D1 的子表「本期转回或收回金额重要的坏账准备」读取行数据，按 amount 字段写入附注"
       },
       "triggers": [
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "转回或收回金额重要的坏账准备子表推送（五、4/八、4）amount；数据来源：披露表"
+      "description": "本期转回或收回金额重要的坏账准备子表推送（五、4）amount；数据来源：披露表"
     },
     {
       "rule_id": "D2.note.subtable_13",
@@ -9347,8 +8581,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、5",
-          "soe": "八、5"
+          "listed": "五、5"
         },
         "table": "重要的应收账款核销情况（逐项披露）",
         "rows": "d2_note_main",
@@ -9365,7 +8598,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "重要的应收账款核销情况（逐项披露）子表推送（五、5/八、5）amount；数据来源：披露表"
+      "description": "重要的应收账款核销情况（逐项披露）子表推送（五、5）amount；数据来源：披露表"
     },
     {
       "rule_id": "D2.note.subtable_14",
@@ -9375,8 +8608,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、5",
-          "soe": "八、5"
+          "listed": "五、5"
         },
         "table": "按欠款方归集的应收账款和合同资产期末余额前五名单位情况",
         "rows": "d2_note_main",
@@ -9397,7 +8629,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "按欠款方归集的应收账款和合同资产期末余额前五名单位情况子表推送（五、5/八、5）ar_amount/contract_asset_amount/total_amount/ratio/provision；数据来源：披露表"
+      "description": "按欠款方归集的应收账款和合同资产期末余额前五名单位情况子表推送（五、5）ar_amount/contract_asset_amount/total_amount/ratio/provision；数据来源：披露表"
     },
     {
       "rule_id": "D2.note.subtable_15",
@@ -9407,8 +8639,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、5",
-          "soe": "八、5"
+          "listed": "五、5"
         },
         "table": "因金融资产转移而终止确认的应收账款情况",
         "rows": "d2_note_main",
@@ -9426,7 +8657,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "因金融资产转移而终止确认的应收账款情况子表推送（五、5/八、5）amount/gain_loss；数据来源：披露表"
+      "description": "因金融资产转移而终止确认的应收账款情况子表推送（五、5）amount/gain_loss；数据来源：披露表"
     },
     {
       "rule_id": "D2.note.subtable_16",
@@ -9436,10 +8667,9 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、5",
-          "soe": "八、5"
+          "listed": "五、5"
         },
-        "table": "转移应收账款且继续涉入形成的资产、负债",
+        "table": "转移应收账款且继续涉入形成的资产、负债的金额",
         "rows": "d2_note_main",
         "fields": [
           "asset_amount",
@@ -9449,13 +8679,13 @@
       "source": {
         "kind": "derivation",
         "name": "d2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「转移应收账款且继续涉入形成的资产、负债」读取行数据，按 asset_amount/liability_amount 字段写入附注"
+        "formula_text": "数据来源：披露表 → 附注。从底稿 D2 的子表「转移应收账款且继续涉入形成的资产、负债的金额」读取行数据，按 asset_amount/liability_amount 字段写入附注"
       },
       "triggers": [
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "转移应收账款且继续涉入形成的资产、负债子表推送（五、5/八、5）asset_amount/liability_amount；数据来源：披露表"
+      "description": "转移应收账款且继续涉入形成的资产、负债的金额子表推送（五、5）asset_amount/liability_amount；数据来源：披露表"
     },
     {
       "rule_id": "F2.note.subtable_3",
@@ -9929,34 +9159,6 @@
       "description": "碳排放配额变动情况子表推送（五、13/八、14）prior_amount；数据来源：披露表"
     },
     {
-      "rule_id": "G4.note.subtable_1",
-      "page_key": "workpaper:G4",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、14",
-          "soe": "八、15"
-        },
-        "table": "债权投资减值准备本期变动情况",
-        "rows": "g4_note_main",
-        "fields": [
-          "opening"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "g4_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 G4 的子表「债权投资减值准备本期变动情况」读取行数据，按 opening 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "债权投资减值准备本期变动情况子表推送（五、14/八、15）opening；数据来源：披露表"
-    },
-    {
       "rule_id": "G4.note.subtable_6",
       "page_key": "workpaper:G4",
       "stage": "note",
@@ -10127,34 +9329,6 @@
         "manual"
       ],
       "description": "重要的债权投资核销情况（逐项披露）子表推送（五、14/八、15）amount；数据来源：披露表"
-    },
-    {
-      "rule_id": "G6.note.subtable_2",
-      "page_key": "workpaper:G6",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、15",
-          "soe": "八、16"
-        },
-        "table": "其他债权投资减值准备本期变动情况",
-        "rows": "g6_note_main",
-        "fields": [
-          "opening"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "g6_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 G6 的子表「其他债权投资减值准备本期变动情况」读取行数据，按 opening 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "其他债权投资减值准备本期变动情况子表推送（五、15/八、16）opening；数据来源：披露表"
     },
     {
       "rule_id": "G6.note.subtable_5",
@@ -10597,8 +9771,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、22",
-          "soe": "八、22"
+          "listed": "五、22"
         },
         "table": "暂时闲置的固定资产情况",
         "rows": "h1_note_main",
@@ -10615,7 +9788,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "暂时闲置的固定资产情况子表推送（五、22/八、22）book_value；数据来源：披露表"
+      "description": "暂时闲置的固定资产情况子表推送（五、22）book_value；数据来源：披露表"
     },
     {
       "rule_id": "H1.note.subtable_3",
@@ -10625,8 +9798,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、22",
-          "soe": "八、22"
+          "listed": "五、22"
         },
         "table": "通过经营租赁租出的固定资产",
         "rows": "h1_note_main",
@@ -10643,7 +9815,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "通过经营租赁租出的固定资产子表推送（五、22/八、22）book_value；数据来源：披露表"
+      "description": "通过经营租赁租出的固定资产子表推送（五、22）book_value；数据来源：披露表"
     },
     {
       "rule_id": "H1.note.subtable_4",
@@ -10653,10 +9825,9 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、22",
-          "soe": "八、22"
+          "listed": "五、22"
         },
-        "table": "（披露期末未办妥产权证书的固定资产账面价值及原因。）",
+        "table": "未办妥产权证书的固定资产情况",
         "rows": "h1_note_main",
         "fields": [
           "book_value"
@@ -10665,13 +9836,13 @@
       "source": {
         "kind": "derivation",
         "name": "h1_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 H1 的子表「（披露期末未办妥产权证书的固定资产账面价值及原因。）」读取行数据，按 book_value 字段写入附注"
+        "formula_text": "数据来源：披露表 → 附注。从底稿 H1 的子表「未办妥产权证书的固定资产情况」读取行数据，按 book_value 字段写入附注"
       },
       "triggers": [
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "（披露期末未办妥产权证书的固定资产账面价值及原因。）子表推送（五、22/八、22）book_value；数据来源：披露表"
+      "description": "未办妥产权证书的固定资产情况子表推送（五、22）book_value；数据来源：披露表"
     },
     {
       "rule_id": "H1.note.subtable_5",
@@ -10681,8 +9852,7 @@
       "target": {
         "domain": "note",
         "section_by_template": {
-          "listed": "五、22",
-          "soe": "八、22"
+          "listed": "五、22"
         },
         "table": "固定资产清理",
         "rows": "h1_note_main",
@@ -10700,7 +9870,7 @@
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "固定资产清理子表推送（五、22/八、22）end_balance/prior_balance；数据来源：披露表"
+      "description": "固定资产清理子表推送（五、22）end_balance/prior_balance；数据来源：披露表"
     },
     {
       "rule_id": "H2.note.subtable_4",
@@ -10845,118 +10015,6 @@
       "description": "未办妥产权证书的土地使用权情况子表推送（五、26/八、27）carrying_value；数据来源：披露表"
     },
     {
-      "rule_id": "G10.note.subtable_1",
-      "page_key": "workpaper:G10",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、34",
-          "soe": "八、34"
-        },
-        "table": "1、对于指定为以公允价值计量且其变动计入当期损益的金融负债，应单独列示期初余额、期末余额，并披露指定的理由和依据。",
-        "rows": "g10_note_main",
-        "fields": [
-          "end_balance"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "g10_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 G10 的子表「1、对于指定为以公允价值计量且其变动计入当期损益的金融负债，应单独列示期初余额、期末余额，并披露指定的理由和依据。」读取行数据，按 end_balance 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "1、对于指定为以公允价值计量且其变动计入当期损益的金融负债，应单独列示期初余额、期末余额，并披露指定的理由和依据。子表推送（五、34/八、34）end_balance；数据来源：披露表"
-    },
-    {
-      "rule_id": "G10.note.subtable_2",
-      "page_key": "workpaper:G10",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、34",
-          "soe": "八、34"
-        },
-        "table": "对于指定为以公允价值计量且其变动计入当期损益的金融负债，2025年公允价值的变动情况如下表所示：",
-        "rows": "g10_note_main",
-        "fields": [
-          "end_balance"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "g10_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 G10 的子表「对于指定为以公允价值计量且其变动计入当期损益的金融负债，2025年公允价值的变动情况如下表所示：」读取行数据，按 end_balance 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "对于指定为以公允价值计量且其变动计入当期损益的金融负债，2025年公允价值的变动情况如下表所示：子表推送（五、34/八、34）end_balance；数据来源：披露表"
-    },
-    {
-      "rule_id": "D7.note.subtable_1",
-      "page_key": "workpaper:D7",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、39",
-          "soe": "八、39"
-        },
-        "table": "账龄超过1年的重要合同负债",
-        "rows": "d7_note_main",
-        "fields": [
-          "end_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "d7_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 D7 的子表「账龄超过1年的重要合同负债」读取行数据，按 end_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "账龄超过1年的重要合同负债子表推送（五、39/八、39）end_amount；数据来源：披露表"
-    },
-    {
-      "rule_id": "K3.note.subtable_6",
-      "page_key": "workpaper:K3",
-      "stage": "note",
-      "policy": "editable",
-      "target": {
-        "domain": "note",
-        "section_by_template": {
-          "listed": "五、42",
-          "soe": "八、42"
-        },
-        "table": "其中，账龄超过1年的重要其他应付款",
-        "rows": "k3_note_main",
-        "fields": [
-          "end_amount"
-        ]
-      },
-      "source": {
-        "kind": "derivation",
-        "name": "k3_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 K3 的子表「其中，账龄超过1年的重要其他应付款」读取行数据，按 end_amount 字段写入附注"
-      },
-      "triggers": [
-        "WORKPAPER_SAVED",
-        "manual"
-      ],
-      "description": "其中，账龄超过1年的重要其他应付款子表推送（五、42/八、42）end_amount；数据来源：披露表"
-    },
-    {
       "rule_id": "L4.note.subtable_2",
       "page_key": "workpaper:L4",
       "stage": "note",
@@ -10999,18 +10057,22 @@
         "rows": "j2_note_main",
         "fields": [
           "amount"
-        ]
+        ],
+        "table_by_template": {
+          "listed": "未折现的离职后福利预计到期分析：",
+          "soe": "未折现的离职后福利预计到期分析"
+        }
       },
       "source": {
         "kind": "derivation",
         "name": "j2_note_main",
-        "formula_text": "数据来源：披露表 → 附注。从底稿 J2 的子表「未折现的离职后福利预计到期分析：」读取行数据，按 amount 字段写入附注"
+        "formula_text": "数据来源：披露表 → 附注。从底稿 J2 的子表「未折现的离职后福利预计到期分析：」/「未折现的离职后福利预计到期分析」读取行数据，按 amount 字段写入附注"
       },
       "triggers": [
         "WORKPAPER_SAVED",
         "manual"
       ],
-      "description": "未折现的离职后福利预计到期分析：子表推送（五、49/八、54）amount；数据来源：披露表"
+      "description": "未折现的离职后福利预计到期分析：」/「未折现的离职后福利预计到期分析子表推送（五、49/八、54）amount；数据来源：披露表"
     },
     {
       "rule_id": "M2.note.subtable_0",

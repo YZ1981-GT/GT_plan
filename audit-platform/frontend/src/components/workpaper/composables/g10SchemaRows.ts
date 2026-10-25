@@ -41,6 +41,21 @@ export const G10_SOE_BALANCE_ROWS: G10DisclosureRowDef[] = [
   { rowKey: 'soe_designated_other', label: '其他' },
 ]
 
+/**
+ * 父行的子行 rowKey：父行之后、下一个父行之前的行（行序同底稿，父行 = 其下各行之和，如上市 B8 = B9+B10+B11）。
+ * 披露页显示与附注载荷共用这一份，父行金额两边同口径。
+ */
+export function g10ChildKeys(defs: readonly G10DisclosureRowDef[], parentKey: string): string[] {
+  const at = defs.findIndex((d) => d.rowKey === parentKey)
+  if (at < 0 || !defs[at].isParent) return []
+  const out: string[] = []
+  for (const d of defs.slice(at + 1)) {
+    if (d.isParent) break
+    out.push(d.rowKey)
+  }
+  return out
+}
+
 /** 上市 — 表2 指定负债明细（期初/期末/理由）默认种子行 */
 export const G10_LISTED_DESIGNATED_SEED_LABEL = '发行的普通债权'
 

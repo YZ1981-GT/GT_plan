@@ -63,8 +63,14 @@ def test_build_expectations_expands_multi_section():
     assert len(g10_listed) >= 2, f"G10 listed 应至少 2 条（多章节），实际 {len(g10_listed)}"
 
 
+#: 两版模板章节数本就不同、一个变体多推一节的底稿（逐条写理由；条目必须真的不对称，否则删条目）
+_ASYMMETRIC_BY_TEMPLATE: dict[str, str] = {
+    "L3": "国企「（1）一年内到期的长期借款」是独立章节 八、45；上市同表在 L4 / L5 共用的 五、43，不推（R8.4 批 9b-2）",
+}
+
+
 def test_expectations_variant_balanced():
-    """每个 wp_code 的 listed + soe 条数应相等（注册表结构对称）。"""
+    """每个 wp_code 的 listed + soe 条数应相等（注册表结构对称），模板结构本就不对称的逐条登记。"""
     exps = _build_expectations()
     counter: dict[str, dict[str, int]] = {}
     for e in exps:
@@ -73,9 +79,13 @@ def test_expectations_variant_balanced():
         counter[code][e["variant"]] += 1
 
     for code, counts in counter.items():
+        if code in _ASYMMETRIC_BY_TEMPLATE:
+            assert counts["listed"] != counts["soe"], f"{code} 已对称，删 _ASYMMETRIC_BY_TEMPLATE 条目"
+            continue
         assert counts["listed"] == counts["soe"] or counts["listed"] == 0 or counts["soe"] == 0, (
             f"{code}: listed={counts['listed']} soe={counts['soe']} 不对称"
         )
+    assert set(_ASYMMETRIC_BY_TEMPLATE) <= set(counter), "登记的底稿不在注册表里"
 
 
 def test_registry_path_exists():

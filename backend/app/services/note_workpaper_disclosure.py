@@ -11,6 +11,9 @@ spec: consol-note-header-library-and-node-reaggregate R8.4（design §17.5）；
   （「利息资 / 本化累 / 计金额」）连成一段；盖住多个逻辑列的才是分组。
 - 列路径里去掉：勾稽注记（「（1）」「C=A+B」）、括号提示（「（不适用删除）」）；表头为空或末段是「……」的列不算
   （空白间隔列 / 按需增加的占位列）。
+- 表头格是单格引用公式（「='被投资单位财务信息（合营、联营）G7-5'!C8」，引用格是文字）的，取被引用格的字；标签列
+  的合并格从更上面一行开始的（A229:B230，第 229 行其余格只有引用公式），表头从合并格首行算起 —— G7 国企合营 / 联营
+  财务信息表的企业名行原先因此丢掉（R8.4 批 9b-2）。只认表头行里的引用；数据行不解析。
 """
 from __future__ import annotations
 
@@ -117,6 +120,44 @@ class WpTable:
     @property
     def paths(self) -> list[tuple[str, ...]]:
         return [c.path for c in self.columns]
+
+
+_SHEET_REF = re.compile(r"^=\s*(?:'((?:[^']|'')+)'|([^'!=()\s]+))!\$?([A-Z]{1,3})\$?(\d+)\s*$")
+_LOCAL_REF = re.compile(r"^=\s*\$?([A-Z]{1,3})\$?(\d+)\s*$")
+
+
+def ref_text(ws: Any, value: Any) -> str:
+    """单格引用公式（跨 sheet 或本 sheet）→ 被引用格的显示文字（``cell_text`` 口径）；不是单格引用、引用格不是文字
+    （数值 / 又一层公式 / 空）的返回空串。"""
+    if not (isinstance(value, str) and value.lstrip().startswith("=")):
+        return ""
+    m = _SHEET_REF.match(value.strip())
+    if m:
+        title = (m.group(1) or "").replace("''", "'") or m.group(2)
+        col, row = m.group(3), m.group(4)
+    else:
+        m = _LOCAL_REF.match(value.strip())
+        if not m:
+            return ""
+        title, col, row = ws.title, m.group(1), m.group(2)
+    book = getattr(ws, "parent", None)
+    if book is None or title not in book.sheetnames:
+        return ""
+    return cell_text(book[title][f"{col}{row}"].value)
+
+
+def _resolve_header_refs(ws: Any, vals: dict, owner: dict, rows: list[int], maxc: int) -> dict:
+    """``vals`` 副本：表头行里单格引用公式的格换成被引用格的字（只换表头行，数据行不动）。"""
+    out = dict(vals)
+    for r in rows:
+        for c in range(1, maxc + 1):
+            o = owner.get((r, c), (r, c))
+            if o not in out or cell_text(out[o]):
+                continue
+            text = ref_text(ws, out[o])
+            if text:
+                out[o] = text
+    return out
 
 
 def _grid(ws: Any) -> tuple[dict, dict]:
@@ -228,8 +269,12 @@ def extract_tables(ws: Any, *, wp_code: str = "", sheet: str = "") -> list[WpTab
         h0 = r
         while r <= maxr and _header_like(vals, owner, r, maxc):
             r += 1
+        top = owner.get((h0, 1), (h0, 1))[0]
+        if prev_end < top < h0:
+            h0 = top  # 标签列合并格从更上面一行开始：那几行也是表头（其余格只有引用公式，如企业名行）
         rows = list(range(h0, r))
-        if any(b in _cell(vals, owner, hr, c)[1] for hr in rows for c in range(1, maxc + 1) for b in _BANNER):
+        hv = _resolve_header_refs(ws, vals, owner, rows, maxc)
+        if any(b in _cell(hv, owner, hr, c)[1] for hr in rows for c in range(1, maxc + 1) for b in _BANNER):
             prev_end = r - 1
             continue
         cands, t = [], h0 - 1
@@ -239,9 +284,9 @@ def extract_tables(ws: Any, *, wp_code: str = "", sheet: str = "") -> list[WpTab
             elif not _blank(vals, owner, t, maxc):
                 break
             t -= 1
-        used = [c for c in range(1, maxc + 1) if any(_cell(vals, owner, hr, c)[1] for hr in rows)]
+        used = [c for c in range(1, maxc + 1) if any(_cell(hv, owner, hr, c)[1] for hr in rows)]
         last = max(used)
-        own = _extend_unmerged_groups(vals, owner, rows, last)
+        own = _extend_unmerged_groups(hv, owner, rows, last)
         owners = [tuple(own[(hr, c)] for hr in rows) for c in range(1, last + 1)]
         logical = [i for i in range(last) if i == 0 or owners[i] != owners[i - 1]]
         # 每个单元格盖住几个逻辑列（分组判定）
@@ -258,7 +303,7 @@ def extract_tables(ws: Any, *, wp_code: str = "", sheet: str = "") -> list[WpTab
                 if o in seen:
                     continue
                 seen.add(o)
-                txt = _TAIL_NOTE.sub("", cell_text(vals.get(o))).strip()
+                txt = _TAIL_NOTE.sub("", cell_text(hv.get(o))).strip()
                 if txt and not _NOTE_SEG.match(_WS.sub("", txt)) and not _HINT_SEG.match(_WS.sub("", txt)):
                     span = cover.get(o, {li})
                     segs.append((txt, (min(span), max(span))))

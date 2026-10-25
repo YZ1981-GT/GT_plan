@@ -1255,7 +1255,7 @@
       "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-ying-shou-kuan",
       "soe_format": {
         "content_type": "mixed",
-        "table_count": 18
+        "table_count": 19
       },
       "listed_format": {
         "content_type": "mixed",
@@ -1385,7 +1385,7 @@
       },
       "listed_format": {
         "content_type": "mixed",
-        "table_count": 5
+        "table_count": 4
       },
       "field_mapping": null
     },
@@ -1395,11 +1395,11 @@
       "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-piao-ju",
       "soe_format": {
         "content_type": "mixed",
-        "table_count": 17
+        "table_count": 12
       },
       "listed_format": {
         "content_type": "mixed",
-        "table_count": 20
+        "table_count": 14
       },
       "field_mapping": null
     },
@@ -1409,7 +1409,7 @@
       "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
       "soe_format": {
         "content_type": "mixed",
-        "table_count": 13
+        "table_count": 15
       },
       "listed_format": {
         "content_type": "mixed",

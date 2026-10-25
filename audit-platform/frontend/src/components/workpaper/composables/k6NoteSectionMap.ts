@@ -92,7 +92,8 @@ export const K6_SOE_LIABILITY_SUBTABLE = {
  */
 export const K6_LEGACY_OBSOLETE_TABLES = {
   listed: ['期末，持有待售资产的情况：', '子公司A', '分公司B', '项  目'],
-  soe: ['持有待售资产（表4）'],
+  // 第二个：以提示末行为名、表头与「持有待售资产」相同的重复表，模板 R8.4 批 9b-2 已删（底稿 K6 国企只有一张）
+  soe: ['持有待售资产（表4）', '4.应披露与持有待售的非流动资产或处置组有关的其他综合收益累计金额。】'],
 } as const
 
 /** 两级表头的父表头串（**per-variant，禁共享常量**） */

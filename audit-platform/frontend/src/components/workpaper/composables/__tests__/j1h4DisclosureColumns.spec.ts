@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest'
 import {
   J1_SUB_TABLE_KEYS,
   buildJ1SyncPayload,
-  j1MovementColumns,
+  j1ColumnsFor,
 } from '../j1NoteSectionMap'
 import { buildH4ListedSyncPayloads } from '../h4DisclosureSyncPayload'
 import { buildH2ListedColumns } from '../h2DisclosureSyncPayload'
@@ -32,35 +32,57 @@ function j1Snapshot() {
   return { summary: rows, shortTerm: rows, postEmployment: rows, notes: {} } as never
 }
 
+const VARIANTS = ['listed', 'soe'] as const
+
 describe('J1 应付职工薪酬披露 columns 契约', () => {
-  it('5 列取附注模板口径（「期初余额」而非组件的「上年年末数」）', () => {
-    expect(j1MovementColumns().map((c) => c.label)).toEqual([
+  it('5 列按各自底稿口径：上市「上年年末数 / 期末数」，国企「期初余额 / 期末余额」；key 两版相同', () => {
+    expect(j1ColumnsFor('listed').map((c) => c.label)).toEqual([
+      '项目', '上年年末数', '本期增加', '本期减少', '期末数',
+    ])
+    expect(j1ColumnsFor('soe').map((c) => c.label)).toEqual([
       '项目', '期初余额', '本期增加', '本期减少', '期末余额',
     ])
+    for (const v of VARIANTS) {
+      expect(j1ColumnsFor(v).map((c) => c.key)).toEqual(['项目', '期初余额', '本期增加', '本期减少', '期末余额'])
+    }
   })
 
-  it('🔴 标签列标 flat，抑制凭空「本期」父表头；全表 0 处 group', () => {
-    const cols = j1MovementColumns()
+  it.each(VARIANTS)('🔴 %s：标签列标 flat，抑制凭空「本期」父表头；全表 0 处 group', (v) => {
+    const cols = j1ColumnsFor(v)
     expect(cols.some((c) => c.flat === true), '未声明 flat → 后端会反猜「本期」父表头').toBe(true)
     expect(cols.filter((c) => c.group !== undefined)).toHaveLength(0)
   })
 
-  it('4 个金额列标 format: amount（标签列不标）', () => {
-    const cols = j1MovementColumns()
+  it.each(VARIANTS)('%s：4 个金额列标 format: amount（标签列不标）', (v) => {
+    const cols = j1ColumnsFor(v)
     expect(cols[0].format).toBeUndefined()
     expect(cols.slice(1).map((c) => c.format)).toEqual(['amount', 'amount', 'amount', 'amount'])
   })
 
-  it('Property 2：恰好 1 个 is_label 且居首', () => {
-    const cols = j1MovementColumns()
+  it.each(VARIANTS)('Property 2（%s）：恰好 1 个 is_label 且居首', (v) => {
+    const cols = j1ColumnsFor(v)
     expect(cols.filter((c) => c.is_label === true)).toHaveLength(1)
     expect(cols[0].is_label).toBe(true)
   })
 
-  it('Property 6：无英文/snake_case 键泄漏为列头', () => {
-    for (const c of j1MovementColumns()) {
+  it.each(VARIANTS)('Property 6（%s）：无英文/snake_case 键泄漏为列头', (v) => {
+    for (const c of j1ColumnsFor(v)) {
       expect(c.label.trim()).not.toBe('')
       expect(/^[a-z_]+$/.test(c.label)).toBe(false)
+    }
+  })
+
+  it.each(VARIANTS)('%s 载荷三张表都用本版列定义（原先两版都推国企口径）', (variant) => {
+    const { body } = buildJ1SyncPayload({
+      variant,
+      wpId: 'wp-j1',
+      year: 2025,
+      snapshot: j1Snapshot(),
+      applicableStandards: [variant === 'listed' ? 'listed_standalone' : 'soe_standalone'],
+    })
+    const columns = (body as unknown as { columns: Record<string, Array<{ label: string }>> }).columns
+    for (const name of Object.values(J1_SUB_TABLE_KEYS[variant])) {
+      expect(columns[name].map((c) => c.label)).toEqual(j1ColumnsFor(variant).map((c) => c.label))
     }
   })
 

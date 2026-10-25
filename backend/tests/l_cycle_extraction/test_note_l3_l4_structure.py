@@ -3,8 +3,8 @@
 锁定 `fix_note_l3_l4_structure.py` 的对齐结果，防 md 重建 / 并发会话回退：
 
 覆盖 6 个章节 16 张表：
-- L3 listed 五、45 长期借款（1 表，5 列，**有 group** 两级表头）
-- L3 soe 八、49 长期借款（1 表，5 列，有 group）
+- L3 listed 五、45 长期借款（1 表，5 列，一层表头，两列同名「利率区间」；R8.4 批 9b-2 由两级改一层）
+- L3 soe 八、49 长期借款（1 表，5 列，一层表头）
 - L4 listed 五、46 应付债券（5 表，列数 3/6/8/10/5）
 - L4 soe 八、50 应付债券（2 表，列数 3/10）
 - 五、43 一年内到期的非流动负债 listed（5 表，列数 3/3/5/7/3）
@@ -13,7 +13,7 @@
 守卫内容：
 - 表数正确；
 - 每张表列数正确 + flat/group 表态正确；
-- L3 两表有 group（两级表头），其余为 flat（单级表头）；
+- L3 两表按底稿一层表头（flat），列名与行序逐字对底稿；L4 第 5 张为两级，其余为 flat（单级表头）；
 - 所有表 guidance 齐备且非空；
 - 旧名「参考披露格式：」（L4 表4）不得复活；
 - 旧名「项  目」（五、43 表5）不得复活；
@@ -78,9 +78,9 @@ def _get_table(section: dict, table_name: str) -> dict:
 # ═══════════════════════════════════════════════════════════════════
 
 CASES = [
-    # L3 - 两级表头
-    ("五、45", "长期借款", 5, True, "listed"),
-    ("八、49", "长期借款", 5, True, "soe"),
+    # L3 - 一层表头（底稿 A7:E7 / A8:E8 一行、无合并格）
+    ("五、45", "长期借款", 5, False, "listed"),
+    ("八、49", "长期借款", 5, False, "soe"),
     # L4 listed 五、46 - 5 张表
     ("五、46", "应付债券", 3, False, "listed"),
     ("五、46", "应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）", 6, False, "listed"),
@@ -132,7 +132,7 @@ def test_columns_count_and_structure(
     )
 
     if has_group:
-        # L3 两级表头：至少一列有 group
+        # 两级表头：至少两列有 group
         groups = [c.get("group") for c in cols if c.get("group")]
         assert len(groups) >= 2, (
             f"{variant}/{section_number}/{table_name} 应有 group 两级表头"
@@ -183,6 +183,50 @@ def test_nc_listed_old_name_not_resurrected(listed):
     assert "项  目" not in table_names, (
         f"旧名「项  目」复活！当前表名: {table_names}"
     )
+
+
+#: 底稿 L3 两张披露 sheet 的长期借款表（一行表头、无合并格；openpyxl 实测上市 A7:E7、国企 A8:E8）
+_L3_WORKPAPER = {
+    "listed": ("五、45", ["项  目", "期末余额", "利率区间", "上年年末余额", "利率区间"], "prior"),
+    "soe": ("八、49", ["借款类别", "期末余额", "利率区间", "期初余额", "利率区间"], "begin"),
+}
+_L3_ROWS = ["质押借款", "抵押借款", "保证借款", "信用借款", "小计", "减：一年内到期的长期借款", "合计"]
+
+
+@pytest.mark.parametrize("variant", ["listed", "soe"])
+def test_l3_one_level_matches_workpaper(variant, listed, soe):
+    """长期借款按底稿一层表头：列名与行序逐字对底稿，两列「利率区间」同名靠 key 区分，key 沿用（推送规则零迁移）。"""
+    section, headers, prior = _L3_WORKPAPER[variant]
+    tbl = _get_table(_find_section(listed if variant == "listed" else soe, section), "长期借款")
+    assert tbl["headers"] == headers
+    assert [c["label"] for c in tbl["columns"]] == headers
+    assert [c["key"] for c in tbl["columns"]] == [
+        "label", "end_amount", "end_rate_range", f"{prior}_amount", f"{prior}_rate_range",
+    ]
+    assert "_column_groups" not in tbl
+    assert [r["label"] for r in tbl["rows"]] == _L3_ROWS
+
+
+def test_continuation_renamed_tables_restored(listed):
+    """5914e315b 改成同节前一张表名的两张表已按位置改回原名（同节表名唯一）。"""
+    for section_number, name in (("五、46", "（3）划分为金融负债的其他金融工具"), ("五、43", "一年内到期的长期应付款")):
+        names = [str(t.get("name")) for t in _find_section(listed, section_number).get("tables") or []]
+        assert name in names, (section_number, names)
+        assert len(names) == len(set(names)), (section_number, names)
+
+
+def test_kit_duplicate_label_rule_skips_text_columns_only():
+    """文字列同名放行（底稿 L3 两列「利率区间」），金额列同名仍打红（按列名取数会分不清期间）。"""
+    sys.path.insert(0, str(SCRIPTS))
+    from _note_structure_kit import AMOUNT, TEXT, flat_columns, validate_section
+
+    def section(fmt: str) -> dict:
+        cols = flat_columns([("label", "项目", None), ("a", "余额", fmt), ("b", "余额", fmt)])
+        return {"tables": [{"name": "替身表", "headers": [c["label"] for c in cols], "columns": cols,
+                            "rows": [], "guidance": "x"}]}
+
+    assert not [e for e in validate_section(section(TEXT), ["替身表"]) if "列名重复" in e]
+    assert any("列名重复" in e for e in validate_section(section(AMOUNT), ["替身表"]))
 
 
 def test_idempotent_check():

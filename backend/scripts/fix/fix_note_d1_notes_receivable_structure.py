@@ -47,12 +47,19 @@ spec: .kiro/specs/d1-notes-receivable-disclosure-alignment/ Task 1
 from __future__ import annotations
 
 import argparse
+import copy
 import datetime as _dt
 import json
-import re
 import sys
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _note_structure_kit import (  # noqa: E402
+    drop_tables,
+    is_title_paragraph as _is_title_paragraph,
+    titleize_text_sections,
+)
 
 _BACKEND = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = _BACKEND / "data"
@@ -220,6 +227,27 @@ S = {
 LEGACY_TABLE_NAMES = {
     "listed": {"transfer": ["期末因出票人未履约而将其转应收账款的票据"]},
     "soe": {},
+}
+
+# 四版 Word 拆章时带进来的重复表（与上面同一张表另起一个名字、或名字与内容错位），底稿与推送载荷都没有，
+# 留着会在附注里多出空表、按位置配表名时还会错位 —— 删（consol-note-header-library-and-node-reaggregate
+# R8.4 批 9b-2，逐张核对底稿 D1 两张披露 sheet：上市 14 张、国企 12 张，与本脚本 L / S 一一对应）。
+DROP_TABLE_NAMES = {
+    "listed": [
+        "期末本公司已质押的应收票据",                       # = 期末已质押的应收票据
+        "期末本公司已背书或贴现但尚未到期的应收票据",         # = 期末已背书或贴现但尚未到期的应收票据
+        "期末本公司因出票人未履约而将其转应收账款的票据",     # = 期末因出票人未履约而其转应收账款的票据
+        "按坏账计提方法分类",                               # = 按坏账计提方法分类（期末余额）
+        "按单项计提坏账准备的应收票据",                     # 期末 / 上年年末两期并一张 = 单项计提两张
+        "转回或收回金额重要的坏账准备",                     # 名字是转回表、列是核销逐项表
+    ],
+    "soe": [
+        "按坏账准备计提方法分类披露应收票据",               # = 按坏账准备计提方法分类披露应收票据（期末数）
+        "按坏账准备计提方法分类披露应收票据（续）",         # 名字是分类续表、列是单项计提表
+        "其中，本期转回或收回金额重要的应收票据坏账准备",   # 名字是转回表、列是已质押表
+        "期末已背书或贴现且在资产负债表日尚未到期的应收票据",  # 名字是背书贴现表、列是转应收账款表
+        "期末因出票人未履约而转为应收账款的票据",           # 名字是转应收账款表、列是核销表
+    ],
 }
 
 NOTE_KINDS = ["银行承兑汇票", "商业承兑汇票"]
@@ -680,53 +708,11 @@ def apply_plan(section: dict[str, Any], plan: list[dict[str, Any]]) -> tuple[lis
 
 
 # ─────────────────── text_sections 标题化（裸表名不得当正文）───────────────────
-
-# 与后端 `disclosure_engine._NUMBERED_TITLE_RE` 同口径（`（N）xxx` / `N. xxx`）
-_NUMBERED_TITLE_RE = re.compile(r"^(?:（(\d+)）|(\d+)[.、])")
-
-
-def _is_title_paragraph(para: str) -> bool:
-    """复刻 `disclosure_engine._is_table_title_paragraph`（stdlib-only，供 --check 独立跑）。
-
-    ① `#` 开头 → 任意长度都算标题
-    ② 非 `#` 时须 **≤20 字且匹配编号**
-    """
-    s = (para or "").strip()
-    if not s:
-        return False
-    if s.startswith("#"):
-        return True
-    if len(s) > 20:
-        return False
-    return bool(_NUMBERED_TITLE_RE.match(s))
-
-
-def titleize_text_sections(section: dict[str, Any]) -> list[str]:
-    """把 `text_sections` 里的**裸表名**加上 `#### ` 前缀，返回变更说明。
-
-    🔴 后端只把「`#` 开头」或「≤20 字的编号短标题」当标题（标题本身不进任何输出）。
-    写成裸表名（如 `组合计提项目：银行承兑汇票`）既不是标题、也没有 `提示`/`【` 等
-    guidance 关键词 → 落进 `text_content`，**附注正文与 Word 导出会凭空多出
-    「只有一个表名」的段落**（D1 实测 6 条：上市 3 + 国企 3）。
-    正确范式见 `fix_note_ar_soe_structure.TEXT_SECTIONS`（`#### xxx` / `（N）xxx`）。
-    """
-    paras = section.get("text_sections")
-    if not isinstance(paras, list):
-        return []
-    names = {str(t.get("name", "")).strip() for t in (section.get("tables") or [])}
-    changes: list[str] = []
-    out: list[str] = []
-    for p in paras:
-        s = str(p)
-        stripped = s.strip()
-        if stripped in names and not _is_title_paragraph(s):
-            out.append(f"#### {stripped}")
-            changes.append(f"text_sections：裸表名「{stripped}」→ 加 #### 前缀（不再当正文渲染）")
-        else:
-            out.append(s)
-    if changes:
-        section["text_sections"] = out
-    return changes
+# 🔴 后端只把「`#` 开头」或「≤20 字的编号短标题」当标题（标题本身不进任何输出）。写成裸表名（如
+# `组合计提项目：银行承兑汇票`）既不是标题、也没有 `提示`/`【` 等 guidance 关键词 → 落进 `text_content`，
+# 附注正文与 Word 导出凭空多出「只有一个表名」的段落（D1 实测 6 条：上市 3 + 国企 3）。
+# 标题判定与加前缀用 kit 的同一份（`_is_title_paragraph` / `titleize_text_sections` 原是本文件的复制件，
+# R8.4 批 9b-2 收口）；正确范式 `#### xxx` / `（N）xxx`。
 
 
 def find_bare_table_name_paragraphs(section: dict[str, Any]) -> list[str]:
@@ -846,10 +832,20 @@ def run(variant: str, *, dry_run: bool, check: bool) -> tuple[list[str], list[st
     if section is None:
         return [], [f"未找到章节 {spec['section']}（{path.name}）"], []
 
+    drops = DROP_TABLE_NAMES[variant]
     if check:
-        return [], [], validate_section(section, spec["expected"])
+        # 现状校验 + 在副本上重放写入路径（与 `_note_structure_kit.run_section` 的 `--check` 同口径）：
+        # 原先只做现状校验，重复表、列 key / 表头漂移都看不见
+        errs = validate_section(section, spec["expected"])
+        probe = copy.deepcopy(section)
+        residual = drop_tables(probe, drops)
+        residual += apply_plan(probe, spec["plan"])[0] + titleize_text_sections(probe)
+        errs += [f"结构未对齐（表 / headers / columns / rows / guidance）：{c}" for c in residual]
+        return [], [], errs
 
-    changes, warnings = apply_plan(section, spec["plan"])
+    changes = drop_tables(section, drops)
+    plan_changes, warnings = apply_plan(section, spec["plan"])
+    changes += plan_changes
     changes += titleize_text_sections(section)
     errs = validate_section(section, spec["expected"])
     if changes and not dry_run and not errs:

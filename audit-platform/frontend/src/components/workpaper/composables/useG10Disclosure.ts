@@ -29,6 +29,7 @@ import {
   G10_SOE_BALANCE_ROWS,
   G10_LISTED_DESIGNATED_SEED_LABEL,
   G10_FV_CREDIT_SEED_LABEL,
+  g10ChildKeys,
   g10MaturityDiffPlaceholder,
 } from './g10SchemaRows'
 import { parseNum, calcSubtotal } from './useG10FormulaEngine'
@@ -179,8 +180,6 @@ export function useG10Disclosure(opts: {
 
   const listedMovementRows = computed(() => {
     const mv = listedStore.value.movement
-    const tradingChildren = ['mv_trading_bond', 'mv_derivative', 'mv_other']
-    const designatedChildren = ['mv_designated_bond', 'mv_hybrid_tool', 'mv_designated_other']
     return G10_LISTED_MOVEMENT_ROWS.map((def) => {
       let row = mv[def.rowKey] ?? {
         openingAmount: 0,
@@ -189,10 +188,7 @@ export function useG10Disclosure(opts: {
         closingAmount: 0,
       }
       if (def.isParent) {
-        row = parentMovementSum(
-          def.rowKey === 'mv_trading' ? tradingChildren : designatedChildren,
-          mv,
-        )
+        row = parentMovementSum(g10ChildKeys(G10_LISTED_MOVEMENT_ROWS, def.rowKey), mv)
       } else {
         row = enrichMovement(row)
       }
@@ -221,15 +217,10 @@ export function useG10Disclosure(opts: {
 
   const soeBalanceRows = computed(() => {
     const bal = soeStore.value.balance
-    const tradingChildren = ['soe_trading_bond', 'soe_derivative', 'soe_other']
-    const designatedChildren = ['soe_hybrid_tool', 'soe_designated_other']
     return G10_SOE_BALANCE_ROWS.map((def) => {
       let row = bal[def.rowKey] ?? { currentAmount: 0, priorAmount: 0 }
       if (def.isParent) {
-        row = parentBalanceSum(
-          def.rowKey === 'soe_trading' ? tradingChildren : designatedChildren,
-          bal,
-        )
+        row = parentBalanceSum(g10ChildKeys(G10_SOE_BALANCE_ROWS, def.rowKey), bal)
       }
       return { ...def, ...row, isTotal: false as const }
     })

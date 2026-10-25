@@ -98,7 +98,8 @@ describe('K4 其他流动负债披露 columns 契约', () => {
   it('上市：短期应付债券明细 6 列（源 A19:F19 / 附注模版 L4614）', () => {
     const cols = buildK4ListedColumns({ includeBond: true })[K4_SUBTABLE.bond]
     expect(cols.map(c => c.label)).toEqual(['债券名称', '面值', '票面利率', '发行日期', '债券期限', '发行金额'])
-    expect(cols.map(c => c.key)).toEqual(['bond_name', 'face_value', 'coupon_rate', 'issue_date', 'term', 'issue_amount'])
+    // 标签列 key 是平台惯例 `label`（eba7535b0 起；投影器对标签列双向兜底，改 key 不丢数）
+    expect(cols.map(c => c.key)).toEqual(['label', 'face_value', 'coupon_rate', 'issue_date', 'term', 'issue_amount'])
     expect(cols[0].is_label).toBe(true)
     expect(cols[2].format).toBe('percent')
     expect(cols[3].format).toBe('text')
@@ -110,7 +111,7 @@ describe('K4 其他流动负债披露 columns 契约', () => {
       '债券名称', '期初余额', '本期发行', '按面值计提利息', '溢折价摊销', '本期偿还', '期末余额', '是否违约',
     ])
     expect(cols.map(c => c.key)).toEqual([
-      'bond_name', 'begin_amount', 'issued', 'interest_accrued', 'premium_amort', 'repaid', 'end_amount', 'defaulted',
+      'label', 'begin_amount', 'issued', 'interest_accrued', 'premium_amort', 'repaid', 'end_amount', 'defaulted',
     ])
     expect(cols.map(c => c.label)).not.toContain('上年年末数')
     expect(cols[7].format).toBe('text')

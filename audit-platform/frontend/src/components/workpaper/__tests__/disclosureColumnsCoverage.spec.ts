@@ -294,6 +294,11 @@ const P1_ROUTE: Record<string, { spec: string; complete: boolean; note?: string 
   },
   buildL3ListedColumns: { spec: 'composables/__tests__/l3NoteSectionMap.spec.ts', complete: true },
   buildL3SoeColumns: { spec: 'composables/__tests__/l3NoteSectionMap.spec.ts', complete: true },
+  buildL3Within1ySoeColumns: {
+    spec: 'composables/__tests__/l3NoteSectionMap.spec.ts',
+    complete: true,
+    note: '国企 §八、45「（1）一年内到期的长期借款」（L3 第二个 item）；上市所在 §五、43 是共用节，不推',
+  },
   buildK2ListedColumns: {
     spec: 'composables/__tests__/k2NoteSubtableContract.spec.ts',
     complete: true,
@@ -311,7 +316,7 @@ const P1_ROUTE: Record<string, { spec: string; complete: boolean; note?: string 
   buildK10SoeColumns: {
     spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts',
     complete: true,
-    note: '国企 4 列（末列「是否为政府补助」文本型）+ 合计后结构行「其中：政府补助」不参与求和',
+    note: '国企 3 列（按底稿，R8.4 批 9b-2 删「是否为政府补助」）+ 合计后结构行「其中：政府补助」不参与求和',
   },
   buildK11ListedColumns: { spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts', complete: true },
   buildK11SoeColumns: { spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts', complete: true },
@@ -532,6 +537,13 @@ const P1_ROUTE: Record<string, { spec: string; complete: boolean; note?: string 
   buildG8SoeColumns: { spec: 'composables/__tests__/g8NoteSubtableContract.spec.ts', complete: true },
   buildG9ListedColumns: { spec: 'composables/__tests__/g9NoteSubtableContract.spec.ts', complete: true },
   buildG9SoeColumns: { spec: 'composables/__tests__/g9NoteSubtableContract.spec.ts', complete: true },
+  // R8.4 批 9b-2：G10 三个列构建器原为模块私有、sweep 扫不到（表名按审计年度拼、键与模板不一致长期无人发现）
+  buildG10ListedColumns: { spec: 'composables/__tests__/g10NoteSubtableContract.spec.ts', complete: true },
+  buildG10ListedDerivativeColumns: {
+    spec: 'composables/__tests__/g10NoteSubtableContract.spec.ts',
+    complete: true,
+  },
+  buildG10SoeColumns: { spec: 'composables/__tests__/g10NoteSubtableContract.spec.ts', complete: true },
   buildG12ListedColumns: { spec: 'composables/__tests__/g12NoteSubtableContract.spec.ts', complete: true },
   buildG12SoeColumns: { spec: 'composables/__tests__/g12NoteSubtableContract.spec.ts', complete: true },
   buildG5ListedColumns: {

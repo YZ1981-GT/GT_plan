@@ -183,6 +183,10 @@ def _run_soe_54(dry_run: bool, check: bool) -> tuple[list[str], list[str], list[
     if check:
         errs: list[str] = []
         tables = section.get("tables") or []
+        # 表名清单（原先 --check 定义了清单却不比 ⇒ 5914e315b 把后 4 张表名错位后仍报「已对齐」，R8.4 批 9b-2 补）
+        names = [str(t.get("name", "")) for t in tables]
+        if names != SOE_54_EXPECTED_TABLES:
+            errs.append(f"表名清单与源模板不一致：{names}（复位见 fix_note_j2_long_term_employee_structure.py）")
         # 检查是否仍存在应删除的变动表
         for i, t in enumerate(tables):
             name = str(t.get("name", ""))

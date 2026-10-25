@@ -60,7 +60,7 @@ describe('noteDisclosureJump', () => {
   it('detects G7 equity note sections', () => {
     expect(isG7EquityNoteSection('五、18')).toBe(true)
     expect(isG7EquityNoteSection('八、18')).toBe(true)
-    expect(isG7EquityNoteSection('七、本期纳入合并报表')).toBe(true)
+    expect(isG7EquityNoteSection('七、本期纳入合并报表范围的子公司基本情况')).toBe(true)
     expect(isG7EquityNoteSection('四、货币资金')).toBe(false)
   })
 
@@ -224,7 +224,7 @@ describe('noteDisclosureJump', () => {
     })?.sheet).toBe(G7_DISCLOSURE_SHEET_SOE)
 
     expect(resolveNoteDisclosureJumpTarget({
-      note_section: '七、本期发生的同一控',
+      note_section: '七、本期发生的同一控制下企业合并情况',
       table_data: { _current_standard: 'soe' },
     })?.variant).toBe('soe')
   })

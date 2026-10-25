@@ -96,9 +96,12 @@ def _labels_by_table(templates: dict, variant: str, number: str) -> dict[str, li
 #:
 #: 🔴 判据方向是「必须保持不同」：这些表的两版用语真的不一样
 #: （`上年年末余额` vs `期初余额`、`项目（或被投资单位）` vs `项目`、
-#:  K3 soe 主表标签列是 `类别`、K5/K7/K10 两版列数都不同…），
+#:  K3 soe 主表标签列是 `类别`、K5/K7 两版列数都不同…），
 #: 一旦有人「统一成一份常量」，一侧的用语就整体错掉，而列数相同的那几张
 #: **不会有任何报错**。故必须正向锁死差异。
+#:
+#: 2026-10-25：K10「其他收益」移到下方「两版相同」—— 国企 八、69 原多一列「是否为政府补助」，
+#: 底稿 K10 国企披露表没有这一列，已按底稿删（R8.4 批 9b-2），两版列头现为同一组。
 VARIANT_DIVERGENT_TABLES: dict[str, tuple[str, ...]] = {
     "K1": ("其他应收款", "应收利息分类", "应收股利"),
     "K2": ("其他流动资产",),
@@ -107,12 +110,12 @@ VARIANT_DIVERGENT_TABLES: dict[str, tuple[str, ...]] = {
     "K5": ("预计负债",),
     "K6": ("持有待售资产减值准备",),
     "K7": ("递延收益",),
-    "K10": ("其他收益",),
 }
 
 #: 两版列头**确实相同**的表（合法共用，登记以免被误判成漏分变体）。
 VARIANT_IDENTICAL_TABLES: dict[str, tuple[str, ...]] = {
     "K1": ("重要逾期利息",),
+    "K10": ("其他收益",),
     "K11": ("资产减值损失",),
     "K12": ("营业外收入",),
     "K13": ("营业外支出",),
@@ -132,7 +135,7 @@ def test_divergent_tables_stay_divergent(templates, k_sections):
             checked += 1
             if lt[name] == st[name]:
                 same.append(f"{wp}/{name}: 两版列头变成一样了 {lt[name]}")
-    assert checked >= 12, f"只核到 {checked} 张表，登记表可疑"
+    assert checked >= 11, f"只核到 {checked} 张表，登记表可疑"
     assert not same, (
         "8.2 违规：这些表两版用语本来不同，被统一成一份了 —— 一侧用语会整体错掉，"
         f"且列数相同时不会有任何报错：{same}"
@@ -153,7 +156,7 @@ def test_identical_tables_stay_identical(templates, k_sections):
             checked += 1
             if lt[name] != st[name]:
                 diff.append(f"{wp}/{name}: L={lt[name]} S={st[name]}")
-    assert checked >= 4, f"只核到 {checked} 张表，登记表可疑"
+    assert checked >= 5, f"只核到 {checked} 张表，登记表可疑"
     assert not diff, f"登记为两版相同的表出现分叉（只改了一侧？）：{diff}"
 
 

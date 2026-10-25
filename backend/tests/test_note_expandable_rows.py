@@ -107,11 +107,17 @@ def _strip_js_comments(src: str) -> str:
 # 基线（2026-08-08 实测落地结果；只许升不许降 —— 标记被回退即打红）
 # ---------------------------------------------------------------------------
 
-#: 落地后各 variant 的 `expandable` 行数（母公司章 4 行按 R10.2 排除，故 125-4=121）
-EXPECTED_EXPANDABLE: dict[str, int] = {"listed": 79, "soe": 42}
+#: 落地后各 variant 的 `expandable` 行数。
+#:
+#: 🔴 2026-10-25（R8.4 批 9b-2，用户裁决「可无限插行是按实际动态插行、不是真实行内容」）：
+#:    原 R10.2 把母公司章 4 行排除给「A spec」，但 A spec（`fix_note_parent_company_chapter.py`）
+#:    只管母公司章的表集合 / 列 / 表头 / 指引，**从不写行的 row_type** ⇒ 两边都不标，
+#:    这 4 行（长期股权投资（表3）两版各 2 行 `…`）长期按普通数据行渲染。母公司章在合并附注里
+#:    照样出具，语义与其余章节无差别 ⇒ 撤销排除、一并标记。79+2 / 42+2 = 81 / 44。
+EXPECTED_EXPANDABLE: dict[str, int] = {"listed": 81, "soe": 44}
 
-#: 母公司章内仍保留 `data` 的可扩位行数（归 A spec，本 spec 不动）
-EXPECTED_PARENT_CHAPTER_UNMARKED: int = 4
+#: 母公司章内仍保留 `data` 的可扩位行数。排除撤销后应为 **0**（反向自检：排除若被改回来即打红）。
+EXPECTED_PARENT_CHAPTER_UNMARKED: int = 0
 
 
 @pytest.fixture(scope="module")
@@ -278,9 +284,10 @@ class TestExpandableLanded:
 
     def test_baseline_must_not_be_lowered(self) -> None:
         """基线只许升不许降 —— 防「标记被回退就顺手把基线调小」。"""
-        assert EXPECTED_EXPANDABLE == {"listed": 79, "soe": 42}
+        assert EXPECTED_EXPANDABLE == {"listed": 81, "soe": 44}
         assert sum(EXPECTED_EXPANDABLE.values()) + EXPECTED_PARENT_CHAPTER_UNMARKED == 125, (
-            "121 已标 + 4 母公司章未标 = 125 全部可扩位行（算术闭合）"
+            "125 已标 + 0 母公司章未标 = 125 全部可扩位行（算术闭合；"
+            "2026-10-25 撤销母公司章排除，原为 121 + 4）"
         )
 
     @pytest.mark.parametrize("variant", VARIANTS)
@@ -292,21 +299,23 @@ class TestExpandableLanded:
         for num, ti, name, ri, row in _iter_rows(templates[variant]):
             if MARKERS_MOD.match_label_marker(row.get("label")) is None:
                 continue
-            scope = PROBE.classify_section(
-                section_number=num, variant=variant,
-                parent_sections=parents, registry_sections=registry,
-            )
-            if scope == PROBE.SCOPE_PARENT:
-                continue  # R10.2：归 A spec
+            # 2026-10-25 起母公司章不再排除（见 `EXPECTED_EXPANDABLE` 注释）⇒ 全作用域一视同仁
             if str(row.get("row_type") or "") != EXPANDABLE:
                 leftovers.append(f"{num} #{ti} {name[:20]} r{ri} {row.get('label')!r}")
         assert not leftovers, "作用域内仍有未标记的可扩位行：" + "; ".join(leftovers[:10])
+        # 扫描面自检：判据不能空转（本 variant 必须真的扫到过可扩位行）
+        assert parents and registry, "母公司章 / 注册表清单取空 → scope 判定已空转"
 
-    def test_parent_chapter_rows_untouched(self, templates) -> None:
-        """R10.2 反向自检：母公司章的可扩位行必须**仍是 data**（证明排除真生效）。"""
+    def test_parent_chapter_rows_are_marked_too(self, templates) -> None:
+        """母公司章的可扩位行同样必须是 `expandable`（2026-10-25 撤销 R10.2 排除后的反向自检）。
+
+        🔴 这条**反转**了原先的断言（原为「必须仍是 data，证明排除真生效」）。撤销理由见
+        `EXPECTED_EXPANDABLE` 注释：排除把 4 行留给一个从不写 `row_type` 的 spec，结果是没人标。
+        现在若有人把 `fix_note_expandable_rows.py` 的排除加回来，这条立刻打红。
+        """
         parents = PROBE._load_parent_sections()
         registry = PROBE._load_registry_sections()
-        untouched = 0
+        seen = 0
         for variant in VARIANTS:
             for num, _ti, _n, _ri, row in _iter_rows(templates[variant]):
                 if MARKERS_MOD.match_label_marker(row.get("label")) is None:
@@ -317,13 +326,36 @@ class TestExpandableLanded:
                 )
                 if scope != PROBE.SCOPE_PARENT:
                     continue
-                assert str(row.get("row_type") or "") == "data", (
-                    f"母公司章 {variant} {num} 的可扩位行被本 spec 改动了（应归 A spec）"
+                seen += 1
+                assert str(row.get("row_type") or "") == EXPANDABLE, (
+                    f"母公司章 {variant} {num} 的可扩位行仍是 "
+                    f"{row.get('row_type')!r} —— 排除被加回来了？"
+                    "（可无限插行是位置标记、不是真实行内容）"
                 )
-                untouched += 1
-        assert untouched == EXPECTED_PARENT_CHAPTER_UNMARKED, (
-            f"母公司章可扩位行数应为 {EXPECTED_PARENT_CHAPTER_UNMARKED}，实为 {untouched}"
-            "（扫描面变化 → 排除断言可能已空转）"
+        # 🔴 分母非空：母公司章确实有可扩位行，否则上面的断言是空转。
+        #    现算 9 = 本轮新标 4（长期股权投资（表3）两版各 2 行 `…`）
+        #           + 原已带 5（同构子节的表从合并章整表复制，复制时就带着 expandable：
+        #             listed 十六、其他应收款 2 + soe 十二、应收账款 1 / 十二、其他应收款 2）。
+        #    🔴 别把这 9 写成 `EXPECTED_PARENT_CHAPTER_UNMARKED`（= 0）的对偶：前者是
+        #    「母公司章里可扩位行总数」，后者是「其中仍按 data 的条数」，两个分母不同。
+        assert seen == 9, (
+            f"母公司章可扩位行应为 9 行（本轮新标 4 + 同构复制带来 5），实为 {seen}"
+            "（扫描面变化 → 上面的逐行断言可能已空转）"
+        )
+        parent_data_left = 0
+        for variant in VARIANTS:
+            for num, _ti, _n, _ri, row in _iter_rows(templates[variant]):
+                if MARKERS_MOD.match_label_marker(row.get("label")) is None:
+                    continue
+                scope = PROBE.classify_section(
+                    section_number=num, variant=variant,
+                    parent_sections=parents, registry_sections=registry,
+                )
+                if scope == PROBE.SCOPE_PARENT and str(row.get("row_type") or "") == "data":
+                    parent_data_left += 1
+        assert parent_data_left == EXPECTED_PARENT_CHAPTER_UNMARKED, (
+            f"母公司章仍按 data 的可扩位行应为 {EXPECTED_PARENT_CHAPTER_UNMARKED}，"
+            f"实为 {parent_data_left}"
         )
 
     @pytest.mark.parametrize("variant", VARIANTS)

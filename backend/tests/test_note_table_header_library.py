@@ -26,6 +26,36 @@ def _soe_section(code: str) -> list[dict]:
     return copy.deepcopy(sec["tables"])
 
 
+#: 真库旧附注里还在、种子已删的两张表（R8.4 批 9b-2，2026-10-25：底稿 D1 国企没有，是 Word 同步复制出的重复表）——
+#: 无期间主表（表头同「（期末数）」那张）与名为「（续）」的单项计提表（列与分类表完全不同，取自删前种子原样）。
+_LEGACY_PLAIN_MAIN = "按坏账准备计提方法分类披露应收票据"
+_LEGACY_PLAIN_CONT = {
+    "name": "按坏账准备计提方法分类披露应收票据（续）",
+    "headers": ["名称", "账面余额", "坏账准备", "预期信用损失率(%)", "计提理由"],
+    "rows": [{"label": "", "row_type": "data"}] * 3 + [{"label": "合计", "is_total": True, "row_type": "total"}],
+    "columns": [
+        {"key": "label", "label": "名称", "is_label": True, "flat": True},
+        {"key": "balance", "label": "账面余额", "format": "amount"},
+        {"key": "provision", "label": "坏账准备", "format": "amount"},
+        {"key": "loss_rate", "label": "预期信用损失率(%)", "format": "percent"},
+        {"key": "basis", "label": "计提理由", "format": "text"},
+    ],
+}
+
+
+def _soe_receivable_tables() -> list[dict]:
+    """「八、4 应收票据」种子表补回上面两张，顺序同删前种子：分类 / （期末数） / 无期间主表 / （续：期初数） / （续） / 其余。
+
+    真库同一章节并存三种组合（无期间主表 + 续期初 + 续 / 期末数 + 续期初 / 两种都有），由下面各用例按下标取。
+    """
+    t = _soe_section("八、4")
+    assert [x["name"] for x in t[1:3]] == [
+        "按坏账准备计提方法分类披露应收票据（期末数）", "按坏账准备计提方法分类披露应收票据（续：期初数）",
+    ], "种子「八、4」表序变了，按新表序重排本函数"
+    plain = {**copy.deepcopy(t[1]), "name": _LEGACY_PLAIN_MAIN}
+    return [t[0], t[1], plain, t[2], copy.deepcopy(_LEGACY_PLAIN_CONT), *t[3:]]
+
+
 class TestContinuationName:
     @pytest.mark.parametrize("name", [
         "续：", "续（1）：", "续表", "（续）", "按坏账准备计提方法分类披露应收票据（续：期初数）",
@@ -144,7 +174,7 @@ class TestColumnKeys:
 
 class TestContinuationLinks:
     def test_period_split_is_column_continuation(self):
-        tables = _soe_section("八、4")
+        tables = _soe_receivable_tables()
         links = L.continuation_links([tables[0], tables[1], tables[3]])
         assert set(links) == {2}
         assert (links[2].of, links[2].kind, links[2].via) == (1, "columns", "base")
@@ -314,7 +344,7 @@ class TestMatchColumns:
 class TestChooseUnit:
     @pytest.mark.parametrize("combo", ["both", "no_period_primary", "end_primary"])
     def test_real_receivable_note_combos(self, combo):
-        t = _soe_section("八、4")
+        t = _soe_receivable_tables()
         tables = {
             "both": t,
             "no_period_primary": [t[0], t[2], t[3], t[4], *t[5:]],

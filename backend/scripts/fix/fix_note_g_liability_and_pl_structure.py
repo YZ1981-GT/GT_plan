@@ -16,9 +16,12 @@ seed 路径走 `note_sub_table_projector._infer_groups_from_headers` 前缀推�
 
 章节与表结构：
 
-- **G10 交易性金融负债**
-  - Listed §五、34：3 tables，主表 5 列（项目/期初余额/本期增加/本期减少/期末余额）
-  - Soe §八、34：2 tables，主表 3 列（项目/期末公允价值/期初公允价值）
+- **G10 交易性金融负债**（逐表按底稿 G10 两张披露 sheet，R8.4 批 9b-2）
+  - Listed §五、34：3 tables —— 主表 5 列（项目/期初余额/本期增加/本期减少/期末余额）、
+    指定类明细 4 列（项目/期初余额/期末余额/指定的理由和依据）、公允价值变动 4 列
+    （项目/2025年公允价值变动额/因自身信用风险变动引起的公允价值本年变动额/…累计变动额）
+  - Listed §五、35：1 table，3 列（项目/期末余额/上年年末余额）
+  - Soe §八、34：2 tables —— 主表 3 列（项目/期末公允价值/期初公允价值）、公允价值变动 4 列
 
 - **G11 投资收益**
   - Listed §五、69：2 tables，主表 3 列（项目/本期发生额/上期发生额）
@@ -46,10 +49,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _note_structure_kit import (  # noqa: E402
     AMOUNT,
+    TEXT,
     build_cli,
+    data_row,
     flat_columns,
     rule,
     run_section,
+    total_row,
 )
 
 _BACKEND = Path(__file__).resolve().parent.parent.parent
@@ -82,23 +88,89 @@ GUIDANCE_G14 = (
 # ═══════════════════════════ G10 交易性金融负债 ═══════════════════════════
 
 G10_LISTED_SECTION = "五、34"
+G10_LISTED_DERIVATIVE_SECTION = "五、35"
 G10_SOE_SECTION = "八、34"
 
-# Listed: 5 列主表（同结构用于3张表）
-_G10_LISTED_COLS = flat_columns([
+# 🔴 逐表定列（R8.4 批 9b-2，2026-10-24）：原先运行时读出本节全部表名、把主表列套给每一张 ⇒ 上市「指定为…理由和
+#    依据」表成了变动表（底稿第 18 行是 期初余额 | 期末余额 | 指定的理由和依据）、两版「公允价值的变动情况」表成了
+#    变动表 / 余额表（底稿上市第 26 行、国企第 18 行是 公允价值变动额 | 因自身信用风险变动引起的公允价值本年变动额 |
+#    …累计变动额），对齐白名单只能整表豁免。列与两版 Word 原表头一致；列键 = 前端载荷 g10DisclosureSyncPayload.ts。
+#    表名逐字取模板（= 两版 Word 原文）：上市写 2025 年、国企写 202X 年。表名是模板表的标识、不随审计年度变，审计
+#    年度只体现在前端推送的列名里（原先前端按审计年度拼表名，国企恒对不上模板、上市跨年对不上）。
+G10_LISTED_MAIN_TABLE = "交易性金融负债"
+G10_LISTED_DESIGNATED_TABLE = (
+    "1、对于指定为以公允价值计量且其变动计入当期损益的金融负债，应单独列示期初余额、期末余额，并披露指定的理由和依据。"
+)
+G10_LISTED_FV_TABLE = "对于指定为以公允价值计量且其变动计入当期损益的金融负债，2025年公允价值的变动情况如下表所示："
+#: 单表章节，表名 = 章节名（与国企 八、35 同）。5914e315b（Word 同步）把它换成了表前的 15 号文提示段（提示段本就在
+#: guidance 里），前端一直推「衍生金融负债」⇒ 别名改回（R8.4 批 9b-2）
+G10_LISTED_DERIVATIVE_TABLE = "衍生金融负债"
+_G10_LISTED_DERIVATIVE_DAMAGED = (
+    "（15号文第二十条（三），分类列示衍生金融负债期初余额、期末余额，披露其形成的原因以及相关会计处理。）"
+)
+G10_SOE_MAIN_TABLE = "交易性金融负债"
+G10_SOE_FV_TABLE = "对于指定为以公允价值计量且其变动计入当期损益的金融负债，202X年公允价值的变动情况如下表所示："
+
+_G10_LISTED_MAIN_COLS = flat_columns([
     ("label", "项目", None),
     ("begin_balance", "期初余额", AMOUNT),
     ("current_increase", "本期增加", AMOUNT),
     ("current_decrease", "本期减少", AMOUNT),
     ("end_balance", "期末余额", AMOUNT),
 ])
-
-# Soe: 3 列主表（同结构用于2张表）
-_G10_SOE_COLS = flat_columns([
+_G10_LISTED_DESIGNATED_COLS = flat_columns([
+    ("label", "项目", None),
+    ("begin_balance", "期初余额", AMOUNT),
+    ("end_balance", "期末余额", AMOUNT),
+    ("designation_reason", "指定的理由和依据", TEXT),
+])
+_G10_LISTED_DERIVATIVE_COLS = flat_columns([
+    ("label", "项目", None),
+    ("end_balance", "期末余额", AMOUNT),
+    ("prior_balance", "上年年末余额", AMOUNT),
+])
+_G10_SOE_MAIN_COLS = flat_columns([
     ("label", "项目", None),
     ("end_fv", "期末公允价值", AMOUNT),
     ("begin_fv", "期初公允价值", AMOUNT),
 ])
+
+
+def _g10_fv_cols(year_text: str) -> list[dict]:
+    """公允价值变动表（两版同构，首个金额列名带 Word 原文年份）。"""
+    return flat_columns([
+        ("label", "项目", None),
+        ("fv_change_amount", f"{year_text}年公允价值变动额", AMOUNT),
+        ("credit_risk_current", "因自身信用风险变动引起的公允价值本年变动额", AMOUNT),
+        ("credit_risk_cumulative", "因自身信用风险变动引起的公允价值累计变动额", AMOUNT),
+    ])
+
+
+#: 主表行按底稿（上市第 8~15 行 / 国企第 8~14 行）：两组「其中」各带父行（底稿 B8 = B9+B10+B11 求和）。
+#: 原先上市是 Word 的空「其中：」占位行，国企缺「衍生金融负债」与指定类下的「其他」
+_G10_LISTED_MAIN_ROWS = [
+    data_row("交易性金融负债"),
+    data_row("其中：发行的交易性债券"),
+    data_row("衍生金融负债"),
+    data_row("其他"),
+    data_row("指定为以公允价值计量且其变动计入当期损益的金融负债"),
+    data_row("其中：债券"),
+    data_row("其他"),
+    total_row("合计"),
+]
+_G10_SOE_MAIN_ROWS = [
+    data_row("交易性金融负债"),
+    data_row("其中：发行的交易性债券"),
+    data_row("衍生金融负债"),
+    data_row("其他"),
+    data_row("指定为以公允价值计量且其变动计入当期损益的金融负债"),
+    data_row("其他"),
+    total_row("合计"),
+]
+GUIDANCE_G10_DERIVATIVE = (
+    "（提示：企业衍生金融工具业务具有重要性的，单独披露衍生金融负债。）\n"
+    "（15号文第二十条（三），分类列示衍生金融负债期初余额、期末余额，披露其形成的原因以及相关会计处理。）"
+)
 
 # ═══════════════════════════ G11 投资收益 ═══════════════════════════
 
@@ -136,14 +208,27 @@ _G14_COLS = flat_columns([
 
 # ═══════════════════════════ 章节计划 ═══════════════════════════
 
-def _g10_listed_plan(tables: list[str]) -> list[dict]:
-    """G10 Listed 五、34：3 tables，全部使用相同 5 列结构。"""
-    return [rule(name, _G10_LISTED_COLS, None, GUIDANCE_G10) for name in tables]
+def _g10_listed_plan(_tables: list[str]) -> list[dict]:
+    """G10 Listed 五、34：主表 + 指定类明细 + 公允价值变动（逐表定列，见 G10 常量注释）。"""
+    return [
+        rule(G10_LISTED_MAIN_TABLE, _G10_LISTED_MAIN_COLS, _G10_LISTED_MAIN_ROWS, GUIDANCE_G10),
+        rule(G10_LISTED_DESIGNATED_TABLE, _G10_LISTED_DESIGNATED_COLS, None, GUIDANCE_G10),
+        rule(G10_LISTED_FV_TABLE, _g10_fv_cols("2025"), None, GUIDANCE_G10),
+    ]
 
 
-def _g10_soe_plan(tables: list[str]) -> list[dict]:
-    """G10 Soe 八、34：2 tables，全部使用相同 3 列结构。"""
-    return [rule(name, _G10_SOE_COLS, None, GUIDANCE_G10) for name in tables]
+def _g10_listed_derivative_plan(_tables: list[str]) -> list[dict]:
+    """G10 Listed 五、35 衍生金融负债：列键随前端载荷（原为列名当键）。"""
+    return [rule(G10_LISTED_DERIVATIVE_TABLE, _G10_LISTED_DERIVATIVE_COLS, None, GUIDANCE_G10_DERIVATIVE,
+                 aliases=[_G10_LISTED_DERIVATIVE_DAMAGED])]
+
+
+def _g10_soe_plan(_tables: list[str]) -> list[dict]:
+    """G10 Soe 八、34：主表 + 公允价值变动（逐表定列）。"""
+    return [
+        rule(G10_SOE_MAIN_TABLE, _G10_SOE_MAIN_COLS, _G10_SOE_MAIN_ROWS, GUIDANCE_G10),
+        rule(G10_SOE_FV_TABLE, _g10_fv_cols("202X"), None, GUIDANCE_G10),
+    ]
 
 
 def _g11_listed_plan(tables: list[str]) -> list[dict]:
@@ -199,6 +284,8 @@ _LABELS: dict[str, str] = {}
 # 按章节键注册：{cycle}_{variant}
 _CHAPTER_DEFS: list[tuple[str, str, Path, str, object]] = [
     ("g10_listed", "G10 交易性金融负债（上市 §五、34）", LISTED_PATH, G10_LISTED_SECTION, _g10_listed_plan),
+    ("g10_listed_derivative", "G10 衍生金融负债（上市 §五、35）", LISTED_PATH, G10_LISTED_DERIVATIVE_SECTION,
+     _g10_listed_derivative_plan),
     ("g10_soe", "G10 交易性金融负债（国企 §八、34）", SOE_PATH, G10_SOE_SECTION, _g10_soe_plan),
     ("g11_listed", "G11 投资收益（上市 §五、69）", LISTED_PATH, G11_LISTED_SECTION, _g11_listed_plan),
     ("g11_soe", "G11 投资收益（国企 §八、70）", SOE_PATH, G11_SOE_SECTION, _g11_soe_plan),
@@ -207,6 +294,16 @@ _CHAPTER_DEFS: list[tuple[str, str, Path, str, object]] = [
     ("g14_listed", "G14 信用减值损失（上市 §五、76）", LISTED_PATH, G14_LISTED_SECTION, _g14_listed_plan),
     ("g14_soe", "G14 信用减值损失（国企 §八、73）", SOE_PATH, G14_SOE_SECTION, _g14_soe_plan),
 ]
+
+
+#: 表名复位后要摘掉 `#### ` 前缀的段落（与 `aliases=[..._DAMAGED]` 成对，见
+#: `_note_structure_kit.untitleize_text_sections`）。5914e315b 把提示段当成了表名，之后有人给那条
+#: 提示段加了 `#### ` 当标题让「每张表都有小节标题」过关；表名复位后标题就多了一个，`disclosure_engine`
+#: 段落游标会多走一格、把后续提示段错配到别的表。受损前（5914e315b~1）它是普通正文段 ⇒ 摘回去
+#: （R8.4 批 9b-2，2026-10-25；逐条取证见 design §17.6）。
+_UNTITLE_AFTER_RESTORE: dict[str, list[str]] = {
+    "g10_listed_derivative": [_G10_LISTED_DERIVATIVE_DAMAGED],
+}
 
 
 def _runner(key: str, dry_run: bool, check: bool):
@@ -220,10 +317,12 @@ def _runner(key: str, dry_run: bool, check: bool):
                 path,
                 section_number,
                 plan,
-                table_names,
+                # 期望表名取计划本身：G10 逐表写死（缺表 / 改名 --check 报欠账），G11/G13/G14 仍按现有表名
+                [r["new_name"] for r in plan],
                 aligned_by=ALIGNED_BY,
                 dry_run=dry_run,
                 check=check,
+                untitle_text_sections=_UNTITLE_AFTER_RESTORE.get(key),
             )
     return [], [f"未知键：{key}"], []
 

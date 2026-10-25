@@ -65,6 +65,50 @@ def _load_json(path: Path) -> list | dict:
 #: 单体附注主章节（报表项目注释）：同名子表出现在多章时取它（母公司报表注释等不覆盖）
 _MAIN_CHAPTER = {"soe": "八", "listed": "五"}
 
+#: 合并表标题与单体表名说法不同、按名字认不出的对照：{口径: {合并表标题: (单体章节号, 单体表名)}}。
+#: 2026-10-25（R8.4 批 9b-2）：合并种子的表标题照搬合并 Word 表前那段文字（不少是编制提示句，或「期末本公司已质押…」
+#: 这类与底稿不同的说法）；单体表名按底稿披露表 / 前端推送名复位后（5914e315b 曾把单体表名同步成同一段 Word 文字、
+#: 上市 五、4 另有一组照搬 应收款项融资 的 Word 名重复表，两边才「同名」），这些表只能靠这里对上。
+#: 只补名字证据（加进表标题索引）：定章投票、章节内取表、续表跟随照常走 —— 同一合并标题在别章另有真同名表时
+#: （上市「期末本公司已质押的应收票据」五、6 也有）按本合并章节取。条目失效（合并标题 / 单体章节 / 表不在了）生成即报错。
+#: 国企 五-54-4「设定受益计划净负债（净资产）」不登记：单体按底稿是一张「设定受益计划情况」三组列合表，没有一一对应的表。
+_TITLE_ALIASES: dict[str, dict[str, tuple[str, str]]] = {
+    "listed": {
+        "期末本公司已质押的应收票据": ("五、4", "期末已质押的应收票据"),
+        "期末本公司已背书或贴现但尚未到期的应收票据": ("五、4", "期末已背书或贴现但尚未到期的应收票据"),
+        "期末本公司因出票人未履约而将其转应收账款的票据": ("五、4", "期末因出票人未履约而其转应收账款的票据"),
+        "按坏账计提方法分类": ("五、4", "按坏账计提方法分类（期末余额）"),
+        "按单项计提坏账准备的应收票据": ("五、4", "按单项计提坏账准备的应收票据（期末余额）"),
+        "转回或收回金额重要的坏账准备": ("五、4", "本期转回或收回金额重要的坏账准备"),
+        "如果企业经常贴现或背书信用等级较高的银行承兑的汇票，则其业务模式可能是既以收取合同现金流量为目标又以出售该金融资产"
+        "为目标，从而可能需要在“应收款项融资”项目列报。】": ("五、6", "应收款项融资"),
+        "（采用公允价值计量模式的投资性房地产，分类列示期初余额、期末余额和本期增减变动情况。）": (
+            "五、21", "按公允价值计量的投资性房地产"),
+        "（披露期末未办妥产权证书的固定资产账面价值及原因。）": ("五、22", "未办妥产权证书的固定资产情况"),
+        "⑥（按照《知识产权相关会计信息披露规定》（财会〔2018〕30号），应当单独披露对企业财务报表具有重要影响的单项无形资产的"
+        "内容、账面价值和剩余摊销期限。）": ("五、26", "重要单项无形资产"),
+        "资产组的可收回金额是依据管理层编制的五年期预测，采用未来现金流量折合现值计算。超过该五年期的现金流量采用以下所述的"
+        "估计增长率作出推算。采用未来现金流量折现方法所运用的假设主要包括：": ("五、28", "商誉减值测试关键假设"),
+        "业绩承诺完成及对应商誉减值情况如下：": ("五、28", "业绩承诺完成及商誉减值情况"),
+    },
+    "soe": {
+        "（1）商誉账面原值": ("八、29", "（1）商誉账面价值"),
+    },
+}
+
+
+def _add_title_aliases(template_type: str, consol_tables: list, singles: list[dict],
+                       by_table: dict[str, list[tuple[dict, str]]]) -> None:
+    """把 ``_TITLE_ALIASES`` 加进表标题索引；条目失效即报错（不静默放过对照表过期）。"""
+    titles = {_table_key(t.get("title")) for t in consol_tables}
+    by_number = {s.get("section_number"): s for s in singles}
+    for title, (number, name) in _TITLE_ALIASES.get(template_type, {}).items():
+        single = by_number.get(number)
+        if _table_key(title) not in titles or single is None or name not in {
+                t.get("name") for t in single.get("tables") or []}:
+            raise ValueError(f"合并↔单体表名对照失效（{template_type}）：「{title}」→ {number}「{name}」")
+        by_table.setdefault(_table_key(title), []).append((single, name))
+
 
 def _is_generic_continuation(title: str) -> bool:
     """「续：」这类只表示接上一张表的泛标题。"""
@@ -152,6 +196,7 @@ def generate(template_type: str) -> tuple[list[dict], Counter]:
             key = _table_key(t.get("name"))
             if key and not _is_generic_continuation(t.get("name", "")):
                 by_table.setdefault(key, []).append((s, t.get("name")))
+    _add_title_aliases(template_type, consol_tables, sorted_singles, by_table)
 
     # 按 section_title 索引单体（精确 + 规范化两份索引）——合并章节没有任何表标题命中时兜底
     single_exact: dict[str, dict] = {}

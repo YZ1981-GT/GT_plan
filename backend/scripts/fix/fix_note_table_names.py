@@ -8,7 +8,8 @@ spec: note-template-columns-and-legacy-snapshot-closure（Task 5）
 唯一动作
 --------
 改 ``sections[].tables[].name`` + 追加 ``tables[].legacy_aliases``（**只增不删**）
-+ 给被触及的 section 盖 ``_aligned_by``。
++ 给被触及的 section 盖 ``_aligned_by``。另有静态清单 ``RESTORES``：把被 Word 同步改坏的表名按整组快照
+复位（不追加 alias，见该常量注释）。
 
 **不动** ``rows`` / ``headers`` / ``columns`` / ``guidance``（行集与列元数据分别归
 per-cycle spec 与本 spec 的 Wave 3）。
@@ -37,6 +38,7 @@ per-cycle spec 与本 spec 的 Wave 3）。
 from __future__ import annotations
 
 import argparse
+import copy
 import importlib.util
 import json
 import re
@@ -62,6 +64,62 @@ FRONTEND_MAPS = (
 ALIGNED_BY = "note-template-columns-and-legacy-snapshot-closure"
 VARIANTS = ("listed", "soe")
 _HTML_RE = re.compile(r"<[^>]+>")
+
+# 表名整组复位（R8.4 批 9b-2，2026-10-25）：5914e315b 的 Word 同步把本脚本名下两节的表名改成了 Word 表前的
+# 提示段 / 错一位的小节标题（五、74 T3 成了 T2 的名字、T4 成了 T3 的名字）。按 section_id 登记（受损快照, 目标），
+# 经 ``KIT.restore_table_names`` 只在表名序列恰为受损快照时改，已复位或被人改过都不动。目标 = 5914e315b 之前
+# 的表名（逐字核对过）。🔴 不追加 legacy_aliases：五、74 T3 的受损名就是 T2 的真名，登记即撞名（Property 8）；
+# 旧库快照读时由 ``note_table_enrichment`` 按位置回填模板表名。不重跑真源生成器：它会顺带改错别处的表名。
+_LEASE_UNDISCOUNTED = (
+    "②资产负债表日后连续五个会计年度每年将收到的未折现租赁收款额，以及剩余年度将收到的未折现租赁收款额总额"
+)
+_LEASE_RECONCILE = "③未折现租赁收款额与租赁投资净额的调节表"
+RESTORES: dict[str, dict[str, tuple[list[str], list[str]]]] = {
+    "listed": {
+        # 五、3：单表节按章节名命名；G1 前端一直推「衍生金融资产」，国企 八、3 同名
+        "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yan-sheng-jin-rong-zi-chan": (
+            ["（提示：企业衍生金融工具业务具有重要性的，单独披露衍生金融资产。）"],
+            ["衍生金融资产"],
+        ),
+        # 五、74：T0 / T3 / T4 受损，T1 / T2 / T5 未动（T5 比 T2 多一个句号，是经营租赁那张）
+        "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-zu-lin": (
+            [
+                "（公司作为承租人的租赁，应披露未纳入租赁负债计量的可变租赁付款额、简化处理的短期租赁费用和"
+                "低价值资产租赁费用、与租赁相关的现金流出总额等相关信息。涉及售后租回交易的，应披露是否满足"
+                "销售及其判断依据。）",
+                "①销售损益、租赁投资净额的融资收益以及与未纳入租赁投资净额的可变租赁付款额相关的收入",
+                _LEASE_UNDISCOUNTED,
+                _LEASE_UNDISCOUNTED,
+                _LEASE_RECONCILE,
+                _LEASE_UNDISCOUNTED + "。",
+            ],
+            [
+                "作为承租人",
+                "①销售损益、租赁投资净额的融资收益以及与未纳入租赁投资净额的可变租赁付款额相关的收入",
+                _LEASE_UNDISCOUNTED,
+                _LEASE_RECONCILE,
+                "①租赁收入",
+                _LEASE_UNDISCOUNTED + "。",
+            ],
+        ),
+    },
+}
+
+# 表名复位后要摘掉 `#### ` 前缀的段落（与 `RESTORES` 成对，R8.4 批 9b-2，2026-10-25）。
+# 5914e315b 把提示段当成表名后，有人给那条提示段加了 `#### ` 当标题，让「每张表都有小节标题」类守卫过关；
+# 表名复位后一节里标题比表多一个 ⇒ `disclosure_engine` 段落游标多走一格、把后续提示段错配到别的表
+# （H1 五、22 实测打红 `test_listed_cursor_inference_leaves_gaps_and_misattribution`）。
+# 🔴 **独立于复位是否还需要做**：复位早已落盘时上面的循环会 `continue`，摘前缀仍须执行 ⇒ 单独一轮、
+# 幂等（`KIT.untitleize_text_sections` 只动 `#` 开头且正文逐字命中的段）。
+# 只登记「受损前是普通正文段」的那几条；受损前**就是**标题的（五、28 业绩承诺 / 五、31 / 八、29 / 八、32 /
+# 八、54）一律不动 —— 逐条取证见 design §17.6。
+UNTITLE_AFTER_RESTORE: dict[str, dict[str, list[str]]] = {
+    "listed": {
+        "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yan-sheng-jin-rong-zi-chan": [
+            "（提示：企业衍生金融工具业务具有重要性的，单独披露衍生金融资产。）",
+        ],
+    },
+}
 
 
 def _kit():
@@ -207,6 +265,40 @@ def run_variant(
                 tables[idx].update(patch or {})
                 touched_sections.add(section_number)
 
+    restores = RESTORES.get(variant, {})
+    for section_id, (damaged, target) in restores.items():
+        section = by_id.get(section_id)
+        if section is None:
+            warnings.append(f"[{variant}] 章节不存在：{section_id} → 跳过复位")
+            continue
+        names = [str(t.get("name") or "") for t in (section.get("tables") or [])]
+        if names == list(target):
+            continue
+        if names != list(damaged):
+            drifts.append(
+                f"[{variant}] {section.get('section_number')} 表名序列既非受损快照也非目标 → 跳过复位（需重新核对）"
+            )
+            continue
+        # dry-run / check 在副本上复位，只为拿到与写盘一致的变更清单
+        lines = KIT.restore_table_names(section if apply else copy.deepcopy(section), (damaged, target))
+        changes.extend(f"[{variant}] {section.get('section_number')} {x} (restore, basis=5914e315b)" for x in lines)
+        if apply and lines:
+            touched_sections.add(section_id)
+
+    # 摘掉当初为受损表名加的 `#### ` 前缀 —— 与上面的复位成对，但**不依赖**复位本轮是否发生
+    # （复位已落盘时上面会 continue）。幂等，见 `UNTITLE_AFTER_RESTORE` 注释。
+    for section_id, paragraphs in UNTITLE_AFTER_RESTORE.get(variant, {}).items():
+        section = by_id.get(section_id)
+        if section is None:
+            warnings.append(f"[{variant}] 章节不存在：{section_id} → 跳过摘标题前缀")
+            continue
+        lines = KIT.untitleize_text_sections(
+            section if apply else copy.deepcopy(section), paragraphs
+        )
+        changes.extend(f"[{variant}] {section.get('section_number')} {x}" for x in lines)
+        if apply and lines:
+            touched_sections.add(section_id)
+
     if apply and touched_sections:
         for section_number in sorted(touched_sections):
             section = by_id.get(section_number)
@@ -215,7 +307,7 @@ def run_variant(
 
     # 落地后校验：唯一性 + alias 不撞名
     post_errors: list[str] = []
-    for section_number in plans:
+    for section_number in [*plans, *restores]:
         section = by_id.get(section_number)
         if section is None:
             continue

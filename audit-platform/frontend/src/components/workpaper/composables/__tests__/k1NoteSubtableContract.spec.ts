@@ -95,26 +95,28 @@ describe('附注 §五、8 / §八、9 结构要求', () => {
     }
   })
 
-  it('国企三阶段变动表同步列头 / 分组与附注模板同表逐位一致（阶段名作分组、释义作列名）', () => {
-    // 下面「同步 columns 与模板 headers 逐位同形」逐表比到第一张不一致的表即停（上市侧有同义写法的既有差异），
-    // 到不了这张表 ⇒ 单独比：seed（模板）与同步（这里）须同形
-    const name = K1_SOE_SUBTABLE.eclMovement
-    const tbl = templateTable('soe', K1_NOTE_SECTION.soe, name)
-    expect(tbl, `模板缺表 ${name}`).toBeDefined()
-    const cols = K1_SOE_COLUMNS[name]
-    expect(cols.map((c) => c.label)).toEqual(tbl!.headers)
-    expect(deriveColumnGroups(cols)).toEqual(tbl!._column_groups ?? null)
-    expect(deriveColumnGroups(cols)).toEqual([
-      { group: '第一阶段', start: 1, span: 1 },
-      { group: '第二阶段', start: 2, span: 1 },
-      { group: '第三阶段', start: 3, span: 1 },
-    ])
-  })
+  it.each([K1_SOE_SUBTABLE.eclMovement, K1_SOE_SUBTABLE.balanceMovement])(
+    '国企三阶段变动表「%s」同步列头 / 分组与附注模板同表逐位一致（阶段名作分组、释义作列名）',
+    (name) => {
+      // 下面「同步 columns 与模板 headers 逐位同形」逐表比到第一张不一致的表即停（上市侧有同义写法的既有差异），
+      // 到不了这两张表 ⇒ 单独比：seed（模板）与同步（这里）须同形。源 xlsx A63:E63 / A77:E77 同一写法
+      // （一格里先写阶段名再写释义）—— 账面余额变动表 R8.4 批 9b-2 回到 §八、9，与坏账准备变动表同一落法。
+      const tbl = templateTable('soe', K1_NOTE_SECTION.soe, name)
+      expect(tbl, `模板缺表 ${name}`).toBeDefined()
+      const cols = K1_SOE_COLUMNS[name]
+      expect(cols.map((c) => c.label)).toEqual(tbl!.headers)
+      expect(deriveColumnGroups(cols)).toEqual(tbl!._column_groups ?? null)
+      expect(deriveColumnGroups(cols)).toEqual([
+        { group: '第一阶段', start: 1, span: 1 },
+        { group: '第二阶段', start: 2, span: 1 },
+        { group: '第三阶段', start: 3, span: 1 },
+      ])
+    },
+  )
 
   it('源模板单级的表必须显式 flat 且无 _column_groups（反向锁死，防被误加两级）', () => {
     const flatTables = [
       K1_SOE_SUBTABLE.aging,          // 源 xlsx A6:C15 = 账 龄 / 期末数 / 期初数
-      K1_SOE_SUBTABLE.balanceMovement,
     ]
     for (const name of flatTables) {
       const tbl = (soeSection.tables ?? []).find((t) => t.name === name)

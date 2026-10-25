@@ -211,7 +211,7 @@ describe('规则③ 国企 noteSectionId 逐条存在于 note_template_soe.json 
     expect(
       allSectionNumbers.has(sid),
       `"${sid}" 不在 note_template_soe.json 的 section_number 集合中。\n` +
-        `可能是 md 截断值不匹配，请核实模板真实 section_number`,
+        `请核实模板真实 section_number（七 章节是全称；旧的 10 字截断值只登记在 legacy_section_numbers）`,
     ).toBe(true)
   })
 })

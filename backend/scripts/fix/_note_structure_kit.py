@@ -35,6 +35,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable
 
+_HERE_DIR = Path(__file__).resolve().parent
 _BACKEND_ROOT = Path(__file__).resolve().parents[2]
 if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
@@ -443,86 +444,49 @@ def apply_plan(section: dict[str, Any], plan: list[dict[str, Any]]) -> tuple[lis
     return changes, warnings
 
 
-# ─────────────── text_sections 标题化（裸表名不得当正文）───────────────
+# ─────────────── text_sections（标题化 / 去标题化 / 补段）───────────────
+#
+# 🔴 整段已拆到伴生模块 `_note_text_sections.py`（R8.4 批 9b-2）：本会话给 kit 加了三个共享
+#    helper 后它越过 800 行门禁，而 HEAD 上它是 761 行（在限内）⇒ 不该靠白名单放过，按门禁
+#    提示拆伴生模块。下面逐名 re-export，`KIT.titleize_text_sections` 这类既有调用逐字不变。
+#    载入方式两种都要兼容：调用方有的 `sys.path.insert(fix 目录)` 后 import 本 kit，有的用
+#    `importlib` 按路径 _load ——后者不会把 fix 目录放进 sys.path，故这里自己补。
+if str(_HERE_DIR) not in sys.path:
+    sys.path.insert(0, str(_HERE_DIR))
 
-# 与后端 `disclosure_engine._NUMBERED_TITLE_RE` 同口径（`（N）xxx` / `N. xxx`）
-_NUMBERED_TITLE_RE = re.compile(r"^(?:（(\d+)）|(\d+)[.、])")
+from _note_text_sections import (  # noqa: E402
+    ensure_text_sections,
+    find_bare_table_name_paragraphs,
+    is_title_paragraph,
+    missing_text_sections,
+    titleize_text_sections,
+    untitleize_text_sections,
+)
 
 
-def is_title_paragraph(para: str) -> bool:
-    """复刻 `disclosure_engine._is_table_title_paragraph`（stdlib-only，供 --check 独立跑）。"""
-    s = (para or "").strip()
-    if not s:
-        return False
-    if s.startswith("#"):
-        return True
-    if len(s) > 20:
-        return False
-    return bool(_NUMBERED_TITLE_RE.match(s))
+def ensure_legacy_section_numbers(section: dict[str, Any], olds: list[str]) -> list[str]:
+    """补登记本节的旧编号（只追加缺的，幂等）。旧编号是 ``note_section_catalog.normalize_section_code``
+    的别名：库内旧行、旧公式、前端旧映射经它仍能解析；``migrate/rename_note_section_codes.py`` 按它换掉
+    数据文件与代码里的旧编号。"""
+    have = list(section.get("legacy_section_numbers") or [])
+    add = [o for o in olds or [] if o and o != section.get("section_number") and o not in have]
+    if add:
+        section["legacy_section_numbers"] = have + add
+    return [f"legacy_section_numbers：登记旧编号「{o}」" for o in add]
 
 
-def titleize_text_sections(section: dict[str, Any]) -> list[str]:
-    """把 `text_sections` 里的**裸表名**加上 `#### ` 前缀，返回变更说明。"""
-    paras = section.get("text_sections")
-    if not isinstance(paras, list):
+def restore_table_names(section: dict[str, Any], rename: tuple[list[str], list[str]] | None) -> list[str]:
+    """表名整组复位 ``rename = (错位快照, 目标)``：本节表名序列恰为错位快照时逐位改成目标，其余情形不动（已复位 /
+    人工改过都不猜）。错位是轮换（A→B、B→C…），``apply_plan`` 逐张改名会被重名闸挡住，故先整组改。"""
+    if not rename:
         return []
-    names = {str(t.get("name", "")).strip() for t in (section.get("tables") or [])}
-    changes: list[str] = []
-    out: list[str] = []
-    for p in paras:
-        s = str(p)
-        stripped = s.strip()
-        if stripped in names and not is_title_paragraph(s):
-            out.append(f"#### {stripped}")
-            changes.append(f"text_sections：裸表名「{stripped}」→ 加 #### 前缀（不再当正文渲染）")
-        else:
-            out.append(s)
-    if changes:
-        section["text_sections"] = out
-    return changes
-
-
-def missing_text_sections(section: dict[str, Any], required: list[str]) -> list[str]:
-    """返回 `required` 里尚不存在于 `text_sections` 的段落（按 strip 后逐字比对）。"""
-    paras = section.get("text_sections")
-    existing = {str(p).strip() for p in (paras if isinstance(paras, list) else [])}
-    return [r for r in (required or []) if str(r).strip() not in existing]
-
-
-def ensure_text_sections(section: dict[str, Any], required: list[str]) -> list[str]:
-    """确保 `required` 段落存在 —— **缺失则按序追加到末尾**，已有的一律不动。幂等。
-
-    与 `run_section(text_sections=...)` 的**整表替换**语义不同：这里是「补齐缺段」，
-    用于「源模板有某小节说明、模板 JSON 漏了」的场景（如 K1 上市 ⑧⑨⑩ 三节），
-    避免为补 3 段而手抄整份 47 段（手抄错字会被脚本写回模板，风险远大于收益）。
-
-    ⚠️ 正文段**不要**带 `#### ` 前缀 —— `disclosure_engine._is_table_title_paragraph`
-    见 `#` 即判为标题，标题本身不进任何输出 → 实质披露正文会被静默丢弃。
-    """
-    paras = section.get("text_sections")
-    paras = list(paras) if isinstance(paras, list) else []
-    existing = {str(p).strip() for p in paras}
-    changes: list[str] = []
-    for r in required or []:
-        key = str(r).strip()
-        if not key or key in existing:
-            continue
-        paras.append(r)
-        existing.add(key)
-        changes.append(f"text_sections：追加「{key[:24]}…」")
-    if changes:
-        section["text_sections"] = paras
-    return changes
-
-
-def find_bare_table_name_paragraphs(section: dict[str, Any]) -> list[str]:
-    """返回仍会被当正文渲染的裸表名段落（供 validate / 测试）。"""
-    names = {str(t.get("name", "")).strip() for t in (section.get("tables") or [])}
-    return [
-        str(p).strip()
-        for p in (section.get("text_sections") or [])
-        if str(p).strip() in names and not is_title_paragraph(str(p))
-    ]
+    damaged, target = rename
+    tables = section.get("tables") or []
+    if len(damaged) != len(target) or [str(t.get("name", "")) for t in tables] != list(damaged):
+        return []
+    for tbl, new in zip(tables, target):
+        tbl["name"] = new
+    return [f"表名整组复位：「{a}」→「{b}」" for a, b in zip(damaged, target) if a != b]
 
 
 def stamp(section: dict[str, Any], aligned_by: str) -> None:
@@ -593,9 +557,12 @@ def validate_section(
                     f"[{i}] {name} group 含 '/'（多级）→ 前端 activeTableColumns 只认扁平"
                     " {group,start,span}，树形会渲染崩"
                 )
+            # 文字列不查重名：底稿本身就有同名文字列（L3 长期借款「期末余额 | 利率区间 | 上年年末余额 | 利率区间」），
+            # 加期别前缀即杜撰；按列名取数只取金额 / 比例列，文字列同名不会取错期间（R8.4 批 9b-2）
             by_group: dict[str, list[str]] = {}
             for c in cols[1:]:
-                by_group.setdefault(str(c.get("group") or ""), []).append(str(c.get("label")))
+                if c.get("format") != TEXT:
+                    by_group.setdefault(str(c.get("group") or ""), []).append(str(c.get("label")))
             for g, labels in by_group.items():
                 dup = {x for x in labels if labels.count(x) > 1}
                 if dup:
@@ -647,12 +614,17 @@ def run_section(
     drops: list[str] | None = None,
     text_sections: list[str] | None = None,
     require_text_sections: list[str] | None = None,
+    untitle_text_sections: list[str] | None = None,
+    legacy_section_numbers: list[str] | None = None,
+    rename: tuple[list[str], list[str]] | None = None,
 ) -> tuple[list[str], list[str], list[str]]:
     """处理单个章节，返回 `(changes, warnings, errs)`。
 
     `text_sections` = **整表替换**（目标清单即真源）；
     `require_text_sections` = **补齐缺段**（只追加缺的，已有段落不动）。两者可并用，
-    补齐在替换之后执行。
+    补齐在替换之后执行。`legacy_section_numbers` = 本节须登记的旧编号（只追加缺的）。
+    `rename` = 表名整组复位（见 ``restore_table_names``），在逐表计划之前执行。
+    `untitle_text_sections` = 摘 `#### ` 前缀（:func:`untitleize_text_sections`，与表名复位成对，早于 `titleize`）。
     """
     doc = json.loads(path.read_text(encoding="utf-8"))
     section = find_section(doc, section_number)
@@ -691,18 +663,20 @@ def run_section(
         # 由绿转红（专项应付款 2 处 `guidance` 文本欠账，属 L 循环 spec 作用域）——
         # 即本次补强暴露的是真欠账，不是引入新失败。
         probe = copy.deepcopy(section)
-        residual = drop_tables(probe, drops or [])
+        residual = drop_tables(probe, drops or []) + restore_table_names(probe, rename)
         probe_changes, _probe_warnings = apply_plan(probe, plan)
         residual += probe_changes
         if text_sections is not None and probe.get("text_sections") != list(text_sections):
             probe["text_sections"] = list(text_sections)
         residual += ensure_text_sections(probe, require_text_sections or [])
+        residual += untitleize_text_sections(probe, untitle_text_sections or [])
         residual += titleize_text_sections(probe)
+        residual += ensure_legacy_section_numbers(probe, legacy_section_numbers or [])
         for change in residual:
             errs.append(f"结构未对齐（headers/columns/rows/guidance）：{change}")
         return [], [], errs
 
-    changes = drop_tables(section, drops or [])
+    changes = drop_tables(section, drops or []) + restore_table_names(section, rename)
     plan_changes, warnings = apply_plan(section, plan)
     changes += plan_changes
     if text_sections is not None and section.get("text_sections") != text_sections:
@@ -710,7 +684,9 @@ def run_section(
         section["text_sections"] = list(text_sections)
         changes.append(f"text_sections：{old} → {len(text_sections)} 段")
     changes += ensure_text_sections(section, require_text_sections or [])
+    changes += untitleize_text_sections(section, untitle_text_sections or [])
     changes += titleize_text_sections(section)
+    changes += ensure_legacy_section_numbers(section, legacy_section_numbers or [])
     errs = validate_section(section, expected, forbidden_names=drops)
     if changes and not dry_run and not errs:
         stamp(section, aligned_by)

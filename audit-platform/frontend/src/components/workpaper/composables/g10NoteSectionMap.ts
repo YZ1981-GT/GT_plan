@@ -17,6 +17,42 @@ export const G10_DISCLOSURE_SHEET_NAME = {
   soe: '附注披露信息（国企）',
 } as const satisfies Record<G10DisclosureVariant, string>
 
+/**
+ * 子表名：逐字取 note_template §五、34 / §八、34（= 两版 Word 原文；守卫 g10NoteSubtableContract.spec.ts P1）。
+ *
+ * 公允价值变动表名是模板表的标识、不随审计年度变：上市版 Word 写「2025年」、国企版写「202X年」，审计年度只
+ * 体现在推送的列名里。原先按审计年度拼 `…${year}年公允价值的变动情况…` ⇒ 国企恒对不上模板、上市跨年对不上，
+ * 推成孤儿子表（R8.4 批 9b-2，2026-10-24）。
+ */
+export const G10_SUBTABLE = {
+  listed: {
+    trading: '交易性金融负债',
+    designated:
+      '1、对于指定为以公允价值计量且其变动计入当期损益的金融负债，应单独列示期初余额、期末余额，并披露指定的理由和依据。',
+    fvCredit: '对于指定为以公允价值计量且其变动计入当期损益的金融负债，2025年公允价值的变动情况如下表所示：',
+  },
+  soe: {
+    trading: '交易性金融负债',
+    fvCredit: '对于指定为以公允价值计量且其变动计入当期损益的金融负债，202X年公允价值的变动情况如下表所示：',
+  },
+} as const
+
+/**
+ * 上市 §五、35 衍生金融负债的子表名：单表章节，表名 = 章节名（与国企 八、35 同）。
+ * 表前的「（15号文…）」提示段在模板 guidance 里；5914e315b 曾把它写成表名，R8.4 批 9b-2 已在模板侧改回。
+ */
+export const G10_DERIVATIVE_SUBTABLE = {
+  listed: '衍生金融负债',
+} as const
+
+/** 旧载荷按审计年度拼的公允价值变动表名（两版同一写法）；与现名不同的随 `_removed_table_keys` 清掉 */
+export function g10LegacyFvCreditTableNames(current: string, auditYear: number | null): string[] {
+  const years = new Set([auditYear ?? new Date().getFullYear(), new Date().getFullYear()])
+  return [...years]
+    .map((y) => `对于指定为以公允价值计量且其变动计入当期损益的金融负债，${y}年公允价值的变动情况如下表所示：`)
+    .filter((name) => name !== current)
+}
+
 export { G10_ACCOUNT_CODE } from './g10Constants'
 
 function isListedStandard(s: string): boolean {

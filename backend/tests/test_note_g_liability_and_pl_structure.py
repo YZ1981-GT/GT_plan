@@ -3,12 +3,12 @@
 锁定 `fix_note_g_liability_and_pl_structure.py` 的对齐结果，防 md 重建 / 并发会话回退：
 
 - 幂等脚本 --check 返回 0 项欠账（exit code 0）；
-- 所有 12 张表 columns 非空、首列 flat=True；
-- 所有 12 张表 guidance 非空；
-- G11/G13/G14 列键一致（current_amount / prior_amount），G10 按变体区分。
+- 所有 13 张表 columns 非空、首列 flat=True；
+- 所有 13 张表 guidance 非空；
+- G11/G13/G14 列键一致（current_amount / prior_amount），G10 逐表按底稿（R8.4 批 9b-2：原先主表列套给本节每张表）。
 
 章节落点：
-  G10: listed 五、34 / soe 八、34
+  G10: listed 五、34 + 五、35（衍生金融负债）/ soe 八、34
   G11: listed 五、69 / soe 八、70
   G13: listed 五、75 / soe 八、72
   G14: listed 五、76 / soe 八、73
@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -58,6 +59,7 @@ def _get_section(path: Path, section_number: str) -> dict | None:
 # 章节映射：(path, section_number) per chapter key
 _CHAPTER_MAP: dict[str, tuple[Path, str]] = {
     "g10_listed": (LISTED_PATH, "五、34"),
+    "g10_listed_derivative": (LISTED_PATH, "五、35"),
     "g10_soe": (SOE_PATH, "八、34"),
     "g11_listed": (LISTED_PATH, "五、69"),
     "g11_soe": (SOE_PATH, "八、70"),
@@ -72,10 +74,15 @@ _CHAPTER_MAP: dict[str, tuple[Path, str]] = {
 
 
 def test_check_returns_zero_outstanding():
-    """幂等脚本 --check 应返回 0 项欠账。"""
+    """幂等脚本 --check 应返回 0 项欠账。
+
+    子进程输出按 UTF-8 读（同 test_note_m_equity_structure）：原写法 ``text=True`` 在 Windows 按 GBK 解码，脚本的
+    中文输出解码失败 ⇒ ``stdout`` 为 None、本用例恒红（HEAD 即红，R8.4 批 9b-2 修）。
+    """
     result = subprocess.run(
         [sys.executable, str(SCRIPT), "--check"],
-        capture_output=True, text=True, cwd=str(BACKEND),
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(BACKEND),
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
     )
     assert result.returncode == 0, f"--check failed:\n{result.stdout}\n{result.stderr}"
     assert "0 项欠账" in result.stdout
@@ -144,9 +151,21 @@ def test_property_12_guidance_nonempty(chapter_key: str):
 # G11/G13/G14 所有变体的非标签列键一律为 current_amount / prior_amount
 _CONSISTENT_AMOUNT_KEYS = ["current_amount", "prior_amount"]
 
-# G10 按变体区分
-_G10_LISTED_AMOUNT_KEYS = ["begin_balance", "current_increase", "current_decrease", "end_balance"]
-_G10_SOE_AMOUNT_KEYS = ["end_fv", "begin_fv"]
+#: G10 逐表（表名, 非标签列键）—— 与底稿 G10 两张披露 sheet、前端载荷 g10DisclosureSyncPayload.ts 一致。
+#: 原守卫断言「本节每张表都是主表列」，钉住的正是脚本把主表列套给每张表的缺陷（R8.4 批 9b-2）。
+_G10_FV_KEYS = ["fv_change_amount", "credit_risk_current", "credit_risk_cumulative"]
+_G10_TABLE_KEYS: dict[str, list[tuple[str, list[str]]]] = {
+    "g10_listed": [
+        (FIX.G10_LISTED_MAIN_TABLE, ["begin_balance", "current_increase", "current_decrease", "end_balance"]),
+        (FIX.G10_LISTED_DESIGNATED_TABLE, ["begin_balance", "end_balance", "designation_reason"]),
+        (FIX.G10_LISTED_FV_TABLE, _G10_FV_KEYS),
+    ],
+    "g10_listed_derivative": [(FIX.G10_LISTED_DERIVATIVE_TABLE, ["end_balance", "prior_balance"])],
+    "g10_soe": [
+        (FIX.G10_SOE_MAIN_TABLE, ["end_fv", "begin_fv"]),
+        (FIX.G10_SOE_FV_TABLE, _G10_FV_KEYS),
+    ],
+}
 
 
 @pytest.mark.parametrize("chapter_key", [
@@ -169,30 +188,35 @@ def test_property_13_g11_g13_g14_column_keys_consistent(chapter_key: str):
         )
 
 
-def test_property_13_g10_listed_column_keys():
-    """Property 13 补充：G10 上市主表列键为 begin_balance/current_increase/current_decrease/end_balance。"""
-    sec = _get_section(LISTED_PATH, "五、34")
+@pytest.mark.parametrize("chapter_key", sorted(_G10_TABLE_KEYS))
+def test_property_13_g10_tables_follow_workpaper(chapter_key: str):
+    """Property 13 补充：G10 逐表表名与列键按底稿（指定类明细、公允价值变动表不再套主表列）。"""
+    path, section_number = _CHAPTER_MAP[chapter_key]
+    sec = _get_section(path, section_number)
     assert sec is not None
-    tables = sec.get("tables") or []
-    for tbl in tables:
-        cols = tbl.get("columns") or []
-        amount_keys = [c.get("key") for c in cols[1:]]
-        assert amount_keys == _G10_LISTED_AMOUNT_KEYS, (
-            f"G10 listed/{tbl.get('name')} 金额列键不一致：{amount_keys}"
-        )
+    actual = [(t.get("name"), [c.get("key") for c in (t.get("columns") or [])[1:]]) for t in sec.get("tables") or []]
+    assert actual == _G10_TABLE_KEYS[chapter_key]
 
 
-def test_property_13_g10_soe_column_keys():
-    """Property 13 补充：G10 国企主表列键为 end_fv/begin_fv。"""
-    sec = _get_section(SOE_PATH, "八、34")
-    assert sec is not None
-    tables = sec.get("tables") or []
-    for tbl in tables:
-        cols = tbl.get("columns") or []
-        amount_keys = [c.get("key") for c in cols[1:]]
-        assert amount_keys == _G10_SOE_AMOUNT_KEYS, (
-            f"G10 soe/{tbl.get('name')} 金额列键不一致：{amount_keys}"
-        )
+def test_g10_main_rows_follow_workpaper():
+    """主表行按底稿：两组「其中」各带父行（上市不再是 Word 的空「其中：」占位，国企补「衍生金融负债」与指定类「其他」）。"""
+    for path, section_number, want in (
+        (LISTED_PATH, "五、34", ["交易性金融负债", "其中：发行的交易性债券", "衍生金融负债", "其他",
+                                 "指定为以公允价值计量且其变动计入当期损益的金融负债", "其中：债券", "其他", "合计"]),
+        (SOE_PATH, "八、34", ["交易性金融负债", "其中：发行的交易性债券", "衍生金融负债", "其他",
+                              "指定为以公允价值计量且其变动计入当期损益的金融负债", "其他", "合计"]),
+    ):
+        sec = _get_section(path, section_number)
+        assert sec is not None
+        assert [r.get("label") for r in sec["tables"][0]["rows"]] == want, section_number
+        assert sec["tables"][0]["rows"][-1].get("is_total") is True
+
+
+def test_g10_fv_table_names_keep_word_year_literal():
+    """公允价值变动表名逐字取两版 Word（上市 2025 年 / 国企 202X 年）：表名是模板表标识，前端按常量推送、不随审计年度拼。"""
+    assert "2025年" in FIX.G10_LISTED_FV_TABLE
+    assert "202X年" in FIX.G10_SOE_FV_TABLE
+    assert FIX.G10_LISTED_FV_TABLE.replace("2025年", "202X年") == FIX.G10_SOE_FV_TABLE
 
 
 # ═══════════════════════════ 表数量锚点（反向自检防空转） ═══════════════════════════
@@ -200,6 +224,7 @@ def test_property_13_g10_soe_column_keys():
 
 _EXPECTED_TABLE_COUNTS = {
     "g10_listed": 3,
+    "g10_listed_derivative": 1,
     "g10_soe": 2,
     "g11_listed": 2,
     "g11_soe": 1,

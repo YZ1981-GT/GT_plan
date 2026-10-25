@@ -52,6 +52,13 @@ def _note(*tables: dict) -> dict:
      [{"group": "期末余额", "start": 1, "span": 2}, {"group": "期初余额", "start": 3, "span": 2}],
      ["end_amount", "_col1", "prior_amount", "_col3"]),
     (["项目", "期末账面价值", "年初账面价值"], None, ["end_amount", "prior_amount"]),  # 底稿 K2 国企披露表的写法
+    # 列名自己写明期间的价值列（上市 五、18 长期股权投资）：「减值准备期初余额」是另一计量，不抢
+    (["被投资单位", "期初余额（账面价值）", "减值准备期初余额", "追加投资", "期末余额（账面价值）", "减值准备期末余额"],
+     [{"group": "本期增减变动", "start": 3, "span": 1}],
+     ["prior_amount", "_col1", "_col2", "end_amount", "_col4"]),
+    # 跨全部数据列的分组只是表的主题（国企 八、54 设定受益计划净负债）
+    (["项目", "期末数", "期初数"], [{"group": "计划资产的公允价值", "start": 1, "span": 2}],
+     ["end_amount", "prior_amount"]),
 ])
 def test_legacy_value_keys_follow_headers(headers, groups, expected):
     keys, note = nw.legacy_value_keys(_table(headers, groups=groups))
@@ -65,6 +72,9 @@ def test_legacy_value_keys_follow_headers(headers, groups, expected):
     (["项目", "期末折现率区间", "期初余额"], None, "期末", {"prior_amount": 1}),  # 含「期末」字样不是期末金额列
     (["项目", "本期增加", "上期发生额"], None, "期末", {"prior_amount": 1}),      # 含「本期」字样不是本期金额列
     (["项目", "期末余额", "期末余额"], None, "期末 / 期初", {}),                  # 两个期末列 + 没有期初列
+    # 余额与账面价值并列（国企 八、4 应收票据分类旧写法）：推账面余额还是账面价值定不了 ⇒ 不猜
+    (["票据种类", "期末余额", "坏账准备", "期末账面价值", "年初余额", "坏账准备", "年初账面价值"],
+     [{"group": "期末数", "start": 1, "span": 3}, {"group": "期初数", "start": 4, "span": 3}], "期末 / 期初", {}),
 ])
 def test_legacy_value_keys_refuse_to_guess(headers, groups, missing, mapped):
     keys, note = nw.legacy_value_keys(_table(headers, groups=groups))

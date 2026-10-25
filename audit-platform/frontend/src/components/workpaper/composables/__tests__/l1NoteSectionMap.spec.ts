@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
+  L1_LEGACY_OBSOLETE_TABLES,
+  L1_SUBTABLE,
   buildL1ListedColumns,
   buildL1SoeColumns,
   buildL1SyncPayload,
@@ -10,14 +12,13 @@ import type { ColumnDef } from '../disclosureColumnDefs'
 /**
  * L1 短期借款披露 columns 契约
  *
- * spec `disclosure-columns-coverage-rollout` design §批 1 列头清查 §2/§3（Task 5.1 实证）
- * 口径证据：源 `L 债务循环/L1 短期借款.xlsx` 两张披露 sheet +
- *   `附注模版/上市报表附注.md` L4198~4223 / `国企报表附注.md` L3337~3360 +
- *   `note_template_{listed,soe}.json` 五、33 / 八、33。
+ * 口径证据：源 `L/L1 短期借款.xlsx` 两张披露 sheet（上市 A7:C7 / A18:E18，国企 A16:C16）=
+ *   `note_template_{listed,soe}.json` 五、33 / 八、33（R8.4 批 9b-2 起「单体都按底稿披露表格式」）。
+ * 模板侧逐字对齐由 `lCycleNoteSubtableContract.spec.ts` 的共享 helper P1~P6 守。
  *
  * 覆盖 Property 1（columns ↔ sub_table_data 键一一对应，含空逾期分支）/
  *      Property 2（标签列唯一且居首）/ Property 6（无 snake_case 列头）+
- *      单行表头 `flat` 声明（批 1 全表 0 处 group）+ values 位置对齐。
+ *      单行表头 `flat` 声明（批 1 全表 0 处 group）+ values 位置对齐 + 旧表名清理。
  */
 
 const SNAKE_CASE = /^[a-z_][a-z0-9_]*$/
@@ -45,18 +46,18 @@ function dataKeys(sub: Record<string, unknown>): string[] {
 }
 
 describe('L1 短期借款披露 columns 契约', () => {
-  it('上市：分类表 3 列（项目 / 期末余额 / 上年年末余额）', () => {
-    const cols = buildL1ListedColumns()['短期借款分类']
-    expect(cols.map(c => c.label)).toEqual(['项目', '期末余额', '上年年末余额'])
+  it('上市：分类表 3 列（项  目 / 期末余额 / 上年年末余额，标签列头逐字同底稿 A7）', () => {
+    const cols = buildL1ListedColumns()[L1_SUBTABLE.category]
+    expect(cols.map(c => c.label)).toEqual(['项  目', '期末余额', '上年年末余额'])
     expect(cols.map(c => c.key)).toEqual(['category', 'endBalance', 'beginBalance'])
     expect(cols[0].is_label).toBe(true)
     expect(cols[1].format).toBe('amount')
     expect(cols[2].format).toBe('amount')
   })
 
-  it('上市：逾期表 5 列且标 flat（抑制凭空「逾期」父表头）', () => {
-    const cols = buildL1ListedColumns({ includeOverdue: true })['逾期借款情况']
-    // 利率列取附注模版口径：均无 `(%)`（底稿 UI 的 `借款利率(%)` 不作准）
+  it('上市：逾期表「（2）逾期借款情况」5 列且标 flat（抑制凭空「逾期」父表头）', () => {
+    expect(L1_SUBTABLE.overdue.listed).toBe('（2）逾期借款情况')
+    const cols = buildL1ListedColumns({ includeOverdue: true })[L1_SUBTABLE.overdue.listed]
     expect(cols.map(c => c.label)).toEqual(['借款单位', '期末余额', '借款利率', '逾期时间', '逾期利率'])
     expect(cols.map(c => c.key)).toEqual(['borrower', 'endBalance', 'rate', 'overdueTime', 'penaltyRate'])
     // 源 A18:E18 单行表头；不标 flat 时后端会把「逾期时间/逾期利率」并到假父表头「逾期」下
@@ -67,16 +68,17 @@ describe('L1 短期借款披露 columns 契约', () => {
     expect(cols[4].format).toBe('percent')
   })
 
-  it('国企：分类表标签列为「借款类别」，第 3 列取附注口径「期初余额」（非源 xlsx 的「年初余额」）', () => {
-    const cols = buildL1SoeColumns()['短期借款分类']
+  it('国企：分类表标签列为「借款类别」，第 3 列「期初余额」', () => {
+    const cols = buildL1SoeColumns()[L1_SUBTABLE.category]
     expect(cols.map(c => c.label)).toEqual(['借款类别', '期末余额', '期初余额'])
     expect(cols[0].is_label).toBe(true)
     expect(cols.map(c => c.label)).not.toContain('年初余额')
   })
 
-  it('国企：逾期表 3 列，标签列为「债权单位」、利率列全角括号「借款利率（%）」', () => {
-    const cols = buildL1SoeColumns({ includeOverdue: true })['逾期借款情况']
-    expect(cols.map(c => c.label)).toEqual(['债权单位', '期末余额', '借款利率（%）'])
+  it('国企：逾期表「已逾期未偿还的短期借款情况」3 列，标签列「债权单位」、利率列「借款利率」（同底稿 C16）', () => {
+    expect(L1_SUBTABLE.overdue.soe).toBe('已逾期未偿还的短期借款情况')
+    const cols = buildL1SoeColumns({ includeOverdue: true })[L1_SUBTABLE.overdue.soe]
+    expect(cols.map(c => c.label)).toEqual(['债权单位', '期末余额', '借款利率'])
     // 标签列头必须 = 附注 headers[0]，写「借款单位」会出孤儿列
     expect(cols[0].label).not.toBe('借款单位')
     // 源 A16:C16 仅 3 列 → 禁凭空补「逾期时间（月）」「逾期利率」录入列
@@ -86,21 +88,30 @@ describe('L1 短期借款披露 columns 契约', () => {
   it('Property 1：两版 columns 键与 sub_table_data 数据键集合相等', () => {
     for (const variant of ['listed', 'soe'] as const) {
       const { sub_table_data, columns } = payloadOf(variant)
-      expect(dataKeys(sub_table_data), variant).toEqual(['短期借款分类', '逾期借款情况'].sort())
+      expect(dataKeys(sub_table_data), variant).toEqual([L1_SUBTABLE.category, L1_SUBTABLE.overdue[variant]].sort())
       expect(Object.keys(columns).sort(), variant).toEqual(dataKeys(sub_table_data))
     }
   })
 
-  it('Property 1（空逾期分支）：无逾期数据时「逾期借款情况」在两侧同时缺席', () => {
+  it('Property 1（空逾期分支）：无逾期数据时逾期表在两侧同时缺席，并清掉上次推过的逾期表', () => {
     for (const variant of ['listed', 'soe'] as const) {
       // 空数组 + 全空行（`borrower || endBalance` 均为假）两种入参都应落到同一分支
       for (const overdueRows of [[], [{ borrower: '', endBalance: 0, rate: 0 }]]) {
         const { sub_table_data, columns } = payloadOf(variant, { overdueRows })
-        expect(sub_table_data['逾期借款情况'], variant).toBeUndefined()
-        expect(columns['逾期借款情况'], variant).toBeUndefined()
+        expect(sub_table_data[L1_SUBTABLE.overdue[variant]], variant).toBeUndefined()
+        expect(columns[L1_SUBTABLE.overdue[variant]], variant).toBeUndefined()
         expect(Object.keys(columns).sort(), variant).toEqual(dataKeys(sub_table_data))
-        expect(dataKeys(sub_table_data), variant).toEqual(['短期借款分类'])
+        expect(dataKeys(sub_table_data), variant).toEqual([L1_SUBTABLE.category])
+        expect(sub_table_data._removed_table_keys, variant).toContain(L1_SUBTABLE.overdue[variant])
       }
+    }
+  })
+
+  it('旧表名「逾期借款情况」（两版模板都没有）进 _removed_table_keys，且不与推送键相交', () => {
+    for (const variant of ['listed', 'soe'] as const) {
+      const { sub_table_data } = payloadOf(variant)
+      expect(sub_table_data._removed_table_keys, variant).toEqual([...L1_LEGACY_OBSOLETE_TABLES])
+      for (const legacy of L1_LEGACY_OBSOLETE_TABLES) expect(dataKeys(sub_table_data), variant).not.toContain(legacy)
     }
   })
 

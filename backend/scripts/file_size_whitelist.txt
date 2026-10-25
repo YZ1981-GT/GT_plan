@@ -1598,3 +1598,22 @@ backend/app/services/acnr/resolver.py  1086
 #     拆分方向：公式生成（generate_*）、执行（execute_note_formulas + _exec_*）、跨表取数（_load_cross_table_data +
 #     _resolve_single_cross_ref）三块各自成模块。
 backend/app/services/note_formula_generator.py  1483
+#   diagnose_g7_column_alignment.py —— 历史大文件（HEAD 已 1600 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-24 consol-note-header-library-and-node-reaggregate R8.4 批 9b-2：清空单槽占位豁免登记（4 张合营表改两层，净 −24）。
+#     拆分方向：openpyxl 读取（read_source_facts）/ 六维比对（build_alignment_report）/ 自检（_sc_*）/ 报告与 facts 投影各成模块。
+backend/scripts/diagnose/diagnose_g7_column_alignment.py  1576
+#   _j1_disclosure_import_export.py / fix_note_i_cycle_structure.py / test_note_expandable_rows.py
+#     —— 历史大文件（HEAD 已 831 / 1247 / 954 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-25 consol-note-header-library-and-node-reaggregate R8.4 批 9b-2：
+#       · _j1_disclosure_import_export.py 只改一行注释（J1 期初 / 期末列用语改指附注修订脚本，行数不变）；
+#       · fix_note_i_cycle_structure.py 复位 5914e315b 改坏的 五、27 同节重名 + 五、26 / 五、28 摘权宜标题前缀（+12）；
+#       · test_note_expandable_rows.py 撤销「母公司章排除」后反转守卫（基线 81/44、母公司章未标 0、
+#         test_parent_chapter_rows_are_marked_too 及其分母自检，+32）。
+#     拆分方向：J1 披露导入导出按列定义 / 导出 / 导入校验三块拆；I 循环修订脚本把各节计划表（列定义 / 行 / 指引）
+#     抽成数据模块；可扩位守卫按「词表判据 / 落地计数 / 单一真源扫描」三组拆文件。
+#   🔴 `_note_structure_kit.py` **不登记**：HEAD 上它 761 行在限内，本会话加三个共享 helper 后越线 ——
+#     按门禁提示拆了伴生模块 `_note_text_sections.py`（text_sections 关注点整段搬出 + 逐名 re-export），
+#     现 737 行，比 HEAD 还小。白名单只给历史大文件，自己推过线的要拆。
+backend/app/routers/wp_render_strategies/_j1_disclosure_import_export.py  831
+backend/scripts/fix/fix_note_i_cycle_structure.py  1259
+backend/tests/test_note_expandable_rows.py  986

@@ -60,7 +60,7 @@
         "consol_seq": 6,
         "standalone_note_section": "八、4",
         "standalone_section_title": "应收票据",
-        "match_type": "structure",
+        "match_type": "chapter",
         "standalone_table_name": "按坏账准备计提方法分类披露应收票据（期末数）"
       },
       {
@@ -70,7 +70,7 @@
         "consol_seq": 7,
         "standalone_note_section": "八、4",
         "standalone_section_title": "应收票据",
-        "match_type": "structure",
+        "match_type": "chapter",
         "standalone_table_name": "按坏账准备计提方法分类披露应收票据（续：期初数）"
       },
       {
@@ -130,8 +130,8 @@
         "consol_seq": 13,
         "standalone_note_section": "八、4",
         "standalone_section_title": "应收票据",
-        "match_type": "table_title",
-        "standalone_table_name": "期末已背书或贴现且在资产负债表日尚未到期的应收票据"
+        "match_type": "structure",
+        "standalone_table_name": "期末已背书或贴现但尚未到期的应收票据"
       },
       {
         "consol_section_id": "五-4-10",
@@ -140,8 +140,8 @@
         "consol_seq": 14,
         "standalone_note_section": "八、4",
         "standalone_section_title": "应收票据",
-        "match_type": "table_title",
-        "standalone_table_name": "期末因出票人未履约而转为应收账款的票据"
+        "match_type": "chapter",
+        "standalone_table_name": "期末因出票人未履约而其转为应收账款的票据"
       },
       {
         "consol_section_id": "五-4-11",
@@ -540,8 +540,8 @@
         "consol_seq": 54,
         "standalone_note_section": "八、12",
         "standalone_section_title": "持有待售资产",
-        "match_type": "table_title",
-        "standalone_table_name": "4.应披露与持有待售的非流动资产或处置组有关的其他综合收益累计金额。】"
+        "match_type": "structure",
+        "standalone_table_name": "持有待售资产"
       },
       {
         "consol_section_id": "五-12-2",
@@ -780,8 +780,8 @@
         "consol_seq": 78,
         "standalone_note_section": "八、18",
         "standalone_section_title": "长期股权投资",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "table_title",
+        "standalone_table_name": "②对合营企业或联营企业发生超额亏损的分担额"
       },
       {
         "consol_section_id": "五-18-9",
@@ -1031,7 +1031,7 @@
         "standalone_note_section": "八、29",
         "standalone_section_title": "商誉",
         "match_type": "table_title",
-        "standalone_table_name": "（1）商誉账面原值"
+        "standalone_table_name": "（1）商誉账面价值"
       },
       {
         "consol_section_id": "五-29-2",
@@ -1110,8 +1110,8 @@
         "consol_seq": 111,
         "standalone_note_section": "八、32",
         "standalone_section_title": "其他非流动资产",
-        "match_type": "table_title",
-        "standalone_table_name": "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如："
+        "match_type": "structure",
+        "standalone_table_name": "合同取得成本"
       },
       {
         "consol_section_id": "五-33-1",
@@ -1530,8 +1530,8 @@
         "consol_seq": 153,
         "standalone_note_section": "八、54",
         "standalone_section_title": "长期应付职工薪酬",
-        "match_type": "table_title",
-        "standalone_table_name": "设定受益计划净负债（净资产）"
+        "match_type": "chapter",
+        "standalone_table_name": null
       },
       {
         "consol_section_id": "五-54-5",
@@ -1560,8 +1560,8 @@
         "consol_seq": 156,
         "standalone_note_section": "八、54",
         "standalone_section_title": "长期应付职工薪酬",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "table_title",
+        "standalone_table_name": "精算假设"
       },
       {
         "consol_section_id": "五-54-8",
@@ -1570,8 +1570,8 @@
         "consol_seq": 157,
         "standalone_note_section": "八、54",
         "standalone_section_title": "长期应付职工薪酬",
-        "match_type": "structure",
-        "standalone_table_name": "计划资产"
+        "match_type": "table_title",
+        "standalone_table_name": "敏感性分析"
       },
       {
         "consol_section_id": "五-55-1",
@@ -3212,8 +3212,8 @@
         "consol_seq": 3,
         "standalone_note_section": "五、3",
         "standalone_section_title": "衍生金融资产",
-        "match_type": "table_title",
-        "standalone_table_name": "（提示：企业衍生金融工具业务具有重要性的，单独披露衍生金融资产。）"
+        "match_type": "exact",
+        "standalone_table_name": "衍生金融资产"
       },
       {
         "consol_section_id": "五-4-1",
@@ -3233,7 +3233,7 @@
         "standalone_note_section": "五、4",
         "standalone_section_title": "应收票据",
         "match_type": "table_title",
-        "standalone_table_name": "期末本公司已质押的应收票据"
+        "standalone_table_name": "期末已质押的应收票据"
       },
       {
         "consol_section_id": "五-4-3",
@@ -3243,7 +3243,7 @@
         "standalone_note_section": "五、4",
         "standalone_section_title": "应收票据",
         "match_type": "table_title",
-        "standalone_table_name": "期末本公司已背书或贴现但尚未到期的应收票据"
+        "standalone_table_name": "期末已背书或贴现但尚未到期的应收票据"
       },
       {
         "consol_section_id": "五-4-4",
@@ -3253,7 +3253,7 @@
         "standalone_note_section": "五、4",
         "standalone_section_title": "应收票据",
         "match_type": "table_title",
-        "standalone_table_name": "期末本公司因出票人未履约而将其转应收账款的票据"
+        "standalone_table_name": "期末因出票人未履约而其转应收账款的票据"
       },
       {
         "consol_section_id": "五-4-5",
@@ -3262,7 +3262,7 @@
         "consol_seq": 8,
         "standalone_note_section": "五、4",
         "standalone_section_title": "应收票据",
-        "match_type": "structure",
+        "match_type": "table_title",
         "standalone_table_name": "按坏账计提方法分类（期末余额）"
       },
       {
@@ -3282,7 +3282,7 @@
         "consol_seq": 10,
         "standalone_note_section": "五、4",
         "standalone_section_title": "应收票据",
-        "match_type": "structure",
+        "match_type": "table_title",
         "standalone_table_name": "按单项计提坏账准备的应收票据（期末余额）"
       },
       {
@@ -3333,7 +3333,7 @@
         "standalone_note_section": "五、4",
         "standalone_section_title": "应收票据",
         "match_type": "table_title",
-        "standalone_table_name": "转回或收回金额重要的坏账准备"
+        "standalone_table_name": "本期转回或收回金额重要的坏账准备"
       },
       {
         "consol_section_id": "五-4-13",
@@ -3513,7 +3513,7 @@
         "standalone_note_section": "五、6",
         "standalone_section_title": "应收款项融资",
         "match_type": "table_title",
-        "standalone_table_name": "如果企业经常贴现或背书信用等级较高的银行承兑的汇票，则其业务模式可能是既以收取合同现金流量为目标又以出售该金融资产为目标，从而可能需要在“应收款项融资”项目列报。】"
+        "standalone_table_name": "应收款项融资"
       },
       {
         "consol_section_id": "五-6-2",
@@ -4040,10 +4040,10 @@
         "consol_parent": "其他流动资产",
         "consol_title": "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如：",
         "consol_seq": 87,
-        "standalone_note_section": "五、31",
-        "standalone_section_title": "其他非流动资产",
-        "match_type": "table_title",
-        "standalone_table_name": "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如："
+        "standalone_note_section": "五、13",
+        "standalone_section_title": "其他流动资产",
+        "match_type": "structure",
+        "standalone_table_name": "合同取得成本"
       },
       {
         "consol_section_id": "五-13-3",
@@ -4513,7 +4513,7 @@
         "standalone_note_section": "五、21",
         "standalone_section_title": "投资性房地产",
         "match_type": "table_title",
-        "standalone_table_name": "（采用公允价值计量模式的投资性房地产，分类列示期初余额、期末余额和本期增减变动情况。）"
+        "standalone_table_name": "按公允价值计量的投资性房地产"
       },
       {
         "consol_section_id": "五-21-3",
@@ -4522,8 +4522,8 @@
         "consol_seq": 135,
         "standalone_note_section": "五、21",
         "standalone_section_title": "投资性房地产",
-        "match_type": "table_title",
-        "standalone_table_name": "（披露未办妥产权证书的投资性房地产账面价值及原因。）"
+        "match_type": "structure",
+        "standalone_table_name": "未办妥产权证书的情况"
       },
       {
         "consol_section_id": "五-22-1",
@@ -4573,7 +4573,7 @@
         "standalone_note_section": "五、22",
         "standalone_section_title": "固定资产",
         "match_type": "table_title",
-        "standalone_table_name": "（披露期末未办妥产权证书的固定资产账面价值及原因。）"
+        "standalone_table_name": "未办妥产权证书的固定资产情况"
       },
       {
         "consol_section_id": "五-22-6",
@@ -4693,7 +4693,7 @@
         "standalone_note_section": "五、26",
         "standalone_section_title": "无形资产",
         "match_type": "table_title",
-        "standalone_table_name": "⑥（按照《知识产权相关会计信息披露规定》（财会〔2018〕30号），应当单独披露对企业财务报表具有重要影响的单项无形资产的内容、账面价值和剩余摊销期限。）"
+        "standalone_table_name": "重要单项无形资产"
       },
       {
         "consol_section_id": "五-26-3",
@@ -4753,7 +4753,7 @@
         "standalone_note_section": "五、28",
         "standalone_section_title": "商誉",
         "match_type": "table_title",
-        "standalone_table_name": "资产组的可收回金额是依据管理层编制的五年期预测，采用未来现金流量折合现值计算。超过该五年期的现金流量采用以下所述的估计增长率作出推算。采用未来现金流量折现方法所运用的假设主要包括："
+        "standalone_table_name": "商誉减值测试关键假设"
       },
       {
         "consol_section_id": "五-28-4",
@@ -4763,7 +4763,7 @@
         "standalone_note_section": "五、28",
         "standalone_section_title": "商誉",
         "match_type": "table_title",
-        "standalone_table_name": "业绩承诺完成及对应商誉减值情况如下："
+        "standalone_table_name": "业绩承诺完成及商誉减值情况"
       },
       {
         "consol_section_id": "五-29-1",
@@ -4832,8 +4832,8 @@
         "consol_seq": 166,
         "standalone_note_section": "五、31",
         "standalone_section_title": "其他非流动资产",
-        "match_type": "table_title",
-        "standalone_table_name": "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如："
+        "match_type": "structure",
+        "standalone_table_name": "合同取得成本"
       },
       {
         "consol_section_id": "五-32-1",
@@ -4912,8 +4912,8 @@
         "consol_seq": 174,
         "standalone_note_section": "五、35",
         "standalone_section_title": "衍生金融负债",
-        "match_type": "table_title",
-        "standalone_table_name": "（15号文第二十条（三），分类列示衍生金融负债期初余额、期末余额，披露其形成的原因以及相关会计处理。）"
+        "match_type": "exact",
+        "standalone_table_name": "衍生金融负债"
       },
       {
         "consol_section_id": "五-36-1",
@@ -5162,8 +5162,8 @@
         "consol_seq": 199,
         "standalone_note_section": "五、43",
         "standalone_section_title": "一年内到期的非流动负债",
-        "match_type": "chapter",
-        "standalone_table_name": null
+        "match_type": "table_title",
+        "standalone_table_name": "一年内到期的长期应付款"
       },
       {
         "consol_section_id": "五-44-1",
@@ -5942,8 +5942,8 @@
         "consol_seq": 277,
         "standalone_note_section": "五、74",
         "standalone_section_title": "租赁",
-        "match_type": "exact",
-        "standalone_table_name": null
+        "match_type": "table_title",
+        "standalone_table_name": "作为承租人"
       },
       {
         "consol_section_id": "五-82-2",
@@ -5952,7 +5952,7 @@
         "consol_seq": 278,
         "standalone_note_section": "五、74",
         "standalone_section_title": "租赁",
-        "match_type": "exact",
+        "match_type": "chapter",
         "standalone_table_name": null
       },
       {
@@ -5962,7 +5962,7 @@
         "consol_seq": 279,
         "standalone_note_section": "五、74",
         "standalone_section_title": "租赁",
-        "match_type": "exact",
+        "match_type": "chapter",
         "standalone_table_name": null
       },
       {
@@ -5972,7 +5972,7 @@
         "consol_seq": 280,
         "standalone_note_section": "五、74",
         "standalone_section_title": "租赁",
-        "match_type": "exact",
+        "match_type": "chapter",
         "standalone_table_name": null
       },
       {
@@ -5982,7 +5982,7 @@
         "consol_seq": 281,
         "standalone_note_section": "五、74",
         "standalone_section_title": "租赁",
-        "match_type": "exact",
+        "match_type": "chapter",
         "standalone_table_name": null
       },
       {
@@ -5992,7 +5992,7 @@
         "consol_seq": 282,
         "standalone_note_section": "五、74",
         "standalone_section_title": "租赁",
-        "match_type": "exact",
+        "match_type": "chapter",
         "standalone_table_name": null
       },
       {
@@ -6063,7 +6063,7 @@
         "standalone_note_section": "五、27",
         "standalone_section_title": "开发支出",
         "match_type": "structure",
-        "standalone_table_name": "开发支出"
+        "standalone_table_name": "研发支出"
       },
       {
         "consol_section_id": "六-1-2",

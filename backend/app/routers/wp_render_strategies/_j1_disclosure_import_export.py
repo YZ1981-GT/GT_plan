@@ -107,8 +107,8 @@ _INCREASE_HEADER = "本期增加"
 _DECREASE_HEADER = "本期减少"
 _DERIVED_SUFFIX = "(公式，不导入)"
 
-# 期初 / 期末列用语按变体分叉（各自源模板口径；附注侧由 `j1MovementColumns()` 投影成
-# 「期初余额 / 期末余额」）。一份常量给两变体共用 = 国企侧列头错位（F3 已踩过）。
+# 期初 / 期末列用语按变体分叉（各自源模板口径；附注 五、40 / 八、40 列头同样按变体，见
+# `fix_note_j1_employee_comp_structure.PERIOD_LABELS`）。一份常量给两变体共用 = 国企侧列头错位（F3 已踩过）。
 _PERIOD_LABELS: dict[str, dict[str, str]] = {
     "listed": {"begin": "上年年末数", "end": "期末数"},
     "soe": {"begin": "期初余额", "end": "期末余额"},

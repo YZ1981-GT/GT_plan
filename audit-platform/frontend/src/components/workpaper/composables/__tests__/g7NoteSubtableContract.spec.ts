@@ -15,10 +15,12 @@
  * 现在按 `(章节, 表名)` 二元组把**每个章节各作一个 variant 条目**喂给 helper
  * （helper 本身按 `section + subtables` 成组，天然支持多章节，**无需改它的 P1~P6 语义**）。
  *
- * ## 🔴 soe 的 `七、…` 章节号是 md 截断值（10 字符）
+ * ## 🔴 soe 的 `七、…` 章节号是全称
  *
- * 如 `七、本期纳入合并报表` / `七、母公司拥有被投资` —— 属**既有真源形态**
- * （`note_template_soe.json` 里就是这个值），按截断值断言，**不得「补全」**。
+ * 如 `七、本期纳入合并报表范围的子公司基本情况`。2026-10-10 前种子里是 md 重建按 10 个字截断的值，
+ * 本文件当时按截断值断言、禁「补全」；5914e315b 把种子换成全称而前端没跟 ⇒ 13 个章节全部落空。
+ * R8.4 批 9b-2 起前端按种子全称推，截断旧值登记在种子该节 `legacy_section_numbers`（后端
+ * `normalize_section_code` 归一）。
  *
  * **Validates: Requirements 9.1, 9.2, 9.5**
  * **Properties: 7, 11, 32, 33, 34**
@@ -56,7 +58,7 @@ interface SectionGroup {
  * 按 `noteSectionId` 分组（保持声明顺序），每组产出一个 helper variant 条目。
  *
  * 🔴 **无表章节必须剔除**：`G7_SOE_DISCLOSURE_SECTIONS` 里有 3 个只放 `text_sections`
- * 的纯叙述章节（`七`、`七、子公司使用企业集`、`七、纳入合并财务报表`，`tables` 为空或
+ * 的纯叙述章节（`七`、`七、子公司使用企业集团资产和清偿企业集团债务的重大限制`、`七、纳入合并财务报表范围的结构化主体的相关信息`，`tables` 为空或
  * 只有非载荷表）—— 它们没有子表可推送。若把它们也喂给 helper，`P1 声明了子表` 会因
  * `entries.length === 0` 打红，那是**本文件的判据缺陷**（空转组），不是产品偏差。
  * 剔除的同时把它们记进 `EMPTY_SECTIONS` 由自检断言可见，防「剔除」被滥用成静默漏检。
@@ -104,15 +106,12 @@ const SOE_GROUPS = SOE_SPLIT.groups
 const listedAllColumns = buildG7ListedColumns() as Record<string, unknown[]>
 const soeAllColumns = buildG7SoeColumns() as Record<string, unknown[]>
 
-/** 国企模板暂缺的子表（helper `tablesPending`：模板补表后该条打红，删条目）。 */
-const SOE_TABLES_PENDING: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  '八、18': {
-    '②对合营企业或联营企业发生超额亏损的分担额':
-      '单体模板 八、18 原第 8 张表名写成本表、内容却是「结构化主体获得收益及转移资产情况」，R8.4 批 9b-1 按底稿' +
-      '改正表名；单体模板本就没有超额亏损表，批 9b-2 按底稿补表（consol-note-header-library-and-node-reaggregate ' +
-      'design §17.5）',
-  },
-}
+/**
+ * 国企模板暂缺的子表（helper `tablesPending`：模板补表后该条打红，删条目）。
+ * 八、18「②对合营企业或联营企业发生超额亏损的分担额」已于 R8.4 批 9b-2 按底稿补表、移出
+ * （consol-note-header-library-and-node-reaggregate design §17.5）。
+ */
+const SOE_TABLES_PENDING: Readonly<Record<string, Readonly<Record<string, string>>>> = {}
 
 // ─── 共享 helper P1~P6（对**全部章节**跑，不再只跑主章节）────────────────────
 
@@ -143,6 +142,7 @@ type Variant = 'listed' | 'soe'
 
 interface SeedSection {
   section_number?: string
+  legacy_section_numbers?: string[]
   tables?: { name?: string }[]
 }
 
@@ -182,7 +182,7 @@ describe('G7 契约扫描面自检（覆盖面回退即打红）', () => {
 
   it('有表章节全部进契约，每组都真有表（无空转组）', () => {
     // 🔴 `noteSectionId` 分组后必须**过滤掉无表章节**再喂 helper：
-    // 实测 soe 侧有 3 个纯文字披露章节（`七、子公司使用企业集` / `七、纳入合并财务报表`
+    // 实测 soe 侧有 3 个纯文字披露章节（`七、子公司使用企业集团资产和清偿企业集团债务的重大限制` / `七、纳入合并财务报表范围的结构化主体的相关信息`
     // 以及一个截断成 `七` 的），它们只推 `text_sections` 不推表。把它们喂给 helper 会让
     // P1「声明了子表（防空映射空转）」直接失败 —— 那是**判据缺陷**（helper 的空映射闸
     // 本就是为了拦住「忘了填 subtables」），不是产品缺陷。
@@ -218,18 +218,27 @@ describe('G7 契约扫描面自检（覆盖面回退即打红）', () => {
     expect(empty).toEqual([])
   })
 
-  it('soe 的 七、… 章节号按 md 截断值（10 字符）断言，禁「补全」', () => {
+  it('soe 的 七、… 章节号是种子现行全称，不是旧编号（截断值只在 legacy_section_numbers 里）', () => {
     const crossSections = SOE_GROUPS.map((g) => g.section).filter((s) => s.startsWith('七、'))
     expect(crossSections.length, 'soe 跨章章节数').toBeGreaterThanOrEqual(9)
-    for (const s of crossSections) {
-      // 真源形态：`七、` + 8 个汉字 = 10 字符（md 截断）
-      expect(s.length, `章节号 ${s} 长度应为截断值 10`).toBe(10)
+    const tpl = loadTemplate('soe')
+    const current = new Set(tpl.map((s) => String(s.section_number ?? '').trim()))
+    const legacy = new Map<string, string>()
+    for (const s of tpl) {
+      for (const old of s.legacy_section_numbers ?? []) {
+        legacy.set(String(old).trim(), String(s.section_number ?? '').trim())
+      }
     }
-    // 交叉锁死：这些截断值必须真存在于模板（补全后的写法在模板里查不到）
-    const tplSections = new Set(loadTemplate('soe').map((s) => String(s.section_number ?? '').trim()))
     for (const s of crossSections) {
-      expect(tplSections.has(s), `模板缺章节 ${s}（若这里失败，八成是有人把截断值「补全」了）`).toBe(true)
+      expect(
+        current.has(s),
+        `章节 ${s} 不是种子现行编号` + (legacy.has(s) ? `（是旧编号，现行为 ${legacy.get(s)}）` : ''),
+      ).toBe(true)
     }
+    // 反面锚定：截断旧值确实登记了（否则库内旧行 / 旧前端映射无从归一），且都比现行编号短
+    const olds = [...legacy.entries()].filter(([, now]) => crossSections.includes(now))
+    expect(olds.length, '七 章节旧编号未登记 ⇒ 后端 normalize_section_code 归一不了旧值').toBeGreaterThanOrEqual(9)
+    for (const [old, now] of olds) expect(now.startsWith(old) && now.length > old.length, `${old} → ${now}`).toBe(true)
   })
 
   it('孤儿表 0：每张运行时表都在对应变体的**对应章节**里（不是全局按表名）', () => {

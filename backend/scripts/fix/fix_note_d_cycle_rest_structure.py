@@ -152,6 +152,11 @@ def _d3_soe_plan() -> list[dict[str, Any]]:
 
 # ───────────────────────── D5 应收款项融资 ─────────────────────────
 
+_D5_LISTED_DAMAGED_MAIN = (
+    "如果企业经常贴现或背书信用等级较高的银行承兑的汇票，则其业务模式可能是既以收取合同现金流量为目标又以"
+    "出售该金融资产为目标，从而可能需要在“应收款项融资”项目列报。】"
+)
+
 _D5_LISTED_GUIDANCE_MAIN = (
     "提示：「应收款项融资」反映资产负债表日以公允价值计量且其变动计入其他综合收益的"
     "应收票据和应收账款等；披露应参考应收账款和应收票据的相关披露内容。"
@@ -578,7 +583,14 @@ SECTIONS: dict[str, dict[str, Any]] = {
     },
     "d5-listed": {
         "variant": "listed", "section": "五、6", "label": "D5 应收款项融资 五、6（上市）",
-        "plan": _d5_listed_plan(), "drops": [],
+        "plan": _d5_listed_plan(),
+        # 5914e315b（Word 同步）把主表改名成 Word 表前提示段的末句，本脚本随后按 `insert=True` 补回主表 ⇒
+        # 旧主表成了同表头同行的重复表（底稿 D5 上市只有一张，R8.4 批 9b-2）
+        "drops": [_D5_LISTED_DAMAGED_MAIN],
+        # 删表要与「摘掉当初为它加的 #### 前缀」成对：那条提示段被提成标题后，一节里标题比表多一个 ⇒
+        # `disclosure_engine` 段落游标多走一格、把后续提示段错配到别的表（H1 五、22 同型，实测打红守卫）。
+        # 受损前（5914e315b~1）它是普通正文段 ⇒ 摘回去（见 `_note_structure_kit.untitleize_text_sections`）。
+        "untitle": [_D5_LISTED_DAMAGED_MAIN],
     },
     "d5-soe": {
         "variant": "soe", "section": "八、6", "label": "D5 应收款项融资 八、6（国企）",
@@ -623,6 +635,7 @@ def run_key(key: str, dry_run: bool, check: bool) -> tuple[list[str], list[str],
         check=check,
         drops=list(spec["drops"]),
         text_sections=spec.get("text_sections"),
+        untitle_text_sections=spec.get("untitle"),
     )
 
 

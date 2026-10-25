@@ -422,8 +422,14 @@ describe('L8 财务费用 披露映射', () => {
 //
 // spec: .kiro/specs/l-cycle-four-table-extraction-and-disclosure-alignment/ R8, Property 7/8/11
 
-import { buildL1ListedColumns, buildL1SoeColumns } from '../l1NoteSectionMap'
-import { buildL3ListedColumns, buildL3SoeColumns } from '../l3NoteSectionMap'
+import { L1_NOTE_SECTION, L1_SUBTABLE, buildL1ListedColumns, buildL1SoeColumns } from '../l1NoteSectionMap'
+import {
+  L3_NOTE_SECTION,
+  L3_SUBTABLE,
+  buildL3ListedColumns,
+  buildL3SoeColumns,
+  buildL3Within1ySoeColumns,
+} from '../l3NoteSectionMap'
 import { buildL4ListedColumns, buildL4SoeColumns } from '../l4NoteSectionMap'
 
 /**
@@ -452,6 +458,25 @@ function assertColumnsStated(columns: Record<string, any[]>, context: string) {
   }
 }
 
+// L1 短期借款（P1~P6：两版逾期表名不同、标签列头 = 模板 headers[0]；R8.4 批 9b-2 按底稿对齐）
+runDisclosureSubtableContract({
+  cycle: 'L1',
+  variants: [
+    {
+      variant: 'listed',
+      section: L1_NOTE_SECTION.listed,
+      subtables: { category: L1_SUBTABLE.category, overdue: L1_SUBTABLE.overdue.listed },
+      columns: buildL1ListedColumns({ includeOverdue: true }),
+    },
+    {
+      variant: 'soe',
+      section: L1_NOTE_SECTION.soe,
+      subtables: { category: L1_SUBTABLE.category, overdue: L1_SUBTABLE.overdue.soe },
+      columns: buildL1SoeColumns({ includeOverdue: true }),
+    },
+  ],
+})
+
 describe('L1 子表契约', () => {
   it('上市列定义表态正确', () => {
     const cols = buildL1ListedColumns({ includeOverdue: true })
@@ -468,22 +493,35 @@ describe('L1 子表契约', () => {
 })
 
 describe('L3 子表契约', () => {
-  it('上市列定义含两级表头（利率区间）', () => {
-    const cols = buildL3ListedColumns()
-    assertColumnsStated(cols, 'L3 listed')
-    // 长期借款表应为 flat（无 group）
-    const mainCols = cols['长期借款']
-    expect(mainCols).toBeDefined()
-    expect(mainCols.some((c: any) => c.flat === true)).toBe(true)
+  it('两版长期借款表都是一层表头（flat，无 group）', () => {
+    for (const [variant, cols] of [['listed', buildL3ListedColumns()], ['soe', buildL3SoeColumns()]] as const) {
+      assertColumnsStated(cols, `L3 ${variant}`)
+      const mainCols = cols['长期借款']
+      expect(mainCols, variant).toBeDefined()
+      expect(mainCols.some((c: any) => c.flat === true), variant).toBe(true)
+      expect(mainCols.some((c: any) => c.group), variant).toBe(false)
+    }
   })
-  it('国企列定义表态正确', () => {
-    const cols = buildL3SoeColumns()
-    assertColumnsStated(cols, 'L3 soe')
+  it('一年内到期的长期借款只在国企 八、45 推（上市 五、43 是共用节，不推）', () => {
+    expect(Object.keys(buildL3ListedColumns())).not.toContain('一年内到期的长期借款')
+    expect(Object.keys(buildL3SoeColumns())).not.toContain('一年内到期的长期借款')
+    assertColumnsStated(buildL3Within1ySoeColumns(), 'L3 soe 八、45')
   })
-  it('子表名包含一年内到期', () => {
-    const listedKeys = Object.keys(buildL3ListedColumns())
-    expect(listedKeys).toContain('一年内到期的长期借款')
-  })
+})
+
+// L3 长期借款 + 国企 八、45（P1~P6：表名逐字、标签列头 = 模板 headers[0] 等）
+runDisclosureSubtableContract({
+  cycle: 'L3',
+  variants: [
+    { variant: 'listed', section: L3_NOTE_SECTION.listed.main, subtables: { main: L3_SUBTABLE.main }, columns: buildL3ListedColumns() },
+    { variant: 'soe', section: L3_NOTE_SECTION.soe.main, subtables: { main: L3_SUBTABLE.main }, columns: buildL3SoeColumns() },
+    {
+      variant: 'soe',
+      section: L3_NOTE_SECTION.soe.within1y,
+      subtables: { within1y: L3_SUBTABLE.within1ySoe },
+      columns: buildL3Within1ySoeColumns(),
+    },
+  ],
 })
 
 describe('L4 子表契约', () => {

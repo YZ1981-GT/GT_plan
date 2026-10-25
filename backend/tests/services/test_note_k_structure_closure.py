@@ -368,7 +368,12 @@ def test_class_b_shared_tables_carry_row_codes(templates):
 #:     附注模板按平台铁律把示例名收成**一个通用块** ⇒ 4 处源标记落到同 2 处模板行。
 #:   * `NO_TEMPLATE_TARGET` 1 处 —— soe 源 xlsx 有「持有待售负债附注」表而附注模板
 #:     没有这张表；缺的是整张表（Requirement 8 的表集合作业面），不是标记问题。
-TEMPLATE_EXPANDABLE_ROWS_PENDING_TASK18 = 28
+#:
+#: 2026-10-25：28 → **26**（回到 Task 18 收口值）。多出的 2 行在国企 八、12 的重复表
+#: 「4.应披露与持有待售的非流动资产或处置组有关的其他综合收益累计金额。】」里 —— 那是 Word 同步
+#: （5914e315b）以提示末行为名复制出的第二张「持有待售资产」，底稿 K6 国企只有一张，R8.4 批 9b-2 已删；
+#: 两行「……」与正表同位置的两行重复，不是新的可扩位。
+TEMPLATE_EXPANDABLE_ROWS_PENDING_TASK18 = 26
 
 
 def _template_expandable_count(templates, k_sections) -> int:

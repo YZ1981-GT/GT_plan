@@ -32,7 +32,7 @@ spec ``disclosure-note-template-word-realignment`` 按四版 Word 改挂到第�
   「注：本科目明细表按照正数填列、披露表按照负数填列」；K12/K13 **四列**
   含「计入当期非经常性损益的金额」）；
 - ``note_template_{listed,soe}.json``（交付物权威）：列名与固定行名以此为准，
-  其中 **K10 国企是 4 列**（末列「是否为政府补助」，行含「其中：政府补助」）；
+  K10 国企按底稿 3 列（R8.4 批 9b-2 删去随 Word 多出的「是否为政府补助」列），行含「其中：政府补助」；
 - ``note_check_preset_formulas.json``：损益类勾稽为「报表科目 = 合计行本期发生额」
   + 「各明细行之和 = 合计行」。
 
@@ -137,13 +137,6 @@ def _cols4_amount(label_head: str, cur_head: str, prior_head: str, extra_head: s
     ]
 
 
-def _cols4_text(label_head: str, cur_head: str, prior_head: str, extra_head: str) -> list[dict[str, Any]]:
-    return [
-        *_cols3(label_head, cur_head, prior_head),
-        {"key": "is_gov_grant", "label": extra_head, "format": "text"},
-    ]
-
-
 # ─────────────────────────── guidance ───────────────────────────
 
 _G_K8 = (
@@ -188,8 +181,8 @@ _G_K10_SOE = (
     "（4）债务重组中债务人以非金融资产清偿债务形成的差额；"
     "（5）超比例安排残疾人就业收到的奖励；（6）小微企业免征增值税转入；"
     "（7）当期直接减免的增值税。】"
-    "第 4 列「是否为政府补助」按项目性质点选；「其中：政府补助」为结构行，用于单独反映"
-    "政府补助部分，不参与明细行求和。"
+    "「其中：政府补助」为结构行，用于单独反映政府补助部分（底稿披露页按项目点选是否为政府补助后汇总），"
+    "不参与明细行求和。"
     "勾稽：合计行本期发生额 = 利润表「其他收益」本期金额；各明细行之和 = 合计行（逐列）。"
     "数据来源：明细表 K10-2。"
 )
@@ -300,10 +293,12 @@ PLAN: list[dict[str, Any]] = [
         "cycle": "K10",
         "variant": "soe",
         "section": "八、69",
+        # 底稿 K10 国企第 7 行表头只有 项目 | 本期发生额 | 上期发生额：单体附注按底稿披露表格式，删去随 Word 多出的
+        # 「是否为政府补助」列（R8.4 批 9b-2，2026-10-24）；合计后的「其中：政府补助」结构行保留
         "tables": [
             {
                 "name": "其他收益",
-                "columns": _cols4_text("项目", "本期发生额", "上期发生额", "是否为政府补助"),
+                "columns": _cols3("项目", "本期发生额", "上期发生额"),
                 "guidance": _G_K10_SOE,
             }
         ],

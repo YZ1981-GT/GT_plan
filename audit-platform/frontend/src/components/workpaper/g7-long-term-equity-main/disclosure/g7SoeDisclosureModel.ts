@@ -634,7 +634,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
     chapter: 'consolidation-scope',
     title: '（一）本期纳入合并报表范围的子公司基本情况',
     sourceRows: 'A7:M23',
-    noteSectionId: '七、本期纳入合并报表',
+    noteSectionId: '七、本期纳入合并报表范围的子公司基本情况',
     noteSectionTitle: '本期纳入合并报表范围的子公司基本情况',
     guidance: [
       '企业应按照下列格式披露纳入报表合并范围的全部子公司主要情况；大型企业集团可披露到二级子公司，重要子公司不分级次全部披露。',
@@ -673,7 +673,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
     chapter: 'consolidation-scope',
     title: '（二）表决权不足半数但形成控制的原因',
     sourceRows: 'A24:H35',
-    noteSectionId: '七、母公司拥有被投资',
+    noteSectionId: '七、母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因',
     noteSectionTitle: '母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因',
     guidance: ['源表按 G7-4 表决权≤50% 条件筛选；原因列需人工补录。'],
     tables: [
@@ -702,7 +702,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
     chapter: 'consolidation-scope',
     title: '（三）表决权过半但未形成控制的原因',
     sourceRows: 'A36:H52',
-    noteSectionId: '七、母公司直接或通过',
+    noteSectionId: '七、母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的',
     noteSectionTitle: '母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的原因',
     guidance: ['按合营企业、联营企业分组；源表“其他”行存在 #REF!，平台改为可增删动态行。'],
     tables: [
@@ -733,7 +733,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
     chapter: 'consolidation-scope',
     title: '（四）重要非全资子公司情况',
     sourceRows: 'A53:L74',
-    noteSectionId: '七、重要非全资子公司',
+    noteSectionId: '七、重要非全资子公司情况',
     noteSectionTitle: '重要非全资子公司情况',
     guidance: [
       '上述财务数据以合并日子公司可辨认资产和负债的公允价值为基础进行调整；被划分为持有待售资产的，不需要披露该子公司的上述财务信息。',
@@ -788,7 +788,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
     chapter: 'consolidation-scope',
     title: '（六）本期不再纳入合并范围的原子公司',
     sourceRows: 'A76:L107',
-    noteSectionId: '七、本期不再纳入合并',
+    noteSectionId: '七、本期不再纳入合并范围的原子公司',
     noteSectionTitle: '本期不再纳入合并范围的原子公司',
     guidance: [
       '本期因处置部分股权投资或其他原因丧失控制权的，还应按《企业会计准则解释第4号》披露剩余股权在丧失控制权日的公允价值及重新计量损益。',
@@ -851,7 +851,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
     chapter: 'consolidation-scope',
     title: '（七）本期新纳入合并范围的主体',
     sourceRows: 'A108:D119',
-    noteSectionId: '七、本期新纳入合并范',
+    noteSectionId: '七、本期新纳入合并范围的主体',
     noteSectionTitle: '本期新纳入合并范围的主体',
     guidance: ['说明新纳入合并范围的子公司、特殊目的主体、受托经营或承租等方式形成控制权的经营实体。'],
     tables: [
@@ -879,7 +879,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
     chapter: 'consolidation-scope',
     title: '（八）本期发生的同一控制下企业合并情况',
     sourceRows: 'A120:J126',
-    noteSectionId: '七、本期发生的同一控',
+    noteSectionId: '七、本期发生的同一控制下企业合并情况',
     noteSectionTitle: '本期发生的同一控制下企业合并情况',
     guidance: [
       '说明合并日的确定依据、支付的对价及被合并方的账面净资产，并披露被合并方自合并当年期初至合并日的收入、净利润、现金流量等情况。',
@@ -912,7 +912,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
     chapter: 'consolidation-scope',
     title: '（九）本期发生的非同一控制下企业合并情况',
     sourceRows: 'A127:M136',
-    noteSectionId: '七、本期发生的非同一',
+    noteSectionId: '七、本期发生的非同一控制下企业合并情况',
     noteSectionTitle: '本期发生的非同一控制下企业合并情况',
     guidance: [
       '说明购买日确定方法、相关交易公允价值确定方法、商誉金额及计算方法；分步实现企业合并的应分别说明前期和本期取得股权的时点、成本、比例及方式。',
@@ -944,7 +944,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
     chapter: 'consolidation-scope',
     title: '（十）本期发生的吸收合并',
     sourceRows: 'A137:F172',
-    noteSectionId: '七、本期发生的吸收合',
+    noteSectionId: '七、本期发生的吸收合并',
     noteSectionTitle: '本期发生的吸收合并',
     guidance: ['应分别同一控制下和非同一控制下的吸收合并，披露并入的主要资产、负债项目及其金额。'],
     tables: [
@@ -978,7 +978,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
     chapter: 'consolidation-scope',
     title: '（十一）子公司使用企业集团资产和清偿企业集团债务的重大限制',
     sourceRows: 'A173:F176',
-    noteSectionId: '七、子公司使用企业集',
+    noteSectionId: '七、子公司使用企业集团资产和清偿企业集团债务的重大限制',
     noteSectionTitle: '子公司使用企业集团资产和清偿企业集团债务的重大限制',
     narratives: [
       {
@@ -997,7 +997,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
     chapter: 'consolidation-scope',
     title: '（十二）纳入合并财务报表范围的结构化主体的相关信息',
     sourceRows: 'A177:A182',
-    noteSectionId: '七、纳入合并财务报表',
+    noteSectionId: '七、纳入合并财务报表范围的结构化主体的相关信息',
     noteSectionTitle: '纳入合并财务报表范围的结构化主体的相关信息',
     narratives: [
       {
@@ -1013,7 +1013,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
     chapter: 'consolidation-scope',
     title: '（十三）母公司在子公司的所有者权益份额发生变化的情况',
     sourceRows: 'A183:E199',
-    noteSectionId: '七、母公司在子公司的',
+    noteSectionId: '七、母公司在子公司的所有者权益份额发生变化的情况',
     noteSectionTitle: '母公司在子公司的所有者权益份额发生变化的情况',
     tables: [
       {

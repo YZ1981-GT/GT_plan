@@ -91,7 +91,7 @@
         "1121",
         "1231-01"
       ],
-      "rule_count": 22,
+      "rule_count": 17,
       "owned_key_count": 1,
       "has_note_rules": true
     },
@@ -102,7 +102,7 @@
         "1122",
         "1231-02"
       ],
-      "rule_count": 19,
+      "rule_count": 12,
       "owned_key_count": 1,
       "has_note_rules": true
     },
@@ -112,7 +112,7 @@
       "account_prefixes": [
         "2203"
       ],
-      "rule_count": 3,
+      "rule_count": 2,
       "owned_key_count": 1,
       "has_note_rules": true
     },
@@ -151,7 +151,7 @@
       "account_prefixes": [
         "2205"
       ],
-      "rule_count": 3,
+      "rule_count": 2,
       "owned_key_count": 1,
       "has_note_rules": true
     },
@@ -163,7 +163,7 @@
         "1002",
         "1012"
       ],
-      "rule_count": 31,
+      "rule_count": 30,
       "owned_key_count": 27,
       "has_note_rules": true
     },
@@ -173,7 +173,7 @@
       "account_prefixes": [
         "1123"
       ],
-      "rule_count": 5,
+      "rule_count": 4,
       "owned_key_count": 1,
       "has_note_rules": true
     },
@@ -221,7 +221,7 @@
       "account_prefixes": [
         "2202"
       ],
-      "rule_count": 3,
+      "rule_count": 2,
       "owned_key_count": 1,
       "has_note_rules": true
     },
@@ -252,7 +252,7 @@
       "account_prefixes": [
         "2101"
       ],
-      "rule_count": 6,
+      "rule_count": 4,
       "owned_key_count": 3,
       "has_note_rules": true
     },
@@ -322,7 +322,7 @@
       "account_prefixes": [
         "1504"
       ],
-      "rule_count": 16,
+      "rule_count": 15,
       "owned_key_count": 3,
       "has_note_rules": true
     },
@@ -332,7 +332,7 @@
       "account_prefixes": [
         "1531"
       ],
-      "rule_count": 12,
+      "rule_count": 11,
       "owned_key_count": 3,
       "has_note_rules": true
     },
@@ -342,7 +342,7 @@
       "account_prefixes": [
         "1506"
       ],
-      "rule_count": 16,
+      "rule_count": 15,
       "owned_key_count": 3,
       "has_note_rules": true
     },
@@ -352,7 +352,7 @@
       "account_prefixes": [
         "1511"
       ],
-      "rule_count": 5,
+      "rule_count": 4,
       "owned_key_count": 1,
       "has_note_rules": true
     },
@@ -556,7 +556,7 @@
       "account_prefixes": [
         "2705"
       ],
-      "rule_count": 4,
+      "rule_count": 3,
       "owned_key_count": 1,
       "has_note_rules": true
     },
@@ -627,7 +627,7 @@
       "account_prefixes": [
         "2241"
       ],
-      "rule_count": 7,
+      "rule_count": 5,
       "owned_key_count": 3,
       "has_note_rules": true
     },
@@ -656,7 +656,7 @@
         "1481",
         "2245"
       ],
-      "rule_count": 7,
+      "rule_count": 5,
       "owned_key_count": 3,
       "has_note_rules": true
     },
@@ -666,7 +666,7 @@
       "account_prefixes": [
         "2401"
       ],
-      "rule_count": 5,
+      "rule_count": 4,
       "owned_key_count": 3,
       "has_note_rules": true
     },
@@ -696,7 +696,7 @@
       "account_prefixes": [
         "2001"
       ],
-      "rule_count": 4,
+      "rule_count": 3,
       "owned_key_count": 1,
       "has_note_rules": true
     },
@@ -736,7 +736,7 @@
       "account_prefixes": [
         "2701"
       ],
-      "rule_count": 4,
+      "rule_count": 2,
       "owned_key_count": 1,
       "has_note_rules": true
     },

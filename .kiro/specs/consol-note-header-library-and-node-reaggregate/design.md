@@ -598,3 +598,184 @@ V202（`V202__consol_note_mapping_reuse_and_reference.sql`，spec consol-note-ma
   - 修订脚本与模板 HEAD 上就打架的三处（写入方式跑会改动本批也改过的表，但改的不是本批的内容）：D4 两个脚本对分解信息表的列 key（`cat0_*` / `cat_1_*`）与 guidance 各写一套（`fix_note_d4_revenue_structure.py --check` 仍 4 项欠账，CI 该步 HEAD 上就红）；`fix_note_d2_ar_structure.py` 组合计提表 / 单项计提表的列 key 与模板不同；`fix_note_ar_listed_structure.py`（无 `--check`，已被 d2 脚本取代）写入时清空 五、5 各表 `columns`。
   - 模板同一张表 `headers` 与 `columns` 同义不同字的 63 张（如国企 八、4 应收票据分类分组「期末余额 / 期初余额」对 `columns`「期末数 / 期初数」）：本批按「同义算一致」不改，seed 与同步后两种显示仍不同（D1 前端契约两例 HEAD 上就红）。
 - **批 9b-2 追加**：八、12 重复表删除；八、18 补「②超额亏损」等表（删 `tablesPending` 条目）；长期借款两版（上市 五、45、国企 八、49）按底稿改一层，`fix_note_l3_l4_structure.py` 目标态与 `test_note_l3_l4_structure` 随改；已存附注 `_column_groups` 与模板分组同改（读时增强只在已存表没有分组时补，模板删 / 改分组的表已存数据仍是旧分组）；上述 L1 / G7 / L3 载荷对齐。
+
+#### 17.5.2 批 9b-2 实施记录（2026-10-25）
+
+用户：「删 八、12 重复表；八、18 补「②超额亏损」等表；长期借款两版（上市 五、45、国企 八、49）改成一层，相关脚本和测试一起改；L1 / G7 / L3 前端载荷对齐」，加上 §17.5 列的结构改动。逐表改动从 HEAD `bf7685b1d` 算，都由该章节的修订脚本写入（`--check` 重放写入路径，逐个 0 欠账；与 HEAD 一样仍有欠账的见 §17.6「仍未修」）。
+
+- **删重复表**：国企 八、4 5 张（同构的「按坏账准备计提方法分类披露应收票据」与「（续）」、以提示句为名的「其中，本期转回或收回…」、5914e315b 补进的「期末已背书或贴现且在资产负债表日尚未到期…」「期末因出票人未履约而转为应收账款…」），上市 五、4 6 张（5914e315b 从 应收款项融资 照搬的 Word 名表「期末本公司已质押…」等 3 张、「按坏账计提方法分类」「按单项计提坏账准备的应收票据」、核销表重复的「转回或收回金额重要的坏账准备」；D1 前端推的是平台名那一组），`fix_note_d1` 的 `DROP_TABLE_NAMES` 走 `kit.drop_tables`（续表 `continuation_of_index` 随删重排）；国企 八、12「4.应披露…。】」（`fix_note_k_complex`）；上市 五、6 重复主表（`fix_note_d_cycle_rest` `_D5_LISTED_DAMAGED_MAIN`：5914e315b 把主表改名成提示段末句，脚本 insert 又补回一张主表）。
+- **补表 / 拆表**：国企 八、5 与母公司章 十二、应收账款 两张组合计提表按底稿拆成期末 / 「（续：期初数）」（13 → 15 张，`fix_note_d2_ar_structure`）；八、9 补回「其他应收款项账面余额变动」（K1 底稿第 77 行，两层；载荷一直推这张，原被挪到母公司章）；八、18 补「重要联营企业的主要财务信息」「②对合营企业或联营企业发生超额亏损的分担额」（8 → 10 张），合营 / 联营财务信息表两层（「合营企业1 / 期末数」…，键 `jv-fs-company_1_*` 等），切表模块认表头格里的单格引用公式（`='sheet'!C8`，引用格是文字才取）。
+- **改列 / 层级**：长期借款两版两层 → 一层 5 列、行按底稿（`fix_note_l3_l4_structure`；kit 列名查重跳过文字列，两个「利率区间」放行）；国企 八、7 预付款项账龄表 7 列（期末数 / 期初数 各「账面余额-金额 / 账面余额-比例（%） / 坏账准备」，顺带修 `_column_groups` 与 `columns` 分组漂移）；八、55 补「形成原因」；八、69 删「是否为政府补助」；G10 上市 五、34 / 国企 八、34 逐表定列、主表行按底稿（父行 + 其中）；J1 上市 五、40 期间列「上年年末数 / 期末数」、短期薪酬加「……」可扩位行、设定提存计划序号行，国企短期薪酬 4 项；D2 国企分类表组名「账面余额」、单项计提删「计提理由」、列 key 按前端（`book_amount` / `carrying_value` / `end_amount` …）、结构行「其中：」「资产：」「负债：」header_label → data；表头 / 分组复位 5914e315b 改坏的「期末数 / 期初数」：G4 / G5 八、15 / 八、17、D6 八、11、F2 五、9 开发成本 / 八、10、L 循环 五、48 / 五、52 / 八、53 / 八、57。
+- **国企 七 13 节章节号**：5914e315b 把截断的章节号改成全称，没登记旧号、没改消费方（前端 13 个 noteSectionId、`fix_note_g7_soe_scope_change_structure` 常量、G7 三向守卫全断）⇒ kit `run_section(legacy_section_numbers=)` 登记旧号，前端 / 脚本按全称（改名工具 `rename_note_section_codes.py --write` 104 处，`--check` 0）。
+- **前端载荷**：G7（两层 JV 表、②超额亏损，删 `tablesPending`）、L1（国企逾期表「已逾期未偿还的短期借款情况」、上市「（2）逾期借款情况」、利率列「借款利率」）、L3（两版 5 列；国企「一年内到期的长期借款」推 八、45，主节带 `_removed_table_keys` 清孤儿；上市不推共用节 五、43）、G10（表名常量、键 = 模板、父行）、K5、K10、F1、D2（组合表期末 / 期初两张）、J1（`j1ColumnsFor(variant)`）、K1（账面余额变动两层）、K6（旧表名进 `K6_LEGACY_OBSOLETE_TABLES`）。
+- **公式推送规则**（`formula_push_rules.json` 405 → 375 条，探针逐条对模板：规则表名 / 字段与模板不符 WT 121 条，全部与 HEAD 相同、本批新增 0）：删 30 条 —— 表已删 5（D1 2/4/13/14、K6 1）、与主规则同表同字段 1（D1 0）、字段是披露表专有键、试算表取数源不出这个值 2（J2 2、G7 7）、合计行兜底写错数 22（见 §17.6）；改 33 条 —— 两版同键异名的表补 `table_by_template`、只在一版的表收窄 `section_by_template`、D2 字段随模板键、H1 4 随表名复位、D2 16 随上市「…的金额」表名。`formula_push_coverage.json` 重生成（含前一轮 G10 删规则）；独占键只取底稿域规则，不变。
+- **bindings**（`note_template_bindings.json`，按 `get_binding_for_table(章节, 序号)` 消费）：本批改了表清单 / 表头 / 行的章节逐节对齐（名字、表头、行标签全同的旧表沿用，其余用生成器 `_build_table_binding` 新建），连同 9b-1 改过却没同步的 五、23 / 五、62 / 十六、营业收入与营业成本 / 八、14 / 八、42 共 34 节；不齐 37 → 3。
+- **派生产物**：合并↔单体映射（生成器加表名对照，见 §17.6）、标题行库目录（国企 0.9306 → 0.9418、对上 617 → 631、none 14 → 11；上市 0.9339 → 0.9375、819 → 825、25 → 23）、Word 对齐白名单（727 → 691 条，生成器产物；`check_note_template_word_tree.py --check` 通过）、`note_soe_listed_diff.json`（5 处 table_count）、`stale_overwrite` 覆盖下限收紧到现值（上市带 columns 的表 418 → 411 = 删 7 张重复表）；注册表 / 共享表段 / 公式契约 / 披露列覆盖 / G7 诊断与 HEAD 同样通过。
+
+### 17.6 既有问题收口与勘误（2026-10-25）
+
+用户：「之后早就存在的问题也需要修复下」。批 9b-2 里顺带修的、不属于 §17.5 结构改动的：
+
+- **5914e315b 表名受损复位**：`sync_note_templates_from_word`（10-10）把单体表名同步成 Word 表前的提示段 / 错一位的小节标题，前端仍按业务名推 ⇒ 附注里出现孤儿子表、合并映射跟着受损名走。按 5914e315b 之前的表名（逐字核对）由各章节 owner 复位：上市 五、3、五、74 三张（`fix_note_table_names.RESTORES`，表名序列恰为受损快照才整组复位；不加 `legacy_aliases` —— 五、74 第 3 张的受损名就是第 2 张的真名）、五、21 两张（h3）、五、22 第 4 张（H1，受损名在规则里作别名认出）、五、26 第 1 张 / 五、27 第 0 张「研发支出」/ 五、28 第 2~3 张 / 五、31 与国企 八、32「合同取得成本」/ 国企 八、29「（1）商誉账面价值」（i_cycle；八、29 是 I3 前端 `I3_SOE_SUBTABLE` 的定名）、五、35（G10）、五、54 第 2 张（m_equity）、国企 八、54（J2 `restore_table_names` 整组）、五、43 第 4 张 / 五、46 第 3 张同节重名（L3 / L4）。
+- **两个修订脚本写同一节、互相改回**：删 `fix_note_ar_soe_structure.py` / `fix_note_ar_listed_structure.py`（D2 两版由 `fix_note_d2_ar_structure.py` 负责，原测试改指它）、`fix_note_j1_compensation_structure.py`（J1 由 CI 跑的 `fix_note_j1_employee_comp_structure.py` 负责，按新口径分两版写列头，守卫改指它）；`fix_note_d1` 的标题段判定改用 kit 同一份（`is_title_paragraph` / `titleize_text_sections`）；D4 分解信息表结构归 segment 脚本（revenue 脚本不再写 `cat{i}` 键与 guidance）。
+- **公式推送**：
+  - 旧格式附注认列（`note_writer.legacy_value_keys`）改走标题行库：删期间词表与「六列对称」兜底，按列语义找唯一的期末 / 期初金额列，认不出就跳过并写明原因；新旧对比模板 + 真库 2922 张表结果全同。
+  - 子表规则合计行兜底写错数：子表规则与主规则共用 binding 的取数行（科目合计，只有 ending / opening），取数行对不上附注行时引擎把科目合计写进目标表首个合计行 —— 前五名、账龄超过 1 年的重要款项、逾期借款、继续涉入、坏账 / 减值准备变动、政府补助、D2 两科目（1122 + 1231-02）合计等 22 条规则写的是错数（与前一轮删 G10 子表规则同一类）⇒ 删除；余下 18 处（账龄表小计 = 科目账面余额、按性质 / 来源列示的损益表等）逐条裁决，守卫 `test_formula_push_subtable_total_fallback.py` 钉住（HEAD 上红 20 处；新增或重跑 `gen_subtable_push_rules.py` 补回的规则命中兜底必须先裁决）。
+- **bindings 按序号消费**：模板改了表清单却不同步 binding，生成附注时取数按序号套到别的表上（9b-1 的 五、23 / 八、18 改名即此）⇒ 逐节对齐（§17.5.2）+ 全量守卫（`test_disclosure_multitable_r2`：每个 binding 章节的表名、表头列数逐位与模板相同，两版同号的章节两版都要齐；既有 2 节登记）。
+- **合并↔单体映射**：合并种子的表标题照搬合并 Word 表前文字（不少是编制提示句，或「期末本公司已质押…」这类与底稿不同的说法），单体表名复位后按名字对不上，重跑生成器时上市 五-4 整章被投票到 五、6（应收款项融资里有真同名表），另有 7 张落成章节级 ⇒ `gen_consol_standalone_note_mapping._TITLE_ALIASES` 补名字证据（加进表标题索引，定章投票 / 章节内取表 / 续表跟随照常；条目失效生成即报错），重跑后与 HEAD 的 36 处差异全是改进；守卫加「入库 == 生成器产物」与对照用例。国企 五-54-2 / 五-54-4 不登记：单体按底稿是一张「设定受益计划情况」三组列合表，没有一一对应的表。
+- **H1 / K1 / K 循环前端**：K1 八、9 账面余额变动按底稿两层（与 ECL 变动表同一表头），前端同改；K 损益 / 负债契约测试按可扩位约定（占位行必须 `row_type` 为 expandable）。
+- **读时增强**：`note_table_enrichment.carry_template_table_names` 同名优先、位置兜底；模板生成的旧表换模板表头时分组跟模板（模板无分组 ⇒ 清空），投影表不动。
+
+**勘误**（推翻 / 更正 §17.5.1 的条目）：「已知」里的 `test_push_note_disclosure_replace.py` 已删、`legacy_value_keys` 六列兜底已删（见上）；「G7.note.subtable_7 结果不变」—— 该规则字段 `total` 不是列键、取数源也不出这个值，已删；「D4 两个脚本打架」「d2 脚本列 key 与模板不同」「fix_note_ar_listed_structure 清空 五、5 columns」已收口；L1 国企逾期表名 / 利率列、G7 国企 JV 分组列、国企 L3 4 列 ≠ 5 列已对齐；标题行库 0.9306 / 0.9339、明细映射「五-18-8 改为章节级」以 §17.5.2 为准（补表后按表名映射）。
+
+**仍未修（只报告）**：
+- N 循环三向冲突：`fix_note_deferred_tax` / `fix_note_n2_tax` / `fix_note_n_cycle_full` 对 五、30 / 八、31 各写一套，`--check` 互相报欠账（`n_cycle_full --apply` 只改了 `_aligned_by`，已从快照还原）；N1 国企表头「年初余额」与前端不一致（HEAD 同红）。
+- 加粗标记：owner 脚本 guidance 里 16 处 `**`（`fix_note_bold_markers --check`，HEAD 同）。
+- G1 上市载荷 `buildG1ListedSubTableData` 推 9 张表到 五、2，都不是模板表名，无守卫（列定义是模块私有常量，扫不到）—— 需按底稿重排 五、2 / 五、3。
+- 被删重复表带的 `text_after_table`（Word 表后文字）未迁到主表：该字段归 `sync_note_templates_from_word` Phase 6，全仓与 Word 不一致 196 处。
+- 公式推送：非 F3 行 `read_cell` 恒可定位 ⇒ 规则字段不是列键时写进看不见的孤儿键（J1 / K6 主规则在已同步附注上即此）；主规则表名 ≠ 章节标题或不是真表（如 D2.note.main 标题校验恒失败），探针 121 条，与 HEAD 同；`gen_subtable_push_rules` 不分口径；试算表 binding 的子表规则取数行只有科目合计，恒不写，只产生跳过记录。
+- bindings 两版同号章节（十一、关联交易情况 / 十一、关联方应收应付款项）只能存一份；`test_variant_matrix::test_bindings_soe_legacy_alias_annotated`（`normalize_note_bindings` 产物从未入库）、H8 载荷键、K3 逾期利息 / L2L4 写入归属（并发 WIP）：HEAD 同红。
+
+### 17.7 两条语义裁决：「不适用就删除」与「可无限插行」（2026-10-25 用户明确）
+
+用户：「你注意对（不适用就删除）这个的处理，真的就是这个科目如果不适用这个表格就需要删掉的意思；对于可无限插行的意思也是根据实际清空动态插行的意思，这个无限插行并不是真实行内容。」补充：「母公司章节是在合并附注中的」。
+
+#### A「（不适用的项目请删除）」= 编制指引，不是表名 / 不是披露正文
+
+它是写给编制人的话（该科目不适用就把这张表删掉），落位只能是 `guidance`。现算落位（两版模板，探针 `p_na_expand.py`）：
+
+| 落位 | listed | soe | 判定 |
+|---|---|---|---|
+| 表名 | 0 | 0 | ✅ 本批把 6 处受损表名复位后归零（§17.6） |
+| `guidance` | 15 | 15 | ✅ 正确落位（HEAD 13 / 11 ⇒ 本批 **+6**，把指引搬进了 guidance） |
+| 标题段（`####`） | 20 | 0 | 属 Word 原文小节标题（`（2）第二层次公允价值计量的相关信息（不适用的项目请删除）`），照抄 Word，不动 |
+| 正文段 | 20 | 0 | 同上，Word 原文 |
+| 行 `label` | 4 | 3 | 🔴 **既有缺陷，本批未修**（见下） |
+
+本批与该语义**同向**的动作有两类，且是同一机理的两面：
+
+1. **表名复位**（§17.6）：`sync_note_templates_from_word` 把提示段当成了表名 ⇒ 复位成业务名，提示语义回到 `guidance`。
+2. **摘掉权宜标题前缀**（本节新增）：表名受损后，为了让「每张表都要有小节标题」类守卫过关，有人给那条提示段加了 `#### ` 当标题。表名复位后一节里**标题比表多一个** ⇒ `disclosure_engine` 段落游标逐标题前移时多走一格，把后续提示段配到**别的表**上。
+   - 实测现场：H1 五、22 的 R85 政府补助提示被配到**表 0 汇总表**，守卫 `test_h1_note_section_alignment::test_listed_cursor_inference_leaves_gaps_and_misattribution` 打红 —— 这是本批全量对比里**唯一一条新增红**，根因即此。
+   - 收口：kit 新增 `untitleize_text_sections(section, paragraphs)`（`titleize_text_sections` 的逆操作，幂等）+ `run_section(untitle_text_sections=)`；**与表名复位成对调用**，缺一即段落错配。
+   - 逐条取证（探针 `p_leftover_verdict.py`，以 5914e315b~1 为裁决基准）：受损前是**正文段**的 **6 条**摘前缀（五、3 / 五、6 / 五、26 / 五、28 资产组假设 / 五、35 / 八、12），受损前**就是标题**的 **5 条**保留（五、28 业绩承诺 / 五、31 / 八、29 / 八、32 / 八、54）。摘完 `p_leftover_verdict.py` 只剩这 5 条合法标题。
+   - H1 五、22 摘前缀后游标推断回到 5914e315b~1 的形态：`per_table[0]` / `[3]` 空、`[4]` 含「冲减无形资产」、`[5]` 回来，守卫 35 passed。
+
+**未修（只报告）**：行 `label` 内嵌该指引 **7 条**（上市 五、17 / 五、40 / 五、49 / 五、71，国企 八、40 / 八、91 / 十二、现金流量表补充资料），与 HEAD 逐条相同、本批未碰。它们**不是模板侧孤例**：底稿源 xlsx 里行名本身就带这个尾注（`p_grep_wp.py` 在 `wp_templates/**` 命中 215 处），且该字面量同时出现在前端 J1 两个 Tab 的行模型、`formula_presets_seed.json` 的 description、`note_table_headers_source_facts.json`、合并种子两版、`address_registry_l2_semantic.json` 的坐标键里 ⇒ 改行名 = 改行身份，会断掉按行名匹配的推送 / 载荷 / 坐标 / 真库已存数据对行。属「规模超单轮能力时冻结而非硬修」，另立一轮按消费方逐个迁移。
+
+#### B「可无限插行」/「……」= 可扩位位置标记，不是真实行内容
+
+平台已有单一真源与 owner，本批**不另造机制**：
+
+- 判据真源 `app/services/note_expandable_markers.py`（`LABEL_MARKERS` 含 `可无限量添加行` / `......` / `……` / `预留` / `…`；**恰等于**匹配，排除 `可改名`）。
+- 第 6 个 `row_type` 取值 `expandable` = 零可见内容：不渲染成数据行（`note_word_exporter`）、不参与任何合计（`note_total_recalc._SKIP_ROW_TYPES`）、不计入空表判定（`note_empty_table_detector` / `note_is_empty_calc`）、合并拉数跳过（`consol_note_standalone_reader._SKIP_ROW_TYPES`）。
+- owner 脚本 `backend/scripts/fix/fix_note_expandable_rows.py`（幂等，`--check`）。
+
+🔴 **本批修的真缺陷：母公司章 4 行长期在 `data`**。owner 脚本原有一条 `R10.2：母公司章一律排除（归 A spec）`，但 A spec（`fix_note_parent_company_chapter.py`）只管母公司章的**表集合 / 列 / 表头 / 指引**，`OWN_RULES` 里**从不写行的 `row_type`** ⇒ 两边都不标，这 4 行（上市 `十六、长期股权投资` T2 r1/r4、国企 `十二、长期股权投资` T2 r1/r3，label 都是 `…`）一直按普通数据行渲染出 4 条空占位披露行。用户已明确「母公司章节是在合并附注中的」—— 它照样出具，语义与其余章节无差别，排除没有依据。
+
+处置：撤销该排除（源码注释写明撤销理由），`--apply` 后 listed 92→94 / soe 59→61，`--check` 0 欠账、幂等。守卫 `test_note_expandable_rows.py` 相应**反转**：
+
+- `EXPECTED_EXPANDABLE` 79/42 → **81/44**；`EXPECTED_PARENT_CHAPTER_UNMARKED` 4 → **0**；算术闭合仍 125。
+- `test_parent_chapter_rows_untouched`（原断言「母公司章必须**仍是 data**，证明排除生效」）→ `test_parent_chapter_rows_are_marked_too`（断言必须是 `expandable`）。把排除加回来即打红。
+- 🔴 分母现算 **9** 不是 4：母公司章可扩位行总数 = 本轮新标 4 + **同构子节从合并章整表复制时就带着的 5**（listed 十六、其他应收款 2 / soe 十二、应收账款 1 + 十二、其他应收款 2）。首版把这 9 写成 4 被自己的分母断言抓到 —— `EXPECTED_PARENT_CHAPTER_UNMARKED`（仍按 data 的条数）与「可扩位行总数」是两个分母，不可互推。
+- 另一处源码级断言 `test_note_text_hygiene::test_parent_chapter_exclusion_is_wired_in_source` 钉的是 `fix_note_text_hygiene.py`（裸表名标题化 / `header_label` 删行）的排除，**不是**本脚本，未受影响（现读确认）。
+
+**不改的两类（现算后判定本就合规，改了反而不一致）**：
+
+- **空 `label` + `row_type=data` 的空白行 600 条**（listed 384 / soe 216；HEAD 607，本批删重复表净减 7）。这是源模板给用户填的空白行经 md 重建的既有表示法，**全平台普遍**，与 `expandable` 两种表示法并存。本批新插的 `八、18` T7「②对合营企业或联营企业发生超额亏损的分担额」6 行空白行与上市同构表 `七、1` T12 **逐条同构**（底稿源 `G7 长期股权投资.xlsx` 上市 A220 / 国企 A300 两处结构逐格一致：合营企业 + 3 行引用 `未确认投资损失测试表G7-16` + 小计 + 联营企业 + 3 行 + 小计 + 合计）⇒ 沿用既有表示法是对的，单独改成 `expandable` 会与其余 594 条不一致。统一口径属跨 spec 工作（影响前端渲染、推送找行、真库已存数据对行、勾稽），登记不修。
+- Word 比对侧已把这两类都当占位：`note_word_table._PLACEHOLDER_ROW`（`^[.…·．。\-—_]*$|添加行|^\d{1,3}$`）在行标签比对时忽略它们 ⇒ 本批改 `row_type` 不影响 `check_note_template_word_tree --check`（现算仍通过）。
+
+**派生产物复核**（改 `row_type` 与摘标题前缀后全部重跑，`--check` 均 0）：标题行库目录、章节号改名工具、同步注册表、Word 表格白名单、推送独占键 / 覆盖清册、soe↔listed diff、G7 三向对齐、Word 树、披露列覆盖。
+
+### 17.8 批 9b-2 验证（2026-10-25）
+
+口径：干净私有 worktree `r9b2_mine` =「要提交的那棵树」（HEAD `58f7afb42` + 本会话 135 文件，私有索引 `hash-object --path` 装配）vs `r9b2_head` = 同一 HEAD。两边同一份清单、同一 venv。
+
+| 项 | HEAD | 要提交的树 | 结论 |
+|---|---|---|---|
+| 后端 340 个测试文件（`-m "not pg_only"`） | 284 failed / 9889 passed | **86 failed / 10046 passed** | 修 198、**新增 0** |
+| 前端 102 个 spec | 118 red | **21 red** | 修 97、**新增 0** |
+| `fix_note_*.py --check`（54 个） | 25 个非零 | **6 个非零**（⊆ HEAD） | 无绿转红 |
+| 派生产物 10 个生成器 / 检查 `--check` | 2 个红（改名工具、G7 自检） | **全 0** | — |
+
+**余 21 条前端红与 86 条后端红全部 HEAD 同红**，归属已登记 §17.6：L2/L4 写入归属（15）、K3 逾期利息、H8 载荷键、N1 国企表头、OO 在线编辑宿主（2，他会话 spec）。
+
+**变异测试**（私有 worktree 磁盘注入 → 跑测试 → 逐字节还原并校 sha256，探针 `p_mutate.py`）：**6/6 全打红**。
+
+| 变异 | 打红的守卫 | owner 脚本 `--check` |
+|---|---|---|
+| M1 kit `untitleize` 改空操作 | `test_note_text_hygiene`（本轮新增单元测试） | — |
+| M1b 把 `untitleize` 从 `run_section` 摘掉 | 同上（源码级接线断言） | — |
+| M2 模板 `ts[13]` 改回 `#### ` 权宜标题 | `test_h1_note_section_alignment` | H1 报 1 项欠账 |
+| M3 母公司章 `…` 改回 `data` | `test_note_expandable_rows` | 可扩位脚本报 2 项欠账 |
+| M4 清空 `_TITLE_ALIASES` | `test_consol_note_section_mapping` | — |
+| M5 读时增强撤掉「同名优先」 | `test_note_table_enrichment` | — |
+
+🔴 **M1 首版变异存活，暴露真缺口**：原本把 M1 指向 `test_h1_note_section_alignment` —— 那条守卫读的是**模板 JSON**（函数的效果已落盘），改函数体不会让它红（实测仍 35 passed）。即新增的共享 helper **只被数据态间接覆盖 = 没有守卫**。据此补了 kit 的 4 条直接单元测试（逐段只摘登记项 / 幂等 / 与 `titleize` 不互相翻转 / 源码级两条路径接线且顺序正确），M1、M1b 才打红。同一纪律的另一面：M2/M3 证明「表名复位 ↔ 摘前缀」「撤销排除 ↔ 标记」两对动作都真的成对生效。
+
+**行数门**（`check_file_size.py` 逐文件，全部 exit 0）：
+- 登记白名单 3 条（均 HEAD 已超限且未登记，任何改动都会被门禁拒）：`_j1_disclosure_import_export.py` 831、`fix_note_i_cycle_structure.py` 1259、`test_note_expandable_rows.py` 986，各写明本轮改动与拆分方向。
+- 🔴 `_note_structure_kit.py` **不登记**：HEAD 上 761 行**在限内**，是本会话加三个共享 helper（`untitleize_text_sections` / `ensure_legacy_section_numbers` / `restore_table_names`）后越的线 ⇒ 白名单只给历史大文件，自己推过线的要拆。按门禁提示拆伴生模块 `_note_text_sections.py`（`text_sections` 关注点整段搬出 + 逐名 re-export + kit 自己把所在目录加进 `sys.path` 以兼容 `importlib` 按路径 `_load` 的调用方），现 **737 行，比 HEAD 还小**；54 个 `fix_note_*.py --check` 与 139 条相关用例在拆分前后逐条相同。
+
+**其他**：`test_committed_code_imports_only_committed_modules.py` 在要提交的树上通过（新模块已随同一次提交入库，不留「已提交代码引用未提交模块」）；`test_lazy_import_resolvability` 2 red 在 HEAD 逐条同红（他会话未入库的 `app/services/formula_settings/` 包触发）。design / tasks 两文件 LF、无 U+FFFD。
+
+🔴 **本轮操作事故与处置（如实记录）**：为重算自己的白名单块，我把工作树 `file_size_whitelist.txt` 覆盖成了 HEAD 内容，**抹掉了其他会话未提交的 3 块登记**（15 行）。已按本会话早先留下的完整 diff 转储原样补回（还原后 145224 字节、`git diff --numstat` 为 `24 0`，与事故前逐值一致），再追加自己的新块；提交 blob 经 `git diff` 核对只含我的 2 块、不含他会话的 15 行。**教训：共享文件要重算自己的 hunk 时，不得用 HEAD 覆盖工作树** —— 应在私有索引里组装（本会话 `p_mk_tree.py` 本来就是这么做的），工作树只做追加。
+
+### 17.9 批 9b-2 真实数据验证（2026-10-25）
+
+用户授权：「你可以用真实数据分别测试下国企和上市的附注，原有数据你可以先清空附注数据，之后再重新生成」。
+
+工具 `backend/scripts/fix/realign_project_notes.py --rebuild --project <id> --year 2025 --apply`（先备份 → 锁行 → 删该年度全部附注 + 推送状态 + 章节锁 → 按现行模板生成（不调大模型）→ 提交后公式推送 → 校验；任一硬断言不过整体回滚）。
+
+| 项目 | 重建前 | 重建后 | 公式推送 | 校验 |
+|---|---|---|---|---|
+| 国企 重药控股安徽 `0ec33ac9` | 169 行 / 168 在用 / 1 软删，**2 节不在模板**（十三、十三、1），with_text 100、edited 73 | **166 / 166 在用 / 0 软删 / 0 孤儿 / 0 不在模板** | 写 63 格、32 节；0 warning | **319 / 319 通过** |
+| 国企 宜宾新健康大药房 `c8621493` | 172 行 / 168 在用 / 4 软删，同样 2 节不在模板 | **166 / 166 / 0 / 0 / 0** | 写 78 格、37 节；0 warning | **319 / 319 通过** |
+| 上市【测试】甲有限公司 `4c77f3e8` | 0 行（本就无附注） | **199 / 199 / 0 / 0 / 0** | 写 4 格、1 节 | **350 / 350 通过** |
+
+备份落 `backend/backups/note_rebuild_<pid>_2025_<stamp>.json`（该目录不入库），可 `--restore` 原样恢复。
+
+**库内结构 == 模板**（探针逐章节比对 `_tables` 表名序列）：22 个本批改过的章节**全部一致、0 不符**（安徽 八、4/5/7/9/12/18/22/49/55/69，宜宾 八、4/5/18/49，上市 五、3/4/6/22/26/28/35/45）。逐项诉求在真库数据里的落位：
+
+- 八、49 / 五、45 长期借款**一层表头**：`headers` 5 列平铺、`_column_groups` 为 `None`
+- 八、7 预付款项按账龄列示 **7 列**：`期末数` / `期初数` 各 span 3（账面余额-金额 / 账面余额-比例（%）/ 坏账准备）
+- 八、55 预计负债含「形成原因」；八、69 其他收益 3 列、**无**「是否为政府补助」
+- 八、18 本批新插的「②对合营企业或联营企业发生超额亏损的分担额」存在，列头与底稿 `G7 长期股权投资.xlsx` 国企 A301 逐字一致
+- 八、9 本批补回的「其他应收款项账面余额变动」存在且是**两层表头**（第一 / 第二 / 第三阶段）
+- 上市 五、3「衍生金融资产」/ 五、35「衍生金融负债」/ 五、22「未办妥产权证书的固定资产情况」**表名已复位**（不再是提示段）
+
+**浏览器实测**（chrome-devtools，自建隔离上下文 `r9b2-admin`，每步校 `location.pathname`；浏览器与并发会话共用，未碰其他会话页面）：
+- 安徽附注编辑页：头部「166 个章节」；八、18 打开后 **10 张子表全部渲染成 tab**，含本批补的「重要联营企业的主要财务信息」与新插的「②对合营企业或联营企业发生超…」
+- 八、49 长期借款：`thead` **仅 1 行**、5 个 `th` 全部 `colspan=1 / rowspan=1` —— 一层表头在界面上成立
+- 上市【测试】项目：头部「199 个章节」；五、22 的 6 张 tab 中第 5 张显示为**「未办妥产权证书的固定资产情况」**
+- **console error 0 条**
+
+#### 公式推送真库守卫（`test_formula_push_note_skip_pg.py`，安徽）
+
+该守卫在 HEAD 即红（棘轮 `_MAX_SKIPPED=85`）。**同一份已重建的真库、只换代码**跑 `dry_run`，归因如下：
+
+| | HEAD 代码 | 本批代码 | |
+|---|---|---|---|
+| skipped | 218 | **196** | 改善 |
+| D 类（主规则表名 ≠ 章节标题，§17.6 的 P3） | 126 | **84** | 改善 33% |
+| C 类（银行 / 现金明细未建立） | 32 | 32 | 持平（≤ 登记 36） |
+| L 类（找不到唯一期末 / 期初金额列） | 8 | 14 | ≤ 登记 15 |
+| G 类（无对应章节 / 未生成） | 2 | **16** | 见下 |
+| 规则总数 | 517 | 487 | 本批删 30 条错数规则 |
+
+🔴 **G 类 +14 的归因（必须写明，不是回归）**：这 14 条是本批按变体收窄的 D1(6) / D2(4) / H1(4) 规则，收窄后在 soe 项目上报「附注模板类型 soe 没有对应的附注章节」。逐表核对列键证明收窄是**对的**：
+
+| 表（soe 八、22） | 规则字段（listed 口径） | soe 实际列键 | 结论 |
+|---|---|---|---|
+| 暂时闲置的固定资产情况 | `book_value` | `original_cost/accum_dep/impairment/**carrying**/remark` | 字段**不存在** |
+| 未办妥产权证书的固定资产情况 | `book_value` | `**carrying**/reason` | 字段**不存在** |
+| 固定资产清理 | `end_balance` / `prior_balance` | `**end_carrying**/**begin_carrying**/reason` | 字段**不存在** |
+| 通过经营租赁租出的固定资产 | `book_value` | soe 无此表 | 表**不存在** |
+
+即 HEAD 上这些规则在 soe 侧写的是**库里不存在的键 = 孤儿键**（编辑器 / Word 导出 / 校验都读不到，§17.6 登记的 P2 类）。本批把「静默写到看不见的地方」换成「显式跳过并报原因」，是**把假覆盖换成真实报告**，与本批删 22 条「合计行兜底写错数」规则同一性质。
+
+**不动棘轮**：`_MAX_SKIPPED` 是只减不增的棘轮，本批没资格上调；它在 HEAD 就红（218 > 85），本批降到 196 仍红，如实留红。`coverage` 227 < 下限 295 同理（重建后附注是模板骨架，底稿推来的 `sub_table_data` 被清空 ⇒ 可写目标行变少；HEAD 代码在同一数据上也只有 235）。
+
+**该守卫要真正变绿需要的后续工作**（登记，不在本批）：① D 类 84 条 = 主规则的 `table` 写的是子表名 / 不是章节标题，须逐条改成章节级或补 `table_by_template`；② 引擎缺 `fields_by_template` ⇒ 两版列键不同的表无法用一条规则覆盖，正解是加该能力或给 soe 建同名兄弟规则（`target` 键含 `section_by_template`，两版章节不同不算撞目标）；③ C 类 32 条须先导入银行存款 / 现金明细。
+
+**数据清理**：上市验证用的是**【测试】项目**（`4c77f3e8` 【测试】公式同步甲有限公司_2025），其附注为本次新建；两个国企项目是用户点名的真实项目，重建后数据即新基线，备份保留可回滚。

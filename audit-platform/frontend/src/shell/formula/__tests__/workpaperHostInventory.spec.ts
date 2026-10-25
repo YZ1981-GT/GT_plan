@@ -4,7 +4,8 @@
  * **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 4.1, 13.2**
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, beforeEach } from 'vitest'
 
@@ -23,10 +24,8 @@ import {
   scanDuplicateCapabilityFindings,
 } from '@/shell/formula'
 
-const EVIDENCE_DIR = join(
-  __dirname,
-  '../../../../../../.kiro/specs/workpaper-page-formula-toolbar-closure/basis',
-)
+// 落盘只为验证运行记录能原样读回：写临时目录。原先写 `.kiro/specs/workpaper-page-formula-toolbar-closure/basis`
+// —— 该 spec 已归档到 `_archive/05-business-features/`，每跑一次就在 specs 根下造出一个只有这份文件的「活动 spec」目录。
 
 describe('Task 2: workpaper host inventory', () => {
   beforeEach(() => {
@@ -183,8 +182,8 @@ describe('Task 2: workpaper host inventory', () => {
     expect(run.digests.exclusions).toMatch(/^[a-f0-9]{64}$/)
     expect(run.digests.run).toMatch(/^[a-f0-9]{64}$/)
 
-    mkdirSync(EVIDENCE_DIR, { recursive: true })
-    const outPath = join(EVIDENCE_DIR, 'T02-host-inventory-run.json')
+    const evidenceDir = mkdtempSync(join(tmpdir(), 'gt-t02-host-inventory-'))
+    const outPath = join(evidenceDir, 'T02-host-inventory-run.json')
     writeFileSync(
       outPath,
       JSON.stringify(
@@ -205,6 +204,7 @@ describe('Task 2: workpaper host inventory', () => {
       'utf8',
     )
     const saved = JSON.parse(readFileSync(outPath, 'utf8'))
+    rmSync(evidenceDir, { recursive: true, force: true })
     expect(saved.digests.run).toBe(run.digests.run)
   })
 

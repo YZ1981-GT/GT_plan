@@ -81,7 +81,9 @@ def test_build_tables_strips_header_label_and_keeps_meta(soe_section: dict[str, 
     ]
 
     aging = tables[0]
-    assert aging["headers"] == ["账  龄", "金 额", "比例（%）", "金 额", "比例（%）"]
+    # 国企按底稿每期 账面余额-金额 / 账面余额-比例 / 坏账准备（R8.4 批 9b-2）
+    leaves = ["账面余额-金额", "账面余额-比例（%）", "坏账准备"]
+    assert aging["headers"] == ["账  龄", *leaves, *leaves]
     assert [g["group"] for g in aging["_column_groups"]] == ["期末数", "期初数"]
     assert aging["guidance"]
     # 无 header_label 假行；每行 values 长度 = 值列数
@@ -92,9 +94,9 @@ def test_build_tables_strips_header_label_and_keeps_meta(soe_section: dict[str, 
 
     # 金额列（end_amount / prior_amount）才打 semantic + binding_id
     data_row = next(r for r in aging["rows"] if r["label"] == "1年以内（含1年）")
-    assert sorted(data_row["_cell_meta"]) == ["0", "2"]
+    assert sorted(data_row["_cell_meta"]) == ["0", "3"]
     assert data_row["_cell_meta"]["0"]["semantic"] == "closing_balance"
-    assert data_row["_cell_meta"]["2"]["semantic"] == "opening_balance"
+    assert data_row["_cell_meta"]["3"]["semantic"] == "opening_balance"
     assert data_row["_cell_meta"]["0"]["binding_id"] == "八、7.1年以内（含1年）.closing_balance"
 
     # 单级表头表不带父表头
@@ -103,7 +105,7 @@ def test_build_tables_strips_header_label_and_keeps_meta(soe_section: dict[str, 
 
 
 def test_rebuild_reports_rename_and_header_change(soe_section: dict[str, Any]) -> None:
-    """模拟修订前的存量快照（重名 + 压平表头）→ 重建后表名唯一、表头 5 列。"""
+    """模拟修订前的存量快照（重名 + 压平表头）→ 重建后表名唯一、表头按模板（国企 7 列）。"""
     legacy = {
         "headers": ["账龄", "期末数", "期初数"],
         "rows": [{"label": "账龄", "values": [None, None], "row_type": "header_label"}],
@@ -118,7 +120,8 @@ def test_rebuild_reports_rename_and_header_change(soe_section: dict[str, Any]) -
     names = [t["name"] for t in new_data["_tables"]]
     assert len(set(names)) == 3
     assert names[2] == "按欠款方归集的期末余额前五名的预付款项"
-    assert new_data["headers"] == ["账  龄", "金 额", "比例（%）", "金 额", "比例（%）"]
+    leaves = ["账面余额-金额", "账面余额-比例（%）", "坏账准备"]
+    assert new_data["headers"] == ["账  龄", *leaves, *leaves]
     # 顶层 rows 沿用「= 第一张表」约定，且无 header_label
     assert all(r["row_type"] != "header_label" for r in new_data["rows"])
     assert any("表名" in c for c in changes)

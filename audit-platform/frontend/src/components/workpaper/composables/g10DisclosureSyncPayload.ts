@@ -1,87 +1,107 @@
 /**
  * G10 披露 → disclosure_notes sync payload
- * 子表名对齐 note_template §五、34 / §八、34（及衍生 §五、35 / §八、35）
+ *
+ * 子表名 / 列键逐字对齐 note_template §五、34 / §五、35 / §八、34（守卫 g10NoteSubtableContract.spec.ts）：
+ * - 表名取 `G10_SUBTABLE` / `G10_DERIVATIVE_SUBTABLE` 常量，不按审计年度拼；旧载荷按年度拼的公允价值变动表名随
+ *   `_removed_table_keys` 清掉
+ * - 标签列头 / 合计行名用模板字面量（「项目」「合计」），与披露页的「项  目」「合  计」视觉写法解耦
+ * - 主表带父行（「交易性金融负债」「指定为…金融负债」= 其下各行之和，与底稿、披露页同口径），合计 = 末级行之和
+ * - 每张表显式 `flat`：源模板单级表头，不标时后端会把「本期增加 / 本期减少」反猜出凭空的「本期」父表头
+ * （R8.4 批 9b-2，2026-10-24）
  */
 import type { G10DiscListedStore, G10DiscSoeStore } from './g10DisclosureFromAdj'
 import {
+  G10_DERIVATIVE_SUBTABLE,
   G10_DISCLOSURE_SHEET_NAME,
   G10_NOTE_SECTION,
+  G10_SUBTABLE,
+  g10LegacyFvCreditTableNames,
   isG10DisclosureApplicable,
   resolveG10CurrentStandard,
   type G10DisclosureVariant,
 } from './g10NoteSectionMap'
 import {
   G10_DISCLOSURE_COL_LABELS,
-  G10_DISCLOSURE_TOTAL_LABEL,
   G10_LISTED_MOVEMENT_ROWS,
   G10_SOE_BALANCE_ROWS,
+  g10ChildKeys,
 } from './g10SchemaRows'
 import { calcSubtotal } from './useG10FormulaEngine'
-import type { ColumnDef } from './disclosureColumnDefs'
+import { defineColumns, type ColumnDef } from './disclosureColumnDefs'
 
 export interface G10SyncFromWorkpaperPayload {
   wp_id: string
   sheet_name: string
   section_id: string
   current_standard: string
-  sub_table_data: Record<string, Record<string, unknown>[]>
-  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 G10_DISCLOSURE_COL_LABELS（源对齐） */
+  /** 子表行 + `_note_texts` / `_removed_table_keys` 两个保留键（与 L1 / L4 载荷同形） */
+  sub_table_data: Record<string, any>
+  /** 列头元数据（disclosure-table-sync-convergence）：数据列 label 取自 G10_DISCLOSURE_COL_LABELS（源对齐） */
   columns?: Record<string, ColumnDef[]>
 }
 
-// ── G10 各子表列头：label 取自 G10_DISCLOSURE_COL_LABELS，键与子表名（含动态年份）一致 ──
-function buildG10ListedColumns(year: number | null): Record<string, ColumnDef[]> {
+/** 模板 headers[0]（标签列头）与合计行名：附注字面量；披露页显示的是「项  目」「合  计」 */
+export const G10_NOTE_ITEM_LABEL = '项目'
+export const G10_NOTE_TOTAL_LABEL = '合计'
+
+const FV_KEYS = ['fv_change_amount', 'credit_risk_current', 'credit_risk_cumulative'] as const
+
+function labelColumn(): ColumnDef {
+  return { key: 'label', label: G10_NOTE_ITEM_LABEL, is_label: true, flat: true }
+}
+
+function fvCreditColumns(fv: { fvChange: string; creditCurrent: string; creditCumulative: string }): ColumnDef[] {
+  return defineColumns([
+    labelColumn(),
+    { key: 'fv_change_amount', label: fv.fvChange, format: 'amount' },
+    { key: 'credit_risk_current', label: fv.creditCurrent, format: 'amount' },
+    { key: 'credit_risk_cumulative', label: fv.creditCumulative, format: 'amount' },
+  ])
+}
+
+// ── 各子表列头：键 = 模板列键（note_template §五、34 / §五、35 / §八、34），数据列 label 取自 G10_DISCLOSURE_COL_LABELS ──
+export function buildG10ListedColumns(year: number | null): Record<string, ColumnDef[]> {
   const L = G10_DISCLOSURE_COL_LABELS.listed
-  const fv = L.fvCredit(year)
+  const S = G10_SUBTABLE.listed
   return {
-    交易性金融负债: [
-      { key: 'label', label: L.movement.item, is_label: true },
-      { key: 'opening_balance', label: L.movement.opening, format: 'amount' },
+    [S.trading]: defineColumns([
+      labelColumn(),
+      { key: 'begin_balance', label: L.movement.opening, format: 'amount' },
       { key: 'current_increase', label: L.movement.increase, format: 'amount' },
       { key: 'current_decrease', label: L.movement.decrease, format: 'amount' },
       { key: 'end_balance', label: L.movement.closing, format: 'amount' },
-    ],
-    [LISTED_DESIGNATED_TABLE]: [
-      { key: 'label', label: L.designated.item, is_label: true },
-      { key: 'opening_balance', label: L.designated.opening, format: 'amount' },
+    ]),
+    [S.designated]: defineColumns([
+      labelColumn(),
+      { key: 'begin_balance', label: L.designated.opening, format: 'amount' },
       { key: 'end_balance', label: L.designated.closing, format: 'amount' },
-      { key: 'designation_reason', label: L.designated.reason },
-    ],
-    [listedFvCreditTableName(year)]: [
-      { key: 'label', label: fv.item, is_label: true },
-      { key: 'fv_change_amount', label: fv.fvChange, format: 'amount' },
-      { key: 'credit_risk_current', label: fv.creditCurrent, format: 'amount' },
-      { key: 'credit_risk_cumulative', label: fv.creditCumulative, format: 'amount' },
-    ],
+      { key: 'designation_reason', label: L.designated.reason, format: 'text' },
+    ]),
+    [S.fvCredit]: fvCreditColumns(L.fvCredit(year)),
   }
 }
 
-function buildG10ListedDerivativeColumns(): Record<string, ColumnDef[]> {
+export function buildG10ListedDerivativeColumns(): Record<string, ColumnDef[]> {
   const D = G10_DISCLOSURE_COL_LABELS.listed.derivative
   return {
-    衍生金融负债: [
-      { key: 'label', label: D.item, is_label: true },
+    [G10_DERIVATIVE_SUBTABLE.listed]: defineColumns([
+      labelColumn(),
       { key: 'end_balance', label: D.current, format: 'amount' },
       { key: 'prior_balance', label: D.prior, format: 'amount' },
-    ],
+    ]),
   }
 }
 
-function buildG10SoeColumns(year: number | null): Record<string, ColumnDef[]> {
+export function buildG10SoeColumns(year: number | null): Record<string, ColumnDef[]> {
   const B = G10_DISCLOSURE_COL_LABELS.soe.balance
-  const fv = G10_DISCLOSURE_COL_LABELS.soe.fvCredit(year)
+  const S = G10_SUBTABLE.soe
   return {
-    交易性金融负债: [
-      { key: 'label', label: B.item, is_label: true },
-      { key: 'end_fair_value', label: B.current, format: 'amount' },
-      { key: 'prior_fair_value', label: B.prior, format: 'amount' },
-    ],
-    [soeFvCreditTableName(year)]: [
-      { key: 'label', label: fv.item, is_label: true },
-      { key: 'fv_change_amount', label: fv.fvChange, format: 'amount' },
-      { key: 'credit_risk_current', label: fv.creditCurrent, format: 'amount' },
-      { key: 'credit_risk_cumulative', label: fv.creditCumulative, format: 'amount' },
-    ],
+    [S.trading]: defineColumns([
+      labelColumn(),
+      { key: 'end_fv', label: B.current, format: 'amount' },
+      { key: 'begin_fv', label: B.prior, format: 'amount' },
+    ]),
+    [S.fvCredit]: fvCreditColumns(G10_DISCLOSURE_COL_LABELS.soe.fvCredit(year)),
   }
 }
 
@@ -97,17 +117,14 @@ export interface G10SoeSyncSnapshot {
   auditYear: number | null
 }
 
-const LISTED_DESIGNATED_TABLE =
-  '1、对于指定为以公允价值计量且其变动计入当期损益的金融负债，应单独列示期初余额、期末余额，并披露指定的理由和依据。'
+type Row = Record<string, unknown>
 
-function listedFvCreditTableName(year: number | null): string {
-  const y = year ?? new Date().getFullYear()
-  return `对于指定为以公允价值计量且其变动计入当期损益的金融负债，${y}年公允价值的变动情况如下表所示：`
-}
-
-function soeFvCreditTableName(year: number | null): string {
-  const y = year ?? new Date().getFullYear()
-  return `对于指定为以公允价值计量且其变动计入当期损益的金融负债，${y}年公允价值的变动情况如下表所示：`
+/** 合计行：金额键 = 给定行之和（只传末级行，父行不重复计）；文字键留空 */
+function totalRow(rows: readonly Row[], amountKeys: readonly string[], textKeys: readonly string[] = []): Row {
+  const out: Row = { label: G10_NOTE_TOTAL_LABEL }
+  for (const k of amountKeys) out[k] = calcSubtotal(rows.map((r) => Number(r[k]) || 0))
+  for (const k of textKeys) out[k] = ''
+  return { ...out, is_total: true, row_type: 'total' }
 }
 
 function hasDerivativeListedData(store: G10DiscListedStore): boolean {
@@ -120,55 +137,18 @@ function hasDerivativeListedData(store: G10DiscListedStore): boolean {
   return fromMovement || fromRows || Boolean(store.derivativeNote?.trim())
 }
 
-export function buildG10ListedSubTableData(
-  snap: G10ListedSyncSnapshot,
-): Record<string, Record<string, unknown>[]> {
-  const { store, auditNote, auditYear } = snap
-  const leafRows = G10_LISTED_MOVEMENT_ROWS.filter((r) => !r.isParent)
-  const movementRows = leafRows.map((def) => {
-    const pair = store.movement[def.rowKey] ?? {
-      openingAmount: 0,
-      increaseAmount: 0,
-      decreaseAmount: 0,
-      closingAmount: 0,
-    }
-    return {
-      label: def.label.trim(),
-      row_key: def.rowKey,
-      opening_balance: pair.openingAmount,
-      current_increase: pair.increaseAmount,
-      current_decrease: pair.decreaseAmount,
-      end_balance: pair.closingAmount,
-      row_type: 'data',
-    }
-  })
-  const total = {
-    label: G10_DISCLOSURE_TOTAL_LABEL,
-    opening_balance: calcSubtotal(movementRows.map((r) => Number(r.opening_balance) || 0)),
-    current_increase: calcSubtotal(movementRows.map((r) => Number(r.current_increase) || 0)),
-    current_decrease: calcSubtotal(movementRows.map((r) => Number(r.current_decrease) || 0)),
-    end_balance: calcSubtotal(movementRows.map((r) => Number(r.end_balance) || 0)),
-    is_total: true,
-    row_type: 'total',
-  }
+const MOVEMENT_KEYS = ['begin_balance', 'current_increase', 'current_decrease', 'end_balance'] as const
+const ZERO_MOVEMENT = { openingAmount: 0, increaseAmount: 0, decreaseAmount: 0, closingAmount: 0 }
 
-  const designated = Object.entries(store.designatedDetail).map(([rowKey, row]) => ({
-    label: row.label?.trim() || '（未命名）',
-    row_key: rowKey,
-    opening_balance: row.openingAmount,
-    end_balance: row.closingAmount,
-    designation_reason: row.designationReason || '',
-    row_type: 'data',
-  }))
-  const designatedTotal = {
-    label: G10_DISCLOSURE_TOTAL_LABEL,
-    opening_balance: calcSubtotal(designated.map((r) => Number(r.opening_balance) || 0)),
-    end_balance: calcSubtotal(designated.map((r) => Number(r.end_balance) || 0)),
-    is_total: true,
-    row_type: 'total',
-  }
+type FvCreditStore = Record<string, {
+  label?: string
+  fvChangeAmount: number
+  creditRiskCurrent: number
+  creditRiskCumulative: number
+}>
 
-  const fvCredit = Object.entries(store.fvCreditRisk).map(([rowKey, row]) => ({
+function fvCreditRows(src: FvCreditStore): Row[] {
+  return Object.entries(src).map(([rowKey, row]) => ({
     label: row.label?.trim() || '（未命名）',
     row_key: rowKey,
     fv_change_amount: row.fvChangeAmount,
@@ -176,99 +156,97 @@ export function buildG10ListedSubTableData(
     credit_risk_cumulative: row.creditRiskCumulative,
     row_type: 'data',
   }))
-  const fvTotal = {
-    label: G10_DISCLOSURE_TOTAL_LABEL,
-    fv_change_amount: calcSubtotal(fvCredit.map((r) => Number(r.fv_change_amount) || 0)),
-    credit_risk_current: calcSubtotal(fvCredit.map((r) => Number(r.credit_risk_current) || 0)),
-    credit_risk_cumulative: calcSubtotal(fvCredit.map((r) => Number(r.credit_risk_cumulative) || 0)),
-    is_total: true,
-    row_type: 'total',
-  }
+}
 
-  return {
-    交易性金融负债: [...movementRows, total],
-    [LISTED_DESIGNATED_TABLE]: designated.length ? [...designated, designatedTotal] : [designatedTotal],
-    [listedFvCreditTableName(auditYear)]: fvCredit.length ? [...fvCredit, fvTotal] : [fvTotal],
+/** 只在有旧名可清时才带 `_removed_table_keys`（与 L4 载荷同） */
+function withRemoved(data: Record<string, any>, removed: readonly string[]): Record<string, any> {
+  const pushed = new Set(Object.keys(data))
+  const keys = removed.filter((name) => !pushed.has(name))
+  return keys.length ? { ...data, _removed_table_keys: keys } : data
+}
+
+export function buildG10ListedSubTableData(snap: G10ListedSyncSnapshot): Record<string, any> {
+  const { store, auditNote, auditYear } = snap
+  const S = G10_SUBTABLE.listed
+  const pairOf = (key: string) => store.movement[key] ?? ZERO_MOVEMENT
+  const movement: Row[] = G10_LISTED_MOVEMENT_ROWS.map((def) => {
+    const parts = def.isParent ? g10ChildKeys(G10_LISTED_MOVEMENT_ROWS, def.rowKey).map(pairOf) : [pairOf(def.rowKey)]
+    const value = (f: keyof typeof ZERO_MOVEMENT) => (def.isParent ? calcSubtotal(parts.map((p) => p[f])) : parts[0][f])
+    return {
+      label: def.label.trim(),
+      row_key: def.rowKey,
+      begin_balance: value('openingAmount'),
+      current_increase: value('increaseAmount'),
+      current_decrease: value('decreaseAmount'),
+      end_balance: value('closingAmount'),
+      row_type: 'data',
+    }
+  })
+  const leaves = movement.filter((_row, i) => !G10_LISTED_MOVEMENT_ROWS[i].isParent)
+
+  const designated: Row[] = Object.entries(store.designatedDetail).map(([rowKey, row]) => ({
+    label: row.label?.trim() || '（未命名）',
+    row_key: rowKey,
+    begin_balance: row.openingAmount,
+    end_balance: row.closingAmount,
+    designation_reason: row.designationReason || '',
+    row_type: 'data',
+  }))
+  const fvCredit = fvCreditRows(store.fvCreditRisk)
+
+  return withRemoved({
+    [S.trading]: [...movement, totalRow(leaves, MOVEMENT_KEYS)],
+    [S.designated]: [...designated, totalRow(designated, ['begin_balance', 'end_balance'], ['designation_reason'])],
+    [S.fvCredit]: [...fvCredit, totalRow(fvCredit, FV_KEYS)],
     _note_texts: [
       { section: 'listed-derivative-note', text: store.derivativeNote },
       { section: 'listed-maturity-diff', text: store.maturityDiffNote },
       { section: 'listed-audit-note', text: auditNote },
     ],
-  }
+  }, g10LegacyFvCreditTableNames(S.fvCredit, auditYear))
 }
 
-export function buildG10ListedDerivativeSubTableData(
-  snap: G10ListedSyncSnapshot,
-): Record<string, Record<string, unknown>[]> {
+export function buildG10ListedDerivativeSubTableData(snap: G10ListedSyncSnapshot): Record<string, any> {
   const { store } = snap
-  const rows = store.derivativeRows.map((r) => ({
+  const rows: Row[] = store.derivativeRows.map((r) => ({
     label: r.label?.trim() || '（未命名）',
     row_key: r.rowKey,
     end_balance: r.currentAmount,
     prior_balance: r.priorAmount,
     row_type: 'data',
   }))
-  const total = {
-    label: G10_DISCLOSURE_TOTAL_LABEL,
-    end_balance: calcSubtotal(rows.map((r) => Number(r.end_balance) || 0)),
-    prior_balance: calcSubtotal(rows.map((r) => Number(r.prior_balance) || 0)),
-    is_total: true,
-    row_type: 'total',
-  }
   return {
-    衍生金融负债: rows.length ? [...rows, total] : [total],
+    [G10_DERIVATIVE_SUBTABLE.listed]: [...rows, totalRow(rows, ['end_balance', 'prior_balance'])],
     _note_texts: [{ section: 'listed-derivative-note', text: store.derivativeNote }],
   }
 }
 
-export function buildG10SoeSubTableData(
-  snap: G10SoeSyncSnapshot,
-): Record<string, Record<string, unknown>[]> {
+export function buildG10SoeSubTableData(snap: G10SoeSyncSnapshot): Record<string, any> {
   const { store, auditNote, auditYear } = snap
-  const leafRows = G10_SOE_BALANCE_ROWS.filter((r) => !r.isParent)
-  const balanceRows = leafRows.map((def) => {
-    const pair = store.balance[def.rowKey] ?? { currentAmount: 0, priorAmount: 0 }
+  const S = G10_SUBTABLE.soe
+  const pairOf = (key: string) => store.balance[key] ?? { currentAmount: 0, priorAmount: 0 }
+  const balance: Row[] = G10_SOE_BALANCE_ROWS.map((def) => {
+    const parts = def.isParent ? g10ChildKeys(G10_SOE_BALANCE_ROWS, def.rowKey).map(pairOf) : [pairOf(def.rowKey)]
+    const value = (f: 'currentAmount' | 'priorAmount') => (def.isParent ? calcSubtotal(parts.map((p) => p[f])) : parts[0][f])
     return {
       label: def.label.trim(),
       row_key: def.rowKey,
-      end_fair_value: pair.currentAmount,
-      prior_fair_value: pair.priorAmount,
+      end_fv: value('currentAmount'),
+      begin_fv: value('priorAmount'),
       row_type: 'data',
     }
   })
-  const total = {
-    label: G10_DISCLOSURE_TOTAL_LABEL,
-    end_fair_value: calcSubtotal(balanceRows.map((r) => Number(r.end_fair_value) || 0)),
-    prior_fair_value: calcSubtotal(balanceRows.map((r) => Number(r.prior_fair_value) || 0)),
-    is_total: true,
-    row_type: 'total',
-  }
+  const leaves = balance.filter((_row, i) => !G10_SOE_BALANCE_ROWS[i].isParent)
+  const fvCredit = fvCreditRows(store.fvCreditRisk)
 
-  const fvCredit = Object.entries(store.fvCreditRisk).map(([rowKey, row]) => ({
-    label: row.label?.trim() || '（未命名）',
-    row_key: rowKey,
-    fv_change_amount: row.fvChangeAmount,
-    credit_risk_current: row.creditRiskCurrent,
-    credit_risk_cumulative: row.creditRiskCumulative,
-    row_type: 'data',
-  }))
-  const fvTotal = {
-    label: G10_DISCLOSURE_TOTAL_LABEL,
-    fv_change_amount: calcSubtotal(fvCredit.map((r) => Number(r.fv_change_amount) || 0)),
-    credit_risk_current: calcSubtotal(fvCredit.map((r) => Number(r.credit_risk_current) || 0)),
-    credit_risk_cumulative: calcSubtotal(fvCredit.map((r) => Number(r.credit_risk_cumulative) || 0)),
-    is_total: true,
-    row_type: 'total',
-  }
-
-  return {
-    交易性金融负债: [...balanceRows, total],
-    [soeFvCreditTableName(auditYear)]: fvCredit.length ? [...fvCredit, fvTotal] : [fvTotal],
+  return withRemoved({
+    [S.trading]: [...balance, totalRow(leaves, ['end_fv', 'begin_fv'])],
+    [S.fvCredit]: [...fvCredit, totalRow(fvCredit, FV_KEYS)],
     _note_texts: [
       { section: 'soe-maturity-diff', text: store.maturityDiffNote },
       { section: 'soe-audit-note', text: auditNote },
     ],
-  }
+  }, g10LegacyFvCreditTableNames(S.fvCredit, auditYear))
 }
 
 export function buildG10ListedSyncPayloads(

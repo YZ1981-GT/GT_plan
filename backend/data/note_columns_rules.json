@@ -3935,7 +3935,7 @@
       },
       {
         "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-na-ru-he-bing-bao-biao-fan-wei-de-zi-gong-si-ji-b",
-        "section_number": "七、本期纳入合并报表",
+        "section_number": "七、本期纳入合并报表范围的子公司基本情况",
         "section_title": "本期纳入合并报表范围的子公司基本情况",
         "index": 0,
         "table_name": "本期纳入合并报表范围的子公司基本情况",
@@ -3944,7 +3944,7 @@
       },
       {
         "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-mu-gong-si-yong-you-bei-tou-zi-dan-wei-biao-jue-quan-bu",
-        "section_number": "七、母公司拥有被投资",
+        "section_number": "七、母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因",
         "section_title": "母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因",
         "index": 0,
         "table_name": "母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因",
@@ -3953,7 +3953,7 @@
       },
       {
         "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-mu-gong-si-zhi-jie-huo-tong-guo-qi-ta-zi-gong-si-jian-ji",
-        "section_number": "七、母公司直接或通过",
+        "section_number": "七、母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的",
         "section_title": "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的",
         "index": 0,
         "table_name": "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的原因",
@@ -3962,7 +3962,7 @@
       },
       {
         "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-zhong-yao-fei-quan-zi-zi-gong-si-qing-kuang",
-        "section_number": "七、重要非全资子公司",
+        "section_number": "七、重要非全资子公司情况",
         "section_title": "重要非全资子公司情况",
         "index": 0,
         "table_name": "少数股东",
@@ -3971,7 +3971,7 @@
       },
       {
         "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-zhong-yao-fei-quan-zi-zi-gong-si-qing-kuang",
-        "section_number": "七、重要非全资子公司",
+        "section_number": "七、重要非全资子公司情况",
         "section_title": "重要非全资子公司情况",
         "index": 1,
         "table_name": "主要财务信息",
@@ -3980,7 +3980,7 @@
       },
       {
         "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-bu-zai-na-ru-he-bing-fan-wei-de-yuan-zi-gong-si",
-        "section_number": "七、本期不再纳入合并",
+        "section_number": "七、本期不再纳入合并范围的原子公司",
         "section_title": "本期不再纳入合并范围的原子公司",
         "index": 0,
         "table_name": "原子公司的基本情况",
@@ -3989,7 +3989,7 @@
       },
       {
         "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-bu-zai-na-ru-he-bing-fan-wei-de-yuan-zi-gong-si",
-        "section_number": "七、本期不再纳入合并",
+        "section_number": "七、本期不再纳入合并范围的原子公司",
         "section_title": "本期不再纳入合并范围的原子公司",
         "index": 1,
         "table_name": "本期出售的子公司出售日的财务状况",
@@ -3998,7 +3998,7 @@
       },
       {
         "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-bu-zai-na-ru-he-bing-fan-wei-de-yuan-zi-gong-si",
-        "section_number": "七、本期不再纳入合并",
+        "section_number": "七、本期不再纳入合并范围的原子公司",
         "section_title": "本期不再纳入合并范围的原子公司",
         "index": 2,
         "table_name": "本期出售的子公司出售日的经营成果",
@@ -4007,7 +4007,7 @@
       },
       {
         "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-xin-na-ru-he-bing-fan-wei-de-zhu-ti",
-        "section_number": "七、本期新纳入合并范",
+        "section_number": "七、本期新纳入合并范围的主体",
         "section_title": "本期新纳入合并范围的主体",
         "index": 0,
         "table_name": "本期新纳入合并范围的主体",
@@ -4016,7 +4016,7 @@
       },
       {
         "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-tong-yi-kong-zhi-xia-qi-ye-he-bing-qi",
-        "section_number": "七、本期发生的同一控",
+        "section_number": "七、本期发生的同一控制下企业合并情况",
         "section_title": "本期发生的同一控制下企业合并情况",
         "index": 0,
         "table_name": "本期发生的同一控制下企业合并情况",
@@ -4025,7 +4025,7 @@
       },
       {
         "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-fei-tong-yi-kong-zhi-xia-qi-ye-he-bin",
-        "section_number": "七、本期发生的非同一",
+        "section_number": "七、本期发生的非同一控制下企业合并情况",
         "section_title": "本期发生的非同一控制下企业合并情况",
         "index": 0,
         "table_name": "本期发生的非同一控制下企业合并情况",
@@ -4034,7 +4034,7 @@
       },
       {
         "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-xi-shou-he-bing",
-        "section_number": "七、本期发生的吸收合",
+        "section_number": "七、本期发生的吸收合并",
         "section_title": "本期发生的吸收合并",
         "index": 0,
         "table_name": "本期发生的吸收合并",
@@ -4043,7 +4043,7 @@
       },
       {
         "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-mu-gong-si-zai-zi-gong-si-de-suo-you-zhe-quan-yi-fen-e-f",
-        "section_number": "七、母公司在子公司的",
+        "section_number": "七、母公司在子公司的所有者权益份额发生变化的情况",
         "section_title": "母公司在子公司的所有者权益份额发生变化的情况",
         "index": 0,
         "table_name": "母公司在子公司的所有者权益份额发生变化的情况",

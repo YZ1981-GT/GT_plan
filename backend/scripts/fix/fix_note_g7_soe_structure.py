@@ -129,14 +129,34 @@ T1_ROWS: list[dict[str, Any]] = [
     total_row("合  计"),
 ]
 
-# ═══════ T2 重要合营企业的主要财务信息（源 A229:C241，flat 3 列）═══════
+# ═══════ T2 重要合营企业的主要财务信息（源 A229:D241，1 个被投资单位 × 两期，两级）═══════
 # 🔴 国企侧本就比上市侧少两行（无「其中：少数股东权益」「归属于母公司的所有者权益」），
 #    源模板逐字如此，不是欠账。
+# 🔴 两级：源 A229:B230 标签列跨两行，C229:D229 合并格是引用公式「='被投资单位财务信息（合营、联营）G7-5'!C8」
+#    = 被投资单位名（合营企业1），C230/D230 = 期末数 / 期初数（E229:F229、G229:H229 是留给更多企业的空合并格）。
+#    原先按「父表头空白、只有 1 个实体槽」裁成单层（`SOURCE_PLACEHOLDER_SINGLE_SLOT`），而那一格不是空白、是企业名
+#    引用；运行时 `g7SoeDisclosureModel` 早已按实体槽两层推（`JV_FS_SLOT`）⇒ seed 跟运行时与底稿，key 与运行时
+#    `buildG7SlotColumns` 逐字一致（consol-note-header-library-and-node-reaggregate R8.4 批 9b-2）。
 
 T2 = "重要合营企业的主要财务信息（划分为持有待售的除外）"
-_FS_COLUMNS = flat_columns([
-    ("label", "项 目", None), ("current", "期末数", AMOUNT), ("prior", "期初数", AMOUNT),
-])
+_JV_FS_SLOT = "jv-fs-company"
+_JV_PL_SLOT = "jv-pl-company"
+#: 合营表槽位默认名（与 `g7SoeDisclosureModel.JV_FS_SLOT_DEFAULT_NAMES` 同源，= 源 G7-5!C8）
+_JV_SLOT_NAMES = ("合营企业1",)
+
+
+def _slot_columns(slot: str, names: tuple[str, ...], label_header: str,
+                  current_label: str, prior_label: str) -> list[dict[str, Any]]:
+    """N 个被投资单位 × {current, prior} 的两级列定义（key 与前端 slot 列生成器一致）。"""
+    leaves: list[tuple[str, str, str | None, str | None]] = []
+    for seq, entity in enumerate(names, start=1):
+        leaves.append((f"{slot}_{seq}_current", current_label, AMOUNT, entity))
+        leaves.append((f"{slot}_{seq}_prior", prior_label, AMOUNT, entity))
+    return grouped_columns(("label", label_header), leaves)
+
+
+# 标签列头逐字取源 xlsx A229（一个空格），与本 sheet 其余表的「项  目」（两个空格）不同
+_FS_COLUMNS = _slot_columns(_JV_FS_SLOT, _JV_SLOT_NAMES, "项 目", "期末数", "期初数")
 _JV_FS_LABELS = [
     "流动资产", "非流动资产", "资产合计", "流动负债", "非流动负债", "负债合计", "净资产",
     "按持股比例计算的净资产份额", "调整事项", "对合营企业权益投资的账面价值 ",
@@ -146,9 +166,7 @@ _JV_FS_LABELS = [
 # ═══════ T3 续：重要合营企业本期及上期经营成果（源 A243:C251）═══════
 
 T3 = "续：重要合营企业本期及上期经营成果"
-_PL_COLUMNS = flat_columns([
-    ("label", "项  目", None), ("current", "本期发生额", AMOUNT), ("prior", "上期发生额", AMOUNT),
-])
+_PL_COLUMNS = _slot_columns(_JV_PL_SLOT, _JV_SLOT_NAMES, "项  目", "本期发生额", "上期发生额")
 _JV_PL_LABELS = [
     "营业收入", "财务费用", "所得税费用", "净利润", "其他综合收益",
     "综合收益总额", "企业本期收到的来自合营企业的股利",
@@ -177,12 +195,8 @@ _ASSOC_SLOT_NAMES = ("合营企业2", "联营企业1", "联营企业2")
 
 def _assoc_columns(slot: str, current_label: str, prior_label: str) -> list[dict[str, Any]]:
     """3 主体 × {current, prior} 的两级列定义（key 与前端 slot 列生成器一致）。"""
-    leaves: list[tuple[str, str, str | None, str | None]] = []
-    for seq, entity in enumerate(_ASSOC_SLOT_NAMES, start=1):
-        leaves.append((f"{slot}_{seq}_current", current_label, AMOUNT, entity))
-        leaves.append((f"{slot}_{seq}_prior", prior_label, AMOUNT, entity))
     # 标签列头逐字取源 xlsx A257（两个空格），与 A229 合营表的「项 目」（一个空格）不同
-    return grouped_columns(("label", "项  目"), leaves)
+    return _slot_columns(slot, _ASSOC_SLOT_NAMES, "项  目", current_label, prior_label)
 
 
 _ASSOC_FS_COLUMNS = _assoc_columns(_ASSOC_FS_SLOT, "期末数", "期初数")
@@ -357,13 +371,15 @@ def _soe_plan() -> list[dict[str, Any]]:
         rule(T1, T1_COLUMNS, T1_ROWS, _G1),
         rule(T2, _FS_COLUMNS, [data_row(x) for x in _JV_FS_LABELS], _G2),
         rule(T3, _PL_COLUMNS, [data_row(x) for x in _JV_PL_LABELS], _G3, aliases=["续："]),
-        rule(T4, _ASSOC_FS_COLUMNS, [data_row(x) for x in _ASSOC_FS_LABELS], _G4),
+        # 源模板与运行时都有、模板 JSON 整张缺失（原第 4 张位置被「续：」表占了）⇒ 插入（R8.4 批 9b-2）
+        rule(T4, _ASSOC_FS_COLUMNS, [data_row(x) for x in _ASSOC_FS_LABELS], _G4, insert=True),
         rule(
             T5, _ASSOC_PL_COLUMNS, [data_row(x) for x in _ASSOC_PL_LABELS], _G5,
             aliases=["续："],
         ),
         rule(T6, T6_COLUMNS, [data_row(x) for x in T6_LABELS], _G6),
-        rule(T7, T7_COLUMNS, T7_ROWS, _G7),
+        # 同上：原第 8 张顶着这个表名、内容是结构化主体收益表（批 9b-1 已正名），本表整张缺失 ⇒ 插入
+        rule(T7, T7_COLUMNS, T7_ROWS, _G7, insert=True),
         rule(
             T8, T8_COLUMNS, T8_ROWS, _G8,
             aliases=[

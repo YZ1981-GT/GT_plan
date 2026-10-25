@@ -19,8 +19,8 @@ G7 的列结构有三个真源：源 xlsx / 模板 seed（``note_template_*.json
    同名必误合并 / 豁免表仍单槽 / 豁免登记表完整性），任一不成立 ``--check`` 即 exit 2。
 
 报告分两节：**计入偏差**与**豁免登记**。后者是 ``SOURCE_PLACEHOLDER_SINGLE_SLOT``
-登记的 4 张合营表（源模板 merge 结构暗示 3 槽、叶子只填 1 槽 ⇒ 平台按单槽 flat 实现），
-其 ``flat`` / ``group`` 偏差**不计入偏差数**但必须如实打印。
+等三张登记表登记的表，其被豁免维度的偏差**不计入偏差数**但必须如实打印。
+单槽登记表 2026-10-24 起为空（原 4 张合营表的「空白合并」前提不成立，见该常量注释）。
 
 ``--emit-facts`` 把 (1) 的结果落盘成 ``backend/data/g7_column_source_facts.json``，
 供前端三向守卫（Task 3）作「源 xlsx 端」使用。该 JSON 是**派生投影、不是真源**，
@@ -82,8 +82,8 @@ SHEETS = {
 # ─────────────────────────── 表区域注册表 ───────────────────────────
 # (variant, noteSectionId, tableName, header_row_start, header_row_end)
 #
-# 章节号取 note_template_*.json 的 `section_number` 原值 —— soe 的 `七、…` 是 md 截断值
-# （10 字符），属既有真源形态，**不得补全**。
+# 章节号取 note_template_*.json 的 `section_number` 原值 —— soe 的 `七、…` 是全称（2026-10-10 前是 md 重建
+# 按 10 个字截断的值，旧值登记在种子该节 `legacy_section_numbers`，R8.4 批 9b-2 起各消费方改用全称）。
 # 表头行区间取自四个既有幂等脚本 docstring 里登记的源模板区间，并已用 openpyxl 逐区复核。
 # 右边界不写死：由「叶子表头最后一个非空列」自动判定（源模板有大量空白横向合并作排版留白，
 # 写死列数会把留白算成数据列）。
@@ -109,22 +109,22 @@ REGIONS: tuple[_Region, ...] = (
     ("listed", "七、1", "对合营企业或联营企业发生超额亏损的分担额", 221, 221),
     ("listed", "七、1", "重要的共同经营", 235, 236),
     # ── soe 七、…（13 节，其中 2 节纯文本无表格）──
-    ("soe", "七、本期纳入合并报表", "本期纳入合并报表范围的子公司基本情况", 9, 9),
-    ("soe", "七、母公司拥有被投资",
+    ("soe", "七、本期纳入合并报表范围的子公司基本情况", "本期纳入合并报表范围的子公司基本情况", 9, 9),
+    ("soe", "七、母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因",
      "母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因", 25, 25),
-    ("soe", "七、母公司直接或通过",
+    ("soe", "七、母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的",
      "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的原因",
      37, 37),
-    ("soe", "七、重要非全资子公司", "少数股东", 55, 55),
-    ("soe", "七、重要非全资子公司", "主要财务信息", 62, 63),
-    ("soe", "七、本期不再纳入合并", "原子公司的基本情况", 78, 78),
-    ("soe", "七、本期不再纳入合并", "本期出售的子公司出售日的财务状况", 87, 88),
-    ("soe", "七、本期不再纳入合并", "本期出售的子公司出售日的经营成果", 98, 99),
-    ("soe", "七、本期新纳入合并范", "本期新纳入合并范围的主体", 109, 109),
-    ("soe", "七、本期发生的同一控", "本期发生的同一控制下企业合并情况", 122, 123),
-    ("soe", "七、本期发生的非同一", "本期发生的非同一控制下企业合并情况", 129, 131),
-    ("soe", "七、本期发生的吸收合", "本期发生的吸收合并", 139, 140),
-    ("soe", "七、母公司在子公司的", "母公司在子公司的所有者权益份额发生变化的情况", 187, 187),
+    ("soe", "七、重要非全资子公司情况", "少数股东", 55, 55),
+    ("soe", "七、重要非全资子公司情况", "主要财务信息", 62, 63),
+    ("soe", "七、本期不再纳入合并范围的原子公司", "原子公司的基本情况", 78, 78),
+    ("soe", "七、本期不再纳入合并范围的原子公司", "本期出售的子公司出售日的财务状况", 87, 88),
+    ("soe", "七、本期不再纳入合并范围的原子公司", "本期出售的子公司出售日的经营成果", 98, 99),
+    ("soe", "七、本期新纳入合并范围的主体", "本期新纳入合并范围的主体", 109, 109),
+    ("soe", "七、本期发生的同一控制下企业合并情况", "本期发生的同一控制下企业合并情况", 122, 123),
+    ("soe", "七、本期发生的非同一控制下企业合并情况", "本期发生的非同一控制下企业合并情况", 129, 131),
+    ("soe", "七、本期发生的吸收合并", "本期发生的吸收合并", 139, 140),
+    ("soe", "七、母公司在子公司的所有者权益份额发生变化的情况", "母公司在子公司的所有者权益份额发生变化的情况", 187, 187),
     # ── soe 八、18（10 张表）──
     ("soe", "八、18", "长期股权投资分类", 202, 202),
     ("soe", "八、18", "长期股权投资明细", 210, 211),
@@ -233,9 +233,12 @@ class AlignmentDeviation:
 
 # ─────────────────── 豁免登记：源模板占位形态（单槽） ───────────────────
 #
-# 4 张合营表源侧确有 `B132:C132` 这类**空白跨 2 合并**，但**同表的 D/E、F/G（soe 为
-# E/F、G/H）合并其叶子行为空** ⇒ 源模板自身只填了 1 个实体槽，与联营表填满 3 槽
-# **不同构**。裁决为「源模板占位形态，登记豁免、不重构」。
+# 🔴 现为空表（2026-10-24 勘误，见 `SOURCE_PLACEHOLDER_SINGLE_SLOT` 注释）；以下是原裁决
+#    的历史说明，保留机制供将来真有「源模板只填 1 槽」的表时登记。
+#
+# 原登记的 4 张合营表源侧有 `B132:C132` 这类跨 2 合并，**同表的 D/E、F/G（soe 为
+# E/F、G/H）合并其叶子行为空** ⇒ 当时判为源模板自身只填了 1 个实体槽，与联营表填满 3 槽
+# **不同构**，裁决为「源模板占位形态，登记豁免、不重构」。
 #
 # 🔴 这不是「待修」而是「已裁决豁免」：报告必须单列一节如实打印
 #    「源模板 merge 结构暗示 3 槽、叶子只填 1 槽 —— 平台按单槽 flat 实现」。
@@ -261,52 +264,19 @@ class SingleSlotExemption:
         return (self.variant, self.section, self.table)
 
 
-_BASIS_COMMON: tuple[str, ...] = (
-    "源侧 D/E、F/G（soe 为 E/F、G/H）合并的叶子行为空 ⇒ 源模板只填了 1 个实体槽",
-    "seed 与运行时**两侧独立**都判 flat + 2 数据列（两个独立实现结论一致）",
-    "改成动态多实体属**结构性变更**，超出本 spec R1 明列的 6 张 A 类表",
-    "父表头是**实体名**、源 xlsx 留空 ⇒ 无从裁决，改了就是臆造（违「宁缺勿造」）",
-)
-
-SOURCE_PLACEHOLDER_SINGLE_SLOT: tuple[SingleSlotExemption, ...] = (
-    SingleSlotExemption(
-        variant="listed", section="七、1", table="重要合营企业主要财务信息",
-        source_ref="A132:C133",
-        source_text="A132:A133='项 目'；B132:C132 空白合并；B133='期末数' C133='期初数'；"
-                    "D132:E132 与 F132:G132 亦为空白合并但 D133~G133 全空",
-        basis=_BASIS_COMMON,
-        platform_intent="按单槽 flat 实现：标签列「项目」+ 期末数 / 期初数 两个数据列，不声明 group",
-    ),
-    SingleSlotExemption(
-        variant="listed", section="七、1", table="续：重要合营企业本期及上期经营成果",
-        source_ref="A153:C154",
-        source_text="A153:A154='项  目'；B153:C153 空白合并；B154='本期发生额' C154='上期发生额'；"
-                    "D153:E153 与 F153:G153 亦为空白合并但 D154~G154 全空",
-        basis=_BASIS_COMMON,
-        platform_intent="按单槽 flat 实现：标签列「项目」+ 本期发生额 / 上期发生额 两个数据列，不声明 group",
-    ),
-    SingleSlotExemption(
-        variant="soe", section="八、18",
-        table="重要合营企业的主要财务信息（划分为持有待售的除外）",
-        source_ref="A229:D230",
-        source_text="A229:B230='项 目'（标签列跨 2 xlsx 列）；C229:D229 空白合并；"
-                    "C230='期末数' D230='期初数'；E229:F229 与 G229:H229 亦为空白合并但 E230~H230 全空",
-        basis=_BASIS_COMMON,
-        platform_intent="按单槽 flat 实现：标签列「项目」+ 期末数 / 期初数 两个数据列，不声明 group",
-    ),
-    SingleSlotExemption(
-        variant="soe", section="八、18", table="续：重要合营企业本期及上期经营成果",
-        source_ref="A243:D244",
-        source_text="A243:B244='项  目'（标签列跨 2 xlsx 列）；C243:D243 空白合并；"
-                    "C244='本期发生额' D244='上期发生额'；E243:F243 与 G243:H243 亦为空白合并但 E244~H244 全空",
-        basis=_BASIS_COMMON,
-        platform_intent="按单槽 flat 实现：标签列「项目」+ 本期发生额 / 上期发生额 两个数据列，不声明 group",
-    ),
-)
+#: 🔴 2026-10-24 清空（consol-note-header-library-and-node-reaggregate R8.4 批 9b-2）。原登记 4 张合营表
+#: （上市 七、1「重要合营企业主要财务信息」「续：重要合营企业本期及上期经营成果」、国企 八、18 同名两张）的前提
+#: 「父表头是空白合并、源 xlsx 留空」不成立：B132（上市）/ C229（国企）等父表头格是引用公式
+#: 「='被投资单位财务信息（合营、联营）G7-5'!C8」= 被投资单位名「合营企业1」，与联营表 C257=G7-5!E8 同一写法，
+#: 只是合营表只引了 1 个企业（本脚本把它读成 `<DYNAMIC:cN>` 动态占位，读法本就对）。运行时
+#: `g7SoeDisclosureModel` / `g7ListedDisclosureModel` 也早已按实体槽两层推（`JV_FS_SLOT` / `IMPORTANT_JV_SLOT`），
+#: 「两侧独立都判 flat」已不成立 ⇒ 4 张表移入 `DYNAMIC_MATRIX_EXPECTED_RUNS`（1 个实体槽），seed 按两层写
+#: （`fix_note_g7_soe_structure.py` / `fix_note_g7_listed_other_entities_structure.py`）。
+SOURCE_PLACEHOLDER_SINGLE_SLOT: tuple[SingleSlotExemption, ...] = ()
 
 # 上限只许下调：`len(...) <= _EXEMPTION_CAP` 拦不住把 CAP 改大，故另存天花板常量。
-_EXEMPTION_CAP = 4
-_EXEMPTION_CAP_CEILING = 4
+_EXEMPTION_CAP = 0
+_EXEMPTION_CAP_CEILING = 0
 
 EXEMPTION_INDEX: dict[tuple[str, str, str], SingleSlotExemption] = {
     e.key: e for e in SOURCE_PLACEHOLDER_SINGLE_SLOT
@@ -384,7 +354,7 @@ PLATFORM_CONSTRAINT_EXEMPTIONS: tuple[PlatformConstraintExemption, ...] = (
         platform_intent="group 名改写为等价无斜杠表述「持股比例或享有的份额(%)」，段结构逐字保持",
     ),
     PlatformConstraintExemption(
-        variant="soe", section="七、本期发生的非同一",
+        variant="soe", section="七、本期发生的非同一控制下企业合并情况",
         table="本期发生的非同一控制下企业合并情况",
         kind="label",
         source_ref="F129:H129 / F130:F131+G130:H130 / G131+H131（三级表头）",
@@ -470,7 +440,7 @@ _CORNER_BASIS_COMMON: tuple[str, ...] = (
 
 CORNER_TITLE_EXEMPTIONS: tuple[CornerTitleExemption, ...] = (
     CornerTitleExemption(
-        variant="soe", section="七、本期不再纳入合并",
+        variant="soe", section="七、本期不再纳入合并范围的原子公司",
         table="本期出售的子公司出售日的财务状况",
         source_ref="A87:B87='公司名称' / A88:B88='截止日期'（各自横向合并 A:B，无纵向合并）",
         expected_parts=("公司名称", "截止日期"),
@@ -481,7 +451,7 @@ CORNER_TITLE_EXEMPTIONS: tuple[CornerTitleExemption, ...] = (
         platform_intent="标签列 label 取「项目」（源 xlsx 未给行标识列名，按数据行语义定）",
     ),
     CornerTitleExemption(
-        variant="soe", section="七、本期不再纳入合并",
+        variant="soe", section="七、本期不再纳入合并范围的原子公司",
         table="本期出售的子公司出售日的经营成果",
         source_ref="A98:B98='公司名称' / A99:B99='期间'（各自横向合并 A:B，无纵向合并）",
         expected_parts=("公司名称", "期间"),
@@ -509,9 +479,14 @@ for _pex in PLATFORM_CONSTRAINT_EXEMPTIONS:
 # 源模板填满多个实体槽的动态列矩阵：源侧 group 运行段数必须等于 seed 侧段数。
 # value = 期望段数（= 实体槽数）
 DYNAMIC_MATRIX_EXPECTED_RUNS: dict[tuple[str, str, str], int] = {
+    # 合营表源模板只引了 1 个企业（G7-5!C8），原登记为单槽豁免，见 `SOURCE_PLACEHOLDER_SINGLE_SLOT` 注释
+    ("listed", "七、1", "重要合营企业主要财务信息"): 1,
+    ("listed", "七、1", "续：重要合营企业本期及上期经营成果"): 1,
     ("listed", "七、1", "重要联营企业主要财务信息"): 3,
     ("listed", "七、1", "续：重要联营企业本期及上期经营成果"): 3,
-    ("soe", "七、重要非全资子公司", "主要财务信息"): 5,
+    ("soe", "七、重要非全资子公司情况", "主要财务信息"): 5,
+    ("soe", "八、18", "重要合营企业的主要财务信息（划分为持有待售的除外）"): 1,
+    ("soe", "八、18", "续：重要合营企业本期及上期经营成果"): 1,
     ("soe", "八、18", "重要联营企业的主要财务信息"): 3,
     ("soe", "八、18", "续：重要联营企业本期及上期经营成果"): 3,
 }
@@ -1320,10 +1295,11 @@ def build_facts_payload(facts: dict[tuple[str, str, str], dict[str, Any]]) -> di
                 "源模板占位形态（单槽）豁免，**一处登记两端消费**（后端 "
                 "SOURCE_PLACEHOLDER_SINGLE_SLOT 是唯一真源，前端读表级 "
                 "`single_slot_exemption` 字段，不得另抄一份表名清单）：\n"
-                "  这 4 张合营表源侧确有「空白跨 2 合并」暗示多个实体槽，但**同表另两组"
-                "合并的叶子行全空** ⇒ 源模板自身只填了 1 槽，与联营表填满 3 槽不同构。\n"
-                "  平台按**单槽 flat** 实现（标签列 + 2 个数据列，不声明 group）⇒ 运行时"
-                "「无分组」与源侧「1 段动态占位跨 2」的差异是**已裁决豁免**，不是待修偏差。\n"
+                "  登记对象 = 源侧有动态占位合并、但源模板自身只填 1 槽、平台按**单槽 flat**"
+                "实现（不声明 group）的表；运行时「无分组」与源侧「1 段动态占位」的差异是"
+                "**已裁决豁免**，不是待修偏差。\n"
+                "  🔴 2026-10-24 起登记为空：原 4 张合营表的父表头格是引用被投资单位名的公式"
+                "（非空白占位），seed 与运行时均按 1 个实体槽两层实现。\n"
                 "  🔴 消费方须豁免的维度 = `exempt_kinds`（仅 flat / group）；其余维度照常比对。\n"
                 "  🔴 stale 检测在后端 `_sc_single_slot_still_single()`：源侧段数一旦不再是 1"
                 "（源 xlsx 把叶子填满多槽）即打红，提醒**重新裁决**而非继续豁免。"

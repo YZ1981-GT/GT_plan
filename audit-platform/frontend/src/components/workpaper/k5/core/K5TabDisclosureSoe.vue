@@ -448,7 +448,7 @@ async function handleAiGenerate(): Promise<void> {
         + '逐项说明重要预计负债的形成原因（未决诉讼、对外担保、产品质量保证、亏损合同、'
         + '弃置义务、环保修复义务等）、计量所依据的重要假设与会计估计及其变动；'
         + '并按国资委附加披露要求说明重大或有负债的性质、财务影响估计与获得补偿的可能性。'
-        + '注意：附注表体只有「期末余额/期初余额」两个金额列，形成原因以表下注文字披露。'
+        + '注意：附注表体为「期末余额/期初余额/形成原因」三列，形成原因取本页「确认依据」，补充说明不必逐项重复。'
         + '只能使用已提供的项目名称与金额，不得虚构诉讼、担保、合同、环保义务或金额，'
         + '无把握的内容留空由审计师补充。',
       context: {
@@ -492,12 +492,13 @@ function persistContingent(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  // 附注 八、55 只有 2 个值列（附注模版 L3952 / note headers / consol 五-55-1 三源一致，
-  // 形成原因降级为表下注文字）→ 不传 `reason`；`basis`/`riskLevel` 是审计列，附注无落点。
+  // 附注 八、55 按底稿披露表 4 列（项目 | 期末余额 | 期初余额 | 形成原因，R8.4 批 9b-2）：底稿 D 列取
+  // 明细表 K5-2「预计负债计提原因」，本页对应「确认依据」→ 推 `reason`；`riskLevel` 是审计列，附注无落点。
   const rows = provisionTable.value.filter(r => !r.isTotal).map(r => ({
     project: r.category,
     endAmount: r.endBalance ?? 0,
     priorAmount: r.beginBalance ?? 0,
+    reason: r.basis ?? '',
   }))
   const payload = buildK5SyncPayload('soe', props.wpId || '', rows, narrativeText.value)
   try {

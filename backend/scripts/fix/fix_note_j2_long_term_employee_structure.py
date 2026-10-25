@@ -15,9 +15,9 @@
 7. 精算假设 (flat 3 cols: 项目/期末数/期初数)
 8. 敏感性分析 (group 4 cols: 项目 + 假设的变动幅度 + 对设定受益义务现值的影响{计划负债增加|计划负债减少})
 
-**SOE 八、54** — 6 tables:
+**SOE 八、54** — 6 tables（表名清单与 T2 列取自 fix_note_j2_dbp_structure.py）:
 1. 长期应付职工薪酬 (flat 5 cols: 项目/期初数/本期增加/本期减少/期末数)
-2. 设定受益计划义务现值 (group 7 cols: 项目 + 义务现值{本期|上期} + 计划资产的公允价值{本期|上期} + 设定受益计划净负债{本期|上期})
+2. 设定受益计划情况 (group 7 cols: 项目 + 设定受益计划义务现值{本期金额|上期金额} + 计划资产的公允价值{…} + 设定受益计划净负债（净资产）{…})
 3. 未折现的离职后福利预计到期分析 (flat 2 cols: 项目/金额)
 4. 计划资产 (group 3 cols: 项目 + 计划资产的公允价值{期末数|期初数})
 5. 精算假设 (flat 3 cols: 项目/期末数/期初数)
@@ -48,6 +48,7 @@ from _note_structure_kit import (  # noqa: E402
     rule,
     run_section,
 )
+from fix_note_j2_dbp_structure import SOE_54_EXPECTED_TABLES, SOE_54_TABLE1_COLUMNS  # noqa: E402
 
 _BACKEND = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = _BACKEND / "data"
@@ -70,22 +71,17 @@ LISTED_T8 = "敏感性分析"
 
 LISTED_EXPECTED = [LISTED_T1, LISTED_T2, LISTED_T3, LISTED_T4, LISTED_T5, LISTED_T6, LISTED_T7, LISTED_T8]
 
-# ── SOE 表名（无尾冒号） ─────────────────────────────────────────────────────
-SOE_T1 = "长期应付职工薪酬"
-SOE_T2 = "设定受益计划义务现值"
-SOE_T3 = "计划资产"  # index 2: movement table (part of change section)
-SOE_T4 = "设定受益计划净负债（净资产）"
-SOE_T5 = "未折现的离职后福利预计到期分析"
-# index 5 is ALSO named "计划资产" — asset composition table (duplicate name in template)
-# We cannot disambiguate in expected list. We'll use the first occurrence for movement
-# and handle the second occurrence (asset comp) by cursor position in the plan.
-SOE_T6_ASSET_COMP = "计划资产"  # index 5 — same name as T3, cursor position disambiguates
-SOE_T7 = "精算假设"
-SOE_T8 = "敏感性分析"
-
-# We list ALL expected table names (duplicates included once since validate_section checks existence)
-SOE_EXPECTED = [SOE_T1, SOE_T2, SOE_T3, SOE_T4, SOE_T5, SOE_T7, SOE_T8]
-# Note: "计划资产" appears twice but validate_section only checks each expected name exists at least once
+# ── SOE 表名（无尾冒号）：6 张，与 fix_note_j2_dbp_structure.py 同一份清单 ─────────────────
+# 🔴 R8.4 批 9b-2（2026-10-24）：原先这里还是 8 张表的旧形态（两张变动表 dbp 脚本已删、T2 已改名「设定受益计划
+#    情况」），--check 恒 20 项欠账、两个脚本对同一节互相矛盾 ⇒ 改为与 dbp 同一份清单、同一套 T2 列。
+#    5914e315b（Word 同步）按 Word 的 8 张表名逐位套给本节 6 张表 ⇒ 后 4 张名字错位（「计划资产」出现两次、
+#    精算假设 / 敏感性分析两张找不到），列与行没动 ⇒ 用 SOE_RENAME 整组复位。
+SOE_T1, SOE_T2, SOE_T3, SOE_T4, SOE_T5, SOE_T6 = SOE_54_EXPECTED_TABLES
+SOE_EXPECTED = list(SOE_54_EXPECTED_TABLES)
+SOE_RENAME = (
+    [SOE_T1, SOE_T2, "计划资产", "设定受益计划净负债（净资产）", "未折现的离职后福利预计到期分析", "计划资产"],
+    SOE_EXPECTED,
+)
 
 # ── Guidance（取自源模板红字 / CAS 9 编制提示） ────────────────────────────────
 _GUIDANCE_SUMMARY_LISTED = (
@@ -187,26 +183,6 @@ def soe_summary_cols():
     ])
 
 
-def soe_movement_cols():
-    """计划资产 / 设定受益计划净负债（净资产）— flat 3 cols (same as listed movement tables)"""
-    return flat_columns([("label", "项目", None), ("cur", "本期金额", AMOUNT), ("prior", "上期金额", AMOUNT)])
-
-
-def soe_change_cols():
-    """设定受益计划义务现值 — 7 cols with 3 groups"""
-    return grouped_columns(
-        ("label", "项目"),
-        [
-            ("dbo_cur", "本期", AMOUNT, "义务现值"),
-            ("dbo_prior", "上期", AMOUNT, "义务现值"),
-            ("asset_cur", "本期", AMOUNT, "计划资产的公允价值"),
-            ("asset_prior", "上期", AMOUNT, "计划资产的公允价值"),
-            ("net_cur", "本期", AMOUNT, "设定受益计划净负债"),
-            ("net_prior", "上期", AMOUNT, "设定受益计划净负债"),
-        ],
-    )
-
-
 def soe_maturity_cols():
     return flat_columns([("label", "项目", None), ("amount", "金额", AMOUNT)])
 
@@ -252,13 +228,11 @@ LISTED_PLAN = [
 
 SOE_PLAN = [
     rule(SOE_T1, soe_summary_cols(), None, _GUIDANCE_SOE_SUMMARY),
-    rule(SOE_T2, soe_change_cols(), None, _GUIDANCE_SOE_CHANGE),
-    rule(SOE_T3, soe_movement_cols(), None, _GUIDANCE_ASSET_MOVEMENT),  # 计划资产 (movement)
-    rule(SOE_T4, soe_movement_cols(), None, _GUIDANCE_NET),  # 设定受益计划净负债（净资产）
-    rule(SOE_T5, soe_maturity_cols(), None, _GUIDANCE_MATURITY),
-    rule(SOE_T6_ASSET_COMP, soe_asset_comp_cols(), None, _GUIDANCE_ASSET_COMP),  # 计划资产 (composition)
-    rule(SOE_T7, soe_assume_cols(), None, _GUIDANCE_ASSUME),
-    rule(SOE_T8, soe_sens_cols(), None, _GUIDANCE_SENS_SOE),
+    rule(SOE_T2, SOE_54_TABLE1_COLUMNS, None, _GUIDANCE_SOE_CHANGE),  # 设定受益计划情况（三组两级表头）
+    rule(SOE_T3, soe_maturity_cols(), None, _GUIDANCE_MATURITY),
+    rule(SOE_T4, soe_asset_comp_cols(), None, _GUIDANCE_ASSET_COMP),  # 计划资产（构成）
+    rule(SOE_T5, soe_assume_cols(), None, _GUIDANCE_ASSUME),
+    rule(SOE_T6, soe_sens_cols(), None, _GUIDANCE_SENS_SOE),
 ]
 
 
@@ -298,29 +272,12 @@ def run(key: str, dry_run: bool, check: bool):
             LISTED_PATH, LISTED_SECTION, LISTED_PLAN, LISTED_EXPECTED,
             aligned_by=ALIGNED_BY, dry_run=dry_run, check=check,
         )
-    else:
-        # SOE 有已知不可修的重复表名（「计划资产」index 2 是变动表、index 5 是构成表），
-        # validate_section 会报 err 阻止写盘。先正常调用，然后把"表名重复"降级为 warning。
-        changes, warnings, errs = run_section(
-            SOE_PATH, SOE_SECTION, SOE_PLAN, SOE_EXPECTED,
-            aligned_by=ALIGNED_BY, dry_run=dry_run, check=check,
-        )
-        # 如果唯一的 err 是已知的重复表名（模板设计如此，不可修），手动写盘
-        dup_errs = [e for e in errs if "表名重复" in e]
-        real_errs = [e for e in errs if "表名重复" not in e]
-        if dup_errs and not real_errs and changes and not dry_run and not check:
-            # run_section 因 errs 没写盘，手动补写
-            import json as _json
-            doc = _json.loads(SOE_PATH.read_text(encoding="utf-8"))
-            section = next(s for s in doc["sections"] if s.get("section_number") == SOE_SECTION)
-            # Re-apply plan on fresh read (run_section already mutated in-memory but didn't save)
-            from _note_structure_kit import apply_plan as _apply, stamp as _stamp
-            _apply(section, SOE_PLAN)
-            _stamp(section, ALIGNED_BY)
-            SOE_PATH.write_text(_json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        # 降级为 warning 返回
-        warnings.extend(dup_errs)
-        return changes, warnings, real_errs
+    # 原先 SOE 两张「计划资产」重名被当成「模板设计如此」、降级为 warning 后手动写盘 —— 重名其实是 5914e315b 的错位，
+    # 整组复位后表名唯一，走 run_section 的常规校验（R8.4 批 9b-2）
+    return run_section(
+        SOE_PATH, SOE_SECTION, SOE_PLAN, SOE_EXPECTED,
+        aligned_by=ALIGNED_BY, dry_run=dry_run, check=check, rename=SOE_RENAME,
+    )
 
 
 LABELS = {"listed": f"Listed {LISTED_SECTION}", "soe": f"SOE {SOE_SECTION}"}

@@ -5,11 +5,11 @@
  *   listed_standalone = 五、33
  *   soe_standalone    = 八、33
  *
- * 附注模板结构（五、33 / 八、33）：
- *   表1: 短期借款分类（项目/期末余额/上年年末余额|期初余额）
+ * 附注模板结构（五、33 / 八、33，按底稿 L1 两张披露 sheet）：
+ *   表1: 短期借款分类（上市: 项  目/期末余额/上年年末余额；国企: 借款类别/期末余额/期初余额）
  *     固定4行: 信用借款/抵押借款/保证借款/质押借款 + 合计
- *   表2: 逾期借款情况（上市: 借款单位/期末余额/借款利率/逾期时间/逾期利率；
- *                     国企: 债权单位/期末余额/借款利率（%））
+ *   表2: 上市「（2）逾期借款情况」: 借款单位/期末余额/借款利率/逾期时间/逾期利率；
+ *        国企「已逾期未偿还的短期借款情况」: 债权单位/期末余额/借款利率
  *   说明: 审计核对结论
  *
  * 数据来源：
@@ -29,6 +29,18 @@ export const L1_NOTE_SECTION = {
 export const L1_DISCLOSURE_SHEET_LISTED = '附注披露信息核对（上市公司）'
 export const L1_DISCLOSURE_SHEET_SOE = '附注披露信息核对（国企）'
 
+/** 子表名（逐字取附注模板 `tables[].name`；两版逾期表名不同） */
+export const L1_SUBTABLE = {
+  category: '短期借款分类',
+  overdue: { listed: '（2）逾期借款情况', soe: '已逾期未偿还的短期借款情况' },
+} as const
+
+/**
+ * 旧载荷推过、模板里不存在的表：随载荷带 `_removed_table_keys` 清掉库里的孤儿子表。
+ * 改造前逾期表两版都推「逾期借款情况」（模板两版都没有这个表名）。
+ */
+export const L1_LEGACY_OBSOLETE_TABLES = ['逾期借款情况'] as const
+
 // ─── 列定义 ──────────────────────────────────────────────────────────────────
 //
 // 口径实证见 spec `disclosure-columns-coverage-rollout` design §批 1 列头清查 §2/§3：
@@ -36,15 +48,14 @@ export const L1_DISCLOSURE_SHEET_SOE = '附注披露信息核对（国企）'
 //     / 附注模版 md 仅 1 行 header）→ 标签列一律 `flat: true`，0 处 `group`。
 //     不标 `flat` 时后端 `_infer_groups_from_headers` 会给上市逾期表凭空加「逾期」
 //     父表头（逾期时间/逾期利率被并到假父表头下），实跑已复现。
-//   · label 逐字取自附注模版（`上市报表附注.md` L4198~4223 /
-//     `国企报表附注.md` L3337~3360）+ `note_template_{listed,soe}.json` 五、33 / 八、33。
-//     与源 xlsx 冲突处按「附注是交付物」以附注为准（国企分类表 `期初余额`、
-//     国企逾期表 `债权单位` / `借款利率（%）` 全角括号）。
+//   · 🔴 表名与列名按底稿 L1 两张披露 sheet（= 附注模板 五、33 / 八、33，R8.4 批 9b-2 起「单体都按底稿
+//     披露表格式」）：上市分类表标签列「项  目」（底稿 A7 双空格）、国企逾期表利率列「借款利率」（底稿 C16，
+//     原按附注模版 md 写「借款利率（%）」）、两版逾期表名见 `L1_SUBTABLE`。
 
-/** 分类表列头（上市: 项目/期末余额/上年年末余额；国企: 借款类别/期末余额/期初余额） */
+/** 分类表列头（上市: 项  目/期末余额/上年年末余额；国企: 借款类别/期末余额/期初余额） */
 function buildCategoryColumns(variant: 'listed' | 'soe'): ColumnDef[] {
   return [
-    { key: 'category', label: variant === 'listed' ? '项目' : '借款类别', is_label: true, flat: true },
+    { key: 'category', label: variant === 'listed' ? '项  目' : '借款类别', is_label: true, flat: true },
     { key: 'endBalance', label: '期末余额', format: 'amount' },
     { key: 'beginBalance', label: variant === 'listed' ? '上年年末余额' : '期初余额', format: 'amount' },
   ]
@@ -56,7 +67,7 @@ function buildOverdueColumns(variant: 'listed' | 'soe'): ColumnDef[] {
     return [
       { key: 'borrower', label: '债权单位', is_label: true, flat: true },
       { key: 'endBalance', label: '期末余额', format: 'amount' },
-      { key: 'rate', label: '借款利率（%）', format: 'percent' },
+      { key: 'rate', label: '借款利率', format: 'percent' },
     ]
   }
   return [
@@ -79,10 +90,10 @@ export interface L1ColumnsOptions {
 
 function buildL1Columns(variant: 'listed' | 'soe', opts: L1ColumnsOptions): Record<string, ColumnDef[]> {
   const columns: Record<string, ColumnDef[]> = {
-    '短期借款分类': buildCategoryColumns(variant),
+    [L1_SUBTABLE.category]: buildCategoryColumns(variant),
   }
   if (opts.includeOverdue) {
-    columns['逾期借款情况'] = buildOverdueColumns(variant)
+    columns[L1_SUBTABLE.overdue[variant]] = buildOverdueColumns(variant)
   }
   return columns
 }
@@ -138,13 +149,19 @@ export function buildL1SyncPayload(opts: L1SyncPayloadOptions) {
       return { label: r.borrower, values }
     })
 
+  const overdueTable = L1_SUBTABLE.overdue[variant]
   const sub_table_data: Record<string, any> = {
-    '短期借款分类': categoryTableRows,
+    [L1_SUBTABLE.category]: categoryTableRows,
   }
 
   if (overdueTableRows.length > 0) {
-    sub_table_data['逾期借款情况'] = overdueTableRows
+    sub_table_data[overdueTable] = overdueTableRows
   }
+  // 清旧载荷的孤儿表；逾期表是「如无，删除」的条件表，本次没有逾期数据时连同上次推过的一起清掉
+  sub_table_data._removed_table_keys = [
+    ...L1_LEGACY_OBSOLETE_TABLES,
+    ...(overdueTableRows.length > 0 ? [] : [overdueTable]),
+  ]
 
   const columnsOpts: L1ColumnsOptions = { includeOverdue: overdueTableRows.length > 0 }
   const columns = variant === 'listed'

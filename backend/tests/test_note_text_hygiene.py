@@ -176,6 +176,87 @@ class TestBareTableNameParagraphs:
         assert after[2] == "（1）已是标题", "已是标题的段落不得被重复加前缀"
         assert len(changes) == 1
 
+    def test_untitleize_strips_only_registered_paragraphs(self) -> None:
+        """`untitleize_text_sections` = `titleize` 的逆操作，只摘登记过的那几段。
+
+        🔴 为什么必须有这条独立单元测试（2026-10-25，R8.4 批 9b-2）：该函数的效果已经落进
+        模板 JSON，**变异它不会让读数据的守卫打红**（实测把函数体改成空操作后
+        `test_h1_note_section_alignment` 仍 35 passed）⇒ 只靠数据态守卫等于没守卫。
+        用处与机理见 `_note_structure_kit.untitleize_text_sections` 的 docstring。
+        """
+        section = {
+            "tables": [{"name": "未办妥产权证书的固定资产情况"}],
+            "text_sections": [
+                "#### 未办妥产权证书的固定资产情况",
+                "#### （披露期末未办妥产权证书的固定资产账面价值及原因。）",
+                "#### 别的小节标题",
+                "（提示：这段本来就不是标题）",
+            ],
+        }
+        before = len(section["text_sections"])
+        changes = KIT.untitleize_text_sections(
+            section, ["（披露期末未办妥产权证书的固定资产账面价值及原因。）"]
+        )
+        after = section["text_sections"]
+        assert len(after) == before, "摘前缀不得改变段数"
+        assert after[0] == "#### 未办妥产权证书的固定资产情况", "表名标题不得被动"
+        assert after[1] == "（披露期末未办妥产权证书的固定资产账面价值及原因。）", "登记段应摘掉 #### "
+        assert after[2] == "#### 别的小节标题", "未登记的标题不得被动"
+        assert after[3] == "（提示：这段本来就不是标题）", "本就不是标题的段落不得被动"
+        assert len(changes) == 1
+
+    def test_untitleize_is_idempotent_and_noop_without_registry(self) -> None:
+        """幂等 + 空登记即空操作（防它顺手改别的段）。"""
+        base = ["#### 表名", "（提示：甲）", "正文"]
+        section = {"tables": [{"name": "表名"}], "text_sections": list(base)}
+        assert KIT.untitleize_text_sections(section, []) == []
+        assert section["text_sections"] == base, "空登记必须一段不动"
+        assert KIT.untitleize_text_sections(section, None) == []
+
+        sec2 = {"tables": [{"name": "表名"}], "text_sections": ["#### （提示：甲）"]}
+        first = KIT.untitleize_text_sections(sec2, ["（提示：甲）"])
+        assert first and sec2["text_sections"] == ["（提示：甲）"]
+        second = KIT.untitleize_text_sections(sec2, ["（提示：甲）"])
+        assert second == [], "第二次必须是空操作（幂等）"
+
+    def test_untitleize_and_titleize_do_not_fight(self) -> None:
+        """摘完若该段恰是表名，`titleize` 会再加回来 —— 两者不得互相翻转造成反复改写。
+
+        `run_section` 的顺序是 untitleize → titleize：故「登记的段落同时是表名」时最终仍是标题，
+        这是有意的（裸表名不能当正文），且第二次跑为空操作。
+        """
+        section = {"tables": [{"name": "甲表"}], "text_sections": ["#### 甲表"]}
+        KIT.untitleize_text_sections(section, ["甲表"])
+        assert section["text_sections"] == ["甲表"]
+        KIT.titleize_text_sections(section)
+        assert section["text_sections"] == ["#### 甲表"]
+        # 再走一轮同样顺序 ⇒ 稳定在标题态
+        assert KIT.untitleize_text_sections(section, ["甲表"])
+        assert KIT.titleize_text_sections(section)
+        assert section["text_sections"] == ["#### 甲表"]
+
+    def test_untitleize_is_wired_into_run_section(self) -> None:
+        """源码级：`run_section` 必须在 `titleize` **之前**调 `untitleize`，且写入 / `--check` 两条路径都调。
+
+        顺序反了 = 先加回前缀再摘、或摘完又被当裸表名加回，表现为反复改写；
+        只在写入路径调 = `--check` 看不见这项欠账（假绿）。
+        """
+        src = (BACKEND_ROOT / "scripts" / "fix" / "_note_structure_kit.py").read_text(
+            encoding="utf-8"
+        )
+        i = src.find("def run_section(")
+        assert i > 0, "未找到 run_section"
+        body = src[i:]
+        assert "untitle_text_sections" in body, "run_section 未接 untitle_text_sections 形参"
+        un = [m.start() for m in re.finditer(r"untitleize_text_sections\(", body)]
+        ti = [m.start() for m in re.finditer(r"titleize_text_sections\(", body)]
+        # titleize 的匹配会把 untitleize 也算进去（后者含前者）⇒ 剔掉
+        ti = [x for x in ti if x - 2 not in [u - 0 for u in un] and body[max(0, x - 2):x] != "un"]
+        assert len(un) == 2, f"untitleize 应在 --check 与写入两条路径各调一次，实得 {len(un)}"
+        assert len(ti) == 2, f"titleize 应在两条路径各调一次，实得 {len(ti)}"
+        for u, t in zip(un, ti):
+            assert u < t, "untitleize 必须早于 titleize"
+
     def test_numbered_paragraph_is_already_title(self) -> None:
         """反向自检：带 `（N）` / `N.` 编号的段落本就被判为标题 → 不进作业面。
 

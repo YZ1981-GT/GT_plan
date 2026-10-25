@@ -484,6 +484,11 @@ def _i3_listed(dry_run: bool, check: bool) -> tuple[list[str], list[str], list[s
         aligned_by=ALIGNED_BY,
         dry_run=dry_run,
         check=check,
+        # 与上面 `aliases=[_I3_LISTED_TABLE3_ALIAS]` 的正名成对：那条假设说明段被提成 `#### ` 标题
+        # 让「每张表都有小节标题」过关，表名正回来后标题就多了一个 ⇒ `disclosure_engine` 段落游标
+        # 多走一格、把后续提示段错配到别的表（H1 五、22 同型，实测打红守卫）。受损前（5914e315b~1）
+        # 它是普通正文段；表4 的 `业绩承诺完成及对应商誉减值情况如下：` 受损前**就是**标题，不动。
+        untitle_text_sections=[_I3_LISTED_TABLE3_ALIAS],
     )
 
 
@@ -668,7 +673,7 @@ def _i2_listed(dry_run: bool, check: bool) -> tuple[list[str], list[str], list[s
         rule(
             _I2_LISTED_TABLE2_NAME,
             _I2_LISTED_TABLE2_COLUMNS,
-            _clean_rows(0),  # 清 header_label（现有的第 0 张就是「开发支出」）
+            _clean_rows(1),  # 清 header_label（第 0 张是「研发支出」，「开发支出」在第 1 张）
             _I2_LISTED_TABLE2_GUIDANCE,
         ),
         rule(
@@ -695,16 +700,19 @@ def _i2_listed(dry_run: bool, check: bool) -> tuple[list[str], list[str], list[s
             insert=True,
         ),
     ]
+    expected = [_I2_LISTED_TABLE1_NAME, _I2_LISTED_TABLE2_NAME, _I2_LISTED_TABLE3_NAME,
+                _I2_LISTED_TABLE4_NAME, _I2_LISTED_TABLE5_NAME]
     return run_section(
         LISTED_PATH,
         "五、27",
         plan,
-        [_I2_LISTED_TABLE1_NAME, _I2_LISTED_TABLE2_NAME,
-         _I2_LISTED_TABLE3_NAME, _I2_LISTED_TABLE4_NAME,
-         _I2_LISTED_TABLE5_NAME],
+        expected,
         aligned_by=ALIGNED_BY,
         dry_run=dry_run,
         check=check,
+        # 5914e315b（Word 同步）把第 0 张「研发支出」改成了「开发支出」⇒ 与第 1 张重名；按名找表时第 0 张被当成
+        # 「开发支出」、再插一张空「研发支出」。整组复位只在表名序列恰为该错位快照时生效（R8.4 批 9b-2，2026-10-24）
+        rename=([_I2_LISTED_TABLE2_NAME, *expected[1:]], expected),
     )
 
 
@@ -1151,6 +1159,10 @@ def _i1_listed(dry_run: bool, check: bool) -> tuple[list[str], list[str], list[s
         aligned_by=ALIGNED_BY,
         dry_run=dry_run,
         check=check,
+        # 与上面 `aliases=[_I1_LISTED_TABLE2_ALIAS]` 的正名成对：那条 30 号文说明段被提成 `#### ` 标题，
+        # 表名正回来后标题多出一个 ⇒ 段落游标多走一格、后续提示段错配（H1 五、22 同型）。受损前是正文段。
+        # 表4 的受损名 `项  目` 是表头首格泄漏、从来不是段落，无需摘。
+        untitle_text_sections=[_I1_LISTED_TABLE2_ALIAS],
     )
     # 行骨架欠账并入本章节结果：`--check` 计为 errs（与 columns 欠账同等级），
     # `--dry-run`/`--apply` 计为 changes

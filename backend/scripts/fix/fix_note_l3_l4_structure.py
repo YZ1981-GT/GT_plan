@@ -3,8 +3,8 @@
 
 **覆盖 6 个章节**：
 
-1. 五、45 长期借款（listed）—— 1 表，两级表头
-2. 八、49 长期借款（soe）—— 1 表，两级表头
+1. 五、45 长期借款（listed）—— 1 表，一层表头
+2. 八、49 长期借款（soe）—— 1 表，一层表头
 3. 五、46 应付债券（listed）—— 5 表
 4. 八、50 应付债券（soe）—— 2 表
 5. 五、43 一年内到期的非流动负债（listed）—— 5 表
@@ -12,8 +12,9 @@
 
 **问题摘要**：
 
-- L3 两版「长期借款」两级表头（期末/上年年末各含 余额+利率区间）被压扁；
-  国企模板只有 4 列（遗漏一列「利率区间」）。
+- L3 两版「长期借款」按底稿一行表头 5 列（两列同名「利率区间」）；国企模板原只有 4 列（遗漏一列「利率区间」）。
+  早先写成「期末余额 / 上年年末余额」两组的两级表头，R8.4 批 9b-2 按底稿改回一层。
+- 5914e315b 把 五、46 第 4 张、五、43 第 5 张改成了同节前一张的表名（同节重名），按位置改回原名。
 - L4 上市第 4 张表名是参考格式占位名 `参考披露格式：` 应改为
   「（3）划分为金融负债的其他金融工具」。
 - 五、43 上市第 5 张表名为表头首格泄漏 `项  目` 应改为「一年内到期的长期应付款」。
@@ -44,10 +45,13 @@ from _note_structure_kit import (  # noqa: E402
     PERCENT,
     TEXT,
     build_cli,
+    data_row,
     flat_columns,
     grouped_columns,
     rule,
     run_section,
+    subtotal_row,
+    total_row,
 )
 
 _BACKEND = Path(__file__).resolve().parent.parent.parent
@@ -61,44 +65,50 @@ SCRIPT_NAME = "fix_note_l3_l4_structure.py"
 # L3 长期借款
 # ═══════════════════════════════════════════════════════════════════
 
-# ─── 上市 五、45 长期借款 ─── 1 表，两级表头
+# 🔴 一层表头（R8.4 批 9b-2，用户「长期借款两版改成一层」）：底稿 L3 两张披露 sheet 的表头都只有一行、
+#    没有合并格（上市 A7:E7 / 国企 A8:E8），原先拆成「期末余额 / 上年年末余额」两组（各含 余额 + 利率区间）
+#    是臆造的分组。两列「利率区间」同名照抄（加期别前缀即杜撰），靠 key 区分；key 不变（推送规则与已存数据零迁移）。
+#    行与行序按底稿（质押 / 抵押 / 保证 / 信用 + 小计 − 一年内到期 = 合计）。
+_L3_ROWS = [
+    data_row("质押借款"),
+    data_row("抵押借款"),
+    data_row("保证借款"),
+    data_row("信用借款"),
+    subtotal_row("小计"),
+    data_row("减：一年内到期的长期借款"),
+    total_row("合计"),
+]
+
+# ─── 上市 五、45 长期借款 ─── 1 表，一层表头
 L3_LISTED_SECTION = "五、45"
 L3_LISTED_TABLE_NAME = "长期借款"
 
 # 源 xlsx R07: 项  目 | 期末余额 | 利率区间 | 上年年末余额 | 利率区间
-# group="期末余额" → 叶子列: 余额(amount) + 利率区间(text)
-# group="上年年末余额" → 叶子列: 余额(amount) + 利率区间(text)
-L3_LISTED_COLS = grouped_columns(
-    ("label", "项  目"),
-    [
-        ("end_amount", "余额", AMOUNT, "期末余额"),
-        ("end_rate_range", "利率区间", TEXT, "期末余额"),
-        ("prior_amount", "余额", AMOUNT, "上年年末余额"),
-        ("prior_rate_range", "利率区间", TEXT, "上年年末余额"),
-    ],
-)
+L3_LISTED_COLS = flat_columns([
+    ("label", "项  目", None),
+    ("end_amount", "期末余额", AMOUNT),
+    ("end_rate_range", "利率区间", TEXT),
+    ("prior_amount", "上年年末余额", AMOUNT),
+    ("prior_rate_range", "利率区间", TEXT),
+])
 
 L3_LISTED_GUIDANCE = (
     "按借款种类分类列示（质押/抵押/保证/信用），同时列示利率区间。"
     "减：一年内到期的长期借款。"
 )
 
-# ─── 国企 八、49 长期借款 ─── 1 表，两级表头
+# ─── 国企 八、49 长期借款 ─── 1 表，一层表头
 L3_SOE_SECTION = "八、49"
 L3_SOE_TABLE_NAME = "长期借款"
 
 # 源 xlsx R08: 借款类别 | 期末余额 | 利率区间 | 期初余额 | 利率区间
-# group="期末余额" → 叶子列: 余额(amount) + 利率区间(text)
-# group="期初余额" → 叶子列: 余额(amount) + 利率区间(text)
-L3_SOE_COLS = grouped_columns(
-    ("label", "借款类别"),
-    [
-        ("end_amount", "余额", AMOUNT, "期末余额"),
-        ("end_rate_range", "利率区间", TEXT, "期末余额"),
-        ("begin_amount", "余额", AMOUNT, "期初余额"),
-        ("begin_rate_range", "利率区间", TEXT, "期初余额"),
-    ],
-)
+L3_SOE_COLS = flat_columns([
+    ("label", "借款类别", None),
+    ("end_amount", "期末余额", AMOUNT),
+    ("end_rate_range", "利率区间", TEXT),
+    ("begin_amount", "期初余额", AMOUNT),
+    ("begin_rate_range", "利率区间", TEXT),
+])
 
 L3_SOE_GUIDANCE = (
     "按借款类别列示（质押/抵押/保证/信用），同时列示利率区间。"
@@ -305,14 +315,22 @@ NC_S_T1_GUIDANCE = "一年内到期的各项非流动负债按类别分别列示
 
 def _l3_listed_plan() -> list[dict[str, Any]]:
     return [
-        rule(L3_LISTED_TABLE_NAME, L3_LISTED_COLS, None, L3_LISTED_GUIDANCE),
+        rule(L3_LISTED_TABLE_NAME, L3_LISTED_COLS, _L3_ROWS, L3_LISTED_GUIDANCE),
     ]
 
 
 def _l3_soe_plan() -> list[dict[str, Any]]:
     return [
-        rule(L3_SOE_TABLE_NAME, L3_SOE_COLS, None, L3_SOE_GUIDANCE),
+        rule(L3_SOE_TABLE_NAME, L3_SOE_COLS, _L3_ROWS, L3_SOE_GUIDANCE),
     ]
+
+
+# 🔴 5914e315b（2026-10-10「附注续表(续)格式识别」）把上市 五、46 第 4 张表与 五、43 第 5 张表改成了同节前一张表的名字
+#    （「应付债券的增减变动（…）」×2 /「一年内到期的应付债券（续）」×2）：sub_table_data 按表名作键，同节重名整张表
+#    互相覆盖；本脚本按原名找不到表，--check 自那天起一直红。表头仍是原表的（10 列 / 3 列），按位置改回原名：
+#    游标只前进，前一条规则已认领第一张同名表，这里的别名只会命中第二张（R8.4 批 9b-2）。
+_L4_L_T4_RENAMED_BY_CONTINUATION = L4_L_T2_NAME
+_NC_L_T5_RENAMED_BY_CONTINUATION = NC_L_T4_NAME
 
 
 def _l4_listed_plan() -> list[dict[str, Any]]:
@@ -322,7 +340,7 @@ def _l4_listed_plan() -> list[dict[str, Any]]:
         rule(L4_L_T3_NAME, L4_L_T3_COLS, None, L4_L_T3_GUIDANCE),
         rule(
             L4_L_T4_NAME, L4_L_T4_COLS, None, L4_L_T4_GUIDANCE,
-            aliases=[L4_L_T4_OBSOLETE_NAME],
+            aliases=[L4_L_T4_OBSOLETE_NAME, _L4_L_T4_RENAMED_BY_CONTINUATION],
         ),
         rule(L4_L_T5_NAME, L4_L_T5_COLS, L4_L_T5_ROWS, L4_L_T5_GUIDANCE),
     ]
@@ -343,7 +361,7 @@ def _nc_listed_plan() -> list[dict[str, Any]]:
         rule(NC_L_T4_NAME, NC_L_T4_COLS, None, NC_L_T4_GUIDANCE),
         rule(
             NC_L_T5_NAME, NC_L_T5_COLS, None, NC_L_T5_GUIDANCE,
-            aliases=[NC_L_T5_OBSOLETE_NAME],
+            aliases=[NC_L_T5_OBSOLETE_NAME, _NC_L_T5_RENAMED_BY_CONTINUATION],
         ),
     ]
 

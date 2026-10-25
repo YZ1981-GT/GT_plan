@@ -58,6 +58,10 @@ T_SOE = ("预付款项按账龄列示", "账龄超过1年的大额预付款项",
          "按欠款方归集的期末余额前五名的预付款项")
 
 AGING_COLUMN_KEYS = ["label", "end_amount", "end_pct", "prior_amount", "prior_pct"]
+#: 国企按账龄表按底稿每期多一列逐账龄段坏账准备（R8.4 批 9b-2）
+SOE_AGING_COLUMN_KEYS = ["label", "end_amount", "end_pct", "end_provision", "prior_amount", "prior_pct",
+                         "prior_provision"]
+SOE_AGING_LEAVES = ["账面余额-金额", "账面余额-比例（%）", "坏账准备"]
 AGING_TAIL_ROWS = ["小计", "减：减值准备", "合计"]
 
 
@@ -127,9 +131,8 @@ def test_obsolete_listed_table_name_gone(listed: dict[str, Any]) -> None:
 #: 按账龄表列头字面（逐字取源 xlsx，**含空格**；上市金额列双空格、国企单空格）
 AGING_LABEL_COL = "账  龄"
 AGING_HEADER_CASES = [
-    # fixture, table, 标签列, 金额列, 比例列, 期末组名, 期初组名
+    # fixture, table, 标签列, 金额列, 比例列, 期末组名, 期初组名（国企是三层表头，见 test_soe_aging_follows_three_level_workpaper）
     ("listed", T_LISTED[0], AGING_LABEL_COL, "金  额", "比例%", "期末数", "上年年末数"),
-    ("soe", T_SOE[0], AGING_LABEL_COL, "金 额", "比例（%）", "期末数", "期初数"),
 ]
 
 
@@ -158,6 +161,19 @@ def test_aging_two_level_header(
     assert [c.get("group") for c in tbl["columns"]] == [
         None, end_group, end_group, prior_group, prior_group,
     ], _FIX_HINT
+
+
+def test_soe_aging_follows_three_level_workpaper(soe: dict[str, Any]) -> None:
+    """国企按账龄表按底稿 F1 国企第 8~10 行：每期 账面余额（金额 / 比例）+ 坏账准备，三层压两层（期间作父表头，
+    「账面余额」与子列合写）。原 5 列把逐段坏账准备只留在底稿侧（R8.4 批 9b-2 改）。"""
+    tbl = _get(soe, T_SOE[0])
+    assert tbl["headers"] == [AGING_LABEL_COL, *SOE_AGING_LEAVES, *SOE_AGING_LEAVES], _FIX_HINT
+    assert tbl["_column_groups"] == [
+        {"group": "期末数", "start": 1, "span": 3},
+        {"group": "期初数", "start": 4, "span": 3},
+    ], _FIX_HINT
+    assert [c["key"] for c in tbl["columns"]] == SOE_AGING_COLUMN_KEYS, _FIX_HINT
+    assert [c.get("group") for c in tbl["columns"]] == [None] + ["期末数"] * 3 + ["期初数"] * 3, _FIX_HINT
 
 
 @pytest.mark.parametrize(
@@ -297,7 +313,7 @@ def test_soe_text_sections_have_unsettled_reason_note(soe: dict[str, Any]) -> No
 # ─── 与校验预设交叉印证 ──────────────────────────────────────────────────────
 
 def test_check_presets_reference_impairment_row_not_column() -> None:
-    """F7-7 依赖「减值准备**行**」（非逐段列），据此裁决附注按账龄表为 5 列。"""
+    """F7-7 依赖「减值准备**行**」，据此两版按账龄表都保留「减：减值准备」行（国企按底稿另带逐段坏账准备列）。"""
     doc = json.loads(CHECK_PRESET_PATH.read_text(encoding="utf-8"))
 
     def _f7_7(variant: str) -> str:
@@ -357,16 +373,17 @@ def _build_from_seed(section: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 @pytest.mark.parametrize(
-    ("fixture_name", "expected_names", "aging_groups"),
+    ("fixture_name", "expected_names", "aging_groups", "aging_cols"),
     [
-        ("listed", T_LISTED, ["期末数", "上年年末数"]),
-        ("soe", T_SOE, ["期末数", "期初数"]),
+        ("listed", T_LISTED, ["期末数", "上年年末数"], 5),
+        ("soe", T_SOE, ["期末数", "期初数"], 7),
     ],
 )
 def test_generation_path_carries_groups_and_guidance(
     fixture_name: str,
     expected_names: tuple[str, ...],
     aging_groups: list[str],
+    aging_cols: int,
     request: pytest.FixtureRequest,
 ) -> None:
     """新建项目生成的 `table_data._tables` 必须有 3 张唯一表 + 两级表头 + guidance。
@@ -381,7 +398,7 @@ def test_generation_path_carries_groups_and_guidance(
 
     aging = built[0]
     assert [g["group"] for g in aging["_column_groups"]] == aging_groups
-    assert len(aging["columns"]) == 5
+    assert len(aging["columns"]) == aging_cols
 
     for t in built:
         assert str(t.get("guidance") or "").strip(), f"{t['name']} 生成后缺 guidance"
@@ -510,6 +527,24 @@ def test_three_way_aging_header_alignment(
     assert (
         f"{groups_const} = {{ end: '{end_group}', prior: '{prior_group}' }}" in ts
     ), f"{groups_const} 与源 xlsx 不一致"
+
+
+def test_three_way_soe_aging_header_alignment(soe: dict[str, Any]) -> None:
+    """国企三层表头三向一致：源 xlsx（期间 B8/E8、账面余额 B9/E9、坏账准备 D9/G9、金额 B10、比例 C10）==
+    模板两层表头（期间作父表头，「账面余额」与子列合写、金额去掉格内空格）== 同步载荷常量。"""
+    grid = _source_cells("soe")
+    assert (grid.get("A8"), grid.get("B8"), grid.get("E8")) == (AGING_LABEL_COL, "期末数", "期初数")
+    assert (grid.get("B9"), grid.get("E9"), grid.get("D9"), grid.get("G9")) == ("账面余额", "账面余额", "坏账准备", "坏账准备")
+    leaves = [f"{grid['B9']}-{grid['B10'].replace(' ', '')}", f"{grid['B9']}-{grid['C10']}", grid["D9"]]
+    assert leaves == SOE_AGING_LEAVES
+
+    tbl = _get(soe, T_SOE[0])
+    assert tbl["headers"][1:] == leaves * 2
+
+    ts = SYNC_PAYLOAD_TS.read_text(encoding="utf-8")
+    for key, label in zip(("amount", "pct", "provision"), leaves):
+        assert f"{key}: '{label}'" in ts, f"F1_SOE_NOTE_AGING_LABELS.{key} 与源 xlsx 不一致"
+    assert "F1_SOE_AGING_GROUPS = { end: '期末数', prior: '期初数' }" in ts
 
 
 def test_three_way_reverse_self_check() -> None:

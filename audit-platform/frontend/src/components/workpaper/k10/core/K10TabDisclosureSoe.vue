@@ -52,7 +52,7 @@
             <span v-else>{{ fmtAmt(row.priorAmount) }}</span>
           </template>
         </el-table-column>
-        <!-- 源模板国企侧第 4 列（附注 §八、69 headers[3]），交互点选 -->
+        <!-- 点选决定合计后「其中：政府补助」行的金额；附注按底稿只有 3 列，本列不推送（R8.4 批 9b-2） -->
         <el-table-column prop="isGovGrant" label="是否为政府补助" width="140">
           <template #default="{ row }">
             <el-select
@@ -176,12 +176,11 @@ onBeforeUnmount(() => autoSync.cancelPending())
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
   // 🔴 行模型字段是 `category`，旧载荷读 `project` → 曾把标签推成空串；
-  // 第 4 列「是否为政府补助」与合计后的「其中：政府补助」结构行按源模板行序推送
+  // 附注按底稿 3 列（R8.4 批 9b-2）：「是否为政府补助」点选只决定合计后「其中：政府补助」结构行的金额
   const detail = disclosureRows.value.map(r => ({
     project: r.category,
     currentAmount: r.currentAmount,
     priorAmount: r.priorAmount,
-    isGovGrant: r.isGovGrant,
   }))
   const govGrantRow = disclosureRows.value
     .filter(r => r.isGovGrant === '是')
@@ -230,7 +229,7 @@ interface DisclosureRow {
   category: string
   currentAmount: number
   priorAmount: number
-  /** 附注 §八、69 第 4 列「是否为政府补助」（源模板国企侧独有） */
+  /** 「是否为政府补助」点选：汇总成附注「其中：政府补助」行（不是附注列） */
   isGovGrant: string
   remark: string
 }

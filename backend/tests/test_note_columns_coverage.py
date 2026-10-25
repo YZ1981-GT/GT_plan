@@ -105,9 +105,10 @@ EXPECTED_STANCE_NONE_TABLES = {"listed": 336, "soe": 242}
 EXPECTED_GUIDANCE_BOLD = {"listed": 1, "soe": 1}
 
 # 母公司章规模（A spec 的作用域，本 spec 排除；反向自检用）
+# 2026-10-24 R8.4 批 9b-2：国企母公司章 应收账款 随八、5 两张组合计提表拆期末 / 期初（+2）⇒ 42 → 44
 PARENT_CHAPTER_SHAPE = {
     "listed": {"sections": 6, "tables": 62},
-    "soe": {"sections": 6, "tables": 42},
+    "soe": {"sections": 6, "tables": 44},
 }
 
 # `row_type` 允许取值域。前五个是既有语义；`expandable` 由本 spec Wave 4 additive 新增。

@@ -2810,67 +2810,6 @@
         },
         {
           "table_index": 2,
-          "table_name": "按坏账准备计提方法分类披露应收票据",
-          "header_normalize": [
-            {
-              "text": "类别",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "金额",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "比例(%)",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "金额",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "预期信用损失率(%)",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "账面价值",
-              "semantic": "carrying_value"
-            }
-          ],
-          "rows": {
-            "按单项计提坏账准备": {
-              "row_type": "data",
-              "binding": {
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "按组合计提坏账准备": {
-              "row_type": "data",
-              "binding": {
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "合计": {
-              "row_type": "total",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            }
-          }
-        },
-        {
-          "table_index": 3,
           "table_name": "按坏账准备计提方法分类披露应收票据（续：期初数）",
           "header_normalize": [
             {
@@ -2931,49 +2870,7 @@
           }
         },
         {
-          "table_index": 4,
-          "table_name": "按坏账准备计提方法分类披露应收票据（续）",
-          "header_normalize": [
-            {
-              "text": "名称",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "账面余额",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "坏账准备",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "预期信用损失率(%)",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "计提理由",
-              "semantic": "manual_text"
-            }
-          ],
-          "rows": {
-            "row_0": {
-              "row_type": "data"
-            },
-            "row_1": {
-              "row_type": "data"
-            },
-            "row_2": {
-              "row_type": "data"
-            },
-            "合计": {
-              "row_type": "total",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            }
-          }
-        },
-        {
-          "table_index": 5,
+          "table_index": 3,
           "table_name": "按单项计提坏账准备的应收票据",
           "header_normalize": [
             {
@@ -3015,7 +2912,7 @@
           }
         },
         {
-          "table_index": 6,
+          "table_index": 4,
           "table_name": "按组合计提坏账准备的应收票据",
           "header_normalize": [
             {
@@ -3060,7 +2957,7 @@
           }
         },
         {
-          "table_index": 7,
+          "table_index": 5,
           "table_name": "本期计提、收回或转回的应收票据坏账准备情况",
           "header_normalize": [
             {
@@ -3200,7 +3097,7 @@
           }
         },
         {
-          "table_index": 8,
+          "table_index": 6,
           "table_name": "本期转回或收回金额重要的应收票据坏账准备",
           "header_normalize": [
             {
@@ -3333,52 +3230,7 @@
           }
         },
         {
-          "table_index": 9,
-          "table_name": "其中，本期转回或收回金额重要的应收票据坏账准备",
-          "header_normalize": [
-            {
-              "text": "种类",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "期末已质押金额",
-              "semantic": "closing_balance"
-            }
-          ],
-          "rows": {
-            "银行承兑票据": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "商业承兑票据": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "合计": {
-              "row_type": "total",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            }
-          }
-        },
-        {
-          "table_index": 10,
+          "table_index": 7,
           "table_name": "期末已质押的应收票据",
           "header_normalize": [
             {
@@ -3423,7 +3275,7 @@
           }
         },
         {
-          "table_index": 11,
+          "table_index": 8,
           "table_name": "期末已背书或贴现但尚未到期的应收票据",
           "header_normalize": [
             {
@@ -3486,7 +3338,7 @@
           }
         },
         {
-          "table_index": 12,
+          "table_index": 9,
           "table_name": "期末因出票人未履约而其转为应收账款的票据",
           "header_normalize": [
             {
@@ -3519,68 +3371,7 @@
           }
         },
         {
-          "table_index": 13,
-          "table_name": "期末已背书或贴现且在资产负债表日尚未到期的应收票据",
-          "header_normalize": [
-            {
-              "text": "种类",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "期末转应收账款金额",
-              "semantic": "closing_balance"
-            }
-          ],
-          "rows": {
-            "商业承兑票据": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "合计": {
-              "row_type": "total",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            }
-          }
-        },
-        {
-          "table_index": 14,
-          "table_name": "期末因出票人未履约而转为应收账款的票据",
-          "header_normalize": [
-            {
-              "text": "项目",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "核销金额",
-              "semantic": "current_period_writeoff"
-            }
-          ],
-          "rows": {
-            "实际核销的应收票据": {
-              "row_type": "data",
-              "binding": {
-                "current_period_writeoff": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                }
-              }
-            }
-          }
-        },
-        {
-          "table_index": 15,
+          "table_index": 10,
           "table_name": "本期实际核销的应收票据",
           "header_normalize": [
             {
@@ -3608,7 +3399,7 @@
           }
         },
         {
-          "table_index": 16,
+          "table_index": 11,
           "table_name": "重要的应收票据核销情况",
           "header_normalize": [
             {
@@ -3944,6 +3735,18 @@
                 }
               }
             },
+            "其中：": {
+              "row_type": "data",
+              "binding": {
+                "carrying_value": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
             "应收中央企业客户": {
               "row_type": "data",
               "binding": {
@@ -4029,6 +3832,18 @@
                 }
               }
             },
+            "其中：": {
+              "row_type": "data",
+              "binding": {
+                "carrying_value": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
             "应收中央企业客户": {
               "row_type": "data",
               "binding": {
@@ -4083,10 +3898,6 @@
             {
               "text": "预期信用损失率（%）",
               "semantic": "manual_text"
-            },
-            {
-              "text": "计提理由",
-              "semantic": "manual_text"
             }
           ],
           "rows": {
@@ -4103,18 +3914,6 @@
           "header_normalize": [
             {
               "text": "账 龄",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "应收账款",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "比例（%）",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "坏账准备",
               "semantic": "manual_text"
             },
             {
@@ -4158,22 +3957,10 @@
         },
         {
           "table_index": 5,
-          "table_name": "组合计提项目：应收海外企业客户",
+          "table_name": "组合计提项目：应收中央企业客户（续：期初数）",
           "header_normalize": [
             {
               "text": "账 龄",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "应收账款",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "比例（%）",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "坏账准备",
               "semantic": "manual_text"
             },
             {
@@ -4217,6 +4004,100 @@
         },
         {
           "table_index": 6,
+          "table_name": "组合计提项目：应收海外企业客户",
+          "header_normalize": [
+            {
+              "text": "账 龄",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "应收账款",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "比例（%）",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "坏账准备",
+              "semantic": "manual_text"
+            }
+          ],
+          "rows": {
+            "1年以内（含1年）": {
+              "row_type": "data"
+            },
+            "1至2年": {
+              "row_type": "data"
+            },
+            "2至3年": {
+              "row_type": "data"
+            },
+            "3至4年": {
+              "row_type": "data"
+            },
+            "4至5年": {
+              "row_type": "data"
+            },
+            "5年以上": {
+              "row_type": "data"
+            },
+            "合 计": {
+              "row_type": "total",
+              "formula": "sum(detail)",
+              "mode": "auto"
+            }
+          }
+        },
+        {
+          "table_index": 7,
+          "table_name": "组合计提项目：应收海外企业客户（续：期初数）",
+          "header_normalize": [
+            {
+              "text": "账 龄",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "应收账款",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "比例（%）",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "坏账准备",
+              "semantic": "manual_text"
+            }
+          ],
+          "rows": {
+            "1年以内（含1年）": {
+              "row_type": "data"
+            },
+            "1至2年": {
+              "row_type": "data"
+            },
+            "2至3年": {
+              "row_type": "data"
+            },
+            "3至4年": {
+              "row_type": "data"
+            },
+            "4至5年": {
+              "row_type": "data"
+            },
+            "5年以上": {
+              "row_type": "data"
+            },
+            "合 计": {
+              "row_type": "total",
+              "formula": "sum(detail)",
+              "mode": "auto"
+            }
+          }
+        },
+        {
+          "table_index": 8,
           "table_name": "采用余额百分比或其他组合方法计提坏账准备的应收账款",
           "header_normalize": [
             {
@@ -4257,7 +4138,7 @@
           }
         },
         {
-          "table_index": 7,
+          "table_index": 9,
           "table_name": "（3）本期计提、收回或转回的坏账准备情况",
           "header_normalize": [
             {
@@ -4393,7 +4274,7 @@
           }
         },
         {
-          "table_index": 8,
+          "table_index": 10,
           "table_name": "收回或转回的坏账准备",
           "header_normalize": [
             {
@@ -4422,7 +4303,7 @@
           }
         },
         {
-          "table_index": 9,
+          "table_index": 11,
           "table_name": "（4）本期实际核销的应收账款",
           "header_normalize": [
             {
@@ -4459,7 +4340,7 @@
           }
         },
         {
-          "table_index": 10,
+          "table_index": 12,
           "table_name": "（5）按欠款方归集的期末余额前五名的应收账款",
           "header_normalize": [
             {
@@ -4488,7 +4369,7 @@
           }
         },
         {
-          "table_index": 11,
+          "table_index": 13,
           "table_name": "（6）由金融资产转移而终止确认的应收账款",
           "header_normalize": [
             {
@@ -4513,7 +4394,7 @@
           }
         },
         {
-          "table_index": 12,
+          "table_index": 14,
           "table_name": "（7）应收账款转移继续涉入形成的资产、负债的金额",
           "header_normalize": [
             {
@@ -4526,10 +4407,34 @@
             }
           ],
           "rows": {
+            "资产：": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
             "资产小计": {
               "row_type": "subtotal",
               "formula": "sum(detail)",
               "mode": "auto"
+            },
+            "负债：": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
             },
             "负债小计": {
               "row_type": "subtotal",
@@ -4620,19 +4525,27 @@
               "semantic": "manual_text"
             },
             {
-              "text": "金 额",
+              "text": "账面余额-金额",
               "semantic": "manual_text"
             },
             {
-              "text": "比例（%）",
+              "text": "账面余额-比例（%）",
               "semantic": "manual_text"
             },
             {
-              "text": "金 额",
+              "text": "坏账准备",
               "semantic": "manual_text"
             },
             {
-              "text": "比例（%）",
+              "text": "账面余额-金额",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "账面余额-比例（%）",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "坏账准备",
               "semantic": "manual_text"
             }
           ],
@@ -5136,15 +5049,15 @@
               "semantic": "manual_text"
             },
             {
-              "text": "第一阶段",
+              "text": "未来12个月预期信用损失",
               "semantic": "manual_text"
             },
             {
-              "text": "第二阶段",
+              "text": "整个存续期预期信用损失（未发生信用减值）",
               "semantic": "manual_text"
             },
             {
-              "text": "第三阶段",
+              "text": "整个存续期预期信用损失（已发生信用减值）",
               "semantic": "manual_text"
             },
             {
@@ -5214,7 +5127,7 @@
               "semantic": "current_period_recover"
             },
             {
-              "text": "是否发生减值及其判断依据",
+              "text": "相关款项是否发生减值",
               "semantic": "manual_text"
             }
           ],
@@ -6006,15 +5919,15 @@
               "semantic": "manual_text"
             },
             {
-              "text": "第一阶段",
+              "text": "未来12个月预期信用损失",
               "semantic": "manual_text"
             },
             {
-              "text": "第二阶段",
+              "text": "整个存续期预期信用损失（未发生信用减值）",
               "semantic": "manual_text"
             },
             {
-              "text": "第三阶段",
+              "text": "整个存续期预期信用损失（已发生信用减值）",
               "semantic": "manual_text"
             },
             {
@@ -6065,6 +5978,66 @@
         },
         {
           "table_index": 12,
+          "table_name": "其他应收款项账面余额变动",
+          "header_normalize": [
+            {
+              "text": "账面余额",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "未来12个月预期信用损失",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "整个存续期预期信用损失（未发生信用减值）",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "整个存续期预期信用损失（已发生信用减值）",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "合计",
+              "semantic": "manual_text"
+            }
+          ],
+          "rows": {
+            "期初余额": {
+              "row_type": "data"
+            },
+            "期初余额在本期": {
+              "row_type": "data"
+            },
+            "—转入第二阶段": {
+              "row_type": "data"
+            },
+            "—转入第三阶段": {
+              "row_type": "data"
+            },
+            "—转回第二阶段": {
+              "row_type": "data"
+            },
+            "—转回第一阶段": {
+              "row_type": "data"
+            },
+            "本期新增": {
+              "row_type": "data"
+            },
+            "本期终止确认": {
+              "row_type": "data"
+            },
+            "其他变动": {
+              "row_type": "data"
+            },
+            "期末余额": {
+              "row_type": "total",
+              "formula": "sum(detail)",
+              "mode": "auto"
+            }
+          }
+        },
+        {
+          "table_index": 13,
           "table_name": "收回或转回的坏账准备",
           "header_normalize": [
             {
@@ -6171,7 +6144,7 @@
           }
         },
         {
-          "table_index": 13,
+          "table_index": 14,
           "table_name": "本期实际核销的其他应收款项",
           "header_normalize": [
             {
@@ -6286,7 +6259,7 @@
           }
         },
         {
-          "table_index": 14,
+          "table_index": 15,
           "table_name": "按欠款方归集的期末余额前五名的其他应收款项",
           "header_normalize": [
             {
@@ -6338,7 +6311,7 @@
           }
         },
         {
-          "table_index": 15,
+          "table_index": 16,
           "table_name": "由金融资产转移而终止确认的其他应收款项",
           "header_normalize": [
             {
@@ -6420,7 +6393,7 @@
           }
         },
         {
-          "table_index": 16,
+          "table_index": 17,
           "table_name": "其他应收款项转移继续涉入形成的资产、负债的金额",
           "header_normalize": [
             {
@@ -6470,7 +6443,7 @@
           }
         },
         {
-          "table_index": 17,
+          "table_index": 18,
           "table_name": "涉及政府补助的应收款项",
           "header_normalize": [
             {
@@ -8082,321 +8055,6 @@
         },
         {
           "table_index": 1,
-          "table_name": "4.应披露与持有待售的非流动资产或处置组有关的其他综合收益累计金额。】",
-          "header_normalize": [
-            {
-              "text": "项目",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "账面余额",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "减值准备",
-              "semantic": "impairment_provision"
-            },
-            {
-              "text": "账面价值",
-              "semantic": "carrying_value"
-            },
-            {
-              "text": "账面余额",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "减值准备",
-              "semantic": "impairment_provision"
-            },
-            {
-              "text": "账面价值",
-              "semantic": "carrying_value"
-            }
-          ],
-          "rows": {
-            "（一）持有待售非流动资产": {
-              "row_type": "subtotal",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            },
-            "其中：固定资产": {
-              "row_type": "data",
-              "binding": {
-                "impairment_provision": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "impairment_provision_col5": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value_col6": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "无形资产": {
-              "row_type": "data",
-              "binding": {
-                "impairment_provision": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "impairment_provision_col5": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value_col6": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "……": {
-              "row_type": "expandable",
-              "binding": {
-                "impairment_provision": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "impairment_provision_col5": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value_col6": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "row_4": {
-              "row_type": "data",
-              "binding": {
-                "impairment_provision": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "impairment_provision_col5": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value_col6": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "（二）持有待售处置组中的资产": {
-              "row_type": "subtotal",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            },
-            "row_6": {
-              "row_type": "data",
-              "binding": {
-                "impairment_provision": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "impairment_provision_col5": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value_col6": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "row_7": {
-              "row_type": "data",
-              "binding": {
-                "impairment_provision": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "impairment_provision_col5": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value_col6": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "row_8": {
-              "row_type": "data",
-              "binding": {
-                "impairment_provision": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "impairment_provision_col5": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value_col6": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "……#1": {
-              "row_type": "expandable",
-              "binding": {
-                "impairment_provision": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "impairment_provision_col5": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "carrying_value_col6": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "合计": {
-              "row_type": "total",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            }
-          }
-        },
-        {
-          "table_index": 2,
           "table_name": "持有待售资产减值准备",
           "header_normalize": [
             {
@@ -8707,7 +8365,7 @@
           }
         },
         {
-          "table_index": 3,
+          "table_index": 2,
           "table_name": "持有待售非流动资产",
           "header_normalize": [
             {
@@ -8844,7 +8502,7 @@
           }
         },
         {
-          "table_index": 4,
+          "table_index": 3,
           "table_name": "持有待售处置组中的资产",
           "header_normalize": [
             {
@@ -9209,12 +8867,12 @@
               "semantic": "manual_text"
             },
             {
-              "text": "期末余额",
+              "text": "期末账面价值",
               "semantic": "closing_balance"
             },
             {
-              "text": "期初余额",
-              "semantic": "opening_balance"
+              "text": "年初账面价值",
+              "semantic": "carrying_value"
             }
           ],
           "rows": {
@@ -9228,7 +8886,7 @@
                   "mode": "manual",
                   "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
                 },
-                "opening_balance": {
+                "carrying_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -9247,7 +8905,7 @@
                   "mode": "manual",
                   "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
                 },
-                "opening_balance": {
+                "carrying_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -9266,7 +8924,7 @@
                   "mode": "manual",
                   "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
                 },
-                "opening_balance": {
+                "carrying_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -9285,7 +8943,7 @@
                   "mode": "manual",
                   "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
                 },
-                "opening_balance": {
+                "carrying_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -9304,7 +8962,7 @@
                   "mode": "manual",
                   "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
                 },
-                "opening_balance": {
+                "carrying_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -9323,7 +8981,7 @@
                   "mode": "manual",
                   "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
                 },
-                "opening_balance": {
+                "carrying_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -9342,7 +9000,7 @@
                   "mode": "manual",
                   "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
                 },
-                "opening_balance": {
+                "carrying_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -9361,7 +9019,7 @@
                   "mode": "manual",
                   "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
                 },
-                "opening_balance": {
+                "carrying_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -11413,7 +11071,7 @@
         },
         {
           "table_index": 2,
-          "table_name": "（如果母公司为投资性主体，无需披露下列财务信息。）",
+          "table_name": "重要合营企业的主要财务信息（划分为持有待售的除外）",
           "header_normalize": [
             {
               "text": "项 目",
@@ -11683,6 +11341,559 @@
         },
         {
           "table_index": 4,
+          "table_name": "重要联营企业的主要财务信息",
+          "header_normalize": [
+            {
+              "text": "项  目",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "期末数",
+              "semantic": "closing_balance"
+            },
+            {
+              "text": "期初数",
+              "semantic": "opening_balance"
+            },
+            {
+              "text": "期末数",
+              "semantic": "closing_balance"
+            },
+            {
+              "text": "期初数",
+              "semantic": "opening_balance"
+            },
+            {
+              "text": "期末数",
+              "semantic": "closing_balance"
+            },
+            {
+              "text": "期初数",
+              "semantic": "opening_balance"
+            }
+          ],
+          "rows": {
+            "流动资产": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col3": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col4": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col5": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col6": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "非流动资产": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col3": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col4": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col5": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col6": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "资产合计": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col3": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col4": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col5": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col6": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "流动负债": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col3": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col4": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col5": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col6": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "非流动负债": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col3": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col4": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col5": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col6": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "负债合计": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col3": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col4": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col5": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col6": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "净资产": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col3": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col4": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col5": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col6": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "按持股比例计算的净资产份额": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col3": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col4": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col5": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col6": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "调整事项": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col3": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col4": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col5": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col6": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "对联营企业权益投资的账面价值": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col3": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col4": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col5": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col6": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "存在公开报价的权益投资的公允价值": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col3": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col4": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "closing_balance_col5": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance_col6": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            }
+          }
+        },
+        {
+          "table_index": 5,
           "table_name": "续：重要联营企业本期及上期经营成果",
           "header_normalize": [
             {
@@ -11733,8 +11944,8 @@
           }
         },
         {
-          "table_index": 5,
-          "table_name": "（如果母公司为投资性主体，无需披露下列财务信息。）",
+          "table_index": 6,
+          "table_name": "不重要合营企业和联营企业的汇总信息",
           "header_normalize": [
             {
               "text": "项  目",
@@ -11789,8 +12000,143 @@
           }
         },
         {
-          "table_index": 6,
-          "table_name": "不重要合营企业和联营企业的汇总信息",
+          "table_index": 7,
+          "table_name": "②对合营企业或联营企业发生超额亏损的分担额",
+          "header_normalize": [
+            {
+              "text": "被投资单位名称",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "前期累积未确认的损失份额",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "本期未确认的损失份额（或本期实现净利润的分享额）",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "本期末累积未确认的损失份额",
+              "semantic": "closing_balance"
+            }
+          ],
+          "rows": {
+            "合营企业": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "row_1": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "row_2": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "row_3": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "小计": {
+              "row_type": "subtotal",
+              "formula": "sum(detail)",
+              "mode": "auto"
+            },
+            "联营企业": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "row_6": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "row_7": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "row_8": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "小计#1": {
+              "row_type": "subtotal",
+              "formula": "sum(detail)",
+              "mode": "auto"
+            },
+            "合  计": {
+              "row_type": "total",
+              "formula": "sum(detail)",
+              "mode": "auto"
+            }
+          }
+        },
+        {
+          "table_index": 8,
+          "table_name": "结构化主体权益的账面价值和最大损失敞口",
           "header_normalize": [
             {
               "text": "项目",
@@ -11901,8 +12247,8 @@
           }
         },
         {
-          "table_index": 7,
-          "table_name": "②对合营企业或联营企业发生超额亏损的分担额",
+          "table_index": 9,
+          "table_name": "结构化主体获得收益及转移资产情况",
           "header_normalize": [
             {
               "text": "结构化主体类型",
@@ -19253,7 +19599,7 @@
         },
         {
           "table_index": 1,
-          "table_name": "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如：",
+          "table_name": "合同取得成本",
           "header_normalize": [
             {
               "text": "项  目",
@@ -19441,22 +19787,18 @@
               "row_type": "data",
               "binding": {
                 "closing_balance": {
-                  "source": "trial_balance",
-                  "field": "audited_amount",
-                  "account_codes": [
-                    "2101"
-                  ],
-                  "mode": "auto",
-                  "agg": "sum"
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
                 },
                 "opening_balance": {
-                  "source": "trial_balance",
-                  "field": "opening_balance",
-                  "account_codes": [
-                    "2101"
-                  ],
-                  "mode": "auto",
-                  "agg": "sum"
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
                 }
               }
             },
@@ -19479,7 +19821,7 @@
                 }
               }
             },
-            "指定为以公允价值计量且其变动计入当期损益的金融负债": {
+            "衍生金融负债": {
               "row_type": "data",
               "binding": {
                 "closing_balance": {
@@ -19517,6 +19859,44 @@
                 }
               }
             },
+            "指定为以公允价值计量且其变动计入当期损益的金融负债": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "其他#1": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
             "合计": {
               "row_type": "total",
               "formula": "sum(detail)",
@@ -19533,26 +19913,37 @@
               "semantic": "manual_text"
             },
             {
-              "text": "期末公允价值",
-              "semantic": "closing_balance"
+              "text": "202X年公允价值变动额",
+              "semantic": "fair_value"
             },
             {
-              "text": "期初公允价值",
-              "semantic": "opening_balance"
+              "text": "因自身信用风险变动引起的公允价值本年变动额",
+              "semantic": "fair_value"
+            },
+            {
+              "text": "因自身信用风险变动引起的公允价值累计变动额",
+              "semantic": "fair_value"
             }
           ],
           "rows": {
             "发行的普通债权": {
               "row_type": "data",
               "binding": {
-                "closing_balance": {
+                "fair_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
                   "mode": "manual",
                   "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
                 },
-                "opening_balance": {
+                "fair_value_col2": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "fair_value_col3": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -20426,7 +20817,7 @@
                 }
               }
             },
-            "其中：医疗保险费及生育保险费": {
+            "其中：医疗保险费": {
               "row_type": "data",
               "binding": {
                 "opening_balance": {
@@ -20460,6 +20851,39 @@
               }
             },
             "工伤保险费": {
+              "row_type": "data",
+              "binding": {
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "current_year_increase": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
+                },
+                "current_year_decrease": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
+                },
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "生育保险费": {
               "row_type": "data",
               "binding": {
                 "opening_balance": {
@@ -21232,7 +21656,7 @@
           "table_name": "其他应付款",
           "header_normalize": [
             {
-              "text": "类别",
+              "text": "项目",
               "semantic": "manual_text"
             },
             {
@@ -21434,7 +21858,7 @@
           "table_name": "重要的已逾期未支付的利息情况",
           "header_normalize": [
             {
-              "text": "债权单位",
+              "text": "借款单位",
               "semantic": "manual_text"
             },
             {
@@ -23672,7 +24096,7 @@
         },
         {
           "table_index": 2,
-          "table_name": "计划资产",
+          "table_name": "未折现的离职后福利预计到期分析",
           "header_normalize": [
             {
               "text": "项目",
@@ -23705,7 +24129,7 @@
         },
         {
           "table_index": 3,
-          "table_name": "设定受益计划净负债（净资产）",
+          "table_name": "计划资产",
           "header_normalize": [
             {
               "text": "项目",
@@ -23920,7 +24344,7 @@
         },
         {
           "table_index": 4,
-          "table_name": "未折现的离职后福利预计到期分析",
+          "table_name": "精算假设",
           "header_normalize": [
             {
               "text": "项目",
@@ -24054,7 +24478,7 @@
         },
         {
           "table_index": 5,
-          "table_name": "计划资产",
+          "table_name": "敏感性分析",
           "header_normalize": [
             {
               "text": "项目",
@@ -24111,6 +24535,10 @@
             {
               "text": "期初余额",
               "semantic": "opening_balance"
+            },
+            {
+              "text": "形成原因",
+              "semantic": "manual_text"
             }
           ],
           "rows": {
@@ -28665,6 +29093,18 @@
                 }
               }
             },
+            "其中：": {
+              "row_type": "data",
+              "binding": {
+                "carrying_value": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
             "应收中央企业客户": {
               "row_type": "data",
               "binding": {
@@ -28750,6 +29190,18 @@
                 }
               }
             },
+            "其中：": {
+              "row_type": "data",
+              "binding": {
+                "carrying_value": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
             "应收中央企业客户": {
               "row_type": "data",
               "binding": {
@@ -28804,10 +29256,6 @@
             {
               "text": "预期信用损失率（%）",
               "semantic": "manual_text"
-            },
-            {
-              "text": "计提理由",
-              "semantic": "manual_text"
             }
           ],
           "rows": {
@@ -28824,18 +29272,6 @@
           "header_normalize": [
             {
               "text": "账 龄",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "应收账款",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "比例（%）",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "坏账准备",
               "semantic": "manual_text"
             },
             {
@@ -28879,22 +29315,10 @@
         },
         {
           "table_index": 5,
-          "table_name": "组合计提项目：应收海外企业客户",
+          "table_name": "组合计提项目：应收中央企业客户（续：期初数）",
           "header_normalize": [
             {
               "text": "账 龄",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "应收账款",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "比例（%）",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "坏账准备",
               "semantic": "manual_text"
             },
             {
@@ -28938,6 +29362,100 @@
         },
         {
           "table_index": 6,
+          "table_name": "组合计提项目：应收海外企业客户",
+          "header_normalize": [
+            {
+              "text": "账 龄",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "应收账款",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "比例（%）",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "坏账准备",
+              "semantic": "manual_text"
+            }
+          ],
+          "rows": {
+            "1年以内（含1年）": {
+              "row_type": "data"
+            },
+            "1至2年": {
+              "row_type": "data"
+            },
+            "2至3年": {
+              "row_type": "data"
+            },
+            "3至4年": {
+              "row_type": "data"
+            },
+            "4至5年": {
+              "row_type": "data"
+            },
+            "5年以上": {
+              "row_type": "data"
+            },
+            "合 计": {
+              "row_type": "total",
+              "formula": "sum(detail)",
+              "mode": "auto"
+            }
+          }
+        },
+        {
+          "table_index": 7,
+          "table_name": "组合计提项目：应收海外企业客户（续：期初数）",
+          "header_normalize": [
+            {
+              "text": "账 龄",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "应收账款",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "比例（%）",
+              "semantic": "manual_text"
+            },
+            {
+              "text": "坏账准备",
+              "semantic": "manual_text"
+            }
+          ],
+          "rows": {
+            "1年以内（含1年）": {
+              "row_type": "data"
+            },
+            "1至2年": {
+              "row_type": "data"
+            },
+            "2至3年": {
+              "row_type": "data"
+            },
+            "3至4年": {
+              "row_type": "data"
+            },
+            "4至5年": {
+              "row_type": "data"
+            },
+            "5年以上": {
+              "row_type": "data"
+            },
+            "合 计": {
+              "row_type": "total",
+              "formula": "sum(detail)",
+              "mode": "auto"
+            }
+          }
+        },
+        {
+          "table_index": 8,
           "table_name": "采用余额百分比或其他组合方法计提坏账准备的应收账款",
           "header_normalize": [
             {
@@ -28978,7 +29496,7 @@
           }
         },
         {
-          "table_index": 7,
+          "table_index": 9,
           "table_name": "（3）本期计提、收回或转回的坏账准备情况",
           "header_normalize": [
             {
@@ -29073,6 +29591,39 @@
                 }
               }
             },
+            "……": {
+              "row_type": "expandable",
+              "binding": {
+                "opening_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "current_period_recover": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
+                },
+                "current_period_writeoff": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
+                },
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
             "合 计": {
               "row_type": "total",
               "formula": "sum(detail)",
@@ -29081,7 +29632,7 @@
           }
         },
         {
-          "table_index": 8,
+          "table_index": 10,
           "table_name": "收回或转回的坏账准备",
           "header_normalize": [
             {
@@ -29110,7 +29661,7 @@
           }
         },
         {
-          "table_index": 9,
+          "table_index": 11,
           "table_name": "（4）本期实际核销的应收账款",
           "header_normalize": [
             {
@@ -29147,7 +29698,7 @@
           }
         },
         {
-          "table_index": 10,
+          "table_index": 12,
           "table_name": "（5）按欠款方归集的期末余额前五名的应收账款",
           "header_normalize": [
             {
@@ -29176,7 +29727,7 @@
           }
         },
         {
-          "table_index": 11,
+          "table_index": 13,
           "table_name": "（6）由金融资产转移而终止确认的应收账款",
           "header_normalize": [
             {
@@ -29201,7 +29752,7 @@
           }
         },
         {
-          "table_index": 12,
+          "table_index": 14,
           "table_name": "（7）应收账款转移继续涉入形成的资产、负债的金额",
           "header_normalize": [
             {
@@ -29214,10 +29765,34 @@
             }
           ],
           "rows": {
+            "资产：": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
             "资产小计": {
               "row_type": "subtotal",
               "formula": "sum(detail)",
               "mode": "auto"
+            },
+            "负债：": {
+              "row_type": "data",
+              "binding": {
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
             },
             "负债小计": {
               "row_type": "subtotal",
@@ -29516,15 +30091,15 @@
               "semantic": "manual_text"
             },
             {
-              "text": "第一阶段",
+              "text": "未来12个月预期信用损失",
               "semantic": "manual_text"
             },
             {
-              "text": "第二阶段",
+              "text": "整个存续期预期信用损失（未发生信用减值）",
               "semantic": "manual_text"
             },
             {
-              "text": "第三阶段",
+              "text": "整个存续期预期信用损失（已发生信用减值）",
               "semantic": "manual_text"
             },
             {
@@ -29594,7 +30169,7 @@
               "semantic": "current_period_recover"
             },
             {
-              "text": "是否发生减值及其判断依据",
+              "text": "相关款项是否发生减值",
               "semantic": "manual_text"
             }
           ],
@@ -30386,15 +30961,15 @@
               "semantic": "manual_text"
             },
             {
-              "text": "第一阶段",
+              "text": "未来12个月预期信用损失",
               "semantic": "manual_text"
             },
             {
-              "text": "第二阶段",
+              "text": "整个存续期预期信用损失（未发生信用减值）",
               "semantic": "manual_text"
             },
             {
-              "text": "第三阶段",
+              "text": "整个存续期预期信用损失（已发生信用减值）",
               "semantic": "manual_text"
             },
             {
@@ -30452,15 +31027,15 @@
               "semantic": "manual_text"
             },
             {
-              "text": "第一阶段",
+              "text": "未来12个月预期信用损失",
               "semantic": "manual_text"
             },
             {
-              "text": "第二阶段",
+              "text": "整个存续期预期信用损失（未发生信用减值）",
               "semantic": "manual_text"
             },
             {
-              "text": "第三阶段",
+              "text": "整个存续期预期信用损失（已发生信用减值）",
               "semantic": "manual_text"
             },
             {
@@ -33306,256 +33881,6 @@
         },
         {
           "table_index": 5,
-          "table_name": "期末本公司已质押的应收票据",
-          "header_normalize": [
-            {
-              "text": "种类",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "期末已质押金额",
-              "semantic": "closing_balance"
-            }
-          ],
-          "rows": {
-            "银行承兑票据": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "商业承兑票据": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "合计": {
-              "row_type": "total",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            }
-          }
-        },
-        {
-          "table_index": 6,
-          "table_name": "期末本公司已背书或贴现但尚未到期的应收票据",
-          "header_normalize": [
-            {
-              "text": "种类",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "期末终止确认金额",
-              "semantic": "closing_balance"
-            },
-            {
-              "text": "期末未终止确认金额",
-              "semantic": "closing_balance"
-            }
-          ],
-          "rows": {
-            "银行承兑票据": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "closing_balance_col2": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "商业承兑票据": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                },
-                "closing_balance_col2": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "合计": {
-              "row_type": "total",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            }
-          }
-        },
-        {
-          "table_index": 7,
-          "table_name": "期末本公司因出票人未履约而将其转应收账款的票据",
-          "header_normalize": [
-            {
-              "text": "种类",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "期末转应收账款金额",
-              "semantic": "closing_balance"
-            }
-          ],
-          "rows": {
-            "商业承兑票据": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "合计": {
-              "row_type": "total",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            }
-          }
-        },
-        {
-          "table_index": 8,
-          "table_name": "按坏账计提方法分类",
-          "header_normalize": [
-            {
-              "text": "类别",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "金额",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "比例(%)",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "坏账准备",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "预期信用损失率(%)",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "账面价值",
-              "semantic": "carrying_value"
-            }
-          ],
-          "rows": {
-            "按单项计提坏账准备": {
-              "row_type": "data",
-              "binding": {
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "其中：": {
-              "row_type": "data",
-              "binding": {
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "按组合计提坏账准备": {
-              "row_type": "data",
-              "binding": {
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "其中：#1": {
-              "row_type": "data",
-              "binding": {
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "银行承兑汇票": {
-              "row_type": "data",
-              "binding": {
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "商业承兑汇票": {
-              "row_type": "data",
-              "binding": {
-                "carrying_value": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
-                }
-              }
-            },
-            "合计": {
-              "row_type": "total",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            }
-          }
-        },
-        {
-          "table_index": 9,
           "table_name": "按坏账计提方法分类（续：上年年末余额）",
           "header_normalize": [
             {
@@ -33664,7 +33989,7 @@
           }
         },
         {
-          "table_index": 10,
+          "table_index": 6,
           "table_name": "按单项计提坏账准备的应收票据（期末余额）",
           "header_normalize": [
             {
@@ -33703,7 +34028,7 @@
           }
         },
         {
-          "table_index": 11,
+          "table_index": 7,
           "table_name": "按单项计提坏账准备的应收票据（续：上年年末余额）",
           "header_normalize": [
             {
@@ -33742,57 +34067,7 @@
           }
         },
         {
-          "table_index": 12,
-          "table_name": "按单项计提坏账准备的应收票据",
-          "header_normalize": [
-            {
-              "text": "名称",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "应收票据",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "坏账准备",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "预期信用损失率(%)",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "应收票据",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "坏账准备",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "预期信用损失率(%)",
-              "semantic": "manual_text"
-            }
-          ],
-          "rows": {
-            "row_0": {
-              "row_type": "data"
-            },
-            "row_1": {
-              "row_type": "data"
-            },
-            "row_2": {
-              "row_type": "data"
-            },
-            "合计": {
-              "row_type": "total",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            }
-          }
-        },
-        {
-          "table_index": 13,
+          "table_index": 8,
           "table_name": "组合计提项目：银行承兑汇票",
           "header_normalize": [
             {
@@ -33842,7 +34117,7 @@
           }
         },
         {
-          "table_index": 14,
+          "table_index": 9,
           "table_name": "组合计提项目：商业承兑汇票",
           "header_normalize": [
             {
@@ -33892,7 +34167,7 @@
           }
         },
         {
-          "table_index": 15,
+          "table_index": 10,
           "table_name": "本期计提、收回或转回的坏账准备情况",
           "header_normalize": [
             {
@@ -33931,7 +34206,7 @@
           }
         },
         {
-          "table_index": 16,
+          "table_index": 11,
           "table_name": "本期转回或收回金额重要的坏账准备",
           "header_normalize": [
             {
@@ -34021,7 +34296,7 @@
           }
         },
         {
-          "table_index": 17,
+          "table_index": 12,
           "table_name": "本期实际核销的应收票据情况",
           "header_normalize": [
             {
@@ -34049,123 +34324,8 @@
           }
         },
         {
-          "table_index": 18,
+          "table_index": 13,
           "table_name": "重要的应收票据核销情况（逐项披露）",
-          "header_normalize": [
-            {
-              "text": "单位名称",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "应收票据性质",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "核销金额",
-              "semantic": "current_period_writeoff"
-            },
-            {
-              "text": "核销原因",
-              "semantic": "current_period_writeoff"
-            },
-            {
-              "text": "履行的核销程序",
-              "semantic": "current_period_writeoff"
-            },
-            {
-              "text": "款项是否由关联交易产生",
-              "semantic": "manual_text"
-            }
-          ],
-          "rows": {
-            "row_0": {
-              "row_type": "data",
-              "binding": {
-                "current_period_writeoff": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                },
-                "current_period_writeoff_col3": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                },
-                "current_period_writeoff_col4": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                }
-              }
-            },
-            "row_1": {
-              "row_type": "data",
-              "binding": {
-                "current_period_writeoff": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                },
-                "current_period_writeoff_col3": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                },
-                "current_period_writeoff_col4": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                }
-              }
-            },
-            "row_2": {
-              "row_type": "data",
-              "binding": {
-                "current_period_writeoff": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                },
-                "current_period_writeoff_col3": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                },
-                "current_period_writeoff_col4": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                }
-              }
-            },
-            "合计": {
-              "row_type": "total",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            }
-          }
-        },
-        {
-          "table_index": 19,
-          "table_name": "转回或收回金额重要的坏账准备",
           "header_normalize": [
             {
               "text": "单位名称",
@@ -35995,7 +36155,7 @@
         },
         {
           "table_index": 16,
-          "table_name": "转移应收账款且继续涉入形成的资产、负债",
+          "table_name": "转移应收账款且继续涉入形成的资产、负债的金额",
           "header_normalize": [
             {
               "text": "项  目",
@@ -36230,102 +36390,6 @@
         },
         {
           "table_index": 1,
-          "table_name": "如果企业经常贴现或背书信用等级较高的银行承兑的汇票，则其业务模式可能是既以收取合同现金流量为目标又以出售该金融资产为目标，从而可能需要在“应收款项融资”项目列报。】",
-          "header_normalize": [
-            {
-              "text": "项  目",
-              "semantic": "manual_text"
-            },
-            {
-              "text": "期末余额",
-              "semantic": "closing_balance"
-            },
-            {
-              "text": "上年年末余额",
-              "semantic": "prior_year_value"
-            }
-          ],
-          "rows": {
-            "应收票据": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "trial_balance",
-                  "field": "audited_amount",
-                  "account_codes": [
-                    "1131"
-                  ],
-                  "mode": "auto",
-                  "agg": "sum"
-                },
-                "prior_year_value": {
-                  "source": "prior_year_note",
-                  "field": "value",
-                  "account_codes": [
-                    "1131"
-                  ],
-                  "mode": "auto"
-                }
-              }
-            },
-            "应收账款": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "trial_balance",
-                  "field": "audited_amount",
-                  "account_codes": [
-                    "1131"
-                  ],
-                  "mode": "auto",
-                  "agg": "sum"
-                },
-                "prior_year_value": {
-                  "source": "prior_year_note",
-                  "field": "value",
-                  "account_codes": [
-                    "1131"
-                  ],
-                  "mode": "auto"
-                }
-              }
-            },
-            "小  计": {
-              "row_type": "subtotal",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            },
-            "减：其他综合收益-公允价值变动": {
-              "row_type": "data",
-              "binding": {
-                "closing_balance": {
-                  "source": "trial_balance",
-                  "field": "audited_amount",
-                  "account_codes": [
-                    "1131"
-                  ],
-                  "mode": "auto",
-                  "agg": "sum"
-                },
-                "prior_year_value": {
-                  "source": "prior_year_note",
-                  "field": "value",
-                  "account_codes": [
-                    "1131"
-                  ],
-                  "mode": "auto"
-                }
-              }
-            },
-            "期末公允价值": {
-              "row_type": "total",
-              "formula": "sum(detail)",
-              "mode": "auto"
-            }
-          }
-        },
-        {
-          "table_index": 2,
           "table_name": "本期计提、收回或转回的减值准备情况",
           "header_normalize": [
             {
@@ -36430,7 +36494,7 @@
           }
         },
         {
-          "table_index": 3,
+          "table_index": 2,
           "table_name": "期末本公司已质押的应收票据",
           "header_normalize": [
             {
@@ -36479,7 +36543,7 @@
           }
         },
         {
-          "table_index": 4,
+          "table_index": 3,
           "table_name": "期末本公司已背书或贴现但尚未到期的应收票据",
           "header_normalize": [
             {
@@ -37207,7 +37271,7 @@
               "semantic": "current_period_recover"
             },
             {
-              "text": "是否发生减值及其判断依据",
+              "text": "是否发生减值及其原因",
               "semantic": "manual_text"
             }
           ],
@@ -50483,7 +50547,7 @@
         },
         {
           "table_index": 1,
-          "table_name": "（采用公允价值计量模式的投资性房地产，分类列示期初余额、期末余额和本期增减变动情况。）",
+          "table_name": "按公允价值计量的投资性房地产",
           "header_normalize": [
             {
               "text": "项目",
@@ -50538,7 +50602,7 @@
         },
         {
           "table_index": 2,
-          "table_name": "（披露未办妥产权证书的投资性房地产账面价值及原因。）",
+          "table_name": "未办妥产权证书的情况",
           "header_normalize": [
             {
               "text": "项目",
@@ -51124,7 +51188,7 @@
         },
         {
           "table_index": 4,
-          "table_name": "（披露期末未办妥产权证书的固定资产账面价值及原因。）",
+          "table_name": "未办妥产权证书的固定资产情况",
           "header_normalize": [
             {
               "text": "项目",
@@ -51369,7 +51433,7 @@
         },
         {
           "table_index": 4,
-          "table_name": "重要在建工程项目变动情况（续）：",
+          "table_name": "在建工程减值准备情况",
           "header_normalize": [
             {
               "text": "项目",
@@ -51402,7 +51466,7 @@
         },
         {
           "table_index": 5,
-          "table_name": "在建工程减值准备情况",
+          "table_name": "工程物资",
           "header_normalize": [
             {
               "text": "项目",
@@ -51508,7 +51572,7 @@
       "tables": [
         {
           "table_index": 0,
-          "table_name": "开发支出",
+          "table_name": "研发支出",
           "header_normalize": [
             {
               "text": "项  目",
@@ -51830,7 +51894,7 @@
         },
         {
           "table_index": 2,
-          "table_name": "资产组的可收回金额是依据管理层编制的五年期预测，采用未来现金流量折合现值计算。超过该五年期的现金流量采用以下所述的估计增长率作出推算。采用未来现金流量折现方法所运用的假设主要包括：",
+          "table_name": "商誉减值测试关键假设",
           "header_normalize": [
             {
               "text": "资产组/业务",
@@ -51863,7 +51927,7 @@
         },
         {
           "table_index": 3,
-          "table_name": "业绩承诺完成及对应商誉减值情况如下：",
+          "table_name": "业绩承诺完成及商誉减值情况",
           "header_normalize": [
             {
               "text": "项目",
@@ -52846,7 +52910,7 @@
         },
         {
           "table_index": 1,
-          "table_name": "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如：",
+          "table_name": "合同取得成本",
           "header_normalize": [
             {
               "text": "项  目",
@@ -53322,48 +53386,8 @@
                   "source": "trial_balance",
                   "field": "opening_balance",
                   "account_codes": [
-                    "2101"
-                  ],
-                  "mode": "auto",
-                  "agg": "sum"
-                },
-                "current_year_increase": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [
-                    "2101"
-                  ],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                },
-                "current_year_decrease": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [
-                    "2101"
-                  ],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                },
-                "closing_balance": {
-                  "source": "trial_balance",
-                  "field": "audited_amount",
-                  "account_codes": [
-                    "2101"
-                  ],
-                  "mode": "auto",
-                  "agg": "sum"
-                }
-              }
-            },
-            "其中：": {
-              "row_type": "data",
-              "binding": {
-                "opening_balance": {
-                  "source": "trial_balance",
-                  "field": "opening_balance",
-                  "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "auto",
@@ -53373,7 +53397,8 @@
                   "source": "manual",
                   "field": "value",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "manual",
@@ -53383,7 +53408,8 @@
                   "source": "manual",
                   "field": "value",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "manual",
@@ -53393,7 +53419,8 @@
                   "source": "trial_balance",
                   "field": "audited_amount",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "auto",
@@ -53401,14 +53428,15 @@
                 }
               }
             },
-            "指定为以公允价值计量且其变动计入当期损益的金融负债": {
+            "其中：发行的交易性债券": {
               "row_type": "data",
               "binding": {
                 "opening_balance": {
                   "source": "trial_balance",
                   "field": "opening_balance",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "auto",
@@ -53418,7 +53446,8 @@
                   "source": "manual",
                   "field": "value",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "manual",
@@ -53428,7 +53457,8 @@
                   "source": "manual",
                   "field": "value",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "manual",
@@ -53438,7 +53468,8 @@
                   "source": "trial_balance",
                   "field": "audited_amount",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "auto",
@@ -53446,14 +53477,15 @@
                 }
               }
             },
-            "其中：#1": {
+            "衍生金融负债": {
               "row_type": "data",
               "binding": {
                 "opening_balance": {
                   "source": "trial_balance",
                   "field": "opening_balance",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "auto",
@@ -53463,7 +53495,8 @@
                   "source": "manual",
                   "field": "value",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "manual",
@@ -53473,7 +53506,8 @@
                   "source": "manual",
                   "field": "value",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "manual",
@@ -53483,7 +53517,8 @@
                   "source": "trial_balance",
                   "field": "audited_amount",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "auto",
@@ -53498,7 +53533,8 @@
                   "source": "trial_balance",
                   "field": "opening_balance",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "auto",
@@ -53508,7 +53544,8 @@
                   "source": "manual",
                   "field": "value",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "manual",
@@ -53518,7 +53555,8 @@
                   "source": "manual",
                   "field": "value",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "manual",
@@ -53528,7 +53566,155 @@
                   "source": "trial_balance",
                   "field": "audited_amount",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
+                    "6604"
+                  ],
+                  "mode": "auto",
+                  "agg": "sum"
+                }
+              }
+            },
+            "指定为以公允价值计量且其变动计入当期损益的金融负债": {
+              "row_type": "data",
+              "binding": {
+                "opening_balance": {
+                  "source": "trial_balance",
+                  "field": "opening_balance",
+                  "account_codes": [
+                    "2601",
+                    "2651",
+                    "6604"
+                  ],
+                  "mode": "auto",
+                  "agg": "sum"
+                },
+                "current_year_increase": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [
+                    "2601",
+                    "2651",
+                    "6604"
+                  ],
+                  "mode": "manual",
+                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
+                },
+                "current_year_decrease": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [
+                    "2601",
+                    "2651",
+                    "6604"
+                  ],
+                  "mode": "manual",
+                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
+                },
+                "closing_balance": {
+                  "source": "trial_balance",
+                  "field": "audited_amount",
+                  "account_codes": [
+                    "2601",
+                    "2651",
+                    "6604"
+                  ],
+                  "mode": "auto",
+                  "agg": "sum"
+                }
+              }
+            },
+            "其中：债券": {
+              "row_type": "data",
+              "binding": {
+                "opening_balance": {
+                  "source": "trial_balance",
+                  "field": "opening_balance",
+                  "account_codes": [
+                    "2601",
+                    "2651",
+                    "6604"
+                  ],
+                  "mode": "auto",
+                  "agg": "sum"
+                },
+                "current_year_increase": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [
+                    "2601",
+                    "2651",
+                    "6604"
+                  ],
+                  "mode": "manual",
+                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
+                },
+                "current_year_decrease": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [
+                    "2601",
+                    "2651",
+                    "6604"
+                  ],
+                  "mode": "manual",
+                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
+                },
+                "closing_balance": {
+                  "source": "trial_balance",
+                  "field": "audited_amount",
+                  "account_codes": [
+                    "2601",
+                    "2651",
+                    "6604"
+                  ],
+                  "mode": "auto",
+                  "agg": "sum"
+                }
+              }
+            },
+            "其他#1": {
+              "row_type": "data",
+              "binding": {
+                "opening_balance": {
+                  "source": "trial_balance",
+                  "field": "opening_balance",
+                  "account_codes": [
+                    "2601",
+                    "2651",
+                    "6604"
+                  ],
+                  "mode": "auto",
+                  "agg": "sum"
+                },
+                "current_year_increase": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [
+                    "2601",
+                    "2651",
+                    "6604"
+                  ],
+                  "mode": "manual",
+                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
+                },
+                "current_year_decrease": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [
+                    "2601",
+                    "2651",
+                    "6604"
+                  ],
+                  "mode": "manual",
+                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
+                },
+                "closing_balance": {
+                  "source": "trial_balance",
+                  "field": "audited_amount",
+                  "account_codes": [
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "auto",
@@ -53556,16 +53742,12 @@
               "semantic": "opening_balance"
             },
             {
-              "text": "本期增加",
-              "semantic": "current_year_increase"
-            },
-            {
-              "text": "本期减少",
-              "semantic": "current_year_decrease"
-            },
-            {
               "text": "期末余额",
               "semantic": "closing_balance"
+            },
+            {
+              "text": "指定的理由和依据",
+              "semantic": "manual_text"
             }
           ],
           "rows": {
@@ -53585,61 +53767,50 @@
               "semantic": "manual_text"
             },
             {
-              "text": "期初余额",
-              "semantic": "opening_balance"
+              "text": "2025年公允价值变动额",
+              "semantic": "fair_value"
             },
             {
-              "text": "本期增加",
-              "semantic": "current_year_increase"
+              "text": "因自身信用风险变动引起的公允价值本年变动额",
+              "semantic": "fair_value"
             },
             {
-              "text": "本期减少",
-              "semantic": "current_year_decrease"
-            },
-            {
-              "text": "期末余额",
-              "semantic": "closing_balance"
+              "text": "因自身信用风险变动引起的公允价值累计变动额",
+              "semantic": "fair_value"
             }
           ],
           "rows": {
             "发行的普通债权": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "fair_value": {
                   "source": "trial_balance",
-                  "field": "opening_balance",
+                  "field": "audited_amount",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "auto",
                   "agg": "sum"
                 },
-                "current_year_increase": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [
-                    "2802",
-                    "6604"
-                  ],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                },
-                "current_year_decrease": {
-                  "source": "manual",
-                  "field": "value",
-                  "account_codes": [
-                    "2802",
-                    "6604"
-                  ],
-                  "mode": "manual",
-                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
-                },
-                "closing_balance": {
+                "fair_value_col2": {
                   "source": "trial_balance",
                   "field": "audited_amount",
                   "account_codes": [
-                    "2802",
+                    "2601",
+                    "2651",
+                    "6604"
+                  ],
+                  "mode": "auto",
+                  "agg": "sum"
+                },
+                "fair_value_col3": {
+                  "source": "trial_balance",
+                  "field": "audited_amount",
+                  "account_codes": [
+                    "2601",
+                    "2651",
                     "6604"
                   ],
                   "mode": "auto",
@@ -54447,8 +54618,8 @@
               "semantic": "manual_text"
             },
             {
-              "text": "期初余额",
-              "semantic": "opening_balance"
+              "text": "上年年末数",
+              "semantic": "prior_year_value"
             },
             {
               "text": "本期增加",
@@ -54459,7 +54630,7 @@
               "semantic": "current_year_decrease"
             },
             {
-              "text": "期末余额",
+              "text": "期末数",
               "semantic": "closing_balance"
             }
           ],
@@ -54467,7 +54638,7 @@
             "短期薪酬": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54500,7 +54671,7 @@
             "离职后福利-设定提存计划": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54533,7 +54704,7 @@
             "辞退福利": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54566,7 +54737,7 @@
             "一年内到期的其他福利": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54612,8 +54783,8 @@
               "semantic": "manual_text"
             },
             {
-              "text": "期初余额",
-              "semantic": "opening_balance"
+              "text": "上年年末数",
+              "semantic": "prior_year_value"
             },
             {
               "text": "本期增加",
@@ -54624,7 +54795,7 @@
               "semantic": "current_year_decrease"
             },
             {
-              "text": "期末余额",
+              "text": "期末数",
               "semantic": "closing_balance"
             }
           ],
@@ -54632,7 +54803,7 @@
             "工资、奖金、津贴和补贴": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54665,7 +54836,7 @@
             "职工福利费": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54698,7 +54869,7 @@
             "社会保险费": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54731,7 +54902,7 @@
             "其中：1．医疗保险费": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54764,7 +54935,7 @@
             "2．工伤保险费": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54797,7 +54968,40 @@
             "3．生育保险费": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                },
+                "current_year_increase": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
+                },
+                "current_year_decrease": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待 P-1 审计师手工标注（变动列/计提比例/公式列）"
+                },
+                "closing_balance": {
+                  "source": "manual",
+                  "field": "value",
+                  "account_codes": [],
+                  "mode": "manual",
+                  "todo": "待审计师手工填或从底稿同步（无科目码自动映射）"
+                }
+              }
+            },
+            "……": {
+              "row_type": "expandable",
+              "binding": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54830,7 +55034,7 @@
             "住房公积金": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54863,7 +55067,7 @@
             "工会经费和职工教育经费": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54896,7 +55100,7 @@
             "短期带薪缺勤": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54929,7 +55133,7 @@
             "短期利润分享计划": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54962,7 +55166,7 @@
             "非货币性福利": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -54995,7 +55199,7 @@
             "其他短期薪酬": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -55041,8 +55245,8 @@
               "semantic": "manual_text"
             },
             {
-              "text": "期初余额",
-              "semantic": "opening_balance"
+              "text": "上年年末数",
+              "semantic": "prior_year_value"
             },
             {
               "text": "本期增加",
@@ -55053,7 +55257,7 @@
               "semantic": "current_year_decrease"
             },
             {
-              "text": "期末余额",
+              "text": "期末数",
               "semantic": "closing_balance"
             }
           ],
@@ -55061,7 +55265,7 @@
             "离职后福利": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -55091,10 +55295,10 @@
                 }
               }
             },
-            "其中：基本养老保险费": {
+            "其中：1．基本养老保险费": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -55124,10 +55328,10 @@
                 }
               }
             },
-            "失业保险费": {
+            "2．失业保险费": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -55157,10 +55361,10 @@
                 }
               }
             },
-            "企业年金缴费": {
+            "3．企业年金缴费": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -55190,10 +55394,10 @@
                 }
               }
             },
-            "其他": {
+            "4．其他": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -55226,7 +55430,7 @@
             "其他长期职工福利（不适用的删除）": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -55256,10 +55460,10 @@
                 }
               }
             },
-            "其中：xxx": {
+            "其中：1．xxx": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -55289,10 +55493,10 @@
                 }
               }
             },
-            "其他#1": {
+            "2．其他": {
               "row_type": "data",
               "binding": {
-                "opening_balance": {
+                "prior_year_value": {
                   "source": "manual",
                   "field": "value",
                   "account_codes": [],
@@ -56243,7 +56447,7 @@
         },
         {
           "table_index": 4,
-          "table_name": "一年内到期的应付债券（续）",
+          "table_name": "一年内到期的长期应付款",
           "header_normalize": [
             {
               "text": "项目",
@@ -56596,7 +56800,7 @@
         },
         {
           "table_index": 3,
-          "table_name": "应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）",
+          "table_name": "（3）划分为金融负债的其他金融工具",
           "header_normalize": [
             {
               "text": "项目",
@@ -58975,7 +59179,7 @@
         },
         {
           "table_index": 2,
-          "table_name": "期末发行在外的优先股、永续债等其他金融工具变动情况",
+          "table_name": "权益工具持有者的相关信息",
           "header_normalize": [
             {
               "text": "项目",
@@ -60482,19 +60686,19 @@
               "semantic": "manual_text"
             },
             {
-              "text": "收入",
+              "text": "主营业务收入",
               "semantic": "manual_text"
             },
             {
-              "text": "成本",
+              "text": "主营业务成本",
               "semantic": "cost"
             },
             {
-              "text": "收入",
+              "text": "主营业务收入",
               "semantic": "manual_text"
             },
             {
-              "text": "成本",
+              "text": "主营业务成本",
               "semantic": "cost"
             }
           ],
@@ -62722,7 +62926,7 @@
       "tables": [
         {
           "table_index": 0,
-          "table_name": "（公司作为承租人的租赁，应披露未纳入租赁负债计量的可变租赁付款额、简化处理的短期租赁费用和低价值资产租赁费用、与租赁相关的现金流出总额等相关信息。涉及售后租回交易的，应披露是否满足销售及其判断依据。）",
+          "table_name": "作为承租人",
           "header_normalize": [
             {
               "text": "项目",
@@ -62919,7 +63123,7 @@
         },
         {
           "table_index": 3,
-          "table_name": "②资产负债表日后连续五个会计年度每年将收到的未折现租赁收款额，以及剩余年度将收到的未折现租赁收款额总额",
+          "table_name": "③未折现租赁收款额与租赁投资净额的调节表",
           "header_normalize": [
             {
               "text": "项目",
@@ -62947,7 +63151,7 @@
         },
         {
           "table_index": 4,
-          "table_name": "③未折现租赁收款额与租赁投资净额的调节表",
+          "table_name": "①租赁收入",
           "header_normalize": [
             {
               "text": "项目",
@@ -77065,7 +77269,7 @@
               "semantic": "current_period_recover"
             },
             {
-              "text": "是否发生减值及其判断依据",
+              "text": "是否发生减值及其原因",
               "semantic": "manual_text"
             }
           ],
@@ -79555,19 +79759,19 @@
               "semantic": "manual_text"
             },
             {
-              "text": "收入",
+              "text": "主营业务收入",
               "semantic": "manual_text"
             },
             {
-              "text": "成本",
+              "text": "主营业务成本",
               "semantic": "cost"
             },
             {
-              "text": "收入",
+              "text": "主营业务收入",
               "semantic": "manual_text"
             },
             {
-              "text": "成本",
+              "text": "主营业务成本",
               "semantic": "cost"
             }
           ],

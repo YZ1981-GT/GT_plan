@@ -153,7 +153,9 @@ SOE_LTE_ALREADY_CORRECT_INDEXES = (0, 1)
 # 母公司章表数（JSON 现值）。2026-08-06 Task 6 后实测：同构子节按合并章替换后
 # listed 57→62（应收账款 15→17 / 其他应收款 18→21）、soe 36→42（应收账款 11→13 /
 # 其他应收款 15→19）—— 母公司侧原先缺的表由合并章补齐，**子节数量未变**（需求 4.8）。
-JSON_PARENT_TABLE_COUNT = {"listed": 62, "soe": 42}
+# 2026-10-24 soe 42→44：合并章 八、5 两个预置组合的计提表按底稿 D2 国企拆成期末 / 期初各一张（应收账款 13→15），
+# 同构子节随 `fix_note_parent_company_chapter.py` 同步（consol-note-header-library-and-node-reaggregate R8.4 批 9b-2）。
+JSON_PARENT_TABLE_COUNT = {"listed": 62, "soe": 44}
 
 # 已登记的两版用语差异：JSON 两版都写「与」，listed 源 docx 写「和」。
 # 属用语差异不属结构缺陷，登记在此防下个会话把它当欠账"修正"。
@@ -1427,7 +1429,7 @@ PARENT_TABLE_CENSUS: dict[str, dict[str, tuple[int, int]]] = {
         "投资收益": (1, 1),
     },
     "soe": {
-        "应收账款": (13, 13),
+        "应收账款": (15, 15),  # 2026-10-24 13→15：组合计提表按底稿拆期末 / 期初（R8.4 批 9b-2）
         "其他应收款": (19, 19),
         "长期股权投资": (3, 3),
         "营业收入与营业成本": (5, 5),

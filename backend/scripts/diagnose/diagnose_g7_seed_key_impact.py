@@ -135,7 +135,7 @@ TARGETS: tuple[TableTarget, ...] = (
          "directShare", "indirectShare"),
     ),
     TableTarget(
-        "soe", "七、本期发生的同一控", "本期发生的同一控制下企业合并情况", "C",
+        "soe", "七、本期发生的同一控制下企业合并情况", "本期发生的同一控制下企业合并情况", "C",
         ("consolidationDate", "bookNetAssets", "consideration", "controller",
          "revenue", "netProfit", "cashIncrease", "operatingCashFlow"),
         ("consolidationDate", "bookNetAssets", "consideration", "ultimateController",
@@ -143,7 +143,7 @@ TARGETS: tuple[TableTarget, ...] = (
         note="仅 controller -> ultimateController 一列不同",
     ),
     TableTarget(
-        "soe", "七、本期发生的非同一", "本期发生的非同一控制下企业合并情况", "C",
+        "soe", "七、本期发生的非同一控制下企业合并情况", "本期发生的非同一控制下企业合并情况", "C",
         ("purchaseDate", "purchaseDateBasis", "preHoldingRatio",
          "atCombinationHoldingRatio", "bookNetAssets", "fvIdentifiableAmount",
          "fvIdentifiableMethod", "consideration", "goodwill",
@@ -197,7 +197,7 @@ TARGETS: tuple[TableTarget, ...] = (
         note="动态列",
     ),
     TableTarget(
-        "soe", "七、重要非全资子公司", "主要财务信息", "C",
+        "soe", "七、重要非全资子公司情况", "主要财务信息", "C",
         ("c1Current", "c1Prior", "c2Current", "c2Prior", "c3Current", "c3Prior",
          "c4Current", "c4Prior", "c5Current", "c5Prior"),
         ("minority-fs-company_1_current", "minority-fs-company_1_prior",
@@ -208,14 +208,14 @@ TARGETS: tuple[TableTarget, ...] = (
         note="动态列",
     ),
     TableTarget(
-        "soe", "七、本期不再纳入合并", "本期出售的子公司出售日的财务状况", "C",
+        "soe", "七、本期不再纳入合并范围的原子公司", "本期出售的子公司出售日的财务状况", "C",
         ("c1SaleDate", "c1Opening", "c2SaleDate", "c2Opening"),
         ("sold-fs-position-company_1_saleDate", "sold-fs-position-company_1_opening",
          "sold-fs-position-company_2_saleDate", "sold-fs-position-company_2_opening"),
         note="动态列",
     ),
     TableTarget(
-        "soe", "七、本期不再纳入合并", "本期出售的子公司出售日的经营成果", "C",
+        "soe", "七、本期不再纳入合并范围的原子公司", "本期出售的子公司出售日的经营成果", "C",
         ("aCurrent", "aPrior", "bCurrent", "bPrior", "cCurrent", "cPrior",
          "dCurrent", "dPrior", "eCurrent", "ePrior"),
         ("sold-fs-result-company_1_current", "sold-fs-result-company_1_prior",
@@ -226,7 +226,7 @@ TARGETS: tuple[TableTarget, ...] = (
         note="动态列",
     ),
     TableTarget(
-        "soe", "七、母公司在子公司的",
+        "soe", "七、母公司在子公司的所有者权益份额发生变化的情况",
         "母公司在子公司的所有者权益份额发生变化的情况", "C",
         ("company1", "company2", "company3"),
         ("ownership-change-company_1", "ownership-change-company_2",
@@ -235,7 +235,7 @@ TARGETS: tuple[TableTarget, ...] = (
     ),
     # ── E 类：列数差 1（差异列恒为 `name`）─────────────────────────────────
     TableTarget(
-        "soe", "七、本期纳入合并报表", "本期纳入合并报表范围的子公司基本情况", "E",
+        "soe", "七、本期纳入合并报表范围的子公司基本情况", "本期纳入合并报表范围的子公司基本情况", "E",
         ("name", "level", "enterpriseType", "registered", "region", "nature",
          "paidInCapital", "subscribedRatio", "paidRatio", "votingRights",
          "investmentAmount", "method"),
@@ -245,7 +245,7 @@ TARGETS: tuple[TableTarget, ...] = (
         note="E+C 叠加：既差 name 一列，其余列 key 亦不同",
     ),
     TableTarget(
-        "soe", "七、母公司拥有被投资",
+        "soe", "七、母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因",
         "母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因", "E",
         ("name", "subscribedRatio", "votingRights", "registeredCapital",
          "investmentAmount", "level", "reason"),
@@ -254,7 +254,7 @@ TARGETS: tuple[TableTarget, ...] = (
         note="仅差 name 一列，其余 key 逐位相同",
     ),
     TableTarget(
-        "soe", "七、母公司直接或通过",
+        "soe", "七、母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的",
         "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的原因",
         "E",
         ("name", "subscribedRatio", "votingRights", "registeredCapital",
@@ -264,14 +264,14 @@ TARGETS: tuple[TableTarget, ...] = (
         note="仅差 name 一列，其余 key 逐位相同",
     ),
     TableTarget(
-        "soe", "七、重要非全资子公司", "少数股东", "E",
+        "soe", "七、重要非全资子公司情况", "少数股东", "E",
         ("name", "minorityRatio", "minorityProfit", "minorityDividend",
          "minorityEquity"),
         ("holdingRatio", "currentProfit", "dividend", "closingEquity"),
         note="E+C 叠加",
     ),
     TableTarget(
-        "soe", "七、本期不再纳入合并", "原子公司的基本情况", "E",
+        "soe", "七、本期不再纳入合并范围的原子公司", "原子公司的基本情况", "E",
         ("name", "registered", "nature", "holdingRatio", "votingRatio", "reason"),
         ("registeredPlace", "businessNature", "holdingRatio", "votingRights",
          "reason"),

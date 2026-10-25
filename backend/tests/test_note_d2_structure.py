@@ -39,7 +39,9 @@ FIX = _load_fix_module()
 
 VARIANTS = ["listed", "soe"]
 SECTION = {"listed": "五、5", "soe": "八、5"}
-TABLE_COUNT = {"listed": 17, "soe": 13}
+# 国企 13 → 15：两个预置组合的计提表按底稿 D2 国企第 36 / 47 行拆成期末、期初各一张
+# （consol-note-header-library-and-node-reaggregate R8.4 批 9b-2）
+TABLE_COUNT = {"listed": 17, "soe": 15}
 TEMPLATE = {
     "listed": DATA_DIR / "note_template_listed.json",
     "soe": DATA_DIR / "note_template_soe.json",
@@ -156,11 +158,17 @@ def test_guidance_has_no_markdown_bold(variant: str, name: str, tbl: dict) -> No
 
 @pytest.mark.parametrize(("variant", "name", "tbl"), ALL_TABLES, ids=TABLE_IDS)
 def test_no_placeholder_or_header_label_rows(variant: str, name: str, tbl: dict) -> None:
-    bad_labels = {"可无限量添加行", "……", "..."}
+    """「可无限量添加行」是给填表人的说明、不是表格行；「……」是源模板可扩位，行类型由
+    ``note_expandable_markers.row_type_for_label`` 单一判定（``expandable``），不是假数据行 —— 原先把它也当
+    占位删掉，与 ``fix_note_expandable_rows.py`` 互相翻转（HEAD 上本用例对国企变动表恒红）。"""
+    from app.services.note_expandable_markers import row_type_for_label
+
     for i, row in enumerate(tbl.get("rows") or []):
         assert str(row.get("row_type", "")) != "header_label", f"{name} 第 {i} 行是压扁的表头"
         label = str(row.get("label", "")).strip()
-        assert label not in bad_labels, f"{name} 第 {i} 行是占位说明「{label}」"
+        assert label != "可无限量添加行", f"{name} 第 {i} 行是占位说明「{label}」"
+        if row_type_for_label(label) == "expandable":
+            assert row.get("row_type") == "expandable", f"{name} 第 {i} 行可扩位「{label}」行类型不对"
 
 
 # ─── 关键表的两级表头分组（防悄悄改回） ────────────────────────────────────────
@@ -177,10 +185,13 @@ def _table(variant: str, name: str) -> dict:
     [
         ("listed", "按坏账计提方法分类披露", ["账面余额", "坏账准备"]),
         ("listed", "按坏账计提方法分类披露（续：上年年末余额）", ["账面余额", "坏账准备"]),
-        ("soe", "（2）按坏账准备计提方法分类披露应收账款", ["账面金额", "坏账准备"]),
-        ("soe", "（2）按坏账准备计提方法分类披露应收账款（续：期初数）", ["账面金额", "坏账准备"]),
+        # 国企组名取底稿 D2 国企第 17 行原字「账面余额」（原写同义的「账面金额」，模板与载荷各一套）
+        ("soe", "（2）按坏账准备计提方法分类披露应收账款", ["账面余额", "坏账准备"]),
+        ("soe", "（2）按坏账准备计提方法分类披露应收账款（续：期初数）", ["账面余额", "坏账准备"]),
         ("listed", "组合计提项目：应收中央企业客户", ["期末余额", "上年年末余额"]),
-        ("soe", "组合计提项目：应收中央企业客户", ["期末数", "期初数"]),
+        # 国企组合表按底稿期末 / 期初各一张，期间在表名（R8.4 批 9b-2）
+        ("soe", "组合计提项目：应收中央企业客户", ["账面余额"]),
+        ("soe", "组合计提项目：应收中央企业客户（续：期初数）", ["账面余额"]),
         ("soe", "采用余额百分比或其他组合方法计提坏账准备的应收账款", ["期末数", "期初数"]),
         ("soe", "（3）本期计提、收回或转回的坏账准备情况", ["本期变动金额"]),
         # R8.4 批 9b-1 单体按底稿披露表：源模板 B51:E51「期末余额」盖住四个数据列（续表名带期间，仍单层）
@@ -222,9 +233,26 @@ def test_listed_portfolio_tables_share_identical_columns() -> None:
 
 
 def test_soe_portfolio_tables_share_identical_columns() -> None:
-    names = ["组合计提项目：应收中央企业客户", "组合计提项目：应收海外企业客户"]
-    cols_sets = [tuple((c["key"], c.get("group")) for c in _table("soe", n)["columns"]) for n in names]
-    assert len(set(cols_sets)) == 1, "国企 2 张组合分表列结构必须同构"
+    for suffix in ("", FIX.PORTFOLIO_CONT_SUFFIX_SOE):
+        names = [f"组合计提项目：应收中央企业客户{suffix}", f"组合计提项目：应收海外企业客户{suffix}"]
+        cols_sets = [tuple((c["key"], c.get("group")) for c in _table("soe", n)["columns"]) for n in names]
+        assert len(set(cols_sets)) == 1, f"国企 2 张组合分表（{suffix or '期末'}）列结构必须同构"
+
+
+def test_soe_portfolio_split_matches_workpaper_periods() -> None:
+    """期末表只放期末列、续表只放期初列，各 4 列（底稿 D2 国企第 36 / 47 行三层表头去掉期间一层）。"""
+    end = _table("soe", "组合计提项目：应收中央企业客户")
+    prior = _table("soe", "组合计提项目：应收中央企业客户" + FIX.PORTFOLIO_CONT_SUFFIX_SOE)
+    assert [c["key"] for c in end["columns"]] == ["label", "end_amount", "end_ratio", "end_provision"]
+    assert [c["key"] for c in prior["columns"]] == ["label", "prior_amount", "prior_ratio", "prior_provision"]
+    assert end["headers"] == prior["headers"] == ["账 龄", "应收账款", "比例（%）", "坏账准备"]
+    assert [r.get("label") for r in end["rows"]] == [r.get("label") for r in prior["rows"]]
+
+
+def test_soe_individual_table_has_no_basis_column() -> None:
+    """国企单项计提表没有「计提理由」（底稿 D2 国企第 30 行没有这列；用户 2026-10-24「待定两列按底稿删」）。"""
+    tbl = _table("soe", "期末单项计提坏账准备的应收账款")
+    assert tbl["headers"] == ["债务人名称", "账面余额", "坏账准备", "账龄", "预期信用损失率（%）"]
 
 
 # ─── 幂等 ─────────────────────────────────────────────────────────────────────

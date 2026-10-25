@@ -144,13 +144,18 @@ describe('K 系负债/递延类模板结构', () => {
     }
   })
 
-  it.each(SECTIONS)('%s §%s 无泄漏表名与占位说明行', (variant, section) => {
+  it.each(SECTIONS)('%s §%s 无泄漏表名；可扩位标记行只能是 expandable', (variant, section) => {
     const sec = loadSection(FILE_OF[variant], section)
     const names = (sec.tables ?? []).map(t => String(t.name))
     for (const leaked of LEAKED_NAMES) expect(names).not.toContain(leaked)
     for (const t of sec.tables ?? []) {
-      const labels = (t.rows ?? []).map(r => String(r.label ?? ''))
-      for (const bad of PLACEHOLDER_ROWS) expect(labels, `${t.name}`).not.toContain(bad)
+      // 源模板的「可无限量添加行」「……」是可扩位（平台 `row_type: expandable`，零可见内容、不参与合计；
+      // 判据 note_expandable_markers），不是占位数据行 —— 原断言「不得出现」写在 expandable 行型之前，与之相反
+      for (const r of t.rows ?? []) {
+        if (PLACEHOLDER_ROWS.includes(String(r.label ?? ''))) {
+          expect(String(r.row_type ?? ''), `${t.name}「${r.label}」`).toBe('expandable')
+        }
+      }
       expect((t.rows ?? []).some(r => String(r.row_type ?? '') === 'header_label')).toBe(false)
     }
   })
@@ -176,9 +181,9 @@ describe('K 系负债/递延类模板结构', () => {
     expect(names).not.toContain('债券名称')
   })
 
-  it('K5 变体列数不同：上市 4 列（末列形成原因）/ 国企 3 列', () => {
+  it('K5 两版都是 4 列（末列形成原因，国企按底稿 K5 国企第 6 行，R8.4 批 9b-2）', () => {
     expect(buildK5ListedColumns()[K5_SUBTABLE.provision]).toHaveLength(4)
-    expect(buildK5SoeColumns()[K5_SUBTABLE.provision]).toHaveLength(3)
+    expect(buildK5SoeColumns()[K5_SUBTABLE.provision]).toHaveLength(4)
   })
 
   it('K7 国企含政府补助明细 10 列表（模板侧已补 columns/guidance）', () => {

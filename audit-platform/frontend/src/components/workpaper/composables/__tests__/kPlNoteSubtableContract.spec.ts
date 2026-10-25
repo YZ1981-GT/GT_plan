@@ -176,12 +176,17 @@ describe('K 系损益类模板结构（fix_note_k_pl_structure.py 成果防回�
     expect((c.cols[c.table] ?? []).some(d => d.flat === true)).toBe(true)
   })
 
-  it.each(CASES)('$cycle $variant 有 guidance 且无占位说明行 / 假表头行', (c) => {
+  it.each(CASES)('$cycle $variant 有 guidance、可扩位标记行只能是 expandable、无假表头行', (c) => {
     const sec = loadSection(FILE_OF[c.variant], c.section)
     const tbl = (sec.tables ?? []).find(t => t.name === c.table)!
     expect(String(tbl.guidance ?? '').trim()).not.toBe('')
-    const labels = (tbl.rows ?? []).map(r => String(r.label ?? ''))
-    for (const bad of PLACEHOLDER_ROWS) expect(labels).not.toContain(bad)
+    // 源模板的「……」「可无限量添加行」是可扩位（平台 `row_type: expandable`，零可见内容、不参与合计；
+    // 判据 note_expandable_markers），不是数据行 —— 原断言「不得出现」写在 expandable 行型之前，与之相反
+    for (const r of tbl.rows ?? []) {
+      if (PLACEHOLDER_ROWS.includes(String(r.label ?? ''))) {
+        expect(String(r.row_type ?? ''), `${c.table}「${r.label}」`).toBe('expandable')
+      }
+    }
     expect((tbl.rows ?? []).some(r => String(r.row_type ?? '') === 'header_label')).toBe(false)
   })
 
@@ -191,9 +196,9 @@ describe('K 系损益类模板结构（fix_note_k_pl_structure.py 成果防回�
     expect(K13_NOTE_SECTION.listed).toBe('五、80')
   })
 
-  it('K10 国企是 4 列（末列「是否为政府补助」），上市是 3 列', () => {
+  it('K10 两版都是 3 列（国企按底稿 K10 国企第 7 行，删去随 Word 多出的「是否为政府补助」，R8.4 批 9b-2）', () => {
     expect(buildK10SoeColumns()[K10_SOE_SUBTABLE.main].map(c => c.label)).toEqual([
-      '项目', '本期发生额', '上期发生额', '是否为政府补助',
+      '项目', '本期发生额', '上期发生额',
     ])
     expect(buildK10ListedColumns()[K10_LISTED_SUBTABLE.main]).toHaveLength(3)
   })
@@ -217,7 +222,11 @@ describe('K 系损益类模板结构（fix_note_k_pl_structure.py 成果防回�
     ] as const) {
       const sec = loadSection(FILE_OF[variant], section)
       const tbl = (sec.tables ?? []).find(t => t.name === table)!
-      const labels = (tbl.rows ?? []).map(r => String(r.label ?? '')).filter(l => l !== '合计')
+      // 可扩位行（expandable，零可见内容）不是固定行
+      const labels = (tbl.rows ?? [])
+        .filter(r => String(r.row_type ?? '') !== 'expandable')
+        .map(r => String(r.label ?? ''))
+        .filter(l => l !== '合计')
       expect(labels).toEqual([...want])
     }
   })
@@ -282,7 +291,7 @@ describe('K 系损益类载荷', () => {
     expect(rows[rows.length - 1]).toMatchObject({ is_total: true, non_recurring_amount: 14 })
   })
 
-  it('K10 国企：文本型第 4 列合计置 null；结构行排在合计之后且不参与求和', () => {
+  it('K10 国企：结构行排在合计之后且不参与求和；「是否为政府补助」点选不推成附注列', () => {
     const p = buildK10SyncPayload(
       'soe',
       'wp-1',
@@ -297,8 +306,8 @@ describe('K 系损益类载荷', () => {
     expect(rows.map(r => r.label)).toEqual(['政府补助', '个税手续费返还', '合计', K10_SOE_STRUCTURAL_ROW])
     const total = rows[2]
     expect(total).toMatchObject({ is_total: true, current_amount: 120, prior_amount: 60 })
-    expect(total.is_gov_grant).toBeNull()
     expect(rows[3]).toMatchObject({ current_amount: 100, prior_amount: 50 })
+    for (const row of rows) expect(row).not.toHaveProperty('is_gov_grant')
   })
 
   it('入参里已带的合计行被剔除（防双合计）', () => {

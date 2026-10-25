@@ -62,7 +62,10 @@ T_MOVEMENT = "固定资产情况"
 T_IDLE = "暂时闲置的固定资产情况"
 T_LEASE = "通过经营租赁租出的固定资产"  # 仅上市
 T_TITLE = "未办妥产权证书的固定资产情况"
-T_TITLE_LISTED = "（披露期末未办妥产权证书的固定资产账面价值及原因。）"  # listed 侧权威名（Word 同步）
+#: listed 五、22 第 5 张表被 Word 同步（5914e315b）改名成 Word 表前的提示段，原脚本跟着把它当了权威名 ——
+#: 表名不能是编制提示（平台命名口径 `build_note_table_name_corrections.is_business_title`），H1 前端一直推
+#: 「未办妥产权证书的固定资产情况」（两版同名）⇒ 按旧名定位、复位成业务名（R8.4 批 9b-2，2026-10-25）。
+_T_TITLE_LISTED_DAMAGED = "（披露期末未办妥产权证书的固定资产账面价值及原因。）"
 T_CLEARING = "固定资产清理"
 
 # 上市「固定资产情况」资产类别列（seed 默认五类；同步时按项目实际类别整表覆盖）
@@ -103,11 +106,11 @@ def _listed_plan() -> list[dict]:
             ("label", "项目", None),
             ("book_value", "账面价值", AMOUNT),
         ]), None, ""),
-        rule(T_TITLE_LISTED, flat_columns([
+        rule(T_TITLE, flat_columns([
             ("label", "项目", None),
             ("book_value", "账面价值", AMOUNT),
             ("reason", "未办妥产权证书原因", None),
-        ]), None, ""),
+        ]), None, "", aliases=[_T_TITLE_LISTED_DAMAGED]),
         rule(T_CLEARING, flat_columns([
             ("label", "项目", None),
             ("end_balance", "期末余额", AMOUNT),
@@ -147,7 +150,7 @@ def _soe_plan() -> list[dict]:
 
 
 EXPECTED = {
-    "listed": [T_SUMMARY, T_MOVEMENT, T_IDLE, T_LEASE, T_TITLE_LISTED, T_CLEARING],
+    "listed": [T_SUMMARY, T_MOVEMENT, T_IDLE, T_LEASE, T_TITLE, T_CLEARING],
     "soe": [T_SUMMARY, T_MOVEMENT, T_IDLE, T_TITLE, T_CLEARING],
 }
 
@@ -171,6 +174,12 @@ def _runner(key: str, dry_run: bool, check: bool):
         aligned_by=ALIGNED_BY,
         dry_run=dry_run,
         check=check,
+        # 🔴 与上面 `aliases=[_T_TITLE_LISTED_DAMAGED]` 的表名复位**成对**：5914e315b 之后，为了让
+        #    「每张表都有小节标题」过关，那条提示段被加了 `#### ` 当标题。表名复位后这个标题就多了一个
+        #    （6 张表 / 7 个标题）⇒ `disclosure_engine` 段落游标多走一格，把 R85 的政府补助提示配到表 0
+        #    汇总表上（实测守卫 `test_listed_cursor_inference_leaves_gaps_and_misattribution` 打红）。
+        #    摘掉前缀即回到 5914e315b~1 的段落形态（R8.4 批 9b-2，2026-10-25）。
+        untitle_text_sections=[_T_TITLE_LISTED_DAMAGED] if key == "listed" else None,
     )
 
 

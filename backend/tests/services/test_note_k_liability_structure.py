@@ -124,11 +124,13 @@ def test_k3_leaked_names_renamed() -> None:
     assert "其他应付款（表6）" not in soe
 
 
-def test_k5_variant_column_counts_differ() -> None:
-    """上市 4 列（末列「形成原因」）/ 国企 3 列 —— 附注模版口径，不得"统一"。"""
-    assert len(_load("listed", "五、50")["tables"][0]["columns"]) == 4
-    assert len(_load("soe", "八、55")["tables"][0]["columns"]) == 3
-    assert _load("listed", "五、50")["tables"][0]["columns"][3]["key"] == "reason"
+def test_k5_both_variants_carry_formation_reason() -> None:
+    """两版都是 4 列（末列「形成原因」）：单体附注按底稿披露表格式，底稿 K5 国企第 6 行就是 项目 | 期末数 | 期初数 |
+    形成原因（R8.4 批 9b-2）。原国企 3 列是随附注模版把形成原因降为表下注文字。"""
+    for variant, section in (("listed", "五、50"), ("soe", "八、55")):
+        cols = _load(variant, section)["tables"][0]["columns"]
+        assert [c["key"] for c in cols] == ["label", "end_amount", "prior_amount", "reason"], variant
+        assert cols[3]["label"] == "形成原因"
 
 
 def test_k7_soe_grant_table() -> None:

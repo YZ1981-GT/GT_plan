@@ -61,7 +61,7 @@ describe('noteSectionToNodeKey', () => {
   it('中文顿号/空白归一为下划线', () => {
     expect(noteSectionToNodeKey('五、1')).toBe('note_五_1')
     expect(noteSectionToNodeKey('十三、1')).toBe('note_十三_1')
-    expect(noteSectionToNodeKey('七、本期不再纳入合并')).toBe('note_七_本期不再纳入合并')
+    expect(noteSectionToNodeKey('七、本期不再纳入合并范围的原子公司')).toBe('note_七_本期不再纳入合并范围的原子公司')
     expect(noteSectionToNodeKey('九')).toBe('note_九')
   })
 

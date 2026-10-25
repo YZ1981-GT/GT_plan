@@ -117,7 +117,7 @@ import http from '@/utils/http'
 import type { useL3FormData } from '@/components/workpaper/composables/useL3FormData'
 import { useL3Disclosure, type L3DisclosureRow, type L3CurrentPortionRow } from '@/components/workpaper/composables/useL3Disclosure'
 import { eventBus } from '@/utils/eventBus'
-import { L3_NOTE_SECTION, buildL3SyncPayload } from '../../composables/l3NoteSectionMap'
+import { buildL3SyncPayload } from '../../composables/l3NoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
@@ -160,7 +160,8 @@ async function syncToDisclosureNotes() {
   if (props.isReadonly || !props.projectId) return
   syncing.value = true
   try {
-    const { sub_table_data, columns } = buildL3SyncPayload({
+    // 国企推两节（八、49 长期借款 + 八、45 一年内到期的长期借款），一次事务
+    const items = buildL3SyncPayload({
       variant: 'soe',
       classificationRows: classificationRows.value,
       currentPortionRows: currentPortionRows.value,
@@ -168,18 +169,16 @@ async function syncToDisclosureNotes() {
       propertyNote: '',
       conclusion: conclusion.value,
     })
-    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-batch-from-workpaper`, {
       wp_id: props.wpId,
-      sheet_name: 'L3-note-soe',
-      section_id: L3_NOTE_SECTION.soe,
       current_standard: 'soe_standalone',
-      sub_table_data,
-      columns,
+      items: items.map(item => ({ sheet_name: 'L3-note-soe', ...item })),
     })
-    ElMessage.success(`已同步到附注（${L3_NOTE_SECTION.soe}）`)
+    const sectionIds = items.map(item => item.section_id)
+    ElMessage.success(`已同步到附注（${sectionIds.join('、')}）`)
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'L3', accountCode: '2501', projectId: props.projectId,
-      sectionIds: [L3_NOTE_SECTION.soe],
+      sectionIds,
     })
   } catch { ElMessage.warning('同步附注失败') }
   finally { syncing.value = false }

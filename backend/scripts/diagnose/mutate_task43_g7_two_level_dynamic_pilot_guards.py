@@ -577,9 +577,11 @@ MUTATIONS += [
         id="M37", side="be", path=PG7, kind="replace",
         anchor="    return two_level, exempt, two_level - exempt",
         new="    return two_level, exempt, two_level",
-        want=f"{_PICK}::test_seed_counts_reproduce_the_archived_spec_numbers",
-        why="「应渲染两级」的期望不再剔除 `single_slot_exemption` ⇒ 24 而不是 20，"
-            "而 `is_two_level` 是源侧物理结构字段、把父行为空的占位合并也算两级"
+        # 🔴 2026-10-24 起真实登记表为空（豁免 0）⇒ 真实数据上本变异与原式等价，
+        #    `test_seed_counts_reproduce_the_archived_spec_numbers` 杀不死它；改由副本上登记一张豁免的用例杀。
+        want=f"{_PICK}::test_rendered_expectation_subtracts_registered_exemptions",
+        why="「应渲染两级」的期望不再剔除 `single_slot_exemption` ⇒ 有豁免时期望多算，"
+            "而 `is_two_level` 是源侧物理结构字段、把源模板只填 1 槽的占位合并也算两级"
             "（归档 spec 实测过的那条口径）",
         tags=("four-edge", "seed", "exemption"),
     ),
@@ -606,7 +608,7 @@ MUTATIONS += [
         scope='        "source_rows": "A62:L63",',
         offset=-2,
         scope_check=_facts_field_is(
-            "七、重要非全资子公司", "主要财务信息", "is_two_level", False
+            "七、重要非全资子公司情况", "主要财务信息", "is_two_level", False
         ),
     ),
     Mutation(

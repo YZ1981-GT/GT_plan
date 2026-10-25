@@ -198,18 +198,19 @@ const CLASS_COLUMNS_LISTED_PRIOR: ColumnDef[] = [
   { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT, group: '坏账准备' },
   { key: 'carrying_value', label: '账面价值', format: AMT },
 ]
+// 国企分组名取底稿原字「账面余额」（D2 国企披露表第 17 行；原写同义的「账面金额」，与附注模板显示不一）
 const CLASS_COLUMNS_SOE: ColumnDef[] = [
   { key: 'label', label: '类 别', is_label: true },
-  { key: 'book_amount', label: '金额', format: AMT, group: '账面金额' },
-  { key: 'ratio', label: '比例(%)', format: PCT, group: '账面金额' },
+  { key: 'book_amount', label: '金额', format: AMT, group: '账面余额' },
+  { key: 'ratio', label: '比例(%)', format: PCT, group: '账面余额' },
   { key: 'provision', label: '金额', format: AMT, group: '坏账准备' },
   { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT, group: '坏账准备' },
   { key: 'carrying_value', label: '账面价值', format: AMT },
 ]
 const CLASS_COLUMNS_SOE_PRIOR: ColumnDef[] = [
   { key: 'label', label: '类 别', is_label: true },
-  { key: 'book_amount', label: '金额', format: AMT, group: '账面金额' },
-  { key: 'ratio', label: '比例(%)', format: PCT, group: '账面金额' },
+  { key: 'book_amount', label: '金额', format: AMT, group: '账面余额' },
+  { key: 'ratio', label: '比例(%)', format: PCT, group: '账面余额' },
   { key: 'provision', label: '金额', format: AMT, group: '坏账准备' },
   { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT, group: '坏账准备' },
   { key: 'carrying_value', label: '账面价值', format: AMT },
@@ -241,23 +242,28 @@ const PORTFOLIO_COLUMNS_LISTED: ColumnDef[] = [
   { key: 'prior_provision', label: '坏账准备', format: AMT, group: '上年年末余额' },
   { key: 'prior_loss_rate', label: '预期信用损失率(%)', format: PCT, group: '上年年末余额' },
 ]
+// 国企底稿单项计提表没有「计提理由」列（第 30 行）—— 用户 2026-10-24「待定两列按底稿删」，附注模板同删
 const INDIVIDUAL_COLUMNS_SOE: ColumnDef[] = [
   { key: 'label', label: '债务人名称', is_label: true, flat: true },
   { key: 'end_amount', label: '账面余额', format: AMT },
   { key: 'provision', label: '坏账准备', format: AMT },
   { key: 'aging', label: '账龄', format: TXT },
   { key: 'loss_rate', label: '预期信用损失率（%）', format: PCT },
-  { key: 'basis', label: '计提理由', format: TXT },
 ]
-// 国企组合计提分表：源模板 r36~r79（账龄 + 双期各{应收账款, 比例（%）, 坏账准备}）
-const PORTFOLIO_COLUMNS_SOE: ColumnDef[] = [
+// 国企组合计提分表：底稿每个组合期末、期初各一张（第 36 行「组合计提项目：组合1」+ 第 47 行「续：」），
+// 三层表头「期末数 / 账面余额 / 应收账款」⇒ 期间提到表名（续表 `D2_SOE_PRIOR_SUFFIX`），表内两层
+// （与本节分类表同一范式；附注模板 八、5 同改，R8.4 批 9b-2）。
+const PORTFOLIO_COLUMNS_SOE_END: ColumnDef[] = [
   { key: 'label', label: '账 龄', is_label: true },
-  { key: 'end_amount', label: '应收账款', format: AMT, group: '期末数' },
-  { key: 'end_ratio', label: '比例（%）', format: PCT, group: '期末数' },
-  { key: 'end_provision', label: '坏账准备', format: AMT, group: '期末数' },
-  { key: 'prior_amount', label: '应收账款', format: AMT, group: '期初数' },
-  { key: 'prior_ratio', label: '比例（%）', format: PCT, group: '期初数' },
-  { key: 'prior_provision', label: '坏账准备', format: AMT, group: '期初数' },
+  { key: 'end_amount', label: '应收账款', format: AMT, group: '账面余额' },
+  { key: 'end_ratio', label: '比例（%）', format: PCT, group: '账面余额' },
+  { key: 'end_provision', label: '坏账准备', format: AMT },
+]
+const PORTFOLIO_COLUMNS_SOE_PRIOR: ColumnDef[] = [
+  { key: 'label', label: '账 龄', is_label: true },
+  { key: 'prior_amount', label: '应收账款', format: AMT, group: '账面余额' },
+  { key: 'prior_ratio', label: '比例（%）', format: PCT, group: '账面余额' },
+  { key: 'prior_provision', label: '坏账准备', format: AMT },
 ]
 // 采用余额百分比或其他组合方法：源模板 r82~r90（组合名称 + 双期各{账面余额, 计提比例（%）, 坏账准备}）
 const OTHER_PORTFOLIO_COLUMNS_SOE: ColumnDef[] = [
@@ -553,7 +559,6 @@ export function buildD2SyncPayload(
           provision: num(r.provision),
           aging: str(r.aging),
           loss_rate: num(r.lossRate),
-          basis: str(r.basis),
         })),
         {
           label: DISCLOSURE_TOTAL_LABEL,
@@ -561,7 +566,6 @@ export function buildD2SyncPayload(
           provision: individuals.reduce((s, r) => s + num(r.provision), 0),
           aging: '',
           loss_rate: 0,
-          basis: '',
           is_total: true,
         },
       ],
@@ -620,32 +624,34 @@ export function buildD2SyncPayload(
     )
   }
 
-  // ④ 组合计提项目（每组合一张分表，表名随组合名动态）
-  // 上市：源模板 r66 双期{应收账款, 坏账准备, 预期信用损失率}
-  // 国企：源模板 r36 双期{应收账款, 比例（%）, 坏账准备}
-  const portfolioCols = isSoe ? PORTFOLIO_COLUMNS_SOE : PORTFOLIO_COLUMNS_LISTED
-  const portfolioRow = (r: D2PortfolioRowLike) =>
-    isSoe
-      ? {
-          label: discAgingLabel(r),
-          end_amount: num(r.endAmount),
-          end_ratio: num(r.ratio),
-          end_provision: num(r.provision),
-          prior_amount: num(r.priorAmount),
-          prior_ratio: num(r.priorRatio),
-          prior_provision: num(r.priorProvision),
-          ...(r.isTotal || isTotalLabel(str(r.label)) ? { is_total: true } : {}),
-        }
-      : {
-          label: discAgingLabel(r),
-          end_amount: num(r.endAmount),
-          end_provision: num(r.provision),
-          end_loss_rate: num(r.lossRate),
-          prior_amount: num(r.priorAmount),
-          prior_provision: num(r.priorProvision),
-          prior_loss_rate: num(r.priorLossRate),
-          ...(r.isTotal || isTotalLabel(str(r.label)) ? { is_total: true } : {}),
-        }
+  // ④ 组合计提项目（表名随组合名动态）
+  // 上市：源模板 r66 每组合一张，双期{应收账款, 坏账准备, 预期信用损失率}
+  // 国企：源模板 r36 / r47 每组合期末、期初各一张{账面余额{应收账款, 比例（%）}, 坏账准备}
+  const totalFlag = (r: D2PortfolioRowLike) => (r.isTotal || isTotalLabel(str(r.label)) ? { is_total: true } : {})
+  const listedPortfolioRow = (r: D2PortfolioRowLike) => ({
+    label: discAgingLabel(r),
+    end_amount: num(r.endAmount),
+    end_provision: num(r.provision),
+    end_loss_rate: num(r.lossRate),
+    prior_amount: num(r.priorAmount),
+    prior_provision: num(r.priorProvision),
+    prior_loss_rate: num(r.priorLossRate),
+    ...totalFlag(r),
+  })
+  const soeEndRow = (r: D2PortfolioRowLike) => ({
+    label: discAgingLabel(r),
+    end_amount: num(r.endAmount),
+    end_ratio: num(r.ratio),
+    end_provision: num(r.provision),
+    ...totalFlag(r),
+  })
+  const soePriorRow = (r: D2PortfolioRowLike) => ({
+    label: discAgingLabel(r),
+    prior_amount: num(r.priorAmount),
+    prior_ratio: num(r.priorRatio),
+    prior_provision: num(r.priorProvision),
+    ...totalFlag(r),
+  })
   for (const group of snapshot.portfolios ?? []) {
     let name = portfolioTableName(group.name)
     if (name in sub) {
@@ -660,7 +666,13 @@ export function buildD2SyncPayload(
         name = `${name}（${i}）`
       }
     }
-    put(name, (group.rows ?? []).map(portfolioRow), portfolioCols)
+    const rows = group.rows ?? []
+    if (isSoe) {
+      put(name, rows.map(soeEndRow), PORTFOLIO_COLUMNS_SOE_END)
+      put(`${name}${D2_SOE_PRIOR_SUFFIX}`, rows.map(soePriorRow), PORTFOLIO_COLUMNS_SOE_PRIOR)
+    } else {
+      put(name, rows.map(listedPortfolioRow), PORTFOLIO_COLUMNS_LISTED)
+    }
   }
   if (isSoe) {
     const other = snapshot.otherPortfolioRows ?? []

@@ -407,6 +407,7 @@ import {
   F1_AGING_LABEL_COL,
   F1_SOE_AGING_GROUPS,
   F1_SOE_AMOUNT_LABEL,
+  F1_SOE_NOTE_AGING_LABELS,
   F1_SOE_PCT_LABEL,
 } from '../composables/f1DisclosureSyncPayload'
 import { buildF1ConsistencyChecks } from '../composables/f1DisclosureConsistency'
@@ -419,10 +420,10 @@ const AGING_GROUPS = F1_SOE_AGING_GROUPS
 const AMOUNT_LABEL = F1_SOE_AMOUNT_LABEL
 const PCT_LABEL = F1_SOE_PCT_LABEL
 /**
- * ①表逐段备抵列列头 = 源模板 `D9`/`G9` 字面「坏账准备」（底稿侧）；
- * 同步到附注时聚合为「减：减值准备」**行**（附注模版与 F7-7 口径）—— 两侧各守其源。
+ * ①表逐段备抵列列头 = 源模板 `D9`/`G9` 字面「坏账准备」；附注按底稿也带这一列（R8.4 批 9b-2），
+ * 其合计另落「减：减值准备」行（F7-7 口径），与附注列头同一常量。
  */
-const BAD_DEBT_LABEL = '坏账准备'
+const BAD_DEBT_LABEL = F1_SOE_NOTE_AGING_LABELS.provision
 
 const props = withDefaults(defineProps<{
   allResponses: Map<string, ChecklistResponse>

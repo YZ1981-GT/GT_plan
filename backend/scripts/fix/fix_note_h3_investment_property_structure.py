@@ -74,6 +74,9 @@ ALIGNED_BY = "h3-investment-property-disclosure-alignment"
 T_L_COST = "按成本计量的投资性房地产"
 T_L_FAIR = "按公允价值计量的投资性房地产"
 T_L_TITLE = "未办妥产权证书的情况"
+#: 5914e315b（Word 同步）把上市第 2、3 张表名换成了表前的提示段（R8.4 批 9b-2 改回；h3NoteSectionMap 推的一直是业务名）
+_L_FAIR_DAMAGED = "（采用公允价值计量模式的投资性房地产，分类列示期初余额、期末余额和本期增减变动情况。）"
+_L_TITLE_DAMAGED = "（披露未办妥产权证书的投资性房地产账面价值及原因。）"
 
 T_S_COST = "以成本计量"
 T_S_FAIR = "以公允价值计量"
@@ -282,12 +285,12 @@ _SOE_TEXT_SECTIONS = [
 def _listed_plan() -> list[dict[str, Any]]:
     return [
         rule(T_L_COST, _listed_transposed_columns(), _L_COST_ROWS, _G_L_COST),
-        rule(T_L_FAIR, _listed_transposed_columns(), _L_FAIR_ROWS, _G_L_FAIR),
+        rule(T_L_FAIR, _listed_transposed_columns(), _L_FAIR_ROWS, _G_L_FAIR, aliases=[_L_FAIR_DAMAGED]),
         rule(T_L_TITLE, flat_columns([
             ("label", "项目", None),
             ("book_value", "账面价值", AMOUNT),
             ("reason", "未办妥产权证书原因", None),
-        ]), _L_TITLE_ROWS, _G_L_TITLE),
+        ]), _L_TITLE_ROWS, _G_L_TITLE, aliases=[_L_TITLE_DAMAGED]),
     ]
 
 

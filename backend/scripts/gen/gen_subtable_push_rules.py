@@ -9,6 +9,12 @@
 不带 --write 则只打印到 stdout；--write 追加到 formula_push_rules.json。
 --wp-code 可过滤只生成指定底稿的规则。
 
+⚠ 2026-10-25（spec consol-note-header-library-and-node-reaggregate R8.4 批 9b-2）：本生成器不分口径 —— 表名取先扫到的
+那一版、``section_by_template`` 两版都填、rule_id 用该版表序号；产物须逐条按两版模板核对（只在一版的表收窄口径，两版
+同键异名的表补 ``table_by_template``）。子表规则与主表共用 binding 的取数行（科目合计），命中合计行兜底的规则会把科目
+合计写进子表合计行 ⇒ 由 ``tests/test_formula_push_subtable_total_fallback.py`` 逐条裁决（当日删掉的 22 条写错数规则
+重跑本脚本会补回，守卫会点名）。
+
 spec: formula-push-subtable-expansion Phase 1
 """
 from __future__ import annotations

@@ -37,6 +37,7 @@ spec: .kiro/specs/d-cycle-extraction-chain-completion/ Task 2.2
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 from pathlib import Path
@@ -48,6 +49,7 @@ from _note_structure_kit import (  # noqa: E402
     PERCENT,
     TEXT,
     apply_plan,
+    data_row,
     derive_column_groups,
     find_bare_table_name_paragraphs,
     find_section,
@@ -56,6 +58,7 @@ from _note_structure_kit import (  # noqa: E402
     rule,
     stamp,
     titleize_text_sections,
+    total_row,
     validate_section,
 )
 
@@ -96,6 +99,14 @@ _G_INDIVIDUAL = (
     "各明细行之和 = 合计行（F5-21、F5-24）。"
     "完整性：账面余额 ≠ 0 时，名称（债务人名称）、坏账准备、计提依据（理由）列"
     "均不应为空（F5-33、F5-34）。"
+)
+# 国企底稿单项计提表没有「计提理由」列（D2 国企披露表第 30 行：债务人名称 / 账面余额 / 坏账准备 / 账龄 /
+# 预期信用损失率）—— 用户 2026-10-24「待定两列按底稿删」
+_G_INDIVIDUAL_SOE = (
+    "期末单项计提坏账准备的应收账款逐项列示，可无限量添加行项目。"
+    "勾稽：预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（F5-13、F5-29）；"
+    "各明细行之和 = 合计行（F5-21、F5-24）。"
+    "完整性：账面余额 ≠ 0 时，债务人名称、坏账准备列均不应为空（F5-33、F5-34）。"
 )
 
 _G_PORTFOLIO = (
@@ -187,11 +198,12 @@ CLASS_COLUMNS_LISTED = grouped_columns(
         ("carrying_value", "账面价值", AMT, None),
     ],
 )
+# 分组名取底稿原字「账面余额」（D2 国企披露表第 17 行；前端载荷同改，原写同义的「账面金额」）
 CLASS_COLUMNS_SOE = grouped_columns(
     ("label", "类 别"),
     [
-        ("book_amount", "金额", AMT, "账面金额"),
-        ("ratio", "比例(%)", PCT, "账面金额"),
+        ("book_amount", "金额", AMT, "账面余额"),
+        ("ratio", "比例(%)", PCT, "账面余额"),
         ("provision", "金额", AMT, "坏账准备"),
         ("loss_rate", "预期信用损失率(%)", PCT, "坏账准备"),
         ("carrying_value", "账面价值", AMT, None),
@@ -222,7 +234,6 @@ INDIVIDUAL_COLUMNS_SOE = flat_columns([
     ("provision", "坏账准备", AMT),
     ("aging", "账龄", TXT),
     ("loss_rate", "预期信用损失率（%）", PCT),
-    ("basis", "计提理由", TXT),
 ])
 
 PORTFOLIO_COLUMNS_LISTED = grouped_columns(
@@ -236,17 +247,19 @@ PORTFOLIO_COLUMNS_LISTED = grouped_columns(
         ("prior_loss_rate", "预期信用损失率(%)", PCT, "上年年末余额"),
     ],
 )
-PORTFOLIO_COLUMNS_SOE = grouped_columns(
-    ("label", "账 龄"),
-    [
-        ("end_amount", "应收账款", AMT, "期末数"),
-        ("end_ratio", "比例（%）", PCT, "期末数"),
-        ("end_provision", "坏账准备", AMT, "期末数"),
-        ("prior_amount", "应收账款", AMT, "期初数"),
-        ("prior_ratio", "比例（%）", PCT, "期初数"),
-        ("prior_provision", "坏账准备", AMT, "期初数"),
-    ],
-)
+# 国企组合计提表：底稿每个组合期末、期初各一张（第 36 / 47 行「组合计提项目：组合1」+「续：」…），三层表头
+# 「期末数 / 账面余额 / 应收账款」—— 期间提到表名（续表「（续：期初数）」），表内两层（与本节分类表同一范式）。
+_PORTFOLIO_SOE_SUBS = (("amount", "应收账款", AMT, "账面余额"), ("ratio", "比例（%）", PCT, "账面余额"),
+                       ("provision", "坏账准备", AMT, None))
+PORTFOLIO_COLUMNS_SOE_END = grouped_columns(
+    ("label", "账 龄"), [(f"end_{k}", lbl, fmt, grp) for k, lbl, fmt, grp in _PORTFOLIO_SOE_SUBS])
+PORTFOLIO_COLUMNS_SOE_PRIOR = grouped_columns(
+    ("label", "账 龄"), [(f"prior_{k}", lbl, fmt, grp) for k, lbl, fmt, grp in _PORTFOLIO_SOE_SUBS])
+_PORTFOLIO_ROWS_SOE = [
+    *(data_row(x) for x in ("1年以内（含1年）", "1至2年", "2至3年", "3至4年", "4至5年", "5年以上")),
+    total_row("合 计"),
+]
+PORTFOLIO_CONT_SUFFIX_SOE = "（续：期初数）"
 OTHER_PORTFOLIO_COLUMNS_SOE = grouped_columns(
     ("label", "组合名称"),
     [
@@ -381,15 +394,23 @@ def _build_listed_plan() -> list[dict[str, Any]]:
     ]
 
 
+#: 国企模板预置的两个组合（项目里按实际组合命名，推送载荷按 `组合计提项目：{组合名}` 推）
+_SOE_PORTFOLIOS = ("组合计提项目：应收中央企业客户", "组合计提项目：应收海外企业客户")
+
+
 def _build_soe_plan() -> list[dict[str, Any]]:
     return [
         rule("（1）按账龄披露应收账款", AGING_COLUMNS_SOE, None, _G_AGING),
         rule("（2）按坏账准备计提方法分类披露应收账款", CLASS_COLUMNS_SOE, None, _G_CLASS),
         rule("（2）按坏账准备计提方法分类披露应收账款（续：期初数）", CLASS_COLUMNS_SOE, None, _G_CLASS),
         # 🔴 占位行清理：header_label 假行 + 「可无限量添加行」（rows=[data_row(),total_row()] 交由脚本判定，见下方 CLEAN_PLACEHOLDER）
-        rule("期末单项计提坏账准备的应收账款", INDIVIDUAL_COLUMNS_SOE, None, _G_INDIVIDUAL),
-        rule("组合计提项目：应收中央企业客户", PORTFOLIO_COLUMNS_SOE, None, _G_PORTFOLIO),
-        rule("组合计提项目：应收海外企业客户", PORTFOLIO_COLUMNS_SOE, None, _G_PORTFOLIO),
+        rule("期末单项计提坏账准备的应收账款", INDIVIDUAL_COLUMNS_SOE, None, _G_INDIVIDUAL_SOE),
+        # 组合计提表按底稿拆成期末 / 期初两张（每个默认组合各一对，续表缺则插入；R8.4 批 9b-2）
+        *(r for name in _SOE_PORTFOLIOS for r in (
+            rule(name, PORTFOLIO_COLUMNS_SOE_END, None, _G_PORTFOLIO),
+            rule(name + PORTFOLIO_CONT_SUFFIX_SOE, PORTFOLIO_COLUMNS_SOE_PRIOR, _PORTFOLIO_ROWS_SOE, _G_PORTFOLIO,
+                 insert=True),
+        )),
         rule("采用余额百分比或其他组合方法计提坏账准备的应收账款", OTHER_PORTFOLIO_COLUMNS_SOE, None, _G_OTHER_PORTFOLIO),
         rule("（3）本期计提、收回或转回的坏账准备情况", MOVEMENT_COLUMNS_SOE, None, _G_MOVEMENT),
         rule("收回或转回的坏账准备", REVERSAL_COLUMNS_SOE, None, _G_REVERSAL),
@@ -421,8 +442,9 @@ SECTION_PLANS: dict[str, dict[str, Any]] = {
         "expected": [
             "（1）按账龄披露应收账款", "（2）按坏账准备计提方法分类披露应收账款",
             "（2）按坏账准备计提方法分类披露应收账款（续：期初数）",
-            "期末单项计提坏账准备的应收账款", "组合计提项目：应收中央企业客户",
-            "组合计提项目：应收海外企业客户", "采用余额百分比或其他组合方法计提坏账准备的应收账款",
+            "期末单项计提坏账准备的应收账款",
+            *(x for name in _SOE_PORTFOLIOS for x in (name, name + PORTFOLIO_CONT_SUFFIX_SOE)),
+            "采用余额百分比或其他组合方法计提坏账准备的应收账款",
             "（3）本期计提、收回或转回的坏账准备情况", "收回或转回的坏账准备",
             "（4）本期实际核销的应收账款", "（5）按欠款方归集的期末余额前五名的应收账款",
             "（6）由金融资产转移而终止确认的应收账款",
@@ -434,21 +456,31 @@ SECTION_PLANS: dict[str, dict[str, Any]] = {
 
 # ─────────────────────────── 占位行清理（国企 4 处） ───────────────────────
 
-_PLACEHOLDER_LABELS = {"可无限量添加行", "……", "..."}
+#: 只是给填表人的说明、不是表格行（语义已在 guidance 里）。「……」是源模板可扩位，归
+#: ``fix_note_expandable_rows.py`` 管，这里不动（原先一并删掉，两个脚本互相翻转）。
+_PLACEHOLDER_LABELS = {"可无限量添加行"}
 
 
 def _clean_placeholder_rows(section: dict[str, Any]) -> list[str]:
-    """删除 rows 里的 header_label 假行 / 占位说明行（语义已在 guidance 里）。"""
+    """删占位说明行；``header_label`` 行：「其中：」「资产：」「负债：」这类结构行改回 ``data``（平台其余 71 处同类行
+    都是 ``data``；原先把它们当压扁的第二行表头删掉，表里就没了「其中」层级），其余真·表头复写行删掉。"""
     changes: list[str] = []
     for i, tbl in enumerate(section.get("tables") or []):
         rows = tbl.get("rows") or []
-        kept = [
-            r for r in rows
-            if str(r.get("row_type", "")) != "header_label"
-            and str(r.get("label", "")).strip() not in _PLACEHOLDER_LABELS
-        ]
+        kept = []
+        for r in rows:
+            label = str(r.get("label", "")).strip()
+            if label in _PLACEHOLDER_LABELS:
+                continue
+            if str(r.get("row_type", "")) == "header_label":
+                if not label.endswith(("：", ":")):
+                    continue
+                r = {**r, "row_type": "data"}
+                changes.append(f"[{i}] {tbl.get('name')} 行「{label}」：header_label → data（结构行）")
+            kept.append(r)
         if len(kept) != len(rows):
             changes.append(f"[{i}] {tbl.get('name')}.rows：{len(rows)} → {len(kept)}（删占位/假表头行）")
+        if kept != rows:
             tbl["rows"] = kept
     return changes
 
@@ -464,7 +496,14 @@ def run(variant: str, *, dry_run: bool, check: bool) -> tuple[list[str], list[st
         return [], [f"未找到章节 {spec['section']}（{path.name}）"], []
 
     if check:
-        return [], [], validate_section(section, spec["expected"])
+        # 与 `_note_structure_kit.run_section` 的 `--check` 同口径：现状校验 + 在副本上重放写入路径，任何变更都算欠账
+        # （原先只做现状校验，列 key / 表头 / 分组漂移一律看不见 —— 模板被别的脚本改成另一套 key 也报不出来）。
+        errs = validate_section(section, spec["expected"])
+        probe = copy.deepcopy(section)
+        residual, _ = apply_plan(probe, spec["plan"])
+        residual += _clean_placeholder_rows(probe) + titleize_text_sections(probe)
+        errs += [f"结构未对齐（headers/columns/rows/guidance）：{c}" for c in residual]
+        return [], [], errs
 
     changes, warnings = apply_plan(section, spec["plan"])
     changes += _clean_placeholder_rows(section)

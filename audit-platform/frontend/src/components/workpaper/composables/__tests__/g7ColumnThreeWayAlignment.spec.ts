@@ -756,7 +756,8 @@ describe('G7 三向对齐守卫｜判据自检与结构性防回退（必须全�
         '任一侧列集为空 ⇒ 逐列比对退化成恒真',
       ).toEqual([])
 
-      // ③ 豁免登记真的流过了比对（后端下发的 13 条裁决必须可见；空了说明登记断链）
+      // ③ 豁免登记真的流过了比对（后端下发的裁决必须可见；单槽登记 2026-10-24 起为空，
+      //    现由转角标题登记撑起；整体空了说明登记断链）
       expect(ALL_EXEMPTED.length, '豁免登记为空 ⇒ 后端 exempt_kinds/label_header_kind 没被消费').toBeGreaterThan(0)
 
       // ④ 活性探针：拿**真实生产数据**的每一张表各改坏一处，必须逐张打红。
@@ -1187,9 +1188,14 @@ describe('G7 三向对齐守卫｜六维逐表比对（已全部收口，转为�
 // 修复后实测：listed 9 张、soe 11 张两级（合计 20），与本节期望逐张吻合。
 //
 // 期望值**不是**直接取 `is_two_level` —— 必须剔除 `single_slot_exemption` 且
-// `exempt_kinds` 含 `group` 的表：那些表源侧父表头行是**空白合并单元格**（只填了 1 个
-// 实体槽，如 soe C229:D229 空白 + C230='期末数' D230='期初数'），平台裁决为单级。
-// 实测正是这 4 张（listed 2 + soe 2）把「24 张」修正为「20 张」。
+// `exempt_kinds` 含 `group` 的表（源模板自身只填 1 个实体槽、平台裁决为单级的表）。
+// 当时登记了 4 张合营表（listed 2 + soe 2），把「24 张」修正为「20 张」。
+//
+// 🔴 2026-10-24 勘误（consol-note-header-library-and-node-reaggregate R8.4 批 9b-2）：那 4 张表
+// 的父表头格（soe C229 / listed B132 等）不是空白合并，而是引用被投资单位名的公式
+// 「='被投资单位财务信息（合营、联营）G7-5'!C8」，与联营表同一写法、只是只引了 1 个企业；
+// 运行时也早已按实体槽两层推（`JV_FS_SLOT` / `IMPORTANT_JV_SLOT`）。后端登记表
+// `SOURCE_PLACEHOLDER_SINGLE_SLOT` 已清空、seed 改为两层 ⇒ 两级期望回到 listed 11 / soe 13（24）。
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SOE_TAB_REL =
@@ -1325,28 +1331,25 @@ describe('G7 三向对齐守卫｜第四边：渲染层两级表头（DOM 判据
       .toHaveLength(0)
   })
 
-  it('两级表头张数锁死（反面锚定：listed 9 / soe 11，合计 20）', () => {
+  it('两级表头张数锁死（反面锚定：listed 11 / soe 13，合计 24）', () => {
     const count = (v: Variant) =>
       TRIPLES.filter((t) => t.variant === v && t.facts && shouldRenderTwoLevel(t.facts)).length
-    // 🔴 改造前浏览器实测 0 张；这两个数字是修复后的实测值，回退即打红。
-    expect({ listed: count('listed'), soe: count('soe') }).toEqual({ listed: 9, soe: 11 })
+    // 🔴 改造前浏览器实测 0 张；2026-08-12 修复后 9 / 11（剔除 4 张单槽豁免），
+    //    2026-10-24 单槽豁免勘误清空后 11 / 13。回退即打红。
+    expect({ listed: count('listed'), soe: count('soe') }).toEqual({ listed: 11, soe: 13 })
   })
 
-  it('单槽占位豁免恰 4 张（listed 2 + soe 2）且都确实物理两级 —— 否则期望值失去依据', () => {
-    const exempted = TRIPLES.filter(
-      (t) => t.facts?.single_slot_exemption?.exempt_kinds.includes('group'),
-    )
-    expect(exempted.map((t) => `${t.variant}/${t.table}`).sort()).toHaveLength(4)
-    for (const t of exempted) {
-      expect(
-        t.facts?.is_two_level,
-        `${t.variant}/${t.table} 被登记为单槽占位豁免，却不是物理两级 ⇒ 登记 stale`,
-      ).toBe(true)
-      expect(
-        t.facts?.single_slot_exemption?.expected_source_runs,
-        `${t.variant}/${t.table} 单槽豁免的 expected_source_runs 必须是 1`,
-      ).toBe(1)
-    }
+  it('单槽占位豁免为空（2026-10-24 勘误）⇒ 物理两级的表全部应渲染两级', () => {
+    const exempted = TRIPLES.filter((t) => t.facts?.single_slot_exemption)
+    // 🔴 后端 `SOURCE_PLACEHOLDER_SINGLE_SLOT` 已清空。有人再登记一张，这里打红 ⇒ 须连同
+    //    本节期望与 seed / 运行时一起重新裁决，不能只加一条豁免让张数对上。
+    expect(exempted.map((t) => `${t.variant}/${t.section}/${t.table}`)).toEqual([])
+    const physical = TRIPLES.filter((t) => t.facts?.is_two_level)
+    expect(physical.length, '源侧物理两级的表为 0 ⇒ facts 读取失效，本条空转').toBeGreaterThan(0)
+    const notRendered = physical
+      .filter((t) => !shouldRenderTwoLevel(t.facts))
+      .map((t) => `${t.variant}/${t.section}/${t.table}`)
+    expect(notRendered, '物理两级却不应渲染两级的表').toEqual([])
   })
 
   it('分块函数：相邻同 group 合并、非相邻同名不合并（跨列合并不可能跳格）', () => {

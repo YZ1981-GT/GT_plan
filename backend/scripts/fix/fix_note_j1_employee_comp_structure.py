@@ -17,8 +17,8 @@
   seed 路径会被 `_infer_groups_from_headers` 反猜出源模板**不存在**的「本期」父表头
   （与 F2 房企 3 表同款缺陷）。→ 标签列标 `flat` 即对整表生效。
 - **6 张表全部无 `guidance`**（附注 TAB 页签无编制提示）。
-- listed 五、40 表2 残留 `……` 占位行（源模板"可添行"提示被 md 重建脚本落成假数据行
-  → 附注渲染出一行空披露数据）→ 删除，语义移入 `guidance`。
+- listed 五、40 表2 的 `……`（源模板可扩位）曾以普通数据行落在模板里 → 附注渲染出一行空披露数据
+  （当时删掉；平台加了 `expandable` 行型后改为保留并标 `expandable`，零可见内容）。
 - **两侧说明文本区几乎全缺**：
   listed `text_sections` 只有【提示】块（辞退福利 / 一年内到期），源模板 R37/R38/R50/R53
   的 4 段说明**一条都没有**；soe `text_sections` 只有 3 个 `###` 表标题
@@ -34,18 +34,18 @@
 
 裁决要点（详见 spec design）：
 
-- **列头取附注交付口径**「期初余额 / 本期增加 / 本期减少 / 期末余额」。源 xlsx 上市侧写
-  「上年年末数 / 期末数」、国企侧写「期初余额 / 期末余额」，而 `consol_note_sections_listed`
-  五-40-1/2/3 三张表**都是**期初/期末余额 → 附注侧统一，底稿 UI 各自保留源模板列头
-  （已冻结的 Decision 2，前端 `j1MovementColumns()` 负责投影）。
-- **不加空白预留行**：源 xlsx 的预留行（listed R11 / R25~R27 / R34）与 `……` 都是
-  "可添行"提示。本章节 12~13 个项目**全部具名**，空行在交付物里会被读者当成缺数据 →
-  一律不落 `rows`，语义写进 `guidance`。
-- **soe 表2 社保「其中」项保持模板的 3 项**（`医疗保险费及生育保险费` / `工伤保险费` /
-  `其他`）。源 xlsx 是 4 项（医疗 / 工伤 / 生育 / 其他），但这是**行**差异而非列差异，
-  且 `_source=workpaper` 时投影器只渲染底稿推送、不与模板合并 → 底稿推 4 行附注就显示
-  4 行，信息更细且不丢。模板 seed 只服务从未同步过的项目，保持致同原文，**不做聚合**
-  （聚合会让「生育保险费」在附注里不可见，且引入不可逆变换）。
+- **列头按各自底稿披露表**（单体都按底稿披露表格式，含上市版 —— 用户 2026-10-24）：上市
+  「上年年末数 / 本期增加 / 本期减少 / 期末数」（源 R6 / R17 / R40），国企「期初余额 / … / 期末余额」
+  （源 R8 / R16 / R31）；列 key 两版相同（`期初余额` / `期末余额` 是数据键），前端
+  `buildJ1ListedColumns()` / `buildJ1SoeColumns()` 逐字对应。原「附注侧统一用期初/期末余额」（Decision 2）
+  已由 j-cycle-four-table spec 废止，但那次是另写了 ``fix_note_j1_compensation_structure.py`` 改模板，
+  两个脚本同管本节、目标相反，谁后跑谁覆盖（HEAD 上本脚本 ``--check`` 绿、那边守卫 5 红）——
+  2026-10-25 收口到本脚本，那个脚本删除（R8.4 批 9b-2）。
+- **空白预留行不落 `rows`**（listed R11 / R25~R27 / R34）；上市「短期薪酬」R24 的 `……` 是源模板可扩位，
+  落 `row_type: expandable` 行（零可见内容，判据 = `note_expandable_markers.row_type_for_label`）。
+- **行名按底稿原字**：上市「设定提存计划」的「其中：」带序号（`其中：1．基本养老保险费` … `4．其他`、
+  `其中：1．xxx` / `2．其他`，源 R42~R48）；国企「短期薪酬列示」社保「其中」4 项（医疗 / 工伤 / 生育 /
+  其他，源 R20~R23；原模板把医疗与生育并成一行）。
 - **soe 说明第 3 条的交叉引用改指 `八、54`**：源 xlsx 写"详见附注八、47"，但平台现行
   编号 `八、47` = 「（3）一年内到期的长期应付款」，`八、54` = 「长期应付职工薪酬」
   （8 张设定受益计划表在此）→ 源模板编号已过时，按实证指向正确章节。
@@ -69,6 +69,14 @@ from typing import Any
 
 _BACKEND = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = _BACKEND / "data"
+if str(_BACKEND) not in sys.path:
+    sys.path.insert(0, str(_BACKEND))
+
+# `row_type` 判据单一真源：`……` 是源模板可扩位（零可见内容），禁硬编码 "data"，
+# 否则与 `fix_note_expandable_rows.py` 互相翻转。
+from app.services.note_expandable_markers import (  # noqa: E402
+    row_type_for_label as _row_type_for_label,
+)
 
 ALIGNED_BY = "j1-disclosure-template-alignment"
 
@@ -79,11 +87,17 @@ TEMPLATE_PATH = {
 
 AMOUNT = "amount"
 
+#: 期初 / 期末列名（底稿原字，两版不同；列 key 两版相同）
+PERIOD_LABELS: dict[str, tuple[str, str]] = {
+    "listed": ("上年年末数", "期末数"),
+    "soe": ("期初余额", "期末余额"),
+}
+
 
 # ─────────────────────────── 行 / 列构造 ───────────────────────────
 
 def _data(label: str) -> dict[str, Any]:
-    return {"label": label, "row_type": "data"}
+    return {"label": label, "row_type": _row_type_for_label(label)}
 
 
 def _total(label: str = "合计") -> dict[str, Any]:
@@ -94,22 +108,31 @@ def _labels_then_total(labels: list[str]) -> list[dict[str, Any]]:
     return [_data(x) for x in labels] + [_total()]
 
 
-def _movement_columns() -> list[dict[str, Any]]:
-    """J1 三张表共用的 5 列单级表头（与前端 `j1MovementColumns()` 逐字一致）。
+def movement_headers(variant: str) -> list[str]:
+    begin, end = PERIOD_LABELS[variant]
+    return ["项目", begin, "本期增加", "本期减少", end]
+
+
+def _movement_columns(variant: str) -> list[dict[str, Any]]:
+    """J1 三张表共用的 5 列单级表头（与前端 `buildJ1ListedColumns()` / `buildJ1SoeColumns()` 逐字一致）。
 
     🔴 标签列标 `flat`：本表是单行表头，但「本期增加」「本期减少」共享前缀「本期」，
     不表态会被后端 `_infer_groups_from_headers` 反猜出凭空的「本期」父表头。
     """
+    begin, end = PERIOD_LABELS[variant]
     return [
         {"key": "项目", "label": "项目", "is_label": True, "flat": True},
-        {"key": "期初余额", "label": "期初余额", "format": AMOUNT},
+        {"key": "期初余额", "label": begin, "format": AMOUNT},
         {"key": "本期增加", "label": "本期增加", "format": AMOUNT},
         {"key": "本期减少", "label": "本期减少", "format": AMOUNT},
-        {"key": "期末余额", "label": "期末余额", "format": AMOUNT},
+        {"key": "期末余额", "label": end, "format": AMOUNT},
     ]
 
 
-MOVEMENT_HEADERS = ["项目", "期初余额", "本期增加", "本期减少", "期末余额"]
+def _roll(variant: str) -> str:
+    """逐行变动勾稽，列名随底稿（上市「期末数 = 上年年末数 + …」）。"""
+    begin, end = PERIOD_LABELS[variant]
+    return f"{end} = {begin} + 本期增加 − 本期减少"
 
 
 # ─────────────────────────── 表名常量 ───────────────────────────
@@ -128,22 +151,25 @@ T_SOE_POST = "设定提存计划列示"
 # ─────────────────────────── guidance 片段 ───────────────────────────
 # 只取：源 xlsx 红字 / CAS 9 条款 / 以「勾稽：」前缀标注的**源模板 Excel 公式**实证关系。
 
-_G_SUMMARY_COMMON = (
-    "勾稽：逐行 期末余额 = 期初余额 + 本期增加 − 本期减少；各类别行之和 = 合计行"
-    "（四列各自独立校验）；「短期薪酬」行 = 下方「短期薪酬」表合计行，"
-    "「离职后福利-设定提存计划」行 = 下方「设定提存计划」表合计行"
-    "（源模板三张表同引「明细表J1-2 」，互为勾稽关系而非派生）；"
-    "合计行期末余额 = 资产负债表「应付职工薪酬」期末数 = J1-1 审定表期末审定合计。"
-)
+def _g_summary_common(variant: str) -> str:
+    end = PERIOD_LABELS[variant][1]
+    return (
+        f"勾稽：逐行 {_roll(variant)}；各类别行之和 = 合计行"
+        "（四列各自独立校验）；「短期薪酬」行 = 下方「短期薪酬」表合计行，"
+        "「离职后福利-设定提存计划」行 = 下方「设定提存计划」表合计行"
+        "（源模板三张表同引「明细表J1-2 」，互为勾稽关系而非派生）；"
+        f"合计行{end} = 资产负债表「应付职工薪酬」期末数 = J1-1 审定表期末审定合计。"
+    )
+
 
 _G_SUMMARY_LISTED = (
-    "按 CAS 9 分类列示应付职工薪酬的期初、本期增减与期末。"
+    "按 CAS 9 分类列示应付职工薪酬的上年年末数、本期增减与期末数。"
     "【提示：辞退福利包括（1）预期在其确认的年度报告期间期末后12个月内完全支付的辞退福利；"
     "（2）补偿款超过1年支付的辞退计划将于年度报告期间期末后12个月内支付的款项，"
     "例如内退计划将于下一年支付的金额。"
     "一年内到期的其他福利：指一年内到期的其他长期福利（不含设定受益计划），"
     "应根据「长期应付职工薪酬」项目分析填列。】"
-    + _G_SUMMARY_COMMON
+    + _g_summary_common("listed")
     + "另注：应付职工薪酬、设定受益计划净负债（净资产）、一年后支付的辞退福利及其他长期"
     "职工福利的本期减少，一般与现金流量表「支付给职工以及为职工支付的现金」一致，"
     "除非存在代扣税未交、实物发放等情形。"
@@ -151,50 +177,55 @@ _G_SUMMARY_LISTED = (
 
 _G_SUMMARY_SOE = (
     "按国企口径分类列示应付职工薪酬的期初余额、本期增减与期末余额（不适用的类别可删除）。"
-    + _G_SUMMARY_COMMON
+    + _g_summary_common("soe")
 )
 
-_G_SHORT_TERM_COMMON = (
-    "勾稽：「社会保险费」行 = 其下「其中：」各险种之和（源模板父行为 SUM 公式，"
-    "不应手工录入）；合计行 = 各非「其中：」行之和（源模板合计公式显式排除「其中：」"
-    "明细行，避免双算）；逐行 期末余额 = 期初余额 + 本期增加 − 本期减少；"
-    "合计行 = 上方汇总表「短期薪酬」行。"
-)
+
+def _g_short_term_common(variant: str) -> str:
+    return (
+        "勾稽：「社会保险费」行 = 其下「其中：」各险种之和（源模板父行为 SUM 公式，"
+        "不应手工录入）；合计行 = 各非「其中：」行之和（源模板合计公式显式排除「其中：」"
+        f"明细行，避免双算）；逐行 {_roll(variant)}；"
+        "合计行 = 上方汇总表「短期薪酬」行。"
+    )
+
 
 _G_SHORT_TERM_LISTED = (
-    "上市公司口径的短期薪酬明细。源模板在「其中：」区与「其他短期薪酬」之后各留有"
-    "可插入行的空白区（原表以「……」标注），如实际险种多于示例，请在对应区间内新增行，"
-    "不要改动父行的汇总范围。"
-    + _G_SHORT_TERM_COMMON
+    "上市公司口径的短期薪酬明细。「其中：」各险种后的「……」是源模板留的可扩位（R24，零可见内容）："
+    "实际险种多于示例时在此处新增行；「其他短期薪酬」后源模板也留有空白预留区（R34）。"
+    "新增行不要改动父行的汇总范围。"
+    + _g_short_term_common("listed")
     + "说明区须披露本期非货币性福利的形式及其计算依据，以及短期利润分享计划的薪酬计算依据。"
 )
 
 _G_SHORT_TERM_SOE = (
-    "国企口径的短期薪酬明细。本表 seed 骨架按附注模板列「其中：医疗保险费及生育保险费 / "
-    "工伤保险费 / 其他」3 项；源底稿（J1 国企披露 sheet）按医疗 / 工伤 / 生育 / 其他 4 项"
-    "录入，同步后附注按底稿实际行呈现（更细，不做聚合）。"
+    "国企口径的短期薪酬明细。社保「其中：」按底稿 4 项列示（医疗保险费 / 工伤保险费 / "
+    "生育保险费 / 其他，源 R20~R23）。"
     "国企版无独立「非货币性福利」行，源模板将其并入「其他短期薪酬」。"
-    + _G_SHORT_TERM_COMMON
+    + _g_short_term_common("soe")
 )
 
-_G_POST_COMMON = (
-    "勾稽：「离职后福利」行 = 其下「其中：」四项之和（基本养老保险费 / 失业保险费 / "
-    "企业年金缴费 / 其他）；「其他长期职工福利」行 = 其下「其中：」各项之和；"
-    "合计行 = 「离职后福利」+「其他长期职工福利」（源模板合计公式只加这两个父行，"
-    "不含「其中：」明细）；逐行 期末余额 = 期初余额 + 本期增加 − 本期减少；"
-    "合计行 = 上方汇总表「离职后福利-设定提存计划」行。"
-)
+
+def _g_post_common(variant: str) -> str:
+    return (
+        "勾稽：「离职后福利」行 = 其下「其中：」四项之和（基本养老保险费 / 失业保险费 / "
+        "企业年金缴费 / 其他）；「其他长期职工福利」行 = 其下「其中：」各项之和；"
+        "合计行 = 「离职后福利」+「其他长期职工福利」（源模板合计公式只加这两个父行，"
+        f"不含「其中：」明细）；逐行 {_roll(variant)}；"
+        "合计行 = 上方汇总表「离职后福利-设定提存计划」行。"
+    )
+
 
 _G_POST_LISTED = (
     "设定提存计划（CAS 9）：企业每期将应缴存金额确认为负债并计入当期损益或相关资产成本。"
     "【提示：其他长期职工福利指符合设定提存计划条件的其他长期职工福利。】"
-    + _G_POST_COMMON
+    + _g_post_common("listed")
     + "说明区须披露设定提存计划的性质、计算缴费金额的公式或依据。"
 )
 
 _G_POST_SOE = (
     "国企口径的设定提存计划列示（不适用的类别可删除）。"
-    + _G_POST_COMMON
+    + _g_post_common("soe")
     + "说明区须披露设定提存计划的性质与缴费金额计算依据；存在设定受益计划的，"
     "另见附注八、54「长期应付职工薪酬」。"
 )
@@ -248,8 +279,8 @@ SECTION_PLANS: dict[str, dict[str, Any]] = {
         "plan": [
             {
                 "aliases": [T_LISTED_SUMMARY],
-                "headers": MOVEMENT_HEADERS,
-                "columns": _movement_columns(),
+                "headers": movement_headers("listed"),
+                "columns": _movement_columns("listed"),
                 "rows": _labels_then_total([
                     "短期薪酬",
                     "离职后福利-设定提存计划",
@@ -260,9 +291,9 @@ SECTION_PLANS: dict[str, dict[str, Any]] = {
             },
             {
                 "aliases": [T_LISTED_SHORT_TERM],
-                "headers": MOVEMENT_HEADERS,
-                "columns": _movement_columns(),
-                # 🔴 删掉源模板的 `……` 占位行（"可添行"提示，非数据行）
+                "headers": movement_headers("listed"),
+                "columns": _movement_columns("listed"),
+                # 源 R18~R33；R24「……」是可扩位（`_data` 按词表标 expandable），R25~R27 / R34 空白预留区不落行
                 "rows": _labels_then_total([
                     "工资、奖金、津贴和补贴",
                     "职工福利费",
@@ -270,6 +301,7 @@ SECTION_PLANS: dict[str, dict[str, Any]] = {
                     "其中：1．医疗保险费",
                     "2．工伤保险费",
                     "3．生育保险费",
+                    "……",
                     "住房公积金",
                     "工会经费和职工教育经费",
                     "短期带薪缺勤",
@@ -281,17 +313,18 @@ SECTION_PLANS: dict[str, dict[str, Any]] = {
             },
             {
                 "aliases": [T_LISTED_POST],
-                "headers": MOVEMENT_HEADERS,
-                "columns": _movement_columns(),
+                "headers": movement_headers("listed"),
+                "columns": _movement_columns("listed"),
+                # 源 R41~R48 原字（「其中：」带序号）
                 "rows": _labels_then_total([
                     "离职后福利",
-                    "其中：基本养老保险费",
-                    "失业保险费",
-                    "企业年金缴费",
-                    "其他",
+                    "其中：1．基本养老保险费",
+                    "2．失业保险费",
+                    "3．企业年金缴费",
+                    "4．其他",
                     "其他长期职工福利（不适用的删除）",
-                    "其中：xxx",
-                    "其他",
+                    "其中：1．xxx",
+                    "2．其他",
                 ]),
                 "guidance": _G_POST_LISTED,
             },
@@ -303,8 +336,8 @@ SECTION_PLANS: dict[str, dict[str, Any]] = {
         "plan": [
             {
                 "aliases": [T_SOE_SUMMARY],
-                "headers": MOVEMENT_HEADERS,
-                "columns": _movement_columns(),
+                "headers": movement_headers("soe"),
+                "columns": _movement_columns("soe"),
                 "rows": _labels_then_total([
                     "短期薪酬",
                     "离职后福利-设定提存计划",
@@ -316,14 +349,16 @@ SECTION_PLANS: dict[str, dict[str, Any]] = {
             },
             {
                 "aliases": [T_SOE_SHORT_TERM],
-                "headers": MOVEMENT_HEADERS,
-                "columns": _movement_columns(),
+                "headers": movement_headers("soe"),
+                "columns": _movement_columns("soe"),
+                # 源 R17~R28（社保「其中」4 项：医疗 / 工伤 / 生育 / 其他）
                 "rows": _labels_then_total([
                     "工资、奖金、津贴和补贴",
                     "职工福利费",
                     "社会保险费",
-                    "其中：医疗保险费及生育保险费",
+                    "其中：医疗保险费",
                     "工伤保险费",
+                    "生育保险费",
                     "其他",
                     "住房公积金",
                     "工会经费和职工教育经费",
@@ -339,8 +374,8 @@ SECTION_PLANS: dict[str, dict[str, Any]] = {
                 #    的 title 即 `设定提存计划列示`（致同原本措辞）。
                 "aliases": [T_SOE_SHORT_TERM, T_SOE_POST],
                 "new_name": T_SOE_POST,
-                "headers": MOVEMENT_HEADERS,
-                "columns": _movement_columns(),
+                "headers": movement_headers("soe"),
+                "columns": _movement_columns("soe"),
                 "rows": _labels_then_total([
                     "离职后福利",
                     "其中：基本养老保险费",
@@ -440,15 +475,12 @@ def _stamp(section: dict[str, Any]) -> None:
 
 # ─────────────────────────── 校验 ───────────────────────────
 
-_PLACEHOLDER_ROW_LABELS = {"……", "...", "…"}
-
-
 def validate_section(
     section: dict[str, Any],
     expected: list[str],
     want_text_sections: list[str] | None,
 ) -> list[str]:
-    """表名唯一齐备 / 单级表头表态 / guidance 齐备 / 无占位行 / text_sections 到位。"""
+    """表名唯一齐备 / 单级表头表态 / guidance 齐备 / 可扩位行标 expandable / text_sections 到位。"""
     errs: list[str] = []
     tables = section.get("tables") or []
     seen: dict[str, int] = {}
@@ -471,8 +503,11 @@ def validate_section(
             label = str(row.get("label", "")).strip()
             if str(row.get("row_type", "")) == "header_label":
                 errs.append(f"[{i}] {name} 第 {j} 行仍为 header_label（压扁的第二行表头）")
-            if label in _PLACEHOLDER_ROW_LABELS:
-                errs.append(f"[{i}] {name} 第 {j} 行是占位行「{label}」（应移入 guidance）")
+            if _row_type_for_label(label) == "expandable" and str(row.get("row_type", "")) != "expandable":
+                errs.append(
+                    f"[{i}] {name} 第 {j} 行「{label}」是源模板可扩位，row_type 应为 expandable"
+                    "（否则会渲染成一行空披露数据）"
+                )
             if not label:
                 errs.append(f"[{i}] {name} 第 {j} 行 label 为空（交付物不应出现无名空行）")
 

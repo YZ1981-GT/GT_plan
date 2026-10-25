@@ -11,12 +11,12 @@ import { runDisclosureSubtableContract } from './_disclosureSubtableContract.hel
 import {
   J1_NOTE_SECTION,
   J1_SUB_TABLE_KEYS,
-  j1MovementColumns,
+  j1ColumnsFor,
 } from '../j1NoteSectionMap'
 
-/** 三张表共用同一份 5 列定义（附注模板三表 headers 相同） */
+/** 三张表共用本版 5 列定义（附注模板同一版三表 headers 相同；两版列名按各自底稿不同） */
 function columnsFor(variant: 'listed' | 'soe') {
-  const cols = j1MovementColumns()
+  const cols = j1ColumnsFor(variant)
   return Object.fromEntries(
     Object.values(J1_SUB_TABLE_KEYS[variant]).map((name) => [name, cols]),
   )
