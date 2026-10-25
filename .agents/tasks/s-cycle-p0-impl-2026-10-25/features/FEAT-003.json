@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Phase 4: S-segment sidebar routing in resolveProcedureSheetKey.ts (Tasks 17-18). Adds the S-cycle if-chain block to the procedure sheet key resolver, following the established long-prefix-first pattern. Independent of FEAT-001/002 — this function is a pure routing utility.",
+  "status": "completed",
+  "steps": [
+    "1. Read context.json first. Then read audit-platform/frontend/src/utils/resolveProcedureSheetKey.ts in full (already confirmed ~95 lines). The function is a pure if-chain with startsWith checks. Currently has D/E/F/G/H/I/J/K/L/M/N segments but NO S segment.",
+    "2. Add S-segment block between the K segment (ending at K9→k9a, ~line 82) and the F segment (starting at F2→f2a, ~line 84). The S block must use long-prefix-first ordering to avoid startsWith mismatches. Exact entries per design §1.6: S20→s20a, S17→s17a, S16→e1a (fallback), S15→s15a, S14→s14a, S13→s13a, S12→s12a, S11→e1a (fallback), S10→s10a, S8→s8a, S1→s1a. Add Chinese comments for each entry matching the existing style. CRITICAL: S16 and S11 must appear before S1 to avoid being caught by startsWith('S1'). S8 naturally safe (doesn't start with S1) but placed before S1 for clarity.",
+    "3. Create test file audit-platform/frontend/src/utils/__tests__/resolveProcedureSheetKey.s-cycle.spec.ts following the pattern in resolveProcedureSheetKey.spec.ts (vitest describe/it blocks). Test cases: (a) S20/S20-1→s20a, (b) S17/S17-1/S17-2→s17a, (c) S16→e1a (explicit fallback), (d) S15→s15a, (e) S14→s14a, (f) S13→s13a, (g) S12→s12a, (h) S11/S11-1→e1a (explicit fallback, NOT caught by S1), (i) S10/S10-1→s10a, (j) S8/S8-1→s8a, (k) S1/S1-1→s1a, (l) S2→e1a (default fallback), (m) S9→e1a (default fallback), (n) S21→e1a (default fallback), (o) S32/S34→e1a (bundle codes fall to default).",
+    "4. Run the full resolveProcedureSheetKey test suite to ensure no regression in D/E/F/G/H/I/J/K/L/M/N segments."
+  ],
+  "acceptance_criteria": [
+    "resolveProcedureSheetKey routes S20→s20a, S17→s17a, S15→s15a, S14→s14a, S13→s13a, S12→s12a, S10→s10a, S8→s8a, S1→s1a",
+    "S16→e1a and S11→e1a (explicit fallback, not caught by S1 prefix)",
+    "S2/S9/S21/S32/S34 → e1a (default fallback)",
+    "No regression in existing D/E/F/G/H/I/J/K/L/M/N routing tests",
+    "New S-cycle test file passes all cases"
+  ],
+  "verification": [
+    "cd audit-platform/frontend ; npx vitest run src/utils/__tests__/resolveProcedureSheetKey --reporter=verbose"
+  ],
+  "blocked_reason": null,
+  "findings": "All 117 tests passed (16 new S-cycle + 101 existing). S16/S11 correctly fallback to e1a without being caught by startsWith('S1'). No regressions in D/E/F/G/H/I/J/K/L/M/N segments."
+}
