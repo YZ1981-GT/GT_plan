@@ -6,6 +6,7 @@
  * G-investment-cycle G-F12 Task 3.5: 加 G 循环路由 G1→g1a / G4→g4a / G7→g7a
  * M-equity-cycle M-F5 Task 2.4: 加 M 循环路由 M1→m1a / M2→m2a / M3→m3a / M4→m4a / M5→m5a / M6→m6a / M7→m7a / M8→m8a / M9→m9a / M10→m10a
  * N-tax-cycle N-F5 Task 2.5: 加 N 循环路由 N1→n1a / N2→n2a / N3→n3a / N4→n4a / N5→n5a
+ * s-cycle-linkage-trimming-and-component-wiring §1.6: 加 S 循环路由（S20/S17/S15/S14/S13/S12/S10/S8/S1 专属，S16/S11 显式 fallback）
  *
  * 路由映射：
  * - G 循环：G1→g1a / G4→g4a / G7→g7a / G8→g8a / G9→g9a / G10→g10a / G11→g11a / G12→g12a / G13→g13a / G14→g14a (G10+ 优先于 G1)
@@ -17,6 +18,7 @@
  * - L 循环：L1→l1a / L3→l3a / L5→l5a / L8→l8a
  * - M 循环：M1→m1a / M2→m2a / M3→m3a / M4→m4a / M5→m5a / M6→m6a / M7→m7a / M8→m8a / M9→m9a / M10→m10a
  * - N 循环：N1→n1a / N2→n2a / N3→n3a / N4→n4a / N5→n5a
+ * - S 循环：S20→s20a / S17→s17a / S16→e1a / S15→s15a / S14→s14a / S13→s13a / S12→s12a / S11→e1a / S10→s10a / S8→s8a / S1→s1a
  * - 默认：E1→e1a
  */
 export function resolveProcedureSheetKey(wpCode: string): string {
@@ -80,6 +82,20 @@ export function resolveProcedureSheetKey(wpCode: string): string {
   if (upper.startsWith('K5')) return 'k5a' // K5 预计负债
   if (upper.startsWith('K8')) return 'k8a' // K8 销售费用
   if (upper.startsWith('K9')) return 'k9a' // K9 管理费用
+  // S 循环路由（S20/S17/S16/S15/S14/S13/S12/S11 必须在 S10/S8/S1 之前判断，避免 startsWith('S1') 误匹配 S10~S17 等多位编号）
+  if (upper.startsWith('S20')) return 's20a'  // S20 营业收入扣除
+  if (upper.startsWith('S17')) return 's17a'  // S17 非经常性损益
+  if (upper.startsWith('S16')) return 'e1a'   // S16 套期活动，无专属程序表 fallback
+  if (upper.startsWith('S15')) return 's15a'  // S15 每股收益/ROE
+  if (upper.startsWith('S14')) return 's14a'  // S14 会计估计
+  if (upper.startsWith('S13')) return 's13a'  // S13 利用管理层专家
+  if (upper.startsWith('S12')) return 's12a'  // S12 利用专家
+  if (upper.startsWith('S11')) return 'e1a'   // S11 利用服务机构，无专属程序表 fallback
+  if (upper.startsWith('S10')) return 's10a'  // S10 环境事项
+  if (upper.startsWith('S8')) return 's8a'    // S8 租赁（S8AdjudicationSheet 需侧边栏数据源）
+  if (upper.startsWith('S1')) return 's1a'    // S1 违反法规行为
+  // S2~S6/S9/S21 无专属程序表数据源，落默认 e1a
+  // S32~S35 bundle 有自己的导航机制，不进此路由
   // F 循环路由
   if (upper.startsWith('F2')) return 'f2a'
   if (upper.startsWith('F1')) return 'f1a'
