@@ -37,6 +37,8 @@ from app.services.formula_ref_preload import (
     _START,
     _note_table_data,
     note_locate,
+    note_section_hint,
+    note_section_missing,
     period_kind,
 )
 
@@ -207,16 +209,20 @@ class FormulaRefChecker:
         sections = await self._load_note_sections()
         if sections:
             return RefVerdict(True) if section in sections else \
-                RefVerdict(False, f"本年度（{self.year}）附注没有章节 {section}")
+                RefVerdict(False, note_section_missing(self.year, section))
         if section in self._load_template():
             return RefVerdict(True)
-        return RefVerdict(False, f"本年度（{self.year}）附注尚未生成，附注模板（{self.template_type}）也没有章节 {section}")
+        return RefVerdict(False, self._template_missing(section))
+
+    def _template_missing(self, section: str) -> str:
+        return (f"本年度（{self.year}）附注尚未生成，附注模板（{self.template_type}）也没有章节 {section}"
+                f"{note_section_hint(section)}")
 
     async def _check_note(self, section: str, label: str, column: str) -> RefVerdict:
         sections = await self._load_note_sections()
         if sections:
             if section not in sections:
-                return RefVerdict(False, f"本年度（{self.year}）附注没有章节 {section}")
+                return RefVerdict(False, note_section_missing(self.year, section))
             if section not in self._notes:
                 self._notes[section] = await _note_table_data(self.db, self.project_id, self.year, section)
             _, table_data = self._notes[section]
@@ -224,7 +230,7 @@ class FormulaRefChecker:
             return RefVerdict(not reason, reason)
         template = self._load_template().get(section)
         if template is None:
-            return RefVerdict(False, f"本年度（{self.year}）附注尚未生成，附注模板（{self.template_type}）也没有章节 {section}")
+            return RefVerdict(False, self._template_missing(section))
         table_data = _template_table_data(template)
         if table_data is None:
             return RefVerdict(False, f"本年度（{self.year}）附注尚未生成，附注模板章节 {section} 没有表格")

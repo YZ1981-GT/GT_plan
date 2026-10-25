@@ -727,7 +727,7 @@
    },
    "dual_mode_carrier": {
     "kind": "child_tab_dedicated_composable",
-    "site": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L384",
+    "site": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L385",
     "module": "audit-platform/frontend/src/components/workpaper/composables/useL6DualMode.ts",
     "orphan_twin": null,
     "localStorage_prefix": "l6-dual-mode",
@@ -845,7 +845,7 @@
    },
    "dual_mode_carrier": {
     "kind": "child_tab_dedicated_composable",
-    "site": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L386",
+    "site": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L389",
     "module": "audit-platform/frontend/src/components/workpaper/composables/useL7DualMode.ts",
     "orphan_twin": null,
     "localStorage_prefix": "l7-dual-mode",
@@ -1283,8 +1283,8 @@
     "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L13",
     "audit-platform/frontend/src/components/workpaper/l8/core/L8TabAdjudication.vue#L14",
     "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L239",
-    "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L384",
-    "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L386",
+    "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L385",
+    "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L389",
     "audit-platform/frontend/src/components/workpaper/l8/core/L8TabAdjudication.vue#L317",
     "audit-platform/frontend/src/components/workpaper/composables/useL5DualMode.ts",
     "audit-platform/frontend/src/components/workpaper/composables/useL6DualMode.ts",
@@ -1809,7 +1809,7 @@
     "entry_id": "xlsx/gt-l6-special-payables",
     "child_tab": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue",
     "segmented_site": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L13",
-    "carrier_site": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L384",
+    "carrier_site": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L385",
     "carrier_module": "audit-platform/frontend/src/components/workpaper/composables/useL6DualMode.ts",
     "dual_mode_members_consumed_in_template": [
      "mode",
@@ -1827,7 +1827,7 @@
     "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
     "child_tab": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue",
     "segmented_site": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L13",
-    "carrier_site": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L386",
+    "carrier_site": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L389",
     "carrier_module": "audit-platform/frontend/src/components/workpaper/composables/useL7DualMode.ts",
     "dual_mode_members_consumed_in_template": [
      "mode",

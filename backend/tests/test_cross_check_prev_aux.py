@@ -106,24 +106,33 @@ class TestCrossCheckStrictCrossRefs:
         return SimpleNamespace(db=None, project_id=uuid4(), year=2025, resolve_tb=_zero, resolve_sum=_zero)
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        ("executor", "expression", "label"),
-        [
-            ("NOTEExecutor", "NOTE('五、1','期末余额') - 0", "NOTE('五、1', '期末余额')"),
-            ("WPExecutor", "WP('E1','审定数') - 0", "WP('E1', '审定数')"),
-        ],
-    )
-    async def test_unavailable_cross_ref_is_not_compared_as_zero(self, monkeypatch, executor, expression, label):
+    async def test_unavailable_wp_is_not_compared_as_zero(self, monkeypatch):
         from app.services import formula_engine
         from app.services.formula_settings.cross_check_rules import _evaluate
 
         async def _none(*_a, **_k):
             return None
 
-        monkeypatch.setattr(getattr(formula_engine, executor), "execute", staticmethod(_none))
-        value, reason = await _evaluate(expression, self._resolver(), {})
-        assert value is None, f"取不到的 {label} 被当成 0 参与比较：{value}"
-        assert label in reason and "无可用上下文数据" in reason, reason
+        monkeypatch.setattr(formula_engine.WPExecutor, "execute", staticmethod(_none))
+        value, reason = await _evaluate("WP('E1','审定数') - 0", self._resolver(), {})
+        assert value is None, f"取不到的 WP 被当成 0 参与比较：{value}"
+        assert "WP('E1', '审定数')" in reason and "无可用上下文数据" in reason, reason
+
+    @pytest.mark.asyncio
+    async def test_unavailable_note_is_not_compared_as_zero(self, monkeypatch):
+        """NOTE 走唯一实现 ``formula_ref_preload.load_note_values``（原先经 NOTEExecutor：未导入 sa ⇒ 恒 0，
+        本用例 mock 掉它反而测不出来；spec formula-fetch-followup-defect-closure 7.2 改写）。真库口径见
+        ``formula_settings/test_note_value_single_source.py``。"""
+        from app.services import formula_ref_preload
+        from app.services.formula_settings.cross_check_rules import _evaluate
+
+        async def _missing(_db, _pid, _year, refs):
+            return {}, {ref: "本年度（2025）附注没有章节 五、1" for ref in refs}
+
+        monkeypatch.setattr(formula_ref_preload, "load_note_values", _missing)
+        value, reason = await _evaluate("NOTE('五、1','期末余额') - 0", self._resolver(), {})
+        assert value is None, f"取不到的 NOTE 被当成 0 参与比较：{value}"
+        assert "NOTE('五、1','期末余额')" in reason and "附注没有章节 五、1" in reason, reason
 
 
 class TestCrossCheckUsesCorrectExecutor:

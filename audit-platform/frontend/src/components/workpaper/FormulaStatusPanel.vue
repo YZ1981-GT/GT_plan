@@ -29,6 +29,8 @@ import { api } from '@/services/apiProxy'
 // spec: formula-management-runtime-closure Task 14 — 公式端点收敛进 apiPaths（纯搬迁，URL 逐字不变）
 import { wpFormula } from '@/services/apiPaths/formula'
 import { wpFormulaSaveNotice, type WpFormulaSaveReceipt } from '@/composables/formula/wpFormulaSaveNotice'
+import { refIssueDetailText } from '@/utils/formulaRefIssues'
+import { showFormulaError } from '@/composables/formula/useFormulaSettings'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import {
   FORMULA_TYPE_LABEL,
@@ -283,10 +285,11 @@ function handleSaveError(err: any): void {
       detail.message || `公式含不受支持的函数：${fns}；序时账取数（LEDGER 等）由底稿预填充承担。`,
     )
   } else if (code === 'FORMULA_REF_NOT_FOUND') {
-    const issues = (detail.issues || []).join('；')
-    ElMessage.error(`公式引用不存在：${issues || '存在悬空引用'}`)
+    // 问题是对象 {ref, message, …}：原先直接 join 成「[object Object]」（spec formula-fetch-followup 7.2）
+    ElMessage.error(refIssueDetailText(detail))
   } else {
-    ElMessage.error('保存失败，请检查公式表达式')
+    // 版本冲突 409 / 缺版本 428 / 无权 403 / 归档 423 用后端说明（原先一律「请检查公式表达式」）
+    showFormulaError(err, '保存失败，请检查公式表达式')
   }
 }
 

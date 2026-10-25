@@ -878,10 +878,7 @@ async def evaluate_formula_result(
 
     # ── WP/NOTE 跨引用预载（spec: formula-push-user-custom-cross-module T7）──
     # 不再硬替换为 0，而是预载数据到 FormulaContext，让 L1 handler 求值。
-    from app.services.formula_engine import (
-        _extract_wp_refs, _extract_note_refs,
-        WPExecutor, NOTEExecutor,
-    )
+    from app.services.formula_engine import _extract_wp_refs, WPExecutor
     wp_data: dict[str, dict] = {}
     note_data: dict[str, dict] = {}
 
@@ -906,26 +903,22 @@ async def evaluate_formula_result(
                     ) from exc
                 wp_data[wc][col] = Decimal("0")
 
-    note_refs = _extract_note_refs(formula)
-    if note_refs and hasattr(resolver, 'db') and hasattr(resolver, 'project_id') and hasattr(resolver, 'year'):
-        seen_note: set[tuple[str, str]] = set()
-        for section, field_name in note_refs:
-            if (section, field_name) in seen_note:
-                continue
-            seen_note.add((section, field_name))
-            if section not in note_data:
-                note_data[section] = {}
-            try:
-                val = await NOTEExecutor.execute(resolver.db, resolver.project_id, resolver.year, section, field_name)
-                if val is None and strict_context:
-                    raise ValueError(f"NOTE({section!r}, {field_name!r}) 无可用上下文数据")
-                note_data[section][field_name] = Decimal(str(val)) if val is not None else Decimal("0")
-            except Exception as exc:
-                if strict_context:
-                    raise ValueError(
-                        f"NOTE({section!r}, {field_name!r}) 上下文加载失败: {exc}"
-                    ) from exc
-                note_data[section][field_name] = Decimal("0")
+    # NOTE：按本年度附注的章节 / 行 / 列取数（唯一实现 formula_ref_preload.load_note_values，与引用校验、底稿公式、
+    # 附注公式执行器同一套匹配）。原先经 NOTEExecutor：它引用了未导入的 sa ⇒ NameError 被自身 except 吞掉、恒为 0，
+    # 而且忽略行和列、一律取合计行第一列（spec formula-fetch-followup-defect-closure 7.2 浏览器实测发现）。
+    # 严格（表间审核 / 报表审核 / 公式试算）取不到即报原因；非严格（报表生成）按 0，与 WP 同口径。
+    from app.services.formula_ref_preload import load_note_values, note_refs_in, note_token
+    note_refs = note_refs_in(formula)
+    if note_refs and all(hasattr(resolver, a) for a in ("db", "project_id", "year")):
+        try:
+            note_data, note_missing = await load_note_values(
+                resolver.db, resolver.project_id, resolver.year, note_refs)
+        except Exception as exc:
+            if strict_context:
+                raise ValueError(f"NOTE 上下文加载失败: {exc}") from exc
+            note_data, note_missing = {}, {}
+        if note_missing and strict_context:
+            raise ValueError("；".join(f"{note_token(ref)}：{why}" for ref, why in note_missing.items()))
 
     # WP/NOTE token 不再预替换——留给 L1 handler 消费 wp_data/note_data
 

@@ -10,6 +10,7 @@ import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { versionBridge } from '@/composables/useVersionCheck'
 import { getClientInstanceId } from './clientInstance'
+import { refIssueDetailText } from './formulaRefIssues'
 
 // ── NProgress 活跃请求计数器 ──────────────────────────────
 let activeRequests = 0
@@ -222,6 +223,9 @@ async function extractErrorDetail(responseData: unknown): Promise<string> {
       return d.map((item: any) => item?.msg || item?.message || JSON.stringify(item)).join('；')
     }
     if (d && typeof d === 'object') {
+      // 公式引用校验 422：逐条列出「引用：原因」（底稿公式的 detail 没有 message，原先整段 JSON 甩给用户）
+      const refText = refIssueDetailText(d)
+      if (refText) return refText
       const base = d.message || d.msg || JSON.stringify(d)
       return d.item_id ? `${base}（ID: ${d.item_id}）` : base
     }

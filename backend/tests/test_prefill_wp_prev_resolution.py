@@ -453,10 +453,19 @@ class TestResolverSourceGuard:
         assert not missing, f"统一预载层取数函数不见了：{missing}"
 
     def test_note_loader_is_the_row_label_paradigm(self) -> None:
-        """附注取值按行标签 + 列键匹配、不碰 cells（「JSON 内寻址」的既有范式）。"""
+        """附注取值按行标签 + 列键匹配、不碰 cells（「JSON 内寻址」的既有范式）。
+
+        预载层 ``_load_note`` 委托 NOTE 取数的唯一实现 ``formula_ref_preload.load_note_values``（spec
+        formula-fetch-followup-defect-closure 7.2）⇒ 行标签匹配在那边的 ``_note_rows``，判据跟过去看。
+        """
         body = extract_func_body(self._preloader(), "_load_note")
         assert body, "未截到 _load_note"
-        assert '"label"' in body and not re.search(r"""['"]cells['"]""", body)
+        assert "load_note_values" in body and not re.search(r"""['"]cells['"]""", body)
+        ref_src = strip_comments((_BACKEND / "app" / "services" / "formula_ref_preload.py").read_text(encoding="utf-8"))
+        rows = extract_func_body(ref_src, "_note_rows")
+        assert rows and '"label"' in rows, "附注行不再按行标签匹配"
+        for name in ("_note_rows", "_note_column", "note_locate", "_note_cell", "load_note_values"):
+            assert not re.search(r"""['"]cells['"]""", extract_func_body(ref_src, name)), f"{name} 在读 cells"
 
 
 # ═════════════════════ 取值层 SQL 对真实 schema 可执行 ═════════════════════

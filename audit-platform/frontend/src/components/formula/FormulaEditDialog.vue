@@ -65,7 +65,7 @@
               <el-button size="small" title="引用同报表某一行金额，如 ROW('BS-002')" @click="insertRef(idx, 'ROW')">ROW</el-button>
               <el-button size="small" title="连续行范围求和，如 SUM_ROW('BS-002','BS-010')" @click="insertRef(idx, 'SUM_ROW')">SUM_ROW</el-button>
               <el-button size="small" title="按科目前缀汇总，如 SUM_TB('10','审定数') 汇总10开头科目" @click="insertRef(idx, 'SUM_TB')">SUM_TB</el-button>
-              <el-button size="small" title="引用附注表格数据，如 NOTE('货币资金','合计','期末')" @click="insertRef(idx, 'NOTE')">NOTE</el-button>
+              <el-button size="small" title="引用附注表格数据（第一参是附注章节编号），如 NOTE('五、1','合计','期末')" @click="insertRef(idx, 'NOTE')">NOTE</el-button>
               <el-button size="small" title="引用底稿审定表数据，如 WP('E1-1','审定数')" @click="insertRef(idx, 'WP')">WP</el-button>
               <el-button size="small" title="跨表引用其他报表行金额，如 REPORT('BS-002','期末')" @click="insertRef(idx, 'REPORT')">REPORT</el-button>
               <el-button size="small" title="从辅助余额表按维度取数，如 AUX('1122','客户A','期末')" @click="insertRef(idx, 'AUX')">AUX</el-button>
@@ -153,8 +153,8 @@
             <span>跨表引用其他报表行的金额</span>
           </div>
           <div class="gt-fe-help-item">
-            <code>NOTE('货币资金','合计','期末')</code>
-            <span>引用附注表格的合计值</span>
+            <code>NOTE('五、1','合计','期末')</code>
+            <span>引用附注表格的值：第一参是附注章节编号（不是标题），第二参是行名，第三参是列名或期间</span>
           </div>
           <div class="gt-fe-help-item">
             <code>WP('E1-1','审定数')</code>
@@ -439,7 +439,9 @@ import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
 import type { WpFormulaContext } from '@/components/workpaper/GtCustomWpEditor.vue'
-import { filterWpBrowserRows, mapRegistryToPickerRows, mapAcnrCellsToPickerRows } from '@/utils/wpFormulaPicker'
+import {
+  filterWpBrowserRows, mapRegistryToPickerRows, mapAcnrCellsToPickerRows, mapNoteTreeToPickerRows, noteSectionRef,
+} from '@/utils/wpFormulaPicker'
 import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
 import { ADDRESS_REGISTRY_FULL_LOAD_LIMIT } from '@/stores/addressRegistry'
 import FormulaDebugPanel from './FormulaDebugPanel.vue'
@@ -676,11 +678,11 @@ function jumpToSource(type: string, key: string) {
     openSourceBrowserForReport(reportType, label)
   } else if (type === 'note') {
     pickerFnType.value = 'NOTE'
-    // 直接插入带科目名的引用模板
+    // 直接插入引用：key 是附注章节编号（数据源一览的附注节点只带编号，标题拼出的引用取不到数）
     const idx = activeFormulaIdx.value
-    if (idx >= 0 && idx < formulas.value.length) {
+    if (key && idx >= 0 && idx < formulas.value.length) {
       const f = formulas.value[idx]
-      f.expression += (f.expression ? ' + ' : '') + `NOTE('${key}','合计','期末')`
+      f.expression += (f.expression ? ' + ' : '') + noteSectionRef(key)
     }
   } else if (type === 'wp') {
     pickerFnType.value = 'WP'
@@ -783,33 +785,24 @@ async function openSourceBrowserForTB(fn: string) {
 }
 
 // ── 附注章节浏览 ──
+// 本项目附注目录：GET /api/disclosure-notes/{project_id}/{year}（原写的 /api/projects/{pid}/disclosure-notes/{yr}/tree
+// 不存在，恒 404、列表恒空）；引用用章节编号拼（原先拿原始节点上不存在的 row_name / title 拼，得到 NOTE('',…)）。
 async function openSourceBrowserForNote() {
   sourceBrowserTitle.value = '附注章节'
   sourceBrowserSearch.value = ''
   showSourceBrowser.value = true
   sourceBrowserLoading.value = true
-  sourceBrowserRefBuilder.value = (r: any) => {
-    const name = r.row_name || r.title || ''
-    return `NOTE('${name}','合计','期末')`
-  }
+  sourceBrowserRefBuilder.value = (r: any) => r._ref || noteSectionRef(r.row_code || '')
   try {
     const pid = resolveProjectId()
-    const yr = resolveYear()
     if (!pid) throw new Error('缺少项目ID')
-    const resp = await api.get(`/api/projects/${pid}/disclosure-notes/${yr}/tree`, {
-      _silent: true,
-      validateStatus: (s: number) => s < 600,
-    } as any)
-    const items = resp?.sections ?? resp?.data ?? resp ?? []
-    sourceBrowserRows.value = (Array.isArray(items) ? items : []).map((r: any) => ({
-      row_code: r.note_section || r.note_number || r.section_number || '',
-      row_name: r.section_title || r.title || r.note_section || '',
-      indent_level: (r.level || 1) - 1,
-      formula: '',
-      _ref: sourceBrowserRefBuilder.value(r),
-    }))
-  } catch {
+    const { getDisclosureNoteTree } = await import('@/services/auditPlatformApi')
+    const items = await getDisclosureNoteTree(pid, Number(resolveYear()), { _silent: true } as any)
+    sourceBrowserRows.value = mapNoteTreeToPickerRows(Array.isArray(items) ? items : [])
+  } catch (e: any) {
     sourceBrowserRows.value = []
+    // 附注未生成（404）是正常空态，说明原因而不是给一个空列表
+    if ((e?.response?.status ?? e?.status) === 404) ElMessage.info('本项目本年度附注尚未生成，暂无可引用的附注章节')
   } finally {
     sourceBrowserLoading.value = false
   }
@@ -950,6 +943,8 @@ import { wpCodeNaturalCompare, composeSheetLabelsForGroup } from '@/services/acn
 const acnrSourceSheets = shallowRef<AcnrSheetEntry[]>([])
 const acnrSourceLoaded = ref(false)
 const noteSourceChildren = ref<any[]>([])
+/** 本项目附注目录请求已结束（成功 / 未生成 / 失败）：附注节点据此显示「尚未生成」而不是一直「加载中…」 */
+const noteSourceLoaded = ref(false)
 
 async function loadAcnrSources() {
   if (acnrSourceLoaded.value) return
@@ -964,14 +959,16 @@ async function loadAcnrSources() {
     const yr = props.year || resolveYear()
     if (pid && yr) {
       const { getDisclosureNoteTree } = await import('@/services/auditPlatformApi')
-      // 附注未生成（404）是正常空态：静默、用静态目录（原先每次打开都弹「附注数据不存在」）
+      // 附注未生成（404）是正常空态：静默（原先每次打开都弹「附注数据不存在」）
       const notes = await getDisclosureNoteTree(pid, Number(yr), { _silent: true } as any)
       if (Array.isArray(notes) && notes.length) {
         noteSourceChildren.value = buildNoteSourceTree(notes)
       }
     }
   } catch (e: any) {
-    if ((e?.response?.status ?? e?.status) !== 404) ElMessage.warning('本项目附注目录加载失败，暂按模板目录显示')
+    if ((e?.response?.status ?? e?.status) !== 404) ElMessage.warning('本项目附注目录加载失败')
+  } finally {
+    noteSourceLoaded.value = true
   }
 }
 
@@ -987,7 +984,9 @@ function buildNoteSourceTree(notes: any[]): any[] {
   }
   for (const sec of notes) {
     const title = sec.section_title || sec.title || sec.note_section || ''
-    const sectionId = sec.note_section || sec.section_id || ''
+    const sectionId = (sec.note_section || '').trim()
+    // 点击叶子插入 NOTE 引用，第一参必须是章节编号；没有编号的节点拼不出能取到数的引用，不列出
+    if (!sectionId) continue
     const chapterMatch = sectionId.match(/^([一二三四五六七八九十]+)/)
     const chapter = chapterMatch ? chapterMatch[1] : '其他'
     if (!chapterMap[chapter]) {
@@ -1000,8 +999,7 @@ function buildNoteSourceTree(notes: any[]): any[] {
       label: displayLabel.length > 24 ? displayLabel.slice(0, 24) + '…' : displayLabel,
       icon: '',
       _type: 'note',
-      _code: title || sectionId,
-      _sectionId: sectionId,
+      _code: sectionId,
     })
   }
   const result: any[] = []
@@ -1054,21 +1052,15 @@ const sourceTreeData = computed(() => {
   })
 
   // 3. 附注域（从项目实际附注章节加载，带编号如「五、1 货币资金」）
+  // 原先拿不到本项目附注时降级到 ACNR 的附注条目，用条目名（标题）拼 NOTE 第一参 —— 取不到数；而且 ACNR 目录
+  // 实际没有附注域条目，降级结果恒为「加载中…」，附注未生成时也一直这样显示。现在如实显示空态。
   if (noteSourceChildren.value.length) {
     tree.push({ key: 'note', label: '附注', icon: '📝', _leafCount: noteSourceChildren.value.reduce((n, ch) => n + (ch.children?.length || 0), 0), children: noteSourceChildren.value })
   } else {
-    // ACNR 降级
-    const noteSheets = acnrSourceSheets.value.filter(s => s.domain === 'note')
-    const noteChildren = noteSheets.length
-      ? noteSheets.map(s => ({
-          key: `n_${s.sheet_code || s.addr_id}`,
-          label: s.sheet_name || s.sheet_code || '',
-          icon: '',
-          _type: 'note',
-          _code: s.sheet_name || s.sheet_code || '',
-        }))
-      : [{ key: 'n_loading', label: '加载中…', icon: '⏳' }]
-    tree.push({ key: 'note', label: '附注', icon: '📝', _leafCount: noteChildren.length, children: noteChildren })
+    const placeholder = noteSourceLoaded.value
+      ? { key: 'n_empty', label: '本项目本年度附注尚未生成', icon: '' }
+      : { key: 'n_loading', label: '加载中…', icon: '⏳' }
+    tree.push({ key: 'note', label: '附注', icon: '📝', _leafCount: 0, children: [placeholder] })
   }
 
   // 4. 底稿域（按 cycle → parent → sheet 三级，与公式管理中心一致）

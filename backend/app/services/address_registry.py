@@ -382,9 +382,19 @@ async def build_trial_balance_entries(db, project_id: str, year: int) -> list[Ad
 
 async def build_note_entries(db, project_id: str, year: int,
                              template_type: str = 'soe') -> list[AddressEntry]:
-    """从附注模板构建地址条目"""
+    """从附注模板构建地址条目：每张表「合计」行 × 每个数据列一条 ``NOTE('章节','合计','列')``。
+
+    只登记**取得到这张表这一列**的引用 —— 按求值 / 保存校验同一套匹配（``formula_ref_preload.note_locate``，
+    模板转成附注同形由 ``formula_ref_check._template_table_data`` 做）判定。原先每张表的每个表头都登记
+    （spec formula-fetch-followup-defect-closure 7.2 浏览器实测）：国企模板 1422 条只有 213 条取得到，其余
+    ① 第一列是行名列（「项目」）不是数据列 ② 表格没有合计行 ③ 列名在表里出现多次 ④ 不是主表：NOTE 没有「第几张表」参数，
+    「合计」先在主表里找，子表的列要么取不到、要么取到的是主表同名列的数 —— 选择器插入后保存即判悬空，或静默取错表。
+    """
     import json
     from pathlib import Path
+
+    from app.services.formula_ref_check import _template_table_data
+    from app.services.formula_ref_preload import note_locate
 
     entries = []
     try:
@@ -404,31 +414,35 @@ async def build_note_entries(db, project_id: str, year: int,
             # 章节编号（如「八、1」）= disclosure_notes.note_section = NOTE() 第一参；section_id 是内部稳定键
             section_id = sec.get('section_number') or sec.get('note_section') or sec.get('section_id', '')
             title = sec.get('section_title', sec.get('title', ''))
-            tables = sec.get('tables', [])
-            if not tables and sec.get('table_template'):
-                tables = [sec['table_template']]
+            table_data = _template_table_data(sec)
+            if table_data is None:
+                continue
 
-            for tbl_idx, tbl in enumerate(tables):
-                tbl_name = tbl.get('name', f'表{tbl_idx + 1}')
-                headers = tbl.get('headers', [])
-                rows_tpl = tbl.get('rows', [])
+            for tbl_idx, tbl in enumerate(table_data['_tables']):
+                tbl_name = tbl.get('name') or f'表{tbl_idx + 1}'
+                headers = tbl.get('headers') or []
 
-                # 为每个表头列+合计行生成地址
-                for col_idx, hdr in enumerate(headers):
-                    if isinstance(hdr, str) and hdr:
-                        uri = build_uri('note', section_id, '合计', hdr)
-                        entries.append(AddressEntry(
-                            uri=uri,
-                            domain='note',
-                            source=section_id,
-                            path='合计',
-                            cell=hdr,
-                            label=f"附注 > {title} > {tbl_name} > 合计 > {hdr}",
-                            note_section=section_id,
-                            formula_ref=f"NOTE('{section_id}','合计','{hdr}')",
-                            jump_route=build_jump_route(uri, project_id, year),
-                            tags=['附注', title],
-                        ))
+                # 合计行 × 数据列（第一列是行名列）；取不到这张表这一列的不登记
+                for hdr in headers[1:]:
+                    if not (isinstance(hdr, str) and hdr.strip()):
+                        continue
+                    row, _idx, _headers, reason = note_locate(table_data, section_id, '合计', hdr,
+                                                              require_values=False)
+                    if reason or not any(r is row for r in tbl['rows']):
+                        continue
+                    uri = build_uri('note', section_id, '合计', hdr)
+                    entries.append(AddressEntry(
+                        uri=uri,
+                        domain='note',
+                        source=section_id,
+                        path='合计',
+                        cell=hdr,
+                        label=f"附注 > {title} > {tbl_name} > 合计 > {hdr}",
+                        note_section=section_id,
+                        formula_ref=f"NOTE('{section_id}','合计','{hdr}')",
+                        jump_route=build_jump_route(uri, project_id, year),
+                        tags=['附注', title],
+                    ))
     except Exception as e:
         logger.error(f"build_note_entries error: {e}", exc_info=True)
     return entries

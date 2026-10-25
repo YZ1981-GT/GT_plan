@@ -133,12 +133,9 @@ async def _build_context(
         return FormulaContext(tb_data=tb, row_cache=rows)
 
     from app.services.formula_preloader import preload
-    from app.services.formula_ref_check import project_ref_scope
 
-    _year, template_type = await project_ref_scope(db, project_id)
     exclude = frozenset({"workpaper"}) if scope in ("report", "note") else frozenset()
-    return await preload(db, project_id, year, [formula], adj_exclude_origins=exclude,
-                         template_type=template_type, gaps=gaps)
+    return await preload(db, project_id, year, [formula], adj_exclude_origins=exclude, gaps=gaps)
 
 
 def _context_summary(ctx: Any) -> dict[str, Any]:

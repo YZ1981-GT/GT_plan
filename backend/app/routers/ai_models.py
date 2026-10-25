@@ -16,6 +16,7 @@ from app.core.database import get_db
 from app.deps import require_role
 from app.models.ai_model_options import (
     AIAuthScheme,
+    AIDeployment,
     OCRCapability,
     OCRProtocol,
     ReasoningEffort,
@@ -42,6 +43,7 @@ from app.services.llm_provider_registry import provider_profile, public_provider
 from app.services.llm_runtime import (
     LLMRuntimeError,
     classify_model_deployment,
+    deployment_of,
     resolve_config_from_model,
     test_runtime_config,
 )

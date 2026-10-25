@@ -7,6 +7,7 @@
  * - 状态字面量比较集中在本文件（.vue 里写 `=== 'pending'` 会触发 no-status-string-literal）。
  */
 import { ElMessage } from 'element-plus'
+import { refIssueDetailText } from '@/utils/formulaRefIssues'
 
 // ── 类型 ──────────────────────────────────────────────────────────────────────
 
@@ -365,7 +366,8 @@ export function definitionText(d: Definition | null | undefined, structure?: Rec
 export function formulaErrorText(e: any, fallback: string): string {
   const status = e?.response?.status || e?.status || 0
   const detail = e?.response?.data?.detail ?? e?.data?.detail
-  const msg = typeof detail === 'string' ? detail : String(detail?.message || '')
+  // 公式引用校验 422 逐条列「引用：原因」（与全局提示、handleApiError 同一格式化）
+  const msg = typeof detail === 'string' ? detail : (refIssueDetailText(detail) || String(detail?.message || ''))
   if (!status) return `${fallback}：网络不通，请检查连接`
   if (status === 403) return msg || '没有权限执行此操作'
   if (status === 428) return msg || '缺少版本信息，请刷新后重试'

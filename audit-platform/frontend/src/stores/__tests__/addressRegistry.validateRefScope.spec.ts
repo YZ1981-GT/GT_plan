@@ -79,6 +79,14 @@ describe('地址库 validate 的 ACNR 短路范围', () => {
     }
   })
 
+  it('校验请求本身失败：问题的原因写在 message（与后端同形，弹窗据此显示原因）', async () => {
+    mockHttpPost.mockRejectedValue(new Error('network'))
+    const store = await storeBoundTo('pid-1')
+    const r = await store.validate("TB('1001','期末余额')")
+    expect(r).toEqual({ valid: false, issues: [{ ref: "TB('1001','期末余额')", message: '校验请求失败' }],
+      formula: "TB('1001','期末余额')" })
+  })
+
   it('resolve 带当前绑定的项目（非底稿域按项目数据判存在）', async () => {
     mockResolveUri.mockResolvedValue({ found: true, uri: 'tb://1001#期末余额' })
     const store = await storeBoundTo('pid-1')

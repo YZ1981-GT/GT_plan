@@ -39,6 +39,7 @@ from app.services.formula_ref_preload import (
     PREV_TB_RE,
     AuxRef,
     load_report_rows,
+    note_refs_in,
     parse_aux_refs,
     resolve_aux_refs,
 )
@@ -59,7 +60,6 @@ _ADJ_RE = re.compile(r"ADJ\(\s*'([^']+)'")
 #: 报表行引用（ROW / SUM_ROW / REPORT）：调用方没给 row_cache 时据此决定是否读本年度报表
 _REPORT_REF_RE = re.compile(r"(?<![A-Za-z0-9_])(?:ROW|SUM_ROW|REPORT)\s*\(")
 _WP_RE = re.compile(r"WP\(\s*'([^']+)'\s*,\s*'([^']+)'(?:\s*,\s*'([^']+)')?\s*\)")
-_NOTE_RE = re.compile(r"NOTE\(\s*'([^']+)'\s*,\s*'([^']+)'(?:\s*,\s*'([^']+)')?\s*\)")
 #: LEDGER('科目','方向'[,'范围'])；前面紧挨字母 / 下划线的（COUNT_LEDGER）不算
 _LEDGER_RE = re.compile(r"(?<![A-Za-z0-9_])LEDGER\(\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)")
 #: COUNT_LEDGER('科目'[,'范围'])：原先混在 LEDGER 里扫，第二参被当成方向、期间恒按全年 ⇒ 非全年的笔数恒取不到
@@ -76,7 +76,7 @@ def _scan_refs(formulas: list[str]) -> dict[str, set]:
         "aux_specs": set(),  # formula_ref_preload.AuxRef（四参 / 三参 / 两参，按写法原样）
         "report_refs": set(),  # 出现过的 ROW / SUM_ROW / REPORT 调用（只用于判断要不要读报表）
         "wp_refs": set(),    # (wp_code, column) or (wp_code, sheet, cell)
-        "note_refs": set(),  # (section, field) or (section, field, row_label)
+        "note_refs": set(),  # (章节, 行, 列)；两参写法列为空串
         "prev_codes": set(),        # PREV 两参 / PREV(TB(…)) 的科目（上年试算表）
         "prev_wp_refs": set(),      # PREV 三参 (底稿, 表, 字段)（上年同底稿取数）
         "ledger_specs": set(),       # (account, direction, period)
@@ -96,8 +96,8 @@ def _scan_refs(formulas: list[str]) -> dict[str, set]:
         refs["report_refs"].update(m.group(0) for m in _REPORT_REF_RE.finditer(t))
         for m in _WP_RE.finditer(t):
             refs["wp_refs"].add(tuple(g for g in m.groups() if g))
-        for m in _NOTE_RE.finditer(t):
-            refs["note_refs"].add(tuple(g for g in m.groups() if g))
+        # NOTE 与严格代入同一个识别正则（允许空参：预设公式写 NOTE('五、1','','') = 合计行第一列）
+        refs["note_refs"].update(note_refs_in(t))
         for m in (*PREV_RE.finditer(t), *PREV_TB_RE.finditer(t)):
             refs["prev_codes"].add(m.group(1))
         for m in PREV3_RE.finditer(t):
@@ -441,102 +441,25 @@ async def _load_wp(db: AsyncSession, project_id: uuid.UUID, year: int,
 
 
 async def _load_note(db: AsyncSession, project_id: uuid.UUID, year: int,
-                     refs: set[tuple], template_type: str) -> dict[str, dict[str, Decimal]]:
-    """从披露表 sub_table_data 取附注值（复用 disclosure_source，与 note-data-from-disclosure-table 对齐）。
+                     refs: set[tuple], gaps: list[str] | None = None) -> dict[str, dict[str, Decimal]]:
+    """附注取数：按章节 / 行 / 列取本年度附注单元格，取不到的写进 ``gaps``（L1 ``_handle_note`` 仍按 0 求值）。
 
-    spec: formula-execution-path-convergence 复盘修复 P0-2
+    委托 NOTE 取数的唯一实现 ``formula_ref_preload.load_note_values``（按行标签 + 表头列名定位，与引用校验、
+    严格代入、报表求值同一套匹配；值按 ``note_value_key(行, 列)`` 存）。
+
+    原实现只读披露表同步数据 ``sub_table_data``、按第二参当字段键（``end_amount`` 等）取最后一行的值 ⇒
+    ``NOTE('五、1','合计','期末余额')`` 这种标准写法恒取不到、静默为 0，公式调试也不提示；它的降级分支
+    ``_load_note_fallback`` 把 ``values``（列表）当字典取 ⇒ 恒抛错（spec formula-fetch-followup-defect-closure 7.2）。
     """
     if not refs:
         return {}
-    out: dict[str, dict[str, Decimal]] = {}
+    from app.services.formula_ref_preload import load_note_values, note_token
 
-    # 按 section 分组需要的 field
-    section_fields: dict[str, set[str]] = {}
-    for ref_tuple in refs:
-        section = ref_tuple[0]
-        field = ref_tuple[1] if len(ref_tuple) > 1 else ""
-        section_fields.setdefault(section, set()).add(field)
-
-    # 复用 disclosure_source 的 wp_code → section 映射查询 sub_table_data
-    try:
-        from app.services.formula_push.bindings.disclosure_source import (
-            _load_section_map,
-            load_disclosure_sub_table_data,
-            note_rows_from_disclosure,
-        )
-    except ImportError:
-        logger.warning("preloader._load_note: disclosure_source not available, falling back to direct query")
-        return await _load_note_fallback(db, project_id, year, refs)
-
-    # 反查 section → wp_code（section_map 是 wp_code → {listed/soe: section}）
-    section_map = _load_section_map()
-    section_to_wp: dict[str, str] = {}
-    for wp_code, entry in section_map.items():
-        for variant_key in ("listed", "soe"):
-            sec = entry.get(variant_key, "")
-            if sec:
-                section_to_wp.setdefault(sec, wp_code)
-
-    for section, fields in section_fields.items():
-        wp_code = section_to_wp.get(section)
-        if not wp_code:
-            continue
-        sub = await load_disclosure_sub_table_data(db, project_id, year, wp_code, template_type)
-        if sub is None:
-            continue
-        entry = out.setdefault(section, {})
-        for table_name, rows_list in sub.items():
-            if not isinstance(rows_list, list):
-                continue
-            for row in rows_list:
-                if not isinstance(row, dict):
-                    continue
-                label = str(row.get("label") or "").strip()
-                for field in fields:
-                    if not field:
-                        continue
-                    # 复用 disclosure_source._read_row_value 的多键名兼容
-                    from app.services.formula_push.bindings.disclosure_source import _read_row_value
-                    from app.services.formula_push.note_writer import NOTE_FIELDS
-                    value_key = NOTE_FIELDS.get(field, (field, "end"))[0]
-                    raw = _read_row_value(row, value_key, field)
-                    if raw is not None:
-                        entry[field] = _safe_decimal(raw)
-                        if label:
-                            entry[f"{label}:{field}"] = _safe_decimal(raw)
-    return out
-
-
-async def _load_note_fallback(db: AsyncSession, project_id: uuid.UUID, year: int,
-                              refs: set[tuple]) -> dict[str, dict[str, Decimal]]:
-    """降级：直接查 disclosure_notes（disclosure_source 不可用时）。"""
-    out: dict[str, dict[str, Decimal]] = {}
-    sections = {r[0] for r in refs}
-    from app.models.report_models import DisclosureNote
-
-    for section in sections:
-        note = (await db.execute(
-            sa.select(DisclosureNote).where(
-                DisclosureNote.project_id == project_id,
-                DisclosureNote.year == year,
-                DisclosureNote.note_section == section,
-                DisclosureNote.is_deleted == sa.false(),
-            )
-        )).scalar_one_or_none()
-        if note is None or not isinstance(note.table_data, dict):
-            continue
-        td_rows = note.table_data.get("rows", [])
-        for r in td_rows:
-            if not isinstance(r, dict):
-                continue
-            for field_ref in refs:
-                if field_ref[0] != section:
-                    continue
-                field = field_ref[1] if len(field_ref) > 1 else ""
-                val = r.get("values", {}).get(field)
-                if val is not None:
-                    out.setdefault(section, {})[field] = _safe_decimal(val)
-    return out
+    wanted = [(str(r[0]).strip(), r[1] if len(r) > 1 else "", r[2] if len(r) > 2 else "") for r in refs]
+    values, missing = await load_note_values(db, project_id, year, sorted(set(wanted)))
+    for ref, why in missing.items():
+        _gap(gaps, f"{note_token(ref)}：{why}")
+    return values
 
 
 def _mentions_occurrence(formulas: list[str]) -> bool:
@@ -586,7 +509,6 @@ async def preload(
     formulas: list[str],
     *,
     adj_exclude_origins: frozenset[str] = frozenset(),
-    template_type: str = "soe",
     row_cache: dict[str, Decimal] | None = None,
     gaps: list[str] | None = None,
 ) -> FormulaContext:
@@ -595,10 +517,12 @@ async def preload(
     Args:
         formulas: 公式文本列表（可含 ``=`` 前缀）
         adj_exclude_origins: ADJ 取数排除的 origin 集合（底稿传空集、报表传 {"workpaper"}）
-        template_type: 项目模板类型（"soe"/"listed"），影响附注取数的章节映射
         row_cache: 已计算的行次缓存（供 ROW/SUM_ROW/REPORT 引用）；不传且公式引用了报表行 ⇒ 读本年度报表本期金额
-        gaps: 传入列表时记取数缺口（报表未生成、辅助核算取不到、调整分录取数失败），供严格调用方报错；
+        gaps: 传入列表时记取数缺口（报表未生成、辅助核算取不到、调整分录取数失败、附注单元格取不到），供严格调用方报错；
             不传 = 非严格（缺数按 0，L1 内核行为）
+
+    原有 ``template_type`` 参数已删：只用于附注旧取法的「底稿 → 附注章节」映射；NOTE 第一参就是本项目附注的
+    章节编号，按编号直接取，不需要口径（spec formula-fetch-followup-defect-closure 7.2）。
     """
     refs = _scan_refs(formulas)
 
@@ -610,7 +534,7 @@ async def preload(
     if row_cache is None and refs["report_refs"]:
         row_cache = await _load_report_rows(db, project_id, year, gaps)
     wp_data = await _load_wp(db, project_id, year, refs["wp_refs"])
-    note_data = await _load_note(db, project_id, year, refs["note_refs"], template_type)
+    note_data = await _load_note(db, project_id, year, refs["note_refs"], gaps)
     ledger_data = await _load_ledger(db, project_id, year, refs["ledger_specs"])
     ledger_count = await _load_ledger_count(db, project_id, year, refs["ledger_count_specs"])
     ledger_detail = await _load_ledger_detail(db, project_id, year, refs["ledger_detail_specs"])

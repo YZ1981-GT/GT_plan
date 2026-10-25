@@ -83,10 +83,10 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L42",
-    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L90",
-    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L86",
-    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L121",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L43",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L91",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L87",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L122",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -221,10 +221,10 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L42",
-    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L90",
-    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L86",
-    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L121",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L43",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L91",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L87",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L122",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -383,10 +383,10 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L42",
-    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L90",
-    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L86",
-    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L121",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L43",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L91",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L87",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L122",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -528,10 +528,10 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L43",
-    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L91",
-    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L87",
-    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L122",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L45",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L93",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L89",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L124",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -670,10 +670,10 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L42",
-    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L90",
-    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L86",
-    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L121",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L43",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L91",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L87",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L122",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -805,10 +805,10 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L47",
-    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L95",
-    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L91",
-    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L126",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L48",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L96",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L92",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L127",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -941,10 +941,10 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L45",
-    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L93",
-    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L89",
-    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L126",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L46",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L94",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L90",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L127",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -1084,10 +1084,10 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L48",
-    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L96",
-    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L92",
-    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L129",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L58",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L125",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L121",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L158",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -1226,10 +1226,10 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L46",
-    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L94",
-    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L90",
-    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L127",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L47",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L95",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L91",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L128",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -1371,10 +1371,10 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L42",
-    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L90",
-    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L86",
-    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L121",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L43",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L91",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L87",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L122",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -1876,13 +1876,13 @@
     "反向判据：展示序号族（`seq: idx + 1`）现算 10 处**不计入缺陷**（它们只进渲染不进身份），若守卫把它们也算进来，缺陷数会虚高。"
    ],
    "source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L271",
-    "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L268",
-    "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L273",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L272",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L269",
     "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L274",
-    "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L229",
-    "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L222",
-    "audit-platform/frontend/src/components/workpaper/m1/core/M1TabAdjudication.vue#L390"
+    "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L275",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L230",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L223",
+    "audit-platform/frontend/src/components/workpaper/m1/core/M1TabAdjudication.vue#L391"
    ],
    "entries": [
     "xlsx/gt-m1-dividends-payable",
@@ -3165,93 +3165,93 @@
    "summary_persist_sites": 28,
    "derived_column_persist": [
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L273",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L274",
      "derived_field": "audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L274",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L275",
      "derived_field": "endBalance"
-    },
-    {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L222",
-     "derived_field": "beginAudited"
     },
     {
      "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L223",
-     "derived_field": "endAudited"
-    },
-    {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L231",
      "derived_field": "beginAudited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L232",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L224",
      "derived_field": "endAudited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L217",
-     "derived_field": "audited"
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L232",
+     "derived_field": "beginAudited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L233",
+     "derived_field": "endAudited"
     },
     {
      "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L218",
-     "derived_field": "endBalance"
+     "derived_field": "audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L238",
-     "derived_field": "audited"
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L219",
+     "derived_field": "endBalance"
     },
     {
      "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L239",
-     "derived_field": "endBalance"
+     "derived_field": "audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L272",
-     "derived_field": "audited"
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L240",
+     "derived_field": "endBalance"
     },
     {
      "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L273",
-     "derived_field": "endBalance"
+     "derived_field": "audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L246",
-     "derived_field": "audited"
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L274",
+     "derived_field": "endBalance"
     },
     {
      "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L247",
-     "derived_field": "endBalance"
+     "derived_field": "audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L271",
-     "derived_field": "audited"
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L248",
+     "derived_field": "endBalance"
     },
     {
      "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L272",
-     "derived_field": "endBalance"
-    },
-    {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L282",
      "derived_field": "audited"
     },
     {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L273",
+     "derived_field": "endBalance"
+    },
+    {
      "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L283",
+     "derived_field": "audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L284",
      "derived_field": "endBalance"
     }
    ],
    "summary_persist": [
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L280",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L281",
      "item_id": "M10-1-perpetualBond-subtotal"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L281",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L282",
      "item_id": "M10-1-preferredStock-subtotal"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L282",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L283",
      "item_id": "M10-1-other-subtotal"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L283",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L284",
      "item_id": "M10-1-total-audited"
     },
     {
@@ -3267,63 +3267,63 @@
      "item_id": "M10-4-summary-consistent"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L229",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L230",
      "item_id": "M1-M1-1-total-audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L238",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L239",
      "item_id": "M2-M2-1-total-audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L224",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L225",
      "item_id": "M3-M3-1-total-audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L245",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L246",
      "item_id": "M4-1-premium-subtotal"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L246",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L247",
      "item_id": "M4-1-other-subtotal"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L247",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L248",
      "item_id": "M4-1-total-audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L279",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L280",
      "item_id": "M5-1-statutory-subtotal"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L280",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L281",
      "item_id": "M5-1-discretionary-subtotal"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L281",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L282",
      "item_id": "M5-1-total-audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L253",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L254",
      "item_id": "M6-1-total-audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L254",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L255",
      "item_id": "M6-1-total-endBalance"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L278",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L279",
      "item_id": "M7-1-safety-subtotal"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L279",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L280",
      "item_id": "M7-1-maintenance-subtotal"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L280",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L281",
      "item_id": "M7-1-other-subtotal"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L281",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L282",
      "item_id": "M7-1-total-audited"
     },
     {
@@ -3335,15 +3335,15 @@
      "item_id": "M8-1-total-beginAudited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L289",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L290",
      "item_id": "M9-1-nonReclass-subtotal"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L290",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L291",
      "item_id": "M9-1-reclass-subtotal"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L291",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L292",
      "item_id": "M9-1-total-audited"
     },
     {
@@ -3443,9 +3443,9 @@
     "row_identity": {
      "kind": "generated_opaque_in_memory_positional_in_store",
      "identity_field": "key",
-     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L162",
-     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L229",
-     "index_binding_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L219"
+     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L163",
+     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L230",
+     "index_binding_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L220"
     },
     "registered_as": [
      "BP-10"
@@ -3458,8 +3458,8 @@
     "row_identity": {
      "kind": "generated_opaque_in_memory_positional_in_store",
      "identity_field": "key",
-     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L220",
-     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L283",
+     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L221",
+     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L284",
      "index_binding_source_ref": null
     },
     "registered_as": [
@@ -3473,8 +3473,8 @@
     "row_identity": {
      "kind": "generated_opaque_in_memory_positional_in_store",
      "identity_field": "key",
-     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L214",
-     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L271",
+     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L215",
+     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L272",
      "index_binding_source_ref": null
     },
     "registered_as": [
@@ -3486,130 +3486,130 @@
    "scan_recipe": "两族分开穷举（剥注释、保留行号）：① 渲染键族 —— `(rowId|rowKey|id)\\s*:\\s*<值>` 且值里含下标 token 或 `${i|idx|index}`；② 持久化键族 —— `itemId:\\s*`…row-\\$\\{(n|i|idx|index)\\}…``。反向判据：展示序号族（`seq: idx + 1`）**不计入**缺陷。",
    "render_key_family": [
     {
-     "site": "audit-platform/frontend/src/components/workpaper/m1/core/M1TabAdjudication.vue#L390",
+     "site": "audit-platform/frontend/src/components/workpaper/m1/core/M1TabAdjudication.vue#L391",
      "key": "rowKey",
      "value": "String(idx)"
     }
    ],
    "persistence_key_family": [
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L271",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L272",
      "item_id_template": "M10-1-row-${n}-name"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L268",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L269",
      "item_id_template": "M10-1-row-${n}-group"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L273",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L274",
      "item_id_template": "M10-1-row-${n}-audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L274",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L275",
      "item_id_template": "M10-1-row-${n}-endBalance"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L229",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L230",
      "item_id_template": "M1-M1-1-row-${n}-name"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L222",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L223",
      "item_id_template": "M1-M1-1-row-${n}-beginAudited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L223",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L224",
      "item_id_template": "M1-M1-1-row-${n}-endAudited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L223",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L224",
      "item_id_template": "M2-M2-1-row-${n}-name"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L238",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L239",
      "item_id_template": "M2-M2-1-row-${n}-beginAudited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L232",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L233",
      "item_id_template": "M2-M2-1-row-${n}-endAudited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L209",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L210",
      "item_id_template": "M3-M3-1-row-${n}-name"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L224",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L225",
      "item_id_template": "M3-M3-1-row-${n}-audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L218",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L219",
      "item_id_template": "M3-M3-1-row-${n}-endBalance"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L232",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L233",
      "item_id_template": "M4-1-row-${n}-name"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L233",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L234",
      "item_id_template": "M4-1-row-${n}-block"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L238",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L239",
      "item_id_template": "M4-1-row-${n}-audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L239",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L240",
      "item_id_template": "M4-1-row-${n}-endBalance"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L265",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L266",
      "item_id_template": "M5-1-row-${n}-name"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L266",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L267",
      "item_id_template": "M5-1-row-${n}-block"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L267",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L268",
      "item_id_template": "M5-1-row-${n}-category"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L272",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L273",
      "item_id_template": "M5-1-row-${n}-audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L273",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L274",
      "item_id_template": "M5-1-row-${n}-endBalance"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L240",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L241",
      "item_id_template": "M6-1-row-${n}-name"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L241",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L242",
      "item_id_template": "M6-1-row-${n}-category"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L246",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L247",
      "item_id_template": "M6-1-row-${n}-audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L247",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L248",
      "item_id_template": "M6-1-row-${n}-endBalance"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L265",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L266",
      "item_id_template": "M7-1-row-${n}-name"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L266",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L267",
      "item_id_template": "M7-1-row-${n}-category"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L271",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L272",
      "item_id_template": "M7-1-row-${n}-audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L272",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L273",
      "item_id_template": "M7-1-row-${n}-endBalance"
     },
     {
@@ -3625,23 +3625,23 @@
      "item_id_template": "M8-1-row-${n}-beginAudited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L283",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L284",
      "item_id_template": "M9-1-row-${n}-name"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L276",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L277",
      "item_id_template": "M9-1-row-${n}-block"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L277",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L278",
      "item_id_template": "M9-1-row-${n}-category"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L282",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L283",
      "item_id_template": "M9-1-row-${n}-audited"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L283",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L284",
      "item_id_template": "M9-1-row-${n}-endBalance"
     },
     {
@@ -3683,7 +3683,7 @@
    ],
    "generated_opaque_family": [
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L214",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L215",
      "prefix": "m10-adj"
     },
     {
@@ -3691,7 +3691,7 @@
      "prefix": "m10-det"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L162",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L163",
      "prefix": "m1-adj"
     },
     {
@@ -3699,7 +3699,7 @@
      "prefix": "m1-detail"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L166",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L167",
      "prefix": "m2-adj"
     },
     {
@@ -3715,7 +3715,7 @@
      "prefix": "m2-unlisted"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L157",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L158",
      "prefix": "m3-adj"
     },
     {
@@ -3723,7 +3723,7 @@
      "prefix": "m3-det"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L180",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L181",
      "prefix": "m4-adj"
     },
     {
@@ -3731,7 +3731,7 @@
      "prefix": "m4-det"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L207",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L208",
      "prefix": "m5-adj"
     },
     {
@@ -3739,7 +3739,7 @@
      "prefix": "m5-det"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L183",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L184",
      "prefix": "m6-adj"
     },
     {
@@ -3747,7 +3747,7 @@
      "prefix": "m6-det"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L208",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L209",
      "prefix": "m7-adj"
     },
     {
@@ -3759,7 +3759,7 @@
      "prefix": "m8-detail"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L220",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L221",
      "prefix": "m9-adj"
     },
     {

@@ -25,25 +25,10 @@ export interface CrossCheckDeps {
   CROSS_CHECK_NODE_KEYS: typeof _Keys
 }
 
-const DEFAULT_SEEDS: Record<string, any[]> = {
-  cross_report_note: [
-    { label: 'BS货币资金 = 附注货币资金合计', left_ref: "REPORT('BS-002','期末')", right_ref: "NOTE('货币资金','合计','期末')", _editing: false },
-    { label: 'BS应收账款 = 附注应收账款合计', left_ref: "REPORT('BS-008','期末')", right_ref: "NOTE('应收账款','合计','期末')", _editing: false },
-    { label: 'IS营业收入 = 附注营业收入合计', left_ref: "REPORT('IS-002','本期')", right_ref: "NOTE('营业收入','合计','本期')", _editing: false },
-  ],
-  cross_report_wp: [
-    { label: 'BS货币资金 = E1-1审定数', left_ref: "REPORT('BS-002','期末')", right_ref: "WP('E1-1','审定数')", _editing: false },
-    { label: 'BS应收账款 = D2-1审定数', left_ref: "REPORT('BS-008','期末')", right_ref: "WP('D2-1','审定数')", _editing: false },
-  ],
-  cross_note_wp: [
-    { label: '附注货币资金 = E1-1审定数', left_ref: "NOTE('货币资金','合计','期末')", right_ref: "WP('E1-1','审定数')", _editing: false },
-  ],
-  cross_consol: [
-    { label: '合并抵消分录借贷平衡', left_ref: "CONSOL('抵消分录','借方合计')", right_ref: "CONSOL('抵消分录','贷方合计')", _editing: false },
-    { label: '模拟权益法长投 = 净资产×持股比例', left_ref: "CONSOL('模拟权益法','期末长投小计')", right_ref: "CONSOL('净资产表','期末净资产') × 持股比例", _editing: false },
-    { label: '资本公积变动期末 = 合并报表期末', left_ref: "CONSOL('资本公积变动','期末金额')", right_ref: "REPORT('BS-资本公积','期末')", _editing: false },
-  ],
-}
+// 原先这里有一组写死的「示例规则」（DEFAULT_SEEDS）作为规则表的初值：读接口返回「从未保存过 = 空集」时不覆盖
+// ⇒ 它们冒充本项目规则显示（面板的「尚无自定义规则」空态永远出不来），用户第一次保存任何规则时被整组写进库。
+// 而它们本身取不到数：NOTE 第一参写的是标题（应为章节编号，且国企 / 上市编号不同，写死不了）、CONSOL 不是可执行函数、
+// REPORT('BS-资本公积') 不是行次（spec formula-fetch-followup-defect-closure 7.2）。规则以服务端为准，空就是空。
 
 export function useCrossCheckRules(deps: CrossCheckDeps) {
   // ── 执行结果（7 条内置 logic_check 勾稽 + 用户规则执行结果） ──
@@ -57,9 +42,7 @@ export function useCrossCheckRules(deps: CrossCheckDeps) {
   let execSeq = 0
 
   // ── 用户可编辑规则（按树节点 key 分组） ──
-  const rulesMap = ref<Record<string, any[]>>(
-    Object.fromEntries(Object.entries(DEFAULT_SEEDS).map(([k, v]) => [k, v.map(r => ({ ...r }))]))
-  )
+  const rulesMap = ref<Record<string, any[]>>({})
   const tokens = ref<Record<string, string>>({})
 
   const isCrossCheckMode = computed(() => deps.selectedNodeKey.value.startsWith('cross_'))
@@ -132,21 +115,24 @@ export function useCrossCheckRules(deps: CrossCheckDeps) {
         _silent: true, validateStatus: (s: number) => s < 600,
       } as any)
       applyRulesData(data)
-    } catch { /* 读失败保留内存默认 */ }
+    } catch { /* 读失败：保留已加载的规则（首次进入即为空，不再拿写死的示例冒充） */ }
   }
 
   function applyRulesData(data: any) {
     const rules = data?.rules ?? data?.data?.rules ?? null
     if (!rules || typeof rules !== 'object') return
     tokens.value = data?.loaded ?? data?.data?.loaded ?? {}
+    // 读接口 / 保存接口返回的都是本项目生效的**全部**规则 ⇒ 整体替换；响应里没有的节点就是没有规则
+    const next: Record<string, any[]> = {}
     for (const [nodeKey, nodeRules] of Object.entries(rules)) {
       if (!Array.isArray(nodeRules)) continue
-      rulesMap.value[nodeKey] = (nodeRules as any[]).map((r) => ({
+      next[nodeKey] = (nodeRules as any[]).map((r) => ({
         rule_id: r.rule_id || undefined, label: r.label || '', left_ref: r.left_ref || '',
         operator: r.operator || '=', right_ref: r.right_ref || '', description: r.description || '',
         layer: r.layer, pending: r.pending, _editing: false,
       }))
     }
+    rulesMap.value = next
   }
 
   async function persist() {

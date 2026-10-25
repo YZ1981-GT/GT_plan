@@ -123,11 +123,12 @@
           </el-select>
         </el-form-item>
         <el-form-item label="右侧（目标）" required>
-          <el-input v-model="form.right_ref" placeholder="附注/底稿引用，如 NOTE('货币资金','合计') 或 WP('E1','E1-1','审定数')">
+          <el-input v-model="form.right_ref" placeholder="附注/底稿引用，如 NOTE('五、1','合计','期末') 或 WP('E1','E1-1','审定数')">
             <template #prepend>目标</template>
           </el-input>
           <div style="font-size: 11px; color: var(--gt-color-text-tertiary); margin-top: 4px;">
-            语法：NOTE('章节','字段') / WP('底稿','sheet','坐标') / TB('科目','字段') / AUX('科目','维度','字段') / PREV('科目','字段')
+            语法：NOTE('章节编号','行','列') / WP('底稿','sheet','坐标') / TB('科目','字段') / AUX('科目','维度','字段') / PREV('科目','字段')。
+            NOTE 第一参是附注章节编号（如「五、1」），写标题取不到数
           </div>
           <!-- spec: formula-management-deep-optimization P2-9 — 快捷按钮 -->
           <div style="display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap;">

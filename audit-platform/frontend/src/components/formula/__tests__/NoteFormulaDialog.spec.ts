@@ -268,3 +268,58 @@ describe('NoteFormulaDialog — 加载/编辑/持久化（Req 15.1/15.2/15.4）'
     wrapper.unmount()
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════
+// spec formula-fetch-followup-defect-closure 7.2 浏览器实测：提示只列引用、不说原因（原因在问题的 message 里）
+describe('NoteFormulaDialog — 悬空引用提示写明原因', () => {
+  /** 后端 `validate_formula_refs` 的真实形状：原因在 message，status 是状态码 */
+  const ISSUE = {
+    ref: "NOTE('货币资金','合计','期末')", uri: 'note://货币资金/合计#期末', status: 'not_found',
+    message: '本年度（2025）附注没有章节 货币资金（第一参须是章节编号，如「五、1」，不是标题）',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGet.mockResolvedValue({ formulas: [makeSavedFormula()] })
+    mockPut.mockResolvedValue({ saved_count: 1 })
+    mockValidate.mockResolvedValue({ valid: true, issues: [] })
+  })
+
+  async function completeFirstRow() {
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+    const row = (wrapper.vm as any).formulas[0]
+    row._editing = true
+    await (wrapper.vm as any).completeRow(row)
+    await flushPromises()
+    return { wrapper, row }
+  }
+
+  it('保存前校验：提示「引用：原因」，不只列引用', async () => {
+    mockValidate.mockResolvedValue({ valid: false, issues: [ISSUE] })
+    const { wrapper } = await completeFirstRow()
+    expect(mockMsgError).toHaveBeenCalledTimes(1)
+    expect(String(mockMsgError.mock.calls[0][0])).toContain(`${ISSUE.ref}：${ISSUE.message}`)
+    expect(mockPut).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('服务端 422：逐条列「【单元格】引用：原因」，请求带 _silent（全局提示不再先弹一次）', async () => {
+    mockPut.mockRejectedValue({ response: { status: 422, data: { detail: {
+      error_code: 'FORMULA_DANGLING_REFS', message: '公式含悬空引用，拒绝保存', issues: [{ ...ISSUE, target: 'R1' }],
+    } } } })
+    const { wrapper, row } = await completeFirstRow()
+    expect(mockPut.mock.calls[0][2]).toMatchObject({ _silent: true })
+    expect(mockMsgError).toHaveBeenCalledTimes(1)
+    expect(String(mockMsgError.mock.calls[0][0])).toContain(`【R1】${ISSUE.ref}：${ISSUE.message}`)
+    expect(row._editing, '没保存成功不能退出编辑态').toBe(true)
+    wrapper.unmount()
+  })
+
+  it('428 缺版本令牌：显示后端说明（handleApiError 不认 428，会落进「系统错误」分支）', async () => {
+    mockPut.mockRejectedValue({ response: { status: 428, data: { detail: { message: '缺少载入版本，请刷新后重试' } } } })
+    const { wrapper } = await completeFirstRow()
+    expect(mockMsgWarning).toHaveBeenCalledWith('缺少载入版本，请刷新后重试')
+    wrapper.unmount()
+  })
+})

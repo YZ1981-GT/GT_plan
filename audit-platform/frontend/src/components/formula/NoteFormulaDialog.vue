@@ -86,6 +86,8 @@ import { api } from '@/services/apiProxy'
 // spec: formula-management-runtime-closure Task 14 — 端点收敛进 apiPaths（纯搬迁）
 import { noteFormula } from '@/services/apiPaths/formula'
 import { useAddressRegistry } from '@/stores/addressRegistry'
+import { formatRefIssue } from '@/utils/formulaRefIssues'
+import { showFormulaError } from '@/composables/formula/useFormulaSettings'
 import FormulaRefPicker from './FormulaRefPicker.vue'
 
 const props = defineProps<{
@@ -209,8 +211,9 @@ async function collectDanglingRefs(list: any[]): Promise<string[]> {
     try {
       const res = await addrStore.validate(expr)
       if (res && res.valid === false) {
+        // 「引用：原因」—— 原先只列引用，看不出是章节不存在、写成了标题还是行列对不上
         for (const iss of (res.issues || [])) {
-          dangling.push(iss?.ref || expr)
+          dangling.push(formatRefIssue(iss) || expr)
         }
       }
     } catch {
@@ -240,9 +243,11 @@ async function persistFormulas(): Promise<boolean> {
     .map(({ _editing, layer, layer_label, pending, slot_key, ...rest }) => rest)
   persisting.value = true
   try {
+    // 错误由本弹窗显示（_silent：全局拦截器不再先弹一次）；422 悬空引用逐条列「引用：原因」
     const resp = await api.put(
       noteFormula.list(props.projectId, props.year, noteSection),
-      { formulas: payload, loaded: loadedTokens.value }
+      { formulas: payload, loaded: loadedTokens.value },
+      { _silent: true } as any,
     )
     // 保存后换用新令牌（连续保存不会带旧令牌撞 409），并就地刷新层级标签；
     // 不替换行对象 —— 调用方（completeRow）还要把正在完成的那一行退出编辑态
@@ -257,7 +262,8 @@ async function persistFormulas(): Promise<boolean> {
     emit('saved')
     return true
   } catch (e: any) {
-    handleApiError(e, '保存失败')
+    // 公式集保存带版本令牌：缺令牌 428 / 已被他人修改 409 / 无权 403 / 归档 423 各有说明（handleApiError 不认 428）
+    showFormulaError(e, '保存失败')
     return false
   } finally {
     persisting.value = false

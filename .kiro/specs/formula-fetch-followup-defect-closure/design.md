@@ -524,3 +524,93 @@ R1.5 的附注模板绑定未重生成（理由见 §10.3 第 19 条）。
      年度兜底 2025 已进 `audit-year-calendar-fallback-ratchet` 的基线。
   2. `formula_grammar.FORMULA_FUNCTION_NAMES` 无引用方，内容停在 14 个函数（不含 ADJ / 序时账 / TB_AUX）。
   3. 守卫不覆盖子进程：用 `subprocess` 跑生成器 `--write` 的测试仍可能改写已跟踪文件（本轮扫描未见）。
+
+### 10.12 7.1 回归归因与数据文件行号锚点同步（2026-10-25）
+
+- **逐提交回归**（每个提交的提交树干净检出 vs 其基线，见各节）：R7~R9 / R4 新增 0；R5 新增 0；R2 / R3 新增 0、消除 18；6.5 新增 0、消除 30；
+  6.6 新增 0、消除 4；R1 / R6（基线 `bf759b369` → `58f7afb42`）新增 6，逐个在中间各提交上复跑归因：
+  1. `test_disclosure_source_binding` 3 例：用例随并发会话的 WIP 提交 `25a506a57` 入库而实现没入库，在该提交上即红；其中 BalanceAdj 一例
+     还与本 spec 的 `AUDITED_SOURCES` 守卫（G1 + `fixed_row_keys`）口径冲突，需并发会话收口时对齐。
+  2. `test_formula_push_legacy_tables` 2 例：并发会话 `note_writer` 六列对称兜底所致（该会话正在改，工作树里有未提交的 `note_writer.py` 与该测试）。
+  3. `test_task55::test_formdata_refs_really_hit_the_prefix_filter_and_the_calls` 1 例：本 spec R1.4（`a5147814a`）改了 J / K / L / M 循环源码，
+     `backend/data/workpaper_sync_{j,k,l,m}_cycle_manifest_slice.json` 与 `l_ / m_cycle_deletion_plan.json` 里 `路径#L行号` 锚点随之错位。
+- **锚点同步工具**（正式工具，可重跑）`backend/scripts/fix/resync_data_line_anchors.py`：`--base <rev>` 取改动前源码，按 difflib 相等块把旧行号映到新行号，
+  `--check` 只报告、`--apply` 逐字节保留其余内容写回、`--only` 限定源文件（只同步被本 spec 提交挪动的 25 个源文件；被并发提交挪动的不代改，如实报告）；
+  已删除但仍跟踪的 JSON 跳过。本轮 192 处锚点（154 个不同锚点）全部映射成功，新旧行内容逐条相等；主工作树与变异 worktree 结果逐字节一致。
+  测试 `tests/scripts/test_resync_data_line_anchors.py` 3 例；变异 MT1~MT4（映射偏移、相等块外不报、`--only` 失效、改写非锚点字节）打红。
+- **同步后回归**：13 个任务文件新增 0；53 个文件新增 2，均为 `test_sync_editor_host_discovery_contract::TestTheInvariantHoldsOnLiveFacts` —
+  基线 worktree 没有 `node_modules` 联接时这两例 skip，补联接后基线同样红（环境差异，非本 spec 引入）。
+- **收尾回归**（7.2 修复全部完成后）：引用全部未提交改动模块 / 数据文件的后端测试 277 个文件（基线 `58f7afb42` 干净检出 vs 改后），
+  新增失败 0、消除 1（即上面第 3 条）；双方其余失败逐条相同（987 / 986 failed + 59 errors，均为预存，多为底稿同步各循环用例）；已跟踪文件守卫无报告。
+  四个新测试文件在改后树上 22 passed。
+- **合并树**：收尾期间远端由并发会话推进到 `a15d5590e` → `07bbbc4e1` → `01ed968ec`（与本清单只在 INDEX 交集，按最新 HEAD 只改本 spec 行），
+  本提交以 `01ed968ec` 为父。函数全局名棘轮在合并树上打红：`a15d5590e`（企业预设离线可启用）给 `routers/ai_models._local_unavailable_warning`
+  加的企业预设分支用了未导入的 `deployment_of` / `AIDeployment` ⇒ 只要验证失败就 NameError，启用 / 更新不可用的本机或企业预设模型恒 500。
+  补两处导入 + `test_ai_models_unavailable_warning.py` 4 例（本机 / 企业预设 / 向量 / 无失败），变异 MA1 / MA2（各删一处导入）打红在预期用例上；
+  合并树上本 spec 全部新测试、棘轮与该用例通过（后端 110 passed；前端相关目录 109 个文件只剩预存的 `parseIndexRef` 5 例）；
+  同口径 277 个文件的全量对比回归在合并树上推送时仍在运行（以 `58f7afb42` 为基线的结果见上一条：新增 0）。
+- **环境事故（登记）**：16:14 前后并发会话删除了本会话的 4 个临时 worktree（含已 lock 的两个），正在跑的合并树回归被中断；其中一个 worktree 里有
+  指向主前端 `node_modules` 的联接，递归删除顺联接删掉了真目录的 `.bin`、`.vite` 与 22 个包（`@asamuzakjp/css-color` 至 `@element-plus/icons-vue`，
+  到 `@esbuild` 因文件占用中止）⇒ 按 lockfile `npm install --prefer-offline` 恢复（新增 22、变更 44，`package-lock.json` 未变），前端开发服务与 vitest 复核可用。
+- **前端**：`src/components/formula` + `src/utils` + `src/composables/formula`（7.2 修复后再加 `src/stores` 与 `FormulaStatusPanel.spec.ts`）基线与改后
+  失败集逐条相同（`parseIndexRef.test.ts` 5 例 + `transposeGrid.spec.ts` 1 例，预存）；单区域 vue-tsc 两组配置基线 = 改后（4 = 4、7 = 7，均在未改动的行），
+  注入 TS2322 被报出。
+
+### 10.13 7.2 浏览器实测与随之修复（2026-10-25）
+
+实测在【测试】项目「【测试】公式取数收口验收有限公司_2025」（`1a03ad84-e74d-454e-9bfd-0d7d47c346fa`，国企版单体）与重药安徽（只读）上进行。
+实测抓到的问题逐条复现、修主代码、加守卫：
+
+- **NOTE 取数只有一个实现**：报表求值（报表生成 + 报表审核 / 表间审核 / 公式试算）与旧公式执行接口经 `NOTEExecutor` 取附注，它引用了 `formula_engine`
+  从未导入的 `sa` ⇒ NameError 被自身 `except` 吞掉，任何 NOTE 恒为 0、严格入口也不报错，且忽略行列一律取合计行第一列；统一预载层（公式调试 / 预填）
+  只读披露表同步数据、把第二参当字段键 ⇒ 标准写法恒取不到、静默为 0；L1 只按第二参存取 ⇒ 同一行期末 / 期初撞成一个值。改为唯一实现
+  `formula_ref_preload.load_note_values`（与引用校验同一套 `note_locate`），L1 先取「行 + 列」键再退回旧键，两个旧执行器改为薄封装（取不到返回 `None`）。
+  重药安徽只读核对：`NOTE('八、1','合计','期末余额')` 由 0 变为 9,182,572.99，`NOTE('八、1','银行存款','期初')` = 22,944,619.45。
+  测试 `formula_settings/test_note_value_single_source.py`（改前全红）；变异 MN1~MN12 打红。
+- **公式编辑弹窗附注选择器**：原请求 `/api/projects/{pid}/disclosure-notes/{yr}/tree`（不存在，恒 404）并按标题拼出 `NOTE('',…)`；改走附注目录接口
+  `getDisclosureNoteTree`，引用第一参用章节编号，404 提示「本项目本年度附注尚未生成」。重药安徽列出 166 节，插入 `NOTE('八、1','合计','期末')`，
+  弹窗内调试 = 9,182,572.99。
+- **表间审核写死示例规则**：`useCrossCheckRules.DEFAULT_SEEDS` 当真规则显示、首次保存即入库（附注引用写标题、CONSOL 不可执行）⇒ 删除，服务端为唯一来源。
+- **公式面板错误提示**：调试 / 健康度 / 时间线三面板 `handleApiError(e, { silent: true }) || '…'` 把对象当操作名（弹「[object Object]：…」、原因丢失）⇒
+  请求带 `_silent`、面板用 `formulaErrorText` 显示后端原因。前端变异 MF1~MF10 打红。
+- **地址库附注域**：`build_note_entries` 原给每个表头登记一条（含行名列、无合计行、重复列名、子表落到主表）⇒ 只登记 `note_locate` 能定位到本表的引用，
+  国企 1422 → 213 条、上市 2356 → 238 条。`test_note_registry_entries_resolvable.py` 4 例；变异 MN13~MN15。【测试】项目清本项目地址缓存后，
+  公式引用选择器「其他附注」列 213 条，首条 `八、1 货币资金 合计 期末余额`，无行名列条目（原先会给出 `NOTE('八、2','合计','项目')`）。
+- **悬空引用提示写明原因**（§10.8 范围外第 2 条一并收口）：后端逐引用问题的原因在 `message`，前端三条文案通路（全局拦截器、`handleApiError`、
+  `formulaErrorText`）只取 `detail.message`（底稿公式的 422 没有 message ⇒ 全局提示是整段 JSON、`handleApiError` 是「请求参数有误」），附注公式弹窗
+  保存前校验只列引用，底稿公式面板把问题对象拼成「[object Object]」（既有用例用字符串问题，与真实契约不符）。改为：
+  1. 前端 `utils/formulaRefIssues.ts` 唯一格式化（「【单元格】引用：原因」，只认 `FORMULA_DANGLING_REFS` / `FORMULA_REF_NOT_FOUND`），三条通路、附注公式弹窗、
+     底稿公式面板共用；`addressRegistry.ValidateResult` 的问题类型按后端改为 `message`（原写 `reason`，即状态码）。
+  2. 附注公式弹窗保存带 `_silent`、失败走 `showFormulaError`（原 `handleApiError` 不认 428，缺版本令牌会落进「系统错误」）；底稿公式面板其余错误
+     （409 / 428 / 403 / 423）显示后端说明（原一律「请检查公式表达式」）。
+  3. 后端「本年度附注没有章节」的文案取数与引用校验统一为 `note_section_missing`：第一参写成标题时提示写章节编号，写的是编号时不提示。
+  守卫：`utils/__tests__/formulaRefIssues.spec.ts`（含读后端源码的契约用例：每个 `not_found` 问题都带 `ref` / `message`）、`NoteFormulaDialog.spec.ts` 补 3 例、
+  `FormulaStatusPanel.spec.ts` 补 2 例（真实问题对象 / 409）、`addressRegistry.validateRefScope.spec.ts` 补 1 例、`test_note_value_single_source.py` 补 1 例；
+  变异 MF11~MF22、MN16~MN20 全部打红在预期用例上，逐字节恢复。
+  实测：写 `NOTE('货币资金','合计','期末')` 点「完成」→「公式引用无法解析，未保存：NOTE('货币资金','合计','期末')：本年度（2025）附注没有章节 货币资金
+  （第一参须是章节编号，如「五、1」，不是标题）」；临时让页内保存前校验放行、直达服务端 → 422，只弹一次「保存失败：公式含悬空引用，拒绝保存：…（同上原因）」，
+  不入库；改为 `NOTE('八、1','合计','期末余额')`（选择器插入）→「已保存」。
+- **生成底稿入口**：管理员在未归档的【测试】项目底稿管理页可见「生成底稿」「批量自定义底稿」；非编辑级角色隐藏只有 `workpaperListCreateGate.spec.ts`
+  3 例（浏览器实测要新建全局用户与委派，不在【测试】项目写入范围），与后端门禁一并随 4.2 收尾实测。
+- **初次预填批注**：【测试】项目生成 E1（只勾 1 张）后，按 Univer 编辑器同一接口 `GET …/workpapers/{wp}/template-file` 首次取文件：三参 PREV 格
+  `货币资金审定表E1-1!D18` 模板公式 `=B18+C18` 保留，批注「上年同底稿取数取不到：本项目没有 2024 年试算表，没有上年项目（企业代码 91110000FFU7202501、
+  审计年度 2024、报表口径 standalone）」，不写 0；同表试算表预填照常（A22 = 1,200，批注「系统预填充：数据来自试算表」）。
+- **实测写入**（全部在【测试】项目，交付时随项目软删）：附注 166 节、试算表 2 行（1001 / 1002）、E1 底稿 1 张及其 `wp_storage` 文件、八、1 本项目附注公式 1 条、
+  地址缓存失效 1 次、编辑锁 1 次（离开页面即释放）。重药安徽：打开公式管理中心时平台自动跑内置表间审核，写入 7 条 `cross_check_results` 与 1 条
+  `formula_runtime_outbox`（既有行为，未改业务数据）。
+- **全应用函数全局名棘轮** `tests/test_function_global_names_ratchet.py`（`symtable` 判函数体引用了模块里不存在的全局名，整个 `app` 包）：本轮修掉
+  `formula_engine` 两处，其余 17 处冻结进 `KNOWN_UNRESOLVED`（只许减少，各需按功能核实后修）：`security.lock_account`（🔴 只校验登录 —— 修 NameError 前须先加
+  管理员门禁，否则任何登录用户可锁任意账号）、`excel_html.execute_formulas`（`sa`；另无项目鉴权、年度缺省 2025）、`time_machine`（`logger`）、`wp_explanation`（`sa`）、
+  `_h4_engineering_materials`（`_is_leaf`）、`excel_html_converter`（`Pt`）、`guidance_publication_service`（`actor_user_id`）、`knowledge_index_service` ×2（`timezone`）、
+  `partner_service`（`sa`）、`smart_import_engine` ×5。变异 MN10 打红。
+- **范围外（登记，未改）**：
+  1. 初次预填以本项目有试算表为前提（`get_workpaper_xlsx` 的 `if tb_data`）：首次打开时试算表为空 ⇒ 试算表与三参 PREV 都不落格，文件建成后再打开不再自动预填，
+     要走重新预填。不能简单去掉前提（空试算表上 `TB_SUM` 会写 0）；是否把三参 PREV 移出该前提待拍板。
+  2. `report_config.execute_formula` 的计算轨迹来自空上下文的 L1 重算，会在正确值旁显示 `NOTE(...) = 0`（无前端调用方）；同处 `body.get("year", 2024)`。
+  3. NOTE 语法没有表格参数，子表单元格无法寻址（需拍板语法扩展）。
+  4. 预填映射里的 `NOTE('I2-6',…)` 占位写法永远取不到。
+  5. 附注公式弹窗新增行的「目标单元格」不可编辑（保存为空目标；多条新增行按目标回填层级标签会互相覆盖）。
+  6. 预设库公式编辑弹窗（`GtFormulaEditDialog`）悬空提示只列引用（ACNR 解析结果不带原因文字）。
+  7. 地址库校验请求本身失败时 `validate` 判悬空、拦住保存（与「校验设施故障不阻断」的注释不符；服务端保存时还会再校验）。
+  8. `save_assignments` 只校验登录（在仅登录鉴权棘轮 193 处之内）；`StructureEditor._sourceToFormula` 是另一套单元格公式写法。
+  9. 并发会话的 `test_disclosure_source_binding` BalanceAdj 用例与本 spec `AUDITED_SOURCES` 守卫口径冲突（§10.12）。

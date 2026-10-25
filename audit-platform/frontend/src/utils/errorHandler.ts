@@ -16,6 +16,7 @@
  */
 import { ElMessage, ElNotification } from 'element-plus'
 import { getLastTraceId } from '@/utils/http'
+import { refIssueDetailText } from '@/utils/formulaRefIssues'
 
 /** 错误分类枚举 */
 export type ApiErrorCategory = 'permission' | 'network' | 'backend_detail' | 'degraded'
@@ -44,7 +45,8 @@ export function classifyApiError(e: any): ApiErrorCategory {
 function detailText(detail: any): string {
   if (typeof detail === 'string') return detail.trim()
   if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
-    return String(detail.message || detail.msg || detail.error || '').trim()
+    // 公式引用校验 422：逐条列出「引用：原因」（原先只有「公式含悬空引用，拒绝保存」，底稿公式连这句都没有）
+    return (refIssueDetailText(detail) || String(detail.message || detail.msg || detail.error || '')).trim()
   }
   return ''
 }

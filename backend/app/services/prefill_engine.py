@@ -254,8 +254,7 @@ async def prefill_workpaper_real(
     from app.services.formula_engine import execute as fe_execute
 
     formula_texts = [f["original"].lstrip("=") for f in formulas_found]
-    ctx = await preload(db, project_id, year, formula_texts, adj_exclude_origins=frozenset(),
-                        template_type=getattr(wp, "template_type", None) or "soe")
+    ctx = await preload(db, project_id, year, formula_texts, adj_exclude_origins=frozenset())
 
     filled = 0
     errors = list(overlay_notes)

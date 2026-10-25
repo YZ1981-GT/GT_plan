@@ -67,6 +67,38 @@ export function mapAcnrCellsToPickerRows(cells: AcnrCellEntry[]): WpPickerRow[] 
   })
 }
 
+/** 附注目录节点（`GET /api/disclosure-notes/{project_id}/{year}` 返回的一项） */
+export interface NoteTreeItem {
+  note_section?: string | null
+  section_title?: string | null
+  account_name?: string | null
+}
+
+/**
+ * NOTE 引用写法：第一参是附注**章节编号**（`note_section`，如「五、1」），不是标题 ——
+ * 后端求值与保存时的引用校验都按章节编号查本项目附注，写标题恒取不到（spec formula-fetch-followup-defect-closure 7.2）。
+ * 列写「期末」：按期间语义匹配该表唯一的期末列；同一张表有多个期末列时，保存校验会提示写完整列名。
+ */
+export function noteSectionRef(section: string): string {
+  return `NOTE('${section.trim()}','合计','期末')`
+}
+
+/** 附注目录 → 弹窗行；没有章节编号的节点不列出（拼不出能取到数的引用） */
+export function mapNoteTreeToPickerRows(items: NoteTreeItem[]): WpPickerRow[] {
+  return (items || [])
+    .filter((n) => (n.note_section || '').trim())
+    .map((n) => {
+      const section = (n.note_section || '').trim()
+      return {
+        row_code: section,
+        row_name: n.section_title || n.account_name || '',
+        indent_level: 0,
+        formula: '',
+        _ref: noteSectionRef(section),
+      }
+    })
+}
+
 /** 与 FormulaEditDialog.filteredBrowserRows 一致 */
 export function filterWpBrowserRows(rows: WpPickerRow[], keyword: string): WpPickerRow[] {
   const kw = keyword.toLowerCase().trim()

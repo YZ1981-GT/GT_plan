@@ -222,3 +222,37 @@ describe('内置勾稽：同一次响应供树与问题清单', () => {
     expect(cc.execRun.value.executed).toBe(true)
   })
 })
+
+// spec formula-fetch-followup-defect-closure 7.2：原先规则表初值是一组写死的「示例规则」，读接口返回空集时不覆盖 ⇒
+// 冒充本项目规则显示，首次保存任何规则时被整组写库；示例里 NOTE 第一参写标题（应为章节编号）、CONSOL 不可执行。
+describe('不拿写死的示例冒充本项目规则', () => {
+  it('初始没有任何规则；读接口返回空集后仍为空（面板显示「尚无自定义规则」）', async () => {
+    const deps = makeDeps()
+    deps.api.get.mockImplementation(async (url: string) =>
+      String(url).includes('cross-check-rules') ? { rules: {}, loaded: {} } : { results: [] })
+    const cc = useCrossCheckRules(deps)
+    expect(cc.rulesMap.value).toEqual({})
+    await cc.loadExecItems()
+    expect(deps.api.get.mock.calls.map((c: any[]) => String(c[0]))).toContain('/api/projects/p1/formula/cross-check-rules')
+    expect(cc.rulesMap.value).toEqual({})
+  })
+
+  it('首次保存只写用户自己加的规则', () => {
+    const deps = makeDeps()
+    deps.api.put.mockResolvedValue({ rules: {}, loaded: {} })
+    const cc = useCrossCheckRules(deps)
+    cc.onAdd()
+    cc.form.value = { label: '我的规则', left_ref: "REPORT('BS-002','期末')", operator: '=',
+                      right_ref: "NOTE('五、1','合计','期末')", description: '' }
+    cc.onSave()
+    const payload = deps.api.put.mock.calls[0][1].rules
+    expect(Object.values(payload).flat().map((r: any) => r.label)).toEqual(['我的规则'])
+  })
+
+  it('读 / 存的响应是本项目全部规则：响应里没有的节点清空', () => {
+    const cc = useCrossCheckRules(makeDeps())
+    cc.rulesMap.value = { cross_report_wp: [{ label: '旧' }] }
+    cc.applyRulesData({ rules: { cross_report_note: [{ rule_id: 'r1', label: 'A' }] }, loaded: {} })
+    expect(Object.keys(cc.rulesMap.value)).toEqual(['cross_report_note'])
+  })
+})

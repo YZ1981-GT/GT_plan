@@ -363,6 +363,19 @@ def note_locate(table_data: Any, section: str, label: str, column: str, *,
     return rows[0], idx, headers, ""
 
 
+def note_section_hint(section: str) -> str:
+    """第一参写成标题（不含「、」，如「货币资金」）是最常见的写法错误：原因后面点明要写章节编号。
+
+    写的就是编号（如「五、9」）时返回空串，免得把「该章节已删除 / 本年度没有」误导成写法问题。
+    """
+    return "" if "、" in section else "（第一参须是章节编号，如「五、1」，不是标题）"
+
+
+def note_section_missing(year: int, section: str) -> str:
+    """本年度附注没有该章节的原因 —— 取数（``load_note_values``）与引用校验（``formula_ref_check``）同一文案。"""
+    return f"本年度（{year}）附注没有章节 {section}{note_section_hint(section)}"
+
+
 def _note_cell(table_data: Any, section: str, label: str, column: str) -> tuple[Decimal | None, str]:
     row, idx, headers, reason = note_locate(table_data, section, label, column)
     if row is None or idx is None:
@@ -371,6 +384,63 @@ def _note_cell(table_data: Any, section: str, label: str, column: str) -> tuple[
     if value is None:
         return None, f"附注 {section}「{label}」行「{headers[idx + 1]}」列为空或不是数值"
     return value, ""
+
+
+#: 一处 NOTE 引用的身份：``(章节, 行, 列)``；两参写法列为空串（= 第一个数据列）
+NoteRef = tuple[str, str, str]
+
+
+def note_ref_of(match: re.Match[str]) -> NoteRef:
+    """``NOTE_RE`` 的一个命中 → 引用身份（章节去空白；行 / 列原样，匹配时再去空白）。"""
+    return match.group(1).strip(), match.group(2), match.group(3) or ""
+
+
+def note_refs_in(expression: str) -> list[NoteRef]:
+    """表达式里全部 NOTE 引用（按出现顺序，含重复）。"""
+    return [note_ref_of(m) for m in NOTE_RE.finditer(expression or "")]
+
+
+def note_token(ref: NoteRef) -> str:
+    """引用身份 → 写法（提示文案用）：``NOTE('五、1','合计','期末')``，两参写法不带列。"""
+    section, label, column = ref
+    return f"NOTE('{section}','{label}','{column}')" if column else f"NOTE('{section}','{label}')"
+
+
+async def load_note_values(db: AsyncSession, project_id: uuid.UUID, year: int,
+                           refs: list[NoteRef]) -> tuple[dict[str, dict[str, Decimal]], dict[NoteRef, str]]:
+    """逐个取 NOTE 引用的本年度附注单元格 → ``(值, 原因)``。
+
+    ``值[章节][note_value_key(行, 列)]``；取不到的引用不代入 0，原因写进 ``原因[引用]``，由调用方决定报错还是按 0。
+    这是 NOTE 取数的唯一实现：严格代入（本模块）、报表求值（``report_engine``）、统一预载层（公式调试 / 预填）、
+    旧公式执行接口（``FormulaEngine.execute``）都调它，与引用校验（``formula_ref_check``）同一套匹配（``note_locate``）。
+    读库包在保存点里（失败不污染调用方事务）。
+    """
+    from app.services.formula_engine import note_value_key
+
+    values: dict[str, dict[str, Decimal]] = {}
+    missing: dict[NoteRef, str] = {}
+    wanted = list(dict.fromkeys(refs))
+    if not wanted:
+        return values, missing
+    tables: dict[str, tuple[bool, Any]] = {}
+    async with db.begin_nested():
+        for ref in wanted:
+            section, label, column = ref
+            if not section:
+                missing[ref] = "NOTE 第一参（附注章节编号，如「五、1」）为空"
+                continue
+            if section not in tables:
+                tables[section] = await _note_table_data(db, project_id, year, section)
+            exists, table_data = tables[section]
+            if not exists:
+                missing[ref] = note_section_missing(year, section)
+                continue
+            value, reason = _note_cell(table_data, section, label, column)
+            if value is None:
+                missing[ref] = reason
+            else:
+                values.setdefault(section, {})[note_value_key(label, column)] = value
+    return values, missing
 
 
 async def substitute_report_note_refs(expression: str, *, db: AsyncSession, project_id: uuid.UUID, year: int,
@@ -416,17 +486,13 @@ async def substitute_report_note_refs(expression: str, *, db: AsyncSession, proj
                     label = "本期" if kind == "current" else "上期"
                     put(m.group(0), None if amount is None else Decimal(str(amount)), f"报表行 {code} {label}金额为空")
 
-        note_cache: dict[str, tuple[bool, Any]] = {}
-        for m in NOTE_RE.finditer(text):
-            section, label, column = m.group(1).strip(), m.group(2), m.group(3) or ""
-            if section not in note_cache:
-                note_cache[section] = await _note_table_data(db, project_id, year, section)
-            exists, table_data = note_cache[section]
-            if not exists:
-                put(m.group(0), None, f"本年度（{year}）附注没有章节 {section}")
-                continue
-            value, reason = _note_cell(table_data, section, label, column)
-            put(m.group(0), value, reason)
+    note_hits = [(m.group(0), note_ref_of(m)) for m in NOTE_RE.finditer(text)]
+    if note_hits:
+        from app.services.formula_engine import note_value_key
+
+        values, missing = await load_note_values(db, project_id, year, [ref for _token, ref in note_hits])
+        for token, ref in note_hits:
+            put(token, values.get(ref[0], {}).get(note_value_key(ref[1], ref[2])), missing.get(ref, ""))
 
     for m in _LEFTOVER_REPORT_NOTE_RE.finditer(out.expression):
         out.missing.append(f"{m.group(1)} 写法无法识别（ROW 需「行次」，SUM_ROW 需「起, 止」，"

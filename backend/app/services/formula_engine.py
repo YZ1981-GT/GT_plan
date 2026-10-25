@@ -985,15 +985,25 @@ def _handle_adj(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decim
     return val
 
 
+def note_value_key(label: str, column: str) -> str:
+    """NOTE 预载值在 ``ctx.note_data[章节]`` 里的键：行 + 列（两参写法列为空串 = 第一个数据列）。
+
+    预载（``formula_ref_preload.load_note_values``，NOTE 取数的唯一实现）按本键存值，本模块 ``_handle_note`` 按本键取值；
+    单一来源，两侧同函数计算（同 ``aux_ref_key``）。原先只按第二参存取：同章节同行不同列（期末 / 期初）会撞成一个值。
+    """
+    return f"{(label or '').strip()}\x1f{(column or '').strip()}"
+
+
 def _handle_note(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """NOTE('section','field','column') — 附注数据取值"""
+    """NOTE('section','row','column') — 附注数据取值：先取预载键（行 + 列），没有时退回旧口径 ``note_data[章节][第二参]``。"""
     str_args = _extract_string_args(args, ctx, trace)
-    section = str_args[0] if str_args else ''
+    section = (str_args[0] if str_args else '').strip()
     field_name = str_args[1] if len(str_args) > 1 else ''
-    col_name = str_args[2] if len(str_args) > 2 else ctx.default_column
+    column = str_args[2] if len(str_args) > 2 else ''
     section_data = ctx.note_data.get(section, {})
-    val = section_data.get(field_name, Decimal("0"))
-    trace.append(f"NOTE('{section}','{field_name}','{col_name}') = {val}")
+    key = note_value_key(field_name, column)
+    val = section_data[key] if key in section_data else section_data.get(field_name, Decimal("0"))
+    trace.append(f"NOTE('{section}','{field_name}','{column or ctx.default_column}') = {val}")
     return val
 
 
@@ -1809,21 +1819,19 @@ class FormulaEngine:
                     logger.warning("FormulaEngine 预载 WP('%s','%s') 失败: %s", wc, col, exc)
                     wp_data[wc][col] = Decimal("0")
 
-        note_refs = _extract_note_refs(formula_str)
+        # NOTE：按章节 / 行 / 列取本年度附注（唯一实现 formula_ref_preload.load_note_values）；取不到按 0 求值但写进
+        # warnings（原先经 NOTEExecutor：未导入 sa ⇒ NameError 被吞、恒 0 且无任何提示）。
+        warnings: list[str] = []
+        from app.services.formula_ref_preload import load_note_values, note_refs_in, note_token
+
+        note_refs = note_refs_in(formula_str)
         if note_refs:
-            seen_note: set[tuple[str, str]] = set()
-            for section, field_name in note_refs:
-                if (section, field_name) in seen_note:
-                    continue
-                seen_note.add((section, field_name))
-                if section not in note_data:
-                    note_data[section] = {}
-                try:
-                    val = await NOTEExecutor.execute(db, project_id, year, section, field_name)
-                    note_data[section][field_name] = Decimal(str(val)) if val is not None else Decimal("0")
-                except Exception as exc:
-                    logger.warning("FormulaEngine 预载 NOTE('%s','%s') 失败: %s", section, field_name, exc)
-                    note_data[section][field_name] = Decimal("0")
+            try:
+                note_data, note_missing = await load_note_values(db, project_id, year, note_refs)
+            except Exception as exc:
+                logger.warning("FormulaEngine 预载 NOTE 失败: %s", exc)
+                note_missing = {ref: f"取数失败：{exc}" for ref in note_refs}
+            warnings += [f"{note_token(ref)} 取不到数，按 0 计算：{why}" for ref, why in note_missing.items()]
 
         # 构建完整 FormulaContext（含 wp_data / note_data）
         ctx = FormulaContext.from_simple_map(tb_map, {}, adj_map=adj_map)
@@ -1833,7 +1841,6 @@ class FormulaEngine:
         val = formula_result.value
 
         # ── 父子双算显式告警（R7.5：不改口径但必须让调用方知道） ──────────────
-        warnings: list[str] = []
         if _has_parent_child_overlap(tb_map):
             msg = (
                 f"{PARENT_CHILD_DOUBLE_COUNT_WARNING}"
@@ -2127,95 +2134,43 @@ class WPExecutor:
 
 
 class REPORTExecutor:
-    """REPORT 函数执行器：从 financial_report 取数
+    """REPORT 函数执行器：按行次取本年度已生成报表的本期金额（取不到 ⇒ ``None``，不代入 0）。
 
-    语法: REPORT('BS','BS-001')
-    从已生成的报表数据中按报表类型和行次编码取数。
+    口径同严格代入（``formula_ref_preload.load_report_rows``）。原实现引用了本模块从未导入的 ``sa`` ⇒ NameError
+    被自身 ``except`` 吞掉、恒返回 0（spec formula-fetch-followup-defect-closure 7.2 发现）；行次在各报表间唯一，
+    ``report_type`` 只为兼容旧签名保留。
 
     Requirements: 39.1
     """
 
     @staticmethod
     async def execute(db, project_id, year: int, report_type: str, row_code: str):
-        """Fetch value from financial_report."""
-        from decimal import Decimal as D
+        """本年度报表 ``row_code`` 行的本期金额；报表未生成 / 没有该行 / 金额为空 ⇒ ``None``。"""
+        from app.services.formula_ref_preload import load_report_rows
 
-        try:
-            result = await db.execute(
-                sa.text("""
-                    SELECT current_period_amount
-                    FROM financial_report
-                    WHERE project_id = :pid
-                      AND year = :year
-                      AND report_type = :rtype
-                      AND row_code = :rcode
-                      AND is_deleted = false
-                    LIMIT 1
-                """),
-                {
-                    "pid": str(project_id),
-                    "year": year,
-                    "rtype": report_type,
-                    "rcode": row_code,
-                },
-            )
-            row = result.fetchone()
-            if row and row[0] is not None:
-                return D(str(row[0]))
-            return D("0")
-        except Exception:
-            return D("0")
+        rows = await load_report_rows(db, project_id, year)
+        current = rows.get((row_code or "").strip(), (None, None))[0]
+        return None if current is None else Decimal(str(current))
 
 
 class NOTEExecutor:
-    """NOTE 函数执行器：从其他附注章节取数（交叉引用）
+    """NOTE 函数执行器：按章节 / 行 / 列取本年度附注单元格（取不到 ⇒ ``None``，不代入 0）。
 
-    语法: NOTE('五、（一）1','合计')
-    从已生成的附注数据中按章节编码取数。
+    语法: ``NOTE('五、1','合计')`` / ``NOTE('五、1','银行存款','期初')``。委托 NOTE 取数的唯一实现
+    ``formula_ref_preload.load_note_values``（与引用校验同一套匹配）。原实现引用了未导入的 ``sa`` ⇒ NameError 被吞、
+    恒返回 0，且忽略行和列、一律取合计行第一列（spec formula-fetch-followup-defect-closure 7.2 发现）。
 
     Requirements: 39.1
     """
 
     @staticmethod
-    async def execute(db, project_id, year: int, section_code: str, field_name: str = "合计"):
-        """Fetch value from another note section (cross-reference)."""
-        from decimal import Decimal as D
+    async def execute(db, project_id, year: int, section_code: str, field_name: str = "合计", column: str = ""):
+        """附注单元格的数值；章节 / 行 / 列找不到或单元格为空 ⇒ ``None``。"""
+        from app.services.formula_ref_preload import load_note_values
 
-        try:
-            result = await db.execute(
-                sa.text("""
-                    SELECT table_data
-                    FROM disclosure_notes
-                    WHERE project_id = :pid
-                      AND year = :year
-                      AND note_section = :section
-                      AND is_deleted = false
-                    LIMIT 1
-                """),
-                {
-                    "pid": str(project_id),
-                    "year": year,
-                    "section": section_code,
-                },
-            )
-            row = result.fetchone()
-            if row and row[0]:
-                table_data = row[0]
-                rows = table_data.get("rows", []) if isinstance(table_data, dict) else []
-                for r in rows:
-                    if isinstance(r, dict) and r.get("is_total"):
-                        values = r.get("values", [])
-                        if values and values[0] is not None:
-                            return D(str(values[0]))
-                if rows:
-                    last_row = rows[-1]
-                    if isinstance(last_row, dict):
-                        values = last_row.get("values", [])
-                        if values and values[0] is not None:
-                            return D(str(values[0]))
-            return D("0")
-        except Exception:
-            return D("0")
+        ref = ((section_code or "").strip(), field_name or "", column or "")
+        values, _missing = await load_note_values(db, project_id, year, [ref])
+        return values.get(ref[0], {}).get(note_value_key(ref[1], ref[2]))
 
 
 def _validate_custom_expression(expression: str) -> bool:

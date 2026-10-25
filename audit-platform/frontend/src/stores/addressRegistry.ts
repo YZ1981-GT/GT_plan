@@ -66,7 +66,8 @@ export interface ResolveResult {
 
 export interface ValidateResult {
   valid: boolean
-  issues: Array<{ ref: string; reason: string }>
+  /** 与后端 `validate_formula_refs` 同形：原因文案在 `message`，`status` / `reason` 是状态码（`not_found`） */
+  issues: Array<{ ref: string; message?: string; uri?: string; status?: string; reason?: string }>
   formula: string
 }
 
@@ -392,7 +393,7 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
       })
       return data
     } catch {
-      return { valid: false, issues: [{ ref: formula, reason: '校验请求失败' }], formula }
+      return { valid: false, issues: [{ ref: formula, message: '校验请求失败' }], formula }
     }
   }
 

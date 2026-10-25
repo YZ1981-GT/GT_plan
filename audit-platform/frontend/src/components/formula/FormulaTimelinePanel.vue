@@ -48,7 +48,7 @@
 import { computed, ref, watch } from 'vue'
 import { api } from '@/services/apiProxy'
 import { formulaTimeline } from '@/services/apiPaths/formula'
-import { handleApiError } from '@/utils/errorHandler'
+import { formulaErrorText } from '@/composables/formula/useFormulaSettings'
 
 const props = defineProps<{
   projectId: string
@@ -69,11 +69,13 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const data = await api.get(formulaTimeline.list(props.projectId, props.year))
+    // 错误由本面板自己显示：请求带 _silent；原先 handleApiError(e, { silent: true }) 把对象当操作名、返回 void ⇒
+    // 弹「[object Object]：…」且面板只剩「加载失败」（spec formula-fetch-followup 7.2）
+    const data = await api.get(formulaTimeline.list(props.projectId, props.year), { _silent: true } as any)
     events.value = data.events || []
     eventTypes.value = data.event_types || {}
   } catch (e: any) {
-    error.value = handleApiError(e, { silent: true }) || '加载失败'
+    error.value = formulaErrorText(e, '加载失败')
   } finally {
     loading.value = false
   }

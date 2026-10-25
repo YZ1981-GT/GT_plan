@@ -123,20 +123,16 @@ const COMPONENT_REFS: Record<string, string[]> = {
     "ROW('BS-001')",
     "SUM_ROW('BS-002','BS-010')",
     "REPORT('BS-002','期末')",
-    "NOTE('货币资金','合计','期末')",
+    "NOTE('五、1','合计','期末')", // noteSectionRef：第一参是附注章节编号（原先拼标题，取不到数）
     "WP('E1-1','审定数')", // 2 参语义列
     "AUX('1122','客户A','期末')",
     "PREV('BS-002','期末')", // 2 参 tb 域
     "WP('D2','明细表D2-2','E100')", // mapAcnrCellsToPickerRows 透传的 3 参
   ],
-  // FormulaManagerDialog.vue — recomputeFormulaRow (TB) + crossCheckRulesMap 默认引用
+  // FormulaManagerDialog.vue — recomputeFormulaRow (TB)。表间审核写死的示例规则（REPORT / NOTE 标题 / WP 等）已删除：
+  // 它们冒充本项目规则并在首次保存时被写库，NOTE 用标题取不到数（spec formula-fetch-followup-defect-closure 7.2）
   FormulaManagerDialog: [
     "TB('1001','期末余额')",
-    "REPORT('BS-002','期末')",
-    "REPORT('IS-002','本期')",
-    "NOTE('货币资金','合计','期末')",
-    "WP('E1-1','审定数')",
-    "WP('D2-1','审定数')",
   ],
   // FormulaBar.vue — loadTbRows / loadReportRows / loadNoteRows / loadWpRows
   FormulaBar: [

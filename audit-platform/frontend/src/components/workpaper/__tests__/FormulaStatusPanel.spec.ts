@@ -277,6 +277,42 @@ describe('FormulaStatusPanel', () => {
     )
   })
 
+  it('422 FORMULA_REF_NOT_FOUND 真实问题对象 → 「引用：原因」，不是「[object Object]」（spec formula-fetch-followup 7.2）', async () => {
+    // 后端 `acnr/formula_validation._make_wp_issue` 的形状（上一条用例的字符串问题与真实契约不符，所以漏掉了）
+    const issue = {
+      ref: "WP('X9','X9-1','Z1')", uri: 'wp://X9/X9-1#Z1', status: 'not_found', reason: 'not_found',
+      message: '引用地址 wp://X9/X9-1#Z1 在当前项目中不存在',
+    }
+    mockApiGet.mockResolvedValue(fullResponse())
+    mockApiPut.mockRejectedValue({ response: { status: 422, data: { detail: { error_code: 'FORMULA_REF_NOT_FOUND', issues: [issue] } } } })
+    const wrapper = mountPanel()
+    await flushPromises()
+    await findBtnByText(wrapper, '编辑')[0].trigger('click')
+    await flushPromises()
+    await findBtnByText(wrapper, '保存')[0].trigger('click')
+    await flushPromises()
+
+    const text = String(mockError.mock.calls[0]?.[0])
+    expect(text).toContain(`${issue.ref}：${issue.message}`)
+    expect(text).not.toContain('[object Object]')
+  })
+
+  it('409 版本冲突 → 显示后端说明（原先一律「请检查公式表达式」）', async () => {
+    mockApiGet.mockResolvedValue(fullResponse())
+    mockApiPut.mockRejectedValue({ response: { status: 409, data: { detail: {
+      error_code: 'FORMULA_VERSION_CONFLICT', message: '公式已被他人修改（版本不一致），请刷新后重试。',
+    } } } })
+    const wrapper = mountPanel()
+    await flushPromises()
+    await findBtnByText(wrapper, '编辑')[0].trigger('click')
+    await flushPromises()
+    await findBtnByText(wrapper, '保存')[0].trigger('click')
+    await flushPromises()
+
+    expect(mockWarning).toHaveBeenCalledWith('公式已被他人修改（版本不一致），请刷新后重试。')
+    expect(mockError).not.toHaveBeenCalled()
+  })
+
   it('恢复默认 → DELETE 对应 formula id（R5.4）', async () => {
     mockApiGet.mockResolvedValue(fullResponse())
     mockApiDelete.mockResolvedValue({ deleted: 'f-1' })

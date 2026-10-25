@@ -79,7 +79,7 @@
 import { ref, computed, watch } from 'vue'
 import { api } from '@/services/apiProxy'
 import { formulaDebug } from '@/services/apiPaths/formula'
-import { handleApiError } from '@/utils/errorHandler'
+import { formulaErrorText } from '@/composables/formula/useFormulaSettings'
 
 const props = defineProps<{
   /** 外部传入的公式文本（来自 FormulaEditDialog 的编辑区） */
@@ -113,19 +113,22 @@ async function onRun() {
   running.value = true
   result.value = null
   try {
+    // 错误由本面板自己显示：请求带 _silent，免得全局拦截器先弹一次
     const data = await api.post(formulaDebug.run(), {
       formula: f,
       project_id: props.projectId,
       year: props.year,
       scope: props.scope || 'report',
-    })
+    }, { _silent: true } as any)
     result.value = data
     emit('ran', data)
   } catch (e: any) {
+    // 原先写 handleApiError(e, { silent: true }) || '请求失败'：它的第二参是上下文文案、返回 void ⇒
+    // 弹一条「[object Object]：…」提示，面板里永远只剩「请求失败」，真实原因丢了（spec formula-fetch-followup 7.2）
     result.value = {
       ok: false,
       state: 'error',
-      errors: [handleApiError(e, { silent: true }) || '请求失败'],
+      errors: [formulaErrorText(e, '调试运行失败')],
       trace: [],
     }
   } finally {

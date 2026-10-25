@@ -248,7 +248,7 @@
       "ui_toolbar_gate_second_level": null,
       "extra_unrelated_segmented_sites": [
         "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L27",
-        "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjudication.vue#L386"
+        "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjudication.vue#L391"
       ],
       "extra_unrelated_segmented_note": "🔴 全 J 域 `el-segmented` 共 3 处，只有宿主 #L10 那处是模式切换器；J1TabGeneralCheck.vue#L27 与 J2TabAdjudication.vue#L386 是 Tab 内部的分段控件。全文件 grep 会把它们误判成第二个模式切换器 ⇒ 判据必须先按 ui_toolbar_gate 声明的锚点截出工具栏区块再看。",
       "notice_mounted": false,
@@ -925,7 +925,7 @@
         "owner_module": "六个 J2 子 Tab 各自的组件局部 `KEY` 对象",
         "owner_constant": "KEY",
         "owner_constant_sources": [
-          "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjudication.vue#L45",
+          "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjudication.vue#L46",
           "audit-platform/frontend/src/components/workpaper/j2/J2TabDetail.vue#L35",
           "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjustment.vue#L30",
           "audit-platform/frontend/src/components/workpaper/j2/J2TabAccrualCheck.vue#L31",
