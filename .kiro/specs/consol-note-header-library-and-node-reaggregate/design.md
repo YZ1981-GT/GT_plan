@@ -779,3 +779,35 @@ V202（`V202__consol_note_mapping_reuse_and_reference.sql`，spec consol-note-ma
 **该守卫要真正变绿需要的后续工作**（登记，不在本批）：① D 类 84 条 = 主规则的 `table` 写的是子表名 / 不是章节标题，须逐条改成章节级或补 `table_by_template`；② 引擎缺 `fields_by_template` ⇒ 两版列键不同的表无法用一条规则覆盖，正解是加该能力或给 soe 建同名兄弟规则（`target` 键含 `section_by_template`，两版章节不同不算撞目标）；③ C 类 32 条须先导入银行存款 / 现金明细。
 
 **数据清理**：上市验证用的是**【测试】项目**（`4c77f3e8` 【测试】公式同步甲有限公司_2025），其附注为本次新建；两个国企项目是用户点名的真实项目，重建后数据即新基线，备份保留可回滚。
+
+### 17.10 批 9b-2 提交推送（2026-10-25）
+
+提交 `07bbbc4e1`（parent `a15d5590e`）→ `spec/disclosure-note-doc-upload-and-batch-fill`，`git ls-remote` 核对远端 SHA 逐字符一致。
+
+**私有索引只收本会话文件**（主工作树同时有 4+ 并发会话的未提交改动，全仓 `git status` 307 条）：现扫分类 MINE 135 / SHARED 4 / 他会话 233。提交 138 项 = 131 改或新增 + 4 删 + 3 共享。
+
+| 共享文件 | 本提交内容 | 核对 |
+|---|---|---|
+| `.kiro/specs/INDEX.md` | HEAD blob + 仅第 9 行（本 spec 条目改 `56/59 → 59/61`、`批 9b-2 待做 → 已推送`、追加 ⑦ 要点） | 1093 行不变、仅 1 行差异、`+1/-1` 单 hunk、U+FFFD 0 |
+| `.kiro/steering/conventions.md` | 工作树版（其 diff 只有本会话 2 个 hunk） | `+2/-2`、2 hunk、断言两个本会话锚点在位 |
+| `backend/scripts/file_size_whitelist.txt` | HEAD + 本会话 19 行登记 | `+19/-0`、他会话 20 行未带入 |
+| `.kiro/steering/memory.md` | **HEAD 原样** | 工作树 4 个 hunk 经「本会话关键词 + spec 名」双向核对 **0 条属本会话**（涉 7 个他会话 spec） |
+
+**远端前移后重建**：`fetch` 发现远端已到 `a15d5590e`（他会话「23 个 schema 漂移 + 企业预设离线可启用」，7 文件），我的父是 `58f7afb42` ⇒ 非 fast-forward。先验证 4 个共享文件在两个 base 上 blob 完全相同、他会话 7 文件与我的 135 个零重叠，再以 `a15d5590e` 为底重建；新树 vs 旧树只差那 7 个文件，我的 138 项原样。**没有用 force push，也没有改写他会话的提交。**
+
+**门禁**（干净 detached worktree，检出后 `git status` 0 条）：
+
+| 项 | 结果 |
+|---|---|
+| `gitleaks`（`--log-opts` 限本提交） | 1 commit scanned、**no leaks** |
+| `check_file_size.py` | 115 个 `.py/.vue/.ts` exit 0 |
+| U+FFFD | 115 个文件命中 0 |
+| `check_note_template_ratchet.py` | exit 0 |
+
+🔴 `gitleaks detect` 不加 `--log-opts` 会扫全量历史（2364 commits / 599 MB / 4 分 17 秒）报 **1233 leaks** 并因 docx 二进制解析失败刷一堆 `docx2txt.pl` 报错 —— 那是**仓库预存噪声**，与本批无关。pre-commit 钩子用的是 `gitleaks protect --staged`（增量口径），复核提交时的等价写法是 `--log-opts <base>..<commit>`。**不要拿全量结果当本次结论**。
+
+**主工作树对齐**（否则我这 135 个文件仍显示「未提交」，下一个会话 `git add -A` 会把它们当新改动重复带入，或 `git checkout -- .` 清掉）。三道前置校验任一不过即中止、不做任何修改：① HEAD 仍是 `58f7afb42`（并发会话移动过就中止）② 他会话 7 文件在主工作树干净（否则不能 `checkout`）③ 我的 135 文件工作树内容逐字节等于已推送提交（`hash-object --path` 逐个比 blob SHA）。然后 `git add -A -- <我的路径>` → `git update-ref` 带 **old-value CAS** → `git checkout <commit> -- <他会话 7 文件>`。结果：HEAD `07bbbc4e1`、我的文件 status **0** 条、他会话 7 文件 **0** 条、`ahead/behind 0 0`、暂存区对 HEAD **为空**（不代他会话暂存）。全程未用 `git stash`、未在共享终端设 `GIT_*` 变量（git 全走子进程显式传 env）。
+
+🔴 **`update-ref` 之后还有一步必须做，漏了就等于没推**：HEAD 前移后，索引对 3 个共享路径仍是**旧提交**的内容 ⇒ `git status` 显示 `MM`，并发会话一 `git commit`（只提交已暂存的）就会**把我的改动回退**。处置 = `git reset -- <3 路径>`（索引对齐 HEAD，他会话的工作树编辑保留为未暂存）+ 把我那行**幂等**改写进工作树 `INDEX.md`（它是「旧内容 + 他会话 3 行编辑」，缺我那行；改写后 CRLF 与 1096 行不变、U+FFFD 0）。核对三处（HEAD blob / 索引 blob / 工作树）我那行同时在位。这正是 `deliverable-writeback` 轮记下的教训「用 commit-tree / update-ref 前移已检出的分支后，必须 `git reset -- <这些路径>` 对齐主工作区暂存区」—— **本轮如果只做到推送成功就收工，我的 INDEX.md 与 conventions.md 改动会在他会话下一次提交时被静默回退**。
+
+**顺带登记（非本批引入）**：`INDEX.md` 含 **7 个 U+0085（NEL）**，在基线 `58f7afb42` 上逐值相同、我那行一个都没有 ⇒ 预存。它会让 `splitlines()` 比 `split("\n")` 多出 6 行（1099 vs 1093）—— 又一例方法论铁律⑩「行数口径统一 `len(text.split("\n"))`」：本轮我自己先用 `splitlines()` 量了一次，差 6 行差点被当成「提交把文件弄短了」。
