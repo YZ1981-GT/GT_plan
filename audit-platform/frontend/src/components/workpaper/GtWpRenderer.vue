@@ -43,6 +43,13 @@
         </el-result>
       </div>
 
+      <!-- applicable_when 裁剪：项目类型不匹配此底稿 -->
+      <div v-else-if="isWpNotApplicable" class="gt-wp-renderer__not-applicable">
+        <el-result icon="info" title="不适用">
+          <template #sub-title>当前项目类型不适用此底稿</template>
+        </el-result>
+      </div>
+
       <template v-else>
       <WorkpaperBackgroundMergeBanner :wp-id="wpId" />
       <el-alert
@@ -394,6 +401,7 @@ import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
 import { useWorkpaperScaffold } from '@/components/workpaper/composables/useWorkpaperScaffold'
 import WorkpaperBackgroundMergeBanner from '@/components/workpaper/sync/WorkpaperBackgroundMergeBanner.vue'
 import { isBackgroundMerging } from '@/components/workpaper/sync/backgroundMergeRegistry'
+import { isIpoProject } from '@/utils/ipoProjectUtils'
 
 // ─── Types ───
 export interface SavePayload {
@@ -502,6 +510,19 @@ const redirectHint = computed(() => {
 function handleRedirectNavigation() {
   const targetPath = renderConfig.value?.target_path
   const projectId = renderConfig.value?.project_id
+
+// ─── applicable_when 裁剪覆盖层（S 类 IPO/上市/新三板/再融资等专项底稿） ───
+const isWpNotApplicable = computed<boolean>(() => {
+  const aw = renderConfig.value?.applicable_when
+  if (!aw || typeof aw !== 'object') return false
+  const cats = (aw as Record<string, string[]>).business_category
+  if (!cats?.length) return false
+  // 从项目上下文取 business_category（render-config 注入的 project_context 或 project API）
+  const projectBiz: string =
+    (renderConfig.value as any)?.project_context?.business_category ||
+    ''
+  return !isIpoProject(projectBiz, cats)
+})
   if (targetPath) {
     // target_path may already contain full route (e.g. /projects/{id}/confirmation)
     // or relative path (e.g. /materiality) needing project prefix

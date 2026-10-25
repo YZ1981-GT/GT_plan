@@ -69,6 +69,17 @@ def match_workpapers(
         elif m.get("trigger") == "conditional":
             applies_when = m.get("applies_when")
             hit = bool(applies_when and project_flags.get(applies_when))
+        elif m.get("applicable_when"):
+            aw = m["applicable_when"]
+            # 各键之间 OR：business_category / industry 等，任一键命中即 hit
+            _KEY_FLAG_PREFIX = {"business_category": "biz_", "industry": "ind_"}
+            for key, values in aw.items():
+                prefix = _KEY_FLAG_PREFIX.get(key, f"{key}_")
+                if any(project_flags.get(f"{prefix}{v}") for v in values):
+                    hit = True
+                    break
+            else:
+                hit = False
         else:
             hit = False
         if hit:

@@ -44,6 +44,8 @@ export function useF2SpecialFormData(options: { wpId: Ref<string>; projectId: Re
 
   // IPO 专项适用性：项目详情接口实际返回 project_type（annual/ipo/…）与
   // template_type（listed/soe），business_category 仅作历史兼容兜底。
+  // 注意：本 computed 是 F2 的三级瀑布 wrapper（project_type→template_type→中文 IPO_CATEGORIES），
+  // 核心 IPO 判定统一来源在 @/utils/ipoProjectUtils.isIpoProject。
   const isIpoProject = computed(() => {
     const ctx = projectContext.value
     if (ctx.project_type === 'ipo') return true
