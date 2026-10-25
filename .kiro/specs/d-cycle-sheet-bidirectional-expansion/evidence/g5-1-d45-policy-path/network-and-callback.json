@@ -1,0 +1,74 @@
+{
+  "script": "e2e/g5-1-d45-policy-path.spec.ts",
+  "captured_at": "2026-09-13T11:35:00.434Z",
+  "scope": {
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+    "entry_id": "xlsx/gt-d4-operating-revenue"
+  },
+  "predicates": {
+    "user_sync_requests": [
+      {
+        "method": "GET",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/materialize",
+        "status": 200
+      }
+    ],
+    "forcesave_hits": [],
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "callback_url_redacted": "http://host.docker.internal:9980/api/workpaper-sync/rooms/1ee2851e-f081-46e0-90ad-4ca709566bab/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
+    "host_mounted": true,
+    "confirm_descriptor_200": true,
+    "forcesave_clicked": false,
+    "oo_cell_dirty_attempted": false,
+    "host_dirty_before_forcesave": false,
+    "forcesave_cs_error": null,
+    "forcesave_cs_outcome": null,
+    "forcesave_http_status": null,
+    "forcesave_body_keys": null,
+    "materialize_room_id": "1ee2851e-f081-46e0-90ad-4ca709566bab",
+    "materialize_has_jwt_token": true,
+    "doc_editor_called": false,
+    "doc_editor_has_root_token": false,
+    "doc_editor_document_mutable": false,
+    "host_status": "OnlyOffice 编辑中",
+    "host_error": "",
+    "confirm_forcesave_error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveAttribute\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid=\"wp-sync-host\"]')\nExpected: \u001b[32m\"oo_editing\"\u001b[39m\nReceived: \u001b[31m\"\"\u001b[39m\nTimeout:  30000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveAttribute\" with timeout 30000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid=\"wp-sync-host\"]')\u001b[22m\n\u001b[2m    62 × locator resolved to <div data-v-17d632fd=\"\" data-v-412af136=\"\" data-testid=\"wp-sync-host\" class=\"wp-sync-editor-hos",
+    "html_dom_roundtrip": {
+      "attempted": false,
+      "marker": null,
+      "switched_to_html": false,
+      "marker_visible": false
+    },
+    "oo_write_target": "A18",
+    "oo_cell_edit_probe": null,
+    "http_errors": []
+  },
+  "notes": [
+    "token/JWT/route_credential 值已脱敏",
+    "OO 写格：Asc.editor 写受管 A18(biz_name)；权威判据是 forcesave cs_error（0=有变更，4=no_changes）",
+    "application applied / revision+1 由同目录 DB 核查脚本补齐（venv 查库）",
+    "§9.6 条件 6：切回结构化视图后扫 .d4-policy-check 分组输入（排除 .mode-bar）",
+    "D4-5 独立宿主：D4TabPolicyCheck 自管 bridge，sheet_key=d45-managed；不并入父级 isD4DetailSheet"
+  ],
+  "auth_probe": {
+    "has_token": true
+  }
+}

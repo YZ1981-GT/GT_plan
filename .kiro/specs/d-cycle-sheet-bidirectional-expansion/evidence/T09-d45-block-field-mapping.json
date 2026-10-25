@@ -1,0 +1,161 @@
+{
+  "measured_at": "2026-09-13",
+  "tool": "openpyxl data_only=False",
+  "template_path": "backend/wp_templates/D/D4 收入底稿.xlsx",
+  "decision": "paragraph_block_bidirectional",
+  "mapping_digest": "5e261da248cb0df23ba45f562099c1fdfdb450130df96022fb41ec4275f12eee",
+  "digest_payload": {
+    "managed_sheet": "营业收入会计政策检查D4-5",
+    "template_sha256": "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f",
+    "layout": "paragraph_block_bidirectional",
+    "uuid_column": "Z",
+    "fixed_fields": [
+      {
+        "store_item": "D4-5-biz-scene",
+        "column_key": "biz_scene",
+        "cell": "B11",
+        "label_cell": "A11"
+      },
+      {
+        "store_item": "D4-5-biz-order",
+        "column_key": "biz_order",
+        "cell": "B12",
+        "label_cell": "A12"
+      },
+      {
+        "store_item": "D4-5-biz-produce",
+        "column_key": "biz_produce",
+        "cell": "B13",
+        "label_cell": "A13"
+      },
+      {
+        "store_item": "D4-5-biz-sales",
+        "column_key": "biz_sales",
+        "cell": "B14",
+        "label_cell": "A14"
+      },
+      {
+        "store_item": "D4-5-biz-pricing",
+        "column_key": "biz_pricing",
+        "cell": "B15",
+        "label_cell": "A15"
+      },
+      {
+        "store_item": "D4-5-biz-delivery",
+        "column_key": "biz_delivery",
+        "cell": "B16",
+        "label_cell": "A16"
+      },
+      {
+        "store_item": "D4-5-credit-policy",
+        "column_key": "credit_policy",
+        "cell": "A48",
+        "anchor_marker": "（三）信用政策",
+        "anchor_row_template": 47,
+        "content_offset": 1
+      },
+      {
+        "store_item": "D4-5-audit-note",
+        "column_key": "audit_note",
+        "cell": "A52",
+        "anchor_marker": "三、审计说明",
+        "anchor_row_template": 51,
+        "content_offset": 1
+      },
+      {
+        "store_item": "D4-5-audit-conclusion",
+        "column_key": "audit_conclusion",
+        "cell": "A56",
+        "anchor_marker": "四、审计结论",
+        "anchor_row_template": 55,
+        "content_offset": 1
+      }
+    ],
+    "policy_group_block": {
+      "store_item": "D4-5-policy-groups",
+      "table_key": "d45_policy_groups",
+      "row_identity_key": "id",
+      "section_marker": "（二）会计政策",
+      "section_row_template": 17,
+      "insert_before_marker": "3.……",
+      "insert_before_row_template": 45,
+      "next_section_marker": "（三）信用政策",
+      "block_row_span": 13,
+      "fields": [
+        {
+          "column_key": "bizName",
+          "col": "A",
+          "offset_in_block": 0,
+          "role": "title"
+        },
+        {
+          "column_key": "revenuePolicy",
+          "col": "A",
+          "offset_in_block": 2,
+          "role": "content",
+          "note": "first blank under （1） header at +1"
+        },
+        {
+          "column_key": "industryPolicy",
+          "col": "A",
+          "offset_in_block": 6,
+          "role": "content"
+        },
+        {
+          "column_key": "rationalityAnalysis",
+          "col": "A",
+          "offset_in_block": 10,
+          "role": "content"
+        }
+      ],
+      "template_groups": [
+        {
+          "ordinal": 0,
+          "title_row": 18,
+          "title": "1.销售商品收入",
+          "revenue_row": 20,
+          "industry_row": 24,
+          "rationality_row": 28,
+          "uuid_cell": "Z18"
+        },
+        {
+          "ordinal": 1,
+          "title_row": 31,
+          "title": "2.贸易业务",
+          "revenue_row": 33,
+          "industry_row": 37,
+          "rationality_row": 41,
+          "uuid_cell": "Z31"
+        }
+      ]
+    },
+    "readonly_mask": [
+      {
+        "cell": "A5",
+        "reason": "section_header"
+      },
+      {
+        "cell": "A6",
+        "reason": "audit_objective_fixed"
+      },
+      {
+        "cell": "A58",
+        "reason": "tip1"
+      },
+      {
+        "cell": "A59",
+        "reason": "tip2"
+      }
+    ],
+    "host_path": "D4TabPolicyCheck_own_dualMode_not_isD4DetailSheet"
+  },
+  "notes": [
+    "模板正文几乎仅 A 列标签；经营模式 6 项约定内容写入 B11-B16（标签 A 只读）",
+    "政策分组：块高 13 行（组0:18-30；组1:31-43）；内容取 （1）（2）（3）标题下首空行",
+    "新组插入锚：A 列「3.……」（模板 R45）之前；插删后信用/说明/结论按 marker 重定位",
+    "UUID 列 Z 写在块首行（标题行）；HTML PolicyGroup.id 对齐",
+    "宿主独立：不并入 isD4DetailSheet / 父级 WorkpaperSyncEditorHost",
+    "layout_normalization=compact_group_table：契约受管几何将分组带正规化为 A–D+Z 一行一组（HTML 段落 UX 不变）"
+  ],
+  "supersedes": "T08-d45-single-html-triage.json"
+}

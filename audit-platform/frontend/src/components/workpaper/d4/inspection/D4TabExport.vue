@@ -12,9 +12,11 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * - 电子口岸系统（申报外营收入/差异/原因/索引）
  * - 免抵退税申报数据（申报外营收入/差异/原因/索引）
  */
-import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
+import { calcChangeAmount } from '../../composables/useD4FormulaEngine'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -107,9 +109,9 @@ function removeRow(id: string) {
 }
 
 function onCellChange(row: ExportCheckRow) {
-  // Auto-calc differences
-  row.portsDiff = row.bookAmount - row.portsAmount
-  row.taxDiff = row.bookAmount - row.taxReportAmount
+  // 差异自动计算：统一走公式引擎纯函数 calcChangeAmount(a,b)=a-b（差异=账面−系统）
+  row.portsDiff = calcChangeAmount(row.bookAmount, row.portsAmount)
+  row.taxDiff = calcChangeAmount(row.bookAmount, row.taxReportAmount)
   persistAll()
 }
 
@@ -118,6 +120,28 @@ const totalBook = computed(() => rows.value.reduce((s, r) => s + r.bookAmount, 0
 const totalPortsDiff = computed(() => rows.value.reduce((s, r) => s + r.portsDiff, 0))
 const totalTaxDiff = computed(() => rows.value.reduce((s, r) => s + r.taxDiff, 0))
 const hasDiff = computed(() => rows.value.some(r => r.portsDiff !== 0 || r.taxDiff !== 0))
+
+// ─── 双向回写：出口差异 → A13 错报 + D4-1 审计说明 ─────────────────────
+const { pushToA13 } = useD4InspectionWriteback({
+  wpCode: 'D4-16',
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+})
+function handlePushToA13() {
+  const items = rows.value
+    .filter(r => r.portsDiff !== 0 || r.taxDiff !== 0)
+    .map((r, idx) => {
+      const parts: string[] = []
+      if (r.portsDiff !== 0) parts.push(`口岸差异${r.portsDiff}${r.portsReason ? `（${r.portsReason}）` : ''}`)
+      if (r.taxDiff !== 0) parts.push(`免抵退税差异${r.taxDiff}${r.taxReason ? `（${r.taxReason}）` : ''}`)
+      return {
+        amount: Math.abs(r.portsDiff) + Math.abs(r.taxDiff),
+        description: `${r.portsPeriod || `第${idx + 1}行`}：${parts.join('，')}`,
+        indexRef: r.taxIndex || 'D4-16',
+      }
+    })
+  pushToA13(items, '6001', '营业收入')
+}
 
 // ─── Persistence ─────────────────────────────────────────────────────
 function persistAll() {
@@ -211,6 +235,9 @@ function fmtAmount(v: number): string {
         </el-dropdown>
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-14" :context-project-id="projectId" />
+        <el-tooltip content="将口岸/免抵退税核对差异推送至 A13 未更正错报汇总，并同步至 D4-1 审计说明" placement="top">
+          <el-button size="small" type="warning" plain :disabled="isReadonly || !hasDiff" @click="handlePushToA13">推送差异至 A13</el-button>
+        </el-tooltip>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-16-export')">💬 复核</el-button>
       </div>
     </div>
@@ -282,7 +309,12 @@ function fmtAmount(v: number): string {
               <WpAmountInput v-model="row.portsAmount" size="small" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" />
             </template>
           </el-table-column>
-          <el-table-column label="差异" min-width="110" align="right">
+          <el-table-column min-width="110" align="right" class-name="auto-calc-col">
+            <template #header>
+              <el-tooltip content="差异 = 账面出口收入 − 口岸结关金额（自动计算）" placement="top">
+                <span class="auto-calc-header">差异 <span class="fx-mark">ƒ</span></span>
+              </el-tooltip>
+            </template>
             <template #default="{ row }">
               <span :class="{ 'diff-warn': row.portsDiff !== 0 }">{{ fmtAmount(row.portsDiff) }}</span>
             </template>
@@ -301,7 +333,12 @@ function fmtAmount(v: number): string {
               <WpAmountInput v-model="row.taxReportAmount" size="small" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" />
             </template>
           </el-table-column>
-          <el-table-column label="差异" min-width="110" align="right">
+          <el-table-column min-width="110" align="right" class-name="auto-calc-col">
+            <template #header>
+              <el-tooltip content="差异 = 账面出口收入 − 申报外营收入（自动计算）" placement="top">
+                <span class="auto-calc-header">差异 <span class="fx-mark">ƒ</span></span>
+              </el-tooltip>
+            </template>
             <template #default="{ row }">
               <span :class="{ 'diff-warn': row.taxDiff !== 0 }">{{ fmtAmount(row.taxDiff) }}</span>
             </template>
@@ -398,6 +435,10 @@ function fmtAmount(v: number): string {
 .export-table :deep(.col-ports .el-table__cell) { background-color: #f0f5ff !important; }
 .export-table :deep(.col-tax .el-table__cell) { background-color: #fff8f0 !important; }
 .diff-warn { color: #f56c6c; font-weight: 600; }
+/* 自动计算列（差异）统一灰底，对齐 D4-2 蓝本约定；特异性高于 col-ports/col-tax 分组底色 */
+.export-table :deep(td.auto-calc-col.el-table__cell) { background-color: #f5f7fa !important; }
+.auto-calc-header { color: #606266; }
+.auto-calc-header .fx-mark { color: #909399; font-style: italic; font-size: 11px; }
 .add-row-bar { margin: 12px 0 20px; text-align: center; }
 .audit-opinion-card { margin-bottom: 20px; }
 .opinion-header { display: flex; align-items: center; justify-content: space-between; }

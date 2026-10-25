@@ -9,8 +9,10 @@
  *
  * 无独立"审计意见区"（源模板中不存在）
  */
-import { ref, computed, watch, inject, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, inject, onBeforeUnmount, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -163,6 +165,44 @@ async function genConclusion() {
 }
 
 const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
+
+// ─── 导入导出（叙述式：导出核对过程/结论，导入按区块回写）────────────────
+const reloadWorkpaperData = inject<(() => Promise<void> | void) | null>('reloadWorkpaperData', null)
+const { exportTemplate, exportData, importData, importing } = useD4ImportExport({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+function handleExportTemplate() { exportTemplate('D4-13') }
+function handleExportData() { exportData('D4-13') }
+async function handleImportFile(uploadFile: any) {
+  const file = uploadFile.raw || uploadFile
+  const res = await importData('D4-13', file)
+  if (res) await reloadWorkpaperData?.()
+}
+
+// ─── 双向回写：ERP 核对差异 → A13 错报 + D4-1 审计说明 ─────────────────
+// 叙述式底稿无结构化差异数据，由审计师填差异金额后推送（结论文本作描述）。
+const { pushToA13 } = useD4InspectionWriteback({
+  wpCode: 'D4-13',
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+})
+async function handlePushToA13() {
+  if (props.isReadonly) return
+  let amountStr: string
+  try {
+    const r = await ElMessageBox.prompt(
+      '请输入 ERP 核对差异金额（账面 − ERP，元）。描述将取自「核对结论」文本。',
+      '推送差异至 A13',
+      { confirmButtonText: '推送', cancelButtonText: '取消', inputPattern: /^-?\d+(\.\d+)?$/, inputErrorMessage: '请输入有效金额' },
+    )
+    amountStr = (r as any).value
+  } catch { return }
+  const amount = Number(amountStr)
+  if (!amount) { ElMessage.info('差异金额为 0，无需推送'); return }
+  const desc = (conclusionText.value || '').trim() || 'ERP 系统核对存在差异'
+  pushToA13([{ amount, description: `账面与ERP核对差异：${desc}`, indexRef: 'D4-13' }], '6001', '营业收入')
+}
 </script>
 
 <template>
@@ -171,9 +211,27 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
     <div class="toolbar">
       <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
       <div class="toolbar-right">
+        <el-dropdown trigger="click" size="small">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
+              <el-dropdown-item>
+                <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false"
+                  :disabled="isReadonly || importing" @change="handleImportFile">
+                  <span>导入数据</span>
+                </el-upload>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <span class="chip-label">关联</span>
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-5" :context-project-id="projectId" />
+        <el-tooltip content="填写差异金额后推送至 A13 未更正错报汇总，并同步至 D4-1 审计说明" placement="top">
+          <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handlePushToA13">推送差异至 A13</el-button>
+        </el-tooltip>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-13')">💬 复核</el-button>
       </div>
     </div>

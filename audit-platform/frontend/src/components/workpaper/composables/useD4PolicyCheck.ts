@@ -61,6 +61,7 @@ export interface PolicyCheckReturn {
   progress: ComputedRef<number>
   // 编制提示（只读）
   guidanceTips: { title: string; content: string }[]
+  flushPendingSave: () => void
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -101,7 +102,11 @@ const GUIDANCE_TIPS: { title: string; content: string }[] = [
 let _gid = 0
 function nextGroupId(): string {
   _gid += 1
-  return `pg-${Date.now()}-${_gid}`
+  // UUID-shaped id so Excel row_identity / GTROW align with PolicyGroup.id
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `pg-${Date.now().toString(36)}-${_gid}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -267,6 +272,15 @@ export function useD4PolicyCheck(options: UseD4BaseOptions): PolicyCheckReturn {
     } catch { /* silent */ }
   }
 
+  /** 切 OO 前强制落盘（与 D4-3 flushPendingSave 同角色）。 */
+  function flushPendingSave(): void {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+    }
+    flushSave()
+  }
+
   onBeforeUnmount(() => {
     if (debounceTimer) {
       clearTimeout(debounceTimer)
@@ -293,6 +307,7 @@ export function useD4PolicyCheck(options: UseD4BaseOptions): PolicyCheckReturn {
     totalCount,
     progress,
     guidanceTips: GUIDANCE_TIPS,
+    flushPendingSave,
   }
 }
 

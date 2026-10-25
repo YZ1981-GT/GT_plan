@@ -38,6 +38,7 @@ import {
   getRecoveryCaseTimeline,
   listRecoveryCases,
   materialize,
+  readStoreProjection,
   requestForcesave,
   resolveConflicts,
   retryOperation,
@@ -175,6 +176,7 @@ const DRIVERS: Record<string, () => Promise<unknown>> = {
       expectedRevision: 11,
       projection: { fields: [] },
     }).catch(() => null),
+  read_store_projection: () => readStoreProjection(SCOPE).catch(() => null),
   materialize: () =>
     materialize(SCOPE, {
       sheetKey: 's',
@@ -240,6 +242,18 @@ describe('生成的路由表与 client 一一对应', () => {
     const clientEndpoints = Object.values(WORKPAPER_SYNC_CLIENT_ENDPOINTS).sort()
     expect(clientEndpoints).toEqual(routeEndpoints)
     expect(Object.keys(DRIVERS).sort()).toEqual(routeEndpoints)
+  })
+
+  it('readStoreProjection 拒绝空 values（空投影会清空整表）', async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        expected_revision: 0,
+        field_count: 0,
+        row_count: 0,
+        projection: { values: {} },
+      },
+    })
+    await expectAsyncRefusal(() => readStoreProjection(SCOPE), 'store_projection_empty')
   })
 
   it.each(WP_SYNC_ROUTES.map((route) => [route.endpoint, route.method, route.suffix]))(

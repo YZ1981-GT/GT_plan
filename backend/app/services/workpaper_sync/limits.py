@@ -98,6 +98,7 @@ class SyncLimits:
     max_projection_fields: int
     chunk_bytes: int
     peak_memory_budget_bytes: int
+    materialize_soft_limit_seconds: float
     baseline_max_bytes: int
     baseline_max_fields: int
     ooxml: OoxmlPolicy
@@ -253,6 +254,9 @@ def _parse(raw: dict[str, Any]) -> SyncLimits:
         chunk_bytes=_require(streaming, "chunk_bytes", int, "streaming"),
         peak_memory_budget_bytes=_require(
             streaming, "peak_memory_budget_bytes", int, "streaming"
+        ),
+        materialize_soft_limit_seconds=float(
+            _require(streaming, "materialize_soft_limit_seconds", int, "streaming")
         ),
         baseline_max_bytes=_require(baseline, "max_bytes", int, "baseline_operation"),
         baseline_max_fields=_require(baseline, "max_fields", int, "baseline_operation"),

@@ -54,9 +54,134 @@ from app.services.workpaper_sync.excel_instrumentation import (
     ExcelIdentityCarrierGate,
     ExcelInstrumentationSpec,
     InstrumentationError,
-    build_instrumentation_payload,
+    build_instrumentation_payload_for_sheets,
     build_template_payload,
     normalized_structure_hash,
+)
+from app.services.workpaper_sync.phase5_d4_other_revenue_sheet import (
+    EXPECTED_MAPPING_DIGEST_D43,
+    MANAGED_SHEET_D43,
+    ROWS_TABLE_KEY_D43,
+    SHEET_KEY_D43,
+    STORE_ITEM_ID_D43,
+    TABLE_NAME_D43,
+    TEMPLATE_ID_D43,
+    assert_mapping_digest_d43,
+    instrumentation_spec_d43,
+    merge_projection_into_d43_store_rows,
+    rows_table_payload_d43,
+    split_store_row_d43,
+)
+from app.services.workpaper_sync.phase5_d4_other_check_sheet import (
+    EXPECTED_MAPPING_DIGEST_D435,
+    MANAGED_SHEET_D435,
+    ROWS_TABLE_KEY_D435,
+    ROW_IDENTITY_STORE_KEY_D435,
+    SHEET_KEY_D435,
+    STORE_ITEM_ID_D435,
+    TABLE_NAME_D435,
+    TEMPLATE_ID_D435,
+    assert_mapping_digest_d435,
+    build_d435_store_projection,
+    instrumentation_spec_d435,
+    merge_projection_into_d435_store_rows,
+    rows_table_payload_d435,
+    split_store_row_d435,
+)
+from app.services.workpaper_sync.phase5_d4_policy_check_sheet import (
+    EXPECTED_MAPPING_DIGEST_D45,
+    MANAGED_SHEET_D45,
+    SHEET_KEY_D45,
+    STORE_ITEM_ID_D45_GROUPS,
+    STORE_ITEM_IDS_D45_FIXED,
+    TABLE_NAME_D45,
+    TEMPLATE_ID_D45,
+    assert_mapping_digest_d45,
+    build_d45_fixed_store_projection,
+    build_d45_groups_store_projection,
+    instrumentation_spec_d45,
+    merge_projection_into_d45_fixed_items,
+    merge_projection_into_d45_group_rows,
+    sheet_payload_d45,
+)
+from app.services.workpaper_sync.phase5_d4_ipo_related_sheets import (
+    EXPECTED_MAPPING_DIGEST_D421,
+    EXPECTED_MAPPING_DIGEST_D422,
+    EXPECTED_MAPPING_DIGEST_D423,
+    EXPECTED_MAPPING_DIGEST_D424,
+    ROWS_TABLE_KEY_D421,
+    ROWS_TABLE_KEY_D422,
+    ROWS_TABLE_KEY_D423,
+    ROWS_TABLE_KEY_D424,
+    ROW_IDENTITY_STORE_KEY_D421,
+    ROW_IDENTITY_STORE_KEY_D422,
+    ROW_IDENTITY_STORE_KEY_D423,
+    ROW_IDENTITY_STORE_KEY_D424,
+    SHEET_KEY_D421,
+    SHEET_KEY_D422,
+    SHEET_KEY_D423,
+    SHEET_KEY_D424,
+    STORE_ITEM_ID_D421,
+    STORE_ITEM_ID_D422,
+    STORE_ITEM_ID_D423,
+    STORE_ITEM_ID_D424,
+    TABLE_NAME_D421,
+    TABLE_NAME_D422,
+    TABLE_NAME_D423,
+    TABLE_NAME_D424,
+    TEMPLATE_ID_D421,
+    TEMPLATE_ID_D422,
+    TEMPLATE_ID_D423,
+    TEMPLATE_ID_D424,
+    MANAGED_SHEET_D421,
+    MANAGED_SHEET_D422,
+    MANAGED_SHEET_D423,
+    MANAGED_SHEET_D424,
+    assert_all_sibling_mapping_digests,
+    build_d421_store_projection,
+    build_d422_store_projection,
+    build_d423_store_projection,
+    build_d424_store_projection,
+    instrumentation_spec_d421,
+    instrumentation_spec_d422,
+    instrumentation_spec_d423,
+    instrumentation_spec_d424,
+    merge_projection_into_d421_store_rows,
+    merge_projection_into_d422_store_rows,
+    merge_projection_into_d423_store_rows,
+    merge_projection_into_d424_store_rows,
+    rows_table_payload_d421,
+    rows_table_payload_d422,
+    rows_table_payload_d423,
+    rows_table_payload_d424,
+)
+from app.services.workpaper_sync.phase5_d4_29_customer_detail import (
+    MANAGED_SHEET as MANAGED_SHEET_D429,
+    SHEET_KEY as SHEET_KEY_D429,
+    STORE_ITEM_ID as STORE_ITEM_ID_D429,
+    build_store_projection as build_d429_store_projection,
+    merge_projection_into_store as merge_d429_projection_into_store,
+    sheet_payload,
+    assert_mapping_digest as assert_mapping_digest_d429,
+)
+
+from app.services.workpaper_sync.phase5_d4_ipo_interview_sheets import (
+    codes as INTERVIEW_SHEET_CODES,
+    instrumentation_spec as instrumentation_spec_interview,
+    sheet_payload as interview_sheet_payload,
+    store_item_id as interview_store_item_id,
+    build_store_projection as build_interview_store_projection,
+    merge_projection_into_store as merge_interview_projection_into_store,
+)
+from app.services.workpaper_sync.phase5_d4_ipo_checklist_sheets import (  # noqa: E402
+    CHECKLIST_SHEET_CODES,
+    SHEET_KEY_BY_CODE,
+    STORE_ITEM_ID_BY_CODE,
+    assert_all_checklist_mapping_digests,
+    build_store_projection as build_ipo_checklist_store_projection,
+    instrumentation_spec as instrumentation_spec_ipo_checklist,
+    merge_projection_into_rows as merge_ipo_checklist_projection_into_rows,
+    sheet_payload as ipo_checklist_sheet_payload,
 )
 from app.services.workpaper_sync.json_path import (
     JsonPathMissingSegmentError,
@@ -99,6 +224,8 @@ TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"
 TEMPLATE_SHA256: Final[str] = (
     "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f"
 )
+#: D4-30/31/32 几何未就绪：关则不进 instrumentation/contract/combined projection。
+_INCLUDE_IPO_INTERVIEW_SHEETS: Final[bool] = False
 MANAGED_SHEET: Final[str] = "主营业务收入明细表D4-2"
 TEMPLATE_ID: Final[str] = "D42"
 SHEET_KEY: Final[str] = f"{TEMPLATE_ID.lower()}-managed"
@@ -120,6 +247,17 @@ AUTHORITY_MODEL: Final[AuthorityModel] = AuthorityModel.projection_contract
 FOOTER_MARKER: Final[str] = "合计"
 
 STORE_ITEM_ID: Final[str] = "D4-2-rows"
+STORE_ITEM_IDS: Final[tuple[str, ...]] = (
+    STORE_ITEM_ID,
+    STORE_ITEM_ID_D43,
+    STORE_ITEM_ID_D45_GROUPS,
+    STORE_ITEM_ID_D421,
+    STORE_ITEM_ID_D422,
+    STORE_ITEM_ID_D423,
+    STORE_ITEM_ID_D424,
+    STORE_ITEM_ID_D429,
+    *STORE_ITEM_ID_BY_CODE.values(),
+)
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 ROW_IDENTITY_STORE_KEY: Final[str] = "rowId"
 
@@ -225,6 +363,11 @@ def assert_mapping_digest() -> str:
         raise EntrySelectionError(
             f"D4 契约字段数必须为 18，实得 {len(MANAGED_FIELD_SPECS)}"
         )
+    try:
+        assert_mapping_digest_d43()
+        assert_all_sibling_mapping_digests()  # D4-21/22/23/24
+    except ValueError as exc:
+        raise EntrySelectionError(str(exc)) from exc
     return got
 
 
@@ -332,6 +475,7 @@ def assert_entry_selectable(
 
 
 def instrumentation_spec() -> ExcelInstrumentationSpec:
+    """D4-2 主受管 sheet（保持单 sheet 调用面）。"""
     return ExcelInstrumentationSpec(
         entry_id=ENTRY_ID,
         template_id=TEMPLATE_ID,
@@ -346,6 +490,53 @@ def instrumentation_spec() -> ExcelInstrumentationSpec:
     )
 
 
+def instrumentation_specs() -> tuple:
+    """D4-2/3/5 + D4-21/22/23/24 受管 sheet（同 entry / 同 template blob）。"""
+    return (
+        instrumentation_spec(),
+        instrumentation_spec_d43(
+            entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+        ),
+        instrumentation_spec_d45(
+            entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+        ),
+        instrumentation_spec_d421(
+            entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+        ),
+        instrumentation_spec_d422(
+            entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+        ),
+        instrumentation_spec_d423(
+            entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+        ),
+        instrumentation_spec_d424(
+            entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+        ),
+        # D4-35 由并发会话加入契约 sheets（8 张）但漏了这条 spec，导致
+        # instrumentation_specs(7) 与契约 sheets(8) 不对齐、多 sheet binding 无法对齐、
+        # 全 D4 entry attach fail-closed。补齐这条使二者一致（spec 函数已 import）。
+        instrumentation_spec_d435(
+            entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+        ),
+        # D4-25/26/27/28 IPO 检查表追加受管 sheet（同 entry / 同 template blob）。
+        *(
+            instrumentation_spec_ipo_checklist(
+                code, entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+            )
+            for code in CHECKLIST_SHEET_CODES
+        ),
+        # D4-30/31/32：D4-31 singleton 多字段挤同一物理行，materialize roundtrip 红；
+        # 暂不进 instrumentation，待几何重裁后再开（否则挡 D4-5 rematerialize）。
+        *(
+            instrumentation_spec_interview(
+                code, entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+            )
+            for code in INTERVIEW_SHEET_CODES()
+            if _INCLUDE_IPO_INTERVIEW_SHEETS
+        ),
+    )
+
+
 def template_definition_payload() -> dict[str, Any]:
     data = read_authoritative_template()
     return build_template_payload(
@@ -356,12 +547,15 @@ def template_definition_payload() -> dict[str, Any]:
 
 
 def instrumentation_definition_payload() -> dict[str, Any]:
-    return build_instrumentation_payload(
-        spec=instrumentation_spec(),
+    """多 sheet instrumentation（D4-2 + D4-3 + D4-5）。"""
+    payload = build_instrumentation_payload_for_sheets(
+        specs=instrumentation_specs(),
         template_definition_sha256=canonical_digest(template_definition_payload()),
         template_sha256=TEMPLATE_SHA256,
         gate=excel_carrier_gate(),
     )
+    payload["transposed_sheets"] = [sheet_payload()]
+    return payload
 
 
 def authority_model_payload() -> dict[str, Any]:
@@ -439,12 +633,32 @@ _HTML_STORE_NOTE: Final[str] = (
 
 _REVIEWED_BASIS: Final[str] = (
     "openpyxl 直读净化后权威模板 D/D4 收入底稿.xlsx（Task 4 sha256 "
-    "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f），只取受管 sheet "
-    "主营业务收入明细表D4-2：单级表头行 11，数据区 12-23，A24「合计」footer；18 契约字段 "
+    "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f），三受管 sheet："
+    "（1）主营业务收入明细表D4-2：单级表头行 11，数据区 12-23，A24「合计」footer；18 契约字段 "
     "（A product + B-M months/0..11 + N formula periodTotal + O auditAdjustment + Q/R prior "
     "+ V remark）；P/S/T/U 仅 formula_mask。mapping_digest="
-    f"{EXPECTED_MAPPING_DIGEST}（T01）。wp_code 模块侧 D4O（manifest 幻影码）；裁决落点 D4"
-    "（真载荷 2 行，Task 6）。"
+    f"{EXPECTED_MAPPING_DIGEST}（T01 D4-2）。"
+    "（2）其他业务收入明细表D4-3：两级表头 11+12，受管区 13-18（A19「……」BP-21 排除），"
+    f"A20「合计」；6 契约字段 item/current*/prior*/remark；D/E/F/I/J/K/L/M mask。"
+    f"mapping_digest={EXPECTED_MAPPING_DIGEST_D43}（T01 D4-3）。"
+    "（3）营业收入会计政策检查D4-5：分组紧凑表 d45_policy_groups（A–D+Z，footer=信用政策）"
+    f"+ fixed B11-B16/信用/说明/结论；mapping_digest={EXPECTED_MAPPING_DIGEST_D45}（T09）。"
+    "宿主：D4-2/3 走统一 WorkpaperSyncEditorHost；D4-5 由 D4TabPolicyCheck 自管路径。"
+    "wp_code 模块侧 D4O（manifest 幻影码）；裁决落点 D4。"
+)
+
+_HTML_STORE_NOTE_D43: Final[str] = (
+    "其他业务收入明细存成 checklist_responses item D4-3-rows（JSON 数组，"
+    "useD4OtherRevenue StoredOtherRow）。与 D4-2-rows 分 item；按 sheet_key=d43-managed "
+    "extract/merge。D/I 重分类不进 store。"
+)
+
+_HTML_STORE_NOTE_D45: Final[str] = (
+    "D4-5 政策检查：分组 JSON 存 D4-5-policy-groups（PolicyGroup.id=row identity）；"
+    "经营模式/信用/说明/结论为独立 item（D4-5-biz-* / credit / note / conclusion）。"
+    "sheet_key=d45-managed；宿主独立于 isD4DetailSheet。"
+    "Excel 契约仅 groups + 经营模式 B11–B16；信用/说明/结论为 HTML-only"
+    "（footer 下 static_row 与插行 fail-closed 冲突，见 phase5_d4_policy_check_sheet）。"
 )
 
 
@@ -452,11 +666,16 @@ def build_contract_payload() -> dict[str, Any]:
     from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
 
     assert_mapping_digest()
+    assert_mapping_digest_d43()
+    assert_mapping_digest_d45()
+    assert_mapping_digest_d435()
+    assert_all_checklist_mapping_digests()
+    assert_mapping_digest_d429()
     template_payload = template_definition_payload()
     return {
         "schema_version": CONTRACT_SCHEMA_VERSION,
         "contract_id": ADAPTER_ID,
-        "semantic_version": "1.0.0",
+        "semantic_version": "1.2.0",
         "review_status": "reviewed",
         "document_type": "xlsx",
         "template_definition_sha256": canonical_digest(template_payload),
@@ -480,7 +699,56 @@ def build_contract_payload() -> dict[str, Any]:
                 "excel_name": MANAGED_SHEET,
                 "locator": {"anchor": TABLE_SHEET_ANCHOR},
                 "tables": [_rows_table_payload()],
-            }
+            },
+            {
+                "sheet_key": SHEET_KEY_D43,
+                "excel_name": MANAGED_SHEET_D43,
+                "locator": {"anchor": TABLE_SHEET_ANCHOR},
+                "tables": [rows_table_payload_d43()],
+            },
+            sheet_payload_d45(),
+            {
+                "sheet_key": SHEET_KEY_D421,
+                "excel_name": MANAGED_SHEET_D421,
+                "locator": {"anchor": TABLE_SHEET_ANCHOR},
+                "tables": [rows_table_payload_d421()],
+            },
+            {
+                "sheet_key": SHEET_KEY_D422,
+                "excel_name": MANAGED_SHEET_D422,
+                "locator": {"anchor": TABLE_SHEET_ANCHOR},
+                "tables": [rows_table_payload_d422()],
+            },
+            {
+                "sheet_key": SHEET_KEY_D423,
+                "excel_name": MANAGED_SHEET_D423,
+                "locator": {"anchor": TABLE_SHEET_ANCHOR},
+                "tables": [rows_table_payload_d423()],
+            },
+            {
+                "sheet_key": SHEET_KEY_D424,
+                "excel_name": MANAGED_SHEET_D424,
+                "locator": {"anchor": TABLE_SHEET_ANCHOR},
+                "tables": [rows_table_payload_d424()],
+            },
+            {
+                "sheet_key": SHEET_KEY_D435,
+                "excel_name": MANAGED_SHEET_D435,
+                "locator": {"anchor": TABLE_SHEET_ANCHOR},
+                "tables": [rows_table_payload_d435()],
+            },
+            {
+                "sheet_key": SHEET_KEY_D429,
+                "excel_name": MANAGED_SHEET_D429,
+                "locator": {"anchor": TABLE_SHEET_ANCHOR},
+                "tables": sheet_payload()["tables"],
+            },
+            *(ipo_checklist_sheet_payload(code) for code in CHECKLIST_SHEET_CODES),
+            *(
+                interview_sheet_payload(code)
+                for code in INTERVIEW_SHEET_CODES()
+                if _INCLUDE_IPO_INTERVIEW_SHEETS
+            ),
         ],
         "review": {
             "entry_id": ENTRY_ID,
@@ -492,9 +760,119 @@ def build_contract_payload() -> dict[str, Any]:
                 "row_identity_key": ROW_IDENTITY_STORE_KEY,
                 "shape": "json_array_of_row_objects",
                 "note": _HTML_STORE_NOTE,
+                "sibling_stores": [
+                    {
+                        "item_id": STORE_ITEM_ID_D43,
+                        "sheet_key": SHEET_KEY_D43,
+                        "table_key": rows_table_payload_d43()["table_key"],
+                        "row_identity_key": "rowId",
+                        "note": _HTML_STORE_NOTE_D43,
+                    },
+                    {
+                        "item_id": STORE_ITEM_ID_D45_GROUPS,
+                        "sheet_key": SHEET_KEY_D45,
+                        "table_key": "d45_policy_groups",
+                        "row_identity_key": "id",
+                        "note": _HTML_STORE_NOTE_D45,
+                        "fixed_item_ids": list(STORE_ITEM_IDS_D45_FIXED),
+                    },
+                    {
+                        "item_id": STORE_ITEM_ID_D421,
+                        "sheet_key": SHEET_KEY_D421,
+                        "table_key": ROWS_TABLE_KEY_D421,
+                        "row_identity_key": ROW_IDENTITY_STORE_KEY_D421,
+                        "note": (
+                            "D4-21 关联方销售/价格分析：动态行 store（12 受管列）；I/K 差异率入 mask；"
+                            "O16-24 关联关系图例逐字保留、UUID 用 P。"
+                        ),
+                    },
+                    {
+                        "item_id": STORE_ITEM_ID_D422,
+                        "sheet_key": SHEET_KEY_D422,
+                        "table_key": ROWS_TABLE_KEY_D422,
+                        "row_identity_key": ROW_IDENTITY_STORE_KEY_D422,
+                        "note": (
+                            "D4-22 重要指标分析：固定 12 指标行 + 同业公司 {slot}_{seq} 动态列；"
+                            "固定列 A/B/C/H。"
+                        ),
+                    },
+                    {
+                        "item_id": STORE_ITEM_ID_D423,
+                        "sheet_key": SHEET_KEY_D423,
+                        "table_key": ROWS_TABLE_KEY_D423,
+                        "row_identity_key": ROW_IDENTITY_STORE_KEY_D423,
+                        "note": (
+                            "D4-23 收入与开票比较：固定 12 月行（月份天然键）；D/I/J 内部算术入 mask + "
+                            "footer24 SUM。"
+                        ),
+                    },
+                    {
+                        "item_id": STORE_ITEM_ID_D424,
+                        "sheet_key": SHEET_KEY_D424,
+                        "table_key": ROWS_TABLE_KEY_D424,
+                        "row_identity_key": ROW_IDENTITY_STORE_KEY_D424,
+                        "note": (
+                            "D4-24 第三方回款：动态行 store（13 列，枚举列 J/K）；"
+                            "A24 导航引用 <E1-31>/<D2-7> 走 cross_wp_references。"
+                        ),
+                    },
+                    {
+                        "item_id": STORE_ITEM_ID_D435,
+                        "sheet_key": SHEET_KEY_D435,
+                        "table_key": ROWS_TABLE_KEY_D435,
+                        "row_identity_key": ROW_IDENTITY_STORE_KEY_D435,
+                        "note": (
+                            "D4-35 其他业务收入检查表：受管 rows 均质行（16 列 A-Q，check1..6 = H-M）；"
+                            "store 嵌套 {rows,sampling,periodAmount}，sampling(抽样参数区 8-10 行)/periodAmount "
+                            "为 HTML-only 非行数据，不进 Excel Table 受管区（15..25），mirror 回读须包回并保留。"
+                        ),
+                    },
+                    {"item_id": STORE_ITEM_ID_D429, "sheet_key": SHEET_KEY_D429,
+                     "table_key": sheet_payload()["tables"][0]["table_key"],
+                     "row_identity_key": "id", "note": "客户按 id 同步，Excel 转置客户列由专用 dispatcher 读写。"},
+                    *(
+                        {
+                            "item_id": STORE_ITEM_ID_BY_CODE[code],
+                            "sheet_key": SHEET_KEY_BY_CODE[code],
+                            "table_key": ipo_checklist_sheet_payload(code)["tables"][0]["table_key"],
+                            "row_identity_key": "rowId",
+                            "note": f"{code} IPO 检查表动态行 store；json_path 与前端 ipoChecklistSchema 列 key 逐列对齐。",
+                        }
+                        for code in CHECKLIST_SHEET_CODES
+                    ),
+                ],
             },
             "reviewed_basis": _REVIEWED_BASIS,
             "mapping_digest": EXPECTED_MAPPING_DIGEST,
+            "mapping_digest_d43": EXPECTED_MAPPING_DIGEST_D43,
+            "mapping_digest_d45": EXPECTED_MAPPING_DIGEST_D45,
+            "mapping_digest_d435": EXPECTED_MAPPING_DIGEST_D435,
+            "mapping_digest_ipo_checklist": assert_all_checklist_mapping_digests(),
+            "mapping_digest_d429": assert_mapping_digest_d429(),
+            "instrumentation_template_ids": [
+                TEMPLATE_ID,
+                TEMPLATE_ID_D43,
+                TEMPLATE_ID_D45,
+                TEMPLATE_ID_D421,
+                TEMPLATE_ID_D422,
+                TEMPLATE_ID_D423,
+                TEMPLATE_ID_D424,
+                TEMPLATE_ID_D435,
+                sheet_payload()["template_id"],
+                *[ipo_checklist_sheet_payload(c)["template_id"] for c in CHECKLIST_SHEET_CODES],
+            ],
+            "instrumentation_tables": [
+                TABLE_NAME,
+                TABLE_NAME_D43,
+                TABLE_NAME_D45,
+                TABLE_NAME_D421,
+                TABLE_NAME_D422,
+                TABLE_NAME_D423,
+                TABLE_NAME_D424,
+                TABLE_NAME_D435,
+                sheet_payload()["tables"][0]["table_key"],
+                *[ipo_checklist_sheet_payload(c)["tables"][0]["table_key"] for c in CHECKLIST_SHEET_CODES],
+            ],
         },
     }
 
@@ -570,7 +948,24 @@ def _resolve_store_path(row: Mapping[str, Any], json_path: str) -> Any:
     """共享 resolve_json_path；标量缺失段 → None（periodTotal 等可不持久化）。
 
     months/* 缺失不得软化：数组路径必须 fail closed（Requirement 1.4）。
+    periodTotal 不在 HTML store 持久化时，用 months 求和作为投影基线，避免 OO 公式
+    缓存值（N=SUM(B:M)）与 base=0 形成 protected 冲突挡住整次 apply。
     """
+    if json_path == "periodTotal":
+        months = row.get("months")
+        if isinstance(months, list) and len(months) == 12:
+            total = 0.0
+            saw_numeric = False
+            for cell in months:
+                if cell is None or cell == "":
+                    continue
+                try:
+                    total += float(cell)
+                    saw_numeric = True
+                except (TypeError, ValueError):
+                    continue
+            if saw_numeric or all(c is None or c == "" or c == 0 for c in months):
+                return total
     try:
         return resolve_json_path(row, json_path)
     except JsonPathMissingSegmentError:
@@ -585,6 +980,18 @@ def split_store_row(
     for column_key, _column, _mode, _vt, json_path, _label in MANAGED_FIELD_SPECS:
         spec = contract.field_by_stable_key(stable_key_for(column_key))
         yield stable_key_for(column_key, row_identity), _resolve_store_path(row, json_path), spec
+
+
+def _ensure_months_list(row: dict[str, Any]) -> None:
+    """HTML store 行必须带长度 12 的 months list（仅 product 写入时也不得落成 null）。"""
+    months = row.get("months")
+    if isinstance(months, list) and len(months) == 12:
+        return
+    if isinstance(months, list):
+        padded = list(months) + [None] * 12
+        row["months"] = padded[:12]
+        return
+    row["months"] = [None] * 12
 
 
 def build_store_projection(
@@ -604,8 +1011,11 @@ def build_store_projection(
     for identity, row in iter_store_rows(payload):
         budget.add_row(ROWS_TABLE_KEY)
         row_keys.append(identity)
+        # 历史/仅写 product 的行可能缺 months；投影前归一成长度 12，避免 store-projection 422
+        normalized = dict(row)
+        _ensure_months_list(normalized)
         for stable_key, value, spec in split_store_row(
-            row, row_identity=identity, contract=contract
+            normalized, row_identity=identity, contract=contract
         ):
             budget.add_field()
             values[stable_key] = FieldValue(
@@ -629,8 +1039,13 @@ def merge_projection_into_store_rows(
     projection: Any,
     base_rows: list[Mapping[str, Any]],
 ) -> tuple[list[dict[str, Any]], int, int, set[str]]:
-    """把已 extract 的 projection 合进 D4-2-rows（共享 set_json_path，months 保持 list）。"""
+    """把已 extract 的 projection 合进 D4-2-rows（共享 set_json_path，months 保持 list）。
+
+    只消费 ``revenue_detail_rows/*`` 键；D4-3 的 ``other_revenue_detail_rows/*`` 由
+    :func:`merge_projection_into_d43_store_rows` / :func:`merge_projection_into_all_d4_stores` 处理。
+    """
     field_to_path = {spec[0]: spec[4] for spec in MANAGED_FIELD_SPECS}
+    prefix = f"{ROWS_TABLE_KEY}/"
     by_id: dict[str, dict[str, Any]] = {}
     order: list[str] = []
     for row in base_rows:
@@ -638,9 +1053,7 @@ def merge_projection_into_store_rows(
         if not rid:
             continue
         copied = dict(row)
-        months = copied.get("months")
-        if isinstance(months, list):
-            copied["months"] = list(months)
+        _ensure_months_list(copied)
         by_id[rid] = copied
         order.append(rid)
 
@@ -648,6 +1061,9 @@ def merge_projection_into_store_rows(
     visited = 0
     touched_rows: set[str] = set()
     for key in projection.stable_keys():
+        sk = str(key)
+        if not sk.startswith(prefix):
+            continue
         fv = projection.get(key)
         if fv is None or getattr(fv, "is_protected", False):
             continue
@@ -656,10 +1072,11 @@ def merge_projection_into_store_rows(
             continue
         target = by_id.get(str(rid))
         if target is None:
-            target = {ROW_IDENTITY_STORE_KEY: str(rid)}
+            target = {ROW_IDENTITY_STORE_KEY: str(rid), "product": ""}
+            _ensure_months_list(target)
             by_id[str(rid)] = target
             order.append(str(rid))
-        field_id = str(key).rsplit("/", 1)[-1]
+        field_id = sk.rsplit("/", 1)[-1]
         json_path = field_to_path.get(field_id)
         if not json_path:
             continue
@@ -668,8 +1085,243 @@ def merge_projection_into_store_rows(
         if set_json_path(target, json_path, new_val):
             applied += 1
             touched_rows.add(str(rid))
+            _ensure_months_list(target)
 
     return [by_id[rid] for rid in order], applied, visited, touched_rows
+
+
+def build_d43_store_projection(
+    payload: str | bytes | Sequence[Any],
+    *,
+    contract: SyncContract,
+    limits: Any | None = None,
+) -> Any:
+    """把 D4-3-rows JSON 投影成 other_revenue_detail_rows/* FieldValue。"""
+    from app.services.workpaper_sync.adapters.base import FieldValue, Projection
+    from app.services.workpaper_sync.excel_extract import StreamingProjectionBudget
+    from app.services.workpaper_sync.limits import load_limits
+
+    lim = limits or load_limits()
+    budget = StreamingProjectionBudget(lim)
+    values: dict[str, FieldValue] = {}
+    row_keys: list[str] = []
+    for identity, row in iter_store_rows(payload):
+        budget.add_row(ROWS_TABLE_KEY_D43)
+        row_keys.append(identity)
+        for stable_key, value, spec in split_store_row_d43(
+            row, row_identity=identity, contract=contract
+        ):
+            budget.add_field()
+            values[stable_key] = FieldValue(
+                stable_key=stable_key,
+                value=value,
+                value_type=spec.value_type,
+                mode=spec.mode,
+                row_key=identity,
+            )
+    return Projection(
+        contract_id=contract.contract_id,
+        semantic_version=contract.semantic_version,
+        document_type=contract.document_type,
+        values=values,
+        row_keys={ROWS_TABLE_KEY_D43: tuple(row_keys)},
+    )
+
+
+def build_combined_store_projection(
+    payloads: Mapping[str, str | bytes | Sequence[Any]],
+    *,
+    contract: SyncContract,
+    limits: Any | None = None,
+) -> Any:
+    """合并 D4-2 / D4-3 / D4-5(groups+fixed) store 投影（materialize overlay 用）。"""
+    from app.services.workpaper_sync.adapters.base import FieldValue, Projection
+
+    d42_payload = payloads.get(STORE_ITEM_ID, EMPTY_STORE_PAYLOAD)
+    d43_payload = payloads.get(STORE_ITEM_ID_D43, EMPTY_STORE_PAYLOAD)
+    d45_groups = payloads.get(STORE_ITEM_ID_D45_GROUPS, "[]")
+    left = build_store_projection(d42_payload, contract=contract, limits=limits)
+    right = build_d43_store_projection(d43_payload, contract=contract, limits=limits)
+    groups = build_d45_groups_store_projection(d45_groups, contract=contract)
+    fixed_payloads = {
+        item_id: (
+            payloads.get(item_id)
+            if isinstance(payloads.get(item_id), str)
+            else None
+        )
+        for item_id in STORE_ITEM_IDS_D45_FIXED
+    }
+    # allow bytes
+    for item_id in STORE_ITEM_IDS_D45_FIXED:
+        raw = payloads.get(item_id)
+        if isinstance(raw, (bytes, bytearray)):
+            fixed_payloads[item_id] = raw.decode("utf-8")
+        elif isinstance(raw, str):
+            fixed_payloads[item_id] = raw
+    fixed = build_d45_fixed_store_projection(fixed_payloads, contract=contract)
+    d429 = build_d429_store_projection(payloads.get(STORE_ITEM_ID_D429, []), contract=contract, limits=limits)
+
+    d421 = build_d421_store_projection(
+        payloads.get(STORE_ITEM_ID_D421, EMPTY_STORE_PAYLOAD), contract=contract, limits=limits
+    )
+    d422 = build_d422_store_projection(
+        payloads.get(STORE_ITEM_ID_D422, EMPTY_STORE_PAYLOAD), contract=contract, limits=limits
+    )
+    d423 = build_d423_store_projection(
+        payloads.get(STORE_ITEM_ID_D423, EMPTY_STORE_PAYLOAD), contract=contract, limits=limits
+    )
+    d424 = build_d424_store_projection(
+        payloads.get(STORE_ITEM_ID_D424, EMPTY_STORE_PAYLOAD), contract=contract, limits=limits
+    )
+    # D4-35 dict store（{rows,sampling,periodAmount}）：只投影 rows；空/缺失时安全返回空投影。
+    d435 = build_d435_store_projection(
+        payloads.get(STORE_ITEM_ID_D435, {}), contract=contract, limits=limits
+    )
+    interview_projs = [
+        build_interview_store_projection(
+            code,
+            payloads.get(interview_store_item_id(code), {} if code == "D4-31" else []),
+            contract=contract,
+            limits=limits,
+        )
+        for code in INTERVIEW_SHEET_CODES()
+        if _INCLUDE_IPO_INTERVIEW_SHEETS
+    ]
+    # D4-25/26/27/28 IPO 检查表追加受管 sheet（空载荷时安全返回空投影）。
+    ipo_checklist_projs = [
+        build_ipo_checklist_store_projection(
+            code,
+            payloads.get(STORE_ITEM_ID_BY_CODE[code], EMPTY_STORE_PAYLOAD),
+            contract=contract,
+            limits=limits,
+        )
+        for code in CHECKLIST_SHEET_CODES
+    ]
+    values: dict[str, FieldValue] = dict(left.values)
+    values.update(right.values)
+    values.update(groups.values)
+    values.update(fixed.values)
+    for proj in (d421, d422, d423, d424, d429, d435, *ipo_checklist_projs, *interview_projs):
+        values.update(proj.values)
+    row_keys = {
+        **dict(left.row_keys),
+        **dict(right.row_keys),
+        **dict(groups.row_keys),
+        **dict(d421.row_keys),
+        **dict(d422.row_keys),
+        **dict(d423.row_keys),
+        **dict(d424.row_keys),
+        **dict(d429.row_keys),
+
+        **{k: v for p in interview_projs for k, v in dict(p.row_keys).items()},
+        **{k: v for p in ipo_checklist_projs for k, v in dict(p.row_keys).items()},
+    }
+    return Projection(
+        contract_id=contract.contract_id,
+        semantic_version=contract.semantic_version,
+        document_type=contract.document_type,
+        values=values,
+        row_keys=row_keys,
+    )
+
+
+def merge_projection_into_all_d4_stores(
+    *,
+    projection: Any,
+    base_by_item: Mapping[str, list[Mapping[str, Any]]],
+) -> dict[str, tuple[list[dict[str, Any]], int, int, set[str]]]:
+    """对 D4-2 / D4-3 / D4-5-policy-groups 分别 merge（fixed items 另见 merge_d45_fixed）。"""
+    d42_base = list(base_by_item.get(STORE_ITEM_ID) or ())
+    d43_base = list(base_by_item.get(STORE_ITEM_ID_D43) or ())
+    d45_base = list(base_by_item.get(STORE_ITEM_ID_D45_GROUPS) or ())
+    d421_base = list(base_by_item.get(STORE_ITEM_ID_D421) or ())
+    d422_base = list(base_by_item.get(STORE_ITEM_ID_D422) or ())
+    d423_base = list(base_by_item.get(STORE_ITEM_ID_D423) or ())
+    d424_base = list(base_by_item.get(STORE_ITEM_ID_D424) or ())
+    interview_results = {
+        interview_store_item_id(code): merge_interview_projection_into_store(
+            code,
+            projection=projection,
+            base_payload=base_by_item.get(interview_store_item_id(code), {} if code == "D4-31" else []),
+        )
+        for code in INTERVIEW_SHEET_CODES()
+        if _INCLUDE_IPO_INTERVIEW_SHEETS
+    }
+    return {
+        STORE_ITEM_ID: merge_projection_into_store_rows(
+            projection=projection, base_rows=d42_base
+        ),
+        STORE_ITEM_ID_D43: merge_projection_into_d43_store_rows(
+            projection=projection, base_rows=d43_base
+        ),
+        STORE_ITEM_ID_D45_GROUPS: merge_projection_into_d45_group_rows(
+            projection=projection, base_rows=d45_base
+        ),
+        STORE_ITEM_ID_D421: merge_projection_into_d421_store_rows(
+            projection=projection, base_rows=d421_base
+        ),
+        STORE_ITEM_ID_D422: merge_projection_into_d422_store_rows(
+            projection=projection, base_rows=d422_base
+        ),
+        STORE_ITEM_ID_D423: merge_projection_into_d423_store_rows(
+            projection=projection, base_rows=d423_base
+        ),
+        STORE_ITEM_ID_D429: merge_d429_projection_into_store(
+            projection=projection, base_payload=base_by_item.get(STORE_ITEM_ID_D429)
+        ),
+
+        **interview_results,
+        **{
+            STORE_ITEM_ID_BY_CODE[code]: merge_ipo_checklist_projection_into_rows(
+                code,
+                projection=projection,
+                base_rows=list(base_by_item.get(STORE_ITEM_ID_BY_CODE[code]) or ()),
+            )
+            for code in CHECKLIST_SHEET_CODES
+        },
+    }
+
+
+def merge_d45_fixed_from_projection(
+    *,
+    projection: Any,
+    base_by_item: Mapping[str, str | None],
+) -> dict[str, str]:
+    """D4-5 固定 item（remark 纯文本）← projection。"""
+    return merge_projection_into_d45_fixed_items(
+        projection=projection, base_by_item=base_by_item
+    )
+
+
+#: D4-35 store item（dict 形态 {rows, sampling, periodAmount}，非行数组，不进 STORE_ITEM_IDS）。
+STORE_ITEM_ID_D435_DICT: Final[str] = STORE_ITEM_ID_D435
+
+
+def merge_d435_from_projection(
+    *,
+    projection: Any,
+    base_state: Mapping[str, Any] | None,
+) -> tuple[dict[str, Any], int, int]:
+    """D4-35 dict store ← projection：只 merge rows，保留 sampling/periodAmount（HTML-only 非行数据）。
+
+    返回 (merged_dict, applied, visited)。merged_dict 恒为 {rows, sampling, periodAmount} 完整形态。
+    """
+    base = dict(base_state) if isinstance(base_state, Mapping) else {}
+    base_rows = base.get("rows")
+    if not isinstance(base_rows, list):
+        base_rows = []
+    merged_rows, applied, visited, _touched = merge_projection_into_d435_store_rows(
+        projection=projection, base_rows=base_rows
+    )
+    return (
+        {
+            "rows": merged_rows,
+            "sampling": base.get("sampling", {}),        # 保留：抽样设计不被 OO 回读冲掉
+            "periodAmount": base.get("periodAmount", ""),  # 保留
+        },
+        applied,
+        visited,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -898,11 +1550,17 @@ async def attach_adapters(
     observation = await resolve_published_frozen_definitions(
         session=session, representation=representation, contract=contract
     )
+    sibling_bindings = _attach_sibling_bindings(
+        primary=observation.identity_binding,
+        contract=contract,
+        dynamic_bindings=observation.identity_binding.dynamic_column_columns,
+    )
     register_adapter(
         registry,
         adapter=build_excel_adapter(
             definitions=observation.definitions,
             binding=observation.identity_binding,
+            sibling_bindings=sibling_bindings,
             direction="html_to_oo",
         ),
         bundle=bundle,
@@ -911,6 +1569,50 @@ async def attach_adapters(
         contract=contract,
     )
     return (ADAPTER_ID,)
+
+
+def _attach_sibling_bindings(
+    *,
+    primary: Any,
+    contract: Any,
+    dynamic_bindings: Mapping[str, Any],
+) -> tuple[Any, ...]:
+    """Attach 时补 sibling binding（与 publish 的 `_sibling_identity_bindings` 同序）。"""
+    from app.services.excel_structure_fingerprint import GT_SYNC_SHEET_NAME
+    from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
+
+    specs = tuple(instrumentation_specs())
+    from app.services.workpaper_sync.phase5_d4_29_customer_detail import row_oriented_sheets
+    sheets = row_oriented_sheets(contract)
+    if len(specs) <= 1 or len(sheets) != len(specs):
+        return ()
+    siblings: list[Any] = []
+    for spec, sheet in zip(specs[1:], sheets[1:]):
+        dynamic = next(
+            (table for table in sheet.tables if table.row_identity is not None),
+            None,
+        )
+        if dynamic is None:
+            continue
+        binding = ExcelIdentityBinding(
+            table_name=str(spec.table_name),
+            uuid_column=str(spec.uuid_col),
+            table_key=str(dynamic.table_key),
+            metadata_sheet=GT_SYNC_SHEET_NAME,
+            defined_name_prefix=str(
+                getattr(spec, "defined_name_prefix", None) or "GT_"
+            ),
+            tombstoned_row_keys=(),
+            dynamic_column_columns={
+                str(table_key): dict(mapping)
+                for table_key, mapping in (dynamic_bindings or {}).items()
+                if isinstance(mapping, Mapping)
+            },
+        )
+        if binding.table_key == primary.table_key:
+            continue
+        siblings.append(binding)
+    return tuple(siblings)
 
 
 def manifest_capability_enabled(*, manifest: Mapping[str, Any] | None = None) -> bool:

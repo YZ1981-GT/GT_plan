@@ -102,7 +102,8 @@ async def get_workpaper_guidance(
     from app.services import guidance_source_refs
     from app.services.wp_visibility.entry_integration import gate_wp
 
-    gate_sheet_code = sheet_code or inventory.extract_sheet_code(sheet_name)
+    # 先校验底稿/项目访问；D4 合册子 sheet 的 canonical membership 由后续
+    # render-config 裁决，不能提前把 render sheet code 当成 ProcedureRowTask.sheet_key。
     await gate_wp(
         db,
         current_user,
@@ -112,7 +113,7 @@ async def get_workpaper_guidance(
         wp_id=wp_uuid,
         route_name="get_workpaper_guidance",
         entry_family="workpaper",
-        requested_sheet_key=gate_sheet_code,
+        requested_sheet_key=None,
     )
 
     from app.models.workpaper_models import WorkingPaper, WpIndex
@@ -162,8 +163,9 @@ async def get_workpaper_guidance(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    # 若 canonical identity 只能由 render manifest 裁决，再以该 key 做第二次 sheet gate。
-    if resolved_sheet_code and resolved_sheet_code != gate_sheet_code:
+    # 若 render manifest 解析出具体 sheet，再执行已有窄粒度 gate；未知 sheet
+    # 仍在 resolve_render_sheet_context 阶段拒绝，不会退化为整稿访问。
+    if resolved_sheet_code:
         await gate_wp(
             db,
             current_user,

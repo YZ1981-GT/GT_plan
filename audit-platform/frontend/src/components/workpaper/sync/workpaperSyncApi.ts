@@ -248,6 +248,76 @@ export interface CreatePendingMutationInput {
   readonly idempotencyKey?: string
 }
 
+/**
+ * store-backed entry（D2/H1/G7）的 projection **服务端现算**（G4-0c）。
+ *
+ * 前端不得重造 39 列 → stable-key 映射（Requirement 6.1）。本端点只读，不推 revision。
+ * 返回的 `projection` / `expectedRevision` 直接喂给 `flushHtml` → pending-mutation →
+ * materialize。空 projection 一律拒绝（空 = 清空整表）。
+ */
+export interface StoreProjectionSnapshot {
+  readonly expectedRevision: number
+  readonly fieldCount: number
+  readonly rowCount: number
+  readonly projection: { readonly values: Readonly<Record<string, unknown>> }
+}
+
+export async function readStoreProjection(
+  scope: WorkpaperSyncEntryScope,
+): Promise<StoreProjectionSnapshot> {
+  const payload = await request({
+    endpoint: 'read_store_projection',
+    scope,
+  })
+  if (payload == null || typeof payload !== 'object' || Array.isArray(payload)) {
+    refuse(
+      'store_projection_shape_invalid',
+      'store-projection 响应不是对象 —— 不得把半截响应当 projection',
+    )
+  }
+  const wire = payload as Record<string, unknown>
+  const expectedRevision = wire.expected_revision
+  const fieldCount = wire.field_count
+  const rowCount = wire.row_count
+  const projection = wire.projection
+  if (
+    typeof expectedRevision !== 'number' ||
+    !Number.isInteger(expectedRevision) ||
+    expectedRevision < 0
+  ) {
+    refuse(
+      'store_projection_revision_invalid',
+      `store-projection.expected_revision 非法: ${JSON.stringify(expectedRevision)}`,
+    )
+  }
+  if (
+    projection == null ||
+    typeof projection !== 'object' ||
+    Array.isArray(projection) ||
+    typeof (projection as { values?: unknown }).values !== 'object' ||
+    (projection as { values?: unknown }).values == null ||
+    Array.isArray((projection as { values?: unknown }).values)
+  ) {
+    refuse(
+      'store_projection_values_missing',
+      'store-projection 缺 projection.values 对象 —— 空投影会清空整表，必须 fail visible',
+    )
+  }
+  const values = (projection as { values: Record<string, unknown> }).values
+  if (Object.keys(values).length === 0) {
+    refuse(
+      'store_projection_empty',
+      'store-projection 返回空 values —— 不得作为 flush/materialize 载荷',
+    )
+  }
+  return {
+    expectedRevision,
+    fieldCount: typeof fieldCount === 'number' ? fieldCount : Object.keys(values).length,
+    rowCount: typeof rowCount === 'number' ? rowCount : 0,
+    projection: { values },
+  }
+}
+
 /** `flushHtml()` 的落点。**不推进** revision（AC 3.1）。 */
 export async function createPendingMutation(
   scope: WorkpaperSyncEntryScope,
@@ -718,6 +788,7 @@ export async function rollbackVersion(
 /** 全部 client method 名 → endpoint 名。判据用它证明「每条路由都有唯一消费方」。 */
 export const WORKPAPER_SYNC_CLIENT_ENDPOINTS = Object.freeze({
   createPendingMutation: 'create_pending_mutation',
+  readStoreProjection: 'read_store_projection',
   materialize: 'materialize',
   confirmDescriptor: 'confirm_descriptor',
   requestForcesave: 'request_forcesave',

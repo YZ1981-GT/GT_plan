@@ -16,7 +16,7 @@ describe('useDisplayPrefsStore', () => {
 
   it('默认值正确', () => {
     const store = useDisplayPrefsStore()
-    expect(store.amountUnit).toBe('wan')
+    expect(store.amountUnit).toBe('yuan')
     expect(store.fontSize).toBe('sm')
     expect(store.density).toBe('default')
     expect(store.showZero).toBe(false)

@@ -8436,6 +8436,52 @@
       "category": "cross_module",
       "severity": "warning",
       "source_address": "B60D:报送函:对应B60版本日期"
+    },
+    {
+      "ref_id": "CW-D424-E131",
+      "description": "第三方回款检查明细详见银行流水双向核对表（导航引用）",
+      "source_wp": "D4-24",
+      "source_sheet": "第三方回款检查D4-24",
+      "source_cell": "A24",
+      "targets": [
+        {
+          "wp_code": "E1-31",
+          "sheet": "银行流水双向核对表E1-31",
+          "cell": null,
+          "formula": null,
+          "cell_label": "第三方回款明细",
+          "address": "E1-31:银行流水双向核对表E1-31"
+        }
+      ],
+      "category": "navigation",
+      "relation": "detail_reference",
+      "severity": "info",
+      "source_cell_label": "审计说明·第三方回函检查明细",
+      "source_file": "D4 收入底稿.xlsx",
+      "note": "导航引用（非公式依赖）：D4-24 → E1-31，供 GtIndexChip 跳转（Req 5.1）"
+    },
+    {
+      "ref_id": "CW-D424-D27",
+      "description": "第三方回款检查明细详见应收账款检查表（导航引用）",
+      "source_wp": "D4-24",
+      "source_sheet": "第三方回款检查D4-24",
+      "source_cell": "A24",
+      "targets": [
+        {
+          "wp_code": "D2-7",
+          "sheet": "应收账款检查表D2-7",
+          "cell": null,
+          "formula": null,
+          "cell_label": "第三方回款明细",
+          "address": "D2-7:应收账款检查表D2-7"
+        }
+      ],
+      "category": "navigation",
+      "relation": "detail_reference",
+      "severity": "info",
+      "source_cell_label": "审计说明·第三方回函检查明细",
+      "source_file": "D4 收入底稿.xlsx",
+      "note": "导航引用（非公式依赖）：D4-24 → D2-7，供 GtIndexChip 跳转（Req 5.1）"
     }
   ],
   "stats": {

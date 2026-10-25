@@ -280,7 +280,7 @@ class WpBoundGate:
         resolved_sheet_key: str | None = None
         if request.requested_sheet_key is not None:
             catalog = await SheetBindingCatalog.build(
-                self.db, project_id, wp_index_id, current_version
+                self.db, project_id, wp_index_id, current_version, wp_id=wp_id
             )
             sr = catalog.resolve_sheet_key(request.requested_sheet_key)
             if not sr.ok or sr.sheet_key is None:

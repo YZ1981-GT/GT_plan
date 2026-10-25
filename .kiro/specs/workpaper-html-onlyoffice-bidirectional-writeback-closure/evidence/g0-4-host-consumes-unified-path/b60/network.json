@@ -1,0 +1,62 @@
+{
+  "capture_kind": "playwright_runtime_network_capture",
+  "captured_at": "2026-09-11T05:36:33.425Z",
+  "complete_for_negative_assertion": false,
+  "complete_for_positive_assertion": true,
+  "entry_id": "xlsx/b60/gt-b60-bundle",
+  "evidence_source": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g4-1-b60-host-unified-path/network-and-callback.json",
+  "execution_status": "COMPLETED",
+  "positive_state_eligible": true,
+  "requests": [
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/afb9201a-5989-4c3f-b79f-e1a950e53be9/sync/entries/xlsx/b60/gt-b60-bundle/store-projection"
+    },
+    {
+      "method": "POST",
+      "status": 200,
+      "url": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/afb9201a-5989-4c3f-b79f-e1a950e53be9/sync/entries/xlsx/b60/gt-b60-bundle/pending-mutations"
+    },
+    {
+      "method": "POST",
+      "status": 200,
+      "url": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/afb9201a-5989-4c3f-b79f-e1a950e53be9/sync/entries/xlsx/b60/gt-b60-bundle/materialize"
+    },
+    {
+      "method": "POST",
+      "status": 202,
+      "url": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/afb9201a-5989-4c3f-b79f-e1a950e53be9/sync/entries/xlsx/b60/gt-b60-bundle/rooms/e4c46326-ab6f-463a-836d-47288b0ab1ae/forcesave"
+    }
+  ],
+  "run_id": "g4-1-pilots-positive-runtime-v1",
+  "schema_version": "host-unified-path-network-evidence/v1",
+  "source_bindings": [
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/b60/GtB60Bundle.vue",
+      "required_literals": [
+        "useWorkpaperSyncBridge({",
+        "WorkpaperSyncEditorHost",
+        "capabilityForEntry(B60_SYNC_ENTRY_ID)"
+      ],
+      "sha256": "3cbffd5d0e2e95dfa29f37d52f223318821e09a82c5314410b5958abca5f7707"
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/sync/useWorkpaperSyncBridge.ts",
+      "required_literals": [
+        "materialize",
+        "forcesave"
+      ],
+      "sha256": "add95900a9b72c1df730df2b0471e7379a18d77b1b6984c453bb2efd94558d1d"
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
+      "required_literals": [
+        "forcesaveEndpoint",
+        "G4-0a",
+        "/d2-sync/forcesave"
+      ],
+      "sha256": "2fbc5fb6067360448c044ae24d54da37549f7ce43a1e18b1da161c2aac78e816"
+    }
+  ]
+}

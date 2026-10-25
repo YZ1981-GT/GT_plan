@@ -69,7 +69,8 @@
 
 Registry 一 entry 一 adapter 不变；多 sheet 只扩契约 `sheets[]`。分析类/程序类未进本任务集前必须先做映射可行性核，不得默认 bidirectional。
 
-- **D4-5 会计政策检查**：已 triage → `single_html`（`evidence/T08-d45-single-html-triage.json`）。段落式 + 多 `D4-5-*` item，无 GTROW；**禁止**扩进 `d4.revenue_detail` sheets[]。双向下一刀 = **D1-2**（D4-4 已于 Task 8 改判 single_html，见 `T08-d44-single-html-adjudication.json`）。
+- **D4-5 会计政策检查**：T08 曾判 `single_html`；**已由 T09 改判** `paragraph_block_bidirectional`（分组紧凑表 + 经营模式 B11–B16 static；`D4TabPolicyCheck` 自管 sync host，**不**进 `isD4DetailSheet`）。契约 sheet_key=`d45-managed` 已进 `d4.revenue_detail` sheets[]。信用/说明/结论因 footer 下 `static_row` 与插行 fail-closed 冲突，暂 HTML-only（见 `HTML_ONLY_ITEM_IDS_D45`）。
+- **D4-5 落地进度（本轮）**：`phase5_d4_policy_check_sheet.py` + contract `1.2.0`；roundtrip 单测 `test_d45_production_roundtrip.py`（含第三组插行）绿；宿主接线 vitest `d45SyncHostWiring.spec.ts` 绿；e2e 草稿 `e2e/g5-1-d45-policy-path.spec.ts`。真栈取证前需 Task76 重发含 D45 的 bundle + `d43_rematerialize_dual_sheet.py --apply`。
 
 ## Task Dependency Graph
 

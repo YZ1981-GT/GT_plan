@@ -13,7 +13,7 @@
  *
  * Requirements: 4.1-4.7
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import {
   parseNum,
   calcAuditedWithAdj,
@@ -270,14 +270,27 @@ export function useD4OtherRevenue(options: UseD4BaseOptions) {
     } catch { /* silent */ }
   }
 
-  // ─── Lifecycle ───────────────────────────────────────────────────────
-
-  onBeforeUnmount(() => {
+  function flushPendingSave(): void {
     if (debounceTimer) {
       clearTimeout(debounceTimer)
       debounceTimer = null
-      flushSave()
     }
+    flushSave()
+  }
+
+  function onHostFlushPending(): void {
+    flushPendingSave()
+  }
+
+  // ─── Lifecycle ───────────────────────────────────────────────────────
+
+  onMounted(() => {
+    window.addEventListener('d4:flush-pending', onHostFlushPending)
+  })
+
+  onBeforeUnmount(() => {
+    window.removeEventListener('d4:flush-pending', onHostFlushPending)
+    flushPendingSave()
   })
 
   // ─── Return ──────────────────────────────────────────────────────────
@@ -289,6 +302,7 @@ export function useD4OtherRevenue(options: UseD4BaseOptions) {
     addRow,
     removeRow,
     updateCell,
+    flushPendingSave,
   }
 }
 

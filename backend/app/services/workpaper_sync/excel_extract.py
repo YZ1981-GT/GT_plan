@@ -787,18 +787,7 @@ def managed_tables_of(
                 f"{dynamic.table_key!r} 的 identity 上"
             )
         statics.append(table)
-    others = [
-        t.table_key
-        for s in contract.sheets
-        if s.sheet_key != sheet.sheet_key
-        for t in s.tables
-    ]
-    if others:
-        raise ManagedRegionResolutionError(
-            f"契约 {contract.contract_id} 在受管 sheet {sheet.sheet_key!r} 之外还声明了表 "
-            f"{sorted(others)} —— 一次 extract 只覆盖一张 sheet 的受管区域，"
-            "跨 sheet 必须各自有 Table 锚点与绑定，不得让一次反读静默漏掉它们"
-        )
+    # 其它 sheet 的表由各自 binding / sibling_bindings 覆盖；此处只解析本 sheet。
     return dynamic, tuple(statics)
 
 
@@ -1516,17 +1505,25 @@ def _shared_strings_prefix_digest(
 
 
 def _classify_parts(
-    zf: zipfile.ZipFile, *, region: ManagedRegion, metadata_sheet: str
+    zf: zipfile.ZipFile,
+    *,
+    region: ManagedRegion,
+    metadata_sheet: str,
+    extra_managed_sheet_parts: frozenset[str] | set[str] = frozenset(),
 ) -> dict[str, list[str]]:
     """把 zip 全部条目分到 aspect 桶里。**最后一个桶是 catch-all**。
 
     分类顺序即优先级；`DERIVED_PARTS` 与「受管部件」先被摘掉，剩下的必须落进某个桶 ——
     :func:`unmanaged_region_digest` 会断言「已分类 + 已摘除 == 全部条目」，于是新出现的
     部件类别不可能悄悄逃过检查。
+
+    ``extra_managed_sheet_parts``：同 workbook 其它受管 sheet（多 sheet 契约）的 part，
+    不得落入 ``other_sheet_parts`` 逐字节比对（那些 sheet 由各自 binding 的
+    ``managed_sheet_*`` aspect 检查）。
     """
     sheet_parts = _sheet_parts(zf)
     metadata_part = sheet_parts.get(metadata_sheet)
-    managed_parts = {region.sheet_part}
+    managed_parts = {region.sheet_part, *extra_managed_sheet_parts}
     if metadata_part:
         managed_parts.add(metadata_part)
 
@@ -1574,6 +1571,7 @@ def unmanaged_region_digest(
     row_shift: RowShiftPlan | None = None,
     total_formula_rows: Sequence[int] = (),
     propagation: Any | None = None,
+    extra_managed_sheet_parts: frozenset[str] | set[str] = frozenset(),
 ) -> UnmanagedRegionDigest:
     """算一份 artifact 的未管理区域 digest（供 rematerialize 前后比对）。
 
@@ -1597,7 +1595,12 @@ def unmanaged_region_digest(
         contract=contract, region=region, binding=binding, scan=scan
     )
     with zipfile.ZipFile(path) as zf:
-        buckets = _classify_parts(zf, region=region, metadata_sheet=binding.metadata_sheet)
+        buckets = _classify_parts(
+            zf,
+            region=region,
+            metadata_sheet=binding.metadata_sheet,
+            extra_managed_sheet_parts=extra_managed_sheet_parts,
+        )
         aspects: dict[str, str] = {}
         coverage: dict[str, int] = {}
 
@@ -1657,7 +1660,7 @@ def unmanaged_region_digest(
         classified = {p for parts in buckets.values() for p in parts}
         skipped = (
             set(DERIVED_PARTS)
-            | {region.sheet_part}
+            | {region.sheet_part, *extra_managed_sheet_parts}
             | {
                 part
                 for name, part in _sheet_parts(zf).items()
@@ -1689,6 +1692,7 @@ def verify_unmanaged_regions(
     row_shift: RowShiftPlan | None = None,
     total_formula_rows: Sequence[int] = (),
     propagation: Any | None = None,
+    extra_managed_sheet_parts: frozenset[str] | set[str] = frozenset(),
 ) -> UnmanagedRegionReport:
     """Task 38 的 `verify_unmanaged_regions` 的**共用实现**。
 
@@ -1714,6 +1718,7 @@ def verify_unmanaged_regions(
         binding=binding,
         scan=scan,
         limits=lim,
+        extra_managed_sheet_parts=extra_managed_sheet_parts,
     )
     target = unmanaged_region_digest(
         after,
@@ -1729,6 +1734,7 @@ def verify_unmanaged_regions(
         total_formula_rows=total_formula_rows,
         # 工作簿级传播的**声明**条目 —— 同上，只给 after 侧。
         propagation=propagation,
+        extra_managed_sheet_parts=extra_managed_sheet_parts,
     )
     for aspect in UNMANAGED_ASPECTS:
         if base.aspects[aspect] != target.aspects[aspect]:
@@ -2120,6 +2126,7 @@ def extract_projection(
     baseline_formulas: Mapping[str, str] | None = None,
     limits: SyncLimits | None = None,
     sidecar_path: Path | None = None,
+    retain_identity_inventory: bool = True,
 ) -> ExcelExtractOutcome:
     """按 representation 固定的 stable identity 反读受管字段。
 
@@ -2205,9 +2212,13 @@ def extract_projection(
     tier = assert_identity_carriers_usable(
         inventory, contract=contract, entry_id=entry_id
     )
-    assert_identity_inventory_retained(
-        expected=definitions.identity_inventory, observed=inventory, entry_id=entry_id
-    )
+    # 多受管 sheet：冻结 inventory 只锁主 binding；sibling 表列跨度不同，不得拿主表期望比对。
+    if retain_identity_inventory:
+        assert_identity_inventory_retained(
+            expected=definitions.identity_inventory,
+            observed=inventory,
+            entry_id=entry_id,
+        )
 
     budget = StreamingProjectionBudget(lim)
     values: dict[str, FieldValue] = {}

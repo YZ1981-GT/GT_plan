@@ -387,9 +387,6 @@ def stage_instrumented_substrate(
         load_limits,
         validate_ooxml_artifact,
     )
-    from app.services.workpaper_sync.excel_instrumentation import (
-        instrument_workbook_bytes,
-    )
 
     provider = _provider_for(entry_id)
     if contract is None:
@@ -397,11 +394,26 @@ def stage_instrumented_substrate(
 
     try:
         source_bytes = provider.read_authoritative_template()
-        instrumented = instrument_workbook_bytes(
-            source_bytes,
-            provider.instrumentation_spec(),
-            gate=provider.excel_carrier_gate(),
-        )
+        gate = provider.excel_carrier_gate()
+        specs_fn = getattr(provider, "instrumentation_specs", None)
+        if callable(specs_fn):
+            from app.services.workpaper_sync.excel_instrumentation import (
+                instrument_workbook_bytes_multi,
+            )
+
+            instrumented = instrument_workbook_bytes_multi(
+                source_bytes, specs_fn(), gate=gate
+            )
+        else:
+            from app.services.workpaper_sync.excel_instrumentation import (
+                instrument_workbook_bytes,
+            )
+
+            instrumented = instrument_workbook_bytes(
+                source_bytes,
+                provider.instrumentation_spec(),
+                gate=gate,
+            )
     except Exception as exc:
         raise SubstrateStagingError(
             f"entry {entry_id!r} 的权威模板 instrumentation 失败: "
@@ -520,6 +532,7 @@ async def publish_first_generation(
     from app.services.workpaper_sync.models import ArtifactKind, ArtifactState
     from app.services.workpaper_sync.publish_time_structure_hash import (
         anchors_from_instrumentation_spec,
+        anchors_from_instrumentation_specs,
     )
 
     provider = _provider_for(plan.entry_id)
@@ -544,23 +557,27 @@ async def publish_first_generation(
     )
 
     # ── ② adapter ─────────────────────────────────────────────────
+    primary_binding = _identity_binding(
+        provider=provider, staged=staged, contract=plan.contract
+    )
+    sibling_bindings = _sibling_identity_bindings(
+        provider=provider,
+        staged=staged,
+        contract=plan.contract,
+        primary=primary_binding,
+    )
     adapter = build_excel_adapter(
         definitions=definitions,
-        binding=_identity_binding(
-            provider=provider, staged=staged, contract=plan.contract
-        ),
+        binding=primary_binding,
         direction=FIRST_PUBLICATION_DIRECTION,
+        sibling_bindings=sibling_bindings,
     )
 
     # ── ③ business projection = substrate 基线 ⊕ HTML store 覆盖 ────
-    if not hasattr(provider, "build_store_projection"):
-        raise ProviderCapabilityError(
-            f"provider {plan.provider_module!r} 未导出 `build_store_projection` —— "
-            "projection-based commit 必须提交业务 projection，不得用权威 OOXML 字节代替"
-            "（Requirement 2.11 的反面）"
-        )
-    store_projection = provider.build_store_projection(
-        store_payload, contract=plan.contract
+    store_projection = _store_projection_for_provider(
+        provider=provider,
+        store_payload=store_payload,
+        contract=plan.contract,
     )
     projection = _overlay_store_on_substrate_baseline(
         adapter=adapter,
@@ -598,8 +615,11 @@ async def publish_first_generation(
         #    `compute_structure_hash_from_artifact` 的模块文档）。锚点从 provider 的
         #    instrumentation spec 投影 —— 此刻那份 instrumentation definition 还没发布
         #    （它与 representation 同一次事务才成形），取不到冻结 payload。
-        structure_anchors=anchors_from_instrumentation_spec(
-            provider.instrumentation_spec()
+        #    多 sheet entry 必须投全部 specs，否则 sibling 不进 structure_hash。
+        structure_anchors=(
+            anchors_from_instrumentation_specs(provider.instrumentation_specs())
+            if callable(getattr(provider, "instrumentation_specs", None))
+            else anchors_from_instrumentation_spec(provider.instrumentation_spec())
         ),
         reason="content_commit",
     )
@@ -925,58 +945,55 @@ def _column_index_of(column: str) -> int:
     return index
 
 
-def _overlay_store_on_substrate_baseline(
-    *, adapter: Any, contract: Any, substrate: Path, store_projection: Any
+def _coerce_excel_numeric_text_field(field: Any) -> Any:
+    """Excel 数字格落入 ``value_type=text`` 受管列时，写成字符串以便 materialize。
+
+    模板脚手架（如 D4-25 ``seq`` 占位 1..10、勾选列 ``1``）经 openpyxl 读成 int/float；
+    ``normalize_value`` 对 text 拒绝数字。首版/rematerialize 路径 = 基线 ⊕ store，空
+    store 时必须带着这些脚手架键过 roundtrip，故在 overlay 出口把数字写成十进制字符串。
+    不放宽 ``merge.normalize_value``（HTML store 侧 int 仍 fail visible）。
+    """
+    from dataclasses import replace
+
+    from app.services.workpaper_sync.contracts import ValueType
+
+    if getattr(field, "value_type", None) is not ValueType.text:
+        return field
+    value = getattr(field, "value", None)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return field
+    if isinstance(value, float) and value.is_integer():
+        return replace(field, value=str(int(value)))
+    return replace(field, value=str(value))
+
+
+def overlay_store_on_baseline_projection(
+    *, baseline: Any, store_projection: Any
 ) -> Any:
-    """首版业务 projection = **substrate 基线** ⊕ HTML store 覆盖。
+    """业务 projection = **substrate 基线** ⊕ HTML store 覆盖（纯函数，无 I/O）。
 
-    ═══ 为什么首版不能只提交 store projection ═══════════════════════════════════
+    ═══ 为什么不能只提交 store projection ═══════════════════════════════════
 
-    实测（H1，`H1-8-rows` 全库 0 行）：只交 store projection 时
-    `_assert_roundtrip_equivalent` 报「反读出未提交的受管字段
-    `disposal_check_rows/GTROW-H18-0013/seq` …（共 15 个）」。
+    实测（H1 空 store / D2 已有 published）：只交 store 时 `_assert_roundtrip_equivalent`
+    报「反读出未提交的受管字段」（模板 ``GTROW-*`` / ``seq`` 等脚手架）。materialize 对
+    不在 projection 里的行不写任何东西，模板值原样留在 staged artifact，extract 读得到，
+    projection 无对端 ⇒ 判多出字段。
 
-    根因不是 materialize 写错了，而是**那 15 个 `seq` 本来就在权威模板里** —— H1-8 的
-    A13:A27 预印了序号 1..15，`seq` 的 contract mode 是 `auto_source`（表单脚手架，不是
-    审计师录入项）。materialize 对不在 projection 里的行不写任何东西，于是模板值原样留
-    在 staged artifact 上，extract 自然读得到它，而 projection 里没有对端 ⇒ 判「多出字段」。
+    正确语义是提交「这张表当前的内容」= 基线 ⊕ store（**store 侧优先**）。
 
-    正确的业务语义是：**首版记录的是「这张表当前的内容」**，而不是「store 里有什么」。
-    空 store 的固定资产减少检查表，在 OO 里就该显示那张印着序号 1..15 的空白表单 ——
-    那是审计师期望看到的纸质表形态，不是脏数据。
-
-    故这里先 `adapter.extract(staged substrate)` 取基线（= 权威模板经 instrumentation 后
-    的当前内容），再把 store projection 逐字段叠加在上面（**store 侧优先**：HTML 已录入
-    的值是更新的业务事实）。两侧都没有的字段不出现。
-
-    🔴 只在**首版**这么做。后续代际的 substrate 是上一版 published representation，
-    基线已经包含全部业务内容，再叠加一次是空操作；而 OO→HTML 方向的 substrate 是
-    durable incoming，那条路必须走 Task 26 的三方 merge，不得用本函数的「后者覆盖前者」
-    代替 —— 那正是 design「明确拒绝的方案」第 5 条（last-write-wins）。
+    🔴 只丢「基线没有该键 **且** store 侧取值为 None」的占位（G7 矩阵显式 None 坑）。
     """
     from app.services.workpaper_sync.adapters.base import Projection
 
-    baseline = adapter.extract(artifact=substrate, contract=contract)
-
-    values = dict(baseline.values)
+    values = {
+        key: _coerce_excel_numeric_text_field(field)
+        for key, field in baseline.values.items()
+    }
     for key, field in store_projection.values.items():
-        # 🔴 只丢「基线没有该键 **且** store 侧取值为 None」的字段 —— 那既不是业务事实、
-        #    也不是清空动作，是 provider 为固定形状的矩阵吐出的**占位**。
-        #
-        #    实测（G7，`minority_financials` 是 10×10 矩阵）：`build_store_projection`
-        #    吐出 **100 个显式 None** 的 amount 字段，而 substrate 上那 100 格本来是空的
-        #    （`adapter.extract` 对空格**不产键**，基线只有 5 个值）。照原样叠加的后果是
-        #    materialize 把 None 写成 `0`，反读回来 100 处全部 `None → 0` 不等值，
-        #    `_assert_roundtrip_equivalent` 判 `roundtrip_projection_mismatch`。
-        #
-        #    判据必须带「基线没有该键」这一半：基线**有值**而 store 给 None 是审计师
-        #    「清空这一格」的真实动作，那一种必须保留、必须写下去。少了这一半就会把
-        #    清空静默吞掉 —— 那比多写一个 0 更贵。
         if field.value is None and key not in baseline.values:
             continue
-        values[key] = field
+        values[key] = _coerce_excel_numeric_text_field(field)
 
-    # row_keys 按表合并：基线的物理行序 + store 新增行（保序、去重）
     row_keys: dict[str, tuple[str, ...]] = {}
     for table_key in {*baseline.row_keys, *store_projection.row_keys}:
         merged: list[str] = []
@@ -995,6 +1012,20 @@ def _overlay_store_on_substrate_baseline(
         document_type=str(store_projection.document_type),
         values=values,
         row_keys=row_keys,
+    )
+
+
+def _overlay_store_on_substrate_baseline(
+    *, adapter: Any, contract: Any, substrate: Path, store_projection: Any
+) -> Any:
+    """首版 / materialize-ready：adapter.extract(substrate) 取基线后再叠加 store。
+
+    🔴 只在**有 published substrate** 时这么做。OO→HTML 的 durable incoming 必须走
+    Task 26 三方 merge，不得用本函数的「后者覆盖前者」代替。
+    """
+    baseline = adapter.extract(artifact=substrate, contract=contract)
+    return overlay_store_on_baseline_projection(
+        baseline=baseline, store_projection=store_projection
     )
 
 
@@ -1033,22 +1064,110 @@ def _row_bearing_table_key(*, contract: Any, provider: Any) -> str:
             for field in table.fields
         )
     ]
-    if len(candidates) != 1:
+    declared = str(getattr(provider, "ROWS_TABLE_KEY", "") or "").strip()
+    if len(candidates) == 0:
         raise ProviderCapabilityError(
             f"契约 {contract.contract_id!r} 里满足「row_identity 声明非空 ∧ 有 "
-            f"row_from=row_identity 字段」的表有 {len(candidates)} 张 {candidates}"
-            " —— 需恰 1 张才能确定行身份表；0 张说明契约没声明动态行，"
-            "多张说明一个受管 sheet 上有两套行身份，identity 绑定无法二选一"
+            f"row_from=row_identity 字段」的表有 0 张 —— 契约没声明动态行，"
+            "无法确定行身份表"
         )
-    derived = candidates[0]
-    declared = str(getattr(provider, "ROWS_TABLE_KEY", "") or "").strip()
-    if declared and declared != derived:
+    if len(candidates) == 1:
+        derived = candidates[0]
+        if declared and declared != derived:
+            raise ProviderCapabilityError(
+                f"provider 声明 ROWS_TABLE_KEY={declared!r}，但契约 "
+                f"{contract.contract_id!r} 的行身份表是 {derived!r} —— 两侧不一致时"
+                "不得静默取一侧：那会把「契约改了表名而 provider 没跟」变成无声的错行写入"
+            )
+        return derived
+    # 多受管 sheet（如 D4-2 + D4-3）：主 binding 必须取 provider.ROWS_TABLE_KEY。
+    if declared and declared in candidates:
+        return declared
+    raise ProviderCapabilityError(
+        f"契约 {contract.contract_id!r} 里满足「row_identity 声明非空 ∧ 有 "
+        f"row_from=row_identity 字段」的表有 {len(candidates)} 张 {candidates}"
+        " —— 多 sheet 时 provider 必须声明 ROWS_TABLE_KEY 指向主表，"
+        "其余表由 sibling_bindings 覆盖"
+    )
+
+
+def _store_projection_for_provider(
+    *, provider: Any, store_payload: Any, contract: Any
+) -> Any:
+    """单 store 走 `build_store_projection`；多 store 走 `build_combined_store_projection`。
+
+    ``store_payload`` 可以是单份 JSON 文本，或 ``{item_id: json_text}`` 映射
+    （宿主在 `STORE_ITEM_IDS` 场景下传入）。
+    """
+    item_ids = tuple(getattr(provider, "STORE_ITEM_IDS", ()) or ())
+    if (
+        len(item_ids) > 1
+        and hasattr(provider, "build_combined_store_projection")
+        and isinstance(store_payload, Mapping)
+    ):
+        return provider.build_combined_store_projection(
+            store_payload, contract=contract
+        )
+    if not hasattr(provider, "build_store_projection"):
         raise ProviderCapabilityError(
-            f"provider 声明 ROWS_TABLE_KEY={declared!r}，但契约 "
-            f"{contract.contract_id!r} 的行身份表是 {derived!r} —— 两侧不一致时"
-            "不得静默取一侧：那会把「契约改了表名而 provider 没跟」变成无声的错行写入"
+            f"provider {getattr(provider, '__name__', provider)!r} 未导出 "
+            "`build_store_projection` —— projection-based commit 必须提交业务 projection，"
+            "不得用权威 OOXML 字节代替（Requirement 2.11 的反面）"
         )
-    return derived
+    return provider.build_store_projection(store_payload, contract=contract)
+
+
+def _sibling_identity_bindings(
+    *,
+    provider: Any,
+    staged: StagedSubstrate,
+    contract: Any,
+    primary: Any,
+) -> tuple[Any, ...]:
+    """同 workbook 其它受管 sheet 的 binding（与 `instrumentation_specs` 顺序对齐）。"""
+    from app.services.excel_structure_fingerprint import GT_SYNC_SHEET_NAME
+    from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
+
+    specs_fn = getattr(provider, "instrumentation_specs", None)
+    if not callable(specs_fn):
+        return ()
+    specs = tuple(specs_fn())
+    if len(specs) <= 1:
+        return ()
+    from app.services.workpaper_sync.phase5_d4_29_customer_detail import row_oriented_sheets
+    sheets = row_oriented_sheets(contract)
+    if len(sheets) != len(specs):
+        raise ProviderCapabilityError(
+            f"provider {getattr(provider, '__name__', provider)!r} 的 "
+            f"instrumentation_specs 数 ({len(specs)}) 与契约 sheets 数 ({len(sheets)}) "
+            "不一致 —— 多 sheet binding 无法对齐"
+        )
+    siblings: list[Any] = []
+    for spec, sheet in zip(specs[1:], sheets[1:]):
+        dynamic = next(
+            (table for table in sheet.tables if table.row_identity is not None),
+            None,
+        )
+        if dynamic is None:
+            continue
+        binding = ExcelIdentityBinding(
+            table_name=str(spec.table_name),
+            uuid_column=str(spec.uuid_col),
+            table_key=str(dynamic.table_key),
+            metadata_sheet=GT_SYNC_SHEET_NAME,
+            defined_name_prefix=str(
+                getattr(spec, "defined_name_prefix", None) or "GT_"
+            ),
+            tombstoned_row_keys=(),
+            dynamic_column_columns={
+                table_key: dict(mapping)
+                for table_key, mapping in staged.observed_dynamic_bindings.items()
+            },
+        )
+        if binding.table_key == primary.table_key:
+            continue
+        siblings.append(binding)
+    return tuple(siblings)
 
 
 def _identity_binding(
@@ -1114,6 +1233,7 @@ __all__ = [
     "resolve_plan",
     "stage_instrumented_substrate",
     "publish_first_generation",
+    "overlay_store_on_baseline_projection",
     # 异常
     "FirstPublicationError",
     "ProjectionBundleNotProvisionedError",

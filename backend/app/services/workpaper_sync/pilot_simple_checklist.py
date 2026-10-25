@@ -162,6 +162,7 @@ __all__ = [
     "PilotSelectionError",
     "assert_contract_file_matches_source",
     "assert_manifest_capability_enabled",
+    "manifest_capability_enabled",
     "assert_pilot_entry_selectable",
     "excel_carrier_gate",
     "resolve_published_frozen_definitions",
@@ -878,6 +879,11 @@ async def attach_pilot_adapters(
     """
     if PILOT_ADAPTER_ID in {reg.adapter_id for reg in registry.registrations()}:
         return ()
+    if not manifest_capability_enabled():
+        # 🔴 与 D2/H1/G7 同口径：「capability 还没启用」必须 return () 而不是 raise。
+        #    B60 已有 published representation 时若仍 raise，会把整条 sync 路由拖成 500
+        #    （_attach_pilot_adapters 在 _registration 的 try 之外）。
+        return ()
 
     import sqlalchemy as sa
 
@@ -950,6 +956,21 @@ async def attach_pilot_adapters(
         contract=contract,
     )
     return (PILOT_ADAPTER_ID,)
+
+
+def manifest_capability_enabled(*, manifest: Mapping[str, Any] | None = None) -> bool:
+    """capability 是否已启用（接线路径的「今天不是我的回合」分支用它做真值判定）。
+
+    🔴 实现**委派**给 :func:`assert_manifest_capability_enabled`，只把它的异常翻成布尔：
+    两处各写一套判据会让「接线路径放行、顺序门仍红」这种不一致悄悄发生。`except` 只捕获
+    :class:`PilotSelectionError` 这一个窄类型 —— 宽 `except Exception` 会把 manifest 读不出来
+    之类的真故障也吞成「未启用」（本 spec 最贵的 fail-open 形态）。
+    """
+    try:
+        assert_manifest_capability_enabled(manifest=manifest)
+    except PilotSelectionError:
+        return False
+    return True
 
 
 def assert_manifest_capability_enabled(

@@ -1,0 +1,32 @@
+{
+  "captured_at": "2026-09-10T12:53:34.149Z",
+  "marker": "g4s63676",
+  "cellEdit": {
+    "ok": true,
+    "hasSave": "function",
+    "hasIsModified": "function",
+    "hasCanSave": "function",
+    "inserted": true,
+    "entered": true,
+    "cellText": "g4s63676",
+    "modifiedBeforeSave": true,
+    "saveRet": true,
+    "saved": true
+  },
+  "dirty": "0",
+  "host_status": "已发送强制保存，等待 OnlyOffice 回传文件",
+  "host_error": null,
+  "bridge": "waiting_application",
+  "forcesaveBody": {
+    "forcesave_request_id": "88d8c315-a4b9-4e53-a206-0c216c0abbf5",
+    "operation_id": "38030530-c0cd-48aa-8818-7a6758ce6a35",
+    "request_sequence": 14,
+    "state": "accepted",
+    "poll_after_ms": 500,
+    "replayed": false,
+    "dispatch_error": null,
+    "cs_error": 0,
+    "cs_outcome": "accepted",
+    "callback_expected": true
+  }
+}

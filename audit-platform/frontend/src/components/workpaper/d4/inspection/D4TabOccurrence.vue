@@ -8,7 +8,7 @@
  *
  * Spec: .kiro/specs/d4-14-walkthrough-test/ Phase 4
  */
-import { ref, computed, inject, onBeforeUnmount, defineAsyncComponent, type Ref } from 'vue'
+import { ref, computed, inject, onBeforeUnmount, defineAsyncComponent, toRef, type Ref } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import useD4WalkthroughTest, {
   type TransactionItem,
@@ -18,6 +18,7 @@ import useD4WalkthroughTest, {
   collectAiContext,
 } from '../../composables/useD4WalkthroughTest'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import D4WalkthroughCard from './D4WalkthroughCard.vue'
 import D4WalkthroughMatrix from './D4WalkthroughMatrix.vue'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
@@ -73,6 +74,25 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
+
+// ─── 双向回写：重大异常事项 → A13 错报 + D4-1 审计说明 ─────────────────
+const { pushToA13 } = useD4InspectionWriteback({
+  wpCode: 'D4-14',
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+})
+const anomalousTransactions = computed(() =>
+  transactions.value.filter(t => t.conclusion === '存在重大异常' || t.isAnomalous),
+)
+function handlePushToA13() {
+  const misItems = anomalousTransactions.value.map(t => ({
+    voucherNo: t.voucher?.number || t.indexNo || '',
+    amount: t.voucher?.amount || 0,
+    description: `${t.label || t.indexNo || '事项'} 穿行测试${t.conclusion || '存在异常'}`,
+    indexRef: t.indexNo || 'D4-14',
+  }))
+  pushToA13(misItems, '6001', '营业收入')
+}
 
 // ─── 4.1.1 Mode switching ────────────────────────────────────────────
 const editorMode = ref<string>('卡片视图')
@@ -414,6 +434,9 @@ ensureActiveTab()
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-12" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-4" :context-project-id="projectId" />
+        <el-tooltip content="将穿行测试重大异常事项推送至 A13 未更正错报汇总，并同步至 D4-1 审计说明" placement="top">
+          <el-button size="small" type="warning" plain :disabled="isReadonly || anomalousTransactions.length === 0" @click="handlePushToA13">推送异常至 A13</el-button>
+        </el-tooltip>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-14-walkthrough')">
           💬 复核
         </el-button>

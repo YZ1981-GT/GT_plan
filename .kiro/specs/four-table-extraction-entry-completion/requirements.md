@@ -117,6 +117,20 @@
 4. WHEN 全部交付 THEN 必须至少一次浏览器真栈实测：某张此前无入口的明细表，点新按钮后行数从 0 变为账套真实户数，且金额与只读 SQL 快照逐字对齐
 5. WHEN 迁移历史端点 THEN 必须实测迁移前后金额差异并解释（若原来双算，迁移后金额下降是**预期**修正，须在证据里写明倍数）
 
+### Requirement 8: D4-6/D4-7 上下游数据联动（表间公式驱动）
+
+**User Story:** 作为审计师，D4-6 重要指标分析表的 12 项指标数值（应收账款/总资产、应收账款周转天数等）应能从 trial_balance 自动预填，而不是每项都手抄科目余额再人工计算；D4-7 毛利率月度分析表的月度收入/成本应能从 D4-2 主营明细表汇总联动，按产品毛利应能从后端 segment_prefill 预填——这两张表是分析程序的核心，数据断链会迫使审计师在 4 张表之间手动抄录同一组数字。
+
+#### Acceptance Criteria
+
+1. WHEN D4-6 加载指标表 THEN 后端 render 策略必须在 `html_data` 中下发 `indicator_prefill: Record<string, {current: number, prior: number}>`，按指标 key 从 `trial_balance` / `tb_balance` 取数计算（如 `ar-to-assets` = 科目1122审定数 / 资产总计审定数），前端 `loadIndicators()` 在指标值为 0 且有 prefill 时自动填入
+2. WHEN D4-6 指标需要跨科目组合计算 THEN 取数逻辑必须复用 `four_table/` 的 `select_leaves` / `aggregate_leaves` 现有函数（禁止另写裸 SQL），科目码从 `DEFAULT_INDICATORS[].source` 的 TB 科目标注解析
+3. WHEN D4-6 指标涉及非 TB 数据（如"员工总数"来自 project_info）THEN 该指标的 prefill 留空，不伪造；前端 tooltip 提示"需手动填写"
+4. WHEN D4-7 月度毛利分析加载 THEN 如果 `D4-7-monthly` 未持久化（首次进入），前端必须从 `allResponses.get('D4-2-rows')` 读取 D4-2 主营明细的各产品 × 12 月数据，按月 SUM 汇总作为收入行 seed；如 D4-2 无数据则留空不伪造
+5. WHEN D4-7 按产品毛利分析加载 THEN 如果 `D4-7-products` 未持久化（首次进入），前端必须从 `html_data.segment_prefill`（后端已产出含 `label`/`current_revenue`/`current_cost`/`prior_revenue`/`prior_cost`）预填产品行；已有持久化数据时不覆盖
+6. WHEN D4-7 月度数据导入导出 THEN 必须支持月度毛利分析部分（12 个月 ×（收入+成本）+ 上期收入 + 上期成本 = 26 列）的导入导出，不只导出产品毛利分析部分
+7. WHEN D4-7 后端导入解析 `_parse_d4_7_row` THEN 必须包含 `上期数量` 列（当前默认 0 导致上期平均单价和单位成本计算全 0）
+
 ## Glossary
 
 | 术语 | 含义 |

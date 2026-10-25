@@ -7,13 +7,19 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 合计/本期发生额/检查比例自动计算
  * 行级附件+OCR + AI + 双模式 + 导入导出
  */
-import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
+import { parseNum, calcSubtotal, calcAnomalyRate, calcCoverageRate } from '../../composables/useD4FormulaEngine'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
+import { d4_35Candidates, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME } from '../../composables/d4OtherGroupPushPredicates'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -35,7 +41,7 @@ const periodAmount = ref<number | string>('')  // 本期发生额
 const auditNote = ref(''); const auditConclusion = ref('')
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-function pn(v: any): number { if (!v || v === '') return 0; const n = parseFloat(String(v)); return isNaN(n) ? 0 : n }
+const pn = parseNum  // 数值解析走引擎单一真源
 function createRow(): CheckRow { return { id: `ck-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`, date: '', voucherNo: '', content: '', counterAccount: '', detailAccount: '', amount: '', supportDoc: '', check1: '', check2: '', check3: '', check4: '', check5: '', check6: '', indexRef: '', isAnomalous: '', remark: '' } }
 
 function loadData() {
@@ -52,10 +58,13 @@ function removeRow(id: string) { if (props.isReadonly) return; rows.value = rows
 function updateRow(id: string, field: keyof CheckRow, value: any) { if (props.isReadonly) return; const row = rows.value.find(r => r.id === id); if (row) { (row as any)[field] = value; persistAll() } }
 function updateSampling(field: keyof SamplingParams, value: string) { if (props.isReadonly) return; sampling.value[field] = value; persistAll() }
 
-// Stats
-const totalChecked = computed(() => rows.value.reduce((s, r) => s + pn(r.amount), 0))
-const checkRatio = computed(() => { const pa = pn(periodAmount.value); return pa > 0 ? ((totalChecked.value / pa) * 100).toFixed(2) + '%' : '—' })
+// Stats — 全部走引擎单一真源（合计/异常率/覆盖率），组件内不再内联 reduce/百分比口径
+const totalChecked = computed(() => calcSubtotal(rows.value.map(r => pn(r.amount))))
 const anomalyCount = computed(() => rows.value.filter(r => r.isAnomalous === '是').length)
+// 覆盖率 = 检查金额 / 本期发生额 × 100（引擎 calcCoverageRate 已 *100）
+const checkRatio = computed(() => { const pa = pn(periodAmount.value); return pa > 0 ? calcCoverageRate(totalChecked.value, pa).toFixed(2) + '%' : '—' })
+// 异常率 = 异常笔数 / 已检查笔数 × 100（引擎 calcAnomalyRate 已 *100）
+const anomalyRate = computed(() => rows.value.length > 0 ? calcAnomalyRate(anomalyCount.value, rows.value.length).toFixed(2) + '%' : '—')
 
 function persistAll() {
   props.allResponses.set('D4-35-data', { item_id: 'D4-35-data', conclusion: null, remark: JSON.stringify({ rows: rows.value, sampling: sampling.value, periodAmount: periodAmount.value }) })
@@ -65,6 +74,12 @@ function persistAll() {
 }
 function updateAuditNote(v: string) { if (props.isReadonly) return; auditNote.value = v; persistAll() }
 function updateAuditConclusion(v: string) { if (props.isReadonly) return; auditConclusion.value = v; persistAll() }
+// 立即 flush 防抖中的落库（双向回写 flushHtml 用：先把 html 改动落库再 readStoreProjection）
+function flushPendingSave() {
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+  const keys = ['D4-35-data','D4-35-note','D4-35-conclusion']
+  window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } }))
+}
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); const keys = ['D4-35-data','D4-35-note','D4-35-conclusion']; window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } })) } })
 
 // OCR
@@ -88,7 +103,72 @@ async function handleOcrUpload(rowId: string, file: File) {
   } catch { ElMessage.warning('OCR识别失败') }
 }
 
-const editorMode = ref<string>('表格视图'); const modeOptions = ['表格视图', '在线编辑']
+// ─── D4-35 双向回写 sync bridge（sheet_key=d435-managed，同 entry gt-d4-operating-revenue）─────
+const D435_ENTRY = 'xlsx/gt-d4-operating-revenue'
+const D435_SHEET_KEY = 'd435-managed'
+const ooHealthy = ref(false)
+async function checkOoHealth() {
+  try {
+    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
+  } catch { ooHealthy.value = false }
+}
+checkOoHealth()
+const d435SyncSwitching = ref(false)
+const d435SyncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const d435SyncBridge = useWorkpaperSyncBridge({
+  entryId: ref(D435_ENTRY),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(D435_SHEET_KEY),
+  capability: capabilityForEntry(D435_ENTRY),
+  flushHtml: async () => {
+    flushPendingSave()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D435_ENTRY })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D435_SHEET_KEY }
+  },
+  reloadHtml: async () => { window.dispatchEvent(new CustomEvent('d4:reload-responses')) },
+})
+const d435SyncOoDescriptor = computed(() => d435SyncBridge.descriptor.value)
+const d435SyncBusy = computed(
+  () => d435SyncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(d435SyncBridge.state.value)),
+)
+const editorMode = computed<string>({
+  get: () => (d435SyncBridge.mode.value === 'oo' ? '在线编辑' : '表格视图'),
+  set: (v: string) => { void switchD435Mode(v === '在线编辑' ? 'onlyoffice' : 'structured') },
+})
+const modeOptions = computed(() => [
+  { label: '表格视图', value: '表格视图' },
+  { label: '在线编辑', value: '在线编辑', disabled: props.isReadonly || !ooHealthy.value || d435SyncBusy.value },
+])
+async function switchD435Mode(target: 'structured' | 'onlyoffice'): Promise<void> {
+  const cur = d435SyncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
+  if (target === cur) return
+  if (target === 'onlyoffice') {
+    if (props.isReadonly || !ooHealthy.value) return
+    d435SyncSwitching.value = true
+    try { await d435SyncBridge.switchToOnlyOffice() } finally { d435SyncSwitching.value = false }
+    return
+  }
+  d435SyncSwitching.value = true
+  try { await d435SyncBridge.switchToHtml() } finally { d435SyncSwitching.value = false }
+}
+// 同步态三态中文标签（禁裸英文）
+const syncStateTag = computed(() => {
+  const st = String(d435SyncBridge.state.value)
+  if (d435SyncBusy.value) return { text: '同步中…', type: 'info' as const }
+  if (d435SyncBridge.dirty?.value) {
+    return d435SyncBridge.mode.value === 'oo'
+      ? { text: 'excel 侧有未同步改动', type: 'warning' as const }
+      : { text: 'html 侧有未同步改动', type: 'warning' as const }
+  }
+  if (st.includes('error') || String(d435SyncBridge.lastError?.value || '')) {
+    return { text: '同步失败，请重试', type: 'danger' as const }
+  }
+  return { text: '已同步', type: 'success' as const }
+})
+
 const aiAvailable = ref(false)
 async function checkAiHealth() { try { const r = await http.get('/api/ai/health', { _silent: true } as any); aiAvailable.value = (r.data?.data?.status ?? r.data?.status) === 'healthy' || (r.data?.data?.status ?? r.data?.status) === 'degraded' } catch { aiAvailable.value = false } }
 checkAiHealth()
@@ -100,11 +180,32 @@ async function genConclusion() { if (props.isReadonly || !aiAvailable.value) ret
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 function fmtAmt(v: number): string { return v ? v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—' }
 function rowClassName({ row }: { row: CheckRow }) { return row.isAnomalous === '是' ? 'row-anomaly' : '' }
+
+// ─── A13 错报推送（复用共享件，科目 6051；判据走单一真源 d4_35Candidates）──────
+const { pushToA13 } = useD4InspectionWriteback({
+  wpCode: 'D4-35',
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+})
+const pushableCount = computed(() => d4_35Candidates(rows.value as any).length)
+function pushAnomaliesToA13() {
+  if (props.isReadonly) return
+  const cands = d4_35Candidates(rows.value as any)
+  if (!cands.length) { ElMessage.info('无抽凭异常，无需推送'); return }
+  // 抽凭金额是参考额，人工认定错报金额与方向（不把凭证全额直接等同错报）
+  const items = cands.map(c => ({
+    voucherNo: c.voucherNo,
+    amount: c.refAmount ?? 0,
+    description: c.description,
+    indexRef: c.indexRef,
+  }))
+  pushToA13(items, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME)
+}
 </script>
 
 <template>
 <div class="d4-other-check">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-35')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-35')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-35',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-35-check')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /><el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushAnomaliesToA13" title="把抽凭异常推送到 A13 未更正错报汇总（金额与方向由人工认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" :disabled="isReadonly||d435SyncBusy||editorMode==='在线编辑'" @click="switchD435Mode('onlyoffice')" title="把当前 html 数据推送到在线编辑（人工触发）">同步到在线编辑</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-35')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-35')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-35',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-35-check')">💬 复核</el-button></div></div>
 
   <template v-if="editorMode !== '在线编辑'">
     <!-- 审计目标 -->
@@ -136,6 +237,7 @@ function rowClassName({ row }: { row: CheckRow }) { return row.isAnomalous === '
       <span class="stat-item">检查金额：<strong>{{ fmtAmt(totalChecked) }}</strong></span>
       <span class="stat-item">检查比例：<strong>{{ checkRatio }}</strong></span>
       <span class="stat-item" :class="{ warn: anomalyCount > 0 }">异常：<strong>{{ anomalyCount }}笔</strong></span>
+      <span class="stat-item" :class="{ warn: anomalyCount > 0 }">异常率：<strong>{{ anomalyRate }}</strong></span>
       <span class="stat-item">样本数：<strong>{{ rows.length }}笔</strong></span>
     </div>
 
@@ -170,7 +272,7 @@ function rowClassName({ row }: { row: CheckRow }) { return row.isAnomalous === '
     <!-- 审计意见区 -->
     <el-card class="audit-opinion-card" shadow="never"><template #header><div class="opinion-header"><span class="opinion-title">审计意见区</span><div class="opinion-actions"><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiNoteLoading" :disabled="isReadonly||!aiAvailable" @click="genNote">🤖 AI辅助说明</el-button></el-tooltip><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiConclusionLoading" :disabled="isReadonly||!aiAvailable" @click="genConclusion">🤖 AI辅助结论</el-button></el-tooltip></div></div></template><div class="opinion-body"><div class="opinion-field"><label>四、审计说明</label><el-input type="textarea" :autosize="{minRows:3,maxRows:12}" :model-value="auditNote" :disabled="isReadonly" placeholder="记录抽凭检查中发现的异常情况" @input="(v:string)=>updateAuditNote(v)" /></div><div class="opinion-field"><label>五、审计结论</label><el-input type="textarea" :autosize="{minRows:2,maxRows:8}" :model-value="auditConclusion" :disabled="isReadonly" placeholder="综合判断其他业务收入是否真实、完整、准确" @input="(v:string)=>updateAuditConclusion(v)" /></div></div></el-card>
   </template>
-  <template v-if="editorMode==='在线编辑'"><div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="其他业务收入检查表D4-35" :readonly="isReadonly" /></div></template>
+  <template v-if="editorMode==='在线编辑'"><div class="oo-container"><WorkpaperSyncEditorHost v-if="d435SyncOoDescriptor" ref="d435SyncHostRef" :descriptor="d435SyncOoDescriptor" :bridge="d435SyncBridge" /><div v-else class="d435-oo-loading">正在打开 D4-35 同步编辑器…</div></div></template>
 </div>
 </template>
 

@@ -16,12 +16,12 @@
       {
         "role": "carrier_contract",
         "path": "backend/data/onlyoffice_excel_identity_carrier_contract.json",
-        "sha256": "c88df6d7c2a122cfea678657191530c223f77efe7afa6c3e20303d5659d1f31b"
+        "sha256": "350b7659e7d57f7de8f713cc195b480f8f5ec241935ee3ca8d694db3d63f1274"
       },
       {
         "role": "fingerprint_module",
         "path": "backend/app/services/excel_structure_fingerprint.py",
-        "sha256": "eed868a0e276ec02029adcbe4953387bf65cacc6f685ed758299fd6ad04d357f"
+        "sha256": "6f508e9ae159ddb7f77deed39e3cb2d5065fdc9d174900d47a86cc319573c347"
       }
     ],
     "onlyoffice_build": "9.4.0-129",

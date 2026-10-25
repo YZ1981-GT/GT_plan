@@ -1,0 +1,988 @@
+{
+  "generated_from": "backend/data/workpaper_sync_entry_manifest.json + *_cycle_manifest_slice.json",
+  "legacy_fake_total": 137,
+  "in_slice_count": 81,
+  "bucket_summary": {
+    "A_bidirectional_candidate_xlsx": 2,
+    "B_word_lane": 22,
+    "C_single_html_no_workbook": 63,
+    "D_not_in_slice_xlsx_pending": 50
+  },
+  "bucket_meaning": {
+    "A_bidirectional_candidate_xlsx": "xlsx权威册+有HTML store对端 → bidirectional候选(需逐字段核映射,参A5-1蓝图多为partial)",
+    "B_word_lane": "docx权威册 → Word lane(Phase 6),非xlsx单元格双向",
+    "C_single_html_no_workbook": "无权威册(前端纯checklist,OO空壳) → single_html终态",
+    "D_xlsx_store_unresolved": "in_slice已核: xlsx但store未解析 → 待逐entry解析(多为single_html)",
+    "D_not_in_slice_xlsx_pending": "未在cycle slice逐entry核的xlsx(如D循环d1/d3/d4等) → 待补slice或逐entry判store,不武断定终态",
+    "E_other": "未落入上述(需人工看)"
+  },
+  "buckets": {
+    "B_word_lane": [
+      {
+        "entry_id": "docx/gt-a10-bundle",
+        "document_type": "docx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "docx/gt-a12-bundle",
+        "document_type": "docx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "docx/gt-a16-bundle",
+        "document_type": "docx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "docx/gt-a17-bundle",
+        "document_type": "docx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "docx/gt-wp-renderer",
+        "document_type": "docx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "docx/wp-popup-docx-editor",
+        "document_type": "docx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-a101-governance-communication",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a111-subsequent-events-inquiry",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a112-dual-checklist",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "field_overrides",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a115-disclosure-checklist",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses+field_overrides",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a121-legal-confirmation",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a171-audit-summary",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a1721-kam",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a173-consultation-record",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a1731-consultation-execution",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a174-disagreement-record",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a176-closing-meeting",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a181-regulatory-submission",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a182-regulatory-communication",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a271-it-audit-memo",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a81-other-info-representation",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a91-deficiency-letter",
+        "document_type": "xlsx",
+        "workbook_format": "docx",
+        "store": "checklist_responses",
+        "in_slice": true
+      }
+    ],
+    "C_single_html_no_workbook": [
+      {
+        "entry_id": "xlsx/cash-flow-verification",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a177-independence-declaration",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a38-goodwill-impairment",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "field_overrides",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-b1-evaluation",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-b1-kaa-check",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-b1-risk-assessment",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-b14-due-diligence-report",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-b22-a-control-matrix",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-b22-b-control-matrix",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-b22-b-deficiency-evaluation",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-b22-c-design-effectiveness",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-b23-process-control",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses+field_overrides",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-b50-risk-assessment",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses+field_overrides",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-c-control-test",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-c22-itgc-bundle",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-k1-other-receivables",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-k10-other-income",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-k11-asset-impairment-loss",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-k12-non-operating-income",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-k13-non-operating-expense",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-k2-other-current-assets",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-k3-other-payables",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-k4-other-current-liabilities",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-k5-provisions",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-k6-held-for-sale",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-k7-deferred-income",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-k8-selling-expenses",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-k9-admin-expenses",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-l1-short-term-loans",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-l2-interest-payable",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-l3-long-term-loans",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-l4-bonds-payable",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-l5-long-term-payables",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-l6-special-payables",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-l8-financial-expenses",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-m1-dividends-payable",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-m10-other-equity-instruments",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-m2-paid-in-capital",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-m3-treasury-stock",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-m4-capital-reserve",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-m5-surplus-reserve",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-m6-retained-earnings",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-m7-special-reserve",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-m8-general-risk-reserve",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-m9-other-comprehensive-income",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-n1-deferred-tax-assets",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-n2-taxes-payable",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-n3-deferred-tax-liabilities",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-n4-taxes-and-surcharges",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-n5-income-tax-expense",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-wp-renderer",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses+field_overrides+custom_cells",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/s12-cpa-expert/gt-s12-cpa-expert",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/s13-mgmt-expert/gt-s13-mgmt-expert",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/s14-accounting-estimate/gt-s14-accounting-estimate",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/s15-eps-roe/gt-s15-eps-roe",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/s20-revenue-deduction/gt-s20-revenue-deduction",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/s21-data-asset/gt-s21-data-asset",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/s3-policy-change/gt-s3-policy-change",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/s4-nonmonetary-exchange/gt-s4-nonmonetary-exchange",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/s5-debt-restructuring/gt-s5-debt-restructuring",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/s6-fund-occupation/gt-s6-fund-occupation",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "checklist_responses",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/shared/cycle-standalone-procedure-shell",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": "field_overrides",
+        "in_slice": true
+      }
+    ],
+    "A_bidirectional_candidate_xlsx": [
+      {
+        "entry_id": "xlsx/gt-a3-consolidation-console",
+        "document_type": "xlsx",
+        "workbook_format": "xlsx",
+        "store": "field_overrides",
+        "in_slice": true
+      },
+      {
+        "entry_id": "xlsx/gt-a51-cashflow-audit",
+        "document_type": "xlsx",
+        "workbook_format": "xlsx",
+        "store": "checklist_responses",
+        "in_slice": true
+      }
+    ],
+    "D_not_in_slice_xlsx_pending": [
+      {
+        "entry_id": "xlsx/gt-d1-notes-receivable",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-d3-prepaid-accounts",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-d4-operating-revenue",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-d5-receivables-financing",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-d6-contract-assets",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-d7-contract-liabilities",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-e1-monetary-fund",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-f1-prepayment",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-f2-inventory-main",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-f2-inventory-special",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-f2-inventory-valuation",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-f2-stocktake-bundle",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-f3-notes-payable",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-f4-accounts-payable",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-f5-cost-of-sales",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g1-trading-financial-assets",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g10-trading-financial-liabilities",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g11-investment-income",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g12-net-hedge-gains",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g13-fair-value-changes",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g14-credit-impairment-loss",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g2-interest-receivable",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g3-dividend-receivable",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g4-bond-investment-ecl",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g4-bond-investment-main",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g4-bond-investment-sppi",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g5-long-term-receivable",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g6-other-bond-investment-ecl",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g6-other-bond-main",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g6-other-bond-sppi",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g7-equity-method",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g7-equity-subsidiary",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g8-other-equity-instruments",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-g9-other-noncurrent-financial",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-h10-asset-disposal-income",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-h2-construction-in-progress",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-h3-investment-property",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-h4-engineering-materials",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-h5-oil-gas-assets",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-h6-asset-disposal-clearing",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-h7-biological-assets",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-h8-right-of-use-assets",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-h9-lease-liabilities",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-i1-intangible-assets",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-i2-development-expenditure",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-i3-goodwill",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-i4-long-term-prepaid",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-i5-other-noncurrent-assets",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/gt-i6-research-development-expense",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      },
+      {
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "document_type": "xlsx",
+        "workbook_format": null,
+        "store": null,
+        "in_slice": false
+      }
+    ]
+  }
+}

@@ -1,0 +1,600 @@
+{
+  "captured_at": "2026-09-10T11:02:14.582Z",
+  "frame_count": 3,
+  "dump": [
+    {
+      "url": "http://localhost:3030/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/ef7f88e3-09eb-42cc-9f1d-1469fb3e6c88/edit",
+      "ascType": "undefined",
+      "ascKeys": [],
+      "editorType": "undefined",
+      "editorInteresting": [],
+      "editorSampleAsc": [],
+      "apiTry": {
+        "hasApi": "undefined",
+        "hasAscDesktopEditor": "undefined",
+        "hasCommon": "undefined"
+      },
+      "interestingIds": [],
+      "inputs": [
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-segmented__item-input",
+          "visible": true
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-segmented__item-input",
+          "visible": true
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "el-id-1428-72",
+          "className": "el-switch__input",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "el-id-1428-73",
+          "className": "el-switch__input",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "el-radio-button__original-radio",
+          "visible": false
+        }
+      ],
+      "canvasCount": 0
+    },
+    {
+      "url": "http://localhost:8080/9.4.0-acf53c9ad19e2bf7f71903eed02d9328/web-apps/apps/spreadsheeteditor/main/index.html?_dc=9.4.0-129&lang=zh-CN&customer=ONLYOFFICE&type=desktop&frameEditorId=wp-sync-oo-wpsync-0dcc5c0cbe887c5b40275e5c-g1-1&isForm=false&parentOrigin=http://localhost:3030&fileType=xlsx",
+      "ascType": "object",
+      "ascKeys": [
+        "c_oAscError",
+        "ST_EdGrp",
+        "ST_DisplacedByCustomXml",
+        "c_oNumeralType",
+        "FONT_THUMBNAIL_HEIGHT",
+        "c_oAscMaxColumnWidth",
+        "c_oAscMaxRowHeight",
+        "c_nMaxConversionTime",
+        "c_nCommonRequestTime",
+        "c_nMaxDownloadTitleLen",
+        "c_nVersionNoBase64",
+        "c_dMaxParaRunContentLength",
+        "c_nMaxHyperlinkLength",
+        "c_sNativeViewerFormats",
+        "c_sShardKeyName",
+        "c_sWopiSrcName",
+        "c_sUserSessionIdName",
+        "c_oAscFileType",
+        "g_oLcidNameToIdMap",
+        "availableIdeographLanguages",
+        "availableBidiLanguages",
+        "g_oLcidIdToNameMap",
+        "c_oAscTextAssociation",
+        "c_oAscAsyncAction",
+        "c_oAscAdvancedOptionsID",
+        "c_oAscFontRenderingModeType",
+        "c_oAscAsyncActionType",
+        "c_oAscNumFormatType",
+        "c_oAscDrawingLayerType",
+        "c_oAscTypeSelectElement",
+        "linerule_AtLeast",
+        "linerule_Auto",
+        "linerule_Exact",
+        "c_oAscShdClear",
+        "c_oAscShdNil",
+        "c_oAscShd",
+        "c_oAscDropCap",
+        "c_oAscChartTitleShowSettings",
+        "c_oAscChartHorAxisLabelShowSettings",
+        "c_oAscChartVertAxisLabelShowSettings"
+      ],
+      "editorType": "object",
+      "editorInteresting": [
+        "editorId",
+        "isLoadFullApi",
+        "isOpenedFrameEditor",
+        "openedFrameEditorType",
+        "mathInputType",
+        "CoAuthoringApi",
+        "isLockTargetUpdate",
+        "isLockScrollToTarget",
+        "evalCommand",
+        "SpellCheckApi",
+        "isBlurEditor",
+        "topLineEditorName",
+        "topLineEditorElement",
+        "collaborativeEditing",
+        "isEditVisibleAreaOleEditor",
+        "CollaborativeEditing",
+        "isCEditorFocused",
+        "Begin_CompositeInput",
+        "End_CompositeInput",
+        "Set_CursorPosInCompositeText",
+        "Get_CursorPosInCompositeText",
+        "Get_MaxCursorPosInCompositeText",
+        "beginInlineDropTarget",
+        "endInlineDropTarget",
+        "isEnabledDropTarget"
+      ],
+      "editorSampleAsc": [],
+      "apiTry": {
+        "hasApi": "undefined",
+        "hasAscDesktopEditor": "undefined",
+        "hasCommon": "undefined"
+      },
+      "interestingIds": [
+        "big_btn-menu-cell",
+        "btn-cell-group",
+        "btn-cell-ungroup",
+        "btn-ins-formula",
+        "btn-print-area",
+        "btn-addcell",
+        "btn-chartcategory-area-normal",
+        "btn-chartcategory-surface-normal",
+        "btn-delcell",
+        "btn-formula",
+        "btn-menu-cell",
+        "btn-merge-cells",
+        "btn-remove-trace-arrows",
+        "btn-resize-to-cell",
+        "btn-rows-and-columns",
+        "btn-show-formulas",
+        "btn-trace-dependents",
+        "btn-trace-precedents",
+        "btn-unmerge-cells",
+        "toolbar",
+        "formula",
+        "id-toolbar-btn-save",
+        "id-toolbar-btn-print",
+        "id-toolbar-btn-copy",
+        "id-toolbar-btn-undo",
+        "id-toolbar-btn-redo",
+        "id-toolbar-btn-paste",
+        "id-toolbar-btn-cut",
+        "id-toolbar-btn-copystyle",
+        "id-toolbar-btn-incfont",
+        "id-toolbar-btn-decfont",
+        "id-toolbar-btn-case",
+        "id-toolbar-btn-bold",
+        "id-toolbar-btn-italic",
+        "id-toolbar-btn-underline",
+        "id-toolbar-btn-strikeout",
+        "id-toolbar-btn-subscript",
+        "id-toolbar-btn-fontcolor",
+        "id-toolbar-btn-fillparag",
+        "id-toolbar-btn-borders",
+        "id-toolbar-mnu-item-border-width",
+        "id-toolbar-mnu-item-border-width",
+        "id-toolbar-mnu-item-border-color",
+        "id-toolbar-mnu-item-border-color",
+        "id-toolbar-menu-auto-bordercolor",
+        "id-toolbar-menu-bordercolor",
+        "id-toolbar-menu-new-bordercolor",
+        "id-toolbar-rtn-valign-top",
+        "id-toolbar-rtn-valign-middle",
+        "id-toolbar-rtn-valign-bottom",
+        "id-toolbar-rtn-wrap",
+        "id-toolbar-rtn-textorient",
+        "id-toolbar-btn-align-left",
+        "id-toolbar-btn-align-center",
+        "id-toolbar-btn-align-right",
+        "id-toolbar-btn-align-just",
+        "id-toolbar-rtn-merge",
+        "id-toolbar-btn-direction",
+        "slot-btn-formula",
+        "id-toolbar-btn-insertformula",
+        "id-toolbar-btn-fill-num",
+        "id-toolbar-btn-insertrange",
+        "id-toolbar-btn-clear",
+        "id-toolbar-toolbar__icon btn-sort-down0",
+        "id-toolbar-toolbar__icon btn-sort-up0",
+        "id-toolbar-toolbar__icon btn-autofilter0",
+        "id-toolbar-toolbar__icon btn-clear-filter0",
+        "id-toolbar-mnu-item-more-formats",
+        "id-toolbar-btn-accounting-style",
+        "id-toolbar-btn-percent-style",
+        "id-toolbar-btn-comma-style",
+        "id-toolbar-btn-decdecimal",
+        "id-toolbar-btn-incdecimal",
+        "slot-btn-cell-ins",
+        "id-toolbar-btn-addcell",
+        "slot-btn-cell-del",
+        "id-toolbar-btn-delcell",
+        "slot-btn-cell-format",
+        "id-toolbar-btn-formatcell",
+        "id-toolbar-menu-tab-color",
+        "id-toolbar-menu-new-color",
+        "id-toolbar-toolbar__icon btn-big-pivot-sum0",
+        "id-toolbar-menu-insertchart",
+        "id-toolbar-menu-insertspark",
+        "id-toolbar-menu-insart",
+        "id-toolbar-menu-symbols",
+        "id-toolbar-menu-draw-pen-asc-gen6963",
+        "id-toolbar-draw-updownpicker-asc-gen6963",
+        "id-toolbar-menu-draw-pen-asc-gen6974",
+        "id-toolbar-draw-updownpicker-asc-gen6974",
+        "id-toolbar-menu-draw-pen-asc-gen6985",
+        "id-toolbar-draw-updownpicker-asc-gen6985",
+        "slot-btn-printarea",
+        "tlbtn-printarea",
+        "id-toolbar-scale-updownpicker",
+        "id-toolbar-btn-colorschemas",
+        "slot-btn-additional-formula",
+        "slot-btn-trace-prec",
+        "slot-btn-trace-dep",
+        "slot-btn-show-formulas"
+      ],
+      "inputs": [
+        {
+          "tag": "INPUT",
+          "id": "title-doc-name",
+          "className": "",
+          "visible": true
+        },
+        {
+          "tag": "INPUT",
+          "id": "rib-doc-name",
+          "className": "",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "form-control",
+          "visible": true
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "form-control",
+          "visible": true
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "form-control",
+          "visible": true
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-952",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-953",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1454",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1457",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1455",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1456",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "form-control",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1511",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1514",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1515",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1516",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1513",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1512",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1517",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1518",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1112",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1113",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1114",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1115",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1184",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1185",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1186",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1187",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1188",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1189",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1190",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "form-control",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "className": "form-control",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1357",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1448",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1449",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1450",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1451",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1452",
+          "className": "checkbox__native",
+          "visible": false
+        },
+        {
+          "tag": "INPUT",
+          "id": "chb-1453",
+          "className": "checkbox__native",
+          "visible": false
+        }
+      ],
+      "canvasCount": 11
+    },
+    {
+      "url": "http://localhost:8080/9.4.0-acf53c9ad19e2bf7f71903eed02d9328/sdkjs-plugins/%7B9DC93CDB-B576-4F0C-B55E-FCC9C48DD007%7D/index.html?lang=zh-CN&theme-type=light",
+      "ascType": "object",
+      "ascKeys": [
+        "plugin",
+        "scope",
+        "supportOrigins",
+        "Buttons",
+        "ToolbarButtonType",
+        "ButtonContextMenu",
+        "ButtonToolbar",
+        "ButtonContentControl",
+        "OpenAIEncode",
+        "OpenAIDecode",
+        "Editor",
+        "PluginsMD",
+        "Library",
+        "Prompts",
+        "generateGuid",
+        "inputHelper",
+        "PluginWindow"
+      ],
+      "editorType": "undefined",
+      "editorInteresting": [],
+      "editorSampleAsc": [],
+      "apiTry": {
+        "hasApi": "undefined",
+        "hasAscDesktopEditor": "undefined",
+        "hasCommon": "undefined"
+      },
+      "interestingIds": [],
+      "inputs": [],
+      "canvasCount": 0
+    }
+  ],
+  "ascEdit": {
+    "tried": true,
+    "names": [],
+    "triedCalls": [
+      "callCommand"
+    ],
+    "errors": []
+  },
+  "host_dirty": "0",
+  "host_status": "OnlyOffice 编辑中"
+}

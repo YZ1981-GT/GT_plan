@@ -1,152 +1,122 @@
----
+﻿---
 inclusion: always
 ---
 
 # 持久记忆
 
-每次对话自动加载，**保持 ≤200 行**。明细下沉：完成事项 → `#dev-history`；架构决策 → `#architecture`；踩坑/编码约定 → `#conventions`；spec 状态 → `.kiro/specs/INDEX.md`。
+每次对话自动加载。详见 `#architecture` / `#conventions` / `#dev-history`。
+**保持本文件 ≤ 200 行**：完成事项 → dev-history / INDEX.md / git 历史；技术决策 → architecture；规范铁律 → conventions。
+精简归档历史（含 V3/附注/合并 A-P 系列详细 sprint 日志）见 `git show <旧commit>:.kiro/steering/memory.md` + `docs/proposals/` + `.kiro/specs/INDEX.md`。
 
 ## 用户偏好
 
-- 语言中文；启动 `start-dev.bat`（后端 9980 + 前端 3030）
-- **输出分步但连续做完**；**单次回复不要过长 —— 分段输出、每段一个可交付进展**（2026-08-05 用户明确要求）；**任务标记不能假绿**；**彻底解决不绕开**；**optional(*) 任务也要做完**
-- **调查完必须主动给改进建议，别只堆实证就停下**（2026-08-05 用户催「明明都已分析好了呀」）
-- **🔴 codegraph 优先于 grep**：146k 节点/312k 边/8673 文件；grep 仅用于非符号纯文本
-- **触类旁通**；**改动前先 spec 三件套**（>500 行 / 3+ 组件 / 跨前后端）；**改动后必 Playwright 实测**
-- **UI 全中文化**；**报表/附注金额默认「元」**；**中文场景全链路不能崩**
-- **不要考虑轻量**：要针对性、联动性、美观性、实操性、易懂性；审计 UI 必须有逻辑追溯能力
-- **四表取数新循环一律复用 `app/services/four_table/`**（`ReportLineAccountSpec` 声明报表行 + 兜底码 + `extra_standard_codes`；`select_leaves`/`aggregate_leaves` 做叶子聚合），禁止再抄一份科目定位/聚合逻辑
-- **死代码立即删除**（不留 DEPRECATED/fallback 注释，否则每次复盘重复提议）
-- **🔴 避免硬编码（2026-08-01 用户明确要求，全局适用）**：科目码/分类标签/章节号/表名/列 label/行集/列数/行数一律走**单一真源 + 守卫与真源双向锁死**。落法：①科目 → per-cycle `xAccountScope.ts`（`k2AccountScope.ts` 是范式），运行态取 render 下发的 `tb_source_codes`，常量只作兜底+展示 ②分类桶 → 一份声明式 dataclass（含 `source_ref` 指向源 xlsx 单元格），后端分类器/prefill 行标签/前端 seed 共同读，前端不抄第二份 ③章节号/表名字面量无法避免时（registry 生成器要求内联）**必须**与 `note_template_variant_matrix.json` / `note_template_*.json` 交叉锁死 ④列 label/行集真源 = 源 xlsx，守卫 openpyxl 直读三向比对 ⑤**按公司/单位横向展开的表禁写死列数**（`公司1..公司N`），改动态列 + 稳定 key `{slot}_{seq}`（H7 范式，**key 不能用 label** 会撞键）⑥**动态区骨架行数禁写死**（`blankRows(p,3|5|10)`），改 `max(seed 行数,1)`，预置空占位会被推成占位披露行 ⑦守卫读源码前必 `stripComments()` + 反向自检
-- 功能收敛；git 单 commit；**push 前必先 fetch**；**协作走 PR 不直推 main**
-- **会话结束前清掉自己的 `tmp_*` 诊断产物**（用户 2026-08-01 明确要求删；曾积到 68 个 / 18.7 MB，含 6.8 MB 的 vitest JSON 与带 token 的 `tmp_login.json`）。`.gitignore` **尚未收 `tmp_*`**（已向用户提议加、待答）
-- **spec 归档按功能分类**（05-business-features / 04-infra 等），不按日期批次
-- 目标并发 6000 人；底稿编码 = 致同 2025 修订版
-- 5 角色轮转：审计助理 / 现场经理 / 业务合伙人 / 质量控制复核合伙人 / EQCR 技术复核人
-- **v3.0 愿景（当前不做）**：项目级知识自动提取 + 跨年度续审继承
-
-## 平台级 UI/数值铁律
-
-> 完整机制与代码位置见 `#architecture` §平台级数值格式 / §表格 UI 规范。
-
-- **金额格式单一真源** = `stores/displayPrefs.ts` 的 `fmtAmount()`（千分符 + 2 位小数 + 默认「元」+ localStorage 持久化）。只读金额一律走它。**🔴 它是 store 成员、不是模块级导出** —— 写 `import { fmtAmount } from '@/stores/displayPrefs'` 会让整页崩成「页面渲染出错：does not provide an export named 'fmtAmount'」（`get_diagnostics` 与 vitest 全绿，只有浏览器暴露）；正解 = setup 顶层 `const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()` 再 `displayPrefs.fmtAmount(v)`（`useDisplayPrefsStore` 是 setup 作用域 composable，写进函数体静默失效）。
-- **防折行全局** = `styles/global.css` 的 `.el-table td.is-right .cell{white-space:nowrap;font-variant-numeric:tabular-nums}`。
-- **🔴 可编辑金额千分符只能用 `el-input`（2026-07-29 已定论，双证）**：①源码 —— EP **2.13.6** 的 `node_modules/element-plus/es/components/input-number/**` 全文无 `formatter`/`parser`，该 prop 不存在；②浏览器实测 —— `el-input-number :formatter` 下输 1234567.5 显示 `1234567.50`（**无千分符**），换 `el-input` 后显示 `1,234,567.50`。故平台现存 40+ 处 `el-input-number :formatter`（K1TabDisclosureListed·Soe / K1StageEclTable / E1TabCashCount / E1TabCreditReport）**全是空操作，千分符从未生效**；`wpAmountInput.ts` 的用法注释写错。→ 统一用 `components/workpaper/shared/WpAmountInput.vue`（失焦千分符 / 聚焦原始值便于编辑 / 粘贴带逗号可解析 / 非法输入回退不写 NaN）；存量替换待单独 spec 收口。`:precision="2"` 是真 prop 可留。**绝不套用**利率/汇率/比例/笔数/年度/月份。
-- **🔴 `fmtAmount(0)` 默认返回「-」不是 bug**：`stores/displayPrefs.DEFAULTS.showZero = false` + `utils/formatters.fmtAmountUnit` 的 `if (n === 0 && !showZero) return '-'` → 「0 显示成 -」现在是**用户可切换的平台级偏好**（已收敛到单一真源），不再是组件私自写死。要让 0 恒显 `0.00` 得改 `showZero` 默认值 = 波及全部表格的平台级变更，别在单个循环里绕。
-- **底稿表格统一**：13px 字号；AI+复核按钮右对齐在 section 标题同行；公式列虚线下划线 + tooltip 来源；审计说明/结论 `el-card` 包裹；编制提示 `details` 折叠底部。
-- **`GtPageHeader` 操作按钮**放**默认插槽**用 `margin-left:auto` 推右（放 `#actions` 会被拉伸成整条）；列表页表格禁 `border stripe`，改无边框 + `el-card shadow="never"`。
-- **列表页打磨范式**：状态列全中文彩色 tag（禁裸英文）；操作列 >4 项收「更多▾」；`highlight-current-row` 代替"选中"按钮；文件名带类型图标；状态面板禁空洞 `el-card` 改紧凑单行 bar。
-- **🔴 Vue 模板属性禁用中文引号/特殊 Unicode**（`content="…"XX""` 的 U+201C/201D 触发 Vite 编译崩溃，`get_diagnostics` 查不出）。
-- **导入导出统一** `el-dropdown「导入导出▾」`（导出模板/导出数据/导入数据）+ 复用 `useXImportExport`；多区块分 sheet。
-
-## 底稿交互铁律
-
-- **交互点选优先**（尤其 C 类控制测试）：判断/枚举字段一律下拉/单选/多选 tag/按钮点选；长文本才 autosize textarea + AI 辅助。
-- **动态行新增**需命名的必须先 `ElMessageBox.prompt` 输入名称再创建。
-- **多 section 底稿每个文本区都要 AI 辅助**（section 标题行右侧放 AI 按钮，不只底部有）。
-- **宽表（>10 列）录入**改引导式弹窗（分组卡片 + 内嵌方法论 + 实时联动分析面板 + 点点点 select）；>15 列必须拆分（区段 Tab / 借贷双区块 / 固定列+滚动 / 左右视觉分组）+ ⚙列设置。
-- **源模板红字内容**嵌入对应功能区上方作"方法论上下文"（琥珀色左边线+浅黄背景）；示例内嵌到编制界面可一键套用，不藏 Drawer。
-- **必要处加 📎 附件上传 + OCR**（样本证据/凭证/审计证据/过程记录），复用 `/d4/contract-ocr` → 确认弹窗 → merge 填充。
-- **结论/缺陷/偏差回写**：→ B50 EventBus / → A14 缺陷底稿 / → C21-1 汇总 / → A13 错报（`a13:push-misstatement`）。
-- **叙述式底稿**（仅核对+结论）不加独立审计意见区；textarea 用 `:autosize="{minRows:5}"`。
-
-## MCP 使用铁律
-
-- **🔴 工具选型阶梯**：符号/调用链/影响面→`codegraph`；wp_code/componentType/spec 进度→`gt-plan`；库表实证→`postgres`；容器日志/健康→`docker`；PR/CI→`github`；框架 API→`context7`；用户可见行为→`playwright`；非符号纯文本→`grep`（末位）
-- **🔴 gt-plan 优先于手翻 JSON**：查 wp_code、spec tasks、迁移 V 号先 `wp_lookup` / `spec_status` / `migration_status`
-- **🔴 postgres 只读**：仅 `restricted` 模式；禁经 MCP 写库；写库验证用 pytest 或现有脚本
-- **docker / github 默认只读**：破坏性操作须用户明确要求
-- **禁止 MCP 叠床架屋**：同一问题只选一主工具；失败降级回退终端命令并说明；密钥仅 `.cursor/mcp.env`
-
-## 底稿开发铁律
-
-- **风险导向审计**：B50 风险 → D~N 程序表 → A13 评价错报，全链可追溯
-- **componentType 选型**：结构化=`d-form-table` / 复杂 Excel=OnlyOffice / 文档=`word-template` / 程序表=`a-program-console` / 函证=`confirmation-*`（9 类）
-- **三表 HTML 渲染**：底稿目录+审定表+附注全走 HTML，仅复杂公式/DCF/图表留 OnlyOffice
-- **联动是核心价值**：`ref_index` chip + `auto_data_source` 实时取数；孤立底稿=无价值
-- **🔴 函证模块跨循环共享**：D0 的 9 个 `confirmation-*` 组件跨循环复用（E0/F0/G0/H0/K0/L0），不为每循环独立开发
-- **开发前必先逐 sheet 读源模板**（openpyxl 读 xlsx + BCD 类 md 交叉验证）
-- **🔴 源模板 xlsx 只认 `backend/wp_templates/`（运行时权威）**：`wp_template_init_service` 生成底稿时从这里复制、`wp_template_finder` 以 `_index.json` 索引。`基础数据/致同通用审计程序及底稿模板…` 是**参考副本且已落后**（实测 G4/G5/G6 两处不一致：权威版多「项目N（可改名）」占位行 +「（预留，可填或在本区内插入行）」预留区 + 6 条「编制说明」；G4 国企三阶段用语统一为「减值准备」；G4/G6 上市**只有「期末第一阶段」末列是「理由」**其余为「划分依据」；G5 删了「应收保证金/应收关联方款项」两行。G8~G12 两处字节一致）。2026-07-30 曾据参考副本重建 G4/G5/G6 后返工。**读模板前先比对两处 size**，并注意 `~$` 锁文件要跳过（用户开着 WPS 时可能还有未保存改动）
-- **🔴 增强打磨禁止自造披露内容**：附注/披露表增强必先看源模板，禁按"常识"造表（D5 曾自造"金融资产风险敞口"）。**存量已发现自造组件：`G6TabDisclosureListed.vue`**（7 个虚构小节「一、其他债权投资成本/二、利息调整/…/七、其他披露事项」+ `generateRows()` 批量生成 137 行 `成本项目N`，列头亦自拟；源表实为 14 张表）→ **不得接附注同步**（会污染附注），须按源模板重写；G6 国企侧结构正确（仅行名是可改名占位，可接）
-- **模板预填优先于 AI 生成**：有固定骨架的章节用 CHAPTER_TEMPLATE + 变量替换，AI 仅用于复杂章节
-- **🔴 底稿→附注同步不得压扁列结构**：底稿 UI 已按源模板渲染宽表时，`{X}NoteSectionMap.ts` 必须推同构列头（D2 曾把 6 列分类披露压成 2 列，附注/Word 双双缩水）；双期表拆两张、续表键补「（续：上年年末余额）」
-- **`sub_table_data` 唯一规范形态 = `{key: list[dict]}`（业务键行）**：投影结果（`{rows,_column_groups}` / 位置化 `values`）被回写时由 `note_sub_table_projector.normalize_sub_table_data` 读写两端逆投影，禁止再写 skip 分支丢整表
-- **底稿改版重命名子表**须随载荷上报 `sub_table_data._removed_table_keys`（后端删旧键，跳过本次推送键），否则附注永久残留空表
-- **附注行真源 = `rows[].label` + `rows[].values`（`_cell_meta`/`_cell_modes` 按 value 列索引键，标签列不算数据列）**；离线导入 xlsx 中间结构才是 `cells`（`cells[0]` 是标签列，对齐时须 -1）。`note_offline_import_service` 曾两侧都读 `cells` → 对真实附注 diff 恒「本地全空+全 ADD」、OVERWRITE 还把 `cells` 写回库（渲染器读不出），已修
-- **D~N 专属组件 8 步**：registry+yaml → composable 分层（`useXFormulaEngine` 纯函数）→ 主入口 sheetName v-if 分发 → 后端 3-4 py → 注册四件套 → 联动（TB 回写+EventBus+GtIndexChip）→ UI 铁律 → 功能方向（联动/美观/溯源/易操作/导入导出/AI/双三模式）
-- **OO sheet-name 必须与源 xlsx tab 名完全一致**；多 sheet workbook OO 隐藏非目标 tab
-- **通用 schema 复用** `{wp_code}-generic.yaml` + pattern matching
-- **🔴 列式转置结构**（投资项目作列头+检查项作行，如 G4-9）前端必须转为行式交互视图
-
-## 审定表预填充铁律
-
-- **X-1 审定表未审数从 `tb_balance` 明细子科目预填**（render 策略 `_build_adjudication_prefill`）：`get_active_filter` 查 `{code}%` → **优先叶子科目防双算** → 按 code 段分类 → 负债 `abs()` → snake_case 对齐前端；**仅无持久化时预填**（编辑后不覆盖）。`trial_balance` 只有一级总额+期末，故分类行必须从 `tb_balance` 取。
-- **审定表双期结构**：源模板若有「期初数/期末数各（未审/账项调整/重分类/审定）」分组表头即双期，单期 roll-forward 是误用；有一年内到期则加「减一年内到期→最终审定数」。
-- **四表取数 Tier A vs Tier B**：固定类别审定表（每类=一个科目，如 F2/H/I/L/M/N）适合 Tier A 可编辑 `TB()` 公式；动态分类审定表（D 循环信用风险/账龄）只能 Tier B 预填。**宁缺勿造**：无法干净映射的分类行不 seed。
+- 语言中文；本地优先轻量方案；启动 `start-dev.bat`（后端 9980 + 前端 3030）；打包 `build_exe.py`（PyInstaller 不要 .bat）
+- **输出控制铁律（反复强调）**：分步输出，一次不要太长，大改动拆小批次；**但要连续做完整个任务直到完成，不要每段都停问**（分步 ≠ 频繁征求确认，只在真正需决策时停）
+- **tasks.md `*` 标记任务也要做**：run-all-tasks 时 `*` 可选任务也必须做完，除非用户明确说跳过
+- **任务标记不能假绿**：标 completed 必须有实际代码+测试通过证据；外部依赖/待环境如实标 `[ ]*`，用"代码已改但未实测"措辞
+- **彻底解决不绕开**：错误必复现+定位根因+修主代码+加防御测试，绝不"换参数避开"
+- **触类旁通 grep**：发现一处反模式立即 grep 全仓找同类一次修完
+- **改动前先 spec 三件套**：>500 行文件 / 3+ 组件 / 跨前后端 = 先写 spec
+- **spec 设计阶段必做"现状 grep 确认"**（G spec 复盘教训）：每项改进先确认迁移/端点/依赖 spec 是否已有产物；外部依赖标明降级方案+切换点；`*` 评估任务在设计阶段直接做 ROI 判断（列改动文件数/收益/风险）
+- **改动后必 Playwright 实测**：getDiagnostics 过 ≠ 运行时无错
+- **UI 全中文化**：所有用户可见文本中文（技术术语 SQL/PDF/LLM/API/UUID/CAS/编号 保留英文）；不接入 i18n 硬编码 + ESLint 卡点
+- 功能收敛停加新功能，核心 6-8 页做到极致，空壳标 developing；前后端必须联动；删除二次确认+先进回收站；一次性脚本用完即删
+- **文档/文件夹级 LLM 对话是最实用核心功能（2026-05-31 用户强调）**：平台任意文档/文件夹都能发起 AI 对话，自动注入当前文档+关联知识库（同行业/同模板/同科目）作 RAG 上下文；把知识库从"存文件"变"随时可问的专家"；详见 `docs/proposals/global-modules-status-and-improvement-2026-05-31.md` §二十二（spec 名 `doc-level-ai-chat`）
+- git 单 commit 提交所有变更；**push 前必先 fetch 同步**（stash → fetch --prune → 评估 ahead/behind → 决策 → pop → commit/push）
+- **协作走 PR 不直推 main**（紧急修 main 崩溃可一次性例外，需用户拍板）；默认分支 `main`（非 master）
+- 提建议前先验证不引用过时记录；完整复盘诚实暴露问题不粉饰；PDCA：建议→spec→实施→复盘；5 角色轮转（合伙人/项目经理/质控/审计助理/EQCR）
+- 目标并发 6000 人；底稿编码致同 2025 修订版（`backend/data/wp_account_mapping.json` 206 条 v2025-R5）
+- 审计循环代号：A 报表/调整 / B 控制了解 / C 控制测试 / D 销售收入 / E 货币资金 / F 采购存货 / G 投资 / H 固定资产 / I 无形资产 / J 职工薪酬 / K 管理 / L 筹资 / M 股东权益 / N 税费 / S 专项
 
 ## 环境配置
 
-- Python 3.12 / Docker / PG 16 / Redis；后端 9980 / 前端 3030 / vLLM 8100；DB `audit_platform`
-- vLLM：Qwen3.5-27B-NVFP4，APC+fp8 kv-cache
-- Docker：postgres(5432)/redis(6379)/metabase(3000)/pgbouncer(6432)/OCR(8200)/onlyoffice(8080)
-- DB_DISABLE_SSL=True；连接池 150 / PG max_connections=200
-- 前端唯一路径：`audit-platform/frontend/`
-- **codegraph v0.9.9**；**MCP 7 个**（codegraph/playwright/postgres/github/gt-plan/docker/context7，配置 `.cursor/mcp.json`）；**rtk 0.42.1**；**OnlyOffice 9.4.0**
-- 部署 v2.0：瘦客户端（Electron）+ 内网全栈
-
-## PG schema
-
-- `trial_balance` = standard_account_code / unadjusted_amount / aje_adjustment / audited_amount（v2 正数口径，只有一级总额+期末）
-- `tb_balance` = account_code / opening_balance / closing_balance / debit_amount / credit_amount / closing_direction（多级子科目；**无符号绝对值 + 方向列**，recalc 必按方向带符号求和）
-- `working_paper` 无 wp_code（在 `wp_index`，需 JOIN）
-- recalc 铁律：只汇总**叶子**科目；未映射叶子按**最长前缀**继承祖先映射；损益取发生额
-- `tb_ledger` 人员列仅 `preparer`（无 poster/reviewer）；`counterpart_account` 填充率低（~9%）不可靠
-- `tb_aux_balance` 按维度**冗余存储**（校验须 GROUP BY aux_type，见 `#architecture`）
-- 契约测试：schema_contract（表级）+ column_contract（列级）+ componentType 契约 vitest
-- **迁移** = `backend/migrations/V*.sql`（MigrationRunner，非 alembic），新加必须 `IF NOT EXISTS` 幂等
+- Python 3.12（仓库根 `.venv`）/ Docker / PG 16 / Redis 6379；后端 9980 / 前端 3030 / vLLM 8100；DB 名 `audit_platform`；测试用户 admin/admin123
+- **venv 路径**：backend cwd 用 `..\.venv\Scripts\python.exe`；仓库根 cwd 用 `.venv\Scripts\python.exe`（勿混）
+- Docker 容器：`audit-postgres`(5432) / `audit-redis`(6379→6379) / `audit-metabase`(3000)；health 端点 `/api/health`
+- **前端唯一路径**：`audit-platform/frontend/`（仓库根无 `frontend/`）；views/components/composables 在其 `src/` 下
+- Playwright MCP 已装（workspace `.kiro/settings/mcp.json`）；新增依赖见 #dev-history（locust/marked+dompurify/decimal.js/python-docx/PyYAML/fast-check/Jinja2/jsonpatch + 外部 LibreOffice）
+- **scripts 规约**：`_` 前缀=一次性用完即删，无前缀=正式工具；`backend/scripts/` 分 8 子目录（check/seed/gen/analyze/ops/fix/migrate/e2e）；仓库根 `scripts/run.py` 统一入口
+- **底稿模板源目录**：`backend/wp_templates/`（按审计循环 A~S 分子目录），scan 脚本 `scripts/analyze/scan_wp_templates.py` 扫描后输出 `backend/data/gt_template_library.json`；ROOT 变量 = `backend/`（parent×3）
+- **D6 MigrationRunner 是运行时迁移**（不是 alembic）：启动跑 `backend/migrations/V*.sql`；新加列写 `V0XX__*.sql`+`R0XX__*.sql` 配对，CREATE/ALTER 必 `IF NOT EXISTS`；按 version **数字**去重（撞名字母序靠后者静默丢失）；**当前最高 V044**；**✅ V040 冲突已修（2026-06-01）**：report_config_baseline 重编号 V040→V044/R044（旧 V040/R040 已删，真实 PG 确认表+is_stale 列存在），且 `scan_migrations` **加同号检测**（重复 version 抛 RuntimeError 根治复发）+ 防御测试；**✅ V043 pgvector 容错化**：原无条件 `CREATE EXTENSION vector` 在标准 PG 镜像（无扩展）硬失败致 health degraded（曾 attempt 11 次）→ 改 `DO $$ ... EXCEPTION WHEN OTHERS RETURN` 优雅跳过，降级 VECTOR_STORE_BACKEND=pgtext（真实 PG 确认 embedding 列未建、failure 已清；装 pgvector 后重跑启用）
+- **真实 PG 数据**：5 项目多为 standalone，**0 个 consolidated 项目**（合并模块真实 UAT 全卡此）；首汽租车_2025(df5b8403) tb 最全；**⚠️ 首汽租车 audit_period_end 为 NULL**（按年度取数端点 project_year 降级 None）
+- **本地 PG schema 漂移已修**（commit 508393da，965→critical=0）：drift detector 用 pkgutil walk import 全 model 子模块 + 过滤 Metabase 共库污染 + health 按 critical_count（orm_extra+enum_mismatch）判 degraded
+- **🔴 projects 表无 year / template_version_id 列**（render-config/prefill-context 曾因此对所有底稿普适 500——PG 首条 UndefinedColumn 使事务 aborted 后续全 500，2026-06-01 已修+契约测试守护）：年度须用 `EXTRACT(YEAR FROM audit_period_end)::int`；materiality 年度列名 `overall_materiality`（非 materiality_level）；人员姓名在 `staff_members.name`（users 无 display_name），JOIN 用 `project_assignments.staff_id`（非 user_id）；**database.py 已加 `async_engine = engine` 别名**（dataset_purge/recycle_bin/ledger_import_health 曾 import 不存在的 async_engine）
 
 ## 任务状态
 
-> 完整 spec 进度、编排器历轮判定、各循环（G7/I/K/L/M/N/E/F 等）深度调查结论、各类复盘明细 → 全部下沉 `#dev-history` 末尾「从 memory.md 下沉的任务状态与复盘明细」。此处只留每次对话必用的活状态。
+### 合并模块（consolidation）四阶段 — 代码+测试完成，未见真实数据
+- **🧮 合并核心会计模型（用户 2026-05-31 明确，已对照代码验证）**：**合并数 = 各子企业个别数据汇总（individual_sum）+ 差额表**；差额表与其他子企业列类似，是专门填调整分录 + 抵销分录（以及同控合并重复部分处理）的"虚拟列"，**一般以负数填列**；代码实现 = `consol_amount = individual_sum + consol_adjustment + consol_elimination`（trial 路径）/ 差额表引擎中间节点 = Σ子节点 consolidated + 本级抵销调整（差额表只记调整抵销不含个别数）——两路径同此模型
+- **4 Phase spec 全 ✅ 代码+测试**（2026-05-31 merge 后四阶段套件 **147 passed/0 failed**）：Phase0 核心管线（B1 汇总/B2 对账/schema 基线/锁定闭环）+ Phase1 架构锁定（AmountResolver 统一引擎/ELIMINATION_APPROVED 事件重算/全端点锁定+ConsolLockedBanner/B6 负商誉/B7 少数股东/A3 async）+ Phase2 编排接线（cascade_refresh/refresh-all SSE/V2 附注 flag/自动抵销 draft/报表穿透/cross_template/公式联动/签字冻结）+ Phase3 前端穿透（ConsolBreakdownDialog/provenance/双向导航/自动建树）
+- **16 ADR**（CONSOL-001~003/101~106/201~206/301~304）+ 24 consol service
+- **🔴 四阶段曾最大盲区 = 无全链路集成测试**（各阶段 mock 掉相邻阶段，merge 两次咬人：async 签名漂移 + Phase1 删 _execute_formula + **PK 缺 uuid default 致 B1 链路从未真实落库**）→ 封板①已补 `test_consol_full_chain_integration.py` 守护；**统一卡点 = PG 0 个 consolidated 项目**（真实 UAT 全 data-blocked，封板②seed 脚本待 live PG 解锁）
+- **封板已完成（work 分支补，2026-05-31 merge 入 main）**：①✅ 全链路集成测试 `test_consol_full_chain_integration.py`（真 SQLite+真 ORM 行+真 service 跑 aggregate→trial→reconcile + refresh_all report-await 回归守卫 + branch/draft-vs-approved，4 passed）②✅ `seed_consol_uat.py` 幂等造最小合成集团（1母2子+TB+draft/approved抵销+内部交易，--dry-run 离线可验）③🟡 Phase2/3 Playwright 待环境；**收手判断：地基已正确，①②已封板转回核心模块**
+- **🐛 封板①抓到真 bug 并修复**：`consolidation_models.py` 全部 14 个主键 `id` 列 `primary_key=True` 但缺 `default=uuid.uuid4`（V034 迁移 `id UUID NOT NULL` 也无 server default），导致 `upsert_trial_row` 等不传 id 的 ORM 插入 NULL 主键 → PG/SQLite 均 NOT NULL 违约；147 旧测试全 mock/纯函数从未真实落库故漏网。根因修复=全列补 `default=uuid.uuid4`，280 consol 测试全绿无回归
+- **✅ 预存 worksheet 测试失败已修（commit `ce898e83`）**：`test_consol_worksheet.py` 2 红根因 = seeded_db fixture 抵销用 `review_status=draft`，但 Phase1 引擎改为**只消费 APPROVED**（ADR-CONSOL-102）→ 抵销不生效；**引擎本身正确**（差额表中间节点 consolidated=Σ子节点 consolidated + 本级抵销/调整，不含本级个别数，非"丢本体"bug）；修复=fixture 改 approved；**教训：先读设计文档确认是引擎错还是 fixture 过时，不预设引擎会计 bug**
+- **四阶段三件套已归档 `_archive/09-consolidation-phases/`**（work commit `375edd8d`，封板①②完成后归档，非空归档）；**tasks.md 残留未勾项全是外部依赖**（真实集团数据 UAT `*` 卡 PG 0 consolidated + Playwright 待环境 + B6/B7 CAS20 审计专业复核），代码+测试层面已封板
 
-- **当前在做**：`k-cycle-extraction-formula-and-disclosure-closure`（最新实测 5/25，Wave1 全交付 + Wave2 Task4/5，未 commit）。
-- **`g7-column-alignment-and-extraction-closure` 已 24/24 全交付并归档**（2026-08-15 → `_archive/08-disclosure-notes/`，commit `83ccf630`，分支 `work/2026-08-12-g7-column-alignment-closure`）：56 偏差点→0；补第三边（源xlsx↔seed↔运行时）+ **新增第四边「渲染层」**（两级表头 0/38→20 张）；契约 11→38 张；2 个 CI job；变异 **15 锚点**全 RED；前端 887 passed / 后端 G7 主域 2297 passed。收口复盘追加修 **fail-open**（两个披露 Tab 的 `syncToDisclosureNotes()` 真同步与收尾共用一个 `try`，失败被成功文案盖掉 ⇒ 拆两段 + 失败 `return`，文案下沉 `g7DisclosureSyncFeedback.ts`）。**16 个新文件已入库，此前登记的「10 个正式产物 `??` 未跟踪」已解除。**
-- **`e-cycle-extraction-formula-and-disclosure-completion` 已 24/24 全交付并归档**（2026-08-15 复盘后 → `_archive/08-disclosure-notes/`，归档 commit `267111b6`，主交付 commit `2ee7929e`）：账户级取数走 `tb_aux_balance` 的 `aux_type='银行账户'` ⇒ E1-3 出 22 行逐户（此前叶子口径恒 1 行汇总）；浏览器实测抓出两处真实缺陷（① `resolveRestrictedRows` 按数组下标重算 id 覆盖稳定序号 ⇒ 删后再增复用已删序号、历史 reason 串到新类别 —— **已修**；② E1-3 multi 版 variant 切换抹零 —— **登记未修**，见下）；变异 **29 条全 RED**；后端 368 / 前端 568 passed；CI 两个新 job。**复盘沉淀两条通用做法**：变异脚本 `--check-anchors` 是「已归档 spec 是否还可复现」的最便宜判据（只读、秒级、证明 29 处结构未漂移，不必重跑全量变异去改带并发在途改动的文件）· 工作树 dirty 文件**必须逐个 diff 归因**（`E1TabDisclosure.vue` 名字是 E 循环的却是并发 K 循环改的）。
-- 🔴 **E 循环遗留缺陷（未修，非该 spec 引入，建议单独立任务）**：E1-3 先点`仅人民币`再点`人民币及外币` ⇒ 22 行金额全变 `-` + 一条错的「审定合计 0.00 ≠ TB」横幅。根因 = 宿主 `seedFromFourTable()` 只在 `onMounted` 跑一次且 `seedRowsKey` 有 persist-first 短路，种子形态一会话内只按当时 variant 定型；`recalcRow(row,'multi')` 又把六个金额全由「原币 × fxRate」派生，rmb 形态种子无 `openingFc` ⇒ 恒 0。29 条变异 + 568 例守卫全没拦住，因为**没有一条把「种子的 variant」与「消费它的 Tab 的 variant」串起来断言** = 假绿第①源第三种变体。改法要动种子键按 variant 分离 + 新守卫。可与「E1-10 交叉核对把科目码当账号比对」并入存量口径回填 spec。
-- **Active spec = 6 个带 tasks.md + 2 个空壳**（🔴 数字一律以 `.kiro/specs/` 复选框实扫为准，行首锚定正则 `^\s*-\s\[([ x~-])\]\s+\d+\.`，别信 memory 旧数）。2026-08-15 实扫：`i-cycle-…closure` **23/24** · `k-cycle-…closure` **19/25** · `l-cycle-…completion` 3/26 · `procedure-trim-report-line-account-resolution` 0/16 · `workpaper-import-export-lifecycle-closure` 24/25 · `x3-adjustment-entry-import-export` **33/53**（`e-cycle-…completion` 24/24 已归档，见上）。空壳 2 个（`procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening`，git 里 `??` 未跟踪，2026-08-12 曾误记为「已清理入归档区」）⇒ **报 Active 数必须区分「目录数」与「带 tasks.md 的 spec 数」**。Archived **553**。
-- 🔴 **4 个在办 spec 目录在 git 里全是 `??` 未跟踪**（2026-08-15 归档 e-cycle 时 `git status` 实录：`i-cycle` / `k-cycle` / `l-cycle` / `x3`，连同 2 个空壳）⇒ **丢工作树即全部蒸发**，且 INDEX/memory 登记的进度数无法从 HEAD 复核。已归档 spec 不受影响（`_archive/**` 已跟踪）。建议各推进方尽快把自己的 spec 目录入库。
-- **🔴 run-all-tasks 编排器累计逾二十次均判「不接管」**（最近 2026-08-09）。判据三条，任一不满足即不启动子代理：①本会话是否真发起过批量执行（用户说「继续」≠「run all tasks」，编排器只恢复被中断的批量、不替用户发起）②带 `[-]`/`[~]` 的任务，其 tasks.md 正文是否写明了阻塞原因（写明=有意驻留，如 `h-cycle` Task18「浏览器实测待做」；未写明才可能是被中断）③该 spec 的 tasks.md mtime 是否秒/分钟级（=并发会话正在写，勿碰）。
-- **git/迁移**：当前分支 `work/2026-08-12-g7-column-alignment-closure`（并发会话另在 `work/2026-05-30-wp-specs` / `work/2026-08-12-e-cycle-extraction-closure`）；最高迁移 **V146**（2026-08-15 实扫 `backend/migrations/V*.sql` 得 146 个文件、最大号 146，`R1xx__` 是配对回滚脚本非同号冲突）；新迁移须重启后端才应用（MigrationRunner 只在启动时跑）；**push 前必先 fetch 看远端真实 base**（memory 里的旧 commit hash 会过期）；协作走 PR 不直推 main。
-- **并发多会话现状**：工作树长期不干净、根目录 `tmp_*`/`backend/scripts/diagnose/_wip_*` 多为他人在用（按 mtime + 内容关键词判归属，勿按文件名里的任务号误删）；同一文件禁与并发会话并行编辑；判 spec 是否真完成一律**工作树 + HEAD 双查**（防「从未提交」与「被回退」两类假红）。
-- **🔴 「spec 全绿」≠「产物已入库」**：多个 spec 的正式产物（守卫测试、诊断脚本、判据 JSON、新建实现文件）长期 `??` 未跟踪 —— G7 收口时实测本 spec **10 个正式产物全未跟踪**，同目录另有他人 20 个 `??` 测试文件。后果两条：①挂进 `governance-checks.yml` 的 job 在干净 checkout 下**必挂**（文件不存在）②工作树一丢全部蒸发。**每个 spec 收口必查 `git status --porcelain -- <产物清单>`**，见到 `??` 即登记待 add。
-- **`.gitignore` 已于 2026-08-15 补收 `tmp_*` 与 `_wip_*`**（此前只收带前导下划线的 `_tmp_*`，G7 收口前根目录积了 **487** 个 `tmp_*`）。补之前用 `git check-ignore -v` 验证过 0 个正式产物被挡（`tmpHeadBaseline.spec.ts` / `_wipG7RuntimeProbe.spec.ts` 因无下划线分隔不受影响）。清理时仍按前缀 + mtime 判归属（今日仍有产出 = 并发会话在用，勿碰）。
-- **pre-push 的「6 维核查」不达标≠push 有问题**：`.git-hooks/pre-push` 在 `GIT_MODE=single` 下只警告（multi 才阻断）。维度 1（工作树 clean）与 5（untracked 0）在本仓库**长期不可能达标**（并发多会话在途 + 数百 `tmp_*`/`_wip_*`）；判自己的 push 完不完整只看**维度 2/3/4**（本地 HEAD == 远程 / ahead 0 / behind 0）。核查脚本 = `backend/scripts/check/check_git_sync_state.py`。
+### git 当前状态（2026-06-01）
+- 当前分支 `main`，已 push origin/main（HEAD `732ddbbd`）；已 merge `origin/work/2026-05-30-wp-specs`（bb7ea6cf，含 B/C/E/F/G 全量实施）
+- 工作树干净，本地=远程完全同步
 
-## 踩坑铁律（完整 500+ 条见 `#conventions`）
+### 已完成 spec 总览
+- **全局模块 7 spec + frontend-consistency-m1 = 8 个 active spec 全部 ✅ 完成（2026-06-01，121 任务全绿）**：A formula-engine-unification(20/20) / B retrieval-kernel-unification(12/12) / C doc-level-ai-chat(12/12) / D report-config-baseline(12/12) / E wp-ai-review-ux-fix(8/8) / F global-modules-cleanup(10/10) / G global-modules-p2-polish(11/11) / frontend-consistency-m1(36/36)；残留仅 Playwright E2E 待 start-dev.bat 环境
+- active 仅剩 `consol-note-three-level-drilldown`（stub 无 tasks.md，待真实合并数据）；**合并四阶段已归档 `_archive/09-consolidation-phases/`**
 
-> 每写一段代码/守卫前先过一遍下列高频坑；具体某模块的坑在 `#conventions` 对应小节。
+### 真正待办（外部依赖）
+- LLM 真实接入（6 stub 引擎 `WP_AI_SERVICE_ENABLED` 一键切换）/ 6000 并发压测（Locust+真 PG 大数据）/ 钉集成 / 合并模块真实集团数据 UAT
 
-- **假绿三源**：①additive 注入即死代码（新加的取数/字段无消费方）②grep 式守卫只查字符串存在（改成 `if False:`/删调用/改名残留仍绿）③守卫把错值当基线锁死（把真源改对反而打红）。→ 判据一律用「行为/结构/真实执行」而非「字符存在」；**每写完守卫必做变异检验**（改一字看是否变红），没打红=守卫有缺陷不是代码没问题。
-- **🔴 第①源的最隐蔽形态 = 守卫层级不够，渲染层死代码结构性不可见**：G7 实测「模型声明 `column.group`（三向守卫拿它跟源 xlsx 合并单元格逐张对齐、39 例全绿）而任何 `.vue` 零引用」⇒ 两级表头 **0/38 张从未渲染**，审计师看到 5 组一模一样的 `期末数|期初数` 分不清属于哪家公司。守卫只比「源↔seed↔模型」三层数据，**从不看 DOM**。→ 判「某声明是否真生效」必须落到**浏览器 DOM** 或**模板形态判据**（遍历+外层门控+内层嵌套三要素缺一即红），并把 DOM 结论沉成可测投影当第四边。
-- **多 spec 混合文件（`governance-checks.yml` / 共享模板 JSON）的「只加不动」验收必须用归因型判据**（变动是否落在**我的字节区间**内），不能用全局等值型（「其他 job 一个都没变」）—— 并发会话同时改同一文件是常态，全局等值必假红（实测拍快照 144 job → 我 append → 复核 147）。`fs_append` 与并发编辑不互相覆盖。
-- **真实库写入/复原三坑**：①timestamptz 回写必须在 **Python 侧**转 `datetime`（备份用 `::text` 导出后回写会被 asyncpg 拒；**SQL 层 `CAST(:x AS timestamptz)` 无效**，驱动发送前就按目标类型编码）②`engine.begin()` 内**一处失败全部回滚**（复原脚本第 3 步抛错把前两步撤回）③**被 `^C` 中断的运行可能已提交部分变更** ⇒ 判成败一律查数据不看 exit code。
-- **别跑全量 `backend/tests`**（根目录 **1522** 个测试文件，前台跑数分钟无输出会被当卡死）⇒ 按**引用关系反查辐射面**：扫测试文件里对本次改动物的实际引用（G7 得 77 个文件，2分49秒跑完）。
-- **「源侧物理结构」字段不能直接当期望值**：facts 的 `is_two_level` 描述源 xlsx 有几行表头（含父行为空的占位合并），须剔除已登记的 `single_slot_exemption` 才是「应渲染两级」的期望（24 → 20）。同理任何 `_exemption`/`_adjudicated` 登记表都要参与期望值推导。
-- **变异检验四态**：RED（打红且正是预期那条测试）/ GREEN（守卫缺陷）/ ANCHOR-MISS（脚本缺陷：锚点未命中或命中 >1，含 `\n` 跨行锚点在 CRLF 必 MISS）/ WRONG-TEST（打红了但不是预期项=污染残留或锚点错行）。只看退出码会把后三态误判成 RED。
-- **fail-open 掩盖接线错误（最贵一类）**：`except Exception` 把「函数名/列名拼错、单参调用 async、传错客户端形态」全吞成 WARNING → 表现为「本项目无此数据/静默取空」，而 Volar/vitest/get_diagnostics/HEAD-swap 四层全绿 → 取值层守卫必须**真跑一次并把异常记 ERROR 态**，反向自检要「故意写错必失败」。
-- **Vue 传不存在的 prop / 绑不存在的字段** = 静默失效（渲染空串、门控恒开、录入不落库），四层全查不出，只有浏览器挂载才暴露。判「某能力接没接」要落到**唯一消费方 + 有渲染宿主**，不能只 grep 符号名。
-- **截函数体禁固定字符窗口、禁 `strip_comments` 剥 SQL**：一律花括号/圆括号配对 + **先跳参数列表**（TS 返回类型注解 `): Promise<{...}>`、Python 多行签名都会骗到「第一个 `{`」）；`strip_comments` 会把 `sa.text("""...SQL...""")` 一起剥掉。
-- **磁盘真相与编码**：`read_file` 对并发/自己刚改的文件返回**陈旧版本** → 判磁盘一律 `python -c "open(p,encoding='utf-8').read()"`；PS `>`/`Out-File` 会把 python 的 UTF-8 中文腌成乱码 → 脚本内 `Path.write_text(encoding='utf-8')` 或 `cmd /c "... > f 2>&1"`；含 emoji/中文的破坏性脚本先 `$env:PYTHONIOENCODING='utf-8'`，判成败查数据不看 exit code（`--apply` 常被 Ctrl+C 中断但写入已提交）。
-- **pytest 一律从仓库根跑**（从 `backend/` 跑用相对路径的测试会 `FileNotFoundError` 假红 17 例）；连库守卫用**一次 `asyncio.run` 取全部快照**（每测试各自 async 会污染共享连接池，第二个起 `NoneType has no attribute send`）；`-k "a or b"` 经 shell 会被拆成多个位置参数 → 用 `subprocess.run([...])` 不经 shell + 加「passed<N 即中止」自检。
-- **改共享数据文件前 grep 其他 active spec 是否也要改它**（`note_template_*.json`/`prefill_formula_mapping.json`/`report_config` 等是回退高发文件）；并发会话会互相回退，**幂等脚本 `--check` + 契约测试**是唯一可靠恢复手段，测试红了先重跑对应 `scripts/fix/fix_*.py`。
-- **三件套校验（`get_diagnostics` 对 `.kiro/specs/**/*.md` 生效）**：`### Property N` 只认整数、`**Validates: Requirements X.Y**` 只认 `X.Y`、tasks 的 `## Task Dependency Graph` 必含 waves JSON。除机器校验外还要人工核：**未被引用的 AC**（悬挂 0 也可能整条 Requirement 零实现）+ **design 承诺的新函数/新取值是否真在生产代码 grep 得到**。
-- **改 .md 禁用 `index()` 算边界**（会一次删掉整段，Markdown 无结构校验查不出）：一律 `str_replace` 传完整旧文本；非要脚本切片则边界用行首锚点 + assert + 改完做结构核验（`### `/`## ` 计数、字符数、尾部锚点）。**Kiro local history**（`%APPDATA%\Kiro\User\History\<hash>\entries.json`）可恢复误删、也可取证「文件被谁何时覆盖」。
+### 待修 bug（2026-06-01 grep 实证，与已修 render-config 同源：查 users 不存在的 display_name 列）
+- 🔴 `project_wizard.py:207` `select(UserModel.display_name)` — User ORM 无此字段 → AttributeError，项目向导仪表盘聚合崩（user_ids 非空时）；修 → username
+- 🔴 `qc_report_export.py:244` 裸 SQL `COALESCE(u.display_name, u.username)` — 真实 PG users 无 display_name → UndefinedColumn 500；修 → 删 display_name
+- 系统性防御建议：加 CI「SQL 列引用 ⊆ 真实 schema」契约检查，一次兜住整类「查不存在列」bug（render-config/prefill/wizard/qc 已 4 处同源）
 
-## 关键引用
 
-- spec 状态 → `.kiro/specs/INDEX.md`
-- 领域术语 → `glossary.md`（inclusion:always）
-- 底稿内容结构权威来源 → `基础数据/致同通用审计程序及底稿模板（2025年修订）/BCD类底稿md/`
-- 附注章节号权威源 → `backend/data/note_template_variant_matrix.json`
-- 附注 section↔wp 映射真源 → `backend/data/note_workpaper_sync_registry.json`
-- 报表科目映射真源 → `report_config` DB 表（非 `formula_presets_seed.json`）
+### 全局 7 模块改进 7 spec 全部完成（2026-06-01）
+- 据盘点文档生成 6 个 active spec（全 Design-First/bugfix，三件套齐全 0 diagnostics）：**A `formula-engine-unification`**（feature，4套求值器→单内核+审计收口哈希链，4阶段19任务）/ **B `retrieval-kernel-unification`**（feature，检索3套→单内核+pgvector+知识文件入网，3阶段12任务）/ **C `doc-level-ai-chat`**（feature，文档级LLM对话，**依赖B**，4阶段12任务）/ **D `report-config-baseline`**（feature，报表主模板回填+克隆stale通知，3阶段11任务）/ **E `wp-ai-review-ux-fix`**（bugfix，复核显底稿编号+接useCellLocate，8任务）/ **F `global-modules-cleanup`**（bugfix，地址库澄清+33MB死文件+模板JSON→registry+懒建表，10任务）
+- 用户拍板**全部 7 个按梯队顺序 A→B→C→D→E→F→G 实施**；依赖链仅 B→C；**全部 7 spec 已实施完成（2026-06-01）**
+- **✅ A `formula-engine-unification` 已实施完成（2026-06-01）**：19 任务全绿；核心产出=L1 单内核(formula_engine.py 递归下降 AST+FunctionRegistry 14 函数)+L2 编排(report_engine 委托) PBT 全绿
+- **✅ B `retrieval-kernel-unification` 已实施完成（2026-06-01，110 测试全绿 R1~R4 PBT + 零回归）**：阶段1 删 B（KnowledgeService deprecated 限期 2026-07-01）+ 阶段2 IndexSource 注册表+KnowledgeDocSource+semantic_search scope/user+CRUD 联动钩子+reference_doc_service 改调 + 阶段3 VectorStore Protocol+PgVectorStore(pgvector ivfflat)+feature flag(`VECTOR_STORE_BACKEND=pgtext|pgvector`)+ADR-RETRIEVAL-001
+- **✅ C `doc-level-ai-chat` 已实施+UAT 通过（2026-05-31）**
+- **✅ D `report-config-baseline` 已实施完成（2026-06-01）**：11 任务全绿；核心产出=V040 迁移(report_config_baseline 表+is_stale 列)+ORM+4 service 方法(suggest_to_master/review_candidate/diff_vs_master/apply_master_update)+EventBus REPORT_CONFIG_MASTER_UPDATED+_mark_cloned_configs_stale handler+覆盖率 CI 脚本+6 API 端点+前端 ReportConfigBaselineTab+ADR-REPORT-CONFIG-001；E1~E4 PBT 全绿；**修复联动断裂③**
+- **✅ E `wp-ai-review-ux-fix` 已实施完成（2026-05-31）**：C1 卡片底稿编号 el-tag + C2 useCellLocate 接线 + C3 复核按钮底稿名；36 vitest 全绿
+- **✅ F global-modules-cleanup 已实施完成（2026-06-01，35 测试全绿）**：删 33MB L1 死文件 + V1/V2 命名澄清 + sync_registry_from_json 联动 + 枚举注释修正 + V040 迁移
+- **✅ G global-modules-p2-polish 已实施完成（2026-06-01，57 测试全绿）**
+- **UAT 修复**：`services/apiProxy.ts` 缺 `apiProxy` named export 致前端白屏（5 个组件 import `{ apiProxy }` from services 路径）→ 已加兼容别名 `export const apiProxy = api`
+- **7 spec 跨 spec 一致性复盘修正 2 偏差（2026-05-31）**：①🔴 spec G content_text 提取工具引用错——`wp_document_recognizer` 实为 LLM 结构化凭证字段提取(DocType.VOUCHER 返结构化字段)**不产全文**，改为 `mineru_service.recognize_for_ocr`(返 `{"text":全文}`)/`unified_ocr_service.recognize` ②🔴 spec D 审计 event_type 歧义——"复用 formula-engine 哈希链收口"被误读会把报表配置变更记成公式变更，澄清为复用 `append_audit_log` 机制但用**独立 event_type `report_config_changed`**(非 A 的 formula_changed)；跨 spec 协调点核查通过=B↔C semantic_search 签名一致 / A↔G FormulaManagerDialog 改不同部分且 G 在 A 后 / E↔C useCellLocate 签名统一；**教训：单 spec 复盘抓不到跨 spec 问题，必须查"工具真实产出物"+"schema 复用边界"**
+- **6 spec 三件套复盘实证（2026-05-31，承重锚点全属实，修正 4 处偏差）**：✅ formula_engine.execute/FormulaContext/FormulaResult + amount_resolver Protocol + report_engine.evaluate_formula + knowledge_index_service + report_config_service + GroupNoteTemplateBaseline + useCellLocate + 两懒建表 全 readCode 实证存在；🔴 修正 = ①spec B `incremental_update` 真实参 `source_id`(非doc_id) + `KnowledgeSourceType` 枚举无 `knowledge_doc` 需先加成员 ②spec B `semantic_search(project_id,query,top_k)` 无 scope/user 需新增 + "6类"实为"11类"业务数据 ③spec E `useCellLocate` 真实签名 snake_case `{wp_code,sheet_name,cell_ref,component_type}` 且 component_type 必传(非camelCase) ④spec F 死文件/模板 JSON 真实路径 `backend/data/`(非 backend/app/data/)
+- **6 spec 覆盖度核查（2026-05-31，两轮复盘）**：完整覆盖文档 P0+P1 核心（单源/联动/澄清）；**P1-7「公式管理覆盖合并+底稿」已补进 spec A 需求8+task17b**——实证发现 `FormulaManagerScope` 现已有 6 scope（note/consol_note/consol_worksheet/consol_report/report/tb，**合并部分已由 consol Phase2 ADR-205 完成**），仅剩"底稿 workpaper scope"半条（需 readCode 定底稿公式语法域归内核 or cell_formula_evaluator）；**第二轮发现文档优先级自相矛盾**（地址库 Redis 缓存 §一标 P1 但 §九 路线图标 P2）→ 已修正 §一 对齐 P2；**未纳入 6 spec 的全是 P2 体验性能（地址库 Redis/公式时间线 UI/高级查询缓存/note_template DB 化/枚举扩展）+ P3 + 外部依赖（diff 去 mock）+ 已属既存 spec（生成链路 populate_parsed_data 归 wp-generation-pipeline）**，非遗漏；文档 §二十四 固化覆盖度对照表 + 建议 P2 批次另起 `global-modules-p2-polish` spec
+
+### 全局 7 模块盘点 + 多源治理（2026-05-31，文档 `docs/proposals/global-modules-status-and-improvement-2026-05-31.md` 六轮代码实证复盘）
+- **7 横切支撑模块**=地址库/公式管理/高级查询/枚举字典/底稿模板库/报告模板库/知识库；ROI 高于合并模块（天天用不卡真实数据）
+- **必须单源（删旧代码）**：①公式求值 3 套报表 DSL（formula_engine+report_engine+formula_parser，formula_engine 升级为唯一内核，其余委托/删求值器）②审计留痕 3 处（formula_audit_log 懒建表+core.Log+哈希链 → 只写哈希链）③知识库旧 KnowledgeService（仅 1 处降级调用，删）
+- **多源但正交（不合并只澄清）**：地址库 V1(公式编辑目录)/V2(stale 影响图) 正交；formula_unified 实际是底稿 Cell 公式（Excel 语法非报表 DSL，改名 cell_formula_evaluator 保持独立）；note_formula_engine 是 validator 非 evaluator（排除收敛）
+- **🔴 3 处联动断裂必修**：①~~知识文件→向量索引~~（✅ 已修 spec B：CRUD 钩子 incremental_update）②底稿模板 JSON→registry（scan 不写 wp_template_registry 表，✅ 已修 spec F）③报表主模板→已克隆项目（update_config 不通知 project:{pid} 克隆，待 spec D）；正解=单一权威源+EventBus 单向派生（平台已有 stale 传播骨架）
+- **删旧代码铁律**：删前 grep 0 调用方 + 删前后测试全绿 + 独立 commit+tag 防回滚 + deprecated 超 1 sprint 必删
+- **向量存储选型裁定 pgvector**（同库事务一致+零运维+数据量数千条；ChromaDB 现仅 health check 闲置，留 Plan B）；三大内核统一（公式/检索/审计）各立 Design-First spec
+- **底稿 AI 复核弹窗 UX 缺陷已修（spec E `wp-ai-review-ux-fix`）**：C1 底稿编号 tag + C2 useCellLocate 接线 + C3 复核按钮底稿名；**已知阻塞：render-config 端点 500（所有底稿均如此，预存后端问题）**→ 待排查修复后可 E2E 实测
+
+## 操作铁律（标题级，详见 #conventions）
+
+- **三层一致校验**：DB 迁移 + ORM `Mapped[]` + service 方法，任一缺失即伪绿
+- **router_registry 必查**：新建 router 必在 `backend/app/router_registry/{group}.py` 注册，否则前端 404；FastAPI 不热加载 router（改后需 start-dev.bat 重启）
+- **service 只 flush 不 commit**：跨 service 编排的 router 端点各 service 只 flush，router 统一 commit 保原子
+- **PG 运维**：SET 不支持绑定参数（用 set_config）/ ALTER TYPE ADD VALUE 不可事务内即用 / PG-only SQL（jsonb cast/advisory lock/set_config）必加 SQLite dialect 检测
+- **历史档案不回填修改**：dev-history / spec-tasks 是 append-only 审计轨迹
+- **PowerShell**：写中文/emoji 用 fsWrite（禁 `-replace`/`Set-Content` 处理中文会乱码，用 `python -c read_text/write_text`）；长 commit msg 用 `git commit --% -m "..."` 后不接 `;`；读中文输出先 `chcp 65001 + [Console]::OutputEncoding=UTF8`
+- **fsWrite ≥100 行会截断**：大文件分 fsWrite(≤50)+多次小 fsAppend；大块结构删除用临时 python 脚本动态定位边界
+- **apiProxy 单层解构**：`api.get/post` 已返业务数据不再 `const {data}=`；但 `http.get/post`（utils/http）返完整响应体需 `.data`
+- **ReviewStatusEnum 等枚举成员核对**：引用前用 `python -c "getattr(Enum,'X','MISSING')"` 实证大小写（小写 draft/approved），不信测试与代码哪个对
+- **xfail 标"production code bug"= 根因修复信号**：先验证真实定义，修根因后去 xfail 让其真实通过，不留假绿
+- **merge 跨阶段签名变更必 grep 调用方**：sync↔async 改 / 删公开方法时全仓 grep 调用点同步改（单阶段 mock 测试全绿不代表跨阶段不断裂）
+- **改动后必 Playwright 实测**（运行时 bug 单测/getDiagnostics 抓不到，如包装体解包/CSS 样式孤儿）；改动前后 6 维 git 核查
+- **hypothesis PBT 调速**：max_examples 5（用户 2026-06 明确要求降速，禁默认 100）
+- 详细规约（UI 视觉 17 条 / ESLint AST / 测试 fixture / 启动 lifecycle / CI 卡点 / EventBus / 中间件 等）→ `#conventions` + `#dev-history`
+
+## 关键引用指南
+- **仅 memory.md 是 `inclusion: always`（≤200 行约束只针对它）**；architecture/conventions/dev-history 均 `inclusion: manual` 仅 `#` 引用时加载，体量符合参考文档定位**无需裁剪**（dev-history 还是 append-only 审计轨迹）
+- 技术事实 / 端点速查 / PG schema / spec 历史详细 → `#dev-history` grep 关键词
+- 架构 / 系统规模 / 数据流 → `#architecture`
+- 编码规范 / UI 视觉补充 / 操作铁律详解 / PG 运维 → `#conventions`
+- spec 状态总览 → `.kiro/specs/INDEX.md`
+- 合并模块完整体检 → `docs/proposals/consolidation-module-status-and-proposal.md`
+- 全局 7 横切模块盘点 + 多源治理 → `docs/proposals/global-modules-status-and-improvement-2026-05-31.md`（六轮复盘 + 三大内核统一 + 单源/联动裁定）

@@ -1,0 +1,125 @@
+{
+  "script": "e2e/g4-1-b60-unified-path.spec.ts",
+  "captured_at": "2026-09-12T04:42:20.314Z",
+  "scope": {
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "wp_id": "8c258d1c-be69-4623-aaef-140e3001123d",
+    "wp_id_b601": "afb9201a-5989-4c3f-b79f-e1a950e53be9",
+    "entry_id": "xlsx/b60/gt-b60-bundle"
+  },
+  "predicates": {
+    "user_sync_requests": [
+      {
+        "method": "GET",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/afb9201a-5989-4c3f-b79f-e1a950e53be9/sync/entries/xlsx/b60/gt-b60-bundle/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/afb9201a-5989-4c3f-b79f-e1a950e53be9/sync/entries/xlsx/b60/gt-b60-bundle/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/afb9201a-5989-4c3f-b79f-e1a950e53be9/sync/entries/xlsx/b60/gt-b60-bundle/materialize",
+        "status": 200
+      }
+    ],
+    "forcesave_hits": [
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/afb9201a-5989-4c3f-b79f-e1a950e53be9/sync/entries/xlsx/b60/gt-b60-bundle/rooms/e4c46326-ab6f-463a-836d-47288b0ab1ae/forcesave",
+        "status": 202
+      }
+    ],
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "callback_url_redacted": "http://host.docker.internal:9980/api/workpaper-sync/rooms/e4c46326-ab6f-463a-836d-47288b0ab1ae/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
+    "host_mounted": true,
+    "confirm_descriptor_200": true,
+    "forcesave_clicked": true,
+    "oo_cell_dirty_attempted": true,
+    "host_dirty_before_forcesave": false,
+    "forcesave_dispatch_error": null,
+    "forcesave_cs_error": 0,
+    "forcesave_cs_outcome": "accepted",
+    "forcesave_callback_expected": true,
+    "forcesave_http_status": 202,
+    "forcesave_error_code": null,
+    "forcesave_body_keys": [
+      "forcesave_request_id",
+      "operation_id",
+      "request_sequence",
+      "state",
+      "poll_after_ms",
+      "replayed",
+      "dispatch_error",
+      "cs_error",
+      "cs_outcome",
+      "callback_expected"
+    ],
+    "materialize_room_id": "e4c46326-ab6f-463a-836d-47288b0ab1ae",
+    "materialize_has_jwt_token": true,
+    "doc_editor_called": false,
+    "doc_editor_has_root_token": false,
+    "doc_editor_document_mutable": false,
+    "host_status": "",
+    "host_error": "",
+    "confirm_forcesave_error": null,
+    "html_dom_roundtrip": {
+      "attempted": true,
+      "marker": "77051409",
+      "switched_to_html": true,
+      "marker_visible": true,
+      "store_mirrored": true,
+      "dom_probe": {
+        "input_or_text_hits": 1,
+        "tracked_operation_id": "5e989850-7d3c-480c-9ba8-44b81419f850"
+      }
+    },
+    "oo_write_target": "G7",
+    "oo_cell_edit_probe": {
+      "ok": true,
+      "target": "G7",
+      "attempt": 1,
+      "hasInsert": "function",
+      "hasEnter": "function",
+      "hasPaste": "function",
+      "hasFind": "function",
+      "sheetNames": [
+        "底稿目录",
+        "B60-1工时预算与控制表",
+        "B60-1工时预算与控制板（按阶段）",
+        "GT_Custom",
+        "_GT_SYNC"
+      ],
+      "activeSheet": "B60-1工时预算与控制表",
+      "inserted": true,
+      "entered": true,
+      "pasted": true,
+      "closeRet": true,
+      "closed": true,
+      "cellText": "77051409",
+      "modified": true,
+      "saveRet": true,
+      "saved": true,
+      "cellTextAfterSave": "77051409"
+    }
+  },
+  "notes": [
+    "token/JWT/route_credential 值已脱敏",
+    "OO 写格：Asc.editor 写受管 G7(实际执行工时/首行)；权威判据是 forcesave 响应 cs_error（0=有变更，4=no_changes）",
+    "application applied / revision+1 由同目录 DB 核查脚本补齐",
+    "§9.6 条件 6：切回结构化视图后 DOM 应出现 marker（getByDisplayValue / virtual text / input.value，排除搜索框）",
+    "DocEditor document 必须是可变纯对象（readonly Proxy 会导致 document.token 赋值被吞 → -20）"
+  ],
+  "auth_probe": {
+    "has_token": true
+  }
+}

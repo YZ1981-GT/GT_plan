@@ -1,0 +1,72 @@
+{
+  "mode": "apply",
+  "entries": [
+    {
+      "target": {
+        "entry_id": "xlsx/gt-d4-operating-revenue",
+        "contract_id": "d4.revenue_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_d4_revenue_detail",
+        "wp_codes": [
+          "D4"
+        ],
+        "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+        "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+        "wp_code": "D4",
+        "store_bytes": 2051,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "outcome": {
+        "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+        "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+        "entry_id": "xlsx/gt-d4-operating-revenue",
+        "contract_id": "d4.revenue_detail",
+        "authority_model": "projection_contract",
+        "authority_model_definition_id": "55d819d8-cc0d-46fd-89fb-3de394f3183e",
+        "authority_model_definition_sha256": "134884caa91f67c946c546ede8495c58be68e4776e266acc2ebc1cea8cb02f64",
+        "template_definition_id": "c52dad1f-06f8-4869-abac-6a53c8c76ae3",
+        "template_definition_sha256": "7b1c91f81e62daa1b002b0c6b3ef14784a87f6817a7eaf93f2c03b54bcf4d3c6",
+        "instrumentation_definition_id": "71057298-109b-417e-875b-183383f67d7a",
+        "instrumentation_definition_sha256": "e8841d40050ac76a24621ef4aca4a5f1e351c5f893707406e91bf96a2472bc55",
+        "contract_definition_id": "28429eae-1403-4eee-9645-21d9e9295235",
+        "contract_definition_sha256": "0efeec0b4521a770c31221b80d21e76b694ef6d97f569db6f3b1b960581ea522",
+        "definition_bundle_id": "f2dc6413-7582-4575-8dba-53248060b718",
+        "definition_bundle_sha256": "adddb51660ddcc684e89eb58b08369325636c42f81491d589c3cf2840173bdc7",
+        "created_stages": [
+          "instrumentation",
+          "contract",
+          "bundle"
+        ],
+        "reused_stages": [
+          "authority_model",
+          "template"
+        ],
+        "representation_settlement": "blocked",
+        "representation_reason": "entry xlsx/gt-d4-operating-revenue 没有 `state=awaiting_contract` 的 representation upgrade candidate 可绑定。approved bundle 已就位，缺的是**表示**侧供给：①该 entry 若还没有任何 content version/representation，首版只能由 `ContentMutationService.commit(...)`（唯一能推进 content_revision 的业务事务）产生；②已有 representation 时，纯 definitions 升级须先由 Task 17 的 instrumentation upgrader 登记 non-current candidate。本 provisioner **不**自建第三条 representation 写入路径（会伪造业务 projection 并绕过 `assert_candidate_finalizable`，Property 4 / 67 双打红）",
+        "attached_candidate_id": null,
+        "attach": null,
+        "content_revision_before": 21,
+        "content_revision_after": 21,
+        "revision_unchanged": true,
+        "entry_pointer_before": "6c84fcb2-4ba8-4276-9669-f5b429e09880",
+        "entry_pointer_after": "6c84fcb2-4ba8-4276-9669-f5b429e09880",
+        "created_anything": true
+      }
+    }
+  ],
+  "errors": [],
+  "supply_rows_before": {
+    "working_paper_sync_definition_artifact": 56,
+    "working_paper_sync_definition_bundle": 19,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 98
+  },
+  "supply_rows_after": {
+    "working_paper_sync_definition_artifact": 58,
+    "working_paper_sync_definition_bundle": 20,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 98
+  },
+  "created_total": 3
+}

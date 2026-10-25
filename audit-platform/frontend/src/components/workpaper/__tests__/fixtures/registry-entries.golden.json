@@ -1,0 +1,2493 @@
+[
+  {
+    "componentType": "a1-dashboard",
+    "importPath": "./GtA1Dashboard.vue",
+    "icon": "🎯",
+    "label": "A1 项目总控仪表盘",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "core"
+  },
+  {
+    "componentType": "a2-adjustment-console",
+    "importPath": "./GtA2AdjustmentConsole.vue",
+    "icon": "📝",
+    "label": "A2 调整分录中控台",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "core"
+  },
+  {
+    "componentType": "a3-consolidation-console",
+    "importPath": "./GtA3ConsolidationConsole.vue",
+    "icon": "🔗",
+    "label": "A3 合并流程中控台",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "core"
+  },
+  {
+    "componentType": "a-program-console",
+    "importPath": "./GtCycleAProgramRouter.vue",
+    "icon": "📋",
+    "label": "A 程序表中控台",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b-index",
+    "importPath": "./GtBIndex.vue",
+    "icon": "🗂️",
+    "label": "B 底稿目录",
+    "emits": [
+      "save"
+    ],
+    "contextProps": null,
+    "domain": "core"
+  },
+  {
+    "componentType": "c-note-table",
+    "importPath": "./GtCNoteTable.vue",
+    "icon": "📝",
+    "label": "C 附注披露嵌套表",
+    "emits": [
+      "save",
+      "subtable-toggle",
+      "standard-switch",
+      "sync-to-disclosure-notes",
+      "jump-to-reference",
+      "open-formula"
+    ],
+    "contextProps": null,
+    "domain": "core"
+  },
+  {
+    "componentType": "d-form-table",
+    "importPath": "./GtDForm/GtDForm.vue",
+    "icon": "📑",
+    "label": "D 检查表 (table)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "form-type",
+    "domain": "forms"
+  },
+  {
+    "componentType": "d-form-paragraph",
+    "importPath": "./GtDForm/GtDForm.vue",
+    "icon": "📄",
+    "label": "D 检查表 (paragraph)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "form-type",
+    "domain": "forms"
+  },
+  {
+    "componentType": "d-form-qa",
+    "importPath": "./GtDForm/GtDForm.vue",
+    "icon": "❓",
+    "label": "D 检查表 (qa)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "form-type",
+    "domain": "forms"
+  },
+  {
+    "componentType": "d-form-confirmation",
+    "importPath": "./GtDForm/GtDForm.vue",
+    "icon": "✉️",
+    "label": "D 检查表 (confirmation)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "form-type",
+    "domain": "forms"
+  },
+  {
+    "componentType": "d-form-review",
+    "importPath": "./GtDForm/GtDForm.vue",
+    "icon": "✍️",
+    "label": "D 检查表 (review)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "form-type",
+    "domain": "forms"
+  },
+  {
+    "componentType": "e-control-test",
+    "importPath": "./GtEControlTest.vue",
+    "icon": "🧪",
+    "label": "E 控制测试",
+    "emits": [
+      "save",
+      "trigger-procedure-trimming-suggestion",
+      "conclusion-change",
+      "step-advance"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "h-static-doc",
+    "importPath": "./GtHStaticDoc.vue",
+    "icon": "📖",
+    "label": "H 辅助说明",
+    "emits": [],
+    "contextProps": null,
+    "domain": "core"
+  },
+  {
+    "componentType": "custom",
+    "importPath": "./GtCustomWpEditor.vue",
+    "icon": "📎",
+    "label": "自定义底稿",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "custom",
+    "domain": "core"
+  },
+  {
+    "componentType": "audit-sheet",
+    "importPath": "./GtAuditSheet.vue",
+    "icon": "📊",
+    "label": "审定表",
+    "emits": [
+      "save",
+      "field-change",
+      "open-formula",
+      "restore"
+    ],
+    "contextProps": "standard",
+    "domain": "core"
+  },
+  {
+    "componentType": "bad-debt-sheet",
+    "importPath": "./GtBadDebtSheet.vue",
+    "icon": "💰",
+    "label": "坏账准备明细表",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "core"
+  },
+  {
+    "componentType": "cf-verification",
+    "importPath": "./CashFlowVerification.vue",
+    "icon": "💧",
+    "label": "现金流量表核查",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "core"
+  },
+  {
+    "componentType": "procedure-table",
+    "importPath": "./ProcedureTableRenderer.vue",
+    "icon": "📋",
+    "label": "程序表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "custom",
+    "domain": "programs"
+  },
+  {
+    "componentType": "report-analysis",
+    "importPath": "./ReportAnalysisPanel.vue",
+    "icon": "📈",
+    "label": "报表分析",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "misstatement-summary",
+    "importPath": "./MisstatementSummaryView.vue",
+    "icon": "⚠️",
+    "label": "错报汇总",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "review-checklist",
+    "importPath": "./GtReviewChecklist.vue",
+    "icon": "✍️",
+    "label": "复核面板",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "word-template",
+    "importPath": "./WorkpaperWordEditor.vue",
+    "icon": "📄",
+    "label": "Word 模板编辑",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "core"
+  },
+  {
+    "componentType": "independence-signing",
+    "importPath": "./IndependenceSigning.vue",
+    "icon": "✍️",
+    "label": "独立性签署",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "core"
+  },
+  {
+    "componentType": "wp-popup-signing",
+    "importPath": "./WpPopupSigning.vue",
+    "icon": "✍️",
+    "label": "签字流转控制表",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "core"
+  },
+  {
+    "componentType": "a1-11-signing-form",
+    "importPath": "./GtA111SigningForm.vue",
+    "icon": "✍️",
+    "label": "A1-11 签发流转控制表",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "core"
+  },
+  {
+    "componentType": "audit-legend",
+    "importPath": "./AuditLegendPanel.vue",
+    "icon": "📋",
+    "label": "审计标识一览表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "core"
+  },
+  {
+    "componentType": "checklist-table",
+    "importPath": "./GtChecklistTable.vue",
+    "icon": "✅",
+    "label": "核对表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "analytical-review",
+    "importPath": "./GtAnalyticalReview.vue",
+    "icon": "📊",
+    "label": "分析性复核",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "a17-summary",
+    "importPath": "./GtA17Summary.vue",
+    "icon": "📋",
+    "label": "A17 重大事项概要",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "kam-workpaper",
+    "importPath": "./GtKamWorkpaper.vue",
+    "icon": "🔑",
+    "label": "A17-2-1 关键审计事项",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "regulatory-letter",
+    "importPath": "./GtRegulatoryLetter.vue",
+    "icon": "📮",
+    "label": "A18-2 监管沟通函",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "goodwill-impairment",
+    "importPath": "./GtGoodwillImpairment.vue",
+    "icon": "💎",
+    "label": "商誉减值测试",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "segment-report",
+    "importPath": "./GtSegmentReport.vue",
+    "icon": "🏢",
+    "label": "经营分部",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "contingent-liability",
+    "importPath": "./GtContingentLiability.vue",
+    "icon": "⚖️",
+    "label": "或有事项",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "discontinued-operations",
+    "importPath": "./GtDiscontinuedOperations.vue",
+    "icon": "📉",
+    "label": "终止经营",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "misstatement-workpaper",
+    "importPath": "./GtMisstatementWorkpaper.vue",
+    "icon": "⚠️",
+    "label": "A13 错报套件",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "a14-3-workbook",
+    "importPath": "./GtA14_3Workbook.vue",
+    "icon": "🖥️",
+    "label": "A14-3 IT缺陷",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a10-bundle",
+    "importPath": "./GtA10Bundle.vue",
+    "icon": "📋",
+    "label": "A10 前期审计程序",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a11-bundle",
+    "importPath": "./GtA11Bundle.vue",
+    "icon": "📅",
+    "label": "A11 期后事项套件",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a12-bundle",
+    "importPath": "./GtA12Bundle.vue",
+    "icon": "📋",
+    "label": "A12 期初余额审计",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a15-bundle",
+    "importPath": "./GtA15Bundle.vue",
+    "icon": "🔄",
+    "label": "A15 持续经营套件",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a16-bundle",
+    "importPath": "./GtA16Bundle.vue",
+    "icon": "📜",
+    "label": "A16 管理层声明书",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a17-bundle",
+    "importPath": "./GtA17Bundle.vue",
+    "icon": "📋",
+    "label": "A17 审计总结聚合",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "confirmation-summary",
+    "importPath": "./confirmation/GtConfirmationSummary.vue",
+    "icon": "✉️",
+    "label": "函证结果汇总表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-entity-verify",
+    "importPath": "./confirmation/entityVerify/GtConfirmationEntityVerify.vue",
+    "icon": "🔍",
+    "label": "核实被函证单位信息",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-followup",
+    "importPath": "./confirmation/followup/GtConfirmationFollowup.vue",
+    "icon": "📋",
+    "label": "跟函过程控制",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-diff-reconcile",
+    "importPath": "./confirmation/diffReconcile/GtConfirmationDiffReconcile.vue",
+    "icon": "⚖️",
+    "label": "函证差异调节表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-alternative-d05",
+    "importPath": "./confirmation/alternativeD05/GtConfirmationAlternativeD05.vue",
+    "icon": "🔄",
+    "label": "替代程序(合同负债及销售)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-alternative-d06",
+    "importPath": "./confirmation/alternativeD06/GtConfirmationAlternativeD06.vue",
+    "icon": "🔄",
+    "label": "替代程序(应收及销售)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-diff-checklist",
+    "importPath": "./confirmation/diffChecklist/GtConfirmationDiffChecklist.vue",
+    "icon": "📊",
+    "label": "函证差异检查表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-fraud-risk",
+    "importPath": "./confirmation/fraudRisk/GtConfirmationFraudRisk.vue",
+    "icon": "🚨",
+    "label": "舞弊风险评价表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-reliability",
+    "importPath": "./confirmation/reliability/GtConfirmationReliability.vue",
+    "icon": "🔐",
+    "label": "回函可靠性验证",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-wealth-list",
+    "importPath": "./confirmation/wealthList/GtConfirmationWealthList.vue",
+    "icon": "💰",
+    "label": "理财产品发函记录表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-send-list-e03",
+    "importPath": "./confirmation/e0-send-list/GtE0SendListE03.vue",
+    "icon": "✉️",
+    "label": "发函清单(货币资金)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-send-list-e04",
+    "importPath": "./confirmation/e0-send-list/GtE0SendListE04.vue",
+    "icon": "✉️",
+    "label": "发函清单(借款)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-send-list-e05",
+    "importPath": "./confirmation/e0-send-list/GtE0SendListE05.vue",
+    "icon": "✉️",
+    "label": "发函清单(银承)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "b50-risk-assessment",
+    "importPath": "./GtB50RiskAssessment.vue",
+    "icon": "🎯",
+    "label": "B50 重大错报风险评估",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b22a-control-matrix",
+    "importPath": "./GtB22AControlMatrix.vue",
+    "icon": "🛡️",
+    "label": "B22A 内部控制了解程序表",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b22b-deficiency-evaluation",
+    "importPath": "./GtB22BDeficiencyEvaluation.vue",
+    "icon": "⚠️",
+    "label": "B22B 内部控制缺陷评价表",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b22b-control-matrix",
+    "importPath": "./GtB22BControlMatrix.vue",
+    "icon": "🗂️",
+    "label": "B22B 企业层面控制矩阵登记册",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b22c-design-effectiveness",
+    "importPath": "./GtB22CDesignEffectiveness.vue",
+    "icon": "📋",
+    "label": "B22C 企业层面控制设计有效性评价",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b23-process-control",
+    "importPath": "./GtB23ProcessControl.vue",
+    "icon": "🔄",
+    "label": "B23 业务流程与控制了解表",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b30-group-audit",
+    "importPath": "./GtB30GroupAudit.vue",
+    "icon": "🏢",
+    "label": "B30 集团审计范围确定",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b2-bundle",
+    "importPath": "./GtB2Bundle.vue",
+    "icon": "📋",
+    "label": "B2 业务承接程序",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b13-bundle",
+    "importPath": "./GtB13Bundle.vue",
+    "icon": "📋",
+    "label": "B13 初步分析性程序",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b19-bundle",
+    "importPath": "./GtB19Bundle.vue",
+    "icon": "📋",
+    "label": "B19 审计工作方案",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b51-bundle",
+    "importPath": "./GtB51Bundle.vue",
+    "icon": "📋",
+    "label": "B51 舞弊风险识别",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b60-strategy",
+    "importPath": "./b60/GtB60Bundle.vue",
+    "icon": "📋",
+    "label": "B60 总体审计策略",
+    "emits": [
+      "save",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b2-12-evaluation",
+    "importPath": "./GtB212Evaluation.vue",
+    "icon": "🧾",
+    "label": "B2-12 对前任注册会计师的评价",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a1-12-dual-checklist",
+    "importPath": "./GtA112DualChecklist.vue",
+    "icon": "✅",
+    "label": "A1-12 重大事项决定程序核查表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a1-15-disclosure-checklist",
+    "importPath": "./GtA115DisclosureChecklist.vue",
+    "icon": "📋",
+    "label": "A1-15 企业会计准则财务报表列报及披露核对表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a1-17-corresponding-data",
+    "importPath": "./GtA117CorrespondingData.vue",
+    "icon": "📊",
+    "label": "A1-17 对应数据程序表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a17-6-closing-meeting",
+    "importPath": "./GtA176ClosingMeeting.vue",
+    "icon": "📋",
+    "label": "A17-6 总结会会议纪要",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a18-1-regulatory-submission",
+    "importPath": "./GtA181RegulatorySubmission.vue",
+    "icon": "📨",
+    "label": "A18-1 向监管部门报送审计小结",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "a18-2-regulatory-communication",
+    "importPath": "./GtA182RegulatoryCommunication.vue",
+    "icon": "📮",
+    "label": "A18-2 与监管层沟通函",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "a8-1-other-info-representation",
+    "importPath": "./GtA81OtherInfoRepresentation.vue",
+    "icon": "📋",
+    "label": "A8-1 管理层对其他信息的书面声明",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a11-1-subsequent-events-inquiry",
+    "importPath": "./GtA111SubsequentEventsInquiry.vue",
+    "icon": "📅",
+    "label": "A11-1 期后事项问询函",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a17-3-consultation-record",
+    "importPath": "./GtA173ConsultationRecord.vue",
+    "icon": "📋",
+    "label": "A17-3 业务咨询记录",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a17-3-1-consultation-execution",
+    "importPath": "./GtA1731ConsultationExecution.vue",
+    "icon": "📋",
+    "label": "A17-3-1 咨询结果执行",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a17-4-disagreement-record",
+    "importPath": "./GtA174DisagreementRecord.vue",
+    "icon": "📋",
+    "label": "A17-4 重大专业分歧事项记录",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a17-7-independence-declaration",
+    "importPath": "./GtA177IndependenceDeclaration.vue",
+    "icon": "✍️",
+    "label": "A17-7 独立性声明书",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a9-1-deficiency-letter",
+    "importPath": "./GtA91DeficiencyLetter.vue",
+    "icon": "📋",
+    "label": "A9-1 内控缺陷沟通函",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a9-2-deficiency-letter-governance",
+    "importPath": "./GtA91DeficiencyLetter.vue",
+    "icon": "📋",
+    "label": "A9-2 治理层内控缺陷沟通函",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a27-1-it-audit-memo",
+    "importPath": "./GtA271ItAuditMemo.vue",
+    "icon": "💻",
+    "label": "A27-1 IT审计总结备忘录",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a12-1-legal-confirmation",
+    "importPath": "./GtA121LegalConfirmation.vue",
+    "icon": "⚖️",
+    "label": "A12-1 法律事务确认函",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a10-1-governance-communication",
+    "importPath": "./GtA101GovernanceCommunication.vue",
+    "icon": "📋",
+    "label": "A10-1 与治理层沟通函",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a17-1-audit-summary",
+    "importPath": "./GtA171AuditSummary.vue",
+    "icon": "📋",
+    "label": "A17-1 重大事项概要汇总",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "a17-2-1-kam",
+    "importPath": "./GtA1721Kam.vue",
+    "icon": "🔑",
+    "label": "A17-2-1 关键审计事项",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "a5-1-cashflow-audit",
+    "importPath": "./GtA51CashflowAudit.vue",
+    "icon": "💰",
+    "label": "A5-1 现金流量表审计",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "a3-8-goodwill-impairment",
+    "importPath": "./GtA38GoodwillImpairment.vue",
+    "icon": "💠",
+    "label": "A3-8 商誉减值测试",
+    "emits": [
+      "save",
+      "jump-to-workpaper"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b1-4-due-diligence-report",
+    "importPath": "./GtB14DueDiligenceReport.vue",
+    "icon": "📋",
+    "label": "B1-4 尽职调查报告",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "reports"
+  },
+  {
+    "componentType": "b1-risk-assessment",
+    "importPath": "./GtB1RiskAssessment.vue",
+    "icon": "📊",
+    "label": "B1-1/B1-2 风险评估表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b1-3-business-evaluation",
+    "importPath": "./GtB1Evaluation.vue",
+    "icon": "📝",
+    "label": "B1-3 业务评价表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "b1-5-kaa-check",
+    "importPath": "./GtB1KaaCheck.vue",
+    "icon": "✅",
+    "label": "B1-5 KAA检查表",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "confirmation-alternative-f05",
+    "importPath": "./confirmation/alternativeF05/GtConfirmationAlternativeF05.vue",
+    "icon": "🔄",
+    "label": "替代程序(预付及采购)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-alternative-f06",
+    "importPath": "./confirmation/alternativeF06/GtConfirmationAlternativeF06.vue",
+    "icon": "🔄",
+    "label": "替代程序(应付及采购)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-alternative-g06",
+    "importPath": "./g0-confirmation/alternativeG06/GtConfirmationAlternativeG06.vue",
+    "icon": "🔄",
+    "label": "替代程序(投资循环)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-alternative-h05",
+    "importPath": "./confirmation/alternativeH05/GtConfirmationAlternativeH05.vue",
+    "icon": "🔄",
+    "label": "替代程序(固定资产循环)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-alternative-k05",
+    "importPath": "./confirmation/alternativeK05/GtConfirmationAlternativeK05.vue",
+    "icon": "🔄",
+    "label": "替代程序(其他应收款)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-alternative-k06",
+    "importPath": "./confirmation/alternativeK06/GtConfirmationAlternativeK06.vue",
+    "icon": "🔄",
+    "label": "替代程序(其他应付款)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-alternative-l05",
+    "importPath": "./confirmation/alternativeL05/GtConfirmationAlternativeL05.vue",
+    "icon": "🔄",
+    "label": "替代程序(债务循环)",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-diff-securities",
+    "importPath": "./g0-confirmation/diffSecurities/GtConfirmationDiffSecurities.vue",
+    "icon": "📈",
+    "label": "证券差异核对",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "confirmation-diff-nonsecurities",
+    "importPath": "./g0-confirmation/diffNonSecurities/GtG0DiffNonSecurities.vue",
+    "icon": "🏦",
+    "label": "非证券差异核对",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "confirmations"
+  },
+  {
+    "componentType": "c-control-test",
+    "importPath": "./GtCControlTest.vue",
+    "icon": "🧪",
+    "label": "C 控制测试",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "c1-entity-level-control",
+    "importPath": "./GtC1EntityControl.vue",
+    "icon": "🏛️",
+    "label": "C1 企业层面控制测试",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "c22-itgc-bundle",
+    "importPath": "./GtC22ItgcBundle.vue",
+    "icon": "💻",
+    "label": "C22 IT一般控制测试聚合",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "c23-journal-entry-control",
+    "importPath": "./GtC23JournalControl.vue",
+    "icon": "📋",
+    "label": "C23 会计分录控制测试",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "c24-journal-entry-detail",
+    "importPath": "./GtC24JournalDetail.vue",
+    "icon": "🔍",
+    "label": "C24 会计分录细节测试",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "c25-internal-audit-reliance",
+    "importPath": "./GtC25InternalAudit.vue",
+    "icon": "🔎",
+    "label": "C25 利用内部审计工作",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "c26-info-processing-control",
+    "importPath": "./GtC26InfoControl.vue",
+    "icon": "🛡️",
+    "label": "C26 信息处理控制测试",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "d1-notes-receivable",
+    "importPath": "./GtD1NotesReceivable.vue",
+    "icon": "📄",
+    "label": "D1 应收票据",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "forms"
+  },
+  {
+    "componentType": "d2-accounts-receivable",
+    "importPath": "./GtD2AccountsReceivable.vue",
+    "icon": "💰",
+    "label": "D2 应收账款",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "forms"
+  },
+  {
+    "componentType": "d3-prepaid-accounts",
+    "importPath": "./GtD3PrepaidAccounts.vue",
+    "icon": "💰",
+    "label": "D3 预收账款",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "forms"
+  },
+  {
+    "componentType": "d4-operating-revenue",
+    "importPath": "./GtD4OperatingRevenue.vue",
+    "icon": "💹",
+    "label": "D4 营业收入",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "forms"
+  },
+  {
+    "componentType": "d5-receivables-financing",
+    "importPath": "./GtD5ReceivablesFinancing.vue",
+    "icon": "📈",
+    "label": "D5 应收款项融资",
+    "emits": [
+      "save",
+      "completed",
+      "jump-to-section"
+    ],
+    "contextProps": "standard",
+    "domain": "forms"
+  },
+  {
+    "componentType": "d6-contract-assets",
+    "importPath": "./GtD6ContractAssets.vue",
+    "icon": "📋",
+    "label": "D6 合同资产",
+    "emits": [
+      "save",
+      "completed",
+      "jump-to-section"
+    ],
+    "contextProps": "standard",
+    "domain": "forms"
+  },
+  {
+    "componentType": "d7-contract-liabilities",
+    "importPath": "./GtD7ContractLiabilities.vue",
+    "icon": "📋",
+    "label": "D7 合同负债",
+    "emits": [
+      "save",
+      "completed",
+      "jump-to-section"
+    ],
+    "contextProps": "standard",
+    "domain": "forms"
+  },
+  {
+    "componentType": "e1-monetary-fund",
+    "importPath": "./GtE1MonetaryFund.vue",
+    "icon": "💵",
+    "label": "E1 货币资金",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "f1-prepayment",
+    "importPath": "./GtF1Prepayment.vue",
+    "icon": "💳",
+    "label": "F1 预付账款",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "f2-inventory-main",
+    "importPath": "./GtF2InventoryMain.vue",
+    "icon": "📦",
+    "label": "F2 存货核心",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "f2-inventory-special",
+    "importPath": "./GtF2InventorySpecial.vue",
+    "icon": "📦",
+    "label": "F2 存货特殊",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "f2-inventory-valuation-impairment",
+    "importPath": "./GtF2InventoryValuation.vue",
+    "icon": "📦",
+    "label": "F2 计价减值",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "f2-stocktake-bundle",
+    "importPath": "./GtF2StocktakeBundle.vue",
+    "icon": "📦",
+    "label": "F2 存货监盘",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "programs"
+  },
+  {
+    "componentType": "f3-notes-payable",
+    "importPath": "./GtF3NotesPayable.vue",
+    "icon": "📄",
+    "label": "F3 应付票据",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "f4-accounts-payable",
+    "importPath": "./GtF4AccountsPayable.vue",
+    "icon": "📋",
+    "label": "F4 应付账款",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "f5-cost-of-sales",
+    "importPath": "./GtF5CostOfSales.vue",
+    "icon": "📊",
+    "label": "F5 营业成本",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g1-trading-financial-assets",
+    "importPath": "./GtG1TradingFinancialAssets.vue",
+    "icon": "📈",
+    "label": "G1 交易性金融资产",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g2-interest-receivable",
+    "importPath": "./GtG2InterestReceivable.vue",
+    "icon": "💰",
+    "label": "G2 应收利息",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g3-dividend-receivable",
+    "importPath": "./GtG3DividendReceivable.vue",
+    "icon": "💰",
+    "label": "G3 应收股利",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g4-bond-investment-ecl",
+    "importPath": "./GtG4BondInvestmentEcl.vue",
+    "icon": "🏦",
+    "label": "G4 ECL",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g4-bond-investment-main",
+    "importPath": "./GtG4BondInvestmentMain.vue",
+    "icon": "🏦",
+    "label": "G4 债权投资",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g4-bond-investment-sppi",
+    "importPath": "./GtG4BondInvestmentSppi.vue",
+    "icon": "🏦",
+    "label": "G4 SPPI",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g5-long-term-receivable",
+    "importPath": "./GtG5LongTermReceivable.vue",
+    "icon": "📑",
+    "label": "G5 长期应收款",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g6-other-bond-investment-ecl",
+    "importPath": "./GtG6OtherBondInvestmentEcl.vue",
+    "icon": "🏦",
+    "label": "G6 ECL",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g6-other-bond-investment-main",
+    "importPath": "./GtG6OtherBondMain.vue",
+    "icon": "📊",
+    "label": "G6 其他债权投资",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g6-other-bond-investment-sppi",
+    "importPath": "./GtG6OtherBondSppi.vue",
+    "icon": "🔬",
+    "label": "G6 SPPI",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g7-long-term-equity-main",
+    "importPath": "./GtG7LongTermEquityMain.vue",
+    "icon": "🏢",
+    "label": "G7 长期股权投资",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g7-long-term-equity-method",
+    "importPath": "./GtG7EquityMethod.vue",
+    "icon": "🏢",
+    "label": "G7 权益法",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g7-long-term-equity-subsidiary",
+    "importPath": "./GtG7EquitySubsidiary.vue",
+    "icon": "🏢",
+    "label": "G7 子公司",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g8-other-equity-instruments",
+    "importPath": "./GtG8OtherEquityInstruments.vue",
+    "icon": "📈",
+    "label": "G8 其他权益工具",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g9-other-noncurrent-financial",
+    "importPath": "./GtG9OtherNoncurrentFinancial.vue",
+    "icon": "📈",
+    "label": "G9 其他非流动金融",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g10-trading-financial-liabilities",
+    "importPath": "./GtG10TradingFinancialLiabilities.vue",
+    "icon": "📉",
+    "label": "G10 交易性金融负债",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g11-investment-income",
+    "importPath": "./GtG11InvestmentIncome.vue",
+    "icon": "💹",
+    "label": "G11 投资收益",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g12-net-hedge-gains",
+    "importPath": "./GtG12NetHedgeGains.vue",
+    "icon": "🛡️",
+    "label": "G12 套期收益",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g13-fair-value-changes",
+    "importPath": "./GtG13FairValueChanges.vue",
+    "icon": "📊",
+    "label": "G13 公允价值变动",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "g14-credit-impairment-loss",
+    "importPath": "./GtG14CreditImpairmentLoss.vue",
+    "icon": "⚠️",
+    "label": "G14 信用减值损失",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "h1-fixed-assets",
+    "importPath": "./GtH1FixedAssets.vue",
+    "icon": "🏗️",
+    "label": "H1 固定资产",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "h2-construction-in-progress",
+    "importPath": "./GtH2ConstructionInProgress.vue",
+    "icon": "🚧",
+    "label": "H2 在建工程",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "h3-investment-property",
+    "importPath": "./GtH3InvestmentProperty.vue",
+    "icon": "🏠",
+    "label": "H3 投资性房地产",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "h4-engineering-materials",
+    "importPath": "./GtH4EngineeringMaterials.vue",
+    "icon": "🧱",
+    "label": "H4 工程物资",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "h5-oil-gas-assets",
+    "importPath": "./GtH5OilGasAssets.vue",
+    "icon": "🛢️",
+    "label": "H5 油气资产",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "h7-biological-assets",
+    "importPath": "./GtH7BiologicalAssets.vue",
+    "icon": "🌱",
+    "label": "H7 生产性生物资产",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "h6-asset-disposal-clearing",
+    "importPath": "./GtH6AssetDisposalClearing.vue",
+    "icon": "🧹",
+    "label": "H6 固定资产清理",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "h8-right-of-use-assets",
+    "importPath": "./GtH8RightOfUseAssets.vue",
+    "icon": "📑",
+    "label": "H8 使用权资产",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "h9-lease-liabilities",
+    "importPath": "./GtH9LeaseLiabilities.vue",
+    "icon": "📋",
+    "label": "H9 租赁负债",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "h10-asset-disposal-income",
+    "importPath": "./GtH10AssetDisposalIncome.vue",
+    "icon": "🏭",
+    "label": "H10 资产处置损益",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "i1-intangible-assets",
+    "importPath": "./GtI1IntangibleAssets.vue",
+    "icon": "💎",
+    "label": "I1 无形资产",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "i2-development-expenditure",
+    "importPath": "./GtI2DevelopmentExpenditure.vue",
+    "icon": "🔬",
+    "label": "I2 开发支出",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "i3-goodwill",
+    "importPath": "./GtI3Goodwill.vue",
+    "icon": "💎",
+    "label": "I3 商誉",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "i4-long-term-prepaid",
+    "importPath": "./GtI4LongTermPrepaid.vue",
+    "icon": "📋",
+    "label": "I4 长期待摊费用",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "i5-other-noncurrent-assets",
+    "importPath": "./GtI5OtherNoncurrentAssets.vue",
+    "icon": "📋",
+    "label": "I5 其他非流动资产",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "i6-research-development-expense",
+    "importPath": "./GtI6ResearchDevelopmentExpense.vue",
+    "icon": "🔬",
+    "label": "I6 研发费用",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "j1-employee-compensation",
+    "importPath": "./j1/GtJ1EmployeeCompensation.vue",
+    "icon": "👥",
+    "label": "J1 应付职工薪酬",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "j2-defined-benefit-plan",
+    "importPath": "./j2/GtJ2DefinedBenefitPlan.vue",
+    "icon": "🏥",
+    "label": "J2 设定受益计划",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "j3-share-based-payment",
+    "importPath": "./j3/GtJ3ShareBasedPayment.vue",
+    "icon": "📊",
+    "label": "J3 股份支付",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "k1-other-receivables",
+    "importPath": "./GtK1OtherReceivables.vue",
+    "icon": "💰",
+    "label": "K1 其他应收款",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "k2-other-current-assets",
+    "importPath": "./GtK2OtherCurrentAssets.vue",
+    "icon": "📋",
+    "label": "K2 其他流动资产",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "k3-other-payables",
+    "importPath": "./GtK3OtherPayables.vue",
+    "icon": "💳",
+    "label": "K3 其他应付款",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "k4-other-current-liabilities",
+    "importPath": "./GtK4OtherCurrentLiabilities.vue",
+    "icon": "📋",
+    "label": "K4 其他流动负债",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "k5-provisions",
+    "importPath": "./GtK5Provisions.vue",
+    "icon": "⚖️",
+    "label": "K5 预计负债",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "k6-held-for-sale",
+    "importPath": "./GtK6HeldForSale.vue",
+    "icon": "🏷️",
+    "label": "K6 持有待售",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "k7-deferred-income",
+    "importPath": "./GtK7DeferredIncome.vue",
+    "icon": "📋",
+    "label": "K7 递延收益",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "k8-selling-expenses",
+    "importPath": "./GtK8SellingExpenses.vue",
+    "icon": "💰",
+    "label": "K8 销售费用",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "k9-admin-expenses",
+    "importPath": "./GtK9AdminExpenses.vue",
+    "icon": "🏢",
+    "label": "K9 管理费用",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "k11-asset-impairment-loss",
+    "importPath": "./GtK11AssetImpairmentLoss.vue",
+    "icon": "📉",
+    "label": "K11 资产减值损失",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "k10-other-income",
+    "importPath": "./GtK10OtherIncome.vue",
+    "icon": "🏛️",
+    "label": "K10 其他收益",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "k12-non-operating-income",
+    "importPath": "./GtK12NonOperatingIncome.vue",
+    "icon": "🎁",
+    "label": "K12 营业外收入",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "k13-non-operating-expense",
+    "importPath": "./GtK13NonOperatingExpense.vue",
+    "icon": "💸",
+    "label": "K13 营业外支出",
+    "emits": [
+      "save",
+      "completed",
+      "navigate-sheet"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "l1-short-term-loans",
+    "importPath": "./GtL1ShortTermLoans.vue",
+    "icon": "🏦",
+    "label": "L1 短期借款",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "l2-interest-payable",
+    "importPath": "./GtL2InterestPayable.vue",
+    "icon": "💸",
+    "label": "L2 应付利息",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "l3-long-term-loans",
+    "importPath": "./GtL3LongTermLoans.vue",
+    "icon": "🏛️",
+    "label": "L3 长期借款",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "l4-bonds-payable",
+    "importPath": "./GtL4BondsPayable.vue",
+    "icon": "📜",
+    "label": "L4 应付债券",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "l5-long-term-payables",
+    "importPath": "./GtL5LongTermPayables.vue",
+    "icon": "💳",
+    "label": "L5 长期应付款",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "l6-special-payables",
+    "importPath": "./GtL6SpecialPayables.vue",
+    "icon": "🏛️",
+    "label": "L6 专项应付款",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "l7-other-noncurrent-liabilities",
+    "importPath": "./GtL7OtherNoncurrentLiabilities.vue",
+    "icon": "📋",
+    "label": "L7 其他非流动负债",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "l8-financial-expenses",
+    "importPath": "./GtL8FinancialExpenses.vue",
+    "icon": "💰",
+    "label": "L8 财务费用",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "m1-dividends-payable",
+    "importPath": "./GtM1DividendsPayable.vue",
+    "icon": "💸",
+    "label": "M1 应付股利",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "m2-paid-in-capital",
+    "importPath": "./GtM2PaidInCapital.vue",
+    "icon": "🏦",
+    "label": "M2 实收资本（股本）",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "m3-treasury-stock",
+    "importPath": "./GtM3TreasuryStock.vue",
+    "icon": "📦",
+    "label": "M3 库存股",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "m4-capital-reserve",
+    "importPath": "./GtM4CapitalReserve.vue",
+    "icon": "💰",
+    "label": "M4 资本公积",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "m5-surplus-reserve",
+    "importPath": "./GtM5SurplusReserve.vue",
+    "icon": "📊",
+    "label": "M5 盈余公积",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "m6-retained-earnings",
+    "importPath": "./GtM6RetainedEarnings.vue",
+    "icon": "💰",
+    "label": "M6 未分配利润",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "m7-special-reserve",
+    "importPath": "./GtM7SpecialReserve.vue",
+    "icon": "🛡️",
+    "label": "M7 专项储备",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "m8-general-risk-reserve",
+    "importPath": "./GtM8GeneralRiskReserve.vue",
+    "icon": "⚠️",
+    "label": "M8 一般风险准备",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "m9-other-comprehensive-income",
+    "importPath": "./GtM9OtherComprehensiveIncome.vue",
+    "icon": "🌈",
+    "label": "M9 其他综合收益",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "m10-other-equity-instruments",
+    "importPath": "./GtM10OtherEquityInstruments.vue",
+    "icon": "📜",
+    "label": "M10 其他权益工具",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "n1-deferred-tax-assets",
+    "importPath": "./GtN1DeferredTaxAssets.vue",
+    "icon": "🧾",
+    "label": "N1 递延所得税资产",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "n2-taxes-payable",
+    "importPath": "./GtN2TaxesPayable.vue",
+    "icon": "🧾",
+    "label": "N2 应交税费",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "n3-deferred-tax-liabilities",
+    "importPath": "./GtN3DeferredTaxLiabilities.vue",
+    "icon": "🧾",
+    "label": "N3 递延所得税负债",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "n4-taxes-and-surcharges",
+    "importPath": "./GtN4TaxesAndSurcharges.vue",
+    "icon": "🧾",
+    "label": "N4 税金及附加",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "n5-income-tax-expense",
+    "importPath": "./GtN5IncomeTaxExpense.vue",
+    "icon": "🧾",
+    "label": "N5 所得税费用",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s3-policy-change",
+    "importPath": "./s3-policy-change/GtS3PolicyChange.vue",
+    "icon": "📋",
+    "label": "S3 会计政策变更",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s4-nonmonetary-exchange",
+    "importPath": "./s4-nonmonetary-exchange/GtS4NonmonetaryExchange.vue",
+    "icon": "🔄",
+    "label": "S4 非货币性资产交换",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s5-debt-restructuring",
+    "importPath": "./s5-debt-restructuring/GtS5DebtRestructuring.vue",
+    "icon": "📑",
+    "label": "S5 债务重组",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s6-fund-occupation",
+    "importPath": "./s6-fund-occupation/GtS6FundOccupation.vue",
+    "icon": "💰",
+    "label": "S6 资金占用",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s12-cpa-expert",
+    "importPath": "./s12-cpa-expert/GtS12CpaExpert.vue",
+    "icon": "👨‍💼",
+    "label": "S12 注册会计师专家",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s13-mgmt-expert",
+    "importPath": "./s13-mgmt-expert/GtS13MgmtExpert.vue",
+    "icon": "👨‍💻",
+    "label": "S13 管理层专家",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s14-accounting-estimate",
+    "importPath": "./s14-accounting-estimate/GtS14AccountingEstimate.vue",
+    "icon": "🧮",
+    "label": "S14 会计估计",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s15-eps-roe",
+    "importPath": "./s15-eps-roe/GtS15EpsRoe.vue",
+    "icon": "📊",
+    "label": "S15 每股收益与净资产收益率",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s20-revenue-deduction",
+    "importPath": "./s20-revenue-deduction/GtS20RevenueDeduction.vue",
+    "icon": "💹",
+    "label": "S20 营业收入扣除",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s21-data-asset",
+    "importPath": "./s21-data-asset/GtS21DataAsset.vue",
+    "icon": "💾",
+    "label": "S21 数据资产",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s32-fraud-bundle",
+    "importPath": "./s32-fraud-bundle/GtS32Bundle.vue",
+    "icon": "🚨",
+    "label": "S32 舞弊核查聚合",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s33-ann14-bundle",
+    "importPath": "./s33-ann14-bundle/GtS33Bundle.vue",
+    "icon": "📋",
+    "label": "S33 14号公告核查聚合",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s34-ipo-bundle",
+    "importPath": "./s34-ipo-bundle/GtS34Bundle.vue",
+    "icon": "📋",
+    "label": "S34 首发审核特项核查聚合",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s35-refinance-bundle",
+    "importPath": "./s35-refinance-bundle/GtS35Bundle.vue",
+    "icon": "📋",
+    "label": "S35 再融资审核特项核查聚合",
+    "emits": [],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "review-bundle",
+    "importPath": "./GtReviewBundle.vue",
+    "icon": "✍️",
+    "label": "角色复核聚合",
+    "emits": [
+      "save"
+    ],
+    "contextProps": "standard",
+    "domain": "core"
+  }
+]

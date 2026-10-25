@@ -398,3 +398,178 @@ async def _resolve_d4_ledger_monthly_by_product(
     summary = f"6001按产品贷方导入 {len(rows)} 行，年度合计={total:,.0f}"
 
     return {"summary": summary, "rows": rows}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# IPO 检查表取数（D4-25/26/27/28）—— 表间提取 resolver（客户/姓名维度）
+#
+# spec: d4-ipo-checklist-dual-mode-writeback-and-formula · Wave 3 · Task 7
+#
+# 数据源统一走 tb_aux_balance 的客户维度（aux_name = 客户名/姓名）：
+#   * 本期销售金额  → 收入科目 6001/6051 的贷方发生额（credit_amount）
+#   * 期末应收账款余额 → 应收账款 1122 的期末余额（closing_balance）
+#   * 合同负债期末余额 → 合同负债 2203 的期末余额（closing_balance）
+#
+# 🔴 走 get_active_filter 统一入口（数据集隔离），禁止裸 is_deleted==False。
+# 🔴 匹配不到 → **值字段为 None（不是 0）** —— 0 会被误解为「已核对为零」（宁缺勿造）。
+#    resolver 本身始终返回含 summary 的 dict（契约 test_resolver_success_contract 要求），
+#    仅 sales_amount/ar_balance/... 这类**数值字段**在无匹配时为 None。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+from app.models.audit_platform_models import TbAuxBalance  # noqa: E402
+
+#: 收入 / 应收 / 合同负债 的科目前缀（标准科目表）。
+_REVENUE_PREFIXES = ("6001", "6051")
+_AR_PREFIX = "1122"
+_CONTRACT_LIAB_PREFIX = "2203"
+
+
+async def _aux_amount_by_customer(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    *,
+    account_prefixes: tuple[str, ...],
+    customer_name: str,
+    column: str,
+) -> float | None:
+    """按客户名（aux_name）从 tb_aux_balance 指定科目取金额；匹配不到返回 None。
+
+    ``column`` ∈ {"credit_amount", "closing_balance"}。跨全部 aux_type 匹配 aux_name，
+    因为不同账套的客户维度类型名不一（客户/往来单位/供应商）。
+    """
+    name = (customer_name or "").strip()
+    if not name:
+        return None
+    try:
+        active_filter = await get_active_filter(db, TbAuxBalance.__table__, project_id, year)
+        col = getattr(TbAuxBalance, column)
+        prefix_conds = sa.or_(
+            *[TbAuxBalance.account_code.like(f"{p}%") for p in account_prefixes]
+        )
+        stmt = sa.select(
+            sa.func.coalesce(sa.func.sum(col), 0).label("amt"),
+            sa.func.count().label("n"),
+        ).where(
+            active_filter,
+            prefix_conds,
+            TbAuxBalance.aux_name == name,
+        )
+        row = (await db.execute(stmt)).one_or_none()
+        if row is None or int(row.n) == 0:
+            return None  # 匹配不到 → None（禁返回 0）
+        return float(row.amt)
+    except Exception as e:  # noqa: BLE001 — 记 WARNING，不吞成 0
+        logger.warning("_aux_amount_by_customer(%s/%s) 查询失败: %s", account_prefixes, column, e)
+        return None
+
+
+@auto_resolver("d4_25_dealer_sales")
+async def _resolve_d4_25_dealer_sales(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    **kwargs: Any,
+) -> dict[str, Any] | None:
+    """D4-25 经销商检查：按客户名称取本期销售金额（6001/6051 贷方）+ 期末应收账款余额（1122）。"""
+    customer_name = str(kwargs.get("customer_name") or kwargs.get("customerName") or "")
+    if not customer_name.strip():
+        return {"summary": "未提供客户名称", "sales_amount": None, "ar_balance": None}
+    sales = await _aux_amount_by_customer(
+        db, project_id, year,
+        account_prefixes=_REVENUE_PREFIXES, customer_name=customer_name, column="credit_amount",
+    )
+    ar = await _aux_amount_by_customer(
+        db, project_id, year,
+        account_prefixes=(_AR_PREFIX,), customer_name=customer_name, column="closing_balance",
+    )
+    return {
+        "summary": f"{customer_name}：本期销售={sales if sales is not None else '—'}；期末应收={ar if ar is not None else '—'}",
+        "sales_amount": sales,
+        "ar_balance": ar,
+    }
+
+
+@auto_resolver("d4_26_overseas_sales")
+async def _resolve_d4_26_overseas_sales(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    **kwargs: Any,
+) -> dict[str, Any] | None:
+    """D4-26 境外销售收入检查：按客户名称取本期销售金额（6001/6051 贷方）。
+
+    无稳定的「境外」维度，按客户名从收入 aux 取；匹配不到返回 None（宁缺勿造）。
+    """
+    customer_name = str(kwargs.get("customer_name") or kwargs.get("customerName") or "")
+    if not customer_name.strip():
+        return {"summary": "未提供客户名称", "sales_amount": None}
+    sales = await _aux_amount_by_customer(
+        db, project_id, year,
+        account_prefixes=_REVENUE_PREFIXES, customer_name=customer_name, column="credit_amount",
+    )
+    return {
+        "summary": f"{customer_name}：本期销售={sales if sales is not None else '—'}",
+        "sales_amount": sales,
+    }
+
+
+@auto_resolver("d4_27_related_party_sales")
+async def _resolve_d4_27_related_party_sales(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    **kwargs: Any,
+) -> dict[str, Any] | None:
+    """D4-27 识别未披露的关联方：按姓名/客户法人取年度销售额（6001/6051 贷方）。"""
+    person_name = str(
+        kwargs.get("person_name") or kwargs.get("name") or kwargs.get("customer_name") or ""
+    )
+    if not person_name.strip():
+        return {"summary": "未提供姓名", "annual_sales": None}
+    annual = await _aux_amount_by_customer(
+        db, project_id, year,
+        account_prefixes=_REVENUE_PREFIXES, customer_name=person_name, column="credit_amount",
+    )
+    return {
+        "summary": f"{person_name}：年度销售额={annual if annual is not None else '—'}",
+        "annual_sales": annual,
+    }
+
+
+@auto_resolver("d4_28_customer_balances")
+async def _resolve_d4_28_customer_balances(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    **kwargs: Any,
+) -> dict[str, Any] | None:
+    """D4-28 客户信息核查清单：按客户名称取销售金额（6001/6051）+ 应收账款期末余额（1122）
+    + 合同负债期末余额（2203）。三者都匹配不到才返回 None。"""
+    customer_name = str(kwargs.get("customer_name") or kwargs.get("customerName") or "")
+    if not customer_name.strip():
+        return {
+            "summary": "未提供客户名称",
+            "sales_amount": None, "ar_balance": None, "contract_liab_balance": None,
+        }
+    sales = await _aux_amount_by_customer(
+        db, project_id, year,
+        account_prefixes=_REVENUE_PREFIXES, customer_name=customer_name, column="credit_amount",
+    )
+    ar = await _aux_amount_by_customer(
+        db, project_id, year,
+        account_prefixes=(_AR_PREFIX,), customer_name=customer_name, column="closing_balance",
+    )
+    contract_liab = await _aux_amount_by_customer(
+        db, project_id, year,
+        account_prefixes=(_CONTRACT_LIAB_PREFIX,), customer_name=customer_name, column="closing_balance",
+    )
+    return {
+        "summary": (
+            f"{customer_name}：销售={sales if sales is not None else '—'}；"
+            f"应收={ar if ar is not None else '—'}；合同负债={contract_liab if contract_liab is not None else '—'}"
+        ),
+        "sales_amount": sales,
+        "ar_balance": ar,
+        "contract_liab_balance": contract_liab,
+    }

@@ -24,7 +24,9 @@ def main() -> int:
     path = m.contract_file_path()
     text = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if apply:
-        path.write_text(text, encoding="utf-8")
+        # 🔴 `newline="\n"` 必填：不传时 Windows 按 `\r\n` 写回，CRLF 被双向锁漏掉
+        #（canonical digest 对 CR 不可见）。用 `write_bytes` 让字节序完全由 text 决定。
+        path.write_bytes(text.encode("utf-8"))
         print(f"[apply] wrote {path} (canonical_digest={canonical_digest(payload)})")
         return 0
     if not path.exists():

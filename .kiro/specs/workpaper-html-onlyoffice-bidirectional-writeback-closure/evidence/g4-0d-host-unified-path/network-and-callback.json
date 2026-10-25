@@ -1,0 +1,134 @@
+{
+  "script": "e2e/g4-0d-d2-unified-path.spec.ts",
+  "captured_at": "2026-09-12T05:01:55.669Z",
+  "scope": {
+    "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+    "wp_id": "ef7f88e3-09eb-42cc-9f1d-1469fb3e6c88",
+    "entry_id": "xlsx/gt-d2-accounts-receivable"
+  },
+  "predicates": {
+    "user_sync_requests": [
+      {
+        "method": "GET",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/ef7f88e3-09eb-42cc-9f1d-1469fb3e6c88/sync/entries/xlsx/gt-d2-accounts-receivable/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/ef7f88e3-09eb-42cc-9f1d-1469fb3e6c88/sync/entries/xlsx/gt-d2-accounts-receivable/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/ef7f88e3-09eb-42cc-9f1d-1469fb3e6c88/sync/entries/xlsx/gt-d2-accounts-receivable/materialize",
+        "status": 200
+      }
+    ],
+    "forcesave_hits": [
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/ef7f88e3-09eb-42cc-9f1d-1469fb3e6c88/sync/entries/xlsx/gt-d2-accounts-receivable/rooms/cfaf372a-1769-489e-97e4-349b147578c8/forcesave",
+        "status": 202
+      }
+    ],
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "callback_url_redacted": "http://host.docker.internal:9980/api/workpaper-sync/rooms/cfaf372a-1769-489e-97e4-349b147578c8/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
+    "host_mounted": true,
+    "confirm_descriptor_200": true,
+    "forcesave_clicked": true,
+    "oo_cell_dirty_attempted": true,
+    "host_dirty_before_forcesave": false,
+    "forcesave_dispatch_error": null,
+    "forcesave_cs_error": 0,
+    "forcesave_cs_outcome": "accepted",
+    "forcesave_callback_expected": true,
+    "forcesave_http_status": 202,
+    "forcesave_error_code": null,
+    "forcesave_body_keys": [
+      "forcesave_request_id",
+      "operation_id",
+      "request_sequence",
+      "state",
+      "poll_after_ms",
+      "replayed",
+      "dispatch_error",
+      "cs_error",
+      "cs_outcome",
+      "callback_expected"
+    ],
+    "materialize_room_id": "cfaf372a-1769-489e-97e4-349b147578c8",
+    "materialize_has_jwt_token": true,
+    "doc_editor_called": false,
+    "doc_editor_has_root_token": false,
+    "doc_editor_document_mutable": false,
+    "host_status": "",
+    "host_error": "",
+    "confirm_forcesave_error": null,
+    "html_dom_roundtrip": {
+      "attempted": true,
+      "marker": "g4h205660",
+      "switched_to_html": true,
+      "marker_visible": true,
+      "store_mirrored": true,
+      "dom_probe": {
+        "by_exact_text": 1,
+        "input_prop_hits": 0,
+        "virtual_text_has": true,
+        "search_value": "g4h205660",
+        "tracked_operation_id": "ff0711b0-4028-415b-b770-90fd45b1a576"
+      }
+    },
+    "oo_write_target": "B25",
+    "oo_cell_edit_probe": {
+      "ok": true,
+      "target": "B25",
+      "attempt": 1,
+      "hasInsert": "function",
+      "hasEnter": "function",
+      "hasPaste": "function",
+      "hasFind": "function",
+      "sheetNames": [
+        "底稿目录",
+        "应收账款实质性程序表D2A",
+        "审定表D2-1",
+        "附注披露信息(上市公司）D2-1",
+        "附注披露信息（国企）D2-1",
+        "附注披露信息(上市公司)",
+        "附注披露信息(国企)",
+        "明细表D2-2",
+        "坏账准备明细表D2-3",
+        "调整分录汇总表D2-4",
+        "GT_Custom",
+        "_GT_SYNC"
+      ],
+      "activeSheet": "明细表D2-2",
+      "inserted": true,
+      "entered": true,
+      "pasted": true,
+      "closeRet": true,
+      "closed": true,
+      "cellText": "g4h205660",
+      "modified": true,
+      "saveRet": true,
+      "saved": true,
+      "cellTextAfterSave": "g4h205660"
+    }
+  },
+  "notes": [
+    "token/JWT/route_credential 值已脱敏",
+    "OO 写格：Asc.editor 写受管 B25(customer_name)；权威判据是 forcesave 响应 cs_error（0=有变更，4=no_changes）",
+    "application applied / revision+1 由同目录 DB 核查脚本补齐",
+    "§9.6 条件 6：切回结构化视图后 DOM 应出现 marker（getByDisplayValue / virtual text / input.value，排除搜索框）",
+    "DocEditor document 必须是可变纯对象（readonly Proxy 会导致 document.token 赋值被吞 → -20）"
+  ],
+  "auth_probe": {
+    "has_token": true
+  }
+}

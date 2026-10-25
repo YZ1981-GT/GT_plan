@@ -94,6 +94,7 @@ vi.mock('@/components/dashboard/ProjectTimeline.vue', () => ({
 vi.mock('@element-plus/icons-vue', () => ({
   Refresh: { template: '<i class="mock-refresh-icon" />' },
   Connection: { template: '<i class="mock-connection-icon" />' },
+  FolderChecked: { template: '<i class="mock-folder-checked-icon" />' },
 }))
 
 // ─── Import component under test ────────────────────────────────────────────

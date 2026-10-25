@@ -7,13 +7,16 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 差异=本期实计收入-本期应计收入 自动计算
  * 双模式 + AI + 导入导出
  */
-import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { parseNum, calcChangeAmount } from '../../composables/useD4FormulaEngine'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
+import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
+import { d4_34Candidates, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME } from '../../composables/d4OtherGroupPushPredicates'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -26,7 +29,8 @@ const consults = ref<ConsultRow[]>([])
 const auditNote = ref(''); const auditConclusion = ref('')
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-function pn(v: any): number { if (!v || v === '') return 0; const n = parseFloat(String(v)); return isNaN(n) ? 0 : n }
+// 数值解析走引擎单一真源（替换本地 pn，消除第二套解析路径）
+const pn = parseNum
 
 function createRental(name: string): RentalRow { return { id: `rt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`, tenant: name, period: '', area: '', unitPrice: '', contractRef: '', actualMonths: '', expectedRevenue: '', actualRevenue: '', diff: 0, indexRef: '' } }
 function createConsult(name: string): ConsultRow { return { id: `cs-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`, client: name, project: '', duration: '', contractAmount: '', contractRef: '', expectedRevenue: '', actualRevenue: '', diff: 0, indexRef: '' } }
@@ -45,8 +49,9 @@ async function addConsult() { if (props.isReadonly) return; try { const { value 
 function removeRental(id: string) { if (props.isReadonly) return; rentals.value = rentals.value.filter(r => r.id !== id); persistAll() }
 function removeConsult(id: string) { if (props.isReadonly) return; consults.value = consults.value.filter(r => r.id !== id); persistAll() }
 
-function updateRental(id: string, field: keyof RentalRow, value: any) { if (props.isReadonly) return; const row = rentals.value.find(r => r.id === id); if (!row) return; (row as any)[field] = value; row.diff = pn(row.actualRevenue) - pn(row.expectedRevenue); persistAll() }
-function updateConsult(id: string, field: keyof ConsultRow, value: any) { if (props.isReadonly) return; const row = consults.value.find(r => r.id === id); if (!row) return; (row as any)[field] = value; row.diff = pn(row.actualRevenue) - pn(row.expectedRevenue); persistAll() }
+// 差异 = 实计 - 应计，走引擎 calcChangeAmount（单一真源，保留符号不 abs）
+function updateRental(id: string, field: keyof RentalRow, value: any) { if (props.isReadonly) return; const row = rentals.value.find(r => r.id === id); if (!row) return; (row as any)[field] = value; row.diff = calcChangeAmount(pn(row.actualRevenue), pn(row.expectedRevenue)); persistAll() }
+function updateConsult(id: string, field: keyof ConsultRow, value: any) { if (props.isReadonly) return; const row = consults.value.find(r => r.id === id); if (!row) return; (row as any)[field] = value; row.diff = calcChangeAmount(pn(row.actualRevenue), pn(row.expectedRevenue)); persistAll() }
 
 function persistAll() {
   props.allResponses.set('D4-34-data', { item_id: 'D4-34-data', conclusion: null, remark: JSON.stringify({ rentals: rentals.value, consults: consults.value }) })
@@ -70,6 +75,26 @@ async function genConclusion() { if (props.isReadonly || !aiAvailable.value) ret
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 function fmtAmt(v: number): string { return v ? v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—' }
 function rowClass({ row }: { row: any }) { return row.diff !== 0 && row.diff ? 'row-diff' : '' }
+
+// ─── A13 错报推送（科目 6051；两区差异各自独立成条，保留符号不 abs，走判据单一真源）─────
+const { pushToA13 } = useD4InspectionWriteback({
+  wpCode: 'D4-34',
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+})
+const pushableCount = computed(() => d4_34Candidates(rentals.value as any, consults.value as any).length)
+function pushDiffsToA13() {
+  if (props.isReadonly) return
+  const cands = d4_34Candidates(rentals.value as any, consults.value as any)
+  if (!cands.length) { ElMessage.info('无合同测算差异，无需推送'); return }
+  const items = cands.map(c => ({
+    voucherNo: c.voucherNo,
+    amount: c.refAmount ?? 0, // 差异保留符号，人工认定
+    description: c.description,
+    indexRef: c.indexRef,
+  }))
+  pushToA13(items, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME)
+}
 
 // ─── OCR附件上传 ─────────────────────────────────────────────────────
 async function handleOcrUpload(type: 'rental' | 'consult', rowId: string, file: File) {
@@ -107,7 +132,7 @@ async function handleOcrUpload(type: 'rental' | 'consult', rowId: string, file: 
 
 <template>
 <div class="d4-other-contract">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushDiffsToA13" title="把合同测算差异推送到 A13 未更正错报汇总（差异保留符号，人工认定）">推送差异至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu>
     <el-dropdown-item disabled class="dropdown-group-label">— 房屋租赁业务 —</el-dropdown-item>
     <el-dropdown-item @click="exportTemplate('D4-34-rental')">导出模板</el-dropdown-item>
     <el-dropdown-item @click="exportData('D4-34-rental')">导出数据</el-dropdown-item>
@@ -149,7 +174,7 @@ async function handleOcrUpload(type: 'rental' | 'consult', rowId: string, file: 
         <el-table-column label="实际租赁月数" min-width="80" align="right"><template #default="{ row }"><el-input-number v-model="row.actualMonths" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateRental(row.id,'actualMonths',row.actualMonths)" /></template></el-table-column>
         <el-table-column label="本期应计收入" min-width="100" align="right"><template #default="{ row }"><WpAmountInput v-model="row.expectedRevenue" size="small" :disabled="isReadonly" style="width:100%" @change="updateRental(row.id,'expectedRevenue',row.expectedRevenue)" /></template></el-table-column>
         <el-table-column label="本期实计收入" min-width="100" align="right"><template #default="{ row }"><WpAmountInput v-model="row.actualRevenue" size="small" :disabled="isReadonly" style="width:100%" @change="updateRental(row.id,'actualRevenue',row.actualRevenue)" /></template></el-table-column>
-        <el-table-column label="差异" min-width="80" align="right"><template #default="{ row }"><span class="auto-calc" :class="{ 'diff-warn': row.diff !== 0 }">{{ fmtAmt(row.diff) }}</span></template></el-table-column>
+        <el-table-column min-width="80" align="right" class-name="auto-calc-col"><template #header><span class="auto-calc-header">差异 <el-tooltip content="本期实计收入 − 本期应计收入（自动计算）" placement="top"><span class="fx-mark">ƒx</span></el-tooltip></span></template><template #default="{ row }"><span class="auto-calc" :class="{ 'diff-warn': row.diff !== 0 }">{{ fmtAmt(row.diff) }}</span></template></el-table-column>
         <el-table-column label="索引" width="60"><template #default="{ row }"><el-input v-model="row.indexRef" size="small" :disabled="isReadonly" @change="updateRental(row.id,'indexRef',row.indexRef)" /></template></el-table-column>
         <el-table-column label="附件" width="70" align="center">
           <template #default="{ row }">
@@ -178,7 +203,7 @@ async function handleOcrUpload(type: 'rental' | 'consult', rowId: string, file: 
         <el-table-column label="合同索引" width="70"><template #default="{ row }"><el-input v-model="row.contractRef" size="small" :disabled="isReadonly" @change="updateConsult(row.id,'contractRef',row.contractRef)" /></template></el-table-column>
         <el-table-column label="本期应计收入" min-width="100" align="right"><template #default="{ row }"><WpAmountInput v-model="row.expectedRevenue" size="small" :disabled="isReadonly" style="width:100%" @change="updateConsult(row.id,'expectedRevenue',row.expectedRevenue)" /></template></el-table-column>
         <el-table-column label="本期实计收入" min-width="100" align="right"><template #default="{ row }"><WpAmountInput v-model="row.actualRevenue" size="small" :disabled="isReadonly" style="width:100%" @change="updateConsult(row.id,'actualRevenue',row.actualRevenue)" /></template></el-table-column>
-        <el-table-column label="差异" min-width="80" align="right"><template #default="{ row }"><span class="auto-calc" :class="{ 'diff-warn': row.diff !== 0 }">{{ fmtAmt(row.diff) }}</span></template></el-table-column>
+        <el-table-column min-width="80" align="right" class-name="auto-calc-col"><template #header><span class="auto-calc-header">差异 <el-tooltip content="本期实计收入 − 本期应计收入（自动计算）" placement="top"><span class="fx-mark">ƒx</span></el-tooltip></span></template><template #default="{ row }"><span class="auto-calc" :class="{ 'diff-warn': row.diff !== 0 }">{{ fmtAmt(row.diff) }}</span></template></el-table-column>
         <el-table-column label="索引" width="60"><template #default="{ row }"><el-input v-model="row.indexRef" size="small" :disabled="isReadonly" @change="updateConsult(row.id,'indexRef',row.indexRef)" /></template></el-table-column>
         <el-table-column label="附件" width="70" align="center">
           <template #default="{ row }">
@@ -213,6 +238,9 @@ async function handleOcrUpload(type: 'rental' | 'consult', rowId: string, file: 
 .block-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}.block-title{font-size:14px;font-weight:600;color:#303133}.block-hint{font-size:12px;color:#909399}
 .contract-table{font-size: var(--wp-font-size, 13px)}.contract-table :deep(.el-table__cell){padding:5px 4px}.contract-table :deep(.row-diff td){background-color:#fdf6ec !important}
 .auto-calc{color:#909399;font-style:italic;border-bottom:1px dashed #c0c4cc;cursor:help}.diff-warn{color:#e6a23c;font-weight:600;font-style:normal}
+/* 自动计算列统一灰底，对齐 D4-2 蓝本 .auto-calc-col */
+.contract-table :deep(td.auto-calc-col.el-table__cell){background-color:#f5f7fa !important}
+.auto-calc-header{color:#606266}.auto-calc-header .fx-mark{color:#909399;font-style:italic;font-size:11px}
 .audit-opinion-card{margin-bottom:16px}.opinion-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.opinion-title{font-size:14px;font-weight:600;color:#303133}.opinion-actions{margin-left:auto;display:flex;gap:8px}.opinion-body{display:flex;flex-direction:column;gap:14px}.opinion-field label{display:block;font-size:12px;color:#909399;margin-bottom:4px;font-weight:500}
 .oo-container{min-height:600px;height:calc(100vh - 280px);border-radius:8px;overflow:hidden}
 </style>

@@ -40,7 +40,7 @@ from __future__ import annotations
 import zipfile
 from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from app.services.workpaper_sync.adapters.base import (
     AdapterProtocolError,
@@ -104,6 +104,8 @@ class ExcelSyncAdapter:
     #: OO→HTML 的 baseline 来源（application 冻结的 base representation）。给了才做受保护格
     #: 篡改分类；`extract` 对**这份**文件本身不套 baseline（它就是 baseline）。
     baseline_representation: Path | None = None
+    #: 同 workbook 其它受管 sheet 的 binding（首版 / 重投影写全表时用；日常单 sheet 切页为空）。
+    sibling_bindings: tuple[ExcelIdentityBinding, ...] = ()
     _baseline: dict[str, Any] = dataclass_field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
@@ -148,6 +150,40 @@ class ExcelSyncAdapter:
                 f"{frozen.contract_id!r}/{frozen.canonical_sha256[:12]}… 不一致 —— "
                 "adapter 按 operation 冻结身份构造，不得跨 entry 复用"
             )
+
+    def _all_bindings(self) -> tuple[ExcelIdentityBinding, ...]:
+        if not self.sibling_bindings:
+            return (self.binding,)
+        seen = {self.binding.table_key}
+        out: list[ExcelIdentityBinding] = [self.binding]
+        for binding in self.sibling_bindings:
+            if binding.table_key in seen:
+                continue
+            seen.add(binding.table_key)
+            out.append(binding)
+        return tuple(out)
+
+    def _merge_projections(self, parts: Sequence[Projection]) -> Projection:
+        if len(parts) == 1:
+            return parts[0]
+        values: dict[str, Any] = {}
+        row_keys: dict[str, tuple[str, ...]] = {}
+        for part in parts:
+            values.update(part.values)
+            for table_key, keys in part.row_keys.items():
+                merged = list(row_keys.get(table_key, ()))
+                for key in keys:
+                    if key not in merged:
+                        merged.append(key)
+                row_keys[table_key] = tuple(merged)
+        head = parts[0]
+        return Projection(
+            contract_id=head.contract_id,
+            semantic_version=head.semantic_version,
+            document_type=head.document_type,
+            values=values,
+            row_keys=row_keys,
+        )
 
     def _baseline_pair(self) -> tuple[Projection | None, Mapping[str, str] | None]:
         """从冻结的 base representation 现算 `(baseline projection, baseline formulas)`。
@@ -219,20 +255,162 @@ class ExcelSyncAdapter:
         output: Path,
         contract: SyncContract,
     ) -> MaterializeResult:
-        """写 staged 产物。反读门由 `ContentMutationService` 紧随其后的 `extract` 完成。"""
+        """写 staged 产物。反读门由 `ContentMutationService` 紧随其后的 `extract` 完成。
+
+        OO→HTML：OnlyOffice 可能保留 `_GT_SYNC` 清册项却掏空 sheetData。此时从冻结的
+        base representation 重注 runtime binding 到**临时** xlsx 再写；durable incoming
+        本体一字不动（AC 8.10）。
+        """
         self._assert_same_contract(contract, where="materialize")
-        return materialize_projection(
-            substrate=substrate,
-            projection=projection,
-            output=output,
-            definitions=self.definitions,
-            binding=self.binding,
-            substrate_role=self.substrate_role,
-            substrate_kind=self.substrate_kind,
-            substrate_state=self.substrate_state,
-            capability=self.capability,
-            limits=self._limits,
-        ).result
+        repaired: Path | None = None
+        substrate_for_write = substrate
+        g7_sanitized: Path | None = None
+        try:
+            # OO→HTML：OnlyOffice 可能保留 `_GT_SYNC` 清册却掏空 sheetData。从冻结的
+            # base representation 重注到临时 xlsx；durable incoming 本体一字不动（AC 8.10）。
+            # 路径命名空间也认 `.incoming/`：registry 上常见 `html_to_oo` 复用实例，
+            # 此时 `substrate_kind` 仍是 canonical，不能只靠 kind 门。
+            incoming_ns = (
+                self.substrate_kind is ArtifactKind.incoming
+                or ".incoming" in substrate.resolve().parts
+            )
+            if self.baseline_representation is not None and incoming_ns:
+                from app.services.workpaper_sync.excel_extract import (
+                    reinject_runtime_binding_from_base_if_needed,
+                )
+
+                repaired = reinject_runtime_binding_from_base_if_needed(
+                    incoming=substrate,
+                    base=self.baseline_representation,
+                    metadata_sheet=self.binding.metadata_sheet,
+                )
+                if repaired is not None:
+                    substrate_for_write = repaired
+            # G7：OnlyOffice 对部分 IF() 在加载期 tocBool 崩溃（error -82）。在 substrate
+            # 副本上中性化后再 materialize，使 before/after 公式集一致、哈希自洽。
+            if self.adapter_id == "g7.soe_subsidiary_disclosure":
+                import shutil
+
+                from app.services.workpaper_sync.pilot_g7_two_level_dynamic import (
+                    neutralize_oo_crash_if_formulas,
+                )
+
+                g7_sanitized = substrate_for_write.with_name(
+                    substrate_for_write.name + ".g7-noif.xlsx"
+                )
+                shutil.copy2(substrate_for_write, g7_sanitized)
+                neutralize_oo_crash_if_formulas(g7_sanitized)
+                substrate_for_write = g7_sanitized
+
+            bindings = self._all_bindings()
+            role = (
+                SubstrateRole.incoming if incoming_ns else self.substrate_role
+            )
+            kind = ArtifactKind.incoming if incoming_ns else self.substrate_kind
+            state = ArtifactState.durable if incoming_ns else self.substrate_state
+            if len(bindings) == 1:
+                result = materialize_projection(
+                    substrate=substrate_for_write,
+                    projection=projection,
+                    output=output,
+                    definitions=self.definitions,
+                    binding=bindings[0],
+                    substrate_role=role,
+                    substrate_kind=kind,
+                    substrate_state=state,
+                    capability=self.capability,
+                    limits=self._limits,
+                ).result
+                from app.services.workpaper_sync.phase5_d4_29_customer_detail import materialize_file, is_enabled
+                if is_enabled(contract):
+                    # D4-29 转置写盘后只刷新 artifact 字节摘要；structure_hash 由
+                    # ContentMutationService._projection_structure_hash（与观测器同构）覆盖，
+                    # 不得用 normalized_structure_hash（整簿指纹）覆盖 —— 那会立刻漂移。
+                    import dataclasses
+                    import hashlib
+                    materialize_file(output, projection, contract)
+                    result = dataclasses.replace(
+                        result,
+                        artifact_sha256=hashlib.sha256(output.read_bytes()).hexdigest(),
+                    )
+                return result
+
+            # 多受管 sheet：按 binding 顺序叠写同一份 workbook（首版 / 重投影）。
+            # 🔴 row_shift / propagation 必须保留**主 binding**那一趟的声明：末趟（sibling）
+            #    常无插行 ⇒ row_shift=None，若用末趟结果喂 verify，主 sheet 的插行会被
+            #    判成 unmanaged drift（D4 rematerialize 实测 169→253）。
+            import dataclasses
+            import tempfile
+
+            current = substrate_for_write
+            primary_result: MaterializeResult | None = None
+            last_result: MaterializeResult | None = None
+            field_count = 0
+            tmp_paths: list[Path] = []
+            try:
+                for index, binding in enumerate(bindings):
+                    is_last = index == len(bindings) - 1
+                    if is_last:
+                        target = output
+                    else:
+                        handle = tempfile.NamedTemporaryFile(
+                            suffix=f".sheet{index}.xlsx", delete=False
+                        )
+                        handle.close()
+                        target = Path(handle.name)
+                        tmp_paths.append(target)
+                    step = materialize_projection(
+                        substrate=current,
+                        projection=projection,
+                        output=target,
+                        definitions=self.definitions,
+                        binding=binding,
+                        substrate_role=role,
+                        substrate_kind=kind,
+                        substrate_state=state,
+                        capability=self.capability,
+                        limits=self._limits,
+                        retain_identity_inventory=(
+                            binding.table_key == self.binding.table_key
+                        ),
+                    ).result
+                    field_count += int(step.managed_field_count)
+                    if binding.table_key == self.binding.table_key:
+                        primary_result = step
+                    last_result = step
+                    current = target
+            finally:
+                for path in tmp_paths:
+                    path.unlink(missing_ok=True)
+            assert last_result is not None
+            assert primary_result is not None
+            from app.services.workpaper_sync.phase5_d4_29_customer_detail import materialize_file, is_enabled
+            if is_enabled(contract):
+                # D4-29 转置写盘后只刷新 artifact 字节摘要；structure_hash 由
+                # ContentMutationService._projection_structure_hash（与观测器同构）覆盖。
+                import hashlib
+                materialize_file(output, projection, contract)
+                last_result = dataclasses.replace(
+                    last_result,
+                    artifact_sha256=hashlib.sha256(output.read_bytes()).hexdigest(),
+                )
+            return dataclasses.replace(
+                primary_result,
+                managed_field_count=field_count,
+                output_path=output,
+                # 产物字节摘要以末趟为准（含全部 sibling 写入）。
+                artifact_sha256=last_result.artifact_sha256,
+                # structure_hash 是 workbook 级，末趟与主趟同值；identity 清册必须用主
+                # binding：observer/_frozen_anchors 只锚主表，末趟 sibling 的 digest
+                # 会写成 D43 清册并与观测器重算的 D42 清册漂移（D4 rematerialize 实测）。
+                structure_hash=last_result.structure_hash,
+                identity_inventory_sha256=primary_result.identity_inventory_sha256,
+            )
+        finally:
+            if repaired is not None:
+                repaired.unlink(missing_ok=True)
+            if g7_sanitized is not None:
+                g7_sanitized.unlink(missing_ok=True)
 
     def extract(self, *, artifact: Path, contract: SyncContract) -> Projection:
         """反读受管 projection。
@@ -253,17 +431,27 @@ class ExcelSyncAdapter:
         role, kind, state = self._substrate_shape_of(artifact)
         if role is SubstrateRole.published_representation:
             baseline, baseline_formulas = (None, None)
-        return extract_projection(
-            artifact=artifact,
-            definitions=self.definitions,
-            binding=self.binding,
-            substrate_role=role,
-            artifact_kind=kind,
-            artifact_state=state,
-            baseline=baseline,
-            baseline_formulas=baseline_formulas,
-            limits=self._limits,
-        ).projection
+        parts: list[Projection] = []
+        for binding in self._all_bindings():
+            parts.append(
+                extract_projection(
+                    artifact=artifact,
+                    definitions=self.definitions,
+                    binding=binding,
+                    substrate_role=role,
+                    artifact_kind=kind,
+                    artifact_state=state,
+                    baseline=baseline,
+                    baseline_formulas=baseline_formulas,
+                    limits=self._limits,
+                    # 冻结 inventory 只锁主 sheet；sibling 表列跨度不同，不得拿主表期望比对。
+                    retain_identity_inventory=binding.table_key == self.binding.table_key,
+                ).projection
+            )
+        from app.services.workpaper_sync.phase5_d4_29_customer_detail import is_enabled, extract_file
+        if is_enabled(contract):
+            parts.append(extract_file(artifact, contract))
+        return self._merge_projections(parts)
 
     def _substrate_shape_of(
         self, artifact: Path
@@ -334,21 +522,87 @@ class ExcelSyncAdapter:
         标死类型反而给本模块加两条不必要的 import 边。
         """
         self._assert_same_contract(contract, where="verify_unmanaged_regions")
-        with zipfile.ZipFile(after) as zf:
-            region = resolve_managed_region(
-                zf, contract=self.definitions.contract, binding=self.binding
+        # G7：materialize 在 substrate 副本上中性化 IF()；before 必须用同一口径，
+        # 否则 verifier 会把「清 IF」误判成 unmanaged 公式漂移，commit 永远进不去，
+        # OO 继续吃带 IF 的 published 表示 → error -82。
+        before_for_compare = before
+        g7_before_sanitized: Path | None = None
+        d429_before: Path | None = None
+        try:
+            from app.services.workpaper_sync.phase5_d4_29_customer_detail import (
+                is_enabled, materialize_transposed_workbook, extract_transposed_workbook,
             )
-        return verify_unmanaged_regions(
-            before=before,
-            after=after,
-            contract=self.definitions.contract,
-            region=region,
-            binding=self.binding,
-            limits=self._limits,
-            row_shift=row_shift,
-            total_formula_rows=total_formula_rows,
-            propagation=propagation,
-        )
+            if is_enabled(contract):
+                import tempfile
+                handle = tempfile.NamedTemporaryFile(suffix=".d429-before.xlsx", delete=False)
+                handle.close()
+                d429_before = Path(handle.name)
+                d429_before.write_bytes(materialize_transposed_workbook(
+                    before.read_bytes(), extract_transposed_workbook(after.read_bytes())
+                ))
+                before_for_compare = d429_before
+            if self.adapter_id == "g7.soe_subsidiary_disclosure":
+                import shutil
+
+                from app.services.workpaper_sync.pilot_g7_two_level_dynamic import (
+                    neutralize_oo_crash_if_formulas,
+                )
+
+                g7_before_sanitized = before.with_name(
+                    before.name + ".g7-noif-before.xlsx"
+                )
+                shutil.copy2(before, g7_before_sanitized)
+                neutralize_oo_crash_if_formulas(g7_before_sanitized)
+                before_for_compare = g7_before_sanitized
+            with zipfile.ZipFile(after) as zf:
+                regions_by_binding: list[tuple[ExcelIdentityBinding, Any]] = []
+                for binding in self._all_bindings():
+                    regions_by_binding.append(
+                        (
+                            binding,
+                            resolve_managed_region(
+                                zf,
+                                contract=self.definitions.contract,
+                                binding=binding,
+                            ),
+                        )
+                    )
+            all_managed_parts = frozenset(
+                region.sheet_part for _binding, region in regions_by_binding
+            )
+            last_report: UnmanagedRegionReport | None = None
+            for binding, region in regions_by_binding:
+                extra = all_managed_parts - {region.sheet_part}
+                # 插行 / 工作簿传播声明来自主 sheet 那一趟；sibling 校验仍要带上，
+                # 否则 workbook.xml definedName 位移会被判成 workbook_and_styles 漂移。
+                last_report = verify_unmanaged_regions(
+                    before=before_for_compare,
+                    after=after,
+                    contract=self.definitions.contract,
+                    region=region,
+                    binding=binding,
+                    limits=self._limits,
+                    row_shift=(
+                        row_shift
+                        if binding.table_key == self.binding.table_key
+                        else None
+                    ),
+                    total_formula_rows=(
+                        total_formula_rows
+                        if binding.table_key == self.binding.table_key
+                        else ()
+                    ),
+                    propagation=propagation,
+                    extra_managed_sheet_parts=extra,
+                )
+                last_report.assert_equivalent()
+            assert last_report is not None
+            return last_report
+        finally:
+            if d429_before is not None:
+                d429_before.unlink(missing_ok=True)
+            if g7_before_sanitized is not None:
+                g7_before_sanitized.unlink(missing_ok=True)
 
 
 def build_excel_adapter(
@@ -359,6 +613,7 @@ def build_excel_adapter(
     baseline_representation: Path | None = None,
     capability: ExcelWriteCapability | None = None,
     limits: SyncLimits | None = None,
+    sibling_bindings: tuple[ExcelIdentityBinding, ...] = (),
 ) -> ExcelSyncAdapter:
     """按方向构造 adapter。`direction` 是封闭词表，不接受自由文本。
 
@@ -395,4 +650,5 @@ def build_excel_adapter(
         capability=capability,
         limits=limits,
         baseline_representation=baseline_representation,
+        sibling_bindings=sibling_bindings,
     )

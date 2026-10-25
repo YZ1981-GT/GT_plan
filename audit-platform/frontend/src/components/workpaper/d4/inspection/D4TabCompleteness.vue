@@ -7,10 +7,11 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 双模式：表格视图 / 在线编辑
  * 支持行级OCR、自动一致性校验、AI辅助
  */
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import useD4CompletenessCheck, { checkConsistency, mapOcrToCompleteness } from '../../composables/useD4CompletenessCheck'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -155,6 +156,23 @@ const consistencyRate = computed(() => {
   return Math.round((consistentCount.value / itemCount.value) * 100)
 })
 
+// ─── 双向回写：不一致项 → A13 错报 + D4-1 审计说明 ─────────────────────
+const { pushToA13 } = useD4InspectionWriteback({
+  wpCode: 'D4-15',
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+})
+function handlePushToA13() {
+  const misItems = items.value
+    .filter(i => i.isConsistent === false)
+    .map(i => ({
+      amount: i.delivery.amount || i.invoice.amount || i.voucher.amount || 0,
+      description: `${i.indexNo || i.delivery.number || '事项'} 三维核对不一致（发货单/发票/记账凭证品名·数量·金额存在差异）${i.remark ? `：${i.remark}` : ''}`,
+      indexRef: i.indexNo || 'D4-15',
+    }))
+  pushToA13(misItems, '6001', '营业收入')
+}
+
 // ─── Row class for inconsistent highlight ────────────────────────────
 function rowClassName({ row }: { row: any }) {
   return row.isConsistent === false ? 'row-inconsistent' : ''
@@ -186,6 +204,9 @@ function rowClassName({ row }: { row: any }) {
         </el-dropdown>
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-14" :context-project-id="projectId" />
+        <el-tooltip content="将三维核对不一致项推送至 A13 未更正错报汇总，并同步至 D4-1 审计说明" placement="top">
+          <el-button size="small" type="warning" plain :disabled="isReadonly || inconsistentCount === 0" @click="handlePushToA13">推送不一致项至 A13</el-button>
+        </el-tooltip>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-15-completeness')">
           💬 复核
         </el-button>
@@ -341,8 +362,13 @@ function rowClassName({ row }: { row: any }) {
           </el-table-column>
         </el-table-column>
 
-        <!-- 一致性列 -->
-        <el-table-column label="一致" width="60" align="center">
+        <!-- 一致性列（自动判定，灰底） -->
+        <el-table-column width="60" align="center" class-name="auto-calc-col">
+          <template #header>
+            <el-tooltip content="一致性 = 发货单/发票/记账凭证的金额·品名·数量三要素是否吻合（自动判定）" placement="top">
+              <span class="auto-calc-header">一致 <span class="fx-mark">ƒ</span></span>
+            </el-tooltip>
+          </template>
           <template #default="{ row }">
             <span v-if="row.isConsistent === true" class="consistency-yes">√</span>
             <span v-else-if="row.isConsistent === false" class="consistency-no">×</span>
@@ -482,6 +508,9 @@ function rowClassName({ row }: { row: any }) {
 .completeness-table :deep(.col-invoice .el-table__cell) { background-color: #f0f5ff !important; }
 .completeness-table :deep(.col-voucher .el-table__cell) { background-color: #f8f0ff !important; }
 .completeness-table :deep(.row-inconsistent td) { border-left: 3px solid #f56c6c; }
+.completeness-table :deep(td.auto-calc-col.el-table__cell) { background-color: #f5f7fa !important; }
+.auto-calc-header { color: #606266; }
+.auto-calc-header .fx-mark { color: #909399; font-style: italic; font-size: 11px; }
 .consistency-yes { color: #67c23a; font-weight: 700; font-size: 16px; }
 .consistency-no { color: #f56c6c; font-weight: 700; font-size: 16px; }
 .consistency-na { color: #c0c4cc; font-size: 14px; }

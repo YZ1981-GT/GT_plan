@@ -1,137 +1,252 @@
 <script setup lang="ts">
-import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
- * D4TabCustomerChecklist — D4-28 客户信息核查清单
+ * D4TabCustomerChecklist — D4-28 客户信息核查清单（两级表头，9 主 + 5 子 + 索引号）
  *
- * 动态行：每行一个客户，15列含多级表头
- * 基本信息(序号/客户/原因/销售额/占比/应收余额/占比/合同负债/占比) + 核查方式5子列(√) + 索引号
- * 双模式 + AI + 导入导出
+ * 5 个二级列为 checkbox，父组「核查方式（√）」嵌套 el-table-column 渲染（DOM 跨 5 列，
+ * Property 32）；三个占比列表内计算（各自分母 0 留空）；销售/应收/合同负债表间提取。
  */
-import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useD4ImportExport } from '../../composables/useD4ImportExport'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
+import { Plus } from '@element-plus/icons-vue'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
-import { Plus } from '@element-plus/icons-vue'
+import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import {
+  useWorkpaperSyncBridge,
+  WP_BRIDGE_IN_FLIGHT_STATES,
+} from '../../sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useIpoChecklistTab } from './useIpoChecklistTab'
+import type { ChecklistColumnSpec } from './ipoChecklistSchema'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
+const emit = defineEmits<{ (e: 'imported'): void }>()
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
-interface ChecklistRow {
-  id: string; customerName: string; reason: string
-  salesAmount: number | string; salesRatio: string
-  arBalance: number | string; arRatio: string
-  contractLiability: number | string; clRatio: string
-  checkBiz: boolean; checkInternet: boolean; checkConfirm: boolean; checkCall: boolean; checkVisit: boolean
-  indexRef: string
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
+
+const {
+  columns, rows, auditNote, auditConclusion,
+  addRow, removeRow, updateCell, updateNote, updateConclusion, flushPendingSave, reloadHost,
+} = useIpoChecklistTab({
+  sheetCode: 'D4-28',
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
+  isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+})
+
+interface RenderSegment { group: string | null; cols: ChecklistColumnSpec[] }
+const headerSegments = computed<RenderSegment[]>(() => {
+  const segs: RenderSegment[] = []
+  for (const col of columns.value) {
+    const last = segs[segs.length - 1]
+    if (col.group && last && last.group === col.group) last.cols.push(col)
+    else segs.push({ group: col.group, cols: [col] })
+  }
+  return segs
+})
+
+// ─── D4-28 专用 sync bridge ──────────────────────────────────────────
+const D4_28_ENTRY = 'xlsx/gt-d4-operating-revenue'
+const D4_28_SHEET_KEY = 'd4-28-managed'
+const syncSwitching = ref(false)
+const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const entryId = ref(D4_28_ENTRY)
+const sheetKey = ref(D4_28_SHEET_KEY)
+const syncBridge = useWorkpaperSyncBridge({
+  entryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey,
+  capability: capabilityForEntry(D4_28_ENTRY),
+  flushHtml: async () => {
+    flushPendingSave()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_28_ENTRY })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_28_SHEET_KEY }
+  },
+  reloadHtml: async () => { await reloadHost() },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(
+  () => syncSwitching.value || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+const syncFeedbackOk = computed(() => (syncBridge.feedback.value.kind === 'success' ? syncBridge.feedback.value.message : ''))
+const syncFeedbackErr = computed(() => (syncBridge.feedback.value.kind === 'error' ? syncBridge.feedback.value.message : ''))
+
+const editorMode = computed({
+  get: (): 'structured' | 'onlyoffice' => (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'),
+  set: (v: 'structured' | 'onlyoffice') => { void switchMode(v) },
+})
+const modeOptions = computed(() => [
+  { label: '表格视图', value: 'structured' },
+  { label: '在线编辑', value: 'onlyoffice', disabled: props.isReadonly || syncBusy.value },
+])
+async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
+  if (target === editorMode.value) return
+  syncSwitching.value = true
+  try {
+    if (target === 'onlyoffice') { if (props.isReadonly) return; await syncBridge.switchToOnlyOffice() }
+    else await syncBridge.switchToHtml()
+  } finally { syncSwitching.value = false }
 }
 
-const rows = ref<ChecklistRow[]>([])
-const auditNote = ref(''); const auditConclusion = ref('')
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
-
-function createRow(name: string): ChecklistRow {
-  return { id: `cl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`, customerName: name, reason: '', salesAmount: '', salesRatio: '', arBalance: '', arRatio: '', contractLiability: '', clRatio: '', checkBiz: false, checkInternet: false, checkConfirm: false, checkCall: false, checkVisit: false, indexRef: '' }
-}
-
-function loadData() { const r = props.allResponses.get('D4-28-rows'); if (r?.remark) { try { const p = JSON.parse(r.remark); if (Array.isArray(p)) { rows.value = p; return } } catch {} }; rows.value = [] }
-function loadNote() { auditNote.value = props.allResponses.get('D4-28-note')?.remark || ''; auditConclusion.value = props.allResponses.get('D4-28-conclusion')?.remark || '' }
-watch(() => props.allResponses.get('D4-28-rows')?.remark, loadData, { immediate: true })
-watch(() => props.allResponses.get('D4-28-note')?.remark, loadNote, { immediate: true })
-
-async function handleAddRow() { if (props.isReadonly) return; try { const { value } = await ElMessageBox.prompt('请输入客户名称', '添加核查客户', { confirmButtonText: '确认', cancelButtonText: '取消', inputPattern: /\S+/, inputErrorMessage: '不能为空' }); if (value?.trim()) { rows.value.push(createRow(value.trim())); persistAll() } } catch {} }
-function removeRow(id: string) { if (props.isReadonly) return; rows.value = rows.value.filter(r => r.id !== id); persistAll() }
-function updateCell(id: string, field: keyof ChecklistRow, value: any) { if (props.isReadonly) return; const row = rows.value.find(r => r.id === id); if (row) { (row as any)[field] = value; persistAll() } }
-
-function persistAll() {
-  props.allResponses.set('D4-28-rows', { item_id: 'D4-28-rows', conclusion: null, remark: JSON.stringify(rows.value) })
-  props.allResponses.set('D4-28-note', { item_id: 'D4-28-note', conclusion: null, remark: auditNote.value })
-  props.allResponses.set('D4-28-conclusion', { item_id: 'D4-28-conclusion', conclusion: null, remark: auditConclusion.value })
-  if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { debounceTimer = null; const keys = ['D4-28-rows','D4-28-note','D4-28-conclusion']; window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } })) }, 2000)
-}
-function updateAuditNote(v: string) { if (props.isReadonly) return; auditNote.value = v; persistAll() }
-function updateAuditConclusion(v: string) { if (props.isReadonly) return; auditConclusion.value = v; persistAll() }
-onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); const keys = ['D4-28-rows','D4-28-note','D4-28-conclusion']; window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } })) } })
-
-const editorMode = ref<string>('表格视图'); const modeOptions = ['表格视图', '在线编辑']
+// ─── AI 辅助 ─────────────────────────────────────────────────────────
 const aiAvailable = ref(false)
-async function checkAiHealth() { try { const r = await http.get('/api/ai/health', { _silent: true } as any); aiAvailable.value = (r.data?.data?.status ?? r.data?.status) === 'healthy' || (r.data?.data?.status ?? r.data?.status) === 'degraded' } catch { aiAvailable.value = false } }
+async function checkAiHealth() {
+  try {
+    const r = await http.get('/api/ai/health', { _silent: true } as any)
+    const s = r.data?.data?.status ?? r.data?.status
+    aiAvailable.value = s === 'healthy' || s === 'degraded'
+  } catch { aiAvailable.value = false }
+}
 checkAiHealth()
-const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
-const aiNoteLoading = ref(false); const aiConclusionLoading = ref(false)
+const aiTip = computed(() => (aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用'))
+const aiNoteLoading = ref(false)
+const aiConclusionLoading = ref(false)
+async function genNote() {
+  if (props.isReadonly || !aiAvailable.value) return
+  aiNoteLoading.value = true
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, {
+      section: 'analysis-note', existingContent: auditNote.value,
+      relatedContext: { task: '基于客户信息核查清单(D4-28)结果生成审计说明', rowCount: rows.value.length },
+    }, { _silent: true } as any)
+    const t = res.data?.data?.content ?? res.data?.content ?? ''
+    if (!t) { ElMessage.warning('AI 未生成内容'); return }
+    await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' })
+    updateNote(t)
+  } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiNoteLoading.value = false }
+}
+async function genConclusion() {
+  if (props.isReadonly || !aiAvailable.value) return
+  aiConclusionLoading.value = true
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, {
+      section: 'adj-conclusion', existingContent: auditConclusion.value,
+      relatedContext: { task: '基于客户信息核查结果生成审计结论', noteText: auditNote.value },
+    }, { _silent: true } as any)
+    const t = res.data?.data?.content ?? res.data?.content ?? ''
+    if (!t) { ElMessage.warning('AI 未生成内容'); return }
+    await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' })
+    updateConclusion(t)
+  } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiConclusionLoading.value = false }
+}
 
-async function genNote() { if (props.isReadonly || !aiAvailable.value) return; aiNoteLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'analysis-note', existingContent: auditNote.value, relatedContext: { task: '基于客户信息核查清单(D4-28)结果生成审计说明', rowCount: rows.value.length } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成 · 审计说明', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info', customStyle: { maxWidth: '600px' } }); updateAuditNote(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiNoteLoading.value = false } }
-async function genConclusion() { if (props.isReadonly || !aiAvailable.value) return; aiConclusionLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'adj-conclusion', existingContent: auditConclusion.value, relatedContext: { task: '基于客户核查清单结果生成审计结论', noteText: auditNote.value, rowCount: rows.value.length } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成 · 审计结论', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info', customStyle: { maxWidth: '600px' } }); updateAuditConclusion(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiConclusionLoading.value = false } }
-
-const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+// ─── 导入导出 ────────────────────────────────────────────────────────
+const { exportTemplate, exportData, importData, importing } = useD4ImportExport({
+  wpId: computed(() => props.wpId), projectId: computed(() => props.projectId),
+})
 function handleExportTemplate() { exportTemplate('D4-28') }
 function handleExportData() { exportData('D4-28') }
-async function handleImportFile(f: any) { await importData('D4-28', f.raw || f) }
+async function handleImportFile(f: any) {
+  const ok = await importData('D4-28', f.raw || f)
+  if (!ok) return
+  await reloadHost()
+  emit('imported')
+}
 
-// Stats
-const checkedCount = computed(() => rows.value.filter(r => r.checkBiz || r.checkInternet || r.checkConfirm || r.checkCall || r.checkVisit).length)
+function alignOf(col: ChecklistColumnSpec) {
+  if (col.type === 'amount' || col.type === 'number' || col.type === 'percent') return 'right'
+  if (col.type === 'checkbox' || col.type === 'select' || col.seqColumn) return 'center'
+  return 'left'
+}
+function pctText(v: unknown): string {
+  return v == null ? '—' : (Number(v) * 100).toFixed(2) + '%'
+}
 </script>
 
 <template>
 <div class="d4-customer-checklist">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item><el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-29" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-28-checklist')">💬 复核</el-button></div></div>
-
-  <!-- 仪表板 -->
-  <div class="stats-dashboard">
-    <div class="stat-card stat-primary"><div class="stat-value">{{ rows.length }}<span class="stat-unit">家</span></div><div class="stat-label">抽取客户</div></div>
-    <div class="stat-card stat-ok"><div class="stat-value">{{ checkedCount }}<span class="stat-unit">家</span></div><div class="stat-label">已执行核查</div></div>
+  <div class="toolbar">
+    <div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div>
+    <div class="toolbar-right">
+      <el-dropdown trigger="click" size="small">
+        <el-button size="small">导入导出 ▾</el-button>
+        <template #dropdown><el-dropdown-menu>
+          <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
+          <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
+          <el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item>
+        </el-dropdown-menu></template>
+      </el-dropdown>
+      <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
+      <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-28-customer-checklist')">复核</el-button>
+    </div>
   </div>
 
-  <template v-if="editorMode !== '在线编辑'">
-    <!-- 方法论 -->
-    <details class="methodology-collapse">
-      <summary class="methodology-summary">📖 审计目标与核查过程（点击展开）</summary>
-      <div class="methodology-body">
-        <p><strong>审计目标：</strong>利润表中记录的营业收入已发生，且与被审计单位有关，已记录于恰当的账户。</p>
-        <p><strong>审计过程：</strong></p>
-        <p class="method-step"><span class="step-num">1</span>核查主要客户及交易真实性，包括调查交易对手背景和商业目的等。</p>
-        <p class="method-step"><span class="step-num">2</span>对比历年主要客户清单，找出报告期新增的主要客户、原有主要客户交易额大幅减少或合作关系取消的情况，重点关注变化原因。项目组根据客户集中度和风险情况抽取客户/项目，考虑实施查询工商资料、互联网查询、电话访谈关键经办人员、实地走访客户等程序。</p>
-      </div>
-    </details>
+  <el-alert v-if="syncFeedbackErr" type="error" :closable="false" show-icon class="sync-alert" :title="'同步失败：' + syncFeedbackErr" />
+  <el-alert v-else-if="syncFeedbackOk" type="success" :closable="false" show-icon class="sync-alert" :title="syncFeedbackOk" />
 
-    <!-- 主表格 -->
+  <template v-if="editorMode !== 'onlyoffice'">
+    <div class="methodology-strip">
+      <span class="methodology-label">编制说明：</span>
+      登记客户名称与选取原因，录入销售金额/应收账款期末余额/合同负债期末余额及各自占比（占比自动计算，分母为 0 留空），并勾选核查方式（工商资料查询/互联网信息查询/函证/视频、电话访谈/实地走访）。
+    </div>
+
     <el-table :data="rows" border stripe class="checklist-table">
-      <el-table-column label="序号" width="50" align="center" fixed><template #default="{ $index }">{{ $index+1 }}</template></el-table-column>
-      <el-table-column label="客户名称" min-width="110"><template #default="{ row }"><el-input v-model="row.customerName" size="small" :disabled="isReadonly" @change="updateCell(row.id,'customerName',row.customerName)" /></template></el-table-column>
-      <el-table-column label="选取原因" min-width="110"><template #default="{ row }"><el-input v-model="row.reason" size="small" :disabled="isReadonly" placeholder="如：新增主要客户" @change="updateCell(row.id,'reason',row.reason)" /></template></el-table-column>
-      <el-table-column label="销售金额" min-width="100" align="right"><template #default="{ row }"><WpAmountInput v-model="row.salesAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id,'salesAmount',row.salesAmount)" /></template></el-table-column>
-      <el-table-column min-width="60"><template #header><el-tooltip content="占总交易比重" placement="top"><span>占比</span></el-tooltip></template><template #default="{ row }"><el-input v-model="row.salesRatio" size="small" :disabled="isReadonly" placeholder="%" @change="updateCell(row.id,'salesRatio',row.salesRatio)" /></template></el-table-column>
-      <el-table-column label="应收余额" min-width="100" align="right"><template #default="{ row }"><WpAmountInput v-model="row.arBalance" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id,'arBalance',row.arBalance)" /></template></el-table-column>
-      <el-table-column min-width="60"><template #header><el-tooltip content="占期末余额比重" placement="top"><span>占比</span></el-tooltip></template><template #default="{ row }"><el-input v-model="row.arRatio" size="small" :disabled="isReadonly" placeholder="%" @change="updateCell(row.id,'arRatio',row.arRatio)" /></template></el-table-column>
-      <el-table-column label="合同负债" min-width="100" align="right"><template #default="{ row }"><el-input-number v-model="row.contractLiability" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id,'contractLiability',row.contractLiability)" /></template></el-table-column>
-      <el-table-column min-width="60"><template #header><el-tooltip content="占期末余额比重" placement="top"><span>占比</span></el-tooltip></template><template #default="{ row }"><el-input v-model="row.clRatio" size="small" :disabled="isReadonly" placeholder="%" @change="updateCell(row.id,'clRatio',row.clRatio)" /></template></el-table-column>
-      <!-- 核查方式5子列 -->
-      <el-table-column label="核查方式（√）" align="center" class-name="col-check">
-        <el-table-column width="45" align="center"><template #header><el-tooltip content="工商资料查询" placement="top"><span>工商</span></el-tooltip></template><template #default="{ row }"><el-checkbox v-model="row.checkBiz" :disabled="isReadonly" @change="updateCell(row.id,'checkBiz',row.checkBiz)" /></template></el-table-column>
-        <el-table-column width="45" align="center"><template #header><el-tooltip content="互联网信息查询" placement="top"><span>网查</span></el-tooltip></template><template #default="{ row }"><el-checkbox v-model="row.checkInternet" :disabled="isReadonly" @change="updateCell(row.id,'checkInternet',row.checkInternet)" /></template></el-table-column>
-        <el-table-column width="45" align="center"><template #header><el-tooltip content="函证" placement="top"><span>函证</span></el-tooltip></template><template #default="{ row }"><el-checkbox v-model="row.checkConfirm" :disabled="isReadonly" @change="updateCell(row.id,'checkConfirm',row.checkConfirm)" /></template></el-table-column>
-        <el-table-column width="45" align="center"><template #header><el-tooltip content="视频/电话访谈" placement="top"><span>电话</span></el-tooltip></template><template #default="{ row }"><el-checkbox v-model="row.checkCall" :disabled="isReadonly" @change="updateCell(row.id,'checkCall',row.checkCall)" /></template></el-table-column>
-        <el-table-column width="45" align="center"><template #header><el-tooltip content="实地走访客户" placement="top"><span>走访</span></el-tooltip></template><template #default="{ row }"><el-checkbox v-model="row.checkVisit" :disabled="isReadonly" @change="updateCell(row.id,'checkVisit',row.checkVisit)" /></template></el-table-column>
+      <template v-for="seg in headerSegments" :key="seg.group || seg.cols[0].key">
+        <el-table-column v-if="seg.group" :label="seg.group" align="center">
+          <el-table-column v-for="col in seg.cols" :key="col.key" :label="col.label" :width="col.width || 90" align="center" class-name="col-check">
+            <template #default="{ row }">
+              <el-checkbox :model-value="!!row[col.key]" :disabled="isReadonly" @change="(v) => updateCell(row.rowId, col.key, v)" />
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column v-else :label="seg.cols[0].label" :min-width="seg.cols[0].width || 100" :align="alignOf(seg.cols[0])">
+          <template #default="{ row, $index }">
+            <span v-if="seg.cols[0].seqColumn">{{ $index + 1 }}</span>
+            <span v-else-if="seg.cols[0].derived" class="derived-cell" title="该列为计算列">{{ pctText(row[seg.cols[0].key]) }}</span>
+            <WpAmountInput v-else-if="seg.cols[0].type === 'amount'" v-model="row[seg.cols[0].key]" size="small" :disabled="isReadonly" style="width:100%" @change="(v) => updateCell(row.rowId, seg.cols[0].key, v)" />
+            <el-input v-else v-model="row[seg.cols[0].key]" size="small" :disabled="isReadonly" @change="(v) => updateCell(row.rowId, seg.cols[0].key, v)" />
+          </template>
+        </el-table-column>
+      </template>
+      <el-table-column label="操作" width="55" fixed="right" align="center">
+        <template #default="{ row }"><el-popconfirm title="确认删除？" @confirm="removeRow(row.rowId)"><template #reference><el-button link type="danger" size="small" :disabled="isReadonly">删除</el-button></template></el-popconfirm></template>
       </el-table-column>
-      <el-table-column label="索引" width="70"><template #default="{ row }"><el-input v-model="row.indexRef" size="small" :disabled="isReadonly" @change="updateCell(row.id,'indexRef',row.indexRef)" /></template></el-table-column>
-      <el-table-column label="操作" width="55" fixed="right" align="center"><template #default="{ row }"><el-popconfirm title="确认删除？" @confirm="removeRow(row.id)"><template #reference><el-button link type="danger" size="small" :disabled="isReadonly">删除</el-button></template></el-popconfirm></template></el-table-column>
     </el-table>
-    <div class="add-row-bar"><el-button :disabled="isReadonly" @click="handleAddRow"><el-icon :size="14"><Plus /></el-icon> 添加客户</el-button></div>
+    <div class="add-row-bar"><el-button :disabled="isReadonly" @click="addRow"><el-icon :size="14"><Plus /></el-icon> 添加客户</el-button></div>
 
-    <!-- 审计意见区 -->
-    <el-card class="audit-opinion-card" shadow="never"><template #header><div class="opinion-header"><span class="opinion-title">审计意见区</span><div class="opinion-actions"><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiNoteLoading" :disabled="isReadonly||!aiAvailable" @click="genNote">🤖 AI辅助说明</el-button></el-tooltip><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiConclusionLoading" :disabled="isReadonly||!aiAvailable" @click="genConclusion">🤖 AI辅助结论</el-button></el-tooltip></div></div></template><div class="opinion-body"><div class="opinion-field"><label>三、审计说明</label><el-input type="textarea" :autosize="{minRows:3,maxRows:12}" :model-value="auditNote" :disabled="isReadonly" placeholder="记录核查发现的异常情况" @input="(v:string)=>updateAuditNote(v)" /></div><div class="opinion-field"><label>四、审计结论</label><el-input type="textarea" :autosize="{minRows:2,maxRows:8}" :model-value="auditConclusion" :disabled="isReadonly" placeholder="综合判断客户交易真实性" @input="(v:string)=>updateAuditConclusion(v)" /></div></div></el-card>
+    <el-card class="audit-opinion-card" shadow="never">
+      <template #header><div class="opinion-header"><span class="opinion-title">审计意见区</span><div class="opinion-actions">
+        <el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiNoteLoading" :disabled="isReadonly||!aiAvailable" @click="genNote">AI辅助说明</el-button></el-tooltip>
+        <el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiConclusionLoading" :disabled="isReadonly||!aiAvailable" @click="genConclusion">AI辅助结论</el-button></el-tooltip>
+      </div></div></template>
+      <div class="opinion-body">
+        <div class="opinion-field"><label>三、审计说明</label><el-input type="textarea" :autosize="{minRows:3,maxRows:12}" :model-value="auditNote" :disabled="isReadonly" placeholder="记录客户信息核查中发现的异常情况" @input="(v) => updateNote(v)" /></div>
+        <div class="opinion-field"><label>四、审计结论</label><el-input type="textarea" :autosize="{minRows:2,maxRows:8}" :model-value="auditConclusion" :disabled="isReadonly" placeholder="综合判断客户信息核查结论" @input="(v) => updateConclusion(v)" /></div>
+      </div>
+    </el-card>
   </template>
-  <template v-if="editorMode==='在线编辑'"><div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="客户信息核查清单D4-28" :readonly="isReadonly" /></div></template>
+
+  <template v-else>
+    <div class="oo-container">
+      <WorkpaperSyncEditorHost v-if="syncOoDescriptor" ref="syncHostRef" :descriptor="syncOoDescriptor" :bridge="syncBridge" />
+      <div v-else class="oo-loading">正在打开 D4-28 同步编辑器…</div>
+    </div>
+  </template>
 </div>
 </template>
 
 <style scoped>
-.d4-customer-checklist{padding:16px 20px;font-size: var(--wp-font-size, 13px)}.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px}.toolbar-left{display:flex;align-items:center}.toolbar-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.stats-dashboard{display:flex;gap:12px;margin-bottom:20px;padding:14px 18px;background:linear-gradient(135deg,#f8f9fe 0%,#f0f4ff 100%);border-radius:10px;border:1px solid #e4e7ed}.stat-card{padding:10px 16px;min-width:100px;border-radius:8px;background:#fff;border:1px solid #ebeef5;box-shadow:0 1px 3px rgba(0,0,0,.04)}.stat-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.08)}.stat-card.stat-primary{border-left:3px solid #409eff}.stat-card.stat-ok{border-left:3px solid #67c23a}.stat-value{font-size:18px;font-weight:700;color:#303133;font-variant-numeric:tabular-nums}.stat-unit{font-size:12px;font-weight:400;color:#909399;margin-left:2px}.stat-label{font-size:12px;color:#909399;margin-top:2px}
-.methodology-collapse{margin-bottom:14px;border-radius:6px;border:1px solid #faecd8;border-left:3px solid #e6a23c;background:#fffbf0}.methodology-summary{cursor:pointer;padding:8px 14px;font-size: var(--wp-font-size, 13px);font-weight:500;color:#b88230}.methodology-body{padding:8px 14px 12px;font-size:12px;color:#606266;line-height:1.8}.method-step{margin-bottom:6px}.step-num{display:inline-block;background:#e6a23c;color:#fff;border-radius:3px;padding:1px 6px;font-size:11px;margin-right:6px}
-.checklist-table{font-size: var(--wp-font-size, 13px)}.checklist-table :deep(.el-table__cell){padding:5px 3px}.checklist-table :deep(.col-check .el-table__cell){background-color:#f0f9eb !important}
+.d4-customer-checklist{padding:16px 20px;font-size: var(--wp-font-size, 13px)}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px}
+.toolbar-left{display:flex;align-items:center}.toolbar-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sync-alert{margin-bottom:12px}
+.methodology-strip{margin-bottom:14px;padding:10px 14px;border-radius:6px;border:1px solid #faecd8;border-left:3px solid #e6a23c;background:#fffbf0;font-size:12px;color:#606266;line-height:1.7}
+.methodology-label{font-weight:600;color:#b88230}
+.checklist-table{font-size:12px}.checklist-table :deep(.el-table__cell){padding:4px 3px}
+.checklist-table :deep(.col-check .el-table__cell){background-color:#f0f9eb !important}
+.derived-cell{color:#409eff;font-weight:600;border-bottom:1px dashed #a0cfff;cursor:help}
 .add-row-bar{margin:12px 0 24px;text-align:center}
-.audit-opinion-card{margin-bottom:20px}.opinion-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.opinion-title{font-size:14px;font-weight:600;color:#303133}.opinion-actions{margin-left:auto;display:flex;gap:8px}.opinion-body{display:flex;flex-direction:column;gap:14px}.opinion-field label{display:block;font-size:12px;color:#909399;margin-bottom:4px;font-weight:500}
+.audit-opinion-card{margin-bottom:20px}
+.opinion-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.opinion-title{font-size:14px;font-weight:600;color:#303133}.opinion-actions{margin-left:auto;display:flex;gap:8px}
+.opinion-body{display:flex;flex-direction:column;gap:14px}.opinion-field label{display:block;font-size:12px;color:#909399;margin-bottom:4px;font-weight:500}
 .oo-container{min-height:600px;height:calc(100vh - 280px);border-radius:8px;overflow:hidden}
+.oo-loading{padding:40px;text-align:center;color:#909399}
 </style>

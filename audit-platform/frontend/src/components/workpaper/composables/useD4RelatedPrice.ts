@@ -24,17 +24,29 @@ import type { UseD4BaseOptions } from './useD4Adjudication'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/**
+ * D4-21 行模型 —— 字段键与后端 phase5_d4_ipo_related_sheets 契约的 json_path 逐字对齐
+ * （源模板 关联方销售情况及价格分析D4-21 的 12 个受管列 A/B/C/D/E/F/G/H/J/L/M/N）。
+ * I/K 差异率是模板内部 OO 公式（FORMULA_MASK），前端本地派生仅供展示、不入 store、
+ * 不参与双向 projection。旧字段（relatedPrice/nonRelatedPrice/reason/…）已废弃。
+ */
 export interface RelatedPriceRow {
-  rowId: string
-  product: string
-  relatedCustomer: string
-  relatedPrice: number
-  nonRelatedCustomer: string
-  nonRelatedPrice: number
-  priceDiffRate: number       // auto = (rp - nrp) / nrp * 100
-  reason: string
-  conclusion: 'normal' | 'abnormal' | 'attention' | ''
-  remark: string
+  rowId: string             // 稳定行身份（ROW_IDENTITY_STORE_KEY_D421）
+  partyName: string         // A 关联方客户名称
+  relationship: string      // B 关联关系
+  product: string           // C 产品名称
+  qty: number               // D 销售数量
+  salesAmount: number       // E 销售额
+  salesRatio: number        // F 销售额占同类产品销售额比例
+  avgPrice: number          // G 平均单价
+  nonrelatedAvgPrice: number // H 非关联方销售平均单价
+  fairPrice: number         // J 可比公允价格
+  priorSalesRatio: number   // L 上年度销售额占比
+  priorAvgPrice: number     // M 上年度销售平均单价
+  remark: string            // N 备注
+  // 展示派生（不持久化、不进 projection）：I=(G-H)/H、K=(G-J)/J
+  priceDiffRate?: number
+  fairDiffRate?: number
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -73,13 +85,19 @@ export function useD4RelatedPrice(options: UseD4BaseOptions) {
 
   const rows = ref<RelatedPriceRow[]>([])
 
+  /** 差异率派生（I=(G-H)/H、K=(G-J)/J，展示用，不持久化）。 */
+  function withDerived(r: RelatedPriceRow): RelatedPriceRow {
+    return {
+      ...r,
+      priceDiffRate: calcPriceDiffRate(parseNum(r.avgPrice), parseNum(r.nonrelatedAvgPrice)),
+      fairDiffRate: calcPriceDiffRate(parseNum(r.avgPrice), parseNum(r.fairPrice)),
+    }
+  }
+
   function loadRows(): void {
     const resp = allResponses.value.get(STORAGE_KEY)
     const parsed = safeParseRows<RelatedPriceRow>(resp?.remark)
-    rows.value = parsed.map(r => ({
-      ...r,
-      priceDiffRate: calcPriceDiffRate(parseNum(r.relatedPrice), parseNum(r.nonRelatedPrice)),
-    }))
+    rows.value = parsed.map(withDerived)
   }
 
   watch(
@@ -101,13 +119,16 @@ export function useD4RelatedPrice(options: UseD4BaseOptions) {
   // ─── Computed: relatedSalesTotal + proportionToRevenue ────────────────
 
   const relatedSalesTotal = computed<number>(() => {
-    return calcSubtotal(rows.value.map(r => parseNum(r.relatedPrice)))
+    // 关联方销售合计 = Σ 销售额（E 列 salesAmount）
+    return calcSubtotal(rows.value.map(r => parseNum(r.salesAmount)))
   })
 
   const proportionToRevenue = computed<number>(() => {
-    // Get total revenue from D4-1 grand total or TB
-    const tbResp = allResponses.value.get('D4-1-adj-tb-6001')
-    const totalRevenue = parseNum(tbResp?.remark)
+    // 🔴 Req 3.3：不得读旧键 `D4-1-adj-tb-6001`。营业收入审定数改由 Wave4 的
+    // wp_formula/four_table（D4-1 canonical snapshot，6001）下发到 allResponses 的
+    // 规范键；此处先读规范键，缺失时返 0（宁缺勿造），不回退旧键。
+    const auditedResp = allResponses.value.get('D4-21-revenue-audited')
+    const totalRevenue = parseNum(auditedResp?.remark)
     return calcProportion(relatedSalesTotal.value, totalRevenue)
   })
 
@@ -144,15 +165,20 @@ export function useD4RelatedPrice(options: UseD4BaseOptions) {
     if (readonly.value) return
     rows.value.push({
       rowId: generateRowId(),
+      partyName: '',
+      relationship: '',
       product: '',
-      relatedCustomer: '',
-      relatedPrice: 0,
-      nonRelatedCustomer: '',
-      nonRelatedPrice: 0,
-      priceDiffRate: 0,
-      reason: '',
-      conclusion: '',
+      qty: 0,
+      salesAmount: 0,
+      salesRatio: 0,
+      avgPrice: 0,
+      nonrelatedAvgPrice: 0,
+      fairPrice: 0,
+      priorSalesRatio: 0,
+      priorAvgPrice: 0,
       remark: '',
+      priceDiffRate: 0,
+      fairDiffRate: 0,
     })
     persistRows()
   }
@@ -168,9 +194,10 @@ export function useD4RelatedPrice(options: UseD4BaseOptions) {
     const row = rows.value.find(r => r.rowId === rowId)
     if (!row) return
     ;(row as any)[field] = value
-    // Recalculate diff rate if price fields changed
-    if (field === 'relatedPrice' || field === 'nonRelatedPrice') {
-      row.priceDiffRate = calcPriceDiffRate(parseNum(row.relatedPrice), parseNum(row.nonRelatedPrice))
+    // 单价类字段变化时重算差异率派生（I=(G-H)/H、K=(G-J)/J）
+    if (field === 'avgPrice' || field === 'nonrelatedAvgPrice' || field === 'fairPrice') {
+      row.priceDiffRate = calcPriceDiffRate(parseNum(row.avgPrice), parseNum(row.nonrelatedAvgPrice))
+      row.fairDiffRate = calcPriceDiffRate(parseNum(row.avgPrice), parseNum(row.fairPrice))
     }
     persistRows()
   }
@@ -178,7 +205,10 @@ export function useD4RelatedPrice(options: UseD4BaseOptions) {
   // ─── Persistence ──────────────────────────────────────────────────────
 
   function persistRows(): void {
-    const json = JSON.stringify(rows.value)
+    // 派生字段（priceDiffRate/fairDiffRate = I/K 内部公式）不落 store：它们是模板
+    // FORMULA_MASK 列，双向 projection 不覆盖，前端仅本地展示。
+    const clean = rows.value.map(({ priceDiffRate: _p, fairDiffRate: _f, ...keep }) => keep)
+    const json = JSON.stringify(clean)
     allResponses.value.set(STORAGE_KEY, { item_id: STORAGE_KEY, conclusion: null, remark: json })
     debounceSave()
   }

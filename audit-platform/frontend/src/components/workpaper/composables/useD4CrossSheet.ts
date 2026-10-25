@@ -112,7 +112,7 @@ export function useD4CrossSheet(options: UseD4CrossSheetOptions) {
     return result
   })
 
-  /** 主营合计 = 所有产品 current/prior 之和 */
+  /** 主营合计（审定）= 所有产品 current/prior 之和；供 D4-1/附注消费 */
   const mainRevenueTotal: ComputedRef<{ current: number; prior: number }> = computed(() => {
     const byProduct = mainRevenueByProduct.value
     const products = Object.values(byProduct)
@@ -120,6 +120,21 @@ export function useD4CrossSheet(options: UseD4CrossSheetOptions) {
       current: calcSubtotal(products.map(p => p.current)),
       prior: calcSubtotal(products.map(p => p.prior)),
     }
+  })
+
+  /**
+   * 主营本期未审合计 = Σ SUM(months)；真源对齐 WP('D4-2','本期未审合计')。
+   * D4-10「本期销售总额」公式取数走此值，不得误用审定合计。
+   */
+  const mainRevenueUnadjustedTotal: ComputedRef<{ current: number; prior: number }> = computed(() => {
+    let current = 0
+    let prior = 0
+    for (const row of d4Row2Data.value) {
+      const monthsArr = Array.isArray(row.months) ? row.months.map(parseNum) : []
+      current += calcMonthlyTotal(monthsArr)
+      prior += parseNum(row.priorUnadjusted)
+    }
+    return { current, prior }
   })
 
   // ─── D4-3 → D4-1 按项目聚合 ───────────────────────────────────────────
@@ -260,31 +275,14 @@ export function useD4CrossSheet(options: UseD4CrossSheetOptions) {
     return isIpoGroupVisible(projectContext.value.business_category || '')
   })
 
-  // ─── D4-2/D4-3行结构→D4-1行同步（CustomEvent） ────────────────────
-
-  /**
-   * 同步产品行到审定表
-   * D4-2 addRow 时→D4-1 主营区块新增对应行（isFromCrossSheet=true）
-   * D4-2 removeRow 时→D4-1 同步删除
-   */
-  function syncProductRowToAdjudication(action: 'add' | 'remove', product: string): void {
-    if (typeof window === 'undefined') return
-    window.dispatchEvent(new CustomEvent('d4:sync-row', {
-      detail: { section: 'main-revenue', action, product },
-    }))
-  }
-
-  /**
-   * 同步其他项目行到审定表
-   * D4-3 addRow 时→D4-1 其他区块新增对应行
-   * D4-3 removeRow 时→D4-1 同步删除
-   */
-  function syncOtherItemRowToAdjudication(action: 'add' | 'remove', item: string): void {
-    if (typeof window === 'undefined') return
-    window.dispatchEvent(new CustomEvent('d4:sync-row', {
-      detail: { section: 'other-revenue', action, item },
-    }))
-  }
+  // ─── D4-2/D4-3 行结构 → D4-1 行同步 ──────────────────────────────────
+  //
+  // 🔴 已移除死代码 syncProductRowToAdjudication / syncOtherItemRowToAdjudication：
+  // 二者曾发 `d4:sync-row` CustomEvent 但**无任何接收端**（发了无人听）。
+  // 参照 D2 范式，D4-1 审定表的产品/项目行现改由 useD4Adjudication 的
+  // crossSheetMainRows/crossSheetOtherRows **computed 派生**自 mainRevenueByProduct/
+  // otherRevenueByItem（读 D4-2-rows/D4-3-rows），行结构联动无需命令式事件。
+  // spec: .kiro/specs/d4-price-analysis-writeback-linkage/ Req 1.5
 
   // ─── 附注成本跨循环取数（从TB科目6401+6402） ────────────────────────
 
@@ -335,6 +333,7 @@ export function useD4CrossSheet(options: UseD4CrossSheetOptions) {
     // D4-2 → D4-1 按产品聚合
     mainRevenueByProduct,
     mainRevenueTotal,
+    mainRevenueUnadjustedTotal,
     // D4-3 → D4-1 按项目聚合
     otherRevenueByItem,
     otherRevenueTotal,
@@ -348,9 +347,6 @@ export function useD4CrossSheet(options: UseD4CrossSheetOptions) {
     adjudicationForDisclosure,
     // IPO组可见性
     ipoGroupVisible,
-    // D4-2/D4-3行结构→D4-1行同步
-    syncProductRowToAdjudication,
-    syncOtherItemRowToAdjudication,
     // 附注成本跨循环取数
     costFromTb,
     // 出口/境外适用性

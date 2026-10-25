@@ -9,13 +9,16 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 截止日期可配 + 自动跨期判断 + AI + 双模式 + 导入导出
  * 预留cutoff-test-auto-sampling对接接口
  */
-import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { isCrossPeriodForward, isCrossPeriodBackward, calcCrossPeriodDays } from '../../composables/useD4FormulaEngine'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
+import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
+import { d4_36Candidates, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME } from '../../composables/d4OtherGroupPushPredicates'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -39,22 +42,16 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 function createRow(): CutoffRow { return { id: `ct-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`, voucherDate: '', voucherNo: '', voucherProduct: '', voucherQty: '', voucherAmount: '', docDate: '', docNo: '', docProduct: '', docQty: '', docAmount: '', isCrossing: '' } }
 
-// 自动判断跨期
+// 自动判断跨期 —— 走引擎方向化纯函数（forward/backward 语义相反，单一真源）
 function autoJudgeForward(row: CutoffRow) {
-  // 账到单据：凭证日期≤截止 且 发货日期>截止 → 跨期×
+  // 账到单据：凭证在截止日或之前 且 单据在截止日之后 → 跨期×
   if (!row.voucherDate || !row.docDate || cutoffDate.value.startsWith('202X')) return
-  const vd = new Date(row.voucherDate); const dd = new Date(row.docDate); const cd = new Date(cutoffDate.value)
-  if (!isNaN(vd.getTime()) && !isNaN(dd.getTime()) && !isNaN(cd.getTime())) {
-    row.isCrossing = (vd <= cd && dd > cd) ? '×' : '√'
-  }
+  row.isCrossing = isCrossPeriodForward(row.voucherDate, row.docDate, cutoffDate.value) ? '×' : '√'
 }
 function autoJudgeBackward(row: CutoffRow) {
-  // 单据到账：发货日期≤截止 且 凭证日期>截止 → 跨期×
+  // 单据到账：单据在截止日或之前 且 凭证在截止日之后 → 跨期×
   if (!row.voucherDate || !row.docDate || cutoffDate.value.startsWith('202X')) return
-  const vd = new Date(row.voucherDate); const dd = new Date(row.docDate); const cd = new Date(cutoffDate.value)
-  if (!isNaN(vd.getTime()) && !isNaN(dd.getTime()) && !isNaN(cd.getTime())) {
-    row.isCrossing = (dd <= cd && vd > cd) ? '×' : '√'
-  }
+  row.isCrossing = isCrossPeriodBackward(row.docDate, row.voucherDate, cutoffDate.value) ? '×' : '√'
 }
 
 function loadData() {
@@ -100,11 +97,41 @@ async function genConclusion() { if (props.isReadonly || !aiAvailable.value) ret
 
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 function rowClass({ row }: { row: CutoffRow }) { return row.isCrossing === '×' ? 'row-crossing' : '' }
+
+// ─── A13 错报推送（科目 6051；forward 取 docAmount / backward 取 voucherAmount；带方向+跨期天数）──
+const { pushToA13 } = useD4InspectionWriteback({
+  wpCode: 'D4-36',
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+})
+// 给判据补跨期天数（凭证↔单据日期绝对天数，走引擎）
+function withDays(rows: CutoffRow[]) {
+  return rows.map(r => ({
+    voucherNo: r.voucherNo, voucherAmount: r.voucherAmount,
+    docNo: r.docNo, docAmount: r.docAmount, isCrossing: r.isCrossing,
+    crossPeriodDays: (r.voucherDate && r.docDate) ? calcCrossPeriodDays(r.voucherDate, r.docDate) : undefined,
+  }))
+}
+const pushableCount = computed(
+  () => d4_36Candidates(withDays(forwardRows.value) as any, withDays(backwardRows.value) as any).length,
+)
+function pushCrossPeriodToA13() {
+  if (props.isReadonly) return
+  const cands = d4_36Candidates(withDays(forwardRows.value) as any, withDays(backwardRows.value) as any)
+  if (!cands.length) { ElMessage.info('无跨期疑点，无需推送'); return }
+  const items = cands.map(c => ({
+    voucherNo: c.voucherNo,
+    amount: c.refAmount ?? 0, // 取证金额是参考，人工认定
+    description: c.description,
+    indexRef: c.indexRef,
+  }))
+  pushToA13(items, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME)
+}
 </script>
 
 <template>
 <div class="d4-other-cutoff">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushCrossPeriodToA13" title="把跨期疑点推送到 A13 未更正错报汇总（方向+跨期天数，人工认定金额）">推送跨期至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu>
     <el-dropdown-item disabled class="dropdown-group-label">— (一)账到单据 —</el-dropdown-item>
     <el-dropdown-item @click="exportTemplate('D4-36-forward')">导出模板</el-dropdown-item>
     <el-dropdown-item @click="exportData('D4-36-forward')">导出数据</el-dropdown-item>

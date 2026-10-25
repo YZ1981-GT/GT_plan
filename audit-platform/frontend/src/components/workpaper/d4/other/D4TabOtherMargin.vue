@@ -6,13 +6,16 @@
  * 毛利率=(收入-成本)/收入 自动计算；合计=12月之和；变动额=合计-上年；变动比例=变动额/上年
  * 双模式 + AI + 导入导出
  */
-import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { parseNum, calcGrossMarginRate, calcSubtotal, calcChangeRate } from '../../composables/useD4FormulaEngine'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
+import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
+import { d4_33Candidates, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME } from '../../composables/d4OtherGroupPushPredicates'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -26,18 +29,19 @@ const store = ref<StoreData>({ bizTypes: [], months: {}, priorYear: {} })
 const auditNote = ref(''); const auditConclusion = ref('')
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-function pn(v: any): number { if (!v || v === '') return 0; const n = parseFloat(String(v)); return isNaN(n) ? 0 : n }
-function fmtMargin(rev: number, cost: number): string { if (!rev) return '—'; return ((rev - cost) / rev * 100).toFixed(2) + '%' }
+// 数值解析走引擎单一真源；毛利率 = 引擎 calcGrossMarginRate（小数比率）× 100 展示（DEC-2 百分比口径，*100 仅格式化非改口径）
+const pn = parseNum
+function fmtMargin(rev: number, cost: number): string { if (!rev) return '—'; return (calcGrossMarginRate(rev, cost) * 100).toFixed(2) + '%' }
 function fmtAmt(v: number): string { return v ? v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—' }
 
 // 获取某业务类型某月数据
 function getMonth(bizId: string, monthIdx: number): MonthEntry { return store.value.months[bizId]?.[monthIdx] || { revenue: '', cost: '' } }
 function getPrior(bizId: string): MonthEntry { return store.value.priorYear[bizId] || { revenue: '', cost: '' } }
 
-// 合计（12月之和）
+// 合计（12月之和）走引擎 calcSubtotal
 function getTotal(bizId: string, field: 'revenue' | 'cost'): number {
   const arr = store.value.months[bizId] || []
-  return arr.reduce((s, m) => s + pn(m[field]), 0)
+  return calcSubtotal(arr.map(m => pn(m[field])))
 }
 
 function loadData() {
@@ -115,11 +119,48 @@ async function genNote() { if (props.isReadonly || !aiAvailable.value) return; a
 async function genConclusion() { if (props.isReadonly || !aiAvailable.value) return; aiConclusionLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'adj-conclusion', existingContent: auditConclusion.value, relatedContext: { task: '基于毛利率分析结果生成审计结论', noteText: auditNote.value } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditConclusion(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiConclusionLoading.value = false } }
 
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+
+// ─── A13 错报推送（科目 6051；毛利率分析=定性项，金额与方向由人工认定，不推 0）──────
+const { pushToA13 } = useD4InspectionWriteback({
+  wpCode: 'D4-33',
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+})
+// 每业务类型的合计毛利率(%) + 同比变动率(%)
+function bizStats() {
+  return store.value.bizTypes.map(b => {
+    const curRev = getTotal(b.id, 'revenue'); const curCost = getTotal(b.id, 'cost')
+    const priorRev = pn(getPrior(b.id).revenue); const priorCost = pn(getPrior(b.id).cost)
+    const marginPct = calcGrossMarginRate(curRev, curCost) * 100
+    const priorMarginPct = calcGrossMarginRate(priorRev, priorCost) * 100
+    const cr = calcChangeRate(marginPct, priorMarginPct) // 毛利率同比变动率
+    return { name: b.name, marginPct, changeRatePct: (cr === '' || cr === 'N/A') ? null : cr * 100 }
+  })
+}
+const pushableCount = computed(() => d4_33Candidates(bizStats()).length)
+async function pushMarginAnomaliesToA13() {
+  if (props.isReadonly) return
+  const cands = d4_33Candidates(bizStats())
+  if (!cands.length) { ElMessage.info('无毛利率异常，无需推送'); return }
+  // 定性项：逐条由人工认定错报金额（不自动推 amount:0）
+  const items: { amount: number; description: string; indexRef: string }[] = []
+  for (const c of cands) {
+    try {
+      const { value } = await ElMessageBox.prompt(
+        `${c.description}\n\n请认定该项对应的错报金额（元）；如仅为定性关注、暂无法量化，请填 0 并在 A13 说明。`,
+        'A13 错报金额认定', { confirmButtonText: '确认', cancelButtonText: '跳过此项', inputValue: '' },
+      )
+      items.push({ amount: parseNum(value), description: c.description, indexRef: c.indexRef })
+    } catch { /* 跳过此项 */ }
+  }
+  if (!items.length) { ElMessage.info('未认定任何金额，已取消推送'); return }
+  pushToA13(items, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME)
+}
 </script>
 
 <template>
 <div class="d4-other-margin">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-33')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-33')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-33',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-3" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-33-margin')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushMarginAnomaliesToA13" title="把毛利率异常推送到 A13（定性项，金额由人工逐条认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-33')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-33')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-33',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-3" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-33-margin')">💬 复核</el-button></div></div>
 
   <template v-if="editorMode !== '在线编辑'">
     <!-- 业务类型管理 -->
@@ -139,8 +180,8 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
             <th v-for="biz in store.bizTypes" :key="biz.id" colspan="3" class="col-biz">{{ biz.name }}</th>
           </tr>
           <tr class="header-row-2">
-            <th>收入</th><th>成本</th><th>毛利率</th>
-            <template v-for="biz in store.bizTypes" :key="biz.id+'h'"><th>收入</th><th>成本</th><th>毛利率</th></template>
+            <th>收入</th><th>成本</th><th title="(收入 − 成本) / 收入 × 100%（自动计算）">毛利率 ƒx</th>
+            <template v-for="biz in store.bizTypes" :key="biz.id+'h'"><th>收入</th><th>成本</th><th title="(收入 − 成本) / 收入 × 100%（自动计算）">毛利率 ƒx</th></template>
           </tr>
         </thead>
         <tbody>

@@ -44,6 +44,7 @@ import {
   readNum,
   readRaw,
   normalizeLabel,
+  labelKey,
 } from './shared/dynamicAdjudicationRows'
 import type { ChecklistResponse } from './useD4FormData'
 
@@ -524,19 +525,79 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     return { mainAje, mainRje, otherAje, otherRje }
   })
 
-  // ─── Sections computed (combining dynamic rows + crossSheet) ─────────
+  // ─── CrossSheet 派生行（D4-2/D4-3 明细行 → D4-1 审定行，computed 派生） ───
+  //
+  // 🔴 修复 d4:sync-row 死代码（spec d4-price-analysis-writeback-linkage / Req 1）：
+  // 原实现靠 useD4CrossSheet 发 `d4:sync-row` CustomEvent 同步行结构，但**无接收端**。
+  // 参照 D2 范式（useD2CrossSheet 的 computed 派生链，非行同步事件）：D4-1 审定表的
+  // 主营/其他产品行改为 **computed 派生自 mainRevenueByProduct/otherRevenueByItem**
+  // （二者读 D4-2-rows/D4-3-rows），D4-2 增删产品行 → 下一次 computed 重算即联动。
+  //
+  // 派生行 rowKey 用稳定归一键 `xsheet-{section}-{labelKey}`（不用 label 防撞键）；
+  // isFromCrossSheet=true（金额列只读、浅蓝背景）；AJE/RJE 仍从 per-field 键读，
+  // 键以稳定 rowKey 为组成部分 → 审计师对派生行填的调整不丢。
+
+  /**
+   * 派生行：从上游明细聚合生成 isFromCrossSheet 行（供 sections 合并）。
+   *
+   * 派生行未审数 = 上游明细逐产品/项目聚合值（只读，UI 按 isFromCrossSheet 门控为只读）。
+   * 派生行的 AJE/RJE 恒 0：D4-1 编制约定「浅蓝跨表行不可手工编辑」，审计调整统一走
+   * D4-4 调整分录 → adjustmentTotals → 小计 AJE/RJE 列（非逐行手填）。
+   * rowKey 用稳定归一键（不用 label 防撞键；同名产品折叠为一行）。
+   */
+  function buildCrossSheetRow(
+    section: 'main' | 'other',
+    label: string,
+    agg: { current: number; prior: number },
+  ): AdjudicationRow {
+    const rowKey = `xsheet-${section}-${labelKey(label)}`
+    return {
+      rowKey,
+      label,
+      isFixed: false,
+      currentUnadjusted: agg.current,
+      currentAje: 0,
+      currentRje: 0,
+      currentAudited: calcAuditedAmount(agg.current, 0, 0),
+      priorUnadjusted: agg.prior,
+      priorAje: 0,
+      priorRje: 0,
+      priorAudited: calcAuditedAmount(agg.prior, 0, 0),
+      isFromCrossSheet: true,
+      isEditable: false, // 派生行金额/调整均只读（审计调整走 D4-4）
+    }
+  }
+
+  const crossSheetMainRows = computed<AdjudicationRow[]>(() =>
+    Object.entries(mainRevenueByProduct.value).map(([product, agg]) =>
+      buildCrossSheetRow('main', product, agg),
+    ),
+  )
+
+  const crossSheetOtherRows = computed<AdjudicationRow[]>(() =>
+    Object.entries(otherRevenueByItem.value).map(([item, agg]) =>
+      buildCrossSheetRow('other', item, agg),
+    ),
+  )
+
+  // ─── Sections computed (combining crossSheet 派生行 + dynamic 手工行) ─────────
 
   const sections: ComputedRef<AdjudicationSection[]> = computed(() => {
     const rows = dynamicRows.value
     const adjTotals = adjustmentTotals.value
 
-    // 按科目码分组（主营 6001 / 其他 6051）
-    const mainRows: AdjudicationRow[] = []
-    const otherRows: AdjudicationRow[] = []
+    // 1) 先放上游派生行（isFromCrossSheet），并登记已占用的 labelKey（派生优先，Req 1.6）
+    const mainRows: AdjudicationRow[] = [...crossSheetMainRows.value]
+    const otherRows: AdjudicationRow[] = [...crossSheetOtherRows.value]
+    const mainSeen = new Set(mainRows.map(r => labelKey(r.label)))
+    const otherSeen = new Set(otherRows.map(r => labelKey(r.label)))
 
+    // 2) 再放手工/历史动态行，与派生行同名则去重（跳过，派生行金额为准）
     for (const r of rows) {
       const code = r.accountCode || ''
       const isOther = isOtherRevenueCode(code)
+      const lk = labelKey(r.label)
+      if (isOther ? otherSeen.has(lk) : mainSeen.has(lk)) continue
 
       const currentUnadj = getRowFieldValue(r.rowId, 'currentUnadjusted')
       const priorUnadj = getRowFieldValue(r.rowId, 'priorUnadjusted')
@@ -564,9 +625,11 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
 
       if (isOther) {
         otherRows.push(adjRow)
+        otherSeen.add(lk)
       } else {
         // 默认归入主营（无科目码的手工行也归主营）
         mainRows.push(adjRow)
+        mainSeen.add(lk)
       }
     }
 

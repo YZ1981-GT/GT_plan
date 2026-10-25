@@ -41,6 +41,8 @@ export interface RevenueDetailRow {
   unadjustedChangeRate: number | '' | 'N/A'  // T: =(N-Q)/Q (auto)
   auditedChangeRate: number | '' | 'N/A'     // U: =(P-S)/S (auto)
   remark: string            // V: 备注
+  /** 价格异常回标：{ 'D4-10': diffPct, 'D4-11': diffPct }；可选，向后兼容 */
+  priceAbnormal?: Record<string, number>
 }
 
 /** Stored row (without computed fields) */
@@ -52,6 +54,7 @@ interface StoredRevenueRow {
   priorUnadjusted: number
   priorAdjustment: number
   remark: string
+  priceAbnormal?: Record<string, number>
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -70,15 +73,27 @@ function safeParseRows(jsonStr: string | null | undefined): StoredRevenueRow[] {
   try {
     const parsed = JSON.parse(jsonStr)
     if (!Array.isArray(parsed)) return []
-    return parsed.map((raw: any) => ({
-      rowId: raw.rowId || generateRowId(),
-      product: raw.product || '',
-      months: Array.isArray(raw.months) ? raw.months.map(parseNum) : [...EMPTY_MONTHS],
-      auditAdjustment: parseNum(raw.auditAdjustment),
-      priorUnadjusted: parseNum(raw.priorUnadjusted),
-      priorAdjustment: parseNum(raw.priorAdjustment),
-      remark: raw.remark || '',
-    }))
+    return parsed.map((raw: any) => {
+      const row: StoredRevenueRow = {
+        rowId: raw.rowId || generateRowId(),
+        product: raw.product || '',
+        months: Array.isArray(raw.months) ? raw.months.map(parseNum) : [...EMPTY_MONTHS],
+        auditAdjustment: parseNum(raw.auditAdjustment),
+        priorUnadjusted: parseNum(raw.priorUnadjusted),
+        priorAdjustment: parseNum(raw.priorAdjustment),
+        remark: raw.remark || '',
+      }
+      // 保留价格异常回标（useD4PriceWriteback 写入）；不得在 parse/persist 时剥掉
+      if (raw.priceAbnormal && typeof raw.priceAbnormal === 'object' && !Array.isArray(raw.priceAbnormal)) {
+        const mark: Record<string, number> = {}
+        for (const [k, v] of Object.entries(raw.priceAbnormal)) {
+          const n = Number(v)
+          if (Number.isFinite(n)) mark[k] = n
+        }
+        if (Object.keys(mark).length > 0) row.priceAbnormal = mark
+      }
+      return row
+    })
   } catch {
     return []
   }
@@ -95,7 +110,7 @@ function computeRow(stored: StoredRevenueRow): RevenueDetailRow {
   const unadjustedChangeRate = calcChangeRate(periodTotal, stored.priorUnadjusted)
   const auditedChangeRate = calcChangeRate(audited, priorAudited)
 
-  return {
+  const out: RevenueDetailRow = {
     rowId: stored.rowId,
     product: stored.product,
     months,
@@ -109,6 +124,10 @@ function computeRow(stored: StoredRevenueRow): RevenueDetailRow {
     auditedChangeRate,
     remark: stored.remark,
   }
+  if (stored.priceAbnormal && Object.keys(stored.priceAbnormal).length > 0) {
+    out.priceAbnormal = { ...stored.priceAbnormal }
+  }
+  return out
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -138,12 +157,12 @@ export function useD4RevenueDetail(options: UseD4BaseOptions) {
     storedData.value = safeParseRows(resp?.remark)
   }
 
+  // Always re-parse when remark changes so OO→HTML mirror (new/updated rowIds) lands in DOM.
+  // D5 useD5Detail does the same; the old "only if empty" guard hid post-forcesave markers.
   watch(
     () => allResponses.value.get(STORAGE_KEY)?.remark,
     () => {
-      if (storedData.value.length === 0) {
-        loadRows()
-      }
+      loadRows()
     },
     { immediate: true },
   )
@@ -329,11 +348,12 @@ export function useD4RevenueDetail(options: UseD4BaseOptions) {
 
   // ─── Lifecycle ───────────────────────────────────────────────────────
 
+  // 切到 OO 时本 composable 会卸载；若这里 flush 旧 HTML 行，会与 OO→HTML apply
+  // 竞态并盖掉镜像结果。未落库的编辑改由宿主 flushPendingSave / 显式 persist 负责。
   onBeforeUnmount(() => {
     if (debounceTimer) {
       clearTimeout(debounceTimer)
       debounceTimer = null
-      flushSave()
     }
   })
 

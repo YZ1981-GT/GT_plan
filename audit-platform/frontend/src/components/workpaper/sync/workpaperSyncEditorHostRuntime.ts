@@ -194,8 +194,12 @@ export function buildDocEditorConfig(
   if (customization.forcesave === true) {
     refuse('editor_host_editor_side_forcesave_enabled')
   }
+  // 🔴 必须交给 DocEditor **可变纯对象**：Vue reactive / readonly Proxy 会吞掉
+  // OO 对 `document.token` 的赋值 → 编辑器 -20（见 g4-* 证据 notes）。
+  // events 不能进 JSON 克隆，单独挂回。
+  const plain = JSON.parse(JSON.stringify(source)) as Record<string, unknown>
   return {
-    ...source,
+    ...plain,
     width: '100%',
     height: '100%',
     events,

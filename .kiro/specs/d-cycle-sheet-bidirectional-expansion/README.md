@@ -19,11 +19,11 @@
 | 0 | D*-detail 七张已 verified | 各异 | ✅ |
 | 1 | **D4-3** `D4-3-rows` | 字段键扁平行 | ✅ §9.6 绿（evidence `g5-1-d43-unified-path/`） |
 | — | ~~D4-4 `D4-4-rows` 调整分录~~ | 字段键 | 🚫 **`single_html`**（无 UUID 行身份列 + `AdjustmentSyncService`/A13 hub 冲突；`T08-d44-single-html-adjudication.json`）— 不做单元格双向 |
-| — | **D4-5** 会计政策检查 | 段落式多 item | ❌ **`single_html`**（`T08-d45-single-html-triage.json`）— 不得扩 sheets[] |
+| — | **D4-5** 会计政策检查 | 段落 + 紧凑分组表 | 🔄 **`paragraph_block_bidirectional`**（T09；宿主独立 `d45-managed` / `D4TabPolicyCheck`；契约已扩 sheets[]；Excel 同步=分组表+经营模式 B11–B16；信用/说明/结论暂 HTML-only） |
 | 2 | **D1-2 按类别明细**（下一双向 canary，D4-4/D4-5 改判 single_html 后提前） | 字段键 | 待 |
 | 4 | D2-3 坏账准备 | nested/多 item | 待 |
 | 5 | D5-3 / D6-3 / D7-3… | 同族明细 | 待 |
 | 6 | 分析类候选（D4-7…）逐表核映射 | 不定 | 待裁决 |
-| 终 | 程序/附注/目录/政策检查 | — | → single_html 收口 |
+| 终 | 程序/附注/目录 | — | → single_html 收口 |
 
 配套盘点：[explore inventory](d3bae344-9fd0-4d13-9784-b6c248425e94)（D 循环 gap）。

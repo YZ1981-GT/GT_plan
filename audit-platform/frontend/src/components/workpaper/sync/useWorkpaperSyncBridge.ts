@@ -408,6 +408,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
       return fail('flush', error)
     }
     let token: string
+    let pendingKey: string
     try {
       const receipt = await api.createPendingMutation(scope(), {
         sheetKey: flushed.sheetKey ?? sheetKey(),
@@ -416,6 +417,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
         clientEditEpoch: flushed.clientEditEpoch,
       })
       token = receipt.pendingMutationToken
+      pendingKey = receipt.idempotencyKey
       pendingMutationToken.value = token
     } catch (error) {
       return failIdentityOrSync('pending_mutation', error)
@@ -430,6 +432,9 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
         pendingMutationToken: token,
         projection: flushed.projection,
         clientEditEpoch: flushed.clientEditEpoch,
+        // 🔴 与 pending-mutation 同源 Idempotency-Key：token 已冻结该 key，
+        // materialize 再 new 一把会 409 materialize_idempotency_key_mismatch。
+        idempotencyKey: pendingKey,
       })
     } catch (error) {
       return failIdentityOrSync('materialize', error)

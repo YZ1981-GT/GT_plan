@@ -1,0 +1,800 @@
+{
+  "measured_at": "2026-09-13",
+  "tool": "openpyxl data_only=False + finder",
+  "workbook_adjudication": {
+    "chosen_workbook": "backend\\wp_templates\\D\\D4 收入底稿.xlsx",
+    "reason": "D4-21~24 前端同步 manifest 全部 parent_duplicate/independentEntry=false，parentEntryId=xlsx/gt-d4-operating-revenue，其权威 workbook=D/D4 收入底稿.xlsx 已实测含 5 张 sheet；descriptor 挂合册（与 D4-2/3/5 同 blob）。",
+    "finder_standalone_hits": {
+      "D4-21": "D:\\GT_plan\\backend\\wp_templates\\D\\D4-21营业收入-关联方检查（Leap-常规程序）.xlsx",
+      "D4-22A": "D:\\GT_plan\\backend\\wp_templates\\D\\D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "D4-22": "D:\\GT_plan\\backend\\wp_templates\\D\\D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "D4-23": "D:\\GT_plan\\backend\\wp_templates\\D\\D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "D4-24": "D:\\GT_plan\\backend\\wp_templates\\D\\D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx"
+    }
+  },
+  "template_sha256_by_path": {
+    "D:\\GT_plan\\backend\\wp_templates\\D\\D4 收入底稿.xlsx": "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f"
+  },
+  "mapping_digest": "57a55ec323e5881e78a254d29d7e2e405f714588a9253b39584e6f547e37c4a2",
+  "sheets": [
+    {
+      "wp_code": "D4-21",
+      "template_relative_path": "D\\D4 收入底稿.xlsx",
+      "sheet_name": "关联方销售情况及价格分析D4-21",
+      "dimensions": "A1:R49",
+      "max_row": 49,
+      "max_col": 18,
+      "header_row": 15,
+      "headers": {
+        "A": "关联方客户名称",
+        "B": "关联关系",
+        "C": "产品名称",
+        "D": "销售数量",
+        "E": "销售额",
+        "F": "销售额占同类产品销售额比例",
+        "G": "平均单价",
+        "H": "非关联方销售平均单价",
+        "I": "差异率",
+        "J": "可比公允价格",
+        "K": "差异率",
+        "L": "上年度销售额占同类产品销售额比例",
+        "M": "上年度销售平均单价",
+        "N": "备注",
+        "O": null,
+        "P": null,
+        "Q": null,
+        "R": null
+      },
+      "first_data_row": 16,
+      "footer_row": null,
+      "footer_marker_exact": null,
+      "last_data_row": 49,
+      "merged_ranges": [
+        "A2:N2",
+        "A1:N1"
+      ],
+      "formula_count": 30,
+      "formula_cells": [
+        {
+          "cell": "I16",
+          "col": "I",
+          "row": 16,
+          "formula": "=(G16-H16)/H16",
+          "kind": "internal"
+        },
+        {
+          "cell": "K16",
+          "col": "K",
+          "row": 16,
+          "formula": "=(G16-J16)/J16",
+          "kind": "internal"
+        },
+        {
+          "cell": "I17",
+          "col": "I",
+          "row": 17,
+          "formula": "=(G17-H17)/H17",
+          "kind": "internal"
+        },
+        {
+          "cell": "K17",
+          "col": "K",
+          "row": 17,
+          "formula": "=(G17-J17)/J17",
+          "kind": "internal"
+        },
+        {
+          "cell": "I18",
+          "col": "I",
+          "row": 18,
+          "formula": "=(G18-H18)/H18",
+          "kind": "internal"
+        },
+        {
+          "cell": "K18",
+          "col": "K",
+          "row": 18,
+          "formula": "=(G18-J18)/J18",
+          "kind": "internal"
+        },
+        {
+          "cell": "I19",
+          "col": "I",
+          "row": 19,
+          "formula": "=(G19-H19)/H19",
+          "kind": "internal"
+        },
+        {
+          "cell": "K19",
+          "col": "K",
+          "row": 19,
+          "formula": "=(G19-J19)/J19",
+          "kind": "internal"
+        },
+        {
+          "cell": "I20",
+          "col": "I",
+          "row": 20,
+          "formula": "=(G20-H20)/H20",
+          "kind": "internal"
+        },
+        {
+          "cell": "K20",
+          "col": "K",
+          "row": 20,
+          "formula": "=(G20-J20)/J20",
+          "kind": "internal"
+        },
+        {
+          "cell": "I21",
+          "col": "I",
+          "row": 21,
+          "formula": "=(G21-H21)/H21",
+          "kind": "internal"
+        },
+        {
+          "cell": "K21",
+          "col": "K",
+          "row": 21,
+          "formula": "=(G21-J21)/J21",
+          "kind": "internal"
+        },
+        {
+          "cell": "I22",
+          "col": "I",
+          "row": 22,
+          "formula": "=(G22-H22)/H22",
+          "kind": "internal"
+        },
+        {
+          "cell": "K22",
+          "col": "K",
+          "row": 22,
+          "formula": "=(G22-J22)/J22",
+          "kind": "internal"
+        },
+        {
+          "cell": "I23",
+          "col": "I",
+          "row": 23,
+          "formula": "=(G23-H23)/H23",
+          "kind": "internal"
+        },
+        {
+          "cell": "K23",
+          "col": "K",
+          "row": 23,
+          "formula": "=(G23-J23)/J23",
+          "kind": "internal"
+        },
+        {
+          "cell": "I24",
+          "col": "I",
+          "row": 24,
+          "formula": "=(G24-H24)/H24",
+          "kind": "internal"
+        },
+        {
+          "cell": "K24",
+          "col": "K",
+          "row": 24,
+          "formula": "=(G24-J24)/J24",
+          "kind": "internal"
+        },
+        {
+          "cell": "I25",
+          "col": "I",
+          "row": 25,
+          "formula": "=(G25-H25)/H25",
+          "kind": "internal"
+        },
+        {
+          "cell": "K25",
+          "col": "K",
+          "row": 25,
+          "formula": "=(G25-J25)/J25",
+          "kind": "internal"
+        },
+        {
+          "cell": "I26",
+          "col": "I",
+          "row": 26,
+          "formula": "=(G26-H26)/H26",
+          "kind": "internal"
+        },
+        {
+          "cell": "K26",
+          "col": "K",
+          "row": 26,
+          "formula": "=(G26-J26)/J26",
+          "kind": "internal"
+        },
+        {
+          "cell": "I27",
+          "col": "I",
+          "row": 27,
+          "formula": "=(G27-H27)/H27",
+          "kind": "internal"
+        },
+        {
+          "cell": "K27",
+          "col": "K",
+          "row": 27,
+          "formula": "=(G27-J27)/J27",
+          "kind": "internal"
+        },
+        {
+          "cell": "I28",
+          "col": "I",
+          "row": 28,
+          "formula": "=(G28-H28)/H28",
+          "kind": "internal"
+        },
+        {
+          "cell": "K28",
+          "col": "K",
+          "row": 28,
+          "formula": "=(G28-J28)/J28",
+          "kind": "internal"
+        },
+        {
+          "cell": "I29",
+          "col": "I",
+          "row": 29,
+          "formula": "=(G29-H29)/H29",
+          "kind": "internal"
+        },
+        {
+          "cell": "K29",
+          "col": "K",
+          "row": 29,
+          "formula": "=(G29-J29)/J29",
+          "kind": "internal"
+        },
+        {
+          "cell": "I30",
+          "col": "I",
+          "row": 30,
+          "formula": "=(G30-H30)/H30",
+          "kind": "internal"
+        },
+        {
+          "cell": "K30",
+          "col": "K",
+          "row": 30,
+          "formula": "=(G30-J30)/J30",
+          "kind": "internal"
+        }
+      ],
+      "data_region_formula_columns": {
+        "I": {
+          "count": 15,
+          "sample": "=(G16-H16)/H16"
+        },
+        "K": {
+          "count": 15,
+          "sample": "=(G16-J16)/J16"
+        }
+      },
+      "o_column_preserved": {
+        "O16": "勿删、勿改",
+        "O17": "实际控制人",
+        "O18": "控股股东",
+        "O19": "控股股东、实际控制人的附属企业",
+        "O20": "持有5%以上股份的法人或其他组织",
+        "O21": "联营企业",
+        "O22": "合营企业",
+        "O23": "董高监等关键管理人员",
+        "O24": "其他关联方"
+      },
+      "nav_refs": []
+    },
+    {
+      "wp_code": "D4-22A",
+      "template_relative_path": "D\\D4 收入底稿.xlsx",
+      "sheet_name": "程序表D4-22A",
+      "dimensions": "A1:O37",
+      "max_row": 37,
+      "max_col": 11,
+      "header_row": 15,
+      "headers": {
+        "A": "序号",
+        "B": "对应Leap程序",
+        "C": "审计程序",
+        "D": "程序分类",
+        "E": "财务报表认定",
+        "F": null,
+        "G": null,
+        "H": null,
+        "I": null,
+        "J": "底稿索引号",
+        "K": null
+      },
+      "first_data_row": 16,
+      "footer_row": null,
+      "footer_marker_exact": null,
+      "last_data_row": 37,
+      "merged_ranges": [
+        "A8:G8",
+        "A35:J35",
+        "A3:C3",
+        "J15:J16",
+        "H11:J11",
+        "A10:G10",
+        "A13:G13",
+        "A9:G9",
+        "A5:C5",
+        "H13:J13",
+        "A14:C14",
+        "H12:J12",
+        "A4:C4",
+        "A11:G11",
+        "B15:B16",
+        "D15:D16",
+        "A1:J1",
+        "E15:I15",
+        "A6:J6",
+        "H8:J8",
+        "H10:J10",
+        "A12:G12",
+        "A15:A16",
+        "C15:C16",
+        "H9:J9",
+        "A2:J2"
+      ],
+      "formula_count": 0,
+      "formula_cells": [],
+      "data_region_formula_columns": {},
+      "o_column_preserved": {},
+      "nav_refs": []
+    },
+    {
+      "wp_code": "D4-22",
+      "template_relative_path": "D\\D4 收入底稿.xlsx",
+      "sheet_name": "重要指标分析表D4-22",
+      "dimensions": "A1:O30",
+      "max_row": 30,
+      "max_col": 8,
+      "header_row": 11,
+      "headers": {
+        "A": "指标名称",
+        "B": "本期",
+        "C": "上期",
+        "D": "同行业公司1",
+        "E": "同行业公司2",
+        "F": "同行业公司3",
+        "G": "……",
+        "H": "合理性分析"
+      },
+      "first_data_row": 12,
+      "footer_row": null,
+      "footer_marker_exact": null,
+      "last_data_row": 30,
+      "merged_ranges": [
+        "A2:H2",
+        "A1:H1"
+      ],
+      "formula_count": 0,
+      "formula_cells": [],
+      "data_region_formula_columns": {},
+      "o_column_preserved": {},
+      "nav_refs": []
+    },
+    {
+      "wp_code": "D4-23",
+      "template_relative_path": "D\\D4 收入底稿.xlsx",
+      "sheet_name": "收入与开具发票金额比较分析D4-23",
+      "dimensions": "A1:O32",
+      "max_row": 32,
+      "max_col": 13,
+      "header_row": 11,
+      "headers": {
+        "A": null,
+        "B": "主营业务收入",
+        "C": "其他业务收入",
+        "D": "营业收入合计",
+        "E": "增值税发票金额",
+        "F": "防伪税控开具的增值税发票份数",
+        "G": "普通发票金额",
+        "H": "开具的普通发票份数",
+        "I": "申报的开票金额合计",
+        "J": "差异",
+        "K": "索引号",
+        "L": null,
+        "M": null
+      },
+      "first_data_row": 12,
+      "footer_row": 24,
+      "footer_marker_exact": "合计",
+      "last_data_row": 23,
+      "merged_ranges": [
+        "B10:D10",
+        "A10:A11",
+        "A2:K2",
+        "E10:K10",
+        "A1:K1"
+      ],
+      "formula_count": 45,
+      "formula_cells": [
+        {
+          "cell": "D12",
+          "col": "D",
+          "row": 12,
+          "formula": "=B12+C12",
+          "kind": "internal"
+        },
+        {
+          "cell": "I12",
+          "col": "I",
+          "row": 12,
+          "formula": "=E12+G12",
+          "kind": "internal"
+        },
+        {
+          "cell": "J12",
+          "col": "J",
+          "row": 12,
+          "formula": "=D12-I12",
+          "kind": "internal"
+        },
+        {
+          "cell": "D13",
+          "col": "D",
+          "row": 13,
+          "formula": "=B13+C13",
+          "kind": "internal"
+        },
+        {
+          "cell": "I13",
+          "col": "I",
+          "row": 13,
+          "formula": "=E13+G13",
+          "kind": "internal"
+        },
+        {
+          "cell": "J13",
+          "col": "J",
+          "row": 13,
+          "formula": "=D13-I13",
+          "kind": "internal"
+        },
+        {
+          "cell": "D14",
+          "col": "D",
+          "row": 14,
+          "formula": "=B14+C14",
+          "kind": "internal"
+        },
+        {
+          "cell": "I14",
+          "col": "I",
+          "row": 14,
+          "formula": "=E14+G14",
+          "kind": "internal"
+        },
+        {
+          "cell": "J14",
+          "col": "J",
+          "row": 14,
+          "formula": "=D14-I14",
+          "kind": "internal"
+        },
+        {
+          "cell": "D15",
+          "col": "D",
+          "row": 15,
+          "formula": "=B15+C15",
+          "kind": "internal"
+        },
+        {
+          "cell": "I15",
+          "col": "I",
+          "row": 15,
+          "formula": "=E15+G15",
+          "kind": "internal"
+        },
+        {
+          "cell": "J15",
+          "col": "J",
+          "row": 15,
+          "formula": "=D15-I15",
+          "kind": "internal"
+        },
+        {
+          "cell": "D16",
+          "col": "D",
+          "row": 16,
+          "formula": "=B16+C16",
+          "kind": "internal"
+        },
+        {
+          "cell": "I16",
+          "col": "I",
+          "row": 16,
+          "formula": "=E16+G16",
+          "kind": "internal"
+        },
+        {
+          "cell": "J16",
+          "col": "J",
+          "row": 16,
+          "formula": "=D16-I16",
+          "kind": "internal"
+        },
+        {
+          "cell": "D17",
+          "col": "D",
+          "row": 17,
+          "formula": "=B17+C17",
+          "kind": "internal"
+        },
+        {
+          "cell": "I17",
+          "col": "I",
+          "row": 17,
+          "formula": "=E17+G17",
+          "kind": "internal"
+        },
+        {
+          "cell": "J17",
+          "col": "J",
+          "row": 17,
+          "formula": "=D17-I17",
+          "kind": "internal"
+        },
+        {
+          "cell": "D18",
+          "col": "D",
+          "row": 18,
+          "formula": "=B18+C18",
+          "kind": "internal"
+        },
+        {
+          "cell": "I18",
+          "col": "I",
+          "row": 18,
+          "formula": "=E18+G18",
+          "kind": "internal"
+        },
+        {
+          "cell": "J18",
+          "col": "J",
+          "row": 18,
+          "formula": "=D18-I18",
+          "kind": "internal"
+        },
+        {
+          "cell": "D19",
+          "col": "D",
+          "row": 19,
+          "formula": "=B19+C19",
+          "kind": "internal"
+        },
+        {
+          "cell": "I19",
+          "col": "I",
+          "row": 19,
+          "formula": "=E19+G19",
+          "kind": "internal"
+        },
+        {
+          "cell": "J19",
+          "col": "J",
+          "row": 19,
+          "formula": "=D19-I19",
+          "kind": "internal"
+        },
+        {
+          "cell": "D20",
+          "col": "D",
+          "row": 20,
+          "formula": "=B20+C20",
+          "kind": "internal"
+        },
+        {
+          "cell": "I20",
+          "col": "I",
+          "row": 20,
+          "formula": "=E20+G20",
+          "kind": "internal"
+        },
+        {
+          "cell": "J20",
+          "col": "J",
+          "row": 20,
+          "formula": "=D20-I20",
+          "kind": "internal"
+        },
+        {
+          "cell": "D21",
+          "col": "D",
+          "row": 21,
+          "formula": "=B21+C21",
+          "kind": "internal"
+        },
+        {
+          "cell": "I21",
+          "col": "I",
+          "row": 21,
+          "formula": "=E21+G21",
+          "kind": "internal"
+        },
+        {
+          "cell": "J21",
+          "col": "J",
+          "row": 21,
+          "formula": "=D21-I21",
+          "kind": "internal"
+        },
+        {
+          "cell": "D22",
+          "col": "D",
+          "row": 22,
+          "formula": "=B22+C22",
+          "kind": "internal"
+        },
+        {
+          "cell": "I22",
+          "col": "I",
+          "row": 22,
+          "formula": "=E22+G22",
+          "kind": "internal"
+        },
+        {
+          "cell": "J22",
+          "col": "J",
+          "row": 22,
+          "formula": "=D22-I22",
+          "kind": "internal"
+        },
+        {
+          "cell": "D23",
+          "col": "D",
+          "row": 23,
+          "formula": "=B23+C23",
+          "kind": "internal"
+        },
+        {
+          "cell": "I23",
+          "col": "I",
+          "row": 23,
+          "formula": "=E23+G23",
+          "kind": "internal"
+        },
+        {
+          "cell": "J23",
+          "col": "J",
+          "row": 23,
+          "formula": "=D23-I23",
+          "kind": "internal"
+        },
+        {
+          "cell": "B24",
+          "col": "B",
+          "row": 24,
+          "formula": "=SUM(B12:B23)",
+          "kind": "internal"
+        },
+        {
+          "cell": "C24",
+          "col": "C",
+          "row": 24,
+          "formula": "=SUM(C12:C23)",
+          "kind": "internal"
+        },
+        {
+          "cell": "D24",
+          "col": "D",
+          "row": 24,
+          "formula": "=SUM(D12:D23)",
+          "kind": "internal"
+        },
+        {
+          "cell": "E24",
+          "col": "E",
+          "row": 24,
+          "formula": "=SUM(E12:E23)",
+          "kind": "internal"
+        },
+        {
+          "cell": "F24",
+          "col": "F",
+          "row": 24,
+          "formula": "=SUM(F12:F23)",
+          "kind": "internal"
+        },
+        {
+          "cell": "G24",
+          "col": "G",
+          "row": 24,
+          "formula": "=SUM(G12:G23)",
+          "kind": "internal"
+        },
+        {
+          "cell": "H24",
+          "col": "H",
+          "row": 24,
+          "formula": "=SUM(H12:H23)",
+          "kind": "internal"
+        },
+        {
+          "cell": "I24",
+          "col": "I",
+          "row": 24,
+          "formula": "=SUM(I12:I23)",
+          "kind": "internal"
+        },
+        {
+          "cell": "J24",
+          "col": "J",
+          "row": 24,
+          "formula": "=SUM(J12:J23)",
+          "kind": "internal"
+        }
+      ],
+      "data_region_formula_columns": {
+        "D": {
+          "count": 12,
+          "sample": "=B12+C12"
+        },
+        "I": {
+          "count": 12,
+          "sample": "=E12+G12"
+        },
+        "J": {
+          "count": 12,
+          "sample": "=D12-I12"
+        }
+      },
+      "o_column_preserved": {},
+      "nav_refs": []
+    },
+    {
+      "wp_code": "D4-24",
+      "template_relative_path": "D\\D4 收入底稿.xlsx",
+      "sheet_name": "第三方回款检查D4-24",
+      "dimensions": "A1:O27",
+      "max_row": 27,
+      "max_col": 14,
+      "header_row": 14,
+      "headers": {
+        "A": "序号",
+        "B": "客户名称",
+        "C": "本年度销售金额",
+        "D": "期末应收账款余额",
+        "E": "本年度第三方回款金额",
+        "F": "第三方回款方名称",
+        "G": "第三方回款原因",
+        "H": "第三方回款方与客户关系",
+        "I": "第三方回款方与被审计单位关系",
+        "J": "是否有代付协议",
+        "K": "是否函证",
+        "L": "合理性分析",
+        "M": "索引",
+        "N": null
+      },
+      "first_data_row": 15,
+      "footer_row": null,
+      "footer_marker_exact": null,
+      "last_data_row": 27,
+      "merged_ranges": [
+        "A2:M2",
+        "A1:M1"
+      ],
+      "formula_count": 0,
+      "formula_cells": [],
+      "data_region_formula_columns": {},
+      "o_column_preserved": {},
+      "nav_refs": [
+        {
+          "cell": "A24",
+          "ref": "E1-31"
+        },
+        {
+          "cell": "A24",
+          "ref": "D2-7"
+        }
+      ]
+    }
+  ]
+}

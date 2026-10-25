@@ -277,6 +277,10 @@ class MaterializeCoordinatorError(SyncDomainError):
     error_code = "materialize_failed"
 
 
+class _ExpiredLeaseRoomSuperseded(Exception):
+    """内部信号：过期/撤销 lease 已 revoke+supersede，调用方应立刻 open 新 room。"""
+
+
 # ── pending mutation token：五类拒绝（Property 10 逐条点名）───────────────
 
 
@@ -1838,6 +1842,12 @@ class MaterializeCoordinator:
     ) -> MaterializeOutcome:
         """事务 B + C：唯一业务 commit，然后 room/participant/descriptor。"""
         request = authorized.request
+        # 与 OO→HTML rematerialize 同构：Excel projection commit 必须带冻结
+        # structure_anchors，否则 content_mutation 会 content_commit_failed。
+        from app.services.workpaper_sync.publish_time_structure_hash import (
+            load_frozen_structure_anchors,
+        )
+
         plan = ContentCommitPlan(
             project_id=request.project_id,
             wp_id=request.wp_id,
@@ -1858,6 +1868,12 @@ class MaterializeCoordinator:
             operation_id=operation_id,
             parent_version_id=pre.base_content_version_id,
             contract=request.contract,
+            structure_anchors=await load_frozen_structure_anchors(
+                session=self._session,
+                resolution=self._resolution,
+                bundle=pre.bundle,
+                document_type=pre.resolution.document_type,
+            ),
             pending_mutation_id=pending.id,
             idempotency_key=request.idempotency_key,
             reason="content_commit",
@@ -2220,7 +2236,25 @@ class MaterializeCoordinator:
             ) from exc
         # 冻结 identity 与 room 侧现算身份逐项比对：不等即 alias 漂移（AC 2.10）。
         pre.bundle_identity.assert_same_as(room_bundle, where="materialize-room")
-        participant = await self._join_or_reuse_participant(request, room=room)
+        try:
+            participant = await self._join_or_reuse_participant(request, room=room)
+        except _ExpiredLeaseRoomSuperseded:
+            # 僵死 lease 已终结并 supersede；同一次 materialize 内开新 room。
+            try:
+                room, room_bundle = await self._rooms.open_or_reuse_room(
+                    request.scope,
+                    representation=representation,
+                    opened_base_version_id=content_version_id,
+                    ttl=self._room_ttl,
+                )
+            except (RepresentationNotPublishedError, BundleAliasDriftError) as exc:
+                raise DescriptorSubstrateStaleError(
+                    f"{STALE_ON_ROOM_OPEN_MARKER}: 开 room 时 representation "
+                    f"{representation.id} 已不可用（{exc}）—— preflight 与 room 打开之间"
+                    "发生了并发推进，请重新 flush"
+                ) from exc
+            pre.bundle_identity.assert_same_as(room_bundle, where="materialize-room-retry")
+            participant = await self._join_or_reuse_participant(request, room=room)
         await self._session.commit()
 
         descriptor = EditorLaunchDescriptor(
@@ -2301,9 +2335,19 @@ class MaterializeCoordinator:
         if live.revoked_at is not None or (
             live.expires_at is not None and live.expires_at <= _now()
         ):
-            raise MaterializeAuthorizationError(
-                f"participant {live.id} 的 lease 已撤销/过期 —— 不得复用，也不得在唯一"
-                "约束下新建第二个；必须先由 room 侧终结该 lease"
+            # 僵死 lease 仍占 uq_wpoop_active_lease：先终结并 supersede，
+            # 由 _open_room_and_descriptor 同一次 materialize 内开新 room。
+            await self._rooms.revoke_participant(
+                room_id=room.id,
+                participant_id=live.id,
+                oo_drop_confirmed=False,
+            )
+            await self._rooms.supersede_room(
+                room_id=room.id,
+                reason="expired_or_revoked_lease_on_materialize",
+            )
+            raise _ExpiredLeaseRoomSuperseded(
+                f"participant {live.id} lease expired/revoked; room superseded"
             )
         return live
 

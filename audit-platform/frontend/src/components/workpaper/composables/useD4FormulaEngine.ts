@@ -183,6 +183,34 @@ export function isCrossPeriod(voucherDate: string, referenceDate: string, balanc
 }
 
 /**
+ * 账到单据（forward）跨期判定：凭证在截止日或之前、单据在截止日之后 → true（跨期）
+ *
+ * D4-36（一）账到单据方向语义：记账凭证 → 发货单/验收单/出库单。
+ * 无效日期返回 false。与 isCrossPeriodBackward 方向相反，不得混用不区分方向的 isCrossPeriod。
+ */
+export function isCrossPeriodForward(voucherDate: string, docDate: string, cutoffDate: string): boolean {
+  const vd = new Date(voucherDate).getTime()
+  const dd = new Date(docDate).getTime()
+  const cd = new Date(cutoffDate).getTime()
+  if (isNaN(vd) || isNaN(dd) || isNaN(cd)) return false
+  return vd <= cd && dd > cd
+}
+
+/**
+ * 单据到账（backward）跨期判定：单据在截止日或之前、凭证在截止日之后 → true（跨期）
+ *
+ * D4-36（二）单据到账方向语义：发货单/验收单/出库单 → 记账凭证。
+ * 无效日期返回 false。与 isCrossPeriodForward 方向相反。
+ */
+export function isCrossPeriodBackward(docDate: string, voucherDate: string, cutoffDate: string): boolean {
+  const dd = new Date(docDate).getTime()
+  const vd = new Date(voucherDate).getTime()
+  const cd = new Date(cutoffDate).getTime()
+  if (isNaN(dd) || isNaN(vd) || isNaN(cd)) return false
+  return dd <= cd && vd > cd
+}
+
+/**
  * 跨期天数 = |凭证日期 - 参考日期| (返回绝对值天数)
  *
  * 无效日期返回 0。D4-17/D4-18截止测试天数计算。
@@ -232,4 +260,58 @@ const IPO_KEYWORDS = ['ipo', 'listed', 'neeq', 'restructuring', 'fraud_risk'] as
 export function isIpoGroupVisible(businessCategory: string): boolean {
   const lower = businessCategory.toLowerCase()
   return IPO_KEYWORDS.some(keyword => lower.includes(keyword))
+}
+
+// ─── 表间 WP 取数公式（预设 + 手工二次编辑） ───────────────────────────────
+
+/** D4-10「本期销售总额」预设：取 D4-2 主营明细本期未审合计（N 列 Σ） */
+export const D4_10_TOTAL_AMOUNT_PRESET = "WP('D4-2','本期未审合计')" as const
+
+const WP2_PATTERN = /^WP\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)$/i
+
+export interface WpFormulaRef {
+  wpCode: string
+  field: string
+}
+
+/**
+ * 解析两参 WP('D4-2','本期未审合计') 声明。非法表达式返回 null（fail closed）。
+ */
+export function parseWpFormulaRef(expr: string | null | undefined): WpFormulaRef | null {
+  if (!expr) return null
+  const m = String(expr).trim().match(WP2_PATTERN)
+  if (!m) return null
+  return { wpCode: m[1], field: m[2] }
+}
+
+/**
+ * 从 D4-2 行数组现算「本期未审合计」= Σ periodTotal = Σ SUM(months)。
+ * 不把审计调整计入（与字段名「未审」一致；审定走 calcAuditedWithAdj）。
+ */
+export function resolveD42PeriodUnadjustedTotal(
+  rows: Array<{ months?: unknown; periodTotal?: unknown }>,
+): number {
+  if (!Array.isArray(rows) || rows.length === 0) return 0
+  return calcSubtotal(
+    rows.map((row) => {
+      if (row.periodTotal != null && row.periodTotal !== '') return parseNum(row.periodTotal as any)
+      const months = Array.isArray(row.months) ? (row.months as unknown[]).map(parseNum) : []
+      return calcMonthlyTotal(months)
+    }),
+  )
+}
+
+/**
+ * 标量字段的预设/手工二次编辑：manualOverride 时用 stored；否则用 presetValue。
+ * 上游为 0 且未手工覆盖时保留 stored（不造 0）。
+ */
+export function resolvePresetOrOverride(options: {
+  presetValue: number
+  storedValue: number
+  manualOverride: boolean
+}): number {
+  const { presetValue, storedValue, manualOverride } = options
+  if (manualOverride) return storedValue
+  if (presetValue > 0) return presetValue
+  return storedValue
 }

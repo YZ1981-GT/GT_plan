@@ -108,13 +108,36 @@ export function useD4KeyIndicator(options: UseD4KeyIndicatorOptions) {
   // ─── Load ───────────────────────────────────────────────────────────
 
   function loadData() {
-    const resp = allResponses.value.get('D4-22-data')
+    const resp = allResponses.value.get('D4-22-rows')
     if (resp?.remark) {
       try {
         const parsed = JSON.parse(resp.remark)
         if (parsed && typeof parsed === 'object') {
-          if (Array.isArray(parsed.rows) && parsed.rows.length) rows.value = parsed.rows
-          else initRows()
+          // 逆投影：持久化扁平行 → UI 行模型（peer_N → peers 数组，
+          // metricName→label，rationality→analysis）。按 metricName 对齐
+          // INDICATOR_DEFINITIONS 固定 12 行，缺字段回退空值。
+          const peerCount = Array.isArray(parsed.peers) ? parsed.peers.length : 0
+          if (Array.isArray(parsed.rows) && parsed.rows.length) {
+            const byMetric = new Map(parsed.rows.map((r: any) => [String(r.metricName ?? r.label ?? ''), r]))
+            rows.value = INDICATOR_DEFINITIONS.map(def => {
+              const src = byMetric.get(def.label) ?? {}
+              const peers: (number | string)[] = []
+              for (let i = 1; i <= Math.max(peerCount, 0); i++) {
+                peers.push(src[`peer_${i}`] ?? '')
+              }
+              return {
+                key: def.key,
+                label: def.label,
+                currentPeriod: src.currentPeriod ?? '',
+                priorPeriod: src.priorPeriod ?? '',
+                peers,
+                analysis: src.rationality ?? '',
+                isAutoCalc: def.isAutoCalc,
+              }
+            })
+          } else {
+            initRows()
+          }
           if (Array.isArray(parsed.peers)) peerCompanies.value = parsed.peers
           if (parsed.transportExpense != null) transportExpense.value = parsed.transportExpense
           return
@@ -142,7 +165,7 @@ export function useD4KeyIndicator(options: UseD4KeyIndicatorOptions) {
     }))
   }
 
-  watch(() => allResponses.value.get('D4-22-data')?.remark, () => loadData(), { immediate: true })
+  watch(() => allResponses.value.get('D4-22-rows')?.remark, () => loadData(), { immediate: true })
   watch(() => allResponses.value.get('D4-22-note')?.remark, () => loadNoteConclusion(), { immediate: true })
 
   // ─── Peer Companies CRUD ────────────────────────────────────────────
@@ -235,13 +258,31 @@ export function useD4KeyIndicator(options: UseD4KeyIndicatorOptions) {
   const analysisFilledCount = computed(() => rows.value.filter(r => r.analysis.trim() !== '').length)
 
   // ─── Persistence (debounce 2s) ──────────────────────────────────────
+  // 持久化形态与后端 phase5_d4_ipo_related_sheets D4-22 descriptor 对齐：
+  //   行身份 metricName（descriptor ROW_IDENTITY_STORE_KEY_D422）
+  //   固定列 currentPeriod / priorPeriod / rationality
+  //   动态同业列 peer_1 / peer_2 / …（稳定键 {slot}_{seq}，禁 label 作 key）
+  // UI 内部态仍是 peers 数组 + label/analysis/isAutoCalc；持久化时展平，
+  // 加载时由 loadData 读回原形态（前端行模型不变，仅序列化层对齐）。
+  function toPersistedRows(): Record<string, any>[] {
+    return rows.value.map(r => {
+      const out: Record<string, any> = {
+        metricName: r.label,
+        currentPeriod: r.currentPeriod,
+        priorPeriod: r.priorPeriod,
+        rationality: r.analysis,
+      }
+      r.peers.forEach((v, i) => { out[`peer_${i + 1}`] = v })
+      return out
+    })
+  }
 
   function persistAll() {
-    allResponses.value.set('D4-22-data', {
-      item_id: 'D4-22-data',
+    allResponses.value.set('D4-22-rows', {
+      item_id: 'D4-22-rows',
       conclusion: null,
       remark: JSON.stringify({
-        rows: rows.value,
+        rows: toPersistedRows(),
         peers: peerCompanies.value,
         transportExpense: transportExpense.value,
       }),
@@ -265,7 +306,7 @@ export function useD4KeyIndicator(options: UseD4KeyIndicatorOptions) {
   }
 
   function flushSave() {
-    const keys = ['D4-22-data', 'D4-22-note', 'D4-22-conclusion']
+    const keys = ['D4-22-rows', 'D4-22-note', 'D4-22-conclusion']
     const items = keys.map(k => allResponses.value.get(k)).filter(Boolean)
     window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
   }

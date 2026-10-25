@@ -1,6 +1,8 @@
 # Design Document
 
-## Preserved business model
+## Current closure scope
+D4-30/31/32 must use the unified sync bridge and registered providers before OnlyOffice is advertised. D4-32 unknown groups are a visible, durable intermediate state: preserve source label and row identity, expose explicit human mapping, and never silently discard or reclassify rows. D4-29 is explicitly out of scope for this continuation and existing dirty D4-29 changes must remain untouched.
+
 D4-29 为客户粒度 `D4-29-rows`；D4-30 为 `{customers,customDimensions}` 转置矩阵；D4-31 为单份 `InterviewData` 问卷，保留多选数组 `q1_relation` 与四章节；D4-32 为六组 `GroupData` 流水。源 xlsx 逐 sheet 核定后才能确定列头和稳定 row/column ids。
 
 ## Architecture

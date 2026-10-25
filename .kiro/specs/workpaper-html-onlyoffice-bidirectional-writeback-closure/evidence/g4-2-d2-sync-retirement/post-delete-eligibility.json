@@ -1,0 +1,176 @@
+{
+  "work_package": "G4-2",
+  "phase": "post_delete",
+  "eligible_to_delete": null,
+  "post_delete_clean": true,
+  "counts": {
+    "pass": 12,
+    "fail": 0,
+    "unverifiable": 0
+  },
+  "verdicts": [
+    {
+      "id": "E0.phase-is-consistent",
+      "result": "pass",
+      "detail": "相位一致：post_delete",
+      "facts": {
+        "phase": "post_delete"
+      }
+    },
+    {
+      "id": "E1.milestone-no-legacy-regression",
+      "result": "pass",
+      "detail": "HOST-CONSUMES-UNIFIED-PATH=STALE，REQUEST_PATH_LEGACY=0、未掉回 BLOCKED（删除导致删除前采的浏览器观测 stale 属预定行为；freshness 由 workpaper-sync-program-milestones 那道门负责，本门不重复断言）",
+      "facts": {
+        "state": "STALE",
+        "predicate_count": 10,
+        "failing_predicates": [
+          "host-consumes-unified-path.1-user-sync-prefix-request",
+          "host-consumes-unified-path.2-no-legacy-bypass",
+          "host-consumes-unified-path.3-callback-url-bound",
+          "host-consumes-unified-path.4-application-applied",
+          "host-consumes-unified-path.5-operation-terminal-bound",
+          "host-consumes-unified-path.6-onlyoffice-content-version",
+          "host-consumes-unified-path.7-no-secondary-revision-domain",
+          "host-consumes-unified-path.8-server-computed-capability",
+          "host-entry-projection"
+        ],
+        "blocker_count": 9,
+        "entry_state_counts": {
+          "BLOCKED": 0,
+          "ONLYOFFICE_VERIFIED": 0,
+          "REQUEST_PATH_LEGACY": 0,
+          "REQUEST_PATH_VERIFIED": 0,
+          "STALE": 4
+        },
+        "phase": "post_delete"
+      }
+    },
+    {
+      "id": "E2a.backend-no-production-caller",
+      "result": "pass",
+      "detail": "扫 2200 个 backend/app 模块，允许集 空 之外零字面量",
+      "facts": {
+        "scanned": 2200,
+        "allowed": [],
+        "offenders": {}
+      }
+    },
+    {
+      "id": "E2b.frontend-no-production-caller",
+      "result": "pass",
+      "detail": "扫 5209 个 src 生产文件（剥注释后），允许集 空 之外零命中",
+      "facts": {
+        "scanned": 5209,
+        "allowed": [],
+        "offenders": {}
+      }
+    },
+    {
+      "id": "E2c.no-route-registration",
+      "result": "pass",
+      "detail": "post-delete：全仓 router 零 `d2-sync` 路由，registry 零 `d2_sync` 绑定",
+      "facts": {
+        "routes": {},
+        "registry_bindings": [],
+        "phase": "post_delete"
+      }
+    },
+    {
+      "id": "E3a.command-service-superset",
+      "result": "pass",
+      "detail": "统一返回码真值表覆盖 error [0, 1, 2, 3, 4, 5, 6] / 6 个 outcome，legacy 三态映射 {'accepted': 'accepted', 'nothing_to_save': 'no_changes', 'rejected': 'doc_not_online'}",
+      "facts": {
+        "error_codes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "outcomes": [
+          "accepted",
+          "configuration_error",
+          "doc_not_online",
+          "implementation_defect",
+          "no_changes",
+          "server_error"
+        ],
+        "legacy_state_map": {
+          "accepted": "accepted",
+          "nothing_to_save": "no_changes",
+          "rejected": "doc_not_online"
+        },
+        "missing_errors": [],
+        "missing_outcomes": []
+      }
+    },
+    {
+      "id": "E3b.bridge-module-retained",
+      "result": "pass",
+      "detail": "`d2_bidirectional_bridge` 在盘且被统一 oo_to_html 引用（总控 §2.4.6 可复用资产，不删）",
+      "facts": {
+        "bridge_exists": true,
+        "referenced_by_oo_to_html": true,
+        "path": "backend/app/services/workpaper_sync/d2_bidirectional_bridge.py"
+      }
+    },
+    {
+      "id": "E3c.defect-a-reverse-lock",
+      "result": "pass",
+      "detail": "缺陷 A 反向锁（flush 严格早于读 store projection） 在位（readAt > flushAt，audit-platform/frontend/src/components/workpaper/__tests__/d2SyncHostWiring.spec.ts）",
+      "facts": {
+        "path": "audit-platform/frontend/src/components/workpaper/__tests__/d2SyncHostWiring.spec.ts",
+        "block_chars": 462,
+        "flush_var": "flushAt",
+        "read_var": "readAt",
+        "ordering_assertion": true
+      }
+    },
+    {
+      "id": "E3d.four-state-text-guard",
+      "result": "pass",
+      "detail": "四态结果文案互不相同门（取代 legacy durable 三态文案判据） 在位（audit-platform/frontend/src/components/workpaper/sync/__tests__/workpaperSyncBridgeMachine.spec.ts，块 598 字符）",
+      "facts": {
+        "path": "audit-platform/frontend/src/components/workpaper/sync/__tests__/workpaperSyncBridgeMachine.spec.ts",
+        "anchor": "WP_BRIDGE_STATE_TEXT.forcesave_accepted",
+        "block_chars": 598,
+        "missing": []
+      }
+    },
+    {
+      "id": "E3e.forcesave-fail-closed",
+      "result": "pass",
+      "detail": "G4-0a fail-closed 在位（audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue）",
+      "facts": {
+        "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
+        "missing": []
+      }
+    },
+    {
+      "id": "E4.store-value-equivalence-rehomed",
+      "result": "pass",
+      "detail": "store 值等价判据已迁到 backend/tests/workpaper_sync/test_d2_store_value_equivalence.py，覆盖 ['same_store_value', '_assign_store_value', 'merge_projection_into_store_rows']",
+      "facts": {
+        "path": "backend/tests/workpaper_sync/test_d2_store_value_equivalence.py",
+        "missing": [],
+        "required": [
+          "same_store_value",
+          "_assign_store_value",
+          "merge_projection_into_store_rows"
+        ]
+      }
+    },
+    {
+      "id": "E5.negative-assertion-inventory",
+      "result": "pass",
+      "detail": "7 处防复活负向断言全部在位",
+      "facts": {
+        "inventory_size": 7,
+        "broken": {}
+      }
+    }
+  ]
+}

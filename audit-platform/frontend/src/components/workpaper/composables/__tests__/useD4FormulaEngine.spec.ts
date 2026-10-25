@@ -19,9 +19,15 @@ import {
   calcAnomalyRate,
   calcCoverageRate,
   isCrossPeriod,
+  isCrossPeriodForward,
+  isCrossPeriodBackward,
   calcCrossPeriodDays,
   isSuspiciousFundFlow,
   isIpoGroupVisible,
+  D4_10_TOTAL_AMOUNT_PRESET,
+  parseWpFormulaRef,
+  resolveD42PeriodUnadjustedTotal,
+  resolvePresetOrOverride,
 } from '../useD4FormulaEngine'
 
 describe('useD4FormulaEngine', () => {
@@ -366,6 +372,80 @@ describe('useD4FormulaEngine', () => {
 
     it('handles empty string', () => {
       expect(isIpoGroupVisible('')).toBe(false)
+    })
+  })
+
+  // ─── isCrossPeriodForward / isCrossPeriodBackward（D4-36 方向化跨期）──────────
+
+  describe('isCrossPeriodForward', () => {
+    it('凭证期内且单据期后 → 跨期 true', () => {
+      // 凭证 2024-12-30 ≤ 截止 2024-12-31，单据 2025-01-03 > 截止
+      expect(isCrossPeriodForward('2024-12-30', '2025-01-03', '2024-12-31')).toBe(true)
+    })
+    it('凭证与单据均在期内 → 非跨期 false', () => {
+      expect(isCrossPeriodForward('2024-12-20', '2024-12-28', '2024-12-31')).toBe(false)
+    })
+    it('无效日期 → false', () => {
+      expect(isCrossPeriodForward('', '2025-01-03', '2024-12-31')).toBe(false)
+    })
+  })
+
+  describe('isCrossPeriodBackward', () => {
+    it('单据期内且凭证期后 → 跨期 true', () => {
+      // 单据 2024-12-29 ≤ 截止，凭证 2025-01-05 > 截止
+      expect(isCrossPeriodBackward('2024-12-29', '2025-01-05', '2024-12-31')).toBe(true)
+    })
+    it('单据与凭证均在期内 → 非跨期 false', () => {
+      expect(isCrossPeriodBackward('2024-12-20', '2024-12-28', '2024-12-31')).toBe(false)
+    })
+  })
+
+  describe('forward/backward 方向相反', () => {
+    it('同一组日期在两个方向下结果相反（一真一假）', () => {
+      // 凭证 2024-12-30（期内）、单据 2025-01-03（期后）
+      // forward（账到单据：凭证期内+单据期后）→ 跨期 true
+      // backward（单据到账：单据期内+凭证期后）→ 单据不在期内 → false
+      const v = '2024-12-30', d = '2025-01-03', c = '2024-12-31'
+      expect(isCrossPeriodForward(v, d, c)).toBe(true)
+      expect(isCrossPeriodBackward(d, v, c)).toBe(false)
+    })
+  })
+
+  // ─── 表间 WP 取数 / 预设二次编辑 ─────────────────────────────────────────
+  describe('parseWpFormulaRef + D4-10 preset', () => {
+    it('解析合法两参 WP', () => {
+      expect(parseWpFormulaRef(D4_10_TOTAL_AMOUNT_PRESET)).toEqual({
+        wpCode: 'D4-2',
+        field: '本期未审合计',
+      })
+    })
+    it('非法表达式 fail closed → null', () => {
+      expect(parseWpFormulaRef("WP(D4-2,合计)")).toBeNull()
+      expect(parseWpFormulaRef('')).toBeNull()
+      expect(parseWpFormulaRef(null)).toBeNull()
+    })
+  })
+
+  describe('resolveD42PeriodUnadjustedTotal', () => {
+    it('Σ months 为未审合计，不含 auditAdjustment', () => {
+      const total = resolveD42PeriodUnadjustedTotal([
+        { months: [100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+        { months: [50, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+      ])
+      expect(total).toBe(200)
+    })
+    it('优先用已算好的 periodTotal', () => {
+      expect(resolveD42PeriodUnadjustedTotal([{ periodTotal: 1234, months: [1] }])).toBe(1234)
+    })
+  })
+
+  describe('resolvePresetOrOverride', () => {
+    it('未覆盖时用 preset；覆盖时保留 stored', () => {
+      expect(resolvePresetOrOverride({ presetValue: 100, storedValue: 9, manualOverride: false })).toBe(100)
+      expect(resolvePresetOrOverride({ presetValue: 100, storedValue: 9, manualOverride: true })).toBe(9)
+    })
+    it('上游为 0 且未覆盖 → 保留 stored（不造 0）', () => {
+      expect(resolvePresetOrOverride({ presetValue: 0, storedValue: 88, manualOverride: false })).toBe(88)
     })
   })
 })

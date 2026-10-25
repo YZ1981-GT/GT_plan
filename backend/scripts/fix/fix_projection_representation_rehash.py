@@ -476,6 +476,67 @@ def _managed_uuid_last_row(xml_bytes: bytes, *, column: str) -> int | None:
     return max(rows) if rows else None
 
 
+def _missing_managed_sheets(
+    *, relative_path: str, contract_id: str
+) -> tuple[str, ...] | None:
+    """新契约声明的受管 sheet 里，已发布 artifact **尚未插桩**的那些（按 Excel Table 判）。
+
+    契约扩张（本次为 D4-2/3/5 之外新增 D4-21/22/23/24）会让 `recompute_structure_hash`
+    因 `contract_sha256` 变化而判 stale，但**字节层面真正缺的是新受管 sheet 的插桩部件**
+    （UUID 列 / Excel Table / defined name）。这类漂移的正确修法是**重投影**（重新
+    instrument + 重新 materialize 现有 store，产新 content version），而不是 representation-only
+    rehash（后者不改字节，会留下没有新 sheet Table 的 artifact + 更新后的 frozen hash，
+    自相矛盾）。
+
+    判据：契约每张声明了 `row_identity` 或 `dynamic_columns` 的受管 sheet，其 `excel_name`
+    对应的 Excel Table（``GT_{template_id}_ROWS`` 一类）是否在 artifact 里存在。这是
+    **结构性缺失**判据（Table 是受管 sheet 的唯一运行态锚点，见 published_identity_observer），
+    不靠字符串包含。返回缺失 sheet 的 excel_name 元组；无缺失返回空元组；读不出返回 None。
+    """
+    from app.services.workpaper_sync.contracts import load_contract
+
+    path = _BACKEND_ROOT / relative_path
+    if not path.is_file():
+        return None
+    try:
+        data = path.read_bytes()
+        contract = load_contract(contract_id)
+    except Exception:  # noqa: BLE001
+        return None
+
+    # artifact 里所有 Excel Table 的 displayName 集合（受管 sheet 锚点）。
+    table_names: set[str] = set()
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            for name in zf.namelist():
+                if not re.match(r"xl/tables/table[^/]*\.xml$", name):
+                    continue
+                xml = zf.read(name).decode("utf-8")
+                m = re.search(r'<table\b[^>]*\bdisplayName="([^"]+)"', xml)
+                if not m:
+                    m = re.search(r'<table\b[^>]*\bname="([^"]+)"', xml)
+                if m:
+                    table_names.add(m.group(1))
+    except Exception:  # noqa: BLE001
+        return None
+
+    # 汇总判据：契约声明的动态受管表数（有 row_identity 或 dynamic_columns 的 table）
+    # vs artifact 实测 Excel Table 数。artifact Table 少于声明 ⇒ 有受管 sheet 未插桩
+    # ⇒ 契约扩张缺插桩。逐表名核对由 stage_instrumented_substrate 的实测入参 fail-closed。
+    declared_dynamic = sum(
+        1
+        for sheet in contract.sheets
+        for t in sheet.tables
+        if t.row_identity is not None or t.dynamic_columns is not None
+    )
+    if len(table_names) < declared_dynamic:
+        return (
+            f"artifact 实测 Excel Table 数 {len(table_names)} < 契约声明的动态受管表数 "
+            f"{declared_dynamic}（缺 {declared_dynamic - len(table_names)} 张受管 sheet 的插桩）",
+        )
+    return ()
+
+
 async def _read_store_payload(
     session: Any, *, wp_id: uuid.UUID, store_item_id: str, provider: Any, entry_id: str
 ) -> str:
@@ -698,16 +759,30 @@ async def _process_entry(
             )
             return out
     else:
-        # 🔴 冻结 hash ≠ 重算值，但（进入本分支的前提是）字节未被判为坐标漂移：
-        #    artifact 字节没问题，错的只是 representation 行上那一列的旧口径值。
-        #    ⇒ representation-only：同 content version、新 generation、revision 不变。
-        out.stages.append("stale_confirmed")
-        out.state = "stale_needs_rehash"
-        out.diagnosis = (
-            f"冻结 {current['structure_hash'][:12]}… ≠ 重算 {recomputed[:12]}… ⇒ "
-            "BP-30 旧口径遗留（artifact 字节正确）⇒ representation-only 产新 generation、"
-            "content_revision 不变"
+        # 🔴 冻结 hash ≠ 重算值。先分辨两种成因：
+        #    (a) 契约扩张（新增受管 sheet）⇒ artifact 字节**真的缺**新 sheet 的插桩部件
+        #        ⇒ 必须重投影（重 instrument + 重 materialize），representation-only 修不了；
+        #    (b) 纯口径遗留（BP-30，artifact 字节正确，只是 frozen hash 列旧口径）
+        #        ⇒ representation-only：同 content version、新 generation、revision 不变。
+        missing_sheets = _missing_managed_sheets(
+            relative_path=current["relative_path"], contract_id=contract_id
         )
+        if missing_sheets:
+            out.stages.append("stale_confirmed")
+            out.state = "stale_needs_reprojection"
+            out.diagnosis = (
+                f"冻结 {current['structure_hash'][:12]}… ≠ 重算 {recomputed[:12]}… 且"
+                f"artifact 缺新受管 sheet 插桩（{'；'.join(missing_sheets)}）⇒ 契约扩张 ⇒ "
+                "重投影（重 instrument + 重 materialize 现有 store）产新 content version"
+            )
+        else:
+            out.stages.append("stale_confirmed")
+            out.state = "stale_needs_rehash"
+            out.diagnosis = (
+                f"冻结 {current['structure_hash'][:12]}… ≠ 重算 {recomputed[:12]}… ⇒ "
+                "BP-30 旧口径遗留（artifact 字节正确）⇒ representation-only 产新 generation、"
+                "content_revision 不变"
+            )
 
     # ── 第 3 步：仅重投影分支需要 store 载荷 ─────────────────────────
     #

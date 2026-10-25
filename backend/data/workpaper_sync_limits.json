@@ -27,9 +27,10 @@
   },
 
   "streaming": {
-    "comment": "流式读取块大小。必须远小于 max_expanded_bytes，否则『内存受界』失效；守卫用 tracemalloc 峰值锁死。",
+    "comment": "流式读取块大小。必须远小于 max_expanded_bytes，否则『内存受界』失效；守卫用 tracemalloc 峰值锁死。materialize_soft_limit_seconds：CPU 段软上限（秒），超限 fail visible。",
     "chunk_bytes": 262144,
-    "peak_memory_budget_bytes": 16777216
+    "peak_memory_budget_bytes": 16777216,
+    "materialize_soft_limit_seconds": 120
   },
 
   "ooxml_policy": {

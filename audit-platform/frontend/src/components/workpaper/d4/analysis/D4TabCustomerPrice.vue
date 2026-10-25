@@ -22,6 +22,13 @@ import http from '@/utils/http'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+import type useD4CrossSheet from '../../composables/useD4CrossSheet'
+import { eventBus } from '@/utils/eventBus'
+import { mergeCustomers } from '../../composables/d4PriceUpstreamMerge'
+import {
+  D4_10_TOTAL_AMOUNT_PRESET,
+  resolvePresetOrOverride,
+} from '../../composables/useD4FormulaEngine'
 
 const props = defineProps<{
   wpId: string
@@ -31,6 +38,14 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+
+// ─── 上游联动（宿主 provide 的 useD4CrossSheet 实例） ────────────────────
+// 从 D4-9 客户结构（customerStructureData，派生自 D4-2 主营明细）取重要客户行。
+type D4CrossSheet = ReturnType<typeof useD4CrossSheet>
+const crossSheet = inject<D4CrossSheet | null>('d4CrossSheet', null)
+
+// ─── 异常价格阈值（客户价格：与均价/市价差异绝对值 > 20%） ────────────
+const ABNORMAL_THRESHOLD = 0.2
 
 // 双模式（结构化视图 / 在线编辑）
 const editorMode = ref<'structured' | 'onlyoffice'>('structured')
@@ -72,6 +87,10 @@ interface PriceRow {
 const rows = ref<PriceRow[]>([])
 const totalAmount = ref(0)
 const totalQuantity = ref(0)
+/** 手工覆盖「本期销售总额」；false 时真源为预设 WP 公式 */
+const totalAmountManualOverride = ref(false)
+/** 公式真源声明（preset；用户手工覆盖后仍保留以便恢复） */
+const TOTAL_AMOUNT_FORMULA_REF = D4_10_TOTAL_AMOUNT_PRESET
 
 function loadData() {
   const resp = props.allResponses.get('D4-10-data')
@@ -81,14 +100,58 @@ function loadData() {
       rows.value = d.rows || []
       totalAmount.value = d.totalAmount || 0
       totalQuantity.value = d.totalQuantity || 0
+      totalAmountManualOverride.value = Boolean(d.totalAmountManualOverride)
+      // totalAmountFormulaRef 持久化供导入导出；运行时预设常量即 SoT，二次编辑走 manualOverride
       return
     } catch {}
   }
   rows.value = []
   totalAmount.value = 0
   totalQuantity.value = 0
+  totalAmountManualOverride.value = false
 }
 watch(() => props.allResponses.get('D4-10-data')?.remark, () => loadData(), { immediate: true })
+
+/** 公式派生总额：未审合计 ≡ WP('D4-2','本期未审合计')；上游空不造 0 */
+const formulaTotalAmount = computed(() => {
+  const upstream = crossSheet?.mainRevenueUnadjustedTotal?.value.current
+    ?? crossSheet?.mainRevenueTotal.value.current
+    ?? 0
+  return upstream > 0 ? upstream : 0
+})
+
+watch(
+  formulaTotalAmount,
+  (upstream) => {
+    const next = resolvePresetOrOverride({
+      presetValue: upstream,
+      storedValue: totalAmount.value,
+      manualOverride: totalAmountManualOverride.value,
+    })
+    if (!totalAmountManualOverride.value && next !== totalAmount.value && (upstream > 0 || next === 0)) {
+      if (upstream > 0) {
+        totalAmount.value = next
+        persistData()
+      }
+    }
+  },
+  { immediate: true },
+)
+
+function onTotalAmountInput(v: number) {
+  if (props.isReadonly) return
+  totalAmountManualOverride.value = true
+  totalAmount.value = v
+  updateData()
+}
+
+function resetTotalAmountToFormula() {
+  if (props.isReadonly) return
+  totalAmountManualOverride.value = false
+  const upstream = formulaTotalAmount.value
+  if (upstream > 0) totalAmount.value = upstream
+  persistData()
+}
 
 // 计算列
 interface ComputedPriceRow extends PriceRow {
@@ -105,6 +168,33 @@ const computedRows = computed<ComputedPriceRow[]>(() => rows.value.map(r => ({
   marketDiff: (r.marketPrice === 0 && r.unitPrice === 0) ? 0 : r.marketPrice === 0 ? (r.unitPrice > 0 ? 1 : 0) : (r.unitPrice - r.marketPrice) / r.marketPrice,
 })))
 
+// ─── 异常客户清单 + 回标上游（方案 C，spec Req 4.1） ──────────────────
+// 与均价/市价差异绝对值 > 20% 视为价格异常，按客户名归并（取最大差异率），
+// 经 eventBus 'd4:price-abnormal' 回标 D4-2 主营明细对应行。幂等：每次发全量异常集，
+// 空集 = 清除本表标记（由接收端处理）。
+const abnormalCustomers = computed(() => {
+  const byName = new Map<string, number>()
+  for (const r of computedRows.value) {
+    const maxDiff = Math.max(
+      r.avgDiff != null ? Math.abs(r.avgDiff) : 0,
+      r.marketDiff != null ? Math.abs(r.marketDiff) : 0,
+    )
+    const name = (r.customer || '').trim()
+    if (!name || maxDiff <= ABNORMAL_THRESHOLD) continue
+    byName.set(name, Math.max(byName.get(name) ?? 0, maxDiff))
+  }
+  return [...byName.entries()].map(([name, diffPct]) => ({ name, diffPct }))
+})
+
+watch(abnormalCustomers, (items) => {
+  eventBus.emit('d4:price-abnormal', {
+    wpCode: 'D4-10',
+    targetKey: 'customer',
+    items,
+    timestamp: Date.now(),
+  })
+}, { deep: true })
+
 function addRow() {
   if (props.isReadonly) return
   rows.value.push({ seq: null, customer: '', product: '', amount: 0, quantity: 0, unitPrice: 0, avgPrice: 0, avgReason: '', marketPrice: 0, marketReason: '' })
@@ -113,7 +203,13 @@ function addRow() {
 function removeRow(idx: number) { if (props.isReadonly) return; rows.value.splice(idx, 1); persistData() }
 function updateData() { if (props.isReadonly) return; persistData() }
 function persistData() {
-  const data = { rows: rows.value, totalAmount: totalAmount.value, totalQuantity: totalQuantity.value }
+  const data = {
+    rows: rows.value,
+    totalAmount: totalAmount.value,
+    totalQuantity: totalQuantity.value,
+    totalAmountManualOverride: totalAmountManualOverride.value,
+    totalAmountFormulaRef: TOTAL_AMOUNT_FORMULA_REF,
+  }
   props.allResponses.set('D4-10-data', { item_id: 'D4-10-data', conclusion: null, remark: JSON.stringify(data) })
   debounceSave()
 }
@@ -123,8 +219,10 @@ const auditNote = ref('')
 const auditConclusion = ref('')
 function loadNoteConclusion() { auditNote.value = props.allResponses.get('D4-10-note')?.remark || ''; auditConclusion.value = props.allResponses.get('D4-10-conclusion')?.remark || '' }
 watch(() => props.allResponses.get('D4-10-note')?.remark, () => loadNoteConclusion(), { immediate: true })
-function updateNote(val: string) { if (props.isReadonly) return; auditNote.value = val; persist('D4-10-note', val) }
-function updateConclusion(val: string) { if (props.isReadonly) return; auditConclusion.value = val; persist('D4-10-conclusion', val) }
+function updateNote(val: string) { if (props.isReadonly) return; auditNote.value = val; persist('D4-10-note', val); emitNoteUpdated() }
+function updateConclusion(val: string) { if (props.isReadonly) return; auditConclusion.value = val; persist('D4-10-conclusion', val); emitNoteUpdated() }
+// 结论/说明变更 → 供 D4 附注/审计说明消费（方案 C，spec Req 5.1，复用现有事件族+桥）
+function emitNoteUpdated() { eventBus.emit('disclosure:note-text-updated', { wpCode: 'D4-10', timestamp: Date.now() }) }
 
 // ─── 格式化 ──────────────────────────────────────────────────────────
 function fmtAmt(val: number): string { return val === 0 ? '-' : val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
@@ -170,6 +268,39 @@ function handleExportTemplate() { exportTemplate('D4-10' as any) }
 function handleExportData() { exportData('D4-10' as any) }
 function handleImportUpload(file: File): boolean { importData('D4-10' as any, file).then(r => { if (r && r.rowCount > 0) loadData() }); return false }
 
+// ─── 从 D4-9 客户结构导入（上游联动，spec Req 2） ────────────────────
+// merge：按客户名去重，只填客户名/销售金额（录入列），不覆盖手工改过的行；
+// 派生列（占比/差异）交前端 computed 重算；本期销售总额自动 = D4-2 主营合计。
+const importingUpstream = ref(false)
+async function importFromUpstream() {
+  if (props.isReadonly) return
+  if (!crossSheet) { ElMessage.warning('上游联动未就绪，请在营业收入底稿内打开本表'); return }
+  const upstream = crossSheet.customerStructureData.value
+  if (!upstream || upstream.length === 0) {
+    ElMessage.warning('D4-2 主营明细为空，无法取客户结构；请先编制 D4-2 主营业务收入明细')
+    return
+  }
+  importingUpstream.value = true
+  try {
+    const { added, updated } = mergeCustomers(
+      rows.value,
+      upstream,
+      (name, amount) => ({ seq: null, customer: name, product: '', amount, quantity: 0, unitPrice: 0, avgPrice: 0, avgReason: '', marketPrice: 0, marketReason: '' }),
+    )
+    // 本期销售总额自动带出（公式真源 WP('D4-2','本期未审合计')；仅在未手工覆盖时填）
+    const upstreamTotal = crossSheet.mainRevenueTotal.value.current
+    if (!totalAmountManualOverride.value && upstreamTotal) {
+      totalAmount.value = upstreamTotal
+    } else if (!totalAmount.value && upstreamTotal) {
+      totalAmount.value = upstreamTotal
+    }
+    persistData()
+    ElMessage.success(`已从 D4-9 客户结构导入：新增 ${added} 户、补金额 ${updated} 户`)
+  } finally {
+    importingUpstream.value = false
+  }
+}
+
 // ─── 持久化 ──────────────────────────────────────────────────────────
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 function persist(itemId: string, value: string) { props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: value }); debounceSave() }
@@ -212,6 +343,9 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
       <div class="sec-header">
         <h4 class="sec-title">重要客户销售价格分析</h4>
         <div class="sec-actions">
+          <el-tooltip content="从 D4-9 客户结构（源自 D4-2 主营明细）导入重要客户与销售金额，自动带出本期销售总额" placement="top" :show-after="300">
+            <el-button size="small" type="primary" plain :disabled="isReadonly" :loading="importingUpstream" @click="importFromUpstream">从 D4-9 导入客户</el-button>
+          </el-tooltip>
           <el-dropdown size="small" trigger="click" :disabled="isReadonly">
             <el-button size="small">导入导出 ▾</el-button>
             <template #dropdown>
@@ -230,12 +364,37 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
         </div>
       </div>
 
-      <!-- 本期销售总额 -->
+      <!-- 本期销售总额：公式真源 WP('D4-2','本期未审合计')；手工可覆盖并「恢复公式」 -->
       <div class="total-row">
         <span>本期销售总额：</span>
-        <el-tooltip content="数据来源: D4-9本期销售总额或D4-2合计" placement="right" :show-after="200">
-          <el-input-number v-model="totalAmount" :controls="false" size="small" :disabled="isReadonly" :precision="2" class="total-input" @change="updateData" />
+        <el-tooltip
+          :content="totalAmountManualOverride
+            ? `已手工覆盖（原公式 ${TOTAL_AMOUNT_FORMULA_REF}）`
+            : `公式取数: ${TOTAL_AMOUNT_FORMULA_REF} ≡ D4-2 主营本期合计`"
+          placement="right"
+          :show-after="200"
+        >
+          <el-input-number
+            :model-value="totalAmount"
+            :controls="false"
+            size="small"
+            :disabled="isReadonly"
+            :precision="2"
+            class="total-input"
+            @update:model-value="(v: number | undefined) => onTotalAmountInput(Number(v ?? 0))"
+          />
         </el-tooltip>
+        <el-tag v-if="!totalAmountManualOverride" size="small" type="info" class="formula-tag" effect="plain">
+          {{ TOTAL_AMOUNT_FORMULA_REF }}
+        </el-tag>
+        <el-button
+          v-else
+          size="small"
+          link
+          type="primary"
+          :disabled="isReadonly"
+          @click="resetTotalAmountToFormula"
+        >恢复公式</el-button>
         <span style="margin-left:16px">本期总数量：</span>
         <el-input-number v-model="totalQuantity" :controls="false" size="small" :disabled="isReadonly" class="total-input" @change="updateData" />
       </div>
@@ -365,6 +524,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
 .objective-list { padding: 10px 14px; background: #f5f7fa; border-radius: 6px; }
 .objective-item { margin: 0; font-size: var(--wp-font-size, 13px); color: #303133; line-height: 1.7; }
 .total-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: var(--wp-font-size, 13px); flex-wrap: wrap; }
+.formula-tag { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
 .total-input { width: 140px; }
 .total-input :deep(.el-input__inner) { text-align: right; }
 .price-table { font-size: var(--wp-font-size, 13px); }

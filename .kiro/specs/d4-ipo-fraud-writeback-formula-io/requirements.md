@@ -26,6 +26,14 @@
 ### Requirement 4: 质量验证
 1. WHEN 交付完成 THEN 必须有行为测试、四态变异检验和真实 HTML/Excel 双向实测，不能仅以静态字符串或纯函数测试验收。
 
+### Requirement 5: D4-30/31/32 统一同步桥
+1. WHEN D4-30、D4-31 或 D4-32 切换在线编辑 THEN 必须由 `WorkpaperSyncEditorHost` 消费受管 sheet provider descriptor，经过统一 mutation/version/三方合并/ack；不得继续由页面私自挂载 legacy `GtOnlyOfficeSheet`。
+2. WHEN D4-32 导入未知组别 THEN 原始组别 label、稳定 row id、金额（含 0/空）、账号和中文必须保留并在 HTML 显示待映射；人工选择已知组后才移动并持久化。
+3. WHEN D4-32 JSON 非法或桥接保存失败 THEN 旧数据不得被清空或覆盖，页面必须显示可见错误并保持可恢复状态。
+
+### Requirement 6: 真栈接线边界
+1. WHEN provider/contract 未注册或宿主未消费 descriptor THEN 不得宣称支持 OnlyOffice；能力应显示为阻塞态并记录原因。
+2. WHEN D4-29 已有改动 THEN 本次不得修改 D4-29 生产或测试行为。
 ## Correctness Properties
 ### Property 1
 **Validates: Requirements 1.1-1.5**
