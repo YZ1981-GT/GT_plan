@@ -14,7 +14,10 @@
 """
 from __future__ import annotations
 
+import json
 import logging
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -30,6 +33,37 @@ NEW_S_RESOLVER_SOURCES: tuple[str, ...] = (
     "s33_5_revenue_cost_check",
     "s14_estimate_related_data",
 )
+
+
+_MAPPING_PATH = (
+    Path(__file__).resolve().parents[3] / "data" / "wp_account_mapping.json"
+)
+
+
+@lru_cache(maxsize=1)
+def _load_linked_workpapers_index() -> dict[str, list[str]]:
+    """从 wp_account_mapping.json 读取 wp_code -> linked_workpapers（单一来源）。
+
+    R7.1 的关联声明权威源是映射表；resolver 不再硬编码关联底稿，避免双写漂移。
+    文件缺失/解析失败降级为空索引，不阻断取数。
+    """
+    try:
+        data = json.loads(_MAPPING_PATH.read_text(encoding="utf-8-sig"))
+    except Exception:  # noqa: BLE001 - 降级为空索引
+        logger.warning("加载 wp_account_mapping linked_workpapers 失败", exc_info=True)
+        return {}
+    index: dict[str, list[str]] = {}
+    for item in data.get("mappings", []) if isinstance(data, dict) else []:
+        code = str(item.get("wp_code") or "").strip()
+        links = item.get("linked_workpapers")
+        if code and isinstance(links, list) and links:
+            index[code] = [str(x).strip() for x in links if str(x).strip()]
+    return index
+
+
+def linked_workpapers_for(wp_code: str) -> list[str]:
+    """返回映射表声明的关联底稿列表（复用既有链接消费方的输入）。"""
+    return list(_load_linked_workpapers_index().get(wp_code, []))
 
 
 def _as_float(value: Any, default: float | None = None) -> float | None:
@@ -147,7 +181,7 @@ async def s6_related_party_summary(
         "party_count": party_count,
         "transaction_count": transaction_count,
         "transaction_total": transaction_total,
-        "linked_workpapers": ["S6"],
+        "linked_workpapers": linked_workpapers_for("S6"),
     }
 
 
@@ -220,7 +254,7 @@ async def s33_5_revenue_cost_check(
         "gross_margin_rate": gross_margin_rate,
         "d4_indicators": d4_data.get("indicators", {}),
         "f5_rows": f5_rows,
-        "linked_workpapers": ["D4", "F5"],
+        "linked_workpapers": linked_workpapers_for("S33-5"),
     }
 
 

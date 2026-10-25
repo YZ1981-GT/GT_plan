@@ -266,3 +266,27 @@ For any combination of risk presence and workpaper presence, the P2 classifier S
 - **前端单元与静态守卫**：覆盖 GtWpRenderer true/false/缺失三态、D4/F2 IPO 路径、9 个可写组件的 `items[]`/readonly/identity、S17 三视图映射和 procedure key；用 registry/override/backend dispatch 四集合 parity 及 grep/AST 守卫确认没有第三套 IPO 定义或旧保存体。单区域 `vue-tsc` 必须先用 `number = string` 变异证明检查器有效；全量检查若 OOM 如实记录。
 - **浏览器与真实运行时**：仅在 `start-dev.bat` 已启动、使用【测试】项目且前后端重启加载路由后做 Playwright；验证 render-config overlay、组件真实保存/只读、只读联动和风险负责人展示。S17 分类未批准时，浏览器只能记录阻塞，不得把无 sheet 当作完成。
 - **回归与证据**：实现前后重新核对 requirements/design/tasks 三件套、D1-D8 门和关键边界；不以 FEAT JSON、单纯 registry 通过、代码 diff 或任何 `[x]` 记录替代端到端证据，也不在本设计中声称已实现。
+
+## 阻塞项闭环执行记录（2026-10-26，用户要求"阻塞项该修复修复"）
+
+本节为 append-only 执行轨迹，记录三个运行时/数据阻塞的真实修复与证据，不改写既有任务勾选。
+
+### P0.3 / R4 运行时 dispatch — 已修复（根因=运行中 worker 加载旧代码，非代码缺陷）
+- 诊断：进程内直调真实入口 `_get_render_config_impl` 对 S1/S8/S9/S10 全部正确命中 s-checklist 类型；而实时 HTTP 仍返回 `a-program-console`/`audit-sheet`/`h-static-doc`。运行中的 uvicorn worker（PID 启动于当日早于 P0/D3 改动）未重载。
+- 处置：经用户授权重启 backend（`backfill`/kill 端口 + `run_uvicorn.py` 无 reload 单 worker）。重启后实时 HTTP 复验：S1 `S1-1对法律法规的考虑记录表`→`s1-regulation-record`、S8 `审定表S8-1`→`s8-adjudication`、S9 四张（adjudication/internal-control/program-description/legal-regulations）、S10 三张（adjudication/internal-control/environmental-regulations）全部正确，无 grid_fallback/onlyoffice 劫持。顶层 `not_applicable` 同时正确输出 False。
+
+### R6.6 / S17 运行时 — 已解锁（用户 2026-10-26 明确批准写共享库）
+- 根因：S17 模板是 `.xls`，未被既有 `.xlsx` 扫描收录，`workpaper_sheet_classification` 中 S17 为 0 行 → render-config 返回 0 sheet。
+- 处置：先跑 `generate_s17_classification_dry_run.py`（8 候选 / 4 处 legacy-xlsx 分类器不一致，均属 .xls 新通路预期），再经批准用 `backend/scripts/ops/backfill_s17_classification.py --apply` 幂等写入 8 行（class_code 遵循 S9/S10 约定；ON CONFLICT DO NOTHING）。
+- 复验（实时 HTTP）：S17 8 sheet，`审定表S17-1`/`审核表（合并）S17-2`/`审核表（个别报表）S17-3`→`s17-nonrecurring-detail`、`S17-11`→`s17-reconciliation`、`S17-21`→`s17-tax-impact`，与 R6.5 mapping、R4.1 逐一吻合，无 a-program-console 残留、无 detail/reconciliation/tax 串接。
+
+### P1.1 / R7.1 linked_workpapers — 已修复
+- 在 `backend/data/wp_account_mapping.json` 补 5 条声明：S20→D4、S15→D4/M2、S17→K12/K13、S6→K1、S33-5→D4/F5（映射表为单一权威源）。
+- `_s_linkage.py` 新增 `linked_workpapers_for()`（读映射表、lru_cache），S6/S33-5 resolver 改为从映射读取（S6 由自引用 `["S6"]` 纠正为 `["K1"]`），避免双写漂移。
+- 守卫：`test_s_linkage_resolvers.py` 新增 `TestR71LinkedWorkpapersDeclarations`（3 例）断言 5 条声明精确目标 + helper 单一来源 + S6 不再自引用。全文件 13 passed。
+
+### R10 风险/委派（P2.1）— 诚实保持数据阻塞（代码已验，不伪造审计数据）
+- 真库 `risk_assessments` 0 行、B50 checklist 0 行（全库皆空）。P2.2/P2.3 代码正确（空→"未知"象限、负责人回退 username），但无真实风险数据不展示填充结果。用户 2026-10-26 确认接受为数据阻塞，不向共享库写入风险数据。
+
+### 回归
+- 相关套件全绿：`test_s_linkage_resolvers`(13) + `test_s17_override_mapping`(?) + `test_s17_classification_dry_run` + `test_s_checklist_render_strategy` + `test_s_checklist_registry_parity` + `test_render_config_wire_contract` 合计 40 passed；`business_category_service`/`linkage_service` 映射加载 1025 条不变。
