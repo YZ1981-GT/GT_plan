@@ -11047,7 +11047,10 @@
       "account_name": "大股东资金占用/违规担保",
       "report_row": null,
       "note_section": null,
-      "must_have": false
+      "must_have": false,
+      "linked_workpapers": [
+        "K1"
+      ]
     },
     {
       "wp_code": "S8",
@@ -11137,7 +11140,11 @@
       "account_name": "每股收益和净资产收益率",
       "report_row": null,
       "note_section": null,
-      "must_have": false
+      "must_have": false,
+      "linked_workpapers": [
+        "D4",
+        "M2"
+      ]
     },
     {
       "wp_code": "S16",
@@ -11157,7 +11164,11 @@
       "account_name": "非经常性损益",
       "report_row": null,
       "note_section": null,
-      "must_have": false
+      "must_have": false,
+      "linked_workpapers": [
+        "K12",
+        "K13"
+      ]
     },
     {
       "wp_code": "S20",
@@ -11167,7 +11178,10 @@
       "account_name": "营业收入扣除情况核查",
       "report_row": null,
       "note_section": null,
-      "must_have": true
+      "must_have": true,
+      "linked_workpapers": [
+        "D4"
+      ]
     },
     {
       "wp_code": "S21",
@@ -11483,7 +11497,11 @@
           "listed",
           "neeq"
         ]
-      }
+      },
+      "linked_workpapers": [
+        "D4",
+        "F5"
+      ]
     },
     {
       "wp_code": "S33-6",

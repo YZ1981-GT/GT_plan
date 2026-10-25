@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 import inspect
+import json
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -203,3 +204,54 @@ def test_new_resolver_module_has_no_write_calls():
         if node.func.attr in forbidden:
             violations.append(f"{node.func.attr}@{node.lineno}")
     assert not violations, f"S linkage resolver 出现写入调用: {violations}"
+
+
+class TestR71LinkedWorkpapersDeclarations:
+    """R7.1: 映射表暴露 S20/S15/S17/S6/S33-5 的 linked_workpapers，并被 resolver 复用。"""
+
+    EXPECTED = {
+        "S20": ["D4"],
+        "S15": ["D4", "M2"],
+        "S17": ["K12", "K13"],
+        "S6": ["K1"],
+        "S33-5": ["D4", "F5"],
+    }
+
+    def _load_mapping(self):
+        path = Path(__file__).resolve().parents[1] / "data" / "wp_account_mapping.json"
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+        return {m["wp_code"]: m for m in data["mappings"] if m.get("wp_code")}
+
+    def test_five_declarations_present_with_exact_targets(self):
+        mapping = self._load_mapping()
+        for wp_code, links in self.EXPECTED.items():
+            entry = mapping.get(wp_code)
+            assert entry is not None, f"{wp_code} 缺失于 wp_account_mapping.json"
+            assert entry.get("linked_workpapers") == links, (
+                f"{wp_code} linked_workpapers 应为 {links}，实际 {entry.get('linked_workpapers')}"
+            )
+
+    def test_helper_reads_mapping_as_single_source(self):
+        from app.services.auto_data_resolvers._s_linkage import (
+            _load_linked_workpapers_index,
+            linked_workpapers_for,
+        )
+
+        _load_linked_workpapers_index.cache_clear()
+        for wp_code, links in self.EXPECTED.items():
+            assert linked_workpapers_for(wp_code) == links
+
+    def test_s6_resolver_surfaces_mapping_link_not_self(self):
+        """S6 resolver 的 linked_workpapers 复用映射声明（K1），不再自引用 S6。"""
+        import ast
+
+        source_path = (
+            Path(__file__).resolve().parents[1]
+            / "app" / "services" / "auto_data_resolvers" / "_s_linkage.py"
+        )
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        # 不得残留硬编码 ["S6"] / ["D4", "F5"] 字面量作为 linked_workpapers 赋值
+        literals_from_mapping = source_path.read_text(encoding="utf-8")
+        assert 'linked_workpapers_for("S6")' in literals_from_mapping
+        assert 'linked_workpapers_for("S33-5")' in literals_from_mapping
+        assert '"linked_workpapers": ["S6"]' not in literals_from_mapping
