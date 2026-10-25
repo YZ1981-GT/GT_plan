@@ -2972,6 +2972,66 @@
       ],
       "status": "active"
     },
+    "s1-regulation-record": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "HtmlComponentType",
+        "REGISTRY_LIST",
+        "VALID_COMPONENT_TYPES",
+        "_ONLYOFFICE_HTML_WHITELIST",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s10-adjudication": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "HtmlComponentType",
+        "REGISTRY_LIST",
+        "VALID_COMPONENT_TYPES",
+        "_ONLYOFFICE_HTML_WHITELIST",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s10-environmental-regulations": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "HtmlComponentType",
+        "REGISTRY_LIST",
+        "VALID_COMPONENT_TYPES",
+        "_ONLYOFFICE_HTML_WHITELIST",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s10-internal-control": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "HtmlComponentType",
+        "REGISTRY_LIST",
+        "VALID_COMPONENT_TYPES",
+        "_ONLYOFFICE_HTML_WHITELIST",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
     "s12-cpa-expert": {
       "has_backend_renderer": true,
       "has_frontend_component": true,
@@ -3028,6 +3088,51 @@
         "RENDERER_DISPATCH",
         "REGISTRY_LIST",
         "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s17-nonrecurring-detail": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "HtmlComponentType",
+        "REGISTRY_LIST",
+        "VALID_COMPONENT_TYPES",
+        "_ONLYOFFICE_HTML_WHITELIST",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s17-reconciliation": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "HtmlComponentType",
+        "REGISTRY_LIST",
+        "VALID_COMPONENT_TYPES",
+        "_ONLYOFFICE_HTML_WHITELIST",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s17-tax-impact": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "HtmlComponentType",
+        "REGISTRY_LIST",
+        "VALID_COMPONENT_TYPES",
+        "_ONLYOFFICE_HTML_WHITELIST",
         "wp_code_overrides"
       ],
       "status": "active"
@@ -3176,6 +3281,81 @@
         "RENDERER_DISPATCH",
         "REGISTRY_LIST",
         "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s8-adjudication": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "HtmlComponentType",
+        "REGISTRY_LIST",
+        "VALID_COMPONENT_TYPES",
+        "_ONLYOFFICE_HTML_WHITELIST",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s9-adjudication": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "HtmlComponentType",
+        "REGISTRY_LIST",
+        "VALID_COMPONENT_TYPES",
+        "_ONLYOFFICE_HTML_WHITELIST",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s9-internal-control": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "HtmlComponentType",
+        "REGISTRY_LIST",
+        "VALID_COMPONENT_TYPES",
+        "_ONLYOFFICE_HTML_WHITELIST",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s9-legal-regulations": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "HtmlComponentType",
+        "REGISTRY_LIST",
+        "VALID_COMPONENT_TYPES",
+        "_ONLYOFFICE_HTML_WHITELIST",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s9-program-description": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "HtmlComponentType",
+        "REGISTRY_LIST",
+        "VALID_COMPONENT_TYPES",
+        "_ONLYOFFICE_HTML_WHITELIST",
         "wp_code_overrides"
       ],
       "status": "active"
@@ -3617,6 +3797,78 @@
       "owner": "workpaper-rendering",
       "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
       "source_digest": "a7c67a1ff3d31a16"
+    },
+    {
+      "component_type": "s1-regulation-record",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "s8-adjudication",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "s9-adjudication",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "s9-internal-control",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "s9-legal-regulations",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "s9-program-description",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "s10-adjudication",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "s10-internal-control",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "s10-environmental-regulations",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "s17-nonrecurring-detail",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "s17-reconciliation",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "s17-tax-impact",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
     }
   ],
   "schema_version": 1

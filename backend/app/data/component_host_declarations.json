@@ -58,6 +58,18 @@
     "k12-non-operating-income",
     "k13-non-operating-expense",
     "s32-fraud-bundle",
-    "s33-ann14-bundle"
+    "s33-ann14-bundle",
+    "s1-regulation-record",
+    "s8-adjudication",
+    "s9-adjudication",
+    "s9-internal-control",
+    "s9-legal-regulations",
+    "s9-program-description",
+    "s10-adjudication",
+    "s10-internal-control",
+    "s10-environmental-regulations",
+    "s17-nonrecurring-detail",
+    "s17-reconciliation",
+    "s17-tax-impact"
   ]
 }
