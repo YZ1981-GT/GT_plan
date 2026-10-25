@@ -61,12 +61,13 @@ export function parseProgramSubSteps(content: string): { parentDesc: string; sub
   return { parentDesc: text, subSteps: [] }
 }
 
-export function normalizeAProgramRow<T extends Record<string, unknown>>(row: T): T & { sub_steps?: ProgramSubStep[] } {
-  const existing = row.sub_steps as ProgramSubStep[] | undefined
+export function normalizeAProgramRow<T extends object>(row: T): T & { sub_steps?: ProgramSubStep[] } {
+  const record = row as Record<string, unknown>
+  const existing = record.sub_steps as ProgramSubStep[] | undefined
   if (Array.isArray(existing) && existing.length > 0) {
     return row as T & { sub_steps?: ProgramSubStep[] }
   }
-  const desc = String(row.program_desc ?? row.content ?? '').trim()
+  const desc = String(record.program_desc ?? record.content ?? '').trim()
   if (!desc) return row as T & { sub_steps?: ProgramSubStep[] }
   const { parentDesc, subSteps } = parseProgramSubSteps(desc)
   if (subSteps.length === 0) return row as T & { sub_steps?: ProgramSubStep[] }
@@ -74,9 +75,9 @@ export function normalizeAProgramRow<T extends Record<string, unknown>>(row: T):
     ...row,
     program_desc: parentDesc,
     sub_steps: subSteps,
-  }
+  } as T & { sub_steps?: ProgramSubStep[] }
 }
 
-export function normalizeAProgramRows<T extends Record<string, unknown>>(rows: T[]): Array<T & { sub_steps?: ProgramSubStep[] }> {
+export function normalizeAProgramRows<T extends object>(rows: T[]): Array<T & { sub_steps?: ProgramSubStep[] }> {
   return rows.map(r => normalizeAProgramRow(r))
 }

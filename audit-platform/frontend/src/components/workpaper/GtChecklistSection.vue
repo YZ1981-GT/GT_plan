@@ -374,7 +374,7 @@ function activateCell(itemId: string, field: string) {
                 size="small"
                 :disabled="readonly"
                 automatic-dropdown
-                @change="(val: string) => { updateConclusion(conclusionItem.id, val || null); activeCell = '' }"
+                @change="(val: string) => { updateConclusion(conclusionItem?.id ?? '', val || null); activeCell = '' }"
                 @visible-change="(visible: boolean) => { if (!visible) activeCell = '' }"
               >
                 <el-option label="是" value="Y" />

@@ -186,7 +186,7 @@ export function useWorkpaperScaffold(opts: UseWorkpaperScaffoldOptions): UseWork
   const generateAiText: GenerateWorkpaperAiText = async (
     inputOrSection: WorkpaperAiTextInput | string,
     legacyContext: Record<string, unknown> | string = {},
-    legacyExistingContent = '',
+    legacyExistingContent: string = '',
   ): Promise<string> => {
     const input: WorkpaperAiTextInput = typeof inputOrSection === 'string'
       ? {

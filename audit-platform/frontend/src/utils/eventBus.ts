@@ -10,6 +10,9 @@
  */
 import mitt from 'mitt'
 import type { SSEEventType } from '@/types/sse'
+import type { CanonicalWorkpaperLocation } from '@/shared/contracts/gc0'
+import type { WorkpaperCapabilitySnapshot } from '@/shell/formula/workpaperCapabilitySnapshot'
+import type { FormulaManagerSession } from '@/shell/formula/openFormulaManagerCommand'
 
 // Re-export SSEEventType for convenience
 export type { SSEEventType } from '@/types/sse'
@@ -58,8 +61,12 @@ export interface OpenFormulaManagerPayload {
   /** 附注公式入口的当前章节编号与标题。 */
   noteSection?: string
   noteSectionTitle?: string
-  /** 报表或试算入口当前报表类型（六类 report_type）。 */
-  initialReportType?: string
+  /** 统一公式管理入口的上下文类型与 canonical session。 */
+  contextKind?: 'workpaper' | 'scope'
+  canonicalLocation?: CanonicalWorkpaperLocation
+  capabilitySnapshot?: WorkpaperCapabilitySnapshot
+  formulaSession?: FormulaManagerSession
+  readOnly?: boolean
 }
 
 /**
@@ -213,14 +220,15 @@ export interface MaterialityChangedPayload {
 export interface YearChangedPayload {
   projectId: string
   year: number
+  previousYear?: number
 }
 
 /** 审计上下文变更（Req 5：useAuditContext 检测到任一字段变化） */
 export interface AuditContextChangedPayload {
   projectId: string
-  year: number
+  year: number | null
   applicableStandard: 'soe' | 'listed'
-  before: { projectId: string; year: number; applicableStandard: 'soe' | 'listed' }
+  before: { projectId: string; year: number | null; applicableStandard: 'soe' | 'listed' }
 }
 
 /** 底稿单元格定位（R8-S2-02：自检失败项 → Univer 定位 / wp-locate-foundation: 穿透定位） */
@@ -408,6 +416,12 @@ export type Events = {
   'sse:sync-failed': SyncEventPayload
   'sse:connected': void
   'sse:disconnected': void
+  /** 项目切换时清理项目级状态。 */
+  'project:reset': { reason: string; projectId: string }
+  /** 项目/年度切换时停止旧 SSE 订阅。 */
+  'sse:disconnect': { reason: string }
+  /** 年度切换后重建 SSE 订阅。 */
+  'sse:reconnect': { projectId: string; year: number }
 
   // 底稿生命周期
   'workpaper:parsed': WorkpaperParsedPayload

@@ -88,6 +88,8 @@ export interface AcnrResolveResult {
   error?: string
   /** 非底稿域：是否按项目数据核过存在（R5.1） */
   verified?: boolean
+  /** 裁剪状态（底稿域命中但当前项目被裁剪时由后端返回）。 */
+  trimmed?: boolean
   /** 判不存在 / 无法确认的原因 */
   reason?: string
   candidates?: Array<{

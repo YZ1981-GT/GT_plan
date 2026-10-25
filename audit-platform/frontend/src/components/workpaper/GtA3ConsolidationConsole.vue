@@ -175,9 +175,16 @@ import { ref, computed, watch, onMounted, defineAsyncComponent, toRef } from 'vu
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowDown, InfoFilled } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import { api } from '@/services/apiProxy'
+import { useProgramOverrideTarget } from '@/composables/useProgramOverrideTarget'
 import { getWpIndex, type WpIndexItem } from '@/services/workpaperApi'
+// 🔴 下面三个在 setup 里直接调用：漏 import ⇒ 挂载即 ReferenceError、整页空白（2026-10-02 改线时漏掉）
+import { useWorkpaperSyncBridge } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
+
+const WorkpaperSyncEditorHost = defineAsyncComponent(() => import('./sync/WorkpaperSyncEditorHost.vue'))
 
 const GtA38GoodwillImpairment = defineAsyncComponent(() => import('./GtA38GoodwillImpairment.vue'))
 
@@ -197,6 +204,8 @@ interface AProgramHtmlData {
   programs: ProgramRow[]
   trim_decisions: Array<{ programId: string; reason: string }>
   signatures?: Array<{ role: string; name: string; date: string }>
+  /** render-config 读字段覆盖用的 scope */
+  override_scope?: string
 }
 
 const props = withDefaults(defineProps<{
@@ -206,6 +215,7 @@ const props = withDefaults(defineProps<{
   htmlData: AProgramHtmlData
   readonly?: boolean
   projectId?: string
+  /** 仅兼容挂载方传参：写请求的年度一律取项目审计年度（audit-year R0） */
   year?: number
   wpCode?: string
 }>(), { readonly: false, wpCode: 'A3' })
@@ -219,6 +229,10 @@ const route = useRoute()
 const router = useRouter()
 const programs = ref<ProgramRow[]>([])
 const projectId = computed(() => props.projectId || (route.params.projectId as string) || '')
+// 字段覆盖写入位置：scope 以 render-config 回传为准、年度取项目审计年度（audit-year R0）
+const { writeField } = useProgramOverrideTarget({
+  projectId, htmlData: () => props.htmlData, fallbackCode: () => props.wpCode || 'A3',
+})
 const activeTab = ref('program')
 const wpIndex = ref<WpIndexItem[]>([])
 
@@ -235,29 +249,39 @@ const wpIdMap = computed<Record<string, string>>(() => {
 
 // 加载 wpIndex
 
+function flushPendingSave(): void {
+  emit('save', {
+    programs: programs.value,
+    trim_decisions: programs.value
+      .filter((row) => row.status === 'not_applicable' && row.trim_reason)
+      .map((row) => ({ programId: row.id, reason: row.trim_reason! })),
+    signatures: props.htmlData.signatures,
+    override_scope: props.htmlData.override_scope,
+  })
+}
+
 // ─── sync bridge（替代 legacy mode + GtOnlyOfficeSheet）───
 const _ENTRY_ID = 'xlsx/gt-a3-consolidation-console'
 const _SHEET_KEY = 'a3consolidationconsole-managed'
 const syncBridge = useWorkpaperSyncBridge({
   entryId: ref(_ENTRY_ID),
   wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
+  projectId,
   sheetKey: ref(_SHEET_KEY),
   capability: capabilityForEntry(_ENTRY_ID),
   flushHtml: async () => {
-    if (typeof flushPendingSave === 'function') flushPendingSave()
-    else if (typeof flushPendingSaves === 'function') flushPendingSaves()
+    flushPendingSave()
     // 🔴 降级保护：本 entry 的 capability 仍是 single_onlyoffice（后端无 per-entry
     //    adapter）⇒ readStoreProjection 会 404。捕获后返回空投影，让 OO 走「无投影」
     //    路径（与改线前 legacy 行为等价）。capability 升 bidirectional 后自动失效。
     try {
-      const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: _ENTRY_ID })
+      const snap = await readStoreProjection({ projectId: projectId.value, wpId: props.wpId, entryId: _ENTRY_ID })
       return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: _SHEET_KEY }
     } catch {
       return { expectedRevision: 0, projection: null, sheetKey: _SHEET_KEY }
     }
   },
-  reloadHtml: async () => { if (typeof loadData === 'function') await loadData(props.wpId); else if (typeof refreshData === 'function') await refreshData(props.wpId) },
+  reloadHtml: async () => { initData() },
 })
 const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 
@@ -428,16 +452,8 @@ async function saveExecution(row: ProgramRow) {
   persistField(row.program_no, 'execution_summary', row.execution_summary || '')
 }
 async function persistField(programNo: number, field: string, value: any) {
-  const year = props.year || parseInt(route.query.year as string) || new Date().getFullYear()
   try {
-    await api.post('/api/workpapers/field-overrides', {
-      project_id: projectId.value,
-      year,
-      scope: `procedure_table:${props.wpCode || 'A3'}`,
-      item_key: String(programNo),
-      field,
-      value,
-    })
+    await writeField(programNo, field, value)
   } catch (e: any) {
     const { ElMessage } = await import('element-plus')
     ElMessage.error(`保存失败：${e?.message || '网络异常'}`)

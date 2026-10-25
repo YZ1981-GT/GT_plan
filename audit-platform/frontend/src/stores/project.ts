@@ -110,7 +110,7 @@ export const useProjectStore = defineStore('project', () => {
         const proj = await getProject(pid)
         clientName.value = (proj as any)?.client_name || (proj as any)?.name || ''
         projectStatus.value = (proj as any)?.status || ''
-        auditScope.value = (proj as any)?.audit_scope || (proj as any)?.project_type === 'consolidated' ? 'consolidated' : 'standalone'
+        auditScope.value = (proj as any)?.audit_scope || ((proj as any)?.project_type === 'consolidated' ? 'consolidated' : 'standalone')
         const resolved = resolveAuditYearFromProject(proj as any)
         if (resolved) {
           auditYear.value = resolved
@@ -133,7 +133,7 @@ export const useProjectStore = defineStore('project', () => {
       const proj = await getProject(pid)
       clientName.value = (proj as any)?.client_name || (proj as any)?.name || ''
       projectStatus.value = (proj as any)?.status || ''
-      auditScope.value = (proj as any)?.audit_scope || (proj as any)?.project_type === 'consolidated' ? 'consolidated' : 'standalone'
+      auditScope.value = (proj as any)?.audit_scope || ((proj as any)?.project_type === 'consolidated' ? 'consolidated' : 'standalone')
       const resolved = resolveAuditYearFromProject(proj as any)
       if (resolved) {
         auditYear.value = resolved

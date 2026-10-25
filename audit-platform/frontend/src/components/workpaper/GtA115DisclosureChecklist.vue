@@ -395,6 +395,7 @@ const props = withDefaults(defineProps<{
 
 const route = useRoute()
 const projectId = computed(() => (route.params.projectId as string) || '')
+const syncProjectId = computed(() => props.projectId || projectId.value)
 
 // ─── Composables ────────────────────────────────────────────────────────────
 
@@ -610,23 +611,22 @@ const _SHEET_KEY = 'a115disclosurechecklist-managed'
 const syncBridge = useWorkpaperSyncBridge({
   entryId: ref(_ENTRY_ID),
   wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
+  projectId: syncProjectId,
   sheetKey: ref(_SHEET_KEY),
   capability: capabilityForEntry(_ENTRY_ID),
   flushHtml: async () => {
-    if (typeof flushPendingSave === 'function') flushPendingSave()
-    else if (typeof flushPendingSaves === 'function') flushPendingSaves()
+    flushPendingSave()
     // 🔴 降级保护：本 entry 的 capability 仍是 single_onlyoffice（后端无 per-entry
     //    adapter）⇒ readStoreProjection 会 404。捕获后返回空投影，让 OO 走「无投影」
     //    路径（与改线前 legacy 行为等价）。capability 升 bidirectional 后自动失效。
     try {
-      const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: _ENTRY_ID })
+      const snap = await readStoreProjection({ projectId: syncProjectId.value, wpId: props.wpId, entryId: _ENTRY_ID })
       return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: _SHEET_KEY }
     } catch {
       return { expectedRevision: 0, projection: null, sheetKey: _SHEET_KEY }
     }
   },
-  reloadHtml: async () => { if (typeof loadData === 'function') await loadData(props.wpId); else if (typeof refreshData === 'function') await refreshData(props.wpId) },
+  reloadHtml: async () => { await loadData() },
 })
 const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 

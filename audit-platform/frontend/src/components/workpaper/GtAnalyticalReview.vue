@@ -104,6 +104,7 @@ interface EpsRoeData {
   year: number
   inputs: Record<string, number | null>
   share_changes: Array<{ id: string; label: string; shares: number | null; months: number; weight: number }>
+  dilution_factors?: Record<string, number | null>
   computed: {
     roe_diluted: number | null
     roe_weighted: number | null

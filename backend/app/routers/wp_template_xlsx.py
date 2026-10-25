@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import require_project_access
+from app.routers.wp_template_files import _load_owned_wp_code
 from app.services.wp_template_init_service import (
     get_workpaper_file,
     get_workpaper_storage_path,
@@ -624,22 +625,20 @@ async def convert_xlsx_storage_to_json(
     """
     pid = UUID(project_id)
     wid = UUID(wp_id)
+    wp_code = await _load_owned_wp_code(db, pid, wid)
 
     # 1. 找 storage 文件，不存在则从模板初始化
     storage_path = get_workpaper_file(pid, wid)
     if not storage_path:
-        # 查 wp_code
-        row = (await db.execute(text("""
-            SELECT i.wp_code FROM working_paper w
-            LEFT JOIN wp_index i ON w.wp_index_id = i.id
-            WHERE w.id = :wid
-        """), {"wid": wp_id})).first()
-        if not row or not row[0]:
-            raise HTTPException(status_code=404, detail="底稿不存在或无编码")
-        result = init_workpaper_from_template(pid, wid, row[0])
+        result = init_workpaper_from_template(pid, wid, wp_code)
         if not result:
-            raise HTTPException(status_code=404, detail=f"模板文件不存在: {row[0]}")
+            raise HTTPException(status_code=404, detail=f"模板文件不存在: {wp_code}")
         storage_path = result
+    # 懒加载用的本底稿文件回写 file_path（spec procedure-chain-followup-closure R3.3）
+    from app.services.wp_generate_file import bind_lazy_workpaper_file
+
+    if await bind_lazy_workpaper_file(db, wid, storage_path):
+        await db.commit()
 
     if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
         raise HTTPException(
@@ -691,12 +690,7 @@ async def convert_xlsx_storage_to_json(
 
         # ── Foundation Task 1.2: 注入 prefill_source 元数据到 cellData ──
         try:
-            _wp_code_row = (await db.execute(text("""
-                SELECT i.wp_code FROM working_paper w
-                LEFT JOIN wp_index i ON w.wp_index_id = i.id
-                WHERE w.id = :wid
-            """), {"wid": wp_id})).first()
-            _current_wp_code = _wp_code_row[0] if _wp_code_row else None
+            _current_wp_code = wp_code
 
             if _current_wp_code:
                 import json as _json

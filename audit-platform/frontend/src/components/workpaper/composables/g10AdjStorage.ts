@@ -161,7 +161,6 @@ function normalizeAdjRow(raw: G10AdjRowRaw | undefined, deriveClosingFromPeriod 
 
   const hasExplicitClosing = !deriveClosingFromPeriod
     && base.closingUnadjusted != null
-    && base.closingUnadjusted !== ''
 
   if (
     !hasExplicitClosing

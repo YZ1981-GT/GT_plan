@@ -267,7 +267,7 @@ const emit = defineEmits<{ 'jump-to-workpaper': [wpCode: string]; save: [] }>()
 
 const route = useRoute()
 const projectId = computed(() => props.projectId || (route.params.projectId as string) || '')
-const auditYear = computed(() => props.year || parseInt(route.query.year as string) || new Date().getFullYear())
+const auditYear = computed<number | null>(() => props.year || parseInt(route.query.year as string) || null)
 
 const activeMode = ref<'html' | 'docx'>('html')
 const activeTab = ref('impairment')
@@ -350,23 +350,22 @@ const _SHEET_KEY = 'a38goodwillimpairment-managed'
 const syncBridge = useWorkpaperSyncBridge({
   entryId: ref(_ENTRY_ID),
   wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
+  projectId,
   sheetKey: ref(_SHEET_KEY),
   capability: capabilityForEntry(_ENTRY_ID),
   flushHtml: async () => {
-    if (typeof flushPendingSave === 'function') flushPendingSave()
-    else if (typeof flushPendingSaves === 'function') flushPendingSaves()
+    flushSave()
     // 🔴 降级保护：本 entry 的 capability 仍是 single_onlyoffice（后端无 per-entry
     //    adapter）⇒ readStoreProjection 会 404。捕获后返回空投影，让 OO 走「无投影」
     //    路径（与改线前 legacy 行为等价）。capability 升 bidirectional 后自动失效。
     try {
-      const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: _ENTRY_ID })
+      const snap = await readStoreProjection({ projectId: projectId.value, wpId: props.wpId, entryId: _ENTRY_ID })
       return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: _SHEET_KEY }
     } catch {
       return { expectedRevision: 0, projection: null, sheetKey: _SHEET_KEY }
     }
   },
-  reloadHtml: async () => { if (typeof loadData === 'function') await loadData(props.wpId); else if (typeof refreshData === 'function') await refreshData(props.wpId) },
+  reloadHtml: async () => { await load() },
 })
 const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
 

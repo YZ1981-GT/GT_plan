@@ -20,7 +20,7 @@
  *   applicableWhen,
  *   parseLinkedWorkpapers,
  *   statusLabel,
- *   getYear: () => parseInt(route.query.year as string) || new Date().getFullYear(),
+ *   getYear: ensureAuditYear, // useProgramOverrideTarget / useProjectAuditYear：项目审计年度，取不到为 null
  * })
  */
 import { ref, computed, type Ref } from 'vue'
@@ -88,8 +88,8 @@ export function useAProgramPopups(options: {
   parseLinkedWorkpapers: (value: string) => string[]
   /** 状态码 → 中文标签（主组件持有，导出复用） */
   statusLabel: (status: string) => string
-  /** 当前审计年度取值（getter，与主组件 route.query.year 口径一致） */
-  getYear: () => number
+  /** 项目审计年度（与写字段覆盖同一来源；取不到为 null ⇒ 兜底拉取不传年度，由后端定） */
+  getYear: () => number | null | Promise<number | null>
 }) {
   const { projectId, applicableWhen, parseLinkedWorkpapers, statusLabel, getYear } = options
 
@@ -232,7 +232,9 @@ export function useAProgramPopups(options: {
   function initData() {
     const htmlData = options.htmlData()
     if (htmlData?.programs && htmlData.programs.length > 0) {
-      programs.value = normalizeAProgramRows(JSON.parse(JSON.stringify(htmlData.programs))) as ProgramRow[]
+      programs.value = normalizeAProgramRows(
+        JSON.parse(JSON.stringify(htmlData.programs)) as ProgramRow[],
+      )
     } else {
       programs.value = []
       // htmlData 为空时自动从 procedure-tables API 拉取
@@ -246,26 +248,25 @@ export function useAProgramPopups(options: {
     // 从 sheetName 推导 table_code：如 "审计程序A8" → "A8"
     const tableCode = extractTableCode(options.sheetName())
     if (!tableCode) return
-    const year = getYear()
+    const year = await getYear()
     try {
       const res = await api.get(
         `/api/projects/${projectId.value}/procedure-tables/${tableCode}`,
-        { params: { year } },
+        { params: year != null ? { year } : {} },
       )
       const data = res?.data || res
       if (data?.items && Array.isArray(data.items)) {
-        programs.value = normalizeAProgramRows(
-          data.items.map((item: any, idx: number) => ({
-            id: item._key || `proc-${idx}`,
-            program_no: item.seq,
-            program_desc: item.content,
-            program_category: '',
-            linked_workpapers: item.ref_index || '',
-            execution_summary: item.summary || '',
-            status: item.step_status || ((item.applicable === 'na' || item.applicable === 'no') ? 'not_applicable' : 'pending'),
-            phase: item.phase || undefined,
-          })),
-        ) as ProgramRow[]
+        const fetchedRows: ProgramRow[] = data.items.map((item: any, idx: number) => ({
+          id: item._key || `proc-${idx}`,
+          program_no: item.seq,
+          program_desc: item.content,
+          program_category: '',
+          linked_workpapers: item.ref_index || '',
+          execution_summary: item.summary || '',
+          status: item.step_status || ((item.applicable === 'na' || item.applicable === 'no') ? 'not_applicable' : 'pending'),
+          phase: item.phase || undefined,
+        }))
+        programs.value = normalizeAProgramRows(fetchedRows)
       }
       // 存储 applicable_when（B30 等仅限合并审计的底稿）
       if (data?.applicable_when) {

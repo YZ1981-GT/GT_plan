@@ -11,8 +11,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.workpaper_models import WorkingPaper, WpIndex
 
 from app.core.database import get_db
 from app.deps import require_project_access
@@ -37,6 +39,40 @@ router = APIRouter(
 )
 
 
+async def _load_owned_wp_code(db: AsyncSession, project_id: UUID, wp_id: UUID) -> str:
+    """校验底稿属于 URL 中的项目，并返回编码。
+
+    仅校验项目成员依赖不够：合法成员若拿到其他项目的 ``wp_id``，旧实现会读取/初始化并回写另一项目文件。
+    所有懒加载入口先走这条 ORM 查询，避免 SQLite 原生 SQL 的 UUID 文本格式差异。
+    """
+    code = (await db.execute(
+        select(WpIndex.wp_code)
+        .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == False,  # noqa: E712
+            WpIndex.project_id == project_id,
+            WpIndex.is_deleted == False,  # noqa: E712
+        )
+    )).scalar_one_or_none()
+    if not code:
+        raise HTTPException(status_code=404, detail="底稿不存在或不属于当前项目")
+    return str(code)
+
+
+async def _bind_file_path(db: AsyncSession, wp_id: UUID, path) -> None:
+    """懒加载用的本底稿文件回写到 ``file_path``（原值为空 / 指向共享模板 / 文件不存在时），改了就提交。
+
+    spec procedure-chain-followup-closure R3.3：此前这里落了 ``wp_storage/{项目}/{底稿}.xlsx`` 却不记，
+    在线编辑（读 ``file_path``）仍打开模板或空路径，两边看到的不是同一份文件。
+    """
+    from app.services.wp_generate_file import bind_lazy_workpaper_file
+
+    if await bind_lazy_workpaper_file(db, wp_id, path):
+        await db.commit()
+
+
 @router.get("")
 async def get_workpaper_xlsx(
     project_id: str,
@@ -50,28 +86,17 @@ async def get_workpaper_xlsx(
     """
     pid = UUID(project_id)
     wid = UUID(wp_id)
+    wp_code = await _load_owned_wp_code(db, pid, wid)
 
     # 检查是否已有底稿文件
     existing = get_workpaper_file(pid, wid)
     if existing:
+        await _bind_file_path(db, wid, existing)
         return FileResponse(
             str(existing),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             filename=existing.name,
         )
-
-    # 从数据库获取 wp_code（支持多种关联方式）
-    row = (await db.execute(text("""
-        SELECT i.wp_code
-        FROM working_paper w
-        LEFT JOIN wp_index i ON w.wp_index_id = i.id
-        WHERE w.id = :wid
-    """), {"wid": wp_id})).first()
-
-    if not row or not row[0]:
-        raise HTTPException(status_code=404, detail="底稿不存在或无编码，无法加载模板")
-    else:
-        wp_code = row[0]
 
     # 从模板初始化
     result = init_workpaper_from_template(pid, wid, wp_code)
@@ -102,6 +127,8 @@ async def get_workpaper_xlsx(
             except Exception as e:
                 logger.warning("Auto-prefill failed (non-blocking): wp_code=%s, error=%s", wp_code, e)
 
+    # 读完再记账：回写 file_path 会提交本请求的事务（预填用到的读取都在这之前）
+    await _bind_file_path(db, wid, result)
     return FileResponse(
         str(result),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -119,22 +146,15 @@ async def init_from_template(
     """手动触发从模板初始化底稿文件（覆盖已有文件）"""
     pid = UUID(project_id)
     wid = UUID(wp_id)
+    wp_code = await _load_owned_wp_code(db, pid, wid)
 
-    row = (await db.execute(text("""
-        SELECT i.wp_code FROM working_paper w
-        JOIN wp_index i ON w.wp_index_id = i.id
-        WHERE w.id = :wid
-    """), {"wid": wp_id})).first()
-
-    if not row or not row[0]:
-        raise HTTPException(status_code=404, detail="底稿不存在或无编码")
-
-    result = init_workpaper_from_template(pid, wid, row[0])
+    result = init_workpaper_from_template(pid, wid, wp_code)
     if not result:
-        raise HTTPException(status_code=404, detail=f"模板文件不存在: {row[0]}")
+        raise HTTPException(status_code=404, detail=f"模板文件不存在: {wp_code}")
+    await _bind_file_path(db, wid, result)
 
     return {
-        "message": f"底稿已从模板初始化: {row[0]}",
+        "message": f"底稿已从模板初始化: {wp_code}",
         "file_path": str(result.name),
         "size_kb": round(result.stat().st_size / 1024, 1),
     }
@@ -239,21 +259,16 @@ async def get_single_sheet_data(
     """
     pid = UUID(project_id)
     wid = UUID(wp_id)
+    wp_code = await _load_owned_wp_code(db, pid, wid)
 
     # 1. 找 storage 文件，不存在则从模板初始化
     storage_path = get_workpaper_file(pid, wid)
     if not storage_path:
-        row = (await db.execute(text("""
-            SELECT i.wp_code FROM working_paper w
-            LEFT JOIN wp_index i ON w.wp_index_id = i.id
-            WHERE w.id = :wid
-        """), {"wid": wp_id})).first()
-        if not row or not row[0]:
-            raise HTTPException(status_code=404, detail="底稿不存在或无编码")
-        result = init_workpaper_from_template(pid, wid, row[0])
+        result = init_workpaper_from_template(pid, wid, wp_code)
         if not result:
-            raise HTTPException(status_code=404, detail=f"模板文件不存在: {row[0]}")
+            raise HTTPException(status_code=404, detail=f"模板文件不存在: {wp_code}")
         storage_path = result
+    await _bind_file_path(db, wid, storage_path)
 
     if storage_path.suffix.lower() not in (".xlsx", ".xlsm"):
         raise HTTPException(

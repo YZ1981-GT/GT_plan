@@ -51,7 +51,7 @@ export function resolveG8ProjectionMethod(raw: string | undefined): SamplingMeth
   if (s === 'mus' || s.includes('货币') || s.includes('mus')) return 'mus'
   if (s === 'systematic' || s.includes('系统')) return 'systematic'
   if (s === 'stratified' || s.includes('分层')) return 'stratified'
-  if (s === 'specific' || s.includes('特定')) return 'specific'
+  if (s === 'specific' || s.includes('特定')) return 'specific_item'
   return 'random'
 }
 
@@ -65,6 +65,9 @@ function emptySampled(overrides: Partial<SampledVoucher>): SampledVoucher {
     accountCode: '1503',
     accountName: '其他权益工具投资',
     counterpartAccount: null,
+    counterpartAccountName: null,
+    isMultiAccount: false,
+    voucherEntries: [],
     voucherType: null,
     accountingPeriod: null,
     checkResult: '',

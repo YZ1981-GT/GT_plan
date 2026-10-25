@@ -79,7 +79,16 @@ export function recalcG11VoucherAbnormal(row: G11VoucherCheckRow): G11VoucherChe
   return { ...row, isAbnormal }
 }
 
-export function enrichG11VoucherRow(raw: Partial<G11VoucherCheckRow> & { id?: string; summary?: string; amount?: number; indexRef?: string }, seq: number): G11VoucherCheckRow {
+export function enrichG11VoucherRow(
+  raw: Omit<Partial<G11VoucherCheckRow>, 'forceAbnormal'> & {
+    id?: string
+    summary?: string
+    amount?: number
+    indexRef?: string
+    forceAbnormal?: boolean | string
+  },
+  seq: number,
+): G11VoucherCheckRow {
   const base: G11VoucherCheckRow = {
     id: raw.id ?? generateId(),
     seq,

@@ -5,11 +5,12 @@ Validates: Requirements 1.1-1.8, 6.2, 6.3
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -96,6 +97,16 @@ def select_generation_codes(
     chosen = set(wanted)
     in_set = set(ordered)
     return [c for c in ordered if c in chosen], [c for c in wanted if c not in in_set]
+
+
+class TemplateSetGeneration(NamedTuple):
+    """模板集生成回执：新建的底稿 + 三类没生成的编码（均按模板集顺序）。"""
+
+    workpapers: list[WorkingPaper]
+    ignored_codes: list[str]          # 选中但不在模板集里
+    skipped_trimmed_codes: list[str]  # 已在程序裁剪中标为不执行（含子表 / 程序表）
+    in_recycle_codes: list[str]       # 底稿在回收站中（同码只能恢复，不能新建）
+    blank_codes: tuple[str, ...] = ()  # 找不到模板、建了空白底稿（与按编码生成同口径单列）
 
 
 class TemplateEngine:
@@ -431,12 +442,12 @@ class TemplateEngine:
         created_by: UUID | None = None,
         selected_codes: list[str] | None = None,
     ) -> list[WorkingPaper]:
-        """从模板集生成项目底稿（只要底稿列表；要「选中但不在模板集里」的编码用 *_detailed）。"""
-        workpapers, _ignored = await self.generate_project_workpapers_detailed(
+        """从模板集生成项目底稿（只要底稿列表；要没生成的编码与原因用 *_detailed）。"""
+        outcome = await self.generate_project_workpapers_detailed(
             db=db, project_id=project_id, template_set_id=template_set_id, year=year,
             created_by=created_by, selected_codes=selected_codes,
         )
-        return workpapers
+        return outcome.workpapers
 
     async def generate_project_workpapers_detailed(
         self,
@@ -446,23 +457,27 @@ class TemplateEngine:
         year: int = 2025,
         created_by: UUID | None = None,
         selected_codes: list[str] | None = None,
-    ) -> tuple[list[WorkingPaper], list[str]]:
+    ) -> TemplateSetGeneration:
         """Generate project workpapers from a template set.
 
         ``selected_codes``：用户在生成前裁剪弹窗里确认的编码（None = 整套生成，兼容旧调用方）。
         只生成「模板集 ∩ 选中」，返回 (底稿, 选中但不在模板集里的编码)。此前端点不收这个字段，
         用户裁剪掉的底稿照样全部生成（spec formula-fetch-and-wp-generation-defect-closure R4）。
 
+        粗裁结果经 ``procedure_scope_retention.plan_generation`` 判定（子表 / 程序表跟随科目，读不到即抛
+        ``TrimScopeUnavailable`` 停止生成）；底稿在回收站中的编码不新建、如实回报
+        （spec procedure-trim-generation-delegation-chain 需求 2）。
+
         1. Iterate template codes in the set
         2. For each code, find the latest published (or draft) template
         3. Create wp_index record
-        4. Create working_paper record with file_path in project dir
-        5. Copy template .xlsx to project workpaper directory
+        4. Create working_paper record
+        5. 按底稿 id 落文件（``wp_generate_file.materialize_workpaper_files``，与按编码生成同一解析），
+           ``file_path`` 指向本底稿自己的文件（不引用模板库路径）
 
         Validates: Requirements 1.8, 6.2, 6.3
         """
         import json
-        import shutil
         from pathlib import Path
 
         ts_result = await db.execute(
@@ -477,17 +492,9 @@ class TemplateEngine:
         )
         workpapers: list[WorkingPaper] = []
 
-        # 加载程序裁剪结果（跳过被裁剪的底稿）
-        from app.models.procedure_models import ProcedureInstance
-        trimmed_q = sa.select(ProcedureInstance.wp_code, ProcedureInstance.status).where(
-            ProcedureInstance.project_id == project_id,
-            ProcedureInstance.is_deleted == sa.false(),
-            ProcedureInstance.status.in_(["skip", "not_applicable"]),
-        )
-        trimmed_codes = set()
-        for wp_code, status in (await db.execute(trimmed_q)).all():
-            if wp_code:
-                trimmed_codes.add(wp_code)
+        # 保留范围：已裁（含子表 / 程序表）与在回收站的编码都不新建；已存在的幂等跳过
+        from app.services.procedure_scope_retention import plan_generation
+        plan = await plan_generation(db, project_id, template_codes)
 
         # 加载模板库索引（用于查找模板文件路径）
         # Phase 17: 优先从 template_library 表查找项目已选择的模板
@@ -539,10 +546,6 @@ class TemplateEngine:
             except Exception:
                 pass
 
-        # 项目底稿目录（按审计循环分子目录）
-        project_wp_dir = Path("storage") / "projects" / str(project_id) / "workpapers"
-        project_wp_dir.mkdir(parents=True, exist_ok=True)
-
         # ── 性能优化：批量预加载 WpTemplate（避免 N+1 查询） ──
         # 注意：wp_template 表可能为空（模板尚未上传），此时跳过
         tpl_map: dict[str, Any] = {}
@@ -578,25 +581,9 @@ class TemplateEngine:
         except Exception:
             pass  # wp_template 表不存在或查询失败时降级为空 map
 
-        # ── 批量检查已存在的 wp_index（幂等：跳过已有编码） ──
-        existing_codes_result = await db.execute(
-            sa.select(WpIndex.wp_code).where(
-                WpIndex.project_id == project_id,
-                WpIndex.wp_code.in_(template_codes),
-            )
-        )
-        existing_codes = set(r[0] for r in existing_codes_result.all())
+        _pending_wps: list[WpIndex] = []
 
-        _pending_wps: list[tuple] = []  # (wp_index, template_file_path)
-
-        for code in template_codes:
-            # 跳过被裁剪的底稿
-            if code in trimmed_codes:
-                continue
-            # 幂等：跳过已存在的
-            if code in existing_codes:
-                continue
-
+        for code in plan.to_create:
             # 从预加载 map 取模板（无 N+1）
             tpl = tpl_map.get(code)
 
@@ -616,15 +603,6 @@ class TemplateEngine:
             if not audit_cycle:
                 audit_cycle = code[0] if code and code[0].isalpha() else None
 
-            # 模板文件路径（引用模板库原始路径，不复制到项目目录）
-            template_file_path: str | None = None
-            if code in project_template_map:
-                template_file_path = project_template_map[code]
-            elif lib_entry.get("file_path"):
-                template_file_path = lib_entry["file_path"]
-            elif tpl and tpl.file_path:
-                template_file_path = tpl.file_path
-
             # Create wp_index（批量 add，延迟 flush）
             wp_index = WpIndex(
                 project_id=project_id,
@@ -635,17 +613,17 @@ class TemplateEngine:
             )
             db.add(wp_index)
             # 暂存到列表，flush 后再创建 working_paper
-            _pending_wps.append((wp_index, template_file_path))
+            _pending_wps.append(wp_index)
 
         # ── 批量 flush 所有 wp_index（一次 round-trip） ──
         await db.flush()
 
-        # ── 批量创建 working_paper（引用 wp_index.id） ──
-        for wp_index, template_file_path in _pending_wps:
+        # ── 批量创建 working_paper（引用 wp_index.id）；文件按底稿 id 落地，先占空串 ──
+        for wp_index in _pending_wps:
             wp = WorkingPaper(
                 project_id=project_id,
                 wp_index_id=wp_index.id,
-                file_path=template_file_path or "",  # NOT NULL 约束兜底
+                file_path="",  # 下面落文件后改写（NOT NULL 约束）
                 source_type=WpSourceType.template,
                 file_version=1,
                 created_by=created_by,
@@ -653,8 +631,43 @@ class TemplateEngine:
             db.add(wp)
             workpapers.append(wp)
 
-        # 二次 flush working_paper 批量
+        # 二次 flush working_paper 批量（取底稿 id：文件按 wp_storage/{项目}/{底稿 id} 存放）
         await db.flush()
+
+        # ── 底稿文件（spec procedure-chain-followup-closure R3.3）──
+        # 与按编码生成 / 链路编排同一解析（模板目录索引 + 多文件合并 + 场景裁剪，找不到模板建空白册）。
+        # 🔴 此前 file_path 直接引用模板库路径（H1 ⇒ wp_templates/H/...，在线保存会写进所有项目共用的模板），
+        #    模板库里没有的编码（E1 / D2 等多页底稿）留空串。整批放线程里做（不读写库，不占事件循环）；
+        #    不在这里填表头：重药安徽 737 个编码只落文件约 31 秒，逐份填表头再加约 4 分钟（超过前端 180 秒超时）。
+        #    🔴 也不要在这里加回表头填充：表头写入遇到模板首几行的合并单元格会抛 AttributeError
+        #    （J2A / K11-4 / B10-2 / L1-1 / J2-5 / J2-6 等约一成模板），整批全有或全无 ⇒ 含这些编码的模板集整体生成失败。
+        from app.services.wp_generate_file import (
+            WorkpaperFileJob,
+            discard_generated_file,
+            load_generation_scenario,
+            materialize_workpaper_files,
+        )
+
+        scenario, has_foreign_currency = await load_generation_scenario(db, project_id)
+        jobs = [
+            WorkpaperFileJob(wp.id, idx.wp_code, idx.wp_name, project_template_map.get(idx.wp_code))
+            for wp, idx in zip(workpapers, _pending_wps)
+        ]
+        generated_files = await asyncio.to_thread(
+            materialize_workpaper_files, project_id, jobs,
+            scenario=scenario, has_foreign_currency=has_foreign_currency,
+        )
+        try:
+            for wp, generated in zip(workpapers, generated_files):
+                wp.file_path = str(generated.path)
+            await db.flush()
+        except BaseException:
+            for generated in generated_files:
+                discard_generated_file(generated)
+            raise
+        blank_codes = tuple(
+            idx.wp_code for idx, generated in zip(_pending_wps, generated_files) if not generated.from_template
+        )
 
         # F50 / Sprint 8.17: 底稿快照绑定 — 所有新建底稿都绑定当前 active dataset
         # 没有 active dataset（账套未导入）时，字段保持 None；允许先建底稿后导账套
@@ -666,5 +679,11 @@ class TemplateEngine:
             logger.warning("dataset binding failed for project=%s: %s", project_id, _bind_err)
 
         await db.flush()
-        logger.info("generate_project_workpapers: project=%s codes=%d files=%d", project_id, len(template_codes), len(workpapers))
-        return workpapers, ignored_codes
+        logger.info(
+            "generate_project_workpapers: project=%s codes=%d files=%d blank=%d trimmed=%d recycled=%d",
+            project_id, len(template_codes), len(workpapers), len(blank_codes),
+            len(plan.skipped_trimmed_codes), len(plan.in_recycle_codes),
+        )
+        return TemplateSetGeneration(
+            workpapers, ignored_codes, plan.skipped_trimmed_codes, plan.in_recycle_codes, blank_codes
+        )

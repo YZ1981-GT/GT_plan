@@ -92,7 +92,12 @@ export function recalcG12VoucherAbnormal(row: G12VoucherRow): G12VoucherRow {
 }
 
 export function enrichG12VoucherRow(
-  raw: Partial<G12VoucherRow> & { rowId?: string; id?: string; summary?: string },
+  raw: Omit<Partial<G12VoucherRow>, 'forceAbnormal'> & {
+    rowId?: string
+    id?: string
+    summary?: string
+    forceAbnormal?: boolean | string
+  },
   seq: number,
 ): G12VoucherRow {
   const base: G12VoucherRow = {

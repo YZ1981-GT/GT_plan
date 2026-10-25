@@ -5667,3 +5667,20 @@ instrumentation / 基线里**已有**的 sheet 粒度 digest（新增 sheet 是 
 
 新纪律：**既有 sheet 的行为变更获准后，sheet digest 与 provider overall digest成对更新；但先列出
 全量 `--update` 将改的每个路径，只接受有因果链的字段。**
+
+## 2026-10-25 程序裁剪 → 底稿生成 → 委派 → 可见性链条闭环（spec `procedure-trim-generation-delegation-chain`，23/23，未提交）
+
+缘起：用户 2026-10-24「平台的程序裁剪有两次裁剪，一定要在生成底稿的时候只保留裁剪后的；后续委派人员时也只能看到委派给自己的」，并裁决：安徽已生成又被裁掉的底稿可先删掉重新生成、细裁先做方案一、执行人整表可见只改本人行、主管看全部循环 / 审计员按团队分配勾选的循环、科目判定按映射后的标准科目。
+
+- 九个需求六批实施：科目有无数据（`trim_subject_scope`）→ 生成只留保留项（`procedure_scope_retention`，七个入口）→ 粗裁联动回收站（`workpaper_recycle_service` / `procedure_trim_recycle`）→ 委派拦截与扩权（`wp_visibility/delegation_guard`、`procedure_delegation_scope`）→ 可见范围（`wp_visibility/effective_scope`）→ 细裁落行任务与本人行编辑（`procedure_row_trim_service`、`wp_visibility/program_row_guard`、`useProgramRowControl`）→ 安徽处置（`scripts/fix/recycle_trimmed_workpapers.py`：误裁 H3 恢复、131 张移入回收站、级联取消 17 条任务）
+- 浏览器实测（【测试】项目 + 审计员 ptgd_auditor，全程界面）另修 5 处：人员委派弹窗关闭不保存、参照项目列表恒空（`P_proj.list()` 把字符串当函数）、回收站报错两遍、粗裁后行链接指向回收站底稿、控制台超 1900 行守卫（委派对话框抽到 `useProgramRowDelegate`）
+- 证据：变异 166 个（后端 B01~B101、前端 F01~F65）全部红在预期断言上；后端 192 个相关文件、前端 74 个文件失败集合与 HEAD 逐条相同；ESLint / 单区域 vue-tsc 与 HEAD 相同；行数门通过
+- 未尽 / 待拍板：执行人填写按今年存、按审计年度读（属 `audit-year-calendar-fallback-ratchet`）；`GET /api/users/` 未鉴权、`PUT /api/users/{id}` 不存在、无停用 / 删除用户入口（测试用户仍启用）；工时跨项目审批、DSH 拒绝用例空转、SQLite 用例写真库日志、附注就绪度汇总泄露全量等见 design §7 / §8
+- 从 memory 移来（已解决的旧条目）：2026-06-01 grep 实证的「查 users 不存在的 display_name 列」—— 2026-10-10 全部已修：`project_wizard.py` / `qc_report_export.py` 改用 username（守卫 `test_sql_uses_username_not_display_name`）；`word_export.py` full-package 函数体内延迟 `from fastapi import HTTPException` 遮蔽模块级名字致 `UnboundLocalError`，删冗余 import 即修；系统性防御建议：CI「SQL 列引用 ⊆ 真实 schema」契约检查
+
+### 2026-10-25：procedure-chain-followup-closure 代码与真库收口
+- R1：`UserUpdate` 密码更新统一 8~64；用户更新/锁定走 admin + 自停用/最后 admin 保护；停用用户旧 access 与 refresh 均失效；安全变更写 `audit_logger_enhanced`；前端状态/启停/编辑/重置密码/readonly 角色已接通。
+- R2：预览前定义导入、任务物化与已生成底稿绑定沿用现有链路；物化端点委派人鉴权；开关关闭仍可按行建任务并进入 preview/apply；0 目标展示服务端原因且禁止 apply。
+- R3：底稿列表/回收站补显示名与删除人；模板集批量生成复用统一落盘并填 xlsx 表头，失败清理；WOPI/Univer 懒加载禁止跨项目 wp_id 读取或回写；角色别名复用 assignment 单一来源。
+- R4：新增 `backend/scripts/ops/procedure_chain_cleanup.py`。2026-10-25 真 PG 先 dry-run，再 `--apply`：备份到 `backend/backups/procedure_chain_cleanup_20261025_193211.json`，清理 testuser2/yangzhi 及 143 条人员档案、和平药房 155 条 24 小时前任务、测试项目任务/事件/预览/测试定义，并逐类对账为 0；append-only 历史表经显式维护开关与外键子表顺序安全清理。
+- 证据：后端针对性 37 + 15 + 59 + 2 passed；前端 Vitest 23 passed；Python/诊断无错误；ESLint 0 errors（既有 warnings）；本 spec 两文件单区域 vue-tsc 通过。Chrome DevTools 实测用户停用后登录 401、真实程序表开关关闭时逐行「委派」按钮；R2 实际写入委派与 R3 完整模板链尚未补。宽区域 tsc 仍被既有 `useA115Checklist.ts` 语法错误阻断，未伪报全绿。

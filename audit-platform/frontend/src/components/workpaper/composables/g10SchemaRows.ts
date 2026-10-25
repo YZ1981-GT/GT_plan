@@ -108,7 +108,8 @@ export const G10_DISCLOSURE_TOTAL_LABEL = '合  计'
 
 /** 到期支付差额披露句式（对齐 Excel 底稿红字提示） */
 export function g10MaturityDiffPlaceholder(year: number | null): string {
-  const y = year ?? new Date().getFullYear()
+  const y = year
+  if (y == null) return '截至项目审计年度12月31日止，指定为以公允价值计量且其变动计入当期损益的金融负债的账面价值与按合同到期应支付金额之间的差额为______。'
   return `截至${y}年12月31日止，指定为以公允价值计量且其变动计入当期损益的金融负债的账面价值与按合同到期应支付金额之间的差额为______。`
 }
 

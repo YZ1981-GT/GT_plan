@@ -44,6 +44,8 @@ export interface ChecklistTemplate {
   sections: ChecklistSection[]
   toc: TocEntry[]
   stats: ChecklistStats
+  has_standard_ref?: boolean
+  allow_custom_items?: boolean
 }
 
 export interface ResponseData {

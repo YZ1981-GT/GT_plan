@@ -337,7 +337,7 @@ export interface G10DiscSoeStore {
   version: 2
   auditYear?: number
   balance: Record<string, G10DiscBalancePair>
-  fvCreditRisk: Record<string, { fvChangeAmount: number; creditRiskCurrent: number; creditRiskCumulative: number }>
+  fvCreditRisk: Record<string, { label?: string; fvChangeAmount: number; creditRiskCurrent: number; creditRiskCumulative: number }>
   maturityDiffNote: string
 }
 

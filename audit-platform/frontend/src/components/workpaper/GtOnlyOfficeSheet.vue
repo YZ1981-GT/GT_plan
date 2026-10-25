@@ -79,7 +79,7 @@ const rootEl = ref<HTMLElement | null>(null)
 const editorContainer = ref<HTMLElement | null>(null)
 const isFullscreen = ref(false)
 let editorInstance: any = null
-let readyTimeout: ReturnType<typeof setTimeout> | null = null
+let readyTimeout: number | null = null
 
 function clearReadyTimeout(): void {
   if (readyTimeout != null) {

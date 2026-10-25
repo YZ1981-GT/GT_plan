@@ -6,6 +6,7 @@ import { OCI_ACCOUNT_CODE } from './mCycleAccountScope'
 import { parseNum, calcAdjustedAmount } from './useG8FormulaEngine'
 import { parseG8AdjStore, patchG8AdjRow } from './g8AdjStorage'
 import { G8_SHEET_LABEL_MAP, resolveG8SheetLabel } from './g8SheetLabels'
+import { writeProgramStepOverrides } from './programStepOverrides'
 import type { ChecklistResponse } from './useF1FormData'
 
 /** 辅助核算取数行（生成 G8-2 明细） */
@@ -75,9 +76,8 @@ export async function fetchG8AuxInvesteeSeeds(
   try {
     const http = (await import('@/utils/http')).default
     const { resolveAuditYearNumber } = await import('./workpaperAuditYear')
-    const y = year
-      ?? resolveAuditYearNumber(undefined, new Date().getFullYear() - 1)
-      ?? (new Date().getFullYear() - 1)
+    const y = year ?? resolveAuditYearNumber(undefined)
+    if (y == null) return { seeds: [], dimType: '', error: '未设置审计年度' }
 
     const { data } = await http.get(`/api/projects/${projectId}/ledger/aux-balance/${G8_ACCOUNT_CODE}`, {
       params: { year: y },
@@ -347,13 +347,13 @@ export function pushG8FvDiffToAdjustment(
 
   if (!added.length) return 0
 
-  const merged = [...existing, ...added].map((r, i) => ({ ...r, seq: i + 1 }))
+  const merged: Record<string, unknown>[] = [...existing, ...added].map((r, i) => ({ ...r, seq: i + 1 }))
   debouncedSave(G8_ADJ_KEY, { remark: JSON.stringify(merged) })
 
   // 仅 1503 净额回写 G8-1（与 G8-3 syncWriteback 一致）
   const net = merged.reduce((s, r) => {
-    if (!String(r.accountCode ?? '').startsWith('1503')) return s
-    return s + parseNum(r.debitAmount) - parseNum(r.creditAmount)
+    if (!String(r['accountCode'] ?? '').startsWith('1503')) return s
+    return s + parseNum(r['debitAmount']) - parseNum(r['creditAmount'])
   }, 0)
   debouncedSave('G8-adj-overlay', {
     remark: JSON.stringify({ rowKey: 'fv_1', closingAdjustment: net }),
@@ -571,35 +571,9 @@ export async function markG8AProcedureSteps(opts: {
   sheetName?: string
 }): Promise<number> {
   if (!opts.projectId || !opts.programNos.length) return 0
-  const { api } = await import('@/services/apiProxy')
-  const year = opts.year || new Date().getFullYear()
-  const scope = `procedure_table:${opts.sheetName || G8A_PROCEDURE_SHEET}`
   const status = opts.status || 'completed'
-  let n = 0
-  for (const programNo of opts.programNos) {
-    const fields: Array<{ field: string; value: unknown }> = [
-      { field: 'status', value: status },
-    ]
-    if (opts.linkedWorkpapers) {
-      fields.push({ field: 'linked_workpapers', value: opts.linkedWorkpapers })
-    }
-    if (opts.executionSummary) {
-      fields.push({ field: 'execution_summary', value: opts.executionSummary })
-    }
-    for (const f of fields) {
-      try {
-        await api.post('/api/workpapers/field-overrides', {
-          project_id: opts.projectId,
-          year,
-          scope,
-          item_key: String(programNo),
-          field: f.field,
-          value: f.value,
-        }, { _silent: true } as any)
-        if (f.field === 'status') n += 1
-      } catch { /* silent per field */ }
-    }
-  }
+  // scope 用表码、年度缺省取项目审计年度（与读取方一致，audit-year R0）
+  const n = await writeProgramStepOverrides({ ...opts, sheet: opts.sheetName || G8A_PROCEDURE_SHEET, status })
   try {
     window.dispatchEvent(
       new CustomEvent('g8:procedure-marked', {

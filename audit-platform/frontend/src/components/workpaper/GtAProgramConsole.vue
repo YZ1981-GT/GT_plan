@@ -106,7 +106,7 @@
           <!-- Sprint 4 Task 14.3: 重新触发引导按钮 -->
           <el-button text size="small" @click="triggerGuide" title="使用引导">?</el-button>
           <el-button
-            v-if="!readonly"
+            v-if="!readonly && rowFullPower"
             type="primary"
             size="small"
             @click="openAddDialog"
@@ -114,7 +114,7 @@
             + 新增程序
           </el-button>
           <el-button
-            v-if="!readonly && selectedIds.length > 0"
+            v-if="!readonly && canTrim && selectedIds.length > 0"
             type="warning"
             size="small"
             @click="openBatchTrimDialog"
@@ -149,9 +149,9 @@
       @selection-change="handleSelectionChange"
       class="gt-a-program-console__table gt-tb-font-md"
     >
-      <!-- 多选列 -->
+      <!-- 多选列（只用于批量裁剪 ⇒ 只给项目委派人） -->
       <el-table-column
-        v-if="!readonly"
+        v-if="!readonly && canTrim"
         type="selection"
         width="40"
         :selectable="isRowSelectable"
@@ -314,7 +314,7 @@
       <el-table-column label="执行说明" min-width="180" show-overflow-tooltip>
         <template #default="{ row }">
           <el-input
-            v-if="!readonly"
+            v-if="!readonly && canEditRow(row)"
             v-model="row.execution_summary"
             size="small"
             placeholder="填写执行情况"
@@ -347,7 +347,7 @@
                 @click="runTaskAction(row, act.key)"
               >{{ act.label }}</el-button>
               <el-button
-                v-if="!readonly && row.task_id"
+                v-if="!readonly && canTrim && row.task_id"
                 size="small" link
                 @click="openDelegate(row)"
               >委派</el-button>
@@ -365,7 +365,7 @@
       <el-table-column v-if="!taskOverlayActive" label="状态" width="120" align="center">
         <template #default="{ row }">
           <el-dropdown
-            v-if="!readonly"
+            v-if="!readonly && canEditRow(row) && (canTrim || row.status !== PROC_STATUS.NOT_APPLICABLE)"
             trigger="click"
             @command="(cmd: string) => handleStatusChange(row, cmd)"
           >
@@ -381,13 +381,23 @@
               <el-dropdown-menu>
                 <el-dropdown-item command="in_progress">执行中</el-dropdown-item>
                 <el-dropdown-item command="completed">已完成</el-dropdown-item>
-                <el-dropdown-item command="not_applicable" divided>裁剪</el-dropdown-item>
+                <el-dropdown-item v-if="canTrim" command="not_applicable" divided>裁剪</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
           <el-tag v-else :type="statusTagType(row.status)" size="small">
             {{ statusLabel(row.status) }}
           </el-tag>
+          <!-- 执行人：受限用户看别人的行时显示；委派人（canTrim）看全部已委派的行 -->
+          <div v-if="!readonly && (!canEditRow(row) || canTrim) && assigneeOf(row)" class="gt-a-program-console__task-who">
+            执行：{{ assigneeOf(row) }}
+          </div>
+          <!-- 逐行委派（开关关闭也可用：按需建这一行的任务，spec procedure-chain-followup-closure R2.2） -->
+          <el-button
+            v-if="!readonly && canTrim && row.status !== PROC_STATUS.NOT_APPLICABLE && !String(row.id).startsWith('custom-')"
+            size="small" link type="primary" class="gt-a-program-console__row-delegate"
+            @click="openDelegateForProgramRow(row)"
+          >委派</el-button>
         </template>
       </el-table-column>
 
@@ -585,19 +595,34 @@
       <!-- 服务端预览统计（真实 target/conflict；不伪造） -->
       <div v-if="delegateDialog.previewStats" class="gt-a-program-console__preview">
         <el-descriptions :column="2" size="small" border>
-          <el-descriptions-item label="目标数">{{ delegateDialog.previewStats.target_count ?? delegateDialog.previewStats.targets ?? '—' }}</el-descriptions-item>
-          <el-descriptions-item label="冲突数">{{ delegateDialog.previewStats.conflict_count ?? delegateDialog.previewStats.conflicts ?? 0 }}</el-descriptions-item>
-          <el-descriptions-item label="已分配">{{ delegateDialog.previewStats.assigned_count ?? '—' }}</el-descriptions-item>
+          <!-- 计数在嵌套的 summary 里（顶层 target_count / conflict_count / assigned_count 后端不存在，原先恒显示「—」/ 0） -->
+          <el-descriptions-item label="目标数">{{ delegateDialog.previewStats.summary?.targets ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="冲突数">{{ delegateDialog.previewStats.summary?.conflict ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="已分配">{{ delegateDialog.previewStats.summary?.already_assigned ?? '—' }}</el-descriptions-item>
           <el-descriptions-item label="预览状态">{{ delegateDialog.previewStats.status || 'ready' }}</el-descriptions-item>
           <el-descriptions-item v-if="delegateDialog.ttl" label="有效期至" :span="2">{{ delegateDialog.ttl }}</el-descriptions-item>
         </el-descriptions>
+        <el-alert
+          v-if="delegateDialog.previewStats.summary?.targets === 0"
+          type="warning"
+          :closable="false"
+          show-icon
+          :title="delegateDialog.previewStats.hint || '没有可委派的程序行'"
+        />
+        <el-alert v-if="delegateScopeGapText" type="warning" :closable="false" show-icon :title="delegateScopeGapText" />
         <div class="gt-a-program-console__preview-tip">预览为一次性凭证：过期/篡改/目标版本变化时应用将被拒绝（409），需重新预览。</div>
       </div>
 
       <template #footer>
         <el-button @click="delegateDialog.visible = false">取消</el-button>
         <el-button v-if="!delegateDialog.previewId" type="primary" :loading="delegateDialog.loading" @click="runDelegatePreview">预览</el-button>
-        <el-button v-else type="primary" :loading="delegateDialog.loading" @click="runDelegateApply">确认委派</el-button>
+        <el-button
+          v-else
+          type="primary"
+          :loading="delegateDialog.loading"
+          :disabled="delegateDialog.previewStats?.summary?.targets === 0"
+          @click="runDelegateApply"
+        >确认委派</el-button>
       </template>
     </el-dialog>
 
@@ -629,6 +654,7 @@ import { useWpOnboardingGuide } from '@/composables/useWpOnboardingGuide'
 import { useAProgramReview } from '@/composables/useAProgramReview'
 import { useAProgramData } from '@/composables/useAProgramData'
 import { useAProgramPopups } from '@/composables/useAProgramPopups'
+import { useProgramOverrideTarget } from '@/composables/useProgramOverrideTarget'
 import { normalizeAProgramRows } from '@/components/workpaper/composables/parseProgramSubSteps'
 import { INLINE_POPUP_WP_CODES } from '@/components/workpaper/wpPopupDocxConfigs'
 import { isReviewRoleRef } from '@/components/workpaper/reviewWpResolve'
@@ -649,12 +675,14 @@ import {
 import {
   listProjectProcedureRowTasks,
   transitionProcedureRowTask,
-  previewProcedureDelegation,
-  applyProcedureDelegation,
   type ProcedureRowTaskItem,
 } from '@/services/commonApi'
 import { listAssignments } from '@/services/staffApi'
 import { ElMessage as _ElMsg, ElMessageBox as _ElBox } from 'element-plus'
+import { useProgramRowDelegate } from '@/composables/useProgramRowDelegate'
+// 行归属（只能改派给自己的行）+ 按行裁剪 / 恢复落到程序行任务（同 spec 需求 6 / 7）
+import { useProgramRowControl } from '@/composables/useProgramRowControl'
+import { PROCEDURE_EXECUTION_STATUS as PROC_STATUS } from '@/constants/statusEnum'
 
 // ─── Types ───
 interface ProgramAssertions {
@@ -706,6 +734,10 @@ interface AProgramHtmlData {
   programs: ProgramRow[]
   trim_decisions: TrimDecision[]
   signatures?: Array<{ role: string; name: string; date: string }>
+  /** render-config 读字段覆盖用的 scope（写状态 / 执行说明以它为准） */
+  override_scope?: string
+  /** 非标准程序表的网格兜底内容 */
+  grid_fallback?: unknown
 }
 
 // ─── Props / Emits ───
@@ -752,6 +784,11 @@ const {
   loadProjectInfo,
 } = useAProgramData(projectId)
 
+// ─── 字段覆盖写入位置：scope 以 render-config 回传为准、年度取项目审计年度（audit-year R0）───
+const { adoptScope: adoptOverrideScope, ensureAuditYear, writeField: writeProgramField } = useProgramOverrideTarget({
+  projectId, htmlData: () => props.htmlData, sheetName: () => props.sheetName,
+})
+
 // ─── 程序行加载 + 弹窗完成状态 + A16 推荐版本 + 导出（composable: useAProgramPopups）───
 const {
   programs,
@@ -772,8 +809,14 @@ const {
   applicableWhen,
   parseLinkedWorkpapers,
   statusLabel,
-  getYear: () => parseInt(route.query.year as string) || new Date().getFullYear(),
+  getYear: ensureAuditYear,
 })
+
+// 行归属 + 按行裁剪 / 恢复（composable: useProgramRowControl）
+const {
+  fullPower: rowFullPower, canTrim, canEditRow, assigneeOf, loadAccess: loadRowAccess, applyRows,
+} = useProgramRowControl({ projectId: () => projectId.value, wpId: () => props.wpId, sheetName: () => props.sheetName })
+watch(() => [props.wpId, props.sheetName], () => { loadRowAccess() }, { immediate: true })
 
 // 子底稿弹窗状态
 const showPopup = ref(false)
@@ -907,6 +950,7 @@ async function selfLoad() {
       { _silent: true } as any,
     )
     const data = res?.sheets?.[0]?.html_data
+    adoptOverrideScope(data?.override_scope)
     if (data?.programs?.length) {
       programs.value = normalizeAProgramRows(data.programs.map((p: any, i: number) => ({
         id: p.id || `row-${i + 1}`,
@@ -962,10 +1006,10 @@ const pendingCount = computed(() =>
 )
 
 const progressPercentage = computed(() => {
-  const total = programs.value.length
-  if (total === 0) return 0
-  const done = completedCount.value + trimmedCount.value
-  return Math.round((done / total) * 100)
+  // 不适用（裁剪）不计入分子分母（spec procedure-trim-generation-delegation-chain 需求 6.5），全部不适用按完成
+  const total = programs.value.length - trimmedCount.value
+  if (programs.value.length === 0) return 0
+  return total <= 0 ? 100 : Math.round((completedCount.value / total) * 100)
 })
 
 /** 当任意程序行有非空 assertions 时显示认定列（循环 *A 程序表强制隐藏，对齐 D4A） */
@@ -1033,9 +1077,8 @@ const hasCategory = computed(() =>
 
 // ─── Methods ───
 function progressFormat(percentage: number): string {
-  const total = programs.value.length
-  const done = completedCount.value + trimmedCount.value
-  return `${done}/${total} (${percentage}%)`
+  const total = programs.value.length - trimmedCount.value
+  return `${completedCount.value}/${Math.max(total, 0)} (${percentage}%)`
 }
 
 function categoryTagType(category: string): 'primary' | 'success' | 'warning' | 'danger' | 'info' {
@@ -1167,24 +1210,16 @@ async function saveExecutionSummary(row: ProgramRow) {
   persistProgramField(row.program_no, 'execution_summary', row.execution_summary || '')
 }
 
-/** 通用：持久化程序行字段到 FieldOverrideService */
+/** 通用：持久化程序行字段到 FieldOverrideService（位置 / 年度取不到时不写并提示，见 useProgramOverrideTarget） */
 async function persistProgramField(programNo: number, field: string, value: any) {
-  const year = parseInt(route.query.year as string) || new Date().getFullYear()
   try {
-    await api.post('/api/workpapers/field-overrides', {
-      project_id: projectId.value,
-      year,
-      scope: `procedure_table:${props.sheetName || 'A1'}`,
-      item_key: String(programNo),
-      field,
-      value,
-    })
+    await writeProgramField(programNo, field, value)
   } catch {
-    // 静默
+    // 请求失败：全局拦截器已提示
   }
 }
 
-function handleStatusChange(row: ProgramRow, newStatus: string) {
+async function handleStatusChange(row: ProgramRow, newStatus: string) {
   if (newStatus === 'not_applicable') {
     // Open trim reason dialog
     trimForm.value = {
@@ -1199,6 +1234,11 @@ function handleStatusChange(row: ProgramRow, newStatus: string) {
   // Direct status change (no reason required for non-trim)
   const idx = programs.value.findIndex(p => p.id === row.id)
   if (idx >= 0) {
+    if (programs.value[idx].status === PROC_STATUS.NOT_APPLICABLE) {
+      // 恢复：先落到程序行任务（任务回到待委派、须重新委派），成功才改页面
+      if (!(await applyRows('restore', [row])).size) return
+      programs.value[idx].trim_reason = ''
+    }
     programs.value[idx].status = newStatus
     emit('program-status-change', { programId: row.id, status: newStatus })
     // 持久化到 FieldOverrideService（跨模块可读，如 A1 进度联动）
@@ -1207,15 +1247,15 @@ function handleStatusChange(row: ProgramRow, newStatus: string) {
   }
 }
 
-function confirmTrim() {
+async function confirmTrim() {
   const { programId, reason } = trimForm.value
   if (!reason.trim()) return
 
   const idx = programs.value.findIndex(p => p.id === programId)
-  if (idx >= 0) {
-    programs.value[idx].status = 'not_applicable'
-    programs.value[idx].trim_reason = reason.trim()
-  }
+  // 先落到程序行任务（委派 / 可见性都认它），成功才改页面；失败保持原状（已提示）
+  if (idx < 0 || !(await applyRows('trim', [programs.value[idx]], reason.trim())).size) return
+  programs.value[idx].status = 'not_applicable'
+  programs.value[idx].trim_reason = reason.trim()
 
   emit('program-trim', { programId, reason: reason.trim() })
   trimDialogVisible.value = false
@@ -1255,17 +1295,16 @@ function confirmAdd() {
   debounceSave()
 }
 
-function confirmBatchTrim() {
+async function confirmBatchTrim() {
   const reason = batchTrimForm.value.reason.trim()
   if (!reason) return
 
-  selectedIds.value.forEach(id => {
-    const idx = programs.value.findIndex(p => p.id === id)
-    if (idx >= 0) {
-      programs.value[idx].status = 'not_applicable'
-      programs.value[idx].trim_reason = reason
-    }
-    emit('program-trim', { programId: id, reason })
+  const rows = programs.value.filter(p => selectedIds.value.includes(p.id))
+  const done = await applyRows('trim', rows, reason) // 逐行落到程序行任务，只改成功的
+  rows.filter(r => done.has(String(r.program_no))).forEach(r => {
+    r.status = 'not_applicable'
+    r.trim_reason = reason
+    emit('program-trim', { programId: r.id, reason })
   })
 
   selectedIds.value = []
@@ -1357,7 +1396,6 @@ async function loadStaffNames() {
     const map: Record<string, string> = {}
     for (const a of (Array.isArray(list) ? list : [])) {
       if (a.staff_id) map[a.staff_id] = a.staff_name || a.staff_id.slice(0, 8)
-      if (a.user_id) map[a.user_id] = a.staff_name || a.user_id.slice(0, 8)
     }
     staffNameMap.value = map
   } catch { /* 静默 */ }
@@ -1474,6 +1512,7 @@ async function refreshOverlayFromServer() {
     )
     const data = res?.sheets?.find((s: any) => s.sheet_name === props.sheetName)?.html_data
       ?? res?.sheets?.[0]?.html_data
+    adoptOverrideScope(data?.override_scope)
     if (data?.programs?.length) {
       const fresh = data.programs
       // 仅回填 overlay 字段，保留本地展示行序/子步骤
@@ -1492,92 +1531,14 @@ async function refreshOverlayFromServer() {
   } catch { /* 静默 */ }
 }
 
-// ── 管理者行级委派（materialized 行；未物化行只展示不可写）──
-const delegateDialog = ref<{
-  visible: boolean; row: ProgramRow | null; assigneeId: string; reviewerId: string;
-  previewStats: any | null; previewId: string; reqId: string; ttl: string | null; loading: boolean;
-}>({
-  visible: false, row: null, assigneeId: '', reviewerId: '', previewStats: null, previewId: '', reqId: '', ttl: null, loading: false,
+// ── 管理者行级委派（materialized 行；未物化行只展示不可写；预览 → 应用，执行人看不到循环时填理由扩大可见范围）──
+const {
+  delegateDialog, delegateScopeGapText, teamMembers, openDelegate, openDelegateForProgramRow, runDelegatePreview, runDelegateApply,
+} = useProgramRowDelegate({
+  projectId: () => projectId.value, wpId: () => props.wpId, sheetName: () => props.sheetName,
+  // 开关关闭时行上的执行人来自行归属接口 ⇒ 委派后一并刷新
+  onApplied: async () => { await refreshOverlayFromServer(); await loadRowAccess() },
 })
-const teamMembers = ref<{ staff_id: string; staff_name: string; role_label?: string }[]>([])
-
-async function loadTeamMembers() {
-  if (!projectId.value) return
-  try {
-    const list = await listAssignments(projectId.value)
-    const ROLE_LABELS: Record<string, string> = {
-      partner: '合伙人', signing_partner: '签字合伙人', manager: '项目经理',
-      auditor: '审计员', reviewer: '复核', eqcr: 'EQCR',
-    }
-    teamMembers.value = (Array.isArray(list) ? list : [])
-      .filter((a: any) => a.staff_id)
-      .map((a: any) => ({ staff_id: a.staff_id, staff_name: a.staff_name || a.staff_id.slice(0, 8), role_label: ROLE_LABELS[a.role] || a.role || '' }))
-  } catch { teamMembers.value = [] }
-}
-
-function openDelegate(row: ProgramRow) {
-  const o = row as unknown as OverlayRow
-  delegateDialog.value = {
-    visible: true, row, assigneeId: o.assignee_staff_id || '', reviewerId: o.reviewer_staff_id || '',
-    previewStats: null, previewId: '', reqId: '', ttl: null, loading: false,
-  }
-  if (!teamMembers.value.length) loadTeamMembers()
-}
-
-async function runDelegatePreview() {
-  const row = delegateDialog.value.row
-  const o = row ? (row as unknown as OverlayRow) : null
-  if (!o?.task_id || !delegateDialog.value.assigneeId) {
-    _ElMsg.warning('请选择程序执行人')
-    return
-  }
-  delegateDialog.value.loading = true
-  try {
-    const body = {
-      selector: { kind: 'row' as const, task_ids: [o.task_id] },
-      assignee_staff_id: delegateDialog.value.assigneeId,
-      reviewer_staff_id: delegateDialog.value.reviewerId || null,
-    }
-    const res = await previewProcedureDelegation(projectId.value, body)
-    delegateDialog.value.previewStats = res
-    delegateDialog.value.previewId = res?.preview_id || res?.preview?.id || ''
-    delegateDialog.value.reqId = newRequestId()
-    delegateDialog.value.ttl = res?.expires_at || res?.preview?.expires_at || null
-  } catch (e: any) {
-    _ElMsg.error(e?.response?.data?.message || '预览失败')
-  } finally {
-    delegateDialog.value.loading = false
-  }
-}
-
-async function runDelegateApply() {
-  const row = delegateDialog.value.row
-  const o = row ? (row as unknown as OverlayRow) : null
-  if (!o?.task_id || !delegateDialog.value.previewId) return
-  delegateDialog.value.loading = true
-  try {
-    const body = {
-      selector: { kind: 'row' as const, task_ids: [o.task_id] },
-      assignee_staff_id: delegateDialog.value.assigneeId,
-      reviewer_staff_id: delegateDialog.value.reviewerId || null,
-    }
-    const res = await applyProcedureDelegation(projectId.value, delegateDialog.value.previewId, delegateDialog.value.reqId, body)
-    const applied = res?.applied ?? res?.changed ?? 0
-    _ElMsg.success(`委派完成：应用 ${applied} 项`)
-    delegateDialog.value.visible = false
-    await refreshOverlayFromServer()
-  } catch (e: any) {
-    if (e?.response?.status === 409) {
-      _ElMsg.warning('预览已失效（过期/一次消费/目标版本变化），请重新预览')
-      delegateDialog.value.previewId = ''
-      delegateDialog.value.previewStats = null
-    } else {
-      _ElMsg.error(e?.response?.data?.message || '委派失败')
-    }
-  } finally {
-    delegateDialog.value.loading = false
-  }
-}
 
 // ── 一级复核面板抽屉 ──
 const reviewDrawer = ref<{ visible: boolean; row: ProgramRow | null }>({ visible: false, row: null })

@@ -242,6 +242,8 @@
           :wp-id="subWps.wpIdMap.value[tab.wpCode]"
           :readonly="isSubTabReadonly(tab)"
           :project-id="projectId"
+          :wp-code="tab.wpCode"
+          :year="props.year ?? 0"
         />
         <GtChecklistTable
           v-else-if="tab.componentType === 'checklist'"
@@ -369,6 +371,7 @@ import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import GtAuditFlowGraph from '@/components/workpaper/GtAuditFlowGraph.vue'
 import ReviewDashboardCard from '@/components/workpaper/ReviewDashboardCard.vue'
 import { api } from '@/services/apiProxy'
+import { useProgramOverrideTarget } from '@/composables/useProgramOverrideTarget'
 import { getWpIndex, type WpIndexItem } from '@/services/workpaperApi'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useA1SubWorkpapers, type A1SubTab } from './composables/useA1SubWorkpapers'
@@ -404,6 +407,8 @@ interface AProgramHtmlData {
   programs: ProgramRow[]
   trim_decisions: Array<{ programId: string; reason: string }>
   signatures?: Array<{ role: string; name: string; date: string }>
+  /** render-config 读字段覆盖用的 scope */
+  override_scope?: string
 }
 
 // ─── Props / Emits ───
@@ -414,6 +419,7 @@ const props = withDefaults(defineProps<{
   htmlData: AProgramHtmlData
   readonly?: boolean
   projectId?: string
+  /** 仅兼容挂载方传参：读写程序表的年度一律取项目审计年度（audit-year R0） */
   year?: number
   wpCode?: string
 }>(), { readonly: false, wpCode: 'A1' })
@@ -430,6 +436,9 @@ const emit = defineEmits<{
   'program-trim': [payload: { programId: string; reason: string }]
   'program-status-change': [payload: { programId: string; status: string }]
   'program-add': [payload: { programId: string; description: string }]
+  'export-template': []
+  'export-data': []
+  'import-data': []
 }>()
 
 // ─── Constants ───
@@ -450,6 +459,10 @@ const flowGraphVisible = ref(false)
 const cardRefs = reactive<Record<number, HTMLElement>>({})
 
 const projectId = computed(() => props.projectId || (route.params.projectId as string) || '')
+// 字段覆盖写入位置：scope 以 render-config 回传为准、年度取项目审计年度（audit-year R0）
+const { ensureAuditYear, requireAuditYear, writeField } = useProgramOverrideTarget({
+  projectId, htmlData: () => props.htmlData, fallbackCode: () => props.wpCode || 'A1',
+})
 
 // ─── 公式管理（ADR-FMC-03 统一 primary outlet）──────────────────────────────
 // A1 自管工具栏（非走 GtWpRenderer 的标准工具栏），故在本页补同一 primary outlet：
@@ -579,10 +592,10 @@ const reviewDashboardData = ref<{ levels?: any[] }>({})
 async function loadReviewDashboard() {
   if (!projectId.value) return
   try {
-    const year = props.year || parseInt(route.query.year as string) || new Date().getFullYear()
+    const year = await ensureAuditYear()
     const res = await api.get(
       `/api/projects/${projectId.value}/procedure-tables/A1`,
-      { params: { year, resolver: 'review_dashboard_status' } },
+      { params: year != null ? { year, resolver: 'review_dashboard_status' } : { resolver: 'review_dashboard_status' } },
     )
     // 优先从 resolver_results 取，否则尝试顶层
     const data = res?.data ?? res
@@ -771,7 +784,8 @@ function confirmAdd() {
 }
 
 async function persistCustomItem(item: ProgramRow) {
-  const year = props.year || parseInt(route.query.year as string) || new Date().getFullYear()
+  const year = await requireAuditYear('新增程序')
+  if (year == null) return
   try {
     await api.post(`/api/projects/${projectId.value}/procedure-tables/custom-items`, {
       table_code: props.wpCode || 'A1',
@@ -793,16 +807,8 @@ async function saveExecution(row: ProgramRow) {
 }
 
 async function persistField(programNo: number, field: string, value: any) {
-  const year = props.year || parseInt(route.query.year as string) || new Date().getFullYear()
   try {
-    await api.post('/api/workpapers/field-overrides', {
-      project_id: projectId.value,
-      year,
-      scope: `procedure_table:${props.wpCode || 'A1'}`,
-      item_key: String(programNo),
-      field,
-      value,
-    })
+    await writeField(programNo, field, value)
   } catch (e: any) {
     const { ElMessage } = await import('element-plus')
     ElMessage.error(`保存失败：${e?.message || '网络异常'}`)

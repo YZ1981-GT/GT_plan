@@ -835,6 +835,7 @@ export function applyG66InterestToDetailRows<T extends Record<string, any>>(
       continue
     }
 
+    const writable: Record<string, unknown> = row as Record<string, unknown>
     const adjustment = (group.periods || []).reduce(
       (sum, period) =>
         sum + (Number(period.effectiveInterest) || 0) - (Number(period.cashInflow) || 0),
@@ -842,22 +843,22 @@ export function applyG66InterestToDetailRows<T extends Record<string, any>>(
     )
     const adj = Math.round(adjustment * 100) / 100
     matchedAdjustmentTotal = Math.round((matchedAdjustmentTotal + adj) * 100) / 100
-    row.periodInterestAdjChange = adj
-    row.periodChangeSubtotal = Math.round((
+    writable['periodInterestAdjChange'] = adj
+    writable['periodChangeSubtotal'] = Math.round((
       (Number(row.periodCostChange) || 0)
       + adj
       + (Number(row.periodAccruedInterestChange) || 0)
     ) * 100) / 100
-    row.closingInterestAdj = Math.round((
+    writable['closingInterestAdj'] = Math.round((
       (Number(row.openingInterestAdj) || 0) + adj
     ) * 100) / 100
-    row.closingSubtotal = Math.round((
+    writable['closingSubtotal'] = Math.round((
       (Number(row.closingCost) || 0)
       + (Number(row.closingInterestAdj) || 0)
       + (Number(row.closingAccruedInterest) || 0)
     ) * 100) / 100
-    row.interestWritebackSource = 'G6-6'
-    row.interestWritebackUpdatedAt = new Date().toISOString()
+    writable['interestWritebackSource'] = 'G6-6'
+    writable['interestWritebackUpdatedAt'] = new Date().toISOString()
     matched.push(String(row.investProject || label))
   }
 

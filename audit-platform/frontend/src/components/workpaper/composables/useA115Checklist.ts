@@ -267,10 +267,12 @@ export function useA115Checklist(wpId: Ref<string>, readonly: Ref<boolean>) {
   }
 
   async function saveFieldOverrideToc(sectionId: string, applicable: boolean): Promise<void> {
+    const year = getCurrentYear()
+    if (year == null) return
     try {
       await api.post('/api/workpapers/field-overrides', {
         project_id: getProjectId(),
-        year: getCurrentYear(),
+        year,
         scope: `a115_disclosure:${wpId.value}`,
         item_key: `toc-${sectionId.toLowerCase()}`,
         field: 'applicable',
@@ -391,8 +393,8 @@ export function useA115Checklist(wpId: Ref<string>, readonly: Ref<boolean>) {
     }
   }
 
-  function getCurrentYear(): number {
-    return new Date().getFullYear()
+  function getCurrentYear(): number | null {
+    return null
   }
 
   function delay(ms: number): Promise<void> {

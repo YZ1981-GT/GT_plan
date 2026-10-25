@@ -52,13 +52,20 @@
         <el-table-column prop="is_active" label="状态" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.is_active ? 'success' : 'danger'" size="small" effect="light">
-              {{ row.is_active ? '启用' : '禁用' }}
+              {{ row.is_active ? '启用' : '停用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" align="center" fixed="right">
+        <el-table-column label="操作" width="200" align="center" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="editUser(row)" v-permission="'admin'">编辑</el-button>
+            <el-button link type="primary" size="small" @click="openResetPassword(row)" v-permission="'admin'">重置密码</el-button>
+            <!-- 不能停用自己（后端同样拒绝） -->
+            <el-button
+              v-if="row.id !== currentUserId"
+              link size="small" :type="row.is_active ? 'danger' : 'success'"
+              @click="toggleActive(row)" v-permission="'admin'"
+            >{{ row.is_active ? '停用' : '启用' }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -68,7 +75,8 @@
     <el-dialog append-to-body v-model="showCreate" :title="editingUser ? '编辑用户' : '新增用户'" width="450px" @closed="onDialogClosed">
       <el-form ref="userFormRef" :model="form" :rules="userFormRules" label-width="80px">
         <el-form-item label="用户名" prop="username">
-          <el-input v-model="form.username" placeholder="请输入用户名" />
+          <!-- 用户名是登录名，历史记录都认它，建好后不能改 -->
+          <el-input v-model="form.username" placeholder="请输入用户名" :disabled="!!editingUser" />
         </el-form-item>
         <el-form-item label="邮箱" prop="email">
           <el-input v-model="form.email" placeholder="请输入邮箱" />
@@ -87,18 +95,39 @@
         <el-button type="primary" @click="saveUser" :loading="userSubmitting || saving">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 重置密码 -->
+    <el-dialog append-to-body v-model="resetDialog.visible" :title="`重置密码：${resetDialog.username}`" width="420px"
+      @closed="onResetClosed">
+      <el-form ref="resetFormRef" :model="resetDialog" :rules="resetRules" label-width="80px">
+        <el-form-item label="新密码" prop="password">
+          <el-input v-model="resetDialog.password" type="password" show-password placeholder="8-64 位" />
+        </el-form-item>
+        <el-form-item label="确认密码" prop="confirm">
+          <el-input v-model="resetDialog.confirm" type="password" show-password placeholder="再输一遍" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="resetDialog.visible = false">取消</el-button>
+        <el-button type="primary" @click="submitResetPassword" :loading="resetSubmitting">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { listUsers, createUser, updateUser } from '@/services/commonApi'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import { rules, makeRules } from '@/utils/formRules'
 import { useFormSubmit } from '@/composables/useFormSubmit'
+import { buildUserUpdateBody } from '@/utils/userUpdateBody'
+import { useAuthStore } from '@/stores/auth'
+
+const currentUserId = computed(() => useAuthStore().userId)
 
 const users = ref<any[]>([])
 const loading = ref(false)
@@ -134,6 +163,7 @@ const ROLE_OPTIONS = [
   { value: 'auditor', label: '审计员', tag: 'info' },
   { value: 'qc', label: '质量控制复核人', tag: 'success' },
   { value: 'eqcr', label: 'EQCR技术复核人', tag: 'primary' },
+  { value: 'readonly', label: '只读', tag: 'info' },
 ] as const
 
 const ROLE_MAP = Object.fromEntries(ROLE_OPTIONS.map(o => [o.value, o]))
@@ -158,7 +188,7 @@ const userFormRules = computed<FormRules>(() => ({
     ? []
     : [
         rules.required('密码'),
-        { min: 6, max: 64, message: '长度 6-64 字符', trigger: 'blur' },
+        { min: 8, max: 64, message: '长度 8-64 字符', trigger: 'blur' },
       ],
   role: [rules.required('角色', 'change')],
 }))
@@ -188,7 +218,14 @@ async function saveUser() {
     saving.value = true
     try {
       if (editingUser.value) {
-        await updateUser(editingUser.value.id, form.value)
+        // 只发改了的字段：用户名不可改、密码走「重置密码」（后端多余字段直接 422）
+        const body = buildUserUpdateBody(editingUser.value, form.value)
+        if (!Object.keys(body).length) {
+          ElMessage.info('没有改动')
+          showCreate.value = false
+          return
+        }
+        await updateUser(editingUser.value.id, body)
       } else {
         await createUser(form.value)
       }
@@ -196,7 +233,59 @@ async function saveUser() {
       showCreate.value = false
       editingUser.value = null
       await loadUsers()
-    } finally { saving.value = false }
+    } catch { /* 原因已由请求拦截器提示（如邮箱已被其他用户使用） */ }
+    finally { saving.value = false }
+  })
+}
+
+// 启用 / 停用：二次确认；不能停用自己、至少保留一个启用的管理员由后端判（拦截器提示原因）
+async function toggleActive(row: any) {
+  const enable = !row.is_active
+  try {
+    await ElMessageBox.confirm(
+      enable ? `确定启用「${row.username}」？` : `确定停用「${row.username}」？停用后该账号不能登录。`,
+      enable ? '启用账号' : '停用账号',
+      { type: 'warning', confirmButtonText: enable ? '启用' : '停用', cancelButtonText: '取消' },
+    )
+  } catch { return }
+  try {
+    await updateUser(row.id, { is_active: enable })
+    ElMessage.success(enable ? '已启用' : '已停用')
+    await loadUsers()
+  } catch { /* 原因已由请求拦截器提示 */ }
+}
+
+// 重置密码：只发 password（8-64 位，与后端 UserUpdate 同一下限；两次一致）
+const resetFormRef = ref<FormInstance>()
+const resetDialog = ref({ visible: false, userId: '', username: '', password: '', confirm: '' })
+const resetRules: FormRules = {
+  password: [rules.required('新密码'), { min: 8, max: 64, message: '长度 8-64 字符', trigger: 'blur' }],
+  confirm: [
+    rules.required('确认密码'),
+    {
+      validator: (_rule, value, callback) =>
+        value === resetDialog.value.password ? callback() : callback(new Error('两次输入的密码不一致')),
+      trigger: 'blur',
+    },
+  ],
+}
+const { submit: submitResetForm, submitting: resetSubmitting } = useFormSubmit(resetFormRef)
+
+function openResetPassword(row: any) {
+  resetDialog.value = { visible: true, userId: row.id, username: row.username, password: '', confirm: '' }
+}
+
+function onResetClosed() {
+  resetDialog.value = { visible: false, userId: '', username: '', password: '', confirm: '' }
+}
+
+async function submitResetPassword() {
+  await submitResetForm(async () => {
+    try {
+      await updateUser(resetDialog.value.userId, { password: resetDialog.value.password })
+      ElMessage.success(`已重置「${resetDialog.value.username}」的密码`)
+      resetDialog.value.visible = false
+    } catch { /* 原因已由请求拦截器提示 */ }
   })
 }
 

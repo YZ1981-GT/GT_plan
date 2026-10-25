@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 from app.models.base import UserRole
 
@@ -34,6 +34,31 @@ class UserCreate(BaseModel):
     password: str
     role: UserRole
     office_code: str | None = None
+
+
+class UserUpdate(BaseModel):
+    """修改用户（管理员使用）：只改传了的字段；用户名不可改（登录名与历史记录都认它）。
+
+    密码：空串 / 只有空白视为不改（编辑表单不填密码）；非空密码长度须为 8~64。
+    多余字段直接 422（不默默忽略 ``username`` / ``hashed_password`` 这类不该由这里改的字段）。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr | None = None
+    role: UserRole | None = None
+    office_code: str | None = None
+    is_active: bool | None = None
+    password: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def _password(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        if not 8 <= len(value) <= 64:
+            raise ValueError("密码长度须为 8~64 位")
+        return value
 
 
 class UserRegister(BaseModel):
