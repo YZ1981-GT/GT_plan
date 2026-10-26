@@ -29,7 +29,7 @@ WP_COMPOSABLES = WP_COMPONENTS / "composables"
 
 import sys
 sys.path.insert(0, str(BACKEND / "scripts" / "analyze"))
-import n_cycle_scanner as scanner  # noqa: E402
+import n_cycle_scanner_summary as scanner  # noqa: E402
 
 
 # ════════════════════════════════════════════════════════════════════════════

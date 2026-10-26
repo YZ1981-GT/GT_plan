@@ -193,13 +193,6 @@ KNOWN_FAILING: dict[str, tuple[str, str, str]] = {
         "F3-1 上区 GT_F31_SLOT_ROWS 末行 +1 恰为下区首行（9 = 9），「下方兄弟区」前提不成立；"
         "F3 provider 末次改动 5cb7ebe70",
     ),
-    "tests/workpaper_sync/test_n_lane3_json_table_identity.py"
-    "::TestLane3TemplateDefects::test_a1_reverse_denominators"
-    "[加计扣除研发费用情况明细表N5-6-1-E12-=C12+N5-^=C(\\d+)\\+D\\1$-37]": (
-        "n2-n5-json-table-identity-and-cross-entry-readonly",
-        "5914e315b",
-        "scripts.analyze.n_cycle_scanner 无 load_workbook 属性 ⇒ AttributeError（扫描器与测试不同步）",
-    ),
     # ── 权威模板目录：别 lane 已提交模板改动，账本 / 登记未跟上 ──────────────────
     "tests/workpaper_sync/test_template_override_resolution.py"
     "::TestProperty3AuthoritativeFrozen::test_index_size_drift_is_registered_not_growing": (

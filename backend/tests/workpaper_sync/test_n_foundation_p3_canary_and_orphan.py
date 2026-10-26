@@ -32,7 +32,7 @@ WP_COMPOSABLES = WP_COMPONENTS / "composables"
 
 import sys
 sys.path.insert(0, str(BACKEND / "scripts" / "analyze"))
-import n_cycle_scanner as scanner  # noqa: E402
+import n_cycle_scanner_summary as scanner  # noqa: E402
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -54,9 +54,10 @@ class TestN4InertRepair:
             "N4 onModeChange 仍为空实现（inert 未修复）"
 
     def test_health_check_exists(self, n4_source: str):
-        """宿主中存在 OO 健康检查（/onlyoffice/health）。"""
-        assert "onlyoffice/health" in n4_source, \
-            "N4 宿主未包含 OO 健康检查端点"
+        """宿主中存在 OO 健康检查，且走统一能力层（不再在宿主里直调 /onlyoffice/health）。"""
+        stripped = scanner.strip_comments(n4_source)
+        assert "fetchOnlyOfficeHealthy" in stripped, "N4 宿主未接统一健康探针"
+        assert "onlyoffice/health" not in stripped, "N4 宿主又复制了一份健康端点直调"
 
     def test_explicit_feedback_on_oo_unavailable(self, n4_source: str):
         """OO 不可用时有显式用户反馈（不仅是日志）。"""
@@ -94,17 +95,19 @@ class TestEFamilySampleExists:
         src = path.read_text("utf-8", errors="replace")
         assert "rowKey" in src, "useN4Detail 缺少 rowKey 行身份"
 
-    def test_n4_tax_types_provides_stable_keys(self):
-        """n4TaxTypes.ts 提供英文稳定 key 词典。"""
-        src = (WP_COMPOSABLES / "n4TaxTypes.ts").read_text("utf-8", errors="replace")
-        # 10 个税种的稳定 key
-        stable_keys = [
-            "consumption-tax", "urban-construction", "education-surcharge",
-            "local-education", "property-tax", "land-use-tax",
-            "vehicle-vessel", "stamp-tax", "resource-tax", "other",
+    def test_n4_tax_types_second_order_orphan_deleted(self):
+        """n4TaxTypes.ts 是二阶 orphan（唯一消费方是已删的两个 V2 孪生），已随 Task 17 删除。
+
+        裁定依据登记在 `n_cycle_facts.SECOND_ORDER_ORPHANS_DELETED`；这里守住「删掉且没人再引用」。
+        """
+        assert not (WP_COMPOSABLES / "n4TaxTypes.ts").exists(), "n4TaxTypes.ts 仍在（二阶 orphan 未处置）"
+        refs = [
+            p.relative_to(FRONTEND).as_posix()
+            for p in FRONTEND.rglob("*")
+            if p.suffix in (".ts", ".vue") and p.is_file()
+            and "n4TaxTypes" in p.read_text("utf-8", errors="replace")
         ]
-        for key in stable_keys:
-            assert key in src, f"n4TaxTypes 缺少稳定 key '{key}'"
+        assert refs == [], f"仍有文件引用已删的 n4TaxTypes：{refs}"
 
 
 # ════════════════════════════════════════════════════════════════════════════

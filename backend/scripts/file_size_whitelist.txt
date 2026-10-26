@@ -1668,3 +1668,10 @@ backend/app/services/qc_engine.py  974
 #     3 个夹具补项目审计年度、加「项目未设置审计年度不写字段覆盖」用例（+27）。
 #     拆分方向：按 A16 模式 / 通用模式 / 签字与字段覆盖三组拆文件，共享桩抽到 __tests__ 辅助模块。
 audit-platform/frontend/src/components/workpaper/__tests__/WorkpaperWordEditor.spec.ts  1956
+#   n_cycle_scanner.py —— 2026-10-26 从 work/2026-10-01-n-cycle-sync-three-specs 移植（原样 965 行 + 模块说明 12 行）。
+#     三份 N spec tasks.md 点名的守卫（test_n_cycle_foundation_canary / test_n_lane2_host_inline_router /
+#     test_n_lane3_json_table_identity）只认这一份口径；当前分支此前同名文件是并行会话的另一份扫描器
+#     （已改名 n_cycle_scanner_summary.py），三份守卫因 AttributeError 整体不可跑。
+#     入册而不拆：拆分会动判据实现本身，变异证明要重做。拆分方向：模板层（openpyxl 事实）/
+#     源码层（域文件、行身份、import 图）两个模块，入口模块保留 re-export。
+backend/scripts/analyze/n_cycle_scanner.py  977

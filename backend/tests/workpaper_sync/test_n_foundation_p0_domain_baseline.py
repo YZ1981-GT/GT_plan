@@ -37,7 +37,7 @@ SLICE_PATH = DATA / "workpaper_sync_n_cycle_manifest_slice.json"
 # 导入扫描器模块
 import sys
 sys.path.insert(0, str(BACKEND / "scripts" / "analyze"))
-import n_cycle_scanner as scanner  # noqa: E402
+import n_cycle_scanner_summary as scanner  # noqa: E402
 
 
 # ════════════════════════════════════════════════════════════════════════════

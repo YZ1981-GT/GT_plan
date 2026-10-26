@@ -25,7 +25,7 @@ WP_COMPOSABLES = WP_COMPONENTS / "composables"
 
 import sys
 sys.path.insert(0, str(ROOT / "backend" / "scripts" / "analyze"))
-import n_cycle_scanner as scanner  # noqa: E402
+import n_cycle_scanner_summary as scanner  # noqa: E402
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -153,26 +153,40 @@ class TestGateSemantics:
 # ════════════════════════════════════════════════════════════════════════════
 
 class TestN3HealthConvergence:
-    """NA-P8：N3 的 onlyoffice/health 调用仍存在。"""
+    """NA-P8：N3 的健康探针收敛到统一能力层 `sync/onlyOfficeHealth.ts`（BP-4）。
 
-    def test_n3_has_health_endpoint(self):
-        """N3 宿主包含 /api/workpapers/onlyoffice/health。"""
+    🔴 旧版本断言「宿主里仍有 /onlyoffice/health 直调」，与 Task 4 的收敛方向相反；
+    改线后宿主只调 `fetchOnlyOfficeHealthy`，端点字面量只剩注释里的来历说明。
+    """
+
+    def test_n3_health_goes_through_capability_layer(self):
+        """N3 宿主走 fetchOnlyOfficeHealthy，代码里不再直调健康端点。"""
         src = (WP_COMPONENTS / "GtN3DeferredTaxLiabilities.vue").read_text("utf-8", errors="replace")
-        assert "onlyoffice/health" in src
+        stripped = scanner.strip_comments(src)
+        assert "fetchOnlyOfficeHealthy" in stripped
+        assert "onlyoffice/health" not in stripped
 
-    def test_health_endpoint_count_still_5(self):
-        """全 N 域 onlyoffice/health 生产命中（删 orphan 后可能从 5 降为 4）。"""
+    def test_n_domain_has_no_direct_health_call(self):
+        """全 N 域生产代码 onlyoffice/health 直调 = 0；统一能力层的使用方逐个点名。"""
         prod, _ = scanner.scan_n_domain_files()
-        count = 0
+        direct, via_layer = [], []
         for p in prod:
             try:
                 text = p.read_text("utf-8", errors="replace")
             except OSError:
                 continue
             stripped = scanner.strip_comments(text)
-            count += len(re.findall(r"onlyoffice/health", stripped))
-        # 删 useN3DualMode 后从 5 降为 4（N3 宿主内联的 health 仍在，orphan 的不在了）
-        assert count >= 4, f"onlyoffice/health 命中 {count}（期望 >= 4）"
+            if re.search(r"onlyoffice/health", stripped):
+                direct.append(p.name)
+            if "fetchOnlyOfficeHealthy" in stripped:
+                via_layer.append(p.name)
+        assert direct == [], f"仍有宿主直调健康端点：{direct}"
+        assert sorted(via_layer) == [
+            "GtN3DeferredTaxLiabilities.vue",
+            "GtN4TaxesAndSurcharges.vue",
+            "GtN5IncomeTaxExpense.vue",
+            "useN1DualMode.ts",
+        ], via_layer
 
 
 # ════════════════════════════════════════════════════════════════════════════
