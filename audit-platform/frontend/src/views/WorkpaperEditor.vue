@@ -237,8 +237,9 @@
       </div>
     </div>
 
-    <!-- Univer 编辑器核心 -->
+    <!-- Univer 编辑器核心：归类加载完再挂（HTML 册不先挂再卸载），取到的详情交回 Shell（R1） -->
     <UniverEditorCore
+      v-if="modeResolved"
       ref="univerEditorCoreRef"
       :project-id="projectId"
       :wp-id="wpId"
@@ -257,6 +258,7 @@
       @saved="onChildSaved"
       @dirty-change="onDirtyChange"
       @sheet-switch="onSwitchSheet"
+      @update:wp-detail="onCoreWpDetail"
     />
 
     <!-- Sprint 5.5: 查看公式详情弹窗 -->
@@ -428,7 +430,7 @@ import { useEditingLock } from '@/composables/useEditingLock'
 import { useStepMapping } from '@/composables/useStepMapping'
 import { useStaleImpact, type StaleAffectedItem } from '@/composables/useStaleImpact'
 import { warnIgnoredPrograms } from '@/composables/useProgramRowControl'
-import { usePrerequisiteStatus } from '@/composables/usePrerequisiteStatus'
+import { prerequisiteWpCode, usePrerequisiteStatus } from '@/composables/usePrerequisiteStatus'
 import { useWorkpaperRefresh } from '@/composables/useWorkpaperRefresh'
 import { useWorkpaperReviewMarkers, type ReviewMarkerTicket } from '@/composables/useWorkpaperReviewMarkers'
 import { useReviewDialogProvider } from '@/composables/useReviewDialogProvider'
@@ -456,19 +458,14 @@ const GtReviewDialogLazy = defineAsyncComponent(() => import('@/components/colla
 import GtWpVersionTrail from '@/components/workpaper/version-trail/GtWpVersionTrail.vue'
 import WorkpaperCapabilityShell from '@/shell/formula/WorkpaperCapabilityShell.vue'
 import { GC0_CONTRACT_VERSION, type CanonicalWorkpaperLocation } from '@/shared/contracts/gc0'
-import type { WorkpaperCapabilitySnapshot, CapabilityDecision } from '@/shell/formula/workpaperCapabilitySnapshot'
-import { fetchWorkpaperCapabilitySnapshot } from '@/shell/formula/fetchCapabilitySnapshot'
 import { DSH_ASSIST_BRIDGE_KEY } from '@/shell/formula/dshAssistBridge'
 import { openFormulaManagerFromLocation } from '@/shell/formula/openFormulaManagerFromLocation'
 import { FORMULA_MANAGER_CAPABILITY_CONTEXT } from '@/shell/formula/formulaManagerCapabilityContext'
-import {
-  createShellStructuredError,
-  type ShellStructuredError,
-} from '@/shell/formula/shellStructuredError'
 import { useGuidancePanelStore } from '@/stores/guidancePanelStore'
 import { Clock } from '@element-plus/icons-vue'
 import { openLedgerWindow } from '@/utils/openLedgerWindow'
 import { useWorkpaperProjectMeta } from './workpaper-editor/useWorkpaperProjectMeta'
+import { useShellCapability } from './workpaper-editor/useShellCapability'
 
 // ─── 路由解析 ────────────────────────────────────────────────────────────────
 const route = useRoute()
@@ -495,7 +492,7 @@ function onShellCloseReview(): void {
 }
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
-const { renderConfig } = useWpRenderer(wpId)
+const { renderConfig } = useWpRenderer(wpId, { silent: true }) // 只给侧栏 decision_trace，失败不弹全局提示（R10）
 // 深链 ?sheet= 初始激活底稿页签（无 ?cell= 的纯 Tab 导航，如附注→披露表跳转）。
 // GtWpRenderer 仅 initialSheet + locate-cell 事件切页；此前未接线导致纯 ?sheet= 被忽略回退底稿目录。
 const initialSheetFromQuery = computed<string | undefined>(() => {
@@ -581,6 +578,8 @@ const {
   wpClassification,
   fetchComponentType,
 } = useEditorMode({ wpId, projectId, wpDetail })
+const modeResolved = ref(false) // 归类加载完（成功或失败）才挂 Univer 核心（R1）
+const onCoreWpDetail = (d: WorkpaperDetail) => { wpDetail.value = d }
 
 // ─── 函证枢纽（D0/E0/F0/G0/H0/K0/L0） ──────────────────────────────────────
 // workbook 级 componentType 为 confirmation-hub：底稿在编辑器内按源模板逐 sheet 编制
@@ -644,7 +643,7 @@ async function loadUniverSheetIdentityCatalog(): Promise<void> {
   if (!requestedWpId || useHtmlRenderer.value) return
   try {
     const config = await httpApi.get<RenderConfig>(
-      `/api/workpapers/${requestedWpId}/render-config`,
+      `/api/workpapers/${requestedWpId}/render-config`, { _silent: true, _dedupe: false } as any, // 失败有回退，不弹全局提示（R10）
     )
     if (requestId !== univerIdentityRequestId || requestedWpId !== wpId.value) return
     univerRenderSheets.value = Array.isArray(config?.sheets) ? config.sheets : []
@@ -685,6 +684,7 @@ const { cycleDialogs, fCycle, iCycle, gCycle, kCycle, lCycle, mCycle, nCycle } =
 // ─── 编辑锁 ─────────────────────────────────────────────────────────────────
 const editLock = useEditingLock({
   resourceId: computed(() => wpId.value || ''),
+  enabled: canEdit, // 只读身份不取锁（取锁被拒会留拒绝记录、还可能把要编辑的人挤成只读，R2）
 })
 
 // 多窗口门禁：编辑锁冲突时覆盖 canEdit，禁用所有保存/编辑操作
@@ -692,18 +692,8 @@ const editLock = useEditingLock({
 const effectiveCanEdit = computed(() => canEdit.value && !editLock.forcedReadonly.value)
 
 // ─── 前置状态横幅 ────────────────────────────────────────────────────────────
-const prerequisiteCycleCode = computed(() => {
-  if (isHCycle.value) return wpDetail.value?.wp_code || 'H1'
-  if (isICycle.value) return wpDetail.value?.wp_code || 'I1'
-  if (isGCycle.value) return wpDetail.value?.wp_code || 'G1'
-  if (isLCycle.value) return wpDetail.value?.wp_code || 'L1'
-  if (isMCycle.value) return wpDetail.value?.wp_code || 'M2'
-  if (isNCycle.value) return wpDetail.value?.wp_code || 'N2'
-  if (isFCycle.value) return wpDetail.value?.wp_code || 'F2'
-  if (isDCycle.value) return wpDetail.value?.wp_code || 'D2'
-  return 'E1'
-})
-const prerequisiteStatus = usePrerequisiteStatus(projectId.value, prerequisiteCycleCode.value)
+// 按当前底稿编码请求：详情加载 / 换底稿后重取，没有前置环节的循环不请求（原先 setup 时取值 ⇒ 恒按 E1，R9）
+const prerequisiteStatus = usePrerequisiteStatus(() => projectId.value, () => prerequisiteWpCode(wpDetail.value?.wp_code))
 const prerequisiteBanner = computed(() => prerequisiteStatus.banner.value)
 
 // ─── Stale 影响 ─────────────────────────────────────────────────────────────
@@ -984,94 +974,9 @@ const activeSheetContext = ref<WorkpaperSheetContext>({
   contextRevision: 0,
 })
 
-/** Task 12 shell bridge — live capability snapshot + DSH inject. */
-const shellOwnerEpoch = ref(1)
-const shellCapabilityEpoch = ref(1)
-const shellError = ref<ShellStructuredError | null>(null)
-let shellCapabilityRequest = 0
-
-function denyCapabilitySnapshot(ownerEpoch: number, reasonCode = 'snapshot_uninitialized'): WorkpaperCapabilitySnapshot {
-  const deny: CapabilityDecision = {
-    allowed: false,
-    reasonCode,
-    owner: 'workpaper-capability-matrix',
-    nextAction: '刷新后重试',
-    zhMessage: '能力快照尚未就绪，请稍候。',
-  }
-  return {
-    snapshotVersion: '1.0',
-    subjectDigest: '',
-    ownerEpoch,
-    expiresAt: '1970-01-01T00:00:00Z',
-    formulaView: deny,
-    formulaEditUser: deny,
-    formulaHistory: deny,
-    aiReviewPage: deny,
-    aiReviewBatch: deny,
-    aiAssistChat: deny,
-    humanReviewRead: deny,
-    humanReviewWrite: deny,
-    guidanceRead: deny,
-  }
-}
-
-const shellCapabilitySnapshot = ref<WorkpaperCapabilitySnapshot>(denyCapabilitySnapshot(1))
-
-async function refreshShellCapability(): Promise<void> {
-  const request = ++shellCapabilityRequest
-  const subject = {
-    wpId: wpId.value,
-    projectId: projectId.value,
-    sheetUid: activeSheetContext.value.sheetUid,
-    ownerEpoch: activeSheetContext.value.ownerEpoch ?? shellOwnerEpoch.value,
-  }
-  shellOwnerEpoch.value = subject.ownerEpoch
-  shellCapabilityEpoch.value = subject.ownerEpoch
-  shellCapabilitySnapshot.value = denyCapabilitySnapshot(subject.ownerEpoch, 'snapshot_loading')
-  const stillCurrent = () => request === shellCapabilityRequest
-    && wpId.value === subject.wpId
-    && projectId.value === subject.projectId
-    && activeSheetContext.value.sheetUid === subject.sheetUid
-    && (activeSheetContext.value.ownerEpoch ?? shellOwnerEpoch.value) === subject.ownerEpoch
-  try {
-    const snap = await fetchWorkpaperCapabilitySnapshot(subject)
-    if (!stillCurrent()) return
-    if (!snap || snap.ownerEpoch !== subject.ownerEpoch) {
-      shellCapabilitySnapshot.value = denyCapabilitySnapshot(subject.ownerEpoch, 'snapshot_subject_mismatch')
-      shellError.value = createShellStructuredError({
-        domain: 'capability',
-        reasonCode: 'snapshot_parse_failed',
-        zhMessage: '能力快照不可用，公共操作已暂时阻断。',
-        ownerEpoch: subject.ownerEpoch,
-        capabilityEpoch: shellCapabilityEpoch.value,
-      })
-      return
-    }
-    shellCapabilitySnapshot.value = snap
-    shellCapabilityEpoch.value = snap.ownerEpoch
-    shellError.value = null
-  } catch (err) {
-    if (!stillCurrent()) return
-    shellCapabilitySnapshot.value = denyCapabilitySnapshot(subject.ownerEpoch, 'snapshot_fetch_failed')
-    shellError.value = createShellStructuredError({
-      domain: 'capability',
-      reasonCode: 'snapshot_fetch_failed',
-      zhMessage: '能力快照加载失败，请稍后重试。',
-      ownerEpoch: subject.ownerEpoch,
-      capabilityEpoch: shellCapabilityEpoch.value,
-      operation: 'capability-snapshot',
-    })
-    void err
-  }
-}
-
-watch(
-  () => [wpId.value, projectId.value, shellOwnerEpoch.value, activeSheetContext.value.sheetUid, activeSheetContext.value.wholeWorkbook] as const,
-  () => {
-    void refreshShellCapability()
-  },
-  { immediate: true },
-)
+/** Task 12 shell bridge — live capability snapshot（useShellCapability）。 */
+const { shellOwnerEpoch, shellCapabilityEpoch, shellError, shellCapabilitySnapshot } =
+  useShellCapability({ wpId, projectId, activeSheetContext })
 
 const shellLocation = computed<CanonicalWorkpaperLocation | null>(() => {
   if (!wpDetail.value || projectYear.value == null) return null // 未设置审计年度：页面不渲染底稿，没有可定位的年度
@@ -1287,6 +1192,7 @@ onMounted(() => {
     try {
       await wpClassification.load()
     } catch { /* 静默：归类失败回退到 Univer/子编辑器路径 */ }
+    modeResolved.value = true
 
     // D0/E0/F0/G0/H0/K0/L0 函证枢纽：**不再整体重定向到函证管理中心**。
     // 这些底稿是多 sheet 工作簿（底稿目录 / X0A 程序表 / X0-1 函证结果汇总 /

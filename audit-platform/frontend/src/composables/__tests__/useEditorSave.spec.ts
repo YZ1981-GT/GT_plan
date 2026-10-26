@@ -74,6 +74,7 @@ function makeOptions(overrides: Partial<UseEditorSaveOptions> = {}): UseEditorSa
     projectId: computed(() => 'proj-1'),
     wpId: computed(() => 'wp-1'),
     wpDetail: ref({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 1 } as any),
+    setWpDetail: vi.fn(),
     univerAPI: ref({
       getActiveWorkbook: () => ({
         getSnapshot: () => ({ id: 'wb1', sheets: { s1: {} } }),
@@ -189,6 +190,16 @@ describe('useEditorSave — onSave 主要行为', () => {
     } finally {
       globalThis.fetch = origFetch
     }
+  })
+
+  it('保存后的最新详情经 setWpDetail 交回持有者，不写只读详情（R1：版本号不再停在旧值）', async () => {
+    const wpDetail = computed(() => ({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 1 } as any))
+    const setWpDetail = vi.fn()
+    const success = await useEditorSave(makeOptions({ wpDetail, setWpDetail })).onSave()
+
+    expect(success).toBe(true)
+    expect(setWpDetail).toHaveBeenCalledTimes(1)
+    expect(setWpDetail).toHaveBeenCalledWith({ wp_code: 'D2-1', wp_name: '应收账款', file_version: 2 })
   })
 
   it('onSave 在 univerAPI 为 null 时返回 false 且不调用 httpApi', async () => {

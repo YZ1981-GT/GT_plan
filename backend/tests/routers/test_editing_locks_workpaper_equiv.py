@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 # 确保所有模型注册（含 users 等被 FK 引用的表）
 import app.models  # noqa: F401
+from tests._editing_lock_helpers import lock_error_detail, lock_targets_visible  # noqa: F401  锁语义用例：资源判定放行（鉴权另见 test_editing_lock_authz_pg.py）
 from app.models.base import Base
 from app.models.editing_lock_models import EditingLock
 
@@ -122,7 +123,7 @@ async def test_acquire_conflict_returns_409_with_holder_info(
     async with await make_client(holder_b_id, "holder_b") as client_b:
         resp_b = await client_b.post(f"/api/editing-locks/workpaper/{resource_id}")
         assert resp_b.status_code == 409
-        detail = resp_b.json()["detail"]
+        detail = lock_error_detail(resp_b.json())
         assert "locked_by" in detail
         assert detail["locked_by"] == str(holder_a_id)
         assert "locked_by_name" in detail
@@ -297,8 +298,8 @@ async def test_force_acquire_takes_over_lock(
         assert resp_a.status_code == 200
 
     # holder B force-acquires (mock broadcast_raw to prevent SSE errors)
-    with patch("app.routers.editing_locks.event_bus") as mock_event_bus:
-        mock_event_bus.broadcast_raw = lambda *a, **kw: None
+    # router 内是懒导入 ``from app.services.event_bus import event_bus`` ⇒ 只能 patch 单例上的方法（原先 patch 路由模块属性 ⇒ AttributeError）
+    with patch("app.services.event_bus.event_bus.broadcast_raw", lambda *a, **kw: None):
         async with await make_client(holder_b_id, "holder_b") as client_b:
             resp_b = await client_b.post(
                 f"/api/editing-locks/workpaper/{resource_id}/force"

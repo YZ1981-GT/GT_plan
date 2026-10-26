@@ -1204,6 +1204,7 @@ import {
   type PlatformDefaultCompletenessCycle,
 } from '@/components/workpaper/composables/trimAdequacyReview'
 import { listWorkpapersPaged } from '@/services/workpaperApi'
+import { programConsoleRoute } from '@/utils/programConsoleRoute'
 import { listAssignments } from '@/services/staffApi'
 import { ROLE_TERMS, newRequestId } from '@/components/workpaper/composables/procedureConsoleOverlay'
 import http from '@/utils/http'
@@ -2541,9 +2542,7 @@ function enterProgramConsole(row: any) {
     ElMessage.warning('该程序底稿尚未生成，请先生成底稿')
     return
   }
-  router.push({
-    path: `/projects/${projectId.value}/workpapers/${row.wp_id}/edit`,
-  })
+  router.push(programConsoleRoute(projectId.value, row.wp_id)) // 直接落到程序表页签（R5）
 }
 
 // 智能裁剪

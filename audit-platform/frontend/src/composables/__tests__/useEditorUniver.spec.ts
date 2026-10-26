@@ -46,9 +46,10 @@ vi.mock('@/services/apiPaths', () => ({
   },
 }))
 
-// Mock workpaperApi
+// Mock workpaperApi（首屏取详情走 getWorkpaperSettled：并发共享在途 + 取消重取一次）
 vi.mock('@/services/workpaperApi', () => ({
-  getWorkpaper: vi.fn().mockResolvedValue({
+  getWorkpaperSettled: vi.fn().mockResolvedValue({
+    id: '12345678-1234-1234-1234-123456789abc',
     wp_code: 'D2-1',
     wp_name: '应收账款',
     file_version: 1,
@@ -60,9 +61,11 @@ vi.mock('@/utils/logger', () => ({
   logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-import { useEditorUniver, DIRTY_COMMAND_PATTERNS, type UseEditorUniverOptions } from '../useEditorUniver'
+import { useEditorUniver, DIRTY_COMMAND_PATTERNS, WP_UNAVAILABLE_MESSAGE, type UseEditorUniverOptions } from '../useEditorUniver'
 import { createUniver } from '@univerjs/presets'
 import { api as httpApi } from '@/services/apiProxy'
+import { getWorkpaperSettled } from '@/services/workpaperApi'
+import axios from 'axios'
 
 function makeOptions(overrides: Partial<UseEditorUniverOptions> = {}): UseEditorUniverOptions {
   return {
@@ -225,5 +228,93 @@ describe('useEditorUniver — 原生 sheet tab 事件', () => {
 
     expect(opts.sheetNavFacade.refresh).toHaveBeenCalledTimes(1)
     expect(result.dirty.value).toBe(false)
+  })
+})
+
+describe('useEditorUniver — 详情只读、不误判无文件（spec procedure-chain-hardening-and-java-contracts R1）', () => {
+  const WP_ID = '12345678-1234-1234-1234-123456789abc'
+  const detail = { id: WP_ID, wp_code: 'H1A', wp_name: '固定资产', file_version: 3 }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+    vi.mocked(httpApi.get).mockResolvedValue({
+      id: 'wb1',
+      sheets: { sheet0: { id: 'sheet0', name: 'Sheet1', rowCount: 10, columnCount: 10, cellData: {} } },
+      sheetOrder: ['sheet0'],
+    })
+    vi.mocked(getWorkpaperSettled).mockResolvedValue(detail as any)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('选项是只读 computed（与 UniverEditorCore 同形态）：取到详情经回调交回，不判 no_file', async () => {
+    const onDetailLoaded = vi.fn()
+    const result = useEditorUniver(makeOptions({ wpDetail: computed(() => null), onDetailLoaded }))
+
+    await result.initUniver()
+
+    expect(result.loadErrorState.value).toBeNull()
+    expect(onDetailLoaded).toHaveBeenCalledWith(detail)
+    expect(createUniver).toHaveBeenCalledTimes(1)
+  })
+
+  it('Shell 已有同一底稿的详情 ⇒ 直接用，不再另取、不回调', async () => {
+    const onDetailLoaded = vi.fn()
+    const result = useEditorUniver(makeOptions({ wpDetail: computed(() => detail as any), onDetailLoaded }))
+
+    await result.initUniver()
+
+    expect(getWorkpaperSettled).not.toHaveBeenCalled()
+    expect(onDetailLoaded).not.toHaveBeenCalled()
+    expect(result.loadErrorState.value).toBeNull()
+  })
+
+  it('取消（重取后仍被取消）⇒ 「被中断」错误可重试，不判 no_file', async () => {
+    vi.mocked(getWorkpaperSettled).mockRejectedValue(new axios.CanceledError())
+    const result = useEditorUniver(makeOptions({ wpDetail: computed(() => null) }))
+
+    await result.initUniver()
+
+    expect(result.loadErrorState.value).toBe('error')
+    expect(result.loadErrorMessage.value).toBe('加载底稿被中断，请重试')
+    expect(createUniver).not.toHaveBeenCalled()
+  })
+
+  it('404 ⇒ 中性文案（不区分无权 / 已删 / 不存在）', async () => {
+    vi.mocked(getWorkpaperSettled).mockRejectedValue({ response: { status: 404 } })
+    const result = useEditorUniver(makeOptions({ wpDetail: computed(() => null) }))
+
+    await result.initUniver()
+
+    expect(result.loadErrorState.value).toBe('no_index')
+    expect(result.loadErrorMessage.value).toBe(WP_UNAVAILABLE_MESSAGE)
+    expect(WP_UNAVAILABLE_MESSAGE).not.toMatch(/[A-Za-z_]{6,}/)
+  })
+
+  it('403 同 404；其余错误给中文文案、不显示 axios 英文（R10）', async () => {
+    vi.mocked(getWorkpaperSettled).mockRejectedValueOnce({ response: { status: 403 } })
+    const forbidden = useEditorUniver(makeOptions({ wpDetail: computed(() => null) }))
+    await forbidden.initUniver()
+    expect([forbidden.loadErrorState.value, forbidden.loadErrorMessage.value]).toEqual(['no_index', WP_UNAVAILABLE_MESSAGE])
+
+    vi.mocked(getWorkpaperSettled).mockRejectedValueOnce(Object.assign(new Error('Request failed with status code 500'), {
+      response: { status: 500 },
+    }))
+    const broken = useEditorUniver(makeOptions({ wpDetail: computed(() => null) }))
+    await broken.initUniver()
+    expect(broken.loadErrorState.value).toBe('error')
+    expect(broken.loadErrorMessage.value).toBe('加载底稿失败：网络或服务暂时异常，请重试')
+  })
+
+  it('详情为空对象（没有 id）才判 no_file', async () => {
+    vi.mocked(getWorkpaperSettled).mockResolvedValue({ status: 'not_started' } as any)
+    const result = useEditorUniver(makeOptions({ wpDetail: computed(() => null) }))
+
+    await result.initUniver()
+
+    expect(result.loadErrorState.value).toBe('no_file')
   })
 })

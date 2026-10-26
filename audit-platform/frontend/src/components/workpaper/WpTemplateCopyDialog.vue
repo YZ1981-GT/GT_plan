@@ -47,21 +47,10 @@
         </el-form-item>
       </template>
 
-      <!-- 覆盖选项 -->
-      <el-form-item>
-        <el-checkbox v-model="overwrite">
-          覆盖目标已有同编码底稿
-        </el-checkbox>
-      </el-form-item>
-
-      <!-- 冲突提示 -->
-      <el-alert
-        v-if="!overwrite"
-        type="info"
-        :closable="false"
-        show-icon
-      >
-        目标项目已存在同 wp_code 的底稿将被跳过。勾选"覆盖"可强制替换。
+      <!-- 规则提示（覆盖未实现，不再提供勾选项） -->
+      <el-alert type="info" :closable="false" show-icon>
+        目标项目已有同编码的底稿会跳过（暂不支持覆盖）；只能复制你在来源项目里看得见的底稿。
+        复制出的底稿按模板生成自己的文件，不带来源项目的文件内容。
       </el-alert>
     </el-form>
 
@@ -108,6 +97,7 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useWpExportImport } from '@/composables/useWpExportImport'
 import type { CopyResult } from '@/composables/useWpExportImport'
+import { summarizeTemplateCopy } from '@/utils/templateCopyResult'
 
 const props = defineProps<{
   modelValue: boolean
@@ -130,7 +120,6 @@ const copyMode = ref<'single' | 'cycle'>('single')
 const sourceWpId = ref('')
 const sourceProjectId = ref('')
 const auditCycle = ref('')
-const overwrite = ref(false)
 const copyResults = ref<CopyResult[]>([])
 
 const auditCycles = [
@@ -178,7 +167,7 @@ function statusLabel(status: string) {
 
 async function handleCopy() {
   try {
-    const params: Record<string, any> = { overwrite: overwrite.value }
+    const params: Record<string, any> = {}
     if (copyMode.value === 'single') {
       params.source_wp_id = sourceWpId.value.trim()
     } else {
@@ -190,9 +179,11 @@ async function handleCopy() {
     const results = Array.isArray(result) ? result : [result]
     copyResults.value = results
     emit('copied', results)
-    ElMessage.success('模板复制完成')
+    const summary = summarizeTemplateCopy(results)
+    ElMessage[summary.level](summary.message)
   } catch (err: any) {
-    ElMessage.error(err?.message || '模板复制失败')
+    const detail = err?.response?.data?.detail ?? err?.response?.data?.message
+    ElMessage.error((typeof detail === 'string' && detail) || '模板复制失败，请稍后重试')
   }
 }
 
@@ -201,7 +192,6 @@ function handleClose() {
   sourceWpId.value = ''
   sourceProjectId.value = ''
   auditCycle.value = ''
-  overwrite.value = false
   copyResults.value = []
   visible.value = false
 }

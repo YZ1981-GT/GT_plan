@@ -46,6 +46,24 @@ class FieldOverrideSetResponse(BaseModel):
     value: Any
 
 
+#: 单次批量上限（程序表一张表的程序行 × 3 个字段远小于它）
+MAX_BATCH_ITEMS = 200
+
+
+class FieldOverrideItem(BaseModel):
+    scope: str = Field(max_length=50)
+    item_key: str = Field(max_length=100)
+    field: str = Field(max_length=50)
+    value: Any = None
+
+
+class FieldOverrideBatchRequest(BaseModel):
+    """批量设置覆盖值（spec procedure-chain-hardening-and-java-contracts R8：原先前端逐字段单发、失败静默吞掉）"""
+    project_id: UUID
+    year: int
+    items: list[FieldOverrideItem] = Field(max_length=MAX_BATCH_ITEMS)
+
+
 # ─── Endpoints ──────────────────────────────────────────────────────────────
 
 
@@ -94,3 +112,36 @@ async def set_field_override(
         field=override.field,
         value=override.value,
     )
+
+
+@router.post("/batch", status_code=200)
+async def set_field_overrides_batch(
+    body: FieldOverrideBatchRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """批量 upsert 覆盖值：一次鉴权、每项一个保存点、一次提交；不能写的项逐条回报原因（不吞错）。
+
+    每项的判定与单条端点相同（``assert_program_override_allowed``：程序表行只能写派给本人的、非委派人不能写不适用）。
+    """
+    from fastapi import HTTPException
+
+    await assert_project_permission(db, user, body.project_id, "edit")
+    svc = FieldOverrideService(db)
+    saved: list[dict] = []
+    failed: list[dict] = []
+    for item in body.items:
+        try:
+            async with db.begin_nested():
+                await assert_program_override_allowed(
+                    db, user, body.project_id, item.scope, item.item_key, item.field, item.value,
+                )
+                await svc.set(project_id=body.project_id, year=body.year, scope=item.scope,
+                              item_key=item.item_key, field=item.field, value=item.value, user_id=user.id)
+            saved.append({"scope": item.scope, "item_key": item.item_key, "field": item.field})
+        except HTTPException as exc:
+            detail = exc.detail.get("message") if isinstance(exc.detail, dict) else exc.detail
+            failed.append({"scope": item.scope, "item_key": item.item_key, "field": item.field,
+                           "status": exc.status_code, "reason": str(detail or "不能写入")})
+    await db.commit()
+    return {"saved": saved, "failed": failed}

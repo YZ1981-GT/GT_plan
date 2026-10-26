@@ -183,14 +183,28 @@ async def restore_row(
                                       reason=reason)
         for t in target.tasks if t.applicability_status == NOT_APPLICABLE
     ]
+    # 恢复会清空执行人（Property P9：不自动恢复原执行人）⇒ 回执带原执行人姓名，页面提示「原执行人已清除，请重新委派」
+    previous_ids = {o["previous_assignee_staff_id"] for o in outs if o.get("previous_assignee_staff_id")}
+    previous = await _staff_names(db, previous_ids)
     return {
         "task_ids": [o["task_id"] for o in outs],
         "changed": any(o["changed"] for o in outs),
         "applicability_status": "execute",
         "requires_reassign": bool(outs),
+        "previous_assignees": previous,
         "program_no": target.program_no,
         "template_code": target.template_code,
     }
+
+
+async def _staff_names(db: AsyncSession, staff_ids: set) -> list[str]:
+    if not staff_ids:
+        return []
+    from app.models.staff_models import StaffMember
+
+    ids = [UUID(str(i)) for i in staff_ids]
+    rows = (await db.execute(sa.select(StaffMember.name).where(StaffMember.id.in_(ids)))).scalars()
+    return sorted({n for n in rows if n})
 
 
 async def ensure_row_task_for_delegation(

@@ -13,7 +13,8 @@ import { UniverSheetsCorePreset } from '@univerjs/preset-sheets-core'
 import UniverPresetSheetsCoreZhCN from '@univerjs/preset-sheets-core/lib/locales/zh-CN'
 import { api as httpApi } from '@/services/apiProxy'
 import { workpapers as P_wp } from '@/services/apiPaths'
-import { getWorkpaper, type WorkpaperDetail } from '@/services/workpaperApi'
+import { getWorkpaperSettled, type WorkpaperDetail } from '@/services/workpaperApi'
+import { isRequestCancelled } from '@/utils/http'
 import { logger } from '@/utils/logger'
 import type { SheetNavFacadeAPI } from './useSheetNavFacade'
 
@@ -31,9 +32,16 @@ export interface UseEditorUniverOptions {
   containerRef: Ref<HTMLElement | null>
   projectId: ComputedRef<string>
   wpId: ComputedRef<string>
-  wpDetail: Ref<WorkpaperDetail | null>
+  /** Shell 持有的底稿详情（只读：本函数不写它）。Shell 已有同一底稿的详情时直接用，不再另取。 */
+  wpDetail: Readonly<Ref<WorkpaperDetail | null>>
+  /** 本函数自己取到详情时交回 Shell（UniverEditorCore 转成 `update:wpDetail`）。 */
+  onDetailLoaded?: (detail: WorkpaperDetail) => void
   sheetNavFacade: SheetNavFacadeAPI
 }
+
+/** 无权 / 已删除 / 不存在一律同一句（后端拒绝统一 404，不泄露是哪一种）。 */
+export const WP_UNAVAILABLE_MESSAGE =
+  '无法打开这张底稿：它可能不存在、已删除或移入回收站，或没有委派给你。请回到底稿列表，或联系项目经理确认委派。'
 
 export interface UseEditorUniverReturn {
   univerAPI: Ref<any>
@@ -70,25 +78,34 @@ export function useEditorUniver(opts: UseEditorUniverOptions): UseEditorUniverRe
       return
     }
 
-    // 1. 加载底稿详情
+    // 1. 加载底稿详情（🔴 不写 opts.wpDetail：调用方传的是只读 computed，写入被静默丢弃后再读回会把
+    //    「Shell 还没拿到详情」误判成「底稿文件尚未生成」，spec procedure-chain-hardening-and-java-contracts R1）
     loadingHint.value = '加载底稿详情'
+    let detail: WorkpaperDetail
     try {
-      opts.wpDetail.value = await getWorkpaper(opts.projectId.value, opts.wpId.value)
-      if (!opts.wpDetail.value) {
+      const known = opts.wpDetail.value
+      detail = known && known.id === opts.wpId.value
+        ? known
+        : await getWorkpaperSettled(opts.projectId.value, opts.wpId.value)
+      if (!detail?.id) {
         loadErrorState.value = 'no_file'
         loadErrorMessage.value = '底稿数据为空，可能尚未生成文件。请先在生命周期中执行"一键生成底稿"。'
         loading.value = false
         loadingHint.value = ''
         return
       }
+      if (detail !== known) opts.onDetailLoaded?.(detail)
     } catch (e: any) {
       const status = e?.response?.status
-      if (status === 404) {
+      if (status === 404 || status === 403) {
         loadErrorState.value = 'no_index'
-        loadErrorMessage.value = '该底稿不在当前项目中（可能编码已变更或被删除）。请回到底稿列表选择有效的底稿。'
+        loadErrorMessage.value = WP_UNAVAILABLE_MESSAGE
       } else {
+        // 不显示 axios 的英文错误（「Request failed with status code 500」对用户没有意义，R10）
         loadErrorState.value = 'error'
-        loadErrorMessage.value = e?.message || '加载底稿时发生错误'
+        loadErrorMessage.value = isRequestCancelled(e)
+          ? '加载底稿被中断，请重试'
+          : '加载底稿失败：网络或服务暂时异常，请重试'
       }
       loading.value = false
       loadingHint.value = ''
@@ -125,8 +142,8 @@ export function useEditorUniver(opts: UseEditorUniverOptions): UseEditorUniverRe
 
     if (!workbookData || !workbookData.sheets) {
       // 兜底：创建空白工作簿
-      const wpCode = opts.wpDetail.value.wp_code || 'wp'
-      const wpName = opts.wpDetail.value.wp_name || 'Sheet1'
+      const wpCode = detail.wp_code || 'wp'
+      const wpName = detail.wp_name || 'Sheet1'
       workbookData = {
         id: wpCode,
         name: `${wpCode} ${wpName}`,
@@ -155,8 +172,8 @@ export function useEditorUniver(opts: UseEditorUniverOptions): UseEditorUniverRe
       api.createWorkbook(workbookData)
     } else {
       logger.error('[useEditorUniver] No workbook data available, creating empty workbook')
-      const wpCode = opts.wpDetail.value.wp_code || 'wp'
-      const wpName = opts.wpDetail.value.wp_name || 'Sheet1'
+      const wpCode = detail.wp_code || 'wp'
+      const wpName = detail.wp_name || 'Sheet1'
       api.createWorkbook({
         id: wpCode,
         name: `${wpCode} ${wpName}`,

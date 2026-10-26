@@ -81,6 +81,7 @@
  */
 import { ref, computed } from 'vue'
 import type { CycleTypeFlags } from '@/composables/useCycleType'
+import { prerequisiteWpCode } from '@/composables/usePrerequisiteStatus'
 import type { StaleAffectedItem } from '@/composables/useStaleImpact'
 import type { WorkpaperDetail } from '@/services/workpaperApi'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
@@ -140,14 +141,8 @@ const infoBannerCount = computed(() => {
   return count
 })
 
-const showPrereqBanner = computed(() => {
-  const wpCode = props.wpDetail?.wp_code || ''
-  const ct = props.cycleType
-  return wpCode.startsWith('E1')
-    || ct.isDCycle.value || ct.isFCycle.value || ct.isHCycle.value
-    || ct.isICycle.value || ct.isGCycle.value || ct.isKCycle.value
-    || ct.isLCycle.value || ct.isMCycle.value || ct.isNCycle.value
-})
+// 与请求同一判定（prerequisiteWpCode）：有前置环节的循环才显示（原先漏了 J 循环，R9）
+const showPrereqBanner = computed(() => !!prerequisiteWpCode(props.wpDetail?.wp_code))
 
 function onConflictResolved(_id: string, _resolution: string) { /* noop */ }
 

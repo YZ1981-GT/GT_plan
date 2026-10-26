@@ -24,6 +24,10 @@ from typing import Any
 from uuid import UUID, uuid4
 
 
+#: 目标项目已有同编码底稿时的跳过说明（复制器与模板复制路由共用一句；原先界面显示「overwrite=False 跳过」）
+EXISTING_CODE_SKIP_MESSAGE = "目标项目已有该编码的底稿（暂不支持覆盖），未复制"
+
+
 @dataclass
 class CopyResult:
     """模板复制单项结果"""
@@ -77,13 +81,13 @@ class TemplateCopier:
         wp_code = source_wp["wp_code"]
         existing = existing_codes or set()
 
-        # 目标已存在同 wp_code 且不覆盖 → 跳过
+        # 目标已存在同 wp_code 且不覆盖 → 跳过（说明给用户看：不带参数名，spec procedure-chain-hardening-and-java-contracts R3）
         if wp_code in existing and not overwrite:
             return CopyResult(
                 source_wp_code=wp_code,
                 target_wp_id=None,
                 status="skipped",
-                message=f"目标项目已存在 wp_code={wp_code}，overwrite=False 跳过",
+                message=EXISTING_CODE_SKIP_MESSAGE,
             )
 
         # 生成新 UUID

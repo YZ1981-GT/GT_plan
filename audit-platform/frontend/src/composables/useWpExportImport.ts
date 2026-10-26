@@ -257,9 +257,11 @@ export function useWpExportImport() {
     loading.value = true
     error.value = null
     try {
+      // 错误由弹窗按后端原因提示（不再叠一条全局通用错误）
       const result = await api.post<CopyResult | CopyResult[]>(
         wpExportPaths.templateCopy(projectId),
         params,
+        { _silent: true } as any,
       )
       return result
     } catch (e: any) {

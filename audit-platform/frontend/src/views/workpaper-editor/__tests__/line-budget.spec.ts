@@ -44,7 +44,8 @@ describe('行数预算断言测试', () => {
   // 填**真实值、不加余量** ⇒ 本条恢复为「只许变小」的棘轮，再加一行即打红。
   // **1000 仍是目标**：WorkpaperEditor 继续瘦身时必须同步下调本值，否则棘轮失效。
   // 2026-10-26：项目信息 / 审计年度加载抽到 useWorkpaperProjectMeta.ts（读取失败不再显示成「未设置审计年度」）⇒ 1456。
-  const SHELL_RATCHET = 1456
+  // 2026-10-26：能力快照抽到 useShellCapability.ts、前置横幅改按编码 getter（spec procedure-chain-hardening-and-java-contracts R1 / R9 / R10）⇒ 1362。
+  const SHELL_RATCHET = 1362
   test(`Shell (WorkpaperEditor.vue) ≤ ${SHELL_RATCHET} 行（棘轮；目标仍是 1000）`, () => {
     const lines = countLines(files.Shell)
     expect(

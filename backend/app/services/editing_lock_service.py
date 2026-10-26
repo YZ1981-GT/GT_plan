@@ -279,8 +279,11 @@ async def force_acquire_lock(
     resource_id: str,
     holder_id: uuid.UUID,
     holder_name: str,
+    client_instance: str | None = None,
 ) -> dict:
     """强制获取锁（释放原锁 + 创建新锁）
+
+    ``client_instance``：发起接管的窗口标识写进新锁（不写 ⇒ 本人所有窗口都能续期这把锁）。
 
     Returns:
         {"lock_id": str, "previous_holder_id": str|None, "previous_holder_name": str|None, "acquired_at": str}
@@ -316,6 +319,7 @@ async def force_acquire_lock(
         holder_name=(holder_name or None),
         acquired_at=now,
         heartbeat_at=now,
+        client_instance=(client_instance or None),
     )
     db.add(new_lock)
     await db.flush()

@@ -418,14 +418,16 @@ async def trim_row_restore(
 
 
 class ProgramRowTrimRequest(BaseModel):
-    sheet_name: str = Field(..., min_length=1, max_length=200)
+    # 整册嵌入的控制台（A10~A17 / B 类汇总包）没有表名 ⇒ 空串按底稿编码定位程序表（与 program-rows/task 同口径；
+    # spec procedure-chain-hardening-and-java-contracts R6：原先 min_length=1 ⇒ 这些控制台的细裁只改页面、不落任务）
+    sheet_name: str = Field(default="", max_length=200)
     program_no: str | int = Field(...)
     reason: str = Field(..., min_length=1, max_length=500)
     request_id: str | None = None
 
 
 class ProgramRowRestoreRequest(BaseModel):
-    sheet_name: str = Field(..., min_length=1, max_length=200)
+    sheet_name: str = Field(default="", max_length=200)
     program_no: str | int = Field(...)
     reason: str | None = Field(default=None, max_length=500)
     request_id: str | None = None

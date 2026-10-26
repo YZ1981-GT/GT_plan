@@ -17,6 +17,7 @@ Requirements: 7.1, 7.4, 7.5
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Optional
 from uuid import UUID
@@ -27,7 +28,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import assert_project_permission, get_current_user, require_project_access
 from app.models.core import User
 
 logger = logging.getLogger(__name__)
@@ -100,8 +101,12 @@ async def template_copy(
     # ─── 模式 1: 单底稿复制 ──────────────────────────────────────────────
     if body.source_wp_id:
         source_wp_data = await _load_source_wp(db, body.source_wp_id)
-        if source_wp_data is None:
+        # 来源须对当前用户可见（与底稿列表同一可见性口径）；看不见与不存在同一句，不泄露存在性
+        if source_wp_data is None or not await _source_visible(
+            db, current_user, source_wp_data["project_id"], [source_wp_data["wp_index_id"]],
+        ):
             raise HTTPException(status_code=404, detail="源底稿不存在")
+        await _reset_target_context(db, current_user, project_id)
 
         result = copier.copy_single(
             source_wp=source_wp_data,
@@ -112,22 +117,36 @@ async def template_copy(
 
         await _apply_retention(db, project_id, [result], trim_scope)
         # 持久化目标底稿记录
-        if result.status == "copied" and hasattr(result, "target_record"):
-            await _persist_copy_result(db, result, project_id)
+        jobs = []
+        if result.status == "copied" and getattr(result, "target_record", None):
+            jobs.append(await _persist_copy_result(db, result, project_id))
 
-        await db.commit()
+        await _materialize_and_commit(db, project_id, jobs)
         return _result_payload(result)
 
     # ─── 模式 2: 批量复制整个循环 ────────────────────────────────────────
     if body.source_project_id and body.audit_cycle:
+        not_found = HTTPException(
+            status_code=404,
+            detail=f"源项目循环 {body.audit_cycle} 下无可复制底稿",
+        )
+        try:
+            await assert_project_permission(db, current_user, body.source_project_id, "readonly")
+        except HTTPException as exc:
+            if exc.status_code == 403:  # 不是来源项目成员：与「没有可复制底稿」同一句
+                raise not_found from exc
+            raise
         source_wps = await _load_source_cycle(
             db, body.source_project_id, body.audit_cycle
         )
         if not source_wps:
-            raise HTTPException(
-                status_code=404,
-                detail=f"源项目循环 {body.audit_cycle} 下无可复制底稿",
-            )
+            raise not_found
+        visible = await _visible_index_ids(db, current_user, body.source_project_id)
+        hidden = [w for w in source_wps if w["wp_index_id"] not in visible]
+        source_wps = [w for w in source_wps if w["wp_index_id"] in visible]
+        if not source_wps:
+            raise not_found
+        await _reset_target_context(db, current_user, project_id)
 
         results = copier.copy_cycle(
             source_workpapers=source_wps,
@@ -139,12 +158,19 @@ async def template_copy(
 
         await _apply_retention(db, project_id, results, trim_scope)
         # 持久化所有复制成功的记录
+        jobs = []
         for r in results:
-            if r.status == "copied" and hasattr(r, "target_record"):
-                await _persist_copy_result(db, r, project_id)
+            if r.status == "copied" and getattr(r, "target_record", None):
+                jobs.append(await _persist_copy_result(db, r, project_id))
 
-        await db.commit()
-        return [_result_payload(r) for r in results]
+        await _materialize_and_commit(db, project_id, jobs)
+        payload = [_result_payload(r) for r in results]
+        payload += [
+            {"source_wp_code": w["wp_code"], "target_wp_id": None, "status": "skipped",
+             "message": "无权查看该底稿（未委派给你），未复制"}
+            for w in hidden
+        ]
+        return payload
 
     # 参数不完整
     raise HTTPException(
@@ -170,6 +196,7 @@ def _result_payload(result) -> dict:
 async def _apply_retention(db: AsyncSession, project_id: UUID, results: list, trim_scope) -> None:
     """复制前按保留范围拦截：已裁 / 在回收站 / 目标已有同码（覆盖未实现，原先撞唯一索引 500）⇒ 跳过。"""
     from app.services.procedure_scope_retention import wp_index_states
+    from app.services.wp_export.template_copier import EXISTING_CODE_SKIP_MESSAGE
 
     copied = [r for r in results if r.status == "copied"]
     states = await wp_index_states(db, project_id, [r.source_wp_code for r in copied])
@@ -180,7 +207,7 @@ async def _apply_retention(db: AsyncSession, project_id: UUID, results: list, tr
         elif states.get(code) is True:
             reason = "该编码的底稿在回收站中，请先从回收站恢复，未复制"
         elif states.get(code) is False:
-            reason = "目标项目已有该编码的底稿（暂不支持覆盖），未复制"
+            reason = EXISTING_CODE_SKIP_MESSAGE
         else:
             continue
         r.status, r.message, r.target_wp_id = "skipped", reason, None
@@ -215,7 +242,56 @@ async def _load_source_wp(db: AsyncSession, wp_id: UUID) -> dict | None:
         "schema": None,
         "wp_id": wp.id,
         "project_id": wp.project_id,
+        "wp_index_id": idx.id,
     }
+
+
+async def _visible_index_ids(db: AsyncSession, user: User, project_id: UUID) -> frozenset[UUID]:
+    """当前用户在来源项目里可见的 wp_index（与底稿列表 / 看板同一口径；纯读、不写拒绝记录）。"""
+    from app.services.wp_visibility import VisibilityRoleClassifier
+    from app.services.wp_visibility.visibility_query import VisibilityQueryService
+
+    context = await VisibilityRoleClassifier(db).classify(user, project_id)
+    return await VisibilityQueryService(db).visible_wp_index_ids(context)
+
+
+async def _source_visible(db: AsyncSession, user: User, project_id: UUID, wp_index_ids: list[UUID]) -> bool:
+    visible = await _visible_index_ids(db, user, project_id)
+    return all(i in visible for i in wp_index_ids)
+
+
+async def _reset_target_context(db: AsyncSession, user: User, project_id: UUID) -> None:
+    """来源项目的判定会把 RLS 上下文设成来源项目；写目标项目前设回（同时复核目标 edit 级）。"""
+    await assert_project_permission(db, user, project_id, "edit")
+
+
+async def _materialize_and_commit(db: AsyncSession, project_id: UUID, jobs: list) -> None:
+    """给复制出的底稿落本底稿自己的文件（按模板目录生成，不复制来源项目文件内容），再提交；失败清理已落文件。
+
+    🔴 原先 ``file_path=''``：在线编辑拿到空路径，打开时懒加载补的又是模板文件（spec procedure-chain-hardening-and-java-contracts R3）。
+    """
+    from app.services.wp_generate_file import (
+        discard_generated_file,
+        load_generation_scenario,
+        materialize_workpaper_files,
+    )
+
+    if not jobs:
+        await db.commit()
+        return
+    scenario, has_fx = await load_generation_scenario(db, project_id)
+    generated = await asyncio.to_thread(
+        materialize_workpaper_files, project_id, [job for job, _wp in jobs],
+        scenario=scenario, has_foreign_currency=has_fx,
+    )
+    try:
+        for (_job, wp), gen in zip(jobs, generated):
+            wp.file_path = str(gen.path)
+        await db.commit()
+    except BaseException:
+        for gen in generated:
+            discard_generated_file(gen)
+        raise
 
 
 async def _load_source_cycle(
@@ -248,23 +324,27 @@ async def _load_source_cycle(
             "schema": None,
             "wp_id": wp.id,
             "project_id": wp.project_id,
+            "wp_index_id": idx.id,
         }
         for wp, idx in rows
     ]
 
 
-async def _persist_copy_result(db: AsyncSession, copy_result, project_id: UUID) -> None:
-    """将复制结果持久化为目标项目的 wp_index + working_paper 记录。
+async def _persist_copy_result(db: AsyncSession, copy_result, project_id: UUID):
+    """将复制结果持久化为目标项目的 wp_index + working_paper 记录，返回 ``(落文件任务, 底稿行)``。
 
-    简化实现：创建 wp_index 和 working_paper 记录。
+    🔴 两个模型之间没有 relationship ⇒ 同一次 flush 里 SQLAlchemy 不知道先后，按类名排序先插 working_paper，
+       PG 上外键 ``working_paper_wp_index_id_fkey`` 违例 500（SQLite 测试默认不查外键所以一直是绿的）。
+       先 flush 索引行再建底稿行。
     """
     import uuid as uuid_mod
 
     from app.models.workpaper_models import WorkingPaper, WpIndex, WpSourceType
+    from app.services.wp_generate_file import WorkpaperFileJob
 
     target_record = getattr(copy_result, "target_record", None)
     if not target_record:
-        return
+        return None
 
     # 创建 wp_index 记录
     new_index_id = uuid_mod.uuid4()
@@ -277,6 +357,7 @@ async def _persist_copy_result(db: AsyncSession, copy_result, project_id: UUID) 
         is_deleted=False,
     )
     db.add(wp_index)
+    await db.flush()
 
     # 创建 working_paper 记录
     working_paper = WorkingPaper(
@@ -294,3 +375,5 @@ async def _persist_copy_result(db: AsyncSession, copy_result, project_id: UUID) 
     db.add(working_paper)
 
     await db.flush()
+    job = WorkpaperFileJob(working_paper.id, wp_index.wp_code, wp_index.wp_name or "")
+    return job, working_paper

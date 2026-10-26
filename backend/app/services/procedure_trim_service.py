@@ -38,6 +38,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.procedure_trim_engine import TrimReasonCode
+from app.services.program_row_status_sync import align_task_row_status  # 行级适用性变化后对齐状态覆盖值（R4）
 from app.models.procedure_models import (
     ProcedureInstance,
     ProcedureRowDefinition,
@@ -174,6 +175,7 @@ class ProcedureTrimService:
             set_applicability=APPLICABILITY_NOT_APPLICABLE,
             event_type="trim_not_applicable",
         )
+        await align_task_row_status(self.db, project_id, task, APPLICABILITY_NOT_APPLICABLE, actor_user_id=actor_user_id)
         return {
             "task_id": str(task.id),
             "changed": changed,
@@ -195,6 +197,7 @@ class ProcedureTrimService:
         恢复后 workflow=unassigned，须由 Delegator 重新 assign→ack（不自动完成，Property P9）。
         """
         task = await self._load_task(project_id, task_id)
+        previous_assignee = task.assignee_staff_id  # reopen 会清空执行人（P9）⇒ 先记下，回执里告诉页面须重新委派谁
         changed = await self.transition.reopen(
             task,
             actor_user_id=actor_user_id,
@@ -203,12 +206,14 @@ class ProcedureTrimService:
             reason=reason,
             event_type="trim_restore",
         )
+        await align_task_row_status(self.db, project_id, task, APPLICABILITY_EXECUTE, actor_user_id=actor_user_id)
         return {
             "task_id": str(task.id),
             "changed": changed,
             "applicability_status": task.applicability_status,
             "workflow_status": task.workflow_status,
             "requires_reassign": True,
+            "previous_assignee_staff_id": str(previous_assignee) if previous_assignee else None,
         }
 
     # ======================================================================
@@ -1029,6 +1034,7 @@ class ProcedureTrimService:
                             reason="scheme_restore",
                             event_type="scheme_restore",
                         )
+                    await align_task_row_status(self.db, project_id, t, target, actor_user_id=actor_user_id)
                     if changed:
                         entry_applied += 1
                     else:

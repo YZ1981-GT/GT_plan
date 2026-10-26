@@ -118,6 +118,9 @@ _READ_FAMILIES: tuple[tuple[str, str, str], ...] = (
 _CONTENT_MUTATION_FAMILIES: tuple[tuple[str, str, str], ...] = (
     ("workpaper.checklist_save", "PUT", "save_checklist"),
     ("workpaper.parsed_data_write", "PUT", "save_parsed_data"),
+    # 编辑锁 取锁 / 续期：与保存同一受众（能改内容的身份才占锁；spec procedure-chain-hardening-and-java-contracts R2）
+    ("workpaper.editing_lock", "POST", "acquire_edit_lock"),
+    ("workpaper.editing_lock", "PATCH", "renew_edit_lock"),
     ("workpaper.ai_generate", "POST", "ai_generate"),
     ("attachment.upload", "POST", "attach_upload"),
     ("attachment.delete", "DELETE", "attach_delete"),
@@ -135,6 +138,8 @@ _VERSION_RESTORE_FAMILY = ("version.restore", "POST", "version_restore")
 _VERSION_SNAPSHOT_FAMILY = ("version.snapshot", "POST", "version_snapshot")
 # 编辑器写盘：仅 lead/admin/supervisor_scope（reviewer editor write 明确禁止，§6）。
 _EDITOR_WRITE_FAMILY = ("editor.file_write", "POST", "editor_write")
+# 强制接管他人编辑锁：仅 lead/admin/supervisor_scope（assignee 不能把负责人挤成只读；R2.3）。
+_EDIT_LOCK_FORCE_FAMILY = ("workpaper.editing_lock_force", "POST", "force_edit_lock")
 # 试算表审定回写（trial-balance writeback）：whole-wp 审定数写 trial_balance，
 # 仅 lead/admin/supervisor_scope；method 因组件而异（S/M 类 POST、N 类 PUT）均登记。
 _TB_WRITEBACK_METHODS: tuple[str, ...] = ("POST", "PUT")
@@ -251,6 +256,7 @@ def _build_entries() -> tuple[frozenset[MatrixEntry], frozenset[MatrixKey]]:
             _VERSION_RESTORE_FAMILY,
             _VERSION_SNAPSHOT_FAMILY,
             _EDITOR_WRITE_FAMILY,
+            _EDIT_LOCK_FORCE_FAMILY,
         ):
             entries.add(_entry(uc, ak, ep, method, action, "mutation"))
         for src, tgt in _STATUS_TRANSITIONS:

@@ -142,16 +142,26 @@ describe('GtAProgramConsole — 行归属', () => {
     expect(wrapper.text()).toContain('+ 新增程序')
   })
 
-  it('委派人有裁剪入口；读不到行归属时按原行为放开（服务端保存兜底）', async () => {
+  it('委派人有裁剪入口；不适用的行只给「恢复执行」不给下拉（R4）；读不到行归属 ⇒ 整表只读 + 原因 + 重试（R7）', async () => {
     const { wrapper, row } = await mountConsole()
     expect(statusCell(row(4)).find('[data-command="not_applicable"]').exists()).toBe(true)
-    expect(statusCell(row(3)).find('.el-dropdown').exists()).toBe(true)
+    expect(statusCell(row(4)).find('[data-command="pending"]').exists()).toBe(true)
+    expect(statusCell(row(3)).find('.el-dropdown').exists()).toBe(false)
+    expect(restoreButton(row(3))).toBeTruthy()
+    expect(restoreButton(row(4))).toBeUndefined()
     expect(wrapper.find('.col-selection').exists()).toBe(true)
 
-    rowApi.getAccess.mockRejectedValue(new Error('网络错误'))
+    // 原先读不到按全权放开（服务端保存兜底）⇒ 页面上能改、保存时才被静默丢弃
+    rowApi.getAccess.mockRejectedValue({ response: { status: 500, data: { detail: '服务暂不可用' } } })
     const fallback = await mountConsole()
-    expect(summaryInput(fallback.row(4)).exists()).toBe(true)
-    expect(fallback.wrapper.find('.col-selection').exists()).toBe(true)
+    expect(summaryInput(fallback.row(4)).exists()).toBe(false)
+    expect(statusCell(fallback.row(4)).find('.el-dropdown').exists()).toBe(false)
+    expect(restoreButton(fallback.row(3))).toBeUndefined()
+    expect(fallback.wrapper.find('.col-selection').exists()).toBe(false)
+    expect(fallback.wrapper.text()).not.toContain('+ 新增程序')
+    // el-alert 是透传桩（不带 class）⇒ 按文字找
+    const alerts = fallback.wrapper.findAll('.el-alert').map((w) => w.text())
+    expect(alerts.some((t) => t.includes('无法读取本表的行级权限（服务暂不可用）') && t.includes('重试'))).toBe(true)
   })
 })
 
@@ -207,6 +217,9 @@ describe('GtAProgramConsole — 逐行委派（程序行任务开关关闭也可
 })
 
 const httpError = (status: number, detail: unknown) => ({ response: { status, data: { detail } } })
+const restoreButton = (r: ReturnType<Awaited<ReturnType<typeof mountConsole>>['row']>) =>
+  r.find('[data-label="裁剪/灰显说明"]').findAllComponents({ name: 'el-button' })
+    .find((b: { text(): string }) => b.text() === '恢复执行')
 const byNo = (vm: any, no: number) => vm.programs.find((p: any) => p.program_no === no)
 
 describe('GtAProgramConsole — 按行裁剪 / 恢复先落到程序行任务', () => {
@@ -238,17 +251,21 @@ describe('GtAProgramConsole — 按行裁剪 / 恢复先落到程序行任务', 
     expect(ElMessage.warning).not.toHaveBeenCalled()
   })
 
-  it('恢复：先调恢复接口，成功才把页面状态改回并清掉裁剪理由；失败不动', async () => {
-    const { vm } = await mountConsole()
+  it('恢复执行（R4）：先调恢复接口，成功才改回待执行、清掉裁剪理由并提示重新委派；失败不动；下拉改状态不碰细裁接口', async () => {
+    vi.spyOn(ElMessage, 'success').mockImplementation((() => undefined) as any)
+    const { vm, row } = await mountConsole()
     rowApi.setApplicability.mockRejectedValueOnce(httpError(409, '已复核任务不可取消'))
-    await vm.handleStatusChange(byNo(vm, 3), 'in_progress')
+    await vm.restoreProgramRow(byNo(vm, 3))
     expect([byNo(vm, 3).status, byNo(vm, 3).trim_reason]).toEqual(['not_applicable', '非 IPO'])
     expect(ElMessage.warning).toHaveBeenCalledWith(expect.stringContaining('已复核任务不可取消'))
 
-    await vm.handleStatusChange(byNo(vm, 3), 'in_progress')
+    rowApi.setApplicability.mockResolvedValueOnce({ changed: true, requires_reassign: true, previous_assignees: ['甲'] })
+    await (restoreButton(row(3))!.vm.$attrs as any).onClick()
+    await flushPromises()
     expect(rowApi.setApplicability).toHaveBeenLastCalledWith('proj-001', 'wp-001', 'restore',
       expect.objectContaining({ sheet_name: SHEET, program_no: '3' }))
-    expect([byNo(vm, 3).status, byNo(vm, 3).trim_reason]).toEqual(['in_progress', ''])
+    expect([byNo(vm, 3).status, byNo(vm, 3).trim_reason]).toEqual(['pending', ''])
+    expect(ElMessage.success).toHaveBeenCalledWith('已恢复执行，原执行人已清除（原执行人：甲），请重新委派')
 
     rowApi.setApplicability.mockClear()
     await vm.handleStatusChange(byNo(vm, 4), 'completed')

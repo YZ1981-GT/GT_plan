@@ -126,8 +126,22 @@ describe('useEditorMode - fetchComponentType', () => {
     await result.fetchComponentType()
 
     expect(result.componentType.value).toBe('form')
-    expect(refs.wpDetail.value).toEqual({ component_type: 'form', wp_code: 'D2-1' })
+    // 详情与 Univer 核心同一来源（getWorkpaperSettled），经 normalizeWorkpaper 补 id / status
+    expect(refs.wpDetail.value).toMatchObject({ component_type: 'form', wp_code: 'D2-1' })
     expect(apiGet).toHaveBeenCalledTimes(1)
+  })
+
+  it('请求被 GET 去重取消 ⇒ 重取一次，不回退 univer、不丢详情（R1）', async () => {
+    const canceled = Object.assign(new Error('canceled'), { __CANCEL__: true, code: 'ERR_CANCELED' })
+    apiGet.mockRejectedValueOnce(canceled).mockResolvedValueOnce({ component_type: 'form', wp_code: 'H1A' })
+    const refs: HarnessRefs = { wpId: ref('wp-5'), projectId: ref('proj-A'), wpDetail: ref(null) }
+    const { result } = withSetup(refs)
+
+    await result.fetchComponentType()
+
+    expect(apiGet).toHaveBeenCalledTimes(2)
+    expect(result.componentType.value).toBe('form')
+    expect(refs.wpDetail.value?.wp_code).toBe('H1A')
   })
 
   it('falls back to template_metadata.component_type when detail.component_type missing', async () => {

@@ -22,6 +22,9 @@ const mockPost = vi.fn()
 const mockDelete = vi.fn()
 const mockPatch = vi.fn()
 
+const elError = vi.fn()
+vi.mock('element-plus', () => ({ ElMessage: { error: (...a: any[]) => elError(...a) } }))
+
 vi.mock('@/services/apiProxy', () => ({
   api: {
     post: (...args: any[]) => mockPost(...args),
@@ -31,6 +34,9 @@ vi.mock('@/services/apiProxy', () => ({
 }))
 
 import { useEditingLock } from '@/composables/useEditingLock'
+
+/** 取锁 / 续期 / 释放 / 强抢都静默（错误由组合式函数自己处理，不叠全局提示） */
+const SILENT = { _silent: true }
 
 describe('useEditingLock', () => {
   beforeEach(() => {
@@ -50,7 +56,7 @@ describe('useEditingLock', () => {
     const { locked, isMine } = useEditingLock({ resourceId, resourceType: 'workpaper' })
 
     await vi.advanceTimersByTimeAsync(0)
-    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-001')
+    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-001', undefined, SILENT)
     expect(locked.value).toBe(true)
     expect(isMine.value).toBe(true)
   })
@@ -78,7 +84,7 @@ describe('useEditingLock', () => {
     expect(isMine.value).toBe(true)
 
     await release()
-    expect(mockDelete).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-003')
+    expect(mockDelete).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-003', SILENT)
   })
 
   it('sends heartbeat via v2 endpoint at configured interval', async () => {
@@ -92,7 +98,7 @@ describe('useEditingLock', () => {
     mockPatch.mockClear()
     // Advance past one heartbeat interval
     await vi.advanceTimersByTimeAsync(1000)
-    expect(mockPatch).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-004/heartbeat')
+    expect(mockPatch).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-004/heartbeat', undefined, SILENT)
   })
 
   it('uses generic lock endpoint for non-workpaper resources', async () => {
@@ -101,7 +107,7 @@ describe('useEditingLock', () => {
     const { locked, isMine } = useEditingLock({ resourceId, resourceType: 'other' })
 
     await vi.advanceTimersByTimeAsync(0)
-    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/other/report-001')
+    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/other/report-001', undefined, SILENT)
     expect(locked.value).toBe(true)
     expect(isMine.value).toBe(true)
   })
@@ -122,7 +128,7 @@ describe('useEditingLock', () => {
 
     await vi.advanceTimersByTimeAsync(0)
     await forceAcquire()
-    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-006/force')
+    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-006/force', undefined, SILENT)
   })
 
   // ── 切换资源时必须释放**旧** id（2026-09-28 Playwright 实测缺陷）──────────
@@ -141,7 +147,7 @@ describe('useEditingLock', () => {
     useEditingLock({ resourceId, resourceType: 'workpaper' })
 
     await vi.advanceTimersByTimeAsync(0)
-    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-old')
+    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-old', undefined, SILENT)
     mockDelete.mockClear()
     mockPost.mockClear()
 
@@ -149,11 +155,11 @@ describe('useEditingLock', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     // 释放的必须是旧 id
-    expect(mockDelete).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-old')
+    expect(mockDelete).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-old', SILENT)
     // 且绝不能把 DELETE 发到新 id 上（原缺陷形态）
-    expect(mockDelete).not.toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-new')
+    expect(mockDelete).not.toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-new', SILENT)
     // 新 id 只应被 acquire
-    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-new')
+    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-new', undefined, SILENT)
   })
 
   it('release() 释放的是持有的那把锁（卸载/关页路径）', async () => {
@@ -165,7 +171,7 @@ describe('useEditingLock', () => {
     await vi.advanceTimersByTimeAsync(0)
     mockDelete.mockClear()
     await release()
-    expect(mockDelete).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-cur')
+    expect(mockDelete).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-cur', SILENT)
   })
 
   // 🔴 真实缺陷路径：resourceId 先变、release 后调（= 组件卸载路径）
@@ -182,7 +188,7 @@ describe('useEditingLock', () => {
     const { release } = useEditingLock({ resourceId, resourceType: 'workpaper', autoAcquire: true })
 
     await vi.advanceTimersByTimeAsync(0)
-    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-held')
+    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-held', undefined, SILENT)
     mockDelete.mockClear()
 
     // 模拟路由参数已切到新底稿（组件还没重新 acquire）
@@ -190,8 +196,8 @@ describe('useEditingLock', () => {
     resourceId.value = 'wp-routed-away'
     await release()
 
-    expect(mockDelete).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-held')
-    expect(mockDelete).not.toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-routed-away')
+    expect(mockDelete).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-held', SILENT)
+    expect(mockDelete).not.toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-routed-away', SILENT)
   })
 
   // 心跳/释放都以 heldId 为准 ⇒ acquire 没成功（锁在别人手里）时不得有任何后续请求。
@@ -225,5 +231,101 @@ describe('useEditingLock', () => {
     await vi.advanceTimersByTimeAsync(0)
     await release()
     expect(mockDelete).not.toHaveBeenCalled()
+  })
+})
+
+describe('useEditingLock — 鉴权拒绝与可编辑门控（spec procedure-chain-hardening-and-java-contracts R2）', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    mockPost.mockReset()
+    mockDelete.mockReset()
+    mockPatch.mockReset()
+    elError.mockReset()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('取锁 404（看不见 / 无编辑权）⇒ denied，不显示他人正在编辑、不只读、不心跳', async () => {
+    mockPost.mockRejectedValue({ response: { status: 404, data: { detail: '资源不存在或不可访问' } } })
+    const resourceId = ref('wp-denied')
+    const { locked, isMine, forcedReadonly, denied, lockedBy } = useEditingLock({
+      resourceId, resourceType: 'workpaper', heartbeatMs: 1000,
+    })
+
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(denied.value).toBe(true)
+    expect(locked.value).toBe(false)
+    expect(isMine.value).toBe(false)
+    expect(forcedReadonly.value).toBe(false)
+    expect(lockedBy.value).toBeNull()
+    expect(mockPatch).not.toHaveBeenCalled()
+  })
+
+  it('续期 404（锁被收回）⇒ 停心跳并重新取锁；他人已持锁 ⇒ 409 进只读', async () => {
+    mockPost
+      .mockResolvedValueOnce({ acquired: true })
+      .mockRejectedValueOnce({ response: { status: 409, data: { detail: { locked_by_name: '李四' } } } })
+    mockPatch.mockRejectedValue({ response: { status: 404, data: { detail: '无活跃锁' } } })
+    const resourceId = ref('wp-lost')
+    const { isMine, forcedReadonly, lockedBy } = useEditingLock({ resourceId, resourceType: 'workpaper', heartbeatMs: 1000 })
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(isMine.value).toBe(true)
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(mockPost).toHaveBeenCalledTimes(2)
+    expect(isMine.value).toBe(false)
+    expect(forcedReadonly.value).toBe(true)
+    expect(lockedBy.value).toBe('李四')
+    mockPatch.mockClear()
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(mockPatch).not.toHaveBeenCalled() // 不再持锁 ⇒ 不再续期
+  })
+
+  it('续期遇网络抖动（无状态码）⇒ 保持持锁，下一次再续', async () => {
+    mockPost.mockResolvedValue({ acquired: true })
+    mockPatch.mockRejectedValueOnce(new Error('Network Error')).mockResolvedValue({})
+    const resourceId = ref('wp-flaky')
+    const { isMine } = useEditingLock({ resourceId, resourceType: 'workpaper', heartbeatMs: 1000 })
+
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(isMine.value).toBe(true)
+    expect(mockPost).toHaveBeenCalledTimes(1)
+    expect(mockPatch).toHaveBeenCalledTimes(2)
+  })
+
+  it('enabled=false 时不取锁；变为 true 取锁，再变回 false 释放', async () => {
+    mockPost.mockResolvedValue({ acquired: true })
+    mockDelete.mockResolvedValue({})
+    const resourceId = ref('wp-gated')
+    const enabled = ref(false)
+    const { isMine } = useEditingLock({ resourceId, resourceType: 'workpaper', enabled })
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockPost).not.toHaveBeenCalled()
+
+    enabled.value = true
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockPost).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-gated', undefined, SILENT)
+    expect(isMine.value).toBe(true)
+
+    enabled.value = false
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockDelete).toHaveBeenCalledWith('/api/editing-locks/workpaper/wp-gated', SILENT)
+    expect(isMine.value).toBe(false)
+  })
+
+  it('强制接管 403 ⇒ 中文提示后端原因', async () => {
+    mockPost.mockRejectedValue({
+      response: { status: 403, data: { detail: '只有底稿负责人、主管或管理员可以强制接管编辑锁' } },
+    })
+    const resourceId = ref('wp-force')
+    const { forceAcquire, isMine } = useEditingLock({ resourceId, resourceType: 'workpaper', autoAcquire: false })
+
+    await forceAcquire()
+    expect(isMine.value).toBe(false)
+    expect(elError).toHaveBeenCalledWith('只有底稿负责人、主管或管理员可以强制接管编辑锁')
   })
 })

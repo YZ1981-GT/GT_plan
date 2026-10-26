@@ -21,11 +21,15 @@ import { markG12AProcedureSteps } from '../g12VoucherCross'
 
 beforeEach(() => {
   api.get.mockReset().mockResolvedValue({ audit_year: 2025 })
-  api.post.mockReset().mockResolvedValue({})
+  // 批量端点：回执逐项列出写入成功的（spec procedure-chain-hardening-and-java-contracts R8）
+  api.post.mockReset().mockImplementation(async (_url: string, body: any) => ({
+    saved: body.items.map((i: any) => ({ scope: i.scope, item_key: i.item_key, field: i.field })), failed: [],
+  }))
   warn.mockReset()
 })
 
-const scopes = () => [...new Set(api.post.mock.calls.map(c => `${c[1].scope}@${c[1].year}`))]
+const items = () => api.post.mock.calls.flatMap(c => c[1].items.map((it: any) => ({ ...it, year: c[1].year })))
+const scopes = () => [...new Set(items().map(it => `${it.scope}@${it.year}`))]
 
 describe('writeProgramStepOverrides', () => {
   it('scope 用表码而不是整张表名；传了年度就用', async () => {
@@ -35,7 +39,9 @@ describe('writeProgramStepOverrides', () => {
     })
     expect(n).toBe(2)
     expect(scopes()).toEqual(['procedure_table:G8A@2024'])
-    expect(api.post.mock.calls.map(c => `${c[1].item_key}:${c[1].field}`)).toEqual([
+    expect(api.post).toHaveBeenCalledTimes(1) // 一次请求（原先逐字段 6 发）
+    expect(api.post.mock.calls[0][0]).toBe('/api/workpapers/field-overrides/batch')
+    expect(items().map(it => `${it.item_key}:${it.field}`)).toEqual([
       '3:status', '3:linked_workpapers', '3:execution_summary', '10:status', '10:linked_workpapers', '10:execution_summary',
     ])
     expect(api.get).not.toHaveBeenCalled()
@@ -73,7 +79,7 @@ describe('G8~G12 回填函数都走同一写入（scope = 表码）', () => {
     const n = await (mark as any)({ projectId: 'p1', programNos: [2], executionSummary: '已检查' })
     expect(n).toBe(1)
     expect(scopes()).toEqual([`procedure_table:${code}@2025`])
-    expect(api.post.mock.calls.find(c => c[1].field === 'status')?.[1].value).toBe('completed')
+    expect(items().find(it => it.field === 'status')?.value).toBe('completed')
   })
 })
 
@@ -84,10 +90,10 @@ describe('变异：writeProgramStepOverrides 不可回退到旧写法', () => {
       projectId: 'p1', year: 2025, sheet: '其他权益工具投资实质性程序表G8A',
       programNos: [1], status: 'completed',
     })
-    for (const call of api.post.mock.calls) {
+    for (const it of items()) {
       // scope 应该是 procedure_table:G8A，不是 procedure_table:其他权益工具投资实质性程序表G8A
-      expect(call[1].scope).toBe('procedure_table:G8A')
-      expect(call[1].scope).not.toContain('其他权益工具')
+      expect(it.scope).toBe('procedure_table:G8A')
+      expect(it.scope).not.toContain('其他权益工具')
     }
   })
 
@@ -109,6 +115,7 @@ describe('变异：writeProgramStepOverrides 不可回退到旧写法', () => {
     for (const call of api.post.mock.calls) {
       expect(call[1].year).toBe(2024)
     }
+    expect(items().length).toBe(2)
   })
 
   it('MO-S4: 未知的表名返回 0、不发请求（防止写到错误的 scope）', async () => {
@@ -117,5 +124,33 @@ describe('变异：writeProgramStepOverrides 不可回退到旧写法', () => {
     })
     expect(n).toBe(0)
     expect(api.post).not.toHaveBeenCalled()
+  })
+})
+
+describe('批量写入的失败如实提示（R8：原先逐字段吞错）', () => {
+  it('后端回报不能写的项 ⇒ 提示原因，只计写入成功的状态', async () => {
+    api.post.mockResolvedValueOnce({
+      saved: [{ scope: 'procedure_table:G8A', item_key: '1', field: 'status' }],
+      failed: [{ scope: 'procedure_table:G8A', item_key: '2', field: 'status', status: 403, reason: '只能填写派给本人的程序行' }],
+    })
+    const n = await writeProgramStepOverrides({ projectId: 'p1', year: 2025, sheet: 'G8A', programNos: [1, 2], status: 'completed' })
+    expect(n).toBe(1)
+    expect(warn).toHaveBeenCalledWith('回填程序表有 1 项没有写入 —— 第 2 条：只能填写派给本人的程序行')
+  })
+
+  it('超过单次上限按 200 项分批（后端 MAX_BATCH_ITEMS）', async () => {
+    const programNos = Array.from({ length: 70 }, (_, i) => i + 1) // 70 × 3 字段 = 210 项
+    const n = await writeProgramStepOverrides({
+      projectId: 'p1', year: 2025, sheet: 'G8A', programNos, status: 'completed', linkedWorkpapers: 'G8-4', executionSummary: 'x',
+    })
+    expect(api.post.mock.calls.map(c => c[1].items.length)).toEqual([200, 10])
+    expect(n).toBe(70)
+  })
+
+  it('请求失败 ⇒ 提示后端原因、返回 0', async () => {
+    api.post.mockRejectedValueOnce({ response: { status: 403, data: { detail: '权限不足' } } })
+    const n = await writeProgramStepOverrides({ projectId: 'p1', year: 2025, sheet: 'G8A', programNos: [1], status: 'completed' })
+    expect(n).toBe(0)
+    expect(warn).toHaveBeenCalledWith('回填程序表失败：权限不足')
   })
 })

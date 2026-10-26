@@ -9,8 +9,12 @@
  * - 整体规则：全 ✅ → 绿色横幅；任一 ⚠ → 黄色；任一 ❌ → 红色
  *
  * 后端端点：GET /api/projects/{pid}/workpapers/prerequisite-status?wp_code=E1
+ *
+ * spec procedure-chain-hardening-and-java-contracts R9：项目 / 底稿编码接受 getter，变化即重取（旧回执丢弃）；
+ * 编码为空不请求。原先编辑器在 setup 时传 `.value` ⇒ 详情还没加载，每张底稿都按 E1 请求、看到的都是货币资金的前置。
+ * 后端 `wp_prerequisite_status.prerequisites_for` 是清单的权威；下面的清单只在请求失败时兜底（两侧逐项对拍）。
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, toValue, watch, type MaybeRefOrGetter } from 'vue'
 import { api } from '@/services/apiProxy'
 
 export type PrerequisiteState = 'completed' | 'in_progress' | 'pending' | 'not_applicable'
@@ -152,7 +156,17 @@ function getICyclePrerequisites(wpCode: string): typeof I_CYCLE_PREREQUISITES {
   return result
 }
 
-export function usePrerequisiteStatus(projectId: string, wpCode: string) {
+/**
+ * 编辑器前置横幅按哪个编码请求：E1 族 ⇒ 'E1'；D / F / G / H / I / J / K / L / M / N 循环 ⇒ 底稿编码；
+ * 其余（A / B / C / S…）没有前置环节 ⇒ ''（不请求、不显示横幅）。
+ */
+export function prerequisiteWpCode(wpCode: string | null | undefined): string {
+  const code = String(wpCode || '').trim()
+  if (/^E1(?!\d)/i.test(code)) return 'E1'
+  return /^[DFGHIJKLMN]\d/i.test(code) ? code : ''
+}
+
+export function usePrerequisiteStatus(projectIdSource: MaybeRefOrGetter<string>, wpCodeSource: MaybeRefOrGetter<string>) {
   const items = ref<PrerequisiteItem[]>([])
   const overall = ref<'ready' | 'partial' | 'blocked'>('ready')
   const loading = ref(false)
@@ -180,8 +194,17 @@ export function usePrerequisiteStatus(projectId: string, wpCode: string) {
     }
   })
 
+  let seq = 0
   async function refresh() {
-    if (!projectId) return
+    const projectId = toValue(projectIdSource)
+    const wpCode = toValue(wpCodeSource)
+    const mine = ++seq
+    if (!projectId || !wpCode) { // 没有前置环节的底稿 / 详情还没加载：不请求
+      items.value = []
+      overall.value = 'ready'
+      loading.value = false
+      return
+    }
     loading.value = true
     lastError.value = ''
     try {
@@ -189,9 +212,11 @@ export function usePrerequisiteStatus(projectId: string, wpCode: string) {
         `/api/projects/${projectId}/workpapers/prerequisite-status`,
         { params: { wp_code: wpCode } },
       )
+      if (mine !== seq) return // 换了底稿：旧回执丢弃
       items.value = data?.items || []
       overall.value = data?.overall || 'ready'
     } catch (err: any) {
+      if (mine !== seq) return
       // 端点可能未实现，降级为静默置空：默认前置全 pending
       lastError.value = err?.message || ''
       const isDCycle = /^D\d/i.test(wpCode)
@@ -233,13 +258,11 @@ export function usePrerequisiteStatus(projectId: string, wpCode: string) {
       // M 循环无前置底稿（空数组），fallback 时直接 ready
       overall.value = fallbackList.length === 0 ? 'ready' : 'blocked'
     } finally {
-      loading.value = false
+      if (mine === seq) loading.value = false
     }
   }
-
-  onMounted(() => {
-    refresh()
-  })
+  // 多源 watch 逐项比值：详情对象换了但编码没变不重取
+  watch([() => toValue(projectIdSource), () => toValue(wpCodeSource)], () => { void refresh() }, { immediate: true })
 
   return {
     items,

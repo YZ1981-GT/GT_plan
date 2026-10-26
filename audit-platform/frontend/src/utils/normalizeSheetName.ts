@@ -23,6 +23,14 @@ export function normalizeSheetName(name: string): string {
 }
 
 /**
+ * 深链别名：`?sheet=@program` ⇒ 这本底稿的程序表页签（第一张 componentType = a-program-console 的表）。
+ * 程序裁剪页「进入程序表」不知道表名（H1A / 函证程序表F0A …），原先不带 sheet ⇒ 落到「底稿目录」
+ * （spec procedure-chain-hardening-and-java-contracts R5）。按表名解析的 `resolveSheetNameByDeepLink`
+ * 不认这个别名（它只看表名，别名要按 componentType 认，见 `useWpRenderer.resolveRenderSheet`）。
+ */
+export const PROGRAM_SHEET_ALIAS = '@program'
+
+/**
  * 深链 `?sheet=` → 实际 sheet_name 解析（纯函数，供 `GtWpRenderer` 与守卫共用）。
  *
  * 三级匹配，逐级放宽：

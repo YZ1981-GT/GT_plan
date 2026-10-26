@@ -13,7 +13,8 @@
  * Validates: Requirements 1.1（D2A 痛点 7 项）+ 3.2（A 程序表详细需求）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
+import { ElMessage } from 'element-plus'
 import { nextTick } from 'vue'
 import { setActivePinia, createPinia } from 'pinia'
 import GtAProgramConsole from '../GtAProgramConsole.vue'
@@ -429,6 +430,68 @@ describe('GtAProgramConsole — 批量裁剪', () => {
     expect(vm.programs[3].status).toBe('not_applicable')
     expect(vm.programs[1].trim_reason).toBe('本项目不涉及该业务')
     expect(vm.selectedIds.length).toBe(0)
+  })
+})
+
+describe('GtAProgramConsole — 恢复执行 / 行级权限（spec procedure-chain-hardening-and-java-contracts R4 / R7）', () => {
+  const mk = () => mount(GtAProgramConsole, {
+    props: { wpId: 'wp-001', sheetName: '应收账款实质性程序表D2A', schema: {}, htmlData: createMockHtmlData() },
+    global: { stubs: globalStubs },
+  })
+
+  it('不适用行不经下拉改状态（原先改成执行中 = 先恢复再标执行中 ⇒ 无人执行却执行中）', async () => {
+    const vm = mk().vm as any
+    await vm.handleStatusChange(vm.programs[2], 'in_progress')
+    expect(vm.programs[2].status).toBe('not_applicable')
+    expect(rowApi.setApplicability).not.toHaveBeenCalled()
+  })
+
+  it('恢复执行：先落任务，成功后待执行、提示原执行人、重读行归属', async () => {
+    const success = vi.spyOn(ElMessage, 'success').mockImplementation((() => undefined) as any)
+    rowApi.setApplicability.mockResolvedValueOnce({ changed: true, requires_reassign: true, previous_assignees: ['张三'] })
+    const wrapper = mk()
+    await flushPromises()
+    const vm = wrapper.vm as any
+    const loads = rowApi.getAccess.mock.calls.length
+    await vm.restoreProgramRow(vm.programs[2])
+    expect(rowApi.setApplicability).toHaveBeenCalledWith('proj-001', 'wp-001', 'restore', expect.objectContaining({ program_no: '3' }))
+    expect([vm.programs[2].status, vm.programs[2].trim_reason]).toEqual(['pending', ''])
+    expect(wrapper.emitted('program-status-change')![0][0]).toEqual({ programId: 'p3', status: 'pending' })
+    expect(success).toHaveBeenCalledWith('已恢复执行，原执行人已清除（原执行人：张三），请重新委派')
+    expect(rowApi.getAccess.mock.calls.length).toBe(loads + 1)
+    success.mockRestore()
+  })
+
+  it('恢复没生效 ⇒ 页面保持不适用', async () => {
+    rowApi.setApplicability.mockRejectedValueOnce({ response: { status: 403 } })
+    const vm = mk().vm as any
+    await vm.restoreProgramRow(vm.programs[2])
+    expect(vm.programs[2].status).toBe('not_applicable')
+  })
+
+  it('裁剪成功后重读行归属（执行人已取消）', async () => {
+    const wrapper = mk()
+    await flushPromises()
+    const vm = wrapper.vm as any
+    const loads = rowApi.getAccess.mock.calls.length
+    vm.trimForm = { programId: 'p4', programDesc: '检查期后回款情况', reason: '不适用' }
+    await vm.confirmTrim()
+    expect(rowApi.getAccess.mock.calls.length).toBe(loads + 1)
+  })
+
+  it('行级权限读不到 ⇒ 整表只读（原先按全权放开）', async () => {
+    rowApi.getAccess.mockReset().mockRejectedValue({ response: { status: 500, data: { detail: '服务暂不可用' } } })
+    const wrapper = mk()
+    await flushPromises()
+    const vm = wrapper.vm as any
+    expect([vm.rowAccessState, vm.rowAccessError]).toEqual(['error', '服务暂不可用'])
+    expect([vm.canEditRow(vm.programs[3]), vm.canTrim, vm.rowFullPower]).toEqual([false, false, false])
+    const alert = wrapper.find('.gt-a-program-console__access-error')
+    expect(alert.exists()).toBe(true)
+    expect(alert.text()).toContain('无法读取本表的行级权限（服务暂不可用）')
+    const calls = rowApi.getAccess.mock.calls.length
+    await alert.find('button').trigger('click') // 重试
+    expect(rowApi.getAccess.mock.calls.length).toBe(calls + 1)
   })
 })
 

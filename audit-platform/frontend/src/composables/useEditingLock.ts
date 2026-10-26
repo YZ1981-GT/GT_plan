@@ -19,6 +19,7 @@
  * const lock = useEditingLock({ resourceId: reportId, resourceType: 'audit_report' })
  */
 import { ref, computed, onMounted, onUnmounted, watch, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 
@@ -52,6 +53,19 @@ export interface EditingLockOptions {
   heartbeatMs?: number
   /** 是否在 mount 时自动 acquire（默认 true） */
   autoAcquire?: boolean
+  /**
+   * 能编辑时才取锁（不传 = 恒取锁，兼容旧调用方）。变为 false 时释放已持有的锁。
+   * 🔴 只读身份（质控 / EQCR / 未委派的人）打开底稿也去取锁 ⇒ 后端拒绝时每次都留一条拒绝记录，
+   *    放行时又把真正要编辑的人挤成只读（spec procedure-chain-hardening-and-java-contracts R2）。
+   */
+  enabled?: Readonly<Ref<boolean>>
+}
+
+/** 取锁 / 续期 / 强制接管的错误由本函数处理，不弹全局提示（拦截器会把 404 / 409 弹成通用错误）。 */
+const SILENT = { _silent: true } as any
+
+function statusOf(e: any): number | undefined {
+  return e?.response?.status ?? e?.status
 }
 
 export function useEditingLock(options: EditingLockOptions) {
@@ -60,10 +74,13 @@ export function useEditingLock(options: EditingLockOptions) {
   const isMine = ref(false)
   /** 多窗口门禁：acquire 被 409 拒绝时为 true，宿主据此禁用所有保存操作 */
   const forcedReadonly = ref(false)
+  /** 取锁被拒（无权编辑 / 看不见该资源，后端 403 / 404）：不显示「他人正在编辑」 */
+  const denied = ref(false)
   let timer: ReturnType<typeof setInterval> | null = null
 
   const heartbeatMs = options.heartbeatMs ?? 120_000
   const resourceType = options.resourceType ?? 'workpaper'
+  const isEnabled = () => options.enabled === undefined || options.enabled.value
 
   async function acquire() {
     const id = options.resourceId.value
@@ -71,14 +88,16 @@ export function useEditingLock(options: EditingLockOptions) {
 
     const base = `/api/editing-locks/${resourceType}/${id}`
     try {
-      const res = await api.post(base)
+      const res = await api.post(base, undefined, SILENT)
       locked.value = true
       isMine.value = res?.acquired ?? true
       lockedBy.value = res?.locked_by_name ?? null
+      denied.value = false
       // 记下**实际持有**的 id —— release / heartbeat 一律按它发（见 release 注释）
       if (isMine.value) heldId.value = id
     } catch (e: any) {
-      if (e?.response?.status === 409 || e?.status === 409) {
+      const status = statusOf(e)
+      if (status === 409) {
         locked.value = true
         isMine.value = false
         // 多窗口门禁：同底稿第二窗口锁冲突 → 强制只读
@@ -86,6 +105,11 @@ export function useEditingLock(options: EditingLockOptions) {
         forcedReadonly.value = true
         lockedBy.value = e?.response?.data?.detail?.locked_by_name
           ?? e?.data?.detail?.locked_by_name ?? '其他用户'
+      } else if (status === 403 || status === 404) {
+        locked.value = false
+        isMine.value = false
+        lockedBy.value = null
+        denied.value = true
       }
     }
   }
@@ -114,7 +138,7 @@ export function useEditingLock(options: EditingLockOptions) {
     if (!id || !isMine.value) return
 
     try {
-      await api.delete(`/api/editing-locks/${resourceType}/${id}`)
+      await api.delete(`/api/editing-locks/${resourceType}/${id}`, SILENT)
     } catch { /* ignore */ }
     heldId.value = null
     locked.value = false
@@ -126,8 +150,19 @@ export function useEditingLock(options: EditingLockOptions) {
     if (!id || !isMine.value) return
 
     try {
-      await api.patch(`/api/editing-locks/${resourceType}/${id}/heartbeat`)
-    } catch { /* ignore */ }
+      await api.patch(`/api/editing-locks/${resourceType}/${id}/heartbeat`, undefined, SILENT)
+    } catch (e: any) {
+      const status = statusOf(e)
+      if (status !== 403 && status !== 404) return // 网络抖动：下一次再续
+      // 锁已过期 / 已被收回（撤权时后端顺手放掉了本人的锁）：不再当作持锁，重新取一次
+      // （他人已持锁 ⇒ 409 进只读；无权 ⇒ denied）
+      stopHeartbeat()
+      heldId.value = null
+      isMine.value = false
+      locked.value = false
+      await acquire()
+      if (isMine.value) startHeartbeat()
+    }
   }
 
   /** 强抢锁 */
@@ -136,14 +171,21 @@ export function useEditingLock(options: EditingLockOptions) {
     if (!id) return
 
     try {
-      const res = await api.post(`/api/editing-locks/${resourceType}/${id}/force`)
+      const res = await api.post(`/api/editing-locks/${resourceType}/${id}/force`, undefined, SILENT)
       locked.value = true
       isMine.value = true
       lockedBy.value = null
       forcedReadonly.value = false
       heldId.value = id
       return res
-    } catch { /* ignore */ }
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail ?? e?.response?.data?.message
+      ElMessage.error(
+        statusOf(e) === 403
+          ? (typeof detail === 'string' && detail) || '只有底稿负责人、主管或管理员可以强制接管编辑锁'
+          : '强制接管编辑锁失败，请刷新页面后重试',
+      )
+    }
   }
 
   function startHeartbeat() {
@@ -205,7 +247,7 @@ export function useEditingLock(options: EditingLockOptions) {
   }
 
   onMounted(async () => {
-    if (options.autoAcquire !== false) {
+    if (options.autoAcquire !== false && isEnabled()) {
       await acquire()
       if (isMine.value) startHeartbeat()
     }
@@ -225,11 +267,25 @@ export function useEditingLock(options: EditingLockOptions) {
     // release() 按 heldId 发，此刻 heldId 仍是旧 id ⇒ 无需也不应传参（见 release 注释）
     if (oldId && isMine.value) await release()
     stopHeartbeat()
-    if (newId) {
+    denied.value = false
+    if (newId && isEnabled()) {
       await acquire()
       if (isMine.value) startHeartbeat()
     }
   })
 
-  return { locked, lockedBy, isMine, forcedReadonly, acquire, release, forceAcquire }
+  // 可编辑状态变化：变为可编辑时取锁，变为不可编辑时放锁
+  if (options.enabled) {
+    watch(options.enabled, async (on) => {
+      if (on && !isMine.value && options.autoAcquire !== false) {
+        await acquire()
+        if (isMine.value) startHeartbeat()
+      } else if (!on && isMine.value) {
+        stopHeartbeat()
+        await release()
+      }
+    })
+  }
+
+  return { locked, lockedBy, isMine, forcedReadonly, denied, acquire, release, forceAcquire }
 }

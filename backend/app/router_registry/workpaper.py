@@ -379,9 +379,13 @@ def register_workpaper_routers(app: FastAPI) -> None:
     # 全部含 ``{wp_id}``/``{wp_index_id}`` 路径参数的横切 router（wp_ai/wp_editor/wp_review/
     # wp_structure/working_paper/version/download/... 等）。该依赖对无 wp_id 路径段的路由是安全
     # no-op，故对混合 router 只影响其 wp_id 绑定子路由。一处机制统一覆盖，避免逐路由手工接线。
+    def _self_gated(r) -> bool:
+        """路由自己已声明 ``dedicated_wp_gate``（如 wp_program_row_access）⇒ 不重复挂（否则判两次、拒绝记两条）。"""
+        return any(getattr(d, "dependency", None) is dedicated_wp_gate for d in (r.dependencies or []))
+
     for tag, routers in groups.items():
         for r in routers:
-            if router_has_dedicated_module(r) or router_has_wp_id_route(r):
+            if (router_has_dedicated_module(r) or router_has_wp_id_route(r)) and not _self_gated(r):
                 app.include_router(r, tags=[tag], dependencies=[_Depends(dedicated_wp_gate)])
             else:
                 app.include_router(r, tags=[tag])

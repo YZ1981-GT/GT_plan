@@ -34,25 +34,50 @@ export async function writeProgramStepOverrides(opts: {
   }
   if (year == null) return 0
   const { api } = await import('@/services/apiProxy')
+  const { ElMessage } = await import('element-plus')
   const scope = `procedure_table:${code}`
-  let n = 0
-  for (const programNo of opts.programNos) {
-    const fields: Array<{ field: string; value: unknown }> = [{ field: 'status', value: opts.status }]
-    if (opts.linkedWorkpapers) fields.push({ field: 'linked_workpapers', value: opts.linkedWorkpapers })
-    if (opts.executionSummary) fields.push({ field: 'execution_summary', value: opts.executionSummary })
-    for (const f of fields) {
-      try {
-        await api.post('/api/workpapers/field-overrides', {
-          project_id: opts.projectId,
-          year,
-          scope,
-          item_key: String(programNo),
-          field: f.field,
-          value: f.value,
-        }, { _silent: true } as any)
-        if (f.field === 'status') n += 1
-      } catch { /* 单字段失败不阻断其余字段 */ }
+  const items = buildProgramStepOverrideItems(scope, opts)
+  // 批量端点：一次请求一次提交，不能写的项逐条回报（spec procedure-chain-hardening-and-java-contracts R8：
+  // 原先逐字段单发、失败静默吞掉 ⇒ 403「只能填写派给本人的程序行」用户完全看不到）
+  const saved: Array<{ field: string }> = []
+  const failed: Array<{ item_key: string; reason: string }> = []
+  for (let i = 0; i < items.length; i += OVERRIDE_BATCH_SIZE) {
+    try {
+      const res: any = await api.post('/api/workpapers/field-overrides/batch', {
+        project_id: opts.projectId, year, items: items.slice(i, i + OVERRIDE_BATCH_SIZE),
+      }, { _silent: true } as any)
+      saved.push(...(res?.saved ?? []))
+      failed.push(...(res?.failed ?? []))
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail
+      ElMessage.warning(`回填程序表失败：${typeof detail === 'string' && detail ? detail : '请稍后重试'}`)
+      return saved.filter((s) => s.field === 'status').length
     }
   }
-  return n
+  if (failed.length) {
+    const shown = failed.slice(0, 3).map((f) => `第 ${f.item_key} 条：${f.reason}`).join('；')
+    ElMessage.warning(`回填程序表有 ${failed.length} 项没有写入 —— ${shown}${failed.length > 3 ? ' 等' : ''}`)
+  }
+  return saved.filter((s) => s.field === 'status').length
+}
+
+/** 后端单次批量上限 200（`wp_field_overrides.MAX_BATCH_ITEMS`） */
+export const OVERRIDE_BATCH_SIZE = 200
+
+/** 每个程序号：状态（必写）+ 关联底稿 / 执行说明（有值才写）。 */
+export function buildProgramStepOverrideItems(scope: string, opts: {
+  programNos: readonly number[]
+  status: string
+  linkedWorkpapers?: string
+  executionSummary?: string
+}): Array<{ scope: string; item_key: string; field: string; value: unknown }> {
+  return opts.programNos.flatMap((programNo) => {
+    const item_key = String(programNo)
+    const list: Array<{ scope: string; item_key: string; field: string; value: unknown }> = [
+      { scope, item_key, field: 'status', value: opts.status },
+    ]
+    if (opts.linkedWorkpapers) list.push({ scope, item_key, field: 'linked_workpapers', value: opts.linkedWorkpapers })
+    if (opts.executionSummary) list.push({ scope, item_key, field: 'execution_summary', value: opts.executionSummary })
+    return list
+  })
 }

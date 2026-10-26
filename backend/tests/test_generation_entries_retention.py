@@ -240,9 +240,14 @@ async def test_b60_and_ipo_loaders(world, monkeypatch):
     assert again["added_codes"] == [] and "D4-26" in again["skipped_existing"]
 
 
-async def test_template_copy_skips_trimmed_and_returns_json(world):
+async def test_template_copy_skips_trimmed_and_returns_json(world, monkeypatch):
     """复制前按保留范围拦截；响应不再在 commit 后调不存在的 model_dump（原先复制落库、接口却 500）。"""
     db = world["db"]
+
+    async def _all_visible(db_, user, project_id):  # 来源可见性是 PG 口径（真库用例另见 test_template_copy_visibility_pg.py）
+        return frozenset((await db_.execute(sa.select(WpIndex.id).where(WpIndex.project_id == project_id))).scalars())
+
+    monkeypatch.setattr(wp_template_copy_router, "_visible_index_ids", _all_visible)
     created = {}
     for code in ("H3-1", "G1"):
         idx = WpIndex(project_id=world["source"], wp_code=code, wp_name=code, audit_cycle=code[0],

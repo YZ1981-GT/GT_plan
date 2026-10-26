@@ -2,7 +2,8 @@
  * 底稿模块 API 服务层
  * 封装模板管理、取数公式、WOPI、底稿管理、质量自检、复核批注全部 API
  */
-import http, { downloadFile } from '@/utils/http'
+import http, { downloadFile, isRequestCancelled } from '@/utils/http'
+import { api as apiProxy } from '@/services/apiProxy'
 import {
   templates as P_tpl, formula as P_fm, workpapers as P_wp,
   wpReviews as P_wr, wpMapping as P_wm, sampling as P_samp,
@@ -393,9 +394,37 @@ export async function listWorkpapers(
   return realized.map(normalizeWorkpaper)
 }
 
+/** 取底稿详情（每次独立请求；保存后刷新等要拿到最新版本号的场景用它）。 */
 export async function getWorkpaper(projectId: string, wpId: string): Promise<WorkpaperDetail> {
   const { data } = await http.get(P_wp.detail(projectId, wpId))
   return normalizeWorkpaper(data)
+}
+
+/**
+ * 编辑器首屏取底稿详情：同一底稿详情的并发请求共享一个在途结果（本模块自己的在途表：apiProxy 只给不带 config 的
+ * GET 共享，这里要带 `_silent`），被 GET 去重取消时重取一次；其余错误原样抛出、不弹全局提示。
+ *
+ * 🔴 Shell（useEditorMode）与 Univer 核心（useEditorUniver）曾各自直接发同 URL 的 GET：utils/http 的 GET 去重
+ *    取消先发的那一发，被取消方又把取消当失败 ⇒ 5 次里 3 次误报「底稿文件尚未生成」（spec procedure-chain-hardening-and-java-contracts R1）。
+ */
+const settledDetailInflight = new Map<string, Promise<WorkpaperDetail>>()
+
+export function getWorkpaperSettled(projectId: string, wpId: string): Promise<WorkpaperDetail> {
+  const url = P_wp.detail(projectId, wpId)
+  const shared = settledDetailInflight.get(url)
+  if (shared) return shared
+  // 静默：无权 / 已删除 / 不存在由编辑器给一句中性提示（R10），不再叠加全局「资源不存在」提示
+  const load = async () => normalizeWorkpaper(await apiProxy.get(url, { _silent: true } as any))
+  const p = (async () => {
+    try {
+      return await load()
+    } catch (e) {
+      if (!isRequestCancelled(e)) throw e
+      return load()
+    }
+  })().finally(() => settledDetailInflight.delete(url))
+  settledDetailInflight.set(url, p)
+  return p
 }
 
 export async function downloadWorkpaper(projectId: string, wpId: string) {
