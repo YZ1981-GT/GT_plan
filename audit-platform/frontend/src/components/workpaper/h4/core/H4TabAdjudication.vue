@@ -468,7 +468,7 @@ const props = defineProps<{
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
 const seedingCip = ref(false)
-const { resolveInstance } = useAcnr()
+const { resolveInstance } = useAcnr(() => props.projectId)
 
 const allResponsesRef = computed(() => props.allResponses)
 const tbValues = inject<Ref<Record<string, number>>>('h4TbValues', ref({}))

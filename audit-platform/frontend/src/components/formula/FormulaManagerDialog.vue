@@ -1514,7 +1514,7 @@ async function exitGlobalBrowse() {
 async function loadAcnrTree() {
   if (acnrTreeLoaded.value) return
   try {
-    const acnr = useAcnr()
+    const acnr = useAcnr(() => props.projectId)
     acnrSheets.value = await acnr.listSheets()
     acnrTreeLoaded.value = true
   } catch (e) {

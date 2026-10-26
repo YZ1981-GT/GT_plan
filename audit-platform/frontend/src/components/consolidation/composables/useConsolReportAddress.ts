@@ -26,6 +26,7 @@ import { computed, type ComputedRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAddressRegistry } from '@/stores/addressRegistry'
 import { useAcnr, type AcnrResolveResult } from '@/services/acnr/useAcnr'
+import { useCurrentProjectId } from '@/composables/useCurrentProjectId'
 
 /** 解析结果（consolBreakdown drill 用）。 */
 export interface AccountJumpResult {
@@ -72,7 +73,15 @@ function norm(s: unknown): string {
  * 未填充时自然走降级（Req 20.7 无回归）。
  */
 export function useConsolReportAddress(): ConsolReportAddressApi {
-  const { resolveIndex, resolveUri } = useAcnr()
+  // D9（需求 11.1）：按当前项目订阅 ACNR 失效。纯函数单测环境无 router/pinia 时降级为无项目
+  // （与下方 store 的 try/catch 降级一致），不订阅、不影响 resolve。
+  let currentPid: ComputedRef<string> | null = null
+  try {
+    currentPid = useCurrentProjectId()
+  } catch {
+    currentPid = null
+  }
+  const { resolveIndex, resolveUri } = useAcnr(() => currentPid?.value || '')
 
   // 无活跃 Pinia（纯函数单测环境）时降级为 null → 全部走 miss 回退。
   let store: ReturnType<typeof useAddressRegistry> | null = null

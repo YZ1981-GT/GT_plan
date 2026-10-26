@@ -157,7 +157,9 @@ export async function fetchD43RowsFromProject(projectId: string): Promise<D43Ren
       message: '无项目上下文，无法加载 D4-3',
     }
   }
-  const { resolveInstance } = useAcnr()
+  // D9（需求 11.4）：普通 async 函数内调用，无 effect scope ⇒ 不订阅 SSE；传 projectId
+  // 仅作 resolve 缺省项目（本处 resolveInstance 显式传参）。
+  const { resolveInstance } = useAcnr(projectId)
   try {
     const inst = await resolveInstance(projectId, 'D4', 'D4-3')
     const wpId = inst?.found ? inst.wp_id : undefined

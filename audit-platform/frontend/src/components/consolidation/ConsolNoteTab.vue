@@ -826,7 +826,7 @@ const emit = defineEmits<{
 // 合并附注 note section 引用经 useAcnr().resolveIndex('note:'+sectionId) 解析/跳转，
 // NOTE 域走 full_resolve V1 delegation，无需预登记 L1 catalog（Req 17.4）。
 const router = useRouter()
-const acnr = useAcnr()
+const acnr = useAcnr(() => props.projectId)
 
 /**
  * 源单体附注 section 的稳定 NOTE 地址标识（Req 20.4 reaggregate 溯源）。

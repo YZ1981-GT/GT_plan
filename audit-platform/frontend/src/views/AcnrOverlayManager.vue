@@ -127,7 +127,7 @@ import { useAcnr, type AcnrOverlay } from '@/services/acnr/useAcnr'
 const route = useRoute()
 const projectId = computed(() => String(route.params.projectId || ''))
 
-const { listOverlays, applyOverlay, removeOverlay } = useAcnr()
+const { listOverlays, applyOverlay, removeOverlay } = useAcnr(() => projectId.value)
 
 const rows = ref<AcnrOverlay[]>([])
 const loading = ref(false)

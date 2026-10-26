@@ -165,9 +165,11 @@ import { ref, computed, watch } from 'vue'
 import { fmtAmount } from '@/utils/formatters'
 import { useAddressRegistry } from '@/stores/addressRegistry'
 import { useAcnr, type AcnrSheetEntry, type AcnrCellEntry } from '@/services/acnr/useAcnr'
+import { useCurrentProjectId } from '@/composables/useCurrentProjectId'
 
 const addrStore = useAddressRegistry()
-const acnr = useAcnr()
+// D9（需求 11.1）：按当前项目订阅 ACNR 失效（组件无项目入参，取路由/store 当前项目）。
+const acnr = useAcnr(useCurrentProjectId())
 
 const props = defineProps<{
   modelValue: boolean

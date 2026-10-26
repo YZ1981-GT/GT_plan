@@ -2323,7 +2323,7 @@ const { showSyncHint, dismissSyncHint, noteProgress } =
 
 // ─── 附注→披露表跳转（useNoteDisclosureJumpActions composable）──────────────
 import { useNoteDisclosureJumpActions } from '@/views/composables/useNoteDisclosureJumpActions'
-const { resolveInstance: acnrResolveInstance } = useAcnr()
+const { resolveInstance: acnrResolveInstance } = useAcnr(() => projectId.value)
 const {
   jumpingDisclosure, disclosureJumpTarget,
   jumpToLastSyncWorkpaper, jumpToDisclosureSheet,

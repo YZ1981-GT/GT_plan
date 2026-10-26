@@ -113,7 +113,6 @@ import { ElMessage } from 'element-plus'
 // 收敛到与 FormulaRefPicker/CellSelector/FormulaEditDialog/NoteFormulaDialog 同一 ACNR 模式；
 // store 未加载/ACNR 空时回退 legacy 端点（strangler-fig，无回归）。
 const addrStore = useAddressRegistry()
-const acnr = useAcnr()
 
 interface CellInfo {
   cell: string
@@ -137,6 +136,11 @@ const props = defineProps<{
   // 当前执行器维度（函数支持矩阵查表用，需求 8）。缺省 wp evaluator；附注结构编辑器传 note_executor。
   executor?: Executor
 }>()
+
+// R14.6 候选地址源：WP 域走 useAcnr。D9（需求 11.1）按当前项目订阅 SSE 失效。
+// 放在 defineProps 之后——useAcnr 内部 watch immediate 会在 setup 期同步读 props.projectId，
+// props 须先初始化（否则 TDZ）。
+const acnr = useAcnr(() => props.projectId)
 
 // ── 函数支持矩阵（需求 8，禁静默 0）：据当前执行器判每个取数按钮是否支持 ──
 // 不支持者在模板里 disabled + tooltip 标注「此处不支持」，并在 pickSource 内 fail-closed，

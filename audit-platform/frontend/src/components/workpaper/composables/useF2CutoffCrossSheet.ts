@@ -144,7 +144,9 @@ export async function fetchD4CutoffMatches(
   if (!projectId) {
     return { loaded: false, message: '无项目上下文，无法加载收入截止底稿', matches: [] }
   }
-  const { resolveInstance } = useAcnr()
+  // D9（需求 11.4）：普通 async 函数内调用，无 effect scope ⇒ 不订阅 SSE；传 projectId
+  // 仅作 resolve 缺省项目（本处 resolveInstance 显式传参，不依赖该缺省）。
+  const { resolveInstance } = useAcnr(projectId)
   const docSet = new Map(
     f2Rows
       .filter((r) => (r.docNo || '').trim())

@@ -84,7 +84,7 @@ const props = defineProps<{
  * 宿主只留 import + 一个标签（净增 5 行）。组件自包含也更好复用。
  */
 const router = useRouter()
-const { resolveInstance: acnrResolveInstance } = useAcnr()
+const { resolveInstance: acnrResolveInstance } = useAcnr(() => props.projectId)
 
 async function jumpToWorkpaper(wpCode: string): Promise<void> {
   if (!wpCode || !props.projectId) return

@@ -19,7 +19,15 @@
  *
  * Requirements: 14.1, 14.2, 15.3；acnr-invalidation-overlay-hardening R1/R4
  */
-import { ref, shallowRef, onUnmounted } from 'vue'
+import {
+  ref,
+  shallowRef,
+  watch,
+  toValue,
+  getCurrentScope,
+  onScopeDispose,
+  type MaybeRefOrGetter,
+} from 'vue'
 import http from '@/utils/http'
 import {
   subscribeProjectEvent,
@@ -392,16 +400,32 @@ export function subscribeInvalidation(projectId: string): () => void {
 
 // ─── Composable ───────────────────────────────────────────────────────────────
 
-export function useAcnr(projectId?: string) {
+export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>) {
   // 使用模块级缓存引用（所有实例共享）
   const sheetsCache = _sheetsCache
   const cellsCache = _cellsCache
 
-  // R1: 有项目上下文时订阅项目级 SSE 实时失效（引用计数复用）；
-  // 无 projectId → 不建连接，仅靠 TTL_Fallback（R1.3）。
-  if (projectId) {
-    const _cleanupSSE = subscribeInvalidation(projectId)
-    onUnmounted(() => {
+  /** 当前项目上下文（D9：支持 ref / getter / 静态字符串）。 */
+  function currentProjectId(): string {
+    return toValue(projectId) || ''
+  }
+
+  // D9 需求 11.1/11.4：订阅随项目切换。只在存在 effect scope（组件 setup、Pinia setup
+  // store）时订阅——此时才能 onScopeDispose 释放；在普通函数里调用 useAcnr() 无从释放连接，
+  // 不订阅（只作 resolve* 的缺省项目来源，R1.3 全局/无上下文不建连接）。
+  // 订阅随 projectId 变化切换：A→B 时先 cleanup 掉 A 再建 B（本层按 projectId 引用计数
+  // 复用总线连接），空值不建连接。
+  if (getCurrentScope()) {
+    let _cleanupSSE: () => void = () => {}
+    watch(
+      currentProjectId,
+      (pid) => {
+        _cleanupSSE()
+        _cleanupSSE = subscribeInvalidation(pid)
+      },
+      { immediate: true },
+    )
+    onScopeDispose(() => {
       _cleanupSSE()
     })
   }
@@ -527,7 +551,7 @@ export function useAcnr(projectId?: string) {
     }
     // 试算表 / 报表 / 附注 / 辅助余额引用按项目数据判定是否存在；不带项目时后端答「无法确认」
     // （error=project_context_required），不再一律判存在（spec formula-fetch-followup-defect-closure R5.4）
-    const pid = projectIdArg ?? projectId
+    const pid = projectIdArg ?? (currentProjectId() || undefined)
     // Req-20: resolve 缓存 (epoch 变则已由 invalidateModuleCache 清空)
     const cacheKey = `resolve:${JSON.stringify({ formula_ref: formulaRef, project_id: pid })}`
     const cached = _resolveCacheGet(cacheKey)
@@ -554,7 +578,7 @@ export function useAcnr(projectId?: string) {
     if (!uri || !isValidUri(uri)) {
       return { found: false, error: 'invalid_uri' }
     }
-    const pid = projectIdArg ?? projectId
+    const pid = projectIdArg ?? (currentProjectId() || undefined)
     // Req-20: resolve 缓存（按项目分开：非底稿域按项目数据判存在）
     const cacheKey = `resolve:${JSON.stringify({ uri, project_id: pid })}`
     const cached = _resolveCacheGet(cacheKey)
@@ -606,7 +630,7 @@ export function useAcnr(projectId?: string) {
     if (!indexRef || !isValidIndexRef(indexRef)) {
       return { found: false, error: 'invalid_index_ref' }
     }
-    const pid = projectIdArg ?? projectId
+    const pid = projectIdArg ?? (currentProjectId() || undefined)
     // Req-20: resolve 缓存
     const cacheKey = `resolve:${JSON.stringify({ index_ref: indexRef, project_id: pid })}`
     const cached = _resolveCacheGet(cacheKey)
@@ -710,7 +734,7 @@ export function useAcnr(projectId?: string) {
     projectIdArg?: string,
   ): Promise<AcnrResolveResult[]> {
     if (!inputs || inputs.length === 0) return []
-    const pid = projectIdArg ?? projectId
+    const pid = projectIdArg ?? (currentProjectId() || undefined)
     try {
       const { data } = await http.post(ACNR_PATHS.resolveBatch, {
         items: inputs,

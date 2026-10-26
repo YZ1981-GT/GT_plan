@@ -463,7 +463,7 @@ const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse'
   props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
 })
 const seedingFa = ref(false)
-const { resolveInstance } = useAcnr()
+const { resolveInstance } = useAcnr(() => props.projectId)
 
 // H10 跨底稿审定数（由主入口 GtH6 provide，经 h6H10Pull 异步拉取）
 const h10AmountInjected = inject<Ref<number>>('h10Amount', ref(0))

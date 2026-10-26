@@ -140,7 +140,8 @@ function parseAddrId(addrId: string): { parent: string; sheet: string; coord: st
  *   与项目归属校验）。无 project_id 时下钻按「目标已失效」优雅处理。
  */
 export function useAcnrDrill(getProjectId: () => string) {
-  const { resolveIndex } = useAcnr()
+  // D9（需求 11.1）：按当前项目订阅 ACNR 失效（getProjectId 既是下钻缺省项目来源）。
+  const { resolveIndex } = useAcnr(getProjectId)
 
   /**
    * 下钻到 addr_id 对应的底稿格。

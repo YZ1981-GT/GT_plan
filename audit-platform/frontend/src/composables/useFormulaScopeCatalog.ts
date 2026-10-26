@@ -27,6 +27,8 @@ import http from '@/utils/http'
 // spec: formula-management-runtime-closure Task 14 — 端点收敛进 apiPaths（纯搬迁）
 import { formulaScope as formulaScopePaths } from '@/services/apiPaths/formula'
 import { useAcnr } from '@/services/acnr/useAcnr'
+import { useCurrentProjectId } from '@/composables/useCurrentProjectId'
+import type { ComputedRef } from 'vue'
 
 // ── Formula_Scope 7 类（与后端 FORMULA_SCOPES / 组件 FormulaManagerScope 对齐）──
 export const FORMULA_SCOPES = [
@@ -127,7 +129,15 @@ function mapItem(raw: Record<string, unknown>, scope: FormulaScope): ScopeFormul
 }
 
 export function useFormulaScopeCatalog() {
-  const acnr = useAcnr()
+  // D9（需求 11.1）：按当前项目订阅 ACNR 失效。本 composable 在纯函数单测里被直接调用（无
+  // router/pinia），此时 useCurrentProjectId 会抛 ⇒ 降级为无项目（不订阅、不影响 resolve）。
+  let currentPid: ComputedRef<string> | null = null
+  try {
+    currentPid = useCurrentProjectId()
+  } catch {
+    currentPid = null
+  }
+  const acnr = useAcnr(() => currentPid?.value || '')
 
   // (scope, addrKey) 隔离缓存：每个作用域一个 Map，键为 addrKey。
   const scopeCache: Record<string, Map<string, ScopeFormulaRow>> = {}

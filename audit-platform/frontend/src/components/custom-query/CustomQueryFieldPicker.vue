@@ -128,6 +128,7 @@ import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { WarnTriangleFilled, Refresh, Select } from '@element-plus/icons-vue'
 import { useAcnr, type AcnrSheetEntry, type AcnrCellEntry } from '@/services/acnr/useAcnr'
+import { useCurrentProjectId } from '@/composables/useCurrentProjectId'
 import { eventBus } from '@/utils/eventBus'
 
 const props = withDefaults(
@@ -150,7 +151,8 @@ const emit = defineEmits<{
   ): void
 }>()
 
-const { buildAddressTree, loadCellNodes, clearCache } = useAcnr()
+// D9（需求 11.1）：按当前项目订阅 ACNR 失效（组件无项目入参，取路由/store 当前项目）。
+const { buildAddressTree, loadCellNodes, clearCache } = useAcnr(useCurrentProjectId())
 
 // ─── 循环过滤（acnr Req 8.5） ────────────────────────────────────────────────
 const cycleOptions = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'S']

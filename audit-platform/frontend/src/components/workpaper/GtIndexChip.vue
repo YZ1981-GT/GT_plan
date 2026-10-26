@@ -114,9 +114,6 @@ const route = useRoute()
 const router = useRouter()
 const { push: pushNavHistory } = useWpNavigationHistory()
 
-// ─── ACNR SDK (R13.3: 不自行 parse，委托 ACNR resolve) ───
-const { resolve: acnrResolve, resolveInstance: acnrResolveInstance } = useAcnr()
-
 // ─── State ───
 const parsed = ref<ResolvedIndexRef | null>(null)
 const resolveStatus = ref<'pending' | 'exists' | 'not_exists' | 'trimmed' | 'error'>('pending')
@@ -129,6 +126,13 @@ const acnrResult = ref<AcnrResolveResult | null>(null)
 const projectId = computed(() => {
   return props.contextProjectId || (route?.params?.projectId as string) || ''
 })
+
+// ─── ACNR SDK (R13.3: 不自行 parse，委托 ACNR resolve) ───
+// D9（需求 11.1）：按当前项目订阅 SSE 失效（复用 chip 既有 projectId 计算属性，contextProjectId
+// 优先、其次路由）。放在 projectId 之后——useAcnr 内部 watch immediate 会在 setup 期读它。
+const { resolve: acnrResolve, resolveInstance: acnrResolveInstance } = useAcnr(
+  () => projectId.value,
+)
 
 const isCrossProject = computed(() => {
   // If contextProjectId is provided and differs from current route project, it's cross-project

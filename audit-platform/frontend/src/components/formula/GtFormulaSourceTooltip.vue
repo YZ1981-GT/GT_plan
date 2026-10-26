@@ -52,6 +52,7 @@ import { computed, ref } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { fmtDateTime } from '@/utils/formatters'
 import { useAcnr } from '@/services/acnr/useAcnr'
+import { useCurrentProjectId } from '@/composables/useCurrentProjectId'
 
 const props = withDefaults(
   defineProps<{
@@ -78,7 +79,8 @@ const props = withDefaults(
   },
 )
 
-const { resolveAddr, resolveFormula } = useAcnr()
+// D9（需求 11.1）：按当前项目订阅 ACNR 失效（组件无项目入参，取路由/store 当前项目）。
+const { resolveAddr, resolveFormula } = useAcnr(useCurrentProjectId())
 
 const resolving = ref(false)
 const resolved = ref(false)

@@ -9,6 +9,7 @@ import { ElMessage } from 'element-plus'
 import { useWorkpaperRegistry, type RegistryEntry } from './useWorkpaperRegistry'
 import { api } from '@/services/apiProxy'
 import { useAcnr } from '@/services/acnr/useAcnr'
+import { useCurrentProjectId } from '@/composables/useCurrentProjectId'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -87,7 +88,8 @@ function resolveRoute(
 export function useWorkpaperNavigation() {
   const router = useRouter()
   const registry = useWorkpaperRegistry()
-  const acnr = useAcnr()
+  // D9（需求 11.1）：按当前项目订阅 ACNR 失效（导航无项目入参，取路由/store 当前项目）。
+  const acnr = useAcnr(useCurrentProjectId())
 
   /**
    * 解析索引号字符串为可点击链接数组

@@ -170,7 +170,9 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
 
   // ACNR SDK 单例：store 内复用同一实例，保证其内部缓存归 store 掌控，
   // 便于 template-applied / formula-changed 时统一 clearCache（R16.5）。
-  const _acnr = useAcnr()
+  // D9（需求 11.1）：按当前绑定项目订阅 SSE 失效。store 是 Pinia setup store（effect scope
+  // 内），useAcnr 内部 watch 会在 refresh 切 _projectId 时同步切订阅、随 store 释放。
+  const _acnr = useAcnr(() => _projectId.value)
 
   // ─── 按域分组的计算属性 ───
   const tbAddresses = computed(() => addresses.value.filter(a => a.domain === 'tb'))

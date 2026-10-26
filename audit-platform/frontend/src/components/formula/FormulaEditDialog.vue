@@ -447,8 +447,6 @@ import { ADDRESS_REGISTRY_FULL_LOAD_LIMIT } from '@/stores/addressRegistry'
 import FormulaDebugPanel from './FormulaDebugPanel.vue'
 
 const route = useRoute()
-// ACNR 前端 SDK（acnr-consumer-wiring Req 14.3/14.5, task 18.3）
-const acnr = useAcnr()
 
 interface FormulaItem {
   expression: string
@@ -467,6 +465,11 @@ const props = defineProps<{
   year?: number
   wpContext?: WpFormulaContext
 }>()
+
+// ACNR 前端 SDK（acnr-consumer-wiring Req 14.3/14.5, task 18.3）。
+// D9（需求 11.1）：按当前项目订阅 SSE 失效（props 优先、其次路由项目）。放 defineProps 之后——
+// useAcnr 内部 watch immediate 在 setup 期同步读 props，props 须先初始化（否则 TDZ）。
+const acnr = useAcnr(() => props.projectId || (route.params.projectId as string))
 
 const emit = defineEmits<{
   'update:modelValue': [val: boolean]
@@ -949,7 +952,7 @@ const noteSourceLoaded = ref(false)
 async function loadAcnrSources() {
   if (acnrSourceLoaded.value) return
   try {
-    const acnr = useAcnr()
+    const acnr = useAcnr(() => props.projectId || (route.params.projectId as string))
     acnrSourceSheets.value = await acnr.listSheets()
     acnrSourceLoaded.value = true
   } catch { /* 降级用静态 */ }
