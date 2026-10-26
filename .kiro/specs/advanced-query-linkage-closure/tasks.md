@@ -7,7 +7,7 @@
 >
 > | 阶段 | 任务 | 断点 | 与批次表的差异及理由 |
 > |---|---|---|---|
-> | 0 | 0 | — | 新增：本地与远端分叉，合入后才开工（第 2 轮评审 #1） |
+> | 0 | 0 | — | 新增：本地与远端分叉，合入后才开工（第 2 轮评审 #1）；先在分离头 worktree 试合并、冲突两侧都保留，主树前移由用户决定（第 3 轮评审 #1） |
 > | A 测试地基 | 1、2 | AQ-32（夹具部分） | 批 6 → 最先：后面每个任务都要靠能跑的构建器测试与权限配方表验收 |
 > | B 口径、计数与隔离 | 3~12 | 批 1 的 AQ-02、03、06、19；另含 AQ-25 的 batch-execute 族（任务 6）、AQ-13 / 18 / 21 / 28 的后端部分、AQ-26 的默认排序、AQ-27、AQ-32 的假绿用例改写 | batch-execute 直接调 router 内取数器，须先于取数器下沉删除（第 1 轮评审 #6）；构建器的准入、作用域、total、公式引用都在 `builder_dsl` / `query_builder` 两个文件里，随作用域一起改省返工 |
 > | C 写入安全 | 13~16 | 批 2 的 AQ-04、05、23 | 无 |
@@ -19,9 +19,12 @@
 > | J 实测与收尾 | 37*、38*、39 | — | — |
 
 ## 阶段 0　分支同步（阻塞全部任务）
-- [ ] 0. 合入远端与现状重算（requirements A6；design §1、§9、§14.4）
-  - `git fetch --prune`，现算 `git rev-list --left-right --count HEAD...origin/spec/disclosure-note-doc-upload-and-batch-fill`；落后数不为 0 时按简报分叉规则暂停（send_message warning），把两边提交列表交用户决定合入方式，用户决定前不开工任何任务；不改写历史、不 stash、不 `--no-verify`
-  - 合入后确认 `git merge-base --is-ancestor d0de87a6c HEAD` 为真，重算并写入本条：design §1 的年度 / 行数门 / 循环范围三行、§9 全表的「现状」列（`check_file_size.py` 门限与 HARD_CAPS、`test_hard_cap_ratchet.py` 结果）、年度兜底基线与 `CALENDAR_YEAR_EXEMPT` 中与本 spec 相关的条目、`deps.require_project_audit_year` 与 `effective_scope.resolve_member_scope` 的签名（`inspect.signature` 打印一次）；与 design 不符的数字在本条写明差异，结论不同的停下改 design 再开工
+- [ ] 0. 合入远端与现状重算（requirements A6；design §1 分支行、§9、§14.4、§16 #1）
+  - `git fetch --prune`，现算 `git rev-list --left-right --count HEAD...origin/spec/disclosure-note-doc-upload-and-batch-fill` 与 merge-base；逐个列出本地侧（merge-base..HEAD）与远端侧改到本 spec 目标 / 守卫的文件与提交（第 3 轮修订时本地侧是 design §1 分支行的 6 个文件）
+  - 试合并只在分离头 worktree 里做：`git worktree add --detach d:\GT_plan\tmp_aql_verify HEAD` → `git worktree lock` → 在其中 `git merge --no-commit --no-ff origin/spec/disclosure-note-doc-upload-and-batch-fill`，记下冲突清单。本 spec 相关的冲突按「两侧都保留、不整文件取一侧」拟定解决结果：年度兜底基线 JSON = 远端 13 条去掉本地已删的 `composables/useEditorSave.ts`、`composables/useStaleImpact.ts`（11 条）；后端年度棘轮取远端版（`BASELINE = {}` + `CALENDAR_YEAR_EXEMPT`，本地删的一条已被包含）；body_carried 两段注释都保留，`_BODY_IDENTITY_ONLY_BASELINE` 按合并后的代码现算。其余冲突（`address_registry_v2.py`、`GtAProgramLinkedChips.vue`、`GtWpRenderer.runtime-boundary.test.ts`）不属本 spec，只列出、不拟定
+  - 在试合并树上跑四个守卫：`test_project_endpoint_authz_body_carried.py`、`test_project_endpoint_authorization_baseline.py`、`test_audit_year_calendar_fallback_ratchet.py`（cwd 为该 worktree 的 `backend`，用仓库根 venv）与 `auditYearCalendarFallbackRatchet.spec.ts`（临时建 node_modules 联接，跑完 `cmd /c rmdir`）；随后 `git merge --abort`，按 unlock → 拆联接 → `git worktree remove --force` → `git worktree prune` 拆除
+  - send_message warning 交用户决定：ahead / behind、两侧提交列表、冲突清单与拟定的解决结果、四个守卫结果。写明主工作树的 `components.d.ts`、`auto-imports.d.ts` 有他人未提交改动（`components.d.ts` 两侧都改过），在主树直接 `git merge` 会中止；主树如何、何时前移（如等对方提交后再合入，或由用户处理）由用户决定；前移会让共享开发环境对远端改动的 878 个文件热重载。不改写历史、不 stash、不 `--no-verify`；用户决定前不开工任何任务
+  - 合入后确认 `git merge-base --is-ancestor d0de87a6c HEAD` 为真，在主树重跑上述四个守卫，结果写入本条；重算并写入本条：design §1 的年度 / 行数门 / 循环范围三行、§9 全表的「现状」列（`check_file_size.py` 门限与 HARD_CAPS、`test_hard_cap_ratchet.py` 结果，DisclosureEditor 应仍为 3,265 行）、年度兜底基线与 `CALENDAR_YEAR_EXEMPT` 中与本 spec 相关的条目、`deps.require_project_audit_year` 与 `effective_scope.resolve_member_scope` 的签名（`inspect.signature` 打印一次）；与 design 不符的数字在本条写明差异，结论不同的停下改 design 再开工
   - 对本 spec 全部目标文件现查 `git status`，有他人未提交改动的文件列入本条，后续任务只改、只提交自己的块
 
 ## 阶段 A　测试地基
@@ -32,7 +35,7 @@
   - 前端 `advancedQueryFrontend-p7.spec.ts`「legacy global 显示为公开」超时：定位 `mountTabForScope('manager')` 不 resolve 的根因并修复（禁止只调大超时）
   - 现跑评估列出的 10 个后端 + 4 个前端测试文件，以及 `tests/scripts/test_hard_cap_ratchet.py`、`auditYearCalendarFallbackRatchet.spec.ts`，结果写入本条作为回归基线（合入前本地已红的棘轮用例合入后应转绿；合入后仍红的写明归属，不算到本 spec 头上）
 - [ ] 2. 端点权限配方表骨架（R12.5、N2，design §10.3）
-  - 新建 `tests/advanced_query_linkage/test_aql_endpoint_authz.py`：基于 authz_world 表驱动，design §10.3 的 29 行（W3 的第 30~32 行在任务 41 补）逐格按「底座」列选 `sqlite_world` / `pg_world`；PM、SM 按 §10.3 补 `eqcr_assignment("manager")`（每个身份只调一次），PM / SM 走到循环范围的格 `extra_tables` 含 `wp_index`；第 25 / 26 行的世界在 X、Y 各造一行 trial_balance 并断言结果非空；循环受限身份 CR 的子表（23c、25c、26c、28c）一并建好；现已成立的格直接断言，待修复的格 `xfail(strict=True)` 并注明修复任务号
+  - 新建 `tests/advanced_query_linkage/test_aql_endpoint_authz.py`：基于 authz_world 表驱动，design §10.3 的 29 行（W3 的第 30~32 行在任务 41 补）逐格按「底座」列选 `sqlite_world` / `pg_world`；PM、SM 按 §10.3 补 `eqcr_assignment("manager")`（每个身份只调一次），PM / SM 走到循环范围的格 `extra_tables` 含 `wp_index`；第 25 / 26 行的世界在 X、Y 各造一行 trial_balance 并断言结果非空；循环受限身份 CR 的子表（23c、25c、26c、28c）与身份 NM 的第 23n 行一并建好；SM 的委派写 `project=SM.other_project`；现已成立的格直接断言，待修复的格 `xfail(strict=True)` 并注明修复任务号
   - 路由对账：custom_query、custom_query_writeback、query_builder 三个 router 的每条路由都出现在表中，缺失即红（新增路由在其任务里补行）
 
 ## 阶段 B　口径、计数与隔离（P0）
@@ -70,7 +73,7 @@
   - 改写 `test_query_builder_formula_ref_grammar_v1.py`（design §10.1）
   - 测试：和平药房 total = 金标准、借方降序首行非空；PG 校验华氏每条 formula_ref 经地址库有效
 - [ ] 12. 构建器准入（R3.6 后端、R11.3，ADR-AQL-08；变异 #13）
-  - 新建 `services/custom_query/builder_access.py`；`require_query_builder_access` 改 async；新增 `GET /api/query/access`（admin / partner 返回 `all_projects`；其余身份的计数先按「可访问 − 已删」，循环受限排除与空作用域 reason 在任务 23 补）；`tests/authz_world.py` 把新门禁登记进 `PRODUCTION_GATES` 与 `_GUARDED_MODULES`
+  - 新建 `services/custom_query/builder_access.py`；`require_query_builder_access` 改 async；新增 `GET /api/query/access`（admin / partner 返回 `all_projects`；其余身份的计数先按「可访问 − 已删」，计数为 0 时 reason「您当前没有可访问的项目」，配方表 23n 转正；循环受限排除与循环范围 reason 在任务 23 补）；`tests/authz_world.py` 把新门禁登记进 `PRODUCTION_GATES` 与 `_GUARDED_MODULES`
   - 改写 `test_query_builder_role_gate_pbt.py`（await 异步依赖）；新测试覆盖系统角色、项目经理、只读成员、已删项目成员
 
 ## 阶段 C　写入安全（P0 / P1）
@@ -106,18 +109,18 @@
   - PG：和平药房某科目带 aux_type 筛选的行数 = 金标准；辅助明细不带筛选 400；构建器查 tb_aux_balance 的口径同 R1；辅助明细首页耗时记录（N1）
 - [ ] 22. 列补齐与标签（R5.7、R6.6）
   - 试算表 rje_adjustment、余额方向列；`queryColumnLabels.ts`（summary「摘要」、ws_consol_tb 覆盖为「汇总数」、新列中文）+ `queryColumnLabels.spec.ts`
-- [ ] 23. 循环范围（R3.1、R3.5、R3.6 计数、R3.8，ADR-AQL-08 / 19；变异 #19、#19b、#36）
-  - 二次确认分支含远端提交 d0de87a6c（`git merge-base --is-ancestor d0de87a6c HEAD`，任务 0 已合入）；不在本 spec 里复制 `effective_scope`
-  - 新建 `services/custom_query/cycle_scope.py`（`CycleScopeCache`、`resolve_cycle_scope` / `is_cycle_restricted`，只调 `deps.get_user_scope_cycles`）；接入试算表、调整分录、附注目录 / 章节与附注树（严格过滤，`SECTION_OUT_OF_SCOPE`）；`resolve_builder_scope` 逐个可访问项目排除受限项目（`CYCLE_SCOPED_PROJECT`，同一请求共用缓存）；access 接口计数改为排除后、作用域为空时给 reason（design §3.4）
-  - PG：design §10.2「循环范围」行（团队分配勾选、主管不限、勾选为空即无行三种，带缓存与不带结果相同）；e2e_manager 用例改为 §10.2 金标准（现库期望 0 行 + 排除 warning）并加 u_011abb97dd2d4101 正例；配方表 CR 子表与第 23 行计数列转正
+- [ ] 23. 循环范围（R3.1、R3.5、R3.6 计数与原因、R3.8，ADR-AQL-08 / 19；变异 #19、#19b、#36、#39）
+  - 二次确认分支含远端提交 d0de87a6c（`git merge-base --is-ancestor d0de87a6c HEAD`，任务 0 已合入）；不在本 spec 里复制 `effective_scope`，不改平台函数
+  - 新建 `services/custom_query/cycle_scope.py`（`CycleScopeCache`、`resolve_cycle_scope` / `is_cycle_restricted`；`CycleScopeCache.cycles` 是唯一调用 `deps.get_user_scope_cycles` 处，按 design §3.10 的代码在保存点里调用、成败都回滚，不用 `async with begin_nested()`）；接入试算表、调整分录、附注目录 / 章节与附注树（严格过滤，`SECTION_OUT_OF_SCOPE`）；`resolve_builder_scope` 逐个可访问项目排除受限项目（`CYCLE_SCOPED_PROJECT`，同一请求共用缓存，`BuilderScope.excluded_cycle_scoped` 记排除数）；access 接口计数改为排除后，作用域为空时按排除数给两种 reason（design §3.4）
+  - PG：design §10.2「循环范围」行（团队分配勾选、主管不限、勾选为空即无行三种，带缓存与不带结果相同；末尾的故障注入用例：200、0 行而不是 500）；e2e_manager 用例改为 §10.2 金标准（现库期望 0 行 + 排除 warning）并加 u_011abb97dd2d4101 正例；配方表 CR 子表与第 23 行计数列转正，23n 仍为「没有可访问的项目」
 
 ## 阶段 E　模板与导出后端（P1 / P2）
 - [ ] 24. 模板后端（R9.1~R9.3，ADR-AQL-11；变异 #12）
   - `template_service.py`（只用 adapter 归一与可见性、`visible_templates`、`config_to_request`、错误码 `TEMPLATE_NOT_VISIBLE`）；`template_scope_adapter.py` 报错改中文；router 模板端点（list / get / execute 走 service、`TemplateForbiddenError` → 403、`TemplateInvalidError` → 400、删 update 末尾的原值覆盖、execute 分页，年度经 `deps.require_project_audit_year`；参数占位的取值在任务 41 接入）
   - 改写固化旧 scope 模型的断言（design §10.1 所列三个文件），逐条写明理由；新用例：非作者执行私有模板 403、更新 `scope=global` 入库为 public、adapter 报错为中文
-- [ ] 25. 模板软删与回收站（R9.5，ADR-AQL-11；迁移 design §8）
-  - 迁移 V{n} / R{n}（号实施时现扫并写入本条）；ORM 混入 `SoftDeleteMixin`；`template_service.soft_delete`；`routers/recycle_bin.py` 作者类型（作者 = `coalesce(creator_id, created_by)`，列表逐行 `can_restore` / `can_purge`）；`views/RecycleBin.vue` 按钮改 `canRowAct`（design §3.6，行数 ≤ §9）；`MigrationRunner(...).run_pending()` 落本地库
-  - 测试：软删后列表 / 详情 / 执行 404；回收站作者与 admin 可见、可恢复、可彻底删除，他人 403；列表里模板行带 `can_restore` / `can_purge`、其余类型不带；vitest：系统 auditor 作者看得到并能点「恢复」，其余类型照旧按权限表（design §10.1 回收站条）；列 / 索引 / 约束存在，R 文件可回放
+- [ ] 25. 模板软删与回收站（R9.5，ADR-AQL-11；迁移 design §8；变异 #35、#37）
+  - 迁移 V{n} / R{n}（号实施时现扫并写入本条）；ORM 混入 `SoftDeleteMixin`；`template_service.soft_delete`；`routers/recycle_bin.py` 作者类型（作者 = `coalesce(creator_id, created_by)`，列表逐行 `can_restore` / `can_purge`）；`views/RecycleBin.vue` 操作列按行分支（design §3.6：带 `can_restore` 的行用逐行能力，其余行原样保留两个 `v-permission` 按钮，不经 `usePermission()`；+6 行，≤ §9）；`MigrationRunner(...).run_pending()` 落本地库
+  - 测试：软删后列表 / 详情 / 执行 404；回收站作者与 admin 可见、可恢复、可彻底删除，他人 403；列表里模板行带 `can_restore` / `can_purge`、其余类型不带；vitest `RecycleBin.rowActions.spec.ts`（注册真实 `vPermission` 指令）：系统 auditor 作者看得到并能点「恢复」；项目类型行在 auditor 下隐藏、在 `{role: 'manager', permissions: [后端矩阵的 10 个权限码]}` 下可见（design §10.1 回收站条）；列 / 索引 / 约束存在，R 文件可回放
 - [ ] 26. 服务端完整导出（R8.1~R8.6，ADR-AQL-14；变异 #18）
   - `export_service`（`info_rows`、`_text_safe_cell` 接入数据行 / 表头 / 查询说明）；新建 `services/custom_query/export_gate.py`；`POST /api/custom-query/export`（首块预取、导出槽在生成器 finally 释放、审计）；`query_builder.export_excel` 改用 export_service（同一导出闸、COUNT 预检、headers、去掉 1,000 行限制）
   - 单元：导出闸 429 / 释放 / 幂等；PG：design §10.2「导出」行；10 万行导出耗时记录（N1）
@@ -150,17 +153,17 @@
 - [ ] 34. 删除其余收敛对象（R12.1，ADR-AQL-04 / 13；按 design §3.9 一类一提交）
   - 每类删前 grep 0 调用方、删前后跑同一组测试（跨模块单元格源族另跑 `test_lazy_import_resolvability.py`）、提交前打 tag；下调 `test_module_cell_resolver.py` 白名单基线；`SheetCellRangePicker.vue` 删模块模式
 - [ ] 35. 权限配方表全部转正与磁盘变异（R12.5、N2，design §10.3 / §10.4）
-  - 删除全部 xfail，路由对账通过；变异 #1~#21、#10b、#19b、#33、#35、#36 逐条打红（单独一条命令跑，在 `tmp_aql_verify` 里做，逐字节恢复后 sha256 核对），结果写入本条；W3 / W6 的变异 #22~#32、#34 在阶段 H、I 各自任务内按同样方式跑
+  - 删除全部 xfail，路由对账通过；变异 #1~#21、#10b、#19b、#33、#35~#37、#39 逐条打红（单独一条命令跑，在 `tmp_aql_verify` 里做，逐字节恢复后 sha256 核对），结果写入本条；W3 / W6 的变异 #22~#32、#34、#38 在阶段 H、I 各自任务内按同样方式跑
 - [ ] 36. 性能与 e2e 静态复核（N1、R12.4）
   - N1 三项实测，`EXPLAIN ANALYZE` 摘要写入本条；不达标按 ADR-AQL-06 预案①②处理后重测，仍不达标保持本条未勾并附实测与执行计划，索引迁移只提 W12 不执行
   - 两个高级查询 e2e spec 只做静态核对（路由、选择器是否还在）：过期的更新或删除，保留的写入任务 37 清单；实际运行归 37*
 
 ## 阶段 H　W3 常用审计预置模板（用户 2026-10-26 追加；R13，ADR-AQL-05；design §3.11、§4.3）
-- [ ] 40. 条件能力扩展（R13.5，ADR-AQL-03；变异 #22、#23、#29、#30、#32）
-  - `param_sql_builder`：抽 `_prefix_predicate`，`starts_with` 与 `prefix` 共用；新增 `_weekday_predicate`、`_blank_predicate`（`nonempty` 的 False 分支改调它）；`table_whitelist.OPERATOR_WHITELIST` 增三项；`paged_fetch` 的 `CONDITION_VALUE_REQUIRED`（含未解析的 `$param`）与 `BLANK_FIELD_INVALID`
+- [ ] 40. 条件能力扩展（R13.5，ADR-AQL-03；变异 #22、#23、#29、#30、#32、#38）
+  - `param_sql_builder`：抽 `_prefix_predicate`，`starts_with` 与 `prefix` 共用；新增 `_weekday_predicate`、`_blank_predicate`（`nonempty` 的 False 分支改调它；字符集常量 `BLANK_CHARS` = ECMAScript `trim()` 的 25 个码点）；`table_whitelist.OPERATOR_WHITELIST` 增三项，同一提交新增 `BUILDER_UI_OPERATORS`（现有 13 项字面量 + 导入期不变式），`routers/query_builder.get_schema` 改下发它（三项不出现在构建器界面，构建器前端不改）；`paged_fetch` 的 `CONDITION_VALUE_REQUIRED`（含未解析的 `$param`）与 `BLANK_FIELD_INVALID`
   - `ledger_sampling_service.ledger_line_amount`（带 `type_`；`build_ledger_query` 两处改调，SQL 文本改前改后一致，`test_cutoff_sampling_pbt.py` 保持通过）；注册表 `SourceSpec.condition_only` 与序时账 `line_amount`；指标树叶子 `condition_fields`，schema 12
   - `QueryConditionEditor.vue`：按 dtype 给算子（含开头是、为空或空白、大于等于、小于等于、星期为）、条件行 `params` 标记、`toSavedConditions`、`incompleteReason`、`notices`、`EDITOR_OPS`；`queryColumnLabels.ts` 增 `line_amount`
-  - 测试：单元（编译 SQL 与绑定参数、`coerce_value(ledger_line_amount(t), "1000000")` 为 Decimal、`weekday_in` 用于文本列 400、`is_blank` 用于数值列 400、空值 400）；PG design §10.2「新条件能力」行（字符串阈值经 TestClient、【UAT】空白摘要三行）；vitest（算子随 dtype、未填值禁用查询与保存、改值去掉 `params` 标记、`toSavedConditions`）
+  - 测试：单元（编译 SQL 与绑定参数、`coerce_value(ledger_line_amount(t), "1000000")` 为 Decimal、`weekday_in` 用于文本列 400、`is_blank` 用于数值列 400、空值 400、`BLANK_CHARS` 等于 `unicodedata` 按 ECMAScript 定义现算的集合）；schema 端点 TestClient（`operators == sorted(BUILDER_UI_OPERATORS)`，白名单与它的差集恰为三项，构建器 DSL 带 `starts_with` 照常编译）；`AdvancedQueryBuilder.spec.ts` 读 `table_whitelist.py` 的 `BUILDER_UI_OPERATORS` 字面量作 schema，每个操作符选项的 label 不等于键名（design §10.1）；PG design §10.2「新条件能力」行（字符串阈值经 TestClient、【UAT】空白摘要三行）；vitest（算子随 dtype、未填值禁用查询与保存、改值去掉 `params` 标记、`toSavedConditions`）
 - [ ] 41. 预置定义与服务端解析（R13.1~R13.4、R13.8，ADR-AQL-05；变异 #24、#31）
   - `backend/data/custom_query_presets.json`（10 条，design ADR-AQL-05 表）；`services/custom_query/template_presets.py`（加载、校验含排序与每页行数、列表、`resolve_config` / `resolve`、`PARAM_NAMES`；重要性读取包 `begin_nested`）；`sampling_enhanced_service.cutoff_window` 与默认值常量（`run_cutoff_test` 改用，行为不变）
   - router 薄路由 `GET /template-presets`、`GET /template-presets/{preset_id}/resolve`、`GET /templates/{template_id}/resolve`，年度经 `deps.require_project_audit_year`；模板执行接入 `resolve_config`（任务 24 的执行管线前加一步）；保存 / 更新校验 `$param` 已登记；权限配方表补第 30~32 行，路由对账通过
@@ -193,4 +196,4 @@
 - [ ]* 37. 浏览器全链路实测（写后读回，design §10.5，含 W3 / W6 段落）：需 start-dev 运行环境；未实测时写「代码已改但未实测」
 - [ ]* 38. 合并项目路径实测（tb_summary / ws_* / consol_unit / 合并附注）：现库 0 个合并项目；未实测时写「代码已改但未实测」
 - [ ] 39. 收尾
-  - `.kiro/specs/INDEX.md` 只更新本 spec 行；写 `closure.md`，逐条回显 design §2 全部裁决（ADR-AQL-01~20）与 §11 待拍板（W1、W2、W4、W5、W7~W16；W3 / W6 标「已纳入」），写明只做周末、不做节假日的原因、design §14.5 的范围外登记、新断点 AQ-38 的处置、e2e_manager 构建器基线按 design §10.2 口径的结果（现库 0 行 + 排除提示），供用户复核；清理 `tmp_aql_linkage/` 与验证 worktree；核对任务数（0~47，共 48 个）与 INDEX 一致
+  - `.kiro/specs/INDEX.md` 只更新本 spec 行；写 `closure.md`，逐条回显 design §2 全部裁决（ADR-AQL-01~20）与 §11 待拍板（W1、W2、W4、W5、W7~W16；W3 / W6 标「已纳入」），写明只做周末、不做节假日的原因、design §14.5 的范围外登记、新断点 AQ-38 的处置、e2e_manager 构建器基线按 design §10.2 口径的结果（现库 0 行 + 排除提示）、「按裁决调整的基线」（批 5 完整导出改为按月完整导出 + 超限 400 不产生文件，附 W11 推荐默认值，不写「通过」，design §12），供用户复核；清理 `tmp_aql_linkage/` 与验证 worktree；核对任务数（0~47，共 48 个）与 INDEX 一致
