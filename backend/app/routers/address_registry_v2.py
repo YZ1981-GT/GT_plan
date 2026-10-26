@@ -9,6 +9,11 @@
 - POST /api/address-registry/v2/notify-cell-change                            通知单元格变更（触发 stale）
 - GET /api/address-registry/v2/anchors?wp_code=...&sheet=...                  查询某 sheet 的语义锚点
 - GET /api/address-registry/v2/stats                                          全局统计
+
+鉴权结论（spec acnr-foundation-defect-closure D8 / 需求 10.4~10.5，T25）：
+- notify-cell-change 已下线（410，不触达数据）；本模块不再有「带 project_id 的无鉴权写端点」。
+- /stats、/resolve、/anchors、/stale-impact、/dependencies 只读模块级静态依赖图（入参是 wp_code/sheet/
+  cell_desc，不带 project_id、不写项目数据），维持仅登录（get_current_user）即可。
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pathlib import Path
