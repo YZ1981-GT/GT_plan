@@ -35,3 +35,8 @@ backend/data/note_workpaper_sync_registry.json text eol=lf
 # `workpaper_sync_contracts/` 下、已被覆盖，本文件是唯一漏网的。
 # index 里本就是 LF，加这条不产生行尾 churn。
 backend/data/workpaper_sync_entry_wp_code_adjudication.json text eol=lf
+# ACNR 目录契约 schema 强制 LF（2026-10-27，spec acnr-foundation-defect-closure T03/D3）。
+# `test_catalog_schema_single_source.py::test_schema_file_byte_equal_to_build_schema` 校验磁盘字节
+# 必须与 catalog_contract.schema_json() 逐字节相等（LF）。core.autocrlf=true 会在 checkout 时把
+# LF blob 转成 CRLF ⇒ 该守卫在 Windows 本机红、CI 的 Linux 上绿。index 里本就是 LF，不产生行尾 churn。
+docs/acnr/schemas/global_catalog.schema.json text eol=lf

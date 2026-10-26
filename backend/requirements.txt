@@ -13,6 +13,7 @@ python-multipart
 openpyxl
 xlrd==2.0.2  # legacy .xls reader used by the S17 classification dry-run
 PyYAML
+jsonschema==4.26.0  # ACNR 目录契约校验（catalog_contract.build_schema / 发布门禁 Draft-07）
 boto3
 
 # OCR dependencies (optional, install as needed)

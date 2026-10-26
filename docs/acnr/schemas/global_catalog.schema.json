@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://audit-platform.internal/acnr/global_catalog.schema.json",
   "title": "ACNR Global Catalog",
-  "description": "L1 全局目录 schema — 标准底稿全量 sheet + 坐标种子（首期仅 wp 域静态 JSON）。不含 project_id / wp_id（R6.4）。",
+  "description": "L1 全局目录 schema — 标准底稿全量 sheet + 坐标种子（首期仅 wp 域静态 JSON）。不含 project_id / wp_id。",
   "type": "object",
   "required": [
     "version",
@@ -23,8 +23,28 @@
     },
     "registry_version": {
       "type": "string",
-      "description": "Catalog 版本号，归档项目创建时记录，用于版本锁定解析",
-      "pattern": "^\\d{4}\\.\\d+\\.\\d+$"
+      "description": "Catalog 版本号（UTC 时间戳，14 位数字），用于版本锁定解析",
+      "pattern": "^\\d{14}$"
+    },
+    "alias_policy": {
+      "type": "object",
+      "description": "顶层别名处置：禁止别名集合（design §7.2）",
+      "properties": {
+        "forbidden": {
+          "type": "object",
+          "description": "{parent_wp_code: {alias: [sheet_code...]}}",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     },
     "sheets": {
       "type": "array",
@@ -70,7 +90,7 @@
           "enum": [
             "wp"
           ],
-          "description": "域标识，首期仅 wp 进 L1 JSON"
+          "description": "域标识，首期仅 wp"
         },
         "origin": {
           "type": "string",
@@ -97,14 +117,14 @@
         },
         "sheet_name": {
           "type": "string",
-          "description": "权威中文 Tab 名（源=classification，R20.2 R-NAME）"
+          "description": "权威中文 Tab 名（源=classification）"
         },
         "sheet_name_aliases": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "别名反查来源（ingest 自 labels + classification 展示名）"
+          "description": "别名反查来源（平台底稿名 + labels）"
         },
         "component_type": {
           "type": "string",
@@ -117,16 +137,18 @@
         "functional_type": {
           "type": "string",
           "enum": [
-            "procedure_table",
-            "adjudication_table",
+            "impairment",
+            "confirmation",
             "detail_table",
-            "check_table",
-            "analysis_table",
-            "directory",
-            "note_disclosure",
-            "custom"
+            "sampling",
+            "aging",
+            "monthly_analysis",
+            "cutoff",
+            "reconciliation",
+            "depreciation",
+            "amortization"
           ],
-          "description": "功能类型枚举"
+          "description": "功能类型（受控词表；缺省时省略本字段）"
         },
         "editor_engine": {
           "type": "string",
@@ -147,7 +169,7 @@
             "object",
             "null"
           ],
-          "description": "导入导出配置（null 表示不支持导入导出）",
+          "description": "导入导出配置（null 表示不支持）",
           "properties": {
             "enabled": {
               "type": "boolean"
@@ -156,7 +178,20 @@
               "type": "string"
             },
             "item_id": {
-              "type": "string"
+              "description": "单值或多值 item_id",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                }
+              ]
             },
             "storage_field": {
               "type": "string"
@@ -192,11 +227,24 @@
             "readonly_directory",
             "custom_univer_only"
           ],
-          "description": "非空则 bulk manifest 排除（完全阻止本次 manifest 生成）"
+          "description": "非空则 bulk manifest 排除"
+        },
+        "deprecated": {
+          "type": "boolean",
+          "description": "停用标记（保留 >=1 registry_version）",
+          "default": false
+        },
+        "deprecated_at_version": {
+          "type": "string",
+          "description": "首次停用的 registry_version"
+        },
+        "replaced_by": {
+          "type": "string",
+          "description": "停用后建议改用的 addr_id（可解析）"
         },
         "display_label": {
           "type": "string",
-          "description": "展示路径（如 底稿 > D2 > 明细表D2-2）"
+          "description": "统一显示名（底稿 > {父} > {sheet}，design §13）"
         },
         "jump_route_template": {
           "type": "string",
@@ -212,7 +260,11 @@
         },
         "source_of_truth": {
           "type": "string",
-          "description": "权威来源标识（如 classification_db）"
+          "enum": [
+            "classification_db",
+            "sheet_verdicts"
+          ],
+          "description": "权威来源标识"
         }
       },
       "additionalProperties": false
@@ -252,7 +304,7 @@
           "enum": [
             "wp"
           ],
-          "description": "域标识，首期仅 wp（note 子域坐标见 R16.2）"
+          "description": "域标识，首期仅 wp"
         },
         "cell_address": {
           "type": [
@@ -271,7 +323,7 @@
         },
         "semantic_only": {
           "type": "boolean",
-          "description": "true = 尚无可靠 A1，公式仍可引用语义；CI 标记须尽快补 A1",
+          "description": "true = 尚无可靠 A1，公式仍可引用语义",
           "default": false
         },
         "purpose": {
@@ -279,26 +331,29 @@
             "string",
             "null"
           ],
-          "enum": [
-            null,
-            "balance_verification",
-            "conclusion",
-            "ratio_analysis",
-            "total_row",
-            "adjustment",
-            "cross_reference",
-            "disclosure"
-          ],
-          "description": "坐标用途分类"
+          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+          "description": "坐标用途分类（受控模式）"
         },
         "formula_ref": {
           "type": "string",
-          "description": "公式引用（如 WP('D2','明细表D2-2','合计行-期末余额')）"
+          "description": "公式引用"
         },
         "deprecated": {
           "type": "boolean",
-          "description": "弃用标记（保留 >=1 registry_version，R19.3）",
+          "description": "停用标记（保留 >=1 registry_version）",
           "default": false
+        },
+        "replaced_by": {
+          "type": "string",
+          "description": "停用后建议改用的 addr_id（父 sheet）"
+        },
+        "display_label": {
+          "type": "string",
+          "description": "统一显示名（design §13）"
+        },
+        "cell_label": {
+          "type": "string",
+          "description": "单元格显示标签（如 {A1}（语义待核对））"
         },
         "registry_version": {
           "type": "string",
