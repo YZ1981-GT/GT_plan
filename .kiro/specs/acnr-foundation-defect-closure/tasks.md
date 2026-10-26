@@ -1,0 +1,203 @@
+# 实施计划：ACNR 地址坐标名称库底座缺陷收口（acnr-foundation-defect-closure）
+
+> 以 design.md 为权威（修订轮 2）。每个任务可独立验收；标完成须有代码 + 测试证据与至少一条磁盘变异证明（备份到 `tmp_acnr_foundation/mutations/`、注入缺陷、确认对应守卫红且红在预期处、逐字节还原并核对 sha256）。环境做不到的标 `[ ]*` 并写「代码已改但未实测」。编号 T01~T40 按发布顺序（§18）排，分 P0 / P1 / P2 / 文档四批。问题编号映射见文末。
+> 铁律：根因修复不换参数绕开；生成产物禁手改、改生成器输入；被引用的 addr_id 不得静默消失；每条门禁配可打红的变异。约束：Windows PowerShell 用 `;` 不用 `&&`、用 `cwd` 不 `cd`；含中文 / 正则的脚本写成 `.py` 执行；行数用 Python `len(text.split("\n"))` 统计；后端 `python -m pytest -p no:playwright`，`hypothesis max_examples=5`，PG 专有 SQL 加方言判断；前端 vitest + 单区域 tsconfig（全量 vue-tsc 会 OOM）；前端改动用 chrome-devtools 浏览器实测、关键点击前校验 `location.pathname`、写入型验收只用【测试】项目并走平台路径清理对账。提交只含本 spec 文件（`git diff --cached --name-only` 核对），不碰 §0.3 的他人脏文件。
+
+## 批次 P0：可解析与契约单一化（T01~T09）
+
+- [ ] 1. 导出 HEAD 现算基线夹具（发布顺序的第一步，后续任务据此比对）
+      从当前 HEAD 导出并提交固定夹具，之后不随目录变化：`platform_name_writings.json`（372 条平台索引名写法→期望 addr_id）、`same_name_group_writings.json`（26 处同名组静态写法→名称所属 sheet）、`resolvable_writings_baseline.json`（现算 2599 条：不变 2434、改判 147、歧义 18）、`head_resolvable_static_writings.json`（R2-F2：用 HEAD 运行时 `catalog._formula_ref_to_addr_id` 四步判定遍历全部静态写法 + PG 公式存储 `wp_formula`/`report_config`/公式设置各域/附注公式/`wp_user_formulas`，记「写法→HEAD addr_id」；预设用带逗号后空格的正确口径，现算仅子串命中会变 not_found 的 14 处/7 组逐条列证据）。实施时以当时 HEAD 现算为准，变化记入本任务。
+      Files: `backend/tests/acnr/fixtures/{platform_name_writings,same_name_group_writings,resolvable_writings_baseline,head_resolvable_static_writings}.json`；导出脚本 `tmp_acnr_foundation/probes/export_head_baselines.py`（一次性，交付后清理）
+      Verify: `python -m pytest backend/tests/acnr/test_head_baselines_sane.py -p no:playwright` 断言四夹具非空、条数与现算一致、`head_resolvable` 的 14 处逐条有 `head_resolvable_at`。变异：把 `resolvable_writings_baseline.json` 的一条改判项改回借名父级→该断言红。
+
+- [x] 2. 唯一精确身份判定 `exact_identity`（§6.2，被后续多数任务依赖）
+      已交付（commit 0d0ca8f24）：`exact_identity.py`（sheet_of 6 步 / cell_of A1+in_catalog / name_owner / forbidden_disjoint 不变量，只导入 stdlib + catalog/reasons）+ `reasons.py`。现算真实目录 78 同名组=70 唯一 / 8 None（A21/A22/A23/F2 底稿目录、A3 Word附注/已审比率分析、B50 相关资源、S32 程序表），与 design §1.2 逐组一致（探针 tmp_acnr_foundation/probes/p_sheet_of.py）。`test_exact_identity.py` 17 passed。变异：第 6 步改「取首个」→ 同名组用例红在 H1/D1 借名父级，逐字节还原 sha256 核对一致（8939c8b3…883d0）。
+      新建纯函数模块，输入 `CatalogIndex`（缺省 `get_catalog()`，可传任意索引）：`sheet_of`（6 步规则：父级定位→sheet_code→禁止集合→sheet_name 唯一→别名唯一→编码完整词元最长唯一→歧义/未找到，文本逐字比较不归一）、`cell_of`（A1 匹配 `^[A-Z]{1,3}[0-9]{1,7}$`、返 `in_catalog`）、`name_owner`（78 组：70 组唯一、8 组 None）；不变量：父级禁止集合与 sheet_name/sheet_code 不相交。该模块只导入标准库与 `catalog`/`reasons`。
+      Files: `backend/app/services/acnr/exact_identity.py`、`backend/app/services/acnr/reasons.py`（错误码→中文文案集中表）
+      Verify: `python -m pytest backend/tests/acnr/test_exact_identity.py -p no:playwright` —— 6 步规则逐例、`name_owner` 对 78 组现算、不相交不变量。变异：第 6 步改成「取第一个」→同名组用例红；删一条不相交断言的输入→不变量用例红。
+
+- [x] 3. 目录契约单一来源 `catalog_contract` 与 schema 由它生成（需求 3 / D3）
+      已交付（commit 0d0ca8f24）：`catalog_contract.py`（REGISTRY_VERSION_PATTERN `^\d{14}$`、FUNCTIONAL_TYPES 10 词表、PURPOSE_PATTERN、SOURCE_OF_TRUTH/EDITOR_ENGINES/SKIP_REASONS 枚举、item_id oneOf string|array、新增 deprecated/replaced_by/display_label/cell_label + 顶层 alias_policy、additionalProperties:false、禁 project_id/wp_id）；`build_schema()` 生成 schema 文件并经 `.gitattributes` 固定 LF（index 字节 == build_schema()）。删 `_build_schema.py`/`_verify_schema.py`（grep 确认唯一外部引用只在 docs/acnr/schemas 内自身与一处注释；test_xlsx_diff/word_entry_gate 的同名函数无关）。requirements 钉 jsonschema==4.26.0。`test_catalog_schema_single_source.py` 10 passed（真实目录 + 4 份快照 schema 0 错误；词表覆盖真实取值）。变异（产物副本）：词表外 functional_type / 旧版本号 2026.1.1 / 删 sheet_code / cell 加 project_id 各自红并点名 JSON 路径。
+      新建 `catalog_contract.py` 为唯一来源：`REGISTRY_VERSION_PATTERN=^\d{14}$`、`FUNCTIONAL_TYPES`（10 种 + 缺省省略）、`PURPOSE_PATTERN=^[a-z][a-z0-9_]{0,63}$`（受控模式）、`SOURCE_OF_TRUTH`、`EDITOR_ENGINES`、`SKIP_REASONS`、`import_export.item_id` 为 `oneOf: string|array`、新增字段（sheet/cell 的 deprecated/replaced_by/display_label/cell_label、顶层 alias_policy）、`additionalProperties:false`、禁 project_id/wp_id。`build_schema()` 生成 Draft-07，删除 `_build_schema.py`/`_verify_schema.py`（删前 grep 调用方）。`backend/requirements.txt` 钉 `jsonschema==4.26.0`。
+      Files: `backend/app/services/acnr/catalog_contract.py`；删 `docs/acnr/schemas/_build_schema.py`、`_verify_schema.py`；`backend/requirements.txt`
+      Verify: `python -m pytest backend/tests/acnr/test_catalog_schema_single_source.py -p no:playwright` —— schema 文件与 `build_schema()` 逐字节相等、四类约束与常量逐值相等、真实目录 0 错误、4 份历史快照只做加载测试。变异（产物副本）：注入词表外 functional_type / `registry_version="2026.1.1"` / 删 sheet_code / 给 cell 加 project_id → 校验各自红并点名 JSON 路径。
+
+- [ ] 4. classification 缓存 vs 库表对照守卫（需求 A2 裁定 §1.3）
+      确认生成器 classification 权威输入 = 已提交离线缓存（库表缺 771 拆分编码、模板版本不同，不作权威）；差异逐类登记 `sources/classification_reconcile.json`（13 条无库表依据的拆分记录 `cache_only_without_db_basis`、S17 新增 8 条 `db_newer_than_cache` 不并入）。生成器把缓存 `template_version_id`/记录数/sha256 写进报告 `release.classification`。
+      Files: `backend/data/acnr/sources/classification_reconcile.json`；`backend/tests/acnr/test_classification_cache_vs_db_pg.py`
+      Verify: `python -m pytest backend/tests/acnr/test_classification_cache_vs_db_pg.py -p no:playwright`（pg_only 只读）—— 库表 current 版本每个 (wp_code, sheet_name) 都在缓存里（例外恰 8 条）、缓存独有编码能由库表父码记录复算或在 13 条清单里；清单有失效条目也红。变异：从清单删一条仍无库表依据的编码 → 红。
+
+- [ ] 5. 孤儿与历史移除判定记录 `sheet_verdicts`（需求 2 / D2，R2-F1 用户拍板）
+      新建生成器权威输入与 loader：`sheet_verdicts` 段（5 张父 sheet `add_platform_sheet` 仅为导航落到 wp_index 实例；K14~K18 `deprecate` 带 `replaced_by` H10-1/K10-1/G11-1/G13-1/K7-1，K14 依据科目 6115）；`cell_verdicts` 段（25 个孤儿 cell 逐个 `deprecate`、`replaced_by` 指父 sheet、reason「无物理来源」，证据含 renderer_tabs/project_files/static_refs=0/pg_formula_refs=0）。每条带证据字段与 owner/decided_on。**实施前以当时 HEAD 现算复核这 25 个 addr_id/formula_ref 是否被公式预设、真库公式、交叉引用实际使用；若被引用不得静默消失，降级为可解析 `replaced_by` 并记证据，仍存疑则暂停向用户说明。**
+      Files: `backend/data/acnr/sources/sheet_verdicts.json`；`backend/app/services/acnr/loaders/from_sheet_verdicts.py`；`backend/tests/acnr/test_sheet_verdicts.py`
+      Verify: `python -m pytest backend/tests/acnr/test_sheet_verdicts.py -p no:playwright` —— 两段结构、sheet 结论在三种内 / cell 结论为 deprecate、离线证据现算（openpyxl 读模板 tab、渲染 schema、缓存、种子、manifest、映射、6115 依据、25 格 static_refs=0/pg_formula_refs=0）与记录逐项相等；pg_only 断言在用 wp_index 计数 > 0 且 25 格 parsed_data_null 为真。变异：删 I6-7 的 sheet 条目 → 后续门禁报孤儿并点名 `I6/I6-7`；把某孤儿 cell verdict 改回有效 → 报「无物理来源的有效 cell」红。
+
+- [ ] 6. 名称体系 loader、生成器名称规则与 13 张种子名不一致处置（需求 5 / D4，R2-F2）
+      新建 `from_wp_account_mapping.py`（wp_name 与模板名不同并入别名；父级内一名多码 9 组记禁止别名；只跨父级重名 6 组父级限定别名；并入前断言 `sheet_of` 回到本 sheet）。生成器 cell 的 formula_ref/uri 在合并全部 sheet 后用 `name_owner` 归属判断选模板名或 sheet_code（预演非孤儿 449 全往返）。13 张种子名不一致 sheet 的 47 格按 §6.4 三路：范围内 33 格保留地址 + `semantic_label=null`/`cell_label="{A1}（语义待核对）"` + 豁免 `seed_semantic_unverified`；超范围 14 格 deprecate；挂错 0 张；种子名不作别名。逐格判定写进 `cell_verdicts`（证据含行文字/模板范围/本格值）。
+      Files: `backend/app/services/acnr/loaders/from_wp_account_mapping.py`；`backend/data/acnr/sources/sheet_verdicts.json`（追加 cell_verdicts）；生成器名称规则 `scripts/acnr/generate_catalog.py`
+      Verify: `python -m pytest backend/tests/acnr/test_name_system.py -p no:playwright` —— 449 非孤儿 cell 全往返、9 组禁止别名 / 6 组父级限定、47 格三路判定与现算一致。变异：某循环 formula_ref 改回索引名写法并删别名 → 往返用例红；删一条禁止别名 → alias 门禁红。
+
+- [ ] 7. 发布门禁与生成器流程 `catalog_release` + `--check` + 迁回外科补丁（需求 4 / D4）
+      新建 `catalog_release.py`（`run_release_gates` 跑完汇总，check ∈ schema/duplicate/sheet_code/orphan/a1/roundtrip/immutable/alias/ack/verdict/override；往返用新目录解析，`catalog.use_catalog(index)` ContextVar 只供门禁与测试、守卫断言生产不调用）。生成器流程：加载全部输入（含上一批次快照作别名沿用唯一来源，R2-F11）、`inputs_fingerprint` 含快照 sha256；版本不变逐字节相等即不写（幂等）；门禁过后同批写出快照→schema→报告（含 release）→目录，先临时文件再 `os.replace`；同名快照异内容失败（唯一例外登记 `release_exceptions.json`）；`--check` 结构化比对（漂移退 2 点名、门禁违规退 1），`check_catalog_drift.py` 改薄壳调同一 `main(["--check"])`；删 `--offline`/`--cycle`/`--no-shards` CLI（R2-N3 函数签名保留 offline/cycle）、删 shards 两文件与 `write_shards`。迁回 57 张外科补丁：D1/G14 改 manifest、H4/I24/L8/N2 共 38 入 `global_catalog.overrides.json`（SAFE 来源可复算）、别名 4 张不迁按沿用保留；三个 fix 脚本删目录写入分支改 `--check`。
+      Files: `backend/app/services/acnr/catalog_release.py`、`backend/app/services/acnr/catalog.py`（use_catalog）、`scripts/acnr/generate_catalog.py`、`scripts/check/check_catalog_drift.py`、`backend/data/acnr/{global_catalog.overrides.json,release_exceptions.json}`、`backend/data/acnr/sources/{d_,g_}cycle_ie_manifest.yaml`、`scripts/acnr/fix_acnr_catalog_ie_gap.py`、`fix_acnr_dangling_api_prefix.py`、`fix_x3_adjustment_ie_registration.py`；删 `shards/catalog_ALL.json`、`catalog_D.json`
+      Verify: `python scripts/acnr/generate_catalog.py --check`（0 漂移）；`python -m pytest backend/tests/acnr/test_catalog_release_gates.py backend/tests/acnr/test_only_generator_writes_catalog.py backend/tests/acnr/test_overrides_provenance.py -p no:playwright`；迁移验收现跑 `check_ie_catalog_sync`、四个 fix/gen 脚本 `--check`、`check_x3_deviation_registry.py --check`、`test_x3_ie_registrar.py`（含 `test_real_preflight_is_16_of_16`）、`test_x3_ie_manifest_registration.py`、`test_x3_ie_catalog_sync_partial_mode.py` 全绿。变异：注入重复 addr_id/删父 sheet/改 cell A1/删已发布 addr_id/改 parent_wp_code/删一条 override 的 source → 门禁各自红在对应 check；绕过生成器直改 `global_catalog.json` → `--check` 退 2 点名（R2-F11：只加一个别名也退 2）。幂等：连续两次 sha256 相同、第二次不写；4 份既有快照 sha256 前缀不变。
+
+- [ ] 8. CatalogIndex fail-closed 与加载期互校（需求 4.7 / D4）
+      `CatalogIndex.__init__` 收集三类重复（sheets 内 / cells 内 / 互撞）非空即抛 `CatalogIntegrityError`（继承 `CatalogLoadError`，列前 10 与总数），同时建 `sheets_by_parent`/禁止别名/名称归属三个索引。`_load_catalog` 并入降级分支（有上一版缓存则只读并告警、无则失败）；加载期比对报告 `release.registry_version`/`catalog_sha256`，不一致按 `CatalogIntegrityError`；测试目录无报告时跳过（守卫断言生产路径报告存在）。
+      Files: `backend/app/services/acnr/catalog.py`
+      Verify: `python -m pytest backend/tests/acnr/test_catalog_index_fail_closed.py -p no:playwright` —— 合成三类重复各一例、真实目录与 4 份快照全部可加载、临时目录注入重复验证「无缓存失败」与「有缓存降级 + 告警」；加载耗时基线 8.3 ms、加检测后 ≤ 10.0 ms（p28 口径实测记录）。变异：注入互撞 addr_id → fail-closed 用例红。
+
+- [ ] 9. 目录报告分组、别名三类处置与豁免清单（需求 6 / D4）
+      `catalog_report.json` 改四组 `{count,items}`（count=len(items)）：blocking（发布前必 0）/acknowledged/deprecated/info，另加 release 段；旧 `gap_count` 等删（R2-N2：先改读取方 `check_acnr_catalog_drift.py` 删陈旧度判据、`test_catalog_gap_count_integrity::TestRealCatalogReport` 改断言四组 count==len）。新建 `sources/alias_policy.json`（disposition ∈ parent_qualified/forbidden/project_context/non_address_label/merge_into）；现算 4 条冲突与 28 条未登记别名逐条处置（D5-1 `merge_into`→D5/D5；12 目录伪键 + 10 附注伪键 + 2 示例 + 2 程序表 tab + 参考中证协 = non_address_label 可伪证）。`sources/acknowledgements.json`（kind ∈ seed_semantic_unverified 33 格 / ccr_unresolved ≥48 / head_resolvable_errmatch 4 组带 head_resolvable_at，各带 owner/reason/created_on/expires_on/evidence）。
+      Files: `backend/data/acnr/sources/{alias_policy,acknowledgements}.json`；`backend/app/services/acnr/catalog_release.py`（报告生成 + ack/alias 门禁）；`scripts/check/check_acnr_catalog_drift.py`；`backend/tests/acnr/test_catalog_gap_count_integrity.py`
+      Verify: `python -m pytest backend/tests/acnr/test_catalog_report_buckets.py backend/tests/acnr/test_catalog_gap_count_integrity.py -p no:playwright` —— 四组 count==len(items)、真实报告 blocking 0、4 冲突 + 28 未登记逐条有处置。变异：一条豁免到期日改到过去 / 删一条豁免所指冲突来源 / 删一条禁止别名 / 把一条 non_address_label 的键改成真实 sheet_code → 各自红（失效条目）。
+
+## 批次 P1：取值、版本锁、追溯、依赖图与鉴权（T10~T26）
+
+- [ ] 10. 往返门禁、保存校验接线与停用条目行为（需求 5.1~5.4 / 2.3 / D4）
+      `exact_identity` 接入全部使用者（删 catalog `_formula_ref_to_addr_id`/`_uri_to_addr_id` 的子串与直接拼接旧启发式、原签名留薄壳；`full_resolve` 第 1 步歧义返回 found=false + reason + required_context + candidates）。往返门禁 + `test_catalog_roundtrip_real.py`（读真实目录禁 mock，非停用 cell 的 addr_id/formula_ref/uri/`cell:{code}!{A1}` 与 sheet 的 addr_id/`sheet:{code}` 回到自身）。`ResolveResult` 增 deprecated/replaced_by；停用条目六场景行为（resolve 带 deprecated、resolve_instance 导航仍可达、保存校验接受并记指标 `deprecated_ref_saved`、acnr_targets 422、CCR 计 deprecated 组、entries/tree 默认不列）。`head_resolvable_static_writings.json` 逐条断言仍可解析或有登记处置（D5-1/I1-1/审定表I1-1 落父级限定别名，其余 4 组登记 ccr_unresolved 带 head_resolvable_at）。
+      Files: `backend/app/services/acnr/catalog.py`、`resolver.py`（full_resolve、ResolveResult）；`backend/app/services/acnr/formula_validation.py`（fail-open 先 `except (VersionNotFoundError, CatalogIntegrityError): raise`）；`backend/tests/acnr/{test_catalog_roundtrip_real,test_catalog_release_integrity,test_deprecated_navigation_pg,test_picker_refs_pass_save_validation_pg}.py`
+      Verify: 上述测试 `-p no:playwright`（后两者 pg_only、安徽骨科医院_2025 上下文只读回滚）；`test_picker_refs_pass_save_validation_pg` 遍历全部非停用 cell formula_ref 调 `validate_refs_via_acnr` 拒绝数 0；孤儿 cell 发布后都是 deprecated 条目、逐个 full_resolve 命中带可解析 replaced_by、默认不进地址树；4 个项目 K14~K18 经 resolve_instance 可达。变异：某循环 formula_ref 退回索引名写法 → 保存校验用例红；K15 的 replaced_by 改成不存在地址 → 门禁红。
+
+- [ ] 11. 共用读取器 `wp_cell_reader` 对接与 J1 字段回退（§2.4 / D1，与 formula-hub 共享）
+      动手前 `git log -S "resolve_wp_cell" -- backend/app/services/wp_cell_reader.py` 核对 formula-hub 任务 22 是否入库：未入库则按 ADR-FHIC-06 第 1 点原文建模块并登记 `WP_CELL_READER_IMPL`，入库则只接线。J1 走回退流程 B：`git log -S "reason_code"` 核对；未带则由本 spec 单独一次提交给 `WpCellRead` 追加默认 None 的 `reason_code`/`raw`，在七条返回路径填值（year_mismatch/wp_missing/wp_ambiguous/sheet_ambiguous/sheet_missing/cell_empty/non_numeric 与原 reason 一一对应），同步改 `test_wp_cell_reader.py` 整对象相等断言、在 formula-hub 任务 22 下登记此跨 spec 修订。
+      Files: `backend/app/services/wp_cell_reader.py`（按需新建或追加两字段）；`backend/tests/test_wp_cell_reader.py`
+      Verify: `python -m pytest backend/tests/test_wp_cell_reader.py -p no:playwright` 全绿（两字段默认 None、不改现有三态语义）。变异：某返回路径不填 reason_code → 对应断言红。
+
+- [ ] 12. ACNR 侧取值接线模块 `wp_cell_target` 与锁定目录身份判断（§2.4 / D1，R2-F7）
+      新建 `services/acnr/wp_cell_target.py`（不读 parsed_data、不调 extract_custom_cells）：`sheet_key_for`（name_owner 命中用归一名，借用 / 多义 blocked `sheet_name_borrowed`）、`bind_wp_code`（项目有 sheet 级底稿读它、否则父底稿、仅「不存在」时回落）、`read_entry_cell`、`read_formula_cell`（sheet_of 命中→read_entry_cell、not_found/wp_not_in_catalog→按原文 resolve_wp_cell、ambiguous/alias_forbidden→blocked）、原因细化（PG 专有：has checklist_responses→value_in_form_storage、有 file_path 无 html_data→value_in_file，`db.info` 请求级记忆）。R2-F7 新增 `effective_catalog(db, project_id)`（锁定命中→load_versioned_catalog，否则 get_catalog），`sheet_key_for`/`read_entry_cell`/`read_formula_cell`/acnr_targets/三参取值统一用它并显式传 `index=` 给 exact_identity；数据库异常上抛不伪装 missing。
+      Files: `backend/app/services/acnr/wp_cell_target.py`、`limits.py`（`ACNR_BATCH_LIMIT=50`、`ACNR_BATCH_DEADLINE_S=8`）；`backend/tests/acnr/test_wp_cell_target.py`
+      Verify: `python -m pytest backend/tests/acnr/test_wp_cell_target.py -p no:playwright`（含 pg_only）—— sheet 级 vs 父底稿绑定、借名 blocked、原因细化、`effective_catalog` 锁定命中。变异：`read_formula_cell` 不比 sheet（两参取首格）→ 两 sheet 同 A1 用例红；`effective_catalog` 改为恒 get_catalog → 锁定身份用例红。
+
+- [ ] 13. WP 三参接线与 `formula_wp_semantics` 登记（§2.5 / D1 / 需求 1.2，F12）
+      `WPExecutor` 增 `read_sheet_cell`（委托 read_formula_cell），`execute` 在 field 匹配 A1 且第二参非 D2-3 时返回真实值（原恒 0）；两参与 D2-3 分支逐字节不变。`wp_formula_eval_service._WP3_PATTERN` 循环加 `_A1` 分支（本 spec 落地；前两支 wp_values/strict_wp 沿用 formula-hub 第 6 点），非 ok 时 0 为占位、errors 非空，4 个调用方（wp_formula L570/L1079、tier_a_seed、prev_wp_field）丢弃该值。报表 / 自定义公式路径三参不加预载、继续抛 `FormulaColumnError`。`formula_wp_semantics.py` 只此一份：EXECUTOR_WP_IMPL.positional_args 改 `(wp_code,column,field)`、data_source 补 A1 说明、WP_KNOWN_DIFFERENCES 改 positional_arg_count.detail。
+      Files: `backend/app/services/formula/formula_engine.py`（净增 ≤14）、`backend/app/services/formula/wp_formula_eval_service.py`（净增 ≤12）、`backend/app/services/formula/formula_wp_semantics.py`
+      Verify: `python -m pytest backend/tests/test_formula_wp_semantics.py backend/tests/test_wp_formula_eval_service.py -p no:playwright` 全绿；三者相等用例（底稿公式三参求值、acnr_targets、库内值逐值相等）在 T14 的 pg_only 覆盖。变异：三参改回恒 0 → 相等用例红；两参分支被动 → 两参回归红。
+
+- [ ] 14. acnr_targets 解析编排、拒绝分类与请求模型严格化（需求 1.1~1.5 / D1）
+      新建 `services/custom_query/acnr_target_values.py`（唯一解析 + 取值编排）与 `strict_model.py`（`StrictRequestModel` extra=forbid + before 校验抛 unknown_field 中文；`AcnrTargetList` Annotated 校验 ≤512 字符/≤50 条/不去重）。`resolve_acnr_targets` 逐项分类（resolve_unavailable/external_namespace/unsupported_domain/runtime_entry/sheet_level/deprecated/ambiguous/unresolvable/接受 L1_cell）；`resolve_many` 在 db 非空时顺序执行（修同会话并发）、遇首个 resolve_unavailable 立即 503、整批 `asyncio.timeout(8)`。任一不接受 → 422 `ACNR_TARGETS_REJECTED` + issues；任一 resolve_unavailable → 503 `RESOLVE_UNAVAILABLE`；都不取数。`QueryDSL`/`QueryRequest` 继承 StrictRequestModel（ExportDSL 若对方已引入同样继承）。
+      Files: `backend/app/services/custom_query/{acnr_target_values,strict_model}.py`；`backend/app/services/custom_query/builder_dsl.py`、`business query request model`
+      Verify: `python -m pytest backend/tests/acnr/test_acnr_targets_single_reader.py backend/tests/test_query_dsl_rejects_unknown_fields.py -p no:playwright`；AST 守卫断言取值路径只调 resolve_wp_cell、不下标 parsed_data；参数化每种 error_code 一例、spy resolve_wp_cell 调用 0 次；R2-F9 桩每项睡 6 秒断言总耗时 ≤ 8s + 余量、返 503、取数 0 次。变异：删 DSL acnr_targets 声明 → 1.1/1.5 红；分类表恒接受 → 拒绝用例红；resolve_many 改回 gather → 并发用例红。
+
+- [ ] 15. 端点接线、项目鉴权与年度补齐（需求 1.1~1.4 / 1.6 / D1，R2-F5/N5）
+      `QueryOrchestrator._resolve_targets` 改调 `resolve_acnr_targets`；`execute` 在缓存读取后调 `read_acnr_target_values`（不进缓存）；`QueryResult.acnr_results` 只增。构建器三端点：acnr_targets 非空缺 project_id → 422；否则复用 `builder_scope.resolve_builder_scope(requested_project_id=...)`（与业务视图同一 ownership_guard，覆盖非成员合伙人与委派员工），不另调 assert_project_permission。年度 = body.year（None 或 ≤0 视缺省）→ `fetch_project_audit_year` 补、仍 None 返 422 `YEAR_REQUIRED`。body-carried 扫描器登记 `resolve_builder_scope` 为项目级校验函数。R2-N5：保存模板时按 AcnrTargetList 校验、`execute_template` 包 ValidationError→422。`/preview` 只解析不取值、`/export-excel` 追加「单元格取值」工作表。
+      Files: `backend/app/routers/custom_query.py`（≤ +4 行）、`backend/app/services/custom_query/orchestrator.py`、模板保存 / 执行、builder scope 登记
+      Verify: `python -m pytest backend/tests/acnr/test_acnr_targets_query_e2e.py -p no:playwright`（pg_only 回滚事务建【测试】项目）—— 三入口逐字段断言、两 sheet 各取各值、文本格 text、表单底稿 value_in_form_storage、未生成 wp_missing、顺序与重复逐项对应；权限矩阵覆盖非成员合伙人与委派员工并断言两入口放行一致；缺年度且项目无年度 → YEAR_REQUIRED；不带 acnr_targets 旧请求逐字段相等；模板存非法 acnr_targets → 422 不 500。同步改既有断言：`test_advanced_query_hardening_wave012.py` L512-515（400→422）、L701 的替身补 result（L1_cell）、`test_addressing_service_*` 顺序执行补一例。变异：摘端点项目校验 → 非成员用例红。
+
+- [ ] 16. acnr_targets 前端结果区、请求构造与下钻（需求 1.6~1.7 / D1，R2-F10/N7）
+      新组件 `AcnrTargetResults.vue`（中文名 / 引用 / 值 / 状态 / 原因 / 下钻；missing/blocked 显示原因、text 显示原文；下钻优先 `useAcnrDrill.openRoute(item.source.jump_route, cell)`、缺它才 drill(addr_id)）。请求体抽纯函数 `queryPayloads.ts`（buildBuilderPayload/buildBusinessPayload），project_id 取路由项目、year 仅 `projectStore.auditYear` 已知时发送、无项目上下文提示先进项目不发 acnr_targets。R2-F10：五个 `/execute` 调用点（CustomQueryTab/CustomQueryDialog L819/SheetCellRangePicker L211/useBatchQuery L107/AdvancedQueryBuilder）统一走 buildBusinessPayload 或 TS 语法树抽键断言子集，去 SheetCellRangePicker 日历年兜底。三请求带 `_silent`；422/503/403 逐类中文提示。`useAcnrDrill` 站内路由去 noopener（修丢登录）。
+      Files: `audit-platform/frontend/src/components/custom-query/{AcnrTargetResults.vue,queryPayloads.ts}`、`AdvancedQueryBuilder.vue`、`CustomQueryTab.vue`、`CustomQueryDialog.vue`、`SheetCellRangePicker.vue`、`composables/useBatchQuery.ts`、`composables/useAcnrDrill.ts`
+      Verify: `rtk npx vitest run src/components/custom-query`（`queryPayloads.contract.spec.ts` 解析两后端模型字段断言构造键是子集、四状态渲染、真实 422/503 形状逐项原因可见）；浏览器实测（chrome-devtools，【测试】项目，业务视图与构建器各选 2 格执行、点 chip 打开底稿仍登录态、选 sheet 级看到逐项中文原因，截图存 `tmp_acnr_foundation/screenshots/`）。R2-F10 契约覆盖全 5 调用点。变异：去掉 buildBusinessPayload 的 project_id → 契约或 e2e 红。
+
+- [ ] 17. 版本锁持久化：迁移、ORM、服务（需求 7.1~7.2 / D5，三层一致）
+      迁移 `V{N}__acnr_project_registry_lock.sql`（给 projects 加 `acnr_registry_version VARCHAR(14)`、`acnr_registry_locked_at TIMESTAMPTZ`，`IF NOT EXISTS`）+ 配对 `R{N}`（DROP COLUMN IF EXISTS）；版本号实施时现扫 `backend/migrations/V*.sql`（含未跟踪、对照 gt-plan migration_status 与其他 worktree，当前最高 V205）取最大 +1。ORM 加两字段（`DateTime(timezone=True)`、`@validates` 校验 `^\d{14}$`），存量空即未锁定不回填。新建 `project_registry_lock.py`（`lock_project_registry` 幂等 + 要求快照存在且 sha256 匹配否则 `RegistryLockError`；`unlock_project_registry`；`get_locked_version` 请求级 `db.info` 记忆）。`RegistryLockError` 继承 `CatalogLoadError`（R2-N4，不继承 ValueError，否则被归档路由 400 抢先）。
+      Files: `backend/migrations/V{N}__acnr_project_registry_lock.sql`、`R{N}__...sql`；`backend/app/models/project*.py`；`backend/app/services/acnr/project_registry_lock.py`
+      Verify: `python -m pytest backend/tests/acnr/test_project_registry_lock_schema.py -p no:playwright`（守卫读迁移文本与 ORM 元数据逐项比对类型）；共享库 `MigrationRunner(...).run_pending()` 落库后现查两列存在。变异：ORM 字段类型改成 `String` → 三层一致守卫红。
+
+- [ ] 18. 归档 / 解锁接线、错误映射与前端 409 不回退（需求 7.2~7.3 / D5，R2-F13）
+      `Project.status` 写入点（AST 4 个）：deliverable_service 置 archived 前调 `lock_project_registry`（失败上抛、路由不提交、交付件归档回滚）；`unarchive_project` 同事务 `unlock_project_registry`；`confirm_project` 加 archived 拒绝（409 `PROJECT_ARCHIVED`）；`event_handlers` 保持 created/planning 判断。`full_resolve` 锁定版本改由 `get_locked_version` 取、异则 `load_versioned_catalog`；`project_id` 非空而 db 为空标 `version_lock_checked=false` 计指标（R2-N6：现算该生产调用应为 0，守卫钉住）。删 `immutability` 进程内 dict 及 record_/get_/remove/clear。错误映射（app/main.py 全局处理器均 409）：snapshot_missing/invalid/lock_failed 中文文案。R2-F13：前端 `stores/addressRegistry.ts` 的 resolve/validate 与 useWorkpaperNavigation 回退前先判 409（snapshot_missing/invalid 直接返 found=false 不回退 V1）。
+      Files: `backend/app/services/deliverable_service.py`（净增 ≤6）、`archived_exception.py`、`project_wizard_service.py`、`backend/app/services/acnr/resolver.py`、`immutability.py`、`app/main.py`；`audit-platform/frontend/src/stores/addressRegistry.ts`、`composables/useWorkpaperNavigation.ts`
+      Verify: `python -m pytest backend/tests/acnr/test_project_registry_lock_pg.py -p no:playwright`（pg_only 回滚事务：建【测试】项目经交付件归档真实路径归档→清缓存模拟重启→换目录 v2→仍按 v1；取消归档→按 v2；删 v1 快照→409 snapshot_missing；R2-F7 加「v1·v2 名称归属不同、锁定按 v1」一例；confirm_project 对已归档 409 单测）；`rtk npx vitest run src/stores/addressRegistry.spec.ts`（真实 409 形状断言不发 legacy）；删快照步做 chrome-devtools 浏览器核对（归档项目打开底稿显示中文 409、网络面板无 legacy 请求，截图存 screenshots/）。变异：删 lock_project_registry 调用 → 写入点守卫与端到端红；缺快照改回退当前目录 → 409 用例红。
+
+- [ ] 19. 快照清理 DB-aware 重写与启动期 GC（需求 7.4 / D5，R2-F4 用户拍板）
+      `catalog_snapshot_gc` 新增 `async referenced_registry_versions(db)`（查 `projects.acnr_registry_version IS NOT NULL` 含软删），取代 `query_referenced_versions`（删除后者及其对 `list_archived_projects` 的 import，删除顺序：先改 GC 查库再删函数）；`run_db_aware_gc(session=None)` session 空时自开短会话、查库失败 `referenced_versions=None` fail-closed 不删；启动任务 `_task_acnr_catalog_snapshot_gc` 与 `gc_snapshots.py` 走同一入口；生成器离线清理保持「引用不可验证即不删」。
+      Files: `backend/app/services/acnr/catalog_snapshot_gc.py`、`backend/app/core/startup_registry.py`、`scripts/acnr/gc_snapshots.py`；`backend/tests/acnr/test_catalog_snapshot_gc_pg.py`
+      Verify: `python -m pytest backend/tests/acnr/test_catalog_snapshot_gc_pg.py -p no:playwright`（pg_only）—— 回滚事务内把【测试】项目锁定一个超出 keep_recent=10 的旧版本（快照在临时副本）→ 经启动任务同一入口跑 `run_db_aware_gc`（session=None 读本连接）→ 被锁旧快照仍在；查库失败桩 → fail-closed 不删；纯文件判定用例在临时副本跑。受影响既有测试改打桩 `get_locked_version`/`referenced_registry_versions`（test_full_resolve/test_immutability/test_versioned_resolve_determinism/test_resolve_instance_memo）。变异：`referenced_registry_versions` 恒返回空集 → 被锁旧快照被删用例红。
+
+- [ ] 20. 异步追溯拿规范 addr_id（需求 8 / D6，R2-F8）
+      `CrossSheetResolver.__init__` 增 `resolve_identity=True`（False 时 BFS 不调 `_sync_resolve`、节点保持 resolve_missed）；生产构造全显式传 False（模块单例、wp_formula_eval_service 构造处注明「只取值不取身份」）。`RefChainNode` 增 sheet/cell。R2-F8：编排器 `trace(..., parent_wp_code)` 对每节点 `exact_identity.cell_of`——sheet 识别且 A1 合法即 resolved=true 返规范 addr_id + `in_catalog`，wp_id/jump_route 由 `resolve_instance` 按 sheet 记忆取；仅 sheet 未识别 / 多义 / 禁止别名 / A1 非法才 resolved=false + 中文 unresolved_reason。`TracedRefNode` 增 unresolved_reason/in_catalog（只增）。
+      Files: `backend/app/services/custom_query/cross_sheet_trace_orchestrator.py`、`cross_sheet_resolver.py`、`backend/app/services/formula/wp_formula_eval_service.py`
+      Verify: `python -m pytest backend/tests/acnr/test_cross_sheet_trace_async_e2e.py backend/tests/acnr/test_cross_sheet_identity_paths.py -p no:playwright` —— TestClient 调 `/api/custom-query/cross-sheet-trace`（不 mock _sync_resolve 与 resolver，夹具用目录权威名「货币资金分析表E1-14」）：登记格 resolved=true/in_catalog=true、R2-F8 未登记格 `E1-14!Z99` resolved=true/in_catalog=false/addr_id=`E1/E1-14/Z99`/jump_route 非空、目录外 sheet / A1 非法 / 多义 resolved=false 中文原因；AST 守卫断言每个 `CrossSheetResolver(` 构造显式传 resolve_identity、生产不引用 _sync_resolve；既有 `test_cross_sheet_*`/`test_cross_sheet_trace_wiring.py` 全绿。变异：编排器退回 `cell:{sheet 名}!{A1}` → e2e 红；「sheet 已识别 A1 合法」判 resolved=false → 未登记格用例红；某生产构造去掉 resolve_identity=False → 守卫红。
+
+- [ ] 21. V2 依赖图规范化与 stale 身份内核（需求 9.1~9.4 / D7）
+      新建 `services/acnr/v2_canonical.py`（`canonical_node` 只调 exact_identity，addr_id 与 unresolved_reason 恰有其一，分类见 §10.2 表；identity_key 并入同物理格 / 同 sheet 同标签多写法）。V2 四读端点每个节点与边两端增 addr_id/sheet_addr_id/unresolved_code/unresolved_reason（只增）；`/resolve` 包含匹配改 `matched:false`/`candidate:true`/`match_kind:"contains"`。stale 引擎 `_identity_index` 替代 `_addr_id_index`，入口 `_start_keys` 先算 identity_key 再查索引，算不出不写库返原因、图中无节点返空影响；图键与入口共用 canonical_node；`_normalize_wp_uri_to_addr_id` 不再被写路径使用。
+      Files: `backend/app/services/acnr/v2_canonical.py`、`backend/app/routers/address_registry_v2.py`、`backend/app/services/acnr/stale_propagation_engine.py`、`linkage_graph_builder.py`
+      Verify: `python -m pytest backend/tests/acnr/test_v2_canonical_reconcile.py -p no:playwright`（真实数据文件）—— 四读端点经 TestClient 返回节点恰有 addr_id 或 unresolved_reason、非空 addr_id full_resolve 回到同格、每类有中文原因；stale 写路径碰撞组样本 BFS 起点只含该格自身、只包含匹配的输入不写库（spy `_mark_stale_by_uri` 0 次）、`editor_save_inputs.json` 夹具新规则命中不少于旧逻辑正确命中（947→113/113、1128→100/100）。变异：canonical_node 改回正则猜编码 → 碰撞组用例红；删响应 addr_id → 9.1 红；包含匹配改 matched:true → /resolve 用例红。
+
+- [ ] 22. V2 双读对账产物与 CCR 不可解析源处置（需求 9.4~9.5 / D7，R2-F3）
+      `scripts/acnr/reconcile_v2_canonical.py --write|--check` 生成 `data/acnr/v2_canonical_reconcile.json`（按来源文件 × 分类计数、每类中文原因 + 前 20 样本、不含时间戳），CI 跑 `--check`。CCR 检查器 `check_ccr_resolve._find_sheet` 改委托 exact_identity 删私有匹配；统一判定重算 425 源（R2-F3：改写须两项证据 = 模板 tab 存在 + 字段文字在该 tab，B60×6/S14×1 不能改写入 ccr_unresolved，预计修 ≤4、豁免 ≥48，实施以当时现算逐条列证据）；`ccr_unresolved` 条目带 owner / 到期 2027-04-30 / 「缺哪项证据」理由，不整类豁免；`check_ccr_resolve --blocking` 清单外与「已可解析仍在清单」都失败。
+      Files: `scripts/acnr/reconcile_v2_canonical.py`、`scripts/acnr/check_ccr_resolve.py`、`backend/data/acnr/sources/acknowledgements.json`（追加 ccr_unresolved）、`backend/data/acnr/v2_canonical_reconcile.json`
+      Verify: `python scripts/acnr/reconcile_v2_canonical.py --check`（0 漂移）；`python scripts/acnr/check_ccr_resolve.py --blocking`（清单外 0、作业转绿）；`python -m pytest backend/tests/acnr/test_ccr_resolve.py -p no:playwright`。变异：把 B60 一条改写到工时预算看板 → 两项证据校验红；删一条已失效仍在清单的 ccr_unresolved → 清单失效条目红。
+
+- [ ] 23. 写 stale 端点项目鉴权（需求 10 / D8，先复现）
+      先 TestClient 复现并把证据写入 `tmp_acnr_foundation/out/p26_notify_idor_repro.txt`。处置三端点：V2 `notify-cell-change` 下线（只 raise 410 ENDPOINT_GONE、去请求体、留 get_current_user、不触达数据，前端删 `notifyCellChange` 常量）；linkage-bus `POST /impact` 加 project_id/year（缺省 fetch_project_audit_year 补、仍 None 422 YEAR_REQUIRED）+ 首句 `assert_project_permission(..., "edit")`；`GET /impact-by-addr` 改只读 `preview_impact`（不写库 / 不推 SSE / 不审计）+ `require_project_access("readonly")`、删 year。鉴权基线 `test_project_endpoint_authz_body_carried.py` 现算下调 `_BODY_IDENTITY_ONLY_BASELINE`、两 linkage-bus 端点入 `_FIXED_ENDPOINTS`；年度棘轮 `routers/address_registry_v2.py` 与前端 useStaleImpact/useEditorSave 条目下调（去日历年兜底）。
+      Files: `backend/app/routers/address_registry_v2.py`、`backend/app/routers/linkage_bus.py`、`backend/app/services/acnr/stale_propagation_engine.py`（preview_impact）；`audit-platform/frontend/src/{composables/useStaleImpact.ts,composables/useEditorSave.ts,services/apiPaths/system.ts}`；`backend/tests/test_project_endpoint_authz_body_carried.py`、`test_audit_year_calendar_fallback_ratchet.py`
+      Verify: `python -m pytest backend/tests/acnr/test_stale_write_endpoint_authz.py -p no:playwright`（表驱动：/impact 未登录 401 / 非成员 403 且 on_change 0 次 / readonly 与 review 403 / 审计员·经理·合伙人·admin 200 / 缺年度且项目无年度 422；/impact-by-addr 非成员 403 / readonly 200 且 `_mark_stale_by_uri` 0 次；notify-cell-change 登录 410 未登录 401，AST 断言函数体只有 raise）；`rtk npx vitest run src/composables/useStaleImpact.spec.ts`。变异：逐个摘掉新加鉴权 → 对应 403 红；docstring 写鉴权不算数（AST）。
+
+- [ ] 24. 消费方台账、绕过棘轮与门禁转绿（需求 13 / D11）
+      新建扫描器 `scripts/check/acnr_bypass_scan.py`（语法树：Python ast、TS 编译器 API、.vue 含模板，注释不计）定义 BP-1~BP-4（BP-2 按 R2-F12 窄定义：加载 3 个身份 JSON 或读 CCR 推 sheet 身份，纯 CCR 业务规则消费方只进台账；实施按窄定义现算后冻结不写死 47/12）。基线 `bypass_baseline.json`（文件 + 符号、不含行号），超出或失效条目都红。`check_acnr_consumer_coverage.py --strict` 改薄壳调它，删 `coverage_ledger.json` 两条纯注释引用。台账 `consumer_ledger.json`（草案见 §17，status ∈ migrated/legacy_fallback/not_wired，守卫校验文件与符号真实存在、migrated 不在 BP 基线）。F18 四红作业交付后确定绿（不用 continue-on-error / 整类豁免）。
+      Files: `backend/scripts/check/acnr_bypass_scan.py`、`backend/data/acnr/{bypass_baseline,consumer_ledger}.json`、`scripts/check/check_acnr_consumer_coverage.py`；删 `coverage_ledger.json`
+      Verify: `python -m pytest backend/tests/acnr/test_acnr_bypass_ratchet.py -p no:playwright`、`rtk npx vitest run src/acnrBypassRatchet.spec.ts`；交付前在 `tmp_acnr_foundation/verify_wt` 干净检出跑四个 CI 作业命令（drift / ie-catalog-sync / ccr-resolve-blocking / consumer-coverage）+ X3 作业 + `fix_acnr_catalog_ie_gap.py --check` 全绿。变异：临时副本注入一处新 `from app.services.address_registry import address_registry` → 红；只注释提到 legacy → 不红；删一个基线所指调用 → 报失效条目红；台账写不存在符号 → 红。
+
+- [ ] 25. V2 其余端点排查与 GET 写库处置登记（需求 10.4~10.5 / D8）
+      V2 `/stats`、`/resolve`、`/anchors`、`/stale-impact`、`/dependencies` 不带 project_id 只读静态数据，维持登录即可并在 design 已登记结论；`/impact-by-addr` 已在 T23 由会写库 GET 改只读。核对无遗漏的带 project_id 写端点；已修端点从鉴权基线删欠账、下调计数不回填。
+      Files: `backend/app/routers/address_registry_v2.py`（登记注释）、`backend/tests/test_project_endpoint_authz_body_carried.py`
+      Verify: `python -m pytest backend/tests/test_project_endpoint_authz_body_carried.py -p no:playwright` 全绿（基线只减不增、无失效条目）。变异：把一个已修端点的鉴权摘掉 → 基线红。
+
+- [ ] 26. acnr_targets / 版本锁 / 拒绝计入 ACNR 指标（非功能·可观测）
+      版本锁命中 / 锁定快照缺失 / acnr_targets 各类拒绝计入 `/api/acnr/metrics`（`version_lock_hit`、`version_lock_snapshot_missing`、`version_lock_unchecked`、`acnr_targets_rejected{error_code}`、`deprecated_ref_saved`、`stale_start_unresolved{code}`）。
+      Files: `backend/app/services/acnr/metrics.py`、相关调用点
+      Verify: `python -m pytest backend/tests/acnr/test_acnr_metrics.py -p no:playwright` 断言各指标在对应路径自增；端点返回含新指标键。变异：删一处 `acnr_targets_rejected` 自增 → 指标用例红。
+
+## 批次 P2：前端订阅隔离、统一显示与多项目验收（T27~T31）
+
+- [ ] 27. `useAcnr` 按项目订阅与 28 处调用改法（需求 11.1~11.4 / D9）
+      `useAcnr` 签名改 `(projectId?: MaybeRefOrGetter<string|null|undefined>)`，内部 `watch(() => toValue(projectId)||'', ...)` 仅 `getCurrentScope()` 存在时订阅并 `onScopeDispose(cleanup)`（普通函数内不订阅）；传静态字符串旧写法仍可用。新建 `composables/useCurrentProjectId.ts`。`stores/addressRegistry.ts` 用 `useAcnr(() => _projectId.value)` 并在 refresh 切项目同步切订阅（store 无实例、不依赖 onUnmounted）。28 处按 §12.2 表逐处改（props.projectId / 路由项目 / useCurrentProjectId / 函数入参 / 登记目录级）；2 处无项目上下文（FormulaTab 全局模板库、useAcnrCatalogIndex 只列目录）登记到 `services/acnr/acnrCatalogOnlyCallers.ts`。
+      Files: `audit-platform/frontend/src/composables/useAcnr.ts`、`useCurrentProjectId.ts`、`stores/addressRegistry.ts`、§12.2 表列出的 27 个文件、`services/acnr/acnrCatalogOnlyCallers.ts`
+      Verify: `rtk npx vitest run src/acnrSubscriptionLedger.spec.ts src/composables/useAcnr.spec.ts`（守卫用 TS 编译器 API 解析非测试 .ts 与 .vue 的 `<script>`，零参 `useAcnr()` 集合必须等于登记集合、登记里有不存在文件也红、注释不计；vitest 打桩 subscribeProjectEvent 计数：A→B 切换 A 取消 B 建立、同项目多处一个订阅、卸载归零、store refresh 切项目同步切、普通函数不订阅）。变异：去掉某处项目参数 → 守卫红。
+
+- [ ] 28. 失效隔离与多项目 SSE 浏览器验收（需求 11.3 / 11.5 / D9）
+      确认 `_onAcnrInvalidate` 的隔离逻辑（版本未变只清本项目解析缓存、版本变化清目录级、重连后清本项目缓存）并补测试与浏览器实测。
+      Files: `audit-platform/frontend/src/composables/useAcnr.ts`（如需补）、`src/stores/addressRegistry.ts`
+      Verify: `rtk npx vitest run src/composables/useAcnr.spec.ts`（A 收到 `acnr:invalidate` 只清 A 解析缓存、B 仍命中；目录版本变化才清目录级）；浏览器实测（chrome-devtools，两个【测试】项目、两个标签页：A 保存底稿 / 改 overlay 后 A 的选址或解析在 SSE 事件后刷新、B 不变；断开 SSE 重连后清 A 缓存，截图存 screenshots/）。变异：按项目清缓存改为全清 → 隔离 vitest 红。
+      多 worker + Redis pub/sub 场景本机不具备 → 标 `[ ]*`「代码已改但未实测」，降级仅 TTL 300 秒收敛同。
+
+- [ ] 29. 统一显示名下沉为后端单一函数并由生成器写入（需求 12.1 / D10）
+      规则以前端 `composeSheetLabelsForGroup` 现行口径逐行移植为 `services/acnr/display.py::compose_sheet_labels`（自然排序、名称来源顺序、纯编码置空、科目简称前缀、同组序号消歧完全相同，只多「（已停用）」）；`cell_labels` 生成 cell_label 与 display_label。沿用 `display_label` 字段名、取值改为统一显示名，生成器写出，list_sheets/resolve 命中与候选/acnr_targets/V2 节点都输出同一字段，L3/V1 由 resolver 现算。`wp_account_mapping.json` 与 `sheet_display_names.json` 成为生成器输入（进 inputs_fingerprint）、后者改手工维护、`gen_sheet_display_names.py` 删除（删前 grep）、`check_sheet_display_names.py` 改薄壳读目录。
+      Files: `backend/app/services/acnr/display.py`、`scripts/acnr/generate_catalog.py`、`backend/app/services/acnr/catalog.py`（list_sheets 只增 account_name/mapped_sheet_name）；删 `scripts/gen_sheet_display_names.py`；`scripts/check/check_sheet_display_names.py`
+      Verify: `python -m pytest backend/tests/acnr/test_display_contract.py -p no:playwright`（跨语言契约 `fixtures/display_contract.json` 从真实目录抽样同组序号 / 科目前缀 / 纯编码 / 停用 / 语义待核对，后端生成结果与 acnr_targets、`/api/acnr/resolve` 的 display_label 逐字相等）。变异：`display.py` 去掉序号消歧 → 契约夹具红。
+
+- [ ] 30. 前端显示统一到 display_label 并上守卫（需求 12.1 / D10）
+      `sheetDisplayName.ts` 保留 wpCodeNaturalCompare、新增 groupHeaderLabel 与 sortSheetsForGroup，删 composeSheetLabelsForGroup 与 cleanSheetLabelName；三棵树改调 sortSheetsForGroup。9 处拼接改读 display_label/cell_label（FormulaRefPicker 列为「单元格」+「引用」、CustomQueryFieldPicker 已选标签存 display_label、GtIndexChip 提示首行 display_label、AcnrTargetResults 显示 display_label）。
+      Files: `audit-platform/frontend/src/components/.../sheetDisplayName.ts`、`useAcnr.ts`、`FormulaManagerDialog.vue`、`FormulaEditDialog.vue`、`FormulaRefPicker.vue`、`CellSelector.vue`、`FormulaBar.vue`、`leftPanelAnchors.ts`、`stores/addressRegistry.ts`、`CustomQueryFieldPicker.vue`、`GtIndexChip.vue`、`AcnrTargetResults.vue`
+      Verify: `rtk npx vitest run src/acnrDisplaySingleSource.spec.ts`（TS 编译器 API + @vue/compiler-sfc 取模板表达式：登记文件中不出现 `.sheet_name`/`.semantic_label`/`.mapped_sheet_name` 属性读取、`.account_name` 只在 groupHeaderLabel、全仓无 composeSheetLabelsForGroup/cleanSheetLabelName）；vitest 用 display_contract 夹具挂载树 / 选址器 / 结果区 / chip 断言渲染文本逐字包含夹具值。变异：某组件改回读 `sheet_name` 拼显示名 → 守卫红。
+
+- [ ] 31. 歧义候选、可解释原因与外部命名空间中文提示（需求 12.2~12.5 / D10）
+      `ResolveResult` 增 reason（中文）/required_context/next_step/deprecated/replaced_by，候选增 display_label（≤5）；中文文案集中在 `reasons.py`。新组件 `AcnrCandidatesHint.vue`（显示原因 + 所需上下文 + 候选，选中候选按 addr_id 重解析）用于选址器 / 地址树 / GtIndexChip。`grammar_v1.json` 6 个外部命名空间各增 label_zh/next_step_zh，resolver 外部分支返回 external_module_not_resolved + 「「{label_zh}」类引用暂不支持定位到物理地址」+ next_step；GtIndexChip 显示原因与下一步、不显示英文错误码。
+      Files: `backend/app/services/acnr/{resolver.py,reasons.py}`、`backend/data/acnr/grammar_v1.json`；`audit-platform/frontend/src/components/acnr/AcnrCandidatesHint.vue`、`GtIndexChip.vue`
+      Verify: `python -m pytest backend/tests/acnr/test_external_namespace_reasons.py -p no:playwright`（遍历全部外部命名空间、缺文案即红）；`rtk npx vitest run src/components/acnr`（AcnrCandidatesHint 歧义候选、chip 外部命名空间中文原因与下一步、界面无英文错误码）。变异：删一个命名空间的 label_zh → 遍历用例红；某组件改回只显示「跳转 → ns:target」→ chip 用例红。
+
+## 批次 文档与勘误（T32~T33）
+
+- [ ] 32. 架构提案「现状（2026-10-26）」节与一致性守卫（需求 14.1 / 14.4 / D12）
+      在 `docs/proposals/address-coordinate-name-registry-architecture.md` 标题信息表后插入新节（原有段落一字不改）：已落地组件、发布后目录规模、版本格式 14 位 UTC 时间戳、L1 只覆盖底稿域、V1/V2/legacy 并行关系、本 spec 完成后门禁清单、定位「canonical resolver + legacy 委托」；逐条指出过时陈述（第 18 行「实施 spec 尚未创建」、第 543/562 行 `2026.07.10` 示例、首期仅 D 循环，行号按守卫标题与关键词定位）；同步改 `resolver.py` 模块注释「四大消费库的唯一解析入口」。
+      Files: `docs/proposals/address-coordinate-name-registry-architecture.md`、`backend/app/services/acnr/resolver.py`（注释）；`backend/tests/acnr/test_acnr_architecture_status_doc.py`
+      Verify: `python -m pytest backend/tests/acnr/test_acnr_architecture_status_doc.py -p no:playwright`（该节存在、节内版本格式与 `catalog_contract.REGISTRY_VERSION_PATTERN` 一致）。变异：把该节版本格式改回 `YYYY.N.N` 或删该节 → 守卫红。
+
+- [ ] 33. 勘误节、INDEX 登记与提交边界核对（需求 14.2~14.3 / D12）
+      本 spec design 已设「勘误」节（§15.2 七条，承接审计报告 §11 + 本轮新发现，不改历史报告原文；本 spec 提交不含 `.agents/tasks/` 任何文件）。在 `.kiro/specs/INDEX.md` 顶部登记本 spec（纯 CRLF：Python 读 bytes 解码再写回 bytes；表格单元格禁裸竖线、校验只数未转义竖线；不覆盖他人行），注明「acnr_targets 字段与面板以本 spec 为准（与 advanced-query-linkage-closure 的裁决 §16 Q0）」。
+      Files: `.kiro/specs/INDEX.md`（登记）；本 spec design.md（勘误节已就位）
+      Verify: `git diff --name-only` 不含 `.agents/tasks/` 任何文件（现算核查）；INDEX 登记行用 bytes 校验（Python 读写、每行行尾 CRLF、无裸竖线）。变异：无（文档任务，核查即验收）。
+
+## 问题编号 → 任务映射
+
+| 编号 | 任务 |
+|---|---|
+| ACNR-P0-01 / D1 | 1、11、12、13、14、15、16 |
+| ACNR-P0-02 / D2 | 5、6、10 |
+| ACNR-P0-03 / D3 | 3、4 |
+| ACNR-P1-01 / D4 | 1、2、6、7、8、9、10 |
+| ACNR-P1-02 / D5 | 17、18、19 |
+| ACNR-P1-03 / D4 | 9 |
+| ACNR-P1-04 / D6 | 20 |
+| ACNR-P1-05 / D7 | 21、22 |
+| ACNR-P2-01 / D9 | 27、28 |
+| ACNR-P2-02 / D8 | 23、25 |
+| D10（统一显示 / 外部命名空间中文提示） | 29、30、31 |
+| D11（消费方台账与 AST 棘轮） | 24 |
+| D12（架构提案现状节 + 勘误 + INDEX） | 32、33 |
+| 多项目 SSE / 缓存验收 | 28 |
+| 公式管理评估勘误 | 33（design §15.2） |
+| 可观测（非功能） | 26 |
+
+说明：T26 指标为非功能需求的集中落点；T10 跨 D2（停用条目行为）与 D4（往返 / 保存校验），故在 D2 与 P1-01 两处出现；T6 跨 D2（cell_verdicts）与 D4（名称规则），同理。每个决策 D1~D12、每个问题编号 ACNR-P0-01~P2-02 均至少映射到一个可独立验收的任务。
