@@ -208,7 +208,24 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     ("f3", "phase5_f3_notes_payable", "ADAPTER_ID", True, True),
     ("f4", "phase5_f4_accounts_payable", "ADAPTER_ID", True, True),
     ("f5", "phase5_f5_cost_of_sales", "ADAPTER_ID", True, True),
-    # ── N4 canary 条目随 N 循环 provider 入库时补回（phase5_n4 尚未提交）──
+    # ── L1 / J1（manifest 已翻 bidirectional ⇒ `test_golden_digest_coverage_ratchet` 要求必须在门内）──
+    #    两家都单受管 sheet，但 instrumentation 走复数 API（`instrumentation_specs()`），同 G10 口径。
+    ("l1", "phase5_l1_short_term_loans", "ADAPTER_ID", True, True),
+    #    🔴 J1 行身份 = 模板骨架行身份 `GTROW-J16S-*`（修行翻倍）；本门 digest 会在
+    #    `row_identity_key` / `uuid_col` / 骨架行区间被误改时打红。
+    ("j1", "phase5_j1_employee_compensation", "ADAPTER_ID", True, True),
+    # ── N4 canary（spec: n-cycle-sync-foundation-and-first-canary · Task 7）──
+    #    4556dca19 因 phase5_n4 当时未入库暂移，现已入库 ⇒ 按原注释补回。
+    #    🔴 N 循环**首条**纳入零回归门的 provider。`plural_instr=True`：它的
+    #    `instrumentation_definition_payload()` 走 phase5_l_cycle_common 的
+    #    `build_instrumentation_payload_for_sheets(specs=instrumentation_specs())`，
+    #    注册路径读的是**复数**。留 False 会让本门只核单 spec ⇒ 将来打开 N4-1/N4-3
+    #    等灰度开关时扩容面对判据完全不可见（D2 注释警告过的假绿）。
+    #    `has_projection=True`：薄转发框架层 `build_store_projection`，任何 digest 漂移
+    #    都来自引擎本身。本条的 contract digest 会在误改上打红：① `header_rows` 从 **1**
+    #    被改成 2（N4-2 是单级表头）② `formula_mask` 的 E/I/K 三列被改 ③ 行身份从
+    #    `rowKey` 改成 `rowId`（同税种可多行，熵键是本 entry 的有意选择）。
+    ("n4", "phase5_n4_taxes_and_surcharges", "ADAPTER_ID", True, True),
 )
 
 

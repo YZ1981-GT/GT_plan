@@ -700,13 +700,24 @@ export type Events = {
     timestamp: number
   }
 
-  // N5 所得税费用更新（当期/递延/有效税率）
+  // N4 税金及附加审定 → A 类利润表勾稽（发布方：useN4CrossSheet / useN4FormData）
+  'expense:taxes-surcharges-updated': {
+    wpCode: string
+    amount: number
+    details: Array<{ tax: string; amount: number }>
+    /** 旧发布方兼容字段；新消费方以 amount/details 为准 */
+    accountCode?: string
+    auditedAmount?: number
+    timestamp: number
+  }
+
+  // N5 所得税费用更新（当期/递延/有效税率；算不出有限值（如利润总额为 0）时为 null）
   'income-tax:updated': {
     wpCode: string
     currentTax: number
     deferredTax: number
     totalIncomeTax: number
-    effectiveTaxRate: number
+    effectiveTaxRate: number | null
     timestamp: number
   }
 
@@ -765,7 +776,9 @@ export type Events = {
   // D~N 附注刷新通知（主入口订阅 → selfLoad 重新加载数据）
   'disclosure:refresh': {
     wpCode?: string
-    timestamp: number
+    /** 触发来源（如 N3 调整分录页发 `adjustment`） */
+    source?: string
+    timestamp?: number
   } | void
 
   // 快捷键（shortcuts.ts 发出）

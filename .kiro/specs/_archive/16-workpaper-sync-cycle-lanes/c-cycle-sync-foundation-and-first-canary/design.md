@@ -2,7 +2,7 @@
 
 ## 定位
 
-本 spec 是 C 循环（控制测试）两份 sync spec 的**地基层**：一次性裁定 CC-1 ~ CC-56 共同判据、锁定 2 条 entry 的事实基线、落地首张 canary（`xlsx/gt-c-control-test`）。lane spec 只引用 CC 编号。
+本 spec 是 C 循环（控制测试）两份 sync spec 的**地基层**：一次性裁定 CC-1 ~ CC-68 共同判据、锁定 2 条 entry 的事实基线、落地首张 canary（`xlsx/gt-c-control-test`）。lane spec 只引用 CC 编号。
 
 ## 一、拆分裁决：为什么是 2 份而不是 1 份或 3 份
 
@@ -52,7 +52,7 @@ C 域只有 **2** 条 in-scope entry，第 3 份无 entry 可分。`pattern_less
 
 1 + 1 = **2** ✓
 
-## 二、CC-1 ~ CC-56 共同裁决对照表
+## 二、CC-1 ~ CC-68 共同裁决对照表
 
 判定图例：✅ 沿用 · ⚠️ 变形（方向不变但锚点/口径须改）· ❌ 不适用（空分母）· 🔁 反转（B 轮结论在 C 被证伪）· ➕ 新增（C 独有）
 

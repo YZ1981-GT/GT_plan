@@ -66,6 +66,18 @@ def _sequenced_execute(*head: object) -> AsyncMock:
     return AsyncMock(side_effect=_execute)
 
 
+def _authorized_project_result(project_id: uuid.UUID) -> MagicMock:
+    """config 端点**第一次** execute：``authorize_wp_read`` 按 wp_id 反查所属项目。
+
+    🔴 原门 ``require_project_access("readonly")`` 从 query 的 project_id 取权限，而端点随后
+    按 wp_id 加载底稿 ⇒ 有权项目 A + 他项目底稿 B 即可越权（j1-post-publish 修复）。现在先按
+    wp_id 反查真实项目再授权，故注入 session 的第一条查询是它；admin 角色在确认底稿存在后放行。
+    """
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = project_id
+    return result
+
+
 def _make_app_with_edit_wp(tmp_path, project_id, wp_code="D0", wp_status="draft"):
     """构建测试 app + 文件 + mock DB（编辑模式底稿）"""
     # 创建 xlsx 文件
@@ -93,7 +105,9 @@ def _make_app_with_edit_wp(tmp_path, project_id, wp_code="D0", wp_status="draft"
     #    `scalar_one_or_none() -> None` = 「本入口还没有存活 room」，正是生产基线代际路径。
     fake_room_result = MagicMock()
     fake_room_result.scalar_one_or_none.return_value = None
-    fake_db.execute = _sequenced_execute(fake_wp_result, fake_proj_result, fake_room_result)
+    fake_db.execute = _sequenced_execute(
+        _authorized_project_result(project_id), fake_wp_result, fake_proj_result, fake_room_result
+    )
 
     app = FastAPI()
     app.include_router(router)
@@ -326,7 +340,10 @@ class TestIdempotentRenewal:
             #    `scalar_one_or_none() -> None` = 「本入口还没有存活 room」，正是生产基线代际路径。
             fake_room_result = MagicMock()
             fake_room_result.scalar_one_or_none.return_value = None
-            fake_db.execute = _sequenced_execute(fake_wp_result, fake_proj_result, fake_room_result)
+            fake_db.execute = _sequenced_execute(
+                _authorized_project_result(project_id),
+                fake_wp_result, fake_proj_result, fake_room_result,
+            )
             return fake_db
 
         # 创建文件
