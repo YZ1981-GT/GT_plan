@@ -6,6 +6,57 @@
 - **定位**：平台级 **单一真源（Single Source of Truth）**，统一底稿/报表/附注/试算表/辅助余额的 **名称、坐标、URI、跳转、依赖锚点**
 - **关联文档**：[`workpaper-bulk-tab-import-export-requirements.md`](./workpaper-bulk-tab-import-export-requirements.md)（bulk ZIP 为 ACNR 消费者之一；命名规则见该文档 §8.6）
 
+## 现状（2026-10-26）
+
+> 本节由实施 spec `acnr-foundation-defect-closure`（D12）补入，反映底座缺陷收口（P0/P1/P2）落地后的实际状态。以本节为准读取下方各期规划章节——本文其余段落为架构提案原文，未改一字，其中对「当前状态」的陈述（见末尾「过时陈述勘误」）均以本节覆盖。
+
+### 已落地组件
+
+- **生成器 + L1 目录**：`global_catalog.json` 由生成器单向写出，不再有手维护的 schema 构建 / 校验脚本；目录只覆盖**底稿域**（wp），tb / report / note / aux 仍由现网 V1 动态解析，经同一 `resolve` 出口对外。
+- **L2 overlay**：项目级 overlay 以 CAS 方式写入、命中时与 L1 cell 同口径标记（`L1_cell`），作为 L1 的项目态叠加层，不独立成一套身份。
+- **L3 运行时**：索引命名空间（`wp/sheet/cell/...` + Layer 1-4）运行时解析，作为 legacy 导航门面继续服务，后端已转发 ACNR。
+- **`full_resolve` 与非底稿域 V1 委托**：`acnr/resolver.py` 是底稿域的 canonical resolver，非底稿域委托 V1；定位是「**canonical resolver + legacy 委托**」，不是「四大消费库的唯一解析入口」（resolver 模块注释已随本 spec 同步更正）。
+- **前端 SDK**：`useAcnr` / 地址树 / `GtIndexChip` / 下钻统一从目录取显示名与引用，带项目上下文。
+
+### 发布后目录规模
+
+- **sheet**：1225（classification 骨架 1215 + 补登 5 张平台独有父 sheet〔I6-7、J2-5、J3-4、J3-5、M6-5〕+ 停用 5 张旧编码 sheet〔K14~K18〕）。
+- **cell**：449 个有效 cell（474 − 25 个孤儿 cell 停用）；另有 25 个 `deprecated=true` cell 条目与 14 个超范围停用 cell 条目，发布后其 `parent_addr_id` 均在 sheets 集合内。
+- **孤儿计数 0**：所有 cell 的父 sheet 都在目录内（审计报告曾记 25 个孤儿 cell、512 处 schema 错误，均已清零）。
+
+### 版本号格式
+
+- `registry_version` 为 **14 位 UTC 时间戳**（`%Y%m%d%H%M%S`，形态 `^\d{14}$`，如 `20261027115337`），由生成器在写出时赋值；不再使用 `YYYY.N.N`（本文下方示例中的 `2026.07.10` 已过时，见末尾勘误）。版本号是项目级版本锁定解析的依据。
+
+### 单一契约与发布门禁
+
+- schema 单一契约集中在 `services/acnr/catalog_contract.py`（`REGISTRY_VERSION_PATTERN` / `FUNCTIONAL_TYPES` / `PURPOSE_PATTERN` 等），后端、门禁、测试同读这一份。
+- 目录只由生成器写出，写出前跑一组发布门禁（`catalog_release`）：重复 addr_id / sheet_code、孤儿 cell、已发布 addr_id 不得静默消失（不可变门禁）、别名与父级禁止集合不相交、往返一致、幂等（连续两次生成 sha256 相同）等。绕过生成器直改 `global_catalog.json`（含只加一个别名）→ `--check` 退出 2 并点名。
+
+### 版本锁持久化
+
+- 历史版本锁定由「仅进程内、生产调用方 0」升级为**持久化**：`lock_project_registry` 把项目锁定到某一目录版本并落库，`effective_catalog(db, project_id)` 统一返回锁定版本或当前版本；身份归属、三参取值、acnr_targets、打开归档底稿求值都走它，锁定项目在目录升级后仍按锁定版本解析。锁定与解锁口径跟随项目 `status`。
+
+### V1 / V2 / legacy 导航的并行关系
+
+- **V1**（动态寻址）：非底稿域的权威，底稿域经 ACNR 委托；为 canonical resolver 的回退路径（版本锁 / 目录完整性异常时不再回退）。
+- **V2**（依赖图与 stale）：节点身份经 `v2_canonical` 规范化为 addr_id / 身份键（`addr_id` 与 `unresolved_reason` 恰有其一，不再用正则猜编码造成碰撞组错并）；此为 **additive 规范化**——只增节点的规范身份字段、写路径只按精确身份标 stale，不改既有图边与端点语义。V2 只读端点属「非权威」，退役见规划章节。
+- **legacy 导航门面**（`wp_index_resolve` 等）：已转发 ACNR，`resolve_instance` 按 `wp_index.wp_code` 绑定项目已有底稿，导航可达；停用条目不看停用标记仍可导航（chip 提示附停用原因）。
+
+### 高级查询 acnr_targets：跨模块单元格取值
+
+- 高级查询此前只复用了**地址树组件**，两个执行入口都不取值（构建器丢弃字段、业务视图不读解析结果）。本轮 D1 已实现 `acnr_targets` 为**跨模块单元格取值**：构建器 / 业务视图 / 模板执行三个入口接受地址目标，经与 formula-hub 共用的 `wp_cell_reader` 按目录 sheet 精确取值（先 sheet 级底稿、无则父底稿），结果单独成 `acnr_results` 块；带项目取值先过项目鉴权，拒绝给中文原因（422 `ACNR_TARGETS_REJECTED` / 503 `RESOLVE_UNAVAILABLE` / 403 / 422 `YEAR_REQUIRED`），全有或全无，不表现为 0 / 空结果 / 成功。
+
+### 本 spec 完成后的门禁清单
+
+- schema 单一契约守卫（契约与目录同读一份）、发布门禁（`catalog_release` + `--check`）、往返一致（formula_ref ↔ addr_id）、classification 缓存与库表对照（`pg_only`、只读）、显示名单一来源、消费方迁移台账 AST 棘轮（绕过点基线冻结只减不增）、V2 双读对账（`reconcile_v2_canonical --check`）、架构提案本现状节一致性守卫（`test_acnr_architecture_status_doc.py`，校验本节存在且版本格式与 `REGISTRY_VERSION_PATTERN` 一致）。
+
+### 过时陈述勘误（原文保留，仅在此指出）
+
+- 「实施 spec 尚未创建（G8 阻塞项）」：实施 spec `acnr-foundation-defect-closure` 已创建并完成 P0/P1/P2；本现状节即其 D12 产物。
+- `registry_version: "2026.07.10"`（本文附录 A / §十三等示例）：版本号已改为 14 位 UTC 时间戳，`YYYY.N.N` 形态作废。
+- 「首期仅 D 循环」「L1 仅 wp 域 D 循环骨架」等分期陈述：发布后 L1 底稿域目录已覆盖全循环（1225 张 sheet / 449 个有效 cell），不再限于 D 循环。
+
 ### 文档体系地图
 
 | 文档 | 路径 | 角色 | 状态 |
