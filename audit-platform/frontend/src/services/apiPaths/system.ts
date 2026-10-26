@@ -602,7 +602,7 @@ export const addressRegistry = {
     anchors: '/api/address-registry/v2/anchors',
     staleImpact: '/api/address-registry/v2/stale-impact',
     dependencies: '/api/address-registry/v2/dependencies',
-    notifyCellChange: '/api/address-registry/v2/notify-cell-change',
+    // notify-cell-change 已停用（spec acnr-foundation-defect-closure D8），常量随之删除
   },
 } as const
 

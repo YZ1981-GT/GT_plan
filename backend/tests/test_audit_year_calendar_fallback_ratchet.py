@@ -34,7 +34,6 @@ FROZEN_TOTAL_CAP = 130
 #: 2026-10-25 现算冻结（相对 backend/app）：只许变小
 BASELINE: dict[str, int] = {
     "routers/account_note_mapping.py": 1,
-    "routers/address_registry_v2.py": 1,
     "routers/aging_analysis.py": 1,
     "routers/analytical_review_save.py": 2,
     "routers/audit_check.py": 1,

@@ -59,16 +59,22 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
   }) {
     const code = wpCode.value
     if (!code) return
+    // 没有项目上下文就不发请求：后端要求项目鉴权，裸发必 403
+    // （spec acnr-foundation-defect-closure D8 / 需求 10）
+    if (!payload.project_id) return
     loading.value = true
     try {
       // 构建统一 URI: WP:{wp_code}:{sheet}:{cell_or_label}
       const sourceUri = `WP:${code}:${payload.sheet || ''}:${payload.cell || '审定数'}`
 
-      const res: any = await http.post(linkageBus.impact, {
+      // 年度未知时不带 year，由后端按项目审计年度补齐（不用日历年兜底）
+      const body: { source_uri: string; project_id: string; year?: number } = {
         source_uri: sourceUri,
-        project_id: payload.project_id || '',
-        year: payload.year || new Date().getFullYear(),
-      })
+        project_id: payload.project_id,
+      }
+      if (payload.year) body.year = payload.year
+
+      const res: any = await http.post(linkageBus.impact, body)
 
       // 将 affected URIs 转换为 StaleAffectedItem 格式
       const affectedUris: string[] = res.data?.affected || res?.affected || []
@@ -91,6 +97,11 @@ export function useStaleImpact(wpCodeSource: WpCodeSource) {
       // 降级模式：503 时静默（不显示黄条，不阻断保存）
       if (e?.response?.status === 503) {
         logger.log('[useStaleImpact] Engine degraded (503), silently skipping')
+        return null
+      }
+      // 无权访问该项目：非阻塞，静默跳过（不阻断保存）
+      if (e?.response?.status === 403) {
+        logger.log('[useStaleImpact] No project access (403), silently skipping')
         return null
       }
       console.warn('[useStaleImpact] notify failed:', e)

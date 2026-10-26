@@ -110,7 +110,9 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
           sheet: sheetName,
           max_depth: 3,
           project_id: opts.projectId.value,
-          year: opts.wpDetail.value?.year || new Date().getFullYear(),
+          // 年度未知不兜底日历年：由后端按项目审计年度补齐
+          // （spec acnr-foundation-defect-closure D8 / 需求 10）
+          year: opts.wpDetail.value?.year,
         })
         if (impactResp && (impactResp.total || impactResp.total_affected) > 0) {
           const total = impactResp.total || impactResp.total_affected

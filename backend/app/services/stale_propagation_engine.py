@@ -441,6 +441,30 @@ class StalePropagationEngine:
             "duration_ms": duration_ms,
         }
 
+    def preview_impact(self, source_uri: str, max_depth: int = 5) -> dict[str, Any]:
+        """只读下游影响预览：只做 BFS，不写 DB、不推 SSE、不记审计。
+
+        供 ``GET /api/linkage-bus/impact-by-addr`` 用——该端点原来是会写库的 GET
+        （调 :meth:`on_change`），改为只读预览后不再有副作用（spec
+        acnr-foundation-defect-closure D8 / 需求 10）。
+
+        降级模式下尝试重载图；仍降级则返回空影响 + ``degraded=True``（不回退到
+        粗粒度 mark_stale——那是写操作，只读预览不该触发）。
+        """
+        if self._degraded:
+            self._load_graph()
+            if self._degraded:
+                return {"affected": [], "total": 0, "degraded": True}
+
+        normalized = _detect_and_normalize(source_uri)
+        graph_key = self._addr_id_index.get(normalized, normalized)
+        affected_uris = self._bfs(graph_key, max_depth=max_depth)
+        return {
+            "affected": affected_uris,
+            "total": len(affected_uris),
+            "degraded": False,
+        }
+
     @property
     def is_degraded(self) -> bool:
         """当前是否处于降级模式。"""

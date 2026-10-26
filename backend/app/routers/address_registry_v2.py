@@ -300,39 +300,18 @@ async def get_dependencies(
 
 @router.post("/notify-cell-change")
 async def notify_cell_change(
-    body: dict,
     user=Depends(get_current_user),
 ) -> dict:
-    """通知单元格变更，返回 stale 传播链路（前端编辑器调用）"""
-    wp_code = body.get("wp_code", "")
-    sheet = body.get("sheet", "")
-    cell = body.get("cell", "")
-    max_depth = int(body.get("max_depth", 3))
-    project_id = body.get("project_id", "")
-    year = int(body.get("year", 2025))
+    """已停用（spec acnr-foundation-defect-closure D8 / 需求 10）。
 
-    if not wp_code:
-        raise HTTPException(400, "wp_code is required")
-
-    # 直接复用 stale-impact
-    impact = await stale_impact(wp_code, sheet, cell, max_depth, user)
-
-    # Global Linkage Bus Sprint 3: 调用 stale_engine.on_change 写 DB stale 标记
-    try:
-        from app.services.stale_propagation_engine import stale_engine
-
-        uri = f"WP:{wp_code}:{sheet}:{cell}" if cell else f"WP:{wp_code}:{sheet}:"
-        if project_id:
-            await stale_engine.on_change(uri, project_id, year)
-    except Exception:
-        pass  # Never block main operation
-
-    return {
-        "ok": True,
-        "wp_code": wp_code,
-        "sheet": sheet,
-        "cell": cell,
-        "stale_targets": impact.get("affected", []),
-        "total_affected": impact.get("total_affected"),
-        "message": f"已识别 {impact.get('total_affected')} 个下游影响点",
-    }
+    原实现无项目鉴权即按任意 project_id 写 stale（年度写死 2025），属越权写
+    （IDOR）。前端已无调用方。改走带项目鉴权的 ``POST /api/linkage-bus/impact``。
+    仅保留登录校验（未登录 401）、不触达任何数据。
+    """
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error_code": "ENDPOINT_GONE",
+            "message": "该接口已停用，请改用 /api/linkage-bus/impact",
+        },
+    )

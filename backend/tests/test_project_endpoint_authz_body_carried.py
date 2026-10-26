@@ -88,6 +88,10 @@ _FIXED_ENDPOINTS = frozenset({
     "draft_refresh.py::one_click_draft_refresh",
     "refresh_scopes.py::list_refresh_scopes",
     "row_name_alignment_router.py::batch_refresh",
+    # spec acnr-foundation-defect-closure D8：联动总线写 stale 的两个端点
+    # （/impact 写 stale 走 edit；/impact-by-addr 改只读预览走 readonly）
+    "linkage_bus.py::stale_impact",
+    "linkage_bus.py::stale_impact_by_addr",
     # spec formula-fetch-followup-defect-closure R4.1：地址库读项目数据的五个端点（只读级）
     "address_registry.py::search_addresses",
     "address_registry.py::get_stats",
@@ -121,7 +125,9 @@ _BODY_KNOWN_GAPS: frozenset[str] = frozenset({
 #: 写 stale）与地址库 v2 notify-cell-change（同样写 stale）、地址库六个读端点、底稿字段覆盖值两个端点。
 #: 2026-10-24 spec formula-fetch-followup-defect-closure R4.1 修地址库五个读端点（jump 只拼路由、登记进
 #: _BODY_IDENTITY_BY_DESIGN 不计欠账）后现算 87。
-_BODY_IDENTITY_ONLY_BASELINE = 87
+#: 2026-10-27 spec acnr-foundation-defect-closure D8：linkage-bus /impact（edit）、/impact-by-addr（readonly）
+#: 两个 stale 写端点加项目鉴权升到 project 档，v2 notify-cell-change 下线去请求体（不再带项目、退出本维）后现算 84。
+_BODY_IDENTITY_ONLY_BASELINE = 84
 
 
 def _rooted_at_param(expr: ast.AST, params: set[str]) -> bool:
