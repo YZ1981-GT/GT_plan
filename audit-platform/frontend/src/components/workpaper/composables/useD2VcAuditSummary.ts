@@ -133,13 +133,15 @@ export function useD2VcAuditSummary(options: UseD2VcAuditSummaryOptions) {
     if (!projectId.value) return
     isLoadingTb.value = true
     try {
-      // 获取项目审计年度
-      let year = new Date().getFullYear() - 1
+      // 获取项目审计年度；项目未设置年度时不猜日历年，也不发试算表请求。
+      let year: number | null = null
       try {
         const projRes = await api.get(`/api/projects/${projectId.value}`)
         const proj = projRes?.data ?? projRes
-        if (proj?.audit_year) year = Number(proj.audit_year)
-      } catch { /* fallback to previous year */ }
+        const candidate = Number(proj?.audit_year)
+        if (Number.isFinite(candidate) && candidate > 0) year = candidate
+      } catch { /* 项目年度读取失败时保持空态 */ }
+      if (year == null) return
 
       const tbRes = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
         params: { year },

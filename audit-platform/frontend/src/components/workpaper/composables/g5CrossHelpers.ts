@@ -243,9 +243,8 @@ export async function fetchTb1531AuxByCustomer(
   try {
     const http = (await import('@/utils/http')).default
     const { resolveAuditYearNumber } = await import('./workpaperAuditYear')
-    const y = year
-      ?? resolveAuditYearNumber(undefined, new Date().getFullYear() - 1)
-      ?? (new Date().getFullYear() - 1)
+    const y = year ?? resolveAuditYearNumber(undefined)
+    if (y == null) return out
     const { data } = await http.get(`/api/projects/${projectId}/ledger/aux-balance-detail`, {
       params: {
         account_code: G5_ACCOUNT_CODE,

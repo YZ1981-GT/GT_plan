@@ -14,9 +14,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import assert_project_permission, get_current_user
 from app.models.core import User
 from app.services.field_override_service import FieldOverrideService
+from app.services.wp_visibility.program_row_guard import assert_program_override_allowed
 
 router = APIRouter(prefix="/api/workpapers/field-overrides")
 
@@ -56,7 +57,8 @@ async def get_field_overrides(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> dict[str, dict[str, Any]]:
-    """获取指定 scope 下所有覆盖值"""
+    """获取指定 scope 下所有覆盖值（项目成员可读；原先只校验登录，可读任意项目）"""
+    await assert_project_permission(db, _user, project_id, "readonly")
     svc = FieldOverrideService(db)
     return await svc.get_batch(project_id, year, scope)
 
@@ -67,7 +69,11 @@ async def set_field_override(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> FieldOverrideSetResponse:
-    """Upsert 单个覆盖值"""
+    """Upsert 单个覆盖值（项目 edit 级；程序表行只能写派给本人的，spec procedure-trim-generation-delegation-chain 需求 7.3）"""
+    await assert_project_permission(db, user, body.project_id, "edit")
+    await assert_program_override_allowed(
+        db, user, body.project_id, body.scope, body.item_key, body.field, body.value,
+    )
     svc = FieldOverrideService(db)
     override = await svc.set(
         project_id=body.project_id,

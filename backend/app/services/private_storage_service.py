@@ -13,9 +13,15 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from app.services.project_audit_year import resolve_project_audit_year
+
 logger = logging.getLogger(__name__)
 
 STORAGE_ROOT = Path(os.environ.get("STORAGE_ROOT", "storage"))
+
+
+class InvalidPrivateFileName(ValueError):
+    """文件名带路径（``..`` / 分隔符）或为空 —— 不能逃出本人的私人库目录。"""
 
 
 class PrivateStorageService:
@@ -26,6 +32,21 @@ class PrivateStorageService:
 
     def _user_dir(self, user_id: UUID) -> Path:
         return STORAGE_ROOT / "users" / str(user_id) / "private"
+
+    def _file_path(self, user_id: UUID, filename: str) -> Path:
+        """私人库内的文件路径：只认纯文件名（不含 ``/`` ``\\`` ``..``），解析后必须仍在本人目录下。
+
+        🔴 原先直接 ``目录 / filename``：上传的文件名来自客户端，删除的文件名来自路径参数（Windows 上 ``%5C`` 解码成
+        反斜杠后仍是一段路径），都能用 ``..`` 写到 / 删到私人库目录之外。
+        """
+        name = (filename or "").strip()
+        if not name or name in {".", ".."} or "/" in name or "\\" in name or "\x00" in name:
+            raise InvalidPrivateFileName("文件名不合法")
+        base = self._user_dir(user_id).resolve()
+        target = (base / name).resolve()
+        if target.parent != base:
+            raise InvalidPrivateFileName("文件名不合法")
+        return target
 
     async def check_quota(self, user_id: UUID) -> dict[str, Any]:
         """检查容量"""
@@ -65,16 +86,16 @@ class PrivateStorageService:
             raise ValueError(f"容量不足：已用 {quota['used']/(1024*1024):.1f}MB，上限 {self.MAX_SIZE_BYTES/(1024*1024):.0f}MB")
 
         path = self._user_dir(user_id)
+        file_path = self._file_path(user_id, filename)
         path.mkdir(parents=True, exist_ok=True)
-        file_path = path / filename
         file_path.write_bytes(content)
-        logger.info("private_storage upload: user=%s, file=%s, size=%d", user_id, filename, len(content))
-        return {"name": filename, "size": len(content), "path": str(file_path.relative_to(path))}
+        logger.info("private_storage upload: user=%s, file=%s, size=%d", user_id, file_path.name, len(content))
+        return {"name": file_path.name, "size": len(content), "path": file_path.name}
 
     async def delete_file(self, user_id: UUID, filename: str) -> bool:
         """删除私人库文件"""
-        file_path = self._user_dir(user_id) / filename
-        if file_path.exists():
+        file_path = self._file_path(user_id, filename)
+        if file_path.is_file():
             file_path.unlink()
             return True
         return False
@@ -122,10 +143,9 @@ class ProjectArchiveService:
         )
         project = proj_result.scalar_one_or_none()
         project_name = project.client_name if project else "unknown"
-        year = 2025  # 从 wizard_state 取
-        if project and project.wizard_state:
-            bi = project.wizard_state.get("steps", {}).get("basic_info", {}).get("data", {})
-            year = bi.get("audit_year", 2025)
+        year = resolve_project_audit_year(project) if project else None
+        if year is None:
+            raise ValueError("未设置审计年度，请先在项目基本信息中填写")
 
         # 3. 推送云端
         cloud_result = None

@@ -83,20 +83,26 @@ class ProcedureTaskMaterializationService:
         }
 
     async def _definitions_for_wp_code(
-        self, wp_code: str, definition_revision: str | None = None
+        self, wp_code: str, definition_revision: str | None = None,
+        only_keys: frozenset[str] | None = None,
     ) -> list[ProcedureRowDefinition]:
         """按底稿基码匹配模板定义（template_code base == wp_code）。
 
         用 ``LIKE wp_code%`` 收窄后在 Python 按精确 base 过滤，规避 D2 与 D20 前缀误匹配。
-        可选按 ``definition_revision`` 进一步过滤某一版本。
+        可选按 ``definition_revision`` 进一步过滤某一版本；``only_keys`` 只取这些定义键（委派预览只物化当前模板版本，
+        见 ``procedure_row_definitions``）。
         """
         if not wp_code:
+            return []
+        if only_keys is not None and not only_keys:
             return []
         conds = [ProcedureRowDefinition.template_code.like(f"{wp_code}%")]
         if definition_revision:
             conds.append(
                 ProcedureRowDefinition.template_revision_hash == definition_revision
             )
+        if only_keys is not None:
+            conds.append(ProcedureRowDefinition.definition_key.in_(sorted(only_keys)))
         rows = (
             await self.db.execute(
                 sa.select(ProcedureRowDefinition).where(*conds)
@@ -112,10 +118,13 @@ class ProcedureTaskMaterializationService:
         wp_index_ids: list[UUID],
         *,
         definition_revision: str | None = None,
+        definition_keys_by_wp_code: dict[str, frozenset[str]] | None = None,
         actor_user_id: UUID | None = None,
         request_id: str | None = None,
     ) -> dict:
         """把匹配 definitions 显式物化为 ProcedureRowTask（批量 active partial unique upsert）。
+
+        ``definition_keys_by_wp_code``：只物化这些定义键（委派预览按当前模板版本，``procedure_row_definitions``）。
 
         - 新 (project, wp_index, sheet, definition) → 插入 task（默认 unassigned/execute）。
         - 已存在 active task → 只更新展示快照（wp_code/sheet_name），不动委派/工作流/版本/wp_id。
@@ -133,7 +142,8 @@ class ProcedureTaskMaterializationService:
         per_index: dict[UUID, int] = {}
         for wp_index_id, meta in wp_index_map.items():
             wp_code = meta["wp_code"]
-            defs = await self._definitions_for_wp_code(wp_code, definition_revision)
+            only = None if definition_keys_by_wp_code is None else definition_keys_by_wp_code.get(wp_code, frozenset())
+            defs = await self._definitions_for_wp_code(wp_code, definition_revision, only)
             per_index[wp_index_id] = len(defs)
             for d in defs:
                 value_rows.append(
@@ -324,6 +334,7 @@ class ProcedureTaskMaterializationService:
         wp_index_id: UUID,
         *,
         definition_revision: str | None = None,
+        definition_keys_by_wp_code: dict[str, frozenset[str]] | None = None,
     ) -> list[dict]:
         """纯读：对本 wp_index 的全部 definition 行构造 overlay（缺 task 标 materialization_required）。
 
@@ -333,7 +344,8 @@ class ProcedureTaskMaterializationService:
         meta = wp_index_map.get(wp_index_id)
         if meta is None:
             return []
-        defs = await self._definitions_for_wp_code(meta["wp_code"], definition_revision)
+        only = None if definition_keys_by_wp_code is None else definition_keys_by_wp_code.get(meta["wp_code"], frozenset())
+        defs = await self._definitions_for_wp_code(meta["wp_code"], definition_revision, only)
         task_index = await self._active_tasks_by_key(project_id, wp_index_id)
 
         overlay: list[dict] = []

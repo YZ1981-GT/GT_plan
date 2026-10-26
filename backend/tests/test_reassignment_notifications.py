@@ -208,6 +208,14 @@ class TestAssignEndpointReassignment:
             created_by=MANAGER_USER_ID,
         )
         db_session.add(wp_unassigned)
+        # 编制人走底稿主编委派事务（spec procedure-trim-generation-delegation-chain 任务 12）：
+        # 被委派人须是本项目成员（团队分配）且看得到该循环
+        from app.models.staff_models import ProjectAssignment, StaffMember
+        new_staff = StaffMember(id=uuid.uuid4(), user_id=NEW_USER_ID, name="新编制人")
+        db_session.add(new_staff)
+        await db_session.flush()
+        db_session.add(ProjectAssignment(project_id=FAKE_PROJECT_ID, staff_id=new_staff.id,
+                                         role="auditor", assigned_cycles=["D"]))
         await db_session.commit()
 
         # 模拟首次分配
@@ -218,6 +226,7 @@ class TestAssignEndpointReassignment:
             wp_id=wp_unassigned.id,
             project_id=FAKE_PROJECT_ID,
             assigned_to=NEW_USER_ID,
+            actor_user_id=MANAGER_USER_ID,
         )
         await db_session.commit()
 

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_audit_year
 from app.models.core import User
 from app.services.consistency_gate import ConsistencyGate
 
@@ -53,15 +53,8 @@ async def get_vr_heatmap(
     """
     gate = ConsistencyGate(db)
 
-    # 获取项目年度（从最近的报表或默认 2025）
-    from app.models.core import Project
-    import sqlalchemy as sa
-    proj = (await db.execute(
-        sa.select(Project).where(Project.id == project_id)
-    )).scalar_one_or_none()
-    year = 2025  # 默认
-    if proj and proj.audit_period_end:
-        year = proj.audit_period_end.year
+    # 获取项目审计年度（统一项目年度解析，缺失时明确返回 422）
+    year = await require_project_audit_year(db, project_id)
 
     matrix = []
     total = {"blocking": 0, "warning": 0, "info": 0}

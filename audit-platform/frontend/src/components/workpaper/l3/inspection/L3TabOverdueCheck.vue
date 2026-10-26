@@ -320,7 +320,8 @@
  * Task: 4.5
  * Requirements: 7.1-7.3
  */
-import { inject, ref, toRef, watch } from 'vue'
+import { computed, inject, ref, toRef, watch } from 'vue'
+import { useProjectAuditYear } from '@/composables/useProjectAuditYear'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useL3OverdueCheck, type L3OverdueCheckRow } from '@/composables/useL3OverdueCheck'
 import { useL3ImportExport } from '@/composables/useL3ImportExport'
@@ -344,8 +345,10 @@ const formData = inject<ReturnType<typeof useL3FormData>>('l3FormData')!
 
 // ─── 报告期截止日（默认当年12月31日） ────────────────────────────────────────
 
-const currentYear = new Date().getFullYear()
-const reportDateStr = `${currentYear}-12-31`
+// 报告日取项目审计年度的 12-31（原先取今年）；取不到留空
+const { auditYear: projectAuditYear, ensureAuditYear } = useProjectAuditYear(() => props.projectId)
+void ensureAuditYear()
+const reportDateStr = computed(() => (projectAuditYear.value == null ? '' : `${projectAuditYear.value}-12-31`))
 
 // ─── Composable（rows 由 composable 内部从 allResponses hydrate，JSON存储 L3-overdue-check-rows） ───
 

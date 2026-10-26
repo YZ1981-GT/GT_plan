@@ -687,7 +687,7 @@ const isReadonly = computed(() => Boolean(props.isReadonly))
 const projectId = computed(() => props.projectId)
 const checkOpts = I2_12_CHECK_OPTIONS.filter((o) => o !== '') as string[]
 const samplingVisible = ref(false)
-const samplingYear = computed(() => props.year || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 const allResponsesRef = toRef(props, 'allResponses')
 

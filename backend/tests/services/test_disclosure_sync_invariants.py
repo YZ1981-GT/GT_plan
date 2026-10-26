@@ -19,7 +19,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -213,18 +213,21 @@ class TestManualOverrideDetection:
 
 
 class TestYearAuthority:
-    """同步目标年度取 projects.audit_year，不用服务器自然年。"""
+    """同步目标年度取 projects.audit_year，不用服务器自然年。
 
-    def test_derive_year_fallback_is_current(self):
-        """_derive_year(None) 回退到当前自然年（兜底，不是权威）。"""
+    spec audit-year-calendar-fallback-ratchet：取不到年度一律返回 None（由调用方跳过同步
+    并回原因），不再回退服务器当前自然年 —— 自然年与审计年度通常不同（2026 年做 2025 年报），
+    回退会把底稿推送写进附注模块看不到的年度。
+    """
+
+    def test_derive_year_no_calendar_fallback(self):
+        """_derive_year(None) 返回 None，不猜自然年。"""
         from app.services.wp_disclosure_sync_service import _derive_year
 
-        year = _derive_year(None)
-        assert isinstance(year, int)
-        assert 2020 <= year <= 2030
+        assert _derive_year(None) is None
 
     def test_derive_year_explicit_wins(self):
-        """显式传入年度优先于当前自然年。
+        """显式传入年度原样采用；不传时返回 None（不是当前自然年）。
 
         🔴 修复复盘 P2-2：首版本测试**函数体只有注释、零断言** = 空转。
         """
@@ -237,18 +240,15 @@ class TestYearAuthority:
         assert _derive_year(explicit) == explicit, (
             "显式 payload_year 未被采用 ⇒ 同步会落到错误年度的附注"
         )
-        # 反向：不传时才回退当前自然年
-        assert _derive_year(None) == current
+        # 反向：不传时不得落到当前自然年
+        assert _derive_year(None) is None
 
     def test_derive_year_rejects_non_int(self):
-        """非整数年度不被当作显式值（防 '2025' 字符串绕过类型检查）。"""
-        from datetime import datetime, timezone
-
+        """非整数 / 0 年度不被当作显式值（防 '2025' 字符串绕过类型检查），也不回退自然年。"""
         from app.services.wp_disclosure_sync_service import _derive_year
 
-        current = datetime.now(timezone.utc).year
-        for bad in (0, None):
-            assert _derive_year(bad) == current, f"{bad!r} 应回退当前年"
+        for bad in (0, None, "2025"):
+            assert _derive_year(bad) is None, f"{bad!r} 应视为未提供年度"
 
     @pytest.mark.asyncio
     async def test_resolve_target_year_payload_wins(self):
@@ -275,8 +275,8 @@ class TestYearAuthority:
         assert result == 2024
 
     @pytest.mark.asyncio
-    async def test_resolve_target_year_fallback_last(self):
-        """_resolve_target_year：前两者都无时才用 _derive_year（当前自然年）。"""
+    async def test_resolve_target_year_missing_returns_none(self):
+        """_resolve_target_year：payload 与项目审计年度都没有时返回 None（不回退自然年）。"""
         from app.services.wp_disclosure_sync_service import _resolve_target_year
 
         mock_db = AsyncMock()
@@ -285,9 +285,32 @@ class TestYearAuthority:
             return_value=None,
         ):
             result = await _resolve_target_year(mock_db, uuid4(), None)
-        # 兜底值应是当前自然年
-        assert isinstance(result, int)
-        assert 2020 <= result <= 2030
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_sync_from_workpaper_skips_when_year_missing(self):
+        """sync_from_workpaper：取不到年度时跳过同步并回原因，不写任何附注行。"""
+        from app.services import wp_disclosure_sync_service as svc
+
+        mock_db = AsyncMock()
+        facts = (None, "listed", "listed", "standalone")
+        with patch.object(
+            svc, "_resolve_project_sync_facts", AsyncMock(return_value=facts)
+        ), patch.object(svc, "_guard_standard_matches_project", lambda *a, **k: None):
+            result = await svc.sync_from_workpaper(
+                mock_db,
+                uuid4(),
+                wp_id=uuid4(),
+                sheet_name="附注披露",
+                section_id="五、1",
+                sub_table_data={"t1": [{"name": "a", "amount": 1}]},
+                current_standard="listed",
+                user=MagicMock(),
+            )
+        assert result == {"synced": 0, "skipped_reason": "未设置审计年度"}
+        mock_db.add.assert_not_called()
+        mock_db.execute.assert_not_called()
+        mock_db.commit.assert_not_called()
 
 
 # ══════════════════════════════════════════════════════════════════════════

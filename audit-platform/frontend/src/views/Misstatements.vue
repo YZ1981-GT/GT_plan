@@ -316,7 +316,10 @@ const router = useRouter()
 const penetrate = usePenetrate()
 const { canEdit, onContextChange } = useAuditContext()
 const { isFullscreen, toggleFullscreen } = useFullscreen()
-const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+const year = computed<number | null>(() => {
+  const value = Number(route.query.year)
+  return Number.isFinite(value) && value > 0 ? value : null
+})
 
 // R10 Spec B / F7：错报单元格选中 + 右键菜单
 const msCtx = useCellSelection()

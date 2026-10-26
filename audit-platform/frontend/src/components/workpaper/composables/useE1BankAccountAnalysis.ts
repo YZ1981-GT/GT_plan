@@ -112,7 +112,7 @@ export function createEmptyRow(): BankAnalysisRow {
 }
 
 function defaultYears(bsYear: number): AnalysisYearCols[] {
-  const y = bsYear > 1900 ? bsYear : new Date().getFullYear() - 1
+  const y = bsYear > 1900 ? bsYear : 0
   return [
     { year: y, accountCount: 0, openedCount: 0, closedCount: 0, zeroBalanceCount: 0 },
     { year: y - 1, accountCount: 0, openedCount: 0, closedCount: 0, zeroBalanceCount: 0 },
@@ -179,7 +179,7 @@ function yearFromBs(bs?: string): number {
     const y = parseInt(bs.slice(0, 4), 10)
     if (Number.isFinite(y) && y > 1900) return y
   }
-  return new Date().getFullYear() - 1
+  return 0
 }
 
 export function useE1BankAccountAnalysis(options: UseE1BaseOptions) {

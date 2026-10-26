@@ -183,7 +183,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
 
-const periodEndRef = computed(() => props.periodEnd || `${new Date().getFullYear()}-12-31`)
+const periodEndRef = computed(() => props.periodEnd || '')
 
 // ═══ Composable ═══
 const {

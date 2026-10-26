@@ -108,9 +108,10 @@ class RiskSummaryService:
                 return int(row)
         except Exception:
             pass
-        # 兜底：当前年度 - 1
-        from datetime import datetime, timezone
-        return datetime.now(timezone.utc).year - 1
+        # 兜底：单一来源取项目审计年度，取不到返回 0（下游查询不会命中错误年度数据）
+        from app.services.project_audit_year import fetch_project_audit_year
+        resolved = await fetch_project_audit_year(self.db, project_id)
+        return resolved if resolved is not None else 0
 
     async def _get_high_findings(self, project_id: UUID) -> list[dict]:
         """高严重度未解决问题单（blocker + major）"""

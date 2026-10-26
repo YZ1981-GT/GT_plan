@@ -98,7 +98,9 @@ _AUTH_TOKENS = _PROJECT_LEVEL_TOKENS + _IDENTITY_ONLY_TOKENS
 _DECOR = re.compile(r'@router\.(get|post|put|patch|delete)\(\s*[\'"]([^\'"]+)[\'"]')
 
 #: **桩端点**豁免：函数体只 `raise` 4xx/5xx（410 已废弃 / 501 未实现），
-#: **不触达 DB、不接收文件、无任何副作用** ⇒ 无鉴权合理。现算 **6** 处。
+#: **不触达 DB、不接收文件、无任何副作用** ⇒ 无鉴权合理。现算 **7** 处
+#: （`wp_mapping.py::assign_workpaper_gone` 由 spec procedure-trim-generation-delegation-chain 任务 12 下线：
+#: 原按姓名写主编、只 flush 不提交，绕过裁剪与可见范围）。
 #:
 #: 🔴 首版误列 9 处：`init_procedures` / `add_custom` / `delete_custom_procedure` /
 #: `add_custom_with_template` 其实是**活端点且已挂 `require_project_delegator`**，
@@ -117,10 +119,11 @@ _STUB_ENDPOINTS: frozenset[str] = frozenset({
     "procedures.py::batch_apply_gone",
     "procedures.py::update_execution_status_gone",
     "disclosure_notes.py::upload_history",
+    "wp_mapping.py::assign_workpaper_gone",
 })
 
 #: 桩端点所在文件（供 `test_stub_endpoints_really_are_stubs` 定位源码）
-_STUB_FILES: frozenset[str] = frozenset({"procedures.py", "disclosure_notes.py"})
+_STUB_FILES: frozenset[str] = frozenset({"procedures.py", "disclosure_notes.py", "wp_mapping.py"})
 
 #: 🔴 真实鉴权欠账基线 —— **2026-09-28 已清零**（原 6 处全部修完）。
 #: **只许变短**：新增无鉴权端点由 `test_no_new_unauthorized_project_endpoint` 判红。
@@ -413,7 +416,11 @@ def _scan_identity_only() -> list[tuple[str, str]]:
 #: 2026-10-23 现算 200：formula-governance-coverage-closure R1（74c7c0a8f）给公式域端点补项目级判定后
 #: 降 2，当时未同步下调，`test_note_edit_gate_endpoints` 的相等断言因此一直红（spec
 #: formula-fetch-and-wp-generation-defect-closure R7 收口时下调）。
-_IDENTITY_ONLY_BASELINE = 200
+#: 2026-10-24 现算 193：spec procedure-trim-generation-delegation-chain 给生成底稿两端点、自定义底稿三端点、
+#: 准则切换两端点补项目级判定（edit / readonly）后降 7。
+#: 2026-10-26 现算 191：spec procedure-chain-followup-closure R2.3 给程序行任务物化两端点（materialize /
+#: materialize-jobs，原先任何登录用户都能给任意项目物化）挂 ``require_project_delegator`` 后降 2。
+_IDENTITY_ONLY_BASELINE = 191
 
 
 def test_identity_only_endpoints_do_not_grow():
@@ -672,7 +679,8 @@ def test_every_router_prefix_is_a_literal():
 
 def test_no_new_prefixed_unauthorized_endpoint():
     none = {k for k, _, tier in _scan_prefixed() if tier == "none"}
-    new_gaps = sorted(none - _PREFIXED_KNOWN_GAPS - set(_PREFIXED_SELF_AUTH))
+    # 桩端点（只 raise 410 / 501、不声明依赖）两维同一豁免，真伪由 test_stub_endpoints_really_are_stubs 核验
+    new_gaps = sorted(none - _PREFIXED_KNOWN_GAPS - set(_PREFIXED_SELF_AUTH) - _STUB_ENDPOINTS)
     assert not new_gaps, "新增了无鉴权的项目级端点（路由前缀带 {project_id}）：\n  " + "\n  ".join(new_gaps)
 
 

@@ -139,7 +139,8 @@ export function useL8FormData(options: UseL8FormDataOptions) {
     if (!projectId.value) return
     const yearVal = typeof options.year === 'number'
       ? options.year
-      : (options.year?.value ?? new Date().getFullYear())
+      : (options.year?.value ?? null)
+    if (yearVal == null) return
     try {
       const data = await api.get(
         `/api/projects/${projectId.value}/ledger/balance`,

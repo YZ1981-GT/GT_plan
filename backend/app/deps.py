@@ -168,6 +168,13 @@ def require_role(allowed_roles: list[str]) -> Callable:
     return dependency
 
 
+def assert_self_or_admin(current_user: User, user_id: UUID) -> None:
+    """路径里的 ``user_id`` 只能是本人，admin 例外（私人库、改语言等「用户自己的数据」端点用）。"""
+    role = getattr(getattr(current_user, "role", None), "value", None)
+    if role != "admin" and str(current_user.id) != str(user_id):
+        raise HTTPException(status_code=403, detail="只能操作自己的数据")
+
+
 # ---------------------------------------------------------------------------
 # _check_project_not_archived — 归档项目只读守卫
 # ---------------------------------------------------------------------------
@@ -579,23 +586,21 @@ async def get_user_scope_cycles(
     project_id: UUID,
     db: AsyncSession,
 ) -> list[str] | None:
-    """获取用户在指定项目中的循环范围限制。
+    """用户在指定项目中的循环范围限制（试算表 / 调整分录 / 附注按循环过滤）。
 
-    admin/partner 返回 None（不限制）。
+    ``None`` = 不限：系统 admin / partner，以及本项目主管（经理、合伙人、质控、EQCR，含中文别名）。
+    受限成员返回有效范围（团队分配勾选 ∪ 委派扩大的循环），**可以是空列表** —— 调用方须按
+    ``is not None`` 过滤，空列表即什么都不给。原先只读 ``project_users.scope_cycles`` 且空 = 不限，
+    与底稿可见性相反（spec procedure-trim-generation-delegation-chain 需求 5，与角色分类器同一来源）。
     """
     if current_user.role.value in ("admin", "partner"):
         return None
-    result = await db.execute(
-        select(ProjectUser.scope_cycles).where(
-            ProjectUser.project_id == project_id,
-            ProjectUser.user_id == current_user.id,
-            ProjectUser.is_deleted == False,  # noqa: E712
-        )
-    )
-    sc = result.scalar()
-    if sc and isinstance(sc, str) and sc.strip():
-        return [c.strip() for c in sc.split(",") if c.strip()]
-    return None
+    from app.services.wp_visibility.effective_scope import resolve_member_scope
+
+    member = await resolve_member_scope(db, project_id, current_user.id)
+    if member.is_supervisor and not member.is_admin:
+        return None
+    return sorted(member.cycles) if not member.is_admin else []
 
 
 # ---------------------------------------------------------------------------
@@ -659,3 +664,28 @@ def require_operation(operation: str) -> Callable:
         return current_user
 
     return dependency
+
+
+# ---------------------------------------------------------------------------
+# require_project_audit_year — 项目年度解析（非鉴权依赖）
+# ---------------------------------------------------------------------------
+
+async def require_project_audit_year(
+    db: AsyncSession,
+    project_id: UUID,
+    requested_year: int | None = None,
+) -> int:
+    """返回请求年度或项目审计年度，缺失时以 422 明确拒绝。
+
+    ``year`` 是项目数据的业务维度，不能用自然年或固定年度兜底。显式传入的
+    年度保留调用方选择；缺省时从项目的统一年度解析器取值。
+    """
+    from app.services.project_audit_year import resolve_project_audit_year_for_request
+
+    year = await resolve_project_audit_year_for_request(db, project_id, requested_year)
+    if year is None:
+        raise HTTPException(
+            status_code=422,
+            detail="未设置审计年度，请先在项目基本信息中填写",
+        )
+    return year

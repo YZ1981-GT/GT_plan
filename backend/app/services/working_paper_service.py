@@ -433,11 +433,24 @@ class WorkingPaperService:
         assigned_to: UUID | None = None,
         reviewer: UUID | None = None,
         project_id: UUID | None = None,
+        *,
+        actor_user_id: UUID | None = None,
+        expand_scope: bool = False,
+        scope_reason: str | None = None,
     ) -> dict:
         """分配编制人和复核人。
 
+        编制人走底稿主编委派事务（spec procedure-trim-generation-delegation-chain 任务 12：已裁 / 在回收站拒绝、
+        被委派人须看得到该循环、两层 + 展示镜像 + 历史 + 可见性策略版本；失败抛 ``DelegationError``，调用方回滚）。
+        ``assigned_to`` 可以是本项目人员 id 或其用户 id；复核人仍直写但须是本项目成员。
+
         Validates: Requirements 6.1
         """
+        from app.services.wp_visibility.lead_delegation_entry import (
+            delegate_workpaper_leads,
+            resolve_project_member_user,
+        )
+
         query = sa.select(WorkingPaper).where(
             WorkingPaper.id == wp_id,
             WorkingPaper.is_deleted == sa.false(),
@@ -450,23 +463,23 @@ class WorkingPaperService:
             raise ValueError("底稿不存在")
 
         if assigned_to is not None:
-            wp.assigned_to = assigned_to
+            if actor_user_id is None:
+                raise ValueError("分配编制人须提供操作人")
+            await delegate_workpaper_leads(
+                db, wp.project_id, [(wp.id, assigned_to)], actor_user_id=actor_user_id,
+                expand_scope=expand_scope, scope_reason=scope_reason,
+            )
         if reviewer is not None:
-            wp.reviewer = reviewer
+            reviewer_user = await resolve_project_member_user(db, wp.project_id, reviewer)
+            if reviewer_user is None:
+                raise ValueError("复核人不是本项目成员，请先在团队分配中加入")
+            wp.reviewer = reviewer_user
+            idx = (await db.execute(sa.select(WpIndex).where(WpIndex.id == wp.wp_index_id))).scalar_one_or_none()
+            if idx is not None:
+                idx.reviewer = reviewer_user
         wp.updated_at = datetime.now(timezone.utc)
         await db.flush()
-
-        # Also update wp_index
-        idx_result = await db.execute(
-            sa.select(WpIndex).where(WpIndex.id == wp.wp_index_id)
-        )
-        idx = idx_result.scalar_one_or_none()
-        if idx:
-            if assigned_to is not None:
-                idx.assigned_to = assigned_to
-            if reviewer is not None:
-                idx.reviewer = reviewer
-            await db.flush()
+        await db.refresh(wp)
 
         return {
             "wp_id": str(wp.id),

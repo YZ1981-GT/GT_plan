@@ -334,7 +334,7 @@ const emit = defineEmits<{
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const isReadonly = computed(() => props.isReadonly)
-const year = computed(() => props.year ?? new Date().getFullYear())
+const year = computed<number | null>(() => props.year ?? null)
 
 // ─── FormData (for persistence) ─────────────────────────────────────────────
 

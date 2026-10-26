@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import get_current_user, require_project_access, require_project_audit_year
 from app.models.core import User
 from app.services.report_trace_service import ReportTraceService
 from app.services.consol_enhanced_service import ConsolLockService, IndependentModuleService
@@ -274,7 +274,7 @@ async def list_snapshots(project_id: UUID, db: AsyncSession = Depends(get_db), c
 
 @router.post("/api/consolidation/{project_id}/snapshots")
 async def create_snapshot(
-    project_id: UUID, year: int = 2025, reason: str = "manual",
+    project_id: UUID, year: int | None = None, reason: str = "manual",
     db: AsyncSession = Depends(get_db),
 current_user: User = Depends(require_project_access("edit")),
 ):
@@ -285,6 +285,7 @@ current_user: User = Depends(require_project_access("edit")),
     时快照锁定只读（签字冻结）。创建写审计留痕。
     """
     from app.services.consol_snapshot_service import create_consol_snapshot
+    year = await require_project_audit_year(db, project_id, year)
     return await create_consol_snapshot(
         db, project_id, year, reason, user_id=current_user.id,
     )

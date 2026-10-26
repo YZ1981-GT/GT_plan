@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import require_project_access
+from app.deps import require_project_access, require_project_audit_year
 from app.services.procedure_table_auto_service import ProcedureTableService, list_table_codes
 from app.services.field_override_service import FieldOverrideService
 
@@ -38,11 +38,12 @@ router = APIRouter(
 async def get_procedure_tables_batch(
     project_id: UUID,
     codes: str = Query(description="逗号分隔的表编码，如 A1,A2,A3"),
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     business_category: str = Query(default="C"),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """批量获取多个程序表数据（一次请求返回多表）"""
+    year = await require_project_audit_year(db, project_id, year)
     code_list = [c.strip() for c in codes.split(",") if c.strip()]
     valid_codes = set(list_table_codes())
     invalid = [c for c in code_list if c not in valid_codes]
@@ -60,11 +61,12 @@ async def get_procedure_tables_batch(
 async def get_procedure_table(
     project_id: UUID,
     table_code: str,
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     business_category: str = Query(default="C"),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """获取指定程序表的完整数据（模板 + 自动值 + 用户覆盖）"""
+    year = await require_project_audit_year(db, project_id, year)
     svc = ProcedureTableService(db)
     return await svc.get_procedure_table(project_id, year, table_code, business_category)
 
@@ -72,7 +74,7 @@ async def get_procedure_table(
 # ─── P0: 自定义程序行持久化（用户新增的程序不丢失） ─────────────────────
 class CustomItemCreate(BaseModel):
     table_code: str
-    year: int = 2025
+    year: int | None = None
     description: str
     phase: str = "completion"
     ref_index: str = ""
@@ -86,11 +88,12 @@ async def create_custom_item(
     _: Any = Depends(require_project_access("edit")),
 ) -> dict[str, Any]:
     """持久化用户自定义程序行（存入 field_overrides 表）"""
+    year = await require_project_audit_year(db, project_id, body.year)
     override_svc = FieldOverrideService(db)
     scope = f"procedure_table:{body.table_code}:custom_items"
 
     # 读取现有自定义行
-    existing = await override_svc.get_batch(project_id, body.year, scope)
+    existing = await override_svc.get_batch(project_id, year, scope)
     # 生成新 ID
     import time
     item_id = f"custom-{int(time.time() * 1000)}"
@@ -103,7 +106,7 @@ async def create_custom_item(
     }
     # 存储（item_key = item_id）
     await override_svc.set(
-        project_id, body.year, scope, item_id, "data", json.dumps(item_data, ensure_ascii=False)
+        project_id, year, scope, item_id, "data", json.dumps(item_data, ensure_ascii=False)
     )
     await db.commit()
     return {"item_id": item_id, **item_data}
@@ -114,11 +117,12 @@ async def delete_custom_item(
     project_id: UUID,
     item_id: str,
     table_code: str = Query(...),
-    year: int = Query(default=2025),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     _: Any = Depends(require_project_access("edit")),
 ) -> dict[str, str]:
     """删除用户自定义程序行"""
+    year = await require_project_audit_year(db, project_id, year)
     import sqlalchemy as sa
     from app.models.workpaper_field_override_models import WorkpaperFieldOverride
     scope = f"procedure_table:{table_code}:custom_items"

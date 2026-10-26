@@ -408,7 +408,7 @@ const CONCLUSION_TEMPLATES = [
 
 // ─── 抽凭引擎 ──────────────────────────────────────────────────────
 const samplingVisible = ref(false)
-const samplingYear = computed(() => props.year || new Date().getFullYear() - 1)
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 /**
  * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
@@ -429,7 +429,7 @@ const _injectedTbSrc = inject<Ref<any> | null>('tbSourceCodes', null)
 const D7_ACCOUNT_PREFIXES = computed(() => dSlotQueryCodes('D7', _injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
-  if (!props.projectId || !props.wpId) return
+  if (!props.projectId || !props.wpId || samplingYear.value == null) return
   try {
     const recs = await listAttachedVouchers(props.projectId, samplingYear.value, props.wpId, true)
     attachedCount.value = recs.length
@@ -438,7 +438,10 @@ async function refreshAttachedCount(): Promise<void> {
 void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
-  if (props.isReadonly) return
+  if (props.isReadonly || samplingYear.value == null) {
+    if (samplingYear.value == null) ElMessage.warning('未设置审计年度，无法读取序时账凭证')
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

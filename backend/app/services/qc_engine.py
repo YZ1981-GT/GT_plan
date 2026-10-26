@@ -40,7 +40,7 @@ class QCContext:
         working_paper: WorkingPaper,
         wp_index: WpIndex | None = None,
         project_id: UUID | None = None,
-        year: int = 2025,
+        year: int | None = None,
     ):
         self.db = db
         self.working_paper = working_paper

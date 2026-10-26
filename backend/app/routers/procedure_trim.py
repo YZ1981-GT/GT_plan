@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -75,6 +75,9 @@ class TrimPreviewRequest(BaseModel):
 class TrimApplyRequest(TrimPreviewRequest):
     preview_id: UUID
     request_id: str
+    # 预览里 recycle_preview.substantive 非空（有编制内容的底稿将移入回收站）时须为 true，否则 409
+    # （spec procedure-trim-generation-delegation-chain 需求 3.2）。不进 preview 防篡改 payload。
+    confirm_substantive_recycle: bool = False
 
 
 class TrimSchemeSaveRequest(BaseModel):
@@ -186,6 +189,7 @@ async def trim_apply(
             request_id=body.request_id,
             entries=_entries_payload(body.entries) if body.entries else None,
             scheme_id=body.scheme_id,
+            confirm_substantive_recycle=body.confirm_substantive_recycle,
         )
     except Exception:
         await db.rollback()
@@ -402,6 +406,100 @@ async def trim_row_restore(
             request_id=body.request_id,
             reason=body.reason,
         )
+    except Exception:
+        await db.rollback()
+        raise
+    await db.commit()
+    return result
+
+
+# ── 程序表控制台按行裁剪（spec procedure-trim-generation-delegation-chain 需求 6）──
+# 控制台只知道底稿、程序表页名、程序号；服务端按需导入定义、建任务并绑定底稿，再走上面同一套细裁。
+
+
+class ProgramRowTrimRequest(BaseModel):
+    sheet_name: str = Field(..., min_length=1, max_length=200)
+    program_no: str | int = Field(...)
+    reason: str = Field(..., min_length=1, max_length=500)
+    request_id: str | None = None
+
+
+class ProgramRowRestoreRequest(BaseModel):
+    sheet_name: str = Field(..., min_length=1, max_length=200)
+    program_no: str | int = Field(...)
+    reason: str | None = Field(default=None, max_length=500)
+    request_id: str | None = None
+
+
+@router.post("/{pid}/procedure-trim/workpapers/{wp_id}/program-rows/not-applicable")
+async def trim_program_row(
+    pid: UUID,
+    wp_id: UUID,
+    body: ProgramRowTrimRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    _guard: DelegatorContext = Depends(require_project_delegator_pid),
+):
+    """程序表某一行 → 不适用（自加的行 / 无模板的程序表 422）。"""
+    from app.services.procedure_row_trim_service import trim_row
+
+    if not body.reason.strip():
+        raise HTTPException(status_code=422, detail="裁剪理由必填")
+    try:
+        result = await trim_row(db, pid, wp_id, body.sheet_name, body.program_no, actor_user_id=user.id,
+                                reason=body.reason.strip(), request_id=body.request_id)
+    except Exception:
+        await db.rollback()
+        raise
+    await db.commit()
+    return result
+
+
+class ProgramRowTaskRequest(BaseModel):
+    sheet_name: str = Field(default="", max_length=200)
+    program_no: str | int = Field(...)
+
+
+@router.post("/{pid}/procedure-trim/workpapers/{wp_id}/program-rows/task")
+async def ensure_program_row_task(
+    pid: UUID,
+    wp_id: UUID,
+    body: ProgramRowTaskRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    _guard: DelegatorContext = Depends(require_project_delegator_pid),
+):
+    """取 / 建这一程序行的任务（控制台逐行委派用；程序行任务开关关闭时也可用，spec procedure-chain-followup-closure R2.2）。
+
+    自加的行 422、已裁剪的行 409；只给委派人。之后按返回的 task_ids 走既有的委派预览 → 应用。
+    整册嵌入的控制台没有表名（sheet_name 为空）⇒ 按底稿编码定位程序表。
+    """
+    from app.services.procedure_row_trim_service import ensure_row_task_for_delegation
+
+    try:
+        result = await ensure_row_task_for_delegation(db, pid, wp_id, body.sheet_name, body.program_no)
+    except Exception:
+        await db.rollback()
+        raise
+    await db.commit()
+    return result
+
+
+@router.post("/{pid}/procedure-trim/workpapers/{wp_id}/program-rows/restore")
+async def restore_program_row(
+    pid: UUID,
+    wp_id: UUID,
+    body: ProgramRowRestoreRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    _guard: DelegatorContext = Depends(require_project_delegator_pid),
+):
+    """程序表某一行恢复执行（任务回到待委派，须重新委派）。"""
+    from app.services.procedure_row_trim_service import restore_row
+
+    try:
+        result = await restore_row(db, pid, wp_id, body.sheet_name, body.program_no, actor_user_id=user.id,
+                                   reason=body.reason, request_id=body.request_id)
     except Exception:
         await db.rollback()
         raise

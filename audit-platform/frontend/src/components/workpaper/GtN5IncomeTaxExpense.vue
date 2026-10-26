@@ -270,7 +270,7 @@ function handleNavigate(sheetName: string): void {
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
-const yearRef = computed(() => props.year || new Date().getFullYear())
+const yearRef = computed<number | null>(() => props.year ?? null)
 const allResponses = ref<Map<string, any>>(new Map())
 const allResponsesRef = computed(() => allResponses.value)
 const isReadonly = computed(() => !!props.readonly)

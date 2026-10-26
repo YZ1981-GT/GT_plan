@@ -562,7 +562,11 @@ export function useI5Adjustment(params: {
       lastSyncMsg.value = '借贷不平衡，无法推送至调整分录模块'
       return 0
     }
-    const year = resolveAuditYear() ?? new Date().getFullYear()
+    const year = resolveAuditYear()
+    if (year == null) {
+      lastSyncMsg.value = '未设置审计年度，无法推送调整分录'
+      return 0
+    }
     const pending = rows.value.filter(
       (r) =>
         !r.sourceGroupId
@@ -634,7 +638,11 @@ export function useI5Adjustment(params: {
     syncing.value = true
     lastSyncMsg.value = ''
     try {
-      const year = resolveAuditYear() ?? new Date().getFullYear()
+      const year = resolveAuditYear()
+    if (year == null) {
+      lastSyncMsg.value = '未设置审计年度，无法推送调整分录'
+      return 0
+    }
       const res: any = await api.get(adjPaths.list(projectId), {
         params: { year, page: 1, page_size: 200 },
         _silent: true,

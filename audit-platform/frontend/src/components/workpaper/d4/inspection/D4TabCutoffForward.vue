@@ -33,9 +33,8 @@ const props = defineProps<{
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
-// 审计年度（主入口 provide('d4AuditYear')），回退"当前年-1"
-const auditYear = inject<Ref<number> | null>('d4AuditYear', null)
-const samplingYear = computed<number>(() => auditYear?.value ?? new Date().getFullYear() - 1)
+const auditYear = inject<Ref<number | null> | null>('d4AuditYear', null)
+const samplingYear = computed<number | null>(() => auditYear?.value ?? null)
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface CutoffForwardRow {

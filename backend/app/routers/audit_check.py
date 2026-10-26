@@ -606,11 +606,11 @@ class SignoffRequest(BaseModel):
     note: str | None = None
 
 
-def _resolve_signoff_year(year: int | None) -> int:
-    """签认年度：优先项目审计年度，缺失时回退当前自然年（year 列 NOT NULL）。"""
+def _resolve_signoff_year(year: int | None) -> int | None:
+    """签认年度：优先项目审计年度，缺失时返回 None（由调用方报 422）。"""
     if year:
         return int(year)
-    return datetime.now(timezone.utc).year
+    return None
 
 
 @router.post("/api/projects/{project_id}/audit-checks/signoff")
@@ -644,6 +644,8 @@ async def create_audit_check_signoff(
     summary = await _compute_project_summary(db, project_id)
     blocking_present = summary.blocking_open > 0
     year = _resolve_signoff_year(await _resolve_project_year(db, project_id))
+    if year is None:
+        raise HTTPException(status_code=422, detail="未设置审计年度，请先在项目基本信息中填写")
 
     signoff = AuditCheckSignoff(
         project_id=project_id,
@@ -784,6 +786,8 @@ async def export_audit_checks(
     if proj_row:
         project_label = (proj_row[1] or proj_row[0] or "").strip()
     year = _resolve_signoff_year(await _resolve_project_year(db, project_id))
+    if year is None:
+        raise HTTPException(status_code=422, detail="未设置审计年度，请先在项目基本信息中填写")
 
     # 批量读全项目底稿检查项（复用 summary 端点的解析逻辑）
     rows = (

@@ -348,6 +348,38 @@ class TestTwoViewIdentityBoundary:
 
 
 # ===========================================================================
+# 列表项带编制人 / 复核人姓名（spec procedure-chain-followup-closure R3.1）：原先只回 id，
+# 底稿列表「编制人」恒「—」（前端读 assignee_name）
+# ===========================================================================
+@pytest.mark.skipif(not IS_PG, reason="need PostgreSQL")
+@pytest.mark.asyncio
+class TestPreparerReviewerNames:
+    async def test_staff_name_first_then_username(self, session):
+        proj = await mk_project(session)
+        preparer = await mk_user(session)
+        reviewer = await mk_user(session)  # 没有人员档案 ⇒ 用户名
+        staff = await mk_staff(session, user_id=preparer.id)
+        await mk_staff(session, user_id=reviewer.id, is_deleted=True)  # 已删的档案不算
+        wi = await mk_wp_index(session, proj.id, wp_code="D2-1", audit_cycle="D")
+        wp = await _mk_lead_wp(session, proj.id, wi.id, preparer.id)
+        wp.reviewer = reviewer.id
+        await session.flush()
+        ctx = _ctx(preparer.id, proj.id, VisibilityRole.restricted, {"D"})
+        [item] = (await WorkpaperListQueryService(session).list_workpapers(ctx))["items"]
+        assert item["assignee_name"] == staff.name
+        assert item["reviewer_name"] == reviewer.username
+
+    async def test_unassigned_paper_has_no_names(self, session):
+        proj = await mk_project(session)
+        admin = await mk_user(session, role="admin")
+        wi = await mk_wp_index(session, proj.id, wp_code="D2-1", audit_cycle="D")
+        await mk_working_paper(session, proj.id, wi.id)
+        ctx = _ctx(admin.id, proj.id, VisibilityRole.admin, set())
+        [item] = (await WorkpaperListQueryService(session).list_workpapers(ctx))["items"]
+        assert item["assignee_name"] is None and item["reviewer_name"] is None
+
+
+# ===========================================================================
 # Property 15: visibility_mode / client identity never authorize + 非法参数 422 前置
 # Validates: Requirements 12.1–12.3, 11.7
 # ===========================================================================

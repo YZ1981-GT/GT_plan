@@ -374,6 +374,7 @@ async def execute_handover(
     """
     from app.services.handover_service import HandoverService
     from app.services.manager_dashboard_service import ManagerDashboardService
+    from app.services.wp_visibility.delegation_guard import DelegationError
 
     if staff_id == body.target_staff_id:
         raise HTTPException(
@@ -419,6 +420,11 @@ async def execute_handover(
             effective_date=body.effective_date,
             executed_by=user.id,
         )
+    except DelegationError as e:
+        # 编制人走底稿主编委派事务（spec procedure-trim-generation-delegation-chain 任务 12）：
+        # 接收人不是项目成员等 ⇒ 整次交接回滚，错误体带原因
+        await db.rollback()
+        raise HTTPException(status_code=e.http_status, detail=e.http_detail()) from e
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

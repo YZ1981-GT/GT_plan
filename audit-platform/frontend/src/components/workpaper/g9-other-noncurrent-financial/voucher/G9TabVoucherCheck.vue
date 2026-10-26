@@ -671,7 +671,7 @@ const showSampling = ref(false)
 const showReview = ref(false)
 const reviewRows = ref<PostFillReviewRow[]>([])
 const reviewSection = ref<'voucher-review' | 'cutoff-review'>('voucher-review')
-const engineYear = computed(() => props.year ?? (new Date().getFullYear() - 1))
+const engineYear = computed<number | null>(() => props.year ?? null)
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码

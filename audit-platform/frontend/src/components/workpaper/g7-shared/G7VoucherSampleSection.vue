@@ -133,15 +133,14 @@ const effectiveAccountCode = computed(() =>
   props.accountCode ?? gCycleScope('G7')!.queryCodes(_injectedTbSrc?.value ?? null, 'gross').join(','),
 )
 
-/** 审计年度：优先 prop，否则从 htmlData.project_context 派生（audit_year → bs_date 年份 → 当前年） */
-const auditYear = computed<number>(() => {
+const auditYear = computed<number | null>(() => {
   if (props.auditYear) return Number(props.auditYear)
   const ctx = (props.htmlData?.project_context ?? {}) as Record<string, any>
   const y = ctx.audit_year ?? ctx.auditYear
   if (y) return Number(y)
   const bs = ctx.bs_date ?? ctx.bsDate
   if (typeof bs === 'string' && bs.length >= 4) return Number(bs.slice(0, 4))
-  return new Date().getFullYear()
+  return null
 })
 
 const rows = ref<G7VoucherSampleRow[]>([])

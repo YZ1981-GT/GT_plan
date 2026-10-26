@@ -447,7 +447,7 @@ const columnViewMode = ref<'compact' | 'full'>('compact')
 const isReadonly = computed(() => Boolean(props.isReadonly))
 const samplingVisible = ref(false)
 const tb6602 = ref<number | null>(null)
-const samplingYear = computed(() => props.year || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 const summary = computed(() => summarizeI2WorkHourRows(rows.value))
 const prepValidation = computed(() => validateI2WorkHourPrep(rows.value))

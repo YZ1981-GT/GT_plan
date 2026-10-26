@@ -299,7 +299,7 @@ const route = useRoute()
 const projectStore = useProjectStore()
 
 const projectId = computed(() => route.params.projectId as string)
-const year = computed(() => projectStore.year || new Date().getFullYear() - 1)
+const year = computed<number | null>(() => projectStore.year ?? null)
 
 const loading = ref(false)
 const generating = ref(false)

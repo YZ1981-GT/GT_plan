@@ -27,6 +27,19 @@ from uuid import UUID, uuid4
 
 import pytest
 
+# 被测模块在模块顶层（收集期、真实 settings 下）先导入一次。
+# 🔴 别只在 `with patch("app.core.config.settings", mock)` 里导入：整对象替换期间**首次**导入的
+# 模块，其模块级 `from app.core.config import settings` 会把 Mock 永久留在本进程（单独跑本文件实测
+# 首次导入 67 个模块，之后 app.core.security 与 dsh_discovery 一直拿着 Mock，
+# dsh_discovery.DSH_VENDOR_ROOT 变成 Mock 拼出的路径），同进程后面的用例全受影响。
+# 被测函数都在函数体内 `from app.core.config import settings`，调用时才读，补丁照样生效。
+from app.services.ai_chat import (  # noqa: E402,F401
+    capability_endpoint,
+    dsh_discovery,
+    engine,
+    startup_health,
+)
+
 
 # ---------------------------------------------------------------------------
 # Fixtures

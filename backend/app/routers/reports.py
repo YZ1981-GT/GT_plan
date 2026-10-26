@@ -599,7 +599,10 @@ async def update_report_cell(
     from app.models.report_models import FinancialReport, FinancialReportType
 
     if year is None:
-        year = datetime.now().year - 1
+        from app.services.project_audit_year import fetch_project_audit_year
+        year = await fetch_project_audit_year(db, project_id)
+        if year is None:
+            raise HTTPException(status_code=422, detail="未设置审计年度，请先在项目基本信息中填写")
 
     # 查找或创建该行
     result = await db.execute(

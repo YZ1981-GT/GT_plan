@@ -77,9 +77,14 @@ async def template_copy(
     复制后：状态 draft、清除复核状态、清除业务数据保留结构。
     """
     from app.models.workpaper_models import WorkingPaper, WpIndex
+    from app.services.procedure_scope_retention import TrimScopeUnavailable, load_trimmed_scope
     from app.services.wp_export.template_copier import TemplateCopier
 
     copier = TemplateCopier()
+    try:
+        trim_scope = await load_trimmed_scope(db, project_id)
+    except TrimScopeUnavailable as e:
+        raise HTTPException(status_code=503, detail=e.http_detail())
 
     # 获取目标项目已有 wp_code 集合
     existing_result = await db.execute(
@@ -105,12 +110,13 @@ async def template_copy(
             existing_codes=existing_codes,
         )
 
+        await _apply_retention(db, project_id, [result], trim_scope)
         # 持久化目标底稿记录
         if result.status == "copied" and hasattr(result, "target_record"):
             await _persist_copy_result(db, result, project_id)
 
         await db.commit()
-        return result.model_dump(mode="json")
+        return _result_payload(result)
 
     # ─── 模式 2: 批量复制整个循环 ────────────────────────────────────────
     if body.source_project_id and body.audit_cycle:
@@ -131,13 +137,14 @@ async def template_copy(
             existing_codes=existing_codes,
         )
 
+        await _apply_retention(db, project_id, results, trim_scope)
         # 持久化所有复制成功的记录
         for r in results:
             if r.status == "copied" and hasattr(r, "target_record"):
                 await _persist_copy_result(db, r, project_id)
 
         await db.commit()
-        return [r.model_dump(mode="json") for r in results]
+        return [_result_payload(r) for r in results]
 
     # 参数不完整
     raise HTTPException(
@@ -147,6 +154,36 @@ async def template_copy(
 
 
 # ─── Private Helpers ──────────────────────────────────────────────────────────
+
+
+def _result_payload(result) -> dict:
+    """``CopyResult`` 是 dataclass（没有 ``model_dump``）：原先在 commit 之后调 ``model_dump`` ⇒ 复制已落库、
+    接口却 500。``target_record`` 是附加属性，不进响应。"""
+    return {
+        "source_wp_code": result.source_wp_code,
+        "target_wp_id": str(result.target_wp_id) if result.target_wp_id else None,
+        "status": result.status,
+        "message": result.message,
+    }
+
+
+async def _apply_retention(db: AsyncSession, project_id: UUID, results: list, trim_scope) -> None:
+    """复制前按保留范围拦截：已裁 / 在回收站 / 目标已有同码（覆盖未实现，原先撞唯一索引 500）⇒ 跳过。"""
+    from app.services.procedure_scope_retention import wp_index_states
+
+    copied = [r for r in results if r.status == "copied"]
+    states = await wp_index_states(db, project_id, [r.source_wp_code for r in copied])
+    for r in copied:
+        code = r.source_wp_code
+        if trim_scope.is_trimmed(code):
+            reason = "该编码已在程序裁剪中标为不执行，未复制"
+        elif states.get(code) is True:
+            reason = "该编码的底稿在回收站中，请先从回收站恢复，未复制"
+        elif states.get(code) is False:
+            reason = "目标项目已有该编码的底稿（暂不支持覆盖），未复制"
+        else:
+            continue
+        r.status, r.message, r.target_wp_id = "skipped", reason, None
 
 
 async def _load_source_wp(db: AsyncSession, wp_id: UUID) -> dict | None:
@@ -223,7 +260,7 @@ async def _persist_copy_result(db: AsyncSession, copy_result, project_id: UUID) 
     """
     import uuid as uuid_mod
 
-    from app.models.workpaper_models import WorkingPaper, WpIndex
+    from app.models.workpaper_models import WorkingPaper, WpIndex, WpSourceType
 
     target_record = getattr(copy_result, "target_record", None)
     if not target_record:
@@ -251,6 +288,7 @@ async def _persist_copy_result(db: AsyncSession, copy_result, project_id: UUID) 
         review_status="not_submitted",
         is_deleted=False,
         file_path="",
+        source_type=WpSourceType.template,  # NOT NULL：原先没给 ⇒ 复制一律插入失败
         parsed_data=target_record.get("data", {}),
     )
     db.add(working_paper)

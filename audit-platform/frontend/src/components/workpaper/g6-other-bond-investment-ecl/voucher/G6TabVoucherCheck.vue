@@ -484,13 +484,15 @@ const auditYear = computed(() => {
   const raw = props.htmlData?.project_context?.audit_year
     ?? props.htmlData?.projectContext?.audit_year
     ?? props.htmlData?.audit_year
-  if (raw) return Number(raw) || new Date().getFullYear() - 1
-  return new Date().getFullYear() - 1
+  if (raw) return Number(raw) || null
+  return null
 })
 /** 期后抽凭用次年；本期用审计年度 */
-const samplingYear = computed(() =>
-  vc.activePeriod.value === 'post' ? auditYear.value + 1 : auditYear.value,
-)
+const samplingYear = computed<number | null>(() => {
+  const y = auditYear.value
+  if (y == null) return null // 未设置审计年度：不按 null + 1 = 1 去抽凭
+  return vc.activePeriod.value === 'post' ? y + 1 : y
+})
 
 const pagedRows = computed(() => {
   const start = (page.value - 1) * pageSize.value

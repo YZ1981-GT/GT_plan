@@ -281,7 +281,7 @@ const emit = defineEmits<{
 }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
-const year = computed(() => props.year ?? new Date().getFullYear())
+const year = computed<number | null>(() => props.year ?? null)
 const allResponsesRef = computed(() => props.allResponses)
 
 const {

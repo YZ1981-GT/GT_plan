@@ -25197,6 +25197,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.api.users:update_user",
+      "callable": "update_user",
+      "route": "/api/users/{user_id}",
+      "method": "PUT",
+      "family": "non_wp_bound",
+      "action": "update",
+      "wp_bound": false,
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": []
+    },
+    {
+      "kind": "http",
       "entrypoint": "app.routers.i18n:set_user_language",
       "callable": "set_user_language",
       "route": "/api/users/{user_id}/language",

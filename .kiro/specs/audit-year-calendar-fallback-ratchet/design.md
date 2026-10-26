@@ -2,6 +2,23 @@
 
 > 现状均为 2026-10-25 在 `bf7685b1d` 干净检出上现算。行号会漂，锚点用文件名 / 函数名。
 
+## 0. 优先：程序表字段覆盖写读对齐（R0，任务 0）
+
+- 读取方（不改口径）：`wp_render_strategies/_a_program.py` 生成分支按 `get_batch(project_id, year or 0, "procedure_table:{表码}")` 合并状态 / 执行说明，
+  年度 = render-config 的 `_prog_year`（`PROJECT_AUDIT_YEAR_BIZ_SQL`：审计年度 → 审计期末 → 审计期初），表码 = `resolve_program_template_code(表名, wp_code)`。
+  已整表保存（`/save`）的 A 类顶层表走持久化分支，不读覆盖；循环 *A 表与整册嵌入的控制台没有整表保存，只靠覆盖。
+- `render` 两个分支都在返回的 html_data 里加 `override_scope`（持久化分支原来「投影没变就返回 None」，改为总返回投影副本；只改本次响应，不回写）。
+- 前端年度：`utils/resolveAuditYear.ts` 加 `resolveAuditYearOrNull`（同一来源顺序、没有日历兜底；`resolveEffectiveAuditYear` 委托它，保留去年兜底，仍计在基线）；
+  `composables/useProjectAuditYear.ts`：`fetchProjectAuditYear(pid)`（`GET /api/projects/{id}`，`_dedupe:false` 免与页面同址请求互相取消，`_silent` 自管提示）、
+  `requireProjectAuditYear(pid, 动作)`（取不到即提示并返回 null）、组合式 `useProjectAuditYear(pid)`（按实例缓存非空结果，换项目重取，null 不缓存）。
+  不取 store：`setCurrentYear` 会把 `auditYear` 改成用户切换的年度；不取 `GtWpRenderer` 的 `preparationYear`：它永不为空（最后兜底去年）。
+- 写入方：`GtAProgramConsole`（`persistProgramField`；scope 取 `htmlData` 或自加载结果的 `override_scope` → 按表名解析表码 → 都没有不写）、
+  `GtA1Dashboard` / `GtA2AdjustmentConsole` / `GtA3ConsolidationConsole`（读写同一年度）、G8~G12 六个「回填程序表」函数收口为
+  `composables/programStepOverrides.ts` `writeProgramStepOverrides`（表码用 `extractCycleProcedureSheetCode`，与循环程序表壳传给控制台的 sheetName 同源；
+  调用方传了年度就用，没传按项目取）。配对的读请求（控制台兜底拉 `procedure-tables`、A1 仪表盘）年度取不到时不传。
+- 存量：`backend/scripts/fix/fix_program_override_placement.py`，按项目算读取方的 (scope, 年度)，列出不一致行、目标位置与冲突（目标已有同 item/field 行），
+  默认 dry-run；`--apply` 移动无冲突行、冲突行只报不动，写审计日志。真实项目执行须用户确认。
+
 ## 1. 守卫（R1，任务 1）
 
 ### 1.1 前端：`src/__tests__/auditYearCalendarFallbackRatchet.spec.ts`

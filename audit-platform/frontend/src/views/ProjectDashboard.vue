@@ -10,7 +10,7 @@
 
     <!-- 工作流进度条 + 一键刷新按钮 -->
     <div class="gt-pd-workflow-bar">
-      <WorkflowProgress :project-id="projectId" :year="projectYear" @step-action="onStepAction" />
+      <WorkflowProgress :project-id="projectId" :year="projectYear ?? undefined" @step-action="onStepAction" />
       <el-button
         type="primary"
         :loading="chainExec.executing.value"
@@ -184,7 +184,7 @@ use([PieChart, BarChart, TitleComponent, TooltipComponent, GridComponent, Canvas
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
 const projectStore = useProjectStore()
-const projectYear = computed(() => projectStore.year || new Date().getFullYear() - 1)
+const projectYear = computed<number | null>(() => projectStore.year ?? null)
 
 // ── 全链路执行 ──
 const chainExec = useChainExecution(projectId)
@@ -192,6 +192,11 @@ const showChainProgress = ref(false)
 
 /** 一键刷新全部按钮点击 */
 async function onRefreshAll() {
+  const year = projectYear.value
+  if (year == null) {
+    ElMessage.warning('未设置审计年度，请先在项目基本信息中填写')
+    return
+  }
   try {
     await ElMessageBox.confirm(
       '将依次执行以下步骤：\n1. 重算试算表\n2. 生成底稿\n3. 生成报表\n4. 生成附注\n\n确认执行？',
@@ -207,7 +212,7 @@ async function onRefreshAll() {
   }
 
   showChainProgress.value = true
-  await chainExec.executeFullChain(projectYear.value)
+  await chainExec.executeFullChain(year)
 }
 
 /** 工作流步骤动作回调 */

@@ -31,6 +31,7 @@ import sqlalchemy as sa
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.project_audit_year import resolve_project_audit_year_for_request
 
 from app.routers.wp_render_strategies._x3_adjustment_import_export import (
     X3_SHEET_SPECS,
@@ -139,9 +140,12 @@ async def _get_wp_context(wp_id: str, db: AsyncSession) -> dict[str, Any]:
     row = result.fetchone()
     if not row:
         raise HTTPException(404, f"底稿不存在: {wp_id}")
+    year = await resolve_project_audit_year_for_request(db, row.project_id)
+    if year is None:
+        raise HTTPException(422, "未设置审计年度，请先在项目基本信息中填写")
     return {
         "project_id": row.project_id,
-        "year": int(row.audit_year or 2025),
+        "year": year,
     }
 
 

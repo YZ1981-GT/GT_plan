@@ -131,7 +131,7 @@ const formRef = ref<FormInstance>()
 const form = reactive({
   method: 'random' as 'random' | 'stratified' | 'top_n' | 'mus',
   account_codes: [] as string[],
-  year: new Date().getFullYear() - 1,
+  year: 0 as number,
   sample_size: 25,
   amount_threshold: 100000,
   sampling_interval: 50000,
@@ -140,7 +140,7 @@ const form = reactive({
 const rules: FormRules = {
   method: [{ required: true, message: '请选择抽样方式', trigger: 'change' }],
   account_codes: [{ required: true, message: '请选择科目编码', trigger: 'change' }],
-  year: [{ required: true, message: '请输入会计年度', trigger: 'blur' }],
+  year: [{ required: true, message: '请输入会计年度', trigger: 'blur' }, { type: 'number', min: 2001, message: '请输入有效会计年度（如 2025）', trigger: 'blur' }],
   sample_size: [{ required: true, message: '请输入样本量', trigger: 'blur' }],
 }
 

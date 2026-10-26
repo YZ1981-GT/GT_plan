@@ -591,7 +591,11 @@ async function onSeedCurrentPortion() {
     ElMessage.error('I5-2 明细解析失败')
     return
   }
-  const year = props.year ?? new Date().getFullYear()
+  const year = props.year
+  if (year == null) {
+    ElMessage.warning('未设置审计年度，无法生成重分类候选')
+    return
+  }
   const candidates = extractI5CurrentPortionCandidates(detail, year)
   if (!candidates.length) {
     ElMessage.info(

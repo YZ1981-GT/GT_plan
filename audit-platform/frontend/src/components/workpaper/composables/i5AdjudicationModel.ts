@@ -766,7 +766,8 @@ export function calcI5RemainingMonths(
 ): number | null {
   const s = _str(maturityDate).trim()
   if (!s) return null
-  const year = asOfYear ?? new Date().getFullYear()
+  if (asOfYear == null) return null
+  const year = asOfYear
   const m = s.match(/(\d{4})[-/.年](\d{1,2})/)
   if (!m) return null
   const y = Number(m[1])
@@ -790,7 +791,8 @@ export function extractI5CurrentPortionCandidates(
   maturityDate: string
   category: string
 }> {
-  const year = asOfYear ?? new Date().getFullYear()
+  if (asOfYear == null) return [] // 没有审计年度就算不出剩余月数：无候选
+  const year = asOfYear
   const out: Array<{
     projectName: string
     amount: number

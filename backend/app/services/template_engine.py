@@ -438,7 +438,7 @@ class TemplateEngine:
         db: AsyncSession,
         project_id: UUID,
         template_set_id: UUID,
-        year: int = 2025,
+        year: int | None = None,
         created_by: UUID | None = None,
         selected_codes: list[str] | None = None,
     ) -> list[WorkingPaper]:
@@ -454,7 +454,7 @@ class TemplateEngine:
         db: AsyncSession,
         project_id: UUID,
         template_set_id: UUID,
-        year: int = 2025,
+        year: int | None = None,
         created_by: UUID | None = None,
         selected_codes: list[str] | None = None,
     ) -> TemplateSetGeneration:

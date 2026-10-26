@@ -276,7 +276,11 @@ watch(ledgerDateRange, (val) => {
 
 onMounted(async () => {
   const pid = route.params.projectId as string
-  const y = Number(route.query.year) || new Date().getFullYear()
+  const y = Number(route.query.year)
+  if (!Number.isFinite(y) || y <= 0) {
+    ElMessage.warning('未设置审计年度，无法加载余额数据')
+    return
+  }
   store.setProject(pid, y)
   store.reset()
   try {

@@ -245,7 +245,7 @@ const auditYear = computed(() => {
   if (bs && String(bs).length >= 4) return parseInt(String(bs).slice(0, 4), 10)
   const yr = formData.projectContext.value?.audit_year
   if (yr) return parseInt(String(yr), 10)
-  return new Date().getFullYear() - 1
+  return null
 })
 const bsDate = computed(
   () => (props.htmlData?.project_context?.bs_date

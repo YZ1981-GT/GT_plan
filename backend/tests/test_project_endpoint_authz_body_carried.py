@@ -94,6 +94,10 @@ _FIXED_ENDPOINTS = frozenset({
     "address_registry.py::resolve_uri",
     "address_registry.py::validate_formula",
     "address_registry.py::invalidate_cache",
+    # spec procedure-trim-generation-delegation-chain：生成前的模板清单（批 1）、底稿字段覆盖值读写（批 5，写还要本人行）
+    "wp_template_list.py::get_template_list",
+    "wp_field_overrides.py::get_field_overrides",
+    "wp_field_overrides.py::set_field_override",
 })
 
 #: 不用会话令牌、自带签名校验的端点 → 必须调到的校验依赖（可伪证：``test_body_self_auth_endpoints_really_verify``）
@@ -121,7 +125,8 @@ _BODY_KNOWN_GAPS: frozenset[str] = frozenset({
 #: 写 stale）与地址库 v2 notify-cell-change（同样写 stale）、地址库六个读端点、底稿字段覆盖值两个端点。
 #: 2026-10-24 spec formula-fetch-followup-defect-closure R4.1 修地址库五个读端点（jump 只拼路由、登记进
 #: _BODY_IDENTITY_BY_DESIGN 不计欠账）后现算 87。
-_BODY_IDENTITY_ONLY_BASELINE = 87
+#: 2026-10-24 spec procedure-trim-generation-delegation-chain 修生成前模板清单与底稿字段覆盖值两个端点后现算 84。
+_BODY_IDENTITY_ONLY_BASELINE = 84
 
 
 def _rooted_at_param(expr: ast.AST, params: set[str]) -> bool:

@@ -705,7 +705,10 @@ const { push: navPush } = useNavigationStack()
 const projectId = computed(() => route.params.projectId as string)
 // 自动建树 5.3：项目级事件流（含 CONSOL_SCOPE_CHANGED）
 const consolEvents = useProjectEvents(projectId)
-const year = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
+const year = computed<number | null>(() => {
+  const value = Number(route.query.year)
+  return Number.isFinite(value) && value > 0 ? value : null
+})
 
 // ─── 批注与复核持久化（合并报表/试算表共用） ─────────────────────────────────
 const consolComments = useCellComments(() => projectId.value, effectiveConsolYear, 'consol_report')
@@ -947,7 +950,7 @@ const visibleDiagnostics = computed(() => {
 // ─── 项目基本信息 ─────────────────────────────────────────────────────────────
 const projectInfo = reactive({
   clientName: '',
-  year: new Date().getFullYear() - 1,
+  year: null,
   standard: 'soe' as 'soe' | 'listed',
 })
 

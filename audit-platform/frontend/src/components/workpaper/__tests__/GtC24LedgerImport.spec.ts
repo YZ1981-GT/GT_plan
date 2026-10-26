@@ -23,11 +23,14 @@ vi.mock('vue-router', () => ({
 const auditYear = ref<number | null>(null)
 const storeYear = ref<number | null>(null)
 
+// 照 pinia 的样子把 state 解包成普通值（组件读 `store.auditYear` 拿到的是数字，不是 ref）。
+// 🔴 原先直接塞 ref：组件读到 ref 对象、解析不出年度，旧实现按「今年 - 1」兜底恰好 = 2025 才通过；
+//    兜底删掉后（spec audit-year-calendar-fallback-ratchet）才暴露出来。
 vi.mock('@/stores/project', () => ({
   useProjectStore: () => ({
-    auditYear,
-    year: storeYear,
-    projectId: ref('proj-1'),
+    get auditYear() { return auditYear.value },
+    get year() { return storeYear.value },
+    projectId: 'proj-1',
     loadProjectContext: vi.fn(),
   }),
 }))

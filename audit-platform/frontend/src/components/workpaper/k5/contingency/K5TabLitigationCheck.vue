@@ -291,7 +291,7 @@ const emit = defineEmits<{
 // 父组件模板绑定会自动解包 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
 
-const samplingYear = computed(() => props.year ?? new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 /**
  * 抽凭科目码。本组件无 `tbSourceCodes` prop（不接 render 解析结果），

@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
+from app.services.project_audit_year import resolve_project_audit_year_for_request
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,8 +52,12 @@ class DataValidationEngine:
     def __init__(self, db=None):
         self.db = db
 
-    async def validate_project(self, project_id: UUID, year: int = 2025) -> dict:
-        """运行全部校验，返回汇总结果。"""
+    async def validate_project(self, project_id: UUID, year: int | None = None) -> dict:
+        """运行全部校验；缺省年度只能从项目上下文解析。"""
+        if year is None and self.db is not None:
+            year = await resolve_project_audit_year_for_request(self.db, project_id)
+            if year is None:
+                raise ValueError("未设置审计年度，请先在项目基本信息中填写")
         findings: list[ValidationFinding] = []
 
         # 一致性校验

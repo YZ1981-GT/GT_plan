@@ -507,12 +507,11 @@ const props = defineProps<{
 const emit = defineEmits<{ imported: [] }>()
 
 const isReadonly = computed(() => !!props.readonly)
-const auditYear = computed(() => {
+const auditYear = computed<number | null>(() => {
   const raw = props.htmlData?.project_context?.audit_year
     ?? props.htmlData?.projectContext?.audit_year
     ?? props.htmlData?.audit_year
-  if (raw) return Number(raw) || new Date().getFullYear()
-  return new Date().getFullYear()
+  return raw == null || raw === '' ? null : Number(raw) || null
 })
 const g5Notes = useInjectedG5FormData({
   wpId: toRef(props, 'wpId'),

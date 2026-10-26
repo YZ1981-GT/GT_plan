@@ -329,7 +329,7 @@ const props = defineProps<{
 const isReadonly = computed(() => false)
 const yearNum = computed(() => {
   const d = props.htmlData as any
-  return d?.year ?? new Date().getFullYear()
+  return d?.year ?? null
 })
 
 // 视图模式

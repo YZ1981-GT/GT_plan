@@ -117,6 +117,7 @@ import { useRoute } from 'vue-router'
 import { ArrowDown, InfoFilled } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { api } from '@/services/apiProxy'
+import { useProgramOverrideTarget } from '@/composables/useProgramOverrideTarget'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
 
 interface ProgramRow {
@@ -135,6 +136,8 @@ interface AProgramHtmlData {
   programs: ProgramRow[]
   trim_decisions: Array<{ programId: string; reason: string }>
   signatures?: Array<{ role: string; name: string; date: string }>
+  /** render-config 读字段覆盖用的 scope */
+  override_scope?: string
 }
 
 const props = withDefaults(defineProps<{
@@ -144,6 +147,7 @@ const props = withDefaults(defineProps<{
   htmlData: AProgramHtmlData
   readonly?: boolean
   projectId?: string
+  /** 仅兼容挂载方传参：写请求的年度一律取项目审计年度（audit-year R0） */
   year?: number
   wpCode?: string
 }>(), { readonly: false, wpCode: 'A2' })
@@ -156,6 +160,10 @@ const emit = defineEmits<{
 const route = useRoute()
 const programs = ref<ProgramRow[]>([])
 const projectId = computed(() => props.projectId || (route.params.projectId as string) || '')
+// 字段覆盖写入位置：scope 以 render-config 回传为准、年度取项目审计年度（audit-year R0）
+const { requireAuditYear, writeField } = useProgramOverrideTarget({
+  projectId, htmlData: () => props.htmlData, fallbackCode: () => props.wpCode || 'A2',
+})
 
 const title = computed(() => {
   const code = props.wpCode || 'A2'
@@ -270,7 +278,8 @@ function confirmAdd() {
 }
 
 async function persistCustomItem(item: ProgramRow) {
-  const year = props.year || parseInt(route.query.year as string) || new Date().getFullYear()
+  const year = await requireAuditYear('新增程序')
+  if (year == null) return
   try {
     await api.post(`/api/projects/${projectId.value}/procedure-tables/custom-items`, {
       table_code: props.wpCode || 'A2',
@@ -290,16 +299,8 @@ async function saveExecution(row: ProgramRow) {
   persistField(row.program_no, 'execution_summary', row.execution_summary || '')
 }
 async function persistField(programNo: number, field: string, value: any) {
-  const year = props.year || parseInt(route.query.year as string) || new Date().getFullYear()
   try {
-    await api.post('/api/workpapers/field-overrides', {
-      project_id: projectId.value,
-      year,
-      scope: `procedure_table:${props.wpCode || 'A2'}`,
-      item_key: String(programNo),
-      field,
-      value,
-    })
+    await writeField(programNo, field, value)
   } catch (e: any) {
     const { ElMessage } = await import('element-plus')
     ElMessage.error(`保存失败：${e?.message || '网络异常'}`)

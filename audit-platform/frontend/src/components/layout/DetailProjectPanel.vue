@@ -593,12 +593,13 @@
     </div>
 
     <!-- 人员委派弹窗 -->
-    <el-dialog v-model="showTeamAssign" title="人员委派" width="900px" append-to-body destroy-on-close>
+    <el-dialog v-model="showTeamAssign" title="人员委派" width="900px" append-to-body destroy-on-close
+      :before-close="closeTeamAssign">
       <div style="min-height: 500px;">
-        <TeamAssignmentStep v-if="showTeamAssign" :project-id="project.id" />
+        <TeamAssignmentStep v-if="showTeamAssign" ref="teamAssignRef" :project-id="project.id" />
       </div>
       <template #footer>
-        <el-button @click="showTeamAssign = false">关闭</el-button>
+        <el-button :loading="savingTeamAssign" @click="closeTeamAssign()">关闭</el-button>
       </template>
     </el-dialog>
 
@@ -631,12 +632,28 @@ const { push: navPush } = useNavigationStack()
 const prefs = useDisplayPrefsStore()
 const activeTab = ref('overview')
 const showTeamAssign = ref(false)
+// 人员委派弹窗关闭即保存团队分配（spec procedure-trim-generation-delegation-chain 任务 22 实测：原先关闭只隐藏、从未落库）；
+// 保存失败不关，留在弹窗里改
+const teamAssignRef = ref<{ save: () => Promise<boolean> } | null>(null)
+const savingTeamAssign = ref(false)
+async function closeTeamAssign(done?: () => void) {
+  if (savingTeamAssign.value) return
+  savingTeamAssign.value = true
+  try {
+    if (teamAssignRef.value && !(await teamAssignRef.value.save())) return
+    if (done) done()
+    else showTeamAssign.value = false
+  } finally { savingTeamAssign.value = false }
+}
 const showAttUpload = ref(false)
 const platformGuideRef = ref<InstanceType<typeof PlatformUserGuideDialog> | null>(null)
 const attForm = ref({ wpCode: '', type: 'general' })
 const attFiles = ref<any[]>([])
 const attWpOptions = ref<{ label: string; value: string }[]>([])
-const projectYear = computed(() => Number(props.project?.audit_year) || new Date().getFullYear())
+const projectYear = computed<number | null>(() => {
+  const value = Number(props.project?.audit_year)
+  return Number.isFinite(value) && value > 0 ? value : null
+})
 
 function openPlatformGuide() {
   platformGuideRef.value?.open()
@@ -930,13 +947,13 @@ function goTo(page: string, extraQuery?: Record<string, string>) {
   if (!props.project) return
   router.push({
     path: `/projects/${props.project.id}/${page}`,
-    query: { year: String(projectYear.value), ...extraQuery },
+    query: { ...(projectYear.value != null ? { year: String(projectYear.value) } : {}), ...extraQuery },
   })
 }
 
 function onOpenLedgerWindow() {
   if (!props.project) return
-  openLedgerWindow(props.project.id, projectYear.value)
+  openLedgerWindow(props.project.id, projectYear.value ?? undefined)
 }
 
 /**

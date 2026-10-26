@@ -400,9 +400,11 @@ describe('Property 31: `no_data` 自动裁集合与改造前逐条一致', () =>
 
   it('`auto_trim` 集合对重要性维度取值不变（档 7/8 只产生建议）', () => {
     const base = autoTrimSet(matrix)
+    // 金额取 0：「无数据」格的金额只能是 0 / 未出现 —— 非零金额与「无数据」矛盾，档 4 起
+    // 不再判自动裁（spec procedure-trim-generation-delegation-chain R1.7），那是另一条判据。
     const withMateriality = autoTrimSet(matrix, {
       materiality: { performanceMateriality: 500000, trivialThreshold: 20000 },
-      accountAmount: 1,
+      accountAmount: 0,
     })
     expect(
       diff(base, withMateriality),

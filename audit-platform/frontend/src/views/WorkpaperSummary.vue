@@ -102,7 +102,7 @@ import GtAmountCell from '@/components/common/GtAmountCell.vue'
 const route = useRoute()
 const projectId = route.params.projectId as string
 const projectStore = useProjectStore()
-const year = computed(() => projectStore.year || new Date().getFullYear())
+const year = computed<number | null>(() => projectStore.year ?? null)
 
 // ── 科目树 ──
 const accountFilter = ref('')

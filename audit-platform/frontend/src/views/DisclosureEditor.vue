@@ -1520,7 +1520,7 @@ function onProjectChange(newId: string) {
 }
 
 // 年度切换
-const selectedYear = ref(new Date().getFullYear() - 1)
+const selectedYear = ref<number | null>(null)
 const yearOptions = computed(() => projectStore.yearOptions)
 function onYearChange() {
   projectStore.changeYear(selectedYear.value)

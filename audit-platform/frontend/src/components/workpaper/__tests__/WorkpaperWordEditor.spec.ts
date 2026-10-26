@@ -283,7 +283,7 @@ describe('WorkpaperWordEditor — 主/补分离', () => {
           return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
         }
         if (url.includes('/projects/')) {
-          return Promise.resolve({ client_name: '测试公司' })
+          return Promise.resolve({ client_name: '测试公司', audit_year: '2025' })
         }
         return Promise.resolve(null)
       })
@@ -296,15 +296,41 @@ describe('WorkpaperWordEditor — 主/补分离', () => {
       await toggle.trigger('change')
       await flushPromises()
 
-      // Should persist enabled via field_overrides
+      // Should persist enabled via field_overrides（年度 = 项目审计年度）
       expect(mockApiPost).toHaveBeenCalledWith(
         '/api/workpapers/field-overrides',
         expect.objectContaining({
+          year: 2025,
           scope: 'word_template:A16:A16-7',
           item_key: 'enabled',
           field: 'value',
         }),
       )
+    })
+
+    it('项目未设置审计年度：不写 field_overrides（后端 year 必填），提示先填年度', async () => {
+      mockApiGet.mockImplementation((url: string) => {
+        if (url.includes('/a16/recommended-version')) {
+          return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
+        }
+        if (url.includes('/projects/')) {
+          return Promise.resolve({ client_name: '测试公司' })
+        }
+        return Promise.resolve(null)
+      })
+
+      const wrapper = createWrapper()
+      await flushPromises()
+      mockApiPost.mockClear()
+
+      await wrapper.find('.el-switch').trigger('change')
+      await (wrapper.vm as any).onVersionChange('A16-5')
+      await flushPromises()
+
+      const overridePosts = mockApiPost.mock.calls.filter((c: any[]) => c[0] === '/api/workpapers/field-overrides')
+      expect(overridePosts).toEqual([])
+      const { ElMessage } = await import('element-plus')
+      expect(ElMessage.warning).toHaveBeenCalledWith('未设置审计年度，请先在项目基本信息中填写')
     })
 
     it('A16-7 签回 scope 独立于主版本', async () => {
@@ -378,7 +404,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
           return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
         }
         if (url.includes('/projects/')) {
-          return Promise.resolve({ client_name: '测试公司' })
+          return Promise.resolve({ client_name: '测试公司', audit_year: '2025' })
         }
         if (url.includes('/file-info')) {
           return Promise.resolve({ sign_status: 'pending' })
@@ -409,6 +435,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
         '/api/workpapers/field-overrides',
         expect.objectContaining({
           project_id: 'proj-test-123',
+          year: 2025,
           scope: 'word_template:A16',
           item_key: 'selected_version',
           field: 'value',
@@ -423,7 +450,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
           return Promise.resolve({ main: { code: 'A16-3', label: 'IPO申报' }, supplement: null })
         }
         if (url.includes('/projects/')) {
-          return Promise.resolve({ client_name: '测试公司' })
+          return Promise.resolve({ client_name: '测试公司', audit_year: '2025' })
         }
         if (url.includes('/file-info')) {
           return Promise.resolve({ sign_status: 'pending' })

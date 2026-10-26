@@ -428,6 +428,7 @@
  * Requirements: 3.1-3.6
  */
 import { computed, inject, ref, watch, type Ref } from 'vue'
+import { useProjectAuditYear } from '@/composables/useProjectAuditYear'
 import type { useL3FormData } from '@/components/workpaper/composables/useL3FormData'
 import { useL3Detail, L3_DETAIL_SEGMENTS, type L3DetailRow } from '@/composables/useL3Detail'
 import { useL3ImportExport } from '@/composables/useL3ImportExport'
@@ -480,9 +481,12 @@ watch(
 
 // ─── 报告日（从 allResponses 或默认取年末） ──────────────────────────────────
 
+// 报告日默认取项目审计年度的 12-31（原先取今年）；取不到留空
+const { auditYear: projectAuditYear, ensureAuditYear } = useProjectAuditYear(() => props.projectId)
+void ensureAuditYear()
 const reportDate = computed(() => {
   const resp = formData.allResponses.value.get('L3-report-date')
-  return resp?.remark || `${new Date().getFullYear()}-12-31`
+  return resp?.remark || (projectAuditYear.value == null ? '' : `${projectAuditYear.value}-12-31`)
 })
 
 // ─── Composable: 明细表业务逻辑 ─────────────────────────────────────────────

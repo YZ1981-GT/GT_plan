@@ -252,7 +252,10 @@ const authStore = useAuthStore()
 
 const projectId = computed(() => route.params.projectId as string)
 const currentUserId = computed(() => String(authStore.user?.id || ''))
-const year = computed(() => Number(route.params.year) || new Date().getFullYear() - 1)
+const year = computed<number | null>(() => {
+  const value = Number(route.params.year)
+  return Number.isFinite(value) && value > 0 ? value : null
+})
 
 // Spec A R3：项目状态摘要数据
 const {

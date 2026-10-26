@@ -9,7 +9,7 @@
  * 4. onContextChange 回调注册 + 取消
  * 5. route 变化触发 audit-context:changed 事件（50ms debounce）
  * 6. irrelevant 选项跳过事件监听
- * 7. year 三级 fallback（projectStore.year || route.query.year || currentYear - 1）
+ * 7. year fallback 链（projectStore.year || route.query.year || null）
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -80,6 +80,7 @@ function withSetup<T>(composable: () => T): { result: T; wrapper: ReturnType<typ
 describe('useAuditContext — Req 5 审计上下文 composable', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    vi.clearAllTimers()
     testPinia = createPinia()
     setActivePinia(testPinia)
     // 重置 mock route
@@ -137,13 +138,13 @@ describe('useAuditContext — Req 5 审计上下文 composable', () => {
       wrapper.unmount()
     })
 
-    it('year 最终 fallback 到 currentYear - 1', () => {
+    it('year 全部来源缺失时返回 null', () => {
       mockRoute.query.year = ''
       const store = useProjectStore()
       store.year = 0
 
       const { result, wrapper } = withSetup(() => useAuditContext())
-      expect(result.year.value).toBe(new Date().getFullYear() - 1)
+      expect(result.year.value).toBeNull()
       wrapper.unmount()
     })
 

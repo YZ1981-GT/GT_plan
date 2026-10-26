@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import get_current_user, require_project_access, require_project_audit_year
 from app.models.core import User
 from app.models.phase10_schemas import DownloadPackRequest, UploadWorkpaperRequest
 from app.services.wp_download_service import WpDownloadService, WpUploadService
@@ -177,8 +177,7 @@ async def get_cloud_url(
         raise HTTPException(status_code=404, detail="项目不存在")
 
     pname = proj.client_name or "unknown"
-    ws = proj.wizard_state or {}
-    yr = ws.get("steps", {}).get("basic_info", {}).get("data", {}).get("audit_year", 2025)
+    yr = await require_project_audit_year(db, project_id)
 
     file_path = Path(wp.file_path)
     try:

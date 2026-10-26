@@ -61,8 +61,8 @@
       "path": "audit-platform/frontend/src/components/workpaper/GtAProgramConsole.vue",
       "symbol": "component:GtAProgramConsole",
       "rule": "parallel-my-procedure-tasks-page-route",
-      "fingerprint": "sha256:1a4568db86a26a4d56f8a8252e860257b593ba36dc5d0320357711d7e22dd132",
-      "reason": "GtAProgramConsole renders an in-place '程序任务' task-overlay column and submit dialog (Task 14); it is the canonical program console, not a parallel MyProcedureTasks page, so the coarse heuristic match is acknowledged debt."
+      "fingerprint": "sha256:da804fb7ee9a5ad5169fee9d2b29e986e0f36b8dfe4402c676b1b76f6b7a230a",
+      "reason": "GtAProgramConsole renders an in-place '程序任务' task-overlay column and submit dialog (Task 14); it is the canonical program console, not a parallel MyProcedureTasks page, so the coarse heuristic match is acknowledged debt. 2026-10-24 fingerprint refreshed: spec procedure-trim-generation-delegation-chain task 13 wired the scope-expansion retry into row delegation (no route or task-page change). 2026-10-25 refreshed again: tasks 16 / 18 added row-level trim / restore through the row-task endpoints and per-row read-only for restricted users (still no route or task-page change)."
     },
     {
       "path": "audit-platform/frontend/src/layouts/DefaultLayout.vue",

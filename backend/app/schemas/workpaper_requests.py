@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class UploadRequest(BaseModel):
@@ -25,6 +25,10 @@ class StatusUpdateRequest(BaseModel):
 class AssignRequest(BaseModel):
     assigned_to: UUID | None = None
     reviewer: UUID | None = None
+    # 被委派人可见范围不含该循环（400 out_of_scope）时带理由重试 ⇒ 同事务扩大其可见范围
+    # （spec procedure-trim-generation-delegation-chain 需求 4.4）
+    expand_scope: bool = False
+    scope_reason: str | None = Field(default=None, max_length=500)
 
 
 class ReviewStatusRequest(BaseModel):

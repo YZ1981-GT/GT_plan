@@ -1665,7 +1665,7 @@ const routeYear = computed(() => {
   return Number.isFinite(value) && value > 2000 ? value : null
 })
 const projectYear = ref<number | null>(null)
-const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear())
+const year = computed<number | null>(() => routeYear.value ?? projectYear.value ?? null)
 
 const loading = ref(false)
 const showTbImport = ref(false)
@@ -3602,9 +3602,11 @@ async function loadTbSummary() {
  * 3. 都没有则加载空行次结构供手动填写
  */
 async function _loadOpeningTbSummary() {
+  const currentYear = year.value
+  if (currentYear == null) return // 未设置审计年度：没有「上年」可取
   try {
     // 先尝试从上年获取（连续审计场景）
-    const priorYear = year.value - 1
+    const priorYear = currentYear - 1
     let priorRows: any[] = []
     try {
       const priorResult = await api.get(

@@ -13,6 +13,7 @@ import logging
 import traceback
 
 from fastapi import HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from starlette.responses import JSONResponse
 
@@ -30,13 +31,17 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
-    """处理 Pydantic 校验错误，返回 422 + 字段级错误详情。"""
+    """处理 Pydantic 校验错误，返回 422 + 字段级错误详情。
+
+    🔴 ``exc.errors()`` 必须经 ``jsonable_encoder``（FastAPI 自带处理器同样如此）：自定义 ``field_validator`` 抛
+    ``ValueError`` 时错误里带 ``ctx.error``（异常对象），直接序列化会 TypeError ⇒ 本该 422 的请求变成 500。
+    """
     return JSONResponse(
         status_code=422,
         content={
             "code": 422,
             "message": "请求参数校验失败",
-            "detail": exc.errors(),
+            "detail": jsonable_encoder(exc.errors()),
         },
     )
 

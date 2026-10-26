@@ -377,7 +377,7 @@ const state = useK1Adjustment({
 // ─── 同步到集中调整登记（workpaper-adjustment-centralization） ──────────
 const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
   projectId: () => props.projectId,
-  year: () => Number(auditYear.value) || new Date().getFullYear(),
+  year: () => auditYear.value ?? null,
   wpId: () => props.wpId,
   wpCode: 'K1',
   itemId: 'K1-4-adj-entries',

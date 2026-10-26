@@ -144,13 +144,13 @@ const samplingPhase = ref<'final' | 'preliminary'>('final')
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.5
  */
 const samplingAccountCode = E1_FALLBACK_STANDARD
-const year = computed(() => {
+const year = computed<number | null>(() => {
   const bs = props.bsDate || ''
   if (bs.length >= 4) {
     const y = parseInt(bs.slice(0, 4), 10)
     if (Number.isFinite(y) && y > 1900) return y
   }
-  return new Date().getFullYear() - 1
+  return null
 })
 
 function openSampling(): void {

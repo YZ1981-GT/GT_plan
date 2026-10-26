@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -248,13 +249,18 @@ async def test_property_sign_status_rollback_permission(role: str, transition: t
     mock_wp.project_id = project_id
     mock_wp.wp_index_id = wp_index_id
 
+    # 项目审计年度：require_project_audit_year → db.get(Project)（spec audit-year-calendar-fallback-ratchet：
+    # 取不到即 422，不再按 2025 兜底），故不占 execute 序列
+    db.get = AsyncMock(return_value=SimpleNamespace(
+        audit_year=2025, audit_period_end=None, audit_period_start=None, wizard_state=None, name="测试_2025",
+    ))
+
     # execute 调用序列：
     # 1. select(WorkingPaper) → mock_wp
     # 2. select(WpIndex.wp_code) → "A9-1"
-    # 3. sa.text("SELECT EXTRACT(YEAR...") → 2025
-    # 4. FieldOverrideService.get → "signed" (当前状态)
-    # 5. select(ProjectAssignment.role) → role (用户角色)
-    # 6. FieldOverrideService.set → (如果允许)
+    # 3. FieldOverrideService.get → "signed" (当前状态)
+    # 4. select(ProjectAssignment.role) → role (用户角色)
+    # 5. FieldOverrideService.set → (如果允许)
     call_idx = [0]
 
     async def _execute_side_effect(stmt, *args, **kwargs):
@@ -269,12 +275,9 @@ async def test_property_sign_status_rollback_permission(role: str, transition: t
             # WpIndex.wp_code 查询
             result.scalar_one_or_none.return_value = "A9-1"
         elif idx == 2:
-            # 项目年度查询
-            result.scalar.return_value = 2025
-        elif idx == 3:
             # FieldOverrideService.get → 当前状态为 "signed"
             result.scalar_one_or_none.return_value = "signed"
-        elif idx == 4:
+        elif idx == 3:
             # ProjectAssignment.role 查询 → 用户角色
             result.scalar_one_or_none.return_value = role
         else:

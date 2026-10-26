@@ -461,14 +461,13 @@ const props = defineProps<{
 }>()
 
 const isReadonly = computed(() => !!props.readonly)
-/** 审计年度：从 htmlData.project_context 派生（audit_year → bs_date 年份 → 当前年），供抽凭引擎按年度查询序时账 */
-const auditYear = computed<number>(() => {
+const auditYear = computed<number | null>(() => {
   const ctx = (props.htmlData?.project_context ?? {}) as Record<string, any>
   const y = ctx.audit_year ?? ctx.auditYear
   if (y) return Number(y)
   const bs = ctx.bs_date ?? ctx.bsDate
   if (typeof bs === 'string' && bs.length >= 4) return Number(bs.slice(0, 4))
-  return new Date().getFullYear()
+  return null
 })
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 

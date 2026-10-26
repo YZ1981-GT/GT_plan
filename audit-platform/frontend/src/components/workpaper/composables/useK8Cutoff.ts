@@ -233,7 +233,8 @@ export function useK8Cutoff(params: UseK8CutoffParams) {
 
   // ─── 资产负债表日前/后分段（对齐源模板"截止日期"分隔线）────────────────────
   function _sideOf(row: K8CutoffRow): 'pre' | 'post' {
-    const end = periodEnd?.value ?? '2025-12-31'
+    const end = periodEnd?.value ?? ''
+    if (!end) return 'pre' // 没有截止日分不开前后：全归「日前」，不让样本从两张表里都消失
     // S2V：以支出凭单日期判断所属期；V2S：以记账日期
     const d = (direction === 'S2V' ? row.sourceDate : row.bookDate) || row.bookDate || row.sourceDate
     if (!d) return 'pre'
@@ -249,8 +250,10 @@ export function useK8Cutoff(params: UseK8CutoffParams) {
     isLoading.value = true
     try {
       const { default: http } = await import('@/utils/http')
-      const end = periodEnd?.value ?? '2025-12-31'
-      const yr = Number(String(end).slice(0, 4)) || new Date().getFullYear()
+      const end = periodEnd?.value ?? ''
+      if (!end) return
+      const yr = Number(String(end).slice(0, 4))
+      if (!Number.isFinite(yr) || yr <= 0) return
       // 真实端点：POST /sampling/cutoff-test（提取期末±N天序时账交易）。
       // 旧代码调 GET /ledger/cutoff-samples 为不存在端点，导致「自动提取」恒 404 失败。
       const res = await http.post(`/api/projects/${projectId.value}/sampling/cutoff-test`, {

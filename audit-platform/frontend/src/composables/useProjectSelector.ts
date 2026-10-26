@@ -31,7 +31,7 @@ export function useProjectSelector(pagePath: string) {
 
   const selectedProjectId = ref(projectId.value)
   const projectOptions = ref<ProjectOption[]>([])
-  const selectedYear = ref(routeYear.value ?? new Date().getFullYear() - 1)
+  const selectedYear = ref<number | null>(routeYear.value ?? null)
   const yearOptions = computed(() => {
     const cur = new Date().getFullYear()
     return [cur - 2, cur - 1, cur, cur + 1]
@@ -54,7 +54,7 @@ export function useProjectSelector(pagePath: string) {
   function onProjectChange(pid: string) {
     router.push({
       path: `/projects/${pid}/${pagePath}`,
-      query: { year: String(selectedYear.value) },
+      query: selectedYear.value != null ? { year: String(selectedYear.value) } : {},
     })
   }
 

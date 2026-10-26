@@ -89,6 +89,22 @@ def resolve_member_mapping(roles: Iterable[str]) -> tuple[ProjectUserRole, Permi
     return next(r for r in _ROLE_TIEBREAK if r in candidates), best  # 项目角色按固定先后取第一个
 
 
+def _assignment_cycles_text(role: str | None, assigned_cycles) -> str:
+    """委派通知里的「负责循环」。
+
+    经理、合伙人、质控、EQCR 默认看全部循环，没勾选写「全部」；其余角色只看勾选的循环，没勾选就看不到
+    底稿 —— 原先一律写「全部」，与可见范围相反（spec procedure-trim-generation-delegation-chain 需求 5）。
+    """
+    from app.services.wp_visibility.effective_scope import SUPERVISOR_ROLES, normalize_role, parse_cycles
+
+    cycles = sorted(parse_cycles(assigned_cycles))
+    if cycles:
+        return ", ".join(cycles)
+    if normalize_role(role) in SUPERVISOR_ROLES:
+        return "全部"
+    return "未勾选（暂时看不到底稿，请联系项目经理在团队分配中勾选循环）"
+
+
 class MemberChange(NamedTuple):
     """委派同步对一名用户在本项目成员行的改动（只用于 info 日志与测试断言）；``before`` 为 None 表示新建。"""
 
@@ -275,7 +291,7 @@ class AssignmentService:
                     "eqcr": "独立复核合伙人",  # R5 任务 2
                 }
                 role_cn = role_map.get(pa.role, pa.role)
-                cycles = ", ".join(pa.assigned_cycles) if pa.assigned_cycles else "全部"
+                cycles = _assignment_cycles_text(pa.role, pa.assigned_cycles)
 
                 notif = Notification(
                     recipient_id=staff.user_id,

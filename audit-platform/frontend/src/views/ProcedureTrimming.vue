@@ -624,6 +624,11 @@
           </el-descriptions-item>
           <el-descriptions-item v-if="delegateWizard.preview.expires_at" label="预览有效期至" :span="2">{{ delegateWizard.preview.expires_at }}</el-descriptions-item>
         </el-descriptions>
+        <el-alert v-if="previewScopeGapText" class="gt-proc-scope-gap" type="warning" :closable="false" show-icon
+          :title="previewScopeGapText" />
+        <!-- 目标为 0 时服务端给的原因（预览已先导入程序行定义，见 spec procedure-chain-followup-closure R2.1） -->
+        <el-alert v-if="previewSummary?.targets === 0 && delegateWizard.preview.hint" class="gt-proc-scope-gap" type="info"
+          :closable="false" show-icon :title="`没有可委派的目标：${delegateWizard.preview.hint}`" />
 
         <!-- 受影响底稿清单（后端已下发，改造前完全未展示 = 审计师盲选） -->
         <div v-if="affectedWorkpapers.count > 0" class="gt-proc-wizard-affected">
@@ -1156,6 +1161,9 @@ import {
   toDecisionReportLine,
 } from '@/components/workpaper/composables/trimAmountSource'
 import { evaluateAggregateGate } from '@/components/workpaper/composables/trimAggregateGate'
+import { confirmTrimRecycle, describeRecycleResult, trimApplyConflictMessage } from '@/components/workpaper/composables/trimRecycleConfirm'
+// 被委派人看不到目标循环（400 out_of_scope）⇒ 填写理由后带 expand_scope 重试（spec procedure-trim-generation-delegation-chain 需求 4.4）
+import { describeScopeGaps, withScopeExpansionRetry } from '@/composables/useScopeExpansionRetry'
 import {
   COMPLETENESS_CYCLE_RULES,
   resolveCompletenessExemption,
@@ -1641,8 +1649,15 @@ function degradationText(d: TrimDecisionDegradation): string {
 /** 加载三维判据上下文 + 科目级数据可用性 */
 async function loadTrimContext(cycleList: string[]): Promise<boolean> {
   trimContextError.value = null
+  const y = year.value
+  if (y == null) {
+    trimContext.value = null
+    trimContextCycles.value = new Set()
+    trimContextError.value = '未设置审计年度，请先在项目基本信息中填写'
+    return false
+  }
   try {
-    trimContext.value = await fetchTrimDecisionContext(projectId.value, year.value, cycleList)
+    trimContext.value = await fetchTrimDecisionContext(projectId.value, y, cycleList)
     // 🔴 覆盖面与上下文**同一次**更新：分开更新会出现「上下文是 D 的、覆盖面标着 E」
     //    这种复核视图按错循环解析金额的中间态。
     trimContextCycles.value = new Set(
@@ -1657,7 +1672,7 @@ async function loadTrimContext(cycleList: string[]): Promise<boolean> {
   try {
     const av: any = await http.get(
       `/api/projects/${projectId.value}/procedure-scope/data-availability`,
-      { params: { year: year.value } },
+      { params: { year: y } },
     )
     const sp = av?.data?.data ?? av?.data ?? {}
     subjectWithData.value = new Set((sp.subject_with_data || []).map((w: any) => String(w).toUpperCase()))
@@ -1938,10 +1953,16 @@ const noteLinkageActionable = computed(() => {
  */
 async function loadNoteLinkage(): Promise<void> {
   if (!projectId.value) return
+  const y = year.value
+  if (y == null) {
+    noteLinkage.value = null
+    noteLinkageError.value = '未设置审计年度，请先在项目基本信息中填写'
+    return
+  }
   noteLinkageLoading.value = true
   noteLinkageError.value = null
   try {
-    const view = await fetchTrimNoteLinkage(projectId.value, year.value)
+    const view = await fetchTrimNoteLinkage(projectId.value, y)
     noteLinkage.value = view
     if (noteLinkageActionable.value > 0) noteLinkagePanelVisible.value = true
   } catch (e: any) {
@@ -1966,9 +1987,14 @@ function openNoteLinkagePanel() {
 /** 应用联动：后端只写 `disclosure_notes.is_empty` + provenance 面包屑，幂等。 */
 async function applyNoteLinkage(): Promise<void> {
   if (!projectId.value || !canManage.value) return
+  const y = year.value
+  if (y == null) {
+    ElMessage.warning('未设置审计年度，请先在项目基本信息中填写')
+    return
+  }
   noteLinkageApplying.value = true
   try {
-    const res = await applyTrimNoteLinkage(projectId.value, year.value)
+    const res = await applyTrimNoteLinkage(projectId.value, y)
     noteLinkage.value = res
     if (res.marked || res.revoked) {
       ElMessage.success(`附注章节已更新（标注 ${res.marked} 节，撤销 ${res.revoked} 节）`)
@@ -2087,6 +2113,7 @@ async function resetAll() {
     const o: any = origById.get(p.id)
     try {
       await assignProcedures(projectId.value, [{ procedure_id: p.id, staff_id: o.assigned_to || null }])
+      persistedAssignee.set(p.id, o.assigned_to || null)
     } catch (e: any) {
       handleApiError(e, '还原委派')
     }
@@ -2137,24 +2164,32 @@ async function saveTrim(promptDelegate = false) {
       ElMessage.warning(`${preview.migration_conflicts.length} 个条目含旧 UUID 无法自动转换，请联系管理员`)
       return
     }
+    // 已生成的底稿将移入回收站 / 从回收站恢复 → 先确认（spec procedure-trim-generation-delegation-chain 需求 3.2）
+    const recycleDecision = await confirmTrimRecycle(preview)
+    if (recycleDecision === 'cancel') return
 
     // 阶段 2：apply（消费 preview 凭证 + request_id 幂等）
     const requestId = newRequestId()
-    const result = await canonicalTrimApply(projectId.value, entries, previewId, requestId)
+    const result = await canonicalTrimApply(projectId.value, entries, previewId, requestId,
+      { confirmSubstantiveRecycle: recycleDecision === 'confirmed' })
 
     // 保存成功 → 刷新初始快照，isDirty 归位
     originalSnapshot = JSON.parse(JSON.stringify(procedures.value))
     const applied = result.applied ?? result.changed ?? 0
     const unchanged = result.unchanged ?? 0
-    ElMessage.success(`裁剪已保存（变更 ${applied}，未变 ${unchanged}），保留执行的程序已加入待执行底稿库`)
+    ElMessage.success(`裁剪已保存（变更 ${applied}，未变 ${unchanged}），保留执行的程序已加入待执行底稿库${describeRecycleResult(result)}`)
     ok = true
+    // 有底稿移入 / 移出回收站 ⇒ 重取程序列表：行上的 wp_id 决定「程序裁剪 ›」还是「未生成」，不重取就指向已移入回收站的底稿
+    if (result.recycled_codes?.length || result.restored_codes?.length) {
+      await loadProcedures().catch(() => { /* 裁剪已保存；刷新失败下次进入页面即正确 */ })
+    }
     // 附注反向联动（Task 21 / R13.1）：裁剪已落库 → 看附注侧有没有章节该标「本期不适用」。
     // 🔴 放在 `ok = true` 之后且自吞异常：联动是加法式的，R13.6 要求它任何情况下都不
     //    阻断裁剪保存。裁剪本身已 commit，此处失败只是少提示一次。
     void loadNoteLinkage()
   } catch (e: any) {
     if (e?.response?.status === 409) {
-      ElMessage.warning('目标版本已变化或预览过期，请重试')
+      ElMessage.warning(trimApplyConflictMessage(e) || '目标版本已变化或预览过期，请重试')
     } else {
       handleApiError(e, '保存裁剪')
     }
@@ -2336,11 +2371,26 @@ async function loadTeamMembers() {
   }
 }
 
+// 底稿主编下拉的已保存值：委派被拒 / 取消扩权时把下拉恢复成它（服务端没变）
+const persistedAssignee = new Map<string, string | null>()
+function lastPersistedAssignee(id: string): string | null {
+  if (persistedAssignee.has(id)) return persistedAssignee.get(id) ?? null
+  return originalSnapshot.find((o: any) => o.id === id)?.assigned_to ?? null
+}
+
 // 委派执行人变更 → 立即持久化（P1-5：成功后短暂显示 ✓ 已存，消除"即时保存 vs 批量保存"困惑）
 async function onAssigneeChange(row: any) {
   if (!row.id) return
+  const before = lastPersistedAssignee(row.id)
   try {
-    await assignProcedures(projectId.value, [{ procedure_id: row.id, staff_id: row.assigned_to }])
+    const out = await withScopeExpansionRetry((exp) => assignProcedures(
+      projectId.value, [{ procedure_id: row.id, staff_id: row.assigned_to }], { ...exp, silent: true }))
+    if (out.status === 'cancelled') {
+      row.assigned_to = before
+      ElMessage.info('已取消，委派未修改')
+      return
+    }
+    persistedAssignee.set(row.id, row.assigned_to || null)
     const member = teamMembers.value.find(m => m.staff_id === row.assigned_to)
     ElMessage.success(row.assigned_to ? `已委派给 ${member?.staff_name || '执行人'}` : '已取消委派')
     // 瞬时反馈：行内 ✓ 已存，2.5s 后消失
@@ -2351,6 +2401,7 @@ async function onAssigneeChange(row: any) {
       savedAssignees.value = new Set(savedAssignees.value)
     }, 2500)
   } catch (e: any) {
+    row.assigned_to = before
     handleApiError(e, '委派')
   }
 }
@@ -2708,7 +2759,11 @@ async function confirmSmartTrim() {
           }))
           const pv = await canonicalTrimPreview(projectId.value, entries)
           if (pv?.preview_id) {
-            await canonicalTrimApply(projectId.value, entries, pv.preview_id, newRequestId())
+            // 批量路径：只在有编制内容的底稿要移入回收站时才问（取消 = 本循环不保存，计入失败循环）
+            const decision = await confirmTrimRecycle(pv, { onlySubstantive: true })
+            if (decision === 'cancel') throw new Error('已取消')
+            await canonicalTrimApply(projectId.value, entries, pv.preview_id, newRequestId(),
+              { confirmSubstantiveRecycle: decision === 'confirmed' })
           }
         }
       } catch {
@@ -2857,13 +2912,17 @@ async function applySuggestions(rows: any[]) {
   }))
   const pv = await canonicalTrimPreview(projectId.value, entries)
   if (!pv?.preview_id) throw new Error('预览失败，未获得 preview 凭证')
-  await canonicalTrimApply(projectId.value, entries, pv.preview_id, newRequestId())
+  const decision = await confirmTrimRecycle(pv)
+  if (decision === 'cancel') return false // 用户不同意把已生成底稿移入回收站 ⇒ 不保存
+  await canonicalTrimApply(projectId.value, entries, pv.preview_id, newRequestId(),
+    { confirmSubstantiveRecycle: decision === 'confirmed' })
+  return true
 }
 
 /** 逐条确认建议。 */
 async function confirmSuggestion(row: any) {
   try {
-    await applySuggestions([row])
+    if (await applySuggestions([row]) === false) return
     ElMessage.success(`已确认裁剪：${row.wp_code || row.procedure_code}`)
     await loadProcedures()
     await loadTrimContext([activeCycle.value])
@@ -2904,7 +2963,7 @@ async function confirmAllSuggestions() {
   }
   loading.value = true
   try {
-    await applySuggestions(rows)
+    if (await applySuggestions(rows) === false) return
     ElMessage.success(`已确认 ${rows.length} 项裁剪建议`)
     await loadProcedures()
     await loadTrimContext([activeCycle.value])
@@ -3128,9 +3187,12 @@ async function applyRef() {
       ElMessage.warning('预览创建失败')
       return
     }
-    const result = await canonicalTrimApply(projectId.value, entries, preview.preview_id, newRequestId())
+    const decision = await confirmTrimRecycle(preview)
+    if (decision === 'cancel') return
+    const result = await canonicalTrimApply(projectId.value, entries, preview.preview_id, newRequestId(),
+      { confirmSubstantiveRecycle: decision === 'confirmed' })
     const applied = result.applied ?? result.changed ?? 0
-    ElMessage.success(`已应用参照方案（变更 ${applied} 条）`)
+    ElMessage.success(`已应用参照方案（变更 ${applied} 条）${describeRecycleResult(result)}`)
     showRefDialog.value = false
     await loadProcedures()
   } catch (e: any) { handleApiError(e, '应用参照') }
@@ -3156,6 +3218,9 @@ const previewSummary = computed<Record<string, any> | null>(() => {
   const s = delegateWizard.value.preview?.summary
   return s && typeof s === 'object' ? s : null
 })
+
+/** 被委派人看不到的循环（preview 的 scope_gaps）：应用时需填写理由扩大其可见范围；空串 = 无缺口 */
+const previewScopeGapText = computed(() => describeScopeGaps(delegateWizard.value.preview?.scope_gaps))
 
 /** 执行人当前负载（preview 侧口径，与 member-loads 端点同源）；null = 未下发 */
 const previewAssigneeLoad = computed<number | null>(() => {
@@ -3499,17 +3564,23 @@ async function applySuggestionGroup(state: SuggestionApplyGroupState): Promise<v
       return
     }
     if (state.targets === 0) {
-      // 有 preview 也不 apply：apply 会返回 applied=0 并被读成"成功"
+      // 有 preview 也不 apply：apply 会返回 applied=0 并被读成"成功"；原因以服务端为准（预览已先导入程序行定义）
       state.status = 'no_target'
-      state.message = '预览目标数为 0：本组底稿的行任务尚未物化，或已被粗裁为不适用，'
-        + '或 applicability 非 execute。请先在底稿内生成程序行任务后重试'
+      state.message = `预览目标数为 0：${pv?.hint || '没有可委派的程序行'}`
       return
     }
     state.status = 'applying'
     state.requestId = newRequestId()
-    const res = await applyProcedureDelegation(
-      projectId.value, previewId, state.requestId, body,
-    )
+    // 执行人看不到目标循环 ⇒ 填写理由后同一凭证带 expand_scope 重试（400 不消费预览凭证）
+    const out = await withScopeExpansionRetry((exp) => applyProcedureDelegation(
+      projectId.value, previewId, state.requestId, body, { ...exp, silent: true },
+    ))
+    if (out.status === 'cancelled') {
+      state.status = 'failed'
+      state.message = '已取消：执行人的可见范围不含目标循环，未委派'
+      return
+    }
+    const res = out.result
     state.applied = Number(res?.applied ?? 0)
     state.unchanged = Number(res?.unchanged ?? 0)
     state.conflict = Number(res?.conflict ?? 0)
@@ -3682,9 +3753,16 @@ async function runDelegateApply() {
   if (!delegateWizard.value.previewId) return
   delegateWizard.value.loading = true
   try {
-    const res = await applyProcedureDelegation(
+    // 被委派人看不到本循环 ⇒ 填写理由后同一凭证带 expand_scope 重试（400 不消费预览凭证）
+    const out = await withScopeExpansionRetry((exp) => applyProcedureDelegation(
       projectId.value, delegateWizard.value.previewId, delegateWizard.value.reqId, wizardBody(),
-    )
+      { ...exp, silent: true },
+    ))
+    if (out.status === 'cancelled') {
+      ElMessage.info('已取消委派，预览仍可使用')
+      return
+    }
+    const res = out.result
     delegateWizard.value.applyResult = res
     const applied = res?.applied ?? res?.changed ?? 0
     ElMessage.success(`委派完成：已应用 ${applied} 项`)

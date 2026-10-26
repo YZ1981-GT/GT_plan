@@ -122,9 +122,7 @@ const projectStore = useProjectStore()
 const resolvedProjectId = computed(
   () => (route.params.projectId as string) || '',
 )
-const resolvedYear = computed(
-  () => parseInt(route.query.year as string) || projectStore.year || new Date().getFullYear() - 1,
-)
+const resolvedYear = computed<number | null>(() => parseInt(route.query.year as string) || projectStore.year || null)
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 

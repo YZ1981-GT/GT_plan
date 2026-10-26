@@ -35,6 +35,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { apiProxy } from '@/utils/apiProxy'
 import { useRouter } from 'vue-router'
 
@@ -60,7 +61,11 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const year = props.year || new Date().getFullYear()
+    const year = props.year
+    if (year == null) {
+      ElMessage.warning('未设置审计年度，无法读取程序表')
+      return
+    }
     tableData.value = await apiProxy.get(
       `/api/projects/${props.projectId}/procedure-tables/${props.wpCode}?year=${year}`
     )

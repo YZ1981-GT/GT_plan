@@ -168,7 +168,7 @@ const state = useH5DisposalCheck({
 // ─── 抽凭引擎 ────────────────────────────────────────────────────────────────
 const samplingVisible = ref(false)
 const { year: auditYear } = useAuditContext()
-const samplingYear = computed(() => props.year || auditYear.value || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? auditYear.value ?? null)
 
 const rawMethodologyPersist = buildChecklistDirectPersist({
   wpId: computed(() => props.wpId),

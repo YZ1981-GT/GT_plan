@@ -844,7 +844,7 @@ watch(auditConclusion, (v) => {
 })
 
 const tableWidth = 1000
-const engineYear = computed(() => props.year ?? (new Date().getFullYear() - 1))
+const engineYear = computed<number | null>(() => props.year ?? null)
 
 const showSampling = ref(false)
 const showReview = ref(false)

@@ -44,7 +44,7 @@
     <div class="gt-wp-editor-main">
       <!-- 底稿标题栏（HTML 渲染器路径）。导出/导入移至各 sheet 内工具栏；
            底稿切换由 GtWpRenderer 内「🗂️ 切换底稿」树形弹窗承载，此处不再冗余。 -->
-      <div v-if="useHtmlRenderer && wpDetail" class="gt-wp-io-toolbar">
+      <div v-if="useHtmlRenderer && wpDetail && projectYear != null" class="gt-wp-io-toolbar">
         <el-button text @click="goBack">← 返回</el-button>
         <span class="gt-wp-editor-code">{{ wpDetail.wp_code }}</span>
         <span class="gt-wp-editor-name">{{ displayWpName }}</span>
@@ -73,8 +73,9 @@
       <!-- HTML 渲染器路由分发（A/B/C/D/E/H/skip 优先级最高） -->
       <GtWpRenderer
         ref="wpRendererRef"
-        v-if="useHtmlRenderer"
+        v-if="useHtmlRenderer && projectYear != null"
         :wp-id="wpId"
+        :audit-year="projectYear"
         :initial-sheet="initialSheetFromQuery"
         @save-success="onChildSaved"
         @saved-notify="onChildSaved"
@@ -87,7 +88,7 @@
       />
 
       <!-- 默认 Univer 编辑器（component_type='univer' 或未配置时） -->
-      <div v-else class="gt-wp-editor gt-fade-in">
+      <div v-else-if="projectYear != null" class="gt-wp-editor gt-fade-in">
     <!-- 顶部工具栏 -->
     <div class="gt-wp-editor-toolbar">
       <div class="gt-wp-editor-toolbar-left">
@@ -268,20 +269,22 @@
       @navigate="onCellDetailNavigate"
     />
 
-  </div>
+      </div>
+      <AuditYearMissingResult v-else :loading="!projectMeta && !projectMetaFailed" :failed="projectMetaFailed"
+        @retry="loadProjectMeta" @back="goBack" />
     </div><!-- /gt-wp-editor-main -->
 
     <!-- 编制说明面板内容（trigger/placement 由 shell 拥有；G-RAIL adapter） -->
     <template #guidance-panel>
       <WpGuidancePanel
-        v-if="wpDetail"
+        v-if="wpDetail && projectYear != null"
         shell-owned
         :wp-id="wpId"
         :wp-code="wpDetail.wp_code || ''"
         :wp-name="wpDetail.wp_name || ''"
         :component-type="componentType || ''"
         :project-id="projectId"
-        :year="projectYear || new Date().getFullYear() - 1"
+        :year="projectYear"
         :sheet-code="activeSheetContext.sheetCode"
         :sheet-name="activeSheetContext.sheetName"
         :sheet-uid="activeSheetContext.sheetUid"
@@ -312,7 +315,7 @@
 
   <!-- 弹窗/抽屉（条件渲染，不占主布局） -->
   <CycleDialogHost
-    v-if="wpDetail"
+    v-if="wpDetail && projectYear != null"
     :project-id="projectId"
     :wp-id="wpId"
     :wp-detail="wpDetail"
@@ -332,7 +335,7 @@
 
   <!-- 非 HTML 编辑器仍使用编辑器级 Host；HTML 路径由 GtWpRenderer Runtime Boundary 唯一承载。 -->
   <GtWpVersionTrail
-    v-if="!useHtmlRenderer"
+    v-if="!useHtmlRenderer && projectYear != null"
     ref="versionTrailRef"
     :workpaper-id="wpId"
     :project-id="projectId"
@@ -373,6 +376,7 @@
     append-to-body
   >
     <WorkpaperSidePanel
+      v-if="projectYear != null"
       :project-id="projectId"
       :wp-id="wpId"
       :year="projectYear"
@@ -423,6 +427,7 @@ import { useSheetNavFacade } from '@/composables/useSheetNavFacade'
 import { useEditingLock } from '@/composables/useEditingLock'
 import { useStepMapping } from '@/composables/useStepMapping'
 import { useStaleImpact, type StaleAffectedItem } from '@/composables/useStaleImpact'
+import { warnIgnoredPrograms } from '@/composables/useProgramRowControl'
 import { usePrerequisiteStatus } from '@/composables/usePrerequisiteStatus'
 import { useWorkpaperRefresh } from '@/composables/useWorkpaperRefresh'
 import { useWorkpaperReviewMarkers, type ReviewMarkerTicket } from '@/composables/useWorkpaperReviewMarkers'
@@ -446,6 +451,7 @@ import ReviewMarkDialog from './workpaper-editor/ReviewMarkDialog.vue'
 import WpExportButton from '@/components/workpaper/WpExportButton.vue'
 import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
 import WpGuidancePanel from '@/components/workpaper/WpGuidancePanel.vue'
+import AuditYearMissingResult from '@/components/common/AuditYearMissingResult.vue'
 const GtReviewDialogLazy = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
 import GtWpVersionTrail from '@/components/workpaper/version-trail/GtWpVersionTrail.vue'
 import WorkpaperCapabilityShell from '@/shell/formula/WorkpaperCapabilityShell.vue'
@@ -462,6 +468,7 @@ import {
 import { useGuidancePanelStore } from '@/stores/guidancePanelStore'
 import { Clock } from '@element-plus/icons-vue'
 import { openLedgerWindow } from '@/utils/openLedgerWindow'
+import { useWorkpaperProjectMeta } from './workpaper-editor/useWorkpaperProjectMeta'
 
 // ─── 路由解析 ────────────────────────────────────────────────────────────────
 const route = useRoute()
@@ -609,8 +616,7 @@ const displayWpName = computed(() => {
 
 // ─── Sheet 导航 facade ──────────────────────────────────────────────────────
 const univerAPIRef = ref<any>(null)
-const projectMeta = ref<{ scenario: string; has_foreign_currency: boolean; measurement_model?: string } | null>(null)
-const projectYear = ref<number | null>(null)
+const { projectMeta, projectYear, projectMetaFailed, loadProjectMeta } = useWorkpaperProjectMeta(projectId)
 const scenarioFilter = computed(() => {
   if (!projectMeta.value) return null
   return {
@@ -822,7 +828,7 @@ function onChildSaved(payload?: { sheet_name: string; html_data: Record<string, 
       sheet_name: payload.sheet_name,
       html_data: payload.html_data,
       schema_version: payload.schema_version || 'v2025-R5',
-    }).catch((e) => {
+    }).then(warnIgnoredPrograms).catch((e) => {
       // 409 是业务状态冲突，必须给用户明确指引；其余失败静默告警不阻断 UI。
       // 🔴 原先这里只有 console.warn，用户会以为「保存成功」—— 实际数据一行都没落库
       // （D2-2 这类已绑定 OO 的双向底稿，走本通道必然 409）。
@@ -1068,7 +1074,7 @@ watch(
 )
 
 const shellLocation = computed<CanonicalWorkpaperLocation | null>(() => {
-  if (!wpDetail.value) return null
+  if (!wpDetail.value || projectYear.value == null) return null // 未设置审计年度：页面不渲染底稿，没有可定位的年度
   const ctx = activeSheetContext.value
   const host = (ctx.host === 'onlyoffice' || ctx.host === 'word' || ctx.host === 'grid' || ctx.host === 'html' || ctx.host === 'univer')
     ? ctx.host
@@ -1079,7 +1085,7 @@ const shellLocation = computed<CanonicalWorkpaperLocation | null>(() => {
     contractVersion: GC0_CONTRACT_VERSION,
     organizationId: projectId.value,
     projectId: projectId.value,
-    fiscalYear: projectYear.value || new Date().getFullYear() - 1,
+    fiscalYear: projectYear.value,
     wpId: wpId.value,
     wpCode: wpDetail.value.wp_code || '',
     entryId: null,
@@ -1337,22 +1343,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
 })
-
-async function loadProjectMeta() {
-  try {
-    const proj: any = await httpApi.get(`/api/projects/${projectId.value}`, {
-      validateStatus: (s: number) => s < 600,
-    })
-    projectMeta.value = {
-      scenario: proj?.scenario || 'normal',
-      has_foreign_currency: !!proj?.has_foreign_currency,
-      measurement_model: proj?.measurement_model || 'cost',
-    }
-    projectYear.value = Number(proj?.audit_year) || null
-  } catch {
-    projectMeta.value = { scenario: 'normal', has_foreign_currency: false, measurement_model: 'cost' }
-  }
-}
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
   if (dirty.value) {

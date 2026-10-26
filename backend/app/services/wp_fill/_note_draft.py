@@ -60,7 +60,9 @@ class NoteDraftMixin:
         Returns:
             AIContent: 生成的AI内容记录
         """
-        year_int = int(year) if year else datetime.now().year
+        year_int = int(year) if year else None
+        if year_int is None:
+            raise ValueError("未指定审计年度，无法生成附注初稿")
 
         # 根据章节类型确定相关科目
         section_accounts = self._get_section_accounts(note_section)

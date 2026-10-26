@@ -29,16 +29,18 @@ export interface CompletionRate {
 // ─── 内部计算函数（纯函数，便于测试） ─────────────────────────────────────────
 
 /**
- * A 类：已决策程序数 / 总程序数
- * programs 数组中 status !== 'pending' 视为已决策
+ * A 类：已决策程序数 / 适用程序数
+ * programs 数组中 status !== 'pending' 视为已决策；不适用（裁剪）的程序不计入分子与分母
+ * （spec procedure-trim-generation-delegation-chain 需求 6.5，原先算作已决策）。全部不适用 ⇒ 无须执行，按完成。
  */
 export function calcACompletion(htmlData: Record<string, any>): CompletionRate {
   const programs: any[] = htmlData?.programs ?? []
   if (programs.length === 0) return { filled: 0, total: 0, percentage: 0, category: 'empty' }
 
-  const total = programs.length
-  const filled = programs.filter(p => p.status !== 'pending' && p.status != null).length
-  return buildRate(filled, total)
+  const applicable = programs.filter(p => p?.status !== 'not_applicable')
+  if (applicable.length === 0) return { filled: 0, total: 0, percentage: 100, category: 'complete' }
+  const filled = applicable.filter(p => p.status !== 'pending' && p.status != null).length
+  return buildRate(filled, applicable.length)
 }
 
 /**

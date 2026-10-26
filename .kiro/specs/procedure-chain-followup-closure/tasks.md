@@ -43,4 +43,14 @@
     均是并发会话正在改的文件。前端 29 个文件 230 例过 225，5 例 HEAD 同红（大组件 / 行数预算 / 底稿列表 matrix 页签）。
   - ESLint 0 error，warning 数与 HEAD 相同；单区域 vue-tsc 本 spec 文件对 HEAD 新增 0（A3 修 import 后由 11 降为 0），注入 TS2322 证明非空转；
     并发会话把 `useAuditContext().year` 改成可空后，`ProcedureTrimming.vue` 3 处调用未跟上（登记，未改）。行数门：`wopi_service.py` 改动后 815 行超限，已拆回 797
-- [x] 5.2 INDEX / memory / dev-history；清理探针与临时 worktree（本 spec 无探针/临时 worktree，设计偏离已登记）
+- [x] 5.2 INDEX / memory / dev-history；清理探针与临时 worktree
+  - INDEX 条目移到顶部并按实况改写；memory 合并进上游 spec 条目（仍 300 行）；dev-history 追加勘误条目（并发会话那条照旧保留）；
+    探针目录、两个临时 tsconfig、干净 HEAD 验证 worktree 已删（先拆 `node_modules` 联接再删目录），设计偏离见 design §6
+  - 暂存核对补（2026-10-26，导出暂存树逐项跑）：R2.1 给委派预览加的 `materialization` / `hint` 没登记到契约冻结守卫（`test_task23_zero_regression.py` 在工作区也红）⇒ 已登记；`adjustments.py` 与两份角色验收用例因 spec 名折行被分拣漏掉 ⇒ 已补暂存
+- [x] 5.3 修 5.1 登记未改的两项（2026-10-26，用户要求）：按编码生成表头遇合并单元格模板静默填不上；`test_wopi.py` 单独跑必失败
+  - 表头：做法见 design §6 R3.3 末条。证据：`test_wp_header_fill.py` 39 例（合成工作簿 + 按生成链路建册的 13 个编码：原先抛错的 J2A / K11-4 / B10-2 / L1-1 / J2-5 / J2-6 / A10 / A12 / B13-2
+    与 C21 / A5-3 / S34-16 / E1，另 D2-5 / D4-12 外部链接表头回报）、`test_generate_from_codes_endpoint.py` 新增 4 例（含 A30 逐字节不重存）、前端 `workpaperGenerateResult.spec.ts` 1 例；
+    变异 M1~M19（合并格 / 冒号 / 全名 / 表头页 / A1 说明 / 跟引用 / 示例替换 / 右边有值 / 同格覆盖 / 标准布局 / 重存 / 外部链接 / 异常回报 / 回执 / 提示文字）与前端 F1~F2 全部打红
+  - test_wopi：夹具 `patch("app.core.config.settings")` 换整个对象、替换期间才首次 `from app.main import app` ⇒ 单独跑时 `main.py` 拿到 Mock，`CORS_ORIGINS.split` 当场 AttributeError；
+    改为模块顶层导入应用、夹具只改 `STORAGE_ROOT`。同类 `test_task30_capabilities.py`（替换期间首次导入 67 个模块，之后 `security` / `dsh_discovery` 一直拿着 Mock）⇒ 模块顶层先导入。
+    守卫 `test_settings_patch_isolation.py`：这两个文件各自在新进程单独跑 + 跑完查泄漏；整对象替换只许出现在登记的 9 个文件（AST 判，注释不算）。变异：换回旧版 test_wopi / 删预导入均打红

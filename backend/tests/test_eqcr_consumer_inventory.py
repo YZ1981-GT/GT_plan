@@ -185,12 +185,9 @@ EQCR_CONSUMER_REGISTRY: dict[str, ConsumerEntry] = {
         treatment="保持，范围外",
         rationale="宽权限名单",
     ),
-    "app/services/wp_visibility/role_classifier.py::<module>": ConsumerEntry(
-        purpose="底稿可见性角色分类",
-        recognizes_chinese_alias=False,
-        treatment="保持，范围外",
-        rationale="宽权限名单",
-    ),
+    # role_classifier 的主管名单原为写死的英文角色集合（含 'eqcr' 字面量、不认中文别名）；
+    # spec procedure-trim-generation-delegation-chain 任务 14 改为取 wp_visibility/effective_scope.SUPERVISOR_ROLES，
+    # 后者由 ROLE_MAP（下一条，唯一来源）派生、认「独立复核合伙人」等中文别名 ⇒ 不再含字面量，从登记表移除。
     # ── ROLE_MAP（唯一来源） ──
     "app/services/assignment_service.py::<module>": ConsumerEntry(
         purpose="ROLE_MAP 唯一来源（含 eqcr 与 独立复核合伙人）",

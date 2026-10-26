@@ -675,7 +675,7 @@ const deeplinkHint = ref('')
 const occurrenceTableRef = ref<InstanceType<typeof ElTable>>()
 const postTableRef = ref<InstanceType<typeof ElTable>>()
 
-const year = computed(() => props.year ?? new Date().getFullYear())
+const year = computed<number | null>(() => props.year ?? null)
 
 const allResponsesRef = computed(() => props.allResponses)
 

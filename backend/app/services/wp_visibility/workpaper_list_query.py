@@ -413,7 +413,17 @@ class WorkpaperListQueryService:
         p["limit"] = params.page_size
         p["offset"] = params.offset
         rows = (await self.db.execute(sql, p)).mappings().all()
-        return [self._hydrate(r) for r in rows]
+        items = [self._hydrate(r) for r in rows]
+        # 编制人 / 复核人显示名：原先只回 id，底稿列表的「编制人」恒「—」（spec procedure-chain-followup-closure R3.1）
+        from app.services.user_display_names import resolve_user_display_names
+
+        names = await resolve_user_display_names(
+            self.db, {i["assigned_to"] for i in items} | {i["reviewer"] for i in items},
+        )
+        for item in items:
+            item["assignee_name"] = names.get(item["assigned_to"]) if item["assigned_to"] else None
+            item["reviewer_name"] = names.get(item["reviewer"]) if item["reviewer"] else None
+        return items
 
     @staticmethod
     def _hydrate(r: Mapping[str, Any]) -> dict:

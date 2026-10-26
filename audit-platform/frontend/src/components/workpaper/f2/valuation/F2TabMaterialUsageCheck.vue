@@ -358,7 +358,7 @@
         default-method="random"
         :workpaper-id="wpId"
         :project-id="projectId"
-        :year="auditYear ?? new Date().getFullYear()"
+        :year="auditYear"
         @filled="handleSamplingFilled"
       />
     </el-dialog>

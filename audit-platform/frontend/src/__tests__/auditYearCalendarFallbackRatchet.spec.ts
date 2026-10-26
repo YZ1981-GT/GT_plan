@@ -33,8 +33,42 @@ const TODAY_YEAR = new RegExp(
   'g',
 )
 const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*|<!--)/
-/** 2026-10-25 冻结时的总数。挪动代码可以把条目挪到新文件，但基线总数不得超过它（净增不行）。 */
-const FROZEN_TOTAL_CAP = 340
+/**
+ * 基线总数上限：挪动代码可以把条目挪到新文件，但基线总数不得超过它（净增不行）。只许下调：
+ * 2026-10-25 冻结 340；同日任务 0（程序表字段覆盖写入方改项目审计年度）修掉 14 处 → 326；
+ * 任务 2.2 CALENDAR 日历用途 21 处移入豁免表 → 305。
+ * 任务 3.1 SINGLE_SOURCE 三处去年兜底改返回 null → 301。
+ * 任务 3.2 WRITE 20 处日历兜底修掉 → 281。
+ */
+const FROZEN_TOTAL_CAP = 281
+
+/**
+ * 日历用途豁免表（spec 任务 2.2）：年度选择器上限、年度声明、EQCR 趋势终点等本就该取今年，
+ * 不是「猜审计年度」。豁免须可证伪：该文件仍命中扫描口径（即 `countTodayYear` 不为 0）。
+ * 键 = 相对 `src` 的路径，值 = { count: 豁免处数, reason: 理由 }。
+ */
+const CALENDAR_YEAR_EXEMPT: Record<string, { count: number; reason: string }> = {
+  'components/eqcr/EqcrAnnualDeclarationDialog.vue': { count: 1, reason: 'EQCR 年度独立性声明的「当前年度」标签' },
+  'components/layout/FourColumnCatalog.vue': { count: 1, reason: '四列目录年度筛选器默认值' },
+  'components/layout/MiddleProjectList.vue': { count: 1, reason: '项目列表年度筛选器默认值' },
+  'components/ledger-import/ImportTimeline.vue': { count: 1, reason: '导入时间线年度标签' },
+  'components/ledger-import/LedgerDataManager.vue': { count: 1, reason: '数据集管理器年度筛选器' },
+  'components/report/MultiYearCompare.vue': { count: 2, reason: '多年对比报表年度范围生成（终点=当年）' },
+  'components/template-library/CustomQueryTab.vue': { count: 1, reason: '自定义查询年度下拉默认值' },
+  'components/wizard/MaterialityStep.vue': { count: 1, reason: '向导重要性步骤年度初始值' },
+  'composables/useProjectSelector.ts': { count: 1, reason: 'yearOptions 年度下拉选项（[cur-2, cur-1, cur, cur+1]）上限' },
+  'views/ConsolidationIndex.vue': { count: 1, reason: 'const currentYear 用于年度选择器选项生成' },
+  'views/LedgerImportHistory.vue': { count: 1, reason: 'yearOptions 数组生成（年度下拉上限）' },
+  'views/LedgerPenetration.vue': { count: 1, reason: 'yearOptions 计算（年度下拉上限）' },
+  'views/Materiality.vue': { count: 1, reason: '重要性水平页面年度选择器' },
+  'views/ProjectProgressBoard.vue': { count: 1, reason: '项目进度看板年度选择器' },
+  'views/QCDashboard.vue': { count: 1, reason: 'QC 看板默认取当年评级' },
+  'views/SamplingEnhanced.vue': { count: 1, reason: '增强抽样页面年度选择器' },
+  'views/eqcr/EqcrMetrics.vue': { count: 1, reason: 'EQCR 指标看板默认年度（当年）' },
+  'views/eqcr/EqcrProjectView.vue': { count: 1, reason: 'EQCR 项目视图默认年度' },
+  'views/independence/IndependenceDeclarationForm.vue': { count: 1, reason: '独立性声明表单当前年度' },
+  'views/qc/QcAnnualReports.vue': { count: 1, reason: 'QC 年度报告生成表单默认年度' },
+}
 
 /** 引号成对（`//` 不在字符串里）。 */
 function quotesBalanced(head: string): boolean {
@@ -110,6 +144,11 @@ const NOT_COUNTED = [
   'const e = new Date(row.date).getFullYear()',
 ]
 
+/** 文件的期望总数 = 基线 + 豁免（扫描器同时看到两类，但豁免部分是日历用途不算兜底）。 */
+function expectedCount(rel: string, frozen: Record<string, number>): number {
+  return (frozen[rel] ?? 0) + (CALENDAR_YEAR_EXEMPT[rel]?.count ?? 0)
+}
+
 describe('拿不到审计年度时用今年：只许减少（audit-year-calendar-fallback-ratchet）', () => {
   const { files, counts } = scan()
   const frozen = JSON.parse(readFileSync(BASELINE_PATH, 'utf-8')) as Record<string, number>
@@ -128,10 +167,10 @@ describe('拿不到审计年度时用今年：只许减少（audit-year-calendar
     expect(files).toBeGreaterThan(3000)
   })
 
-  it('没有新增：基线外的文件、或文件里比基线多', () => {
+  it('没有新增：基线外的文件、或文件里比基线多（豁免部分不算）', () => {
     const grown = Object.entries(counts)
-      .filter(([rel, n]) => n > (frozen[rel] ?? 0))
-      .map(([rel, n]) => `${rel}：基线 ${frozen[rel] ?? 0} → 现算 ${n}`)
+      .filter(([rel, n]) => n > expectedCount(rel, frozen))
+      .map(([rel, n]) => `${rel}：期望 ${expectedCount(rel, frozen)}（基线 ${frozen[rel] ?? 0} + 豁免 ${CALENDAR_YEAR_EXEMPT[rel]?.count ?? 0}）→ 现算 ${n}`)
     expect(
       grown,
       '审计年度请取项目年度，取不到如实提示，不要用今年兜底；只是把代码挪到别的文件时，把基线条目一起挪过去',
@@ -140,8 +179,8 @@ describe('拿不到审计年度时用今年：只许减少（audit-year-calendar
 
   it('基线只许变小：已修掉的请把基线下调到现算值（为 0 删掉该行）', () => {
     const stale = Object.entries(frozen)
-      .filter(([rel, n]) => (counts[rel] ?? 0) < n)
-      .map(([rel, n]) => `${rel}：基线 ${n} → 现算 ${counts[rel] ?? 0}`)
+      .filter(([rel, n]) => (counts[rel] ?? 0) < n + (CALENDAR_YEAR_EXEMPT[rel]?.count ?? 0))
+      .map(([rel, n]) => `${rel}：期望 ${n + (CALENDAR_YEAR_EXEMPT[rel]?.count ?? 0)} → 现算 ${counts[rel] ?? 0}`)
     expect(stale).toEqual([])
   })
 
@@ -150,5 +189,18 @@ describe('拿不到审计年度时用今年：只许减少（audit-year-calendar
     expect(keys).toEqual([...keys].sort())
     expect(Object.values(frozen).filter((n) => !Number.isInteger(n) || n <= 0)).toEqual([])
     expect(Object.values(frozen).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(FROZEN_TOTAL_CAP)
+  })
+
+  it('豁免表可证伪：豁免的文件仍命中扫描口径', () => {
+    const missing = Object.entries(CALENDAR_YEAR_EXEMPT)
+      .filter(([rel]) => !counts[rel])
+      .map(([rel]) => `${rel}：豁免了 ${CALENDAR_YEAR_EXEMPT[rel].count} 处但扫描结果为 0（豁免失效）`)
+    expect(missing, '豁免的文件已不命中扫描口径，请从豁免表中删除').toEqual([])
+  })
+
+  it('豁免表规范（键已排序、值为正整数）', () => {
+    const keys = Object.keys(CALENDAR_YEAR_EXEMPT)
+    expect(keys).toEqual([...keys].sort())
+    expect(Object.values(CALENDAR_YEAR_EXEMPT).filter((e) => !Number.isInteger(e.count) || e.count <= 0)).toEqual([])
   })
 })

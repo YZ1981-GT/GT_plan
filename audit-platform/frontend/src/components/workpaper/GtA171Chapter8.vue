@@ -105,7 +105,7 @@ import { api } from '@/services/apiProxy'
 
 interface SignificantItem { sheet: string; name: string; prior: string; current: string; pct: number | null; status: string }
 
-const props = defineProps<{ wpId: string; projectId: string }>()
+const props = defineProps<{ wpId: string; projectId: string; year?: number | null }>()
 
 // ─── Auto data from A1-13/A1-14 ───
 const autoLoading = ref(false)
@@ -125,8 +125,11 @@ async function loadAutoData() {
   if (!props.projectId) return
   autoLoading.value = true
   try {
-    // 从 projectId 推断年份(后端auto-data端点要求year参数)
-    const yearParam = new Date().getFullYear()
+    const yearParam = props.year
+    if (yearParam == null) {
+      ElMessage.warning('未设置审计年度，无法读取分析数据')
+      return
+    }
     const res = await api.get<any>(
       `/api/projects/${props.projectId}/auto-data/a17_ch08_analytical_review`,
       { params: { year: yearParam }, _silent: true } as any,

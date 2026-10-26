@@ -52,8 +52,12 @@ pytestmark = pytest.mark.asyncio
 # ---------------------------------------------------------------------------
 # setup helper：一名合法自然人（user↔staff 唯一 active 映射）+ 底稿/实例
 # ---------------------------------------------------------------------------
-async def _setup_person(s, project, *, cycle="D", scope="D", role="manager"):
-    """在 project 内建立唯一 active staff↔user 映射 + scope。"""
+async def _setup_person(s, project, *, cycle="D", scope="D", role="auditor"):
+    """在 project 内建立唯一 active staff↔user 映射 + scope。
+
+    默认角色由 manager 改为 auditor（spec procedure-trim-generation-delegation-chain 需求 5 用户裁决：
+    经理 / 合伙人 / 质控 / EQCR 默认看全部循环、委派不做跨循环校验）—— 本文件的跨循环用例要的是受限成员。
+    """
     user = await mk_user(s)
     staff = await mk_staff(s, user_id=user.id)
     await mk_assignment(s, project.id, staff.id, role=role)
@@ -68,6 +72,68 @@ async def _setup_wp(s, project, *, cycle="D", wp_code="D2"):
         s, project.id, audit_cycle=cycle, wp_code=wp_code, wp_id=wp.id
     )
     return wi, wp, inst
+
+
+async def _cleanup_committed(project_id, staff_ids, user_ids) -> None:
+    """已提交 setup 的收尾（只有并发 / 崩溃恢复两个用例必须真提交）。
+
+    🔴 ``workpaper_delegation_history`` 与 ``wp_visibility_invalidation_outbox`` 有 append-only 触发器，
+    原清理在同一事务里先 DELETE 这两张表 ⇒ 第一条就失败、事务中止，后面全部静默失败，每跑一次留下一个
+    可见的 ``proj_xxxxxxxx`` 项目及其人员（2026-10-24 真库现算 64 个，60 个此前已手工软删）。
+    现在：先在一个事务里开受控维护开关（V113 触发器的 ``app.wp_visibility_maintenance``）按外键顺序硬删；
+    任何一步失败（别的表还引用）整体回滚，退回逐条语句软删（项目 / 底稿 / 人员 / 用户）。
+    """
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from app.core.config import settings as app_settings
+
+    hard = (
+        "DELETE FROM wp_visibility_invalidation_outbox WHERE project_id = :p",
+        "DELETE FROM wp_access_security_outbox WHERE project_id = :p",
+        "DELETE FROM workpaper_delegation_history WHERE project_id = :p",
+        "DELETE FROM wp_visibility_policy_epoch WHERE project_id = :p",
+        "DELETE FROM procedure_instances WHERE project_id = :p",
+        "DELETE FROM project_assignments WHERE project_id = :p",
+        "DELETE FROM project_users WHERE project_id = :p",
+        "DELETE FROM working_paper WHERE project_id = :p",
+        "DELETE FROM wp_index WHERE project_id = :p",
+        "DELETE FROM staff_members WHERE id = ANY(:s)",
+        "DELETE FROM users WHERE id = ANY(:u)",
+        "DELETE FROM projects WHERE id = :p",
+    )
+    engine = create_async_engine(app_settings.DATABASE_URL)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(sa.text("SET LOCAL app.wp_visibility_maintenance = 'on'"))
+            values = {"p": project_id, "s": list(staff_ids), "u": list(user_ids)}
+            for sql in hard:
+                await conn.execute(sa.text(sql), {k: v for k, v in values.items() if f":{k}" in sql})
+        return
+    except Exception:  # noqa: BLE001 — 硬删不成退回软删
+        pass
+    finally:
+        await engine.dispose()
+
+    stmts = (
+        ("DELETE FROM procedure_instances WHERE project_id = :p", {"p": project_id}),
+        ("DELETE FROM project_assignments WHERE project_id = :p", {"p": project_id}),
+        ("DELETE FROM project_users WHERE project_id = :p", {"p": project_id}),
+        ("UPDATE working_paper SET is_deleted = true WHERE project_id = :p", {"p": project_id}),
+        ("UPDATE wp_index SET is_deleted = true WHERE project_id = :p", {"p": project_id}),
+        ("UPDATE staff_members SET is_deleted = true WHERE id = ANY(:ids)", {"ids": list(staff_ids)}),
+        ("UPDATE users SET is_deleted = true, is_active = false WHERE id = ANY(:ids)", {"ids": list(user_ids)}),
+        ("UPDATE projects SET is_deleted = true WHERE id = :p", {"p": project_id}),
+    )
+    engine = create_async_engine(app_settings.DATABASE_URL)
+    try:
+        for sql, params in stmts:
+            try:
+                async with engine.begin() as conn:
+                    await conn.execute(sa.text(sql), params)
+            except Exception:  # noqa: BLE001 — 单条失败不拖累其余
+                pass
+    finally:
+        await engine.dispose()
 
 
 async def test_lead_two_layer_same_person(session):
@@ -559,35 +625,7 @@ async def test_concurrent_reassignment_serialized(session):
             assert hist_n == 2
         await verify_engine.dispose()
     finally:
-        # 显式清理（FK 安全顺序）
-        clean_engine = create_async_engine(app_settings.DATABASE_URL)
-        async with AsyncSession(clean_engine) as s:
-            pid = ids["project"]
-            for stmt in (
-                sa.text("DELETE FROM wp_visibility_invalidation_outbox WHERE project_id=:p"),
-                sa.text("DELETE FROM wp_visibility_policy_epoch WHERE project_id=:p"),
-                sa.text("DELETE FROM workpaper_delegation_history WHERE project_id=:p"),
-                sa.text("DELETE FROM procedure_instances WHERE project_id=:p"),
-                sa.text("DELETE FROM working_paper WHERE project_id=:p"),
-                sa.text("DELETE FROM wp_index WHERE project_id=:p"),
-                sa.text("DELETE FROM project_assignments WHERE project_id=:p"),
-                sa.text("DELETE FROM project_users WHERE project_id=:p"),
-                sa.text("DELETE FROM staff_members WHERE id = ANY(:ids)"),
-                sa.text("DELETE FROM users WHERE id = ANY(:ids)"),
-                sa.text("DELETE FROM projects WHERE id=:p"),
-            ):
-                try:
-                    if "staff_members" in stmt.text or "FROM users" in stmt.text:
-                        await s.execute(
-                            stmt, {"ids": [ids["st1"], ids["st2"]] if "staff" in stmt.text
-                                    else [ids["u1"], ids["u2"]]}
-                        )
-                    else:
-                        await s.execute(stmt, {"p": pid})
-                except Exception:  # noqa: BLE001
-                    pass
-            await s.commit()
-        await clean_engine.dispose()
+        await _cleanup_committed(ids["project"], [ids["st1"], ids["st2"]], [ids["u1"], ids["u2"]])
     await setup_engine.dispose()
 
 
@@ -647,31 +685,5 @@ async def test_crash_recovery_outbox_persisted(session):
             assert ob[0].delivery_state == "pending"  # fan-out 未投递，等待恢复重投
         await verify_engine.dispose()
     finally:
-        clean_engine = create_async_engine(app_settings.DATABASE_URL)
-        async with AsyncSession(clean_engine) as s:
-            pid = ids["project"]
-            for stmt in (
-                sa.text("DELETE FROM wp_visibility_invalidation_outbox WHERE project_id=:p"),
-                sa.text("DELETE FROM wp_visibility_policy_epoch WHERE project_id=:p"),
-                sa.text("DELETE FROM workpaper_delegation_history WHERE project_id=:p"),
-                sa.text("DELETE FROM procedure_instances WHERE project_id=:p"),
-                sa.text("DELETE FROM working_paper WHERE project_id=:p"),
-                sa.text("DELETE FROM wp_index WHERE project_id=:p"),
-                sa.text("DELETE FROM project_assignments WHERE project_id=:p"),
-                sa.text("DELETE FROM project_users WHERE project_id=:p"),
-                sa.text("DELETE FROM staff_members WHERE id=:sid"),
-                sa.text("DELETE FROM users WHERE id=:uid"),
-                sa.text("DELETE FROM projects WHERE id=:p"),
-            ):
-                try:
-                    params = {"p": pid}
-                    if ":sid" in stmt.text:
-                        params = {"sid": ids["staff"]}
-                    elif ":uid" in stmt.text:
-                        params = {"uid": ids["user"]}
-                    await s.execute(stmt, params)
-                except Exception:  # noqa: BLE001
-                    pass
-            await s.commit()
-        await clean_engine.dispose()
+        await _cleanup_committed(ids["project"], [ids["staff"]], [ids["user"]])
     await setup_engine.dispose()

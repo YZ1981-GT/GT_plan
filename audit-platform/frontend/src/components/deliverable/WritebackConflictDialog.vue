@@ -158,8 +158,13 @@ async function onSubmit(): Promise<void> {
 
   try {
     const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/writeback`
+    const year = props.year
+    if (year == null) {
+      ElMessage.warning('未设置审计年度，无法提交回填裁决')
+      return
+    }
     await api.post(url, {
-      year: props.year || new Date().getFullYear(),
+      year,
       resolutions: resolutions.value,
     })
 

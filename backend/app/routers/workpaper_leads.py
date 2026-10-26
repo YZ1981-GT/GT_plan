@@ -13,7 +13,8 @@ Feature: procedure-mainline-convergence / 需求 5、设计 §2
 原子性与副作用完全复用 ``ProcedureService.assign_procedures``
 → ``DelegationTransactionService.delegate_lead``（同事务写权威 + 投影 +
 统一委派历史 + policy epoch + invalidation outbox）。任一 assignment 校验失败
-抛 ``DelegationError`` → 本路由回滚整批（不 commit），返回 400。
+抛 ``DelegationError`` → 本路由回滚整批（不 commit），返回 400（已裁 / 在回收站 409，读不到裁剪结果 503），
+错误体 ``{error, reason, message, cycles}``；``reason == "out_of_scope"`` 时前端带理由与 ``expand_scope`` 重试。
 
 授权：项目级 Delegator 守卫（fail-closed 403）。
 约定：service 只 flush；router 显式 commit。
@@ -51,6 +52,10 @@ class WorkpaperLeadAssignment(BaseModel):
 
 class WorkpaperLeadRequest(BaseModel):
     assignments: list[WorkpaperLeadAssignment] = Field(min_length=1)
+    # 被委派人可见范围不含目标循环时，确认后带理由重试 ⇒ 同事务扩大其可见范围
+    # （spec procedure-trim-generation-delegation-chain 需求 4.4）
+    expand_scope: bool = False
+    scope_reason: str | None = Field(default=None, max_length=500)
 
 
 @router.put("/{pid}/workpaper-leads")
@@ -70,14 +75,14 @@ async def set_workpaper_leads(
             pid,
             [a.model_dump() for a in body.assignments],
             actor_user_id=getattr(user, "id", None),
+            expand_scope=body.expand_scope,
+            scope_reason=body.scope_reason,
         )
     except DelegationError as exc:
-        # fail-closed：整批回滚，不留半成品委派
+        # fail-closed：整批回滚，不留半成品委派；错误体带中文原因与缺少的循环（前端据此提示扩权重试）。
+        # 状态码：已裁 / 在回收站 409，读不到裁剪结果 503，其余 400
         await db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "lead_delegation_rejected", "reason": exc.reason.value},
-        ) from exc
+        raise HTTPException(status_code=exc.http_status, detail=exc.http_detail()) from exc
     except Exception:
         await db.rollback()
         raise

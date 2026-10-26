@@ -521,7 +521,9 @@ async def _setup_person(s, project, *, scope="D"):
 
     user = await mk_user(s)
     staff = await mk_staff(s, user_id=user.id)
-    await mk_assignment(s, project.id, staff.id, role="manager")
+    # 团队角色用审计员：经理 / 合伙人 / 质控 / EQCR 默认看全部循环、委派免检、不扩权（用户裁决，
+    # spec procedure-trim-generation-delegation-chain 需求 4），原 manager 夹具测不到扩权写入
+    await mk_assignment(s, project.id, staff.id, role="auditor")
     await mk_project_user(s, project.id, user.id, role="auditor", scope_cycles=scope)
     await s.flush()
     return user, staff

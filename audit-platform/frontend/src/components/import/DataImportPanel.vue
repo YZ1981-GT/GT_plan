@@ -169,7 +169,7 @@ const props = defineProps<{
 const form = reactive({
   sourceType: 'generic',
   dataType: '',
-  year: new Date().getFullYear(),
+  year: null,
 })
 
 const selectedFile = ref<File | null>(null)
@@ -187,7 +187,10 @@ function handleFileRemove() {
 }
 
 async function startImport() {
-  if (!selectedFile.value || !form.dataType) return
+  if (!selectedFile.value || !form.dataType || form.year == null) {
+    if (form.year == null) ElMessage.warning('未设置审计年度，无法导入数据')
+    return
+  }
 
   // 1. 先检查是否有重复数据
   try {

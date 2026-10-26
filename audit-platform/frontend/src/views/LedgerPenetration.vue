@@ -1395,7 +1395,7 @@ const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => {
   const q = Number(route.query.year)
   if (q && q > 2000) return q
-  return new Date().getFullYear() - 1
+  return null
 })
 
 // 金额单位（从 active dataset 的 source_summary.amount_unit 读取）

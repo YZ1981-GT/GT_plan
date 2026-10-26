@@ -13,6 +13,7 @@ import { expandMultiAccountVouchers } from './expandMultiAccountVouchers'
 import type { ExtractedVoucher, FillMode } from './useCutoffAutoSampling'
 import type { ChecklistResponse } from './useF1FormData'
 import { G9_ACCOUNT_CODE, G9_RISK_LEVEL_OPTIONS } from './g9Constants'
+import { writeProgramStepOverrides } from './programStepOverrides'
 import {
   buildG9VoucherCrossSnapshot,
   buildG9VoucherLinkHints,
@@ -465,31 +466,9 @@ async function markG9AProcedureSteps(opts: {
   executionSummary?: string
 }): Promise<number> {
   if (!opts.projectId || !opts.programNos.length) return 0
-  const { api } = await import('@/services/apiProxy')
-  const year = opts.year || new Date().getFullYear()
-  const scope = `procedure_table:${G9A_PROCEDURE_SHEET}`
   const status = opts.status || 'completed'
-  let n = 0
-  for (const programNo of opts.programNos) {
-    const fields: Array<{ field: string; value: unknown }> = [
-      { field: 'status', value: status },
-    ]
-    if (opts.linkedWorkpapers) fields.push({ field: 'linked_workpapers', value: opts.linkedWorkpapers })
-    if (opts.executionSummary) fields.push({ field: 'execution_summary', value: opts.executionSummary })
-    for (const f of fields) {
-      try {
-        await api.post('/api/workpapers/field-overrides', {
-          project_id: opts.projectId,
-          year,
-          scope,
-          item_key: String(programNo),
-          field: f.field,
-          value: f.value,
-        }, { _silent: true } as any)
-        if (f.field === 'status') n += 1
-      } catch { /* silent */ }
-    }
-  }
+  // scope 用表码、年度缺省取项目审计年度（与读取方一致，audit-year R0）
+  const n = await writeProgramStepOverrides({ ...opts, sheet: G9A_PROCEDURE_SHEET, status })
   try {
     window.dispatchEvent(new CustomEvent('g9:procedure-marked', {
       detail: { programNos: [...opts.programNos], status, timestamp: Date.now() },
@@ -777,7 +756,11 @@ export function useG9VoucherCheck(opts: {
     }
 
     a13Pushing.value = true
-    const year = opts.year?.value || new Date().getFullYear()
+    const year = opts.year?.value
+    if (year == null) {
+      ElMessage.warning('未设置审计年度，无法创建未更正错报')
+      return 0
+    }
     let created = 0
     try {
       const { createMisstatement } = await import('@/services/auditPlatformApi')

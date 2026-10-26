@@ -333,7 +333,7 @@ const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => 
 
 // ─── Year ────────────────────────────────────────────────────────────────────
 
-const year = computed(() => props.year ?? new Date().getFullYear())
+const year = computed<number | null>(() => props.year ?? null)
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 

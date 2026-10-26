@@ -37,6 +37,8 @@ export const workpapers = {
   customRefreshProjection: (wpId: string) => `/api/workpapers/${wpId}/custom-refresh-projection`,
   formulas: (wpId: string) => `/api/workpapers/${wpId}/formulas`,
   formulaDetail: (wpId: string, formulaId: string) => `/api/workpapers/${wpId}/formulas/${formulaId}`,
+  // 程序表行级访问：本人能改哪些行、能否裁剪、各行执行人（spec procedure-trim-generation-delegation-chain 需求 7）
+  programRowAccess: (wpId: string) => `/api/workpapers/${wpId}/program-row-access`,
   structure: {
     get: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/structure`,
     rebuild: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/structure/rebuild`,
@@ -220,6 +222,14 @@ export const procedureRowTasks = {
   trimSaveScheme: (pid: string) => `/api/projects/${pid}/procedure-trim/schemes`,
   trimRowNotApplicable: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-trim/rows/${taskId}/not-applicable`,
   trimRowRestore: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-trim/rows/${taskId}/restore`,
+  // 程序表控制台按行裁剪 / 恢复：按底稿 + 程序表页 + 程序号定位任务（spec procedure-trim-generation-delegation-chain 需求 6）
+  trimProgramRow: (pid: string, wpId: string) =>
+    `/api/projects/${pid}/procedure-trim/workpapers/${wpId}/program-rows/not-applicable`,
+  restoreProgramRow: (pid: string, wpId: string) =>
+    `/api/projects/${pid}/procedure-trim/workpapers/${wpId}/program-rows/restore`,
+  // 控制台逐行委派：取 / 建这一程序行的任务（程序行任务开关关闭时也可用，spec procedure-chain-followup-closure R2.2）
+  programRowTask: (pid: string, wpId: string) =>
+    `/api/projects/${pid}/procedure-trim/workpapers/${wpId}/program-rows/task`,
   /**
    * 驳回裁剪建议（procedure-trimming-and-delegation-intelligence Task 13）。
    *

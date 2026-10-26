@@ -292,7 +292,11 @@ function normLabelForMatch(s: unknown): string {
 
 async function pullMonthlyFromLedger() {
   if (isReadonly.value) return
-  const year = Number(auditCtx.year?.value || new Date().getFullYear())
+  const year = auditCtx.year?.value
+  if (year == null) {
+    ElMessage.warning('未设置审计年度，无法读取序时账')
+    return
+  }
   try {
     await ElMessageBox.confirm(
       `将从序时账拉取 ${year} 年度科目 2211（应付职工薪酬）的贷方发生额按明细科目×月汇总，直接回填月度分析表各月列。是否继续？`,

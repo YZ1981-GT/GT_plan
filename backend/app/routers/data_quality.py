@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_audit_year
 from app.models.core import User
 from app.services.data_quality_service import DataQualityService
 from app.services.ledger_import.sign_convention_guard import check_sign_convention_readiness
@@ -25,7 +25,7 @@ router = APIRouter(
 async def run_data_quality_check(
     project_id: UUID,
     checks: str = Query("all", description="要执行的检查项，逗号分隔或 all"),
-    year: int = Query(2025, description="检查年度"),
+    year: int | None = Query(None, description="检查年度"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -54,6 +54,7 @@ async def run_data_quality_check(
         checks = ",".join(resolved)
 
     service = DataQualityService(db)
+    year = await require_project_audit_year(db, project_id, year)
     result = await service.run_checks(project_id, year, checks)
 
     # 过渡期语义（Task 7.1 / 需求 10）：检测 v1 残留，附加 warning 不阻断

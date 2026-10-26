@@ -1090,7 +1090,7 @@ function onProjectChange(newId: string) {
 }
 
 // 年度选择器
-const selectedYear = ref(new Date().getFullYear() - 1)
+const selectedYear = ref<number | null>(null)
 const yearOptions = computed(() => projectStore.yearOptions)
 function onYearChange(val: number) {
   selectedYear.value = val
@@ -1112,7 +1112,7 @@ async function onTemplateTypeChange(val: string) {
 // ─── Other UI state ─────────────────────────────────────────────────────────
 const showDocAiChat = ref(false)
 
-const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear() - 1)
+const year = computed<number | null>(() => routeYear.value ?? projectYear.value ?? null)
 
 const activeTab = ref('balance_sheet')
 const reportMode = ref<'audited' | 'unadjusted' | 'compare'>('audited')
@@ -1473,7 +1473,7 @@ async function _ensureProjectYearWrapper() {
   await ensureProjectYear()
   // Sync main-file-owned state from composable results
   projectYear.value = reportData._fetchedAuditYear.value
-  selectedYear.value = projectYear.value || new Date().getFullYear() - 1
+  selectedYear.value = projectYear.value ?? null
   selectedTemplateType.value = templateType.value
 }
 

@@ -727,9 +727,15 @@ async function handlePullFromLossCheck() {
     if (!Array.isArray(v2Rows)) v2Rows = []
   }
 
+  // 新旧两条取数路径都要审计年度（届满判断按年度算），取不到如实提示、不按日历猜
+  const year = props.year
+  if (year == null) {
+    ElMessage.warning('未设置审计年度，无法从 N1-5 取数')
+    return
+  }
+
   if (v2Rows.length > 0) {
     // 新模型取数：按源模板结构派生（同 useN1LossCheck 公式）
-    const year = props.year || new Date().getFullYear()
     let base = 0
     let asset = 0
     for (const row of v2Rows) {
@@ -759,7 +765,7 @@ async function handlePullFromLossCheck() {
   // 回退旧键 N1-5-loss-rows（legacy 兼容）
   const rows = deriveDisclosureLossRows(
     formData.allResponses.value,
-    props.year || new Date().getFullYear(),
+    year,
   )
   if (rows.length === 0) {
     ElMessage.warning('N1-5 亏损检查表暂无数据，请先编制 N1-5')

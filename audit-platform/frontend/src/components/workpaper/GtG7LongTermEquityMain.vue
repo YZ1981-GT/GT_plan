@@ -448,13 +448,13 @@ async function switchRenderMode(target: 'html' | 'onlyoffice'): Promise<void> {
 }
 
 // ─── 合并联动 stale 常驻提示（Task 6.1，只读；失败静默降级 Property 12）────
-const auditYear = computed<number>(() => {
+const auditYear = computed<number | null>(() => {
   const ctx = (resolvedHtmlData.value?.project_context ?? {}) as Record<string, any>
   const y = ctx.audit_year ?? ctx.auditYear
   if (y) return Number(y)
   const bs = ctx.bs_date ?? ctx.bsDate
   if (typeof bs === 'string' && bs.length >= 4) return Number(bs.slice(0, 4))
-  return new Date().getFullYear()
+  return null
 })
 const linkageStale = useG7ConsolLinkageEntry(projectIdRef, auditYear)
 function handleLinkageChanged(): void {

@@ -14,8 +14,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pathlib import Path
 import json
 from typing import Any, Optional
+from uuid import UUID
 
-from app.deps import get_current_user
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.deps import get_current_user, require_project_audit_year
 
 router = APIRouter(prefix="/api/address-registry/v2", tags=["地址坐标-变更影响分析(V2/linkage)"])
 
@@ -301,6 +305,7 @@ async def get_dependencies(
 @router.post("/notify-cell-change")
 async def notify_cell_change(
     body: dict,
+    db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ) -> dict:
     """通知单元格变更，返回 stale 传播链路（前端编辑器调用）"""
@@ -309,7 +314,13 @@ async def notify_cell_change(
     cell = body.get("cell", "")
     max_depth = int(body.get("max_depth", 3))
     project_id = body.get("project_id", "")
-    year = int(body.get("year", 2025))
+    requested_year = body.get("year")
+    year = requested_year
+    if project_id:
+        try:
+            year = await require_project_audit_year(db, UUID(str(project_id)), requested_year)
+        except ValueError as exc:
+            raise HTTPException(422, "未设置审计年度，请先在项目基本信息中填写") from exc
 
     if not wp_code:
         raise HTTPException(400, "wp_code is required")

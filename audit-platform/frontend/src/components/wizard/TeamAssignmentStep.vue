@@ -362,7 +362,7 @@ watch(showRefProjectDialog, async (v) => {
     selectedRefProject.value = null
     refProjectsLoading.value = true
     try {
-      const res = await api.get(P_proj.list())
+      const res = await api.get(P_proj.list)
       const allProjects = res?.items || res || []
       // 排除当前项目，只显示有成员的历史项目
       refProjects.value = allProjects
@@ -556,13 +556,43 @@ async function quickCreateStaff() {
   } finally { creating.value = false }
 }
 
+function persistAssignments() {
+  return saveAssignments(props.projectId as string, members.value.map(m => ({
+    staff_id: m.staff_id, role: m.role, assigned_cycles: m.assigned_cycles,
+  })))
+}
+
+// 已加载的团队分配（null = 没加载成功）：save() 据此判断有没有改动、能不能保存
+let loadedSnapshot: string | null = null
+function snapshotOf(list: MemberRow[]): string {
+  return JSON.stringify(list.map(m => [m.staff_id, m.role, [...(m.assigned_cycles || [])].sort()]).sort())
+}
+
+/**
+ * 只保存团队分配、不写向导状态（项目详情面板「人员委派」弹窗关闭时调用；原先关闭只是隐藏，勾选从未落库）。
+ * 没改动不提交（保存会重写全部分配并逐人发委派通知）；成员列表没加载成功时不提交（免得空列表覆盖已有分配）。
+ * 返回 false = 保存失败，调用方不要关闭弹窗。
+ */
+async function save(): Promise<boolean> {
+  if (!props.projectId) return true
+  if (loadedSnapshot === null) {
+    ElMessage.warning('成员列表未加载成功，本次未保存团队分配')
+    return true
+  }
+  if (snapshotOf(members.value) === loadedSnapshot) return true
+  try {
+    await persistAssignments()
+  } catch (e) { handleApiError(e, '保存委派失败'); return false }
+  loadedSnapshot = snapshotOf(members.value)
+  ElMessage.success('团队分配已保存')
+  return true
+}
+
 async function validate(): Promise<boolean> {
   // 保存到 project_assignments 表
   if (props.projectId) {
     try {
-      await saveAssignments(props.projectId, members.value.map(m => ({
-        staff_id: m.staff_id, role: m.role, assigned_cycles: m.assigned_cycles,
-      })))
+      await persistAssignments()
     } catch (e) { handleApiError(e, '保存委派失败'); return false }
   }
   // 保存到 wizard_state
@@ -572,7 +602,7 @@ async function validate(): Promise<boolean> {
   return true
 }
 
-defineExpose({ validate })
+defineExpose({ validate, save })
 
 onMounted(async () => {
   // #1 首次进入自动弹出操作手册
@@ -588,11 +618,12 @@ onMounted(async () => {
         staff_id: a.staff_id, staff_name: a.staff_name || '', staff_title: a.staff_title || '',
         employee_no: a.employee_no || '', role: a.role, assigned_cycles: a.assigned_cycles || [],
       }))
-    } catch { /* ignore */ }
+      loadedSnapshot = snapshotOf(members.value)
+    } catch { /* ignore：save() 不会用没加载成功的空列表覆盖已有分配 */ }
   }
-  // 从 wizard_state 恢复
+  // 从 wizard_state 恢复（只认同一项目的向导状态：项目详情面板里向导 store 可能还留着别的项目）
   const saved = wizardStore.stepData?.team_assignment as any
-  if (saved?.members && members.value.length === 0) {
+  if (saved?.members && members.value.length === 0 && (!props.projectId || wizardStore.projectId === props.projectId)) {
     members.value = saved.members
   }
 })

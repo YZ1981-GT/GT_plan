@@ -37,7 +37,7 @@
           :workpaper-id="wpId"
           :account-code="samplingAccountCode"
           phase="final"
-          :year="year ?? new Date().getFullYear()"
+          :year="year"
           @filled="handleSamplingFilled"
         />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="adj.addRow">+ 新增行</el-button>

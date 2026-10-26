@@ -595,6 +595,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * → 检查比例 → 说明/结论；平台增强 CAS21 终止损益 + H9 同步
  */
 import { computed, ref, toRef, inject, type Ref } from 'vue'
+import { useAuditContext } from '@/composables/useAuditContext'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   useH8DisposalCheck,
@@ -641,7 +642,8 @@ const showSampling = ref(false)
 const isReadonly = toRef(props, 'isReadonly')
 const projectId = toRef(props, 'projectId')
 const wpId = toRef(props, 'wpId')
-const samplingYear = computed(() => new Date().getFullYear())
+const { year: auditYear } = useAuditContext()
+const samplingYear = computed<number | null>(() => auditYear.value ?? null)
 
 const {
   rows,

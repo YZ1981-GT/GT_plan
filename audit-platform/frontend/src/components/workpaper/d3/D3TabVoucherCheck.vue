@@ -720,7 +720,7 @@ const showSampling = ref(false)
 const samplingSection = ref<'current' | 'postPeriod'>('current')
 
 /** 抽凭总体年度：优先父级传入，缺省取上一年度 */
-const engineYear = computed(() => props.year ?? (new Date().getFullYear() - 1))
+const engineYear = computed<number | null>(() => props.year ?? null)
 
 /**
  * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
@@ -745,7 +745,7 @@ const importingAttached = ref(false)
 const D3_ACCOUNT_PREFIXES = computed(() => dSlotQueryCodes('D3', _injectedTbSrc?.value ?? null))
 
 async function refreshAttachedCount(): Promise<void> {
-  if (!props.projectId || !props.wpId) return
+  if (!props.projectId || !props.wpId || engineYear.value == null) return
   try {
     const recs = await listAttachedVouchers(props.projectId, engineYear.value, props.wpId, true)
     attachedCount.value = recs.length
@@ -756,7 +756,10 @@ async function refreshAttachedCount(): Promise<void> {
 void refreshAttachedCount()
 
 async function importFromAttached(): Promise<void> {
-  if (props.isReadonly) return
+  if (props.isReadonly || engineYear.value == null) {
+    if (engineYear.value == null) ElMessage.warning('未设置审计年度，无法读取序时账凭证')
+    return
+  }
   importingAttached.value = true
   try {
     const { samples, misattached } = await pullSamplesForWorkpaper(

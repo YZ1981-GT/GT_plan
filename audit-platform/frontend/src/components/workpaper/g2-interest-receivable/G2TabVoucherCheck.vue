@@ -732,7 +732,7 @@ const tabOptions = [
 
 const year = computed(() => {
   if (props.bsDate && props.bsDate.length >= 4) return parseInt(props.bsDate.slice(0, 4), 10)
-  return new Date().getFullYear() - 1
+  return props.bsDate && props.bsDate.length >= 4 ? parseInt(props.bsDate.slice(0, 4), 10) : null
 })
 
 const ratioPct = computed(() => vc.inspectionRatio.value)

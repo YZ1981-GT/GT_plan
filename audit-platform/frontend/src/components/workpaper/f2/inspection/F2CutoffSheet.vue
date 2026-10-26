@@ -821,7 +821,7 @@ onMounted(hydrateAudit)
 const year = computed(() => {
   const d = props.bsDate || ''
   if (d.length >= 4) return parseInt(d.slice(0, 4), 10)
-  return new Date().getFullYear() - 1
+  return null
 })
 
 const cutoff = useF2CutoffSheet({

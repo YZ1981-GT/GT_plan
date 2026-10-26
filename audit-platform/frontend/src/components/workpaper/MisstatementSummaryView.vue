@@ -107,9 +107,7 @@ const resolvedProjectId = computed(
   () => props.projectId || (route.params.projectId as string) || '',
 )
 /** 从路由或 prop 取 year */
-const resolvedYear = computed(
-  () => props.year || parseInt(route.query.year as string) || projectStore.year || new Date().getFullYear() - 1,
-)
+const resolvedYear = computed<number | null>(() => props.year || parseInt(route.query.year as string) || projectStore.year || null)
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 

@@ -538,7 +538,8 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 对齐源模板 54 列：4 区段 Tab + 未审/期初调整/账项调整/审定 + 净值 + 核对标志 + 结论 A/B/C
  */
 import { ref, computed, toRef, inject, onMounted, defineComponent, h } from 'vue'
-import { ElMessageBox, ElInputNumber } from 'element-plus'
+import { ElMessage, ElMessageBox, ElInputNumber } from 'element-plus'
+import { fetchProjectAuditYear } from '@/composables/useProjectAuditYear'
 import {
   useH1Detail,
   type DetailRow,
@@ -597,7 +598,12 @@ onMounted(() => {
 // ─── 从序时账取数（资产类科目1601 借方=增加 贷方=减少）────────────────────────
 const ledgerPulling = ref(false)
 async function handlePullFromLedger() {
-  const year = new Date().getFullYear() - 1
+  // 取项目审计年度（原先按今年 / 去年猜）；取不到如实提示
+  const { year, failed } = await fetchProjectAuditYear(props.projectId)
+  if (year == null) {
+    ElMessage.warning(failed ? '读取项目审计年度失败，请稍后重试' : '未设置审计年度，无法读取序时账')
+    return
+  }
   ledgerPulling.value = true
   try {
     const result = await pullAssetMovementFromLedger(props.projectId, year, '1601')

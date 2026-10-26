@@ -245,10 +245,10 @@ const adjudicationPrefill = computed<Array<{ name: string; unadjustedDebit: numb
 )
 
 // ─── 年度（供 K10-6 抽凭引擎等使用；props.year → sheet/项目回退当前年） ──────
-const k10Year = computed<number>(() => {
+const k10Year = computed<number | null>(() => {
   if (props.year) return props.year
   const y = Number(String(props.sheetName || '').match(/20\d{2}/)?.[0])
-  return Number.isFinite(y) && y > 0 ? y : new Date().getFullYear()
+  return Number.isFinite(y) && y > 0 ? y : null
 })
 
 // ─── 双模式 (OO 健康检查 + config 拉取成功才切；D4 范式) ───────────────────────

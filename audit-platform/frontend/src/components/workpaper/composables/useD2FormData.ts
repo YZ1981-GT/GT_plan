@@ -20,6 +20,7 @@ import {
   useChecklistPersistence,
   type ChecklistResponse as PersistenceChecklistResponse,
 } from '@/composables/workpaper/useChecklistPersistence'
+import { hasManualTbAmount } from './dCycleTbSeed'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -28,17 +29,93 @@ export type ChecklistResponse = ChecklistItem
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
+/** D2-1 TB 核对锚点（净额口径，公式推送独占键）。 */
+const D2_TB_ANCHOR = 'D2-adj-tb-amount'
+
+/** 试算表参考数：1122 应收账款原值 / 1231-02 坏账准备的审定额；`null` = 没取到（不拿 0 冒充）。 */
+export interface D2TbReference {
+  grossAudited: number | null
+  provisionAudited: number | null
+}
+
+/** 从 `GET /api/projects/{pid}/trial-balance` 的行里取某标准科目的审定额（审定为空回退未审）。 */
+export function pickTbAudited(tbRows: unknown, code: string): number | null {
+  if (!Array.isArray(tbRows)) return null
+  const row = tbRows.find((r: any) => r?.standard_account_code === code)
+  if (!row) return null
+  const v = Number(row.audited_amount ?? row.unadjusted_amount ?? 0)
+  return Number.isFinite(v) ? v : null
+}
+
+/**
+ * D2-adj-tb-amount 回退种子（净额）：render 下发的 `project_context.tb_amount`（净额）优先，
+ * 其次试算表 1122 原值 − 1231-02 坏账准备；都没有返回 `null`（不补）。
+ */
+export function d2NetTbSeed(htmlData: unknown, ref_: D2TbReference): number | null {
+  const raw = (htmlData as any)?.project_context?.tb_amount
+  if (raw !== undefined && raw !== null && raw !== '') {
+    const n = Number(raw)
+    if (Number.isFinite(n)) return n
+  }
+  if (ref_.grossAudited == null) return null
+  return ref_.grossAudited - Math.abs(ref_.provisionAudited ?? 0)
+}
+
 export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>, htmlData?: Ref<any>) {
   const persistence = useChecklistPersistence({ wpId, projectId, debounceMs: 2000 })
   const allResponses = persistence.responses
   const loading = ref(false)
   const saving = ref(false)
 
+  // ─── 试算表参考数（D2-2↔TB 原值核对 + 锚点回退种子共用一次取数）──────────
+
+  /**
+   * D2-2 明细逐客户列的是**原值**，与试算表核对要拿 1122 原值审定额 —— 不能用
+   * `D2-adj-tb-amount`（净额锚点），否则差异恰好等于坏账准备（spec
+   * writeback-followup-issue-closure R11.2）。取不到时保持 `null`，核对条不显示。
+   */
+  const tbReference = ref<D2TbReference>({ grossAudited: null, provisionAudited: null })
+
+  async function resolveAuditYear(): Promise<number | null> {
+    const fromRender = Number((htmlData?.value as any)?.project_context?.audit_year)
+    if (Number.isFinite(fromRender) && fromRender > 0) return fromRender
+    if (!projectId?.value) return null
+    try {
+      const projRes = await api.get(`/api/projects/${projectId.value}`)
+      const proj = projRes?.data ?? projRes
+      const year = Number(proj?.audit_year)
+      return Number.isFinite(year) && year > 0 ? year : null
+    } catch {
+      return null
+    }
+  }
+
+  async function loadTbReference(): Promise<void> {
+    if (!projectId?.value) return
+    try {
+      const year = await resolveAuditYear()
+      if (year == null) return
+      const tbRes = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
+        params: { year },
+      })
+      const tbData = Array.isArray(tbRes?.data) ? tbRes.data : (Array.isArray(tbRes) ? tbRes : [])
+      tbReference.value = {
+        grossAudited: pickTbAudited(tbData, '1122'),
+        provisionAudited: pickTbAudited(tbData, '1231-02'),
+      }
+    } catch {
+      // 取数失败不阻断加载；D2-2↔TB 核对条随之不显示
+    }
+  }
+
   // ─── Load ────────────────────────────────────────────────────────────────
 
   async function loadAll(): Promise<void> {
     if (!wpId.value) return
     loading.value = true
+    // 试算表参考数与底稿数据互不依赖：并行取，loadAll 结束前等它到位（在线编辑回写后的重载也走这里，
+    // 串行会给「看到新值」多加一次往返）。loadTbReference 自己吞掉全部异常。
+    const tbReferenceLoaded = projectId?.value ? loadTbReference() : Promise.resolve()
     try {
       await persistence.load()
       // D2 主入口只暴露本循环 item，避免其他历史响应污染业务 composable。
@@ -48,48 +125,22 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>, htmlDa
       }
       persistence.hydrate(d2Responses)
 
-      // 自动取试算平衡表 1122 科目余额 → D2-adj-tb-amount 锚点（seed 回退）
-      // 🔴 主路径是 Tier A 公式（灰度开时由 render `seed_tier_a_reconciliation` 写入），
-      //    此处只是前端自行 seed 的**回退**（灰度关/公式被停用时兜底）。
-      //    **优先读 render 下发的 `project_context.tb_amount`（净额口径）**，
-      //    只在无下发时才自行查 TB API（灰度关时 render 不下发，保持原值回退行为不变）。
-      //    口径说明：审定表 D2-1 比的是「三、应收账款净值」合计 A27（原值 − 坏账准备），
-      //    取原值会产生恰好等于坏账准备的假差异（D1 同款缺陷已实测）。
+      // D2-adj-tb-amount 锚点的**回退种子**。锚点是净额（公式推送 TB('1122') − TB('1231-02')；
+      // 源模板 D2-1 被比较项是「三、应收账款净值」合计 A27），主路径是公式推送 / Tier A 写入。
+      // 🔴 库里已有值（手工或公式推送）一律不动：此前这里无条件用试算表原值覆盖内存里的锚点，
+      //    在线编辑回写后重载（reloadHtml → loadAll）即把净额换成原值，D2-1 净值核对随之出现
+      //    恰好等于坏账准备的假差异（spec writeback-followup-issue-closure R11.2）。补的种子也是净额。
+      await tbReferenceLoaded
       if (projectId?.value) {
-        try {
-          const renderTbAmount = (htmlData?.value as any)?.project_context?.tb_amount
-          if (renderTbAmount !== undefined && renderTbAmount !== null) {
-            // render 已下发净额（灰度开时），直接用
-            allResponses.value.set('D2-adj-tb-amount', {
-              item_id: 'D2-adj-tb-amount',
+        if (!hasManualTbAmount(allResponses.value.get(D2_TB_ANCHOR)?.remark)) {
+          const net = d2NetTbSeed(htmlData?.value, tbReference.value)
+          if (net != null) {
+            allResponses.value.set(D2_TB_ANCHOR, {
+              item_id: D2_TB_ANCHOR,
               conclusion: null,
-              remark: String(Number(renderTbAmount)),
+              remark: String(net),
             })
-          } else {
-            // 灰度关 / render 未下发：自行查 TB 回退（原值口径，与改动前行为一致）
-            let year = new Date().getFullYear() - 1
-            try {
-              const projRes = await api.get(`/api/projects/${projectId.value}`)
-              const proj = projRes?.data ?? projRes
-              if (proj?.audit_year) year = Number(proj.audit_year)
-            } catch { /* fallback */ }
-
-            const tbRes = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-              params: { year },
-            })
-            const tbData = Array.isArray(tbRes?.data) ? tbRes.data : (Array.isArray(tbRes) ? tbRes : [])
-            const tbRow = tbData.find((r: any) => r.standard_account_code === '1122')
-            if (tbRow) {
-              const tbAmount = Number(tbRow.audited_amount ?? tbRow.unadjusted_amount ?? 0)
-              allResponses.value.set('D2-adj-tb-amount', {
-                item_id: 'D2-adj-tb-amount',
-                conclusion: null,
-                remark: String(tbAmount),
-              })
-            }
           }
-        } catch {
-          // trial_balance 取数失败不阻断加载
         }
       }
     } catch {
@@ -204,6 +255,8 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>, htmlDa
     getField,
     setFieldImmediate,
     loadSubWorkpaperData,
+    tbReference,
+    loadTbReference,
     stateOf: persistence.stateOf,
     cancelPendingSave: persistence.cancel,
   }

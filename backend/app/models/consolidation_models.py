@@ -466,6 +466,9 @@ class ConsolNoteTemplatePushLog(Base):
     failure_count: Mapped[int] = mapped_column(
         Integer, server_default=text("0"), nullable=False
     )
+    # NOTE: 不写 `'[]'::jsonb`（PG 字面 cast）—— SQLite 测试 dialect 不识别 `::`，整批 create_all 报
+    # "unrecognized token"（回收站 / WOPI 等 SQLite 用例因此全挂）。`'[]'` 在 PG/SQLite 双方言下都能解析为
+    # 合法空 JSON 数组（同 workpaper_models / custom_query_models 约定；守卫 test_model_server_default_portability）。
     failures: Mapped[dict | None] = mapped_column(
-        JSONB, server_default=text("'[]'::jsonb"), nullable=True
+        JSONB, server_default=text("'[]'"), nullable=True
     )

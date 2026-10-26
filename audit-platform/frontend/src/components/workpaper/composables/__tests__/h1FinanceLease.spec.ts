@@ -55,6 +55,8 @@ describe('H1-20 融资租出公式', () => {
     })
     expect(schedule[0].rent).toBe(20_000)
     expect(schedule[2].rent).toBe(70_000) // 20000 + 50000
+    // 没给起始年度（起租日未填）：日期列留空、不按今年猜，金额照算
+    expect(schedule.map(p => p.date)).toEqual(['', '', ''])
   })
 
   it('IRR 求解：等额租金使 NPV≈0', () => {

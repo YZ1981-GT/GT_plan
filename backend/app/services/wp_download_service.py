@@ -23,6 +23,8 @@ from app.services.wp_export.self_evidence import (
 )
 from app.services.wp_export.wp_file_resolver import VERDICT_LABELS, resolve_wp_file
 
+from app.services.project_audit_year import resolve_project_audit_year
+
 logger = logging.getLogger(__name__)
 
 STORAGE_ROOT = Path("storage")
@@ -462,8 +464,9 @@ class WpUploadService:
                 proj = proj_r.scalar_one_or_none()
                 if proj:
                     pname = proj.client_name or "unknown"
-                    ws = proj.wizard_state or {}
-                    yr = ws.get("steps", {}).get("basic_info", {}).get("data", {}).get("audit_year", 2025)
+                    yr = resolve_project_audit_year(proj)
+                    if yr is None:
+                        raise ValueError("未设置审计年度，请先在项目基本信息中填写")
                     rel_path = str(file_path.relative_to(Path("storage") / "projects" / str(project_id)))
                     await cloud_svc.sync_single_file(project_id, pname, yr, file_path, rel_path)
         except Exception as e:

@@ -788,7 +788,7 @@ const isReadonly = computed(() => Boolean(props.isReadonly))
 const projectId = computed(() => props.projectId)
 const checkOpts = I6_4_CHECK_OPTIONS.filter((o) => o !== '') as string[]
 const samplingVisible = ref(false)
-const samplingYear = computed(() => props.year || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)
@@ -815,7 +815,7 @@ async function importFromAttached(): Promise<void> {
     if (samples.length === 0 && misattached.length === 0) ElMessage.info('暂无挂入本底稿的序时账凭证')
   } finally { importingAttached.value = false }
 }
-const asOfYear = computed(() => props.year || new Date().getFullYear())
+const asOfYear = computed<number | null>(() => props.year ?? null)
 
 const allResponsesRef = toRef(props, 'allResponses')
 

@@ -90,7 +90,7 @@ const canStartAiReview = computed(() =>
 const pageReviewA11yName = computed(() => descriptorFor('ai_review_page').a11yName)
 const batchReviewA11yName = computed(() => descriptorFor('ai_review_batch').a11yName)
 
-const resolvedYear = computed(() => props.year || new Date().getFullYear())
+const resolvedYear = computed<number | null>(() => props.year ?? null)
 
 const reviewDialogVisible = ref(false)
 const reviewing = ref(false)

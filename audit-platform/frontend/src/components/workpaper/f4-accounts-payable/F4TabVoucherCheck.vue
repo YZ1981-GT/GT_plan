@@ -103,7 +103,7 @@ const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(
   toRef(props, 'wpId') as Ref<string>,
 )
 
-const auditYear = computed(() => props.year ?? new Date().getFullYear() - 1)
+const auditYear = computed<number | null>(() => props.year ?? null)
 const currentPhase = computed<Phase>(() => 'final')
 const totalRowCount = computed(() => debitRows.value.length + creditRows.value.length)
 const totalAbnormal = computed(() => debitAbnormal.value + creditAbnormal.value)

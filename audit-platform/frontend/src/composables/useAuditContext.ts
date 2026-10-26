@@ -21,8 +21,8 @@ import { eventBus } from '@/utils/eventBus'
 export interface AuditContextState {
   /** 当前项目 ID（响应式） */
   projectId: ComputedRef<string>
-  /** 当前审计年度（响应式） */
-  year: ComputedRef<number>
+  /** 当前审计年度（响应式）；全部来源缺失时为 null（调用方需处理） */
+  year: ComputedRef<number | null>
   /** 适用准则 'soe' | 'listed'（响应式） */
   applicableStandard: ComputedRef<'soe' | 'listed'>
   /** 项目是否已归档（响应式） */
@@ -30,7 +30,7 @@ export interface AuditContextState {
   /** 当前用户在该项目下是否可编辑（响应式） */
   canEdit: ComputedRef<boolean>
   /** 注册 refetch 回调，年度/项目变化时自动触发；返回取消注册函数 */
-  onContextChange: (cb: (ctx: { projectId: string; year: number }) => void) => () => void
+  onContextChange: (cb: (ctx: { projectId: string; year: number | null }) => void) => () => void
 }
 
 /** debounce 延迟（ms），避免路由跳转期间多次触发 */
@@ -48,8 +48,8 @@ export function useAuditContext(options?: {
   // ─── 响应式 computed（三级 fallback 铁律） ───
   const projectId = computed(() => projectStore.projectId || (route.params.projectId as string) || '')
 
-  const year = computed(() =>
-    projectStore.year || Number(route.query.year) || new Date().getFullYear() - 1
+  const year = computed<number | null>(() =>
+    projectStore.year || Number(route.query.year) || null
   )
 
   const applicableStandard = computed<'soe' | 'listed'>(() => projectStore.standard)
@@ -59,9 +59,9 @@ export function useAuditContext(options?: {
   const canEdit = computed(() => !isArchived.value && canDo('edit', 'workpaper'))
 
   // ─── onContextChange 回调注册 ───
-  const callbacks = new Set<(ctx: { projectId: string; year: number }) => void>()
+  const callbacks = new Set<(ctx: { projectId: string; year: number | null }) => void>()
 
-  function onContextChange(cb: (ctx: { projectId: string; year: number }) => void): () => void {
+  function onContextChange(cb: (ctx: { projectId: string; year: number | null }) => void): () => void {
     callbacks.add(cb)
     return () => { callbacks.delete(cb) }
   }
@@ -87,7 +87,7 @@ export function useAuditContext(options?: {
             applicableStandard: currentStandard,
             before: {
               projectId: (oldPid as string) || '',
-              year: Number(oldYear) || new Date().getFullYear() - 1,
+              year: Number(oldYear) || null,
               applicableStandard: (oldStandard as 'soe' | 'listed') || 'soe',
             },
           })

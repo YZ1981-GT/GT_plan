@@ -158,7 +158,10 @@ import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
-const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+const year = computed<number | null>(() => {
+  const value = Number(route.query.year)
+  return Number.isFinite(value) && value > 0 ? value : null
+})
 
 const {
   projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,

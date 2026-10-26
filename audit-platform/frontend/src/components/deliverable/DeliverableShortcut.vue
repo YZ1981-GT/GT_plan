@@ -72,7 +72,8 @@ const stats = ref({ total: 0, confirmed: 0 })
 
 async function loadCompleteness() {
   try {
-    const year = props.year || new Date().getFullYear()
+    const year = props.year
+    if (year == null) return
     const data = await api.get(
       `/api/projects/${props.projectId}/deliverables/completeness`,
       { params: { year } }

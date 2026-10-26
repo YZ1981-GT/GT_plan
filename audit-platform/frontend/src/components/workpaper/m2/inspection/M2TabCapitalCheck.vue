@@ -314,7 +314,7 @@ const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => 
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const aiLoading = ref('')
 
-const year = computed(() => props.year ?? new Date().getFullYear())
+const year = computed<number | null>(() => props.year ?? null)
 
 // ─── FormData（自包含加载） ──────────────────────────────────────────────────
 

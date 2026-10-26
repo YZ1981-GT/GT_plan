@@ -36,6 +36,14 @@ export interface AuxImportOutcome {
   message?: string
   /** 总行数（merge 后，可选）。 */
   totalRows?: number
+  /** 归集出的往来单位超过单次导入上限、有单位没导入（后端 `truncated`）。 */
+  truncated?: boolean
+  /** 归集出的往来单位总数（后端 `total_units`，可选）。 */
+  totalUnits?: number
+  /** 超上限没导入的单位数（后端 `dropped_units`，可选）。 */
+  droppedUnits?: number
+  /** 超上限时后端给的中文说明（后端 `warning`，可选）。 */
+  warning?: string
 }
 
 /** 提示级别，供 UI 决定用 success / info / warning / error。 */
@@ -75,6 +83,11 @@ export function parseAuxImportResponse(res: any): AuxImportOutcome {
     selectedAuxType: data?.selected_aux_type ?? data?.aux_type ?? undefined,
     message: typeof data?.message === 'string' ? data.message : undefined,
     totalRows: data?.total_rows != null ? Number(data.total_rows) : undefined,
+    // 旧端点不带该字段 ⇒ undefined（与改动前同形），新端点带 true / false
+    truncated: typeof data?.truncated === 'boolean' ? data.truncated : undefined,
+    totalUnits: data?.total_units != null ? Number(data.total_units) : undefined,
+    droppedUnits: data?.dropped_units != null ? Number(data.dropped_units) : undefined,
+    warning: typeof data?.warning === 'string' ? data.warning : undefined,
   }
 }
 
@@ -93,11 +106,18 @@ function isAuxImportReason(v: unknown): v is AuxImportReason {
  * 由 `AuxImportOutcome` 决定要给用户的提示（success / info / warning / error）。
  *
  * 优先级：
+ *  0) 超过单次导入上限（有单位没导入）→ warning，不论本次新增几行（截断必须让人看见，不得报成成功）
  *  1) 导入 > 0 → success（带新增行数，若有 message 用 message 更精确）
  *  2) 导入 = 0 且有 reason → 按 reason 给可辨别提示（Requirement 4.4）
  *  3) 导入 = 0 且无 reason（旧端点）→ 用 message 兜底，再兜底通用文案
  */
 export function auxImportPrompt(outcome: AuxImportOutcome): AuxImportPrompt {
+  if (outcome.truncated) {
+    return {
+      level: 'warning',
+      text: outcome.message || outcome.warning || '往来单位超过单次导入上限，部分单位未导入，请补录',
+    }
+  }
   if (outcome.importedCount > 0) {
     return {
       level: 'success',

@@ -106,6 +106,7 @@ interface Props {
   wpId: string
   /** 当前激活的 sheet 名（用于写回 parsed_data.impairment_summary[sheet]） */
   targetSheet?: string
+  year?: number | null
 }
 
 const props = withDefaults(defineProps<Props>(), { targetSheet: '' })
@@ -137,7 +138,7 @@ const applying = ref(false)
 const result = ref<SummaryResponse | null>(null)
 
 const form = reactive({
-  year: new Date().getFullYear(),
+  year: props.year ?? null,
 })
 
 function formatAmount(n: number | undefined) {
@@ -156,7 +157,15 @@ function buildBody(applySheet?: string) {
   }
 }
 
+/** 后端 year 必填（缺失即 422）：没有年度就不发请求，提示先填 */
+function yearMissing(): boolean {
+  if (form.year != null) return false
+  ElMessage.warning('未设置审计年度，请先填写年度')
+  return true
+}
+
 async function onCalc() {
+  if (yearMissing()) return
   loading.value = true
   try {
     const resp = await api.post<SummaryResponse>(
@@ -179,6 +188,7 @@ async function onApplyToSheet() {
     ElMessage.warning('未识别到当前 sheet')
     return
   }
+  if (yearMissing()) return
   applying.value = true
   try {
     const resp = await api.post<SummaryResponse>(
@@ -203,6 +213,14 @@ watch(
   () => props.visible,
   (v) => {
     if (!v) result.value = null
+  },
+)
+
+// 项目审计年度可能在弹窗挂载后才取到：到了就带入（用户已手填的不覆盖）
+watch(
+  () => props.year,
+  (y) => {
+    if (y != null && form.year == null) form.year = y
   },
 )
 </script>

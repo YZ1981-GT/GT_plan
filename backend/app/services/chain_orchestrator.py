@@ -563,34 +563,20 @@ class ChainOrchestrator:
         if not matched_primary:
             return {"created": 0, "skipped_reason": "无匹配的底稿模板"}
 
-        # 5b. 尊重程序裁剪结果：从 ProcedureInstance 查询已裁剪的 wp_code，排除
+        # 5b. 尊重程序裁剪结果（保留范围单一实现：子表 / 程序表跟随科目）。读不到裁剪结果即抛出、
+        #     本步失败 —— 原先吞掉异常、跳过过滤照样整套生成（fail-open）。
         from app.models.procedure_models import ProcedureInstance
-        try:
-            trimmed_q = await db.execute(
-                sa.select(ProcedureInstance.wp_code).where(
-                    ProcedureInstance.project_id == project_id,
-                    ProcedureInstance.is_deleted == sa.false(),
-                    ProcedureInstance.status.in_(["skip", "not_applicable"]),
-                    ProcedureInstance.wp_code.isnot(None),
-                )
-            )
-            trimmed_codes = {r[0] for r in trimmed_q.all() if r[0]}
-            if trimmed_codes:
-                # 从 matched_primary 中移除被裁剪的主编码
-                before_count = len(matched_primary)
-                matched_primary -= trimmed_codes
-                # 也移除主编码被裁剪的子表（如 D2 被裁剪则 D2-1/D2-2 也跳过）
-                trimmed_prefixes = {c + '-' for c in trimmed_codes}
-                matched_primary = {c for c in matched_primary if not any(c.startswith(p) for p in trimmed_prefixes)}
-                logger.info(
-                    "chain_orchestrator: 程序裁剪过滤 %d → %d（裁剪 %d 个 wp_code）",
-                    before_count, len(matched_primary), len(trimmed_codes),
-                )
-        except Exception as trim_err:
-            logger.warning("chain_orchestrator: 查询程序裁剪状态失败，跳过过滤: %s", trim_err)
+        from app.services.procedure_scope_retention import load_trimmed_scope
+        trim_scope = await load_trimmed_scope(db, project_id)
+        kept_primary, skipped_trimmed = trim_scope.split(sorted(matched_primary))
+        matched_primary = set(kept_primary)
+        in_recycle: list[str] = []
+        if skipped_trimmed:
+            logger.info("chain_orchestrator: 程序裁剪过滤 %d 个主编码：%s", len(skipped_trimmed), skipped_trimmed)
 
         if not matched_primary:
-            return {"created": 0, "skipped_reason": "所有匹配底稿均已被裁剪"}
+            return {"created": 0, "skipped_reason": "所有匹配底稿均已被裁剪",
+                    "skipped_trimmed_codes": skipped_trimmed, "in_recycle_codes": in_recycle}
 
         # 5c. 加入自定义程序（is_custom=True 且 status=execute 且有 wp_code）
         try:
@@ -643,15 +629,16 @@ class ChainOrchestrator:
         copied_count = 0
         for code in sorted(matched_codes):
             try:
-                # Idempotent check
-                existing = await db.execute(
-                    sa.select(WpIndex.id).where(
+                # Idempotent check（软删的同码在回收站：只能恢复，不新建、如实回报）
+                existing = (await db.execute(
+                    sa.select(WpIndex.id, WpIndex.is_deleted).where(
                         WpIndex.project_id == project_id,
                         WpIndex.wp_code == code,
                     )
-                )
-                existing_id = existing.scalar_one_or_none()
-                if existing_id:
+                )).first()
+                if existing:
+                    if existing.is_deleted:
+                        in_recycle.append(code)
                     continue
 
                 wp_name = resolve_wp_name(code, code_name_map.get(code))
@@ -740,15 +727,20 @@ class ChainOrchestrator:
                 if ct == "skip" and code.startswith(skip_prefix)
             ]
             for sub_code in sorted(skip_subs):
+                if trim_scope.is_trimmed(sub_code):  # 主底稿保留、子表自己被裁（如 A1-11 不适用）
+                    skipped_trimmed.append(sub_code)
+                    continue
                 try:
                     # Idempotent check
-                    existing = await db.execute(
-                        sa.select(WpIndex.id).where(
+                    existing = (await db.execute(
+                        sa.select(WpIndex.id, WpIndex.is_deleted).where(
                             WpIndex.project_id == project_id,
                             WpIndex.wp_code == sub_code,
                         )
-                    )
-                    if existing.scalar_one_or_none():
+                    )).first()
+                    if existing:
+                        if existing.is_deleted:
+                            in_recycle.append(sub_code)
                         continue
 
                     sub_name = resolve_wp_name(sub_code, code_name_map.get(sub_code))
@@ -801,6 +793,8 @@ class ChainOrchestrator:
             "metadata_loaded": len(meta_map),
             "by_cycle": matched_details,
             "project_flags": {k: v for k, v in project_flags.items() if v},
+            "skipped_trimmed_codes": skipped_trimmed,
+            "in_recycle_codes": in_recycle,
         }
 
     async def _step_generate_reports(self, db: AsyncSession, project_id: UUID, year: int) -> dict:

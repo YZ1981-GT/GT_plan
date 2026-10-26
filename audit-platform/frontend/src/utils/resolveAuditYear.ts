@@ -51,8 +51,11 @@ export function resolveAuditYearFromProject(project: {
   )
 }
 
-/** 底稿/序时账等场景：多来源合并为最终查询年度 */
-export function resolveEffectiveAuditYear(sources: AuditYearSources): number {
+/**
+ * 多来源合并为审计年度；全部缺失返回 null（不按日历猜）。
+ * 写请求一律用它（或 `useProjectAuditYear`）：取不到就不发、提示先填年度（spec audit-year-calendar-fallback-ratchet R0 / R3）。
+ */
+export function resolveAuditYearOrNull(sources: AuditYearSources): number | null {
   const candidates: unknown[] = [
     sources.propYear,
     sources.configYear,
@@ -67,5 +70,14 @@ export function resolveEffectiveAuditYear(sources: AuditYearSources): number {
     const y = parseAuditYear(c)
     if (y) return y
   }
-  return new Date().getFullYear() - 1
+  return null
+}
+
+/**
+ * 多来源合并为最终查询年度；全部缺失返回 null。
+ * 调用方须处理 null：写请求不发 + 提示，读请求显示空态。
+ * （spec audit-year-calendar-fallback-ratchet R3.1：删去年兜底，选方案 B）
+ */
+export function resolveEffectiveAuditYear(sources: AuditYearSources): number | null {
+  return resolveAuditYearOrNull(sources)
 }

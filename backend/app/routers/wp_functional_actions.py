@@ -18,7 +18,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_audit_year
 from app.models.core import User
 from app.services.wp_action_registry import (
     ACTION_REGISTRY,
@@ -223,13 +223,14 @@ async def _dispatch_action(
     )
 
     endpoint = action.endpoint
+    year = await require_project_audit_year(db, project_id, params.get("year"))
 
     if endpoint == "sampling/cutoff-test":
         svc = CutoffTestService()
         return await svc.run_cutoff_test(
             db,
             project_id,
-            params.get("year", 2025),
+            year,
             params.get("account_codes", []),
             params.get("days_before", 5),
             params.get("days_after", 5),
@@ -250,7 +251,7 @@ async def _dispatch_action(
             params.get("account_code", ""),
             brackets,
             params.get("base_date", ""),
-            params.get("year"),
+            year,
         )
 
     elif endpoint == "sampling/monthly-detail":
@@ -259,7 +260,7 @@ async def _dispatch_action(
             db,
             project_id,
             params.get("account_code", ""),
-            params.get("year", 2025),
+            year,
         )
 
     # 注：`sampling/execute` 分支已于 sampling-compliance-closure Wave 2 移除。

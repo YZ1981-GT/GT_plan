@@ -43,7 +43,8 @@ describe('行数预算断言测试', () => {
   // 处置同 check_file_size.py 对 ReportView / DisclosureEditor 的做法：
   // 填**真实值、不加余量** ⇒ 本条恢复为「只许变小」的棘轮，再加一行即打红。
   // **1000 仍是目标**：WorkpaperEditor 继续瘦身时必须同步下调本值，否则棘轮失效。
-  const SHELL_RATCHET = 1472
+  // 2026-10-26：项目信息 / 审计年度加载抽到 useWorkpaperProjectMeta.ts（读取失败不再显示成「未设置审计年度」）⇒ 1456。
+  const SHELL_RATCHET = 1456
   test(`Shell (WorkpaperEditor.vue) ≤ ${SHELL_RATCHET} 行（棘轮；目标仍是 1000）`, () => {
     const lines = countLines(files.Shell)
     expect(

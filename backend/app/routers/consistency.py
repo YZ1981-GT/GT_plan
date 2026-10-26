@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_audit_year
 from app.services.consistency_check_service import ConsistencyCheckService
 
 router = APIRouter(prefix="/api/projects", tags=["consistency"])
@@ -20,11 +20,12 @@ router = APIRouter(prefix="/api/projects", tags=["consistency"])
 @router.get("/{project_id}/consistency-check")
 async def get_consistency(
     project_id: UUID,
-    year: int = Query(2025),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     """获取全链路一致性校验结果"""
+    year = await require_project_audit_year(db, project_id, year)
     svc = ConsistencyCheckService(db)
     return await svc.check_full_chain(project_id, year)
 
@@ -32,11 +33,12 @@ async def get_consistency(
 @router.post("/{project_id}/consistency-check/run")
 async def run_consistency(
     project_id: UUID,
-    year: int = Query(2025),
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     """手动触发全链路校验"""
+    year = await require_project_audit_year(db, project_id, year)
     svc = ConsistencyCheckService(db)
     result = await svc.check_full_chain(project_id, year)
     await db.commit()

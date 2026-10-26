@@ -139,11 +139,11 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
   const prefix = `D4-disc-${variant}-`
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
-  // 审计年度（由主入口 provide('d4AuditYear')），回退"当前年-1"
-  const injectedAuditYear = inject<Ref<number> | null>('d4AuditYear', null)
-  function resolveAuditYear(): number {
+  // 审计年度由主入口 provide('d4AuditYear') 提供；缺失时保持空态，不猜日历年。
+  const injectedAuditYear = inject<Ref<number | null> | null>('d4AuditYear', null)
+  function resolveAuditYear(): number | null {
     const y = injectedAuditYear?.value
-    return y && y > 0 ? y : new Date().getFullYear() - 1
+    return y && y > 0 ? y : null
   }
 
   // ─── Persistence helpers ─────────────────────────────────────────────
@@ -212,6 +212,7 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
     try {
       const { default: http } = await import('@/utils/http')
       const projectYear = resolveAuditYear()
+      if (projectYear == null) return // 未设置审计年度：不取数，不按日历猜（finally 复位 isRefreshing）
 
       // 1. 从TB取收入/成本审定数
       const res = await http.get(`/api/projects/${projectId.value}/auto-data/d4_analysis_indicators`, {

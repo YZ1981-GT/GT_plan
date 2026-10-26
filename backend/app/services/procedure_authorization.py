@@ -39,13 +39,16 @@ from app.deps import get_current_user
 from app.models.core import User
 from app.models.procedure_models import ProcedureRowTask, ProcedureRowTaskHistory
 from app.models.staff_models import ProjectAssignment, StaffMember
+from app.services.assignment_service import PARTNER_MANAGER_ROLE_ALIASES
 
 logger = logging.getLogger(__name__)
 
 # 允许作为程序行委派人（Delegator）的项目委派角色（Design C5、需求 11.1/11.3）。
-# ProjectAssignment.role 为自由文本列；此处以规范化小写字面量集合判定，不依赖系统 role。
+# ProjectAssignment.role 为自由文本列；按去空白小写比较，不依赖系统 role。
+# 与团队委派的合伙人 / 经理别名同源（含中文「合伙人」「项目经理」）：此前这里另写了英文三个，
+# 以中文角色委派的合伙人 / 经理在本项目恒 403（spec procedure-chain-followup-closure R4）。
 DELEGATOR_ASSIGNMENT_ROLES: frozenset[str] = frozenset(
-    {"partner", "signing_partner", "manager"}
+    alias.strip().lower() for alias in PARTNER_MANAGER_ROLE_ALIASES
 )
 
 
@@ -226,7 +229,7 @@ async def ensure_project_delegator(
     规则（Design C5）：
       1. 认证 admin：全局通过。
       2. 其余 user：唯一 active StaffMember(user_id) → 唯一 active ProjectAssignment(project_id, staff_id)。
-      3. assignment role ∈ {partner, signing_partner, manager}。
+      3. assignment role ∈ ``DELEGATOR_ASSIGNMENT_ROLES``（合伙人 / 签字合伙人 / 经理，含中文别名）。
       4. 任何缺失/重复/inactive/跨项目/查询异常 → 403（不 500 泄露）。
 
     供 materialize、reconcile、trim、scheme、delegation、cancel/reopen、dead-letter replay

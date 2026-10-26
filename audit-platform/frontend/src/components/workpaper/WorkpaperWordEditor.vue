@@ -351,6 +351,7 @@ import { ElMessage } from 'element-plus'
 import { Download, Document, Upload } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { getAuthHeaders } from '@/utils/authToken'
+import { resolveAuditYearFromProject, resolveAuditYearOrNull } from '@/utils/resolveAuditYear'
 import OnlyOfficeWordDialog from './OnlyOfficeWordDialog.vue'
 import GtWordTemplateStructuredView from './GtWordTemplateStructuredView.vue'
 import { useWordTemplateStructured } from './composables/useWordTemplateStructured'
@@ -370,6 +371,8 @@ const props = defineProps<{
 const route = useRoute()
 const projectId = computed(() => props.projectId || (route.params.projectId as string) || '')
 const wpCode = computed(() => props.wpCode || '')
+/** 项目审计年度（loadProjectInfo 从项目信息解析）：宿主没传、路由也没有时用它 */
+const projectAuditYear = ref<number | null>(null)
 
 // ─── Mode Detection ───
 const isA16Mode = computed(() => wpCode.value === 'A16')
@@ -745,6 +748,7 @@ async function loadProjectInfo() {
   try {
     const info = await api.get<any>(`/api/projects/${projectId.value}`, { _silent: true } as any)
     const d = info?.data || info
+    projectAuditYear.value = resolveAuditYearFromProject(d)
     placeholders.client_name = d?.client_name || d?.name || ''
     placeholders.entity_name = d?.client_name || d?.name || ''
     placeholders.audit_period = d?.audit_period_end ? `${d.audit_year || ''}年度` : ''
@@ -761,6 +765,10 @@ async function loadProjectInfo() {
     // Try to get audit report date for sign_date default
     try {
       const year = getAuditYear()
+      if (year == null) {
+        ElMessage.info('未设置审计年度，暂无法读取审计报告日期')
+        return
+      }
       const report = await api.get<any>(`/api/audit-report?project_id=${projectId.value}&year=${year}`, { _silent: true } as any)
       const rd = report?.report_date || report?.data?.report_date
       if (rd) cachedReportDate.value = typeof rd === 'string' ? rd.slice(0, 10) : ''
@@ -850,6 +858,7 @@ async function loadMisstatementSummary() {
   if (!isA16Mode.value) return
   try {
     const year = getAuditYear()
+    if (year == null) { misstatementLoaded.value = true; return }
     const r = await api.get<any>(
       `/api/projects/${projectId.value}/misstatements/for-letter`,
       { params: { year } },
@@ -883,6 +892,7 @@ async function loadSignStatus() {
     // Fallback: query field_overrides
     try {
       const year = getAuditYear()
+      if (year == null) { signStatus.value = 'draft'; return }
       const scope = `word_template:${wpCode.value}`
       const overrides = await api.get<any>('/api/workpapers/field-overrides', {
         params: { project_id: projectId.value, year, scope },
@@ -935,7 +945,8 @@ async function _doUpdateSignStatus(status: string, signDate?: string) {
   } catch {
     // Fallback: field_overrides
     try {
-      const year = getAuditYear()
+      const year = yearForWrite()
+      if (year == null) return
       const scope = isA16Mode.value
         ? `word_template:A16:${selectedVersion.value}`
         : `word_template:${wpCode.value}`
@@ -982,7 +993,8 @@ async function _doUpdateSupplementSignStatus(status: string, _signDate?: string)
     ElMessage.success(status === 'signed' ? 'A16-7 已签回' : 'A16-7 已标记待签署')
   } catch {
     try {
-      const year = getAuditYear()
+      const year = yearForWrite()
+      if (year == null) return
       await api.post('/api/workpapers/field-overrides', {
         project_id: projectId.value, year,
         scope: `word_template:A16:${SUPPLEMENT_CODE}`,
@@ -998,7 +1010,8 @@ async function _doUpdateSupplementSignStatus(status: string, _signDate?: string)
 
 async function onSupplementToggle(enabled: boolean | string | number) {
   try {
-    const year = getAuditYear()
+    const year = yearForWrite()
+    if (year == null) return
     await api.post('/api/workpapers/field-overrides', {
       project_id: projectId.value, year,
       scope: `word_template:A16:${SUPPLEMENT_CODE}`,
@@ -1017,7 +1030,8 @@ async function onVersionChange(code: string) {
 
 async function persistSelectedVersion(code: string) {
   try {
-    const year = getAuditYear()
+    const year = yearForWrite()
+    if (year == null) return
     await api.post('/api/workpapers/field-overrides', {
       project_id: projectId.value, year,
       scope: 'word_template:A16',
@@ -1029,6 +1043,7 @@ async function persistSelectedVersion(code: string) {
 async function loadPersistedVersion(): Promise<string | null> {
   try {
     const year = getAuditYear()
+    if (year == null) return null
     const overrides = await api.get<Record<string, Record<string, any>>>(
       '/api/workpapers/field-overrides',
       { params: { project_id: projectId.value, year, scope: 'word_template:A16' } },
@@ -1039,8 +1054,16 @@ async function loadPersistedVersion(): Promise<string | null> {
   return null
 }
 
-function getAuditYear(): number {
-  return props.year || parseInt(route.query.year as string) || new Date().getFullYear()
+/** 审计年度：宿主 prop > 路由 > 项目信息；都没有返回 null（不按今年猜） */
+function getAuditYear(): number | null {
+  return resolveAuditYearOrNull({ propYear: props.year, routeYear: route.query.year }) ?? projectAuditYear.value
+}
+
+/** 写字段覆盖用的年度（后端 year 必填）：取不到就提示并返回 null，调用方不写 */
+function yearForWrite(): number | null {
+  const year = getAuditYear()
+  if (year == null) ElMessage.warning('未设置审计年度，请先在项目基本信息中填写')
+  return year
 }
 
 // ─── OnlyOffice editor actions ───

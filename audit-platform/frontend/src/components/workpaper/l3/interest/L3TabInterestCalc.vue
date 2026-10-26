@@ -320,6 +320,7 @@
  */
 import { computed, inject, ref, toRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useProjectAuditYear } from '@/composables/useProjectAuditYear'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useL3InterestCalc, type L3InterestCalcRow } from '@/composables/useL3InterestCalc'
 import { useL3ImportExport } from '@/composables/useL3ImportExport'
@@ -363,9 +364,16 @@ watch(
 
 // ─── 报告期（默认当年） ──────────────────────────────────────────────────────
 
-const currentYear = new Date().getFullYear()
-const reportStart = ref(`${currentYear}-01-01`)
-const reportEnd = ref(`${currentYear}-12-31`)
+// 报告期默认取项目审计年度（原先取今年）；取到后只补空的起止日（用户改过的不动）
+const { auditYear: projectAuditYear, ensureAuditYear } = useProjectAuditYear(() => props.projectId)
+void ensureAuditYear()
+const reportStart = ref('')
+const reportEnd = ref('')
+watch(projectAuditYear, (y) => {
+  if (y == null) return
+  if (!reportStart.value) reportStart.value = `${y}-01-01`
+  if (!reportEnd.value) reportEnd.value = `${y}-12-31`
+}, { immediate: true })
 
 // ─── Composable: 利息测算 ────────────────────────────────────────────────────
 

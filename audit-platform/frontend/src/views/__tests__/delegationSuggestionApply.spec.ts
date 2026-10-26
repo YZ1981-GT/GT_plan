@@ -69,8 +69,10 @@ const mocks = vi.hoisted(() => ({
   listAssignments: vi.fn(),
   listWorkpapersPaged: vi.fn(),
   confirm: vi.fn(),
+  prompt: vi.fn().mockResolvedValue({ value: 'x' }),
   msgSuccess: vi.fn(),
   msgWarning: vi.fn(),
+  msgInfo: vi.fn(),
 }))
 
 vi.mock('@/services/commonApi', () => ({
@@ -109,12 +111,13 @@ vi.mock('vue-router', () => ({
 vi.mock('element-plus', () => ({
   ElMessage: Object.assign(
     (..._a: any[]) => {},
-    { success: mocks.msgSuccess, warning: mocks.msgWarning, error: vi.fn(), info: vi.fn() },
+    { success: mocks.msgSuccess, warning: mocks.msgWarning, error: vi.fn(), info: mocks.msgInfo },
   ),
-  ElMessageBox: { confirm: mocks.confirm, prompt: vi.fn().mockResolvedValue({ value: 'x' }) },
+  ElMessageBox: { confirm: mocks.confirm, prompt: mocks.prompt },
 }))
 
 import ProcedureTrimming from '../ProcedureTrimming.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 // ── 双哨兵向上找仓库根（单哨兵不稳，目录做哨兵会被历史空目录骗停）──
 function repoRoot(): string {
@@ -559,7 +562,9 @@ describe('判据 B — 分组载荷与 selector 粒度', () => {
     const calls = (FN_GROUP.match(/suggestionGroupBody\s*\(/g) ?? []).length
     expect(calls, 'body 构造超过一次 ⇒ 两侧 payload 可能不同 ⇒ 409「预览请求已被篡改」').toBe(1)
     expect(FN_GROUP).toMatch(/previewProcedureDelegation\s*\(\s*projectId\.value\s*,\s*body\s*\)/)
-    expect(FN_GROUP).toMatch(/applyProcedureDelegation\s*\([\s\S]{0,160}?\bbody\s*,?\s*\)/)
+    // 第 5 参是扩权重试选项（spec procedure-trim-generation-delegation-chain 任务 13：expand_scope / scope_reason
+    // 不进后端预览哈希，故仍是同一个 body 对象；只允许一个不含花括号嵌套的选项字面量跟在 body 后面）
+    expect(FN_GROUP).toMatch(/applyProcedureDelegation\s*\([\s\S]{0,160}?\bbody\s*(?:,\s*\{[^{}]*\}\s*)?,?\s*\)/)
   })
 
   it('每组自带 request_id（幂等按组隔离，不共用一个）', () => {
@@ -662,12 +667,16 @@ describe('判据 D — 无目标不得报成功', () => {
     expect(zeroBlock, '零目标分支必须 return，不能继续走到 apply').toMatch(/\breturn\b/)
   })
 
-  it('no_target 的说明写明三种成因（未物化 / 已裁 / 非 execute）', () => {
+  it('no_target 的说明取服务端给的原因（spec procedure-chain-followup-closure R2.1）', () => {
+    // 原先前端写死「未物化 / 已裁 / 非 execute」三种猜测；现在预览先导入程序行定义并物化，真正的原因
+    // （没有程序表模板 / 都已裁剪 / 都已分配 …）由后端 `hint` 给出（后端用例 test_row_delegation_without_flag 钉住）
     const iZero = FN_GROUP.search(/targets\s*===\s*0/)
     const zeroBlock = FN_GROUP.slice(iZero, iZero + 500)
-    expect(zeroBlock).toMatch(/物化/)
-    expect(zeroBlock).toMatch(/粗裁|不适用/)
-    expect(zeroBlock).toMatch(/execute/)
+    expect(zeroBlock).toMatch(/pv\?\.hint/)
+    expect(zeroBlock, '后端没给原因时也要有兜底说明').toMatch(/没有可委派的程序行/)
+    // 委派向导的预览：目标为 0 时同样显示服务端原因（否则只看到「0 个目标」不知道为什么）
+    expect(SEG.template).toMatch(/previewSummary\?\.targets\s*===\s*0\s*&&\s*delegateWizard\.preview\.hint/)
+    expect(SEG.template).toMatch(/没有可委派的目标：\$\{delegateWizard\.preview\.hint\}/)
   })
 
   it('no_target 的标签与配色都不是「成功」', () => {
@@ -993,5 +1002,217 @@ describe('判据 G — 行为级：逐组 preview → apply 且一组 409 不影
     await vm.onSuggestionApplyRequest([group('s1', ['w1'])], [])
     await flushPromises()
     expect(mocks.assignProcedures).not.toHaveBeenCalled()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// spec procedure-trim-generation-delegation-chain 任务 13：被委派人看不到目标循环（400 out_of_scope）⇒
+// 填写理由后带 expand_scope 重试；同一预览凭证 / 同一 body；取消不写、主编下拉恢复原值
+// ═══════════════════════════════════════════════════════════════════════════
+function http400OutOfScope(error: string, cycles: string[] = ['E']) {
+  return { response: { status: 400, data: { detail: {
+    error, reason: 'out_of_scope', cycles, message: `执行人甲的可见范围不含 ${cycles.join('、')} 循环`,
+  } } } }
+}
+
+describe('可见范围扩权重试（out_of_scope → 理由 → expand_scope）', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('建议分配逐组应用：同一凭证、同一 body 带理由重试，组状态为已应用', async () => {
+    const vm = (await mountView()).vm as any
+    mocks.previewProcedureDelegation.mockResolvedValue({ status: 'ready', preview_id: 'pv', summary: { targets: 1 } })
+    mocks.applyProcedureDelegation
+      .mockRejectedValueOnce(http400OutOfScope('row_delegation_rejected'))
+      .mockResolvedValueOnce({ applied: 1, unchanged: 0, conflict: 0 })
+    mocks.prompt.mockResolvedValueOnce({ value: ' 跨循环支援 ' })
+    await vm.onSuggestionApplyRequest([group('s1', ['w1'])], [])
+    await flushPromises()
+    const [first, second] = mocks.applyProcedureDelegation.mock.calls
+    expect(mocks.applyProcedureDelegation).toHaveBeenCalledTimes(2)
+    expect(first[4]).toEqual({ silent: true })
+    expect([second[1], second[2], second[3]]).toEqual([first[1], first[2], first[3]])
+    expect(second[3]).toBe(first[3])
+    expect(second[4]).toEqual({ expand_scope: true, scope_reason: '跨循环支援', silent: true })
+    expect(vm.suggestApply.groups[0].status).toBe('applied')
+  })
+
+  it('建议分配：取消理由框 ⇒ 不重试，组标为未委派', async () => {
+    const vm = (await mountView()).vm as any
+    mocks.previewProcedureDelegation.mockResolvedValue({ status: 'ready', preview_id: 'pv', summary: { targets: 1 } })
+    mocks.applyProcedureDelegation.mockRejectedValueOnce(http400OutOfScope('row_delegation_rejected'))
+    mocks.prompt.mockRejectedValueOnce(new Error('cancel'))
+    await vm.onSuggestionApplyRequest([group('s1', ['w1'])], [])
+    await flushPromises()
+    expect(mocks.applyProcedureDelegation).toHaveBeenCalledTimes(1)
+    expect(vm.suggestApply.groups[0].status).toBe('failed')
+    expect(vm.suggestApply.groups[0].message).toContain('已取消')
+  })
+
+  it('委派向导：带理由重试成功后凭证作废；取消则凭证保留、不重试', async () => {
+    const vm = (await mountView()).vm as any
+    const wizard = (previewId: string) => ({
+      visible: true, assigneeId: 's1', reviewerId: '', unassignedOnly: false, loading: false,
+      jobStatus: null, preview: { status: 'ready' }, previewId, reqId: 'req-w', applyResult: null,
+    })
+    vm.delegateWizard = wizard('pv-w')
+    mocks.applyProcedureDelegation
+      .mockRejectedValueOnce(http400OutOfScope('row_delegation_rejected'))
+      .mockResolvedValueOnce({ applied: 2 })
+    mocks.prompt.mockResolvedValueOnce({ value: '支援' })
+    await vm.runDelegateApply()
+    const calls = mocks.applyProcedureDelegation.mock.calls
+    expect(calls.map((c: any[]) => [c[1], c[2]])).toEqual([['pv-w', 'req-w'], ['pv-w', 'req-w']])
+    expect(calls[1][4]).toEqual({ expand_scope: true, scope_reason: '支援', silent: true })
+    expect(vm.delegateWizard.applyResult).toEqual({ applied: 2 })
+    expect(vm.delegateWizard.previewId).toBe('')
+
+    mocks.applyProcedureDelegation.mockClear()
+    vm.delegateWizard = wizard('pv-2')
+    mocks.applyProcedureDelegation.mockRejectedValueOnce(http400OutOfScope('row_delegation_rejected'))
+    mocks.prompt.mockRejectedValueOnce(new Error('cancel'))
+    await vm.runDelegateApply()
+    expect(mocks.applyProcedureDelegation).toHaveBeenCalledTimes(1)
+    expect(vm.delegateWizard.previewId).toBe('pv-2')
+    expect(mocks.msgInfo).toHaveBeenCalled()
+  })
+
+  it('底稿主编下拉：取消 / 被拒都恢复为已保存值，带理由重试成功后记为新的已保存值', async () => {
+    const vm = (await mountView()).vm as any
+    const row: any = { id: 'p1', assigned_to: 's2' }
+    mocks.assignProcedures.mockRejectedValueOnce(http400OutOfScope('lead_delegation_rejected', ['A']))
+    mocks.prompt.mockRejectedValueOnce(new Error('cancel'))
+    await vm.onAssigneeChange(row)
+    expect(mocks.assignProcedures.mock.calls[0][2]).toEqual({ silent: true })
+    expect(row.assigned_to, '取消后下拉仍显示新的人 = 与服务端不一致').toBeNull()
+
+    row.assigned_to = 's2'
+    mocks.assignProcedures
+      .mockRejectedValueOnce(http400OutOfScope('lead_delegation_rejected', ['A']))
+      .mockResolvedValueOnce({ updated: 1 })
+    mocks.prompt.mockResolvedValueOnce({ value: '支援' })
+    await vm.onAssigneeChange(row)
+    expect(mocks.assignProcedures.mock.calls[2][2]).toEqual({ expand_scope: true, scope_reason: '支援', silent: true })
+    expect(row.assigned_to).toBe('s2')
+
+    row.assigned_to = 's3'
+    mocks.assignProcedures.mockRejectedValueOnce({ response: { status: 409, data: { detail: {
+      error: 'lead_delegation_rejected', reason: 'trimmed', cycles: [], message: '底稿已在程序裁剪中标为不执行' } } } })
+    await vm.onAssigneeChange(row)
+    expect(mocks.prompt).toHaveBeenCalledTimes(2)
+    expect(row.assigned_to, '被拒后恢复为上次保存成功的 s2').toBe('s2')
+    expect(handleApiError).toHaveBeenCalled()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// spec procedure-trim-generation-delegation-chain 任务 9：已生成的底稿要移入回收站时，四个保存入口
+// （保存粗裁 / 确认建议 / 参照项目 / 跨循环智能裁剪）先确认；取消不 apply，确认后 apply 带确认标记
+// ═══════════════════════════════════════════════════════════════════════════
+const RECYCLE_PV = {
+  preview_id: 'pv-r',
+  recycle_preview: {
+    to_recycle: ['H3', 'H3-1'], to_restore: [],
+    substantive: [{ wp_code: 'H3-1', substantive_reasons: ['已填写编制内容'] }],
+  },
+}
+const PLAIN_PV = { preview_id: 'pv-p', recycle_preview: { to_recycle: ['H3'], substantive: [], to_restore: [] } }
+
+describe('粗裁保存：已生成底稿移入回收站前先确认', () => {
+  // 确认框的一次性返回值不跨用例残留（clearAllMocks 不清 mockResolvedValueOnce 队列）
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.confirm.mockReset()
+  })
+
+  it('保存粗裁：取消 ⇒ 不 apply；确认 ⇒ 带确认标记；没有要移入的 ⇒ 不弹框、不带确认', async () => {
+    const vm = (await mountView()).vm as any
+    mocks.canonicalTrimPreview.mockResolvedValue(RECYCLE_PV)
+    mocks.canonicalTrimApply.mockResolvedValue({ applied: 1 })
+    mocks.confirm.mockRejectedValueOnce('cancel')
+    await vm.saveTrim()
+    expect(mocks.confirm).toHaveBeenCalledTimes(1)
+    expect(mocks.canonicalTrimApply, '取消后仍 apply = 未经同意把底稿移入回收站').not.toHaveBeenCalled()
+
+    mocks.confirm.mockResolvedValueOnce('confirm')
+    await vm.saveTrim()
+    expect(mocks.canonicalTrimApply.mock.calls[0][2]).toBe('pv-r')
+    expect(mocks.canonicalTrimApply.mock.calls[0][4]).toEqual({ confirmSubstantiveRecycle: true })
+
+    mocks.canonicalTrimPreview.mockResolvedValueOnce({ preview_id: 'pv-n', recycle_preview: { to_recycle: [] } })
+    await vm.saveTrim()
+    expect(mocks.confirm, '没有要移入回收站的底稿不该弹框').toHaveBeenCalledTimes(2)
+    expect(mocks.canonicalTrimApply.mock.calls[1][4]).toEqual({ confirmSubstantiveRecycle: false })
+  })
+
+  it('保存粗裁后有底稿移入 / 移出回收站 ⇒ 重取程序列表（「程序裁剪 ›」不再指向已移入回收站的底稿）', async () => {
+    const vm = (await mountView()).vm as any
+    mocks.canonicalTrimPreview.mockResolvedValue({ preview_id: 'pv-n', recycle_preview: { to_recycle: [] } })
+    mocks.canonicalTrimApply.mockResolvedValueOnce({ applied: 1 })
+    await vm.saveTrim()
+    expect(mocks.getProcedures, '没有底稿进出回收站不必重取').toHaveBeenCalledTimes(1)
+
+    mocks.getProcedures.mockResolvedValueOnce([{ id: 'x', wp_code: 'H1', status: 'execute', wp_id: 'w-restored' }])
+    mocks.canonicalTrimApply.mockResolvedValueOnce({ applied: 1, restored_codes: ['H1'] })
+    await vm.saveTrim()
+    expect(mocks.getProcedures).toHaveBeenCalledTimes(2)
+    expect(vm.procedures[0].wp_id, '恢复的底稿要能点「程序裁剪 ›」进去').toBe('w-restored')
+
+    mocks.getProcedures.mockResolvedValueOnce([{ id: 'x', wp_code: 'H1', status: 'not_applicable', skip_reason: '无' }])
+    mocks.canonicalTrimApply.mockResolvedValueOnce({ applied: 1, recycled_codes: ['H1'] })
+    await vm.saveTrim()
+    expect(mocks.getProcedures).toHaveBeenCalledTimes(3)
+    expect(vm.procedures[0].wp_id, '移入回收站的底稿不能再指向它').toBeNull()
+  })
+
+  it('确认建议：取消 ⇒ 返回 false 且不 apply；确认 ⇒ 带确认标记', async () => {
+    const vm = (await mountView()).vm as any
+    mocks.canonicalTrimPreview.mockResolvedValue(RECYCLE_PV)
+    mocks.canonicalTrimApply.mockResolvedValue({ applied: 1 })
+    const row = { wp_code: 'H3', _suggestNarrative: '金额低于临界值', _suggestReasonCode: 'below_trivial' }
+    mocks.confirm.mockRejectedValueOnce('cancel')
+    expect(await vm.applySuggestions([row])).toBe(false)
+    expect(mocks.canonicalTrimApply).not.toHaveBeenCalled()
+    mocks.confirm.mockResolvedValueOnce('confirm')
+    expect(await vm.applySuggestions([row])).toBe(true)
+    expect(mocks.canonicalTrimApply.mock.calls[0][4]).toEqual({ confirmSubstantiveRecycle: true })
+  })
+
+  it('参照项目：取消 ⇒ 不 apply；确认 ⇒ 带确认标记', async () => {
+    const vm = (await mountView()).vm as any
+    vm.refProjectId = 'project-2'
+    mocks.getProcedures.mockResolvedValue([{ id: 'x', wp_code: 'H3', status: 'not_applicable', skip_reason: '参照' }])
+    mocks.canonicalTrimPreview.mockResolvedValue(RECYCLE_PV)
+    mocks.canonicalTrimApply.mockResolvedValue({ applied: 1 })
+    mocks.confirm.mockRejectedValueOnce('cancel')
+    await vm.applyRef()
+    expect(mocks.canonicalTrimApply).not.toHaveBeenCalled()
+    mocks.confirm.mockResolvedValueOnce('confirm')
+    await vm.applyRef()
+    expect(mocks.canonicalTrimApply.mock.calls[0][4]).toEqual({ confirmSubstantiveRecycle: true })
+  })
+
+  it('跨循环智能裁剪：只在有编制内容时才问；取消 = 该循环不保存', async () => {
+    const vm = (await mountView()).vm as any
+    vm.smartTrimScope = 'custom'
+    vm.smartTrimCycles = ['H']
+    mocks.fetchTrimDecisionContext.mockResolvedValue({ accounts: { 投资性房地产: {} }, degradations: [] })
+    mocks.getProcedures.mockResolvedValue([{ id: 'x', wp_code: 'H3', status: 'not_applicable', skip_reason: '无数据' }])
+    mocks.canonicalTrimApply.mockResolvedValue({ applied: 1 })
+    mocks.confirm.mockResolvedValue('confirm')
+
+    mocks.canonicalTrimPreview.mockResolvedValueOnce(PLAIN_PV)
+    await vm.confirmSmartTrim()
+    expect(mocks.confirm, '没有编制内容的只问「跨循环直接保存」这一次').toHaveBeenCalledTimes(1)
+    expect(mocks.canonicalTrimApply.mock.calls[0][4]).toEqual({ confirmSubstantiveRecycle: false })
+
+    mocks.canonicalTrimPreview.mockResolvedValueOnce(RECYCLE_PV)
+    mocks.confirm.mockResolvedValueOnce('confirm').mockRejectedValueOnce('cancel')
+    await vm.confirmSmartTrim()
+    expect(mocks.confirm).toHaveBeenCalledTimes(3)
+    expect(mocks.canonicalTrimApply, '取消后仍保存了该循环').toHaveBeenCalledTimes(1)
+
+    mocks.canonicalTrimPreview.mockResolvedValueOnce(RECYCLE_PV)
+    await vm.confirmSmartTrim()
+    expect(mocks.canonicalTrimApply.mock.calls[1][4]).toEqual({ confirmSubstantiveRecycle: true })
   })
 })

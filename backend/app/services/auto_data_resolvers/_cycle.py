@@ -165,53 +165,17 @@ async def _resolve_confirmation_summary(db: AsyncSession, project_id: UUID, year
     参数: kw['cycle'] 默认为 "D"（收入循环）。
     """
     cycle = kw.get("cycle", "D")
-
-    # 尝试从 confirmation 相关表读取数据
-    try:
-        # 查询 confirmation 表中该循环的发函/回函/差异统计
-        stmt = sa.text("""
-            SELECT
-                COUNT(*) FILTER (WHERE status IS NOT NULL) AS sent_count,
-                COUNT(*) FILTER (WHERE status = 'received') AS received_count,
-                COUNT(*) FILTER (WHERE has_difference = true) AS diff_count
-            FROM confirmations
-            WHERE project_id = :project_id
-              AND year = :year
-              AND cycle = :cycle
-        """)
-        result = await db.execute(stmt, {"project_id": project_id, "year": year, "cycle": cycle})
-        row = result.first()
-    except Exception:
-        # confirmation 表可能不存在或结构不同 → 降级
-        _logger.debug("confirmation_summary_for_cycle: table query failed, using fallback")
-        return {
-            "summary": f"{cycle}循环函证: 尚未发起函证",
-            "sent_count": 0,
-            "received_count": 0,
-            "response_rate": "0%",
-            "diff_count": 0,
-        }
-
-    if row is None or row.sent_count == 0:
-        return {
-            "summary": f"{cycle}循环函证: 尚未发起函证",
-            "sent_count": 0,
-            "received_count": 0,
-            "response_rate": "0%",
-            "diff_count": 0,
-        }
-
-    sent = row.sent_count
-    received = row.received_count
-    diff = row.diff_count
-    rate = (received / sent * 100) if sent > 0 else 0
-
+    # 🔴 原实现查 confirmations 的 cycle / year / has_difference，三列真库都没有（真实列是 confirm_type /
+    #    diff_amount / status 等，也没有按循环、年度区分的口径），这条 SQL 从来没成功过：在 try/except 里降级成
+    #    「尚未发起函证」，但 PG 上失败的语句会让整个请求事务 aborted —— 同一次渲染里随后的取数（B50 风险等）
+    #    全部失败、程序表渲染还得靠回滚兜底（spec audit-year-calendar-fallback-ratchet 任务 0.1 实测发现）。
+    #    在函证中心有按循环 / 年度的统计口径之前不查库，直接返回原来的降级结果（对用户显示不变）。
     return {
-        "summary": f"{cycle}循环函证: 已发{sent}函/回函{received}封/差异{diff}笔",
-        "sent_count": sent,
-        "received_count": received,
-        "response_rate": f"{rate:.0f}%",
-        "diff_count": diff,
+        "summary": f"{cycle}循环函证: 尚未发起函证",
+        "sent_count": 0,
+        "received_count": 0,
+        "response_rate": "0%",
+        "diff_count": 0,
     }
 
 

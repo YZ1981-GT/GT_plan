@@ -585,7 +585,7 @@ const h1Year = computed(() => {
   if (props.year) return props.year
   const m = /^(\d{4})/.exec(h1PeriodEnd.value || '')
   if (m) return Number(m[1])
-  return new Date().getFullYear()
+  return null
 })
 
 const showHtmlToolbar = computed(() => {

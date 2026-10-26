@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_audit_year
 from app.models.core import User
 from app.services.data_fetch_custom import CustomFetchService, FetchRule
 
@@ -25,13 +25,14 @@ router = APIRouter(prefix="/api/projects/{project_id}/custom-fetch", tags=["自�
 class ExecuteRuleRequest(BaseModel):
     """执行取数规则请求"""
     rules: list[dict]
-    year: int = 2025
+    year: int | None = None
 
 
 class TraceRequest(BaseModel):
     """溯源查询请求"""
     location: str
     rules: list[dict]
+    year: int | None = None
 
 
 class SaveRulesRequest(BaseModel):
@@ -61,7 +62,8 @@ async def execute_fetch_rules(
         "description": "货币资金=库存现金+银行存款"
     }
     """
-    svc = CustomFetchService(db, project_id, data.year)
+    year = await require_project_audit_year(db, project_id, data.year)
+    svc = CustomFetchService(db, project_id, year)
     result = await svc.execute_rules(data.rules)
     return result
 
@@ -77,7 +79,8 @@ async def trace_forward(
 
     location 格式：note:五、1:0:1 / workpaper:E1-1:Sheet1:B7
     """
-    svc = CustomFetchService(db, project_id, 2025)
+    year = await require_project_audit_year(db, project_id, data.year)
+    svc = CustomFetchService(db, project_id, year)
     traces = await svc.trace_target(data.location, data.rules)
     return {"target": data.location, "sources": traces}
 
@@ -93,7 +96,8 @@ async def trace_backward(
 
     location 格式：trial_balance:1001:audited_amount
     """
-    svc = CustomFetchService(db, project_id, 2025)
+    year = await require_project_audit_year(db, project_id, data.year)
+    svc = CustomFetchService(db, project_id, year)
     targets = await svc.trace_source(data.location, data.rules)
     return {"source": data.location, "targets": targets}
 

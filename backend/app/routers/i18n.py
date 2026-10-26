@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import assert_self_or_admin, get_current_user
 from app.models.core import User
 from app.services.i18n_service import I18nService
 
@@ -62,7 +62,8 @@ async def set_user_language(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """设置用户语言偏好"""
+    """设置用户语言偏好（本人或 admin；原先任何登录用户都能改别人的语言）"""
+    assert_self_or_admin(current_user, user_id)
     svc = I18nService()
     try:
         result = await svc.set_user_language(db, user_id, body.language)

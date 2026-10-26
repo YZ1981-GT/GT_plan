@@ -641,18 +641,12 @@ async def _auto_import_data_sheets(
         "aux_ledger": ["aux_type", "voucher_date", "debit_amount", "credit_amount"],
     }
 
-    # 如果没有指定年度，从项目的 wizard_state 中获取
+    # 如果没有指定年度，从项目审计年度单一来源取
     if year is None:
-        from sqlalchemy import select as sa_select
-        from app.models.core import Project
-        proj_result = await db.execute(
-            sa_select(Project.wizard_state).where(Project.id == project_id)
-        )
-        ws = proj_result.scalar_one_or_none() or {}
-        basic = ws.get("steps", {}).get("basic_info", {}).get("data", {})
-        year = basic.get("audit_year") or basic.get("year") or (
-            __import__("datetime").datetime.now().year - 1
-        )
+        from app.services.project_audit_year import fetch_project_audit_year
+        year = await fetch_project_audit_year(db, project_id)
+        if year is None:
+            raise HTTPException(status_code=422, detail="未设置审计年度，请先在项目基本信息中填写")
 
     # 1. 解析所有 sheet，识别每个 sheet 的数据类型，生成诊断信息
     all_sheets = _parse_excel_multi_sheet(content)

@@ -210,7 +210,7 @@ async function loadSheetData() {
       const fullSource = `${props.moduleSource}|A1:G100`
       const data = await api.post('/api/custom-query/execute', {
         project_id: props.projectId,
-        year: props.year || new Date().getFullYear(),
+        year: props.year ?? null,
         source: fullSource,
         filters: {},
       }) as any

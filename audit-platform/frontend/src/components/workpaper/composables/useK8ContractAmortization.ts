@@ -143,8 +143,8 @@ export function useK8ContractAmortization(params: UseK8ContractAmortizationParam
   const amortStart = ref('')
   const amortEnd = ref('')
 
-  function _defaultYear(): number {
-    return year?.value ?? new Date().getFullYear()
+  function _defaultYear(): number | null {
+    return year?.value ?? null
   }
 
   function _getJson(itemId: string): any {

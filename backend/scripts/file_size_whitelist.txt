@@ -1598,6 +1598,21 @@ backend/app/services/acnr/resolver.py  1086
 #     拆分方向：公式生成（generate_*）、执行（execute_note_formulas + _exec_*）、跨表取数（_load_cross_table_data +
 #     _resolve_single_cross_ref）三块各自成模块。
 backend/app/services/note_formula_generator.py  1483
+#   ProcedureTrimming.vue / GtAProgramConsole.vue / procedure_trim_service.py —— 历史大文件（HEAD 已 4012 / 1889 / 1086 行且未登记）。
+#     2026-10-24 procedure-trim-generation-delegation-chain 批 3：粗裁保存前回收站确认（+16）、被委派人看不到目标循环时带理由扩权重试与
+#     预览缺口提示（+38 / +11）、apply_scheme 回收站联动与级联按底稿归属（+44；新逻辑放伴生模块 procedure_trim_recycle）。
+#     拆分方向：ProcedureTrimming 委派向导 / 建议分配 / 智能裁剪三块各成子组件；控制台行委派弹窗抽组件；
+#     procedure_trim_service 方案 preview / apply 与级联按职责拆模块。
+audit-platform/frontend/src/views/ProcedureTrimming.vue  4012
+audit-platform/frontend/src/components/workpaper/GtAProgramConsole.vue  1889
+backend/app/services/procedure_trim_service.py  1086
+#   test_task1_resource_access.py / test_task15_integration_explain.py / test_ai_chat_mcp_tools_data.py —— 历史大文件
+#     （HEAD 已 1104 / 863 / 972 行且未登记）。2026-10-25 procedure-trim-generation-delegation-chain 批 3 / 批 4：
+#     按「主管看全部循环」裁决改写的既有用例（+5 / +2 / +2，样本换成受限审计员、夹具角色改审计员）。
+#     拆分方向：DSH 资源访问按宿主类型分文件；MCP 工具数据按工具分文件。
+backend/tests/dsh_agent_panel/test_task1_resource_access.py  1104
+backend/tests/procedure_delegation_visibility/test_task15_integration_explain.py  863
+backend/tests/test_ai_chat_mcp_tools_data.py  972
 #   diagnose_g7_column_alignment.py —— 历史大文件（HEAD 已 1600 行且未登记，任何改动都会被门禁拒）。
 #     2026-10-24 consol-note-header-library-and-node-reaggregate R8.4 批 9b-2：清空单槽占位豁免登记（4 张合营表改两层，净 −24）。
 #     拆分方向：openpyxl 读取（read_source_facts）/ 六维比对（build_alignment_report）/ 自检（_sc_*）/ 报告与 facts 投影各成模块。
@@ -1617,3 +1632,26 @@ backend/scripts/diagnose/diagnose_g7_column_alignment.py  1576
 backend/app/routers/wp_render_strategies/_j1_disclosure_import_export.py  831
 backend/scripts/fix/fix_note_i_cycle_structure.py  1259
 backend/tests/test_note_expandable_rows.py  986
+#   GtC24JournalDetail.vue / GtWpRenderer.vue / useH1LeaseCheck.ts / N1TabCalcTable.vue / audit_check.py /
+#   account_chart_service.py / qc_engine.py —— 历史大文件（HEAD 已 2049 / 1502 / 1562 / 1522 / 888 / 1521 / 974 行且未登记，
+#     任何改动都会被门禁拒）。2026-10-26 audit-year-calendar-fallback-ratchet：拿不到审计年度不再用今年 / 写死年度 ——
+#     GtWpRenderer 缺年度时显示「未设置审计年度」、不挂载读年度数据的组件（+7）；N1 计算表在两条取数路径前统一取年度、
+#     缺失提示（+6）；useH1LeaseCheck（+2）/ audit_check（+4）改取项目审计年度；account_chart_service 净 −6；
+#     GtC24JournalDetail / qc_engine 行数不变。
+#     拆分方向：GtWpRenderer 把运行时边界与 sheet 分发拆子组件；GtC24 明细表 / 抽凭区各成子组件；useH1LeaseCheck 按
+#     租赁负债测算 / 检查表持久化两块拆；N1 计算表把取数拆 composable；audit_check 与 qc_engine 按检查类别拆模块；
+#     account_chart_service 按导入 / 映射 / 查询拆。
+#   🔴 `excel_html.py` / `report_config.py` **不登记**：HEAD 上 796 / 800 行在限内，本次加年度解析后越线 ——
+#     删掉函数体内重复的 `from uuid import UUID`、压掉 E303 多余空行，现 799 / 800。
+audit-platform/frontend/src/components/workpaper/GtC24JournalDetail.vue  2049
+audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue  1509
+audit-platform/frontend/src/components/workpaper/composables/useH1LeaseCheck.ts  1564
+audit-platform/frontend/src/components/workpaper/n1/calc/N1TabCalcTable.vue  1528
+backend/app/routers/audit_check.py  892
+backend/app/services/account_chart_service.py  1515
+backend/app/services/qc_engine.py  974
+#   WorkpaperWordEditor.spec.ts —— 历史大文件（HEAD 已 1929 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-26 audit-year-calendar-fallback-ratchet 任务 8.2：组件年度改为宿主 > 路由 > 项目信息后，
+#     3 个夹具补项目审计年度、加「项目未设置审计年度不写字段覆盖」用例（+27）。
+#     拆分方向：按 A16 模式 / 通用模式 / 签字与字段覆盖三组拆文件，共享桩抽到 __tests__ 辅助模块。
+audit-platform/frontend/src/components/workpaper/__tests__/WorkpaperWordEditor.spec.ts  1956

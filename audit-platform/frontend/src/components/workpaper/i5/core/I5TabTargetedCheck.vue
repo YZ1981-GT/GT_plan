@@ -779,8 +779,8 @@ const samplingGate = useSamplingAccountGate({
   isReadonly: () => props.isReadonly,
 })
 const I5_ACCOUNT_PREFIXES = computed(() => i5GrossQueryCodes(_injectedTbSrc?.value ?? null))
-const samplingYear = computed(() => props.year || new Date().getFullYear())
-const asOfYear = computed(() => props.year || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
+const asOfYear = computed<number | null>(() => props.year ?? null)
 
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
 const attachedCount = ref(0)

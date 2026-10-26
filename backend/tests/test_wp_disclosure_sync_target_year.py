@@ -5,15 +5,19 @@ fallback 到服务器当前自然年 → 2026 年做 2025 年报审计时，同�
 附注记录，审计师在附注模块（按 ``projects.audit_year`` 渲染）永远看不到。
 DB 实证曾有 4 条 year=2026 孤儿记录（F3 五、36/八、36、H9 五、47、H10 三、资产处置收益）。
 
-修复：同步路径统一走 ``_resolve_target_year``，以 ``projects.audit_year`` 为权威；
-payload 显式 year 仍优先；两者都取不到才回落当前自然年。
+修复（两阶段）：
+1. 同步路径统一走 ``_resolve_target_year``，以 ``projects.audit_year`` 为权威；
+   payload 显式 year 仍优先。
+2. spec audit-year-calendar-fallback-ratchet 任务 6.1：
+   审计年度取不到不再 fallback 到 ``datetime.now().year``，而是返回 None——
+   如实暴露「年度未设置」，由调用方决定是否拒绝写入。
 
 Properties:
 - P-Y1 payload 显式 year 优先（不查库）
 - P-Y2 payload 无 year → 用 projects.audit_year
-- P-Y3 audit_year 缺失/非法 → 回落当前自然年（fail-open，不抛）
-- P-Y4 查询异常 → fail-open 回落当前自然年
-- P-Y5 纯函数 _derive_year 行为不变（零回归）
+- P-Y3 audit_year 缺失/非法 → 返回 None（如实暴露）
+- P-Y4 查询异常 → 返回 None（如实暴露）
+- P-Y5 纯函数 _derive_year：显式 year 原样返回，None/0/False → None
 """
 
 from __future__ import annotations
@@ -48,16 +52,17 @@ def _db_returning(value: object, *, raises: bool = False) -> MagicMock:
 
 
 class TestDeriveYearPure:
-    """P-Y5：纯兜底函数行为不变（零回归）。"""
+    """P-Y5：纯函数 _derive_year——显式 year 原样返回，None/0/False → None。"""
 
     def test_payload_year_wins(self):
         assert _derive_year(2025) == 2025
 
-    def test_none_falls_back_to_current_natural_year(self):
-        assert _derive_year(None) == CURRENT_YEAR
+    def test_none_returns_none(self):
+        """任务 6.1 后不再 fallback 到 datetime.now().year。"""
+        assert _derive_year(None) is None
 
-    def test_zero_and_bool_fall_back(self):
-        assert _derive_year(0) == CURRENT_YEAR
+    def test_zero_and_bool_return_none(self):
+        assert _derive_year(0) is None
 
 
 class TestResolveProjectAuditYear:
@@ -98,12 +103,13 @@ class TestResolveTargetYear:
         assert await _resolve_target_year(db, PROJECT_ID, None) == 2025
 
     @pytest.mark.asyncio
-    async def test_falls_back_to_current_year_when_audit_year_missing(self):
-        """P-Y3：审计年度缺失时回落当前自然年（保持旧行为，不抛）。"""
+    async def test_returns_none_when_audit_year_missing(self):
+        """P-Y3：审计年度缺失时返回 None（如实暴露，不 fallback 到当前年）。"""
         db = _db_returning(None)
-        assert await _resolve_target_year(db, PROJECT_ID, None) == CURRENT_YEAR
+        assert await _resolve_target_year(db, PROJECT_ID, None) is None
 
     @pytest.mark.asyncio
-    async def test_falls_back_to_current_year_on_db_error(self):
+    async def test_returns_none_on_db_error(self):
+        """P-Y4：查询异常返回 None（如实暴露，不 fallback 到当前年）。"""
         db = _db_returning(None, raises=True)
-        assert await _resolve_target_year(db, PROJECT_ID, None) == CURRENT_YEAR
+        assert await _resolve_target_year(db, PROJECT_ID, None) is None

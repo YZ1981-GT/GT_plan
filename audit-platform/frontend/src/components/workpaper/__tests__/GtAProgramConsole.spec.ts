@@ -36,6 +36,20 @@ vi.mock('@/services/apiProxy', () => ({
   },
 }))
 
+// 按行裁剪 / 行归属（spec procedure-trim-generation-delegation-chain 需求 6 / 7）：裁剪先落到程序行任务
+const rowApi = vi.hoisted(() => ({ setApplicability: vi.fn(), getAccess: vi.fn() }))
+vi.mock('@/services/commonApi', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  setProgramRowApplicability: rowApi.setApplicability,
+  getProgramRowAccess: rowApi.getAccess,
+}))
+beforeEach(() => {
+  rowApi.setApplicability.mockReset().mockResolvedValue({ changed: true })
+  rowApi.getAccess.mockReset().mockResolvedValue({
+    full_power: true, can_trim: true, own_program_nos: [], assignees: {}, template_code: 'D2A',
+  })
+})
+
 // Mock useWpOnboardingGuide（避免引导逻辑依赖）
 vi.mock('@/composables/useWpOnboardingGuide', () => ({
   useWpOnboardingGuide: () => ({
@@ -205,7 +219,7 @@ describe('GtAProgramConsole — 进度条统计', () => {
     expect(vm.pendingCount).toBe(1)
   })
 
-  it('进度百分比 = (完成 + 裁剪) / 总数', () => {
+  it('进度百分比 = 完成 / (总数 − 裁剪)（不适用不计入分子分母）', () => {
     const wrapper = mount(GtAProgramConsole, {
       props: {
         wpId: 'wp-001',
@@ -217,8 +231,10 @@ describe('GtAProgramConsole — 进度条统计', () => {
     })
 
     const vm = wrapper.vm as any
-    // (1 completed + 1 trimmed) / 4 total = 50%
-    expect(vm.progressPercentage).toBe(50)
+    // 1 completed / (4 total − 1 trimmed) = 33%（spec procedure-trim-generation-delegation-chain 需求 6.5；
+    // 原先 (完成 + 裁剪) / 总数 = 50%）
+    expect(vm.progressPercentage).toBe(33)
+    expect(vm.progressFormat(33)).toBe('1/3 (33%)')
   })
 
   it('空数据时进度为 0', () => {
@@ -351,9 +367,12 @@ describe('GtAProgramConsole — 裁剪确认', () => {
     vm.trimDialogVisible = true
     await nextTick()
 
-    vm.confirmTrim()
+    await vm.confirmTrim()
     await nextTick()
 
+    expect(rowApi.setApplicability).toHaveBeenCalledWith('proj-001', 'wp-001', 'trim', expect.objectContaining({
+      sheet_name: '应收账款实质性程序表D2A', program_no: '4', reason: '本期无期后回款',
+    }))
     const emitted = wrapper.emitted('program-trim')
     expect(emitted).toBeDefined()
     expect(emitted![0][0]).toEqual({ programId: 'p4', reason: '本期无期后回款' })
@@ -380,6 +399,7 @@ describe('GtAProgramConsole — 裁剪确认', () => {
 
     // Should not emit since reason is whitespace-only
     expect(wrapper.emitted('program-trim')).toBeUndefined()
+    expect(rowApi.setApplicability).not.toHaveBeenCalled()
   })
 })
 
@@ -398,8 +418,9 @@ describe('GtAProgramConsole — 批量裁剪', () => {
     const vm = wrapper.vm as any
     vm.selectedIds = ['p2', 'p4']
     vm.batchTrimForm.reason = '本项目不涉及该业务'
-    vm.confirmBatchTrim()
+    await vm.confirmBatchTrim()
     await nextTick()
+    expect(rowApi.setApplicability.mock.calls.map((c: any[]) => c[3].program_no)).toEqual(['2', '4'])
 
     const emitted = wrapper.emitted('program-trim')
     expect(emitted).toBeDefined()

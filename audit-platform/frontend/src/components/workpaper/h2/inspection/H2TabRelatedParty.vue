@@ -565,6 +565,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  */
 import { inject, toRef, computed, ref, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { fetchProjectAuditYear } from '@/composables/useProjectAuditYear'
 import {
   useH2RelatedParty,
   type H2RelatedPartyRow,
@@ -643,7 +644,12 @@ async function loadParties() {
 async function loadA7Total() {
   if (!props.projectId) return
   try {
-    const year = new Date().getFullYear()
+    // 取项目审计年度（原先取今年）；取不到如实提示
+    const { year, failed } = await fetchProjectAuditYear(props.projectId)
+    if (year == null) {
+      ElMessage.warning(failed ? '读取项目审计年度失败，请稍后重试' : '未设置审计年度，无法读取关联方汇总')
+      return
+    }
     const res = await http.get(
       `/api/projects/${props.projectId}/related-party-summary`,
       { params: { year }, _silent: true } as any,

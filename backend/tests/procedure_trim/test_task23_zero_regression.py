@@ -66,6 +66,19 @@ SIB_REASON = _HERE.parent / "test_trim_reason_code_contract.py"
 # 新增字段属 additive，**必须同时登记在此**，否则本守卫打红 —— 这正是它的作用：
 # 让"悄悄多下发一个键"和"悄悄少下发一个键"都必须经过一次显式登记。
 # ═══════════════════════════════════════════════════════════════════════════
+# ─── 增量登记（additive，2026-10-24，spec procedure-trim-generation-delegation-chain 批 3 任务 11）───
+#   preview.scope_gaps                被委派人可见范围不含任务所在循环的缺口（应用时须填理由扩权）
+#   preview.summary.trimmed_excluded  底稿已裁剪 / 在回收站、程序行不适用而不委派的任务数
+#   apply.scope_expanded              本次扩权写入的循环；apply.trimmed_excluded 同上（应用时现算）
+# ─── 增量登记（additive，2026-10-25，spec procedure-chain-followup-closure R2.1）───
+#   preview.materialization           预览前置：导入程序行定义 / 物化缺的行任务 / 绑定已生成底稿的结果
+#   preview.hint                      没有可委派任务时说明原因（有任务时为 None）
+# 只增不减。HEAD 侧交叉佐证改为「HEAD 有的工作树必有 + 工作树多出的必在此登记」，提交前后都成立。
+ADDITIVE_KEYS = {
+    "preview": frozenset({"scope_gaps", "materialization", "hint"}),
+    "summary": frozenset({"trimmed_excluded"}),
+    "apply": frozenset({"scope_expanded", "trimmed_excluded"}),
+}
 PREVIEW_TOP_KEYS = frozenset({
     "status",
     "preview_id",
@@ -75,7 +88,7 @@ PREVIEW_TOP_KEYS = frozenset({
     "membership_load",
     "affected_workpapers",
     "target_versions",
-})
+}) | ADDITIVE_KEYS["preview"]
 PREVIEW_SUMMARY_KEYS = frozenset({
     "targets",
     "would_assign",
@@ -88,7 +101,7 @@ PREVIEW_SUMMARY_KEYS = frozenset({
     "already_assigned",
     "in_progress",
     "submitted",
-})
+}) | ADDITIVE_KEYS["summary"]
 PREVIEW_MEMBERSHIP_LOAD_KEYS = frozenset({"assignee_staff_id", "active_task_count"})
 PREVIEW_AFFECTED_WP_KEYS = frozenset({"wp_index_ids", "wp_ids"})
 PREVIEW_TARGET_VERSION_KEYS = frozenset({"task_id", "lock_version", "assignment_version"})
@@ -103,7 +116,7 @@ APPLY_KEYS = frozenset({
     "skipped_assigned",
     "best_effort",
     "per_task",
-})
+}) | ADDITIVE_KEYS["apply"]
 
 # 附注同步链路的**既有**模块（本 spec 的 Task 21 联动为纯新增，不得改它们）。
 NOTE_CHAIN_FILES = (
@@ -344,9 +357,10 @@ class TestDelegationContractFrozen:
         )
 
     def test_head_side_keys_equal_worktree(self):
-        """🔴 直接证据：同一抽取器施加于 HEAD 版文本，两侧键集必须相等。
+        """🔴 直接证据：同一抽取器施加于 HEAD 版文本，HEAD 有的字段工作树一个不少，工作树多出的必须已登记。
 
-        这才是「逐字段不变」而不只是「与我写下的常量一致」。
+        这才是「逐字段不变」而不只是「与我写下的常量一致」。原判据是两侧精确相等 —— 登记过的
+        additive 字段在提交前恒红、提交后自愈（2026-10-24 改，见 ``ADDITIVE_KEYS``）。
         git 不可用时 skip 并写明理由（主判据仍恒执行）。
         """
         head = _git_show(DELEGATION_SVC_REL)
@@ -356,16 +370,24 @@ class TestDelegationContractFrozen:
                 "⚠️ 不等于契约没变：主判据（冻结常量比对）仍在本类其余用例中执行。"
             )
         wt = _read(DELEGATION_SVC)
-        assert _keys(_preview_dict(head)) == _keys(_preview_dict(wt)), (
-            "preview 顶层字段集在 HEAD 与工作树之间不同 —— 本 spec 改动了委派对外契约"
-        )
-        assert _keys(_apply_dict(head)) == _keys(_apply_dict(wt)), (
-            "apply 字段集在 HEAD 与工作树之间不同 —— 本 spec 改动了委派对外契约"
-        )
+
+        def _check(name: str, h_keys, w_keys) -> None:
+            h_keys, w_keys = set(h_keys), set(w_keys)
+            assert h_keys <= w_keys, (
+                f"{name} 字段集比 HEAD 少了 {sorted(h_keys - w_keys)} —— 破 R14.1 对外契约"
+            )
+            extra = w_keys - h_keys
+            assert extra <= ADDITIVE_KEYS.get(name, frozenset()), (
+                f"{name} 比 HEAD 多出未登记的字段 {sorted(extra - ADDITIVE_KEYS.get(name, frozenset()))}"
+                " —— 新增字段须登记在 ADDITIVE_KEYS"
+            )
+
+        _check("preview", _keys(_preview_dict(head)), _keys(_preview_dict(wt)))
+        _check("apply", _keys(_apply_dict(head)), _keys(_apply_dict(wt)))
         for sub in ("summary", "membership_load", "affected_workpapers"):
             h, w = _sub_dict(_preview_dict(head), sub), _sub_dict(_preview_dict(wt), sub)
             assert h is not None and w is not None, f"HEAD 或工作树缺 preview.{sub}"
-            assert _keys(h) == _keys(w), f"preview.{sub} 字段集与 HEAD 不同"
+            _check(sub, _keys(h), _keys(w))
 
     def test_head_comparison_is_not_vacuous(self):
         """反向自检：上一条不是在空文本上比空集。"""

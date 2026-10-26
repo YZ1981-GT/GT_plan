@@ -138,6 +138,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import apiPaths from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import GtCustomGridSheet from '@/components/workpaper/custom/GtCustomGridSheet.vue'
 import GtOnlyOfficeSheet from '@/components/workpaper/GtOnlyOfficeSheet.vue'
 import FormulaEditDialog from '@/components/formula/FormulaEditDialog.vue'
@@ -271,6 +272,8 @@ const formulaCells = computed<Record<string, string>>(() => {
 
 const wpContext = computed<WpFormulaContext | undefined>(() => {
   if (!props.projectId) return undefined
+  const yearVal = props.year ?? null
+  if (yearVal == null) return undefined // 年度不可用时不提供公式上下文
   const cells = effectiveHtmlData.value?.cells as Record<string, unknown> | undefined
   // 🔴 语义标签派生：直接用 `A1`/`B2` 当 label 会让选址列表毫无语义，
   //    审计师无法判断该格是什么项目（违反「审计 UI 必须有逻辑追溯能力」）。
@@ -281,7 +284,7 @@ const wpContext = computed<WpFormulaContext | undefined>(() => {
     wpCode: props.wpCode || '',
     sheetName: props.sheetName,
     projectId: props.projectId,
-    year: props.year ?? new Date().getFullYear(),
+    year: yearVal,
     cells: cellList,
   }
 })
@@ -412,11 +415,16 @@ async function onFormulaSave(payload: {
     //    definition_version」，改已有公式恒失败（spec formula-governance-coverage-closure R5 走查实测）
     const existing = formulaList.value.find((f) => f.target_cell === targetCell
       && (!f.sheet_name || f.sheet_name === props.sheetName))
+    const formulaYear = props.year ?? null
+    if (formulaYear == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      return
+    }
     const res = (await api.put(apiPaths.workpapers.formulas(props.wpId), {
       sheet_name: props.sheetName,
       target_cell: targetCell,
       expression: payload.formula,
-      year: props.year ?? new Date().getFullYear(),
+      year: formulaYear,
       // 不传 template_type：后端按底稿所属项目的口径校验引用（R6；原先写死 soe ⇒ 上市项目按国企附注校验）
       category: payload.category,
       description: payload.description,

@@ -522,7 +522,11 @@ export function useD6Detail(options: UseD6DetailOptions) {
   async function importPostSettlementFromLedger(bsDate?: string): Promise<void> {
     if (!wpId.value || !projectId.value) return
 
-    const year = bsDate ? parseInt(bsDate.slice(0, 4)) : new Date().getFullYear() - 1
+    const year = bsDate ? parseInt(bsDate.slice(0, 4)) : null
+    if (year == null || !Number.isFinite(year)) {
+      ElMessage.warning('未设置审计年度，无法读取期后序时账')
+      return
+    }
     const nextYear = year + 1
     const dateFrom = `${nextYear}-01-01`
     const dateTo = `${nextYear}-06-30`

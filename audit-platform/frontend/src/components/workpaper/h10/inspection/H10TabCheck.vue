@@ -204,7 +204,7 @@ const auditNote = ref('')
 const auditConclusion = ref('')
 const sampleReasons = ref<string[]>([])
 const showSamplingDialog = ref(false)
-const samplingYear = computed(() => props.year ?? new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 function saveSampleReasons(val: string[]): void {
   if (props.isReadonly) return

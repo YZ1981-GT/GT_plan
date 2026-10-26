@@ -178,8 +178,9 @@ describe('9 档决策顺序逐条命中', () => {
     }
   })
 
+  // 「无数据」格的金额只能是未出现（null）或 0：baseInput 默认金额 100 万，与「无数据」矛盾。
   it('档 4 数据存在性：科目底稿级 no_data ⟹ auto_trim / no_data', () => {
-    expect(triple(baseInput({ subjectDataState: 'no_data' }))).toEqual([
+    expect(triple(baseInput({ subjectDataState: 'no_data', accountAmount: null }))).toEqual([
       'auto_trim',
       'no_data',
       'no_data',
@@ -188,8 +189,23 @@ describe('9 档决策顺序逐条命中', () => {
 
   it('档 4 数据存在性：科目级 unknown + 循环级无数据 ⟹ auto_trim / no_data', () => {
     expect(
-      triple(baseInput({ subjectDataState: 'unknown', cycleHasData: false })),
+      triple(baseInput({ subjectDataState: 'unknown', cycleHasData: false, accountAmount: 0 })),
     ).toEqual(['auto_trim', 'no_data', 'no_data'])
+  })
+
+  it('档 4 矛盾守卫：数据存在性说无数据、金额却非零 ⟹ 不自动裁（重药安徽 H3 回归）', () => {
+    // H3 曾在叙述里写着「无数据（科目余额 7,689,744.44 元）」被自动裁掉
+    for (const over of [
+      { subjectDataState: 'no_data', accountAmount: 7_689_744.44 },
+      { subjectDataState: 'unknown', cycleHasData: false, accountAmount: -1 },
+      { subjectDataState: 'no_data', accountAmount: 0.01 },
+    ] as const) {
+      const d = decideTrim(baseInput({ ...over }))
+      expect(d.verdict, JSON.stringify(over)).not.toBe('auto_trim')
+      expect(d.reasonCode, JSON.stringify(over)).not.toBe('no_data')
+    }
+    // 低于 0.005 元视为 0，仍按无数据自动裁
+    expect(triple(baseInput({ subjectDataState: 'no_data', accountAmount: 0.004 }))[0]).toBe('auto_trim')
   })
 
   it('档 5 完整性豁免（认定级）：completenessRmm=H ⟹ keep，不进重要性判据', () => {
@@ -309,11 +325,12 @@ describe('决策顺序短路性', () => {
   })
 
   it('档 4 命中时，重要性与完整性取值变化不改变结论', () => {
-    assertStable('档 4', { subjectDataState: 'no_data' }, [
+    // 金额只取与「无数据」相容的值（未出现 / 0）；非零金额由档 4 矛盾守卫另测
+    assertStable('档 4', { subjectDataState: 'no_data', accountAmount: null }, [
       {},
       { materiality: null },
       { materiality: { performanceMateriality: 1, trivialThreshold: 1 } },
-      { accountAmount: 1 },
+      { accountAmount: 0 },
       { accountAmount: null },
       { completenessSensitiveCycle: true },
     ])
@@ -421,6 +438,7 @@ describe('既有五类保留判据行为保持（Property 32）', () => {
       baseInput({
         procedure: { executionStatus: 'pending', hasWorkpaperEntry: false },
         subjectDataState: 'no_data',
+        accountAmount: 0,
       }),
     )
     expect(d.verdict).toBe('auto_trim')

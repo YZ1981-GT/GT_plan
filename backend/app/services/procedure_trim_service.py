@@ -52,6 +52,13 @@ from app.services.procedure_operation_preview import (
 )
 from app.services.procedure_reconcile_service import is_legacy_uuid_key
 from app.services.procedure_task_materialization_service import _base_wp_code
+from app.services.procedure_trim_recycle import (
+    CASCADE_EVENT,
+    apply_linkage,
+    ensure_confirmed,
+    load_scope_coverage,
+    plan_scope_linkage,
+)
 from app.services.procedure_task_transition_service import (
     APPLICABILITY_EXECUTE,
     APPLICABILITY_NOT_APPLICABLE,
@@ -637,9 +644,13 @@ class ProcedureTrimService:
         )
 
     async def _resolve_scope(
-        self, project_id: UUID, cycle: str, wp_index_code: str
+        self, project_id: UUID, cycle: str, wp_index_code: str, coverage=None
     ) -> tuple[list[ProcedureInstance], list[ProcedureRowTask]]:
-        """粗裁范围：匹配的 ProcedureInstance + 该范围未终态可级联取消的 tasks。"""
+        """粗裁范围：匹配的 ProcedureInstance + 该范围可级联取消 / 重开的 tasks。
+
+        任务按底稿归属匹配（该条目覆盖的 wp_index，含子表 / 程序表；见 ``procedure_trim_recycle``）∪ 同码快照。
+        原按 ``audit_cycle_snapshot == cycle``，物化时循环兜底成 ``A`` 的任务裁剪后不被取消。
+        """
         instances = (
             (
                 await self.db.execute(
@@ -656,16 +667,20 @@ class ProcedureTrimService:
             .scalars()
             .all()
         )
+        index_ids = [row.id for row in coverage.covered(wp_index_code)] if coverage else []
+        belongs = ProcedureRowTask.wp_code == wp_index_code
+        if index_ids:
+            belongs = sa.or_(belongs, ProcedureRowTask.wp_index_id.in_(index_ids))
         tasks = (
             (
                 await self.db.execute(
                     sa.select(ProcedureRowTask)
                     .where(
                         ProcedureRowTask.project_id == project_id,
-                        ProcedureRowTask.wp_code == wp_index_code,
-                        ProcedureRowTask.audit_cycle_snapshot == cycle,
+                        belongs,
                         ProcedureRowTask.is_deleted == sa.false(),
                     )
+                    .order_by(ProcedureRowTask.id)
                     .with_for_update()
                 )
             )
@@ -689,6 +704,10 @@ class ProcedureTrimService:
         scope_plans: list[dict] = []
         conflicts: list[dict] = []
         migration_conflicts: list[dict] = []
+        coverage = (
+            await load_scope_coverage(self.db, project_id)
+            if any(e["kind"] == KIND_SCOPE for e in entries) else None
+        )
 
         for entry in entries:
             if entry["kind"] == KIND_ROW:
@@ -725,7 +744,7 @@ class ProcedureTrimService:
                 )
             else:  # scope
                 instances, tasks = await self._resolve_scope(
-                    project_id, entry["cycle"], entry["wp_index_code"]
+                    project_id, entry["cycle"], entry["wp_index_code"], coverage
                 )
                 if not instances and not tasks:
                     conflicts.append({"key": entry["key"], "reason": "no_scope_target"})
@@ -746,6 +765,7 @@ class ProcedureTrimService:
             "scope_plans": scope_plans,
             "conflicts": conflicts,
             "migration_conflicts": migration_conflicts,
+            "linkage": await plan_scope_linkage(self.db, project_id, scope_plans, coverage),
         }
 
     async def _membership_snapshot(self, project_id: UUID) -> list:
@@ -906,6 +926,8 @@ class ProcedureTrimService:
                     if t.workflow_status in TERMINAL_WORKFLOW_STATES:
                         continue
                     would_change += 1
+        # 恢复执行：因粗裁级联取消的任务重开（与 apply 的真实计数同一判据）
+        would_change += len(plan["linkage"].reopen_task_ids)
 
         membership = await self._membership_snapshot(project_id)
         preview = await create_preview(
@@ -930,6 +952,8 @@ class ProcedureTrimService:
             },
             "conflicts": plan["conflicts"],
             "migration_conflicts": plan["migration_conflicts"],
+            # 已生成底稿的去向：被裁的移入回收站（substantive = 有编制内容，保存前须确认）、恢复执行的从回收站恢复
+            "recycle_preview": plan["linkage"].preview(),
         }
 
     async def apply_scheme(
@@ -941,6 +965,7 @@ class ProcedureTrimService:
         request_id: str,
         entries: list[dict] | None = None,
         scheme_id: UUID | None = None,
+        confirm_substantive_recycle: bool = False,
     ) -> dict:
         """方案应用：消费一次性 preview，经 TransitionService 真实应用（只 flush）。
 
@@ -948,6 +973,8 @@ class ProcedureTrimService:
         - 目标 task lock_version 自 preview 后变化 → 409（版本冲突）。
         - applied == **真实** 发生变化的 task/scope 数；无变化 applied=0（Property P10）。
         - 相同 request_id 重试 → 幂等返回旧 result。
+        - 已生成底稿联动（``procedure_trim_recycle``）：被裁的移入回收站、恢复执行的恢复并重开级联取消的任务；
+          有编制内容的底稿未确认（``confirm_substantive_recycle``）→ 写库前 409，预览凭证不消费。
         """
         if entries is None and scheme_id is not None:
             entries = await self._load_scheme_entries(project_id, scheme_id)
@@ -968,6 +995,8 @@ class ProcedureTrimService:
             }
             if current_versions != dict(preview.target_versions or {}):
                 raise HTTPException(status_code=409, detail="目标任务版本已变化，请重新预览")
+            linkage = plan["linkage"]
+            ensure_confirmed(linkage, confirm_substantive_recycle)
 
             applied = 0
             unchanged = 0
@@ -1044,21 +1073,35 @@ class ProcedureTrimService:
                         changed = await self.transition.cancel(
                             t,
                             actor_user_id=actor_user_id,
-                            reason="scheme_scope_cascade",
+                            reason=CASCADE_EVENT,
                             request_id=request_id,
                             set_applicability=APPLICABILITY_NOT_APPLICABLE,
-                            event_type="scheme_scope_cascade",
+                            event_type=CASCADE_EVENT,
                         )
                         if changed:
                             entry_applied += 1
                         else:
                             entry_unchanged += 1
+                else:  # 恢复执行：重开因粗裁级联取消的任务（cancelled→unassigned，须重新委派）
+                    for t in sp["cascade_tasks"]:
+                        if t.id in linkage.reopen_task_ids and t.workflow_status == "cancelled":
+                            await self.transition.reopen(
+                                t, actor_user_id=actor_user_id, request_id=request_id,
+                                set_applicability=APPLICABILITY_EXECUTE, reason="scheme_scope_restore",
+                                event_type="scheme_scope_restore",
+                            )
+                            entry_applied += 1
                 applied += entry_applied
                 unchanged += entry_unchanged
                 per_entry.append(
                     {"key": sp["entry"]["key"], "applied": entry_applied, "unchanged": entry_unchanged}
                 )
 
+            moved = await apply_linkage(
+                db, project_id, linkage, actor_user_id=actor_user_id, request_id=request_id,
+                reasons={sp["entry"]["wp_index_code"]: sp["entry"].get("skip_reason") or ""
+                         for sp in plan["scope_plans"]},
+            )
             await db.flush()
             return {
                 "applied": applied,
@@ -1066,6 +1109,7 @@ class ProcedureTrimService:
                 "conflict": len(plan["conflicts"]),
                 "conflicts": plan["conflicts"],
                 "per_entry": per_entry,
+                **moved,
             }
 
         return await consume_and_apply(

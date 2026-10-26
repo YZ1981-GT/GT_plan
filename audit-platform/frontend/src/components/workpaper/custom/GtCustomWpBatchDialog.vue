@@ -136,6 +136,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import { readWorkbookAoa } from '@/composables/useExcelIO'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
@@ -276,9 +277,16 @@ async function doCreate() {
       .filter((it) => okCodes.has(it.wp_code))
       .map(toPayloadItem)
 
+    const batchYear = props.year ?? null
+    if (batchYear == null) {
+      ElMessage.warning(MISSING_AUDIT_YEAR_MESSAGE)
+      creating.value = false
+      return
+    }
+
     const res = (await api.post(
       `/api/projects/${props.projectId}/working-papers/create-custom-batch`,
-      { items, year: props.year ?? new Date().getFullYear() }
+      { items, year: batchYear }
     )) as {
       created?: number
       skipped?: number

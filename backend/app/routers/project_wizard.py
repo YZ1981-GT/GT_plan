@@ -752,7 +752,9 @@ async def delete_project(
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
-    project.is_deleted = True
+    # 记下删除人与删除时间（回收站「删除人 / 删除时间」读它们；原先只置 is_deleted，两列恒空）
+    project.soft_delete()
+    project.updated_by = current_user.id
     # 需求 7.2：删除后按三码重算本年度派生链接（下级不再指向已删的合并项目）
     from app.services.group_links import sync_group_links_for
 
@@ -782,7 +784,8 @@ async def batch_delete_projects(
         )
         p = result.scalar_one_or_none()
         if p:
-            p.is_deleted = True
+            p.soft_delete()  # 同时记删除时间
+            p.updated_by = current_user.id  # 删除人（回收站读它）
             deleted.append(p)
     # 需求 7.2：整批删除后按涉及的年度各重算一次派生链接
     await sync_group_links_for(db, *deleted)

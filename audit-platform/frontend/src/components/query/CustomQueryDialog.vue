@@ -274,7 +274,7 @@ watch(visible, (v) => { if (v) activeTab.value = props.initialTab || 'basic' })
 
 // 项目 / 年度（默认从 props 继承，可由用户在弹窗内改写）
 const localProjectId = ref<string>(props.projectId || '')
-const localYear = ref<number>(props.year || new Date().getFullYear() - 1)
+const localYear = ref<number | null>(props.year ?? null)
 watch(() => props.projectId, (pid) => { if (pid && !localProjectId.value) localProjectId.value = pid })
 watch(() => props.year, (y) => { if (y) localYear.value = y })
 

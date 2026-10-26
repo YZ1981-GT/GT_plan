@@ -156,7 +156,7 @@ import { handleApiError } from '@/utils/errorHandler'
 const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
-const selectedYear = ref(Number(route.query.year) || new Date().getFullYear())
+const selectedYear = ref<number | null>(Number(route.query.year) || null)
 const yearOptions = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i)
 const loading = ref(false)
 const loadError = ref('')

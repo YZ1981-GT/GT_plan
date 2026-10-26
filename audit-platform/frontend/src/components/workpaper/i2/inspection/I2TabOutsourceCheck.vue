@@ -554,7 +554,7 @@ const openReviewDialog = inject<(section: string) => void>('openReviewDialog', (
 
 const columnViewMode = ref<'compact' | 'full'>('compact')
 const samplingVisible = ref(false)
-const samplingYear = computed(() => props.year || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 const {
   rows,

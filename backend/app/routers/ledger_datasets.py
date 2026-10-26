@@ -10,11 +10,11 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import require_project_access
+from app.deps import require_project_access, require_project_audit_year
 from app.models.core import User
 from app.models.dataset_models import JobStatus
 from app.services.dataset_service import DatasetService
@@ -29,11 +29,12 @@ router = APIRouter(prefix="/api/projects/{project_id}/ledger-import", tags=["数
 @router.get("/datasets")
 async def list_datasets(
     project_id: UUID,
-    year: int = 2025,
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """查询数据集版本历史"""
+    year = await require_project_audit_year(db, project_id, year)
     datasets = await DatasetService.list_datasets(db, project_id, year)
     return [
         {
@@ -54,11 +55,12 @@ async def list_datasets(
 @router.get("/datasets/active")
 async def get_active_dataset(
     project_id: UUID,
-    year: int = 2025,
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """查询当前 active 数据集"""
+    year = await require_project_audit_year(db, project_id, year)
     dataset_id = await DatasetService.get_active_dataset_id(db, project_id, year)
     if not dataset_id:
         return {"active_dataset_id": None, "message": "当前无有效数据集"}
@@ -162,7 +164,7 @@ async def rollback_dataset(
     project_id: UUID,
     dataset_id: UUID,
     request: Request,
-    year: int = 2025,
+    year: int | None = Query(None),
     reason: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
@@ -172,6 +174,7 @@ async def rollback_dataset(
     F23: activate 与 rollback 共享同一项目锁；锁被占用时返回 409。
     F25: 写入 ActivationRecord.reason / ip_address / duration_ms / before_/after_row_counts。
     """
+    year = await require_project_audit_year(db, project_id, year)
     # F25: 从请求里拿客户端 IP（X-Forwarded-For 优先，兼容反向代理）
     ip_address: str | None = None
     if request is not None:
@@ -203,11 +206,12 @@ async def rollback_dataset(
 @router.get("/activation-records")
 async def list_activation_records(
     project_id: UUID,
-    year: int = 2025,
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """查询激活/回滚操作历史"""
+    year = await require_project_audit_year(db, project_id, year)
     records = await DatasetService.list_activation_records(db, project_id, year)
     return [
         {

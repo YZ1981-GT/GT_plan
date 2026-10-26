@@ -586,7 +586,11 @@ async function syncFromConsolScope(): Promise<void> {
   try {
     const year = props.htmlData?.project_context?.audit_year
       ?? props.htmlData?.audit_year
-      ?? new Date().getFullYear()
+      ?? null
+    if (year == null) {
+      ElMessage.warning('未设置审计年度，无法读取合并范围')
+      return
+    }
     const response = await api.get('/api/consolidation/scope', {
       params: { project_id: props.projectId, year },
       _silent: true,

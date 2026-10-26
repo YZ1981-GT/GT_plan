@@ -138,7 +138,11 @@ onMounted(async () => {
   if (!data.materialityConfig.value?.performance_materiality && props.projectId) {
     try {
       const { getMateriality } = await import('@/services/auditPlatformApi')
-      const year = props.year ? parseInt(props.year) : new Date().getFullYear()
+      const year = props.year ? parseInt(props.year) : null
+      if (year == null || !Number.isFinite(year) || year <= 2000) {
+        console.debug('[DiffChecklist] 未设置审计年度，跳过自动获取重要性')
+        return
+      }
       const matData = await getMateriality(props.projectId, year)
       if (matData?.performance_materiality) {
         data.materialityConfig.value = {

@@ -251,9 +251,9 @@ async def download_blank_template(
     }
     cycle_name = CYCLE_NAMES.get(cycle.upper(), cycle)
 
-    # 获取项目年度（防御性）
-    from datetime import datetime
-    year = datetime.now().year - 1
+    # 获取项目年度（单一来源 resolve_project_audit_year，不用自然年猜）
+    from app.services.project_audit_year import resolve_project_audit_year
+    year: int | None = None
     entity_name = ""
     period_end = ""
     preparer_name = ""
@@ -266,12 +266,7 @@ async def download_blank_template(
             pe = getattr(proj, "audit_period_end", None)
             if pe:
                 period_end = str(pe)[:10]
-                year = int(str(pe)[:4])
-            ws = getattr(proj, 'wizard_state', None)
-            if isinstance(ws, dict):
-                y = ws.get("steps", {}).get("basic_info", {}).get("data", {}).get("audit_year")
-                if y:
-                    year = int(y)
+            year = resolve_project_audit_year(proj)
     except Exception as e:
         log.warning("blank-template: 获取项目信息失败: %s", e)
 
@@ -338,7 +333,7 @@ async def download_blank_template(
         (f"📋 {procedure_name} — 编制要求", "header"),
         ("", ""),
         (f"审计循环：{cycle} {cycle_name}", ""),
-        (f"审计年度：{year}", ""),
+        (f"审计年度：{year or '未设置'}", ""),
         ("", ""),
         ("一、底稿编制目标", "section"),
         ("记录审计程序的执行过程、获取的审计证据和形成的审计结论。", ""),

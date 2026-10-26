@@ -26,7 +26,7 @@ const props = defineProps<{
   year?: number
 }>()
 
-const year = props.year || new Date().getFullYear()
+const year = props.year ?? null
 const activeTab = ref('full-tb')
 </script>
 

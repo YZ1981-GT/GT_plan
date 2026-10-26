@@ -282,7 +282,7 @@ const auditYear = computed(() => {
   const d = formData.projectContext.value?.audit_period_end
     || formData.projectContext.value?.bs_date || ''
   if (d.length >= 4) return parseInt(d.slice(0, 4), 10)
-  return new Date().getFullYear() - 1
+  return null
 })
 
 const htmlSheets = new Set([

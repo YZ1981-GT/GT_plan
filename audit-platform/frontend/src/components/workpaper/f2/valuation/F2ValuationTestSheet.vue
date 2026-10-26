@@ -48,11 +48,11 @@
     <!-- 工具栏 -->
     <div class="toolbar">
       <GtVoucherSamplingEngine
-        v-if="wpId && projectId && !isReadonly"
+        v-if="wpId && projectId && !isReadonly && auditYear != null"
         :project-id="projectId"
         :workpaper-id="wpId"
         :account-code="valuationAccountCodes.join(',')"
-        :year="new Date().getFullYear()"
+        :year="auditYear"
         phase="final"
         @filled="handleSamplingFilled"
       />

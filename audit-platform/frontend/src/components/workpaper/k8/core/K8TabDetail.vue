@@ -414,7 +414,7 @@ const pullingI1 = ref(false)
 
 // ─── 从序时账按月取数（6601 明细科目×月发生额）─────────────────────────────
 const pullingLedger = ref(false)
-const detailYear = computed(() => props.year ?? new Date().getFullYear())
+const detailYear = computed<number | null>(() => props.year ?? null)
 async function handlePullLedgerMonthly() {
   if (props.isReadonly) return
   pullingLedger.value = true

@@ -29,8 +29,8 @@ import app.models  # noqa: E402, F401  全量注册（生成路径会查程序�
 from app.core.database import get_db  # noqa: E402
 from app.deps import get_current_user  # noqa: E402
 from app.models.audit_platform_models import AccountCategory, TrialBalance  # noqa: E402
-from app.models.base import Base, ProjectStatus, UserRole  # noqa: E402
-from app.models.core import Project, User  # noqa: E402
+from app.models.base import Base, PermissionLevel, ProjectStatus, ProjectUserRole, UserRole  # noqa: E402
+from app.models.core import Project, ProjectUser, User  # noqa: E402
 from app.models.workpaper_models import WpIndex  # noqa: E402
 from app.routers import wp_template  # noqa: E402
 from app.services import wp_template_init_service  # noqa: E402
@@ -76,6 +76,9 @@ async def world(tmp_path, monkeypatch):
         db.add(Project(id=pid, name="【测试】裁剪生成", client_name="【测试】裁剪生成", status=ProjectStatus.execution,
                        template_type="soe", report_scope="standalone", audit_year=2025))
         await db.flush()
+        # 生成端点要求本项目 edit 级成员（spec procedure-trim-generation-delegation-chain 需求 2.6）
+        db.add(ProjectUser(project_id=pid, user_id=user.id, role=ProjectUserRole.auditor,
+                           permission_level=PermissionLevel.edit))
         db.add(TrialBalance(project_id=pid, year=2025, company_code="001", standard_account_code="1001",
                             account_name="库存现金", account_category=AccountCategory.asset,
                             unadjusted_amount=Decimal("1"), audited_amount=Decimal("1")))

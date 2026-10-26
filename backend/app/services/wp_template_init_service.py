@@ -281,45 +281,46 @@ async def _ensure_ipo_loaded(
         "added_codes": [],
         "skipped_existing": [],
         "errors": [],
+        "skipped_trimmed_codes": [],
+        "in_recycle_codes": [],
     }
 
     # year 参数当前未做按年度筛选（wp_index 不带 year 字段），保留供未来扩展
     _ = year
 
+    if codes:
+        # 保留范围：已裁（科目被裁则 IPO 子表跟随）/ 在回收站的不建；读不到裁剪结果即抛出、不加载
+        from app.services.procedure_scope_retention import plan_generation
+
+        plan = await plan_generation(db, project_id, codes)
+        result.update(plan.receipt())
+        result["skipped_existing"] = list(plan.existing_codes)
+        codes = plan.to_create
+
     for code in codes:
         try:
-            # 幂等检查：wp_index 已存在则跳过
-            existing = await db.execute(
-                sa.select(WpIndex.id).where(
-                    WpIndex.project_id == project_id,
-                    WpIndex.wp_code == code,
+            # 单条保存点：失败只回滚这一条（原先整会话 rollback，连同已建的一起丢掉）
+            async with db.begin_nested():
+                wp_index = WpIndex(
+                    project_id=project_id,
+                    wp_code=code,
+                    wp_name=f"{name_prefix} {code}",
+                    audit_cycle=audit_cycle,
+                    status=WpStatus.not_started,
                 )
-            )
-            if existing.scalar_one_or_none():
-                result["skipped_existing"].append(code)  # type: ignore[union-attr]
-                continue
+                db.add(wp_index)
+                await db.flush()
 
-            # 创建 WpIndex
-            wp_index = WpIndex(
-                project_id=project_id,
-                wp_code=code,
-                wp_name=f"{name_prefix} {code}",
-                audit_cycle=audit_cycle,
-                status=WpStatus.not_started,
-            )
-            db.add(wp_index)
-            await db.flush()
-
-            # 创建 WorkingPaper（file_path 占位，复制模板成功后会被覆盖）
-            wp = WorkingPaper(
-                wp_index_id=wp_index.id,
-                project_id=project_id,
-                source_type=WpSourceType.template,
-                file_path=f"storage/projects/{project_id}/workpapers/{code}.xlsx",
-                parsed_data={},
-            )
-            db.add(wp)
-            await db.flush()
+                # 创建 WorkingPaper（file_path 占位，复制模板成功后会被覆盖）
+                wp = WorkingPaper(
+                    wp_index_id=wp_index.id,
+                    project_id=project_id,
+                    source_type=WpSourceType.template,
+                    file_path=f"storage/projects/{project_id}/workpapers/{code}.xlsx",
+                    parsed_data={},
+                )
+                db.add(wp)
+                await db.flush()
 
             # 强制 scenario='ipo' 让模板复制绕过 normal 过滤规则
             try:
@@ -342,10 +343,6 @@ async def _ensure_ipo_loaded(
             result["added_codes"].append(code)  # type: ignore[union-attr]
         except Exception as e:
             result["errors"].append({"code": code, "error": str(e)})  # type: ignore[union-attr]
-            try:
-                await db.rollback()
-            except Exception as e:
-                logger.debug("模板初始化 rollback 失败 code=%s: %s", code, e)
 
     return result
 

@@ -489,6 +489,7 @@
  */
 import { ref, computed, inject, toRef, defineComponent, h } from 'vue'
 import { ElMessage, ElMessageBox, ElInputNumber } from 'element-plus'
+import { fetchProjectAuditYear } from '@/composables/useProjectAuditYear'
 import {
   useH2Detail,
   H2_2_PROJECT_STATUS_OPTIONS,
@@ -544,7 +545,12 @@ const mortgagedCount = computed(() =>
 // ─── 从序时账取数（资产类科目1604 借方=增加 贷方=减少）────────────────────────
 const ledgerPulling = ref(false)
 async function handlePullFromLedger() {
-  const year = new Date().getFullYear() - 1
+  // 取项目审计年度（原先按今年 / 去年猜）；取不到如实提示
+  const { year, failed } = await fetchProjectAuditYear(props.projectId)
+  if (year == null) {
+    ElMessage.warning(failed ? '读取项目审计年度失败，请稍后重试' : '未设置审计年度，无法读取序时账')
+    return
+  }
   ledgerPulling.value = true
   try {
     const result = await pullAssetMovementFromLedger(props.projectId, year, '1604')

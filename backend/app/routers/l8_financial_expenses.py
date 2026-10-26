@@ -36,6 +36,7 @@ from app.services.l8_financial_expenses_service import (
     extract_cutoff_entries,
     import_data,
 )
+from app.services.project_audit_year import resolve_project_audit_year_for_request
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +66,13 @@ async def _get_wp_context(wp_id: str, db: AsyncSession) -> dict[str, Any]:
     row = result.fetchone()
     if not row:
         raise HTTPException(404, f"底稿不存在: {wp_id}")
+    year = await resolve_project_audit_year_for_request(db, row.project_id)
+    if year is None:
+        raise HTTPException(422, "未设置审计年度，请先在项目基本信息中填写")
     return {
         "project_id": row.project_id,
-        "year": int(row.audit_year or 2025),
-        "report_date": row.report_date,
+        "year": year,
+        "report_date": row.report_date or date(year, 12, 31),
     }
 
 

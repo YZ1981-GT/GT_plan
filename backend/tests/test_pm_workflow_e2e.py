@@ -22,7 +22,7 @@ from app.deps import get_current_user, require_project_access, require_role
 from app.models.base import Base, ProjectStatus, ProjectType, UserRole
 from app.models.core import Notification, Project
 from app.models.phase15_models import IssueTicket
-from app.models.staff_models import ProjectAssignment, StaffMember, WorkHour
+from app.models.staff_models import ProjectAssignment, StaffMember
 from app.models.workpaper_models import (
     WorkingPaper,
     WpFileStatus,
@@ -36,6 +36,7 @@ from app.routers.pm_dashboard import router as pm_router
 from app.routers.workhour_approve import router as wa_router
 from app.routers.working_paper import router as wp_router
 from app.routers.workpaper_remind import router as remind_router
+from app.routers.wp_review_router import router as wp_review_router
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
@@ -92,10 +93,12 @@ async def seeded(db_session: AsyncSession):
     db_session.add_all([
         ProjectAssignment(id=uuid.uuid4(), project_id=PROJECT_ID,
                           staff_id=MGR_STAFF_ID, role="manager"),
+        # 团队分配勾选 D：编制人走底稿主编委派后，被委派人须看得到该循环
+        # （spec procedure-trim-generation-delegation-chain 任务 12）
         ProjectAssignment(id=uuid.uuid4(), project_id=PROJECT_ID,
-                          staff_id=AUD_STAFF_ID, role="auditor"),
+                          staff_id=AUD_STAFF_ID, role="auditor", assigned_cycles=["D"]),
         ProjectAssignment(id=uuid.uuid4(), project_id=PROJECT_ID,
-                          staff_id=NEW_AUD_STAFF_ID, role="auditor"),
+                          staff_id=NEW_AUD_STAFF_ID, role="auditor", assigned_cycles=["D"]),
     ])
     await db_session.flush()
 
@@ -122,6 +125,9 @@ def _app(db_session: AsyncSession, user_id=MGR_USER_ID, role=UserRole.admin):
     app.include_router(bae_router)
     app.include_router(remind_router)
     app.include_router(wp_router)
+    # 分配端点已拆到 wp_review_router（working_paper.py 只 re-export 函数，不含路由）——
+    # 原用例只挂 wp_router，第 3 步恒 404、从未走到分配逻辑
+    app.include_router(wp_review_router)
     app.include_router(pm_router)
     app.include_router(wa_router)
 
@@ -171,14 +177,19 @@ async def test_pm_full_workflow(db_session, seeded):
         assert resp.status_code == 200, resp.text
         assert resp.json()["remind_count"] == 1
 
-        # 3. 重新分配到 auditor B
+        # 3. 重新分配到 auditor B（传人员 id：分配走底稿主编委派事务，人员 id / 用户 id 都解析为本项目人员，
+        #    落库为其用户 id —— spec procedure-trim-generation-delegation-chain 任务 12）
         resp = await c.put(
             f"/api/projects/{PROJECT_ID}/working-papers/{seeded['wp_id']}/assign",
             json={"assigned_to": str(uuid.UUID(str(NEW_AUD_STAFF_ID)).hex)},
         )
-        # 由于 assigned_to 用 staff_id 还是 user_id 依赖实现，结果接受 200 或 400
-        # 至少不能 500
-        assert resp.status_code in (200, 400)
+        assert resp.status_code == 200, resp.text
+        import sqlalchemy as _sa
+        new_user = (await db_session.execute(
+            _sa.select(StaffMember.user_id).where(StaffMember.id == NEW_AUD_STAFF_ID))).scalar_one()
+        assigned = (await db_session.execute(
+            _sa.select(WorkingPaper.assigned_to).where(WorkingPaper.id == seeded["wp_id"]))).scalar_one()
+        assert assigned == new_user
 
         # 4. 沟通记录承诺 (POST /api/projects/{id}/communications)
         resp = await c.post(
@@ -197,10 +208,16 @@ async def test_pm_full_workflow(db_session, seeded):
         )
         assert resp.status_code == 200, resp.text
 
-        # 5. 工时审批（需先造一条 confirmed 工时）
-        wh = WorkHour(
-            id=uuid.uuid4(), staff_id=AUD_STAFF_ID, project_id=PROJECT_ID,
-            work_date=date.today(), hours=Decimal("8"), status="confirmed",
+        # 5. 工时审批（需先造一条待审批工时）
+        # 审批服务按 work_hour_entries（WorkHourEntry，submitted → approved）审批；原用例造的是旧表
+        # WorkHour + confirmed，第 3 步恒 404 时从未走到这里，复活后才暴露（审批路由的项目鉴权仍查旧表，
+        # 见 spec procedure-trim-generation-delegation-chain design §8 范围外登记）
+        from datetime import datetime, timezone
+        from app.models.workhour_entry_models import WorkHourEntry
+        wh = WorkHourEntry(
+            id=uuid.uuid4(), user_id=AUD_USER_ID, project_id=PROJECT_ID,
+            date=date.today(), hours=Decimal("8"), cycle="D", wp_code="E-1",
+            description="E2E 工时", status="submitted", submitted_at=datetime.now(timezone.utc),
         )
         db_session.add(wh)
         await db_session.commit()

@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 
 import sqlalchemy as sa
@@ -157,7 +158,7 @@ async def _generate_a_program_data(
         try:
             from app.services.field_override_service import FieldOverrideService
             override_svc = FieldOverrideService(db)
-            overrides = await override_svc.get_batch(project_id, year or 0, f"procedure_table:{wp_code}")
+            overrides = await override_svc.get_batch(project_id, year or 0, program_override_scope(wp_code))
             for prog in programs:
                 item_key = str(prog.get("program_no", ""))
                 if item_key in overrides:
@@ -177,6 +178,15 @@ async def _generate_a_program_data(
     if existing and isinstance(existing.get("signatures"), list):
         result["signatures"] = existing["signatures"]
     return result
+
+
+def program_override_scope(sheet_code: str) -> str:
+    """程序表字段覆盖（状态 / 执行说明）的 scope：生成分支按它读，render 结果里的 ``override_scope`` 回传给前端按它写。
+
+    🔴 写读必须同一个 scope：前端原来用传入的 sheetName 拼（整册嵌入时没传 ⇒ 写进 ``A1``；A 类顶层是「审计程序A7」这类表名），
+    这里按表码读 ⇒ 用户改的状态 / 执行说明刷新后看不到（spec audit-year-calendar-fallback-ratchet R0）。
+    """
+    return f"procedure_table:{sheet_code}"
 
 
 def resolve_program_template_code(sheet_name: str, wp_code: str) -> str:
@@ -230,6 +240,11 @@ async def render(ctx: RenderContext) -> dict | None:
     1. procedure_table_templates 自动汇总（A1~A17）
     2. 模板 xlsx 兜底提取
     """
+    # 多文件聚合：程序表 sheet（如 D2 父码下的 "D2A 应收账款实质性程序表"）的
+    # procedure_table 模板与模板文件应按 **sheet 级编码**（D2A）解析，而非父码 wp_code(D2)。
+    # 使用 resolve_program_template_code 处理循环前缀不一致的场景（如 L0 的 "函证程序表F0A" → "L0A"）。
+    _sheet_code = resolve_program_template_code(ctx.classification.sheet_name or "", ctx.wp_code)
+
     # 已有持久化 programs 数据则不重新生成——但若全是空描述且无用户编辑痕迹视同无效
     if isinstance(ctx.sheet_html_data, dict) and ctx.sheet_html_data.get("programs"):
         _persisted = ctx.sheet_html_data["programs"]
@@ -241,13 +256,13 @@ async def render(ctx: RenderContext) -> dict | None:
             for p in _persisted
         )
         if _has_substance:
-            return None
+            # 细裁投影：展示状态跟随程序行任务（只改本次响应的副本，不回写）。
+            # 投影没改动也返回副本：前端要靠其中的 override_scope 决定字段覆盖写到哪
+            projected = copy.deepcopy(ctx.sheet_html_data)
+            await project_row_applicability(ctx, projected, _sheet_code)
+            projected["override_scope"] = program_override_scope(_sheet_code)
+            return projected
         # 全空描述且无编辑 → 继续重新生成（grid_fallback 接管）
-
-    # 多文件聚合：程序表 sheet（如 D2 父码下的 "D2A 应收账款实质性程序表"）的
-    # procedure_table 模板与模板文件应按 **sheet 级编码**（D2A）解析，而非父码 wp_code(D2)。
-    # 使用 resolve_program_template_code 处理循环前缀不一致的场景（如 L0 的 "函证程序表F0A" → "L0A"）。
-    _sheet_code = resolve_program_template_code(ctx.classification.sheet_name or "", ctx.wp_code)
     # 程序表内容来自 sheet 自己的来源模板（聚合 source_files），否则全局模板路径
     _src_files = [f for f in (getattr(ctx, "source_files", None) or []) if f]
     _file_path = _src_files[0] if _src_files else ctx.template_file_path
@@ -267,8 +282,75 @@ async def render(ctx: RenderContext) -> dict | None:
     # materialization_required）。默认关闭（expand 阶段不改既有读语义），只有
     # PROCEDURE_ROW_TASKS_ENABLED=True 才注入；只读、失败降级、不阻塞渲染。
     await _apply_task_overlay(ctx, sheet_html_data)
+    await project_row_applicability(ctx, sheet_html_data, _sheet_code)
+    sheet_html_data["override_scope"] = program_override_scope(_sheet_code)
 
     return sheet_html_data
+
+
+async def project_row_applicability(ctx: RenderContext, sheet_html_data: dict, template_code: str) -> bool:
+    """细裁投影（spec procedure-trim-generation-delegation-chain 需求 6.3）：程序行任务的适用性决定展示状态。
+
+    - 任务不适用 ⇒ 行 ``status=not_applicable``，``trim_reason`` = 最近一次控制台裁剪的理由；
+    - 任务最近一次行级决定（控制台细裁 / 裁剪方案的行条目）是「恢复」而行仍是不适用 ⇒ 置 ``pending``（恢复后待重新
+      执行）。粗裁级联与粗裁恢复执行不算（整张底稿的决定，粗裁期间底稿在回收站、页面没被改过）。
+    没有任务、或任务没有行级决定的行不动（页面里原有的状态照旧）。只读、失败不阻塞渲染；返回是否改动。
+    同一程序号对应多条任务时，任一不适用即不适用。
+    """
+    programs = sheet_html_data.get("programs") if isinstance(sheet_html_data, dict) else None
+    wp_index_id = getattr(getattr(ctx, "working_paper", None), "wp_index_id", None)
+    if not programs or ctx.db is None or ctx.project_id is None or wp_index_id is None:
+        return False
+    try:
+        from app.models.procedure_models import ProcedureRowTask, ProcedureRowTaskHistory
+        from app.services.procedure_row_trim_service import ROW_RESTORE_EVENTS, ROW_TRIM_EVENTS, normalize_program_no
+
+        async with ctx.db.begin_nested():
+            tasks = (await ctx.db.execute(sa.select(
+                ProcedureRowTask.id, ProcedureRowTask.program_no, ProcedureRowTask.applicability_status,
+            ).where(
+                ProcedureRowTask.project_id == ctx.project_id,
+                ProcedureRowTask.wp_index_id == wp_index_id,
+                ProcedureRowTask.sheet_key == template_code,
+                ProcedureRowTask.is_deleted == sa.false(),
+                ProcedureRowTask.program_no.isnot(None),
+            ))).all()
+            events = (await ctx.db.execute(sa.select(
+                ProcedureRowTaskHistory.task_id, ProcedureRowTaskHistory.event_type, ProcedureRowTaskHistory.reason,
+            ).where(
+                ProcedureRowTaskHistory.task_id.in_([t[0] for t in tasks]),
+                ProcedureRowTaskHistory.event_type.in_(ROW_TRIM_EVENTS + ROW_RESTORE_EVENTS),
+            ).order_by(ProcedureRowTaskHistory.lock_version.desc(),  # 同一任务按任务版本（创建时间是事务开始时间，
+                       ProcedureRowTaskHistory.created_at.desc()))).all() if tasks else []  # 并发时先后不可靠）
+    except Exception as e:  # noqa: BLE001 — 投影只读增强，失败不阻塞渲染
+        logger.debug("program row applicability projection 跳过 wp_code=%s: %s", ctx.wp_code, e)
+        return False
+
+    latest: dict = {}
+    for task_id, event_type, reason in events:
+        latest.setdefault(task_id, (event_type, reason))
+    by_no: dict[str, list] = {}
+    for task_id, no, applicability in tasks:
+        by_no.setdefault(normalize_program_no(no), []).append((applicability, latest.get(task_id)))
+
+    changed = False
+    for row in programs:
+        group = by_no.get(normalize_program_no(row.get("program_no")))
+        if not group:
+            continue
+        trimmed = [ev for app, ev in group if app == "not_applicable"]
+        if trimmed:
+            reason = next((ev[1] for ev in trimmed if ev and ev[0] == "trim_not_applicable" and ev[1]), None)
+            if row.get("status") != "not_applicable" or (reason and row.get("trim_reason") != reason):
+                row["status"] = "not_applicable"
+                if reason:
+                    row["trim_reason"] = reason
+                changed = True
+        elif row.get("status") == "not_applicable" and any(ev and ev[0] in ROW_RESTORE_EVENTS for _, ev in group):
+            row["status"] = "pending"
+            row.pop("trim_reason", None)
+            changed = True
+    return changed
 
 
 async def _apply_task_overlay(ctx: RenderContext, sheet_html_data: dict) -> None:

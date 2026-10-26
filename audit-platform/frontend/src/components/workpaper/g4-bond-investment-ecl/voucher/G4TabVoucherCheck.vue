@@ -787,7 +787,7 @@ watch(
 const currentYear = computed(() => {
   const bsDate = props.htmlData?.bsDate as string | undefined
   if (bsDate && bsDate.length >= 4) return parseInt(bsDate.slice(0, 4), 10)
-  return new Date().getFullYear() - 1
+  return null
 })
 
 // ─── 区段Tab选项 ─────────────────────────────────────────────────────────────

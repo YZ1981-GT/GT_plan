@@ -214,7 +214,8 @@ export function seedI3AdjudicationFromDetail(
   asOfYear?: number,
   existing?: I3AdjudicationRowModel[],
 ): I3AdjudicationRowModel[] {
-  const year = asOfYear ?? new Date().getFullYear()
+  if (asOfYear == null) return existing?.length ? existing.map(normalizeI3AdjudicationRow) : []
+  const year = asOfYear
   const details = parseI32DetailRows(detailRaw).filter((r) => {
     const name = _str(r?.investee || r?.projectName || r?.name)
     return name && name !== '合计'

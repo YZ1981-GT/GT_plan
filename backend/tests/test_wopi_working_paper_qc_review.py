@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.models.base import Base
 from app.models.core import Project, ProjectStatus, ProjectType
+from tests._delegation_member_seed import seed_delegation_members
 from app.models.workpaper_models import (
     ReviewCommentStatus,
     WpFileStatus,
@@ -451,11 +452,13 @@ class TestWorkingPaperService:
     @pytest.mark.asyncio
     async def test_assign_workpaper(self, db_session, seeded_db):
         from app.services.working_paper_service import WorkingPaperService
+        await seed_delegation_members(db_session, FAKE_PROJECT_ID, FAKE_USER_ID, ["B"], FAKE_USER_ID_2)
         svc = WorkingPaperService()
         result = await svc.assign_workpaper(
             db_session, seeded_db["wp1"].id,
             assigned_to=FAKE_USER_ID,
             reviewer=FAKE_USER_ID_2,
+            actor_user_id=FAKE_USER_ID_2,
         )
         assert result["assigned_to"] == str(FAKE_USER_ID)
         assert result["reviewer"] == str(FAKE_USER_ID_2)
@@ -801,7 +804,8 @@ class TestWorkingPaperAPI:
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_assign_workpaper_api(self, client, seeded_db):
+    async def test_assign_workpaper_api(self, client, db_session, seeded_db):
+        await seed_delegation_members(db_session, FAKE_PROJECT_ID, FAKE_USER_ID, ["B"])
         wp_id = str(seeded_db["wp1"].id)
         resp = await client.put(
             f"/api/projects/{FAKE_PROJECT_ID}/working-papers/{wp_id}/assign",

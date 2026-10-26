@@ -459,7 +459,11 @@ export function useD5Detail(options: UseD5DetailOptions) {
   async function importPostRealizedFromLedger(bsDate: string): Promise<void> {
     if (isReadonly.value || !projectId.value) return
 
-    const bsYear = bsDate ? parseInt(bsDate.substring(0, 4)) : new Date().getFullYear()
+    const bsYear = bsDate ? parseInt(bsDate.substring(0, 4)) : null
+    if (bsYear == null || !Number.isFinite(bsYear)) {
+      ElMessage.warning('未设置审计年度，无法读取期后序时账')
+      return
+    }
     const nextYear = bsYear + 1
     const dateFrom = `${nextYear}-01-01`
     const dateTo = `${nextYear}-06-30` // 默认期后窗口6个月

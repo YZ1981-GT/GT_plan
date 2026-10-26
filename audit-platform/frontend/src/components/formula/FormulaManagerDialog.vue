@@ -250,7 +250,7 @@
             <FormulaHistoryTab
               v-if="activeCategory === 'history' && projectId"
               :project-id="projectId"
-              :year="year || new Date().getFullYear()"
+              :year="year"
               :read-only="formulaReadOnly"
               @rollback-applied="onHistoryRollbackApplied"
             />
@@ -258,7 +258,7 @@
             <FormulaTimelinePanel
               v-if="activeCategory === 'history' && projectId"
               :project-id="projectId"
-              :year="year || new Date().getFullYear()"
+              :year="year"
             />
           </el-tab-pane>
           <!-- chain-closure-phase2-formula-push-engine：公式推送（四表 / 试算表 / 调整分录 → 底稿 → 附注） -->

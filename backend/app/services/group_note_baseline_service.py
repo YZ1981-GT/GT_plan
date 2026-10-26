@@ -335,7 +335,17 @@ class GroupNoteBaselineService:
         """
         results: list[dict[str, Any]] = []
         for pid in child_project_ids:
-            target_year = year or datetime.now().year
+            target_year = year
+            if target_year is None:
+                from app.services.project_audit_year import fetch_project_audit_year
+                target_year = await fetch_project_audit_year(self.db, pid)
+            if target_year is None:
+                results.append({
+                    "project_id": str(pid),
+                    "success": False,
+                    "error": "未设置审计年度",
+                })
+                continue
             try:
                 r = await self.apply_baseline(pid, target_year, baseline_id, user_id=user_id)
                 results.append({"project_id": str(pid), **r})

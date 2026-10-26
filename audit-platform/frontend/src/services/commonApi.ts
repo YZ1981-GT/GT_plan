@@ -230,6 +230,57 @@ export async function applyProcedureTrim(
   return data?.data ?? data
 }
 
+// ── 程序表控制台按行裁剪 / 行归属（spec procedure-trim-generation-delegation-chain 需求 6 / 7）──
+
+export interface ProgramRowApplicabilityBody {
+  sheet_name: string
+  program_no: string | number
+  reason?: string
+  request_id?: string
+}
+
+/** 程序表某一行 → 不适用（trim）/ 恢复执行（restore）；只给项目委派人。没有任务又不是模板程序的行 → 422。 */
+export async function setProgramRowApplicability(
+  projectId: string, wpId: string, action: 'trim' | 'restore', body: ProgramRowApplicabilityBody,
+): Promise<any> {
+  const url = action === 'trim' ? P_prt.trimProgramRow(projectId, wpId) : P_prt.restoreProgramRow(projectId, wpId)
+  const { data } = await http.post(url, body, { _silent: true } as any)
+  return data?.data ?? data
+}
+
+export interface ProgramRowTaskRef {
+  task_ids: string[]
+  created: boolean
+  template_code: string
+  program_no: string
+  assignee_staff_id: string | null
+  reviewer_staff_id: string | null
+}
+
+/** 取 / 建这一程序行的任务（逐行委派前置；自加的行 422、已裁剪 409，错误由调用方提示）。只给项目委派人。 */
+export async function ensureProgramRowTask(
+  projectId: string, wpId: string, sheetName: string, programNo: string | number,
+): Promise<ProgramRowTaskRef> {
+  const { data } = await http.post(
+    P_prt.programRowTask(projectId, wpId), { sheet_name: sheetName || '', program_no: programNo }, { _silent: true } as any,
+  )
+  return (data?.data ?? data) as ProgramRowTaskRef
+}
+
+export interface ProgramRowAccess {
+  full_power: boolean
+  can_trim: boolean
+  own_program_nos: string[]
+  assignees: Record<string, string>
+  template_code: string
+}
+
+/** 当前用户在这张程序表上能改哪些行、能否裁剪、各行执行人（服务端保存按同一判定合并）。 */
+export async function getProgramRowAccess(wpId: string, sheetName: string): Promise<ProgramRowAccess> {
+  const { data } = await http.get(P_wp.programRowAccess(wpId), { params: { sheet_name: sheetName }, _silent: true } as any)
+  return (data?.data ?? data) as ProgramRowAccess
+}
+
 // ── canonical 粗裁（ProcedureTrimming.vue 主链入口）────────────────────────────
 // 与 previewProcedureTrim/applyProcedureTrim 走同一端点，但签名更贴合粗裁页调用方。
 // entries 里每条包含 kind/cycle/wp_index_code/target_status/skip_reason/reason_code。
@@ -289,15 +340,21 @@ export async function rejectTrimSuggestions(
   }
 }
 
-/** 粗裁 canonical apply：消费 preview + request_id 幂等。 */
+/**
+ * 粗裁 canonical apply：消费 preview + request_id 幂等。
+ * `confirmSubstantiveRecycle`：用户已确认把有编制内容的已生成底稿移入回收站（预览 `recycle_preview.substantive`），
+ * 不传时请求体不变；后端未收到确认而有此类底稿 ⇒ 409 `substantive_recycle_unconfirmed`、零副作用。
+ */
 export async function canonicalTrimApply(
   projectId: string,
   entries: CanonicalTrimScopeEntry[],
   previewId: string,
   requestId: string,
+  options: { confirmSubstantiveRecycle?: boolean } = {},
 ): Promise<any> {
   const { data } = await http.post(P_prt.trimApply(projectId), {
     entries, preview_id: previewId, request_id: requestId,
+    ...(options.confirmSubstantiveRecycle ? { confirm_substantive_recycle: true } : {}),
   })
   return data?.data ?? data
 }
@@ -330,13 +387,17 @@ export async function previewProcedureDelegation(
   return data?.data ?? data
 }
 
+/** 委派扩权重试参数（`useScopeExpansionRetry`）：`expand_scope` / `scope_reason` 不进预览哈希；`silent` 免全局错误提示。 */
+export interface ScopeExpansionOptions { expand_scope?: boolean; scope_reason?: string; silent?: boolean }
+
 /** 委派应用：消费 preview，真实 assign/reassign；默认整批原子（冲突 409），best_effort 逐任务结果。 */
 export async function applyProcedureDelegation(
   projectId: string, previewId: string, requestId: string, body: DelegationPreviewBody,
+  { silent, ...expansion }: ScopeExpansionOptions = {},
 ): Promise<any> {
   const { data } = await http.post(P_prt.delegationApply(projectId), {
-    ...body, preview_id: previewId, request_id: requestId,
-  })
+    ...body, ...expansion, preview_id: previewId, request_id: requestId,
+  }, (silent ? { _silent: true } : {}) as any)
   return data?.data ?? data
 }
 
@@ -1031,18 +1092,20 @@ export async function listRecycleBinItems(params?: Record<string, any>): Promise
   return { items: data?.items || [], total: data?.total || 0 }
 }
 
+// 恢复 / 永久删除 / 清空：回收站页自己用 handleApiError 提示失败原因（如「底稿仍在程序裁剪中标为不执行」409），
+// 请求带 _silent，免得全局拦截器先弹一次、同一原因提示两遍
 export async function restoreRecycleBinItem(itemId: string): Promise<any> {
-  const { data } = await http.post(P_rb.restore(itemId))
+  const { data } = await http.post(P_rb.restore(itemId), null, { _silent: true } as any)
   return data
 }
 
 export async function permanentDeleteItem(itemId: string): Promise<any> {
-  const { data } = await http.delete(P_rb.delete(itemId))
+  const { data } = await http.delete(P_rb.delete(itemId), { _silent: true } as any)
   return data
 }
 
 export async function emptyRecycleBin(): Promise<any> {
-  const { data } = await http.post(P_rb.empty)
+  const { data } = await http.post(P_rb.empty, null, { _silent: true } as any)
   return data
 }
 
@@ -1135,8 +1198,10 @@ export async function applyProcedureScheme(projectId: string, cycle: string, sou
 export async function assignProcedures(
   projectId: string,
   assignments: { procedure_id: string; staff_id: string | null; request_id?: string }[],
+  { silent, ...expansion }: ScopeExpansionOptions = {},
 ): Promise<{ updated: number }> {
-  const { data } = await http.put(P_leads.set(projectId), { assignments })
+  const { data } = await http.put(P_leads.set(projectId), { assignments, ...expansion },
+    (silent ? { _silent: true } : {}) as any)
   return data?.data ?? data
 }
 

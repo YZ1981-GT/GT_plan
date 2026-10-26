@@ -542,7 +542,7 @@ const G12_SAMPLING_ACCOUNT_CODE = computed(() =>
 )
 
 const auditYearRef = useWorkpaperAuditYear()
-const engineYear = computed(() => auditYearRef.value ?? new Date().getFullYear())
+const engineYear = computed<number | null>(() => auditYearRef.value ?? null)
 const showSampling = ref(false)
 
 const vc = useG12VoucherCheck({

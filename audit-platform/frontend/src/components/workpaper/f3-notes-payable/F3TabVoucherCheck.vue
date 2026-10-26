@@ -106,7 +106,7 @@ const sections: Array<{
   { key: 'subsequent', rows: subsequentRows, total: subsequentTotal, abnormal: subsequentAbnormal, sheet: 'F3-7-subsequent' },
 ]
 
-const auditYear = computed(() => props.year ?? new Date().getFullYear() - 1)
+const auditYear = computed<number | null>(() => props.year ?? null)
 const currentPhase = computed<Phase>(() => 'final')
 const totalRowCount = computed(() => debitRows.value.length + creditRows.value.length + subsequentRows.value.length)
 const totalAbnormal = computed(() => debitAbnormal.value + creditAbnormal.value + subsequentAbnormal.value)

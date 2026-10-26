@@ -797,7 +797,12 @@ async function openSourceBrowserForNote() {
     const pid = resolveProjectId()
     if (!pid) throw new Error('缺少项目ID')
     const { getDisclosureNoteTree } = await import('@/services/auditPlatformApi')
-    const items = await getDisclosureNoteTree(pid, Number(resolveYear()), { _silent: true } as any)
+    const year = resolveYear()
+    if (year == null) {
+      ElMessage.info('未设置审计年度，暂无可引用的附注章节')
+      return
+    }
+    const items = await getDisclosureNoteTree(pid, year, { _silent: true } as any)
     sourceBrowserRows.value = mapNoteTreeToPickerRows(Array.isArray(items) ? items : [])
   } catch (e: any) {
     sourceBrowserRows.value = []
@@ -812,8 +817,8 @@ function resolveProjectId(): string {
   return props.projectId || (route.params.projectId as string) || ''
 }
 
-function resolveYear(): number {
-  return props.year ?? new Date().getFullYear()
+function resolveYear(): number | null {
+  return props.year ?? null
 }
 
 async function loadWorkingPapersFallback() {

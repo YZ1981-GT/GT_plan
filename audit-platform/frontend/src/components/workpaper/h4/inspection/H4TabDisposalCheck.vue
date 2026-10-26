@@ -516,12 +516,12 @@
       destroy-on-close
     >
       <GtVoucherSamplingEngine
-        v-if="showSampling && wpId && projectId"
+        v-if="showSampling && wpId && projectId && year != null"
         :project-id="projectId"
         :workpaper-id="wpId"
         :account-code="samplingAccountCode"
         phase="final"
-        :year="year ?? new Date().getFullYear()"
+        :year="year"
         @filled="onSampleFilled"
       />
     </el-dialog>
@@ -583,8 +583,7 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
-/** 抽凭引擎所需审计年度：优先父级传入，回退当前年 */
-const samplingYear = computed(() => props.year ?? new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
 
 const allResponsesRef = computed(() => props.allResponses)

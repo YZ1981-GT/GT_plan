@@ -163,8 +163,9 @@ async def _load_project_context(ctx: RenderContext) -> dict:
             project_ctx["applicable_standards"] = row.applicable_standards or ""
             project_ctx["template_type"] = row.template_type or "listed"
             # 资产负债表日（默认年末）
-            year = row.audit_year or 2025
-            project_ctx["bs_date"] = f"{year}-12-31"
+            from app.services.project_audit_year import resolve_project_audit_year_for_request
+            year = row.audit_year or (await resolve_project_audit_year_for_request(ctx.db, ctx.project_id))
+            project_ctx["bs_date"] = f"{year}-12-31" if year else ""
     except Exception as e:  # noqa: BLE001
         logger.warning("H4 project context load failed: %s", e)
 

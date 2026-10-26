@@ -30,8 +30,9 @@ import app.models  # noqa: E402, F401  全量注册（外键引用的表要在 m
 from app.core.database import get_db  # noqa: E402
 from app.deps import get_current_user  # noqa: E402
 from app.models.audit_platform_models import AccountCategory, TrialBalance  # noqa: E402
-from app.models.base import Base, ProjectStatus, UserRole  # noqa: E402
-from app.models.core import Project, User  # noqa: E402
+from app.models.base import Base, PermissionLevel, ProjectStatus, ProjectUserRole, UserRole  # noqa: E402
+from app.models.core import Project, ProjectUser, User  # noqa: E402
+from app.models.procedure_models import ProcedureInstance  # noqa: E402
 from app.models.workpaper_models import WorkingPaper, WpIndex  # noqa: E402
 from app.routers import wp_template  # noqa: E402
 from app.services import wp_parsed_data_service, wp_template_init_service  # noqa: E402
@@ -40,7 +41,9 @@ from app.services.wp_parsed_data_service import ensure_parsed_data_placeholder  
 
 pytestmark = pytest.mark.asyncio
 
-_TABLES = [User.__table__, Project.__table__, TrialBalance.__table__, WpIndex.__table__, WorkingPaper.__table__]
+#: 生成端点要求本项目 edit 级成员（project_users）并读取粗裁结果（procedure_instances，读不到即 503）
+_TABLES = [User.__table__, Project.__table__, ProjectUser.__table__, ProcedureInstance.__table__,
+           TrialBalance.__table__, WpIndex.__table__, WorkingPaper.__table__]
 _URL = "/api/projects/{pid}/working-papers/generate-from-codes"
 
 #: E1 主文件（E1-1至E1-11）与另两个常规程序文件（E1-14至15 / E1-18至23）各取一个页签；IPO 文件（E1-26至32）只在
@@ -70,6 +73,9 @@ async def world(tmp_path, monkeypatch):
             db.add(Project(id=pid, name=name, client_name=name, status=ProjectStatus.execution,
                            template_type="soe", report_scope="standalone", audit_year=2025, scenario=scenario))
         await db.flush()
+        for pid in (with_tb, without_tb, ipo):
+            db.add(ProjectUser(project_id=pid, user_id=user.id, role=ProjectUserRole.auditor,
+                               permission_level=PermissionLevel.edit))
         for pid in (with_tb, ipo):
             db.add(TrialBalance(project_id=pid, year=2025, company_code="001", standard_account_code="1001",
                                 account_name="库存现金", account_category=AccountCategory.asset,
@@ -215,3 +221,64 @@ async def test_placeholder_keeps_existing_parsed_data():
     blank = WorkingPaper(project_id=uuid.uuid4(), wp_index_id=uuid.uuid4(), file_path="y.xlsx")
     assert ensure_parsed_data_placeholder(blank, wp_code="D2", created_by="standard_conversion") is True
     assert blank.parsed_data["_created_by"] == "standard_conversion" and blank.parsed_data["html_data"] == {}
+
+
+# ── 表头（2026-10-26：合并格模板表头静默填不上） ─────────────────────────────────────────
+
+
+def _cell(path: str, sheet: str, coord: str):
+    wb = openpyxl.load_workbook(path)
+    try:
+        return wb[sheet][coord].value
+    finally:
+        wb.close()
+
+
+async def test_merged_cell_templates_get_header_and_no_header_failures(world):
+    """J2A（表头页「底稿目录」）与 A10（活动页标签、值区是合并格）原先写表头时 AttributeError，回执照报成功。"""
+    body = await _generate(world, "with_tb", ["J2A", "A10"])
+    assert sorted(body["created_codes"]) == ["A10", "J2A"] and body["failures"] == []
+    assert body["header_failures"] == [] and "表头未填上" not in body["message"]
+    papers = {p[0]: p for p in await _papers(world["db"], world["with_tb"])}
+    client = "【测试】按编码生成_有试算表"
+    assert client in str(_cell(papers["J2A"][2], "底稿目录", "A2"))
+    assert client in str(_cell(papers["A10"][2], "审计程序A10", "A3"))
+
+
+async def test_header_fill_exception_is_reported_in_receipt(world, monkeypatch):
+    """填表头抛错 ⇒ 底稿照常生成，但回执 header_failures 与 message 写明（原先只记 warning）。"""
+    from app.services import wp_header_service
+
+    async def _boom(**_kwargs):
+        raise RuntimeError("模拟：表头写入崩溃")
+
+    monkeypatch.setattr(wp_header_service, "fill_workpaper_header", _boom)
+    body = await _generate(world, "with_tb", ["E1"])
+    assert body["created_codes"] == ["E1"] and body["failures"] == []
+    assert body["header_failures"] == [{"wp_code": "E1", "reason": "填写表头时出错，详见服务日志"}]
+    assert "1 个底稿表头未填上：E1（填写表头时出错，详见服务日志）" in body["message"]
+    assert "模拟" not in body["message"], "异常原文只进日志"
+
+
+async def test_external_link_template_header_is_reported(world):
+    """D2-5 的表头格全是外部链接（=[4]底稿目录!$A$2），填不进去 ⇒ 回执写明原因，不再静默。"""
+    body = await _generate(world, "with_tb", ["D2-5"])
+    assert body["created_codes"] == ["D2-5"]
+    [failure] = body["header_failures"]
+    assert failure["wp_code"] == "D2-5" and "外部链接" in failure["reason"]
+    assert "表头未填上" in body["message"]
+
+
+async def test_template_without_header_is_not_resaved(world):
+    """A30（电子底稿归档检查表）没有可填的表头 ⇒ 文件与模板逐字节一致（不重存，openpyxl 重存会丢数据验证扩展）。"""
+    import hashlib
+
+    from app.services.wp_template_finder import find_all_template_files, find_template_file_any
+
+    template = find_template_file_any("A30")
+    assert template is not None and find_all_template_files("A30") == [template], "前提：A30 是单文件模板（不合并）"
+    body = await _generate(world, "with_tb", ["A30"])
+    assert body["header_failures"] == []
+    [(_c, _n, file_path, _p, _id)] = await _papers(world["db"], world["with_tb"])
+    digest = lambda p: hashlib.sha256(open(p, "rb").read()).hexdigest()  # noqa: E731
+    assert digest(file_path) == digest(template)

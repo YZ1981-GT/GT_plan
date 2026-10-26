@@ -891,7 +891,7 @@ const viewOptions = [
   { label: '卡片', value: 'card' },
 ]
 
-const samplingYear = computed(() => props.year ?? new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 watch(testReasonOther, (v) => { otherReasonText.value = v }, { immediate: true })
 watch(auditNote, (v) => { auditNoteLocal.value = v }, { immediate: true })

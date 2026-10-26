@@ -359,7 +359,7 @@ const emit = defineEmits<{
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 
-const year = computed(() => props.year ?? new Date().getFullYear())
+const year = computed<number | null>(() => props.year ?? null)
 const allResponsesRef = computed(() => props.allResponses)
 
 // ═══ K4 专属核对内容标签（覆盖 K1 通用的 5 项）═══

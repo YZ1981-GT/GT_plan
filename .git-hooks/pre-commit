@@ -55,6 +55,14 @@ fi
 # （本次触碰了才检查，正是防打磨倒退所需）。
 # 全仓欠账由 CI 的 `file-size-guard` job 负责暴露，不该阻塞本地提交。
 echo "[pre-commit] 执行文件行数门禁（仅暂存文件）..."
+run_size_gate() {
+    # 先用空清单探一次：旧检出的脚本不认 `--files-from` ⇒ argparse 报错，退回命令行传参（见下方 elif 处说明）
+    if printf '' | "$PY" backend/scripts/check/check_file_size.py --staged --files-from - > /dev/null 2>&1; then
+        printf '%s\n' "${SIZE_ARGS[@]}" | "$PY" backend/scripts/check/check_file_size.py --staged --files-from -
+    else
+        "$PY" backend/scripts/check/check_file_size.py --staged "${SIZE_ARGS[@]}"
+    fi
+}
 SIZE_ARGS=()
 while IFS= read -r f; do
     case "$f" in
@@ -72,7 +80,12 @@ if [ ${#SIZE_ARGS[@]} -eq 0 ]; then
 # 却因另一条 lane 的 ~258 行未提交改动被按 3948 判「膨胀」。
 # 那会逼人二选一：抬基线（替别人预留额度 + 把别人的膨胀记到自己账上）或 `--no-verify`
 # （门直接失效）。两条都是错的，所以改成量暂存内容。
-elif ! "$PY" backend/scripts/check/check_file_size.py --staged "${SIZE_ARGS[@]}"; then
+#
+# 🔴 清单走标准输入（`--files-from -`，2026-10-26）：原先把路径直接摆在命令行上，暂存文件一多
+# （实测 503 个、35114 字符）就超过 Windows 命令行 32767 字符上限 ⇒ `Argument list too long`
+# （exit 126）⇒ 这里把它当成「超限」拒提交，而行数门根本没运行。`printf` 是 bash 内建命令，没有这个上限。
+# `.git/hooks` 是所有 worktree 共用的：停在旧提交的 worktree 里脚本还不认 `--files-from`，那里退回命令行传参。
+elif ! run_size_gate; then
     echo ""
     echo "[pre-commit] ❌ 文件行数超限/膨胀（见上方明细）"
     echo "          请拆分文件或抽伴生模块（优先），确有必要再更新 whitelist 基线"

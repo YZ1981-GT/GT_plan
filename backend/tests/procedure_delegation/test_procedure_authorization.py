@@ -175,9 +175,13 @@ class TestProjectDelegatorMatrix:
         assert ctx.is_admin is True
         assert ctx.project_id == proj.id
 
-    @pytest.mark.parametrize("assign_role", ["partner", "signing_partner", "manager"])
+    @pytest.mark.parametrize("assign_role", ["partner", "signing_partner", "manager", "合伙人", "项目经理"])
     async def test_delegator_roles_with_active_assignment_pass(self, session, assign_role):
-        """partner/signing_partner/manager 持当前项目唯一 active assignment → 通过。"""
+        """partner/signing_partner/manager（含团队委派接受的中文别名）持当前项目唯一 active assignment → 通过。
+
+        中文别名：spec procedure-chain-followup-closure R4 —— 此前委派人角色另写了英文三个，以「合伙人」「项目经理」
+        委派的人在本项目恒 403（团队委派 ``ROLE_MAP`` 收这两个写法）。
+        """
         user = await _mk_user(session, "manager")
         proj = await _mk_project(session)
         staff = await _mk_staff(session, user_id=user.id)
@@ -214,6 +218,33 @@ class TestProjectDelegatorMatrix:
         with pytest.raises(HTTPException) as ei:
             await ensure_project_delegator(session, user, proj.id)
         assert ei.value.status_code == 403
+
+    @pytest.mark.parametrize("assign_role", ["质控", "独立复核合伙人", "审计员", "助理"])
+    async def test_chinese_non_delegator_roles_denied(self, session, assign_role):
+        """中文别名同样按角色判：质控 / EQCR / 审计员 / 助理 不是委派人（与英文代码同口径）。"""
+        user = await _mk_user(session, "auditor")
+        proj = await _mk_project(session)
+        staff = await _mk_staff(session, user_id=user.id)
+        await _mk_assignment(session, proj.id, staff.id, role=assign_role)
+        with pytest.raises(HTTPException) as ei:
+            await ensure_project_delegator(session, user, proj.id)
+        assert ei.value.status_code == 403
+
+    async def test_delegator_list_includes_chinese_roles(self, session):
+        """本项目委派人清单（复核人缺失时通知谁）同样认中文别名，不认质控。"""
+        from app.services.procedure_authorization import list_project_delegator_user_ids
+
+        proj = await _mk_project(session)
+        expected = set()
+        for role in ("项目经理", "合伙人", "manager"):
+            user = await _mk_user(session, "manager")
+            staff = await _mk_staff(session, user_id=user.id)
+            await _mk_assignment(session, proj.id, staff.id, role=role)
+            expected.add(user.id)
+        qc_user = await _mk_user(session, "qc")
+        qc_staff = await _mk_staff(session, user_id=qc_user.id)
+        await _mk_assignment(session, proj.id, qc_staff.id, role="质控")
+        assert await list_project_delegator_user_ids(session, proj.id) == expected
 
     async def test_no_staff_mapping_denied(self, session):
         """user 无 active StaffMember → 403（需求 11.2/11.3）。"""

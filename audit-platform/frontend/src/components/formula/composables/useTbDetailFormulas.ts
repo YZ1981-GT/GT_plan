@@ -40,7 +40,7 @@ export function useTbDetailFormulas(deps: TbDetailDeps) {
         && !fallbackAccounts.value.length) {
       try {
         const tbData: any = await deps.api.get(`/api/projects/${deps.projectId.value}/trial-balance`, {
-          params: { year: deps.year.value || new Date().getFullYear() },
+          params: { year: deps.year.value },
           _silent: true, validateStatus: (s: number) => s < 600,
         } as any)
         const items = Array.isArray(tbData) ? tbData : (tbData?.items || tbData?.data || [])

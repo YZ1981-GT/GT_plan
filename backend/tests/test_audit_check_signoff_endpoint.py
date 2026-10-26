@@ -138,11 +138,28 @@ class TestSignoffCreate:
         assert signoff.note is None
 
     @pytest.mark.asyncio
-    async def test_year_fallback_when_project_year_none(self):
-        """项目无审计年度 → 回退当前自然年（year 列 NOT NULL）。"""
+    async def test_missing_project_year_is_422_and_writes_nothing(self):
+        """项目无审计年度 → 422「未设置审计年度」，不写签认记录（不再按当前自然年兜底 ——
+        spec audit-year-calendar-fallback-ratchet：自然年与审计年度不同时签认会落到看不到的年度）。"""
+        from fastapi import HTTPException
+
         summary = ProjectCheckSummary()
-        result, signoff, _, _ = await _call_signoff(summary, year=None)
-        assert signoff.year == datetime.now(timezone.utc).year
+        with pytest.raises(HTTPException) as exc:
+            await _call_signoff(summary, year=None)
+        assert exc.value.status_code == 422
+        assert "未设置审计年度" in str(exc.value.detail)
+
+    @pytest.mark.asyncio
+    async def test_missing_project_year_does_not_add_or_commit(self, monkeypatch):
+        db, captured = _make_add_capturing_db()
+        monkeypatch.setattr(mod, "_compute_project_summary", AsyncMock(return_value=ProjectCheckSummary()))
+        monkeypatch.setattr(mod, "_resolve_project_year", AsyncMock(return_value=None))
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException):
+            await create_audit_check_signoff(project_id=uuid4(), body=None, db=db, current_user=_user())
+        assert "signoff" not in captured
+        db.commit.assert_not_awaited()
 
 
 # ═══════════════════════════════════════════════════════════════════

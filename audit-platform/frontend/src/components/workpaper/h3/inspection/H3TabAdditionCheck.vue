@@ -927,7 +927,7 @@ async function onTraceFileSelected(ev: Event) {
 }
 
 const samplingVisible = ref(false)
-const samplingYear = computed(() => props.year ?? new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 function openSampling() { samplingVisible.value = true }
 const rawMethodologyPersist = buildChecklistDirectPersist({
   wpId: computed(() => props.wpId),

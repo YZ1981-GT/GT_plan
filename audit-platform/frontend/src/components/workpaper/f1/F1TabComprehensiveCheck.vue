@@ -776,7 +776,7 @@ const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(
 const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: wpIdRef })
 const crossSheet = useF1CrossSheet({ allResponses: allResponsesRef })
 
-const auditYear = computed(() => props.year ?? new Date().getFullYear() - 1)
+const auditYear = computed<number | null>(() => props.year ?? null)
 const currentPhase = computed<Phase>(() => 'final')
 const crossPeriodCutoff = ref(`${auditYear.value}-12-31`)
 

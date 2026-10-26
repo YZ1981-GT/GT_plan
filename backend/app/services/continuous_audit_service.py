@@ -56,8 +56,9 @@ class ContinuousAuditService:
         prior_year = (
             resolve_project_audit_year(prior)
             or basic_info.get("audit_year")
-            or datetime.now(timezone.utc).year
         )
+        if prior_year is None:
+            raise ValueError("上年项目未设置审计年度，无法推算当年年度")
         new_year = int(prior_year) + 1
         inherited_template_type = basic_info.get("template_type") or prior.template_type
         inherited_report_scope = basic_info.get("report_scope") or prior.report_scope

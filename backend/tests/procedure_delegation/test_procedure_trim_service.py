@@ -79,6 +79,11 @@ async def _make_sqlite_env():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # 无 ORM 模型：粗裁移入回收站前核对人工填写内容要读它（读不到按「有内容」处理、要求确认）
+        await conn.execute(sa.text(
+            "CREATE TABLE checklist_responses (id TEXT PRIMARY KEY, project_id TEXT, wp_id TEXT NOT NULL, "
+            "item_id TEXT, updated_by TEXT)"
+        ))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     project_id = uuid.uuid4()
     wp_index_id = uuid.uuid4()
@@ -434,7 +439,12 @@ class TestP10SchemeAppliedReal:
                             sa.select(ProcedureInstance.status).where(ProcedureInstance.id == inst_id)
                         )
                     ).scalar()
+                    index_deleted = (
+                        await s.execute(sa.select(WpIndex.is_deleted).where(WpIndex.id == wp_index_id))
+                    ).scalar()
                 assert inst_status == "not_applicable"
+                # 已生成的 D2 底稿随裁剪移入回收站（spec procedure-trim-generation-delegation-chain 需求 3.1）
+                assert res["recycled_codes"] == [wp_code] and index_deleted is True
             finally:
                 await engine.dispose()
 
@@ -567,7 +577,13 @@ async def _apply_v105(engine) -> None:
 
 
 @pytest_asyncio.fixture
-async def pg_engine():
+async def pg_factory():
+    """真库会话工厂：所有会话共用一条连接上的外层事务（各自 commit = 释放保存点），用例结束整体回滚。
+
+    🔴 原实现每个会话真 commit 进 dev 库，结尾再 DELETE 清理 —— 但 ``procedure_row_task_history`` 有
+    append-only 触发器，清理恒失败、用例恒红，每跑一次就在随手取到的真实项目里留下一条程序行任务（2026-10-24
+    真库现算残留 349 条）。spec procedure-trim-generation-delegation-chain 改为事务回滚。
+    """
     if not _IS_PG:
         pytest.skip("need PostgreSQL (trim scheme apply integration)")
     engine = create_async_engine(app_settings.DATABASE_URL, pool_pre_ping=True, echo=False)
@@ -578,9 +594,13 @@ async def pg_engine():
         await engine.dispose()
         pytest.skip("PG not reachable")
     await _apply_v105(engine)
+    conn = await engine.connect()
+    trans = await conn.begin()
     try:
-        yield engine
+        yield async_sessionmaker(bind=conn, expire_on_commit=False, join_transaction_mode="create_savepoint")
     finally:
+        await trans.rollback()
+        await conn.close()
         await engine.dispose()
 
 
@@ -635,22 +655,11 @@ async def _pg_insert_task(factory, project_id, wp_index_id, wp_code, sheet_key, 
     return task_id
 
 
-async def _pg_cleanup(factory, definition_keys, task_ids):
-    async with factory() as s:
-        for tid in task_ids:
-            await s.execute(sa.text("DELETE FROM procedure_row_task_history WHERE task_id=:id"), {"id": tid})
-        for tid in task_ids:
-            await s.execute(sa.text("DELETE FROM procedure_row_tasks WHERE id=:id"), {"id": tid})
-        for k in definition_keys:
-            await s.execute(sa.text("DELETE FROM procedure_row_definitions WHERE definition_key=:k"), {"k": k})
-        await s.commit()
-
-
 @pytest.mark.asyncio
 class TestPgTrimScheme:
-    async def test_row_scheme_apply_and_version_conflict(self, pg_engine):
+    async def test_row_scheme_apply_and_version_conflict(self, pg_factory):
         """PG：真实 apply 迁 not_applicable；preview 后版本变化 → 二次 409。"""
-        factory = async_sessionmaker(pg_engine, expire_on_commit=False)
+        factory = pg_factory
         picked = await _pick_project_wp_index(factory)
         user_id = await _pick_user(factory)
         if picked is None or user_id is None:
@@ -665,61 +674,58 @@ class TestPgTrimScheme:
             {"kind": "row", "template_code": tmpl, "sheet_key": tmpl,
              "definition_key": dk, "target_applicability": "not_applicable"}
         ]
-        try:
-            async with factory() as s:
-                svc = ProcedureTrimService(s)
-                pv = await svc.preview_scheme(project_id, actor_user_id=user_id, entries=entries)
-                await s.commit()
-            assert pv["summary"]["would_change"] == 1
-            async with factory() as s:
-                svc = ProcedureTrimService(s)
-                res = await svc.apply_scheme(
-                    project_id, actor_user_id=user_id,
-                    preview_id=uuid.UUID(pv["preview_id"]), request_id="pg-1", entries=entries,
-                )
-                await s.commit()
-            assert res["applied"] == 1
-            async with factory() as s:
-                row = (
-                    await s.execute(
-                        sa.text("SELECT applicability_status, workflow_status FROM procedure_row_tasks WHERE id=:id"),
-                        {"id": task_id},
-                    )
-                ).first()
-            assert row[0] == "not_applicable" and row[1] == "cancelled"
-
-            # 新 preview → 外部 bump 版本 → apply 409
-            async with factory() as s:
-                svc = ProcedureTrimService(s)
-                pv2 = await svc.preview_scheme(project_id, actor_user_id=user_id, entries=[
-                    {"kind": "row", "template_code": tmpl, "sheet_key": tmpl,
-                     "definition_key": dk, "target_applicability": "execute"}
-                ])
-                await s.commit()
-            async with factory() as s:
+        async with factory() as s:
+            svc = ProcedureTrimService(s)
+            pv = await svc.preview_scheme(project_id, actor_user_id=user_id, entries=entries)
+            await s.commit()
+        assert pv["summary"]["would_change"] == 1
+        async with factory() as s:
+            svc = ProcedureTrimService(s)
+            res = await svc.apply_scheme(
+                project_id, actor_user_id=user_id,
+                preview_id=uuid.UUID(pv["preview_id"]), request_id="pg-1", entries=entries,
+            )
+            await s.commit()
+        assert res["applied"] == 1
+        async with factory() as s:
+            row = (
                 await s.execute(
-                    sa.text("UPDATE procedure_row_tasks SET lock_version=lock_version+1 WHERE id=:id"),
+                    sa.text("SELECT applicability_status, workflow_status FROM procedure_row_tasks WHERE id=:id"),
                     {"id": task_id},
                 )
-                await s.commit()
-            async with factory() as s:
-                svc = ProcedureTrimService(s)
-                with pytest.raises(HTTPException) as ei:
-                    await svc.apply_scheme(
-                        project_id, actor_user_id=user_id,
-                        preview_id=uuid.UUID(pv2["preview_id"]), request_id="pg-ver", entries=[
-                            {"kind": "row", "template_code": tmpl, "sheet_key": tmpl,
-                             "definition_key": dk, "target_applicability": "execute"}
-                        ],
-                    )
-                await s.rollback()
-            assert ei.value.status_code == 409
-        finally:
-            await _pg_cleanup(factory, [dk], [task_id])
+            ).first()
+        assert row[0] == "not_applicable" and row[1] == "cancelled"
 
-    async def test_legacy_uuid_conflict_409(self, pg_engine):
+        # 新 preview → 外部 bump 版本 → apply 409
+        async with factory() as s:
+            svc = ProcedureTrimService(s)
+            pv2 = await svc.preview_scheme(project_id, actor_user_id=user_id, entries=[
+                {"kind": "row", "template_code": tmpl, "sheet_key": tmpl,
+                 "definition_key": dk, "target_applicability": "execute"}
+            ])
+            await s.commit()
+        async with factory() as s:
+            await s.execute(
+                sa.text("UPDATE procedure_row_tasks SET lock_version=lock_version+1 WHERE id=:id"),
+                {"id": task_id},
+            )
+            await s.commit()
+        async with factory() as s:
+            svc = ProcedureTrimService(s)
+            with pytest.raises(HTTPException) as ei:
+                await svc.apply_scheme(
+                    project_id, actor_user_id=user_id,
+                    preview_id=uuid.UUID(pv2["preview_id"]), request_id="pg-ver", entries=[
+                        {"kind": "row", "template_code": tmpl, "sheet_key": tmpl,
+                         "definition_key": dk, "target_applicability": "execute"}
+                    ],
+                )
+            await s.rollback()
+        assert ei.value.status_code == 409
+
+    async def test_legacy_uuid_conflict_409(self, pg_factory):
         """PG：legacy UUID key 无法唯一转换 → apply 409 migration_conflict。"""
-        factory = async_sessionmaker(pg_engine, expire_on_commit=False)
+        factory = pg_factory
         picked = await _pick_project_wp_index(factory)
         user_id = await _pick_user(factory)
         if picked is None or user_id is None:
@@ -733,20 +739,17 @@ class TestPgTrimScheme:
             {"kind": "row", "template_code": tmpl, "sheet_key": tmpl,
              "definition_key": "legacy-" + uuid.uuid4().hex[:8], "target_applicability": "not_applicable"}
         ]
-        try:
-            async with factory() as s:
-                svc = ProcedureTrimService(s)
-                pv = await svc.preview_scheme(project_id, actor_user_id=user_id, entries=entries)
-                await s.commit()
-            assert pv["summary"]["migration_conflict"] == 1
-            async with factory() as s:
-                svc = ProcedureTrimService(s)
-                with pytest.raises(HTTPException) as ei:
-                    await svc.apply_scheme(
-                        project_id, actor_user_id=user_id,
-                        preview_id=uuid.UUID(pv["preview_id"]), request_id="pg-legacy", entries=entries,
-                    )
-                await s.rollback()
-            assert ei.value.status_code == 409
-        finally:
-            await _pg_cleanup(factory, [dk], [])
+        async with factory() as s:
+            svc = ProcedureTrimService(s)
+            pv = await svc.preview_scheme(project_id, actor_user_id=user_id, entries=entries)
+            await s.commit()
+        assert pv["summary"]["migration_conflict"] == 1
+        async with factory() as s:
+            svc = ProcedureTrimService(s)
+            with pytest.raises(HTTPException) as ei:
+                await svc.apply_scheme(
+                    project_id, actor_user_id=user_id,
+                    preview_id=uuid.UUID(pv["preview_id"]), request_id="pg-legacy", entries=entries,
+                )
+            await s.rollback()
+        assert ei.value.status_code == 409

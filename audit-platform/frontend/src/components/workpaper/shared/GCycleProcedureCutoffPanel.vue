@@ -48,7 +48,7 @@ const emit = defineEmits<{
 
 
 
-const auditYear = computed(() => props.year ?? new Date().getFullYear())
+const auditYear = computed<number | null>(() => props.year ?? null)
 
 
 

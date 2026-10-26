@@ -271,7 +271,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
 
-const currentYear = computed(() => props.year ?? new Date().getFullYear())
+const currentYear = computed<number | null>(() => props.year ?? null)
 
 // ═══ Composable ═══
 const {

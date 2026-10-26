@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_audit_year
 from app.models.core import User
 from app.services.data_validation_engine import DataValidationEngine
 
@@ -18,11 +18,12 @@ router = APIRouter(prefix="/api/projects/{project_id}/data-validation", tags=["d
 @router.post("")
 async def validate_project(
     project_id: UUID,
-    year: int = 2025,
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """运行全部数据校验。"""
+    year = await require_project_audit_year(db, project_id, year)
     engine = DataValidationEngine(db)
     return await engine.validate_project(project_id, year)
 
@@ -30,12 +31,14 @@ async def validate_project(
 @router.get("/findings")
 async def get_findings(
     project_id: UUID,
+    year: int | None = Query(None),
     severity: str | None = None,
     check_type: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """获取校验结果（支持筛选）。"""
+    year = await require_project_audit_year(db, project_id, year)
     engine = DataValidationEngine(db)
     result = await engine.validate_project(project_id)
     findings = result["findings"]
@@ -62,12 +65,14 @@ async def fix_findings(
 async def export_findings(
     project_id: UUID,
     format: str = "csv",
+    year: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """导出校验结果。"""
     from fastapi.responses import Response
 
+    year = await require_project_audit_year(db, project_id, year)
     engine = DataValidationEngine(db)
     result = await engine.validate_project(project_id)
     content = engine.export_findings(result["findings"], format)

@@ -244,7 +244,8 @@ async function loadOwn() {
 async function loadTb() {
   if (!props.projectId) return
   try {
-    const _year = projectStore.year ?? projectStore.auditYear ?? new Date().getFullYear()
+    const _year = projectStore.year ?? projectStore.auditYear
+    if (_year == null) return
     const res: any = await api.get(`/api/projects/${props.projectId}/trial-balance?year=${_year}&account_prefix=1621`)
     const list: any[] = Array.isArray(res) ? res : (res?.data ?? res?.items ?? [])
     let unadj = 0

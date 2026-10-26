@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_audit_year
 from app.models.core import User
 from app.schemas.phase12_schemas import (
     ConfirmDraftRequest,
@@ -41,19 +41,7 @@ async def generate_explanation(
 
     svc = WpExplanationService(db)
     # 从项目获取审计年度
-    try:
-        from app.models.core import Project
-        proj_result = await db.execute(
-            sa.select(Project).where(Project.id == project_id)
-        )
-        proj = proj_result.scalar_one_or_none()
-        audit_year = 2025  # 默认值
-        if proj and proj.wizard_state:
-            steps = proj.wizard_state.get("steps", {})
-            basic = steps.get("basic_info", {}).get("data", {})
-            audit_year = basic.get("audit_year", 2025)
-    except Exception:
-        audit_year = 2025
+    audit_year = await require_project_audit_year(db, project_id)
 
     result = await svc.generate_draft(
         project_id=project_id,

@@ -447,7 +447,7 @@
         :workpaper-id="wpId"
         :account-code="samplingAccountCode"
         phase="final"
-        :year="year ?? new Date().getFullYear()"
+        :year="year"
         @filled="onSampleFilled"
       />
     </el-dialog>
@@ -583,7 +583,7 @@ function fillDraft() {
 }
 
 // ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
-const samplingYear = computed(() => props.year ?? new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 const attachedCount = ref(0)
 const importingAttached = ref(false)
 const I1_ACCOUNT_PREFIXES = computed(() => i1GrossQueryCodes(_injectedTbSrc?.value ?? null))

@@ -47,6 +47,10 @@
               <el-button size="small" @click="showMappingDialog = true" data-testid="consol-note-open-mapping"
                 :disabled="!selectedNoteSection?.section_id">📋 明细映射</el-button>
             </el-tooltip>
+            <el-tooltip content="下推集团模板到子企业：在子企业附注中预生成行骨架" placement="bottom">
+              <el-button size="small" @click="handlePushTemplate" :loading="pushingTemplate"
+                :disabled="!selectedNoteSection?.section_id" data-testid="consol-note-push-template">📤 下推模板</el-button>
+            </el-tooltip>
             <el-tooltip content="管理合并附注明细模板：查看、编辑、绑定模板版本" placement="bottom">
               <el-button size="small" @click="showTemplateManager = true" data-testid="consol-note-open-template-manager"
                 :disabled="!selectedNoteSection?.section_id">📝 模板管理</el-button>
@@ -759,6 +763,7 @@ import {
 } from '@/services/consolidationApi'
 import { nodeLabel as treeNodeLabel, walkTree } from '@/components/consolidation/composables/consolTreeView'
 import { createConsolRequestGuard, isAborted } from '@/components/consolidation/composables/consolRequestGuard'
+import { pushConsolNoteTemplate } from '@/components/consolidation/composables/consolNoteTemplatePush'
 import {
   cellAggregateSummary,
   clearManual,
@@ -1129,6 +1134,7 @@ const reaggregating = ref(false)
 const showMappingDialog = ref(false)
 const showTemplateManager = ref(false)
 const mappingChangedBanner = ref(false)
+const pushingTemplate = ref(false)
 
 /** SSE → eventBus 回调：集团侧映射确认或模板提升 → 显示横幅 */
 function onMappingChangedEvent() {
@@ -2202,6 +2208,11 @@ async function fillCurrentByFormula(): Promise<NoteRefreshResult> {
   } finally {
     formulaFilling.value = false
   }
+}
+
+// 下推集团模板到子企业（spec: consol-note-template-push-to-subsidiaries；实现见 consolNoteTemplatePush）
+function handlePushTemplate() {
+  return pushConsolNoteTemplate(props.projectId, props.year, selectedNoteSection.value?.section_id, pushingTemplate)
 }
 
 // 重新汇总 = 本节点子树逐节点更新（叶子按已确认映射从单体附注拉数、差额节点按抵销分录算差额）

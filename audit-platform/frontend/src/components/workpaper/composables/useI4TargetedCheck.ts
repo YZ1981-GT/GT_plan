@@ -156,7 +156,7 @@ export function useI4TargetedCheck(
     : () => allResponses.value
 
   const getYear = () => {
-    if (!options?.asOfYear) return new Date().getFullYear()
+    if (!options?.asOfYear) return null
     return typeof options.asOfYear === 'function'
       ? options.asOfYear()
       : options.asOfYear.value

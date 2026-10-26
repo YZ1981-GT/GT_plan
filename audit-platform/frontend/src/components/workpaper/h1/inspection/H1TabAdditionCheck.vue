@@ -934,7 +934,7 @@ const props = defineProps<{
 }>()
 
 /** 抽凭引擎所需审计年度：优先父级传入，回退当前年 */
-const samplingYear = computed(() => props.year || new Date().getFullYear())
+const samplingYear = computed<number | null>(() => props.year ?? null)
 
 const emit = defineEmits<{ (e: 'navigate-sheet', sheetName: string): void }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})

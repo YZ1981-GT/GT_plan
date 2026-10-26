@@ -437,9 +437,9 @@ const formData = inject<ReturnType<typeof useL1FormData>>('l1FormData')!
 
 // ─── 报告期日期（优先取项目审计年度，回退当前年） ──────────────────────────
 // 🔴 不能硬编码 new Date().getFullYear()：审计次年编制底稿时会取错报告期。
-const auditYear = computed(() => props.year || new Date().getFullYear())
-const reportStart = computed<Date>(() => new Date(auditYear.value, 0, 1))  // 1月1日
-const reportEnd = computed<Date>(() => new Date(auditYear.value, 11, 31)) // 12月31日
+const auditYear = computed<number | null>(() => props.year ?? null)
+const reportStart = computed<Date>(() => new Date(auditYear.value ?? 0, 0, 1))
+const reportEnd = computed<Date>(() => new Date(auditYear.value ?? 0, 11, 31))
 
 // ─── Composable: 利息测算业务逻辑 ───────────────────────────────────────────
 

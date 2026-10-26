@@ -23,6 +23,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
   bsDate: string
+  year?: number | null
 }>()
 
 const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
@@ -59,11 +60,11 @@ const {
 
 // ─── 年度计算（从bsDate提取，如 "2025-12-31" → 2025）─────────────────────────
 
-const year = computed(() => {
+const year = computed<number | null>(() => {
   if (props.bsDate && props.bsDate.length >= 4) {
     return parseInt(props.bsDate.slice(0, 4), 10)
   }
-  return new Date().getFullYear() - 1
+  return props.year ?? null
 })
 
 // ─── 审计说明/结论（inline 存储）────────────────────────────────────────────

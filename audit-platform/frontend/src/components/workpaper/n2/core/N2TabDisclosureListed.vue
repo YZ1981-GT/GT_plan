@@ -199,7 +199,7 @@ const auditCtx = useAuditContext()
 const isReadonly = computed(() => props.isReadonly ?? false)
 const syncing = ref(false)
 const aiLoading = ref(false)
-const syncYear = computed(() => props.year || auditCtx.year.value || new Date().getFullYear())
+const syncYear = computed<number | null>(() => props.year ?? auditCtx.year.value ?? null)
 
 const formData = useN2FormData({
   wpId: computed(() => props.wpId),

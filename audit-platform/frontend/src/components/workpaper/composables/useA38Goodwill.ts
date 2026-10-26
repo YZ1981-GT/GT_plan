@@ -178,7 +178,7 @@ export function allocateImpairment(
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useA38Goodwill(wpId: () => string, projectId: () => string, year: () => number, readonly: () => boolean) {
+export function useA38Goodwill(wpId: () => string, projectId: () => string, year: () => number | null, readonly: () => boolean) {
   const impairmentRows = ref<A38ImpairmentRow[]>([])
   const allocationRows = ref<A38AllocationRow[]>([])
   const recoverable = ref<A38RecoverableData>({

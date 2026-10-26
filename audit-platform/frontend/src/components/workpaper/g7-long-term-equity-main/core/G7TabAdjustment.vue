@@ -902,7 +902,11 @@ async function syncFromAdjustmentModule(): Promise<number> {
   syncing.value = true
   lastSyncMsg.value = ''
   try {
-    const year = Number(auditYear.value) || new Date().getFullYear()
+    const year = Number(auditYear.value)
+    if (!Number.isFinite(year) || year <= 0) {
+      lastSyncMsg.value = '未设置审计年度，无法读取调整分录'
+      return 0
+    }
     const res: any = await api.get(adjustmentPaths.list(props.projectId), {
       params: { year, page: 1, page_size: 200 },
       _silent: true,

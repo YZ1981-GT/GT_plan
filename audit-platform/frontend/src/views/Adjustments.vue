@@ -836,7 +836,7 @@ const routeYear = computed(() => {
   return Number.isFinite(value) && value > 2000 ? value : null
 })
 const projectYear = ref<number | null>(null)
-const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear())
+const year = computed<number | null>(() => routeYear.value ?? projectYear.value ?? null)
 
 // Spec A R1：跨视图 stale 摘要（错报阈值变化时显示标志）
 const projectIdRef = computed(() => projectId.value || '')

@@ -49,6 +49,12 @@ vi.mock('@/composables/useWpNavigationHistory', () => ({
   useWpNavigationHistory: () => ({ push: vi.fn() }),
 }))
 
+// 行归属（spec procedure-trim-generation-delegation-chain 需求 7）不走真实网络；读不到 = 按原行为放开
+vi.mock('@/services/commonApi', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getProgramRowAccess: vi.fn().mockRejectedValue(new Error('not loaded')),
+}))
+
 const globalStubs = {
   'el-progress': { template: '<div />', props: ['percentage'] },
   'el-tag': { template: '<span><slot /></span>', props: ['type', 'size'] },

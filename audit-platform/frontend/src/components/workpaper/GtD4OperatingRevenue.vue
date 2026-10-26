@@ -347,14 +347,14 @@ provide('d4VersionTrailRef', versionTrailRef)
 provide('d4OpenVersionHistory', openVersionHistory)
 
 // ─── 审计年度：供子表取数（序时账导入/附注TB刷新）统一使用，避免硬编码"当前年-1" ───
-const d4AuditYear = computed<number>(() => {
+const d4AuditYear = computed<number | null>(() => {
   if (props.year && props.year > 0) return props.year
   const end = formData.projectContext.value?.audit_period_end
   if (end) {
     const y = parseInt(String(end).slice(0, 4), 10)
     if (y > 0) return y
   }
-  return new Date().getFullYear() - 1
+  return null
 })
 provide('d4AuditYear', d4AuditYear)
 

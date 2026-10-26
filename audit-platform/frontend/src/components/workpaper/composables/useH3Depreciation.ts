@@ -93,7 +93,8 @@ const H31_COST_DEP_ROWS_KEY = 'H3-1-cost-dep-rows'
 const H310_CALC_ROWS_KEY = 'H3-10-calc-rows'
 
 function defaultPeriodEnd(year?: number): string {
-  const y = year && year > 1900 ? year : new Date().getFullYear()
+  if (!year || year <= 1900) return ''
+  const y = year
   return `${y}-12-31`
 }
 

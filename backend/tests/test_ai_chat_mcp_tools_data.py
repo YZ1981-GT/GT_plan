@@ -631,8 +631,10 @@ class TestToolAuthorization:
         """
 
         async def scenario(fx: AccessFixture, _sql):
+            # 受限成员（审计员）：wp_e 委派给他但在其循环范围外 ⇒ 平台拒绝。原用例用经理 —— 2026-10-24 用户裁决
+            # （spec procedure-trim-generation-delegation-chain 需求 5）后经理默认看全部循环，不再是越界样本
             token = make_token(
-                fx, "manager", cycle_scope=frozenset({IN_SCOPE_CYCLE, OUT_OF_SCOPE_CYCLE})
+                fx, "auditor", cycle_scope=frozenset({IN_SCOPE_CYCLE, OUT_OF_SCOPE_CYCLE})
             )
             with pytest.raises(McpToolError) as exc:
                 await dispatch(

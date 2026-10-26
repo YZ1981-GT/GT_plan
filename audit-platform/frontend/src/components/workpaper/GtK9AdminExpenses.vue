@@ -281,7 +281,7 @@ const tbData = ref({
   audited6602: 0,
 })
 /** 会计期间截止日（按审计年度），供 K9-6/K9-7 截止测试抽样使用 */
-const periodEnd = computed(() => `${props.year ?? new Date().getFullYear()}-12-31`)
+const periodEnd = computed(() => props.year == null ? '' : `${props.year}-12-31`)
 /** K9-1 审定表明细子科目预填（来自后端 render adjudication_prefill） */
 const adjudicationPrefill = computed<Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>>(
   () => (Array.isArray(props.htmlData?.adjudication_prefill) ? props.htmlData.adjudication_prefill : []),

@@ -8,7 +8,7 @@ import pytest_asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from httpx import ASGITransport, AsyncClient
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.middleware.error_handler import (
     generic_exception_handler,
@@ -29,6 +29,20 @@ def _create_app() -> FastAPI:
     class ItemCreate(BaseModel):
         name: str = Field(..., min_length=1)
         price: float = Field(..., gt=0)
+
+    class CodeBody(BaseModel):
+        code: str
+
+        @field_validator("code")
+        @classmethod
+        def _code(cls, value: str) -> str:
+            if not value.isdigit():
+                raise ValueError("编码只能是数字")
+            return value
+
+    @test_app.post("/api/codes")
+    async def create_code(body: CodeBody):
+        return {"code": body.code}
 
     @test_app.get("/api/not-found")
     async def not_found():
@@ -151,6 +165,17 @@ async def test_validation_error_missing_fields(client):
     field_names = [e["loc"][-1] for e in body["detail"]]
     assert "name" in field_names
     assert "price" in field_names
+
+
+@pytest.mark.asyncio
+async def test_validation_error_from_custom_validator_is_422_not_500(client):
+    """自定义 ``field_validator`` 抛 ``ValueError``：错误里的 ``ctx.error`` 是异常对象，处理器须经 jsonable_encoder，
+    否则序列化 TypeError ⇒ 本该 422 的请求变成 500（spec procedure-chain-followup-closure 任务 1.1 实测发现）。"""
+    resp = await client.post("/api/codes", json={"code": "A1"})
+    assert resp.status_code == 422
+    body = resp.json()
+    assert body["message"] == "请求参数校验失败"
+    assert "编码只能是数字" in body["detail"][0]["msg"]
 
 
 @pytest.mark.asyncio

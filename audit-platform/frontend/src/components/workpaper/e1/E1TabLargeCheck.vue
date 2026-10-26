@@ -96,10 +96,10 @@ function formatCellValue(row: any, col: ColumnDef): string {
 // ─── 抽凭引擎 ─────────────────────────────────────────────────────────────────
 
 const samplingVisible = ref(false)
-const samplingYear = computed(() => {
+const samplingYear = computed<number | null>(() => {
   const bs = props.bsDate || ''
   const match = bs.match(/^(\d{4})/)
-  return match ? Number(match[1]) : new Date().getFullYear() - 1
+  return match ? Number(match[1]) : null
 })
 
 /**

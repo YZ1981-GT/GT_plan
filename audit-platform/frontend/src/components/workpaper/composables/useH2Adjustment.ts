@@ -557,7 +557,11 @@ export function useH2Adjustment(options: {
     syncing.value = true
     lastSyncMsg.value = ''
     try {
-      const year = Number(options.auditYear?.value) || new Date().getFullYear()
+      const year = Number(options.auditYear?.value)
+      if (!Number.isFinite(year) || year <= 0) {
+        lastSyncMsg.value = '未设置审计年度，无法读取调整分录'
+        return 0
+      }
       const res: any = await api.get(adjPaths.list(projectId), {
         params: { year, page: 1, page_size: 200 },
         _silent: true,

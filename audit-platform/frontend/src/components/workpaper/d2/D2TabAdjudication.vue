@@ -56,6 +56,8 @@ const baseOpts = {
 const {
   adjudicationRows,
   totalRow,
+  netTotalAudited,
+  trialBalanceAmount,
   trialBalanceDiff,
   updateCell,
   isChangeRateWarning,
@@ -505,7 +507,7 @@ const dSourceHints = [
     </el-alert>
 
     <el-alert v-if="!trialBalanceDiff.isZero" type="error" :closable="false" class="tb-alert">
-      试算平衡表差异：{{ displayPrefs.fmtAmount(trialBalanceDiff.amount) }}（科目1122）
+      试算平衡表差异：{{ displayPrefs.fmtAmount(trialBalanceDiff.amount) }}（按应收账款净值 = 原值 − 坏账准备比对）
     </el-alert>
 
     <el-skeleton :loading="loading" :rows="8" animated>
@@ -615,7 +617,8 @@ const dSourceHints = [
 
         <!-- 试算平衡 -->
         <div class="tb-row">
-          <span>试算平衡表数（1122）：{{ displayPrefs.fmtAmount(parseFloat(String(allResponses.get('D2-adj-tb-amount')?.remark || '0')) || 0) }}</span>
+          <span>净值审定合计：{{ displayPrefs.fmtAmount(netTotalAudited) }}</span>
+          <span>试算平衡表数（应收账款净额）：{{ displayPrefs.fmtAmount(trialBalanceAmount) }}</span>
           <span :class="{ 'rate-warning': !trialBalanceDiff.isZero }">
             差异：{{ displayPrefs.fmtAmount(trialBalanceDiff.amount) }}
           </span>

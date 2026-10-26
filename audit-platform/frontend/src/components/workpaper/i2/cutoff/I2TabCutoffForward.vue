@@ -359,7 +359,7 @@ const criteria = computed(() => forwardCriteria.value)
 const showCutoffPanel = ref(false)
 const showSamplingDialog = ref(false)
 const importInputRef = ref<HTMLInputElement | null>(null)
-const currentYear = computed(() => props.year ?? new Date().getFullYear())
+const currentYear = computed<number | null>(() => props.year ?? null)
 const { suggestedThreshold, fetchHint } = useCutoffMaterialityHint(toRef(props, 'projectId'))
 const { exportData, importData, isExporting } = useI2ImportExport({
   wpId: toRef(props, 'wpId'),

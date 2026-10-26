@@ -28,7 +28,6 @@ Design: "Delegation transactions" 段 / Property 3（两层永不互相覆盖）
 
 from __future__ import annotations
 
-import enum
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -51,6 +50,11 @@ from app.models.wp_visibility_models import (
     WpVisibilityInvalidationOutbox,
     WpVisibilityPolicyEpoch,
 )
+from app.services.wp_visibility.delegation_guard import (  # 拒绝原因 / 错误类型自此导出（原定义处）
+    DelegationError,
+    DelegationGuardMixin,
+    DelegationRejectReason,
+)
 from app.services.wp_visibility.procedure_wp_resolver import (
     ProcedureBindingSources,
     ProcedureWpResolver,
@@ -58,27 +62,6 @@ from app.services.wp_visibility.procedure_wp_resolver import (
 from app.services.wp_visibility.staff_user_mapping import StaffUserMappingService
 
 logger = logging.getLogger(__name__)
-
-
-class DelegationRejectReason(str, enum.Enum):
-    """委派拒绝原因（内部诊断；调用方回滚事务）。"""
-
-    binding_conflict = "binding_conflict"    # procedure→wp_index 解析失败（Req 4.11）
-    mapping_invalid = "mapping_invalid"       # staff→user 严格映射不成立（Req 3.1–3.6）
-    out_of_scope = "out_of_scope"             # 跨循环且未显式扩权（Req 6.1）
-    scope_reason_missing = "scope_reason_missing"  # 扩权缺非空理由（Req 6.3）
-    clear_target_missing = "clear_target_missing"  # 清空未指定目标层/task（Req 3.7/3.8）
-    task_not_found = "task_not_found"         # 目标 ProcedureRowTask 缺失/跨项目
-    instance_not_found = "instance_not_found"  # 目标 ProcedureInstance 缺失/跨项目
-    invalid_request = "invalid_request"       # 请求结构非法（如既非清空又无 staff）
-
-
-class DelegationError(Exception):
-    """委派事务失败（fail-closed）；调用方不应 commit，须回滚全部事务内变更。"""
-
-    def __init__(self, reason: DelegationRejectReason, message: str = ""):
-        self.reason = reason
-        super().__init__(message or reason.value)
 
 
 # ---------------------------------------------------------------------------
@@ -146,13 +129,20 @@ class DelegationResult:
     idempotent: bool = False
 
 
-class DelegationTransactionService:
-    """两层委派原子事务编排器（只 flush；epoch/history/字段同事务）。"""
+class DelegationTransactionService(DelegationGuardMixin):
+    """两层委派原子事务编排器（只 flush；epoch/history/字段同事务）。
+
+    裁剪拦截与有效循环范围校验见 :class:`DelegationGuardMixin`（``delegation_guard``）。
+    """
 
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
         self.mapping = StaffUserMappingService(db)
         self.resolver = ProcedureWpResolver(db)
+        # 同一批委派内裁剪结果不变：每个项目只读一次
+        self._trim_scope_cache: dict = {}
+        # 批量委派时先收集缺少的循环、处理完统一报（用户一次看全、一次确认）；None = 立即报
+        self._deferred_scope_gaps: dict[UUID, set[str]] | None = None
 
     # ==================================================================
     # Lead 层
@@ -171,11 +161,17 @@ class DelegationTransactionService:
                 epoch=None, idempotent=True,
             )
 
+        # ---- 只能委派保留项：已粗裁的底稿（含跟随科目的子表 / 程序表）不能设主编；清空不拦 ----
+        if not req.clear:
+            await self._reject_if_trimmed(req.project_id, req.wp_code)
+
         # ---- 唯一解析 wp_index（Req 4.11：解析失败即拒绝委派）----
         wp_index_id = await self._resolve_lead_wp_index(req)
         wp_index = await self._load_wp_index(req.project_id, wp_index_id)
         if wp_index is None:
             raise DelegationError(DelegationRejectReason.binding_conflict, "wp_index 不属于项目")
+        if not req.clear:
+            await self._reject_if_trimmed(req.project_id, wp_index.wp_code)
 
         # ---- 锁行（串行化并发转派）：working_paper + 目标 procedure_instance ----
         wp_rows = await self._lock_working_papers(req.project_id, wp_index_id)
@@ -222,6 +218,9 @@ class DelegationTransactionService:
         # ① 权威：working_paper.assigned_to = user_id（wp_index 下全部 WP 行）
         for wp in wp_rows:
             wp.assigned_to = new_user_id
+        # ①' 展示镜像：wp_index.assigned_to（进度 / 催办 / 归档完整性 / 关联图读它；原只有复核页指派会写，
+        #     主编委派后各处显示旧人。spec procedure-trim-generation-delegation-chain 设计 §3.4）
+        wp_index.assigned_to = new_user_id
         # ② 投影：procedure_instances.assigned_to = staff_id（Req 2.3；lead staff，非 row staff）
         now = datetime.now(timezone.utc)
         for inst in target_instances:
@@ -323,10 +322,10 @@ class DelegationTransactionService:
                 )
             new_staff_id = req.staff_id
             new_user_id = mapping.user_id
-            wp_index = await self._load_wp_index(req.project_id, task.wp_index_id)
-            audit_cycle = wp_index.audit_cycle if wp_index else task.audit_cycle_snapshot
+            # 只能委派保留项：细裁不适用 / 已取消的程序行、所在底稿已粗裁或在回收站的都拒绝
+            wp_index = await self.assert_row_task_delegable(req.project_id, task)
             scope_before, scope_after = await self._enforce_scope(
-                req.project_id, new_user_id, audit_cycle, req.expand_scope, req.scope_reason
+                req.project_id, new_user_id, wp_index.audit_cycle, req.expand_scope, req.scope_reason
             )
             action = "reassign" if old_staff_id is not None else "assign"
 
@@ -574,53 +573,6 @@ class DelegationTransactionService:
         resolution = await self.mapping.resolve_active_project_mapping(project_id, staff_id)
         return resolution.user_id if resolution.ok else None
 
-    async def _enforce_scope(
-        self,
-        project_id: UUID,
-        user_id: UUID,
-        audit_cycle: str | None,
-        expand_scope: bool,
-        scope_reason: str | None,
-    ) -> tuple[list[str], list[str]]:
-        """跨循环 scope 校验 + 可选扩权（Req 6.1–6.7）。
-
-        返回 (scope_before, scope_after)（排序后的 audit_cycle 列表，供 history 快照）。
-        - 目标 cycle ∈ scope 或 cycle 为空 → 不改 scope，before==after。
-        - 目标 cycle ∉ scope 且未扩权 → 拒绝（Req 6.1）。
-        - 扩权：须非空 reason（Req 6.3），同事务写并集（Req 6.4）。
-        """
-        pu = (
-            await self.db.execute(
-                sa.select(ProjectUser)
-                .where(
-                    ProjectUser.project_id == project_id,
-                    ProjectUser.user_id == user_id,
-                    ProjectUser.is_deleted == sa.false(),
-                )
-                .with_for_update()
-            )
-        ).scalar_one_or_none()
-        before = self._parse_scope(pu.scope_cycles if pu else None)
-        cycle = (audit_cycle or "").strip()
-        if not cycle or cycle in before:
-            return sorted(before), sorted(before)
-        # 跨循环
-        if not expand_scope:
-            raise DelegationError(
-                DelegationRejectReason.out_of_scope, f"目标循环 {cycle} 不在被委派人 scope"
-            )
-        if not (scope_reason or "").strip():
-            raise DelegationError(
-                DelegationRejectReason.scope_reason_missing, "扩权必须提供非空理由"
-            )
-        after = set(before) | {cycle}
-        if pu is None:
-            raise DelegationError(
-                DelegationRejectReason.out_of_scope, "被委派人无项目成员记录，无法扩权"
-            )
-        pu.scope_cycles = ",".join(sorted(after))
-        return sorted(before), sorted(after)
-
     async def _current_scope_pair(
         self, project_id: UUID, user_id: UUID | None
     ) -> tuple[list[str], list[str]]:
@@ -638,12 +590,6 @@ class DelegationTransactionService:
         ).scalar()
         cur = sorted(self._parse_scope(raw))
         return cur, cur
-
-    @staticmethod
-    def _parse_scope(raw: str | None) -> set[str]:
-        if raw and isinstance(raw, str) and raw.strip():
-            return {c.strip() for c in raw.split(",") if c.strip()}
-        return set()
 
     async def _find_idempotent(
         self,

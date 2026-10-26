@@ -256,7 +256,8 @@ export async function fetchG11LedgerIncomeSeeds(opts: {
   year?: number
 }): Promise<{ seeds: G11LedgerIncomeSeed[]; source: string; error?: string }> {
   if (!opts.projectId) return { seeds: [], source: '', error: '缺少项目 ID' }
-  const y = opts.year ?? new Date().getFullYear() - 1
+  const y = opts.year
+  if (y == null) return { seeds: [], source: '', error: '未设置审计年度' }
 
   // 1) 试算表子科目
   try {

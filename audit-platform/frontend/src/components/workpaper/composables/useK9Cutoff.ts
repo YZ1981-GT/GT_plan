@@ -202,8 +202,10 @@ export function useK9Cutoff(params: UseK9CutoffParams) {
     isLoading.value = true
     try {
       const { default: http } = await import('@/utils/http')
-      const end = periodEnd?.value ?? '2025-12-31'
-      const yr = Number(String(end).slice(0, 4)) || new Date().getFullYear()
+      const end = periodEnd?.value ?? ''
+      if (!end) return
+      const yr = Number(String(end).slice(0, 4))
+      if (!Number.isFinite(yr) || yr <= 0) return
       // 真实端点：POST /sampling/cutoff-test（提取期末±N天序时账交易）
       // 旧代码调 GET ledger/cutoff-samples 为不存在端点，导致「自动提取」恒失败。
       const res = await http.post(`/api/projects/${projectId.value}/sampling/cutoff-test`, {

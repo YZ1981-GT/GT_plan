@@ -561,7 +561,11 @@ class TestIntegrationConvertWorkpapers:
         service = WpStandardConversionService(mock_db)
 
         # Patch preconditions to pass, and patch the three helpers
+        # （切换前现读程序裁剪结果判定目标独有底稿保留范围 —— mock 库给一个空裁剪结果）
+        from app.services import procedure_scope_retention
         with patch.object(service, 'check_preconditions', new_callable=AsyncMock) as mock_pre, \
+             patch.object(procedure_scope_retention, 'load_trimmed_scope', new_callable=AsyncMock,
+                          return_value=procedure_scope_retention.TrimmedScope()), \
              patch.object(service, '_archive_source_only_workpapers', new_callable=AsyncMock, return_value=1) as mock_archive, \
              patch.object(service, '_create_target_only_workpapers', new_callable=AsyncMock, return_value=1) as mock_create:
 

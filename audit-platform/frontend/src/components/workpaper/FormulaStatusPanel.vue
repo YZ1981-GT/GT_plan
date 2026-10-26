@@ -121,7 +121,7 @@ const { canDo } = usePermissionMatrix(props.projectId)
 /** 仅编辑角色可变更 Tier A（只读用户仅查看 / R5.7）。 */
 const canEdit = computed(() => canDo('edit', 'workpaper'))
 
-const effYear = computed(() => props.year ?? new Date().getFullYear())
+const effYear = computed<number | null>(() => props.year ?? null)
 
 const loading = ref(false)
 const rawItems = ref<RawFormulaItem[]>([])

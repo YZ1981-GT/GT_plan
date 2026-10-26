@@ -13,7 +13,7 @@
  *   overdueDays/overdueAmount/isExtended/extendedDueDate/riskAssessment/remark
  * 组件内部字段保持 bank/riskEvaluation（模板兼容），序列化时映射后端字段名。
  */
-import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, toValue, watch, type ComputedRef, type MaybeRefOrGetter, type Ref } from 'vue'
 import { calcOverdueDays } from '@/composables/useL3InterestEngine'
 import { calcSubtotal } from '@/composables/useL3FormulaEngine'
 import type { useL3FormData, ChecklistResponse } from '@/components/workpaper/composables/useL3FormData'
@@ -86,7 +86,8 @@ function fromBackend(o: any): L3OverdueCheckRow {
 
 export function useL3OverdueCheck(
   formData: ReturnType<typeof useL3FormData>,
-  reportDate: string,
+  /** 报告日（YYYY-MM-DD）；可传 computed：组件里要等项目审计年度取到才有值 */
+  reportDate: MaybeRefOrGetter<string>,
 ) {
   const { allResponses, debouncedSave } = formData
   const rows: Ref<L3OverdueCheckRow[]> = ref([])
@@ -106,13 +107,13 @@ export function useL3OverdueCheck(
   )
 
   function persist(): void {
-    debouncedSave(ITEM_ROWS, { remark: JSON.stringify(rows.value.map(r => toBackend(r, reportDate))) } as Partial<ChecklistResponse>)
+    debouncedSave(ITEM_ROWS, { remark: JSON.stringify(rows.value.map(r => toBackend(r, toValue(reportDate)))) } as Partial<ChecklistResponse>)
   }
 
   // ─── 计算：逾期天数+等级 ─────────────────────────────────────────────────
   const computedRows: ComputedRef<L3OverdueCheckComputed[]> = computed(() =>
     rows.value.map(row => {
-      const computedOverdueDays = calcOverdueDays(row.dueDate, reportDate)
+      const computedOverdueDays = calcOverdueDays(row.dueDate, toValue(reportDate))
       const isOverdue = computedOverdueDays > 0
       let overdueLevel: L3OverdueLevel = 'none'
       if (isOverdue) {
@@ -151,7 +152,7 @@ export function useL3OverdueCheck(
     if (index < 0 || index >= rows.value.length) return
     ;(rows.value[index] as any)[field] = value
     if (field === 'dueDate') {
-      rows.value[index].overdueDays = calcOverdueDays(value as string, reportDate)
+      rows.value[index].overdueDays = calcOverdueDays(value as string, toValue(reportDate))
     }
     persist()
   }

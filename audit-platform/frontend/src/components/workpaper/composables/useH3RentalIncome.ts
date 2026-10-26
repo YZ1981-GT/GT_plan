@@ -192,9 +192,11 @@ export function calcMonthsInFiscalYear(start: string, end: string, year: number)
 
 /** 重算一行公式列（应计/差异/年租/日后合计/到期月数） */
 export function recalcRentalRow(row: RentalContractRow, opts?: { fiscalYear?: number; fillMonthsIfEmpty?: boolean }): void {
-  if (opts?.fillMonthsIfEmpty && !(row.monthsThisYear > 0) && row.leaseStart && row.leaseEnd) {
-    const y = opts.fiscalYear ?? new Date().getFullYear()
-    const m = calcMonthsInFiscalYear(row.leaseStart, row.leaseEnd, y)
+  // 本年月份按会计年度重叠推算：没有审计年度就不推（不按今年猜）。
+  // 🔴 只跳过这一步：其余公式列（应计 / 差异 / 年租 / 日后合计 / 到期月数）照常重算 ——
+  //    原先在这里 return 会让整行公式列都不再更新
+  if (opts?.fillMonthsIfEmpty && !(row.monthsThisYear > 0) && row.leaseStart && row.leaseEnd && opts.fiscalYear != null) {
+    const m = calcMonthsInFiscalYear(row.leaseStart, row.leaseEnd, opts.fiscalYear)
     if (m > 0) row.monthsThisYear = m
   }
 
@@ -467,7 +469,8 @@ export function useH3RentalIncome(params: {
 
   /** 按合同起止日推算本期租赁月数 */
   function fillMonthsThisYear(fiscalYear?: number): number {
-    const y = fiscalYear ?? new Date().getFullYear()
+    if (fiscalYear == null) return 0
+    const y = fiscalYear
     let updated = 0
     for (const row of contractRows.value) {
       const m = calcMonthsInFiscalYear(row.leaseStart, row.leaseEnd, y)

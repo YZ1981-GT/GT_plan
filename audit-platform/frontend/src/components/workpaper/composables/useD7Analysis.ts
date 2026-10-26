@@ -260,8 +260,12 @@ export function useD7Analysis(options: UseD7AnalysisOptions) {
   async function importFromLedger(): Promise<void> {
     try {
       const http = (await import('@/utils/http')).default
-      const year = parseInt(allResponses.value.get('D7-4-audit-year')?.remark || '0') ||
-        new Date().getFullYear() - 1
+      const year = parseInt(allResponses.value.get('D7-4-audit-year')?.remark || '0') || null
+      if (year == null) {
+        // 同一块里后面有 `const { ElMessage } = await import(...)`：这里直接用会落进暂时性死区（ReferenceError）
+        ;(await import('element-plus')).ElMessage.warning('未设置审计年度，无法读取序时账分析')
+        return
+      }
       const res = await http.get('/api/auto-data/d7_ledger_analysis', {
         params: { project_id: options.projectId.value, year },
       })

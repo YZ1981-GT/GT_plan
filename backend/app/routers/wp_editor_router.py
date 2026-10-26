@@ -25,7 +25,7 @@ import sqlalchemy as sa
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.deps import require_project_access, require_operation, check_consol_lock
+from app.deps import require_project_access, require_project_audit_year, require_operation, check_consol_lock
 from app.services.project_audit_year import fetch_project_audit_year
 from app.models.core import User
 from app.services.feature_flags import get_feature_maturity, is_enabled
@@ -385,7 +385,7 @@ async def update_sign_status(
     if status == "signed" and is_a16_main and not sign_date:
         raise HTTPException(status_code=422, detail="A16 主版本签回时必须提供签署日期(sign_date)")
 
-    year_val = await fetch_project_audit_year(db, project_id) or 0
+    year_val = await require_project_audit_year(db, project_id)
 
     # scope 确定：A16 子版本 → word_template:A16:{wp_code}，其他 → word_template:{wp_code}
     svc = FieldOverrideService(db)
@@ -397,7 +397,7 @@ async def update_sign_status(
     # ── 签署状态回退权限控制 ──
     # signed → draft/pending 需要 signing_partner/partner/qc/eqcr 角色
     current_sign_status = await svc.get(
-        project_id, year_val or 2025, scope, "sign_status", "value"
+        project_id, year_val, scope, "sign_status", "value"
     )
     if current_sign_status == "signed" and status in ("draft", "pending"):
         from app.models.staff_models import ProjectAssignment, StaffMember
@@ -418,7 +418,7 @@ async def update_sign_status(
                 detail="仅业务合伙人及以上角色可撤回签署",
             )
 
-    await svc.set(project_id, year_val or 2025, scope, "sign_status", "value", status, current_user.id)
+    await svc.set(project_id, year_val, scope, "sign_status", "value", status, current_user.id)
 
     # CW-76: push sign_date → audit_report.representation_letter_date
     if status == "signed" and is_a16_main and sign_date:
@@ -677,7 +677,7 @@ async def _prefill_word_template(db: AsyncSession, wp, project_id: UUID, *, user
     try:
         from app.services.misstatement_summary_service import MisstatementSummaryService
         svc = MisstatementSummaryService(db)
-        year = int(str(proj_row[2])[:4]) if proj_row and proj_row[2] else 2025
+        year = int(str(proj_row[2])[:4]) if proj_row and proj_row[2] else await require_project_audit_year(db, project_id)
         misstatement_text = await svc.get_for_representation_letter(project_id, year)
     except Exception as e:
         logger.warning("获取未更正错报摘要失败 pid=%s: %s", project_id, e)
@@ -1027,7 +1027,7 @@ async def export_b2_12_docx(
 async def prefill_workpaper(
     project_id: UUID,
     wp_id: UUID,
-    year: int = 2025,
+    year: int | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
@@ -1039,6 +1039,8 @@ async def prefill_workpaper(
     from app.services.prefill_engine import prefill_workpaper_real
     from app.services.cache_service import CacheService
     from app.core.redis import redis_client
+
+    year = await require_project_audit_year(db, project_id, year)
 
     # 计算 TB 版本标识（用于缓存 key）
     tb_version = CacheService.compute_tb_version(project_id, year)

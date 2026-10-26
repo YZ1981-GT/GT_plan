@@ -1,7 +1,9 @@
-"""用户路由 — 创建用户 / 获取当前用户信息
+"""用户路由 — 用户列表 / 创建 / 修改（启用停用、重置密码）/ 当前用户信息
 
-Validates: Requirements 3.12, 3.13
+Validates: Requirements 3.12, 3.13；spec procedure-chain-followup-closure R1
 """
+
+from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user, require_role
 from app.models.core import User
-from app.schemas.auth import UserCreate, UserResponse
+from app.schemas.auth import UserCreate, UserResponse, UserUpdate
 from app.services import auth_service
 
 router = APIRouter(tags=["用户"])
@@ -18,8 +20,12 @@ router = APIRouter(tags=["用户"])
 @router.get("/")
 async def list_users(
     db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
 ):
-    """获取用户列表（用于底稿分配、复核人选择等下拉框）"""
+    """获取用户列表（用于底稿分配、复核人选择等下拉框；须登录，原先不鉴权）。
+
+    带 ``is_active``：用户管理页显示状态、下拉框可据此排除停用账号。
+    """
     from sqlalchemy import select
     result = await db.execute(
         select(User).where(User.is_deleted == False).order_by(User.username)  # noqa: E712
@@ -29,9 +35,10 @@ async def list_users(
         {
             "id": str(u.id),
             "username": u.username,
-            "full_name": u.full_name if hasattr(u, 'full_name') else u.username,
-            "email": u.email if hasattr(u, 'email') else None,
-            "role": u.role if hasattr(u, 'role') else "auditor",
+            "full_name": u.username,
+            "email": u.email,
+            "role": u.role.value if hasattr(u.role, "value") else u.role,
+            "is_active": bool(u.is_active),
         }
         for u in users
     ]
@@ -48,6 +55,19 @@ async def create_user(
     Validates: Requirements 3.12
     """
     return await auth_service.create_user(user_data=body, db=db)
+
+
+@router.put("/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: UUID,
+    body: UserUpdate,
+    current_user: User = Depends(require_role(["admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> UserResponse:
+    """修改用户（仅 admin）：邮箱 / 角色 / 启用状态 / 重置密码。不能停用或降级自己；至少保留一个启用的管理员。"""
+    updated = await auth_service.update_user(db, actor_id=current_user.id, user_id=user_id, data=body)
+    await db.commit()
+    return updated
 
 
 @router.get("/me", response_model=UserResponse)

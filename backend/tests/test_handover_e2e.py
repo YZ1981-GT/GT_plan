@@ -111,6 +111,10 @@ async def seeded(db_session: AsyncSession):
         id=uuid.uuid4(), project_id=PROJECT_ID,
         staff_id=FROM_STAFF, role="auditor",
     ))
+    # 接收人是项目成员：编制人交接走底稿主编委派事务（spec procedure-trim-generation-delegation-chain 任务 12）
+    from app.models.base import ProjectUserRole
+    from app.models.core import ProjectUser
+    db_session.add(ProjectUser(project_id=PROJECT_ID, user_id=TO_STAFF, role=ProjectUserRole.auditor))
 
     # 1 个 draft 独立性声明
     db_session.add(IndependenceDeclaration(

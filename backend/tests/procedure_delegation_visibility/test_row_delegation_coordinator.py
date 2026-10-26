@@ -230,17 +230,23 @@ async def test_best_effort_savepoint_rolls_back_task_and_visibility_effects(sess
 
 
 async def test_preview_materializes_synchronously_and_returns_ready(session, monkeypatch):
+    """Task 4.1：同步物化后直接返回 ready（不再返回 materialization_pending）。
+
+    spec procedure-chain-followup-closure R2.1 起：物化前先按当前模板版本导入定义，物化只取这些定义键
+    （原先 mock 掉 ``_count_unmaterialized``；该方法已并入预览前置 ``prepare_row_tasks``）。
+    """
+    from app.services.procedure_row_definitions import current_definitions
+
     project = await mk_project(session)
     actor = await mk_user(session)
     assignee = await mk_staff(session, user_id=actor.id)
     await mk_assignment(session, project.id, assignee.id)
     await mk_project_user(session, project.id, actor.id, scope_cycles="D")
     service = ProcedureDelegationService(session)
-    wp_index_id = (await mk_wp_index(session, project.id)).id
+    wp_index_id = (await mk_wp_index(session, project.id, wp_code="D2")).id
     materialize = AsyncMock(
         return_value={"created": 2, "existing": 0, "targets": 2}
     )
-    monkeypatch.setattr(service, "_count_unmaterialized", AsyncMock(return_value=2))
     monkeypatch.setattr(service.materialization, "materialize", materialize)
     monkeypatch.setattr(service, "resolve_targets", AsyncMock(return_value=[]))
 
@@ -250,10 +256,12 @@ async def test_preview_materializes_synchronously_and_returns_ready(session, mon
         selector={"kind": "workpaper", "wp_index_ids": [str(wp_index_id)]},
         assignee_staff_id=assignee.id,
     )
-    # Task 4.1: 同步物化后直接返回 ready（不再返回 materialization_pending）
     assert result["status"] == "ready"
     assert result["preview_id"] is not None
     materialize.assert_awaited_once()
+    keys = materialize.await_args.kwargs["definition_keys_by_wp_code"]["D2"]
+    assert keys == frozenset(d["definition_key"] for d in current_definitions("D2A"))
+    assert result["materialization"]["tasks_created"] == 2 and result["hint"] == "没有可委派的程序行"
 
 
 async def test_atomic_scope_failure_rolls_back_entire_batch(session):

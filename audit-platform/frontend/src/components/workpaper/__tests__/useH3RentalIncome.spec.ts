@@ -46,6 +46,29 @@ describe('H3-14 recalcRentalRow：应计③=①×②，差异⑤=③−④', () 
     expect(row.monthlyRent).toBe(10_000) // 24个月
     expect(row.expectedRent).toBe(120_000)
   })
+
+  it('没有审计年度：只跳过「本年月份」推算，其余公式列照常重算（不按今年猜）', () => {
+    const row = createEmptyRentalRow({
+      leaseStart: '2024-01-01',
+      leaseEnd: '2025-12-31',
+      contractAmount: 240_000,
+      monthsThisYear: 0,
+      monthlyRent: 0,
+      bookedRent: 5_000,
+      futureY1: 100,
+    })
+    row.futureY2 = 200
+    recalcRentalRow(row, { fillMonthsIfEmpty: true })
+    expect(row.monthsThisYear).toBe(0)
+    expect(row.monthlyRent).toBe(10_000)
+    expect(row.annualRent).toBe(120_000)
+    expect(row.incomeDiff).toBe(-5_000)
+    expect(row.futureTotal).toBe(300)
+    // 有审计年度时照常推算本年月份
+    recalcRentalRow(row, { fillMonthsIfEmpty: true, fiscalYear: 2025 })
+    expect(row.monthsThisYear).toBe(12)
+    expect(row.expectedRent).toBe(120_000)
+  })
 })
 
 describe('H3-14 calcMonthsInFiscalYear', () => {

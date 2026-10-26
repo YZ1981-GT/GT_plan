@@ -44,7 +44,7 @@ class AllReportsGeneratedRule(GateRule):
                     FROM financial_report
                     WHERE project_id = :pid AND year = :year
                 """),
-                {"pid": str(project_id), "year": year or 2025},
+                {"pid": str(project_id), "year": year},
             )
             generated_types = {r[0] for r in result.fetchall()}
 
@@ -88,7 +88,7 @@ class AllNotesGeneratedRule(GateRule):
                     SELECT COUNT(*) FROM disclosure_notes
                     WHERE project_id = :pid AND year = :year
                 """),
-                {"pid": str(project_id), "year": year or 2025},
+                {"pid": str(project_id), "year": year},
             )
             count = result.scalar() or 0
 
@@ -124,7 +124,7 @@ class ConsistencyPassedRule(GateRule):
             from app.services.consistency_gate import ConsistencyGate
 
             gate = ConsistencyGate(db)
-            result = await gate.run_all_checks(project_id, year or 2025)
+            result = await gate.run_all_checks(project_id, year)
 
             # 检查是否有 blocking 级别的失败项
             blocking_failures = [

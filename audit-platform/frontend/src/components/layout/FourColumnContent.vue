@@ -70,7 +70,10 @@ const reportRows = ref<any[]>([])
 const reportLoading = ref(false)
 const noteContent = ref('')
 const tbDetail = ref<any>(null)
-const selectedYear = computed(() => Number(props.catalogItem?.year || props.project?.audit_year) || new Date().getFullYear())
+const selectedYear = computed<number | null>(() => {
+  const value = Number(props.catalogItem?.year || props.project?.audit_year)
+  return Number.isFinite(value) && value > 0 ? value : null
+})
 
 const fmtAmt = fmtAmount
 
@@ -82,6 +85,7 @@ function goToWp() {
 watch(() => props.catalogItem, async (item) => {
   if (!item || !props.project) return
   const pid = props.project.id
+  if ((item.type === 'note' || item.type === 'trial_balance') && selectedYear.value == null) return
 
   if (item.type === 'report') {
     reportLoading.value = true

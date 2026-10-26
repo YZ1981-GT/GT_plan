@@ -538,8 +538,13 @@ export function decideTrim(input: TrimDecisionInput): TrimDecision {
   }
 
   // ── 档 4：数据存在性（科目底稿级优先于循环级）────────────────────────────
-  const subjectNoData = input.subjectDataState === 'no_data'
+  // 🔴 金额非零时不判「无数据」：重药安徽 H3 曾在叙述里写着「无数据（科目余额
+  //    7,689,744.44 元）」被自动裁掉 —— 数据存在性与金额来自两个取数源，两者矛盾时
+  //    以有数据处理，落到后续档位（spec procedure-trim-generation-delegation-chain R1.7）。
+  const amountContradictsNoData = isComparableAmount(amount) && Math.abs(amount) >= 0.005
+  const subjectNoData = input.subjectDataState === 'no_data' && !amountContradictsNoData
   const cycleNoData = input.subjectDataState === 'unknown' && input.cycleHasData === false
+    && !amountContradictsNoData
   if (subjectNoData || cycleNoData) {
     const basis = subjectNoData
       ? '该科目在试算平衡表中无数据'

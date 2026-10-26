@@ -1,30 +1,24 @@
 """WOPI 服务与路由单元测试 — POC 文件模式（非UUID file_id）"""
 
-import os
-import tempfile
-from unittest.mock import patch
-
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
+from app.main import app
+
 
 @pytest.fixture()
-def tmp_storage(tmp_path):
-    """临时 storage 目录，自动 patch settings.STORAGE_ROOT。"""
-    with patch("app.core.config.settings") as mock_settings:
-        mock_settings.STORAGE_ROOT = str(tmp_path)
-        mock_settings.JWT_SECRET_KEY = "test-secret"
-        mock_settings.JWT_ALGORITHM = "HS256"
-        mock_settings.CORS_ORIGINS = ["http://localhost:5173"]
-        mock_settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 120
-        mock_settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS = 7
-        mock_settings.LOGIN_MAX_ATTEMPTS = 5
-        mock_settings.LOGIN_LOCK_MINUTES = 30
-        mock_settings.ONLYOFFICE_URL = "http://onlyoffice:80"
-        mock_settings.WOPI_BASE_URL = "http://backend:8000/wopi"
-        mock_settings.DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-        mock_settings.REDIS_URL = "redis://localhost:6379/0"
-        yield tmp_path
+def tmp_storage(tmp_path, monkeypatch):
+    """临时 storage 目录：只改真实配置对象上的 ``STORAGE_ROOT`` 一个属性（POC 路由按它找文件）。
+
+    🔴 原先用 ``patch("app.core.config.settings")`` 把整个配置对象换成 MagicMock，并在替换期间才
+    ``from app.main import app``：单独跑本文件时那是后端应用的首次导入，所有模块级
+    ``from app.core.config import settings`` 都绑定到 MagicMock，``main.py`` 的 ``settings.CORS_ORIGINS.split(",")``
+    当场 AttributeError（夹具把它设成了 list），且 security / 中间件等 5 个模块从此一直拿着 MagicMock；
+    跟别的用例一起跑时应用已被先导入，才碰巧通过。现在应用在本文件导入时加载（真实配置），夹具只改一个属性。
+    """
+    monkeypatch.setattr(settings, "STORAGE_ROOT", str(tmp_path))
+    yield tmp_path
 
 
 # ── WOPI 路由集成测试（POC 文件模式） ──
@@ -33,7 +27,6 @@ def tmp_storage(tmp_path):
 @pytest.fixture()
 def client(tmp_storage):
     """使用临时 storage 的 TestClient。"""
-    from app.main import app
     return TestClient(app)
 
 

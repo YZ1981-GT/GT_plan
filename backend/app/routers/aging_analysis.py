@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import get_current_user, require_project_access, require_project_audit_year
 from app.models.core import User, Project
 from app.services.aging_analysis_service import (
     get_aging_presets, get_project_aging_config,
@@ -91,7 +91,7 @@ async def calculate(
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """计算账龄坏账计提"""
-    year = body.get("year", 2025)
+    year = await require_project_audit_year(db, project_id, body.get("year"))
     account_code = body.get("account_code", "1122")
     preset = body.get("preset")
     custom_segments = body.get("custom_segments")

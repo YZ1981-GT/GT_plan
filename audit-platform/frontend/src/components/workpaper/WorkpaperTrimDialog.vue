@@ -14,6 +14,22 @@
     @update:model-value="$emit('update:modelValue', $event)"
   >
     <div class="wp-trim-dialog">
+      <el-alert
+        v-if="loadError"
+        type="error"
+        :title="loadError"
+        :closable="false"
+        show-icon
+        class="wp-trim-dialog__alert"
+      />
+      <el-alert
+        v-else-if="trimmedCount > 0"
+        type="info"
+        :title="`${trimmedCount} 个底稿已在程序裁剪中标为不执行，不会生成；如需编制请先在程序裁剪中恢复执行`"
+        :closable="false"
+        show-icon
+        class="wp-trim-dialog__alert"
+      />
       <!-- 工具栏 -->
       <div class="wp-trim-dialog__toolbar">
         <el-button size="small" @click="selectAll">全选</el-button>
@@ -30,7 +46,7 @@
         show-checkbox
         node-key="id"
         :default-checked-keys="defaultChecked"
-        :props="{ label: 'label', children: 'children' }"
+        :props="{ label: 'label', children: 'children', disabled: 'disabled' }"
         @check="onCheck"
       />
     </div>
@@ -54,6 +70,10 @@ interface TemplateItem {
   cycle: string
   applicable: boolean
   applicable_reason?: string
+  /** 已在程序裁剪中标为不执行（后端保留范围判定，子表 / 程序表跟随科目） */
+  trimmed?: boolean
+  /** 决定它的程序行编码（如 H3-2 跟随 H3） */
+  trimmed_by?: string | null
 }
 
 interface TreeNode {
@@ -76,6 +96,18 @@ const emit = defineEmits<{
 const treeRef = ref<any>(null)
 const allTemplates = ref<TemplateItem[]>([])
 const selectedCodes = ref<string[]>([])
+const loadError = ref('')
+
+/** 可生成 = 未被程序裁剪；默认再按业务分类预选 */
+const selectable = computed(() => allTemplates.value.filter((t) => !t.trimmed))
+const trimmedCount = computed(() => allTemplates.value.length - selectable.value.length)
+
+function trimLabel(t: TemplateItem): string {
+  if (!t.trimmed) return ''
+  return t.trimmed_by && t.trimmed_by !== t.wp_code
+    ? `（已裁剪：跟随 ${t.trimmed_by}）`
+    : '（已裁剪）'
+}
 
 // 循环名称映射
 const CYCLE_NAMES: Record<string, string> = {
@@ -100,32 +132,39 @@ const treeData = computed<TreeNode[]>(() => {
     label: `${cycle} ${CYCLE_NAMES[cycle] || ''}（${items.length}）`,
     children: items.map((t) => ({
       id: t.wp_code,
-      label: `${t.wp_code} ${t.wp_name}${t.applicable ? '' : ' ⚠️' + (t.applicable_reason || '')}`,
+      label: `${t.wp_code} ${t.wp_name}${trimLabel(t)}${t.applicable ? '' : ' ⚠️' + (t.applicable_reason || '')}`,
+      disabled: !!t.trimmed,
     })),
   }))
 })
 
-// 默认预选：applicable=true 的
+// 默认预选：applicable=true 且未被程序裁剪的
 const defaultChecked = computed(() =>
-  allTemplates.value.filter((t) => t.applicable).map((t) => t.wp_code),
+  selectable.value.filter((t) => t.applicable).map((t) => t.wp_code),
 )
 
 async function loadTemplates() {
+  loadError.value = ''
   try {
+    // 失败原因在弹窗里显示（_silent：不让全局拦截器再弹一次）
     const list = await api.get<TemplateItem[]>(
       '/api/workpapers/template-list',
-      { params: { project_id: props.projectId } },
+      { params: { project_id: props.projectId }, _silent: true } as any,
     )
     allTemplates.value = list
-    selectedCodes.value = list.filter((t) => t.applicable).map((t) => t.wp_code)
-  } catch {
+    selectedCodes.value = list.filter((t) => t.applicable && !t.trimmed).map((t) => t.wp_code)
+  } catch (e: any) {
     allTemplates.value = []
+    selectedCodes.value = []
+    const detail = e?.response?.data?.detail
+    loadError.value = `模板列表加载失败：${detail?.message || (typeof detail === 'string' ? detail : '') || '请稍后重试'}`
   }
 }
 
 function selectAll() {
-  treeRef.value?.setCheckedKeys(allTemplates.value.map((t) => t.wp_code))
-  selectedCodes.value = allTemplates.value.map((t) => t.wp_code)
+  const codes = selectable.value.map((t) => t.wp_code)
+  treeRef.value?.setCheckedKeys(codes)
+  selectedCodes.value = codes
 }
 
 function deselectAll() {
@@ -158,6 +197,10 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-bottom: 12px;
+}
+
+.wp-trim-dialog__alert {
   margin-bottom: 12px;
 }
 
