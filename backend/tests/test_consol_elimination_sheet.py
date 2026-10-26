@@ -345,7 +345,7 @@ class TestTreeLines:
         ], "本项目在前，下级合并项目承载的随后；已删的不列"
         by = {r["entry_no"]: r for r in rows}
         assert (by["IA-1"]["counted"], by["IA-1"]["node_key"], by["IA-1"]["readonly"]) == (True, "G:consol_elim", False)
-        assert by["IA-1"]["node_label"] == "某集团（合并差额）" and by["IA-1"]["origin_label"] == "手工录入"
+        assert by["IA-1"]["node_label"] == "某集团（差额户）" and by["IA-1"]["origin_label"] == "手工录入"
         assert by["IA-2"]["counted"] is False and by["IA-2"]["orphan_reason"] is None, "草稿不计入但不是孤儿"
         assert by["IA-3"]["counted"] is False and "ZZ" in by["IA-3"]["orphan_reason"]
         assert by["IA-4"]["account_code"] is None and "明细行无法识别" in by["IA-4"]["orphan_reason"]
@@ -357,7 +357,7 @@ class TestTreeLines:
             "counted": {"debit": "57.00", "credit": "57.00", "difference": "0.00", "entry_count": 2},
         }
         assert body["hosted_nodes"] == [
-            {"node_key": "G:consol_elim", "label": "某集团（合并差额）", "branch_entity_code": None},
+            {"node_key": "G:consol_elim", "label": "某集团（差额户）", "branch_entity_code": None},
         ]
         # 下级合并项目只看自己子树
         sub = await tree_lines(db, a.id)

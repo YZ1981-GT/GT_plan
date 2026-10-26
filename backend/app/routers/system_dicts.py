@@ -120,7 +120,7 @@ _DICTS: dict[str, list[dict[str, str]]] = {
         {"value": "internal_trade",    "label": "内部交易抵销",   "color": "warning"},
         {"value": "internal_ar_ap",    "label": "内部往来抵销",   "color": "warning"},
         {"value": "unrealized_profit", "label": "未实现利润抵销", "color": "danger"},
-        {"value": "other",             "label": "其他抵销",       "color": "info"},
+        {"value": "other",             "label": "其他调整",       "color": "info"},  # 进调整列（与分录枚举口径一致）
     ],
     # 审计循环代号 A~N + S
     "audit_cycle": [

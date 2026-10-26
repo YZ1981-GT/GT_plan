@@ -9,14 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.deps import require_project_access
 from app.core.database import get_db
 from app.models.core import User
-from app.models.consolidation_schemas import ConsolTrialResponse, ConsolTrialUpdate, ConsistencyCheckResult
+from app.models.consolidation_schemas import ConsolTrialResponse, ConsistencyCheckResult
 from app.services.consol_trial_service import (
     check_trial_consistency,
     delete_trial,
     get_trial_balance,
-    get_trial_row,
     recalculate_trial,
-    upsert_trial_row,
 )
 from app.services.consol_reconciliation_service import reconcile_worksheet_vs_trial
 
@@ -33,24 +31,8 @@ async def get_trial_balance_list(
     return await get_trial_balance(db, project_id, year)
 
 
-@router.put("/{trial_id}", response_model=ConsolTrialResponse)
-async def update_trial_row(
-    trial_id: UUID,
-    project_id: UUID,
-    data: ConsolTrialUpdate,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_project_access("edit")),
-):
-    trial = await get_trial_row(db, trial_id, project_id)
-    if not trial:
-        raise HTTPException(status_code=404, detail="试算表行不存在")
-
-    for key, value in data.model_dump(exclude_unset=True).items():
-        setattr(trial, key, value)
-
-    db.commit()
-    db.refresh(trial)
-    return trial
+# 🔴 原 ``PUT /{trial_id}``（手改合并试算行）已删除（spec consol-autotree-linkage-closure R8.4）：
+# 合并试算是企业树 + 已审批分录的派生数，重算即覆盖；且 ``db.commit()`` 未 await，报成功却从未保存。
 
 
 @router.post("/recalculate", response_model=list[ConsolTrialResponse])
@@ -84,8 +66,8 @@ async def check_consistency(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_project_access("readonly")),
 ):
-    """一致性校验"""
-    return ConsistencyCheckResult(**check_trial_consistency(db, project_id, year))
+    """一致性校验：按科目自然方向汇总借方性质与贷方性质合计判平衡。"""
+    return ConsistencyCheckResult(**(await check_trial_consistency(db, project_id, year)))
 
 
 @router.get("/stale-status")

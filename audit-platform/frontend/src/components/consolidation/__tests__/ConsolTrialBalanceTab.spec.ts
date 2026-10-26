@@ -160,7 +160,8 @@ describe('ConsolTrialBalanceTab', () => {
 
   it('读 report-trial：五列用后端净额（合并审定数不在前端重算）；无公式行不显示 0；取不到数显示留空', async () => {
     const wrapper = await loaded()
-    expect(api.getConsolReportTrial).toHaveBeenCalledWith('p-g', { reportType: 'balance_sheet', nodeKey: null, year: 2025 })
+    // 请求另带 AbortSignal（切换节点时取消上一请求），这里只核对业务参数
+    expect(api.getConsolReportTrial).toHaveBeenCalledWith('p-g', expect.objectContaining({ reportType: 'balance_sheet', nodeKey: null, year: 2025 }))
     expect(wrapper.find('[data-testid="ctb-cell-BS-002-consolidated"]').text()).toBe('75.00')
     expect(wrapper.find('[data-testid="ctb-cell-BS-002-elim_trade"]').text()).toBe('-30.00')
     expect(wrapper.find('[data-testid="ctb-cell-BS-000-consolidated"]').exists()).toBe(false)
@@ -170,14 +171,17 @@ describe('ConsolTrialBalanceTab', () => {
     expect(wrapper.find('[data-testid="ctb-push-status"]').text()).toContain('尚未推送过')
   })
 
-  it('汇总节点下拉 = 企业树的汇总节点；选下级节点后按该节点重读，穿透也带该节点', async () => {
+  it('节点下拉 = 企业树全部节点（按层级缩进、显示名称）；选下级节点后按该节点重读、回写左树，穿透也带该节点', async () => {
     const wrapper = await loaded()
     const options = wrapper.findAll('[data-testid="ctb-node"] i').map((o) => o.attributes('data-value'))
-    expect(options).toEqual(['G:consol', 'A:consol'])
+    // spec consol-autotree-linkage-closure R10.2：不再只列汇总节点（差额户 / 数据节点也能看）
+    expect(options).toEqual(['G:consol', 'G:consol_elim', 'G:parent', 'A:consol', 'A:consol_elim', 'A:parent'])
+    expect(wrapper.findAll('[data-testid="ctb-node"] i').map((o) => o.text())).not.toContain('G:consol')
     ;(wrapper.vm as any).$.setupState.nodeKey = 'A:consol'
     wrapper.findComponent(Select).vm.$emit('change', 'A:consol')
     await flushPromises()
-    expect(api.getConsolReportTrial).toHaveBeenLastCalledWith('p-g', { reportType: 'balance_sheet', nodeKey: 'A:consol', year: 2025 })
+    expect(api.getConsolReportTrial).toHaveBeenLastCalledWith('p-g', expect.objectContaining({ reportType: 'balance_sheet', nodeKey: 'A:consol', year: 2025 }))
+    expect(wrapper.emitted('node-change')).toEqual([['A:consol']])
     api.drillConsolRowEntries.mockResolvedValue({ decomposable: true, total: '-30.00', note: null, lines: [] })
     await wrapper.find('[data-testid="ctb-cell-BS-002-elim_trade"] .amt').trigger('click')
     await flushPromises()
@@ -243,6 +247,82 @@ describe('ConsolTrialBalanceTab', () => {
     await flushPromises()
     await wrapper.setProps({ year: 2025 })
     await flushPromises()
-    expect(api.getConsolReportTrial).toHaveBeenLastCalledWith('p-g', { reportType: 'balance_sheet', nodeKey: null, year: 2025 })
+    expect(api.getConsolReportTrial).toHaveBeenLastCalledWith('p-g', expect.objectContaining({ reportType: 'balance_sheet', nodeKey: null, year: 2025 }))
+  })
+})
+
+// ─── spec consol-autotree-linkage-closure R5.1 / R8.5 / R10 ─────────────────────────
+
+const DRAFT_COLUMNS = [...TRIAL_MEASURES, { key: 'consolidated_with_drafts' as const, label: '含草稿预览' }]
+
+describe('ConsolTrialBalanceTab：含草稿预览、口径说明、平衡提示、穿透补全', () => {
+  beforeEach(() => {
+    Object.values(api).forEach((f) => f.mockReset())
+    api.getConsolPushStatus.mockResolvedValue({ last_run: null, is_stale: false, stale_rows: 0 })
+  })
+
+  async function loadedWith(res: Record<string, unknown>) {
+    api.getConsolReportTrial.mockResolvedValue({ ...trialResponse(), ...res })
+    const wrapper = mountTab()
+    ;(wrapper.vm as any).load()
+    await flushPromises()
+    return wrapper
+  }
+
+  it('含草稿预览与合并审定数不同的格高亮并说明来自未审批分录；相同的格不高亮、不可穿透', async () => {
+    const wrapper = await loadedWith({
+      columns: DRAFT_COLUMNS, draft_pending_entries: 2,
+      rows: [row('BS-002', { consolidated_with_drafts: '62.00' }), row('BS-006', { consolidated_with_drafts: '75.00' })],
+    })
+    const diff = wrapper.find('[data-testid="ctb-cell-BS-002-consolidated_with_drafts"]')
+    expect(diff.classes()).toContain('gt-ctb-draft--diff')
+    expect(diff.text()).toBe('62.00')
+    const same = wrapper.find('[data-testid="ctb-cell-BS-006-consolidated_with_drafts"]')
+    expect(same.classes()).not.toContain('gt-ctb-draft--diff')
+    expect(wrapper.find('[data-testid="ctb-draft-note"]').text()).toContain('2 笔未审批分录')
+    await same.find('.amt').trigger('click')
+    await flushPromises()
+    expect(api.drillConsolRowEntries).not.toHaveBeenCalled()
+  })
+
+  it('列口径按节点类型说明（汇总 / 差额户 / 单体数据）；借贷不平给出两边合计与差额', async () => {
+    const agg = await loadedWith({ node_kind: 'aggregate', balance: { debit_total: '10.00', credit_total: '10.00', difference: '0.00', balanced: true } })
+    expect(agg.find('[data-testid="ctb-basis-note"]').text()).toContain('合并审定数 = 审定汇总')
+    expect(agg.find('[data-testid="ctb-balanced"]').exists()).toBe(true)
+    expect(agg.find('[data-testid="ctb-unbalanced"]').exists()).toBe(false)
+    const elim = await loadedWith({ node_kind: 'elim' })
+    expect(elim.find('[data-testid="ctb-basis-note"]').text()).toContain('差额户')
+    const data = await loadedWith({
+      node_kind: 'data', balance: { debit_total: '100.00', credit_total: '60.00', difference: '40.00', balanced: false },
+    })
+    expect(data.find('[data-testid="ctb-basis-note"]').text()).toContain('单体数据')
+    expect(data.find('[data-testid="ctb-unbalanced"]').text()).toContain('借方性质合计 100.00，贷方性质合计 60.00，相差 40.00')
+  })
+
+  it('穿透：分录带类型与说明，合并审定数给完整构成；个别数带所属上级、可进入项目，0 与空分开显示', async () => {
+    const wrapper = await loadedWith({})
+    api.drillConsolRowEntries.mockResolvedValue({
+      decomposable: true, total: '-30.00', note: null, individual_total: '100.00', consolidated_total: '70.00',
+      lines: [{ entry_id: 'e', entry_no: 'IA-001', entry_type: 'internal_ar_ap', entry_type_label: '内部往来抵销', description: '期末往来',
+        node_key: 'G:consol_elim', node_label: '某集团（差额户）', account_code: '1122', account_name: '应收账款', debit: '0.00', credit: '30.00', contribution: '-30.00' }],
+    })
+    await wrapper.find('[data-testid="ctb-cell-BS-002-consolidated"] .amt').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="ctb-drill-type"]').text()).toBe('内部往来抵销')
+    expect(wrapper.find('[data-testid="ctb-drill-desc"]').text()).toBe('期末往来')
+    expect(wrapper.find('[data-testid="ctb-drill-composition"]').text()).toMatch(/合并审定数 70\.00 = 审定汇总 100\.00\s*\+ 已审批分录 -30\.00/)
+
+    api.drillConsolRowIndividual.mockResolvedValue({ year: 2025, row_code: 'BS-002', rows: [
+      { node_key: 'G:parent', node_label: '某集团（单体母公司户）', parent_label: '某集团（合并户）', project_id: 'p-gs', amount: '0.00', reason: null },
+      { node_key: 'B:subsidiary', node_label: '乙公司', parent_label: '某集团（合并户）', project_id: null, amount: null, reason: '未建单户项目' },
+    ] })
+    await wrapper.find('[data-testid="ctb-cell-BS-002-individual"] .amt').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="ctb-drill-parent"]').text()).toBe('某集团（合并户）')
+    expect(wrapper.find('[data-testid="ctb-drill-amount-G:parent"]').text()).toBe('0.00')
+    expect(wrapper.find('[data-testid="ctb-drill-amount-B:subsidiary"]').text()).toBe('空')
+    expect(wrapper.find('[data-testid="ctb-drill-enter-B:subsidiary"]').exists()).toBe(false)
+    await wrapper.find('[data-testid="ctb-drill-enter-G:parent"]').trigger('click')
+    expect(wrapper.emitted('enter-project')).toEqual([[{ projectId: 'p-gs', label: '某集团（单体母公司户）' }]])
   })
 })

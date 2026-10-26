@@ -8,13 +8,14 @@
   ``ProjectRecord``，不连库，属性测试直接喂记录；
 - 薄装载：``load_year_records`` / ``build_group_tree`` 从库里取同年度记录后调纯函数。
 
-节点模型（design §二）——有合并项目的企业一次生成三个节点：
-  {名称}（合并）          aggregate，合并项目
-    ├ {名称}（合并差额）   elim，分录承载 = 本合并项目
-    ├ {名称}（母公司）     无分公司：data = 单体项目；有分公司：aggregate
-    │    ├ {名称}（母分差额） elim
-    │    ├ {名称}（本部）     data = 单体项目
-    │    └ 各分公司（再有分公司时同样展开为「汇总」）
+节点模型（design §二；展示名见 consol_node_naming，spec consol-autotree-linkage-closure R2）——
+有合并项目的企业一次生成三个节点：
+  {名称}（合并户）          aggregate，合并项目
+    ├ {名称}（差额户）       elim，分录承载 = 本合并项目
+    ├ {名称}（单体母公司户） 无分公司：data = 单体项目；有分公司：aggregate「{名称}（母公司户）」
+    │    ├ {名称}（母分差额户） elim
+    │    ├ {名称}（本部单体户） data = 单体项目
+    │    └ 各分公司（再有分公司时同样展开为「{名称}（汇总户）」）
     └ 各子公司（有合并项目的递归生成三节点；没有的取单体，并把它的下级提升上来，标「经 X 间接持有」）
 
 上级代码等于本企业代码 = 本企业就是上级企业（需求 1.5），一律经
@@ -41,58 +42,36 @@ from app.services.group_relation import (
 from app.services.note_section_catalog import normalize_report_scope
 from app.services.project_audit_year import resolve_project_audit_year
 
-# ─────────────────────────────── 角色 / 类型 / 合并方式 ───────────────────────────────
+# ─────────────────────────────── 角色 / 类型 / 合并方式（定义在 consol_node_naming，此处再导出） ───────────────────────────────
 
-ROLE_CONSOL = "consol"
-ROLE_CONSOL_ELIM = "consol_elim"
-ROLE_PARENT = "parent"
-ROLE_HQ = "hq"
-ROLE_BRANCH_ELIM = "branch_elim"
-ROLE_SUBSIDIARY = "subsidiary"
-ROLE_BRANCH = "branch"
-ELIM_ROLES = frozenset({ROLE_CONSOL_ELIM, ROLE_BRANCH_ELIM})
-# 代表「一个企业在树里的位置」的角色（统计合并方式、判断企业是否在树中用）
-ENTITY_ROLES = frozenset({ROLE_CONSOL, ROLE_PARENT, ROLE_SUBSIDIARY, ROLE_BRANCH})
-
-KIND_AGGREGATE = "aggregate"  # Σ 直接子节点
-KIND_ELIM = "elim"            # 归属本节点的已审批分录
-KIND_DATA = "data"            # 单体项目审定数
-
-MODE_SUBSIDIARY = "subsidiary"
-MODE_BRANCH = "branch"
-MODE_MIXED = "mixed"
-MODE_NONE = "none"
-MODE_LABELS: dict[str, str] = {
-    MODE_SUBSIDIARY: "母子合并",
-    MODE_BRANCH: "总分汇总",
-    MODE_MIXED: "母子合并＋总分汇总",
-    MODE_NONE: "未识别到下级",
-}
-
-_ROLE_SUFFIX: dict[str, str] = {
-    ROLE_CONSOL: "（合并）",
-    ROLE_CONSOL_ELIM: "（合并差额）",
-    ROLE_PARENT: "（母公司）",
-    ROLE_HQ: "（本部）",
-    ROLE_BRANCH_ELIM: "（母分差额）",
-}
+from app.services.consol_node_naming import (  # noqa: E402  —— 再导出，旧调用方 from consol_group_tree import 不变
+    ELIM_ROLES,
+    ENTITY_ROLES,
+    KIND_AGGREGATE,
+    KIND_DATA,
+    KIND_ELIM,
+    MODE_BRANCH,
+    MODE_LABELS,
+    MODE_MIXED,
+    MODE_NONE,
+    MODE_SUBSIDIARY,
+    ROLE_BRANCH,
+    ROLE_BRANCH_ELIM,
+    ROLE_CONSOL,
+    ROLE_CONSOL_ELIM,
+    ROLE_HQ,
+    ROLE_PARENT,
+    ROLE_SUBSIDIARY,
+    consol_label,
+    display_name,
+    node_key,
+)
 
 _DIAG_ORDER = (
     "year_unresolved", "root_no_company_code", "root_not_consolidated", "duplicate_project",
     "cycle_break", "detached", "parent_missing", "relation_conflict", "relation_defaulted",
     "standalone_missing", "branch_consol_ignored", "via", "orphan_entries", "link_mismatch",
 )
-
-
-def node_key(company_code: str, role: str) -> str:
-    return f"{company_code}:{role}"
-
-
-def display_name(name: str, role: str, kind: str) -> str:
-    """带角色后缀的展示名；子公司/分公司有分公司时显示「（汇总）」。"""
-    if role in _ROLE_SUFFIX:
-        return f"{name}{_ROLE_SUFFIX[role]}"
-    return f"{name}（汇总）" if kind == KIND_AGGREGATE else name
 
 
 def _clean(value: object) -> str | None:
@@ -559,7 +538,7 @@ class _TreeBuilder:
                     extra = ("parent_missing",)
                     self.diags.append(Diagnostic(
                         "parent_missing",
-                        f"「{x.name}」没有填写上级代码（或填为本企业），按最终控制方代码挂在「{e.name}（合并）」下",
+                        f"「{x.name}」没有填写上级代码（或填为本企业），按最终控制方代码挂在「{consol_label(e.name)}」下",
                         company_code=x.code, level="info",
                     ))
                 out.extend(self._member(x, host, via=[], relation=x.relation, extra_flags=extra))

@@ -119,8 +119,14 @@ describe('stale 快捷入口真正调用 API（需求 6.5）', () => {
 // ─── 导航路径 ──────────────────────────────────────────────────────────────
 
 describe('导航路径重读当前章节', () => {
-  it('onTreeNodeClick 附注分支调用 onNoteNodeClick 带 section_id', () => {
-    const fn = index.slice(index.indexOf('function onTreeNodeClick(data: ConsolTreeNode)'), index.indexOf('function onTreeNodeClick(data: ConsolTreeNode)') + 1000)
+  it('树节点点击经 setCurrentNode 统一切换，附注页重读当前章节（spec consol-autotree-linkage-closure R7）', () => {
+    const click = index.slice(index.indexOf('function onTreeNodeClick(data: ConsolTreeNode)'), index.indexOf('function onTreeNodeClick(data: ConsolTreeNode)') + 400)
+    expect(click).toContain('setCurrentNode(data)')
+    // 差额户不再自动弹出分录抽屉（R7.2）
+    expect(click).not.toContain('openElimPanel(')
+    const start = index.indexOf('async function reloadCurrentNodeContent()')
+    const fn = index.slice(start, index.indexOf('\n}', start))
+    expect(fn).toContain('await nextTick()')
     expect(fn).toContain("consolNoteTabRef.value?.onNoteNodeClick({ section_id: section.section_id, title: section.title })")
   })
 

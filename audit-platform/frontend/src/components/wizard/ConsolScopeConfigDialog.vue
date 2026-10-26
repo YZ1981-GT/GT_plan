@@ -1,8 +1,13 @@
 <template>
+  <!--
+    企业树版本（spec consol-autotree-linkage-closure R1）：企业树按各项目的三码自动生成，合并计算不需要确认；
+    推送合并数时自动记录版本，树结构变化只提示不拦截。本弹窗展示当前树、已记录版本与差异，可手动「记录为新版本」。
+    mode="created"：向导建完合并项目后打开，只预览自动生成的企业树。
+  -->
   <el-dialog
     :model-value="modelValue"
-    title="合并范围确认"
-    width="720px"
+    :title="isCreated ? '企业树预览' : '企业树版本'"
+    width="760px"
     append-to-body
     @update:model-value="(v: boolean) => emit('update:modelValue', v)"
     @open="handleOpen"
@@ -10,66 +15,52 @@
     <div v-loading="loading">
       <el-alert v-if="loadError" type="error" :closable="false" show-icon :title="loadError" />
 
-      <!-- 确认状态摘要 -->
       <div v-if="preview" class="gt-scope-summary" data-testid="scope-summary">
         <p class="gt-scope-hint">
-          合并范围由各项目基本信息中的企业代码、上级代码和与上级关系自动推导。
-          <template v-if="preview.confirmed">
-            <el-tag type="success" size="small" effect="plain">已确认</el-tag>
-            版本 {{ preview.revision }}
+          企业树由各项目基本信息中的企业代码、上级代码和与上级关系自动生成，合并计算直接按当前树进行，不需要确认；
+          推送合并数时自动记录树版本，树结构变化时只提示、不拦截。
+        </p>
+        <p v-if="!isCreated" class="gt-scope-version" data-testid="scope-version">
+          <template v-if="preview.recorded_revision">
+            已记录版本 v{{ preview.recorded_revision }}（{{ recordedModeText }}<template v-if="preview.recorded_at">，{{ fmtDateTime(preview.recorded_at) }}</template>）
+            <el-tag :type="matchTag.type" size="small" effect="plain">{{ matchTag.text }}</el-tag>
           </template>
           <template v-else>
-            <el-tag type="warning" size="small" effect="plain">待确认</el-tag>
+            <el-tag type="info" size="small" effect="plain">尚未记录</el-tag> 首次推送合并数时自动记录
           </template>
         </p>
-        <el-alert
-          v-if="preview.pending_legacy"
-          type="info"
-          :closable="false"
-          show-icon
-          title="该项目在新确认机制上线前已有合并数据，建议尽快确认当前范围"
-          data-testid="legacy-hint"
-        />
+        <el-alert v-if="!isCreated && diffLines.length" :type="preview.structural_change ? 'warning' : 'info'"
+          :closable="false" show-icon class="gt-scope-diff" title="当前企业树与已记录版本的差异" data-testid="scope-diff">
+          <ul><li v-for="(line, i) in diffLines" :key="i">{{ line }}</li></ul>
+        </el-alert>
       </div>
 
-      <!-- 节点表格（从 D5 nodes 读取，不再依赖旧 forest） -->
-      <el-empty v-if="!loading && members.length === 0" description="暂未识别到下级企业" />
+      <el-empty v-if="!loading && preview && !hasSubordinates" description="暂未识别到下级企业" />
       <el-alert
-        v-if="!loading && members.length === 0 && rootCompanyCode"
+        v-if="!loading && preview && !hasSubordinates && rootCompanyCode"
         type="info"
         :closable="false"
         show-icon
         :title="`请在各子公司/分公司项目的基本信息中把上级代码填为 ${rootCompanyCode}`"
       />
 
-      <el-table
-        v-if="members.length"
-        :data="members"
-        border
-        size="small"
-        max-height="420"
-        data-testid="consol-scope-members"
-      >
-        <el-table-column label="企业名称" min-width="200">
-          <template #default="{ row }">{{ row.company_name || '未命名企业' }}</template>
+      <el-table v-if="members.length" :data="members" border size="small" max-height="420" data-testid="consol-scope-members">
+        <el-table-column label="节点" min-width="230">
+          <template #default="{ row }">
+            <span :style="{ paddingLeft: row.depth * 14 + 'px' }">{{ row.label }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="企业代码" width="170" prop="company_code" />
-        <el-table-column label="角色" width="110" align="center">
+        <el-table-column label="角色" width="120" align="center">
           <template #default="{ row }">
-            <el-tag size="small" effect="plain">{{ roleLabel(row.role) }}</el-tag>
+            <el-tag size="small" effect="plain" :type="row.kind === 'elim' ? 'warning' : 'info'">{{ row.role_label }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="与上级关系" width="110" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="row.relation" size="small" effect="plain">
-              {{ row.relation === 'branch' ? '分公司' : '子公司' }}
-            </el-tag>
-            <span v-else>—</span>
-          </template>
+        <el-table-column label="与上级关系" width="100" align="center">
+          <template #default="{ row }">{{ row.relation_label || '—' }}</template>
         </el-table-column>
       </el-table>
 
-      <!-- 诊断 -->
       <el-alert
         v-if="preview && preview.diagnostics.length"
         type="warning"
@@ -87,64 +78,58 @@
     </div>
 
     <template #footer>
-      <el-button @click="emit('update:modelValue', false)">关闭</el-button>
+      <el-button data-testid="scope-close-btn" @click="emit('update:modelValue', false)">{{ isCreated ? '进入合并模块' : '关闭' }}</el-button>
       <el-button
-        v-if="preview && !preview.confirmed && preview.can_confirm"
+        v-if="!isCreated && preview && preview.can_confirm && !preview.matches_recorded"
         type="primary"
         :loading="confirming"
-        data-testid="confirm-scope-btn"
-        @click="handleConfirm"
+        data-testid="record-version-btn"
+        @click="handleRecord"
       >
-        确认当前合并范围
+        记录为新版本
       </el-button>
-      <el-button v-if="preview && preview.confirmed" type="success" disabled>
-        已确认（版本 {{ preview.revision }}）
-      </el-button>
-      <el-button v-if="preview && !preview.can_confirm && !preview.confirmed" type="info" disabled>
-        项目已锁定
-      </el-button>
+      <el-button v-if="!isCreated && preview && !preview.can_confirm" type="info" disabled>项目已锁定</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { parseApiError } from '@/composables/useApiError'
+import { fmtDateTime } from '@/utils/formatters'
+import { relationLabel } from '@/utils/groupRelation'
+import type { ConsolTreeNode } from '@/services/consolidationApi'
+import { nodeLabel, roleLabel, treeDiffLines } from '@/components/consolidation/composables/consolTreeView'
 import {
   previewScopeConfirmation,
   confirmScope,
   type ScopeConfirmationPreview,
-  type ScopeConfirmationNode,
 } from '@/services/consolScopeConfirmationApi'
 
 interface MemberRow {
+  node_key: string
+  label: string
   company_code: string
-  company_name: string
   role: string
-  relation: string | null
+  role_label: string
+  kind: string
+  relation_label: string
+  depth: number
 }
 
-const ROLE_LABELS: Record<string, string> = {
-  consol: '合并',
-  consol_elim: '合并差额',
-  parent: '母公司',
-  hq: '本部',
-  branch_elim: '母分差额',
-  subsidiary: '子公司',
-  branch: '分公司',
-}
-function roleLabel(role: string): string {
-  return ROLE_LABELS[role] || role
-}
-
-const props = defineProps<{ modelValue: boolean; projectId: string }>()
+const props = defineProps<{
+  modelValue: boolean
+  projectId: string
+  /** created = 向导建完合并项目后的预览（只看树）；默认 = 合并页的企业树版本管理 */
+  mode?: 'created' | 'manage'
+}>()
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  attached: [count: number]
-  confirmed: [preview: ScopeConfirmationPreview]
+  recorded: [preview: ScopeConfirmationPreview]
 }>()
 
+const isCreated = computed(() => props.mode === 'created')
 const loading = ref(false)
 const confirming = ref(false)
 const loadError = ref('')
@@ -152,15 +137,42 @@ const preview = ref<ScopeConfirmationPreview | null>(null)
 const members = ref<MemberRow[]>([])
 const rootCompanyCode = ref('')
 
-function extractMembers(nodes: ScopeConfirmationNode[]): MemberRow[] {
-  return nodes
-    .filter(n => n.role !== 'consol' && n.role !== 'consol_elim' && n.role !== 'branch_elim')
-    .map(n => ({
-      company_code: n.company_code,
-      company_name: n.company_name,
-      role: n.role,
-      relation: n.relation,
-    }))
+const recordedModeText = computed(() => (preview.value?.recorded_mode === 'user' ? '手动记录' : '推送时自动记录'))
+const matchTag = computed(() => {
+  const p = preview.value
+  if (p?.matches_recorded) return { type: 'success' as const, text: '与当前树一致' }
+  if (p?.structural_change) return { type: 'warning' as const, text: '当前树结构已变化' }
+  return { type: 'info' as const, text: '当前树只改了名称' }
+})
+const diffLines = computed(() => treeDiffLines(preview.value?.diff))
+/** 根节点之外还有企业（子公司 / 分公司 / 下级合并户） */
+const hasSubordinates = computed(() => members.value.some((m) => m.depth > 0 && (m.role === 'subsidiary' || m.role === 'branch' || m.role === 'consol')))
+
+/** 企业树（先序）→ 节点行：带层级缩进、展示名、角色（按节点类型）与上级关系 */
+function treeMembers(tree: ConsolTreeNode | null): MemberRow[] {
+  const out: MemberRow[] = []
+  const visit = (node: ConsolTreeNode, depth: number) => {
+    out.push({
+      node_key: node.node_key,
+      label: nodeLabel(node),
+      company_code: node.company_code,
+      role: node.role,
+      role_label: roleLabel(node.role, node.kind) || node.role,
+      kind: node.kind,
+      relation_label: relationLabel(node.relation),
+      depth,
+    })
+    for (const child of node.children || []) visit(child, depth + 1)
+  }
+  if (tree && tree.node_key) visit(tree, 0)
+  return out
+}
+
+function applyPreview(data: ScopeConfirmationPreview) {
+  preview.value = data
+  const tree = (data.tree || null) as unknown as ConsolTreeNode | null
+  rootCompanyCode.value = tree?.company_code || ''
+  members.value = treeMembers(tree)
 }
 
 async function loadPreview() {
@@ -170,13 +182,10 @@ async function loadPreview() {
   preview.value = null
   members.value = []
   try {
-    const data = await previewScopeConfirmation(props.projectId)
-    preview.value = data
-    rootCompanyCode.value = (data.tree as any)?.company_code || ''
-    members.value = extractMembers(data.nodes)
+    applyPreview(await previewScopeConfirmation(props.projectId))
   } catch (err: any) {
     const parsed = parseApiError(err)
-    loadError.value = parsed.message || '加载合并范围预览失败'
+    loadError.value = parsed.message || '加载企业树失败'
   } finally {
     loading.value = false
   }
@@ -186,7 +195,7 @@ async function handleOpen() {
   await loadPreview()
 }
 
-async function handleConfirm() {
+async function handleRecord() {
   if (!preview.value || !props.projectId) return
   confirming.value = true
   try {
@@ -194,40 +203,37 @@ async function handleConfirm() {
       expected_fingerprint: preview.value.fingerprint,
       expected_revision: preview.value.revision,
     })
-    preview.value = result
-    members.value = extractMembers(result.nodes)
-    ElMessage.success('合并范围已确认')
-    emit('confirmed', result)
+    applyPreview(result)
+    ElMessage.success(`已记录为企业树版本 v${result.recorded_revision || result.revision}`)
+    emit('recorded', result)
   } catch (err: any) {
     const parsed = parseApiError(err)
     if (parsed.code === 'SCOPE_FINGERPRINT_CONFLICT' || parsed.code === 'SCOPE_REVISION_CONFLICT') {
       const latestPreview = err?.response?.data?.detail?.latest_preview
-      if (latestPreview) {
-        preview.value = latestPreview
-        members.value = extractMembers(latestPreview.nodes)
-      } else {
-        await loadPreview()
-      }
-      ElMessage.warning('合并范围已变化，请检查后重新确认')
+      if (latestPreview) applyPreview(latestPreview)
+      else await loadPreview()
+      ElMessage.warning('企业树已变化，请检查后重新记录')
     } else if (parsed.code === 'CONSOL_PROJECT_LOCKED') {
-      ElMessage.error('项目已锁定，不能确认合并范围')
+      ElMessage.error('项目已锁定，不能记录企业树版本')
     } else {
-      ElMessage.error(parsed.message || '确认合并范围失败')
+      ElMessage.error(parsed.message || '记录企业树版本失败')
     }
   } finally {
     confirming.value = false
   }
 }
+
+defineExpose({ members, preview })
 </script>
 
 <style scoped>
 .gt-scope-summary { margin-bottom: 12px; }
-.gt-scope-hint {
+.gt-scope-hint, .gt-scope-version {
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-secondary);
   line-height: 1.6;
   margin: 0 0 8px;
 }
+.gt-scope-diff ul, .gt-scope-diagnostics ul { margin: 4px 0 0; padding-left: 18px; font-size: var(--gt-font-size-xs); }
 .gt-scope-diagnostics { margin-top: 12px; }
-.gt-scope-diagnostics ul { margin: 4px 0 0; padding-left: 18px; font-size: var(--gt-font-size-xs); }
 </style>

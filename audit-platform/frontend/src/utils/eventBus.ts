@@ -32,6 +32,11 @@ export interface StandardChangePayload {
 /** 四栏切换 */
 export interface FourColSwitchPayload {
   tab?: string
+  /**
+   * 布局延迟转发给目录的那一次（目录可能刚随四栏模式挂载，第一次没收到）。
+   * 布局自己不再处理带此标记的事件 —— 否则它收到自己转发的事件又转发一次，每 150 ms 重发、永不停止。
+   */
+  _relayed?: boolean
 }
 
 /** 打开公式管理器 */
@@ -156,6 +161,15 @@ export interface ConsolRefreshEntityPayload {
 export interface ConsolRefreshDonePayload {
   projectId: string
   year: number
+}
+
+/**
+ * 合并页当前节点（spec consol-autotree-linkage-closure R7.1）：合并页只保留布局中栏一棵企业树，
+ * 组织图 / 树形列表 / 试算页 / 差额表切换节点后由合并页广播，中栏据此同步高亮。
+ */
+export interface ConsolCurrentNodePayload {
+  projectId: string
+  nodeKey: string | null
 }
 
 /** 合并树汇总 */
@@ -407,6 +421,15 @@ export type Events = {
   'consol-note-audit-all': ConsolNoteAuditAllPayload
   /** 他人确认了合并附注明细映射 / 提升了映射模板（ConsolidationIndex 收 SSE 后转发，ConsolNoteTab 显示横幅） */
   'consol-note-mapping-changed': void
+  /** 合并页当前节点变化（中栏企业树同步高亮）；中栏挂载时发 request，合并页回一次当前值 */
+  'consol-current-node': ConsolCurrentNodePayload
+  'consol-current-node-request': void
+  /** 打开差额户的差额分录面板（中栏右键 / 上下文条「📝 差额分录」，差额户点击不再自动弹出） */
+  'consol-open-elim-panel': { nodeKey: string }
+  /** 中栏「重新推送」：由合并页统一排队推送（与过期横幅同一入口） */
+  'consol-request-push': void
+  /** 打开「企业树版本」弹窗 */
+  'consol-open-scope-confirm': void
 
   // 模板 & 地址注册表
   'template-applied': TemplateAppliedPayload

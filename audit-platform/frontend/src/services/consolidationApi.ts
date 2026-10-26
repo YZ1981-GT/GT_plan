@@ -269,6 +269,16 @@ export type ConsolReportType =
 
 /** 试算平衡表页的五列（均为按科目自然方向归一后的净额） */
 export type ConsolTrialMeasure = 'individual' | 'elim_equity' | 'elim_trade' | 'adjustment' | 'consolidated'
+/** 试算页列：五列净额 + 「含草稿预览」（已审批 + 草稿 + 待审批分录的合并数，只作对照） */
+export type ConsolTrialColumnKey = ConsolTrialMeasure | 'consolidated_with_drafts'
+
+/** 节点合并数按科目自然方向的借贷平衡检查（spec consol-autotree-linkage-closure R8.5） */
+export interface ConsolTrialBalanceCheck {
+  debit_total: string
+  credit_total: string
+  difference: string
+  balanced: boolean
+}
 
 export interface ConsolReportRowMeta {
   row_code: string
@@ -285,6 +295,8 @@ export interface ConsolReportTrialRow extends ConsolReportRowMeta {
   elim_trade: string | null
   adjustment: string | null
   consolidated: string | null
+  /** 含草稿预览（已审批 + 草稿 + 待审批；不含已驳回）；合并审定数仍只认已审批 */
+  consolidated_with_drafts?: string | null
   /** 公式线性 ⇒ 可按分录 / 企业分解 */
   linear: boolean
   /** 留空原因（取不到数的列） */
@@ -296,9 +308,15 @@ export interface ConsolReportTrialResponse {
   applicable_standard: string
   node_key: string
   node_label: string
+  /** aggregate 汇总节点 / elim 差额户 / data 单体数据（列口径说明按它给） */
+  node_kind?: ConsolNodeKind
+  node_role?: ConsolNodeRole | string
   report_type: string
-  columns: Array<{ key: ConsolTrialMeasure; label: string }>
+  columns: Array<{ key: ConsolTrialColumnKey; label: string }>
   rows: ConsolReportTrialRow[]
+  balance?: ConsolTrialBalanceCheck
+  /** 计入「含草稿预览」的未审批分录笔数（本节点子树内） */
+  draft_pending_entries?: number | null
 }
 
 export interface ConsolBreakdownColumn {
@@ -335,6 +353,10 @@ export interface ConsolEntryDrillLine {
   entry_id: string
   entry_no: string
   entry_type: string
+  /** 分录类型中文（与分录枚举一致：other = 其他调整） */
+  entry_type_label?: string
+  /** 分录说明 */
+  description?: string | null
   node_key: string
   node_label: string
   account_code: string
@@ -356,14 +378,106 @@ export interface ConsolEntryDrillResponse {
   note: string | null
   total: string | null
   lines: ConsolEntryDrillLine[]
+  /** 合并审定数列的完整构成：审定汇总 + 分录贡献 = 合并数（只在 measure=consolidated 时给） */
+  individual_total?: string | null
+  consolidated_total?: string | null
 }
 
 export interface ConsolIndividualDrillRow {
   node_key: string
   node_label: string
+  /** 该数据节点在企业树上的直接上级 */
+  parent_label?: string | null
   project_id: string | null
   amount: string | null
   reason: string | null
+}
+
+// ─── 分录汇总表（spec consol-autotree-linkage-closure R9：与合并试算同一计算口径）───────────
+
+export interface ConsolEntrySummaryRow {
+  node_key: string
+  node_label: string
+  /** 差额户由本合并项目承载（否则在下级合并项目录入） */
+  hosted_here: boolean
+  account_code: string
+  account_name: string | null
+  entry_type: string
+  type_label: string
+  measure: string
+  debit: string
+  credit: string
+  /** 按科目自然方向归一的净额 */
+  net: string
+  /** 含草稿（已审批 + 草稿 + 待审批）的净额 */
+  draft_net: string | null
+  entry_count: number
+}
+
+export interface ConsolEntrySummaryByType {
+  entry_type: string
+  type_label: string
+  debit: string
+  credit: string
+  net: string
+  draft_net: string
+  entry_count: number
+}
+
+export interface ConsolEntrySummaryMismatch {
+  account_code: string
+  account_name: string | null
+  summary_adjustment: string
+  trial_adjustment: string
+  summary_elimination: string
+  trial_elimination: string
+}
+
+export interface ConsolEntrySummary {
+  year: number | null
+  rows: ConsolEntrySummaryRow[]
+  by_type: ConsolEntrySummaryByType[]
+  totals: { debit: string; credit: string; difference: string; balanced: boolean; entry_count: number }
+  reconcile: { matched: boolean; mismatches: ConsolEntrySummaryMismatch[]; persisted_stale: boolean; stale_accounts: string[] }
+  orphans: Array<{ entry_no: string; reason: string; review_status: string | null; review_status_label: string | null }>
+  warnings: string[]
+}
+
+// ─── 报表页右键「查看合并明细」（R8.2：报表行次读时计算）───────────────────────────────
+
+export interface ConsolRowBreakdownItem {
+  company_code: string
+  company_name: string
+  display_name?: string
+  amount: string | null
+  /** 占合并数的比例（4 位小数；读时路径另给 pct 百分数） */
+  ratio: string | null
+  pct?: string | null
+  node_key?: string
+  kind?: ConsolNodeKind | string
+  /** 个别数 / 抵销与调整 / 下级汇总 */
+  source?: string
+  source_project_id?: string | null
+  reason?: string | null
+}
+
+export interface ConsolRowBreakdown {
+  account_code: string
+  row_code?: string
+  row_name?: string
+  node_key?: string
+  node_label?: string
+  by_company: ConsolRowBreakdownItem[]
+  elimination: string | null
+  /** 后端合计（合并数） */
+  consolidated: string | null
+  individual_sum?: string
+  linear?: boolean
+  /** read_time = 按报表行读时计算（与报表差额表同源） */
+  basis?: 'read_time'
+  computed_at?: string | null
+  has_breakdown: boolean
+  message: string | null
 }
 
 // ─── 合并推送（需求 8）────────────────────────────────────────────────────────
@@ -606,7 +720,7 @@ export interface ConsolTreeNode {
   node_key: string
   role: ConsolNodeRole
   kind: ConsolNodeKind
-  /** 带角色后缀的名称，如「某集团（合并差额）」 */
+  /** 带角色后缀的名称，如「某集团（差额户）」（后端 consol_node_naming） */
   display_name: string
   relation: 'subsidiary' | 'branch' | null
   /** 差额节点：承载其分录的合并项目 */
@@ -627,6 +741,37 @@ export interface ConsolTreeDiagnostic {
   level: 'warning' | 'info'
 }
 
+/** 两版企业树的节点差异（后端 `structural_diff`；改名只进 renamed，不算结构变化） */
+export interface ConsolTreeDiffItem {
+  node_key: string
+  label?: string | null
+  role?: string | null
+}
+export interface ConsolTreeDiff {
+  added: ConsolTreeDiffItem[]
+  removed: ConsolTreeDiffItem[]
+  moved: Array<ConsolTreeDiffItem & { from: string | null; from_label: string | null; to: string | null; to_label: string | null }>
+  changed: Array<ConsolTreeDiffItem & { fields: string[] }>
+  renamed: Array<{ node_key: string; from: string | null; to: string | null }>
+  structural: boolean
+}
+
+/** 企业树版本（spec consol-autotree-linkage-closure R1：推送时自动记录，手动「记录为新版本」为 user） */
+export interface ConsolScopeVersion {
+  /** 当前有效（已记录）的版本号；0 = 尚未记录 */
+  revision: number
+  latest_revision: number
+  mode: 'user' | 'auto' | null
+  recorded_at: string | null
+  /** 当前树与已记录版本一致 */
+  matches: boolean
+  /** 与已记录版本相比有新增 / 移除 / 上级变化 / 类型或关系变化（改名不算） */
+  structural_change: boolean
+  diff: ConsolTreeDiff | null
+  fingerprint: string
+  can_record: boolean
+}
+
 /** `GET /api/consolidation/worksheet/tree` 响应 */
 export interface ConsolTreeResponse {
   tree: ConsolTreeNode | null
@@ -635,6 +780,8 @@ export interface ConsolTreeResponse {
   diagnostics: ConsolTreeDiagnostic[]
   year: number | null
   message?: string
+  /** 企业树版本；非合并项目 / 取不到时为 null */
+  scope_version?: ConsolScopeVersion | null
 }
 
 /** 差额录入可选科目（方向与金额归一同一判定） */
@@ -1180,6 +1327,20 @@ export async function drillConsolRowIndividual(
 }
 
 // ─── 合并推送（需求 8）────────────────────────────────────────────────────────
+
+/** 分录汇总表：差额户 × 科目 × 类型，与合并试算逐科目对账（只读） */
+export async function getConsolEntrySummary(projectId: string, year: number): Promise<ConsolEntrySummary> {
+  // 调用方（分录汇总表）自己显示失败原因 ⇒ 静默全局错误提示，避免弹两次
+  return api.get(P.worksheet.entrySummary, { params: { project_id: projectId, year }, _dedupe: false, _silent: true } as any)
+}
+
+/** 报表页右键「查看合并明细」：报表行次按所选汇总节点（默认根）读时计算直接下级构成（弹窗自己显示失败原因） */
+export async function getConsolRowBreakdown(
+  projectId: string, year: number, rowCode: string, nodeKey?: string | null,
+): Promise<ConsolRowBreakdown> {
+  const params = nodeKey ? { node_key: nodeKey } : undefined
+  return api.get(P.reports.consolBreakdown(projectId, year, rowCode), { params, _silent: true } as any)
+}
 
 /** 立即推送：本项目 + 上层合并项目依次重算差额表 → 合并试算 → 合并报表 → 标记附注待更新（后台执行） */
 export async function pushConsolidation(

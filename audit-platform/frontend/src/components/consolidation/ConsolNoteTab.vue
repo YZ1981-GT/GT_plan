@@ -273,8 +273,11 @@
             </div>
           </div>
         </div>
-        <div class="gt-note-empty-info">
-          国企版 91 章节 · 221 表格 &nbsp;|&nbsp; 上市版 80 章节 · 282 表格 &nbsp;|&nbsp; 顶部栏切换准则自动更新 &nbsp;|&nbsp; 每表独立保存不丢失 &nbsp;|&nbsp; 全屏编辑按 ESC 退出
+        <!-- 章节 / 表格数按当前模板目录现算（spec consol-autotree-linkage-closure R7.5：原写死的「91 章节 · 221 表格」与模板早已不符） -->
+        <div class="gt-note-empty-info" data-testid="consol-note-empty-info">
+          {{ props.standard === 'listed' ? '上市版' : '国企版' }}
+          {{ props.consolNoteTree.length }} 章节 · {{ props.consolNoteTree.reduce((n: number, g: any) => n + (Number(g?.table_count) || 0), 0) }} 表格
+          &nbsp;|&nbsp; 顶部栏切换准则自动更新 &nbsp;|&nbsp; 每表独立保存不丢失 &nbsp;|&nbsp; 全屏编辑按 ESC 退出
         </div>
       </div>
     </div>

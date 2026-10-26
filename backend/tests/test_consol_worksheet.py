@@ -248,11 +248,11 @@ async def test_to_dict(db_session: AsyncSession, seeded_db):
     d = to_dict(await build_tree(db_session, seeded_db))
     assert d["company_code"] == "ROOT" and d["project_id"] == str(ROOT_C)
     assert d["node_key"] == "ROOT:consol" and d["kind"] == "aggregate"
-    assert d["display_name"] == "集团总公司（合并）"
+    assert d["display_name"] == "集团总公司（合并户）"
     assert len(d["children"]) == 4
     elim = d["children"][0]
     assert elim["project_id"] is None and elim["host_project_id"] == str(ROOT_C)
-    assert elim["display_name"] == "集团总公司（合并差额）"
+    assert elim["display_name"] == "集团总公司（差额户）"
 
 
 # ===========================================================================
@@ -479,7 +479,7 @@ async def test_drill_to_companies(db_session: AsyncSession, seeded_db):
     await recalc_full(db_session, seeded_db, YEAR)
     data = await drill_to_companies(db_session, seeded_db, YEAR, "ROOT", "1001")
     assert [d["node_key"] for d in data] == ["ROOT:consol_elim", "ROOT:parent", "A001:consol", "B001:subsidiary"]
-    assert data[0]["display_name"] == "集团总公司（合并差额）" and data[0]["kind"] == "elim"
+    assert data[0]["display_name"] == "集团总公司（差额户）" and data[0]["kind"] == "elim"
     assert sum((D(d["consolidated_amount"]) for d in data), D(0)) == D(8310)
     assert await drill_to_companies(db_session, seeded_db, YEAR, "B001:subsidiary") == []  # 数据节点没有子节点
 
@@ -554,8 +554,8 @@ async def test_drill_chain(db_session: AsyncSession, seeded_db):
 # ===========================================================================
 
 TREE_ORDER_LABELS = [
-    "集团总公司（合并）", "集团总公司（合并差额）", "集团总公司（母公司）", "子公司A（合并）",
-    "子公司A（合并差额）", "子公司A（母公司）", "孙公司C", "子公司B",
+    "集团总公司（合并户）", "集团总公司（差额户）", "集团总公司（单体母公司户）", "子公司A（合并户）",
+    "子公司A（差额户）", "子公司A（单体母公司户）", "孙公司C", "子公司B",
 ]
 
 

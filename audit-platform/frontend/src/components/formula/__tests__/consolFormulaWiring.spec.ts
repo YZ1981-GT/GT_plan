@@ -39,7 +39,8 @@ describe('公式管理合并域跨层接线', () => {
     expect(note).toContain("scope: 'consol_note'")
     expect(note).toContain('noteSection: sec.section_id')
     expect(worksheets).toContain("scope: 'consol_worksheet'")
-    expect(worksheets).toContain('defineExpose({ reload, activeSheet })')
+    // reload：推送完成后重载；reloadEntrySummary：分录变化后重读分录汇总表（spec consol-autotree-linkage-closure R9.4）
+    expect(worksheets).toContain('defineExpose({ reload, reloadEntrySummary, activeSheet })')
   })
 })
 

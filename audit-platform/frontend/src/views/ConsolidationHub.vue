@@ -320,10 +320,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { Connection, OfficeBuilding, Plus, Refresh, Search, Document, Upload, Clock } from '@element-plus/icons-vue'
 import { useGroupTree, highlightSegments, consolMethodLabel, formatShareholding, countConsolMethods, type TreeNode, type GroupTree } from '@/composables/useGroupTree'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
+import { reparentSummary, type ReparentResult } from '@/components/consolidation/composables/consolReparent'
 import BatchImportDialog from '@/components/wizard/BatchImportDialog.vue'
 
 const router = useRouter()
@@ -536,14 +538,21 @@ async function onNodeDrop(
   }
 
   try {
-    await api.patch(`/api/projects/${dragData.id}/parent-code`, {
+    // 合并项目与单户项目同改（上级代码 / 名称 / 关系 / 控制方补齐 / 向导数据），回执说明同步了哪些项目（R3.3）
+    const result = await api.patch<ReparentResult>(`/api/projects/${dragData.id}/parent-code`, {
       parent_company_code: newParentCode,
+      parent_company_name: dropData.companyName || null,
+    }, { _silent: true } as any)
+    ElNotification({
+      title: '层级调整成功',
+      message: reparentSummary(result),
+      type: result?.notices?.length ? 'warning' : 'success',
+      duration: 8000,
     })
-    ElMessage.success('层级调整成功')
     reload()
   } catch (e: any) {
-    // 400（循环引用等）→ 显示后端 detail；其余 → 通用错误。无论如何重建树恢复
-    ElMessage.error(e?.message || '层级调整失败')
+    // 400 成环 / 422 代码不合法 → 后端说明；403 无权；其余通用。无论如何重建树恢复原位
+    handleApiError(e, '层级调整')
     reload()
   }
 }

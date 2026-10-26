@@ -127,16 +127,6 @@ class ConsolTrialRow(BaseModel):
     consol_amount: Decimal = Field(default=Decimal("0"))
 
 
-class ConsolTrialUpdate(BaseModel):
-    """Update schema for consolidation trial balance row"""
-    account_name: str | None = None
-    account_category: str | None = None
-    individual_sum: Decimal | None = None
-    consol_adjustment: Decimal | None = None
-    consol_elimination: Decimal | None = None
-    consol_amount: Decimal | None = None
-
-
 class ConsolTrialResponse(ConsolTrialRow):
     id: UUID
     project_id: UUID
@@ -643,6 +633,8 @@ class ConsolReportRow(BaseModel):
     source_accounts: dict | list | None = None
     # V173：金额留空时的原因（公式取数超出合并口径 / 引用了留空行）；有值的行为 None
     blank_reason: str | None = None
+    # 上期留空原因（没有上年合并项目 / 上年树没有该节点等，spec consol-autotree-linkage-closure R8.1）
+    prior_blank_reason: str | None = None
     # 推送后下游数据（子企业试算表）已变化 ⇒ 该行待重新推送
     is_stale: bool = False
 

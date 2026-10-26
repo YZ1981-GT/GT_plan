@@ -49,11 +49,9 @@ inclusion: always
 
 ### 合并模块（consolidation）四阶段 — 代码+测试完成，未见真实数据
 - **🧮 合并核心会计模型（用户 2026-05-31 明确，已对照代码验证）**：**合并数 = 各子企业个别数据汇总（individual_sum）+ 差额表**；差额表与其他子企业列类似，是专门填调整分录 + 抵销分录（以及同控合并重复部分处理）的"虚拟列"，**一般以负数填列**；代码实现 = `consol_amount = individual_sum + consol_adjustment + consol_elimination`（trial 路径）/ 差额表引擎中间节点 = Σ子节点 consolidated + 本级抵销调整（差额表只记调整抵销不含个别数）——两路径同此模型
-- **4 Phase spec 全 ✅ 代码+测试**（2026-05-31 merge 后四阶段套件 **147 passed/0 failed**）：Phase0 核心管线（B1 汇总/B2 对账/schema 基线/锁定闭环）+ Phase1 架构锁定（AmountResolver 统一引擎/ELIMINATION_APPROVED 事件重算/全端点锁定+ConsolLockedBanner/B6 负商誉/B7 少数股东/A3 async）+ Phase2 编排接线（cascade_refresh/refresh-all SSE/V2 附注 flag/自动抵销 draft/报表穿透/cross_template/公式联动/签字冻结）+ Phase3 前端穿透（ConsolBreakdownDialog/provenance/双向导航/自动建树）
-- **16 ADR**（CONSOL-001~003/101~106/201~206/301~304）+ 24 consol service
+- **4 Phase spec 全 ✅ 代码+测试**（2026-05-31 merge 后四阶段套件 **147 passed/0 failed**）：Phase0 核心管线（B1 汇总/B2 对账/schema 基线/锁定闭环）+ Phase1 架构锁定（AmountResolver 统一引擎/ELIMINATION_APPROVED 事件重算/全端点锁定+ConsolLockedBanner/B6 负商誉/B7 少数股东/A3 async）+ Phase2 编排接线（cascade_refresh/refresh-all SSE/V2 附注 flag/自动抵销 draft/报表穿透/cross_template/公式联动/签字冻结）+ Phase3 前端穿透（ConsolBreakdownDialog/provenance/双向导航/自动建树）；16 ADR（CONSOL-001~003/101~106/201~206/301~304）+ 24 consol service
 - **🔴 四阶段曾最大盲区 = 无全链路集成测试**（各阶段 mock 掉相邻阶段，merge 两次咬人：async 签名漂移 + Phase1 删 _execute_formula + **PK 缺 uuid default 致 B1 链路从未真实落库**）→ 封板①已补 `test_consol_full_chain_integration.py` 守护；**统一卡点 = PG 0 个 consolidated 项目**（真实 UAT 全 data-blocked，封板②seed 脚本待 live PG 解锁）
-- **封板已完成（work 分支补，2026-05-31 merge 入 main）**：①✅ 全链路集成测试（真 SQLite+真 ORM 行+真 service，4 passed）②✅ `seed_consol_uat.py` 幂等造最小合成集团（--dry-run 离线可验）③🟡 Phase2/3 Playwright 待环境
-- **🐛 封板①抓到真 bug 并修复**：`consolidation_models.py` 全部 14 个主键缺 `default=uuid.uuid4` → ORM 插入 NULL 主键；根因修复=全列补 default，280 consol 测试全绿无回归
+- **封板（2026-05-31 入 main）**：①✅ 全链路集成测试（真 SQLite+真 ORM 行+真 service，4 passed；抓到 `consolidation_models.py` 14 个主键缺 `default=uuid.uuid4` ⇒ ORM 插入 NULL 主键，已全列补 default，280 consol 测试全绿）②✅ `seed_consol_uat.py` 幂等造最小合成集团（--dry-run 离线可验）③🟡 Phase2/3 Playwright 待环境
 - **✅ 预存 worksheet 测试失败已修**：fixture 抵销用 `review_status=draft`，但 Phase1 引擎只消费 APPROVED（ADR-CONSOL-102）→ fixture 改 approved；**教训：先读设计文档确认是引擎错还是 fixture 过时**
 - **四阶段三件套已归档 `_archive/09-consolidation-phases/`**；tasks.md 残留未勾项全是外部依赖（真实集团数据 UAT + Playwright + B6/B7 CAS20）
 
@@ -67,6 +65,9 @@ inclusion: always
 ### 合并抵销分录单源与差额表推送 `consol-elimination-single-source-push`（14/15，余 tasks.md 收尾）
 - ADR-CSP-001~006；唯一来源 `elimination_entries`；计算内核 `consol_report_values`（前缀口径 + 线性分解 + 五度量恒等式 P2）；合并报表按项目口径全六类生成（V172/V173）；试算平衡表只读五列 + 穿透；报表差额表读时计算；合并附注公式种子化 + 填入；推送服务四步上层联动 + SSE；公式管理合并节点 + 推送页。后端 141 passed 变异 166/166；前端 22 files 207 passed；浏览器实测通过
 - 顺带修复合并入口页 "canceled" bug（`useGroupTree.ts` + `ConsolidationIndex.vue` catch 块忽略 axios cancel 错误）
+
+### 合并自动建树与左树联动 `consol-autotree-linkage-closure`（2026-10-26，24/24 ✅）
+- 企业树按项目三码自动构建；范围确认门改年度校验 + 推送时自动记树版本（V206：`confirmed_by` 可空 / `confirmation_mode`，结构变化只提示不拦截）；命名单一来源 `consol_node_naming.py`；拖拽改上级 `group_links.reparent_project`（edit 鉴权、同步上级单位与向导数据）；基本信息表按企业树带出、三码只读；合并页只留中栏一棵树、各页与中栏高亮同步，差额户不自动弹抽屉（「📝 差额分录」）；数据节点右侧显示单体项目报表 / 附注（只读；附注列树本地实现 `consolNoteColumns.ts`，与编辑器 `noteColumnTree.ts` 同读法，后者入库后自动对拍、应改为复用）；试算页全节点下拉 + 「含草稿预览」列（不进合并数）；分录汇总表与差额表同源；右键合并明细读时计算、合并数取后端合计；合并上期取上年合并项目同节点、缺失留空写原因；删手改试算行 PUT。🔴 教训：①多根组件（含 Teleport / 弹窗）上写 `v-show` 不生效 ⇒ 包一层元素（浏览器实测两块同时显示）②代码引用其他会话未入库的模块 ⇒ 干净检出 import 失败（本 spec 曾引 noteColumnTree）③HEAD 被别处提交前移时主工作树不一定带对方改动（eventBus.ts）⇒ 提交树对「基线后 HEAD 改过的文件」三方合并，不能整文件拷贝 ④范围外：`reports.py` 三个端点只校验登录、系统字典「已退回」与合并「已驳回」不一致、ConsolidationHub 范围差异仍比 consol_scope 表
 
 ### 合并附注拉数 `consol-note-pull-from-standalone`（v3）+ 标题行库与子树重新汇总 `consol-note-header-library-and-node-reaggregate`（56/59，R6 四批 + R7 三批与收尾复核 + R8 批 9a / 9b-1 已推送；task 22 待拍板；R8 批 9b-2 结构改动待做，写真库前请用户放行）
 - 唯一拉数链路 = V186 明细映射（明细模板 → 映射规则 → 逐企业绑定 → 用户确认 → apply）；读取层 `consol_note_standalone_reader` 只取表 / 对行，表头识别 / 续表 / 单体↔合并选表全在 `note_table_header_library` + `note_table_header_match`（词表 `note_table_header_vocabulary.json` 手工维护，库目录 `note_table_header_library.json` 生成 + `--check`，请求期不读目录）；映射 JSON 由同一选表结果生成

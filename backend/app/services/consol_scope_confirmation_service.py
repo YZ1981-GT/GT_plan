@@ -1,4 +1,10 @@
-"""D5 服务端确认、CAS 与计算门。"""
+"""合并企业树版本（V183 起名「范围确认」；V206 起推送时自动记录，spec consol-autotree-linkage-closure R1）。
+
+- 计算不再要求用户确认：``require_calc_year`` 只校验年度边界；
+- 推送写路径 ``record_scope_version`` 自动记录（树指纹变化才新建一版）；
+- 手动「记录为新版本」沿用 CAS 接口 ``confirm_scope``（记录方式 user）；
+- 企业树接口附 ``scope_version_info``，结构差异见 ``structural_diff``（改名不算结构变化）。
+"""
 
 from __future__ import annotations
 
@@ -17,8 +23,6 @@ from app.models.consol_scope_confirmation_models import (
     ConsolScopeConfirmation,
     ConsolScopeConfirmationNode,
 )
-from app.models.consolidation_models import ConsolScope, ConsolTrial, ConsolWorksheet
-from app.models.consol_worksheet_data_models import ConsolWorksheetData
 from app.models.core import Project
 from app.services.consol_group_tree import GroupTreeResult, build_group_tree
 from app.services.consol_tree_service import TreeNode, to_dict
@@ -115,33 +119,9 @@ def fingerprint_payload(payload: dict[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-async def _is_legacy_boundary(db: AsyncSession, project: Project, year: int) -> bool:
-    connection = await db.connection()
-    if not await connection.run_sync(lambda conn: sa.inspect(conn).has_table("schema_version")):
-        return False
-    activated_at = await db.scalar(sa.text(
-        "SELECT applied_at FROM schema_version WHERE version = '183' "
-        "AND filename = 'V183__consol_scope_confirmation.sql'"
-    ))
-    if not activated_at or not project.created_at:
-        return False
-    if isinstance(activated_at, str):
-        activated_at = datetime.fromisoformat(activated_at)
-    cutoff = activated_at.replace(tzinfo=timezone.utc) if activated_at.tzinfo is None else activated_at
-    created = project.created_at
-    created = created.replace(tzinfo=timezone.utc) if created.tzinfo is None else created
-    if created >= cutoff:
-        return False
-    for model in (ConsolScope, ConsolTrial, ConsolWorksheet, ConsolWorksheetData):
-        criteria = [model.project_id == project.id, model.year == year, model.created_at < cutoff]
-        if hasattr(model, "is_deleted"):
-            criteria.append(model.is_deleted == sa.false())
-        if await db.scalar(sa.select(sa.exists().where(*criteria))):
-            return True
-    return False
-
-
-async def _load_state(db: AsyncSession, project_id: UUID) -> dict[str, Any]:
+async def _load_state(
+    db: AsyncSession, project_id: UUID, *, result: GroupTreeResult | None = None,
+) -> dict[str, Any]:
     project = (await db.execute(sa.select(Project).where(
         Project.id == project_id,
         Project.is_deleted == sa.false(),
@@ -149,12 +129,13 @@ async def _load_state(db: AsyncSession, project_id: UUID) -> dict[str, Any]:
     if project is None:
         raise ScopeConfirmationError(404, "PROJECT_NOT_FOUND", "项目不存在")
     if normalize_report_scope(project.report_scope) != "consolidated":
-        raise ScopeConfirmationError(422, "CONSOL_SCOPE_REQUIRED", "只有合并报表项目可以确认合并范围")
+        raise ScopeConfirmationError(422, "CONSOL_SCOPE_REQUIRED", "只有合并报表项目才有企业树版本")
 
     year = resolve_project_audit_year(project)
     if year is None:
         raise ScopeConfirmationError(422, "SCOPE_YEAR_UNRESOLVED", "项目缺少有效审计年度")
-    result = await build_group_tree(db, project_id)
+    if result is None:
+        result = await build_group_tree(db, project_id)
     if result is None or result.root is None:
         raise ScopeConfirmationError(404, "PROJECT_NOT_FOUND", "合并项目树不存在")
     payload = _canonical_payload(project, result)
@@ -176,8 +157,10 @@ async def _load_state(db: AsyncSession, project_id: UUID) -> dict[str, Any]:
             ConsolScopeConfirmation.status == "active",
         )
     )).scalar_one_or_none()
-    pending_legacy = latest is None and await _is_legacy_boundary(db, project, year)
-    confirmed = active is not None and active.fingerprint == fingerprint
+    matches = active is not None and active.fingerprint == fingerprint
+    diff = None
+    if active is not None and not matches:
+        diff = structural_diff((active.canonical_payload or {}).get("nodes") or [], payload["nodes"])
     preview = {
         "project_id": str(project_id),
         "year": year,
@@ -187,11 +170,17 @@ async def _load_state(db: AsyncSession, project_id: UUID) -> dict[str, Any]:
         "tree": to_dict(result.root),
         "nodes": _node_payloads(result.root, include_database_ids=True),
         "diagnostics": [item.to_dict() for item in result.diagnostics],
-        "confirmed": confirmed,
-        "pending_legacy": pending_legacy,
-        "pending_confirmation": not confirmed,
+        # 兼容旧字段：confirmed = 当前树与已记录的版本一致（V206 起计算不再需要确认）
+        "confirmed": matches,
+        "matches_recorded": matches,
+        "pending_confirmation": False,
         "can_confirm": project.consol_lock is False,
         "active_confirmation_id": str(active.id) if active is not None else None,
+        "recorded_revision": active.revision if active is not None else 0,
+        "recorded_mode": active.confirmation_mode if active is not None else None,
+        "recorded_at": _iso_utc(active.confirmed_at) if active is not None else None,
+        "structural_change": bool(diff and diff["structural"]),
+        "diff": diff,
     }
     return {
         "project": project,
@@ -204,66 +193,85 @@ async def _load_state(db: AsyncSession, project_id: UUID) -> dict[str, Any]:
     }
 
 
+def _iso_utc(value: datetime | None) -> str | None:
+    """记录时间统一按 UTC 带时区输出（SQLite 读回是无时区值，PG 是带时区值）。"""
+    if value is None:
+        return None
+    return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).isoformat()
+
+
+def structural_diff(old_nodes: list[dict[str, Any]], new_nodes: list[dict[str, Any]]) -> dict[str, Any]:
+    """两版企业树的节点差异（spec consol-autotree-linkage-closure R1.3 / ADR-CAL-002）。
+
+    按 ``node_key`` 比较：新增 / 移除 / 上级变化（``parent_node_key``）/ 类型或与上级关系变化；
+    名称变化单列为 ``renamed``，**不算结构变化**（改展示名、改企业名称不弹「树已变化」提示）。
+    结果顺序确定：新增、上级、类型与改名按新树先序，移除按旧树先序。
+    """
+    old = {n["node_key"]: n for n in old_nodes or [] if n.get("node_key")}
+    new = {n["node_key"]: n for n in new_nodes or [] if n.get("node_key")}
+
+    def label(node: dict[str, Any] | None, key: str | None) -> str | None:
+        if key is None:
+            return None
+        if node is None:
+            return key
+        return (node.get("company_name") or "").strip() or node.get("company_code") or key
+
+    added, moved, changed, renamed = [], [], [], []
+    for key, node in new.items():
+        if key not in old:
+            added.append({"node_key": key, "label": label(node, key), "role": node.get("role")})
+            continue
+        before = old[key]
+        if before.get("parent_node_key") != node.get("parent_node_key"):
+            moved.append({
+                "node_key": key, "label": label(node, key),
+                "from": before.get("parent_node_key"), "from_label": label(old.get(before.get("parent_node_key") or ""), before.get("parent_node_key")),
+                "to": node.get("parent_node_key"), "to_label": label(new.get(node.get("parent_node_key") or ""), node.get("parent_node_key")),
+            })
+        fields = [f for f in ("kind", "relation") if before.get(f) != node.get(f)]
+        if fields:
+            changed.append({"node_key": key, "label": label(node, key), "fields": fields,
+                            "before": {f: before.get(f) for f in fields}, "after": {f: node.get(f) for f in fields}})
+        if (before.get("company_name") or "").strip() != (node.get("company_name") or "").strip():
+            renamed.append({"node_key": key, "from": before.get("company_name"), "to": node.get("company_name")})
+    removed = [
+        {"node_key": key, "label": label(node, key), "role": node.get("role")}
+        for key, node in old.items() if key not in new
+    ]
+    return {
+        "added": added, "removed": removed, "moved": moved, "changed": changed, "renamed": renamed,
+        "structural": bool(added or removed or moved or changed),
+    }
+
+
 async def preview_scope_confirmation(db: AsyncSession, project_id: UUID) -> dict[str, Any]:
-    """只读重建当前树，返回服务端指纹、revision 与 legacy 状态。"""
+    """只读重建当前树，返回服务端指纹、版本号、与已记录版本的差异。"""
     return (await _load_state(db, project_id))["preview"]
 
 
-async def confirm_scope(
-    db: AsyncSession,
-    project_id: UUID,
-    *,
-    confirmed_by: UUID,
-    expected_fingerprint: str,
-    expected_revision: int,
-) -> dict[str, Any]:
-    """重新推导并 CAS 确认；仅 flush，事务由 router commit。"""
-    project = (await db.execute(
-        sa.select(Project)
-        .where(Project.id == project_id, Project.is_deleted == sa.false())
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )).scalar_one_or_none()
-    if project is None:
-        raise ScopeConfirmationError(404, "PROJECT_NOT_FOUND", "项目不存在")
-    if project.consol_lock is not False:
-        raise ScopeConfirmationError(423, "CONSOL_PROJECT_LOCKED", "合并项目已锁定，不能变更范围确认")
-
-    state = await _load_state(db, project_id)
-    preview = state["preview"]
-    if expected_fingerprint != state["fingerprint"]:
-        raise ScopeConfirmationError(
-            409, "SCOPE_FINGERPRINT_CONFLICT", "合并树已变化，请刷新预览后重新确认", preview,
-        )
+async def _write_version(
+    db: AsyncSession, state: dict[str, Any], *, recorded_by: UUID | None, mode: str,
+) -> ConsolScopeConfirmation:
+    """旧 active 置 superseded，写新修订与节点快照（只 flush）。"""
     current_revision = state["latest"].revision if state["latest"] is not None else 0
-    if state["active"] is not None and state["active"].fingerprint == state["fingerprint"]:
-        if expected_revision in (current_revision, current_revision - 1):
-            return preview
-        raise ScopeConfirmationError(
-            409, "SCOPE_REVISION_CONFLICT", "确认版本已变化，请刷新预览后重新确认", preview,
-        )
-    if expected_revision != current_revision:
-        raise ScopeConfirmationError(
-            409, "SCOPE_REVISION_CONFLICT", "确认版本已变化，请刷新预览后重新确认", preview,
-        )
-
     if state["active"] is not None:
         state["active"].status = "superseded"
         await db.flush()
-
     confirmation = ConsolScopeConfirmation(
-        project_id=project_id,
+        project_id=state["project"].id,
         year=state["payload"]["year"],
         report_scope="consolidated",
         revision=current_revision + 1,
         fingerprint=state["fingerprint"],
         canonical_payload=state["payload"],
         status="active",
-        confirmed_by=confirmed_by,
+        confirmed_by=recorded_by,
+        confirmation_mode=mode,
+        confirmed_at=datetime.now(timezone.utc),
     )
     db.add(confirmation)
     await db.flush()
-
     db.add_all([
         ConsolScopeConfirmationNode(
             confirmation_id=confirmation.id,
@@ -279,74 +287,132 @@ async def confirm_scope(
         for node in _node_payloads(state["result"].root, include_database_ids=True)
     ])
     await db.flush()
+    return confirmation
+
+
+async def _lock_project(db: AsyncSession, project_id: UUID) -> Project | None:
+    return (await db.execute(
+        sa.select(Project)
+        .where(Project.id == project_id, Project.is_deleted == sa.false())
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )).scalar_one_or_none()
+
+
+async def confirm_scope(
+    db: AsyncSession,
+    project_id: UUID,
+    *,
+    confirmed_by: UUID,
+    expected_fingerprint: str,
+    expected_revision: int,
+) -> dict[str, Any]:
+    """手动「记录为新版本」（CAS，记录方式 user）；仅 flush，事务由 router commit。"""
+    project = await _lock_project(db, project_id)
+    if project is None:
+        raise ScopeConfirmationError(404, "PROJECT_NOT_FOUND", "项目不存在")
+    if project.consol_lock is not False:
+        raise ScopeConfirmationError(423, "CONSOL_PROJECT_LOCKED", "合并项目已锁定，不能记录企业树版本")
+
+    state = await _load_state(db, project_id)
+    preview = state["preview"]
+    if expected_fingerprint != state["fingerprint"]:
+        raise ScopeConfirmationError(
+            409, "SCOPE_FINGERPRINT_CONFLICT", "企业树已变化，请刷新后再记录", preview,
+        )
+    current_revision = state["latest"].revision if state["latest"] is not None else 0
+    if state["active"] is not None and state["active"].fingerprint == state["fingerprint"]:
+        if expected_revision in (current_revision, current_revision - 1):
+            return preview
+        raise ScopeConfirmationError(
+            409, "SCOPE_REVISION_CONFLICT", "企业树版本已变化，请刷新后再记录", preview,
+        )
+    if expected_revision != current_revision:
+        raise ScopeConfirmationError(
+            409, "SCOPE_REVISION_CONFLICT", "企业树版本已变化，请刷新后再记录", preview,
+        )
+
+    confirmation = await _write_version(db, state, recorded_by=confirmed_by, mode="user")
     return {
         **preview,
         "revision": confirmation.revision,
         "confirmed": True,
-        "pending_legacy": False,
+        "matches_recorded": True,
         "pending_confirmation": False,
         "active_confirmation_id": str(confirmation.id),
+        "recorded_revision": confirmation.revision,
+        "recorded_mode": "user",
+        "recorded_at": _iso_utc(confirmation.confirmed_at),
+        "structural_change": False,
+        "diff": None,
     }
 
 
-async def require_confirmed_scope(
-    db: AsyncSession,
-    project_id: UUID,
-    year: int,
-    *,
-    tree: TreeNode | None = None,
-    allow_legacy_read: bool = False,
-) -> TreeNode | None:
-    """计算门：必须存在与当前服务端树一致的 active 用户确认版本。
+async def record_scope_version(
+    db: AsyncSession, project_id: UUID, *, recorded_by: UUID | None = None, mode: str = "auto",
+) -> dict[str, Any]:
+    """推送时自动记录树版本（R1.2 / ADR-CAL-001）；只 flush，事务由调用方提交。
 
-    ``allow_legacy_read`` 只给既有 legacy 读路径使用：仅当项目被识别为
-    V183 之前已有数据时允许继续读取；新项目和树已变化的项目仍必须确认。
-
-    当 V183 迁移尚未通过 MigrationRunner 正式执行时（``schema_version`` 表不存在或其中
-    没有 V183 记录），整个确认机制还没有生效，透明放行以兼容旧环境和测试。
-    ORM 测试用 ``create_all`` 建表但不走 MigrationRunner，所以不会误触发确认门。
+    当前树指纹与 active 版本相同 ⇒ 不新建；不同 ⇒ 新建一版（旧版 superseded）。
+    合并锁定 ⇒ 不记录（锁定后范围不应再变）。非合并项目 ⇒ 不记录。
     """
-    # V183 尚未通过迁移 runner 正式执行 ⇒ 功能未启用，透明放行
-    connection = await db.connection()
-    has_sv = await connection.run_sync(lambda conn: sa.inspect(conn).has_table("schema_version"))
-    if not has_sv:
-        return tree
-    v183_applied = await db.scalar(sa.text(
-        "SELECT 1 FROM schema_version WHERE version = '183' "
-        "AND filename = 'V183__consol_scope_confirmation.sql'"
-    ))
-    if not v183_applied:
-        return tree
+    project = await _lock_project(db, project_id)
+    if project is None:
+        raise ScopeConfirmationError(404, "PROJECT_NOT_FOUND", "项目不存在")
+    if normalize_report_scope(project.report_scope) != "consolidated":
+        return {"created": False, "skipped": "not_consolidated", "revision": 0}
+    state = await _load_state(db, project_id)
+    active = state["active"]
+    if project.consol_lock is not False:
+        return {"created": False, "skipped": "locked", "revision": active.revision if active else 0}
+    if active is not None and active.fingerprint == state["fingerprint"]:
+        return {"created": False, "skipped": None, "revision": active.revision,
+                "mode": active.confirmation_mode, "fingerprint": state["fingerprint"]}
+    confirmation = await _write_version(db, state, recorded_by=recorded_by, mode=mode)
+    return {"created": True, "skipped": None, "revision": confirmation.revision, "mode": mode,
+            "fingerprint": state["fingerprint"],
+            "structural_change": bool(state["preview"]["structural_change"])}
+
+
+async def scope_version_info(
+    db: AsyncSession, project_id: UUID, *, result: GroupTreeResult | None = None,
+) -> dict[str, Any] | None:
+    """企业树接口附带的版本信息（R1.3）：只读；取不到（非合并 / 无年度）返回 None。"""
     try:
-        state = await _load_state(db, project_id)
-    except ScopeConfirmationError as exc:
-        raise HTTPException(status_code=exc.status_code, detail={
-            "error_code": exc.error_code,
-            "message": exc.message,
-        }) from exc
-    if state["payload"]["year"] != year:
-        raise HTTPException(status_code=409, detail={
-            "error_code": "SCOPE_CONFIRMATION_REQUIRED",
-            "message": "请求年度与已确认合并范围不一致，请重新确认当前合并范围",
+        state = await _load_state(db, project_id, result=result)
+    except ScopeConfirmationError:
+        return None
+    preview = state["preview"]
+    return {
+        "revision": preview["recorded_revision"],
+        "latest_revision": preview["revision"],
+        "mode": preview["recorded_mode"],
+        "recorded_at": preview["recorded_at"],
+        "matches": preview["matches_recorded"],
+        "structural_change": preview["structural_change"],
+        "diff": preview["diff"],
+        "fingerprint": preview["fingerprint"],
+        "can_record": preview["can_confirm"],
+    }
+
+
+async def require_calc_year(db: AsyncSession, project_id: UUID, year: int) -> None:
+    """计算口径的年度边界（V206 起替代「必须先确认合并范围」的计算门）。
+
+    合并树按合并项目的审计年度推导；请求另一年度会拿本年树去配那一年的试算表与分录 ⇒ 拒绝。
+    """
+    project = (await db.execute(sa.select(Project).where(
+        Project.id == project_id, Project.is_deleted == sa.false(),
+    ))).scalar_one_or_none()
+    if project is None:
+        return
+    project_year = resolve_project_audit_year(project)
+    if project_year is None:
+        raise HTTPException(status_code=422, detail={
+            "error_code": "SCOPE_YEAR_UNRESOLVED", "message": "合并项目缺少有效审计年度，无法计算合并数",
         })
-    if tree is not None:
-        passed_payload = _canonical_payload(state["project"], GroupTreeResult(
-            root=tree,
-            year=year,
-            mode=tree.mode or state["result"].mode,
-            diagnostics=[],
-        ))
-        if fingerprint_payload(passed_payload) != state["fingerprint"]:
-            raise HTTPException(status_code=409, detail={
-                "error_code": "SCOPE_CONFIRMATION_REQUIRED",
-                "message": "待计算树与服务端当前合并树不一致，请重新预览并确认",
-            })
-    if not state["preview"]["confirmed"]:
-        if allow_legacy_read and state["preview"]["pending_legacy"]:
-            return tree
+    if project_year != year:
         raise HTTPException(status_code=409, detail={
-            "error_code": "SCOPE_CONFIRMATION_REQUIRED",
-            "message": "当前合并范围尚未由用户确认，确认前不能计算",
-            "preview": state["preview"],
+            "error_code": "SCOPE_YEAR_MISMATCH",
+            "message": f"请求年度 {year} 与合并项目审计年度 {project_year} 不一致，不能用本年度企业树计算",
         })
-    return tree

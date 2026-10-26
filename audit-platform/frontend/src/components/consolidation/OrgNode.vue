@@ -16,8 +16,8 @@
         <span class="org-card-name">{{ nodeLabel(node) }}</span>
       </div>
       <div class="org-card-body">
-        <el-tag v-if="roleLabel(node.role)" size="small" effect="plain" :type="node.kind === 'elim' ? 'warning' : 'info'">
-          {{ roleLabel(node.role) }}
+        <el-tag v-if="roleLabel(node.role, node.kind)" size="small" effect="plain" :type="node.kind === 'elim' ? 'warning' : 'info'">
+          {{ roleLabel(node.role, node.kind) }}
         </el-tag>
         <el-tag v-if="relationTagLabel(node)" size="small" effect="light" data-testid="org-relation-tag">
           {{ relationTagLabel(node) }}

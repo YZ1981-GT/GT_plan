@@ -299,7 +299,7 @@ class TestViews:
             assert {ln["entry_no"] for ln in drill["lines"]} <= {"IA-1", "IA-A"}, "草稿不进穿透"
         drill = await load_entry_drill(db, ctx, row_code="BS-006", measure="elim_trade", node_key="A:consol")
         assert [ln["entry_no"] for ln in drill["lines"]] == ["IA-A"] and drill["total"] == "-7.00"
-        assert drill["lines"][0]["node_label"] == "甲公司（合并差额）"
+        assert drill["lines"][0]["node_label"] == "甲公司（差额户）"
         # 前缀取数：112201 的明细行计入 TB('1122') 行
         drill = await load_entry_drill(db, ctx, row_code="BS-006", measure="consolidated", node_key=None)
         assert {ln["account_code"] for ln in drill["lines"]} == {"112201", "1122"}
@@ -331,6 +331,9 @@ class TestPush:
         assert result.status == "succeeded", result.steps
         assert result.pushed_projects == [str(group["A"].id), str(group["G"].id)]
         assert [s["project_id"] for s in result.steps] == [str(group["A"].id)] * 4 + [str(group["G"].id)] * 4
+        # 推送的工作底稿步骤先自动记录企业树版本（spec consol-autotree-linkage-closure R1.2），两级各记一版
+        ws_details = [s["detail"] for s in result.steps if s["step"] == "worksheet"]
+        assert len(ws_details) == 2 and all(d.startswith("树版本第 1 版（本次自动记录）；") for d in ws_details), ws_details
         a_bs, g_bs = await _report(db, group["A"]), await _report(db, group["G"])
         assert a_bs["BS-006"].current_period_amount == D("73.00")   # A1 80 − 7
         assert g_bs["BS-006"].current_period_amount == D("393.00")  # 400 − 7（上层纳入下级抵销）
@@ -436,11 +439,12 @@ async def _persist(db, user: _User, memberships=()):
 async def client_for(db):
     from app.routers.consol_push import router as push_router
     from app.routers.consol_report import router as report_router
+    from app.routers.consol_report_breakdown import router as report_breakdown_router
     from app.routers.consol_worksheet import router as worksheet_router
     from app.routers.consolidation import router as elim_router
 
     app = FastAPI()
-    for r in (push_router, report_router, worksheet_router, elim_router):
+    for r in (push_router, report_router, report_breakdown_router, worksheet_router, elim_router):
         app.include_router(r)
 
     async def _db():
@@ -540,7 +544,8 @@ class TestEndpoints:
                 assert [(col["key"], col["label"]) for col in body["columns"]] == [
                     ("individual", "审定汇总"), ("elim_equity", "权益抵销"), ("elim_trade", "往来交易抵销"),
                     ("adjustment", "报表调整"), ("consolidated", "合并审定数"),
-                ], "列键与列名一一对应（前端按键取值、按名显示）"
+                    ("consolidated_with_drafts", "含草稿预览"),
+                ], "列键与列名一一对应（前端按键取值、按名显示）；含草稿预览列 spec consol-autotree-linkage-closure R5"
                 row = next(r for r in body["rows"] if r["row_code"] == "BS-006")
                 assert (row["individual"], row["elim_trade"], row["consolidated"]) == ("400.00", "-50.00", "350.00")
                 bd = (await c.get("/api/consolidation/worksheet/report-breakdown",
@@ -600,3 +605,109 @@ class TestEndpoints:
             gen = await c.post("/api/consolidation/reports/generate", params={"project_id": gid},
                                json={"project_id": gid, "year": Y})
             assert gen.status_code == 403
+
+
+# ─────────────────────── 合并上期：上年同企业合并项目同一节点（spec consol-autotree-linkage-closure R8.1）───────────────────────
+
+
+async def _prior_year_data(db) -> Project:
+    """上年：G 单户项目 + 试算表（货币资金 777）；上年树只有 G 一家（没有 A）。"""
+    from app.services.group_links import sync_group_links
+
+    g24_s = _p("G", "某集团", "standalone", year=Y - 1)
+    db.add(g24_s)
+    db.add(_tb(g24_s, "1001", "货币资金", AccountCategory.asset, "777", year=Y - 1))
+    await db.flush()
+    await sync_group_links(db, Y - 1)
+    await db.commit()
+    return g24_s
+
+
+class TestPriorPeriod:
+    @pytest.mark.asyncio
+    async def test_prior_from_prior_year_consol_project_same_node(self, db, group):
+        from app.services.consol_report_view_service import prior_node_values
+
+        await _prior_year_data(db)
+        values, reason = await prior_node_values(db, group["G"].id, Y, "G:consol", "balance_sheet",
+                                                 standard="soe_consolidated")
+        assert reason is None
+        # 🔴 旧实现拿本项目算 year−1（年度边界拒绝被吞）⇒ 恒空；本年货币资金 1400，上年 777
+        assert values["BS-002"].amount == D("777") and values["BS-015"].amount == D("777")
+
+    @pytest.mark.asyncio
+    async def test_blank_with_reason(self, db, group):
+        from app.services.consol_report_view_service import prior_node_values
+
+        await _prior_year_data(db)
+        values, reason = await prior_node_values(db, group["G"].id, Y, "A:consol", "balance_sheet")
+        assert values is None and "上年企业树没有节点「A:consol」" in reason
+        values, reason = await prior_node_values(db, group["A"].id, Y, "A:consol", "balance_sheet")
+        assert values is None and "没有上年项目" in reason and "审计年度 2024" in reason
+        g24 = await db.get(Project, group["G24"].id)
+        g24.template_type = "listed"
+        await db.commit()
+        values, reason = await prior_node_values(db, group["G"].id, Y, "G:consol", "balance_sheet",
+                                                 standard="soe_consolidated")
+        assert values is None and "报表口径" in reason, "上年口径不同 ⇒ 行次对不上，不硬套"
+
+    @pytest.mark.asyncio
+    async def test_endpoint_rows_carry_prior_and_reason(self, db, group, client_for):
+        await _prior_year_data(db)
+        gid = str(group["G"].id)
+        async with client_for(_User(UserRole.admin)) as c:
+            rows = (await c.get(f"/api/consolidation/reports/{gid}/{Y}", params={"report_type": "balance_sheet"})).json()
+            by = {r["row_code"]: r for r in rows}
+            assert D(by["BS-002"]["current_period_amount"]) == D("1400")
+            assert D(by["BS-002"]["prior_period_amount"]) == D("777") and by["BS-002"]["prior_blank_reason"] is None
+            sub = (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
+                               params={"report_type": "balance_sheet", "node_key": "A:consol"})).json()
+            assert sub and all(r["prior_period_amount"] is None for r in sub)
+            assert all("上年企业树没有节点" in r["prior_blank_reason"] for r in sub)
+            a_rows = (await c.get(f"/api/consolidation/reports/{group['A'].id}/{Y}",
+                                  params={"report_type": "balance_sheet"})).json()
+            assert a_rows and all("没有上年项目" in r["prior_blank_reason"] for r in a_rows)
+
+
+# ─────────────────────── 报表页右键「查看合并明细」：行次读时计算（spec consol-autotree-linkage-closure R8.2）───────────────────────
+
+
+class TestReportRowBreakdown:
+    @pytest.mark.asyncio
+    async def test_row_code_read_time_children_sum_to_backend_total(self, db, group):
+        from app.services.consol_report_breakdown_service import get_report_consol_breakdown
+
+        db.add(_entry(group["G"], "IA-1", EliminationEntryType.internal_ar_ap,
+                      [("2202", "应付账款", "50", "0"), ("1122", "应收账款", "0", "50")]))
+        await db.commit()
+        # 🔴 旧实现拿行次按科目码查 consol_trial ⇒ 恒空（has_breakdown=False）
+        res = await get_report_consol_breakdown(db, group["G"].id, Y, "BS-006")
+        assert (res["basis"], res["has_breakdown"], res["consolidated"]) == ("read_time", True, "350.00")
+        by = {r["node_key"]: r for r in res["by_company"]}
+        assert {k: v["amount"] for k, v in by.items()} == {
+            "G:parent": "320.00", "G:consol_elim": "-50.00", "A:consol": "80.00", "B:subsidiary": "0.00",
+        }
+        assert sum(D(r["amount"]) for r in res["by_company"]) == D(res["consolidated"])
+        assert res["elimination"] == "-50.00", "差额子节点（本级抵销与调整）计入抵销"
+        assert (by["G:consol_elim"]["kind"], by["G:consol_elim"]["source"]) == ("elim", "抵销与调整")
+        assert by["G:parent"]["source_project_id"] == str(group["G_s"].id) and by["G:parent"]["source"] == "个别数"
+        assert by["A:consol"]["source"] == "下级汇总" and by["G:parent"]["pct"] is not None
+        sub = await get_report_consol_breakdown(db, group["G"].id, Y, "BS-006", node_key="A:consol")
+        assert sub["consolidated"] == "80.00" and sub["node_key"] == "A:consol"
+        legacy = await get_report_consol_breakdown(db, group["G"].id, Y, "1122")
+        assert legacy["has_breakdown"] is False and "basis" not in legacy, "纯数字科目码仍走已落库穿透明细"
+
+    @pytest.mark.asyncio
+    async def test_endpoint_row_code_and_non_aggregate_node(self, db, group, client_for):
+        gid = str(group["G"].id)
+        async with client_for(_User(UserRole.admin)) as c:
+            ok = await c.get(f"/api/consolidation/report/{gid}/{Y}/BS-002/consol-breakdown")
+            assert ok.status_code == 200, ok.text
+            body = ok.json()
+            assert body["basis"] == "read_time" and body["consolidated"] == "1400.00" and body["row_name"] == "货币资金"
+            bad = await c.get(f"/api/consolidation/report/{gid}/{Y}/BS-002/consol-breakdown",
+                              params={"node_key": "B:subsidiary"})
+            assert bad.status_code == 400 and "不是汇总节点" in bad.json()["detail"]
+            gone = await c.get(f"/api/consolidation/report/{gid}/{Y}/BS-002/consol-breakdown",
+                               params={"node_key": "NOPE:consol"})
+            assert gone.status_code == 404

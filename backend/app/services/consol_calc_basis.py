@@ -932,30 +932,62 @@ async def load_node_amounts(
     return payload
 
 
+#: 「含草稿预览」计入的分录状态（spec consol-autotree-linkage-closure R5）：已驳回不计
+PREVIEW_STATUSES = frozenset({"draft", "pending_review", "approved"})
+
+
 async def load_calc_basis(
     db: AsyncSession, project_id: UUID, year: int, *, tree: TreeNode | None = None,
-    allow_legacy_read: bool = False,
+    include_drafts: bool = False,
 ) -> CalcBasis | None:
-    """以合并项目为根装载计算口径；项目不存在返回 None。树可由调用方传入以免重复推导。"""
+    """以合并项目为根装载计算口径；项目不存在返回 None。树可由调用方传入以免重复推导。
+
+    V206 起不再要求用户先确认合并范围（spec consol-autotree-linkage-closure R1.1）：只校验年度边界
+    （``require_calc_year``）。``include_drafts`` ⇒ 分录按 ``PREVIEW_STATUSES`` 取（只供「含草稿预览」，
+    合并数、推送、报表与附注一律只认已审批）。
+    """
     if tree is None:
         tree = await build_tree(db, project_id)
     if tree is None:
         return None
 
-    from app.services.consol_scope_confirmation_service import require_confirmed_scope
+    from app.services.consol_scope_confirmation_service import require_calc_year
 
-    tree = await require_confirmed_scope(db, project_id, year, tree=tree, allow_legacy_read=allow_legacy_read)
-    if tree is None:
-        return None
+    await require_calc_year(db, project_id, year)
     leaves = data_leaves(tree)
     tb_rows = await load_tb_rows(db, (n.project_id for n in leaves if n.project_id is not None), year)
-    records, invalid = records_from_entries(await load_tree_entries(db, tree, year))
+    if include_drafts:
+        entries = [
+            e for e in await load_tree_entries(db, tree, year, approved_only=False)
+            if _enum_value(e.review_status) in PREVIEW_STATUSES
+        ]
+    else:
+        entries = await load_tree_entries(db, tree, year)
+    records, invalid = records_from_entries(entries)
     return build_calc_basis(tree, year, tb_rows, records, invalid)
+
+
+async def load_calc_basis_pair(
+    db: AsyncSession, project_id: UUID, year: int, *, tree: TreeNode,
+) -> tuple[CalcBasis, CalcBasis]:
+    """同一棵树、同一份试算表的两份口径：（只认已审批的合并数, 含草稿预览）。试算表与分录各只读一次。"""
+    from app.services.consol_scope_confirmation_service import require_calc_year
+
+    await require_calc_year(db, project_id, year)
+    tb_rows = await load_tb_rows(db, (n.project_id for n in data_leaves(tree) if n.project_id is not None), year)
+    entries = await load_tree_entries(db, tree, year, approved_only=False)
+    statuses = {e.id: _enum_value(e.review_status) for e in entries}
+    pair = []
+    for wanted in ({"approved"}, PREVIEW_STATUSES):
+        records, invalid = records_from_entries([e for e in entries if statuses[e.id] in wanted])
+        pair.append(build_calc_basis(tree, year, tb_rows, records, invalid))
+    return pair[0], pair[1]
 
 
 __all__ = [
     "ADJUSTMENT_ENTRY_TYPE",
     "EQUITY_ENTRY_TYPE",
+    "PREVIEW_STATUSES",
     "MEASURES",
     "MEASURE_ADJUSTMENT",
     "MEASURE_CONSOLIDATED",
@@ -989,6 +1021,7 @@ __all__ = [
     "load_account_options",
     "NodeNotFoundError",
     "load_calc_basis",
+    "load_calc_basis_pair",
     "load_node_amounts",
     "load_orphan_diagnostics",
     "load_tb_rows",

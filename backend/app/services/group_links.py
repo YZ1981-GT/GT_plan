@@ -371,7 +371,99 @@ async def sync_group_links_for(db: AsyncSession, *projects: Any) -> set[UUID]:
     return affected
 
 
+# ─────────────────────────────── 拖拽改上级（spec consol-autotree-linkage-closure R3）───────────────────────────────
+
+FIELD_LABELS: dict[str, str] = {
+    "parent_company_name": "上级企业名称",
+    "parent_company_code": "上级企业代码",
+    "relation_to_parent": "与上级关系",
+    "ultimate_company_name": "最终控制方",
+    "ultimate_company_code": "最终控制方代码",
+}
+
+
+async def _company_name_in_year(db: AsyncSession, code: str, year: int | None) -> str | None:
+    """企业代码在本年度项目上的企业名称（单户项目优先，与企业树口径一致）；没有建项返回 None。"""
+    stmt = sa.select(Project).where(Project.company_code == code, Project.is_deleted == sa.false())
+    if year is not None:
+        stmt = stmt.where(Project.audit_year == year)
+    rows = list((await db.execute(stmt)).scalars().all())
+    rows.sort(key=lambda p: 0 if normalize_report_scope(p.report_scope) == "standalone" else 1)
+    return next((_blank_to_none(p.client_name) for p in rows if _blank_to_none(p.client_name)), None)
+
+
+async def reparent_project(
+    db: AsyncSession, project: Project, new_code: str | None, *, name_hint: str | None = None,
+) -> dict[str, Any]:
+    """调整上级企业（「合并」总览页拖拽，ADR-CAL-005）：同企业同年度的合并项目与单户项目同写。
+
+    - 上级企业代码；上级企业名称取新上级本年度项目的企业名称（单户优先），没有建项时用 ``name_hint``；
+    - 与上级关系：有有效上级时保留原值、缺省按名称；否则清空（``resolve_relation``）；
+    - 最终控制方为空时沿用新上级已填的控制方（``infer_ultimate_from_parent``，只抄不猜）；
+    - ORM 列与向导回填数据一起写（``apply_group_values``），再按三码重算整年派生链接
+      （受影响合并项目的合并试算标待更新 + 提交后广播）。
+    校验：上级代码非空须通过统一社会信用代码校验（422）；形成循环（同年度）⇒ 400。
+    只 flush 不 commit。返回 ``{synced: [{id, name, report_scope, fields}], parent_company_name, notices}``。
+    """
+    from app.services.consol_group_tree import load_year_records, would_form_cycle
+    from app.services.group_relation import resolve_relation
+    from app.services.project_audit_year import resolve_project_audit_year
+
+    new_value = _blank_to_none(new_code)
+    own_code = _blank_to_none(project.company_code)
+    year = resolve_project_audit_year(project)
+    if new_value is not None:
+        ok, err = validate_uscc(new_value)
+        if not ok:
+            raise HTTPException(status_code=422, detail=f"上级企业代码：{err}")
+        if own_code and year is not None and would_form_cycle(
+            await load_year_records(db, year), year, own_code, new_value,
+        ):
+            raise HTTPException(status_code=400, detail="该调整会形成循环引用（项目成为自己的祖先）")
+
+    counterpart = await find_counterpart(
+        db, project_id=project.id, company_code=own_code, audit_year=year, report_scope=project.report_scope,
+    )
+    targets = [t for t in (project, counterpart) if t is not None]
+    parent_name = None
+    if new_value is not None:
+        parent_name = await _company_name_in_year(db, new_value, year) or _blank_to_none(name_hint)
+    notices: list[str] = []
+    ultimate: dict[str, str | None] = {}
+    if any(_blank_to_none(t.ultimate_company_code) is None for t in targets):
+        probe = SimpleNamespace(company_code=own_code, parent_company_code=new_value,
+                                ultimate_company_code=None, ultimate_company_name=None)
+        notices += await infer_ultimate_from_parent(db, probe, year)
+        if probe.ultimate_company_code is not None:
+            ultimate = {"ultimate_company_code": probe.ultimate_company_code,
+                        "ultimate_company_name": probe.ultimate_company_name}
+    synced: list[dict[str, Any]] = []
+    for target in targets:
+        before = _group_values(target)
+        values: dict[str, str | None] = {
+            "parent_company_code": new_value,
+            "parent_company_name": parent_name,
+            "relation_to_parent": resolve_relation(
+                target.relation_to_parent, new_value, target.client_name, target.company_code),
+        }
+        if _blank_to_none(target.ultimate_company_code) is None:
+            values.update(ultimate)
+        apply_group_values(target, values)
+        after = _group_values(target)
+        synced.append({
+            "id": str(target.id),
+            "name": target.client_name or target.name,
+            "report_scope": normalize_report_scope(target.report_scope),
+            "fields": [FIELD_LABELS[f] for f in GROUP_FIELDS if before[f] != after[f]],
+        })
+    if new_value is not None and parent_name is None:
+        notices.append(f"上级企业 {new_value} 本年度尚未建项，上级企业名称暂未填写")
+    await sync_group_links(db, year)
+    return {"synced": synced, "parent_company_name": parent_name, "notices": notices}
+
+
 __all__ = [
+    "FIELD_LABELS",
     "GROUP_FIELDS",
     "apply_group_values",
     "default_relation_by_name",
@@ -381,6 +473,7 @@ __all__ = [
     "normalize_group_fields",
     "prepare_group_fields",
     "propagate_to_counterpart",
+    "reparent_project",
     "sync_group_links",
     "sync_group_links_for",
 ]

@@ -1,12 +1,12 @@
 {
   "counts": {
-    "C": 33,
-    "E": 51,
+    "C": 31,
+    "E": 53,
     "G": 2,
     "I": 5,
     "R": 13,
     "S": 1,
-    "X": 1
+    "X": 0
   },
   "editor_unmatched": null,
   "editor_write_call_total": null,
@@ -1349,6 +1349,44 @@
       "category": "C",
       "current_equals_target": true,
       "current_gate": {
+        "consol_lock": false,
+        "eqcr_exclusion": false,
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "edit",
+            "name": "require_project_access",
+            "params": {},
+            "via": "signature"
+          }
+        ],
+        "global_roles": [],
+        "identity_only": false,
+        "max_level": "edit",
+        "operations": [],
+        "stub": null
+      },
+      "file": "consol_notes.py",
+      "function": "push_template_to_subsidiaries",
+      "method": "POST",
+      "path": "/api/consolidation/notes/{project_id}/{year}/push-template",
+      "registered": true,
+      "registry_group": "system",
+      "target_gate": {
+        "declared": false,
+        "eqcr": null,
+        "gate": null,
+        "kind": "keep_current",
+        "params": null,
+        "project_from": null,
+        "reason": null
+      }
+    },
+    {
+      "category": "C",
+      "current_equals_target": true,
+      "current_gate": {
         "consol_lock": true,
         "eqcr_exclusion": false,
         "forms": [
@@ -1548,8 +1586,8 @@
       }
     },
     {
-      "category": "X",
-      "current_equals_target": true,
+      "category": "E",
+      "current_equals_target": false,
       "current_gate": {
         "consol_lock": false,
         "eqcr_exclusion": false,
@@ -1568,6 +1606,14 @@
               ]
             },
             "via": "signature"
+          },
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "edit",
+            "name": "assert_project_permission",
+            "params": {},
+            "via": "body"
           }
         ],
         "global_roles": [
@@ -1577,13 +1623,15 @@
           "signing_partner"
         ],
         "identity_only": false,
-        "max_level": null,
+        "max_level": "edit",
         "operations": [],
         "stub": null
       },
+      "editor_call_points": null,
       "file": "disclosure_notes.py",
       "function": "set_formula_gray",
       "method": "PUT",
+      "outside_editor_files": null,
       "path": "/api/disclosure-notes/{project_id}/formula-gray",
       "registered": true,
       "registry_group": "report",
@@ -1591,7 +1639,7 @@
         "declared": false,
         "eqcr": null,
         "gate": null,
-        "kind": "keep_current",
+        "kind": "note_edit_gate",
         "params": null,
         "project_from": null,
         "reason": null
@@ -1746,6 +1794,50 @@
       "method": "POST",
       "outside_editor_files": null,
       "path": "/api/disclosure-notes/{project_id}/{year}/pull-from-workpapers",
+      "registered": true,
+      "registry_group": "report",
+      "target_gate": {
+        "declared": false,
+        "eqcr": null,
+        "gate": null,
+        "kind": "note_edit_gate",
+        "params": null,
+        "project_from": null,
+        "reason": null
+      }
+    },
+    {
+      "category": "E",
+      "current_equals_target": true,
+      "current_gate": {
+        "consol_lock": false,
+        "eqcr_exclusion": true,
+        "forms": [
+          {
+            "conditional": false,
+            "helper": null,
+            "level": "review",
+            "name": "require_note_edit_access",
+            "params": {
+              "consol_lock": false
+            },
+            "via": "signature"
+          }
+        ],
+        "global_roles": [],
+        "identity_only": false,
+        "max_level": "review",
+        "operations": [
+          "note:edit"
+        ],
+        "stub": null
+      },
+      "editor_call_points": null,
+      "file": "disclosure_notes.py",
+      "function": "refresh_from_disclosure",
+      "method": "POST",
+      "outside_editor_files": null,
+      "path": "/api/disclosure-notes/{project_id}/{year}/refresh-from-disclosure",
       "registered": true,
       "registry_group": "report",
       "target_gate": {
@@ -4627,7 +4719,7 @@
       "report_note_references.py"
     ],
     "frontend": "待接入（任务 8.3）",
-    "write_endpoint_total": 106
+    "write_endpoint_total": 105
   },
   "schema": "note_write_inventory/v1"
 }

@@ -8,18 +8,26 @@
 import type {
   ConsolMode,
   ConsolNodeRole,
+  ConsolScopeVersion,
   ConsolTreeDiagnostic,
+  ConsolTreeDiff,
   ConsolTreeNode,
   CurrentConsolEntity,
 } from '@/services/consolidationApi'
 import { relationLabel } from '@/utils/groupRelation'
+import { fmtDateTime } from '@/utils/formatters'
 
+/**
+ * 角色标签（与后端 `consol_node_naming` 同一口径，spec consol-autotree-linkage-closure R2）。
+ * 母公司按节点类型区分：没有分公司 = 「单体母公司户」（数据节点），有分公司 = 「母公司户」（汇总节点），
+ * 见 `roleLabel(role, kind)`；子公司 / 分公司自己有分公司时为「汇总户」。
+ */
 export const ROLE_LABELS: Record<ConsolNodeRole, string> = {
-  consol: '合并',
-  consol_elim: '合并差额',
-  parent: '母公司',
-  hq: '本部',
-  branch_elim: '母分差额',
+  consol: '合并户',
+  consol_elim: '差额户',
+  parent: '单体母公司户',
+  hq: '本部单体户',
+  branch_elim: '母分差额户',
   subsidiary: '子公司',
   branch: '分公司',
 }
@@ -64,17 +72,89 @@ export function currentConsolEntityForNode(node: ConsolTreeNode): CurrentConsolE
   }
 }
 
-export function roleLabel(role: string | null | undefined): string {
+export function roleLabel(role: string | null | undefined, kind?: string | null): string {
+  if (kind === 'aggregate') {
+    if (role === 'parent') return '母公司户'
+    if (role === 'subsidiary' || role === 'branch') return '汇总户'
+  }
   return (role && ROLE_LABELS[role as ConsolNodeRole]) || ''
 }
 
 /**
  * 组织图卡片上的「与上级关系」标签：与角色标签同文案时不重复显示
- * （子公司/分公司数据节点的角色就是关系本身；下级合并企业显示「合并」+「子公司」两个标签）。
+ * （子公司/分公司数据节点的角色就是关系本身；下级合并企业显示「合并户」+「子公司」两个标签）。
  */
-export function relationTagLabel(node: Pick<ConsolTreeNode, 'role' | 'relation'>): string {
+export function relationTagLabel(node: Pick<ConsolTreeNode, 'role' | 'relation'> & { kind?: string | null }): string {
   const label = relationLabel(node.relation)
-  return label && label !== roleLabel(node.role) ? label : ''
+  return label && label !== roleLabel(node.role, node.kind) ? label : ''
+}
+
+/** 节点口径（内容区上下文条）：汇总 = 合并口径；差额户 = 本级调整与抵销；数据节点 = 单体项目 */
+export function nodeBasisLabel(node: Pick<ConsolTreeNode, 'kind'> | null | undefined): string {
+  if (!node) return ''
+  if (node.kind === 'elim') return '本级调整与抵销'
+  if (node.kind === 'data') return '单体项目'
+  return '合并口径'
+}
+
+/** node_key → 直接上级节点 */
+export function parentIndex(root: ConsolTreeNode | null | undefined): Map<string, ConsolTreeNode> {
+  const parents = new Map<string, ConsolTreeNode>()
+  for (const node of walkTree(root)) for (const child of node.children || []) parents.set(child.node_key, node)
+  return parents
+}
+
+/**
+ * 最近的汇总节点：本身是汇总节点就是自己，否则沿上级找（差额表选中非汇总节点时按它展示并高亮该列，R7.6）。
+ * 找不到节点返回 null。
+ */
+export function nearestAggregateAncestor(
+  root: ConsolTreeNode | null | undefined, nodeKey: string | null | undefined,
+): ConsolTreeNode | null {
+  let node = findNodeByKey(root, nodeKey)
+  if (!node) return null
+  const parents = parentIndex(root)
+  while (node && node.kind !== 'aggregate') node = parents.get(node.node_key) || null
+  return node
+}
+
+export interface StandaloneEntity {
+  projectId: string | null
+  name: string
+  companyCode: string
+  nodeKey: string
+}
+
+/**
+ * 数据节点对应的单体项目（R6：本部单体户、单体母公司户、子公司、分公司）；汇总 / 差额节点返回 null。
+ * `projectId` 为 null = 本年度没有单体项目（调用方给说明，不拿合并口径冒充）。
+ */
+export function standaloneEntityOf(node: ConsolTreeNode | null | undefined): StandaloneEntity | null {
+  if (!node || node.kind !== 'data') return null
+  return {
+    projectId: node.project_id || null,
+    name: node.company_name || nodeLabel(node),
+    companyCode: node.company_code,
+    nodeKey: node.node_key,
+  }
+}
+
+export interface TreeOption {
+  value: string
+  label: string
+  depth: number
+  kind: string
+}
+
+/** 节点下拉：企业树全部节点（先序、按层级缩进、显示名称，不显示内部键，R10.2） */
+export function treeOptionsWithDepth(root: ConsolTreeNode | null | undefined): TreeOption[] {
+  const out: TreeOption[] = []
+  const visit = (node: ConsolTreeNode, depth: number) => {
+    out.push({ value: node.node_key, label: nodeLabel(node), depth, kind: node.kind })
+    for (const child of node.children || []) visit(child, depth + 1)
+  }
+  if (root) visit(root, 0)
+  return out
 }
 
 export function modeLabel(mode: string | null | undefined, serverLabel?: string | null): string {
@@ -172,35 +252,44 @@ export function maxDepth(root: ConsolTreeNode | null | undefined): number {
   return 1 + (kids.length ? Math.max(...kids.map(maxDepth)) : 0)
 }
 
-export interface CompanyColumn {
-  name: string
-  code: string
-  ratio: number
-}
-
-/**
- * 合并工作底稿的企业列（合并范围表为空时的回退）：根合并节点下的子公司类成员 ——
- * 下级合并企业与子公司（含经中间企业提升上来的），排除合并差额、母公司与分公司，按企业代码去重。
- */
-export function directSubsidiaryMembers(root: ConsolTreeNode | null | undefined): CompanyColumn[] {
-  if (!root) return []
-  const out: CompanyColumn[] = []
-  const seen = new Set<string>()
-  for (const child of root.children || []) {
-    if (child.role !== 'subsidiary' && child.role !== 'consol') continue
-    if (!child.company_code || seen.has(child.company_code)) continue
-    seen.add(child.company_code)
-    out.push({
-      name: child.company_name || child.company_code,
-      code: child.company_code,
-      ratio: Number(child.shareholding) || 0,
-    })
-  }
-  return out
-}
-
 /** 诊断排序：警告在前，信息在后（同级保持后端顺序） */
 export function sortDiagnostics(diags: ConsolTreeDiagnostic[] | null | undefined): ConsolTreeDiagnostic[] {
   const list = Array.isArray(diags) ? diags : []
   return [...list.filter((d) => d.level !== 'info'), ...list.filter((d) => d.level === 'info')]
+}
+
+// ─── 企业树版本（spec consol-autotree-linkage-closure R1.4~R1.6）────────────────────
+
+/** 中栏版本标签：「树版本 v3」/「树版本：尚未记录」；悬停说明记录方式与时间 */
+export function scopeVersionLabel(sv: ConsolScopeVersion | null | undefined): { text: string; tip: string } {
+  if (!sv) return { text: '', tip: '' }
+  if (!sv.revision) return { text: '树版本：尚未记录', tip: '首次推送合并数时自动记录企业树版本' }
+  const how = sv.mode === 'user' ? '手动记录' : '推送时自动记录'
+  const when = sv.recorded_at ? `，${fmtDateTime(sv.recorded_at)}` : ''
+  const drift = sv.matches ? '' : sv.structural_change ? '；当前企业树结构已变化' : '；当前企业树只改了名称'
+  return { text: `树版本 v${sv.revision}`, tip: `${how}${when}${drift}` }
+}
+
+/** 结构差异一句话：「新增 2 个节点、上级变化 1 个」（只列非零项；改名不算结构变化，不列） */
+export function treeDiffSummary(diff: ConsolTreeDiff | null | undefined): string {
+  if (!diff) return ''
+  const parts: string[] = []
+  if (diff.added?.length) parts.push(`新增 ${diff.added.length} 个节点`)
+  if (diff.removed?.length) parts.push(`移除 ${diff.removed.length} 个节点`)
+  if (diff.moved?.length) parts.push(`上级变化 ${diff.moved.length} 个`)
+  if (diff.changed?.length) parts.push(`类型或与上级关系变化 ${diff.changed.length} 个`)
+  return parts.join('、')
+}
+
+/** 差异明细（弹窗逐条列出）：每条一句中文 */
+export function treeDiffLines(diff: ConsolTreeDiff | null | undefined): string[] {
+  if (!diff) return []
+  const name = (x: { label?: string | null; node_key: string }) => x.label || x.node_key
+  return [
+    ...(diff.added || []).map((x) => `新增：${name(x)}`),
+    ...(diff.removed || []).map((x) => `移除：${name(x)}`),
+    ...(diff.moved || []).map((x) => `上级变化：${name(x)}（${x.from_label || '无'} → ${x.to_label || '无'}）`),
+    ...(diff.changed || []).map((x) => `类型或关系变化：${name(x)}`),
+    ...(diff.renamed || []).map((x) => `改名：${x.from || '—'} → ${x.to || '—'}`),
+  ]
 }

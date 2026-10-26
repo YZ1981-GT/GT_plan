@@ -397,7 +397,7 @@ import {
   type FormulaManagerContextOwnerState,
 } from '@/shell/formula/formulaManagerContextOwner'
 import { DSH_ASSIST_BRIDGE_KEY, type DshAssistBridge } from '@/shell/formula/dshAssistBridge'
-import { eventBus, type SyncEventPayload, type OpenFormulaManagerPayload } from '@/utils/eventBus'
+import { eventBus, type SyncEventPayload, type OpenFormulaManagerPayload, type FourColSwitchPayload } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
 import { subscribeProjectEvent, WILDCARD_EVENT, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import DegradedBanner from '@/components/DegradedBanner.vue'
@@ -977,13 +977,15 @@ function onRefreshComplete(_result: unknown) {
   eventBus.emit('formula-changed', { action: 'refreshed' })
 }
 
-function onSwitchFourCol(payload: { tab?: string }) {
+function onSwitchFourCol(payload: FourColSwitchPayload) {
+  // 🔴 本函数自己会延迟转发一次给目录：收到的是转发件就不再处理，否则自己收自己转发、每 150 ms 重发永不停止
+  if (payload?._relayed) return
   fourColumnMode.value = true
   catalogCollapsed.value = false
-  // mitt 不需要 _redispatched 补丁：直接延迟通知 catalog 切换 tab
+  // 目录可能随四栏模式刚挂载、没收到第一次：延迟转发一次（只一次）让它切到对应 tab
   if (payload?.tab) {
     setTimeout(() => {
-      eventBus.emit('four-col-switch', payload)
+      eventBus.emit('four-col-switch', { ...payload, _relayed: true })
     }, 150)
   }
 }

@@ -1,8 +1,13 @@
 """报表级合并穿透服务（consol-phase2-orchestration / Phase 2 衔接4 / 需求 5）.
 
-读 `consol_trial.consolidation_breakdown` provenance（Phase 0 B1 aggregate_individual_sum
-汇总时写入），反查"该合并报表科目由哪些子公司贡献多少 + 抵销额 + 合并数"，供前端
-ConsolBreakdownDialog(source=report) 穿透展示（UI 留 Phase 3，后端 Phase 2 就位）。
+两条路径（spec consol-autotree-linkage-closure R8.2）：
+
+- 报表行次（报表页右键「查看合并明细」传的就是行次）：读时计算（``_row_breakdown`` →
+  ``consol_report_view_service.child_contributions``，与报表差额表同一求值），``basis = "read_time"``，
+  ``by_company`` 每行带 ``node_key / kind / source / pct / source_project_id``，``consolidated`` = 后端合计，
+  ``elimination`` = 直接下级里差额节点之和；
+- 纯数字科目码：读 `consol_trial.consolidation_breakdown` provenance（Phase 0 B1 aggregate_individual_sum
+  汇总时写入），反查"该合并报表科目由哪些子公司贡献多少 + 抵销额 + 合并数"（下面的契约与约束只说这条路径）。
 
 数据契约（mirror Phase 0 consol_trial provenance / 附注穿透 notes/consol-breakdown）：
     {
@@ -68,18 +73,28 @@ async def get_report_consol_breakdown(
     project_id: UUID,
     year: int,
     account_code: str,
+    *,
+    node_key: str | None = None,
 ) -> dict:
-    """获取某合并报表科目的子公司贡献明细（报表级穿透）.
+    """获取某合并报表行 / 科目的下级构成（报表级穿透）.
 
     Args:
         db: AsyncSession
         project_id: 合并母项目 ID
         year: 报告年度
-        account_code: 标准科目编码（对应 consol_trial.standard_account_code）
+        account_code: 报表行次（如 ``BS-006``，报表页右键传的就是行次）或标准科目编码（纯数字）
+        node_key: 汇总节点；省略 = 根合并节点（只对行次生效）
 
     Returns:
         dict：见模块 docstring 数据契约。无 breakdown 时友好空返回（HTTP 200）。
+
+    🔴 报表页右键传的是行次，旧实现拿它按科目码查 ``consol_trial`` ⇒ 恒空（spec consol-autotree-linkage-closure
+    R8.2）。行次改为读时计算，与报表差额表 / 汇总穿透同一求值；纯数字仍按科目码读已落库的穿透明细。
     """
+    if not account_code.isdigit():
+        by_row = await _row_breakdown(db, project_id, year, account_code, node_key=node_key)
+        if by_row is not None:
+            return by_row
     trial = await _load_trial_row(db, project_id, year, account_code)
 
     breakdown = trial.consolidation_breakdown if trial is not None else None
@@ -128,6 +143,72 @@ async def get_report_consol_breakdown(
         "computed_at": breakdown.get("computed_at"),
         "has_breakdown": True,
         "message": None,
+    }
+
+
+async def _row_breakdown(
+    db: AsyncSession, project_id: UUID, year: int, row_code: str, *, node_key: str | None = None,
+) -> dict | None:
+    """报表行次 ⇒ 读时计算各直接下级的构成（``child_contributions``），映射为本端点契约。
+
+    不是合并项目 / 报表配置里没有该行次 ⇒ ``None``（调用方按科目码路径友好空返回）。
+    节点不存在 / 不是汇总节点 ⇒ ``ViewError``（路由转 404 / 400）。
+    ``consolidated`` 取后端合计；``elimination`` = 直接下级里差额节点之和（本级调整与抵销）；
+    读时路径不给 ``individual_sum``：直接下级含下级汇总节点（已扣下级抵销），不是「个别数之和」。
+    """
+    from app.services.consol_calc_basis import to_cents
+    from app.services.consol_report_view_service import child_contributions, load_view_context
+
+    ctx = await load_view_context(db, project_id, year)
+    if ctx is None:
+        return None
+    row = next((r for r in ctx.rows if r.row_code == row_code), None)
+    if row is None:
+        return None
+    result = await child_contributions(
+        ctx.basis, ctx.rows, report_type=row.report_type, row_code=row_code, node_key=node_key,
+    )
+    base = {
+        "account_code": row_code,
+        "row_code": row_code,
+        "row_name": row.row_name,
+        "report_type": row.report_type,
+        "node_key": result["node_key"],
+        "node_label": result["node_label"],
+        "consolidated": result["total"],
+        "linear": result["linear"],
+        "basis": "read_time",
+        "computed_at": None,
+    }
+    if result["total"] is None:
+        return {**base, "by_company": [], "elimination": None, "has_breakdown": False,
+                "message": f"该行合并数留空：{result['note'] or '无法计算'}"}
+    total = _safe_decimal(result["total"])
+    elim_sum = Decimal("0")
+    by_company: list[dict] = []
+    for r in result["rows"]:
+        amount = None if r["amount"] is None else _safe_decimal(r["amount"])
+        if amount is not None and r["kind"] == "elim":
+            elim_sum += amount
+        by_company.append({
+            "company_code": r["company_code"],
+            "company_name": r["company_name"],
+            "display_name": r["company_name"],
+            "amount": r["amount"],
+            "ratio": None if amount is None else (str((amount / total).quantize(_RATIO_QUANT)) if total else "0"),
+            "pct": r["pct"],
+            "node_key": r["node_key"],
+            "kind": r["kind"],
+            "source": r["source"],
+            "source_project_id": r["project_id"],
+            "reason": r["reason"],
+        })
+    return {
+        **base,
+        "by_company": by_company,
+        "elimination": str(to_cents(elim_sum)) if result["linear"] else None,
+        "has_breakdown": True,
+        "message": result["note"],
     }
 
 

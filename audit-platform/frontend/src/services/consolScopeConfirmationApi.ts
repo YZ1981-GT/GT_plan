@@ -1,11 +1,15 @@
 /**
- * D5 合并范围确认 API — 独立于 consolidationApi.ts（禁止修改）。
+ * 企业树版本 API（原 D5 合并范围确认）— 独立于 consolidationApi.ts（禁止修改）。
+ *
+ * V206 起合并计算不再要求确认（spec consol-autotree-linkage-closure R1）：推送时自动记录版本，
+ * 这里的 confirm 是可选的「手动记录为新版本」（CAS，记录方式 user）。
  *
  * 端点：
  *   GET  /api/consolidation/{project_id}/scope-confirmation/preview
  *   POST /api/consolidation/{project_id}/scope-confirmation/confirm
  */
 import { api } from '@/services/apiProxy'
+import type { ConsolTreeDiff } from '@/services/consolidationApi'
 
 // ─── 类型 ───────────────────────────────────────────────────────────────────
 
@@ -43,11 +47,22 @@ export interface ScopeConfirmationPreview {
   tree: Record<string, unknown>
   nodes: ScopeConfirmationNode[]
   diagnostics: ScopeConfirmationDiagnostic[]
+  /** 兼容旧字段：= matches_recorded */
   confirmed: boolean
-  pending_legacy: boolean
+  /** V206 起恒为 false（计算不需要确认） */
   pending_confirmation: boolean
+  /** 未锁定才可手动记录 */
   can_confirm: boolean
   active_confirmation_id: string | null
+  /** 当前树与已记录（active）版本一致 */
+  matches_recorded: boolean
+  /** 已记录版本号；0 = 尚未记录 */
+  recorded_revision: number
+  recorded_mode: 'user' | 'auto' | null
+  recorded_at: string | null
+  /** 与已记录版本相比有结构变化（改名不算） */
+  structural_change: boolean
+  diff: ConsolTreeDiff | null
 }
 
 export interface ConfirmScopeRequest {
@@ -65,7 +80,7 @@ export function previewScopeConfirmation(projectId: string) {
   return api.get<ScopeConfirmationPreview>(`${basePath(projectId)}/preview`)
 }
 
-/** 显式确认当前合并范围（CAS：fingerprint + revision 必须与服务端一致）。 */
+/** 手动把当前企业树记录为新版本（CAS：fingerprint + revision 必须与服务端一致）。 */
 export function confirmScope(projectId: string, body: ConfirmScopeRequest) {
   return api.post<ScopeConfirmationPreview>(`${basePath(projectId)}/confirm`, body)
 }

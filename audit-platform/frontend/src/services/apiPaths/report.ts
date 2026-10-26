@@ -375,7 +375,7 @@ export const consolidation = {
     list: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}`,
     generate: '/api/consolidation/reports/generate',
     balanceCheck: (pid: string, year: number) => `/api/consolidation/reports/${pid}/${year}/balance-check`,
-    // 报表级合并穿透明细（前瞻定义，依赖 Phase 2 后端端点；未就绪时组件降级为友好空态）
+    // 报表级合并穿透明细：报表行次读时计算（与报表差额表同源），纯数字科目码读已落库明细
     consolBreakdown: (pid: string, year: number, accountCode: string) =>
       `/api/consolidation/report/${pid}/${year}/${accountCode}/consol-breakdown`,
   },
@@ -396,6 +396,8 @@ export const consolidation = {
     reportBreakdown: '/api/consolidation/worksheet/report-breakdown',
     drillEntries: '/api/consolidation/worksheet/drill/entries',
     drillIndividual: '/api/consolidation/worksheet/drill/individual',
+    // 分录汇总表（与合并试算同一计算口径，spec consol-autotree-linkage-closure R9）
+    entrySummary: '/api/consolidation/worksheet/entry-summary',
   },
   // 合并推送（需求 8）：本项目 + 上层合并项目 差额表 → 合并试算 → 合并报表 → 附注标记
   push: (pid: string, year: number) => `/api/consolidation/${pid}/${year}/push`,

@@ -167,7 +167,7 @@ class TestWorksheetTree:
         assert (body["mode"], body["mode_label"], body["year"]) == ("mixed", "母子合并＋总分汇总", Y)
         tree = body["tree"]
         assert (tree["node_key"], tree["role"], tree["kind"], tree["display_name"]) == (
-            "G:consol", "consol", "aggregate", "某集团（合并）",
+            "G:consol", "consol", "aggregate", "某集团（合并户）",
         )
         assert tree["project_id"] == str(group["G"].id) and tree["company_code"] == "G"  # 旧字段保留
         keys = [n["node_key"] for n in _walk(tree)]
@@ -297,7 +297,7 @@ class TestNodeAmounts:
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert (body["year"], body["node_key"], body["kind"], body["display_name"]) == (
-            Y, "G:consol_elim", "elim", "某集团（合并差额）",
+            Y, "G:consol_elim", "elim", "某集团（差额户）",
         )
         rows = {r["account_code"]: r for r in body["rows"]}
         assert list(rows) == ["1122", "2202"]

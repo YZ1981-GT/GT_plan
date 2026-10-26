@@ -247,27 +247,20 @@ async def get_consol_report(
         require_linear=False,
     )
 
-    # 上期金额：同一 node_key 在上一审计年度的树与计算上下文。
-    # 若上一年度不存在或节点不存在，则 prior = null。（设计 §六.4）
+    # 上期金额：上年同企业合并项目同一 node_key 的合并数（spec consol-autotree-linkage-closure R8.1）。
+    # 取不到（无上年合并项目 / 上年树没有该节点 / 上年无法计算）⇒ 留空并写明原因（prior_blank_reason）。
+    from app.services.consol_report_view_service import prior_node_values
+
     prior_values: dict | None = None
-    prior_year = year - 1
+    prior_reason: str | None = None
     try:
-        prior_ctx = await load_view_context(db, project_id, prior_year)
-        if prior_ctx is not None:
-            prior_all = calc_node_measures(prior_ctx.basis)
-            prior_ms = prior_all.get(resolved_node_key)
-            if prior_ms is not None:
-                prior_consol = prior_ms.get(MEASURE_CONSOLIDATED, {})
-                prior_typed = _rows_of_type(prior_ctx.rows, rt_str)
-                if prior_typed:
-                    prior_values = await calc_report_values(
-                        prior_typed,
-                        prior_consol,
-                        categories=prior_ctx.basis.categories,
-                        require_linear=False,
-                    )
-    except Exception as exc:
-        logger.debug("上期报表计算失败（降级为空）: %s", exc)
+        # SAVEPOINT：上年计算的查询失败不能让本请求事务 aborted
+        async with db.begin_nested():
+            prior_values, prior_reason = await prior_node_values(
+                db, project_id, year, resolved_node_key, rt_str, standard=ctx.standard)
+    except Exception as exc:  # noqa: BLE001 —— 上期是附加列，失败如实说明
+        logger.warning("合并上期计算失败（留空）: %s", exc)
+        prior_values, prior_reason = None, f"合并上期留空：上年数据计算失败（{exc}）"
 
     # 构造响应行，保持 ConsolReportRow 字段契约（设计 §六.3）
     out: list[ConsolReportRow] = []
@@ -280,6 +273,7 @@ async def get_consol_report(
 
         # blank_reason：公式不支持/引用了留空行等原因
         reason = cv.reason if cv else None
+        prior_row_reason = prior_reason if prior_values is None else (pv.reason if pv else None)
 
         out.append(ConsolReportRow(
             row_code=row.row_code,
@@ -292,6 +286,7 @@ async def get_consol_report(
             formula_used=row.formula,
             source_accounts=None,
             blank_reason=reason,
+            prior_blank_reason=prior_row_reason,
             is_stale=False,
         ))
 
