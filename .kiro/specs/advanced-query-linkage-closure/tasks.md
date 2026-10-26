@@ -2,7 +2,8 @@
 
 > 每个任务 = 一个可独立测试的交付单元；引用 `R x.y` / `ADR-AQL-NN` / 变异 `#N`（design §10.4），不复述。标 `[ ]*` 的任务依赖外部运行环境（start-dev 运行环境 / 合并项目数据），未实测时保持未勾，并在任务下写「代码已改但未实测」。
 > 通用纪律：后端测试 `rtk ..\.venv\Scripts\python.exe -m pytest <文件> -q -p no:playwright`（cwd `backend`）；前端 `rtk npx vitest run <文件>`（cwd `audit-platform/frontend`）；改前端后跑单区域 vue-tsc（先例 `tsconfig._g-single-region.json`），并用一条故意的类型错误证明它会报错；真 PG 测试只用回滚事务或【测试】/【UAT】项目；每个任务开工前对涉及文件重跑现状确认（grep / 行数 / 调用方）并写入勾选说明（design §12）；每个断点在根因处修复并配一条防御测试；临时产物放仓库根 `tmp_aql_linkage/`；勾选必须附测试命令与结果摘要，依赖环境的项不得改标星或假绿。
-> 依赖：1 → 全部；2 → 35；1 → 6 → 7；3 → 4 → 5 → 7 → 8；7 → 16~23、26；9 → 10 → 11；9 → 23；12 → 30；13 → 14、15；24 → 25 → 33；27 → 28~33；11、26 → 28~30；28~34 → 35 → 36 → 37*、38* → 39。
+> 依赖：1 → 全部；2 → 35；1 → 6 → 7；3 → 4 → 5 → 7 → 8；7 → 16~23、26；9 → 10 → 11；9 → 23；12 → 30；13 → 14、15；24 → 25 → 33；27 → 28~33；11、26 → 28~30；28~34 → 35 → 36 → 40~44（W3）→ 45~47（W6）→ 37*、38* → 39。W3、W6 两批互不依赖，可按实施时的依赖调换先后（两批都改弹窗，先做的一批提交后另一批再开工）；40 → 41 → 43 → 44，42 独立；45 → 46 → 47。
+> 与评估 report.md §7 批次表对应：阶段 B = 批 1，C = 批 2，D = 批 3，E / F = 批 4、批 5，G = 批 6；阶段 H（W3）、I（W6）是用户 2026-10-26 追加的两批，在批次表之外。编号按加入顺序，执行按阶段顺序。
 
 ## 阶段 A　测试地基
 - [ ] 1. 测试地基与基线（R12.3、R12.5 底座）
@@ -85,9 +86,10 @@
   - PG：和平药房某科目带 aux_type 筛选的行数 = 金标准；辅助明细不带筛选 400；构建器查 tb_aux_balance 的口径同 R1；辅助明细首页耗时记录（N1）
 - [ ] 22. 列补齐与标签（R5.7、R6.6）
   - 试算表 rje_adjustment、余额方向列；`queryColumnLabels.ts`（summary「摘要」、ws_consol_tb 覆盖为「汇总数」、新列中文）+ `queryColumnLabels.spec.ts`
-- [ ] 23. 循环范围（R3.8，ADR-AQL-19；变异 #19）
-  - 新建 `services/custom_query/cycle_scope.py`；接入试算表、调整分录、附注目录 / 章节与附注树（`SECTION_OUT_OF_SCOPE`）；`resolve_builder_scope` 排除循环受限项目（`CYCLE_SCOPED_PROJECT`）
-  - PG：design §10.2「循环范围」行（含附注映射为空集时与附注页同样不过滤）
+- [ ] 23. 循环范围（R3.8，ADR-AQL-19；变异 #19、#19b）
+  - 开工前确认分支含远端提交 d0de87a6c（`git merge-base --is-ancestor d0de87a6c HEAD`）；不含则暂停并报告分叉情况（design §14.4），不在本 spec 里复制 `effective_scope`
+  - 新建 `services/custom_query/cycle_scope.py`（`resolve_cycle_scope` / `is_cycle_restricted`，只调 `deps.get_user_scope_cycles`）；接入试算表、调整分录、附注目录 / 章节与附注树（严格过滤，`SECTION_OUT_OF_SCOPE`）；`resolve_builder_scope` 逐个可访问项目排除受限项目（`CYCLE_SCOPED_PROJECT`）
+  - PG：design §10.2「循环范围」行（团队分配勾选、主管不限、勾选为空即无行三种）
 
 ## 阶段 E　模板与导出后端（P1 / P2）
 - [ ] 24. 模板后端（R9.1~R9.3，ADR-AQL-11；变异 #12）
@@ -108,7 +110,7 @@
   - `CustomQueryDialog.vue` 按 design §4.2；`SheetCellRangePicker.vue` 年度改由父组件传入；删除年度兜底棘轮中这两个文件的条目
   - vitest：换路由后项目跟随、非项目页不自动选、年度为空禁用查询、错误不落空态、翻页显示 total、「仅筛选本页」、操作列打开 / 复制引用（不可用时显示原因）、结果区没有回写入口（R7.5）；操作、翻页、导出控件带 aria-label（N5，页面版与构建器同口径断言）
 - [ ] 29. 页面版改造（R6.1~R6.5、R7、R10.2、R10.4、N5，ADR-AQL-12 / 16）
-  - `CustomQueryTab.vue` 按 design §4.2；改写 `advancedQueryFrontend.spec.ts` 的「今年 − 1」断言；删除棘轮条目
+  - `CustomQueryTab.vue` 按 design §4.2，条件区做成独立组件 `components/query/QueryConditionEditor.vue`（W3 在弹窗复用）；改写 `advancedQueryFrontend.spec.ts` 的「今年 − 1」断言；删除棘轮条目
   - vitest：结构化条件与 AND / OR 进请求、未知字段提示、条件值框可输入、中文列名、ACNR 面板「开发中」且请求不带 acnr_targets、指标树带项目与年度加载
 - [ ] 30. 构建器前端（R2.6、R3.5、R3.6、R6.5、N5，ADR-AQL-08 / 12）
   - `AdvancedQueryBuilder.vue`、`useQueryBuilderAccess.ts`（access 接口）、`services/apiPaths/system.ts`（queryBuilder 组）；改写 `test_advanced_query_hardening_properties_scope.py::test_p23_*`
@@ -127,11 +129,46 @@
 - [ ] 34. 删除其余收敛对象（R12.1，ADR-AQL-04 / 13；按 design §3.9 一类一提交）
   - 每类删前 grep 0 调用方、删前后跑同一组测试（跨模块单元格源族另跑 `test_lazy_import_resolvability.py`）、提交前打 tag；下调 `test_module_cell_resolver.py` 白名单基线；`SheetCellRangePicker.vue` 删模块模式
 - [ ] 35. 权限配方表全部转正与磁盘变异（R12.5、N2，design §10.3 / §10.4）
-  - 删除全部 xfail，路由对账通过；21 条变异（另含 #10b）逐条打红（单独一条命令跑，逐字节恢复后 sha256 核对），结果写入本条
+  - 删除全部 xfail，路由对账通过；21 条变异（另含 #10b、#19b）逐条打红（单独一条命令跑，逐字节恢复后 sha256 核对），结果写入本条；W3 / W6 的变异 #22~#29 在阶段 H、I 各自任务内按同样方式跑
 - [ ] 36. 性能与 e2e 静态复核（N1、R12.4）
   - N1 三项实测，`EXPLAIN ANALYZE` 摘要写入本条；不达标按 ADR-AQL-06 预案①②处理后重测，仍不达标保持本条未勾并附实测与执行计划，索引迁移只提 W12 不执行
   - 两个高级查询 e2e spec 只做静态核对（路由、选择器是否还在）：过期的更新或删除，保留的写入任务 37 清单；实际运行归 37*
-- [ ]* 37. 浏览器全链路实测（写后读回，design §10.5）：需 start-dev 运行环境；未实测时写「代码已改但未实测」
+
+## 阶段 H　W3 常用审计预置模板（用户 2026-10-26 追加；R13，ADR-AQL-05；design §3.11、§4.3）
+- [ ] 40. 条件能力扩展（R13.5，ADR-AQL-03；变异 #22、#23、#29）
+  - `param_sql_builder`：抽 `_prefix_predicate`，`starts_with` 与 `prefix` 共用；新增 `_weekday_predicate`；`table_whitelist.OPERATOR_WHITELIST` 增两项；`paged_fetch` 的 `CONDITION_VALUE_REQUIRED`
+  - `ledger_sampling_service.ledger_line_amount`（`build_ledger_query` 两处改调，SQL 文本改前改后一致）；注册表 `SourceSpec.condition_only` 与序时账 `line_amount`；指标树叶子 `condition_fields`，schema 12
+  - `QueryConditionEditor.vue`：按 dtype 给算子（含开头是、大于等于、小于等于、星期为）、`incompleteReason`、`notices`、`EDITOR_OPS`；`queryColumnLabels.ts` 增 `line_amount`
+  - 测试：单元（编译 SQL 与绑定参数、`weekday_in` 用于文本列 400、空值 400）；PG design §10.2「新条件能力」行；vitest（算子随 dtype、未填值禁用查询与保存）
+- [ ] 41. 预置定义与服务端解析（R13.1、R13.3、R13.4、R13.8；变异 #24）
+  - `backend/data/custom_query_presets.json`（7 条，design ADR-AQL-05 表）；`services/custom_query/template_presets.py`（加载、校验、列表、解析）；`sampling_enhanced_service.cutoff_window` 与默认值常量（`run_cutoff_test` 改用，行为不变）
+  - router 两条薄路由 `GET /template-presets`、`GET /template-presets/{preset_id}/resolve`；权限配方表补第 30、31 行，路由对账通过
+  - 测试：单元（JSON 每条校验通过；坏条目逐类被跳过并记 ERROR；`cutoff_window` 与 `run_cutoff_test` 同窗、默认值相等）；PG design §10.2「预置参数」行
+- [ ] 42. C24 特殊事件词表单一来源（R13.9；变异 #25）
+  - 生成器 `backend/scripts/gen/gen_journal_entry_rules_ts.py`（`--write` / `--check`）→ `src/generated/journalEntryRules.ts`；`useC24AnalyticsEngine.ts` 改为 import 该常量（只换 import，`GtC24JournalDetail.vue` 不动）
+  - 测试：pytest 比对 `render(JSON)` 与磁盘文件；vitest：每个特殊事件词都被 `screenAnomalies` 标为「与特殊事件有关」；C24 既有 spec（`useC24AnalyticsEngine.spec.ts` / `.pbt.spec.ts`、`GtC24JournalDetail.integration.spec.ts`）全绿
+- [ ] 43. 模板列表「系统预置」与载入（R13.1、R13.2、R13.6）
+  - `MyTemplatesDialog.vue` 预置分区（只读，「载入」「另存为我的模板」先调 resolve，emit `load(config, item, notices)` / `save-as`）；弹窗嵌入 `QueryConditionEditor` 并发 `conditions`；页面版与弹窗处理这两个事件（另存为默认名「{预置名}（我的）」）；周末与大额说明经 `notices` 显示
+  - vitest：预置行没有编辑 / 删除 / 执行；载入后不自动执行；留空阈值时查询与保存不可用并显示原因；无项目时按钮不可用；读 `backend/data/custom_query_presets.json` 断言每条预置的算子都在 `EDITOR_OPS` 内（R13.8）
+- [ ] 44. 预置真库对账（R13.7）
+  - 新建 `tests/advanced_query_linkage/test_aql_presets_pg.py`：design §10.2「预置执行对账」行，项目分配按 R13.7；金标准写成独立 SQL，结果与快照差异写入本条
+  - 浏览器验收归 37*（design §10.5 的 W3 段落）
+
+## 阶段 I　W6 业务页行级「按此查询明细」（用户 2026-10-26 追加；R14，ADR-AQL-20；design §3.12、§4.3）
+- [ ] 45. 业务对象 → 科目解析与筛选键（R14.2~R14.4、R14.6；变异 #26、#27）
+  - 新建 `services/custom_query/entry_accounts.py`；注册表筛选键 `account_code`（可多值）、`wp_code`、`report_row`、`note_section`（`FilterKey.resolver`）；`meta.entry_accounts`；错误码按 design §5
+  - 测试：单元（`codes_for_wp_code` 各情形、谓词编译、非法值 400）；PG design §10.2「报表行构成科目」「附注章节与底稿」两行（含回滚事务子科目夹具、范围外 403）
+- [ ] 46. 入口上下文与弹窗（R14.1、R14.2 前端；变异 #28）
+  - `queryEntryContext.buildQueryEntry` / `tbRowDrill`；`composables/useQueryEntry.ts`；`QueryEntryBanner.vue`；弹窗 `entry` prop 与试算表结果行「查明细」；`utils/eventBus.ts` 载荷类型；`ThreeColumnLayout.vue` 经 `resolveDialogOpenContext` 传 `entry`（+≤ 3 行，`currentYear` 不动）；`types/custom-query-template.ts` 增 `filters`
+  - vitest：ADR-AQL-20 表逐行一条落点用例；切换保留筛选；手动换源清除上下文；下钻压栈与返回；`resolveDialogOpenContext` 带 entry 时其项目与年度优先
+- [ ] 47. 四处页面接线（R14.1、R14.5）
+  - 开工前对每个目标文件重跑 `git status` 与行数（design §9）；有他人未提交改动时只改、只提交自己的块
+  - 新建 `QueryDetailEntry.vue`；`TrialBalance.vue`、`DisclosureEditor.vue` 各 2 行，`WorkpaperEditor.vue` 3 行；`ReportDrilldownDialogs.vue` + `useReportDrilldown.ts`（`drilldownData` 加 `report_type` / `year` / `project_id`）+ `ReportDrilldownData` 类型，ReportView 0 行；现跑行数门（DisclosureEditor HARD_CAP、ReportView HARD_CAP）
+  - vitest：组件在合计行与空目标时置灰并显示原因、点击发出带 `entry` 的事件并 emit `opened`；单区域 vue-tsc 覆盖改动文件（含一条故意类型错误的变异证明）
+  - 浏览器验收归 37*（design §10.5 的 W6 段落）
+
+## 阶段 J　全链路实测与收尾
+- [ ]* 37. 浏览器全链路实测（写后读回，design §10.5，含 W3 / W6 段落）：需 start-dev 运行环境；未实测时写「代码已改但未实测」
 - [ ]* 38. 合并项目路径实测（tb_summary / ws_* / consol_unit / 合并附注）：现库 0 个合并项目；未实测时写「代码已改但未实测」
 - [ ] 39. 收尾
-  - `.kiro/specs/INDEX.md` 只更新本 spec 行；写 `closure.md`，逐条回显 design §2 全部裁决（ADR-AQL-01~19，含不做的 ADR-AQL-05）与 §11 待拍板（W1~W14）供用户复核；清理 `tmp_aql_linkage/` 与验证 worktree；核对任务数与 INDEX 一致
+  - `.kiro/specs/INDEX.md` 只更新本 spec 行；写 `closure.md`，逐条回显 design §2 全部裁决（ADR-AQL-01~20）与 §11 待拍板（W1、W2、W4、W5、W7~W16；W3 / W6 标「已纳入」），写明只做周末、不做节假日的原因与 design §14.5 的范围外登记，供用户复核；清理 `tmp_aql_linkage/` 与验证 worktree；核对任务数与 INDEX 一致
