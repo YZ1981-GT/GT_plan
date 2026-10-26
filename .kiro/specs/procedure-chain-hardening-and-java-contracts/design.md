@@ -133,3 +133,37 @@
 - R5：循环册（E1 / H1 / D2-1 …）的程序表页 componentType 是循环组件（`e1-monetary-fund` / `h1-fixed-assets` …），只有独立程序表册才是 `a-program-console`；`@program` 原先只认后者 ⇒ 程序裁剪页「程序裁剪 ›」进 E1 落到「底稿目录」。改为同时认 `sheet_type = procedure`（后端下发，缺省按表名启发式，与 `resolveSheetType` 同口径）。变异 FR5d（只认 a-program-console）/ FR5e（只认下发的 sheet_type、不走启发式）全红。
 - R3：目标已有同编码时，复制器的跳过说明「目标项目已存在 wp_code=E1，overwrite=False 跳过」先于路由的中文说明返回，界面上漏出参数名。改为复制器与路由共用一句中文常量 `EXISTING_CODE_SKIP_MESSAGE`。变异 C7 红。
 - 测试数据：【测试】公式同步甲 E1 第 23 行裁剪 / 恢复留下 1 条程序行任务（现为 execute / unassigned）、2 条任务历史、1 条程序行定义（E1A 第 23 行，其他项目委派预览也会建同一条），收尾时备份后清理（tasks 6.1）。
+
+## §10 实施记录（批 3，2026-10-26）
+
+### 10.1 与设计的偏差
+
+- R11 链路 / IPO / B60 三处建底稿结构相同（索引行 + 底稿行 + 模板文件、不填表头、不绑数据集），共用 `wp_generate_file.create_template_workpaper`；按编码生成、准则转换、自定义底稿名称 / 绑定 / parsed_data 各不相同，只接回执、不并入。链路原先调的 `prefill_engine.fill_header_cells` 查 `Project.company_name / Project.year`（模型里没有这两列，恒 AttributeError 被吞，从未填上过）⇒ 删掉，表头未填如实计入 `header_unfilled`；子底稿只给本步之后在库里的主底稿建（原先在回收站的主底稿也会补建子底稿），仍不落文件（打开时懒加载）。
+- R11 自定义程序码：裁剪判定按「最近一级有程序行的编码」，自定义程序自己那行是执行 ⇒ 不会被判已裁，原先绕开的实际是「在回收站 / 已存在」的分流和名称；现在与科目匹配码一起进 `plan_generation`，名称在映射表没有时用程序名。读自定义程序失败按「裁剪结果不可读」处理（本步失败，不按无裁剪继续）。
+- R11 `procedures.py` 带模板的自定义程序：`ProcedureService.add_custom` 已按 `wp_index`（含软删）查重，同码在回收站时 409，原分析里的「撞唯一索引 500」只在并发下出现 ⇒ 未改。
+- R12 撤权只撤「该账号在这个项目里再没有别的有效分配」的成员行（同一账号可关联多份人员档案）；委派选人：账号停用 / 删除原先能委派成功，现与「没关联账号」一样 422（文案带处理办法）。委派下拉不预先标出这类人员（团队接口不返账号状态），本 spec 未改。
+- R13 前端只有程序行委派对话框调预览（行选择器不走前置导入），`preparation_ready=false` 的提示目前只在按底稿 / 循环委派的接口调用方可见；对话框照样处理。
+- R14 `--apply` 另须 `--project-id`（一次一个项目），见 10.3。
+
+### 10.2 预存失败（b00ff36fc 干净检出逐条复现，非本 spec）
+
+`test_wp_generation_pipeline_property.py` 6 例（`wp_parsed_data_service._read_xlsx_structure` 不存在 / component_type 推导）；其余见回归记录（3.5）。
+
+### 10.3 真库事故与处置
+
+R14 变异 D6（去掉 `--confirm` 校验）时，`test_script_refuses_apply_without_confirm` 的子进程没有指定数据库，按 worktree 的默认配置连上真库跑完了 `--apply`：备份 → 逐项目落文件 → 条件更新 `file_path`，22:52:11 起 3364 份在用底稿（13 个项目，含重药安徽、和平药房等）的 `file_path` 指向 `C:\Users\Administrator\ptgd_deliver\wt\backend\wp_storage\…`（主应用按越界拒绝读取）。处置：按脚本写的备份（3364 行原值）在一个事务里逐行条件恢复（当前值仍指向 worktree 才写），核对 restored=3364、残留 0、与原值不符 0 后提交；worktree 存储里本次落的 3364 个文件删除；备份与恢复前快照留档 `C:\Users\Administrator\ptgd_deliver\incident_20261026\`。`updated_at` 未被改动（核对过），没有别的写入。
+
+教训与改动：调用脚本的用例一律给子进程指定临时空库（`DATABASE_URL=sqlite…/nothing.db`），变异掉校验时只会在空库上失败；脚本 `--apply` 另须 `--project-id`。worktree 里跑的扫描对主树存储的文件会误判（相对路径按 worktree 解析 ⇒ 1037 份有文件的底稿被当成「旧占位」处理），真库 dry-run 必须用主树代码。
+
+### 10.4 范围外发现（未改，汇报用户）
+
+- 真库有 66 个 `proj_xxxxxxxx` 项目（60 个已软删，2026-08-01~10-25 创建）各带 1 份 `file_path=/tmp/*.xlsx` 的 D2 底稿 —— 测试工厂 `mk_working_paper` 的路径，说明曾有测试把数据提交进真库；R14 报告里的「文件缺失 68」有 66 份是它们。
+- 链路编排某一步失败时 `execute_full_chain` 整会话 `rollback`，已完成步骤（如试算表重算）一并丢弃；各步骤内部是否自行 commit 不一，改成步骤级保存点需逐步核对，本 spec 只改了「生成底稿」步内部。
+- `gt_coding_service.generate_project_index`（`POST /api/projects/{pid}/generate-index`）只要求登录、写区间编码，前端不调用；未纳入保留范围判定。
+- 人员档案页 101 人里 99 人是测试工厂的 `staff_xxxxxxxx`（共 111 份、12 份已删，全部有账号、全部分配在上面 66 个 `proj_` 项目里），与 `/tmp` 底稿同源（`procedure_delegation_visibility/_factories.py` 的 `mk_project / mk_staff / mk_working_paper`）。本批 PG 回归前后真库没有新增（最晚仍是 10-25 04:04）；目录里 `test_delegation_transaction.py`、`test_task17_capacity_and_role_acceptance.py` 有显式 `commit()`，是否就是来源未逐条核实。
+
+### 10.5 浏览器实测补修（批 3）
+
+- 委派预览被拒（422 所选人员没有关联登录账号）弹两条同样的提示：`previewProcedureDelegation` 不能静默 ⇒ 全局拦截器先弹一次、组合式再弹一次。加 `{ silent }` 选项（转 `_silent`），程序行委派对话框带上，错误只经 `handleApiError(e, '委派预览')` 提示一次；变异 S1~S3 全红。
+- 删除人员的二次确认框里项目名出现两次：后端 409 提示已点名项目（最多 5 个，超出写「等」），前端又拼了一遍「涉及项目：…」。改为 `staffBusyConfirmMessage`：点名全了原样用，点名不全才补全部项目名；变异 H1 / H2 全红。
+- 冻结契约守卫 `test_task23_zero_regression` 要求新增的响应字段显式登记：R13 的 `preview.preparation_ready` 已登记为 additive（登记前该守卫 2 例红，正是它应有的作用）。

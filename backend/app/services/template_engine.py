@@ -107,6 +107,8 @@ class TemplateSetGeneration(NamedTuple):
     skipped_trimmed_codes: list[str]  # 已在程序裁剪中标为不执行（含子表 / 程序表）
     in_recycle_codes: list[str]       # 底稿在回收站中（同码只能恢复，不能新建）
     blank_codes: tuple[str, ...] = ()  # 找不到模板、建了空白底稿（与按编码生成同口径单列）
+    # 统一回执（含已存在、请求内未填表头的份数；spec procedure-chain-hardening-and-java-contracts R11.6）
+    receipt: Any = None
 
 
 class TemplateEngine:
@@ -684,6 +686,12 @@ class TemplateEngine:
             project_id, len(template_codes), len(workpapers), len(blank_codes),
             len(plan.skipped_trimmed_codes), len(plan.in_recycle_codes),
         )
+        from app.services.wp_generation_receipt import GenerationReceipt
+
+        receipt = GenerationReceipt.from_plan(plan)
+        receipt.ignored_codes = list(ignored_codes)
+        for idx, generated in zip(_pending_wps, generated_files):
+            receipt.add_created(idx.wp_code, generated, header_filled=False)  # 请求内不填表头（见上方说明）
         return TemplateSetGeneration(
-            workpapers, ignored_codes, plan.skipped_trimmed_codes, plan.in_recycle_codes, blank_codes
+            workpapers, ignored_codes, plan.skipped_trimmed_codes, plan.in_recycle_codes, blank_codes, receipt
         )

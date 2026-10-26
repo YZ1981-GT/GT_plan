@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const http = vi.hoisted(() => ({ put: vi.fn(), post: vi.fn(), get: vi.fn(), delete: vi.fn(), patch: vi.fn() }))
 vi.mock('@/utils/http', () => ({ default: http }))
 
-import { applyProcedureDelegation, assignProcedures } from '../commonApi'
+import { applyProcedureDelegation, assignProcedures, previewProcedureDelegation } from '../commonApi'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -30,6 +30,16 @@ describe('assignProcedures', () => {
     expect(http.put).toHaveBeenCalledWith('/api/projects/p1/workpaper-leads',
       { assignments: [{ procedure_id: 'x', staff_id: 's1' }], expand_scope: true, scope_reason: '支援' },
       { _silent: true })
+  })
+})
+
+describe('previewProcedureDelegation（spec procedure-chain-hardening-and-java-contracts R12.3）', () => {
+  it('不传选项：不静默；silent ⇒ _silent（422 只由调用方提示一次，浏览器实测原先弹两条）', async () => {
+    http.post.mockResolvedValue({ data: { preview_id: 'pv' } })
+    expect(await previewProcedureDelegation('p1', BODY)).toEqual({ preview_id: 'pv' })
+    expect(http.post).toHaveBeenLastCalledWith('/api/projects/p1/procedure-delegations/preview', BODY, {})
+    await previewProcedureDelegation('p1', BODY, { silent: true })
+    expect(http.post).toHaveBeenLastCalledWith('/api/projects/p1/procedure-delegations/preview', BODY, { _silent: true })
   })
 })
 

@@ -24,7 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.core import Project
-from app.models.workpaper_models import WorkingPaper, WpIndex, WpSourceType, WpStatus
+from app.models.workpaper_models import WpIndex
+from app.services.wp_generation_receipt import GenerationReceipt
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,8 @@ class AttachmentFlagsResponse(BaseModel):
     generated_wp_codes: list[str] = Field(default_factory=list)
     skipped_trimmed_codes: list[str] = Field(default_factory=list)
     in_recycle_codes: list[str] = Field(default_factory=list)
+    # 自动生成缺附件时的统一回执（失败 / 空白册 / 表头未填 …，见 wp_generation_receipt）；没生成为 None
+    generation_receipt: dict | None = None
     simplification: SimplificationHint | None = None
     scot_rows: list[dict] = Field(default_factory=list)
     b60d_archive: dict | None = None
@@ -290,6 +293,7 @@ class EnsureWorkpapersResult:
     created: list[str] = field(default_factory=list)
     skipped_trimmed_codes: list[str] = field(default_factory=list)
     in_recycle_codes: list[str] = field(default_factory=list)
+    receipt: GenerationReceipt | None = None  # 统一回执（含失败 / 空白册 / 表头未填）
 
 
 async def ensure_workpapers_for_codes(
@@ -298,10 +302,12 @@ async def ensure_workpapers_for_codes(
     """幂等创建缺失的 WpIndex + WorkingPaper + 模板文件。
 
     已在程序裁剪中标为不执行 / 底稿在回收站中的编码不建、如实回报（与其他生成入口同一判定）；
-    读不到裁剪结果返回 503，不生成。每个编码一个保存点，单条失败不影响其余。
+    读不到裁剪结果返回 503，不生成。每个编码一个保存点（建行 + 落文件都在里面）：复制模板失败回滚该码、
+    进回执 failures，不计入新建（spec procedure-chain-hardening-and-java-contracts R11.4：原先复制在保存点外、
+    失败照样算已生成）。
     """
     from app.services.procedure_scope_retention import TrimScopeUnavailable, plan_generation
-    from app.services.wp_template_init_service import init_workpaper_from_template
+    from app.services.wp_generate_file import create_template_workpaper
 
     if not codes:
         return EnsureWorkpapersResult()
@@ -311,50 +317,15 @@ async def ensure_workpapers_for_codes(
     except TrimScopeUnavailable as e:
         raise HTTPException(status_code=503, detail=e.http_detail())
     names = _wp_name_lookup()
-    scenario = str(project.scenario or "normal")
-    has_fc = bool(getattr(project, "has_foreign_currency", False))
-    result = EnsureWorkpapersResult(
-        skipped_trimmed_codes=plan.skipped_trimmed_codes, in_recycle_codes=plan.in_recycle_codes
-    )
-    created = result.created
-
+    receipt = GenerationReceipt.from_plan(plan)
     for code in plan.to_create:
-        try:
-            async with db.begin_nested():
-                wp_index = WpIndex(
-                    project_id=project_id,
-                    wp_code=code,
-                    wp_name=names.get(code) or f"底稿{code}",
-                    audit_cycle="B",
-                    status=WpStatus.not_started,
-                )
-                db.add(wp_index)
-                await db.flush()
-                wp = WorkingPaper(
-                    wp_index_id=wp_index.id,
-                    project_id=project_id,
-                    source_type=WpSourceType.template,
-                    file_path=f"storage/projects/{project_id}/workpapers/{code}",
-                    parsed_data={},
-                )
-                db.add(wp)
-                await db.flush()
-            try:
-                actual_path = init_workpaper_from_template(
-                    project_id=project_id,
-                    wp_id=wp.id,
-                    wp_code=code,
-                    scenario=scenario,
-                    has_foreign_currency=has_fc,
-                )
-                if actual_path is not None:
-                    wp.file_path = str(actual_path)
-            except Exception as e:
-                logger.warning("B60 ensure template copy failed for %s: %s", code, e)
-            created.append(code)
-        except Exception as e:
-            logger.warning("B60 ensure_workpapers failed for %s: %s", code, e)
-    return result
+        await create_template_workpaper(
+            db, receipt, project_id=project_id, wp_code=code, wp_name=names.get(code) or f"底稿{code}",
+            audit_cycle="B", scenario=str(project.scenario or "normal"),
+            has_foreign_currency=bool(getattr(project, "has_foreign_currency", False)),
+        )
+    return EnsureWorkpapersResult(created=list(receipt.created_codes), skipped_trimmed_codes=plan.skipped_trimmed_codes,
+                                  in_recycle_codes=plan.in_recycle_codes, receipt=receipt)
 
 
 async def evaluate_missing_attachments(
@@ -464,6 +435,7 @@ async def save_attachment_flags(
     resp.generated_wp_codes = ensured.created
     resp.skipped_trimmed_codes = ensured.skipped_trimmed_codes
     resp.in_recycle_codes = ensured.in_recycle_codes
+    resp.generation_receipt = ensured.receipt.to_payload() if ensured.receipt else None
     return resp
 
 

@@ -3,7 +3,10 @@
 原先预览只物化「库里已有定义」的行：定义只有裁剪某一行时才顺带写入，新项目恒 0 个目标、也不说为什么；物化出的任务
 ``wp_id`` 为空（只有程序行任务开关打开时，生成底稿才会绑定），委派后底稿页按任务找不到底稿。
 
-- 在 SAVEPOINT 里做：失败只回滚这一步，预览照常继续，回执 ``materialization.error`` 写明原因。
+- 在 SAVEPOINT 里做：库 / 业务校验失败只回滚这一步，预览照常继续，回执 ``ready=False``、``error`` 写明原因、
+  各计数清零（保存点回滚后此前累加的计数都不成立）。只接这几类：``SQLAlchemyError / HTTPException / ValueError /
+  LookupError``；程序错误（AttributeError、TypeError …）照常抛出 —— 原先 ``except Exception`` 把它们也吞成
+  「导入失败」，预览照报目标数（spec procedure-chain-hardening-and-java-contracts R13）。
 - 物化只用当前模板版本的定义键（见 ``procedure_row_definitions``），只在有缺的行时才写（已有任务只刷新展示快照，
   没必要每次预览都改一遍）。
 - 目标为 0 时给出原因（``empty_target_hint``），前端照着显示，不再只有一个 0。
@@ -17,6 +20,8 @@ import logging
 from uuid import UUID
 
 import sqlalchemy as sa
+from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workpaper_models import WorkingPaper
@@ -24,18 +29,21 @@ from app.services.procedure_row_definitions import ensure_current_definitions
 
 logger = logging.getLogger(__name__)
 
+#: 前置失败时回执里清零的计数
+_COUNTS = ("definitions_created", "tasks_created", "tasks_bound", "with_program_table")
+#: 前置可接住的失败（其余是程序错误，照常抛出）
+PREPARE_RECOVERABLE = (SQLAlchemyError, HTTPException, ValueError, LookupError)
+
 
 async def prepare_row_tasks(
     db: AsyncSession, materialization, project_id: UUID, wp_index_ids: list[UUID], *, actor_user_id: UUID,
 ) -> dict:
-    out: dict = {
-        "definitions_created": 0, "tasks_created": 0, "tasks_bound": 0, "with_program_table": 0, "error": None,
-    }
+    out: dict = {**dict.fromkeys(_COUNTS, 0), "ready": True, "error": None}
     if not wp_index_ids:
         return out
     try:
         async with db.begin_nested():
-            meta = await materialization._load_wp_indexes(project_id, wp_index_ids)
+            meta = await materialization.load_wp_indexes(project_id, wp_index_ids)
             out["definitions_created"], keys = await ensure_current_definitions(
                 db, {m["wp_code"] for m in meta.values()},
             )
@@ -63,9 +71,10 @@ async def prepare_row_tasks(
                 seen.add(wp_index_id)
                 bound = await materialization.bind_working_paper(project_id, wp_index_id, wp_id)
                 out["tasks_bound"] += int(bound.get("bound") or 0)
-    except Exception as exc:  # noqa: BLE001 — 前置失败不拖垮预览，如实回报
+    except PREPARE_RECOVERABLE as exc:  # 前置失败不拖垮预览，如实回报「未就绪」
         logger.warning("委派预览前置导入 / 物化失败 project=%s: %s", project_id, exc, exc_info=True)
-        out["error"] = f"程序行定义导入或任务生成失败：{type(exc).__name__}"
+        out.update(dict.fromkeys(_COUNTS, 0), ready=False,
+                   error=f"程序行定义导入或任务生成失败：{type(exc).__name__}")
     return out
 
 

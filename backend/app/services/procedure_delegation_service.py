@@ -497,6 +497,8 @@ class ProcedureDelegationService(DelegationTargetScopeMixin):
             "preview_id": str(preview.id),
             "expires_at": preview.expires_at.isoformat(),
             "materialization": prep,
+            # 前置（导入定义 / 物化 / 绑定底稿）失败 ⇒ False，目标数可能不全（spec procedure-chain-hardening R13）
+            "preparation_ready": prep is None or bool(prep.get("ready")),
             "hint": hint,
             "summary": {
                 "targets": len(targets),

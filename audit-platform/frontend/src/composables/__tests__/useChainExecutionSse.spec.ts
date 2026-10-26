@@ -28,13 +28,29 @@ const post = vi.fn()
 vi.mock('@/services/apiProxy', () => ({ api: { post: (...a: any[]) => post(...a), get: vi.fn(async () => []) } }))
 vi.mock('element-plus', () => ({ ElMessage: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } }))
 
+import { ElMessage } from 'element-plus'
 import { useChainExecution } from '../useChainExecution'
 
 beforeEach(() => {
   FakeConn.all = []
   post.mockReset()
   post.mockResolvedValue({ execution_id: 'exec-1', status: 'running', steps: {} })
+  vi.mocked(ElMessage.success).mockClear()
+  vi.mocked(ElMessage.warning).mockClear()
+  vi.mocked(ElMessage.error).mockClear()
 })
+
+/** 所有提示里以「生成底稿：」开头的那条（生成回执提示） */
+function receiptToasts(): Array<{ level: string; message: string }> {
+  const out: Array<{ level: string; message: string }> = []
+  for (const level of ['success', 'warning', 'error'] as const) {
+    for (const [arg] of vi.mocked(ElMessage[level]).mock.calls) {
+      const message = typeof arg === 'string' ? arg : (arg as { message?: string })?.message ?? ''
+      if (message.startsWith('生成底稿：')) out.push({ level, message })
+    }
+  }
+  return out
+}
 
 describe('useChainExecution 进度流', () => {
   it('经 createSSE 订阅（不拼 ?token= 进 URL）', async () => {
@@ -58,5 +74,37 @@ describe('useChainExecution 进度流', () => {
     expect(c.executing.value).toBe(false)
     expect(c.totalDurationMs.value).toBe(99)
     expect(conn.closed).toBe(true)
+    expect(receiptToasts()).toEqual([])
+  })
+
+  it('「生成底稿」步的回执单独提示，失败的编码与原因写进提示（spec procedure-chain-hardening-and-java-contracts R11）', async () => {
+    const c = useChainExecution(ref('p1'))
+    await c.executeFullChain(2025)
+    const summary = {
+      created: 1,
+      created_codes: ['E1'],
+      failures: [{ wp_code: 'A1', error: '模板文件被占用' }],
+      header_unfilled: 1,
+    }
+    FakeConn.all[0].msg!({ step: 'generate_workpapers', status: 'completed', summary }, 'step_completed')
+    FakeConn.all[0].msg!({ status: 'completed', results: { generate_workpapers: { status: 'completed', summary } } },
+      'chain_completed')
+    const toasts = receiptToasts()
+    expect(toasts).toHaveLength(1)
+    expect(toasts[0].level).toBe('warning')
+    expect(toasts[0].message).toContain('生成底稿：底稿生成完成，共创建 1 份底稿')
+    expect(toasts[0].message).toContain('1 个编码生成失败：A1（模板文件被占用）')
+    expect(toasts[0].message).toContain('1 份底稿生成时未写入表头')
+  })
+
+  it('「生成底稿」步失败或没跑：不提示生成回执（只报步骤结果）', async () => {
+    const c = useChainExecution(ref('p1'))
+    await c.executeFullChain(2025)
+    FakeConn.all[0].msg!({ step: 'generate_workpapers', status: 'failed', error_message: '读取程序裁剪结果失败' },
+      'step_failed')
+    FakeConn.all[0].msg!({ status: 'completed', results: { generate_workpapers: { status: 'failed', error: 'x' } } },
+      'chain_completed')
+    expect(receiptToasts()).toEqual([])
+    expect(ElMessage.error).toHaveBeenCalled()
   })
 })

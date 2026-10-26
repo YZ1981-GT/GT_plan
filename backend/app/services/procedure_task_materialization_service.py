@@ -56,9 +56,9 @@ class ProcedureTaskMaterializationService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    # -- 内部：wp_index 解析 -------------------------------------------------
+    # -- wp_index 解析（委派预览前置也用：公开名，不跨模块调私有方法） --------------------
 
-    async def _load_wp_indexes(
+    async def load_wp_indexes(
         self, project_id: UUID, wp_index_ids: list[UUID]
     ) -> dict[UUID, dict]:
         """加载并校验 wp_index 属于本项目；返回 {wp_index_id: {wp_code, audit_cycle, wp_name}}。"""
@@ -81,6 +81,8 @@ class ProcedureTaskMaterializationService:
             r[0]: {"wp_code": r[1], "audit_cycle": r[2] or "A", "wp_name": r[3]}
             for r in rows
         }
+
+    _load_wp_indexes = load_wp_indexes  # 旧的私有名（兼容）
 
     async def _definitions_for_wp_code(
         self, wp_code: str, definition_revision: str | None = None,
@@ -134,7 +136,7 @@ class ProcedureTaskMaterializationService:
         """
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-        wp_index_map = await self._load_wp_indexes(project_id, wp_index_ids)
+        wp_index_map = await self.load_wp_indexes(project_id, wp_index_ids)
         missing = [str(i) for i in wp_index_ids if i not in wp_index_map]
 
         # 收集全部待 upsert 行（跨 wp_index 一次批量，禁止逐行 N+1）。
@@ -340,7 +342,7 @@ class ProcedureTaskMaterializationService:
 
         绝不创建/更新 definition/task/preview/projection/outbox，也不改 WorkingPaper。
         """
-        wp_index_map = await self._load_wp_indexes(project_id, [wp_index_id])
+        wp_index_map = await self.load_wp_indexes(project_id, [wp_index_id])
         meta = wp_index_map.get(wp_index_id)
         if meta is None:
             return []
@@ -377,7 +379,7 @@ class ProcedureTaskMaterializationService:
         - 无匹配 definition → 保持原样（不臆造 materialization_required）。
         绝不写库；供 render-config 只读调用（Design D3）。
         """
-        wp_index_map = await self._load_wp_indexes(project_id, [wp_index_id])
+        wp_index_map = await self.load_wp_indexes(project_id, [wp_index_id])
         meta = wp_index_map.get(wp_index_id)
         if meta is None:
             return programs

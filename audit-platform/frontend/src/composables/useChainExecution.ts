@@ -17,6 +17,7 @@ import { chainWorkflow } from '@/services/apiPaths'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { createSSE, type SSEConnection } from '@/utils/sse'
+import { summarizeWorkpaperGenerateResult } from '@/utils/workpaperGenerateResult'
 
 export type StepKey = 'recalc_tb' | 'generate_workpapers' | 'generate_reports' | 'generate_notes'
 export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
@@ -27,7 +28,8 @@ export interface StepState {
   status: StepStatus
   durationMs?: number
   error?: string
-  summary?: string
+  /** 后端步骤摘要（生成底稿步 = 统一生成回执，见 utils/workpaperGenerateResult） */
+  summary?: unknown
 }
 
 export interface ChainExecutionResult {
@@ -192,6 +194,19 @@ export function useChainExecution(projectId: Ref<string>) {
 
     // 显示摘要通知
     showCompletionMessage()
+    showWorkpaperReceipt(results)
+  }
+
+  /**
+   * 「生成底稿」步的回执（新建 / 已有 / 已裁 / 在回收站 / 空白册 / 失败 / 表头未填）单独提示一条
+   * （spec procedure-chain-hardening-and-java-contracts R11：原先只报「n/4 步骤成功」，建失败的底稿用户看不到）。
+   */
+  function showWorkpaperReceipt(results?: any) {
+    const step = stepStates.value.find((s) => s.key === 'generate_workpapers')
+    const summary = results?.generate_workpapers?.summary ?? (step?.status === 'completed' ? step.summary : null)
+    if (!summary || typeof summary !== 'object') return
+    const notice = summarizeWorkpaperGenerateResult(summary as Record<string, any>)
+    ElMessage[notice.level]({ message: `生成底稿：${notice.message}`, duration: 8000, showClose: true })
   }
 
   /** 显示完成摘要 */
@@ -226,6 +241,7 @@ export function useChainExecution(projectId: Ref<string>) {
               stepState.status = (info as any).status || stepState.status
               stepState.durationMs = (info as any).duration_ms
               stepState.error = (info as any).error
+              stepState.summary = (info as any).summary
             }
           }
         }

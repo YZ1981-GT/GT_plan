@@ -126,9 +126,11 @@ async def test_ensure_d4_ipo_loaded_creates_all_d4_codes(
     result = await _ensure_d4_ipo_loaded(db_session, project_id, year)
     await db_session.commit()
 
-    # 结构检查
+    # 结构检查（spec procedure-chain-hardening-and-java-contracts R11.4：另透传已裁 / 在回收站 / 空白册）
     assert isinstance(result, dict)
-    assert set(result.keys()) == {"added_codes", "skipped_existing", "errors"}
+    assert set(result.keys()) == {
+        "added_codes", "skipped_existing", "errors", "skipped_trimmed_codes", "in_recycle_codes", "blank_codes",
+    }
 
     # 业务断言：12 条全部新增（首次调用）
     assert len(result["added_codes"]) == len(D4_IPO_CODES) == 12, (

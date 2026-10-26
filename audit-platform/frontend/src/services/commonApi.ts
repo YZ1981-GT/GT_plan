@@ -379,11 +379,14 @@ export interface DelegationPreviewBody {
   due_at?: string | null
 }
 
-/** 委派预览：materialize 前置 job + 目标/冲突分类 + 一次性 preview 凭证（status=ready/materialization_pending）。 */
+/**
+ * 委派预览：materialize 前置 job + 目标/冲突分类 + 一次性 preview 凭证（status=ready/materialization_pending）。
+ * `silent`：调用方自己提示错误（不带时 422「所选人员没有关联登录账号」等会被全局拦截器先弹一次，界面上两条同样的提示）。
+ */
 export async function previewProcedureDelegation(
-  projectId: string, body: DelegationPreviewBody,
+  projectId: string, body: DelegationPreviewBody, { silent }: { silent?: boolean } = {},
 ): Promise<any> {
-  const { data } = await http.post(P_prt.delegationPreview(projectId), body)
+  const { data } = await http.post(P_prt.delegationPreview(projectId), body, (silent ? { _silent: true } : {}) as any)
   return data?.data ?? data
 }
 

@@ -236,8 +236,10 @@ async def test_b60_and_ipo_loaders(world, monkeypatch):
     assert ipo["skipped_trimmed_codes"] == ["D4-22", "D4-22A", "D4-23", "D4-24", "D4-25"], "区间行展开，D4-22A 跟随 D4-22"
     assert ipo["errors"] == [] and "D4-26" in ipo["added_codes"] and "D4-22" not in ipo["added_codes"]
     again = await _ensure_d4_ipo_loaded(db, world["pid"], 2025)
-    assert set(again) == {"added_codes", "skipped_existing", "errors"}, "D4 包装保持原三键"
+    assert set(again) == {"added_codes", "skipped_existing", "errors", "skipped_trimmed_codes",
+                          "in_recycle_codes", "blank_codes"}, "D4 包装原三键 + 透传已裁 / 在回收站 / 空白册（R11.4）"
     assert again["added_codes"] == [] and "D4-26" in again["skipped_existing"]
+    assert again["skipped_trimmed_codes"] == ["D4-22", "D4-22A", "D4-23", "D4-24", "D4-25"]
 
 
 async def test_template_copy_skips_trimmed_and_returns_json(world, monkeypatch):
@@ -281,7 +283,7 @@ async def test_standard_conversion_skips_trimmed_target_only(world, monkeypatch)
     async def _noop(*args, **kwargs):
         return 0
 
-    async def _create(project_id, codes, new_standard, changed_by=None):
+    async def _create(project_id, codes, new_standard, changed_by=None, **kwargs):
         seen["codes"] = list(codes)
         return len(codes)
 
@@ -296,3 +298,134 @@ async def test_standard_conversion_skips_trimmed_target_only(world, monkeypatch)
     await _drop_trim_table(world)
     with pytest.raises(TrimScopeUnavailable):
         await svc.convert_workpapers(world["pid"], {"target_only": ["N1"]}, {"entity_type": "listed"})
+
+
+# ── 统一回执（spec procedure-chain-hardening-and-java-contracts R11）─────────
+
+
+def _materialize_failing(*broken: str):
+    """替身：``broken`` 里的编码落文件失败，其余照常（找不到模板 ⇒ 空白册）。"""
+    from app.services import wp_generate_file
+
+    real = wp_generate_file.materialize_workpaper_file
+
+    def _fake(project_id, wp_id, wp_code, wp_name, **kw):
+        if wp_code in broken:
+            raise OSError("模板文件被占用")
+        return real(project_id, wp_id, wp_code, wp_name, **kw)
+
+    return _fake
+
+
+async def test_chain_step_receipt_isolates_failures_and_routes_custom_codes(world, monkeypatch):
+    """单码失败只回滚该码、不计入新建，同会话先前写入保留；自定义程序与科目匹配结果一起经保留范围判定；
+    在回收站的主底稿不补建子底稿。"""
+    from app.services import chain_orchestrator, wp_code_override_loader, wp_generate_file
+
+    db = world["db"]
+    real_materialize = wp_generate_file.materialize_workpaper_file
+    monkeypatch.setattr(chain_orchestrator, "match_workpapers", lambda mappings, tb, flags: ({"A1", "E1", "E2"}, {}))
+    monkeypatch.setattr(wp_template_init_service, "init_workpaper_from_template", lambda **kw: None)
+    monkeypatch.setattr(wp_generate_file, "materialize_workpaper_file", _materialize_failing("A1"))
+    monkeypatch.setattr(wp_code_override_loader, "load_wp_code_overrides",
+                        lambda: {"E1-31": "skip", "E2-9": "skip", "A1-11": "skip"})
+    db.add_all([
+        ProcedureInstance(project_id=world["pid"], audit_cycle="X", procedure_code="X9", procedure_name="自定义抽盘",
+                          status="execute", wp_code="X9", is_custom=True),
+        ProcedureInstance(project_id=world["pid"], audit_cycle="E", procedure_code="E2", procedure_name="回收站里的",
+                          status="execute", wp_code="E2", is_custom=True),
+    ])
+    db.add(WpIndex(project_id=world["pid"], wp_code="PRE", wp_name="先前写入", audit_cycle="A"))
+    await db.flush()
+
+    result = await chain_orchestrator.ChainOrchestrator()._step_generate_workpapers(db, world["pid"], 2025)
+    assert result["created_codes"] == ["E1", "X9"] and result["created"] == 2, "A1 落文件失败不计入新建"
+    assert result["failures"] == [{"wp_code": "A1", "error": "模板文件被占用"}]
+    assert result["in_recycle_codes"] == ["E2"], "自定义程序码同样判回收站"
+    assert result["blank_codes"] == ["E1", "X9"] and result["header_unfilled"] == 2
+    assert result["sub_workpapers_created"] == ["E1-31"], "建失败的 A1、在回收站的 E2 不补建子底稿"
+    assert "1 个编码生成失败：A1（模板文件被占用）" in result["message"]
+    assert await _live_codes(world) == ["E1", "E1-31", "PRE", "X9"], "失败只回滚该码，同会话先前写入保留"
+    names = dict((await db.execute(sa.select(WpIndex.wp_code, WpIndex.wp_name)
+                                   .where(WpIndex.project_id == world["pid"]))).all())
+    assert names["X9"] == "自定义抽盘", "映射表里没有的自定义程序码用程序名作底稿名"
+
+    monkeypatch.setattr(wp_generate_file, "materialize_workpaper_file", real_materialize)
+    again = await chain_orchestrator.ChainOrchestrator()._step_generate_workpapers(db, world["pid"], 2025)
+    assert again["created_codes"] == ["A1"] and again["existing_codes"] == ["E1", "X9", "E1-31"]
+
+
+async def test_ipo_and_b60_copy_failure_reported_not_counted(world, monkeypatch):
+    from app.services import wp_generate_file
+    from app.services.b60_plan_service import ensure_workpapers_for_codes
+    from app.services.wp_template_init_service import _ensure_ipo_loaded
+
+    monkeypatch.setattr(wp_template_init_service, "init_workpaper_from_template", lambda **kw: None)
+    monkeypatch.setattr(wp_generate_file, "materialize_workpaper_file", _materialize_failing("D4-27", "B60A"))
+    db = world["db"]
+    ipo = await _ensure_ipo_loaded(db, world["pid"], 2025, wp_code_prefix="D4")
+    assert "D4-27" not in ipo["added_codes"] and ipo["errors"] == [{"code": "D4-27", "error": "模板文件被占用"}]
+    assert ipo["blank_codes"] == ipo["added_codes"] and len(ipo["added_codes"]) == 11
+    assert ipo["generation_receipt"]["failures"] == [{"wp_code": "D4-27", "error": "模板文件被占用"}]
+    assert "D4-27" not in await _live_codes(world)
+
+    ensured = await ensure_workpapers_for_codes(world["pid"], ["B60A", "B60-1"], db)
+    assert ensured.created == ["B60-1"]
+    assert ensured.receipt.failures == [{"wp_code": "B60A", "error": "模板文件被占用"}]
+    assert "B60A" not in await _live_codes(world)
+
+
+async def test_template_set_receipt_reports_existing_and_unfilled_headers(world):
+    body = {"template_set_id": world["set_id"], "year": 2025}
+    first = (await world["http"].post(_GEN.format(pid=world["pid"]), json=body)).json()
+    assert first["created_codes"] == ["E1", "H1"] and first["header_unfilled"] == 2
+    assert "2 份底稿生成时未写入表头" in first["message"]
+    second = await world["http"].post(_GEN.format(pid=world["pid"]), json=body)
+    assert second.status_code == 200, second.text
+    assert second.json()["created"] == 0 and second.json()["existing_codes"] == ["E1", "H1"]
+    assert "2 个编码已有底稿，未重复生成：E1、H1" in second.json()["message"]
+
+
+async def test_custom_workpaper_reports_header_not_filled(world, monkeypatch):
+    from app.services import wp_header_service
+
+    async def _fail(**kw):
+        return {"status": "error", "message": "打开底稿文件失败"}
+
+    monkeypatch.setattr(wp_header_service, "fill_workpaper_header", _fail)
+    one = await world["http"].post("/api/projects/{pid}/working-papers/create-custom".format(pid=world["pid"]),
+                                   json={"wp_code": "X1", "wp_name": "自定义一", "year": 2025})
+    assert one.status_code == 200, one.text
+    assert one.json()["message"] == "自定义底稿已创建，表头未填上：打开底稿文件失败"
+    assert one.json()["header_failures"] == [{"wp_code": "X1", "reason": "打开底稿文件失败"}]
+    batch = await world["http"].post(
+        "/api/projects/{pid}/working-papers/create-custom-batch".format(pid=world["pid"]),
+        json={"items": [{"wp_code": "X2", "wp_name": "自定义二"}], "year": 2025})
+    assert batch.status_code == 200, batch.text
+    assert batch.json()["header_failures"] == [{"wp_code": "X2", "reason": "打开底稿文件失败"}]
+    assert "1 个底稿表头未填上：X2（打开底稿文件失败）" in batch.json()["message"]
+
+
+async def test_standard_conversion_records_failures_and_discards_orphan_file(world, monkeypatch, tmp_path):
+    from app.services.wp_standard_conversion_service import WpStandardConversionService
+
+    svc = WpStandardConversionService(world["db"])
+
+    async def _noop(*args, **kwargs):
+        return 0
+
+    async def _boom(self, wp, wp_code, wp_name, cycle):
+        if wp_code == "N1":
+            raise RuntimeError("解析底稿失败")
+
+    for name in ("check_preconditions", "_retain_shared_workpapers", "_archive_source_only_workpapers"):
+        monkeypatch.setattr(svc, name, _noop)
+    monkeypatch.setattr(type(svc), "_populate_parsed_data", _boom)
+    out = await svc.convert_workpapers(  # 年度随准则传入（取项目年度的 SQL 是 PG 口径）
+        world["pid"], {"shared": [], "source_only": [], "target_only": ["N1", "N2"]},
+        {"entity_type": "listed", "year": 2025})
+    assert out["created"] == 1 and out["failures"] == [{"wp_code": "N1", "error": "解析底稿失败"}]
+    assert out["generation_receipt"]["created_codes"] == ["N2"]
+    storage = tmp_path / "wp_storage" / str(world["pid"])
+    assert len(list(storage.glob("*"))) == 1, "N1 已落的文件随该码回滚删掉"
+    assert await _live_codes(world) == ["N2"]

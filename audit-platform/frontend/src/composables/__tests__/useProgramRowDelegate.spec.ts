@@ -63,7 +63,7 @@ describe('useProgramRowDelegate', () => {
     await d.runDelegatePreview()
     expect(mocks.preview).toHaveBeenCalledWith('p1', {
       selector: { kind: 'row', task_ids: ['t1'] }, assignee_staff_id: 's1', reviewer_staff_id: null,
-    })
+    }, { silent: true })
     expect(d.delegateDialog.value).toMatchObject({ previewId: 'pv-1', reqId: 'req-fixed', ttl: '2026-10-25T10:00:00Z', loading: false })
   })
 
@@ -111,7 +111,7 @@ describe('useProgramRowDelegate — 逐行委派（行上没有任务字段，sp
     await d.runDelegatePreview()
     expect(mocks.preview).toHaveBeenCalledWith('p1', {
       selector: { kind: 'row', task_ids: ['t-new', 't-old'] }, assignee_staff_id: 's1', reviewer_staff_id: null,
-    })
+    }, { silent: true })
   })
 
   it('建任务被拒（自加的行 422 / 已裁剪 409 / 非委派人 403）⇒ 提示原因，不打开对话框', async () => {
@@ -140,4 +140,35 @@ it('预览目标为 0 时显示服务端原因，确认按钮路径不调用 app
   expect(mocks.apply).not.toHaveBeenCalled()
   expect(mocks.msg.warning).toHaveBeenCalledWith('所选底稿都已裁剪或在回收站，不能委派')
   expect(d.delegateDialog.value.visible).toBe(true)
+})
+
+it('预览前置没准备好（preparation_ready=false）⇒ 警告目标数可能不全并带服务端原因；准备好了不提示（spec procedure-chain-hardening R13）', async () => {
+  const { d } = setup()
+  d.openDelegate(ROW)
+  mocks.preview.mockResolvedValueOnce({
+    preview_id: 'pv-1', summary: { targets: 1 }, preparation_ready: false,
+    materialization: { ready: false, error: '程序行定义导入或任务生成失败：OperationalError' },
+  })
+  await d.runDelegatePreview()
+  expect(mocks.msg.warning).toHaveBeenCalledWith(
+    '程序行定义导入或任务生成失败：OperationalError，预览的目标数可能不全，请稍后重新预览')
+  expect(d.delegateDialog.value.previewId).toBe('pv-1')
+
+  mocks.msg.warning.mockClear()
+  mocks.preview.mockResolvedValueOnce({ preview_id: 'pv-2', summary: { targets: 1 }, preparation_ready: true })
+  await d.runDelegatePreview()
+  expect(mocks.msg.warning).not.toHaveBeenCalled()
+})
+
+it('预览被拒（422 所选人员没有关联登录账号）⇒ 请求静默、只经 handleApiError 提示一次（spec procedure-chain-hardening R12.3）', async () => {
+  const { d } = setup()
+  d.openDelegate({ ...ROW, assignee_staff_id: 's1' })
+  const err = { response: { status: 422, data: { code: 422, message: '所选人员「甲」没有关联登录账号，不能被委派或设为复核人；请在人员管理中为其关联账号，或改选他人' } } }
+  mocks.preview.mockRejectedValueOnce(err)
+  await d.runDelegatePreview()
+  expect(mocks.preview.mock.calls[0][2]).toEqual({ silent: true })
+  expect(mocks.handleApiError).toHaveBeenCalledTimes(1)
+  expect(mocks.handleApiError).toHaveBeenCalledWith(err, '委派预览')
+  expect(mocks.msg.error).not.toHaveBeenCalled()
+  expect(d.delegateDialog.value.previewId).toBe('')
 })

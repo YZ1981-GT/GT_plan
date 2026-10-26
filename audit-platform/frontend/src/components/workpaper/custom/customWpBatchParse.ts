@@ -261,3 +261,35 @@ export function submitBlockedReason(rows: PreviewRow[]): string {
   if (!rows.some((r) => r.status === 'ok')) return '清单中没有可创建的新编号（全部已存在或重复）'
   return ''
 }
+
+/** 批量创建接口回执（后端 create-custom-batch） */
+export interface BatchCreateResponse {
+  created?: number
+  skipped?: number
+  failed?: number
+  failed_items?: Array<{ wp_code: string; reason: string }>
+  header_failures?: Array<{ wp_code: string; reason: string }>
+}
+
+export interface BatchCreateSummary {
+  counts: { created: number; skipped: number; failed: number }
+  /** 明细表：失败的 + 已创建但表头没填上的（spec procedure-chain-hardening-and-java-contracts R11.5） */
+  items: Array<{ wp_code: string; reason: string }>
+  level: 'success' | 'warning'
+  message: string
+}
+
+/** 批量创建回执 → 计数、明细与一句提示（原先不看表头结果，表头没填上也报成功）。 */
+export function summarizeBatchCreate(res: BatchCreateResponse | null | undefined): BatchCreateSummary {
+  const counts = { created: res?.created ?? 0, skipped: res?.skipped ?? 0, failed: res?.failed ?? 0 }
+  const headerIssues = (Array.isArray(res?.header_failures) ? res!.header_failures! : [])
+    .map((h) => ({ wp_code: h.wp_code, reason: `已创建，表头未填上：${h.reason}` }))
+  const items = [...(Array.isArray(res?.failed_items) ? res!.failed_items! : []), ...headerIssues]
+  if (counts.failed > 0 || headerIssues.length > 0) {
+    const parts = [`已创建 ${counts.created} 个`]
+    if (counts.failed > 0) parts.push(`${counts.failed} 个失败`)
+    if (headerIssues.length > 0) parts.push(`${headerIssues.length} 个表头未填上`)
+    return { counts, items, level: 'warning', message: `${parts.join('，')}（见下方明细）` }
+  }
+  return { counts, items, level: 'success', message: `已创建 ${counts.created} 个，跳过 ${counts.skipped} 个` }
+}

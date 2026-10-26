@@ -37,11 +37,25 @@
 
 ## 3. 批 3：生成与人员
 
-- [ ] 3.1 R11 统一回执模块；链路编排逐码保存点 + plan_generation；IPO / B60 / D4；自定义单张表头；模板集未填表头计数
-- [ ] 3.2 R12 删除人员 admin + 409 / 确认撤权 + 前端二次确认；委派 422 文案
-- [ ] 3.3 R13 prepare_row_tasks 窄化与就绪标记；公开 load_wp_indexes
-- [ ] 3.4 R14 存量文件 dry-run 报告工具（只跑 dry-run，报告给用户）
-- [ ] 3.5 批 3 测试 + 变异、回归、浏览器实测、提交推送
+- [x] 3.1 R11 统一回执模块；链路编排逐码保存点 + plan_generation；IPO / B60 / D4；自定义单张表头；模板集未填表头计数
+  - `wp_generation_receipt.GenerationReceipt`（七类 + 同一措辞）+ `wp_generate_file.create_template_workpaper`（链路 / IPO / B60 共用：单码保存点、落文件失败回滚该码删文件进 failures、不计新建）；链路：自定义程序与科目匹配码一起经 `plan_generation`、读失败只回滚这次读、子底稿只给在库主底稿建且同样判定；模板集 `header_unfilled`；按编码 / 准则转换 / 自定义单张与批量进回执；前端 `workpaperGenerateResult` + 链路步回执提示 + B60 保存提示 + 批量弹窗明细
+  - 测试：`test_generation_receipt.py`（7）+ `test_generation_entries_retention.py` 新增 5 例；变异后端 B1~B21、前端 F1~F10 全红
+- [x] 3.2 R12 删除人员 admin + 409 / 确认撤权 + 前端二次确认；委派 422 文案
+  - `staff_removal_service.remove_staff`（409 列项目；确认后同事务软删分配、账号在该项目再无别的分配才撤成员行、逐项目递增策略版本）；`require_staff_active_user` 三种原因（档案已删 / 没关联账号 / 账号停用或删除，账号停用原先能委派）；前端 `useStaffDelete`（`_silent` + 确认 + 重试）、删除入口只对 admin 显示
+  - 测试：`test_staff_removal_and_delegate_account.py`（5）+ `test_program_chain_hardening_batch3_pg.py`（真库策略版本 + 失效通知）+ `useStaffDelete.spec.ts`；变异 C1~C7、C12、G1~G4 全红
+- [x] 3.3 R13 prepare_row_tasks 窄化与就绪标记；公开 load_wp_indexes
+  - 只接 `SQLAlchemyError / HTTPException / ValueError / LookupError`，失败 `ready=False` 且计数清零；预览回执 `preparation_ready`；`load_wp_indexes` 公开（保留私有别名）；前端预览未就绪提示
+  - 测试：`test_delegation_prepare_readiness.py`（10）+ PG 2 例（真库保存点回滚后计数为 0 / 程序错误抛出）；变异 C8~C11、C10b、C13、G5 全红
+- [x] 3.4 R14 存量文件 dry-run 报告工具（只跑 dry-run，报告给用户）
+  - `workpaper_file_backlog`（分类 / 汇总 / 处理）+ `scripts/fix/report_workpaper_file_backlog.py`（默认只读；`--apply` 须 `--confirm` 且一次一个项目）；测试 4 例，变异 D1~D7 全红
+  - 真库 dry-run（主树代码）：在用底稿 3451 = 自己的文件 1056 / 没有路径 2075 / 旧占位 171 / 指向模板 81 / 文件缺失 68 / 越界 0；可处理 2327（5 份只需回写路径）；`--apply` 未执行，待用户放行
+  - 🔴 事故（已恢复）：变异 D6 去掉 `--confirm` 校验时，用例的子进程按默认配置连上真库跑了 `--apply`，3364 份底稿 `file_path` 被改成 worktree 存储路径；按脚本自己写的备份逐行条件恢复（3364 / 0 残留 / 0 不符），落到 worktree 的 3364 个文件已删，备份与恢复快照留档；用例改为子进程指向临时空库（design §10.3）
+- [x] 3.5 批 3 测试 + 变异、回归、浏览器实测、提交推送
+  - 基线前移：远端在本批期间多了 2 个提交（97b3534c2，139 个文件），与本批 44 个文件零重叠，worktree 带着改动前移后全部重跑
+  - 回归（97b3534c2 干净检出对照）：后端链路 105 文件 12 红 = 基线 101 文件 12 红逐条相同（2414 / 2384 passed）；PG 32 文件 1 红 + 3 错误 = 基线 31 文件逐条相同（378 / 375 passed）；守卫 18 文件 9 红 = 基线逐条相同；前端 142 文件 24 红 = 基线 139 文件 24 红逐条相同；单区域 vue-tsc 本批 17 个前端文件 0 条（补修 `useStaffDelete.spec` 两处类型）
+  - 浏览器（chrome-devtools 独立上下文，admin）：【测试】公式同步甲 E1 第 23 行委派给没关联账号的【测试】人员 ⇒ 只弹一次「委派预览：所选人员「【测试】删除确认人员」没有关联登录账号…」；人员档案删除该人员 ⇒ 确认 → 409 二次确认写明项目与撤销范围 → 「撤销分配并删除」⇒「已删除」，项目团队分配为空，库里档案与分配均已软删；实测补修 2 处见 design §10.5（变异 S1~S3、H1 / H2 全红）
+  - 未在浏览器测：模板集 / 按编码生成的回执提示 —— 测试项目只有 1 份底稿，模板集 1025 个编码会真实建约千份底稿，平台没有底稿删除端点；由 `test_generation_receipt` / `test_generation_entries_retention` / PG 用例与前端回执用例覆盖
+  - 对账：PG 回归前后真库没有新增测试工厂数据（`proj_` / `staff_` 最晚仍是 10-25）
 
 ## 4. 批 4：请求收敛与工程化
 

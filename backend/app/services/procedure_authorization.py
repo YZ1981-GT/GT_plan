@@ -171,17 +171,32 @@ async def list_project_delegator_user_ids(
     return {u for u in rows if u is not None}
 
 
-async def require_staff_active_user(db: AsyncSession, staff_id: UUID) -> UUID:
-    """委派/设为 reviewer 前置：staff 必须 active 且有 user_id，否则 422。
+#: 委派 / 设复核人时所选人员不能用的三种原因（422 文案写明原因与处理办法，spec procedure-chain-hardening-and-java-contracts
+#: R12.3；原先一律「人员无有效账号绑定（缺 active user_id）」，分不清档案已删、没关联账号、账号已停用）
+STAFF_NOT_FOUND_MESSAGE = "所选人员的档案不存在或已删除，请刷新后重新选择"
+STAFF_NO_ACCOUNT_MESSAGE = "所选人员「{name}」没有关联登录账号，不能被委派或设为复核人；请在人员管理中为其关联账号，或改选他人"
+STAFF_ACCOUNT_DISABLED_MESSAGE = (
+    "所选人员「{name}」关联的登录账号已停用或已删除，不能被委派或设为复核人；请在用户管理中启用该账号，或改选他人"
+)
 
-    需求 5.2：无 user_id 的 StaffMember 禁止被委派或设为 reviewer。
+
+async def require_staff_active_user(db: AsyncSession, staff_id: UUID) -> UUID:
+    """委派/设为 reviewer 前置：人员档案未删除、关联了登录账号且账号可用（启用、未删除），否则 422。
+
+    需求 5.2：无 user_id 的 StaffMember 禁止被委派或设为 reviewer。账号停用 / 删除的同样不能（委派过去对方登录不了）。
     """
-    user_id = await normalize_staff_to_user(db, staff_id)
+    row = (await db.execute(
+        sa.select(StaffMember.name, StaffMember.user_id, User.is_active, User.is_deleted)
+        .join(User, User.id == StaffMember.user_id, isouter=True)
+        .where(StaffMember.id == staff_id, StaffMember.is_deleted == False)  # noqa: E712
+    )).first()
+    if row is None:
+        raise HTTPException(status_code=422, detail=STAFF_NOT_FOUND_MESSAGE)
+    name, user_id, is_active, is_deleted = row
     if user_id is None:
-        raise HTTPException(
-            status_code=422,
-            detail="人员无有效账号绑定（缺 active user_id），不能被委派或设为复核人",
-        )
+        raise HTTPException(status_code=422, detail=STAFF_NO_ACCOUNT_MESSAGE.format(name=name))
+    if not is_active or is_deleted:
+        raise HTTPException(status_code=422, detail=STAFF_ACCOUNT_DISABLED_MESSAGE.format(name=name))
     return user_id
 
 

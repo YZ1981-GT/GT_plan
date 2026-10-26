@@ -65,4 +65,22 @@ describe('summarizeWorkpaperGenerateResult', () => {
       message: '底稿生成完成，共创建 3 份底稿',
     })
   })
+
+  it('统一回执（spec procedure-chain-hardening-and-java-contracts R11）：已有底稿与请求内未填表头只作说明，失败带原因', () => {
+    const info = summarizeWorkpaperGenerateResult({
+      created: 2,
+      existing_codes: ['E1', 'H1'],
+      header_unfilled: 2,
+    })
+    expect(info.level).toBe('success')
+    expect(info.message).toContain('2 个编码已有底稿，未重复生成：E1、H1')
+    expect(info.message).toContain('2 份底稿生成时未写入表头（编制单位、审计期间等），需在底稿文件中另行填写')
+    const failed = summarizeWorkpaperGenerateResult({
+      created: 1,
+      failures: [{ wp_code: 'A1', error: '模板文件被占用' }, { wp_code: 'B60A' }],
+    })
+    expect(failed.level).toBe('warning')
+    expect(failed.message).toContain('2 个编码生成失败：A1（模板文件被占用）、B60A')
+    expect(summarizeWorkpaperGenerateResult({ created: 1, header_unfilled: 0 }).message).not.toContain('表头')
+  })
 })

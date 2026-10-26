@@ -4,6 +4,7 @@
 import { computed, ref, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { summarizeWorkpaperGenerateResult, type WorkpaperGenerateResult } from '@/utils/workpaperGenerateResult'
 
 export type B60FlagKey =
   | 'integrated_audit'
@@ -58,6 +59,8 @@ export interface B60AttachmentFlagsState {
   materiality_reference: string | null
   plan_version: number | null
   generated_wp_codes?: string[]
+  /** 自动补缺附件的统一回执（后端 wp_generation_receipt）；没生成为 null */
+  generation_receipt?: WorkpaperGenerateResult | null
   simplification?: B60Simplification | null
   scot_rows?: B60ScotRow[]
   b60d_archive?: {
@@ -148,9 +151,11 @@ export function useB60AttachmentMatrix(projectId: Ref<string | undefined> | (() 
       })) as B60AttachmentFlagsState
       applyState(res)
       await loadQc()
-      const gen = res.generated_wp_codes || []
-      if (gen.length) {
-        ElMessage.success(`矩阵已保存，已自动生成：${gen.join(', ')}`)
+      // 自动补缺附件的统一回执（失败 / 已裁 / 在回收站 / 空白册 …；原先只报生成了哪些，失败也算生成）
+      const receipt = res.generation_receipt
+      const notice = receipt ? summarizeWorkpaperGenerateResult(receipt) : null
+      if (notice && (notice.level === 'warning' || (receipt?.created ?? 0) > 0)) {
+        ElMessage[notice.level](`适用性矩阵已保存；${notice.message}`)
       } else {
         ElMessage.success('适用性矩阵已保存')
       }

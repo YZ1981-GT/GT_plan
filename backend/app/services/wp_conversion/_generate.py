@@ -49,6 +49,8 @@ class WpConversionGenerateMixin:
         target_only_codes: list[str],
         new_standard: dict,
         changed_by: UUID | None = None,
+        *,
+        receipt=None,
     ) -> int:
         """目标准则独有底稿创建逻辑（复用 generate_from_codes 子逻辑）。
 
@@ -79,19 +81,24 @@ class WpConversionGenerateMixin:
             changed_by: 触发切换的用户（作为新建 WorkingPaper.created_by，可选）
 
         Returns:
-            实际新建的底稿数；``target_only_codes`` 为空时返回 0。
+            实际新建的底稿数；``target_only_codes`` 为空时返回 0。``receipt``（``GenerationReceipt``）传入时
+            逐码记新建 / 空白册 / 表头没填上 / 失败（spec procedure-chain-hardening-and-java-contracts R11：
+            原先失败只记日志，切换回执看不出哪些目标独有底稿没建出来）。
         """
         if not target_only_codes:
             return 0
 
         # 模板库目录加载一次（降级为空 dict，不阻塞创建——仍会兜底建空模板）
         template_lib = self._load_template_library()
-        from app.services.wp_generate_file import load_generation_scenario
+        from app.services.wp_generate_file import discard_generated_file, load_generation_scenario
+        from app.services.wp_generation_receipt import GenerationReceipt
 
         scenario = await load_generation_scenario(self.db, project_id)
+        receipt = receipt if receipt is not None else GenerationReceipt()
 
         created = 0
         for wp_code in target_only_codes:
+            made = None
             try:
                 # 单条 savepoint：失败时该底稿的 WpIndex / WorkingPaper 一并回滚，不留无文件的底稿行
                 async with self.db.begin_nested():
@@ -103,14 +110,19 @@ class WpConversionGenerateMixin:
                         changed_by,
                         scenario=scenario,
                     )
+            except Exception as exc:  # 单条失败隔离，不破坏整批切换；如实进回执
                 if made:
-                    created += 1
-            except Exception as exc:  # 单条失败隔离，不破坏整批切换
+                    discard_generated_file(made[0])  # 保存点提交失败：行已回滚，删掉孤儿文件
+                receipt.add_failure(wp_code, exc)
                 logger.warning(
                     "_create_target_only_workpapers: 创建底稿 %s 失败，跳过: %s",
                     wp_code,
                     exc,
                 )
+                continue
+            if made:
+                created += 1
+                receipt.add_created(wp_code, made[0], header_issue=made[1])
 
         logger.info(
             "_create_target_only_workpapers: project=%s created=%d/%d",
@@ -166,7 +178,7 @@ class WpConversionGenerateMixin:
         changed_by: UUID | None,
         *,
         scenario: tuple[str, bool] = ("normal", False),
-    ) -> bool:
+    ) -> tuple | None:
         """为单个 wp_code 创建底稿（建 WpIndex + WorkingPaper + 模板文件 + parsed_data）。
 
         复用 ``wp_template.generate_from_codes`` 的单底稿创建子逻辑（design.md D1）：
@@ -185,7 +197,8 @@ class WpConversionGenerateMixin:
         7. **填充 ``parsed_data``** 使其非空（见 wp-generation-pipeline 发现）。
 
         Returns:
-            True 表示实际新建了一份底稿；False 表示同码已有（含在回收站）而跳过。
+            ``(落的文件 GeneratedWorkpaperFile, 表头没填上的原因或 None)`` 表示实际新建了一份底稿；``None`` 表示
+            同码已有（含在回收站）而跳过。落文件之后任一步抛错 ⇒ 先删掉已落的文件再抛出（行由调用方保存点回滚）。
         """
         # 1+2. 同码已有任何一行（含软删 = 在回收站）即跳过：唯一索引不含 is_deleted，不复活、不覆盖
         existing_id = (await self.db.execute(
@@ -195,7 +208,7 @@ class WpConversionGenerateMixin:
             ).limit(1)
         )).scalar_one_or_none()
         if existing_id is not None:
-            return False
+            return None
 
         from app.services.wp_name_source import resolve_wp_name
         wp_name = resolve_wp_name(wp_code, lib_entry.get("name"), lib_entry.get("wp_name"))
@@ -225,48 +238,52 @@ class WpConversionGenerateMixin:
         await self.db.flush()  # 取 wp.id，供文件/表头/绑定/parsed_data 使用
 
         # 5. 模板文件（与链路编排 / 按编码生成同一解析）
-        from app.services.wp_generate_file import materialize_workpaper_file
+        from app.services.wp_generate_file import discard_generated_file, materialize_workpaper_file
 
         generated = materialize_workpaper_file(
             project_id, wp.id, wp_code, wp_name,
             scenario=scenario[0], has_foreign_currency=scenario[1],
         )
-        wp.file_path = str(generated.path)
-        dest_file = generated.path
-
-        # 6a. 尽力绑定 active dataset（非致命）
-        bind_year = await self._derive_year(new_standard, project_id)
         try:
-            from app.services.dataset_query import bind_to_active_dataset
+            wp.file_path = str(generated.path)
+            dest_file = generated.path
 
-            await bind_to_active_dataset(self.db, wp, project_id, bind_year)
-        except Exception as exc:
-            logger.warning(
-                "_generate_one_workpaper: dataset 绑定失败 wp=%s: %s", wp_code, exc
+            # 6a. 尽力绑定 active dataset（非致命）
+            bind_year = await self._derive_year(new_standard, project_id)
+            try:
+                from app.services.dataset_query import bind_to_active_dataset
+
+                await bind_to_active_dataset(self.db, wp, project_id, bind_year)
+            except Exception as exc:
+                logger.warning(
+                    "_generate_one_workpaper: dataset 绑定失败 wp=%s: %s", wp_code, exc
+                )
+
+            # 6b. 尽力填充底稿表头（非致命；只动 xlsx，见 fill_generated_workpaper_header）；没填上的原因进回执
+            from app.services.wp_header_service import fill_generated_workpaper_header
+
+            header_issue = await fill_generated_workpaper_header(
+                self.db,
+                project_id=project_id,
+                wp_id=wp.id,
+                path=dest_file,
+                wp_code=wp_code,
+                wp_name=wp_name,
+                cycle=cycle,
+                from_template=generated.from_template,
             )
+            if header_issue:
+                logger.warning("_generate_one_workpaper: 表头未填上 wp=%s: %s", wp_code, header_issue)
 
-        # 6b. 尽力填充底稿表头（非致命；只动 xlsx，见 fill_generated_workpaper_header）
-        from app.services.wp_header_service import fill_generated_workpaper_header
+            # 7. 填充 parsed_data 使其非空
+            #    （wp-generation-pipeline 发现：generate_from_codes 从不设
+            #     parsed_data → HTML 渲染器"有记录无内容"；本任务验收要求 +parsed_data）
+            await self._populate_parsed_data(wp, wp_code, wp_name, cycle)
+        except BaseException:
+            discard_generated_file(generated)  # 行由调用方保存点回滚；原先留下孤儿文件
+            raise
 
-        header_issue = await fill_generated_workpaper_header(
-            self.db,
-            project_id=project_id,
-            wp_id=wp.id,
-            path=dest_file,
-            wp_code=wp_code,
-            wp_name=wp_name,
-            cycle=cycle,
-            from_template=generated.from_template,
-        )
-        if header_issue:
-            logger.warning("_generate_one_workpaper: 表头未填上 wp=%s: %s", wp_code, header_issue)
-
-        # 7. 填充 parsed_data 使其非空
-        #    （wp-generation-pipeline 发现：generate_from_codes 从不设
-        #     parsed_data → HTML 渲染器"有记录无内容"；本任务验收要求 +parsed_data）
-        await self._populate_parsed_data(wp, wp_code, wp_name, cycle)
-
-        return True
+        return generated, header_issue
 
     async def _derive_year(self, new_standard: dict, project_id) -> int:
         """派生用于 dataset 绑定/表头的审计年度；缺省走单一来源。"""

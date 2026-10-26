@@ -28,13 +28,9 @@ from app.deps import get_current_user, require_project_access, require_project_a
 from app.models.core import User
 from app.models.workpaper_models import WpIndex, WorkingPaper, WpStatus, WpSourceType
 from app.models.workpaper_schemas import TemplateResponse, TemplateSetResponse
-from app.services.procedure_scope_retention import (
-    TrimScopeUnavailable,
-    describe_skips,
-    load_trimmed_scope,
-    plan_generation,
-)
+from app.services.procedure_scope_retention import TrimScopeUnavailable, load_trimmed_scope, plan_generation
 from app.services.template_engine import TemplateEngine
+from app.services.wp_header_service import describe_header_failures
 import sqlalchemy as sa
 
 router = APIRouter(tags=["templates"])
@@ -283,7 +279,8 @@ async def generate_project_workpapers(
     跳过 wizard_state 的前置检查——因为用户已做出选择，不强制要求走向导步骤。
 
     已在程序裁剪中标为不执行的编码与底稿在回收站中的编码不生成，回执 ``skipped_trimmed_codes`` /
-    ``in_recycle_codes`` 列出；读不到裁剪结果返回 503、不生成。
+    ``in_recycle_codes`` 列出；读不到裁剪结果返回 503、不生成。表头不在请求内填（性能约束），回执
+    ``header_unfilled`` 写明份数（spec procedure-chain-hardening-and-java-contracts R11.6）。
     """
     from app.services.prerequisite_checker import PrerequisiteChecker
 
@@ -310,29 +307,8 @@ async def generate_project_workpapers(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     await db.commit()
-    workpapers, ignored_codes = outcome.workpapers, outcome.ignored_codes
-    receipt = {
-        "skipped_trimmed_codes": outcome.skipped_trimmed_codes,
-        "in_recycle_codes": outcome.in_recycle_codes,
-    }
-    message = f"已生成 {len(workpapers)} 个底稿"
-    if ignored_codes:
-        shown = "、".join(ignored_codes[:10]) + (" 等" if len(ignored_codes) > 10 else "")
-        message += f"；{len(ignored_codes)} 个选中的编码不在所选模板集里，未生成：{shown}"
-    blank_codes = list(outcome.blank_codes)
-    if blank_codes:
-        shown = "、".join(blank_codes[:10]) + (" 等" if len(blank_codes) > 10 else "")
-        message += f"；{len(blank_codes)} 个编码没有找到底稿模板，已建空白底稿：{shown}"
-    if describe_skips(receipt):
-        message += f"；{describe_skips(receipt)}"
-    return {
-        "message": message,
-        "created": len(workpapers),
-        "count": len(workpapers),
-        "ignored_codes": ignored_codes,
-        "blank_codes": blank_codes,
-        **receipt,
-    }
+    # 统一回执（wp_generation_receipt）：已存在 / 已裁 / 在回收站 / 空白册 / 请求内未填表头的份数
+    return {**outcome.receipt.to_payload(), "count": len(outcome.workpapers)}
 
 
 class GenerateFromCodesRequest(BaseModel):
@@ -406,15 +382,10 @@ async def generate_from_codes(
     except TrimScopeUnavailable as e:
         raise HTTPException(status_code=503, detail=e.http_detail())
 
-    scenario, has_foreign_currency = await load_generation_scenario(db, project_id)
-    created = 0
-    failures: list[dict] = []
-    created_codes: list[str] = []
-    skipped_codes: list[str] = list(plan.existing_codes)
-    skipped = len(skipped_codes)
-    blank_codes: list[str] = []
+    from app.services.wp_generation_receipt import GenerationReceipt
 
-    header_failures: list[dict] = []
+    scenario, has_foreign_currency = await load_generation_scenario(db, project_id)
+    receipt = GenerationReceipt.from_plan(plan)
     for code in plan.to_create:
         # [新增] savepoint 隔离单条处理
         generated = None
@@ -470,38 +441,15 @@ async def generate_from_codes(
                 # 填充 parsed_data（核心产物；为空时写最小非空占位）
                 ensure_parsed_data_placeholder(wp, wp_code=code, created_by="generate_from_codes")
 
-            created += 1
-            created_codes.append(code)
-            if not generated.from_template:
-                blank_codes.append(code)
-            if header_issue:
-                header_failures.append({"wp_code": code, "reason": header_issue})
+            receipt.add_created(code, generated, header_issue=header_issue)
         except Exception as e:
             discard_generated_file(generated)
-            failures.append({"wp_code": code, "error": str(e)})
+            receipt.add_failure(code, e)
             _logger.warning("generate failed for %s: %s", code, e)
 
     await db.commit()
-    message = f"已生成 {created} 个底稿，跳过 {skipped} 个，失败 {len(failures)} 个"
-    if blank_codes:
-        shown = "、".join(blank_codes[:10]) + (" 等" if len(blank_codes) > 10 else "")
-        message += f"；{len(blank_codes)} 个编码没有找到底稿模板，已建空白底稿：{shown}"
-    if header_failures:
-        from app.services.wp_header_service import describe_header_failures
-        message += f"；{describe_header_failures(header_failures)}"
-    if describe_skips(plan.receipt()):
-        message += f"；{describe_skips(plan.receipt())}"
-    return {
-        "created": created,
-        "skipped": skipped,
-        "created_codes": created_codes,
-        "skipped_codes": skipped_codes,
-        "blank_codes": blank_codes,
-        "failures": failures,
-        "header_failures": header_failures,
-        "message": message,
-        **plan.receipt(),
-    }
+    # 统一回执（wp_generation_receipt）；skipped / skipped_codes 是原有字段（= 已存在）
+    return {**receipt.to_payload(), "skipped": len(plan.existing_codes), "skipped_codes": list(plan.existing_codes)}
 
 
 class CreateCustomWorkpaperRequest(BaseModel):
@@ -641,26 +589,22 @@ async def _create_one_custom_workpaper(
             "dataset binding failed for custom wp %s: %s", wp_code, _bind_err
         )
 
-    # 自定义底稿强制写入标准表头（is_custom=True）
+    # 自定义底稿强制写入标准表头（is_custom=True）；没填上写进回执 header_issue（原先结果没人看，提示照报「已自动填充」）
+    header_issue: str | None = None
     try:
         from app.services.wp_header_service import fill_workpaper_header
 
-        await fill_workpaper_header(
-            db=db,
-            project_id=project_id,
-            wp_id=wp.id,
-            file_path=str(dest_file),
-            wp_code=wp_code,
-            wp_name=wp_name,
-            cycle=cycle,
-            is_custom=True,
+        header = await fill_workpaper_header(
+            db=db, project_id=project_id, wp_id=wp.id, file_path=str(dest_file),
+            wp_code=wp_code, wp_name=wp_name, cycle=cycle, is_custom=True,
         )
+        if (header or {}).get("status") != "ok":
+            header_issue = (header or {}).get("message") or "原因未知"
     except Exception as _e:
         import logging
 
-        logging.getLogger(__name__).warning(
-            "fill custom header failed for %s: %s", wp_code, _e
-        )
+        logging.getLogger(__name__).warning("fill custom header failed for %s: %s", wp_code, _e, exc_info=True)
+        header_issue = "填写表头时出错，详见服务日志"
 
     # 🔴 投影 parsed_data（必须在 fill_workpaper_header 之后、commit 之前）
     #
@@ -686,6 +630,7 @@ async def _create_one_custom_workpaper(
         "wp_code": wp_code,
         "wp_name": wp_name,
         "file_path": str(dest_file),
+        "header_issue": header_issue,
     }
 
 
@@ -721,9 +666,11 @@ async def create_custom_workpaper(
         raise HTTPException(status_code=409, detail=str(e))
 
     await db.commit()
+    issue = result["header_issue"]
     return {
         **result,
-        "message": "自定义底稿创建成功，表头已自动填充",
+        "header_failures": [{"wp_code": data.wp_code, "reason": issue}] if issue else [],
+        "message": f"自定义底稿已创建，表头未填上：{issue}" if issue else "自定义底稿创建成功，表头已自动填充",
     }
 
 
@@ -899,6 +846,8 @@ async def create_custom_workpaper_batch(
             results.append({"wp_code": code, "status": "failed", "reason": str(e)})
 
     await db.commit()
+    header_failures = [{"wp_code": c["wp_code"], "reason": c["header_issue"]} for c in created if c.get("header_issue")]
+    message = f"已创建 {len(created)} 个，跳过 {len(skipped)} 个，失败 {len(failed)} 个"
     return {
         "created": len(created),
         "skipped": len(skipped),
@@ -906,8 +855,7 @@ async def create_custom_workpaper_batch(
         "created_items": created,
         "skipped_items": skipped,
         "failed_items": failed,
+        "header_failures": header_failures,
         "results": results,
-        "message": (
-            f"已创建 {len(created)} 个，跳过 {len(skipped)} 个，失败 {len(failed)} 个"
-        ),
+        "message": message + (f"；{describe_header_failures(header_failures)}" if header_failures else ""),
     }

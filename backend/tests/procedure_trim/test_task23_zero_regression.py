@@ -73,9 +73,11 @@ SIB_REASON = _HERE.parent / "test_trim_reason_code_contract.py"
 # ─── 增量登记（additive，2026-10-25，spec procedure-chain-followup-closure R2.1）───
 #   preview.materialization           预览前置：导入程序行定义 / 物化缺的行任务 / 绑定已生成底稿的结果
 #   preview.hint                      没有可委派任务时说明原因（有任务时为 None）
+# ─── 增量登记（additive，2026-10-26，spec procedure-chain-hardening-and-java-contracts R13）───
+#   preview.preparation_ready         预览前置（导入定义 / 物化行任务 / 绑定底稿）是否成功；False 时目标数可能不全
 # 只增不减。HEAD 侧交叉佐证改为「HEAD 有的工作树必有 + 工作树多出的必在此登记」，提交前后都成立。
 ADDITIVE_KEYS = {
-    "preview": frozenset({"scope_gaps", "materialization", "hint"}),
+    "preview": frozenset({"scope_gaps", "materialization", "hint", "preparation_ready"}),
     "summary": frozenset({"trimmed_excluded"}),
     "apply": frozenset({"scope_expanded", "trimmed_excluded"}),
 }

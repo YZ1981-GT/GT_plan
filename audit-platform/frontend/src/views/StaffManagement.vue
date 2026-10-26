@@ -114,7 +114,7 @@
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="handover">交接</el-dropdown-item>
-                  <el-dropdown-item v-if="row.source === 'custom'" command="delete" divided>
+                  <el-dropdown-item v-if="row.source === 'custom' && isAdmin" command="delete" divided>
                     <span style="color: var(--el-color-danger)">删除</span>
                   </el-dropdown-item>
                 </el-dropdown-menu>
@@ -328,7 +328,8 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmDelete, confirmDangerous } from '@/utils/confirm'
 import { Search, Plus, ArrowDown, Check, Loading } from '@element-plus/icons-vue'
-import { listStaff, createStaff, updateStaff, getStaffResume, deleteStaff, type StaffMember } from '@/services/staffApi'
+import { listStaff, createStaff, updateStaff, getStaffResume, type StaffMember } from '@/services/staffApi'
+import { deleteStaffWithConfirm } from '@/composables/useStaffDelete'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
@@ -374,6 +375,9 @@ function onSelectionChange(rows: StaffMember[]) { selectedRows.value = rows }
 
 // #8 仪表盘联动入口
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+// 删除人员档案只有 admin 能做（后端 require_role(["admin"])，spec procedure-chain-hardening-and-java-contracts R12）
+const isAdmin = computed(() => (useAuthStore().user?.role || '') === 'admin')
 const route = useRoute()
 const routeProjectId = computed(() => (route.query.project_id as string) || '')
 
@@ -562,11 +566,10 @@ function onRowAction(cmd: string, row: StaffMember) {
 
 async function onDeleteStaff(row: StaffMember) {
   await confirmDelete(`「${row.name}」`)
-  try {
-    await deleteStaff(row.id)
-    ElMessage.success('已删除')
-    await loadStaff()
-  } catch (e: any) { handleApiError(e, '删除') }
+  // 仍在项目团队中 ⇒ 后端列出项目，二次确认后撤销分配与成员权限再删（useStaffDelete）
+  if (!(await deleteStaffWithConfirm(row))) return
+  ElMessage.success('已删除')
+  await loadStaff()
 }
 
 // P2-7 导入增强

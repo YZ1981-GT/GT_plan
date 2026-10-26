@@ -252,17 +252,10 @@ async def _ensure_ipo_loaded(
         wp_code_prefix: IPO 配置 key，必须在 ``_IPO_CONFIG`` 中
 
     Returns:
-        dict 含 ``added_codes`` / ``skipped_existing`` / ``errors`` 三个列表，
+        dict 含 ``added_codes`` / ``skipped_existing`` / ``errors`` / ``skipped_trimmed_codes`` /
+        ``in_recycle_codes`` / ``blank_codes`` 列表、``generation_receipt``（统一回执，见 wp_generation_receipt），
         以及 ``prefix`` 标识本次加载的循环。
     """
-    import sqlalchemy as sa
-    from app.models.workpaper_models import (
-        WorkingPaper,
-        WpIndex,
-        WpSourceType,
-        WpStatus,
-    )
-
     cfg = _IPO_CONFIG.get(wp_code_prefix.upper())
     if not cfg:
         return {
@@ -276,74 +269,36 @@ async def _ensure_ipo_loaded(
     audit_cycle: str = cfg["audit_cycle"]
     name_prefix: str = cfg["name_prefix"]
 
-    result: dict[str, list | str] = {
+    result: dict[str, Any] = {
         "prefix": wp_code_prefix,
         "added_codes": [],
         "skipped_existing": [],
         "errors": [],
         "skipped_trimmed_codes": [],
         "in_recycle_codes": [],
+        "blank_codes": [],
     }
 
     # year 参数当前未做按年度筛选（wp_index 不带 year 字段），保留供未来扩展
     _ = year
 
-    if codes:
-        # 保留范围：已裁（科目被裁则 IPO 子表跟随）/ 在回收站的不建；读不到裁剪结果即抛出、不加载
-        from app.services.procedure_scope_retention import plan_generation
+    if not codes:
+        return result
+    # 保留范围：已裁（科目被裁则 IPO 子表跟随）/ 在回收站的不建；读不到裁剪结果即抛出、不加载
+    from app.services.procedure_scope_retention import plan_generation
+    from app.services.wp_generate_file import create_template_workpaper
+    from app.services.wp_generation_receipt import GenerationReceipt
 
-        plan = await plan_generation(db, project_id, codes)
-        result.update(plan.receipt())
-        result["skipped_existing"] = list(plan.existing_codes)
-        codes = plan.to_create
-
-    for code in codes:
-        try:
-            # 单条保存点：失败只回滚这一条（原先整会话 rollback，连同已建的一起丢掉）
-            async with db.begin_nested():
-                wp_index = WpIndex(
-                    project_id=project_id,
-                    wp_code=code,
-                    wp_name=f"{name_prefix} {code}",
-                    audit_cycle=audit_cycle,
-                    status=WpStatus.not_started,
-                )
-                db.add(wp_index)
-                await db.flush()
-
-                # 创建 WorkingPaper（file_path 占位，复制模板成功后会被覆盖）
-                wp = WorkingPaper(
-                    wp_index_id=wp_index.id,
-                    project_id=project_id,
-                    source_type=WpSourceType.template,
-                    file_path=f"storage/projects/{project_id}/workpapers/{code}.xlsx",
-                    parsed_data={},
-                )
-                db.add(wp)
-                await db.flush()
-
-            # 强制 scenario='ipo' 让模板复制绕过 normal 过滤规则
-            try:
-                actual_path = init_workpaper_from_template(
-                    project_id=project_id,
-                    wp_id=wp.id,
-                    wp_code=code,
-                    scenario="ipo",
-                    has_foreign_currency=False,
-                )
-                if actual_path:
-                    wp.file_path = str(actual_path)
-            except Exception as ie:
-                # 模板复制失败不影响数据库记录（占位 file_path 已写入）
-                logger.warning(
-                    "_ensure_ipo_loaded[%s]: 模板复制失败 code=%s err=%s",
-                    wp_code_prefix, code, ie,
-                )
-
-            result["added_codes"].append(code)  # type: ignore[union-attr]
-        except Exception as e:
-            result["errors"].append({"code": code, "error": str(e)})  # type: ignore[union-attr]
-
+    plan = await plan_generation(db, project_id, codes)
+    receipt = GenerationReceipt.from_plan(plan)
+    # 单码保存点内建行 + 落文件（强制 scenario='ipo' 绕过 normal 的 IPO 文件过滤）；复制失败回滚该码、进 errors，
+    # 不再计入 added_codes（spec procedure-chain-hardening-and-java-contracts R11.4：原先复制在保存点外、失败照样算新增）
+    for code in plan.to_create:
+        await create_template_workpaper(db, receipt, project_id=project_id, wp_code=code,
+                                        wp_name=f"{name_prefix} {code}", audit_cycle=audit_cycle, scenario="ipo")
+    result.update(plan.receipt(), added_codes=receipt.created_codes, skipped_existing=list(plan.existing_codes),
+                  errors=[{"code": f["wp_code"], "error": f["error"]} for f in receipt.failures],
+                  blank_codes=receipt.blank_codes, generation_receipt=receipt.to_payload())
     return result
 
 
@@ -357,16 +312,13 @@ async def _ensure_d4_ipo_loaded(
     spec workpaper-d-sales-cycle 任务 2.2 / ADR D4。
 
     向后兼容包装：转发到通用 ``_ensure_ipo_loaded(prefix='D4')``。
-    保留独立函数名以避免破坏 D spec 既有调用点；
-    返回值剥离 ``prefix`` 字段以保持原 schema（仅 ``added_codes`` /
-    ``skipped_existing`` / ``errors`` 三键）。
+    保留独立函数名以避免破坏 D spec 既有调用点；返回值剥离 ``prefix`` 与 ``generation_receipt``，
+    透传已裁 / 在回收站 / 空白册（spec procedure-chain-hardening-and-java-contracts R11.4：原先只留三键，
+    被裁剪挡下的编码对调用方不可见）。
     """
     raw = await _ensure_ipo_loaded(db, project_id, year, wp_code_prefix="D4")
-    return {
-        "added_codes": raw.get("added_codes", []),
-        "skipped_existing": raw.get("skipped_existing", []),
-        "errors": raw.get("errors", []),
-    }
+    keys = ("added_codes", "skipped_existing", "errors", "skipped_trimmed_codes", "in_recycle_codes", "blank_codes")
+    return {k: raw.get(k, []) for k in keys}
 
 
 def _merge_sheets_dedup(

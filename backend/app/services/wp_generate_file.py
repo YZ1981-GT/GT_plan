@@ -102,6 +102,53 @@ def discard_generated_file(generated: GeneratedWorkpaperFile | None) -> None:
         logger.warning("生成底稿：清理孤儿文件失败 %s: %s", generated.path, exc)
 
 
+async def create_template_workpaper(
+    db: AsyncSession,
+    receipt,
+    *,
+    project_id: UUID,
+    wp_code: str,
+    wp_name: str,
+    audit_cycle: str | None,
+    scenario: str = "normal",
+    has_foreign_currency: bool = False,
+):
+    """建一份模板底稿（索引行 + 底稿行 + 文件）并记进回执（``GenerationReceipt``）；链路编排 / IPO / B60 共用。
+
+    单码保存点：建行或落文件失败只回滚这一码、删掉已落的文件、记入 ``receipt.failures``，不计入新建
+    （spec procedure-chain-hardening-and-java-contracts R11.3 / R11.4；原先复制模板在保存点外、失败照样计入新建，
+    链路编排单码失败还整会话 rollback）。找不到模板建空白册；请求内不填表头（计入 ``header_unfilled``）。
+    返回新建的 ``WorkingPaper``，失败返回 None。调用方先经 ``plan_generation`` 判定保留范围。
+    """
+    from app.models.workpaper_models import WorkingPaper, WpIndex, WpSourceType, WpStatus
+
+    generated: GeneratedWorkpaperFile | None = None
+    try:
+        async with db.begin_nested():
+            wp_index = WpIndex(project_id=project_id, wp_code=wp_code, wp_name=wp_name,
+                               audit_cycle=audit_cycle, status=WpStatus.not_started)
+            db.add(wp_index)
+            await db.flush()
+            wp = WorkingPaper(wp_index_id=wp_index.id, project_id=project_id,
+                              source_type=WpSourceType.template, file_path="", parsed_data={})
+            db.add(wp)
+            await db.flush()  # 取底稿 id：文件按 wp_storage/{项目}/{底稿 id} 存放
+            generated = materialize_workpaper_file(project_id, wp.id, wp_code, wp_name, scenario=scenario,
+                                                   has_foreign_currency=has_foreign_currency)
+            wp.file_path = str(generated.path)
+            await db.flush()
+    except Exception as exc:  # noqa: BLE001 — 单码失败不影响其余，如实进回执
+        discard_generated_file(generated)
+        receipt.add_failure(wp_code, exc)
+        logger.warning("生成底稿失败 wp_code=%s: %s", wp_code, exc, exc_info=True)
+        return None
+    except BaseException:
+        discard_generated_file(generated)
+        raise
+    receipt.add_created(wp_code, generated, header_filled=False)
+    return wp
+
+
 @dataclass(frozen=True)
 class WorkpaperFileJob:
     """批量落文件的一项：``library_file`` = 项目在模板库里选定的文件（没有则按模板目录索引找）。"""

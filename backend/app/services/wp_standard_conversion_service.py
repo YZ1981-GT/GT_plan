@@ -259,9 +259,13 @@ class WpStandardConversionService(WpConversionGenerateMixin):
             reason="准则切换后重新适用", actor_user_id=changed_by,
         ) if plan.in_recycle_codes else []
         in_recycle_codes = [c for c in plan.in_recycle_codes if c not in set(restored_codes)]
-        # 4b. 目标独有底稿创建（任务 3.4）
+        # 4b. 目标独有底稿创建（任务 3.4）；逐码结果进统一回执（失败 / 空白册 / 表头没填上）
+        from app.services.wp_generation_receipt import GenerationReceipt
+
+        receipt = GenerationReceipt.from_plan(plan)
+        receipt.in_recycle_codes = list(in_recycle_codes)
         created = await self._create_target_only_workpapers(
-            project_id, plan.to_create, new_standard, changed_by
+            project_id, plan.to_create, new_standard, changed_by, receipt=receipt
         )
 
         # 5. flush（本方法只 flush 不 commit，事务提交由调用方（router）统一管理。）
@@ -280,7 +284,8 @@ class WpStandardConversionService(WpConversionGenerateMixin):
         # 6. 汇总
         return {"retained": retained, "archived": archived, "created": created,
                 "restored": len(restored_codes), "restored_codes": restored_codes,
-                **plan.receipt(), "in_recycle_codes": in_recycle_codes}
+                **plan.receipt(), "in_recycle_codes": in_recycle_codes,
+                "failures": receipt.failures, "generation_receipt": receipt.to_payload()}
 
     # ------------------------------------------------------------------
     # 内部辅助（分类用，纯查询 / 纯函数）
