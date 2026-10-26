@@ -1,5 +1,6 @@
 # 实施计划：ACNR 地址坐标名称库底座缺陷收口（acnr-foundation-defect-closure）
 
+> **验证收尾（2026-10-26，HEAD 140121ee6）**：实际已交付并验证 6 个任务 —— T02、T03（P0）、T23、T25（D8）、T27、T28（D9）。本 spec 测试 55 后端 + 26 前端全绿；五守卫中 4 绿，`test_lazy_import_resolvability` 2 项预存红（缺失模块属并发 spec 未入库，b5fc200e0 已复现，非本 spec 引入，新增失败=0）。其余 27 个任务**未实施**（服务模块/测试文件均不存在），勾选状态如实为 `[ ]`。T32 架构现状节已入库但守卫未建。浏览器收尾（④）与多项目 SSE 浏览器段依赖未入库取数/显示管线，未执行。完整证据与问题→状态对照见 `.agents/tasks/acnr-foundation-defect-closure-2026-10-26.md`。
 > 以 design.md 为权威（修订轮 2）。每个任务可独立验收；标完成须有代码 + 测试证据与至少一条磁盘变异证明（备份到 `tmp_acnr_foundation/mutations/`、注入缺陷、确认对应守卫红且红在预期处、逐字节还原并核对 sha256）。环境做不到的标 `[ ]*` 并写「代码已改但未实测」。编号 T01~T40 按发布顺序（§18）排，分 P0 / P1 / P2 / 文档四批。问题编号映射见文末。
 > 铁律：根因修复不换参数绕开；生成产物禁手改、改生成器输入；被引用的 addr_id 不得静默消失；每条门禁配可打红的变异。约束：Windows PowerShell 用 `;` 不用 `&&`、用 `cwd` 不 `cd`；含中文 / 正则的脚本写成 `.py` 执行；行数用 Python `len(text.split("\n"))` 统计；后端 `python -m pytest -p no:playwright`，`hypothesis max_examples=5`，PG 专有 SQL 加方言判断；前端 vitest + 单区域 tsconfig（全量 vue-tsc 会 OOM）；前端改动用 chrome-devtools 浏览器实测、关键点击前校验 `location.pathname`、写入型验收只用【测试】项目并走平台路径清理对账。提交只含本 spec 文件（`git diff --cached --name-only` 核对），不碰 §0.3 的他人脏文件。
 
