@@ -2,8 +2,8 @@
   "_meta": {
     "note": "派生投影，非真源。真源 = backend/wp_templates/G/G7 长期股权投资.xlsx；本文件由 backend/scripts/diagnose/diagnose_g7_column_alignment.py --emit-facts 生成，并由 backend/tests/four_table/test_g7_column_source_facts.py 钉死「与实时 openpyxl 读取逐字相等」。禁止手改。",
     "generated_from": "backend/wp_templates/G/G7 长期股权投资.xlsx",
-    "generated_at": "2026-10-24T14:13:36+00:00",
-    "source_sha256": "6bf9e2ebcdf50a1c4a32f8733353dd1de994e7dc483232ad43680043577c3335",
+    "generated_at": "2026-10-26T03:34:29+00:00",
+    "source_sha256": "d01b74be57be759f46ec00986869bd061a2cafa8bf35dd1c44c4117dafa866a1",
     "sheet_names": [
       "附注披露信息（上市公司）",
       "附注披露信息（国企）"

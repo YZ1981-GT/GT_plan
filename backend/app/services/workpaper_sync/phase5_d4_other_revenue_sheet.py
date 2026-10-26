@@ -3,7 +3,7 @@
 
 spec: d-cycle-sheet-bidirectional-expansion · Task 3
 T01 mapping_digest =
-``b3186632300c84d14c4c9c3c947cbff0cdcaaf807ce2e5f9848d42195513637f``
+``fa1819f814e118eb74fdafd45a339c7c71726444c7e48a8f3bc658c1f9395022``
 
 ═══ BP-21 与 T01 last_data_row ═══
 
@@ -27,7 +27,7 @@ from typing import Any, Final, Mapping
 #: 与 phase5_d4_revenue_detail 共享的模板身份（同 workbook）。
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f"
+    "2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62"
 )
 
 MANAGED_SHEET_D43: Final[str] = "其他业务收入明细表D4-3"
@@ -55,7 +55,7 @@ ROW_IDENTITY_STORE_KEY_D43: Final[str] = "rowId"
 
 #: T01 冻结（evidence/T01-d43-column-field-mapping.json）。
 EXPECTED_MAPPING_DIGEST_D43: Final[str] = (
-    "b3186632300c84d14c4c9c3c947cbff0cdcaaf807ce2e5f9848d42195513637f"
+    "fa1819f814e118eb74fdafd45a339c7c71726444c7e48a8f3bc658c1f9395022"
 )
 
 #: 6 个契约字段：`(column_key, 列标, mode, value_type, store json 路径, 表头文本)`。

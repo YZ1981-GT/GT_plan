@@ -43,7 +43,7 @@ TB R75 / 差异 R76。两级表头 R5-R6。**13 列** A-M。
   L-M 空 / 附注
 
 🔴 G5-1 有**六个区**（两大段各三区）—— 全 G 表 section 数量最多。
-🔴 G5-1!B35 越界缺陷（=B9-B225，B225 超出 max_row）。
+G5-1!B35 原越界（=B9-B225，B225 超出 max_row），已修为 =B9-B22（spec oo-writeback-template-parity-closure R1）。
 🔴 `row_mode = fixed_rows`：数据行由模板固定。
 """
 from __future__ import annotations

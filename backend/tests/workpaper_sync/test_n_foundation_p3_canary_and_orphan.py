@@ -210,10 +210,14 @@ class TestOrphanDeletion:
 # ════════════════════════════════════════════════════════════════════════════
 
 class TestTemplateDefectT1:
-    """NF-P20（部分）：T-1 N4-2 E9 的 `=B9+C9+N4` 以记录型锁定。"""
+    """NF-P20（部分）：T-1 N4-2 E9 原为 `=B9+C9+N4`（记录型锁定），已修为 `=B9+C9+D9`。
 
-    def test_n4_2_e9_contains_n4_reference(self):
-        """T-1：N4-2 sheet 的 E9 单元格公式包含 'N4' 引用（真缺陷）。"""
+    `oo-writeback-template-parity-closure` R1 直接修了权威模板；判据翻面为「E9 与同列其余行同形，
+    不再引用本册 wp_code」，同时保留反向分母（同列其他行都用 D 列）。
+    """
+
+    def test_n4_2_e9_is_fixed_like_the_rest_of_the_column(self):
+        """T-1：N4-2 的 E9 = B9+C9+D9，不再含 'N4'；同列其他行同样引用 D 列。"""
         xlsx_path = None
         for f in TEMPLATE_DIR.glob("*.xlsx"):
             if "N4" in f.stem and not f.name.startswith("~$"):
@@ -244,13 +248,14 @@ class TestTemplateDefectT1:
 
         assert e9_val is not None, "E9 为空"
         assert isinstance(e9_val, str) and e9_val.startswith("="), f"E9 非公式: {e9_val}"
-        # 🔴 真缺陷：公式中 D9 被替换为 N4（wp_code 与 A1 引用同形）
-        assert "N4" in e9_val, f"E9 公式不含 N4 引用: {e9_val}"
+        # 修复前 D9 被写成 N4（wp_code 与 A1 引用同形，Excel 不报错、恒取空）
+        assert e9_val.replace(" ", "") == "=B9+C9+D9", f"E9 公式实得 {e9_val!r}"
+        assert "N4" not in e9_val
         assert correct_d_count >= 5, \
-            f"正确 D 列引用只有 {correct_d_count}（期望 >= 5，反向分母 9:1）"
+            f"正确 D 列引用只有 {correct_d_count}（期望 >= 5，反向分母）"
 
     def test_template_sha256_unchanged(self):
-        """删除 orphan 后模板 sha256 未变（T-1 是记录型，不改模板）。"""
+        """N 循环模板文件都可读、sha256 可算（T-1 已在模板里修正，冻结哈希由各 provider 守卫核对）。"""
         import hashlib
         for xlsx in sorted(TEMPLATE_DIR.glob("*.xlsx")):
             if xlsx.name.startswith("~$"):

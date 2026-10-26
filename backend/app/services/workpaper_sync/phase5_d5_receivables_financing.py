@@ -8,7 +8,8 @@ spec: workpaper-html-onlyoffice-bidirectional-writeback-closure · Phase 5 (G5-1
 受管 sheet = `应收款项融资明细表D5-2`（openpyxl 逐格实测）：两级表头（行 10 组标题 + 行 11 子
 标题），17 列 A-Q。组标题：期初数 C:G / 本期变动 H:I / 期末数 J:P（A/B/Q 为 10-11 纵向合并
 的单列）。数据区行 12-16，footer 行 17「合计」（**纯两字无空格，同 D3**，非 D7 三空格）。
-四个公式列逐行：F=C+E+D（期初审定）、J=C+H-I（期末余额）、L=J+K（期末未审）、O=J+N+M（期末审定）。
+四个公式列逐行：F=C+E+D（期初审定）、J=C+H-I（期末余额）、L=J+K（期末未审）、O=L+M+N（期末审定）。
+（O 列原为 =J+N+M、漏了被审计单位重分类 K；spec oo-writeback-template-parity-closure R1 已修模板。）
 
 🔴 与 D3/D6/D7 关键差异：**无账龄组**，每个 group 下的子列都是不同语义字段（非账龄 4 段），
 故本模块无 AGING_GROUPS，只用 SCALAR_FIELD_SPECS 的 group_cell（第 6 列）标注它属于哪个组。
@@ -84,7 +85,7 @@ WP_CODES: Final[frozenset[str]] = frozenset({"D5R"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D5 应收款项融资.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "92c5f7f2d2d54340c29bef6094b24a9360edcfa730fcfd406aeb071d4d138ac4"
+    "ff0342f180a03c1a5803f71beba800c1285a3871206ad9ab4a7f32c1b4ad69ea"
 )
 MANAGED_SHEET: Final[str] = "应收款项融资明细表D5-2"
 TEMPLATE_ID: Final[str] = "D52"
@@ -114,7 +115,7 @@ ROW_IDENTITY_STORE_KEY: Final[str] = "rowId"
 
 #: 17 个受管字段：`(column_key, 列标, mode, value_type, store json 键, 行 11 子标题, 组标题单元格|"")`。
 #: 🔴 顺序即 Excel 列序。store 键 = 前端 useD5Detail.DetailRow 的 camelCase 键。
-#: F/J/L/O 四列在模板里逐行有真公式（F=C+E+D / J=C+H-I / L=J+K / O=J+N+M）⇒ formula。
+#: F/J/L/O 四列在模板里逐行有真公式（F=C+E+D / J=C+H-I / L=J+K / O=L+M+N）⇒ formula。
 #: 第 6 列 = 组标题单元格（C-G 属期初数 C10 / H-I 属本期变动 H10 / J-P 属期末数 J10；A/B/Q 空）。
 #: 🔴 D5 无账龄组，group 下每个子列是不同语义字段（非 4 段账龄），故不展开账龄。
 #: 🔴 useD5Detail 的 postRealized(R)/eclStage(S) 是 store-only（模板无列），不列入。
@@ -269,10 +270,10 @@ _HTML_STORE_NOTE: Final[str] = (
 )
 
 _REVIEWED_BASIS: Final[str] = (
-    "openpyxl 逐 sheet 直读净化后权威模板 D/D5 应收款项融资.xlsx（外链净化后 sha256 92c5f7f2），"
+    "openpyxl 逐 sheet 直读净化后权威模板 D/D5 应收款项融资.xlsx（外链净化 + 公式修正后 sha256 ff0342f1），"
     "只取受管 sheet 应收款项融资明细表D5-2：两级表头 行 10（组标题 期初数 C:G / 本期变动 H:I / "
     "期末数 J:P）/ 行 11（子标题），17 列 A-Q，数据区 12-16，F/J/L/O 四列逐行公式 =C+E+D / "
-    "=C+H-I / =J+K / =J+N+M，A17「合计」footer（纯两字）；FVOCI 无账龄组；字段键与前端 "
+    "=C+H-I / =J+K / =L+M+N（O 列原为 =J+N+M，已修模板），A17「合计」footer（纯两字）；FVOCI 无账龄组；字段键与前端 "
     "useD5Detail.DetailRow 逐字段锁死（postRealized/eclStage store-only 不入）。wp_code=D5"
     "（载荷落点：D5-2-rows 全库 0 行同 H1/D3/D6 空表单，D5 wp 未删除有 file_path；非 D5R 幻影码）"
 )

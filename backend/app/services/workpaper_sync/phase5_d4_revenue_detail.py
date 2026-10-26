@@ -398,7 +398,7 @@ EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wire
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"
 #: Task 4 净化后权威模板哨兵（sanitize --apply 后实测）。
 TEMPLATE_SHA256: Final[str] = (
-    "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f"
+    "2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62"
 )
 #: D4-30/31/32 IPO 访谈/资金流水受管 sheet 接入（批次A-5，d4-ipo-fraud Task 8，2026-09-20）。
 #: 旧「几何未就绪」注释已作废（探针实证）：contract parse 通过 19 sheets、instrumentation_specs=19
@@ -1072,7 +1072,7 @@ _HTML_STORE_NOTE: Final[str] = (
 
 _REVIEWED_BASIS: Final[str] = (
     "openpyxl 直读净化后权威模板 D/D4 收入底稿.xlsx（Task 4 sha256 "
-    "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f），三受管 sheet："
+    "2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62），三受管 sheet："
     "（1）主营业务收入明细表D4-2：单级表头行 11，数据区 12-23，A24「合计」footer；18 契约字段 "
     "（A product + B-M months/0..11 + N formula periodTotal + O auditAdjustment + Q/R prior "
     "+ V remark）；P/S/T/U 仅 formula_mask。mapping_digest="

@@ -79,7 +79,7 @@ EXPECTED_PROFILE_ID: Final[str] = (
 )
 TEMPLATE_RELATIVE_PATH: Final[str] = "F/F1 预付账款.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "68b0e9e9d1ea33adbefc10fe8a445b3b6e78dc50d89e080adbf906bdea5dbc7f"
+    "16d5729db13e071590be8f1ef86c1d781014b0bb610a9e85329f76b3f4071449"
 )
 
 #: canary store item（F1-6 关联方，裁决 F1-H1）

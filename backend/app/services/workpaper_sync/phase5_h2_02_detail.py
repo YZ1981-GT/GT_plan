@@ -34,7 +34,7 @@ store 字段、要么明确无对端；H2 有两处两侧**语义打架**，硬�
 ═══ 分区（表头合并区逐字实测）═══
 
 * **A..I 属性列**（皆 `R9:R12` 纵向合并）：A 工程项目名称 · B 预算金额 · C 资金来源 ·
-  D 工程累计投入占预算比例%（**公式** `=IF(AH{r}=0,0,AH{r}/B{r})`）· E 预计完工时间 ·
+  D 工程累计投入占预算比例%（**公式** `=IF(B{r}=0,0,AG{r}/B{r})`，审定期末余额 / 预算）· E 预计完工时间 ·
   F 工程进度 · G 完工日期 · H 批准文号 · I 利息资本化率
 * **原值 `J9:AH9`** —— 每组都带「其中：」子列（这是 H2 独有的形态）
   - 未审数 `J10:R10`：期初 J-K · 增加 L-M · 减少 N-P · 期末 Q-R
@@ -348,7 +348,9 @@ FIELD_SPECS_H202: Final[
 #: 🔴 `Q` 用 `=J+L-N-O`（**含已判 template-only 的 L**）—— 缺口① 只表示 L 不参与
 #:    「HTML↔OO 值映射」，不表示它不在 Excel 公式里；回写不动 L，Q 的重算仍由 Excel 做。
 FORMULA_TEMPLATES_H202: Final[dict[str, str]] = {
-    "D": "=IF(AH{r}=0,0,AH{r}/B{r})",
+    # D / AV / AW 原取成右边一列 AH / R（「其中：累计资本化金额」），已修模板（spec
+    # oo-writeback-template-parity-closure R1）：比例 = 审定期末余额 AG / 预算 B，净值 = 余额 − 减值
+    "D": "=IF(B{r}=0,0,AG{r}/B{r})",
     "Q": "=J{r}+L{r}-N{r}-O{r}",
     "R": "=K{r}+M{r}-P{r}",
     "Z": "=J{r}+S{r}",
@@ -357,7 +359,7 @@ FORMULA_TEMPLATES_H202: Final[dict[str, str]] = {
     "AG": "=Z{r}+AB{r}-AD{r}-AE{r}",
     "AL": "=AI{r}+AJ{r}-AK{r}",
     "AS": "=AP{r}+AQ{r}-AR{r}",
-    "AW": "=AH{r}-AS{r}",
+    "AW": "=AG{r}-AS{r}",
 }
 
 SPEC_H202: Final[RowTableSheetSpec] = RowTableSheetSpec(

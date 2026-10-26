@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "3e05ff630b65790573e952715273f8edc7066db302693facc55b6af489cf1f50",
+  "instrumentation_definition_sha256": "fc76976e7994f56e0857bdec6370ecb6fe0e0221ca7efcf819307a5a51d3b865",
   "review": {
     "authority_root": "backend/wp_templates",
     "dynamic_columns": {
@@ -2544,9 +2544,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "f7b996619429669be75300d0621a8679383a4c516ddb85f585d8f95491704706",
+    "normalized_structure_hash": "551351da815e3447bd3d2ac68a34b29c11a56603e8d80a227bf704fb328ac549",
     "relative_path": "G/G7 长期股权投资.xlsx",
-    "template_sha256": "6bf9e2ebcdf50a1c4a32f8733353dd1de994e7dc483232ad43680043577c3335"
+    "template_sha256": "d01b74be57be759f46ec00986869bd061a2cafa8bf35dd1c44c4117dafa866a1"
   },
-  "template_definition_sha256": "e3e7e96ab9350819dd1a0e444a3c2129099ba0a943741360340c60878241ac03"
+  "template_definition_sha256": "3d51c96eba2004e9098eccb0f397e893877a187248306f177a3d45ce7c4dcfa7"
 }

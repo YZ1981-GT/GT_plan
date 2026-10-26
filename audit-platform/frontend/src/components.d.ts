@@ -211,7 +211,6 @@ declare module 'vue' {
     CycleProgramConsoleTab: typeof import('./components/workpaper/shared/CycleProgramConsoleTab.vue')['default']
     CycleProgressRing: typeof import('./components/dashboard/CycleProgressRing.vue')['default']
     CycleStandaloneProcedureShell: typeof import('./components/workpaper/shared/CycleStandaloneProcedureShell.vue')['default']
-    CycleTabAdjudication: typeof import('./components/workpaper/shared/CycleTabAdjudication.vue')['default']
     CycleTabProcedure: typeof import('./components/workpaper/shared/CycleTabProcedure.vue')['default']
     D1AuditNoteSection: typeof import('./components/workpaper/d1/D1AuditNoteSection.vue')['default']
     D1BusinessModeCard: typeof import('./components/workpaper/d1/D1BusinessModeCard.vue')['default']

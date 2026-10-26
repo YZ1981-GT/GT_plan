@@ -458,9 +458,11 @@ MUTATIONS: list[Mutation] = [
     Mutation(
         id="M18", side="be", path=SLICE, kind="replace",
         # 🔴 2026-09-28：D1 模板因「贴现息」列数字格式修复而改版，锚点随之更新
-        #    （sha256 e6e8dcf2… → efa8e23d…）。变异仍是「末位 f → 改一位」。
-        anchor='        "sha256": "efa8e23d3531294ed7d4f30cc207339634b83ce58335ebf885a402e7263571ef",',
-        new='        "sha256": "efa8e23d3531294ed7d4f30cc207339634b83ce58335ebf885a402e7263571e0",',
+        #    （sha256 e6e8dcf2… → efa8e23d…）。2026-10-26 D1-7 Q23 公式修正再改版
+        #    （efa8e23d… → 2e75538c…，spec oo-writeback-template-parity-closure R1）。
+        #    变异仍是「末位改一位」。
+        anchor='        "sha256": "2e75538c3c3e542cc577580a0452bff3b834febe196f98fe459abee2af02a4d5",',
+        new='        "sha256": "2e75538c3c3e542cc577580a0452bff3b834febe196f98fe459abee2af02a4d0",',
         want=f"{_P28}::test_authoritative_templates_digests_recompute",
         wants=(f"{_P28}::test_every_entry_template_ref_is_registered_with_digest",),
         why="模板 sha256 改一位仍绿 ⇒ 首轮的 `assert tpath.exists()` 只查存在不查内容，"

@@ -8,7 +8,7 @@ Requirements 1.1 / 2.3 / 1.2 · Property 5（双区几何与 fail-closed）
 
 受管 sheet = ``营业收入审定表D4-1``（openpyxl 直读权威模板，Task 1 冻结几何
 ``evidence/d41-geometry.json`` mapping_digest=
-``94e813e067d7160e3e1f51b83922025d7f0fd293cffe7ddd6ac490e7477b2bff``）：
+``b13fa643b9bd0127372d27632d3055edc53d376718144cac53a47fa08b3dd5e0``）：
 
 * 主营段（``adjudication_main_rows`` / section ``main-revenue``）：表头 R7，数据 R8-11，
   小计 R12，隐藏 UUID 列 **W**。
@@ -43,7 +43,7 @@ from typing import Any, Final, Iterator, Mapping, Sequence
 #: 与 phase5_d4_revenue_detail 共享的模板身份（同 workbook）。
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f"
+    "2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62"
 )
 
 MANAGED_SHEET_D41: Final[str] = "营业收入审定表D4-1"
@@ -96,7 +96,7 @@ TB_CHECK_KEYS_D41: Final[tuple[str, ...]] = ("D4-1-adj-tb-6001", "D4-1-adj-tb-60
 
 #: Task 1 冻结的 mapping_digest（evidence/d41-geometry.json）。
 EXPECTED_MAPPING_DIGEST_D41: Final[str] = (
-    "94e813e067d7160e3e1f51b83922025d7f0fd293cffe7ddd6ac490e7477b2bff"
+    "b13fa643b9bd0127372d27632d3055edc53d376718144cac53a47fa08b3dd5e0"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════

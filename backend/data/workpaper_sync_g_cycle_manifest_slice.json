@@ -2245,8 +2245,8 @@
       },
       {
         "name": "G4 债权投资.xlsx",
-        "size": 999788,
-        "sha256": "da3a3480d37a4b958245abbe6895ed17a1504937bd49d4596aa41fe05a7be0bf",
+        "size": 976968,
+        "sha256": "df73c58aa3ec6b7d0c85053c24e1bc045fce62cebe83655a4276e5b7d5a4e58a",
         "in_runtime_index": true,
         "belongs_to_entry": null,
         "belongs_to_entries": [
@@ -2254,16 +2254,16 @@
           "xlsx/gt-g4-bond-investment-sppi",
           "xlsx/gt-g4-bond-investment-ecl"
         ],
-        "normalized_structure_hash": "285ce84b188d7d68b7afb532e15ebd0820df8e4dc24963acac11595a7a0d871e",
+        "normalized_structure_hash": "b6e0c9f90092449dfa4b9abac7d2c4aabd700e1a29ea75810f60769aacc23c5b",
         "excluded_reason": "🔴 这本工作簿**跨 3 个 entry**：G 循环把一本册子按 sheet 段拆给多个宿主（xlsx/gt-g4-bond-investment-main, xlsx/gt-g4-bond-investment-sppi, xlsx/gt-g4-bond-investment-ecl）。belongs_to_entry 是单值字段，无法诚实表达 1:N ⇒ 记 null 并在 belongs_to_entries 列出真实归属，不硬塞给某一方。这与 F 循环 8 个 entry 一一对应 8 本册子的形态不同，也与 Task 48 的 `F2-29至F2-35` 只写 excluded_reason 不写归属列表的做法不同 —— F 那条无法定归属（逐 sheet 4:3 分属），本条可以定，故显式列出。"
       },
       {
         "name": "G5 长期应收款.xlsx",
-        "size": 398912,
-        "sha256": "c59bba69789eba3f25a8037a5ed32f7482f5eacd08007ef632d04ef2ca0f4b99",
+        "size": 399066,
+        "sha256": "4e7fcc3e976ddb1bf922847fc8574e0b1db92ac0aa0c13607d65bf06f796ed3c",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-g5-long-term-receivable",
-        "normalized_structure_hash": "def3659b39997d4eef7a9ffb3218a59cdda19ebd93d6cda9096fdea5471bd477"
+        "normalized_structure_hash": "4a181c3602dc701dd5bbae281ada8d96c44e85d2ea5f5d8263dbc7d142db6305"
       },
       {
         "name": "G6 其他债权投资.xlsx",
@@ -2281,19 +2281,19 @@
       },
       {
         "name": "G7 长期股权投资.xlsx",
-        "size": 263335,
-        "sha256": "6bf9e2ebcdf50a1c4a32f8733353dd1de994e7dc483232ad43680043577c3335",
+        "size": 263364,
+        "sha256": "d01b74be57be759f46ec00986869bd061a2cafa8bf35dd1c44c4117dafa866a1",
         "in_runtime_index": true,
         "belongs_to_entry": null,
         "excluded_reason": "G7 长期股权投资的 3 条 entry（equity-method / equity-subsidiary / long-term-equity-main）按任务正文排除在本 slice 之外（归已归档 spec g7-column-alignment-and-extraction-closure 与本 spec 的 G7 pilot 任务）—— 见 slice_scope.excluded_from_slice 第 1 条"
       },
       {
         "name": "G8 其他权益工具投资.xlsx",
-        "size": 450079,
-        "sha256": "5c8d3de7ee60ffef8677768c6c3966a313d4210ebc96b19a12c56721954b83b6",
+        "size": 438994,
+        "sha256": "3c291eac04625534a64c150ef19b38d533ed438ab0210d68aee5675c6257b60b",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-g8-other-equity-instruments",
-        "normalized_structure_hash": "dcd0916fb8ea496a271be22d51115dcb6bf7e94c063eb02ecdad909632f0b787"
+        "normalized_structure_hash": "d35c74717a41bf668798eb5249900af28567cbada5c25023c8728671301d75c3"
       },
       {
         "name": "G9 其他非流动金融资产.xlsx",

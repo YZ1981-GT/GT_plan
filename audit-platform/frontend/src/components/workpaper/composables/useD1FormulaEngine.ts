@@ -207,12 +207,13 @@ export function calcDiscountDays(maturityDate: string, discountDate: string): nu
 }
 
 /**
- * 应计贴现利息 = 票面金额 × 贴现率 × 贴息天数 / 360
+ * 应计贴现利息 = 票面金额 × 贴现率 × 贴息天数 / 365
  *
- * D1-9 贴息检查表核心公式 P×R×D/360，用于与账面贴现利息核对。
+ * D1-9 贴息检查表核心公式，与权威模板 J 列 =I/365*H*B 同口径（原为 /360，表单与 OnlyOffice
+ * 两侧算出的值不同；spec oo-writeback-template-parity-closure R2 按模板改）。
  */
 export function calcDiscountInterest(faceValue: number, discountRate: number, days: number): number {
-  return (faceValue * discountRate * days) / 360
+  return (faceValue * discountRate * days) / 365
 }
 
 /**

@@ -6,7 +6,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "1fb05845cd21ad0166129a3537ec21eea74e8fd9623253fb63af20dad1c3d184",
+  "instrumentation_definition_sha256": "1b29504bc5d5f2e2d2c6844cfbb276ec78f007c6324f20a1c9063d8d4dbd4ff4",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-k3-other-payables",
@@ -207,9 +207,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "8733688d45f5a7b74a11614e54e6815ccde603b1b0e08b2652d8770a9b267410",
+    "normalized_structure_hash": "1ee507adc02677cb23db8f94ea89971d3495783f33af7e95256499d6fd8e46f7",
     "relative_path": "K/K3 其他应付款.xlsx",
-    "template_sha256": "b2770bdc8a67aaca5a3e2eefd8934a189abd3e57ffd872597d22176540718d4e"
+    "template_sha256": "f4412b5655d46d8b59d8b2919fab0a12d2d6c9e3d254d99ffbc8e479155e25e3"
   },
-  "template_definition_sha256": "4134ccb3270fb5bad0e5c2230661bed2dab5737c201935f1d8e4a363a8ff1c0d"
+  "template_definition_sha256": "11d5195cd7e7f521c22300918428ec1686c4827c519ad28991b0176877a034f8"
 }

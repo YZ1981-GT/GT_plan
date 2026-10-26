@@ -79,7 +79,7 @@ EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wire
 TEMPLATE_RELATIVE_PATH: Final[str] = "H/H2 在建工程.xlsx"
 #: 2026-10-01 安全净化后实测（135,886 B）：Equation.3 OLE 已转静态预览。
 TEMPLATE_SHA256: Final[str] = (
-    "e6b1ce14cb90c2f2383ddd0cc39467b0896b260716e04527e988d56f70c3023d"
+    "789aa85c2bef4ba201aa1d11a2c014029658ac492619dbd5ea26a1774212e6f5"
 )
 
 STORE_ITEM_ID: Final[str] = _h202.STORE_ITEM_ID_H202

@@ -18,9 +18,10 @@ Property 24）—— D2-2 在线编辑改金额，期末余额 / 期末未审 / 
 * ``=E13+O13-P13``（在第 13 行）→ ``=E{r}+O{r}-P{r}``；OO 在上方插一行后它变成第 14 行的
   ``=E14+O14-P14``，签名不变 —— 原文比较会把每一次插行都判成「公式被改写」；
 * ``$`` 锁定照样换（插行时 OO 也会推动锁定的行）：``$E$13`` → ``$E${r}``；区间逐端点换；
-* 引用别的行（``$C$24`` 合计行）、带表名的引用（任何 ``Sheet!``）、结构化引用、名称、字符串
-  字面量**逐字保留** —— 它们的行号在插行后会变，签名随之不同，那一次保存若值也变了就仍按现状
-  报冲突（不比现在差）。
+* 给了受管表几何（``frame``，spec oo-writeback-template-parity-closure R6）时，引用他行也按几何
+  归一：首行 ``{start}``、末行 ``{end}``、表下方 ``{end+k}``（``$C$24`` 合计行 → ``$C${end+1}``）、
+  表内其他行 ``{r±k}``；表上方的行逐字保留。没给几何（静态格）时他行引用逐字保留；
+* 带表名的引用（任何 ``Sheet!``）、结构化引用、名称、字符串字面量**逐字保留**。
 
 分词只调用 :func:`excel_row_shift._rewrite_formula_refs` —— 全仓唯一的 A1 改写入口
 （Property 27），这里只读使用：它已处理字符串字面量、跨表前缀、``LOG10(`` 这类带数字的函数名
@@ -43,6 +44,7 @@ __all__ = [
     "classify_formula_evidence",
     "formula_families",
     "formula_signature",
+    "instantiate_signature",
     "protected_conflict_reason",
     "recompute_drift_reason",
     "signature_in_family",
@@ -53,25 +55,109 @@ __all__ = [
 #: 签名里「本行」的记号。
 SAME_ROW: Final[str] = "{r}"
 
-#: Excel 最大行号 1048576 + 1：任何真实引用都用不到它，用作「本行」的临时替身。
+#: Excel 最大行号 1048576 + 1 起：任何真实引用都用不到，用作行记号的临时替身（本行固定取第一个）。
 _SENTINEL_ROW: Final[int] = 1_048_577
 _SENTINEL_TEXT: Final[str] = str(_SENTINEL_ROW)
 
 
-def formula_signature(text: str, *, own_row: int) -> str:
+def formula_signature(text: str, *, own_row: int, frame: tuple[int, int] | None = None) -> str:
     """把公式文本归一成与所在行号无关的签名（见模块 docstring）。
 
-    原文里已经出现哨兵数字串时**不归一**、原样返回：此时无法区分哪一处是替身，宁可让签名
-    对行号敏感（只会多出冲突，不会少）。
+    `frame` = 本格所在受管表的 `(首行, 末行)`（spec oo-writeback-template-parity-closure R6）：
+    给了它，引用他行也按表几何归一 —— 首行 ``{start}``、末行 ``{end}``、表下方第 k 行
+    ``{end+k}``（合计行）、表内其他行 ``{r±k}``；表上方的行逐字保留。OO 在表内插行 / 删行后
+    这些引用的行号整体平移，签名不变；引用真被改到别的位置，签名仍不同。
+
+    原文里已经出现哨兵数字串（取前 5 位比较）时**不归一**、原样返回：此时无法区分哪一处是
+    替身，宁可让签名对行号敏感（只会多出冲突，不会少）。
     """
-    if not text or _SENTINEL_TEXT in text:
+    if not text or _SENTINEL_TEXT[:5] in text:
         return text
     from app.services.workpaper_sync.excel_row_shift import _rewrite_formula_refs
 
-    rewritten, _changed = _rewrite_formula_refs(
-        text, remap=lambda row: _SENTINEL_ROW if row == own_row else row
-    )
-    return rewritten.replace(_SENTINEL_TEXT, SAME_ROW)
+    tokens: dict[int, str] = {_SENTINEL_ROW: SAME_ROW}
+
+    def remap(row: int) -> int:
+        token = _row_token(row, own_row=own_row, frame=frame)
+        if token is None:
+            return row
+        for sentinel, known in tokens.items():
+            if known == token:
+                return sentinel
+        sentinel = _SENTINEL_ROW + len(tokens)
+        tokens[sentinel] = token
+        return sentinel
+
+    rewritten, _changed = _rewrite_formula_refs(text, remap=remap)
+    for sentinel in sorted(tokens, reverse=True):
+        rewritten = rewritten.replace(str(sentinel), tokens[sentinel])
+    return rewritten
+
+
+def _row_token(row: int, *, own_row: int, frame: tuple[int, int] | None) -> str | None:
+    """行号 → 签名记号；None = 逐字保留。"""
+    if row == own_row:
+        return SAME_ROW
+    if frame is None:
+        return None
+    first, last = frame
+    if row == first:
+        return "{start}"
+    if row == last:
+        return "{end}"
+    if row > last:
+        return "{end+%d}" % (row - last)
+    if row > first:
+        return "{r%+d}" % (row - own_row)
+    return None
+
+
+def instantiate_signature(
+    signature: str, *, row: int, frame: tuple[int, int] | None = None
+) -> str | None:
+    """签名 → 落在第 `row` 行的公式文本，R4 还原用。
+
+    记号按落点所在表的几何换回行号；有记号落不了地（缺 frame / 不认识的 ``{…}``，比如数组
+    常量）时返回 None —— 宁可不还原，也不写一个猜出来的公式。
+    """
+    text = signature
+    for token in sorted(set(_braced(text)), key=len, reverse=True):
+        value = _token_row(token, row=row, frame=frame)
+        if value is None:
+            return None
+        text = text.replace(token, str(value))
+    return text
+
+
+def _braced(text: str) -> list[str]:
+    """全部 ``{…}`` 片段（不用正则：本模块不做 A1 分词，Property 27）。"""
+    found: list[str] = []
+    start = text.find("{")
+    while start != -1:
+        stop = text.find("}", start)
+        if stop == -1:
+            break
+        found.append(text[start : stop + 1])
+        start = text.find("{", stop)
+    return found
+
+
+def _token_row(token: str, *, row: int, frame: tuple[int, int] | None) -> int | None:
+    body = token[1:-1]
+    if body == "r":
+        return row
+    if frame is None:
+        return None
+    first, last = frame
+    if body == "start":
+        return first
+    if body == "end":
+        return last
+    for prefix, anchor in (("end+", last), ("r+", row), ("r-", row)):
+        if body.startswith(prefix) and body[len(prefix):].isdigit():
+            offset = int(body[len(prefix):])
+            return anchor - offset if prefix == "r-" else anchor + offset
+    return None
 
 
 def union_formula_signatures(parts: Iterable[Any]) -> Mapping[str, str] | None:

@@ -2,7 +2,7 @@
 
 spec: `g5-nested-sections-and-template-defects` · Task 8
 
-三段 × 四子区 = 12 个受管区。三处模板合计漏加小计（R40/R72/R104）。
+三段 × 四子区 = 12 个受管区。三处模板段合计原漏加小计（R40/R72/R104），已修模板（spec oo-writeback-template-parity-closure R1）。
 payload dual_write（remark + conclusion 逐字相同）。
 """
 from __future__ import annotations
@@ -74,7 +74,7 @@ EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wire
 TEMPLATE_RELATIVE_PATH: Final[str] = "G/G5 长期应收款.xlsx"
 #: 逐字取 slice `authoritative_templates.files`（完整 64 位；88,636 B）
 TEMPLATE_SHA256: Final[str] = (
-    "c59bba69789eba3f25a8037a5ed32f7482f5eacd08007ef632d04ef2ca0f4b99"
+    "4e7fcc3e976ddb1bf922847fc8574e0b1db92ac0aa0c13607d65bf06f796ed3c"
 )
 
 #: 受管 store item（明细表G9-2 的三区共用）—— 按值取自 `useG9Detail.ts` 的 `ITEM_ID_ROWS`

@@ -75,7 +75,8 @@ def test_signatures_cover_every_binding_that_has_formulas(world: D4World) -> Non
     tables = {key.split("/", 1)[0] for key in signatures}
     assert {"revenue_detail_rows", "customer_current_rows", "customer_prior_rows"} <= tables, tables
     assert signatures[PERIOD_TOTAL_12] == "=SUM(B{r}:M{r})"
-    assert signatures["customer_current_rows/GTROW-D49C-0013/amount_ratio"] == "=IF(C{r}=0,0,C{r}/$C$24)"
+    # 合计行 $C$24 按受管表几何归一（spec oo-writeback-template-parity-closure R6）：插行后不变。
+    assert signatures["customer_current_rows/GTROW-D49C-0013/amount_ratio"] == "=IF(C{r}=0,0,C{r}/$C${end+2})"
 
 
 def test_signatures_are_not_part_of_the_digest_or_equality(world: D4World) -> None:

@@ -55,7 +55,7 @@ entry）上实测 **3 个**候选、`bidirectional` **0 个**：
 
 ═══ 二、权威模板只认 `backend/wp_templates/` ═══
 
-:data:`TEMPLATE_RELATIVE_PATH` 指向 ``G/G7 长期股权投资.xlsx``（263,335 字节），
+:data:`TEMPLATE_RELATIVE_PATH` 指向 ``G/G7 长期股权投资.xlsx``（263,364 字节），
 :data:`TEMPLATE_SHA256` 是它的字节哨兵。`基础数据/致同通用审计程序及底稿模板（2025年
 修订）/` 下的参考副本**一次都不读**（memory 铁律：运行时权威只认 `backend/wp_templates/`；
 参考副本已实测落后）。:func:`read_authoritative_template` 每次读都比对哨兵。
@@ -443,7 +443,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = "G/G7 长期股权投资.xlsx"
 
 #: 权威模板字节哨兵（Requirement 9.9：`backend/wp_templates/` 运行时只读）。
 TEMPLATE_SHA256: Final[str] = (
-    "6bf9e2ebcdf50a1c4a32f8733353dd1de994e7dc483232ad43680043577c3335"
+    "d01b74be57be759f46ec00986869bd061a2cafa8bf35dd1c44c4117dafa866a1"
 )
 
 #: 声明权威模板的**配置真源**（同一工作簿的两个子码各自独立声明同一份文件）。

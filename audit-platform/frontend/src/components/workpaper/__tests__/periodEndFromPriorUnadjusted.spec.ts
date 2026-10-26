@@ -2,9 +2,10 @@
  * D 循环明细表「期末余额族」以期初未审起算（spec oo-formula-recompute-not-tamper R4）。
  *
  * 权威模板 D1-2 / D1-3 / D2-2 / D3-2 / D5-2 / D6-2 / D7-2 的期末余额（或期末未审）列公式都从
- * 「期初未审」起算，不含期初账项调整 / 重分类调整；D5-2 的期末审定取期末余额列、不含被审计单位
- * 重分类。表单原先按「期初审定」（D5-2 审定按「期末未审」）算，有期初调整的行在表单与
- * OnlyOffice 之间来回变值：OO 按模板公式重算公式格，保存回来公式格的值与表单值对不上。
+ * 「期初未审」起算，不含期初账项调整 / 重分类调整。表单原先按「期初审定」算，有期初调整的行在
+ * 表单与 OnlyOffice 之间来回变值：OO 按模板公式重算公式格，保存回来公式格的值与表单值对不上。
+ * D5-2 的期末审定：模板 O 列原为 =J+N+M（漏了被审计单位重分类），已按会计口径修成 =L+M+N
+ * （spec oo-writeback-template-parity-closure R1，用户 2026-10-26 确认），表单同口径。
  * 先例：useF1Detail.recalcRowFormulas（F1-2 裁决 F1-H3「以模板为准」）。
  *
  * 每个写入点都用同一组「期初调整非 0」的数直接走生产代码，并先断言旧口径算出的值不同
@@ -184,7 +185,7 @@ describe('期末余额族以期初未审起算（与权威模板一致）', () =
     expect(row.endAudited).toBe(END_FROM_UNADJUSTED + RECLASS + END_AJE + END_RJE)
   })
 
-  it('D5-2：期末余额 J = C + H - I，期末审定 O = J + M + N（不含重分类 K）', () => {
+  it('D5-2：期末余额 J = C + H - I，期末审定 O = L + M + N（含重分类 K）', () => {
     const row = recalcD5({
       ...emptyD5(),
       priorUnadjusted: PRIOR_UNADJUSTED, priorAje: PRIOR_AJE, priorRje: PRIOR_RJE,
@@ -194,9 +195,10 @@ describe('期末余额族以期初未审起算（与权威模板一致）', () =
     expect(row.priorAudited).toBe(PRIOR_AUDITED)
     expect(row.endBalance).toBe(END_FROM_UNADJUSTED)
     expect(row.endUnadjusted).toBe(END_FROM_UNADJUSTED + RECLASS)
-    // 旧口径取期末未审 L：两者相差的正好是重分类 K
-    expect(row.endAudited).toBe(END_FROM_UNADJUSTED + END_AJE + END_RJE)
-    expect(row.endAudited).not.toBe(row.endUnadjusted + END_AJE + END_RJE)
+    // 模板 O 列已由 =J+N+M 修成 =L+M+N（spec oo-writeback-template-parity-closure R1）：
+    // 取期末未审 L，两种取法相差的正好是重分类 K
+    expect(row.endAudited).toBe(END_FROM_UNADJUSTED + RECLASS + END_AJE + END_RJE)
+    expect(row.endAudited).not.toBe(row.endBalance + END_AJE + END_RJE)
   })
 
   it('D6-2（借方科目）：期末未审 Q = G + O - P', () => {

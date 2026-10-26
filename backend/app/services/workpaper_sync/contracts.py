@@ -194,10 +194,17 @@ class FieldMode(str, Enum):
     cross_sheet = "cross_sheet"
 
 
+#: 值由模板公式算出的模式：本表公式 `formula` 与跨表公式 `cross_sheet`（G3-1 / G11-1 的 25 格
+#: 在模板里全是引用明细表的公式）。合并按公式字段判（有公式证据走 OO 重算规则），物化只写缓存值、
+#: 不覆盖公式。🔴 全仓「是不是公式字段」一律用本集合判，不单写 `mode is FieldMode.formula` ——
+#: 单写会让 cross_sheet 在物化时按字面量覆盖模板公式、在合并时当可编辑字段直接采纳 OO 值
+#: （spec oo-writeback-template-parity-closure R7）。
+FORMULA_MODES: Final[frozenset[FieldMode]] = frozenset({FieldMode.formula, FieldMode.cross_sheet})
+
 #: 受保护模式：默认只读，OO 侧修改 SHALL 产生受保护字段冲突（Requirement 6.6）。
-PROTECTED_MODES: Final[frozenset[FieldMode]] = frozenset(
-    {FieldMode.formula, FieldMode.auto_source, FieldMode.cross_sheet}
-)
+#: 唯一来源：`FieldSpec.is_protected`、`adapters.base.FieldValue.is_protected` 与
+#: `merge.ContractIndex._protection` 都读它（R7）。
+PROTECTED_MODES: Final[frozenset[FieldMode]] = FORMULA_MODES | frozenset({FieldMode.auto_source})
 
 #: 模板预置骨架行的身份形态（spec workpaper-sync-managed-row-convergence）。
 #:
@@ -1302,6 +1309,8 @@ def _parse_table(
     # 🔴 审定表（AdjudicationSheetSpec）用逐格 `cell_mask` 替代列向 `formula_mask`：
     #    审定表的公式不是整列向的（同列不同行有的是公式有的可编辑），所以用逐格声明。
     #    当 table 有 `cell_mask` 时，CS-13 的 formula_mask 列向检查由 cell_mask 等效满足。
+    #    只查本表 `formula`：跨表公式 `cross_sheet` 按 mode 受保护（FORMULA_MODES，R7），
+    #    不依赖本条（现有 G3-1 / G11-1 契约另有逐格 `cell_mask` 覆盖这些格）。
     cell_mask = raw.get("cell_mask") or []
     has_cell_mask = isinstance(cell_mask, list) and len(cell_mask) > 0
     for spec in fields:

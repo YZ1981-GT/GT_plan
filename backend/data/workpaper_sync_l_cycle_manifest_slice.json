@@ -460,7 +460,7 @@
    "template_ref": {
     "workbook": "L4 应付债券.xlsx",
     "root": "backend/wp_templates/L",
-    "sha256": "9df73e02d7af61f287732102cc6367011df09d2e52863c9c80432216ee1c562b",
+    "sha256": "548167816f0b27e9f7d50372ba5decd5f0b94e06710d9993035441f5cbba49fd",
     "sheet_count": 16,
     "in_runtime_index": true
    },
@@ -820,7 +820,7 @@
    "template_ref": {
     "workbook": "L7 其他非流动负债.xlsx",
     "root": "backend/wp_templates/L",
-    "sha256": "9fe09748148a6f0692eef85e0c0cf3e24f22ea7e5d011c029dfa3e71bb04daea",
+    "sha256": "35e47cf951e4ec008525d9f65008b3fc48852d59b1f25ac0089b5426394b9436",
     "sheet_count": 8,
     "in_runtime_index": true
    },
@@ -936,7 +936,7 @@
    "template_ref": {
     "workbook": "L8 财务费用.xlsx",
     "root": "backend/wp_templates/L",
-    "sha256": "d915e3091a426aadab3828bf4ba43502e9cb3a967392d177d2c22a139c6634e6",
+    "sha256": "f56843b02c3a34a443107d69207904b363187e887d2a359163fd2175381a368c",
     "sheet_count": 10,
     "in_runtime_index": true
    },
@@ -1106,8 +1106,8 @@
    },
    {
     "name": "L4 应付债券.xlsx",
-    "size": 122085,
-    "sha256": "9df73e02d7af61f287732102cc6367011df09d2e52863c9c80432216ee1c562b",
+    "size": 105645,
+    "sha256": "548167816f0b27e9f7d50372ba5decd5f0b94e06710d9993035441f5cbba49fd",
     "sheet_count": 16,
     "sheets": [
      "底稿目录",
@@ -1132,8 +1132,8 @@
    },
    {
     "name": "L5 长期应付款.xlsx",
-    "size": 93254,
-    "sha256": "c8506f391262bf10fa818df22b9ddfe53ddc2ebe4d280af48776e39f8c8ac497",
+    "size": 67514,
+    "sha256": "09380626107dc1b975662eaa60fa99ec541901c0729bb0d2b35bbb60807a9b68",
     "sheet_count": 12,
     "sheets": [
      "底稿目录",
@@ -1154,8 +1154,8 @@
    },
    {
     "name": "L6 专项应付款.xlsx",
-    "size": 55523,
-    "sha256": "cf05ed3b9fa0afd6a05b73de5c79b7ee14a85b6c6f4a04e57ae2f09170d7b5d4",
+    "size": 37735,
+    "sha256": "08630e1cbc962fabbbf580f591374157a2d6705966c2f3c8ecba4a0705f59f62",
     "sheet_count": 9,
     "sheets": [
      "底稿目录",
@@ -1173,8 +1173,8 @@
    },
    {
     "name": "L7 其他非流动负债.xlsx",
-    "size": 47108,
-    "sha256": "9fe09748148a6f0692eef85e0c0cf3e24f22ea7e5d011c029dfa3e71bb04daea",
+    "size": 40635,
+    "sha256": "35e47cf951e4ec008525d9f65008b3fc48852d59b1f25ac0089b5426394b9436",
     "sheet_count": 8,
     "sheets": [
      "底稿目录",
@@ -1191,8 +1191,8 @@
    },
    {
     "name": "L8 财务费用.xlsx",
-    "size": 76069,
-    "sha256": "d915e3091a426aadab3828bf4ba43502e9cb3a967392d177d2c22a139c6634e6",
+    "size": 65929,
+    "sha256": "f56843b02c3a34a443107d69207904b363187e887d2a359163fd2175381a368c",
     "sheet_count": 10,
     "sheets": [
      "底稿目录",

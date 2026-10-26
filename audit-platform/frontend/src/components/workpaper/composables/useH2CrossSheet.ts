@@ -367,9 +367,9 @@ export function useH2CrossSheet(allResponses: Ref<Map<string, any>>) {
       result['total_transfer'] += _getNum(row.transferAmount)
       result['project_count']++
 
-      // 完工率≥100%
+      // 累计投入占预算比例 ≥ 100%（H2-2 存比值，与模板 D 列一致）
       const rate = _getNum(row.completionRate)
-      if (rate >= 100) {
+      if (rate >= 1) {
         result['completed_count']++
       }
 

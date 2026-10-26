@@ -38,13 +38,30 @@ INDEX_PATH = TPL_DIR / "_index.json"
 CONTRACTS_DIR = _BACKEND / "data" / "workpaper_sync_contracts"
 OVERLAY_PATH = _BACKEND / "data" / "workpaper_sync_entry_overlay.json"
 
-# 四条 lane 的 TEMPLATE_SHA256（slice authoritative_templates 按值取）
-LANE_TEMPLATE_SHA256 = {
-    "xlsx/gt-f2-inventory-main": "9e57efd242b47171423e61f63a35be6ae5b46889baa14c246595ea95591fd0d8",
-    "xlsx/gt-f2-stocktake-bundle": "bdfdcf8a804aab1c11db1cc2cd2deaac4f5bbf94c6a60e43a04108f178079bc7",
-    "xlsx/gt-f2-inventory-valuation": "bab0abc099cfed3efdde3095bed510b3bbe7422ce32431054811034f6e6d5cd5",
-    "xlsx/gt-f2-inventory-special": "b9ea248198217827a7b3d142dccca9ab5769c17867d1454ffd9105eaa9cb6c21",
+# 四条 lane 的 TEMPLATE_SHA256 —— 直接取各 provider 的冻结值（单一真源）。
+# 🔴 原为测试里抄写的 4 个常量：后来 3 本模板经净化改了字节，provider 跟着改了，这里的副本与
+#    slice 都没跟 —— 两份过期的值互相「相等」，本判据一直绿。spec oo-writeback-template-parity-closure
+#    把 slice 刷新到磁盘真值后才暴露。改为读 provider，判据才真的在比「provider == slice」。
+_LANE_PROVIDER_MODULES = {
+    "xlsx/gt-f2-inventory-main": "phase5_f2_inventory_main",
+    "xlsx/gt-f2-stocktake-bundle": "phase5_f2_stocktake_bundle",
+    "xlsx/gt-f2-inventory-valuation": "phase5_f2_inventory_valuation",
+    "xlsx/gt-f2-inventory-special": "phase5_f2_inventory_special",
 }
+
+
+def _lane_template_sha256() -> dict[str, str]:
+    import importlib
+
+    out: dict[str, str] = {}
+    for entry_id, module in _LANE_PROVIDER_MODULES.items():
+        mod = importlib.import_module(f"app.services.workpaper_sync.{module}")
+        assert mod.ENTRY_ID == entry_id, (module, mod.ENTRY_ID)
+        out[entry_id] = mod.TEMPLATE_SHA256
+    return out
+
+
+LANE_TEMPLATE_SHA256 = _lane_template_sha256()
 
 # 不可达合册的 sha256
 UNREACHABLE_COMPOSITE_SHA256 = "afc762843ffee1c32087848d6401500b53d5f3fb59d32c1098acfff6f1b2ef0d"

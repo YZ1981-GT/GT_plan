@@ -6,12 +6,11 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { resolveProcedureSheetKey } from '@/utils/resolveProcedureSheetKey'
 import { ALL_CYCLE_PROCEDURE_SHEETS } from '../cycleProcedureSheets'
-import { G12_ADJUDICATION_ITEMS, G12_ACCOUNT_CODE } from '../g12Constants'
+import { G12_ACCOUNT_CODE } from '../g12Constants'
 import { G12_NOTE_SECTION } from '../g12NoteSectionMap'
 import { isG12SheetComplete } from '../g12SheetLabels'
 import { G12A_PROCEDURE_SHEET } from '../g12VoucherCross'
 import { G12_IMPORT_EXPORT_SHEETS } from '../useG12ImportExport'
-import { CYCLE_ADJUDICATION_CONFIGS } from '../../shared/cycleAdjudicationConfigs'
 import { FORMULA_ENGINE_INVENTORY } from '../formulaEngineInventory'
 
 describe('G12 review fixes', () => {
@@ -25,13 +24,6 @@ describe('G12 review fixes', () => {
     expect(G12_ACCOUNT_CODE).toBe('6103')
     expect(G12_NOTE_SECTION.listed).toBe('五、70')
     expect(G12_NOTE_SECTION.soe).toBe('八、71')
-  })
-
-  it('cycleAdjudicationConfigs G12-1 与 G12_ADJUDICATION_ITEMS 对齐', () => {
-    const cfg = CYCLE_ADJUDICATION_CONFIGS['G12-1']
-    expect(cfg.accountCode).toBe('6103')
-    expect(cfg.rows).toHaveLength(G12_ADJUDICATION_ITEMS.length)
-    expect(cfg.rows.map((r) => r.rowKey)).toEqual(G12_ADJUDICATION_ITEMS.map((r) => r.rowKey))
   })
 
   it('isG12SheetComplete：G12A 不认 G12-proc-*；空数组不算已编制', () => {

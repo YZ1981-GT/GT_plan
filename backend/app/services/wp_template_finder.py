@@ -169,7 +169,7 @@ _code_prefix_boundary_ok = _wp_code_filename_prefix_ok
 #: （带空格那份是工作树新增）」——该前提已失效：``git ls-files`` 实测两份**都已入库**，
 #: 且带空格那份才是权威：
 #:
-#: * ``D4 收入底稿.xlsx``（199176 B, sha ``b8fb92d4…``）= sync 契约 ``d4.revenue_detail``
+#: * ``D4 收入底稿.xlsx``（199204 B, sha ``2765d199…``）= sync 契约 ``d4.revenue_detail``
 #:   的 ``TemplateRef`` 钉住的那份，且 ``xl/workbook.xml`` **无** ``<externalReference>``
 #:   （``scripts/fix/sanitize_d4_template_external_links.py`` 就是净化它的，旁边留有
 #:   ``.preclean.bak``）；

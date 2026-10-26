@@ -58,6 +58,17 @@ export function calcCompletionRate(accumulated: number, budget: number): number 
   return (accumulated / budget) * 100
 }
 
+/**
+ * H2-2 明细表 D 列「工程累计投入占预算比例%」= IF(B=0,0,AG/B)：审定期末余额 / 预算。
+ *
+ * 返回**比值**（模板该格数字格式是 0.00%，存比值、展示成百分数）；预算为 0 时为 0（与模板一致）。
+ * 模板原为 =IF(AH=0,0,AH/B)，取成了右边一列「其中：累计资本化金额」，spec
+ * oo-writeback-template-parity-closure R1 已修模板，表单与 OnlyOffice 同口径。
+ */
+export function calcBudgetInputRatio(endAudited: number, budget: number): number {
+  return budget === 0 ? 0 : endAudited / budget
+}
+
 /** 超预算率(%) = (实际 - 预算) / 预算 × 100；预算为0时返回null */
 export function calcOverBudgetRate(actual: number, budget: number): number | null {
   if (budget === 0) return null

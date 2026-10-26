@@ -247,7 +247,23 @@ class TestTask3P1P2P3:
 
 
 class TestTask4P6MissingSubtotal:
-    """P6: 三处合计漏加第三子区小计（模板真实金额错误）。"""
+    """P6: 三处段合计原漏加第三子区小计（模板真实金额错误），已修模板。
+
+    `oo-writeback-template-parity-closure` R1：R40 / R72 / R104 的 D..R 全列改为四个小计相加。
+    判据翻面为「每列都恰好是四个小计相加」，任一列漏回去即红。
+    """
+
+    _SUBTOTALS = {40: (18, 25, 32, 39), 72: (50, 57, 64, 71), 104: (82, 89, 96, 103)}
+
+    def _assert_total_adds_four_subtotals(self, total_row: int) -> None:
+        from openpyxl.utils import get_column_letter
+
+        subtotals = self._SUBTOTALS[total_row]
+        for ci in range(4, 19):  # D..R
+            col = get_column_letter(ci)
+            f = self._formula_at(total_row, col).upper().replace(" ", "")
+            expect = "=" + "+".join(f"{col}{r}" for r in subtotals)
+            assert f == expect, f"R{total_row}{col} 实得 {f!r}，应为 {expect!r}"
 
     @pytest.fixture(autouse=True)
     def _load_workbook(self) -> None:
@@ -267,34 +283,17 @@ class TestTask4P6MissingSubtotal:
         )
         return val
 
-    def test_segment1_total_r40_missing_r32(self) -> None:
-        """段①合计 R40 漏加 R32（第三子区小计）。"""
-        f = self._formula_at(40, "G")
-        # 正确应含 G32，但模板漏了
-        assert "G32" not in f.upper(), (
-            f"R40 G 列已含 G32 —— 缺陷已修？请翻面此判据。公式={f!r}"
-        )
-        # 确认只引用了三个小计
-        for ref in ("G18", "G25", "G39"):
-            assert ref in f.upper(), f"R40 公式应引用 {ref}: {f!r}"
+    def test_segment1_total_r40_includes_r32(self) -> None:
+        """段①合计 R40 = R18 + R25 + R32 + R39（原漏 R32）。"""
+        self._assert_total_adds_four_subtotals(40)
 
-    def test_segment2_total_r72_missing_r64(self) -> None:
-        """段②合计 R72 漏加 R64。"""
-        f = self._formula_at(72, "G")
-        assert "G64" not in f.upper(), (
-            f"R72 已含 G64 —— 缺陷已修？公式={f!r}"
-        )
-        for ref in ("G50", "G57", "G71"):
-            assert ref in f.upper(), f"R72 应引用 {ref}: {f!r}"
+    def test_segment2_total_r72_includes_r64(self) -> None:
+        """段②合计 R72 = R50 + R57 + R64 + R71（原漏 R64）。"""
+        self._assert_total_adds_four_subtotals(72)
 
-    def test_segment3_total_r104_missing_r96(self) -> None:
-        """段③合计 R104 漏加 R96。"""
-        f = self._formula_at(104, "G")
-        assert "G96" not in f.upper(), (
-            f"R104 已含 G96 —— 缺陷已修？公式={f!r}"
-        )
-        for ref in ("G82", "G89", "G103"):
-            assert ref in f.upper(), f"R104 应引用 {ref}: {f!r}"
+    def test_segment3_total_r104_includes_r96(self) -> None:
+        """段③合计 R104 = R82 + R89 + R96 + R103（原漏 R96）。"""
+        self._assert_total_adds_four_subtotals(104)
 
     def test_missing_subtotals_declared_in_provider(self) -> None:
         """provider 声明的漏加小计行号与模板实测一致。"""
@@ -396,7 +395,11 @@ class TestTask6MissingSubtotalDisposition:
     """Task 6: 漏加小计处置（登记 + upstream_gap 或覆盖层修）。"""
 
     def test_p7_template_sha256_unchanged(self) -> None:
-        """不改权威模板字节（覆盖发生在覆盖层）。"""
+        """模板字节与 provider 冻结的哈希一致。
+
+        原设想「不改权威模板、在覆盖层修」从未实现（库里没有覆盖文件、也没有代码读覆盖层）；
+        2026-10-26 改为直接修权威模板（`oo-writeback-template-parity-closure` R1），冻结哈希随之更新。
+        """
         from app.services.workpaper_sync.phase5_g5_long_term_receivable import (
             TEMPLATE_SHA256,
         )

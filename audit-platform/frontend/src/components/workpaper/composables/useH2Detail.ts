@@ -14,7 +14,7 @@ import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import {
   calcCipEndBalance,
   calcSubtotal,
-  calcCompletionRate,
+  calcBudgetInputRatio,
 } from './useH2FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -29,7 +29,7 @@ export interface H2DetailRow {
   startDate: string
   plannedEndDate: string
   actualEndDate: string
-  /** 完工进度(%) = 累计投入/预算×100 */
+  /** 工程累计投入占预算比例（比值，展示为百分数）= 审定期末余额 / 预算，模板 H2-2 D 列 =IF(B=0,0,AG/B) */
   completionRate: number | null
   accumulatedInput: number
   fundSource: string
@@ -420,10 +420,8 @@ function _recalcFormulas(row: H2DetailRow): void {
   row.netEndAud = row.endAudited - row.impairEndAud
   row.netValue = row.netEndAud
 
-  row.completionRate = calcCompletionRate(
-    _getNum(row.accumulatedInput),
-    _getNum(row.budget),
-  )
+  // D 列与模板同口径（比值）：审定期末余额 / 预算；「累计投入」只用于单位造价
+  row.completionRate = calcBudgetInputRatio(row.endAudited, _getNum(row.budget))
 
   const area = _getNum(row.area)
   row.unitCost = area > 0 ? _getNum(row.accumulatedInput) / area : null
@@ -629,7 +627,7 @@ export function useH2Detail(options: {
   const overBudgetRowIds: ComputedRef<Set<string>> = computed(() => {
     const ids = new Set<string>()
     for (const row of rows.value) {
-      if (row.completionRate != null && row.completionRate > 100) ids.add(row.rowId)
+      if (row.completionRate != null && row.completionRate > 1) ids.add(row.rowId)
     }
     return ids
   })

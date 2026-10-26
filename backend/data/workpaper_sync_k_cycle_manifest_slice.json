@@ -97,7 +97,7 @@
       "template_ref": {
         "workbook": "K1 其他应收款.xlsx",
         "root": "backend/wp_templates/K",
-        "sha256": "4abf05902fe09f7f6bec947c991c648669d26f39187f2f285866392c1c633eab",
+        "sha256": "c071af1bd56b7e3be5dc36b9882732bb8acab9b4950abbf656d5a367f2353b92",
         "sheet_count": 17,
         "in_runtime_index": true
       },
@@ -192,7 +192,7 @@
       "template_ref": {
         "workbook": "K2 其他流动资产.xlsx",
         "root": "backend/wp_templates/K",
-        "sha256": "86740bb85e21ab85e85fefe9e9cd55d9e2267da406f8e3329096e21503919894",
+        "sha256": "5ae401411039385e70766635dc9eeb9c0a79c6da4f8c1af316b2ad1430589162",
         "sheet_count": 11,
         "in_runtime_index": true
       },
@@ -288,7 +288,7 @@
       "template_ref": {
         "workbook": "K3 其他应付款.xlsx",
         "root": "backend/wp_templates/K",
-        "sha256": "b2770bdc8a67aaca5a3e2eefd8934a189abd3e57ffd872597d22176540718d4e",
+        "sha256": "f4412b5655d46d8b59d8b2919fab0a12d2d6c9e3d254d99ffbc8e479155e25e3",
         "sheet_count": 12,
         "in_runtime_index": true
       },
@@ -383,7 +383,7 @@
       "template_ref": {
         "workbook": "K4 其他流动负债.xlsx",
         "root": "backend/wp_templates/K",
-        "sha256": "88cdf2e65d75840adb9db327fe5d46ee49986d03d17f396c1596d053a59611dd",
+        "sha256": "eba8df02b32f2da217b0211481517ef41a6ecd54e98a2ba0c659fa1a29dd3612",
         "sheet_count": 8,
         "in_runtime_index": true
       },
@@ -575,7 +575,7 @@
       "template_ref": {
         "workbook": "K6 持有待售资产和负债.xlsx",
         "root": "backend/wp_templates/K",
-        "sha256": "f75f730e959f711c3cd8a7f0d8e33637cc32b6e1f034c103f3b8d88ff0b6076b",
+        "sha256": "ee0ea36e382a5abda83dc4d764858ebcf77ea6e1646fcdd16f3f19d3502ce8c2",
         "sheet_count": 11,
         "in_runtime_index": true
       },
@@ -1325,8 +1325,8 @@
       },
       {
         "name": "K1 其他应收款.xlsx",
-        "size": 173926,
-        "sha256": "4abf05902fe09f7f6bec947c991c648669d26f39187f2f285866392c1c633eab",
+        "size": 150092,
+        "sha256": "c071af1bd56b7e3be5dc36b9882732bb8acab9b4950abbf656d5a367f2353b92",
         "sheet_count": 17,
         "sheets": [
           "底稿目录",
@@ -1423,8 +1423,8 @@
       },
       {
         "name": "K2 其他流动资产.xlsx",
-        "size": 189597,
-        "sha256": "86740bb85e21ab85e85fefe9e9cd55d9e2267da406f8e3329096e21503919894",
+        "size": 54831,
+        "sha256": "5ae401411039385e70766635dc9eeb9c0a79c6da4f8c1af316b2ad1430589162",
         "sheet_count": 11,
         "sheets": [
           "底稿目录",
@@ -1443,8 +1443,8 @@
       },
       {
         "name": "K3 其他应付款.xlsx",
-        "size": 92581,
-        "sha256": "b2770bdc8a67aaca5a3e2eefd8934a189abd3e57ffd872597d22176540718d4e",
+        "size": 80057,
+        "sha256": "f4412b5655d46d8b59d8b2919fab0a12d2d6c9e3d254d99ffbc8e479155e25e3",
         "sheet_count": 12,
         "sheets": [
           "底稿目录",
@@ -1464,8 +1464,8 @@
       },
       {
         "name": "K4 其他流动负债.xlsx",
-        "size": 170841,
-        "sha256": "88cdf2e65d75840adb9db327fe5d46ee49986d03d17f396c1596d053a59611dd",
+        "size": 43845,
+        "sha256": "eba8df02b32f2da217b0211481517ef41a6ecd54e98a2ba0c659fa1a29dd3612",
         "sheet_count": 8,
         "sheets": [
           "底稿目录",
@@ -1501,8 +1501,8 @@
       },
       {
         "name": "K6 持有待售资产和负债.xlsx",
-        "size": 118267,
-        "sha256": "f75f730e959f711c3cd8a7f0d8e33637cc32b6e1f034c103f3b8d88ff0b6076b",
+        "size": 105335,
+        "sha256": "ee0ea36e382a5abda83dc4d764858ebcf77ea6e1646fcdd16f3f19d3502ce8c2",
         "sheet_count": 11,
         "sheets": [
           "底稿目录",

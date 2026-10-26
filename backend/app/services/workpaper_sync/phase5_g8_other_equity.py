@@ -21,31 +21,13 @@ OCI 与减值」。这条依据对 G8 **反向**成立 —— 照抄 G9/G10 的�
 同理 G6（其他债权投资）也是 FVOCI 口径。C-6 evidence §12 把这条列为「与 G9 相比要
 **反向**注意的四条」之首。
 
-═══ 🔴 二：模板四处行级缺陷 ⇒ 两个机制**分开取值** ═══
-
-逐行实测 R11-R20（`M` 本期变动合计 / `P` 期末累计FV变动 / `R` 期末OCI累计 / `T` 审定数）：
-
-* **R11**：`M=SUM(I:L)` ✅含 L · `P=D+J` ❌漏 K · `R` ✅ · `T` ✅
-* **R12**：`M=SUM(I:K)` ❌漏 L · `P=D+J+K` ✅含 K · `R` ✅ · `T` ❌**整格无公式**
-* **R13..R20**：`M=SUM(I:K)` ❌漏 L · `P=D+J` ❌漏 K · `R` ❌**整格无公式** · `T` ✅
-
-会计判读：`M` 应含 L · `P` 应含 K · `R`(=F+J+L) 与 `T`(=Q+S) 都是恒等式、每行都该有。
-即 R11 与 R12 各对一半、R13-R20 两处都漏。与 G5「三段合计各漏加一个小计」同族。
-
-处置（详见 `phase5_g8_02_detail` 模块头）：
-* `formula_columns` 只取模板**逐行完全一致**的 `E·H·O·Q` 四列 —— 它驱动 verify 的区间
-  比对，放进 `M`/`P` 会在 R11/R12 上必红；
-* `M`/`P`/`R`/`T` 的 `mode` 仍判 **formula**（`contracts.PROTECTED_MODES`，store 侧保护），
-  由前端 `useG8Detail.enrichG8DetailRow` 按**会计正确**口径统一重算。
-两个机制在引擎里互不校验、语义也不同（verify 区间 vs store 投影），分开取值是正解。
-
-🔴 **裁决 G1R-H3 的原措辞（「拆两个 spec + 并集取 formula、交集取 editable」）需修正**：
-① 按并集会把 R13 的 `R` 与 R12 的 `T` 标成 formula —— 正是判据 P12 要求证明**不发生**的
-误标；② 三段无法用引擎表达 —— 引擎只支持 `row_section_field`（按**字段值**过滤），而 G8
-是连续 R11-R20 里逐行公式不同，前端数组没有也不该有区归属字段（行的物理位置不是业务
-属性，那会变成 BP-11 语义耦合行身份的同族问题）；③ P12 的前提「那两格留给用户手填」
-也不成立 —— 前端改造前后都把 `T` 当公式算，`R` 是恒等式没有手填空间。
-
+═══ 二：模板行级缺陷已修（spec oo-writeback-template-parity-closure R1）═══
+修复前逐行实测 R11-R20：`M` 在 R11 是 `=SUM(I:L)`、其余 `=SUM(I:K)`；`P` 只有 R12 含 K；
+`R` 在 R13-R20 整格无公式；`T` 在 R12 整格无公式；合计行 K / L / R 三列无 SUM。
+现已逐行统一为 `M=SUM(I:K)` / `P=D+J+K` / `R=F+J+L` / `T=Q+S`（`M` 不含 L：`M` 是投资账面的
+本期变动、须满足 `E+M=Q`，L 只减少 `R` 列 OCI 累计）。八个公式列 E·H·M·O·P·Q·R·T 全部判
+**formula** 并进 `formula_templates`，与前端 `useG8Detail.enrichG8DetailRow` 同口径（详见
+`phase5_g8_02_detail` 模块头）。
 ═══ 🔴 三：GC-2 裸 IF 12 格 ═══
 
 按生产函数 `neutralize_oo_crash_if_formulas` 的口径现算（**格数**）：`审定表G8-1` **12**
@@ -128,7 +110,7 @@ EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wire
 TEMPLATE_RELATIVE_PATH: Final[str] = "G/G8 其他权益工具投资.xlsx"
 #: 逐字取 slice `authoritative_templates.files`（完整 64 位；99,458 B）
 TEMPLATE_SHA256: Final[str] = (
-    "5c8d3de7ee60ffef8677768c6c3966a313d4210ebc96b19a12c56721954b83b6"
+    "3c291eac04625534a64c150ef19b38d533ed438ab0210d68aee5675c6257b60b"
 )
 
 #: 受管 store item —— 按值取自 `useG8Detail.ts` 的 `ITEM_ID_ROWS`
@@ -362,9 +344,9 @@ _REVIEWED_BASIS: Final[str] = (
     "单个受管区 R11-R20 / footer R21 逐列 =SUM(x11:x20) / "
     "有效内容列 23 即 A-W 且 X 空 / max_column=24 含空列 / 0 个 definedName / "
     "受管表零裸 IF，整册 12 格裸 IF 全在 审定表G8-1 / "
-    "🔴 模板**四处行级缺陷**：M 在 R12-R20 漏加 L、P 在 R11+R13-R20 漏加 K、"
-    "R 在 R13-R20 整格无公式、T 在 R12 整格无公式 ⇒ formula_columns 只取逐行一致的 "
-    "E·H·O·Q 四列，M/P/R/T 的 mode 仍判 formula 由前端按会计正确口径算)"
+    "八个公式列 E·H·M·O·P·Q·R·T 逐行同形（M=SUM(I:K) / P=D+J+K / R=F+J+L / T=Q+S；"
+    "修复前 M11 多加 L、P 只有 R12 含 K、R13-R20 与 T12 无公式、合计行 K/L/R 无 SUM，"
+    "spec oo-writeback-template-parity-closure R1 已修模板）)"
     " + 前端 `useG8Detail.ts` 按值 grep（ITEM_ID_ROWS / genId 带随机后缀 / "
     "G8DetailRow 23 字段与模板列序 A..W 逐列对应 / 无 section 字段即单区）"
     " + 模板编制思路见 spec evidence/task8-c6-remaining-eight-template-logic.md §3"

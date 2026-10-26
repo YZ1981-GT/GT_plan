@@ -288,8 +288,8 @@
     "files": [
       {
         "name": "J1 应付职工薪酬.xlsx",
-        "size": 196750,
-        "sha256": "a6100d91202f4d066dc39fb00e3016ea87794489bb75d308fec2733e92ca6061",
+        "size": 166762,
+        "sha256": "6830eda60b73a7f14adc336e9a9e3610deee6ce5c24b983e78fab822cfb4c8ce",
         "belongs_to_entry": "xlsx/j1/gt-j1-employee-compensation",
         "sheet_count": 23,
         "in_runtime_index": true,
@@ -313,8 +313,8 @@
       },
       {
         "name": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx",
-        "size": 107237,
-        "sha256": "b9a4d87c95d275d7d6d20e91494bf20760eeb22140a3588b5670dea4266fcce1",
+        "size": 86309,
+        "sha256": "10c0518352105d5efd5256a6245b78123b57f4c9af9673ceeee97f63125541e8",
         "belongs_to_entry": null,
         "excluded_reason": "🔴 J2 宿主 GtJ2DefinedBenefitPlan.vue 在 source manifest 里不是 entry（无 GtOnlyOfficeSheet 挂载点，见 slice_scope.excluded_from_slice 第 3 条）⇒ 本册没有可归属的 entry_id。它仍要登记在这里并冻结 digest：① 它确实在 backend/wp_templates/J 下（目录集合等值判据的分母）；② template_resolution_audit 要证明 J2 码不会回落到 J1 册；③ 将来 J2 若接上 OO 入口，这份 digest 是它的 template identity 基线。SR-8 要求 belongs_to_entry 为 null 时必须给 excluded_reason —— 本 slice 是 D~I 六轮里**第一份**真正走到 SR-8 null 分支的（H 循环有两条但理由是 pilot/整册服务多 entry，不是「宿主不是 entry」）。",
         "sheet_count": 9,
@@ -328,8 +328,8 @@
       },
       {
         "name": "J3 股份支付.xlsx",
-        "size": 50195,
-        "sha256": "72e026f43612ec6b6b6f11d1115908463453a3118bfc9409b055402a18e3f491",
+        "size": 34642,
+        "sha256": "d2e9d7eb236b6476ccdc6edde1fadbd7119476bb2769bd95c9c9cc1699621bb4",
         "belongs_to_entry": null,
         "excluded_reason": "🔴 同 J2：J3 宿主 GtJ3ShareBasedPayment.vue 无 GtOnlyOfficeSheet 挂载点 ⇒ 不是 manifest entry ⇒ 本册无可归属 entry_id。J3 另有一层特殊：它**无独立科目**（宿主 docstring 明写「费用端走 K8/K9，权益端走 M4，现金端走 J1」），所以即便将来接 OO 入口，它的审定表也不回写 trial_balance。",
         "sheet_count": 6,

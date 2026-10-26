@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "22ec4123c55474b3dd7cd5fea59a9bd9771cdc3b0eb03dc8550bacbd0674b2c4",
+  "instrumentation_definition_sha256": "9e8a5e272cef258f6123ea8ec5284da59412e9e726b765a6ddebf05ba8483f2b",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d1-notes-receivable",
@@ -4954,9 +4954,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "c2da03893080de01ad3e5205e7befd2b3be0cee73b1bfc1769c688f5c50e628d",
+    "normalized_structure_hash": "90128c3be325ec94cb3ec3384b706dd926a0a67282f3bc9548493253c944a485",
     "relative_path": "D/D1 应收票据.xlsx",
-    "template_sha256": "efa8e23d3531294ed7d4f30cc207339634b83ce58335ebf885a402e7263571ef"
+    "template_sha256": "2e75538c3c3e542cc577580a0452bff3b834febe196f98fe459abee2af02a4d5"
   },
-  "template_definition_sha256": "9d0211a1623530fc41f16861aa94b3f025732edad40654fb1d36697d429fca57"
+  "template_definition_sha256": "5d70595cee534e6ebcca43bb97339331b14dc907edb35dd72a7c399e251bb43c"
 }

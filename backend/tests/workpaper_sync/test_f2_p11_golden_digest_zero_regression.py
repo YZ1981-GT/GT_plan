@@ -62,7 +62,11 @@ GOLDEN_BASELINE: dict[str, str] = {
     #    D1~D7 的契约均因 instrumentation / sheet spec 扩容而变化（各 spec tasks.md
     #    有逐次变更说明），F1 因宿主接桥 + 契约重算而变。这些变化均已由各自 spec
     #    的守卫测试覆盖，此处只同步基线 digest。
-    "d1.notes_receivable_detail.json": "72718e0107925d3e",
+    # 🔴 2026-10-26 更新 d1 / d4 / d5 / d6 / f1 / g7（spec oo-writeback-template-parity-closure R1）：
+    #    这些契约的权威模板按会计口径修了公式（清单 `scripts/fix/fix_template_formula_defects.py`），
+    #    契约里随之变的只有模板 sha / 结构哈希 / 定义哈希与审核依据文本，由各生成器重算。
+    #    d1 / f1 的旧基线在 HEAD 上本就已过期（各自 spec 改契约时未同步本表），一并更新到现值。
+    "d1.notes_receivable_detail.json": "75f1b401764fa7c9",
     # 🔴 2026-10-10 更新 d2（`1714d5719d558446` → 本值），两次契约变化一并同步：
     #    ① 299c216a9（10-07）把 `d21-managed` 的 locator 从 TABLE_SHEET_ANCHOR 改为
     #       defined_name_ref，当时未同步本基线（HEAD 上本条已红：`cd80314142ae5bdf`）；
@@ -74,13 +78,13 @@ GOLDEN_BASELINE: dict[str, str] = {
     #       守护。契约是**真的变了**，不是度量漂移，故更新基线。
     "d2.receivable_detail.json": "56007587080236ac",
     "d3.prepaid_receipts_detail.json": "a32e531ac342e7cc",
-    "d4.revenue_detail.json": "58ef8c68b3c74537",
-    "d5.receivables_financing_detail.json": "e2fa67a560a6ac5b",
-    "d6.contract_assets_detail.json": "3e363c45ecf78b8e",
+    "d4.revenue_detail.json": "7b1d6362eeba4a7d",
+    "d5.receivables_financing_detail.json": "b76e345cc29797b5",
+    "d6.contract_assets_detail.json": "eeb454b0dcd45cbc",
     "d7.contract_liabilities_detail.json": "735d194bc8072405",
     "e1.monetary_fund_detail.json": "4a0cf6c928566c96",
-    "f1.prepayment_detail.json": "541bb159890a7e7a",
-    "g7.soe_subsidiary_disclosure.json": "3c992e2f31540f14",
+    "f1.prepayment_detail.json": "0439591e2e504c74",
+    "g7.soe_subsidiary_disclosure.json": "6fdd12a7e008eb24",
     "h1.disposal_check.json": "e7d6c1b75af2d600",
 }
 

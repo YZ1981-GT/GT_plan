@@ -69,7 +69,13 @@ EXPECTED_XLSX_COUNT = 351
 #:    `L/L4 应付债券.xlsx` 122,085 → 105,661 B（-16,424 B）。
 #: 🔴 当前共享集成工作树同时包含 I 四册、J1、L4 净化；逐文件 snapshot 已与磁盘全等，
 #:    351 本逐份相加 = **48,818,132**，故总字节按同一集成态现算；各改动来源见本段与 sanitizer。
-EXPECTED_TOTAL_BYTES = 48_818_132
+#: 🔴 2026-10-26 重算（spec oo-writeback-template-parity-closure R1）：本轮按会计口径修了 19 本模板的
+#:    公式（`scripts/fix/fix_template_formula_defects.py`，逐格清单见该脚本与 spec design §2）；
+#:    同时补回 29 本早已提交、却从未回填本基线的净化改动（A5-1 / D2-6 / F2-21 / F2-47 /
+#:    F2-55 / F5 / G4 / H4 / H5 / H7 / H8 / J2 / J3 / K2 / K4 / L7 / L8 / M1~M10 / N2 / N5，
+#:    各册 sanitizer 见 `backend/scripts/fix/sanitize_*`）—— 回填前本守卫在 HEAD 上本就是红的。
+#:    48_818_132 → 45_834_727 B，数量不变。
+EXPECTED_TOTAL_BYTES = 45_834_727
 
 #: 允许与基线不符的**未提交工作树改动**（不是永久豁免）。
 #:

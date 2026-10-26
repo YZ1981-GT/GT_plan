@@ -31,19 +31,11 @@ spec: `h3-h5-h7-variant-axis-and-dynamic-column-paradigm`
 * 尾部：`X 期初净值`（`=L+U`）· `Y 期末净值`（`=O+W`）· `Z 是否有权属证明` ·
   `AA 是否抵押受限`
 
-═══ 🔴 模板真实缺陷（走覆盖层，不改模板字节）═══
+═══ 模板缺陷已修（登记留痕）═══
 
-**`R` 列（公允价值变动·未审数·期末余额）只有首行 `R12` 有 `=P12+Q12`，
-R13-R26 共 14 行缺公式。** 对照组：H7 公允价值模式的同位列 `S` 满格 25/25 有 `=Q+R`
-⇒ 这是 H3 独有的漏填，不是设计意图。
-
-后果：用户在第 2 行起填 P（期初）与 Q（本年变动）后，R（期末）不自动算 ⇒ 未审期末
-累计公允变动漏算。审定侧 U/V/W 满格有公式，于是**同一张表里审定段算得出期末、
-未审段算不出**（模板内部自相矛盾）。
-
-处置沿用既有规则（F2-26!J9 / F5-7!G31 两例确立）：`backend/wp_templates/` 运行时
-只读 + sha 冻结 ⇒ 缺陷走**覆盖层**，不改字节。本文件把它登记在
-`TEMPLATE_DEFECTS_H302_FAIR`，`R` 列同时判 template-only（它本就无前端对端）。
+`R` 列（公允价值变动·未审数·期末余额）原先只有首行 `R12` 有 `=P12+Q12`，R13-R26 共 14 行
+缺公式（对照 H7 公允价值模式同位列 `S` 满格有 `=Q+R`）⇒ 未审期末累计公允变动漏算。
+现已在权威模板字节上补齐（spec oo-writeback-template-parity-closure R1（scripts/fix/fix_template_formula_defects.py））。`R` 本身无前端对端，仍判 template-only。
 
 ═══ 🔴 前端 `fairValueBegin/End` 是「含公允变动的公允价值总额」，不是模板的「原值」 ═══
 
@@ -133,7 +125,7 @@ UNMANAGED_REGIONS_H302_FAIR: Final[tuple[dict[str, object], ...]] = (
     },
 )
 
-#: 🔴 模板真实缺陷登记（走覆盖层，**不改** `backend/wp_templates/` 字节）。
+#: 模板缺陷登记（已修模板，留痕）。
 TEMPLATE_DEFECTS_H302_FAIR: Final[tuple[dict[str, Any], ...]] = (
     {
         "defect_id": "H3F-TPL-1",
@@ -150,9 +142,10 @@ TEMPLATE_DEFECTS_H302_FAIR: Final[tuple[dict[str, Any], ...]] = (
             "审定段算得出期末、未审段算不出（模板内部自相矛盾）。"
         ),
         "disposition": (
-            "走覆盖层补公式，不改模板字节（同 F2-26!J9 / F5-7!G31 两例）。"
-            "R 本身无前端对端 ⇒ 同时判 template-only，回写不碰它。"
+            "已改权威模板字节补齐 R13:R26（spec oo-writeback-template-parity-closure R1（scripts/fix/fix_template_formula_defects.py））。"
+            "R 本身无前端对端 ⇒ 仍判 template-only，回写不碰它。"
         ),
+        "handling": "template_fixed",
     },
 )
 
@@ -303,8 +296,8 @@ FIELD_SPECS_H302_FAIR: Final[
 )
 
 #: 🔴 只登记进了 `field_specs` 的公式列。template-only 的公式列
-#:    （H/L/M/N/O · R · U/W · X）由 Excel 自行重算 —— 其中 `R` 本身缺 14 行公式
-#:    （见 `TEMPLATE_DEFECTS_H302_FAIR`）。
+#:    （H/L/M/N/O · R · U/W · X）由 Excel 自行重算（`R` 原缺 14 行公式，已修模板，
+#:    见 `TEMPLATE_DEFECTS_H302_FAIR`）。
 FORMULA_TEMPLATES_H302_FAIR: Final[dict[str, str]] = {
     "V": "=Q{r}+T{r}",
     "Y": "=O{r}+W{r}",

@@ -1470,32 +1470,32 @@
       },
       {
         "name": "H2 在建工程.xlsx",
-        "size": 162616,
-        "sha256": "de9426a33e8d51e9351c8dd2393fe8502433d2cf810f30318f254a474ec480fe",
-        "normalized_structure_hash": "15f530571527da67d6770cb838536866840ca329d59427ce0995542afa04ebdb",
+        "size": 135886,
+        "sha256": "789aa85c2bef4ba201aa1d11a2c014029658ac492619dbd5ea26a1774212e6f5",
+        "normalized_structure_hash": "3ee3bcc817b0a6dc036a66176bfdf9a3e4eb4f176493f44e038a25af7df25465",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-h2-construction-in-progress"
       },
       {
         "name": "H3 投资性房地产.xlsx",
-        "size": 146096,
-        "sha256": "6526c9fc186230fa659369a8efa91f2824799f02fc4cfbba8707c40cdbf13038",
-        "normalized_structure_hash": "ec73d52b8f62ca399cf0d6da77003f15016807aee5af5c10ea711d6fe071934a",
+        "size": 122614,
+        "sha256": "a103d407b20608eb349dc1234f440c1e3f158a39913a304e5494f0c0f056013c",
+        "normalized_structure_hash": "fc074951ce4c1e40672473d8234ba326accf3d91abed82f8910b3a9d9742d889",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-h3-investment-property"
       },
       {
         "name": "H4 工程物资.xlsx",
-        "size": 112937,
-        "sha256": "c2c3ee61b33f4a7ca2603359810207bfb14f189c464135e0ede3e0a738c658cc",
+        "size": 97345,
+        "sha256": "dfbe06ef6e0b8420d56d7bb142193fe0edd4656bb9a2980f503e0bd84b883e84",
         "normalized_structure_hash": "b13f5dffb20cf69c448d972ce4b3ee8b86b11963a8945585209ce38dd7ffde41",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-h4-engineering-materials"
       },
       {
         "name": "H5 油气资产.xlsx",
-        "size": 195306,
-        "sha256": "6dcc109bee6310352a6601d8daa388da21ce16e07fa1fd68c1072d3a302b1905",
+        "size": 169576,
+        "sha256": "4fc5ec55eba9418d5651398da617fa666f0b0719799cf1e802f52c55a62e5612",
         "normalized_structure_hash": "71b583cfa669b39eb083660ce3a1320c798c9ef70f9ce6932d0dcc1803d8b238",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-h5-oil-gas-assets"
@@ -1510,17 +1510,17 @@
       },
       {
         "name": "H7 生产性生物资产.xlsx",
-        "size": 225641,
-        "sha256": "df55f0051d9b3a67f894f82392d5f4420c959cd1c68c57a56c5605701db9c8c5",
+        "size": 194163,
+        "sha256": "109a0e4ba6d08da93fc727adac7473c4047f588253fd62c955db67804bf151ec",
         "normalized_structure_hash": "b145772e0d8c030ee96f0be215ba4d633636ff2948e5ce008cbad455ebfefb12",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-h7-biological-assets"
       },
       {
         "name": "H8 使用权资产.xlsx",
-        "size": 465476,
-        "sha256": "112053f0681642c371572998a559e4c5362f518265897a36fc90d7f84e666782",
-        "normalized_structure_hash": "84604d74008be9037587a8601410ef67f1576473545cad279408464edaa1add7",
+        "size": 419735,
+        "sha256": "05abaabbc46fe8861e171ea35b580fe7c69659363ab6d85e3be096a1e23747e9",
+        "normalized_structure_hash": "0bda5f024b5430ee84783d9a5264beb0603e123d90cc05af8073965c860f3012",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-h8-right-of-use-assets"
       },

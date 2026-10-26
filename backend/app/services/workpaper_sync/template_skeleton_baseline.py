@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Mapping, Sequence, Set
 
 from app.services.workpaper_sync.contracts import (
-    FieldMode,
+    FORMULA_MODES,
     SyncContract,
     ValueType,
     is_template_skeleton_identity,
@@ -190,7 +190,7 @@ def pure_template_skeleton_rows(
         if not rid or rid in base_identities or not is_template_skeleton_identity(rid):
             continue
         fields = per_row.setdefault(rid, [])
-        if getattr(fv, "is_protected", False) or getattr(fv, "mode", None) is FieldMode.formula:
+        if getattr(fv, "is_protected", False) or getattr(fv, "mode", None) in FORMULA_MODES:
             continue
         fields.append((stable_key.rsplit("/", 1)[-1], getattr(fv, "value", None)))
     pure = {rid for rid, fields in per_row.items() if not fields}

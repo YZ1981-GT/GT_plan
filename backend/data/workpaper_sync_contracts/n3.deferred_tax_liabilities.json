@@ -6,7 +6,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "bf213224a60842c381ec04d395f953dc5a5215298cb8a610c1c155a9599ad474",
+  "instrumentation_definition_sha256": "f034855a675c876c66c44bc70ad5767ae54b0765ed7dfc6ed82e040c21368e3c",
   "review": {
     "authority_root": "backend/wp_templates",
     "derived_readonly_sheet": {
@@ -29,7 +29,7 @@
       "table": "checklist_responses"
     },
     "pilot_class": "n_cycle_deferred_tax_liabilities",
-    "reviewed_basis": "openpyxl 逐格实测权威模板 N/N3 递延所得税负债.xlsx（6 sheet，净化后 sha256 abd34241）的受管 sheet 递延所得税负债明细表N3-2：两级表头 R9/R10，14 列 A-N，数据区 R11-R21（11 行固定项），R22 空行，R23 合计=SUM。四个公式列 E=ROUND(C*D,2) / H=F+O / K=ROUND(I*J,2) / N=L+K。Editable 10 列 A/B/C/D/F/G/I/J/L/M。🔴 H 列引用隐藏列 O（外链），N 列缺 M，E23 SUM 越界——均为模板既知缺陷，记录型锁定。审定表 N3-1 r7-r13 全公式（SUMIF 引明细表），一格不写。"
+    "reviewed_basis": "openpyxl 逐格实测权威模板 N/N3 递延所得税负债.xlsx（6 sheet，净化 + 公式修正后 sha256 4dc7275f）的受管 sheet 递延所得税负债明细表N3-2：两级表头 R9/R10，14 列 A-N，数据区 R11-R21（11 行固定项），R22 空行，R23 合计=SUM。四个公式列 E=ROUND(C*D,2) / H=E+F+G / K=ROUND(I*J,2) / N=K+L+M。Editable 10 列 A/B/C/D/F/G/I/J/L/M。模板原有缺陷（H=F+O{n} 引空格、N=L+K 漏 M、E23=SUM(E3:O22) 越界、G23/M23 无合计、H10 表头写成「资产」）已按会计口径修正（spec oo-writeback-template-parity-closure R1）。审定表 N3-1 r7-r13 全公式（SUMIF 引明细表），一格不写。"
   },
   "review_status": "reviewed",
   "schema_version": "contract-definition:v1",
@@ -158,7 +158,7 @@
               },
               "column_key": "prior_audited",
               "header_source_ref": "源xlsx!递延所得税负债明细表N3-2!H9",
-              "header_text": "递延所得税资产期初审定数",
+              "header_text": "递延所得税负债期初审定数",
               "json_pointer": "/rows/{row_uuid}/priorAudited",
               "mode": "formula",
               "source_ref": "源xlsx!递延所得税负债明细表N3-2!H11",
@@ -275,9 +275,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "e54a38583ad73f58d1c8f95d0559157301926873aae8677bfff58d4e940122fc",
+    "normalized_structure_hash": "96a2598a3ec2b93ff69129219c6c9c9542419b3724997b06b01706073ab53e7d",
     "relative_path": "N/N3 递延所得税负债.xlsx",
-    "template_sha256": "672addf15523e92b91bc8f9e581f313f8757d3fa3310ff8f02cc888803fa5633"
+    "template_sha256": "4dc7275fc38f85f265e4da985a50f30d97a59da66b891f35e8d4c49cbfc52d0f"
   },
-  "template_definition_sha256": "fd3d8aeeef372aa474c8f42bc20b30cff766a2cd125f9825b4e5e56ecd0babce"
+  "template_definition_sha256": "78a03abb03eee8fdf64b5a25c8f6e7063a7a37a92e9d030ad4799531ec7b37d1"
 }

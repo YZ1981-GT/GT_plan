@@ -6,10 +6,9 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { resolveProcedureSheetKey } from '@/utils/resolveProcedureSheetKey'
 import { ALL_CYCLE_PROCEDURE_SHEETS } from '../cycleProcedureSheets'
-import { G8_ADJUDICATION_ITEMS, G8_ACCOUNT_CODE, G8_IMPORTABLE_SHEETS } from '../g8Constants'
+import { G8_ACCOUNT_CODE, G8_IMPORTABLE_SHEETS } from '../g8Constants'
 import { G8_NOTE_SECTION } from '../g8NoteSectionMap'
 import { isG8SheetComplete } from '../g8SheetLabels'
-import { CYCLE_ADJUDICATION_CONFIGS } from '../../shared/cycleAdjudicationConfigs'
 
 describe('G8 review fixes', () => {
   it('resolveProcedureSheetKey G8 → g8a', () => {
@@ -22,13 +21,6 @@ describe('G8 review fixes', () => {
     expect(G8_ACCOUNT_CODE).toBe('1503')
     expect(G8_NOTE_SECTION.listed).toBe('五、19')
     expect(G8_NOTE_SECTION.soe).toBe('八、19')
-  })
-
-  it('cycleAdjudicationConfigs G8-1 与 G8_ADJUDICATION_ITEMS 对齐', () => {
-    const cfg = CYCLE_ADJUDICATION_CONFIGS['G8-1']
-    expect(cfg.accountCode).toBe('1503')
-    expect(cfg.rows).toHaveLength(G8_ADJUDICATION_ITEMS.length)
-    expect(cfg.rows.map((r) => r.rowKey)).toEqual(G8_ADJUDICATION_ITEMS.map((r) => r.rowKey))
   })
 
   it('isG8SheetComplete：G8A 不认 G8-proc-*；空数组不算已编制', () => {

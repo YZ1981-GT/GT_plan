@@ -41,7 +41,7 @@ merged 里**存在**的键：被清空的键一次都不会被访问 ⇒ HTML st
 from __future__ import annotations
 
 from app.services.workpaper_sync.adapters.base import FieldValue, Projection
-from app.services.workpaper_sync.contracts import FieldMode, SyncContract
+from app.services.workpaper_sync.contracts import FORMULA_MODES, FieldMode, SyncContract
 from app.services.workpaper_sync.merge import (
     ContractIndex,
     FieldVerdict,
@@ -130,7 +130,7 @@ def store_view_with_recomputed_formulas(
         for key, verdict in merge.verdicts.items()
         if verdict is FieldVerdict.took_recomputed
         and key in view.values
-        and view.values[key].mode is FieldMode.formula
+        and view.values[key].mode in FORMULA_MODES
     )
     if not keys:
         return view, ()

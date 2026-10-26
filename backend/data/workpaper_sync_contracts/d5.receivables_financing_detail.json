@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "b829ed8f648524a575f11620c8e53c69b46213453227fad1870d5abc8e05a672",
+  "instrumentation_definition_sha256": "023aff125ad403322cbfbca32155346209ae61356e311d82aee308b4142d5d10",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d5-receivables-financing",
@@ -19,7 +19,7 @@
       "table": "checklist_responses"
     },
     "pilot_class": "phase5_receivables_financing",
-    "reviewed_basis": "openpyxl 逐 sheet 直读净化后权威模板 D/D5 应收款项融资.xlsx（外链净化后 sha256 92c5f7f2），只取受管 sheet 应收款项融资明细表D5-2：两级表头 行 10（组标题 期初数 C:G / 本期变动 H:I / 期末数 J:P）/ 行 11（子标题），17 列 A-Q，数据区 12-16，F/J/L/O 四列逐行公式 =C+E+D / =C+H-I / =J+K / =J+N+M，A17「合计」footer（纯两字）；FVOCI 无账龄组；字段键与前端 useD5Detail.DetailRow 逐字段锁死（postRealized/eclStage store-only 不入）。wp_code=D5（载荷落点：D5-2-rows 全库 0 行同 H1/D3/D6 空表单，D5 wp 未删除有 file_path；非 D5R 幻影码）"
+    "reviewed_basis": "openpyxl 逐 sheet 直读净化后权威模板 D/D5 应收款项融资.xlsx（外链净化 + 公式修正后 sha256 ff0342f1），只取受管 sheet 应收款项融资明细表D5-2：两级表头 行 10（组标题 期初数 C:G / 本期变动 H:I / 期末数 J:P）/ 行 11（子标题），17 列 A-Q，数据区 12-16，F/J/L/O 四列逐行公式 =C+E+D / =C+H-I / =J+K / =L+M+N（O 列原为 =J+N+M，已修模板），A17「合计」footer（纯两字）；FVOCI 无账龄组；字段键与前端 useD5Detail.DetailRow 逐字段锁死（postRealized/eclStage store-only 不入）。wp_code=D5（载荷落点：D5-2-rows 全库 0 行同 H1/D3/D6 空表单，D5 wp 未删除有 file_path；非 D5R 幻影码）"
   },
   "review_status": "reviewed",
   "schema_version": "contract-definition:v1",
@@ -591,9 +591,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "e16bc93b2f3df03aecce4f59902911c4c9e21ca907723d1b0662f128301d39a5",
+    "normalized_structure_hash": "1b5586d077b226fe18d2370ce55c06e96275d55ac57a8c36dbfc597a2fadde1d",
     "relative_path": "D/D5 应收款项融资.xlsx",
-    "template_sha256": "92c5f7f2d2d54340c29bef6094b24a9360edcfa730fcfd406aeb071d4d138ac4"
+    "template_sha256": "ff0342f180a03c1a5803f71beba800c1285a3871206ad9ab4a7f32c1b4ad69ea"
   },
-  "template_definition_sha256": "32e809c091afc65ec0b5ab8ee2c1a61efe35c5552f4a25e9b7a34381d8dc9733"
+  "template_definition_sha256": "7bc8fe2bde9196c05b1dd8b1a9e14b286b26a4411d280fa3ca5e498fb919a536"
 }

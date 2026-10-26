@@ -3721,9 +3721,11 @@ def _collect_fields(
         if observed_formula:
             formula_inventory[stable_key] = observed_formula
             if formula_signatures is not None:
-                # 公式证据（spec oo-formula-recompute-not-tamper R2）：本行引用归一成 `{r}`。
+                # 公式证据（spec oo-formula-recompute-not-tamper R2）：本行引用归一成 `{r}`；
+                # 行域字段再按受管表几何归一他行引用（R6：插行后签名不变）。
                 formula_signatures[stable_key] = formula_signature(
-                    observed_formula, own_row=int(coord[len(column):])
+                    observed_formula, own_row=int(coord[len(column):]),
+                    frame=(region.first_row, region.last_row) if spec.row_scoped else None,
                 )
 
         # 🔴 json：materialize 侧把 value 自身的 JSON 文本落到单元格（见

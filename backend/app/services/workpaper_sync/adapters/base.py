@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence, runtime_checkable
 
 from app.services.workpaper_sync.contracts import (
+    PROTECTED_MODES,
     FieldMode,
     SyncContract,
     ValueType,
@@ -267,7 +268,8 @@ class FieldValue:
 
     @property
     def is_protected(self) -> bool:
-        return self.mode in {FieldMode.formula, FieldMode.auto_source}
+        # 与契约同一来源（含 cross_sheet）：store 合并按它跳过公式字段（R7）。
+        return self.mode in PROTECTED_MODES
 
 
 @dataclass(frozen=True)

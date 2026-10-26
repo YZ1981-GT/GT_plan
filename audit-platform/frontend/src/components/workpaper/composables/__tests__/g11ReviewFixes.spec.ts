@@ -6,12 +6,10 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { resolveProcedureSheetKey } from '@/utils/resolveProcedureSheetKey'
 import { ALL_CYCLE_PROCEDURE_SHEETS } from '../cycleProcedureSheets'
-import { G11_ADJUDICATION_ITEMS } from '../g11Constants'
 import { G11_NOTE_SECTION } from '../g11NoteSectionMap'
 import { isG11SheetComplete } from '../g11SheetLabels'
 import { collectG11SheetConclusions } from '../g11Conclusion'
 import { findBalanceSourceForRowKey } from '../g11ReturnRateBalanceMap'
-import { CYCLE_ADJUDICATION_CONFIGS } from '../../shared/cycleAdjudicationConfigs'
 import { FORMULA_ENGINE_INVENTORY } from '../formulaEngineInventory'
 
 describe('G11 review fixes', () => {
@@ -24,13 +22,6 @@ describe('G11 review fixes', () => {
   it('附注章节：上市五、69 / 国企八、70', () => {
     expect(G11_NOTE_SECTION.listed).toBe('五、69')
     expect(G11_NOTE_SECTION.soe).toBe('八、70')
-  })
-
-  it('cycleAdjudicationConfigs G11-1 与 G11_ADJUDICATION_ITEMS 对齐', () => {
-    const cfg = CYCLE_ADJUDICATION_CONFIGS['G11-1']
-    expect(cfg).toBeTruthy()
-    expect(cfg.rows).toHaveLength(G11_ADJUDICATION_ITEMS.length)
-    expect(cfg.rows.map((r) => r.rowKey)).toEqual(G11_ADJUDICATION_ITEMS.map((r) => r.rowKey))
   })
 
   it('isG11SheetComplete：G11A 不认 G11-proc-*；空数组不算已编制', () => {

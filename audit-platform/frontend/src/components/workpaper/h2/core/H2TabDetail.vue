@@ -123,11 +123,11 @@
             <span v-else>{{ row.actualEndDate || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="完工进度(%)" width="100" align="right">
+        <el-table-column label="累计投入占预算比例(%)" width="110" align="right">
           <template #default="{ row }">
-            <span class="formula-cell" :class="{ 'over-budget': !row.isTotal && row.completionRate != null && row.completionRate > 100 }"
-              title="=累计投入/预算×100">
-              {{ row.completionRate != null ? row.completionRate.toFixed(1) + '%' : '—' }}
+            <span class="formula-cell" :class="{ 'over-budget': !row.isTotal && row.completionRate != null && row.completionRate > 1 }"
+              title="=审定期末余额/预算（与模板 D 列一致）">
+              {{ row.completionRate != null ? (row.completionRate * 100).toFixed(1) + '%' : '—' }}
             </span>
           </template>
         </el-table-column>

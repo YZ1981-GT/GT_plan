@@ -144,6 +144,7 @@ from app.services.workpaper_sync.adapters.base import (
     assert_substrate_usable,
 )
 from app.services.workpaper_sync.contracts import (
+    FORMULA_MODES,
     FieldMode,
     FieldSpec,
     # spec workpaper-sync-managed-row-convergence：
@@ -157,6 +158,8 @@ from app.services.workpaper_sync.contracts import (
     TableSpec,
     ValueType,
 )
+from app.services.workpaper_sync import formula_recompute_evidence as FRE
+from app.services.workpaper_sync import formula_restore as FRS
 from app.services.workpaper_sync.excel_entry_gate import FrozenEntryDefinitions
 from app.services.workpaper_sync.excel_instrumentation import normalized_structure_hash
 from app.services.workpaper_sync.excel_extract import (
@@ -733,6 +736,9 @@ class CellWriteKind(str, Enum):
     cached_value_cleared = "cached_value_cleared"
     #: 隐藏 UUID 列的 row identity 字面量。
     row_identity = "row_identity"
+    #: 受保护公式格在 OO 侧被敲成了字面量：整格写回已发布形态的公式 + 服务端值（R4，见
+    #: :mod:`formula_restore`）。只落在已有格上（缺格不凭空造公式格）。
+    formula_restored = "formula_restored"
 
 
 @dataclass(frozen=True)
@@ -1114,14 +1120,25 @@ def _clear_cached_value(view: _CellView) -> str:
     return f'<c r="{view.coord}"{attrs}>{body}</c>'
 
 
-#: 只能落在**已有公式格**上的两种写入（缺格时不得凭空造公式格）。
+#: 只能落在**已有格**上的公式写入（缺格时不得凭空造公式格）。
 _FORMULA_CELL_WRITES: Final[frozenset[CellWriteKind]] = frozenset(
-    {CellWriteKind.cached_value_only, CellWriteKind.cached_value_cleared}
+    {CellWriteKind.cached_value_only, CellWriteKind.cached_value_cleared, CellWriteKind.formula_restored}
 )
+
+
+def _restore_formula_cell(view: _CellView, value: Any, formula_text: str) -> str:
+    """字面量格整格换成 `<f>` + 服务端值（R4）；样式等属性保留，类型标记按值重算。"""
+    attrs = re.sub(r'\s+t="[^"]*"', "", view.attrs)
+    rendered = "" if value is None else f"<v>{_xml_escape(_render_number(value))}</v>"
+    if value is not None and not _NUMERIC_LITERAL_RE.fullmatch(_render_number(value)):
+        attrs = f'{attrs} t="str"'
+    return f'<c r="{view.coord}"{attrs}><f>{_xml_escape(formula_text)}</f>{rendered}</c>'
 
 
 def _render_existing(view: _CellView, write: CellWrite) -> str:
     """已有格的写入渲染（两条 patch 路径共用，保证逐字节等价）。"""
+    if write.kind is CellWriteKind.formula_restored:
+        return _restore_formula_cell(view, write.value, write.formula_text)
     if write.kind is CellWriteKind.cached_value_only:
         return _replace_cached_value(view, write.value, write.formula_text)
     if write.kind is CellWriteKind.cached_value_cleared:
@@ -1751,8 +1768,49 @@ def _formula_body(text: str) -> str:
     return text[1:] if text.startswith("=") else text
 
 
+def _formula_cell_plan(
+    *, key: str, template: str, coord: str, row: int, view: "_CellView | None",
+    frame: tuple[int, int] | None, own_frame: tuple[int, int] | None, detect_rewrite: bool,
+    substrate_formulas: Mapping[str, str], intended_map: Mapping[str, str], preserved: dict[str, str],
+) -> tuple[CellWriteKind, str]:
+    """公式字段这一格怎么写：`(写入形态, 要写回的公式文本)`。
+
+    OO→HTML 方向（:mod:`formula_restore` 作用域内）以已发布形态的公式为准（R4）：substrate 上
+    这格没有公式（被敲成了数字）⇒ 整格写回公式；公式被改写（签名与已发布形态不同，含值没变的
+    情形）⇒ 还原文本。作用域外（HTML→OO 等）`wanted` 恒为 None，判据与修订前逐字相同。
+    """
+    wanted = FRS.wanted_formula(key, template, row=row, frame=frame)
+    if view is None or not view.has_formula:
+        if view is not None and wanted is not None:
+            preserved[key] = wanted[1]
+            return CellWriteKind.formula_restored, _formula_body(wanted[1])
+        raise ProtectedRegionWriteError(
+            f"契约把 {key!r} 声明为 formula，但 substrate 的 {coord} 没有公式 —— "
+            "契约/模板漂移，不得凭空写一个公式或把它当字面量覆盖（AC 6.6）"
+        )
+    observed = substrate_formulas.get(key, view.formula_text or "")
+    intended = intended_map.get(key, observed)
+    if (
+        wanted is not None and detect_rewrite
+        and FRE.formula_signature(observed, own_row=row, frame=own_frame) != wanted[0]
+    ):
+        intended = wanted[1]
+    preserved[key] = intended
+    if intended and _formula_body(intended) != _formula_body(observed):
+        if not (view.formula_text or ""):
+            raise ProtectedRegionWriteError(
+                f"受保护格 {coord}（{key}）的公式与 base representation 不符"
+                f"（应为 {intended!r}，实测 {observed!r}），但它在 OOXML 上是共享公式"
+                f"组的**成员**（`<f t=\"shared\" si=...` 无文本）—— 成员的公式由主格"
+                "翻译而来，逐格还原不了；这种形态意味着主格被改写、整组已失效，"
+                "必须人工裁决而不是悄悄写回一格（AC 6.6）"
+            )
+        return CellWriteKind.cached_value_only, _formula_body(intended)
+    return CellWriteKind.cached_value_only, ""
+
+
 def _write_kind_for(spec: FieldSpec) -> CellWriteKind:
-    if spec.mode is FieldMode.formula:
+    if spec.mode in FORMULA_MODES:
         return CellWriteKind.cached_value_only
     # 🔴 BP-22：`boolean` 必须**先于**数值族判定，且落 OOXML 真布尔格 `t="b"`。
     #    归到 `number_literal` 时落盘无 `t` ⇒ extract 读回 int ⇒ `normalize_value` 拒绝
@@ -2047,25 +2105,16 @@ def plan_managed_writes(
             return
         view = cell_index.view(coord)
         restore = ""
-        if spec.mode is FieldMode.formula:
-            if view is None or not view.has_formula:
-                raise ProtectedRegionWriteError(
-                    f"契约把 {key!r} 声明为 formula，但 substrate 的 {coord} 没有公式 —— "
-                    "契约/模板漂移，不得凭空写一个公式或把它当字面量覆盖（AC 6.6）"
-                )
-            observed = substrate_formulas.get(key, view.formula_text or "")
-            intended = intended_map.get(key, observed)
-            preserved[key] = intended
-            if intended and _formula_body(intended) != _formula_body(observed):
-                if not (view.formula_text or ""):
-                    raise ProtectedRegionWriteError(
-                        f"受保护格 {coord}（{key}）的公式与 base representation 不符"
-                        f"（应为 {intended!r}，实测 {observed!r}），但它在 OOXML 上是共享公式"
-                        f"组的**成员**（`<f t=\"shared\" si=...` 无文本）—— 成员的公式由主格"
-                        "翻译而来，逐格还原不了；这种形态意味着主格被改写、整组已失效，"
-                        "必须人工裁决而不是悄悄写回一格（AC 6.6）"
-                    )
-                restore = _formula_body(intended)
+        kind = _write_kind_for(spec)
+        if spec.mode in FORMULA_MODES:
+            scoped = spec.row_scoped
+            kind, restore = _formula_cell_plan(
+                key=key, template=spec.stable_field_key, coord=coord, row=row, view=view,
+                frame=(effective_region.first_row, effective_region.last_row) if scoped else None,
+                own_frame=(region.first_row, region.last_row) if scoped else None,
+                detect_rewrite=row_shift is None,
+                substrate_formulas=substrate_formulas, intended_map=intended_map, preserved=preserved,
+            )
         elif spec.mode is FieldMode.auto_source:
             if view is not None and view.has_formula:
                 raise ProtectedRegionWriteError(
@@ -2082,7 +2131,7 @@ def plan_managed_writes(
         writes.append(
             CellWrite(
                 coord=coord,
-                kind=_write_kind_for(spec),
+                kind=kind,
                 value=_normalised_write_value(field, spec, coord),
                 stable_field_key=key,
                 row_key=identity,
@@ -2117,7 +2166,7 @@ def plan_managed_writes(
         for spec in dynamic_table.fields:
             if spec.cell is None or spec.cell.row_from != "row_identity":
                 continue
-            if spec.mode in PROTECTED_MODES and spec.mode is not FieldMode.formula:
+            if spec.mode in PROTECTED_MODES and spec.mode not in FORMULA_MODES:
                 continue
             if projection.get(_instantiate(spec.stable_field_key, identity)) is not None:
                 continue
@@ -2125,14 +2174,14 @@ def plan_managed_writes(
             view = cell_index.view(f"{column}{row}")
             if view is None or ("<v" not in view.body and "<is" not in view.body):
                 continue
-            if spec.mode is FieldMode.formula and not view.has_formula:
+            if spec.mode in FORMULA_MODES and not view.has_formula:
                 continue  # 契约说是公式、模板却没公式：不在这里造或清，交既有判据
             writes.append(
                 CellWrite(
                     coord=f"{column}{row}",
                     kind=(
                         CellWriteKind.cached_value_cleared
-                        if spec.mode is FieldMode.formula
+                        if spec.mode in FORMULA_MODES
                         else CellWriteKind.blank
                     ),
                     value=None,
@@ -2541,23 +2590,14 @@ def _plan_static_writes(
                 continue
             view = cell_index.view(coord)
             restore = ""
-            if spec.mode is FieldMode.formula:
-                if view is None or not view.has_formula:
-                    raise ProtectedRegionWriteError(
-                        f"契约把 {key!r} 声明为 formula，但 substrate 的 {coord} 没有公式 —— "
-                        "契约/模板漂移，不得凭空写公式或当字面量覆盖（AC 6.6）"
-                    )
-                observed = substrate_formulas.get(key, view.formula_text or "")
-                intended = intended_map.get(key, observed)
-                preserved[key] = intended
-                if intended and _formula_body(intended) != _formula_body(observed):
-                    if not (view.formula_text or ""):
-                        raise ProtectedRegionWriteError(
-                            f"受保护格 {coord}（{key}）的公式与 base representation 不符"
-                            f"（应为 {intended!r}，实测 {observed!r}）且是共享公式组成员 —— "
-                            "必须人工裁决而不是悄悄写回一格（AC 6.6）"
-                        )
-                    restore = _formula_body(intended)
+            kind = _write_kind_for(spec)
+            if spec.mode in FORMULA_MODES:
+                kind, restore = _formula_cell_plan(
+                    key=key, template=key, coord=coord, row=spec.cell.static_row, view=view,
+                    frame=None, own_frame=None, detect_rewrite=True,
+                    substrate_formulas=substrate_formulas, intended_map=intended_map,
+                    preserved=preserved,
+                )
             elif spec.mode is FieldMode.auto_source:
                 if view is not None and view.has_formula:
                     raise ProtectedRegionWriteError(
@@ -2572,7 +2612,7 @@ def _plan_static_writes(
             writes.append(
                 CellWrite(
                     coord=coord,
-                    kind=_write_kind_for(spec),
+                    kind=kind,
                     value=_normalised_write_value(field, spec, coord),
                     stable_field_key=key,
                     row_key="",
@@ -4284,6 +4324,9 @@ def apply_plan_openpyxl(
         ws = wb[plan.sheet_name]
         for write in plan.writes:
             cell = ws[write.coord]
+            if write.kind is CellWriteKind.formula_restored:
+                cell.value = f"={write.formula_text}"  # 只能保公式本体（同下）
+                continue
             if write.kind in _FORMULA_CELL_WRITES:
                 # openpyxl 不保留「公式 + 缓存值」两者 ⇒ 公式格只能保公式本体。
                 continue

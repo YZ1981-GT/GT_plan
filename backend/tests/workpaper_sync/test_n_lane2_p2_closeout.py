@@ -37,10 +37,15 @@ import n_cycle_scanner as scanner  # noqa: E402
 # ════════════════════════════════════════════════════════════════════════════
 
 class TestFamilyA2Guard:
-    """NA-P19：族 A2 = N3-2 H11~H21 全 11 行同形，无反向分母。"""
+    """NA-P19：族 A2 = N3-2 H11~H21 全 11 行同形，无反向分母。
+
+    修模板前 H 列是 `=F{r}+O{r-8}`（第二加数指向 O3 起的空格，超出 max_column，恒取空 ⇒ 期初审定
+    漏了期初未审与重分类）；`oo-writeback-template-parity-closure` R1 已改为与 N1-2 同形的
+    `=E{r}+F{r}+G{r}`。判据翻面：11 行逐行同形、不再引用 O 列。
+    """
 
     def test_n3_2_h_column_overflow(self):
-        """N3-2 sheet 的 H 列（col=8）超出 max_column（14），属结构残留。"""
+        """N3-2 的 H11~H21 = E+F+G（期初审定 = 期初未审 + 账项调整 + 重分类调整），不再引用超列的 O。"""
         xlsx = None
         for f in TEMPLATE_DIR.glob("*.xlsx"):
             if "N3" in f.stem and not f.name.startswith("~$"):
@@ -68,9 +73,9 @@ class TestFamilyA2Guard:
         wb.close()
 
         assert len(h_formulas) == 11, f"H11~H21 公式数 {len(h_formulas)}（期望 11）"
-        # 全部包含 O 列引用（超列）且同形
+        assert h_formulas == [f"=E{r}+F{r}+G{r}" for r in range(11, 22)], h_formulas
         o_ref_count = sum(1 for f in h_formulas if "O" in f)
-        assert o_ref_count == 11, f"含 O 引用的 {o_ref_count}/11"
+        assert o_ref_count == 0, f"仍有 {o_ref_count}/11 行引用超列的 O"
 
     def test_biao_de_dirty_forms_3(self):
         """NA-P20：「表的{码}」脏形态 3 处全在 N1/N3。"""

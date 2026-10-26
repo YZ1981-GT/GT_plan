@@ -124,7 +124,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = "D/D1 应收票据.xlsx"
 #: 只动 `xl/styles.xml` 与该 sheet 的 XML，新建一个「只换 numFmtId」的 cellXfs 条目 ——
 #: 全簿其余 number_format 与全部单元格值逐项不变（脚本内三道前置校验钉死）。
 TEMPLATE_SHA256: Final[str] = (
-    "efa8e23d3531294ed7d4f30cc207339634b83ce58335ebf885a402e7263571ef"
+    "2e75538c3c3e542cc577580a0452bff3b834febe196f98fe459abee2af02a4d5"
 )
 
 #: 受管 sheet 的真实 tab 名（构建期选择器；运行时定位一律走 identity 锚点）。

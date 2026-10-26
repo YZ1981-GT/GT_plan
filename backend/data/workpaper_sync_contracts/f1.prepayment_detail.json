@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "17d7a9ec7ba3fa4e033c540ff21be0920f49d782bc3f2b0df6412d6f0bf4f116",
+  "instrumentation_definition_sha256": "e65e660af37ce61b71758a2342999c2ac04492d7759e3423f09072f7eb1c3a27",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-f1-prepayment",
@@ -254,9 +254,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "9afe19353748fd1ab61572e5951a1b6f38302d05f724844780fc5bd4103b7cb0",
+    "normalized_structure_hash": "2dd37a38a5a2d5cf2207f0b767b1a6614a9585e6611deaf47b6cf3d46d07a7ee",
     "relative_path": "F/F1 预付账款.xlsx",
-    "template_sha256": "68b0e9e9d1ea33adbefc10fe8a445b3b6e78dc50d89e080adbf906bdea5dbc7f"
+    "template_sha256": "16d5729db13e071590be8f1ef86c1d781014b0bb610a9e85329f76b3f4071449"
   },
-  "template_definition_sha256": "2f376443f7f5aff666f6ef1e164b5c7a6328f1a52d8c4eb85e5cf023013a90d7"
+  "template_definition_sha256": "f6eb385f96955d4df6c7cd91ffffb7e7aedb30c1fb56cffe7d9fbb9e311c966e"
 }

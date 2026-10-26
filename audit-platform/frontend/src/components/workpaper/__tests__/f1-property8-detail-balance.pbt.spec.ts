@@ -5,7 +5,8 @@
  * - H = E + F + G
  * - O = E + M - N
  * - Q = O + P
- * - X = O + V + W
+ * - X = Q + V + W（模板 X 列原为 =O+V+W、漏了被审计单位重分类 P，spec
+ *   oo-writeback-template-parity-closure R1 已修成 =Q+V+W）
  *
  * **Validates: Requirements 4.5, 4.6, 4.7, 13.3**
  */
@@ -74,7 +75,7 @@ describe('F1 Property 8：明细表余额计算公式链正确性', () => {
         const expectedH = input.priorUnadjusted + input.priorAdjustment + input.priorReclass
         const expectedO = input.priorUnadjusted + input.debit - input.credit
         const expectedQ = expectedO + input.entityReclass
-        const expectedX = expectedO + input.endAje + input.endRje
+        const expectedX = expectedQ + input.endAje + input.endRje
 
         return (
           closeEnough(result.priorAudited, expectedH) &&
@@ -87,7 +88,7 @@ describe('F1 Property 8：明细表余额计算公式链正确性', () => {
     )
   })
 
-  it('非零期初调整、实体重分类和期末调整不会被错误带入 O/X', () => {
+  it('期初调整不进 O；被审计单位重分类进 Q 与 X；期末调整进 X', () => {
     const result = recalcRowFormulas(makeDetailRow({
       priorUnadjusted: 100,
       priorAdjustment: 20,
@@ -102,6 +103,7 @@ describe('F1 Property 8：明细表余额计算公式链正确性', () => {
     expect(result.priorAudited).toBe(113)
     expect(result.endBalance).toBe(122)
     expect(result.endUnadjusted).toBe(133)
-    expect(result.endAudited).toBe(130)
+    // X = Q + V + W = 133 - 5 + 13；按旧模板 O 起算会得 130（少了重分类 11）
+    expect(result.endAudited).toBe(141)
   })
 })

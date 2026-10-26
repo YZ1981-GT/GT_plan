@@ -5,7 +5,7 @@
  * 覆盖 FVOCI 金融资产（科目1124/借方/资产类）的全部公式计算需求。
  *
  * 核心特色：公允价值测算（贴现法）
- *   贴现利息 = 票面金额 × 市场贴现利率 × 剩余天数 ÷ 360
+ *   贴现利息 = 票面金额 × 市场贴现利率 × 剩余天数 ÷ 365（与模板 D5-4 I 列一致）
  *   公允价值 = 票面金额 - 贴现利息
  *
  * 审定表特殊结构：公允价值合计 = 小计 - OCI公允价值变动（非简单加总）
@@ -31,13 +31,14 @@ export function parseNum(val: string | number | null | undefined): number {
 // ─── 贴现公式（D5-4 核心）──────────────────────────────────────────────────
 
 /**
- * 贴现利息 = 票面金额 × 市场贴现利率 × 剩余天数 ÷ 360
+ * 贴现利息 = 票面金额 × 市场贴现利率 × 剩余天数 ÷ 365
  *
- * D5-4 公允价值测算表 I列公式。
+ * D5-4 公允价值测算表 I列公式，与权威模板 =D*H*G/365 同口径（原为 ÷360；spec
+ * oo-writeback-template-parity-closure R2 按模板改）。
  * 审计背景：FVOCI 金融资产以贴现法估算公允价值。
  */
 export function calcDiscountInterest(faceValue: number, rate: number, days: number): number {
-  return faceValue * rate * days / 360
+  return faceValue * rate * days / 365
 }
 
 /**

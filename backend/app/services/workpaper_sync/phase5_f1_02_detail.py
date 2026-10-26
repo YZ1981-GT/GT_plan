@@ -6,7 +6,7 @@ spec: f1-sync-coverage-and-first-canary · Task 19
 ═══ 几何（openpyxl 逐格实测）═══
 
 两级表头 R12（组标题）/ R13（叶子标题）· 数据区 R14-34 · footer R35「合计」
-四列公式：H=E+F+G / O=E+M-N / Q=O+P / X=O+V+W
+四列公式：H=E+F+G / O=E+M-N / Q=O+P / X=Q+V+W
 三套 nested 账龄：agingPrior(I-L) / agingCurrent(R-U) / agingAudited(Y-AB)
 UUID 列 AF
 
@@ -18,7 +18,8 @@ UUID 列 AF
 ═══ 口径已修复（Task 17 裁决 F1-H3）═══
 
 O = E + M - N（模板权威，以期初未审起算）
-X = O + V + W（模板权威，以期末余额起算）
+X = Q + V + W（期末未审起算）：模板 X 列原为 =O+V+W、漏了被审计单位重分类 P，
+spec oo-writeback-template-parity-closure R1 已修模板，前端 useF1Detail 同步改回 Q 起算。
 """
 from __future__ import annotations
 

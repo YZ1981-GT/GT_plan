@@ -552,7 +552,10 @@ export function useH2Stocktake(options: {
         row.bookQty = 1
         row.unitPrice = row.bookAmount
         row.assetNo = String(d.contractNo ?? '')
-        row.visibleProgress = d.completionRate != null ? Number(d.completionRate) : null
+        // H2-2 存比值（模板 D 列格式 0.00%），这里展示百分数
+        row.visibleProgress = d.completionRate != null
+          ? Math.round(Number(d.completionRate) * 1000) / 10
+          : null
         if (row.visibleProgress != null) {
           row.progressDesc = `账面完工进度约 ${row.visibleProgress}%`
         }

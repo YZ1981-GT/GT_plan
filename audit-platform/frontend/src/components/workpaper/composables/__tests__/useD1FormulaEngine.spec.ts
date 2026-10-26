@@ -458,16 +458,17 @@ describe('Feature: d1-endorsement-discount, Property 3: 贴息天数计算正确
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Property 4: 应计贴现利息公式 P×R×D/360 (Task 1.5)
+// Property 4: 应计贴现利息公式 P×R×D/365 (Task 1.5)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('Feature: d1-endorsement-discount, Property 4: 应计贴现利息公式P×R×D/360', () => {
+describe('Feature: d1-endorsement-discount, Property 4: 应计贴现利息公式P×R×D/365', () => {
   /**
    * **Validates: Requirements 10.5**
    *
-   * calcDiscountInterest(P, R, D) ≈ P*R*D/360（容差随量级缩放）
+   * calcDiscountInterest(P, R, D) ≈ P*R*D/365（容差随量级缩放）。
+   * 与权威模板 D1-9 J 列 =I/365*H*B 同口径（spec oo-writeback-template-parity-closure R2，原为 /360）。
    */
-  it('calcDiscountInterest equals faceValue * rate * days / 360', () => {
+  it('calcDiscountInterest equals faceValue * rate * days / 365', () => {
     fc.assert(
       fc.property(
         fc.double({ min: 0, max: 1e9, noNaN: true }),
@@ -475,7 +476,7 @@ describe('Feature: d1-endorsement-discount, Property 4: 应计贴现利息公式
         fc.integer({ min: 0, max: 365 }),
         (faceValue, rate, days) => {
           const result = calcDiscountInterest(faceValue, rate, days)
-          const expected = (faceValue * rate * days) / 360
+          const expected = (faceValue * rate * days) / 365
           expect(Math.abs(result - expected)).toBeLessThanOrEqual(1e-6 * Math.max(1, Math.abs(expected)))
         },
       ),

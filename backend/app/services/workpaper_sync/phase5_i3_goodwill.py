@@ -20,24 +20,10 @@ spec: `i1-i3-disclosure-positional-identity-and-classification-source` · Task 1
 `pilot_h1_grouped_dynamic.UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE` 欠账），
 本表正好用到上界。
 
-═══ 🔴 两处模板真实缺陷，两种不同处置（详见 sheet spec docstring）═══
-
-**缺陷①（IC-14 / ID-3）`AA23:AD23` 四格引错区间 ⇒ `overlay_fixed`**
-
-实际 `=SUM(AA27:AA30)` / 应为 `=SUM(AA14:AA22)`。根因：R27-29 是**编制说明文本行**、
-R30 **超出 max_row(29)** ⇒ 区间完全落在数据区外 ⇒ 🔴 **减值准备区审定数四列合计恒 0**。
-同行左侧 `S23..Z23` 全部正确 ⇒ 四格错法一致 = **复制粘贴错误**。
-
-走**模板覆盖层**（FC-5 的第 **5** 个例外）。`backend/wp_templates/` 字节不动。
-🔴 判据载荷必须是「**只有减值准备区有数**」——「全区都有数」会假绿、「全区都是 0」会恒真。
-
-**缺陷②（本轮新发现）`I14` 缺公式 ⇒ `registered_not_fixed`**
-
-`I15`..`I18` 逐行都有 `=SUM(Dx:Ex)-Gx`，唯**数据区首行 `I14` 是 `None`**。
-处置与缺陷① **不同**（不开第二个覆盖层例外）：前端 `costEnding` 本就按同一套公式重算并落库
-⇒ merge 时该格由 `formula_columns` 重新写入，**不影响回写正确性**；但须登记，
-否则后来者会以为「I 列公式逐行齐全」。
-
+═══ 两处模板缺陷已修（详见 sheet spec docstring）═══
+①`AA23:AD23` 四格原为 `=SUM(<列>27:<列>30)`（引到编制说明文本行与 max_row 之外）⇒ 减值准备区
+审定数四列合计恒 0，现为 `=SUM(<列>14:<列>22)`；②数据区首行 `I14` 原缺公式，现已补齐。
+两处都改在权威模板字节上（spec oo-writeback-template-parity-closure R1（scripts/fix/fix_template_formula_defects.py））。
 ═══ 🔴 BP-6：位置化行身份 7 处全在 I3，但都在披露/减值层不在本 sheet ═══
 
 全 I 8 处位置化 site 里 **I3 占 7**，全在 `useI3Disclosure.ts`（族 A′ 1 + 族 B 3 + 族 D 2）
@@ -98,7 +84,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = "I/I3 商誉.xlsx"
 #: 🔴 2026-10-01 净化（`sanitize_i_cycle_template_external_links.py`，过 OOXML 门）后现算；
 #: 净化前 `96cd6d6cb70698ce90087269aa3f5c3f70a7d80955bd2985904099c3d9257366`（slice 冻结值，append-only 保留；`.preclean.bak` 即其字节）。
 TEMPLATE_SHA256: Final[str] = (
-    "99512b340ccb79bf884d9f3362010f302bd8aaf45be0f3b082c99899f5253085"
+    "5f0d1be518a0c57694c4112e62d30c5c9d80f68ca4ae570ff83b32d2e12d84dc"
 )
 
 STORE_ITEM_ID: Final[str] = _i302.STORE_ITEM_ID_I302
@@ -117,17 +103,14 @@ StorePayloadError = HC.HStorePayloadError
 
 
 _EXTRA_REVIEW: Final[dict[str, Any]] = {
-    # 🔴 两处模板真实缺陷（两种处置，不得混写）
+    # 两处模板缺陷（已修模板，登记留痕）
     "known_template_quirks": [
         dict(_i302.TEMPLATE_DEFECT_AA23_I302),
         dict(_i302.TEMPLATE_DEFECT_I14_I302),
     ],
     "known_template_quirks_note": (
-        "🔴 **两处缺陷两种处置**：①`AA23:AD23` 四格引错区间 ⇒ `overlay_fixed`"
-        "（FC-5 第 **5** 个例外；减值准备区审定数四列合计恒 0，是真金额错误）"
-        "②`I14` 缺公式 ⇒ `registered_not_fixed`（首行漏公式；前端 costEnding 本就重算并落库，"
-        "merge 时由 formula_columns 重新写入 ⇒ 不影响回写正确性，但须登记）。"
-        "**不得混写** —— 把②也标 overlay_fixed 会开一个不必要的覆盖层例外。"
+        "两处缺陷都已改权威模板字节：①`AA23:AD23` 四格引错区间（减值准备区审定数四列合计恒 0）"
+        "②`I14` 首行缺公式（spec oo-writeback-template-parity-closure R1）。"
     ),
     # 🔴 footer 三形态混行
     "footer_shape_facts": dict(_i302.FOOTER_SHAPE_FACTS_I302),
@@ -135,7 +118,7 @@ _EXTRA_REVIEW: Final[dict[str, Any]] = {
     "footer_convention_split": True,
     "footer_kind_note": (
         "🔴 照 I1/I2 的 `pure_sum` 口径去验本表 R23 会因「不是 SUM 开头」而**假红** —— "
-        "同一 footer 行混了三种形态（14 格纯 SUM + 5 格套用行公式 + 4 格引错区间）。"
+        "同一 footer 行混了两种形态（18 格纯 SUM + 5 格套用行公式；AA23:AD23 原引错区间已修）。"
     ),
     # 🔴 mount=4 全 I 唯一
     "carrier": {
@@ -284,18 +267,16 @@ _REVIEWED_BASIS: Final[str] = (
     "openpyxl 逐格实测 I/I3 商誉.xlsx 的 `明细表I3-2`"
     "（🔴 **四级**表头 R10/R11/R12/R13 ⇒ header_rows=**4**（平台上界，H9 那轮从 3 扩来，"
     "结清 Task 42 的 UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE 欠账）/ "
-    "数据 R14-22 九行 / footer R23 🔴 **三形态混行**（14 格纯 SUM E·G·J·K·L·R..Z + "
+    "数据 R14-22 九行 / footer R23 🔴 **两形态混行**（18 格纯 SUM E·G·J·K·L·R..AD + "
     "**5 格套用行公式** I23=SUM(D23:E23)-G23 · M23=D23+J23 · N23=E23+K23 · O23=G23+L23 · "
-    "P23=M23+N23-O23 + **4 格引错区间** AA23:AD23）/ "
+    "P23=M23+N23-O23；AA23:AD23 原引错区间已修）/ "
     "公式列 11 个 I·M·N·O·P·Q·W·AA·AB·AC·AD（Q 是镜像 =A{r}；AB/AC 是**三项相加**口径）/ "
     "🔴 **B/C 两列数据区全空** / 有效内容列 30 == max_column 30（无空列间隙）⇒ UUID 放 AE / "
     "133 公式 / merged 47 / definedName 0 / 裸 IF 63 / 无 Excel Table / "
     "ws.protection.sheet=False ⇒ locked 全惰性）"
-    " + 🔴 **两处模板真实缺陷逐格实证**：①`AA23:AD23` 四格 =SUM(<列>27:<列>30) 应为 "
-    "=SUM(<列>14:<列>22)（R27-29 是编制说明文本行 B27='编制说明：'、R30 超 max_row(29)）⇒ "
-    "减值准备区审定数四列合计恒 0，同行左侧 S23..Z23 全部正确 ⇒ 复制粘贴错误 ⇒ **overlay_fixed** "
-    "②**本轮新发现** `I14` 是 None 而 I15..I18 逐行都有 =SUM(Dx:Ex)-Gx ⇒ 数据区首行漏公式 ⇒ "
-    "**registered_not_fixed**（前端 costEnding 本就重算落库，merge 时由 formula_columns 重写）"
+    " + 两处模板缺陷已修：①`AA23:AD23` 原为 =SUM(<列>27:<列>30)（引到编制说明文本行），"
+    "现为 =SUM(<列>14:<列>22) ②`I14` 原缺 =SUM(D14:E14)-G14，已补齐"
+    "（spec oo-writeback-template-parity-closure R1）"
     " + 前端 `useI3Detail.ts` 按值 grep（ITEM_ID_ROWS='I3-2-rows' / 身份 rowId 族 A 安全生成 / "
     "🔴 removeRow(rowIndex: number) 属**下标族** / I3DetailRow 的核心 12 字段 + Section 2/3 "
     "的 30+ 字段属后置 sheet）"

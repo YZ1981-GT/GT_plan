@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "368cabf44ff329222f2547d067259a9d77619c34a81d068de864a0f0a3148ac4",
+  "instrumentation_definition_sha256": "f2f5410ded377109f990faa3716901c545ce6edd5d32ddb0a0b977d9cd8d497b",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d6-contract-assets",
@@ -19,7 +19,7 @@
       "table": "checklist_responses"
     },
     "pilot_class": "phase5_contract_assets",
-    "reviewed_basis": "openpyxl 逐 sheet 直读净化后权威模板 D/D6 合同资产.xlsx（外链净化后 sha256 88125e42），只取受管 sheet 明细表D6-2：两级表头 行 12（组标题）/ 行 13（账龄子标题 1年以下/1～2/２～3/3年以上），32 列 A-AF，数据区 14-25，J/Q/T 三列逐行公式 =G+H+I / =G+O-P（借方科目）/ =Q+R+S，A26「合   计」footer（3 半角空格）；20 标量列 + 两个账龄组各 4 段（K-N 期初 / U-X 期末，FLAT 键 agePrior*/ageEnd*）；字段键与前端 useD6Detail.DetailRow 逐字段锁死。wp_code=D6（载荷落点：D6-2-rows 全库 0 行同 H1/D3 空表单，D6 wp 未删除有 file_path；非 D6C 幻影码）"
+    "reviewed_basis": "openpyxl 逐 sheet 直读净化后权威模板 D/D6 合同资产.xlsx（外链净化后 sha256 bb41ed49），只取受管 sheet 明细表D6-2：两级表头 行 12（组标题）/ 行 13（账龄子标题 1年以下/1～2/２～3/3年以上），32 列 A-AF，数据区 14-25，J/Q/T 三列逐行公式 =G+H+I / =G+O-P（借方科目）/ =Q+R+S，A26「合   计」footer（3 半角空格）；20 标量列 + 两个账龄组各 4 段（K-N 期初 / U-X 期末，FLAT 键 agePrior*/ageEnd*）；字段键与前端 useD6Detail.DetailRow 逐字段锁死。wp_code=D6（载荷落点：D6-2-rows 全库 0 行同 H1/D3 空表单，D6 wp 未删除有 file_path；非 D6C 幻影码）"
   },
   "review_status": "reviewed",
   "schema_version": "contract-definition:v1",
@@ -2075,9 +2075,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "2d9a80b6b0d1d4c8525db8a7815f0ba0e2e4f09171fe6762f18a2d89994eb0db",
+    "normalized_structure_hash": "c0dcaf370122036a1242a4eb3f20fe68b431ae515d9618673c824fb16d6ec7c3",
     "relative_path": "D/D6 合同资产.xlsx",
-    "template_sha256": "88125e42d79d72813c5d460be2d925adb623d85f881a177dcb4eb7c9ec1e218c"
+    "template_sha256": "bb41ed4931dfff38a6f3e7886135969d5807388d46fa10eb6ac2ea08c1e02b12"
   },
-  "template_definition_sha256": "3bc883579a03bfa1c9f8cc8a26aca3da7e8e72364ac84e9adca703ba96a62ef5"
+  "template_definition_sha256": "461674484653c78fc196d6b3ebea611088a2e3702a62751eeaa5dc260d525e22"
 }

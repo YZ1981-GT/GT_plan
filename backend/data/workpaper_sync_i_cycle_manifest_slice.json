@@ -946,8 +946,8 @@
       },
       {
         "name": "I2 开发支出.xlsx",
-        "size": 138084,
-        "sha256": "a93c298b1f4adfe28532ba899a9e44904459534c703158a5b4e6d92ca4d67178",
+        "size": 119219,
+        "sha256": "90e7199909bdb70a21b071b0b69c90d2bb3dbe16f77be049ceaa2d21260dd3ef",
         "belongs_to_entry": "xlsx/gt-i2-development-expenditure",
         "sheet_count": 21,
         "in_runtime_index": true,
@@ -956,8 +956,8 @@
       },
       {
         "name": "I3 商誉.xlsx",
-        "size": 212588,
-        "sha256": "96cd6d6cb70698ce90087269aa3f5c3f70a7d80955bd2985904099c3d9257366",
+        "size": 175982,
+        "sha256": "5f0d1be518a0c57694c4112e62d30c5c9d80f68ca4ae570ff83b32d2e12d84dc",
         "belongs_to_entry": "xlsx/gt-i3-goodwill",
         "sheet_count": 15,
         "in_runtime_index": true,
@@ -966,8 +966,8 @@
       },
       {
         "name": "I4 长期待摊费用.xlsx",
-        "size": 312532,
-        "sha256": "8bfb85884705e47121589227d3212f3e406cab9b4ea6e0736d53b951c65eb8f8",
+        "size": 60484,
+        "sha256": "94a5baab24adb2990678e9d1cf7a91f75f83ce34ebed7cf725634009dad81a8b",
         "belongs_to_entry": "xlsx/gt-i4-long-term-prepaid",
         "sheet_count": 12,
         "in_runtime_index": true,
@@ -976,8 +976,8 @@
       },
       {
         "name": "I5 其他非流动资产.xlsx",
-        "size": 306241,
-        "sha256": "7e8ec9c22580e05daf7803362f1ab83ca39d452a56c009833b05d6f6a1393860",
+        "size": 55400,
+        "sha256": "dacd18184ef82195b489d014ac2dc7a4dc5edb9df5306d85f7ceb433be56068f",
         "belongs_to_entry": "xlsx/gt-i5-other-noncurrent-assets",
         "sheet_count": 9,
         "in_runtime_index": true,

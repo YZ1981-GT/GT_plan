@@ -14,8 +14,8 @@ spec: d567-sync-coverage-via-row-table-engine · Task 6 · Requirements 1.1, 1.4
   J = D{r}-I{r}          贴现金额 = 票面-利息
   K = J{r}               期末公允价值 = 贴现金额
 
-🔴 前端 recalcFairValueRow 用 ÷360 而模板公式用 ÷365——这是模板与前端的既有落差
-   （双读单写时以模板为准），声明按模板实测。
+前端 recalcFairValueRow 原用 ÷360，spec oo-writeback-template-parity-closure R2 已按模板改成 ÷365；
+模板 R13-R16 的 G / I / J 原先只有首行 R12 有公式，同一 spec R1 已补齐（K 列本就逐行齐全）。
 
 UUID 动态行，`aging_layout=None`（D5 无账龄组）。
 """

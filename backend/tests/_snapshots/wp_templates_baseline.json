@@ -216,8 +216,8 @@
   "size": 20626
  },
  "A/A5-1 现金流量表审计.xlsx": {
-  "sha256": "2a331368dad3aaf3ac922c8f46a0052e9ba1ec8c0a3ae0504edddc8153dab462",
-  "size": 60894
+  "sha256": "9999f5b6511c5230e52732c10bf2eef86ee1238b9e0678e498ed2fffda9f503d",
+  "size": 46790
  },
  "A/A5-2 承诺事项.xlsx": {
   "sha256": "ee455495e98c88accf3420323e2a9caf1da4de43dbd0c49fed7a381fdc5f45c2",
@@ -604,8 +604,8 @@
   "size": 153802
  },
  "D/D1 应收票据.xlsx": {
-  "sha256": "efa8e23d3531294ed7d4f30cc207339634b83ce58335ebf885a402e7263571ef",
-  "size": 120156
+  "sha256": "2e75538c3c3e542cc577580a0452bff3b834febe196f98fe459abee2af02a4d5",
+  "size": 120157
  },
  "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx": {
   "sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa",
@@ -616,16 +616,16 @@
   "size": 102990
  },
  "D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx": {
-  "sha256": "9e833af0fceb9af2ada456a34f109709464798d37eb2b431be1da5b66f5c3f6f",
-  "size": 357051
+  "sha256": "76c5c721bac37bd3f9cbf92eb3dd6dccb156cb27c8dd26e5452aa8b103ce0813",
+  "size": 96261
  },
  "D/D3 预收账款.xlsx": {
   "sha256": "699a9be0e7da639f3e5cd3a2d3bfdf38f7e777b330f9ec6959f5cc390fb6c2d2",
   "size": 74402
  },
  "D/D4 收入底稿.xlsx": {
-  "sha256": "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f",
-  "size": 199176
+  "sha256": "2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62",
+  "size": 199204
  },
  "D/D4-12 营业收入-合同检查（Leap-常规程序）.xlsx": {
   "sha256": "9189b3a9dfcf9535a39cdf7ad33d2d4d332dcc590ac22174697e01ff096ca136",
@@ -644,8 +644,8 @@
   "size": 79380
  },
  "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx": {
-  "sha256": "3058be79f74fd0ce8ff82ac15c0f65c0a8a64d583a74def23444a3f4c6c85c07",
-  "size": 152077
+  "sha256": "56e6e965298744c0d7e86d7f23fbb9dd2786ef551b138d5fa4d12060f2d83218",
+  "size": 137725
  },
  "D/D4-33至D4-36 其他业务收入.xlsx": {
   "sha256": "76684ebd9f31c47932accf2f6da36831d0aa13f1438bd97cb862f554700147f0",
@@ -660,12 +660,12 @@
   "size": 49772
  },
  "D/D5 应收款项融资.xlsx": {
-  "sha256": "92c5f7f2d2d54340c29bef6094b24a9360edcfa730fcfd406aeb071d4d138ac4",
-  "size": 53811
+  "sha256": "ff0342f180a03c1a5803f71beba800c1285a3871206ad9ab4a7f32c1b4ad69ea",
+  "size": 53897
  },
  "D/D6 合同资产.xlsx": {
-  "sha256": "88125e42d79d72813c5d460be2d925adb623d85f881a177dcb4eb7c9ec1e218c",
-  "size": 125607
+  "sha256": "bb41ed4931dfff38a6f3e7886135969d5807388d46fa10eb6ac2ea08c1e02b12",
+  "size": 125594
  },
  "D/D7 合同负债.xlsx": {
   "sha256": "0facd3fe2297dbf72804d513d54ca08c55d6a26a41bf1d5c59fc3d7ea1c76a9a",
@@ -696,8 +696,8 @@
   "size": 915398
  },
  "F/F1 预付账款.xlsx": {
-  "sha256": "f30055cbebc7daedec6d073e983e7ada5375c3edf50b49880c7aa571846510dd",
-  "size": 261608
+  "sha256": "16d5729db13e071590be8f1ef86c1d781014b0bb610a9e85329f76b3f4071449",
+  "size": 96285
  },
  "F/F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx": {
   "sha256": "ab2db1115926cc5e540ef1d6ae135a61a85a3c45d338bd25cb985cdfc051c69f",
@@ -712,8 +712,8 @@
   "size": 180630
  },
  "F/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx": {
-  "sha256": "bdfdcf8a804aab1c11db1cc2cd2deaac4f5bbf94c6a60e43a04108f178079bc7",
-  "size": 81418
+  "sha256": "da258bbc2e9813885afee3eeca90d1531599b8def14aa8d9635a86227fdb3e72",
+  "size": 47525
  },
  "F/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx": {
   "sha256": "81532ad5ebe30f1913ea390232b77b539d656e0c8da43d5f4d75b80e1408a835",
@@ -724,16 +724,16 @@
   "size": 114865
  },
  "F/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx": {
-  "sha256": "bab0abc099cfed3efdde3095bed510b3bbe7422ce32431054811034f6e6d5cd5",
-  "size": 443368
+  "sha256": "f6c03d09605da7e9e9457a0d2219530e4e761d7abfbbe849867f5569dc5e97cb",
+  "size": 47678
  },
  "F/F2-52 存货及跌价准备 -关联交易（Leap-常规程序）.xlsx": {
   "sha256": "a3182f1244d3e96aae268358151372cf16745a976813c36696b577bcc5b849b0",
   "size": 104179
  },
  "F/F2-55至F2-58 合同履约成本.xlsx": {
-  "sha256": "b9ea248198217827a7b3d142dccca9ab5769c17867d1454ffd9105eaa9cb6c21",
-  "size": 100429
+  "sha256": "9d9348fa69acdff3f96d8171efe8b3177a11e0e7f9ed9f20ec242c69b1074b36",
+  "size": 43662
  },
  "F/F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx": {
   "sha256": "8be7b7c01322daa93ea0a29621b6292bcbdd19806deb142492915d43638289b6",
@@ -752,8 +752,8 @@
   "size": 108329
  },
  "F/F5 营业成本.xlsx": {
-  "sha256": "417e5ae7453528725f3ae5eb06f70d36269b089cd73a00884c835f4586267cb7",
-  "size": 187721
+  "sha256": "daca3810d6ae20aa37f36fed6638bd293abd50dc5b14cea30458eb96d5fbc6f1",
+  "size": 63586
  },
  "G/G0 投资循环函证.xlsx": {
   "sha256": "9d9820aba2761c1fbc092933675f3c5a56a6736ce72eb25b008d0599396df81a",
@@ -792,24 +792,24 @@
   "size": 480411
  },
  "G/G4 债权投资.xlsx": {
-  "sha256": "da3a3480d37a4b958245abbe6895ed17a1504937bd49d4596aa41fe05a7be0bf",
-  "size": 999788
+  "sha256": "df73c58aa3ec6b7d0c85053c24e1bc045fce62cebe83655a4276e5b7d5a4e58a",
+  "size": 976968
  },
  "G/G5 长期应收款.xlsx": {
-  "sha256": "c59bba69789eba3f25a8037a5ed32f7482f5eacd08007ef632d04ef2ca0f4b99",
-  "size": 398912
+  "sha256": "4e7fcc3e976ddb1bf922847fc8574e0b1db92ac0aa0c13607d65bf06f796ed3c",
+  "size": 399066
  },
  "G/G6 其他债权投资.xlsx": {
   "sha256": "63bf38c797d4612e71eeea6fad9dd049765399663af56bc95f235023d2df8f34",
   "size": 981008
  },
  "G/G7 长期股权投资.xlsx": {
-  "sha256": "6bf9e2ebcdf50a1c4a32f8733353dd1de994e7dc483232ad43680043577c3335",
-  "size": 263335
+  "sha256": "d01b74be57be759f46ec00986869bd061a2cafa8bf35dd1c44c4117dafa866a1",
+  "size": 263364
  },
  "G/G8 其他权益工具投资.xlsx": {
-  "sha256": "5c8d3de7ee60ffef8677768c6c3966a313d4210ebc96b19a12c56721954b83b6",
-  "size": 450079
+  "sha256": "3c291eac04625534a64c150ef19b38d533ed438ab0210d68aee5675c6257b60b",
+  "size": 438994
  },
  "G/G9 其他非流动金融资产.xlsx": {
   "sha256": "264322c0ed1b4bf6882687b973377ff0e90bdb5664edb4d7e3752ba39fec2379",
@@ -828,32 +828,32 @@
   "size": 42334
  },
  "H/H2 在建工程.xlsx": {
-  "sha256": "de9426a33e8d51e9351c8dd2393fe8502433d2cf810f30318f254a474ec480fe",
-  "size": 162616
+  "sha256": "789aa85c2bef4ba201aa1d11a2c014029658ac492619dbd5ea26a1774212e6f5",
+  "size": 135886
  },
  "H/H3 投资性房地产.xlsx": {
-  "sha256": "6526c9fc186230fa659369a8efa91f2824799f02fc4cfbba8707c40cdbf13038",
-  "size": 146096
+  "sha256": "a103d407b20608eb349dc1234f440c1e3f158a39913a304e5494f0c0f056013c",
+  "size": 122614
  },
  "H/H4 工程物资.xlsx": {
-  "sha256": "c2c3ee61b33f4a7ca2603359810207bfb14f189c464135e0ede3e0a738c658cc",
-  "size": 112937
+  "sha256": "dfbe06ef6e0b8420d56d7bb142193fe0edd4656bb9a2980f503e0bd84b883e84",
+  "size": 97345
  },
  "H/H5 油气资产.xlsx": {
-  "sha256": "6dcc109bee6310352a6601d8daa388da21ce16e07fa1fd68c1072d3a302b1905",
-  "size": 195306
+  "sha256": "4fc5ec55eba9418d5651398da617fa666f0b0719799cf1e802f52c55a62e5612",
+  "size": 169576
  },
  "H/H6 固定资产清理.xlsx": {
   "sha256": "c7d0d78a798ce9c3c47aab64ea02ffc93919a9b02474d8801d115c614656e8a8",
   "size": 48865
  },
  "H/H7 生产性生物资产.xlsx": {
-  "sha256": "df55f0051d9b3a67f894f82392d5f4420c959cd1c68c57a56c5605701db9c8c5",
-  "size": 225641
+  "sha256": "109a0e4ba6d08da93fc727adac7473c4047f588253fd62c955db67804bf151ec",
+  "size": 194163
  },
  "H/H8 使用权资产.xlsx": {
-  "sha256": "112053f0681642c371572998a559e4c5362f518265897a36fc90d7f84e666782",
-  "size": 465476
+  "sha256": "05abaabbc46fe8861e171ea35b580fe7c69659363ab6d85e3be096a1e23747e9",
+  "size": 419735
  },
  "H/H9 租赁负债.xlsx": {
   "sha256": "7b1afdb49f190854160548349a24a07a65ac39f2014fbe8c1014b86c92c598a4",
@@ -868,8 +868,8 @@
   "size": 119219
  },
  "I/I3 商誉.xlsx": {
-  "sha256": "99512b340ccb79bf884d9f3362010f302bd8aaf45be0f3b082c99899f5253085",
-  "size": 175971
+  "sha256": "5f0d1be518a0c57694c4112e62d30c5c9d80f68ca4ae570ff83b32d2e12d84dc",
+  "size": 175982
  },
  "I/I4 长期待摊费用.xlsx": {
   "sha256": "94a5baab24adb2990678e9d1cf7a91f75f83ce34ebed7cf725634009dad81a8b",
@@ -888,20 +888,20 @@
   "size": 166762
  },
  "J/J2 长期应付职工薪酬-设定受益计划净资产.xlsx": {
-  "sha256": "b9a4d87c95d275d7d6d20e91494bf20760eeb22140a3588b5670dea4266fcce1",
-  "size": 107237
+  "sha256": "10c0518352105d5efd5256a6245b78123b57f4c9af9673ceeee97f63125541e8",
+  "size": 86309
  },
  "J/J3 股份支付.xlsx": {
-  "sha256": "72e026f43612ec6b6b6f11d1115908463453a3118bfc9409b055402a18e3f491",
-  "size": 50195
+  "sha256": "d2e9d7eb236b6476ccdc6edde1fadbd7119476bb2769bd95c9c9cc1699621bb4",
+  "size": 34642
  },
  "K/K0 管理循环函证.xlsx": {
   "sha256": "3de48276e74a7f860d3ff4c712c810d86443eaa2ee3fd2dd372fcb228721f552",
   "size": 108986
  },
  "K/K1 其他应收款.xlsx": {
-  "sha256": "4abf05902fe09f7f6bec947c991c648669d26f39187f2f285866392c1c633eab",
-  "size": 173926
+  "sha256": "c071af1bd56b7e3be5dc36b9882732bb8acab9b4950abbf656d5a367f2353b92",
+  "size": 150092
  },
  "K/K10 其他收益.xlsx": {
   "sha256": "04996321e9ff9525b293ef3fd2bd0fffbc1249aae2e760ddd7c90aa836afbc0d",
@@ -920,24 +920,24 @@
   "size": 58775
  },
  "K/K2 其他流动资产.xlsx": {
-  "sha256": "86740bb85e21ab85e85fefe9e9cd55d9e2267da406f8e3329096e21503919894",
-  "size": 189597
+  "sha256": "5ae401411039385e70766635dc9eeb9c0a79c6da4f8c1af316b2ad1430589162",
+  "size": 54831
  },
  "K/K3 其他应付款.xlsx": {
-  "sha256": "b2770bdc8a67aaca5a3e2eefd8934a189abd3e57ffd872597d22176540718d4e",
-  "size": 92581
+  "sha256": "f4412b5655d46d8b59d8b2919fab0a12d2d6c9e3d254d99ffbc8e479155e25e3",
+  "size": 80057
  },
  "K/K4 其他流动负债.xlsx": {
-  "sha256": "88cdf2e65d75840adb9db327fe5d46ee49986d03d17f396c1596d053a59611dd",
-  "size": 170841
+  "sha256": "eba8df02b32f2da217b0211481517ef41a6ecd54e98a2ba0c659fa1a29dd3612",
+  "size": 43845
  },
  "K/K5 预计负债.xlsx": {
   "sha256": "01780f5ee08b4ea659651ae0d40f28b15388a4e140f28840e8b1ad50f0a9c8e0",
   "size": 81429
  },
  "K/K6 持有待售资产和负债.xlsx": {
-  "sha256": "f75f730e959f711c3cd8a7f0d8e33637cc32b6e1f034c103f3b8d88ff0b6076b",
-  "size": 118267
+  "sha256": "ee0ea36e382a5abda83dc4d764858ebcf77ea6e1646fcdd16f3f19d3502ce8c2",
+  "size": 105335
  },
  "K/K7 递延收益.xlsx": {
   "sha256": "90e915f70395698363b3aae3fef0ea0c38de7883292380eabaefa77d415c0e0b",
@@ -968,8 +968,8 @@
   "size": 87427
  },
  "L/L4 应付债券.xlsx": {
-  "sha256": "b4ba30cfde3d929908ab4989363c04944ed1134b9c25813370307db54443c255",
-  "size": 105661
+  "sha256": "548167816f0b27e9f7d50372ba5decd5f0b94e06710d9993035441f5cbba49fd",
+  "size": 105645
  },
  "L/L5 长期应付款.xlsx": {
   "sha256": "09380626107dc1b975662eaa60fa99ec541901c0729bb0d2b35bbb60807a9b68",
@@ -980,72 +980,72 @@
   "size": 37735
  },
  "L/L7 其他非流动负债.xlsx": {
-  "sha256": "9fe09748148a6f0692eef85e0c0cf3e24f22ea7e5d011c029dfa3e71bb04daea",
-  "size": 47108
+  "sha256": "35e47cf951e4ec008525d9f65008b3fc48852d59b1f25ac0089b5426394b9436",
+  "size": 40635
  },
  "L/L8 财务费用.xlsx": {
-  "sha256": "d915e3091a426aadab3828bf4ba43502e9cb3a967392d177d2c22a139c6634e6",
-  "size": 76069
+  "sha256": "f56843b02c3a34a443107d69207904b363187e887d2a359163fd2175381a368c",
+  "size": 65929
  },
  "M/M1 应付股利（利润）.xlsx": {
-  "sha256": "fe19e06e954699db4c0d710a12ec9af02ea4ba462d13fb7cd9fc2ed4d5fa6bf2",
-  "size": 302441
+  "sha256": "0a3697a485d16b843be7870db54fa92a732a39c5d7edea92d03585ef6695115d",
+  "size": 60031
  },
  "M/M10 其他权益工具.xlsx": {
-  "sha256": "c804b879770c07c261d903917a7d6ae43af8047d2a6c40d707c08673ca489eea",
-  "size": 139234
+  "sha256": "073d75ae83274d4d54147934b5a4ef2b00d4be5c8a020b7cd074a99613ac8077",
+  "size": 69169
  },
  "M/M2 实收资本（股本）.xlsx": {
-  "sha256": "85b8e9bf871e89dbd02dfccd00ebe9c8dec1d8b137faedfa996dfa4ec26686a0",
-  "size": 120532
+  "sha256": "9fb504204d6ab731d85c67ba43fdfc7ccda92787bc0a6d95bc83d14c74ffe15b",
+  "size": 63112
  },
  "M/M3 库存股.xlsx": {
-  "sha256": "a0ee640d9f3919e6c10e46dc9048dcc860472116a68da128df7ab4f087939151",
-  "size": 109810
+  "sha256": "ec8448c9df0fc5ae93f83fd2016e2ab26091e38749397595f66da818e9162115",
+  "size": 53645
  },
  "M/M4 资本公积.xlsx": {
-  "sha256": "09d6688e728023c48ccd49013dba718dbb5154bda2dbc6e6a8ef94cde5d545dd",
-  "size": 105867
+  "sha256": "40a8fa32902252105c2fe06409f6366a83881c305d97c7a08419f0fc84596a0a",
+  "size": 50633
  },
  "M/M5 盈余公积.xlsx": {
-  "sha256": "572919b71ca374fe34c62f4c59d5756f902a0492bb81e286c4d4af066b98db45",
-  "size": 109027
+  "sha256": "0e32a0567e4e3a36e137fa2f2d8ae66a0b1d5eaf266dfd57f9ffd1ce24ae2316",
+  "size": 53489
  },
  "M/M6 未分配利润.xlsx": {
-  "sha256": "fc09ebd1c95e56f616ebca1b046a0a1fe2a5e04b5b786877dbe953c486d07bd7",
-  "size": 114625
+  "sha256": "bedd8b0799b4170b06e0257e9a19e3a5ea5585dae02704231bf93a57cf830bf5",
+  "size": 45696
  },
  "M/M7 专项储备.xlsx": {
-  "sha256": "46d938a5d9c3e1651a6cd7f04fcaeafa9fa3ff9fe830b56afc28a928349906ae",
-  "size": 108714
+  "sha256": "9604cf8805dbf0446853c3f718bab1f7e0f126002c4df4bf468d04923086dbfc",
+  "size": 53059
  },
  "M/M8 一般风险准备.xlsx": {
-  "sha256": "6ea4da1f3a9ba741633f89edab167f9dc21c9f8bcccf95ebcbb1fda5c779f8c6",
-  "size": 114420
+  "sha256": "248a8bb72f1b3c2f8ec28950f718138462ec26a33b6e46c58884a47a74cbbcc1",
+  "size": 58891
  },
  "M/M9 其他综合收益.xlsx": {
-  "sha256": "bc9994a0828b0b61c701363b01cf23779595075ea249accb31f03c46bcea794e",
-  "size": 453383
+  "sha256": "0cfdc95ce3f9410610037b684f50a07f874df1cab4cebe09aa63c6461b6fbc66",
+  "size": 60847
  },
  "N/N1 递延所得税资产.xlsx": {
-  "sha256": "2ca3ebbcd6f65c91da37bc576bb1af071543bf54d10b05d71c1216d2993386b5",
-  "size": 125085
+  "sha256": "892aaa102c6a330872713a4561dfed2859ff4b5301fe38076c9934250b7d9d12",
+  "size": 58604
  },
  "N/N2 应交税费.xlsx": {
-  "sha256": "24e92c2353b2abd6d89537361f195b490977757b9b49896285beb0661a6443b1",
-  "size": 159454
+  "sha256": "ec6e6712cc4b52edaf5bcaa794f90cd9345edd8c0273473f21b8c5d31e542f43",
+  "size": 86649
  },
  "N/N3 递延所得税负债.xlsx": {
-  "sha256": "dd3759ffa5859716e07cf8cffb35594122cf1bd999cedd24bc84a3f3ab77ac5f",
-  "size": 89735
+  "sha256": "4dc7275fc38f85f265e4da985a50f30d97a59da66b891f35e8d4c49cbfc52d0f",
+  "size": 28235
  },
  "N/N4 税金及附加.xlsx": {
-  "sha256": "ae2ae9e1b290b11afe41be1e12156df20c47bc64644a293a5d5547bc35dd8c73",
-  "size": 55903
+  "sha256": "28e4b30f1c3f6123860a10989318e40304b7004272e78df835e6029ec39fcc08",
+  "size": 46325
  },
  "N/N5 所得税费用.xlsx": {
-  "sha256": "0fa060b214a7eed83bf53e5153752abdb765cc1da922506d6d539d3003f8bd3d",
-  "size": 124437
+  "sha256": "d5dd5b29ac649dbbd2959496bcdad4c984f0210996bdaba2407072758c4e89b3",
+  "size": 92455
  },
  "S/S1 对被审计单位违反法规行为的考虑2019.xlsx": {
   "sha256": "433eadf9d37e0c3f8ec9cb3f623faf4e982d76b0064d9801a7f359637b0fef82",

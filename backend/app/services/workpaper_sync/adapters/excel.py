@@ -359,7 +359,10 @@ class ExcelSyncAdapter:
         # 因此不存在「读到上一趟旧字节」的可能。
         # 🔴 下面每一处 `unlink` 之前都必须 `release_scoped_workbooks`，否则缓存里的
         # zip 句柄会让 Windows 删不掉临时文件。
-        with workbook_read_scope():
+        from app.services.workpaper_sync.formula_restore import restore_scope_for
+
+        # OO→HTML：受保护公式格按已发布形态的公式写回（R4，见 formula_restore）。
+        with workbook_read_scope(), restore_scope_for(self, substrate, contract):
             return self._materialize_within_scope(
                 substrate=substrate,
                 projection=projection,

@@ -112,6 +112,7 @@ from app.services.workpaper_sync.conflicts import (
     resolved_value_for,
 )
 from app.services.workpaper_sync.contracts import (
+    FORMULA_MODES,
     PROTECTED_MODES,
     ROW_UUID_PLACEHOLDER,
     FieldMode,
@@ -896,7 +897,8 @@ class ContractIndex:
         真正整列是公式的动态行字段，CS-13 要求它声明 ``mode=formula``，走第一类判定。
         """
         spec = template.spec
-        if spec.mode is FieldMode.formula:
+        # 本表公式与跨表公式同为公式字段（`contracts.FORMULA_MODES`，R7）。
+        if spec.mode in FORMULA_MODES:
             return ProtectionPolicy.read_only_formula
         if spec.mode is FieldMode.auto_source:
             return ProtectionPolicy.read_only_auto_source
@@ -922,7 +924,7 @@ class ContractIndex:
 
     @staticmethod
     def _field_source(spec: FieldSpec, document_type: str) -> FieldSource:
-        if spec.mode is FieldMode.formula:
+        if spec.mode in FORMULA_MODES:
             return FieldSource.server_formula
         if spec.mode is FieldMode.auto_source:
             return FieldSource.auto_data_source
@@ -1555,7 +1557,7 @@ def merge_projections(
 
         if (
             row_id in added_rows and i.present and not b.present and not c.present
-            and locator.mode is FieldMode.formula
+            and locator.mode in FORMULA_MODES
             and locator.protection_policy in _SPREADSHEET_RECOMPUTED_POLICIES
         ):
             if families is None:

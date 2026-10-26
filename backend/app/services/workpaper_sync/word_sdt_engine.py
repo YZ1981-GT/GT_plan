@@ -124,6 +124,7 @@ from app.services.workpaper_sync.merge import (
     reduce_word_instances,
 )
 from app.services.workpaper_sync.contracts import (
+    FORMULA_MODES,
     ROW_UUID_PLACEHOLDER,
     CarrierGate,
     FieldMode,
@@ -866,14 +867,14 @@ def _locator_for(spec: FieldSpec, *, key: str, xpath: str, row_key: str) -> Fiel
         else ProtectionPolicy.word_only
         if spec.mode is FieldMode.word_only
         else ProtectionPolicy.read_only_formula
-        if spec.mode is FieldMode.formula
+        if spec.mode in FORMULA_MODES
         else ProtectionPolicy.read_only_auto_source
     )
     source = (
         FieldSource.onlyoffice_sdt
         if spec.mode in (FieldMode.editable, FieldMode.word_only)
         else FieldSource.server_formula
-        if spec.mode is FieldMode.formula
+        if spec.mode in FORMULA_MODES
         else FieldSource.auto_data_source
     )
     return FieldLocator(
