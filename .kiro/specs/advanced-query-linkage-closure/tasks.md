@@ -1,0 +1,137 @@
+# 实施计划：高级查询联动闭环（advanced-query-linkage-closure）
+
+> 每个任务 = 一个可独立测试的交付单元；引用 `R x.y` / `ADR-AQL-NN` / 变异 `#N`（design §10.4），不复述。标 `[ ]*` 的任务依赖外部运行环境（start-dev 运行环境 / 合并项目数据），未实测时保持未勾，并在任务下写「代码已改但未实测」。
+> 通用纪律：后端测试 `rtk ..\.venv\Scripts\python.exe -m pytest <文件> -q -p no:playwright`（cwd `backend`）；前端 `rtk npx vitest run <文件>`（cwd `audit-platform/frontend`）；改前端后跑单区域 vue-tsc（先例 `tsconfig._g-single-region.json`），并用一条故意的类型错误证明它会报错；真 PG 测试只用回滚事务或【测试】/【UAT】项目；每个任务开工前对涉及文件重跑现状确认（grep / 行数 / 调用方）并写入勾选说明（design §12）；每个断点在根因处修复并配一条防御测试；临时产物放仓库根 `tmp_aql_linkage/`；勾选必须附测试命令与结果摘要，依赖环境的项不得改标星或假绿。
+> 依赖：1 → 全部；2 → 35；1 → 6 → 7；3 → 4 → 5 → 7 → 8；7 → 16~23、26；9 → 10 → 11；9 → 23；12 → 30；13 → 14、15；24 → 25 → 33；27 → 28~33；11、26 → 28~30；28~34 → 35 → 36 → 37*、38* → 39。
+
+## 阶段 A　测试地基
+- [ ] 1. 测试地基与基线（R12.3、R12.5 底座）
+  - `tests/test_query_builder_endpoint.py`、`tests/test_query_builder_joins.py` 夹具改为只建构建器所需表（`Base.metadata.create_all(tables=[…])`），两文件 32 条恢复运行
+  - `tests/authz_world.py`：`sqlite_world` / `pg_world` 增可选参数 `extra_tables`（缺省仍只建六张表，`test_world_has_exactly_the_six_tables` 不变）；`test_authz_world.py` 加「extra_tables 建出、缺省仍六张」用例
+  - 新建 `tests/advanced_query_linkage/conftest.py`：`pg_only`、金标准 SQL 助手（统计排除软删项目）、真库回滚事务会话夹具
+  - 前端 `advancedQueryFrontend-p7.spec.ts`「legacy global 显示为公开」超时：定位 `mountTabForScope('manager')` 不 resolve 的根因并修复（禁止只调大超时）
+  - 现跑评估列出的 10 个后端 + 4 个前端测试文件，结果写入本条作为回归基线
+- [ ] 2. 端点权限配方表骨架（R12.5、N2，design §10.3）
+  - 新建 `tests/advanced_query_linkage/test_aql_endpoint_authz.py`：基于 authz_world 表驱动，29 行逐格按「底座」列选 `sqlite_world` / `pg_world`；现已成立的格直接断言，待修复的格 `xfail(strict=True)` 并注明修复任务号
+  - 路由对账：custom_query、custom_query_writeback、query_builder 三个 router 的每条路由都出现在表中，缺失即红（新增路由在其任务里补行）
+
+## 阶段 B　口径、计数与隔离（P0）
+- [ ] 3. 多项目数据集谓词（R1.2；design §3.4）
+  - `services/dataset_query.py` 新增 `active_rows_predicate(db, table, *, project_ids, year)`（先查生效数据集再按 id 过滤，排序同 `DatasetService.get_active_dataset_id`，查询失败原样上抛）
+  - PG `test_aql_dataset_predicate_pg.py`：每个活项目年度与 `get_active_filter` 行集合相等（含宜宾临港店与无生效数据集的项目）；SQLite 上编译执行不报错
+- [ ] 4. 源注册表与 SQL 分页内核（R2.1~R2.3、R6.1~R6.3、R12.2，ADR-AQL-03 / 06；变异 #14）
+  - 新建 `services/custom_query/source_registry.py`（design §3.1 全部 SQL 源）、`services/custom_query/paged_fetch.py`
+  - `param_sql_builder.build_portable_filter`（in / not_in / prefix / nonempty）；`build_filter` 的 like / not_like 转义；`builder_dsl._build_filter` 改为委托
+  - 单元测试 `test_aql_source_registry.py`：列与 ORM 反射一致；未知筛选键 / 条件字段 / 算子 / 列 400；postgresql 方言编译后断言 WHERE、ORDER BY 末项唯一键、NULLS LAST 只在可空列、用户值参数化；like 按字面匹配 `%` `_`
+- [ ] 5. 编排器与 execute 契约接入 FetchPage（R2.1~R2.5、R2.8、N3）
+  - `query_orchestrator.py`（FetchPage、conditions / condition_logic 进 cache_def、meta 往返）、`execute_compatibility.py`、`services/query_cache.py`（canonical identity）、`pagination.py`（删 SQL 源默认排序条目；内存源默认 `_row_index`；`TIE_BREAKER_CANDIDATES` 以 `_row_index` 打头）、router `QueryRequest` 新字段
+  - 单元测试 `test_aql_orchestrator_fetchpage.py`（含内存源行序与同值保序）；`TestExecuteContractBaseline` 保持全绿
+- [ ] 6. 删除 batch-execute 族（R12.1，ADR-AQL-13；单独提交，必须先于任务 7）
+  - 删前 grep 生产调用方为 0（结论写入本条），跑 `test_batch_query.py`、`test_function_global_names_ratchet.py` 等作基线
+  - 删 `POST /batch-execute` 及其请求 / 响应模型、`BatchQueryToolbar.vue`、`composables/useBatchQuery.ts` 与 `useBatchQuery.test.ts`、`customQuery.batchExecute`；按 design §3.9 删改相关用例
+  - 删后同组测试全绿；提交前打 tag
+- [ ] 7. 取数分派切换与取数器下沉（R2、N4）
+  - `business_fetchers.py` 改为注册表分派，删跨模块单元格分支与 `fetch_cap_warning`
+  - 新建 `services/custom_query/fetchers/{__init__,disclosure,worksheet,workpaper_cells}.py`（行为原样迁移，只读改造在任务 16）；router 删 14 个 `_query_*`，`_query_disclosure` 由 fetchers 再导出
+  - 改写依赖旧分派的测试（`test_advanced_query_hardening_wave012.py` 的 `_query_trial_balance` 替身用例），理由写入本条
+  - `backend/scripts/file_size_whitelist.txt` 中 `custom_query.py` 基线下调为真实行数（只改这一行）
+- [ ] 8. 业务视图口径真 PG 回归（R1.1、R1.3、R2.1~R2.5、R2.7、R5.8，ADR-AQL-07；变异 #1、#3、#4）
+  - `test_aql_business_view_pg.py`：宜宾临港店科目余额；和平药房序时账 total、借方降序首行、第 N 页与相邻页不重叠、offset 超限 422；科目 1002 分组 > 5,000 ⇒ 400；华氏试算表首行与 Σ审定；底稿清单；无生效数据集的 warnings；查生效数据集失败（在下一层注入异常）⇒ 500 而不是退化为不过滤
+  - 记录和平药房序时账首页耗时（N1）
+- [ ] 9. 构建器作用域（R1.2、R3.1~R3.3、R3.5 后端；变异 #2、#5、#16）
+  - `builder_scope.py`（`resolve_builder_scope` 新参数、`scope_predicates`、已删项目排除、projects 按 id、staff 角色门、report_config 副本行、数据集谓词预先算好）、`builder_dsl.py`（QueryDSL `project_id` / `year`；基表谓词进 WHERE 最后一步、JOIN 目标谓词进 ON）、`table_whitelist.py`（`DATASET_SCOPED_TABLES`、`ROLE_RESTRICTED_TABLES`）、`routers/query_builder.py`（三端点传 `requested_project_id` 与 `year`）
+  - 测试：方言编译断言（目标谓词在 ON）+ PG（宜宾计数、e2e_manager 的 projects、指定不可访问项目 403、staff 对 manager 403、design §10.2「LEFT JOIN 无匹配行」、report_config 副本行只给可访问项目）
+- [ ] 10. JOIN 基数登记（R3.4；变异 #6）
+  - `table_whitelist.JOIN_WHITELIST` 按 design ADR-AQL-09 表逐条加 target_where 与 cardinality，删除 report_line_mapping → report_config；导入期不变式；schema 下发 cardinality；一对多 warning
+  - PG 守卫 `test_aql_join_cardinality_pg.py`：逐条覆盖保留的 11 条登记——多对一在活项目上 LEFT JOIN 后行数不变，一对多产生 warning；被删登记请求返回 400 `JOIN_NOT_REGISTERED`
+- [ ] 11. 构建器 total、排序与公式引用（R2.2、R2.6 后端、R3.7，ADR-AQL-18）
+  - `builder_dsl.build_count`；可空列 `.nulls_last()`；`query_builder.execute` 的 total = COUNT；`_derive_formula_refs` 对 tb_balance 返回 None
+  - 改写 `test_query_builder_formula_ref_grammar_v1.py`（design §10.1）
+  - 测试：和平药房 total = 金标准、借方降序首行非空；PG 校验华氏每条 formula_ref 经地址库有效
+- [ ] 12. 构建器准入（R3.6 后端、R11.3，ADR-AQL-08；变异 #13）
+  - 新建 `services/custom_query/builder_access.py`；`require_query_builder_access` 改 async；新增 `GET /api/query/access`（admin / partner 返回 `all_projects`）；`tests/authz_world.py` 把新门禁登记进 `PRODUCTION_GATES` 与 `_GUARDED_MODULES`
+  - 改写 `test_query_builder_role_gate_pbt.py`（await 异步依赖）；新测试覆盖系统角色、项目经理、只读成员、已删项目成员
+
+## 阶段 C　写入安全（P0 / P1）
+- [ ] 13. 删除 tb / adj / report 回写实现（R4.1，ADR-AQL-02；单独提交）
+  - 删前 grep 调用方（结论写入本条）并跑基线；`snapshot_writer_modules.py`、`snapshot_writer.py` 删三模块；`CellWritebackRequest` 与 writeback 目标的 module 改 `Literal["workpaper", "note"]`
+  - 改写 `test_snapshot_writer.py`、`test_custom_query_auth_bug_condition.py`、`test_custom_query_auth_preservation.py` 中依赖三模块的用例（改为断言 422）；`file_size_whitelist.txt` 里 `test_snapshot_writer.py` 的基线按实际行数下调；删后同组测试全绿；提交前打 tag
+- [ ] 14. 回写取行带项目条件与预览门（R4.2、R4.5；变异 #11、#21）
+  - `snapshot_writer.py` 底稿取行（新异常 `WritebackTargetNotFound`）、`write_note_cell` 取行、`writeback_preview.py`（`_build_item` 归属核对、`_read_workpaper_value` 带项目、有 `found=False` 即不可确认）；cell-writeback 与 writeback-confirm 异常映射（design §3.7）
+  - 改写 `test_writeback_preview.py` / `test_writeback_pbt.py` 中固化缺陷的断言；单测覆盖「全部可定位 → 可确认」「一个不可定位 → 不可确认」
+  - PG `test_aql_writeback_isolation_pg.py`：design §10.2「回写不锁他项目行」「回写预览门」两行
+- [ ] 15. `publish_rows` 调用方棘轮（R4.3；变异 #9）
+  - 新建 `tests/advanced_query_linkage/test_aql_publish_rows_callers.py`：AST 收集 `publish_rows` 的导入与调用，登记集 = design §1 所列的 5 个他域调用方（任务 13 删掉 `snapshot_writer_modules` 那一处之后）；高级查询包零调用；登记集多一个或少一个都红
+- [ ] 16. 查询路径只读（R4.4；变异 #10、#10b）
+  - `fetchers/workpaper_cells.py`：无文件提示、写盘只在 `_temp_copy`、`recompute_with_libreoffice` 只返回字节；router `wp_sheet_preview` 改调它
+  - AST 守卫：模块内无 `init_workpaper_from_template`；`shutil.copy*` / `.write_bytes` / `.write_text` / 写模式 `open` / `os.replace` / `shutil.move` 只出现在 `_temp_copy`；`_temp_copy` 的调用点都传 `tempfile` 目录；`recompute_with_libreoffice` 返回 bytes 且函数体无写调用
+  - PG：前后 sha256 与 mtime 不变；LibreOffice 不可用时的 warnings
+
+## 阶段 D　数据源（P1）
+- [ ] 17. 报表源与报表行次（R5.1、R5.3；变异 #8、#20）
+  - 注册表 report 源（准则 = `resolve_applicable_standard`，准则行 ∪ 本项目独有行，LEFT JOIN financial_report，未生成 / 过期 warnings）与 report_lines 源（row_number，项目副本行限本项目）
+  - PG：华氏 BS-002 = financial_report 值；design §10.2「报表源结构」行；无报表的项目金额为空且有 warnings；报表行次可查且按行号排序
+- [ ] 18. 调整分录源（R5.2；变异 #7）
+  - adj_aje / adj_rje、adj_rcl 兼容、大写值归一、通用源全部类型 + 类型列、entry_group_id 隐藏列；consol_unit 调整分录改小写枚举
+  - PG：华氏 AJE 行数 = 金标准；无 RJE 的项目返回 0 行不报错；通用源行数 = 全部类型金标准
+- [ ] 19. 附注源与项目章节树（R5.4，ADR-AQL-16；变异 #17）
+  - `fetchers/disclosure.py`（附注目录、按表返回、`meta.tables`、`_row_index`、章节集合取 `get_notes_tree`）；router `get_indicators` 增 `year` 与 `X-Notes-Version`，`_build_disclosure_tree` 增项目分支（函数名不变，更新测试替身签名）
+  - PG：华氏叶子与 `get_notes_tree` 章节集合、顺序一致；「八、1」第一张表行数与行序 = `table_data`（合计行最后）；表切换返回第二张表；附注更新后 `X-Notes-Version` 变化
+- [ ] 20. 指标树按项目形态（R5.5、R5.7 叶子列，ADR-AQL-10 / 16）
+  - 单体隐藏 tb_summary / ws_* 并更名；叶子 columns 与 supports_conditions 由注册表生成；调整分录叶子改名；schema 版本 11
+  - 单元测试：叶子列 == 注册表显示列；单体 / 合并两种树形
+- [ ] 21. 辅助核算源与构建器白名单扩充（R5.6）
+  - 注册表 aux_balance / aux_ledger（`required_filters`、跨维 warnings）；`table_whitelist` 增 tb_aux_balance / tb_aux_ledger / financial_report（超 800 行按 design §9 先抽伴生模块）
+  - PG：和平药房某科目带 aux_type 筛选的行数 = 金标准；辅助明细不带筛选 400；构建器查 tb_aux_balance 的口径同 R1；辅助明细首页耗时记录（N1）
+- [ ] 22. 列补齐与标签（R5.7、R6.6）
+  - 试算表 rje_adjustment、余额方向列；`queryColumnLabels.ts`（summary「摘要」、ws_consol_tb 覆盖为「汇总数」、新列中文）+ `queryColumnLabels.spec.ts`
+- [ ] 23. 循环范围（R3.8，ADR-AQL-19；变异 #19）
+  - 新建 `services/custom_query/cycle_scope.py`；接入试算表、调整分录、附注目录 / 章节与附注树（`SECTION_OUT_OF_SCOPE`）；`resolve_builder_scope` 排除循环受限项目（`CYCLE_SCOPED_PROJECT`）
+  - PG：design §10.2「循环范围」行（含附注映射为空集时与附注页同样不过滤）
+
+## 阶段 E　模板与导出后端（P1 / P2）
+- [ ] 24. 模板后端（R9.1~R9.3，ADR-AQL-11；变异 #12）
+  - `template_service.py`（只用 adapter 归一与可见性、`visible_templates`、`config_to_request`、错误码 `TEMPLATE_NOT_VISIBLE`）；`template_scope_adapter.py` 报错改中文；router 模板端点（list / get / execute 走 service、`TemplateForbiddenError` → 403、`TemplateInvalidError` → 400、删 update 末尾的原值覆盖、execute 年度与分页）
+  - 改写固化旧 scope 模型的断言（design §10.1 所列三个文件），逐条写明理由；新用例：非作者执行私有模板 403、更新 `scope=global` 入库为 public、adapter 报错为中文
+- [ ] 25. 模板软删与回收站（R9.5，ADR-AQL-11；迁移 design §8）
+  - 迁移 V{n} / R{n}（号实施时现扫并写入本条）；ORM 混入 `SoftDeleteMixin`；`template_service.soft_delete`；`routers/recycle_bin.py` 作者类型；`MigrationRunner(...).run_pending()` 落本地库
+  - 测试：软删后列表 / 详情 / 执行 404；回收站作者与 admin 可见、可恢复、可彻底删除，他人 403；列 / 索引 / 约束存在，R 文件可回放
+- [ ] 26. 服务端完整导出（R8.1~R8.6，ADR-AQL-14；变异 #18）
+  - `export_service`（`info_rows`、`_text_safe_cell` 接入数据行 / 表头 / 查询说明）；新建 `services/custom_query/export_gate.py`；`POST /api/custom-query/export`（首块预取、导出槽在生成器 finally 释放、审计）；`query_builder.export_excel` 改用 export_service（同一导出闸、COUNT 预检、headers、去掉 1,000 行限制）
+  - 单元：导出闸 429 / 释放 / 幂等；PG：design §10.2「导出」行；10 万行导出耗时记录（N1）
+
+## 阶段 F　前端联动（P1 / P2）
+- [ ] 27. 前端公共模块（R7.1~R7.3、R10.3、R10.4、R11.1~R11.2，ADR-AQL-01 / 16 / 18；变异 #15）
+  - 新建 `queryResultLinks.ts`（含 `validatePageRefs`）、`queryErrorText.ts`、`queryEntryContext.ts`（含 `resolveDialogOpenContext`）、`queryTemplateCache.ts`、`queryIndicatorCache.ts`；`useLedgerUrlSync.ts` 抽出 `buildLedgerQuery`
+  - vitest：ADR-AQL-01 每一行一条用例；四种引用语法；批量校验按 `ref` 回填、WP `not_found` 文案、请求失败全部不可用；422 / 429 / 500 / 信封对象文案；缓存键含年度与附注版本、版本变化不命中
+- [ ] 28. 弹窗改造（R2.6、R7、R8.3、R10.1~R10.2、R11、N5，ADR-AQL-15）
+  - `CustomQueryDialog.vue` 按 design §4.2；`SheetCellRangePicker.vue` 年度改由父组件传入；删除年度兜底棘轮中这两个文件的条目
+  - vitest：换路由后项目跟随、非项目页不自动选、年度为空禁用查询、错误不落空态、翻页显示 total、「仅筛选本页」、操作列打开 / 复制引用（不可用时显示原因）、结果区没有回写入口（R7.5）；操作、翻页、导出控件带 aria-label（N5，页面版与构建器同口径断言）
+- [ ] 29. 页面版改造（R6.1~R6.5、R7、R10.2、R10.4、N5，ADR-AQL-12 / 16）
+  - `CustomQueryTab.vue` 按 design §4.2；改写 `advancedQueryFrontend.spec.ts` 的「今年 − 1」断言；删除棘轮条目
+  - vitest：结构化条件与 AND / OR 进请求、未知字段提示、条件值框可输入、中文列名、ACNR 面板「开发中」且请求不带 acnr_targets、指标树带项目与年度加载
+- [ ] 30. 构建器前端（R2.6、R3.5、R3.6、R6.5、N5，ADR-AQL-08 / 12）
+  - `AdvancedQueryBuilder.vue`、`useQueryBuilderAccess.ts`（access 接口）、`services/apiPaths/system.ts`（queryBuilder 组）；改写 `test_advanced_query_hardening_properties_scope.py::test_p23_*`
+  - vitest：无权禁用 + 原因、默认当前项目、跨项目开关（含 all_projects）、翻页
+- [ ] 31. 入口上下文（R10.1~R10.3，ADR-AQL-15）
+  - `ThreeColumnLayout.vue`：只新增 `customQueryYear`（`currentYear` 不动），经 `resolveDialogOpenContext` 处理 override / 侧栏预选 / 关闭清空；行数 ≤ design §9；年度兜底基线中 ThreeColumnLayout 条目保留
+  - vitest：`resolveDialogOpenContext` 各分支；静态守卫用 `@vue/compiler-sfc` 解析模板，断言 CustomQueryDialog 的 `:year` 绑定 `customQueryYear`、FormulaManagerDialog 与 GtRefreshScopeDialog 的年度绑定仍含 `currentYear`
+- [ ] 32. 报表与模板库深链、模板溯源（R7.1 报表行、R7.4，ADR-AQL-17）
+  - 新建 `composables/useReportRouteFocus.ts`（`?tab=&highlight=`）；`ReportView.vue` 净增 ≤ 0（现跑 HARD_CAP 门禁）；`TemplateLibraryMgmt.vue`、`WpTemplateTab.vue`；router `address_resolve`
+  - 测试：`wp_template_registry` 表不存在时 address-resolve 用 JSON 目录且不 500、页签名正确；vitest 覆盖普通模式、对比模式、矩阵报表三种情况与找不到行次
+- [ ] 33. 模板选择组件（R9.3、R9.4）
+  - 修复 `MyTemplatesDialog.vue` 并接入弹窗（载入 / 执行，执行走 `templateExecute`）与页面版（替换内联模板对话框）
+  - vitest：列表解包、载入还原状态、执行与翻页、删除提示进回收站
+
+## 阶段 G　收敛与验收
+- [ ] 34. 删除其余收敛对象（R12.1，ADR-AQL-04 / 13；按 design §3.9 一类一提交）
+  - 每类删前 grep 0 调用方、删前后跑同一组测试（跨模块单元格源族另跑 `test_lazy_import_resolvability.py`）、提交前打 tag；下调 `test_module_cell_resolver.py` 白名单基线；`SheetCellRangePicker.vue` 删模块模式
+- [ ] 35. 权限配方表全部转正与磁盘变异（R12.5、N2，design §10.3 / §10.4）
+  - 删除全部 xfail，路由对账通过；21 条变异（另含 #10b）逐条打红（单独一条命令跑，逐字节恢复后 sha256 核对），结果写入本条
+- [ ] 36. 性能与 e2e 静态复核（N1、R12.4）
+  - N1 三项实测，`EXPLAIN ANALYZE` 摘要写入本条；不达标按 ADR-AQL-06 预案①②处理后重测，仍不达标保持本条未勾并附实测与执行计划，索引迁移只提 W12 不执行
+  - 两个高级查询 e2e spec 只做静态核对（路由、选择器是否还在）：过期的更新或删除，保留的写入任务 37 清单；实际运行归 37*
+- [ ]* 37. 浏览器全链路实测（写后读回，design §10.5）：需 start-dev 运行环境；未实测时写「代码已改但未实测」
+- [ ]* 38. 合并项目路径实测（tb_summary / ws_* / consol_unit / 合并附注）：现库 0 个合并项目；未实测时写「代码已改但未实测」
+- [ ] 39. 收尾
+  - `.kiro/specs/INDEX.md` 只更新本 spec 行；写 `closure.md`，逐条回显 design §2 全部裁决（ADR-AQL-01~19，含不做的 ADR-AQL-05）与 §11 待拍板（W1~W14）供用户复核；清理 `tmp_aql_linkage/` 与验证 worktree；核对任务数与 INDEX 一致
