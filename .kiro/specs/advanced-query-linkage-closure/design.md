@@ -2,14 +2,15 @@
 
 ## 0. 概览
 
-本设计把业务视图取数从「router 内 14 个文本 SQL 取数器 + 编排器在 ≤5,000 行样本上内存排序 / 分组 / 计数」改为「声明式源注册表 + 数据库内计数、排序、分页与条件」；JSON 类内存源保留内存处理，但触顶即拒、默认保持取数行序。构建器由一个作用域函数为计划中的每张表生成项目、未删、数据集、年度谓词（报表配置另加项目副本行谓词），基表谓词放 WHERE、JOIN 目标谓词并入该 JOIN 的 ON，并逐条声明 JOIN 基数、修正准入。循环级可见性与试算表 / 调整分录 / 附注页同口径。写入面只收窄不扩张：删除 tb / adj / report 写入，回写取行与预览带项目条件，查询路径只读。联动面以「下钻到权威页面 + 复制经地址库校验的公式引用 + 服务端完整导出 + 模板可共享可执行可回收 + 入口带路由上下文」交付。最后按删旧代码铁律删除无入口且接上也不可用的对象。按用户 2026-10-26 决定追加两批：W3 常用审计预置模板（ADR-AQL-05，只读 JSON 定义合入模板列表，载入到条件编辑器，复用 C24 词表、抽凭与截止测试的口径）与 W6 业务页行级「按此查询明细」（ADR-AQL-20，四处页面各挂一个入口组件，映射只在 `queryEntryContext.ts`，科目解析只在后端 `entry_accounts.py`）。本文为第 2 轮设计，评审意见回应见 §13，W3 / W6 的现状核实与裁决见 §14。
+本设计把业务视图取数从「router 内 14 个文本 SQL 取数器 + 编排器在 ≤5,000 行样本上内存排序 / 分组 / 计数」改为「声明式源注册表 + 数据库内计数、排序、分页与条件」；JSON 类内存源保留内存处理，但触顶即拒、默认保持取数行序。构建器由一个作用域函数为计划中的每张表生成项目、未删、数据集、年度谓词（报表配置另加项目副本行谓词），基表谓词放 WHERE、JOIN 目标谓词并入该 JOIN 的 ON，并逐条声明 JOIN 基数、修正准入。循环级可见性与试算表 / 调整分录 / 附注页同口径。写入面只收窄不扩张：删除 tb / adj / report 写入，回写取行与预览带项目条件，查询路径只读。联动面以「下钻到权威页面 + 复制经地址库校验的公式引用 + 服务端完整导出 + 模板可共享可执行可回收 + 入口带路由上下文」交付。最后按删旧代码铁律删除无入口且接上也不可用的对象。按用户 2026-10-26 决定追加两批：W3 常用审计预置模板（ADR-AQL-05，只读 JSON 定义合入模板列表，载入到条件编辑器，复用 C24 词表、抽凭与截止测试的口径）与 W6 业务页行级「按此查询明细」（ADR-AQL-20，四处页面各挂一个入口组件，映射只在 `queryEntryContext.ts`，科目解析只在后端 `entry_accounts.py`）。本文为第 3 版：第 1 轮评审回应见 §13，W3 / W6 的现状核实与裁决见 §14，第 2 轮评审回应见 §15。本地分支与远端已分叉，全部任务在合入远端后开工（tasks 任务 0）；标「合入后」的事实按远端分支现读，合入后重算。
 
 技术栈（批准后锁定）：后端 FastAPI + SQLAlchemy 2.x Core（asyncpg）+ PG 16，Excel 经既有 `services/custom_query/export_service.py`（openpyxl write_only）；前端 Vue 3 `<script setup>` + Element Plus + vue-router，业务数据请求走 `@/services/apiProxy` 的 `api`，需要响应头或 blob 时走 `@/utils/http`；测试 pytest（`pg_only` 真 PG；端点权限基于 `tests/authz_world.py`）、hypothesis `max_examples=5`、vitest；浏览器实测用 chrome-devtools / Playwright MCP。不引入新依赖，不新建 router。
 
-## 1. 现状确认（2026-10-26 读码 / grep / 只读 SQL，HEAD b5fc200e0；评估已有事实不重抄）
+## 1. 现状确认（2026-10-26 读码 / grep / 只读 SQL，HEAD b5fc200e0；评估已有事实不重抄。2026-10-27 第 3 版：标「合入后」的行按远端 `origin/spec/disclosure-note-doc-upload-and-batch-fill`（13120d6d6）现读——本地侧自 merge-base 3f7d857d2 起没有改动本 spec 的任何目标文件，合入后这些文件即远端版本；任务 0 合入后重算）
 
 | 改进点 | 现状确认 | 结论 |
 |---|---|---|
+| 分支 | 本地与远端同名分支分叉（2026-10-27 现算领先 12、落后 10）；远端 d0de87a6c 改了本 spec 的 17 个目标文件（`deps.py`、`project_audit_year.py`、新增 `wp_visibility/effective_scope.py`、`assignment_service.py`、`file_size_whitelist.txt`、`check_file_size.py`、`test_project_endpoint_authorization_baseline.py`、CustomQueryDialog、SheetCellRangePicker、TrialBalance、ReportView、DisclosureEditor、WorkpaperEditor、RecycleBin、GtC24JournalDetail、年度兜底基线与棘轮 spec），13120d6d6 另改白名单；`wp_account_mapping.json` 两侧改动相同 | 任务 0：合入后才开工，合入方式由用户决定 |
 | 四表口径 | `_query_account_balance` / `_query_ledger_entries` 只写 `is_deleted = false`；`dataset_query.get_active_filter(db, table, project_id, year)` 只服务单项目单年度，默认 fail-open（查生效数据集失败即回滚并退化为不按数据集过滤）；真库同一项目年度多个 active 数据集 0 组 | 业务视图用 `get_active_filter(strict=True)`；多项目口径在同模块新增可移植谓词 |
 | 计数 / 排序 / 分页 | 取数器以 `FETCH_HARD_CAP=5000` 取数，编排器 step5~7 内存分组、排序、计 total、切片；`fetch_cap_warning` 拿本页行数比 5,000；`pagination._tie_breaker_keys` 在结果列里找不到唯一键候选时把全部列按列名排序（附注表格行按金额重排、`cell_ref` 按字符串排序） | 新建注册表 + 分页内核；内存源加隐藏行序列 `_row_index` |
 | 条件谓词 | `param_sql_builder.build_filter` / `ParamSQLBuilder.build_where(conditions, *, logic, filter_builder)` 被 `builder_dsl` 使用；方言中立 in / not_in 在 `builder_dsl._build_filter`；like 不转义 `%` `_`；旧筛选键要的前缀、非空判定不在其中；业务视图零使用 | ADR-AQL-03 |
@@ -20,9 +21,9 @@
 | 回收站 | `routers/recycle_bin.py` 通用于带 `is_deleted` 的模型，可见性按项目，无 project_id 的类型只给 admin；`custom_query_templates` 无软删列；平台有 `models.base.SoftDeleteMixin` | 迁移加列 + ORM 用 mixin + 回收站增「按作者可见」类型 |
 | 构建器准入 | `_QUERY_BUILDER_ROLES` 只看系统角色；前端 `useQueryBuilderAccess` 与弹窗 `ADVANCED_ROLES` 各一份；`test_p23_*` 正则锁两份清单 | ADR-AQL-08 |
 | 构建器作用域与 JOIN | `apply_scope_to_select` 只对基表在 WHERE 追加 `project_id IN`；JOIN 支持 `left`（`outerjoin`）；`JOIN_WHITELIST` 12 条登记都无基数声明；report_config 自 V199 起有 `project:{uuid}` 项目副本行（现库 0 行；报表生成用 `load_effective_report_configs` = 准则行 ⊕ 本项目行）；`report_line_mapping → report_config` 只按行次码关联；account_chart 每码 client + standard 两行（部分唯一索引含 source） | ADR-AQL-09 |
-| 循环级可见性 | 试算表、调整分录、附注页按 `deps.get_user_scope_cycles` + `mapping_service.get_codes_by_cycles` / `get_sections_by_cycles` 过滤（本地 HEAD：试算表、调整分录映射为空即无行，附注页映射为空集时不过滤；远端 d0de87a6c 起入口改调 `effective_scope`、附注空范围即空，见 §14.4）；账簿穿透、报表、底稿清单页不按循环过滤；调整分录行 `account_code` 即标准科目码（`adjustment_service` 写入 `li.standard_account_code`）；高级查询各源与附注树都不过滤 | ADR-AQL-19 |
+| 循环级可见性 | 试算表、调整分录、附注页按 `deps.get_user_scope_cycles` + `mapping_service.get_codes_by_cycles` / `get_sections_by_cycles`（两者只读 `wp_account_mapping.json`）过滤。合入后入口改调 `effective_scope.resolve_member_scope`：admin / partner 与链路唯一的本项目主管返回 None，其余返回勾选 ∪ 扩大（可为空；查询失败按受限空集）；主管分支另读 `wp_index`（`project_cycles`）；附注目录与就绪度空范围即空（§14.4）；账簿穿透、报表、底稿清单页不按循环过滤；调整分录行 `account_code` 即标准科目码（`adjustment_service` 写入 `li.standard_account_code`）；高级查询各源与附注树都不过滤 | ADR-AQL-19 |
 | 回写 | 底稿写路径只认 univer_snapshot（真库 0 / 1,738）；writeback-confirm 直接用 `target.wp_id`，写路径先 `FOR UPDATE` 再比项目，查不到抛 ValueError（router 映射 400）；cell-writeback 的底稿已按 wp_code + 项目定位（跨项目在 HEAD 已 404）；预览对 `missing_target` 仍给 `enter_confirmation=true`；两个回写端点都要求 `X-File-Opened-At` 头；`batch_execute` 直接调 `_query_workpaper` / `_query_workpaper_cell_range`；`write_note_cell` 惰性导入 `module_cell_resolver._NOTE_COLUMNS`；`publish_rows` 生产调用方 6 处（`snapshot_writer_modules` + `event_handlers_cycle_linkage` + `m9_other_comprehensive_income` + `n2_taxes_payable` + `s_transaction_tb_writeback_service` + `s_estimate_tb_writeback_service`）；【UAT】子公司A / B 底稿 0 张，【UAT】合成集团母公司 consol_note_data 2 行 | ADR-AQL-02 |
-| 年度 | `list-with-progress` 与 `/api/projects` 已下发审计年度；年度兜底棘轮含 CustomQueryDialog / SheetCellRangePicker / CustomQueryTab / ThreeColumnLayout 各 1；ThreeColumnLayout 的 `currentYear` 同时传给 FormulaManagerDialog（L327）与 GtRefreshScopeDialog（L349） | ADR-AQL-15 |
+| 年度（合入后） | `list-with-progress` 与 `/api/projects` 已下发审计年度；平台入口 `deps.require_project_audit_year(db, project_id, requested_year)`（显式年度优先，否则 ORM 解析项目审计年度，缺失 422「未设置审计年度，请先在项目基本信息中填写」，SQLite 可用）；年度兜底基线只剩 13 个文件（含 `layouts/ThreeColumnLayout.vue` 1、`composables/useBatchQuery.ts` 1），CustomQueryDialog 的 `localYear` 已是 `ref<number \| null>(props.year ?? null)`、SheetCellRangePicker 模块模式已是 `props.year ?? null`，CustomQueryTab 的 `defaultAuditYear()` 在 `CALENDAR_YEAR_EXEMPT`（count 1，「豁免表可证伪」要求该文件仍命中扫描）；ThreeColumnLayout `currentYear` 仍是 `Number(route.query.year) \|\| 当年 − 1`，同时传给 FormulaManagerDialog 与 GtRefreshScopeDialog；TrialBalance、ReportView 的 `year` 取不到为 null，DisclosureEditor、ReportView 年度选择器初值 null；WorkpaperEditor 两个工具栏只在 `projectYear != null` 时渲染，否则显示 `AuditYearMissingResult` | ADR-AQL-15 / 20 |
 | 指标树缓存 | 弹窗缓存键 `{schema}:{pid}`（sessionStorage，无过期）；页面版固定 `no-project`；schema 版本经 `X-Indicators-Schema-Version` 下发 | ADR-AQL-16 |
 | 零挂载 | 除评估所列外，BatchQueryToolbar、FormulaTracePopover、SnapshotStalenessChip 零挂载；`composables/useBatchQuery.ts` 只剩自身测试 | ADR-AQL-13 |
 | 预置模板 | 无实现；6 个归档高级查询 spec grep「预置模板 / 预设模板 / 常用查询」0 处；现成筛选规则在 C24 前端引擎与抽凭 / 截止测试服务（§14.1） | ADR-AQL-05 |
@@ -30,7 +31,7 @@
 | 测试耦合 | `test_advanced_query_hardening_wave012.py` monkeypatch router `_query_trial_balance`；指标树测试替身 `_build_disclosure_tree`；`test_note_table_payload_readers_pg.py` 从 router 导入 `_query_disclosure`；`test_query_builder_role_gate_pbt.py` 同步调依赖；`test_query_builder_formula_ref_grammar_v1.py` 断言 tb_balance 生成 `TB(code,'期末')` 并以 `verify_existence=False` 证「期末」可解析（AQ-32 假绿）；`test_advanced_query_scope_budget_tiers.py` 断言 report_config ∈ unscoped_tables；`tests/authz_world.py` 已有 `sqlite_world` / `pg_world`、8 种身份与门禁自检，只建 6 张表 | 改写清单见 §10.1 |
 | 性能 | tb_ledger 有 (project_id, year, voucher_date, voucher_no)、(project_id, year, dataset_id) 部分索引等，voucher_date / voucher_no 非空；tb_aux_ledger 有 (project_id, year, account_code, voucher_date, id)；序时账默认排序升降混合，单索引覆盖不了 | ADR-AQL-06 N1 预案 |
 | 并发 spec 边界 | `formula-hub-integrity-closure` 不碰高级查询 DSL / acnr_targets，负责中央 TB() 口径与 `COLUMN_ALIASES`，也在改 FormulaManagerDialog 与 GtRefreshScopeDialog；`audit-year-calendar-fallback-ratchet` 负责全平台年度兜底 | TB 列名以地址库词表为准；不动这两个组件的年度 |
-| 行数门 | `custom_query.py` 3,086（白名单 2,966，上限约 3,114）；ReportView 1,949 = HARD_CAP；DisclosureEditor HARD_CAP 3,281；ThreeColumnLayout 1,546（白名单 1,515，上限约 1,590） | 先下沉取数器；HARD_CAP 文件净增 ≤ 0 |
+| 行数门（合入后） | 门限 = 白名单基线 × 1.05 取整，HARD_CAP 文件按 `test_hard_cap_ratchet` 要求上限 = 实际行数；`custom_query.py` 3,086（白名单 2,966，门限 3,114）；ReportView 1,949 = HARD_CAP；DisclosureEditor 3,265 = HARD_CAP（远端由 3,281 下调；本地 HEAD 上该棘轮已红 2 例）；TrialBalance 4,628（门限 4,715）；WorkpaperEditor 1,455（默认上限 1,500）；ThreeColumnLayout 1,546（门限 1,590）；GtC24JournalDetail 2,049（远端已登记白名单，门限 2,151） | 先下沉取数器；HARD_CAP 文件净增 ≤ 0；数字在任务 0 合入后重算 |
 
 ## 2. 裁决（ADR；closure.md 原样回显供用户复核）
 
@@ -55,7 +56,7 @@
 本 spec 不开放任何回写界面。advanced-query-module R13.6「查询结果引用到底稿」改由两种只读联动交付：①复制经地址库校验的公式引用（ADR-AQL-18），用户粘进底稿 / 附注公式后经各自权威保存链落库；②下钻打开权威编辑器定位后编辑。后端：删除 tb / adj / report 三个写入实现（P0）；cell-writeback 与 writeback-preview / confirm 的 module 收窄为 workpaper、note；取行与预览带项目条件（R4.2），预览有无法定位的目标即不进入确认（R4.5）。workpaper / note 写入代码与三个端点保持现状（无界面），是否下线进 §11 W2。理由：①TB 审定数只经发布门、调整分录只经调整分录服务是平台铁律，tb / adj 写入绕门，report 写的是全库 0 行的 report_snapshot；②底稿写路径依赖 univer_snapshot（0 / 1,738），接上界面对真实底稿恒失败，要可用须改走 workpaper_sync 内容写入，属新能力；③附注写路径只覆盖合并附注 consol_note_data（0 个合并项目），单体 disclosure_notes 无写路径，附注内容的权威写入方是附注编辑器与底稿单项推送；④整体删除回写栈会波及 workpaper_sync 写入者清单与门禁测试（`test_workpaper_writer_inventory.py`、`test_task20_writer_gate.py`、durable outbox 系列），属他域治理。
 
 ### ADR-AQL-03 `param_sql_builder`：接线（保留）
-作为业务视图结构化条件、旧筛选键与构建器条件共同的唯一谓词来源。新增 `build_portable_filter(col, op, value)`：承接 `builder_dsl._build_filter` 里方言中立的 in / not_in（空集合恒假 / 恒真），并提供两个只供注册表旧筛选键使用的内部算子 `prefix`（转义后 `LIKE value || '%'`）与 `nonempty`（True = 非空且非空串，False = 取反），二者不进 `OPERATOR_WHITELIST`，用户条件仍只认白名单；其余算子委托 `build_filter`。`build_filter` 的 like / not_like 改为先转义 `\ % _` 再包 `%`（`escape="\\"`，构建器同时受益）。`_build_filter` 名称保留为薄委托，既有测试不动。W3 起用户算子白名单增加两项（ADR-AQL-05）：`starts_with` 与 `prefix` 共用同一个谓词函数（同一转义规则），`weekday_in` 为新谓词；`prefix` / `nonempty` 仍只供旧筛选键。
+作为业务视图结构化条件、旧筛选键与构建器条件共同的唯一谓词来源。新增 `build_portable_filter(col, op, value)`：承接 `builder_dsl._build_filter` 里方言中立的 in / not_in（空集合恒假 / 恒真），并提供两个只供注册表旧筛选键使用的内部算子 `prefix`（转义后 `LIKE value || '%'`）与 `nonempty`（False = 「为空或空白」`_blank_predicate(col)` = `col IS NULL OR trim(col, ' \t\r\n\u3000') = ''`，True = 取反；`trim(string, characters)` 在 PG 16 与 SQLite 上同形，已只读验证；只含空白的公式也算「没有公式」是有意的），二者不进 `OPERATOR_WHITELIST`，用户条件仍只认白名单；其余算子委托 `build_filter`。`build_filter` 的 like / not_like 改为先转义 `\ % _` 再包 `%`（`escape="\\"`，构建器同时受益）。`_build_filter` 名称保留为薄委托，既有测试不动。W3 起用户算子白名单增加三项（ADR-AQL-05）：`starts_with` 与 `prefix` 共用同一个谓词函数（同一转义规则）；`is_blank` 与 `nonempty` 的 False 分支共用同一个谓词函数；`weekday_in` 为新谓词；`prefix` / `nonempty` 仍只供旧筛选键。构建器 DSL 的 `FilterCond.op` 是字符串、按同一白名单校验，三项对构建器同时可用。
 
 ### ADR-AQL-04 `cross_sheet_trace_orchestrator`：删除
 它与 `GET /cross-sheet-trace` 只读 univer_snapshot（真库 0 张），端点无前端调用方，配套 `FormulaTracePopover.vue` 零挂载。删除 orchestrator、端点、popover 及其专属测试；保留被 `wp_formula_eval_service` 使用的 `cross_sheet_resolver`。按删旧代码铁律单独提交（§3.9）。公式来源改由下钻到底稿格后编辑器自身展示。
@@ -67,7 +68,8 @@
 - 特殊事件关键词：C24 规则 11 写在 `useC24AnalyticsEngine.screenAnomalies` 的局部常量里 ⇒ 词表搬进本 JSON 的 `keyword_sets.special_event`，由生成器写出 `src/generated/journalEntryRules.ts`，C24 引擎改为 import 它（一处维护，`--check` 防漂移）。
 - 大额：平台口径是 `LedgerSamplingService.build_ledger_query` 的「`GREATEST(COALESCE(借,0), COALESCE(贷,0)) >= 阈值`」（抽凭与截止测试共用，注释写明不取绝对值）⇒ 抽成 `ledger_sampling_service.ledger_line_amount(table)`，抽凭与查询共用。C24 规则 4 是前端对导入分录的同义判断（`>`），不改。
 - 期末前后窗口：`CutoffTestService.run_cutoff_test` 的期末日规则（显式截止日，否则 `date(年度, 12, 31)`）与默认前后 5 天 ⇒ 抽成 `sampling_enhanced_service.cutoff_window()` 与两个默认值常量，截止测试与预置共用。
-- C24「含模糊词」默认词表写在 `GtC24JournalDetail.vue`（2,049 行，超前端默认上限 1,500 且不在白名单，改一行就被行数门拦）⇒ 本轮不做「模糊词」预置，进 §11 W16。
+- 默认模糊词：C24 规则 12 的默认词表写在 `GtC24JournalDetail.vue` 的 `ruleParams.vagueKeywordsText`（「调整,暂估,其他,冲销」）⇒ 搬进本 JSON 的 `keyword_sets.vague`，生成常量 `VAGUE_KEYWORDS_DEFAULT`，组件默认值改为 `VAGUE_KEYWORDS_DEFAULT.join(',')`（合入后该文件已登记白名单 2,049、门限 2,151：改 1 行 + 加 1 行 import 可过门；用户在底稿里改过的词表照旧只存在该底稿）。
+- 规则 9「借贷方不常见组合」（`debit > 0 && credit > 0`）与规则 13「没有摘要」（`!summary || summary.trim() === ''`）用现有算子与「为空或空白」表达，判断与 C24 相同；13 条规则逐条去向见 §14.1。
 
 预置清单（数据源都是序时账 `ledger_entries`；条件形状与用户模板的 `config.conditions` 相同：`{field, op, value}`）：
 
@@ -80,8 +82,13 @@
 | `je_large_amount` | 大额分录 | `line_amount` 大于等于 `materiality_performance` | and | 说明「借、贷较大者，与抽凭、截止测试同口径，不取绝对值；负数红字见负数金额分录」 |
 | `je_weekend` | 周末分录 | `voucher_date` 星期为 六、日 | and | 说明「只按周六、周日筛选：调休上班日也会列出，法定节假日不在其内」 |
 | `je_special_event` | 摘要涉及特殊事件 | `summary` 包含 关联交易、收购、合并、重组、诉讼、处置、清算、破产 | or | 词表 `keyword_sets.special_event`（= C24 规则 11） |
+| `je_vague_keywords` | 摘要含模糊词 | `summary` 包含 调整、暂估、其他、冲销 | or | 词表 `keyword_sets.vague`（= C24 规则 12 默认词表）；说明「默认词表与 C24 底稿相同，载入后可增删」 |
+| `je_both_sides` | 借、贷都有金额的分录行 | `debit_amount` 大于 0；`credit_amount` 大于 0 | and | = C24 规则 9 |
+| `je_no_summary` | 没有摘要 | `summary` 为空或空白 | and | = C24 规则 13；说明「空白指只含空格、制表符、换行或全角空格」（C24 用 JS `trim()`，另含不间断空格等少见空白；现库只含空白字符的摘要 0 行） |
 
-阈值取「实际执行的重要性水平」（`materiality.performance_materiality`）：整体重要性对分录级筛选过高、几乎筛不出；明显微小错报临界值过低、筛出过多；实际执行的重要性是确定进一步审计程序范围的口径。值不大于 0、没有记录或读取失败时留空并给原因，不取绝对值、不给默认值（两个真实记录都是负数，见 §14.1）。最小新能力四项：用户算子 `starts_with`、`weekday_in`（ADR-AQL-03），序时账只作条件的计算列 `line_amount`，条件编辑器补「大于等于」「小于等于」。节假日：平台没有日历来源（§14.1），只做周末，进 §11 W15。预置没有数据库 id，不能直接执行：执行前必须经条件编辑器确认参数；「另存为我的模板」走既有保存（R9.1）。
+阈值取「实际执行的重要性水平」（`materiality.performance_materiality`）：整体重要性对分录级筛选过高、几乎筛不出；明显微小错报临界值过低、筛出过多；实际执行的重要性是确定进一步审计程序范围的口径。值不大于 0、没有记录或读取失败时留空并给原因，不取绝对值、不给默认值（两个真实记录都是负数，见 §14.1）；金额显示一律 `f"{value:,.2f}"`。最小新能力五项：用户算子 `starts_with`、`weekday_in`、`is_blank`（ADR-AQL-03；`is_blank` 就是旧筛选键内部谓词 `nonempty` 的取反，同一函数），序时账只作条件的计算列 `line_amount`，条件编辑器补「大于等于」「小于等于」。节假日：平台没有日历来源（§14.1），只做周末，进 §11 W15。预置没有数据库 id，不能直接执行：执行前必须经条件编辑器确认参数。
+
+「另存为我的模板」的参数语义：候选 (a) 保留参数占位，载入 / 执行时按目标项目与年度重新取值；(b) 按字面冻结并把来源写进 `config.notes`、执行前要求确认。采用 (a)：阈值与截止窗口是审计口径，跨项目或跨年度沿用别的项目的值会让取证范围错而不自知，(b) 的确认框也只是提醒，用户仍要手改。做法：解析结果给每个取自参数的条件标 `params`（参数名列表）；编辑器里用户改过该条件的值或算子即去掉标记（改成字面值）；保存时带标记的条件写成 `{"$param": <参数名>}`，其余写字面值；用户模板的「载入」与「执行」都先经同一个 `template_presets.resolve_config` 取值，执行时任一参数取不到 ⇒ 400 `CONDITION_VALUE_REQUIRED`，message 写明原因（§3.6、§3.11）。
 
 ### ADR-AQL-06 计数分页下推（AQ-03 根因）与 N1 预案
 候选：(a) 调大 5,000 上限：只推迟错数，否决；(b) 内存路径触顶即拒：序时账等大表基本不可用，不作主路径；(c) SQL 源声明式注册（列、筛选键、默认排序、唯一键、口径谓词），COUNT、ORDER BY、LIMIT / OFFSET、条件全在数据库内，JSON 内存源保留内存路径但触顶即拒、默认按 `_row_index` 保持取数行序：采用。取数器从 router 下沉到 `services/custom_query/`；编排器继续接受旧的 `(rows, columns)` 返回（既有约 40 个编排器测试不改）。
@@ -91,7 +98,7 @@ N1 预案（按序执行，每步后重测）：①辅助明细必须带科目�
 不出界面。SQL 源带分组 / 透视时先 COUNT：≤ 5,000 取全量交 grouping_engine / pivot_engine（结果正确）；> 5,000 返回 400 `AGGREGATION_TOO_LARGE`。两个引擎保留。
 
 ### ADR-AQL-08 构建器准入与人员表（评估 D1、D2）
-D1：允许 = 系统角色 ∈ {admin, partner, manager}，或存在未删 project_users 行（项目未删）role ∈ {manager, partner} 且 permission_level = edit。判定只在 `services/custom_query/builder_access.py`，`require_query_builder_access` 与 `GET /api/query/access` 都调它；作用域仍为 OwnershipGuard 可访问集合（循环受限项目见 ADR-AQL-19）；PII 仍按系统角色判定（项目经理看不到电话、邮箱）。access 接口对 admin / partner 返回 `all_projects: true`、`accessible_project_count: null`。D2：staff_members 只对系统 admin / partner 开放（含作为 JOIN 目标）。
+D1：允许 = 系统角色 ∈ {admin, partner, manager}，或存在未删 project_users 行（项目未删）role ∈ {manager, partner} 且 permission_level = edit。判定只在 `services/custom_query/builder_access.py`，`require_query_builder_access` 与 `GET /api/query/access` 都调它；作用域 = 构建器作用域（OwnershipGuard 可访问集合 − 已删项目 − 循环受限项目，ADR-AQL-19）；PII 仍按系统角色判定（项目经理看不到电话、邮箱）。access 接口对 admin / partner 返回 `all_projects: true`、`accessible_project_count: null`；其余身份的 `accessible_project_count` 按构建器作用域计（排除之后）。准入通过而作用域为空时返回 `allowed: true`、`accessible_project_count: 0`、`reason`「您可访问的项目均设有审计循环范围，请在业务视图中查询」：前端入口置灰并显示该原因；后端不另拒绝（直接调接口得 0 行 + 排除 warning），避免出现第二套准入口径。现库 e2e_manager 即此情形（§10.2）。D2：staff_members 只对系统 admin / partner 开放（含作为 JOIN 目标）。
 
 ### ADR-AQL-09 构建器作用域与 JOIN
 作用域谓词（`builder_scope.scope_predicates`）对计划中每张表生成：项目（projects 用 `id`，其余用 `project_id`；可访问集合恒排除已删项目，admin / partner 为全部未删项目）、`is_deleted = false`（有列时）、四表数据集口径、请求年度（有 `year` 列且请求带年度）、report_config 项目副本行限可访问项目。**基表谓词追加在 WHERE 最后一步（DSL 无法放宽）；JOIN 目标谓词与登记的目标条件一起并入该 JOIN 的 ON**，LEFT JOIN 无匹配时目标列为 NULL、基表行保留。12 条登记逐条裁决（导入期不变式：每条必须声明基数；PG 守卫逐条覆盖）：
@@ -121,13 +128,13 @@ D8：前端只给「仅我可见 / 指定项目共享 / 公开」；后端 scope
 面板标「开发中」（禁用，说明「当前不影响查询结果」），前端不再发送 acnr_targets；后端 acnr_targets 契约（存在性校验、全有或全无）不改。「选中格成为结果列」进 §11 W4：要接 xlsx 只读取值与 sheet_code → sheet 名映射，属新能力；同类需求由弹窗的底稿 sheet 选区器满足。
 
 ### ADR-AQL-13 删除清单（评估 D6 + 新发现）
-删：`POST /batch-execute` + 零挂载 `BatchQueryToolbar.vue` + `composables/useBatchQuery.ts` + apiPaths `customQuery.batchExecute`（`batch_execute` 直接调 router 内取数器，必须先于取数器下沉删除，tasks 6）；`report:` / `note:` / `adj:` / `tb:` 跨模块单元格源族（`module_cell_resolver` 取数部分；保留 `parse_source_uri` / `format_source_uri` 与被 `write_note_cell` 惰性导入的 `_NOTE_COLUMNS`）与选区器模块模式（父组件从不传 moduleSource）；零挂载 `SaveAsTemplateButton.vue`、`SnapshotStalenessChip.vue`（依赖 univer_snapshot）；ADR-AQL-04 三件；零调用方常量 `customQuery.cellWriteback`。保留：`/index-health`（运维端点）、grouping / pivot 引擎、export_service、MyTemplatesDialog（修复后接线）、cell-writeback 与 writeback 两端点（ADR-AQL-02）。
+删：`POST /batch-execute` + 零挂载 `BatchQueryToolbar.vue` + `composables/useBatchQuery.ts` + apiPaths `customQuery.batchExecute`（`batch_execute` 直接调 router 内取数器，必须先于取数器下沉删除，tasks 6；年度兜底基线里 `composables/useBatchQuery.ts` 一行随文件一起删，否则棘轮「基线只许变小」打红）；`report:` / `note:` / `adj:` / `tb:` 跨模块单元格源族（`module_cell_resolver` 取数部分；保留 `parse_source_uri` / `format_source_uri` 与被 `write_note_cell` 惰性导入的 `_NOTE_COLUMNS`）与选区器模块模式（父组件从不传 moduleSource）；零挂载 `SaveAsTemplateButton.vue`、`SnapshotStalenessChip.vue`（依赖 univer_snapshot）；ADR-AQL-04 三件；零调用方常量 `customQuery.cellWriteback`。保留：`/index-health`（运维端点）、grouping / pivot 引擎、export_service、MyTemplatesDialog（修复后接线）、cell-writeback 与 writeback 两端点（ADR-AQL-02）。
 
 ### ADR-AQL-14 导出
 三处统一服务端导出，经 `export_service.stream_xlsx`：先 COUNT 预检（> 1,000,000 → 400，沿用 advanced-query-module R8.4「不启动导出」，不改为截断，§11 W11），再流式写临时文件；端点内预取第一块（构建阶段在请求会话存活时完成，错误能以 JSON 返回），其余块只读临时文件。中文表头由前端随请求传 `headers`（标签真源仍是前端 `queryColumnLabels.ts`）。两项防护：①以 `= + - @` 开头的字符串（数据、表头、「查询说明」）按文本写入；②进程内导出闸：每个用户同时 1 个、全进程同时 4 个，超出 429 `EXPORT_BUSY`（平台目标并发 6000，而单次导出最多 100 万行、120 s、行写入在事件循环里）。前端 `exportQueryResultToXlsx` 保留为「导出当前页」。
 
 ### ADR-AQL-15 年度与入口上下文
-弹窗年度只取路由 `?year` 或项目审计年度（后端解析值），取不到要求选择。ThreeColumnLayout 只为弹窗新增计算属性 `customQueryYear`，`currentYear` 不动（它还传给公式管理与一键刷新，两者在并发 spec 范围内），年度兜底棘轮里 ThreeColumnLayout 条目保留。弹窗每次打开以路由项目为准，模板库事件的 project_id 优先；侧栏打开时按当前路由名预选数据源（`queryEntryContext.ts` 一处映射）；行级「按此查询明细」按用户 2026-10-26 决定纳入本 spec，裁决见 ADR-AQL-20（事件带 `entry` 时其项目、年度、数据源优先于路由预选）。
+弹窗年度只取路由 `?year` 或项目审计年度（后端解析值），取不到要求选择；后端需要年度而请求未带时一律经平台入口 `deps.require_project_audit_year`（合入后才有，缺失 422「未设置审计年度，请先在项目基本信息中填写」），不再自写 `YEAR_REQUIRED` 分支——平台已统一这条文案，前端 `describeQueryError` 原样显示字符串 message。ThreeColumnLayout 只为弹窗新增计算属性 `customQueryYear`，`currentYear` 不动（它还传给公式管理与一键刷新，两者在并发 spec 范围内），年度兜底棘轮里 ThreeColumnLayout 条目保留。弹窗每次打开以路由项目为准，模板库事件的 project_id 优先；侧栏打开时按当前路由名预选数据源（`queryEntryContext.ts` 一处映射）。模板库「📊 高级查询」按钮（AQ-38，第 2 轮评审发现）发的是模板口径的源 URI，不是注册表源键：`ReportConfigTab` 恒为 `report:balance_sheet`、`NoteTemplateTab` 为 `note:<模板章节号>`（缺省 `note:五-1-1`）、`WpTemplateDetail` 为 `workpaper:<编码>`；前两种在 `business_fetchers._dispatch` 里既不是带 `|区间` 的模块单元格源、也不是注册键 ⇒ 现在恒 400 `UNKNOWN_SOURCE`。映射同样收进 `queryEntryContext.ts`（`resolveTemplateLibrarySource`）：`report:<类型>` → `report_<类型>`；`workpaper:<编码>[|sheet]` 原样；`note:<任意>` → `disclosure`（附注目录）并带提示「模板章节号与项目附注编号不同，请在目录中选择章节」（模板章节号「五-1-1」与项目附注编号「八、1」不是同一体系，不能猜对应）；三个宿主与 `TemplateLibraryButton` 不改（其测试断言的事件载荷不变）。行级「按此查询明细」按用户 2026-10-26 决定纳入本 spec，裁决见 ADR-AQL-20（事件带 `entry` 时其项目、年度、数据源优先于路由预选）。
 
 ### ADR-AQL-16 指标树
 单体项目附注分支按该项目该年度附注生成（indicators 增可选 `year`，缺省取项目审计年度），章节集合与顺序复用附注编辑器同一函数 `DisclosureEngine.get_notes_tree`（含口径过滤）再叠加循环范围；合并项目沿用模板种子树。缓存键改为 `{schema}:{pid}:{year}:{notesVersion}`，`notesVersion` 由响应头 `X-Notes-Version` 下发（附注行数、最近更新时间与循环范围的摘要），附注重新生成 / 对齐或切换年度即失效；弹窗与页面版共用同一缓存模块，弹窗懒加载进 §11 W5。页面版加载「骨架 + 附注分支」并把叶子拍平，不列逐底稿 / 逐 sheet 叶子、只留「底稿清单」：页面版的源选择是 el-select 平铺列表，底稿分支约 640 KB、上千个选项无法在下拉里使用；sheet 级查询仍从弹窗的底稿选区器发起，功能不回退。树形变化 ⇒ schema 版本 10 → 11。W3 给叶子加 `condition_fields: [{key, dtype}]`（可作条件的显示列与只作条件的计算列，由注册表生成，条件编辑器据 dtype 给算子）⇒ schema 版本 11 → 12。
@@ -139,10 +146,10 @@ D8：前端只给「仅我可见 / 指定项目共享 / 公开」；后端 scope
 前端 `queryResultLinks.ts` 按源生成：试算表 `TB('<标准科目码>','<列名>')`（列名取 审定数 / 未审数 / AJE调整 / RJE调整 / 期初余额，与地址库词表一致）、报表 `ROW('<row_code>')`、附注 `NOTE('<章节>','<行标签>','<列表头>')`、底稿单元格 `WP('<wp_code>','<sheet>','<cell>')`。每页结果渲染后对本页引用批量校验一次：把引用以 `+` 连成一条公式调 `POST /api/address-registry/validate`（每次 ≤ 200 个，带 `meta.ref_context` 的 template_type 与年度），按返回 issue 的 `ref` 标记各按钮；校验不通过的按钮不可用并显示首条原因，底稿格 `not_found` 显示「该单元格未登记为可引用地址」（WP 只查地址目录，只对已登记坐标开放；为未登记坐标开放进 §11 W14）。校验请求失败时全部按钮不可用并提示「引用校验暂不可用」。构建器 `_derive_formula_refs` 只给 trial_balance 行，tb_balance 行返回 null（客户科目码不属于 TB 域）。
 
 ### ADR-AQL-19 循环级可见性
-候选：(a) 高级查询各源与附注树复用原页面的循环过滤；(b) 登记范围外归平台鉴权。采用 (a)：不做等于高级查询绕过试算表 / 调整分录 / 附注页的限制，接上完整导出后范围更大。口径只来自平台唯一入口 `deps.get_user_scope_cycles`，循环范围不另读 `project_users.scope_cycles` / `project_assignments.assigned_cycles`、不改其语义；它的规则在 `services/wp_visibility/effective_scope.resolve_member_scope`：系统 admin / partner 返回 None（不限）；本项目主管——委派角色属合伙人、签字合伙人、项目经理、质控、EQCR（含中文别名，取自 `assignment_service.ROLE_MAP`）且人员记录与成员行链路唯一——返回 None；其余成员返回「团队分配勾选 `assigned_cycles` ∪ `project_users.scope_cycles`」，可以是空列表，空即什么都看不到；查询失败按空集。唯一实现 `services/custom_query/cycle_scope.py`，在该入口之上调 `mapping_service.get_codes_by_cycles` / `get_sections_by_cycles`，与原页面逐项同口径：试算表源按 `standard_account_code ∈ 科目集合`（空集无行）；调整分录源取「分录组内任一行科目在集合内」的整组（取科目集合失败按空集，与调整分录页同）；附注目录、附注章节与附注树按章节集合严格过滤（空集即空，与附注页同）；查询范围外章节 403 `SECTION_OUT_OF_SCOPE`。账簿、辅助、报表、底稿清单、工时源对应页面不按循环过滤，同口径不过滤（是否收紧登记范围外）。构建器对每个可访问项目调同一入口，返回值不为 None 的项目排除出作用域（fail-closed，warnings 写明排除数；显式指定 403 `CYCLE_SCOPED_PROJECT`），这类项目只能在按循环过滤的业务视图里查。前置：上述入口规则在远端提交 d0de87a6c，本地分支尚未包含（§14.4），任务 23 开工前分支须包含该提交。
+候选：(a) 高级查询各源与附注树复用原页面的循环过滤；(b) 登记范围外归平台鉴权。采用 (a)：不做等于高级查询绕过试算表 / 调整分录 / 附注页的限制，接上完整导出后范围更大。口径只来自平台唯一入口 `deps.get_user_scope_cycles`，循环范围不另读 `project_users.scope_cycles` / `project_assignments.assigned_cycles`、不改其语义；它的规则在 `services/wp_visibility/effective_scope.resolve_member_scope`：系统 admin / partner 返回 None（不限）；本项目主管——委派角色属合伙人、签字合伙人、项目经理、质控、EQCR（含中文别名，取自 `assignment_service.ROLE_MAP`）且人员记录与成员行链路唯一——返回 None；其余成员返回「团队分配勾选 `assigned_cycles` ∪ `project_users.scope_cycles`」，可以是空列表，空即什么都看不到；查询失败按空集。唯一实现 `services/custom_query/cycle_scope.py`，在该入口之上调 `mapping_service.get_codes_by_cycles` / `get_sections_by_cycles`，与原页面逐项同口径：试算表源按 `standard_account_code ∈ 科目集合`（空集无行）；调整分录源取「分录组内任一行科目在集合内」的整组（取科目集合失败按空集，与调整分录页同）；附注目录、附注章节与附注树按章节集合严格过滤（空集即空，与附注页同）；查询范围外章节 403 `SECTION_OUT_OF_SCOPE`。账簿、辅助、报表、底稿清单、工时源对应页面不按循环过滤，同口径不过滤（是否收紧登记范围外）。构建器对每个可访问项目调同一入口，返回值不为 None 的项目排除出作用域（fail-closed，warnings 写明排除数；显式指定 403 `CYCLE_SCOPED_PROJECT`），这类项目只能在按循环过滤的业务视图里查。注意「链路唯一」的后果：没有人员记录或没有成员行的成员（如只经委派访问项目的 e2e_manager、只有成员行的测试身份）一律受限，范围为空即看不到试算表 / 调整分录 / 附注，构建器作用域也排除该项目——与试算表页同口径，不另设例外。代价：入口每次 4~5 条查询（主管再加一条 `wp_index`）；同一请求内按 (user, project) 记忆化（`cycle_scope.CycleScopeCache`，挂在请求级 `FetchContext` / `BuilderScope` 上，业务视图与构建器共用），不写批量版判定（会复制 `effective_scope` 的口径）；现库非 admin / partner 的构建器可用身份每人可访问项目最多 1 个（2026-10-27 只读现算：系统 auditor 105 人、manager 1 人），每请求多 4~5 条查询。前置：上述入口规则在远端提交 d0de87a6c，全部任务在合入后开工（任务 0，§14.4）。
 
 ### ADR-AQL-20 业务页行级「按此查询明细」入口（W6，用户 2026-10-26 纳入）
-候选：(a) 每页各自拼查询参数打开弹窗；(b) 页面只挂一个入口组件 `QueryDetailEntry.vue`，上下文 → 查询参数的映射只在 `queryEntryContext.ts`，业务对象 → 科目的解析只在后端 `services/custom_query/entry_accounts.py`；(c) 只用各页现有穿透（账簿查询页），不进高级查询。采用 (b)：用户要求映射一处；目标页面都在行数门附近（ReportView = HARD_CAP、DisclosureEditor 余 16 行、WorkpaperEditor 余 35 行）；(c) 的账簿页不能叠加条件、不能服务端导出全量。现有穿透全部保留，新入口与之并列，不替换。
+候选：(a) 每页各自拼查询参数打开弹窗；(b) 页面只挂一个入口组件 `QueryDetailEntry.vue`，上下文 → 查询参数的映射只在 `queryEntryContext.ts`，业务对象 → 科目的解析只在后端 `services/custom_query/entry_accounts.py`；(c) 只用各页现有穿透（账簿查询页），不进高级查询。采用 (b)：用户要求映射一处；目标页面都在行数门附近（合入后 ReportView、DisclosureEditor 都是 HARD_CAP = 实际行数、零余量，WorkpaperEditor 余 45 行）；(c) 的账簿页不能叠加条件、不能服务端导出全量。现有穿透全部保留，新入口与之并列，不替换。
 
 | 入口（并列的现有能力） | 落点：数据源 + 筛选 | 可切换 / 行内下钻 | 科目解析（复用的现有定义） |
 |---|---|---|---|
@@ -151,7 +158,7 @@ D8：前端只给「仅我可见 / 指定项目共享 / 公开」；后端 scope
 | 附注表格右键菜单（「📊 穿透到序时账」） | `disclosure_note:<章节>`（第 0 张表，弹窗内可切表） | 「相关科目（试算表）」：`tb_detail` + `note_section=<章节>` | 章节标题 → `note_account_mappings`（`{准则}_standalone`）→ 底稿编码 → `wp_account_mapping.json` → 科目 |
 | 底稿编辑器两个工具栏 | 序时账 + `wp_code=<底稿编码>` | 科目余额 / 辅助余额 / 辅助明细 | `wp_account_mapping.json`：编码精确匹配，没有该编码时取主编码（第一个「-」之前） |
 
-项目取路由 `projectId`；年度取路由 `?year`（页面当前显示的年度，用户在页面上显式切换过时，明细必须与所点的行同一年度），没有时由弹窗按 R10.2 取项目审计年度（`resolve_project_audit_year`），任何一步都不用日历年兜底；入口经 `open-custom-query` 事件带 `entry` 打开弹窗并立即执行；用户手动换数据源即清除上下文（避免把筛选键带到不认它的源而 400）；落到的源按 ADR-AQL-19 过滤。附注落第 0 张表而不取编辑器的 `activeTableTab`：后者是投影后的序号（`resolveProjectedTableIndex`），与 `table_data` 原始序号不一定相同。「底稿格」入口放工具栏：科目是底稿属性（`wp_account_mapping` 按底稿编码登记），37 种 HTML 渲染器没有共用的单元格右键菜单。
+项目取路由 `projectId`；年度 = 宿主页面取数用的年度，由宿主显式传入（明细必须与所点的行同一年度）：TrialBalance 传其 `year`（= `routeYear ?? projectYear`，切年会写路由）、DisclosureEditor 传其 `year`（= 路由 `?year ?? projectStore.year`；页内年度选择器只调 `projectStore.changeYear`、不写路由，只读路由会查错年度）、ReportView 经 `drilldownData.year`（穿透请求用的同一个 `year`）、WorkpaperEditor 传 `projectYear`（合入后工具栏只在它非空时渲染）；合入后这些值取不到时都是 null，宿主年度为空才由弹窗按 R10.2 取项目审计年度，任何一步都不用日历年兜底；入口经 `open-custom-query` 事件带 `entry` 打开弹窗并立即执行；用户手动换数据源即清除上下文（避免把筛选键带到不认它的源而 400）；落到的源按 ADR-AQL-19 过滤。附注落第 0 张表而不取编辑器的 `activeTableTab`：后者是投影后的序号（`resolveProjectedTableIndex`），与 `table_data` 原始序号不一定相同。「底稿格」入口放工具栏：科目是底稿属性（`wp_account_mapping` 按底稿编码登记），37 种 HTML 渲染器没有共用的单元格右键菜单。
 
 ## 3. 后端设计
 
@@ -204,7 +211,7 @@ class SourceSpec:
 
 旧 filters 键（`filter_keys`，未登记 → 400 `UNKNOWN_FILTER_KEY`）：report（report_type、standard）；trial_balance（account_name like、company_code）；account_balance（account_code prefix、account_name like、company_code）；ledger_entries（account_code prefix、voucher_no like、summary like、date_from / date_to、company_code）；aux_balance（account_code prefix、aux_type、aux_code、aux_name like）；aux_ledger（同 aux_balance + voucher_no + date_from / date_to）；adjustments（adjustment_type、account_name like、review_status、company_code）；workpaper（wp_code、sheet_name、status、review_status、cycle）；report_lines（report_type、applicable_standard、has_formula → nonempty、row_name like）；workhours（staff_id、status、date_from / date_to）。谓词一律经 `param_sql_builder.build_portable_filter` 生成。
 
-源级 warnings（`warn`）：四表无生效数据集 → R1.3 文案；辅助余额未按 aux_type 筛选 → R5.6 文案；报表源该项目年度类型无 fr 行 → 「该项目尚未生成此报表，金额为空」，存在 `fr.is_stale` → 「报表数据已过期，请在报表页重新生成」。所有源的响应 `meta.ref_context = {"template_type": "soe" | "listed", "year": 请求年度}`（`_resolve_project_template_type`），供前端校验引用。
+源级 warnings（`warn`）：四表无生效数据集 → R1.3 文案；辅助余额未按 aux_type 筛选 → R5.6 文案；报表源该项目年度类型无 fr 行 → 「该项目尚未生成此报表，金额为空」，存在 `fr.is_stale` → 「报表数据已过期，请在报表页重新生成」。注册表源的响应都带 `meta.ref_context = {"template_type": "soe" | "listed", "year": 请求年度}`（`_resolve_project_template_type`），供前端校验引用；JSON 源的 `meta` 由取数器给（附注带 `tables` 与 `ref_context`，合并工作底稿与底稿选区不带）。`meta` 是新增可选键，没有内容时整键省略（N3）。
 
 `services/custom_query/paged_fetch.py`（新）：
 - `build_statement(spec, ctx, *, conditions, logic, columns)`：先查 `required_filters`（都不满足 → 400 `AUX_FILTER_REQUIRED`）；WHERE = `await spec.base_where(ctx)` + 旧 filters + 条件（`ParamSQLBuilder.build_where(..., logic, filter_builder=build_portable_filter)`）；选择列 = 所选显示列（空 = 全部）+ 全部隐藏列。`columns` 含未登记键 → 400 `UNKNOWN_COLUMN`；条件字段非 conditionable 或未登记 → 400 `UNKNOWN_CONDITION_FIELD`。
@@ -224,14 +231,14 @@ class SourceSpec:
 - `business_fetchers.business_fetcher`：SQL 源无分组 / 透视 → `paged_fetch.page()` 返回 `FetchPage(paged=True)`；有分组 / 透视 → `all_rows()` 返回 `(rows, columns)`；JSON 源 → `FetchPage(paged=False, rows=全部, total=len, meta=…)`。删除跨模块单元格分支与 `fetch_cap_warning`。
 - `query_orchestrator`：新增 `FetchPage(rows, columns, total, paged, meta, warnings)`；`_run_pipeline` 遇 `paged=True` 跳过 step5~7、total 取 `FetchPage.total`，`paged=False` 与 tuple 走原内存路径；`QueryRequest` 增 `conditions: list[dict]`、`condition_logic: str = "and"` 并进 `cache_def()`；`QueryResult` 增 `meta: dict`（`to_payload` / `from_payload` 往返）。
 - `pagination`：`DEFAULT_SORT_BY_SOURCE` 删去 SQL 源条目（默认排序唯一所有者 = 注册表），内存源条目一律改为 `(("_row_index", "asc"),)`；`TIE_BREAKER_CANDIDATES` 以 `_row_index` 打头（行里没有时沿用原候选）。
-- `execute_compatibility`：映射 conditions / condition_logic（旧请求体缺字段时取默认）；`to_legacy_response` 仅当 meta 非空时加 `meta` 键（既有响应键集合不变）。
+- `execute_compatibility`：映射 conditions / condition_logic（旧请求体缺字段时取默认）；`to_legacy_response` 把 `meta` 作为新增可选键输出，没有内容时省略（既有键与类型不变；`TestExecuteContractBaseline` 只断言既有字段）。
 - `services/query_cache.build_canonical_query_identity` 增 conditions、condition_logic。
 - router `QueryRequest`：增 `conditions: list[ConditionSpec]`（≤ 20；`ConditionSpec{field ≤ 64, op ∈ OPERATOR_WHITELIST, value}`）、`condition_logic: Literal["and", "or"] = "and"`；`year` 加 `ge=2000, le=2100`；`columns` ≤ 60。删除 14 个 `_query_*`，`_legacy_business_fetcher` 保留为委托。
 
 ### 3.4 构建器
-- `services/custom_query/builder_access.py`（新）：`async resolve_builder_access(user, db) -> BuilderAccess(allowed, basis: "system_role" | "project_manager" | None, reason, all_projects: bool, accessible_project_count: int | None)`。`routers/query_builder.require_query_builder_access` 改为 async 依赖（`get_current_user` + `get_db`），拒绝 → 403 `ROLE_FORBIDDEN`「高级构建器仅限管理员、合伙人、经理（含任一项目的项目经理）使用」。新增 `GET /api/query/access`（`get_current_user`，返回 BuilderAccess）。`_require_admin_or_manager` 与 `_QUERY_BUILDER_ROLES`（系统角色）保留。
+- `services/custom_query/builder_access.py`（新）：`async resolve_builder_access(user, db) -> BuilderAccess(allowed, basis: "system_role" | "project_manager" | None, reason, all_projects: bool, accessible_project_count: int | None)`；`accessible_project_count` = `len(resolve_builder_scope(...) 的作用域)`（排除已删与循环受限之后，与执行时同一函数，不另数）；`allowed` 且计数为 0 时 `reason` = ADR-AQL-08 的提示。`routers/query_builder.require_query_builder_access` 改为 async 依赖（`get_current_user` + `get_db`），拒绝 → 403 `ROLE_FORBIDDEN`「高级构建器仅限管理员、合伙人、经理（含任一项目的项目经理）使用」。新增 `GET /api/query/access`（`get_current_user`，返回 BuilderAccess）。`_require_admin_or_manager` 与 `_QUERY_BUILDER_ROLES`（系统角色）保留。
 - `QueryDSL` 增 `project_id: UUID | None`、`year: int | None (2000..2100)`；preview / execute / export 把 `requested_project_id=body.project_id`、`year=body.year` 传给 `resolve_builder_scope`；导出体 `ExportDSL(QueryDSL)` 增 `headers: dict[str, str]`。
-- `builder_scope.resolve_builder_scope(*, user, dsl_tables, requested_project_id, year, db)`：可访问集合 = OwnershipGuard 集合 − 已删项目 − 本人循环范围受限的项目（`cycle_scope.is_cycle_restricted`，即 `deps.get_user_scope_cycles` 不为 None；admin / partner 不调用）（有排除时 warning「已排除 N 个对您设有审计循环范围的项目，请在业务视图中查询」）；显式指定且不可访问 → 403 `FORBIDDEN_PROJECT`，指定的是循环受限项目 → 403 `CYCLE_SCOPED_PROJECT`；staff_members（基表或 JOIN 目标）对非 admin / partner → 403 `TABLE_ROLE_FORBIDDEN`。`BuilderScope` 增 `requested_project_id`、`dataset_predicates: Mapping[str, ColumnElement]`（计划中的四表各一条，由 `dataset_query.active_rows_predicate` 预先算好，使下面的谓词构造保持同步）；`describe()` 增 `requested_project_id`。report_config 仍记入 `unscoped_tables`（无 project_id 列），warning 改为「表 'report_config' 为平台级配置；项目副本行只含可访问项目」。
+- `builder_scope.resolve_builder_scope(*, user, dsl_tables, requested_project_id, year, db, cycle_cache: CycleScopeCache | None = None)`：可访问集合 = OwnershipGuard 集合 − 已删项目 − 本人循环范围受限的项目（`cycle_scope.is_cycle_restricted`，即 `deps.get_user_scope_cycles` 不为 None；admin / partner 不调用；同一请求内经 `cycle_cache` 按项目记忆化）（有排除时 warning「已排除 N 个对您设有审计循环范围的项目，请在业务视图中查询」；全部被排除时结果 0 行 + 该 warning，不报错）；显式指定且不可访问 → 403 `FORBIDDEN_PROJECT`，指定的是循环受限项目 → 403 `CYCLE_SCOPED_PROJECT`；staff_members（基表或 JOIN 目标）对非 admin / partner → 403 `TABLE_ROLE_FORBIDDEN`。`BuilderScope` 增 `requested_project_id`、`dataset_predicates: Mapping[str, ColumnElement]`（计划中的四表各一条，由 `dataset_query.active_rows_predicate` 预先算好，使下面的谓词构造保持同步）；`describe()` 增 `requested_project_id`。report_config 仍记入 `unscoped_tables`（无 project_id 列），warning 改为「表 'report_config' 为平台级配置；项目副本行只含可访问项目」。
 - `builder_scope.scope_predicates(table_name, scope, *, year) -> list[ColumnElement]`：项目谓词（projects 用 `id`；all-projects 时其余表为 `project_id IN (SELECT id FROM projects WHERE NOT is_deleted)`）、`is_deleted = false`（有列时）、`scope.dataset_predicates[table]`（四表）、`year == :year`（有列且带年度）、report_config 的 `or_(applicable_standard.notlike('project:%'), applicable_standard.in_([f'project:{pid}' for pid in 可访问集合]))`（all-projects 不加）。取代 `apply_scope_to_select`。
 - `builder_dsl._build_select(..., for_export=False)`：
   ```python
@@ -251,11 +258,12 @@ class SourceSpec:
 - `query_builder.export_excel`：同一导出闸 + COUNT 预检 + `_build_select(for_export=True)` + `db.stream` 分批 → 同一 `stream_xlsx`，表头取 `headers`；删除 router 内自写 Workbook 段与 1,000 行限制。
 
 ### 3.6 模板与回收站
-- `template_service`：删除自有的 `_normalize_scope` / `VALID_INPUT_SCOPES` / `_SCOPE_ALIASES` / `_is_template_visible` / `_normalize_shared_project_ids`，改用 `TemplateScopeAdapter.normalize(scope, shared_project_ids, config_project_id=…)`（`TemplateScopeValidationError` 转 `TemplateInvalidError`）与 `TemplateScopeAdapter.is_visible(*, scope, owner_id, user_id, shared_project_ids, config_project_id, accessible_project_ids)`（纯关键字参数）；`TemplateForbiddenError` 的错误码改为 `TEMPLATE_NOT_VISIBLE`、文案「无权访问该模板」；新增 `soft_delete(tpl)`（调 `SoftDeleteMixin.soft_delete()`，只 flush）、`visible_templates(user, db)`（SQL 取未删且（作者 = 本人或 scope ∈ public / global / project / team）的候选，按 updated_at 倒序逐条判可见，凑满 500 条为止——先过滤后截断）、`config_to_request(config, *, project_id, year, limit, offset)`（execute 唯一翻译：source、filters 并入 cell_range / sheet_name、conditions、condition_logic、selected_columns → columns、sort_field / sort_order → sort、page_size；`filter_text` 是前端显示过滤，不进请求）。
+- `template_service`：删除自有的 `_normalize_scope` / `VALID_INPUT_SCOPES` / `_SCOPE_ALIASES` / `_is_template_visible` / `_normalize_shared_project_ids`，改用 `TemplateScopeAdapter.normalize(scope, shared_project_ids, config_project_id=…)`（`TemplateScopeValidationError` 转 `TemplateInvalidError`）与 `TemplateScopeAdapter.is_visible(*, scope, owner_id, user_id, shared_project_ids, config_project_id, accessible_project_ids)`（纯关键字参数）；`TemplateForbiddenError` 的错误码改为 `TEMPLATE_NOT_VISIBLE`、文案「无权访问该模板」；新增 `soft_delete(tpl)`（调 `SoftDeleteMixin.soft_delete()`，只 flush）、`visible_templates(user, db)`（SQL 取未删且（作者 = 本人或 scope ∈ public / global / project / team）的候选，按 updated_at 倒序逐条判可见，凑满 500 条为止——先过滤后截断）、`config_to_request(config, *, project_id, year, limit, offset)`（execute 唯一翻译：source、filters 并入 cell_range / sheet_name、conditions、condition_logic、selected_columns → columns、sort_field / sort_order → sort、page_size；`filter_text` 是前端显示过滤，不进请求；入参 config 必须已经过 `template_presets.resolve_config`，仍含 `$param` 即 ValueError——防止占位串被当成字面值查询）。保存 / 更新时 `config.conditions` 里的 `{"$param": 名}` 只许是已登记参数（`template_presets.PARAM_NAMES`），否则 400 `TEMPLATE_INVALID`「模板参数「{名}」未登记」。
 - `TemplateScopeAdapter` 四条报错改中文（「scope 必须是字符串」「不支持的模板范围：{scope}」「指定项目共享至少需要一个项目」「共享项目标识非法：{raw}」），`_normalize_template_scope` 原样放进 422 `TEMPLATE_SCOPE_INVALID`。
-- router：list / get / execute 都走 template_service（删除两处 `scope == 'global'`）；get / execute 捕获 `TemplateForbiddenError` → 403 `{"error_code": "TEMPLATE_NOT_VISIBLE", "message": "无权访问该模板"}`（`_assert_template_visible` 同文案）；create / update 捕获 `TemplateInvalidError` → 400 `TEMPLATE_INVALID`；`update_template` 删除末尾 `if body.scope is not None: tpl.scope = body.scope`；delete → `soft_delete` + commit；execute 请求体增 `year`（可选）、`limit`、`offset`，年度 = body.year 或 `fetch_project_audit_year`（None → 422 `YEAR_REQUIRED`）；已软删模板一律 404 `TEMPLATE_NOT_FOUND`。
+- router：list / get / execute 都走 template_service（删除两处 `scope == 'global'`）；get / execute 捕获 `TemplateForbiddenError` → 403 `{"error_code": "TEMPLATE_NOT_VISIBLE", "message": "无权访问该模板"}`（`_assert_template_visible` 同文案）；create / update 捕获 `TemplateInvalidError` → 400 `TEMPLATE_INVALID`；`update_template` 删除末尾 `if body.scope is not None: tpl.scope = body.scope`；delete → `soft_delete` + commit；execute 请求体增 `year`（可选）、`limit`、`offset`，年度 = `await deps.require_project_audit_year(db, project_id, body.year)`（缺失 422，平台统一文案）→ `template_presets.resolve_config`（任一参数取不到 → 400 `CONDITION_VALUE_REQUIRED`，message 为该参数的 `missing_reason`）→ `config_to_request` → 与 execute 同一管线；新增 `GET /api/custom-query/templates/{template_id}/resolve?project_id=&year=`（门禁与模板执行相同：模板可见 + `assert_target_accessible`）→ `{config, params, notes}`，供「载入」含参数占位的用户模板（不含占位的模板前端直接载入、不调它）；已软删模板一律 404 `TEMPLATE_NOT_FOUND`。
 - ORM `CustomQueryTemplate(Base, SoftDeleteMixin)`（`is_deleted` / `deleted_at` 由 mixin 声明，与迁移列一致）。
-- `routers/recycle_bin.py`：`_RECYCLABLE_TABLES` 增 `"custom_query_template": (CustomQueryTemplate, "查询模板", "name")`；`_OWNER_SCOPED = {"custom_query_template": "created_by"}`；`_visibility_filter(tbl_key, model, visible, user)` 对该类型 = `created_by == user.id`（admin 不限）；`_authorize_row` 对该类型 = 作者或 admin；`_deleted_by` 对该类型返回 created_by。
+- `routers/recycle_bin.py`：`_RECYCLABLE_TABLES` 增 `"custom_query_template": (CustomQueryTemplate, "查询模板", "name")`；`_OWNER_SCOPED = {"custom_query_template": lambda m: func.coalesce(m.creator_id, m.created_by)}`（与模型属性 `owner_id` = `creator_id or created_by` 同一口径，router 判 `is_owner` 也用它）；`_visibility_filter(tbl_key, model, visible, user)` 对该类型 = `owner_expr == user.id`（admin 不限）；`_authorize_row` 对该类型 = `row.owner_id == user.id` 或 admin，不走项目成员判定；`_deleted_by` 对该类型返回 `owner_id`；列表项对按作者可见的类型增 `can_restore` / `can_purge`（= 作者或 admin，恒为布尔；其余类型不带这两个键，界面照旧按系统角色权限）。合入后同一列表已有逐行 `purgeable`（底稿不可彻底删除），模板为 true。
+- `views/RecycleBin.vue`（合入后 354 行）：「恢复」「删除」按钮由 `v-permission` 改为 `v-if="canRowAct(row, 'restore' | 'purge')"`（新函数，约 6 行：行上有布尔 `can_restore` / `can_purge` 就用它，否则 = `usePermission().can('recycle:restore' | 'recycle:purge')`，与指令同一张权限表，其余类型的显示结果不变）；删除按钮另保留合入后的 `row.purgeable !== false` 条件。理由：权限指令只看系统角色，模板作者多为系统 auditor（库内 auditor 114、manager 1），按钮会被藏起来；逐行能力由后端按同一判定给出，前后端不会分叉。审计员也能进回收站页（顶栏「回收站」按钮，路由无权限限制）。
 
 ### 3.7 写入收窄与只读查询
 - 删除 `snapshot_writer_modules.write_report_cell / write_adj_cell / write_tb_cell` 与 `SnapshotWriter` 对应薄委托及 `write_cell` 三个分支（未知 module → ValueError）；`CellWritebackRequest.module` 与 writeback 目标 module 改 `Literal["workpaper", "note"]`。
@@ -265,14 +273,14 @@ class SourceSpec:
 
 ### 3.8 指标树与模板溯源（router 内，函数名保持以兼容既有测试）
 - `get_indicators` 增 `year: int | None`；`_build_disclosure_tree(template_type, *, db=None, project_id=None, year=None, report_scope="standalone", user=None)`：有项目且单体 → `DisclosureEngine(db).get_notes_tree(project_id, year)` 叠加循环范围；按章节号首个「、」之前分组，组名取同号章节节点的标题，没有该节点时用章节号；叶子 `disclosure_note:{note_section}`、标签「{章节号} {标题}」，组前置「附注目录」（`disclosure`）；否则沿用种子树。
-- 有 project_id 的 indicators 响应（depth=1、branch、全量）都带 `X-Notes-Version` = `sha1(f"{行数}|{max(updated_at)}|{循环章节集合或 *}")[:12]`（disclosure_notes 未删行，ORM 查询）；无项目为 `none`。
-- 叶子 `columns` 由注册表生成（JSON 源为 []），叶子增 `supports_conditions`；trial_balance 组增 aux_balance、aux_ledger；adjustment 组改为 adj_aje、adj_rje；单体隐藏 tb_summary 与 worksheet 组；`_INDICATORS_SCHEMA_VERSION = 11`。
+- 有 project_id 的 indicators 响应（depth=1、branch、全量）都带 `X-Notes-Version` = `sha1(f"{行数}|{max(updated_at)}|{循环章节集合或 *}")[:12]`（ORM 查询 disclosure_notes，条件 `project_id = :pid AND year = :year AND is_deleted = false`，年度与本次指标树同一年度）；无项目为 `none`。
+- `get_indicators` 的年度缺省经 `project_audit_year.resolve_project_audit_year_for_request`（合入后才有）取项目审计年度；仍取不到时不建附注分支（其余骨架照常返回，`X-Notes-Version: no-year`，前端在附注组显示「请先选择审计年度」），不报 422——指标树的其余分支与年度无关，不能因为附注缺年度让整棵树打不开。叶子 `columns` 由注册表生成（JSON 源为 []），叶子增 `supports_conditions`；trial_balance 组增 aux_balance、aux_ledger；adjustment 组改为 adj_aje、adj_rje；单体隐藏 tb_summary 与 worksheet 组；`_INDICATORS_SCHEMA_VERSION = 11`。
 - `address_resolve`：按 ADR-AQL-17；目录读取异常记 WARNING 并返回 `registered=false`，不再 500。
 
 ### 3.9 删除清单（各自单独提交；删前 grep 0 调用方，删前后跑同一组测试）
 | 对象 | 连带处理 |
 |---|---|
-| `POST /batch-execute` + `BatchQueryToolbar.vue` + `useBatchQuery.ts` + `customQuery.batchExecute`（tasks 6，先于取数器下沉） | 删 `test_batch_query.py`、`useBatchQuery.test.ts`；`test_custom_query_auth_bug_condition.py`、`test_advanced_query_audit_helper.py` 的 batch 用例删除；`test_function_global_names_ratchet.py` 同步跑 |
+| `POST /batch-execute` + `BatchQueryToolbar.vue` + `useBatchQuery.ts` + `customQuery.batchExecute`（tasks 6，先于取数器下沉） | 删 `test_batch_query.py`、`useBatchQuery.test.ts`；`test_custom_query_auth_bug_condition.py`、`test_advanced_query_audit_helper.py` 的 batch 用例删除；年度兜底基线删 `composables/useBatchQuery.ts` 一行（只改这一行）并跑 `auditYearCalendarFallbackRatchet.spec.ts`；`test_function_global_names_ratchet.py` 同步跑 |
 | `GET /cross-sheet-trace` + `cross_sheet_trace_orchestrator.py` + `FormulaTracePopover.vue` | 删 `test_cross_sheet_trace_orchestrator.py`、`test_cross_sheet_trace_wiring.py`、`useFormulaTrace.test.ts`；`audit_helper.record_cross_sheet_trace` 若 0 调用方一并删并改 `test_audit_helper_pbt.py` / `test_audit_throttle.py` 对应用例 |
 | 跨模块单元格源族 + 选区器模块模式 | `module_cell_resolver.py` 只留 `parse_source_uri` / `format_source_uri` / `_NOTE_COLUMNS`（`_REPORT_COLUMNS` / `_ADJ_COLUMNS` 随 tasks 13 写入实现删除）；删前后跑 `test_lazy_import_resolvability.py`（覆盖 `write_note_cell` 的惰性导入名）；`test_module_cell_resolver.py` 只留解析用例并下调白名单基线；删 `test_formula_tb_sign_passthrough.py::test_module_cell_resolver_tb_columns_pure` |
 | tb / adj / report 写入 | `test_snapshot_writer.py` 对应用例删除并按实际行数下调白名单基线 1,418；`test_custom_query_auth_*` 的 tb 用例改为断言 422；`test_project_endpoint_authz_body_carried.py` 证明链不变（`_assert_writeback_authorized` 保留） |
@@ -285,28 +293,33 @@ class CycleScope:
     codes: frozenset[str] | None      # None = 不限
     sections: frozenset[str] | None   # None = 不限；空集 = 什么都看不到
 
-async def resolve_cycle_scope(user, project_id: UUID, db) -> CycleScope
-async def is_cycle_restricted(user, project_id: UUID, db) -> bool
+class CycleScopeCache:                # 一次请求一个实例；键 = project_id（用户在实例上固定）
+    async def cycles(self, project_id: UUID) -> list[str] | None   # 只调 deps.get_user_scope_cycles，结果记忆
+
+async def resolve_cycle_scope(user, project_id: UUID, db, cache: CycleScopeCache | None = None) -> CycleScope
+async def is_cycle_restricted(user, project_id: UUID, db, cache: CycleScopeCache | None = None) -> bool
 ```
-`resolve_cycle_scope`：`cycles = await deps.get_user_scope_cycles(user, project_id, db)`；None → `CycleScope(None, None)`；列表（可为空）→ `codes = get_codes_by_cycles(...)`、`sections = get_sections_by_cycles(...)`，任一调用异常按空集并记 WARNING（与调整分录页「取不到不放行」同）。`is_cycle_restricted` = 同一入口返回值不为 None。注册表在 `FetchContext` 里带上它：试算表源 `standard_account_code IN codes`（空集 = 无行，与试算表页同）；调整分录源 `entry_group_id IN (SELECT entry_group_id FROM adjustments WHERE 项目 + 年度 + 未删 AND account_code IN codes)`；附注目录、附注章节与附注树按 sections 严格过滤（空集即空）。构建器的循环受限项目排除在 `resolve_builder_scope`（§3.4）里逐个可访问项目调 `is_cycle_restricted`。
+`resolve_cycle_scope`：`cycles = await (cache.cycles(project_id) if cache else deps.get_user_scope_cycles(user, project_id, db))`；None → `CycleScope(None, None)`；列表（可为空）→ `codes = get_codes_by_cycles(...)`、`sections = get_sections_by_cycles(...)`，任一调用异常按空集并记 WARNING（与调整分录页「取不到不放行」同）。`is_cycle_restricted` = 同一入口返回值不为 None。注册表在 `FetchContext` 里带上它：试算表源 `standard_account_code IN codes`（空集 = 无行，与试算表页同）；调整分录源 `entry_group_id IN (SELECT entry_group_id FROM adjustments WHERE 项目 + 年度 + 未删 AND account_code IN codes)`；附注目录、附注章节与附注树按 sections 严格过滤（空集即空）。构建器的循环受限项目排除在 `resolve_builder_scope`（§3.4）里逐个可访问项目调 `is_cycle_restricted`，与 access 接口、execute 共用同一请求内的 `CycleScopeCache`。PG 用例对拍：同一身份与项目，`resolve_cycle_scope` 的 codes / sections 等于 `get_codes_by_cycles(get_user_scope_cycles(...))` / `get_sections_by_cycles(...)`，带缓存与不带缓存结果相同。
 
 ### 3.11 W3 常用审计预置模板（ADR-AQL-05）
-- `backend/data/custom_query_presets.json`（新）：`{version, keyword_sets: {reversal: [...], special_event: [...]}, presets: [{id, name, category, description, notes: [str], config: {source, condition_logic, conditions, sort_field?, sort_order?, page_size?}}]}`。`conditions` 是条件数组，或 `{"$keyword_set": <名>, "field": <字段>, "op": "like"}`（展开为每个词一条）；条件值是字面量，或 `{"$param": <参数名>}`。参数只有三个：`materiality_performance`、`cutoff_start`、`cutoff_end`。
+- `backend/data/custom_query_presets.json`（新）：`{version, keyword_sets: {reversal: [...], special_event: [...], vague: [...]}, presets: [{id, name, category, description, notes: [str], config: {source, condition_logic, conditions, sort_field?, sort_order?, page_size?}}]}`。`conditions` 是条件数组，或 `{"$keyword_set": <名>, "field": <字段>, "op": "like"}`（展开为每个词一条）；条件值是字面量、`{"$param": <参数名>}`，或（`between`）两个这样的值组成的数组。参数只有三个（`PARAM_NAMES`）：`materiality_performance`、`cutoff_start`、`cutoff_end`。
 - `services/custom_query/template_presets.py`（新，≤ 300 行）：
   - `load_presets() -> tuple[Preset, ...]`（`lru_cache`）：读 JSON 并逐条 `validate_preset`；不合格的条目记 ERROR（id + 原因）并跳过，其余照常返回（数据文件一处写错不拖垮模板列表）。
-  - `validate_preset(p) -> list[str]`：id 符合 `^[a-z0-9_]{1,40}$` 且唯一；数据源经 `source_registry.resolve_source` 可解析；字段是该源可作条件的列（显示列或 `condition_only`）；算子 ∈ `OPERATOR_WHITELIST`；`$param` / `$keyword_set` 已登记；展开后条件 ≤ 20；`condition_logic` ∈ and / or。
+  - `validate_preset(p) -> list[str]`：id 符合 `^[a-z0-9_]{1,40}$` 且唯一；数据源经 `source_registry.resolve_source` 可解析；字段是该源可作条件的列（显示列或 `condition_only`）；算子 ∈ `OPERATOR_WHITELIST`；`$param` / `$keyword_set` 已登记；展开后条件 ≤ 20；`condition_logic` ∈ and / or；`sort_field`（有时）是该源 `sortable` 的显示列，`sort_order` ∈ asc / desc，`page_size` ∈ 1..2000。
   - `list_presets() -> list[dict]`：`{id, name, category, description, data_source, params: [参数名], read_only: True}`。
-  - `async resolve(db, preset_id, *, project_id, year) -> dict`：展开词表；`materiality_performance` = `MaterialityService(db).get_current(project_id, year).performance_materiality`，> 0 时取 `str(值)`，否则值为 None 并给 `missing_reason`（无记录「本项目 {year} 年度未设置重要性水平，请填写阈值」/ ≤ 0「本项目重要性水平为负数（{值}），不能作为阈值，请填写」/ 读取异常「重要性水平读取失败，请填写阈值」并记 WARNING）；`cutoff_start` / `cutoff_end` = `cutoff_window(year, cutoff_date=项目 audit_period_end（与 year 同年时）)` 的起止日（ISO 字符串）。返回 `{id, name, config（参数已代入，缺失值为 ""）, params: [{key, label, value, basis, missing_reason}], notes}`；`basis` 例：「本项目 2025 年度实际执行的重要性水平」「期末日 2025-12-31 前后各 5 天（与截止性测试同一默认值）」。
-- router `custom_query.py`（只写薄路由，≤ 30 行，逻辑在上面的模块；路由前缀不与 `/templates/{template_id}` 冲突）：
+  - `async resolve_config(db, config, *, project_id, year) -> ResolvedConfig(config, params, notes)`：预置与用户模板共用的唯一取值函数。展开词表；对每个 `$param` 取值并在该条件上标 `params: [参数名…]`（前端据此知道哪些值来自参数）。`materiality_performance` = `MaterialityService(db).get_current(project_id, year).performance_materiality`，读取包在 `async with db.begin_nested()` 里（PG 上语句失败会让外层事务 aborted，后面取 `audit_period_end` 的查询会连带报错）；> 0 时取 `str(值)`，否则值为 None 并给 `missing_reason`（无记录「本项目 {year} 年度未设置重要性水平，请填写阈值」/ ≤ 0「本项目重要性水平为负数（{f"{值:,.2f}"}），不能作为阈值，请填写」/ 读取异常「重要性水平读取失败，请填写阈值」并记 WARNING）；`cutoff_start` / `cutoff_end` = `cutoff_window(year, cutoff_date=项目 audit_period_end（与 year 同年时）)` 的起止日（ISO 字符串）。缺失的参数在 config 里代入 `""`。`params` = `[{key, label, value, basis, missing_reason}]`；`basis` 例：「本项目 2025 年度实际执行的重要性水平 1,234,567.00 元」「期末日 2025-12-31 前后各 5 天（与截止性测试同一默认值）」。
+  - `async resolve(db, preset_id, *, project_id, year) -> dict`：按 id 取预置后调 `resolve_config`，返回 `{id, name, config, params, notes（预置 notes）}`。
+- router `custom_query.py`（只写薄路由，≤ 40 行，逻辑在上面的模块；路由前缀不与 `/templates/{template_id}` 冲突）：
   - `GET /api/custom-query/template-presets`（`get_current_user`）→ `{presets}`。
-  - `GET /api/custom-query/template-presets/{preset_id}/resolve?project_id=&year=`：`ownership_guard.assert_target_accessible(project_id)`（与 execute 同一判定）→ year 缺省取 `fetch_project_audit_year`，仍取不到 422 `YEAR_REQUIRED` → `resolve`；未知 id 404 `TEMPLATE_PRESET_NOT_FOUND`。
-- `param_sql_builder`：抽出 `_prefix_predicate(col, value)`（转义后 `LIKE value || '%'`），`build_portable_filter` 的 `prefix` 与 `build_filter` 的 `starts_with` 都调它；新增 `_weekday_predicate(col, value)`：列的 `python_type` 不是 date / datetime → 400 `WEEKDAY_FIELD_INVALID`「星期条件只能用于日期字段」；值不是 1~7 个不重复的 0~6 整数 → 400 `INVALID_WEEKDAY_VALUE`；否则 `extract('dow', col).in_(values)`（PG 的 `EXTRACT(DOW)` 与 SQLite 的 `strftime('%w')` 都是 0 = 周日，绑定参数，不拼 SQL；同形先例 `build_ledger_query` 的 `extract('month', …).in_(…)`）。`table_whitelist.OPERATOR_WHITELIST` 增 `starts_with`、`weekday_in`（构建器同时可用）。
-- `paged_fetch.build_statement`：除 `is_null` / `is_not_null` 外，值为 None 或去空白后为空串的条件（`between` 任一端、`weekday_in` 的空数组同样算）→ 400 `CONDITION_VALUE_REQUIRED`「条件「{字段中文名}」未填写值」（缺失参数在服务端同样拦住，不只靠前端）；`in` / `not_in` 的空数组保持 ADR-AQL-03 的恒假 / 恒真语义。
+  - `GET /api/custom-query/template-presets/{preset_id}/resolve?project_id=&year=`：`ownership_guard.assert_target_accessible(project_id)`（与 execute 同一判定）→ `year = await deps.require_project_audit_year(db, project_id, year)`（缺失 422，平台统一文案）→ `resolve`；未知 id 404 `TEMPLATE_PRESET_NOT_FOUND`。
+  - `GET /api/custom-query/templates/{template_id}/resolve` 与模板执行的参数取值见 §3.6，同调 `resolve_config`。
+- `param_sql_builder`：抽出 `_prefix_predicate(col, value)`（转义后 `LIKE value || '%'`），`build_portable_filter` 的 `prefix` 与 `build_filter` 的 `starts_with` 都调它；新增 `_weekday_predicate(col, value)`：列的 `python_type` 不是 date / datetime → 400 `WEEKDAY_FIELD_INVALID`「星期条件只能用于日期字段」；值不是 1~7 个不重复的 0~6 整数 → 400 `INVALID_WEEKDAY_VALUE`；否则 `extract('dow', col).in_(values)`（PG 的 `EXTRACT(DOW)` 与 SQLite 的 `strftime('%w')` 都是 0 = 周日，绑定参数，不拼 SQL；同形先例 `build_ledger_query` 的 `extract('month', …).in_(…)`）；新增 `_blank_predicate(col)`（ADR-AQL-03，`nonempty` 的 False 分支改调它）：列的 `python_type` 不是 str → 400 `BLANK_FIELD_INVALID`「「为空或空白」只能用于文本字段」，忽略 value。`table_whitelist.OPERATOR_WHITELIST` 增 `starts_with`、`weekday_in`、`is_blank`（构建器同时可用）。
+- `paged_fetch.build_statement`：除 `is_null` / `is_not_null` / `is_blank` 外，值为 None 或去空白后为空串的条件（`between` 任一端、`weekday_in` 的空数组同样算）→ 400 `CONDITION_VALUE_REQUIRED`「条件「{字段中文名}」未填写值」（缺失参数在服务端同样拦住，不只靠前端；模板执行时由 `resolve_config` 给出的 `missing_reason` 作 message）；`in` / `not_in` 的空数组保持 ADR-AQL-03 的恒假 / 恒真语义；值仍是 `{"$param": …}` 对象（未经解析）→ 400 `CONDITION_VALUE_REQUIRED`，不当字面值查询。
 - `source_registry`：`SourceSpec` 增 `condition_only: tuple[SourceColumn, ...] = ()`（可作条件、不返回、不导出、不可排序）；`ledger_entries` 增 `line_amount`（`expr = ledger_sampling_service.ledger_line_amount(TbLedger.__table__)`，dtype number）。
-- `ledger_sampling_service.ledger_line_amount(table) -> ColumnElement`（新）= `func.greatest(func.coalesce(table.c.debit_amount, 0), func.coalesce(table.c.credit_amount, 0))`；`build_ledger_query` 的阈值与上限两处改调它（SQL 不变）。
+- `ledger_sampling_service.ledger_line_amount(table) -> ColumnElement`（新）= `func.greatest(func.coalesce(table.c.debit_amount, 0), func.coalesce(table.c.credit_amount, 0), type_=table.c.debit_amount.type)`；`build_ledger_query` 的阈值与上限两处改调它（渲染的 SQL 文本不变）。`type_` 不能省：`func.greatest` 缺省是 NullType，`coerce_value` 取不到 `python_type` 就原样返回字符串，字符串阈值按 varchar 绑定，PG 报 `operator does not exist: numeric >= character varying`（第 2 轮评审只读探针复现）；加上后 `coerce_value(ledger_line_amount(t), "1000000")` 得 `Decimal('1000000')`（本轮离线编译复核）。`greatest` 是 PG 函数，SQLite 没有（只有多参 `max`），编译不报错、执行才报 `no such function`：该计算列的执行类用例只放真 PG，SQLite 只做编译断言；不为 SQLite 改写方言（生产只跑 PG；既有抽凭单测 `test_cutoff_sampling_pbt.py` 也只对 SQL 文本断言含 `greatest`，改后须保持通过）。
 - `sampling_enhanced_service`：`DEFAULT_CUTOFF_DAYS_BEFORE = 5`、`DEFAULT_CUTOFF_DAYS_AFTER = 5`、`cutoff_window(year, cutoff_date=None, days_before=…, days_after=…) -> CutoffWindow(period_end, start, end)`（规则照搬 `run_cutoff_test` 现有代码）；`run_cutoff_test` 的默认值与窗口计算改用它们（行为不变）。
 - 指标树叶子 `condition_fields`（ADR-AQL-16，schema 12）。
-- 生成器 `backend/scripts/gen/gen_journal_entry_rules_ts.py`（新，先例 `gen_account_to_wp_ts.py`）：`render(presets_json) -> str` 写出 `audit-platform/frontend/src/generated/journalEntryRules.ts`（`export const SPECIAL_EVENT_KEYWORDS = [...] as const`，文件头写「由 custom_query_presets.json 生成，禁止手改」）；`--write` 幂等（无时间戳）、`--check` 漂移 exit 2。
+- 生成器 `backend/scripts/gen/gen_journal_entry_rules_ts.py`（新，先例 `gen_account_to_wp_ts.py`）：`render(presets_json) -> str` 写出 `audit-platform/frontend/src/generated/journalEntryRules.ts`（`export const SPECIAL_EVENT_KEYWORDS = [...] as const` 与 `export const VAGUE_KEYWORDS_DEFAULT = [...] as const`，文件头写「由 custom_query_presets.json 生成，禁止手改」）；`--write` 幂等（无时间戳）、`--check` 漂移 exit 2。C24 两处改读它：`useC24AnalyticsEngine.screenAnomalies` 规则 11 的局部常量、`GtC24JournalDetail.vue` 的 `ruleParams.vagueKeywordsText` 默认值（`VAGUE_KEYWORDS_DEFAULT.join(',')`）。
 
 ### 3.12 W6 业务对象 → 科目（ADR-AQL-20）
 - `services/custom_query/entry_accounts.py`（新，≤ 250 行）：
@@ -316,16 +329,16 @@ async def is_cycle_restricted(user, project_id: UUID, db) -> bool
 - 注册表筛选键（`FilterKey` 增可选 `resolver: Callable[[FetchContext, value], Awaitable[ColumnElement]]`，有 resolver 的键不走 `build_portable_filter`）：
   - `account_code`（account_balance、ledger_entries、aux_balance、aux_ledger）：值可为字符串或 ≤ 50 项的数组，多值按前缀 `or_`。
   - `wp_code`（同上四源）：`codes_for_wp_code` → 前缀列表；空 → 400 `WP_CODE_NO_ACCOUNTS`「该底稿没有登记对应科目」；`aux_ledger.required_filters` 增 `{wp_code}`。
-  - `report_row`（trial_balance）：值 `<报表类型>:<行次>`，经 `report_row_predicate`；两类异常 → 400 `REPORT_ROW_NOT_GENERATED`「该报表行尚未生成，请先在报表页生成报表」/ `REPORT_ROW_NO_ACCOUNTS`「该报表行没有直接取数的科目（合计行或矩阵报表），请在报表页查看公式」；warnings「构成科目按报表公式 {formula} 的取数科目列出（含减项）」。
+  - `report_row`（trial_balance）：值 `<报表类型>:<行次>`，经 `report_row_predicate`；两类异常 → 400 `REPORT_ROW_NOT_GENERATED`「该报表行尚未生成，请先在报表页生成报表」/ `REPORT_ROW_NO_ACCOUNTS`「该报表行没有直接取数的科目，请在报表页查看公式」（界面上只有非合计行会走到这里，如矩阵报表的行：`useReportDrilldown.onDrilldown` 对 `is_total_row` 直接 return，合计行打不开穿透弹窗；直接调接口传合计行同样得这个 400）；warnings「构成科目按报表公式 {formula} 的取数科目列出（含减项）」。
   - `note_section`（trial_balance）：先按 ADR-AQL-19 判章节是否在本人范围（范围外 403 `SECTION_OUT_OF_SCOPE`），再 `codes_for_note_section` → `standard_account_code IN codes`；章节不存在 / 没有科目 → 400 `NOTE_SECTION_NOT_FOUND`「本项目该年度没有这个附注章节」/ `NOTE_SECTION_NO_ACCOUNTS`「该附注章节没有登记对应科目」。
-- 响应 `meta.entry_accounts`：本次解析出的科目码（排序，最多 50 个）供弹窗显示；`meta` 键仅在非空时出现（N3）。
+- 响应 `meta.entry_accounts`：本次解析出的科目码（排序，最多 50 个）供弹窗显示；与 `meta.ref_context` 并列，规则同 §3.1（N3）。
 
 ## 4. 前端设计
 
 ### 4.1 新模块
 - `components/query/queryResultLinks.ts`：`buildRowDrill(ctx: {kind: "source" | "table", key, projectId, year}, row) -> {location, label} | null`（ADR-AQL-01 的唯一实现；账簿查询的 query 由 `useLedgerUrlSync.ts` 新导出的纯函数 `buildLedgerQuery(state, year)` 生成，`syncToUrl` 也改用它）；`buildFormulaRef(source, row, columnKey) -> string | null`；`validatePageRefs(refs, {projectId, year, templateType}) -> Map<ref, {ok, reason}>`（ADR-AQL-18 的批量校验，每批 ≤ 200）；常量 `TB_REF_COLUMNS`。
 - `components/query/queryErrorText.ts`：`describeQueryError(err) -> {message, correlationId?}`：读响应体（信封 `message` 为对象时取其 `message` / `error_code`；响应头 `X-Correlation-ID` 兜底）；422 detail 按 pydantic `type`（greater_than_equal / less_than_equal / missing / literal_error / string_too_long / too_long / int_parsing）译成中文，字段名用 `resolveColumnLabel` 与内置请求字段名表；429 `EXPORT_BUSY` 原样显示后端文案。
-- `components/query/queryEntryContext.ts`：`resolveQueryEntryContext(route) -> {projectId?, year?, source?}`（TrialBalance → tb_detail；Reports → `report_<?tab 或 balance_sheet>`；DisclosureNotes → 有 `?section` 时 `disclosure_note:<section>`，否则 disclosure；Adjustments → adj_aje；LedgerPenetration → level ∈ {ledger, voucher} 为 ledger_entries、aux_balance / aux_ledger 同名、其余 account_balance；AuxSummary → aux_balance；WorkpaperEditor → workpaper）；纯函数 `resolveDialogOpenContext({route, eventPayload, previous}) -> {projectId, year, initialSource}`（事件 project_id 优先于路由、非项目页不给项目、关闭后清空），供 ThreeColumnLayout 调用与 vitest。
+- `components/query/queryEntryContext.ts`：`resolveQueryEntryContext(route) -> {projectId?, year?, source?}`（TrialBalance → tb_detail；Reports → `report_<?tab 或 balance_sheet>`；DisclosureNotes → 有 `?section` 时 `disclosure_note:<section>`，否则 disclosure；Adjustments → adj_aje；LedgerPenetration → level ∈ {ledger, voucher} 为 ledger_entries、aux_balance / aux_ledger 同名、其余 account_balance；AuxSummary → aux_balance；WorkpaperEditor → workpaper）；纯函数 `resolveTemplateLibrarySource(uri) -> {source, notice?}`（ADR-AQL-15 的模板库源映射：`report:<类型>` → `report_<类型>`，`note:<任意>` → `disclosure` + 提示，`workpaper:…` 与注册表键原样）；纯函数 `resolveDialogOpenContext({route, eventPayload, previous}) -> {projectId, year, initialSource, initialNotice}`（事件 project_id 优先于路由、非项目页不给项目、事件 source 先经 `resolveTemplateLibrarySource`、关闭后清空），供 ThreeColumnLayout 调用与 vitest。
 - `components/query/queryTemplateCache.ts`：模板列表 sessionStorage 缓存读写与失效（从 MyTemplatesDialog 挪出）。
 - `components/query/queryIndicatorCache.ts`：`indicatorCacheKey({schema, projectId, year, notesVersion})` = `gt:custom-query:indicators:{schema}:{pid}:{year}:{notesVersion}`、读 / 写 / 清理旧版本；弹窗与页面版共用。
 - `composables/useReportRouteFocus.ts`：`useReportRouteFocus({route, activeTab, reportMode, rows, compareRows, rvTableRef, compareTableRef, notify}) -> {routeYear, initialTab}`：`?tab` 是合法页签名时作初始页签；首次加载完行后读 `?highlight`：矩阵报表（equity_statement、impairment_provision）只提示「该报表为矩阵格式，已打开对应报表」；对比模式在 `compareTableRef`、其余在 `rvTableRef` 上按 row_code `setCurrentRow` 并滚动居中；找不到该行次提示「未找到行次 {code}」；同一路由只执行一次。
@@ -334,27 +347,31 @@ async def is_cycle_restricted(user, project_id: UUID, db) -> bool
 - `CustomQueryDialog.vue`：打开时 `localProjectId = props.projectId || ""`（不再取列表第一项）；年度 = `props.year ?? 所选项目 audit_year ?? null`，null 时禁用查询并提示「请选择审计年度」；请求加 `_silent: true`、删 `validateStatus`，失败在结果区 `el-alert` 显示 `describeQueryError` + 「复制追踪号」；分页（100 / 200 / 500）+ 真实 total，删除「已达上限」判断；本地文字筛选占位文案改「仅筛选本页」；结果表首列「操作」：「打开」（buildRowDrill）、「复制引用」（buildFormulaRef + validatePageRefs 结果）；`jumpToCell` 改走 buildRowDrill（`?cell=`）；源键 `adj_rcl` → `adj_rje`；`meta.tables` 多于 1 张时显示表格切换；「导出 ▾」= 导出全部（服务端）/ 导出当前页；「📑 模板」改为打开 MyTemplatesDialog（载入 / 执行）；构建器页签按 `useQueryBuilderAccess` 渲染，无权时 disabled + 原因，向内嵌构建器传 projectId / year；指标树缓存改用 `queryIndicatorCache`（`notesVersion` 取 depth=1 探测的 `X-Notes-Version`）。
 - `CustomQueryTab.vue`：条件 → `conditions`（eq / like / gt / lt / between / is_null / is_not_null）+ `condition_logic`，条件区做成独立组件 `components/query/QueryConditionEditor.vue`（v-model `{conditions: {field, op, value}[], logic}`，与模板 `config.conditions` 同形，W3 起弹窗复用）；字段下拉与勾选框用 `resolveColumnLabel`；条件值框 `min-width: 120px`、条件行可换行；年度规则同弹窗；源下拉按 ADR-AQL-16 拍平并带项目、年度加载（缓存同弹窗）；`supports_conditions=false` 时禁用条件区并提示；操作列与导出同弹窗；删除内联模板列表对话框，改用 MyTemplatesDialog；ACNR 面板「开发中」。
 - `views/AdvancedQueryBuilder.vue`：props `projectId?` / `year?`；「跨项目」开关（`accessible_project_count > 1` 或 `all_projects` 时出现）；payload 带 project_id / year；翻页（offset）+ total；导出带 headers；单项目范围时结果操作列下钻与复制引用；ACNR 面板「开发中」。
-- `composables/useQueryBuilderAccess.ts`：首次调用 `GET /api/query/access`（模块级缓存，登出清空），返回 `canUseBuilder` / `builderDisabledReason` / `accessibleProjectCount` / `allProjects` / `loading`；删除 `QUERY_BUILDER_ROLES` 常量。
-- `layouts/ThreeColumnLayout.vue`：新增 `const customQueryYear = computed(() => { const v = Number(route.query.year); return Number.isFinite(v) && v > 2000 ? v : undefined })`，只用于 `<CustomQueryDialog :year>`；`currentYear` 与它传给 FormulaManagerDialog / GtRefreshScopeDialog 的绑定不动；打开 / 关闭经 `resolveDialogOpenContext`（事件 project_id 存入 override、侧栏打开预选数据源、关闭清空 override 与 initialSource）。
-- `components/query/MyTemplatesDialog.vue`：命名导入 `api`、读 `{templates, total}`、缓存走 queryTemplateCache、删除确认文案「删除后可在回收站恢复」；每行「载入」emit `load(config, tpl)`、「执行」emit `run(tpl)`（`allowRun` 控制显示）。
+- `composables/useQueryBuilderAccess.ts`：首次调用 `GET /api/query/access`（模块级缓存，登出清空），返回 `canUseBuilder`（= `allowed && (all_projects || accessible_project_count > 0)`）/ `builderDisabledReason`（取接口 `reason`，含作用域为空的提示）/ `accessibleProjectCount` / `allProjects` / `loading`；删除 `QUERY_BUILDER_ROLES` 常量。
+- `layouts/ThreeColumnLayout.vue`：新增 `const customQueryYear = computed(() => { const v = Number(route.query.year); return Number.isFinite(v) && v > 2000 ? v : undefined })`，只用于 `<CustomQueryDialog :year>`；`currentYear` 与它传给 FormulaManagerDialog / GtRefreshScopeDialog 的绑定不动；打开 / 关闭经 `resolveDialogOpenContext`（事件 project_id 存入 override、侧栏打开预选数据源、模板库源映射、关闭清空 override、initialSource 与 initialNotice），弹窗增 `:initial-notice` 绑定（+1 行），弹窗在结果区上方以 info 提示显示它，用户换数据源即清除。
+- `components/query/MyTemplatesDialog.vue`：命名导入 `api`、读 `{templates, total}`、缓存走 queryTemplateCache、删除确认文案「删除后可在回收站恢复」；每行「载入」emit `load(config, tpl)`、「执行」emit `run(tpl)`（`allowRun` 控制显示）；config 含参数占位的用户模板，「载入」先调 `GET /templates/{id}/resolve`（带 props 的项目与年度），再 emit `load(resolved.config, tpl, notices)`，与预置同形（§4.3）。
 - `views/ReportView.vue`：`routeYear` 计算属性移入 useReportRouteFocus，`activeTab` 初值取 `initialTab`，净增 ≤ 0 行。
 - `views/TemplateLibraryMgmt.vue`：挂载时 `?tab` 合法则设 activeTab，向 WpTemplateTab 传 `initial-search = ?wp_code`；`WpTemplateTab.vue` 增 `initialSearch` prop 种入 searchInput。
 - `components/query/SheetCellRangePicker.vue`：删除模块模式（moduleSource、isModuleMode、moduleLabel 与 module 分支）；年度改由父组件传入，未传时禁用预览并提示「请先选择审计年度」。
 - `components/query/queryColumnLabels.ts`：`summary` → 「摘要」；新增 `QUERY_SOURCE_LABEL_OVERRIDES = { ws_consol_tb: { summary: "汇总数" } }` 与 `resolveColumnLabel(key, title?, source?)`；补 aux_type、aux_code、aux_name、aux_type_name、opening_direction、closing_direction、entry_group_id、adjustment_type 中文。
 - `services/apiPaths/system.ts`：customQuery 增 `export`、`templateExecute(id)`，删 `batchExecute`、`cellWriteback`；新增 `queryBuilder = { access, schema, preview, execute, exportExcel }`，构建器改用。`types/custom-query-template.ts` 增 `condition_logic?: "and" | "or"`。
-- `__tests__/auditYearCalendarFallbackBaseline.json`：删除 CustomQueryDialog、SheetCellRangePicker、CustomQueryTab 三条（只动这三行；ThreeColumnLayout 条目保留）。
+- 年度兜底棘轮（合入后口径）：`auditYearCalendarFallbackBaseline.json` 已无 CustomQueryDialog / SheetCellRangePicker 条目；本 spec 只删自己修掉或删掉的文件的条目——任务 6 删 `composables/useBatchQuery.ts` 一行；任务 29 删掉 CustomQueryTab 的 `defaultAuditYear()` 后，`auditYearCalendarFallbackRatchet.spec.ts` 的 `CALENDAR_YEAR_EXEMPT` 中 `components/template-library/CustomQueryTab.vue` 一条随之删除（「豁免表可证伪」用例要求豁免文件仍命中扫描，不删即红；只改这一条，该文件属 `audit-year-calendar-fallback-ratchet`，提交时只含本条改动块）；`layouts/ThreeColumnLayout.vue` 条目保留。
 
 ### 4.3 W3 / W6 前端（ADR-AQL-05 / 20；页面文件只加最小接线，逻辑在新组件与 composable）
-- `QueryConditionEditor.vue`（W3 扩展）：props `fields: {key, dtype}[]`（来自叶子 `condition_fields`，缺省按 `columns` 当文本）、`notices?: string[]`（预置参数说明，显示在条件区上方）、`disabled?`；算子按 dtype 给：文本 等于 / 包含 / 开头是 / 为空 / 不为空，数值 等于 / 大于 / 大于等于 / 小于 / 小于等于 / 介于 / 为空 / 不为空，日期 再加「星期为」（多选 周一…周日 ⇒ 1…6、0）；导出 `incompleteReason`（首个未填值的条件：「条件「{字段}」未填写值」），宿主据此禁用「查询」「💾 保存」；导出常量 `EDITOR_OPS`（vitest 用它核对预置 JSON 的算子都在编辑器选项内）。
-- `MyTemplatesDialog.vue`（W3）：props 增 `projectId`、`year`；顶部「系统预置」分区（`GET /template-presets`，列表缓存走 `queryTemplateCache` 的独立键），每行只有「载入」「另存为我的模板」，不显示编辑、删除、执行；两个操作都先调 `resolve`（带 props 的项目与年度；没有项目时按钮不可用，提示「请先选择项目」），再 emit 与用户模板同名的 `load(config, item, notices)`，或新增的 `save-as(config, item, notices)`；`notices` = 每个参数一行（有值：「当前阈值：{basis} {value} 元」/「截止窗口：{basis}」；缺失：`missing_reason`）+ 预置 `notes`（用户模板的 `load` 不带第三个参数）。
-- `CustomQueryDialog.vue`：W3 嵌入 `QueryConditionEditor`（「条件」折叠面板，`supports_conditions=false` 的源禁用），请求带 `conditions` / `condition_logic`；处理 `load`（带 `notices` 时交给编辑器显示）/ `save-as`（载入后打开既有 💾 保存对话框，默认名「{预置名}（我的）」）。W6 新 prop `entry?: QueryEntryRequest | null`，打开时交给 `useQueryEntry`；结果区上方挂 `QueryEntryBanner`；试算表结果行的操作列增「查明细」。
-- `CustomQueryTab.vue`（W3）：处理 MyTemplatesDialog 的两个事件，同弹窗。
-- `queryEntryContext.ts`（W6，ADR-AQL-20 映射的唯一实现）：`buildQueryEntry(kind, target, route) -> QueryEntryRequest | {disabledReason}`，`QueryEntryRequest = {kind, projectId, year?, source, filters, label, switches: {source, label}[]}`；`tb_row`（合计 / 小计行 → `disabledReason`「合计行请在高级查询中按科目查询」）、`report_row`（读 `drilldownData` 的 `report_type` / `row_code` / `row_name`）、`note_section`（读当前附注的 `note_section` / `section_title`）、`workpaper`（读 `wp_code` / `wp_name`）；`tbRowDrill(row, entry)` 生成行内「查明细」的下一跳。
+- `QueryConditionEditor.vue`（W3 扩展）：props `fields: {key, dtype}[]`（来自叶子 `condition_fields`，缺省按 `columns` 当文本）、`notices?: string[]`（参数说明，显示在条件区上方）、`disabled?`；算子按 dtype 给：文本 等于 / 包含 / 开头是 / 为空 / 不为空 / 为空或空白，数值 等于 / 大于 / 大于等于 / 小于 / 小于等于 / 介于 / 为空 / 不为空，日期 再加「星期为」（多选 周一…周日 ⇒ 1…6、0）；条件行可带 `params` 标记（服务端解析时标上，表示值取自参数），用户改了该行的值或算子即去掉标记；导出 `incompleteReason`（首个未填值的条件：「条件「{字段}」未填写值」），宿主据此禁用「查询」「💾 保存」；导出纯函数 `toSavedConditions(conditions)`（带 `params` 标记的行把值写回 `{"$param": 名}`，`between` 写回两个占位，其余写字面值；请求体只发 field / op / value，不发标记）与常量 `EDITOR_OPS`（vitest 用它核对预置 JSON 的算子都在编辑器选项内）。
+- `MyTemplatesDialog.vue`（W3）：props 增 `projectId`、`year`；顶部「系统预置」分区（`GET /template-presets`，列表缓存走 `queryTemplateCache` 的独立键），每行只有「载入」「另存为我的模板」，不显示编辑、删除、执行；两个操作都先调 `resolve`（带 props 的项目与年度；没有项目时按钮不可用，提示「请先选择项目」），再 emit 与用户模板同名的 `load(config, item, notices)`，或新增的 `save-as(config, item, notices)`；`notices` = 每个参数一行（有值：「当前阈值：{basis}」/「截止窗口：{basis}」；缺失：`missing_reason`）+ 预置 `notes`。含参数占位的用户模板「载入」同样带 `notices`（§4.2）；不含占位的不带第三个参数。
+- `CustomQueryDialog.vue`：W3 嵌入 `QueryConditionEditor`（「条件」折叠面板，`supports_conditions=false` 的源禁用），请求带 `conditions` / `condition_logic`；处理 `load`（带 `notices` 时交给编辑器显示）/ `save-as`（载入后打开既有 💾 保存对话框，默认名「{预置名}（我的）」）；保存模板时 `config.conditions` 取 `toSavedConditions(...)`。显示 `initialNotice`（§4.2）。W6 新 prop `entry?: QueryEntryRequest | null`，打开时交给 `useQueryEntry`；结果区上方挂 `QueryEntryBanner`；试算表结果行的操作列增「查明细」。
+- `CustomQueryTab.vue`（W3）：处理 MyTemplatesDialog 的两个事件、保存时用 `toSavedConditions`，同弹窗。
+- `queryEntryContext.ts`（W6，ADR-AQL-20 映射的唯一实现）：`buildQueryEntry(kind, target, route, hostYear) -> QueryEntryRequest | {disabledReason}`，`QueryEntryRequest = {kind, projectId, year?, source, filters, label, switches: {source, label}[]}`，`year = target.year ?? hostYear ?? undefined`（undefined 交弹窗按 R10.2 解析）；`tb_row`：目标为空或 `target._isSubtotal || target._isTotal`（`TrialBalance.vue` 的 `DisplayRow` 标记，页面本身也按这两个标记区分小计 / 合计行）→ `disabledReason`「合计行请在高级查询中按科目查询」；`report_row`（读 `drilldownData` 的 `report_type` / `row_code` / `row_name` / `year`）；`note_section`（读当前附注的 `note_section` / `section_title`）；`workpaper`（读 `wp_code` / `wp_name`）；`tbRowDrill(row, entry)` 生成行内「查明细」的下一跳。
 - `composables/useQueryEntry.ts`（W6，≤ 250 行）：应用 entry（项目、年度、数据源、筛选，随后执行）、切换（保留筛选换源）、行内下钻（压栈，最多 5 层，「← 返回上一查询」出栈）、清除；用户手动换数据源时自动清除；保存模板时把 entry 的筛选写进 `config.filters`（`types/custom-query-template.ts` 增 `filters?: Record<string, string | string[]>`）。
 - `QueryEntryBanner.vue`（W6，≤ 150 行）：显示 `label`、`meta.entry_accounts`、切换按钮、「清除上下文」「← 返回上一查询」；按钮带 aria-label（N5）。
-- `QueryDetailEntry.vue`（W6，≤ 120 行，放 `components/query/`；页面显式 import，与各页现有写法一致，不依赖由构建工具重写、且常被并发会话改动的 `components.d.ts`）：props `kind`、`target`、`variant: 'ctx' | 'button'`；项目、年度读当前路由；点击 `eventBus.emit('open-custom-query', { entry })` 并 emit `opened`（页面用它关右键菜单）；不可用时置灰并 title 显示原因。`utils/eventBus.ts` 的 `open-custom-query` 载荷类型增 `entry?: QueryEntryRequest`；`ThreeColumnLayout.vue` 增 `customQueryEntry` 引用并绑 `:entry`（经 `resolveDialogOpenContext` 传递，关闭清空；+≤ 3 行）。
-- 页面接线（每页另加 1 行 import）：`TrialBalance.vue` 右键菜单插槽 1 行 `<QueryDetailEntry kind="tb_row" variant="ctx" :target="tbCtx.contextMenu.rowData" @opened="tbCtx.closeContextMenu()" />`（放在「📊 查看明细」之后）；`DisclosureEditor.vue` 右键菜单 1 行（`kind="note_section"`、`:target="currentNote"`、`@opened="deCtx.closeContextMenu()"`，放在「📊 穿透到序时账」之后）；`WorkpaperEditor.vue` 两个工具栏各 1 行（`kind="workpaper"`、`variant="button"`、`:target="wpDetail"`）；`ReportView.vue` 0 行——入口放 `components/report/ReportDrilldownDialogs.vue` 穿透弹窗内（`:target="drilldownData"`），`views/composables/useReportDrilldown.ts` 的 `onDrilldown` 给 `drilldownData` 加 `report_type`（当前页签）、`year`、`project_id`，`ReportDrilldownData` 类型增这三个可选字段。
-- `queryColumnLabels.ts`：`line_amount`「发生额（借贷较大者）」。`composables/useC24AnalyticsEngine.ts`（W3）：特殊事件词表改为 `import { SPECIAL_EVENT_KEYWORDS } from '@/generated/journalEntryRules'`，其余不动。
+- `QueryDetailEntry.vue`（W6，≤ 120 行，放 `components/query/`；页面显式 import，与各页现有写法一致，不依赖由构建工具重写、且常被并发会话改动的 `components.d.ts`）：props `kind`、`target`、`variant: 'ctx' | 'button'`、`year?: number | null`（宿主取数用的年度，ADR-AQL-20）；项目读当前路由，年度交 `buildQueryEntry` 的 `hostYear`；点击 `eventBus.emit('open-custom-query', { entry })` 并 emit `opened`（页面用它关右键菜单）；不可用时置灰并 title 显示原因；`ctx` 变体渲染为 `div.gt-ucell-ctx-item`（该样式在 `CellContextMenu.vue` 的非 scoped `<style>` 里，插槽内的子组件同样生效）。`utils/eventBus.ts` 的 `open-custom-query` 载荷类型增 `entry?: QueryEntryRequest`；`ThreeColumnLayout.vue` 增 `customQueryEntry` 引用并绑 `:entry`（经 `resolveDialogOpenContext` 传递，关闭清空；+≤ 3 行）。
+- 页面接线（按合入后的文件，开工前现查行数与 `git status`）：
+  - `TrialBalance.vue`（+2）：右键菜单插槽 1 行 `<QueryDetailEntry kind="tb_row" variant="ctx" :target="tbCtx.contextMenu.rowData" :year="year" @opened="tbCtx.closeContextMenu()" />`（放在「📊 查看明细」之后；`year` 是页面顶层 computed，合入后取不到为 null）+ 1 行 import。
+  - `DisclosureEditor.vue`（净 0，HARD_CAP 3,265 = 实际行数不动）：现有 4 行的「R9-F5：穿透到序时账」块（注释 1 行 + `div` / `span` / `/div` 3 行）压成 2 行（注释 1 行 + 单行 `<div class="gt-ucell-ctx-item" @click="onDeCtxPenetrateToLedger"><span class="gt-ucell-ctx-icon">📊</span> 穿透到序时账</div>`，与 TrialBalance 菜单项的单行写法相同，渲染结果不变），腾出的 2 行放 `<QueryDetailEntry kind="note_section" variant="ctx" :target="currentNote" :year="year" @opened="deCtx.closeContextMenu()" />` 与 import；`year` = 路由 `?year ?? projectStore.year`，页内切年后随之变化。不选「把穿透项也收进新组件」：那样要把 `onDeCtxPenetrateToLedger` 当 prop 传进去，新组件就和附注编辑器的内部函数耦合了。
+  - `WorkpaperEditor.vue`（+3）：合入后两个工具栏（`gt-wp-io-toolbar` 与 Univer 编辑器内的 `gt-wp-editor-toolbar`）只在 `projectYear != null` 时渲染，各加 1 行 `<QueryDetailEntry kind="workpaper" variant="button" :target="wpDetail" :year="projectYear" />` + 1 行 import；缺年度时页面显示 `AuditYearMissingResult`，入口随工具栏一起不出现。
+  - `ReportView.vue`（0 行）：入口放 `components/report/ReportDrilldownDialogs.vue` 穿透弹窗内（`:target="drilldownData"`）；`views/composables/useReportDrilldown.ts` 的 `onDrilldown` 给 `drilldownData` 加 `report_type`（当前页签）、`year`（本次穿透请求用的同一个 `year.value`）、`project_id`，`ReportDrilldownData` 类型增这三个可选字段；`target.year` 优先于 `hostYear`，所以报表入口只有这一个年度来源。
+- `queryColumnLabels.ts`：`line_amount`「发生额（借贷较大者）」。C24（W3）：`composables/useC24AnalyticsEngine.ts` 规则 11 的局部常量改为 `import { SPECIAL_EVENT_KEYWORDS } from '@/generated/journalEntryRules'`；`components/workpaper/GtC24JournalDetail.vue` 的 `ruleParams` 默认 `vagueKeywordsText` 改为 `VAGUE_KEYWORDS_DEFAULT.join(',')`（改 1 行 + 1 行 import；合入后白名单 2,049、门限 2,151）；两文件其余不动。
 
 ## 5. 错误处理（失败条件 → 可恢复性 → 调用方收到 → 日志）
 
@@ -381,23 +398,27 @@ async def is_cycle_restricted(user, project_id: UUID, db) -> bool
 | 构建器 | 准入不足 | 否 | 403 `ROLE_FORBIDDEN`（中文原因含合伙人） | 不记 |
 | 构建器 | staff_members 越权 | 否 | 403 `TABLE_ROLE_FORBIDDEN` | 审计 `custom_query.pii_denied` 同路径 |
 | 构建器 | 指定不可访问项目 / 指定循环受限项目 | 否 | 403 `FORBIDDEN_PROJECT` / `CYCLE_SCOPED_PROJECT`「该项目对您设有审计循环范围，请在业务视图中查询」 | 审计（既有守卫） |
+| 构建器 | 可访问项目全部被循环范围排除（作用域为空） | 是（改用业务视图） | 200、0 行 + warning「已排除 N 个…」；access 接口 `accessible_project_count = 0` + reason，入口置灰 | 不记 |
 | 回写 | module 为 tb / adj / report | 是 | 422（pydantic Literal） | 不记 |
 | 回写 | 缺 / 错 `X-File-Opened-At` | 是 | 400（既有） | 不记 |
 | 回写 | 目标不属于请求项目 | 否 | 404 `WRITEBACK_TARGET_NOT_FOUND`（底稿）/ 404 `NOTE_RECORD_NOT_FOUND`（附注）；不加锁 | 不记 |
 | 回写预览 / 确认 | 有目标无法定位 | 是（修正后重新预览） | 预览 200 `enter_confirmation=false` + notice；确认 409 `WRITEBACK_CONFLICT`，不写入 | 不记 |
 | 模板保存 / 更新 | scope、名称、分享项目非法 | 是 | 422 `TEMPLATE_SCOPE_INVALID` / 400 `TEMPLATE_INVALID`，中文原因（不再 500） | 不记 |
 | 模板读取 / 执行 | 不可见 / 已删除 | 否 | 403 `TEMPLATE_NOT_VISIBLE`「无权访问该模板」/ 404 `TEMPLATE_NOT_FOUND` | 不记 |
-| 模板执行 | 目标项目审计年度不可解析且未传 year | 是 | 422 `YEAR_REQUIRED` | 不记 |
-| 回收站恢复 / 彻底删除模板 | 非作者且非 admin | 否 | 403 | 不记 |
+| 模板执行 / 模板解析 / 预置解析 | 未传 year 且目标项目审计年度不可解析 | 是（填写项目审计年度或传 year） | 422「未设置审计年度，请先在项目基本信息中填写」（`deps.require_project_audit_year`，平台统一文案） | 不记 |
+| 模板执行 | 模板含参数占位，某参数取不到（如该项目年度没有重要性） | 是（载入后填写再执行） | 400 `CONDITION_VALUE_REQUIRED`，message = 该参数的 `missing_reason` | 不记 |
+| 模板保存 / 更新 | `config.conditions` 含未登记的 `$param` | 是 | 400 `TEMPLATE_INVALID`「模板参数「{名}」未登记」 | 不记 |
+| 回收站恢复 / 彻底删除模板 | 非作者且非 admin | 否 | 403（列表里该行 `can_restore` / `can_purge` 为 false，界面不显示按钮） | 不记 |
 | address-resolve | URI 非法 / 模板目录读取失败 | 是 / — | 400（既有）/ 200 `registered=false` | 不记 / WARNING |
 | 底稿预览 / 区域取数 | storage 无文件 | 是（先打开底稿） | 200 `available=false` / 400 `QUERY_FAILED` 中文 | 不记 |
 | 底稿区域取数 | LibreOffice 不可用或失败 | — | 200 + warnings「公式未能重算」 | WARNING |
 | 前端复制引用 | 校验接口失败 / 引用无效 | 是 | 按钮不可用并显示原因 | 不记 |
-| execute（W3 条件） | 条件值为空（为空 / 不为空除外） | 是（填写） | 400 `CONDITION_VALUE_REQUIRED`「条件「{字段}」未填写值」 | 不记 |
+| execute（W3 条件） | 条件值为空或仍是未解析的参数占位（为空 / 不为空 / 为空或空白除外） | 是（填写） | 400 `CONDITION_VALUE_REQUIRED`「条件「{字段}」未填写值」 | 不记 |
 | 同上 | 星期条件用于非日期字段 / 值不是 1~7 个不重复的 0~6 整数 | 是 | 400 `WEEKDAY_FIELD_INVALID` / `INVALID_WEEKDAY_VALUE` | 不记 |
+| 同上 | 「为空或空白」用于非文本字段 | 是 | 400 `BLANK_FIELD_INVALID` | 不记 |
 | 预置列表 | JSON 中某条不合格 | — | 200，该条不出现 | ERROR（id + 原因） |
-| 预置解析 | id 未知 / 项目不可访问 / 年度不可解析 | 否 / 否 / 是 | 404 `TEMPLATE_PRESET_NOT_FOUND` / 403 `FORBIDDEN_PROJECT` / 422 `YEAR_REQUIRED` | 不记 / 审计（既有守卫）/ 不记 |
-| 预置解析 | 没有重要性记录、值 ≤ 0、读取异常 | 是（填写阈值） | 200，该参数 `value=null` + `missing_reason`，条件值为空串 | 不记 / 不记 / WARNING |
+| 预置解析 / 模板解析 | 预置 id 未知 / 模板不可见或已删 / 项目不可访问 | 否 | 404 `TEMPLATE_PRESET_NOT_FOUND` / 403 `TEMPLATE_NOT_VISIBLE` 或 404 `TEMPLATE_NOT_FOUND` / 403 `FORBIDDEN_PROJECT` | 不记 / 不记 / 审计（既有守卫） |
+| 预置解析 / 模板解析 | 没有重要性记录、值 ≤ 0、读取异常（读取在 SAVEPOINT 内，失败只回滚该保存点） | 是（填写阈值） | 200，该参数 `value=null` + `missing_reason`，条件值为空串 | 不记 / 不记 / WARNING |
 | execute（W6 筛选键） | 报表行未生成 / 无直接取数科目 | 是（先生成报表 / 改看公式） | 400 `REPORT_ROW_NOT_GENERATED` / `REPORT_ROW_NO_ACCOUNTS` | 不记 |
 | 同上 | 附注章节不存在 / 没有登记科目 / 章节在本人范围外 | 是 / 是 / 否 | 400 `NOTE_SECTION_NOT_FOUND` / 400 `NOTE_SECTION_NO_ACCOUNTS` / 403 `SECTION_OUT_OF_SCOPE` | 不记 |
 | 同上 | 底稿没有登记科目 | 是 | 400 `WP_CODE_NO_ACCOUNTS` | 不记 |
@@ -427,8 +448,10 @@ async def is_cycle_restricted(user, project_id: UUID, db) -> bool
 | 模板 `scope` | 否（默认 private） | private / project / public（及兼容 personal、global、team） | 422 `TEMPLATE_SCOPE_INVALID` |
 | 模板 `shared_project_ids` | project 时必填 | 1..50 个 UUID，逐个 edit 鉴权 | 422 / 403 |
 | 模板 `config` | 是 | dict，序列化 ≤ 64 KB | 422 |
-| 模板执行 `project_id` / `year` / `limit` / `offset` | project_id 必填 | UUID / 可选 int 2000..2100 / 1..2000 / ≥ 0 | 422；年度不可解析 422 `YEAR_REQUIRED` |
-| indicators `year` | 否 | int 2000..2100，缺省取项目审计年度 | 422 |
+| 模板执行 `project_id` / `year` / `limit` / `offset` | project_id 必填 | UUID / 可选 int 2000..2100 / 1..2000 / ≥ 0 | 422；年度不可解析 422（平台统一文案） |
+| 模板解析 `project_id` / `year` | project_id 必填 | UUID / 可选 int 2000..2100 | 403（OwnershipGuard）/ 422；年度不可解析 422（平台统一文案） |
+| 模板 `config.conditions[].value` 中的 `{"$param": 名}` | 否 | 名 ∈ `PARAM_NAMES`；`between` 的两端可分别为占位 | 400 `TEMPLATE_INVALID` |
+| indicators `year` | 否 | int 2000..2100，缺省取项目审计年度；取不到时不建附注分支（§3.8） | 422（仅值越界） |
 | address-resolve `uri` | 是 | ≤ 500 字符且 `parse_source_uri` 可解析 | 400 |
 | execute `conditions[].op = starts_with` | — | value 字符串 1..64 | 400 `CONDITION_VALUE_REQUIRED` / 422 |
 | execute `conditions[].op = weekday_in` | — | value 为 1..7 个不重复的 0..6 整数；字段为日期列 | 400 `INVALID_WEEKDAY_VALUE` / `WEEKDAY_FIELD_INVALID` |
@@ -436,7 +459,8 @@ async def is_cycle_restricted(user, project_id: UUID, db) -> bool
 | execute `filters.wp_code` / `note_section` | 否 | 字符串 1..40 / 1..80 | 400 `INVALID_FILTER_VALUE` |
 | execute `filters.report_row` | 否 | `<FinancialReportType 值>:<行次>`，≤ 80 字符 | 400 `INVALID_FILTER_VALUE` |
 | 预置解析 `preset_id` | 是 | `^[a-z0-9_]{1,40}$` 且在已加载清单中 | 404 `TEMPLATE_PRESET_NOT_FOUND` |
-| 预置解析 `project_id` / `year` | project_id 必填 | UUID / 可选 int 2000..2100 | 403（OwnershipGuard）/ 422；年度不可解析 422 `YEAR_REQUIRED` |
+| 预置解析 `project_id` / `year` | project_id 必填 | UUID / 可选 int 2000..2100 | 403（OwnershipGuard）/ 422；年度不可解析 422（平台统一文案） |
+| execute `conditions[].op = is_blank` | — | 忽略 value；字段为文本列 | 400 `BLANK_FIELD_INVALID` |
 
 ## 7. 不变量与所有者
 
@@ -456,7 +480,7 @@ async def is_cycle_restricted(user, project_id: UUID, db) -> bool
 | 查询路径不写 storage | `fetchers/workpaper_cells.py`（写盘只在 `_temp_copy`）+ AST 守卫 | 预览与区域取数唯一实现处 |
 | 回写不碰他项目行 | `snapshot_writer` 两个取行语句（WHERE 含项目）+ `writeback_preview._build_item` 归属核对 | 加锁发生在取行，项目条件必须在同一语句；预览不读他项目旧值 |
 | 模板可见性 | `TemplateScopeAdapter.is_visible`（template_service 委托，router 不自判） | 列表、详情、执行三处结论一致 |
-| 构建器准入 | `builder_access.resolve_builder_access`（依赖与 access 接口共用） | 前后端同源 |
+| 构建器准入与作用域计数 | `builder_access.resolve_builder_access`（依赖与 access 接口共用；计数取 `resolve_builder_scope` 的结果） | 前后端同源；入口显示的项目数与执行时的作用域是同一个函数算的 |
 | 导出并发 | `export_gate`（业务视图与构建器导出共用） | 一处计数才有上限 |
 | 下钻路由与引用语法 | 前端 `queryResultLinks.ts`（账簿 query 由 `buildLedgerQuery` 生成） | 三个结果表共用一处 |
 | 列中文标签 | 前端 `queryColumnLabels.ts`（导出表头也由它经请求传入） | advanced-query-consolidation R1 既定真源 |
@@ -465,7 +489,9 @@ async def is_cycle_restricted(user, project_id: UUID, db) -> bool
 | 大额口径「借、贷较大者」 | `ledger_sampling_service.ledger_line_amount`（抽凭、截止测试、查询共用） | 原表达式就在这里，抽出后三处同一实现 |
 | 期末前后窗口 | `sampling_enhanced_service.cutoff_window` 与两个默认值常量 | 截止性测试是该口径的原所有者 |
 | 业务对象 → 科目（报表行、附注章节、底稿） | 后端 `custom_query/entry_accounts.py` | 依赖库内报表结果与映射表；前端只传对象键 |
-| 业务页入口 → 查询参数 | 前端 `queryEntryContext.buildQueryEntry` | 用户要求一处映射；四个页面只挂组件 |
+| 业务页入口 / 模板库按钮 → 查询参数 | 前端 `queryEntryContext.ts`（`buildQueryEntry`、`resolveTemplateLibrarySource`） | 用户要求一处映射；四个页面与三个模板宿主只挂组件 / 发事件 |
+| 参数占位的取值（预置与用户模板） | 服务端 `template_presets.resolve_config`（载入、执行共用；`config_to_request` 拒收未解析的占位） | 审计口径要按目标项目与年度取值，不能沿用保存时那个项目的值 |
+| 回收站按钮能力 | 后端列表逐行 `can_restore` / `can_purge`（按作者可见的类型）；`RecycleBin.vue` 有布尔值就用，否则按系统角色权限 | 判定与 `_authorize_row` 同一处，界面不另算 |
 | 空条件值不执行 | 前端 `QueryConditionEditor.incompleteReason` + 后端 `paged_fetch` 的 `CONDITION_VALUE_REQUIRED` | 前端给即时提示，后端是不可绕过的那一道 |
 
 ## 8. 迁移（实施时现扫 `backend/migrations/V*.sql` 取 MAX+1，现最高 V205）
@@ -483,26 +509,27 @@ END $$;
 ```
 `R{n}__custom_query_template_soft_delete.sql`：`ALTER TABLE … DROP CONSTRAINT IF EXISTS ck_custom_query_templates_scope; DROP INDEX IF EXISTS idx_cqt_live_updated; ALTER TABLE … DROP COLUMN IF EXISTS deleted_at, DROP COLUMN IF EXISTS is_deleted;`。三层：迁移 + ORM（`SoftDeleteMixin` 声明两列，§3.6）+ `template_service.soft_delete` / `visible_templates`。开发服务器热重载不跑迁移 ⇒ 落库用 `MigrationRunner(...).run_pending()`，不重启共享 start-dev。
 
-## 9. 行数门与文件预算（splitlines 口径；门禁 = 白名单 × 1.05）
+## 9. 行数门与文件预算（splitlines 口径；白名单文件门限 = 基线 × 1.05 取整，HARD_CAP 文件门限 = 上限且上限须等于实际行数；「现状」列按合入远端后的树现读，任务 0 合入后重算）
 
 | 文件 | 现状 | 预期 | 处置 |
 |---|---|---|---|
-| `routers/custom_query.py` | 3,086（白名单 2,966） | ≈ 1,900 | 先删 batch-execute、再下沉取数器，再做其余改动；完成后白名单基线下调为真实行数 |
+| `routers/custom_query.py` | 3,086（白名单 2,966，门限 3,114） | ≈ 1,900 | 先删 batch-execute、再下沉取数器，再做其余改动；完成后白名单基线下调为真实行数 |
 | `services/custom_query/table_whitelist.py` | 700 | ≤ 800 | 超 800 先把列分层 / 敏感表段抽到同包 `table_whitelist_tiers.py` |
 | `snapshot_writer.py` / `snapshot_writer_modules.py` / `writeback_preview.py` | 759 / 385 / 710 | ≈ 700 / ≈ 200 / ≤ 760 | 前两者只减 |
 | 新文件 `source_registry.py` / `paged_fetch.py` / `fetchers/*.py` / `builder_access.py` / `cycle_scope.py` / `export_gate.py` | — | 各 ≤ 800 | — |
 | `ReportView.vue`（HARD_CAP 1,949） | 1,949 | ≤ 1,949 | 先把 `routeYear` 移入 `useReportRouteFocus` |
-| `ThreeColumnLayout.vue`（白名单 1,515，上限约 1,590） | 1,546 | ≤ 1,565 | 映射与开合逻辑放 `queryEntryContext.ts` |
+| `ThreeColumnLayout.vue`（白名单 1,515，门限 1,590） | 1,546 | ≤ 1,566 | 映射与开合逻辑放 `queryEntryContext.ts`；`customQueryYear`、`:initial-notice`、`:entry` 三处接线 |
+| `RecycleBin.vue`（默认上限 1,500） | 354 | ≤ 365 | 按钮改 `canRowAct` |
 | `CustomQueryDialog.vue` / `CustomQueryTab.vue` / `AdvancedQueryBuilder.vue` | 1,061 / 1,245 / 900 | 各 ≤ 1,450 | 超出先把操作列 / 分页条抽成 `QueryResultActions.vue`；W3 / W6 在弹窗里净增 ≤ 40 行（逻辑在 `useQueryEntry.ts` 与三个新组件） |
-| `TrialBalance.vue`（白名单 4,491，上限约 4,715） | 4,626 | ≤ 4,628 | W6 只加 2 行 |
-| `DisclosureEditor.vue`（HARD_CAP 3,281） | 3,265 | ≤ 3,267 | W6 只加 2 行；开工前现跑门禁 |
-| `WorkpaperEditor.vue`（默认上限 1,500，不在白名单） | 1,465 | ≤ 1,468 | W6 只加 3 行 |
+| `TrialBalance.vue`（白名单 4,491，门限 4,715） | 4,628 | ≤ 4,630 | W6 只加 2 行 |
+| `DisclosureEditor.vue`（HARD_CAP 3,265 = 实际） | 3,265 | = 3,265 | W6 净增 0（§4.3：穿透项 4 行压成 2 行）；HARD_CAP 不动；任务 47 跑 `tests/scripts/test_hard_cap_ratchet.py` 与 `check_file_size.py --staged` |
+| `WorkpaperEditor.vue`（默认上限 1,500，不在白名单） | 1,455 | ≤ 1,458 | W6 只加 3 行 |
 | `ReportDrilldownDialogs.vue` / `useReportDrilldown.ts` | 173 / 196 | ≤ 200 / ≤ 205 | ReportView 不动 |
 | `ledger_sampling_service.py`（白名单 1,044，上限约 1,096） | 1,044 | ≤ 1,060 | 只加 `ledger_line_amount` 并改两处调用 |
 | `sampling_enhanced_service.py` / `useC24AnalyticsEngine.ts` | 388 / 470 | ≤ 420 / ≤ 470 | 只抽函数与常量 / 只换 import |
 | 新文件 `template_presets.py` / `entry_accounts.py` / `gen_journal_entry_rules_ts.py` | — | ≤ 300 / ≤ 250 / ≤ 150 | — |
 | 新文件 `QueryConditionEditor.vue` / `QueryDetailEntry.vue` / `QueryEntryBanner.vue` / `useQueryEntry.ts` | — | ≤ 350 / ≤ 120 / ≤ 150 / ≤ 250 | — |
-| `GtC24JournalDetail.vue`（2,049，超默认上限且不在白名单） | 2,049 | 不改 | 改一行即被行数门拦，W16 |
+| `GtC24JournalDetail.vue`（合入后白名单 2,049，门限 2,151） | 2,049 | ≤ 2,050 | 只改默认词表 1 行 + 1 行 import（§4.3） |
 
 ## 10. 测试计划
 
@@ -516,11 +543,14 @@ END $$;
 - 模板：adapter 归一（含中文报错）；`visible_templates` 四类可见性与「先过滤后截断」；`config_to_request`；软删后列表不见；更新传 `scope=global` 入库为 public。
 - 构建器：准入判定（系统角色 / 项目经理 / 只读成员 / 已删项目成员）；`scope_predicates` 的基表谓词在 WHERE、目标谓词在 ON（编译 SQL 断言）；JOIN 基数不变式；report_config 副本行谓词；`_derive_formula_refs` 对 tb_balance 为 None。
 - 导出：`_text_safe_cell` 对字符串 `=1+1`、`+1`、`-1`、`@x` 置文本，数值 -1 不受影响；导出闸：同一用户第 2 个 429、第 5 个全局 429、释放后可再取、`release` 幂等。
-- W3：`validate_preset` 对 JSON 每条为空列表；逐类构造坏条目（未知源、不可条件字段、白名单外算子、未登记参数、超 20 条）各得对应原因且被 `load_presets` 跳过并记 ERROR；`starts_with` / `weekday_in` 编译为 postgresql 方言后用户值只在绑定参数里，`weekday_in` 用于文本列 400；`cutoff_window` 与 `run_cutoff_test` 的窗口一致（同一函数），`DEFAULT_CUTOFF_DAYS_*` 等于 `run_cutoff_test` 签名默认值；`build_ledger_query` 的 SQL 文本改前改后一致；生成器 `render(JSON)` 等于磁盘上的 `journalEntryRules.ts`（先例 `test_wp_account_mapping_single_source.py`，不走子进程）；vitest 读预置 JSON，断言每条的算子都在 `QueryConditionEditor.EDITOR_OPS` 内（先例 `noteEditCoverage.ts` 的 JSON 比对）。
-- W6：`codes_for_wp_code`（E1 → 1001 / 1002 / 1012，E1-2 → 1001，A1 → 空，未登记子编码取主编码）；`report_row_predicate` 单码编译为转义后的 `LIKE`、区间为 `BETWEEN`；筛选键非法值 400；`buildQueryEntry` 四种对象的落点与切换（vitest，ADR-AQL-20 表逐行一条）、合计行不可用、手动换源清除上下文、下钻压栈与返回。
+- W3：`validate_preset` 对 JSON 每条为空列表；逐类构造坏条目（未知源、不可条件字段、白名单外算子、未登记参数、超 20 条、不可排序的 `sort_field`、`sort_order` 非 asc / desc、`page_size` 越界）各得对应原因且被 `load_presets` 跳过并记 ERROR；`coerce_value(ledger_line_amount(t), "1000000")` 为 `Decimal`，`build_filter(ledger_line_amount(t), "gte", "1000000")` 编译后绑定值为 `Decimal`；`is_blank` 编译为 `IS NULL OR trim(col, :chars) = :empty`（PG 与 SQLite 同形），用于数值列 400 `BLANK_FIELD_INVALID`，`nonempty=False` 与 `is_blank` 调的是同一个函数（AST 断言）；`resolve_config` 给取自参数的条件标 `params`、缺失参数代入 `""` 并给 `missing_reason`；`config_to_request` 收到未解析的 `$param` 抛错；保存含未登记 `$param` 的模板 400；`starts_with` / `weekday_in` 编译为 postgresql 方言后用户值只在绑定参数里，`weekday_in` 用于文本列 400；`cutoff_window` 与 `run_cutoff_test` 的窗口一致（同一函数），`DEFAULT_CUTOFF_DAYS_*` 等于 `run_cutoff_test` 签名默认值；`build_ledger_query` 的 SQL 文本改前改后一致；生成器 `render(JSON)` 等于磁盘上的 `journalEntryRules.ts`（先例 `test_wp_account_mapping_single_source.py`，不走子进程）；vitest 读预置 JSON，断言每条的算子都在 `QueryConditionEditor.EDITOR_OPS` 内（先例 `noteEditCoverage.ts` 的 JSON 比对）；vitest：`toSavedConditions` 对带 `params` 标记的行写回占位（含 `between` 两端），改过值的行写字面值；`GtC24JournalDetail` 的默认模糊词等于 `VAGUE_KEYWORDS_DEFAULT`。
+- W6：`codes_for_wp_code`（E1 → 1001 / 1002 / 1012，E1-2 → 1001，A1 → 空，未登记子编码取主编码）；`report_row_predicate` 单码编译为转义后的 `LIKE`、区间为 `BETWEEN`；筛选键非法值 400；`buildQueryEntry` 四种对象的落点与切换（vitest，ADR-AQL-20 表逐行一条）、`_isSubtotal` / `_isTotal` 行与空目标不可用、年度取 `target.year ?? hostYear`（附注编辑器页内切到 2024 后挂载的 `QueryDetailEntry` 发出的 entry 年度为 2024；报表 `drilldownData.year` 优先）、手动换源清除上下文、下钻压栈与返回；`resolveTemplateLibrarySource` 三种载荷（`report:balance_sheet` → `report_balance_sheet`、`note:五-1-1` → `disclosure` + 提示、`workpaper:D2` 原样）与 `resolveDialogOpenContext` 带出 `initialNotice`。
+- 回收站（vitest）：`canRowAct` 对带 `can_restore=true` 的模板行在系统 auditor 身份下显示「恢复」「删除」，`false` 时不显示；不带该键的其余类型仍按权限表（auditor 不显示，manager 显示）。
 - 依赖旧内部形态而需改写的测试（任务内逐条写明「旧断言固化了缺陷 / 内部形态」）：`test_advanced_query_hardening_wave012.py` 的 `_query_trial_balance` 替身用例；`test_template_service_pbt.py`、`test_advanced_query_template_service.py`、`test_advanced_query_template_execution.py` 的旧 scope 模型、`_is_template_visible` / `_normalize_scope` 用法与 `TEMPLATE_FORBIDDEN` 断言；`test_query_builder_role_gate_pbt.py`（改为 await 异步依赖）；`test_advanced_query_hardening_properties_scope.py::test_p23_*`（改为断言前端不再持有角色清单且经 access 接口判定）；指标树测试的 `_build_disclosure_tree` 替身签名；`advancedQueryFrontend.spec.ts` 中「今年 − 1」断言；`test_query_builder_formula_ref_grammar_v1.py`（tb_balance 形态断言改为全 None、参数化去掉 tb_balance；双列名用例改到真 PG，用 `address_registry.validate_formula_refs` 断言 `TB('1001','审定数')` 有效、`TB('1001','期末')` 无效）；`test_writeback_preview.py` / `test_writeback_pbt.py` 中「含不可定位条目仍可确认」的断言；`test_advanced_query_scope_budget_tiers.py` 的 report_config 用例保持不变（仍在 unscoped_tables，warning 仍含表名）。
 
 ### 10.2 真 PG（`pg_only`，金标准现算，统计排除软删项目）
+写入只发生在回滚事务里、只写名称带【测试】/【UAT】的项目：需要华氏数据形态时，在回滚事务里新建【测试】项目（`template_type` / `report_scope` 同华氏），把所需华氏行复制过去（华氏行只读），金标准在副本上现算；真实项目只做只读查询与 R4.2 的 `NOWAIT` 加锁验证。
+
 | 用例 | 金标准 |
 |---|---|
 | 宜宾临港店科目余额（业务视图与构建器） | `get_active_filter` 行数与 Σ期末 |
@@ -530,25 +560,26 @@ END $$;
 | `active_rows_predicate` 与 `get_active_filter` | 每个活项目年度两者行集合相等 |
 | 构建器 LEFT JOIN 无匹配行 | 回滚事务里给【UAT】子公司A 插一行没有对应标准科目的试算行：`trial_balance LEFT JOIN account_chart` 行数 = 基表行数，该行目标列为空 |
 | 全部登记 JOIN | 多对一登记在活项目上 LEFT JOIN 后行数 = 基表行数；一对多登记产生 warning |
-| e2e_manager 构建器 projects / trial_balance | = OwnershipGuard 可访问集合 ∩ 未删项目 |
-| 报表源结构 | 回滚事务里给华氏插一条覆盖行与一条本项目独有行：每个活项目的 (report_type, row_code) 集合 == `load_effective_report_configs` 的集合；独有行出现、金额为空；报表行次源只含准则行与本项目副本 |
+| e2e_manager 构建器 projects / trial_balance | 金标准 = OwnershipGuard 可访问集合 − 已删项目 − `is_cycle_restricted` 为真的项目。现库 e2e_manager 只经委派访问 5e193c68、成员行 0 ⇒ 链路不唯一 ⇒ 受限 ⇒ 期望 0 行 + 排除 warning，access 接口计数 0 + reason；正例 u_011abb97dd2d4101（系统 auditor，65a9afa5 上人员记录 1 + 成员行 manager / edit + manager 委派 ⇒ 主管）只返回 65a9afa5。身份事实实施时现查，变了按同一口径换人；closure.md 按此口径回报简报的这条基线 |
+| 报表源结构 | 回滚事务里新建【测试】项目、复制华氏该年度 financial_report 行，再插 `project:{测试项目}` 的一条覆盖行与一条独有行：该项目报表源的 (report_type, row_code) 集合 == `load_effective_report_configs` 的集合，独有行出现、金额为空；各真实活项目只读对拍同一集合等价；报表行次源只含准则行与本项目副本 |
 | 华氏 BS-002 / AJE / 「八、1」/ 报表行次 | financial_report 值 / adjustments 行数 / 第一张表的行数与行序（与 `table_data` 一致，合计行在最后）/ report_config 行数 |
 | 辅助余额 / 辅助明细 | 带 aux_type / 科目筛选的独立 COUNT；辅助明细不带筛选 400 |
-| 循环范围（分支须含 d0de87a6c） | 回滚事务里建临时用户（系统 manager）与其人员记录，在华氏建成员行（`scope_cycles` 为空）与委派（角色 auditor、`assigned_cycles=['D']`）：金标准 = `deps.get_user_scope_cycles` 的返回值（应为 `['D']`）；试算表源 = `get_codes_by_cycles(该返回值)` 内科目；调整分录按分录组；附注树与附注目录只含 `get_sections_by_cycles` 章节，范围外章节 403；该用户构建器作用域不含华氏。同一用户委派角色改为 manager ⇒ 返回 None、三源不限；勾选改为空 ⇒ 三源都无行 |
+| 循环范围（合入后） | 回滚事务里新建【测试】项目并复制华氏的 trial_balance、adjustments、disclosure_notes 行；建临时用户（系统 manager）与其一条人员记录，在该项目建成员行（`scope_cycles` 为空）与委派（角色 auditor、`assigned_cycles=['D']`）：金标准 = `deps.get_user_scope_cycles` 的返回值（应为 `['D']`）；试算表源 = `get_codes_by_cycles(该返回值)` 内科目；调整分录按分录组；附注树与附注目录只含 `get_sections_by_cycles` 章节，范围外章节 403；该用户构建器作用域不含该项目。同一用户委派角色改为 manager ⇒ 返回 None、三源不限；勾选改为空 ⇒ 三源都无行；带 `CycleScopeCache` 与不带结果相同 |
 | 预置执行对账（只读） | 每条预置经 resolve + execute（TestClient、真实依赖链，项目分配见 R13.7）：total = 独立 SQL `COUNT`；第一页逐值 = 独立 SQL 同排序 `LIMIT`；结果 ≤ 5,000 行的逐页取全量后 Σ借 / Σ贷 = 独立 `SUM` |
-| 预置参数 | 回滚事务给【UAT】子公司A 插重要性记录：正数 ⇒ 阈值 = 该数；负数 ⇒ 留空 + 负数原因；无记录 ⇒ 留空 + 未设置原因；华氏（真实负数）只读验证负数原因；`audit_period_end` 为空时截止窗口 = 年度 12-31 前后各 5 天 |
-| 新条件能力 | 和平药房：周末 total = 独立 `EXTRACT(DOW FROM voucher_date) IN (0, 6)` 计数；`account_code` 开头是 1002 = `LIKE '1002%'` 计数；华氏 `line_amount` 大于等于 1,000,000 = 独立 `GREATEST(COALESCE(借,0), COALESCE(贷,0)) >= 1000000` 计数；空阈值 400 |
+| 预置参数 | 回滚事务给【UAT】子公司A 插重要性记录：正数 ⇒ 阈值 = 该数；负数 ⇒ 留空 + 负数原因（千分位两位小数）；无记录 ⇒ 留空 + 未设置原因；华氏（真实负数）只读验证负数原因；`audit_period_end` 为空时截止窗口 = 年度 12-31 前后各 5 天 |
+| 参数占位跨项目（R13.2） | 回滚事务里新建【测试】项目 A、B，各插一条正数重要性（值不同）：A 上解析大额预置后按 `toSavedConditions` 的形状保存为用户模板（条件值为 `{"$param": "materiality_performance"}`）；B 上 `POST /templates/{id}/execute` 的阈值 = B 的值（结果 total = B 上的独立计数），`GET /templates/{id}/resolve` 的 notices 写 B；删掉 B 的重要性后执行 400 `CONDITION_VALUE_REQUIRED`、message 为未设置原因 |
+| 新条件能力 | 和平药房：周末 total = 独立 `EXTRACT(DOW FROM voucher_date) IN (0, 6)` 计数；`account_code` 开头是 1002 = `LIKE '1002%'` 计数；华氏 `line_amount` 大于等于 1,000,000（经 TestClient、阈值以字符串 `"1000000"` 发送）= 独立 `GREATEST(COALESCE(借,0), COALESCE(贷,0)) >= 1000000` 计数；空阈值 400；「为空或空白」：和平药房 0 行 = 独立计数，回滚事务给【UAT】子公司A 造摘要为 NULL、`''`、`'   '` 三行（按该项目年度生效数据集口径写 `dataset_id`）后计数增 3 |
 | 报表行构成科目（W6） | 华氏每个「公式只含 TB / SUM_TB 相加、列为 期末余额 / 审定数」的报表行：`report_row` 结果 Σ审定 = 该行 `current_period_amount`；回滚事务给【UAT】子公司A 造试算表 1002 与 100201 两行及 `source_accounts=['1002']` 的报表行 ⇒ 结果两行都在；未生成 / 合计行 400 |
 | 附注章节与底稿（W6） | 华氏「八、1」相关科目 = {1001, 1002, 1012} ∩ 本项目试算表；没有映射的章节 400；范围外章节 403（循环范围夹具）；和平药房 `wp_code=E1` total = 三个前缀的独立计数；`account_code=1002` total = 前缀计数 = 经 account_mapping 计数；`wp_code=A1` 400 |
 | 构建器 formula_refs | 华氏每条非空 ref 经 `validate_formula_refs` 有效 |
 | 回写不锁他项目行 | 目标：活项目中 updated_at 最早的一张已提交底稿、【UAT】合成集团母公司的一条 consol_note_data；会话 A 以【UAT】子公司A 直调 `snapshot_writer.write_cell` / `write_note_cell`，分别得 `WritebackTargetNotFound` / `NoteRecordNotFound`（A 事务未结束）；会话 B 对目标行 `SELECT … FOR UPDATE NOWAIT` 成功；两会话回滚，目标行前后指纹一致 |
 | 回写预览门 | 同一底稿目标经 writeback-preview：条目 `target_not_in_project`、`enter_confirmation=false`；writeback-confirm 409，写入方未被调用 |
 | 查询路径只读 | 预览与区域取数前后 storage 文件 sha256 与 mtime 不变 |
-| 导出 | 和平药房序时账按月导出行数 = COUNT（openpyxl 读回）、超限 400 且不产生文件、中文表头、「查询说明」sheet；回滚事务造一行摘要为 `=1+1` 的序时账（经 TestClient、`get_db` 指向该会话）导出后读回 `data_type == "s"` |
+| 导出 | 和平药房序时账按月导出行数 = COUNT（openpyxl 读回，只读）、超限 400 且不产生文件、中文表头、「查询说明」sheet；回滚事务给【UAT】子公司A 造一行摘要为 `=1+1` 的序时账（经 TestClient、`get_db` 指向该会话），导出该项目后读回 `data_type == "s"` |
 | 迁移 | `run_pending` 后列、索引、约束存在；R 文件可回放 |
 
 ### 10.3 端点权限配方表（`test_aql_endpoint_authz.py`，基于 `tests/authz_world.py`，TestClient 走真实依赖链，只 override `get_current_user` / `get_db`）
-身份都用 authz_world 工厂建在同一世界（X = `TARGET_PROJECT_ID`，Y = `OTHER_PROJECT_ID`）：匿名 = `user=None`；A = `world.user(auditor)`（无成员行）；R = `readonly_member()`；E = `member("edit", "auditor")`；PM = `edit_member()`（manager, edit，系统 auditor）；SM = `non_member_with_other_project(global_role=manager)`（系统 manager，只在 Y 有成员行）；P = `world.user(partner)`；AD = `admin_non_member()`。模板：T = AD 公开；S = PM 共享给 X；Q = AD 私有。底座：S = `sqlite_world`（纯门禁格）；P = `pg_world`（依赖文本 SQL 定位或断言结果内容的格——SQLite 存 32 位十六进制 UUID，文本 SQL 绑定 `str(uuid)` 永远匹配不上，会假绿）；所需业务表经 `extra_tables` 补齐，缺表即该格失败、不降级跳过。回写两类请求一律带 `X-File-Opened-At`（缺头即 400，会掩盖门禁结论）。
+身份都用 authz_world 工厂建在同一世界（X = `TARGET_PROJECT_ID`，Y = `OTHER_PROJECT_ID`）：匿名 = `user=None`；A = `world.user(auditor)`（无成员行）；R = `readonly_member()`；E = `member("edit", "auditor")`；PM = `edit_member()`（manager, edit，系统 auditor）再 `world.eqcr_assignment("manager", user=PM.user)`（补一条人员记录与 X 上的 manager 委派 ⇒ 链路唯一的 X 主管，不受循环范围限制）；SM = `non_member_with_other_project(global_role=manager)`（系统 manager，只在 Y 有成员行）再 `world.eqcr_assignment("manager", user=SM.user, project=Y)`（⇒ Y 主管）；P = `world.user(partner)`；AD = `admin_non_member()`。`eqcr_assignment` 每调一次就新建一条人员记录，每个身份只调一次（两条人员记录 ⇒ 链路不唯一 ⇒ 受限）。主管判定成立后 `resolve_member_scope` 还会调 `project_cycles` 读 `wp_index`（该调用在函数的 try 块之外，缺表直接抛错）⇒ PM / SM 会走到循环范围的格（第 1、4、5、13、23~26、28 行）`extra_tables` 须含 `wp_index`。不补委派时 PM、SM 在合入后的口径下是「受限、范围为空」，构建器作用域为空、「只含 X」类断言对空集恒真——这正是第 2 轮评审 #3 指出的假绿。模板：T = AD 公开；S = PM 共享给 X；Q = AD 私有。底座：S = `sqlite_world`（纯门禁格）；P = `pg_world`（依赖文本 SQL 定位或断言结果内容的格——SQLite 存 32 位十六进制 UUID，文本 SQL 绑定 `str(uuid)` 永远匹配不上，会假绿）；所需业务表经 `extra_tables` 补齐，缺表即该格失败、不降级跳过。回写两类请求一律带 `X-File-Opened-At`（缺头即 400，会掩盖门禁结论）。
 
 | # | 端点 | 底座 | 匿名 | A | R | E | PM | SM | P | AD |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -574,7 +605,7 @@ END $$;
 | 20 | POST /api/custom-query/writeback-confirm（同 19） | P | 401 | 403 | 403 | 409 | 409 | 403 | 409 | 409 |
 | 21 | GET /api/custom-query/index-health | S | 401 | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
 | 22 | GET /api/custom-query/address-resolve?uri=workpaper:A1 | S | 401 | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
-| 23 | GET /api/query/access：allowed / all_projects | S | 401 | 否/否 | 否/否 | 否/否 | 是/否 | 是/否 | 是/是 | 是/是 |
+| 23 | GET /api/query/access：allowed / all_projects / accessible_project_count | S | 401 | 否/否/0 | 否/否/0 | 否/否/0 | 是/否/1 | 是/否/1 | 是/是/null | 是/是/null |
 | 24 | GET /api/query/schema、POST /api/query/preview（trial_balance） | S | 401 | 403 | 403 | 403 | 200 | 200 | 200 | 200 |
 | 25 | POST /api/query/execute、POST /api/query/export-excel（trial_balance） | P | 401 | 403 | 403 | 403 | 200 仅 X | 200 仅 Y | 200 | 200 |
 | 26 | POST /api/query/execute（projects） | P | 401 | 403 | 403 | 403 | 仅 X | 仅 Y | 全部未删 | 全部未删 |
@@ -582,9 +613,19 @@ END $$;
 | 28 | POST /api/query/execute（project_id=Y） | P | 401 | 403 | 403 | 403 | 403 | 200 | 200 | 200 |
 | 29 | POST /api/custom-query/batch-execute、GET /api/custom-query/cross-sheet-trace（已删） | S | 404 | 404 | 404 | 404 | 404 | 404 | 404 | 404 |
 | 30 | GET /api/custom-query/template-presets（W3） | S | 401 | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
-| 31 | GET /api/custom-query/template-presets/je_large_amount/resolve?project_id=X&year=2025（W3） | S | 401 | 403 | 200 | 200 | 200 | 403 | 200 | 200 |
+| 31 | GET /api/custom-query/template-presets/je_large_amount/resolve?project_id=X&year=2025（W3；`extra_tables` 含 materiality，200 格断言 `missing_reason` 是「未设置」而不是「读取失败」） | S | 401 | 403 | 200 | 200 | 200 | 403 | 200 | 200 |
+| 32 | GET /api/custom-query/templates/{S}/resolve?project_id=X&year=2025（W3） | P | 401 | 403 | 200 | 200 | 200 | 403 | 200 | 200 |
 
-† 200 且 `enter_confirmation=false`、条目 `error=target_not_in_project`。定级依据：只读类跟 execute 行（OwnershipGuard 成员即可）；分享到项目按该项目 edit 级（`require_project_access("edit")`，合伙人非成员同样 403）；改删仅作者（admin 亦不例外）；构建器各端点跟 access 判定；index-health、address-resolve 只校验登录。先建表、以 `xfail(strict=True)` 钉住尚未修复的格，各任务修完即删对应 xfail；全部转正后做路由对账：custom_query、custom_query_writeback、query_builder 三个 router 的每条路由（含新增 export / access 与 W3 的两条 template-presets）都在表里出现，已删路由只出现在第 29 行；第 31 行显式带 `year`（缺省年度走的 `PROJECT_AUDIT_YEAR_SQL` 是 PG 专用写法）。
+循环受限身份 CR = `member("edit", "manager")`（有构建器准入：项目经理口径）再 `world.eqcr_assignment("auditor", user=CR.user)`（委派角色不是主管 ⇒ 受限、范围为空），只测构建器行：
+
+| # | 端点 | 底座 | CR 期望 |
+|---|---|---|---|
+| 23c | GET /api/query/access | S | `allowed=true`、`all_projects=false`、`accessible_project_count=0`、`reason` 为 ADR-AQL-08 的提示 |
+| 25c | POST /api/query/execute（trial_balance，世界里 X 有试算行） | P | 200、0 行、warnings 含「已排除 1 个…」 |
+| 26c | POST /api/query/execute（projects） | P | 200、0 行 + 同一 warning |
+| 28c | POST /api/query/execute（project_id=X） | P | 403 `CYCLE_SCOPED_PROJECT` |
+
+† 200 且 `enter_confirmation=false`、条目 `error=target_not_in_project`。第 25、26 行的世界在 X、Y 各造一行 trial_balance：PM 的结果非空且只含 X、SM 的非空且只含 Y（防空集恒真）。第 14 行 200 时 S 那一行带 `can_restore` / `can_purge` = true，作者判定按 `owner_id`。定级依据：只读类跟 execute 行（OwnershipGuard 成员即可）；分享到项目按该项目 edit 级（`require_project_access("edit")`，合伙人非成员同样 403）；改删仅作者（admin 亦不例外）；构建器各端点跟 access 判定；index-health、address-resolve 只校验登录。先建表、以 `xfail(strict=True)` 钉住尚未修复的格，各任务修完即删对应 xfail；全部转正后做路由对账：custom_query、custom_query_writeback、query_builder 三个 router 的每条路由（含新增 export / access、W3 的两条 template-presets 与 templates/{id}/resolve）都在表里出现，已删路由只出现在第 29 行；第 31、32 行显式带 `year`，让格子不依赖年度解析（合入后 `require_project_audit_year` 走 ORM，SQLite 上也能解析，但格子只判门禁）。
 
 ### 10.4 磁盘变异（单独一条命令跑，变异备份放 `tmp_aql_linkage/mut/`，逐字节恢复后 sha256 核对）
 | # | 变异 | 期望打红 |
@@ -620,9 +661,16 @@ END $$;
 | 27 | 附注章节改按章节号匹配 `note_account_mappings` | 「八、1」相关科目用例 |
 | 28 | `buildQueryEntry` 试算表行落点改为科目余额 | vitest 落点用例 |
 | 29 | `paged_fetch` 去掉 `CONDITION_VALUE_REQUIRED` | 空阈值 400 用例 |
+| 30 | `ledger_line_amount` 去掉 `type_` | 字符串阈值 TestClient 用例（PG 报 numeric >= varchar）+ `coerce_value` 单测 |
+| 31 | 模板执行改为沿用保存时的字面值（不经 `resolve_config`） | 参数占位跨项目用例 |
+| 32 | `is_blank` 改成只判 `IS NULL` | 【UAT】空串 / 纯空格行计数用例 |
+| 33 | `resolveTemplateLibrarySource` 去掉 `report:` 映射 | vitest 三种载荷用例 |
+| 34 | `QueryDetailEntry` 年度改回只读路由 `?year` | vitest 页内切年用例 |
+| 35 | `RecycleBin.vue` 模板行改回 `v-permission` | vitest 审计员作者用例 |
+| 36 | access 接口计数改回排除前的 OwnershipGuard 集合 | 配方表第 23c 行 |
 
 ### 10.5 浏览器实测（写后读回；需 start-dev 环境）
-复测评估 B1–B14 场景，并逐类验证：每类结果「打开」落点与定位（报表行分普通、对比、矩阵三种）；「复制引用」：试算表 / 报表 / 附注各一条粘到公式编辑器校验通过，底稿格选一个已登记坐标（D 循环种子坐标）可复制、一个未登记单元格按钮不可用并显示原因；和平药房序时账翻到第 100 页、借方降序、打开凭证；按月导出文件行数 = COUNT（openpyxl 读回）；页面版「借方 > 1 亿」与字段选择；模板三档保存 → 审计员账号可见公开模板 → 弹窗执行 → 删除 → 回收站恢复 → 列表读回；PM 身份构建器默认当前项目、projects 只见可访问项目、JOIN 行数不变、翻页 total；右键跳模板溯源到底稿模板页签；从试算表页切到另一项目再开弹窗，项目随路由；错误态显示中文与追踪号。W3：页面版与弹窗各载入一次全部 7 条预置（和平药房）——条件填进编辑器、未自动执行；大额预置显示「未设置重要性水平」提示且查询按钮不可用，填 1,000,000 后可查；周末预置显示节假日说明；「另存为我的模板」改名为【测试】开头后保存，出现在「我的模板」，再删除并从回收站彻底删除。W6：试算表 1002 右键 → 序时账并切到辅助余额；报表货币资金「查看穿透」→ 构成科目 → 「查明细」→ 返回；附注「八、1」右键 → 附注表格 → 相关科目；底稿 E1 工具栏 → 序时账；在 A1 底稿上点入口显示「该底稿没有登记对应科目」；关键点击前校验 `location.pathname`。写入只用名称带【测试】的模板，结束后走删除 → 回收站彻底删除并核对表内无残留。改带自动保存页面的源码前浏览器先停 about:blank。
+复测评估 B1–B14 场景，并逐类验证：每类结果「打开」落点与定位（报表行分普通、对比、矩阵三种）；「复制引用」：试算表 / 报表 / 附注各一条粘到公式编辑器校验通过，底稿格选一个已登记坐标（D 循环种子坐标）可复制、一个未登记单元格按钮不可用并显示原因；和平药房序时账翻到第 100 页、借方降序、打开凭证；按月导出文件行数 = COUNT（openpyxl 读回）；页面版「借方 > 1 亿」与字段选择；模板三档保存 → 审计员账号可见公开模板 → 弹窗执行 → 删除 → 用系统角色为 auditor 的作者账号在回收站看到「恢复」「删除」并恢复 → 列表读回；模板库三个「📊 高级查询」按钮各点一次（底稿模板预选底稿源、报表模板预选报表源并能查询、附注模板落附注目录并显示编号体系提示）；PM 身份构建器默认当前项目、projects 只见可访问项目、JOIN 行数不变、翻页 total；右键跳模板溯源到底稿模板页签；从试算表页切到另一项目再开弹窗，项目随路由；错误态显示中文与追踪号。W3：页面版与弹窗各载入一次全部 10 条预置（和平药房）——条件填进编辑器、未自动执行；大额预置显示「未设置重要性水平」提示且查询按钮不可用，填 1,000,000 后可查；周末预置显示节假日说明；「另存为我的模板」改名为【测试】开头后保存，出现在「我的模板」，再删除并从回收站彻底删除。W6：试算表 1002 右键 → 序时账并切到辅助余额；报表货币资金「查看穿透」→ 构成科目 → 「查明细」→ 返回；附注「八、1」右键 → 附注表格 → 相关科目；附注编辑器用页内年度选择器切到另一年度后再点入口，弹窗年度与页面一致；底稿 E1 工具栏 → 序时账；在 A1 底稿上点入口显示「该底稿没有登记对应科目」；关键点击前校验 `location.pathname`。写入只用名称带【测试】的模板，结束后走删除 → 回收站彻底删除并核对表内无残留。改带自动保存页面的源码前浏览器先停 about:blank。
 
 ## 11. 待拍板（推荐默认值；本 spec 均不做）
 
@@ -641,9 +689,9 @@ END $$;
 | W13 | 恢复「报表行次映射 → 报表配置」JOIN（按项目准则关联） | 不做，行名已在映射表上 |
 | W14 | 底稿单元格对未登记坐标也提供引用（需先把选区坐标批量登记进地址目录） | 不做，只对已登记坐标开放 |
 | W15 | 节假日凭证（需平台节假日日历：逐年维护的节假日与调休表） | 不做，W3 只做周末；若要做，先定日历的维护人与年度更新流程 |
-| W16 | C24「含模糊词」默认词表并入共享定义，并增加「摘要含模糊词」预置 | 随 `GtC24JournalDetail.vue` 瘦身（2,049 行，先拆到 1,500 以内或登记白名单）一起做 |
+| W16 | C24 其余规则做成预置：夜间录入（序时账 `voucher_date` 只有日期、没有时刻）、频繁调整 / 同金额同摘要重复 / 尾数一致 / 异常账户大量分录（跨行计数，要分组或窗口函数）、约整数（要取模算子）、刚好低于审批限额（平台没有审批限额来源，C24 的 500,000 只是界面默认值，不能按项目取值） | 不做：都超出「现有算子能直接做」，要新增聚合 / 取模能力或数据来源；如要做，先定审批限额由谁维护 |
 
-W3（常用审计预置模板）、W6（业务页行级「按此查询明细」）已按用户 2026-10-26 决定纳入本 spec，裁决见 ADR-AQL-05 / ADR-AQL-20，编号不复用。
+W3（常用审计预置模板）、W6（业务页行级「按此查询明细」）已按用户 2026-10-26 决定纳入本 spec，裁决见 ADR-AQL-05 / ADR-AQL-20，编号不复用。第 2 轮评审后，C24 规则 9、12、13 也做成了预置（原 W16 的「模糊词」部分随之纳入，§15 #8）。
 
 ## 12. 实施纪律
 - 每个任务开工前对本任务涉及的文件重跑现状确认（grep / 行数 / 调用方），结论写入任务勾选说明；评估数值只作参考。
@@ -651,7 +699,8 @@ W3（常用审计预置模板）、W6（业务页行级「按此查询明细」�
 - 共享文件（`.kiro/specs/INDEX.md`、`backend/scripts/file_size_whitelist.txt`、`auditYearCalendarFallbackBaseline.json`、`tests/authz_world.py`、权限基线测试）只提交本 spec 改动块，提交前 `git diff --cached -- <路径>` 核对；底层 git 操作放子进程并显式传环境变量，不在共享终端设 `GIT_INDEX_FILE`；不 stash、不 `--no-verify`。
 - 删除类提交按 §3.9 一类一提交，提交前打 tag 备份；新模块与调用方同一次提交；提交前在干净 worktree 跑「将要提交的那棵树」。
 - 写入型验收只用【测试】/【UAT】项目、回滚事务与【测试】模板；共享开发环境不重启 start-dev。
-- 收尾写 `closure.md`：逐条回显 §2 全部裁决（ADR-AQL-01~20）与 §11 待拍板（W1、W2、W4、W5、W7~W16，W3 / W6 标「已纳入」），并写明只做周末、不做节假日的原因（§14.1），供用户复核。
+- 收尾写 `closure.md`：逐条回显 §2 全部裁决（ADR-AQL-01~20）与 §11 待拍板（W1、W2、W4、W5、W7~W16，W3 / W6 标「已纳入」），写明只做周末、不做节假日的原因（§14.1），登记第 2 轮评审新发现的断点 AQ-38（模板库按钮源键恒 400）及其处置，并按 §10.2 的口径回报简报里「e2e_manager 构建器只返回可访问项目」这条基线（现库为 0 行 + 排除提示），供用户复核。
+- 全部任务在任务 0（合入远端）之后开工；之后每个任务开工前对涉及文件重查 `git status` 与行数，数字以合入后的树为准。
 
 ## 13. 评审意见回应（第 1 轮评审：`design-review.md`，HIGH 2 / MEDIUM 16 / NIT 17）
 
@@ -698,29 +747,30 @@ W3（常用审计预置模板）、W6（业务页行级「按此查询明细」�
 只读查库每条查询独立只读事务，探针在 `tmp_aql_linkage/probe/w36_*.py` / `w6_*.py` / `w3_*.py`（收尾删除，结论以本节为准）。数值是 2026-10-26 快照，测试一律现算。
 
 ### 14.1 W3：现成筛选规则与数据
-- C24：`composables/useC24AnalyticsEngine.ts`（470 行）`screenAnomalies` 有 13 条规则，其中可用 SQL 条件表达的是大额（`Math.max(debit, credit) > largeAmountThreshold`）、特殊事件（函数内局部常量 8 个词）、含模糊词（`rules.vagueKeywords`）、无摘要；参数默认值写在 `GtC24JournalDetail.vue` 的 `ruleParams`（`largeAmountThreshold: 1000000`、`vagueKeywordsText: '调整,暂估,其他,冲销'`）；假期清单逐底稿手填（`C24HolidaySheet.vue`，存 `checklist_responses.item_id = 'C24-holidays'`）；分录由前端整库拉取序时账（`loadFromLedger` → `useLedgerCache`）后在浏览器里筛，后端没有 C24 规则（`backend/app` 搜 `c24|journal_entry|anomal` 0 处）。归档 spec `_archive/05-business-features/c23-c24-journal-entry-testing` 的 `AnomalyRules` 即此。
+- C23：归档 spec 与 `composables/useC23ControlData.ts` 是「授权人员清单 × 样本分录」的控制测试（检查样本的编制人 / 过账人 / 审核人是否在授权清单内），没有可复用的分录筛选规则。
+- C24：`composables/useC24AnalyticsEngine.ts`（470 行）`screenAnomalies` 有 13 条规则，逐条去向（第 3 版）：规则 4 大额（`Math.max(debit, credit) > largeAmountThreshold`）→ `je_large_amount`（复用抽凭口径 `>=`）；规则 9 借贷双边有额（`debit > 0 && credit > 0`）→ `je_both_sides`；规则 11 特殊事件（函数内局部常量 8 个词）→ `je_special_event`；规则 12 含模糊词（`rules.vagueKeywords`）→ `je_vague_keywords`；规则 13 没有摘要（`!summary || summary.trim() === ''`）→ `je_no_summary`；规则 1 假期 → W15；规则 2、3、5、6、7、8、10 → W16（理由见 §11）；参数默认值写在 `GtC24JournalDetail.vue` 的 `ruleParams`（`largeAmountThreshold: 1000000`、`vagueKeywordsText: '调整,暂估,其他,冲销'`）；假期清单逐底稿手填（`C24HolidaySheet.vue`，存 `checklist_responses.item_id = 'C24-holidays'`）；分录由前端整库拉取序时账（`loadFromLedger` → `useLedgerCache`）后在浏览器里筛，后端没有 C24 规则（`backend/app` 搜 `c24|journal_entry|anomal` 0 处）。归档 spec `_archive/05-business-features/c23-c24-journal-entry-testing` 的 `AnomalyRules` 即此。
 - 抽凭 / 截止：`ledger_sampling_service.LedgerQueryFilters` + `LedgerSamplingService.build_ledger_query`（日期、科目前缀列表、`GREATEST(COALESCE(借,0), COALESCE(贷,0)) >= 阈值`、离散月份 `extract('month').in_`、摘要关键词转义 `ilike`）；`sampling_enhanced_service.CutoffTestService.run_cutoff_test`（期末日 = 显式截止日，否则 `date(year, 12, 31)`；默认前后各 5 天；界面请求 `CutoffExtractRequest` 另有 5 / 10 的默认）。
 - 重要性：`audit_platform_models.Materiality`（项目 + 年度唯一，三档 NOT NULL）与 `MaterialityService.get_current(project_id, year)`。
 - 节假日：后端代码与 `backend/data` 没有节假日日历（搜 `holiday|节假日|法定假日` 只命中模板文字）；`wp_templates/C/C24 会计分录 - 细节测试.xlsx` 的「2025假期清单」sheet 有 33 行，全是 2025 年（法定假日 28、调休上班 5），没有任何代码读取；库内 `C24-holidays` 0 行 ⇒ 没有可用来源，只做周末（W15）。
 - 只读查库：`custom_query_templates` 0 行；重要性记录只有 2 条——华氏 2025 实际执行的重要性 −507,095,295.59、辽宁 2025 为 −2,616,403.90（三档都是负数），和平药房没有记录；和平药房 2025 序时账 1,147,414 行，日期 2025-01-01 ~ 2025-10-31。
-- 金标准快照（和平药房，生效数据集）：周末 156,462 行（周日 95,515 + 周六 60,947）；摘要含冲销 / 红字 / 冲红 / 冲回 5,064 行（分别 3,118 / 6 / 10 / 1,935）；负数金额 36,597 行（借负 22,726、贷负 13,871）；特殊事件 44 行；科目 1002 开头 116,443 行、Σ借 3,245,484,243.16。宜宾临港店 2025-12-26 ~ 2026-01-05 窗口 326 行（华氏、和平药房 0 行）。华氏借、贷较大者 ≥ 1,000,000 有 3,157 行。
+- 金标准快照（和平药房，生效数据集）：周末 156,462 行（周日 95,515 + 周六 60,947）；摘要含冲销 / 红字 / 冲红 / 冲回 5,064 行（分别 3,118 / 6 / 10 / 1,935）；负数金额 36,597 行（借负 22,726、贷负 13,871）；特殊事件 44 行；科目 1002 开头 116,443 行、Σ借 3,245,484,243.16。宜宾临港店 2025-12-26 ~ 2026-01-05 窗口 326 行（华氏、和平药房 0 行）。华氏借、贷较大者 ≥ 1,000,000 有 3,157 行。2026-10-27 补查（五个有序时账的项目，生效数据集口径）：借、贷都 > 0 的行只在辽宁卫生服务出现（324,414 / 406,757 行），其余四个项目 0 行；摘要为 NULL、空串或只含空白字符的行五个项目都是 0；摘要含默认模糊词（调整、暂估、其他、冲销）和平药房 35,277、辽宁 3,551、医疗器械 4,052、华氏 7,122、宜宾临港店 109 行。
 
 ### 14.2 W6：各页现有穿透与科目口径
 - 试算表：`TrialBalance.vue`（4,626 行）右键菜单有「📊 查看明细」（`onTbCtxDrillDown` → `onUnadjustedClick` → `/ledger?year=&account=<标准码>`，账簿页 `_scrollToAccount` 按精确或前缀定位）、「查看调整分录」等；双击金额走 `usePenetrate.toLedger`（见 §14.5）。
 - 报表：`ReportView.vue`（1,949 = HARD_CAP）的穿透在 `views/composables/useReportDrilldown.ts`：`onDrilldown` → `GET /api/reports/{pid}/{year}/{type}/drilldown/{row}`（`ReportEngine.drilldown`，按 `financial_report.source_accounts`）；`onLineComposition` → `line-composition`（按 `report_line_mapping`）；弹窗在 `components/report/ReportDrilldownDialogs.vue`（173 行）。报表取数：`ReportFormulaParser._get_tb_rows_prefix`（`LIKE 'code%'`）、`_resolve_sum_tb`（起止区间）。华氏 BS-002：`source_accounts = ["1001", "1002", "1012"]`，公式三个 `TB(…,'期末余额')` 相加，本期 822,999,085.83 = 前缀匹配的 3 行试算表审定数之和；华氏 60 个报表行的 `source_accounts` 是数组，其中 57 行公式只含相加的 TB / SUM_TB。
-- 附注：`DisclosureEditor.vue`（3,265 / HARD_CAP 3,281）右键菜单有「查看相关底稿」「📊 穿透到序时账」（`useNoteCellActions.onDeCtxPenetrateToLedger`）等。附注 → 科目没有现成的完整解析：`note_related_workpapers.py` 注明「完整实现需 note_account_mapping 表」，模板 JSON 只有 `account_name`，`table_data._bindings` 全库 0 行，`wp_account_mapping.json` 的 `note_section` 只有上市版「五、x」（37 个）。可用的是 `note_account_mappings`（ORM `NoteAccountMapping`，280 行，soe_standalone / listed_standalone 各 140，`note_section_code` 存章节名称，`linkage_graph_builder` 已按此使用）：按标题匹配华氏 186 个章节中的 77 个、和平药房 166 个中的 73 个（如「八、1 货币资金」→ E1、E1-1、E1-2、E1-3）。三个真实项目都是国企单体。
+- 附注：`DisclosureEditor.vue`（3,265；HARD_CAP 本地 3,281、远端已下调为 3,265，合入后零余量，见 §9）右键菜单有「查看相关底稿」「📊 穿透到序时账」（`useNoteCellActions.onDeCtxPenetrateToLedger`）等。附注 → 科目没有现成的完整解析：`note_related_workpapers.py` 注明「完整实现需 note_account_mapping 表」，模板 JSON 只有 `account_name`，`table_data._bindings` 全库 0 行，`wp_account_mapping.json` 的 `note_section` 只有上市版「五、x」（37 个）。可用的是 `note_account_mappings`（ORM `NoteAccountMapping`，280 行，soe_standalone / listed_standalone 各 140，`note_section_code` 存章节名称，`linkage_graph_builder` 已按此使用）：按标题匹配华氏 186 个章节中的 77 个、和平药房 166 个中的 73 个（如「八、1 货币资金」→ E1、E1-1、E1-2、E1-3）。三个真实项目都是国企单体。
 - 底稿：`WorkpaperEditor.vue`（1,465 / 默认上限 1,500）两个工具栏都没有科目入口；`wp_account_mapping.json` 1,025 个编码各一条，619 条有科目（D~N），A / B / C / S 为空，子编码有自己的条目（E1-2 → 1001）。
 - 科目口径：和平药房、华氏、宜宾临港店的 `account_mapping` 客户科目全部以所映射的标准码开头（402 / 402、812 / 812、812 / 812），序时账科目 100% 有精确映射（270 / 193 / 88），和平药房试算表标准码都是 4 位（53 行）；和平药房 1002 前缀计数 = 经映射计数 = 116,443，E1 三前缀 116,562 ⇒ 序时账按标准码前缀与按科目映射在三个项目上结果相同，采用账簿页现有的前缀口径。
-- 并发与行数：2026-10-26 现查 `git status`，W3 / W6 要改的文件（TrialBalance、ReportView 及其 composable、DisclosureEditor、WorkpaperEditor、ThreeColumnLayout、CustomQueryDialog、CustomQueryTab、MyTemplatesDialog、CellContextMenu、`components/report/`、useC24AnalyticsEngine、eventBus、`services/custom_query/`、`routers/custom_query.py`、两个抽凭服务、重要性服务、`backend/data/`）都没有他人未提交改动；并发 spec `formula-hub-integrity-closure` 的三件套不涉及这些文件（它改 `components/formula/**`、FormulaManagerDialog、GtRefreshScopeDialog 等）；工作树里 `auto-imports.d.ts`、`components.d.ts` 有他人改动 ⇒ 新组件显式 import，这两个文件不提交。每个 W 任务开工前重查。
+- 并发与行数：2026-10-26 现查 `git status`，W3 / W6 要改的文件（TrialBalance、ReportView 及其 composable、DisclosureEditor、WorkpaperEditor、ThreeColumnLayout、CustomQueryDialog、CustomQueryTab、MyTemplatesDialog、CellContextMenu、`components/report/`、useC24AnalyticsEngine、eventBus、`services/custom_query/`、`routers/custom_query.py`、两个抽凭服务、重要性服务、`backend/data/`）都没有他人未提交改动；并发 spec `formula-hub-integrity-closure` 的三件套不涉及这些文件（它改 `components/formula/**`、FormulaManagerDialog、GtRefreshScopeDialog 等）；工作树里 `auto-imports.d.ts`、`components.d.ts` 有他人改动 ⇒ 新组件显式 import，这两个文件不提交。每个 W 任务开工前重查。2026-10-27 复查：上述路径（另加 RecycleBin、GtC24JournalDetail、template-library 三个宿主、`__tests__/` 年度棘轮两文件、`authz_world.py`、行数门两文件）在本地工作树仍只有那两个 `.d.ts` 有改动；但远端已改其中 17 个（§1 分支行），本节行数是合入前的本地值，合入后以 §9 为准。
 
 ### 14.3 裁决
-- W3 做（ADR-AQL-05）：7 条预置，JSON 定义合入列表，不建系统用户、不加迁移；载入到条件编辑器、不自动执行；阈值 = 实际执行的重要性，缺失留空；复用 C24 特殊事件词表、抽凭的大额表达式、截止测试的窗口函数；最小新能力 4 项；只做周末（W15），「模糊词」预置随 C24 瘦身做（W16）。
-- W6 做（ADR-AQL-20）：四处入口与现有穿透并列；映射只在 `queryEntryContext.ts`，科目解析只在 `entry_accounts.py`；页面净增 TrialBalance 2 / DisclosureEditor 2 / WorkpaperEditor 3 / ReportView 0 行。
+- W3 做（ADR-AQL-05）：10 条预置（第 3 版在原 7 条上补 C24 规则 9、12、13），JSON 定义合入列表，不建系统用户、不加迁移；载入到条件编辑器、不自动执行；阈值 = 实际执行的重要性，缺失留空；另存为保留参数占位；复用 C24 特殊事件与默认模糊词词表、抽凭的大额表达式、截止测试的窗口函数；最小新能力 5 项；只做周末（W15），其余 C24 规则见 W16。
+- W6 做（ADR-AQL-20）：四处入口与现有穿透并列；映射只在 `queryEntryContext.ts`，科目解析只在 `entry_accounts.py`；页面净增 TrialBalance 2 / DisclosureEditor 0 / WorkpaperEditor 3 / ReportView 0 行；入口年度由宿主传入。
 
 ### 14.4 ADR-AQL-19 口径对齐与分支前置
-- 平台可见性规则 `effective_scope`（主管看全部循环、审计员按团队分配）在远端 `origin/spec/disclosure-note-doc-upload-and-batch-fill` 的提交 d0de87a6c（2026-10-26 13:10）：新增 `services/wp_visibility/effective_scope.py`，`deps.get_user_scope_cycles` 改调 `resolve_member_scope`，附注目录树与就绪度改为空范围即空，调整分录取科目失败不再放行。本地 HEAD 的 `get_user_scope_cycles` 仍只读 `project_users.scope_cycles` 且为空即不限；`git merge-base --is-ancestor d0de87a6c HEAD` 为否，`git rev-list --left-right --count HEAD...origin/spec/disclosure-note-doc-upload-and-batch-fill` = 9 / 10（分叉）。
+- 平台可见性规则 `effective_scope`（主管看全部循环、审计员按团队分配）在远端 `origin/spec/disclosure-note-doc-upload-and-batch-fill` 的提交 d0de87a6c（2026-10-26 13:10）：新增 `services/wp_visibility/effective_scope.py`，`deps.get_user_scope_cycles` 改调 `resolve_member_scope`，附注目录树与就绪度改为空范围即空，调整分录取科目失败不再放行。本地 HEAD 的 `get_user_scope_cycles` 仍只读 `project_users.scope_cycles` 且为空即不限；`git merge-base --is-ancestor d0de87a6c HEAD` 为否；`git rev-list --left-right --count HEAD...origin/spec/disclosure-note-doc-upload-and-batch-fill` 逐次现算（2026-10-26 为 9 / 10，2026-10-27 为 12 / 10，本地在继续提交），分叉状态不变。同一提交还新增 `deps.require_project_audit_year`，并改了本 spec 的年度兜底棘轮、DisclosureEditor 硬上限、行数白名单、W6 四个页面的年度处理与底稿编辑器工具栏门控（§1 分支行）。
 - 第 2 轮设计里「构建器排除本人成员行设有循环范围的项目」「附注页映射为空集时不过滤」是旧口径，本轮改为只调平台入口（ADR-AQL-19、§3.4、§3.10、R3.8、§10.2 循环范围行、任务 23），不复制 `effective_scope` 的逻辑，不改平台权限语义。
-- 任务 23 开工前分支须包含 d0de87a6c；合并分叉按简报规则由用户决定（推送时同样会遇到）。
+- 第 3 版：全部任务在合入远端之后开工（任务 0，合入方式按简报的分叉规则由用户决定）；只在任务 23 前合入会让前 22 个任务建在会被合并改掉的基线上（第 2 轮评审 #1）。任务 23 保留 `merge-base --is-ancestor` 检查作二次确认。
 
 ### 14.5 顺带发现（归各自模块，登记不改）
 1. `composables/usePenetrate.ts` 的 `toLedger` 推 `/ledger?code=&year=`，账簿页只读 `account` / `level`（`useLedgerUrlSync.readFromUrl` 与 `LedgerPenetration` 的 onMounted）⇒ 试算表双击金额、错报金额、辅助汇总、附注右键「穿透到序时账」四处都停在余额表、不定位科目。归账簿穿透。
@@ -729,3 +779,37 @@ W3（常用审计预置模板）、W6（业务页行级「按此查询明细」�
 4. `mapping_service.get_sections_by_cycles` 只返回上市版章节号，国企项目受限成员的附注目录为空（附注页与高级查询同口径）。归平台鉴权 / 附注循环映射。
 5. `line-composition` 端点不传年度时取 `tb_balance` 最大年度，报表页调用时没有传年度。归报表。
 6. 「大额」在平台已有两处实现：C24 前端对导入分录 `Math.max(借, 贷) > 阈值`，抽凭 / 截止测试后端 `GREATEST(…) >= 阈值`，只在等于阈值时结论不同；W3 预置复用后端那一处（抽成 `ledger_line_amount`），不新增第三处；两处是否统一归 C24 / 抽凭。
+
+## 15. 第 2 轮评审逐条回应（`design-review-r2.md`，HIGH 2 / MEDIUM 9 / NIT 14）
+
+核实方式：只读源码（本地 HEAD 与远端 `origin/spec/disclosure-note-doc-upload-and-batch-fill` 用 `git show` / `git diff <merge-base> <远端>` 现读）、只读查库（每条查询独立只读事务）、一次离线编译（不连库）。探针在 `tmp_aql_linkage/probe/r2fix/`（收尾删除，结论以本节为准）。25 条全部采纳并已修订；没有哪一条要求超出用户要求去改变系统行为，因此本轮不暂停。构建器对循环受限项目的排除（#3，e2e_manager 现库得 0 行）是把平台既有的可见性规则用到本模块，按简报照常推进并在 closure.md 列出。
+
+| # | 级别 | 发现 | 改了哪里 | 依据 |
+|---|---|---|---|---|
+| 1 | HIGH | 分支分叉，d0de87a6c 改了大量目标文件与门禁，同步只排在任务 23 前 | tasks 任务 0（合入后才开工，任务 1 基线在合入后跑）；A6；§0、§1 分支 / 年度 / 循环 / 行数门四行；§9 全表；R10.2、§4.2 年度棘轮条；R9.3、§3.6、§3.8、§3.11、§5、§6 年度缺失改调 `deps.require_project_audit_year`；ADR-AQL-20 与 §4.3 按页面 `year` 可为 null、底稿工具栏 `projectYear != null` 门控重写；§14.4 | `git rev-list --left-right --count` = 12 / 10、`merge-base --is-ancestor d0de87a6c HEAD` 为否；merge-base 3f7d857d2 起本地侧没有改动本 spec 的任何目标文件（`git diff --stat`），远端侧改了 17 个；远端 `deps.require_project_audit_year`（缺失 422「未设置审计年度，请先在项目基本信息中填写」，底层 `resolve_project_audit_year_for_request` 走 ORM）；远端年度兜底基线只剩 13 个文件、`CALENDAR_YEAR_EXEMPT` 含 CustomQueryTab；远端 WorkpaperEditor 工具栏 `v-if="… && projectYear != null"` |
+| 2 | HIGH | DisclosureEditor 加 2 行与零余量棘轮冲突 | R14.5、N4、§4.3（穿透项 4 行压成 2 行，净 0）、§9、任务 47（跑 `test_hard_cap_ratchet.py` 与 `check_file_size.py --staged`） | 远端 `check_file_size.HARD_CAPS` DisclosureEditor = 3,265 = 实际；`test_hard_cap_has_no_stale_slack` 要求上限 = 实际；TrialBalance 菜单项已有单行写法先例；前端 ESLint 无行长规则（`.eslintrc.cjs` 无 max-len） |
+| 3 | MEDIUM | PM / SM 与 e2e_manager 在 ADR-AQL-19 下验收期望不成立；access 计数口径未定 | 术语「构建器作用域」；R3.1、R3.5、R3.6；ADR-AQL-08（计数 = 排除后、为 0 时 reason、后端不另拒）；ADR-AQL-19（链路唯一的后果）；§3.4；§4.2 `useQueryBuilderAccess`；§5 新行；§10.2 e2e_manager 行（期望 0 行 + 正例）；§10.3 PM / SM 补 `eqcr_assignment("manager")`、新增受限身份 CR 子表、第 23 行加计数、第 25 / 26 行断言非空；变异 #36 | 远端 `effective_scope.resolve_member_scope` 的主管条件 `len(staff_ids) == 1 and len(member_rows) == 1 and roles & SUPERVISOR_ROLES`；只读查库：e2e_manager 在 5e193c68 成员行 0、人员记录 1、委派 manager；u_011abb97dd2d4101 在 65a9afa5 人员记录 1、成员行 manager / edit、委派 manager；`authz_world.eqcr_assignment` 每调一次建一条人员记录 |
+| 4 | MEDIUM | `line_amount` 为 NullType，字符串阈值在 PG 报错 | §3.11 `ledger_line_amount` 加 `type_`；§10.1 `coerce_value` 单测；§10.2 字符串阈值经 TestClient；变异 #30；R13.5 | 本轮离线编译：加 `type_=t.c.debit_amount.type` 后类型 Numeric、`coerce_value(…, "1000000")` = `Decimal('1000000')`、PG 绑定值为 Decimal；SQL 文本仍是 `greatest(coalesce(…), coalesce(…))` |
+| 5 | MEDIUM | 删 `useBatchQuery.ts` 会让年度棘轮变红 | ADR-AQL-13、§3.9 第 1 行、§4.2（只删本 spec 修掉或删掉的文件的条目）、任务 6 | 本地与远端基线都有 `"composables/useBatchQuery.ts": 1`；棘轮「基线只许变小」用例要求文件减少即下调 |
+| 6 | MEDIUM | 模板库按钮报表 / 附注源键恒 400，映射散在三个宿主 | 新断点 AQ-38：R10.5；ADR-AQL-15；§4.1 `resolveTemplateLibrarySource` 与 `resolveDialogOpenContext.initialNotice`；§4.2 ThreeColumnLayout `:initial-notice`；§7；§10.1、§10.4 #33、§10.5；§12 closure 登记；任务 31 | `ReportConfigTab.vue` `reportSource = 'report:balance_sheet'`；`NoteTemplateTab.vue` `note:${section_number}`（缺省 `note:五-1-1`）；`WpTemplateDetail.vue` `workpaper:${wpCode}`；`ThreeColumnLayout.onOpenCustomQueryEvent` 把 source 原样交给弹窗；`TemplateLibraryButton.test.ts` 断言的事件载荷不变 |
+| 7 | MEDIUM | W6 入口年度只读路由，附注编辑器页内切年不写路由 | R14.1；ADR-AQL-20（年度 = 宿主取数年度，逐页写明来源）；§4.3 `QueryDetailEntry` 增 `year`、`buildQueryEntry` 取 `target.year ?? hostYear`、四页接线带 `:year`；§10.1、§10.4 #34、§10.5 | `DisclosureEditor.vue` `year = 路由 ?year ?? projectStore.year`，`onYearChange` 只调 `projectStore.changeYear` 与 `fetchTree`；`useReportDrilldown.onDrilldown` 用 `year.value` 发穿透请求；TrialBalance 切年写 `?year` |
+| 8 | MEDIUM | W3 漏掉 C24 规则 9 与 13，W16 理由合并后失效 | ADR-AQL-05 预置补 `je_vague_keywords`、`je_both_sides`、`je_no_summary`（共 10 条），新增用户算子 `is_blank`；ADR-AQL-03；R13.1、R13.3、R13.5、R13.7、R13.9、A7；§3.11（`vague` 词表、`_blank_predicate`、`BLANK_FIELD_INVALID`）；§4.3（编辑器算子、C24 默认词表改读生成常量）；§9；§11 W16 改写（含规则 5 无审批限额来源）；§14.1 13 条逐条去向 | `useC24AnalyticsEngine.screenAnomalies` 规则 9 `entry.debit > 0 && entry.credit > 0`、规则 13 `!entry.summary \|\| entry.summary.trim() === ''`；远端白名单已登记 `GtC24JournalDetail.vue  2049`（门限 2,151）；只读查库：双边有额只在辽宁 324,414 行、空摘要五个项目都是 0、默认模糊词和平药房 35,277 行；PG 与 SQLite 都支持 `trim(string, characters)`（只读验证） |
+| 9 | MEDIUM | 另存为参数化预置的语义未定 | 采纳评审推荐的 (a) 保留占位：ADR-AQL-05；R13.2；§3.6（模板执行先 `resolve_config`、新增 `GET /templates/{id}/resolve`、保存时校验 `$param`、`config_to_request` 拒收未解析占位）；§3.11 `resolve_config`；§4.2、§4.3（`params` 标记与 `toSavedConditions`）；§5、§6、§7；§10.2 跨项目用例；§10.3 第 32 行；变异 #31 | `config_to_request` 原设计按字面翻译 `config.conditions`；`resolve` 原设计把阈值与截止日代入为字面值 |
+| 10 | MEDIUM | §10.2 在华氏上回滚事务造数 | requirements 术语「真 PG」收紧；§10.2 前言 + 报表源结构、循环范围（新建【测试】项目复制华氏行）、导出（写明【UAT】子公司A）三行 | 简报「真实项目只读」与暂停条件；记忆中的既定做法「回滚事务里新建【测试】项目、复制真实行」 |
+| 11 | MEDIUM | 回收站按钮按系统角色隐藏，审计员作者做不到 R9.5 | R9.5；§3.6（逐行 `can_restore` / `can_purge`）与 `RecycleBin.vue` 改 `canRowAct`；§5、§7、§9；§10.1 vitest；§10.5 改用审计员作者；变异 #35；任务 25 / 33 | `RecycleBin.vue` 两个按钮挂 `v-permission`；`directives/permission.ts` 只按系统角色查 `ROLE_PERMISSIONS`，`recycle:restore` / `recycle:purge` 只在 manager 及以上；回收站页路由无权限限制、顶栏有入口（`ThreeColumnLayout.vue`）；合入后列表已有逐行 `purgeable` 先例 |
+| 12 | NIT | 阶段与批次表对应不准 | tasks.md 头部改为逐阶段列 AQ 编号并注明差异与理由 | report.md §7 批次表 |
+| 13 | NIT | 逐项目调 `get_user_scope_cycles` 的代价 | ADR-AQL-19（代价与记忆化）；§3.4、§3.10 `CycleScopeCache`；§10.2 带缓存对拍 | 远端实现每次 4~5 条查询；只读查库：非 admin / partner 的构建器可用身份每人可访问项目最多 1 个（auditor 105 人、manager 1 人） |
+| 14 | NIT | 重要性读取未包 SAVEPOINT；第 31 行可能假绿 | §3.11 `resolve_config` 读取包 `begin_nested`；§5；§10.3 第 31 行 `extra_tables` 含 materiality 并断言原因 | PG 语句失败使事务 aborted（平台铁律） |
+| 15 | NIT | meta 措辞矛盾 | §3.1、§3.3、§3.12、N3 统一为「新增可选键，没有内容时省略」 | `TestExecuteContractBaseline` 只断言既有字段 |
+| 16 | NIT | 任务 7 未提 router 的导入与调用 | 任务 7 | `routers/custom_query.py` L1145 导入、L1200 调用 `fetch_cap_warning` |
+| 17 | NIT | §14.1 缺 C23 结论 | §14.1 首条 | `useC23ControlData.ts` 文件头：「检查样本分录的 编制人/过账人/审核人 是否在授权清单内」 |
+| 18 | NIT | 试算表入口合计 / 小计判据 | §4.3 `buildQueryEntry`；§10.1 | `TrialBalance.vue` `interface DisplayRow { _isSubtotal?; _isTotal? }`，页面多处按这两个标记分支 |
+| 19 | NIT | 回收站作者列 | §3.6（`coalesce(creator_id, created_by)`，与 `owner_id` 同口径） | `CustomQueryTemplate.owner_id` 属性 = `creator_id or created_by` |
+| 20 | NIT | 预置校验漏排序与每页行数 | R13.8；§3.11 `validate_preset`；§10.1 | — |
+| 21 | NIT | R3.8 与术语漏写链路唯一 | R3.8、requirements 术语「循环范围」 | 远端 `effective_scope` 模块说明与 `unique_chain` 判定 |
+| 22 | NIT | 报表合计行到不了入口 | R14.3；§3.12 错误文案与说明 | `useReportDrilldown.onDrilldown` 首行 `if (!row.row_code \|\| row.is_total_row) return` |
+| 23 | NIT | 负数重要性提示格式 | R13.4；ADR-AQL-05；§3.11 `missing_reason` 用 `f"{值:,.2f}"`；§10.2 | — |
+| 24 | NIT | `greatest` 是 PG 专用 | §3.11（执行类用例只放真 PG、不改方言、既有 `test_cutoff_sampling_pbt.py` 只断言 SQL 文本） | 本轮离线编译：SQLite 方言渲染出 `greatest(…)`（SQLite 无此函数） |
+| 25 | NIT | `X-Notes-Version` 统计范围 | §3.8 写明 `project_id = :pid AND year = :year AND is_deleted = false` | — |
+
+本轮另外补的两处（不在评审清单里，核实时发现）：①合入后 `resolve_member_scope` 判定主管后调 `project_cycles` 读 `wp_index`，且在其 try 块之外 ⇒ 配方表凡 PM / SM 走到循环范围的格须把 `wp_index` 列入 `extra_tables`（§10.3），否则这些格会 500 而不是给出门禁结论；②指标树年度取不到时不建附注分支、其余骨架照常返回，不报 422（§3.8、§6），避免缺年度的项目整棵树打不开。
