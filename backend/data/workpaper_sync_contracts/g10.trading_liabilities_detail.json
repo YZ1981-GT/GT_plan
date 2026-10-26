@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "cbeaf6884273a531ed4ad04595bb24929e04e74d4aa698d899bdf66086b5747c",
+  "instrumentation_definition_sha256": "d1e67e0732feca7c958523e114055f8902e8fdae9c76b18865a86242d436bc5f",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-g10-trading-financial-liabilities",
@@ -982,9 +982,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "b22d05bc81db21ce8b24b179ee76afa77d2c64e770b394dd674336890d208553",
+    "normalized_structure_hash": "c7cddff30554252d4d7d121a8d0277065d56e415293ded6bafa50641e11a257f",
     "relative_path": "G/G10 交易性金融负债.xlsx",
-    "template_sha256": "3afd5131f3783c017f3b7e728e1b081188de71acebb46bdb43e2f8b24fb63da3"
+    "template_sha256": "6164bfcbebea63235d0bb0a18d2afe610ae050b19c39f1fef1746fcdab52fa1f"
   },
-  "template_definition_sha256": "f67d10450c98e2f2090b6be52bf0f673160c785ca519bb8f159cb8049fe1f1bd"
+  "template_definition_sha256": "56c1d77fa30d3be106dc0a837062bab10baaac330b064a373c75ab3e1690cc21"
 }

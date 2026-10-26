@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "e6e3a7e2607095c4b64234090edaddae6a87b2ffc5a04eff765adc501d16681d",
+  "instrumentation_definition_sha256": "153459a543643c8de44c2d1851d9d064fd22b4d2e2cf9c155dcf778992399816",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-g13-fair-value-changes",
@@ -487,9 +487,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "6719b934c661f5d19a047690af463a505a822c8c0d2dcf1a48e12bf8881b8ddd",
+    "normalized_structure_hash": "2b685ceb9b31e1d605b167890c3e78a141dd28474a92cf276d98ab285ed6a2ce",
     "relative_path": "G/G13 公允价值变动收益.xlsx",
-    "template_sha256": "fd5e5e9eeca7b392d59ca54beac51e96bb1575894113c0f3e69f05a234b0f099"
+    "template_sha256": "2848d2a2bf53704b5fc0e9acc7618d5b3e3e1f0c1d05e459929db802a746fae0"
   },
-  "template_definition_sha256": "f766460b6c90f45d548af8ae5b9fa9f02c3f74a93a67458bc7df8859e273a21e"
+  "template_definition_sha256": "bb3b38ad513de755b22220f4dae0d3a2d95f57943376fea2f599499bee47911e"
 }

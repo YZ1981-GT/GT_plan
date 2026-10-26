@@ -101,9 +101,16 @@ function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
   }
 }
 
+/**
+ * 期末未审 = 期初未审 + 本期贷方（开票）− 本期借方（承兑 / 兑付）。
+ *
+ * 权威模板 F3-1 的期末未审 F 取 F3-2 期末未审数 O 的分类合计，O = L + M − N（期初余额 + 本期开票 −
+ * 本期承兑），起点是期初未审，期初调整只进期初审定 E。原先从期初审定起算，有期初调整时表单与模板、
+ * 与 F3-2 合计都对不上（spec oo-writeback-template-parity-closure R2）。
+ */
 function computeRow(stored: StoredF3AdjRow): F3AdjudicationRow {
   const openingAdjusted = calcAuditedAmount(stored.openingUnadjusted, stored.openingAje, stored.openingRje)
-  const closingUnadjusted = calcCreditBalance(openingAdjusted, stored.periodCredit, stored.periodDebit)
+  const closingUnadjusted = calcCreditBalance(stored.openingUnadjusted, stored.periodCredit, stored.periodDebit)
   const closingAdjusted = calcAuditedAmount(closingUnadjusted, stored.closingAje, stored.closingRje)
   return {
     rowKey: stored.rowKey,

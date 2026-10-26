@@ -459,10 +459,12 @@ MUTATIONS: list[Mutation] = [
         id="M18", side="be", path=SLICE, kind="replace",
         # 🔴 2026-09-28：D1 模板因「贴现息」列数字格式修复而改版，锚点随之更新
         #    （sha256 e6e8dcf2… → efa8e23d…）。2026-10-26 D1-7 Q23 公式修正再改版
-        #    （efa8e23d… → 2e75538c…，spec oo-writeback-template-parity-closure R1）。
+        #    （efa8e23d… → 2e75538c…，spec oo-writeback-template-parity-closure R1），同日 D1-1 / D1-15
+        #    再改（→ 6d834112…）。scope_check 的期望值原先停在更早的 e6e8dcf2…（锚点更新时漏改），
+        #    变异本身一直落不到期望值上，一并改成变异值。
         #    变异仍是「末位改一位」。
-        anchor='        "sha256": "2e75538c3c3e542cc577580a0452bff3b834febe196f98fe459abee2af02a4d5",',
-        new='        "sha256": "2e75538c3c3e542cc577580a0452bff3b834febe196f98fe459abee2af02a4d0",',
+        anchor='        "sha256": "6d83411214bb5282886ca7f082880f3d4e842c5b05bd0b4337cddc02c021d3d5",',
+        new='        "sha256": "6d83411214bb5282886ca7f082880f3d4e842c5b05bd0b4337cddc02c021d3d0",',
         want=f"{_P28}::test_authoritative_templates_digests_recompute",
         wants=(f"{_P28}::test_every_entry_template_ref_is_registered_with_digest",),
         why="模板 sha256 改一位仍绿 ⇒ 首轮的 `assert tpath.exists()` 只查存在不查内容，"
@@ -470,18 +472,18 @@ MUTATIONS: list[Mutation] = [
         scope_check=_slice_template_field(
             "D1 应收票据.xlsx",
             "sha256",
-            "e6e8dcf28ba6e7f6fdf9867c3ac43b2f1a72e1a1b6f2aa477f58dfca39097578",
+            "6d83411214bb5282886ca7f082880f3d4e842c5b05bd0b4337cddc02c021d3d0",
         ),
         tags=("template", "data", "failopen"),
     ),
     Mutation(
         id="M19", side="be", path=SLICE, kind="replace",
-        anchor='        "size": 138008,',
-        new='        "size": 138009,',
+        anchor='        "size": 120144,',
+        new='        "size": 120145,',
         want=f"{_P28}::test_authoritative_templates_digests_recompute",
         wants=(f"{_P28}::test_every_entry_template_ref_is_registered_with_digest",),
         why="模板 size 与实况不符仍绿 ⇒ size 这一维是死数据（Task 47 把 size+sha256 双冻结）",
-        scope_check=_slice_template_field("D1 应收票据.xlsx", "size", 138009),
+        scope_check=_slice_template_field("D1 应收票据.xlsx", "size", 120145),
         tags=("template", "data", "failopen"),
     ),
     Mutation(
@@ -498,26 +500,26 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         id="M21", side="be", path=CONTRACT, kind="replace",
-        anchor='    "template_sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa"',
-        new='    "template_sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afb"',
+        anchor='    "template_sha256": "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466"',
+        new='    "template_sha256": "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3460"',
         want=f"{_P28}::test_d2_contract_template_digests_recompute_from_the_template_bytes",
         wants=(f"{_P28}::test_d2_contract_identity_digests_are_real_digests",),
         why="🔴 首轮 Property 28 的整个论证是「没有 definition bundle → 无可漂移 identity → 通过」"
             "（空分母重言式）。D2 契约的 template_sha256 是**真分母**：改一位必须红",
         scope_check=_contract_path_is(
-            "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afb",
+            "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3460",
             "template", "template_sha256",
         ),
         tags=("digest", "data", "tautology"),
     ),
     Mutation(
         id="M22", side="be", path=CONTRACT, kind="replace",
-        anchor='    "normalized_structure_hash": "ff7a91a514db64ca030103f8cb10759fc4e62c77cf6d4cbe3c61bb7d69ebdc9e",',
-        new='    "normalized_structure_hash": "ff7a91a514db64ca030103f8cb10759fc4e62c77cf6d4cbe3c61bb7d69ebdc9f",',
+        anchor='    "normalized_structure_hash": "077b9ab542a9b777e63f43c9f99bdc6f04987d8b56b02a8e961943328b79233b",',
+        new='    "normalized_structure_hash": "077b9ab542a9b777e63f43c9f99bdc6f04987d8b56b02a8e961943328b792330",',
         want=f"{_P28}::test_d2_contract_template_digests_recompute_from_the_template_bytes",
         why="结构 hash 改一位仍绿 ⇒ 「可见业务结构漂移 fail closed」在 D 循环上没有落点",
         scope_check=_contract_path_is(
-            "ff7a91a514db64ca030103f8cb10759fc4e62c77cf6d4cbe3c61bb7d69ebdc9f",
+            "077b9ab542a9b777e63f43c9f99bdc6f04987d8b56b02a8e961943328b792330",
             "template", "normalized_structure_hash",
         ),
         tags=("digest", "data", "tautology"),

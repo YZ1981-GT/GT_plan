@@ -105,8 +105,8 @@ MUTATIONS: list[Mutation] = [
     # ── ① 权威模板哨兵（Requirement 9.9）─────────────────────────────
     Mutation(
         id="M01", side="be", path=PD, kind="replace",
-        anchor='    "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa"',
-        new='    "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afb"',
+        anchor='    "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466"',
+        new='    "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3460"',
         want=f"{_TPL}::test_template_bytes_are_unchanged",
         wants=(f"{_GROUND}::test_disk_contract_matches_the_source_of_truth",),
         why="模板字节哨兵改一位后仍绿 ⇒ 「backend/wp_templates 运行时只读」无人把守，"

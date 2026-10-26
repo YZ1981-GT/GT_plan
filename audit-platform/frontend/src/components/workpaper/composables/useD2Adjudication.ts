@@ -23,6 +23,7 @@ import {
   getChangeRate,
   sumif,
 } from './useD2FormulaEngine'
+import type { TemplateChangeRate } from './templateChangeRate'
 import { resolveTbAmountWithSeed } from './dCycleTbSeed'
 import { eventBus } from '@/utils/eventBus'
 import type { ChecklistItem, ChecklistResponse } from './useD2FormData'
@@ -76,7 +77,7 @@ export interface AdjudicationRow {
   currentAudited: number      // = 未审 + AJE + RJE
   // 变动
   change: number              // = 期末审定 - 期初审定
-  changeRate: number | ''     // = (期末-期初)/期初
+  changeRate: TemplateChangeRate // = (期末-期初)/期初，期初为 0 按模板（templateChangeRate）
   reasonAnalysis: string
   /**
    * 取数来源（归一自旧 isFromSumif 布尔标记 —— spec d2-sync-coverage Q9）。
@@ -614,8 +615,8 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
   /**
    * 判断变动率是否超过阈值需高亮
    */
-  function isChangeRateWarning(changeRate: number | ''): boolean {
-    if (changeRate === '') return false
+  function isChangeRateWarning(changeRate: TemplateChangeRate): boolean {
+    if (changeRate === '' || changeRate === 'N/A') return false
     return Math.abs(changeRate) > 0.3
   }
 

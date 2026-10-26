@@ -39,7 +39,7 @@ function eclRowArbitrary(): fc.Arbitrary<EclRow> {
   }).map(r => ({
     ...r,
     shouldProvision: r.balance * r.lossRate,
-    difference: r.actualProvision - r.balance * r.lossRate,
+    difference: r.balance * r.lossRate - r.actualProvision,
   }))
 }
 
@@ -70,23 +70,24 @@ describe('Feature: d1-ecl-provision, Property 1: D=B×C 应计提公式正确性
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Property 2: F=E-D 差异公式正确性
+// Property 2: F=D-E 差异公式正确性（模板 D1-15 ⑤=③-④）
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('Feature: d1-ecl-provision, Property 2: F=E-D 差异公式正确性', () => {
+describe('Feature: d1-ecl-provision, Property 2: F=D-E 差异公式正确性', () => {
   /**
    * **Validates: Requirements 6.5, 7.4**
    *
-   * calculateDifference(actualProvision, shouldProvision) === actualProvision - shouldProvision
+   * calculateDifference(actualProvision, shouldProvision) === shouldProvision - actualProvision
+   * （原为 actual - should，与模板方向相反；spec oo-writeback-template-parity-closure R2）
    */
-  it('calculateDifference(actual, should) === actual - should', () => {
+  it('calculateDifference(actual, should) === should - actual', () => {
     fc.assert(
       fc.property(
         fc.float({ min: -1e8, max: 1e8, noNaN: true }),
         fc.float({ min: -1e8, max: 1e8, noNaN: true }),
         (actualProvision, shouldProvision) => {
           const result = calculateDifference(actualProvision, shouldProvision)
-          const expected = actualProvision - shouldProvision
+          const expected = shouldProvision - actualProvision
           expect(result).toBe(expected)
         },
       ),
@@ -375,7 +376,7 @@ describe('Feature: d1-ecl-provision, Property 7: JSON Round-Trip行数据持久�
     }).map(r => ({
       ...r,
       shouldProvision: r.balance * r.lossRate,
-      difference: r.actualProvision - r.balance * r.lossRate,
+      difference: r.balance * r.lossRate - r.actualProvision,
     }))
   }
 
@@ -404,7 +405,7 @@ describe('Feature: d1-ecl-provision, Property 7: JSON Round-Trip行数据持久�
 
             // Computed fields recomputed consistently
             const expectedShould = original.balance * original.lossRate
-            const expectedDiff = original.actualProvision - expectedShould
+            const expectedDiff = expectedShould - original.actualProvision
             expect(roundTripped.shouldProvision).toBeCloseTo(expectedShould, 10)
             expect(roundTripped.difference).toBeCloseTo(expectedDiff, 10)
           }

@@ -14,18 +14,18 @@
     {
       "label": "d1",
       "adapter_id": "d1.notes_receivable_detail",
-      "contract_payload_sha256": "d4aa4d9f12605196a0da8f4bf7451165536737810b0d43d9319f5df9ead8ca7f",
+      "contract_payload_sha256": "e800a547647bed51a6ddb17131c7e726a3f2e428c032dddc473e945fb4e5cca2",
       "sheet_digests": {
         "d13-managed": "5ae1032ee1b1a481be926665aeae0d720a825cc5bf5c7ae23e030d921bcd3281",
         "d12-managed": "603270b6fa6c4b8780955471b429080f86c8ab88ab79d1556f56edccc53d5db4",
-        "d14-managed": "7196e9cecb4758928a9d80ab7efaf531197686b343ea8363b5f9cc68089a8120",
+        "d14-managed": "8553e7edbe31899e495ed86d359167dbd571c5b7470848c6a7849413f9fd6958",
         "d18-managed": "e63b5b2fa492c956af2bf422454862eb5a4e38261f2c98dff63f829401fe43e8",
         "d116-managed": "ad542458227e0ecfba1b25748f5058c12b3cfb699858ae5aed5039fa65da9060",
         "d19-managed": "aa57dab3fdda34e17fc284b8d99fa117991d74b30d18bb5fdf6c5cec63c15051",
         "d111-managed": "050b910b83fa4a6299e8e9dc7d81cef7abc9c8dd4d89f149b488f54b3f3e412a",
         "d112-managed": "fa2822de98020387a759b4b18373125c5ceb45ec09b443842fed3ff459f1a9f4",
         "d110-managed": "a1b94db78a655492d0c6c8427730384fa3c3f67195a0492e96d2a0aae5036b00",
-        "d115-managed": "6a901314978faf3bea961762fa2eda857ad3b5fe291a34059a2691e43a65a907",
+        "d115-managed": "e447d46d89f51aa94f5f700b89294fddfff001932fcd55e6a466b8a399421fbf",
         "d113-managed": "2eaf0f23483af7f7287acba54e1befa95a78e12f564a2b78847681388d3a27c5",
         "d17-managed": "881ade446d0aaa1fd81e5ad00dca1e4abd772ba21cf320e9cc1918fbabd4fdde",
         "d11-managed": "c1df40d7c4bda31a520a3533e013f84992383c4d6270978ebe48815dddad0297"
@@ -36,7 +36,7 @@
     {
       "label": "d2",
       "adapter_id": "d2.receivable_detail",
-      "contract_payload_sha256": "8c064287737277e6d9938be31874d5001844f3070b9b00449a556717c032a01d",
+      "contract_payload_sha256": "2909b5f52dfd666b6cbd8d9725e8942c013b9ac35e70bf5d2fe6247043f6b87e",
       "sheet_digests": {
         "d22-managed": "31f1458f39fb568773512a06177e9a40b375a9baee2277b6058176dc05eb5957",
         "d23-managed": "b5b8f846bfb6d3edb41f30f0160090fa071a1fe69e9ccebfa3ffb2e63451c677",
@@ -136,7 +136,7 @@
     {
       "label": "d7",
       "adapter_id": "d7.contract_liabilities_detail",
-      "contract_payload_sha256": "ddb25188ef84d18243deca218de9ec5c8fe4c8f89bace1f29e1be0b9f3298d2d",
+      "contract_payload_sha256": "b9e9484e3acbcca7922d168f4602e9be810a683c04cab4befd6637494e1b5be4",
       "sheet_digests": {
         "d72-managed": "7560a4793aa396b7acbe971c2608a910920a146035f179b9f4597932d2c9b7fe",
         "d75-managed": "30478894c3757656da8d39505ff4af81de50e65d790ab631e355addb770098c4",
@@ -306,7 +306,7 @@
     {
       "label": "g10",
       "adapter_id": "g10.trading_liabilities_detail",
-      "contract_payload_sha256": "eab68356438b9c06ede0a7ecedd18eec44bc5914fe76a89bfd5f356270413c41",
+      "contract_payload_sha256": "b2837f57ce04557efac9141791b4c3ecd7b038511a754e1c89a4ffe97bf4f68a",
       "sheet_digests": {
         "g1002-managed": "179878c0c735084d13f22b03682d53e9eaf2b875282fb26974806638bb54e225",
         "g101-managed": "6f003bd845a3f21edfd78400b570b53d37b90a2909d993ca6692e09ac0e25a76"
@@ -350,7 +350,7 @@
     {
       "label": "g13",
       "adapter_id": "g13.fair_value_changes_detail",
-      "contract_payload_sha256": "5aa76b5b039f8ef024db8d907a5d48d06176688c6d4f91f1a58585332433d88b",
+      "contract_payload_sha256": "84a8e360bac9e4b5c12f2aa6ebbf4cb2cef564446f2ad2f8c23f9e17de22edc1",
       "sheet_digests": {
         "g1302-managed": "0cc15bd2f39a52a4c658c965e2ea14326e4634e86df80d32cad583237458e96b",
         "g131-managed": "3394bfd41c530d01ec8499471a994650943c41d1218dfe53350cef41a7ac04c6"

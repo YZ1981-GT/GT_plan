@@ -682,7 +682,7 @@ class TestAuthoritativeTemplate:
         """跑完本文件 `backend/wp_templates/` 必须原样（Requirement 9.9）。"""
         data = P.read_authoritative_template()
         assert hashlib.sha256(data).hexdigest() == P.TEMPLATE_SHA256
-        assert len(data) == 123_162
+        assert len(data) == 105_407  # oo-writeback-template-parity-closure 第二批修 D2-3 公式后重存（解压内容仅 sheet9 变）
 
     def test_template_lives_under_the_authority_root(self) -> None:
         path = P.authoritative_template_path()

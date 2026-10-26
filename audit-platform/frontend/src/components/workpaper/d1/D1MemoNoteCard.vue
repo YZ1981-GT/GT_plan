@@ -15,6 +15,7 @@ const props = defineProps<{
   projectId: string
   noteTypeOptions: string[]
   statusOptions: string[]
+  derecognizedOptions: string[]
   ynOptions: string[]
   ratingOptions: string[]
   relatedOptions: string[]
@@ -28,12 +29,24 @@ const emit = defineEmits<{
   (e: 'apply-ocr', mode: 'empty-only' | 'override-all'): void
 }>()
 
+// 状态取权威模板 K 列下拉值；本期背书 / 到期承兑 / 贴现按模板公式自动取票据金额
 const statusHint = computed(() => {
-  if (props.row.status === '已贴现') return '联动：自动标记「审计日已贴现背书」并填充本期贴现'
-  if (props.row.status === '已背书') return '联动：自动标记「审计日已贴现背书」并填充本期背书'
-  if (props.row.status === '到期') return '联动：自动填充本期到期承兑金额'
+  if (props.row.status === '贴现') return '联动：自动标记「审计日已贴现背书」，票据金额计入本期贴现'
+  if (props.row.status === '背书') return '联动：自动标记「审计日已贴现背书」，票据金额计入本期背书'
+  if (props.row.status === '到期承兑') return '票据金额计入本期到期承兑'
   return ''
 })
+
+/** 「金额变动」组：权威模板 Q~W 的行公式，只读 */
+const DERIVED_AMOUNT_FIELDS: Array<{ key: keyof MemoRow; label: string }> = [
+  { key: 'beginningBalance', label: '年初余额（自动）' },
+  { key: 'currentReceived', label: '本期收到（自动）' },
+  { key: 'currentEndorsed', label: '本期背书（自动）' },
+  { key: 'currentMatured', label: '本期到期承兑（自动）' },
+  { key: 'currentDiscounted', label: '本期贴现（自动）' },
+  { key: 'endingBalance', label: '年末持有票据余额（自动）' },
+  { key: 'unexpiredEndorsedDiscounted', label: '期末未到期背书或贴现金额（自动）' },
+]
 
 const ocrBadge = computed(() => {
   switch (props.row.ocrStatus) {
@@ -273,42 +286,13 @@ function handleUpload(file: any): boolean {
 
     <!-- 金额变动 -->
     <div class="field-group">
-      <div class="group-title">金额变动 <span class="auto-tag">年末余额自动计算</span></div>
+      <div class="group-title">金额变动 <span class="auto-tag">按收到日期、票据状态、到期日与流转日期自动计算</span></div>
       <el-form label-position="top" size="small">
         <el-row :gutter="12">
-          <el-col v-for="f in [
-            { key: 'beginningBalance', label: '年初余额' },
-            { key: 'currentReceived', label: '本期收到' },
-            { key: 'currentEndorsed', label: '本期背书' },
-            { key: 'currentMatured', label: '本期到期承兑' },
-            { key: 'currentDiscounted', label: '本期贴现' },
-          ]" :key="f.key" :span="8">
+          <el-col v-for="f in DERIVED_AMOUNT_FIELDS" :key="f.key" :span="8">
             <el-form-item :label="f.label">
-              <el-input-number
-                :model-value="(row as any)[f.key]"
-                :controls="false"
-                :precision="2"
-                :disabled="isReadonly"
-                style="width: 100%"
-                @change="(v: number) => emit('update', f.key as keyof MemoRow, v || 0)"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="年末余额（自动）">
               <WpAmountInput
-                :model-value="row.endingBalance"
-                disabled
-                style="width: 100%"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="期末未到期背书贴现（自动）">
-              <el-input-number
-                :model-value="row.unexpiredEndorsedDiscounted"
-                :controls="false"
-                :precision="2"
+                :model-value="row[f.key] as number"
                 disabled
                 style="width: 100%"
               />
@@ -358,7 +342,7 @@ function handleUpload(file: any): boolean {
                 style="width: 100%"
                 @change="(v: string) => emit('update', 'isDerecognized', v || '')"
               >
-                <el-option v-for="o in ynOptions" :key="o" :label="o" :value="o" />
+                <el-option v-for="o in derecognizedOptions" :key="o" :label="o" :value="o" />
               </el-select>
             </el-form-item>
           </el-col>

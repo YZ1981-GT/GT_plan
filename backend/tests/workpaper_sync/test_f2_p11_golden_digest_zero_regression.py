@@ -66,7 +66,10 @@ GOLDEN_BASELINE: dict[str, str] = {
     #    这些契约的权威模板按会计口径修了公式（清单 `scripts/fix/fix_template_formula_defects.py`），
     #    契约里随之变的只有模板 sha / 结构哈希 / 定义哈希与审核依据文本，由各生成器重算。
     #    d1 / f1 的旧基线在 HEAD 上本就已过期（各自 spec 改契约时未同步本表），一并更新到现值。
-    "d1.notes_receivable_detail.json": "75f1b401764fa7c9",
+    #    同日第二批：d1 再变（D1-4 G/J 两列改按加减方向对应前端键、D1-15 ④ 改为录入格，
+    #    外加 D1-1 / D1-15 模板公式），d2 / d7 只是模板改公式（`75f1b401…` / `56007587…` /
+    #    `735d194b…` → 现值）。
+    "d1.notes_receivable_detail.json": "ac919be5ebceffef",
     # 🔴 2026-10-10 更新 d2（`1714d5719d558446` → 本值），两次契约变化一并同步：
     #    ① 299c216a9（10-07）把 `d21-managed` 的 locator 从 TABLE_SHEET_ANCHOR 改为
     #       defined_name_ref，当时未同步本基线（HEAD 上本条已红：`cd80314142ae5bdf`）；
@@ -76,12 +79,12 @@ GOLDEN_BASELINE: dict[str, str] = {
     #       同型。单数 instrumentation 正是 D2 在线编辑失败的根因之一；「契约 sheet 必须被
     #       已发布 instrumentation 覆盖」由 `test_published_instrumentation_covers_contract_sheets.py`
     #       守护。契约是**真的变了**，不是度量漂移，故更新基线。
-    "d2.receivable_detail.json": "56007587080236ac",
+    "d2.receivable_detail.json": "1d9ff003590a11ef",
     "d3.prepaid_receipts_detail.json": "a32e531ac342e7cc",
     "d4.revenue_detail.json": "7b1d6362eeba4a7d",
     "d5.receivables_financing_detail.json": "b76e345cc29797b5",
     "d6.contract_assets_detail.json": "eeb454b0dcd45cbc",
-    "d7.contract_liabilities_detail.json": "735d194bc8072405",
+    "d7.contract_liabilities_detail.json": "392d96f81ef1d123",
     "e1.monetary_fund_detail.json": "4a0cf6c928566c96",
     "f1.prepayment_detail.json": "0439591e2e504c74",
     "g7.soe_subsidiary_disclosure.json": "6fdd12a7e008eb24",

@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "0ddb7bc393070cfdf94cc49b3f22ca2cf42970fc4188dd1d93f0fe058511c76d",
+  "instrumentation_definition_sha256": "94f6d0ccf70b61d14ba973fb3d643da99a3c7cc06a3dcf2e4d4f11fb8b1ca3ce",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d7-contract-liabilities",
@@ -1673,9 +1673,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "d257edcea6f6d2c490755a3a5a93128aaebc1a9b2c097d1e9178897ec482b07a",
+    "normalized_structure_hash": "f7f4c687ae4015b5f03930dcf59f3b3983f86312b9bdadfcd5088b223b50af55",
     "relative_path": "D/D7 合同负债.xlsx",
-    "template_sha256": "0facd3fe2297dbf72804d513d54ca08c55d6a26a41bf1d5c59fc3d7ea1c76a9a"
+    "template_sha256": "9c047a2a5d6f3241eb0110655cdd3612b4ac6e06a917ac775a4ca80ae37101ec"
   },
-  "template_definition_sha256": "10d584e74541cd2d7963f15a505b1285abbd84555dff8524fe2cb8faf0f84292"
+  "template_definition_sha256": "9d50db421221ad34b5cf902f923c82fcc48cd5dfbe318c61aebdc7f1cf6331e5"
 }

@@ -36,13 +36,16 @@ describe('Feature: d1-notes-receivable, Property 1: 审定数公式链', () => {
     )
   })
 
+  // 模板 D1-1 K 列 IF(AND(E=0,I=0),"",IF(AND(E=0,I>0),1,J/E))：期末为负时除零（#DIV/0!）记 N/A
   it('calcChangeRate handles zero prior consistently', () => {
     fc.assert(
       fc.property(valArb, (audited) => {
         if (audited === 0) {
           expect(calcChangeRate(0, 0)).toBe('')
-        } else {
+        } else if (audited > 0) {
           expect(calcChangeRate(0, audited)).toBe(1)
+        } else {
+          expect(calcChangeRate(0, audited)).toBe('N/A')
         }
       }),
       { numRuns: 100 },
@@ -70,10 +73,10 @@ describe('Feature: d1-notes-receivable, Property 2: ECL 公式', () => {
     )
   })
 
-  it('calcDifference = actual - should', () => {
+  it('calcDifference = should - actual（模板 ⑤=③-④，spec oo-writeback-template-parity-closure R2）', () => {
     fc.assert(
       fc.property(valArb, valArb, (actual, should) => {
-        expect(calcDifference(actual, should)).toBeCloseTo(actual - should, 5)
+        expect(calcDifference(actual, should)).toBeCloseTo(should - actual, 5)
       }),
       { numRuns: 100 },
     )

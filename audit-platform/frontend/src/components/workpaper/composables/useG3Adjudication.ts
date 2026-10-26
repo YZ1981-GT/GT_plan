@@ -65,7 +65,7 @@ export interface G3AdjudicationRow {
   openingAJE: number
   openingRJE: number
   openingAdjusted: number       // 公式：期初未审 + AJE + RJE
-  closingUnadjusted: number     // 借方公式：期初审定 + 本期宣告 - 本期收回
+  closingUnadjusted: number     // 借方公式：期初未审 + 本期宣告 - 本期收回
   closingAJE: number
   closingRJE: number
   closingAdjusted: number       // 公式：期末未审 + AJE + RJE
@@ -94,8 +94,11 @@ const CONCLUSION_KEY = G3_ADJ_CONCLUSION_KEY
 /** 从存储行计算展示行（含公式字段） */
 function computeRow(stored: StoredG3AdjRow): G3AdjudicationRow {
   const openingAdjusted = calcAdjustedAmount(stored.openingUnadjusted, stored.openingAJE, stored.openingRJE)
-  // 借方科目：期末未审 = 期初审定 + 本期宣告(借方) - 本期收回(贷方)
-  const closingUnadjusted = calcDebitBalance(openingAdjusted, stored.currentDeclared, stored.currentReceived)
+  // 借方科目：期末未审 = 期初未审 + 本期宣告(借方) - 本期收回(贷方)。权威模板 G3-1 期末未审 F 取 G3-2
+  // 期末数 F = 期初数 + 本期增加 − 本期减少（未审列），期初调整经 G3-1 期末账项 / 重分类调整列（G3-2
+  // 「期初调整」G / H + 本期 I−J / K−L）结转，不进期末未审。原先从期初审定起算
+  // （spec oo-writeback-template-parity-closure R2）
+  const closingUnadjusted = calcDebitBalance(stored.openingUnadjusted, stored.currentDeclared, stored.currentReceived)
   const closingAdjusted = calcAdjustedAmount(closingUnadjusted, stored.closingAJE, stored.closingRJE)
   const changeAmount = calcChangeAmount(closingAdjusted, openingAdjusted)
   const changeRate = calcChangeRate(openingAdjusted, closingAdjusted)

@@ -19,6 +19,7 @@ import {
 } from '../composables/useD1Adjudication'
 import D1CellOverrideBadge from './D1CellOverrideBadge.vue'
 import { isChangeRateExceeding } from '../composables/useD1FormulaEngine'
+import { formatTemplateChangeRate, type TemplateChangeRate } from '../composables/templateChangeRate'
 import type { ChecklistResponse } from '../composables/useD1FormData'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
@@ -149,12 +150,11 @@ function fmtAmount(val: number): string {
   return displayPrefs.fmtAmount(val)
 }
 
-function fmtRate(rate: number | ''): string {
-  if (rate === '') return '-'
-  return (rate * 100).toFixed(2) + '%'
+function fmtRate(rate: TemplateChangeRate): string {
+  return formatTemplateChangeRate(rate)
 }
 
-function isRateExceeding(rate: number | ''): boolean {
+function isRateExceeding(rate: TemplateChangeRate): boolean {
   return isChangeRateExceeding(rate, 0.3)
 }
 

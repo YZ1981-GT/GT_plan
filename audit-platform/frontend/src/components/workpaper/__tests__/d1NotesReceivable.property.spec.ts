@@ -153,10 +153,10 @@ describe('Feature: d1-notes-receivable, Property 3: ECL 迁徙率法计算正确
           const provision = calculateProvision(balance, lossRate)
           expect(provision).toBeCloseTo(balance * lossRate, 5)
 
-          // Assert: difference = actual - should
+          // Assert: difference = should - actual（模板 ⑤=③-④：应计 − 实际，spec oo-writeback-template-parity-closure R2）
           const shouldProvision = provision
           const difference = calculateDifference(actualProvision, shouldProvision)
-          expect(difference).toBeCloseTo(actualProvision - shouldProvision, 5)
+          expect(difference).toBeCloseTo(shouldProvision - actualProvision, 5)
         },
       ),
       { numRuns: 100 },

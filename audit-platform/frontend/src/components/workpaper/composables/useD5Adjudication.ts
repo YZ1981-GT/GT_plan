@@ -21,10 +21,11 @@ import {
   parseNum,
   calcAuditedAmount,
   calcChangeAmount,
-  calcChangeRate,
   calcSubtotal,
   calcFvTotal,
 } from './useD5FormulaEngine'
+// 审定表变动率按模板 D5 K 列（期初为 0、期末为正 → 100%，原先记 N/A）
+import { calcTemplateChangeRate } from './templateChangeRate'
 import { eventBus } from '@/utils/eventBus'
 import { resolveTbAmountWithSeed } from './dCycleTbSeed'
 // 🔴 复用平台级共享四态状态机（spec d567-sync-coverage Task 20）——**绝不**在 D5 侧另写一套。
@@ -241,7 +242,7 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
     const notesPriorAudited = calcAuditedAmount(notesPriorUnadjusted, notesPriorAje, notesPriorRje)
     const notesCurrentAudited = calcAuditedAmount(notesCurrentUnadjusted, notesCurrentAje, notesCurrentRje)
     const notesChangeAmount = calcChangeAmount(notesPriorAudited, notesCurrentAudited)
-    const notesChangeRate = calcChangeRate(notesPriorAudited, notesCurrentAudited)
+    const notesChangeRate = calcTemplateChangeRate(notesPriorAudited, notesCurrentAudited)
 
     const notesRow: AdjudicationRow = {
       rowKey: 'notes-receivable',
@@ -274,7 +275,7 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
     const accPriorAudited = calcAuditedAmount(accPriorUnadjusted, accPriorAje, accPriorRje)
     const accCurrentAudited = calcAuditedAmount(accCurrentUnadjusted, accCurrentAje, accCurrentRje)
     const accChangeAmount = calcChangeAmount(accPriorAudited, accCurrentAudited)
-    const accChangeRate = calcChangeRate(accPriorAudited, accCurrentAudited)
+    const accChangeRate = calcTemplateChangeRate(accPriorAudited, accCurrentAudited)
 
     const accRow: AdjudicationRow = {
       rowKey: 'accounts-receivable',
@@ -304,7 +305,7 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
     const subtotalPriorAudited = calcAuditedAmount(subtotalPriorUnadjusted, subtotalPriorAje, subtotalPriorRje)
     const subtotalCurrentAudited = calcAuditedAmount(subtotalCurrentUnadjusted, subtotalCurrentAje, subtotalCurrentRje)
     const subtotalChangeAmount = calcChangeAmount(subtotalPriorAudited, subtotalCurrentAudited)
-    const subtotalChangeRate = calcChangeRate(subtotalPriorAudited, subtotalCurrentAudited)
+    const subtotalChangeRate = calcTemplateChangeRate(subtotalPriorAudited, subtotalCurrentAudited)
 
     const subtotalRow: AdjudicationRow = {
       rowKey: 'subtotal',
@@ -337,7 +338,7 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
     const ociPriorAudited = calcAuditedAmount(ociPriorUnadjusted, ociPriorAje, ociPriorRje)
     const ociCurrentAudited = calcAuditedAmount(ociCurrentUnadjusted, ociCurrentAje, ociCurrentRje)
     const ociChangeAmount = calcChangeAmount(ociPriorAudited, ociCurrentAudited)
-    const ociChangeRate = calcChangeRate(ociPriorAudited, ociCurrentAudited)
+    const ociChangeRate = calcTemplateChangeRate(ociPriorAudited, ociCurrentAudited)
 
     const ociRow: AdjudicationRow = {
       rowKey: 'oci-change',
@@ -368,7 +369,7 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
     const fvPriorRje = calcFvTotal(subtotalPriorRje, ociPriorRje)
     const fvCurrentRje = calcFvTotal(subtotalCurrentRje, ociCurrentRje)
     const fvChangeAmount = calcChangeAmount(fvPriorAudited, fvCurrentAudited)
-    const fvChangeRate = calcChangeRate(fvPriorAudited, fvCurrentAudited)
+    const fvChangeRate = calcTemplateChangeRate(fvPriorAudited, fvCurrentAudited)
 
     const fvTotalRow: AdjudicationRow = {
       rowKey: 'fv-total',
@@ -403,7 +404,7 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
       currentRje: 0,
       currentAudited: tbCurrentUnadjusted,
       changeAmount: calcChangeAmount(tbPriorUnadjusted, tbCurrentUnadjusted),
-      changeRate: calcChangeRate(tbPriorUnadjusted, tbCurrentUnadjusted),
+      changeRate: calcTemplateChangeRate(tbPriorUnadjusted, tbCurrentUnadjusted),
       isFromCrossSheet: false,
       isEditable: false,
     }
@@ -424,7 +425,7 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
       currentRje: 0,
       currentAudited: diffCurrentAudited,
       changeAmount: calcChangeAmount(diffPriorAudited, diffCurrentAudited),
-      changeRate: calcChangeRate(diffPriorAudited, diffCurrentAudited),
+      changeRate: calcTemplateChangeRate(diffPriorAudited, diffCurrentAudited),
       isFromCrossSheet: false,
       isEditable: false,
     }

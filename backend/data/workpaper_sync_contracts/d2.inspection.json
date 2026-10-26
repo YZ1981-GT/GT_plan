@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "53e7f2a1a83fdfefc87a19b63414dda582f3aeacedf81d3177ab752484458440",
+  "instrumentation_definition_sha256": "e92c626351ad8f9684d2897ff3dc22977008255df3aefaab912f4bd214b98282",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d2-inspection",
@@ -1644,9 +1644,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "bb0f07d559d2f470782fd8b6c2eed00ca1e6aa75b1d2340a584858b160995eac",
+    "normalized_structure_hash": "79a38b24498e4b60d796ce33cf3b47861c1f757426be4c64f6e42e5ae6eeba10",
     "relative_path": "D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
-    "template_sha256": "76c5c721bac37bd3f9cbf92eb3dd6dccb156cb27c8dd26e5452aa8b103ce0813"
+    "template_sha256": "d0e27f6fbff3ff6e7db05ce4a42796f94a3e253dabfaf49761b97400ad23bed2"
   },
-  "template_definition_sha256": "47f3b3ea26a75035ad4b65a1f0405441adf14ae6454d2b05ae05f2431bdfbb7f"
+  "template_definition_sha256": "f662aa2b2d49c6185b7753d385b7dd4b8249ddccdcc75921b120d5bb15fe1209"
 }

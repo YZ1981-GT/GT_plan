@@ -81,13 +81,13 @@ describe('F3 集成: sheetName 正则分发', () => {
 // 2. 贷方余额公式链（composition 测试）
 // ---------------------------------------------------------------------------
 describe('F3 集成: 贷方余额公式链', () => {
-  it('期末未审 = 期初审定 + 贷方 - 借方 → 审定 = 期末未审 + AJE + RJE', () => {
-    const openingAdjusted = 500000
+  it('期末未审 = 期初未审 + 贷方 - 借方 → 审定 = 期末未审 + AJE + RJE', () => {
+    const openingUnadjusted = 500000
     const creditAmount = 120000 // 贷方（增加）
     const debitAmount = 30000  // 借方（减少）
 
-    // Step 1: 贷方余额公式
-    const closingUnadjusted = calcCreditBalance(openingAdjusted, creditAmount, debitAmount)
+    // Step 1: 贷方余额公式（模板 F3-2 O = L + M − N，起点是期初未审）
+    const closingUnadjusted = calcCreditBalance(openingUnadjusted, creditAmount, debitAmount)
     expect(closingUnadjusted).toBe(500000 + 120000 - 30000) // 590000
 
     // Step 2: 审定公式

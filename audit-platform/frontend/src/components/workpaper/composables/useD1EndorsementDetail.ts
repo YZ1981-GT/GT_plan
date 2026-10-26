@@ -11,7 +11,7 @@
  * - 动态行 CRUD（addDiscountRow / removeDiscountRow / addEndorseRow / removeEndorseRow）
  * - 编辑单元格（updateCell，数值字段 parseNum、其余 String）
  * - 从备查簿 D1-7 按状态筛选导入（importFromMemo）——
- *   discount 表取 status==='已贴现'、endorse 表取 status==='已背书'，
+ *   discount 表取票据状态「贴现」、endorse 表取「背书」（模板 K 列值，旧值归一后同样命中），
  *   映射 MemoRow → EndorsementRow，替换目标表全部行（导入后可编辑，见 Req 17.5）
  * - 审计说明 / 审计结论（auditNote / auditConclusion）双向绑定 + 保存
  * - 序列化/反序列化（JSON ↔ checklist_responses remark），debounce 2s 自动保存
@@ -21,7 +21,7 @@
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
-import { parseNum, calcSubtotal } from './useD1FormulaEngine'
+import { parseNum, calcSubtotal, normalizeMemoStatus } from './useD1FormulaEngine'
 import type { MemoRow } from './useD1MemoReconciliation'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -347,15 +347,16 @@ export function useD1EndorsementDetail(options: UseD1EndorsementDetailOptions) {
 
   /**
    * 从备查簿按状态筛选导入并替换目标表全部行（Req 17.1/17.2/17.5）：
-   * - table='discount' 保留 status==='已贴现'
-   * - table='endorse'  保留 status==='已背书'
+   * - table='discount' 保留票据状态「贴现」
+   * - table='endorse'  保留票据状态「背书」
+   * 状态取权威模板 D1-7 K 列下拉值；存量旧值（已贴现 / 已背书）经 normalizeMemoStatus 归一后同样命中。
    * 导入后为可编辑动态行（rowType='dynamic'，新 rowId）。
    */
   function importFromMemo(table: 'discount' | 'endorse', memoRows: MemoRow[]): void {
     if (isReadonly.value) return
-    const targetStatus = table === 'discount' ? '已贴现' : '已背书'
+    const targetStatus = table === 'discount' ? '贴现' : '背书'
     const mapped = (memoRows ?? [])
-      .filter((m) => m.status === targetStatus)
+      .filter((m) => normalizeMemoStatus(m.status) === targetStatus)
       .map((m) => mapMemoRow(m, table))
 
     if (table === 'discount') {

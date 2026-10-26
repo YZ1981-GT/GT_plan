@@ -2189,11 +2189,11 @@
       },
       {
         "name": "G10 交易性金融负债.xlsx",
-        "size": 99458,
-        "sha256": "3afd5131f3783c017f3b7e728e1b081188de71acebb46bdb43e2f8b24fb63da3",
+        "size": 86264,
+        "sha256": "6164bfcbebea63235d0bb0a18d2afe610ae050b19c39f1fef1746fcdab52fa1f",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-g10-trading-financial-liabilities",
-        "normalized_structure_hash": "b22d05bc81db21ce8b24b179ee76afa77d2c64e770b394dd674336890d208553"
+        "normalized_structure_hash": "c7cddff30554252d4d7d121a8d0277065d56e415293ded6bafa50641e11a257f"
       },
       {
         "name": "G11 投资收益.xlsx",
@@ -2213,11 +2213,11 @@
       },
       {
         "name": "G13 公允价值变动收益.xlsx",
-        "size": 58717,
-        "sha256": "fd5e5e9eeca7b392d59ca54beac51e96bb1575894113c0f3e69f05a234b0f099",
+        "size": 50413,
+        "sha256": "2848d2a2bf53704b5fc0e9acc7618d5b3e3e1f0c1d05e459929db802a746fae0",
         "in_runtime_index": true,
         "belongs_to_entry": "xlsx/gt-g13-fair-value-changes",
-        "normalized_structure_hash": "6719b934c661f5d19a047690af463a505a822c8c0d2dcf1a48e12bf8881b8ddd"
+        "normalized_structure_hash": "2b685ceb9b31e1d605b167890c3e78a141dd28474a92cf276d98ab285ed6a2ce"
       },
       {
         "name": "G14 信用减值损失.xlsx",

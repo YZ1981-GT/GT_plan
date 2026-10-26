@@ -13,7 +13,8 @@
  *
  * 第二组（触类旁通，全仓扫「期初审定作滚动起点」后逐个对照模板）：D2-3 / G2-3 / G5-3 / K1-3
  * 坏账准备滚动表与 G2-2 应收利息明细同一问题，连同两处跨表读取（G2-3 → G2-1 / 附注、
- * G5-3 → G5-1 / 上市附注）一起改。
+ * G5-3 → G5-1 / 上市附注）一起改。D1-4 当时因 G / J 两列加减方向也对不上而留待裁定，
+ * 由 spec oo-writeback-template-parity-closure R2 一并改（起点 + G/J 按方向对应前端键）。
  */
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
@@ -47,6 +48,8 @@ const { computeMovement: computeG53, buildDisplayRows: buildG53Rows } = await im
 const { aggregateProvisionFromG53 } = await import('../composables/g5CrossHelpers')
 const { extractBadDebtForDisclosure } = await import('../composables/g5ListedDisclosureRows')
 const { recalcK1BadDebtMainRow } = await import('../composables/useK1BadDebt')
+const { useD1BadDebt } = await import('../composables/useD1BadDebt')
+const { readD1BadDebtTotal } = await import('../composables/d1AdjudicationModel')
 
 // ─── 同一组样例：期初未审 1000，期初调整 200 + 50（期初审定 1250），本期增加 300、减少 100 ──
 const PRIOR_UNADJUSTED = 1000
@@ -133,7 +136,7 @@ describe('期末余额族以期初未审起算（与权威模板一致）', () =
     expect(row.currentAudited).toBe(END_FROM_UNADJUSTED + RECLASS + END_AJE + END_RJE)
   })
 
-  it('D1-7 备查簿核对：明细账(D1-2) 行与 D1-2 同口径', () => {
+  it('D1-7 备查簿核对：明细账(D1-2) 行取 D1-2 未审数（模板 B30 = D1-2 B14，E30 = B30 + C30 − D30）', () => {
     const { reconciliationRows } = withSetup(() => useD1MemoReconciliation({
       ...baseOptions(),
       allResponses: responses({
@@ -146,8 +149,12 @@ describe('期末余额族以期初未审起算（与权威模板一致）', () =
     }))
     const ledger = reconciliationRows.value[1]
     expect(ledger.label).toBe('明细账(D1-2)')
-    expect(ledger.beginningBalance).toBe(PRIOR_AUDITED)
-    expect(ledger.endingBalance).toBe(END_FROM_UNADJUSTED + END_AJE + END_RJE)
+    // 原先取期初审定 / 期末审定（含审计调整），与模板的未审数口径不同
+    expect(ledger.beginningBalance).toBe(PRIOR_UNADJUSTED)
+    expect(ledger.beginningBalance).not.toBe(PRIOR_AUDITED)
+    expect(ledger.currentIncrease).toBe(INCREASE)
+    expect(ledger.currentDecrease).toBe(DECREASE)
+    expect(ledger.endingBalance).toBe(END_FROM_UNADJUSTED)
   })
 
   it('D2-2：期末余额 Q = E + O - P', () => {
@@ -325,6 +332,38 @@ describe('触类旁通：坏账准备滚动表与 G2-2 同样以期初未审起�
     const disclosure = extractBadDebtForDisclosure(JSON.stringify([withoutClosing]))
     expect(disclosure.individualTotals.end.provision).toBe(END_FROM_UNADJUSTED + CLOSING_ADJ)
     expect(disclosure.individualTotals.prior.provision).toBe(PRIOR_AUDITED)
+  })
+
+  it('D1-4 坏账准备明细：期末未审 K = B + SUM(F:G) − SUM(H:J)，G = 其他增加（currentOther）、J = 其他减少（currentRecovery）', () => {
+    // spec oo-writeback-template-parity-closure R2：起点改为期初未审；G / J 按加减方向对应前端键
+    const { individualRows } = withSetup(() => useD1BadDebt({
+      ...baseOptions(),
+      eclTestTotal: ref(0),
+      allResponses: responses({
+        'D1-bd-individual-rows': [{
+          rowId: 'fixed-individual', category: 'individual', label: '按单项计提', isSubRow: false,
+          priorUnadjusted: PRIOR_UNADJUSTED, priorAje: PRIOR_AJE, priorRje: PRIOR_RJE,
+          currentProvision: PROVISION, currentOther: OTHER_INCREASE,
+          currentReversal: REVERSAL, currentWriteOff: WRITE_OFF, currentRecovery: OTHER_DECREASE,
+          currentAje: END_AJE, currentRje: END_RJE,
+        }],
+      }),
+    } as never))
+    const row = individualRows.value.find((r) => r.rowId === 'fixed-individual')!
+    expect(row.priorAudited).toBe(PRIOR_AUDITED)
+    expect(row.currentUnadjusted).toBe(END_FROM_UNADJUSTED)
+    expect(row.currentAudited).toBe(END_FROM_UNADJUSTED + CLOSING_ADJ)
+    // 审定表 / ECL 勾稽读的合计与表单同口径
+    const total = readD1BadDebtTotal(responses({
+      'D1-bd-individual-rows': [{
+        priorUnadjusted: PRIOR_UNADJUSTED, priorAje: PRIOR_AJE, priorRje: PRIOR_RJE,
+        currentProvision: PROVISION, currentOther: OTHER_INCREASE,
+        currentReversal: REVERSAL, currentWriteOff: WRITE_OFF, currentRecovery: OTHER_DECREASE,
+        currentAje: END_AJE, currentRje: END_RJE,
+      }],
+    }).value as never)
+    expect(total.currentUnadjusted).toBe(END_FROM_UNADJUSTED)
+    expect(total.currentAudited).toBe(END_FROM_UNADJUSTED + CLOSING_ADJ)
   })
 
   it('K1-3 坏账准备明细：期末账面 J = B + SUM(E:F) − SUM(G:I)', () => {

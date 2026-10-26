@@ -137,7 +137,7 @@ async function generateAuditConclusion(): Promise<void> {
       <summary>📋 编制思路与联动逻辑</summary>
       <div class="guidance-content">
         <p>1. 先取得并核对完整关联方清单，关注F4-2中关联方标识为空或错误造成的未识别关联方风险；本表仅自动同步F4-2中已标识为关联方的实际债权人。</p>
-        <p>2. 逐项核对期初余额、本期借方和本期贷方，期末余额自动按“期初余额＋本期贷方－本期借方”计算，并与F4-2审定余额交叉核对。</p>
+        <p>2. 逐项核对期初余额、本期借方和本期贷方，期末余额自动按“期初余额＋本期贷方－本期借方”计算（与底稿模板公式一致）；从F4-2同步的行取F4-2期初未审余额与借贷发生额，期末余额与F4-2“期末余额”列交叉核对，审定调整在F4-2中核对。</p>
         <p>3. 结合合同、订单、发票、验收及付款资料检查交易性质和业务合理性；结合第三方价格、成本加成或协议条款评价定价政策。</p>
         <p>4. 分析账龄及期后付款，关注长期挂账、借方余额、期后付款超过期末余额、余额集中及异常资金往来。</p>
         <p>5. 最后核对关联方交易及余额是否在财务报表附注中完整、准确披露；索引号应指向所取得的合同、定价及付款证据。</p>
@@ -381,7 +381,7 @@ async function generateAuditConclusion(): Promise<void> {
       <span>期末 {{ fmtAmount(summary.closingTotal) }}</span>
       <span>期后付款 {{ fmtAmount(summary.postPaymentTotal) }}</span>
       <span :class="{ danger: Math.abs(summary.reconciliationDifference) >= 0.005 }">
-        与F4-2审定数差异 {{ fmtAmount(summary.reconciliationDifference) }}
+        与F4-2期末余额差异 {{ fmtAmount(summary.reconciliationDifference) }}
       </span>
     </div>
 

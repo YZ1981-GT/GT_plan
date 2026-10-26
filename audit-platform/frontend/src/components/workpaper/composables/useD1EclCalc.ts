@@ -20,8 +20,8 @@ export interface EclRow {
   balance: number             // B: 审定应收票据账面余额
   lossRate: number            // C: 预期信用损失率 [0,1]（内部小数存储）
   shouldProvision: number     // D: 期末应计提 = B×C（computed只读）
-  actualProvision: number     // E: 期末坏账准备账面余额
-  difference: number          // F: 差异 = E-D（computed只读）
+  actualProvision: number     // E: 期末坏账准备账面余额（录入）
+  difference: number          // F: 差异 = D-E（computed只读，模板 ⑤=③-④）
   basis: string               // G: 计提依据及文件
   indexRef: string            // H: 索引号
   autoPulled?: boolean        // 是否由D1-4自动取数填充（用于浅蓝背景显示）
@@ -53,12 +53,13 @@ export function calculateShouldProvision(balance: number, lossRate: number): num
 }
 
 /**
- * 差异 = 实际计提 - 应计提 (F=E-D)
+ * 差异 = 应计提 - 期末坏账准备账面余额 (F=D-E，权威模板 D1-15 表头 ⑤=③-④)
  *
- * 正值表示多提，负值表示少提。
+ * 正值表示少提（应补提），负值表示多提。原为 E-D（方向与模板相反，spec
+ * oo-writeback-template-parity-closure R2 按模板改）。参数顺序不变。
  */
 export function calculateDifference(actualProvision: number, shouldProvision: number): number {
-  return actualProvision - shouldProvision
+  return shouldProvision - actualProvision
 }
 
 /**

@@ -58,8 +58,8 @@ def _off_list(template: str, data: bytes) -> list[str]:
 
 
 def test_fix_list_is_non_trivial() -> None:
-    """清单为空时下面的参数化一条都不跑 —— 先钉住分母。"""
-    assert len(_BOOKS) >= 19 and len(_FIXES) >= 280, (len(_BOOKS), len(_FIXES))
+    """清单为空时下面的参数化一条都不跑 —— 先钉住分母（第一批 19 本 285 格 + 第二批 5 本新册 43 格）。"""
+    assert len(_BOOKS) >= 24 and len(_FIXES) >= 328, (len(_BOOKS), len(_FIXES))
 
 
 @pytest.mark.parametrize("template", _BOOKS)
@@ -76,6 +76,16 @@ def test_mutation_reverting_one_cell_is_reported() -> None:
     reverted = patch_bytes(data, [Fix(target.template, target.sheet, target.coord, target.new, target.old)])
     off = _off_list(target.template, reverted)
     assert off == [f"{target.sheet}!E9 实得 {target.old!r}，应为 {target.new!r}"], off
+
+
+def test_mutation_putting_back_a_cleared_formula_is_reported() -> None:
+    """变异：D1-15 ④ 是清掉公式的录入格，有人把 `=B14-D14` 补回去，判据必须点名这一格（new=None 分支）。"""
+    target = next(f for f in _FIXES if f.coord == "E14" and f.sheet == "应收票据坏账准备测试表D1-15")
+    assert target.new is None and target.old == "=B14-D14"
+    data = (TEMPLATES / target.template).read_bytes()
+    reverted = patch_bytes(data, [Fix(target.template, target.sheet, target.coord, None, target.old)])
+    off = _off_list(target.template, reverted)
+    assert off == [f"{target.sheet}!E14 实得 {target.old!r}，应为 None"], off
 
 
 def test_templates_root_is_the_runtime_authority() -> None:

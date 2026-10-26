@@ -36,7 +36,7 @@ class Fix:
     sheet: str
     coord: str
     old: str | None  # openpyxl 读到的现状（公式带 =；None = 空格）
-    new: str         # 期望值（公式带 =；否则是文本）
+    new: str | None  # 期望值（公式带 =；否则是文本；None = 清成空的录入格，保留样式）
 
 
 def _col(column: str, rows: range, old: str | None, new: str, template: str, sheet: str) -> list[Fix]:
@@ -53,6 +53,8 @@ H2, G8, D6 = "H/H2 在建工程.xlsx", "G/G8 其他权益工具投资.xlsx", "D/
 K1, D1, G5 = "K/K1 其他应收款.xlsx", "D/D1 应收票据.xlsx", "G/G5 长期应收款.xlsx"
 I3, H3 = "I/I3 商誉.xlsx", "H/H3 投资性房地产.xlsx"
 G7, K6, L4 = "G/G7 长期股权投资.xlsx", "K/K6 持有待售资产和负债.xlsx", "L/L4 应付债券.xlsx"
+D2I, D7, G10 = "D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx", "D/D7 合同负债.xlsx", "G/G10 交易性金融负债.xlsx"
+D2A, G13 = "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx", "G/G13 公允价值变动收益.xlsx"
 D4_BOOKS = ("D/D4 收入底稿.xlsx", "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx")
 N12S, N32S = "递延所得税资产明细表N1-2", "递延所得税负债明细表N3-2"
 
@@ -138,6 +140,45 @@ def fixes() -> list[Fix]:
     l43 = "划分为金融负债的其他金融工具明细表L4-3"
     for col, a, b, c in (("T", "N", "P", "R"), ("U", "O", "Q", "S"), ("V", "P", "R", "T"), ("W", "Q", "S", "U")):
         out.append(Fix(L4, l43, f"{col}18", f"={a}18+{b}18-{c}18", f"=SUM({col}13:{col}17)"))
+    # ── 第二批（按模板对齐前端时逐表核出，design §2 #20~#25）──
+    # §2-20 D1-1 银行承兑汇票期初三列取了 D1-2 合计行 R14（同行期末 F..H 取 R11、下一行取 R13；
+    # 取合计会让小计 B10 把商业承兑汇票算两遍）
+    d11, d12 = "审定表D1-1", "'原值明细表（按类别）D1-2'"
+    out += [Fix(D1, d11, f"{c}8", f"={d12}!{c}14", f"={d12}!{c}11") for c in ("B", "C", "D")]
+    # §2-21 D1-15 ④「期末坏账准备账面余额」是被审计单位已记录的坏账准备（录入；A8「与被审计单位已记录的
+    # 坏账准备进行比较」），模板写成 ①−③（账面价值）⇒ ⑤=③−④ 恒为 2×③−①；同结构 D2-9 的 ④ 是录入格
+    d115 = "应收票据坏账准备测试表D1-15"
+    out += [Fix(D1, d115, f"E{r}", f"=B{r}-D{r}", None) for r in (*range(14, 18), *range(22, 25))]
+    out += [Fix(D1, d115, f"E{r}", "④=①-③", "④") for r in (13, 21)]
+    # §2-22 D2-9 单项区差异写成 ①−④（表头 ⑤=③−④，两个组合区各行都是 D−E）；
+    # 小计行「预期信用损失率」列在加总比例、「应计提」列在算比例，两格互换
+    d29 = "应收坏账准备测算D2-9"
+    out += _col("F", range(14, 19), "=B{r}-E{r}", "=D{r}-E{r}", D2I, d29)
+    out += [Fix(D2I, d29, "C19", "=SUM(C14:C18)", '=IF(B19=0,"",D19/B19)'),
+            Fix(D2I, d29, "D19", '=IF(B19=0,"",C19/B19)', "=SUM(D14:D18)")]
+    # §2-23 D7-6 合同负债是贷方科目：期末 = 期初 − 借方 + 贷方（同册 D7-2 P=F−N+O）；模板按资产方向写成 C+D−E
+    out += _col("F", range(12, 15), "=C{r}+D{r}-E{r}", "=C{r}-D{r}+E{r}", D7, "关联方关系及交易检查表D7-6")
+    # §2-24 D7-1 期初重分类小计多含表头行 R7（同行其余列 SUM(x8:x13)；SUM 忽略文字，数值不变）
+    out += [Fix(D7, "审定表D7-1", "D14", "=SUM(D7:D13)", "=SUM(D8:D13)")]
+    # §2-25 G10-1「发行的交易性债券」：变动额 / 变动率取了上一行小计 G8，账面余额 G29 也取了 G8
+    # （同行 D..F、H 与其他行都取本行 R9）
+    g101 = "审定表G10-1"
+    out += [Fix(G10, g101, "H9", "=G8-D9", "=G9-D9"),
+            Fix(G10, g101, "I9", '=IF(AND(D9=0,G8=0),"",IF(AND(D9=0,G8>0),1,H9/D9))',
+                '=IF(AND(D9=0,G9=0),"",IF(AND(D9=0,G9>0),1,H9/D9))'),
+            Fix(G10, g101, "G29", "=G8+G19", "=G9+G19")]
+    # §2-26 D2-3 组合区数据行是 R18~R21（四行都有 E/K/N 公式），小计 R17 只有 E/K/N 求和到 R21、其余 10 列
+    # 漏了 R21；期末审定 N18:N21 漏加重分类 M（单项区 N13:N16 与同结构 D1-4 都是 K+L+M）
+    d23 = "坏账准备明细表D2-3"
+    out += [Fix(D2A, d23, f"{c}17", f"=SUM({c}18:{c}20)", f"=SUM({c}18:{c}21)") for c in "BCDFGHIJLM"]
+    out += _col("N", range(18, 22), "=K{r}+L{r}", "=K{r}+L{r}+M{r}", D2A, d23)
+    # §2-27 D2-10 方法 2 的前瞻性调整 C 列逐行取 G64~G69，末行 C90 取到了表外的 G70（R70 是说明文字行）
+    out += [Fix(D2I, "预期信用损失的计量测试D2-10", "C90", "=G70", "=G69")]
+    # §2-28 G13-1 合计行上期审定取了「衍生金融资产」G9（同行其余列取小计 R7）；R7 变动率分母也是 G9
+    g131 = "审定表G13-1"
+    out += [Fix(G13, g131, "G17", "=SUM(G9,G10,G13,G15:G16)", "=SUM(G7,G10,G13,G15:G16)"),
+            Fix(G13, g131, "I7", '=IF(AND(G9=0,D7=0),"",IF(AND(G9=0,D7>0),1,H7/G9))',
+                '=IF(AND(G7=0,D7=0),"",IF(AND(G7=0,D7>0),1,H7/G7))')]
     return out
 
 
@@ -181,12 +222,35 @@ def _shared_master(xml: str, si: str) -> tuple[str, str] | None:
     return None
 
 
+_DEPENDENT = r'<c r="(?P<coord>[A-Z]+\d+)"(?:\s[^>/]*)?>(?:(?!</c>|<c\b).)*?<f[^>]*\bsi="{si}"[^>]*/>'
+
+
+def _shared_members(xml: str, si: str, master: str) -> set[str]:
+    """共享公式组里真正用这条公式的格（主格 + 从属格）。
+
+    ``ref`` 只是外接矩形：区内自带公式的格（如 D2-3 的 E17）不属于该组，不能按 ``ref`` 判。
+    """
+    return {master} | {m.group("coord") for m in re.finditer(_DEPENDENT.format(si=si), xml, re.S)}
+
+
 def _ref_cells(ref: str) -> set[str]:
     a, _, b = ref.partition(":")
     b = b or a
     ma, mb = re.match(r"([A-Z]+)(\d+)", a), re.match(r"([A-Z]+)(\d+)", b)
     cols = range(column_index_from_string(ma.group(1)), column_index_from_string(mb.group(1)) + 1)
     return {f"{get_column_letter(c)}{r}" for c in cols for r in range(int(ma.group(2)), int(mb.group(2)) + 1)}
+
+
+def _assert_group_in_targets(xml: str, fix: Fix, fattrs: str, targets: dict[str, Fix]) -> None:
+    """改共享公式主格 = 改整组：组里每个格都必须在清单内（否则会把清单外的格一起改掉）。"""
+    ref = re.search(r'\bref="([^"]+)"', fattrs)
+    si = re.search(r'\bsi="(\d+)"', fattrs)
+    if ref is None or si is None:
+        return
+    outside = _shared_members(xml, si.group(1), fix.coord) - set(targets)
+    if outside:
+        raise RuntimeError(f"{fix.sheet}!{fix.coord} 是共享公式主格（{ref.group(1)}），"
+                           f"组内有清单外的格 {sorted(outside)}")
 
 
 def _patch_sheet(xml: str, items: list[Fix]) -> str:
@@ -196,17 +260,26 @@ def _patch_sheet(xml: str, items: list[Fix]) -> str:
         if m is None:
             raise RuntimeError(f"{fix.sheet}!{fix.coord} 在 XML 里不存在（不凭空造格）")
         attrs, body = m.group("attrs") or "", m.group("body") or ""
-        if not fix.new.startswith("="):  # 文本格（内联字符串）
-            if 't="inlineStr"' not in attrs:
-                raise RuntimeError(f"{fix.sheet}!{fix.coord} 不是内联文本格，拒绝改写")
-            new_cell = f'<c r="{fix.coord}"{attrs}><is><t>{_esc(fix.new)}</t></is></c>'
+        if fix.new is None:  # 清成空的录入格：去掉公式与缓存值，只留样式
+            f_text = _F_TEXT.search(body)
+            fattrs = f_text.group("fattrs") if f_text else (_F_EMPTY.search(body).group("fattrs")
+                                                          if _F_EMPTY.search(body) else "")
+            _assert_group_in_targets(xml, fix, fattrs, targets)
+            clean = re.sub(r'\s+t="[^"]*"', "", attrs)
+            new_cell = f'<c r="{fix.coord}"{clean}/>'
+        elif not fix.new.startswith("="):  # 文本格：内联字符串原地改；共享字符串格转成内联字符串
+            if 't="inlineStr"' in attrs:
+                new_cell = f'<c r="{fix.coord}"{attrs}><is><t>{_esc(fix.new)}</t></is></c>'
+            elif 't="s"' in attrs:
+                inline = attrs.replace('t="s"', 't="inlineStr"')
+                new_cell = f'<c r="{fix.coord}"{inline}><is><t>{_esc(fix.new)}</t></is></c>'
+            else:
+                raise RuntimeError(f"{fix.sheet}!{fix.coord} 不是文本格，拒绝改写")
         else:
             f_text, f_empty = _F_TEXT.search(body), _F_EMPTY.search(body)
             if f_text is not None:
                 fattrs = f_text.group("fattrs")
-                ref = re.search(r'\bref="([^"]+)"', fattrs)
-                if ref and not _ref_cells(ref.group(1)) <= set(targets):
-                    raise RuntimeError(f"{fix.sheet}!{fix.coord} 是共享公式主格（{ref.group(1)}），组内有清单外的格")
+                _assert_group_in_targets(xml, fix, fattrs, targets)
                 new_body = body.replace(f_text.group(0), f"<f{fattrs}>{_esc(fix.new[1:])}</f>", 1)
                 new_cell = f'<c r="{fix.coord}"{attrs}>{new_body}</c>'
             elif f_empty is not None:

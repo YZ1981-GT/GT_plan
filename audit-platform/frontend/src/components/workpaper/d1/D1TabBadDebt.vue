@@ -3,7 +3,8 @@
  * D1TabBadDebt.vue — 坏账准备 D1-4 HTML渲染
  *
  * 对齐 D1-3：审计目标/过程 + 明细表 + 审计意见区（说明/结论）+ AI
- * 列：项目|期初未审|期初AJE|期初RJE|期初审定|本期计提|本期收回|本期转回|本期核销|本期其他|期末未审|期末AJE|期末RJE|期末审定
+ * 列：项目|期初未审|期初AJE|期初RJE|期初审定|本期计提|其他增加|本期转回|本期核销|其他减少（含收回）|期末未审|期末AJE|期末RJE|期末审定
+ *   （列序与权威模板 D1-4 F~J 一致；期末未审 = 期初未审 + 计提 + 其他增加 − 转回 − 核销 − 其他减少）
  * 固定行结构：按单项计提（可展开子行）+ 按组合计提（可展开子行）+ 小计
  * ECL差异警告（小计行旁黄色 el-alert）
  */
@@ -423,18 +424,19 @@ function onReview(sectionId: string) {
           </template>
         </el-table-column>
 
-        <el-table-column label="本期收回" min-width="110" align="right">
+        <!-- 列顺序与权威模板 D1-4 一致：F 计提 | G 其他增加 | H 转回 | I 核销 | J 其他减少。
+             G 存 currentOther（加项）、J 存 currentRecovery（减项，含收回），与在线编辑契约同一对应
+             （spec oo-writeback-template-parity-closure R2）。 -->
+        <el-table-column label="其他增加" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
-              v-if="isCellEditable(row, 'currentRecovery')"
+            <WpAmountInput
+              v-if="isCellEditable(row, 'currentOther')"
               class="cell-amount-input"
-              :model-value="row.currentRecovery"
+              :model-value="row.currentOther"
               size="small"
-              :controls="false"
-              :precision="2"
-              @change="(v: number) => updateCell(row.rowId, 'currentRecovery', v || 0)"
+              @change="(v: number) => updateCell(row.rowId, 'currentOther', v || 0)"
             />
-            <span v-else v-html="fmtAmount(row.currentRecovery)" />
+            <span v-else v-html="fmtAmount(row.currentOther)" />
           </template>
         </el-table-column>
 
@@ -468,18 +470,16 @@ function onReview(sectionId: string) {
           </template>
         </el-table-column>
 
-        <el-table-column label="本期其他" min-width="110" align="right">
+        <el-table-column label="其他减少（含收回）" min-width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
-              v-if="isCellEditable(row, 'currentOther')"
+            <WpAmountInput
+              v-if="isCellEditable(row, 'currentRecovery')"
               class="cell-amount-input"
-              :model-value="row.currentOther"
+              :model-value="row.currentRecovery"
               size="small"
-              :controls="false"
-              :precision="2"
-              @change="(v: number) => updateCell(row.rowId, 'currentOther', v || 0)"
+              @change="(v: number) => updateCell(row.rowId, 'currentRecovery', v || 0)"
             />
-            <span v-else v-html="fmtAmount(row.currentOther)" />
+            <span v-else v-html="fmtAmount(row.currentRecovery)" />
           </template>
         </el-table-column>
 

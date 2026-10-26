@@ -232,10 +232,12 @@ export function extractF4RelatedPartyCandidates(
     }
     target.rowIds.push(row.rowId)
     target.relationships.add(relationship)
-    target.openingBalance += row.openingAdjusted
+    // 权威模板 F4-6 F = C + E − D 与 F4-2 K = E + J − I 同式：期初取 F4-2 期初未审余额（E 列），
+    // 比对基准取 F4-2 期末余额（K 列），联动行两侧恒等（spec oo-writeback-template-parity-closure R2）
+    target.openingBalance += row.openingUnadjusted
     target.currentDebit += row.currentDebit
     target.currentCredit += row.currentCredit
-    target.sourceClosingBalance += row.closingAdjusted
+    target.sourceClosingBalance += row.closingBalance
     segKeys.forEach((key, index) => {
       target.aging[index] += f4AgingValue(row, 'audited', key)
     })
@@ -282,11 +284,12 @@ function computeRow(
   const aging = source?.aging ?? stored.aging
   const transactionNature = stored.transactionNature || source?.transactionNature || ''
   const postPaymentAmount = source?.postPaymentAmount ?? stored.postPaymentAmount
-  // 联动行直接采用 F4-2 审定期末；勿用「期初审定+贷−借」去比审定数（AJE/RJE 会导致系统性误报）
-  const rollForwardClosing = calcCreditBalance(openingBalance, currentCredit, currentDebit)
+  // 期末余额一律按权威模板 F = C + E − D（期初余额 + 本期贷方 − 本期借方）。原先联动行直接取
+  // F4-2 期末审定数，OnlyOffice 按模板公式重算后两侧不等（spec oo-writeback-template-parity-closure R2）。
+  // 联动行的期初 / 借贷取自 F4-2 未审口径，与 F4-2 期末余额（K）比对；审定调整不进本表
+  const closingBalance = calcCreditBalance(openingBalance, currentCredit, currentDebit)
   const sourceClosingBalance = source?.sourceClosingBalance
-    ?? (stored.sourceRowId ? stored.sourceClosingBalance : rollForwardClosing)
-  const closingBalance = source ? sourceClosingBalance : rollForwardClosing
+    ?? (stored.sourceRowId ? stored.sourceClosingBalance : closingBalance)
   const reconciliationDifference = closingBalance - sourceClosingBalance
   const concentration = calcConcentration(closingBalance, totalClosing)
   const riskFlags: string[] = []
@@ -301,7 +304,7 @@ function computeRow(
     if (!stored.indexNo) riskFlags.push('索引号待补')
   }
   if (Math.abs(reconciliationDifference) >= TOLERANCE && !source && stored.sourceRowId) {
-    riskFlags.push('与F4-2审定数不一致')
+    riskFlags.push('与F4-2期末余额不一致')
   }
   if (closingBalance < -TOLERANCE) riskFlags.push('期末余额为负')
   if (postPaymentAmount > Math.max(0, closingBalance) + TOLERANCE) riskFlags.push('期后付款超过期末余额')
@@ -311,7 +314,7 @@ function computeRow(
   if (concentration > CONCENTRATION_THRESHOLD) riskFlags.push('关联方余额集中度较高')
 
   const riskLevel: RelatedPartyAPRow['riskLevel'] = riskFlags.some((flag) =>
-    ['与F4-2审定数不一致', '期末余额为负', '期后付款超过期末余额'].includes(flag),
+    ['与F4-2期末余额不一致', '期末余额为负', '期后付款超过期末余额'].includes(flag),
   ) ? 'danger' : riskFlags.length ? 'warning' : 'none'
 
   return {

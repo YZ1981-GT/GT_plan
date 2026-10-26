@@ -46,7 +46,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
         # D1-2 按类别明细
         "D1-2": [
-            ("期末未审数", "期初审定 + 本期增加 − 本期减少", "计算",
+            ("期末未审数", "期初未审 + 本期增加 − 本期减少", "计算",
              "按承兑类别原值明细期末未审（calcCurrentUnadjusted）", "useD1FormulaEngine"),
             ("审定数", "未审数 + AJE + RJE", "计算",
              "各类别审定金额（calcAuditedAmount）", "useD1FormulaEngine"),
@@ -55,21 +55,21 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
         # D1-3 按客户明细
         "D1-3": [
-            ("期末未审数", "期初审定 + 本期增加 − 本期减少", "计算",
+            ("期末未审数", "期初未审 + 本期增加 − 本期减少", "计算",
              "按客户原值明细期末未审（calcCurrentUnadjusted）", "useD1FormulaEngine"),
             ("审定数", "未审数 + AJE + RJE", "计算",
              "各客户审定金额（calcAuditedAmount）", "useD1FormulaEngine"),
         ],
         # D1-4 坏账准备
         "D1-4": [
-            ("期末未审数", "期初审定 + 本期计提 − 本期收回 − 本期转回 − 本期核销 + 本期其他", "计算",
+            ("期末未审数", "期初未审 + 本期计提 + 其他增加 − 本期转回 − 本期核销 − 其他减少（含收回）", "计算",
              "坏账准备明细期末未审（calcBadDebtEndBalance）", "useD1FormulaEngine"),
             ("预期信用损失率", "各阶段迁徙率连乘", "计算",
              "按组合计提损失率（calcExpectedLossRate）", "useD1FormulaEngine"),
             ("应计提", "余额 × 损失率", "计算",
              "单项/组合计提（calcProvision）", "useD1FormulaEngine"),
-            ("差异", "实际账面余额 − 应计提", "计算",
-             "正值多提/负值少提（calcDifference）", "useD1FormulaEngine"),
+            ("差异", "应计提 − 期末坏账准备账面余额", "计算",
+             "正值少提/负值多提（calcDifference，模板 ⑤=③-④）", "useD1FormulaEngine"),
         ],
         # D1-5 调整分录
         "D1-5": [
@@ -87,11 +87,20 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
         # D1-7 备查簿
         "D1-7": [
-            ("年末余额", "年初 + 本期收到 − 本期背书 − 本期到期承兑 − 本期贴现", "计算",
-             "备查簿年末余额（calcMemoEndingBalance）", "useD1FormulaEngine"),
+            ("年初余额", "收到票据日期的年度 = 截止日期年度 − 1 → 票据金额，否则 0；本期收到 = 票据金额 − 年初余额",
+             "计算", "模板 Q / R 列（calcMemoOpeningBalance / calcMemoCurrentReceived）", "useD1FormulaEngine"),
+            ("本期背书 / 到期承兑 / 贴现", "票据状态 = 背书 / 到期承兑 / 贴现 → 票据金额，否则 0", "计算",
+             "模板 S / T / U 列（calcMemoStatusMovements）", "useD1FormulaEngine"),
+            ("年末持有票据余额", "年初余额 + 本期收到 − 本期背书 − 本期到期承兑 − 本期贴现", "计算",
+             "模板 V 列（calcMemoEndingBalance）", "useD1FormulaEngine"),
+            ("期末未到期背书或贴现金额", "到期日 ≥ 截止日期 ∧ 流转日期 < 到期日 → 本期背书 + 本期贴现，否则 0",
+             "计算", "模板 W 列（calcUnexpiredEndorsedDiscounted）", "useD1FormulaEngine"),
+            ("备查簿与明细账核对", "备查簿：期初 = 年初余额合计，本期减少 = 背书 + 到期承兑 + 贴现；"
+             "明细账取 D1-2 期初未审数 / 本期增加 / 本期减少；差异 = 备查簿 − 明细账", "logic_check",
+             "模板 A28:E31", "useD1MemoReconciliation"),
             ("高信用银行判定", "承兑人名称 ∈ 6大行+9家上市股份制银行关键词", "logic_check",
              "承兑人信用识别（isHighCreditBank）", "useD1FormulaEngine"),
-            ("终止确认建议", "已贴现/已背书 ∧ 银行承兑 ∧ 高信用银行 → 是；商业承兑 → 否", "logic_check",
+            ("终止确认建议", "票据状态为贴现/背书 ∧ 银行承兑 ∧ 高信用银行 → 是；商业承兑 → 否", "logic_check",
              "终止确认倾向建议（suggestDerecognized）", "useD1FormulaEngine"),
             ("信用评级建议", "高信用银行承兑→AA；商业承兑→其他", "logic_check",
              "信用评级默认档（suggestCreditRating）", "useD1FormulaEngine"),
@@ -103,8 +112,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "useD1CrossSheet"),
             ("已背书转让合计", "Σ（已背书转让尚未到期）汇票金额", "计算",
              "表外披露口径（endorsedTransferTotal）", "useD1CrossSheet"),
-            ("期末未到期背书贴现金额", "已贴现/已背书 ∧ 到期日>基准日 → 取票面金额", "计算",
-             "审计基准日尚未到期部分（calcUnexpiredEndorsedDiscounted）", "useD1FormulaEngine"),
+            ("期末未到期背书或贴现金额", "取自备查簿 D1-7 W 列：到期日 ≥ 截止日期 ∧ 流转日期 < 到期日 → 本期背书 + 本期贴现",
+             "计算", "审计基准日尚未到期部分（calcUnexpiredEndorsedDiscounted）", "useD1FormulaEngine"),
         ],
         # D1-9 贴息检查
         "D1-9": [
@@ -150,7 +159,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         "D2-2": [
             ("期初审定", "期初未审 + 期初 AJE + 期初 RJE", "计算",
              "明细行期初审定（getAuditedAmount / recalcRow）", "useD2Detail"),
-            ("期末余额", "期初审定 + 借方发生 − 贷方发生", "计算",
+            ("期末余额", "期初未审 + 借方发生 − 贷方发生", "计算",
              "借方科目期末余额（recalcRow）", "useD2Detail"),
             ("期末未审", "期末余额 + 被审计单位重分类", "计算",
              "明细行期末未审（recalcRow）", "useD2Detail"),
@@ -167,7 +176,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         "D2-3": [
             ("期初审定", "期初未审 + 期初 AJE + 期初 RJE", "计算",
              "坏账准备行期初审定（recalcRow）", "useD2BadDebt"),
-            ("期末未审数", "期初审定 + 计提 + 其他增加 − 转回 − 核销 − 其他减少", "计算",
+            ("期末未审数", "期初未审 + 计提 + 其他增加 − 转回 − 核销 − 其他减少", "计算",
              "坏账准备变动（recalcRow）", "useD2BadDebt"),
             ("期末审定", "期末未审 + 期末 AJE + 期末 RJE", "计算",
              "坏账准备行期末审定（getAuditedAmount）", "useD2BadDebt"),
@@ -202,8 +211,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         "D2-9": [
             ("应计提", "审定余额 × 预期信用损失率", "计算",
              "单项 ECL 应计提（calculateProvision）", "useD2Ecl"),
-            ("差异", "实际账面余额 − 应计提", "计算",
-             "单项 ECL 差异（calculateDifference）", "useD2Ecl"),
+            ("差异", "应计提 − 期末坏账准备账面余额", "计算",
+             "单项 ECL 差异，正值少提（calculateDifference，模板 ⑤=③-④）", "useD2Ecl"),
             ("从 D2-3 取实际账面余额", "取 D2-3 坏账准备各分类固定行审定数合计", "取数",
              "actualBalance 自动填入（d3BadDebtTotal）", "useD2Ecl"),
             ("从 D2-2 筛单项计提导入", "筛选 D2-2 明细信用风险组合方式=单项计提的客户", "取数",
@@ -256,7 +265,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
             ("变动额", "期末审定 − 期初审定", "计算",
              "本期变动额（calcChangeAmount）", "useD3FormulaEngine"),
             ("变动率", "(期末审定 − 期初审定) ÷ 期初审定", "计算",
-             "期初=0 特殊处理（calcChangeRate）；|变动率|>30% 高亮（isChangeRateExceeding）",
+             "期初=0：期末=0 → 空，期末>0 → 100%，期末<0 → N/A（同模板 K 列，calcAdjudicationChangeRate）；"
+             "|变动率|>30% 高亮（isChangeRateExceeding）",
              "useD3FormulaEngine"),
             ("按款项性质从 D3-2 聚合", "按 nature 分组 SUM(D3-2 明细 期末审定/期初审定)", "取数",
              "按性质分类区块取数（aggregateByNature / natureAggregation）", "useD3CrossSheet"),
@@ -269,7 +279,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         "D3-2": [
             ("期初审定余额(H)", "期初未审(E) + 期初账项调整(F) + 期初重分类调整(G)", "计算",
              "D3-2 明细 H 列（calcPriorAudited）", "useD3FormulaEngine"),
-            ("期末余额(O)", "期初审定(H) + 贷方发生(N) − 借方发生(M)", "计算",
+            ("期末余额(O)", "期初未审(E) + 贷方发生(N) − 借方发生(M)", "计算",
              "贷方科目期末余额（calcEndBalance）", "useD3FormulaEngine"),
             ("期末未审余额(Q)", "期末余额(O) + 被审计单位重分类(P)", "计算",
              "D3-2 明细 Q 列（calcEndUnadjusted）", "useD3FormulaEngine"),
@@ -494,7 +504,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         "D5-2": [
             ("期初审定", "期初未审 + 期初 AJE + 期初 RJE", "计算",
              "明细期初审定（calcAuditedAmount）", "useD5FormulaEngine"),
-            ("期末余额(J)", "期初审定(F) + 本期增加(H) − 本期减少(I)", "计算",
+            ("期末余额(J)", "期初未审(C) + 本期增加(H) − 本期减少(I)", "计算",
              "借方科目期末余额（calcEndBalance）", "useD5FormulaEngine"),
             ("期末未审余额(L)", "期末余额(J) + 被审计单位重分类(K)", "计算",
              "D5-2 明细 L 列（calcEndUnadjusted）", "useD5FormulaEngine"),
@@ -560,7 +570,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
         # D6-2 明细表
         "D6-2": [
-            ("期末未审", "期初审定 + 借方发生 − 贷方发生", "计算",
+            ("期末未审", "期初未审 + 借方发生 − 贷方发生", "计算",
              "借方科目明细期末未审（calcEndUnadjustedDebit）", "useD6FormulaEngine"),
             ("期末审定", "期末未审 + 账项调整 + 重分类调整", "计算",
              "明细期末审定（calcEndAudited）", "useD6FormulaEngine"),
@@ -569,7 +579,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
         # D6-3 减值准备明细
         "D6-3": [
-            ("减值准备期末未审", "期初审定 + 计提 + 其他增加 − 转回 − 核销 − 其他减少", "计算",
+            ("减值准备期末未审", "期初未审 + 计提 + 其他增加 − 转回 − 核销 − 其他减少", "计算",
              "减值准备变动（calcImpairmentEndUnadjusted）", "useD6FormulaEngine"),
             ("期末审定", "期末未审 + 账项调整 + 重分类调整", "计算",
              "减值准备期末审定（calcEndAudited）", "useD6FormulaEngine"),

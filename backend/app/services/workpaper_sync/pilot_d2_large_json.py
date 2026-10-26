@@ -351,7 +351,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = (
 
 #: 权威模板字节哨兵（Requirement 9.9：`backend/wp_templates/` 运行时只读）。
 TEMPLATE_SHA256: Final[str] = (
-    "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa"
+    "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466"
 )
 
 #: 声明权威模板的**配置真源**（`wp_code: D2A` ↔ `template_path` 一一对应）。

@@ -7,6 +7,11 @@
  * Spec: .kiro/specs/d1-adjudication-table/
  * Requirements: 1.3, 1.4, 1.5, 1.6, 1.7, 6.4, 10.5
  */
+import {
+  calcTemplateChangeRate,
+  isTemplateChangeRateExceeding,
+  type TemplateChangeRate,
+} from './templateChangeRate'
 
 // ─── 数值解析 ─────────────────────────────────────────────────────────────────
 
@@ -36,15 +41,14 @@ export function calcAuditedAmount(unadjusted: number, aje: number, rje: number):
 }
 
 /**
- * 变动率计算，含期初=0特殊处理：
- * - 期初=0 且 审定=0 → ''（无意义）
- * - 期初=0 且 审定≠0 → 1（100%新增）
+ * 变动率，与权威模板 D1-1 K 列 `IF(AND(E=0,I=0),"",IF(AND(E=0,I>0),1,J/E))` 同式：
+ * - 期初=0 且 审定=0 → ''（不显示）
+ * - 期初=0 且 审定>0 → 1（100%新增）
+ * - 期初=0 且 审定<0 → 'N/A'（模板除零 #DIV/0!；原先也记 100%）
  * - 其他 → (审定-期初)/期初
  */
-export function calcChangeRate(prior: number, audited: number): number | '' {
-  if (prior === 0 && audited === 0) return ''
-  if (prior === 0) return 1
-  return (audited - prior) / prior
+export function calcChangeRate(prior: number, audited: number): TemplateChangeRate {
+  return calcTemplateChangeRate(prior, audited)
 }
 
 // ─── 小计与净值 ──────────────────────────────────────────────────────────────
@@ -72,11 +76,10 @@ export function calcNetValue(grossValue: number, badDebt: number): number {
 /**
  * 增减比例绝对值是否超阈值
  *
- * 审定表中 |变动率| > 30% 时红色高亮。rate 为 '' 时视为未超阈值。
+ * 审定表中 |变动率| > 30% 时红色高亮。rate 为 '' / 'N/A' 时视为未超阈值。
  */
-export function isChangeRateExceeding(rate: number | '', threshold: number): boolean {
-  if (rate === '') return false
-  return Math.abs(rate) > threshold
+export function isChangeRateExceeding(rate: TemplateChangeRate, threshold: number): boolean {
+  return isTemplateChangeRateExceeding(rate, threshold)
 }
 
 // ─── ECL 坏账准备公式 ────────────────────────────────────────────────────────
@@ -102,12 +105,13 @@ export function calcProvision(balance: number, lossRate: number): number {
 }
 
 /**
- * 差异 = 实际账面余额 - 应计提
+ * 差异 = 应计提 − 期末坏账准备账面余额（权威模板 D1-15 / D2-9 表头 ⑤=③-④）
  *
- * 正值表示多提，负值表示少提。
+ * 正值表示少提（应补提），负值表示多提。原为「实际 − 应计」，方向与模板相反
+ * （spec oo-writeback-template-parity-closure R2）。参数顺序不变。
  */
 export function calcDifference(actual: number, should: number): number {
-  return actual - should
+  return should - actual
 }
 
 // ─── 安全除法（IFERROR 语义） ────────────────────────────────────────────────
@@ -127,19 +131,25 @@ export function safeDivide(numerator: number, divisor: number): number {
 // ─── 坏账准备变动公式 ────────────────────────────────────────────────────────
 
 /**
- * 期末未审数 = 期初审定 + 本期计提 - 本期收回 - 本期转回 - 本期核销 + 本期其他
+ * 期末未审数 = 期初未审 + 本期计提 + 其他增加 − 本期转回 − 本期核销 − 其他减少（含收回）
  *
- * D1-4 坏账准备明细表各行的期末未审数自动计算。
+ * D1-4 坏账准备明细表各行的期末未审数自动计算，与权威模板 `K = B + SUM(F:G) − SUM(H:J)` 同口径：
+ * F 计提 / G 其他增加（`other`，store 键 `currentOther`）/ H 转回 / I 核销 /
+ * J 其他减少（`recovery`，store 键 `currentRecovery`，含收回）。
+ *
+ * 🔴 起点是**期初未审**（模板 B 列），不是期初审定：期初调整只进期初审定 E，不滚进期末未审；
+ * 原先从期初审定起算，有期初调整时表单与 OnlyOffice 两侧算出的期末未审不同
+ * （spec oo-writeback-template-parity-closure R2，与 D1-2 / D2-3 等同族）。参数顺序不变。
  */
 export function calcBadDebtEndBalance(
-  priorAudited: number,
+  priorUnadjusted: number,
   provision: number,
   recovery: number,
   reversal: number,
   writeOff: number,
   other: number
 ): number {
-  return priorAudited + provision - recovery - reversal - writeOff + other
+  return priorUnadjusted + provision - recovery - reversal - writeOff + other
 }
 
 /**
@@ -175,16 +185,17 @@ export function calcDisclosureBadDebtEnd(
 }
 
 /**
- * 期末未审数 = 期初审定 + 本期增加 - 本期减少
+ * 期末未审数 = 期初未审 + 本期增加 - 本期减少
  *
- * D1-2（按类别）/ D1-3（按客户）原值明细表的期末未审数计算。
+ * D1-2（按类别）/ D1-3（按客户）原值明细表的期末未审数计算，与权威模板 D1-2 `H = B + F - G`
+ * 同口径：起点是期初未审（B 列），期初调整只进期初审定、不滚进期末未审。
  */
 export function calcCurrentUnadjusted(
-  priorAudited: number,
+  priorUnadjusted: number,
   increase: number,
   decrease: number
 ): number {
-  return priorAudited + increase - decrease
+  return priorUnadjusted + increase - decrease
 }
 
 // ─── 贴息（贴现利息）公式 ────────────────────────────────────────────────────
@@ -226,7 +237,76 @@ export function calcInterestDifference(calculated: number, booked: number): numb
   return calculated - booked
 }
 
-// ─── D1-7 备查簿公式 ─────────────────────────────────────────────────────────
+// ─── D1-7 备查簿公式（对齐权威模板「审计核对」区 Q~W 列）────────────────────
+//
+// 模板（D1 应收票据.xlsx · 应收票据备查簿核对D1-7）的 Q~W 都是行公式，表单按同式计算、只读：
+//   Q 年初余额      =IF(YEAR(C)=YEAR($B$10)-1,H,0)      R 本期收到 =H-Q
+//   S 本期背书      =IF(K="背书",H,0)                  T 本期到期承兑 =IF(K="到期承兑",H,0)
+//   U 本期贴现      =IF(K="贴现",H,0)                  V 年末持有票据余额 =Q+R-S-T-U
+//   W 期末未到期背书或贴现金额 =IF(I<$B$10,0,IF(J<I,S+U,0))
+// 空白日期按 Excel 口径视为 0（早于任何日期，YEAR 为 1900）。票据状态取模板 K 列下拉值；
+// 表单旧值（持有 / 已贴现 / 已背书 / 到期）读入时换成模板值，否则 S/T/U 在 OnlyOffice 一侧恒为 0
+// （spec oo-writeback-template-parity-closure R2）。
+
+/** 票据状态（模板 K13:K24 数据验证 `$AE$13:$AE$16`，顺序同模板） */
+export const D1_MEMO_STATUS_OPTIONS: readonly string[] = ['背书', '贴现', '到期承兑', '未到期']
+
+/** 期末未到期背书或贴现是否终止确认（模板 X 列数据验证 `$AE$19:$AE$21`） */
+export const D1_MEMO_DERECOGNIZED_OPTIONS: readonly string[] = ['是', '否', '不适用']
+
+/** 表单旧状态值 → 模板状态值 */
+const LEGACY_MEMO_STATUS: Readonly<Record<string, string>> = {
+  已背书: '背书',
+  已贴现: '贴现',
+  到期: '到期承兑',
+  持有: '未到期',
+}
+
+/** 票据状态归一：旧值换成模板值，其余原样（去首尾空白） */
+export function normalizeMemoStatus(raw: unknown): string {
+  const s = typeof raw === 'string' ? raw.trim() : ''
+  return LEGACY_MEMO_STATUS[s] ?? s
+}
+
+/** 日期 → yyyymmdd 整数（不经时区换算）；空白 = 0（Excel 空格），认不出返回 null */
+function memoDateKey(raw: string): number | null {
+  const s = (raw || '').trim()
+  if (!s) return 0
+  const m = /^(\d{4})\D(\d{1,2})\D(\d{1,2})/.exec(s)
+  if (m) return Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[3])
+  const t = new Date(s)
+  if (Number.isNaN(t.getTime())) return null
+  return t.getFullYear() * 10000 + (t.getMonth() + 1) * 100 + t.getDate()
+}
+
+/** Excel `YEAR()`：空白 = YEAR(0) = 1900；认不出返回 NaN（与任何年份都不相等） */
+function memoYear(raw: string): number {
+  const key = memoDateKey(raw)
+  if (key === null) return Number.NaN
+  return key === 0 ? 1900 : Math.floor(key / 10000)
+}
+
+/** 模板 Q 列：年初余额 = IF(YEAR(收到票据日期) = YEAR(截止日期) - 1, 票据金额, 0) */
+export function calcMemoOpeningBalance(amount: number, receivedDate: string, cutoffDate: string): number {
+  return memoYear(receivedDate) === memoYear(cutoffDate) - 1 ? amount : 0
+}
+
+/** 模板 R 列：本期收到 = 票据金额 - 年初余额 */
+export function calcMemoCurrentReceived(amount: number, opening: number): number {
+  return amount - opening
+}
+
+/** 模板 S / T / U 列：按票据状态取票据金额（状态须与模板下拉值完全一致） */
+export function calcMemoStatusMovements(
+  amount: number,
+  status: string,
+): { endorsed: number; matured: number; discounted: number } {
+  return {
+    endorsed: status === '背书' ? amount : 0,
+    matured: status === '到期承兑' ? amount : 0,
+    discounted: status === '贴现' ? amount : 0,
+  }
+}
 
 /** 6 家大型商业银行 + 9 家上市股份制商业银行（与 D1-6 编制提示一致） */
 export const HIGH_CREDIT_BANK_KEYWORDS = [
@@ -236,7 +316,7 @@ export const HIGH_CREDIT_BANK_KEYWORDS = [
 ]
 
 /**
- * 备查簿年末余额 = 年初 + 本期收到 - 本期背书 - 本期到期承兑 - 本期贴现
+ * 模板 V 列：年末持有票据余额 = 年初 + 本期收到 - 本期背书 - 本期到期承兑 - 本期贴现
  */
 export function calcMemoEndingBalance(
   beginning: number,
@@ -265,18 +345,26 @@ export function isDateBefore(a: string, b: string): boolean {
 }
 
 /**
- * 期末未到期背书贴现金额：审计基准日尚未到期且状态为已贴现/已背书时取票面金额
+ * 模板 W 列：期末未到期背书或贴现金额
+ * = IF(到期日 < 截止日期, 0, IF(流转日期 < 到期日, 本期背书 + 本期贴现, 0))
+ *
+ * 空白日期按 0 比较（与 Excel 一致：未填截止日期时只看流转日期是否早于到期日）；
+ * 认不出的日期不出数。原实现按「状态 + 到期日晚于截止日期取票面金额」，不看流转日期、
+ * 到期日等于截止日期时取 0，与模板不同（spec oo-writeback-template-parity-closure R2）。
  */
 export function calcUnexpiredEndorsedDiscounted(
-  amount: number,
-  status: string,
+  endorsed: number,
+  discounted: number,
   maturityDate: string,
+  transferDate: string,
   cutoffDate: string,
 ): number {
-  if (!amount || !cutoffDate || !maturityDate) return 0
-  if (status !== '已贴现' && status !== '已背书') return 0
-  if (isDateBefore(maturityDate, cutoffDate) || maturityDate === cutoffDate) return 0
-  return amount
+  const maturity = memoDateKey(maturityDate)
+  const cutoff = memoDateKey(cutoffDate)
+  const transfer = memoDateKey(transferDate)
+  if (maturity === null || cutoff === null || transfer === null) return 0
+  if (maturity < cutoff) return 0
+  return transfer < maturity ? endorsed + discounted : 0
 }
 
 /**
@@ -287,7 +375,7 @@ export function suggestDerecognized(
   acceptor: string,
   noteType: string,
 ): string {
-  if (status !== '已贴现' && status !== '已背书') return ''
+  if (status !== '贴现' && status !== '背书') return ''
   if (noteType.includes('商业')) return '否'
   if (isHighCreditBank(acceptor)) return '是'
   return '否'

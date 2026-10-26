@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "9e88e86b67ff11ceae71045bd2a68c3e50f4c9570958f88e79bec33f7153ce90",
+  "instrumentation_definition_sha256": "2eda9d230462500749c267383f6d47595348a8c5a84efe9d25a7fa965868a06e",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d2-accounts-receivable",
@@ -1346,9 +1346,9 @@
     }
   ],
   "template": {
-    "normalized_structure_hash": "ff7a91a514db64ca030103f8cb10759fc4e62c77cf6d4cbe3c61bb7d69ebdc9e",
+    "normalized_structure_hash": "077b9ab542a9b777e63f43c9f99bdc6f04987d8b56b02a8e961943328b79233b",
     "relative_path": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
-    "template_sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa"
+    "template_sha256": "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466"
   },
-  "template_definition_sha256": "c7bbec6e010a1c3c768c3524cddb82864c89bb953b1daa4299a34f97ce799638"
+  "template_definition_sha256": "4bdc6ecb78699bf6006bf976629b8f6cae9d748a769dd0163d9bc1b00e04d648"
 }

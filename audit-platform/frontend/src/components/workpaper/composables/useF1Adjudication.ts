@@ -29,9 +29,9 @@ import {
   parseNum,
   calcAuditedAmount,
   calcChangeAmount,
-  calcChangeRate,
   calcSubtotal,
 } from './useF1FormulaEngine'
+import { calcTemplateChangeRate } from './templateChangeRate'
 import type { ChecklistResponse } from './useF1FormData'
 import type { useF1CrossSheet } from './useF1CrossSheet'
 
@@ -182,7 +182,9 @@ function buildRow(
   const priorAudited = calcAuditedAmount(priorUnadjusted, priorAje, priorRje)
   const currentAudited = calcAuditedAmount(currentUnadjusted, currentAje, currentRje)
   const changeAmount = calcChangeAmount(currentAudited, priorAudited)
-  const changeRate = calcChangeRate(priorAudited, currentAudited)
+  // 模板 F1-1 K 列 IF(AND(E=0,J=0),0,IF(AND(E=0,J>0),1,J/E))：期初为 0 时不变 → 0、增加 → 100%
+  // （原先分别记空与 N/A，spec oo-writeback-template-parity-closure R2）
+  const changeRate = calcTemplateChangeRate(priorAudited, currentAudited, 0)
   const reasonAnalysis = getResponseStr(allResponses, makeItemId(section, rowKey, 'reasonAnalysis'))
 
   const isFromCrossSheet =
@@ -225,7 +227,7 @@ function buildSubtotalRow(rows: AdjudicationRow[], label: string): AdjudicationR
   const priorAudited = calcAuditedAmount(priorUnadjusted, priorAje, priorRje)
   const currentAudited = calcAuditedAmount(currentUnadjusted, currentAje, currentRje)
   const changeAmount = calcChangeAmount(currentAudited, priorAudited)
-  const changeRate = calcChangeRate(priorAudited, currentAudited)
+  const changeRate = calcTemplateChangeRate(priorAudited, currentAudited, 0)
 
   return {
     rowKey: 'subtotal',

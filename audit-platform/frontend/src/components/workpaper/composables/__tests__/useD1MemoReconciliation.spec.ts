@@ -16,9 +16,11 @@ import * as fc from 'fast-check'
 import {
   useD1MemoReconciliation,
   emptyMemoRow,
+  deriveMemoRow,
   type MemoRow,
   type UseD1MemoReconciliationOptions,
 } from '../useD1MemoReconciliation'
+import { normalizeMemoStatus } from '../useD1FormulaEngine'
 import type { ChecklistResponse } from '../useD1FormData'
 
 // Mock onBeforeUnmount to avoid lifecycle warnings when instantiating the
@@ -81,7 +83,13 @@ const finiteAmount = fc
   .double({ min: -1e7, max: 1e7, noNaN: true, noDefaultInfinity: true })
   .map((x) => x + 0)
 
-const statusArb = fc.constantFrom('持有', '已贴现', '已背书', '到期')
+/** 模板 K 列下拉值 + 表单旧值（读入时归一成模板值）+ 空 */
+const statusArb = fc.constantFrom('背书', '贴现', '到期承兑', '未到期', '持有', '已贴现', '已背书', '到期', '')
+
+/** 读入后的期望行：状态归一 + 公式列（Q~W）按模板重算；未写截止日期 ⇒ 截止日期为空 */
+function expectedLoaded(row: MemoRow): MemoRow {
+  return deriveMemoRow({ ...row, status: normalizeMemoStatus(row.status) }, '')
+}
 
 /**
  * 完整 MemoRow 生成器：以 emptyMemoRow 为基底，随机覆盖全部字段。
@@ -167,12 +175,10 @@ describe('Feature: d1-endorsement-discount, Property 6: 备查簿核对区差异
           })
 
           const [memoTotal, ledger, diff] = api.reconciliationRows.value
-          const columns: Array<keyof typeof diff> = [
+          const columns: Array<Exclude<keyof typeof diff, 'label'>> = [
             'beginningBalance',
-            'currentReceived',
-            'currentEndorsed',
-            'currentMatured',
-            'currentDiscounted',
+            'currentIncrease',
+            'currentDecrease',
             'endingBalance',
           ]
           for (const col of columns) {
@@ -247,7 +253,7 @@ describe('Feature: d1-endorsement-discount, Property 9: 动态行序列化Round-
    * allResponses 的 D1-memo-rows，实例化后读回 bankRows/commercialRows，
    * 应与原始数据深度相等（所有字段保留）。
    */
-  it('composable 层：注入行序列化后读回深度相等', () => {
+  it('composable 层：注入行读回后录入字段原样保留，公式列按模板重算、状态归一', () => {
     fc.assert(
       fc.property(
         fc.array(memoRowArb('bank'), { minLength: 0, maxLength: 8 }),
@@ -256,8 +262,8 @@ describe('Feature: d1-endorsement-discount, Property 9: 动态行序列化Round-
           const { api } = mountComposable({
             'D1-memo-rows': { bankRows, commercialRows },
           })
-          expect(api.bankRows.value).toEqual(bankRows)
-          expect(api.commercialRows.value).toEqual(commercialRows)
+          expect(api.bankRows.value).toEqual(bankRows.map(expectedLoaded))
+          expect(api.commercialRows.value).toEqual(commercialRows.map(expectedLoaded))
         },
       ),
       { numRuns: 100 },
@@ -283,9 +289,9 @@ describe('Feature: d1-endorsement-discount, Property 11: SUMIFS统计正确性',
   /**
    * **Validates: Requirements 5.6**
    *
-   * endorsedStats.discountedTotal === Σ amount(status==='已贴现')
-   * endorsedStats.endorsedTotal   === Σ amount(status==='已背书')
-   * 统计范围为 bankRows ∪ commercialRows。
+   * endorsedStats.discountedTotal === Σ amount(状态 = 贴现)（= 模板 U25）
+   * endorsedStats.endorsedTotal   === Σ amount(状态 = 背书)（= 模板 S25）
+   * 状态先归一（旧值 已贴现 / 已背书 同样计入）；统计范围为 bankRows ∪ commercialRows。
    */
   it('贴现/背书统计等于按状态过滤的金额之和', () => {
     fc.assert(
@@ -299,10 +305,10 @@ describe('Feature: d1-endorsement-discount, Property 11: SUMIFS统计正确性',
 
           const allRows = [...bankRows, ...commercialRows]
           const expectedDiscounted = allRows
-            .filter((r) => r.status === '已贴现')
+            .filter((r) => normalizeMemoStatus(r.status) === '贴现')
             .reduce((sum, r) => sum + r.amount, 0)
           const expectedEndorsed = allRows
-            .filter((r) => r.status === '已背书')
+            .filter((r) => normalizeMemoStatus(r.status) === '背书')
             .reduce((sum, r) => sum + r.amount, 0)
 
           expect(api.endorsedStats.value.discountedTotal).toBeCloseTo(expectedDiscounted, 4)

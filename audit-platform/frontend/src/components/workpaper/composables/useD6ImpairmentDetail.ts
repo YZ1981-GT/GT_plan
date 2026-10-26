@@ -7,7 +7,7 @@
  *
  * 公式链：
  *   - 期初审定 = 期初未审 + AJE + RJE
- *   - 期末未审 = 期初审定 + 计提 + 其他增加 - 转回 - 核销 - 其他减少
+ *   - 期末未审 = 期初未审 + 计提 + 其他增加 - 转回 - 核销 - 其他减少（模板 K 列，从期初未审起算）
  *   - 期末审定 = 期末未审 + AJE + RJE
  *
  * Spec: .kiro/specs/d6-contract-assets/
@@ -39,7 +39,7 @@ export interface ImpairmentDetailRow {
   reversal: number           // 本期减少-转回
   writeOff: number           // 本期减少-核销
   otherDecrease: number      // 本期减少-其他减少
-  endUnadjusted: number      // = 期初审定+计提+其他增加-转回-核销-其他减少（自动）
+  endUnadjusted: number      // = 期初未审+计提+其他增加-转回-核销-其他减少（自动，模板 K 列）
   endAje: number
   endRje: number
   endAudited: number         // = 期末未审 + AJE + RJE（自动）
@@ -96,15 +96,19 @@ function normalizeRow(raw: any): ImpairmentDetailRow {
 }
 
 /**
- * 重算单行公式链：
- *  priorAudited = priorUnadjusted + priorAje + priorRje
- *  endUnadjusted = priorAudited + provision + otherIncrease - reversal - writeOff - otherDecrease
- *  endAudited = endUnadjusted + endAje + endRje
+ * 重算单行公式链（与权威模板「合同资产减值准备明细表D6-3」逐列一致）：
+ *  priorAudited = priorUnadjusted + priorAje + priorRje                       （E = B+C+D）
+ *  endUnadjusted = priorUnadjusted + provision + otherIncrease
+ *                  - reversal - writeOff - otherDecrease                       （K = B+SUM(F:G)-SUM(H:J)）
+ *  endAudited = endUnadjusted + endAje + endRje                               （N = K+L+M）
+ *
+ * 🔴 期末未审以**期初未审**起算（模板 K 列从 B 起），原先用期初审定，有期初调整的行在表单与
+ * OnlyOffice 之间会来回变值（spec oo-writeback-template-parity-closure R2，同 D 循环明细表族）。
  */
 export function recalcImpairmentRow(row: ImpairmentDetailRow): ImpairmentDetailRow {
   const priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
   const endUnadjusted = calcImpairmentEndUnadjusted(
-    priorAudited, row.provision, row.otherIncrease,
+    row.priorUnadjusted, row.provision, row.otherIncrease,
     row.reversal, row.writeOff, row.otherDecrease,
   )
   const endAudited = calcEndAudited(endUnadjusted, row.endAje, row.endRje)

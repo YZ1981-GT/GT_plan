@@ -6,7 +6,12 @@
  */
 import { ref, inject, toRef, computed, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useD1MemoReconciliation, type MemoRow } from '../composables/useD1MemoReconciliation'
+import {
+  useD1MemoReconciliation,
+  type MemoRow,
+  type ReconciliationRow,
+} from '../composables/useD1MemoReconciliation'
+import { D1_MEMO_STATUS_OPTIONS, D1_MEMO_DERECOGNIZED_OPTIONS } from '../composables/useD1FormulaEngine'
 import type { ChecklistResponse } from '../composables/useD1FormData'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
@@ -52,6 +57,8 @@ const {
   hasDifference,
   endorsedStats,
   unexpiredSummaryRows,
+  unexpiredSummaryTotal,
+  unexpiredCheckDiff,
   allDataRows,
   rowWarnings,
   warningCount,
@@ -81,7 +88,9 @@ const {
 // ─── Dropdown Options ─────────────────────────────────────────────────────────
 
 const NOTE_TYPE_OPTIONS = ['银行承兑汇票', '商业承兑汇票']
-const STATUS_OPTIONS = ['持有', '已贴现', '已背书', '到期']
+// 票据状态 / 是否终止确认取权威模板 K 列 / X 列下拉值（S/T/U 与 SUMIFS 按这些值判断）
+const STATUS_OPTIONS = [...D1_MEMO_STATUS_OPTIONS]
+const DERECOGNIZED_OPTIONS = [...D1_MEMO_DERECOGNIZED_OPTIONS]
 const YN_OPTIONS = ['是', '否']
 const RATING_OPTIONS = ['AAA', 'AA+', 'AA', 'AA-', 'A+', 'A', '其他']
 const RELATED_OPTIONS = ['关联方', '非关联方']
@@ -308,22 +317,22 @@ const flowCols: ColDesc[] = [
   { field: 'discountInterest', label: '贴现息', width: 110, type: 'number' },
 ]
 
-// 金额（9 列）
+// 金额（9 列）：年初余额 ~ 期末未到期背书或贴现金额是权威模板 Q~W 的行公式，只读自动计算
 const amountCols: ColDesc[] = [
   { field: 'isPledged', label: '是否质押', width: 100, type: 'select', options: YN_OPTIONS },
   { field: 'isDiscountedEndorsed', label: '审计日已贴现背书', width: 140, type: 'select', options: YN_OPTIONS },
-  { field: 'beginningBalance', label: '年初余额', width: 120, type: 'number' },
-  { field: 'currentReceived', label: '本期收到', width: 120, type: 'number' },
-  { field: 'currentEndorsed', label: '本期背书', width: 120, type: 'number' },
-  { field: 'currentMatured', label: '本期到期承兑', width: 130, type: 'number' },
-  { field: 'currentDiscounted', label: '本期贴现', width: 120, type: 'number' },
-  { field: 'endingBalance', label: '年末余额（自动）', width: 130, type: 'number', readonly: true },
-  { field: 'unexpiredEndorsedDiscounted', label: '期末未到期背书贴现（自动）', width: 170, type: 'number', readonly: true },
+  { field: 'beginningBalance', label: '年初余额（自动）', width: 130, type: 'number', readonly: true },
+  { field: 'currentReceived', label: '本期收到（自动）', width: 130, type: 'number', readonly: true },
+  { field: 'currentEndorsed', label: '本期背书（自动）', width: 130, type: 'number', readonly: true },
+  { field: 'currentMatured', label: '本期到期承兑（自动）', width: 150, type: 'number', readonly: true },
+  { field: 'currentDiscounted', label: '本期贴现（自动）', width: 130, type: 'number', readonly: true },
+  { field: 'endingBalance', label: '年末持有票据余额（自动）', width: 170, type: 'number', readonly: true },
+  { field: 'unexpiredEndorsedDiscounted', label: '期末未到期背书或贴现金额（自动）', width: 200, type: 'number', readonly: true },
 ]
 
 // 审定（8 列）
 const auditCols: ColDesc[] = [
-  { field: 'isDerecognized', label: '是否终止确认', width: 120, type: 'select', options: YN_OPTIONS },
+  { field: 'isDerecognized', label: '是否终止确认', width: 120, type: 'select', options: DERECOGNIZED_OPTIONS },
   { field: 'creditRating', label: '信用评级', width: 110, type: 'select', options: RATING_OPTIONS },
   { field: 'auditedFinancing', label: '审定应收款项融资', width: 150, type: 'number' },
   { field: 'auditedNotes', label: '审定应收票据', width: 130, type: 'number' },
@@ -405,18 +414,22 @@ function onTextChange(rowId: string, field: keyof MemoRow, v: string) {
 
 // ─── Reconciliation Area Helpers ───────────────────────────────────────────────
 
-const reconCols: Array<{ field: keyof MemoRow; label: string }> = [
-  { field: 'beginningBalance', label: '年初余额' },
-  { field: 'currentReceived', label: '本期收到' },
-  { field: 'currentEndorsed', label: '本期背书' },
-  { field: 'currentMatured', label: '本期到期' },
-  { field: 'currentDiscounted', label: '本期贴现' },
+// 模板 A28:E31：备查簿的本期减少额 = 本期背书 + 本期到期承兑 + 本期贴现
+type ReconField = Exclude<keyof ReconciliationRow, 'label'>
+const reconCols: Array<{ field: ReconField; label: string }> = [
+  { field: 'beginningBalance', label: '期初余额' },
+  { field: 'currentIncrease', label: '本期增加额' },
+  { field: 'currentDecrease', label: '本期减少额' },
   { field: 'endingBalance', label: '期末余额' },
 ]
 
-function reconValue(rowIndex: number, field: keyof MemoRow): number {
-  const row = reconciliationRows.value[rowIndex] as any
-  return (row?.[field] as number) ?? 0
+function reconValue(rowIndex: number, field: ReconField): number {
+  return reconciliationRows.value[rowIndex]?.[field] ?? 0
+}
+
+/** 按分判断非零（与 hasDifference 同口径） */
+function isNonZeroCent(v: number): boolean {
+  return Math.abs(v) >= 0.005
 }
 
 // 明细账行（index 1）取数失败时占位
@@ -441,7 +454,8 @@ function onCellContextMenu(row: MemoRow, _column: any, _cell: any, event: MouseE
 
 const GUIDANCE_TEXTS = [
   '卡片视图按单张票据纵向分组填写；宽表视图适合批量录入与 Excel 导入导出对齐。',
-  '联动规则：状态→贴现/背书金额、承兑人→信用评级、截止日期→逾期/未到期汇总、年末余额自动滚动计算。',
+  '自动计算（与底稿模板公式一致）：收到票据日期在截止日期上一年的计入年初余额，其余计入本期收到；票据状态为背书 / 到期承兑 / 贴现时，票据金额分别计入本期背书 / 本期到期承兑 / 本期贴现；年末持有票据余额 = 年初余额 + 本期收到 − 本期背书 − 本期到期承兑 − 本期贴现；到期日不早于截止日期、且流转日期早于到期日的背书 / 贴现票据，计入期末未到期背书或贴现金额。',
+  '联动规则：状态为背书 / 贴现时标记「审计日已贴现背书」并给出终止确认建议，承兑人→信用评级，截止日期→是否逾期。',
   '备查簿应逐笔登记：对每一张银行承兑汇票、商业承兑汇票的收到、背书转让、贴现、到期承兑、退票等全生命周期事项逐笔登记，确保票据流转全过程可追溯。',
   '与明细账（D1-2）核对：备查簿逐笔登记的年初余额、本期收到、本期背书、本期到期、本期贴现、期末余额等汇总数，应与原值明细表 D1-2 相应科目一致；如存在差异应查明原因并在审计说明中记录。',
   '截止日期用于判断票据的期后事项（背书/贴现/到期）是否已终止确认；请填写审计基准日（通常为资产负债表日），据此计算"期末未到期背书贴现"及贴现背书统计。',
@@ -579,6 +593,7 @@ const GUIDANCE_TEXTS = [
               :project-id="projectId"
               :note-type-options="NOTE_TYPE_OPTIONS"
               :status-options="STATUS_OPTIONS"
+              :derecognized-options="DERECOGNIZED_OPTIONS"
               :yn-options="YN_OPTIONS"
               :rating-options="RATING_OPTIONS"
               :related-options="RELATED_OPTIONS"
@@ -951,7 +966,7 @@ const GUIDANCE_TEXTS = [
               v-for="c in reconCols"
               :key="c.field"
               class="recon-num"
-              :class="{ 'diff-nonzero': hasDifference && reconValue(2, c.field) !== 0 }"
+              :class="{ 'diff-nonzero': hasDifference && isNonZeroCent(reconValue(2, c.field)) }"
               v-html="fmtAmount(reconValue(2, c.field))"
             />
           </tr>
@@ -970,27 +985,42 @@ const GUIDANCE_TEXTS = [
         </el-descriptions-item>
       </el-descriptions>
 
-      <!-- 未到期贴现/质押/背书汇总 -->
-      <div class="section-title">未到期贴现/质押/背书汇总</div>
+      <!-- 贴现、票据已背书未到期明细（模板 G28:I34，按「期末未到期背书或贴现金额」与是否终止确认汇总） -->
+      <div class="section-title">贴现、票据已背书未到期明细</div>
       <table class="unexpired-table">
         <thead>
           <tr>
-            <th>票据类型</th>
-            <th>已贴现未到期</th>
-            <th>已质押</th>
-            <th>已背书未到期</th>
+            <th>分类</th>
+            <th>终止确认</th>
+            <th>不终止确认</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="row in unexpiredSummaryRows" :key="row.category">
             <td class="unexpired-label">{{ row.category }}</td>
-            <td class="recon-num" v-html="fmtAmount(row.discountedUnexpired)" />
-            <td class="recon-num" v-html="fmtAmount(row.pledged)" />
-            <td class="recon-num" v-html="fmtAmount(row.endorsedUnexpired)" />
+            <td class="recon-num" v-html="fmtAmount(row.derecognized)" />
+            <td class="recon-num" v-html="fmtAmount(row.notDerecognized)" />
+          </tr>
+          <tr class="unexpired-total">
+            <td class="unexpired-label">{{ unexpiredSummaryTotal.category }}</td>
+            <td class="recon-num" v-html="fmtAmount(unexpiredSummaryTotal.derecognized)" />
+            <td class="recon-num" v-html="fmtAmount(unexpiredSummaryTotal.notDerecognized)" />
+          </tr>
+          <tr>
+            <td class="unexpired-label">勾稽</td>
+            <td
+              class="recon-num"
+              colspan="2"
+              :class="{ 'diff-nonzero': isNonZeroCent(unexpiredCheckDiff) }"
+              v-html="fmtAmount(unexpiredCheckDiff)"
+            />
           </tr>
         </tbody>
       </table>
-      <p v-if="!cutoffDate" class="cutoff-hint">请先填写截止日期，以计算未到期贴现/背书金额。</p>
+      <p v-if="isNonZeroCent(unexpiredCheckDiff)" class="cutoff-hint">
+        勾稽不为 0：有期末未到期背书或贴现的票据未判断「是否终止确认」（只汇总「是」「否」两档）。
+      </p>
+      <p v-if="!cutoffDate" class="cutoff-hint">请先填写截止日期，以计算年初余额与期末未到期背书或贴现金额。</p>
 
       <!-- 审计说明 -->
       <div class="section-title">三、审计说明</div>
@@ -1235,6 +1265,11 @@ const GUIDANCE_TEXTS = [
 .unexpired-label {
   font-weight: 600;
   text-align: left !important;
+}
+
+.unexpired-total td {
+  background: #f5f7fa;
+  font-weight: 600;
 }
 
 .cutoff-hint {

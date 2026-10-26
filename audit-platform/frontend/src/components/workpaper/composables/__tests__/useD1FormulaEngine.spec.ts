@@ -89,7 +89,8 @@ describe('Feature: d1-adjudication-table, Property 2: 变动额与变动率公�
   /**
    * **Validates: Requirements 1.4**
    *
-   * 变动率三分支：prior=0&&audited=0→''; prior=0&&audited≠0→1; otherwise→(audited-prior)/prior
+   * 变动率按模板 D1-1 K 列 IF(AND(E=0,I=0),"",IF(AND(E=0,I>0),1,J/E))：
+   * prior=0&&audited=0→''; prior=0&&audited>0→1; prior=0&&audited<0→'N/A'（模板除零）; otherwise→(audited-prior)/prior
    */
   it('calcChangeRate follows three-branch logic with zero boundary', () => {
     fc.assert(
@@ -111,7 +112,7 @@ describe('Feature: d1-adjudication-table, Property 2: 变动额与变动率公�
           if (prior === 0 && audited === 0) {
             expect(result).toBe('')
           } else if (prior === 0) {
-            expect(result).toBe(1)
+            expect(result).toBe(audited > 0 ? 1 : 'N/A')
           } else {
             expect(result).toBeCloseTo((audited - prior) / prior, 5)
           }
@@ -578,10 +579,14 @@ describe('D1-7 memo formulas', () => {
     expect(isHighCreditBank('某地方农商行')).toBe(false)
   })
 
-  it('calcUnexpiredEndorsedDiscounted requires unmatured discounted/endorsed', async () => {
+  // 模板 W 列 =IF(I<$B$10,0,IF(J<I,S+U,0))：参数（本期背书, 本期贴现, 到期日, 流转日期, 截止日期）
+  it('calcUnexpiredEndorsedDiscounted follows template W', async () => {
     const { calcUnexpiredEndorsedDiscounted } = await import('../useD1FormulaEngine')
-    expect(calcUnexpiredEndorsedDiscounted(1000, '已贴现', '2024-06-30', '2023-12-31')).toBe(1000)
-    expect(calcUnexpiredEndorsedDiscounted(1000, '已贴现', '2023-06-30', '2023-12-31')).toBe(0)
-    expect(calcUnexpiredEndorsedDiscounted(1000, '持有', '2024-06-30', '2023-12-31')).toBe(0)
+    // 到期日晚于截止日期、流转日期早于到期日 → 本期背书 + 本期贴现
+    expect(calcUnexpiredEndorsedDiscounted(0, 1000, '2024-06-30', '2023-11-01', '2023-12-31')).toBe(1000)
+    // 已到期 → 0
+    expect(calcUnexpiredEndorsedDiscounted(0, 1000, '2023-06-30', '2023-01-01', '2023-12-31')).toBe(0)
+    // 未背书 / 未贴现（S、U 都是 0）→ 0
+    expect(calcUnexpiredEndorsedDiscounted(0, 0, '2024-06-30', '2023-11-01', '2023-12-31')).toBe(0)
   })
 })

@@ -836,15 +836,15 @@
       },
       {
         "name": "D1 应收票据.xlsx",
-        "size": 120157,
-        "sha256": "2e75538c3c3e542cc577580a0452bff3b834febe196f98fe459abee2af02a4d5",
+        "size": 120144,
+        "sha256": "6d83411214bb5282886ca7f082880f3d4e842c5b05bd0b4337cddc02c021d3d5",
         "belongs_to_entry": "xlsx/gt-d1-notes-receivable",
         "read_with": "openpyxl data_only"
       },
       {
         "name": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
-        "size": 123162,
-        "sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa",
+        "size": 105407,
+        "sha256": "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466",
         "belongs_to_entry": "xlsx/gt-d2-accounts-receivable",
         "read_with": "openpyxl data_only"
       },
@@ -857,8 +857,8 @@
       },
       {
         "name": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
-        "size": 96261,
-        "sha256": "76c5c721bac37bd3f9cbf92eb3dd6dccb156cb27c8dd26e5452aa8b103ce0813",
+        "size": 96262,
+        "sha256": "d0e27f6fbff3ff6e7db05ce4a42796f94a3e253dabfaf49761b97400ad23bed2",
         "belongs_to_entry": "xlsx/gt-d2-accounts-receivable",
         "read_with": "openpyxl data_only"
       },
@@ -949,8 +949,8 @@
       },
       {
         "name": "D7 合同负债.xlsx",
-        "size": 88777,
-        "sha256": "0facd3fe2297dbf72804d513d54ca08c55d6a26a41bf1d5c59fc3d7ea1c76a9a",
+        "size": 88776,
+        "sha256": "9c047a2a5d6f3241eb0110655cdd3612b4ac6e06a917ac775a4ca80ae37101ec",
         "belongs_to_entry": "xlsx/gt-d7-contract-liabilities",
         "read_with": "openpyxl data_only"
       }

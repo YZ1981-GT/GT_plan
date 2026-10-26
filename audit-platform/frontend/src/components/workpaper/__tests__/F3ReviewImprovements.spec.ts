@@ -39,11 +39,26 @@ describe('P0-1 rowCategoryKey 票据类别归类', () => {
     expect(rowCategoryKey({})).toBe('other')
   })
 
-  it('F3_CATEGORY_META 覆盖 4 类且键唯一', () => {
-    expect(F3_CATEGORY_META).toHaveLength(4)
+  it('F3_CATEGORY_META 覆盖 5 类（含信用证）且键唯一', () => {
+    expect(F3_CATEGORY_META).toHaveLength(5)
     const keys = F3_CATEGORY_META.map((m) => m.rowKey)
-    expect(new Set(keys).size).toBe(4)
-    expect(keys).toEqual(['bank', 'commercial', 'supplychain', 'other'])
+    expect(new Set(keys).size).toBe(5)
+    expect(keys).toEqual(['bank', 'commercial', 'letter_of_credit', 'supplychain', 'other'])
+    expect(rowCategoryKey({ noteType: '信用证' })).toBe('letter_of_credit')
+  })
+
+  // 信用证加进 F3_CATEGORY_META 时聚合器仍手写四类 ⇒ 信用证行一聚合就抛错、附注分类行整体报错
+  it('聚合与附注分类行覆盖 F3_CATEGORY_META 的全部分类（信用证不丢、不抛错）', () => {
+    const agg = aggregateDetailByCategory([
+      { noteType: '信用证', openingBalance: 10, currentIssued: 5, currentAccepted: 1 },
+    ])
+    expect(Object.keys(agg).sort()).toEqual(F3_CATEGORY_META.map((m) => m.rowKey).sort())
+    expect(agg.letter_of_credit.count).toBe(1)
+    expect(agg.letter_of_credit.closingAdjusted).toBe(14)
+    const rows = buildF3DisclosureClassRows(JSON.stringify([]), JSON.stringify([
+      { noteType: '信用证', openingBalance: 10, currentIssued: 5, currentAccepted: 1 },
+    ]))
+    expect(rows.find((r) => r.rowKey === 'letter_of_credit')).toBeDefined()
   })
 })
 

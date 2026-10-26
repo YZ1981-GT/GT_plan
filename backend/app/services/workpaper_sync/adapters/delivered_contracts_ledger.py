@@ -703,7 +703,7 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "spec `g-cycle-single-region-detail-lanes` 九条中的**第二条**。范式照 G2/G9 的 "
             "`phase5_*`；与首条 G9 的结构差别只在受管区数量 —— G10 是**单区** ⇒ 三个 store "
             "门面各自 ≤3 行薄转发框架层引擎，不需要 G9 那样的「遍历三段」伴生模块。"
-            "权威模板 G/G10 交易性金融负债.xlsx（sha256 3afd5131…，99,458 B，12 sheets）；"
+            "权威模板 G/G10 交易性金融负债.xlsx（sha256 6164bfcb…，86,264 B，12 sheets）；"
             "受管 sheet = 明细表G10-2（**两级**表头 R9 组 / R10 叶子 / 单区 R11-R20 / "
             "footer R21 逐列 =SUM(x11:x20) 且 **O21 例外**为 =M21+N21 / 6 个公式列 "
             "E·G·K·L·M·O 共 60 格 / 0 个 definedName）。"
@@ -963,7 +963,7 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
         "adapter_registered": False,
         "reason": (
             "spec `g-cycle-single-region-detail-lanes` 九条中的**第六条**。"
-            "权威模板 sha256 fd5e5e9e…（58,717 B，8 sheets）；受管 sheet = 明细表G13-2"
+            "权威模板 sha256 2848d2a2…（50,413 B，8 sheets）；受管 sheet = 明细表G13-2"
             "（两级表头 R9/R10：横向组 B9:D9 本期数 · **F9:J9** 对应科目-公允价值变动"
             "（🔴 含 J 列，而 J10=「计入损益」语义上不属该组 —— evidence §7.1 写 F9:I10 不准确）；"
             "纵向合并 A9:A10 / E9:E10 / K9:K10 / L9:L10 / 数据区 R11-R20 **固定 10 行** / "

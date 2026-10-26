@@ -29,8 +29,9 @@ import {
   calcBlockTotal,
   calcNetValue,
   calcChangeAmount,
-  calcChangeRate,
 } from './useD6FormulaEngine'
+// 审定表变动率按模板 D6-1 K 列（期初为 0、期末为正 → 100%，原先记 N/A）
+import { calcTemplateChangeRate } from './templateChangeRate'
 // 🔴 逐格四态覆盖状态机（spec d567-sync-coverage Task 20）——与 D5/D7 **共用同一份**实现。
 import {
   resolvePerCellDerivedState,
@@ -249,7 +250,7 @@ function buildRow(params: {
   const priorAudited = calcAuditedAmount(params.priorUnadjusted, params.priorAje, params.priorRje)
   const currentAudited = calcAuditedAmount(params.currentUnadjusted, params.currentAje, params.currentRje)
   const changeAmount = calcChangeAmount(priorAudited, currentAudited)
-  const changeRate = calcChangeRate(priorAudited, currentAudited)
+  const changeRate = calcTemplateChangeRate(priorAudited, currentAudited)
 
   return {
     rowKey: params.rowKey,

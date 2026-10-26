@@ -13,12 +13,14 @@ sheet_key=``d23-managed``，共享 adapter ``d2.receivable_detail``。
 ═══ 结构：单 sheet **双区**（实测反转 spec 裁决 E2，见 evidence/T03）═══
 
 受管 sheet = ``坏账准备明细表D2-3``（openpyxl 直读权威模板，与父 pilot 同 workbook，
-sha256=``31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa``）：
+sha256=``7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466``）：
 
 * **两级表头**：组标题 R10（项目/期初数/本期增加/本期减少/期末数）+ 二级 R11（13 列细分）。
 * **单项段**（``bad_debt_individual_rows``）：小计 R12（=SUM(B13:B16)），数据 R13-16，
   隐藏 UUID 列 **O**。承载前端 ``individual`` 分类。
-* **组合段**（``bad_debt_combined_rows``）：小计 R17（=SUM(B18:B20)），数据 R18-21，
+* **组合段**（``bad_debt_combined_rows``）：小计 R17（=SUM(B18:B21)），数据 R18-21
+  （🔴 模板原小计十列只求和到 R20、N18:N21 漏加重分类 M，2026-10-26 已按 E/K/N 列与 D1-4 改正，
+  spec oo-writeback-template-parity-closure R1），
   隐藏 UUID 列 **P**（≠单项，避免同 sheet 双区身份串区）。承载前端 ``aging`` + ``customer-type``
   两分类（行内 ``category`` 字段区分归属）。
 * footer 合计 R22（=B12+B17）→ formula_mask，不入受管。
@@ -74,7 +76,7 @@ TEMPLATE_RELATIVE_PATH: Final[str] = (
     "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx"
 )
 TEMPLATE_SHA256: Final[str] = (
-    "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa"
+    "7a24306922fe797879bfe82c21a39f85a822a0b55d4f5dd869b56e52c9ce3466"
 )
 
 MANAGED_SHEET_D23: Final[str] = "坏账准备明细表D2-3"

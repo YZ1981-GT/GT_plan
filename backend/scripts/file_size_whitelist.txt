@@ -1412,6 +1412,10 @@ backend/app/services/workpaper_sync/phase5_g5_long_term_receivable.py 801
 #     wp_template_finder 按「整册查找（含合并册）/ 单文件分档查找 / docx 查找 / 目录列举」拆，override-first 包装留在入口。
 backend/app/services/workpaper_sync/phase5_d4_ipo_related_sheets.py  968
 backend/app/services/wp_template_finder.py  810
+#   wp_surfaced_g.py —— 历史大文件（HEAD 已 994 行且未登记，任何改动都会被门禁拒）。
+#     2026-10-26 oo-writeback-template-parity-closure R2：G3-1 / G10-1 期末未审改从期初未审起算，只改两条公式说明文案（行数不变）。
+#     拆分方向：同 wp_surfaced_k.py，按底稿编码拆成 G1~G14 各自的目录模块，入口只做合并（同 wp_surfaced_formulas）。
+backend/app/routers/wp_surfaced_g.py  994
 
 #   test_render_pipeline_e2e.py —— 集成测试含 A/B/E 三类端到端导出 + schema 冒烟 +
 #     componentType 白名单覆盖。本轮仅加 pytest.skip 保护（3 行），已接近上限。

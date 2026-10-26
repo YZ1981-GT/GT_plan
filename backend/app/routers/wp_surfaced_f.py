@@ -239,8 +239,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         "F3-1": [
             ("期初审定数", "期初未审 + 期初 AJE + 期初 RJE", "计算",
              "期初审定（calcAuditedAmount）", "F3-1 审定表 / useF3Adjudication"),
-            ("期末未审数", "期初审定 + 本期贷方（开票） − 本期借方（承兑/兑付）", "计算",
-             "贷方负债期末未审（calcCreditBalance）", "F3-1 审定表"),
+            ("期末未审数", "期初未审 + 本期贷方（开票） − 本期借方（承兑/兑付）", "计算",
+             "贷方负债期末未审，同 F3-2 O = L + M − N（calcCreditBalance）", "F3-1 审定表"),
             ("期末审定数", "期末未审 + 期末 AJE + 期末 RJE", "计算",
              "期末审定（calcAuditedAmount）", "F3-1 审定表"),
             ("合计", "Σ 各票据类别（银行/商业/供应链/其他）", "计算",

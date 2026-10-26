@@ -55,7 +55,7 @@ export interface F4AdjudicationRow extends StoredF4AdjRow {
   openingAdjusted: number
   closingAdjusted: number
   changeAmount: number
-  changeRate: number
+  changeRate: number | 'N/A'
   isEditable: boolean
   closingFromDetail: boolean
 }
@@ -148,12 +148,27 @@ function createStoredRow(rowKey: string, label: string): StoredF4AdjRow {
   }
 }
 
-export function calcF4ChangeRate(openingAdjusted: number, changeAmount: number): number {
+/**
+ * 变动率，与权威模板 F4-1 K 列 `IF(AND(E=0,J=0),0,IF(AND(E=0,J>0),1,J/E))` 同式：
+ * 期初为 0 时变动为 0 → 0、变动为正 → 1（100%）、变动为负 → 模板除零 #DIV/0!，记 'N/A'
+ * （原先记 −100%，spec oo-writeback-template-parity-closure R2）。期初为 0 按分判断，避开浮点尾差。
+ */
+export function calcF4ChangeRate(openingAdjusted: number, changeAmount: number): number | 'N/A' {
   if (Math.abs(openingAdjusted) < BALANCE_TOLERANCE) {
     if (Math.abs(changeAmount) < BALANCE_TOLERANCE) return 0
-    return changeAmount > 0 ? 1 : -1
+    return changeAmount > 0 ? 1 : 'N/A'
   }
   return changeAmount / openingAdjusted
+}
+
+/** |变动率| 超过阈值（无法计算的不算） */
+export function isF4ChangeRateMaterial(rate: number | 'N/A', threshold = 0.3): boolean {
+  return rate !== 'N/A' && Math.abs(rate) > threshold
+}
+
+/** 变动率显示：比率 → 百分比两位小数；无法计算 → N/A */
+export function formatF4ChangeRate(rate: number | 'N/A'): string {
+  return rate === 'N/A' ? 'N/A' : `${(rate * 100).toFixed(2)}%`
 }
 
 export function computeF4AdjudicationRow(
@@ -511,7 +526,7 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
 
   const significantChanges = computed(() =>
     natureDataRows.value
-      .filter((row) => Math.abs(row.changeRate) > 0.3)
+      .filter((row) => isF4ChangeRateMaterial(row.changeRate))
       .map((row) => ({
         rowKey: row.rowKey,
         label: row.label,

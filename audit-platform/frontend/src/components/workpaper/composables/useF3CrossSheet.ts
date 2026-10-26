@@ -115,12 +115,11 @@ function emptyAgg(): F3CategoryAgg {
 export function aggregateDetailByCategory(
   rows: F3DetailRowRaw[],
 ): Record<F3CategoryKey, F3CategoryAgg> {
-  const acc: Record<F3CategoryKey, F3CategoryAgg> = {
-    bank: emptyAgg(),
-    commercial: emptyAgg(),
-    supplychain: emptyAgg(),
-    other: emptyAgg(),
-  }
+  // 分类键取 F3_CATEGORY_META（单一真源）。原先手写四类、漏了后加的「信用证」：
+  // 信用证行聚合即抛错，附注分类行 / 审定表补行判断对 letter_of_credit 取到 undefined 整页报错
+  const acc = Object.fromEntries(
+    F3_CATEGORY_META.map((m) => [m.rowKey, emptyAgg()]),
+  ) as Record<F3CategoryKey, F3CategoryAgg>
   for (const r of rows) {
     const k = rowCategoryKey(r)
     acc[k].periodCredit += rowPeriodCredit(r)
@@ -148,9 +147,10 @@ function parseOpeningAdjusted(stored: any): number {
 }
 
 /**
- * 由 F3-1 审定表（期初审定 + 期末 AJE/RJE）与 F3-2 明细（本期开票/兑付按类别）
- * 组装附注分类行；期末数 = 期初审定 + 本期贷方 − 本期借方 + 期末 AJE + RJE。
- * 银行/商业承兑始终列示；供应链/其他仅在存在金额或明细时列示。
+ * 由 F3-1 审定表（期初未审 / 期初审定 + 期末 AJE/RJE）与 F3-2 明细（本期开票/兑付按类别）
+ * 组装附注分类行；期末数 = F3-1 期末审定 = 期初未审 + 本期贷方 − 本期借方 + 期末 AJE + RJE
+ * （与 useF3Adjudication 同式、同取数：有明细时本期发生取明细分类合计，无明细时取审定表录入值）。
+ * 期初数 = 期初审定。银行/商业承兑始终列示；供应链/其他仅在存在金额或明细时列示。
  */
 export function buildF3DisclosureClassRows(
   adjRaw: string | null | undefined,
@@ -162,17 +162,20 @@ export function buildF3DisclosureClassRows(
   const storedByKey = new Map<string, any>()
   for (const s of stored) storedByKey.set(String(s.rowKey), s)
 
+  const hasDetail = detailRows.length > 0
   const out: F3ClassRow[] = []
   for (const meta of F3_CATEGORY_META) {
     const s = storedByKey.get(meta.rowKey)
     const openingAdjusted = s ? parseOpeningAdjusted(s) : 0
+    const openingUnadjusted = s ? parseNum(s.openingUnadjusted) : 0
     const closingAje = s ? parseNum(s.closingAje) : 0
     const closingRje = s ? parseNum(s.closingRje) : 0
     const catAgg = agg[meta.rowKey]
-    // 有明细时以明细本期发生驱动；否则退化为期初审定（与旧行为一致）
-    const closingUnadj = catAgg.count > 0
-      ? calcCreditBalance(openingAdjusted, catAgg.periodCredit, catAgg.periodDebit)
-      : openingAdjusted
+    // 与 useF3Adjudication.mergeCrossSheet 同口径：有明细时本期发生取明细分类合计，否则取审定表录入值；
+    // 期末未审从期初未审起算（模板 F3-2 O = L + M − N）。原先从期初审定起算、无明细时不计本期发生
+    const credit = hasDetail ? catAgg.periodCredit : parseNum(s?.periodCredit)
+    const debit = hasDetail ? catAgg.periodDebit : parseNum(s?.periodDebit)
+    const closingUnadj = calcCreditBalance(openingUnadjusted, credit, debit)
     const endAmount = calcAuditedAmount(closingUnadj, closingAje, closingRje)
     const priorAmount = openingAdjusted
     const alwaysShow = meta.rowKey === 'bank' || meta.rowKey === 'commercial'
@@ -233,7 +236,7 @@ export function useF3CrossSheet(options: UseF3CrossSheetOptions) {
 
   /** 明细中出现的分类键（供审定表动态补行判断） */
   const activeCategoryKeys = computed<F3CategoryKey[]>(() =>
-    (['bank', 'commercial', 'supplychain', 'other'] as F3CategoryKey[]).filter((k) => hasCategory(k)),
+    F3_CATEGORY_META.map((m) => m.rowKey).filter((k) => hasCategory(k)),
   )
 
   return {

@@ -105,6 +105,13 @@ MANAGED_LAST_COL_D104: Final[str] = "N"
 #     📌 顺带登记：G/J 两列**前端 UI 措辞与源模板列头不一致**（收回 vs 其他增加 /
 #        其他 vs 其他减少），属前端文案问题，不影响列身份，归 UI 一致性批次。
 #
+# 🔴🔴 2026-10-26 再修正 G/J 两列（spec oo-writeback-template-parity-closure R2）：上面「位置上无歧义」
+#     的对应只看了列顺序、没看**加减方向**。前端期末未审 = … − currentRecovery − … + currentOther，
+#     即「本期收回」是减项、「本期其他」是加项；模板 K = B + SUM(F:G) − SUM(H:J)，G「其他增加」是加项、
+#     J「其他减少」是减项。按位置对应 ⇒ 审计师在表单录的收回（减）进了 OO 的其他增加（加），两侧期末未审
+#     差两倍收回额。改按方向对应：G ↔ currentOther、J ↔ currentRecovery（前端改称「其他增加」/
+#     「其他减少（含收回）」，列顺序随模板）。真库 `D1-bd-*` 无行，不需要迁移数据。
+#
 _FIELD_SPECS_D104: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = (
     ("item", "A", "editable", "text", "label", "项目", ""),
     ("prior_unadjusted", "B", "editable", "amount", "priorUnadjusted", "期初未审数", f"B{HEADER_GROUP_ROW_D104}"),
@@ -112,10 +119,10 @@ _FIELD_SPECS_D104: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] =
     ("prior_rje", "D", "editable", "amount", "priorRje", "重分类调整", f"B{HEADER_GROUP_ROW_D104}"),
     ("prior_audited", "E", "formula", "amount", "priorAudited", "期初审定数", f"B{HEADER_GROUP_ROW_D104}"),
     ("provision", "F", "editable", "amount", "currentProvision", "计提", f"F{HEADER_GROUP_ROW_D104}"),
-    ("other_increase", "G", "editable", "amount", "currentRecovery", "其他增加", f"F{HEADER_GROUP_ROW_D104}"),
+    ("other_increase", "G", "editable", "amount", "currentOther", "其他增加", f"F{HEADER_GROUP_ROW_D104}"),
     ("reversal", "H", "editable", "amount", "currentReversal", "转回", f"H{HEADER_GROUP_ROW_D104}"),
     ("write_off", "I", "editable", "amount", "currentWriteOff", "核销", f"H{HEADER_GROUP_ROW_D104}"),
-    ("other_decrease", "J", "editable", "amount", "currentOther", "其他减少", f"H{HEADER_GROUP_ROW_D104}"),
+    ("other_decrease", "J", "editable", "amount", "currentRecovery", "其他减少", f"H{HEADER_GROUP_ROW_D104}"),
     ("current_unadjusted", "K", "formula", "amount", "currentUnadjusted", "期末未审数", f"K{HEADER_GROUP_ROW_D104}"),
     ("current_aje", "L", "editable", "amount", "currentAje", "账项调整", f"K{HEADER_GROUP_ROW_D104}"),
     ("current_rje", "M", "editable", "amount", "currentRje", "重分类调整", f"K{HEADER_GROUP_ROW_D104}"),

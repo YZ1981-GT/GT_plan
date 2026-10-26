@@ -206,8 +206,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         "G3-1": [
             ("期初审定", "期初未审 + 期初 AJE + 期初 RJE", "计算",
              "期初审定（calcAdjustedAmount）", "useG3Adjudication / useG3DivRecFormulaEngine"),
-            ("期末未审", "期初审定 + 本期宣告(借方) − 本期收回(贷方)", "计算",
-             "借方科目期末未审（calcDebitBalance）", "useG3DivRecFormulaEngine"),
+            ("期末未审", "期初未审 + 本期宣告(借方) − 本期收回(贷方)", "计算",
+             "借方科目期末未审，同 G3-2 期末数（calcDebitBalance）", "useG3DivRecFormulaEngine"),
             ("期末审定", "期末未审 + 期末 AJE + 期末 RJE", "计算",
              "期末审定（calcAdjustedAmount）", "useG3DivRecFormulaEngine"),
             ("合计", "Σ 各被投资方行", "计算",
@@ -758,7 +758,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         "G10-1": [
             ("审定数", "未审数 + AJE + RJE", "计算",
              "各行审定（calcAdjustedAmount）", "useG10Adjudication / useG10FormulaEngine"),
-            ("期末未审(缺失时倒推)", "期初审定 + 本期贷方 − 本期借方", "计算",
+            ("期末未审(缺失时倒推)", "期初未审 + 本期贷方 − 本期借方", "计算",
              "贷方负债余额（calcCreditBalance，resolveClosingUnadjusted 回退）", "useG10Adjudication / useG10FormulaEngine"),
             ("(三)账面余额", "(一)初始金额 + (二)累计公允价值变动", "计算",
              "calcBookFromParts", "useG10FormulaEngine"),

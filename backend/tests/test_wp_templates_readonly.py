@@ -75,7 +75,9 @@ EXPECTED_XLSX_COUNT = 351
 #:    F2-55 / F5 / G4 / H4 / H5 / H7 / H8 / J2 / J3 / K2 / K4 / L7 / L8 / M1~M10 / N2 / N5，
 #:    各册 sanitizer 见 `backend/scripts/fix/sanitize_*`）—— 回填前本守卫在 HEAD 上本就是红的。
 #:    48_818_132 → 45_834_727 B，数量不变。
-EXPECTED_TOTAL_BYTES = 45_834_727
+#:    2026-10-26 第二批再修 6 本（D1 / D2 审定册 D2-1至D2-4 / D2 检查册 D2-6至D2-13 / D7 / G10 / G13），
+#:    45_834_727 → 45_795_461 B。
+EXPECTED_TOTAL_BYTES = 45_795_461
 
 #: 允许与基线不符的**未提交工作树改动**（不是永久豁免）。
 #:

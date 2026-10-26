@@ -116,9 +116,9 @@ ADAPTER_ID: Final[str] = "g10.trading_liabilities_detail"
 WP_CODES: Final[frozenset[str]] = frozenset({"G10T"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
 TEMPLATE_RELATIVE_PATH: Final[str] = "G/G10 交易性金融负债.xlsx"
-#: 逐字取 slice `authoritative_templates.files`（完整 64 位；99,458 B）
+#: 逐字取 slice `authoritative_templates.files`（完整 64 位；86,264 B）
 TEMPLATE_SHA256: Final[str] = (
-    "3afd5131f3783c017f3b7e728e1b081188de71acebb46bdb43e2f8b24fb63da3"
+    "6164bfcbebea63235d0bb0a18d2afe610ae050b19c39f1fef1746fcdab52fa1f"
 )
 
 #: 受管 store item —— 按值取自 `useG10Detail.ts` 的 `ITEM_ID_ROWS`

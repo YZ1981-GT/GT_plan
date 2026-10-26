@@ -110,12 +110,12 @@ describe('G3 集成: sheetName 正则分发（7 sheets + fallback）', () => {
 // 2. 借方余额公式链（期初+宣告-收回=期末未审→+AJE+RJE=审定）
 // ---------------------------------------------------------------------------
 describe('G3 集成: 借方余额公式链（审定表G3-1）', () => {
-  it('Step1: 期末未审 = 期初审定 + 本期宣告(借方) - 本期收回(贷方)', () => {
-    const openingAdjusted = 800000  // 期初审定：80万
-    const declared = 300000         // 本期宣告(借方)：30万
-    const received = 100000         // 本期收回(贷方)：10万
+  it('Step1: 期末未审 = 期初未审 + 本期宣告(借方) - 本期收回(贷方)', () => {
+    const openingUnadjusted = 800000  // 期初未审：80万（模板 G3-2 期末数 = 期初数 + 增加 − 减少）
+    const declared = 300000           // 本期宣告(借方)：30万
+    const received = 100000           // 本期收回(贷方)：10万
 
-    const closingUnadjusted = calcDebitBalance(openingAdjusted, declared, received)
+    const closingUnadjusted = calcDebitBalance(openingUnadjusted, declared, received)
     expect(closingUnadjusted).toBe(1000000) // 80万+30万-10万=100万
   })
 
