@@ -40,6 +40,7 @@ from tests.acnr._status_doc_checks import (
     RESOLVER_DOC_OK,
     SCHEMA_FOLLOWS_CONTRACT, SPEC_TASKS, V1_BYPASS, Check, Unit,
     _component_tests_present, _exact_identity_is_pure, _exact_identity_only_release_imports,
+    _full_resolve_step1_uses_exact_identity,
     _generator_assigns_utc_timestamp, _orphan_verdicts_released, _parsed, _resolve_instance_binds_wp_code,
     _schema_file_is_generated, _sentences, _stale_impact_route, _task_ids, _units_and_structure_problems,
     _versions_are_timestamps, absent, calls, claim, defines, design_quote, exists, fact_eq, fact_ne, has_tests,
@@ -142,9 +143,9 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
     H_COMPONENTS: {
         "门禁清单：已经在跑的守卫见上表「测试」列": P(
             claim("组件表每行的「测试」文件都存在（后端测试文件有 test_ 函数，AST）", _component_tests_present)),
-        "随本 spec 后续任务加入的门禁见下表——往返与保存校验（T10）、V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）": P(
-            task_open("T10", "T22", "T24", "T29", "T30"),
-            in_planned("T10", "T22", "T24", "T29", "T30")),
+        "随本 spec 后续任务加入的门禁见下表——V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）": P(
+            task_open("T22", "T24", "T29", "T30"),
+            in_planned("T22", "T24", "T29", "T30")),
         "L1 目录加载与内存索引": CB(
             _A + "catalog.py", ("CatalogIndex", "get_catalog", "list_sheets", "list_cells"),
             _T + "test_catalog_index_fail_closed.py"),
@@ -166,12 +167,24 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
         "L3 运行时条目": CB(
             _A + "runtime.py", ("get_runtime_entries",), _T + "test_runtime.py",
             calls(_RESOLVER_REL, "full_resolve", "get_runtime_entries")),
-        "唯一精确身份判定（纯函数；尚未接入运行时解析）": CB(
+        "唯一精确身份判定（纯函数；目录写法解析、`full_resolve` 首步、发布门禁与生成器名称规则调用它，取值接线与 V2 / CCR 尚未调用）": CB(
             _A + "exact_identity.py", ("sheet_of", "cell_of", "name_owner"), _T + "test_exact_identity.py",
             claim("exact_identity 只导入标准库与本包 reasons / catalog_contract / catalog、不做文件或数据库读写（AST）",
                   _exact_identity_is_pure),
-            claim("生产代码里导入 exact_identity 的恰为 catalog_release 与 catalog_names（运行时解析未接入，AST）",
-                  _exact_identity_only_release_imports)),
+            claim("生产代码里导入 exact_identity 的恰为 catalog、catalog_names、catalog_release（AST）",
+                  _exact_identity_only_release_imports),
+            claim("full_resolve 第 1 步经 step1_identity → catalog 结构化判定 → sheet_of，catalog 无子串启发式（AST）",
+                  _full_resolve_step1_uses_exact_identity),
+            task_open("T12", "T21", "T22")),
+        "`full_resolve` 首步身份推导与停用字段（多义 / 禁止别名返回中文原因、所需上下文与候选；停用条目带替代地址）": CB(
+            _A + "resolve_identity.py", ("step1_identity", "deprecation_fields"), _T + "test_catalog_roundtrip_real.py",
+            calls(_RESOLVER_REL, "full_resolve", "step1_identity"),
+            calls(_RESOLVER_REL, "_build_cell_resolve_result", "deprecation_fields"),
+            has_tests(_T + "test_catalog_roundtrip_real.py", "test_step1_ambiguous_name_returns_reason_and_candidates",
+                      "test_step1_forbidden_alias_returns_reason_and_candidates",
+                      "test_every_live_cell_round_trips_through_full_resolve"),
+            has_tests(_T + "test_catalog_release_integrity.py", "test_deprecated_cells_resolve_with_resolvable_replacement",
+                      "test_entries_hide_deprecated_sheets_by_default")),
         "目录契约单一来源，schema 由它生成": CB(
             _A + "catalog_contract.py", ("build_schema", "REGISTRY_VERSION_PATTERN", "FUNCTIONAL_TYPES"),
             _T + "test_catalog_schema_single_source.py",
@@ -225,7 +238,6 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             "audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts", exists(_FE_GUARD_REL)),
     },
     H_PLANNED: {
-        "exact_identity 接入全部使用者、删除 catalog 子串启发式、停用条目行为、保存校验与往返": L("T10"),
         "高级查询 acnr_targets 跨模块单元格取值、acnr_results 结果块、422 / 503 / YEAR_REQUIRED、前端结果区与下钻": L("T11、T12、T13、T14、T15、T16"),
         "版本锁持久化（迁移、lock_project_registry、effective_catalog）与按库引用的快照清理": L("T17、T18、T19"),
         "异步追溯拿到规范 addr_id": L("T20"),

@@ -36,9 +36,6 @@ from app.models.workpaper_models import WpIndex, WorkingPaper
 from app.services.acnr.catalog import (
     get_catalog,
     CatalogIndex,
-    _uri_to_addr_id,
-    _formula_ref_to_addr_id,
-    _index_ref_to_addr_id,
     _find_candidates,
     _hit_cell_response,
     _hit_response,
@@ -46,6 +43,7 @@ from app.services.acnr.catalog import (
     _build_jump_route,
 )
 from app.services.acnr.immutability import get_project_registry_version
+from app.services.acnr.resolve_identity import deprecation_fields, step1_identity
 from app.services.acnr.overlay import get_project_overlay, ProjectOverlay
 from app.services.acnr.runtime import get_runtime_entries, RuntimeCellEntry
 
@@ -206,8 +204,11 @@ class ResolveResult:
     source_layer: Optional[str] = None  # "L1_cell" / "L1_sheet" / "L2" / "L3" / "V1"
     #: 非底稿域：True = 按项目数据核过存在；False = 只做了写法换算（调用方声明只建身份，或缺项目上下文）
     verified: Optional[bool] = None
-    #: 判不存在时的原因（与求值缺数同一说法）
+    #: 判不存在时的原因（与求值缺数同一说法）；停用 / 多义 / 禁止别名时为中文说明
     reason: Optional[str] = None
+    deprecated: Optional[bool] = None  # 命中停用条目（design §3.3）
+    replaced_by: Optional[str] = None  # 停用条目的替代地址
+    required_context: Optional[list[str]] = None  # 多义 / 禁止别名时需补的上下文
 
 
 def _detect_non_wp_domain(
@@ -425,17 +426,11 @@ async def full_resolve(
             )
         return result
 
-    # ─── Step 1: grammar 规范化 → 推导 addr_id ──────────────────────────
-    resolved_addr_id: str | None = None
-    if addr_id:
-        resolved_addr_id = addr_id
-    elif uri:
-        resolved_addr_id = _uri_to_addr_id(uri)
-    elif formula_ref:
-        resolved_addr_id = _formula_ref_to_addr_id(formula_ref)
-    elif index_ref:
-        resolved_addr_id = _index_ref_to_addr_id(index_ref)
-
+    # ─── Step 1: grammar 规范化 → 推导 addr_id（exact_identity；多义 / 禁止别名直接返回）──
+    resolved_addr_id, _blocked = step1_identity(cat, uri=uri, formula_ref=formula_ref, addr_id=addr_id, index_ref=index_ref)
+    if _blocked is not None:
+        _resolve_metrics["ambiguous"] += 1
+        return ResolveResult(**_blocked)
     if not resolved_addr_id:
         # 无法解析输入
         _resolve_metrics["miss"] += 1
@@ -776,6 +771,7 @@ def _build_cell_resolve_result(
         uri=cell.get("uri"),
         jump_route=jump_route,
         source_layer="L1_cell",
+        **deprecation_fields(cell, cat),
     )
 
 
@@ -789,12 +785,9 @@ def _build_sheet_resolve_result(
         found=True,
         addr_id=sheet.get("addr_id"),
         entry_type="sheet",
-        cell_address=None,
-        semantic_label=None,
-        formula_ref=None,
-        uri=None,
         jump_route=sheet.get("jump_route_template"),
         source_layer="L1_sheet",
+        **deprecation_fields(sheet, get_catalog()),
     )
 
 

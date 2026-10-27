@@ -34,6 +34,8 @@ from app.services.address_registry import (
     address_registry,
     formula_ref_to_uri,
 )
+from app.services.acnr.catalog import CatalogIntegrityError
+from app.services.acnr.resolver import VersionNotFoundError
 from app.services.formula_grammar import RELAXED_FORMULA_PATTERNS
 
 logger = logging.getLogger(__name__)
@@ -56,9 +58,16 @@ def _expression_has_non_wp_ref(expression: str) -> bool:
     return any(f"{name}(" in expression for name in _NON_WP_FUNCS)
 
 
-def _make_wp_issue(ref_text: str) -> dict[str, Any]:
-    """构造 WP 域 not_found issue，schema 兼容 legacy validate_formula_refs。"""
+def _make_wp_issue(ref_text: str, result: Any = None) -> dict[str, Any]:
+    """构造 WP 域 not_found issue，schema 兼容 legacy validate_formula_refs。
+
+    多义 / 命中禁止别名时 reason 取 resolver 的错误码、message 取其中文原因（含候选与所需上下文）。
+    """
     uri = formula_ref_to_uri(ref_text)
+    error = getattr(result, "error", None)
+    if error in ("ambiguous", "alias_forbidden") and getattr(result, "reason", None):
+        return {"ref": ref_text, "uri": uri, "status": "not_found", "reason": error,
+                "message": result.reason}
     return {
         "ref": ref_text,
         "uri": uri,
@@ -66,6 +75,18 @@ def _make_wp_issue(ref_text: str) -> dict[str, Any]:
         "reason": "not_found",
         "message": f"引用地址 {uri or ref_text} 在当前项目中不存在",
     }
+
+
+def _record_deprecated_ref_saved(pid: str, ref_text: str, result: Any) -> None:
+    """保存了指向停用条目的引用：只记 INFO 与指标 deprecated_ref_saved，不出 issue。"""
+    from app.services.acnr.metrics import get_acnr_metrics
+
+    logger.info("公式引用指向停用地址（已接受保存）：project=%s ref=%s replaced_by=%s",
+                pid, ref_text, result.replaced_by)
+    get_acnr_metrics().record_alert(
+        event_type="deprecated_ref_saved", reason=result.reason or "",
+        metadata={"addr_id": result.addr_id, "replaced_by": result.replaced_by}, silent=True,
+    )
 
 
 async def validate_refs_via_acnr(
@@ -112,7 +133,12 @@ async def validate_refs_via_acnr(
                 db=db,
             )
             if not result.found:
-                wp_issues.append(_make_wp_issue(ref_text))
+                wp_issues.append(_make_wp_issue(ref_text, result))
+            elif result.deprecated:  # 停用条目：接受保存，记 INFO 与指标（design §3.3）
+                _record_deprecated_ref_saved(pid, ref_text, result)
+    except (VersionNotFoundError, CatalogIntegrityError):
+        # 治理错误（锁定快照缺失 / 目录完整性失败）不是「resolver 暂不可用」，不回退 legacy（design §6.5）
+        raise
     except Exception as exc:  # noqa: BLE001 — fail-open：resolver 故障不阻断保存
         logger.warning(
             "ACNR full_resolve 校验失败，回退 legacy validate_formula_refs "

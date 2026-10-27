@@ -86,7 +86,8 @@ def apply_alias_policy(catalog: dict[str, Any], entries: list[dict[str, Any]],
                        label_aliases: dict[str, list[str]]) -> dict[str, list[str]]:
     """规则 4（design §7.2 / §7.3）：按 `sources/alias_policy.json` 处置标签源别名，返回 {目标 addr_id: 新并入别名}。
 
-    - merge_into：把标签源里该键（未登记的 sheet_code）的全部别名并入 `target` sheet；并入后逐条断言
+    - merge_into：把标签源里该键（未登记的 sheet_code）的全部别名并入 `target` sheet（条目带 `writings`
+      写法证据时别名键本身也并入，T10）；并入后逐条断言
       `sheet_of(父级, 别名)` 回到 target，否则 `NameSystemError`；
     - forbidden：别名在所列 sheet 的父级内写进目录顶层 `alias_policy.forbidden`（第 3 步据此拒绝并给理由）；
     - parent_qualified：别名加回所列 sheet（每个父级内唯一，缺父级时由 exact_identity 判歧义）；
@@ -109,7 +110,9 @@ def apply_alias_policy(catalog: dict[str, Any], entries: list[dict[str, Any]],
     for e in entries:
         disp, alias = e.get("disposition"), e.get("alias", "")
         if disp == "merge_into" and e.get("target") in by_id:
-            added = _add(by_id[e["target"]], list(label_aliases.get(alias, [])))
+            # 带 writings 的条目：别名键本身也并入（HEAD 能解析的静态写法改用父级限定别名，design §6.5）
+            names = list(label_aliases.get(alias, [])) + ([alias] if e.get("writings") else [])
+            added = _add(by_id[e["target"]], names)
             if added:
                 merged.setdefault(e["target"], []).extend(added)
         elif disp in ("forbidden", "parent_qualified"):

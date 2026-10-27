@@ -355,12 +355,38 @@ def _gate_alias(new: dict[str, Any], alias_policy: Any, report: dict[str, Any] |
         elif disp in ("non_address_label", "merge_into"):
             if alias in by_code:
                 out.append(GateViolation("alias", "", f"失效条目：{disp}「{alias}」已是目录 sheet_code"))
+            if disp == "merge_into" and e.get("writings"):
+                out += _merge_writing_violations(e, new)
+                if alias not in (open_keys or frozenset()):
+                    continue  # 只由写法证据支撑的并入（T10，design §6.5）：不要求是标签源未登记键
             if open_keys is None:
                 out.append(GateViolation("alias", "", f"{disp}「{alias}」无法核实：报告未提供 open_problems.unregistered_alias_keys"))
             elif alias not in open_keys:
                 out.append(GateViolation("alias", "", f"失效条目：{disp}「{alias}」已不是本批次的未登记别名键（所指问题已不存在）"))
             if disp == "merge_into" and e.get("target") not in sheet_ids:
                 out.append(GateViolation("alias", "", f"alias_policy「{alias}」merge_into 目标「{e.get('target')}」不在目录中"))
+    return out
+
+
+def _merge_writing_violations(e: dict, new: dict[str, Any]) -> list[GateViolation]:
+    """merge_into 带 writings（HEAD 能解析、改用 exact_identity 后需父级限定别名的静态写法，design §6.5）：
+    每条写法须是 {wp_code, sheet, where}、sheet 等于别名键、wp_code 为目标的父级，并入后须解析回目标。"""
+    alias, target = e.get("alias", ""), e.get("target", "")
+    out: list[GateViolation] = []
+    parent = next((s.get("parent_wp_code") for s in new.get("sheets", []) if s.get("addr_id") == target), None)
+    if parent is None:
+        return [GateViolation("alias", "", f"alias_policy「{alias}」merge_into 目标「{target}」不在目录中")]
+    for w in e.get("writings") or []:
+        if not (isinstance(w, dict) and w.get("wp_code") and w.get("where") and w.get("sheet") == alias):
+            out.append(GateViolation("alias", target, f"merge_into「{alias}」的写法证据须为 {{wp_code, sheet=别名, where}}：{w}"))
+        elif w["wp_code"] != parent:
+            out.append(GateViolation("alias", target, f"merge_into「{alias}」写法 {w['where']} 的底稿「{w['wp_code']}」不是目标父级「{parent}」"))
+    index = _try_index(new)
+    if index is not None:
+        sm = exact_identity.sheet_of(parent, alias, index=index)
+        got = (sm.entry or {}).get("addr_id") if sm.ok else sm.state
+        if got != target:
+            out.append(GateViolation("alias", target, f"merge_into「{alias}」并入后在 {parent} 下解析为 {got}，不是目标 {target}"))
     return out
 
 

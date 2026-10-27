@@ -16,7 +16,7 @@
 
 | 事实 | 值 | 复算键 |
 |---|---|---|
-| 目录版本号 | `20261027145857` | `catalog.registry_version` |
+| 目录版本号 | `20261027161822` | `catalog.registry_version` |
 | 目录 sheet 条目数 | `1225` | `catalog.sheets` |
 | 目录 cell 条目数 | `474` | `catalog.cells` |
 | 父 sheet 在目录内的 cell | `474` | `catalog.cells_with_parent` |
@@ -28,7 +28,7 @@
 | cell 自带 formula_ref 能解析回本身的条目 | `474` | `catalog.formula_ref_roundtrip_ok` |
 | 按现行契约 `catalog_contract.build_schema()` 校验目录的错误数 | `0` | `catalog.schema_errors` |
 | 报告是否带 release 段 | `是` | `report.has_release` |
-| 历史快照份数 | `6` | `snapshots.count` |
+| 历史快照份数 | `7` | `snapshots.count` |
 | 仍在仓库的分片文件 | `无` | `shards.files` |
 | 生成器命令行参数 | `--write、--check、--registry-version` | `generator.cli_flags` |
 | 生成器写出前是否跑发布门禁 | `是` | `generator.runs_release_gates` |
@@ -45,7 +45,8 @@
 | 底稿域 canonical resolver（非底稿域委托 V1） | 后端 | `backend/app/services/acnr/resolver.py` | `full_resolve`、`resolve_instance` | `backend/tests/acnr/test_full_resolve.py` |
 | L2 项目 overlay | 后端 | `backend/app/services/acnr/overlay.py` | `get_project_overlay`、`ProjectOverlay` | `backend/tests/acnr/test_overlay.py` |
 | L3 运行时条目 | 后端 | `backend/app/services/acnr/runtime.py` | `get_runtime_entries` | `backend/tests/acnr/test_runtime.py` |
-| 唯一精确身份判定（纯函数；尚未接入运行时解析） | 后端 | `backend/app/services/acnr/exact_identity.py` | `sheet_of`、`cell_of`、`name_owner` | `backend/tests/acnr/test_exact_identity.py` |
+| 唯一精确身份判定（纯函数；目录写法解析、`full_resolve` 首步、发布门禁与生成器名称规则调用它，取值接线与 V2 / CCR 尚未调用） | 后端 | `backend/app/services/acnr/exact_identity.py` | `sheet_of`、`cell_of`、`name_owner` | `backend/tests/acnr/test_exact_identity.py` |
+| `full_resolve` 首步身份推导与停用字段（多义 / 禁止别名返回中文原因、所需上下文与候选；停用条目带替代地址） | 后端 | `backend/app/services/acnr/resolve_identity.py` | `step1_identity`、`deprecation_fields` | `backend/tests/acnr/test_catalog_roundtrip_real.py` |
 | 目录契约单一来源，schema 由它生成 | 后端 | `backend/app/services/acnr/catalog_contract.py` | `build_schema`、`REGISTRY_VERSION_PATTERN`、`FUNCTIONAL_TYPES` | `backend/tests/acnr/test_catalog_schema_single_source.py` |
 | 发布门禁模块（生成器写出与 `--check` 都调用） | 后端 | `backend/app/services/acnr/catalog_release.py` | `run_release_gates`、`GateViolation` | `backend/tests/acnr/test_catalog_release_gates.py` |
 | 孤儿与历史移除判定记录的 loader（发布候选构建读取） | 后端 | `backend/app/services/acnr/loaders/from_sheet_verdicts.py` | `load_sheet_verdicts` | `backend/tests/acnr/test_sheet_verdicts.py` |
@@ -58,13 +59,12 @@
 | 前端 ACNR SDK，按项目订阅失效 | 前端 | `audit-platform/frontend/src/services/acnr/useAcnr.ts` | `useAcnr` | `audit-platform/frontend/src/services/acnr/tests/useAcnr_project_subscription.spec.ts` |
 | 前端当前项目上下文 | 前端 | `audit-platform/frontend/src/composables/useCurrentProjectId.ts` | `useCurrentProjectId` | `audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts` |
 
-门禁清单：已经在跑的守卫见上表「测试」列；随本 spec 后续任务加入的门禁见下表——往返与保存校验（T10）、V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）。
+门禁清单：已经在跑的守卫见上表「测试」列；随本 spec 后续任务加入的门禁见下表——V2 对账（T22）、消费方绕过棘轮（T24）、显示名单一来源（T29、T30）。
 
 ### 计划中（未落地）
 
 | 事项 | 任务 |
 |---|---|
-| exact_identity 接入全部使用者、删除 catalog 子串启发式、停用条目行为、保存校验与往返 | T10 |
 | 高级查询 acnr_targets 跨模块单元格取值、acnr_results 结果块、422 / 503 / YEAR_REQUIRED、前端结果区与下钻 | T11、T12、T13、T14、T15、T16 |
 | 版本锁持久化（迁移、lock_project_registry、effective_catalog）与按库引用的快照清理 | T17、T18、T19 |
 | 异步追溯拿到规范 addr_id | T20 |

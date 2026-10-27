@@ -796,11 +796,11 @@ export function useAcnr(projectId?: MaybeRefOrGetter<string | null | undefined>)
   }
 
   /**
-   * 懒加载某 sheet 下的 cell 子节点
+   * 懒加载某 sheet 下的 cell 子节点（停用 cell 不进地址树；/anchors 仍返回它们并带 deprecated 标记，design §3.3）
    */
   async function loadCellNodes(sheetEntry: AcnrSheetEntry): Promise<AcnrTreeNode[]> {
     const cellList = await listCells(sheetEntry.parent_wp_code, sheetEntry.sheet_code)
-    return cellList.map((c) => ({
+    return cellList.filter((c) => !c.deprecated).map((c) => ({
       label: c.semantic_label || c.cell_address || c.addr_id,
       value: c.addr_id,
       type: 'cell' as const,

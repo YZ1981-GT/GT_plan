@@ -1,6 +1,6 @@
 {
   "acknowledged": {
-    "count": 1,
+    "count": 5,
     "items": [
       {
         "covers": {
@@ -44,6 +44,54 @@
         "id": "ack-seed-semantic-unverified-2026-10-27",
         "kind": "seed_semantic_unverified",
         "owner": "acnr-foundation-defect-closure"
+      },
+      {
+        "covers": {
+          "sheet_codes": [
+            "A13"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "head_resolvable_at": "A13/A13",
+        "id": "ack-head-errmatch-A13-A13-3 评价识别出的错报",
+        "kind": "head_resolvable_errmatch",
+        "owner": "A 循环（报表 / 调整）"
+      },
+      {
+        "covers": {
+          "sheet_codes": [
+            "A13"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "head_resolvable_at": "A13/A13",
+        "id": "ack-head-errmatch-A13-错报明细A13-2",
+        "kind": "head_resolvable_errmatch",
+        "owner": "A 循环（报表 / 调整）"
+      },
+      {
+        "covers": {
+          "sheet_codes": [
+            "B23"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "head_resolvable_at": "B23/B23",
+        "id": "ack-head-errmatch-B23-B23-2 货币资金控制了解",
+        "kind": "head_resolvable_errmatch",
+        "owner": "B 循环（控制了解）"
+      },
+      {
+        "covers": {
+          "sheet_codes": [
+            "I1"
+          ]
+        },
+        "expires_on": "2027-04-30",
+        "head_resolvable_at": "I1/I1",
+        "id": "ack-head-errmatch-I1-摊销测算表（不含减值）I1-10（剩余年限法）",
+        "kind": "head_resolvable_errmatch",
+        "owner": "I 循环（无形资产）"
       }
     ]
   },
@@ -276,9 +324,9 @@
       }
     ]
   },
-  "generated_at": "2026-10-27T14:58:57.832790+00:00",
+  "generated_at": "2026-10-27T16:18:23.529980+00:00",
   "info": {
-    "count": 114,
+    "count": 116,
     "items": [
       {
         "addr_id": "A18/A18",
@@ -609,9 +657,10 @@
         "alias": "D5-1",
         "kind": "merge_into",
         "merged_aliases": [
-          "应收款项融资审定表D5-1"
+          "应收款项融资审定表D5-1",
+          "D5-1"
         ],
-        "reason": "D5 册审定表 tab 的平台编号（design §1.2 / §7.3）：标签源别名「应收款项融资审定表D5-1」并入 D5/D5，并入后在 D5 父级内唯一",
+        "reason": "D5 册审定表 tab 的平台编号（design §1.2 / §7.3）：标签源别名「应收款项融资审定表D5-1」并入 D5/D5，并入后在 D5 父级内唯一；别名键本身也并入：D5 册审定表 tab 的平台编号（2025 审定表编 n-1，design §1.2 / §6.5 / §7.3）；预设 report-cross-check-rw-74 的 WP('D5', 'D5-1', '审定数') 在 HEAD 靠子串落到 D5/D5，业务上正确，改用父级限定别名后仍解析到 D5/D5",
         "target": "D5/D5"
       },
       {
@@ -700,6 +749,16 @@
         "reason": "前端 tab 伪键：工作簿目录页，无可寻址单元格（design §7.3）"
       },
       {
+        "alias": "I1-1",
+        "kind": "merge_into",
+        "merged_aliases": [
+          "I1-1",
+          "审定表I1-1"
+        ],
+        "reason": "I1 册审定表 tab 的平台编号（模板 tab「审定表I1」，映射科目同一，design §6.5）；预设 report-cross-check-rw-83 的 WP('I1', 'I1-1', '审定数') 在 HEAD 靠子串落到 I1/I1，业务上正确，改用父级限定别名",
+        "target": "I1/I1"
+      },
+      {
         "alias": "IT审计总结备忘录",
         "kind": "forbidden_alias",
         "parent_wp_code": "A27",
@@ -741,6 +800,16 @@
           "A18",
           "A18-1"
         ]
+      },
+      {
+        "alias": "审定表I1-1",
+        "kind": "merge_into",
+        "merged_aliases": [
+          "I1-1",
+          "审定表I1-1"
+        ],
+        "reason": "I1 审定表的平台名写法（模板 tab「审定表I1」，design §6.5）；CCR CW-249 / CW-253 / CW-261 在 HEAD 靠子串落到 I1/I1，业务上正确，改用父级限定别名",
+        "target": "I1/I1"
       },
       {
         "alias": "差异调节",
@@ -1024,9 +1093,9 @@
       "附注国企"
     ]
   },
-  "registry_version": "20261027145857",
+  "registry_version": "20261027161822",
   "release": {
-    "catalog_sha256": "c64daad9f533c88a77a405541168df3c148e82bd0bf1f24c79cd0bd4a49e8075",
+    "catalog_sha256": "b171acc97ef47a856a2a5030ccbae05ab8e445fb4664b8489e8e3cf38f878bf7",
     "classification": {
       "path": "backend/data/acnr/sources/classification_cache.json",
       "record_count": 4640,
@@ -1105,8 +1174,8 @@
         "sha256": "165f455a9e6fad3b588519a84e20fc29a259271bdc0d31c6be7b7b1e4a91d742"
       },
       {
-        "path": "backend/data/acnr/catalog_snapshots/20261027130014.json",
-        "sha256": "63ffa79465bd22cbe998e06ee5c17433ad682382f202d1da4bd1e42dcb676bdd"
+        "path": "backend/data/acnr/catalog_snapshots/20261027145857.json",
+        "sha256": "c64daad9f533c88a77a405541168df3c148e82bd0bf1f24c79cd0bd4a49e8075"
       },
       {
         "path": "backend/data/acnr/global_catalog.overrides.json",
@@ -1122,11 +1191,11 @@
       },
       {
         "path": "backend/data/acnr/sources/acknowledgements.json",
-        "sha256": "88306490c087a8c46fb7ab0425459dc2dc2eff65fa9e35170e6e1729d701580f"
+        "sha256": "7ee1f4a4b3bcd07d1002c94f68fcd8c352978acdb39c1ecd07820f0c0844f90f"
       },
       {
         "path": "backend/data/acnr/sources/alias_policy.json",
-        "sha256": "ce33ef513e0371abbdcaa084e2c189b590947fa3428e92881d10432513c668a0"
+        "sha256": "39733ece0b1a472876729688739f8fe222a421b7ac2a5eef2484d1e30d0d91f7"
       },
       {
         "path": "backend/data/acnr/sources/classification_cache.json",
@@ -1229,17 +1298,17 @@
         "sha256": "082b8a081990db1618e28abdaa2059460d16d293283cccb6e90d7856af5acfa3"
       }
     ],
-    "inputs_fingerprint": "5dd3c0af6b16e03d8b68666a20d3d3935952ebf73110743602e543b390d85ffb",
-    "previous_catalog_sha256": "63ffa79465bd22cbe998e06ee5c17433ad682382f202d1da4bd1e42dcb676bdd",
-    "previous_version": "20261027130014",
-    "registry_version": "20261027145857",
+    "inputs_fingerprint": "6db073dd7d3d5be1cf14663b802e90aedc516061d2b0f7d6fce5c57a8ca0f77f",
+    "previous_catalog_sha256": "c64daad9f533c88a77a405541168df3c148e82bd0bf1f24c79cd0bd4a49e8075",
+    "previous_version": "20261027145857",
+    "registry_version": "20261027161822",
     "schema_sha256": "a51d5fee46ed2f73d6aa0611c82d3a6925e77e2157e8fac42d172e2a1705fd8e"
   },
   "summary": {
-    "acknowledged": 1,
+    "acknowledged": 5,
     "blocking": 0,
     "deprecated": 44,
-    "info": 114,
+    "info": 116,
     "total_cells": 474,
     "total_sheets": 1225
   }

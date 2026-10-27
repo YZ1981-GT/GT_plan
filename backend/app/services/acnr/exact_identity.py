@@ -4,9 +4,9 @@
 提供 sheet / cell / 名称归属的唯一判定。文本逐字比较，不做空白或全半角归一。
 
 目标（design §6.2）：全平台「名称/编码 → sheet 身份」只留这一处实现。
-现状：生产代码里导入它的是发布门禁 `catalog_release` 与生成器名称规则 `catalog_names`（T06）；
-`catalog._formula_ref_to_addr_id` / `_uri_to_addr_id`、`full_resolve` 仍用旧启发式。计划接入：
-catalog / full_resolve（T10）、`acnr.wp_cell_target`（T12）、V2 规范化与 stale 引擎（T21）、
+现状：生产代码里调用它的是目录写法解析 `catalog._formula_ref_to_sheet_match` / `_uri_to_sheet_match`
+（`full_resolve` 首步经 `resolve_identity.step1_identity` 调它，T10）、发布门禁 `catalog_release` 与生成器名称规则
+`catalog_names`（T06）。计划接入：`acnr.wp_cell_target`（T12）、V2 规范化与 stale 引擎（T21）、
 `check_ccr_resolve`（T22）。
 
 只依赖标准库与本包的 `catalog` / `reasons` / `catalog_contract`（CI 无需新增依赖）。

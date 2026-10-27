@@ -395,10 +395,30 @@ def _exact_identity_is_pure() -> bool:
 
 
 def _exact_identity_only_release_imports() -> bool:
-    """生产导入方恰为发布门禁与生成器名称规则（T06）——运行时解析（catalog / resolver）尚未接入（T10）。"""
+    """生产导入方恰为目录写法解析（catalog，T10）、发布门禁与生成器名称规则（T06）；
+    wp_cell_target（T12）、V2 / stale（T21）、CCR 检查器（T22）尚未接入。"""
     exclude = _BACKEND / "app" / "services" / "acnr" / "exact_identity.py"
     return _production_importers("exact_identity", exclude) == [
-        "backend/app/services/acnr/catalog_names.py", "backend/app/services/acnr/catalog_release.py"]
+        "backend/app/services/acnr/catalog.py", "backend/app/services/acnr/catalog_names.py",
+        "backend/app/services/acnr/catalog_release.py"]
+
+
+def _full_resolve_step1_uses_exact_identity() -> bool:
+    """full_resolve 第 1 步调 step1_identity，后者经 catalog 的结构化判定调 exact_identity.sheet_of（AST）；
+    catalog 里已不存在按 sheet_code 子串取最长的旧启发式（`code in sheet_name` 形态）。"""
+    def _calls(rel: str, func: str, name: str) -> bool:
+        f = _func(rel, func)
+        return f is not None and any(isinstance(n, ast.Call) and (getattr(n.func, "id", None) == name
+                                     or getattr(n.func, "attr", None) == name) for n in ast.walk(f))
+    cat_rel = "backend/app/services/acnr/catalog.py"
+    rid_rel = "backend/app/services/acnr/resolve_identity.py"
+    substring = any(isinstance(n, ast.Compare) and any(isinstance(op, ast.In) for op in n.ops)
+                    and isinstance(n.left, ast.Name) and n.left.id == "code"
+                    for n in ast.walk(_tree(cat_rel)))
+    return (_calls(_RESOLVER_REL, "full_resolve", "step1_identity")
+            and _calls(rid_rel, "step1_identity", "_formula_ref_to_sheet_match")
+            and _calls(rid_rel, "step1_identity", "_uri_to_sheet_match")
+            and _calls(cat_rel, "_sheet_match", "sheet_of") and not substring)
 
 
 def _orphan_verdicts_released() -> bool:

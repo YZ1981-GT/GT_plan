@@ -215,6 +215,112 @@
       "kind": "seed_semantic_unverified",
       "owner": "acnr-foundation-defect-closure",
       "reason": "13 张种子名不一致 sheet 中坐标在模板已用范围内的 33 格：地址保留，种子语义与模板行文字不符，显示「{A1}（语义待核对）」、semantic_label 置空，逐格重新核对种子属范围外工程（design §6.4 / §16 Q3）"
+    },
+    {
+      "covers": {
+        "sheet_codes": [
+          "A13"
+        ]
+      },
+      "created_on": "2026-10-27",
+      "evidence": {
+        "head_addr_ids": [
+          "A13/A13/A10"
+        ],
+        "writings": [
+          "ccr_source:CW-73"
+        ]
+      },
+      "expires_on": "2027-04-30",
+      "head_resolvable_at": "A13/A13",
+      "id": "ack-head-errmatch-A13-A13-3 评价识别出的错报",
+      "kind": "head_resolvable_errmatch",
+      "owner": "A 循环（报表 / 调整）",
+      "reason": "HEAD 靠子串把「A13-3 评价识别出的错报」落到 A13/A13（错配：该写法指的不是这张表，目录中也没有它所指的表）；改用 exact_identity 后为未找到，不加别名；所指表的登记或写法更正待该循环处置（design §6.5）",
+      "writing": {
+        "sheet": "A13-3 评价识别出的错报",
+        "wp_code": "A13"
+      }
+    },
+    {
+      "covers": {
+        "sheet_codes": [
+          "A13"
+        ]
+      },
+      "created_on": "2026-10-27",
+      "evidence": {
+        "head_addr_ids": [
+          "A13/A13/source_wp_code"
+        ],
+        "writings": [
+          "ccr_source:CW-401"
+        ]
+      },
+      "expires_on": "2027-04-30",
+      "head_resolvable_at": "A13/A13",
+      "id": "ack-head-errmatch-A13-错报明细A13-2",
+      "kind": "head_resolvable_errmatch",
+      "owner": "A 循环（报表 / 调整）",
+      "reason": "HEAD 靠子串把「错报明细A13-2」落到 A13/A13（错配：该写法指的不是这张表，目录中也没有它所指的表）；改用 exact_identity 后为未找到，不加别名；所指表的登记或写法更正待该循环处置（design §6.5）",
+      "writing": {
+        "sheet": "错报明细A13-2",
+        "wp_code": "A13"
+      }
+    },
+    {
+      "covers": {
+        "sheet_codes": [
+          "B23"
+        ]
+      },
+      "created_on": "2026-10-27",
+      "evidence": {
+        "head_addr_ids": [
+          "B23/B23/控制了解结论"
+        ],
+        "writings": [
+          "ccr_source:CW-122",
+          "ccr_target:CW-122"
+        ]
+      },
+      "expires_on": "2027-04-30",
+      "head_resolvable_at": "B23/B23",
+      "id": "ack-head-errmatch-B23-B23-2 货币资金控制了解",
+      "kind": "head_resolvable_errmatch",
+      "owner": "B 循环（控制了解）",
+      "reason": "HEAD 靠子串把「B23-2 货币资金控制了解」落到 B23/B23（错配：该写法指的不是这张表，目录中也没有它所指的表）；改用 exact_identity 后为未找到，不加别名；所指表的登记或写法更正待该循环处置（design §6.5）",
+      "writing": {
+        "sheet": "B23-2 货币资金控制了解",
+        "wp_code": "B23"
+      }
+    },
+    {
+      "covers": {
+        "sheet_codes": [
+          "I1"
+        ]
+      },
+      "created_on": "2026-10-27",
+      "evidence": {
+        "head_addr_ids": [
+          "I1/I1/本期摊销合计"
+        ],
+        "writings": [
+          "ccr_source:CW-246",
+          "ccr_target:CW-246"
+        ]
+      },
+      "expires_on": "2027-04-30",
+      "head_resolvable_at": "I1/I1",
+      "id": "ack-head-errmatch-I1-摊销测算表（不含减值）I1-10（剩余年限法）",
+      "kind": "head_resolvable_errmatch",
+      "owner": "I 循环（无形资产）",
+      "reason": "HEAD 靠子串把「摊销测算表（不含减值）I1-10（剩余年限法）」落到 I1/I1（错配：该写法指的不是这张表，目录中也没有它所指的表）；改用 exact_identity 后为未找到，不加别名；所指表的登记或写法更正待该循环处置（design §6.5）",
+      "writing": {
+        "sheet": "摊销测算表（不含减值）I1-10（剩余年限法）",
+        "wp_code": "I1"
+      }
     }
   ]
 }

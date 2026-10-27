@@ -305,10 +305,12 @@ async def acnr_resolve_get(
 async def acnr_entries(
     cycle: str | None = Query(None, description="循环码过滤，如 D"),
     import_export_only: bool = Query(False, description="仅返回启用 import_export 的 sheet"),
+    include_deprecated: bool = Query(False, description="是否列出已停用的 sheet（默认不列）"),
     _user=Depends(get_current_user),
 ):
-    """列出 sheet 目录条目（支持按 cycle / import_export 过滤）。"""
-    return list_sheets(cycle=cycle, import_export_only=import_export_only)
+    """列出 sheet 目录条目（支持按 cycle / import_export 过滤；停用条目默认不列，design §3.3）。"""
+    return list_sheets(cycle=cycle, import_export_only=import_export_only,
+                       include_deprecated=include_deprecated)
 
 
 @router.get("/anchors")

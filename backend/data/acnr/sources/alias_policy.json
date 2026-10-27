@@ -24,8 +24,20 @@
       "alias": "D5-1",
       "disposition": "merge_into",
       "owner": "acnr-foundation-defect-closure",
-      "reason": "D5 册审定表 tab 的平台编号（design §1.2 / §7.3）：标签源别名「应收款项融资审定表D5-1」并入 D5/D5，并入后在 D5 父级内唯一",
-      "target": "D5/D5"
+      "reason": "D5 册审定表 tab 的平台编号（design §1.2 / §7.3）：标签源别名「应收款项融资审定表D5-1」并入 D5/D5，并入后在 D5 父级内唯一；别名键本身也并入：D5 册审定表 tab 的平台编号（2025 审定表编 n-1，design §1.2 / §6.5 / §7.3）；预设 report-cross-check-rw-74 的 WP('D5', 'D5-1', '审定数') 在 HEAD 靠子串落到 D5/D5，业务上正确，改用父级限定别名后仍解析到 D5/D5",
+      "target": "D5/D5",
+      "writings": [
+        {
+          "sheet": "D5-1",
+          "where": "preset_expr:report-cross-check-rw-74",
+          "wp_code": "D5"
+        },
+        {
+          "sheet": "D5-1",
+          "where": "preset_ref:report-cross-check-rw-74",
+          "wp_code": "D5"
+        }
+      ]
     },
     {
       "alias": "D4-22A",
@@ -188,6 +200,54 @@
       "disposition": "non_address_label",
       "owner": "acnr-foundation-defect-closure",
       "reason": "前端 tab 伪键：附注披露 tab，目录未收录（补齐属范围外，design §7.3）"
+    },
+    {
+      "alias": "I1-1",
+      "disposition": "merge_into",
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "I1 册审定表 tab 的平台编号（模板 tab「审定表I1」，映射科目同一，design §6.5）；预设 report-cross-check-rw-83 的 WP('I1', 'I1-1', '审定数') 在 HEAD 靠子串落到 I1/I1，业务上正确，改用父级限定别名",
+      "target": "I1/I1",
+      "writings": [
+        {
+          "sheet": "I1-1",
+          "where": "preset_expr:report-cross-check-rw-83",
+          "wp_code": "I1"
+        },
+        {
+          "sheet": "I1-1",
+          "where": "preset_ref:report-cross-check-rw-83",
+          "wp_code": "I1"
+        }
+      ]
+    },
+    {
+      "alias": "审定表I1-1",
+      "disposition": "merge_into",
+      "owner": "acnr-foundation-defect-closure",
+      "reason": "I1 审定表的平台名写法（模板 tab「审定表I1」，design §6.5）；CCR CW-249 / CW-253 / CW-261 在 HEAD 靠子串落到 I1/I1，业务上正确，改用父级限定别名",
+      "target": "I1/I1",
+      "writings": [
+        {
+          "sheet": "审定表I1-1",
+          "where": "ccr_source:CW-249",
+          "wp_code": "I1"
+        },
+        {
+          "sheet": "审定表I1-1",
+          "where": "ccr_source:CW-253",
+          "wp_code": "I1"
+        },
+        {
+          "sheet": "审定表I1-1",
+          "where": "ccr_source:CW-261",
+          "wp_code": "I1"
+        },
+        {
+          "sheet": "审定表I1-1",
+          "where": "ccr_target:CW-261",
+          "wp_code": "I1"
+        }
+      ]
     }
   ]
 }

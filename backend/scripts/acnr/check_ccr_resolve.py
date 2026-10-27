@@ -232,6 +232,17 @@ class OfflineCatalog:
 # ---------------------------------------------------------------------------
 
 
+def _is_deprecated(catalog: OfflineCatalog, addr_id: str | None) -> bool:
+    """addr_id 所指 cell 或其所在 sheet 是否为停用条目。"""
+    if not addr_id:
+        return False
+    cell = catalog.cells_by_addr_id.get(addr_id)
+    if cell is not None and cell.get("deprecated"):
+        return True
+    sheet = catalog.sheets_by_addr_id.get(addr_id) or catalog.sheets_by_addr_id.get("/".join(addr_id.split("/")[:2]))
+    return bool(sheet and sheet.get("deprecated"))
+
+
 def _build_ccr_source_formula(ref: dict) -> str | None:
     """Construct a formula_ref from CCR source fields for resolve attempt.
 
@@ -467,6 +478,8 @@ def main() -> int:
     resolved_results = [r for r in results if r.resolved]
     semantic_only_skipped = [r for r in results if not r.resolved and r.semantic_only]
     gap_results = [r for r in results if not r.resolved and not r.semantic_only]
+    # 解析到停用条目的引用：计入 deprecated 组、不阻断（design §3.3）
+    deprecated_results = [r for r in resolved_results if _is_deprecated(catalog, r.addr_id)]
 
     # --- Build L4 edge endpoint addr_id mapping (R17.2) ---
     # Source endpoints
@@ -504,6 +517,13 @@ def main() -> int:
     print(f"  ✓ Resolved:              {resolved_count}")
     print(f"  ○ Semantic-only skipped: {semantic_count}")
     print(f"  ✗ Gaps (unresolved):     {gap_count}")
+    deprecated_targets = [(rid, a) for rid, addrs in target_addr_id_mapping.items() for a in addrs
+                          if _is_deprecated(catalog, a)]
+    print(f"  停用条目引用（deprecated 组，不阻断）: {len(deprecated_results) + len(deprecated_targets)}")
+    for r in deprecated_results:
+        print(f"    [{r.ref_id}] (source) {r.source_formula} → {r.addr_id}")
+    for rid, a in deprecated_targets:
+        print(f"    [{rid}] (target) → {a}")
     print(
         f"  L4 source addr_id:       {len(addr_id_mapping)} mapped"
     )
