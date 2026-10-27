@@ -218,6 +218,19 @@ class _RecordingAddressing:
         self.events.append("resolve")
         return [ResolvedTarget(raw=r, found=True, addr_id=r) for r in raws]
 
+    async def resolve_target(self, raw, *, project_id=None, db=None, timeout_s=5.0):
+        """业务视图经 ``resolve_acnr_targets`` 逐项解析（acnr-foundation-defect-closure T15），只接受 L1 底稿单元格。"""
+        from app.services.acnr.resolver import ResolveResult
+
+        self.events.append("resolve")
+        res = ResolveResult(found=True, addr_id=raw, entry_type="cell", source_layer="L1_cell")
+        return ResolvedTarget(raw=raw, found=True, addr_id=raw, entry_type="cell", result=res)
+
+
+async def _record_values(resolved, *, project_id, year, db):
+    """单元格取值桩（取值发生在缓存之后；本属性只看归属校验先于一切数据层）。"""
+    return None
+
 
 class _RecordingCache:
     """记录 cache（数据读写层）调用时点的缓存桩。"""
@@ -269,13 +282,16 @@ async def test_p16_ownership_check_single_point_no_bypass(entry, deny, n_targets
         if entry == ENTRY_BUSINESS
         else []
     )
-    req = QueryRequest(entry=entry, project_id=str(uuid4()), targets=targets)
+    req = QueryRequest(entry=entry, project_id=str(uuid4()), year=2025, targets=targets)
     user = MagicMock()
     user.id = "u1"
     db = AsyncMock()
+    from unittest.mock import patch
+
+    values = patch("app.services.custom_query.query_orchestrator.read_acnr_target_values", _record_values)
 
     if deny:
-        with pytest.raises(HTTPException) as ei:
+        with values, pytest.raises(HTTPException) as ei:
             await orch.execute(req, user=user, db=db)
         assert ei.value.status_code == 403
         # 未通过 Ownership_Check → 数据读写层零触达（无绕过）
@@ -284,7 +300,8 @@ async def test_p16_ownership_check_single_point_no_bypass(entry, deny, n_targets
         assert "cache" not in events
         assert "fetch" not in events
     else:
-        await orch.execute(req, user=user, db=db)
+        with values:
+            await orch.execute(req, user=user, db=db)
         # Ownership_Check 是数据链的第一步
         assert events[0] == "ownership_check"
         oc = events.index("ownership_check")

@@ -141,6 +141,12 @@ acnr_targets 结果单独成块，不混入常规结果的 `rows/columns`。业�
 
 接线：`QueryOrchestrator._resolve_targets` 改调 `resolve_acnr_targets`；`execute` 在缓存读取之后（无论命中）调 `read_acnr_target_values`，取值不进缓存；`QueryResult.acnr_results` 只增，缺省 None、无目标不输出。`routers/custom_query.py` 只改基类与 import（≤ +4 行，余量 27）。
 
+T15 实施记录（段七第 5 轮，待评审核实）：
+- 落点：业务视图在 `QueryOrchestrator._resolve_targets` 调 `resolve_acnr_targets`（传编排器自己的寻址服务）后经 `complete_year` 补年度，`execute` 在 `get_or_compute` 之后调 `read_acnr_target_values`，`ExecuteCompatibilityAdapter.to_legacy_response` 仅在有块时输出 `acnr_results`。构建器三端点在 `_builder_scope` 之后调 `acnr_target_values.plan_builder_targets`（缺项目 422 `PROJECT_REQUIRED`「选择单元格取值时须指定项目」、`complete_year`、解析拒绝 422 / 503，均在 SQL 与缓存之前）；`/preview` 返回 `acnr_resolved`，`/execute` 命中与未命中缓存都用 `with_acnr_results` 现读后附加（缓存里不带它），`/export-excel` 经 `acnr_sheet` 追加「单元格取值」工作表（`export_service.stream_xlsx` / `query_export.respond_xlsx` / `export_builder_query` 各加一个可选参数，缺省行为不变）。`routers/custom_query.py` 净增 3 行（模板 config 字段类型改 `TemplateConfig`、`execute_template` 包 `ValidationError → template_config_rejected`）。
+- body-carried 扫描器把 `_builder_scope` 登记为额外项目级标识，证明链 `_builder_scope → resolve_builder_scope → OwnershipGuard.assert_target_accessible → _can_access_project → _accessible_project_ids（ProjectUser / ProjectAssignment）`。三端点原本已因 `require_query_builder_access` 记为项目档，档位与基线（84）不变，未加入 `_FIXED_ENDPOINTS`（该钉子的变异会连带删掉 `body.project_id` 读取，端点退出本维，判据不适用）。
+- 年度：业务视图请求 `year` 必填（2000~2100），`complete_year` 只对编排器直调时的 None 生效；构建器 `year` 可缺省，按项目审计年度补齐。模板执行的年度补齐仍归 advanced-query 任务 24（其 ADR-AQL-15 统一走 `deps.require_project_audit_year`，HEAD 尚无该函数）；本 spec 只把模板 config 构造失败（含年度缺失、acnr_targets 非法）由 500 改为 422 `TEMPLATE_CONFIG_INVALID` 并点名非法项，对方任务 24 按其原文「沿用其实现」。
+- 跨 spec 观察（不改对方代码，需用户转达 advanced-query）：`POST /api/custom-query/templates` 传 `scope="private"` 或 `"personal"` 时，路由先归一成 `private`，`template_service.save_template` 的 `_normalize_scope` 又不认 `private`，抛 `TemplateInvalidError` 成 500（端到端用例因此用 `scope="public"`）。
+
 ### 2.4 读取：与 formula-hub 共用 `wp_cell_reader`
 
 契约逐字采用 formula-hub ADR-FHIC-06 第 1 点：`services/wp_cell_reader.py::resolve_wp_cell(db, *, project_id, year, wp_code, sheet_key: str | None, cell) -> WpCellRead{state ∈ ok|missing|blocked, value: Decimal | None, reason, wp_id, sheet, matches}`，步骤、三态与原因按其原文（年度不符 missing、0 份底稿 missing、多份 blocked、`normalize_sheet_key(rec.sheet) == sheet_key` 过滤、同一归一键多个真实表名 blocked、无此表 missing、空值 missing、非数值 blocked）。先后按其 §8.2：任务 22 先提交；本 spec 动手前 `git log -S "resolve_wp_cell"`，未入库则按该原文建模块并登记 `WP_CELL_READER_IMPL`，入库则只接线。

@@ -11,7 +11,12 @@
    ``index=``；返回 ``acnr_results`` 块，``items`` 与请求逐项对应、顺序相同、重复项各答一次。
 
 本模块不读 ``parsed_data``、不调 ``extract_custom_cells``（``test_acnr_targets_single_reader`` 用 AST 钉住）。
-端点接线、项目鉴权与年度补齐在 T15（``QueryOrchestrator`` / 构建器三端点）。
+
+端点接线（T15）：业务视图经 ``QueryOrchestrator``（step1 项目归属 → ``resolve_acnr_targets`` → 缓存 → 取数之后
+``read_acnr_target_values``，取值不进缓存）；构建器三端点在 ``_builder_scope``（``resolve_builder_scope`` →
+``ownership_guard``，与业务视图同一守卫）之后调 ``plan_builder_targets``：带 acnr_targets 缺项目 422、年度
+``complete_year`` 补齐（补不出 422 ``YEAR_REQUIRED``）、解析拒绝 422 / 503；``/preview`` 只解析不取值，``/execute``
+取值不进缓存，``/export-excel`` 追加「单元格取值」工作表（``acnr_sheet``）。
 """
 from __future__ import annotations
 
@@ -30,17 +35,21 @@ from app.services.custom_query.addressing_service import (
     ResolvedTarget,
     addressing_service,
 )
+from app.services.project_audit_year import fetch_project_audit_year
 
 if TYPE_CHECKING:
     from app.services.acnr.catalog import CatalogIndex
 
 __all__ = [
-    "ACNR_TARGETS_REJECTED", "RESOLVE_UNAVAILABLE", "TargetIssue", "classify_target", "read_acnr_target_values",
-    "resolve_acnr_targets",
+    "ACNR_TARGETS_REJECTED", "AcnrQueryPlan", "PROJECT_REQUIRED", "RESOLVE_UNAVAILABLE", "TargetIssue",
+    "YEAR_REQUIRED", "acnr_sheet", "classify_target", "complete_year", "plan_builder_targets",
+    "read_acnr_target_values", "resolve_acnr_targets", "with_acnr_results",
 ]
 
 ACNR_TARGETS_REJECTED = "ACNR_TARGETS_REJECTED"
 RESOLVE_UNAVAILABLE = "RESOLVE_UNAVAILABLE"
+YEAR_REQUIRED = "YEAR_REQUIRED"
+PROJECT_REQUIRED = "PROJECT_REQUIRED"
 _UNAVAILABLE_MESSAGE = "地址解析服务暂不可用，未执行查询，请稍后重试"
 #: 候选最多给几条（design §2.3 ambiguous「带候选 ≤5」）
 _MAX_CANDIDATES = 5
@@ -200,3 +209,78 @@ async def read_acnr_target_values(
             },
         })
     return {"registry_version": cat.registry_version, "year": year, "items": items}
+
+
+async def complete_year(db, project_id, year: int | None) -> int:
+    """取值年度：请求年度（None 或 ≤ 0 视为缺省）⇒ 项目审计年度；仍未知 ⇒ 422 ``YEAR_REQUIRED``（design §2.3）。"""
+    if year is not None and year > 0:
+        return int(year)
+    filled = await fetch_project_audit_year(db, project_id)
+    if filled is None:
+        raise HTTPException(status_code=422, detail={
+            "error_code": YEAR_REQUIRED, "message": "项目审计年度未知，请指定年度后再取值",
+        })
+    return int(filled)
+
+
+@dataclass(frozen=True)
+class AcnrQueryPlan:
+    """一次查询里已全部接受的 acnr_targets（与请求同序）及其项目、取值年度。"""
+
+    resolved: list[ResolvedTarget]
+    project_id: str
+    year: int
+
+    async def results(self, db) -> dict[str, Any] | None:
+        return await read_acnr_target_values(self.resolved, project_id=self.project_id, year=self.year, db=db)
+
+    async def preview(self, db) -> list[dict[str, Any]]:
+        """构建器 ``/preview``：只给解析结果（中文名与公式写法），不取值。"""
+        cat: CatalogIndex = await effective_catalog(db, self.project_id)
+        out: list[dict[str, Any]] = []
+        for target in self.resolved:
+            cell = cat.cells_by_addr_id.get(target.addr_id or "") or {}
+            sheet = cat.sheets_by_addr_id.get(cell.get("parent_addr_id", "")) or {}
+            out.append({"input": target.raw, "addr_id": target.addr_id,
+                        "display_label": _display_label(cell, sheet), "formula_ref": cell.get("formula_ref")})
+        return out
+
+
+async def plan_builder_targets(body, *, db) -> AcnrQueryPlan | None:
+    """构建器三端点：在作用域判定（``_builder_scope`` → ``resolve_builder_scope`` → ``ownership_guard``）之后调用。
+
+    不带 acnr_targets ⇒ None（旧请求原样）；带 acnr_targets 缺 ``project_id`` ⇒ 422；年度补齐见 ``complete_year``；
+    解析拒绝 ⇒ 422 / 503（都不取数、不执行 SQL）。
+    """
+    targets = list(getattr(body, "acnr_targets", None) or [])
+    if not targets:
+        return None
+    if getattr(body, "project_id", None) is None:
+        raise HTTPException(status_code=422, detail={
+            "error_code": PROJECT_REQUIRED, "message": "选择单元格取值时须指定项目",
+        })
+    project_id = str(body.project_id)
+    year = await complete_year(db, project_id, getattr(body, "year", None))
+    resolved = await resolve_acnr_targets(targets, project_id=project_id, db=db)
+    return AcnrQueryPlan(resolved=resolved, project_id=project_id, year=year)
+
+
+def with_acnr_results(payload: dict[str, Any], block: dict[str, Any] | None) -> dict[str, Any]:
+    """响应加 ``acnr_results`` 块（没有目标时原样返回，旧请求响应逐字段不变；不改入参，缓存里的结果不带它）。"""
+    return payload if block is None else {**payload, "acnr_results": block}
+
+
+_STATE_LABELS = {"ok": "已取值", "text": "文本", "missing": "取不到", "blocked": "无法确定"}
+ACNR_SHEET_TITLE = "单元格取值"
+
+
+def acnr_sheet(block: dict[str, Any] | None) -> tuple[str, list[list[Any]]] | None:
+    """构建器导出追加的「单元格取值」工作表：表头 + 逐项（中文名 / 引用 / 状态 / 值 / 原因）。"""
+    if block is None:
+        return None
+    rows: list[list[Any]] = [["中文名", "引用", "状态", "值", "原因"]]
+    for item in block["items"]:
+        value = item["value"] if item["value"] is not None else item["text"]
+        rows.append([item["display_label"], item["formula_ref"] or item["addr_id"],
+                     _STATE_LABELS.get(item["state"], item["state"]), value, item["reason"]])
+    return ACNR_SHEET_TITLE, rows

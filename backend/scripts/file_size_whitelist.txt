@@ -1634,3 +1634,7 @@ backend/app/services/attachment_service.py  1309
 #   位置写入与读取都在 components/attachment/rowEvidence.ts。拆分方向：示例抽屉（C1-1 ~ C1-3）、
 #   过程记录（C1-4-1 ~ C1-4-6）、样本测试表与识别上传三块各成子组件。
 audit-platform/frontend/src/components/workpaper/GtC1EntityControl.vue  3167
+# acnr-foundation-defect-closure T15（2026-10-28）：test_advanced_query_hardening_wave012.py —— 历史大文件（HEAD 已 2222 行且未登记，
+#   任何改动都会被门禁拒）。本 spec 按 tasks.md T15 同步改两条既有断言（不可解析目标 400 → 422 ACNR_TARGETS_REJECTED、
+#   多目标替身补 L1_cell 结果），净增 0 行，基线取 HEAD 值。拆分方向：编排器 / 适配器、鉴权收口、模板执行三组各成文件。
+backend/tests/test_advanced_query_hardening_wave012.py  2222

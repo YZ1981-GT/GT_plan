@@ -119,6 +119,10 @@ class ExecuteCompatibilityAdapter:
         meta = getattr(result, "meta", None)
         if meta:
             payload["meta"] = meta
+        # acnr_targets 取值块（acnr-foundation-defect-closure T15）：不带目标时整键省略
+        acnr_results = getattr(result, "acnr_results", None)
+        if acnr_results is not None:
+            payload["acnr_results"] = acnr_results
         return payload
 
     async def execute(self, body: Any, *, user: Any, db: Any) -> dict[str, Any]:

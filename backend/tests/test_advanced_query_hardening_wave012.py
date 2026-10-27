@@ -14,6 +14,8 @@ from pydantic import ValidationError
 from app.routers.custom_query import QueryRequest as ApiQueryRequest
 from app.services.query_cache import build_canonical_query_identity
 from app.services.custom_query.execute_compatibility import ExecuteCompatibilityAdapter
+from app.services.acnr.resolver import ResolveResult
+from app.services.custom_query.addressing_service import ResolvedTarget
 from app.services.custom_query.query_orchestrator import (
     Agg,
     ColumnMeta,
@@ -493,9 +495,9 @@ async def test_p6_adapter_is_single_core_and_new_fields_are_lossless(
 async def test_acnr_resolution_failure_remains_4xx_and_never_fetches():
     calls = {"fetch": 0}
 
-    class Unresolved:
-        async def resolve_many(self, targets, *, project_id, db):
-            return [SimpleNamespace(raw=targets[0], found=False, addr_id=None)]
+    class Unresolved:  # acnr-foundation-defect-closure T15：逐项 resolve_target，原 400 TARGET_UNRESOLVABLE 改 422
+        async def resolve_target(self, raw, *, project_id=None, db=None, timeout_s=5.0):
+            return ResolvedTarget(raw=raw, found=False, error="unresolvable", result=ResolveResult(found=False))
 
     async def fetcher(req, resolved, db):
         calls["fetch"] += 1
@@ -509,9 +511,9 @@ async def test_acnr_resolution_failure_remains_4xx_and_never_fetches():
             QueryRequest(entry="business", project_id="p1", source="report", targets=["bad-target"]),
             user=SimpleNamespace(id="u1"), db=None,
         )
-    assert exc.value.status_code == 400
-    assert exc.value.detail["error_code"] == "TARGET_UNRESOLVABLE"
-    assert calls["fetch"] == 0
+    assert (exc.value.status_code, exc.value.detail["error_code"]) == (422, "ACNR_TARGETS_REJECTED")
+    assert [(i["ref"], i["error_code"]) for i in exc.value.detail["issues"]] == [("bad-target", "unresolvable")]
+    assert calls["fetch"] == 0  # 取数 0 次保留
 
 
 @pytest.mark.asyncio
@@ -697,8 +699,9 @@ class TestReadonlyGateConvergence:
         assert exc.value.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_multi_target_one_inaccessible_rejects_all_not_partial(self):
-        """acnr_targets 引用多项目时，任一项目不可访问 → 整体 403，不返回部分结果。"""
+    async def test_multi_target_one_inaccessible_rejects_all_not_partial(self, monkeypatch):
+        """acnr_targets 引用多项目时，任一项目不可访问 → 整体 403，不返回部分结果（acnr T15：替身补 L1_cell 结果，取值换桩）。"""
+        monkeypatch.setattr("app.services.custom_query.query_orchestrator.read_acnr_target_values", AsyncMock())
         fetch_calls = {"count": 0}
 
         class MultiProjectGuard:
@@ -714,12 +717,9 @@ class TestReadonlyGateConvergence:
                 return [r for r in rows if r.get("project_id") != "p2"]
 
         class MultiProjectAddressing:
-            """解析多目标，每个目标关联不同项目。"""
-            async def resolve_many(self, targets, *, project_id, db):
-                return [
-                    SimpleNamespace(raw=t, found=True, addr_id=f"WP/{t}", project_id=project_id)
-                    for t in targets
-                ]
+            async def resolve_target(self, raw, *, project_id=None, db=None, timeout_s=5.0):
+                res = ResolveResult(found=True, addr_id=f"WP/{raw}", entry_type="cell", source_layer="L1_cell")
+                return ResolvedTarget(raw=raw, found=True, addr_id=res.addr_id, entry_type="cell", result=res)
 
         async def fetcher(req, resolved, db):
             fetch_calls["count"] += 1
@@ -735,7 +735,7 @@ class TestReadonlyGateConvergence:
         )
 
         req = QueryRequest(
-            entry="business", project_id="p1", source="trial_balance",
+            entry="business", project_id="p1", source="trial_balance", year=2025,
             targets=["target_a", "target_b"],
         )
         result = await orch.execute(req, user=SimpleNamespace(id="u1"), db=None)

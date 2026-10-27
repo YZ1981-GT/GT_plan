@@ -42,6 +42,7 @@ from app.services.custom_query.builder_access import (
     builder_admission,
     resolve_builder_access,
 )
+from app.services.custom_query.acnr_target_values import acnr_sheet, plan_builder_targets, with_acnr_results
 from app.services.custom_query.builder_scope import (
     BuilderScope,
     resolve_builder_scope,
@@ -225,16 +226,18 @@ async def preview_query(
     scope = await _builder_scope(
         body, user=current_user, db=db, requested_project_id=body.project_id, year=body.year
     )
+    acnr = await plan_builder_targets(body, db=db)  # 只解析不取值（acnr design §2.2）
     stmt, column_names = _build_select(
         body, scope=scope, role=_get_role_value(current_user), warnings=warnings
     )
-    return {
+    payload = {
         "sql": _stmt_to_sql(stmt),
         "columns": column_names,
         "table": body.table,
         "scope": scope.describe(),
         "warnings": warnings,
     }
+    return payload if acnr is None else {**payload, "acnr_resolved": await acnr.preview(db)}
 
 
 async def _audit_query_rejection(
@@ -289,6 +292,8 @@ async def execute_query(
     scope = await _builder_scope(
         body, user=current_user, db=db, requested_project_id=body.project_id, year=body.year
     )
+    # acnr_targets：作用域判定（项目归属）之后、SQL 与缓存之前解析；拒绝即 422 / 503，不执行查询
+    acnr = await plan_builder_targets(body, db=db)
     try:
         stmt, column_names = _build_select(
             body, scope=scope, role=_get_role_value(current_user), warnings=warnings
@@ -312,7 +317,7 @@ async def execute_query(
     cached = await get_cached_result(cache_key)
     if cached is not None:
         response.headers["X-Cache"] = "HIT"
-        return cached
+        return with_acnr_results(cached, await acnr.results(db) if acnr else None)
 
     try:
         async with cancellable_query(db, QUERY_TIMEOUT_MS):
@@ -361,10 +366,10 @@ async def execute_query(
         "formula_refs": _derive_formula_refs(body.table, rows_serialized),
     }
 
-    # 回写 Redis 缓存（短 TTL）
+    # 回写 Redis 缓存（短 TTL）；单元格取值每次现读，不进缓存
     await set_cached_result(cache_key, query_result)
 
-    return query_result
+    return with_acnr_results(query_result, await acnr.results(db) if acnr else None)
 
 
 _EXPORT_FETCH_SIZE = 2000  # 每批从 DB 拉取的行数（服务端游标），避免全量加载
@@ -389,6 +394,7 @@ async def export_excel(
     scope = await _builder_scope(
         body, user=current_user, db=db, requested_project_id=body.project_id, year=body.year
     )
+    acnr = await plan_builder_targets(body, db=db)
     try:
         stmt, column_names = _build_select(
             body, scope=scope, role=_get_role_value(current_user), warnings=warnings, for_export=True
@@ -400,6 +406,7 @@ async def export_excel(
     return await export_builder_query(
         body, stmt=stmt, column_names=column_names, scope=scope, warnings=warnings,
         table_label=TABLE_WHITELIST[body.table]["label"], user=current_user, db=db, batch=_EXPORT_FETCH_SIZE,
+        extra_sheet=acnr_sheet(await acnr.results(db) if acnr else None),
     )
 
 

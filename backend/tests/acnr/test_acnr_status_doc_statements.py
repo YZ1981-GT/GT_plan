@@ -103,6 +103,67 @@ def _query_models_are_strict() -> bool:
                    and getattr(n.annotation, "id", None) == "AcnrTargetList" for n in cls.body)
 
     return _ok(_CQ + "builder_dsl.py", "QueryDSL") and _ok("backend/app/routers/custom_query.py", "QueryRequest")
+
+
+_QB_REL = "backend/app/routers/query_builder.py"
+
+
+def _acnr_targets_importers_ok() -> bool:
+    """生产代码里导入 acnr_target_values 的恰为业务视图编排器与构建器路由（T15 接线，AST）。"""
+    return sorted(_production_importers_of("acnr_target_values")) == [_QB_REL, _CQ + "query_orchestrator.py"]
+
+
+def _fn_node(rel: str, name: str):
+    import ast as _ast
+
+    return next(n for n in _ast.walk(_ast.parse(_read(_REPO / rel)))
+                if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef)) and n.name == name)
+
+
+def _first_call_line(node, name: str) -> int | None:
+    import ast as _ast
+
+    lines = [c.lineno for c in _ast.walk(node) if isinstance(c, _ast.Call)
+             and (c.func.id if isinstance(c.func, _ast.Name) else getattr(c.func, "attr", "")) == name]
+    return min(lines) if lines else None
+
+
+def _builder_endpoints_scope_before_targets() -> bool:
+    """构建器三端点：项目守卫（_builder_scope）的调用行先于 plan_builder_targets（取值只在守卫放行之后）。"""
+    for fn in ("preview_query", "execute_query", "export_excel"):
+        node = _fn_node(_QB_REL, fn)
+        scope, plan = _first_call_line(node, "_builder_scope"), _first_call_line(node, "plan_builder_targets")
+        if scope is None or plan is None or not scope < plan:
+            return False
+    return True
+
+
+def _orchestrator_reads_values_after_cache() -> bool:
+    """编排器 execute 里 read_acnr_target_values 在 get_or_compute 之后；QueryResult.to_payload 不含 acnr_results。"""
+    import ast as _ast
+
+    rel = _CQ + "query_orchestrator.py"
+    node = _fn_node(rel, "execute")
+    cache, read = _first_call_line(node, "get_or_compute"), _first_call_line(node, "read_acnr_target_values")
+    to_payload = _fn_node(rel, "to_payload")
+    keys = {k.value for n in _ast.walk(to_payload) if isinstance(n, _ast.Dict)
+            for k in n.keys if isinstance(k, _ast.Constant)}
+    return cache is not None and read is not None and cache < read and "acnr_results" not in keys
+
+
+def _template_configs_are_checked() -> bool:
+    """模板创建 / 更新请求模型的 config 注解里用的是 TemplateConfig（保存时校验 acnr_targets，AST）。"""
+    import ast as _ast
+
+    tree = _ast.parse(_read(_REPO / "backend/app/routers/custom_query.py"))
+    found = {}
+    for cls in (n for n in tree.body if isinstance(n, _ast.ClassDef)):
+        for n in cls.body:
+            if isinstance(n, _ast.AnnAssign) and getattr(n.target, "id", None) == "config":
+                found[cls.name] = {x.id for x in _ast.walk(n.annotation) if isinstance(x, _ast.Name)}
+    return all("TemplateConfig" in found.get(c, set()) for c in ("TemplateCreateRequest", "TemplateUpdateRequest"))
+
+
 _STATEMENTS: dict[str, dict[str, Stmt]] = {
     H_INTRO: {
         "本节由实施 spec `acnr-foundation-defect-closure`（D12）补入，**只写当前 HEAD 可验证的事实**": P(
@@ -203,7 +264,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
                       "test_database_error_propagates"),
             claim("生产代码里导入 wp_cell_reader 的恰为 acnr/wp_cell_target（AST）",
                   lambda: _production_importers_of("wp_cell_reader") == [_A + "wp_cell_target.py"])),
-        "单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；导入它的生产模块是底稿公式三参 WP 的 A1 第三参（WPExecutor）与高级查询取值编排，后者尚未接到端点）": CB(
+        "单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；导入它的生产模块是底稿公式三参 WP 的 A1 第三参（WPExecutor）与高级查询取值编排）": CB(
             _A + "wp_cell_target.py", ("read_entry_cell", "read_formula_cell", "effective_catalog", "sheet_key_for"),
             _T + "test_wp_cell_target.py",
             calls(_A + "wp_cell_target.py", "read_entry_cell", "resolve_wp_cell", "bind_wp_code", "sheet_key_for"),
@@ -217,28 +278,43 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
                       "backend/app/services/custom_query/acnr_target_values.py",
                       "backend/app/services/formula_engine.py"]),
             calls("backend/app/services/formula_engine.py", "read_sheet_cell", "effective_catalog", "read_formula_cell"),
-            claim("生产代码里没有导入 acnr_target_values 的模块（尚未接到端点，AST）",
-                  lambda: _production_importers_of("acnr_target_values") == []),
-            task_open("T15"), in_planned("T15")),
-        "高级查询 acnr_targets 解析与取值编排（逐项分类、任一不合格即整体拒绝并逐项给中文原因、首个解析不可用即返回服务不可用、整批时限；取值只经单元格取值接线；尚无生产调用方，端点接线、项目鉴权与年度补齐见下表）": CB(
-            _CQ + "acnr_target_values.py", ("resolve_acnr_targets", "read_acnr_target_values", "classify_target"),
-            _T + "test_acnr_targets_single_reader.py",
+            claim("生产代码里导入 acnr_target_values 的恰为编排器与构建器路由（AST）", _acnr_targets_importers_ok)),
+        "高级查询 acnr_targets 解析与取值编排（逐项分类、任一不合格即整体拒绝并逐项给中文原因、首个解析不可用即返回服务不可用、整批时限；取值只经单元格取值接线；后端已接到业务视图 execute、模板执行与构建器预览 / 执行 / 导出，构建器先过与业务视图同一项目守卫，带单元格缺项目或年度补不出即拒绝，取值不进查询缓存）": CB(
+            _CQ + "acnr_target_values.py",
+            ("resolve_acnr_targets", "read_acnr_target_values", "classify_target", "plan_builder_targets",
+             "complete_year"),
+            _T + "test_acnr_targets_query_e2e.py",
             calls(_CQ + "acnr_target_values.py", "resolve_acnr_targets", "resolve_target", "classify_target"),
             calls(_CQ + "acnr_target_values.py", "read_acnr_target_values", "effective_catalog", "read_entry_cell"),
+            calls(_CQ + "acnr_target_values.py", "plan_builder_targets", "complete_year", "resolve_acnr_targets"),
             not_calls(_CQ + "acnr_target_values.py", "resolve_wp_cell", "extract_custom_cells"),
+            claim("生产代码里导入 acnr_target_values 的恰为编排器与构建器路由（AST）", _acnr_targets_importers_ok),
+            calls(_CQ + "query_orchestrator.py", "_resolve_targets", "resolve_acnr_targets", "complete_year"),
+            calls(_CQ + "query_orchestrator.py", "execute", "get_or_compute", "read_acnr_target_values"),
+            claim("编排器在缓存读取（get_or_compute）之后才取单元格值、取值块不写进缓存 payload（AST）",
+                  _orchestrator_reads_values_after_cache),
+            claim("构建器预览 / 执行 / 导出三端点都先调 _builder_scope、再调 plan_builder_targets（AST 语句顺序）",
+                  _builder_endpoints_scope_before_targets),
+            calls(_QB_REL, "preview_query", "preview"), calls(_QB_REL, "export_excel", "acnr_sheet"),
+            calls(_QB_REL, "execute_query", "with_acnr_results", "results"),
             has_tests(_T + "test_acnr_targets_single_reader.py", "test_each_rejection_code_is_422_and_reads_nothing",
                       "test_first_unavailable_stops_and_is_503", "test_whole_batch_deadline_is_503"),
             has_tests(_T + "test_acnr_target_values.py", "test_two_sheets_same_a1_each_read_their_own",
                       "test_missing_paper_is_wp_missing_not_zero"),
             has_tests(_T + "test_acnr_targets_three_way_pg.py", "test_formula_targets_and_stored_values_are_equal"),
-            claim("生产代码里没有导入 acnr_target_values 的模块（AST）",
-                  lambda: _production_importers_of("acnr_target_values") == []),
-            task_open("T15"), in_planned("T15")),
-        "高级查询顶层请求模型严格化（构建器与业务视图请求含未声明字段即拒收并点名该字段；acnr_targets 条数与单项长度校验）": CB(
-            _CQ + "strict_model.py", ("StrictRequestModel", "AcnrTargetList"),
+            has_tests(_T + "test_acnr_targets_query_e2e.py", "test_three_entries_return_the_same_block",
+                      "test_builder_year_is_filled_from_project_and_required_when_unknown",
+                      "test_permission_matrix_is_the_same_for_both_entries",
+                      "test_preview_resolves_without_reading_and_export_appends_sheet",
+                      "test_requests_without_targets_are_unchanged")),
+        "高级查询顶层请求模型严格化（构建器与业务视图请求含未声明字段即拒收并点名该字段；acnr_targets 条数与单项长度校验；查询模板保存时同样校验 acnr_targets，执行时模板配置不合格即拒绝并点名非法项、不再报服务器错误）": CB(
+            _CQ + "strict_model.py", ("StrictRequestModel", "AcnrTargetList", "TemplateConfig", "template_config_rejected"),
             "backend/tests/test_query_dsl_rejects_unknown_fields.py",
             claim("QueryDSL 与业务视图 QueryRequest 都继承 StrictRequestModel、acnr_targets 声明为 AcnrTargetList（AST）",
                   _query_models_are_strict),
+            claim("模板创建 / 更新请求的 config 注解为 TemplateConfig（AST）", _template_configs_are_checked),
+            calls("backend/app/routers/custom_query.py", "execute_template", "template_config_rejected"),
+            has_tests(_T + "test_acnr_targets_query_e2e.py", "test_template_with_illegal_targets_is_422_not_500"),
             has_tests("backend/tests/test_query_dsl_rejects_unknown_fields.py",
                       "test_unknown_key_rejected_with_chinese_message", "test_builder_endpoints_reject_unknown_key",
                       "test_business_execute_rejects_unknown_key")),
@@ -304,7 +380,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             "audit-platform/frontend/src/composables/__tests__/useCurrentProjectId.spec.ts", exists(_FE_GUARD_REL)),
     },
     H_PLANNED: {
-        "高级查询三个入口接上 acnr_targets（响应带 acnr_results 结果块、422 / 503 / YEAR_REQUIRED、项目鉴权）、前端结果区与下钻": L("T15、T16"),
+        "高级查询 acnr_targets 前端结果区、请求构造与下钻": L("T16"),
         "版本锁持久化（迁移、lock_project_registry、effective_catalog 改读落库的锁）与按库引用的快照清理": L("T17、T18、T19"),
         "异步追溯拿到规范 addr_id": L("T20"),
         "V2 依赖图节点经 v2_canonical 规范化、stale 身份内核、双读对账产物、CCR 不可解析源处置": L("T21、T22"),

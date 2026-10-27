@@ -71,6 +71,19 @@ _EXTRA_PROJECT_TOKENS: dict[str, tuple[tuple[str, str, tuple[str, ...]], ...]] =
     # 本 spec 新增：公式导入 / 新增自定义预设的引用解析项目上下文（readonly）
     "_assert_context_project": (
         ("routers/formula_import_export.py", "_assert_context_project", ("assert_project_permission",)),),
+    # spec acnr-foundation-defect-closure T15：构建器三端点的项目校验 = 作用域解析 → 与业务视图同一个 ownership_guard
+    # （project_users 成员 ∪ project_assignments 委派，admin / partner 放行）；acnr_targets 取值只在它放行后发生
+    "_builder_scope": (
+        ("routers/query_builder.py", "_builder_scope", ("resolve_builder_scope",)),
+        ("services/custom_query/builder_scope.py", "resolve_builder_scope",
+         ("ownership_guard", "assert_target_accessible")),
+        ("services/custom_query/ownership_guard.py", "OwnershipGuard.assert_target_accessible",
+         ("_can_access_project",)),
+        ("services/custom_query/ownership_guard.py", "OwnershipGuard._can_access_project",
+         ("_accessible_project_ids",)),
+        ("services/custom_query/ownership_guard.py", "OwnershipGuard._accessible_project_ids",
+         ("ProjectUser", "ProjectAssignment")),
+    ),
 }
 
 #: 刻意保持仅登录、不计入欠账的端点 → 理由（可伪证：``test_identity_by_design_endpoints_do_not_touch_data``）

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import pytest
 
+from app.services.acnr.resolver import ResolveResult
 from app.services.custom_query.addressing_service import ResolvedTarget
 from app.services.custom_query.query_orchestrator import (
     ColumnMeta,
@@ -55,11 +56,22 @@ class StubGuard:
 
 
 class StubAddressing:
-    """AddressingService 桩：记录寻址调用，所有目标解析成功。"""
+    """AddressingService 桩：记录寻址调用，所有目标解析为 L1 底稿单元格。
+
+    业务视图入口经 ``resolve_acnr_targets`` 逐项调 ``resolve_target``（acnr-foundation-defect-closure T15），
+    分类表只接受 L1 底稿单元格，故桩返回带 ``result``（``source_layer="L1_cell"``）的结果。
+    """
 
     def __init__(self, events: list[str]) -> None:
         self._events = events
         self.called_with: list[str] = []
+
+    async def resolve_target(self, raw, *, project_id=None, db=None, timeout_s=5.0):
+        if not self.called_with:
+            self._events.append("resolve")
+        self.called_with.append(raw)
+        res = ResolveResult(found=True, addr_id=f"WP/S/{raw}", entry_type="cell", source_layer="L1_cell")
+        return ResolvedTarget(raw=raw, found=True, addr_id=res.addr_id, entry_type="cell", result=res)
 
     async def resolve_many(self, raws, *, project_id, db):
         self._events.append("resolve")
@@ -67,6 +79,24 @@ class StubAddressing:
         return [
             ResolvedTarget(raw=r, found=True, addr_id=f"WP/S/{r}") for r in raws
         ]
+
+
+_BLOCK = {"registry_version": "stub", "year": 2025, "items": []}
+
+
+@pytest.fixture(autouse=True)
+def _stub_value_reader(monkeypatch):
+    """单元格取值换成记录桩（取值本身见 ``tests/acnr/test_acnr_target_values.py`` 与 T15 端到端）。"""
+    from app.services.custom_query import query_orchestrator as orch_module
+
+    calls: list[tuple] = []
+
+    async def _read(resolved, *, project_id, year, db):
+        calls.append((tuple(t.raw for t in resolved), project_id, year))
+        return _BLOCK if resolved else None
+
+    monkeypatch.setattr(orch_module, "read_acnr_target_values", _read)
+    return calls
 
 
 class PassthroughCache:
@@ -111,8 +141,8 @@ def _make_fetcher(events: list[str], tag: str, rows, columns):
 
 
 @pytest.mark.asyncio
-async def test_business_entry_chain_order_and_detail() -> None:
-    """business 入口：Ownership_Check → resolve → fetch，无维度返回明细结果集。"""
+async def test_business_entry_chain_order_and_detail(_stub_value_reader) -> None:
+    """business 入口：Ownership_Check → resolve → fetch → 单元格取值，无维度返回明细结果集。"""
     events: list[str] = []
     guard = StubGuard(events)
     addressing = StubAddressing(events)
@@ -127,13 +157,15 @@ async def test_business_entry_chain_order_and_detail() -> None:
         business_fetcher=_make_fetcher(events, "business", rows, columns),
     )
 
-    req = QueryRequest(entry="business", project_id="p-1", targets=["tb:1001"])
+    req = QueryRequest(entry="business", project_id="p-1", year=2025, targets=["E1/E1-14/C10"])
     result = await orch.execute(req, user=_User(), db=None)
 
-    # 链顺序：准入 → 寻址 → 取数
+    # 链顺序：准入 → 寻址 → 取数 → 单元格取值（取值在缓存读取之后、不进缓存）
     assert events == ["ownership_check", "resolve", "fetch_business"]
+    assert _stub_value_reader == [(("E1/E1-14/C10",), "p-1", 2025)]
+    assert result.acnr_results == _BLOCK
     # 寻址收到业务目标
-    assert addressing.called_with == ["tb:1001"]
+    assert addressing.called_with == ["E1/E1-14/C10"]
 
     # 明细结果集（无维度，R5.7）：原样行、总数、未命中缓存、无告警
     assert isinstance(result, QueryResult)
@@ -186,8 +218,8 @@ async def test_builder_entry_skips_cell_resolve() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cache_hit_returns_cached_without_compute() -> None:
-    """缓存命中：cache_hit=True，且不执行取数（fetcher 不被调用）。"""
+async def test_cache_hit_returns_cached_without_compute(_stub_value_reader) -> None:
+    """缓存命中：cache_hit=True，且不执行取数（fetcher 不被调用）；单元格取值仍现读（不进缓存）。"""
     events: list[str] = []
     guard = StubGuard(events)
     addressing = StubAddressing(events)
@@ -208,11 +240,12 @@ async def test_cache_hit_returns_cached_without_compute() -> None:
         business_fetcher=_make_fetcher(events, "business", [{"amt": 1}], []),
     )
 
-    req = QueryRequest(entry="business", project_id="p-1", targets=["tb:1001"])
+    req = QueryRequest(entry="business", project_id="p-1", year=2025, targets=["E1/E1-14/C10"])
     result = await orch.execute(req, user=_User(), db=None)
 
-    # 命中：准入 + 寻址仍发生，但取数未执行
+    # 命中：准入 + 寻址仍发生，但取数未执行；单元格取值照读
     assert "fetch_business" not in events
+    assert len(_stub_value_reader) == 1 and result.acnr_results == _BLOCK
     assert result.cache_hit is True
     assert result.rows == [{"amt": 999}]
     assert result.total == 1
@@ -235,7 +268,7 @@ async def test_unwired_fetcher_emits_warning() -> None:
 
     orch = QueryOrchestrator(addressing=addressing, guard=guard, cache=cache)
 
-    req = QueryRequest(entry="business", project_id="p-1", targets=["tb:1001"])
+    req = QueryRequest(entry="business", project_id="p-1", year=2025, targets=["E1/E1-14/C10"])
     result = await orch.execute(req, user=_User(), db=None)
 
     assert result.rows == []

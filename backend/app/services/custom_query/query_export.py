@@ -186,10 +186,11 @@ def _titled(columns: Sequence[ColumnMeta], headers: Mapping[str, str]) -> list[C
 
 async def respond_xlsx(
     slot: ExportSlot, rows: Any, columns: list[ColumnMeta], *, info_rows: _InfoRows, file_name: str,
-    sheet_title: str | None = None,
+    sheet_title: str | None = None, extra_sheets: Sequence[tuple[str, list[list[Any]]]] = (),
 ) -> GatedStreamingResponse:
     """生成文件并预取首块（取数与写临时文件都在这一步完成）；失败先释放名额再抛，成功后名额随响应结束释放。"""
-    agen = export_module.export_service.stream_xlsx(rows, columns, info_rows=info_rows, sheet_title=sheet_title)
+    agen = export_module.export_service.stream_xlsx(
+        rows, columns, info_rows=info_rows, sheet_title=sheet_title, extra_sheets=extra_sheets)
     try:
         try:
             first = await agen.__anext__()
@@ -314,11 +315,12 @@ async def _builder_project_text(db: Any, scope: Any) -> str:
 
 async def export_builder_query(
     body: Any, *, stmt: Any, column_names: Sequence[str], scope: Any, warnings: Sequence[str], table_label: str,
-    user: Any, db: Any, batch: int = paged_fetch.STREAM_BATCH,
+    user: Any, db: Any, batch: int = paged_fetch.STREAM_BATCH, extra_sheet: tuple[str, list[list[Any]]] | None = None,
 ) -> GatedStreamingResponse:
     """构建器「导出全部」（``POST /api/query/export-excel``）：``stmt`` 由 ``_build_select(for_export=True)`` 构造。
 
     列按位置取值（键 ``c{序号}``），DSL 里重复选同一字段也不会丢列；表头取请求的 ``headers``（键为列名），sheet 名为表名。
+    ``extra_sheet``：带 acnr_targets 时追加的「单元格取值」工作表（acnr-foundation-defect-closure T15）。
     """
     headers = dict(getattr(body, "headers", None) or {})
     names = list(column_names)
@@ -346,7 +348,7 @@ async def export_builder_query(
             ))
             file_name = clean_file_name(getattr(body, "file_name", None), f"高级构建器_{table_label}")
             response = await respond_xlsx(slot, rows(), columns, info_rows=info, file_name=file_name,
-                                          sheet_title=table_label)
+                                          sheet_title=table_label, extra_sheets=(extra_sheet,) if extra_sheet else ())
         except SQLAlchemyError as exc:
             try:
                 await db.rollback()

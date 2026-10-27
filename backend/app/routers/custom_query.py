@@ -39,7 +39,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,7 +65,7 @@ from app.services.custom_query.pagination import (
 from app.services.custom_query.fetchers.disclosure import _query_disclosure  # noqa: F401 — 再导出（test_note_table_payload_readers_pg）
 from app.services.custom_query.fetchers.workpaper_cells import render_sheet_preview
 from app.services.custom_query.source_registry import resolve_source
-from app.services.custom_query.strict_model import AcnrTargetList, StrictRequestModel
+from app.services.custom_query.strict_model import AcnrTargetList, StrictRequestModel, TemplateConfig, template_config_rejected
 from app.services.wp_template_registry import wp_template_registry_service
 
 router = APIRouter(prefix="/api/custom-query", tags=["custom-query"])
@@ -996,7 +996,7 @@ class TemplateCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: str | None = None
     data_source: str = Field(..., min_length=1, max_length=50)
-    config: dict
+    config: TemplateConfig
     # legacy `global` / `personal` 仍接受为输入，输出恒为 canonical（R8.1）
     scope: Literal["private", "team", "project", "public", "global", "personal"] = "private"
     shared_project_ids: list[str] = Field(default_factory=list)
@@ -1006,7 +1006,7 @@ class TemplateUpdateRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
     description: str | None = None
     data_source: str | None = None
-    config: dict | None = None
+    config: TemplateConfig | None = None
     scope: Literal["private", "team", "project", "public", "global", "personal"] | None = None
     shared_project_ids: list[str] | None = None
 
@@ -1359,19 +1359,22 @@ async def execute_template(
     await template_service.assert_executable(tpl, user=current_user, db=db)
 
     config = tpl.config if isinstance(tpl.config, dict) else {}
-    query_body = QueryRequest(
-        project_id=str(body.project_id),
-        year=int(config.get("year") or 0),
-        source=str(config.get("source") or tpl.data_source or ""),
-        filters=config.get("filters") or {},
-        columns=list(config.get("selected_columns") or config.get("columns") or []),
-        limit=int(config.get("page_size") or config.get("limit") or 500),
-        offset=int(config.get("offset") or 0),
-        sort=list(config.get("sort") or []),
-        group=config.get("group"),
-        pivot=config.get("pivot"),
-        acnr_targets=list(config.get("acnr_targets") or []),
-    )
+    try:  # 模板里存了不合格的配置（如超 50 条 / 空串的 acnr_targets）⇒ 422 点名非法项，不 500（acnr R2-N5）
+        query_body = QueryRequest(
+            project_id=str(body.project_id),
+            year=int(config.get("year") or 0),
+            source=str(config.get("source") or tpl.data_source or ""),
+            filters=config.get("filters") or {},
+            columns=list(config.get("selected_columns") or config.get("columns") or []),
+            limit=int(config.get("page_size") or config.get("limit") or 500),
+            offset=int(config.get("offset") or 0),
+            sort=list(config.get("sort") or []),
+            group=config.get("group"),
+            pivot=config.get("pivot"),
+            acnr_targets=list(config.get("acnr_targets") or []),
+        )
+    except ValidationError as exc:
+        raise template_config_rejected(exc) from None
     return await execute_query(query_body, response, db, current_user)
 
 

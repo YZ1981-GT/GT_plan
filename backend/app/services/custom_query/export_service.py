@@ -298,6 +298,7 @@ class ExportService:
         byte_chunk: int = _STREAM_BYTE_CHUNK,
         info_rows: Sequence[tuple[str, Any]] | Callable[[int], Sequence[tuple[str, Any]]] | None = None,
         sheet_title: str | None = None,
+        extra_sheets: Sequence[tuple[str, Sequence[Sequence[Any]]]] = (),
     ) -> AsyncIterator[bytes]:
         """流式导出平铺明细结果集为 ``.xlsx`` 字节块（异步生成器，R8）。
 
@@ -309,6 +310,7 @@ class ExportService:
         ``info_rows``：给出时在数据 sheet 之后追加「查询说明」sheet（项目、年度、数据源、条件、行数、导出时间、导出人，
         advanced-query-linkage-closure R8.1）；可为接收**实际写入行数**的函数，说明里的行数就与文件里的数据行一致；
         ``sheet_title``：数据 sheet 名（缺省「高级查询结果」，构建器用表名）。
+        ``extra_sheets``：查询说明之后再追加的工作表 ``(名称, 行列表)``（构建器 acnr_targets 的「单元格取值」）。
         表头、数据与查询说明里以 ``= + - @`` 开头的文本一律按文本写入（R8.5）。
 
         流程（R8.1/R8.2/R8.3/R8.4/R8.6/R7.7）：
@@ -409,6 +411,10 @@ class ExportService:
                 items = info_rows(row_count) if callable(info_rows) else info_rows
                 if items:
                     _append_info_sheet(wb, list(items))
+            for title, table_rows in extra_sheets:
+                extra = wb.create_sheet(title=str(title)[:31])
+                for values in table_rows:
+                    extra.append([_text_safe_cell(extra, _excel_cell_value(v)) for v in values])
 
             # step4: 落临时文件（executor 内执行 openpyxl 保存）
             loop = asyncio.get_event_loop()
