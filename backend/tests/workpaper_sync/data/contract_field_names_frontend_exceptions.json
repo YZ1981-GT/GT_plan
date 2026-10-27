@@ -1,0 +1,725 @@
+{
+ "b60.hour_budget|": {
+  "reason": "B60-1 表头元信息（编制 / 复核日期）契约未声明 store item，前端无此两字段：表头区未接通，接通时一并定名",
+  "fields": [
+   "prepared_on",
+   "reviewed_on"
+  ]
+ },
+ "d1.notes_receivable_detail|D1-endorse-transfer-rows": {
+  "reason": "D1-8 背书区：前端背书行沿用贴现行字段，没有模板 K 背书转让单位 / L 背书转让日期两列（前端补列，R3.1）",
+  "fields": [
+   "endorsedDate",
+   "endorsedTo"
+  ]
+ },
+ "d1.notes_receivable_detail|D1-sampling-specific-samples": {
+  "reason": "待核：抽样检查列 check1~3 / 对方科目在前端行模型里另名（同 D7-7 的 checkItems 数组形态）",
+  "fields": [
+   "check1",
+   "check2",
+   "check3",
+   "counterAccount"
+  ]
+ },
+ "d2.inspection|D2-bizmodel-groups": {
+  "reason": "待核：业务模式组「依据」列前端另名",
+  "fields": [
+   "basis"
+  ]
+ },
+ "d2.inspection|D2-ecl-discount-rows": {
+  "reason": "D2-10：前端嵌套 scenarios[]、单一现值，模板平铺情景行、两年现值（design §3.1）",
+  "fields": [
+   "cashflowY1",
+   "pvY1",
+   "pvY2"
+  ]
+ },
+ "d2.inspection|D2-pledge-rows": {
+  "reason": "待核：质押检查两列（质押协议 / 质押条件）前端另名",
+  "fields": [
+   "pledgeAgreement",
+   "pledgeCondition"
+  ]
+ },
+ "d2.inspection|D2-related-party-rows": {
+  "reason": "待核：关联方检查账龄 / 期后回款 / 交易原因三列前端另名或缺列",
+  "fields": [
+   "agingPeriod",
+   "postPayment",
+   "transactionReason"
+  ]
+ },
+ "d2.inspection|D2-writeoff-reversal-rows": {
+  "reason": "待核：坏账转回「合理性」列前端另名",
+  "fields": [
+   "reasonableness"
+  ]
+ },
+ "d2.inspection|D2-writeoff-writeoff-rows": {
+  "reason": "待核：核销表应收款类型 / 是否关联方两列前端另名或缺列",
+  "fields": [
+   "isRelatedParty",
+   "receivableType"
+  ]
+ },
+ "d3.prepaid_receipts_detail|D3-lt-rows": {
+  "reason": "待核：D3 长期挂账表（债权人 / 期末余额 / 业务原因 / 截至审计日是否结清 / 未结清原因）前端另名或缺列",
+  "fields": [
+   "businessReason",
+   "counterpartyName",
+   "endingBalance",
+   "settledByAuditDate",
+   "unsettledReason"
+  ]
+ },
+ "d3.prepaid_receipts_detail|D3-vc-current-rows": {
+  "reason": "待核：凭证抽查核对内容 check1~5 / 对方明细科目 / 索引号前端另名（疑同 D7-7 的 checkItems 数组）",
+  "fields": [
+   "check1",
+   "check2",
+   "check3",
+   "check4",
+   "check5",
+   "counterSubAccount",
+   "indexNo"
+  ]
+ },
+ "d3.prepaid_receipts_detail|D3-vc-post-rows": {
+  "reason": "待核：同 D3-vc-current-rows",
+  "fields": [
+   "check1",
+   "check2",
+   "check3",
+   "check4",
+   "check5",
+   "counterSubAccount",
+   "indexNo"
+  ]
+ },
+ "d4.revenue_detail|D4-31-interview": {
+  "reason": "D4-31 访谈表是单行 dict store，契约行身份写 singleton，前端无此键（行身份口径待定）",
+  "fields": [
+   "singleton"
+  ]
+ },
+ "d7.contract_liabilities_detail|D7-7-period-rows": {
+  "reason": "前端核对内容存为 checkItems 布尔数组（5 项，模板 7 项）、支持文件键 supportDocs；契约逐列 check1~7 / supportDoc 对不上",
+  "fields": [
+   "check1",
+   "check2",
+   "check3",
+   "check4",
+   "check5",
+   "check6",
+   "check7",
+   "supportDoc"
+  ]
+ },
+ "d7.contract_liabilities_detail|D7-7-post-rows": {
+  "reason": "同 D7-7-period-rows",
+  "fields": [
+   "check1",
+   "check2",
+   "check3",
+   "check4",
+   "check5",
+   "check6",
+   "check7",
+   "supportDoc"
+  ]
+ },
+ "f2.inventory_valuation|F2-47-rows": {
+  "reason": "F2-47 前端行模型与模板不同构（双价 / 销售费用与税费可手改 / 应补提截 0），回写未接通，先不改契约（design §4.1）",
+  "fields": [
+   "bookAmt",
+   "impairmentEnd",
+   "nrvTotal",
+   "nrvUnit",
+   "qtyTotal"
+  ]
+ },
+ "f3.notes_payable_detail|F3-1-adj-seed-rows": {
+  "reason": "批 B：前端两区共存 F3-1-adj-rows，契约 seed / slot 两个 item 前端不存在（要区判据 + 多区门面）；前端行模型与模板首区不同构（R2 待裁，design §4.3）",
+  "fields": [
+   "closingAdjusted",
+   "closingAje",
+   "closingRje",
+   "closingUnadjusted",
+   "indexRef",
+   "openingAdjusted",
+   "openingAje",
+   "openingRje",
+   "openingUnadjusted",
+   "rowKey"
+  ]
+ },
+ "f3.notes_payable_detail|F3-1-adj-slot-rows": {
+  "reason": "批 B：同 F3-1-adj-seed-rows",
+  "fields": [
+   "closingAdjusted",
+   "closingAje",
+   "closingRje",
+   "closingUnadjusted",
+   "indexRef",
+   "label",
+   "openingAdjusted",
+   "openingAje",
+   "openingRje",
+   "openingUnadjusted",
+   "rowKey"
+  ]
+ },
+ "f4.accounts_payable_detail|F4-1-adj-aging-seed-rows": {
+  "reason": "批 B：前端账龄段行 + 残差行共存 F4-1-adj-aging-rows，契约 seed / slot 两个 item 前端不存在（要区判据 + 多区门面）",
+  "fields": [
+   "changeAmount",
+   "changeRate",
+   "closingAdjusted",
+   "closingAje",
+   "closingRje",
+   "closingUnadjusted",
+   "openingAdjusted",
+   "openingAje",
+   "openingRje",
+   "openingUnadjusted",
+   "reasonAnalysis",
+   "rowKey"
+  ]
+ },
+ "f4.accounts_payable_detail|F4-1-adj-aging-slot-rows": {
+  "reason": "批 B：同 F4-1-adj-aging-seed-rows",
+  "fields": [
+   "changeAmount",
+   "changeRate",
+   "closingAdjusted",
+   "closingAje",
+   "closingRje",
+   "closingUnadjusted",
+   "label",
+   "openingAdjusted",
+   "openingAje",
+   "openingRje",
+   "openingUnadjusted",
+   "reasonAnalysis",
+   "rowKey"
+  ]
+ },
+ "f4.accounts_payable_detail|F4-2-rows": {
+  "reason": "待核：F4-2 明细表借贷发生额 / 期末调整 / 账龄未审 / 期后付款 / 重分类列前端另名（currentDebit / currentCredit / aje / rje …）",
+  "fields": [
+   "agingUnadjusted",
+   "creditOccurrence",
+   "currentAje",
+   "currentRje",
+   "debitOccurrence",
+   "postPeriodPayment",
+   "reclassAdjustment"
+  ]
+ },
+ "g3.dividend_receivable_detail|": {
+  "reason": "契约表未声明 store item（两方向都未接），字段名与前端不同；接通时一并按前端定名（G3-1 审定表减值 / 期末转入列）",
+  "fields": [
+   "impairmentRelated",
+   "increaseEnd",
+   "transferInEnd"
+  ]
+ },
+ "g4.bond_main|G4-7-items": {
+  "reason": "待核：G4-7 有价证券盘点「证券名称」列前端另名",
+  "fields": [
+   "securityName"
+  ]
+ },
+ "g4.ecl_stage|": {
+  "reason": "契约表未声明 store item（两方向都未接），字段名与前端不同；接通时一并按前端定名（G4-9 三阶段划分转置表，R5 转置表之一）",
+  "fields": [
+   "contractTermChange",
+   "creditMgmtMethodChange",
+   "creditRatingChange",
+   "externalMarketIndicator",
+   "guaranteeCreditChange",
+   "internalPriceIndicator",
+   "investName",
+   "issuerBizFinanceChange",
+   "issuerOperatingResult",
+   "issuerRegulatoryChange",
+   "otherInstrumentCreditChange",
+   "overdueInfo",
+   "overduePerformanceChange",
+   "rateOrTermChange",
+   "repaymentMechanismChange"
+  ]
+ },
+ "g5.long_term_receivable_detail|G5-2-rows": {
+  "reason": "R2 待裁：G5-2 前端行模型与模板列不同构（前端 合同金额 − 已收回，模板 期初 + 借 − 贷与审定三列，期初 / 调整 / 账龄 / ECL 列前端都没有）",
+  "fields": [
+   "aging1to2y",
+   "aging2to3y",
+   "agingNotOverdue",
+   "agingOver3y",
+   "agingWithin1y",
+   "confirmationStatus",
+   "creditIncurred",
+   "debitIncurred",
+   "eclGroupName",
+   "eclMethod",
+   "isRelated",
+   "openingRje",
+   "subsequentRef"
+  ]
+ },
+ "g6.ecl_stage|": {
+  "reason": "契约表未声明 store item（两方向都未接），字段名与前端不同；接通时一并按前端定名（G6-11 三阶段划分转置表，R5 转置表之一）",
+  "fields": [
+   "contractTermChange",
+   "creditMgmtMethodChange",
+   "creditRatingChange",
+   "debtorBizFinanceChange",
+   "debtorOperatingResult",
+   "debtorRegulatoryChange",
+   "externalMarketIndicator",
+   "guaranteeCreditChange",
+   "internalPriceIndicator",
+   "investName",
+   "otherInstrumentCreditChange",
+   "overdueInfo",
+   "overduePerformanceChange",
+   "rateOrTermChange",
+   "repaymentMechanismChange"
+  ]
+ },
+ "g6.other_bond_main|G6-5-fair-value-data": {
+  "reason": "批 B：G6-5 契约字段名改前端名（investProject / unadjQty / unadjPrice / auditedQty / auditedPrice / difference …）；store 是 {rows, conclusion} 对象、存 conclusion 列，接通另需 state 门面",
+  "fields": [
+   "auditedFv",
+   "auditedFvTier",
+   "auditedQuantity",
+   "auditedUnitFv",
+   "fvDifference",
+   "fvInputFactors",
+   "fvSourceMechanism",
+   "investTarget",
+   "unauditedFv",
+   "unauditedFvTier",
+   "unauditedQuantity",
+   "unauditedUnitFv",
+   "unobservableValue",
+   "valuationConsistent",
+   "valuationRef"
+  ]
+ },
+ "g7.soe_subsidiary_disclosure|G7-main-disclosure-soe-v2": {
+  "reason": "G7 pilot：原子公司表行身份 rowUuid / 序号 ordinal 由 pilot 适配层生成，前端行用 id 与位置序号（行身份口径待定）",
+  "fields": [
+   "ordinal",
+   "rowUuid"
+  ]
+ },
+ "k2.other_current_assets_adjustment|K2-3-adj-entries": {
+  "reason": "K 循环调整分录表：前端分录行只有 类型 / 科目 / 借贷 / 摘要 / 备注，缺模板的 类别 / 报表项目 / 附注项目 / 索引列（前端补列，R3.1）",
+  "fields": [
+   "accountName",
+   "category",
+   "indexRef",
+   "reportItem"
+  ]
+ },
+ "k3.other_payables_adjustment|K3-3-adj-entries": {
+  "reason": "同 K2-3-adj-entries（前端 AdjustmentEntry 缺 类别 / 报表项目 / 附注项目 / 索引）",
+  "fields": [
+   "category",
+   "indexRef",
+   "noteItem",
+   "reportItem"
+  ]
+ },
+ "k4.other_current_liabilities_adjustment|K4-3-adj-entries": {
+  "reason": "同 K2-3-adj-entries",
+  "fields": [
+   "category",
+   "indexRef",
+   "reportItem"
+  ]
+ },
+ "k5.provisions_adjustment|K5-3-entries": {
+  "reason": "同 K2-3-adj-entries（K5 分录另有借贷两列前端另名）",
+  "fields": [
+   "category",
+   "creditAmount",
+   "debitAmount",
+   "reportItem"
+  ]
+ },
+ "k6.held_for_sale_adjustment|K6-3-adj-entries": {
+  "reason": "同 K2-3-adj-entries",
+  "fields": [
+   "category",
+   "indexRef",
+   "noteItem",
+   "reportItem"
+  ]
+ },
+ "k7.deferred_income_adjustment|K7-3-adj-entries": {
+  "reason": "同 K2-3-adj-entries（只差 类别）",
+  "fields": [
+   "category"
+  ]
+ },
+ "l4.bonds_payable|L4-3-rows": {
+  "reason": "任务 9.2（批 D）：L4-3 金融负债工具明细表契约字段名整体与前端不同（数量 / 金额 × 未审 / 调整 / 审定）",
+  "fields": [
+   "ajeDecreaseAmount",
+   "ajeDecreaseQty",
+   "ajeIncreaseAmount",
+   "ajeIncreaseQty",
+   "auditedDecreaseAmount",
+   "auditedDecreaseQty",
+   "auditedEndQty",
+   "auditedIncreaseAmount",
+   "auditedIncreaseQty",
+   "auditedPriorAmount",
+   "auditedPriorQty",
+   "priorAjeAmount",
+   "priorAjeQty",
+   "priorRjeAmount",
+   "priorRjeQty",
+   "rjeDecreaseAmount",
+   "rjeDecreaseQty",
+   "rjeIncreaseAmount",
+   "rjeIncreaseQty",
+   "unauditedDecreaseAmount",
+   "unauditedDecreaseQty",
+   "unauditedEndAmount",
+   "unauditedEndQty",
+   "unauditedIncreaseAmount",
+   "unauditedIncreaseQty",
+   "unauditedPriorAmount",
+   "unauditedPriorQty"
+  ]
+ },
+ "m1.dividends_payable|placeholder": {
+  "reason": "任务 9.2（批 D）：M 循环契约 store_item_id 写成 placeholder，前端真实 store item 与字段名都没接",
+  "fields": [
+   "aging",
+   "auditedClosing",
+   "auditedDecrease",
+   "auditedIncrease",
+   "auditedOpening",
+   "closingBalance",
+   "companyCode",
+   "currentAjeDecrease",
+   "currentAjeIncrease",
+   "currentRjeDecrease",
+   "currentRjeIncrease",
+   "decreaseAmount",
+   "increaseAmount",
+   "overdueReason",
+   "priorAdjAje",
+   "priorAdjRje",
+   "priorOpening",
+   "refIndex",
+   "remark",
+   "shareholderName",
+   "shareholderType"
+  ]
+ },
+ "m10.other_equity_instruments|placeholder": {
+  "reason": "任务 9.2（批 D）：M 循环契约 store_item_id 写成 placeholder，前端真实 store item 与字段名都没接",
+  "fields": [
+   "accountingClass",
+   "adjDecreaseAmount",
+   "adjDecreaseQty",
+   "adjIncreaseAmount",
+   "adjIncreaseQty",
+   "auditedClosingAmount",
+   "auditedClosingQty",
+   "bookValue",
+   "closingAmount",
+   "closingQty",
+   "conversionCondition",
+   "conversionStatus",
+   "decreaseAmount",
+   "decreaseQty",
+   "decreaseSubtotal",
+   "docIndexRef",
+   "instrumentType",
+   "interestRate",
+   "issueAmount",
+   "issueDate",
+   "issuePrice",
+   "issueQty",
+   "issueTotalFace",
+   "maturityRenewal",
+   "openingAmount",
+   "openingQty",
+   "otherChange",
+   "quantity",
+   "remark",
+   "transactionCost"
+  ]
+ },
+ "m2.paid_in_capital|placeholder": {
+  "reason": "任务 9.2（批 D）：M 循环契约 store_item_id 写成 placeholder，前端真实 store item 与字段名都没接",
+  "fields": [
+   "auditedClosing",
+   "auditedClosingRatio",
+   "auditedDecrease",
+   "auditedIncrease",
+   "auditedOpening",
+   "auditedOpeningRatio",
+   "closingAmount",
+   "closingRatio",
+   "currentAjeDecrease",
+   "currentAjeIncrease",
+   "currentRjeDecrease",
+   "currentRjeIncrease",
+   "decreaseAmount",
+   "increaseAmount",
+   "increaseMethod",
+   "investAmount",
+   "investMethod",
+   "investRatio",
+   "investorName",
+   "priorAdjAje",
+   "priorAdjRje",
+   "remark",
+   "verificationRef",
+   "verified"
+  ]
+ },
+ "m3.treasury_stock|placeholder": {
+  "reason": "任务 9.2（批 D）：M 循环契约 store_item_id 写成 placeholder，前端真实 store item 与字段名都没接",
+  "fields": [
+   "accountingCorrect",
+   "auditedClosing",
+   "auditedDecrease",
+   "auditedIncrease",
+   "auditedOpening",
+   "category",
+   "closingBalance",
+   "currentAjeDecrease",
+   "currentAjeIncrease",
+   "currentIncrease",
+   "currentRjeDecrease",
+   "currentRjeIncrease",
+   "decreaseCancel",
+   "decreaseTransfer",
+   "priorAdjAje",
+   "priorAdjRje",
+   "priorOpening",
+   "remark",
+   "resolutionRef"
+  ]
+ },
+ "m4.capital_reserve|placeholder": {
+  "reason": "任务 9.2（批 D）：M 循环契约 store_item_id 写成 placeholder，前端真实 store item 与字段名都没接",
+  "fields": [
+   "accountingCorrect",
+   "auditedClosing",
+   "auditedDecrease",
+   "auditedIncrease",
+   "auditedOpening",
+   "category",
+   "closingBalance",
+   "currentAjeDecrease",
+   "currentAjeIncrease",
+   "currentDecrease",
+   "currentIncrease",
+   "currentRjeDecrease",
+   "currentRjeIncrease",
+   "priorAdjAje",
+   "priorAdjRje",
+   "priorOpening",
+   "remark"
+  ]
+ },
+ "m5.surplus_reserve|placeholder": {
+  "reason": "任务 9.2（批 D）：M 循环契约 store_item_id 写成 placeholder，前端真实 store item 与字段名都没接",
+  "fields": [
+   "auditedClosing",
+   "auditedDecrease",
+   "auditedIncrease",
+   "auditedOpening",
+   "closingBalance",
+   "currentAjeDecrease",
+   "currentAjeIncrease",
+   "currentRjeDecrease",
+   "currentRjeIncrease",
+   "decreaseAmount",
+   "decreaseMethod",
+   "increaseAmount",
+   "increaseMethod",
+   "itemName",
+   "priorAdjAje",
+   "priorAdjRje",
+   "priorOpening"
+  ]
+ },
+ "m6.retained_earnings|placeholder": {
+  "reason": "任务 9.2（批 D）：M 循环契约 store_item_id 写成 placeholder，前端真实 store item 与字段名都没接",
+  "fields": [
+   "currentAje",
+   "currentAudited",
+   "currentRje",
+   "currentUnadjusted",
+   "indexRef",
+   "itemName",
+   "priorAje",
+   "priorAudited",
+   "priorRje",
+   "priorUnadjusted",
+   "remark"
+  ]
+ },
+ "m7.special_reserve|placeholder": {
+  "reason": "任务 9.2（批 D）：M 循环契约 store_item_id 写成 placeholder，前端真实 store item 与字段名都没接",
+  "fields": [
+   "auditedClosing",
+   "auditedDecrease",
+   "auditedIncrease",
+   "auditedOpening",
+   "closingBalance",
+   "currentAjeDecrease",
+   "currentAjeIncrease",
+   "currentDecrease",
+   "currentIncrease",
+   "currentRjeDecrease",
+   "currentRjeIncrease",
+   "docRef",
+   "indexRef",
+   "priorAdjAje",
+   "priorAdjRje",
+   "priorOpening",
+   "projectName",
+   "remark"
+  ]
+ },
+ "m8.general_risk_reserve|placeholder": {
+  "reason": "任务 9.2（批 D）：M 循环契约 store_item_id 写成 placeholder，前端真实 store item 与字段名都没接",
+  "fields": [
+   "auditedClosing",
+   "auditedDecrease",
+   "auditedIncrease",
+   "auditedOpening",
+   "closingBalance",
+   "currentAjeDecrease",
+   "currentAjeIncrease",
+   "currentRjeDecrease",
+   "currentRjeIncrease",
+   "decreaseAmount",
+   "docReference",
+   "increaseAmount",
+   "itemName",
+   "priorAdjAje",
+   "priorAdjRje",
+   "priorOpening",
+   "refIndex",
+   "remark"
+  ]
+ },
+ "m9.other_comprehensive_income|placeholder": {
+  "reason": "任务 9.2（批 D）：M 循环契约 store_item_id 写成 placeholder，前端真实 store item 与字段名都没接",
+  "fields": [
+   "auditedClosing",
+   "auditedOpening",
+   "auditedPretax",
+   "auditedTax",
+   "auditedTransfer",
+   "closingBalance",
+   "currentAjePretax",
+   "currentAjeTax",
+   "currentAjeTransfer",
+   "currentPretax",
+   "currentRjePretax",
+   "currentRjeTax",
+   "currentRjeTransfer",
+   "incomeTax",
+   "itemCategory",
+   "priorAdjAje",
+   "priorAdjRje",
+   "priorOpening",
+   "remark",
+   "transferToPnl"
+  ]
+ },
+ "n1.deferred_tax_assets|N1-2-rows": {
+  "reason": "任务 9.1（批 C）：N 循环契约 store item / 字段名与前端不同（design §4：N1 几何、N1-2 前端存 N1-2-detail-rows 等）",
+  "fields": [
+   "currentAje",
+   "currentAudited",
+   "currentDtaBalance",
+   "currentRje",
+   "currentTaxRate",
+   "currentTempDiff",
+   "priorAje",
+   "priorAudited",
+   "priorDtaBalance",
+   "priorRje",
+   "priorTempDiff"
+  ]
+ },
+ "n2.taxes_payable|N2-2-rows": {
+  "reason": "任务 9.1（批 C）：N 循环契约 store item / 字段名与前端不同（design §4：N1 几何、N1-2 前端存 N1-2-detail-rows 等）",
+  "fields": [
+   "adjAje",
+   "adjRje",
+   "ajeAccrued",
+   "auditedAccrued",
+   "auditedClosing",
+   "auditedOpening",
+   "auditedPaid",
+   "id",
+   "priorAccrued",
+   "priorClosing",
+   "priorOpening",
+   "priorPaid",
+   "rjeAccrued",
+   "taxRate"
+  ]
+ },
+ "n3.deferred_tax_liabilities|N3-2-rows": {
+  "reason": "任务 9.1（批 C）：N 循环契约 store item / 字段名与前端不同（design §4：N1 几何、N1-2 前端存 N1-2-detail-rows 等）",
+  "fields": [
+   "currentAje",
+   "currentAudited",
+   "currentDtlBalance",
+   "currentRje",
+   "currentTaxRate",
+   "currentTempDiff",
+   "priorAje",
+   "priorAudited",
+   "priorDtlBalance",
+   "priorRje",
+   "priorTempDiff"
+  ]
+ },
+ "n4.taxes_and_surcharges|N4-2-detail-rows": {
+  "reason": "任务 9.1（批 C）：N 循环契约 store item / 字段名与前端不同（design §4：N1 几何、N1-2 前端存 N1-2-detail-rows 等）",
+  "fields": [
+   "accrualCredit",
+   "accrualDiff",
+   "periodAje",
+   "periodAudited",
+   "periodRje",
+   "periodUnadjusted",
+   "priorAje",
+   "priorAudited",
+   "priorRje",
+   "priorUnadjusted"
+  ]
+ },
+ "n5.income_tax_expense|N5-2-rows": {
+  "reason": "任务 9.1（批 C）：N 循环契约 store item / 字段名与前端不同（design §4：N1 几何、N1-2 前端存 N1-2-detail-rows 等）",
+  "fields": [
+   "currentAmount",
+   "currentIndex",
+   "id",
+   "itemName",
+   "priorAmount",
+   "priorIndex",
+   "remark"
+  ]
+ }
+}
