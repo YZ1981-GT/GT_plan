@@ -222,6 +222,14 @@ class SourceSpec:
 - `stream(..., batch=2000)`：`await db.stream(stmt.execution_options(yield_per=batch))`，按 `partitions(batch)` 产出。
 - 全部包在 `execution_guard.cancellable_query(db, QUERY_TIMEOUT_MS)` 内（导出用 `EXPORT_TIMEOUT_MS`），超时沿用 408 `QUERY_TIMEOUT`；单元格序列化复用 `builder_dsl._serialize_cell`。
 
+B5 实施补记（2026-10-27，任务 17、18、21、22；与上表不同或上表没写到的以此为准）：
+- 声明类型（`SourceColumn` / `FilterKey` / `FetchContext` / `SourceSpec` / `filtered_by`）拆到同包 `source_types.py`，`source_registry` 再导出（登记源超过十个后同处一个文件会超 800 行门）。
+- 声明补四处：`SourceColumn.outer`（LEFT JOIN 被连接一侧的列，排序按可空处理）与 `sort_expr`（报表行次的报表类型显示 / 条件按文本、排序按枚举声明顺序）；`FilterKey.normalize`（调整类型 AJE / RJE / RCL 归一为 aje / rje，cf 与其余值 400 `INVALID_FILTER_VALUE`）；`SourceSpec.context_filters`（报表源的 `report_type` / `standard` 由口径谓词自己消费并校验：报表类型限 `financial_report_type` 六值，缺省资产负债表；`standard` 只收平台准则 `ReportConfigService.VALID_STANDARDS`，不收 `project:{id}`）与 `fixed_filters`（adj_aje / adj_rje 的类型由源键固定，覆盖请求里的同名键——弹窗现在仍会发 `adjustment_type: 'AJE' / 'RCL'`）。`report_{类型}` 由源键决定报表类型（改造前后端只认 `filters.report_type`，页面版不带时一律当资产负债表）。
+- `consol_unit:{cc}:adjustment` = 通用调整分录源 + 该单位（全部类型、带类型列）：单位下只有一个「调整分录」叶子、不分 AJE / RJE；原写死的大写 `'AJE'` 在 PG 枚举里没有、恒 500，也从未按单位过滤。
+- 必填筛选（辅助明细）与辅助余额跨维提示按「已收窄」判断：旧筛选键有值，或有该字段的 eq / in / between 条件（OR 逻辑且多于一条时不算）；跨维提示只认收窄到一个辅助类型。页面版 / W6 发结构化条件时不会被误判为「未筛选」。
+- 报表源的响应键沿用旧取数器的 `indent` / `is_total`（对应列 `indent_level` / `is_total_row`）；构建器白名单的 `financial_report` 字段为 id、project_id、year、report_type、row_code、row_name、本期 / 上期金额、indent_level、is_total_row、is_stale、blank_reason、generated_at 与审计列。
+- 前端（浏览器验收发现，B5 提交③）：弹窗与页面版原先都按 `startsWith('report_')` 给请求派生 `report_type`，报表行次配置 `report_lines` 因此带上 `report_type: 'lines'` 而得 0 行；判定收进 `components/query/querySourceUri.reportTypeOfSource`（只认报表叶子 `report_{类型}`），§4.2 改造弹窗与页面版时沿用它。
+
 ### 3.2 JSON 内存源（`services/custom_query/fetchers/`，从 router 迁入）
 - 共同：每行带隐藏列 `_row_index`（取数顺序，从 0 起，不进 columns、不导出）；行数 > `FETCH_HARD_CAP` → 400 `RESULT_TOO_LARGE`；带 conditions → 400 `CONDITIONS_UNSUPPORTED`；`columns` 投影与 SQL 源同规则。
 - `disclosure.py`：`_query_disclosure`（router 再导出，供 `test_note_table_payload_readers_pg.py`）。章节集合与顺序取 `DisclosureEngine(db).get_notes_tree(project_id, year)` 再叠加循环范围。`disclosure`（附注目录）→ 每「章节 × 表」一行：note_section, section_title, table_name, row_count, is_stale；`disclosure_note:{sec}` → 章节不在循环范围 403 `SECTION_OUT_OF_SCOPE`；`filters.table_index`（默认 0）选一张表，columns = `["note_section", "section_title", "table_name"]` + 该表表头（`_flatten_disclosure_note_rows` 改为按表拆），行序 = `table_data` 原始行序，`meta.tables = [{index, name, row_count}]`。单体读 disclosure_notes，合并沿用 consol_note_data 逻辑。
@@ -532,6 +540,7 @@ END $$;
 | `services/custom_query/table_whitelist.py` | 700 | ≤ 800 | 超 800 先把列分层 / 敏感表段抽到同包 `table_whitelist_tiers.py` |
 | `snapshot_writer.py` / `snapshot_writer_modules.py` / `writeback_preview.py` | 759 / 385 / 710 | ≈ 700 / ≈ 200 / ≤ 760 | 前两者只减 |
 | 新文件 `source_registry.py` / `paged_fetch.py` / `fetchers/*.py` / `builder_access.py` / `cycle_scope.py` / `export_gate.py` | — | 各 ≤ 800 | — |
+| `source_types.py`（B5 从 `source_registry.py` 拆出声明类型） | — | ≤ 800 | B5 末 `source_registry.py` 684、`source_types.py` 157 |
 | `ReportView.vue`（HARD_CAP 1,949） | 1,949 | ≤ 1,949 | 先把 `routeYear` 移入 `useReportRouteFocus` |
 | `ThreeColumnLayout.vue`（白名单 1,515，门限 1,590） | 1,546 | ≤ 1,566 | 映射与开合逻辑放 `queryEntryContext.ts`；`customQueryYear`、`:initial-notice`、`:entry` 三处接线 |
 | `RecycleBin.vue`（默认上限 1,500） | 354 | ≤ 361 | 操作列按行分支（+6，§3.6） |
