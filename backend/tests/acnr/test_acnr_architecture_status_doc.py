@@ -531,7 +531,8 @@ def test_number_rule_self_check(text, expect_red):
 # ─── 9. 完成态措辞必须被复算判据证实（段四复审 F4-02 残留） ─────────────────────
 
 _COMPLETION_RE = re.compile(
-    r"已[^，。；、（）()]{0,8}?(?:接入|清零|停用|持久化|落库|生效|删除|下线|迁回|重新生成|重生成|统一|实现|完成|更正|转发|创建|改为|加)"
+    r"已[^，。；、（）()]{0,8}?(?:接入|接线|启用|上线|落地|发布|支持|打通|修复|补齐|迁移|清零|停用|持久化|落库|生效|删除|下线"
+    r"|迁回|重新生成|重生成|统一|实现|完成|更正|转发|创建|改为|加)"
     r"|现已|清零|退出\s*[12]|写出前(?:运行|跑)"
 )
 _LINKAGE_BUS = _BACKEND / "app" / "routers" / "linkage_bus.py"
@@ -651,6 +652,8 @@ def test_true_completion_claims_are_in_use():
     ("| 发布门禁模块（尚未接入生成器） | 后端 |", True, False),
     ("生成器写出前跑门禁、`--check` 退出 2（T07）。", False, False),
     ("生成器写出前跑门禁（T07）。", True, True),  # 「已落地」子节不接受任务号豁免
+    ("| 发布门禁模块（已在生成器中启用） | 后端 |", True, True),  # 未登记的完成态动词也红
+    ("门禁清单：已经在跑的守卫见上表「测试」列。", True, False),  # 「已经在跑」不是完成态动词
 ])
 def test_completion_rule_self_check(line, landed, expect_red):
     assert bool(_completion_problems([("自检", line, landed)])) is expect_red
