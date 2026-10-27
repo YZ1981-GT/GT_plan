@@ -104,15 +104,25 @@ def format_duplicate_problems(problems: list[str]) -> str:
     return f"目录 addr_id 重复 {len(problems)} 处（前 10）：{head}"
 
 
-def forbidden_alias_index(sheets: list[dict]) -> dict[tuple[str, str], list[str]]:
-    """同一父级内一个别名对应 ≥2 个 sheet_code ⇒ 禁止别名（exact_identity 第 3 步读它）。"""
+def forbidden_alias_index(sheets: list[dict], alias_policy: Any = None) -> dict[tuple[str, str], list[str]]:
+    """禁止别名索引（exact_identity 第 3 步读它）。
+
+    两个来源合并：①同一父级内一个别名对应 ≥2 个 sheet_code；②目录顶层
+    `alias_policy.forbidden`（`{父级: {别名: [sheet_code...]}}`，生成器按 design §6.3 写出的
+    平台底稿名同父一名多码 9 组）。
+    """
     buckets: dict[tuple[str, str], list[str]] = {}
     for s in sheets:
         parent = s.get("parent_wp_code", "")
         code = s.get("sheet_code", "")
         for alias in s.get("sheet_name_aliases", []) or []:
             buckets.setdefault((parent, alias), []).append(code)
-    return {k: sorted(v) for k, v in buckets.items() if len(v) >= 2}
+    out = {k: sorted(v) for k, v in buckets.items() if len(v) >= 2}
+    declared = (alias_policy or {}).get("forbidden") if isinstance(alias_policy, dict) else None
+    for parent, by_alias in (declared or {}).items():
+        for alias, codes in (by_alias or {}).items():
+            out[(parent, alias)] = sorted(set(out.get((parent, alias), [])) | set(codes or []))
+    return out
 
 
 # ─── 报告 release 段互校 ──────────────────────────────────────────────────────

@@ -244,7 +244,9 @@ def test_two_sections_and_verdict_enums(verdicts):
         assert sv.verdict in SHEET_VERDICTS
     for cv in verdicts.cell_verdicts:
         assert cv.verdict in CELL_VERDICTS
-        assert cv.verdict == "deprecate"
+    # 孤儿 cell（R2-F1）恒 deprecate；§6.4 的 47 格由 test_name_system 核对
+    orphans = verdicts.cells_of_kind("orphan")
+    assert len(orphans) == 25 and all(cv.verdict == "deprecate" for cv in orphans)
 
 
 def test_loader_rejects_bad_verdict(tmp_path):
@@ -288,7 +290,7 @@ def test_add_platform_covers_all_orphan_parents(verdicts):
 
 
 def test_orphan_cells_all_deprecate(verdicts):
-    declared = verdicts.deprecated_cell_addr_ids()
+    declared = {c.addr_id for c in verdicts.cells_of_kind("orphan") if c.verdict == "deprecate"}
     assert declared == _ORPHAN_CELLS, (
         f"孤儿 cell 集合不一致：缺 {sorted(_ORPHAN_CELLS - declared)} 多 {sorted(declared - _ORPHAN_CELLS)}"
     )
@@ -360,7 +362,7 @@ def test_orphan_cells_offline_evidence_recomputed(verdicts):
     by_addr = {c["addr_id"]: c for c in _catalog().get("cells", [])}
     parents = {v.addr_id: v for v in verdicts.sheet_verdicts}
     problems = []
-    for cv in verdicts.cell_verdicts:
+    for cv in verdicts.cells_of_kind("orphan"):
         cat_cell = by_addr.get(cv.addr_id, {})
         fr = cv.evidence.get("formula_ref")
         if fr != cat_cell.get("formula_ref"):
@@ -453,7 +455,7 @@ def test_db_evidence_snapshot_matches_live_pg(verdicts):
         if _pf_values(pf) != live_pf:
             problems.append(f"{v.addr_id}.project_files: 记录 {_pf_values(pf)}（as_of {pf.get('as_of')}） ≠ 真库 {live_pf}")
     parents = {v.addr_id: v.sheet_code for v in verdicts.sheet_verdicts}
-    for cv in verdicts.cell_verdicts:
+    for cv in verdicts.cells_of_kind("orphan"):
         live_pf = files.get(parents[cv.parent_sheet_code], {})
         if _pf_values(cv.evidence["project_files"]) != live_pf:
             problems.append(f"{cv.addr_id}.project_files: 记录 {_pf_values(cv.evidence['project_files'])} ≠ 父 sheet 真库 {live_pf}")
@@ -490,7 +492,7 @@ def test_orphan_cells_pg_formula_refs_zero(verdicts):
         cols = cur.fetchall()
         assert cols, "没有找到公式类列（防空转）"
         hits: dict[str, int] = {}
-        for cv in verdicts.cell_verdicts:
+        for cv in verdicts.cells_of_kind("orphan"):
             n = 0
             for t, c in cols:
                 for needle in (cv.addr_id, cv.evidence["formula_ref"]):
@@ -502,4 +504,4 @@ def test_orphan_cells_pg_formula_refs_zero(verdicts):
         conn.close()
     bad = {k: v for k, v in hits.items() if v}
     assert not bad, f"孤儿 cell 在 PG 公式存储里有引用（不得静默停用）：{bad}"
-    assert all(cv.evidence.get("pg_formula_refs") == hits[cv.addr_id] for cv in verdicts.cell_verdicts)
+    assert all(cv.evidence.get("pg_formula_refs") == hits[cv.addr_id] for cv in verdicts.cells_of_kind("orphan"))

@@ -8,17 +8,28 @@
      把禁止别名并入后，`sheet_of(父级, 平台名)` 返回 alias_forbidden（拒绝）。
   5. 与模板名相同的 wp_name 不并入别名（§6.3）。
   6. loader 只读、不触碰目录单例、不读 DB（纯函数：传入 sheets 序列）。
+  7. 生成器名称规则 `catalog_names`（§6.3）：449 个非孤儿 cell 的 formula_ref / uri 全部往返（模板名归属本
+     sheet 用模板名，否则用 sheet_code）；同父一名多码 9 组写进顶层 alias_policy.forbidden 并被拒绝。
+  8. §6.4 的 47 格三路判定：openpyxl 现算证据与 cell_verdicts 记录逐条相等（31 行有文字 + 2 行空 = 33 格
+     keep_semantic_unverified，14 格超范围 deprecate）；apply_cell_verdicts 按判定改写 cell。
 
 变异（在 verify_wt 做）：某禁止别名组改成单码（删一条 wp_code 行）→ forbidden 组数红 / 往返
 禁止别名拒绝用例红；某可并入别名改回与模板名相同 → 往返命中数变化红。
 """
 from __future__ import annotations
 
+import collections
+import copy
 import json
+import re
+import sys
 from pathlib import Path
 
+from app.services.acnr import exact_identity
 from app.services.acnr.catalog import CatalogIndex
 from app.services.acnr.exact_identity import sheet_of
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # _seed_name_mismatch_evidence（与一次性写入脚本同一实现）
 from app.services.acnr.loaders.from_wp_account_mapping import (
     WpNameAliasResult,
     load_wp_account_mapping_aliases,
@@ -188,6 +199,105 @@ def test_same_name_as_template_not_aliased():
         assert sheet_name not in names, (
             f"{code} 的别名里不应含与模板名相同的「{sheet_name}」"
         )
+
+
+# ─── 7. 生成器名称规则（catalog_names，design §6.3）────────────────────────────
+
+
+def _named_copy() -> tuple[dict, object, object]:
+    from app.services.acnr import catalog_names
+
+    cat = copy.deepcopy(_load_catalog())
+    merged = catalog_names.merge_platform_names(cat)
+    named = catalog_names.apply_cell_names(cat)
+    return cat, merged, named
+
+
+def _wp_args(ref: str) -> list[str]:
+    return re.findall(r"'([^']*)'", ref or "")
+
+
+def test_generator_name_rules_roundtrip_all_non_orphan_cells():
+    """449 个非孤儿 cell 的 formula_ref 与 uri 经 exact_identity 都回到本 cell（含 4 个改用编码的）。"""
+    cat, _merged, named = _named_copy()
+    idx = CatalogIndex(cat)
+    sheet_ids = {s["addr_id"] for s in cat["sheets"]}
+    checked, fail = 0, []
+    for c in cat["cells"]:
+        if c["parent_addr_id"] not in sheet_ids or c.get("cell_address") is None:
+            continue
+        checked += 1
+        a = _wp_args(c["formula_ref"])
+        fm = exact_identity.cell_of(a[0], a[1], a[2], index=idx) if len(a) == 3 else None
+        p, rest = c["uri"][len("wp://"):].split("/", 1)
+        s, a1 = rest.rsplit("#", 1)
+        um = exact_identity.cell_of(p, s, a1, index=idx)
+        if fm is None or not fm.ok or fm.addr_id != c["addr_id"] or not um.ok or um.addr_id != c["addr_id"]:
+            fail.append((c["addr_id"], c["formula_ref"], c["uri"]))
+    # 发布前目录：474 − 25 孤儿 = 449；发布后孤儿父 sheet 已补登，25 个停用 cell 也在其中（共 474）
+    assert checked in (449, 474), checked
+    assert not fail, f"名称规则往返失败 {len(fail)} 条：{fail[:10]}"
+    assert named.by_sheet_code >= 1, "防空转：应有模板名不归属本 sheet、改用 sheet_code 的 cell（如 F2/F2-34）"
+    assert named.by_template_name + named.by_sheet_code == checked
+
+
+def test_generator_writes_forbidden_alias_policy_nine_groups():
+    """同父一名多码 9 组写进目录顶层 alias_policy.forbidden，且仅凭它（不进 sheet 别名）即被第 3 步拒绝。"""
+    cat, merged, _ = _named_copy()
+    rows = {(p, a): codes for p, by in cat["alias_policy"]["forbidden"].items() for a, codes in by.items()}
+    assert rows == _EXPECTED_FORBIDDEN
+    idx = CatalogIndex(cat)
+    for (parent, name), codes in _EXPECTED_FORBIDDEN.items():
+        for code in codes:
+            assert name not in (next(s for s in cat["sheets"] if s["sheet_code"] == code).get("sheet_name_aliases") or [])
+        assert sheet_of(parent, name, index=idx).state == "alias_forbidden", (parent, name)
+    assert len(merged.parent_qualified) == 6
+
+
+# ─── 8. §6.4 种子名不一致 47 格三路判定（cell_verdicts，与现算逐项相等）────────────
+
+
+def test_seed_name_mismatch_verdicts_recomputed():
+    from _seed_name_mismatch_evidence import seed_name_mismatch_cells, verdict_record, with_template_evidence
+
+    from app.services.acnr.loaders.from_sheet_verdicts import load_sheet_verdicts
+
+    v = load_sheet_verdicts()
+    added = {s.sheet_code for s in v.add_platform_sheets()}
+    rows = with_template_evidence(seed_name_mismatch_cells(_load_sheets(), added))
+    assert len(rows) == 47 and len({r["sheet_code"] for r in rows}) == 13
+    assert collections.Counter(r["class"] for r in rows) == {"in_range_row_text": 31, "in_range_row_empty": 2, "out_of_range": 14}
+    recorded = json.loads((_ACNR / "sources" / "sheet_verdicts.json").read_text(encoding="utf-8"))["cell_verdicts"]
+    recorded = {c["addr_id"]: c for c in recorded if c.get("kind") == "seed_name_mismatch"}
+    expected = {r["addr_id"]: verdict_record(r) for r in rows}
+    assert set(recorded) == set(expected), sorted(set(recorded) ^ set(expected))
+    diffs = [aid for aid in expected if recorded[aid] != expected[aid]]
+    assert not diffs, f"cell_verdicts 记录与现算不符：{diffs[:10]}"
+    deprecated = sorted(a for a, r in expected.items() if r["verdict"] == "deprecate")
+    assert deprecated == sorted([
+        "F3/F3-6/E30", "F4/F4-3/E50", "F4/F4-3/F50", "F4/F4-3/G50", "F4/F4-3/H50", "G14/G14-2/B50",
+        "G14/G14-2/E40", "G14/G14-2/F40", "G8/G8-3/B35", "G8/G8-3/E30", "J1/J1-3/F30", "J1/J1-3/G30",
+        "J1/J1-3/H30", "J1/J1-3/I30",
+    ])
+
+
+def test_apply_cell_verdicts_three_way():
+    from app.services.acnr import catalog_names
+    from app.services.acnr.loaders.from_sheet_verdicts import load_sheet_verdicts
+
+    cat = copy.deepcopy(_load_catalog())
+    rows = [dict(addr_id=c.addr_id, verdict=c.verdict, replaced_by=c.replaced_by) for c in load_sheet_verdicts().cell_verdicts]
+    catalog_names.apply_cell_verdicts(cat, rows)
+    by_id = {c["addr_id"]: c for c in cat["cells"]}
+    keep = [r for r in rows if r["verdict"] == "keep_semantic_unverified"]
+    dep = [r for r in rows if r["verdict"] == "deprecate"]
+    assert (len(keep), len(dep)) == (33, 39)
+    for r in keep:
+        c = by_id[r["addr_id"]]
+        assert c["semantic_label"] is None and c["cell_label"] == f"{c['cell_address']}（语义待核对）" and not c.get("deprecated")
+    for r in dep:
+        c = by_id[r["addr_id"]]
+        assert c["deprecated"] is True and c["replaced_by"] == r["replaced_by"] == c["parent_addr_id"]
 
 
 # ─── 6. 纯函数：传空 sheets 不抛、不读目录单例 ───────────────────────────────

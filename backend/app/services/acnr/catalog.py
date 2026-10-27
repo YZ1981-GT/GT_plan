@@ -171,8 +171,8 @@ class CatalogIndex:
             parent = c.get("parent_addr_id", "")
             self.cells_by_parent.setdefault(parent, []).append(c)
 
-        # 禁止别名：同一父级内一个别名对应 ≥2 个 sheet_code（exact_identity 第 3 步优先读此属性）
-        self.forbidden_aliases: dict[tuple[str, str], list[str]] = _integrity.forbidden_alias_index(sheets)
+        # 禁止别名：同父一名多码 ∪ 顶层 alias_policy.forbidden（exact_identity 第 3 步优先读此属性）
+        self.forbidden_aliases = _integrity.forbidden_alias_index(sheets, data.get("alias_policy"))
         # 加载期 release 互校状态（_load_catalog 写入；直接构造的索引为 None）
         self.release_check_status: str | None = None
 

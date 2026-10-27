@@ -10,9 +10,8 @@
   按父级限定别名保留（并入各父级内对应 sheet 的别名）。
 
 并入前（§6.3）断言 `sheet_of(父级, 平台名)` 回到本 sheet（r05 现算冲突 0）。
-现状（段四审计 F4-13 更正）：生成器尚未调用本 loader，这条往返只在
-`tests/acnr/test_name_system.py` 里对目录副本校验；T06 / T07 接入后由生成器在合并全部
-输入后用合并后目录统一校验。本 loader 只做纯结构分类，不触碰目录单例，不读 DB。
+现状：由名称规则模块 `catalog_names.merge_platform_names` 调用（T06），并入后在合并后目录上
+逐条校验往返；生成器调用 `catalog_names` 随 T07 接入。本 loader 只做纯结构分类，不触碰目录单例，不读 DB。
 
 Requirements: 5.1, 5.2, 5.3（D4 / R2-F2）
 """

@@ -490,6 +490,7 @@
     {
       "addr_id": "I6/I6-7/B25",
       "parent_sheet_code": "I6/I6-7",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "I6/I6-7",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -511,6 +512,7 @@
     {
       "addr_id": "I6/I6-7/C5",
       "parent_sheet_code": "I6/I6-7",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "I6/I6-7",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -532,6 +534,7 @@
     {
       "addr_id": "I6/I6-7/E20",
       "parent_sheet_code": "I6/I6-7",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "I6/I6-7",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -553,6 +556,7 @@
     {
       "addr_id": "I6/I6-7/F20",
       "parent_sheet_code": "I6/I6-7",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "I6/I6-7",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -574,6 +578,7 @@
     {
       "addr_id": "I6/I6-7/G20",
       "parent_sheet_code": "I6/I6-7",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "I6/I6-7",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -595,6 +600,7 @@
     {
       "addr_id": "J2/J2-5/E10",
       "parent_sheet_code": "J2/J2-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J2/J2-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -616,6 +622,7 @@
     {
       "addr_id": "J2/J2-5/E20",
       "parent_sheet_code": "J2/J2-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J2/J2-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -637,6 +644,7 @@
     {
       "addr_id": "J2/J2-5/F10",
       "parent_sheet_code": "J2/J2-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J2/J2-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -658,6 +666,7 @@
     {
       "addr_id": "J2/J2-5/F20",
       "parent_sheet_code": "J2/J2-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J2/J2-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -679,6 +688,7 @@
     {
       "addr_id": "J2/J2-5/G10",
       "parent_sheet_code": "J2/J2-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J2/J2-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -700,6 +710,7 @@
     {
       "addr_id": "J3/J3-4/C10",
       "parent_sheet_code": "J3/J3-4",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J3/J3-4",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -721,6 +732,7 @@
     {
       "addr_id": "J3/J3-4/C5",
       "parent_sheet_code": "J3/J3-4",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J3/J3-4",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -742,6 +754,7 @@
     {
       "addr_id": "J3/J3-4/C6",
       "parent_sheet_code": "J3/J3-4",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J3/J3-4",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -763,6 +776,7 @@
     {
       "addr_id": "J3/J3-4/C7",
       "parent_sheet_code": "J3/J3-4",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J3/J3-4",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -784,6 +798,7 @@
     {
       "addr_id": "J3/J3-4/C8",
       "parent_sheet_code": "J3/J3-4",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J3/J3-4",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -805,6 +820,7 @@
     {
       "addr_id": "J3/J3-4/C9",
       "parent_sheet_code": "J3/J3-4",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J3/J3-4",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -826,6 +842,7 @@
     {
       "addr_id": "J3/J3-5/E10",
       "parent_sheet_code": "J3/J3-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J3/J3-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -847,6 +864,7 @@
     {
       "addr_id": "J3/J3-5/F10",
       "parent_sheet_code": "J3/J3-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J3/J3-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -868,6 +886,7 @@
     {
       "addr_id": "J3/J3-5/G10",
       "parent_sheet_code": "J3/J3-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J3/J3-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -889,6 +908,7 @@
     {
       "addr_id": "J3/J3-5/H10",
       "parent_sheet_code": "J3/J3-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "J3/J3-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -910,6 +930,7 @@
     {
       "addr_id": "M6/M6-5/C5",
       "parent_sheet_code": "M6/M6-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "M6/M6-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -931,6 +952,7 @@
     {
       "addr_id": "M6/M6-5/C6",
       "parent_sheet_code": "M6/M6-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "M6/M6-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -952,6 +974,7 @@
     {
       "addr_id": "M6/M6-5/C7",
       "parent_sheet_code": "M6/M6-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "M6/M6-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -973,6 +996,7 @@
     {
       "addr_id": "M6/M6-5/D7",
       "parent_sheet_code": "M6/M6-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "M6/M6-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -994,6 +1018,7 @@
     {
       "addr_id": "M6/M6-5/E7",
       "parent_sheet_code": "M6/M6-5",
+      "kind": "orphan",
       "verdict": "deprecate",
       "replaced_by": "M6/M6-5",
       "reason": "该表格在模板册、渲染组件与真实底稿中均无对应表格，种子坐标无物理来源",
@@ -1010,6 +1035,993 @@
         "static_refs": 0,
         "pg_formula_refs": 0,
         "formula_ref": "WP('M6','损益联动验证','E7')"
+      }
+    },
+    {
+      "addr_id": "F3/F3-5/B25",
+      "parent_sheet_code": "F3/F3-5",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/F/F3 应付票据.xlsx",
+        "template_tab": "逾期票据检查F3-5",
+        "max_row": 29,
+        "max_col": 15,
+        "seed_file": "backend/data/f_address_registry_seed.json",
+        "seed_name": "应付票据分析程序",
+        "seed_semantic": "分析程序结论",
+        "seed_tab_exists": false,
+        "row_text": "分析逾期未付票据对公司持续经营的影响程度",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "F3/F3-5/C10",
+      "parent_sheet_code": "F3/F3-5",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/F/F3 应付票据.xlsx",
+        "template_tab": "逾期票据检查F3-5",
+        "max_row": 29,
+        "max_col": 15,
+        "seed_file": "backend/data/f_address_registry_seed.json",
+        "seed_name": "应付票据分析程序",
+        "seed_semantic": "应付票据余额变动分析",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "in_range_row_empty"
+      }
+    },
+    {
+      "addr_id": "F3/F3-6/B25",
+      "parent_sheet_code": "F3/F3-6",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/F/F3 应付票据.xlsx",
+        "template_tab": "关联方及交易检查表F3-6",
+        "max_row": 26,
+        "max_col": 16,
+        "seed_file": "backend/data/f_address_registry_seed.json",
+        "seed_name": "应付票据到期日分析",
+        "seed_semantic": "到期日分析结论",
+        "seed_tab_exists": false,
+        "row_text": "董高监等关键管理人员",
+        "cell_value": "董高监等关键管理人员",
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "F3/F3-6/E30",
+      "parent_sheet_code": "F3/F3-6",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "F3/F3-6",
+      "reason": "种子坐标超出模板已用范围（关联方及交易检查表F3-6 共 26 行 16 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/F/F3 应付票据.xlsx",
+        "template_tab": "关联方及交易检查表F3-6",
+        "max_row": 26,
+        "max_col": 16,
+        "seed_file": "backend/data/f_address_registry_seed.json",
+        "seed_name": "应付票据到期日分析",
+        "seed_semantic": "合计行-未到期票据余额",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "F4/F4-3/E50",
+      "parent_sheet_code": "F4/F4-3",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "F4/F4-3",
+      "reason": "种子坐标超出模板已用范围（调整分录汇总F4-3 共 24 行 10 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/F/F4 应付账款.xlsx",
+        "template_tab": "调整分录汇总F4-3",
+        "max_row": 24,
+        "max_col": 10,
+        "seed_file": "backend/data/f_address_registry_seed.json",
+        "seed_name": "应付账款账龄分析",
+        "seed_semantic": "合计行-应付账款期末余额合计",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "F4/F4-3/F50",
+      "parent_sheet_code": "F4/F4-3",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "F4/F4-3",
+      "reason": "种子坐标超出模板已用范围（调整分录汇总F4-3 共 24 行 10 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/F/F4 应付账款.xlsx",
+        "template_tab": "调整分录汇总F4-3",
+        "max_row": 24,
+        "max_col": 10,
+        "seed_file": "backend/data/f_address_registry_seed.json",
+        "seed_name": "应付账款账龄分析",
+        "seed_semantic": "合计行-1年以内合计",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "F4/F4-3/G50",
+      "parent_sheet_code": "F4/F4-3",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "F4/F4-3",
+      "reason": "种子坐标超出模板已用范围（调整分录汇总F4-3 共 24 行 10 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/F/F4 应付账款.xlsx",
+        "template_tab": "调整分录汇总F4-3",
+        "max_row": 24,
+        "max_col": 10,
+        "seed_file": "backend/data/f_address_registry_seed.json",
+        "seed_name": "应付账款账龄分析",
+        "seed_semantic": "合计行-1-2年合计",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "F4/F4-3/H50",
+      "parent_sheet_code": "F4/F4-3",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "F4/F4-3",
+      "reason": "种子坐标超出模板已用范围（调整分录汇总F4-3 共 24 行 10 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/F/F4 应付账款.xlsx",
+        "template_tab": "调整分录汇总F4-3",
+        "max_row": 24,
+        "max_col": 10,
+        "seed_file": "backend/data/f_address_registry_seed.json",
+        "seed_name": "应付账款账龄分析",
+        "seed_semantic": "合计行-2-3年合计",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "G14/G14-2/B50",
+      "parent_sheet_code": "G14/G14-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "G14/G14-2",
+      "reason": "种子坐标超出模板已用范围（明细表G14-2 共 36 行 13 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/G/G14 信用减值损失.xlsx",
+        "template_tab": "明细表G14-2",
+        "max_row": 36,
+        "max_col": 13,
+        "seed_file": "backend/data/g_address_registry_seed.json",
+        "seed_name": "信用减值损失ECL计算明细",
+        "seed_semantic": "ECL计算结论",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "G14/G14-2/E15",
+      "parent_sheet_code": "G14/G14-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/G/G14 信用减值损失.xlsx",
+        "template_tab": "明细表G14-2",
+        "max_row": 36,
+        "max_col": 13,
+        "seed_file": "backend/data/g_address_registry_seed.json",
+        "seed_name": "信用减值损失ECL计算明细",
+        "seed_semantic": "阶段1-12个月ECL",
+        "seed_tab_exists": false,
+        "row_text": "债权投资减值损失 | =B15+C15 | 债权投资减值准备 | =F15+G15-H15-I15 | =G15+H15 | =D15=K15",
+        "cell_value": "债权投资减值准备",
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "G14/G14-2/E25",
+      "parent_sheet_code": "G14/G14-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/G/G14 信用减值损失.xlsx",
+        "template_tab": "明细表G14-2",
+        "max_row": 36,
+        "max_col": 13,
+        "seed_file": "backend/data/g_address_registry_seed.json",
+        "seed_name": "信用减值损失ECL计算明细",
+        "seed_semantic": "阶段2-整个存续期ECL",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "in_range_row_empty"
+      }
+    },
+    {
+      "addr_id": "G14/G14-2/E35",
+      "parent_sheet_code": "G14/G14-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/G/G14 信用减值损失.xlsx",
+        "template_tab": "明细表G14-2",
+        "max_row": 36,
+        "max_col": 13,
+        "seed_file": "backend/data/g_address_registry_seed.json",
+        "seed_name": "信用减值损失ECL计算明细",
+        "seed_semantic": "阶段3-已减值ECL",
+        "seed_tab_exists": false,
+        "row_text": "4、审计说明可以概述:(1)程序的测试情况、结果;(2)拟调整事项及其调整分录、未调整事项及其影响，审计范围受到限制情况及其影响。",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "G14/G14-2/E40",
+      "parent_sheet_code": "G14/G14-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "G14/G14-2",
+      "reason": "种子坐标超出模板已用范围（明细表G14-2 共 36 行 13 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/G/G14 信用减值损失.xlsx",
+        "template_tab": "明细表G14-2",
+        "max_row": 36,
+        "max_col": 13,
+        "seed_file": "backend/data/g_address_registry_seed.json",
+        "seed_name": "信用减值损失ECL计算明细",
+        "seed_semantic": "ECL合计",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "G14/G14-2/F40",
+      "parent_sheet_code": "G14/G14-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "G14/G14-2",
+      "reason": "种子坐标超出模板已用范围（明细表G14-2 共 36 行 13 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/G/G14 信用减值损失.xlsx",
+        "template_tab": "明细表G14-2",
+        "max_row": 36,
+        "max_col": 13,
+        "seed_file": "backend/data/g_address_registry_seed.json",
+        "seed_name": "信用减值损失ECL计算明细",
+        "seed_semantic": "本期计提减值金额",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "G8/G8-3/B35",
+      "parent_sheet_code": "G8/G8-3",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "G8/G8-3",
+      "reason": "种子坐标超出模板已用范围（调整分录汇总G8-3 共 22 行 10 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/G/G8 其他权益工具投资.xlsx",
+        "template_tab": "调整分录汇总G8-3",
+        "max_row": 22,
+        "max_col": 10,
+        "seed_file": "backend/data/g_address_registry_seed.json",
+        "seed_name": "其他权益工具投资公允价值测试",
+        "seed_semantic": "公允价值测试结论",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "G8/G8-3/E30",
+      "parent_sheet_code": "G8/G8-3",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "G8/G8-3",
+      "reason": "种子坐标超出模板已用范围（调整分录汇总G8-3 共 22 行 10 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/G/G8 其他权益工具投资.xlsx",
+        "template_tab": "调整分录汇总G8-3",
+        "max_row": 22,
+        "max_col": 10,
+        "seed_file": "backend/data/g_address_registry_seed.json",
+        "seed_name": "其他权益工具投资公允价值测试",
+        "seed_semantic": "公允价值差额合计",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "G8/G8-4/B35",
+      "parent_sheet_code": "G8/G8-4",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/G/G8 其他权益工具投资.xlsx",
+        "template_tab": "公允价值测试表G8-4",
+        "max_row": 40,
+        "max_col": 19,
+        "seed_file": "backend/data/g_address_registry_seed.json",
+        "seed_name": "其他权益工具投资OCI变动",
+        "seed_semantic": "OCI变动结论",
+        "seed_tab_exists": false,
+        "row_text": "2、概述：（1）程序的测试情况、结果；",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "G8/G8-4/F30",
+      "parent_sheet_code": "G8/G8-4",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/G/G8 其他权益工具投资.xlsx",
+        "template_tab": "公允价值测试表G8-4",
+        "max_row": 40,
+        "max_col": 19,
+        "seed_file": "backend/data/g_address_registry_seed.json",
+        "seed_name": "其他权益工具投资OCI变动",
+        "seed_semantic": "OCI变动合计",
+        "seed_tab_exists": false,
+        "row_text": "（2）第二层次——直接（即价格）或间接（即从价格推导出）地使用除第一层次中的资产或负债的市场报价之外的可观察输入值。",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "J1/J1-3/F30",
+      "parent_sheet_code": "J1/J1-3",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "J1/J1-3",
+      "reason": "种子坐标超出模板已用范围（调整分录汇总表J1-3 共 24 行 10 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/J/J1 应付职工薪酬.xlsx",
+        "template_tab": "调整分录汇总表J1-3",
+        "max_row": 24,
+        "max_col": 10,
+        "seed_file": "backend/data/j_address_registry_seed.json",
+        "seed_name": "工资测算",
+        "seed_semantic": "工资测算合计金额",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "J1/J1-3/G30",
+      "parent_sheet_code": "J1/J1-3",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "J1/J1-3",
+      "reason": "种子坐标超出模板已用范围（调整分录汇总表J1-3 共 24 行 10 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/J/J1 应付职工薪酬.xlsx",
+        "template_tab": "调整分录汇总表J1-3",
+        "max_row": 24,
+        "max_col": 10,
+        "seed_file": "backend/data/j_address_registry_seed.json",
+        "seed_name": "工资测算",
+        "seed_semantic": "员工人数",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "J1/J1-3/H30",
+      "parent_sheet_code": "J1/J1-3",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "J1/J1-3",
+      "reason": "种子坐标超出模板已用范围（调整分录汇总表J1-3 共 24 行 10 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/J/J1 应付职工薪酬.xlsx",
+        "template_tab": "调整分录汇总表J1-3",
+        "max_row": 24,
+        "max_col": 10,
+        "seed_file": "backend/data/j_address_registry_seed.json",
+        "seed_name": "工资测算",
+        "seed_semantic": "人均月工资",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "J1/J1-3/I30",
+      "parent_sheet_code": "J1/J1-3",
+      "kind": "seed_name_mismatch",
+      "verdict": "deprecate",
+      "replaced_by": "J1/J1-3",
+      "reason": "种子坐标超出模板已用范围（调整分录汇总表J1-3 共 24 行 10 列）",
+      "evidence": {
+        "template_file": "backend/wp_templates/J/J1 应付职工薪酬.xlsx",
+        "template_tab": "调整分录汇总表J1-3",
+        "max_row": 24,
+        "max_col": 10,
+        "seed_file": "backend/data/j_address_registry_seed.json",
+        "seed_name": "工资测算",
+        "seed_semantic": "差异金额（=合计-人数×人均月工资×12）",
+        "seed_tab_exists": false,
+        "row_text": null,
+        "cell_value": null,
+        "class": "out_of_range"
+      }
+    },
+    {
+      "addr_id": "J1/J1-4/F20",
+      "parent_sheet_code": "J1/J1-4",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/J/J1 应付职工薪酬.xlsx",
+        "template_tab": "月度分析表J1-4",
+        "max_row": 61,
+        "max_col": 16,
+        "seed_file": "backend/data/j_address_registry_seed.json",
+        "seed_name": "社保测算",
+        "seed_semantic": "社保测算合计",
+        "seed_tab_exists": false,
+        "row_text": "C部门 | =SUM(B20:M20) | =IF(N20=0,,N20/$N$17)",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "J1/J1-4/G20",
+      "parent_sheet_code": "J1/J1-4",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/J/J1 应付职工薪酬.xlsx",
+        "template_tab": "月度分析表J1-4",
+        "max_row": 61,
+        "max_col": 16,
+        "seed_file": "backend/data/j_address_registry_seed.json",
+        "seed_name": "社保测算",
+        "seed_semantic": "缴费基数",
+        "seed_tab_exists": false,
+        "row_text": "C部门 | =SUM(B20:M20) | =IF(N20=0,,N20/$N$17)",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "J1/J1-4/H20",
+      "parent_sheet_code": "J1/J1-4",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/J/J1 应付职工薪酬.xlsx",
+        "template_tab": "月度分析表J1-4",
+        "max_row": 61,
+        "max_col": 16,
+        "seed_file": "backend/data/j_address_registry_seed.json",
+        "seed_name": "社保测算",
+        "seed_semantic": "缴费比例",
+        "seed_tab_exists": false,
+        "row_text": "C部门 | =SUM(B20:M20) | =IF(N20=0,,N20/$N$17)",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "J1/J1-4/I20",
+      "parent_sheet_code": "J1/J1-4",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/J/J1 应付职工薪酬.xlsx",
+        "template_tab": "月度分析表J1-4",
+        "max_row": 61,
+        "max_col": 16,
+        "seed_file": "backend/data/j_address_registry_seed.json",
+        "seed_name": "社保测算",
+        "seed_semantic": "差异金额（=合计-基数×比例）",
+        "seed_tab_exists": false,
+        "row_text": "C部门 | =SUM(B20:M20) | =IF(N20=0,,N20/$N$17)",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K1/K1-2/F30",
+      "parent_sheet_code": "K1/K1-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K1 其他应收款.xlsx",
+        "template_tab": "明细表K1-2",
+        "max_row": 50,
+        "max_col": 36,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "其他应收款明细",
+        "seed_semantic": "其他应收款明细合计",
+        "seed_tab_exists": false,
+        "row_text": "=F30+G30+H30 | =F30+Q30-R30 | =S30+T30 | =U30+V30+W30",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K1/K1-2/G30",
+      "parent_sheet_code": "K1/K1-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K1 其他应收款.xlsx",
+        "template_tab": "明细表K1-2",
+        "max_row": 50,
+        "max_col": 36,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "其他应收款明细",
+        "seed_semantic": "账面余额合计",
+        "seed_tab_exists": false,
+        "row_text": "=F30+G30+H30 | =F30+Q30-R30 | =S30+T30 | =U30+V30+W30",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K1/K1-2/H30",
+      "parent_sheet_code": "K1/K1-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K1 其他应收款.xlsx",
+        "template_tab": "明细表K1-2",
+        "max_row": 50,
+        "max_col": 36,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "其他应收款明细",
+        "seed_semantic": "坏账准备合计",
+        "seed_tab_exists": false,
+        "row_text": "=F30+G30+H30 | =F30+Q30-R30 | =S30+T30 | =U30+V30+W30",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K1/K1-2/I30",
+      "parent_sheet_code": "K1/K1-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K1 其他应收款.xlsx",
+        "template_tab": "明细表K1-2",
+        "max_row": 50,
+        "max_col": 36,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "其他应收款明细",
+        "seed_semantic": "账面价值合计",
+        "seed_tab_exists": false,
+        "row_text": "=F30+G30+H30 | =F30+Q30-R30 | =S30+T30 | =U30+V30+W30",
+        "cell_value": "=F30+G30+H30",
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K3/K3-2/F25",
+      "parent_sheet_code": "K3/K3-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K3 其他应付款.xlsx",
+        "template_tab": "明细表K3-2",
+        "max_row": 51,
+        "max_col": 27,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "其他应付款明细",
+        "seed_semantic": "其他应付款明细合计",
+        "seed_tab_exists": false,
+        "row_text": "=E25+F25+G25 | =E25-M25+N25 | =O25+P25 | =O25+R25+S25",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K3/K3-2/G25",
+      "parent_sheet_code": "K3/K3-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K3 其他应付款.xlsx",
+        "template_tab": "明细表K3-2",
+        "max_row": 51,
+        "max_col": 27,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "其他应付款明细",
+        "seed_semantic": "账面余额合计",
+        "seed_tab_exists": false,
+        "row_text": "=E25+F25+G25 | =E25-M25+N25 | =O25+P25 | =O25+R25+S25",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K3/K3-2/H25",
+      "parent_sheet_code": "K3/K3-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K3 其他应付款.xlsx",
+        "template_tab": "明细表K3-2",
+        "max_row": 51,
+        "max_col": 27,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "其他应付款明细",
+        "seed_semantic": "本期增加合计",
+        "seed_tab_exists": false,
+        "row_text": "=E25+F25+G25 | =E25-M25+N25 | =O25+P25 | =O25+R25+S25",
+        "cell_value": "=E25+F25+G25",
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K3/K3-2/I25",
+      "parent_sheet_code": "K3/K3-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K3 其他应付款.xlsx",
+        "template_tab": "明细表K3-2",
+        "max_row": 51,
+        "max_col": 27,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "其他应付款明细",
+        "seed_semantic": "本期减少合计",
+        "seed_tab_exists": false,
+        "row_text": "=E25+F25+G25 | =E25-M25+N25 | =O25+P25 | =O25+R25+S25",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K8/K8-2/D30",
+      "parent_sheet_code": "K8/K8-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K8 销售费用.xlsx",
+        "template_tab": "明细表K8-2",
+        "max_row": 48,
+        "max_col": 27,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "销售费用明细",
+        "seed_semantic": "本期发生额合计",
+        "seed_tab_exists": false,
+        "row_text": "3.XX费用测算如下：",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K8/K8-2/E30",
+      "parent_sheet_code": "K8/K8-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K8 销售费用.xlsx",
+        "template_tab": "明细表K8-2",
+        "max_row": 48,
+        "max_col": 27,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "销售费用明细",
+        "seed_semantic": "上年同期发生额合计",
+        "seed_tab_exists": false,
+        "row_text": "3.XX费用测算如下：",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K8/K8-2/F30",
+      "parent_sheet_code": "K8/K8-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K8 销售费用.xlsx",
+        "template_tab": "明细表K8-2",
+        "max_row": 48,
+        "max_col": 27,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "销售费用明细",
+        "seed_semantic": "变动额合计",
+        "seed_tab_exists": false,
+        "row_text": "3.XX费用测算如下：",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K8/K8-2/G30",
+      "parent_sheet_code": "K8/K8-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K8 销售费用.xlsx",
+        "template_tab": "明细表K8-2",
+        "max_row": 48,
+        "max_col": 27,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "销售费用明细",
+        "seed_semantic": "变动率",
+        "seed_tab_exists": false,
+        "row_text": "3.XX费用测算如下：",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K9/K9-2/D35",
+      "parent_sheet_code": "K9/K9-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K9 管理费用.xlsx",
+        "template_tab": "明细表K9-2",
+        "max_row": 55,
+        "max_col": 25,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "管理费用明细",
+        "seed_semantic": "本期发生额合计",
+        "seed_tab_exists": false,
+        "row_text": "项目 | 计提依据 | 计提比例 | 应计提金额 | 账面计提金额 | 差异金额 | 差异原因 | 是否调整",
+        "cell_value": "应计提金额",
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K9/K9-2/E35",
+      "parent_sheet_code": "K9/K9-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K9 管理费用.xlsx",
+        "template_tab": "明细表K9-2",
+        "max_row": 55,
+        "max_col": 25,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "管理费用明细",
+        "seed_semantic": "上年同期发生额合计",
+        "seed_tab_exists": false,
+        "row_text": "项目 | 计提依据 | 计提比例 | 应计提金额 | 账面计提金额 | 差异金额 | 差异原因 | 是否调整",
+        "cell_value": "账面计提金额",
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K9/K9-2/F35",
+      "parent_sheet_code": "K9/K9-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K9 管理费用.xlsx",
+        "template_tab": "明细表K9-2",
+        "max_row": 55,
+        "max_col": 25,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "管理费用明细",
+        "seed_semantic": "变动额合计",
+        "seed_tab_exists": false,
+        "row_text": "项目 | 计提依据 | 计提比例 | 应计提金额 | 账面计提金额 | 差异金额 | 差异原因 | 是否调整",
+        "cell_value": "差异金额",
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "K9/K9-2/G35",
+      "parent_sheet_code": "K9/K9-2",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/K/K9 管理费用.xlsx",
+        "template_tab": "明细表K9-2",
+        "max_row": 55,
+        "max_col": 25,
+        "seed_file": "backend/data/k_address_registry_seed.json",
+        "seed_name": "管理费用明细",
+        "seed_semantic": "变动率",
+        "seed_tab_exists": false,
+        "row_text": "项目 | 计提依据 | 计提比例 | 应计提金额 | 账面计提金额 | 差异金额 | 差异原因 | 是否调整",
+        "cell_value": "差异原因",
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "S15/S15/C12",
+      "parent_sheet_code": "S15/S15",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/S/S15 每股收益和净资产收益率.xlsx",
+        "template_tab": "审计程序S15",
+        "max_row": 30,
+        "max_col": 8,
+        "seed_file": "backend/data/s_address_registry_seed.json",
+        "seed_name": "每股收益",
+        "seed_semantic": "加权平均普通股股数",
+        "seed_tab_exists": false,
+        "row_text": "1.1 确认计算的准确性",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "S15/S15/C8",
+      "parent_sheet_code": "S15/S15",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/S/S15 每股收益和净资产收益率.xlsx",
+        "template_tab": "审计程序S15",
+        "max_row": 30,
+        "max_col": 8,
+        "seed_file": "backend/data/s_address_registry_seed.json",
+        "seed_name": "每股收益",
+        "seed_semantic": "归属于普通股东的净利润",
+        "seed_tab_exists": false,
+        "row_text": "2.每股收益的计算和披露是否符合《企业会计准则第34号-每股收益》的规定。",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "S15/S15/D12",
+      "parent_sheet_code": "S15/S15",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/S/S15 每股收益和净资产收益率.xlsx",
+        "template_tab": "审计程序S15",
+        "max_row": 30,
+        "max_col": 8,
+        "seed_file": "backend/data/s_address_registry_seed.json",
+        "seed_name": "每股收益",
+        "seed_semantic": "稀释每股收益",
+        "seed_tab_exists": false,
+        "row_text": "1.1 确认计算的准确性",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "S15/S15/D16",
+      "parent_sheet_code": "S15/S15",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/S/S15 每股收益和净资产收益率.xlsx",
+        "template_tab": "审计程序S15",
+        "max_row": 30,
+        "max_col": 8,
+        "seed_file": "backend/data/s_address_registry_seed.json",
+        "seed_name": "每股收益",
+        "seed_semantic": "加权平均净资产收益率",
+        "seed_tab_exists": false,
+        "row_text": "3.1 已发行普通股的加权平均",
+        "cell_value": null,
+        "class": "in_range_row_text"
+      }
+    },
+    {
+      "addr_id": "S15/S15/D8",
+      "parent_sheet_code": "S15/S15",
+      "kind": "seed_name_mismatch",
+      "verdict": "keep_semantic_unverified",
+      "replaced_by": null,
+      "reason": "种子名与模板名、平台名都不同，坐标在模板已用范围内但种子语义与模板行文字不符：地址保留，语义待核对",
+      "evidence": {
+        "template_file": "backend/wp_templates/S/S15 每股收益和净资产收益率.xlsx",
+        "template_tab": "审计程序S15",
+        "max_row": 30,
+        "max_col": 8,
+        "seed_file": "backend/data/s_address_registry_seed.json",
+        "seed_name": "每股收益",
+        "seed_semantic": "基本每股收益",
+        "seed_tab_exists": false,
+        "row_text": "2.每股收益的计算和披露是否符合《企业会计准则第34号-每股收益》的规定。",
+        "cell_value": null,
+        "class": "in_range_row_text"
       }
     }
   ]
