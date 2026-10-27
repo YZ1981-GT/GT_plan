@@ -18,7 +18,7 @@ import datetime as dt
 import decimal
 import uuid
 
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 from sqlalchemy import Column, Date, DateTime, Integer, Numeric, String, Uuid
 from sqlalchemy.dialects import postgresql
@@ -135,6 +135,10 @@ _set_strategy = st.one_of(
 # ─────────────────────────────────────────────────────────────────────────────
 @settings(max_examples=5)
 @given(values=_set_strategy, op=st.sampled_from(["in", "not_in"]))
+# 短值与 SQL 文本子串相撞的固定样例（advanced-query-linkage-closure B2 实跑撞到 ['1']）：逐值
+# `v not in sql` 会把 '1' / '(' 与占位符名 `param_1`、`ANY (` 误判为泄露，改为整句结构比对后必须通过
+@example(values=["1"], op="in")
+@example(values=["(", "a"], op="not_in")
 def test_p18_in_set_form_and_empty_boundary(values, op):
     # 空集合不抛错（R10.3）——直接构造成功
     clause = build_filter(_Row.code, op, values)
@@ -155,10 +159,9 @@ def test_p18_in_set_form_and_empty_boundary(values, op):
         else:
             assert "!= ALL (" in upper
         assert " IN (" not in upper
-        # 集合中每个字符串值都作为字面参数绑定，不出现在 SQL 文本
-        for v in values:
-            if isinstance(v, str) and v:
-                assert v not in sql
+        # 集合中的值都作为字面参数绑定、不进 SQL 文本：SQL 文本与任一其他非空集合编译出的逐字相同
+        # （逐值 `v not in sql` 对 '1'、'(' 这类短值必误报——它们本就是 `param_1`、`ANY (` 的子串）
+        assert sql == _compile(build_filter(_Row.code, op, ["\u2603"]))[0]
         # 绑定参数即为原集合（list 形态）
         bound = [p for p in params.values() if isinstance(p, list)]
         assert bound and bound[0] == list(values)

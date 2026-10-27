@@ -27,9 +27,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.audit_platform_models import AccountCategory, TrialBalance
-from app.models.base import Base
 from app.models.core import Project, ProjectStatus, ProjectType, User, UserRole
 from app.routers.query_builder import router as query_builder_router, _EXPORT_FETCH_SIZE
+from tests.advanced_query_linkage.builder_tables import assert_only_builder_tables, create_builder_schema
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
@@ -48,10 +48,12 @@ class _FakeUser:
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncSession:
+    # 只建构建器白名单表及其外键闭包（AQ-32，与 test_query_builder_endpoint.py 同一夹具）：建全部 ORM 表时，
+    # 任一无关模型带 PG 专用 server_default，本文件全部用例都会在 setup 阶段报错（见 builder_tables 模块说明）
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(create_builder_schema)
+        await assert_only_builder_tables(conn)
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:
         yield session
@@ -271,8 +273,8 @@ async def test_pbt_streaming_export_equivalence(count, fields):
 
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(create_builder_schema)
+        await assert_only_builder_tables(conn)
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with factory() as session:
