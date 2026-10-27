@@ -1998,7 +1998,7 @@ sheet_name 须含审定表子码，形如 审定表D2-1，即 D 到 N 字母加�
 ### 六、推送一律在 worktree 内完成
 
 - 实施 worktree 没有并发会话的未跟踪 / 已修改文件污染，pre-push hook 不会被无关文件阻塞
-- 收尾任务的推送步骤在 worktree 内执行（git push origin HEAD:target-branch），不切回主工作树
+- 收尾任务的推送步骤在 worktree 内执行，不切回主工作树：`python <主工作树>/.git-hooks/push_version.py push --branch <target-branch> -c "主要变动…"`（同时打版本标签 vX.Y.Z 并原子推送；pre-push 拒收不带版本标签的新提交，2026-10-27 起）
 - 主工作树只做勾选 tasks.md（然后 byte-for-byte 复制进 worktree）
 
 ### 七、脚本标注生命周期
