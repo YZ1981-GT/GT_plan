@@ -40,3 +40,11 @@ backend/data/workpaper_sync_entry_wp_code_adjudication.json text eol=lf
 # 必须与 catalog_contract.schema_json() 逐字节相等（LF）。core.autocrlf=true 会在 checkout 时把
 # LF blob 转成 CRLF ⇒ 该守卫在 Windows 本机红、CI 的 Linux 上绿。index 里本就是 LF，不产生行尾 churn。
 docs/acnr/schemas/global_catalog.schema.json text eol=lf
+# ACNR 目录产物强制 LF（2026-10-27，spec acnr-foundation-defect-closure 段四审计 F4-07 / T08）。
+# 目录内容哈希口径 = LF 规范内容（catalog_integrity.content_sha256，即 git blob 内容的 sha256），
+# 报告 release.catalog_sha256 与加载期互校都用它；T07 生成器的幂等判定要求磁盘字节与已提交产物
+# 逐字节相等，core.autocrlf=true 的 CRLF 检出会让 Windows 上永远「不相等」。index 里本就是 LF，
+# 不产生行尾 churn。
+backend/data/acnr/global_catalog.json text eol=lf
+backend/data/acnr/catalog_report.json text eol=lf
+backend/data/acnr/catalog_snapshots/*.json text eol=lf

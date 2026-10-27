@@ -332,7 +332,7 @@ CLI 只保留 `--write`（缺省）、`--check`、`--registry-version`；删除 
 2. 以上一批次版本号构建一次；目录与报告（不计 `generated_at`）都与已提交产物逐字节相等 → 不写任何文件，退出 0。
 3. 否则以新版本号（UTC `%Y%m%d%H%M%S` 或显式值）重建并跑门禁；有违规按 `check` 分组打印、退出 1、不写文件。
 4. 通过后同批写出：快照 `{版本}.json`（与目录同字节）→ schema → 报告（含 `release`：版本、`previous_version`（上一批次版本号，用于 `--check` 定位沿用来源）、目录 sha256、schema sha256、`inputs_fingerprint`、`classification`）→ 目录；每个文件先写临时文件再 `os.replace`，中途失败由加载期互校拒绝不一致批次，重跑即恢复。
-5. 已存在同名快照且内容不同 → 失败。唯一例外登记在 `release_exceptions.json`：20260727115337 的快照 sha256（前缀 ee0032ffcab40663）与已提交目录 sha256（前缀 95175fcbcf97203d）各记全长，哈希不匹配即失效；以该快照为此版本权威内容（目前无项目锁定任何版本，§8）。
+5. 已存在同名快照且内容不同 → 失败。唯一例外登记在 `release_exceptions.json`：20260727115337 的快照内容 sha256（前缀 e98a127ed7c4f275）与已提交目录内容 sha256（前缀 b3a988ed2dc63e67）各记全长，哈希不匹配即失效；以该快照为此版本权威内容（目前无项目锁定任何版本，§8）。哈希口径（段四审计 F4-07 更正）：一律是 LF 规范内容的 sha256（`catalog_integrity.content_sha256`，即 git blob 内容哈希）；此前记的 ee0032ffcab40663 / 95175fcbcf97203d 是 Windows CRLF 检出字节的哈希，Linux 检出不成立。
 
 报告 `generated_at` 只在其余内容变化时更新。`--check` 以已提交版本号重算（别名沿用来源取已提交报告 `release.previous_version` 对应的快照，不读工作区目录），结构化比对目录（逐 addr_id 逐字段）、报告、schema、当前版本快照，漂移退出 2 并逐条打印 `addr_id: 字段`（最多 50 条另报总数）；同时对已提交产物跑门禁，违规退出 1。CI 改为 `generate_catalog.py --check`，`check_catalog_drift.py` 改为调用同一 `main(["--check"])` 的薄壳。分片不再产出，删 `shards/` 两个文件与 `write_shards` / `_cell_belongs_to_cycle`（删前重 grep）。
 
@@ -355,12 +355,13 @@ CLI 只保留 `--write`（缺省）、`--check`、`--registry-version`；删除 
 - `CatalogIndex.__init__` 收集三类重复（sheets 内、cells 内、互撞），非空即抛 `CatalogIntegrityError(duplicates)`（继承 `CatalogLoadError`），消息列前 10 个与总数。sheet_code 重复不在此拦（以列表承载、解析时报歧义）。同时建 `sheets_by_parent`、父级禁止别名、名称归属三个索引（§6.2）。
 - `_load_catalog` 把它并入现有降级分支：有上一版缓存则只读上一版并 `_alert_admin("catalog_integrity_failed")`，无缓存则失败；`load_versioned_catalog` 遇到它上抛（§8 映射 409）。
 - 加载期互校：目录同目录有 `catalog_report.json` 时比对 `release.registry_version` 与 `release.catalog_sha256`，不一致按 `CatalogIntegrityError`；默认生产路径缺报告同样处理；`ACNR_CATALOG_PATH` 指向的测试目录无报告时跳过（守卫断言生产路径报告存在）。
+- 段四审计 F4-07 落实（实现在 `services/acnr/catalog_integrity.py`，`catalog.py` 只做薄封装并把执行状态写进 `CatalogIndex.release_check_status`）：release 段存在时 `registry_version` 与 `catalog_sha256` 两个字段必填（缺字段、键名写错即失败，不再「缺字段就跳过」）；报告无法解析即失败；内容哈希一律按 LF 规范内容计算。T08 先于 T07 入库（与 §18 发布顺序①不符），过渡期内对无 release 段的报告跳过互校、运行时行为不变，过渡期由 `LEGACY_REPORT_WITHOUT_RELEASE` 登记（owner、理由、到期 2027-01-31、退出条件）；守卫 `test_production_report_release_or_registered_legacy` 钉住「生产报告无 release 段 ⇒ 必须是登记的那份旧报告（内容哈希相等）且未过期」「生产报告有 release 段 ⇒ 互校真实执行（状态 checked）且登记已删除」——T07 漏写或写错 release 段、报告被改动都会红，登记删除后无 release 段的报告一律被加载器拒绝。
 - 验证：合成三类重复各一例；真实目录与 4 份快照全部可加载；临时目录注入重复后分别验证「无缓存失败」与「有缓存降级 + 告警」。加载耗时基线（p28，7 次中位）8.3 ms，加检测与互校后 ≤ 10.0 ms。
 
 ### 5.6 验证（门禁整体）
 
 - 变异（输入或产物副本）：注入重复 addr_id、删父 sheet、改 cell 的 A1、删已发布 addr_id、改 parent_wp_code、删一条 override 的 `source` → 门禁各自红在对应 `check`；绕过生成器改 `global_catalog.json` → `--check` 退出 2 并点名。**R2-F11 新增变异：只在 `global_catalog.json` 中给某 sheet 加一个别名（不改任何输入与上一批次快照）→ `--check` 必须退出 2 并点名该 addr_id 的别名字段**（证明沿用来源是上一批次快照、不是工作区目录）。
-- 幂等：连续两次生成 sha256 相同且第二次不写文件；改一条种子后版本号变化、旧快照字节不变；4 份既有快照 sha256 前缀保持 3ab8a81e6a322da6、4085ddfcd12bd8ef、af590468c529ad74、ee0032ffcab40663。
+- 幂等：连续两次生成 sha256 相同且第二次不写文件；改一条种子后版本号变化、旧快照内容不变；4 份既有快照内容 sha256（LF 规范内容）前缀保持 8645205d291992d3、ba831e5f75e1857b、8c0a7c47ec3211cd、e98a127ed7c4f275（段四审计 F4-07：原记 3ab8a81e… 等为 CRLF 检出字节口径，已更正；守卫 `test_catalog_index_fail_closed::test_snapshot_content_hashes_pinned` 钉住）。
 - 确定性：指纹与报告不含绝对路径与机器名；CI 中门禁全量 < 2 分钟。
 
 ## 6. D4　名称体系与往返（需求 5）

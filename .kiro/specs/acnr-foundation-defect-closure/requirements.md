@@ -172,7 +172,7 @@
 
 4.4 迁回外科补丁：F4 的 57 张 sheet 差异逐条迁入生成器权威输入（全量登记循环的 manifest；带 owner、理由与可复算来源的 overrides；标签源），x3 部分登记 manifest 与其未覆盖基线不动。迁移后重算的目录与迁移前已提交的目录在 53 张 import_export 上逐字段相等，4 张别名 sheet 的别名是已提交值的超集（旧别名沿用）；x3 相关守卫全绿；`fix_acnr_dangling_api_prefix`、`fix_acnr_catalog_ie_gap`、`fix_x3_adjustment_ie_registration`、`gen_cycle_import_export_registry` 的 `--check` 仍为 0。直接改写 `global_catalog.json` 的脚本改为写生成器输入或下线，由设计逐个裁定。
 
-4.5 发布批次：目录、报告、快照同批写出，带同一个 `registry_version` 与目录内容 sha256，报告记录目录哈希；CI 与加载期互校，不一致即失败。同一 `registry_version` 只能对应一份内容：已存在同名快照且内容不同时失败，不跳过、不覆盖。F5 的存量那一对登记为一次性例外，例外条目写明版本与两份内容哈希，不匹配即失效。4 份既有快照逐字节不变（sha256 前缀依次为 3ab8a81e6a322da6、4085ddfcd12bd8ef、af590468c529ad74、ee0032ffcab40663）。
+4.5 发布批次：目录、报告、快照同批写出，带同一个 `registry_version` 与目录内容 sha256，报告记录目录哈希；CI 与加载期互校，不一致即失败。同一 `registry_version` 只能对应一份内容：已存在同名快照且内容不同时失败，不跳过、不覆盖。F5 的存量那一对登记为一次性例外，例外条目写明版本与两份内容哈希，不匹配即失效。4 份既有快照内容不变（LF 规范内容的 sha256，即 git blob 内容哈希，前缀依次为 8645205d291992d3、ba831e5f75e1857b、8c0a7c47ec3211cd、e98a127ed7c4f275）。段四审计 F4-07 更正：本条原记的 3ab8a81e6a322da6、4085ddfcd12bd8ef、af590468c529ad74、ee0032ffcab40663 是 Windows 下 `core.autocrlf=true` 检出的 CRLF 字节哈希，同一快照在 Linux 检出时不成立；目录、报告与快照的内容哈希一律按 LF 规范内容计算（`catalog_integrity.content_sha256`），`.gitattributes` 已对这三类产物设 `text eol=lf`。
 
 4.6 分片要么纳入同批互校，要么不再产出并移除过期文件，由设计裁定；不得留下版本或内容与目录不一致的分片。
 
