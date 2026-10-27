@@ -1,6 +1,7 @@
 """权限世界夹具的自测（partner-manager-edit-permission 任务 3.1；design §8.2、D11；需求 12.1、12.2、12.4）。
 
-一、世界本身：恰好六张表；三个部分唯一索引与 PG 同语义；Redis 客户端是本世界独占、初始为空的 fakeredis。
+一、世界本身：恰好六张表；三个部分唯一索引与 PG 同语义；Redis 客户端是本世界独占、初始为空的 fakeredis；可选
+    ``extra_tables`` 补建的表排在六张表之后、按外键依赖排序，外键只留指向本次所建表的（SQLite 与 PG 两版）。
 二、八种身份的数据按需求 12.2 / 12.4 原文逐项核对（读库，不读 Identity 对象）；「是否 EQCR」由真实 ``is_project_eqcr`` 判定。
 三、八种身份 × 三个级别经真实 ``assert_project_permission`` 的结论，期望按需求原文与该函数的现行口径写死；每个用例一个独立的世界。
 四、经 HTTP 真发请求：生产注册的 ``wp_cross_check`` 路由 ``POST …/cross-check/rules/custom``（路由级 readonly 门禁 + 端点级 edit
@@ -18,6 +19,7 @@ import pytest
 import pytest_asyncio
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.routing import APIRoute
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,10 +31,12 @@ import app.services.eqcr_resolver as eqcr_resolver
 from app.core.database import get_db
 from app.core.redis import get_redis
 from app.deps import get_current_user
+from app.models.audit_platform_models import TrialBalance
 from app.models.base import PermissionLevel, ProjectStatus, ProjectUserRole
 from app.models.core import Project, ProjectUser, User
 from app.models.report_models import DisclosureNote
 from app.models.staff_models import ProjectAssignment, StaffMember
+from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.routers import wp_cross_check
 from app.services.eqcr_resolver import is_project_eqcr
 from app.services.wp_cross_check_service import CrossCheckService
@@ -47,6 +51,7 @@ from tests.authz_world import (
     TARGET_PROJECT_ID,
     TRACED_GATES,
     WORLD_TABLE_NAMES,
+    WORLD_TABLES,
     AuthzWorld,
     GateClient,
     ServiceStub,
@@ -56,6 +61,7 @@ from tests.authz_world import (
     pg_world,
     production_registrations,
     sqlite_world,
+    world_tables,
 )
 from tests.role_map_expected import EXPECTED_EQCR_ALIASES
 
@@ -149,6 +155,30 @@ async def test_world_has_exactly_the_six_tables(world: AuthzWorld) -> None:
     assert tuple(target) == (ProjectStatus.execution, False, False)  # 目标项目：未归档、未合并锁定、未删除
     note = await world.add_note()
     assert (note.id, note.project_id) == (TARGET_NOTE_ID, TARGET_PROJECT_ID)
+
+
+# 端点要读的业务表（advanced-query-linkage-closure 任务 1）：working_paper → wp_index 的外键在本次所建表内应保留，
+# 指向未建表（如 users 之外的 import_batches 等）的外键应去掉；顺序故意倒着给，验证按外键依赖排序。
+_EXTRA = (WorkingPaper.__table__, TrialBalance.__table__, WpIndex.__table__)
+
+
+async def test_extra_tables_are_built_after_the_six_with_in_world_foreign_keys(monkeypatch) -> None:
+    async with sqlite_world(monkeypatch, extra_tables=_EXTRA) as world:
+        names = set((await world.db.execute(text("SELECT name FROM sqlite_master WHERE type = 'table'"))).scalars())
+        assert names == WORLD_TABLE_NAMES | {"working_paper", "trial_balance", "wp_index"}
+        built = world_tables(_EXTRA)
+        assert [t.name for t in built[: len(WORLD_TABLE_NAMES)]] == [
+            "users", "projects", "project_users", "staff_members", "project_assignments", "disclosure_notes",
+        ]
+        order = [t.name for t in built]
+        assert order.index("wp_index") < order.index("working_paper")
+        for table in ("working_paper", "trial_balance", "wp_index"):
+            fk_rows = (await world.db.execute(text(f"PRAGMA foreign_key_list({table})"))).all()
+            referred = {row[2] for row in fk_rows}
+            assert referred <= names, f"{table} 的外键指向了未建的表：{sorted(referred - names)}"
+        wp_fks = {row[2] for row in (await world.db.execute(text("PRAGMA foreign_key_list(working_paper)"))).all()}
+        assert "wp_index" in wp_fks and "projects" in wp_fks
+        assert world_tables() == WORLD_TABLES  # 缺省不补建
 
 
 async def _same_key_rows(world: AuthzWorld, table: str):
@@ -487,4 +517,35 @@ async def test_pg_world_is_isomorphic_and_leaves_no_objects(monkeypatch: pytest.
         # 世界里的数据没有落到 public 的正式表
         assert await _pg_count("SELECT count(*) FROM public.projects WHERE id = :pid", pid=TARGET_PROJECT_ID) == 0
 
+    assert await _pg_count("SELECT count(*) FROM pg_namespace WHERE nspname = :s", s=schema) == 0
+
+
+@pytest.mark.pg_only
+async def test_pg_world_extra_tables_and_their_enum_types_stay_in_the_scratch_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``extra_tables`` 在 PG 版同样建在临时 schema（含它们的枚举类型），外键同口径，结束后不留对象。"""
+    async with pg_world(monkeypatch, extra_tables=_EXTRA) as world:
+        schema, db = world.schema, world.db
+        tables = set((await db.execute(
+            text("SELECT tablename FROM pg_tables WHERE schemaname = :s"), {"s": schema})).scalars())
+        assert tables == WORLD_TABLE_NAMES | {"working_paper", "trial_balance", "wp_index"}
+        enums = set((await db.execute(text(
+            "SELECT t.typname FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace "
+            "WHERE n.nspname = :s AND t.typtype = 'e'"), {"s": schema})).scalars())
+        expected = {
+            column.type.name for table in world_tables(_EXTRA) for column in table.columns
+            if isinstance(column.type, SAEnum) and column.type.native_enum and column.type.name
+        }
+        six = {
+            column.type.name for table in WORLD_TABLES for column in table.columns
+            if isinstance(column.type, SAEnum) and column.type.native_enum and column.type.name
+        }
+        assert enums == expected and expected - six, f"临时 schema 的枚举类型 {sorted(enums)} 应为 {sorted(expected)}"
+        referred = set((await db.execute(text(
+            "SELECT DISTINCT ccu.table_name FROM information_schema.table_constraints tc "
+            "JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name "
+            "AND ccu.constraint_schema = tc.constraint_schema "
+            "WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = :s"), {"s": schema})).scalars())
+        assert referred <= tables and {"wp_index", "projects"} <= referred
     assert await _pg_count("SELECT count(*) FROM pg_namespace WHERE nspname = :s", s=schema) == 0

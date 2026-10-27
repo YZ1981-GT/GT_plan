@@ -12,6 +12,9 @@
   project_assignments / disclosure_notes。外键只保留指向这六张表的。模型里用 ``postgresql_where`` 声明的部分索引，
   在 SQLite 上按同样的列与条件重建为部分索引（``create_all`` 在 SQLite 上建出的唯一索引不带删除条件，会误拒 PG 上合法的
   「一条已删除行 + 一条现行行」）。
+- 端点要读的业务表经可选参数 ``extra_tables`` 补建（``sqlite_world(monkeypatch, extra_tables=(...))``，PG 版同名参数）：
+  建在六张表之后、按外键依赖排序，外键只保留指向本次所建表的，PG 上所需枚举类型同样在临时 schema 内新建。缺省不补建
+  （仍只有六张表）。缺表即该用例失败，不降级跳过。
 - PG 同构版 ``pg_world``（供 ``pg_only`` 用例）：同一事务内建临时 schema，``SET LOCAL search_path`` 只含该 schema，用同一份
   建表函数建同样的六张表（枚举类型按 ORM 声明的取值在临时 schema 内新建）。会话以 SAVEPOINT 方式加入该事务，端点里的
   ``commit`` 只释放保存点；结束时整体回滚，不留任何对象。连接串只取进程环境变量 ``DATABASE_URL``。
@@ -52,7 +55,7 @@ import importlib
 import os
 import sys
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Iterable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
@@ -71,7 +74,9 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool, StaticPool
-from sqlalchemy.schema import CreateIndex, CreateTable, ForeignKeyConstraint, Index, Table
+from sqlalchemy.schema import (
+    AddConstraint, CreateIndex, CreateTable, ForeignKeyConstraint, Index, Table, sort_tables,
+)
 
 import app
 import app.core.database as core_database
@@ -148,16 +153,25 @@ def _referred_table(fk: ForeignKeyConstraint) -> str:
     return target
 
 
-def _enum_types() -> dict[str, tuple[str, ...]]:
-    """六张表用到的枚举类型：类型名 → ORM 声明的取值（PG 上在临时 schema 内新建）。"""
+def _enum_types(tables: Iterable[Table] = WORLD_TABLES) -> dict[str, tuple[str, ...]]:
+    """所建表用到的原生枚举类型：类型名 → ORM 声明的取值（PG 上在临时 schema 内新建）。
+
+    非原生枚举（``native_enum=False``）在 PG 上建成 VARCHAR，不需要类型；六张表的枚举都是原生且有名字的。
+    """
     found: dict[str, tuple[str, ...]] = {}
-    for table in WORLD_TABLES:
+    for table in tables:
         for column in table.columns:
-            if isinstance(column.type, SAEnum):
+            if isinstance(column.type, SAEnum) and column.type.native_enum and column.type.name:
                 labels = tuple(column.type.enums)
                 if found.setdefault(column.type.name, labels) != labels:
                     raise RuntimeError(f"枚举类型 {column.type.name} 在不同列上声明的取值不同")
     return found
+
+
+def world_tables(extra_tables: Iterable[Table] = ()) -> tuple[Table, ...]:
+    """本次要建的表：六张表在前（原顺序），``extra_tables`` 去掉重复与六张表后按外键依赖排序追加。"""
+    extras = {table.name: table for table in extra_tables if table.name not in WORLD_TABLE_NAMES}
+    return (*WORLD_TABLES, *sort_tables(extras.values()))
 
 
 def _index_statement(index: Index, dialect: str) -> CreateIndex | str:
@@ -172,21 +186,37 @@ def _index_statement(index: Index, dialect: str) -> CreateIndex | str:
     return f"CREATE {unique}INDEX {index.name} ON {index.table.name} ({columns}) WHERE {where}"
 
 
-def create_world_schema(conn: Connection) -> None:
-    """在 ``conn`` 上建权限世界的六张表（供 ``AsyncConnection.run_sync`` 调用）。"""
+def create_world_schema(conn: Connection, extra_tables: Iterable[Table] = ()) -> None:
+    """在 ``conn`` 上建权限世界的六张表及 ``extra_tables``（供 ``AsyncConnection.run_sync`` 调用）。
+
+    PG 建表时就校验外键目标：六张表里指向补建表的外键（如 disclosure_notes → working_paper）在全部表建完后再
+    ``ALTER TABLE … ADD`` 补上；SQLite 建表时不校验外键目标，照旧内联。缺省（不补建）时 DDL 与原先逐句相同。
+    """
+    tables = world_tables(extra_tables)
+    names = frozenset(table.name for table in tables)
     dialect = conn.dialect.name
     if dialect == "postgresql":
-        for name, labels in sorted(_enum_types().items()):
+        for name, labels in sorted(_enum_types(tables).items()):
             postgresql.ENUM(*labels, name=name).create(conn, checkfirst=False)
-    for table in WORLD_TABLES:
-        in_world = [fk for fk in table.foreign_key_constraints if _referred_table(fk) in WORLD_TABLE_NAMES]
-        conn.execute(CreateTable(table, include_foreign_key_constraints=in_world))
+    created: set[str] = set()
+    deferred: list[ForeignKeyConstraint] = []
+    for table in tables:
+        in_world = [fk for fk in table.foreign_key_constraints if _referred_table(fk) in names]
+        inline = in_world
+        if dialect == "postgresql":
+            ready = created | {table.name}
+            inline = [fk for fk in in_world if _referred_table(fk) in ready]
+            deferred.extend(fk for fk in in_world if _referred_table(fk) not in ready)
+        conn.execute(CreateTable(table, include_foreign_key_constraints=inline))
+        created.add(table.name)
         for index in sorted(table.indexes, key=lambda item: item.name):
             statement = _index_statement(index, dialect)
             if isinstance(statement, str):
                 conn.exec_driver_sql(statement)
             else:
                 conn.execute(statement)
+    for fk in deferred:
+        conn.execute(AddConstraint(fk))
 
 
 # ─── 「请求经过的门禁 is 生产对象」 ──────────────────────────────────────────
@@ -709,12 +739,14 @@ class AuthzWorld:
 
 
 @asynccontextmanager
-async def sqlite_world(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AuthzWorld]:
-    """SQLite 内存库版权限世界。"""
+async def sqlite_world(
+    monkeypatch: pytest.MonkeyPatch, *, extra_tables: Iterable[Table] = (),
+) -> AsyncIterator[AuthzWorld]:
+    """SQLite 内存库版权限世界（``extra_tables``：六张表之外要补建的表）。"""
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
     try:
         async with engine.begin() as conn:
-            await conn.run_sync(create_world_schema)
+            await conn.run_sync(create_world_schema, tuple(extra_tables))
         async with async_sessionmaker(engine, expire_on_commit=False)() as session:
             world = await AuthzWorld.create(session, monkeypatch)
             try:
@@ -737,8 +769,10 @@ def pg_engine() -> AsyncEngine:
 
 
 @asynccontextmanager
-async def pg_world(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AuthzWorld]:
-    """真 PG 版权限世界：同一事务内建临时 schema，``search_path`` 只含它，结束整体回滚。"""
+async def pg_world(
+    monkeypatch: pytest.MonkeyPatch, *, extra_tables: Iterable[Table] = (),
+) -> AsyncIterator[AuthzWorld]:
+    """真 PG 版权限世界：同一事务内建临时 schema，``search_path`` 只含它，结束整体回滚（``extra_tables`` 同 SQLite 版）。"""
     engine = pg_engine()
     schema = f"authz_world_{uuid.uuid4().hex[:12]}"
     try:
@@ -748,7 +782,7 @@ async def pg_world(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AuthzWorld]
                 await conn.exec_driver_sql(f'CREATE SCHEMA "{schema}"')
                 # 只含临时 schema：不带 schema 的表名、类型名不可能解析到 public 的正式对象
                 await conn.exec_driver_sql(f'SET LOCAL search_path TO "{schema}"')
-                await conn.run_sync(create_world_schema)
+                await conn.run_sync(create_world_schema, tuple(extra_tables))
                 async with AsyncSession(
                     bind=conn, expire_on_commit=False, join_transaction_mode="create_savepoint",
                 ) as session:

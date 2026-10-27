@@ -45,6 +45,15 @@ vi.mock('element-plus', async () => {
   }
 })
 
+// 构建器用 useRoute() 取项目上下文，本 spec 不装路由。2026-10-27 acnr D9（64eade2e1）起 useAcnrDrill 经
+// useAcnr(getter) 在 setup 里立即求值 route.params，未装路由时 useRoute() 为 undefined ⇒ 每次挂载都
+// TypeError「reading 'params'」（advanced-query-linkage-closure 任务 1 回归基线发现）。生产环境总装着路由，
+// 这里给一个不在项目内的路由（params 为空），其余导出保持原样。
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
+  useRoute: () => ({ params: {}, query: {}, path: '/advanced-query' }),
+}))
+
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
 
 const FIXTURE_SCHEMA = {
