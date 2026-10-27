@@ -1,0 +1,8455 @@
+{
+  "count": 844,
+  "forbidden_alias_groups": 9,
+  "writings": [
+    {
+      "parent": "E1",
+      "index_name": "货币资金审定表",
+      "codes": [
+        "E1-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "现金明细表",
+      "codes": [
+        "E1-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "银行存款明细表",
+      "codes": [
+        "E1-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E0",
+      "index_name": "函证结果汇总",
+      "codes": [
+        "E0-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E0",
+      "index_name": "核实被函证银行",
+      "codes": [
+        "E0-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E0",
+      "index_name": "货币资金发函记录表",
+      "codes": [
+        "E0-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E0",
+      "index_name": "借款发函记录表",
+      "codes": [
+        "E0-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E0",
+      "index_name": "应付银行承兑汇票发函记录表",
+      "codes": [
+        "E0-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "其他货币资金明细表",
+      "codes": [
+        "E1-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "银行存款余额调节表",
+      "codes": [
+        "E1-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "受限货币资金明细",
+      "codes": [
+        "E1-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "大额现金收支检查",
+      "codes": [
+        "E1-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "银行存款检查",
+      "codes": [
+        "E1-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "利息测算",
+      "codes": [
+        "E1-9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "调整分录汇总",
+      "codes": [
+        "E1-10"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "未达账项明细",
+      "codes": [
+        "E1-11"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "货币资金分析程序（一）",
+      "codes": [
+        "E1-14"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "货币资金分析程序（二）",
+      "codes": [
+        "E1-15"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "货币资金检查（一）",
+      "codes": [
+        "E1-18"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "货币资金检查（二）",
+      "codes": [
+        "E1-19"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "货币资金检查（三）",
+      "codes": [
+        "E1-20"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "货币资金检查（四）",
+      "codes": [
+        "E1-21"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "货币资金检查（五）",
+      "codes": [
+        "E1-22"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "货币资金检查（六）",
+      "codes": [
+        "E1-23"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "IPO舞弊应对（一）",
+      "codes": [
+        "E1-26"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "IPO舞弊应对（二）",
+      "codes": [
+        "E1-27"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "IPO舞弊应对（三）",
+      "codes": [
+        "E1-28"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "IPO舞弊应对（四）",
+      "codes": [
+        "E1-29"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "IPO舞弊应对（五）",
+      "codes": [
+        "E1-30"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "IPO舞弊应对（六）",
+      "codes": [
+        "E1-31"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E1",
+      "index_name": "IPO舞弊应对（七）",
+      "codes": [
+        "E1-32"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D1",
+      "index_name": "应收票据审定表",
+      "codes": [
+        "D1",
+        "D1-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": true
+    },
+    {
+      "parent": "D3",
+      "index_name": "预收账款审定表",
+      "codes": [
+        "D3",
+        "D3-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": true
+    },
+    {
+      "parent": "D5",
+      "index_name": "应收款项融资审定表",
+      "codes": [
+        "D5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D6",
+      "index_name": "合同资产审定表",
+      "codes": [
+        "D6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F1",
+      "index_name": "预付账款审定表",
+      "codes": [
+        "F1",
+        "F1-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": true
+    },
+    {
+      "parent": "F3",
+      "index_name": "应付票据审定表",
+      "codes": [
+        "F3",
+        "F3-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": true
+    },
+    {
+      "parent": "F4",
+      "index_name": "应付账款审定表",
+      "codes": [
+        "F4",
+        "F4-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": true
+    },
+    {
+      "parent": "F5",
+      "index_name": "营业成本审定表",
+      "codes": [
+        "F5",
+        "F5-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": true
+    },
+    {
+      "parent": "J1",
+      "index_name": "应付职工薪酬",
+      "codes": [
+        "J1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L1",
+      "index_name": "短期借款",
+      "codes": [
+        "L1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L2",
+      "index_name": "应付利息",
+      "codes": [
+        "L2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M1",
+      "index_name": "应付股利",
+      "codes": [
+        "M1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M1",
+      "index_name": "应付股利审定表",
+      "codes": [
+        "M1-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M1",
+      "index_name": "应付股利明细表",
+      "codes": [
+        "M1-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M1",
+      "index_name": "分配决议核实",
+      "codes": [
+        "M1-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M1",
+      "index_name": "应付股利调整分录",
+      "codes": [
+        "M1-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M2",
+      "index_name": "实收资本（股本）",
+      "codes": [
+        "M2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M2",
+      "index_name": "实收资本审定表",
+      "codes": [
+        "M2-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M2",
+      "index_name": "实收资本明细表",
+      "codes": [
+        "M2-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M2",
+      "index_name": "验资报告核实",
+      "codes": [
+        "M2-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M2",
+      "index_name": "工商变更核实",
+      "codes": [
+        "M2-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M2",
+      "index_name": "股权结构表",
+      "codes": [
+        "M2-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M3",
+      "index_name": "库存股",
+      "codes": [
+        "M3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M3",
+      "index_name": "库存股审定表",
+      "codes": [
+        "M3-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M3",
+      "index_name": "库存股明细表",
+      "codes": [
+        "M3-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M3",
+      "index_name": "回购注销检查",
+      "codes": [
+        "M3-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M3",
+      "index_name": "库存股调整分录",
+      "codes": [
+        "M3-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M4",
+      "index_name": "资本公积",
+      "codes": [
+        "M4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M4",
+      "index_name": "资本公积审定表",
+      "codes": [
+        "M4-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M4",
+      "index_name": "资本公积明细表",
+      "codes": [
+        "M4-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M4",
+      "index_name": "资本公积变动分析",
+      "codes": [
+        "M4-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M4",
+      "index_name": "资本公积来源检查",
+      "codes": [
+        "M4-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M5",
+      "index_name": "盈余公积",
+      "codes": [
+        "M5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M5",
+      "index_name": "盈余公积审定表",
+      "codes": [
+        "M5-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M5",
+      "index_name": "盈余公积明细表",
+      "codes": [
+        "M5-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M5",
+      "index_name": "法定任意提取验证",
+      "codes": [
+        "M5-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M5",
+      "index_name": "盈余公积调整分录",
+      "codes": [
+        "M5-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M6",
+      "index_name": "未分配利润",
+      "codes": [
+        "M6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M6",
+      "index_name": "未分配利润审定表",
+      "codes": [
+        "M6-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M6",
+      "index_name": "未分配利润勾稽表",
+      "codes": [
+        "M6-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M6",
+      "index_name": "利润分配方案",
+      "codes": [
+        "M6-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M6",
+      "index_name": "以前年度调整",
+      "codes": [
+        "M6-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M2",
+      "index_name": "实收资本程序表",
+      "codes": [
+        "M2A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M3",
+      "index_name": "库存股程序表",
+      "codes": [
+        "M3A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M4",
+      "index_name": "资本公积程序表",
+      "codes": [
+        "M4A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M5",
+      "index_name": "盈余公积程序表",
+      "codes": [
+        "M5A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M6",
+      "index_name": "未分配利润程序表",
+      "codes": [
+        "M6A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M7",
+      "index_name": "专项储备程序表",
+      "codes": [
+        "M7A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M8",
+      "index_name": "一般风险准备程序表",
+      "codes": [
+        "M8A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M9",
+      "index_name": "其他综合收益程序表",
+      "codes": [
+        "M9A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M10",
+      "index_name": "其他权益工具程序表",
+      "codes": [
+        "M10A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N1",
+      "index_name": "递延所得税资产",
+      "codes": [
+        "N1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N2",
+      "index_name": "应交税费",
+      "codes": [
+        "N2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N3",
+      "index_name": "递延所得税负债",
+      "codes": [
+        "N3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L4",
+      "index_name": "应付债券",
+      "codes": [
+        "L4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L5",
+      "index_name": "长期应付款",
+      "codes": [
+        "L5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D7",
+      "index_name": "合同负债审定表",
+      "codes": [
+        "D7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L6",
+      "index_name": "专项应付款",
+      "codes": [
+        "L6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D0",
+      "index_name": "收入循环函证",
+      "codes": [
+        "D0"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "E0",
+      "index_name": "银行询证函",
+      "codes": [
+        "E0"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D6",
+      "index_name": "合同资产明细表",
+      "codes": [
+        "D6-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D7",
+      "index_name": "合同负债明细表",
+      "codes": [
+        "D7-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F1",
+      "index_name": "预付账款明细表",
+      "codes": [
+        "F1-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F1",
+      "index_name": "预付账款调整分录汇总",
+      "codes": [
+        "F1-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J1",
+      "index_name": "应付职工薪酬-明细表",
+      "codes": [
+        "J1-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L7",
+      "index_name": "其他非流动负债",
+      "codes": [
+        "L7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D2",
+      "index_name": "应收账款明细表",
+      "codes": [
+        "D2-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D2",
+      "index_name": "应收账款坏账准备明细表",
+      "codes": [
+        "D2-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D2",
+      "index_name": "应收账款调整分录汇总表",
+      "codes": [
+        "D2-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F4",
+      "index_name": "应付账款明细表",
+      "codes": [
+        "F4-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F0",
+      "index_name": "存货循环函证",
+      "codes": [
+        "F0"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F0",
+      "index_name": "函证结果汇总",
+      "codes": [
+        "F0-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F0",
+      "index_name": "核实被函证单位",
+      "codes": [
+        "F0-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F0",
+      "index_name": "跟函控制",
+      "codes": [
+        "F0-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F0",
+      "index_name": "差异调节",
+      "codes": [
+        "F0-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F0",
+      "index_name": "替代程序",
+      "codes": [
+        "F0-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F1",
+      "index_name": "预付账款实质性分析",
+      "codes": [
+        "F1-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F1",
+      "index_name": "预付账款长期挂款检查表",
+      "codes": [
+        "F1-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F1",
+      "index_name": "预付账款关联方及交易检查表",
+      "codes": [
+        "F1-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F1",
+      "index_name": "预付账款凭证检查表",
+      "codes": [
+        "F1-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货审定表",
+      "codes": [
+        "F2-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货分类明细",
+      "codes": [
+        "F2-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货增减变动",
+      "codes": [
+        "F2-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "原材料明细",
+      "codes": [
+        "F2-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "在产品明细",
+      "codes": [
+        "F2-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "库存商品明细",
+      "codes": [
+        "F2-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "在途物资明细",
+      "codes": [
+        "F2-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "委托加工物资明细",
+      "codes": [
+        "F2-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "工程施工明细",
+      "codes": [
+        "F2-9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "开发产品明细",
+      "codes": [
+        "F2-10"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "跌价准备明细",
+      "codes": [
+        "F2-11"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "跌价准备变动",
+      "codes": [
+        "F2-12"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货调整分录汇总",
+      "codes": [
+        "F2-13"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货担保质押",
+      "codes": [
+        "F2-14"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货会计政策检查",
+      "codes": [
+        "F2-16"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货分析程序（一）",
+      "codes": [
+        "F2-18"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货分析程序（二）",
+      "codes": [
+        "F2-19"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货分析程序（三）",
+      "codes": [
+        "F2-20"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货监盘计划",
+      "codes": [
+        "F2-21"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "盘点观察记录",
+      "codes": [
+        "F2-22"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "盘点抽盘测试",
+      "codes": [
+        "F2-23"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货截止测试",
+      "codes": [
+        "F2-24"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "盘点差异汇总",
+      "codes": [
+        "F2-25"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "监盘结论",
+      "codes": [
+        "F2-26"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货检查（一）",
+      "codes": [
+        "F2-29"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货检查（二）",
+      "codes": [
+        "F2-30"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货检查（三）",
+      "codes": [
+        "F2-31"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货检查（四）",
+      "codes": [
+        "F2-32"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货检查（五）",
+      "codes": [
+        "F2-33"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货检查（六）",
+      "codes": [
+        "F2-34"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货检查（七）",
+      "codes": [
+        "F2-35"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "计价测试（一）",
+      "codes": [
+        "F2-38"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "计价测试（二）",
+      "codes": [
+        "F2-39"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "计价测试（三）",
+      "codes": [
+        "F2-40"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "计价测试（四）",
+      "codes": [
+        "F2-41"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "计价测试（五）",
+      "codes": [
+        "F2-42"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "计价测试（六）",
+      "codes": [
+        "F2-43"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "计价测试（七）",
+      "codes": [
+        "F2-44"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "跌价准备测试（一）",
+      "codes": [
+        "F2-47"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "跌价准备测试（二）",
+      "codes": [
+        "F2-48"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "跌价准备测试（三）",
+      "codes": [
+        "F2-49"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货关联交易检查",
+      "codes": [
+        "F2-52"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "合同履约成本（一）",
+      "codes": [
+        "F2-55"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "合同履约成本（二）",
+      "codes": [
+        "F2-56"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "合同履约成本（三）",
+      "codes": [
+        "F2-57"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "合同履约成本（四）",
+      "codes": [
+        "F2-58"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货IPO舞弊应对（一）",
+      "codes": [
+        "F2-61"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货IPO舞弊应对（二）",
+      "codes": [
+        "F2-62"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货IPO舞弊应对（三）",
+      "codes": [
+        "F2-63"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货IPO舞弊应对（四）",
+      "codes": [
+        "F2-64"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货IPO舞弊应对（五）",
+      "codes": [
+        "F2-65"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货IPO舞弊应对（六）",
+      "codes": [
+        "F2-66"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货IPO舞弊应对（七）",
+      "codes": [
+        "F2-67"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货IPO舞弊应对（八）",
+      "codes": [
+        "F2-68"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货IPO舞弊应对（九）",
+      "codes": [
+        "F2-69"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货IPO舞弊应对（十）",
+      "codes": [
+        "F2-70"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货IPO舞弊应对（十一）",
+      "codes": [
+        "F2-71"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F2",
+      "index_name": "存货IPO舞弊应对（十二）",
+      "codes": [
+        "F2-72"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F3",
+      "index_name": "应付票据明细表",
+      "codes": [
+        "F3-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F3",
+      "index_name": "应付票据调整分录汇总",
+      "codes": [
+        "F3-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F3",
+      "index_name": "应付票据利息测算",
+      "codes": [
+        "F3-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F3",
+      "index_name": "应付票据逾期检查",
+      "codes": [
+        "F3-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F3",
+      "index_name": "应付票据关联方检查",
+      "codes": [
+        "F3-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F3",
+      "index_name": "应付票据凭证检查表",
+      "codes": [
+        "F3-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F4",
+      "index_name": "应付账款调整分录汇总",
+      "codes": [
+        "F4-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F4",
+      "index_name": "应付账款实质性分析",
+      "codes": [
+        "F4-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F4",
+      "index_name": "应付账款长期挂账检查表",
+      "codes": [
+        "F4-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F4",
+      "index_name": "应付账款关联方检查表",
+      "codes": [
+        "F4-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F4",
+      "index_name": "应付账款未入账检查表",
+      "codes": [
+        "F4-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F4",
+      "index_name": "应付账款凭证检查表",
+      "codes": [
+        "F4-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F4",
+      "index_name": "应付账款供应商融资检查",
+      "codes": [
+        "F4-9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F5",
+      "index_name": "营业成本明细表",
+      "codes": [
+        "F5-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F5",
+      "index_name": "成本结转测试",
+      "codes": [
+        "F5-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F5",
+      "index_name": "毛利率分析",
+      "codes": [
+        "F5-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F5",
+      "index_name": "营业成本检查",
+      "codes": [
+        "F5-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "F5",
+      "index_name": "营业成本分析程序",
+      "codes": [
+        "F5-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J2",
+      "index_name": "设定受益计划",
+      "codes": [
+        "J2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J3",
+      "index_name": "股份支付",
+      "codes": [
+        "J3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L0",
+      "index_name": "筹资循环函证",
+      "codes": [
+        "L0"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L0",
+      "index_name": "函证结果汇总",
+      "codes": [
+        "L0-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L0",
+      "index_name": "核实被函证单位",
+      "codes": [
+        "L0-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L0",
+      "index_name": "跟函控制",
+      "codes": [
+        "L0-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L0",
+      "index_name": "差异调节",
+      "codes": [
+        "L0-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L0",
+      "index_name": "替代程序",
+      "codes": [
+        "L0-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L1",
+      "index_name": "短期借款审定表",
+      "codes": [
+        "L1-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L1",
+      "index_name": "短期借款明细表",
+      "codes": [
+        "L1-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L1",
+      "index_name": "短期借款利息测算",
+      "codes": [
+        "L1-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L1",
+      "index_name": "短期借款还款计划",
+      "codes": [
+        "L1-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L1",
+      "index_name": "短期借款检查",
+      "codes": [
+        "L1-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L1",
+      "index_name": "短期借款调整分录",
+      "codes": [
+        "L1-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L2",
+      "index_name": "应付利息审定表",
+      "codes": [
+        "L2-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L2",
+      "index_name": "应付利息明细表",
+      "codes": [
+        "L2-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L2",
+      "index_name": "利息计提测算",
+      "codes": [
+        "L2-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L2",
+      "index_name": "应付利息调整分录",
+      "codes": [
+        "L2-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L3",
+      "index_name": "长期借款",
+      "codes": [
+        "L3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L3",
+      "index_name": "长期借款审定表",
+      "codes": [
+        "L3-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L3",
+      "index_name": "长期借款明细表",
+      "codes": [
+        "L3-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L3",
+      "index_name": "长期借款利息测算",
+      "codes": [
+        "L3-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L3",
+      "index_name": "一年内到期长期借款重分类",
+      "codes": [
+        "L3-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L3",
+      "index_name": "长期借款检查",
+      "codes": [
+        "L3-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L3",
+      "index_name": "长期借款调整分录",
+      "codes": [
+        "L3-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L4",
+      "index_name": "应付债券审定表",
+      "codes": [
+        "L4-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L4",
+      "index_name": "应付债券明细表",
+      "codes": [
+        "L4-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L4",
+      "index_name": "实际利率计算",
+      "codes": [
+        "L4-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L4",
+      "index_name": "摊余成本摊销表",
+      "codes": [
+        "L4-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L4",
+      "index_name": "应付债券利息费用测算",
+      "codes": [
+        "L4-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L4",
+      "index_name": "折价溢价分析",
+      "codes": [
+        "L4-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L4",
+      "index_name": "应付债券检查",
+      "codes": [
+        "L4-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L4",
+      "index_name": "应付债券调整分录",
+      "codes": [
+        "L4-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L5",
+      "index_name": "长期应付款审定表",
+      "codes": [
+        "L5-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L5",
+      "index_name": "长期应付款明细表",
+      "codes": [
+        "L5-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L5",
+      "index_name": "长期应付款现值测算",
+      "codes": [
+        "L5-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L5",
+      "index_name": "长期应付款调整分录",
+      "codes": [
+        "L5-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L6",
+      "index_name": "专项应付款审定表",
+      "codes": [
+        "L6-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L6",
+      "index_name": "专项应付款明细表",
+      "codes": [
+        "L6-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L6",
+      "index_name": "专项应付款使用情况检查",
+      "codes": [
+        "L6-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L6",
+      "index_name": "专项应付款调整分录",
+      "codes": [
+        "L6-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L7",
+      "index_name": "其他非流动负债审定表",
+      "codes": [
+        "L7-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L7",
+      "index_name": "其他非流动负债明细表",
+      "codes": [
+        "L7-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L7",
+      "index_name": "其他非流动负债检查",
+      "codes": [
+        "L7-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L7",
+      "index_name": "其他非流动负债调整分录",
+      "codes": [
+        "L7-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L8",
+      "index_name": "财务费用",
+      "codes": [
+        "L8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L8",
+      "index_name": "财务费用审定表",
+      "codes": [
+        "L8-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L8",
+      "index_name": "财务费用明细表",
+      "codes": [
+        "L8-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L8",
+      "index_name": "利息费用测算",
+      "codes": [
+        "L8-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L8",
+      "index_name": "财务费用分析",
+      "codes": [
+        "L8-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L8",
+      "index_name": "汇兑损益测算",
+      "codes": [
+        "L8-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "L8",
+      "index_name": "财务费用调整分录",
+      "codes": [
+        "L8-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M7",
+      "index_name": "专项储备",
+      "codes": [
+        "M7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M7",
+      "index_name": "专项储备审定表",
+      "codes": [
+        "M7-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M7",
+      "index_name": "专项储备明细表",
+      "codes": [
+        "M7-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M7",
+      "index_name": "安全生产费用检查",
+      "codes": [
+        "M7-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M7",
+      "index_name": "专项储备调整分录",
+      "codes": [
+        "M7-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M8",
+      "index_name": "一般风险准备",
+      "codes": [
+        "M8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M8",
+      "index_name": "一般风险准备审定表",
+      "codes": [
+        "M8-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M8",
+      "index_name": "一般风险准备明细表",
+      "codes": [
+        "M8-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M8",
+      "index_name": "提取比例验证",
+      "codes": [
+        "M8-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M8",
+      "index_name": "一般风险准备调整分录",
+      "codes": [
+        "M8-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M9",
+      "index_name": "其他综合收益",
+      "codes": [
+        "M9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M9",
+      "index_name": "其他综合收益审定表",
+      "codes": [
+        "M9-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M9",
+      "index_name": "其他综合收益明细表",
+      "codes": [
+        "M9-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M9",
+      "index_name": "OCI分类检查",
+      "codes": [
+        "M9-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M9",
+      "index_name": "OCI来源追溯",
+      "codes": [
+        "M9-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M10",
+      "index_name": "其他权益工具",
+      "codes": [
+        "M10"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M10",
+      "index_name": "其他权益工具审定表",
+      "codes": [
+        "M10-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M10",
+      "index_name": "其他权益工具明细表",
+      "codes": [
+        "M10-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M10",
+      "index_name": "权益负债分类检查",
+      "codes": [
+        "M10-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "M10",
+      "index_name": "其他权益工具调整分录",
+      "codes": [
+        "M10-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N4",
+      "index_name": "税金及附加",
+      "codes": [
+        "N4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N5",
+      "index_name": "所得税费用",
+      "codes": [
+        "N5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N1",
+      "index_name": "递延所得税资产程序表",
+      "codes": [
+        "N1A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N2",
+      "index_name": "应交税费程序表",
+      "codes": [
+        "N2A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N3",
+      "index_name": "递延所得税负债程序表",
+      "codes": [
+        "N3A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N4",
+      "index_name": "税金及附加程序表",
+      "codes": [
+        "N4A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N5",
+      "index_name": "所得税费用程序表",
+      "codes": [
+        "N5A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N1",
+      "index_name": "递延所得税资产审定表",
+      "codes": [
+        "N1-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N1",
+      "index_name": "递延所得税资产明细表",
+      "codes": [
+        "N1-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N1",
+      "index_name": "暂时性差异计算表（可抵扣）",
+      "codes": [
+        "N1-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N1",
+      "index_name": "可抵扣确认条件检查",
+      "codes": [
+        "N1-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N1",
+      "index_name": "递延所得税资产分析",
+      "codes": [
+        "N1-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N2",
+      "index_name": "应交税费审定表",
+      "codes": [
+        "N2-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N2",
+      "index_name": "应交税费明细表",
+      "codes": [
+        "N2-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N2",
+      "index_name": "增值税核对表",
+      "codes": [
+        "N2-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N2",
+      "index_name": "税费完整性检查",
+      "codes": [
+        "N2-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N2",
+      "index_name": "应交税费分析",
+      "codes": [
+        "N2-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N2",
+      "index_name": "应交税费调整分录",
+      "codes": [
+        "N2-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N3",
+      "index_name": "递延所得税负债审定表",
+      "codes": [
+        "N3-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N3",
+      "index_name": "递延所得税负债明细表",
+      "codes": [
+        "N3-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N3",
+      "index_name": "暂时性差异计算表（应纳税）",
+      "codes": [
+        "N3-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N4",
+      "index_name": "税金及附加审定表",
+      "codes": [
+        "N4-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N4",
+      "index_name": "税金及附加明细表",
+      "codes": [
+        "N4-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N4",
+      "index_name": "税金及附加测算验证",
+      "codes": [
+        "N4-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N5",
+      "index_name": "所得税费用审定表",
+      "codes": [
+        "N5-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N5",
+      "index_name": "所得税费用明细表",
+      "codes": [
+        "N5-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N5",
+      "index_name": "所得税计算表",
+      "codes": [
+        "N5-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N5",
+      "index_name": "纳税调增调减明细",
+      "codes": [
+        "N5-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N5",
+      "index_name": "有效税率分析",
+      "codes": [
+        "N5-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N5",
+      "index_name": "递延所得税联动",
+      "codes": [
+        "N5-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N5",
+      "index_name": "研发加计扣除",
+      "codes": [
+        "N5-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "N5",
+      "index_name": "所得税费用调整分录",
+      "codes": [
+        "N5-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A1",
+      "index_name": "财务报告程序表",
+      "codes": [
+        "A1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A2",
+      "index_name": "调整分录程序表",
+      "codes": [
+        "A2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A3",
+      "index_name": "合并流程程序表",
+      "codes": [
+        "A3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A4",
+      "index_name": "经营分部程序表",
+      "codes": [
+        "A4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A5",
+      "index_name": "财务报表支持程序表",
+      "codes": [
+        "A5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A6",
+      "index_name": "组成部分会计师报告（集团审计）程序表",
+      "codes": [
+        "A6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A7",
+      "index_name": "关联交易程序表",
+      "codes": [
+        "A7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A7",
+      "index_name": "汇总关联方交易及关联往来",
+      "codes": [
+        "A7-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A7",
+      "index_name": "关联方交易附注披露信息",
+      "codes": [
+        "A7-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A8",
+      "index_name": "其他信息程序表",
+      "codes": [
+        "A8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A9",
+      "index_name": "内部控制建议程序表",
+      "codes": [
+        "A9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A10",
+      "index_name": "与治理层沟通程序表",
+      "codes": [
+        "A10"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A11",
+      "index_name": "期后事项程序表",
+      "codes": [
+        "A11"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A12",
+      "index_name": "律师回复程序表",
+      "codes": [
+        "A12"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A13",
+      "index_name": "错报程序表及底稿",
+      "codes": [
+        "A13"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A14",
+      "index_name": "内部控制缺陷程序表",
+      "codes": [
+        "A14"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A15",
+      "index_name": "持续经营假设的考虑程序表",
+      "codes": [
+        "A15"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A16",
+      "index_name": "管理层声明书程序表",
+      "codes": [
+        "A16"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A17",
+      "index_name": "重大事项概要程序表",
+      "codes": [
+        "A17"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A18",
+      "index_name": "向监管部门报送审计小结的函",
+      "codes": [
+        "A18",
+        "A18-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": true
+    },
+    {
+      "parent": "A26",
+      "index_name": "专业技术委员会业务报告审核提交资料清单",
+      "codes": [
+        "A26",
+        "A26-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": true
+    },
+    {
+      "parent": "A27",
+      "index_name": "IT审计总结备忘录",
+      "codes": [
+        "A27",
+        "A27-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": true
+    },
+    {
+      "parent": "A28",
+      "index_name": "税务专家复核",
+      "codes": [
+        "A28"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A30",
+      "index_name": "电子底稿归档检查表",
+      "codes": [
+        "A30"
+      ],
+      "head_state": "ok",
+      "head_addr_id": "A30/A30",
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A31",
+      "index_name": "审计标识一览表",
+      "codes": [
+        "A31"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A1",
+      "index_name": "业务报告签发流转控制表",
+      "codes": [
+        "A1-11"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A1",
+      "index_name": "完成阶段分析性复核（母公司）",
+      "codes": [
+        "A1-13"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A1",
+      "index_name": "完成阶段分析性复核（合并）",
+      "codes": [
+        "A1-14"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A1",
+      "index_name": "对应数据",
+      "codes": [
+        "A1-17"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A1",
+      "index_name": "新金融工具准则衔接影响数核对",
+      "codes": [
+        "A1-18"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A4",
+      "index_name": "经营分部列报信息",
+      "codes": [
+        "A4-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A5",
+      "index_name": "现金流量表审计",
+      "codes": [
+        "A5-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A5",
+      "index_name": "承诺事项",
+      "codes": [
+        "A5-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A5",
+      "index_name": "或有事项",
+      "codes": [
+        "A5-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A5",
+      "index_name": "持续经营净利润和终止经营净利润",
+      "codes": [
+        "A5-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A6",
+      "index_name": "财务报告文件包",
+      "codes": [
+        "A6-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A10",
+      "index_name": "与治理层的沟通记录",
+      "codes": [
+        "A10-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A11",
+      "index_name": "期后事项问询函",
+      "codes": [
+        "A11-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A14",
+      "index_name": "内部控制缺陷汇总表",
+      "codes": [
+        "A14-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A14",
+      "index_name": "企业层面控制缺陷评价",
+      "codes": [
+        "A14-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A14",
+      "index_name": "IT缺陷汇总及评价",
+      "codes": [
+        "A14-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A14",
+      "index_name": "业务流程层面控制缺陷评价",
+      "codes": [
+        "A14-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A14",
+      "index_name": "与其他缺陷一同进行评价",
+      "codes": [
+        "A14-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A14",
+      "index_name": "非财务报告内部控制缺陷评价",
+      "codes": [
+        "A14-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A15",
+      "index_name": "持续经营调查表",
+      "codes": [
+        "A15-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A17",
+      "index_name": "审计工作完成核对表（财报审计）",
+      "codes": [
+        "A17-5-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A17",
+      "index_name": "审计工作完成核对表（内控审计）",
+      "codes": [
+        "A17-5-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A17",
+      "index_name": "审计工作完成核对表（IPO业务）",
+      "codes": [
+        "A17-5-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A17",
+      "index_name": "审计工作完成核对表（新三板挂牌）",
+      "codes": [
+        "A17-5-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A17",
+      "index_name": "审计工作完成核对表（函证程序）",
+      "codes": [
+        "A17-5-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A18",
+      "index_name": "与监管层沟通函",
+      "codes": [
+        "A18-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A21",
+      "index_name": "项目现场负责人复核表（财报审计）",
+      "codes": [
+        "A21-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A21",
+      "index_name": "项目现场负责人复核表（内控审计）",
+      "codes": [
+        "A21-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A22",
+      "index_name": "项目负责经理复核（财报审计）",
+      "codes": [
+        "A22-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A22",
+      "index_name": "项目负责经理复核表（内控审计）",
+      "codes": [
+        "A22-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A23",
+      "index_name": "项目合伙人复核（财报审计）",
+      "codes": [
+        "A23-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A23",
+      "index_name": "项目合伙人复核表（内控审计）",
+      "codes": [
+        "A23-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A24",
+      "index_name": "项目质量复核合伙人复核表",
+      "codes": [
+        "A24-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A24",
+      "index_name": "项目质量复核合伙人复核（内控审计）",
+      "codes": [
+        "A24-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A25",
+      "index_name": "质量控制复核表（财报审计）",
+      "codes": [
+        "A25-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A25",
+      "index_name": "质量控制复核表（内控审计）",
+      "codes": [
+        "A25-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A26",
+      "index_name": "专业技术委员会委员审核记录",
+      "codes": [
+        "A26-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A26",
+      "index_name": "专业技术委员会会议记录",
+      "codes": [
+        "A26-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "A26",
+      "index_name": "专业技术委员会重大业务咨询意见或分歧会议记录",
+      "codes": [
+        "A26-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B2",
+      "index_name": "与前任注册会计师的沟通程序表",
+      "codes": [
+        "B2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B3",
+      "index_name": "独立性确认程序表",
+      "codes": [
+        "B3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B5",
+      "index_name": "业务约定书控制表",
+      "codes": [
+        "B5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B10",
+      "index_name": "了解被审计单位及其环境和适用的财务报告编制基础",
+      "codes": [
+        "B10"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B11",
+      "index_name": "检查相关信息或文件记录程序表",
+      "codes": [
+        "B11"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B12",
+      "index_name": "与相关人员访谈程序及记录",
+      "codes": [
+        "B12"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B13",
+      "index_name": "初步分析程序表",
+      "codes": [
+        "B13"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B15",
+      "index_name": "重要性计算表",
+      "codes": [
+        "B15"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B18",
+      "index_name": "了解内部审计程序表",
+      "codes": [
+        "B18"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B19",
+      "index_name": "识别关联方程序表",
+      "codes": [
+        "B19"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B23",
+      "index_name": "了解、评价并测试销售循环业务层面控制",
+      "codes": [
+        "B23"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B30",
+      "index_name": "集团审计程序表",
+      "codes": [
+        "B30"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B40",
+      "index_name": "项目组讨论程序表",
+      "codes": [
+        "B40"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B50",
+      "index_name": "汇总风险评估结果程序表",
+      "codes": [
+        "B50"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B51",
+      "index_name": "舞弊风险因素（三因素分析）",
+      "codes": [
+        "B51"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B52",
+      "index_name": "舞弊管理层凌驾于控制之上的风险",
+      "codes": [
+        "B52"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B1",
+      "index_name": "业务承接程序表（适用于首次承接）",
+      "codes": [
+        "B1A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B1",
+      "index_name": "业务保持程序表",
+      "codes": [
+        "B1B"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B1",
+      "index_name": "风险评估表（适用于承接）",
+      "codes": [
+        "B1-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B1",
+      "index_name": "风险评估表（适用于保持）",
+      "codes": [
+        "B1-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B1",
+      "index_name": "KAA检查程序表",
+      "codes": [
+        "B1-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B2",
+      "index_name": "与前任注册会计师沟通后的评价",
+      "codes": [
+        "B2-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B13",
+      "index_name": "未审报表初步分析",
+      "codes": [
+        "B13-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B19",
+      "index_name": "识别未披露的关联方关系及异常关联交易",
+      "codes": [
+        "B19-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B22",
+      "index_name": "了解企业层面控制 - 控制矩阵",
+      "codes": [
+        "B22B"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B22",
+      "index_name": "评价设计有效性 - 企业层面",
+      "codes": [
+        "B22C"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B23",
+      "index_name": "了解信息处理控制",
+      "codes": [
+        "B23-15"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B30",
+      "index_name": "了解组成部分",
+      "codes": [
+        "B30-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B30",
+      "index_name": "特别风险记录模板",
+      "codes": [
+        "B30-1-2-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B30",
+      "index_name": "了解组成部分注册会计师",
+      "codes": [
+        "B30-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B30",
+      "index_name": "组成部分已识别错报汇总表",
+      "codes": [
+        "B30-12"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B30",
+      "index_name": "财务报告文件包",
+      "codes": [
+        "B30-13-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B30",
+      "index_name": "组成部分预算和实际收费信息",
+      "codes": [
+        "B30-15"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B50",
+      "index_name": "汇总识别的风险因素",
+      "codes": [
+        "B50-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B50",
+      "index_name": "财务报表层次风险",
+      "codes": [
+        "B50-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B50",
+      "index_name": "认定层次重大错报风险",
+      "codes": [
+        "B50-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B50",
+      "index_name": "汇总认定层次特别风险",
+      "codes": [
+        "B50-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B51",
+      "index_name": "识别对货币资金需保持警觉的情形程序",
+      "codes": [
+        "B51-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B51",
+      "index_name": "识别收入确认方面可能存在舞弊风险的迹象程序",
+      "codes": [
+        "B51-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B60",
+      "index_name": "审计项目工时预算与控制表",
+      "codes": [
+        "B60-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C1",
+      "index_name": "企业层面控制测试",
+      "codes": [
+        "C1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C2",
+      "index_name": "销售循环控制测试",
+      "codes": [
+        "C2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C3",
+      "index_name": "货币资金循环业务层面控制测试",
+      "codes": [
+        "C3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C4",
+      "index_name": "存货循环控制测试",
+      "codes": [
+        "C4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C5",
+      "index_name": "投资循环控制测试",
+      "codes": [
+        "C5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C6",
+      "index_name": "固定资产循环控制测试",
+      "codes": [
+        "C6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C7",
+      "index_name": "在建工程循环控制测试",
+      "codes": [
+        "C7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C8",
+      "index_name": "无形资产及其他长期资产循环控制测试",
+      "codes": [
+        "C8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C9",
+      "index_name": "研发循环控制测试",
+      "codes": [
+        "C9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C10",
+      "index_name": "职工薪酬循环控制测试",
+      "codes": [
+        "C10"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C11",
+      "index_name": "管理循环控制测试",
+      "codes": [
+        "C11"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C12",
+      "index_name": "税金循环控制测试",
+      "codes": [
+        "C12"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C13",
+      "index_name": "债务循环业务层面控制测试",
+      "codes": [
+        "C13"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C14",
+      "index_name": "租赁循环控制测试",
+      "codes": [
+        "C14"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C15",
+      "index_name": "关联方循环控制测试",
+      "codes": [
+        "C15"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C2",
+      "index_name": "销售循环评价控制偏差",
+      "codes": [
+        "C2-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C3",
+      "index_name": "货币资金循环评价控制偏差",
+      "codes": [
+        "C3-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C4",
+      "index_name": "存货循环评价控制偏差",
+      "codes": [
+        "C4-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C5",
+      "index_name": "投资循环评价控制偏差",
+      "codes": [
+        "C5-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C6",
+      "index_name": "固定资产循环评价控制偏差",
+      "codes": [
+        "C6-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C7",
+      "index_name": "在建工程循环评价控制偏差",
+      "codes": [
+        "C7-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C8",
+      "index_name": "无形资产循环评价控制偏差",
+      "codes": [
+        "C8-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C9",
+      "index_name": "研发循环评价控制偏差",
+      "codes": [
+        "C9-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C10",
+      "index_name": "职工薪酬循环评价控制偏差",
+      "codes": [
+        "C10-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C11",
+      "index_name": "管理循环评价控制偏差",
+      "codes": [
+        "C11-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C12",
+      "index_name": "税金循环评价控制偏差",
+      "codes": [
+        "C12-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C13",
+      "index_name": "债务循环评价控制偏差",
+      "codes": [
+        "C13-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C14",
+      "index_name": "租赁循环评价控制偏差",
+      "codes": [
+        "C14-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C15",
+      "index_name": "关联方循环评价控制偏差",
+      "codes": [
+        "C15-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C21",
+      "index_name": "具有信息技术专业技能的项目组成员",
+      "codes": [
+        "C21"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C21",
+      "index_name": "IT审计发现汇总表",
+      "codes": [
+        "C21-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C22",
+      "index_name": "IT一般控制测试",
+      "codes": [
+        "C22"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C23",
+      "index_name": "会计分录控制测试",
+      "codes": [
+        "C23"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C24",
+      "index_name": "会计分录细节测试",
+      "codes": [
+        "C24"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C25",
+      "index_name": "利用内审工作",
+      "codes": [
+        "C25"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "C26",
+      "index_name": "信息处理控制测试",
+      "codes": [
+        "C26"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D0",
+      "index_name": "函证结果汇总",
+      "codes": [
+        "D0-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D0",
+      "index_name": "核实被函证单位",
+      "codes": [
+        "D0-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D0",
+      "index_name": "跟函控制",
+      "codes": [
+        "D0-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D0",
+      "index_name": "差异调节",
+      "codes": [
+        "D0-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D0",
+      "index_name": "替代程序",
+      "codes": [
+        "D0-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D1",
+      "index_name": "应收票据原值明细（按类）",
+      "codes": [
+        "D1-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D1",
+      "index_name": "应收票据原值明细（按客户）",
+      "codes": [
+        "D1-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D1",
+      "index_name": "应收票据坏账准备",
+      "codes": [
+        "D1-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D2",
+      "index_name": "应收账款审定表",
+      "codes": [
+        "D2-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D2",
+      "index_name": "应收账款分析程序",
+      "codes": [
+        "D2-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D2",
+      "index_name": "应收账款检查",
+      "codes": [
+        "D2-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D3",
+      "index_name": "预收账款明细表",
+      "codes": [
+        "D3-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D4",
+      "index_name": "营业收入审定表",
+      "codes": [
+        "D4-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D4",
+      "index_name": "收入明细（按类别）",
+      "codes": [
+        "D4-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D4",
+      "index_name": "收入明细（按客户）",
+      "codes": [
+        "D4-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D4",
+      "index_name": "收入明细（按月份）",
+      "codes": [
+        "D4-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D4",
+      "index_name": "营业收入会计政策",
+      "codes": [
+        "D4-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D4",
+      "index_name": "营业收入分析程序",
+      "codes": [
+        "D4-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D4",
+      "index_name": "营业收入合同检查",
+      "codes": [
+        "D4-12"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D4",
+      "index_name": "主营业务收入检查",
+      "codes": [
+        "D4-13"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D4",
+      "index_name": "营业收入关联方检查",
+      "codes": [
+        "D4-21"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D4",
+      "index_name": "营业收入IPO舞弊应对",
+      "codes": [
+        "D4-22"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D4",
+      "index_name": "其他业务收入",
+      "codes": [
+        "D4-33"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D5",
+      "index_name": "应收款项融资明细",
+      "codes": [
+        "D5-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D6",
+      "index_name": "合同资产明细表（详细）",
+      "codes": [
+        "D6-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D6",
+      "index_name": "合同资产减值准备明细",
+      "codes": [
+        "D6-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D6",
+      "index_name": "合同资产调整分录汇总",
+      "codes": [
+        "D6-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D6",
+      "index_name": "合同资产关联方检查",
+      "codes": [
+        "D6-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D6",
+      "index_name": "合同资产检查表",
+      "codes": [
+        "D6-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D6",
+      "index_name": "合同资产减值准备政策检查",
+      "codes": [
+        "D6-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D6",
+      "index_name": "合同资产减值测算",
+      "codes": [
+        "D6-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D6",
+      "index_name": "合同资产减值转回核销检查",
+      "codes": [
+        "D6-9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "D7",
+      "index_name": "合同负债明细（详细）",
+      "codes": [
+        "D7-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G0",
+      "index_name": "投资循环函证",
+      "codes": [
+        "G0"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G0",
+      "index_name": "投资函证结果汇总",
+      "codes": [
+        "G0-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G0",
+      "index_name": "核实被函证单位",
+      "codes": [
+        "G0-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G0",
+      "index_name": "投资函证跟函控制",
+      "codes": [
+        "G0-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G1",
+      "index_name": "交易性金融资产",
+      "codes": [
+        "G1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G1",
+      "index_name": "交易性金融资产审定表",
+      "codes": [
+        "G1-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G1",
+      "index_name": "交易性金融资产明细表",
+      "codes": [
+        "G1-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G1",
+      "index_name": "交易性金融资产公允价值测试",
+      "codes": [
+        "G1-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G1",
+      "index_name": "交易性金融资产分析程序",
+      "codes": [
+        "G1-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G1",
+      "index_name": "交易性金融资产检查",
+      "codes": [
+        "G1-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G1",
+      "index_name": "交易性金融资产调整分录",
+      "codes": [
+        "G1-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G2",
+      "index_name": "应收利息",
+      "codes": [
+        "G2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G2",
+      "index_name": "应收利息审定表",
+      "codes": [
+        "G2-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G2",
+      "index_name": "应收利息明细表",
+      "codes": [
+        "G2-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G2",
+      "index_name": "应收利息测算",
+      "codes": [
+        "G2-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G2",
+      "index_name": "应收利息调整分录",
+      "codes": [
+        "G2-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G3",
+      "index_name": "应收股利",
+      "codes": [
+        "G3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G3",
+      "index_name": "应收股利审定表",
+      "codes": [
+        "G3-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G3",
+      "index_name": "应收股利明细表",
+      "codes": [
+        "G3-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G3",
+      "index_name": "应收股利检查",
+      "codes": [
+        "G3-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G3",
+      "index_name": "应收股利调整分录",
+      "codes": [
+        "G3-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G4",
+      "index_name": "债权投资",
+      "codes": [
+        "G4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G4",
+      "index_name": "债权投资审定表",
+      "codes": [
+        "G4-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G4",
+      "index_name": "债权投资明细表",
+      "codes": [
+        "G4-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G4",
+      "index_name": "债权投资摊余成本测算",
+      "codes": [
+        "G4-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G4",
+      "index_name": "债权投资实际利率法测算",
+      "codes": [
+        "G4-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G4",
+      "index_name": "债权投资ECL三阶段",
+      "codes": [
+        "G4-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G4",
+      "index_name": "债权投资分析程序",
+      "codes": [
+        "G4-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G4",
+      "index_name": "债权投资检查",
+      "codes": [
+        "G4-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G4",
+      "index_name": "债权投资调整分录",
+      "codes": [
+        "G4-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G5",
+      "index_name": "长期应收款",
+      "codes": [
+        "G5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G5",
+      "index_name": "长期应收款审定表",
+      "codes": [
+        "G5-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G5",
+      "index_name": "长期应收款明细表",
+      "codes": [
+        "G5-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G5",
+      "index_name": "长期应收款现值测算",
+      "codes": [
+        "G5-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G5",
+      "index_name": "长期应收款调整分录",
+      "codes": [
+        "G5-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G6",
+      "index_name": "其他债权投资",
+      "codes": [
+        "G6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G6",
+      "index_name": "其他债权投资审定表",
+      "codes": [
+        "G6-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G6",
+      "index_name": "其他债权投资明细表",
+      "codes": [
+        "G6-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G6",
+      "index_name": "其他债权投资公允价值测试",
+      "codes": [
+        "G6-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G6",
+      "index_name": "其他债权投资ECL测试",
+      "codes": [
+        "G6-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G6",
+      "index_name": "其他债权投资分析程序",
+      "codes": [
+        "G6-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G6",
+      "index_name": "其他债权投资调整分录",
+      "codes": [
+        "G6-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G7",
+      "index_name": "长期股权投资",
+      "codes": [
+        "G7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G7",
+      "index_name": "长期股权投资审定表",
+      "codes": [
+        "G7-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G7",
+      "index_name": "长期股权投资明细表",
+      "codes": [
+        "G7-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G7",
+      "index_name": "长期股权投资权益法核算",
+      "codes": [
+        "G7-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G7",
+      "index_name": "长期股权投资减值测试",
+      "codes": [
+        "G7-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G7",
+      "index_name": "长期股权投资投资收益测算",
+      "codes": [
+        "G7-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G7",
+      "index_name": "被投资公司会计政策",
+      "codes": [
+        "G7-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G7",
+      "index_name": "长期股权投资检查",
+      "codes": [
+        "G7-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G7",
+      "index_name": "长期股权投资调整分录",
+      "codes": [
+        "G7-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G8",
+      "index_name": "其他权益工具投资",
+      "codes": [
+        "G8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G8",
+      "index_name": "其他权益工具投资审定表",
+      "codes": [
+        "G8-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G8",
+      "index_name": "其他权益工具投资明细表",
+      "codes": [
+        "G8-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G8",
+      "index_name": "其他权益工具投资调整分录汇总",
+      "codes": [
+        "G8-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G8",
+      "index_name": "其他权益工具投资公允价值测试表",
+      "codes": [
+        "G8-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G8",
+      "index_name": "指定的适当性检查表",
+      "codes": [
+        "G8-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G8",
+      "index_name": "其他权益工具投资凭证检查表",
+      "codes": [
+        "G8-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G9",
+      "index_name": "其他非流动金融资产",
+      "codes": [
+        "G9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G9",
+      "index_name": "其他非流动金融资产审定表",
+      "codes": [
+        "G9-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G9",
+      "index_name": "其他非流动金融资产明细表",
+      "codes": [
+        "G9-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G9",
+      "index_name": "其他非流动金融资产调整分录汇总",
+      "codes": [
+        "G9-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G9",
+      "index_name": "其他非流动金融资产公允价值测试",
+      "codes": [
+        "G9-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G9",
+      "index_name": "其他非流动金融资产第三层次调节",
+      "codes": [
+        "G9-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G9",
+      "index_name": "其他非流动金融资产凭证检查",
+      "codes": [
+        "G9-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G10",
+      "index_name": "交易性金融负债",
+      "codes": [
+        "G10"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G10",
+      "index_name": "交易性金融负债审定表",
+      "codes": [
+        "G10-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G10",
+      "index_name": "交易性金融负债明细表",
+      "codes": [
+        "G10-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G10",
+      "index_name": "交易性金融负债公允价值测试",
+      "codes": [
+        "G10-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G10",
+      "index_name": "交易性金融负债调整分录",
+      "codes": [
+        "G10-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G11",
+      "index_name": "投资收益",
+      "codes": [
+        "G11"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G11",
+      "index_name": "投资收益审定表",
+      "codes": [
+        "G11-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G11",
+      "index_name": "投资收益明细分析表",
+      "codes": [
+        "G11-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G11",
+      "index_name": "投资收益调整分录汇总",
+      "codes": [
+        "G11-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G11",
+      "index_name": "投资收益收益率分析表",
+      "codes": [
+        "G11-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G12",
+      "index_name": "净敞口套期收益",
+      "codes": [
+        "G12"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G12",
+      "index_name": "净敞口套期收益审定表",
+      "codes": [
+        "G12-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G12",
+      "index_name": "净敞口套期收益明细表",
+      "codes": [
+        "G12-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G12",
+      "index_name": "净敞口套期收益调整分录汇总",
+      "codes": [
+        "G12-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G13",
+      "index_name": "公允价值变动收益",
+      "codes": [
+        "G13"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G13",
+      "index_name": "公允价值变动收益审定表",
+      "codes": [
+        "G13-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G13",
+      "index_name": "公允价值变动收益明细表",
+      "codes": [
+        "G13-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G13",
+      "index_name": "公允价值变动收益调整分录汇总",
+      "codes": [
+        "G13-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G14",
+      "index_name": "信用减值损失",
+      "codes": [
+        "G14"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G14",
+      "index_name": "信用减值损失审定表",
+      "codes": [
+        "G14-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G14",
+      "index_name": "信用减值损失明细表",
+      "codes": [
+        "G14-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "G14",
+      "index_name": "信用减值损失调整分录汇总",
+      "codes": [
+        "G14-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H0",
+      "index_name": "固定资产循环函证",
+      "codes": [
+        "H0"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H0",
+      "index_name": "固定资产函证结果汇总",
+      "codes": [
+        "H0-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H0",
+      "index_name": "核实被函证单位",
+      "codes": [
+        "H0-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H0",
+      "index_name": "固定资产函证跟函控制",
+      "codes": [
+        "H0-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H0",
+      "index_name": "固定资产函证差异调节",
+      "codes": [
+        "H0-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H0",
+      "index_name": "固定资产函证替代程序",
+      "codes": [
+        "H0-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H1",
+      "index_name": "固定资产",
+      "codes": [
+        "H1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H1",
+      "index_name": "固定资产审定表",
+      "codes": [
+        "H1-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H1",
+      "index_name": "固定资产明细表",
+      "codes": [
+        "H1-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H1",
+      "index_name": "固定资产折旧测算",
+      "codes": [
+        "H1-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H1",
+      "index_name": "固定资产增减变动",
+      "codes": [
+        "H1-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H1",
+      "index_name": "固定资产减值测试",
+      "codes": [
+        "H1-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H1",
+      "index_name": "固定资产分析程序",
+      "codes": [
+        "H1-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H1",
+      "index_name": "固定资产检查",
+      "codes": [
+        "H1-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H1",
+      "index_name": "固定资产调整分录",
+      "codes": [
+        "H1-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H2",
+      "index_name": "在建工程",
+      "codes": [
+        "H2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H2",
+      "index_name": "在建工程审定表",
+      "codes": [
+        "H2-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H2",
+      "index_name": "在建工程明细表",
+      "codes": [
+        "H2-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H2",
+      "index_name": "在建工程利息资本化测算",
+      "codes": [
+        "H2-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H2",
+      "index_name": "在建工程转固测试",
+      "codes": [
+        "H2-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H2",
+      "index_name": "在建工程分析程序",
+      "codes": [
+        "H2-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H2",
+      "index_name": "在建工程调整分录",
+      "codes": [
+        "H2-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H3",
+      "index_name": "投资性房地产",
+      "codes": [
+        "H3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H3",
+      "index_name": "投资性房地产审定表",
+      "codes": [
+        "H3-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H3",
+      "index_name": "投资性房地产明细表",
+      "codes": [
+        "H3-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H3",
+      "index_name": "投资性房地产公允价值测试",
+      "codes": [
+        "H3-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H3",
+      "index_name": "投资性房地产折旧摊销",
+      "codes": [
+        "H3-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H3",
+      "index_name": "投资性房地产分析程序",
+      "codes": [
+        "H3-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H3",
+      "index_name": "投资性房地产调整分录",
+      "codes": [
+        "H3-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H4",
+      "index_name": "工程物资",
+      "codes": [
+        "H4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H4",
+      "index_name": "工程物资审定表",
+      "codes": [
+        "H4-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H4",
+      "index_name": "工程物资明细表",
+      "codes": [
+        "H4-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H4",
+      "index_name": "工程物资检查",
+      "codes": [
+        "H4-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H4",
+      "index_name": "工程物资调整分录",
+      "codes": [
+        "H4-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H5",
+      "index_name": "油气资产",
+      "codes": [
+        "H5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H5",
+      "index_name": "油气资产审定表",
+      "codes": [
+        "H5-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H5",
+      "index_name": "油气资产明细表",
+      "codes": [
+        "H5-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H5",
+      "index_name": "油气资产折耗测算",
+      "codes": [
+        "H5-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H5",
+      "index_name": "油气资产调整分录",
+      "codes": [
+        "H5-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H6",
+      "index_name": "固定资产清理",
+      "codes": [
+        "H6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H6",
+      "index_name": "固定资产清理审定表",
+      "codes": [
+        "H6-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H6",
+      "index_name": "固定资产清理明细表",
+      "codes": [
+        "H6-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H6",
+      "index_name": "固定资产清理检查",
+      "codes": [
+        "H6-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H6",
+      "index_name": "固定资产清理调整分录",
+      "codes": [
+        "H6-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H7",
+      "index_name": "生产性生物资产",
+      "codes": [
+        "H7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H7",
+      "index_name": "生产性生物资产审定表",
+      "codes": [
+        "H7-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H7",
+      "index_name": "生产性生物资产明细表",
+      "codes": [
+        "H7-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H7",
+      "index_name": "生产性生物资产折旧测算",
+      "codes": [
+        "H7-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H7",
+      "index_name": "生产性生物资产调整分录",
+      "codes": [
+        "H7-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H8",
+      "index_name": "使用权资产",
+      "codes": [
+        "H8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H8",
+      "index_name": "使用权资产审定表",
+      "codes": [
+        "H8-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H8",
+      "index_name": "使用权资产明细表",
+      "codes": [
+        "H8-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H8",
+      "index_name": "使用权资产折旧测算",
+      "codes": [
+        "H8-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H8",
+      "index_name": "使用权资产租赁还原",
+      "codes": [
+        "H8-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H8",
+      "index_name": "使用权资产减值测试",
+      "codes": [
+        "H8-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H8",
+      "index_name": "使用权资产调整分录",
+      "codes": [
+        "H8-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H9",
+      "index_name": "租赁负债",
+      "codes": [
+        "H9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H9",
+      "index_name": "租赁负债审定表",
+      "codes": [
+        "H9-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H9",
+      "index_name": "租赁负债明细表",
+      "codes": [
+        "H9-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H9",
+      "index_name": "租赁负债现值测算",
+      "codes": [
+        "H9-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H9",
+      "index_name": "租赁负债摊销表",
+      "codes": [
+        "H9-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H10",
+      "index_name": "资产处置损益",
+      "codes": [
+        "H10"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H10",
+      "index_name": "资产处置损益审定表",
+      "codes": [
+        "H10-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H10",
+      "index_name": "资产处置损益明细表",
+      "codes": [
+        "H10-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H10",
+      "index_name": "资产处置损益检查",
+      "codes": [
+        "H10-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "H10",
+      "index_name": "资产处置损益调整分录",
+      "codes": [
+        "H10-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I1",
+      "index_name": "无形资产",
+      "codes": [
+        "I1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I1",
+      "index_name": "无形资产明细表",
+      "codes": [
+        "I1-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I1",
+      "index_name": "无形资产摊销测算",
+      "codes": [
+        "I1-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I1",
+      "index_name": "无形资产减值测试",
+      "codes": [
+        "I1-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I1",
+      "index_name": "无形资产增减变动",
+      "codes": [
+        "I1-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I1",
+      "index_name": "无形资产分析程序",
+      "codes": [
+        "I1-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I1",
+      "index_name": "无形资产检查",
+      "codes": [
+        "I1-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I1",
+      "index_name": "无形资产调整分录",
+      "codes": [
+        "I1-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I1",
+      "index_name": "无形资产实质性程序表",
+      "codes": [
+        "I1A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I1",
+      "index_name": "摊销分配分析表",
+      "codes": [
+        "I1-9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I1",
+      "index_name": "摊销测算表（含减值）",
+      "codes": [
+        "I1-11"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I1",
+      "index_name": "减值准备测试表",
+      "codes": [
+        "I1-12"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I1",
+      "index_name": "可收回金额测试",
+      "codes": [
+        "I1-13"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I2",
+      "index_name": "开发支出",
+      "codes": [
+        "I2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I2",
+      "index_name": "开发支出审定表",
+      "codes": [
+        "I2-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I2",
+      "index_name": "开发支出明细表",
+      "codes": [
+        "I2-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I2",
+      "index_name": "开发支出资本化条件检查",
+      "codes": [
+        "I2-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I2",
+      "index_name": "开发支出转无形资产",
+      "codes": [
+        "I2-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I2",
+      "index_name": "开发支出分析程序",
+      "codes": [
+        "I2-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I2",
+      "index_name": "开发支出调整分录",
+      "codes": [
+        "I2-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I3",
+      "index_name": "商誉",
+      "codes": [
+        "I3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I3",
+      "index_name": "商誉审定表",
+      "codes": [
+        "I3-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I3",
+      "index_name": "商誉明细表",
+      "codes": [
+        "I3-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I3",
+      "index_name": "商誉减值测试概要",
+      "codes": [
+        "I3-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I3",
+      "index_name": "商誉DCF计算",
+      "codes": [
+        "I3-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I3",
+      "index_name": "商誉敏感性分析",
+      "codes": [
+        "I3-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I3",
+      "index_name": "商誉调整分录",
+      "codes": [
+        "I3-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I4",
+      "index_name": "长期待摊费用",
+      "codes": [
+        "I4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I4",
+      "index_name": "长期待摊费用审定表",
+      "codes": [
+        "I4-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I4",
+      "index_name": "长期待摊费用明细表",
+      "codes": [
+        "I4-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I4",
+      "index_name": "长期待摊费用摊销检查",
+      "codes": [
+        "I4-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I4",
+      "index_name": "长期待摊费用调整分录",
+      "codes": [
+        "I4-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I5",
+      "index_name": "其他非流动资产",
+      "codes": [
+        "I5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I5",
+      "index_name": "其他非流动资产审定表",
+      "codes": [
+        "I5-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I5",
+      "index_name": "其他非流动资产明细表",
+      "codes": [
+        "I5-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I5",
+      "index_name": "其他非流动资产检查",
+      "codes": [
+        "I5-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I5",
+      "index_name": "其他非流动资产调整分录",
+      "codes": [
+        "I5-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I6",
+      "index_name": "研发费用",
+      "codes": [
+        "I6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I6",
+      "index_name": "研发费用审定表",
+      "codes": [
+        "I6-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I6",
+      "index_name": "研发费用明细表",
+      "codes": [
+        "I6-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I6",
+      "index_name": "研发费用资本化费用化分类",
+      "codes": [
+        "I6-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I6",
+      "index_name": "研发项目台账",
+      "codes": [
+        "I6-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I6",
+      "index_name": "研发费用分析程序",
+      "codes": [
+        "I6-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "I6",
+      "index_name": "研发费用检查",
+      "codes": [
+        "I6-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J1",
+      "index_name": "应付职工薪酬程序表",
+      "codes": [
+        "J1A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J1",
+      "index_name": "应付职工薪酬-审定表",
+      "codes": [
+        "J1-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J1",
+      "index_name": "工资测算表",
+      "codes": [
+        "J1-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J1",
+      "index_name": "社保测算表",
+      "codes": [
+        "J1-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J1",
+      "index_name": "应付职工薪酬-分析",
+      "codes": [
+        "J1-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J1",
+      "index_name": "应付职工薪酬-检查",
+      "codes": [
+        "J1-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J1",
+      "index_name": "个税验证",
+      "codes": [
+        "J1-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J1",
+      "index_name": "应付职工薪酬-调整分录",
+      "codes": [
+        "J1-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J2",
+      "index_name": "设定受益计划程序表",
+      "codes": [
+        "J2A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J2",
+      "index_name": "设定受益计划-审定表",
+      "codes": [
+        "J2-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J2",
+      "index_name": "设定受益计划-明细表",
+      "codes": [
+        "J2-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J2",
+      "index_name": "精算假设评估",
+      "codes": [
+        "J2-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J2",
+      "index_name": "精算师工作利用",
+      "codes": [
+        "J2-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J3",
+      "index_name": "股份支付程序表",
+      "codes": [
+        "J3A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J3",
+      "index_name": "股份支付-审定表",
+      "codes": [
+        "J3-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "J3",
+      "index_name": "股份支付-明细表",
+      "codes": [
+        "J3-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K0",
+      "index_name": "管理循环函证",
+      "codes": [
+        "K0"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K0",
+      "index_name": "函证结果汇总",
+      "codes": [
+        "K0-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K0",
+      "index_name": "核实被函证单位",
+      "codes": [
+        "K0-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K0",
+      "index_name": "跟函控制",
+      "codes": [
+        "K0-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K0",
+      "index_name": "差异调节",
+      "codes": [
+        "K0-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K0",
+      "index_name": "替代程序",
+      "codes": [
+        "K0-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K1",
+      "index_name": "其他应收款",
+      "codes": [
+        "K1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K1",
+      "index_name": "其他应收款审定表",
+      "codes": [
+        "K1-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K1",
+      "index_name": "其他应收款明细表",
+      "codes": [
+        "K1-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K1",
+      "index_name": "其他应收款账龄分析",
+      "codes": [
+        "K1-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K1",
+      "index_name": "其他应收款坏账准备",
+      "codes": [
+        "K1-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K1",
+      "index_name": "其他应收款检查",
+      "codes": [
+        "K1-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K1",
+      "index_name": "其他应收款调整分录",
+      "codes": [
+        "K1-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K2",
+      "index_name": "其他流动资产",
+      "codes": [
+        "K2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K2",
+      "index_name": "其他流动资产审定表",
+      "codes": [
+        "K2-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K2",
+      "index_name": "其他流动资产明细表",
+      "codes": [
+        "K2-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K2",
+      "index_name": "其他流动资产检查",
+      "codes": [
+        "K2-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K2",
+      "index_name": "其他流动资产调整分录",
+      "codes": [
+        "K2-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K3",
+      "index_name": "其他应付款",
+      "codes": [
+        "K3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K3",
+      "index_name": "其他应付款审定表",
+      "codes": [
+        "K3-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K3",
+      "index_name": "其他应付款明细表",
+      "codes": [
+        "K3-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K3",
+      "index_name": "其他应付款账龄分析",
+      "codes": [
+        "K3-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K3",
+      "index_name": "其他应付款检查",
+      "codes": [
+        "K3-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K3",
+      "index_name": "其他应付款分析",
+      "codes": [
+        "K3-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K3",
+      "index_name": "其他应付款调整分录",
+      "codes": [
+        "K3-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K4",
+      "index_name": "其他流动负债",
+      "codes": [
+        "K4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K4",
+      "index_name": "其他流动负债审定表",
+      "codes": [
+        "K4-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K4",
+      "index_name": "其他流动负债明细表",
+      "codes": [
+        "K4-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K4",
+      "index_name": "其他流动负债检查",
+      "codes": [
+        "K4-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K4",
+      "index_name": "其他流动负债调整分录",
+      "codes": [
+        "K4-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K5",
+      "index_name": "预计负债",
+      "codes": [
+        "K5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K5",
+      "index_name": "预计负债审定表",
+      "codes": [
+        "K5-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K5",
+      "index_name": "预计负债明细表",
+      "codes": [
+        "K5-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K5",
+      "index_name": "或有事项评估",
+      "codes": [
+        "K5-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K5",
+      "index_name": "最佳估计数计算",
+      "codes": [
+        "K5-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K5",
+      "index_name": "律师函回函分析",
+      "codes": [
+        "K5-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K5",
+      "index_name": "预计负债调整分录",
+      "codes": [
+        "K5-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K6",
+      "index_name": "持有待售资产和负债",
+      "codes": [
+        "K6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K6",
+      "index_name": "持有待售审定表",
+      "codes": [
+        "K6-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K6",
+      "index_name": "持有待售明细表",
+      "codes": [
+        "K6-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K6",
+      "index_name": "持有待售分类条件检查",
+      "codes": [
+        "K6-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K6",
+      "index_name": "持有待售调整分录",
+      "codes": [
+        "K6-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K7",
+      "index_name": "递延收益",
+      "codes": [
+        "K7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K7",
+      "index_name": "递延收益审定表",
+      "codes": [
+        "K7-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K7",
+      "index_name": "递延收益明细表",
+      "codes": [
+        "K7-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K7",
+      "index_name": "政府补助分摊",
+      "codes": [
+        "K7-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K7",
+      "index_name": "递延收益调整分录",
+      "codes": [
+        "K7-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K8",
+      "index_name": "销售费用",
+      "codes": [
+        "K8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K8",
+      "index_name": "销售费用审定表",
+      "codes": [
+        "K8-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K8",
+      "index_name": "销售费用明细表",
+      "codes": [
+        "K8-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K8",
+      "index_name": "销售费用分析",
+      "codes": [
+        "K8-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K8",
+      "index_name": "销售费用检查",
+      "codes": [
+        "K8-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K8",
+      "index_name": "销售费用大额检查",
+      "codes": [
+        "K8-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K8",
+      "index_name": "销售费用调整分录",
+      "codes": [
+        "K8-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K9",
+      "index_name": "管理费用",
+      "codes": [
+        "K9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K9",
+      "index_name": "管理费用审定表",
+      "codes": [
+        "K9-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K9",
+      "index_name": "管理费用明细表",
+      "codes": [
+        "K9-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K9",
+      "index_name": "管理费用分析",
+      "codes": [
+        "K9-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K9",
+      "index_name": "管理费用检查",
+      "codes": [
+        "K9-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K9",
+      "index_name": "管理费用大额检查",
+      "codes": [
+        "K9-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K9",
+      "index_name": "管理费用调整分录",
+      "codes": [
+        "K9-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K10",
+      "index_name": "其他收益",
+      "codes": [
+        "K10"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K10",
+      "index_name": "其他收益审定表",
+      "codes": [
+        "K10-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K10",
+      "index_name": "其他收益明细表",
+      "codes": [
+        "K10-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K10",
+      "index_name": "政府补助验证",
+      "codes": [
+        "K10-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K10",
+      "index_name": "其他收益调整分录",
+      "codes": [
+        "K10-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K11",
+      "index_name": "资产减值损失",
+      "codes": [
+        "K11"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K11",
+      "index_name": "资产减值损失审定表",
+      "codes": [
+        "K11-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K11",
+      "index_name": "资产减值损失明细表",
+      "codes": [
+        "K11-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K11",
+      "index_name": "减值测试汇总",
+      "codes": [
+        "K11-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K12",
+      "index_name": "营业外收入",
+      "codes": [
+        "K12"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K12",
+      "index_name": "营业外收入审定表",
+      "codes": [
+        "K12-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K12",
+      "index_name": "营业外收入明细表",
+      "codes": [
+        "K12-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K12",
+      "index_name": "营业外收入检查",
+      "codes": [
+        "K12-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K12",
+      "index_name": "营业外收入调整分录",
+      "codes": [
+        "K12-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K13",
+      "index_name": "营业外支出",
+      "codes": [
+        "K13"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K13",
+      "index_name": "营业外支出审定表",
+      "codes": [
+        "K13-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K13",
+      "index_name": "营业外支出明细表",
+      "codes": [
+        "K13-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K13",
+      "index_name": "营业外支出检查",
+      "codes": [
+        "K13-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "K13",
+      "index_name": "营业外支出调整分录",
+      "codes": [
+        "K13-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S1",
+      "index_name": "违反法规行为的考虑",
+      "codes": [
+        "S1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S2",
+      "index_name": "首次接受委托期初余额",
+      "codes": [
+        "S2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S3",
+      "index_name": "会计政策变更/前期差错/估计变更",
+      "codes": [
+        "S3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S4",
+      "index_name": "非货币性资产交换",
+      "codes": [
+        "S4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S5",
+      "index_name": "债务重组",
+      "codes": [
+        "S5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S6",
+      "index_name": "大股东资金占用/违规担保",
+      "codes": [
+        "S6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S8",
+      "index_name": "租赁",
+      "codes": [
+        "S8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S9",
+      "index_name": "电子商务考虑",
+      "codes": [
+        "S9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S10",
+      "index_name": "环境事项考虑",
+      "codes": [
+        "S10"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S11",
+      "index_name": "利用服务机构",
+      "codes": [
+        "S11"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S12",
+      "index_name": "利用专家工作",
+      "codes": [
+        "S12"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S13",
+      "index_name": "利用管理层专家",
+      "codes": [
+        "S13"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S14",
+      "index_name": "会计估计和相关披露",
+      "codes": [
+        "S14"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S15",
+      "index_name": "每股收益和净资产收益率",
+      "codes": [
+        "S15"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S16",
+      "index_name": "套期活动",
+      "codes": [
+        "S16"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S17",
+      "index_name": "非经常性损益",
+      "codes": [
+        "S17"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S20",
+      "index_name": "营业收入扣除情况核查",
+      "codes": [
+        "S20"
+      ],
+      "head_state": "ok",
+      "head_addr_id": "S20/S20",
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S21",
+      "index_name": "数据资产",
+      "codes": [
+        "S21"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S32",
+      "index_name": "IPO核查-自我交易",
+      "codes": [
+        "S32-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S32",
+      "index_name": "IPO核查-串通",
+      "codes": [
+        "S32-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S32",
+      "index_name": "IPO核查-关联方代付",
+      "codes": [
+        "S32-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S32",
+      "index_name": "IPO核查-利益输送",
+      "codes": [
+        "S32-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S32",
+      "index_name": "IPO核查-体外资金",
+      "codes": [
+        "S32-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S32",
+      "index_name": "IPO核查-互联网造假",
+      "codes": [
+        "S32-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S32",
+      "index_name": "IPO核查-资本化",
+      "codes": [
+        "S32-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S32",
+      "index_name": "IPO核查-压缩薪金",
+      "codes": [
+        "S32-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S32",
+      "index_name": "IPO核查-延迟费用",
+      "codes": [
+        "S32-9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S32",
+      "index_name": "IPO核查-资产减值",
+      "codes": [
+        "S32-10"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S32",
+      "index_name": "IPO核查-延迟转固",
+      "codes": [
+        "S32-11"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S32",
+      "index_name": "IPO核查-其他粉饰",
+      "codes": [
+        "S32-12"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S32",
+      "index_name": "IPO核查-期后下滑",
+      "codes": [
+        "S32-13"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S33",
+      "index_name": "综合核查-内控制度",
+      "codes": [
+        "S33-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S33",
+      "index_name": "综合核查-财务非财务印证",
+      "codes": [
+        "S33-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S33",
+      "index_name": "综合核查-盈利异常",
+      "codes": [
+        "S33-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S33",
+      "index_name": "综合核查-关联方",
+      "codes": [
+        "S33-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S33",
+      "index_name": "综合核查-收入毛利",
+      "codes": [
+        "S33-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S33",
+      "index_name": "综合核查-客户供应商",
+      "codes": [
+        "S33-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S33",
+      "index_name": "综合核查-存货资产",
+      "codes": [
+        "S33-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S33",
+      "index_name": "综合核查-现金收付",
+      "codes": [
+        "S33-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S33",
+      "index_name": "综合核查-财务异常",
+      "codes": [
+        "S33-9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-涉秘豁免",
+      "codes": [
+        "S34-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-期权",
+      "codes": [
+        "S34-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-股份支付",
+      "codes": [
+        "S34-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-关联交易",
+      "codes": [
+        "S34-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-应收减值",
+      "codes": [
+        "S34-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-固定资产",
+      "codes": [
+        "S34-6"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-税收优惠",
+      "codes": [
+        "S34-7"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-合并无形",
+      "codes": [
+        "S34-8"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-共同投资",
+      "codes": [
+        "S34-9"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-财务性投资",
+      "codes": [
+        "S34-10"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-业务重组",
+      "codes": [
+        "S34-11"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-经营下滑",
+      "codes": [
+        "S34-12"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-持续经营",
+      "codes": [
+        "S34-13"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-财务内控",
+      "codes": [
+        "S34-14"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-现金交易",
+      "codes": [
+        "S34-15"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-第三方回款",
+      "codes": [
+        "S34-16"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-会计政策",
+      "codes": [
+        "S34-17"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-第三方数据",
+      "codes": [
+        "S34-18"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-经销商",
+      "codes": [
+        "S34-19"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-劳务外包",
+      "codes": [
+        "S34-20"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-委外加工",
+      "codes": [
+        "S34-21"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-股权集中",
+      "codes": [
+        "S34-22"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-互联网系统",
+      "codes": [
+        "S34-23"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-信息系统",
+      "codes": [
+        "S34-24"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-资金流水",
+      "codes": [
+        "S34-25"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-未盈利",
+      "codes": [
+        "S34-26"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-研发认定",
+      "codes": [
+        "S34-27"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-研发资本化",
+      "codes": [
+        "S34-28"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-政府补助",
+      "codes": [
+        "S34-29"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-对赌",
+      "codes": [
+        "S34-30"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-存货",
+      "codes": [
+        "S34-31"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-期间费用",
+      "codes": [
+        "S34-32"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-商誉减值",
+      "codes": [
+        "S34-33"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-涉农",
+      "codes": [
+        "S34-34"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-收入",
+      "codes": [
+        "S34-35"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-投资收益",
+      "codes": [
+        "S34-36"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-现金流异常",
+      "codes": [
+        "S34-37"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-估值调整",
+      "codes": [
+        "S34-38"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-应收票据融资",
+      "codes": [
+        "S34-39"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-在建工程",
+      "codes": [
+        "S34-40"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S34",
+      "index_name": "证监会-客户供应商",
+      "codes": [
+        "S34-41"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S35",
+      "index_name": "再融资核查-关联交易",
+      "codes": [
+        "S35-1"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S35",
+      "index_name": "再融资核查-财务性投资",
+      "codes": [
+        "S35-2"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S35",
+      "index_name": "再融资核查-现金分红",
+      "codes": [
+        "S35-3"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S35",
+      "index_name": "再融资核查-商誉减值",
+      "codes": [
+        "S35-4"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "S35",
+      "index_name": "再融资核查-募集资金收购",
+      "codes": [
+        "S35-5"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    },
+    {
+      "parent": "B22",
+      "index_name": "了解企业层面控制",
+      "codes": [
+        "B22A"
+      ],
+      "head_state": "not_found",
+      "head_addr_id": null,
+      "forbidden_alias": false
+    }
+  ]
+}

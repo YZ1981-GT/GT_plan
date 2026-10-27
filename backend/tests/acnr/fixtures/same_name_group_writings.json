@@ -1,0 +1,586 @@
+{
+  "count": 71,
+  "same_name_group_total": 78,
+  "owner_unique": 70,
+  "owner_none": 8,
+  "none_groups": [
+    "A21:底稿目录",
+    "A22:底稿目录",
+    "A23:底稿目录",
+    "A3:Word附注",
+    "A3:已审比率分析",
+    "B50:相关资源",
+    "F2:底稿目录",
+    "S32:S32程序表"
+  ],
+  "writings": [
+    {
+      "source": "ccr_source",
+      "where": "CW-05",
+      "raw": "WP('J1','应付职工薪酬实质性程序表 J1A','A32')",
+      "parent": "J1",
+      "name": "应付职工薪酬实质性程序表 J1A",
+      "name_owner_addr_id": "J1/J1A"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-16",
+      "raw": "WP('N1','递延所得税资产审定表N1-1','A20')",
+      "parent": "N1",
+      "name": "递延所得税资产审定表N1-1",
+      "name_owner_addr_id": "N1/N1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-17",
+      "raw": "WP('N3','递延所得税负债审定表N3-1','A17')",
+      "parent": "N3",
+      "name": "递延所得税负债审定表N3-1",
+      "name_owner_addr_id": "N3/N3-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-27",
+      "raw": "WP('D1','审定表D1-1','D1')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-34",
+      "raw": "WP('D1','审定表D1-1','D1')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-45",
+      "raw": "WP('H1','审定表H1-1','A51')",
+      "parent": "H1",
+      "name": "审定表H1-1",
+      "name_owner_addr_id": "H1/H1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-46",
+      "raw": "WP('H1','审定表H1-1','A51')",
+      "parent": "H1",
+      "name": "审定表H1-1",
+      "name_owner_addr_id": "H1/H1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-57",
+      "raw": "WP('N1','递延所得税资产审定表N1-1','D1')",
+      "parent": "N1",
+      "name": "递延所得税资产审定表N1-1",
+      "name_owner_addr_id": "N1/N1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-58",
+      "raw": "WP('N1','递延所得税资产审定表N1-1','D1')",
+      "parent": "N1",
+      "name": "递延所得税资产审定表N1-1",
+      "name_owner_addr_id": "N1/N1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-96",
+      "raw": "WP('H1','审定表H1-1','D1')",
+      "parent": "H1",
+      "name": "审定表H1-1",
+      "name_owner_addr_id": "H1/H1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-103",
+      "raw": "WP('N1','递延所得税资产审定表N1-1','D1')",
+      "parent": "N1",
+      "name": "递延所得税资产审定表N1-1",
+      "name_owner_addr_id": "N1/N1-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-211",
+      "raw": "WP('H1','审定表H1-1','本期增加')",
+      "parent": "H1",
+      "name": "审定表H1-1",
+      "name_owner_addr_id": "H1/H1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-211",
+      "raw": "WP('H1','审定表H1-1','本期增加')",
+      "parent": "H1",
+      "name": "审定表H1-1",
+      "name_owner_addr_id": "H1/H1-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-212",
+      "raw": "WP('H1','审定表H1-1','本期减少')",
+      "parent": "H1",
+      "name": "审定表H1-1",
+      "name_owner_addr_id": "H1/H1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-212",
+      "raw": "WP('H1','审定表H1-1','本期减少')",
+      "parent": "H1",
+      "name": "审定表H1-1",
+      "name_owner_addr_id": "H1/H1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-220",
+      "raw": "WP('H1','审定表H1-1','固定资产净值')",
+      "parent": "H1",
+      "name": "审定表H1-1",
+      "name_owner_addr_id": "H1/H1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-225",
+      "raw": "WP('H1','审定表H1-1','固定资产净值')",
+      "parent": "H1",
+      "name": "审定表H1-1",
+      "name_owner_addr_id": "H1/H1-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-235",
+      "raw": "WP('H1','审定表H1-1','固定资产净值')",
+      "parent": "H1",
+      "name": "审定表H1-1",
+      "name_owner_addr_id": "H1/H1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-235",
+      "raw": "WP('H1','审定表H1-1','固定资产净值')",
+      "parent": "H1",
+      "name": "审定表H1-1",
+      "name_owner_addr_id": "H1/H1-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-239",
+      "raw": "WP('H1','审定表H1-1','折旧政策')",
+      "parent": "H1",
+      "name": "审定表H1-1",
+      "name_owner_addr_id": "H1/H1-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-244",
+      "raw": "WP('I2','审定表I2-1','完工转固金额')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-244",
+      "raw": "WP('I2','审定表I2-1','完工转固金额')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-250",
+      "raw": "WP('I3','审定表I3-1','商誉净值')",
+      "parent": "I3",
+      "name": "审定表I3-1",
+      "name_owner_addr_id": "I3/I3-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-251",
+      "raw": "WP('I6','审定表I6-1','费用化支出合计')",
+      "parent": "I6",
+      "name": "审定表I6-1",
+      "name_owner_addr_id": "I6/I6-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-252",
+      "raw": "WP('I2','审定表I2-1','开发支出期末余额')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-254",
+      "raw": "WP('I3','审定表I3-1','商誉净值')",
+      "parent": "I3",
+      "name": "审定表I3-1",
+      "name_owner_addr_id": "I3/I3-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-255",
+      "raw": "WP('I6','审定表I6-1','研发费用合计')",
+      "parent": "I6",
+      "name": "审定表I6-1",
+      "name_owner_addr_id": "I6/I6-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-256",
+      "raw": "WP('I2','审定表I2-1','开发支出期末余额')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-259",
+      "raw": "WP('I6','审定表I6-1','费用化支出合计')",
+      "parent": "I6",
+      "name": "审定表I6-1",
+      "name_owner_addr_id": "I6/I6-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-259",
+      "raw": "WP('I6','审定表I6-1','费用化支出合计')",
+      "parent": "I6",
+      "name": "审定表I6-1",
+      "name_owner_addr_id": "I6/I6-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-260",
+      "raw": "WP('I3','审定表I3-1','本期减值')",
+      "parent": "I3",
+      "name": "审定表I3-1",
+      "name_owner_addr_id": "I3/I3-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-260",
+      "raw": "WP('I3','审定表I3-1','本期减值')",
+      "parent": "I3",
+      "name": "审定表I3-1",
+      "name_owner_addr_id": "I3/I3-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-262",
+      "raw": "WP('I3','审定表I3-1','商誉净值')",
+      "parent": "I3",
+      "name": "审定表I3-1",
+      "name_owner_addr_id": "I3/I3-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-262",
+      "raw": "WP('I3','审定表I3-1','商誉净值')",
+      "parent": "I3",
+      "name": "审定表I3-1",
+      "name_owner_addr_id": "I3/I3-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-263",
+      "raw": "WP('I6','审定表I6-1','费用化支出合计')",
+      "parent": "I6",
+      "name": "审定表I6-1",
+      "name_owner_addr_id": "I6/I6-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-263",
+      "raw": "WP('I6','审定表I6-1','费用化支出合计')",
+      "parent": "I6",
+      "name": "审定表I6-1",
+      "name_owner_addr_id": "I6/I6-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-264",
+      "raw": "WP('I2','审定表I2-1','开发支出期末余额')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-264",
+      "raw": "WP('I2','审定表I2-1','开发支出期末余额')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-265",
+      "raw": "WP('I2','审定表I2-1','资本化金额')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-265",
+      "raw": "WP('I2','审定表I2-1','资本化金额')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-266",
+      "raw": "WP('I6','审定表I6-1','费用化支出')",
+      "parent": "I6",
+      "name": "审定表I6-1",
+      "name_owner_addr_id": "I6/I6-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-266",
+      "raw": "WP('I6','审定表I6-1','费用化支出')",
+      "parent": "I6",
+      "name": "审定表I6-1",
+      "name_owner_addr_id": "I6/I6-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-309",
+      "raw": "WP('J1','应付职工薪酬实质性程序表 J1A','薪酬政策摘要')",
+      "parent": "J1",
+      "name": "应付职工薪酬实质性程序表 J1A",
+      "name_owner_addr_id": "J1/J1A"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-405",
+      "raw": "WP('I2','审定表I2-1','完工转固金额')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-405",
+      "raw": "WP('I2','审定表I2-1','完工转固金额')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-409",
+      "raw": "WP('I2','审定表I2-1','审定数合计')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-409",
+      "raw": "WP('I2','审定表I2-1','资本化金额合计')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-410",
+      "raw": "WP('I6','审定表I6-1','审定数合计')",
+      "parent": "I6",
+      "name": "审定表I6-1",
+      "name_owner_addr_id": "I6/I6-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-410",
+      "raw": "WP('I6','审定表I6-1','审定数合计')",
+      "parent": "I6",
+      "name": "审定表I6-1",
+      "name_owner_addr_id": "I6/I6-1"
+    },
+    {
+      "source": "ccr_target",
+      "where": "CW-411",
+      "raw": "WP('I2','审定表I2-1','本期减少-转无形合计')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "ccr_source",
+      "where": "CW-411",
+      "raw": "WP('I2','审定表I2-1','本期减少-转无形合计')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "preset_expr",
+      "where": "审定数",
+      "raw": "WP('D1','审定表D1-1','未审数')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "preset_expr",
+      "where": "审定数",
+      "raw": "WP('D1','审定表D1-1','AJE调整')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "preset_expr",
+      "where": "审定数",
+      "raw": "WP('D1','审定表D1-1','RJE调整')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "preset_ref",
+      "where": "审定数",
+      "raw": "WP('D1','审定表D1-1','未审数')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "preset_ref",
+      "where": "审定数",
+      "raw": "WP('D1','审定表D1-1','AJE调整')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "preset_ref",
+      "where": "审定数",
+      "raw": "WP('D1','审定表D1-1','RJE调整')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "preset_expr",
+      "where": "变动额",
+      "raw": "WP('D1','审定表D1-1','审定数')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "preset_expr",
+      "where": "变动额",
+      "raw": "WP('D1','审定表D1-1','期初余额')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "preset_ref",
+      "where": "变动额",
+      "raw": "WP('D1','审定表D1-1','审定数')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "preset_ref",
+      "where": "变动额",
+      "raw": "WP('D1','审定表D1-1','期初余额')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "prefill",
+      "where": "D1:上年审定数",
+      "raw": "PREV('D1','审定表D1-1','审定数')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "prefill",
+      "where": "H1:上年审定数",
+      "raw": "PREV('H1','审定表H1-1','审定数')",
+      "parent": "H1",
+      "name": "审定表H1-1",
+      "name_owner_addr_id": "H1/H1-1"
+    },
+    {
+      "source": "prefill",
+      "where": "I2:上年审定数",
+      "raw": "PREV('I2','审定表I2-1','审定数')",
+      "parent": "I2",
+      "name": "审定表I2-1",
+      "name_owner_addr_id": "I2/I2-1"
+    },
+    {
+      "source": "prefill",
+      "where": "I3:上年审定数",
+      "raw": "PREV('I3','审定表I3-1','审定数')",
+      "parent": "I3",
+      "name": "审定表I3-1",
+      "name_owner_addr_id": "I3/I3-1"
+    },
+    {
+      "source": "prefill",
+      "where": "I4:上年审定数",
+      "raw": "PREV('I4','审定表I4-1','审定数')",
+      "parent": "I4",
+      "name": "审定表I4-1",
+      "name_owner_addr_id": "I4/I4-1"
+    },
+    {
+      "source": "prefill",
+      "where": "I5:上年审定数",
+      "raw": "PREV('I5','审定表I5-1','审定数')",
+      "parent": "I5",
+      "name": "审定表I5-1",
+      "name_owner_addr_id": "I5/I5-1"
+    },
+    {
+      "source": "prefill",
+      "where": "I6:上年审定数",
+      "raw": "PREV('I6','审定表I6-1','审定数')",
+      "parent": "I6",
+      "name": "审定表I6-1",
+      "name_owner_addr_id": "I6/I6-1"
+    },
+    {
+      "source": "prefill",
+      "where": "N3:审定表N3-1_上年审定数",
+      "raw": "PREV('N3','递延所得税负债审定表N3-1','审定数')",
+      "parent": "N3",
+      "name": "递延所得税负债审定表N3-1",
+      "name_owner_addr_id": "N3/N3-1"
+    },
+    {
+      "source": "prefill",
+      "where": "D1:上年审定数",
+      "raw": "PREV('D1','审定表D1-1','审定数')",
+      "parent": "D1",
+      "name": "审定表D1-1",
+      "name_owner_addr_id": "D1/D1-1"
+    },
+    {
+      "source": "prefill",
+      "where": "N5:递延所得税资产变动",
+      "raw": "WP('N1','递延所得税资产审定表N1-1','审定数')",
+      "parent": "N1",
+      "name": "递延所得税资产审定表N1-1",
+      "name_owner_addr_id": "N1/N1-1"
+    }
+  ]
+}

@@ -6,7 +6,8 @@
 
 ## 批次 P0：可解析与契约单一化（T01~T09）
 
-- [ ] 1. 导出 HEAD 现算基线夹具（发布顺序的第一步，后续任务据此比对）
+- [x] 1. 导出 HEAD 现算基线夹具（发布顺序的第一步，后续任务据此比对）
+      已交付：四份夹具按**当时 HEAD 机械现算**导出（tasks T01 口径「以当时 HEAD 现算为准，变化记入本任务」）。实际计数（非设计 §1.2 的人工策展口径，设计分析工具不在仓库无法机械复现）：`platform_name_writings.json` 844 条（9 组禁止别名）、`same_name_group_writings.json` 71 条静态写法（同名组 78 / 唯一 70 / None 8，与设计 §1.2 一致）、`resolvable_writings_baseline.json` 1215 条（不变 1059 / 改判 138 / 歧义 18）、`head_resolvable_static_writings.json` 1193 条静态写法 + 18 条 PG 写法，errmatch=51（子串命中真实 sheet 但 exact 非 ok、发布后会变 not_found，逐条带 `head_resolvable_at`+`head_sheet_addr_id`）。守卫 `test_head_baselines_sane.py` 以**内部一致性**（重算 vs 夹具逐条相等 + 分类计数自洽）替代设计固定数，5 passed。变异：把 resolvable 夹具一条改判项改回 unchanged → 「逐条与现算一致」断言红在 `D1||审定表D1-1||D1`，逐字节还原 sha256 核对一致（bd5a7294…8486）。errmatch 51 > 设计人工策展的 14/7，差异因设计分析工具（人工策展 CCR 源/目标口径）不在仓库，取机械现算，不绑定设计固定数。
       从当前 HEAD 导出并提交固定夹具，之后不随目录变化：`platform_name_writings.json`（372 条平台索引名写法→期望 addr_id）、`same_name_group_writings.json`（26 处同名组静态写法→名称所属 sheet）、`resolvable_writings_baseline.json`（现算 2599 条：不变 2434、改判 147、歧义 18）、`head_resolvable_static_writings.json`（R2-F2：用 HEAD 运行时 `catalog._formula_ref_to_addr_id` 四步判定遍历全部静态写法 + PG 公式存储 `wp_formula`/`report_config`/公式设置各域/附注公式/`wp_user_formulas`，记「写法→HEAD addr_id」；预设用带逗号后空格的正确口径，现算仅子串命中会变 not_found 的 14 处/7 组逐条列证据）。实施时以当时 HEAD 现算为准，变化记入本任务。
       Files: `backend/tests/acnr/fixtures/{platform_name_writings,same_name_group_writings,resolvable_writings_baseline,head_resolvable_static_writings}.json`；导出脚本 `tmp_acnr_foundation/probes/export_head_baselines.py`（一次性，交付后清理）
       Verify: `python -m pytest backend/tests/acnr/test_head_baselines_sane.py -p no:playwright` 断言四夹具非空、条数与现算一致、`head_resolvable` 的 14 处逐条有 `head_resolvable_at`。变异：把 `resolvable_writings_baseline.json` 的一条改判项改回借名父级→该断言红。
@@ -23,7 +24,8 @@
       Files: `backend/app/services/acnr/catalog_contract.py`；删 `docs/acnr/schemas/_build_schema.py`、`_verify_schema.py`；`backend/requirements.txt`
       Verify: `python -m pytest backend/tests/acnr/test_catalog_schema_single_source.py -p no:playwright` —— schema 文件与 `build_schema()` 逐字节相等、四类约束与常量逐值相等、真实目录 0 错误、4 份历史快照只做加载测试。变异（产物副本）：注入词表外 functional_type / `registry_version="2026.1.1"` / 删 sheet_code / 给 cell 加 project_id → 校验各自红并点名 JSON 路径。
 
-- [ ] 4. classification 缓存 vs 库表对照守卫（需求 A2 裁定 §1.3）
+- [x] 4. classification 缓存 vs 库表对照守卫（需求 A2 裁定 §1.3）
+      已交付：`sources/classification_reconcile.json`（缓存 4640 记录 / 1215 wp_code / sha256 50454cd6…fdc3；库表 current tv=d3710183、3875 行、444 wp_code，与缓存 tv=bbc0190d 不同故不作权威）。差异逐类现算登记：`db_newer_than_cache` 8 条（全 S17，与设计一致不并入）、`cache_only_split_codes` 771、`cache_only_without_db_basis` **11** 条（A18/A18-1/A18-2/A26×5/A27×2/B5，父码不在库表 current；设计 §1.3 记 13，差异因 DB current 版本内容与设计分析时不同，取机械现算并在 JSON `_doc` 写明）。守卫 `test_classification_cache_vs_db_pg.py`（pg_only 只读）3 passed：库表 current 独有键恰为 db_newer 清单、缓存独有编码能复算或在无依据清单、清单失效条目红、缓存 sha256 与记录一致。变异：从无依据清单删 A18 → `test_cache_only_codes_derivable_or_registered` 红（缺登记 ['A18']），逐字节还原 sha256 核对一致（972397ca…6a12）。
       确认生成器 classification 权威输入 = 已提交离线缓存（库表缺 771 拆分编码、模板版本不同，不作权威）；差异逐类登记 `sources/classification_reconcile.json`（13 条无库表依据的拆分记录 `cache_only_without_db_basis`、S17 新增 8 条 `db_newer_than_cache` 不并入）。生成器把缓存 `template_version_id`/记录数/sha256 写进报告 `release.classification`。
       Files: `backend/data/acnr/sources/classification_reconcile.json`；`backend/tests/acnr/test_classification_cache_vs_db_pg.py`
       Verify: `python -m pytest backend/tests/acnr/test_classification_cache_vs_db_pg.py -p no:playwright`（pg_only 只读）—— 库表 current 版本每个 (wp_code, sheet_name) 都在缓存里（例外恰 8 条）、缓存独有编码能由库表父码记录复算或在 13 条清单里；清单有失效条目也红。变异：从清单删一条仍无库表依据的编码 → 红。
