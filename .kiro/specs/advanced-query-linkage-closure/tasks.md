@@ -52,29 +52,64 @@
     - 建表时现跑确认的缺陷形态（供后续任务）：第 3 行预览从模板生成文件并 `available=true`（AQ-23）；第 13 行 `TemplateForbiddenError` 未映射（500）；第 20 行确认先锁他项目行再抛 `WritebackPermissionDenied`（500，AQ-04）；第 22 行 `wp_template_registry` 表不存在时 500（AQ-17）；第 26 行 projects 含已删项目、系统经理看到全部项目（AQ-06）；第 14 行合入前本地 HEAD 的回收站列表 import 了 HEAD 不存在的 `app.services.user_display_names`（远端已有，合入后补齐；范围外，只登记）
 
 ## 阶段 B　口径、计数与隔离（P0）
-- [ ] 3. 多项目数据集谓词（R1.2；design §3.4）
+- [x] 3. 多项目数据集谓词（R1.2；design §3.4）
   - `services/dataset_query.py` 新增 `active_rows_predicate(db, table, *, project_ids, year)`（先查生效数据集再按 id 过滤，排序同 `DatasetService.get_active_dataset_id`，查询失败原样上抛）
   - PG `test_aql_dataset_predicate_pg.py`：每个活项目年度与 `get_active_filter` 行集合相等（含宜宾临港店与无生效数据集的项目）；SQLite 上编译执行不报错
-- [ ] 4. 源注册表与 SQL 分页内核（R2.1~R2.3、R6.1~R6.3、R12.2，ADR-AQL-03 / 06；变异 #14）
+  - 证据（B2，2026-10-27；提交 282289f3e；测试先在待提交树的分离头 worktree 里跑，收尾在 HEAD ea389fd3b 干净检出复跑）：
+    - 开工现状：`dataset_query.py` 211 → 262 行（门限 800），主树无他人改动、远端相对 merge-base 未改
+    - 实现：先查一次 `ledger_datasets`（按 `project_ids` / `year` 收窄，排序 `activated_at DESC NULLS LAST, created_at DESC` 与平台同序），每组最新一条在 Python 里取（不用 `DISTINCT ON`、不用逐行相关子查询），返回 `NOT is_deleted AND (dataset_id IN 各组最新 OR (project_id, year) NOT IN 有 active 的组)`；`project_ids=[]` 只按未删；查询失败原样上抛。接入构建器在任务 9
+    - 结果：真 PG 7 passed（四表各一例：每个活项目年度两种谓词「只在一边成立」的行数 = 0；多项目一次调用 = 各项目单独口径之和，宜宾临港店多数据集、和平物流无 active 都在其中；最慢 tb_aux_ledger 32.9 s）；SQLite 2 passed（两个 active 取最新、superseded / 软删不出现、无数据集项目按未删）
+    - 变异 B2-a（去掉「无 active 数据集」分支）⇒ SQLite `{'1001-new', '1002-new'} == {…'1001-none'…}` 红，PG「tb_balance：多项目一次调用 2670 ≠ 各项目单独口径之和 5322」红；恢复后 sha256 一致
+- [x] 4. 源注册表与 SQL 分页内核（R2.1~R2.3、R6.1~R6.3、R12.2，ADR-AQL-03 / 06；变异 #14）
   - 新建 `services/custom_query/source_registry.py`（design §3.1 全部 SQL 源）、`services/custom_query/paged_fetch.py`
   - `param_sql_builder.build_portable_filter`（in / not_in / prefix / nonempty）；`build_filter` 的 like / not_like 转义；`builder_dsl._build_filter` 改为委托
   - 单元测试 `test_aql_source_registry.py`：列与 ORM 反射一致；未知筛选键 / 条件字段 / 算子 / 列 400；postgresql 方言编译后断言 WHERE、ORDER BY 末项唯一键、NULLS LAST 只在可空列、用户值参数化；like 按字面匹配 `%` `_`
-- [ ] 5. 编排器与 execute 契约接入 FetchPage（R2.1~R2.5、R2.8、N3）
+  - 证据（B2，2026-10-27；提交 282289f3e，叶子列用例随 021d5f503 补 1 例）：
+    - 开工现状：新建 `source_registry.py`（441 行）、`paged_fetch.py`（255）；`param_sql_builder.py` 275 → 344、`builder_dsl.py` 448 → 431（门限均 800），主树无他人改动、远端相对 merge-base 未改
+    - 注册表本批登记试算表（tb_detail 别名）、科目余额、序时账、底稿清单（`workpaper:{code}|{sheet}` 叶子）、工时与 `consol_unit:{cc}:{account_balance|ledger_entries|tb_detail}`；报表、报表行次、调整分录按实施计划 B2 的分批调整暂留 router（任务 17 / 18 切换）。四表口径只经 `get_active_filter(strict=True)`；未登记筛选键 / 条件字段 / 算子 / 列 ⇒ 400 `UNKNOWN_FILTER_KEY` / `UNKNOWN_CONDITION_FIELD` / `OP_NOT_ALLOWED` / `UNKNOWN_COLUMN`（message 写明可用项）；offset > 100,000 ⇒ 422 `OFFSET_TOO_DEEP`；分组 / 透视先 COUNT，> 5,000 ⇒ 400 `AGGREGATION_TOO_LARGE`；只对可空列 `NULLS LAST`、末项唯一键
+    - `build_portable_filter`：in / not_in 用 `in_` / `notin_`（空集合恒假 / 恒真）；`prefix` / `nonempty` 只供旧筛选键（`allow_internal=True`），用户条件仍只认 `OPERATOR_WHITELIST`；`build_filter` 的 like / not_like 先 `escape_like` 再 `ESCAPE '\'`；`builder_dsl._build_filter` 的 in / not_in 委托它
+    - 结果：`test_aql_source_registry.py` 66 passed（SQLite 与真 PG 各一遍），`test_param_sql_builder.py` 30 passed、`test_advanced_query_param_sql_builder_wiring.py` 8 passed
+    - 变异 #14（B2-14：未知条件字段改为静默跳过）⇒ `test_unregistered_inputs_are_400[cond-field]`、`[cond-hidden]`「DID NOT RAISE」；B2-d（去掉 like 转义）⇒「包含 50%_ 按字面匹配，不把 % _ 当通配符」红；恢复后 sha256 一致
+    - 触类旁通（AQ-32 同族，B2 收尾在干净 HEAD 复跑时撞到，与本批改动无关；提交 2e90d07e9）：①`test_param_sql_builder_pbt.py::test_p18` 逐值断言 `v not in sql` 把 hypothesis 生成的 `['1']` 与占位符名 `param_1` 误撞（干净 HEAD 上按保存的反例复现；同文件 P17 注释早已点名这一类假阳性）⇒ 改为整句结构比对（非空集合编译出的 SQL 与任一其他非空集合逐字相同）+ 固定样例 `['1']` / `['(', 'a']`；②`test_query_builder_streaming_export.py` 夹具建全部 ORM 表，HEAD 上 1 failed / 4 errors `unrecognized token ":"`（AQ-32a 同形态，任务 1 只修了 endpoint / joins 两个文件）⇒ 改用 `builder_tables` 夹具并核对建表集合。两文件 + `test_param_sql_builder.py` 38 passed；变异 B2-h1（断言改回逐值子串）⇒ `assert '1' not in …param_1`，B2-h2（生产 in 分支把值拼进 SQL 文本）⇒ 新断言 `"code = ANY (ARRAY['1'])" == …` 红，B2-i（夹具改回建全部表）⇒ 1 failed / 4 errors `unrecognized token ":"`；恢复后 sha256 一致
+- [x] 5. 编排器与 execute 契约接入 FetchPage（R2.1~R2.5、R2.8、N3）
   - `query_orchestrator.py`（FetchPage、conditions / condition_logic 进 cache_def、meta 往返）、`execute_compatibility.py`、`services/query_cache.py`（canonical identity）、`pagination.py`（删 SQL 源默认排序条目；内存源默认 `_row_index`；`TIE_BREAKER_CANDIDATES` 以 `_row_index` 打头）、router `QueryRequest` 新字段
   - 单元测试 `test_aql_orchestrator_fetchpage.py`（含内存源行序与同值保序）；`TestExecuteContractBaseline` 保持全绿
-- [ ] 6. 删除 batch-execute 族（R12.1，ADR-AQL-13；单独提交，必须先于任务 7）
+  - 证据（B2，2026-10-27；编排器 / 兼容层 / 缓存 / 分页在提交 282289f3e，router `QueryRequest` 字段与分页默认排序删除在 021d5f503）：
+    - 开工现状：`query_orchestrator.py` 668 → 717、`execute_compatibility.py` 113 → 127、`pagination.py` 295 → 291、`services/query_cache.py` 313 → 319（门限均 800），主树无他人改动、远端未改。§0.11：acnr 尚未加 `conditions` / `condition_logic`（`git log -S condition_logic` 只有本 spec 这两个提交，远端相对 merge-base 0 命中；仓库也没有 `strict_model`），本 spec 先加、acnr 复用
+    - `QueryOrchestrator`：取数钩子可返回 `FetchPage(paged=True)`，此时跳过内存排序 / 计数 / 切片、total 原样；tuple 旧路径不变；`conditions` / `condition_logic` 进 cache_def；`QueryResult.meta` 往返。`execute_compatibility` 映射条件、`meta` 为新增可选键（没有内容时省略）；`build_canonical_query_identity` 覆盖条件；`TIE_BREAKER_CANDIDATES` 以 `_row_index` 打头，内存源默认按取数顺序。router `QueryRequest` 增 `conditions`（≤ 20，`ConditionSpec`）、`condition_logic`（and / or）、`year` 2000..2100、`columns` ≤ 60、`sort` ≤ 5（design §6）
+    - 结果：`test_aql_orchestrator_fetchpage.py` 9 passed（SQLite 与真 PG 各一遍）；`test_advanced_query_hardening_wave012.py` 71 passed（含 `TestExecuteContractBaseline`）；`test_query_orchestrator.py` 5、`test_query_cache.py` 16、`test_query_cache_pbt.py` 4、`test_wave3_query_contract_pbt.py` 5 passed
+    - 变异 B2-g（`TIE_BREAKER_CANDIDATES` 去掉 `_row_index`）⇒「默认保持原表行序（合计行在最后）」红；恢复后 sha256 一致
+- [x] 6. 删除 batch-execute 族（R12.1，ADR-AQL-13；单独提交，必须先于任务 7）
   - 删前 grep 生产调用方为 0（结论写入本条），跑 `test_batch_query.py`、`test_function_global_names_ratchet.py` 等作基线
   - 删 `POST /batch-execute` 及其请求 / 响应模型、`BatchQueryToolbar.vue`、`composables/useBatchQuery.ts` 与 `useBatchQuery.test.ts`、`customQuery.batchExecute`；按 design §3.9 删改相关用例
   - `auditYearCalendarFallbackBaseline.json` 删 `composables/useBatchQuery.ts` 一行（只改这一行；该文件是共享文件，提交前 `git diff --cached` 只含这一块），删后跑 `auditYearCalendarFallbackRatchet.spec.ts`
   - 删后同组测试全绿；提交前打 tag
-- [ ] 7. 取数分派切换与取数器下沉（R2、N4）
+  - 证据（B2，2026-10-27；提交 d606c25dd + faf0c7891（私有索引法），删前 tag `aql/B2-pre-del-batch-execute` = 2fa460957）：
+    - 删前 grep：`POST /api/custom-query/batch-execute` 没有前端调用方（`customQuery.batchExecute` 只有常量定义）；`BatchQueryToolbar.vue` 零挂载；`composables/useBatchQuery.ts` 只被自身测试 import；后端只有 `test_batch_query.py`、`test_custom_query_auth_bug_condition.py` 的 Property 1b 与审计标签用例引用。删后全仓代码 0 命中（剩下的 `batchExecute` 是 `/api/workflow/batch-execute`，不同模块）
+    - 删除：端点与 `BatchExecuteRequest` / `BatchExecuteResponse`、`BatchQueryToolbar.vue`、`useBatchQuery.ts` 与 `useBatchQuery.test.ts`、`test_batch_query.py`；`test_custom_query_auth_bug_condition.py` 删 Property 1b；`test_advanced_query_audit_helper.py` 的自定义动作标签用例改用仍有效的标签（参数本身保留）；`audit_helper.py` 只改文档串；年度兜底基线只删 `composables/useBatchQuery.ts` 一行。`apiPaths/system.ts`（`customQuery.batchExecute`）与 `components.d.ts`（`BatchQueryToolbar`）在主树有他人未提交改动，按私有索引法只提交这两行（faf0c7891），共享索引已对齐、工作树里他人的改动原样保留
+    - 删前删后同一组（SQLite）：删前 `test_batch_query.py` 9、`test_custom_query_auth_bug_condition.py` 4 passed；删后后者 3 passed，配方表第 29 行 8 格由 xfail 转正（SQLite 54 → 62 passed、46 → 38 xfailed），`test_function_global_names_ratchet.py` 5、`test_committed_code_imports_only_committed_modules.py` 10、`test_project_endpoint_authz_body_carried.py` 31、`test_project_endpoint_authorization_baseline.py` 34 passed；`test_lazy_import_resolvability.py` 删前删后同为 2 例预存红（13 处惰性导入指向 HEAD 不存在的 5 个模块，全在回收站 / 模板引擎等他域文件，见任务 1）。`test_custom_query_auth_preservation.py` 删后一次 hypothesis `FailedHealthCheck`（机器负载下生成慢），单独重跑 5 passed，HEAD 干净复跑 5 passed
+    - 前端：删后 `auditYearCalendarFallbackRatchet.spec.ts` 只剩 2 例预存红（`g10NoteSectionMap.ts` 0 → 2、9 条已修未下调，均为他人文件；没有 `useBatchQuery.ts` 条目），HEAD 干净复跑同此；`components.d.ts` 由 Vite 重新生成后除换行外无差异（不再声明已删组件）
+    - 变异 B2-f（恢复该路由）⇒ 第 29 行 8 格红「期望 404，实得 401 / 200」；恢复后 sha256 一致
+- [x] 7. 取数分派切换与取数器下沉（R2、N4）
   - `business_fetchers.py` 改为注册表分派，删 `fetch_cap_warning`（跨模块单元格分支移到任务 34，与该源族同一提交）；同时删 `routers/custom_query.py` 里它的导入与调用（现 L1145 导入、L1200 调用，行号开工时现查），删后跑 `test_function_global_names_ratchet.py` 与 `test_lazy_import_resolvability.py`
   - 新建 `services/custom_query/fetchers/{__init__,disclosure,worksheet,workpaper_cells}.py`（行为原样迁移，只读改造在任务 16）；router 删 `_query_*`，`_query_disclosure` 由 fetchers 再导出；分批调整（实施计划 B2，2026-10-27）：本任务的注册表先登记 trial_balance / tb_detail、account_balance、ledger_entries、workpaper、workhours 与 `consol_unit:{cc}:{account_balance|ledger_entries|tb_detail}`，报表、报表行次、调整分录三个取数器暂留 router，任务 17 / 18 切到注册表后再删，使 AQ-01 / 07 / 08 的修复与其 PG 守卫、变异同批闭环；最终状态与 design 一致
   - 改写依赖旧分派的测试（`test_advanced_query_hardening_wave012.py` 的 `_query_trial_balance` 替身用例），理由写入本条
   - `backend/scripts/file_size_whitelist.txt` 中 `custom_query.py` 基线下调为真实行数（只改这一行）
-- [ ] 8. 业务视图口径真 PG 回归（R1.1、R1.3、R2.1~R2.5、R2.7、R5.8，ADR-AQL-07；变异 #1、#3、#4）
+  - 证据（B2，2026-10-27；提交 021d5f503，白名单一行 ea389fd3b（私有索引法））：
+    - 开工现状：`routers/custom_query.py` 3,086 → 2,980（任务 6）→ 2,030（白名单基线 2,966 → 2,030，不留余量）；`business_fetchers.py` 235 → 202；新建 `fetchers/__init__.py` 28、`disclosure.py` 172、`worksheet.py` 33、`workpaper_cells.py` 547 行；`check_file_size.py` 对本批全部生产文件 rc 0。目标文件主树无他人改动、远端未改；白名单文件有他人未提交的行，只提交本 spec 一行
+    - 分派：`business_fetcher` 只经 `source_registry.resolve_source` 分到三种实现——注册表 SQL 源交 `paged_fetch`（`FetchPage(paged=True)`，带分组 / 透视取全量、> 5,000 行 400）；JSON 内存源（附注、合并工作底稿、底稿选区）行带隐藏列 `_row_index`、> 5,000 行 400 `RESULT_TOO_LARGE`；暂留 router 的报表 / 报表行次 / 调整分录（分批调整见上，任务 17 / 18 切换后删除）带 conditions ⇒ 400 `CONDITIONS_UNSUPPORTED`、结果触顶 5,000 行 ⇒ 400 `RESULT_TOO_LARGE`。`fetch_cap_warning` 连同 router 里的导入与调用一并删除（全仓代码 0 命中）；跨模块单元格分支保留，随任务 34 与该源族同一提交删除
+    - 下沉：附注 / 合并工作底稿 / 底稿选区三个取数器原样搬到 `fetchers/`（只读改造在任务 16），router 再导出 `_query_disclosure`（`test_note_table_payload_readers_pg.py` 7 passed）；router 删除注册表接管的取数器；指标树叶子列取自注册表，`_INDICATORS_SCHEMA_VERSION` 10 → 11（execute 对未登记列回 400 `UNKNOWN_COLUMN`，前端按旧版本缓存的叶子列须失效；任务 20 / 40 的版本号因此各顺延 1，见该两任务）；`pagination.DEFAULT_SORT_BY_SOURCE` 删注册表 SQL 源的条目（报表行次等暂留源的条目随任务 17 / 18 删）
+    - 改写 `test_advanced_query_hardening_wave012.py::test_legacy_fetcher_requests_untruncated_source_rows`（更名 `…_routes_sql_sources_to_database_paging`）：旧用例替身 router 的 `_query_trial_balance`，固化「取数层不截断（limit=None）、编排器内存切片」——这正是 AQ-03 的缺陷形态，且该取数器按设计已删除；改为替换下一层 `paged_fetch.page`，断言收到试算表定义与请求的 limit / offset、FetchPage 原样交给编排器，暂留 router 的取数器（报表行次）仍按旧口径收到 `limit=None`
+    - 守卫（删后）：`test_function_global_names_ratchet.py` 5 passed；`test_lazy_import_resolvability.py` 只有任务 1 登记的 2 例预存红（扫描到的函数体内 import 6,743 → 6,738，13 处不可解析的条目不变且都不在高级查询包内）；`test_committed_code_imports_only_committed_modules.py` 10 passed（`fetchers/` 与调用方同一提交）
+- [x] 8. 业务视图口径真 PG 回归（R1.1、R1.3、R2.1~R2.5、R2.7、R5.8，ADR-AQL-07；变异 #1、#3、#4）
   - `test_aql_business_view_pg.py`：宜宾临港店科目余额；和平药房序时账 total、借方降序首行、第 N 页与相邻页不重叠、offset 超限 422；科目 1002 分组 > 5,000 ⇒ 400；华氏试算表首行与 Σ审定；底稿清单；无生效数据集的 warnings；查生效数据集失败（在下一层注入异常）⇒ 500 而不是退化为不过滤
   - 记录和平药房序时账首页耗时（N1）
+  - 证据（B2，2026-10-27；提交 021d5f503）：
+    - `test_aql_business_view_pg.py` 真 PG 15 passed（待提交树与 HEAD ea389fd3b 干净检出各跑一遍，0 skipped；请求经 httpx ASGI 真发到生产注册的 router，只替换 `get_current_user` / `get_db`（真库回滚事务）、Redis 换独占 fakeredis、审计写入换空操作；金标准在测试内用独立 SQL 现算）
+    - 现算金标准（只读，`tmp_aql_linkage` 探针，与接口逐值相等）：宜宾临港店科目余额 812 行 / Σ期末 −659,481.68（只按未删 1,624 / −1,318,963.36）；和平药房序时账 total 1,147,414，借方降序首两行 2025-03-31 / 0223 / 1651.02 / 241,944,666.92 与 2025-06-11 / 0033 / 1122.11 / 84,770,005.38，借方 > 1 亿 1 行，科目 1002 前缀 116,443 行（> 5,000 ⇒ 400 `AGGREGATION_TOO_LARGE`，`row_count` = 116,443）；华氏试算表 100 行 / Σ审定 2,033,180,355.49 / 首行 1001 且按科目码有序；华氏底稿清单 172；和平物流 active 数据集 0、未删 550 行 ⇒ 按未删返回并带提示「该项目年度没有生效数据集，按未删除行返回」；offset 100,000 仍可达且与独立 SQL 分页逐行一致、100,001 ⇒ 422；offset = total ⇒ 空页且 total 不变；在 `DatasetService.get_active_dataset_id`（`get_active_filter` 的下一层）注入异常 ⇒ 500 `INTERNAL_ERROR` + 32 位追踪号，且不再继续取数；未登记筛选键 400、`columns` 投影（下钻键 `id` 随行返回）、未登记列 400；附注源带 conditions 400
+    - 变异：#1（B2-1，科目余额改回只写 `is_deleted = false`）⇒ `assert 1624 == 812`；#3（B2-3，total 用本页行数）⇒ `assert (100 == 1147414)`；#4（B2-4，排序不在库内）⇒「借方降序首行 = 全量最大借方」红；B2-b（`strict=False`）⇒ 注入用例得 200 而非 500；B2-c（分组上限放到 5,000,000）⇒ 拿到 1002 的聚合结果而非 400；B2-e（试算表默认排序改科目名称）⇒ `'4301' == '1001'` 红；均在验证 worktree 里单独跑，恢复后 sha256 一致
+    - N1（真库，经 `paged_fetch.page`（与 execute 同一内核）各 3 次；另以 9985 活体整条 HTTP 请求复核）：和平药房序时账默认排序首页（含 COUNT）中位 0.17 s（冷启动首次 1.63 s；HTTP 0.22 s）⇒ 达标（≤ 3 s）；另记：按借方降序首页中位 3.49 s、offset 100,000 中位 4.02 s、科目 1002 筛选首页 1.21 s——借方全表排序没有可用索引，交任务 36 按 ADR-AQL-06 预案处理（不放宽阈值、不建索引）
+    - 浏览器（共享 9980 启动于 2026-10-26 0:24 且未开热重载，仍跑本批之前的代码——同一请求在 9980 上 total 仍是 5,000、宜宾 1,624 行；按简报不重启，另起 9985 后端（干净 HEAD worktree、`--lifespan off` 不跑启动任务与后台 worker）+ 3035 前端（独立 cacheDir、关 HMR），验收完即停）：`/custom-query` 选和平药房序时账 ⇒「本页 100 条 / 共 1147414 条」、分页器 11,475 页，翻到第 2 页 total 不变、行不同；选宜宾临港店科目余额 ⇒「共 812 条」，库存现金、银行存款各一行；控制台 0 error。截图 `tmp_aql_linkage/screenshots/B2-ledger-total.png`、`B2-ledger-page2.png`、`B2-yb-balance-once.png`
 - [ ] 9. 构建器作用域（R1.2、R3.1~R3.3、R3.5 后端；变异 #2、#5、#16）
   - `builder_scope.py`（`resolve_builder_scope` 新参数、`scope_predicates`、已删项目排除、projects 按 id、staff 角色门、report_config 副本行、数据集谓词预先算好）、`builder_dsl.py`（QueryDSL `project_id` / `year`；基表谓词进 WHERE 最后一步、JOIN 目标谓词进 ON）、`table_whitelist.py`（`DATASET_SCOPED_TABLES`、`ROLE_RESTRICTED_TABLES`）、`routers/query_builder.py`（三端点传 `requested_project_id` 与 `year`）
   - 测试：方言编译断言（目标谓词在 ON）+ PG（宜宾计数、e2e_manager 的 projects 先按「可访问 − 已删」断言（循环受限排除在任务 23 加上后改为 design §10.2 的金标准）、指定不可访问项目 403、staff 对 manager 403、design §10.2「LEFT JOIN 无匹配行」、report_config 副本行只给可访问项目）
@@ -115,7 +150,7 @@
   - `fetchers/disclosure.py`（附注目录、按表返回、`meta.tables`、`_row_index`、章节集合取 `get_notes_tree`）；router `get_indicators` 增 `year` 与 `X-Notes-Version`，`_build_disclosure_tree` 增项目分支（函数名不变，更新测试替身签名）
   - PG：华氏叶子与 `get_notes_tree` 章节集合、顺序一致；「八、1」第一张表行数与行序 = `table_data`（合计行最后）；表切换返回第二张表；附注更新后 `X-Notes-Version` 变化
 - [ ] 20. 指标树按项目形态（R5.5、R5.7 叶子列，ADR-AQL-10 / 16）
-  - 单体隐藏 tb_summary / ws_* 并更名；叶子 columns 与 supports_conditions 由注册表生成；调整分录叶子改名；schema 版本 11
+  - 单体隐藏 tb_summary / ws_* 并更名；叶子 columns 与 supports_conditions 由注册表生成；调整分录叶子改名；schema 版本 11（B2 注：任务 7 让叶子列改由注册表生成时已调到 11；本任务改树形须再 +1 为 12，任务 40 相应为 13，design ADR-AQL-16 / §3.8 的版本号在本任务实施时顺延）
   - 单元测试：叶子列 == 注册表显示列；单体 / 合并两种树形
 - [ ] 21. 辅助核算源与构建器白名单扩充（R5.6）
   - 注册表 aux_balance / aux_ledger（`required_filters`、跨维 warnings）；`table_whitelist` 增 tb_aux_balance / tb_aux_ledger / financial_report（超 800 行按 design §9 先抽伴生模块）
@@ -177,7 +212,7 @@
 ## 阶段 H　W3 常用审计预置模板（用户 2026-10-26 追加；R13，ADR-AQL-05；design §3.11、§4.3）
 - [ ] 40. 条件能力扩展（R13.5，ADR-AQL-03；变异 #22、#23、#29、#30、#32、#38）
   - `param_sql_builder`：抽 `_prefix_predicate`，`starts_with` 与 `prefix` 共用；新增 `_weekday_predicate`、`_blank_predicate`（`nonempty` 的 False 分支改调它；字符集常量 `BLANK_CHARS` = ECMAScript `trim()` 的 25 个码点）；`table_whitelist.OPERATOR_WHITELIST` 增三项，同一提交新增 `BUILDER_UI_OPERATORS`（现有 13 项字面量 + 导入期不变式），`routers/query_builder.get_schema` 改下发它（三项不出现在构建器界面，构建器前端不改）；`paged_fetch` 的 `CONDITION_VALUE_REQUIRED`（含未解析的 `$param`）与 `BLANK_FIELD_INVALID`
-  - `ledger_sampling_service.ledger_line_amount`（带 `type_`；`build_ledger_query` 两处改调，SQL 文本改前改后一致，`test_cutoff_sampling_pbt.py` 保持通过）；注册表 `SourceSpec.condition_only` 与序时账 `line_amount`；指标树叶子 `condition_fields`，schema 12
+  - `ledger_sampling_service.ledger_line_amount`（带 `type_`；`build_ledger_query` 两处改调，SQL 文本改前改后一致，`test_cutoff_sampling_pbt.py` 保持通过）；注册表 `SourceSpec.condition_only` 与序时账 `line_amount`；指标树叶子 `condition_fields`，schema 12（版本号顺延见任务 20 的 B2 注：届时应为 13）
   - `QueryConditionEditor.vue`：按 dtype 给算子（含开头是、为空或空白、大于等于、小于等于、星期为）、条件行 `params` 标记、`toSavedConditions`、`incompleteReason`、`notices`、`EDITOR_OPS`；`queryColumnLabels.ts` 增 `line_amount`
   - 测试：单元（编译 SQL 与绑定参数、`coerce_value(ledger_line_amount(t), "1000000")` 为 Decimal、`weekday_in` 用于文本列 400、`is_blank` 用于数值列 400、空值 400、`BLANK_CHARS` 等于 `unicodedata` 按 ECMAScript 定义现算的集合）；schema 端点 TestClient（`operators == sorted(BUILDER_UI_OPERATORS)`，白名单与它的差集恰为三项，构建器 DSL 带 `starts_with` 照常编译）；`AdvancedQueryBuilder.spec.ts` 读 `table_whitelist.py` 的 `BUILDER_UI_OPERATORS` 字面量作 schema，每个操作符选项的 label 不等于键名（design §10.1）；PG design §10.2「新条件能力」行（字符串阈值经 TestClient、【UAT】空白摘要三行）；vitest（算子随 dtype、未填值禁用查询与保存、改值去掉 `params` 标记、`toSavedConditions`）
 - [ ] 41. 预置定义与服务端解析（R13.1~R13.4、R13.8，ADR-AQL-05；变异 #24、#31）
