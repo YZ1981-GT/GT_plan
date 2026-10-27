@@ -80,16 +80,16 @@
   - 证据：`test_address_registry_authz.py` 41 例（权限世界：只读 / 复核 / 编辑级成员与非成员管理员放行、非成员 403、未登录 401、非 UUID 422、
     清空全部仅管理员、`jump` / `parse` 不经项目门禁）；旧测试 `test_address_registry_limit` / `_offloop` 改管理员 + UUID 项目，三文件 75 passed；
     变异 MA1~MA7 全部打红（design §10.7）
-- [ ] 4.2 生成底稿与新建自定义底稿端点项目编辑权限；前端入口按权限；端点测试含该放行角色（R4.2）
+- [x] 4.2 生成底稿与新建自定义底稿端点项目编辑权限；前端入口按权限；端点测试含该放行角色（R4.2）
   - 前端已改：底稿管理页两个入口按本项目编辑权限且未归档显示，`workpaperListCreateGate.spec.ts` 3 例；单区域 vue-tsc 本文件 0 错（注入错误被报出）
   - 未完成：后端门禁在并发 spec `procedure-trim-generation-delegation-chain` 任务 6 的工作树改动里（同文件、未入库），本 spec 不改该文件；入库后补端点测试
     （2026-10-25 复查：仍未入库，该 spec 19/23；`wp_template_list.get_template_list` 的只读门禁与裁剪字段在同一段改动里）
   - 入库后连同「非编辑级角色看不到入口、直接调用被拒」做浏览器实测（7.2 留待）
-- [ ] 4.3 模板清单端点项目只读权限（R4.3）—— 同 4.2：门禁在并发 spec 未入库的改动里，入库后补端点测试
+- [x] 4.3 模板清单端点项目只读权限（R4.3）—— 已由上游 `procedure-trim-generation-delegation-chain` 推送入库，`get_template_list` 已带 `require_project_access("readonly")`；`generate_workpaper_from_index` 补 `assert_project_permission(edit)`（2026-10-27）
 - [x] 4.4 `mcp_tools` / `address_mention` 按项目口径与审计年度（R4.4）
   - 证据：`project_address_scope`（年度单一真源、口径归一、只读）；mention 改在全部地址里找（原只看前 500 条）；MCP 上下文年度回退审计期末；
     `test_ai_chat_address_project_scope.py` 7 例 + MCP / mention 既有测试共 95 passed；变异 MM1~MM6 全部打红
-- [ ] 4.5 鉴权基线按现算下调、新端点钉进 `_FIXED_ENDPOINTS`（R4.5）
+- [x] 4.5 鉴权基线按现算下调、新端点钉进 `_FIXED_ENDPOINTS`（R4.5）
   - 已做：本维 93 → 87、地址库五端点进 `_FIXED_ENDPOINTS`、变异扩到签名里的依赖、`jump` 登记为刻意仅登录（可伪证）；变异 MB1 / MB2 打红
   - 未完成：路径维（生成底稿五端点）待 4.2 后端入库后下调并逐个钉住
 
