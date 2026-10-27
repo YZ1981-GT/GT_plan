@@ -213,6 +213,8 @@ for match in _WP3_PATTERN.finditer(raw):
 | `EXECUTOR_WP_IMPL.positional_args` | 改为 `("wp_code", "column", "field")`；`data_source` 追加「第三参为 A1 时经 `acnr.wp_cell_target.read_formula_cell` 按目录 sheet 精确取值（先 sheet 级底稿、无则父底稿），取不到返回 None」 | 本 spec |
 | `WP_KNOWN_DIFFERENCES` | 维度集合不变；只改 `positional_arg_count.detail`：「预填路径三参读 checklist_responses；WPExecutor 三参只对 A1 第三参按 sheet 精确取值，语义第三参仍不支持；报表路径三参报错」 | 本 spec |
 
+T13 实施记录（2026-10-28）：三个文件实际在 `backend/app/services/` 下。formula-hub 第 6 点的 `wp_values` / `strict_wp` 两支尚未入库，三参循环现只有本 spec 的 `_A1` 一支与原逻辑；`WPExecutor.execute` 签名尚无 formula-hub 要加的 `year`，其 A1 分支暂传 `year=None`（不做年度闸门），等对方加 `year` 后透传（需用户转达 formula-hub）。底稿公式路径的 A1 分支直接调 `read_sheet_cell` 并传 `evaluate_wp_formula_expression` 的年度。
+
 ### 2.6 前端
 
 - 新组件 `components/custom-query/AcnrTargetResults.vue`：列 中文名 / 引用 / 值 / 状态 / 原因 / 下钻。`missing` / `blocked` 显示原因、值列「—」；`text` 显示原文。下钻：`GtIndexChip`（`value=addrIdToIndexRef(addr_id)`、`prevent-navigate`）+ 点击时优先 `useAcnrDrill.openRoute(item.source.jump_route, cell)`（新导出，复用 drill 的占位替换与高亮拼接），没有 `jump_route` 才 `drill(addr_id)`。

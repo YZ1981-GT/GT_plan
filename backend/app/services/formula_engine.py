@@ -1915,6 +1915,8 @@ class PREVExecutor:
 # ─── D2-3 坏账准备明细表嵌套结构寻址 ───────────────────────────────────────────
 # 标识 D2-3 底稿的 sheet 名标记（第二参含此子串则走 NestedTableService 而非 parsed_data）
 _D23_SHEET_MARKER = "坏账准备明细表"
+#: 三参 WP 第三参为单元格地址（与 exact_identity.cell_of 同一 A1 口径）
+_A1_FIELD = re.compile(r"^[A-Z]{1,3}[0-9]{1,7}$")
 
 # D2-3 字段中文名 → bad_debt_detail_rows 金额列（13 列语义 B~N + 合计/期末余额别名）
 _D23_FIELD_TO_COLUMN: dict[str, str] = {
@@ -2049,6 +2051,15 @@ class WPExecutor:
             return D("0")
 
     @staticmethod
+    async def read_sheet_cell(db, project_id, year, wp_code: str, sheet_text: str, cell: str):
+        """三参 A1 取值：委托 ``acnr.wp_cell_target.read_formula_cell``（目录按 effective_catalog 取），返回 TargetRead。"""
+        from app.services.acnr.wp_cell_target import effective_catalog, read_formula_cell
+
+        index = await effective_catalog(db, project_id)
+        return await read_formula_cell(
+            db, project_id=project_id, year=year, wp_code=wp_code, sheet_text=sheet_text, cell=cell, index=index)
+
+    @staticmethod
     async def execute(
         db, project_id, wp_code: str, column: str = "审定数", field: str | None = None
     ):
@@ -2058,6 +2069,9 @@ class WPExecutor:
         # D2-3 嵌套寻址：第二参含「坏账准备明细表」标记时走 NestedTableService
         if _D23_SHEET_MARKER in (column or ""):
             return await WPExecutor._resolve_d23(db, project_id, wp_code, column, field)
+        if field and _A1_FIELD.match(field):  # 三参 A1：按目录 sheet 精确取值，取不到 None（acnr T13）
+            tr = await WPExecutor.read_sheet_cell(db, project_id, None, wp_code, column or "", field)
+            return tr.read.value if tr.read.state == "ok" else None
 
         try:
             import sqlalchemy as sa

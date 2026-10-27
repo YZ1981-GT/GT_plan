@@ -47,7 +47,7 @@
 | L3 运行时条目 | 后端 | `backend/app/services/acnr/runtime.py` | `get_runtime_entries` | `backend/tests/acnr/test_runtime.py` |
 | 唯一精确身份判定（纯函数；目录写法解析、`full_resolve` 首步、发布门禁、生成器名称规则与单元格取值接线调用它，V2 / CCR 尚未调用） | 后端 | `backend/app/services/acnr/exact_identity.py` | `sheet_of`、`cell_of`、`name_owner` | `backend/tests/acnr/test_exact_identity.py` |
 | 底稿单元格共享读取函数（与 formula-hub 共用契约，非 ok 带中文原因与原因码、取不到不以零值代替；生产代码只有单元格取值接线导入它） | 后端 | `backend/app/services/wp_cell_reader.py` | `resolve_wp_cell`、`WpCellRead` | `backend/tests/test_wp_cell_reader_contract.py` |
-| 单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；生产代码尚无调用方，高级查询接线见下表） | 后端 | `backend/app/services/acnr/wp_cell_target.py` | `read_entry_cell`、`read_formula_cell`、`effective_catalog`、`sheet_key_for` | `backend/tests/acnr/test_wp_cell_target.py` |
+| 单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；生产调用方只有底稿公式三参 WP 的 A1 第三参（WPExecutor），高级查询接线见下表） | 后端 | `backend/app/services/acnr/wp_cell_target.py` | `read_entry_cell`、`read_formula_cell`、`effective_catalog`、`sheet_key_for` | `backend/tests/acnr/test_wp_cell_target.py` |
 | `full_resolve` 首步身份推导与停用字段（多义 / 禁止别名返回中文原因、所需上下文与候选；停用条目带替代地址） | 后端 | `backend/app/services/acnr/resolve_identity.py` | `step1_identity`、`deprecation_fields` | `backend/tests/acnr/test_catalog_roundtrip_real.py` |
 | 目录契约单一来源，schema 由它生成 | 后端 | `backend/app/services/acnr/catalog_contract.py` | `build_schema`、`REGISTRY_VERSION_PATTERN`、`FUNCTIONAL_TYPES` | `backend/tests/acnr/test_catalog_schema_single_source.py` |
 | 发布门禁模块（生成器写出与 `--check` 都调用） | 后端 | `backend/app/services/acnr/catalog_release.py` | `run_release_gates`、`GateViolation` | `backend/tests/acnr/test_catalog_release_gates.py` |

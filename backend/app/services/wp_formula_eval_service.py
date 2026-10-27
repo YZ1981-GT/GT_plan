@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.audit_platform_models import TrialBalance
 from app.services.dataset_query import get_active_filter
 from app.services.formula_engine import COLUMN_ALIASES, FormulaContext, execute
-from app.services.formula_engine import WPExecutor
+from app.services.formula_engine import _A1_FIELD, _D23_SHEET_MARKER, WPExecutor
 from app.services.four_table.occurrence_by_standard_code import (
     CREDIT_KEY,
     DEBIT_KEY,
@@ -372,9 +372,15 @@ async def evaluate_wp_formula_expression(
     for match in _WP3_PATTERN.finditer(raw):
         wp_code, sheet_name, field = match.group(1), match.group(2), match.group(3)
         try:
-            val = await WPExecutor.execute(
-                db, project_id, wp_code, sheet_name, field=field
-            )
+            if _A1_FIELD.match(field) and _D23_SHEET_MARKER not in sheet_name:  # 三参 A1 按 sheet 精确取值（acnr T13）
+                tr = await WPExecutor.read_sheet_cell(db, project_id, year, wp_code, sheet_name, field)
+                val = tr.read.value if tr.read.state == "ok" else Decimal("0")  # 非 ok 时 0 只是占位
+                if tr.read.state != "ok":
+                    errors.append(f"{match.group(0)}：{tr.read.reason}")
+            else:
+                val = await WPExecutor.execute(
+                    db, project_id, wp_code, sheet_name, field=field
+                )
         except Exception as e:
             logger.warning("WP 三参求值失败 %s: %s", match.group(0), e)
             val = Decimal("0")

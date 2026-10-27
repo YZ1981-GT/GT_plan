@@ -8,7 +8,7 @@ formula-fetch-followup-defect-closure 6.5 按收敛后的现状改写。
 ============  ================================================  ================================================
 维度          预填路径 ``formula_preloader._load_wp``            报表 / 自定义公式路径 ``WPExecutor.execute``
 ============  ================================================  ================================================
-实参          ``(wp_code, sheet_name, cell_ref)`` — 3 个         ``(wp_code, column[, field])`` — 2 个（field 仅 D2-3）
+实参          ``(wp_code, sheet_name, cell_ref)`` — 3 个         ``(wp_code, column[, field])`` — field 为 D2-3 字段或 A1
 数据源        ``checklist_responses.remark``（经中文锚点映射）   ``working_paper.parsed_data``（顶层键 / 单元格）
 存进 ctx 的键 ``wp_data[wp_code]['表!锚点']``                    ``wp_data[wp_code][列名]``
 取不到时      不存键 ⇒ L1 三参报错，该格不写                     ``Decimal('0')``（与「值确实为 0」不可区分）
@@ -74,13 +74,18 @@ WP_IMPLS: tuple[WpImplSpec, ...] = (
     ),
     WpImplSpec(
         impl=EXECUTOR_WP_IMPL,
-        positional_args=("wp_code", "column"),
+        positional_args=("wp_code", "column", "field"),
         data_source=(
             "working_paper.parsed_data：审定数 / 未审数 / 期初余额 / 期末余额映射顶层键，单元格地址经 ACNR 定位后从 "
-            "extract_custom_cells 取；第二参含「坏账准备明细表」时走 D2-3 嵌套表（field 为第三参）"
+            "extract_custom_cells 取；第二参含「坏账准备明细表」时走 D2-3 嵌套表（field 为第三参）；"
+            "第三参为 A1 时经 acnr.wp_cell_target.read_formula_cell 按目录 sheet 精确取值（先 sheet 级底稿、无则父底稿），"
+            "取不到返回 None"
         ),
-        on_missing="Decimal('0')（底稿不存在 / 键缺失 / 异常一律 0）",
-        measured="2026-10-24 现读：报表引擎与 FormulaEngine.execute 预载两参 WP 用它；未改动",
+        on_missing="Decimal('0')（两参：底稿不存在 / 键缺失 / 异常一律 0）；三参 A1 取不到返回 None",
+        measured=(
+            "2026-10-28 acnr-foundation-defect-closure T13：三参 A1 改为按 sheet 精确取值（原来把表名当列名、恒 0）；"
+            "报表引擎与 FormulaEngine.execute 预载的两参 WP 与 D2-3 分支未改动"
+        ),
     ),
     WpImplSpec(
         impl=WP_CELL_READER_IMPL,
@@ -115,8 +120,8 @@ WP_KNOWN_DIFFERENCES: tuple[WpKnownDifference, ...] = (
     WpKnownDifference(
         dimension="positional_arg_count",
         detail=(
-            "预填路径 3 个实参（含 sheet_name），WPExecutor 2 个（第三参只给 D2-3 嵌套表）⇒ 三参 WP 只在预填路径有数据，"
-            "报表 / 自定义公式路径里写三参得到的是 L1 报错；两参 WP 在预填路径会被当成「表 = 锚点」去查锚点映射"
+            "预填路径三参读 checklist_responses；WPExecutor 三参只对 A1 第三参按 sheet 精确取值，语义第三参仍不支持；"
+            "报表路径三参报错"
         ),
         reason=(
             "统一实参要么给 WPExecutor 加 sheet 维度（改 parsed_data 取数口径，波及报表与全部 Tier A 求值），要么让预填路径"

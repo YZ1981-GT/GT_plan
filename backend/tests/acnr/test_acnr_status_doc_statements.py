@@ -186,7 +186,7 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
                       "test_database_error_propagates"),
             claim("生产代码里导入 wp_cell_reader 的恰为 acnr/wp_cell_target（AST）",
                   lambda: _production_importers_of("wp_cell_reader") == [_A + "wp_cell_target.py"])),
-        "单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；生产代码尚无调用方，高级查询接线见下表）": CB(
+        "单元格取值接线（锁定项目按锁定目录判名但锁定来源暂为进程内登记、sheet 级底稿优先、借名与多义不读；生产调用方只有底稿公式三参 WP 的 A1 第三参（WPExecutor），高级查询接线见下表）": CB(
             _A + "wp_cell_target.py", ("read_entry_cell", "read_formula_cell", "effective_catalog", "sheet_key_for"),
             _T + "test_wp_cell_target.py",
             calls(_A + "wp_cell_target.py", "read_entry_cell", "resolve_wp_cell", "bind_wp_code", "sheet_key_for"),
@@ -195,7 +195,9 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             not_imports(_A + "wp_cell_target.py", "project_registry_lock"), task_open("T17", "T18"),
             has_tests(_T + "test_wp_cell_target.py", "test_locked_project_judges_identity_by_locked_catalog",
                       "test_sheet_level_paper_preferred_over_parent", "test_borrowed_and_ambiguous_names_block"),
-            claim("生产代码里没有文件导入 wp_cell_target（AST）", lambda: _production_importers_of("wp_cell_target") == []),
+            claim("生产代码里导入 wp_cell_target 的恰为 formula_engine（AST）",
+                  lambda: _production_importers_of("wp_cell_target") == ["backend/app/services/formula_engine.py"]),
+            calls("backend/app/services/formula_engine.py", "read_sheet_cell", "effective_catalog", "read_formula_cell"),
             task_open("T14"), in_planned("T14")),
         "`full_resolve` 首步身份推导与停用字段（多义 / 禁止别名返回中文原因、所需上下文与候选；停用条目带替代地址）": CB(
             _A + "resolve_identity.py", ("step1_identity", "deprecation_fields"), _T + "test_catalog_roundtrip_real.py",
