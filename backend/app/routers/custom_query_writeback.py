@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -38,7 +38,8 @@ class WritebackTargetSpec(BaseModel):
 
     new_value: Any = None
     raw: str | None = None
-    module: str = "workpaper"
+    # 只收 workpaper / note；tb / adj / report 写入实现已删除（任务 13，ADR-AQL-02）⇒ 422
+    module: Literal["workpaper", "note"] = "workpaper"
     wp_id: str | None = None
     wp_code: str | None = None
     sheet_name: str | None = None

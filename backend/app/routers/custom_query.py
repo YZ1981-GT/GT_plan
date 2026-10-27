@@ -1552,7 +1552,8 @@ class CellWritebackRequest(BaseModel):
     sheet_name: str
     cell_ref: str  # e.g. "B7"
     new_value: Any = None
-    module: Literal["workpaper", "report", "note", "adj", "tb"] = "workpaper"
+    # tb / adj / report 写入实现已删除（任务 13，ADR-AQL-02）：审定数只经发布门、调整分录只经调整分录服务 ⇒ 422
+    module: Literal["workpaper", "note"] = "workpaper"
 
     # ── 附注归属字段（module="note" 时必填）──────────────────────────────
     # 设计 §五.2：writeback schema 显式带归属元组，不得把 record id 视作权限边界。
@@ -1665,7 +1666,7 @@ async def cell_writeback(
             raise HTTPException(status_code=404, detail="Working paper not found in this project")
         wp_id = str(wp_row[0])
     else:
-        # 对于其他模块，wp_code 作为标识符传递
+        # 附注模块：记录以 note_record_id 定位，wp_code 只作兼容标识传递
         wp_id = body.wp_code
 
     try:

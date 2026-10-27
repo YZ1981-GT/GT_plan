@@ -175,7 +175,9 @@ backend/app/routers/wp_editor_router.py  1120
 #     test_snapshot_writer_transaction.py / _addr_id.py / _audit.py 三个文件，属独立任务 ——
 #     与一次删参同批会把 diff 淹没在搬迁噪声里。
 #     spec: advanced-query-hardening-wiring-closure（收口遗留项）
-backend/tests/test_snapshot_writer.py  1418
+#     2026-10-27 advanced-query-linkage-closure 任务 13：tb / adj / report 写入实现删除，随之删掉其用例，
+#     baseline 按删后实际行数下调（1418 → 1230）。
+backend/tests/test_snapshot_writer.py  1230
 
 # ═══════════════════════════════════════════════════════════════════════════
 # spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（2026-09-02 入库）

@@ -2,7 +2,8 @@
 
 实现 cell 级写回到 working_papers.parsed_data['univer_snapshot'] JSONB，
 支持乐观锁冲突检测（X-File-Opened-At vs updated_at）、单事务一致性、
-跨模块路由写入（workpaper / report / note / adj / tb）。
+按模块路由写入（workpaper / note）。tb / adj / report 三个写入实现已删除
+（advanced-query-linkage-closure 任务 13，ADR-AQL-02：试算表审定数只经发布门、调整分录只经调整分录服务）。
 
 ACNR 集成 (M2, R15.1, R15.2, R15.4):
   - 写回时通过 ACNR resolve 获取 canonical addr_id
@@ -69,12 +70,9 @@ logger = logging.getLogger(__name__)
 class SnapshotWriter:
     """双向编辑写回管线。
 
-    支持 5 个模块的 cell 写回：
+    支持 2 个模块的 cell 写回：
       - workpaper → parsed_data['univer_snapshot']
-      - report → report_snapshot.data
       - note → consol_note_data.data
-      - adj → adjustments 表 UPDATE
-      - tb → trial_balance.audited_amount UPDATE
     """
 
     async def write_cell(
@@ -105,7 +103,7 @@ class SnapshotWriter:
             cell_ref: cell 引用 (e.g. "B7")
             new_value: 新值
             opened_at: 前端打开时的 updated_at 时间戳
-            module: 模块名 ('workpaper', 'report', 'note', 'adj', 'tb')
+            module: 模块名 ('workpaper', 'note')；其余（含已删除的 tb / adj / report）→ ValueError
             project_id: 项目 ID（ACNR 解析 project context，R15.4）
 
         Returns:
@@ -120,16 +118,13 @@ class SnapshotWriter:
         Raises:
             WritebackConflict: 乐观锁冲突
             WritebackPermissionDenied: 无写权限
+            ValueError: 不支持的模块（请求层已是 422，这里防直接调用）
         """
         if module == "workpaper":
             return await self._write_workpaper_cell(
                 db, user, wp_id, sheet_name, cell_ref, new_value, opened_at, project_id
             )
-        elif module == "report":
-            return await self._write_report_cell(
-                db, user, wp_id, sheet_name, cell_ref, new_value, opened_at
-            )
-        elif module == "note":
+        if module == "note":
             return await self._write_note_cell(
                 db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
                 note_record_id=note_record_id,
@@ -138,16 +133,7 @@ class SnapshotWriter:
                 note_node_key=note_node_key,
                 note_project_id=note_project_id,
             )
-        elif module == "adj":
-            return await self._write_adj_cell(
-                db, user, wp_id, sheet_name, cell_ref, new_value, opened_at
-            )
-        elif module == "tb":
-            return await self._write_tb_cell(
-                db, user, wp_id, sheet_name, cell_ref, new_value, opened_at
-            )
-        else:
-            raise WritebackPermissionDenied(f"Unsupported module: {module}")
+        raise ValueError(f"不支持的回写模块：{module}（只支持 workpaper / note）")
 
     # ─── workpaper 模块写回 ──────────────────────────────────────────────
 
@@ -413,26 +399,11 @@ class SnapshotWriter:
         if downstream_warnings:
             payload["warnings"] = downstream_warnings
         return payload
-    # ─── 非 workpaper 模块写回（实现在 snapshot_writer_modules）──────────
-    # 四个模块写回都是「SELECT FOR UPDATE → 乐观锁 → 定位虚拟 sheet 列 → UPDATE」的
-    # 同构流程，与 workpaper 的 11 步事务无关，故下沉到伴生模块。类上保留同名薄委托：
-    # 既有测试用 hasattr 检查模块分派、并用实例赋值做替身，搬走会让两者失效。
+    # ─── 附注模块写回（实现在 snapshot_writer_modules）──────────────────
+    # 「SELECT FOR UPDATE → 归属复验 → 乐观锁 → 定位虚拟 sheet 列 → UPDATE」与 workpaper 的
+    # 11 步事务无关，故下沉到伴生模块。类上保留同名薄委托：既有测试用 hasattr 检查模块分派、
+    # 并用实例赋值做替身。tb / adj / report 的委托随写入实现一并删除（任务 13）。
 
-    async def _write_report_cell(
-        self,
-        db: AsyncSession,
-        user: Any,
-        wp_id: str,
-        sheet_name: str,
-        cell_ref: str,
-        new_value: Any,
-        opened_at: datetime,
-    ) -> dict:
-        """写回 report_snapshot.data JSONB（委托 snapshot_writer_modules）。"""
-        return await _mod.write_report_cell(
-            db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
-            check_lock=self._check_optimistic_lock,
-        )
     async def _write_note_cell(
         self,
         db: AsyncSession,
@@ -458,36 +429,6 @@ class SnapshotWriter:
             note_year=note_year,
             note_node_key=note_node_key,
             note_project_id=note_project_id,
-        )
-    async def _write_adj_cell(
-        self,
-        db: AsyncSession,
-        user: Any,
-        wp_id: str,
-        sheet_name: str,
-        cell_ref: str,
-        new_value: Any,
-        opened_at: datetime,
-    ) -> dict:
-        """写回 adjustments 表（委托 snapshot_writer_modules）。"""
-        return await _mod.write_adj_cell(
-            db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
-            check_lock=self._check_optimistic_lock,
-        )
-    async def _write_tb_cell(
-        self,
-        db: AsyncSession,
-        user: Any,
-        wp_id: str,
-        sheet_name: str,
-        cell_ref: str,
-        new_value: Any,
-        opened_at: datetime,
-    ) -> dict:
-        """写回 trial_balance.audited_amount（委托 snapshot_writer_modules）。"""
-        return await _mod.write_tb_cell(
-            db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
-            check_lock=self._check_optimistic_lock,
         )
 
     # ─── 辅助方法 ────────────────────────────────────────────────────────

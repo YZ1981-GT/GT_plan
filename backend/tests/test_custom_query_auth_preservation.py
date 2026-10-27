@@ -295,57 +295,54 @@ async def test_cell_writeback_optimistic_lock_conflict(wp_code):
 
 
 # ---------------------------------------------------------------------------
-# Property 2e: tb module non-audited_amount WritebackPermissionDenied (3.7)
+# Property 2e: tb / adj / report 写回已删除 → 请求模型 422，写入方不被调用
+# （advanced-query-linkage-closure 任务 13，ADR-AQL-02。原用例断言「tb 模块写非 G 列 → 403」，
+#  而 tb 写入实现绕开了 TB 发布门、已删除；保留的契约是：这三个模块在请求层即被拒收）
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_tb_non_audited_amount_permission_denied():
-    """Property 2e: Preservation — tb module non-audited_amount column returns 403.
+@pytest.mark.parametrize("module", ["tb", "adj", "report"])
+async def test_removed_writeback_modules_rejected_with_422(module, monkeypatch):
+    """Property 2e: cell-writeback 的 module=tb / adj / report → 422（真发 HTTP 请求），写入方零调用。
 
-    The existing WritebackPermissionDenied for non-audited_amount columns
-    in tb module must continue to work.
-
-    **Validates: Requirements 3.7**
-
-    EXPECTED: This test PASSES on both unfixed and fixed code.
+    **Validates: Requirements 3.7**（advanced-query-linkage-closure R4.1）
     """
-    from fastapi import HTTPException
-    from app.routers.custom_query import cell_writeback
-    from app.services.custom_query.snapshot_writer import WritebackPermissionDenied
+    from httpx import ASGITransport, AsyncClient
 
+    from app.core.database import get_db
+    from app.deps import get_current_user
+    from app.routers import custom_query
+    from app.services.custom_query.snapshot_writer import snapshot_writer
+    from tests.authz_world import build_app
+
+    calls: list[dict] = []
+
+    async def _spy(**kwargs):
+        calls.append(kwargs)
+        return {"success": True, "updated_at": None, "old_value": None}
+
+    monkeypatch.setattr(snapshot_writer, "write_cell", _spy)
+    api = build_app(custom_query.router)
     user = _make_user(role="admin")
-    project_id = str(uuid.uuid4())
 
-    body = MagicMock()
-    body.wp_code = "TB-001"
-    body.sheet_name = "试算表"
-    body.cell_ref = "C5"  # non-audited_amount column
-    body.new_value = 999.99
-    body.module = "tb"
-    body.project_id = project_id
+    async def _user():
+        return user
 
-    response = MagicMock()
-    response.headers = {}
-    request = MagicMock()
-    request.headers = {"X-File-Opened-At": "2024-01-01T00:00:00Z"}
+    async def _db():
+        yield AsyncMock()
 
-    # db mock: admin visibility check passes
-    db = AsyncMock()
-    visibility_result = MagicMock()
-    visibility_result.all.return_value = [(uuid.UUID(project_id),)]
-    db.execute.return_value = visibility_result
-
-    # Mock snapshot_writer to raise WritebackPermissionDenied
-    perm_denied = WritebackPermissionDenied("Only audited_amount column is writable in tb module")
-
-    with patch("app.services.custom_query.snapshot_writer.snapshot_writer") as mock_sw:
-        mock_sw.write_cell = AsyncMock(side_effect=perm_denied)
-
-        with pytest.raises(HTTPException) as exc_info:
-            await cell_writeback(
-                body=body, response=response, request=request, db=db, current_user=user
-            )
-
-        assert exc_info.value.status_code == 403, (
-            f"WritebackPermissionDenied should map to 403. Got: {exc_info.value.status_code}"
+    api.dependency_overrides[get_current_user] = _user
+    api.dependency_overrides[get_db] = _db
+    body = {
+        "project_id": str(uuid.uuid4()), "wp_code": "TB-001", "sheet_name": "试算表", "cell_ref": "G2",
+        "new_value": 999.99, "module": module,
+    }
+    async with AsyncClient(transport=ASGITransport(app=api), base_url="http://aql-b4") as client:
+        response = await client.post(
+            "/api/custom-query/cell-writeback", json=body, headers={"X-File-Opened-At": "2024-01-01T00:00:00Z"},
         )
+
+    assert response.status_code == 422, response.text
+    errors = response.json()["detail"]
+    assert any(err.get("loc", [None])[-1] == "module" for err in errors), errors
+    assert calls == [], f"module={module} 被拒收前不应调用写入方：{calls}"

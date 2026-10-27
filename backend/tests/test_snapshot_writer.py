@@ -11,7 +11,6 @@ from __future__ import annotations
 import os
 import json
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-unit-tests")
@@ -30,7 +29,6 @@ from app.services.custom_query.snapshot_writer import (
     snapshot_writer,
 )
 from app.services.custom_query.addressing_service import ResolvedTarget
-from app.services.tb_audited_writer import PublishRowResult, PublishRowsResult
 
 
 # ─── addr_id resolve mock helper (Task 15.3) ─────────────────────────────────
@@ -407,33 +405,28 @@ class TestProperty4OptimisticLockConflict:
 class TestProperty5WritePermissionEnforcement:
     """Non-workpaper source or no write permission → 403, data unchanged."""
 
-    @pytest.mark.asyncio
-    @settings(max_examples=10)
-    @given(
-        module=st.sampled_from(["report", "note", "adj", "tb"]),
-    )
-    async def test_non_workpaper_module_requires_permission(self, module):
-        """For non-workpaper modules, permission check applies.
+    def test_only_workpaper_and_note_have_write_handlers(self):
+        """写回只剩 workpaper / note 两个处理器；tb / adj / report 已删（任务 13，ADR-AQL-02）。
 
         **Validates: Requirements 2.5**
         """
-        # 端点级权限校验在 router；服务层这里验证的是**模块分派存在**——
-        # 原判据是 `assert module in ("report", ...)`，而 module 正是从这同一个元组
-        # 参数化来的，等于断言自己的输入，恒真（writer 建了都没用到）。
         writer = SnapshotWriter()
-        handler = getattr(writer, f"_write_{module}_cell", None)
-        assert callable(handler), f"模块 {module} 没有对应的写回处理器"
+        for module in ("workpaper", "note"):
+            assert callable(getattr(writer, f"_write_{module}_cell", None)), f"模块 {module} 没有写回处理器"
+        for module in ("tb", "adj", "report"):
+            assert not hasattr(writer, f"_write_{module}_cell"), f"模块 {module} 的写回处理器应已删除"
 
     @pytest.mark.asyncio
-    async def test_unsupported_module_raises(self):
-        """Unsupported module raises WritebackPermissionDenied.
+    @pytest.mark.parametrize("module", ["invalid_module", "tb", "adj", "report"])
+    async def test_unsupported_module_raises(self, module):
+        """不支持的模块（含已删除的 tb / adj / report）→ ValueError，且不触达数据库。
 
         **Validates: Requirements 2.5**
         """
         writer = SnapshotWriter()
         mock_db = AsyncMock()
 
-        with pytest.raises(WritebackPermissionDenied) as exc_info:
+        with pytest.raises(ValueError, match="不支持的回写模块"):
             await writer.write_cell(
                 db=mock_db,
                 user=_make_mock_user(),
@@ -442,66 +435,38 @@ class TestProperty5WritePermissionEnforcement:
                 cell_ref="A1",
                 new_value="test",
                 opened_at=datetime.now(timezone.utc),
-                module="invalid_module",
+                module=module,
             )
 
-        assert "Unsupported module" in exc_info.value.reason
-
-    @pytest.mark.asyncio
-    async def test_tb_only_allows_audited_amount_column(self):
-        """Trial balance only allows writing to column G (audited_amount).
-
-        **Validates: Requirements 2.5**
-        """
-        writer = SnapshotWriter()
-        now = datetime.now(timezone.utc)
-
-        async def mock_execute(stmt, params=None):
-            stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
-            if "SELECT" in stmt_str:
-                mock_result = MagicMock()
-                mock_result.first.return_value = (
-                    "tb-001",
-                    "test-project-id",
-                    2025,
-                    "1001",
-                    100,
-                    now,
-                )
-                return mock_result
-            return MagicMock()
-
-        mock_db = AsyncMock()
-        mock_db.execute = mock_execute
-
-        # Column A (account_code) should be rejected
-        with pytest.raises(WritebackPermissionDenied):
-            await writer.write_cell(
-                db=mock_db,
-                user=_make_mock_user(),
-                wp_id="tb-001",
-                sheet_name="tb_detail",
-                cell_ref="A1",  # col A = account_code, not writable
-                new_value=100,
-                opened_at=now,
-                module="tb",
-            )
+        mock_db.execute.assert_not_called()
 
     def test_endpoint_permission_model(self):
         """CellWritebackRequest model validates module field."""
         from app.routers.custom_query import CellWritebackRequest
+        from pydantic import ValidationError
 
-        # Valid modules (non-note don't need ownership fields)
-        for module in ("workpaper", "report", "adj", "tb"):
-            req = CellWritebackRequest(
-                project_id="test-project-id",
-                wp_code="D2",
-                sheet_name="Sheet1",
-                cell_ref="A1",
-                new_value=42,
-                module=module,
-            )
-            assert req.module == module
+        # Valid module (non-note doesn't need ownership fields)
+        req = CellWritebackRequest(
+            project_id="test-project-id",
+            wp_code="D2",
+            sheet_name="Sheet1",
+            cell_ref="A1",
+            new_value=42,
+            module="workpaper",
+        )
+        assert req.module == "workpaper"
+
+        # tb / adj / report 写入实现已删除 ⇒ 请求模型拒收（HTTP 422）
+        for module in ("tb", "adj", "report"):
+            with pytest.raises(ValidationError):
+                CellWritebackRequest(
+                    project_id="test-project-id",
+                    wp_code="D2",
+                    sheet_name="Sheet1",
+                    cell_ref="A1",
+                    new_value=42,
+                    module=module,
+                )
 
         # module='note' requires ownership fields
         req = CellWritebackRequest(
@@ -520,7 +485,6 @@ class TestProperty5WritePermissionEnforcement:
         assert req.module == "note"
 
         # Invalid module
-        from pydantic import ValidationError
         with pytest.raises(ValidationError):
             CellWritebackRequest(
                 project_id="test-project-id",
@@ -539,32 +503,11 @@ class TestProperty5WritePermissionEnforcement:
 
 
 class TestProperty26CrossModuleWriteRouting:
-    """For each module, write routes to correct target table/column."""
+    """For each module, write routes to correct target table/column.
 
-    @pytest.mark.asyncio
-    @settings(max_examples=10)
-    @given(
-        module=st.sampled_from(["workpaper", "report", "note", "adj", "tb"]),
-    )
-    async def test_module_routes_to_correct_handler(self, module):
-        """Each module routes to its specific write handler.
-
-        **Validates: Requirements 13.5**
-        """
-        writer = SnapshotWriter()
-
-        # Verify routing by checking method resolution
-        if module == "workpaper":
-            assert hasattr(writer, "_write_workpaper_cell")
-        elif module == "report":
-            assert hasattr(writer, "_write_report_cell")
-        elif module == "note":
-            assert hasattr(writer, "_write_note_cell")
-        elif module == "adj":
-            assert hasattr(writer, "_write_adj_cell")
-        elif module == "tb":
-            assert hasattr(writer, "_write_tb_cell")
-
+    tb / adj / report 三个写入实现已删除（advanced-query-linkage-closure 任务 13，ADR-AQL-02），
+    其路由用例随之删除；它们的拒收由 ``TestProperty5WritePermissionEnforcement`` 断言。
+    """
 
     @pytest.mark.asyncio
     async def test_workpaper_writes_to_parsed_data(self):
@@ -601,41 +544,6 @@ class TestProperty26CrossModuleWriteRouting:
 
         # Verify UPDATE was on working_paper table
         assert any("UPDATE working_paper" in s for s in written_sql)
-
-    @pytest.mark.asyncio
-    async def test_report_writes_to_report_snapshot(self):
-        """Report module writes to report_snapshot.data.
-
-        **Validates: Requirements 13.5**
-        """
-        now = datetime.now(timezone.utc)
-        report_data = {
-            "rows": [
-                {"row_code": "BS-001", "row_name": "资产", "current_period_amount": 100,
-                 "prior_period_amount": 90, "formula": None}
-            ]
-        }
-        written_sql = []
-
-        async def mock_execute(stmt, params=None):
-            stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
-            written_sql.append(stmt_str)
-            if "SELECT" in stmt_str and "report_snapshot" in stmt_str:
-                mock_result = MagicMock()
-                mock_result.first.return_value = ("rs-001", report_data, now)
-                return mock_result
-            return MagicMock()
-
-        mock_db = AsyncMock()
-        mock_db.execute = mock_execute
-
-        await snapshot_writer.write_cell(
-            db=mock_db, user=_make_mock_user(), wp_id="rs-001",
-            sheet_name="report_balance_sheet", cell_ref="C2", new_value=200,
-            opened_at=now, module="report",
-        )
-
-        assert any("UPDATE report_snapshot" in s for s in written_sql)
 
     @pytest.mark.asyncio
     async def test_note_writes_to_consol_note_data(self):
@@ -701,101 +609,6 @@ class TestProperty26CrossModuleWriteRouting:
         )
 
         assert any("UPDATE consol_note_data" in s for s in written_sql)
-
-    @pytest.mark.asyncio
-    async def test_adj_writes_to_adjustments_table(self):
-        """Adj module writes to adjustments table.
-
-        **Validates: Requirements 13.5**
-        """
-        now = datetime.now(timezone.utc)
-        written_sql = []
-
-        async def mock_execute(stmt, params=None):
-            stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
-            written_sql.append(stmt_str)
-            if "SELECT" in stmt_str and "adjustments" in stmt_str:
-                mock_result = MagicMock()
-                mock_result.first.return_value = ("adj-001", now)
-                return mock_result
-            return MagicMock()
-
-        mock_db = AsyncMock()
-        mock_db.execute = mock_execute
-
-        await snapshot_writer.write_cell(
-            db=mock_db, user=_make_mock_user(), wp_id="adj-001",
-            sheet_name="adj_aje", cell_ref="D1", new_value=500.0,
-            opened_at=now, module="adj",
-        )
-
-        assert any("UPDATE adjustments" in s for s in written_sql)
-
-    @pytest.mark.asyncio
-    async def test_tb_writes_to_trial_balance(self):
-        """TB module writes to trial_balance.audited_amount.
-
-        **Validates: Requirements 13.5**
-        """
-        now = datetime.now(timezone.utc)
-        written_sql = []
-
-        async def mock_execute(stmt, params=None):
-            stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
-            written_sql.append(stmt_str)
-            if "SELECT" in stmt_str and "trial_balance" in stmt_str:
-                mock_result = MagicMock()
-                mock_result.first.return_value = (
-                    "tb-001",
-                    "test-project-id",
-                    2025,
-                    "1001",
-                    100,
-                    now,
-                )
-                return mock_result
-            return MagicMock()
-
-        mock_db = AsyncMock()
-        mock_db.execute = mock_execute
-
-        published = PublishRowsResult(
-            updated_account_codes=["1001"],
-            updated_rows=[
-                PublishRowResult(
-                    account_code="1001",
-                    audited_amount=Decimal("1000"),
-                    previous_amount=Decimal("100"),
-                    published_at=now,
-                )
-            ],
-        )
-        with patch(
-            "app.services.tb_audited_writer.publish_rows",
-            new_callable=AsyncMock,
-            return_value=published,
-        ) as mock_publish:
-            result = await snapshot_writer.write_cell(
-                db=mock_db, user=_make_mock_user(), wp_id="tb-001",
-                sheet_name="tb_detail", cell_ref="G2", new_value=1000.0,
-                opened_at=now, module="tb",
-            )
-
-        mock_publish.assert_awaited_once()
-        publish_args, publish_kwargs = mock_publish.await_args
-        assert publish_args[:3] == (mock_db, "test-project-id", 2025)
-        assert publish_args[3] == [
-            {
-                "trial_balance_id": "tb-001",
-                "account_code": "1001",
-                "audited_amount": 1000.0,
-            }
-        ]
-        assert publish_kwargs == {"source": "custom-query:tb-cell"}
-        assert result["success"] is True
-        assert result["old_value"] == Decimal("100")
-        assert result["updated_at"] == now.isoformat()
-        assert not any("UPDATE trial_balance" in s for s in written_sql)
 
 
 # ---------------------------------------------------------------------------

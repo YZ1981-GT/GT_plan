@@ -470,7 +470,6 @@ PENDING: dict[str, dict[str, str]] = {
                 "app.services.user_display_names（远端已有，BM 合入后补齐）"},
     "15": {"*": "任务 25（AQ-30）：模板是硬删；回收站不支持 custom_query_template 类型（400）"},
     "16": {"*": "任务 25（AQ-30）：模板是硬删；回收站不支持 custom_query_template 类型（400）"},
-    "17": _each(_LOGGED_IN, "任务 13（AQ-05）：module 仍接受 tb，先过项目门禁再走 tb 写入实现"),
     "19": _each(("E", "PM", "P", "AD"), "任务 14（AQ-04）：预览不核对目标归属，含他项目目标仍 enter_confirmation=true"),
     "20": _each(("E", "PM", "P", "AD"),
                 "任务 14（AQ-04）：确认先按 wp_id 锁他项目行再比项目，WritebackPermissionDenied 未映射（500）"),
