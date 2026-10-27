@@ -7,15 +7,36 @@ Requirements: 2.1, 2.2, 2.3, 2.4, 5.1, 5.3, 5.6, 23.4, 23.5
 """
 from __future__ import annotations
 
+import contextvars
 import json
 import logging
 import os
+from contextlib import contextmanager
 from difflib import SequenceMatcher
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 logger = logging.getLogger(__name__)
+
+# ─── use_catalog 覆盖（只供发布门禁与测试，生产代码不调用） ─────────────────────
+# `run_release_gates` 的往返检查需要用「待发布的新目录」解析，而不是磁盘上的
+# 已提交目录。ContextVar 在 `with use_catalog(index):` 作用域内让 get_catalog()
+# 返回传入的索引。守卫 test_only_generator_writes_catalog / 发布门禁测试断言
+# `backend/app` 生产路径不引用 use_catalog（只在门禁模块与测试里出现）。
+_catalog_override: contextvars.ContextVar["CatalogIndex | None"] = contextvars.ContextVar(
+    "_acnr_catalog_override", default=None
+)
+
+
+@contextmanager
+def use_catalog(index: "CatalogIndex") -> Iterator["CatalogIndex"]:
+    """在作用域内把 get_catalog() 指向 `index`（仅门禁 / 测试用）。"""
+    token = _catalog_override.set(index)
+    try:
+        yield index
+    finally:
+        _catalog_override.reset(token)
 
 
 @lru_cache(maxsize=1)
@@ -205,7 +226,10 @@ def _load_catalog() -> CatalogIndex:
 
 
 def get_catalog() -> CatalogIndex:
-    """获取 catalog 索引（已缓存）。"""
+    """获取 catalog 索引（已缓存）。use_catalog() 作用域内返回被覆盖的索引。"""
+    override = _catalog_override.get()
+    if override is not None:
+        return override
     return _load_catalog()
 
 
