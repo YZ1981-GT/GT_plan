@@ -4,6 +4,11 @@
  * 后端守卫 backend/tests/acnr/test_acnr_architecture_status_doc.py 用 Python AST 核对后端行，
  * 前端行它只能核对文件存在。本守卫补上前端：用 TypeScript 编译器 API 解析「已落地：组件」表里
  * 类型为「前端」的模块，断言所列符号确实被导出、所列测试文件里确有 it / test 用例。
+ *
+ * 登记制（段四复审第 2 轮 F4-02 残留二）：前端行的「组件」描述也是陈述，必须在 FRONTEND_CLAIMS 里逐字登记
+ * 并绑定编译器 API 判据（例如「按项目订阅失效」= useAcnr 首参为 projectId 且调用 subscribeInvalidation）；
+ * 未登记的描述、判据不成立、登记表里表格已不存在的描述（失效条目）都打红。后端登记制守卫见
+ * backend/tests/acnr/test_acnr_status_doc_statements.py。
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
@@ -77,6 +82,52 @@ function testCaseCount(file: string): number {
   return n
 }
 
+function exportedFunction(sf: ts.SourceFile, name: string): ts.FunctionDeclaration | undefined {
+  return sf.statements.find((st): st is ts.FunctionDeclaration =>
+    ts.isFunctionDeclaration(st) && st.name?.text === name
+    && (ts.getCombinedModifierFlags(st) & ts.ModifierFlags.Export) !== 0)
+}
+
+function paramNames(fn: ts.FunctionDeclaration): string[] {
+  return fn.parameters.map((p) => (ts.isIdentifier(p.name) ? p.name.text : ''))
+}
+
+function callsIdentifier(node: ts.Node, name: string): boolean {
+  let hit = false
+  const visit = (n: ts.Node) => {
+    if (hit) return
+    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === name) {
+      hit = true
+      return
+    }
+    ts.forEachChild(n, visit)
+  }
+  visit(node)
+  return hit
+}
+
+/** 前端组件行「组件」描述 → 编译器 API 判据（返回不成立的原因；登记制：未登记的描述即红）。 */
+const FRONTEND_CLAIMS: Record<string, (sf: ts.SourceFile) => string[]> = {
+  '前端 ACNR SDK，按项目订阅失效': (sf) => {
+    const problems: string[] = []
+    const use = exportedFunction(sf, 'useAcnr')
+    const sub = exportedFunction(sf, 'subscribeInvalidation')
+    if (!use || paramNames(use)[0] !== 'projectId') problems.push('useAcnr 的首个参数须为 projectId（按项目）')
+    if (!sub || paramNames(sub)[0] !== 'projectId') problems.push('subscribeInvalidation 的首个参数须为 projectId')
+    if (!use || !callsIdentifier(use, 'subscribeInvalidation')) problems.push('useAcnr 内须调用 subscribeInvalidation 订阅失效')
+    return problems
+  },
+  '前端当前项目上下文': (sf) => {
+    const fn = exportedFunction(sf, 'useCurrentProjectId')
+    if (!fn) return ['未导出函数 useCurrentProjectId']
+    const problems: string[] = []
+    if (fn.parameters.length !== 0) problems.push('useCurrentProjectId 不应有参数（从上下文取当前项目）')
+    if (!callsIdentifier(fn, 'useRoute')) problems.push('须读取路由（useRoute）')
+    if (!callsIdentifier(fn, 'useProjectStore')) problems.push('须读取项目 store（useProjectStore）')
+    return problems
+  },
+}
+
 describe('架构提案现状节：前端组件行（TS 编译器 API）', () => {
   const rows = frontendRows()
 
@@ -98,5 +149,24 @@ describe('架构提案现状节：前端组件行（TS 编译器 API）', () => 
       if (testCaseCount(testPath) === 0) problems.push(`${name}: ${strip(test)} 没有 it / test 用例`)
     }
     expect(problems, problems.join('\n')).toEqual([])
+  })
+
+  it('每行前端组件的描述都已登记判据，且判据成立（登记制）', () => {
+    const problems: string[] = []
+    for (const [name, , module] of rows) {
+      const claim = FRONTEND_CLAIMS[name]
+      if (!claim) { problems.push(`未登记的前端组件描述：${name}`); continue }
+      const modPath = join(REPO, strip(module))
+      if (!existsSync(modPath)) { problems.push(`${name}: 模块不存在 ${strip(module)}`); continue }
+      const sf = ts.createSourceFile(modPath, readFileSync(modPath, 'utf-8'), ts.ScriptTarget.Latest, true)
+      problems.push(...claim(sf).map((p) => `${name}：${p}`))
+    }
+    expect(problems, problems.join('\n')).toEqual([])
+  })
+
+  it('前端判据登记表没有失效条目', () => {
+    const names = new Set(rows.map((r) => r[0]))
+    const stale = Object.keys(FRONTEND_CLAIMS).filter((k) => !names.has(k))
+    expect(stale, `登记表里表格已不存在的描述：${stale.join('、')}`).toEqual([])
   })
 })

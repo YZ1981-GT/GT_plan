@@ -8,7 +8,7 @@
 
 ## 现状（2026-10-26）
 
-> 本节由实施 spec `acnr-foundation-defect-closure`（D12）补入，**只写当前 HEAD 可验证的事实**。守卫 `backend/tests/acnr/test_acnr_architecture_status_doc.py` 逐项复算：「已落地」事实表的每个值从真实产物（`global_catalog.json`、`catalog_report.json`、快照、生成器源码）现算，组件表用 AST 确认模块、符号与测试存在，「计划中（未落地）」的任务号必须在 tasks.md 里仍未勾选。本文其余段落为架构提案原文，未改一字，其中对「当前状态」的陈述以本节为准（见末尾「过时陈述勘误」）。
+> 本节由实施 spec `acnr-foundation-defect-closure`（D12）补入，**只写当前 HEAD 可验证的事实**。守卫 `backend/tests/acnr/test_acnr_architecture_status_doc.py` 逐项复算：「已落地」事实表的每个值从真实产物（`global_catalog.json`、`catalog_report.json`、快照、生成器源码）现算，组件表用 AST 确认模块、符号与测试存在，「计划中（未落地）」的任务号必须在 tasks.md 里仍未勾选。节内每句正文与事实表「事实」、组件表「组件」、计划表「事项」三列的每个单元格都在守卫 `backend/tests/acnr/test_acnr_status_doc_statements.py` 里逐字登记并绑定复算判据（前端组件的描述另由 `audit-platform/frontend/src/services/acnr/tests/acnrArchitectureStatusDoc.spec.ts` 用 TS 编译器 API 核对），未登记、判据不成立或登记失效都打红。本文其余段落为架构提案原文，未改一字，其中对「当前状态」的陈述以本节为准（见末尾「过时陈述勘误」）。
 >
 > 修订（2026-10-27，段四审计 F4-01）：本节初版（提交 `96fba2c49`）把尚未实施的内容写成了现状（发布后目录规模、生成器结构化比对、版本锁持久化、跨模块单元格取值、显示名统一、「已完成 P0/P1/P2」等），已按上述口径重写；未落地内容全部移到「计划中（未落地）」并标任务号。
 
@@ -89,10 +89,10 @@
 
 ### 过时陈述勘误（原文保留，仅在此指出）
 
-- 「实施 spec 尚未创建（G8 阻塞项）」：实施 spec `acnr-foundation-defect-closure` 已创建，进度以其 tasks.md 为准；上方「计划中（未落地）」所列任务均未完成。
-- `registry_version: "2026.07.10"`（本文附录 A / §十三等示例）：版本号已改为 14 位 UTC 时间戳，`YYYY.N.N` 形态作废。
-- 「首期仅 D 循环」「L1 仅 wp 域 D 循环骨架」等分期陈述：L1 目录现已按 classification 骨架覆盖上表 `catalog.parent_cycles` 所列各循环（仍只覆盖底稿域）。
-- 「ACNR 是四大消费库的唯一解析入口」（resolver 模块旧注释同此）：应称「canonical resolver + legacy 委托」；resolver 模块注释已据此更正。
+- 「文档体系地图」表「实施 spec」行的「❌ **尚未创建**（G8 阻塞项）」：实施 spec `acnr-foundation-defect-closure` 已创建，进度以其 tasks.md 为准；上方「计划中（未落地）」所列任务均未完成。
+- 「5.2 SheetCatalogEntry」「5.3 CellCatalogEntry」两节示例里的 `registry_version: "2026.07.10"`：版本号已改为 14 位 UTC 时间戳，`YYYY.N.N` 形态作废。
+- 「执行摘要」表「M0（先落地）」行的「D 循环 catalog JSON 进库」等按 D 循环分期的陈述：L1 目录现已按 classification 骨架覆盖上表 `catalog.parent_cycles` 所列各循环（仍只覆盖底稿域）。
+- 「执行摘要」表「L1 首期」行的「经同一 `resolve` 出口」、「15.3 文档问题与矛盾」表 D-D10 行的「五域统一 resolve 出口」，以及 resolver 模块旧注释「四大消费库的唯一解析入口」（design §15.2 第 2 条）：应称「canonical resolver + legacy 委托」——底稿域由 ACNR 解析，其他域委托 V1，平台里仍有直接调用 V1 的绕过点（见上一子节）；resolver 模块注释已据此更正。
 
 > —— 现状节到此结束；以下为提案原文（未改动）——
 
