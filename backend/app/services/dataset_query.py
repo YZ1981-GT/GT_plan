@@ -14,11 +14,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.dataset_models import DatasetStatus, LedgerDataset
 from app.services.dataset_service import DatasetService
 
 
@@ -111,6 +113,55 @@ async def get_active_filter(
             pass
 
     return base_filter
+
+
+async def active_rows_predicate(
+    db: AsyncSession,
+    table: sa.Table,
+    *,
+    project_ids: Collection[UUID] | None,
+    year: int | None,
+) -> sa.ColumnElement:
+    """多项目版的生效数据集口径（高级构建器用；advanced-query-linkage-closure 任务 3，design §3.4）。
+
+    与 :func:`get_active_filter` 逐 (项目, 年度) 同口径：有 active 数据集的组合只取其中按
+    ``activated_at DESC NULLS LAST, created_at DESC``（与 ``DatasetService.get_active_dataset_id`` 同序）
+    最新的一个；没有 active 数据集的组合只按未删。返回
+    ``is_deleted = false AND (dataset_id IN (各组合最新 id) OR (project_id, year) NOT IN (有 active 的组合))``。
+
+    先查一次 ``ledger_datasets``（按 ``project_ids`` / ``year`` 收窄；``project_ids=None`` = 不限项目），
+    取每组最新一条在 Python 里完成：不用 ``DISTINCT ON``（只有 PG 有），也不用逐行相关子查询（百万行表上逐行
+    求值代价高）。查询失败原样上抛——调用方不得退化为「不按数据集过滤」。项目与年度本身的范围由调用方的作用域
+    谓词约束，本函数只表达数据集口径。
+    """
+    not_deleted = table.c.is_deleted == sa.false()
+    if project_ids is not None and not project_ids:
+        return not_deleted
+    stmt = sa.select(LedgerDataset.project_id, LedgerDataset.year, LedgerDataset.id).where(
+        LedgerDataset.status == DatasetStatus.active
+    )
+    if project_ids is not None:
+        stmt = stmt.where(LedgerDataset.project_id.in_(list(project_ids)))
+    if year is not None:
+        stmt = stmt.where(LedgerDataset.year == year)
+    stmt = stmt.order_by(
+        LedgerDataset.project_id,
+        LedgerDataset.year,
+        LedgerDataset.activated_at.desc().nulls_last(),
+        LedgerDataset.created_at.desc(),
+    )
+    latest: dict[tuple[UUID, int], UUID] = {}
+    for pid, yr, dataset_id in (await db.execute(stmt)).all():
+        latest.setdefault((pid, yr), dataset_id)
+    if not latest:
+        return not_deleted
+    return sa.and_(
+        not_deleted,
+        sa.or_(
+            table.c.dataset_id.in_(list(latest.values())),
+            sa.tuple_(table.c.project_id, table.c.year).notin_(list(latest)),
+        ),
+    )
 
 
 def sync_active_filter(

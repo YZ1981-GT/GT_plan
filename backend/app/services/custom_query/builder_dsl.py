@@ -23,13 +23,14 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import Column, Select, and_, asc, desc, false, func, select, true
+from sqlalchemy import Column, Select, and_, asc, desc, func, select
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.services.custom_query.builder_scope import apply_scope_to_select
 from app.services.custom_query.param_sql_builder import (
     ParamSQLBuilder as _ParamSQLBuilder,
     build_filter as _psb_build_filter,
+    build_portable_filter as _psb_build_portable_filter,
     coerce_value as _psb_coerce_value,
 )
 
@@ -151,37 +152,19 @@ def _coerce_value(col: Column, value: Any) -> Any:
 
 
 def _build_filter(col: Column, op: str, value: Any) -> ColumnElement:
-    """把 (列, 操作符, 用户值) 构造为参数化谓词。
+    """把 (列, 操作符, 用户值) 构造为参数化谓词——薄委托 ``param_sql_builder``。
 
-    值 coerce 与除 ``in`` / ``not_in`` 外的算子全部委托
-    ``param_sql_builder``（值 → 谓词的单一真源），消除此前两份几乎相同的实现。
+    - ``in`` / ``not_in`` 委托 ``build_portable_filter``：方言中立的 ``in_`` / ``notin_``（空集合恒假 / 恒真、
+      不报错，R10.3）原先写在这里，advanced-query-linkage-closure 任务 4 把它收进 ``build_portable_filter``，
+      使构建器条件、业务视图条件与旧筛选键共用同一谓词来源（R12.2，ADR-AQL-03）。构建器的端点测试在
+      SQLite 上真实执行，SQLite 没有 ``ANY``，故不能用 ``build_filter`` 的 PG 形态。
+    - 其余算子委托 ``build_filter``（含白名单校验：内部算子 ``prefix`` / ``nonempty`` 对构建器不开放 ⇒ 400
+      ``OP_NOT_ALLOWED``）。
 
-    ``in`` / ``not_in`` **不**委托，原因是方言：``param_sql_builder`` 用
-    ``col == any_(list)``（PG 专用，其契约测试固定以 postgresql 方言**编译**、不
-    执行），而构建器的端点测试在 SQLite 上**真实执行** —— SQLite 无 ``ANY``
-    函数，会直接 ``OperationalError: no such function: ANY``。故此处用方言中立的
-    ``in_`` / ``notin_``（SQLAlchemy 2.x 以 expanding bindparam 展开，asyncpg 下
-    同样是参数化的，不存在旧式「IN 传 tuple」的问题）。
-
-    但 R10.3 的**实质**照样落地：原实现对空数组抛 400「要求非空数组」，现在
-    ``in`` 空集合 → 恒假谓词（0 行）、``not_in`` 空集合 → 恒真谓词（全部行），
-    均不报错。空候选集在真实使用中很常见（上游过滤后为空），报错会让用户以为
-    查询坏了。
+    函数名与 ``_psb_build_filter`` 委托名保留：``_build_select`` 与既有接线测试都引用它们。
     """
     if op in ("in", "not_in"):
-        if not isinstance(value, (list, tuple)):
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error_code": "INVALID_IN_VALUE",
-                    "message": f"{op} 操作符要求 value 为数组",
-                },
-            )
-        coerced = [_coerce_value(col, v) for v in value]
-        if not coerced:
-            # R10.3：空集合返回空结果集 / 全部行，不报错
-            return false() if op == "in" else true()
-        return col.in_(coerced) if op == "in" else col.notin_(coerced)
+        return _psb_build_portable_filter(col, op, value)
     return _psb_build_filter(col, op, value)
 
 

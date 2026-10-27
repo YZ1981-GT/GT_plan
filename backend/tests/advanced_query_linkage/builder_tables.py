@@ -50,6 +50,11 @@ def create_builder_schema(conn: Connection) -> None:
     Base.metadata.create_all(conn, tables=list(BUILDER_TABLES))
 
 
+def create_tables_with_closure(conn: Connection, seeds: tuple[Table, ...]) -> None:
+    """只建 ``seeds`` 及其外键闭包（业务视图注册表 / 数据集谓词的 SQLite 用例用；供 ``run_sync`` 调用）。"""
+    Base.metadata.create_all(conn, tables=list(sort_tables(_foreign_key_closure(list(seeds)))))
+
+
 async def assert_only_builder_tables(conn: AsyncConnection) -> None:
     """SQLite 库里实际建出的表都在 ``BUILDER_TABLE_NAMES`` 内，且白名单表一张不缺。"""
     created = set((await conn.execute(text("SELECT name FROM sqlite_master WHERE type = 'table'"))).scalars())

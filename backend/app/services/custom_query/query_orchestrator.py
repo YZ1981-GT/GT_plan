@@ -224,6 +224,10 @@ class QueryRequest:
     sort: list[dict] = field(default_factory=list)
     limit: int = DEFAULT_PAGE_SIZE
     offset: int = 0
+    #: 结构化条件 [{"field", "op", "value"}] 与组合逻辑（advanced-query-linkage-closure R6.1）；
+    #: 只有注册表 SQL 源支持，内存源带条件即 400 CONDITIONS_UNSUPPORTED
+    conditions: list[dict] = field(default_factory=list)
+    condition_logic: str = "and"
 
     def cache_def(self) -> dict:
         """稳定序列化的查询定义（用于缓存键，design Data Models §4）。
@@ -246,7 +250,28 @@ class QueryRequest:
             "sort": [dict(s) for s in self.sort],
             "limit": self.limit,
             "offset": self.offset,
+            # 条件必须进键：否则「借方 > 1 亿」与不带条件的查询会命中同一缓存条目
+            "conditions": [dict(c) for c in self.conditions],
+            "condition_logic": self.condition_logic,
         }
+
+
+@dataclass
+class FetchPage:
+    """取数层的返回（advanced-query-linkage-closure ADR-AQL-06，design §3.3）。
+
+    - ``paged=True``：注册表 SQL 源已在数据库内完成计数、排序与分页——``rows`` 就是这一页、``total`` 是全量
+      COUNT，编排器跳过 step5~7（内存分组 / 透视 / 排序切片）。
+    - ``paged=False``：行集完整（内存源、或带分组 / 透视的 SQL 源全量），编排器照常在内存里处理。
+    旧取数器返回的 ``(rows, columns)`` 元组仍走内存路径（既有编排器测试不改）。
+    """
+
+    rows: list[dict]
+    columns: list["ColumnMeta"]
+    total: int
+    paged: bool
+    meta: dict = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -263,6 +288,8 @@ class QueryResult:
     #: router 调用，故此缺陷此前不可见。
     limit: int = 0
     offset: int = 0
+    #: 取数层给的附加信息（如 ``ref_context``、附注 ``tables``）；没有内容时响应里整键省略（N3）
+    meta: dict = field(default_factory=dict)
 
     def to_payload(self) -> dict:
         """转为 JSON 可序列化 dict（供 QueryCache 存储）。"""
@@ -273,6 +300,7 @@ class QueryResult:
             "warnings": self.warnings,
             "limit": self.limit,
             "offset": self.offset,
+            "meta": self.meta,
         }
 
     @classmethod
@@ -301,13 +329,14 @@ class QueryResult:
             warnings=list(payload.get("warnings", [])),
             limit=int(payload.get("limit", 0)),
             offset=int(payload.get("offset", 0)),
+            meta=dict(payload.get("meta") or {}),
         )
 
 
-# 取数回调签名：给定 (req, resolved_targets, db) → (rows, columns)
+# 取数回调签名：给定 (req, resolved_targets, db) → (rows, columns) 或 FetchPage
 RowFetcher = Callable[
     [QueryRequest, list[ResolvedTarget], AsyncSession],
-    Awaitable[tuple[list[dict], list[ColumnMeta]]],
+    Awaitable["tuple[list[dict], list[ColumnMeta]] | FetchPage"],
 ]
 
 
@@ -431,9 +460,28 @@ class QueryOrchestrator:
         db: AsyncSession,
     ) -> QueryResult:
         warnings: list[str] = []
+        meta: dict = {}
 
         # step4: (sql | cell-fetch) — 按 entry 分派取数（集成钩子）
-        rows, columns = await self._fetch_rows(req, resolved, db, warnings)
+        fetched = await self._fetch_rows(req, resolved, db, warnings)
+        if isinstance(fetched, FetchPage):
+            warnings.extend(fetched.warnings)
+            meta = dict(fetched.meta)
+            if fetched.paged:
+                # 数据库已完成计数 / 排序 / 分页（ADR-AQL-06）：跳过 step5~7，total 原样
+                return QueryResult(
+                    columns=self._finalize_columns(list(fetched.columns), collapsed=False),
+                    rows=list(fetched.rows),
+                    total=int(fetched.total),
+                    limit=req.limit,
+                    offset=req.offset,
+                    cache_hit=False,
+                    warnings=warnings,
+                    meta=meta,
+                )
+            rows, columns = list(fetched.rows), list(fetched.columns)
+        else:
+            rows, columns = fetched
 
         # 跨项目聚合仅保留可访问项目行（R9.6）——防御式，仅当行携带 project_id
         if rows and any("project_id" in r for r in rows):
@@ -470,6 +518,7 @@ class QueryOrchestrator:
             offset=paged.offset,
             cache_hit=False,
             warnings=warnings,
+            meta=meta,
         )
 
     def _finalize_columns(
@@ -506,7 +555,7 @@ class QueryOrchestrator:
         resolved: list[ResolvedTarget],
         db: AsyncSession,
         warnings: list[str],
-    ) -> tuple[list[dict], list[ColumnMeta]]:
+    ) -> "tuple[list[dict], list[ColumnMeta]] | FetchPage":
         """按 entry 分派取数。
 
         - ``business`` → cell-fetch（业务 cell 级取数集成钩子）。

@@ -238,11 +238,14 @@ def build_canonical_query_identity(
     schema_version: str = "1",
     contract_version: str = "aq-disclosure-v1",
     user_scope: dict[str, Any] | None = None,
+    conditions: list[dict[str, Any]] | None = None,
+    condition_logic: str = "and",
 ) -> CanonicalQueryIdentity:
     """构造版本化 canonical query identity（design §3.3 / §4.2，Property P3）。
 
     覆盖字段：``project_id`` / ``year`` / ``source`` / ``filters`` / ``columns`` /
     ``limit`` / ``offset`` / ``sort`` / ``group`` / ``pivot`` / ``acnr_targets`` /
+    ``conditions`` / ``condition_logic`` /
     ``schema_version`` / ``contract_version`` / ``user_scope_signature``（原始
     ``user_scope`` 只存 SHA-256 摘要，不进 payload/key，防敏感信息落 Redis/日志）。
 
@@ -268,6 +271,9 @@ def build_canonical_query_identity(
         "group": _canonicalize(group, path="group", issues=issues) if group else None,
         "pivot": _canonicalize(pivot, path="pivot", issues=issues) if pivot else None,
         "acnr_targets": _canonicalize(acnr_targets or [], path="acnr_targets", issues=issues),
+        # 结构化条件（advanced-query-linkage-closure R6.1）：条件顺序有语义（保序），条件逻辑 and / or
+        "conditions": _canonicalize(conditions or [], path="conditions", issues=issues),
+        "condition_logic": condition_logic,
         "user_scope_signature": _user_scope_signature(user_scope),
     }
 

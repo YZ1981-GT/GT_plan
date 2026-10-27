@@ -43,20 +43,22 @@ DEFAULT_SORT_BY_SOURCE: dict[str, tuple[tuple[str, str], ...]] = {
     "report_lines": (("applicable_standard", "asc"), ("report_type", "asc"), ("sort_order", "asc")),
     "trial_balance": (("standard_account_code", "asc"),),
     "tb_detail": (("account_code", "asc"),),
-    "tb_summary": (("row_code", "asc"),),
+    # JSON 内存源默认按取数顺序 _row_index（附注合计行仍在最后、底稿单元格按行列而非字符串序，R2.8）
+    "tb_summary": (("_row_index", "asc"),),
     "account_balance": (("account_code", "asc"),),
     "ledger_entries": (("voucher_date", "desc"), ("voucher_no", "asc"), ("entry_seq", "asc")),
     "adjustment": (("adjustment_no", "asc"),),
     "adjustments": (("adjustment_no", "asc"),),
-    "disclosure": (("section_id", "asc"),),
+    "disclosure": (("_row_index", "asc"),),
     "workhours": (("work_date", "desc"),),
     "workpaper": (("sheet_name", "asc"), ("cell_ref", "asc")),
 }
 
 #: 优先作为 tie-breaker 的候选列（按此顺序取第一个存在的）。
-#: 之所以不只用 ``id``：分组/透视后的结果行不含 ``id``（如 ``{dept, sum_amount}``），
-#: 此时退化为「全部列参与排序」以取得全序。
-TIE_BREAKER_CANDIDATES = ("id", "addr_id", "account_code", "row_code", "voucher_no")
+#: ``_row_index``（内存源的取数顺序，advanced-query-linkage-closure 任务 5）打头：用户按某列排序时同值行
+#: 保持原序（R2.8）；行里没有它（旧取数器、分组 / 透视结果）时沿用原候选。之所以不只用 ``id``：分组/透视后
+#: 的结果行不含 ``id``（如 ``{dept, sum_amount}``），此时退化为「全部列参与排序」以取得全序。
+TIE_BREAKER_CANDIDATES = ("_row_index", "id", "addr_id", "account_code", "row_code", "voucher_no")
 
 
 @dataclass(frozen=True)
