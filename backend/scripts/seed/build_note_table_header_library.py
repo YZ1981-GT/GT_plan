@@ -21,10 +21,12 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.services.note_table_header_catalog import (  # noqa: E402
+    CORRESPONDENCE_PATH,
     LIBRARY_PATH,
     build_catalog,
     check_catalog,
     render_catalog,
+    render_correspondence,
 )
 
 
@@ -35,18 +37,23 @@ def main(argv: list[str] | None = None) -> int:
     if args.check:
         diff = check_catalog()
         if diff:
-            print(f"[DRIFT] {LIBRARY_PATH.name} 与当前词表 / 种子生成结果不一致（重跑本脚本后审 diff 再提交）：")
+            print(f"[DRIFT] 库目录与当前词表 / 种子生成结果不一致（重跑本脚本后审 diff 再提交）：")
             for line in diff:
                 print("  " + line)
             return 2
-        print(f"[OK] {LIBRARY_PATH.name} 与生成结果一致")
+        print(f"[OK] {LIBRARY_PATH.name} + {CORRESPONDENCE_PATH.name} 与生成结果一致")
         return 0
     catalog = build_catalog()
-    text = render_catalog(catalog)
-    old = LIBRARY_PATH.read_text(encoding="utf-8") if LIBRARY_PATH.exists() else None
-    if old != text:
-        LIBRARY_PATH.write_text(text, encoding="utf-8", newline="\n")
-    print(("已写入 " if old != text else "无变化 ") + str(LIBRARY_PATH))
+    for path, text_fn, label in [
+        (LIBRARY_PATH, render_catalog, "主库"),
+        (CORRESPONDENCE_PATH, render_correspondence, "对应表"),
+    ]:
+        text = text_fn(catalog)
+        old = path.read_text(encoding="utf-8") if path.exists() else None
+        changed = old != text
+        if changed:
+            path.write_text(text, encoding="utf-8", newline="\n")
+        print(("已写入 " if changed else "无变化 ") + f"[{label}] {path}")
     print(json.dumps(catalog["stats"], ensure_ascii=False, indent=2))
     return 0
 

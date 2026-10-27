@@ -63,10 +63,25 @@ AUX_COLUMNS = {
 }
 _DEFAULT_AUX_COLUMN = "期末余额"
 
-#: 期间关键词：先认上期（「上年年末余额」是上期），再认本期
-_PRIOR_PERIOD_WORDS = ("期初", "上期", "上年", "年初", "prior")
-_CURRENT_PERIOD_WORDS = ("期末", "本期", "本年", "年末", "current")
-_PERIOD_SHORTHAND = frozenset(_PRIOR_PERIOD_WORDS + _CURRENT_PERIOD_WORDS)
+#: 期间关键词（改调标题行库，复盘建议 #1：全仓唯一残留的独立期间词表收口）
+from app.services.note_table_header_library import load_vocabulary, parse_segment, period_side
+
+_PERIOD_SHORTHAND: frozenset[str] | None = None
+
+
+def _period_shorthand() -> frozenset[str]:
+    """只有简短的期间词才走期间语义匹配（与旧 ``_PERIOD_SHORTHAND`` 同语义）。
+
+    取词表 ``period_prefixes`` 中的前缀词（「期末」「本期」「上年」…）：这些是用户可能单写在 NOTE 列参数里
+    的短期间词，应该按期间语义在表头里找同侧唯一列。「本期发生额」「期末余额」这类完整列名应该先按精确名找。
+    """
+    global _PERIOD_SHORTHAND
+    if _PERIOD_SHORTHAND is None:
+        vocab = load_vocabulary()
+        shorthand = {prefix for prefix, _period in vocab.prefixes}
+        shorthand.update(("prior", "current"))  # 旧实现支持的英文写法
+        _PERIOD_SHORTHAND = frozenset(shorthand)
+    return _PERIOD_SHORTHAND
 
 
 def has_prev_or_aux(expression: str) -> bool:
@@ -78,14 +93,20 @@ def has_report_or_note(expression: str) -> bool:
 
 
 def period_kind(period: str | None) -> str | None:
-    """期间写法 → ``"current"`` / ``"prior"``；空串按本期；认不出 ⇒ ``None``。"""
+    """期间写法 → ``"current"`` / ``"prior"``；空串按本期；认不出 ⇒ ``None``。
+
+    识别走标题行库 ``parse_segment`` + ``period_side``（全仓唯一一份期间词表），返回值保持 ``"current"/"prior"``
+    以兼容所有调用方（如 ``rows[code][0 if kind == "current" else 1]``）。
+    """
     text = (period or "").strip()
     if not text:
         return "current"
-    if any(word in text for word in _PRIOR_PERIOD_WORDS):
-        return "prior"
-    if any(word in text for word in _CURRENT_PERIOD_WORDS):
+    p, _measure = parse_segment(text)
+    side = period_side(p)
+    if side == "current":
         return "current"
+    if side == "previous":
+        return "prior"
     return None
 
 
@@ -318,7 +339,7 @@ def _note_column(headers: list, column: str) -> tuple[int | None, str]:
     if len(exact) > 1:
         return None, f"列「{wanted}」出现多次"
     # 只有单写期间（期末 / 期初 / 本期 …）才按期间语义找列；「本期发生额」这类完整列名不做模糊匹配
-    kind = period_kind(wanted) if wanted in _PERIOD_SHORTHAND else None
+    kind = period_kind(wanted) if wanted in _period_shorthand() else None
     if kind is not None:
         same = [i for i, h in enumerate(data_headers) if h and period_kind(h) == kind]
         if len(same) == 1:

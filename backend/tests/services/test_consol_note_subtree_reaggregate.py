@@ -348,6 +348,78 @@ class TestProtectionAndSkips:
         assert rows[1][:2] == ["期初余额", "15.00"] and rows[1][4] == "15.00"
 
 
+    def test_skeleton_types_embedded_header_and_named_subtotals(self, monkeypatch):
+        """未绑定章节的骨架：表内子表头标 header（不进合计构成）、「X小计」标小计（旧判定当合计）。"""
+        table = {"headers": ["项目", "期末"], "rows": [["项目", "期末"], ["商业承兑汇票小计", ""], ["账龄", ""],
+                                                     ["合  计", ""]]}
+        monkeypatch.setattr(reaggregate_module, "find_table", lambda tt, sid: table)
+        run = reaggregate_module._Run.__new__(reaggregate_module._Run)
+        run.skeletons, run.template_type = {}, "soe"
+        skeleton, verbatim, placeholders = run._skeleton("五-4-5")
+        assert [t for _n, t in skeleton] == ["header", "subtotal", "data", "total"] and list(verbatim) == [0]
+        assert placeholders == []
+
+    def test_skeleton_marks_template_placeholder_rows(self, monkeypatch):
+        """未绑定章节的「……」占位行（合并模板 73 张表有）记成占位行：汇总没有数就不写（R15）。"""
+        table = {"headers": ["项目", "期末"], "rows": [["甲", ""], ["……", ""], ["乙", ""], ["...", ""], ["合计", ""]]}
+        monkeypatch.setattr(reaggregate_module, "find_table", lambda tt, sid: table)
+        run = reaggregate_module._Run.__new__(reaggregate_module._Run)
+        run.skeletons, run.placeholders, run.template_type = {}, {}, "soe"
+        assert run._skeleton("五-4-5")[2] == [1, 3]
+        run.skeletons, run.placeholders = {"五-4-5": [("甲", "data"), ("……", "data")]}, {"五-4-5": [1]}
+        assert run._skeleton("五-4-5") == ([("甲", "data"), ("……", "data")], {}, [1])
+
+    @pytest.mark.asyncio
+    async def test_total_composition_matches_standalone_rule(self, db, user, group):
+        """合计构成与单体同一判定（spec note-pull-header-formula-closure R5）：
+
+        五-7-1「小计 / 减：减值准备 / 合计」合计 = 小计 − 减项（旧算法把减项加进合计）；五-34-1 有「其中：X」行内
+        写法、合计判不准 ⇒ 合计 = 各下级合计之和（旧算法把「其中」明细也加进合计）。"""
+        rows_by_section = {
+            "五-7-1": {"B:subsidiary": [["1年以内（含1年）", "100.00"], ["小  计", "100.00"], ["减：减值准备", "10.00"],
+                                        ["合  计", "90.00"]],
+                       "A:parent": [["1至2年", "50.00"], ["减：减值准备", "5.00"]]},
+            "五-34-1": {"B:subsidiary": [["交易性金融负债", "100.00"], ["其中：发行的交易性债券", "30.00"],
+                                         ["其他", "20.00"], ["合  计", "120.00"]],
+                        "A:parent": [["交易性金融负债", "10.00"], ["合  计", "10.00"]]},
+        }
+        for section, by_node in rows_by_section.items():
+            db.add_all([ConsolNoteData(project_id=group["G"].id, year=_YEAR, section_id=section, node_key=key,
+                                       data={"rows": rows}) for key, rows in by_node.items()])
+        await db.flush()
+        await reaggregate_subtree(db, group["G"].id, _YEAR, node_key="G:consol", section_ids=list(rows_by_section))
+
+        bad_debt = _rows(await _rec(db, group, "G:consol", "五-7-1"))
+        assert bad_debt["小计"][0] == D("150.00") and bad_debt["减：减值准备"][0] == D("15.00")
+        assert bad_debt["合计"][0] == D("135.00")
+        trading = _rows(await _rec(db, group, "G:consol", "五-34-1"))
+        assert trading["交易性金融负债"][0] == D("110.00") and trading["合计"][0] == D("130.00")
+
+    @pytest.mark.asyncio
+    async def test_aggregate_does_not_write_template_placeholder_rows(self, db, user, group):
+        """未绑定章节按合并模板行汇总：「……」占位行没有下级数就不写；已存的手工格跟着行名走（R15）。
+
+        五-4-5 合并模板两段各有一行「……」；G 上一次（修复前）汇总写出的数据带这两行，第二段明细的坏账准备是手填 7。"""
+        section = "五-4-5"
+        db.add(ConsolNoteData(project_id=group["G"].id, year=_YEAR, section_id=section, node_key="B:subsidiary",
+                              data={"rows": [["商业承兑汇票小计", "", "", ""], ["出票人类型或账龄", "100.00", "1.00", ""],
+                                             ["银行承兑汇票小计", "", "", ""], ["出票人类型或账龄", "50.00", "", ""],
+                                             ["合  计", "", "", ""]]}))
+        db.add(ConsolNoteData(project_id=group["G"].id, year=_YEAR, section_id=section, node_key="G:consol", data={
+            "rows": [["商业承兑汇票小计", "", "", ""], ["出票人类型或账龄", "", "", ""], ["……", "", "", ""],
+                     ["银行承兑汇票小计", "", "", ""], ["出票人类型或账龄", "", "7", ""], ["……", "", "", ""],
+                     ["合  计", "", "", ""]],
+            "manual_cells": [{"row": 4, "col": 2}]}))
+        await db.flush()
+        result = await reaggregate_subtree(db, group["G"].id, _YEAR, node_key="G:consol", section_ids=[section])
+
+        rows = (await _rec(db, group, "G:consol", section)).data
+        assert [r[0] for r in rows["rows"]] == ["商业承兑汇票小计", "出票人类型或账龄", "银行承兑汇票小计", "出票人类型或账龄",
+                                                "合  计"]
+        assert rows["rows"][3][1:3] == ["50.00", "7"] and rows["rows"][4][1:3] == ["150.00", "8.00"]
+        assert rows["manual_cells"] == [{"row": 3, "col": 2}], "手工标记跟着第二段明细移到新行号"
+        assert _nodes(result)["G:consol"]["written"] == 1
+
     @pytest.mark.asyncio
     async def test_failed_elim_stops_aggregation_upward_but_not_the_pulls(self, db, user, group):
         """A 差额算不出（手工格元数据损坏，公式内核拒写）⇒ A 合并、G 合并本章都不汇总；叶子照常拉数。"""
@@ -377,14 +449,14 @@ class TestSectionIsolation:
         db.add(ConsolNoteData(project_id=group["G"].id, year=_YEAR, section_id=_UNBOUND, node_key="B:subsidiary",
                               data={"rows": [["银行承兑汇票保证金", "88.00", ""]]}))
         await db.flush()
-        real = reaggregate_module.build_table_rows
+        real = reaggregate_module.build_note_rows
 
         def broken(skeleton, *args, **kwargs):
             if skeleton and skeleton[0][0] == "库存现金":     # 只让「货币资金」章节的汇总出错
                 raise RuntimeError("汇总写入失败")
             return real(skeleton, *args, **kwargs)
 
-        monkeypatch.setattr(reaggregate_module, "build_table_rows", broken)
+        monkeypatch.setattr(reaggregate_module, "build_note_rows", broken)
         result = await reaggregate_subtree(db, group["G"].id, _YEAR, node_key="G:consol",
                                            section_ids=[_SECTION, _UNBOUND])
 
@@ -499,3 +571,75 @@ def test_record_write_source_falls_back_to_snapshot_then_manual():
     assert formula_service.record_write_source(record) == "formula"
     record.data, record.last_formula_value = {"rows": []}, None
     assert formula_service.record_write_source(record) == "manual"
+
+
+# ── 复盘建议 #3：隔离用例加厚 ────────────────────────────────────────────────
+
+
+class TestRootCompatibleRowCopy:
+    """根节点只有项目级兼容行（node_key=None）时，先复制再在节点专属行上写。"""
+
+    @pytest.mark.asyncio
+    async def test_root_consol_copies_project_level_row_preserving_manual_cells(self, db, user, group):
+        """G 合并节点之前只有一条 node_key=None 的兼容行（手工录了值）；重新汇总把它复制成
+        node_key='G:consol' 的行再汇总写入，手工格保留。"""
+        await _setup(db, user, group)
+        # 先在 node_key=None 上写一条带手工格的兼容行
+        db.add(ConsolNoteData(
+            project_id=group["G"].id, year=_YEAR, section_id=_SECTION, node_key=None,
+            data={"rows": [["库存现金", "99.99", ""], ["银行存款", "", ""],
+                           ["其他货币资金", "", ""], ["数字货币", "", ""], ["合计", "99.99", ""],
+                           ["其中：存放在境外的款项总额", "", ""]],
+                  "manual_cells": [{"row": 0, "col": 1}]},
+        ))
+        await db.flush()
+
+        result = await reaggregate_subtree(db, group["G"].id, _YEAR, node_key="G:consol", section_ids=[_SECTION])
+        assert result["sections_updated"] >= 1
+
+        # node_key='G:consol' 的记录存在且有汇总后的数据
+        root = await _rec(db, group, "G:consol")
+        assert root is not None
+        rows = _rows(root)
+        # 手工格「99.99」保留（来源叶子库存现金 = A:476.73 + B:1000 = 1476.73，手工格不被覆盖）
+        assert rows["库存现金"][0] == D("99.99")
+
+
+class TestUnboundSectionAggregatesWithTemplateRows:
+    """无绑定章节第一次就有下级数据时，用合并附注模板行做骨架并汇总。"""
+
+    @pytest.mark.asyncio
+    async def test_unbound_section_aggregates_from_first_run_using_template_skeleton(self, db, user, group):
+        """未绑定明细模板的章节（五-1-2），下级企业有手工录入的数据 → 第一次重新汇总就写入。"""
+        await _setup(db, user, group)
+        # A 和 B 都有受限货币资金数据
+        for key, amount in [("A:parent", "50.00"), ("B:subsidiary", "30.00")]:
+            db.add(ConsolNoteData(
+                project_id=group["G"].id, year=_YEAR, section_id=_UNBOUND, node_key=key,
+                data={"rows": [["银行承兑汇票保证金", amount, ""]]},
+            ))
+        await db.flush()
+
+        result = await reaggregate_subtree(db, group["G"].id, _YEAR, node_key="G:consol", section_ids=[_UNBOUND])
+        assert result["sections_updated"] == 1
+        root = await _rec(db, group, "G:consol", _UNBOUND)
+        assert root is not None
+        rows = _rows(root)
+        assert rows["银行承兑汇票保证金"][0] == D("80.00")  # 50 + 30
+
+
+class TestAggregateWidthFollowsTemplateHeaders:
+    """汇总结果的列数与模板表头一致（不受下级数据列数的影响）。"""
+
+    @pytest.mark.asyncio
+    async def test_aggregate_output_has_same_width_as_template_headers(self, db, user, group):
+        """模板表头 3 列（项目 / 期末余额 / 期初余额），下级数据只有 2 列 → 汇总结果仍然是 3 列。"""
+        await _setup(db, user, group)
+        result = await reaggregate_subtree(db, group["G"].id, _YEAR, node_key="G:consol", section_ids=[_SECTION])
+        assert result["sections_updated"] >= 1
+
+        root = await _rec(db, group, "G:consol")
+        assert root is not None
+        # 每行的列数 = 模板表头列数（货币资金：项目 / 期末余额 / 期初余额 = 3）
+        for row in root.data["rows"]:
+            assert len(row) == 3, f"行 {row} 列数应为 3"

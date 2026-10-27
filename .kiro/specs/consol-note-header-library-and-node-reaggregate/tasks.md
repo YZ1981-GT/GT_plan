@@ -86,7 +86,8 @@
 - [x] 21. 测试：角色 / 勾稽列单元测试 + 路由三处真实调用（全审 / 单表审核 / 下级汇总兜底）+ 变异；新旧逐列对比并归类（R5.5，design §14.4）
   - `test_note_table_header_library.py` +37 例；`test_consol_note_section_column_roles.py` 20 例（替换只测已删函数的 `test_consol_note_refresh_column_resolve.py`）
   - 干净 worktree（HEAD `cb320d128` + 本轮文件）19 个磁盘变异全打红；合并附注 / 推送 / 标题行库 33 个测试文件 568 passed，152 例失败在 HEAD 同样失败（`test_consol_note_headers.py` 147、`test_seed_counts_on_real_templates` ×2、`test_approve_push_revoke_roundtrip`、`test_note_standalone_consolidated_only_scope.py` ×2）
-- [ ] 22. `note_writer.legacy_value_keys` 改调标题行库（R5.3，与用户确认接手方式后做）
+- [x] 22. `note_writer.legacy_value_keys` 改调标题行库（R5.3，与用户确认接手方式后做）
+  - 实际已在 `25a506a57`（汇总提交并发会话在制改动）入库：`legacy_value_keys` 调 `column_keys`/`period_side`/`parse_segment`/`movement_kind`，旧期间词表已删；`test_formula_push_legacy_tables.py` 25 passed 全绿；工作树与 HEAD 在该函数零差异
 - [x] 23. 收尾：行数门、干净 worktree 跑要提交的树、只提交本会话文件
   - 行数门过（路由 1157 → 1032 行，白名单基线 1116）；库目录 `--check` 一致，映射生成器重跑字节不变；鉴权基线全过，lazy import 2 例红与 HEAD 相同（`consol_lock_service` / `disclosure_source` 不存在，非本轮文件）
   - 私有索引只提交本轮 12 个文件（含删除旧测试）；note_writer 未动（task 22）
@@ -213,7 +214,8 @@
   - [x] 58.3 推送规则（删 30、改 33；探针新增不符 0）、bindings 34 节对齐 + 全量守卫、派生产物（合并映射、标题行库目录 + 棘轮收紧、Word 白名单、diff、覆盖下限）
   - [x] 58.4 已存数据（design §17.9）：国企 `0ec33ac9` / `c8621493` 备份后清空重建 —— 各 169 / 172 行 → **166 / 166**（0 孤儿、0 不在模板，清掉 十三 / 十三、1），推送写 63 / 78 格，校验 **319/319 全通过**；上市【测试】`4c77f3e8` 生成 **199 节**、校验 **350/350**；22 个本批改过的章节「库内表清单 == 模板」0 不符，逐项诉求（长期借款一层、八、7 七列、八、55 形成原因、八、69 删列、八、18 新插表、八、9 两层、三处表名复位）逐条核到真库数据；浏览器实测 10 张子表全渲染 + 长期借款 thead 仅 1 行 + 上市表名复位 + console error 0；PG 推送守卫同数据换代码 218 → 196（D 类 126 → 84），G 类 +14 经逐表列键核对证明是「把孤儿键静默写入换成显式跳过」，棘轮不动、如实留红
 - [x] 59. 批 9b-2 验证（design §17.8）：干净私有 worktree 跑「要提交的那棵树」vs 同一 HEAD `58f7afb42` —— 后端 340 文件 284 → 86 红（新增 0）、前端 102 spec 118 → 21 红（新增 0）、`fix_note_*.py --check` 25 → 6 非零（无绿转红）、派生产物 10 个 `--check` 全 0；磁盘变异 6/6 全打红（M1 首版存活暴露「共享 helper 只被数据态间接覆盖 = 没守卫」⇒ 补 kit 4 条直接单元测试）；行数门登记 3 条历史大文件，`_note_structure_kit.py` 不登记而是拆伴生模块 `_note_text_sections.py`（737 行 < HEAD 761）
-  - [ ] 59.1 清理探针与临时 worktree（提交推送后做）
+  - [x] 59.1 清理探针与临时 worktree（提交推送后做）
+    - `C:\Users\Administrator\r8_cnp_work` 与 `r8_wt2` 两个临时目录已删除；`git worktree prune` 无悬空；`r8-proofread-appendix.md` 是已入库设计产物保留
 - [x] 60. 既有问题收口（用户「之后早就存在的问题也需要修复下」，design §17.6）
   - [x] 60.1 5914e315b 表名受损复位（上市 五、3 / 五、21 / 五、22 / 五、26 / 五、27 / 五、28 / 五、31 / 五、35 / 五、43 / 五、46 / 五、54 / 五、74，国企 八、29 / 八、32 / 八、54）
   - [x] 60.2 互相改回的修订脚本收口：删 `fix_note_ar_soe_structure` / `fix_note_ar_listed_structure` / `fix_note_j1_compensation_structure`，守卫改指 owner；D1 标题判定用 kit；D4 分解信息表结构归 segment 脚本
