@@ -1,0 +1,103 @@
+[
+  {
+    "file": "components/workpaper/d1/D1TabVoucherCheck.vue",
+    "kind": "concurrent",
+    "owner": "凭证身份 / 抽凭回填（并发会话正在改本文件）",
+    "reason": "并发会话改动中，合入后按行级证据接入小眼睛"
+  },
+  {
+    "file": "components/workpaper/d4/inspection/D4TabVoucherCheck.vue",
+    "kind": "concurrent",
+    "owner": "凭证身份 / 抽凭回填（并发会话正在改本文件）",
+    "reason": "并发会话改动中，合入后按行级证据接入小眼睛"
+  },
+  {
+    "file": "components/workpaper/composables/useD3VoucherCheck.ts",
+    "kind": "concurrent",
+    "owner": "凭证身份 / 抽凭回填（并发会话正在改本文件）",
+    "reason": "并发会话改动中；宿主 D3VoucherCheckDialog 已有小眼睛，合入后补识别位置"
+  },
+  {
+    "file": "components/workpaper/composables/useD2VcOcrCheck.ts",
+    "kind": "concurrent",
+    "owner": "凭证身份 / 抽凭回填（宿主 D2VcMatrixView.vue 正被并发会话改动）",
+    "reason": "宿主模板在并发会话改动中，合入后接入"
+  },
+  {
+    "file": "components/workpaper/e1/E1TabBankFlowReconcile.vue",
+    "kind": "concurrent",
+    "owner": "凭证身份 / 抽凭回填（并发会话正在改本文件）",
+    "reason": "并发会话改动中，合入后接入（识别附件编号已随 ocrJobs 持久化）"
+  },
+  {
+    "file": "components/workpaper/e1/E1TabLargeCheck.vue",
+    "kind": "concurrent",
+    "owner": "凭证身份 / 抽凭回填（并发会话正在改本文件）",
+    "reason": "并发会话改动中，合入后按行级证据接入"
+  },
+  {
+    "file": "components/workpaper/confirmation/alternativeH05/GtConfirmationAlternativeH05.vue",
+    "kind": "spec-c",
+    "owner": "Spec C（函证替代程序改走证据入口、按单据类型识别）",
+    "reason": "替代程序的附件与函证挂载一并重做"
+  },
+  {
+    "file": "components/workpaper/confirmation/alternativeK05/GtConfirmationAlternativeK05.vue",
+    "kind": "spec-c",
+    "owner": "Spec C（函证替代程序改走证据入口、按单据类型识别）",
+    "reason": "替代程序的附件与函证挂载一并重做"
+  },
+  {
+    "file": "components/workpaper/confirmation/alternativeK06/GtConfirmationAlternativeK06.vue",
+    "kind": "spec-c",
+    "owner": "Spec C（函证替代程序改走证据入口、按单据类型识别）",
+    "reason": "替代程序的附件与函证挂载一并重做"
+  },
+  {
+    "file": "components/workpaper/confirmation/alternativeL05/GtConfirmationAlternativeL05.vue",
+    "kind": "spec-c",
+    "owner": "Spec C（函证替代程序改走证据入口、按单据类型识别）",
+    "reason": "替代程序的附件与函证挂载一并重做（另：识别地址缺底稿 id）"
+  },
+  {
+    "file": "components/workpaper/g0-confirmation/alternativeG06/GtConfirmationAlternativeG06.vue",
+    "kind": "spec-c",
+    "owner": "Spec C（函证替代程序改走证据入口、按单据类型识别）",
+    "reason": "替代程序的附件与函证挂载一并重做"
+  },
+  {
+    "file": "composables/useOcrGovernance.ts",
+    "kind": "not-workpaper",
+    "owner": "证据治理（附件管理页）",
+    "reason": "证据治理链路，不在底稿页上展示附件",
+    "verify": { "type": "noWorkpaperHost" }
+  },
+  {
+    "file": "components/workpaper/composables/useD1PledgeCheck.ts",
+    "kind": "no-ui",
+    "owner": "D1 质押检查（界面接线另行安排）",
+    "reason": "识别函数未接到界面（D1-12 表格没有 📎 列），接线时同步加小眼睛；识别地址与位置本 spec 已修",
+    "verify": { "type": "absent", "file": "components/workpaper/d1/D1TabPledgeCheck.vue", "text": "handleOcrUpload" }
+  },
+  {
+    "file": "components/workpaper/GtCControlTest.vue",
+    "kind": "by-design",
+    "owner": "C 类控制测试",
+    "reason": "唯一的识别调用是编辑弹窗里「参考资料」供 AI 生成描述：本地待选文件，上传后为整稿附件，在右侧附件页签预览",
+    "verify": { "type": "ocrOnlyInFunction", "fn": "doOcrForAttach" }
+  },
+  {
+    "file": "components/workpaper/actions/ContractConfirmDialog.vue",
+    "kind": "dormant",
+    "owner": "wp-evidence-collection（未接入任何页面）",
+    "reason": "零挂载；接入页面时按附件编号加小眼睛",
+    "verify": { "type": "zeroMounts", "component": "ContractConfirmDialog" }
+  },
+  {
+    "file": "components/workpaper/actions/DocumentRecognizeDialog.vue",
+    "kind": "dormant",
+    "owner": "wp-evidence-collection（未接入任何页面）",
+    "reason": "零挂载；接入页面时按附件编号加小眼睛",
+    "verify": { "type": "zeroMounts", "component": "DocumentRecognizeDialog" }
+  }
+]

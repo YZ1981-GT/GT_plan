@@ -223,10 +223,15 @@
               <el-upload :show-file-list="false" accept="image/*,.pdf"
                 :before-upload="(file: File) => vc.handleRowOcr(row, file)" :disabled="isReadonly">
                 <el-button link size="small" :loading="vc.ocrLoadingRowId.value === row.id"
-                  :title="row.attachmentId ? `已落库 ${row.attachmentId}` : (row.attachment || '上传')">
+                  :title="row.attachment || (row.attachmentId ? '已上传附件' : '上传')">
                   <el-icon :class="{ attached: row.attachmentId || row.attachment }"><Paperclip /></el-icon>
                 </el-button>
               </el-upload>
+              <AttachmentEyeButton
+                v-if="row.attachmentId"
+                :attachment-id="row.attachmentId"
+                :file-name="row.attachment"
+              />
             </template>
           </el-table-column>
         </template>
@@ -400,6 +405,7 @@ import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist, snapshotToResponseMap } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 import { Paperclip } from '@element-plus/icons-vue'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,

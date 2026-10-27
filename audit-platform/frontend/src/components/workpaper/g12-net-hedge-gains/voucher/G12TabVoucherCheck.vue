@@ -329,9 +329,10 @@
             <el-tag size="small" type="info">{{ row.source || '手工' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="📎" width="60">
+        <el-table-column label="📎" width="80">
           <template #default="{ row }">
             <el-button size="small" link :disabled="isReadonly" :loading="ocrLoading === row.rowId" @click="uploadOcr(row)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
       </template>
@@ -522,6 +523,8 @@ import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vu
 import GCycleProcedureCutoffPanel from '../../shared/GCycleProcedureCutoffPanel.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -533,6 +536,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{ imported: [] }>()
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
+/** 行内凭证附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'G12-6'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 // 科目映射码：优先从上层 provide 注入的 tb_source_codes 取映射后的真实码，未注入时退兜底码
 const _injectedTbSrc = inject<Ref<TbSourceCodes | null> | null>('tbSourceCodes', null)
@@ -751,10 +757,12 @@ async function uploadOcr(row: G12VoucherRow) {
     try {
       const fd = new FormData()
       fd.append('file', file)
+      rowEv.append(fd, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
       const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
         _silent: true,
       } as any)
+      rowEv.refresh()
       const fields = (res.data?.data ?? res.data)?.extracted_fields || {}
       if (!Object.keys(fields).length) { ElMessage.info('OCR未识别到字段'); return }
       await ElMessageBox.confirm(`识别到 ${Object.keys(fields).length} 个字段，填入当前行？`, 'OCR')

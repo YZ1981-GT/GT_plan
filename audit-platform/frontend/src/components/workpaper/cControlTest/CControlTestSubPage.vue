@@ -301,7 +301,7 @@
         <el-table-column type="index" label="#" width="45" align="center" />
 
         <!-- 📎 附件上传列（Req 10.1） -->
-        <el-table-column label="📎" width="65" align="center">
+        <el-table-column label="📎" width="96" align="center">
           <template #default="{ $index }">
             <div class="cct-attach-cell">
               <!-- 已有附件：显示文件名链接 -->
@@ -317,6 +317,11 @@
                   @click.stop.prevent="downloadAttachment(sampleAttachments[$index]!.id, sampleAttachments[$index]!.fileName)"
                 >📎</a>
               </el-tooltip>
+              <AttachmentEyeButton
+                v-if="sampleAttachments[$index]"
+                :attachment-id="sampleAttachments[$index]!.id"
+                :file-name="sampleAttachments[$index]!.fileName"
+              />
               <!-- 上传按钮（非只读模式） -->
               <el-upload
                 v-if="!readonly"
@@ -513,6 +518,7 @@ import { computed, ref, watch, onMounted } from 'vue'
 import { ArrowLeft, Plus, Delete, MagicStick, InfoFilled, WarningFilled, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { downloadAttachment } from '@/components/attachment/downloadAttachment'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { suggestSampleSize } from '@/composables/useSampleSizeEngine'
 import { api } from '@/services/apiProxy'

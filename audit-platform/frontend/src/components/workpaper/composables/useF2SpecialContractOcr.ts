@@ -6,6 +6,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import type { ContractCostCheckRow } from './useF2ContractCostCheck'
 import { buildLinkedOcrFormData } from './ocrAttachmentLinkage'
+import { refreshRowEvidence, rowEvidenceCell } from '@/components/attachment/rowEvidence'
+
+/** 识别附件挂到本行（F2-56 + `row:{行 id}`，五类单据同一行），小眼睛按同一位置读取 */
+export const F2_SPE_EVIDENCE_SHEET = 'F2-56'
 
 export interface F2SpeOcrFields {
   voucherNo?: string
@@ -54,12 +58,15 @@ export function useF2SpecialContractOcr(wpId: Ref<string>, projectId?: Ref<strin
         projectId: projectId?.value,
         wpId: wpId.value,
         extraFields: { document_type: documentType },
+        evidenceSheet: F2_SPE_EVIDENCE_SHEET,
+        evidenceCell: rowEvidenceCell(rowId),
       })
       const res = await http.post(
         `/api/workpapers/${wpId.value}/f2-spe/contract-ocr`,
         form,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      refreshRowEvidence(projectId?.value, wpId.value)
       const data = res.data?.data ?? res.data
       const fields = (data?.extracted_fields ?? {}) as F2SpeOcrFields
       const confidence = data?.confidence ?? 0

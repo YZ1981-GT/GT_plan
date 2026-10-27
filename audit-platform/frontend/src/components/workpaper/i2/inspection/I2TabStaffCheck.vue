@@ -314,9 +314,10 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="附件" width="56" align="center" fixed="right">
-          <template #default="{ $index }">
+        <el-table-column label="附件" width="84" align="center" fixed="right">
+          <template #default="{ row, $index }">
             <el-button size="small" text @click="handleOcr($index)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
 
@@ -377,6 +378,8 @@
 </template>
 
 <script setup lang="ts">
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import { computed, defineAsyncComponent, inject, onMounted, ref, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -439,6 +442,8 @@ const props = defineProps<{
   isReadonly?: boolean
   year?: number
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'I2-9'
 
 const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
@@ -560,6 +565,7 @@ async function handleSave() {
 }
 
 async function handleOcr(idx: number) {
+  const rowId = rows.value[idx]?.rowId
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '.jpg,.jpeg,.png,.pdf'
@@ -567,7 +573,11 @@ async function handleOcr(idx: number) {
     const file = input.files?.[0]
     if (!file) return
     try {
-      const fields = await runWorkpaperOcr(props.wpId, file)
+      const fields = await runWorkpaperOcr(props.wpId, file, {
+        projectId: props.projectId,
+        evidenceSheet: EVIDENCE_SHEET,
+        evidenceCell: rowId ? rowEvidenceCell(rowId) : undefined,
+      })
       const name = pickOcrField(fields, 'name', 'staffName', 'personName')
       const education = pickOcrField(fields, 'education', 'degree')
       const hireDate = pickOcrField(fields, 'hireDate', 'date', 'startDate')

@@ -274,12 +274,13 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="attachmentIndex" label="附件索引号" min-width="100">
+        <el-table-column prop="attachmentIndex" label="附件索引号" min-width="128">
           <template #default="{ row, $index }">
             <div class="attach-cell">
               <el-input v-if="!isReadonly" v-model="row.attachmentIndex" size="small" placeholder="索引" />
               <span v-else>{{ row.attachmentIndex || '—' }}</span>
               <el-button v-if="!isReadonly" size="small" text @click="handleOcr($index)">📎</el-button>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
             </div>
           </template>
         </el-table-column>
@@ -359,6 +360,8 @@
 </template>
 
 <script setup lang="ts">
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import { computed, defineAsyncComponent, inject, onMounted, ref, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -428,6 +431,8 @@ const props = defineProps<{
   isReadonly?: boolean
   year?: number
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'I2-10'
 
 const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
@@ -645,6 +650,7 @@ function fillAutoConclusion() {
 
 /** 行级 OCR：上传领用/工时单据 → runWorkpaperOcr 回填 */
 async function handleOcr(idx: number) {
+  const rowId = rows.value[idx]?.rowId
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '.jpg,.jpeg,.png,.pdf'
@@ -652,7 +658,11 @@ async function handleOcr(idx: number) {
     const file = input.files?.[0]
     if (!file) return
     try {
-      const fields = await runWorkpaperOcr(props.wpId, file)
+      const fields = await runWorkpaperOcr(props.wpId, file, {
+        projectId: props.projectId,
+        evidenceSheet: EVIDENCE_SHEET,
+        evidenceCell: rowId ? rowEvidenceCell(rowId) : undefined,
+      })
       const name = pickOcrField(fields, 'name', 'staffName', 'personName')
       const project = pickOcrField(fields, 'projectName', 'project')
       const hours = pickOcrField(fields, 'hours', 'rdHours', 'workHours')

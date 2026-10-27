@@ -135,6 +135,7 @@
       <div class="section-title mb-8">
         <span class="hint" style="margin:0">可 OCR 企业盘点计划/通知</span>
         <el-button v-if="!isReadonly" size="small" :loading="ocrLoading" @click="runClientPlanOcr">📎 OCR 企业盘点计划</el-button>
+        <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" />
       </div>
       <el-form label-width="140px" size="small">
         <el-form-item label="制度名称/索引">
@@ -592,6 +593,8 @@ import {
   PLAN_TO_SUMMARY_FIELD_MAP,
   draftPlanConclusion,
 } from '../../composables/h1StocktakePlanEnhance'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{
   wpId: string
@@ -599,6 +602,9 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
+/** 识别附件挂到本表页（表页级证据），识别按钮旁的小眼睛按表页读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'H1-9'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{ (e: 'navigate-sheet', sheetName: string): void }>()
 
@@ -819,11 +825,13 @@ async function runClientPlanOcr(): Promise<void> {
     try {
       const fd = new FormData()
       fd.append('file', file)
+      rowEv.append(fd, EVIDENCE_SHEET)
       const res = await http.post(
         `/api/workpapers/${props.wpId}/h1/stocktake-summary-ocr?section=client-plan`,
         fd,
         { headers: { 'Content-Type': 'multipart/form-data' } },
       )
+      rowEv.refresh()
       const fields = res.data?.extracted_fields || res.data?.data?.extracted_fields || {}
       ocrDialog.editable = { ...fields }
       ocrDialog.visible = true

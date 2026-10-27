@@ -20,6 +20,7 @@ import {
   EVIDENCE_TYPE_OPTIONS,
   evidencePositionLabel,
 } from '@/components/attachment/workpaperEvidence'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import {
   invalidateWpEvidenceLinks,
   removeWpEvidenceLink,
@@ -120,7 +121,15 @@ function typeLabel(value: string | null): string {
 
     <el-table :data="links" v-loading="loading" size="small" max-height="300" stripe>
       <el-table-column label="文件" min-width="120" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.attachment?.file_name }}</template>
+        <template #default="{ row }">
+          <span>{{ row.attachment?.file_name }}</span>
+          <AttachmentEyeButton
+            :attachment-id="row.attachment_id"
+            :file-name="row.attachment?.file_name"
+            :file-type="row.attachment?.file_type"
+            :ocr-status="row.attachment?.ocr_status"
+          />
+        </template>
       </el-table-column>
       <el-table-column label="位置" min-width="110" show-overflow-tooltip>
         <template #default="{ row }">{{ evidencePositionLabel(row) }}</template>

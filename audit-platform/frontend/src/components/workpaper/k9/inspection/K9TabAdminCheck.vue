@@ -160,15 +160,18 @@
             <span v-else>{{ row.supportingDoc || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="!isReadonly" label="附件OCR" width="72" align="center">
+        <el-table-column label="附件OCR" width="84" align="center">
           <template #default="{ row }">
             <el-upload
+              v-if="!isReadonly"
               :show-file-list="false"
               :before-upload="(f: File) => handleVoucherOcr(row, f)"
               accept=".pdf,.jpg,.jpeg,.png"
+              style="display:inline-block"
             >
               <el-button link size="small" type="primary" :loading="ocrLoadingId === row.id">📎</el-button>
             </el-upload>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
           </template>
         </el-table-column>
         <el-table-column v-if="isColVisible('checks')" label="核对内容" width="180" align="center">
@@ -274,6 +277,8 @@ import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
 import { generateK9AiText } from '../../composables/useK9AiText'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 /**
  * 抽凭科目码取自单一真源 `k9AccountScope`（K9 管理费用）。原为模板内字面量；
@@ -313,6 +318,9 @@ const props = defineProps<{
   isReadonly: boolean
   year?: number
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（只读也能看）（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'K9-8'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
@@ -511,9 +519,11 @@ async function handleVoucherOcr(row: K1VoucherRow, file: File): Promise<boolean>
   try {
     const fd = new FormData()
     fd.append('file', file)
+    rowEv.append(fd, EVIDENCE_SHEET, rowEvidenceCell(row.id))
     const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' }, _silent: true,
     } as any)
+    rowEv.refresh()
     const data = res.data?.data ?? res.data
     const fields: Record<string, any> = data?.extracted_fields || {}
     const doc = String(fields.serviceContent ?? fields.full_text ?? '').trim()

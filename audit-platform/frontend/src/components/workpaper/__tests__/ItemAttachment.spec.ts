@@ -32,6 +32,20 @@ vi.mock('element-plus', async () => {
   return { ...actual, ElMessage: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }
 })
 
+// 小眼睛（spec attachment-inline-preview）：替身暴露 open，记录被打开的附件
+const eyeOpen = vi.hoisted(() => vi.fn())
+vi.mock('@/components/attachment/AttachmentEyeButton.vue', () => ({
+  default: {
+    name: 'AttachmentEyeButtonStub',
+    props: ['attachmentId', 'fileName', 'fileType', 'ocrStatus'],
+    template: '<i class="eye-stub" :data-id="attachmentId" :data-name="fileName" />',
+    methods: { open(this: { attachmentId: string }) { eyeOpen(this.attachmentId) } },
+  },
+}))
+
+const downloadAttachment = vi.hoisted(() => vi.fn())
+vi.mock('@/components/attachment/downloadAttachment', () => ({ downloadAttachment }))
+
 import ItemAttachment from '../ItemAttachment.vue'
 import { resetWpEvidenceLinksForTest } from '@/composables/useWpEvidenceLinks'
 
@@ -198,6 +212,26 @@ describe('ItemAttachment', () => {
     expect(wrapper.text()).toContain('凭证.pdf')
     expect(wrapper.findComponent(UploadStub).exists()).toBe(false)
     expect(wrapper.find('button[aria-label="移除本行证据 凭证.pdf"]').exists()).toBe(false)
+  })
+
+  it('每份文件有小眼睛；点文件名打开预览（不再直接下载），下载按钮单独下载', async () => {
+    mockGet.mockResolvedValueOnce({ data: { items: [linkRow('l1', 'item:3', '凭证.pdf')] } })
+    eyeOpen.mockReset()
+    downloadAttachment.mockReset()
+    const wrapper = mountItem({ readonly: true })
+    await flushPromises()
+
+    const eye = wrapper.find('.eye-stub')
+    expect(eye.exists()).toBe(true)
+    expect(eye.attributes('data-id')).toBe('att-l1')
+    expect(eye.attributes('data-name')).toBe('凭证.pdf')
+
+    await wrapper.find('a.gt-item-attach-link').trigger('click')
+    expect(eyeOpen).toHaveBeenCalledWith('att-l1')
+    expect(downloadAttachment).not.toHaveBeenCalled()
+
+    await wrapper.find('button[aria-label="下载 凭证.pdf"]').trigger('click')
+    expect(downloadAttachment).toHaveBeenCalledWith('att-l1', '凭证.pdf')
   })
 
   it('上传失败交给统一错误提示，列表不变', async () => {

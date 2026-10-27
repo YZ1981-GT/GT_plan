@@ -17,6 +17,7 @@ import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToo
 import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
 import { downloadAttachment } from '@/components/attachment/downloadAttachment'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import { handleApiError } from '@/utils/errorHandler'
 
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
@@ -355,12 +356,16 @@ onMounted(load)
             />
           </template>
         </el-table-column>
-        <el-table-column label="附件" width="130" align="center">
+        <el-table-column label="附件" width="160" align="center">
           <template #default="{ row }">
             <div v-if="steps[row.seq - 1].attachmentId" class="gt-b212__att">
-              <a href="#" :title="steps[row.seq - 1].attachmentName" @click.prevent="openStepAttachment(row.seq - 1)">
+              <a href="#" :title="`下载 ${steps[row.seq - 1].attachmentName}`" @click.prevent="openStepAttachment(row.seq - 1)">
                 📎 {{ steps[row.seq - 1].attachmentName }}
               </a>
+              <AttachmentEyeButton
+                :attachment-id="steps[row.seq - 1].attachmentId || ''"
+                :file-name="steps[row.seq - 1].attachmentName"
+              />
               <el-button v-if="!readonly" link size="small" @click="removeStepAttachment(row.seq - 1)">移除</el-button>
             </div>
             <el-upload

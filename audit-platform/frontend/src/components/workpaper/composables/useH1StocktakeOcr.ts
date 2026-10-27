@@ -5,6 +5,7 @@ import { ref, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import type { StocktakeCheckRow } from './h1StocktakeCheckModel'
+import { appendRowEvidence, refreshRowEvidence, rowEvidenceCell } from '@/components/attachment/rowEvidence'
 
 function parseNum(v: unknown): number {
   if (typeof v === 'number') return v
@@ -16,7 +17,10 @@ function str(v: unknown): string {
   return v == null ? '' : String(v)
 }
 
-export function useH1StocktakeOcr(wpId: Ref<string>) {
+/** 识别附件挂到本行（H1-10 + `row:{行 id}`），表格 📎 旁的小眼睛按同一位置读取 */
+export const H1_STOCKTAKE_EVIDENCE_SHEET = 'H1-10'
+
+export function useH1StocktakeOcr(wpId: Ref<string>, projectId?: Ref<string>) {
   const ocrLoadingId = ref<string | null>(null)
 
   async function uploadAndMerge(
@@ -27,12 +31,14 @@ export function useH1StocktakeOcr(wpId: Ref<string>) {
     ocrLoadingId.value = rowId
     const formData = new FormData()
     formData.append('file', file)
+    appendRowEvidence(formData, H1_STOCKTAKE_EVIDENCE_SHEET, rowEvidenceCell(rowId))
     try {
       const res = await http.post(
         `/api/workpapers/${wpId.value}/f2-st/contract-ocr?sheet=${encodeURIComponent('H1-10')}`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      refreshRowEvidence(projectId?.value, wpId.value)
       const data = res.data?.data ?? res.data
       const fields = (data?.extracted_fields ?? {}) as Record<string, unknown>
       const confidence = data?.confidence ?? 0

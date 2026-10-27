@@ -1265,8 +1265,9 @@ async function doOcrForAttach(index: number, rawFile: File): Promise<void> {
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
-    const fields = (res?.data?.data ?? res?.data)?.extracted_fields || {}
-    const text = fields.full_text || fields.summary || fields.content || Object.values(fields).join('\n') || ''
+    const data = res?.data?.data ?? res?.data
+    // 原文在 ocr_text；extracted_fields 是合同字段（编号 / 对方 / 金额…），原先把它们拼起来当原文交给 AI
+    const text = data?.ocr_text || data?.extracted_fields?.full_text || ''
     // 确保 editOcrTexts 与 editAttachments 索引对齐
     while (editOcrTexts.value.length <= index) editOcrTexts.value.push('')
     editOcrTexts.value[index] = String(text).slice(0, 2000) // 截断防过长

@@ -422,9 +422,10 @@
             <span v-else>{{ row.indexRef || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="📎" width="50" align="center">
-          <template #default="{ $index }">
+        <el-table-column label="📎" width="78" align="center">
+          <template #default="{ row, $index }">
             <el-button size="small" text @click="handleOcr($index)">📎</el-button>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
         <el-table-column prop="conclusion" label="审核结论" min-width="110">
@@ -496,6 +497,8 @@
 </template>
 
 <script setup lang="ts">
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import { computed, defineAsyncComponent, inject, ref, toRef } from 'vue'
 import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -548,6 +551,8 @@ const props = defineProps<{
   isReadonly?: boolean
   year?: number
 }>()
+/** 行内识别附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'I2-11'
 
 const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
@@ -666,6 +671,7 @@ function onSamplesFilled(payload: { samples?: any[] }) {
 }
 
 async function handleOcr(idx: number) {
+  const rowId = rows.value[idx]?.rowId
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '.jpg,.jpeg,.png,.pdf'
@@ -673,7 +679,11 @@ async function handleOcr(idx: number) {
     const file = input.files?.[0]
     if (!file) return
     try {
-      const fields = await runWorkpaperOcr(props.wpId, file)
+      const fields = await runWorkpaperOcr(props.wpId, file, {
+        projectId: props.projectId,
+        evidenceSheet: EVIDENCE_SHEET,
+        evidenceCell: rowId ? rowEvidenceCell(rowId) : undefined,
+      })
       const contractNo = pickOcrField(fields, 'contractNo', 'contract_no', 'number', 'docNo')
       const contractDate = pickOcrField(fields, 'contractDate', 'date', 'signDate')
       const party = pickOcrField(fields, 'counterparty', 'counterpart', 'party', 'supplier')

@@ -612,7 +612,8 @@ export function useG6EclVoucherCheck(
       const preview = Object.entries(patch)
         .map(([key, value]) => `<div><b>${escapeHtml(key)}：</b>${escapeHtml(value)}</div>`)
         .join('')
-        + (attachmentId ? `<div><b>附件ID：</b>${escapeHtml(attachmentId)}</div>` : '')
+        // 显示文件名而不是附件编号（spec attachment-inline-preview 需求 3.3）
+        + (attachmentId ? `<div><b>附件：</b>${escapeHtml(file.name)}</div>` : '')
       await ElMessageBox.confirm(preview || '确认保存附件？', 'OCR识别结果', {
         confirmButtonText: '填入',
         cancelButtonText: '取消',

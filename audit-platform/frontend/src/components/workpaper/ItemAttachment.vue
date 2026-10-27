@@ -7,12 +7,28 @@
         class="gt-item-attach-row"
       >
         <el-icon><Document /></el-icon>
+        <!-- 点文件名即预览（原先直接下载）；预览抽屉里也能下载 -->
         <a
           href="#"
           class="gt-item-attach-link"
-          @click.prevent="downloadAttachment(row.attachment_id, row.attachment.file_name)"
+          :title="`预览 ${row.attachment.file_name}`"
+          @click.prevent="openPreview(row)"
         >{{ row.attachment.file_name }}</a>
         <span class="gt-item-attach-size">{{ formatSize(row.attachment.file_size) }}</span>
+        <AttachmentEyeButton
+          :ref="(el: unknown) => setEye(row.id, el)"
+          :attachment-id="row.attachment_id"
+          :file-name="row.attachment.file_name"
+          :file-type="row.attachment.file_type"
+          :ocr-status="row.attachment.ocr_status"
+        />
+        <el-button
+          text
+          size="small"
+          :aria-label="`下载 ${row.attachment.file_name}`"
+          title="下载"
+          @click="downloadAttachment(row.attachment_id, row.attachment.file_name)"
+        ><el-icon><Download /></el-icon></el-button>
         <el-button
           v-if="!readonly"
           text
@@ -45,11 +61,13 @@
  * 位置键：表页 = sheetKey，单元格 = `item:{itemIndex}`（spec attachment-evidence-intake ADR-AEI-08）。
  * - 上传走底稿证据入口，只写行级证据链接（不再按 title 打标、不再挂整稿关联）；
  * - 列表读本底稿共享链接仓（同一底稿的所有实例只发一次请求），按位置过滤；
- * - 移除 = 删除本行的证据链接（附件本身保留在项目附件里）。
+ * - 移除 = 删除本行的证据链接（附件本身保留在项目附件里）；
+ * - 每份文件有小眼睛预览，点文件名也是预览，另有下载按钮（spec attachment-inline-preview）。
  */
 import { computed, ref } from 'vue'
-import { Document } from '@element-plus/icons-vue'
+import { Document, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import { confirmDelete } from '@/utils/confirm'
 import { handleApiError } from '@/utils/errorHandler'
 import { downloadAttachment } from '@/components/attachment/downloadAttachment'
@@ -87,6 +105,16 @@ const removingId = ref('')
 const store = useWpEvidenceLinks(() => props.projectId, () => props.wpId)
 const cellRef = computed(() => itemCellRef(props.itemIndex))
 const rows = computed(() => store.linksAt(props.sheetKey, cellRef.value))
+
+/** 每行一个小眼睛；点文件名复用同一个（spec attachment-inline-preview ADR-AIP-04） */
+const eyes = new Map<string, { open: () => Promise<void> }>()
+function setEye(id: string, el: unknown) {
+  if (el && typeof (el as { open?: unknown }).open === 'function') eyes.set(id, el as { open: () => Promise<void> })
+  else eyes.delete(id)
+}
+function openPreview(row: WpEvidenceLink) {
+  void eyes.get(row.id)?.open()
+}
 
 function beforeUpload(file: File): boolean {
   if (file.size > EVIDENCE_MAX_UPLOAD_BYTES) {

@@ -266,6 +266,8 @@ import {
 } from '../composables/useF1ComprehensiveCheck'
 import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import ItemAttachment from '../ItemAttachment.vue'
+import { appendRowEvidence, refreshRowEvidence } from '@/components/attachment/rowEvidence'
+import { f1VoucherAttSlot, f1VoucherEvidence } from './f1VoucherEvidence'
 
 type F1OcrDocumentType = 'voucher' | 'approval' | 'bank-receipt' | 'goods-receipt' | 'invoice'
 
@@ -309,12 +311,7 @@ const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(
   computed(() => props.wpId || '') as Ref<string>,
 )
 
-const attSlot = computed(() => {
-  const id = form.value?.rowId || '0'
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
-  return (Math.abs(h) % 9000) + 100
-})
+const attSlot = computed(() => f1VoucherAttSlot(form.value?.rowId))
 
 function isOcrLoading(documentType: F1OcrDocumentType): boolean {
   return ocrLoadingType.value === documentType
@@ -327,10 +324,14 @@ async function runOcr(file: File | undefined, documentType: F1OcrDocumentType): 
     const formData = new FormData()
     formData.append('file', file)
     formData.append('document_type', documentType)
+    // 识别的单据挂到「⑤ 本笔附件」同一位置（原先只挂整稿，⑤ 与表格行里都看不到）
+    const ev = f1VoucherEvidence(props.section, form.value.rowId)
+    appendRowEvidence(formData, ev.sheet, ev.cell)
     const res = await http.post(`/api/workpapers/${props.wpId}/f4/contract-ocr`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       _silent: true,
     } as any)
+    refreshRowEvidence(props.projectId, props.wpId)
     const data = res.data?.data ?? res.data
     const fields = (data?.extracted_fields ?? {}) as Record<string, unknown>
     const confidence = Number(data?.confidence ?? 0)

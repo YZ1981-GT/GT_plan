@@ -14,11 +14,11 @@
         关联原始凭证（{{ evidenceGroup.length }} 份）
       </div>
       <el-table :data="evidenceGroup" border size="small" class="gt-evidence-group__table">
-        <el-table-column prop="attachment_id" label="附件ID" width="120">
+        <!-- 原先显示附件编号前 8 位（用户看不懂）；改为小眼睛：点开取附件信息并预览（spec attachment-inline-preview 需求 3.2） -->
+        <el-table-column label="原件" width="70" align="center">
           <template #default="{ row }">
-            <span class="gt-evidence-group__att-id">
-              {{ row.attachment_id ? row.attachment_id.slice(0, 8) + '...' : '-' }}
-            </span>
+            <AttachmentEyeButton v-if="row.attachment_id" :attachment-id="row.attachment_id" />
+            <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column prop="voucher_no" label="凭证号" width="120" />
@@ -54,6 +54,8 @@
 </template>
 
 <script setup lang="ts">
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
+
 defineProps<{
   evidenceGroup: Array<{
     attachment_id?: string
@@ -94,9 +96,5 @@ function sourceLabel(source?: string) {
 }
 .gt-evidence-group__table {
   margin-top: 4px;
-}
-.gt-evidence-group__att-id {
-  font-family: monospace;
-  font-size: 11px;
 }
 </style>

@@ -213,7 +213,12 @@
     </div>
 
     <!-- 原件预览：已鉴权的预览抽屉（append-to-body，不受本抽屉布局影响） -->
-    <AttachmentPreviewDrawer v-model="previewOpen" :attachment="previewTarget" />
+    <AttachmentPreviewDrawer
+      v-model="previewOpen"
+      :attachment="previewTarget"
+      downloadable
+      size="min(960px, 72vw)"
+    />
   </el-drawer>
 </template>
 
@@ -225,7 +230,7 @@ import { handleApiError } from '@/utils/errorHandler'
 import AttachmentPreviewDrawer, {
   type AttachmentForPreview,
 } from '@/components/common/AttachmentPreviewDrawer.vue'
-import { attachments as P_att } from '@/services/apiPaths'
+import { toAttachmentPreview } from '@/components/attachment/attachmentPreviewTarget'
 
 interface Props {
   visible: boolean
@@ -356,22 +361,9 @@ async function handleUnlink(att: AttachmentLink) {
 const previewOpen = ref(false)
 const previewTarget = ref<AttachmentForPreview | null>(null)
 
-/** 链接行没有 file_type：按扩展名给抽屉一个类型提示（PDF / 图片可在线看，其余给下载） */
-function typeHintOf(fileName: string): string {
-  const ext = (fileName.split('.').pop() || '').toLowerCase()
-  if (ext === 'pdf') return 'application/pdf'
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(ext)) return `image/${ext === 'jpg' ? 'jpeg' : ext}`
-  return ''
-}
-
+/** 链接行没有 file_type：判型按扩展名（统一构造，spec attachment-inline-preview ADR-AIP-02） */
 function handlePreview(att: AttachmentLink) {
-  previewTarget.value = {
-    id: att.attachment_id,
-    name: att.file_name,
-    type_hint: typeHintOf(att.file_name),
-    preview_url: P_att.preview(att.attachment_id),
-    download_url: P_att.download(att.attachment_id),
-  }
+  previewTarget.value = toAttachmentPreview({ id: att.attachment_id, file_name: att.file_name })
   previewOpen.value = true
 }
 

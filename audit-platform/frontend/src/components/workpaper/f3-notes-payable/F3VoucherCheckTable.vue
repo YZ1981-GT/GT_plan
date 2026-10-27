@@ -9,6 +9,8 @@ import {
   type F3VoucherSection,
 } from '../composables/useF3VoucherCheck'
 import { useF3AiGenerate } from '../composables/useF3AiGenerate'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { itemCellRef } from '@/components/attachment/workpaperEvidence'
 
 const SCROLL_THRESHOLD = 50
 const TABLE_MAX_HEIGHT = 480
@@ -207,9 +209,11 @@ async function generateNoteAi(): Promise<void> {
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120" fixed="right">
+      <el-table-column label="操作" width="144" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="emit('open-check', row.rowId)">单据核对</el-button>
+          <!-- 本笔附件（与单据核对弹窗 ⑤ 同一位置）的小眼睛 -->
+          <RowEvidenceEye v-if="wpId" :project-id="projectId" :wp-id="wpId" :sheet-key="`F3-7-${section}`" :cell-ref="itemCellRef(row.attSlot)" />
           <el-button link type="danger" size="small" :disabled="isReadonly" @click="emit('remove-row', row.rowId)">删</el-button>
         </template>
       </el-table-column>

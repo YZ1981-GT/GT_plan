@@ -317,6 +317,8 @@ import F5SheetAttachments from './F5SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 import { buildLinkedOcrFormData } from '../composables/ocrAttachmentLinkage'
+import { itemCellRef } from '@/components/attachment/workpaperEvidence'
+import { refreshRowEvidence } from '@/components/attachment/rowEvidence'
 
 const f5QtyNav = [
   { id: 'f5-6-sales', label: '销售' },
@@ -360,14 +362,19 @@ async function uploadOutboundOcr(file: File): Promise<void> {
   if (props.isReadonly || !props.wpId) return
   ocrLoading.value = true
   try {
+    // 出库单挂到本表页的「数量核对附件」槽（F5SheetAttachments：F5-6 · item:0），上传后即在该栏可预览
+    // （spec attachment-inline-preview；原先挂整稿，表页附件栏里看不到）
     const { form: fd } = await buildLinkedOcrFormData(file, {
       projectId: props.projectId,
       wpId: props.wpId,
+      evidenceSheet: 'F5-6',
+      evidenceCell: itemCellRef(0),
     })
     const res = await http.post(`/api/workpapers/${props.wpId}/f5/contract-ocr`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
       _silent: true,
     } as any)
+    refreshRowEvidence(props.projectId, props.wpId)
     const data = res.data?.data ?? res.data ?? {}
     const fields = data.extracted_fields ?? {}
     const confidence = Number(data.confidence ?? 0)

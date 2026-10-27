@@ -134,13 +134,14 @@
           <span v-else class="text-muted">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="📎" width="56" align="center">
+      <el-table-column label="📎" width="80" align="center">
         <template #default="{ row }">
           <el-tooltip content="律师函联动（上传+OCR）" placement="top">
             <el-button link size="small" :disabled="isReadonly" @click="handleLawyerLetter(row.rowId)">
               📎
             </el-button>
           </el-tooltip>
+          <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
         </template>
       </el-table-column>
       <el-table-column label="" width="48" align="center">
@@ -270,6 +271,8 @@ import {
 import http from '@/utils/http'
 import type { Ref } from 'vue'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),
@@ -282,6 +285,9 @@ const props = defineProps<{
   isReadonly: boolean
   year?: number
 }>()
+/** 律师函附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'K5-6'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
@@ -430,14 +436,20 @@ function handleLawyerLetter(rowId: string) {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('doc_type', 'lawyer_letter')
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(rowId))
     try {
       const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         _silent: true,
       } as any)
+      rowEv.refresh()
       const ocrResult = res?.data?.data ?? res?.data ?? {}
-      const ocrText = ocrResult.extracted_fields?.full_text
-        || ocrResult.text || ocrResult.content || JSON.stringify(ocrResult)
+      // 回执正文字段是 ocr_text；原先读 text / content，读不到就把整个回执 JSON 填进律师意见
+      const ocrText: string = ocrResult.ocr_text || ocrResult.extracted_fields?.full_text || ''
+      if (!ocrText.trim()) {
+        ElMessage.warning('附件已上传，但未识别出文字，请手工填写律师意见')
+        return
+      }
       // 确认弹窗
       await ElMessageBox.confirm(
         `OCR识别结果：\n${ocrText.substring(0, 300)}${ocrText.length > 300 ? '...' : ''}\n\n是否填入律师意见字段？`,

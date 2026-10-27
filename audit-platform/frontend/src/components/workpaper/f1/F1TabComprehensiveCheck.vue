@@ -413,10 +413,11 @@
           >{{ debitEvidenceStatus(row).label }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column v-if="!isReadonly" label="OCR" width="56" align="center" fixed="right">
+      <!-- 只读时也显示本列：已识别的凭证可用小眼睛预览（spec attachment-inline-preview） -->
+      <el-table-column label="OCR" width="76" align="center" fixed="right">
         <template #default="{ row }">
           <el-upload
-            v-if="row.rowId !== '__subtotal__'"
+            v-if="!isReadonly && row.rowId !== '__subtotal__'"
             :show-file-list="false"
             accept="image/*,.pdf"
             :disabled="ocrLoadingRowId === row.rowId"
@@ -424,6 +425,7 @@
           >
             <el-button link size="small" :loading="ocrLoadingRowId === row.rowId" title="上传凭证 OCR">📎</el-button>
           </el-upload>
+          <RowEvidenceEye v-if="row.rowId !== '__subtotal__'" :project-id="projectId" :wp-id="wpId" :sheet-key="f1VoucherEvidence('debit', row.rowId).sheet" :cell-ref="f1VoucherEvidence('debit', row.rowId).cell" />
         </template>
       </el-table-column>
       <el-table-column label="操作" :width="isReadonly ? 80 : 130" fixed="right">
@@ -471,6 +473,9 @@
       :checked-total="creditChecked"
       :is-readonly="isReadonly"
       :ocr-loading-row-id="ocrLoadingRowId"
+      :wp-id="wpId"
+      :project-id="projectId"
+      evidence-section="credit"
       @update="(rowId, field, value) => updateCell('credit', rowId, field, value)"
       @remove="(rowId) => removeSample('credit', rowId)"
       @ocr="(file, rowId) => handleRowOcr(file, 'credit', rowId)"
@@ -526,6 +531,9 @@
       :checked-total="postChecked"
       :is-readonly="isReadonly"
       :ocr-loading-row-id="ocrLoadingRowId"
+      :wp-id="wpId"
+      :project-id="projectId"
+      evidence-section="postPeriod"
       @update="(rowId, field, value) => updateCell('postPeriod', rowId, field, value)"
       @remove="(rowId) => removeSample('postPeriod', rowId)"
       @ocr="(file, rowId) => handleRowOcr(file, 'postPeriod', rowId)"
@@ -696,6 +704,9 @@ import {
   pullSamplesForWorkpaper,
   listAttachedVouchers,
 } from '../composables/useAttachedVouchers'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { useRowEvidence } from '@/components/attachment/rowEvidence'
+import { f1VoucherEvidence } from './f1VoucherEvidence'
 
 // ─── 科目映射码注入（provide/inject，与 D/E 循环同模式）────────────────────────
 // GtF1.vue provide('tbSourceCodes', ...) → 本组件 inject → f1QueryCodes(src) 三层降级
@@ -734,6 +745,8 @@ const props = defineProps<{
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+/** 行内识别附件挂到本笔凭证（f1VoucherEvidence：与弹窗 ⑤ 本笔附件同一位置），📎 旁的小眼睛按同一位置读取 */
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 const wpIdRef = toRef(props, 'wpId') as Ref<string>
@@ -954,11 +967,15 @@ async function handleRowOcr(file: File, section: 'debit' | 'credit' | 'postPerio
   try {
     const formData = new FormData()
     formData.append('file', file)
+    // 与「逐笔单据核对」弹窗 ⑤ 本笔附件同一位置（f1VoucherEvidence）
+    const ev = f1VoucherEvidence(section, rowId)
+    rowEv.append(formData, ev.sheet, ev.cell)
     const res: any = await api.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     const fields: Record<string, any> = (res?.data?.data ?? res?.data ?? res)?.extracted_fields || {}
     if (!Object.keys(fields).length) {
       ElMessage.info('OCR 完成，未识别到可填充字段')

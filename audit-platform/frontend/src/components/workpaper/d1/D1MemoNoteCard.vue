@@ -4,6 +4,7 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
  * D1MemoNoteCard — 单张票据备查簿卡片（纵向分组，便于宽表字段填写）
  */
 import { computed } from 'vue'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import type { MemoRow } from '../composables/useD1MemoReconciliation'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -83,6 +84,11 @@ function handleUpload(file: any): boolean {
     <div class="upload-zone">
       <div v-if="row.attachmentName" class="uploaded-file">
         <span class="file-name">{{ row.attachmentName }}</span>
+        <AttachmentEyeButton
+          v-if="row.attachmentId"
+          :attachment-id="row.attachmentId"
+          :file-name="row.attachmentName"
+        />
         <el-tag v-if="ocrBadge" :type="ocrBadge.type" size="small">{{ ocrBadge.text }}</el-tag>
         <el-button v-if="!isReadonly" size="small" @click="emit('apply-ocr', 'empty-only')">回填空字段</el-button>
         <el-button v-if="!isReadonly" size="small" @click="emit('apply-ocr', 'override-all')">覆盖回填</el-button>

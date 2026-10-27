@@ -408,10 +408,11 @@
             <span v-else>—</span>
           </template>
         </el-table-column>
-        <el-table-column label="📎" width="56" align="center">
+        <el-table-column label="📎" width="84" align="center">
           <template #default="{ row }">
             <el-button v-if="!isReadonly" size="small" link @click="uploadOcr(row)">OCR</el-button>
             <span v-else>{{ row.attachment || '—' }}</span>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.rowId)" />
           </template>
         </el-table-column>
       </template>
@@ -708,6 +709,8 @@ import http from '@/utils/http'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import PostFillAiReviewDialog, { type PostFillReviewRow } from '../../voucher-sampling/PostFillAiReviewDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import G8ImportExportDropdown from '../G8ImportExportDropdown.vue'
 import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { useG8VoucherCheck, type G8VoucherRow, type G8CheckState, formatG8CheckState,
@@ -753,6 +756,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
+/** 行内凭证附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'G8-6'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
@@ -1043,6 +1049,7 @@ async function uploadOcr(row: G8VoucherRow) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowId))
       let res
       try {
         res = await http.post(
@@ -1057,6 +1064,7 @@ async function uploadOcr(row: G8VoucherRow) {
           { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
         )
       }
+      rowEv.refresh()
       const { fields, confidence } = extractG8OcrPayload(res.data)
       if (!Object.keys(fields).length) {
         ElMessage.info('OCR 完成，未识别到可填充字段')

@@ -67,11 +67,23 @@
             </div>
           </div>
           <el-tag v-if="isOffice(att.file_name)" size="small" type="info" round>Office</el-tag>
+          <!-- 整行点击照旧预览；小眼睛让入口一眼可见（spec attachment-inline-preview 需求 2.2） -->
+          <el-tooltip content="预览" placement="top" :show-after="300">
+            <el-button
+              link
+              type="primary"
+              size="small"
+              class="gt-attach-tab__eye"
+              :aria-label="`预览 ${att.file_name}`"
+              data-testid="attachment-eye"
+              @click.stop="onPreview(att)"
+            ><el-icon><View /></el-icon></el-button>
+          </el-tooltip>
         </li>
       </ul>
     </AttachmentDropZone>
 
-    <AttachmentPreviewDrawer v-model="drawerOpen" :attachment="selected" />
+    <AttachmentPreviewDrawer v-model="drawerOpen" :attachment="selected" downloadable size="min(960px, 72vw)" />
 
     <!-- OCR 确认弹窗（底稿内上传同样走确认流程） -->
     <OcrConfirmDialog
@@ -86,11 +98,12 @@
 <script setup lang="ts">
 import { reactive, ref, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Paperclip } from '@element-plus/icons-vue'
+import { Paperclip, View } from '@element-plus/icons-vue'
 import AttachmentDropZone from '@/components/workpaper/AttachmentDropZone.vue'
 import AttachmentPreviewDrawer, {
   type AttachmentForPreview,
 } from '@/components/common/AttachmentPreviewDrawer.vue'
+import { toAttachmentPreview } from '@/components/attachment/attachmentPreviewTarget'
 import {
   LEGACY_CAPABILITIES,
 } from '@/components/attachment/preview/attachmentPreviewFormats'
@@ -204,15 +217,15 @@ function jumpToWp(wpId: string) {
 }
 
 function onPreview(att: AttachmentRow) {
-  selected.value = {
+  // 判型统一构造：file_type 是分类词（image / word），原样当类型提示时图片判不出、
+  // 识别状态 completed 显示成英文（spec attachment-inline-preview ADR-AIP-02）
+  selected.value = toAttachmentPreview({
     id: att.id,
-    name: att.file_name,
-    type_hint: att.file_type || '',
-    preview_url: P_att.preview(att.id),
-    download_url: P_att.download(att.id),
-    ocr_status: att.ocr_status || undefined,
-    ocr_text: att.ocr_text || undefined,
-  }
+    file_name: att.file_name,
+    file_type: att.file_type,
+    ocr_status: att.ocr_status,
+    ocr_text: att.ocr_text,
+  })
   drawerOpen.value = true
 }
 

@@ -195,17 +195,20 @@
             <span v-else>{{ row.indexNo || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="!isReadonly" label="OCR" width="64" align="center" fixed="right">
+        <el-table-column label="OCR" width="80" align="center" fixed="right">
           <template #default="{ row }">
             <el-upload
+              v-if="!isReadonly"
               :show-file-list="false"
               :auto-upload="false"
               accept=".pdf,.png,.jpg,.jpeg,.webp"
               :disabled="ocrLoading"
+              style="display:inline-block"
               @change="(f: any) => onWriteoffOcr('reversal', row, f?.raw)"
             >
               <el-button link size="small" type="primary" :loading="ocrLoading">📎</el-button>
             </el-upload>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(`reversal-${row.id}`)" />
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
@@ -297,17 +300,20 @@
             <span v-else>{{ row.indexNo || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="!isReadonly" label="OCR" width="64" align="center" fixed="right">
+        <el-table-column label="OCR" width="80" align="center" fixed="right">
           <template #default="{ row }">
             <el-upload
+              v-if="!isReadonly"
               :show-file-list="false"
               :auto-upload="false"
               accept=".pdf,.png,.jpg,.jpeg,.webp"
               :disabled="ocrLoading"
+              style="display:inline-block"
               @change="(f: any) => onWriteoffOcr('writeoff', row, f?.raw)"
             >
               <el-button link size="small" type="primary" :loading="ocrLoading">📎</el-button>
             </el-upload>
+            <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(`writeoff-${row.id}`)" />
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
@@ -395,6 +401,8 @@ import {
 import { useK1ImportExport } from '../../composables/useK1ImportExport'
 import { useK1AiGenerate } from '../../composables/useK1AiGenerate'
 import { useK1VoucherOcr } from '../../composables/useK1VoucherOcr'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell } from '@/components/attachment/rowEvidence'
 import http from '@/utils/http'
 import GtReviewDot from '../../GtReviewDot.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
@@ -446,7 +454,9 @@ const { isImporting: importing, exportTemplate, exportData, importData } = useK1
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useK1AiGenerate(wpIdRef)
 
-const { ocrLoading, runOcr } = useK1VoucherOcr()
+const { ocrLoading, runOcr } = useK1VoucherOcr(() => props.wpId, () => props.projectId)
+/** 行内识别附件挂到本行（K1-9 + `row:{转回/核销}-{行 id}`），📎 旁的小眼睛按同一位置读取（只读也能看） */
+const EVIDENCE_SHEET = 'K1-9'
 
 function onWriteoffOcr(
   kind: 'reversal' | 'writeoff',
@@ -458,7 +468,7 @@ function onWriteoffOcr(
     const prev = row.analysis || ''
     row.analysis = prev ? `${prev}\n[OCR] ${text}` : `[OCR] ${text}`
     persist()
-  })
+  }, { sheet: EVIDENCE_SHEET, cell: rowEvidenceCell(`${kind}-${row.id}`) })
 }
 
 onMounted(() => load())

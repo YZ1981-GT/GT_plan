@@ -807,6 +807,9 @@ backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py  803
 #     守卫（test_gc0_reverse_dup_scan 的 covered_by_exemptions / zero_exemptions）
 #     在 HEAD 上就是红的。拆分该组件属 C 循环独立任务：与一次改名同批会把 diff
 #     淹没在搬迁噪声里。baseline 取当前真实行数。
+#     2026-10-27 attachment-inline-preview：1778 → 1905。HEAD 已 1904（26e5ef994 2026-10-02 加了 126 行、未随改基线，
+#     任何改动都会被门禁拒）；本 spec 只把识别附件的正文改读 ocr_text（+1 行）。拆分方向：AI 辅助（例外描述生成 /
+#     参考附件识别 doOcrForAttach）与各步骤表格编辑两块各成模块。
 #   test_workpaper_route_task1_baseline.py —— F-SHELL Task 1「红基线冻结」宿主：
 #     7 类红基线清册（nodeKey payload / 唯一 dialog / FormulaEdit 链 / 旧 dict API /
 #     formula_type 双义 / audit warning commit / 重复 AI-review-rail）+ 域外清册
@@ -814,7 +817,7 @@ backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py  803
 #     拆分会让「某类清册 ↔ 它的变异自检」跨文件，分母核对不可见（沿用同域
 #     mutate_ie_lifecycle_guards.py / check_x3_deviation_registry.py 的在册先例）。
 # ═══════════════════════════════════════════════════════════════════════════
-audit-platform/frontend/src/components/workpaper/GtCControlTest.vue  1778
+audit-platform/frontend/src/components/workpaper/GtCControlTest.vue  1905
 backend/tests/test_workpaper_route_task1_baseline.py  961
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1626,3 +1629,8 @@ backend/tests/test_note_expandable_rows.py  986
 #   Paperless 集成、搜索与分类三块各成模块（附件 Spec G）。
 # attachment-evidence-intake（2026-10-27）：底稿统一视图组装挪到 attachment_wp_view.py，1391 → 1309，基线随之下调。
 backend/app/services/attachment_service.py  1309
+# attachment-inline-preview（2026-10-27）：GtC1EntityControl.vue —— 历史大文件（HEAD 已 3154 行且未登记，任何改动都会被门禁拒）。
+#   本 spec 只给样本行与过程记录的识别附件挂小眼睛（2 处挂载 + 引入 + 表页键 + 4 处上传 / 刷新，+13 行），
+#   位置写入与读取都在 components/attachment/rowEvidence.ts。拆分方向：示例抽屉（C1-1 ~ C1-3）、
+#   过程记录（C1-4-1 ~ C1-4-6）、样本测试表与识别上传三块各成子组件。
+audit-platform/frontend/src/components/workpaper/GtC1EntityControl.vue  3167

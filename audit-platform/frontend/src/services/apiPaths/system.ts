@@ -257,6 +257,8 @@ export const attachments = {
   search: '/api/attachments/search',
   upload: (pid: string) => `/api/projects/${pid}/attachments/upload`,
   classify: (pid: string) => `/api/projects/${pid}/attachments/classify`,
+  /** 附件详情（文件名 / 类型 / 识别状态；项目门 + 底稿可见性门，不存在或无权 ⇒ 404 / 403） */
+  detail: (id: string) => `/api/attachments/${id}`,
   preview: (id: string) => `/api/attachments/${id}/preview`,
   /** Office 文件高保真预览：后端 LibreOffice 转 PDF（503 时前端降级到下载提示） */
   previewPdf: (id: string) => `/api/attachments/${id}/preview-pdf`,

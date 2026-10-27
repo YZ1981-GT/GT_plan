@@ -43,9 +43,14 @@
         <el-table-column label="序" width="45" align="center" fixed>
           <template #default="{ row }">{{ row.seq }}</template>
         </el-table-column>
-        <el-table-column label="📎" width="45" align="center">
+        <el-table-column label="📎" width="64" align="center">
           <template #default="{ $index }">
-            <span v-if="sampleAttachments[$index]" class="attach-flag">📎</span>
+            <!-- 行点击会打开编辑弹窗：小眼睛自己阻止冒泡，点了只看原件 -->
+            <AttachmentEyeButton
+              v-if="sampleAttachments[$index]"
+              :attachment-id="sampleAttachments[$index]!.id"
+              :file-name="sampleAttachments[$index]!.fileName"
+            />
             <span v-else class="attach-empty">—</span>
           </template>
         </el-table-column>
@@ -203,6 +208,11 @@
               <span v-if="sampleAttachments[activeSampleIndex]" class="attach-name">
                 {{ sampleAttachments[activeSampleIndex]?.fileName }}
               </span>
+              <AttachmentEyeButton
+                v-if="sampleAttachments[activeSampleIndex]"
+                :attachment-id="sampleAttachments[activeSampleIndex]!.id"
+                :file-name="sampleAttachments[activeSampleIndex]!.fileName"
+              />
             </div>
           </el-form-item>
         </el-form>
@@ -270,6 +280,7 @@ import { exportMultiSheetData, readSheetAoa } from '@/composables/useExcelIO'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { itemCellRef, uploadWorkpaperEvidence } from '@/components/attachment/workpaperEvidence'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 
 /** 样本行附件信息 */
 export interface SampleAttachment {

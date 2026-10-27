@@ -6,6 +6,7 @@
  * 顶部附件上传区 + OCR状态
  */
 import { computed } from 'vue'
+import AttachmentEyeButton from '@/components/attachment/AttachmentEyeButton.vue'
 import { FIELD_GROUPS, type ContractInspectionItem } from '../../composables/useD4ContractInspection'
 
 const props = defineProps<{
@@ -73,6 +74,11 @@ const filledCount = computed(() => {
       <div v-if="item.attachmentName" class="uploaded-file">
         <el-icon><svg viewBox="0 0 1024 1024" width="16" height="16"><path fill="currentColor" d="M160 832h704a32 32 0 1 1 0 64H160a32 32 0 1 1 0-64zm384-253.696 236.288-236.352 45.248 45.248L512 700.8 198.464 387.2l45.248-45.248L480 578.304V128h64v450.304z"/></svg></el-icon>
         <span class="file-name">{{ item.attachmentName }}</span>
+        <AttachmentEyeButton
+          v-if="item.attachmentId"
+          :attachment-id="item.attachmentId"
+          :file-name="item.attachmentName"
+        />
         <el-tag v-if="ocrBadge" :type="ocrBadge.type" size="small">{{ ocrBadge.text }}</el-tag>
         <el-button v-if="!isReadonly" type="danger" size="small" link @click="$emit('remove-attachment')">移除</el-button>
       </div>

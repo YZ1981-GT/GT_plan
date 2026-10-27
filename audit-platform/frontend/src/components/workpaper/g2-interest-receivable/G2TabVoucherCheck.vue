@@ -321,7 +321,7 @@
         </template>
 
         <template v-else-if="activeTab === 'check'">
-          <el-table-column label="📎" width="56" align="center">
+          <el-table-column label="📎" width="80" align="center">
             <template #default="{ row }">
               <el-upload
                 :show-file-list="false"
@@ -331,6 +331,7 @@
               >
                 <el-button size="small" link :loading="ocrLoadingKey === `debit:${row.id}`" :disabled="isReadonly">📎</el-button>
               </el-upload>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="sideRowCell('debit', row.id)" />
             </template>
           </el-table-column>
           <el-table-column label="支持性文件" min-width="130">
@@ -505,7 +506,7 @@
         </template>
 
         <template v-else-if="activeTab === 'check'">
-          <el-table-column label="📎" width="56" align="center">
+          <el-table-column label="📎" width="80" align="center">
             <template #default="{ row }">
               <el-upload
                 :show-file-list="false"
@@ -515,6 +516,7 @@
               >
                 <el-button size="small" link :loading="ocrLoadingKey === `credit:${row.id}`" :disabled="isReadonly">📎</el-button>
               </el-upload>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="sideRowCell('credit', row.id)" />
             </template>
           </el-table-column>
           <el-table-column label="支持性文件" min-width="130">
@@ -662,6 +664,8 @@ import {
 import GtIndexChip from '../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import G2ImportExportDropdown from './G2ImportExportDropdown.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import G2AuditTextCards from './G2AuditTextCards.vue'
 import type { SampledVoucher, FillMode, Phase } from '../composables/useSamplingAlgorithms'
 import type { ChecklistResponse } from '../composables/useF1FormData'
@@ -811,6 +815,12 @@ function onFillAbnormalIndex(): void {
 }
 
 const ocrLoadingKey = ref<string | null>(null)
+/** 行内凭证附件挂到本行（行级证据；借、贷两区各自成行），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'G2-8'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
+function sideRowCell(side: 'debit' | 'credit', rowId: string): string {
+  return rowEvidenceCell(`${side}-${rowId}`)
+}
 const OCR_FIELD_MAP: Record<string, string> = {
   date: 'voucherDate', 凭证日期: 'voucherDate', voucher_date: 'voucherDate',
   voucher_no: 'voucherNo', 凭证号: 'voucherNo',
@@ -829,11 +839,13 @@ async function handleRowOcr(
   try {
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, sideRowCell(side, rowId))
     const res = await http.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     const fields: Record<string, any> = (res.data?.data ?? res.data)?.extracted_fields || {}
     if (!Object.keys(fields).length) {
       ElMessage.info('OCR完成，未识别到可填充字段')

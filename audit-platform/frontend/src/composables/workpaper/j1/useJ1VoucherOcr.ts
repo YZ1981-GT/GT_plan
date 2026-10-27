@@ -12,6 +12,13 @@
 import { ref, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
+import { appendRowEvidence, refreshRowEvidence } from '@/components/attachment/rowEvidence'
+
+/** 识别附件挂到的位置（表页 + 行槽位，spec attachment-inline-preview）；小眼睛按同一位置读取 */
+export interface J1OcrPosition {
+  sheet: string
+  cell?: string | null
+}
 
 export interface J1OcrFields {
   date?: string
@@ -44,7 +51,7 @@ const FIELD_MAP: Record<string, string> = {
   approver: '_approver',
 }
 
-export function useJ1VoucherOcr(wpId: Ref<string>) {
+export function useJ1VoucherOcr(wpId: Ref<string>, projectId?: Ref<string | undefined>) {
   const ocrLoadingId = ref<string | null>(null)
 
   /**
@@ -55,16 +62,19 @@ export function useJ1VoucherOcr(wpId: Ref<string>) {
     file: File,
     direction: 'credit' | 'debit' | 'post',
     updateRow: (id: string, patch: Record<string, any>) => void,
+    position?: J1OcrPosition,
   ): Promise<void> {
     ocrLoadingId.value = rowId
     const formData = new FormData()
     formData.append('file', file)
+    if (position) appendRowEvidence(formData, position.sheet, position.cell)
     try {
       const res = await http.post(
         `/api/workpapers/${wpId.value}/d4/contract-ocr`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
+      refreshRowEvidence(projectId?.value, wpId.value)
       const data = res.data?.data ?? res.data
       const fields = (data?.extracted_fields ?? {}) as J1OcrFields
       const confidence = data?.confidence ?? 0

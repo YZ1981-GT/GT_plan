@@ -247,7 +247,7 @@
               <span v-else>{{ fmtNum(row.creditAmount) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="📎" width="70" align="center">
+          <el-table-column label="📎" width="84" align="center">
             <template #default="{ row }">
               <el-upload
                 :show-file-list="false"
@@ -259,6 +259,7 @@
                   <el-icon :class="{ 'has-file': row.attachment }"><Paperclip /></el-icon>
                 </el-button>
               </el-upload>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
             </template>
           </el-table-column>
         </template>
@@ -433,7 +434,7 @@
               <span v-else>{{ fmtNum(row.creditAmount) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="📎" width="70" align="center">
+          <el-table-column label="📎" width="84" align="center">
             <template #default="{ row }">
               <el-upload
                 :show-file-list="false"
@@ -445,6 +446,7 @@
                   <el-icon :class="{ 'has-file': row.attachment }"><Paperclip /></el-icon>
                 </el-button>
               </el-upload>
+              <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
             </template>
           </el-table-column>
         </template>
@@ -642,6 +644,8 @@ import http from '@/utils/http'
 import { useG4EclVoucherCheck } from '../../composables/useG4EclVoucherCheck'
 import { useG4EclFormData } from '../../composables/useG4EclFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import G4AuditTextCards from '../../g4-bond-investment-main/G4AuditTextCards.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import G4EclImportExportDropdown from '../G4EclImportExportDropdown.vue'
@@ -686,6 +690,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
+/** 行内凭证附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'G4-13'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -1015,11 +1022,13 @@ async function handleRowOcr(row: VoucherCheckRow, file: File): Promise<boolean> 
   try {
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.id))
     const res = await http.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     const fields: Record<string, any> = (res.data?.data ?? res.data)?.extracted_fields || {}
     if (!Object.keys(fields).length) {
       ElMessage.info('OCR完成，未识别到可填充字段')

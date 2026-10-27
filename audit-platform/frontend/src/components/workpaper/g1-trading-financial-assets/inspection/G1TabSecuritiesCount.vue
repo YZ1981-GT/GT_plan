@@ -131,6 +131,7 @@
           :is-readonly="isReadonly"
           :ocr-loading-row-id="ocrLoadingRowId"
           :wp-id="wpId"
+          :project-id="projectId"
           @update="(id, patch) => sc.updateRow(id, patch)"
           @remove="(id) => sc.removeRow(id)"
           @ocr="handleRowOcr"
@@ -143,6 +144,7 @@
       :is-readonly="isReadonly"
       :ocr-loading-row-id="ocrLoadingRowId"
       :wp-id="wpId"
+      :project-id="projectId"
       @update="(id, patch) => sc.updateRow(id, patch)"
       @remove="(id) => sc.removeRow(id)"
       @ocr="handleRowOcr"
@@ -276,6 +278,8 @@ import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 import ItemAttachment from '../../ItemAttachment.vue'
 import { ElMessage, ElMessageBox, ElTable, ElTableColumn, ElInput, ElInputNumber, ElDatePicker, ElButton, ElUpload, ElTooltip } from 'element-plus'
 import http from '@/utils/http'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -289,6 +293,9 @@ const wpId = computed(() => props.wpId ?? '')
 const projectId = computed(() => props.projectId ?? '')
 
 const emit = defineEmits<{ imported: [] }>()
+/** 行内识别附件挂到本行（行级证据），📎 列的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const G1_11_EVIDENCE_SHEET = 'G1-11'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -398,11 +405,13 @@ async function handleRowOcr(rowId: string, file: File): Promise<boolean> {
   try {
     const formData = new FormData()
     formData.append('file', file)
+    rowEv.append(formData, G1_11_EVIDENCE_SHEET, rowEvidenceCell(rowId))
     const res = await http.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
+    rowEv.refresh()
     const fields: Record<string, any> = (res.data?.data ?? res.data)?.extracted_fields || {}
     if (!Object.keys(fields).length) {
       ElMessage.info('OCR完成，未识别到可填充字段')
@@ -444,6 +453,7 @@ const CountTable = defineComponent({
     isReadonly: { type: Boolean, default: false },
     ocrLoadingRowId: { type: String as () => string | null, default: null },
     wpId: { type: String, default: '' },
+    projectId: { type: String, default: '' },
   },
   emits: ['update', 'remove', 'ocr'],
   setup(p, { emit }) {
@@ -586,10 +596,19 @@ const CountTable = defineComponent({
                   onChange: () => emit('update', row.id, { custodian: row.custodian }),
                 }),
             }),
-            h(ElTableColumn, { label: '📎', width: 72, fixed: 'right' }, {
+            h(ElTableColumn, { label: '📎', width: 96, fixed: 'right' }, {
               default: ({ row }: { row: G1SecuritiesCountRow }) => {
-                if (p.isReadonly || !p.wpId) return h('span', '—')
-                return h(ElTooltip, { content: '上传对账单/盘点表 OCR', placement: 'top' }, {
+                // 本行已识别的附件：小眼睛按位置读共享链接仓（spec attachment-inline-preview）
+                const eye = p.wpId
+                  ? h(RowEvidenceEye, {
+                      projectId: p.projectId || null,
+                      wpId: p.wpId,
+                      sheetKey: G1_11_EVIDENCE_SHEET,
+                      cellRef: rowEvidenceCell(row.id),
+                    })
+                  : null
+                if (p.isReadonly || !p.wpId) return eye ?? h('span', '—')
+                const upload = h(ElTooltip, { content: '上传对账单/盘点表 OCR', placement: 'top' }, {
                   default: () =>
                     h(ElUpload, {
                       autoUpload: true,
@@ -611,6 +630,7 @@ const CountTable = defineComponent({
                         }, () => 'OCR'),
                     }),
                 })
+                return h('span', { class: 'ocr-eye-cell' }, [upload, eye])
               },
             }),
             !p.isReadonly

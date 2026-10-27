@@ -243,10 +243,11 @@
                 <span v-else>{{ Number(row.creditAmount || 0).toFixed(2) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="📎" width="50" align="center">
+            <el-table-column label="📎" width="76" align="center">
               <template #default="{ row }">
                 <el-button v-if="!isReadonly" link size="small" @click="handleOCR(row)">📎</el-button>
                 <span v-else-if="row.attachment">✓</span>
+                <RowEvidenceEye :project-id="projectId" :wp-id="wpId" :sheet-key="EVIDENCE_SHEET" :cell-ref="rowEvidenceCell(row.id)" />
               </template>
             </el-table-column>
             <el-table-column v-if="!isReadonly" label="操作" width="70">
@@ -441,6 +442,8 @@ import { useG7SubFormData } from '../../composables/useG7SubFormData'
 import { useG7SubImportExport } from '../../composables/useG7SubImportExport'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
+import RowEvidenceEye from '@/components/attachment/RowEvidenceEye.vue'
+import { rowEvidenceCell, useRowEvidence } from '@/components/attachment/rowEvidence'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import { gCycleScope } from '../../composables/gCycleAccountScope'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
@@ -461,6 +464,9 @@ const props = defineProps<{
 }>()
 
 const isReadonly = computed(() => !!props.readonly)
+/** 行内凭证附件挂到本行（行级证据），📎 旁的小眼睛按同一位置读取（spec attachment-inline-preview） */
+const EVIDENCE_SHEET = 'G7-18'
+const rowEv = useRowEvidence(() => props.wpId, () => props.projectId)
 /** 审计年度：从 htmlData.project_context 派生（audit_year → bs_date 年份 → 当前年），供抽凭引擎按年度查询序时账 */
 const auditYear = computed<number>(() => {
   const ctx = (props.htmlData?.project_context ?? {}) as Record<string, any>
@@ -849,7 +855,9 @@ async function handleOCR(row: Record<string, any>): Promise<void> {
     try {
       const fd = new FormData()
       fd.append('file', file)
+      rowEv.append(fd, EVIDENCE_SHEET, rowEvidenceCell(row.id))
       const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, fd)
+      rowEv.refresh()
       const data = res?.data?.data ?? res?.data ?? {}
       const preview = [
         data.voucherDate || data.date || '',
